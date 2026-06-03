@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-03T21:46:31",
+  "generated_at": "2026-06-03T21:52:29",
   "inputs": {
     "coffee_c_usd_lb": 2.5715,
     "coffee_c_date": "2026-06-03",
@@ -126,10 +126,10 @@
     }
   ],
   "default_assumptions": {
-    "cif_rate": 0.1,
-    "logistics_krw_per_kg": 300,
+    "cif_rate": 0.08,
+    "logistics_krw_per_kg": 250,
     "importer_margin_rate": 0.15,
-    "roast_loss_rate": 0.18
+    "roast_loss_rate": 0.17
   },
   "signal": {
     "current": 2.5715,
@@ -149,8 +149,8 @@
       "point_diff": 1000,
       "tariff": 0.02,
       "fob_usd_lb": 2.6715,
-      "green_krw_per_kg": 11830,
-      "roasted_krw_per_kg": 14427
+      "green_krw_per_kg": 11564,
+      "roasted_krw_per_kg": 13932
     },
     {
       "origin": "Colombia",
@@ -158,8 +158,8 @@
       "point_diff": 1000,
       "tariff": 0.0,
       "fob_usd_lb": 2.6715,
-      "green_krw_per_kg": 11605,
-      "roasted_krw_per_kg": 14152
+      "green_krw_per_kg": 11342,
+      "roasted_krw_per_kg": 13666
     },
     {
       "origin": "Costa Rica",
@@ -167,8 +167,8 @@
       "point_diff": 1000,
       "tariff": 0.0,
       "fob_usd_lb": 2.6715,
-      "green_krw_per_kg": 11605,
-      "roasted_krw_per_kg": 14152
+      "green_krw_per_kg": 11342,
+      "roasted_krw_per_kg": 13666
     },
     {
       "origin": "Tanzania",
@@ -176,8 +176,8 @@
       "point_diff": 0,
       "tariff": 0.02,
       "fob_usd_lb": 2.5715,
-      "green_krw_per_kg": 11400,
-      "roasted_krw_per_kg": 13902
+      "green_krw_per_kg": 11141,
+      "roasted_krw_per_kg": 13423
     },
     {
       "origin": "Uganda",
@@ -185,8 +185,8 @@
       "point_diff": 0,
       "tariff": 0.02,
       "fob_usd_lb": 2.5715,
-      "green_krw_per_kg": 11400,
-      "roasted_krw_per_kg": 13902
+      "green_krw_per_kg": 11141,
+      "roasted_krw_per_kg": 13423
     },
     {
       "origin": "Papua New Guinea",
@@ -194,8 +194,8 @@
       "point_diff": 0,
       "tariff": 0.02,
       "fob_usd_lb": 2.5715,
-      "green_krw_per_kg": 11400,
-      "roasted_krw_per_kg": 13902
+      "green_krw_per_kg": 11141,
+      "roasted_krw_per_kg": 13423
     },
     {
       "origin": "Guatemala",
@@ -203,8 +203,8 @@
       "point_diff": 500,
       "tariff": 0.0,
       "fob_usd_lb": 2.6215,
-      "green_krw_per_kg": 11394,
-      "roasted_krw_per_kg": 13895
+      "green_krw_per_kg": 11136,
+      "roasted_krw_per_kg": 13416
     },
     {
       "origin": "Burundi",
@@ -212,8 +212,8 @@
       "point_diff": -100,
       "tariff": 0.02,
       "fob_usd_lb": 2.5615,
-      "green_krw_per_kg": 11357,
-      "roasted_krw_per_kg": 13850
+      "green_krw_per_kg": 11099,
+      "roasted_krw_per_kg": 13373
     },
     {
       "origin": "Rwanda",
@@ -221,8 +221,8 @@
       "point_diff": -100,
       "tariff": 0.02,
       "fob_usd_lb": 2.5615,
-      "green_krw_per_kg": 11357,
-      "roasted_krw_per_kg": 13850
+      "green_krw_per_kg": 11099,
+      "roasted_krw_per_kg": 13373
     },
     {
       "origin": "Venezuela",
@@ -230,8 +230,8 @@
       "point_diff": -100,
       "tariff": 0.02,
       "fob_usd_lb": 2.5615,
-      "green_krw_per_kg": 11357,
-      "roasted_krw_per_kg": 13850
+      "green_krw_per_kg": 11099,
+      "roasted_krw_per_kg": 13373
     },
     {
       "origin": "Dominican Republic",
@@ -239,8 +239,8 @@
       "point_diff": -400,
       "tariff": 0.02,
       "fob_usd_lb": 2.5315,
-      "green_krw_per_kg": 11228,
-      "roasted_krw_per_kg": 13693
+      "green_krw_per_kg": 10973,
+      "roasted_krw_per_kg": 13220
     },
     {
       "origin": "Ecuador",
@@ -248,8 +248,8 @@
       "point_diff": -400,
       "tariff": 0.02,
       "fob_usd_lb": 2.5315,
-      "green_krw_per_kg": 11228,
-      "roasted_krw_per_kg": 13693
+      "green_krw_per_kg": 10973,
+      "roasted_krw_per_kg": 13220
     },
     {
       "origin": "Mexico",
@@ -257,8 +257,8 @@
       "point_diff": 0,
       "tariff": 0.0,
       "fob_usd_lb": 2.5715,
-      "green_krw_per_kg": 11183,
-      "roasted_krw_per_kg": 13638
+      "green_krw_per_kg": 10929,
+      "roasted_krw_per_kg": 13167
     },
     {
       "origin": "El Salvador",
@@ -266,8 +266,8 @@
       "point_diff": 0,
       "tariff": 0.0,
       "fob_usd_lb": 2.5715,
-      "green_krw_per_kg": 11183,
-      "roasted_krw_per_kg": 13638
+      "green_krw_per_kg": 10929,
+      "roasted_krw_per_kg": 13167
     },
     {
       "origin": "Nicaragua",
@@ -275,8 +275,8 @@
       "point_diff": 0,
       "tariff": 0.0,
       "fob_usd_lb": 2.5715,
-      "green_krw_per_kg": 11183,
-      "roasted_krw_per_kg": 13638
+      "green_krw_per_kg": 10929,
+      "roasted_krw_per_kg": 13167
     },
     {
       "origin": "Honduras",
@@ -284,8 +284,8 @@
       "point_diff": 0,
       "tariff": 0.0,
       "fob_usd_lb": 2.5715,
-      "green_krw_per_kg": 11183,
-      "roasted_krw_per_kg": 13638
+      "green_krw_per_kg": 10929,
+      "roasted_krw_per_kg": 13167
     },
     {
       "origin": "Peru",
@@ -293,8 +293,8 @@
       "point_diff": 0,
       "tariff": 0.0,
       "fob_usd_lb": 2.5715,
-      "green_krw_per_kg": 11183,
-      "roasted_krw_per_kg": 13638
+      "green_krw_per_kg": 10929,
+      "roasted_krw_per_kg": 13167
     },
     {
       "origin": "Panama",
@@ -302,8 +302,8 @@
       "point_diff": 0,
       "tariff": 0.0,
       "fob_usd_lb": 2.5715,
-      "green_krw_per_kg": 11183,
-      "roasted_krw_per_kg": 13638
+      "green_krw_per_kg": 10929,
+      "roasted_krw_per_kg": 13167
     },
     {
       "origin": "India",
@@ -311,8 +311,8 @@
       "point_diff": -100,
       "tariff": 0.0,
       "fob_usd_lb": 2.5615,
-      "green_krw_per_kg": 11141,
-      "roasted_krw_per_kg": 13587
+      "green_krw_per_kg": 10887,
+      "roasted_krw_per_kg": 13117
     }
   ]
 }

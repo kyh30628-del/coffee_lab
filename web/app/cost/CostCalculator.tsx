@@ -19,11 +19,11 @@ function computeRow(cc: number, fx: number, lbToKg: number, pdiff: number, tarif
   return { fobUsdLb, green, roasted };
 }
 
-const FIELDS: { key: keyof Assumptions; label: string; min: number; max: number; step: number; pct?: boolean }[] = [
-  { key: "cif_rate", label: "운임·보험(CIF)", min: 0, max: 0.3, step: 0.01, pct: true },
-  { key: "logistics_krw_per_kg", label: "통관·물류 ₩/kg", min: 0, max: 2000, step: 50 },
-  { key: "importer_margin_rate", label: "수입사 마진", min: 0, max: 0.4, step: 0.01, pct: true },
-  { key: "roast_loss_rate", label: "로스팅 손실", min: 0.1, max: 0.25, step: 0.01, pct: true },
+const FIELDS: { key: keyof Assumptions; label: string; min: number; max: number; step: number; pct?: boolean; hint: string }[] = [
+  { key: "cif_rate", label: "운임·보험(CIF)", min: 0, max: 0.3, step: 0.01, pct: true, hint: "일반 5~12%" },
+  { key: "logistics_krw_per_kg", label: "통관·물류 ₩/kg", min: 0, max: 2000, step: 50, hint: "물량 따라 편차 큼" },
+  { key: "importer_margin_rate", label: "수입사 마진", min: 0, max: 0.4, step: 0.01, pct: true, hint: "직수입 0~, 유통 10~20%" },
+  { key: "roast_loss_rate", label: "로스팅 손실", min: 0.1, max: 0.25, step: 0.01, pct: true, hint: "라이트 12~, 다크 ~20%" },
 ];
 
 export default function CostCalculator({
@@ -54,10 +54,11 @@ export default function CostCalculator({
               <input type="range" min={f.min} max={f.max} step={f.step}
                 value={a[f.key]} onChange={(e) => set(f.key, parseFloat(e.target.value))}
                 className="w-full accent-amber-500" />
+              <div className="text-[10px] text-stone-600 mt-0.5">{f.hint}</div>
             </div>
           ))}
         </div>
-        <p className="text-xs text-stone-600 mt-3">※ 관세는 산지별 FTA 적용(원산지증명 구비 시, 추정). 부가세는 생두 면제.</p>
+        <p className="text-xs text-stone-600 mt-3">※ 기본값은 업계 일반 범위의 추정치. 관세는 산지별 FTA(원산지증명 시), 부가세는 생두 면제. 실제 견적으로 조정하세요.</p>
       </div>
 
       <table className="w-full text-sm">
