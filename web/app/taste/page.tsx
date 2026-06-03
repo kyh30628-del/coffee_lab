@@ -2,19 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import ShareCard from "./ShareCard";
+import { QUESTIONS, buildProfile, type Answers } from "./profile";
 
 type Bean = {
   origin: string; process: string;
   acidity: number; body: number; sweetness: number;
   cup_total: number; samples: number; flavors: string[];
 };
-
-const AXES = [
-  { key: "acidity" as const, label: "산미", desc: "밝고 상큼한" },
-  { key: "body" as const, label: "바디", desc: "묵직하고 진한" },
-  { key: "sweetness" as const, label: "단맛", desc: "은은한 단맛" },
-];
-const FAMILIES = ["플로럴", "베리/과일", "시트러스", "초콜릿", "견과", "카라멜", "스파이스/허브", "어시/흙내음"];
 
 const ORIGIN_NOTE: Record<string, string> = {
   Ethiopia: "커피의 고향. 화사한 꽃향과 베리, 밝은 산미가 특징.",
@@ -40,8 +34,8 @@ function brewFor(b: Bean) {
 
 export default function TastePage() {
   const [beans, setBeans] = useState<Bean[]>([]);
-  const [pref, setPref] = useState({ acidity: 0.5, body: 0.5, sweetness: 0.5 });
-  const [fams, setFams] = useState<string[]>([]);
+  const [ans, setAns] = useState<Answers>({});
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [copied, setCopied] = useState(false);
   const interacted = useRef(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -50,56 +44,54 @@ export default function TastePage() {
     fetch("/data/beans.json").then((r) => r.json()).then((d) => setBeans(d.beans ?? [])).catch(() => setBeans([]));
   }, []);
 
-  useEffect(() => {
-    try {
-      const sp = new URLSearchParams(window.location.search);
-      const a = sp.get("a"), b = sp.get("b"), s = sp.get("s"), f = sp.get("f");
-      if (a || b || s) setPref({
-        acidity: a ? Math.min(1, Math.max(0, parseFloat(a))) : 0.5,
-        body: b ? Math.min(1, Math.max(0, parseFloat(b))) : 0.5,
-        sweetness: s ? Math.min(1, Math.max(0, parseFloat(s))) : 0.5,
-      });
-      if (f) setFams(f.split(",").filter((x) => FAMILIES.includes(x)));
-    } catch {}
-  }, []);
+  const profile = useMemo(() => buildProfile(ans), [ans]);
+  const answeredCount = Object.keys(ans).length;
 
-  const toggleFam = (f: string) => { interacted.current = true; setFams((c) => (c.includes(f) ? c.filter((x) => x !== f) : [...c, f])); };
+  const pick = (qid: string, value: string, multi?: boolean) => {
+    interacted.current = true;
+    setAns((cur) => {
+      if (multi) {
+        const arr = Array.isArray(cur[qid]) ? (cur[qid] as string[]) : [];
+        const next = arr.includes(value) ? arr.filter((v) => v !== value) : [...arr, value];
+        return { ...cur, [qid]: next };
+      }
+      return { ...cur, [qid]: value };
+    });
+  };
+  const isPicked = (qid: string, value: string) => {
+    const v = ans[qid];
+    return Array.isArray(v) ? v.includes(value) : v === value;
+  };
 
   const ranked = useMemo(() => {
+    if (answeredCount === 0) return [];
+    const fams = profile.flavors;
     const scored = beans.map((b) => {
-      const da = b.acidity - pref.acidity, db = b.body - pref.body, ds = b.sweetness - pref.sweetness;
+      const da = b.acidity - profile.acidity, db = b.body - profile.body, ds = b.sweetness - profile.sweetness;
       const dist = Math.sqrt(da*da + db*db + ds*ds);
       const matched = fams.filter((f) => (b.flavors ?? []).includes(f));
       return { ...b, dist, matchCount: matched.length, matched };
     });
-    return (fams.length > 0
-      ? scored.sort((a, b) => b.matchCount - a.matchCount || a.dist - b.dist)
-      : scored.sort((a, b) => a.dist - b.dist)).slice(0, 5);
-  }, [beans, pref, fams]);
+    return scored.sort((a, b) => (b.matchCount - a.matchCount) || (a.dist - b.dist)).slice(0, 5);
+  }, [beans, profile, answeredCount]);
 
-  // 자동 저장: 사용자가 조작한 뒤 1.5초 멈추면 한 번 저장 (디바운스)
   useEffect(() => {
     if (!interacted.current || ranked.length === 0) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
-      fetch("/api/taste", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...pref, flavors: fams, top_origin: ranked[0]?.origin ?? "" }),
-      }).catch(() => {});
+      fetch("/api/taste", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...profile, top_origin: ranked[0]?.origin ?? "" }) }).catch(() => {});
     }, 1500);
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
-  }, [pref, fams, ranked]);
-
-  const setPrefInteract = (k: "acidity"|"body"|"sweetness", v: number) => { interacted.current = true; setPref({ ...pref, [k]: v }); };
+  }, [profile, ranked]);
 
   const share = async () => {
-    const sp = new URLSearchParams({ a: pref.acidity.toFixed(2), b: pref.body.toFixed(2), s: pref.sweetness.toFixed(2) });
-    if (fams.length) sp.set("f", fams.join(","));
-    const url = `${window.location.origin}${window.location.pathname}?${sp.toString()}`;
+    const url = `${window.location.origin}${window.location.pathname}`;
     try { await navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 2000); }
     catch { prompt("아래 링크를 복사하세요", url); }
   };
+
+  const visibleQ = QUESTIONS.filter((q) => !q.advanced || showAdvanced);
 
   return (
     <main className="min-h-screen bg-[#f5efe6] text-stone-900" style={{ fontFamily: "'DM Sans', system-ui, sans-serif" }}>
@@ -107,92 +99,91 @@ export default function TastePage() {
         <header className="border-b border-stone-300/70 pb-5 mb-8 flex items-end justify-between flex-wrap gap-3">
           <div>
             <div className="text-amber-800/70 text-[11px] tracking-[0.35em] uppercase">Beanmark · For You</div>
-            <h1 className="text-3xl font-bold tracking-tight mt-1">취향 원두 찾기</h1>
+            <h1 className="text-3xl font-bold tracking-tight mt-1">취향 진단</h1>
           </div>
           <a href="/" className="text-xs text-stone-500 hover:text-amber-800 underline">← 홈</a>
         </header>
 
         <p className="text-stone-600 text-sm mb-8 leading-relaxed">
-          산미·바디·단맛과 선호 향을 고르면, <strong className="text-stone-800">전 세계 1,300여 종의 실제 큐핑 평가 데이터(CQI)</strong>를 바탕으로
-          취향에 맞는 원두를 찾아 구매처까지 연결해 드립니다.
+          평소 마시는 습관과 취향을 고르면, <strong className="text-stone-800">1,300여 종 큐핑 데이터(CQI)</strong>로 정밀하게 맞는 원두를 찾아드려요.
+          전문 용어는 몰라도 괜찮아요.
         </p>
 
-        <section className="space-y-6 mb-7 bg-white rounded-2xl p-7 shadow-sm border border-stone-200/70">
-          {AXES.map((ax) => (
-            <div key={ax.key}>
-              <div className="flex justify-between items-baseline mb-2">
-                <label className="font-semibold">{ax.label}</label>
-                <span className="text-xs text-stone-400">{ax.desc}</span>
-              </div>
-              <input type="range" min={0} max={1} step={0.01} value={pref[ax.key]}
-                onChange={(e) => setPrefInteract(ax.key, parseFloat(e.target.value))}
-                className="w-full accent-amber-700" />
-              <div className="flex justify-between text-xs text-stone-400 mt-1">
-                <span>약함</span><span className="text-amber-800 font-semibold">{Math.round(pref[ax.key]*100)}</span><span>강함</span>
+        <section className="space-y-5 mb-6">
+          {visibleQ.map((q) => (
+            <div key={q.id} className="bg-white rounded-2xl p-5 shadow-sm border border-stone-200/70">
+              <div className="font-semibold mb-3 text-[15px]">{q.title}</div>
+              <div className="flex flex-wrap gap-2">
+                {q.options.map((o) => (
+                  <button key={o.value} onClick={() => pick(q.id, o.value, q.multi)}
+                    className={`px-3.5 py-2 rounded-xl text-sm border transition-colors ${isPicked(q.id, o.value) ? "bg-amber-800 text-white border-amber-800" : "bg-stone-50 text-stone-700 border-stone-200 hover:border-amber-400"}`}>
+                    {o.label}
+                  </button>
+                ))}
               </div>
             </div>
           ))}
         </section>
 
-        <section className="mb-8">
-          <p className="text-sm font-semibold mb-3">선호하는 향 <span className="text-stone-400 font-normal">(여러 개 가능)</span></p>
-          <div className="flex flex-wrap gap-2">
-            {FAMILIES.map((f) => (
-              <button key={f} onClick={() => toggleFam(f)}
-                className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${fams.includes(f) ? "bg-amber-800 text-white border-amber-800" : "bg-white text-stone-600 border-stone-300 hover:border-amber-500"}`}>
-                {f}
-              </button>
-            ))}
-          </div>
-        </section>
+        {!showAdvanced && (
+          <button onClick={() => setShowAdvanced(true)}
+            className="w-full mb-10 py-3 rounded-xl border border-dashed border-amber-400 text-amber-800 text-sm font-semibold hover:bg-amber-50 transition-colors">
+            + 더 자세히 (정확도 ↑)
+          </button>
+        )}
 
         <section>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xs uppercase tracking-wider text-stone-500">추천 원두 {ranked.length > 0 ? `· 상위 ${ranked.length}` : ""}</h2>
-            <button onClick={share} className="text-xs px-3 py-1.5 rounded-full bg-stone-900 text-amber-50 hover:bg-stone-700 transition-colors">
-              {copied ? "링크 복사됨 ✓" : "내 취향 공유"}
-            </button>
+            {ranked.length > 0 && (
+              <button onClick={share} className="text-xs px-3 py-1.5 rounded-full bg-stone-900 text-amber-50 hover:bg-stone-700 transition-colors">
+                {copied ? "링크 복사됨 ✓" : "공유"}
+              </button>
+            )}
           </div>
 
-          {ranked.length > 0 && <ShareCard pref={pref} top={ranked[0]} />}
-
-          {ranked.length === 0 ? (
+          {answeredCount === 0 ? (
+            <p className="text-stone-500 text-sm bg-white rounded-2xl p-6 border border-stone-200/70 text-center">위 질문에 답하면 추천이 나타나요 ☕</p>
+          ) : ranked.length === 0 ? (
             <p className="text-stone-500 text-sm">데이터 로딩 중...</p>
           ) : (
-            <div className="space-y-4">
-              {ranked.map((b, i) => {
-                const note = originNote(b.origin);
-                const q = encodeURIComponent(`${b.origin} 원두`);
-                return (
-                  <div key={`${b.origin}-${b.process}`} className="bg-white rounded-2xl p-5 border border-stone-200/70 shadow-sm">
-                    <div className="flex items-start gap-4">
-                      <div className="text-2xl font-bold text-amber-800/90 w-8 pt-0.5">{i+1}</div>
-                      <div className="flex-1">
-                        <div className="font-bold text-lg">{b.origin}</div>
-                        <div className="text-stone-500 text-sm">{b.process} · 큐핑 {b.cup_total}점 · 표본 {b.samples}종</div>
-                        {note && <p className="text-sm text-stone-600 mt-2">{note}</p>}
-                        <div className="flex flex-wrap gap-1.5 mt-2">
-                          {(b.flavors ?? []).map((f) => (
-                            <span key={f} className={`text-xs px-2 py-0.5 rounded-full ${b.matched.includes(f) ? "bg-amber-200 text-amber-900 font-semibold" : "bg-stone-100 text-stone-500"}`}>{f}</span>
-                          ))}
+            <>
+              <ShareCard pref={{ acidity: profile.acidity, body: profile.body, sweetness: profile.sweetness }} top={ranked[0]} />
+              <div className="space-y-4">
+                {ranked.map((b, i) => {
+                  const note = originNote(b.origin);
+                  const q = encodeURIComponent(`${b.origin} 원두`);
+                  return (
+                    <div key={`${b.origin}-${b.process}`} className="bg-white rounded-2xl p-5 border border-stone-200/70 shadow-sm">
+                      <div className="flex items-start gap-4">
+                        <div className="text-2xl font-bold text-amber-800/90 w-8 pt-0.5">{i+1}</div>
+                        <div className="flex-1">
+                          <div className="font-bold text-lg">{b.origin}</div>
+                          <div className="text-stone-500 text-sm">{b.process} · 큐핑 {b.cup_total}점 · 표본 {b.samples}종</div>
+                          {note && <p className="text-sm text-stone-600 mt-2">{note}</p>}
+                          <div className="flex flex-wrap gap-1.5 mt-2">
+                            {(b.flavors ?? []).map((f) => (
+                              <span key={f} className={`text-xs px-2 py-0.5 rounded-full ${b.matched.includes(f) ? "bg-amber-200 text-amber-900 font-semibold" : "bg-stone-100 text-stone-500"}`}>{f}</span>
+                            ))}
+                          </div>
+                          <div className="text-xs text-stone-400 mt-2">
+                            산미 {Math.round(b.acidity*100)} / 바디 {Math.round(b.body*100)} / 단맛 {Math.round(b.sweetness*100)}
+                            {b.matchCount > 0 && <span className="text-amber-800"> · 선호 향 {b.matchCount}개 일치</span>}
+                          </div>
+                          <div className="mt-3 text-sm text-amber-900 bg-amber-50 rounded-lg px-3 py-2">☕ {brewFor(b)}</div>
                         </div>
-                        <div className="text-xs text-stone-400 mt-2">
-                          산미 {Math.round(b.acidity*100)} / 바디 {Math.round(b.body*100)} / 단맛 {Math.round(b.sweetness*100)}
-                          {b.matchCount > 0 && <span className="text-amber-800"> · 선호 향 {b.matchCount}개 일치</span>}
-                        </div>
-                        <div className="mt-3 text-sm text-amber-900 bg-amber-50 rounded-lg px-3 py-2">☕ {brewFor(b)}</div>
+                      </div>
+                      <div className="flex gap-2 mt-4 pt-4 border-t border-stone-100">
+                        <a href={`https://search.shopping.naver.com/search/all?query=${q}`} target="_blank" rel="noopener noreferrer"
+                           className="flex-1 text-center bg-amber-800 text-white rounded-lg py-2.5 text-sm font-semibold hover:bg-amber-900 transition-colors">원두 사러 가기</a>
+                        <a href={`https://map.kakao.com/?q=${encodeURIComponent("로스터리 " + b.origin)}`} target="_blank" rel="noopener noreferrer"
+                           className="flex-1 text-center bg-white border border-amber-300 text-amber-800 rounded-lg py-2.5 text-sm font-semibold hover:border-amber-500 transition-colors">근처 로스터리</a>
                       </div>
                     </div>
-                    <div className="flex gap-2 mt-4 pt-4 border-t border-stone-100">
-                      <a href={`https://search.shopping.naver.com/search/all?query=${q}`} target="_blank" rel="noopener noreferrer"
-                         className="flex-1 text-center bg-amber-800 text-white rounded-lg py-2.5 text-sm font-semibold hover:bg-amber-900 transition-colors">원두 사러 가기</a>
-                      <a href={`https://map.kakao.com/?q=${encodeURIComponent("로스터리 " + b.origin)}`} target="_blank" rel="noopener noreferrer"
-                         className="flex-1 text-center bg-white border border-amber-300 text-amber-800 rounded-lg py-2.5 text-sm font-semibold hover:border-amber-500 transition-colors">근처 로스터리</a>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            </>
           )}
         </section>
 
