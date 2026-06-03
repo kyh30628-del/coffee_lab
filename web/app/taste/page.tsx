@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import ShareCard from "./ShareCard";
 
 type Bean = {
   origin: string; process: string;
@@ -47,18 +48,15 @@ export default function TastePage() {
     fetch("/data/beans.json").then((r) => r.json()).then((d) => setBeans(d.beans ?? [])).catch(() => setBeans([]));
   }, []);
 
-  // URL에 취향이 있으면 복원 (공유 링크로 들어온 경우)
   useEffect(() => {
     try {
       const sp = new URLSearchParams(window.location.search);
       const a = sp.get("a"), b = sp.get("b"), s = sp.get("s"), f = sp.get("f");
-      if (a || b || s) {
-        setPref({
-          acidity: a ? Math.min(1, Math.max(0, parseFloat(a))) : 0.5,
-          body: b ? Math.min(1, Math.max(0, parseFloat(b))) : 0.5,
-          sweetness: s ? Math.min(1, Math.max(0, parseFloat(s))) : 0.5,
-        });
-      }
+      if (a || b || s) setPref({
+        acidity: a ? Math.min(1, Math.max(0, parseFloat(a))) : 0.5,
+        body: b ? Math.min(1, Math.max(0, parseFloat(b))) : 0.5,
+        sweetness: s ? Math.min(1, Math.max(0, parseFloat(s))) : 0.5,
+      });
       if (f) setFams(f.split(",").filter((x) => FAMILIES.includes(x)));
     } catch {}
   }, []);
@@ -66,18 +64,11 @@ export default function TastePage() {
   const toggleFam = (f: string) => setFams((c) => (c.includes(f) ? c.filter((x) => x !== f) : [...c, f]));
 
   const share = async () => {
-    const sp = new URLSearchParams({
-      a: pref.acidity.toFixed(2), b: pref.body.toFixed(2), s: pref.sweetness.toFixed(2),
-    });
+    const sp = new URLSearchParams({ a: pref.acidity.toFixed(2), b: pref.body.toFixed(2), s: pref.sweetness.toFixed(2) });
     if (fams.length) sp.set("f", fams.join(","));
     const url = `${window.location.origin}${window.location.pathname}?${sp.toString()}`;
-    try {
-      await navigator.clipboard.writeText(url);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      prompt("아래 링크를 복사하세요", url);
-    }
+    try { await navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 2000); }
+    catch { prompt("아래 링크를 복사하세요", url); }
   };
 
   const ranked = useMemo(() => {
@@ -140,11 +131,13 @@ export default function TastePage() {
         <section>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xs uppercase tracking-wider text-stone-500">추천 원두 {ranked.length > 0 ? `· 상위 ${ranked.length}` : ""}</h2>
-            <button onClick={share}
-              className="text-xs px-3 py-1.5 rounded-full bg-stone-900 text-amber-50 hover:bg-stone-700 transition-colors">
+            <button onClick={share} className="text-xs px-3 py-1.5 rounded-full bg-stone-900 text-amber-50 hover:bg-stone-700 transition-colors">
               {copied ? "링크 복사됨 ✓" : "내 취향 공유"}
             </button>
           </div>
+
+          {ranked.length > 0 && <ShareCard pref={pref} top={ranked[0]} />}
+
           {ranked.length === 0 ? (
             <p className="text-stone-500 text-sm">데이터 로딩 중...</p>
           ) : (
