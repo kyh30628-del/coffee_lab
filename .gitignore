@@ -1,0 +1,13 @@
+# secrets
+.env
+.env.local
+# python
+data-engine/.venv/
+__pycache__/
+*.pyc
+# node
+web/node_modules/
+web/.next/
+# data (원본/정제 데이터는 git에 안 올림)
+data-engine/data/raw/
+data-engine/data/clean/
