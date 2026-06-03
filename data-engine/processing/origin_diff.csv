@@ -1,20 +1,20 @@
-origin,point_diff,note
-Colombia,1000,프리미엄
-Costa Rica,1000,프리미엄
-Kenya,1000,프리미엄
-Guatemala,500,프리미엄
-Mexico,0,par
-El Salvador,0,par
-Nicaragua,0,par
-Honduras,0,par
-Peru,0,par
-Panama,0,par
-Tanzania,0,par
-Uganda,0,par
-Papua New Guinea,0,par
-Burundi,-100,디스카운트
-Rwanda,-100,디스카운트
-Venezuela,-100,디스카운트
-India,-100,디스카운트
-Dominican Republic,-400,디스카운트
-Ecuador,-400,디스카운트
+origin,point_diff,tariff,note
+Colombia,1000,0.0,프리미엄·한콜FTA 0%
+Costa Rica,1000,0.0,프리미엄·한중미FTA 0%
+Kenya,1000,0.02,프리미엄·FTA미적용 2%
+Guatemala,500,0.0,프리미엄·한중미FTA 0%
+Mexico,0,0.0,par·한중미FTA 발효국 0%
+El Salvador,0,0.0,par·한중미FTA 0%
+Nicaragua,0,0.0,par·한중미FTA 0%
+Honduras,0,0.0,par·한중미FTA 0%
+Peru,0,0.0,par·한페루FTA 0%
+Panama,0,0.0,par·한중미FTA 0%
+Tanzania,0,0.02,par·FTA미적용 2%
+Uganda,0,0.02,par·FTA미적용 2%
+Papua New Guinea,0,0.02,par·FTA미적용 2%
+Burundi,-100,0.02,디스카운트·FTA미적용 2%
+Rwanda,-100,0.02,디스카운트·FTA미적용 2%
+Venezuela,-100,0.02,디스카운트·FTA미적용 2%
+India,-100,0.0,디스카운트·한인도CEPA 0%
+Dominican Republic,-400,0.02,디스카운트·FTA미적용 2%
+Ecuador,-400,0.02,디스카운트·FTA미적용 2%
