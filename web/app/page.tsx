@@ -1,65 +1,54 @@
-import Image from "next/image";
+import Link from "next/link";
 
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <main className="min-h-screen bg-stone-950 text-stone-100">
+      <div className="max-w-4xl mx-auto px-6 py-24">
+        <header className="mb-16">
+          <p className="text-amber-500 text-sm tracking-[0.3em] uppercase mb-4">
+            Coffee Intelligence
           </p>
+          <h1 className="text-5xl font-bold tracking-tight leading-tight">
+            데이터로 커피를<br />다시 본다
+          </h1>
+          <p className="text-stone-400 mt-6 text-lg max-w-xl">
+            국제 시세와 환율, 그리고 관능 평가 데이터를 기반으로
+            원두를 추천하고 원가를 투명하게 보여줍니다.
+          </p>
+        </header>
+
+        <div className="grid md:grid-cols-2 gap-6">
+          <Link href="/taste"
+                className="group bg-amber-50 text-stone-900 rounded-2xl p-8 hover:scale-[1.02] transition-transform">
+            <div className="text-amber-700 text-xs tracking-widest uppercase mb-3">For You · B2C</div>
+            <h2 className="text-2xl font-bold mb-2">취향 원두 추천</h2>
+            <p className="text-stone-600 text-sm mb-6">
+              산미·바디·단맛 취향을 조절하면 CQI 관능 데이터 기반으로
+              맞는 원두를 찾아드립니다.
+            </p>
+            <span className="text-amber-700 font-semibold text-sm group-hover:underline">
+              추천 받기 →
+            </span>
+          </Link>
+
+          <Link href="/cost"
+                className="group bg-stone-900 border border-stone-800 rounded-2xl p-8 hover:scale-[1.02] transition-transform">
+            <div className="text-amber-500 text-xs tracking-widest uppercase mb-3">For Roasters · B2B</div>
+            <h2 className="text-2xl font-bold mb-2">생두 원가 모니터</h2>
+            <p className="text-stone-400 text-sm mb-6">
+              ICE Coffee C 선물과 한국은행 환율로 산지별 도착원가와
+              시세 추이를 실시간 추정합니다.
+            </p>
+            <span className="text-amber-500 font-semibold text-sm group-hover:underline">
+              원가 보기 →
+            </span>
+          </Link>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+
+        <footer className="mt-20 pt-8 border-t border-stone-800 text-xs text-stone-600">
+          데이터 출처: CQI 큐핑 데이터 · ICE Coffee C · 한국은행 ECOS. 원가는 추정치입니다.
+        </footer>
+      </div>
+    </main>
   );
 }
