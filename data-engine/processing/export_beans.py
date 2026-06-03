@@ -1,9 +1,9 @@
 """
-export_beans.py — beans.csv를 산지×가공으로 집계해 web 추천용 JSON 출력
+export_beans.py — beans.csv를 산지×가공으로 집계 + 산지별 향 경향 부착 → 추천용 JSON
 출력: web/public/data/beans.json
-규칙(CLAUDE.md): clean만 읽음. CQI 편향 고려해 상대위치(정규화)값 사용.
-표본 적은 조합(n<3) 제외해 노이즈 감소.
+규칙(CLAUDE.md): 산미·바디·단맛은 CQI 실데이터(정규화). 향은 origin_flavor.csv 경향(추정).
 """
+import csv
 import json
 from pathlib import Path
 
@@ -12,6 +12,7 @@ import pandas as pd
 HERE = Path(__file__).resolve()
 DATA_ENGINE = HERE.parents[1]
 CLEAN = DATA_ENGINE / "data" / "clean"
+PROC = DATA_ENGINE / "processing"
 WEB_DATA = DATA_ENGINE.parent / "web" / "public" / "data"
 WEB_DATA.mkdir(parents=True, exist_ok=True)
 OUT = WEB_DATA / "beans.json"
@@ -19,8 +20,27 @@ OUT = WEB_DATA / "beans.json"
 MIN_SAMPLES = 3
 
 
+def load_flavor_map():
+    path = PROC / "origin_flavor.csv"
+    m = {}
+    with path.open(encoding="utf-8") as f:
+        for row in csv.DictReader(f):
+            m[row["origin_key"].lower()] = row["flavors"].split(";")
+    return m
+
+
+def flavors_for(origin, fmap):
+    o = str(origin).lower()
+    for key, fams in fmap.items():
+        if key in o:                 # 부분 일치 (예: 'Tanzania, ...' 도 매칭)
+            return fams
+    return []
+
+
 def run():
     df = pd.read_csv(CLEAN / "beans.csv")
+    fmap = load_flavor_map()
+
     grouped = (
         df.groupby(["origin", "process"])
           .agg(acidity=("acidity", "mean"),
@@ -32,8 +52,9 @@ def run():
     )
     grouped = grouped[grouped["n"] >= MIN_SAMPLES]
 
-    beans = [
-        {
+    beans = []
+    for r in grouped.itertuples():
+        beans.append({
             "origin": r.origin,
             "process": r.process,
             "acidity": round(r.acidity, 3),
@@ -41,15 +62,15 @@ def run():
             "sweetness": round(r.sweetness, 3),
             "cup_total": round(r.cup_total, 2),
             "samples": int(r.n),
-        }
-        for r in grouped.itertuples()
-    ]
+            "flavors": flavors_for(r.origin, fmap),
+        })
     beans.sort(key=lambda b: b["cup_total"], reverse=True)
 
     OUT.write_text(json.dumps({"count": len(beans), "beans": beans},
                               ensure_ascii=False, indent=2), encoding="utf-8")
+    tagged = sum(1 for b in beans if b["flavors"])
     print(f"내보내기 완료: {OUT}")
-    print(f"  {len(beans)}개 산지×가공 조합 (표본 {MIN_SAMPLES}종 이상)")
+    print(f"  {len(beans)}개 조합 · 향 태그 부착 {tagged}개")
 
 
 if __name__ == "__main__":

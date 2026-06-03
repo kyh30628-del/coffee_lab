@@ -8,7 +8,8 @@
       "body": 0.851,
       "sweetness": 1.0,
       "cup_total": 87.32,
-      "samples": 6
+      "samples": 6,
+      "flavors": []
     },
     {
       "origin": "Ethiopia",
@@ -17,7 +18,12 @@
       "body": 0.823,
       "sweetness": 1.0,
       "cup_total": 86.47,
-      "samples": 8
+      "samples": 8,
+      "flavors": [
+        "플로럴",
+        "베리/과일",
+        "시트러스"
+      ]
     },
     {
       "origin": "Ethiopia",
@@ -26,7 +32,12 @@
       "body": 0.782,
       "sweetness": 0.991,
       "cup_total": 85.41,
-      "samples": 17
+      "samples": 17,
+      "flavors": [
+        "플로럴",
+        "베리/과일",
+        "시트러스"
+      ]
     },
     {
       "origin": "Ethiopia",
@@ -35,7 +46,12 @@
       "body": 0.814,
       "sweetness": 0.972,
       "cup_total": 85.14,
-      "samples": 19
+      "samples": 19,
+      "flavors": [
+        "플로럴",
+        "베리/과일",
+        "시트러스"
+      ]
     },
     {
       "origin": "Indonesia",
@@ -44,7 +60,12 @@
       "body": 0.818,
       "sweetness": 1.0,
       "cup_total": 84.67,
-      "samples": 3
+      "samples": 3,
+      "flavors": [
+        "어시/흙내음",
+        "스파이스/허브",
+        "초콜릿"
+      ]
     },
     {
       "origin": "Kenya",
@@ -53,7 +74,11 @@
       "body": 0.738,
       "sweetness": 0.997,
       "cup_total": 84.15,
-      "samples": 22
+      "samples": 22,
+      "flavors": [
+        "베리/과일",
+        "시트러스"
+      ]
     },
     {
       "origin": "China",
@@ -62,7 +87,12 @@
       "body": 0.751,
       "sweetness": 1.0,
       "cup_total": 84.11,
-      "samples": 3
+      "samples": 3,
+      "flavors": [
+        "견과",
+        "초콜릿",
+        "베리/과일"
+      ]
     },
     {
       "origin": "Uganda",
@@ -71,7 +101,11 @@
       "body": 0.732,
       "sweetness": 1.0,
       "cup_total": 84.11,
-      "samples": 18
+      "samples": 18,
+      "flavors": [
+        "초콜릿",
+        "베리/과일"
+      ]
     },
     {
       "origin": "El Salvador",
@@ -80,7 +114,12 @@
       "body": 0.67,
       "sweetness": 0.981,
       "cup_total": 84.04,
-      "samples": 4
+      "samples": 4,
+      "flavors": [
+        "카라멜",
+        "견과",
+        "베리/과일"
+      ]
     },
     {
       "origin": "Guatemala",
@@ -89,7 +128,12 @@
       "body": 0.754,
       "sweetness": 1.0,
       "cup_total": 83.87,
-      "samples": 8
+      "samples": 8,
+      "flavors": [
+        "초콜릿",
+        "스파이스/허브",
+        "베리/과일"
+      ]
     },
     {
       "origin": "Honduras",
@@ -98,7 +142,12 @@
       "body": 0.734,
       "sweetness": 1.0,
       "cup_total": 83.81,
-      "samples": 3
+      "samples": 3,
+      "flavors": [
+        "카라멜",
+        "견과",
+        "베리/과일"
+      ]
     },
     {
       "origin": "Uganda",
@@ -107,7 +156,11 @@
       "body": 0.719,
       "sweetness": 1.0,
       "cup_total": 83.62,
-      "samples": 7
+      "samples": 7,
+      "flavors": [
+        "초콜릿",
+        "베리/과일"
+      ]
     },
     {
       "origin": "Colombia",
@@ -116,7 +169,12 @@
       "body": 0.721,
       "sweetness": 0.999,
       "cup_total": 83.33,
-      "samples": 121
+      "samples": 121,
+      "flavors": [
+        "카라멜",
+        "견과",
+        "베리/과일"
+      ]
     },
     {
       "origin": "Guatemala",
@@ -125,7 +183,12 @@
       "body": 0.708,
       "sweetness": 0.992,
       "cup_total": 83.12,
-      "samples": 10
+      "samples": 10,
+      "flavors": [
+        "초콜릿",
+        "스파이스/허브",
+        "베리/과일"
+      ]
     },
     {
       "origin": "Taiwan",
@@ -134,7 +197,11 @@
       "body": 0.571,
       "sweetness": 1.0,
       "cup_total": 83.12,
-      "samples": 5
+      "samples": 5,
+      "flavors": [
+        "플로럴",
+        "베리/과일"
+      ]
     },
     {
       "origin": "Colombia",
@@ -143,7 +210,12 @@
       "body": 0.736,
       "sweetness": 0.972,
       "cup_total": 83.06,
-      "samples": 27
+      "samples": 27,
+      "flavors": [
+        "카라멜",
+        "견과",
+        "베리/과일"
+      ]
     },
     {
       "origin": "United States (Hawaii)",
@@ -152,7 +224,8 @@
       "body": 0.727,
       "sweetness": 0.981,
       "cup_total": 83.04,
-      "samples": 24
+      "samples": 24,
+      "flavors": []
     },
     {
       "origin": "Brazil",
@@ -161,7 +234,12 @@
       "body": 0.694,
       "sweetness": 0.99,
       "cup_total": 82.87,
-      "samples": 24
+      "samples": 24,
+      "flavors": [
+        "초콜릿",
+        "견과",
+        "카라멜"
+      ]
     },
     {
       "origin": "Brazil",
@@ -170,7 +248,12 @@
       "body": 0.695,
       "sweetness": 1.0,
       "cup_total": 82.85,
-      "samples": 14
+      "samples": 14,
+      "flavors": [
+        "초콜릿",
+        "견과",
+        "카라멜"
+      ]
     },
     {
       "origin": "Costa Rica",
@@ -179,7 +262,12 @@
       "body": 0.682,
       "sweetness": 0.988,
       "cup_total": 82.73,
-      "samples": 45
+      "samples": 45,
+      "flavors": [
+        "시트러스",
+        "카라멜",
+        "베리/과일"
+      ]
     },
     {
       "origin": "Indonesia",
@@ -188,7 +276,12 @@
       "body": 0.716,
       "sweetness": 1.0,
       "cup_total": 82.72,
-      "samples": 5
+      "samples": 5,
+      "flavors": [
+        "어시/흙내음",
+        "스파이스/허브",
+        "초콜릿"
+      ]
     },
     {
       "origin": "Vietnam",
@@ -197,7 +290,8 @@
       "body": 0.759,
       "sweetness": 1.0,
       "cup_total": 82.72,
-      "samples": 3
+      "samples": 3,
+      "flavors": []
     },
     {
       "origin": "Indonesia",
@@ -206,7 +300,12 @@
       "body": 0.732,
       "sweetness": 1.0,
       "cup_total": 82.71,
-      "samples": 4
+      "samples": 4,
+      "flavors": [
+        "어시/흙내음",
+        "스파이스/허브",
+        "초콜릿"
+      ]
     },
     {
       "origin": "China",
@@ -215,7 +314,12 @@
       "body": 0.689,
       "sweetness": 0.987,
       "cup_total": 82.68,
-      "samples": 12
+      "samples": 12,
+      "flavors": [
+        "견과",
+        "초콜릿",
+        "베리/과일"
+      ]
     },
     {
       "origin": "El Salvador",
@@ -224,7 +328,12 @@
       "body": 0.712,
       "sweetness": 0.974,
       "cup_total": 82.55,
-      "samples": 15
+      "samples": 15,
+      "flavors": [
+        "카라멜",
+        "견과",
+        "베리/과일"
+      ]
     },
     {
       "origin": "Thailand",
@@ -233,7 +342,8 @@
       "body": 0.704,
       "sweetness": 1.0,
       "cup_total": 82.52,
-      "samples": 11
+      "samples": 11,
+      "flavors": []
     },
     {
       "origin": "Colombia",
@@ -242,7 +352,12 @@
       "body": 0.647,
       "sweetness": 0.998,
       "cup_total": 82.38,
-      "samples": 35
+      "samples": 35,
+      "flavors": [
+        "카라멜",
+        "견과",
+        "베리/과일"
+      ]
     },
     {
       "origin": "Taiwan",
@@ -251,7 +366,11 @@
       "body": 0.715,
       "sweetness": 0.988,
       "cup_total": 82.33,
-      "samples": 13
+      "samples": 13,
+      "flavors": [
+        "플로럴",
+        "베리/과일"
+      ]
     },
     {
       "origin": "Brazil",
@@ -260,7 +379,12 @@
       "body": 0.692,
       "sweetness": 0.993,
       "cup_total": 82.32,
-      "samples": 80
+      "samples": 80,
+      "flavors": [
+        "초콜릿",
+        "견과",
+        "카라멜"
+      ]
     },
     {
       "origin": "Thailand",
@@ -269,7 +393,8 @@
       "body": 0.67,
       "sweetness": 0.991,
       "cup_total": 82.32,
-      "samples": 18
+      "samples": 18,
+      "flavors": []
     },
     {
       "origin": "Tanzania, United Republic Of",
@@ -278,7 +403,11 @@
       "body": 0.668,
       "sweetness": 1.0,
       "cup_total": 82.25,
-      "samples": 37
+      "samples": 37,
+      "flavors": [
+        "베리/과일",
+        "시트러스"
+      ]
     },
     {
       "origin": "Peru",
@@ -287,7 +416,12 @@
       "body": 0.767,
       "sweetness": 0.981,
       "cup_total": 82.18,
-      "samples": 8
+      "samples": 8,
+      "flavors": [
+        "견과",
+        "카라멜",
+        "초콜릿"
+      ]
     },
     {
       "origin": "Taiwan",
@@ -296,7 +430,11 @@
       "body": 0.69,
       "sweetness": 0.991,
       "cup_total": 82.13,
-      "samples": 9
+      "samples": 9,
+      "flavors": [
+        "플로럴",
+        "베리/과일"
+      ]
     },
     {
       "origin": "Indonesia",
@@ -305,7 +443,12 @@
       "body": 0.655,
       "sweetness": 1.0,
       "cup_total": 82.1,
-      "samples": 6
+      "samples": 6,
+      "flavors": [
+        "어시/흙내음",
+        "스파이스/허브",
+        "초콜릿"
+      ]
     },
     {
       "origin": "Mexico",
@@ -314,7 +457,12 @@
       "body": 0.67,
       "sweetness": 0.991,
       "cup_total": 82.05,
-      "samples": 17
+      "samples": 17,
+      "flavors": [
+        "견과",
+        "초콜릿",
+        "카라멜"
+      ]
     },
     {
       "origin": "Vietnam",
@@ -323,7 +471,8 @@
       "body": 0.685,
       "sweetness": 1.0,
       "cup_total": 82.0,
-      "samples": 3
+      "samples": 3,
+      "flavors": []
     },
     {
       "origin": "United States (Hawaii)",
@@ -332,7 +481,8 @@
       "body": 0.646,
       "sweetness": 1.0,
       "cup_total": 81.92,
-      "samples": 9
+      "samples": 9,
+      "flavors": []
     },
     {
       "origin": "Brazil",
@@ -341,7 +491,12 @@
       "body": 0.672,
       "sweetness": 1.0,
       "cup_total": 81.9,
-      "samples": 7
+      "samples": 7,
+      "flavors": [
+        "초콜릿",
+        "견과",
+        "카라멜"
+      ]
     },
     {
       "origin": "Mexico",
@@ -350,7 +505,12 @@
       "body": 0.65,
       "sweetness": 1.0,
       "cup_total": 81.89,
-      "samples": 14
+      "samples": 14,
+      "flavors": [
+        "견과",
+        "초콜릿",
+        "카라멜"
+      ]
     },
     {
       "origin": "Nicaragua",
@@ -359,7 +519,12 @@
       "body": 0.685,
       "sweetness": 0.99,
       "cup_total": 81.89,
-      "samples": 8
+      "samples": 8,
+      "flavors": [
+        "견과",
+        "카라멜",
+        "초콜릿"
+      ]
     },
     {
       "origin": "Laos",
@@ -368,7 +533,8 @@
       "body": 0.635,
       "sweetness": 1.0,
       "cup_total": 81.83,
-      "samples": 3
+      "samples": 3,
+      "flavors": []
     },
     {
       "origin": "United States (Puerto Rico)",
@@ -377,7 +543,8 @@
       "body": 0.726,
       "sweetness": 0.981,
       "cup_total": 81.73,
-      "samples": 4
+      "samples": 4,
+      "flavors": []
     },
     {
       "origin": "Malawi",
@@ -386,7 +553,8 @@
       "body": 0.627,
       "sweetness": 1.0,
       "cup_total": 81.71,
-      "samples": 11
+      "samples": 11,
+      "flavors": []
     },
     {
       "origin": "Taiwan",
@@ -395,7 +563,11 @@
       "body": 0.649,
       "sweetness": 0.998,
       "cup_total": 81.67,
-      "samples": 37
+      "samples": 37,
+      "flavors": [
+        "플로럴",
+        "베리/과일"
+      ]
     },
     {
       "origin": "Guatemala",
@@ -404,7 +576,12 @@
       "body": 0.662,
       "sweetness": 0.984,
       "cup_total": 81.64,
-      "samples": 161
+      "samples": 161,
+      "flavors": [
+        "초콜릿",
+        "스파이스/허브",
+        "베리/과일"
+      ]
     },
     {
       "origin": "Taiwan",
@@ -413,7 +590,11 @@
       "body": 0.631,
       "sweetness": 1.0,
       "cup_total": 81.58,
-      "samples": 9
+      "samples": 9,
+      "flavors": [
+        "플로럴",
+        "베리/과일"
+      ]
     },
     {
       "origin": "Mexico",
@@ -422,7 +603,12 @@
       "body": 0.662,
       "sweetness": 1.0,
       "cup_total": 81.57,
-      "samples": 7
+      "samples": 7,
+      "flavors": [
+        "견과",
+        "초콜릿",
+        "카라멜"
+      ]
     },
     {
       "origin": "Brazil",
@@ -431,7 +617,12 @@
       "body": 0.656,
       "sweetness": 1.0,
       "cup_total": 81.46,
-      "samples": 6
+      "samples": 6,
+      "flavors": [
+        "초콜릿",
+        "견과",
+        "카라멜"
+      ]
     },
     {
       "origin": "Honduras",
@@ -440,7 +631,12 @@
       "body": 0.628,
       "sweetness": 1.0,
       "cup_total": 81.14,
-      "samples": 14
+      "samples": 14,
+      "flavors": [
+        "카라멜",
+        "견과",
+        "베리/과일"
+      ]
     },
     {
       "origin": "United States (Hawaii)",
@@ -449,7 +645,8 @@
       "body": 0.721,
       "sweetness": 0.939,
       "cup_total": 81.07,
-      "samples": 40
+      "samples": 40,
+      "flavors": []
     },
     {
       "origin": "Nicaragua",
@@ -458,7 +655,12 @@
       "body": 0.667,
       "sweetness": 1.0,
       "cup_total": 81.0,
-      "samples": 11
+      "samples": 11,
+      "flavors": [
+        "견과",
+        "카라멜",
+        "초콜릿"
+      ]
     },
     {
       "origin": "Myanmar",
@@ -467,7 +669,8 @@
       "body": 0.621,
       "sweetness": 1.0,
       "cup_total": 80.92,
-      "samples": 5
+      "samples": 5,
+      "flavors": []
     },
     {
       "origin": "Philippines",
@@ -476,7 +679,8 @@
       "body": 0.594,
       "sweetness": 0.981,
       "cup_total": 80.75,
-      "samples": 4
+      "samples": 4,
+      "flavors": []
     },
     {
       "origin": "Haiti",
@@ -485,7 +689,8 @@
       "body": 0.62,
       "sweetness": 1.0,
       "cup_total": 80.71,
-      "samples": 4
+      "samples": 4,
+      "flavors": []
     },
     {
       "origin": "Mexico",
@@ -494,7 +699,12 @@
       "body": 0.636,
       "sweetness": 0.997,
       "cup_total": 80.7,
-      "samples": 198
+      "samples": 198,
+      "flavors": [
+        "견과",
+        "초콜릿",
+        "카라멜"
+      ]
     },
     {
       "origin": "Nicaragua",
@@ -503,7 +713,12 @@
       "body": 0.626,
       "sweetness": 1.0,
       "cup_total": 80.58,
-      "samples": 4
+      "samples": 4,
+      "flavors": [
+        "견과",
+        "카라멜",
+        "초콜릿"
+      ]
     },
     {
       "origin": "Honduras",
@@ -512,7 +727,12 @@
       "body": 0.636,
       "sweetness": 0.974,
       "cup_total": 80.53,
-      "samples": 35
+      "samples": 35,
+      "flavors": [
+        "카라멜",
+        "견과",
+        "베리/과일"
+      ]
     },
     {
       "origin": "Nicaragua",
@@ -521,7 +741,12 @@
       "body": 0.493,
       "sweetness": 0.846,
       "cup_total": 74.47,
-      "samples": 3
+      "samples": 3,
+      "flavors": [
+        "견과",
+        "카라멜",
+        "초콜릿"
+      ]
     }
   ]
 }
