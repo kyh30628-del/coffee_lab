@@ -1,0 +1,527 @@
+{
+  "count": 58,
+  "beans": [
+    {
+      "origin": "United States",
+      "process": "Washed / Wet",
+      "acidity": 0.862,
+      "body": 0.851,
+      "sweetness": 1.0,
+      "cup_total": 87.32,
+      "samples": 6
+    },
+    {
+      "origin": "Ethiopia",
+      "process": "Washed / Wet",
+      "acidity": 0.824,
+      "body": 0.823,
+      "sweetness": 1.0,
+      "cup_total": 86.47,
+      "samples": 8
+    },
+    {
+      "origin": "Ethiopia",
+      "process": "Natural / Dry",
+      "acidity": 0.779,
+      "body": 0.782,
+      "sweetness": 0.991,
+      "cup_total": 85.41,
+      "samples": 17
+    },
+    {
+      "origin": "Ethiopia",
+      "process": "정보없음",
+      "acidity": 0.805,
+      "body": 0.814,
+      "sweetness": 0.972,
+      "cup_total": 85.14,
+      "samples": 19
+    },
+    {
+      "origin": "Indonesia",
+      "process": "정보없음",
+      "acidity": 0.682,
+      "body": 0.818,
+      "sweetness": 1.0,
+      "cup_total": 84.67,
+      "samples": 3
+    },
+    {
+      "origin": "Kenya",
+      "process": "Washed / Wet",
+      "acidity": 0.739,
+      "body": 0.738,
+      "sweetness": 0.997,
+      "cup_total": 84.15,
+      "samples": 22
+    },
+    {
+      "origin": "China",
+      "process": "Natural / Dry",
+      "acidity": 0.682,
+      "body": 0.751,
+      "sweetness": 1.0,
+      "cup_total": 84.11,
+      "samples": 3
+    },
+    {
+      "origin": "Uganda",
+      "process": "Washed / Wet",
+      "acidity": 0.703,
+      "body": 0.732,
+      "sweetness": 1.0,
+      "cup_total": 84.11,
+      "samples": 18
+    },
+    {
+      "origin": "El Salvador",
+      "process": "정보없음",
+      "acidity": 0.803,
+      "body": 0.67,
+      "sweetness": 0.981,
+      "cup_total": 84.04,
+      "samples": 4
+    },
+    {
+      "origin": "Guatemala",
+      "process": "정보없음",
+      "acidity": 0.7,
+      "body": 0.754,
+      "sweetness": 1.0,
+      "cup_total": 83.87,
+      "samples": 8
+    },
+    {
+      "origin": "Honduras",
+      "process": "정보없음",
+      "acidity": 0.699,
+      "body": 0.734,
+      "sweetness": 1.0,
+      "cup_total": 83.81,
+      "samples": 3
+    },
+    {
+      "origin": "Uganda",
+      "process": "Natural / Dry",
+      "acidity": 0.69,
+      "body": 0.719,
+      "sweetness": 1.0,
+      "cup_total": 83.62,
+      "samples": 7
+    },
+    {
+      "origin": "Colombia",
+      "process": "Washed / Wet",
+      "acidity": 0.671,
+      "body": 0.721,
+      "sweetness": 0.999,
+      "cup_total": 83.33,
+      "samples": 121
+    },
+    {
+      "origin": "Guatemala",
+      "process": "Natural / Dry",
+      "acidity": 0.686,
+      "body": 0.708,
+      "sweetness": 0.992,
+      "cup_total": 83.12,
+      "samples": 10
+    },
+    {
+      "origin": "Taiwan",
+      "process": "정보없음",
+      "acidity": 0.572,
+      "body": 0.571,
+      "sweetness": 1.0,
+      "cup_total": 83.12,
+      "samples": 5
+    },
+    {
+      "origin": "Colombia",
+      "process": "Natural / Dry",
+      "acidity": 0.669,
+      "body": 0.736,
+      "sweetness": 0.972,
+      "cup_total": 83.06,
+      "samples": 27
+    },
+    {
+      "origin": "United States (Hawaii)",
+      "process": "정보없음",
+      "acidity": 0.709,
+      "body": 0.727,
+      "sweetness": 0.981,
+      "cup_total": 83.04,
+      "samples": 24
+    },
+    {
+      "origin": "Brazil",
+      "process": "Semi-washed / Semi-pulped",
+      "acidity": 0.662,
+      "body": 0.694,
+      "sweetness": 0.99,
+      "cup_total": 82.87,
+      "samples": 24
+    },
+    {
+      "origin": "Brazil",
+      "process": "정보없음",
+      "acidity": 0.651,
+      "body": 0.695,
+      "sweetness": 1.0,
+      "cup_total": 82.85,
+      "samples": 14
+    },
+    {
+      "origin": "Costa Rica",
+      "process": "Washed / Wet",
+      "acidity": 0.664,
+      "body": 0.682,
+      "sweetness": 0.988,
+      "cup_total": 82.73,
+      "samples": 45
+    },
+    {
+      "origin": "Indonesia",
+      "process": "Semi-washed / Semi-pulped",
+      "acidity": 0.691,
+      "body": 0.716,
+      "sweetness": 1.0,
+      "cup_total": 82.72,
+      "samples": 5
+    },
+    {
+      "origin": "Vietnam",
+      "process": "Natural / Dry",
+      "acidity": 0.594,
+      "body": 0.759,
+      "sweetness": 1.0,
+      "cup_total": 82.72,
+      "samples": 3
+    },
+    {
+      "origin": "Indonesia",
+      "process": "Other",
+      "acidity": 0.66,
+      "body": 0.732,
+      "sweetness": 1.0,
+      "cup_total": 82.71,
+      "samples": 4
+    },
+    {
+      "origin": "China",
+      "process": "Washed / Wet",
+      "acidity": 0.663,
+      "body": 0.689,
+      "sweetness": 0.987,
+      "cup_total": 82.68,
+      "samples": 12
+    },
+    {
+      "origin": "El Salvador",
+      "process": "Washed / Wet",
+      "acidity": 0.638,
+      "body": 0.712,
+      "sweetness": 0.974,
+      "cup_total": 82.55,
+      "samples": 15
+    },
+    {
+      "origin": "Thailand",
+      "process": "정보없음",
+      "acidity": 0.658,
+      "body": 0.704,
+      "sweetness": 1.0,
+      "cup_total": 82.52,
+      "samples": 11
+    },
+    {
+      "origin": "Colombia",
+      "process": "정보없음",
+      "acidity": 0.616,
+      "body": 0.647,
+      "sweetness": 0.998,
+      "cup_total": 82.38,
+      "samples": 35
+    },
+    {
+      "origin": "Taiwan",
+      "process": "Natural / Dry",
+      "acidity": 0.659,
+      "body": 0.715,
+      "sweetness": 0.988,
+      "cup_total": 82.33,
+      "samples": 13
+    },
+    {
+      "origin": "Brazil",
+      "process": "Natural / Dry",
+      "acidity": 0.646,
+      "body": 0.692,
+      "sweetness": 0.993,
+      "cup_total": 82.32,
+      "samples": 80
+    },
+    {
+      "origin": "Thailand",
+      "process": "Washed / Wet",
+      "acidity": 0.678,
+      "body": 0.67,
+      "sweetness": 0.991,
+      "cup_total": 82.32,
+      "samples": 18
+    },
+    {
+      "origin": "Tanzania, United Republic Of",
+      "process": "Washed / Wet",
+      "acidity": 0.639,
+      "body": 0.668,
+      "sweetness": 1.0,
+      "cup_total": 82.25,
+      "samples": 37
+    },
+    {
+      "origin": "Peru",
+      "process": "Washed / Wet",
+      "acidity": 0.702,
+      "body": 0.767,
+      "sweetness": 0.981,
+      "cup_total": 82.18,
+      "samples": 8
+    },
+    {
+      "origin": "Taiwan",
+      "process": "Semi-washed / Semi-pulped",
+      "acidity": 0.608,
+      "body": 0.69,
+      "sweetness": 0.991,
+      "cup_total": 82.13,
+      "samples": 9
+    },
+    {
+      "origin": "Indonesia",
+      "process": "Washed / Wet",
+      "acidity": 0.619,
+      "body": 0.655,
+      "sweetness": 1.0,
+      "cup_total": 82.1,
+      "samples": 6
+    },
+    {
+      "origin": "Mexico",
+      "process": "Natural / Dry",
+      "acidity": 0.65,
+      "body": 0.67,
+      "sweetness": 0.991,
+      "cup_total": 82.05,
+      "samples": 17
+    },
+    {
+      "origin": "Vietnam",
+      "process": "Other",
+      "acidity": 0.651,
+      "body": 0.685,
+      "sweetness": 1.0,
+      "cup_total": 82.0,
+      "samples": 3
+    },
+    {
+      "origin": "United States (Hawaii)",
+      "process": "Washed / Wet",
+      "acidity": 0.658,
+      "body": 0.646,
+      "sweetness": 1.0,
+      "cup_total": 81.92,
+      "samples": 9
+    },
+    {
+      "origin": "Brazil",
+      "process": "Pulped natural / honey",
+      "acidity": 0.636,
+      "body": 0.672,
+      "sweetness": 1.0,
+      "cup_total": 81.9,
+      "samples": 7
+    },
+    {
+      "origin": "Mexico",
+      "process": "Semi-washed / Semi-pulped",
+      "acidity": 0.638,
+      "body": 0.65,
+      "sweetness": 1.0,
+      "cup_total": 81.89,
+      "samples": 14
+    },
+    {
+      "origin": "Nicaragua",
+      "process": "정보없음",
+      "acidity": 0.643,
+      "body": 0.685,
+      "sweetness": 0.99,
+      "cup_total": 81.89,
+      "samples": 8
+    },
+    {
+      "origin": "Laos",
+      "process": "Washed / Wet",
+      "acidity": 0.588,
+      "body": 0.635,
+      "sweetness": 1.0,
+      "cup_total": 81.83,
+      "samples": 3
+    },
+    {
+      "origin": "United States (Puerto Rico)",
+      "process": "Washed / Wet",
+      "acidity": 0.672,
+      "body": 0.726,
+      "sweetness": 0.981,
+      "cup_total": 81.73,
+      "samples": 4
+    },
+    {
+      "origin": "Malawi",
+      "process": "Washed / Wet",
+      "acidity": 0.617,
+      "body": 0.627,
+      "sweetness": 1.0,
+      "cup_total": 81.71,
+      "samples": 11
+    },
+    {
+      "origin": "Taiwan",
+      "process": "Washed / Wet",
+      "acidity": 0.613,
+      "body": 0.649,
+      "sweetness": 0.998,
+      "cup_total": 81.67,
+      "samples": 37
+    },
+    {
+      "origin": "Guatemala",
+      "process": "Washed / Wet",
+      "acidity": 0.667,
+      "body": 0.662,
+      "sweetness": 0.984,
+      "cup_total": 81.64,
+      "samples": 161
+    },
+    {
+      "origin": "Taiwan",
+      "process": "Other",
+      "acidity": 0.592,
+      "body": 0.631,
+      "sweetness": 1.0,
+      "cup_total": 81.58,
+      "samples": 9
+    },
+    {
+      "origin": "Mexico",
+      "process": "정보없음",
+      "acidity": 0.651,
+      "body": 0.662,
+      "sweetness": 1.0,
+      "cup_total": 81.57,
+      "samples": 7
+    },
+    {
+      "origin": "Brazil",
+      "process": "Washed / Wet",
+      "acidity": 0.599,
+      "body": 0.656,
+      "sweetness": 1.0,
+      "cup_total": 81.46,
+      "samples": 6
+    },
+    {
+      "origin": "Honduras",
+      "process": "Natural / Dry",
+      "acidity": 0.604,
+      "body": 0.628,
+      "sweetness": 1.0,
+      "cup_total": 81.14,
+      "samples": 14
+    },
+    {
+      "origin": "United States (Hawaii)",
+      "process": "Natural / Dry",
+      "acidity": 0.66,
+      "body": 0.721,
+      "sweetness": 0.939,
+      "cup_total": 81.07,
+      "samples": 40
+    },
+    {
+      "origin": "Nicaragua",
+      "process": "Washed / Wet",
+      "acidity": 0.563,
+      "body": 0.667,
+      "sweetness": 1.0,
+      "cup_total": 81.0,
+      "samples": 11
+    },
+    {
+      "origin": "Myanmar",
+      "process": "Washed / Wet",
+      "acidity": 0.634,
+      "body": 0.621,
+      "sweetness": 1.0,
+      "cup_total": 80.92,
+      "samples": 5
+    },
+    {
+      "origin": "Philippines",
+      "process": "Washed / Wet",
+      "acidity": 0.589,
+      "body": 0.594,
+      "sweetness": 0.981,
+      "cup_total": 80.75,
+      "samples": 4
+    },
+    {
+      "origin": "Haiti",
+      "process": "Washed / Wet",
+      "acidity": 0.566,
+      "body": 0.62,
+      "sweetness": 1.0,
+      "cup_total": 80.71,
+      "samples": 4
+    },
+    {
+      "origin": "Mexico",
+      "process": "Washed / Wet",
+      "acidity": 0.618,
+      "body": 0.636,
+      "sweetness": 0.997,
+      "cup_total": 80.7,
+      "samples": 198
+    },
+    {
+      "origin": "Nicaragua",
+      "process": "Natural / Dry",
+      "acidity": 0.566,
+      "body": 0.626,
+      "sweetness": 1.0,
+      "cup_total": 80.58,
+      "samples": 4
+    },
+    {
+      "origin": "Honduras",
+      "process": "Washed / Wet",
+      "acidity": 0.6,
+      "body": 0.636,
+      "sweetness": 0.974,
+      "cup_total": 80.53,
+      "samples": 35
+    },
+    {
+      "origin": "Nicaragua",
+      "process": "Other",
+      "acidity": 0.46,
+      "body": 0.493,
+      "sweetness": 0.846,
+      "cup_total": 74.47,
+      "samples": 3
+    }
+  ]
+}
