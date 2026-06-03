@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import ShareCard from "./ShareCard";
 
 type Bean = {
@@ -43,6 +43,8 @@ export default function TastePage() {
   const [pref, setPref] = useState({ acidity: 0.5, body: 0.5, sweetness: 0.5 });
   const [fams, setFams] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
+  const interacted = useRef(false);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     fetch("/data/beans.json").then((r) => r.json()).then((d) => setBeans(d.beans ?? [])).catch(() => setBeans([]));
@@ -61,15 +63,7 @@ export default function TastePage() {
     } catch {}
   }, []);
 
-  const toggleFam = (f: string) => setFams((c) => (c.includes(f) ? c.filter((x) => x !== f) : [...c, f]));
-
-  const share = async () => {
-    const sp = new URLSearchParams({ a: pref.acidity.toFixed(2), b: pref.body.toFixed(2), s: pref.sweetness.toFixed(2) });
-    if (fams.length) sp.set("f", fams.join(","));
-    const url = `${window.location.origin}${window.location.pathname}?${sp.toString()}`;
-    try { await navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 2000); }
-    catch { prompt("아래 링크를 복사하세요", url); }
-  };
+  const toggleFam = (f: string) => { interacted.current = true; setFams((c) => (c.includes(f) ? c.filter((x) => x !== f) : [...c, f])); };
 
   const ranked = useMemo(() => {
     const scored = beans.map((b) => {
@@ -82,6 +76,30 @@ export default function TastePage() {
       ? scored.sort((a, b) => b.matchCount - a.matchCount || a.dist - b.dist)
       : scored.sort((a, b) => a.dist - b.dist)).slice(0, 5);
   }, [beans, pref, fams]);
+
+  // 자동 저장: 사용자가 조작한 뒤 1.5초 멈추면 한 번 저장 (디바운스)
+  useEffect(() => {
+    if (!interacted.current || ranked.length === 0) return;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      fetch("/api/taste", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...pref, flavors: fams, top_origin: ranked[0]?.origin ?? "" }),
+      }).catch(() => {});
+    }, 1500);
+    return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
+  }, [pref, fams, ranked]);
+
+  const setPrefInteract = (k: "acidity"|"body"|"sweetness", v: number) => { interacted.current = true; setPref({ ...pref, [k]: v }); };
+
+  const share = async () => {
+    const sp = new URLSearchParams({ a: pref.acidity.toFixed(2), b: pref.body.toFixed(2), s: pref.sweetness.toFixed(2) });
+    if (fams.length) sp.set("f", fams.join(","));
+    const url = `${window.location.origin}${window.location.pathname}?${sp.toString()}`;
+    try { await navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 2000); }
+    catch { prompt("아래 링크를 복사하세요", url); }
+  };
 
   return (
     <main className="min-h-screen bg-[#f5efe6] text-stone-900" style={{ fontFamily: "'DM Sans', system-ui, sans-serif" }}>
@@ -107,7 +125,7 @@ export default function TastePage() {
                 <span className="text-xs text-stone-400">{ax.desc}</span>
               </div>
               <input type="range" min={0} max={1} step={0.01} value={pref[ax.key]}
-                onChange={(e) => setPref({ ...pref, [ax.key]: parseFloat(e.target.value) })}
+                onChange={(e) => setPrefInteract(ax.key, parseFloat(e.target.value))}
                 className="w-full accent-amber-700" />
               <div className="flex justify-between text-xs text-stone-400 mt-1">
                 <span>약함</span><span className="text-amber-800 font-semibold">{Math.round(pref[ax.key]*100)}</span><span>강함</span>
@@ -179,7 +197,7 @@ export default function TastePage() {
         </section>
 
         <footer className="mt-12 pt-6 border-t border-stone-300/70 text-[11px] text-stone-500 leading-relaxed">
-          맛 데이터 CQI 큐핑 평가 기반 · 산지 향·설명은 일반적 경향(추정) · 구매 링크는 검색 결과로 연결됩니다.
+          맛 데이터 CQI 큐핑 평가 기반 · 산지 향·설명은 일반적 경향(추정) · 익명 취향 통계가 서비스 개선에 활용됩니다.
         </footer>
       </div>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet" />
