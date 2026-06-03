@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-03T21:52:29",
+  "generated_at": "2026-06-03T22:22:32",
   "inputs": {
     "coffee_c_usd_lb": 2.5715,
     "coffee_c_date": "2026-06-03",
@@ -137,10 +137,15 @@
     "high": 3.0585,
     "avg": 2.8082,
     "position_pct": 0.0,
-    "label": "저점권 · 구매 유리 구간",
+    "label": "저점권",
     "tone": "good",
     "trend": "하락",
     "days": 22
+  },
+  "summary": {
+    "headline": "지금은 구매하기 유리한 구간입니다 (시세 저점권)",
+    "detail": "현재 Coffee C $2.5715/lb, 추세 하락 · 관세 0% 산지 중 India이(가) 원가상 유리 · 최근 환율 하락 → 원화 원가에 우호적",
+    "tone": "good"
   },
   "rows": [
     {
