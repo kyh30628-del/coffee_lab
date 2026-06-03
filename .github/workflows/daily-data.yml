@@ -2,49 +2,49 @@ name: 매일 커피 데이터 갱신
 
 on:
   schedule:
-      - cron: "0 21 * * *"
-        workflow_dispatch: {}
+    - cron: "0 21 * * *"
+  workflow_dispatch: {}
 
-        permissions:
-          contents: write
+permissions:
+  contents: write
 
-          jobs:
-            update-data:
-                runs-on: ubuntu-latest
-                    steps:
-                          - name: 저장소 체크아웃
-                                  uses: actions/checkout@v4
+jobs:
+  update-data:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v4
 
-                                        - name: Python 설치
-                                                uses: actions/setup-python@v5
-                                                        with:
-                                                                  python-version: "3.11"
+      - name: Python 설치
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
-                                                                        - name: 의존성 설치
-                                                                                run: |
-                                                                                          python -m pip install --upgrade pip
-                                                                                                    pip install -r data-engine/requirements.txt
-                                                                                                    
-                                                                                                          - name: 수집 + 계산 + export 실행
-                                                                                                                  env:
-                                                                                                                            ECOS_API_KEY: ${{ secrets.ECOS_API_KEY }}
-                                                                                                                                    run: |
-                                                                                                                                              cd data-engine
-                                                                                                                                                        python collectors/fx_collector.py
-                                                                                                                                                                  python collectors/coffee_c_collector.py
-                                                                                                                                                                            python models/export_cost.py
-                                                                                                                                                                                      python models/export_timeseries.py
-                                                                                                                                                                                      
-                                                                                                                                                                                            - name: 최신 변경 먼저 받기
-                                                                                                                                                                                                    run: |
-                                                                                                                                                                                                              git config user.name "github-actions[bot]"
-                                                                                                                                                                                                                        git config user.email "github-actions[bot]@users.noreply.github.com"
-                                                                                                                                                                                                                                  git stash --include-untracked || true
-                                                                                                                                                                                                                                            git pull --rebase origin main || true
-                                                                                                                                                                                                                                                      git stash pop || true
-                                                                                                                                                                                                                                                      
-                                                                                                                                                                                                                                                            - name: 갱신된 데이터 커밋
-                                                                                                                                                                                                                                                                    uses: stefanzweifel/git-auto-commit-action@v5
-                                                                                                                                                                                                                                                                            with:
-                                                                                                                                                                                                                                                                                      commit_message: "data: 일일 커피 데이터 자동 갱신"
-                                                                                                                                                                                                                                                                                                file_pattern: "data-engine/data/clean/* web/public/data/*"
+      - name: 의존성 설치
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r data-engine/requirements.txt
+
+      - name: 수집 + 계산 + export 실행
+        env:
+          ECOS_API_KEY: ${{ secrets.ECOS_API_KEY }}
+        run: |
+          cd data-engine
+          python collectors/fx_collector.py
+          python collectors/coffee_c_collector.py
+          python models/export_cost.py
+          python models/export_timeseries.py
+
+      - name: 최신 변경 먼저 받기
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git stash --include-untracked || true
+          git pull --rebase origin main || true
+          git stash pop || true
+
+      - name: 갱신된 데이터 커밋
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "data: 일일 커피 데이터 자동 갱신"
+          file_pattern: "data-engine/data/clean/* web/public/data/*"
