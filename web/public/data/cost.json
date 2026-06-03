@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-06-03T18:15:07",
+  "generated_at": "2026-06-03T10:02:58",
   "inputs": {
     "coffee_c_usd_lb": 2.592,
-    "coffee_c_date": "2026-06-02",
+    "coffee_c_date": "2026-06-03",
     "coffee_c_source": "Yahoo Finance KC=F (ICE Coffee C, delayed)",
     "usd_krw": 1511.3,
     "usd_krw_date": "2026-06-02",
@@ -117,12 +117,12 @@
     "current": 2.592,
     "low": 2.592,
     "high": 3.0585,
-    "avg": 2.8195,
+    "avg": 2.8091,
     "position_pct": 0.0,
     "label": "저점권 · 구매 유리 구간",
     "tone": "good",
     "trend": "하락",
-    "days": 21
+    "days": 22
   },
   "assumptions": {
     "cif_rate": 0.1,
