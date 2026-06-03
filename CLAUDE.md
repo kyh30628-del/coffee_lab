@@ -159,3 +159,4 @@ coffee-platform/
 - [ ] Vercel 배포 + cron
 
 > 진행하며 이 체크리스트와 §3 데이터 소스를 최신으로 유지할 것.
+- origin_flavor.csv: 산지별 향 경향(추정). CQI엔 향 태그 없어 별도 참조표로 추가. 실제 향 데이터로 교체 가능.
