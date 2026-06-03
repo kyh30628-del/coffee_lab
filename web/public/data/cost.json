@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-03T18:12:51",
+  "generated_at": "2026-06-03T18:15:07",
   "inputs": {
     "coffee_c_usd_lb": 2.592,
     "coffee_c_date": "2026-06-02",
@@ -7,6 +7,111 @@
     "usd_krw": 1511.3,
     "usd_krw_date": "2026-06-02",
     "usd_krw_source": "ECOS(한국은행) 731Y001/0000001"
+  },
+  "lb_to_kg": 2.2046,
+  "origins": [
+    {
+      "origin": "Colombia",
+      "point_diff": 1000,
+      "note": "프리미엄"
+    },
+    {
+      "origin": "Costa Rica",
+      "point_diff": 1000,
+      "note": "프리미엄"
+    },
+    {
+      "origin": "Kenya",
+      "point_diff": 1000,
+      "note": "프리미엄"
+    },
+    {
+      "origin": "Guatemala",
+      "point_diff": 500,
+      "note": "프리미엄"
+    },
+    {
+      "origin": "Mexico",
+      "point_diff": 0,
+      "note": "par"
+    },
+    {
+      "origin": "El Salvador",
+      "point_diff": 0,
+      "note": "par"
+    },
+    {
+      "origin": "Nicaragua",
+      "point_diff": 0,
+      "note": "par"
+    },
+    {
+      "origin": "Honduras",
+      "point_diff": 0,
+      "note": "par"
+    },
+    {
+      "origin": "Peru",
+      "point_diff": 0,
+      "note": "par"
+    },
+    {
+      "origin": "Panama",
+      "point_diff": 0,
+      "note": "par"
+    },
+    {
+      "origin": "Tanzania",
+      "point_diff": 0,
+      "note": "par"
+    },
+    {
+      "origin": "Uganda",
+      "point_diff": 0,
+      "note": "par"
+    },
+    {
+      "origin": "Papua New Guinea",
+      "point_diff": 0,
+      "note": "par"
+    },
+    {
+      "origin": "Burundi",
+      "point_diff": -100,
+      "note": "디스카운트"
+    },
+    {
+      "origin": "Rwanda",
+      "point_diff": -100,
+      "note": "디스카운트"
+    },
+    {
+      "origin": "Venezuela",
+      "point_diff": -100,
+      "note": "디스카운트"
+    },
+    {
+      "origin": "India",
+      "point_diff": -100,
+      "note": "디스카운트"
+    },
+    {
+      "origin": "Dominican Republic",
+      "point_diff": -400,
+      "note": "디스카운트"
+    },
+    {
+      "origin": "Ecuador",
+      "point_diff": -400,
+      "note": "디스카운트"
+    }
+  ],
+  "default_assumptions": {
+    "cif_rate": 0.1,
+    "tariff_rate": 0.02,
+    "logistics_krw_per_kg": 300,
+    "importer_margin_rate": 0.15,
+    "roast_loss_rate": 0.18
   },
   "signal": {
     "current": 2.592,

@@ -1,18 +1,19 @@
 import fs from "node:fs";
 import path from "node:path";
 import PriceChart from "./PriceChart";
+import CostCalculator from "./CostCalculator";
 
-type Row = { origin: string; note: string; point_diff: number;
-  fob_usd_lb: number; green_krw_per_kg: number; roasted_krw_per_kg: number; };
+type Origin = { origin: string; point_diff: number; note: string };
 type Signal = { current: number; low: number; high: number; avg: number;
   position_pct: number; label: string; tone: string; trend: string; days: number; } | null;
 type CostData = {
   generated_at: string;
   inputs: { coffee_c_usd_lb: number; coffee_c_date: string; coffee_c_source: string;
     usd_krw: number; usd_krw_date: string; usd_krw_source: string; };
+  lb_to_kg: number;
+  origins: Origin[];
+  default_assumptions: { cif_rate: number; tariff_rate: number; logistics_krw_per_kg: number; importer_margin_rate: number; roast_loss_rate: number; };
   signal: Signal;
-  assumptions: Record<string, number>;
-  rows: Row[];
 };
 type Point = { date: string; coffee_c: number; usd_krw: number };
 
@@ -25,7 +26,6 @@ function loadTimeseries(): { points: Point[] } {
   catch { return { points: [] }; }
 }
 const won = (n: number) => n.toLocaleString("ko-KR");
-
 const TONE: Record<string, string> = {
   good: "bg-emerald-950 border-emerald-700 text-emerald-300",
   high: "bg-red-950 border-red-800 text-red-300",
@@ -41,7 +41,7 @@ export default function CostPage() {
       </main>
     );
   }
-  const { inputs, assumptions, rows, signal } = data;
+  const { inputs, signal, origins, default_assumptions, lb_to_kg } = data;
   const ts = loadTimeseries();
 
   return (
@@ -61,9 +61,7 @@ export default function CostPage() {
               </div>
               <div className="text-right text-sm">
                 <div>기간 내 위치 <span className="font-bold">{signal.position_pct}%</span> · 추세 {signal.trend}</div>
-                <div className="opacity-60 text-xs mt-0.5">
-                  최저 ${signal.low} · 평균 ${signal.avg} · 최고 ${signal.high}
-                </div>
+                <div className="opacity-60 text-xs mt-0.5">최저 ${signal.low} · 평균 ${signal.avg} · 최고 ${signal.high}</div>
               </div>
             </div>
             <div className="mt-3 h-2 bg-black/30 rounded-full overflow-hidden">
@@ -94,32 +92,13 @@ export default function CostPage() {
         </section>
 
         <section>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-stone-500 text-xs uppercase tracking-wider border-b border-stone-800">
-                <th className="text-left py-3">산지</th><th className="text-right">Differential</th>
-                <th className="text-right">FOB $/lb</th><th className="text-right">생두원가 ₩/kg</th>
-                <th className="text-right">로스팅후 ₩/kg</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.origin} className="border-b border-stone-900 hover:bg-stone-900/50">
-                  <td className="py-3 text-stone-200">{r.origin}</td>
-                  <td className="text-right text-stone-500">{r.point_diff > 0 ? "+" + r.point_diff : r.point_diff}</td>
-                  <td className="text-right text-stone-400">{r.fob_usd_lb}</td>
-                  <td className="text-right text-amber-300">{won(r.green_krw_per_kg)}</td>
-                  <td className="text-right text-amber-50 font-bold">{won(r.roasted_krw_per_kg)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <CostCalculator cc={inputs.coffee_c_usd_lb} fx={inputs.usd_krw}
+            lbToKg={lb_to_kg} origins={origins} defaults={default_assumptions} />
         </section>
 
         <footer className="mt-10 pt-6 border-t border-stone-800 text-xs text-stone-600 space-y-1">
           <p>생성: {data.generated_at}</p>
-          <p>가정값(추정): CIF {assumptions.cif_rate * 100}% · 관세 {assumptions.tariff_rate * 100}% · 물류 ₩{won(assumptions.logistics_krw_per_kg)}/kg · 수입사마진 {assumptions.importer_margin_rate * 100}% · 로스팅손실 {assumptions.roast_loss_rate * 100}%</p>
-          <p className="text-stone-700">※ 산지 differential은 ICE 계약 명세 기준 추정값. 실제 계약가와 다를 수 있음.</p>
+          <p className="text-stone-700">※ 산지 differential은 ICE 계약 명세 기준 추정값. 가정값은 직접 조정 가능. 실제 계약가와 다를 수 있음.</p>
         </footer>
       </div>
     </main>
