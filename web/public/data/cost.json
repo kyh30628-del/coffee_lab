@@ -1,0 +1,172 @@
+{
+  "generated_at": "2026-06-03T16:24:23",
+  "inputs": {
+    "coffee_c_usd_lb": 2.592,
+    "coffee_c_date": "2026-06-02",
+    "coffee_c_source": "Yahoo Finance KC=F (ICE Coffee C, delayed)",
+    "usd_krw": 1511.3,
+    "usd_krw_date": "2026-06-02",
+    "usd_krw_source": "ECOS(한국은행) 731Y001/0000001"
+  },
+  "assumptions": {
+    "cif_rate": 0.1,
+    "tariff_rate": 0.02,
+    "logistics_krw_per_kg": 300,
+    "importer_margin_rate": 0.15,
+    "roast_loss_rate": 0.18
+  },
+  "rows": [
+    {
+      "origin": "Colombia",
+      "note": "프리미엄",
+      "point_diff": 1000,
+      "fob_usd_lb": 2.692,
+      "green_krw_per_kg": 11918,
+      "roasted_krw_per_kg": 14534
+    },
+    {
+      "origin": "Costa Rica",
+      "note": "프리미엄",
+      "point_diff": 1000,
+      "fob_usd_lb": 2.692,
+      "green_krw_per_kg": 11918,
+      "roasted_krw_per_kg": 14534
+    },
+    {
+      "origin": "Kenya",
+      "note": "프리미엄",
+      "point_diff": 1000,
+      "fob_usd_lb": 2.692,
+      "green_krw_per_kg": 11918,
+      "roasted_krw_per_kg": 14534
+    },
+    {
+      "origin": "Guatemala",
+      "note": "프리미엄",
+      "point_diff": 500,
+      "fob_usd_lb": 2.642,
+      "green_krw_per_kg": 11703,
+      "roasted_krw_per_kg": 14272
+    },
+    {
+      "origin": "Mexico",
+      "note": "par",
+      "point_diff": 0,
+      "fob_usd_lb": 2.592,
+      "green_krw_per_kg": 11488,
+      "roasted_krw_per_kg": 14010
+    },
+    {
+      "origin": "El Salvador",
+      "note": "par",
+      "point_diff": 0,
+      "fob_usd_lb": 2.592,
+      "green_krw_per_kg": 11488,
+      "roasted_krw_per_kg": 14010
+    },
+    {
+      "origin": "Nicaragua",
+      "note": "par",
+      "point_diff": 0,
+      "fob_usd_lb": 2.592,
+      "green_krw_per_kg": 11488,
+      "roasted_krw_per_kg": 14010
+    },
+    {
+      "origin": "Honduras",
+      "note": "par",
+      "point_diff": 0,
+      "fob_usd_lb": 2.592,
+      "green_krw_per_kg": 11488,
+      "roasted_krw_per_kg": 14010
+    },
+    {
+      "origin": "Peru",
+      "note": "par",
+      "point_diff": 0,
+      "fob_usd_lb": 2.592,
+      "green_krw_per_kg": 11488,
+      "roasted_krw_per_kg": 14010
+    },
+    {
+      "origin": "Panama",
+      "note": "par",
+      "point_diff": 0,
+      "fob_usd_lb": 2.592,
+      "green_krw_per_kg": 11488,
+      "roasted_krw_per_kg": 14010
+    },
+    {
+      "origin": "Tanzania",
+      "note": "par",
+      "point_diff": 0,
+      "fob_usd_lb": 2.592,
+      "green_krw_per_kg": 11488,
+      "roasted_krw_per_kg": 14010
+    },
+    {
+      "origin": "Uganda",
+      "note": "par",
+      "point_diff": 0,
+      "fob_usd_lb": 2.592,
+      "green_krw_per_kg": 11488,
+      "roasted_krw_per_kg": 14010
+    },
+    {
+      "origin": "Papua New Guinea",
+      "note": "par",
+      "point_diff": 0,
+      "fob_usd_lb": 2.592,
+      "green_krw_per_kg": 11488,
+      "roasted_krw_per_kg": 14010
+    },
+    {
+      "origin": "Burundi",
+      "note": "디스카운트",
+      "point_diff": -100,
+      "fob_usd_lb": 2.582,
+      "green_krw_per_kg": 11445,
+      "roasted_krw_per_kg": 13957
+    },
+    {
+      "origin": "Rwanda",
+      "note": "디스카운트",
+      "point_diff": -100,
+      "fob_usd_lb": 2.582,
+      "green_krw_per_kg": 11445,
+      "roasted_krw_per_kg": 13957
+    },
+    {
+      "origin": "Venezuela",
+      "note": "디스카운트",
+      "point_diff": -100,
+      "fob_usd_lb": 2.582,
+      "green_krw_per_kg": 11445,
+      "roasted_krw_per_kg": 13957
+    },
+    {
+      "origin": "India",
+      "note": "디스카운트",
+      "point_diff": -100,
+      "fob_usd_lb": 2.582,
+      "green_krw_per_kg": 11445,
+      "roasted_krw_per_kg": 13957
+    },
+    {
+      "origin": "Dominican Republic",
+      "note": "디스카운트",
+      "point_diff": -400,
+      "fob_usd_lb": 2.552,
+      "green_krw_per_kg": 11316,
+      "roasted_krw_per_kg": 13800
+    },
+    {
+      "origin": "Ecuador",
+      "note": "디스카운트",
+      "point_diff": -400,
+      "fob_usd_lb": 2.552,
+      "green_krw_per_kg": 11316,
+      "roasted_krw_per_kg": 13800
+    }
+  ]
+}
