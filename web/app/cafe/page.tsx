@@ -8,6 +8,8 @@ type Cafe = {
   vibe: string; note: string; price_hint: string; source: string;
   acidity: number; body: number; sweet: number; taste_pick: string; tone: string;
   photo_url: string | null;
+  synth_grade: string | null; synth_identity: string | null;
+  synth_basis: string | null; synth_count: number | null;
 };
 
 const PURPOSES = [
@@ -16,18 +18,21 @@ const PURPOSES = [
   { key: "수다", label: "수다 떨기", emoji: "💬" },
   { key: "빵", label: "빵·디저트", emoji: "🥐" },
 ];
-
 const TASTE_Q = [
   { id: "acidity", q: "산미는 어때요?", opts: [{ label: "상큼한 거 좋아요", v: 0.85 }, { label: "적당히", v: 0.5 }, { label: "부드러운 게 좋아요", v: 0.2 }] },
   { id: "body", q: "진하기는?", opts: [{ label: "묵직·진하게", v: 0.85 }, { label: "중간", v: 0.5 }, { label: "가볍게", v: 0.2 }] },
   { id: "sweet", q: "단맛은?", opts: [{ label: "달달한 게 좋아요", v: 0.8 }, { label: "상관없음", v: 0.5 }, { label: "깔끔한 게 좋아요", v: 0.25 }] },
 ];
-
 const TONES: Record<string, { from: string; to: string; ink: string }> = {
   amber: { from: "#c8893f", to: "#8a5a24", ink: "#fff" }, brown: { from: "#6f4e37", to: "#3d2a1d", ink: "#fff" },
   rose: { from: "#c97a6d", to: "#8f4a44", ink: "#fff" }, dark: { from: "#3a2e28", to: "#1a1310", ink: "#fff" },
   green: { from: "#5f7355", to: "#36412f", ink: "#fff" }, gold: { from: "#c9a227", to: "#8a6d15", ink: "#fff" },
   steel: { from: "#7d8794", to: "#454d57", ink: "#fff" }, cream: { from: "#d8c3a0", to: "#a8895f", ink: "#3d2a1d" },
+};
+const GRADE_STYLE: Record<string, { bg: string; label: string }> = {
+  검증: { bg: "#5f7355", label: "검증 · 리뷰 30건+" },
+  참고: { bg: "#9c6b3f", label: "참고" },
+  발굴: { bg: "#a8927a", label: "발굴 · 데이터 적음" },
 };
 
 function Visual({ c }: { c: Cafe }) {
@@ -165,13 +170,18 @@ export default function CafePage() {
             <div className="space-y-6">
               {ranked.map((c, i) => {
                 const reason = matchReason(c, pref);
+                const g = c.synth_grade ? GRADE_STYLE[c.synth_grade] : null;
                 return (
                   <article key={c.id} className="bg-[#fdfaf4] rounded-2xl p-5 shadow-[0_4px_24px_rgba(80,50,20,0.08)] border border-[#ece0cd]">
                     {pref && i === 0 && <div className="text-[11px] font-bold text-[#9c6b3f] uppercase tracking-wider mb-2">★ 당신께 가장 가까운 곳</div>}
                     <Visual c={c} />
-                    <h2 className="text-2xl font-bold leading-tight">{c.name}</h2>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h2 className="text-2xl font-bold leading-tight">{c.name}</h2>
+                      {g && <span className="text-[10px] text-white px-2 py-0.5 rounded-full" style={{ background: g.bg }}>{g.label}</span>}
+                    </div>
                     <div className="text-[#9c6b3f] text-sm mt-0.5 mb-3">{c.vibe}</div>
                     {c.note && <p className="text-[18px] leading-relaxed text-[#3d2f22] font-medium mb-4">“{c.note}”</p>}
+
                     {reason && (
                       <div className="bg-[#e8f0e3] border border-[#bcd4ad] rounded-xl px-4 py-3 mb-3">
                         <div className="text-[11px] text-[#5f7355] uppercase tracking-wider mb-0.5">추천 근거</div>
@@ -179,11 +189,21 @@ export default function CafePage() {
                       </div>
                     )}
                     {c.taste_pick && (
-                      <div className="bg-[#f0e6d4] rounded-xl px-4 py-3 mb-4">
+                      <div className="bg-[#f0e6d4] rounded-xl px-4 py-3 mb-3">
                         <div className="text-[11px] text-[#9c6b3f] uppercase tracking-wider mb-0.5">이런 분께</div>
                         <div className="text-[15px] text-[#52402e] leading-snug">{c.taste_pick}</div>
                       </div>
                     )}
+
+                    {/* 합성 근거 — 카카오맵과 다른 핵심 (헌법1·7) */}
+                    {c.synth_identity && (
+                      <div className="bg-[#efe9dd] rounded-xl px-4 py-3 mb-4 border border-[#ddd0bb]">
+                        <div className="text-[11px] text-[#8a7458] uppercase tracking-wider mb-1">리뷰 종합 분석 {c.synth_count ? `· ${c.synth_count}건` : ""}</div>
+                        <div className="text-[14px] text-[#52402e] leading-snug">{c.synth_identity}</div>
+                        {c.synth_basis && <div className="text-[11px] text-[#a8927a] mt-1.5">근거: {c.synth_basis}</div>}
+                      </div>
+                    )}
+
                     {c.acidity != null && (
                       <div className="flex gap-4 mb-4 text-[11px] text-[#8a7458]">
                         {([["산미", c.acidity], ["바디", c.body], ["단맛", c.sweet]] as [string, number][]).map(([l, v]) => (
@@ -207,7 +227,7 @@ export default function CafePage() {
             </div>
           )}
         <a href="/cafe/register" className="block mt-10 text-center text-sm text-[#9c6b3f] underline">사장님이세요? 우리 가게 등록하기 →</a>
-        <footer className="mt-8 pt-6 border-t border-[#d9c9b0] text-[11px] text-[#a8927a] leading-relaxed">위치·시간·평점은 공개 정보 · 한줄평·취향 매칭은 큐레이션입니다. 강동·구리 지역.</footer>
+        <footer className="mt-8 pt-6 border-t border-[#d9c9b0] text-[11px] text-[#a8927a] leading-relaxed">위치·시간·평점은 공개 정보 · 리뷰 종합 분석은 공개 리뷰를 교차검증한 결과입니다(근거 표시). 강동·구리 지역.</footer>
       </div>
       <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet" />
     </main>
