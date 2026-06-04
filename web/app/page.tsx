@@ -2,59 +2,56 @@ import Link from "next/link";
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-[#0c0a09] text-stone-100" style={{ fontFamily: "'DM Sans', system-ui, sans-serif" }}>
-      <div className="max-w-4xl mx-auto px-6 py-20">
-        <header className="mb-16">
-          <div className="flex items-center gap-2 mb-6">
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-            <span className="text-amber-500/90 text-sm tracking-[0.3em] uppercase font-semibold">Beanmark</span>
-          </div>
-          <h1 className="text-5xl font-bold tracking-tight leading-[1.1]">커피를 데이터로<br />다시 본다</h1>
-          <p className="text-stone-400 mt-6 text-lg max-w-xl leading-relaxed">
-            국제 시세·환율과 실제 관능 평가 데이터를 기반으로,
-            소비자에겐 취향에 맞는 원두를, 로스터리에겐 투명한 원가와 구매 판단을 제공합니다.
+    <main className="min-h-screen bg-[#f4ece0] text-[#2b2018]" style={{ fontFamily: "'Gowun Batang', serif" }}>
+      <div className="max-w-2xl mx-auto px-6 py-16">
+        {/* 히어로 */}
+        <header className="mb-14">
+          <div className="text-[#9c6b3f] text-xs tracking-[0.4em] uppercase mb-4">Neighborhood Coffee Guide</div>
+          <h1 className="text-5xl font-bold leading-[1.15]">
+            동네 커피 노트
+          </h1>
+          <p className="text-[#6b5a48] mt-5 text-lg leading-relaxed">
+            프랜차이즈 말고, 내 동네에 숨어 있는 진짜 좋은 커피.
+            별점이 아니라 커피 좀 아는 사람이 직접 골라 적었습니다.
           </p>
         </header>
 
-        <div className="grid md:grid-cols-2 gap-5">
-          <Link href="/taste" className="group bg-[#f5efe6] text-stone-900 rounded-2xl p-8 hover:-translate-y-1 transition-transform">
-            <div className="text-amber-800 text-xs tracking-widest uppercase mb-3 font-semibold">For You · 소비자</div>
-            <h2 className="text-2xl font-bold mb-2">취향 원두 찾기</h2>
-            <p className="text-stone-600 text-sm mb-6 leading-relaxed">취향을 조절하면 1,300여 종 큐핑 데이터로 맞는 원두를 찾고 구매처까지 연결.</p>
-            <span className="text-amber-800 font-semibold text-sm group-hover:underline">시작하기 →</span>
+        {/* 두 갈래 진입 */}
+        <div className="space-y-4">
+          <Link href="/cafe" className="group block bg-[#fdfaf4] rounded-2xl p-7 border border-[#ece0cd] shadow-[0_2px_20px_rgba(80,50,20,0.06)] hover:border-[#9c6b3f] transition-colors">
+            <div className="text-[#9c6b3f] text-xs tracking-widest uppercase mb-2">커피 마실 곳 찾기</div>
+            <h2 className="text-2xl font-bold mb-2">강동 동네 카페 둘러보기</h2>
+            <p className="text-[#6b5a48] text-[15px] leading-relaxed mb-4">
+              오늘 뭐 하러 가는지(작업·수다·혼자) 고르면, 거기 맞는 동네 로스터리를 안목 담긴 노트와 함께 보여드려요.
+            </p>
+            <span className="text-[#9c6b3f] font-medium text-sm group-hover:underline">가이드 열기 →</span>
           </Link>
-          <Link href="/cost" className="group bg-stone-900 border border-stone-800 rounded-2xl p-8 hover:-translate-y-1 transition-transform">
-            <div className="text-amber-500 text-xs tracking-widest uppercase mb-3 font-semibold">For Roasters · 로스터리</div>
-            <h2 className="text-2xl font-bold mb-2">생두 원가 · 구매 판단</h2>
-            <p className="text-stone-400 text-sm mb-6 leading-relaxed">ICE 시세·환율·FTA 관세로 산지별 원가를 추정하고, 지금이 살 때인지 판단을 제시.</p>
-            <span className="text-amber-500 font-semibold text-sm group-hover:underline">대시보드 →</span>
+
+          <Link href="/cafe/register" className="group block bg-[#2b2018] text-[#f4ece0] rounded-2xl p-7 hover:bg-[#3d2f22] transition-colors">
+            <div className="text-[#d4a574] text-xs tracking-widest uppercase mb-2">사장님이세요?</div>
+            <h2 className="text-2xl font-bold mb-2">우리 가게 소개하기</h2>
+            <p className="text-[#cbb89f] text-[15px] leading-relaxed mb-4">
+              광고가 아니라, 커피를 아는 손님에게 우리 가게의 결을 전하는 안내. 무료로 등록하세요.
+            </p>
+            <span className="text-[#d4a574] font-medium text-sm group-hover:underline">가게 등록하기 →</span>
           </Link>
         </div>
 
-        <Link href="/insights" className="block mt-5 bg-stone-900/60 border border-stone-800 rounded-2xl p-6 hover:border-amber-700/60 transition-colors group">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-amber-500/80 text-xs tracking-widest uppercase mb-1 font-semibold">Insights</div>
-              <h2 className="text-lg font-bold">취향 트렌드 — 지금 사람들이 찾는 원두</h2>
-            </div>
-            <span className="text-amber-500 font-semibold text-sm group-hover:underline">보기 →</span>
+        {/* 우리가 다른 점 */}
+        <section className="mt-14">
+          <div className="text-[#9c6b3f] text-xs tracking-widest uppercase mb-4">네이버 지도와 다른 점</div>
+          <div className="space-y-3 text-[15px] text-[#524434] leading-relaxed">
+            <p>· <strong className="text-[#2b2018]">별점이 아니라 안목.</strong> "4.5점"이 아니라 "이 집은 이래서, 이런 사람한테, 이걸 시켜".</p>
+            <p>· <strong className="text-[#2b2018]">발견이 아니라 연결.</strong> 그냥 목록이 아니라 오늘 내 목적에 맞는 곳으로.</p>
+            <p>· <strong className="text-[#2b2018]">커피를 아는 사람의 노트.</strong> 원두·로스팅·맛까지 읽고 고른 안내.</p>
           </div>
-        </Link>
-
-        <section className="mt-12 grid grid-cols-3 gap-4 text-center">
-          {[["1,300+", "큐핑 평가 원두"], ["매일", "자동 시세 갱신"], ["FTA 반영", "산지별 관세"]].map(([big, small]) => (
-            <div key={small} className="border border-stone-800 rounded-xl py-5">
-              <div className="text-amber-400 text-xl font-bold">{big}</div>
-              <div className="text-stone-500 text-xs mt-1">{small}</div>
-            </div>
-          ))}
         </section>
 
-        <footer className="mt-16 pt-8 border-t border-stone-800 text-xs text-stone-600">
-          데이터 출처: CQI 큐핑 데이터 · ICE Coffee C · 한국은행 ECOS. 원가·향 정보는 추정치를 포함합니다.
+        <footer className="mt-16 pt-8 border-t border-[#d9c9b0] text-[11px] text-[#a8927a] leading-relaxed">
+          위치·영업시간은 공개 정보 · 큐레이션은 직접 확인하거나 사장님이 등록한 정보입니다. 현재 강동 지역부터 시작합니다.
         </footer>
       </div>
-      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet" />
+      <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet" />
     </main>
   );
 }
