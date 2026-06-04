@@ -7,6 +7,7 @@ type Cafe = {
   roasts_own: boolean; beans: string; signature: string; uses: string;
   vibe: string; note: string; price_hint: string; source: string;
   acidity: number; body: number; sweet: number; taste_pick: string; tone: string;
+  photo_url: string | null;
 };
 
 const PURPOSES = [
@@ -16,14 +17,10 @@ const PURPOSES = [
   { key: "빵", label: "빵·디저트", emoji: "🥐" },
 ];
 
-// 취향 질문 — 직관적 선택지 → 0~1 좌표
 const TASTE_Q = [
-  { id: "acidity", q: "산미는 어때요?", opts: [
-    { label: "상큼한 거 좋아요", v: 0.85 }, { label: "적당히", v: 0.5 }, { label: "부드러운 게 좋아요", v: 0.2 } ] },
-  { id: "body", q: "진하기는?", opts: [
-    { label: "묵직·진하게", v: 0.85 }, { label: "중간", v: 0.5 }, { label: "가볍게", v: 0.2 } ] },
-  { id: "sweet", q: "단맛은?", opts: [
-    { label: "달달한 게 좋아요", v: 0.8 }, { label: "상관없음", v: 0.5 }, { label: "깔끔한 게 좋아요", v: 0.25 } ] },
+  { id: "acidity", q: "산미는 어때요?", opts: [{ label: "상큼한 거 좋아요", v: 0.85 }, { label: "적당히", v: 0.5 }, { label: "부드러운 게 좋아요", v: 0.2 }] },
+  { id: "body", q: "진하기는?", opts: [{ label: "묵직·진하게", v: 0.85 }, { label: "중간", v: 0.5 }, { label: "가볍게", v: 0.2 }] },
+  { id: "sweet", q: "단맛은?", opts: [{ label: "달달한 게 좋아요", v: 0.8 }, { label: "상관없음", v: 0.5 }, { label: "깔끔한 게 좋아요", v: 0.25 }] },
 ];
 
 const TONES: Record<string, { from: string; to: string; ink: string }> = {
@@ -35,6 +32,15 @@ const TONES: Record<string, { from: string; to: string; ink: string }> = {
 
 function Visual({ c }: { c: Cafe }) {
   const t = TONES[c.tone] ?? TONES.amber;
+  if (c.photo_url) {
+    return (
+      <div className="relative h-40 rounded-xl overflow-hidden mb-4">
+        <img src={c.photo_url} alt={c.name} className="w-full h-full object-cover" />
+        <div className="absolute top-3 right-4 text-[11px] text-white bg-black/40 rounded-full px-2 py-0.5">{c.area}</div>
+        {c.roasts_own && <span className="absolute bottom-3 left-4 text-[10px] text-white bg-[#9c6b3f] rounded-full px-2 py-0.5">직접 로스팅</span>}
+      </div>
+    );
+  }
   return (
     <div className="relative h-28 rounded-xl overflow-hidden mb-4" style={{ background: `linear-gradient(135deg, ${t.from}, ${t.to})` }}>
       <div className="absolute inset-0 opacity-15" style={{ backgroundImage: "radial-gradient(circle at 20% 30%, #fff 1px, transparent 1px), radial-gradient(circle at 70% 70%, #fff 1px, transparent 1px)", backgroundSize: "24px 24px" }} />
@@ -47,7 +53,6 @@ function Visual({ c }: { c: Cafe }) {
   );
 }
 
-// 취향 매칭 근거 문장 생성
 function matchReason(c: Cafe, pref: { acidity: number; body: number; sweet: number } | null): string | null {
   if (!pref || c.acidity == null) return null;
   const diffs = [
@@ -55,7 +60,6 @@ function matchReason(c: Cafe, pref: { acidity: number; body: number; sweet: numb
     { k: "바디", cafe: c.body, want: pref.body, high: "묵직한", low: "가벼운" },
     { k: "단맛", cafe: c.sweet, want: pref.sweet, high: "단맛이 좋은", low: "깔끔한" },
   ];
-  // 사용자가 강하게 원한(0.7+ 또는 0.3-) 축 중, 카페가 잘 맞는 걸 근거로
   for (const d of diffs) {
     if (d.want >= 0.7 && d.cafe >= 0.65) return `${d.k} 좋아하는 당신께 — 여긴 ${d.high} 편이에요`;
     if (d.want <= 0.3 && d.cafe <= 0.35) return `${d.k} 부담스러운 당신께 — 여긴 ${d.low} 편이에요`;
@@ -91,19 +95,17 @@ export default function CafePage() {
     return list;
   }, [cafes, purpose, pref]);
 
-  // STEP 1: 목적
   if (step === "purpose") {
     return (
       <Shell>
-        <div className="text-[#9c6b3f] text-xs tracking-[0.4em] uppercase mb-4">강동 동네 커피 노트</div>
+        <div className="text-[#9c6b3f] text-xs tracking-[0.4em] uppercase mb-4">강동·구리 동네 커피 노트</div>
         <h1 className="text-4xl font-bold leading-snug mb-3">오늘 커피,<br />뭐 하러 가세요?</h1>
         <p className="text-[#6b5a48] mb-10 leading-relaxed">목적과 취향을 알려주시면, 거기 딱 맞는 동네 로스터리를 <strong className="text-[#2b2018]">근거와 함께</strong> 추천해드려요.</p>
         <div className="grid grid-cols-2 gap-3">
           {PURPOSES.map((p) => (
             <button key={p.key} onClick={() => { setPurpose(p.key); setStep("taste"); }}
               className="bg-[#fdfaf4] border border-[#ece0cd] rounded-2xl p-6 text-left hover:border-[#9c6b3f] hover:-translate-y-0.5 transition-all shadow-sm">
-              <div className="text-3xl mb-2">{p.emoji}</div>
-              <div className="text-lg font-bold">{p.label}</div>
+              <div className="text-3xl mb-2">{p.emoji}</div><div className="text-lg font-bold">{p.label}</div>
             </button>
           ))}
         </div>
@@ -112,7 +114,6 @@ export default function CafePage() {
     );
   }
 
-  // STEP 2: 취향
   if (step === "taste") {
     const allAnswered = Object.keys(taste).length === 3;
     return (
@@ -127,16 +128,13 @@ export default function CafePage() {
               <div className="flex flex-wrap gap-2">
                 {q.opts.map((o) => (
                   <button key={o.label} onClick={() => setTaste({ ...taste, [q.id]: o.v })}
-                    className={`px-4 py-2.5 rounded-xl text-sm border transition-colors ${taste[q.id] === o.v ? "bg-[#2b2018] text-[#f4ece0] border-[#2b2018]" : "bg-[#fdfaf4] text-[#6b5a48] border-[#cbb89f] hover:border-[#9c6b3f]"}`}>
-                    {o.label}
-                  </button>
+                    className={`px-4 py-2.5 rounded-xl text-sm border transition-colors ${taste[q.id] === o.v ? "bg-[#2b2018] text-[#f4ece0] border-[#2b2018]" : "bg-[#fdfaf4] text-[#6b5a48] border-[#cbb89f] hover:border-[#9c6b3f]"}`}>{o.label}</button>
                 ))}
               </div>
             </div>
           ))}
         </div>
-        <button onClick={() => setStep("result")} disabled={!allAnswered}
-          className="w-full mt-10 bg-[#2b2018] text-[#f4ece0] rounded-xl py-3.5 font-medium disabled:opacity-40 transition-opacity">
+        <button onClick={() => setStep("result")} disabled={!allAnswered} className="w-full mt-10 bg-[#2b2018] text-[#f4ece0] rounded-xl py-3.5 font-medium disabled:opacity-40 transition-opacity">
           {allAnswered ? "내게 맞는 카페 보기 →" : "세 가지 모두 골라주세요"}
         </button>
         <button onClick={() => setStep("result")} className="w-full mt-3 text-sm text-[#9c6b3f] underline">취향 없이 전체 보기</button>
@@ -144,13 +142,12 @@ export default function CafePage() {
     );
   }
 
-  // STEP 3: 결과
   return (
     <main className="min-h-screen bg-[#f4ece0] text-[#2b2018]" style={{ fontFamily: "'Gowun Batang', serif" }}>
       <div className="max-w-xl mx-auto px-6 py-10">
         <header className="mb-6 flex items-center justify-between">
           <div>
-            <div className="text-[#9c6b3f] text-[11px] tracking-[0.3em] uppercase">강동 동네 커피 노트</div>
+            <div className="text-[#9c6b3f] text-[11px] tracking-[0.3em] uppercase">강동·구리 동네 커피 노트</div>
             <h1 className="text-2xl font-bold mt-1">{purpose ? `${PURPOSES.find((p) => p.key === purpose)?.label}` : "전체"}{pref ? " · 취향 맞춤" : ""}</h1>
           </div>
           <button onClick={() => setStep("purpose")} className="text-xs text-[#9c6b3f] underline">처음부터</button>
@@ -158,7 +155,7 @@ export default function CafePage() {
 
         {pref && (
           <div className="bg-[#2b2018] text-[#f4ece0] rounded-xl px-4 py-3 mb-6 text-sm">
-            당신의 취향: 산미 {Math.round(pref.acidity*100)} · 바디 {Math.round(pref.body*100)} · 단맛 {Math.round(pref.sweet*100)} <span className="text-[#d4a574]">— 가까운 순으로 정렬했어요</span>
+            당신의 취향: 산미 {Math.round(pref.acidity*100)} · 바디 {Math.round(pref.body*100)} · 단맛 {Math.round(pref.sweet*100)} <span className="text-[#d4a574]">— 가까운 순 정렬</span>
           </div>
         )}
 
@@ -175,8 +172,6 @@ export default function CafePage() {
                     <h2 className="text-2xl font-bold leading-tight">{c.name}</h2>
                     <div className="text-[#9c6b3f] text-sm mt-0.5 mb-3">{c.vibe}</div>
                     {c.note && <p className="text-[18px] leading-relaxed text-[#3d2f22] font-medium mb-4">“{c.note}”</p>}
-
-                    {/* 매칭 근거 — "왜 너한테 맞는지" */}
                     {reason && (
                       <div className="bg-[#e8f0e3] border border-[#bcd4ad] rounded-xl px-4 py-3 mb-3">
                         <div className="text-[11px] text-[#5f7355] uppercase tracking-wider mb-0.5">추천 근거</div>
@@ -189,26 +184,20 @@ export default function CafePage() {
                         <div className="text-[15px] text-[#52402e] leading-snug">{c.taste_pick}</div>
                       </div>
                     )}
-
                     {c.acidity != null && (
                       <div className="flex gap-4 mb-4 text-[11px] text-[#8a7458]">
                         {([["산미", c.acidity], ["바디", c.body], ["단맛", c.sweet]] as [string, number][]).map(([l, v]) => (
-                          <div key={l} className="flex-1">
-                            <div className="mb-1">{l}</div>
-                            <div className="h-1 bg-[#e3d6c2] rounded-full overflow-hidden"><div className="h-full bg-[#9c6b3f]" style={{ width: `${(v ?? 0.5) * 100}%` }} /></div>
-                          </div>
+                          <div key={l} className="flex-1"><div className="mb-1">{l}</div>
+                            <div className="h-1 bg-[#e3d6c2] rounded-full overflow-hidden"><div className="h-full bg-[#9c6b3f]" style={{ width: `${(v ?? 0.5) * 100}%` }} /></div></div>
                         ))}
                       </div>
                     )}
-
                     <dl className="text-sm space-y-1 text-[#6b5a48] mb-4">
                       {c.signature && <div><dt className="inline text-[#9c6b3f]">추천 </dt><dd className="inline">{c.signature}</dd></div>}
                       {c.price_hint && <div><dt className="inline text-[#9c6b3f]">가격 </dt><dd className="inline">{c.price_hint}</dd></div>}
                     </dl>
-
                     <div className="flex gap-2">
-                      <a href={`https://map.kakao.com/?q=${encodeURIComponent(c.name + " " + c.area)}`} target="_blank" rel="noopener noreferrer"
-                         className="flex-1 text-center bg-[#2b2018] text-[#f4ece0] rounded-lg py-2.5 text-sm font-medium hover:bg-[#3d2f22] transition-colors">지도·길찾기</a>
+                      <a href={`https://map.kakao.com/?q=${encodeURIComponent(c.name + " " + c.area)}`} target="_blank" rel="noopener noreferrer" className="flex-1 text-center bg-[#2b2018] text-[#f4ece0] rounded-lg py-2.5 text-sm font-medium hover:bg-[#3d2f22] transition-colors">지도·길찾기</a>
                       {c.phone && <a href={`tel:${c.phone}`} className="px-4 text-center bg-transparent border border-[#cbb89f] text-[#524434] rounded-lg py-2.5 text-sm font-medium flex items-center">전화</a>}
                     </div>
                     <div className="text-[11px] text-[#a8927a] mt-3">{c.hours} · 공개평점 {c.rating}({c.rating_count})</div>
@@ -217,9 +206,8 @@ export default function CafePage() {
               })}
             </div>
           )}
-
         <a href="/cafe/register" className="block mt-10 text-center text-sm text-[#9c6b3f] underline">사장님이세요? 우리 가게 등록하기 →</a>
-        <footer className="mt-8 pt-6 border-t border-[#d9c9b0] text-[11px] text-[#a8927a] leading-relaxed">위치·시간·평점은 공개 정보 · 한줄평·취향 매칭은 큐레이션입니다. 강동 지역부터 시작합니다.</footer>
+        <footer className="mt-8 pt-6 border-t border-[#d9c9b0] text-[11px] text-[#a8927a] leading-relaxed">위치·시간·평점은 공개 정보 · 한줄평·취향 매칭은 큐레이션입니다. 강동·구리 지역.</footer>
       </div>
       <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet" />
     </main>
