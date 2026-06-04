@@ -37,19 +37,15 @@ export default function CafePage() {
   return (
     <main className="min-h-screen bg-[#f4ece0] text-[#2b2018]" style={{ fontFamily: "'Gowun Batang', serif" }}>
       <div className="max-w-2xl mx-auto px-6 py-12">
-        {/* 헤더 */}
         <header className="mb-8">
           <div className="text-[#9c6b3f] text-xs tracking-[0.4em] uppercase mb-3">Neighborhood Coffee Guide</div>
-          <h1 className="text-4xl font-bold leading-tight" style={{ fontFamily: "'Gowun Batang', serif" }}>
-            강동, 동네 커피 노트
-          </h1>
+          <h1 className="text-4xl font-bold leading-tight">강동, 동네 커피 노트</h1>
           <p className="text-[#6b5a48] mt-3 leading-relaxed">
             별점 말고, 커피 좀 아는 사람이 직접 골라 적은 동네 카페 안내.
             오늘 뭐 하러 가는지 고르면 거기 맞는 곳을 보여드려요.
           </p>
         </header>
 
-        {/* 용도 필터 */}
         <div className="flex flex-wrap gap-2 mb-8">
           {USES.map((u) => (
             <button key={u.key} onClick={() => setUse(u.key)}
@@ -62,7 +58,6 @@ export default function CafePage() {
           ))}
         </div>
 
-        {/* 카페 카드 */}
         {loading ? (
           <p className="text-[#6b5a48]">불러오는 중...</p>
         ) : filtered.length === 0 ? (
@@ -81,28 +76,24 @@ export default function CafePage() {
                 </div>
                 <div className="text-[#9c6b3f] text-sm mb-4">{c.area} · {c.vibe}</div>
 
-                {/* 한 줄평 — 우리만의 것, 가장 크게 */}
                 {c.note && (
-                  <blockquote className="border-l-3 border-[#9c6b3f] pl-4 my-4 text-[17px] leading-relaxed text-[#3d2f22]" style={{ borderLeftWidth: 3 }}>
+                  <blockquote className="border-l-[3px] border-[#9c6b3f] pl-4 my-4 text-[17px] leading-relaxed text-[#3d2f22]">
                     “{c.note}”
                   </blockquote>
                 )}
 
-                {/* 커피 정보 */}
                 <dl className="text-sm space-y-1.5 mt-4 text-[#524434]">
                   {c.beans && <div><dt className="inline text-[#9c6b3f]">원두 </dt><dd className="inline">{c.beans}</dd></div>}
                   {c.signature && <div><dt className="inline text-[#9c6b3f]">추천 </dt><dd className="inline">{c.signature}</dd></div>}
                   {c.price_hint && <div><dt className="inline text-[#9c6b3f]">가격 </dt><dd className="inline">{c.price_hint}</dd></div>}
                 </dl>
 
-                {/* 용도 태그 */}
                 <div className="flex flex-wrap gap-1.5 mt-4">
                   {(c.uses ?? "").split(",").filter(Boolean).map((u) => (
                     <span key={u} className="text-xs bg-[#efe6d6] text-[#6b5a48] px-2.5 py-1 rounded-full">{u}</span>
                   ))}
                 </div>
 
-                {/* 액션 */}
                 <div className="flex gap-2 mt-5 pt-5 border-t border-[#ece0cd]">
                   <a href={`https://map.kakao.com/?q=${encodeURIComponent(c.name + " " + c.area)}`} target="_blank" rel="noopener noreferrer"
                      className="flex-1 text-center bg-[#2b2018] text-[#f4ece0] rounded-lg py-2.5 text-sm font-medium hover:bg-[#3d2f22] transition-colors">
@@ -124,7 +115,11 @@ export default function CafePage() {
           </div>
         )}
 
-        <footer className="mt-12 pt-6 border-t border-[#d9c9b0] text-[11px] text-[#a8927a] leading-relaxed">
+        <a href="/cafe/register" className="block mt-10 text-center text-sm text-[#9c6b3f] underline">
+          사장님이세요? 우리 가게 등록하기 →
+        </a>
+
+        <footer className="mt-8 pt-6 border-t border-[#d9c9b0] text-[11px] text-[#a8927a] leading-relaxed">
           위치·영업시간·평점은 공개 정보 · 큐레이션(원두·추천·한줄평)은 직접 확인하거나 사장님이 등록한 정보입니다.
         </footer>
       </div>
