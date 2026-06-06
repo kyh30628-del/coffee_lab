@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
       try {
         const places = await fetchPlacesReviews(c.name, c.area ?? "");
         const rating = places.place?.rating ?? null;
-        const count = places.place?.userRatingCount ?? places.place?.rating_count ?? null;
+        const count = places.place?.ratingCount ?? null;
         if (rating != null || count != null) {
           await sql`INSERT INTO cafe_snapshots (cafe_id, rating, rating_count) VALUES (${c.id}, ${rating}, ${count})`;
           recorded++;
