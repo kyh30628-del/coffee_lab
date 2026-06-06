@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-type EvidenceReview = { quote: string; link?: string; source?: string; date?: string };
+type EvidenceReview = { quote: string; link?: string; source?: string; date?: string; trust?: "verified" | "reference" | "rejected"; score?: number; why?: string[] };
+type QualityStats = { raw: number; verified: number; reference: number; rejected: number; rejectReasons?: Record<string, number> };
 type Cafe = {
   id: number; name: string; area: string; lat: number; lng: number;
   hours: string; phone: string; roasts_own: boolean; signature: string; uses: string;
@@ -306,12 +307,14 @@ function MapControls({ sido, sigungu, onSido, setSigungu, tasteKey, setTasteKey,
 function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; onMap: () => void }) {
   const g = cafe.synth_grade ? GRADE_STYLE[cafe.synth_grade] : null;
   const [reviews, setReviews] = useState<EvidenceReview[]>([]);
+  const [quality, setQuality] = useState<QualityStats | null>(null);
   const [loadingRev, setLoadingRev] = useState(true);
   useEffect(() => {
     let live = true; setLoadingRev(true);
-    fetch(`/api/cafe-detail?id=${cafe.id}`).then((r) => r.json()).then((d) => { if (live) { setReviews(d.reviews ?? []); setLoadingRev(false); } }).catch(() => { if (live) setLoadingRev(false); });
+    fetch(`/api/cafe-detail?id=${cafe.id}`).then((r) => r.json()).then((d) => { if (live) { setReviews(d.reviews ?? []); setQuality(d.quality ?? null); setLoadingRev(false); } }).catch(() => { if (live) setLoadingRev(false); });
     return () => { live = false; };
   }, [cafe.id]);
+  const kept = quality ? quality.verified + quality.reference : 0;
   const chars = topChars(cafe, 4);
   return (
     <div className="fixed inset-0 z-[3000]" style={{ fontFamily: "'Gowun Batang', serif" }}>
@@ -339,12 +342,28 @@ function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; 
           )}
           {cafe.signature && <div className="text-sm text-[#6b5a48] mb-4"><span className="text-[#9c6b3f]">추천 </span>{cafe.signature}</div>}
           {loadingRev && <div className="text-[11px] text-[#a8927a] mb-4">근거 후기 불러오는 중...</div>}
+          {!loadingRev && quality && quality.raw > 0 && (
+            <div className="bg-[#eef3ea] border border-[#cfe0c2] rounded-lg px-4 py-2.5 mb-4">
+              <div className="text-[11px] text-[#4f6a43] leading-relaxed">
+                🔍 네이버 공개 글 <b>{quality.raw}건</b>을 검증해, 다른 가게·모음글·동명 카페 등 <b>노이즈 {quality.rejected}건</b>을 걸러내고
+                <b> 옥석 {kept}건</b>만 분석에 썼어요.
+              </div>
+            </div>
+          )}
           {!loadingRev && reviews.length > 0 && (
             <div className="mb-4">
               <div className="text-[11px] text-[#a8927a] mb-2">이 분석의 근거가 된 실제 후기 (네이버 공개 글)</div>
               <div className="space-y-3">
                 {reviews.map((rv, i) => (
                   <div key={i} className="border-b border-[#f0e6d4] pb-3 last:border-0">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      {rv.trust === "verified"
+                        ? <span className="text-[9px] text-white px-1.5 py-0.5 rounded-full" style={{ background: "#5f7355" }}>검증 ✓</span>
+                        : rv.trust === "reference"
+                        ? <span className="text-[9px] text-white px-1.5 py-0.5 rounded-full" style={{ background: "#9c6b3f" }}>참고</span>
+                        : null}
+                      {rv.why?.[0] && <span className="text-[10px] text-[#8a7458]">{rv.why[0]}</span>}
+                    </div>
                     <div className="text-[13px] text-[#3d2f22] leading-relaxed">“{rv.quote}”</div>
                     <div className="flex items-center gap-2 mt-1.5 text-[10px] text-[#a8927a]"><span>{rv.source}</span>{rv.date && <span>· {rv.date}</span>}{rv.link && <a href={rv.link} target="_blank" rel="noopener noreferrer" className="text-[#9c6b3f] underline ml-auto">원문 →</a>}</div>
                   </div>
