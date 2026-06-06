@@ -62,9 +62,14 @@ export async function GET() {
     const row = (await sql`
       SELECT COUNT(*)::int AS total,
              COUNT(*) FILTER (WHERE agreed)::int AS agreed,
-             COUNT(*) FILTER (WHERE region IS NOT NULL)::int AS located
+             COUNT(*) FILTER (WHERE region IS NOT NULL)::int AS located,
+             COUNT(*) FILTER (WHERE created_at > now() - interval '7 days')::int AS last7d
       FROM user_consents`)[0];
-    return NextResponse.json({ ok: true, ...row });
+    const topRegions = await sql`
+      SELECT region, COUNT(*)::int AS n
+      FROM user_consents WHERE region IS NOT NULL
+      GROUP BY region ORDER BY n DESC LIMIT 10`;
+    return NextResponse.json({ ok: true, ...row, topRegions });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }

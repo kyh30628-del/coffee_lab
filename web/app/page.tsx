@@ -325,7 +325,7 @@ export default function Home() {
             <div ref={mapRef} className="w-full h-full md:rounded-2xl overflow-hidden bg-[#e8e0d3] z-0" />
           </div>
           <aside className="hidden md:block md:w-[380px] md:h-full bg-[#fdfaf4] border-l border-[#ece0cd] overflow-y-auto p-6 relative z-10">
-            <MapControls {...{ sido, sigungu, onSido, setSigungu, tasteKey, setTasteKey, filtered, matchSet, setSelected }} />
+            <MapControls {...{ sido, sigungu, onSido, setSigungu, tasteKey, setTasteKey, filtered, matchSet, setSelected, openLocation, autoGu, geoMsg, clearAuto }} />
           </aside>
           <div className="md:hidden absolute left-0 right-0 bottom-0 bg-[#fdfaf4] rounded-t-3xl shadow-[0_-4px_24px_rgba(0,0,0,0.18)] z-[1200] flex flex-col transition-transform duration-300 ease-out will-change-transform" style={{ height: "72dvh", transform: sheetOpen ? "translateY(0)" : "translateY(calc(72dvh - 60px))" }}>
             <button onClick={() => setSheetOpen((o) => !o)} className="shrink-0 w-full pt-3 pb-2.5 flex flex-col items-center gap-1.5" aria-expanded={sheetOpen}>
@@ -333,7 +333,7 @@ export default function Home() {
               <span className="text-[11px] font-bold text-[#9c6b3f]">{sheetOpen ? "지도 보기 ▾" : `지역·필터 펼치기 ▴ (${filtered.length})`}</span>
             </button>
             <div className="flex-1 overflow-y-auto px-5 pb-8" style={{ WebkitOverflowScrolling: "touch" }}>
-              <MapControls {...{ sido, sigungu, onSido, setSigungu, tasteKey, setTasteKey, filtered, matchSet, setSelected }} />
+              <MapControls {...{ sido, sigungu, onSido, setSigungu, tasteKey, setTasteKey, filtered, matchSet, setSelected, openLocation, autoGu, geoMsg, clearAuto }} />
             </div>
           </div>
         </div>
@@ -348,18 +348,22 @@ export default function Home() {
           <div className="relative bg-[#fdfaf4] w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl p-6 shadow-2xl">
             <div className="text-2xl mb-1">📍</div>
             <h3 className="text-lg font-bold text-[#2b2018] mb-2">내 동네 카페 먼저 보기</h3>
-            <p className="text-[13px] text-[#52402e] leading-relaxed mb-3">
-              위치를 확인해 가장 가까운 동네(시·군·구)의 <b>검증된 카페</b>를 먼저 보여드려요.
-              정확한 좌표가 아니라 <b>대략적 지역</b>만 쓰고, 언제든 끌 수 있어요.
+            <p className="text-[13px] text-[#52402e] leading-relaxed mb-2">
+              동네 커피 가이드라서, 위치를 알면 <b>가장 가까운 동네(시·군·구)의 검증된 카페</b>를 바로 보여드릴 수 있어요.
+            </p>
+            <p className="text-[12px] text-[#6b5a48] leading-relaxed mb-3">
+              정확한 좌표가 아니라 <b>대략적 지역만</b> 쓰고(저장도 ≈1km로 뭉뚱그려요), 이름·연락처 같은 <b>개인정보는 받지 않아요</b>. 동의는 <b>선택</b>이고 언제든 끌 수 있어요. 동의하시면 브라우저가 위치 권한을 한 번 더 물어봅니다.
             </p>
             <details className="mb-4">
-              <summary className="text-[12px] text-[#9c6b3f] cursor-pointer">수집·이용 동의 내용 보기</summary>
+              <summary className="text-[12px] text-[#9c6b3f] cursor-pointer">수집·이용 동의 내용 자세히 보기</summary>
               <div className="text-[11px] text-[#6b5a48] leading-relaxed mt-2 bg-[#f4ece0] rounded-lg p-3 space-y-1">
-                <div>· 수집 항목: 대략적 위치(시·군·구 수준), 익명 식별자</div>
-                <div>· 이용 목적: 내 동네 카페 자동 추천·필터</div>
-                <div>· 보관 기간: 동의 철회(브라우저 데이터 삭제) 시까지</div>
-                <div>· 제3자 제공: 없음 · 이름·연락처 등 개인정보는 받지 않아요</div>
-                <div>· 거부하셔도 전체 카페는 그대로 이용할 수 있어요</div>
+                <div>· <b>수집 항목</b>: 대략적 위치(시·군·구 수준), 브라우저 익명 식별자</div>
+                <div>· <b>이용 목적</b>: 내 동네 카페 자동 추천·필터, 지역별 수요 통계</div>
+                <div>· <b>보관·파기</b>: 동의 철회 또는 브라우저 데이터 삭제 시까지, 이후 파기</div>
+                <div>· <b>제3자 제공·판매</b>: 일절 없음</div>
+                <div>· <b>개인정보</b>: 이름·연락처·정밀 위치는 수집·저장하지 않습니다</div>
+                <div>· <b>거부 권리</b>: 거부해도 전체 카페를 그대로 이용할 수 있어요</div>
+                <div>· <b>철회 방법</b>: 위 '전체보기'로 끄거나 브라우저 사이트 데이터 삭제</div>
               </div>
             </details>
             <div className="flex flex-col gap-2">
@@ -374,11 +378,16 @@ export default function Home() {
   );
 }
 
-function MapControls({ sido, sigungu, onSido, setSigungu, tasteKey, setTasteKey, filtered, matchSet, setSelected }: any) {
+function MapControls({ sido, sigungu, onSido, setSigungu, tasteKey, setTasteKey, filtered, matchSet, setSelected, openLocation, autoGu, geoMsg, clearAuto }: any) {
   return (
     <>
       <div className="mb-5">
-        <div className="text-sm font-bold text-[#52402e] mb-2.5">📍 지역</div>
+        <div className="flex items-center justify-between mb-2.5">
+          <div className="text-sm font-bold text-[#52402e]">📍 지역</div>
+          {autoGu
+            ? <span className="text-[11px] text-[#5f7355] bg-[#eef3ea] border border-[#cfe0c2] rounded-full px-2 py-0.5">내 위치 <b>{autoGu}</b></span>
+            : <button onClick={openLocation} className="text-[11px] text-white bg-[#5f7355] rounded-full px-2.5 py-1 font-medium">📍 내 위치로</button>}
+        </div>
         <div className="flex gap-2">
           <select value={sido} onChange={(e) => onSido(e.target.value)} className="flex-1 border border-[#cbb89f] rounded-lg px-3 py-2.5 text-base bg-white text-[#2b2018]">
             <option value="">시·도</option>{Object.keys(REGIONS).map((s) => <option key={s} value={s}>{s}</option>)}
@@ -387,7 +396,8 @@ function MapControls({ sido, sigungu, onSido, setSigungu, tasteKey, setTasteKey,
             <option value="">시·군·구</option>{sido && REGIONS[sido].map((g: string) => <option key={g} value={g}>{g}</option>)}
           </select>
         </div>
-        {(sido || sigungu) && <button onClick={() => { onSido(""); setSigungu(""); }} className="text-xs text-[#9c6b3f] underline mt-2">전체</button>}
+        {geoMsg && <div className="text-[10px] text-[#a8927a] mt-1.5">{geoMsg}</div>}
+        {(sido || sigungu) && <button onClick={() => { if (clearAuto) clearAuto(); else { onSido(""); setSigungu(""); } }} className="text-xs text-[#9c6b3f] underline mt-2">전체</button>}
       </div>
       <div className="mb-5">
         <div className="text-sm font-bold text-[#52402e] mb-2.5">☕ 어떤 카페 찾으세요?</div>

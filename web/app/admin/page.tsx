@@ -5,11 +5,13 @@ type Cafe = {
   id: number; name: string; area: string; note: string; beans: string;
   signature: string; uses: string; phone: string; source: string; published: boolean;
 };
+type Consent = { total: number; agreed: number; located: number; last7d: number; topRegions: { region: string; n: number }[] };
 
 export default function AdminPage() {
   const [pw, setPw] = useState("");
   const [authed, setAuthed] = useState(false);
   const [cafes, setCafes] = useState<Cafe[]>([]);
+  const [consent, setConsent] = useState<Consent | null>(null);
   const [msg, setMsg] = useState("");
 
   const load = async (password: string) => {
@@ -19,6 +21,7 @@ export default function AdminPage() {
     const d = await r.json();
     if (d.ok) { setCafes(d.cafes); setAuthed(true); setMsg(""); }
     else setMsg("오류: " + d.error);
+    fetch("/api/consent").then((x) => x.json()).then((c) => { if (c.ok) setConsent(c); }).catch(() => {});
   };
 
   const act = async (id: number, action: string, published?: boolean) => {
@@ -74,6 +77,31 @@ export default function AdminPage() {
     <main className="min-h-screen bg-stone-100 p-6">
       <div className="max-w-2xl mx-auto">
         <h1 className="text-2xl font-bold mb-6">카페 관리</h1>
+
+        {consent && (
+          <section className="mb-8">
+            <h2 className="text-sm font-bold text-stone-500 mb-3">📍 위치 동의 현황</h2>
+            <div className="bg-white rounded-xl p-4 border">
+              <div className="grid grid-cols-4 gap-2 text-center mb-3">
+                <div><div className="text-xl font-bold text-stone-900">{consent.total}</div><div className="text-[11px] text-stone-400">전체</div></div>
+                <div><div className="text-xl font-bold text-emerald-600">{consent.agreed}</div><div className="text-[11px] text-stone-400">동의</div></div>
+                <div><div className="text-xl font-bold text-stone-900">{consent.located}</div><div className="text-[11px] text-stone-400">위치확인</div></div>
+                <div><div className="text-xl font-bold text-amber-600">{consent.last7d}</div><div className="text-[11px] text-stone-400">최근7일</div></div>
+              </div>
+              {consent.topRegions.length > 0 && (
+                <div className="border-t pt-3">
+                  <div className="text-[11px] text-stone-400 mb-1.5">동네별 (상위)</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {consent.topRegions.map((r) => (
+                      <span key={r.region} className="text-xs bg-stone-100 text-stone-600 rounded-full px-2.5 py-1">{r.region} <b className="text-stone-900">{r.n}</b></span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <p className="text-[10px] text-stone-400 mt-2.5">익명 식별자 기준 · 좌표는 ≈1km로 익명화 저장 · 개인 식별정보 미수집</p>
+            </div>
+          </section>
+        )}
 
         <section className="mb-8">
           <h2 className="text-sm font-bold text-stone-500 mb-3">검수 대기 ({pending.length})</h2>
