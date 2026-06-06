@@ -18,9 +18,14 @@ export async function GET(req: NextRequest) {
     await sql.query(`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS embedding vector(${EMBED_DIM})`);
     await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS embed_updated TIMESTAMPTZ`;
 
+    // NULL(미임베딩) 먼저, 그다음 재합성으로 오래된(embed_updated < synth_updated) 것 갱신.
     const rows = (await sql`
       SELECT id, name, area, synth_identity, signature, note, vibe, uses, beans, char_scores, synth_reviews
-      FROM cafes WHERE published = true AND embedding IS NULL LIMIT 100`) as unknown as any[];
+      FROM cafes
+      WHERE published = true
+        AND (embedding IS NULL OR embed_updated IS NULL OR embed_updated < synth_updated)
+      ORDER BY (embedding IS NOT NULL), embed_updated ASC NULLS FIRST
+      LIMIT 100`) as unknown as any[];
 
     let updated = 0;
     if (rows.length > 0) {
