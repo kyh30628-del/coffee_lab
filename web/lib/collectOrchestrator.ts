@@ -1,46 +1,46 @@
-// 수집 오케스트레이터 (PRINCIPLES.md 1·3·4·7조)
-// 여러 소스를 신뢰도/필터정책/최신성과 함께 통합해 합성 입력을 만든다.
-// - 구글 Places: 출처 신뢰 → 필터 off
-// - 웹검색(블로그/다이닝코드 등): 필터 on (노이즈·동명 배제)
-// - 소스별 "맛 묘사 밀도" 가중치 (블로그 상세 > 평점 요약)
-// 실제 검색/Places 호출은 서버에 키 연결 시 connectors로 주입(여기선 인터페이스만).
-
+// 수집 오케스트레이터 (PRINCIPLES.md 1·2·3·4·7조)
 import { filterReviews } from "./noiseFilter";
 import { synthesize, type Review, type SynthResult } from "./synthEngine";
+import type { WebSnippet } from "./webSearchCollector";
 
 export type RawSource = {
   source: "google" | "blog" | "diningcode" | "tripadvisor" | "instagram" | "etc";
-  texts: { text: string; time?: number }[]; // time: epoch초(최신성)
+  texts: WebSnippet[];
 };
 
-// 소스별 신뢰/필터 정책
 const POLICY: Record<RawSource["source"], { filter: boolean; weight: number }> = {
-  google:     { filter: false, weight: 1.0 }, // 출처 보증, 맛묘사 보통
-  blog:       { filter: true,  weight: 1.2 }, // 맛 묘사 진함 → 가중↑
-  diningcode: { filter: true,  weight: 1.1 },
-  tripadvisor:{ filter: true,  weight: 1.0 },
-  instagram:  { filter: true,  weight: 0.8 }, // 홍보성 많음 → 가중↓
-  etc:        { filter: true,  weight: 0.7 },
+  google: { filter: false, weight: 1.0 },
+  blog: { filter: true, weight: 1.2 },
+  diningcode: { filter: true, weight: 1.1 },
+  tripadvisor: { filter: true, weight: 1.0 },
+  instagram: { filter: true, weight: 0.8 },
+  etc: { filter: true, weight: 0.7 },
 };
+
+// 카드에 보여줄 근거 리뷰 (A방식: 인용 한 줄 + 링크 + 출처)
+export type EvidenceReview = { quote: string; link?: string; source?: string; date?: string };
 
 export type CollectResult = {
   synth: SynthResult;
   collected: number;
   perSource: { source: string; raw: number; kept: number }[];
+  evidenceReviews: EvidenceReview[];
 };
 
-export function collectAndSynthesize(
-  name: string,
-  area: string[],
-  sources: RawSource[]
-): CollectResult {
+// 인용은 한 줄로 자름(저작권: 원문 복제 금지, 요약/일부만)
+function toQuote(text: string, maxLen = 80): string {
+  const t = text.trim();
+  return t.length <= maxLen ? t : t.slice(0, maxLen) + "…";
+}
+
+export function collectAndSynthesize(name: string, area: string[], sources: RawSource[]): CollectResult {
   const merged: Review[] = [];
   const perSource: { source: string; raw: number; kept: number }[] = [];
+  const evidenceReviews: EvidenceReview[] = [];
 
   for (const src of sources) {
     const pol = POLICY[src.source];
     let texts = src.texts;
-
     if (pol.filter) {
       const onlyText = texts.map((t) => t.text);
       const { passed } = filterReviews(onlyText, name, area);
@@ -48,14 +48,20 @@ export function collectAndSynthesize(
     }
     perSource.push({ source: src.source, raw: src.texts.length, kept: texts.length });
 
-    // 가중치는 합성 엔진의 최신성 가중과 곱해지도록 time을 보존한 채 전달.
-    // 소스 가중치는 "중복 투표" 방식으로 반영: weight>=1.2면 한 번 더 카운트되게 복제.
     for (const t of texts) {
       merged.push({ text: t.text, time: t.time });
-      if (pol.weight >= 1.2) merged.push({ text: t.text, time: t.time }); // 맛묘사 진한 소스 가중
+      if (pol.weight >= 1.2) merged.push({ text: t.text, time: t.time });
+      // 링크 있는 것 위주로 근거 리뷰에 추가 (최신순 정렬은 아래)
+      if (t.link) {
+        evidenceReviews.push({ quote: toQuote(t.text), link: t.link, source: t.source, date: t.date });
+      }
     }
   }
 
+  // 근거 리뷰: 최신순으로 정렬, 최대 6개만 (카드 호버용)
+  evidenceReviews.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
+  const topEvidence = evidenceReviews.slice(0, 6);
+
   const synth = synthesize(name, merged);
-  return { synth, collected: merged.length, perSource };
+  return { synth, collected: merged.length, perSource, evidenceReviews: topEvidence };
 }
