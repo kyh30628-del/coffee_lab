@@ -158,7 +158,7 @@ export default function OwnerPage() {
                     <Legend wrapperStyle={{ fontSize: 12 }} />
                   </RadarChart>
                 </ResponsiveContainer>
-                <div className="text-[10px] text-[#a8927a] mt-1 leading-relaxed">0~100점 = 같은 특징이 언급된 수도권 카페들 분포 안에서의 상대 위치(높을수록 그 특징이 두드러짐). 리뷰 언급 빈도 기반이며 측정값이 아닙니다.</div>
+                <div className="text-[10px] text-[#a8927a] mt-1 leading-relaxed">0~100점 = 같은 동네 카페들 분포 안에서의 상대 위치(50 = 동네 중간, 높을수록 그 특징이 두드러짐). 리뷰 언급 빈도 기반이며 측정값이 아닙니다.</div>
               </>)}
               {tab === "pie" && (<>
                 <div className="text-[11px] text-[#8a7458] uppercase tracking-wider mb-3">우리 카페는 어떤 특징으로 이야기되나</div>

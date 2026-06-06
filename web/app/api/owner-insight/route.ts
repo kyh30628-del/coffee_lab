@@ -41,22 +41,23 @@ export async function GET(req: NextRequest) {
     const rank = sorted.findIndex((c) => c.name === me.name) + 1;
     const rankList = sorted.map((c, i) => ({ rank: i + 1, name: c.name, count: c.synth_count ?? 0, grade: c.synth_grade, isMe: c.name === me.name }));
 
-    // ===== 축별 점수화 (절대 카운트 → 도시 전체 분포 내 백분위 0~100) =====
+    // ===== 축별 점수화 (절대 카운트 → 같은 동네 분포 내 백분위 0~100) =====
     // PRINCIPLES §3/§5: 절대점수 대신 분포 내 상대 위치로 변환·정규화.
     // raw 카운트는 (a)축마다 키워드 흔한 정도가 달라 baseline이 안 맞고(디저트·분위기↑, 작업·조용↓),
     // (b)리뷰량 많을수록 모든 축이 커지는 볼륨 편향이 있어 그대로 비교하면 무의미하다.
-    // → 각 축을 "그 특징이 언급된 도시 카페들 분포" 안의 백분위로 환산하면 두 편향이 동시에 제거된다.
-    const cityNonzero: Record<string, number[]> = {};
+    // 기준 분포는 "같은 동네(구/시) 카페들" — 사장님의 실제 경쟁 상대가 동네에 있으므로.
+    // → 각 축을 그 동네 분포 안의 백분위로 환산하면 두 편향이 제거되고 동네 평균이 기준선(~50)이 된다.
+    const hoodNonzero: Record<string, number[]> = {};
     for (const ax of CHAR_AXES) {
-      cityNonzero[ax.key] = all
+      hoodNonzero[ax.key] = hood
         .map((c) => (c.char_scores ?? {})[ax.key] ?? 0)
         .filter((v: number) => v > 0)
         .sort((a: number, b: number) => a - b);
     }
-    // 언급 0 → 0점(근거 없음, 정직히). 그 외 → 비영 분포 내 중위순위 백분위(동률은 절반 배분).
+    // 언급 0 → 0점(근거 없음, 정직히). 그 외 → 동네 비영 분포 내 중위순위 백분위(동률은 절반 배분).
     const axisScore = (count: number, key: string): number => {
       if (!count || count <= 0) return 0;
-      const arr = cityNonzero[key];
+      const arr = hoodNonzero[key];
       if (!arr.length) return 0;
       let below = 0, equal = 0;
       for (const v of arr) { if (v < count) below++; else if (v === count) equal++; }
