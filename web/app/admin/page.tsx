@@ -14,6 +14,7 @@ export default function AdminPage() {
   const [cafes, setCafes] = useState<Cafe[]>([]);
   const [consent, setConsent] = useState<Consent | null>(null);
   const [msg, setMsg] = useState("");
+  const [showAuto, setShowAuto] = useState(false);
 
   const load = async (password: string) => {
     setMsg("불러오는 중...");
@@ -49,7 +50,8 @@ export default function AdminPage() {
     );
   }
 
-  const pending = cafes.filter((c) => !c.published);
+  const ownerPending = cafes.filter((c) => !c.published && c.source === "owner");
+  const autoHidden = cafes.filter((c) => !c.published && c.source !== "owner");
   const live = cafes.filter((c) => c.published);
 
   const Row = ({ c }: { c: Cafe }) => (
@@ -107,14 +109,28 @@ export default function AdminPage() {
           </section>
         )}
 
+        {/* 1) 사장님이 직접 등록 → 사람이 검수해서 공개/거절 */}
         <section className="mb-8">
-          <h2 className="text-sm font-bold text-stone-500 mb-3">검수 대기 ({pending.length})</h2>
-          {pending.length === 0 ? <p className="text-sm text-stone-400">대기 중인 등록이 없습니다.</p> :
-            <div className="space-y-2">{pending.map((c) => <Row key={c.id} c={c} />)}</div>}
+          <h2 className="text-sm font-bold text-stone-700 mb-1">🙋 사장님 등록 검수 대기 ({ownerPending.length})</h2>
+          <p className="text-[11px] text-stone-400 mb-3">사장님이 <b>/cafe/register</b>로 직접 등록한 가게. 확인 후 공개/삭제하세요.</p>
+          {ownerPending.length === 0 ? <p className="text-sm text-stone-400 bg-white rounded-xl p-4 border">아직 사장님 직접 등록 신청이 없습니다.</p> :
+            <div className="space-y-2">{ownerPending.map((c) => <Row key={c.id} c={c} />)}</div>}
+        </section>
+
+        {/* 2) 자동수집 중 데이터 부족(발굴)으로 자동 비공개 — 사람 요청 아님 */}
+        <section className="mb-8">
+          <h2 className="text-sm font-bold text-stone-700 mb-1">🔍 자동수집 미공개 · 데이터 부족 ({autoHidden.length})</h2>
+          <p className="text-[11px] text-stone-400 mb-3">시스템이 모았지만 <b>검증 리뷰 5건 미만(발굴 등급)</b>이라 자동 비공개. 사람이 요청한 게 아니에요. 리뷰가 쌓이면 자동 공개됩니다.</p>
+          {autoHidden.length === 0 ? <p className="text-sm text-stone-400">없음</p> : (
+            <>
+              <button onClick={() => setShowAuto((v) => !v)} className="text-xs px-3 py-1.5 rounded-lg bg-stone-200 text-stone-700 mb-3">{showAuto ? "접기 ▲" : `목록 펼치기 ▼ (${autoHidden.length})`}</button>
+              {showAuto && <div className="space-y-2">{autoHidden.map((c) => <Row key={c.id} c={c} />)}</div>}
+            </>
+          )}
         </section>
 
         <section>
-          <h2 className="text-sm font-bold text-stone-500 mb-3">공개 중 ({live.length})</h2>
+          <h2 className="text-sm font-bold text-stone-700 mb-3">✅ 공개 중 ({live.length})</h2>
           <div className="space-y-2">{live.map((c) => <Row key={c.id} c={c} />)}</div>
         </section>
       </div>
