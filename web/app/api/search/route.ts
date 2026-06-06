@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
+import { embedQuery, toVectorLiteral, hasEmbedKey } from "@/lib/embed";
 export const runtime = "nodejs";
 
 // 자연어 카페 검색 (PRINCIPLES §1·§5): "떠오르는 느낌"으로도 찾게 한다.
-// - 시맨틱(개념): 느낌 단어 → 카페 신호(성격축·취향축·용도) 매핑. 블랙박스 없음, 근거 노출.
-// - exact: 질의 토큰을 카페의 모든 텍스트 + 검증된 블로그 리뷰 인용에서 직접 매칭.
-// 모든 점수는 DB의 실제 수집·검증값에서만 나온다(숫자 환각 금지).
+// - 시맨틱: 임베딩(text-embedding-004) 코사인 유사도 — 사전에 없는 표현도 의미로 매칭.
+// - exact/개념: 질의 토큰을 카페 텍스트·검증 리뷰에서 직접 매칭 + 느낌→신호 가산(근거 노출).
+// 키 없으면 키워드 기반으로 자동 폴백. 점수는 DB 실제값만 사용(환각 금지).
 
 const CONCEPTS: { id: string; triggers: string[]; axis?: string; taste?: string; uses?: string[]; label: string }[] = [
   { id: "quiet", triggers: ["조용", "혼자", "차분", "사색", "고요", "한적", "혼카", "평온", "힐링", "나홀로", "한가"], axis: "quiet", uses: ["혼자"], label: "조용·혼자" },
@@ -28,6 +29,35 @@ function inRegion(area: string, region: string): boolean {
 }
 const occ = (text: string, kw: string) => (!text || !kw ? 0 : text.toLowerCase().split(kw.toLowerCase()).length - 1);
 
+// exact(키워드) + 개념(느낌) 가산 — 두 모드 공통
+function lexicalScore(c: any, tokens: string[], hitConcepts: typeof CONCEPTS) {
+  const reviewText = Array.isArray(c.synth_reviews) ? c.synth_reviews.map((r: any) => r?.quote ?? "").join(" ") : "";
+  const fields: [string, number][] = [
+    [c.name ?? "", 4], [c.synth_identity ?? "", 2.5], [c.signature ?? "", 2], [c.note ?? "", 2],
+    [c.vibe ?? "", 2], [c.uses ?? "", 1.5], [c.beans ?? "", 1.5], [reviewText, 2], [c.area ?? "", 1],
+  ];
+  let exact = 0;
+  const tokenHit = new Set<string>();
+  for (const tok of tokens) for (const [text, w] of fields) { const n = occ(text, tok); if (n > 0) { exact += n * w; tokenHit.add(tok); } }
+
+  let concept = 0;
+  const cs = c.char_scores ?? {};
+  const reasons: string[] = [];
+  for (const cc of hitConcepts) {
+    let add = 0;
+    if (cc.axis && (cs[cc.axis] ?? 0) > 0) add += Math.min(cs[cc.axis], 12) * 1.5;
+    if (cc.taste) { const t = c[`synth_${cc.taste}`]; if (t != null) add += t >= 0.6 ? 18 : t >= 0.5 ? 8 : 0; }
+    if (cc.uses && c.uses && cc.uses.some((u) => String(c.uses).includes(u))) add += 6;
+    if (add > 0) { concept += add; reasons.push(`'${cc.label}' 느낌`); }
+  }
+  const reviewTok = tokens.find((t) => occ(reviewText, t) > 0);
+  if (reviewTok) reasons.push(`리뷰에 '${reviewTok}' 언급`);
+  else if (tokenHit.size > 0) reasons.push(`'${Array.from(tokenHit)[0]}' 일치`);
+  return { exact, concept, reasons };
+}
+
+const FIELDS = `id, name, area, synth_grade, synth_count, synth_identity, signature, note, vibe, uses, beans, char_scores, synth_reviews, synth_acidity, synth_body, synth_sweet`;
+
 export async function GET(req: NextRequest) {
   try {
     await ensureSchema();
@@ -36,62 +66,60 @@ export async function GET(req: NextRequest) {
     if (q.length < 1) return NextResponse.json({ ok: false, error: "검색어 필요" }, { status: 400 });
 
     const ql = q.toLowerCase();
-    // 질의 토큰(2글자+) — exact 매칭용
     const tokens = Array.from(new Set(ql.split(/[\s,./?!~"'()]+/).filter((t) => t.length >= 2)));
-    // 발동한 개념(시맨틱)
     const hitConcepts = CONCEPTS.filter((c) => c.triggers.some((t) => ql.includes(t)));
+    const short = region.replace(/(특별시|광역시|시|군|구)$/, "");
+    const p1 = `%${region}%`, p2 = `%${short}%`;
 
-    const rows = await sql`
-      SELECT id, name, area, synth_grade, synth_count, synth_identity, signature, note, vibe, uses, beans,
-             char_scores, synth_reviews, synth_acidity, synth_body, synth_sweet
-      FROM cafes WHERE published = true` as unknown as any[];
+    let mode: "semantic" | "keyword" = "keyword";
+    let scored: any[] = [];
 
-    const scored = [];
-    for (const c of rows) {
-      if (!inRegion(c.area ?? "", region)) continue;
-      const reviewText = Array.isArray(c.synth_reviews) ? c.synth_reviews.map((r: any) => r?.quote ?? "").join(" ") : "";
-      const fields: [string, number][] = [
-        [c.name ?? "", 4], [c.synth_identity ?? "", 2.5], [c.signature ?? "", 2], [c.note ?? "", 2],
-        [c.vibe ?? "", 2], [c.uses ?? "", 1.5], [c.beans ?? "", 1.5], [reviewText, 2], [c.area ?? "", 1],
-      ];
-
-      // exact 점수 + 어디서 맞았는지(근거)
-      let exact = 0;
-      const tokenHit = new Set<string>();
-      for (const tok of tokens) {
-        for (const [text, w] of fields) {
-          const n = occ(text, tok);
-          if (n > 0) { exact += n * w; tokenHit.add(tok); }
+    // ===== 시맨틱(임베딩) 경로 =====
+    if (hasEmbedKey()) {
+      try {
+        const qvec = await embedQuery(q);
+        if (qvec) {
+          const lit = toVectorLiteral(qvec);
+          const rows = (await sql.query(
+            `SELECT ${FIELDS}, 1 - (embedding <=> $1::vector) AS sim
+             FROM cafes
+             WHERE published = true AND embedding IS NOT NULL
+               AND ($2 = '' OR area ILIKE $3 OR area ILIKE $4)
+             ORDER BY embedding <=> $1::vector
+             LIMIT 80`,
+            [lit, region, p1, p2],
+          )) as unknown as any[];
+          if (rows.length > 0) {
+            mode = "semantic";
+            scored = rows.map((c) => {
+              const { exact, concept, reasons } = lexicalScore(c, tokens, hitConcepts);
+              const sim = Number(c.sim) || 0;
+              const total = sim * 100 + exact + concept; // 의미 유사도가 1차, 키워드·느낌이 가산
+              const why = [`의미 유사 ${Math.round(sim * 100)}%`, ...reasons];
+              return { id: c.id, name: c.name, area: c.area, grade: c.synth_grade, count: c.synth_count, identity: c.synth_identity, score: Math.round(total * 10) / 10, reasons: why.slice(0, 3) };
+            });
+          }
         }
+      } catch {
+        // 임베딩 실패 → 키워드 폴백
       }
-      const inReview = tokens.some((t) => occ(reviewText, t) > 0);
+    }
 
-      // 개념(시맨틱) 점수 — 카페가 실제로 그 신호를 가질 때만 가산(환각 금지)
-      let concept = 0;
-      const cs = c.char_scores ?? {};
-      const reasons: string[] = [];
-      for (const cc of hitConcepts) {
-        let add = 0;
-        if (cc.axis && (cs[cc.axis] ?? 0) > 0) add += Math.min(cs[cc.axis], 12) * 1.5;
-        if (cc.taste) { const t = c[`synth_${cc.taste}`]; if (t != null) add += t >= 0.6 ? 18 : t >= 0.5 ? 8 : 0; }
-        if (cc.uses && c.uses && cc.uses.some((u) => String(c.uses).includes(u))) add += 6;
-        if (add > 0) { concept += add; reasons.push(`'${cc.label}' 느낌`); }
+    // ===== 키워드/개념 폴백 =====
+    if (scored.length === 0) {
+      const rows = (await sql.query(`SELECT ${FIELDS} FROM cafes WHERE published = true`)) as unknown as any[];
+      for (const c of rows) {
+        if (!inRegion(c.area ?? "", region)) continue;
+        const { exact, concept, reasons } = lexicalScore(c, tokens, hitConcepts);
+        const total = exact + concept;
+        if (total <= 0) continue;
+        scored.push({ id: c.id, name: c.name, area: c.area, grade: c.synth_grade, count: c.synth_count, identity: c.synth_identity, score: Math.round(total * 10) / 10, reasons: reasons.slice(0, 3) });
       }
-
-      const total = exact + concept;
-      if (total <= 0) continue;
-      if (inReview) reasons.push(`리뷰에 '${tokens.find((t) => occ(reviewText, t) > 0)}' 언급`);
-      else if (tokenHit.size > 0) reasons.push(`'${Array.from(tokenHit)[0]}' 직접 일치`);
-
-      scored.push({
-        id: c.id, name: c.name, area: c.area, grade: c.synth_grade, count: c.synth_count,
-        identity: c.synth_identity, score: Math.round(total * 10) / 10, reasons: reasons.slice(0, 3),
-      });
     }
 
     scored.sort((a, b) => b.score - a.score);
     return NextResponse.json({
-      ok: true, region: region || "수도권 전체", q,
+      ok: true, mode, region: region || "수도권 전체", q,
       concepts: hitConcepts.map((c) => c.label),
       count: scored.length, results: scored.slice(0, 24),
     });
