@@ -1,6 +1,8 @@
-// 수집 오케스트레이터 (PRINCIPLES.md 1·2·3·4·7조)
-import { filterReviews } from "./noiseFilter";
+// 수집 오케스트레이터 (PRINCIPLES §1·§2·§3·§4·§7)
+// 모든 수집 글을 '리뷰 품질 검증 엔진'에 통과시켜 옥석을 가린 뒤에만 합성·집계·노출한다.
+import { verifyReview, type QualityVerdict, type SourceKind } from "./reviewQuality";
 import { synthesize, type Review, type SynthResult } from "./synthEngine";
+import { computeCharScores } from "./charScore";
 import type { WebSnippet } from "./webSearchCollector";
 
 export type RawSource = {
@@ -8,60 +10,103 @@ export type RawSource = {
   texts: WebSnippet[];
 };
 
-const POLICY: Record<RawSource["source"], { filter: boolean; weight: number }> = {
-  google: { filter: false, weight: 1.0 },
-  blog: { filter: true, weight: 1.2 },
-  diningcode: { filter: true, weight: 1.1 },
-  tripadvisor: { filter: true, weight: 1.0 },
-  instagram: { filter: true, weight: 0.8 },
-  etc: { filter: true, weight: 0.7 },
+// 출처별 합성 가중(검증 통과분에만 적용). 블로그 직접후기 > 일반.
+const SRC_WEIGHT: Record<RawSource["source"], number> = {
+  google: 1.0, blog: 1.2, diningcode: 1.1, tripadvisor: 1.0, instagram: 0.8, etc: 0.7,
+};
+const SRC_KIND: Record<RawSource["source"], SourceKind> = {
+  google: "google", blog: "blog", diningcode: "etc", tripadvisor: "etc", instagram: "etc", etc: "etc",
 };
 
-// 카드에 보여줄 근거 리뷰 (A방식: 인용 한 줄 + 링크 + 출처)
-export type EvidenceReview = { quote: string; link?: string; source?: string; date?: string };
+// 카드에 보여줄 근거 리뷰 + 신뢰 근거(투명성)
+export type EvidenceReview = {
+  quote: string; link?: string; source?: string; date?: string;
+  trust?: QualityVerdict; score?: number; why?: string[];
+};
+
+export type QualityStats = {
+  raw: number; verified: number; reference: number; rejected: number;
+  rejectReasons: Record<string, number>; // 탈락 사유별 건수 (투명성)
+};
 
 export type CollectResult = {
   synth: SynthResult;
-  collected: number;
+  collected: number;          // = 검증 통과 고유 리뷰 수 (신뢰 헤드라인 숫자)
+  grade: "검증" | "참고" | "발굴";
+  charScores: Record<string, number>;
   perSource: { source: string; raw: number; kept: number }[];
   evidenceReviews: EvidenceReview[];
+  quality: QualityStats;
 };
 
-// 인용은 한 줄로 자름(저작권: 원문 복제 금지, 요약/일부만)
 function toQuote(text: string, maxLen = 80): string {
   const t = text.trim();
   return t.length <= maxLen ? t : t.slice(0, maxLen) + "…";
 }
+const dedupeKey = (s: string) => s.toLowerCase().replace(/\s+/g, "").slice(0, 60);
 
 export function collectAndSynthesize(name: string, area: string[], sources: RawSource[]): CollectResult {
-  const merged: Review[] = [];
+  const verifiedReviews: Review[] = [];   // 합성 입력(검증, 출처가중 반영)
   const perSource: { source: string; raw: number; kept: number }[] = [];
-  const evidenceReviews: EvidenceReview[] = [];
+  const evidence: EvidenceReview[] = [];
+  const verifiedTexts: string[] = [];      // char_scores 계산용
+  const seen = new Set<string>();
+  const stats: QualityStats = { raw: 0, verified: 0, reference: 0, rejected: 0, rejectReasons: {} };
 
   for (const src of sources) {
-    const pol = POLICY[src.source];
-    let texts = src.texts;
-    if (pol.filter) {
-      const onlyText = texts.map((t) => t.text);
-      const { passed } = filterReviews(onlyText, name, area);
-      texts = texts.filter((t) => passed.includes(t.text));
-    }
-    perSource.push({ source: src.source, raw: src.texts.length, kept: texts.length });
+    const weight = SRC_WEIGHT[src.source];
+    const kind = SRC_KIND[src.source];
+    let kept = 0;
 
-    for (const t of texts) {
-      merged.push({ text: t.text, time: t.time });
-      if (pol.weight >= 1.2) merged.push({ text: t.text, time: t.time });
-      // 링크 있는 것 위주로 근거 리뷰에 추가 (최신순 정렬은 아래)
-      if (t.link) {
-        evidenceReviews.push({ quote: toQuote(t.text), link: t.link, source: t.source, date: t.date });
+    for (const t of src.texts) {
+      stats.raw++;
+      const key = dedupeKey(t.text);
+      if (seen.has(key)) continue;        // 교차 출처 중복 제거
+      seen.add(key);
+
+      const q = verifyReview({ title: t.title, body: t.desc ?? t.text, name, areaTerms: area, source: kind });
+
+      if (q.verdict === "rejected") {
+        stats.rejected++;
+        const r = q.reasons[0] ?? "기타";
+        stats.rejectReasons[r] = (stats.rejectReasons[r] ?? 0) + 1;
+        continue;
+      }
+      // verified / reference 만 통과
+      if (q.verdict === "verified") stats.verified++; else stats.reference++;
+      kept++;
+
+      // 합성 입력: verified 정가중, reference 절반가중. 출처가중도 반영.
+      const reps = q.verdict === "verified" ? Math.max(1, Math.round(weight)) : 1;
+      for (let i = 0; i < reps; i++) verifiedReviews.push({ text: t.text, time: t.time });
+      verifiedTexts.push(t.text);
+
+      if (t.link || src.source === "google") {
+        evidence.push({
+          quote: toQuote(t.text), link: t.link, source: t.source, date: t.date,
+          trust: q.verdict, score: q.score, why: q.reasons.slice(0, 3),
+        });
       }
     }
+    perSource.push({ source: src.source, raw: src.texts.length, kept });
   }
 
-  // 근거 리뷰: 최신순으로 정렬, 최대 6개만 (카드 호버용)
-  evidenceReviews.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
-  const topEvidence = evidenceReviews.slice(0, 6);
+  // 신뢰 헤드라인 숫자 = 노이즈 제거 후 '주제가 맞는 진짜 리뷰' 수(검증+참고).
+  // rejected(동명·모음언급·무관·내용없음)만 버린 뒤 남은 옥석. 등급도 이 기준.
+  const trustCount = stats.verified + stats.reference;
+  const grade: "검증" | "참고" | "발굴" = trustCount >= 30 ? "검증" : trustCount >= 5 ? "참고" : "발굴";
 
-  const synth = synthesize(name, merged);
-  return { synth, collected: merged.length, perSource, evidenceReviews: topEvidence };
+  // 근거 리뷰: 검증 우선 → 최신순, 최대 6개
+  const order: Record<string, number> = { verified: 0, reference: 1 };
+  evidence.sort((a, b) =>
+    (order[a.trust ?? "reference"] - order[b.trust ?? "reference"]) ||
+    (b.date ?? "").localeCompare(a.date ?? ""));
+  const topEvidence = evidence.slice(0, 6);
+
+  const synth = synthesize(name, verifiedReviews);
+  synth.grade = grade;              // 신뢰 리뷰 수 기준으로 등급 통일
+  synth.reviewCount = trustCount;
+  const charScores = computeCharScores(verifiedTexts);
+
+  return { synth, collected: trustCount, grade, charScores, perSource, evidenceReviews: topEvidence, quality: stats };
 }

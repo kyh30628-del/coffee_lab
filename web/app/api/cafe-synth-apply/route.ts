@@ -18,6 +18,9 @@ export async function POST(req: NextRequest) {
     await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_body REAL`;
     await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_sweet REAL`;
     await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_updated TIMESTAMPTZ`;
+    await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_reviews JSONB`;
+    await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS char_scores JSONB`;
+    await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_quality JSONB`;
 
     const body = await req.json();
     const { name, area } = body;
@@ -29,7 +32,7 @@ export async function POST(req: NextRequest) {
     else if (Array.isArray(body.reviews)) sources = [{ source: "google", texts: body.reviews.map((t: string) => ({ text: t })) }];
     else return NextResponse.json({ ok: false, error: "sources 또는 reviews 필요" }, { status: 400 });
 
-    const { synth, collected } = collectAndSynthesize(name, areaTerms, sources);
+    const { synth, collected, grade, charScores, evidenceReviews, quality } = collectAndSynthesize(name, areaTerms, sources);
     const c = synth.coords;
     // basis를 읽기 쉬운 한 줄로
     const basisLine = ["acidity", "body", "sweet"]
@@ -37,19 +40,21 @@ export async function POST(req: NextRequest) {
       .map((ax) => `${ax === "acidity" ? "산미" : ax === "body" ? "바디" : "단맛"} ${synth.basis[ax]}`)
       .join(" / ");
 
+    const publish = grade === "검증" || grade === "참고";
     const r = await sql`
       UPDATE cafes SET
-        synth_grade=${synth.grade}, synth_identity=${synth.identity},
+        synth_grade=${grade}, synth_identity=${synth.identity},
         synth_basis=${basisLine}, synth_count=${collected},
         synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet},
-        synth_updated=now()
+        synth_reviews=${JSON.stringify(evidenceReviews)}, char_scores=${JSON.stringify(charScores)},
+        synth_quality=${JSON.stringify(quality)}, synth_updated=now(), published=${publish}
       WHERE name=${name}
       RETURNING id, name
     `;
     if (r.length === 0) {
       return NextResponse.json({ ok: false, error: `'${name}' 카페를 DB에서 못 찾음`, synth }, { status: 404 });
     }
-    return NextResponse.json({ ok: true, applied: r[0], synth, collected });
+    return NextResponse.json({ ok: true, applied: r[0], synth, collected, grade, quality });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }

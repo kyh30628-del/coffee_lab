@@ -15,21 +15,22 @@ async function synthOne(cafe: { id: number; name: string; area: string }) {
   if (web.snippets.length) sources.push({ source: "blog", texts: web.snippets });
   if (sources.length === 0) return { id: cafe.id, name: cafe.name, ok: false, reason: "수집 0" };
 
-  const { synth, collected, evidenceReviews } = collectAndSynthesize(cafe.name, cafe.area ? [cafe.area] : [], sources);
+  const { synth, collected, grade, charScores, evidenceReviews, quality } = collectAndSynthesize(cafe.name, cafe.area ? [cafe.area] : [], sources);
   const c = synth.coords;
   const basisLine = ["acidity", "body", "sweet"].filter((ax) => c[ax] != null)
     .map((ax) => `${ax === "acidity" ? "산미" : ax === "body" ? "바디" : "단맛"} ${synth.basis[ax]}`).join(" / ");
 
-  // 데이터 충분(검증/참고 등급 = 표본 5+)하면 자동 공개, 부족하면 비공개 유지(헌법1: 정직)
-  const publish = synth.grade === "검증" || synth.grade === "참고";
+  // 데이터 충분(검증/참고 등급 = 검증 리뷰 5+)하면 자동 공개, 부족하면 비공개 유지(헌법1: 정직)
+  const publish = grade === "검증" || grade === "참고";
   await sql`
     UPDATE cafes SET
-      synth_grade=${synth.grade}, synth_identity=${synth.identity}, synth_basis=${basisLine},
+      synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine},
       synth_count=${collected}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet},
-      synth_reviews=${JSON.stringify(evidenceReviews)}, synth_updated=now(),
+      synth_reviews=${JSON.stringify(evidenceReviews)}, char_scores=${JSON.stringify(charScores)},
+      synth_quality=${JSON.stringify(quality)}, synth_updated=now(),
       published=${publish}
     WHERE id=${cafe.id}`;
-  return { id: cafe.id, name: cafe.name, ok: true, grade: synth.grade, collected, evidence: evidenceReviews.length, published: publish };
+  return { id: cafe.id, name: cafe.name, ok: true, grade, collected, evidence: evidenceReviews.length, quality, published: publish };
 }
 
 export async function POST(req: NextRequest) {
@@ -44,9 +45,11 @@ export async function POST(req: NextRequest) {
     await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_sweet REAL`;
     await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_updated TIMESTAMPTZ`;
     await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_reviews JSONB`;
+    await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS char_scores JSONB`;
+    await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_quality JSONB`;
 
     const body = await req.json().catch(() => ({}));
-    const limit = Math.min(Math.max(Number(body.limit) || 5, 1), 20);
+    const limit = Math.min(Math.max(Number(body.limit) || 5, 1), 50);
 
     const targets = await sql`
       SELECT id, name, area FROM cafes

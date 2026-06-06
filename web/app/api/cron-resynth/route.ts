@@ -16,20 +16,23 @@ async function synthOne(cafe: { id: number; name: string; area: string }) {
   if (web.snippets.length) sources.push({ source: "blog", texts: web.snippets });
   if (sources.length === 0) return { name: cafe.name, ok: false };
 
-  const { synth, collected } = collectAndSynthesize(cafe.name, cafe.area ? [cafe.area] : [], sources);
+  const { synth, collected, grade, charScores, evidenceReviews, quality } = collectAndSynthesize(cafe.name, cafe.area ? [cafe.area] : [], sources);
   const c = synth.coords;
   const basisLine = ["acidity", "body", "sweet"]
     .filter((ax) => c[ax] != null)
     .map((ax) => `${ax === "acidity" ? "산미" : ax === "body" ? "바디" : "단맛"} ${synth.basis[ax]}`)
     .join(" / ");
+  const publish = grade === "검증" || grade === "참고";
+  // 재수집 시 char_scores·synth_reviews·품질통계까지 함께 갱신(과거 버그 수정).
   await sql`
     UPDATE cafes SET
-      synth_grade=${synth.grade}, synth_identity=${synth.identity},
+      synth_grade=${grade}, synth_identity=${synth.identity},
       synth_basis=${basisLine}, synth_count=${collected},
       synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet},
-      synth_updated=now()
+      synth_reviews=${JSON.stringify(evidenceReviews)}, char_scores=${JSON.stringify(charScores)},
+      synth_quality=${JSON.stringify(quality)}, synth_updated=now(), published=${publish}
     WHERE id=${cafe.id}`;
-  return { name: cafe.name, ok: true, grade: synth.grade, collected };
+  return { name: cafe.name, ok: true, grade, collected };
 }
 
 // 자동 실행 진입점: 가장 오래 갱신 안 된 카페 몇 곳을 재수집
@@ -43,6 +46,9 @@ export async function GET(req: NextRequest) {
     }
 
     await ensureSchema();
+    await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_reviews JSONB`;
+    await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS char_scores JSONB`;
+    await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_quality JSONB`;
     // 한 번 실행에 3곳씩만 (비용·시간 보호). 매주 돌면 3곳씩 천천히 최신화.
     const targets = await sql`
       SELECT id, name, area FROM cafes

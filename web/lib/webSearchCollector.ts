@@ -1,6 +1,6 @@
 // 네이버 검색 API로 카페 리뷰성 문서 수집 (PRINCIPLES.md 2조: 공식 API, 합법)
 // (A)방식: 원문 복제 금지. 인용 한 줄(요약) + 출처 링크 + 날짜만 보존.
-export type WebSnippet = { text: string; time?: number; link?: string; source?: string; date?: string };
+export type WebSnippet = { text: string; title?: string; desc?: string; kind?: "blog" | "cafearticle"; time?: number; link?: string; source?: string; date?: string };
 
 const ID = process.env.NAVER_CLIENT_ID;
 const SECRET = process.env.NAVER_CLIENT_SECRET;
@@ -30,6 +30,7 @@ async function naverSearch(kind: "blog" | "cafearticle", query: string): Promise
     const desc = stripTags(it.description ?? "");
     return {
       text: `${title} ${desc}`.trim(),
+      title, desc, kind,
       time: parseDate(it.postdate),
       link: it.link,
       source: it.bloggername || (kind === "cafearticle" ? "네이버 카페" : "네이버 블로그"),
