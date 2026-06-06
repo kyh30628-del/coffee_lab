@@ -5,7 +5,7 @@ import { BarChart, Bar, XAxis, YAxis, Cell, ResponsiveContainer,
   PieChart, Pie, Tooltip } from "recharts";
 
 type RankItem = { rank: number; name: string; count: number; grade: string | null; isMe: boolean };
-type CharItem = { key: string; label: string; emoji: string; me: number; avg: number; diff: number };
+type CharItem = { key: string; label: string; emoji: string; me: number; avg: number; diff: number; meRaw?: number; hoodPenetration?: number };
 type Action = { type: string; title: string; body: string; tone: "good" | "warn" | "info" };
 type Insight = {
   me: { name: string; area: string; grade: string | null; count: number | null; identity: string | null };
@@ -68,7 +68,6 @@ export default function OwnerPage() {
 
   const rankData = insight ? insight.rankList.slice(0, 12).map((r) => ({ name: r.name + (r.isMe ? " ★" : ""), count: r.count, isMe: r.isMe })) : [];
   const radarData = insight ? insight.charProfile.map((c) => ({ axis: c.label, 우리카페: c.me, 동네평균: c.avg })) : [];
-  const radarMax = insight ? Math.max(2, ...insight.charProfile.flatMap((c) => [c.me, c.avg])) : 2;
   const pieData = insight ? insight.charProfile.filter((c) => c.me > 0).map((c) => ({ name: c.label, value: c.me })) : [];
 
   return (
@@ -153,13 +152,13 @@ export default function OwnerPage() {
                   <RadarChart data={radarData} margin={{ top: 16, right: 36, bottom: 16, left: 36 }} outerRadius="66%">
                     <PolarGrid stroke="#e3d6c2" />
                     <PolarAngleAxis dataKey="axis" tick={<RadarTick />} />
-                    <PolarRadiusAxis angle={90} domain={[0, radarMax]} tickCount={Math.min(radarMax, 4) + 1} tick={{ fontSize: 9, fill: "#bcab92" }} axisLine={false} />
+                    <PolarRadiusAxis angle={90} domain={[0, 100]} tickCount={3} tick={{ fontSize: 9, fill: "#bcab92" }} axisLine={false} />
                     <Radar name="동네평균" dataKey="동네평균" stroke="#a8927a" strokeWidth={2} fill="#a8927a" fillOpacity={0.2} dot={{ r: 2.5, fill: "#a8927a" }} />
                     <Radar name="우리카페" dataKey="우리카페" stroke="#9c6b3f" strokeWidth={2} fill="#9c6b3f" fillOpacity={0.4} dot={{ r: 2.5, fill: "#9c6b3f" }} />
                     <Legend wrapperStyle={{ fontSize: 12 }} />
                   </RadarChart>
                 </ResponsiveContainer>
-                <div className="text-[10px] text-[#a8927a] mt-1">리뷰에서 자주 언급되는 정도 (측정값 아님)</div>
+                <div className="text-[10px] text-[#a8927a] mt-1 leading-relaxed">0~100점 = 같은 특징이 언급된 수도권 카페들 분포 안에서의 상대 위치(높을수록 그 특징이 두드러짐). 리뷰 언급 빈도 기반이며 측정값이 아닙니다.</div>
               </>)}
               {tab === "pie" && (<>
                 <div className="text-[11px] text-[#8a7458] uppercase tracking-wider mb-3">우리 카페는 어떤 특징으로 이야기되나</div>

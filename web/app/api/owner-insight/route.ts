@@ -41,15 +41,39 @@ export async function GET(req: NextRequest) {
     const rank = sorted.findIndex((c) => c.name === me.name) + 1;
     const rankList = sorted.map((c, i) => ({ rank: i + 1, name: c.name, count: c.synth_count ?? 0, grade: c.synth_grade, isMe: c.name === me.name }));
 
-    // 성격 프로필
+    // ===== 축별 점수화 (절대 카운트 → 도시 전체 분포 내 백분위 0~100) =====
+    // PRINCIPLES §3/§5: 절대점수 대신 분포 내 상대 위치로 변환·정규화.
+    // raw 카운트는 (a)축마다 키워드 흔한 정도가 달라 baseline이 안 맞고(디저트·분위기↑, 작업·조용↓),
+    // (b)리뷰량 많을수록 모든 축이 커지는 볼륨 편향이 있어 그대로 비교하면 무의미하다.
+    // → 각 축을 "그 특징이 언급된 도시 카페들 분포" 안의 백분위로 환산하면 두 편향이 동시에 제거된다.
+    const cityNonzero: Record<string, number[]> = {};
+    for (const ax of CHAR_AXES) {
+      cityNonzero[ax.key] = all
+        .map((c) => (c.char_scores ?? {})[ax.key] ?? 0)
+        .filter((v: number) => v > 0)
+        .sort((a: number, b: number) => a - b);
+    }
+    // 언급 0 → 0점(근거 없음, 정직히). 그 외 → 비영 분포 내 중위순위 백분위(동률은 절반 배분).
+    const axisScore = (count: number, key: string): number => {
+      if (!count || count <= 0) return 0;
+      const arr = cityNonzero[key];
+      if (!arr.length) return 0;
+      let below = 0, equal = 0;
+      for (const v of arr) { if (v < count) below++; else if (v === count) equal++; }
+      return Math.round(((below + equal / 2) / arr.length) * 100);
+    };
+
+    // 성격 프로필 — me/avg 모두 0~100 점수(동일 척도). raw 카운트는 근거로 함께 보존.
     const charProfile = CHAR_AXES.map((ax) => {
-      const myScore = (me.char_scores ?? {})[ax.key] ?? 0;
-      const vals = hood.map((c) => (c.char_scores ?? {})[ax.key] ?? 0);
-      const avg = vals.length ? vals.reduce((s: number, x: number) => s + x, 0) / vals.length : 0;
+      const myRaw = (me.char_scores ?? {})[ax.key] ?? 0;
+      const meScore = axisScore(myRaw, ax.key);
+      const hoodScores = hood.map((c) => axisScore((c.char_scores ?? {})[ax.key] ?? 0, ax.key));
+      const avgScore = hoodScores.length ? Math.round(hoodScores.reduce((s, x) => s + x, 0) / hoodScores.length) : 0;
       const hasCount = hood.filter((c) => ((c.char_scores ?? {})[ax.key] ?? 0) > 0).length;
-      return { key: ax.key, label: ax.label, emoji: ax.emoji, me: myScore, avg: Math.round(avg * 10) / 10,
-        diff: Math.round((myScore - avg) * 10) / 10, ratio: avg > 0 ? myScore / avg : (myScore > 0 ? 99 : 0),
-        hoodPenetration: Math.round((hasCount / hood.length) * 100) };
+      return { key: ax.key, label: ax.label, emoji: ax.emoji,
+        me: meScore, avg: avgScore, diff: meScore - avgScore, meRaw: myRaw,
+        ratio: avgScore > 0 ? meScore / avgScore : (meScore > 0 ? 99 : 0),
+        hoodPenetration: hood.length ? Math.round((hasCount / hood.length) * 100) : 0 };
     });
 
     // 비슷한 카페
@@ -62,36 +86,36 @@ export async function GET(req: NextRequest) {
     // ===== 액션 플랜 자동 생성 (데이터에서만 도출) =====
     const actions: { type: string; title: string; body: string; tone: "good" | "warn" | "info" }[] = [];
 
-    // [차별점] 동네 평균 1.5배 이상 앞선 축
-    const strong = [...charProfile].filter((c) => c.me > 0 && c.ratio >= 1.5).sort((a, b) => b.ratio - a.ratio);
+    // [차별점] 동네 평균보다 20점+ 앞서고 절대 수준도 높은(60+) 축
+    const strong = [...charProfile].filter((c) => c.me >= 60 && c.diff >= 20).sort((a, b) => b.diff - a.diff);
     if (strong.length > 0) {
       const s = strong[0];
       actions.push({ type: "차별점", tone: "good", title: `${s.emoji} ${s.label} — 당신의 무기`,
-        body: `${s.label} 언급이 동네 평균의 **${s.ratio >= 99 ? "독보적 수준" : s.ratio.toFixed(1) + "배"}**입니다. 이 동네에서 당신을 규정하는 **차별점**이에요. 메뉴판·간판·온라인 소개에서 **${s.label.replace(/[🔥💻🤍🍰📸🪑]/g,"").trim()}을(를) 1순위로** 내세우세요.` });
+        body: `'${s.label}' 점수 **${s.me}/100**(언급 ${s.meRaw}회)로 동네 평균 ${s.avg}점보다 **${s.diff}점 높습니다**. 이 동네에서 당신을 규정하는 **차별점**이에요. 메뉴판·간판·온라인 소개에서 **${s.label}을(를) 1순위로** 내세우세요.` });
     }
 
-    // [빈 포지션] 동네 침투율 25% 미만(희소)인데 내가 가진 축
-    const rare = charProfile.filter((c) => c.me > 0 && c.hoodPenetration <= 30 && c.hoodPenetration > 0).sort((a, b) => a.hoodPenetration - b.hoodPenetration);
+    // [빈 포지션] 동네 침투율 30% 이하(희소)인데 내가 실제로 가진(50+) 축
+    const rare = charProfile.filter((c) => c.me >= 50 && c.hoodPenetration <= 30 && c.hoodPenetration > 0).sort((a, b) => a.hoodPenetration - b.hoodPenetration);
     if (rare.length > 0) {
       const r = rare[0];
       actions.push({ type: "빈 포지션", tone: "info", title: `${r.emoji} ${r.label} — 선점 기회`,
-        body: `${myGu} 카페 중 '${r.label}'(으)로 이야기되는 곳은 **${r.hoodPenetration}%뿐**입니다. **경쟁이 비어있는 자리**예요. 당신은 이미 이 신호가 있으니, **'${r.label}' 포지션을 명확히** 내세우면 이 수요를 **선점**할 수 있습니다.` });
+        body: `${myGu} 카페 중 '${r.label}'(으)로 이야기되는 곳은 **${r.hoodPenetration}%뿐**인데, 당신은 이미 **${r.me}점**(언급 ${r.meRaw}회)의 신호가 있습니다. **경쟁이 비어있는 자리**예요 — '${r.label}' 포지션을 명확히 내세우면 이 수요를 **선점**할 수 있습니다.` });
     }
 
-    // [매몰점] 동네 평균과 거의 같은(±0.3) 축 → 차별 안 됨
-    const buried = charProfile.filter((c) => Math.abs(c.diff) <= 0.3 && c.me > 0).sort((a, b) => b.me - a.me);
+    // [매몰점] 동네 평균과 거의 같고(±10점) 어느 정도 존재하는(30+) 축 → 차별 안 됨
+    const buried = charProfile.filter((c) => c.me >= 30 && Math.abs(c.diff) <= 10).sort((a, b) => b.me - a.me);
     if (buried.length > 0) {
       const b = buried[0];
       actions.push({ type: "매몰점", tone: "warn", title: `${b.emoji} ${b.label} — 차별화 안 됨`,
-        body: `${b.label}은(는) 동네 평균과 비슷한 수준이라, **여기서 경쟁하면 묻힙니다**. 다른 카페도 다 가진 특징이에요. 여기에 자원을 더 쏟기보다, **위의 차별점을 키우는 게 효율적**입니다.` });
+        body: `'${b.label}'은(는) 당신 ${b.me}점 vs 동네 평균 ${b.avg}점으로 **거의 같습니다**. 다른 카페도 다 가진 특징이라 **여기서 경쟁하면 묻힙니다**. 여기에 자원을 더 쏟기보다, **위의 차별점을 키우는 게 효율적**입니다.` });
     }
 
-    // [보완점] 동네 평균보다 크게 뒤처진 축
-    const weak = charProfile.filter((c) => c.diff < -0.5).sort((a, b) => a.diff - b.diff);
+    // [보완점] 동네 평균보다 20점+ 뒤처진 축
+    const weak = charProfile.filter((c) => c.diff <= -20).sort((a, b) => a.diff - b.diff);
     if (weak.length > 0) {
       const w = weak[0];
       actions.push({ type: "보완점", tone: "warn", title: `${w.emoji} ${w.label} — 약점`,
-        body: `${w.label} 언급이 동네 평균보다 **${Math.abs(w.diff).toFixed(1)} 적습니다**. 이 부분을 **보강**하거나(메뉴·공간 개선 후 리뷰에 드러나게), 아니면 **과감히 포기하고 강점에 집중**하는 선택이 필요합니다.` });
+        body: `'${w.label}' 점수가 당신 ${w.me}점 vs 동네 평균 ${w.avg}점으로 **${Math.abs(w.diff)}점 낮습니다**. 이 부분을 **보강**하거나(메뉴·공간 개선 후 리뷰에 드러나게), 아니면 **과감히 포기하고 강점에 집중**하는 선택이 필요합니다.` });
     }
 
     // [순위 전략] 정량 격차
