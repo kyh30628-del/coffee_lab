@@ -221,7 +221,16 @@ export default function Home() {
 
 function CafePanel({ cafe, onClose }: { cafe: Cafe; onClose: () => void }) {
   const g = cafe.synth_grade ? GRADE_STYLE[cafe.synth_grade] : null;
-  const reviews = cafe.synth_reviews ?? [];
+  const [reviews, setReviews] = useState<EvidenceReview[]>([]);
+  const [loadingRev, setLoadingRev] = useState(true);
+  useEffect(() => {
+    let live = true;
+    setLoadingRev(true);
+    fetch(`/api/cafe-detail?id=${cafe.id}`).then((r) => r.json()).then((d) => {
+      if (live) { setReviews(d.reviews ?? []); setLoadingRev(false); }
+    }).catch(() => { if (live) setLoadingRev(false); });
+    return () => { live = false; };
+  }, [cafe.id]);
   return (
     <div className="fixed inset-0 z-[3000]" style={{ fontFamily: "'Gowun Batang', serif" }}>
       <div onClick={onClose} className="absolute inset-0 bg-black/30" />
@@ -254,7 +263,8 @@ function CafePanel({ cafe, onClose }: { cafe: Cafe; onClose: () => void }) {
             </div>
           )}
           {cafe.signature && <div className="text-sm text-[#6b5a48] mb-4"><span className="text-[#9c6b3f]">추천 </span>{cafe.signature}</div>}
-          {reviews.length > 0 && (
+          {loadingRev && <div className="text-[11px] text-[#a8927a] mb-4">근거 후기 불러오는 중...</div>}
+          {!loadingRev && reviews.length > 0 && (
             <div className="mb-4">
               <div className="text-[11px] text-[#a8927a] mb-2">이 분석의 근거가 된 실제 후기 (네이버 공개 글)</div>
               <div className="space-y-3">
