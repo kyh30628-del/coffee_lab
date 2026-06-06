@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
     await ensureSchema();
     const q = req.nextUrl.searchParams.get("q") ?? "";
     const rows = await sql`
-      SELECT id, name, area, published, synth_grade, synth_count, lat, lng
+      SELECT id, name, area, published, synth_grade, synth_count, lat, lng, char_scores
       FROM cafes WHERE name ILIKE ${"%" + q + "%"} LIMIT 20`;
     return NextResponse.json({ ok: true, count: rows.length, rows });
   } catch (e) {

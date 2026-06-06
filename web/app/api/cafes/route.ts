@@ -9,7 +9,7 @@ export async function GET() {
     const cafes = await sql`
       SELECT id, name, area, lat, lng, vibe, note, signature,
              synth_grade, synth_count, synth_identity,
-             acidity, body, sweet, roasts_own, uses, tone, photo_url, hours, phone
+             acidity, body, sweet, roasts_own, uses, tone, photo_url, hours, phone, char_scores
       FROM cafes
       WHERE published = true
       ORDER BY (note IS NOT NULL AND note <> '') DESC, synth_count DESC NULLS LAST
