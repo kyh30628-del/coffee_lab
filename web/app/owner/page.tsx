@@ -2,18 +2,20 @@
 import { useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, Cell, ResponsiveContainer,
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Legend,
-  PieChart, Pie, Tooltip } from "recharts";
+  PieChart, Pie, Tooltip, AreaChart, Area, CartesianGrid } from "recharts";
 import BackLink from "../BackLink";
 
 type RankItem = { rank: number; name: string; count: number; grade: string | null; isMe: boolean };
 type CharItem = { key: string; label: string; emoji: string; me: number; avg: number; diff: number; meRaw?: number; hoodPenetration?: number };
 type Action = { type: string; title: string; body: string; tone: "good" | "warn" | "info" };
+type CadenceMonth = { ym: string; label: string; count: number };
+type ReviewCadence = { months: CadenceMonth[]; total: number; last12: number; recentShare: number; gapMonths: number | null; lastDate: string | null; insight: string };
 type Insight = {
   me: { name: string; area: string; grade: string | null; count: number | null; identity: string | null };
   gu: string; hoodCount: number; rank: number;
   rankList: RankItem[]; charProfile: CharItem[];
   similar: { name: string; grade: string | null; count: number | null }[];
-  actions: Action[];
+  actions: Action[]; reviewCadence?: ReviewCadence;
 };
 const GRADE_BG: Record<string, string> = { 검증: "#5f7355", 참고: "#9c6b3f", 발굴: "#a8927a" };
 const PIE_COLORS = ["#9c6b3f", "#5f7355", "#c8893f", "#6f4e37", "#c97a6d", "#a8927a"];
@@ -54,18 +56,52 @@ export default function OwnerPage() {
   const [insight, setInsight] = useState<Insight | null>(null);
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState("rank");
+  // 관리자 전용 게이트
+  const [authed, setAuthed] = useState(false);
+  const [pw, setPw] = useState("");
+  const [authMsg, setAuthMsg] = useState("");
+  const hdr = { "x-admin-password": pw };
+
+  const tryAuth = async (password: string) => {
+    setAuthMsg("확인 중...");
+    try {
+      const r = await fetch(`/api/cafe-find?q=__authcheck__`, { headers: { "x-admin-password": password } });
+      if (r.status === 401) { setAuthMsg("비밀번호가 틀렸습니다."); return; }
+      if (r.ok) { setAuthed(true); setAuthMsg(""); }
+      else setAuthMsg("오류가 발생했습니다.");
+    } catch { setAuthMsg("네트워크 오류."); }
+  };
 
   const search = async () => {
     if (!q.trim()) return;
     setLoading(true); setInsight(null);
-    try { const r = await fetch(`/api/cafe-find?q=${encodeURIComponent(q.trim())}`); const d = await r.json(); setResults((d.rows ?? []).filter((c: any) => c.published)); } catch {}
+    try { const r = await fetch(`/api/cafe-find?q=${encodeURIComponent(q.trim())}`, { headers: hdr }); const d = await r.json(); setResults((d.rows ?? []).filter((c: any) => c.published)); } catch {}
     setLoading(false);
   };
   const loadInsight = async (name: string) => {
     setLoading(true); setResults([]); setTab("rank");
-    try { const r = await fetch(`/api/owner-insight?name=${encodeURIComponent(name)}`); const d = await r.json(); if (d.ok) setInsight(d); } catch {}
+    try { const r = await fetch(`/api/owner-insight?name=${encodeURIComponent(name)}`, { headers: hdr }); const d = await r.json(); if (d.ok) setInsight(d); } catch {}
     setLoading(false);
   };
+
+  // 비밀번호 게이트 화면
+  if (!authed) {
+    return (
+      <div className="min-h-screen bg-[#f4ece0] text-[#2b2018] flex items-center justify-center p-6" style={{ fontFamily: "'Gowun Batang', serif" }}>
+        <div className="bg-white rounded-2xl p-8 w-full max-w-sm border border-[#ece0cd] shadow-sm">
+          <BackLink to="/" label="홈" className="text-[#9c6b3f] mb-4" />
+          <div className="text-[#d4a574] text-[10px] tracking-[0.2em] uppercase">For Owners · 관리자 전용</div>
+          <h1 className="text-xl font-bold mb-1 mt-1">사장님 카페 분석</h1>
+          <p className="text-[13px] text-[#6b5a48] mb-4 leading-relaxed">현재는 관리자에게만 공개되는 기능이에요. 비밀번호를 입력해주세요.</p>
+          <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && tryAuth(pw)}
+            placeholder="관리자 비밀번호" className="w-full border border-[#cbb89f] rounded-lg px-4 py-3 text-base bg-white mb-3" />
+          <button onClick={() => tryAuth(pw)} className="w-full bg-[#2b2018] text-[#f4ece0] rounded-lg py-3 font-medium">들어가기</button>
+          {authMsg && <p className="text-sm text-[#b5703c] mt-3">{authMsg}</p>}
+        </div>
+        <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet" />
+      </div>
+    );
+  }
 
   const rankData = insight ? insight.rankList.slice(0, 12).map((r) => ({ name: r.name + (r.isMe ? " ★" : ""), count: r.count, isMe: r.isMe })) : [];
   const radarData = insight ? insight.charProfile.map((c) => ({ axis: c.label, 우리카페: c.me, 동네평균: c.avg })) : [];
@@ -178,6 +214,32 @@ export default function OwnerPage() {
                 <div className="text-[10px] text-[#a8927a] mt-1">언급 비중이 클수록 그 특징으로 많이 이야기돼요</div>
               </>)}
             </div>
+
+            {/* 리뷰 주기 */}
+            {insight.reviewCadence && (
+              <div className="bg-white rounded-2xl p-4 sm:p-5 border border-[#ece0cd] mb-4">
+                <div className="text-[11px] text-[#8a7458] uppercase tracking-wider mb-1">🗓 리뷰 주기 (최근 12개월)</div>
+                <div className="text-[13px] text-[#52402e] leading-relaxed mb-3">{renderEmphasis(insight.reviewCadence.insight, "#b5703c")}</div>
+                {insight.reviewCadence.last12 > 0 ? (
+                  <ResponsiveContainer width="100%" height={170}>
+                    <AreaChart data={insight.reviewCadence.months} margin={{ top: 5, right: 10, bottom: 0, left: -20 }}>
+                      <defs><linearGradient id="cad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#9c6b3f" stopOpacity={0.5} /><stop offset="100%" stopColor="#9c6b3f" stopOpacity={0.05} /></linearGradient></defs>
+                      <CartesianGrid stroke="#f0e6d4" vertical={false} />
+                      <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#8a7458" }} interval={1} axisLine={false} tickLine={false} />
+                      <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: "#a8927a" }} axisLine={false} tickLine={false} width={28} />
+                      <Tooltip cursor={{ stroke: "#cbb89f" }} formatter={(v: any) => [`${v}건`, "리뷰"]} />
+                      <Area type="monotone" dataKey="count" stroke="#9c6b3f" strokeWidth={2} fill="url(#cad)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : <p className="text-sm text-[#a8927a] py-6 text-center">날짜가 있는 검증 리뷰가 아직 적어요.</p>}
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-[#a8927a] mt-2">
+                  <span>최근 12개월 <b className="text-[#52402e]">{insight.reviewCadence.last12}건</b></span>
+                  {insight.reviewCadence.lastDate && <span>마지막 리뷰 <b className="text-[#52402e]">{insight.reviewCadence.lastDate}</b></span>}
+                  {insight.reviewCadence.recentShare > 0 && <span>최근 3개월 비중 <b className="text-[#52402e]">{insight.reviewCadence.recentShare}%</b></span>}
+                </div>
+                <div className="text-[10px] text-[#a8927a] mt-1">검증된 리뷰의 게시일 기준 · 측정값이 아니라 공개 후기 작성 시점</div>
+              </div>
+            )}
 
             <div className="bg-white rounded-2xl p-4 sm:p-5 border border-[#ece0cd] mb-4">
               <div className="text-[11px] text-[#8a7458] uppercase tracking-wider mb-3">성격이 비슷한 경쟁 카페</div>

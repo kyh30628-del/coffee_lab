@@ -315,7 +315,7 @@ export default function Home() {
           </div>
         </div>
         <div className="flex gap-2 shrink-0">
-          <a href="/owner" className="bg-[#9c6b3f] rounded-full px-3 py-1.5 text-xs whitespace-nowrap">내 카페 분석</a>
+          <a href="/owner" className="bg-[#9c6b3f] rounded-full px-3 py-1.5 text-xs whitespace-nowrap">🔒 내 카페 분석</a>
           <a href="/cafe/register" className="bg-[#3d2f22] rounded-full px-3 py-1.5 text-xs whitespace-nowrap hidden sm:inline-block">사장님 등록</a>
         </div>
       </header>

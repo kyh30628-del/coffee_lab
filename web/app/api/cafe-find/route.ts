@@ -4,6 +4,10 @@ export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
   try {
+    // 관리자 전용(사장님 분석 검색): 비밀번호 필요
+    if (req.headers.get("x-admin-password") !== process.env.ADMIN_PASSWORD) {
+      return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
     await ensureSchema();
     const q = req.nextUrl.searchParams.get("q") ?? "";
     const rows = await sql`

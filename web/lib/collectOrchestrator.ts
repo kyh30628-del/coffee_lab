@@ -36,6 +36,7 @@ export type CollectResult = {
   charScores: Record<string, number>;
   perSource: { source: string; raw: number; kept: number }[];
   evidenceReviews: EvidenceReview[];
+  reviewDates: string[];
   quality: QualityStats;
 };
 
@@ -50,6 +51,7 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
   const perSource: { source: string; raw: number; kept: number }[] = [];
   const evidence: EvidenceReview[] = [];
   const verifiedTexts: string[] = [];      // char_scores 계산용
+  const reviewDates: string[] = [];        // 리뷰 주기 분석용(검증·참고 게시일 YYYY.MM.DD)
   const seen = new Set<string>();
   const stats: QualityStats = { raw: 0, verified: 0, reference: 0, rejected: 0, rejectReasons: {} };
 
@@ -80,6 +82,7 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
       const reps = q.verdict === "verified" ? Math.max(1, Math.round(weight)) : 1;
       for (let i = 0; i < reps; i++) verifiedReviews.push({ text: t.text, time: t.time });
       verifiedTexts.push(t.text);
+      if (t.date && /^\d{4}\.\d{2}\.\d{2}$/.test(t.date)) reviewDates.push(t.date);
 
       if (t.link || src.source === "google") {
         evidence.push({
@@ -108,5 +111,5 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
   synth.reviewCount = trustCount;
   const charScores = computeCharScores(verifiedTexts);
 
-  return { synth, collected: trustCount, grade, charScores, perSource, evidenceReviews: topEvidence, quality: stats };
+  return { synth, collected: trustCount, grade, charScores, perSource, evidenceReviews: topEvidence, reviewDates, quality: stats };
 }

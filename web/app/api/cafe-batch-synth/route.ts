@@ -15,7 +15,7 @@ async function synthOne(cafe: { id: number; name: string; area: string }) {
   if (web.snippets.length) sources.push({ source: "blog", texts: web.snippets });
   if (sources.length === 0) return { id: cafe.id, name: cafe.name, ok: false, reason: "수집 0" };
 
-  const { synth, collected, grade, charScores, evidenceReviews, quality } = collectAndSynthesize(cafe.name, cafe.area ? [cafe.area] : [], sources);
+  const { synth, collected, grade, charScores, evidenceReviews, reviewDates, quality } = collectAndSynthesize(cafe.name, cafe.area ? [cafe.area] : [], sources);
   const c = synth.coords;
   const basisLine = ["acidity", "body", "sweet"].filter((ax) => c[ax] != null)
     .map((ax) => `${ax === "acidity" ? "산미" : ax === "body" ? "바디" : "단맛"} ${synth.basis[ax]}`).join(" / ");
@@ -27,7 +27,7 @@ async function synthOne(cafe: { id: number; name: string; area: string }) {
       synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine},
       synth_count=${collected}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet},
       synth_reviews=${JSON.stringify(evidenceReviews)}, char_scores=${JSON.stringify(charScores)},
-      synth_quality=${JSON.stringify(quality)}, synth_updated=now(),
+      synth_quality=${JSON.stringify(quality)}, review_dates=${JSON.stringify(reviewDates)}, synth_updated=now(),
       published=${publish}
     WHERE id=${cafe.id}`;
   return { id: cafe.id, name: cafe.name, ok: true, grade, collected, evidence: evidenceReviews.length, quality, published: publish };
@@ -47,6 +47,7 @@ export async function POST(req: NextRequest) {
     await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_reviews JSONB`;
     await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS char_scores JSONB`;
     await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_quality JSONB`;
+    await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS review_dates JSONB`;
 
     const body = await req.json().catch(() => ({}));
     const limit = Math.min(Math.max(Number(body.limit) || 5, 1), 50);

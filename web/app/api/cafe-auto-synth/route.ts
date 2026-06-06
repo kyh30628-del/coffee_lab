@@ -21,6 +21,7 @@ export async function POST(req: NextRequest) {
     await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_reviews JSONB`;
     await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS char_scores JSONB`;
     await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_quality JSONB`;
+    await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS review_dates JSONB`;
 
     const { name, area } = await req.json();
     if (!name) return NextResponse.json({ ok: false, error: "name 필요" }, { status: 400 });
@@ -38,7 +39,7 @@ export async function POST(req: NextRequest) {
 
     if (sources.length === 0) return NextResponse.json({ ok: false, error: "수집된 데이터 없음", collectDebug }, { status: 404 });
 
-    const { synth, collected, grade, charScores, perSource, evidenceReviews, quality } = collectAndSynthesize(name, areaTerms, sources);
+    const { synth, collected, grade, charScores, perSource, evidenceReviews, reviewDates, quality } = collectAndSynthesize(name, areaTerms, sources);
     const c = synth.coords;
     const basisLine = ["acidity", "body", "sweet"].filter((ax) => c[ax] != null)
       .map((ax) => `${ax === "acidity" ? "산미" : ax === "body" ? "바디" : "단맛"} ${synth.basis[ax]}`).join(" / ");
@@ -51,7 +52,7 @@ export async function POST(req: NextRequest) {
         synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine},
         synth_count=${collected}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet},
         synth_reviews=${JSON.stringify(evidenceReviews)}, char_scores=${JSON.stringify(charScores)},
-        synth_quality=${JSON.stringify(quality)}, synth_updated=now(), published=${publish}
+        synth_quality=${JSON.stringify(quality)}, review_dates=${JSON.stringify(reviewDates)}, synth_updated=now(), published=${publish}
       WHERE place_id=${placeId} OR name=${name} OR name=${placeName}
       RETURNING id, name`;
     if (r.length === 0) return NextResponse.json({ ok: false, error: `DB 매칭 실패: '${name}'`, synth, perSource, collectDebug }, { status: 404 });

@@ -16,7 +16,7 @@ async function synthOne(cafe: { id: number; name: string; area: string }) {
   if (web.snippets.length) sources.push({ source: "blog", texts: web.snippets });
   if (sources.length === 0) return { name: cafe.name, ok: false };
 
-  const { synth, collected, grade, charScores, evidenceReviews, quality } = collectAndSynthesize(cafe.name, cafe.area ? [cafe.area] : [], sources);
+  const { synth, collected, grade, charScores, evidenceReviews, reviewDates, quality } = collectAndSynthesize(cafe.name, cafe.area ? [cafe.area] : [], sources);
   const c = synth.coords;
   const basisLine = ["acidity", "body", "sweet"]
     .filter((ax) => c[ax] != null)
@@ -30,7 +30,7 @@ async function synthOne(cafe: { id: number; name: string; area: string }) {
       synth_basis=${basisLine}, synth_count=${collected},
       synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet},
       synth_reviews=${JSON.stringify(evidenceReviews)}, char_scores=${JSON.stringify(charScores)},
-      synth_quality=${JSON.stringify(quality)}, synth_updated=now(), published=${publish}
+      synth_quality=${JSON.stringify(quality)}, review_dates=${JSON.stringify(reviewDates)}, synth_updated=now(), published=${publish}
     WHERE id=${cafe.id}`;
   return { name: cafe.name, ok: true, grade, collected };
 }
@@ -49,6 +49,7 @@ export async function GET(req: NextRequest) {
     await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_reviews JSONB`;
     await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS char_scores JSONB`;
     await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_quality JSONB`;
+    await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS review_dates JSONB`;
     // 한 번 실행에 3곳씩만 (비용·시간 보호). 매주 돌면 3곳씩 천천히 최신화.
     const targets = await sql`
       SELECT id, name, area FROM cafes

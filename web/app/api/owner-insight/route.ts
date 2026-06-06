@@ -25,11 +25,15 @@ const CHAR_AXES = [
 
 export async function GET(req: NextRequest) {
   try {
+    // 관리자 전용: 비밀번호 필요
+    if (req.headers.get("x-admin-password") !== process.env.ADMIN_PASSWORD) {
+      return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
     await ensureSchema();
     const name = req.nextUrl.searchParams.get("name") ?? "";
     if (!name) return NextResponse.json({ ok: false, error: "name 필요" }, { status: 400 });
 
-    const me = (await sql`SELECT id, name, area, synth_grade, synth_count, synth_identity, char_scores FROM cafes WHERE name = ${name} LIMIT 1`)[0];
+    const me = (await sql`SELECT id, name, area, synth_grade, synth_count, synth_identity, char_scores, review_dates FROM cafes WHERE name = ${name} LIMIT 1`)[0];
     if (!me) return NextResponse.json({ ok: false, error: "카페를 찾을 수 없음" }, { status: 404 });
 
     const myGu = guOf(me.area);
@@ -130,10 +134,39 @@ export async function GET(req: NextRequest) {
     rankBody += `순위는 리뷰 수 기준이니, 방문 손님이 자연스럽게 후기를 남기도록 하는 것(영수증 리뷰 안내, 시그니처 메뉴로 사진 유도)이 가장 직접적입니다.`;
     actions.push({ type: "순위 전략", tone: "info", title: "📈 순위를 올리려면", body: rankBody });
 
+    // ===== 리뷰 주기 분석 (검증 리뷰 게시일 기반) =====
+    const dates: string[] = (Array.isArray(me.review_dates) ? me.review_dates : []).filter((d: string) => /^\d{4}\.\d{2}\.\d{2}$/.test(d));
+    const counts: Record<string, number> = {};
+    for (const d of dates) { const k = d.slice(0, 7).replace(".", "-"); counts[k] = (counts[k] ?? 0) + 1; }
+    const now = new Date();
+    const months: { ym: string; label: string; count: number }[] = [];
+    for (let i = 11; i >= 0; i--) {
+      const dt = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const k = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}`;
+      months.push({ ym: k, label: `${dt.getMonth() + 1}월`, count: counts[k] ?? 0 });
+    }
+    const total = dates.length;
+    const last3 = months.slice(-3).reduce((s, m) => s + m.count, 0);
+    const prev3 = months.slice(-6, -3).reduce((s, m) => s + m.count, 0);
+    const last12 = months.reduce((s, m) => s + m.count, 0);
+    const recentShare = total ? Math.round((last3 / total) * 100) : 0;
+    const sortedDates = [...dates].sort();
+    const lastDate = sortedDates[sortedDates.length - 1];
+    let gapMonths: number | null = null;
+    if (lastDate) { const [y, m] = lastDate.split(".").map(Number); gapMonths = (now.getFullYear() - y) * 12 + (now.getMonth() + 1 - m); }
+    let cadenceInsight: string;
+    if (total < 3) cadenceInsight = "리뷰 표본이 적어 주기 판단이 어려워요. **후기 유도**가 우선입니다.";
+    else if (gapMonths !== null && gapMonths >= 4) cadenceInsight = `최근 **${gapMonths}개월** 새 리뷰가 거의 없어요 — **신규 유입 둔화**. 재방문·신규 후기를 자극할 시점입니다.`;
+    else if (last3 > prev3 * 1.3 && last3 >= 3) cadenceInsight = `최근 3개월에 리뷰가 몰려요(전체의 **${recentShare}%**) — **상승세**. 지금 흐름을 메뉴·이벤트로 이어가세요.`;
+    else if (prev3 > last3 * 1.3) cadenceInsight = `리뷰 속도가 이전보다 **줄었어요** — 관심이 식기 전 새 시그니처·시즌 메뉴로 환기하세요.`;
+    else cadenceInsight = `리뷰가 **꾸준히** 쌓이는 편이라 안정적이에요. 차별점을 키우면 속도를 더 올릴 수 있어요.`;
+    const reviewCadence = { months, total, last12, recentShare, gapMonths, lastDate: lastDate ?? null, insight: cadenceInsight };
+    actions.push({ type: "리뷰 주기", tone: gapMonths !== null && gapMonths >= 4 ? "warn" : "good", title: "🗓 리뷰 주기", body: cadenceInsight });
+
     return NextResponse.json({
       ok: true,
       me: { name: me.name, area: me.area, grade: me.synth_grade, count: me.synth_count, identity: me.synth_identity },
-      gu: myGu, hoodCount: hood.length, rank, rankList, charProfile, similar, actions,
+      gu: myGu, hoodCount: hood.length, rank, rankList, charProfile, similar, actions, reviewCadence,
     });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
