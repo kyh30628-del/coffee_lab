@@ -29,6 +29,31 @@ function toGu(area: string): { sido: string; sigungu: string } {
   if (a.includes("하남")) return { sido: "경기", sigungu: "하남시" };
   return { sido: "", sigungu: "" };
 }
+
+const CONSENT_VERSION = "v1";
+
+// 외부 지오코딩 없이, 보유 카페 좌표로 사용자의 '가장 가까운 동네'를 역산.
+// 가까운 7곳의 다수결 시·군·구를 채택. 30km 밖이면 수도권 밖으로 보고 null.
+function nearestRegion(cafes: Cafe[], lat: number, lng: number): { sido: string; sigungu: string; distKm: number } | null {
+  const pts = cafes.filter((c) => c.lat && c.lng);
+  if (!pts.length) return null;
+  const KM_LAT = 111, KM_LNG = 88; // 위도 37.5° 근사
+  const withD = pts.map((c) => {
+    const dx = (c.lat - lat) * KM_LAT, dy = (c.lng - lng) * KM_LNG;
+    return { c, d: Math.sqrt(dx * dx + dy * dy) };
+  }).sort((a, b) => a.d - b.d);
+  if (withD[0].d > 30) return null;
+  const tally: Record<string, { sido: string; sigungu: string; n: number }> = {};
+  for (const { c } of withD.slice(0, 7)) {
+    const g = toGu(c.area);
+    if (!g.sigungu) continue;
+    const key = `${g.sido}|${g.sigungu}`;
+    tally[key] = tally[key] ?? { sido: g.sido, sigungu: g.sigungu, n: 0 };
+    tally[key].n++;
+  }
+  const best = Object.values(tally).sort((a, b) => b.n - a.n)[0];
+  return best ? { sido: best.sido, sigungu: best.sigungu, distKm: Math.round(withD[0].d * 10) / 10 } : null;
+}
 const TASTE_CHOICES = [
   { key: "roast", label: "직접 로스팅", emoji: "🔥", desc: "커피에 진심인 집" },
   { key: "work", label: "작업·공부", emoji: "💻", desc: "오래 머물기 좋은" },
@@ -67,6 +92,13 @@ export default function Home() {
   const [homeSido, setHomeSido] = useState("");
   const [homeGu, setHomeGu] = useState("");
   const [sheetOpen, setSheetOpen] = useState(true); // 모바일 바텀시트 펼침/접힘
+  // 위치/동의 상태
+  const [consent, setConsent] = useState<"unknown" | "agreed" | "declined">("unknown");
+  const [showConsent, setShowConsent] = useState(false);
+  const [autoGu, setAutoGu] = useState("");   // 위치로 자동 설정된 동네 표시
+  const [geoMsg, setGeoMsg] = useState("");
+  const anonRef = useRef("");
+  const detectedRef = useRef(false);
   // 지도용 상태
   const [tasteKey, setTasteKey] = useState<string | null>(null);
   const [sido, setSido] = useState("");
@@ -77,6 +109,53 @@ export default function Home() {
   const LRef = useRef<any>(null);
 
   useEffect(() => { fetch("/api/cafes").then((r) => r.json()).then((d) => setCafes(d.cafes ?? [])).catch(() => {}); }, []);
+
+  // 익명 식별자 준비 + 저장된 동의 상태 로드
+  useEffect(() => {
+    try {
+      let a = localStorage.getItem("dcn_anon");
+      if (!a) { a = (crypto?.randomUUID?.() ?? `a${Date.now()}${Math.floor(Math.random() * 1e6)}`); localStorage.setItem("dcn_anon", a); }
+      anonRef.current = a;
+      const c = localStorage.getItem("dcn_consent");
+      if (c === "agreed") setConsent("agreed");
+      else if (c === "declined") setConsent("declined");
+      else { setConsent("unknown"); setShowConsent(true); } // 첫 방문 → 동의 안내
+    } catch { setConsent("declined"); }
+  }, []);
+
+  const postConsent = (agreed: boolean, extra?: { region?: string; lat?: number; lng?: number }) => {
+    if (!anonRef.current) return;
+    fetch("/api/consent", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ anonId: anonRef.current, agreed, version: CONSENT_VERSION, ...extra }) }).catch(() => {});
+  };
+
+  const detectLocation = () => {
+    if (!navigator.geolocation) { setGeoMsg("이 브라우저는 위치를 지원하지 않아요"); return; }
+    setGeoMsg("위치 확인 중…");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        const r = nearestRegion(cafes, latitude, longitude);
+        if (!r) { setGeoMsg("수도권 밖이거나 가까운 카페가 없어 전체를 보여드려요"); postConsent(true, { lat: latitude, lng: longitude }); return; }
+        setHomeSido(r.sido); setHomeGu(r.sigungu);
+        setSido(r.sido); setSigungu(r.sigungu);
+        setAutoGu(r.sigungu); setGeoMsg("");
+        postConsent(true, { region: `${r.sido} ${r.sigungu}`, lat: latitude, lng: longitude });
+      },
+      (err) => setGeoMsg(err.code === 1 ? "위치 권한이 거부됐어요 (브라우저 설정에서 허용 가능)" : "위치를 가져오지 못했어요"),
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 },
+    );
+  };
+
+  // 동의 완료 + 카페 로드되면 1회 자동 감지
+  useEffect(() => {
+    if (consent === "agreed" && cafes.length > 0 && !detectedRef.current) { detectedRef.current = true; detectLocation(); }
+  }, [consent, cafes.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const onAgree = () => { try { localStorage.setItem("dcn_consent", "agreed"); } catch {} setShowConsent(false); setConsent("agreed"); postConsent(true); };
+  const onDecline = () => { try { localStorage.setItem("dcn_consent", "declined"); } catch {} setShowConsent(false); setConsent("declined"); postConsent(false); };
+  const openLocation = () => { if (consent === "agreed") { detectedRef.current = false; detectLocation(); } else setShowConsent(true); };
+  const clearAuto = () => { setHomeSido(""); setHomeGu(""); setAutoGu(""); setSido(""); setSigungu(""); setGeoMsg(""); };
   useEffect(() => { const u = homeGu ? `/api/discover?region=${encodeURIComponent(homeGu)}` : "/api/discover"; setDiscover(null); fetch(u).then((r) => r.json()).then((d) => { if (d.ok) setDiscover(d); }).catch(() => {}); }, [homeGu]);
 
   const openById = (id: number) => { const c = cafes.find((x) => x.id === id); if (c) setSelected(c); };
@@ -210,7 +289,18 @@ export default function Home() {
                   <option value="">우리 동네 선택</option>{homeSido && REGIONS[homeSido].map((g) => <option key={g} value={g}>{g}</option>)}
                 </select>
               </div>
-              {homeGu && <button onClick={() => { setHomeSido(""); setHomeGu(""); }} className="text-[11px] text-[#9c6b3f] underline mt-2">수도권 전체 보기</button>}
+              <div className="mt-2.5 flex flex-col items-center gap-1">
+                {autoGu ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] text-[#5f7355] bg-[#eef3ea] border border-[#cfe0c2] rounded-full px-2.5 py-1">📍 내 위치 기준 <b>{autoGu}</b></span>
+                    <button onClick={clearAuto} className="text-[11px] text-[#9c6b3f] underline">전체보기</button>
+                  </div>
+                ) : (
+                  <button onClick={openLocation} className="text-[12px] text-[#fff] bg-[#5f7355] rounded-full px-3.5 py-1.5 font-medium">📍 내 위치로 우리 동네 보기</button>
+                )}
+                {geoMsg && <span className="text-[10px] text-[#a8927a]">{geoMsg}</span>}
+                {homeGu && !autoGu && <button onClick={clearAuto} className="text-[11px] text-[#9c6b3f] underline">수도권 전체 보기</button>}
+              </div>
             </div>
             {!discover ? <p className="text-center text-[#a8927a] py-10">불러오는 중...</p> : (
               <>
@@ -250,6 +340,35 @@ export default function Home() {
       )}
 
       {selected && <CafePanel cafe={selected} onClose={() => setSelected(null)} onMap={() => { setTab("map"); setTimeout(() => { if (mapObj.current && selected.lat) mapObj.current.setView([selected.lat, selected.lng], 16); }, 300); }} />}
+
+      {/* 위치이용 동의 안내 */}
+      {showConsent && (
+        <div className="fixed inset-0 z-[4000] flex items-end sm:items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={onDecline} />
+          <div className="relative bg-[#fdfaf4] w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl p-6 shadow-2xl">
+            <div className="text-2xl mb-1">📍</div>
+            <h3 className="text-lg font-bold text-[#2b2018] mb-2">내 동네 카페 먼저 보기</h3>
+            <p className="text-[13px] text-[#52402e] leading-relaxed mb-3">
+              위치를 확인해 가장 가까운 동네(시·군·구)의 <b>검증된 카페</b>를 먼저 보여드려요.
+              정확한 좌표가 아니라 <b>대략적 지역</b>만 쓰고, 언제든 끌 수 있어요.
+            </p>
+            <details className="mb-4">
+              <summary className="text-[12px] text-[#9c6b3f] cursor-pointer">수집·이용 동의 내용 보기</summary>
+              <div className="text-[11px] text-[#6b5a48] leading-relaxed mt-2 bg-[#f4ece0] rounded-lg p-3 space-y-1">
+                <div>· 수집 항목: 대략적 위치(시·군·구 수준), 익명 식별자</div>
+                <div>· 이용 목적: 내 동네 카페 자동 추천·필터</div>
+                <div>· 보관 기간: 동의 철회(브라우저 데이터 삭제) 시까지</div>
+                <div>· 제3자 제공: 없음 · 이름·연락처 등 개인정보는 받지 않아요</div>
+                <div>· 거부하셔도 전체 카페는 그대로 이용할 수 있어요</div>
+              </div>
+            </details>
+            <div className="flex flex-col gap-2">
+              <button onClick={onAgree} className="w-full bg-[#2b2018] text-[#f4ece0] rounded-xl py-3 font-medium">동의하고 내 동네 보기</button>
+              <button onClick={onDecline} className="w-full text-[#9c6b3f] rounded-xl py-2 text-sm">아니요, 전체 볼게요</button>
+            </div>
+          </div>
+        </div>
+      )}
       <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet" />
     </div>
   );
