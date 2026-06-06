@@ -52,3 +52,21 @@ export async function embedBatch(texts: string[], task: Task = "RETRIEVAL_DOCUME
 export function toVectorLiteral(v: number[]): string {
   return `[${v.join(",")}]`;
 }
+
+// 카페 임베딩 텍스트: 화면·DB·검증 리뷰의 의미를 한 덩어리로(embed-cafes·cron-embed 공용).
+import { CHAR_AXES } from "./charScore";
+export function buildCafeEmbedText(c: any): string {
+  const parts: string[] = [c.name];
+  if (c.synth_identity) parts.push(c.synth_identity);
+  if (c.signature) parts.push(`추천 ${c.signature}`);
+  if (c.note) parts.push(c.note);
+  if (c.vibe) parts.push(c.vibe);
+  if (c.uses) parts.push(`용도 ${c.uses}`);
+  if (c.beans) parts.push(`원두 ${c.beans}`);
+  const cs = c.char_scores ?? {};
+  const chars = CHAR_AXES.filter((a) => (cs[a.key] ?? 0) > 0).sort((a, b) => (cs[b.key] ?? 0) - (cs[a.key] ?? 0)).map((a) => a.label);
+  if (chars.length) parts.push(`특징 ${chars.join(", ")}`);
+  if (Array.isArray(c.synth_reviews)) parts.push(c.synth_reviews.map((r: any) => r?.quote ?? "").join(" "));
+  if (c.area) parts.push(c.area);
+  return parts.filter(Boolean).join(". ").slice(0, 6000);
+}
