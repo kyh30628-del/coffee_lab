@@ -65,6 +65,7 @@ export default function Home() {
   const [discover, setDiscover] = useState<Discover | null>(null);
   const [homeSido, setHomeSido] = useState("");
   const [homeGu, setHomeGu] = useState("");
+  const [sheetOpen, setSheetOpen] = useState(true); // 모바일 바텀시트 펼침/접힘
   // 지도용 상태
   const [tasteKey, setTasteKey] = useState<string | null>(null);
   const [sido, setSido] = useState("");
@@ -182,7 +183,7 @@ export default function Home() {
           <div className="flex bg-[#3d2f22] rounded-full p-0.5">
             {(["home", "map"] as const).map((t) => (
               <button key={t} onClick={() => setTab(t)} className={`px-3 py-1.5 text-xs font-bold rounded-full transition-colors ${tab === t ? "bg-[#f4ece0] text-[#2b2018]" : "text-[#cbb89f]"}`}>
-                {t === "home" ? "🗞 홈" : "🗺 지도"}
+                {t === "home" ? "홈" : "지도"}
               </button>
             ))}
           </div>
@@ -235,8 +236,11 @@ export default function Home() {
           <aside className="hidden md:block md:w-[380px] md:h-full bg-[#fdfaf4] border-l border-[#ece0cd] overflow-y-auto p-6 relative z-10">
             <MapControls {...{ sido, sigungu, onSido, setSigungu, tasteKey, setTasteKey, filtered, matchSet, setSelected }} />
           </aside>
-          <div className="md:hidden absolute left-0 right-0 bottom-0 bg-[#fdfaf4] rounded-t-3xl shadow-[0_-4px_24px_rgba(0,0,0,0.18)] z-[1200] flex flex-col" style={{ height: "70dvh" }}>
-            <div className="shrink-0 w-full pt-3 pb-2 flex justify-center"><div className="w-10 h-1.5 bg-[#cbb89f] rounded-full" /></div>
+          <div className="md:hidden absolute left-0 right-0 bottom-0 bg-[#fdfaf4] rounded-t-3xl shadow-[0_-4px_24px_rgba(0,0,0,0.18)] z-[1200] flex flex-col transition-transform duration-300 ease-out will-change-transform" style={{ height: "72dvh", transform: sheetOpen ? "translateY(0)" : "translateY(calc(72dvh - 60px))" }}>
+            <button onClick={() => setSheetOpen((o) => !o)} className="shrink-0 w-full pt-3 pb-2.5 flex flex-col items-center gap-1.5" aria-expanded={sheetOpen}>
+              <div className="w-10 h-1.5 bg-[#cbb89f] rounded-full" />
+              <span className="text-[11px] font-bold text-[#9c6b3f]">{sheetOpen ? "지도 보기 ▾" : `지역·필터 펼치기 ▴ (${filtered.length})`}</span>
+            </button>
             <div className="flex-1 overflow-y-auto px-5 pb-8" style={{ WebkitOverflowScrolling: "touch" }}>
               <MapControls {...{ sido, sigungu, onSido, setSigungu, tasteKey, setTasteKey, filtered, matchSet, setSelected }} />
             </div>

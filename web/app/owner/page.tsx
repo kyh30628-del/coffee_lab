@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, Cell, ResponsiveContainer,
-  RadarChart, PolarGrid, PolarAngleAxis, Radar, Legend,
+  RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Legend,
   PieChart, Pie, Tooltip } from "recharts";
 
 type RankItem = { rank: number; name: string; count: number; grade: string | null; isMe: boolean };
@@ -22,6 +22,19 @@ const TONE: Record<string, { bg: string; border: string; tag: string }> = {
   warn: { bg: "#f7ede4", border: "#e3c9b0", tag: "#b5703c" },
   info: { bg: "#eef0f3", border: "#c3cad4", tag: "#5a6b82" },
 };
+
+// 레이더 축 라벨: 길면 두 줄로 쪼개 잘림 방지
+function RadarTick({ x, y, textAnchor, payload }: any) {
+  const v = String(payload?.value ?? "");
+  let lines = [v];
+  if (v.includes(" ")) lines = v.split(" ");
+  else if (v.length > 4) { const h = Math.ceil(v.length / 2); lines = [v.slice(0, h), v.slice(h)]; }
+  return (
+    <text x={x} y={y} textAnchor={textAnchor} fill="#52402e" fontSize={11} fontWeight={600}>
+      {lines.map((ln, i) => <tspan key={i} x={x} dy={i === 0 ? (lines.length > 1 ? -2 : 4) : 12}>{ln}</tspan>)}
+    </text>
+  );
+}
 
 function renderEmphasis(text: string, tagColor: string) {
   // **...** 를 볼드+색으로
@@ -55,6 +68,7 @@ export default function OwnerPage() {
 
   const rankData = insight ? insight.rankList.slice(0, 12).map((r) => ({ name: r.name + (r.isMe ? " ★" : ""), count: r.count, isMe: r.isMe })) : [];
   const radarData = insight ? insight.charProfile.map((c) => ({ axis: c.label, 우리카페: c.me, 동네평균: c.avg })) : [];
+  const radarMax = insight ? Math.max(2, ...insight.charProfile.flatMap((c) => [c.me, c.avg])) : 2;
   const pieData = insight ? insight.charProfile.filter((c) => c.me > 0).map((c) => ({ name: c.label, value: c.me })) : [];
 
   return (
@@ -64,7 +78,7 @@ export default function OwnerPage() {
         <a href="/" className="text-xs text-[#cbb89f] underline">지도로</a>
       </header>
 
-      <div className="max-w-2xl mx-auto px-5 py-6">
+      <div className="max-w-2xl mx-auto px-4 sm:px-5 py-6">
         {!insight && (
           <>
             <p className="text-[#6b5a48] text-sm mb-4 leading-relaxed">우리 카페를 검색하면, 같은 동네 카페들과 비교한 <strong>순위·성격·구성</strong>과 <strong>데이터 기반 액션 플랜</strong>을 보여드려요.</p>
@@ -87,7 +101,7 @@ export default function OwnerPage() {
           <div>
             <button onClick={() => setInsight(null)} className="text-xs text-[#9c6b3f] underline mb-4">← 다른 카페 검색</button>
 
-            <div className="bg-white rounded-2xl p-5 border border-[#ece0cd] mb-4">
+            <div className="bg-white rounded-2xl p-4 sm:p-5 border border-[#ece0cd] mb-4">
               <div className="flex items-center gap-2 mb-1">
                 <h2 className="text-2xl font-bold">{insight.me.name}</h2>
                 {insight.me.grade && <span className="text-[10px] text-white px-2 py-0.5 rounded-full" style={{ background: GRADE_BG[insight.me.grade] }}>{insight.me.grade}</span>}
@@ -121,7 +135,7 @@ export default function OwnerPage() {
                 <button key={t.k} onClick={() => setTab(t.k)} className={`flex-1 rounded-lg py-2.5 text-sm font-medium transition-colors ${tab === t.k ? "bg-[#2b2018] text-[#f4ece0]" : "bg-white text-[#6b5a48] border border-[#cbb89f]"}`}>{t.l}</button>
               ))}
             </div>
-            <div className="bg-white rounded-2xl p-5 border border-[#ece0cd] mb-4">
+            <div className="bg-white rounded-2xl p-4 sm:p-5 border border-[#ece0cd] mb-4">
               {tab === "rank" && (<>
                 <div className="text-[11px] text-[#8a7458] uppercase tracking-wider mb-3">동네 카페 리뷰 수 순위</div>
                 <ResponsiveContainer width="100%" height={Math.max(rankData.length * 34, 200)}>
@@ -135,11 +149,13 @@ export default function OwnerPage() {
               </>)}
               {tab === "radar" && (<>
                 <div className="text-[11px] text-[#8a7458] uppercase tracking-wider mb-3">우리 카페의 결 vs 동네 평균</div>
-                <ResponsiveContainer width="100%" height={300}>
-                  <RadarChart data={radarData}>
-                    <PolarGrid stroke="#e3d6c2" /><PolarAngleAxis dataKey="axis" tick={{ fontSize: 11, fill: "#52402e" }} />
-                    <Radar name="동네평균" dataKey="동네평균" stroke="#a8927a" fill="#a8927a" fillOpacity={0.25} />
-                    <Radar name="우리카페" dataKey="우리카페" stroke="#9c6b3f" fill="#9c6b3f" fillOpacity={0.45} />
+                <ResponsiveContainer width="100%" height={250}>
+                  <RadarChart data={radarData} margin={{ top: 16, right: 36, bottom: 16, left: 36 }} outerRadius="66%">
+                    <PolarGrid stroke="#e3d6c2" />
+                    <PolarAngleAxis dataKey="axis" tick={<RadarTick />} />
+                    <PolarRadiusAxis angle={90} domain={[0, radarMax]} tickCount={Math.min(radarMax, 4) + 1} tick={{ fontSize: 9, fill: "#bcab92" }} axisLine={false} />
+                    <Radar name="동네평균" dataKey="동네평균" stroke="#a8927a" strokeWidth={2} fill="#a8927a" fillOpacity={0.2} dot={{ r: 2.5, fill: "#a8927a" }} />
+                    <Radar name="우리카페" dataKey="우리카페" stroke="#9c6b3f" strokeWidth={2} fill="#9c6b3f" fillOpacity={0.4} dot={{ r: 2.5, fill: "#9c6b3f" }} />
                     <Legend wrapperStyle={{ fontSize: 12 }} />
                   </RadarChart>
                 </ResponsiveContainer>
@@ -160,7 +176,7 @@ export default function OwnerPage() {
               </>)}
             </div>
 
-            <div className="bg-white rounded-2xl p-5 border border-[#ece0cd] mb-4">
+            <div className="bg-white rounded-2xl p-4 sm:p-5 border border-[#ece0cd] mb-4">
               <div className="text-[11px] text-[#8a7458] uppercase tracking-wider mb-3">성격이 비슷한 경쟁 카페</div>
               {insight.similar.map((c) => (
                 <div key={c.name} className="flex items-center gap-2 py-2 border-b border-[#f0e6d4] last:border-0">
