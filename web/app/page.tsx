@@ -129,6 +129,7 @@ export default function Home() {
       let a = localStorage.getItem("dcn_anon");
       if (!a) { a = (crypto?.randomUUID?.() ?? `a${Date.now()}${Math.floor(Math.random() * 1e6)}`); localStorage.setItem("dcn_anon", a); }
       anonRef.current = a;
+      fetch("/api/visit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ anonId: a }) }).catch(() => {});
       const c = localStorage.getItem("dcn_consent");
       if (c === "agreed") setConsent("agreed");
       else if (c === "declined") setConsent("declined");
