@@ -61,6 +61,17 @@ const NON_METRO = ["충주", "청주", "충북", "충남", "대전", "세종", "
   "경주", "창원", "김해", "진주", "전주", "군산", "익산", "전북", "전남", "여수", "순천", "목포", "광양",
   "강릉", "속초", "춘천", "원주", "강원", "제주", "서귀포", "통영", "안동", "구미", "경북", "경남", "양양", "거제", "사천"];
 
+// 카페 맥락어 — 흔한 단어 이름(예: '리프레쉬')이 무관 글에 우연히 걸리는 것 방지용
+const CAFE_WORDS = ["카페", "커피", "로스터리", "베이커리", "디저트", "에스프레소", "라떼", "아메리카노", "점", "coffee", "cafe"];
+
+// 수도권 시·군·구 — 같은 상호의 '다른 지점'을 지역으로 구분하기 위함
+const ALL_GU = [
+  "강남구", "강동구", "강북구", "강서구", "관악구", "광진구", "구로구", "금천구", "노원구", "도봉구", "동대문구", "동작구", "마포구", "서대문구", "서초구", "성동구", "성북구", "송파구", "양천구", "영등포구", "용산구", "은평구", "종로구", "중랑구",
+  "수원시", "성남시", "고양시", "용인시", "부천시", "안산시", "안양시", "남양주시", "화성시", "평택시", "의정부시", "시흥시", "파주시", "김포시", "광명시", "광주시", "군포시", "하남시", "오산시", "양주시", "구리시", "안성시", "포천시", "의왕시", "여주시", "동두천시", "과천시", "이천시", "양평군", "가평군", "연천군",
+  "미추홀구", "연수구", "남동구", "부평구", "계양구", "강화군", "옹진군",
+];
+const guShort = (g: string) => g.replace(/(특별시|광역시|시|군|구)$/, "");
+
 const norm = (s: string) => (s || "").toLowerCase().replace(/\s+/g, "");
 const has = (t: string, kws: string[]) => kws.some((k) => t.includes(k.toLowerCase()));
 const countOccur = (t: string, kw: string) => kw ? t.split(kw).length - 1 : 0;
@@ -108,15 +119,27 @@ export function verifyReview(input: QualityInput): QualityResult {
   const distinct = tokens.length ? tokens : (nameN ? [input.name] : []);
   const inTitleFull = !!nameN && titleN.includes(nameN);
   const inBodyFull = !!nameN && bodyN.includes(nameN);
-  const nameInTitle = inTitleFull || distinct.some((tk) => titleN.includes(norm(tk)));
-  const nameInBody = inBodyFull || distinct.some((tk) => bodyN.includes(norm(tk)));
+  const distinctInTitle = distinct.some((tk) => titleN.includes(norm(tk)));
+  const distinctInBody = distinct.some((tk) => bodyN.includes(norm(tk)));
   const visit = has(fullL, VISIT_CUES);
   const substance = SUBSTANCE_CUES.filter((k) => fullL.includes(k.toLowerCase())).length;
   const areaPresent = areaTerms.length ? areaTerms.some((a) => `${title} ${body}`.includes(a)) : false;
+  // [#4] 흔한 단어 이름 오매칭 방지: 전체 이름 일치는 강함. 토큰만 일치면
+  //     '카페 맥락(카페·커피·로스터리…)'이나 지역이 함께 있어야 주제로 인정.
+  const titleHasCafeWord = CAFE_WORDS.some((w) => title.includes(w));
+  const bodyHasCafeWord = CAFE_WORDS.some((w) => body.includes(w));
+  const nameInTitle = inTitleFull || (distinctInTitle && (titleHasCafeWord || areaPresent));
+  const nameInBody = inBodyFull || (distinctInBody && (bodyHasCafeWord || areaPresent));
   const listicle = LISTICLE_TITLE.some((re) => re.test(title)) || (((`${title} ${body}`.match(PLACE_TOKEN) ?? []).length) >= 4);
   const generic = has(fullL, GENERIC_CUES);
   const nameOccurBody = nameN ? countOccur(bodyN, nameN) : 0;
   const foreignInTitle = NON_METRO.find((c) => title.includes(c));
+  // [#5] 수도권 내 동명 '다른 지점': 대상 시·군·구를 알 때, 제목에 다른 시·군·구가
+  //     박히고 대상 지역어가 어디에도 없으면 다른 지점으로 보고 배제.
+  const targetShorts = ALL_GU.map(guShort).filter((s) => s.length >= 2 && areaTerms.some((a) => a.includes(s)));
+  const otherGuInTitle = targetShorts.length
+    ? ALL_GU.map(guShort).find((s) => s.length >= 2 && !targetShorts.includes(s) && title.includes(s) && !areaTerms.some((a) => a.includes(s)))
+    : undefined;
 
   const sig = { nameInTitle, nameInBody, visit, substance, listicle, sponsored, areaMatch: areaPresent };
 
@@ -127,6 +150,10 @@ export function verifyReview(input: QualityInput): QualityResult {
   // 동명 카페: 제목이 수도권 밖 도시인데 대상 지역어가 어디에도 없음 → 다른 지역 동명점
   if (foreignInTitle && !areaPresent) {
     return { verdict: "rejected", score: 5, reasons: [`다른 지역 동명 카페 추정(제목 '${foreignInTitle}')`], signals: sig };
+  }
+  // 수도권 내 다른 시·군·구의 동명 지점
+  if (otherGuInTitle && !areaPresent) {
+    return { verdict: "rejected", score: 8, reasons: [`다른 지점 추정(제목 '${otherGuInTitle}', 대상 지역 언급 없음)`], signals: sig };
   }
   if (generic && !nameInTitle) {
     return { verdict: "rejected", score: 5, reasons: ["일반 교양/정보글(그 카페 후기 아님)"], signals: sig };

@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import BackLink from "../BackLink";
 
 type Cafe = {
   id: number; name: string; area: string; note: string; beans: string;
@@ -76,7 +77,10 @@ export default function AdminPage() {
   return (
     <main className="min-h-screen bg-stone-100 p-6">
       <div className="max-w-2xl mx-auto">
-        <h1 className="text-2xl font-bold mb-6">카페 관리</h1>
+        <div className="flex items-center gap-3 mb-6">
+          <BackLink to="/" label="홈" className="text-stone-500" />
+          <h1 className="text-2xl font-bold">카페 관리</h1>
+        </div>
 
         {consent && (
           <section className="mb-8">

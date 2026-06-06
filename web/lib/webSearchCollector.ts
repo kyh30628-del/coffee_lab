@@ -42,7 +42,10 @@ async function naverSearch(kind: "blog" | "cafearticle", query: string): Promise
 export async function fetchWebReviews(name: string, area: string): Promise<{ snippets: WebSnippet[]; error?: string; debug?: unknown }> {
   if (!ID || !SECRET) return { snippets: [], error: "NAVER_CLIENT_ID/SECRET 미설정" };
   try {
-    const queries = [`${name} ${area}`, `${name} 카페 후기`, `${name} 리뷰`];
+    // 지역을 모든 질의에 포함해 같은 상호의 다른 지점·동명 노이즈를 줄인다(#5).
+    const queries = area
+      ? [`${name} ${area}`, `${name} ${area} 카페`, `${name} ${area} 후기`, `${name} ${area} 리뷰`]
+      : [`${name} 카페 후기`, `${name} 카페 리뷰`, `${name} 후기`];
     const seen = new Set<string>();
     const snippets: WebSnippet[] = [];
     const debug: unknown[] = [];

@@ -3,6 +3,7 @@ import { useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, Cell, ResponsiveContainer,
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Legend,
   PieChart, Pie, Tooltip } from "recharts";
+import BackLink from "../BackLink";
 
 type RankItem = { rank: number; name: string; count: number; grade: string | null; isMe: boolean };
 type CharItem = { key: string; label: string; emoji: string; me: number; avg: number; diff: number; meRaw?: number; hoodPenetration?: number };
@@ -72,9 +73,12 @@ export default function OwnerPage() {
 
   return (
     <div className="min-h-screen bg-[#f4ece0] text-[#2b2018]" style={{ fontFamily: "'Gowun Batang', serif" }}>
-      <header className="bg-[#2b2018] text-[#f4ece0] px-5 py-4 flex items-center justify-between">
-        <div><div className="text-[#d4a574] text-[10px] tracking-[0.2em] uppercase">For Owners</div><h1 className="text-lg font-bold">사장님 카페 분석</h1></div>
-        <a href="/" className="text-xs text-[#cbb89f] underline">지도로</a>
+      <header className="bg-[#2b2018] text-[#f4ece0] px-5 py-4 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <BackLink to="/" label="홈" className="text-[#cbb89f] shrink-0" />
+          <div className="min-w-0"><div className="text-[#d4a574] text-[10px] tracking-[0.2em] uppercase">For Owners</div><h1 className="text-lg font-bold truncate">사장님 카페 분석</h1></div>
+        </div>
+        <a href="/" className="text-xs text-[#cbb89f] underline shrink-0">지도로</a>
       </header>
 
       <div className="max-w-2xl mx-auto px-4 sm:px-5 py-6">

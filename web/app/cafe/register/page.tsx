@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import BackLink from "../../BackLink";
 
 const USE_OPTIONS = ["작업", "혼자", "수다", "빵", "사진", "단골"];
 
@@ -52,6 +53,7 @@ export default function RegisterPage() {
     <main className="min-h-screen bg-[#f4ece0] text-[#2b2018]" style={{ fontFamily: "'Gowun Batang', serif" }}>
       <div className="max-w-xl mx-auto px-6 py-12">
         <header className="mb-8">
+          <BackLink to="/" label="홈" className="text-[#9c6b3f] mb-4" />
           <div className="text-[#9c6b3f] text-xs tracking-[0.4em] uppercase mb-3">For Owners</div>
           <h1 className="text-3xl font-bold leading-tight">사장님, 가게를 소개해주세요</h1>
           <p className="text-[#6b5a48] mt-3 leading-relaxed text-[15px]">

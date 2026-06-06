@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import BackLink from "../BackLink";
 
 type EvidenceReview = { quote: string; link?: string; source?: string; date?: string };
 type Cafe = {
@@ -214,6 +215,7 @@ export default function CafePage() {
   if (step === "purpose") {
     return (
       <Shell wide={false}>
+        <BackLink to="/" label="홈" className="text-[#9c6b3f] mb-4" />
         <div className="text-[#9c6b3f] text-xs tracking-[0.4em] uppercase mb-4">강동·구리 동네 커피 노트</div>
         <h1 className="text-4xl font-bold leading-snug mb-3">오늘 커피,<br />뭐 하러 가세요?</h1>
         <p className="text-[#6b5a48] mb-10 leading-relaxed">목적과 취향을 알려주시면, 거기 딱 맞는 동네 로스터리를 <strong className="text-[#2b2018]">근거와 함께</strong> 추천해드려요.</p>

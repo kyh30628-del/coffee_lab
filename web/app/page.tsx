@@ -71,15 +71,18 @@ const CHAR_LABELS: Record<string, { label: string; emoji: string }> = {
 const GRADE_STYLE: Record<string, { bg: string; label: string }> = { 검증: { bg: "#5f7355", label: "검증" }, 참고: { bg: "#9c6b3f", label: "참고" }, 발굴: { bg: "#a8927a", label: "발굴" } };
 const TONES = ["#6f4e37", "#5f7355", "#9c6b3f", "#3a2e28", "#8a5a24"];
 
-function makePinHtml(c: Cafe, isMatch: boolean): string {
+function makePinHtml(c: Cafe, isMatch: boolean, isFocus = false): string {
   const grade = c.synth_grade ?? "발굴";
-  const color = isMatch ? "#5f7355" : (GRADE_STYLE[grade]?.bg ?? "#9c6b3f");
-  const size = isMatch ? 36 : 28;
-  const ring = isMatch ? "box-shadow:0 0 0 4px rgba(95,115,85,0.3),0 2px 6px rgba(0,0,0,0.3);" : "box-shadow:0 1px 4px rgba(0,0,0,0.3);";
+  const color = isFocus ? "#b5703c" : isMatch ? "#5f7355" : (GRADE_STYLE[grade]?.bg ?? "#9c6b3f");
+  const size = isFocus ? 44 : isMatch ? 36 : 28;
+  const ring = isFocus
+    ? "box-shadow:0 0 0 6px rgba(181,112,60,0.4),0 3px 10px rgba(0,0,0,0.4);"
+    : isMatch ? "box-shadow:0 0 0 4px rgba(95,115,85,0.3),0 2px 6px rgba(0,0,0,0.3);" : "box-shadow:0 1px 4px rgba(0,0,0,0.3);";
+  const labelStyle = isFocus ? "background:#b5703c;color:#fff;font-weight:700;" : "background:rgba(253,250,244,0.95);color:#2b2018;font-weight:600;";
   return `<div style="transform:translate(-50%,-100%);text-align:center;">
     <div style="width:${size}px;height:${size}px;background:${color};border:2px solid #fdfaf4;border-radius:50% 50% 50% 0;transform:rotate(-45deg);${ring}display:flex;align-items:center;justify-content:center;margin:0 auto;">
-      <span style="transform:rotate(45deg);font-size:${isMatch ? 14 : 11}px;">☕</span></div>
-    <div style="margin-top:2px;background:rgba(253,250,244,0.95);color:#2b2018;padding:1px 5px;border-radius:7px;font-size:9px;font-weight:600;white-space:nowrap;display:inline-block;">${c.name}${isMatch ? " ✓" : ""}</div>
+      <span style="transform:rotate(45deg);font-size:${isFocus ? 18 : isMatch ? 14 : 11}px;">${isFocus ? "📍" : "☕"}</span></div>
+    <div style="margin-top:2px;${labelStyle}padding:1px 5px;border-radius:7px;font-size:${isFocus ? 10 : 9}px;white-space:nowrap;display:inline-block;">${c.name}${isFocus ? "" : isMatch ? " ✓" : ""}</div>
   </div>`;
 }
 function topChars(c: Cafe, n = 4) {
@@ -96,6 +99,7 @@ export default function Home() {
   const [homeGu, setHomeGu] = useState("");
   const [sheetOpen, setSheetOpen] = useState(true); // 모바일 바텀시트 펼침/접힘
   const [focusTarget, setFocusTarget] = useState<{ lat: number; lng: number } | null>(null); // 지도에서 위치 보기
+  const [focusId, setFocusId] = useState<number | null>(null); // 핀 고정 강조할 카페
   // 자연어 검색
   const [showSearch, setShowSearch] = useState(false);
   const [searchQ, setSearchQ] = useState("");
@@ -232,17 +236,22 @@ export default function Home() {
     if (!L || !mapObj.current || !layerRef.current) return;
     layerRef.current.clearLayers();
     filtered.forEach((c) => {
+      const isFocus = c.id === focusId;
       const isMatch = matchSet.has(c.id);
-      const icon = L.divIcon({ className: "", html: makePinHtml(c, isMatch), iconSize: [0, 0] });
-      L.marker([c.lat, c.lng], { icon, zIndexOffset: isMatch ? 1000 : 0 }).addTo(layerRef.current).on("click", () => setSelected(c));
+      const icon = L.divIcon({ className: "", html: makePinHtml(c, isMatch, isFocus), iconSize: [0, 0] });
+      const m = L.marker([c.lat, c.lng], { icon, zIndexOffset: isFocus ? 3000 : isMatch ? 1000 : 0 }).addTo(layerRef.current).on("click", () => setSelected(c));
+      if (isFocus) { m.bindPopup(`<b>${c.name}</b><br>${c.area}`); m.openPopup(); }
     });
-    if (filtered.length > 0 && (sido || sigungu)) {
+    // 핀 고정 중이면 그 카페로 이동(아래 focus 효과)에 맡기고 fitBounds 생략
+    if (focusId) {
+      /* focus effect가 setView 처리 */
+    } else if (filtered.length > 0 && (sido || sigungu)) {
       const lats = filtered.map((c) => c.lat), lngs = filtered.map((c) => c.lng);
       mapObj.current.fitBounds(L.latLngBounds([[Math.min(...lats), Math.min(...lngs)], [Math.max(...lats), Math.max(...lngs)]]), { padding: [50, 50], maxZoom: 15 });
     } else if (sido && SIDO_CENTER[sido]) { const [la, ln, z] = SIDO_CENTER[sido]; mapObj.current.setView([la, ln], z); }
-  }, [filtered, matchSet, sido, sigungu, tab]);
+  }, [filtered, matchSet, sido, sigungu, tab, focusId]);
 
-  const onSido = (v: string) => { setSido(v); setSigungu(""); };
+  const onSido = (v: string) => { setSido(v); setSigungu(""); setFocusId(null); };
 
   // ===== 잡지 카드 컴포넌트 =====
   const HeadlineCard = ({ c, kicker, tone }: { c: DCafe; kicker: string; tone: number }) => (
@@ -347,7 +356,7 @@ export default function Home() {
                 <Row title="🏆 리뷰 많은 Top 3" items={discover.top3} />
                 <Row title="🔥 스페셜티 픽" items={discover.specialty} />
                 <Row title="✨ 새로 발견된 카페" items={discover.fresh} />
-                <button onClick={() => setTab("map")} className="w-full bg-[#2b2018] text-[#f4ece0] rounded-xl py-3.5 font-medium mt-2">🗺 지도에서 전체 둘러보기 →</button>
+                <button onClick={() => { if (homeSido) { setSido(homeSido); setSigungu(homeGu); } setFocusId(null); setSheetOpen(true); setTab("map"); }} className="w-full bg-[#2b2018] text-[#f4ece0] rounded-xl py-3.5 font-medium mt-2">🗺 {homeGu ? `${homeGu} 지도로 보기` : "지도에서 전체 둘러보기"} →</button>
               </>
             )}
             <p className="text-[10px] text-[#a8927a] mt-6 text-center leading-relaxed">모든 큐레이션은 네이버 공개 후기를 교차검증한 데이터 기반입니다.</p>
@@ -382,6 +391,7 @@ export default function Home() {
           const g = toGu(selected.area);
           if (g.sido) { setSido(g.sido); setSigungu(g.sigungu); }
           setFocusTarget({ lat: selected.lat, lng: selected.lng });
+          setFocusId(selected.id);
         }
         setSheetOpen(false); setSelected(null); setTab("map");
       }} />}
@@ -474,6 +484,7 @@ export default function Home() {
 }
 
 function MapControls({ sido, sigungu, onSido, setSigungu, tasteKey, setTasteKey, filtered, matchSet, setSelected, openLocation, autoGu, geoMsg, clearAuto }: any) {
+  const listCafes: Cafe[] = tasteKey ? filtered.filter((c: Cafe) => matchSet.has(c.id)) : filtered;
   return (
     <>
       <div className="mb-5">
@@ -504,13 +515,13 @@ function MapControls({ sido, sigungu, onSido, setSigungu, tasteKey, setTasteKey,
             </button>
           ))}
         </div>
-        {tasteKey && <p className="text-xs text-[#9c6b3f] mt-2">이 결이 자주 언급되는 {matchSet.size}곳을 ✓로 강조</p>}
+        {tasteKey && <p className="text-xs text-[#9c6b3f] mt-2">'{TASTE_CHOICES.find((t) => t.key === tasteKey)?.label}' 결이 자주 언급되는 {matchSet.size}곳만 보는 중</p>}
       </div>
       <div>
-        <div className="text-sm font-bold text-[#52402e] mb-2.5">목록 ({filtered.length})</div>
-        {filtered.length === 0 ? <p className="text-xs text-[#a8927a] bg-[#f4ece0] rounded-lg p-4">지역을 선택하면 목록이 나와요.</p> : (
+        <div className="text-sm font-bold text-[#52402e] mb-2.5">목록 ({listCafes.length}{tasteKey ? ` · ${TASTE_CHOICES.find((t) => t.key === tasteKey)?.label}` : ""})</div>
+        {listCafes.length === 0 ? <p className="text-xs text-[#a8927a] bg-[#f4ece0] rounded-lg p-4">{tasteKey ? "이 카테고리에 해당하는 카페가 이 지역엔 없어요. 다른 결을 골라보세요." : "지역을 선택하면 목록이 나와요."}</p> : (
           <div className="space-y-2">
-            {filtered.slice(0, 50).map((c: Cafe) => (
+            {listCafes.slice(0, 50).map((c: Cafe) => (
               <button key={c.id} onClick={() => setSelected(c)} className="w-full text-left bg-[#f4ece0] rounded-xl p-3">
                 <div className="flex items-center gap-1.5">
                   <span className="font-bold text-sm text-[#2b2018]">{c.name}</span>
