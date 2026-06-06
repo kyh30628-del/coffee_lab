@@ -14,6 +14,9 @@ type Cafe = {
 };
 type DCafe = { id: number; name: string; area: string; lat: number; lng: number; grade: string | null; count: number | null; identity: string | null; note: string | null; beanNote: string[]; reason?: string };
 type Discover = { headlineA: DCafe | null; headlineB: DCafe | null; top3: DCafe[]; fresh: DCafe[]; specialty: DCafe[]; scopeCount: number };
+type SearchResult = { id: number; name: string; area: string; grade: string | null; count: number | null; identity: string | null; score: number; reasons: string[] };
+type SearchRes = { ok: boolean; region: string; q: string; concepts: string[]; count: number; results: SearchResult[] };
+const SEARCH_EXAMPLES = ["비 오는 날 혼자 조용히", "감성 사진 데이트", "노트북 작업하기 좋은", "산미 또렷한 커피", "빵 맛있는 집"];
 
 const REGIONS: Record<string, string[]> = {
   서울: ["강남구","강동구","강북구","강서구","관악구","광진구","구로구","금천구","노원구","도봉구","동대문구","동작구","마포구","서대문구","서초구","성동구","성북구","송파구","양천구","영등포구","용산구","은평구","종로구","중구","중랑구"],
@@ -92,6 +95,12 @@ export default function Home() {
   const [homeSido, setHomeSido] = useState("");
   const [homeGu, setHomeGu] = useState("");
   const [sheetOpen, setSheetOpen] = useState(true); // 모바일 바텀시트 펼침/접힘
+  const [focusTarget, setFocusTarget] = useState<{ lat: number; lng: number } | null>(null); // 지도에서 위치 보기
+  // 자연어 검색
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQ, setSearchQ] = useState("");
+  const [searchRes, setSearchRes] = useState<SearchRes | null>(null);
+  const [searchLoading, setSearchLoading] = useState(false);
   // 위치/동의 상태
   const [consent, setConsent] = useState<"unknown" | "agreed" | "declined">("unknown");
   const [showConsent, setShowConsent] = useState(false);
@@ -160,6 +169,18 @@ export default function Home() {
 
   const openById = (id: number) => { const c = cafes.find((x) => x.id === id); if (c) setSelected(c); };
 
+  const runSearch = async (query: string) => {
+    const qq = query.trim();
+    if (!qq) return;
+    setSearchQ(qq); setSearchLoading(true); setSearchRes(null);
+    try {
+      const u = `/api/search?q=${encodeURIComponent(qq)}${homeGu ? `&region=${encodeURIComponent(homeGu)}` : ""}`;
+      const d = await (await fetch(u)).json();
+      if (d.ok) setSearchRes(d);
+    } catch {}
+    setSearchLoading(false);
+  };
+
   // 지도 탭 진입 시 지도 초기화
   useEffect(() => {
     if (tab !== "map") return;
@@ -177,6 +198,22 @@ export default function Home() {
     return () => { cancelled = true; };
   }, [tab]);
   useEffect(() => { if (tab === "map") setTimeout(() => mapObj.current?.invalidateSize(), 200); }, [tab]);
+
+  // '지도에서 위치 보기' — 지도 비동기 초기화가 끝날 때까지 재시도 후 해당 좌표로 이동
+  useEffect(() => {
+    if (tab !== "map" || !focusTarget) return;
+    let tries = 0;
+    const iv = setInterval(() => {
+      tries++;
+      if (mapObj.current && LRef.current) {
+        mapObj.current.invalidateSize();
+        mapObj.current.setView([focusTarget.lat, focusTarget.lng], 16, { animate: true });
+        setFocusTarget(null);
+        clearInterval(iv);
+      } else if (tries > 50) clearInterval(iv);
+    }, 120);
+    return () => clearInterval(iv);
+  }, [tab, focusTarget]);
 
   const filtered = useMemo(() => cafes.filter((c) => {
     if (!c.lat || !c.lng) return false;
@@ -288,6 +325,7 @@ export default function Home() {
                 <select value={homeGu} onChange={(e) => setHomeGu(e.target.value)} disabled={!homeSido} className="border border-[#cbb89f] rounded-lg px-3 py-2 text-sm bg-white text-[#2b2018] disabled:opacity-50">
                   <option value="">우리 동네 선택</option>{homeSido && REGIONS[homeSido].map((g) => <option key={g} value={g}>{g}</option>)}
                 </select>
+                <button onClick={() => { setSearchRes(null); setSearchQ(""); setShowSearch(true); }} aria-label="느낌으로 검색" className="border border-[#cbb89f] rounded-lg px-3 py-2 bg-white text-[#2b2018] hover:bg-[#f0e6d4]">🔍</button>
               </div>
               <div className="mt-2.5 flex flex-col items-center gap-1">
                 {autoGu ? (
@@ -339,7 +377,64 @@ export default function Home() {
         </div>
       )}
 
-      {selected && <CafePanel cafe={selected} onClose={() => setSelected(null)} onMap={() => { setTab("map"); setTimeout(() => { if (mapObj.current && selected.lat) mapObj.current.setView([selected.lat, selected.lng], 16); }, 300); }} />}
+      {selected && <CafePanel cafe={selected} onClose={() => setSelected(null)} onMap={() => {
+        if (selected.lat && selected.lng) {
+          const g = toGu(selected.area);
+          if (g.sido) { setSido(g.sido); setSigungu(g.sigungu); }
+          setFocusTarget({ lat: selected.lat, lng: selected.lng });
+        }
+        setSheetOpen(false); setSelected(null); setTab("map");
+      }} />}
+
+      {/* 느낌으로 검색 (시맨틱 + exact, 선택 동네 범위) */}
+      {showSearch && (
+        <div className="fixed inset-0 z-[4000] flex items-start justify-center sm:p-6">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowSearch(false)} />
+          <div className="relative bg-[#fdfaf4] w-full sm:max-w-lg h-full sm:h-auto sm:max-h-[85vh] sm:rounded-2xl flex flex-col shadow-2xl" style={{ height: "100dvh" }}>
+            <div className="shrink-0 p-4 border-b border-[#ece0cd]">
+              <div className="flex items-center gap-2">
+                <input autoFocus value={searchQ} onChange={(e) => setSearchQ(e.target.value)} onKeyDown={(e) => e.key === "Enter" && runSearch(searchQ)}
+                  placeholder={`${homeGu || "수도권"}에서 느낌으로 찾기`} className="flex-1 border border-[#cbb89f] rounded-lg px-3 py-2.5 text-base bg-white text-[#2b2018]" />
+                <button onClick={() => runSearch(searchQ)} className="bg-[#2b2018] text-[#f4ece0] rounded-lg px-4 py-2.5 text-sm font-medium shrink-0">검색</button>
+                <button onClick={() => setShowSearch(false)} className="text-2xl text-[#9c6b3f] leading-none px-1 shrink-0">×</button>
+              </div>
+              <div className="text-[11px] text-[#a8927a] mt-2">{homeGu ? `📍 ${homeGu} 안에서` : "수도권 전체에서"} · 떠오르는 느낌을 자유롭게 적어보세요</div>
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {SEARCH_EXAMPLES.map((ex) => (
+                  <button key={ex} onClick={() => runSearch(ex)} className="text-[11px] text-[#6b5a48] bg-[#f0e6d4] rounded-full px-2.5 py-1">{ex}</button>
+                ))}
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              {searchLoading ? <p className="text-center text-[#a8927a] py-10">찾는 중…</p>
+                : !searchRes ? <p className="text-center text-[#a8927a] py-10 text-sm leading-relaxed">"비 오는 날 혼자 조용히", "감성 사진 데이트"처럼<br />구체적이지 않아도 떠오르는 느낌으로 찾아드려요.</p>
+                : (
+                  <>
+                    {searchRes.concepts.length > 0 && <div className="text-[11px] text-[#5f7355] mb-3">감지된 느낌: <b>{searchRes.concepts.join(" · ")}</b></div>}
+                    {searchRes.results.length === 0 ? (
+                      <p className="text-center text-[#a8927a] py-10 text-sm">결과가 없어요. 다른 표현이나 더 넓은 동네로 시도해 보세요.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="text-[11px] text-[#a8927a] mb-1">{searchRes.region} · {searchRes.count}곳 중 가까운 순</div>
+                        {searchRes.results.map((r) => (
+                          <button key={r.id} onClick={() => { openById(r.id); setShowSearch(false); }} className="w-full text-left bg-white rounded-xl p-3.5 border border-[#ece0cd] hover:border-[#9c6b3f]">
+                            <div className="flex items-center gap-1.5 mb-0.5">
+                              <span className="font-bold text-sm text-[#2b2018]">{r.name}</span>
+                              {r.grade && GRADE_STYLE[r.grade] && <span className="text-[8px] text-white px-1 py-0.5 rounded-full" style={{ background: GRADE_STYLE[r.grade].bg }}>{r.grade}</span>}
+                              <span className="text-[10px] text-[#a8927a] ml-auto">{r.area} · 리뷰 {r.count ?? 0}</span>
+                            </div>
+                            {r.identity && <p className="text-[11px] text-[#6b5a48] line-clamp-1 mb-1">{r.identity}</p>}
+                            {r.reasons.length > 0 && <div className="text-[10px] text-[#b08440]">🔎 {r.reasons.join(" · ")}</div>}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 위치이용 동의 안내 */}
       {showConsent && (
@@ -352,7 +447,7 @@ export default function Home() {
               동네 커피 가이드라서, 위치를 알면 <b>가장 가까운 동네(시·군·구)의 검증된 카페</b>를 바로 보여드릴 수 있어요.
             </p>
             <p className="text-[12px] text-[#6b5a48] leading-relaxed mb-3">
-              정확한 좌표가 아니라 <b>대략적 지역만</b> 쓰고(저장도 ≈1km로 뭉뚱그려요), 이름·연락처 같은 <b>개인정보는 받지 않아요</b>. 동의는 <b>선택</b>이고 언제든 끌 수 있어요. 동의하시면 브라우저가 위치 권한을 한 번 더 물어봅니다.
+              정확한 좌표가 아니라 <b>대략적 지역만</b> 쓰고(저장도 ≈500m로 뭉뚱그려요), 이름·연락처 같은 <b>개인정보는 받지 않아요</b>. 동의는 <b>선택</b>이고 언제든 끌 수 있어요. 동의하시면 브라우저가 위치 권한을 한 번 더 물어봅니다.
             </p>
             <details className="mb-4">
               <summary className="text-[12px] text-[#9c6b3f] cursor-pointer">수집·이용 동의 내용 자세히 보기</summary>

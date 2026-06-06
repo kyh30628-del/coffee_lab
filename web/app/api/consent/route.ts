@@ -4,7 +4,7 @@ export const runtime = "nodejs";
 
 // 위치이용 동의·기록 (PRINCIPLES §2: 개인정보 최소수집)
 // - 익명 식별자(클라이언트 생성 UUID)만 사용. 이름·연락처 등 식별정보 없음.
-// - 좌표는 2자리로 반올림(≈1km)해 대략적 지역만 저장. 정밀 위치는 보관하지 않음.
+// - 좌표는 약 500m 격자로 스냅해 대략적 지역만 저장. 정밀 위치는 보관하지 않음.
 async function ensure() {
   await sql`
     CREATE TABLE IF NOT EXISTS user_consents (
@@ -32,8 +32,9 @@ export async function POST(req: NextRequest) {
     const agreed = !!b.agreed;
     const version = b.version ? String(b.version).slice(0, 16) : null;
     const region = b.region ? String(b.region).slice(0, 40) : null;
-    // 좌표는 대략값(소수 2자리 ≈ 1.1km)만 저장 — 정밀 위치 비보관
-    const coarse = (v: unknown) => (v == null || isNaN(Number(v)) ? null : Math.round(Number(v) * 100) / 100);
+    // 좌표는 대략값(≈500m 격자로 스냅)만 저장 — 정밀 위치 비보관
+    const GRID = 0.005; // ≈500m
+    const coarse = (v: unknown) => (v == null || isNaN(Number(v)) ? null : Math.round(Math.round(Number(v) / GRID) * GRID * 1000) / 1000);
     const lat = coarse(b.lat), lng = coarse(b.lng);
     const ua = (req.headers.get("user-agent") ?? "").slice(0, 200);
 

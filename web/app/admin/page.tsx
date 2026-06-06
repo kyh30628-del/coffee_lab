@@ -98,7 +98,7 @@ export default function AdminPage() {
                   </div>
                 </div>
               )}
-              <p className="text-[10px] text-stone-400 mt-2.5">익명 식별자 기준 · 좌표는 ≈1km로 익명화 저장 · 개인 식별정보 미수집</p>
+              <p className="text-[10px] text-stone-400 mt-2.5">익명 식별자 기준 · 좌표는 ≈500m로 익명화 저장 · 개인 식별정보 미수집</p>
             </div>
           </section>
         )}
