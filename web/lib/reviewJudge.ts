@@ -1,50 +1,87 @@
 // LLM 리뷰 맥락 판정 (PRINCIPLES §1·§5): 규칙이 애매하다고 본 '경계 리뷰'를
-// Gemini가 내용·맥락을 읽어 "정말 이 카페의 양질 후기인지" 재판정한다.
+// LLM이 내용·맥락을 읽어 "정말 이 카페의 양질 후기인지" 재판정한다.
 // - 카페명이 글자 그대로 없어도, 내용이 그 카페(지역·컨셉·메뉴)의 실제 방문 후기면 살린다.
 // - 광고·나열식·무관·내용없는 글은 버린다.
+// 우선순위: Anthropic Claude(ANTHROPIC_API_KEY) → 없으면 Google Gemini.
 // LLM은 '판정'만 한다(데이터 생성 금지). 실패/쿼터 시 null → 호출측은 규칙 결과 유지(무회귀).
 
-const KEY = process.env.GOOGLE_AI_KEY || process.env.GOOGLE_API_KEY_1;
-const MODEL = "gemini-2.0-flash-lite";
-export const hasJudgeKey = () => !!KEY;
+const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
+const GOOGLE_KEY = process.env.GOOGLE_AI_KEY || process.env.GOOGLE_API_KEY_1;
+const CLAUDE_MODEL = "claude-haiku-4-5";
+const GEMINI_MODEL = "gemini-2.0-flash-lite";
+
+export const hasJudgeKey = () => !!(ANTHROPIC_KEY || GOOGLE_KEY);
+export const judgeProvider = () => (ANTHROPIC_KEY ? "claude" : GOOGLE_KEY ? "gemini" : "none");
 
 export type JudgeItem = { i: number; title: string; body: string };
 export type JudgeVerdict = { i: number; about: boolean; helpful: boolean; reason: string };
 
-// 경계 리뷰들을 한 번의 호출로 일괄 판정. 반환: 인덱스→판정. 실패 시 null.
-export async function judgeReviews(cafeName: string, area: string, items: JudgeItem[]): Promise<Map<number, JudgeVerdict> | null> {
-  if (!KEY || items.length === 0) return null;
-  const list = items.map((it) => `#${it.i} 제목:"${(it.title || "").slice(0, 120)}" 내용:"${(it.body || "").slice(0, 300)}"`).join("\n");
-  const prompt = `너는 카페 리뷰 품질 심사관이다. 아래 블로그 스니펫들이 "${cafeName}"(${area}) 카페의 '진짜 방문 후기'이면서 소비자에게 도움이 되는 양질의 글인지 각각 판정하라.
+// 정적 판정 기준(프롬프트 캐싱 대상 — 모든 카페 판정에서 재사용)
+const RUBRIC = `너는 카페 리뷰 품질 심사관이다. 블로그 스니펫들이 특정 카페의 '진짜 방문 후기'이면서 소비자에게 도움이 되는 양질의 글인지 각각 판정한다.
 
 판정 기준:
 - about=true: 그 카페(또는 같은 지역·컨셉·메뉴가 일치하는 그 가게)를 실제로 방문해 쓴 글. 이름이 글자 그대로 없어도 내용·맥락(지역, 분위기, 메뉴, 방문 경험)이 그 카페를 가리키면 true.
-- about=false: 다른 가게·동명 카페·무관한 글(예: 단순히 '정원','책방' 같은 단어만 우연히 겹침), 나열식 맛집 모음에 이름만 끼인 글.
-- helpful=true: 맛·분위기·메뉴·서비스 등 구체적 경험/평가가 담겨 소비자에게 도움됨. false: 광고·협찬 위주, 내용 없는 언급, 사진만.
+- about=false: 다른 가게·동명 카페·무관한 글(단순히 '정원','책방' 같은 단어만 우연히 겹침), 나열식 맛집 모음에 이름만 끼인 글.
+- helpful=true: 맛·분위기·메뉴·서비스 등 구체적 경험/평가가 담겨 소비자에게 도움됨. false: 광고·협찬 위주, 내용 없는 단순 언급, 사진만.
 
-반드시 JSON 배열로만 답하라(설명 금지): [{"i":번호,"about":true/false,"helpful":true/false,"reason":"15자 이내"}]
+반드시 JSON 배열로만 답한다(설명·코드블록 금지): [{"i":번호,"about":true/false,"helpful":true/false,"reason":"15자 이내"}]`;
 
-스니펫:
-${list}`;
+function buildUserText(cafeName: string, area: string, items: JudgeItem[]): string {
+  const list = items.map((it) => `#${it.i} 제목:"${(it.title || "").slice(0, 120)}" 내용:"${(it.body || "").slice(0, 300)}"`).join("\n");
+  return `대상 카페: "${cafeName}" (${area})\n\n스니펫:\n${list}`;
+}
 
+function parseVerdicts(text: string): Map<number, JudgeVerdict> | null {
   try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${KEY}`;
-    const res = await fetch(url, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0, maxOutputTokens: 2048, responseMimeType: "application/json" },
-      }),
-    });
-    if (!res.ok) return null; // 429(쿼터)·기타 → 규칙 결과 유지
-    const data = await res.json();
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!text) return null;
-    const arr = JSON.parse(text) as JudgeVerdict[];
+    const m = text.match(/\[[\s\S]*\]/); // JSON 배열만 추출(코드블록 등 방어)
+    const arr = JSON.parse(m ? m[0] : text) as JudgeVerdict[];
     const map = new Map<number, JudgeVerdict>();
     for (const v of arr) if (typeof v?.i === "number") map.set(v.i, v);
     return map;
-  } catch {
-    return null;
-  }
+  } catch { return null; }
+}
+
+async function judgeClaude(cafeName: string, area: string, items: JudgeItem[]): Promise<Map<number, JudgeVerdict> | null> {
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "x-api-key": ANTHROPIC_KEY!, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+      body: JSON.stringify({
+        model: CLAUDE_MODEL,
+        max_tokens: 1500,
+        // 정적 기준은 캐시(ephemeral)로 재사용 → 비용·지연 절감
+        system: [{ type: "text", text: RUBRIC, cache_control: { type: "ephemeral" } }],
+        messages: [{ role: "user", content: buildUserText(cafeName, area, items) }],
+      }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const text = data?.content?.find((b: any) => b.type === "text")?.text ?? data?.content?.[0]?.text;
+    return text ? parseVerdicts(text) : null;
+  } catch { return null; }
+}
+
+async function judgeGemini(cafeName: string, area: string, items: JudgeItem[]): Promise<Map<number, JudgeVerdict> | null> {
+  try {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GOOGLE_KEY}`;
+    const res = await fetch(url, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: `${RUBRIC}\n\n${buildUserText(cafeName, area, items)}` }] }],
+        generationConfig: { temperature: 0, maxOutputTokens: 2048, responseMimeType: "application/json" },
+      }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    return text ? parseVerdicts(text) : null;
+  } catch { return null; }
+}
+
+// 경계 리뷰들을 한 번의 호출로 일괄 판정. 반환: 인덱스→판정. 실패 시 null.
+export async function judgeReviews(cafeName: string, area: string, items: JudgeItem[]): Promise<Map<number, JudgeVerdict> | null> {
+  if (items.length === 0) return null;
+  if (ANTHROPIC_KEY) return judgeClaude(cafeName, area, items);
+  if (GOOGLE_KEY) return judgeGemini(cafeName, area, items);
+  return null;
 }
