@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Noto Sans KR','Apple SD Gothic Neo',sans-serif; color:#2b2018; font-size:10.5pt; line-height:1.65; }
+  .page { padding:46px 52px; }
+  .brk { page-break-after:always; }
+  h1.cover-t { font-family:'Gowun Batang',serif; font-size:40pt; font-weight:700; }
+  h2 { font-size:17pt; font-weight:700; color:#2b2018; margin:0 0 4px; padding-bottom:7px; border-bottom:3px solid #2b2018; }
+  h2 .num { color:#9c6b3f; }
+  h3 { font-size:12.5pt; font-weight:700; color:#6f4a25; margin:18px 0 7px; }
+  p { margin:5px 0; }
+  .lead { color:#6b5a48; margin-bottom:14px; }
+  table { width:100%; border-collapse:collapse; margin:9px 0 14px; font-size:9.3pt; }
+  th { background:#2b2018; color:#f4ece0; text-align:left; padding:7px 9px; font-weight:500; }
+  td { border:1px solid #e0d4c0; padding:6px 9px; vertical-align:top; }
+  tr:nth-child(even) td { background:#faf6ee; }
+  .tag { display:inline-block; background:#9c6b3f; color:#fff; font-size:8pt; padding:1px 7px; border-radius:9px; font-weight:500; }
+  .gv{background:#5f7355;} .gr{background:#9c6b3f;} .gd{background:#a8927a;} .gx{background:#b05a48;}
+  .box { border:1px solid #ddd0bb; background:#faf6ee; border-radius:8px; padding:11px 14px; margin:10px 0; }
+  .box.hl { border-color:#cfe0c2; background:#eef3ea; }
+  .box.warn { border-color:#e3c9b0; background:#f7ede4; }
+  .box.dark { background:#2b2018; color:#f4ece0; border:none; }
+  .box.dark b { color:#e8b87a; }
+  ul { margin:5px 0 5px 18px; } li { margin:3px 0; }
+  .mono { font-family:'SF Mono',Menlo,monospace; font-size:8.6pt; background:#efe9dd; padding:1px 5px; border-radius:4px; }
+  .small { font-size:8.6pt; color:#8a7458; }
+  .kv { display:flex; gap:8px; margin:3px 0; } .kv b{ min-width:104px; color:#6f4a25; }
+  .flow { font-family:'SF Mono',Menlo,monospace; font-size:8.4pt; background:#2b2018; color:#e8d4b0; padding:13px 15px; border-radius:8px; line-height:1.7; white-space:pre; overflow:hidden; }
+  .pill{display:inline-block;border:1px solid #cbb89f;border-radius:14px;padding:2px 9px;margin:2px 3px 2px 0;font-size:8.4pt;}
+</style></head>
+<body>
+
+<!-- COVER -->
+<div class="page brk" style="background:#2b2018; color:#f4ece0; height:100vh; display:flex; flex-direction:column; justify-content:center;">
+  <div style="font-size:10pt; letter-spacing:6px; color:#cbb89f; text-transform:uppercase;">광고·가짜 후기를 걸러낸 동네 커피 가이드</div>
+  <h1 class="cover-t" style="margin:14px 0 6px;">동네 커피 노트</h1>
+  <div style="font-size:14pt; color:#e8b87a; font-weight:500; margin-bottom:30px;">서비스 종합 가이드</div>
+  <div style="border-top:1px solid #5b4a38; padding-top:22px; max-width:520px; line-height:1.8; color:#e3d6c2; font-size:11pt;">
+    리뷰의 바다에서 <b style="color:#fff;">광고·협찬·무관·동명·나열식</b> 글을 걸러내고,
+    규칙 엔진과 Claude AI가 <b style="color:#fff;">진짜 방문 후기만</b> 가려낸 수도권 카페 가이드.
+    모든 숫자에는 출처·근거가 함께 붙습니다.
+  </div>
+  <div style="margin-top:auto; color:#8a7458; font-size:9pt;">
+    수록 카페 약 2,970곳 (서울·경기·인천) · 공개 약 1,990곳<br>
+    coffee-lab-product-builder.vercel.app · 작성 2026-06-07
+  </div>
+</div>
+
+<!-- TOC -->
+<div class="page brk">
+  <h2><span class="num">목차</span></h2>
+  <table style="font-size:10pt; margin-top:16px;">
+    <tr><td style="width:34px;">1</td><td>서비스 개요와 핵심 차별점(해자)</td></tr>
+    <tr><td>2</td><td>절대 원칙 (헌법)</td></tr>
+    <tr><td>3</td><td>화면 구성</td></tr>
+    <tr><td>4</td><td>데이터 소스 (전부 합법)</td></tr>
+    <tr><td>5</td><td>카페 수집 기준 — 무엇을 넣고 무엇을 뺀다</td></tr>
+    <tr><td>6</td><td>리뷰 품질 검증 엔진 (해자의 심장)</td></tr>
+    <tr><td>7</td><td>신뢰 등급 · 데이터 항목 · 성격/취향 축</td></tr>
+    <tr><td>8</td><td>에이전트 (자동화 두뇌)</td></tr>
+    <tr><td>9</td><td>검색 엔진 (의미 + AI 맥락 + 캐시)</td></tr>
+    <tr><td>10</td><td>자동화 스케줄</td></tr>
+    <tr><td>11</td><td>기술 스택 · 전체 데이터 흐름</td></tr>
+  </table>
+  <div class="box dark" style="margin-top:24px;">
+    <b>한 문장 요약</b><br>
+    "별점 말고 검증된 후기로 고른다." — 합법 공개 후기에서 옥석만 가려, 소비자에겐 믿을 카페를,
+    사장님에겐 검증 데이터 기반 경쟁력 진단을 제공하는 데이터 카페 가이드.
+  </div>
+</div>
+
+<!-- 1 -->
+<div class="page brk">
+  <h2><span class="num">1.</span> 서비스 개요와 핵심 차별점</h2>
+  <p class="lead">커피를 아는 사람이 안내하는, 데이터 기반 동네 카페 가이드. 수도권(서울·경기·인천)의 동네 로스터리·개성 카페 중심.</p>
+
+  <h3>무엇이 다른가 — 해자(moat)</h3>
+  <p>카카오맵·블로그의 <b>별점·광고 후기</b>는 믿기 어렵습니다. 이 서비스의 핵심은 <b>"리뷰의 바다에서 옥석만 가리는 검증 엔진"</b>입니다. 수천 개 공개 후기에서 다음을 걸러냅니다.</p>
+  <ul>
+    <li>나열식 "맛집 N곳 모음"에 이름만 끼인 글</li>
+    <li>카페명만 스치고 내용 없는 글 · 일반 교양/정보글</li>
+    <li>다른 지역·다른 지점의 <b>동명(同名)</b> 카페 글</li>
+    <li>광고·협찬·체험단 글</li>
+  </ul>
+  <p>남은 <b>진짜 방문 후기</b>만 합성·집계·노출하며, 모든 판정에 사람이 읽을 수 있는 <b>근거(reason)</b>를 남깁니다(투명성 = 신뢰).</p>
+
+  <div class="box hl"><b>2단 검증</b> — ① 규칙 엔진(결정적·무료·빠름, 추적 가능)으로 1차 노이즈 제거 → ② <b>Claude Sonnet</b>이 글 내용·맥락을 한 건씩 읽어 최종 심사(놓친 진짜 후기 구제 + 규칙이 잘못 통과시킨 거짓양성 제거).</p></div>
+
+  <h3>두 사용자</h3>
+  <div class="kv"><b>소비자</b><span>광고 없는 진짜 후기로 고른 내 동네 카페 · "느낌"으로 찾는 검색 · 지도·취향 매칭</span></div>
+  <div class="kv"><b>사장님</b><span>검증된 후기로 보는 내 카페 경쟁력 — 동네 순위·성격·구성·리뷰 주기·데이터 기반 액션 플랜(관리자 인증)</span></div>
+
+  <h3>현재 규모</h3>
+  <div class="kv"><b>수록 카페</b><span>약 2,970곳 (서울 25구 · 경기 31시군 · 인천 8)</span></div>
+  <div class="kv"><b>공개 카페</b><span>약 1,990곳 (검증·참고 등급만 공개, 발굴 등급은 비공개 보관)</span></div>
+  <div class="kv"><b>재고</b><span>0 — 직접 제조·판매 아님. 순수 큐레이션·정보 서비스</span></div>
+</div>
+
+<!-- 2 -->
+<div class="page brk">
+  <h2><span class="num">2.</span> 절대 원칙 (헌법)</h2>
+  <p class="lead">코드 한 줄, 데이터 한 건도 어기지 않는 최상위 규칙. 모든 기능이 여기에 종속됩니다.</p>
+  <table>
+    <tr><th style="width:150px;">원칙</th><th>내용</th></tr>
+    <tr><td><b>① 환각 절대 금지</b></td><td>지어낸 정보는 제품의 죽음. 모든 카페 정보는 추적 가능한 출처가 있어야 한다. 근거 없으면 "데이터 부족"으로 정직히 표시. <b>2개 이상 독립 소스에서 반복된 신호만</b> 채택, 단일·광고성은 버린다. 출력에 근거(리뷰 N건 중 X회)를 함께 보존.</td></tr>
+    <tr><td><b>② 합법성 (타협 불가)</b></td><td>약관·저작권 위반 수집(스크래핑) 금지. 합법 소스만: 네이버·구글 공개 검색 API, 카페 자발 공개, 사장님 직접 등록. 외부 이미지 무단 사용 금지. <b>개인정보 수집·표시 금지</b>(위치는 대략적 지역만, ≈500m로 뭉뚱그려 익명 저장).</td></tr>
+    <tr><td><b>③ 품질 극대화</b></td><td>한 소스가 막히면 다른 합법 소스로 메운다(다중 소스 합성). 기술·약관 한계는 포기 사유가 아니라 개선 과제.</td></tr>
+    <tr><td><b>④ 최신성 우선</b></td><td>카페는 원두·메뉴·사장·분위기가 자주 바뀐다. 수집 시 날짜를 확보하고 최근 신호에 가중. 정기 재수집(갱신) 구조를 전제로 설계.</td></tr>
+    <tr><td><b>⑤ 뻔한 답 금지</b></td><td>사장님 인사이트는 그 카페 데이터에서만 나오는 구체적 액션이어야. "맛"이 아니라 "리뷰에서 자주 언급되는 결" — 측정값인 척 과장 금지.</td></tr>
+  </table>
+  <div class="box warn"><b>LLM의 역할 경계</b> — AI(Claude·Gemini)는 <b>선별·설명·검증</b>만 한다. 가격·평점·점수 같은 숫자를 <b>생성하지 않는다</b>. 모든 수치는 DB의 수집·계산값에서만 나온다.</div>
+</div>
+
+<!-- 3 -->
+<div class="page brk">
+  <h2><span class="num">3.</span> 화면 구성</h2>
+  <table>
+    <tr><th style="width:130px;">화면</th><th>구성·기능</th></tr>
+    <tr><td><b>랜딩</b><br><span class="small">초기 화면</span></td><td>"소비자 / 사장님" 분리 진입. 사장님은 관리자 비밀번호 인증(세션 유지). 해자를 한눈에 전달하는 카피.</td></tr>
+    <tr><td><b>홈</b> <span class="mono">/</span><br><span class="small">잡지형 1면</span></td><td>지역 선택 시 그 동네판. 헤드라인 2개(가장 많이 이야기된 곳 / 커피에 진심인 집) + 코너(리뷰 많은 Top3·스페셜티 픽·새로 발견). 각 카드에 "선정 이유" 항상 표시. <b>느낌으로 검색</b>(🔍) · <b>내 위치</b>로 우리 동네 보기.</td></tr>
+    <tr><td><b>지도</b> <span class="mono">/</span></td><td>Leaflet + CartoDB Voyager. 지역·카테고리 필터로 핀·목록 동적 렌더. 취향(성격) 매칭 하이라이트. "위치 보기" 핀 고정.</td></tr>
+    <tr><td><b>카페 상세</b><br><span class="small">패널</span></td><td>결(성격) 태그 · 리뷰 종합 분석(정체성) · <b>옥석 통계</b>("공개 글 N건 검증 → 노이즈 X건 제거 → 옥석 K건") · <b>근거 후기</b>(인용+출처+날짜, 검증/참고/✨AI검증 배지).</td></tr>
+    <tr><td><b>사장님 분석</b> <span class="mono">/owner</span><br><span class="small">관리자 인증</span></td><td>카페 검색 → 동네 순위(bar)·성격(radar)·구성(pie) 3탭 + <b>리뷰 주기</b>(최근 12개월) + <b>데이터 기반 액션 플랜</b>(차별점·빈 포지션·매몰점·보완점·순위 전략).</td></tr>
+    <tr><td><b>사장님 등록</b> <span class="mono">/cafe/register</span></td><td>사장님이 직접 카페 정보·보강 등록(1순위 발굴 대상).</td></tr>
+    <tr><td><b>관리자</b> <span class="mono">/admin</span></td><td>KPI · 등급 분포 · <b>리뷰 검증 엔진 현황</b>(원본 수집%·AI 판정%·노이즈 제거율) · 방문자 통계·차트.</td></tr>
+  </table>
+</div>
+
+<!-- 4 -->
+<div class="page brk">
+  <h2><span class="num">4.</span> 데이터 소스 — 전부 합법</h2>
+  <p class="lead">스크래핑·약관 위반 없음. 공식 API와 자발 공개 채널만 사용.</p>
+  <table>
+    <tr><th style="width:150px;">소스</th><th style="width:90px;">용도</th><th>비고</th></tr>
+    <tr><td><b>네이버 지역검색 API</b><br><span class="small">local.json</span></td><td>카페 발굴</td><td>키워드×지역 검색, 상호·주소·좌표·업종. display=5, 댓글순.</td></tr>
+    <tr><td><b>네이버 블로그/카페글 API</b><br><span class="small">blog·cafearticle</span></td><td>후기 수집</td><td>제목+요약 스니펫(원문 복제 금지, 인용+링크+날짜만). display=100(쿼터 동일, 후기 ~5배). 일일 25,000 한도.</td></tr>
+    <tr><td><b>구글 Places API</b></td><td>방문 리뷰</td><td>실제 방문 리뷰(고신뢰). 무료 쿼터/결제 범위 내.</td></tr>
+    <tr><td><b>공공데이터포털 상가정보</b><br><span class="small">data.go.kr (선택)</span></td><td>발굴 보완</td><td>등록 '커피전문점/카페' + 위경도 직접 제공. 네이버가 놓친 카페 보완(인증키 필요).</td></tr>
+    <tr><td><b>Google Gemini</b><br><span class="small">gemini-embedding-001</span></td><td>의미 검색</td><td>카페·질문을 768차원 벡터로 → 코사인 유사도. "느낌" 검색.</td></tr>
+    <tr><td><b>Claude Sonnet</b><br><span class="small">claude-sonnet-4-5</span></td><td>판정·검색</td><td>리뷰 맥락 최종 심사(구독·로컬 배치) + 검색 질문 맥락 이해(콘솔 키·실시간).</td></tr>
+  </table>
+  <div class="box"><b>원본 보존(감사·재현)</b> — 수집한 모든 후기 원본을 <span class="mono">raw_reviews</span>에 저장. 재합성·재판정 시 API 재호출 없이 그대로 재현(쿼터 절약·결과 재현성). 쿼터/오류로 수집 실패 시엔 기존 데이터를 <b>덮어쓰지 않고 보존</b>한다.</div>
+</div>
+
+<!-- 5 -->
+<div class="page brk">
+  <h2><span class="num">5.</span> 카페 수집 기준</h2>
+  <p class="lead">무엇을 수록하고 무엇을 제외하는가 — 명확한 규칙.</p>
+
+  <h3>✅ 포함</h3>
+  <ul>
+    <li><b>동네 소규모 카페</b> + <b>스페셜티</b>(로스터리·핸드드립·싱글오리진·개성 카페)</li>
+    <li>지역 범위: <b>수도권만</b> — 서울 25개 구 · 경기 31개 시·군 · 인천 8개 구·군</li>
+    <li>스페셜티 체인은 유지(대형 저가 프랜차이즈만 제외)</li>
+  </ul>
+
+  <h3>❌ 제외</h3>
+  <div class="kv"><b>대형 프랜차이즈</b><span>상호에 아래 브랜드 포함 시 제외 (약 45개):</span></div>
+  <div style="margin:4px 0 8px;">
+    <span class="pill">스타벅스</span><span class="pill">투썸</span><span class="pill">이디야</span><span class="pill">메가커피</span><span class="pill">빽다방</span><span class="pill">컴포즈</span><span class="pill">커피빈</span><span class="pill">할리스</span><span class="pill">엔제리너스</span><span class="pill">파스쿠찌</span><span class="pill">탐앤탐스</span><span class="pill">폴바셋</span><span class="pill">드롭탑</span><span class="pill">요거프레소</span><span class="pill">더벤티</span><span class="pill">매머드</span><span class="pill">공차</span><span class="pill">카페베네</span><span class="pill">만랩</span><span class="pill">토프레소</span><span class="pill">셀렉토</span><span class="pill">더리터</span><span class="pill">달콤커피</span><span class="pill">백억커피</span><span class="pill">쥬씨</span><span class="pill">… 외</span>
+  </div>
+  <div class="kv"><b>비(非)카페</b><span>상호·업종에 정육·마트·편의점·치킨·피자·분식·국밥·노래·PC방·학원·병원·은행 등 포함 시 제외</span></div>
+  <div class="kv"><b>중복</b><span>이름(공백 제거) + 좌표 근사(위도×1000 반올림) 동일 시 한 건만</span></div>
+
+  <h3>발굴 키워드 (20개 · 지역마다 순회)</h3>
+  <div style="margin:4px 0;">
+    <span class="pill">로스터리</span><span class="pill">스페셜티커피</span><span class="pill">직접로스팅</span><span class="pill">핸드드립</span><span class="pill">싱글오리진</span><span class="pill">자가배전</span><span class="pill">드립커피전문점</span><span class="pill">에스프레소바</span><span class="pill">커피 맛집</span><span class="pill">동네카페</span><span class="pill">작은카페</span><span class="pill">감성카페</span><span class="pill">디저트카페</span><span class="pill">베이커리카페</span><span class="pill">브런치카페</span><span class="pill">분위기좋은카페</span><span class="pill">조용한카페</span><span class="pill">루프탑카페</span><span class="pill">북카페</span><span class="pill">빈티지카페</span>
+  </div>
+  <div class="box"><b>적재 후 흐름</b> — 발굴된 카페는 우선 <b>비공개</b>로 저장 → 후기 수집·합성·검증을 거쳐 <b>검증/참고</b> 등급이면 자동 공개, 후기가 부족(발굴 등급)하면 비공개로 보관(없는 후기를 지어내지 않음). 후기가 적은 "숨은 집"은 약점이 아니라 <b>희소가치·사장님 등록 1순위</b>로 전환.</div>
+</div>
+
+<!-- 6 -->
+<div class="page brk">
+  <h2><span class="num">6.</span> 리뷰 품질 검증 엔진 — 해자의 심장</h2>
+  <p class="lead">각 후기를 4가지로 판정: <span class="tag gv">검증</span> <span class="tag gr">참고</span> <span class="tag gx">탈락</span> <span class="tag" style="background:#7c5cbf;">경계→AI 재판정</span></p>
+
+  <h3>① 출처별 1차 처리</h3>
+  <div class="kv"><b>구글 리뷰</b><span>장소에 직접 달린 실방문 리뷰라 신뢰 → 내용량만 본다. 본문 ≥15자 검증, ≥8자 참고, 그 미만 탈락.</span></div>
+  <div class="kv"><b>블로그/카페글</b><span>주제성 + 내용성 + 관련성 3가지를 본다(아래).</span></div>
+
+  <h3>② 하드 탈락 규칙 (명백한 노이즈)</h3>
+  <table>
+    <tr><th style="width:230px;">조건</th><th>판정</th></tr>
+    <tr><td>제목·본문에 카페명(구별 토큰)이 전혀 없음</td><td>탈락(무관/동명) — 단, 방문·구체 맥락이 뚜렷하면 <b>경계</b>로 보존해 AI 재판정</td></tr>
+    <tr><td>제목에 수도권 밖 도시(충주·부산·대구 등) + 대상 지역어 없음</td><td>탈락 — 다른 지역 동명 카페</td></tr>
+    <tr><td>제목에 다른 시·군·구 + 대상 지역 언급 없음</td><td>탈락 — 같은 상호 다른 지점</td></tr>
+    <tr><td>"~란 무엇/하는 법/효능" 등 일반 교양·정보글</td><td>탈락 — 그 카페 후기가 아님</td></tr>
+    <tr><td>"맛집 N곳·추천·모음·투어" 나열식(제목 패턴 또는 본문에 가게 토큰 4개+)</td><td>탈락 — 주제가 분산된 모음글</td></tr>
+    <tr><td>방문 단서·구체 경험·평가가 하나도 없음</td><td>탈락 — 언급만</td></tr>
+  </table>
+  <p class="small">※ '구별 토큰' = 카페명에서 일반어(카페·커피·점)·지역어를 뺀 고유 식별어. 예: "을지로 문덕카페" → <span class="mono">문덕</span>. 흔한 단어 이름이 무관 글에 우연히 걸리는 것을 막기 위해, 토큰만 일치할 땐 '카페 맥락어'나 지역이 함께 있어야 주제로 인정.</p>
+
+  <h3>③ 투명 점수화 (0~100)</h3>
+  <table>
+    <tr><th>가점</th><th style="width:60px;">점수</th><th>감점</th><th style="width:60px;">점수</th></tr>
+    <tr><td>제목이 이 카페 (주제 글)</td><td>+42</td><td>나열식 모음 성격</td><td>−22</td></tr>
+    <tr><td>제목에 카페명 일부</td><td>+30</td><td>긴 글에 한 번만 스침</td><td>−16</td></tr>
+    <tr><td>본문에 카페명 언급</td><td>+14</td><td>광고/협찬 신호</td><td>−10</td></tr>
+    <tr><td>실제 방문 단서</td><td>+24</td><td>해시태그 과다(홍보성)</td><td>−8</td></tr>
+    <tr><td>구체 후기 신호(맛·분위기·메뉴…)</td><td>최대 +24</td><td>내용 짧음(&lt;25자)</td><td>−10</td></tr>
+    <tr><td>지역 일치 / 긴 본문</td><td>+8 / +5</td><td></td><td></td></tr>
+  </table>
+  <div class="box hl"><b>최종 판정</b> &nbsp; <span class="tag gv">검증</span> 점수 ≥60 <b>그리고</b> 제목에 카페명 <b>그리고</b> (방문 또는 구체 신호) &nbsp;|&nbsp; <span class="tag gr">참고</span> 점수 ≥38 + (제목 또는 본문에 카페명) &nbsp;|&nbsp; 그 외 <span class="tag gx">탈락</span>.<br>
+  <span class="small">→ 검증은 '제목이 그 카페가 주제'인 글로 한정(본문에 스친 글은 내용이 좋아도 참고까지). 합성·집계엔 옥석(검증+참고)만 사용하며 검증분에 가중.</span></div>
+</div>
+
+<!-- 6b: Sonnet -->
+<div class="page brk">
+  <h2><span class="num">6+</span> Sonnet 최종 심사 (2단 검증)</h2>
+  <p class="lead">규칙은 1차 필터. <b>Claude Sonnet</b>이 규칙을 통과한 후보 전체를 다시 읽어 최종 결정한다.</p>
+  <h3>양방향 정밀도</h3>
+  <div class="kv"><b>구제(rescue)</b><span>카페명이 글자 그대로 없어도 내용·맥락(지역·분위기·메뉴·방문 경험)이 그 카페를 가리키면 → 살림</span></div>
+  <div class="kv"><b>거짓양성 제거</b><span>규칙은 통과했지만 실제론 "가는 길·주차·영업시간" 정보글 등 도움 안 되는 글 → 제거</span></div>
+  <p>심사 기준 두 축: <b>about</b>(그 카페를 실제 방문해 쓴 글인가) · <b>helpful</b>(맛·분위기·메뉴 등 구체 경험이 담겨 도움되는가). 둘 다 참인 글만 통과. 판정이 애매하면 보수적으로 제외.</p>
+  <div class="box dark"><b>왜 Sonnet인가</b> — 규칙은 빠르고 투명하지만 글자 매칭의 한계가 있다. Sonnet은 사람처럼 <b>내용·맥락</b>을 읽어 "단어만 겹친 무관 글"과 "이름은 안 나와도 진짜 그 카페 후기"를 구분한다. 통과한 후기에는 화면에 <b>✨ AI 검증</b> 배지가 붙는다.</div>
+  <h3>실행 방식 (비용·정책)</h3>
+  <p>리뷰 판정은 <b>실시간이 아니라 배치(백그라운드)</b>다. 그래서 사장님 본인 컴퓨터에서 <b>Claude Max 구독</b>으로 매일 돌린다(추가 API 비용 0). 웹앱(Vercel)은 LLM을 호출하지 않고 <b>판정된 결과만</b> 서빙한다. 토큰 만료·실패 시엔 규칙 결과를 그대로 유지(무회귀).</p>
+</div>
+
+<!-- 7 -->
+<div class="page brk">
+  <h2><span class="num">7.</span> 신뢰 등급 · 데이터 항목 · 축</h2>
+  <h3>신뢰 등급 (옥석 리뷰 수 기준)</h3>
+  <table>
+    <tr><th style="width:90px;">등급</th><th style="width:120px;">기준(검증+참고 리뷰 수)</th><th>의미·노출</th></tr>
+    <tr><td><span class="tag gv">검증</span></td><td>30건 이상</td><td>신호 충분 — 공개. 헤드라인·추천 우선.</td></tr>
+    <tr><td><span class="tag gr">참고</span></td><td>5 ~ 30건</td><td>참고 가능 — 공개.</td></tr>
+    <tr><td><span class="tag gd">발굴</span></td><td>5건 미만</td><td>데이터 부족 — 비공개 보관(숨은 집·사장님 등록 1순위).</td></tr>
+  </table>
+  <p class="small">출처별 합성 가중: 블로그 직접후기 1.2 · 구글 1.0 · 기타 0.7. (검증 통과분에만 적용)</p>
+
+  <h3>성격 축 (char_scores) — 6개</h3>
+  <p class="small">검증 통과 리뷰 본문에서의 <b>언급 빈도</b>(측정값 아님). 취향 매칭·"결" 태그·레이더 차트의 기반.</p>
+  <table>
+    <tr><th style="width:120px;">축</th><th>리뷰에서 잡는 키워드</th></tr>
+    <tr><td>🔥 직접로스팅</td><td>로스팅·로스터리·직접 볶·자가배전·스페셜티·싱글오리진</td></tr>
+    <tr><td>💻 작업·공부</td><td>작업·노트북·공부·콘센트·집중·와이파이</td></tr>
+    <tr><td>🤍 조용·혼자</td><td>조용·차분·혼자·고요·사색·한적</td></tr>
+    <tr><td>🍰 디저트</td><td>디저트·케이크·스콘·크로플·티라미수·베이커리·쿠키·빵</td></tr>
+    <tr><td>📸 분위기</td><td>분위기·예쁜·감성·인테리어·사진·뷰·루프탑·아늑</td></tr>
+    <tr><td>🪑 넓은공간</td><td>넓·대형·규모·테라스·주차</td></tr>
+  </table>
+
+  <h3>취향 좌표 (맛)</h3>
+  <p>산미(acidity)·바디(body)·단맛(sweet) — 리뷰의 긍/부정 맥락을 보정해 추정. <b>2건 이상 교차검증된 축만</b> 좌표화하고, 부족하면 비워 둔다(지어내지 않음).</p>
+  <h3>그 외 저장 항목</h3>
+  <p class="small">synth_identity(리뷰 종합 정체성 문장) · synth_reviews(근거 후기 인용 최대 6개) · review_dates(검증 리뷰 게시일 → 리뷰 주기 분석) · synth_quality(원본/노이즈/옥석 통계) · cafe_snapshots(평점·리뷰수 주간 스냅샷 → 모멘텀).</p>
+</div>
+
+<!-- 8 -->
+<div class="page brk">
+  <h2><span class="num">8.</span> 에이전트 (자동화 두뇌)</h2>
+  <table>
+    <tr><th style="width:140px;">에이전트</th><th>역할</th><th style="width:78px;">실행</th></tr>
+    <tr><td><b>발굴</b></td><td>네이버 지역검색으로 동네·스페셜티 카페 수집. 프랜차이즈·비카페·중복 제외 후 비공개 적재.</td><td>Vercel cron</td></tr>
+    <tr><td><b>상가정보 발굴</b></td><td>공공데이터(상가정보)로 누락 카페 보완(키 필요).</td><td>수동/예약</td></tr>
+    <tr><td><b>원본 예열</b></td><td>raw 캐시가 빈 카페의 후기를 새로 수집해 저장(쿼터 효율, 소진 시 자동 중단).</td><td>로컬 00:10</td></tr>
+    <tr><td><b>합성/품질 엔진</b></td><td>수집 후기를 검증 엔진에 통과 → 등급·정체성·성격 축·취향 좌표·근거 후기 산출·저장.</td><td>cron/예열</td></tr>
+    <tr><td><b>Sonnet 판정</b></td><td>규칙 통과 후보를 Claude Sonnet이 맥락 최종 심사 → 양질만 공개(✨AI검증).</td><td>로컬 04:00</td></tr>
+    <tr><td><b>검색</b></td><td>의미(임베딩)로 후보 압축 → Sonnet이 질문 맥락 보고 선별·정렬(캐시).</td><td>요청 시</td></tr>
+    <tr><td><b>임베딩</b></td><td>카페 텍스트를 벡터화(신규·갱신분) → 의미 검색용.</td><td>Vercel 07:00</td></tr>
+    <tr><td><b>스냅샷</b></td><td>평점·리뷰 수 주간 기록 → 급상승(모멘텀) 분석.</td><td>Vercel 주간</td></tr>
+    <tr><td><b>사장님 인사이트</b></td><td>동네(구) 분포와 비교해 백분위 점수·순위·빈 포지션·액션 플랜 산출.</td><td>요청 시</td></tr>
+  </table>
+  <div class="box hl"><b>설계 철학</b> — "사람이 발로 뛰어 채운다"는 틀을 깨고, AI의 강점(대량 데이터 통합·패턴 추출)으로 한 사람이 불가능한 규모를 자동으로 채우고 검증한다. 매일 돌수록 정확도가 누적 상승.</div>
+</div>
+
+<!-- 9 -->
+<div class="page brk">
+  <h2><span class="num">9.</span> 검색 엔진</h2>
+  <p class="lead">"비 오는 날 혼자 조용히 책 읽기 좋은 곳"처럼 사전에 없는 <b>느낌</b>으로도 찾게 한다.</p>
+  <h3>3단 구조</h3>
+  <div class="kv"><b>① 의미(임베딩)</b><span>질문을 벡터로 → 미리 임베딩된 카페와 코사인 유사도. 생성형 LLM 없이도 의미를 매칭(거의 공짜·항상 켜짐).</span></div>
+  <div class="kv"><b>② 키워드·개념</b><span>질문 토큰과 느낌(조용·작업·디저트…)을 카페 텍스트·검증 리뷰에서 직접 매칭, 근거 노출.</span></div>
+  <div class="kv"><b>③ AI 맥락 재정렬</b><span>압축한 후보를 Claude Sonnet이 질문 의도로 선별·정렬, 질문에 답하는 한국어 이유 부착(콘솔 키 있을 때).</span></div>
+  <h3>비용을 묶는 캐시</h3>
+  <p>사람들의 질문은 무한해 보여도 실제론 비슷한 것("조용한", "데이트", "작업")에 몰린다. <b>(질문 + 지역)별로 결과를 캐시</b>(12시간)해, 같은·비슷한 질문은 임베딩·LLM 재계산 없이 즉시 응답.</p>
+  <div class="box dark">→ 비용은 <b>"방문자 수"가 아니라 "서로 다른 질문 수"</b>만큼만. 흔한 질문은 한 번만 계산하고 모두가 캐시를 공유. 키가 없으면 의미 검색으로 자동 폴백(무회귀).</div>
+  <p class="small">데이터는 DB 실제값만 사용(점수·등급 환각 금지). LLM은 어떤 카페가 맞는지 고르고 이유를 말할 뿐, 없는 카페를 지어내지 않는다.</p>
+</div>
+
+<!-- 10 -->
+<div class="page brk">
+  <h2><span class="num">10.</span> 자동화 스케줄</h2>
+  <h3>로컬 (사장님 컴퓨터 · launchd) — Claude Max 구독</h3>
+  <table>
+    <tr><th style="width:130px;">시각(KST)</th><th>작업</th></tr>
+    <tr><td>매일 00:10</td><td><b>원본 예열</b> — 네이버 쿼터 리셋 직후, raw 캐시가 빈 카페 후기 수집</td></tr>
+    <tr><td>매일 04:00</td><td><b>Sonnet 판정</b> — 채워진 카페를 맥락 심사 → ✨AI검증·공개 전환</td></tr>
+  </table>
+  <h3>클라우드 (Vercel cron)</h3>
+  <table>
+    <tr><th style="width:130px;">시각(KST)</th><th>작업</th></tr>
+    <tr><td>매일 03:00</td><td><b>발굴 + 합성</b>(cron-grow) — 새 지역 발굴 + 오래된 카페 재합성</td></tr>
+    <tr><td>매일 07:00</td><td><b>임베딩</b>(cron-embed) — 신규·갱신 카페 벡터화(판정 이후라 최신 반영)</td></tr>
+    <tr><td>월요일 13:00</td><td><b>재수집</b>(cron-resynth) — 최신성 위해 오래된 카페 원본 갱신</td></tr>
+    <tr><td>일요일 13:00</td><td><b>스냅샷</b>(cron-snapshot) — 평점·리뷰수 주간 기록(모멘텀)</td></tr>
+  </table>
+  <div class="flow">[00:10] 예열(raw 수집)  →  [03:00] 발굴+규칙합성  →  [04:00] Sonnet 최종심사  →  [07:00] 임베딩
+        쿼터 효율          노이즈 1차 제거         옥석만 공개+✨배지        의미검색 갱신</div>
+  <p class="small">로컬 작업은 컴퓨터가 켜져 있을 때 실행(잠자기면 다음 깨어났을 때 보충). 매일 돌수록 검증 커버리지가 누적 상승.</p>
+</div>
+
+<!-- 11 -->
+<div class="page">
+  <h2><span class="num">11.</span> 기술 스택 · 전체 데이터 흐름</h2>
+  <h3>스택</h3>
+  <div class="kv"><b>프론트·API</b><span>Next.js 16 (App Router · TypeScript · Tailwind · Turbopack), Vercel 배포</span></div>
+  <div class="kv"><b>DB</b><span>Neon Postgres + pgvector(임베딩). 로컬·프로덕션 동일 DB 공유</span></div>
+  <div class="kv"><b>지도·차트</b><span>Leaflet(CartoDB Voyager) · Recharts(bar/radar/pie/area)</span></div>
+  <div class="kv"><b>AI</b><span>Claude Sonnet(판정·검색) · Google Gemini(임베딩)</span></div>
+
+  <h3>한 카페가 화면에 오르기까지</h3>
+  <div class="flow">발굴(네이버·공공데이터)        프랜차이즈·비카페·중복 제외 → 비공개 적재
+   │
+후기 수집(네이버 블로그/카페·구글)   raw_reviews에 원본 보존
+   │
+규칙 검증 엔진                  주제성·내용성·관련성 → 검증/참고/탈락/경계 (+근거)
+   │
+Sonnet 최종 심사               맥락으로 구제·거짓양성 제거 → ✨AI검증
+   │
+합성·집계                     등급·정체성·성격축·취향좌표·근거후기 산출
+   │
+공개 판정                     검증·참고 → 공개 / 발굴 → 비공개 보관
+   │
+임베딩                        의미 검색 벡터화
+   ▼
+화면(홈·지도·검색·사장님 분석)   모든 숫자에 출처·근거·날짜 동반</div>
+
+  <div class="box hl" style="margin-top:18px;"><b>맺음</b> — 이 서비스의 가치는 "데이터의 양"이 아니라 <b>"리뷰의 바다에서 옥석을 가리는 검증 엔진"</b>과, 그 위에 쌓이는 신뢰입니다. 모든 판정은 추적 가능한 근거를 남기고, AI는 선별·설명만 하며 숫자는 지어내지 않습니다.</div>
+  <div class="small" style="text-align:center; margin-top:24px; color:#a8927a;">동네 커피 노트 · 서비스 종합 가이드 · 2026-06-07</div>
+</div>
+
+</body></html>
