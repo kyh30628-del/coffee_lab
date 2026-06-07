@@ -541,10 +541,11 @@ function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; 
   const g = cafe.synth_grade ? GRADE_STYLE[cafe.synth_grade] : null;
   const [reviews, setReviews] = useState<EvidenceReview[]>([]);
   const [quality, setQuality] = useState<QualityStats | null>(null);
+  const [llmJudged, setLlmJudged] = useState(false);
   const [loadingRev, setLoadingRev] = useState(true);
   useEffect(() => {
     let live = true; setLoadingRev(true);
-    fetch(`/api/cafe-detail?id=${cafe.id}`).then((r) => r.json()).then((d) => { if (live) { setReviews(d.reviews ?? []); setQuality(d.quality ?? null); setLoadingRev(false); } }).catch(() => { if (live) setLoadingRev(false); });
+    fetch(`/api/cafe-detail?id=${cafe.id}`).then((r) => r.json()).then((d) => { if (live) { setReviews(d.reviews ?? []); setQuality(d.quality ?? null); setLlmJudged(!!d.llmJudged); setLoadingRev(false); } }).catch(() => { if (live) setLoadingRev(false); });
     return () => { live = false; };
   }, [cafe.id]);
   const kept = quality ? quality.verified + quality.reference : 0;
@@ -581,6 +582,11 @@ function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; 
                 🔍 네이버 공개 글 <b>{quality.raw}건</b>을 검증해, 다른 가게·모음글·동명 카페 등 <b>노이즈 {quality.rejected}건</b>을 걸러내고
                 <b> 옥석 {kept}건</b>만 분석에 썼어요.
               </div>
+              {llmJudged && (
+                <div className="mt-2 pt-2 border-t border-[#cfe0c2] text-[11px] text-[#5a3a82] font-medium flex items-center gap-1">
+                  ✨ <span>Claude AI가 후기 내용·맥락까지 한 건씩 읽어 <b>최종 검증</b>했어요</span>
+                </div>
+              )}
             </div>
           )}
           {!loadingRev && reviews.length > 0 && (
@@ -589,13 +595,15 @@ function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; 
               <div className="space-y-3">
                 {reviews.map((rv, i) => (
                   <div key={i} className="border-b border-[#f0e6d4] pb-3 last:border-0">
-                    <div className="flex items-center gap-1.5 mb-1">
+                    <div className="flex items-center gap-1.5 mb-1 flex-wrap">
                       {rv.trust === "verified"
                         ? <span className="text-[9px] text-white px-1.5 py-0.5 rounded-full" style={{ background: "#5f7355" }}>검증 ✓</span>
                         : rv.trust === "reference"
                         ? <span className="text-[9px] text-white px-1.5 py-0.5 rounded-full" style={{ background: "#9c6b3f" }}>참고</span>
                         : null}
-                      {rv.why?.[0] && <span className="text-[10px] text-[#8a7458]">{rv.why[0]}</span>}
+                      {rv.why?.some((w) => w.includes("AI 검증"))
+                        ? <span className="text-[9px] text-white px-1.5 py-0.5 rounded-full" style={{ background: "#7c5cbf" }}>✨ AI 검증</span>
+                        : rv.why?.[0] && <span className="text-[10px] text-[#8a7458]">{rv.why[0]}</span>}
                     </div>
                     <div className="text-[13px] text-[#3d2f22] leading-relaxed">“{rv.quote}”</div>
                     <div className="flex items-center gap-2 mt-1.5 text-[10px] text-[#a8927a]"><span>{rv.source}</span>{rv.date && <span>· {rv.date}</span>}{rv.link && <a href={rv.link} target="_blank" rel="noopener noreferrer" className="text-[#9c6b3f] underline ml-auto">원문 →</a>}</div>
