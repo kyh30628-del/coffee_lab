@@ -384,7 +384,11 @@ export default function Home() {
             <div className="text-[12px] text-[#cbb89f] mt-0.5">검증된 후기로 내 카페 경쟁력 진단</div>
           </button>
         </div>
-        <p className="text-[10px] text-[#8a7458] mt-10 text-center leading-relaxed">네이버·구글 공개 후기 교차검증 + AI 맥락 판정<br />광고·협찬·무관 글은 자동 제외</p>
+        <p className="text-[10px] text-[#8a7458] mt-10 text-center leading-relaxed">네이버·구글·유튜브 공개 후기 교차검증 + AI 맥락 판정<br />광고·협찬·무관 글은 자동 제외</p>
+        <div className="mt-3 text-[10px] text-[#8a7458] flex gap-3">
+          <a href="/privacy" className="underline">개인정보처리방침</a>
+          <a href="/terms" className="underline">이용약관</a>
+        </div>
 
         {ownerPwModal && (
           <div className="fixed inset-0 z-[5000] flex items-center justify-center px-6">

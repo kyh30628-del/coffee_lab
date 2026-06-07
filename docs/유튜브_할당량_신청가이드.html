@@ -1,0 +1,176 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Noto Sans KR','Apple SD Gothic Neo',sans-serif;color:#1f1f1f;font-size:10.5pt;line-height:1.65}
+.page{padding:42px 48px}.brk{page-break-after:always}
+h1{font-family:'Gowun Batang',serif;font-size:30pt;font-weight:700}
+h2{font-size:15pt;font-weight:700;color:#c0392b;margin:0 0 4px;padding-bottom:6px;border-bottom:2.5px solid #c0392b}
+h2 .n{color:#999}
+h3{font-size:12pt;font-weight:700;color:#b03a2e;margin:15px 0 6px}
+p{margin:5px 0}.lead{color:#555;margin-bottom:12px}
+table{width:100%;border-collapse:collapse;margin:8px 0 13px;font-size:9.3pt}
+th{background:#c0392b;color:#fff;text-align:left;padding:6px 9px;font-weight:500}
+td{border:1px solid #e2d9d7;padding:6px 9px;vertical-align:top}
+td:first-child{width:38%;font-weight:600;color:#7b241c}
+tr:nth-child(even) td{background:#fdf3f2}
+.val{font-family:'SF Mono',Menlo,monospace;font-size:8.8pt;background:#f0ece9;padding:1px 6px;border-radius:4px;color:#1a1a1a}
+.box{border:1px solid #e3c9b0;background:#fdf6ee;border-radius:8px;padding:11px 14px;margin:10px 0}
+.box.hl{border-color:#bcd4ad;background:#eef6ea}
+.box.warn{border-color:#e0a8a0;background:#fdeeec}
+.box.dark{background:#2b2018;color:#f4ece0;border:none}.box.dark b{color:#e8b87a}
+ul{margin:5px 0 5px 18px}li{margin:3px 0}
+.small{font-size:8.7pt;color:#888}
+.copy{background:#1f1f1f;color:#e8e8e8;font-family:'SF Mono',Menlo,monospace;font-size:8.6pt;padding:11px 13px;border-radius:7px;line-height:1.6;margin:6px 0;white-space:pre-wrap}
+.chk{display:inline-block;width:13px;height:13px;border:1.5px solid #c0392b;border-radius:3px;margin-right:5px;vertical-align:-1px}
+</style></head><body>
+
+<!-- COVER -->
+<div class="page brk" style="background:#c0392b;color:#fff;height:100vh;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:10pt;letter-spacing:5px;color:#f3c6c1;text-transform:uppercase">YouTube Data API · Quota Extension</div>
+<h1 style="margin:12px 0 6px">유튜브 할당량 증설<br>신청 가이드</h1>
+<div style="font-size:13pt;color:#f8d7d3;margin-bottom:26px">동네 커피 노트 · 개인(독립 개발자) 신청 기준</div>
+<div style="border-top:1px solid #d98880;padding-top:18px;max-width:520px;line-height:1.8;color:#fceae8;font-size:11pt">
+양식 "YouTube API Services – Audit and Quota Extension Form"을 <b style="color:#fff">개인 자격</b>으로
+완벽하게 채우는 항목별 안내. 회색 박스의 값은 그대로 입력/복사하세요.</div>
+<div style="margin-top:auto;color:#e6a9a3;font-size:9pt">최신 양식 기준 · 2026-06-08 작성 · support.google.com/youtube/contact/yt_api_form</div>
+</div>
+
+<!-- 0 핵심 답변 -->
+<div class="page brk">
+<h2><span class="n">0.</span> 먼저 — 자주 묻는 것부터</h2>
+<table>
+<tr><td>개인(비사업자)도 신청 되나?</td><td><b>네, 됩니다.</b> 주체 유형에서 <span class="val">Individual user(개인)</span> 선택, 법인명엔 <span class="val">Self</span>, 규모엔 <span class="val">Independent Developer</span>를 고르면 사업자 정보 없이 진행됩니다.</td></tr>
+<tr><td>로그인한 Gmail ≠ 신청자여도 되나?</td><td>기술적으로는 가능하나 <b>권장하지 않음.</b> 양식엔 '연락처 이메일'을 따로 적고 회신은 거기로 옵니다. 다만 <b>할당량 받을 Google Cloud 프로젝트를 소유한 계정으로 로그인 + 그 계정을 연락처로</b> 쓰는 게 검증·적용이 깔끔합니다. (= 유튜브 키 만든 그 계정으로 로그인)</td></tr>
+<tr><td>비용은?</td><td><b>무료.</b> 단 구글이 <b>실제 검토(audit)</b>를 합니다. 승인까지 며칠~몇 주, 회신 기한은 공지 없음.</td></tr>
+<tr><td>꼭 필요한 준비물?</td><td>① Cloud <b>프로젝트 번호</b> ② <b>공개 개인정보처리방침 URL</b> ③ 홈/약관/방침 <b>스크린샷</b> (아래 §1)</td></tr>
+</table>
+<div class="box warn"><b>가장 흔한 거부 사유</b> — ① 공개 개인정보처리방침 없음 ② 사용 사례가 모호 ③ 스크래핑·대량다운로드처럼 보임. 이 가이드는 셋 다 피하도록 작성돼 있습니다.</div>
+</div>
+
+<!-- 1 준비물 -->
+<div class="page brk">
+<h2><span class="n">1.</span> 신청 전 준비물 (3가지)</h2>
+<h3>① Google Cloud 프로젝트 번호</h3>
+<p>console.cloud.google.com → 유튜브 키 만든 프로젝트 선택 → 대시보드 상단 <b>"프로젝트 번호"(숫자)</b> 복사. (프로젝트 ID 아닌 <b>번호</b>)</p>
+<h3>② 공개 개인정보처리방침 URL <span class="small">(필수 — 없으면 거의 거부)</span></h3>
+<p>우리 서비스는 개인정보를 안 받지만, <b>방침 페이지 자체</b>는 공개로 있어야 합니다. 준비된 페이지:</p>
+<div class="copy">https://coffee-lab-product-builder.vercel.app/privacy
+https://coffee-lab-product-builder.vercel.app/terms  (이용약관)</div>
+<p class="small">※ 이 페이지들을 만들어 배포해 둡니다(아래 별도 안내). 방침엔 "YouTube API 사용·데이터·삭제정책"과 "Google 개인정보처리방침 링크"가 보여야 통과에 유리.</p>
+<h3>③ 스크린샷 3장(이미지/PDF)</h3>
+<ul>
+<li><b>홈페이지</b> 화면 (랜딩 — 서비스가 뭔지 보이게)</li>
+<li><b>개인정보처리방침</b> 페이지 (YouTube 관련 문구 + Google 방침 링크 + 삭제정책 보이게)</li>
+<li><b>이용약관</b> 페이지</li>
+</ul>
+<div class="box hl"><b>가점 팁</b>: 카페 상세에서 <b>"▶ YouTube · 채널명 · 영상 보기"</b>가 보이는 화면(예: '제이든 커피 로스터스' 페이지)도 한 장 캡처해두면, "메타데이터+원본 링크"라는 우리 사용 방식을 증명하기 좋습니다.</div>
+</div>
+
+<!-- 2 섹션별 입력값 (A) -->
+<div class="page brk">
+<h2><span class="n">2.</span> 항목별 입력값 — 조직·연락처</h2>
+<table>
+<tr><th style="width:38%">항목</th><th>입력값</th></tr>
+<tr><td>Request Reason (요청 사유)</td><td><span class="val">Compliance audit for quota increase</span> (할당량 증가용 감사)</td></tr>
+<tr><td>Entity Type (주체 유형)</td><td><span class="val">Individual user</span> (개인)</td></tr>
+<tr><td>Full Name</td><td>본인 실명(법적 이름)</td></tr>
+<tr><td>Organization Legal Name</td><td><span class="val">Self</span></td></tr>
+<tr><td>Parent Company Name</td><td><span class="val">Self</span> 또는 비움</td></tr>
+<tr><td>Organization Primary Website</td><td><span class="val">https://coffee-lab-product-builder.vercel.app</span></td></tr>
+<tr><td>Country</td><td>목록에 한국 없으면 <span class="val">Other</span> 선택</td></tr>
+<tr><td>Address / City / State / Postal</td><td>본인 주소(영문 권장)</td></tr>
+<tr><td>Category</td><td><span class="val">Tech/Software</span> (또는 Other)</td></tr>
+<tr><td>Organization Size/Type</td><td><span class="val">Independent Developer</span></td></tr>
+<tr><td>Primary Contact (Name/Email)</td><td>본인 이름 · <b>로그인 계정과 같은 이메일</b> 권장</td></tr>
+<tr><td>Technical / Business Contact</td><td>"Same as primary contact" 체크</td></tr>
+</table>
+<h3>YouTube 비즈니스 설명 (100자 이상 필수)</h3>
+<p>아래를 그대로 붙여넣으세요(영문 권장):</p>
+<div class="copy">I operate "Dongne Coffee Note", a local cafe discovery guide for the Seoul
+metropolitan area. I use the YouTube Data API (search.list, videos.list,
+commentThreads.list) to find public videos about specific local cafes by name,
+and retrieve only the video title, description, publish date, and a few top
+comments to cross-verify and enrich publicly sourced review data. I do NOT
+download, host, embed, or re-host any video content. Every video is linked back
+to YouTube via a "Watch on YouTube" link. I request a higher daily quota to
+backfill metadata for ~3,000 local cafes (currently limited to ~95/day).</div>
+</div>
+
+<!-- 2 섹션별 입력값 (B) -->
+<div class="page brk">
+<h2><span class="n">2.</span> 항목별 입력값 — 비즈니스 모델·API 클라이언트</h2>
+<table>
+<tr><th style="width:38%">항목</th><th>입력값</th></tr>
+<tr><td>Target Audience</td><td><span class="val">General public</span> 체크</td></tr>
+<tr><td>Revenue Model</td><td><span class="val">Free service</span> (사장님 구독 예정이면 <span class="val">Freemium</span>도 함께)</td></tr>
+<tr><td>YouTube Content/Player Ads</td><td><span class="val">N/A</span> (영상/플레이어에 광고 안 팜)</td></tr>
+<tr><td>Existing Google Contact</td><td><span class="val">None</span></td></tr>
+<tr><td>API Discovery Source</td><td><span class="val">Google Developer Docs</span> (또는 Online search)</td></tr>
+<tr><td>Content Owner ID / Google Ads ID</td><td>비움 (해당 없음)</td></tr>
+</table>
+<table>
+<tr><th style="width:38%">API 클라이언트</th><th>입력값</th></tr>
+<tr><td>API Client Name</td><td><span class="val">Dongne Coffee Note (동네 커피 노트)</span></td></tr>
+<tr><td>'YouTube' in Client Name?</td><td><span class="val">No</span></td></tr>
+<tr><td>Primary Access URL</td><td><span class="val">https://coffee-lab-product-builder.vercel.app</span></td></tr>
+<tr><td>Privacy Policy URL</td><td><span class="val">.../privacy</span> (§1 준비)</td></tr>
+<tr><td>Terms of Service URL</td><td><span class="val">.../terms</span></td></tr>
+<tr><td>Public Access Available?</td><td><span class="val">Yes</span></td></tr>
+<tr><td>Demo Account</td><td>공개 사이트라 불필요(비움). 아래 확인 체크박스는 체크.</td></tr>
+</table>
+</div>
+
+<!-- 2 섹션별 입력값 (C) 사용사례·할당량 -->
+<div class="page brk">
+<h2><span class="n">2.</span> 항목별 입력값 — 사용 사례 · 할당량</h2>
+<table>
+<tr><th style="width:38%">항목</th><th>입력값</th></tr>
+<tr><td>Number of Projects</td><td><span class="val">1</span></td></tr>
+<tr><td>Google Cloud Project Number</td><td>§1에서 복사한 <b>프로젝트 번호</b>(숫자)</td></tr>
+<tr><td>Use Case Categories</td><td><span class="val">Websites and Mobile Apps</span> 체크 (+ Analytics and Reporting 선택 가능)</td></tr>
+<tr><td>OAuth 2.0 Required?</td><td><span class="val">No</span> (공개 데이터만 읽음, 사용자 채널 접근 X)</td></tr>
+<tr><td>Derived Metrics / Data Storage</td><td>정책 준수 확인 체크박스 <b>모두 체크</b> (제목·설명·댓글 텍스트만 보관, 원본 링크, 보관기간 한도 준수)</td></tr>
+<tr><td>Expected API Usage</td><td>요청 목표 <span class="val">10,000–100,000/day</span></td></tr>
+<tr><td>API Endpoints (체크)</td><td><span class="val">youtube.search.list</span> · <span class="val">youtube.videos.list</span> · <span class="val">youtube.commentThreads.list</span></td></tr>
+<tr><td>Quota Request — Keep current?</td><td><span class="val">No</span></td></tr>
+<tr><td>Daily total quota</td><td>예) <span class="val">100000</span></td></tr>
+<tr><td>Max quota per minute</td><td>예) <span class="val">1800</span> (비례 추정값)</td></tr>
+</table>
+<h3>Detailed Justification (할당량 사유) — 붙여넣기</h3>
+<div class="copy">Default 10,000 units/day only allows ~95 search.list calls per day. I need to
+backfill YouTube metadata (title/description/top comments) for ~3,000 local
+cafes in the Seoul area, and keep it fresh as new cafes are added. A higher
+daily quota lets me complete this backfill in days instead of months, while
+staying fully within the Terms of Service — metadata only, always linked back
+to the original YouTube videos, no downloading or re-hosting.</div>
+<div class="box hl"><b>필수 첨부</b>: §1의 스크린샷 3장(홈·개인정보처리방침·이용약관) + (가점) 카페 상세의 ▶YouTube 화면.</div>
+</div>
+
+<!-- 3 제출 후 -->
+<div class="page">
+<h2><span class="n">3.</span> 제출 · 그 후 · 핵심 체크</h2>
+<h3>제출 전 마지막 체크</h3>
+<p><span class="chk"></span> 로그인 = 유튜브 키 만든 그 Google 계정인가</p>
+<p><span class="chk"></span> 개인정보처리방침·이용약관 페이지가 <b>공개 URL</b>로 열리는가</p>
+<p><span class="chk"></span> 방침에 "YouTube API 사용·데이터·삭제" + "Google 개인정보처리방침 링크"가 있는가</p>
+<p><span class="chk"></span> 사용 사례에 <b>"메타데이터만 · 원본 링크 · 다운로드/재호스팅 안 함"</b>이 분명한가</p>
+<p><span class="chk"></span> 스크린샷 3장 첨부했는가</p>
+<h3>제출 후</h3>
+<ul>
+<li>제출 사본이 입력한 이메일로 <b>자동 회신</b>됩니다(보관).</li>
+<li>구글 API팀이 검토 후 회신 — <b>기한 공지 없음</b>(며칠~몇 주).</li>
+<li>추가 자료 요청이 오면 빠르게 회신할수록 좋습니다.</li>
+<li>승인되면 그 프로젝트의 <b>일일 한도가 상향</b>됩니다.</li>
+</ul>
+<h3>참고 — 양식 종류(상황별)</h3>
+<table>
+<tr><td>처음 감사+증설</td><td>YouTube API Services – Audit and Quota Extension Form ← <b>지금 이것</b></td></tr>
+<tr><td>이미 감사 완료(12개월 내) 추가 증설</td><td>Audited Developer Requests Form</td></tr>
+<tr><td>감사 탈락 이의신청</td><td>Appeals Form</td></tr>
+</table>
+<div class="box dark" style="margin-top:16px"><b>한 줄 요지</b> — 개인(<b>Self</b> · Independent Developer)으로 신청 가능하고, 합격의 핵심은 <b>공개 개인정보처리방침 + "메타데이터만 쓰고 원본으로 링크"라는 분명한 사용 사례</b>입니다.</div>
+<div class="small" style="text-align:center;margin-top:18px;color:#aaa">동네 커피 노트 · 유튜브 할당량 신청 가이드 · 2026-06-08</div>
+</div>
+
+</body></html>
