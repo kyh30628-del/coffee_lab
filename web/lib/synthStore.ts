@@ -4,7 +4,7 @@
 import { sql } from "./db";
 import { fetchPlacesReviews } from "./placesCollector";
 import { fetchWebReviews } from "./webSearchCollector";
-import { collectAndSynthesize, type RawSource } from "./collectOrchestrator";
+import { collectAndSynthesize, type RawSource, type BorderlineItem, type CollectResult } from "./collectOrchestrator";
 import { judgeReviews, hasJudgeKey } from "./reviewJudge";
 
 type RawItem = { source: "google" | "blog"; text: string; title?: string; desc?: string; time?: number; link?: string; date?: string; srcName?: string };
@@ -14,26 +14,8 @@ async function ensureCols() {
   if (ensured) return;
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS raw_reviews JSONB`;
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS raw_collected_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS llm_judged_at TIMESTAMPTZ`;
   ensured = true;
-}
-
-// 원본 수집: 저장된 raw가 있고 refresh가 아니면 재사용(무료·재현). 아니면 새로 수집해 저장.
-// apiFailed: 수집 0인데 네이버 API 오류/쿼터인 경우 → 진짜 0건과 구분(기존 데이터 보존용).
-async function gatherRaw(cafe: { id: number; name: string; area: string }, refresh: boolean): Promise<{ raw: RawItem[]; fromCache: boolean; apiFailed: boolean }> {
-  if (!refresh) {
-    const row = (await sql`SELECT raw_reviews FROM cafes WHERE id=${cafe.id}`)[0];
-    const cached = row?.raw_reviews;
-    if (Array.isArray(cached) && cached.length) return { raw: cached as RawItem[], fromCache: true, apiFailed: false };
-  }
-  const raw: RawItem[] = [];
-  const places = await fetchPlacesReviews(cafe.name, cafe.area ?? "");
-  for (const r of places.reviews) raw.push({ source: "google", text: r.text, time: r.time });
-  const web = await fetchWebReviews(cafe.name, cafe.area ?? "");
-  for (const s of web.snippets) raw.push({ source: "blog", text: s.text, title: s.title, desc: s.desc, time: s.time, link: s.link, date: s.date, srcName: s.source });
-  // 네이버 쿼터/오류로 아무것도 못 받음 → 저장·갱신하지 않고 보존(나중에 재시도)
-  if (raw.length === 0 && web.apiError) return { raw: [], fromCache: false, apiFailed: true };
-  await sql`UPDATE cafes SET raw_reviews=${JSON.stringify(raw)}, raw_collected_at=now() WHERE id=${cafe.id}`;
-  return { raw, fromCache: false, apiFailed: false };
 }
 
 function rawToSources(raw: RawItem[]): RawSource[] {
@@ -45,11 +27,47 @@ function rawToSources(raw: RawItem[]): RawSource[] {
   return sources;
 }
 
-// opts.refresh=true면 새로 수집(최신성·주간 cron). 기본은 캐시 재사용(재판정·쿼터 절약).
+async function loadRaw(cafeId: number): Promise<RawItem[]> {
+  const row = (await sql`SELECT raw_reviews FROM cafes WHERE id=${cafeId}`)[0];
+  const r = row?.raw_reviews;
+  return Array.isArray(r) ? (r as RawItem[]) : [];
+}
+
+// 원본 수집: 저장된 raw가 있고 refresh가 아니면 재사용(무료·재현). apiFailed면 보존(미변경).
+async function gatherRaw(cafe: { id: number; name: string; area: string }, refresh: boolean): Promise<{ raw: RawItem[]; fromCache: boolean; apiFailed: boolean }> {
+  if (!refresh) {
+    const cached = await loadRaw(cafe.id);
+    if (cached.length) return { raw: cached, fromCache: true, apiFailed: false };
+  }
+  const raw: RawItem[] = [];
+  const places = await fetchPlacesReviews(cafe.name, cafe.area ?? "");
+  for (const r of places.reviews) raw.push({ source: "google", text: r.text, time: r.time });
+  const web = await fetchWebReviews(cafe.name, cafe.area ?? "");
+  for (const s of web.snippets) raw.push({ source: "blog", text: s.text, title: s.title, desc: s.desc, time: s.time, link: s.link, date: s.date, srcName: s.source });
+  if (raw.length === 0 && web.apiError) return { raw: [], fromCache: false, apiFailed: true };
+  await sql`UPDATE cafes SET raw_reviews=${JSON.stringify(raw)}, raw_collected_at=now() WHERE id=${cafe.id}`;
+  return { raw, fromCache: false, apiFailed: false };
+}
+
+// 합성 결과를 DB에 저장(공용). llmJudged=true면 llm_judged_at도 기록.
+async function storeResult(cafeId: number, result: CollectResult, llmJudged: boolean) {
+  const { synth, collected, grade, charScores, evidenceReviews, reviewDates, quality } = result;
+  const c = synth.coords;
+  const basisLine = ["acidity", "body", "sweet"].filter((ax) => c[ax] != null)
+    .map((ax) => `${ax === "acidity" ? "산미" : ax === "body" ? "바디" : "단맛"} ${synth.basis[ax]}`).join(" / ");
+  const publish = grade === "검증" || grade === "참고";
+  if (llmJudged) {
+    await sql`UPDATE cafes SET synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${JSON.stringify(evidenceReviews)}, char_scores=${JSON.stringify(charScores)}, synth_quality=${JSON.stringify(quality)}, review_dates=${JSON.stringify(reviewDates)}, synth_updated=now(), llm_judged_at=now(), published=${publish} WHERE id=${cafeId}`;
+  } else {
+    await sql`UPDATE cafes SET synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${JSON.stringify(evidenceReviews)}, char_scores=${JSON.stringify(charScores)}, synth_quality=${JSON.stringify(quality)}, review_dates=${JSON.stringify(reviewDates)}, synth_updated=now(), published=${publish} WHERE id=${cafeId}`;
+  }
+  return { grade, collected, published: publish, evidence: evidenceReviews.length };
+}
+
+// opts.refresh=true면 새로 수집(최신성). 기본은 캐시 재사용(쿼터 절약).
 export async function synthAndStore(cafe: { id: number; name: string; area: string }, opts?: { refresh?: boolean }) {
   await ensureCols();
   const { raw, fromCache, apiFailed } = await gatherRaw(cafe, !!opts?.refresh);
-  // 쿼터/오류로 수집 실패 → DB 미변경(기존 데이터 보존). 다음 회차 재시도.
   if (apiFailed) return { id: cafe.id, name: cafe.name, ok: false, reason: "수집 API 오류/쿼터 — 보존", skipped: true };
   const sources = rawToSources(raw);
   if (sources.length === 0) {
@@ -60,7 +78,7 @@ export async function synthAndStore(cafe: { id: number; name: string; area: stri
   const area = cafe.area ? [cafe.area] : [];
   let result = collectAndSynthesize(cafe.name, area, sources);
 
-  // 스마트 재판정: 경계 리뷰를 LLM이 읽어 양질 후기만 살림(실패/쿼터 시 1차 결과 유지).
+  // 서버측 보조 LLM 재판정(키 있을 때만). 품질 본판정은 로컬 Sonnet 배치(judge-candidates/apply)가 담당.
   let rescued = 0;
   if (hasJudgeKey() && result.borderline.length > 0) {
     const items = result.borderline.slice(0, 35).map((b, i) => ({ i, title: b.title ?? "", body: b.body }));
@@ -71,20 +89,33 @@ export async function synthAndStore(cafe: { id: number; name: string; area: stri
       if (whitelist.size > 0) { result = collectAndSynthesize(cafe.name, area, sources, { whitelist }); rescued = whitelist.size; }
     }
   }
+  const stored = await storeResult(cafe.id, result, false);
+  return { id: cafe.id, name: cafe.name, ok: true, ...stored, rescued, fromCache };
+}
 
-  const { synth, collected, grade, charScores, evidenceReviews, reviewDates, quality } = result;
-  const c = synth.coords;
-  const basisLine = ["acidity", "body", "sweet"].filter((ax) => c[ax] != null)
-    .map((ax) => `${ax === "acidity" ? "산미" : ax === "body" ? "바디" : "단맛"} ${synth.basis[ax]}`).join(" / ");
-  const publish = grade === "검증" || grade === "참고";
+// ── 로컬 Sonnet 배치용 ───────────────────────────────────────────────
+// 캐시된 raw로 '경계 리뷰'만 추출(서버, LLM 없음). raw 없으면 hasRaw:false.
+export async function getBorderline(cafe: { id: number; name: string; area: string }): Promise<{ borderline: BorderlineItem[]; hasRaw: boolean }> {
+  await ensureCols();
+  const raw = await loadRaw(cafe.id);
+  if (!raw.length) return { borderline: [], hasRaw: false };
+  const result = collectAndSynthesize(cafe.name, cafe.area ? [cafe.area] : [], rawToSources(raw));
+  return { borderline: result.borderline, hasRaw: true };
+}
 
-  await sql`
-    UPDATE cafes SET
-      synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine},
-      synth_count=${collected}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet},
-      synth_reviews=${JSON.stringify(evidenceReviews)}, char_scores=${JSON.stringify(charScores)},
-      synth_quality=${JSON.stringify(quality)}, review_dates=${JSON.stringify(reviewDates)}, synth_updated=now(),
-      published=${publish}
-    WHERE id=${cafe.id}`;
-  return { id: cafe.id, name: cafe.name, ok: true, grade, collected, evidence: evidenceReviews.length, rescued, fromCache, published: publish };
+// 로컬 Sonnet 판정 통과(whitelist key)를 적용해 재합성·저장 + llm_judged_at 기록.
+export async function applyWhitelist(cafe: { id: number; name: string; area: string }, whitelistKeys: string[]) {
+  await ensureCols();
+  const raw = await loadRaw(cafe.id);
+  if (!raw.length) { await sql`UPDATE cafes SET llm_judged_at=now() WHERE id=${cafe.id}`; return { id: cafe.id, rescued: 0, grade: null, published: false, reason: "raw 없음" }; }
+  const whitelist = new Set(whitelistKeys);
+  const result = collectAndSynthesize(cafe.name, cafe.area ? [cafe.area] : [], rawToSources(raw), { whitelist });
+  const stored = await storeResult(cafe.id, result, true);
+  return { id: cafe.id, name: cafe.name, rescued: whitelistKeys.length, ...stored };
+}
+
+// 경계 리뷰 없는 카페는 LLM 불필요 → 판정완료로 마킹(커서 전진).
+export async function markJudged(cafeId: number) {
+  await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS llm_judged_at TIMESTAMPTZ`;
+  await sql`UPDATE cafes SET llm_judged_at=now() WHERE id=${cafeId}`;
 }
