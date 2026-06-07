@@ -1,7 +1,10 @@
 // 구글 Places 리뷰 수집 (PRINCIPLES.md 2조: 공식 API, 합법)
+// ⚠️ 과금 주의: Places API(New)는 호출당 과금(리뷰·평점 필드는 비싼 SKU). 기본 OFF로 두어
+//    요금을 방지한다. 네이버·유튜브·블로그로 충분. 켜려면 ENABLE_GOOGLE_PLACES=1.
 export type CollectedReview = { text: string; time?: number };
 
 const KEY = process.env.GOOGLE_API_KEY;
+const ENABLED = process.env.ENABLE_GOOGLE_PLACES === "1";
 
 export async function fetchPlacesReviews(name: string, area: string): Promise<{
   reviews: CollectedReview[];
@@ -9,6 +12,7 @@ export async function fetchPlacesReviews(name: string, area: string): Promise<{
   error?: string;
   debug?: unknown;
 }> {
+  if (!ENABLED) return { reviews: [], error: "Places 비활성(과금 방지) — ENABLE_GOOGLE_PLACES=1로 켜기" };
   if (!KEY) return { reviews: [], error: "GOOGLE_API_KEY 미설정" };
   try {
     const searchRes = await fetch("https://places.googleapis.com/v1/places:searchText", {
