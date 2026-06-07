@@ -719,7 +719,8 @@ function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; 
             </div>
           </div>
         )}
-        {cafe.photo_url ? <div className="h-40 w-full"><img src={cafe.photo_url} alt={cafe.name} className="w-full h-full object-cover" /></div> : <div className="h-28 w-full" style={{ background: "linear-gradient(135deg,#c8893f,#8a5a24)" }} />}
+        {/* 쇼케이스 배너가 있으면 기본 사진/띠는 생략(중복·잘림 방지) */}
+        {!promo && (cafe.photo_url ? <div className="h-40 w-full"><img src={cafe.photo_url} alt={cafe.name} className="w-full h-full object-cover" /></div> : <div className="h-28 w-full" style={{ background: "linear-gradient(135deg,#c8893f,#8a5a24)" }} />)}
         <div className="p-5">
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-2"><h3 className="text-xl font-bold text-[#2b2018]">{cafe.name}</h3>{g && <span className="text-[10px] text-white px-2 py-0.5 rounded-full" style={{ background: g.bg }}>{g.label}</span>}</div>
