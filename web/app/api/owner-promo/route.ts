@@ -17,6 +17,7 @@ async function ensurePromo() {
     updated_at TIMESTAMPTZ DEFAULT now()
   )`;
   await sql`ALTER TABLE cafe_promos ADD COLUMN IF NOT EXISTS ai_pending BOOLEAN DEFAULT false`;
+  await sql`ALTER TABLE cafe_promos ADD COLUMN IF NOT EXISTS approved BOOLEAN DEFAULT false`; // 관리자 승인 후에만 배너 노출
   ready = true;
 }
 const authed = (req: NextRequest) => !!req.headers.get("x-admin-password") && req.headers.get("x-admin-password") === process.env.ADMIN_PASSWORD;
@@ -28,7 +29,8 @@ export async function GET(req: NextRequest) {
     const cafeId = Number(req.nextUrl.searchParams.get("cafeId"));
     if (!cafeId) return NextResponse.json({ ok: false, error: "cafeId 필요" }, { status: 400 });
     const row = (await sql`SELECT * FROM cafe_promos WHERE cafe_id=${cafeId} LIMIT 1`)[0];
-    if (!row || (!row.published && !authed(req))) return NextResponse.json({ ok: true, promo: null });
+    // 소비자(비관리자)는 '관리자 승인된' 홍보만 본다. 관리자는 미리보기 위해 전부.
+    if (!row || (!authed(req) && !row.approved)) return NextResponse.json({ ok: true, promo: null });
     return NextResponse.json({ ok: true, promo: row });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
@@ -57,15 +59,16 @@ export async function POST(req: NextRequest) {
     if (body.generate && consoleKey) ai = await generatePromo(cafe.name, cafe.area, intro, photos[0]);
     const pending = !!body.generate && !ai; // 생성 요청했는데 인라인 못 함 → 로컬 배치 대기
 
+    // 저장하면 published=true(노출 희망), approved=false(관리자 재승인 필요).
     if (ai) {
-      await sql`INSERT INTO cafe_promos (cafe_id, intro, photos, ai_headline, ai_tagline, ai_points, published, ai_pending, updated_at)
-        VALUES (${cafeId}, ${intro}, ${JSON.stringify(photos)}, ${ai.headline}, ${ai.tagline}, ${JSON.stringify(ai.points)}, ${publish}, false, now())
-        ON CONFLICT (cafe_id) DO UPDATE SET intro=EXCLUDED.intro, photos=EXCLUDED.photos, ai_headline=EXCLUDED.ai_headline, ai_tagline=EXCLUDED.ai_tagline, ai_points=EXCLUDED.ai_points, published=EXCLUDED.published, ai_pending=false, updated_at=now()`;
+      await sql`INSERT INTO cafe_promos (cafe_id, intro, photos, ai_headline, ai_tagline, ai_points, published, approved, ai_pending, updated_at)
+        VALUES (${cafeId}, ${intro}, ${JSON.stringify(photos)}, ${ai.headline}, ${ai.tagline}, ${JSON.stringify(ai.points)}, true, false, false, now())
+        ON CONFLICT (cafe_id) DO UPDATE SET intro=EXCLUDED.intro, photos=EXCLUDED.photos, ai_headline=EXCLUDED.ai_headline, ai_tagline=EXCLUDED.ai_tagline, ai_points=EXCLUDED.ai_points, published=true, approved=false, ai_pending=false, updated_at=now()`;
     } else {
-      await sql`INSERT INTO cafe_promos (cafe_id, intro, photos, published, ai_pending, updated_at)
-        VALUES (${cafeId}, ${intro}, ${JSON.stringify(photos)}, ${publish}, ${pending}, now())
-        ON CONFLICT (cafe_id) DO UPDATE SET intro=EXCLUDED.intro, photos=EXCLUDED.photos, published=EXCLUDED.published, updated_at=now()`;
-      if (pending) await sql`UPDATE cafe_promos SET ai_pending=true WHERE cafe_id=${cafeId}`; // 생성 요청만 pending 표시(나머지 저장은 기존 유지)
+      await sql`INSERT INTO cafe_promos (cafe_id, intro, photos, published, approved, ai_pending, updated_at)
+        VALUES (${cafeId}, ${intro}, ${JSON.stringify(photos)}, true, false, ${pending}, now())
+        ON CONFLICT (cafe_id) DO UPDATE SET intro=EXCLUDED.intro, photos=EXCLUDED.photos, published=true, approved=false, updated_at=now()`;
+      if (pending) await sql`UPDATE cafe_promos SET ai_pending=true WHERE cafe_id=${cafeId}`;
     }
     const row = (await sql`SELECT * FROM cafe_promos WHERE cafe_id=${cafeId}`)[0];
     return NextResponse.json({ ok: true, promo: row, generated: !!ai, pending });

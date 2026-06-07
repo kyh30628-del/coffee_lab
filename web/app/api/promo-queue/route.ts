@@ -15,6 +15,15 @@ export async function GET(req: NextRequest) {
     if (!authed(req)) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
     await ensureSchema();
     await sql`ALTER TABLE cafe_promos ADD COLUMN IF NOT EXISTS ai_pending BOOLEAN DEFAULT false`;
+    await sql`ALTER TABLE cafe_promos ADD COLUMN IF NOT EXISTS approved BOOLEAN DEFAULT false`;
+    // review=1: 관리자 승인 대기(생성 완료 & 미승인). 기본: 로컬 배치용 AI 생성 대기.
+    if (req.nextUrl.searchParams.get("review")) {
+      const rows = await sql`
+        SELECT p.cafe_id, p.intro, p.photos, p.ai_headline, p.ai_tagline, p.ai_points, p.ai_pending, p.approved, c.name, c.area
+        FROM cafe_promos p JOIN cafes c ON c.id = p.cafe_id
+        WHERE p.published = true AND p.approved = false ORDER BY p.updated_at DESC LIMIT 50`;
+      return NextResponse.json({ ok: true, review: rows });
+    }
     const rows = await sql`
       SELECT p.cafe_id, p.intro, p.photos, c.name, c.area
       FROM cafe_promos p JOIN cafes c ON c.id = p.cafe_id
@@ -32,6 +41,9 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     const cafeId = Number(body.cafeId);
     if (!cafeId) return NextResponse.json({ ok: false, error: "cafeId 필요" }, { status: 400 });
+    // 관리자 승인/반려
+    if (body.approve) { await sql`UPDATE cafe_promos SET approved=true WHERE cafe_id=${cafeId}`; return NextResponse.json({ ok: true, approved: true }); }
+    if (body.reject) { await sql`UPDATE cafe_promos SET approved=false, published=false WHERE cafe_id=${cafeId}`; return NextResponse.json({ ok: true, rejected: true }); }
     if (body.fail) { await sql`UPDATE cafe_promos SET ai_pending=false WHERE cafe_id=${cafeId}`; return NextResponse.json({ ok: true, cleared: true }); }
     const headline = String(body.headline ?? "").slice(0, 24);
     const tagline = String(body.tagline ?? "").slice(0, 60);

@@ -33,6 +33,7 @@ export default function AdminPage() {
   const [msg, setMsg] = useState("");
   const [showAuto, setShowAuto] = useState(false);
   const [q, setQ] = useState("");
+  const [review, setReview] = useState<any[]>([]);
 
   const load = async (password: string) => {
     setMsg("불러오는 중...");
@@ -42,11 +43,19 @@ export default function AdminPage() {
     if (d.ok) { setCafes(d.cafes); setAuthed(true); setMsg(""); }
     else { setMsg("오류: " + d.error); return; }
     fetch("/api/admin/stats", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((s) => { if (s.ok) setStats(s); }).catch(() => {});
+    loadReview(password);
   };
 
   const act = async (id: number, action: string, published?: boolean) => {
     await fetch("/api/admin/cafes", { method: "POST", headers: { "Content-Type": "application/json", "x-admin-password": pw }, body: JSON.stringify({ id, action, published }) });
     load(pw);
+  };
+
+  // 🎀 쇼케이스 승인
+  const loadReview = (password: string) => fetch("/api/promo-queue?review=1", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) setReview(d.review ?? []); }).catch(() => {});
+  const promoAct = async (cafeId: number, action: "approve" | "reject") => {
+    await fetch("/api/promo-queue", { method: "POST", headers: { "Content-Type": "application/json", "x-admin-password": pw }, body: JSON.stringify({ cafeId, [action]: true }) });
+    loadReview(pw);
   };
 
   if (!authed) {
@@ -114,6 +123,42 @@ export default function AdminPage() {
           <h1 className="text-2xl font-bold">관리자 대시보드</h1>
           <button onClick={() => load(pw)} className="ml-auto text-xs px-3 py-1.5 rounded-lg bg-stone-200 text-stone-700">새로고침</button>
         </div>
+
+        {/* ===== 🎀 쇼케이스 승인 대기 ===== */}
+        {review.length > 0 && (
+          <div className="mb-6">
+            <div className="text-xs font-bold text-amber-600 uppercase tracking-wider mb-2">🎀 쇼케이스 승인 대기 ({review.length})</div>
+            <div className="space-y-3">
+              {review.map((p) => (
+                <div key={p.cafe_id} className="bg-white rounded-xl border border-amber-200 overflow-hidden">
+                  <div className="p-3">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-bold text-sm">{p.name}</span>
+                      <span className="text-[11px] text-stone-400">{p.area}</span>
+                      {p.ai_pending && <span className="text-[10px] bg-stone-200 text-stone-600 px-1.5 py-0.5 rounded-full ml-auto">AI 생성 대기</span>}
+                    </div>
+                    {p.intro && <p className="text-[12px] text-stone-500 mb-2 line-clamp-2">사장님 글: {p.intro}</p>}
+                    {p.ai_headline ? (
+                      <div className="rounded-lg overflow-hidden bg-stone-900 text-stone-50">
+                        {p.photos?.[0] && <img src={p.photos[0]} alt="" className="w-full h-28 object-cover" />}
+                        <div className="p-3">
+                          <div className="text-[9px] text-amber-300 mb-0.5">미리보기 (소비자 노출 예정)</div>
+                          <div className="text-base font-bold">{p.ai_headline}</div>
+                          {p.ai_tagline && <div className="text-[12px] text-stone-300 mt-0.5">{p.ai_tagline}</div>}
+                          {Array.isArray(p.ai_points) && p.ai_points.length > 0 && <div className="flex flex-wrap gap-1 mt-1.5">{p.ai_points.map((pt: string, i: number) => <span key={i} className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full">{pt}</span>)}</div>}
+                        </div>
+                      </div>
+                    ) : <p className="text-[12px] text-stone-400">AI 카피 생성 대기 중 — 로컬 배치 실행 후 다시 확인</p>}
+                  </div>
+                  <div className="flex border-t border-stone-100">
+                    <button onClick={() => promoAct(p.cafe_id, "approve")} disabled={!p.ai_headline} className="flex-1 py-2.5 text-sm font-bold text-emerald-700 disabled:text-stone-300">✓ 승인 (노출)</button>
+                    <button onClick={() => promoAct(p.cafe_id, "reject")} className="flex-1 py-2.5 text-sm text-rose-600 border-l border-stone-100">✕ 반려</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* ===== 콘텐츠 현황 ===== */}
         <div className="text-xs font-bold text-stone-400 uppercase tracking-wider mb-2">콘텐츠 현황</div>

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import GuideModal from "./GuideModal";
+import InfoDot from "./InfoDot";
 
 type EvidenceReview = { quote: string; link?: string; source?: string; date?: string; trust?: "verified" | "reference" | "rejected"; score?: number; why?: string[] };
 type QualityStats = { raw: number; verified: number; reference: number; rejected: number; rejectReasons?: Record<string, number> };
@@ -119,7 +119,6 @@ export default function Home() {
   const [ownerPw, setOwnerPw] = useState("");
   const [ownerErr, setOwnerErr] = useState("");
   const [backToast, setBackToast] = useState(false);
-  const [showGuide, setShowGuide] = useState(false);
   // 지도용 상태
   const [tasteKey, setTasteKey] = useState<string | null>(null);
   const [sido, setSido] = useState("");
@@ -293,12 +292,12 @@ export default function Home() {
       </div>
     </button>
   );
-  const Row = ({ title, items, sub }: { title: string; items: DCafe[]; sub?: string }) => {
+  const Row = ({ title, items, sub, info }: { title: string; items: DCafe[]; sub?: string; info?: any }) => {
     if (!items?.length) return null;
     return (
       <div className="mb-7">
         <div className="flex items-baseline justify-between mb-1 pb-1 border-b-2 border-[#2b2018]">
-          <div className="text-base font-bold text-[#2b2018]">{title}</div>
+          <div className="text-base font-bold text-[#2b2018] flex items-center gap-1.5">{title}{info && <InfoDot title={title.replace(/^[^가-힣A-Za-z]+/, "")}>{info}</InfoDot>}</div>
           {sub && <div className="text-[10px] text-[#9c6b3f] shrink-0">↕ {sub}</div>}
         </div>
         {/* 바깥은 가로 스크롤, 위쪽 패딩 안에 말풍선이 들어가 잘리지 않음 */}
@@ -428,7 +427,6 @@ export default function Home() {
           </div>
         </div>
         <div className="flex gap-2 shrink-0 items-center">
-          <button onClick={() => setShowGuide(true)} className="text-xs text-[#cbb89f] hover:text-[#f4ece0] whitespace-nowrap" aria-label="사용법">📖 사용법</button>
           {role === "owner" ? (
             <>
               <a href="/owner" className="bg-[#9c6b3f] rounded-full px-3 py-1.5 text-xs whitespace-nowrap">내 카페 분석</a>
@@ -473,9 +471,9 @@ export default function Home() {
               <>
                 {discover.headlineA && <HeadlineCard c={discover.headlineA} kicker="이번 주 가장 많이 이야기된 곳" tone={0} />}
                 {discover.headlineB && <HeadlineCard c={discover.headlineB} kicker="🔥 커피에 진심인 집 — 스페셜티 스포트라이트" tone={1} />}
-                {momentum && momentum.rising.length > 0 && <Row title="📈 요즘 뜨는 카페" items={momentum.rising} sub="최근 입소문 순" />}
-                <Row title="🏆 리뷰 많은 Top 3" items={discover.top3} sub="검증 리뷰 많은 순" />
-                <Row title="🔥 스페셜티 픽" items={discover.specialty} sub="로스팅 언급 순" />
+                {momentum && momentum.rising.length > 0 && <Row title="📈 요즘 뜨는 카페" items={momentum.rising} sub="최근 입소문 순" info={<>별점 대신 <b>검증된 진짜 후기가 요즘 얼마나 빨리 느는지</b>로 뽑은 ‘뜨는 카페’예요. 최근 3개월 검증 후기가 많을수록 상위로 올라가요.</>} />}
+                <Row title="🏆 리뷰 많은 Top 3" items={discover.top3} sub="검증 리뷰 많은 순" info={<>이 동네에서 <b>검증·참고 후기(옥석)가 가장 많은</b> 카페 순서예요. 광고·가짜·무관 글은 제외한 ‘진짜 후기 수’ 기준입니다.</>} />
+                <Row title="🔥 스페셜티 픽" items={discover.specialty} sub="로스팅 언급 순" info={<>검증된 카페 중 <b>직접 로스팅·스페셜티가 후기에 자주 언급된</b> 곳이에요. 커피에 진심인 집 위주로 보여줘요.</>} />
                 <button onClick={() => { if (homeSido) { setSido(homeSido); setSigungu(homeGu); } setFocusId(null); setSheetOpen(true); setTab("map"); }} className="w-full bg-[#2b2018] text-[#f4ece0] rounded-xl py-3.5 font-medium mt-2">🗺 {homeGu ? `${homeGu} 지도로 보기` : "지도에서 전체 둘러보기"} →</button>
               </>
             )}
@@ -598,7 +596,6 @@ export default function Home() {
           </div>
         </div>
       )}
-      {showGuide && <GuideModal type="consumer" onClose={() => setShowGuide(false)} />}
       {backToast && (
         <div className="fixed left-1/2 -translate-x-1/2 bottom-8 z-[5000] bg-[#2b2018] text-[#f4ece0] text-sm px-5 py-3 rounded-full shadow-xl border border-[#9c6b3f]">
           한 번 더 누르면 나가요
@@ -637,7 +634,7 @@ function MapControls({ sido, sigungu, onSido, setSigungu, tasteKey, setTasteKey,
         {(sido || sigungu) && <button onClick={() => { if (clearAuto) clearAuto(); else { onSido(""); setSigungu(""); } }} className="text-xs text-[#9c6b3f] underline mt-2">전체</button>}
       </div>
       <div className="mb-5">
-        <div className="text-sm font-bold text-[#52402e] mb-2.5">☕ 어떤 카페 찾으세요?</div>
+        <div className="text-sm font-bold text-[#52402e] mb-2.5 flex items-center gap-1.5">☕ 어떤 카페 찾으세요?<InfoDot title="‘결’로 거르기"><b>결</b>은 후기에서 자주 언급되는 카페의 성격이에요(조용·작업·디저트·로스팅 등). 고르면 그 결이 강한 카페만 핀·목록에 뜨고, <b>그 결이 많이 언급된 순</b>으로 정렬돼요. 측정값이 아니라 ‘리뷰에서 자주 나온 정도’입니다.</InfoDot></div>
         <div className="grid grid-cols-2 gap-2.5">
           {TASTE_CHOICES.map((t) => (
             <button key={t.key} onClick={() => setTasteKey(tasteKey === t.key ? null : t.key)} className={`rounded-xl p-3 text-left border transition-colors ${tasteKey === t.key ? "bg-[#2b2018] text-[#f4ece0] border-[#2b2018]" : "bg-white text-[#2b2018] border-[#cbb89f]"}`}>
@@ -730,9 +727,9 @@ function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; 
           {loadingRev && <div className="text-[11px] text-[#a8927a] mb-4">근거 후기 불러오는 중...</div>}
           {!loadingRev && quality && quality.raw > 0 && (
             <div className="bg-[#eef3ea] border border-[#cfe0c2] rounded-lg px-4 py-2.5 mb-4">
-              <div className="text-[11px] text-[#4f6a43] leading-relaxed">
-                🔍 네이버 공개 글 <b>{quality.raw}건</b>을 검증해, 다른 가게·모음글·동명 카페 등 <b>노이즈 {quality.rejected}건</b>을 걸러내고
-                <b> 옥석 {kept}건</b>만 분석에 썼어요.
+              <div className="text-[11px] text-[#4f6a43] leading-relaxed flex items-start gap-1">
+                <span className="flex-1">🔍 네이버·유튜브 공개 글 <b>{quality.raw}건</b>을 검증해, 다른 가게·모음글·동명 카페 등 <b>노이즈 {quality.rejected}건</b>을 걸러내고<b> 옥석 {kept}건</b>만 분석에 썼어요.</span>
+                <InfoDot title="옥석 검증이 뭐예요?"><b>이 서비스의 핵심</b>이에요. 수천 개 공개 후기에서 ① 광고·협찬, ② 카페명만 스친 글, ③ ‘맛집 N곳’ 나열식, ④ 다른 지역·다른 지점의 <b>동명(同名)</b> 카페 글을 규칙으로 걸러내고, <b>Claude AI</b>가 내용·맥락까지 읽어 <b>진짜 방문 후기만</b> 남겨요. 모든 판정엔 근거가 붙습니다.</InfoDot>
               </div>
               {llmJudged && (
                 <div className="mt-2 pt-2 border-t border-[#cfe0c2] text-[11px] text-[#5a3a82] font-medium flex items-center gap-1">
