@@ -29,6 +29,8 @@ export type QualityStats = {
   rejectReasons: Record<string, number>; // 탈락 사유별 건수 (투명성)
 };
 
+export type BorderlineItem = { key: string; title?: string; body: string };
+
 export type CollectResult = {
   synth: SynthResult;
   collected: number;          // = 검증 통과 고유 리뷰 수 (신뢰 헤드라인 숫자)
@@ -37,6 +39,7 @@ export type CollectResult = {
   perSource: { source: string; raw: number; kept: number }[];
   evidenceReviews: EvidenceReview[];
   reviewDates: string[];
+  borderline: BorderlineItem[]; // 카페명 불명확하나 후기 맥락 있음 → LLM 재판정 대상
   quality: QualityStats;
 };
 
@@ -46,12 +49,14 @@ function toQuote(text: string, maxLen = 80): string {
 }
 const dedupeKey = (s: string) => s.toLowerCase().replace(/\s+/g, "").slice(0, 60);
 
-export function collectAndSynthesize(name: string, area: string[], sources: RawSource[]): CollectResult {
+export function collectAndSynthesize(name: string, area: string[], sources: RawSource[], opts?: { whitelist?: Set<string> }): CollectResult {
+  const whitelist = opts?.whitelist;
   const verifiedReviews: Review[] = [];   // 합성 입력(검증, 출처가중 반영)
   const perSource: { source: string; raw: number; kept: number }[] = [];
   const evidence: EvidenceReview[] = [];
   const verifiedTexts: string[] = [];      // char_scores 계산용
   const reviewDates: string[] = [];        // 리뷰 주기 분석용(검증·참고 게시일 YYYY.MM.DD)
+  const borderline: BorderlineItem[] = []; // LLM 재판정 대상
   const seen = new Set<string>();
   const stats: QualityStats = { raw: 0, verified: 0, reference: 0, rejected: 0, rejectReasons: {} };
 
@@ -66,9 +71,13 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
       if (seen.has(key)) continue;        // 교차 출처 중복 제거
       seen.add(key);
 
-      const q = verifyReview({ title: t.title, body: t.desc ?? t.text, name, areaTerms: area, source: kind });
+      // LLM 맥락검증 통과분은 강제 검증, 그 외엔 규칙 판정
+      const q = whitelist?.has(key)
+        ? { verdict: "verified" as const, score: 70, reasons: ["LLM 맥락검증: 실제 후기 확인"], signals: {} as any }
+        : verifyReview({ title: t.title, body: t.desc ?? t.text, name, areaTerms: area, source: kind });
 
       if (q.verdict === "rejected") {
+        if (q.borderline) borderline.push({ key, title: t.title, body: t.desc ?? t.text });
         stats.rejected++;
         const r = q.reasons[0] ?? "기타";
         stats.rejectReasons[r] = (stats.rejectReasons[r] ?? 0) + 1;
@@ -111,5 +120,5 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
   synth.reviewCount = trustCount;
   const charScores = computeCharScores(verifiedTexts);
 
-  return { synth, collected: trustCount, grade, charScores, perSource, evidenceReviews: topEvidence, reviewDates, quality: stats };
+  return { synth, collected: trustCount, grade, charScores, perSource, evidenceReviews: topEvidence, reviewDates, borderline, quality: stats };
 }

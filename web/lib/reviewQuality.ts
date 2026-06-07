@@ -25,6 +25,7 @@ export type QualityResult = {
   verdict: QualityVerdict;
   score: number;        // 0~100 (투명 점수)
   reasons: string[];    // 왜 이렇게 판정했는지 (화면 노출 가능)
+  borderline?: boolean; // 카페명 불명확하나 카페후기 맥락 뚜렷 → LLM 재판정 대상
   signals: {
     nameInTitle: boolean; nameInBody: boolean; visit: boolean;
     substance: number; listicle: boolean; sponsored: boolean; areaMatch: boolean;
@@ -145,7 +146,11 @@ export function verifyReview(input: QualityInput): QualityResult {
 
   // ---- 하드 탈락(명백한 노이즈) ----
   if (!nameInTitle && !nameInBody) {
-    return { verdict: "rejected", score: 0, reasons: ["카페명이 제목·본문에 없음(무관/동명)"], signals: sig };
+    // 이름은 안 잡혀도 '카페 방문 후기 맥락'이 뚜렷하면 버리지 않고 LLM 재판정 대상으로(경계).
+    const ctx = (visit || substance >= 2) && (areaPresent || titleHasCafeWord || bodyHasCafeWord) && !listicle;
+    return ctx
+      ? { verdict: "rejected", score: 22, reasons: ["카페명 불명확하나 후기 맥락 있음(LLM 재판정 대상)"], borderline: true, signals: sig }
+      : { verdict: "rejected", score: 0, reasons: ["카페명이 제목·본문에 없음(무관/동명)"], signals: sig };
   }
   // 동명 카페: 제목이 수도권 밖 도시인데 대상 지역어가 어디에도 없음 → 다른 지역 동명점
   if (foreignInTitle && !areaPresent) {

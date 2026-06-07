@@ -1,10 +1,11 @@
 // 한 카페 합성 + DB 저장 (배치·cron·에이전트 공용 단일 출처).
-// PRINCIPLES §1·§7: 노이즈 제거 후 검증된 옥석 리뷰만으로 등급·정체성 산출.
-// 검증/참고 등급(검증 리뷰 5+)이면 자동 공개, 부족하면 비공개 유지(정직).
+// PRINCIPLES §1·§5·§7: 노이즈 제거 후 옥석만으로 산출. 규칙 1차 + LLM 맥락 재판정(스마트).
+// 검증/참고 등급(검증 리뷰 5+)이면 자동 공개, 부족하면 비공개(정직).
 import { sql } from "./db";
 import { fetchPlacesReviews } from "./placesCollector";
 import { fetchWebReviews } from "./webSearchCollector";
 import { collectAndSynthesize, type RawSource } from "./collectOrchestrator";
+import { judgeReviews, hasJudgeKey } from "./reviewJudge";
 
 export async function synthAndStore(cafe: { id: number; name: string; area: string }) {
   const sources: RawSource[] = [];
@@ -18,7 +19,23 @@ export async function synthAndStore(cafe: { id: number; name: string; area: stri
     return { id: cafe.id, name: cafe.name, ok: false, reason: "수집 0", grade: "발굴", published: false };
   }
 
-  const { synth, collected, grade, charScores, evidenceReviews, reviewDates, quality } = collectAndSynthesize(cafe.name, cafe.area ? [cafe.area] : [], sources);
+  const area = cafe.area ? [cafe.area] : [];
+  let result = collectAndSynthesize(cafe.name, area, sources);
+
+  // ── 스마트 재판정: 카페명은 불명확하나 후기 맥락이 있는 '경계 리뷰'를 LLM이 읽고
+  //    실제 그 카페의 양질 후기면 살려낸다(양질 후기 누락 방지). 실패/쿼터 시 1차 결과 유지.
+  let rescued = 0;
+  if (hasJudgeKey() && result.borderline.length > 0) {
+    const items = result.borderline.slice(0, 35).map((b, i) => ({ i, title: b.title ?? "", body: b.body }));
+    const verdicts = await judgeReviews(cafe.name, cafe.area ?? "", items);
+    if (verdicts) {
+      const whitelist = new Set<string>();
+      for (const it of items) { const v = verdicts.get(it.i); if (v?.about && v.helpful) whitelist.add(result.borderline[it.i].key); }
+      if (whitelist.size > 0) { result = collectAndSynthesize(cafe.name, area, sources, { whitelist }); rescued = whitelist.size; }
+    }
+  }
+
+  const { synth, collected, grade, charScores, evidenceReviews, reviewDates, quality } = result;
   const c = synth.coords;
   const basisLine = ["acidity", "body", "sweet"].filter((ax) => c[ax] != null)
     .map((ax) => `${ax === "acidity" ? "산미" : ax === "body" ? "바디" : "단맛"} ${synth.basis[ax]}`).join(" / ");
@@ -32,5 +49,5 @@ export async function synthAndStore(cafe: { id: number; name: string; area: stri
       synth_quality=${JSON.stringify(quality)}, review_dates=${JSON.stringify(reviewDates)}, synth_updated=now(),
       published=${publish}
     WHERE id=${cafe.id}`;
-  return { id: cafe.id, name: cafe.name, ok: true, grade, collected, evidence: evidenceReviews.length, published: publish };
+  return { id: cafe.id, name: cafe.name, ok: true, grade, collected, evidence: evidenceReviews.length, rescued, published: publish };
 }
