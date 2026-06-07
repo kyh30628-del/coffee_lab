@@ -123,7 +123,14 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
   evidence.sort((a, b) =>
     (order[a.trust ?? "reference"] - order[b.trust ?? "reference"]) ||
     (b.date ?? "").localeCompare(a.date ?? ""));
-  const topEvidence = evidence.slice(0, 6);
+  let topEvidence = evidence.slice(0, 6);
+  // 유튜브 최소 1개 노출: 검증·참고 통과한 유튜브 영상이 있으면 상위 6개에 최소 하나 포함
+  // (이미 있으면 그대로, 없으면 가장 우선인 유튜브를 끝자리에 끼움). 유튜브 없으면 네이버로 채워짐.
+  const isYt = (e: EvidenceReview) => /youtu\.?be/.test(e.link ?? "");
+  if (!topEvidence.some(isYt)) {
+    const bestYt = evidence.find(isYt);
+    if (bestYt) topEvidence = [...topEvidence.slice(0, 5), bestYt];
+  }
 
   const synth = synthesize(name, verifiedReviews);
   synth.grade = grade;              // 신뢰 리뷰 수 기준으로 등급 통일
