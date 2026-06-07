@@ -71,12 +71,32 @@ function quotesOf(reviews: any): string {
   return reviews.slice(0, 3).map((r: any) => r?.quote ?? "").filter(Boolean).join(" / ");
 }
 
+// 검색 캐시: (질문+지역)별 결과를 저장해 같은/비슷한 질문은 LLM·임베딩 재계산 없이 즉시 응답.
+let cacheReady = false;
+async function ensureCache() {
+  if (cacheReady) return;
+  await sql`CREATE TABLE IF NOT EXISTS search_cache (qkey TEXT PRIMARY KEY, payload JSONB NOT NULL, created_at TIMESTAMPTZ DEFAULT now())`;
+  cacheReady = true;
+}
+const CACHE_TTL_HOURS = 12;
+
 export async function GET(req: NextRequest) {
   try {
     await ensureSchema();
     const q = (req.nextUrl.searchParams.get("q") ?? "").trim();
     const region = (req.nextUrl.searchParams.get("region") ?? "").trim();
     if (q.length < 1) return NextResponse.json({ ok: false, error: "검색어 필요" }, { status: 400 });
+
+    // 캐시 조회: 같은 질문+지역이면 즉시 반환(LLM·임베딩 호출 0)
+    await ensureCache();
+    const qkey = q.toLowerCase().replace(/\s+/g, " ").trim() + "|" + region;
+    const nocache = req.nextUrl.searchParams.get("nocache") === "1";
+    if (!nocache) {
+      const hit = (await sql`SELECT payload FROM search_cache WHERE qkey=${qkey} AND created_at > now() - (${CACHE_TTL_HOURS} || ' hours')::interval LIMIT 1`)[0];
+      if (hit?.payload && Array.isArray(hit.payload.results) && hit.payload.results.length > 0) {
+        return NextResponse.json({ ...hit.payload, cached: true });
+      }
+    }
 
     const ql = q.toLowerCase();
     const tokens = Array.from(new Set(ql.split(/[\s,./?!~"'()]+/).filter((t) => t.length >= 2)));
@@ -151,11 +171,17 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({
+    const payload = {
       ok: true, mode, region: region || "수도권 전체", q,
       concepts: hitConcepts.map((c) => c.label),
       count: results.length, results,
-    });
+    };
+    // 결과가 있으면 캐시에 저장(다음 동일 질문은 재계산 0)
+    if (results.length > 0) {
+      sql`INSERT INTO search_cache (qkey, payload, created_at) VALUES (${qkey}, ${JSON.stringify(payload)}, now())
+          ON CONFLICT (qkey) DO UPDATE SET payload=EXCLUDED.payload, created_at=now()`.catch(() => {});
+    }
+    return NextResponse.json(payload);
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }

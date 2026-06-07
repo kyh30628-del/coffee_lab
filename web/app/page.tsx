@@ -337,20 +337,21 @@ export default function Home() {
   if (role === null) {
     return (
       <div className="flex flex-col items-center justify-center px-6" style={{ minHeight: "100dvh", background: "#2b2018", color: "#f4ece0", fontFamily: "'Gowun Batang', serif" }}>
-        <div className="text-[10px] tracking-[0.3em] uppercase text-[#cbb89f] mb-1">데이터로 큐레이션하는</div>
-        <h1 className="text-3xl font-bold mb-3">동네 커피 노트</h1>
-        <p className="text-[13px] text-[#cbb89f] mb-10 text-center leading-relaxed">네이버 공개 후기를 교차검증하고 Claude AI가 맥락까지 읽어<br />옥석만 골라주는 동네 커피 가이드</p>
+        <div className="text-[10px] tracking-[0.3em] uppercase text-[#cbb89f] mb-2">광고·가짜 후기를 걸러낸</div>
+        <h1 className="text-4xl font-bold mb-4">동네 커피 노트</h1>
+        <p className="text-[15px] text-[#f4ece0] mb-2 text-center leading-relaxed font-bold">별점 말고, <span className="text-[#e8b87a]">검증된 후기</span>로 고르세요.</p>
+        <p className="text-[13px] text-[#cbb89f] mb-10 text-center leading-relaxed">수천 개 후기 중 광고·협찬·무관한 글은 버리고,<br />Claude AI가 <b className="text-[#f4ece0]">진짜 방문 후기</b>만 가려냈어요.</p>
         <div className="w-full max-w-sm space-y-3">
           <button onClick={chooseConsumer} className="w-full bg-[#f4ece0] text-[#2b2018] rounded-2xl py-5 px-5 text-left shadow-lg active:scale-[0.99] transition">
-            <div className="text-lg font-bold">☕ 소비자로 들어가기</div>
-            <div className="text-[12px] text-[#7c6a55] mt-0.5">내 동네 검증된 카페 둘러보기</div>
+            <div className="text-lg font-bold">☕ 소비자로 시작하기</div>
+            <div className="text-[12px] text-[#7c6a55] mt-0.5">진짜 후기로 고른 우리 동네 카페</div>
           </button>
           <button onClick={() => { setOwnerPw(""); setOwnerErr(""); setOwnerPwModal(true); }} className="w-full border border-[#9c6b3f] text-[#f4ece0] rounded-2xl py-5 px-5 text-left active:scale-[0.99] transition">
-            <div className="text-lg font-bold">🏪 사장님으로 들어가기</div>
-            <div className="text-[12px] text-[#cbb89f] mt-0.5">내 카페 분석·등록 (관리자 인증)</div>
+            <div className="text-lg font-bold">🏪 사장님으로 시작하기</div>
+            <div className="text-[12px] text-[#cbb89f] mt-0.5">검증된 후기로 내 카페 경쟁력 진단</div>
           </button>
         </div>
-        <p className="text-[10px] text-[#8a7458] mt-10 text-center">모든 큐레이션은 네이버 공개 후기를 교차검증한 데이터 기반입니다.</p>
+        <p className="text-[10px] text-[#8a7458] mt-10 text-center leading-relaxed">네이버·구글 공개 후기 교차검증 + AI 맥락 판정<br />광고·협찬·무관 글은 자동 제외</p>
 
         {ownerPwModal && (
           <div className="fixed inset-0 z-[5000] flex items-center justify-center px-6">
@@ -382,7 +383,7 @@ export default function Home() {
     <div className="flex flex-col bg-[#f4ece0]" style={{ height: "100dvh", fontFamily: "'Gowun Batang', serif" }}>
       <header className="shrink-0 bg-[#2b2018] text-[#f4ece0] z-[1500] h-14 flex items-center justify-between px-4 gap-3">
         <div className="flex items-center gap-3 min-w-0">
-          <h1 className="text-lg font-bold shrink-0">동네 커피 노트</h1>
+          <button onClick={() => { try { sessionStorage.removeItem("dcn_role"); } catch {} setRole(null); }} className="text-lg font-bold shrink-0" aria-label="랜딩으로">동네 커피 노트</button>
           {/* 홈/지도 토글 */}
           <div className="flex bg-[#3d2f22] rounded-full p-0.5">
             {(["home", "map"] as const).map((t) => (
