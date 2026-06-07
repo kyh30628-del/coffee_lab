@@ -104,7 +104,7 @@ export default function OwnerPage() {
     try {
       const r = await fetch("/api/owner-promo", { method: "POST", headers: { ...hdr, "Content-Type": "application/json" }, body: JSON.stringify({ cafeId: insight.me.id, intro: promo?.intro ?? "", photos: promo?.photos ?? [], generate: opts.generate, publish: opts.publish ?? promo?.published ?? false }) });
       const d = await r.json();
-      if (d.ok) { setPromo(d.promo); setPromoMsg(opts.generate ? (d.generated ? "✨ 홍보 카피 생성 완료!" : (d.llmAvailable ? "생성 실패 — 다시 시도" : "AI 키 미설정(글·사진은 저장됨)")) : `저장됨${opts.publish ? " · 공개 중" : ""}`); }
+      if (d.ok) { setPromo(d.promo); setPromoMsg(opts.generate ? (d.generated ? "✨ 홍보 카피 생성 완료!" : "✨ 생성 요청 접수 — 잠시 후 사장님 PC 배치가 만들어줘요(나중에 새로고침)") : `저장됨${opts.publish ? " · 공개 중" : ""}`); }
       else setPromoMsg("오류: " + (d.error ?? ""));
     } catch { setPromoMsg("네트워크 오류"); }
     setPromoBusy(false);
@@ -315,7 +315,8 @@ export default function OwnerPage() {
                   </div>
                 </div>
               )}
-              <p className="text-[10px] text-[#a8927a] mt-2">{promo?.published ? "🟢 공개 중 — 카페 상세 상단에 노출됩니다" : "⚪ 비공개 — '공개하기'를 눌러야 노출돼요"}</p>
+              {promo?.ai_pending && <p className="text-[11px] text-[#e8b87a] mt-1.5">🕐 AI 홍보 카피 생성 대기 중… (내 PC 배치가 처리)</p>}
+              <p className="text-[10px] text-[#a8927a] mt-1">{promo?.published ? "🟢 공개 중 — 카페 상세 상단에 노출됩니다" : "⚪ 비공개 — '공개하기'를 눌러야 노출돼요"}</p>
             </div>
 
             <a href="/cafe/register" className="block text-center bg-[#2b2018] text-[#f4ece0] rounded-xl py-3.5 font-medium">우리 카페 정보 등록·보강하기 →</a>

@@ -1,0 +1,45 @@
+import { NextRequest, NextResponse } from "next/server";
+import { sql, ensureSchema } from "@/lib/db";
+export const runtime = "nodejs";
+
+// 홍보 생성 큐 — 사장님 맥의 로컬 배치(promo-batch, Max 구독)가 이용.
+// GET: ai_pending 홍보 목록(카페명·소개글·사진). POST: 생성 결과 저장 + pending 해제.
+function authed(req: NextRequest): boolean {
+  const s = process.env.CRON_SECRET;
+  if (s && req.headers.get("authorization") === `Bearer ${s}`) return true;
+  return !!req.headers.get("x-admin-password") && req.headers.get("x-admin-password") === process.env.ADMIN_PASSWORD;
+}
+
+export async function GET(req: NextRequest) {
+  try {
+    if (!authed(req)) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+    await ensureSchema();
+    await sql`ALTER TABLE cafe_promos ADD COLUMN IF NOT EXISTS ai_pending BOOLEAN DEFAULT false`;
+    const rows = await sql`
+      SELECT p.cafe_id, p.intro, p.photos, c.name, c.area
+      FROM cafe_promos p JOIN cafes c ON c.id = p.cafe_id
+      WHERE p.ai_pending = true ORDER BY p.updated_at ASC LIMIT 20`;
+    return NextResponse.json({ ok: true, pending: rows });
+  } catch (e) {
+    return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    if (!authed(req)) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+    await ensureSchema();
+    const body = await req.json().catch(() => ({}));
+    const cafeId = Number(body.cafeId);
+    if (!cafeId) return NextResponse.json({ ok: false, error: "cafeId 필요" }, { status: 400 });
+    if (body.fail) { await sql`UPDATE cafe_promos SET ai_pending=false WHERE cafe_id=${cafeId}`; return NextResponse.json({ ok: true, cleared: true }); }
+    const headline = String(body.headline ?? "").slice(0, 24);
+    const tagline = String(body.tagline ?? "").slice(0, 60);
+    const points = Array.isArray(body.points) ? body.points.slice(0, 3).map((p: any) => String(p).slice(0, 20)) : [];
+    if (!headline) return NextResponse.json({ ok: false, error: "headline 필요" }, { status: 400 });
+    await sql`UPDATE cafe_promos SET ai_headline=${headline}, ai_tagline=${tagline}, ai_points=${JSON.stringify(points)}, ai_pending=false, updated_at=now() WHERE cafe_id=${cafeId}`;
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
+  }
+}

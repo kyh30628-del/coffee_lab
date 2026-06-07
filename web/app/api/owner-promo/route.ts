@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
-import { generatePromo, hasPromoLLM } from "@/lib/promoAgent";
+import { generatePromo } from "@/lib/promoAgent";
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
@@ -16,6 +16,7 @@ async function ensurePromo() {
     published BOOLEAN DEFAULT false,
     updated_at TIMESTAMPTZ DEFAULT now()
   )`;
+  await sql`ALTER TABLE cafe_promos ADD COLUMN IF NOT EXISTS ai_pending BOOLEAN DEFAULT false`;
   ready = true;
 }
 const authed = (req: NextRequest) => !!req.headers.get("x-admin-password") && req.headers.get("x-admin-password") === process.env.ADMIN_PASSWORD;
@@ -28,7 +29,7 @@ export async function GET(req: NextRequest) {
     if (!cafeId) return NextResponse.json({ ok: false, error: "cafeId 필요" }, { status: 400 });
     const row = (await sql`SELECT * FROM cafe_promos WHERE cafe_id=${cafeId} LIMIT 1`)[0];
     if (!row || (!row.published && !authed(req))) return NextResponse.json({ ok: true, promo: null });
-    return NextResponse.json({ ok: true, promo: row, llmAvailable: hasPromoLLM() });
+    return NextResponse.json({ ok: true, promo: row });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
@@ -49,20 +50,25 @@ export async function POST(req: NextRequest) {
     const cafe = (await sql`SELECT name, area FROM cafes WHERE id=${cafeId}`)[0] as { name: string; area: string } | undefined;
     if (!cafe) return NextResponse.json({ ok: false, error: "카페 없음" }, { status: 404 });
 
+    // Vercel 인라인 생성은 '콘솔 키' 있을 때만. 없으면 ai_pending=true로 두고
+    // 사장님 맥의 로컬 배치(promo-batch, Max 구독)가 생성한다.
+    const consoleKey = !!process.env.ANTHROPIC_API_KEY;
     let ai = null;
-    if (body.generate && hasPromoLLM()) ai = await generatePromo(cafe.name, cafe.area, intro, photos[0]);
+    if (body.generate && consoleKey) ai = await generatePromo(cafe.name, cafe.area, intro, photos[0]);
+    const pending = !!body.generate && !ai; // 생성 요청했는데 인라인 못 함 → 로컬 배치 대기
 
     if (ai) {
-      await sql`INSERT INTO cafe_promos (cafe_id, intro, photos, ai_headline, ai_tagline, ai_points, published, updated_at)
-        VALUES (${cafeId}, ${intro}, ${JSON.stringify(photos)}, ${ai.headline}, ${ai.tagline}, ${JSON.stringify(ai.points)}, ${publish}, now())
-        ON CONFLICT (cafe_id) DO UPDATE SET intro=EXCLUDED.intro, photos=EXCLUDED.photos, ai_headline=EXCLUDED.ai_headline, ai_tagline=EXCLUDED.ai_tagline, ai_points=EXCLUDED.ai_points, published=EXCLUDED.published, updated_at=now()`;
+      await sql`INSERT INTO cafe_promos (cafe_id, intro, photos, ai_headline, ai_tagline, ai_points, published, ai_pending, updated_at)
+        VALUES (${cafeId}, ${intro}, ${JSON.stringify(photos)}, ${ai.headline}, ${ai.tagline}, ${JSON.stringify(ai.points)}, ${publish}, false, now())
+        ON CONFLICT (cafe_id) DO UPDATE SET intro=EXCLUDED.intro, photos=EXCLUDED.photos, ai_headline=EXCLUDED.ai_headline, ai_tagline=EXCLUDED.ai_tagline, ai_points=EXCLUDED.ai_points, published=EXCLUDED.published, ai_pending=false, updated_at=now()`;
     } else {
-      await sql`INSERT INTO cafe_promos (cafe_id, intro, photos, published, updated_at)
-        VALUES (${cafeId}, ${intro}, ${JSON.stringify(photos)}, ${publish}, now())
+      await sql`INSERT INTO cafe_promos (cafe_id, intro, photos, published, ai_pending, updated_at)
+        VALUES (${cafeId}, ${intro}, ${JSON.stringify(photos)}, ${publish}, ${pending}, now())
         ON CONFLICT (cafe_id) DO UPDATE SET intro=EXCLUDED.intro, photos=EXCLUDED.photos, published=EXCLUDED.published, updated_at=now()`;
+      if (pending) await sql`UPDATE cafe_promos SET ai_pending=true WHERE cafe_id=${cafeId}`; // 생성 요청만 pending 표시(나머지 저장은 기존 유지)
     }
     const row = (await sql`SELECT * FROM cafe_promos WHERE cafe_id=${cafeId}`)[0];
-    return NextResponse.json({ ok: true, promo: row, generated: !!ai, llmAvailable: hasPromoLLM() });
+    return NextResponse.json({ ok: true, promo: row, generated: !!ai, pending });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
