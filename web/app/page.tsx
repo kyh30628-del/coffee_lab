@@ -693,26 +693,34 @@ function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; 
     <div className="fixed inset-0 z-[3000]" style={{ fontFamily: "'Gowun Batang', serif" }}>
       <div onClick={onClose} className="absolute inset-0 bg-black/30" />
       <aside className="absolute top-0 right-0 w-full md:max-w-md bg-[#fdfaf4] shadow-2xl overflow-y-auto" style={{ height: "100dvh" }}>
-        {/* 사장님 쇼케이스 홍보 배너 — 매거진 히어로(최상단, 꽉 차게) */}
+        {/* 사장님 쇼케이스 홍보 배너 — 프리미엄 매거진(애니메이션) */}
         {promo && (
-          <div className="relative w-full overflow-hidden" style={{ height: promo.photos?.[0] ? "15rem" : "11.5rem" }}>
+          <div className="relative w-full overflow-hidden" style={{ height: promo.photos?.[0] ? "16rem" : "12rem" }}>
+            <style>{`
+              @keyframes scKen{0%{transform:scale(1.03) translate(0,0)}100%{transform:scale(1.13) translate(-1.5%,-3%)}}
+              @keyframes scUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+              @keyframes scShine{0%{transform:translateX(-130%)}55%,100%{transform:translateX(240%)}}
+              @keyframes scFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-2.5px)}}
+            `}</style>
             {promo.photos?.[0]
-              ? <img src={promo.photos[0]} alt="" className="absolute inset-0 w-full h-full object-cover" />
-              : <div className="absolute inset-0" style={{ background: "linear-gradient(135deg,#3d2a1c 0%,#6f4e37 55%,#9c6b3f 100%)" }} />}
-            {/* 가독성 그라데이션(아래 진하게) */}
-            <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(0,0,0,.88) 0%, rgba(0,0,0,.35) 42%, rgba(0,0,0,.08) 100%)" }} />
-            {/* 상단 라벨 */}
-            <div className="absolute top-3.5 left-4 flex items-center gap-1.5">
-              <span className="text-[9px] font-bold tracking-wider text-[#2b2018] bg-[#e8b87a] px-2.5 py-1 rounded-full shadow-md">🎀 사장님 쇼케이스</span>
+              ? <img src={promo.photos[0]} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ animation: "scKen 11s ease-in-out infinite alternate" }} />
+              : <div className="absolute inset-0" style={{ background: "linear-gradient(135deg,#3d2a1c 0%,#6f4e37 55%,#9c6b3f 100%)", animation: "scKen 11s ease-in-out infinite alternate" }} />}
+            <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(0,0,0,.9) 0%, rgba(0,0,0,.35) 45%, rgba(0,0,0,.05) 100%)" }} />
+            {/* 골드 라벨 + 샤인 스윕 */}
+            <div className="absolute top-3.5 left-4">
+              <span className="relative inline-flex items-center overflow-hidden text-[9px] font-bold tracking-wider text-[#2b2018] bg-[#e8b87a] px-2.5 py-1 rounded-full shadow-md" style={{ animation: "scFloat 3s ease-in-out infinite" }}>
+                🎀 사장님 쇼케이스
+                <span className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(105deg,transparent 32%,rgba(255,255,255,.75) 50%,transparent 68%)", animation: "scShine 3.6s ease-in-out infinite" }} />
+              </span>
             </div>
-            {/* 하단 카피 */}
-            <div className="absolute bottom-0 left-0 right-0 px-5 pb-5 pt-8 text-white">
-              {promo.ai_tagline && <div className="text-[11.5px] font-medium tracking-wide text-[#f0d6ad] mb-1.5">{promo.ai_tagline}</div>}
-              <div className="text-[26px] font-bold leading-[1.15]" style={{ textShadow: "0 2px 16px rgba(0,0,0,.55)" }}>{promo.ai_headline}</div>
+            {/* 하단 카피(순차 등장) */}
+            <div className="absolute bottom-0 left-0 right-0 px-5 pb-5 pt-9 text-white">
+              {promo.ai_tagline && <div className="text-[11.5px] font-medium tracking-wide text-[#f3d9a8] mb-1.5" style={{ animation: "scUp .6s .1s both" }}>{promo.ai_tagline}</div>}
+              <div className="text-[27px] font-bold leading-[1.12]" style={{ textShadow: "0 2px 18px rgba(0,0,0,.6)", animation: "scUp .65s .22s both" }}>{promo.ai_headline}</div>
               {Array.isArray(promo.ai_points) && promo.ai_points.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mt-3">
                   {promo.ai_points.map((pt: string, i: number) => (
-                    <span key={i} className="text-[10.5px] text-white px-2.5 py-1 rounded-full border border-white/30" style={{ background: "rgba(255,255,255,.16)", backdropFilter: "blur(6px)" }}>{pt}</span>
+                    <span key={i} className="text-[10.5px] text-white px-2.5 py-1 rounded-full border border-white/30" style={{ background: "rgba(255,255,255,.16)", backdropFilter: "blur(6px)", animation: `scUp .5s ${0.38 + i * 0.1}s both` }}>{pt}</span>
                   ))}
                 </div>
               )}
