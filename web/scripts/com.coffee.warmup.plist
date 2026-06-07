@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- 매일 00:10(KST, launchd는 로컬시간) raw 캐시 예열. 네이버 쿼터 리셋 직후.
+     설치: cp scripts/com.coffee.warmup.plist ~/Library/LaunchAgents/
+           launchctl load ~/Library/LaunchAgents/com.coffee.warmup.plist -->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.coffee.warmup</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/wangwida/coffee-platform/web/scripts/run-warmup.sh</string>
+  </array>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key><integer>0</integer>
+    <key>Minute</key><integer>10</integer>
+  </dict>
+  <key>RunAtLoad</key>
+  <false/>
+  <key>StandardOutPath</key>
+  <string>/tmp/coffee-warmup.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/coffee-warmup.err.log</string>
+</dict>
+</plist>

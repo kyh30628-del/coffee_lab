@@ -7,8 +7,16 @@ export const maxDuration = 60;
 
 const synthOne = synthAndStore;
 
+function authed(req: NextRequest): boolean {
+  const secret = process.env.CRON_SECRET;
+  if (secret && req.headers.get("authorization") === `Bearer ${secret}`) return true;
+  if (req.headers.get("x-admin-password") && req.headers.get("x-admin-password") === process.env.ADMIN_PASSWORD) return true;
+  return false;
+}
+
 export async function POST(req: NextRequest) {
   try {
+    if (!authed(req)) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
     await ensureSchema();
     await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_grade TEXT`;
     await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_identity TEXT`;
@@ -26,11 +34,12 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     const limit = Math.min(Math.max(Number(body.limit) || 5, 1), 50);
     const refresh = !!body.refresh; // true면 새로 수집(쿼터 사용), 기본은 저장된 raw 재사용
+    // populate 모드: raw 캐시 '없는' 카페만 수집(예열·쿼터 효율 — 이미 캐시된 건 건드리지 않음)
+    const populate = body.mode === "populate";
 
-    const targets = await sql`
-      SELECT id, name, area FROM cafes
-      ORDER BY synth_updated ASC NULLS FIRST LIMIT ${limit}
-    ` as unknown as { id: number; name: string; area: string }[];
+    const targets = populate
+      ? (await sql`SELECT id, name, area FROM cafes WHERE raw_reviews IS NULL ORDER BY id ASC LIMIT ${limit}`) as unknown as { id: number; name: string; area: string }[]
+      : (await sql`SELECT id, name, area FROM cafes ORDER BY synth_updated ASC NULLS FIRST LIMIT ${limit}`) as unknown as { id: number; name: string; area: string }[];
 
     const results = [];
     for (const cafe of targets) {
@@ -39,7 +48,9 @@ export async function POST(req: NextRequest) {
       await new Promise((r) => setTimeout(r, 400));
     }
     const okN = results.filter((r) => r.ok).length;
-    return NextResponse.json({ ok: true, processed: results.length, success: okN, failed: results.length - okN, results });
+    const skipped = results.filter((r: any) => r.skipped).length; // 쿼터/오류로 보존된 건수
+    const remainingNull = populate ? (await sql`SELECT COUNT(*)::int n FROM cafes WHERE raw_reviews IS NULL`)[0].n : undefined;
+    return NextResponse.json({ ok: true, processed: results.length, success: okN, skipped, remainingNull, failed: results.length - okN, results });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
