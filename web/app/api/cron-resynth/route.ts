@@ -5,7 +5,8 @@ import { synthAndStore } from "@/lib/synthStore";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const synthOne = synthAndStore;
+// 주간 재수집은 최신성 위해 새로 수집(raw 갱신)
+const synthOne = (c: { id: number; name: string; area: string }) => synthAndStore(c, { refresh: true });
 
 // 자동 실행 진입점: 가장 오래 갱신 안 된 카페 몇 곳을 재수집
 export async function GET(req: NextRequest) {

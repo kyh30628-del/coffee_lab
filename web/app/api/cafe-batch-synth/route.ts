@@ -25,6 +25,7 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json().catch(() => ({}));
     const limit = Math.min(Math.max(Number(body.limit) || 5, 1), 50);
+    const refresh = !!body.refresh; // true면 새로 수집(쿼터 사용), 기본은 저장된 raw 재사용
 
     const targets = await sql`
       SELECT id, name, area FROM cafes
@@ -33,7 +34,7 @@ export async function POST(req: NextRequest) {
 
     const results = [];
     for (const cafe of targets) {
-      try { results.push(await synthOne(cafe)); }
+      try { results.push(await synthOne(cafe, { refresh })); }
       catch (e) { results.push({ id: cafe.id, name: cafe.name, ok: false, reason: String(e) }); }
       await new Promise((r) => setTimeout(r, 400));
     }

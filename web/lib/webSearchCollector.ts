@@ -19,13 +19,14 @@ function fmtDate(d?: string): string {
   return `${d.slice(0, 4)}.${d.slice(4, 6)}.${d.slice(6, 8)}`;
 }
 
-async function naverSearch(kind: "blog" | "cafearticle", query: string): Promise<WebSnippet[]> {
-  if (!ID || !SECRET) return [];
-  const url = `https://openapi.naver.com/v1/search/${kind}.json?query=${encodeURIComponent(query)}&display=20&sort=date`;
+// display=100: 호출 수는 동일(쿼터 동일)하나 카페당 후기 텍스트 ~5배 확보(검증 정확도↑).
+async function naverSearch(kind: "blog" | "cafearticle", query: string): Promise<{ items: WebSnippet[]; ok: boolean }> {
+  if (!ID || !SECRET) return { items: [], ok: false };
+  const url = `https://openapi.naver.com/v1/search/${kind}.json?query=${encodeURIComponent(query)}&display=100&sort=sim`;
   const res = await fetch(url, { headers: { "X-Naver-Client-Id": ID, "X-Naver-Client-Secret": SECRET } });
-  if (!res.ok) return [];
+  if (!res.ok) return { items: [], ok: false }; // 429(쿼터)·기타 → ok:false
   const data = await res.json();
-  return (data.items ?? []).map((it: { title?: string; description?: string; postdate?: string; link?: string; bloggername?: string }) => {
+  const items = (data.items ?? []).map((it: { title?: string; description?: string; postdate?: string; link?: string; bloggername?: string }) => {
     const title = stripTags(it.title ?? "");
     const desc = stripTags(it.description ?? "");
     return {
@@ -37,10 +38,11 @@ async function naverSearch(kind: "blog" | "cafearticle", query: string): Promise
       date: fmtDate(it.postdate),
     };
   }).filter((s: WebSnippet) => s.text.length >= 20);
+  return { items, ok: true };
 }
 
-export async function fetchWebReviews(name: string, area: string): Promise<{ snippets: WebSnippet[]; error?: string; debug?: unknown }> {
-  if (!ID || !SECRET) return { snippets: [], error: "NAVER_CLIENT_ID/SECRET 미설정" };
+export async function fetchWebReviews(name: string, area: string): Promise<{ snippets: WebSnippet[]; apiError?: boolean; error?: string; debug?: unknown }> {
+  if (!ID || !SECRET) return { snippets: [], error: "NAVER_CLIENT_ID/SECRET 미설정", apiError: true };
   try {
     // 지역을 모든 질의에 포함해 같은 상호의 다른 지점·동명 노이즈를 줄인다(#5).
     const queries = area
@@ -49,10 +51,12 @@ export async function fetchWebReviews(name: string, area: string): Promise<{ sni
     const seen = new Set<string>();
     const snippets: WebSnippet[] = [];
     const debug: unknown[] = [];
+    let anyOk = false, anyFail = false;
     for (const q of queries) {
       for (const kind of ["blog", "cafearticle"] as const) {
-        const items = await naverSearch(kind, q);
-        debug.push({ q, kind, got: items.length });
+        const { items, ok } = await naverSearch(kind, q);
+        if (ok) anyOk = true; else anyFail = true;
+        debug.push({ q, kind, got: items.length, ok });
         for (const it of items) {
           const key = it.text.slice(0, 50);
           if (seen.has(key)) continue;
@@ -61,7 +65,9 @@ export async function fetchWebReviews(name: string, area: string): Promise<{ sni
         }
       }
     }
-    return { snippets, debug };
+    // 수집 0인데 호출이 한 번도 성공 못 함 → API 오류/쿼터(진짜 0건과 구분)
+    const apiError = snippets.length === 0 && anyFail && !anyOk;
+    return { snippets, apiError, debug };
   } catch (e) {
     return { snippets: [], error: String(e) };
   }
