@@ -16,6 +16,7 @@ async function ensureCols() {
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS raw_reviews JSONB`;
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS raw_collected_at TIMESTAMPTZ`;
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS llm_judged_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS yt_checked_at TIMESTAMPTZ`;
   ensured = true;
 }
 
@@ -47,9 +48,14 @@ async function gatherRaw(cafe: { id: number; name: string; area: string }, refre
   for (const r of places.reviews) raw.push({ source: "google", text: r.text, time: r.time });
   const web = await fetchWebReviews(cafe.name, cafe.area ?? "");
   for (const s of web.snippets) raw.push({ source: "blog", text: s.text, title: s.title, desc: s.desc, time: s.time, link: s.link, date: s.date, srcName: s.source });
-  const yt = await fetchYouTubeReviews(cafe.name, cafe.area ?? "");
-  for (const s of yt.snippets) raw.push({ source: "youtube", text: s.text, title: s.title, desc: s.desc, time: s.time, link: s.link, date: s.date, srcName: s.source });
-  if (raw.length === 0 && (web.apiError || yt.apiError)) return { raw: [], fromCache: false, apiFailed: true };
+  // 유튜브는 쿼터가 빡빡해 기본 OFF — 전용 백필(youtube-backfill)이 통제 수집. 인라인은 ENABLE_YOUTUBE_INLINE=1일 때만.
+  let ytErr = false;
+  if (process.env.ENABLE_YOUTUBE_INLINE === "1") {
+    const yt = await fetchYouTubeReviews(cafe.name, cafe.area ?? "");
+    for (const s of yt.snippets) raw.push({ source: "youtube", text: s.text, title: s.title, desc: s.desc, time: s.time, link: s.link, date: s.date, srcName: s.source });
+    ytErr = !!yt.apiError;
+  }
+  if (raw.length === 0 && (web.apiError || ytErr)) return { raw: [], fromCache: false, apiFailed: true };
   await sql`UPDATE cafes SET raw_reviews=${JSON.stringify(raw)}, raw_collected_at=now() WHERE id=${cafe.id}`;
   return { raw, fromCache: false, apiFailed: false };
 }
@@ -118,6 +124,23 @@ export async function applyDecisions(cafe: { id: number; name: string; area: str
   const stored = await storeResult(cafe.id, result, true);
   const approved = Object.values(decisions).filter(Boolean).length;
   return { id: cafe.id, name: cafe.name, approved, judged: Object.keys(decisions).length, ...stored };
+}
+
+// 유튜브 백필: 이미 raw 캐시된 카페에 유튜브만 추가 수집 → 재합성. 쿼터 소진 시 "quota".
+export async function backfillYouTube(cafe: { id: number; name: string; area: string }): Promise<"added" | "none" | "has" | "quota" | "norow"> {
+  await ensureCols();
+  const raw = await loadRaw(cafe.id);
+  if (!raw.length) return "norow";
+  if (raw.some((r) => r.source === "youtube")) { await sql`UPDATE cafes SET yt_checked_at=now() WHERE id=${cafe.id}`; return "has"; }
+  const yt = await fetchYouTubeReviews(cafe.name, cafe.area ?? "");
+  if (yt.apiError) return "quota"; // 쿼터/오류 → 마킹 안 함(다음에 재시도)
+  await sql`UPDATE cafes SET yt_checked_at=now() WHERE id=${cafe.id}`;
+  if (!yt.snippets.length) return "none";
+  for (const s of yt.snippets) raw.push({ source: "youtube", text: s.text, title: s.title, desc: s.desc, time: s.time, link: s.link, date: s.date, srcName: s.source });
+  await sql`UPDATE cafes SET raw_reviews=${JSON.stringify(raw)}, raw_collected_at=now() WHERE id=${cafe.id}`;
+  const result = collectAndSynthesize(cafe.name, cafe.area ? [cafe.area] : [], rawToSources(raw));
+  await storeResult(cafe.id, result, false);
+  return "added";
 }
 
 // 경계 리뷰 없는 카페는 LLM 불필요 → 판정완료로 마킹(커서 전진).

@@ -5,4 +5,5 @@ cd "$(dirname "$0")/.." || exit 1
 [ -f scripts/.judge.env ] && source scripts/.judge.env
 unset ANTHROPIC_API_KEY   # 설정돼 있으면 구독 대신 API키로 가버리므로 해제
 /usr/local/bin/node scripts/promo-batch.mjs >> /tmp/coffee-promo.log 2>&1   # 사장님 홍보 카피 생성(Max 구독)
+/usr/local/bin/node --import tsx scripts/youtube-backfill.mjs >> /tmp/coffee-yt.log 2>&1   # 유튜브 백필(인기순, 쿼터 내)
 exec /usr/local/bin/node scripts/judge-batch.mjs >> /tmp/coffee-judge.log 2>&1
