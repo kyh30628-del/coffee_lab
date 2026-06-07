@@ -95,6 +95,7 @@ export default function Home() {
   const [selected, setSelected] = useState<Cafe | null>(null);
   const [tab, setTab] = useState<"home" | "map">("home");
   const [discover, setDiscover] = useState<Discover | null>(null);
+  const [momentum, setMomentum] = useState<{ rising: DCafe[] } | null>(null);
   const [homeSido, setHomeSido] = useState("");
   const [homeGu, setHomeGu] = useState("");
   const [sheetOpen, setSheetOpen] = useState(true); // 모바일 바텀시트 펼침/접힘
@@ -171,6 +172,7 @@ export default function Home() {
   const openLocation = () => { if (consent === "agreed") detectLocation(); else setShowConsent(true); };
   const clearAuto = () => { setHomeSido(""); setHomeGu(""); setAutoGu(""); setSido(""); setSigungu(""); setGeoMsg(""); };
   useEffect(() => { const u = homeGu ? `/api/discover?region=${encodeURIComponent(homeGu)}` : "/api/discover"; setDiscover(null); fetch(u).then((r) => r.json()).then((d) => { if (d.ok) setDiscover(d); }).catch(() => {}); }, [homeGu]);
+  useEffect(() => { const u = homeGu ? `/api/momentum?region=${encodeURIComponent(homeGu)}` : "/api/momentum"; setMomentum(null); fetch(u).then((r) => r.json()).then((d) => { if (d.ok) setMomentum({ rising: d.rising ?? [] }); }).catch(() => {}); }, [homeGu]);
 
   const openById = (id: number) => { const c = cafes.find((x) => x.id === id); if (c) setSelected(c); };
 
@@ -465,6 +467,7 @@ export default function Home() {
               <>
                 {discover.headlineA && <HeadlineCard c={discover.headlineA} kicker="이번 주 가장 많이 이야기된 곳" tone={0} />}
                 {discover.headlineB && <HeadlineCard c={discover.headlineB} kicker="🔥 커피에 진심인 집 — 스페셜티 스포트라이트" tone={1} />}
+                {momentum && momentum.rising.length > 0 && <Row title="📈 요즘 뜨는 카페" items={momentum.rising} />}
                 <Row title="🏆 리뷰 많은 Top 3" items={discover.top3} />
                 <Row title="🔥 스페셜티 픽" items={discover.specialty} />
                 <Row title="✨ 새로 발견된 카페" items={discover.fresh} />
