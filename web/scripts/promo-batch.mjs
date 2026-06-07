@@ -4,46 +4,38 @@
 // Vercel/콘솔 키 불필요. 환경변수: scripts/.judge.env 재사용(APP_URL·ADMIN_PASSWORD·토큰).
 // 실행: node scripts/promo-batch.mjs   (즉시 생성) / launchd로 주기 실행 가능.
 
+import { query } from "@anthropic-ai/claude-agent-sdk";
+
 const APP_URL = process.env.APP_URL || "https://coffee-lab-product-builder.vercel.app";
 const PW = process.env.ADMIN_PASSWORD || "";
-const OAT = process.env.CLAUDE_CODE_OAUTH_TOKEN || "";
 const MODEL = process.env.PROMO_MODEL || process.env.JUDGE_MODEL || "claude-sonnet-4-5";
 
-const SYSTEM = `너는 동네 카페 전문 홍보 카피라이터다. 사장님이 준 사진과 소개글을 보고, 소비자가 '가보고 싶다'고 느끼게 만드는 짧고 감각적인 홍보 문구를 쓴다.
-- 사진·소개글에 실제로 보이는 것만 근거로(과장·허위·없는 메뉴 금지). 따뜻하고 구체적으로.
-반드시 JSON으로만: {"headline":"6~14자 임팩트 헤드라인","tagline":"20자 내외 한 줄","points":["특징1(8자내외)","특징2","특징3"]}`;
+const SYSTEM = `너는 동네 카페 전문 홍보 카피라이터다. 사장님이 준 소개글(과 사진 설명)을 보고, 소비자가 '가보고 싶다'고 느끼게 만드는 짧고 감각적인 홍보 문구를 쓴다.
+- 소개글에 실제로 있는 것만 근거로(과장·허위·없는 메뉴 금지). 따뜻하고 구체적으로.
+반드시 JSON으로만 답한다(설명·코드블록 금지): {"headline":"6~14자 임팩트 헤드라인","tagline":"20자 내외 한 줄","points":["특징1(8자내외)","특징2","특징3"]}`;
 
-async function callClaude(name, area, intro, photo) {
-  const content = [];
-  if (photo && /^data:image\/(jpe?g|png|webp);base64,/.test(photo)) {
-    const [meta, b64] = photo.split(","); const mt = meta.match(/data:(image\/[\w]+)/)?.[1] || "image/jpeg";
-    content.push({ type: "image", source: { type: "base64", media_type: mt, data: b64 } });
+// 리뷰 판정 배치와 동일하게 Agent SDK(query) 사용 — Max 구독으로 안정 동작(raw Bearer는 막힘).
+// 사진(비전)은 Agent SDK 텍스트 경로라 소개글 기반으로 생성(사진 첨부 여부만 참고).
+async function callClaude(name, area, intro, hasPhoto) {
+  const prompt = `카페: "${name}" (${area})\n사장님 소개글: ${intro || "(없음)"}${hasPhoto ? "\n(사장님이 매장 사진도 첨부함)" : ""}\n\n위 내용을 바탕으로 홍보 카피를 만들어줘.`;
+  let text = "";
+  for await (const msg of query({ prompt, options: { systemPrompt: SYSTEM, model: MODEL, maxTurns: 1, allowedTools: [] } })) {
+    if (msg.type === "result" && msg.subtype === "success") text = msg.result;
   }
-  content.push({ type: "text", text: `카페: "${name}" (${area})\n사장님 소개글: ${intro || "(없음)"}\n\n위 사진과 글을 바탕으로 홍보 카피를 만들어줘.` });
-  for (let attempt = 0; attempt < 4; attempt++) {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${OAT}`, "anthropic-version": "2023-06-01", "anthropic-beta": "oauth-2025-04-20" },
-      body: JSON.stringify({ model: MODEL, max_tokens: 600, system: SYSTEM, messages: [{ role: "user", content }] }),
-    });
-    if (res.status === 429) { await new Promise((r) => setTimeout(r, (attempt + 1) * 15000)); continue; } // 레이트리밋 → 백오프 재시도
-    if (!res.ok) return null;
-    const d = await res.json(); const t = d?.content?.[0]?.text ?? ""; const m = t.match(/\{[\s\S]*\}/); if (!m) return null;
-    try { const j = JSON.parse(m[0]); if (!j.headline) return null; return { headline: String(j.headline), tagline: String(j.tagline ?? ""), points: Array.isArray(j.points) ? j.points.map(String) : [] }; }
-    catch { return null; }
-  }
-  return null;
+  const m = text.match(/\{[\s\S]*\}/); if (!m) return null;
+  try { const j = JSON.parse(m[0]); if (!j.headline) return null; return { headline: String(j.headline), tagline: String(j.tagline ?? ""), points: Array.isArray(j.points) ? j.points.map(String) : [] }; }
+  catch { return null; }
 }
 
 async function main() {
-  if (!PW || !OAT) { console.error("ADMIN_PASSWORD / CLAUDE_CODE_OAUTH_TOKEN 필요(scripts/.judge.env)"); process.exit(1); }
+  if (!PW || !process.env.CLAUDE_CODE_OAUTH_TOKEN) { console.error("ADMIN_PASSWORD / CLAUDE_CODE_OAUTH_TOKEN 필요(scripts/.judge.env)"); process.exit(1); }
   const q = await (await fetch(`${APP_URL}/api/promo-queue`, { headers: { "x-admin-password": PW } })).json();
   const pend = q.pending || [];
   if (!pend.length) { console.log("생성 대기 중인 홍보 없음."); return; }
   console.log(`대기 ${pend.length}건 — 홍보 카피 생성 시작`);
   let ok = 0;
   for (const p of pend) {
-    const ai = await callClaude(p.name, p.area, p.intro, (p.photos || [])[0]);
+    const ai = await callClaude(p.name, p.area, p.intro, !!(p.photos || [])[0]);
     if (ai) {
       await fetch(`${APP_URL}/api/promo-queue`, { method: "POST", headers: { "Content-Type": "application/json", "x-admin-password": PW }, body: JSON.stringify({ cafeId: p.cafe_id, ...ai }) });
       console.log(`  ✓ ${p.name}: "${ai.headline}"`); ok++;
