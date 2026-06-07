@@ -106,8 +106,8 @@ export default function OwnerPage() {
           <>
             <p className="text-[#6b5a48] text-sm mb-4 leading-relaxed">우리 카페를 검색하면, 같은 동네 카페들과 비교한 <strong>순위·성격·구성</strong>과 <strong>데이터 기반 액션 플랜</strong>을 보여드려요.</p>
             <div className="flex gap-2 mb-4">
-              <input value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === "Enter" && search()} placeholder="카페 이름 검색" className="flex-1 border border-[#cbb89f] rounded-lg px-4 py-3 text-base bg-white" />
-              <button onClick={search} className="bg-[#2b2018] text-[#f4ece0] rounded-lg px-10 font-medium shrink-0">검색</button>
+              <input value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === "Enter" && search()} placeholder="카페 이름 검색" className="flex-1 min-w-0 border border-[#cbb89f] rounded-lg px-4 py-3 text-base bg-white" />
+              <button onClick={search} className="bg-[#2b2018] text-[#f4ece0] rounded-lg px-7 py-3 font-medium shrink-0">검색</button>
             </div>
             {loading && <p className="text-sm text-[#a8927a]">검색 중...</p>}
             <div className="space-y-2">
