@@ -291,11 +291,14 @@ export default function Home() {
       </div>
     </button>
   );
-  const Row = ({ title, items }: { title: string; items: DCafe[] }) => {
+  const Row = ({ title, items, sub }: { title: string; items: DCafe[]; sub?: string }) => {
     if (!items?.length) return null;
     return (
       <div className="mb-7">
-        <div className="text-base font-bold text-[#2b2018] mb-1 pb-1 border-b-2 border-[#2b2018]">{title}</div>
+        <div className="flex items-baseline justify-between mb-1 pb-1 border-b-2 border-[#2b2018]">
+          <div className="text-base font-bold text-[#2b2018]">{title}</div>
+          {sub && <div className="text-[10px] text-[#9c6b3f] shrink-0">↕ {sub}</div>}
+        </div>
         {/* 바깥은 가로 스크롤, 위쪽 패딩 안에 말풍선이 들어가 잘리지 않음 */}
         <div className="flex gap-3 overflow-x-auto pt-2 pb-2" style={{ WebkitOverflowScrolling: "touch" }}>
           {items.map((c) => {
@@ -467,10 +470,9 @@ export default function Home() {
               <>
                 {discover.headlineA && <HeadlineCard c={discover.headlineA} kicker="이번 주 가장 많이 이야기된 곳" tone={0} />}
                 {discover.headlineB && <HeadlineCard c={discover.headlineB} kicker="🔥 커피에 진심인 집 — 스페셜티 스포트라이트" tone={1} />}
-                {momentum && momentum.rising.length > 0 && <Row title="📈 요즘 뜨는 카페" items={momentum.rising} />}
-                <Row title="🏆 리뷰 많은 Top 3" items={discover.top3} />
-                <Row title="🔥 스페셜티 픽" items={discover.specialty} />
-                <Row title="✨ 새로 발견된 카페" items={discover.fresh} />
+                {momentum && momentum.rising.length > 0 && <Row title="📈 요즘 뜨는 카페" items={momentum.rising} sub="최근 입소문 순" />}
+                <Row title="🏆 리뷰 많은 Top 3" items={discover.top3} sub="검증 리뷰 많은 순" />
+                <Row title="🔥 스페셜티 픽" items={discover.specialty} sub="로스팅 언급 순" />
                 <button onClick={() => { if (homeSido) { setSido(homeSido); setSigungu(homeGu); } setFocusId(null); setSheetOpen(true); setTab("map"); }} className="w-full bg-[#2b2018] text-[#f4ece0] rounded-xl py-3.5 font-medium mt-2">🗺 {homeGu ? `${homeGu} 지도로 보기` : "지도에서 전체 둘러보기"} →</button>
               </>
             )}
@@ -604,7 +606,12 @@ export default function Home() {
 }
 
 function MapControls({ sido, sigungu, onSido, setSigungu, tasteKey, setTasteKey, filtered, matchSet, setSelected, openLocation, autoGu, geoMsg, clearAuto }: any) {
-  const listCafes: Cafe[] = tasteKey ? filtered.filter((c: Cafe) => matchSet.has(c.id)) : filtered;
+  // 정렬: 카테고리(결) 선택 시 그 결이 강한 순, 아니면 검증 리뷰 많은 순. 검색범주 안에서도 동일 기준.
+  const sortLabel = tasteKey ? `'${TASTE_CHOICES.find((t: any) => t.key === tasteKey)?.label}' 결 강한 순` : "검증 리뷰 많은 순";
+  const listCafes: Cafe[] = [...(tasteKey ? filtered.filter((c: Cafe) => matchSet.has(c.id)) : filtered)].sort((a: Cafe, b: Cafe) => {
+    if (tasteKey) { const d = ((b.char_scores ?? {})[tasteKey] ?? 0) - ((a.char_scores ?? {})[tasteKey] ?? 0); if (d) return d; }
+    return (b.synth_count ?? 0) - (a.synth_count ?? 0);
+  });
   return (
     <>
       <div className="mb-5">
@@ -638,7 +645,10 @@ function MapControls({ sido, sigungu, onSido, setSigungu, tasteKey, setTasteKey,
         {tasteKey && <p className="text-xs text-[#9c6b3f] mt-2">'{TASTE_CHOICES.find((t) => t.key === tasteKey)?.label}' 결이 자주 언급되는 {matchSet.size}곳만 보는 중</p>}
       </div>
       <div>
-        <div className="text-sm font-bold text-[#52402e] mb-2.5">목록 ({listCafes.length}{tasteKey ? ` · ${TASTE_CHOICES.find((t) => t.key === tasteKey)?.label}` : ""})</div>
+        <div className="flex items-baseline justify-between mb-2.5">
+          <div className="text-sm font-bold text-[#52402e]">목록 ({listCafes.length}{tasteKey ? ` · ${TASTE_CHOICES.find((t: any) => t.key === tasteKey)?.label}` : ""})</div>
+          <div className="text-[10px] text-[#9c6b3f] shrink-0">↕ {sortLabel}</div>
+        </div>
         {listCafes.length === 0 ? <p className="text-xs text-[#a8927a] bg-[#f4ece0] rounded-lg p-4">{tasteKey ? "이 카테고리에 해당하는 카페가 이 지역엔 없어요. 다른 결을 골라보세요." : "지역을 선택하면 목록이 나와요."}</p> : (
           <div className="space-y-2">
             {listCafes.slice(0, 50).map((c: Cafe) => (
@@ -647,7 +657,7 @@ function MapControls({ sido, sigungu, onSido, setSigungu, tasteKey, setTasteKey,
                   <span className="font-bold text-sm text-[#2b2018]">{c.name}</span>
                   {c.synth_grade && GRADE_STYLE[c.synth_grade] && <span className="text-[9px] text-white px-1.5 py-0.5 rounded-full" style={{ background: GRADE_STYLE[c.synth_grade].bg }}>{GRADE_STYLE[c.synth_grade].label}</span>}
                   {tasteKey && matchSet.has(c.id) && <span className="text-[10px] text-[#5f7355]">✓</span>}
-                  <span className="text-[10px] text-[#a8927a] ml-auto">{c.area}</span>
+                  <span className="text-[10px] text-[#a8927a] ml-auto">{c.area} · 리뷰 {c.synth_count ?? 0}</span>
                 </div>
                 <div className="text-[11px] text-[#6b5a48] line-clamp-1">{c.note || c.vibe}</div>
               </button>
