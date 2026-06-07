@@ -136,7 +136,8 @@
     <tr><th style="width:150px;">소스</th><th style="width:90px;">용도</th><th>비고</th></tr>
     <tr><td><b>네이버 지역검색 API</b><br><span class="small">local.json</span></td><td>카페 발굴</td><td>키워드×지역 검색, 상호·주소·좌표·업종. display=5, 댓글순.</td></tr>
     <tr><td><b>네이버 블로그/카페글 API</b><br><span class="small">blog·cafearticle</span></td><td>후기 수집</td><td>제목+요약 스니펫(원문 복제 금지, 인용+링크+날짜만). display=100(쿼터 동일, 후기 ~5배). 일일 25,000 한도.</td></tr>
-    <tr><td><b>구글 Places API</b></td><td>방문 리뷰</td><td>실제 방문 리뷰(고신뢰). 무료 쿼터/결제 범위 내.</td></tr>
+    <tr><td><b>YouTube Data API v3</b><br><span class="small">무료 쿼터</span></td><td>영상 후기</td><td>카페 영상 검색 → 제목·설명·상위 댓글 + 영상 링크·게시일. 자막/원문은 합법 불가 → 텍스트까지만. ▶YouTube 링크로 연결. 일 10,000유닛.</td></tr>
+    <tr><td><b>구글 Places API</b><br><span class="small">기본 OFF</span></td><td>(미사용)</td><td>호출당 과금이라 <b>기본 비활성</b>. 네이버·유튜브·블로그로 대체. 필요 시 ENABLE_GOOGLE_PLACES=1.</td></tr>
     <tr><td><b>공공데이터포털 상가정보</b><br><span class="small">data.go.kr (선택)</span></td><td>발굴 보완</td><td>등록 '커피전문점/카페' + 위경도 직접 제공. 네이버가 놓친 카페 보완(인증키 필요).</td></tr>
     <tr><td><b>Google Gemini</b><br><span class="small">gemini-embedding-001</span></td><td>의미 검색</td><td>카페·질문을 768차원 벡터로 → 코사인 유사도. "느낌" 검색.</td></tr>
     <tr><td><b>Claude Sonnet</b><br><span class="small">claude-sonnet-4-5</span></td><td>판정·검색</td><td>리뷰 맥락 최종 심사(구독·로컬 배치) + 검색 질문 맥락 이해(콘솔 키·실시간).</td></tr>
@@ -246,7 +247,7 @@
   <h3>취향 좌표 (맛)</h3>
   <p>산미(acidity)·바디(body)·단맛(sweet) — 리뷰의 긍/부정 맥락을 보정해 추정. <b>2건 이상 교차검증된 축만</b> 좌표화하고, 부족하면 비워 둔다(지어내지 않음).</p>
   <h3>그 외 저장 항목</h3>
-  <p class="small">synth_identity(리뷰 종합 정체성 문장) · synth_reviews(근거 후기 인용 최대 6개) · review_dates(검증 리뷰 게시일 → 리뷰 주기 분석) · synth_quality(원본/노이즈/옥석 통계) · cafe_snapshots(평점·리뷰수 주간 스냅샷 → 모멘텀).</p>
+  <p class="small">synth_identity(리뷰 종합 정체성 문장) · synth_reviews(근거 후기 인용 최대 6개) · review_dates(검증 리뷰 게시일 → 리뷰 주기 분석) · synth_quality(원본/노이즈/옥석 통계) · cafe_snapshots(검증 리뷰 수·최근 90일 버즈 주간 스냅샷 → 모멘텀, 우리 소유 데이터).</p>
 </div>
 
 <!-- 8 -->
@@ -257,11 +258,12 @@
     <tr><td><b>발굴</b></td><td>네이버 지역검색으로 동네·스페셜티 카페 수집. 프랜차이즈·비카페·중복 제외 후 비공개 적재.</td><td>Vercel cron</td></tr>
     <tr><td><b>상가정보 발굴</b></td><td>공공데이터(상가정보)로 누락 카페 보완(키 필요).</td><td>수동/예약</td></tr>
     <tr><td><b>원본 예열</b></td><td>raw 캐시가 빈 카페의 후기를 새로 수집해 저장(쿼터 효율, 소진 시 자동 중단).</td><td>로컬 00:10</td></tr>
+    <tr><td><b>다중 소스 수집</b></td><td>네이버 블로그/카페글 + <b>유튜브</b>(영상·댓글) 수집 → 영상 1개=스니펫 1개, 출처 링크 보존(▶YouTube).</td><td>cron/예열</td></tr>
     <tr><td><b>합성/품질 엔진</b></td><td>수집 후기를 검증 엔진에 통과 → 등급·정체성·성격 축·취향 좌표·근거 후기 산출·저장.</td><td>cron/예열</td></tr>
     <tr><td><b>Sonnet 판정</b></td><td>규칙 통과 후보를 Claude Sonnet이 맥락 최종 심사 → 양질만 공개(✨AI검증).</td><td>로컬 04:00</td></tr>
     <tr><td><b>검색</b></td><td>의미(임베딩)로 후보 압축 → Sonnet이 질문 맥락 보고 선별·정렬(캐시).</td><td>요청 시</td></tr>
     <tr><td><b>임베딩</b></td><td>카페 텍스트를 벡터화(신규·갱신분) → 의미 검색용.</td><td>Vercel 07:00</td></tr>
-    <tr><td><b>스냅샷</b></td><td>평점·리뷰 수 주간 기록 → 급상승(모멘텀) 분석.</td><td>Vercel 주간</td></tr>
+    <tr><td><b>스냅샷</b></td><td>검증 리뷰 수·최근 버즈 주간 기록(소유 데이터) → 급상승(모멘텀) 분석.</td><td>Vercel 주간</td></tr>
     <tr><td><b>사장님 인사이트</b></td><td>동네(구) 분포와 비교해 백분위 점수·순위·빈 포지션·액션 플랜 산출.</td><td>요청 시</td></tr>
   </table>
   <div class="box hl"><b>설계 철학</b> — "사람이 발로 뛰어 채운다"는 틀을 깨고, AI의 강점(대량 데이터 통합·패턴 추출)으로 한 사람이 불가능한 규모를 자동으로 채우고 검증한다. 매일 돌수록 정확도가 누적 상승.</div>
@@ -296,7 +298,7 @@
     <tr><td>매일 03:00</td><td><b>발굴 + 합성</b>(cron-grow) — 새 지역 발굴 + 오래된 카페 재합성</td></tr>
     <tr><td>매일 07:00</td><td><b>임베딩</b>(cron-embed) — 신규·갱신 카페 벡터화(판정 이후라 최신 반영)</td></tr>
     <tr><td>월요일 13:00</td><td><b>재수집</b>(cron-resynth) — 최신성 위해 오래된 카페 원본 갱신</td></tr>
-    <tr><td>일요일 13:00</td><td><b>스냅샷</b>(cron-snapshot) — 평점·리뷰수 주간 기록(모멘텀)</td></tr>
+    <tr><td>일요일 13:00</td><td><b>스냅샷</b>(cron-snapshot) — 검증 리뷰 수·최근 버즈 기록(모멘텀, 소유 데이터)</td></tr>
   </table>
   <div class="flow">[00:10] 예열(raw 수집)  →  [03:00] 발굴+규칙합성  →  [04:00] Sonnet 최종심사  →  [07:00] 임베딩
         쿼터 효율          노이즈 1차 제거         옥석만 공개+✨배지        의미검색 갱신</div>
