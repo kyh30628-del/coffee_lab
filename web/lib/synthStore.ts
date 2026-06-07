@@ -12,7 +12,11 @@ export async function synthAndStore(cafe: { id: number; name: string; area: stri
   if (places.reviews.length) sources.push({ source: "google", texts: places.reviews.map((r) => ({ text: r.text, time: r.time })) });
   const web = await fetchWebReviews(cafe.name, cafe.area ?? "");
   if (web.snippets.length) sources.push({ source: "blog", texts: web.snippets });
-  if (sources.length === 0) return { id: cafe.id, name: cafe.name, ok: false, reason: "수집 0" };
+  if (sources.length === 0) {
+    // 수집되는 리뷰가 전혀 없음 → 발굴등급·비공개로 마킹해 큐에서 제외(무한 재시도 방지, 정직)
+    await sql`UPDATE cafes SET synth_grade='발굴', synth_count=0, synth_updated=now(), published=false WHERE id=${cafe.id}`;
+    return { id: cafe.id, name: cafe.name, ok: false, reason: "수집 0", grade: "발굴", published: false };
+  }
 
   const { synth, collected, grade, charScores, evidenceReviews, reviewDates, quality } = collectAndSynthesize(cafe.name, cafe.area ? [cafe.area] : [], sources);
   const c = synth.coords;
