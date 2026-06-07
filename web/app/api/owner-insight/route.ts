@@ -165,7 +165,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       ok: true,
-      me: { name: me.name, area: me.area, grade: me.synth_grade, count: me.synth_count, identity: me.synth_identity },
+      me: { id: me.id, name: me.name, area: me.area, grade: me.synth_grade, count: me.synth_count, identity: me.synth_identity },
       gu: myGu, hoodCount: hood.length, rank, rankList, charProfile, similar, actions, reviewCadence,
     });
   } catch (e) {

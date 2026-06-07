@@ -4,6 +4,7 @@ import { BarChart, Bar, XAxis, YAxis, Cell, ResponsiveContainer,
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Legend,
   PieChart, Pie, Tooltip, AreaChart, Area, CartesianGrid } from "recharts";
 import BackLink from "../BackLink";
+import GuideModal from "../GuideModal";
 
 type RankItem = { rank: number; name: string; count: number; grade: string | null; isMe: boolean };
 type CharItem = { key: string; label: string; emoji: string; me: number; avg: number; diff: number; meRaw?: number; hoodPenetration?: number };
@@ -11,7 +12,7 @@ type Action = { type: string; title: string; body: string; tone: "good" | "warn"
 type CadenceMonth = { ym: string; label: string; count: number };
 type ReviewCadence = { months: CadenceMonth[]; total: number; last12: number; recentShare: number; gapMonths: number | null; lastDate: string | null; insight: string };
 type Insight = {
-  me: { name: string; area: string; grade: string | null; count: number | null; identity: string | null };
+  me: { id?: number; name: string; area: string; grade: string | null; count: number | null; identity: string | null };
   gu: string; hoodCount: number; rank: number;
   rankList: RankItem[]; charProfile: CharItem[];
   similar: { name: string; grade: string | null; count: number | null }[];
@@ -56,6 +57,7 @@ export default function OwnerPage() {
   const [insight, setInsight] = useState<Insight | null>(null);
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState("rank");
+  const [showGuide, setShowGuide] = useState(false);
   // 인증은 랜딩(사장님)에서 끝남 — 세션 비밀번호 사용. 없으면 홈(랜딩)으로.
   const [pw, setPw] = useState<string | null>(null);
   useEffect(() => {
@@ -72,9 +74,40 @@ export default function OwnerPage() {
     setLoading(false);
   };
   const loadInsight = async (name: string) => {
-    setLoading(true); setResults([]); setTab("rank");
-    try { const r = await fetch(`/api/owner-insight?name=${encodeURIComponent(name)}`, { headers: hdr }); const d = await r.json(); if (d.ok) setInsight(d); } catch {}
+    setLoading(true); setResults([]); setTab("rank"); setPromo(null); setPromoMsg("");
+    try {
+      const r = await fetch(`/api/owner-insight?name=${encodeURIComponent(name)}`, { headers: hdr });
+      const d = await r.json();
+      if (d.ok) {
+        setInsight(d);
+        if (d.me?.id) { try { const pr = await (await fetch(`/api/owner-promo?cafeId=${d.me.id}`, { headers: hdr })).json(); setPromo(pr.promo ?? { intro: "", photos: [] }); } catch { setPromo({ intro: "", photos: [] }); } }
+      }
+    } catch {}
     setLoading(false);
+  };
+
+  // ── 쇼케이스(홍보) ──
+  const [promo, setPromo] = useState<any>(null);
+  const [promoBusy, setPromoBusy] = useState(false);
+  const [promoMsg, setPromoMsg] = useState("");
+  const resizeImg = (file: File): Promise<string> => new Promise((res) => {
+    const img = new Image(); const fr = new FileReader();
+    fr.onload = () => { img.src = fr.result as string; };
+    img.onload = () => { const max = 1000; let w = img.width, h = img.height; if (w > max || h > max) { const r = Math.min(max / w, max / h); w = Math.round(w * r); h = Math.round(h * r); } const cv = document.createElement("canvas"); cv.width = w; cv.height = h; cv.getContext("2d")!.drawImage(img, 0, 0, w, h); res(cv.toDataURL("image/jpeg", 0.82)); };
+    fr.readAsDataURL(file);
+  });
+  const onPhoto = async (e: any) => { const f = e.target.files?.[0]; if (!f) return; const url = await resizeImg(f); setPromo((p: any) => ({ ...(p ?? {}), photos: [...((p?.photos ?? []).slice(0, 2)), url] })); e.target.value = ""; };
+  const rmPhoto = (i: number) => setPromo((p: any) => ({ ...p, photos: (p?.photos ?? []).filter((_: any, j: number) => j !== i) }));
+  const savePromo = async (opts: { generate?: boolean; publish?: boolean }) => {
+    if (!insight?.me?.id) return;
+    setPromoBusy(true); setPromoMsg(opts.generate ? "AI가 홍보 카피 만드는 중…" : "저장 중…");
+    try {
+      const r = await fetch("/api/owner-promo", { method: "POST", headers: { ...hdr, "Content-Type": "application/json" }, body: JSON.stringify({ cafeId: insight.me.id, intro: promo?.intro ?? "", photos: promo?.photos ?? [], generate: opts.generate, publish: opts.publish ?? promo?.published ?? false }) });
+      const d = await r.json();
+      if (d.ok) { setPromo(d.promo); setPromoMsg(opts.generate ? (d.generated ? "✨ 홍보 카피 생성 완료!" : (d.llmAvailable ? "생성 실패 — 다시 시도" : "AI 키 미설정(글·사진은 저장됨)")) : `저장됨${opts.publish ? " · 공개 중" : ""}`); }
+      else setPromoMsg("오류: " + (d.error ?? ""));
+    } catch { setPromoMsg("네트워크 오류"); }
+    setPromoBusy(false);
   };
 
   // 세션 인증 확인 중(없으면 위 effect가 홈으로 보냄)
@@ -98,8 +131,12 @@ export default function OwnerPage() {
           <BackLink to="/" label="홈" className="text-[#cbb89f] shrink-0" />
           <div className="min-w-0"><div className="text-[#d4a574] text-[10px] tracking-[0.2em] uppercase">For Owners</div><h1 className="text-lg font-bold truncate">사장님 카페 분석</h1></div>
         </div>
-        <a href="/" className="text-xs text-[#cbb89f] underline shrink-0">지도로</a>
+        <div className="flex items-center gap-3 shrink-0">
+          <button onClick={() => setShowGuide(true)} className="text-xs text-[#cbb89f]">📖 사용법</button>
+          <a href="/" className="text-xs text-[#cbb89f] underline">지도로</a>
+        </div>
       </header>
+      {showGuide && <GuideModal type="owner" onClose={() => setShowGuide(false)} />}
 
       <div className="max-w-2xl mx-auto px-4 sm:px-5 py-6">
         {!insight && (
@@ -234,6 +271,51 @@ export default function OwnerPage() {
                   <span className="text-xs text-[#a8927a] ml-auto">리뷰 {c.count}건</span>
                 </div>
               ))}
+            </div>
+
+            {/* 쇼케이스(홍보) — 구독 기능 미리보기 */}
+            <div className="bg-gradient-to-br from-[#2b2018] to-[#4a3424] text-[#f4ece0] rounded-2xl p-4 sm:p-5 mb-4">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-lg">🎀</span>
+                <h3 className="text-base font-bold">우리 가게 쇼케이스</h3>
+                <span className="text-[9px] bg-[#e8b87a] text-[#2b2018] px-1.5 py-0.5 rounded-full font-bold ml-auto">구독 미리보기</span>
+              </div>
+              <p className="text-[12px] text-[#cbb89f] leading-relaxed mb-3">글·사진을 올리면 <b className="text-[#f4ece0]">AI가 홍보 카피</b>를 만들어 <b className="text-[#f4ece0]">카페 상세 맨 위</b>에 노출돼요. 소비자에게 자연스럽게 광고됩니다.</p>
+
+              <textarea value={promo?.intro ?? ""} onChange={(e) => setPromo((p: any) => ({ ...(p ?? {}), intro: e.target.value }))} placeholder="우리 가게 소개를 자유롭게 — 시그니처, 분위기, 사장님 한마디 등" rows={3} className="w-full rounded-lg p-3 text-[13px] text-[#2b2018] bg-[#fdfaf4] mb-2 resize-none" />
+
+              <div className="flex gap-2 flex-wrap mb-2.5">
+                {(promo?.photos ?? []).map((url: string, i: number) => (
+                  <div key={i} className="relative w-16 h-16 rounded-lg overflow-hidden">
+                    <img src={url} alt="" className="w-full h-full object-cover" />
+                    <button onClick={() => rmPhoto(i)} className="absolute top-0 right-0 bg-black/60 text-white text-[11px] w-4.5 h-4.5 leading-none flex items-center justify-center rounded-bl">×</button>
+                  </div>
+                ))}
+                {(promo?.photos?.length ?? 0) < 3 && (
+                  <label className="w-16 h-16 rounded-lg border-2 border-dashed border-[#9c6b3f] flex items-center justify-center text-[#cbb89f] text-2xl cursor-pointer">+
+                    <input type="file" accept="image/*" onChange={onPhoto} className="hidden" />
+                  </label>
+                )}
+              </div>
+
+              <div className="flex gap-2 mb-2">
+                <button disabled={promoBusy} onClick={() => savePromo({ generate: true })} className="flex-1 bg-[#e8b87a] text-[#2b2018] rounded-lg py-2.5 text-sm font-bold disabled:opacity-50">✨ AI 홍보물 만들기</button>
+                <button disabled={promoBusy} onClick={() => savePromo({ publish: !(promo?.published) })} className="px-4 border border-[#9c6b3f] rounded-lg py-2.5 text-sm disabled:opacity-50">{promo?.published ? "비공개로" : "공개하기"}</button>
+              </div>
+              {promoMsg && <p className="text-[11px] text-[#e8b87a] mb-2">{promoMsg}</p>}
+
+              {promo?.ai_headline && (
+                <div className="rounded-xl overflow-hidden bg-[#fdfaf4] text-[#2b2018] mt-1">
+                  {promo.photos?.[0] && <img src={promo.photos[0]} alt="" className="w-full h-28 object-cover" />}
+                  <div className="p-3">
+                    <div className="text-[9px] text-[#9c6b3f] mb-0.5">사장님 쇼케이스 · 미리보기</div>
+                    <div className="text-lg font-bold leading-tight">{promo.ai_headline}</div>
+                    {promo.ai_tagline && <div className="text-[12px] text-[#6b5a48] mt-0.5">{promo.ai_tagline}</div>}
+                    {Array.isArray(promo.ai_points) && promo.ai_points.length > 0 && <div className="flex flex-wrap gap-1 mt-2">{promo.ai_points.map((pt: string, i: number) => <span key={i} className="text-[10px] bg-[#f0e6d4] text-[#8a6d3f] px-2 py-0.5 rounded-full">{pt}</span>)}</div>}
+                  </div>
+                </div>
+              )}
+              <p className="text-[10px] text-[#a8927a] mt-2">{promo?.published ? "🟢 공개 중 — 카페 상세 상단에 노출됩니다" : "⚪ 비공개 — '공개하기'를 눌러야 노출돼요"}</p>
             </div>
 
             <a href="/cafe/register" className="block text-center bg-[#2b2018] text-[#f4ece0] rounded-xl py-3.5 font-medium">우리 카페 정보 등록·보강하기 →</a>

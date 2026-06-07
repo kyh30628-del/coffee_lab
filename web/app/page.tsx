@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
+import GuideModal from "./GuideModal";
 
 type EvidenceReview = { quote: string; link?: string; source?: string; date?: string; trust?: "verified" | "reference" | "rejected"; score?: number; why?: string[] };
 type QualityStats = { raw: number; verified: number; reference: number; rejected: number; rejectReasons?: Record<string, number> };
@@ -118,6 +119,7 @@ export default function Home() {
   const [ownerPw, setOwnerPw] = useState("");
   const [ownerErr, setOwnerErr] = useState("");
   const [backToast, setBackToast] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
   // 지도용 상태
   const [tasteKey, setTasteKey] = useState<string | null>(null);
   const [sido, setSido] = useState("");
@@ -426,6 +428,7 @@ export default function Home() {
           </div>
         </div>
         <div className="flex gap-2 shrink-0 items-center">
+          <button onClick={() => setShowGuide(true)} className="text-xs text-[#cbb89f] hover:text-[#f4ece0] whitespace-nowrap" aria-label="사용법">📖 사용법</button>
           {role === "owner" ? (
             <>
               <a href="/owner" className="bg-[#9c6b3f] rounded-full px-3 py-1.5 text-xs whitespace-nowrap">내 카페 분석</a>
@@ -595,6 +598,7 @@ export default function Home() {
           </div>
         </div>
       )}
+      {showGuide && <GuideModal type="consumer" onClose={() => setShowGuide(false)} />}
       {backToast && (
         <div className="fixed left-1/2 -translate-x-1/2 bottom-8 z-[5000] bg-[#2b2018] text-[#f4ece0] text-sm px-5 py-3 rounded-full shadow-xl border border-[#9c6b3f]">
           한 번 더 누르면 나가요
@@ -675,9 +679,11 @@ function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; 
   const [quality, setQuality] = useState<QualityStats | null>(null);
   const [llmJudged, setLlmJudged] = useState(false);
   const [loadingRev, setLoadingRev] = useState(true);
+  const [promo, setPromo] = useState<any>(null);
   useEffect(() => {
-    let live = true; setLoadingRev(true);
+    let live = true; setLoadingRev(true); setPromo(null);
     fetch(`/api/cafe-detail?id=${cafe.id}`).then((r) => r.json()).then((d) => { if (live) { setReviews(d.reviews ?? []); setQuality(d.quality ?? null); setLlmJudged(!!d.llmJudged); setLoadingRev(false); } }).catch(() => { if (live) setLoadingRev(false); });
+    fetch(`/api/owner-promo?cafeId=${cafe.id}`).then((r) => r.json()).then((d) => { if (live && d.promo?.ai_headline) setPromo(d.promo); }).catch(() => {});
     return () => { live = false; };
   }, [cafe.id]);
   const kept = quality ? quality.verified + quality.reference : 0;
@@ -686,6 +692,20 @@ function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; 
     <div className="fixed inset-0 z-[3000]" style={{ fontFamily: "'Gowun Batang', serif" }}>
       <div onClick={onClose} className="absolute inset-0 bg-black/30" />
       <aside className="absolute top-0 right-0 w-full md:max-w-md bg-[#fdfaf4] shadow-2xl overflow-y-auto" style={{ height: "100dvh" }}>
+        {/* 사장님 쇼케이스 홍보 배너(공개 시 최상단) */}
+        {promo && (
+          <div className="relative">
+            {promo.photos?.[0]
+              ? <img src={promo.photos[0]} alt="" className="w-full h-44 object-cover" />
+              : <div className="h-3 w-full bg-[#2b2018]" />}
+            <div className="absolute top-2 left-2 text-[9px] bg-black/55 text-white px-2 py-0.5 rounded-full">🎀 사장님 쇼케이스</div>
+            <div className={promo.photos?.[0] ? "absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/85 via-black/40 to-transparent text-white" : "p-4 bg-[#2b2018] text-[#f4ece0]"}>
+              <div className="text-xl font-bold leading-tight">{promo.ai_headline}</div>
+              {promo.ai_tagline && <div className="text-[12px] opacity-90 mt-0.5">{promo.ai_tagline}</div>}
+              {Array.isArray(promo.ai_points) && promo.ai_points.length > 0 && <div className="flex flex-wrap gap-1 mt-1.5">{promo.ai_points.map((pt: string, i: number) => <span key={i} className="text-[10px] bg-white/25 px-2 py-0.5 rounded-full">{pt}</span>)}</div>}
+            </div>
+          </div>
+        )}
         {cafe.photo_url ? <div className="h-40 w-full"><img src={cafe.photo_url} alt={cafe.name} className="w-full h-full object-cover" /></div> : <div className="h-28 w-full" style={{ background: "linear-gradient(135deg,#c8893f,#8a5a24)" }} />}
         <div className="p-5">
           <div className="flex items-center justify-between mb-1">
