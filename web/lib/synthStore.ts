@@ -94,24 +94,25 @@ export async function synthAndStore(cafe: { id: number; name: string; area: stri
 }
 
 // ── 로컬 Sonnet 배치용 ───────────────────────────────────────────────
-// 캐시된 raw로 '경계 리뷰'만 추출(서버, LLM 없음). raw 없으면 hasRaw:false.
-export async function getBorderline(cafe: { id: number; name: string; area: string }): Promise<{ borderline: BorderlineItem[]; hasRaw: boolean }> {
+// 캐시된 raw로 '규칙상 on-topic 후보 전체'를 추출(서버, LLM 없음). Sonnet이 최종 심사.
+// raw 없으면 hasRaw:false.
+export async function getAuditCandidates(cafe: { id: number; name: string; area: string }): Promise<{ candidates: BorderlineItem[]; hasRaw: boolean }> {
   await ensureCols();
   const raw = await loadRaw(cafe.id);
-  if (!raw.length) return { borderline: [], hasRaw: false };
+  if (!raw.length) return { candidates: [], hasRaw: false };
   const result = collectAndSynthesize(cafe.name, cafe.area ? [cafe.area] : [], rawToSources(raw));
-  return { borderline: result.borderline, hasRaw: true };
+  return { candidates: result.auditItems, hasRaw: true };
 }
 
-// 로컬 Sonnet 판정 통과(whitelist key)를 적용해 재합성·저장 + llm_judged_at 기록.
-export async function applyWhitelist(cafe: { id: number; name: string; area: string }, whitelistKeys: string[]) {
+// Sonnet 최종 결정(key→keep/drop)을 적용해 재합성·저장 + llm_judged_at 기록.
+export async function applyDecisions(cafe: { id: number; name: string; area: string }, decisions: Record<string, boolean>) {
   await ensureCols();
   const raw = await loadRaw(cafe.id);
-  if (!raw.length) { await sql`UPDATE cafes SET llm_judged_at=now() WHERE id=${cafe.id}`; return { id: cafe.id, rescued: 0, grade: null, published: false, reason: "raw 없음" }; }
-  const whitelist = new Set(whitelistKeys);
-  const result = collectAndSynthesize(cafe.name, cafe.area ? [cafe.area] : [], rawToSources(raw), { whitelist });
+  if (!raw.length) { await sql`UPDATE cafes SET llm_judged_at=now() WHERE id=${cafe.id}`; return { id: cafe.id, approved: 0, grade: null, published: false, reason: "raw 없음" }; }
+  const result = collectAndSynthesize(cafe.name, cafe.area ? [cafe.area] : [], rawToSources(raw), { decisions });
   const stored = await storeResult(cafe.id, result, true);
-  return { id: cafe.id, name: cafe.name, rescued: whitelistKeys.length, ...stored };
+  const approved = Object.values(decisions).filter(Boolean).length;
+  return { id: cafe.id, name: cafe.name, approved, judged: Object.keys(decisions).length, ...stored };
 }
 
 // 경계 리뷰 없는 카페는 LLM 불필요 → 판정완료로 마킹(커서 전진).

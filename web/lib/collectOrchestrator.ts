@@ -39,7 +39,8 @@ export type CollectResult = {
   perSource: { source: string; raw: number; kept: number }[];
   evidenceReviews: EvidenceReview[];
   reviewDates: string[];
-  borderline: BorderlineItem[]; // 카페명 불명확하나 후기 맥락 있음 → LLM 재판정 대상
+  borderline: BorderlineItem[]; // 카페명 불명확하나 후기 맥락 있음 → LLM 재판정 대상(경계)
+  auditItems: BorderlineItem[]; // 규칙상 on-topic 전체 → Sonnet 최종 심사 대상
   quality: QualityStats;
 };
 
@@ -49,14 +50,15 @@ function toQuote(text: string, maxLen = 80): string {
 }
 const dedupeKey = (s: string) => s.toLowerCase().replace(/\s+/g, "").slice(0, 60);
 
-export function collectAndSynthesize(name: string, area: string[], sources: RawSource[], opts?: { whitelist?: Set<string> }): CollectResult {
+export function collectAndSynthesize(name: string, area: string[], sources: RawSource[], opts?: { whitelist?: Set<string>; decisions?: Record<string, boolean> }): CollectResult {
   const whitelist = opts?.whitelist;
   const verifiedReviews: Review[] = [];   // 합성 입력(검증, 출처가중 반영)
   const perSource: { source: string; raw: number; kept: number }[] = [];
   const evidence: EvidenceReview[] = [];
   const verifiedTexts: string[] = [];      // char_scores 계산용
   const reviewDates: string[] = [];        // 리뷰 주기 분석용(검증·참고 게시일 YYYY.MM.DD)
-  const borderline: BorderlineItem[] = []; // LLM 재판정 대상
+  const borderline: BorderlineItem[] = []; // LLM 재판정 대상(경계)
+  const auditItems: BorderlineItem[] = []; // Sonnet 최종 심사 대상(규칙상 on-topic 전체)
   const seen = new Set<string>();
   const stats: QualityStats = { raw: 0, verified: 0, reference: 0, rejected: 0, rejectReasons: {} };
 
@@ -71,24 +73,32 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
       if (seen.has(key)) continue;        // 교차 출처 중복 제거
       seen.add(key);
 
-      // LLM 맥락검증 통과분은 강제 검증, 그 외엔 규칙 판정
-      const q = whitelist?.has(key)
-        ? { verdict: "verified" as const, score: 70, reasons: ["LLM 맥락검증: 실제 후기 확인"], signals: {} as any }
-        : verifyReview({ title: t.title, body: t.desc ?? t.text, name, areaTerms: area, source: kind });
+      const rule = verifyReview({ title: t.title, body: t.desc ?? t.text, name, areaTerms: area, source: kind });
 
-      if (q.verdict === "rejected") {
-        if (q.borderline) borderline.push({ key, title: t.title, body: t.desc ?? t.text });
+      // 규칙상 on-topic(검증·참고 또는 경계)은 Sonnet 최종 심사 후보로 노출
+      if (rule.verdict !== "rejected" || rule.borderline) auditItems.push({ key, title: t.title, body: t.desc ?? t.text });
+      if (rule.borderline) borderline.push({ key, title: t.title, body: t.desc ?? t.text });
+
+      // 효과 판정: decisions(Sonnet 최종 심사) > whitelist(보조) > 규칙
+      let verdict = rule.verdict;
+      let reasons = rule.reasons;
+      let score = rule.score;
+      if (opts?.decisions && key in opts.decisions) {
+        if (opts.decisions[key]) { verdict = rule.verdict === "verified" ? "verified" : "reference"; reasons = ["✨ AI 검증: 실제 후기"]; score = 80; }
+        else { verdict = "rejected"; reasons = ["AI 판정: 무관/저품질 제외"]; score = 0; }
+      } else if (whitelist?.has(key)) { verdict = "verified"; reasons = ["✨ AI 검증: 실제 후기"]; score = 75; }
+
+      if (verdict === "rejected") {
         stats.rejected++;
-        const r = q.reasons[0] ?? "기타";
+        const r = reasons[0] ?? "기타";
         stats.rejectReasons[r] = (stats.rejectReasons[r] ?? 0) + 1;
         continue;
       }
-      // verified / reference 만 통과
-      if (q.verdict === "verified") stats.verified++; else stats.reference++;
+      if (verdict === "verified") stats.verified++; else stats.reference++;
       kept++;
 
       // 합성 입력: verified 정가중, reference 절반가중. 출처가중도 반영.
-      const reps = q.verdict === "verified" ? Math.max(1, Math.round(weight)) : 1;
+      const reps = verdict === "verified" ? Math.max(1, Math.round(weight)) : 1;
       for (let i = 0; i < reps; i++) verifiedReviews.push({ text: t.text, time: t.time });
       verifiedTexts.push(t.text);
       if (t.date && /^\d{4}\.\d{2}\.\d{2}$/.test(t.date)) reviewDates.push(t.date);
@@ -96,7 +106,7 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
       if (t.link || src.source === "google") {
         evidence.push({
           quote: toQuote(t.text), link: t.link, source: t.source, date: t.date,
-          trust: q.verdict, score: q.score, why: q.reasons.slice(0, 3),
+          trust: verdict, score, why: reasons.slice(0, 3),
         });
       }
     }
@@ -120,5 +130,5 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
   synth.reviewCount = trustCount;
   const charScores = computeCharScores(verifiedTexts);
 
-  return { synth, collected: trustCount, grade, charScores, perSource, evidenceReviews: topEvidence, reviewDates, borderline, quality: stats };
+  return { synth, collected: trustCount, grade, charScores, perSource, evidenceReviews: topEvidence, reviewDates, borderline, auditItems, quality: stats };
 }

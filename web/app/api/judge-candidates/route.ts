@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
-import { getBorderline, markJudged } from "@/lib/synthStore";
+import { getAuditCandidates, markJudged } from "@/lib/synthStore";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
@@ -31,9 +31,9 @@ export async function GET(req: NextRequest) {
     const cafes = [];
     let advanced = 0;
     for (const cafe of targets) {
-      const { borderline, hasRaw } = await getBorderline(cafe);
-      if (!hasRaw || borderline.length === 0) { await markJudged(cafe.id); advanced++; continue; }
-      cafes.push({ cafeId: cafe.id, name: cafe.name, area: cafe.area, borderline: borderline.slice(0, 40) });
+      const { candidates, hasRaw } = await getAuditCandidates(cafe);
+      if (!hasRaw || candidates.length === 0) { await markJudged(cafe.id); advanced++; continue; }
+      cafes.push({ cafeId: cafe.id, name: cafe.name, area: cafe.area, candidates: candidates.slice(0, 50) });
     }
     const remaining = (await sql`SELECT COUNT(*)::int n FROM cafes WHERE raw_reviews IS NOT NULL AND (llm_judged_at IS NULL OR llm_judged_at < raw_collected_at)`)[0].n;
     return NextResponse.json({ ok: true, cafes, scanned: targets.length, noBorderline: advanced, remaining });
