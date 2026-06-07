@@ -11,6 +11,10 @@
     {
       "path": "/api/cron-embed",
       "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron-grow",
+      "schedule": "0 18 * * *"
     }
   ]
 }

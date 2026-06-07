@@ -1,39 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
-import { fetchPlacesReviews } from "@/lib/placesCollector";
-import { fetchWebReviews } from "@/lib/webSearchCollector";
-import { collectAndSynthesize, type RawSource } from "@/lib/collectOrchestrator";
+import { synthAndStore } from "@/lib/synthStore";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-// 한 카페 합성 후 DB 반영
-async function synthOne(cafe: { id: number; name: string; area: string }) {
-  const sources: RawSource[] = [];
-  const places = await fetchPlacesReviews(cafe.name, cafe.area ?? "");
-  if (places.reviews.length) sources.push({ source: "google", texts: places.reviews });
-  const web = await fetchWebReviews(cafe.name, cafe.area ?? "");
-  if (web.snippets.length) sources.push({ source: "blog", texts: web.snippets });
-  if (sources.length === 0) return { name: cafe.name, ok: false };
-
-  const { synth, collected, grade, charScores, evidenceReviews, reviewDates, quality } = collectAndSynthesize(cafe.name, cafe.area ? [cafe.area] : [], sources);
-  const c = synth.coords;
-  const basisLine = ["acidity", "body", "sweet"]
-    .filter((ax) => c[ax] != null)
-    .map((ax) => `${ax === "acidity" ? "산미" : ax === "body" ? "바디" : "단맛"} ${synth.basis[ax]}`)
-    .join(" / ");
-  const publish = grade === "검증" || grade === "참고";
-  // 재수집 시 char_scores·synth_reviews·품질통계까지 함께 갱신(과거 버그 수정).
-  await sql`
-    UPDATE cafes SET
-      synth_grade=${grade}, synth_identity=${synth.identity},
-      synth_basis=${basisLine}, synth_count=${collected},
-      synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet},
-      synth_reviews=${JSON.stringify(evidenceReviews)}, char_scores=${JSON.stringify(charScores)},
-      synth_quality=${JSON.stringify(quality)}, review_dates=${JSON.stringify(reviewDates)}, synth_updated=now(), published=${publish}
-    WHERE id=${cafe.id}`;
-  return { name: cafe.name, ok: true, grade, collected };
-}
+const synthOne = synthAndStore;
 
 // 자동 실행 진입점: 가장 오래 갱신 안 된 카페 몇 곳을 재수집
 export async function GET(req: NextRequest) {
