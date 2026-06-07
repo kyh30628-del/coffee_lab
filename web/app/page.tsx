@@ -348,9 +348,24 @@ export default function Home() {
             -webkit-text-fill-color:transparent; color:transparent;
             animation: dcnRise 1s cubic-bezier(.2,.7,.2,1) both, dcnShimmer 6s linear .9s infinite;
           }
-          @media (prefers-reduced-motion: reduce) { .dcn-rise,.dcn-title { animation: dcnRise .01s both; } .dcn-title{ -webkit-text-fill-color:#f4ece0; color:#f4ece0; } }
+          @keyframes dcnSteam {
+            0%   { opacity:0; transform: translateY(2px) translateX(0) scaleX(.8); }
+            22%  { opacity:.5; }
+            55%  { transform: translateY(-18px) translateX(5px) scaleX(1.25); }
+            100% { opacity:0; transform: translateY(-38px) translateX(-4px) scaleX(1.5); }
+          }
+          .dcn-cup { position:relative; display:inline-block; }
+          .dcn-steam { position:absolute; top:-22px; width:9px; height:28px; border-radius:50%;
+            background: linear-gradient(to top, rgba(244,236,224,0), rgba(244,236,224,.5)); filter: blur(5px); opacity:0; pointer-events:none; }
+          .dcn-s1 { left:39%; animation: dcnSteam 4.4s ease-in-out 1.4s infinite; }
+          .dcn-s2 { left:50%; animation: dcnSteam 5.0s ease-in-out 2.2s infinite; }
+          .dcn-s3 { left:61%; animation: dcnSteam 4.7s ease-in-out 3.0s infinite; }
+          @media (prefers-reduced-motion: reduce) { .dcn-rise,.dcn-title { animation: dcnRise .01s both; } .dcn-title{ -webkit-text-fill-color:#f4ece0; color:#f4ece0; } .dcn-steam{ display:none; } }
         `}</style>
-        <h1 className="dcn-title text-[2.9rem] sm:text-[3.3rem] leading-[1.12] font-bold tracking-tight mb-5">동네 커피 노트</h1>
+        <div className="dcn-cup mb-5">
+          <span className="dcn-steam dcn-s1" /><span className="dcn-steam dcn-s2" /><span className="dcn-steam dcn-s3" />
+          <h1 className="dcn-title text-[2.9rem] sm:text-[3.3rem] leading-[1.12] font-bold tracking-tight">동네 커피 노트</h1>
+        </div>
         <p className="dcn-rise text-[16px] text-[#f4ece0] mb-2 text-center leading-relaxed font-bold" style={{ animationDelay: ".28s" }}>별점 말고, <span className="text-[#e8b87a]">검증된 후기</span>로 고르세요.</p>
         <p className="dcn-rise text-[13px] text-[#cbb89f] mb-10 text-center leading-relaxed" style={{ animationDelay: ".42s" }}>수천 개 후기 중 광고·협찬·무관한 글은 버리고,<br /><b className="text-[#f4ece0]">진짜 방문 후기</b>만 가려냈어요.</p>
         <div className="dcn-rise w-full max-w-sm space-y-3" style={{ animationDelay: ".56s" }}>
