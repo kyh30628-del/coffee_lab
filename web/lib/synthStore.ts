@@ -4,10 +4,11 @@
 import { sql } from "./db";
 import { fetchPlacesReviews } from "./placesCollector";
 import { fetchWebReviews } from "./webSearchCollector";
+import { fetchYouTubeReviews } from "./youtubeCollector";
 import { collectAndSynthesize, type RawSource, type BorderlineItem, type CollectResult } from "./collectOrchestrator";
 import { judgeReviews, hasJudgeKey } from "./reviewJudge";
 
-type RawItem = { source: "google" | "blog"; text: string; title?: string; desc?: string; time?: number; link?: string; date?: string; srcName?: string };
+type RawItem = { source: "google" | "blog" | "youtube"; text: string; title?: string; desc?: string; time?: number; link?: string; date?: string; srcName?: string };
 
 let ensured = false;
 async function ensureCols() {
@@ -21,9 +22,11 @@ async function ensureCols() {
 function rawToSources(raw: RawItem[]): RawSource[] {
   const g = raw.filter((r) => r.source === "google").map((r) => ({ text: r.text, time: r.time }));
   const b = raw.filter((r) => r.source === "blog").map((r) => ({ text: r.text, title: r.title, desc: r.desc, time: r.time, link: r.link, date: r.date, source: r.srcName }));
+  const y = raw.filter((r) => r.source === "youtube").map((r) => ({ text: r.text, title: r.title, desc: r.desc, time: r.time, link: r.link, date: r.date, source: r.srcName }));
   const sources: RawSource[] = [];
   if (g.length) sources.push({ source: "google", texts: g });
   if (b.length) sources.push({ source: "blog", texts: b });
+  if (y.length) sources.push({ source: "youtube", texts: y });
   return sources;
 }
 
@@ -44,7 +47,9 @@ async function gatherRaw(cafe: { id: number; name: string; area: string }, refre
   for (const r of places.reviews) raw.push({ source: "google", text: r.text, time: r.time });
   const web = await fetchWebReviews(cafe.name, cafe.area ?? "");
   for (const s of web.snippets) raw.push({ source: "blog", text: s.text, title: s.title, desc: s.desc, time: s.time, link: s.link, date: s.date, srcName: s.source });
-  if (raw.length === 0 && web.apiError) return { raw: [], fromCache: false, apiFailed: true };
+  const yt = await fetchYouTubeReviews(cafe.name, cafe.area ?? "");
+  for (const s of yt.snippets) raw.push({ source: "youtube", text: s.text, title: s.title, desc: s.desc, time: s.time, link: s.link, date: s.date, srcName: s.source });
+  if (raw.length === 0 && (web.apiError || yt.apiError)) return { raw: [], fromCache: false, apiFailed: true };
   await sql`UPDATE cafes SET raw_reviews=${JSON.stringify(raw)}, raw_collected_at=now() WHERE id=${cafe.id}`;
   return { raw, fromCache: false, apiFailed: false };
 }

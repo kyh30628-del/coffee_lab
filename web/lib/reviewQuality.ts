@@ -11,7 +11,7 @@
 // ============================================================================
 
 export type QualityVerdict = "verified" | "reference" | "rejected";
-export type SourceKind = "google" | "blog" | "cafearticle" | "etc";
+export type SourceKind = "google" | "blog" | "cafearticle" | "youtube" | "etc";
 
 export type QualityInput = {
   title?: string;       // 글 제목 (블로그/카페글). 제목에 카페명 = 가장 강한 '주제성' 신호

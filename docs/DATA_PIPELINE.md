@@ -38,8 +38,10 @@
 - **필요**: `DATA_GO_KR_KEY`(data.go.kr 무료 발급). 라우트 `/api/sangga-discover`는
   기본 **dry-run(미적재, 샘플 반환)** — 위경도·필터 검증 후 `apply:true`로 적재(`{all:true}`로 전 수도권).
 
-## 2. 후기 수집 (lib/webSearchCollector.ts, placesCollector.ts, synthStore.ts)
+## 2. 후기 수집 (lib/webSearchCollector.ts, placesCollector.ts, youtubeCollector.ts, synthStore.ts)
 
+- 다중 소스: **네이버 블로그/카페글** · **구글 Places 리뷰** · **유튜브**(YouTube Data API v3).
+- **유튜브**(lib/youtubeCollector.ts): 카페 영상 검색 → 영상 1개=스니펫 1개(제목+설명+상위 댓글), 출처 링크=영상 URL, 날짜=게시일. 자막/원문은 합법적으로 불가 → 제목·설명·댓글까지만. 다른 소스와 **동일한 검증 엔진**(주제성·동명·지역 필터)+Sonnet 판정 통과분만 채택. 합성 가중 1.1. 화면엔 ▶YouTube 배지+영상 링크로 표시(사실성). 필요 키: `YOUTUBE_API_KEY`(무료, 일 10,000유닛).
 - 네이버 블로그/카페글 검색으로 후기 스니펫(제목+요약) 수집. 지역을 항상 포함해 다른 지점 노이즈↓.
 - **display=100**(호출 수 동일=쿼터 동일, 카페당 후기 ~5배). 저작권: 원문 복제 금지 — 인용 한 줄 + 링크 + 날짜만.
 - **raw 보존**: 수집 원본을 `raw_reviews`에 저장 → 재합성·재판정 시 **API 재호출 없이 재사용**(쿼터 절약·재현). `refresh:true`일 때만 새로 수집(최신성).

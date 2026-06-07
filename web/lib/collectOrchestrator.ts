@@ -6,16 +6,16 @@ import { computeCharScores } from "./charScore";
 import type { WebSnippet } from "./webSearchCollector";
 
 export type RawSource = {
-  source: "google" | "blog" | "diningcode" | "tripadvisor" | "instagram" | "etc";
+  source: "google" | "blog" | "youtube" | "diningcode" | "tripadvisor" | "instagram" | "etc";
   texts: WebSnippet[];
 };
 
-// 출처별 합성 가중(검증 통과분에만 적용). 블로그 직접후기 > 일반.
+// 출처별 합성 가중(검증 통과분에만 적용). 블로그 직접후기 > 영상 > 일반.
 const SRC_WEIGHT: Record<RawSource["source"], number> = {
-  google: 1.0, blog: 1.2, diningcode: 1.1, tripadvisor: 1.0, instagram: 0.8, etc: 0.7,
+  google: 1.0, blog: 1.2, youtube: 1.1, diningcode: 1.1, tripadvisor: 1.0, instagram: 0.8, etc: 0.7,
 };
 const SRC_KIND: Record<RawSource["source"], SourceKind> = {
-  google: "google", blog: "blog", diningcode: "etc", tripadvisor: "etc", instagram: "etc", etc: "etc",
+  google: "google", blog: "blog", youtube: "youtube", diningcode: "etc", tripadvisor: "etc", instagram: "etc", etc: "etc",
 };
 
 // 카드에 보여줄 근거 리뷰 + 신뢰 근거(투명성)

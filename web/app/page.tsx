@@ -725,7 +725,13 @@ function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; 
                         : rv.why?.[0] && <span className="text-[10px] text-[#8a7458]">{rv.why[0]}</span>}
                     </div>
                     <div className="text-[13px] text-[#3d2f22] leading-relaxed">“{rv.quote}”</div>
-                    <div className="flex items-center gap-2 mt-1.5 text-[10px] text-[#a8927a]"><span>{rv.source}</span>{rv.date && <span>· {rv.date}</span>}{rv.link && <a href={rv.link} target="_blank" rel="noopener noreferrer" className="text-[#9c6b3f] underline ml-auto">원문 →</a>}</div>
+                    <div className="flex items-center gap-2 mt-1.5 text-[10px] text-[#a8927a]">
+                      {rv.link && /youtu\.?be/.test(rv.link) && <span className="text-white rounded-[3px] px-1 py-0.5" style={{ background: "#c4302b", fontSize: "8px" }}>▶ YouTube</span>}
+                      <span>{rv.source}</span>{rv.date && <span>· {rv.date}</span>}
+                      {rv.link && (/youtu\.?be/.test(rv.link)
+                        ? <a href={rv.link} target="_blank" rel="noopener noreferrer" className="text-[#c4302b] font-medium ml-auto">영상 보기 →</a>
+                        : <a href={rv.link} target="_blank" rel="noopener noreferrer" className="text-[#9c6b3f] underline ml-auto">원문 →</a>)}
+                    </div>
                   </div>
                 ))}
               </div>
