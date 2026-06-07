@@ -14,7 +14,9 @@ export async function GET(req: NextRequest) {
   if (!auth(req)) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   try {
     await ensureSchema();
-    const rows = await sql`SELECT * FROM cafes ORDER BY published ASC, source DESC, created_at DESC`;
+    // raw_reviews·synth_reviews·embedding 같은 거대 컬럼 제외(응답 과대 → Neon 507 방지)
+    const rows = await sql`SELECT id, name, area, note, beans, signature, uses, phone, source, published, synth_grade, synth_count, created_at
+      FROM cafes ORDER BY published ASC, source DESC, created_at DESC`;
     return NextResponse.json({ ok: true, cafes: rows });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });

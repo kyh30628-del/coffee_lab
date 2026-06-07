@@ -12,7 +12,9 @@ type Cafe = {
 export async function GET() {
   try {
     await ensureSchema();
-    const rows = (await sql`SELECT * FROM cafes WHERE published=true`) as unknown as Cafe[];
+    // 거대 컬럼(raw_reviews·synth_reviews·embedding) 제외 — Neon 507 방지
+    const rows = (await sql`SELECT id, name, area, note, uses, roasts_own, acidity, body, sweet, signature, tone, photo_url
+      FROM cafes WHERE published=true`) as unknown as Cafe[];
     const has = (c: Cafe, u: string) => (c.uses ?? "").split(",").includes(u);
 
     // 규칙 기반 테마 — 데이터 늘면 자동으로 풍부해짐
