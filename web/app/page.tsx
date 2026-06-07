@@ -105,13 +105,18 @@ export default function Home() {
   const [searchQ, setSearchQ] = useState("");
   const [searchRes, setSearchRes] = useState<SearchRes | null>(null);
   const [searchLoading, setSearchLoading] = useState(false);
-  // 위치/동의 상태
+  // 위치/동의 상태 (세션 캐시 안 함 — '내 위치' 누를 때만 새로 수집)
   const [consent, setConsent] = useState<"unknown" | "agreed" | "declined">("unknown");
   const [showConsent, setShowConsent] = useState(false);
-  const [autoGu, setAutoGu] = useState("");   // 위치로 자동 설정된 동네 표시
+  const [autoGu, setAutoGu] = useState("");   // 위치로 설정된 동네 표시(세션 한정)
   const [geoMsg, setGeoMsg] = useState("");
   const anonRef = useRef("");
-  const detectedRef = useRef(false);
+  // 랜딩/역할 분리 + 사장님 인증 + 뒤로가기 안내
+  const [role, setRole] = useState<"consumer" | "owner" | null>(null);
+  const [ownerPwModal, setOwnerPwModal] = useState(false);
+  const [ownerPw, setOwnerPw] = useState("");
+  const [ownerErr, setOwnerErr] = useState("");
+  const [backToast, setBackToast] = useState(false);
   // 지도용 상태
   const [tasteKey, setTasteKey] = useState<string | null>(null);
   const [sido, setSido] = useState("");
@@ -124,18 +129,16 @@ export default function Home() {
 
   useEffect(() => { fetch("/api/cafes").then((r) => r.json()).then((d) => setCafes(d.cafes ?? [])).catch(() => {}); }, []);
 
-  // 익명 식별자 준비 + 저장된 동의 상태 로드
+  // 익명 식별자 준비 + 역할(세션 단위) 복원. 위치 동의는 캐시하지 않음(매 세션 새로).
   useEffect(() => {
     try {
       let a = localStorage.getItem("dcn_anon");
       if (!a) { a = (crypto?.randomUUID?.() ?? `a${Date.now()}${Math.floor(Math.random() * 1e6)}`); localStorage.setItem("dcn_anon", a); }
       anonRef.current = a;
       fetch("/api/visit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ anonId: a }) }).catch(() => {});
-      const c = localStorage.getItem("dcn_consent");
-      if (c === "agreed") setConsent("agreed");
-      else if (c === "declined") setConsent("declined");
-      else { setConsent("unknown"); setShowConsent(true); } // 첫 방문 → 동의 안내
-    } catch { setConsent("declined"); }
+      const r = sessionStorage.getItem("dcn_role"); // 새 세션이면 null → 랜딩부터
+      if (r === "consumer" || r === "owner") setRole(r);
+    } catch {}
   }, []);
 
   const postConsent = (agreed: boolean, extra?: { region?: string; lat?: number; lng?: number }) => {
@@ -158,22 +161,40 @@ export default function Home() {
         postConsent(true, { region: `${r.sido} ${r.sigungu}`, lat: latitude, lng: longitude });
       },
       (err) => setGeoMsg(err.code === 1 ? "위치 권한이 거부됐어요 (브라우저 설정에서 허용 가능)" : "위치를 가져오지 못했어요"),
-      { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 },
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 0 }, // 매번 현재 위치 새로 수집
     );
   };
 
-  // 동의 완료 + 카페 로드되면 1회 자동 감지
-  useEffect(() => {
-    if (consent === "agreed" && cafes.length > 0 && !detectedRef.current) { detectedRef.current = true; detectLocation(); }
-  }, [consent, cafes.length]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const onAgree = () => { try { localStorage.setItem("dcn_consent", "agreed"); } catch {} setShowConsent(false); setConsent("agreed"); postConsent(true); };
-  const onDecline = () => { try { localStorage.setItem("dcn_consent", "declined"); } catch {} setShowConsent(false); setConsent("declined"); postConsent(false); };
-  const openLocation = () => { if (consent === "agreed") { detectedRef.current = false; detectLocation(); } else setShowConsent(true); };
+  // 자동 감지 없음 — 사용자가 '내 위치' 버튼을 눌렀을 때만 동의→수집.
+  const onAgree = () => { setShowConsent(false); setConsent("agreed"); postConsent(true); detectLocation(); };
+  const onDecline = () => { setShowConsent(false); setConsent("declined"); postConsent(false); };
+  const openLocation = () => { if (consent === "agreed") detectLocation(); else setShowConsent(true); };
   const clearAuto = () => { setHomeSido(""); setHomeGu(""); setAutoGu(""); setSido(""); setSigungu(""); setGeoMsg(""); };
   useEffect(() => { const u = homeGu ? `/api/discover?region=${encodeURIComponent(homeGu)}` : "/api/discover"; setDiscover(null); fetch(u).then((r) => r.json()).then((d) => { if (d.ok) setDiscover(d); }).catch(() => {}); }, [homeGu]);
 
   const openById = (id: number) => { const c = cafes.find((x) => x.id === id); if (c) setSelected(c); };
+
+  // 뒤로가기 가드: 현재 UI 레이어를 ref로 추적(리스너에서 최신값 참조)
+  const uiRef = useRef({ selected: false, showSearch: false, showConsent: false, tab: "home" });
+  uiRef.current = { selected: !!selected, showSearch, showConsent, tab };
+  // 홈에서 뒤로가기 → 모달 열려있으면 닫고, 지도탭이면 홈으로, 그 외엔 '한 번 더' 후 종료
+  useEffect(() => {
+    if (role === null) return; // 랜딩에선 가드 없음(그냥 뒤로)
+    history.pushState(null, "", location.href);
+    let lastBack = 0;
+    const rearm = () => history.pushState(null, "", location.href);
+    const onPop = () => {
+      const u = uiRef.current;
+      if (u.showSearch) { setShowSearch(false); rearm(); return; }
+      if (u.selected) { setSelected(null); rearm(); return; }
+      if (u.showConsent) { setShowConsent(false); rearm(); return; }
+      if (u.tab === "map") { setTab("home"); rearm(); return; }
+      if (Date.now() - lastBack < 2000) { window.removeEventListener("popstate", onPop); history.back(); return; } // 한 번 더 → 종료
+      lastBack = Date.now(); setBackToast(true); setTimeout(() => setBackToast(false), 2000); rearm();
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [role]);
 
   const runSearch = async (query: string) => {
     const qq = query.trim();
@@ -298,6 +319,58 @@ export default function Home() {
     );
   };
 
+  const chooseConsumer = () => { try { sessionStorage.setItem("dcn_role", "consumer"); } catch {} setRole("consumer"); };
+  const submitOwner = async () => {
+    setOwnerErr("");
+    try {
+      const r = await fetch("/api/admin/stats", { headers: { "x-admin-password": ownerPw } });
+      if (r.status === 401) { setOwnerErr("비밀번호가 올바르지 않아요"); return; }
+      if (!r.ok) { setOwnerErr("확인에 실패했어요. 잠시 후 다시"); return; }
+      try { sessionStorage.setItem("dcn_role", "owner"); sessionStorage.setItem("dcn_owner_pw", ownerPw); } catch {}
+      setOwnerPwModal(false); setRole("owner");
+    } catch { setOwnerErr("네트워크 오류"); }
+  };
+
+  // ── 랜딩(초기화면): 소비자 / 사장님 분리 ──
+  if (role === null) {
+    return (
+      <div className="flex flex-col items-center justify-center px-6" style={{ minHeight: "100dvh", background: "#2b2018", color: "#f4ece0", fontFamily: "'Gowun Batang', serif" }}>
+        <div className="text-[10px] tracking-[0.3em] uppercase text-[#cbb89f] mb-1">데이터로 큐레이션하는</div>
+        <h1 className="text-3xl font-bold mb-3">동네 커피 노트</h1>
+        <p className="text-[13px] text-[#cbb89f] mb-10 text-center leading-relaxed">네이버 공개 후기를 교차검증하고 Claude AI가 맥락까지 읽어<br />옥석만 골라주는 동네 커피 가이드</p>
+        <div className="w-full max-w-sm space-y-3">
+          <button onClick={chooseConsumer} className="w-full bg-[#f4ece0] text-[#2b2018] rounded-2xl py-5 px-5 text-left shadow-lg active:scale-[0.99] transition">
+            <div className="text-lg font-bold">☕ 소비자로 들어가기</div>
+            <div className="text-[12px] text-[#7c6a55] mt-0.5">내 동네 검증된 카페 둘러보기</div>
+          </button>
+          <button onClick={() => { setOwnerPw(""); setOwnerErr(""); setOwnerPwModal(true); }} className="w-full border border-[#9c6b3f] text-[#f4ece0] rounded-2xl py-5 px-5 text-left active:scale-[0.99] transition">
+            <div className="text-lg font-bold">🏪 사장님으로 들어가기</div>
+            <div className="text-[12px] text-[#cbb89f] mt-0.5">내 카페 분석·등록 (관리자 인증)</div>
+          </button>
+        </div>
+        <p className="text-[10px] text-[#8a7458] mt-10 text-center">모든 큐레이션은 네이버 공개 후기를 교차검증한 데이터 기반입니다.</p>
+
+        {ownerPwModal && (
+          <div className="fixed inset-0 z-[5000] flex items-center justify-center px-6">
+            <div className="absolute inset-0 bg-black/50" onClick={() => setOwnerPwModal(false)} />
+            <div className="relative bg-[#fdfaf4] text-[#2b2018] w-full max-w-sm rounded-2xl p-6 shadow-2xl">
+              <h3 className="text-lg font-bold mb-1">🔒 사장님 인증</h3>
+              <p className="text-[13px] text-[#6b5a48] mb-3">관리자 비밀번호를 입력하세요.</p>
+              <input autoFocus type="password" value={ownerPw} onChange={(e) => setOwnerPw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submitOwner()}
+                placeholder="관리자 비밀번호" className="w-full border border-[#cbb89f] rounded-lg px-3 py-2.5 text-base bg-white mb-2" />
+              {ownerErr && <p className="text-[12px] text-[#c0392b] mb-2">{ownerErr}</p>}
+              <div className="flex gap-2">
+                <button onClick={submitOwner} className="flex-1 bg-[#2b2018] text-[#f4ece0] rounded-xl py-2.5 font-medium">확인</button>
+                <button onClick={() => setOwnerPwModal(false)} className="px-4 text-[#9c6b3f]">취소</button>
+              </div>
+            </div>
+          </div>
+        )}
+        <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet" />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col bg-[#f4ece0]" style={{ height: "100dvh", fontFamily: "'Gowun Batang', serif" }}>
       <header className="shrink-0 bg-[#2b2018] text-[#f4ece0] z-[1500] h-14 flex items-center justify-between px-4 gap-3">
@@ -312,9 +385,15 @@ export default function Home() {
             ))}
           </div>
         </div>
-        <div className="flex gap-2 shrink-0">
-          <a href="/owner" className="bg-[#9c6b3f] rounded-full px-3 py-1.5 text-xs whitespace-nowrap">🔒 내 카페 분석</a>
-          <a href="/cafe/register" className="bg-[#3d2f22] rounded-full px-3 py-1.5 text-xs whitespace-nowrap hidden sm:inline-block">사장님 등록</a>
+        <div className="flex gap-2 shrink-0 items-center">
+          {role === "owner" ? (
+            <>
+              <a href="/owner" className="bg-[#9c6b3f] rounded-full px-3 py-1.5 text-xs whitespace-nowrap">내 카페 분석</a>
+              <a href="/cafe/register" className="bg-[#3d2f22] rounded-full px-3 py-1.5 text-xs whitespace-nowrap hidden sm:inline-block">사장님 등록</a>
+            </>
+          ) : (
+            <button onClick={() => { try { sessionStorage.removeItem("dcn_role"); } catch {} setRole(null); }} className="text-[11px] text-[#cbb89f] underline whitespace-nowrap">사장님이세요?</button>
+          )}
         </div>
       </header>
 
@@ -474,6 +553,11 @@ export default function Home() {
               <button onClick={onDecline} className="w-full text-[#9c6b3f] rounded-xl py-2 text-sm">아니요, 전체 볼게요</button>
             </div>
           </div>
+        </div>
+      )}
+      {backToast && (
+        <div className="fixed left-1/2 -translate-x-1/2 bottom-8 z-[5000] bg-[#2b2018] text-[#f4ece0] text-sm px-5 py-3 rounded-full shadow-xl border border-[#9c6b3f]">
+          한 번 더 누르면 나가요
         </div>
       )}
       <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet" />

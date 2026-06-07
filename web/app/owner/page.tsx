@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { BarChart, Bar, XAxis, YAxis, Cell, ResponsiveContainer,
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Legend,
   PieChart, Pie, Tooltip, AreaChart, Area, CartesianGrid } from "recharts";
@@ -56,21 +56,14 @@ export default function OwnerPage() {
   const [insight, setInsight] = useState<Insight | null>(null);
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState("rank");
-  // 관리자 전용 게이트
-  const [authed, setAuthed] = useState(false);
-  const [pw, setPw] = useState("");
-  const [authMsg, setAuthMsg] = useState("");
-  const hdr = { "x-admin-password": pw };
-
-  const tryAuth = async (password: string) => {
-    setAuthMsg("확인 중...");
-    try {
-      const r = await fetch(`/api/cafe-find?q=__authcheck__`, { headers: { "x-admin-password": password } });
-      if (r.status === 401) { setAuthMsg("비밀번호가 틀렸습니다."); return; }
-      if (r.ok) { setAuthed(true); setAuthMsg(""); }
-      else setAuthMsg("오류가 발생했습니다.");
-    } catch { setAuthMsg("네트워크 오류."); }
-  };
+  // 인증은 랜딩(사장님)에서 끝남 — 세션 비밀번호 사용. 없으면 홈(랜딩)으로.
+  const [pw, setPw] = useState<string | null>(null);
+  useEffect(() => {
+    const p = typeof window !== "undefined" ? sessionStorage.getItem("dcn_owner_pw") : null;
+    if (!p) { window.location.replace("/"); return; }
+    setPw(p);
+  }, []);
+  const hdr = { "x-admin-password": pw ?? "" };
 
   const search = async () => {
     if (!q.trim()) return;
@@ -84,20 +77,11 @@ export default function OwnerPage() {
     setLoading(false);
   };
 
-  // 비밀번호 게이트 화면
-  if (!authed) {
+  // 세션 인증 확인 중(없으면 위 effect가 홈으로 보냄)
+  if (!pw) {
     return (
-      <div className="min-h-screen bg-[#f4ece0] text-[#2b2018] flex items-center justify-center p-6" style={{ fontFamily: "'Gowun Batang', serif" }}>
-        <div className="bg-white rounded-2xl p-8 w-full max-w-sm border border-[#ece0cd] shadow-sm">
-          <BackLink to="/" label="홈" className="text-[#9c6b3f] mb-4" />
-          <div className="text-[#d4a574] text-[10px] tracking-[0.2em] uppercase">For Owners · 관리자 전용</div>
-          <h1 className="text-xl font-bold mb-1 mt-1">사장님 카페 분석</h1>
-          <p className="text-[13px] text-[#6b5a48] mb-4 leading-relaxed">현재는 관리자에게만 공개되는 기능이에요. 비밀번호를 입력해주세요.</p>
-          <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && tryAuth(pw)}
-            placeholder="관리자 비밀번호" className="w-full border border-[#cbb89f] rounded-lg px-4 py-3 text-base bg-white mb-3" />
-          <button onClick={() => tryAuth(pw)} className="w-full bg-[#2b2018] text-[#f4ece0] rounded-lg py-3 font-medium">들어가기</button>
-          {authMsg && <p className="text-sm text-[#b5703c] mt-3">{authMsg}</p>}
-        </div>
+      <div className="min-h-screen bg-[#f4ece0] text-[#9c6b3f] flex items-center justify-center" style={{ fontFamily: "'Gowun Batang', serif" }}>
+        인증 확인 중…
         <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet" />
       </div>
     );
