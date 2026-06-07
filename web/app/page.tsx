@@ -120,6 +120,7 @@ export default function Home() {
   const mapObj = useRef<any>(null);
   const layerRef = useRef<any>(null);
   const LRef = useRef<any>(null);
+  const [mapReady, setMapReady] = useState(false); // 지도 초기화 완료 신호(마커 재렌더용)
 
   useEffect(() => { fetch("/api/cafes").then((r) => r.json()).then((d) => setCafes(d.cafes ?? [])).catch(() => {}); }, []);
 
@@ -186,7 +187,7 @@ export default function Home() {
     setSearchLoading(false);
   };
 
-  // 지도 탭 진입 시 지도 초기화
+  // 지도 탭 진입 시 지도 초기화. 탭을 떠나면 지도를 파괴(분리된 DOM에 남는 버그 방지).
   useEffect(() => {
     if (tab !== "map") return;
     let cancelled = false;
@@ -198,27 +199,23 @@ export default function Home() {
       mapObj.current = L.map(mapRef.current, { zoomControl: true, attributionControl: false }).setView([37.5, 127.05], 10);
       L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", { subdomains: "abcd", maxZoom: 20 }).addTo(mapObj.current);
       layerRef.current = L.layerGroup().addTo(mapObj.current);
-      setTimeout(() => mapObj.current?.invalidateSize(), 200);
+      setTimeout(() => mapObj.current?.invalidateSize(), 150);
+      setMapReady(true); // 초기화 완료 → 마커 effect 재실행 트리거
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      if (mapObj.current) { try { mapObj.current.remove(); } catch {} mapObj.current = null; layerRef.current = null; }
+      setMapReady(false);
+    };
   }, [tab]);
-  useEffect(() => { if (tab === "map") setTimeout(() => mapObj.current?.invalidateSize(), 200); }, [tab]);
 
-  // '지도에서 위치 보기' — 지도 비동기 초기화가 끝날 때까지 재시도 후 해당 좌표로 이동
+  // '지도에서 위치 보기' — 지도 준비되면 해당 좌표로 이동(핀은 아래 마커 effect가 그림)
   useEffect(() => {
-    if (tab !== "map" || !focusTarget) return;
-    let tries = 0;
-    const iv = setInterval(() => {
-      tries++;
-      if (mapObj.current && LRef.current) {
-        mapObj.current.invalidateSize();
-        mapObj.current.setView([focusTarget.lat, focusTarget.lng], 16, { animate: true });
-        setFocusTarget(null);
-        clearInterval(iv);
-      } else if (tries > 50) clearInterval(iv);
-    }, 120);
-    return () => clearInterval(iv);
-  }, [tab, focusTarget]);
+    if (tab !== "map" || !focusTarget || !mapReady || !mapObj.current) return;
+    mapObj.current.invalidateSize();
+    mapObj.current.setView([focusTarget.lat, focusTarget.lng], 16, { animate: true });
+    setFocusTarget(null);
+  }, [tab, focusTarget, mapReady]);
 
   const filtered = useMemo(() => cafes.filter((c) => {
     if (!c.lat || !c.lng) return false;
@@ -250,7 +247,7 @@ export default function Home() {
       const lats = filtered.map((c) => c.lat), lngs = filtered.map((c) => c.lng);
       mapObj.current.fitBounds(L.latLngBounds([[Math.min(...lats), Math.min(...lngs)], [Math.max(...lats), Math.max(...lngs)]]), { padding: [50, 50], maxZoom: 15 });
     } else if (sido && SIDO_CENTER[sido]) { const [la, ln, z] = SIDO_CENTER[sido]; mapObj.current.setView([la, ln], z); }
-  }, [filtered, matchSet, sido, sigungu, tab, focusId]);
+  }, [filtered, matchSet, sido, sigungu, tab, focusId, mapReady]);
 
   const onSido = (v: string) => { setSido(v); setSigungu(""); setFocusId(null); };
 
