@@ -10,7 +10,7 @@ type Cafe = {
 };
 type Stats = {
   content: {
-    total: number; published: number; hidden: number; owner_pending: number; embedded: number; has_dates: number;
+    total: number; published: number; hidden: number; owner_pending: number; embedded: number; has_dates: number; raw_cached: number; llm_judged: number;
     grades: { grade: string; n: number }[];
     quality: { avg_noise_pct: number | null; raw: number; rejected: number };
     topRegions: { region: string; n: number }[];
@@ -143,6 +143,19 @@ export default function AdminPage() {
                   <Tooltip /><Bar dataKey="n" fill={BAR} radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
+            </Card>
+          </div>
+        )}
+
+        {ct && (
+          <div className="mb-4">
+            <Card title="🛡 리뷰 검증 엔진 현황 (해자)" note="규칙으로 노이즈 제거 → Sonnet이 맥락 판정 → 양질 후기만 공개. 매일 자동 갱신.">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-center">
+                <div><div className="text-xl font-bold text-stone-900">{ct.total ? Math.round((ct.raw_cached / ct.total) * 100) : 0}%</div><div className="text-[11px] text-stone-500">원본 수집(예열)</div><div className="text-[10px] text-stone-400">{ct.raw_cached}/{ct.total}</div></div>
+                <div><div className="text-xl font-bold text-emerald-600">{ct.total ? Math.round((ct.llm_judged / ct.total) * 100) : 0}%</div><div className="text-[11px] text-stone-500">AI 맥락 판정</div><div className="text-[10px] text-stone-400">{ct.llm_judged}/{ct.total}</div></div>
+                <div><div className="text-xl font-bold text-[#9c6b3f]">{ct.quality.avg_noise_pct ?? 0}%</div><div className="text-[11px] text-stone-500">노이즈 제거율</div><div className="text-[10px] text-stone-400">옥석만</div></div>
+              </div>
+              <p className="text-[10px] text-stone-400 mt-2.5">예열(00:10)으로 원본을 한 번 모아두고, Sonnet 판정(04:00)이 매일 정확도를 끌어올립니다.</p>
             </Card>
           </div>
         )}

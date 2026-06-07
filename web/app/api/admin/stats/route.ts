@@ -26,13 +26,17 @@ export async function GET(req: NextRequest) {
     await sql`ALTER TABLE user_consents ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ`;
 
     // ===== 콘텐츠 현황 =====
+    await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS raw_reviews JSONB`;
+    await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS llm_judged_at TIMESTAMPTZ`;
     const c = (await sql`SELECT
       COUNT(*)::int total,
       COUNT(*) FILTER (WHERE published)::int published,
       COUNT(*) FILTER (WHERE NOT published)::int hidden,
       COUNT(*) FILTER (WHERE NOT published AND source='owner')::int owner_pending,
       COUNT(*) FILTER (WHERE embedding IS NOT NULL)::int embedded,
-      COUNT(*) FILTER (WHERE review_dates IS NOT NULL)::int has_dates
+      COUNT(*) FILTER (WHERE review_dates IS NOT NULL)::int has_dates,
+      COUNT(*) FILTER (WHERE raw_reviews IS NOT NULL)::int raw_cached,
+      COUNT(*) FILTER (WHERE llm_judged_at IS NOT NULL)::int llm_judged
       FROM cafes`)[0];
     const grades = await sql`SELECT COALESCE(synth_grade,'미합성') grade, COUNT(*)::int n FROM cafes WHERE published GROUP BY synth_grade`;
     const quality = (await sql`SELECT
