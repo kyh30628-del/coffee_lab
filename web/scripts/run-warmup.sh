@@ -3,4 +3,5 @@
 export PATH="/usr/local/bin:/Users/wangwida/.local/bin:/opt/homebrew/bin:$PATH"
 cd "$(dirname "$0")/.." || exit 1
 [ -f scripts/.judge.env ] && source scripts/.judge.env
-exec /usr/local/bin/node scripts/warmup-raw.mjs >> /tmp/coffee-warmup.log 2>&1
+# 로컬에서 직접 합성(Vercel 함수 타임아웃 회피). tsx로 TS 라이브러리 로드.
+exec /usr/local/bin/node --import tsx scripts/warmup-local.mjs >> /tmp/coffee-warmup.log 2>&1
