@@ -175,26 +175,28 @@ export default function Home() {
   const openById = (id: number) => { const c = cafes.find((x) => x.id === id); if (c) setSelected(c); };
 
   // 뒤로가기 가드: 현재 UI 레이어를 ref로 추적(리스너에서 최신값 참조)
-  const uiRef = useRef({ selected: false, showSearch: false, showConsent: false, tab: "home" });
-  uiRef.current = { selected: !!selected, showSearch, showConsent, tab };
-  // 홈에서 뒤로가기 → 모달 열려있으면 닫고, 지도탭이면 홈으로, 그 외엔 '한 번 더' 후 종료
+  const uiRef = useRef<{ selected: boolean; showSearch: boolean; showConsent: boolean; tab: string; role: string | null; ownerPwModal: boolean }>({ selected: false, showSearch: false, showConsent: false, tab: "home", role: null, ownerPwModal: false });
+  uiRef.current = { selected: !!selected, showSearch, showConsent, tab, role, ownerPwModal };
+  // 뒤로가기: 모달 닫기 → 지도→홈 → 홈→랜딩 → 랜딩에서 '한 번 더' 후 종료
   useEffect(() => {
-    if (role === null) return; // 랜딩에선 가드 없음(그냥 뒤로)
     history.pushState(null, "", location.href);
     let lastBack = 0;
     const rearm = () => history.pushState(null, "", location.href);
     const onPop = () => {
       const u = uiRef.current;
+      if (u.ownerPwModal) { setOwnerPwModal(false); rearm(); return; }
       if (u.showSearch) { setShowSearch(false); rearm(); return; }
       if (u.selected) { setSelected(null); rearm(); return; }
       if (u.showConsent) { setShowConsent(false); rearm(); return; }
       if (u.tab === "map") { setTab("home"); rearm(); return; }
-      if (Date.now() - lastBack < 2000) { window.removeEventListener("popstate", onPop); history.back(); return; } // 한 번 더 → 종료
+      if (u.role !== null) { try { sessionStorage.removeItem("dcn_role"); } catch {} setRole(null); rearm(); return; } // 홈 → 랜딩
+      // 랜딩: 한 번 더 누르면 종료
+      if (Date.now() - lastBack < 2000) { window.removeEventListener("popstate", onPop); history.back(); return; }
       lastBack = Date.now(); setBackToast(true); setTimeout(() => setBackToast(false), 2000); rearm();
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
-  }, [role]);
+  }, []);
 
   const runSearch = async (query: string) => {
     const qq = query.trim();
@@ -364,6 +366,11 @@ export default function Home() {
                 <button onClick={() => setOwnerPwModal(false)} className="px-4 text-[#9c6b3f]">취소</button>
               </div>
             </div>
+          </div>
+        )}
+        {backToast && (
+          <div className="fixed left-1/2 -translate-x-1/2 bottom-8 z-[6000] bg-[#f4ece0] text-[#2b2018] text-sm px-5 py-3 rounded-full shadow-xl">
+            한 번 더 누르면 나가요
           </div>
         )}
         <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet" />

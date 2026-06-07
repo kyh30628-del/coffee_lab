@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
 import { embedQuery, toVectorLiteral, hasEmbedKey } from "@/lib/embed";
+import { hasSearchLLM, rerankWithClaude, type SearchCand } from "@/lib/searchAgent";
 export const runtime = "nodejs";
+export const maxDuration = 30;
 
 // 자연어 카페 검색 (PRINCIPLES §1·§5): "떠오르는 느낌"으로도 찾게 한다.
 // - 시맨틱: 임베딩(text-embedding-004) 코사인 유사도 — 사전에 없는 표현도 의미로 매칭.
@@ -58,6 +60,17 @@ function lexicalScore(c: any, tokens: string[], hitConcepts: typeof CONCEPTS) {
 
 const FIELDS = `id, name, area, synth_grade, synth_count, synth_identity, signature, note, vibe, uses, beans, char_scores, synth_reviews, synth_acidity, synth_body, synth_sweet`;
 
+// Claude 후보용: char_scores → 한국어 특징 태그, 검증 리뷰 → 인용
+const AXIS_LABEL: Record<string, string> = Object.fromEntries(CONCEPTS.filter((c) => c.axis).map((c) => [c.axis as string, c.label]));
+function charTags(cs: any): string {
+  if (!cs || typeof cs !== "object") return "";
+  return Object.entries(cs).filter(([, v]) => Number(v) > 0).sort((a, b) => Number(b[1]) - Number(a[1])).slice(0, 4).map(([k]) => AXIS_LABEL[k] ?? k).join(", ");
+}
+function quotesOf(reviews: any): string {
+  if (!Array.isArray(reviews)) return "";
+  return reviews.slice(0, 3).map((r: any) => r?.quote ?? "").filter(Boolean).join(" / ");
+}
+
 export async function GET(req: NextRequest) {
   try {
     await ensureSchema();
@@ -71,8 +84,9 @@ export async function GET(req: NextRequest) {
     const short = region.replace(/(특별시|광역시|시|군|구)$/, "");
     const p1 = `%${region}%`, p2 = `%${short}%`;
 
-    let mode: "semantic" | "keyword" = "keyword";
+    let mode: "semantic" | "keyword" | "ai" = "keyword";
     let scored: any[] = [];
+    const byId = new Map<number, any>(); // Claude 재정렬용 원본 row 보관
 
     // ===== 시맨틱(임베딩) 경로 =====
     if (hasEmbedKey()) {
@@ -91,6 +105,7 @@ export async function GET(req: NextRequest) {
           )) as unknown as any[];
           if (rows.length > 0) {
             mode = "semantic";
+            for (const c of rows) byId.set(c.id, c);
             scored = rows.map((c) => {
               const { exact, concept, reasons } = lexicalScore(c, tokens, hitConcepts);
               const sim = Number(c.sim) || 0;
@@ -113,15 +128,33 @@ export async function GET(req: NextRequest) {
         const { exact, concept, reasons } = lexicalScore(c, tokens, hitConcepts);
         const total = exact + concept;
         if (total <= 0) continue;
+        byId.set(c.id, c);
         scored.push({ id: c.id, name: c.name, area: c.area, grade: c.synth_grade, count: c.synth_count, identity: c.synth_identity, score: Math.round(total * 10) / 10, reasons: reasons.slice(0, 3) });
       }
     }
 
     scored.sort((a, b) => b.score - a.score);
+
+    // ===== Claude Sonnet 맥락 재정렬 (콘솔 API 키 있을 때) =====
+    // 후보를 압축해 보내고, 질문 의도에 맞는 곳만 선별·정렬. 실패/키없음 시 위 점수순 폴백.
+    let results = scored.slice(0, 24);
+    if (hasSearchLLM() && scored.length > 0) {
+      const cands: SearchCand[] = scored.slice(0, 25).map((s) => {
+        const c = byId.get(s.id) ?? {};
+        return { id: s.id, name: s.name, area: s.area, identity: c.synth_identity ?? s.identity, tags: charTags(c.char_scores), quotes: quotesOf(c.synth_reviews) };
+      });
+      const ranked = await rerankWithClaude(q, region, cands);
+      if (ranked && ranked.length > 0) {
+        mode = "ai";
+        const sById = new Map(scored.map((s) => [s.id, s]));
+        results = ranked.map((r) => { const s = sById.get(r.id); return s ? { ...s, reasons: r.reason ? [r.reason] : s.reasons } : null; }).filter(Boolean).slice(0, 24) as any[];
+      }
+    }
+
     return NextResponse.json({
       ok: true, mode, region: region || "수도권 전체", q,
       concepts: hitConcepts.map((c) => c.label),
-      count: scored.length, results: scored.slice(0, 24),
+      count: results.length, results,
     });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
