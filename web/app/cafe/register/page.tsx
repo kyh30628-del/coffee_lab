@@ -1,7 +1,6 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import BackLink from "../../BackLink";
-import Showcase from "../../Showcase";
 
 const USE_OPTIONS = ["작업", "혼자", "수다", "빵", "사진", "단골"];
 
@@ -13,15 +12,12 @@ export default function RegisterPage() {
   const [uses, setUses] = useState<string[]>([]);
   const [status, setStatus] = useState<"idle" | "sending" | "done" | "error">("idle");
   const [err, setErr] = useState("");
-  // 쇼케이스(사장님 인증 시): 내 카페 검색 → 선택 → 편집기
-  const [ownerPw, setOwnerPw] = useState<string | null>(null);
-  const [scQ, setScQ] = useState("");
-  const [scResults, setScResults] = useState<{ id: number; name: string; area: string }[]>([]);
-  const [scCafe, setScCafe] = useState<{ id: number; name: string } | null>(null);
-  useEffect(() => { try { setOwnerPw(sessionStorage.getItem("dcn_owner_pw")); } catch {} }, []);
-  const scSearch = async () => {
-    if (!scQ.trim() || !ownerPw) return;
-    try { const r = await fetch(`/api/cafe-find?q=${encodeURIComponent(scQ.trim())}`, { headers: { "x-admin-password": ownerPw } }); const d = await r.json(); setScResults((d.rows ?? []).filter((c: any) => c.published).slice(0, 8)); } catch {}
+  // 카페명 자동완성 — 기존 카페 보완 or 신규 작성
+  const [nameSug, setNameSug] = useState<{ id: number; name: string; area: string }[]>([]);
+  const [supplementId, setSupplementId] = useState<number | null>(null);
+  const nameLookup = async (v: string) => {
+    if (v.trim().length < 1) { setNameSug([]); return; }
+    try { const d = await (await fetch(`/api/cafe-names?q=${encodeURIComponent(v.trim())}`)).json(); setNameSug(d.cafes ?? []); } catch {}
   };
 
   const set = (k: string, v: string | boolean) => setForm({ ...form, [k]: v });
@@ -33,7 +29,7 @@ export default function RegisterPage() {
     try {
       const r = await fetch("/api/cafe-submit", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, uses }),
+        body: JSON.stringify({ ...form, uses, supplementId }),
       });
       const d = await r.json();
       if (d.ok) setStatus("done");
@@ -74,9 +70,20 @@ export default function RegisterPage() {
         </header>
 
         <div className="space-y-5">
-          <div>
-            <label className="block text-sm text-[#9c6b3f] mb-1.5">카페 이름 *</label>
-            <input className={field} value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="예) 커피볶는아침" />
+          <div className="relative">
+            <label className="block text-sm text-[#9c6b3f] mb-1.5">카페 이름 * {supplementId && <span className="text-[11px] text-[#5f7355]">· 기존 카페 보완 모드</span>}</label>
+            <input className={field} value={form.name} onChange={(e) => { set("name", e.target.value); setSupplementId(null); nameLookup(e.target.value); }} placeholder="기존 카페를 찾거나 새 이름을 입력" />
+            {nameSug.length > 0 && form.name.trim() && (
+              <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-[#d9c9b0] rounded-lg shadow-lg overflow-hidden max-h-56 overflow-y-auto">
+                {nameSug.map((c) => (
+                  <button key={c.id} type="button" onClick={() => { setForm((f) => ({ ...f, name: c.name, area: c.area })); setSupplementId(c.id); setNameSug([]); }}
+                    className="w-full text-left px-3.5 py-2.5 hover:bg-[#f4ece0] border-b border-[#f0e6d4] last:border-0">
+                    <span className="font-bold text-sm">{c.name}</span><span className="text-xs text-[#a8927a] ml-2">{c.area} · 내용 보완</span>
+                  </button>
+                ))}
+                <div className="px-3.5 py-2 text-[11px] text-[#a8927a]">목록에 없으면 그대로 두고 새로 등록하세요</div>
+              </div>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -145,34 +152,6 @@ export default function RegisterPage() {
           <p className="text-[11px] text-[#a8927a] text-center">신청 후 확인을 거쳐 가이드에 노출됩니다.</p>
         </div>
 
-        {/* 🎀 쇼케이스 — 사장님 인증 시 */}
-        <div className="mt-10 pt-8 border-t border-[#ddd0bb]">
-          <div className="text-[#9c6b3f] text-xs tracking-[0.3em] uppercase mb-2">Showcase · 홍보</div>
-          <h2 className="text-2xl font-bold mb-1">🎀 우리 가게 쇼케이스</h2>
-          <p className="text-[#6b5a48] text-[14px] leading-relaxed mb-4">가이드에 있는 내 카페를 골라, 글·사진으로 <b>AI 홍보물</b>을 만들어 카페 상세 맨 위에 노출하세요. <span className="text-[#9c6b3f]">(구독 미리보기 · 관리자 승인 후 노출)</span></p>
-          {!ownerPw ? (
-            <div className="bg-[#fdfaf4] border border-[#ece0cd] rounded-xl p-4 text-[13px] text-[#6b5a48]">사장님 인증 후 이용할 수 있어요. 홈 랜딩에서 <b>‘사장님으로 시작하기’</b>로 입장한 뒤 다시 와주세요.</div>
-          ) : scCafe ? (
-            <div>
-              <button onClick={() => { setScCafe(null); setScResults([]); }} className="text-xs text-[#9c6b3f] underline mb-3">← 다른 카페 선택</button>
-              <Showcase cafeId={scCafe.id} cafeName={scCafe.name} pw={ownerPw} />
-            </div>
-          ) : (
-            <div>
-              <div className="flex gap-2 mb-3">
-                <input value={scQ} onChange={(e) => setScQ(e.target.value)} onKeyDown={(e) => e.key === "Enter" && scSearch()} placeholder="내 카페 이름 검색" className={field} />
-                <button onClick={scSearch} className="bg-[#2b2018] text-[#f4ece0] rounded-lg px-6 font-medium shrink-0">검색</button>
-              </div>
-              <div className="space-y-2">
-                {scResults.map((c) => (
-                  <button key={c.id} onClick={() => setScCafe({ id: c.id, name: c.name })} className="w-full text-left bg-white rounded-lg p-3 border border-[#ece0cd] hover:border-[#9c6b3f]">
-                    <span className="font-bold text-sm">{c.name}</span><span className="text-xs text-[#a8927a] ml-2">{c.area}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
       </div>
       <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet" />
     </main>

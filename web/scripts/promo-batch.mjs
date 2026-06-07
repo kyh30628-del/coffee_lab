@@ -10,16 +10,24 @@ const APP_URL = process.env.APP_URL || "https://coffee-lab-product-builder.verce
 const PW = process.env.ADMIN_PASSWORD || "";
 const MODEL = process.env.PROMO_MODEL || process.env.JUDGE_MODEL || "claude-sonnet-4-5";
 
-const SYSTEM = `너는 동네 카페 전문 홍보 카피라이터다. 사장님이 준 소개글(과 사진 설명)을 보고, 소비자가 '가보고 싶다'고 느끼게 만드는 짧고 감각적인 홍보 문구를 쓴다.
-- 소개글에 실제로 있는 것만 근거로(과장·허위·없는 메뉴 금지). 따뜻하고 구체적으로.
+const SYSTEM = `너는 동네 카페 전문 홍보 카피라이터다. 사장님이 준 매장 사진과 소개글을 보고, 소비자가 '가보고 싶다'고 느끼게 만드는 짧고 감각적인 홍보 문구를 쓴다.
+- 사진에 실제로 보이는 분위기·메뉴·인테리어와 소개글을 근거로(과장·허위·없는 것 금지). 따뜻하고 구체적으로.
 반드시 JSON으로만 답한다(설명·코드블록 금지): {"headline":"6~14자 임팩트 헤드라인","tagline":"20자 내외 한 줄","points":["특징1(8자내외)","특징2","특징3"]}`;
 
 // 리뷰 판정 배치와 동일하게 Agent SDK(query) 사용 — Max 구독으로 안정 동작(raw Bearer는 막힘).
-// 사진(비전)은 Agent SDK 텍스트 경로라 소개글 기반으로 생성(사진 첨부 여부만 참고).
-async function callClaude(name, area, intro, hasPhoto) {
-  const prompt = `카페: "${name}" (${area})\n사장님 소개글: ${intro || "(없음)"}${hasPhoto ? "\n(사장님이 매장 사진도 첨부함)" : ""}\n\n위 내용을 바탕으로 홍보 카피를 만들어줘.`;
+// 사진이 있으면 비전(이미지 블록)으로 함께 전달 → Claude가 사진을 '보고' 카피 생성.
+async function callClaude(name, area, intro, photo) {
+  const hasImg = typeof photo === "string" && /^data:image\/(jpe?g|png|webp);base64,/.test(photo);
+  const textPrompt = `카페: "${name}" (${area})\n사장님 소개글: ${intro || "(없음)"}\n\n위 ${hasImg ? "사진과 " : ""}소개글을 바탕으로 홍보 카피를 만들어줘.`;
+  let promptArg = textPrompt;
+  if (hasImg) {
+    const [meta, b64] = photo.split(","); const mt = meta.match(/data:(image\/[\w]+)/)?.[1] || "image/jpeg";
+    promptArg = (async function* () {
+      yield { type: "user", parent_tool_use_id: null, session_id: "", message: { role: "user", content: [{ type: "image", source: { type: "base64", media_type: mt, data: b64 } }, { type: "text", text: textPrompt }] } };
+    })();
+  }
   let text = "";
-  for await (const msg of query({ prompt, options: { systemPrompt: SYSTEM, model: MODEL, maxTurns: 1, allowedTools: [] } })) {
+  for await (const msg of query({ prompt: promptArg, options: { systemPrompt: SYSTEM, model: MODEL, maxTurns: 1, allowedTools: [] } })) {
     if (msg.type === "result" && msg.subtype === "success") text = msg.result;
   }
   const m = text.match(/\{[\s\S]*\}/); if (!m) return null;
@@ -35,7 +43,7 @@ async function main() {
   console.log(`대기 ${pend.length}건 — 홍보 카피 생성 시작`);
   let ok = 0;
   for (const p of pend) {
-    const ai = await callClaude(p.name, p.area, p.intro, !!(p.photos || [])[0]);
+    const ai = await callClaude(p.name, p.area, p.intro, (p.photos || [])[0]);
     if (ai) {
       await fetch(`${APP_URL}/api/promo-queue`, { method: "POST", headers: { "Content-Type": "application/json", "x-admin-password": PW }, body: JSON.stringify({ cafeId: p.cafe_id, ...ai }) });
       console.log(`  ✓ ${p.name}: "${ai.headline}"`); ok++;

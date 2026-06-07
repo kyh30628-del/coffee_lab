@@ -5,6 +5,7 @@ import { BarChart, Bar, XAxis, YAxis, Cell, ResponsiveContainer,
   PieChart, Pie, Tooltip, AreaChart, Area, CartesianGrid } from "recharts";
 import BackLink from "../BackLink";
 import InfoDot from "../InfoDot";
+import Showcase from "../Showcase";
 
 type RankItem = { rank: number; name: string; count: number; grade: string | null; isMe: boolean };
 type CharItem = { key: string; label: string; emoji: string; me: number; avg: number; diff: number; meRaw?: number; hoodPenetration?: number };
@@ -57,6 +58,7 @@ export default function OwnerPage() {
   const [insight, setInsight] = useState<Insight | null>(null);
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState("rank");
+  const [showShowcase, setShowShowcase] = useState(false);
   // 인증은 랜딩(사장님)에서 끝남 — 세션 비밀번호 사용. 없으면 홈(랜딩)으로.
   const [pw, setPw] = useState<string | null>(null);
   useEffect(() => {
@@ -99,7 +101,10 @@ export default function OwnerPage() {
           <BackLink to="/" label="홈" className="text-[#cbb89f] shrink-0" />
           <div className="min-w-0"><div className="text-[#d4a574] text-[10px] tracking-[0.2em] uppercase">For Owners</div><h1 className="text-lg font-bold truncate">사장님 카페 분석</h1></div>
         </div>
-        <a href="/" className="text-xs text-[#cbb89f] underline shrink-0">지도로</a>
+        <div className="flex items-center gap-2.5 shrink-0">
+          <a href="/cafe/register" className="text-xs bg-[#9c6b3f] text-[#f4ece0] rounded-full px-3 py-1.5 whitespace-nowrap">📋 카페 등록</a>
+          <a href="/" className="text-xs text-[#cbb89f] underline">지도로</a>
+        </div>
       </header>
 
       <div className="max-w-2xl mx-auto px-4 sm:px-5 py-6">
@@ -237,11 +242,26 @@ export default function OwnerPage() {
               ))}
             </div>
 
-            <a href="/cafe/register" className="block text-center bg-[#2b2018] text-[#f4ece0] rounded-xl py-3.5 font-medium">우리 카페 정보 등록·🎀 쇼케이스 홍보 →</a>
+            <button onClick={() => setShowShowcase(true)} className="w-full bg-gradient-to-r from-[#9c6b3f] to-[#2b2018] text-[#f4ece0] rounded-xl py-3.5 font-medium">🎀 우리 가게 쇼케이스 만들기 (홍보)</button>
             <p className="text-[10px] text-[#a8927a] mt-3 text-center leading-relaxed">분석은 네이버 공개 후기를 교차검증한 데이터 기반입니다. '결'은 측정값이 아니라 리뷰에서 자주 언급되는 정도입니다.</p>
           </div>
         )}
       </div>
+
+      {showShowcase && insight?.me?.id && (
+        <div className="fixed inset-0 z-[5000]" style={{ fontFamily: "'Gowun Batang', serif" }}>
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowShowcase(false)} />
+          <div className="absolute inset-x-0 bottom-0 sm:inset-0 sm:m-auto sm:w-[460px] sm:h-fit bg-[#fdfaf4] rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col" style={{ maxHeight: "92dvh" }}>
+            <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-[#ece0cd]">
+              <div className="font-bold text-[#2b2018] truncate">🎀 {insight.me.name}</div>
+              <button onClick={() => setShowShowcase(false)} className="text-2xl text-[#9c6b3f] leading-none px-1 shrink-0">×</button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              <Showcase cafeId={insight.me.id} cafeName={insight.me.name} pw={pw ?? ""} />
+            </div>
+          </div>
+        </div>
+      )}
       <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet" />
     </div>
   );
