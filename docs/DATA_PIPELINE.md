@@ -30,12 +30,13 @@
 - **한계**: 네이버 플레이스에 **미등록**이거나 **네이버 블로그 글이 0**인 카페는 수집 불가
   (예: "시월의곰커피공장" — 플레이스·블로그 모두 0 → 합법 소스 없음). → **사장님 직접 등록**(/cafe/register)으로 보완.
 
-### 1-B. 공공데이터 LOCALDATA 발굴 (lib/localdata.ts) — 누락 최소화
-- **소스**: LOCALDATA(지방행정 인허가) OpenAPI — 등록된 **휴게음식점 전수** 중 '카페'만, **영업중만**(폐업·휴업 제외 → 최신성).
-- 좌표 EPSG:5174(중부원점 TM) → WGS84 변환(proj4, 왕복오차 0m 검증). 프랜차이즈·중복 제외.
+### 1-B. 공공데이터 상가정보 발굴 (lib/sangga.ts) — 누락 최소화
+- **소스**: data.go.kr 소상공인시장진흥공단 「상가(상권)정보」 — 등록 상가 중 **'커피전문점/카페/다방'만**.
+  **위경도(WGS84) 직접 제공**(좌표변환 불필요·정확). 프랜차이즈·중복 제외.
+- `storeListInDong`(divId=signguCd)로 시·군·구 단위 조회. METRO_SIGNGU(수도권 시군구코드) 순회.
 - 네이버 지역검색이 놓치는 카페(예: 시월의곰커피공장)를 공식 데이터로 보완.
-- **필요**: `LOCALDATA_KEY`(localdata.go.kr 무료 발급). 라우트 `/api/localdata-discover`는
-  기본 **dry-run(미적재, 샘플 반환)** — 좌표·형식 검증 후 `apply:true`로 적재.
+- **필요**: `DATA_GO_KR_KEY`(data.go.kr 무료 발급). 라우트 `/api/sangga-discover`는
+  기본 **dry-run(미적재, 샘플 반환)** — 위경도·필터 검증 후 `apply:true`로 적재(`{all:true}`로 전 수도권).
 
 ## 2. 후기 수집 (lib/webSearchCollector.ts, placesCollector.ts, synthStore.ts)
 
