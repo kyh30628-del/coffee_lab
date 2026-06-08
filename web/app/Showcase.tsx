@@ -71,7 +71,7 @@ export default function Showcase({ cafeId, cafeName, pw }: { cafeId: number; caf
       <div className="flex items-center gap-2 mb-1">
         <span className="text-lg">🎀</span>
         <h3 className="text-base font-bold">우리 가게 쇼케이스</h3>
-        <span className="text-[9px] bg-[#e8b87a] text-[#2b2018] px-1.5 py-0.5 rounded-full font-bold ml-auto">구독 미리보기</span>
+        <span className="text-[9px] bg-[#e8b87a] text-[#2b2018] px-1.5 py-0.5 rounded-full font-bold ml-auto">💎 구독 전용</span>
       </div>
       <p className="text-[12px] text-[#cbb89f] leading-relaxed mb-3"><b className="text-[#f4ece0]">{cafeName}</b> · 홍보 <b className="text-[#f4ece0]">문구를 적으면 AI가 요약</b>해 어필 카피로, 또는 <b className="text-[#f4ece0]">홍보 영상</b>을 올릴 수 있어요. <b className="text-[#f4ece0]">관리자 승인</b> 후 카페 상세 맨 위에 노출돼요.</p>
 

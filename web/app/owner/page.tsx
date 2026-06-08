@@ -243,8 +243,14 @@ export default function OwnerPage() {
               ))}
             </div>
 
-            <button onClick={() => setShowShowcase(true)} className="w-full bg-gradient-to-r from-[#9c6b3f] to-[#2b2018] text-[#f4ece0] rounded-xl py-3.5 font-medium">🎀 우리 가게 쇼케이스 만들기 (홍보)</button>
-            <p className="text-[10px] text-[#a8927a] mt-3 text-center leading-relaxed">분석은 네이버 공개 후기를 교차검증한 데이터 기반입니다. '결'은 측정값이 아니라 리뷰에서 자주 언급되는 정도입니다.</p>
+            {/* 무료/유료 경계 명확화 */}
+            <div className="mt-5 mb-2 flex items-center gap-2">
+              <span className="text-[10px] bg-[#e8b87a] text-[#2b2018] px-2 py-0.5 rounded-full font-bold">💎 구독 전용</span>
+              <span className="text-[11px] text-[#8a7458]">위 후기 분석은 <b>무료</b> · 아래는 <b>홍보팩(구독)</b></span>
+              <a href="/pricing" className="text-[11px] text-[#9c6b3f] underline ml-auto">요금제</a>
+            </div>
+            <button onClick={() => setShowShowcase(true)} className="w-full bg-gradient-to-r from-[#9c6b3f] to-[#2b2018] text-[#f4ece0] rounded-xl py-3.5 font-medium">🎀 쇼케이스·우선노출·성과 (홍보팩)</button>
+            <p className="text-[10px] text-[#a8927a] mt-3 text-center leading-relaxed">분석은 네이버 공개 후기를 교차검증한 데이터 기반입니다(무료). '결'은 측정값이 아니라 리뷰에서 자주 언급되는 정도입니다.</p>
           </div>
         )}
       </div>

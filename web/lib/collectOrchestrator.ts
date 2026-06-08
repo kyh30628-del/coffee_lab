@@ -25,7 +25,7 @@ export type EvidenceReview = {
 };
 
 export type QualityStats = {
-  raw: number; verified: number; reference: number; rejected: number;
+  raw: number; verified: number; reference: number; rejected: number; duplicates: number;
   rejectReasons: Record<string, number>; // 탈락 사유별 건수 (투명성)
 };
 
@@ -61,7 +61,7 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
   const auditItems: BorderlineItem[] = []; // Sonnet 최종 심사 대상(규칙상 on-topic 전체)
   const seen = new Set<string>();
   const seenLinks = new Set<string>();     // 같은 글(URL) 중복 수집 제거용
-  const stats: QualityStats = { raw: 0, verified: 0, reference: 0, rejected: 0, rejectReasons: {} };
+  const stats: QualityStats = { raw: 0, verified: 0, reference: 0, rejected: 0, duplicates: 0, rejectReasons: {} };
   // 블로그 URL 정규화(프로토콜·m.·쿼리·해시·끝슬래시 무시) → 같은 글 1회만
   const linkKeyOf = (u?: string) => (u ?? "").trim().toLowerCase().replace(/^https?:\/\//, "").replace(/^m\./, "").replace(/[#?].*$/, "").replace(/\/+$/, "");
 
@@ -71,13 +71,14 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
     let kept = 0;
 
     for (const t of src.texts) {
-      stats.raw++;
       // 같은 글이 다른 검색어로 여러 번 수집되는 것 제거(같은 URL = 같은 후기 1건)
       const lk = linkKeyOf(t.link);
-      if (lk) { if (seenLinks.has(lk)) continue; seenLinks.add(lk); }
+      if (lk && seenLinks.has(lk)) { stats.duplicates++; continue; }
+      if (lk) seenLinks.add(lk);
       const key = dedupeKey(t.text);
-      if (seen.has(key)) continue;        // 교차 출처 중복(스니펫 동일) 제거
+      if (seen.has(key)) { stats.duplicates++; continue; }   // 교차 출처 중복(스니펫 동일)
       seen.add(key);
+      stats.raw++;   // 고유 글만 '전체'로 집계 → 전체 = 노이즈 + 옥석 (정확히 맞음)
 
       const rule = verifyReview({ title: t.title, body: t.desc ?? t.text, name, areaTerms: area, source: kind });
 
