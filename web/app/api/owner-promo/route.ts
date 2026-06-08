@@ -18,6 +18,7 @@ async function ensurePromo() {
   )`;
   await sql`ALTER TABLE cafe_promos ADD COLUMN IF NOT EXISTS ai_pending BOOLEAN DEFAULT false`;
   await sql`ALTER TABLE cafe_promos ADD COLUMN IF NOT EXISTS approved BOOLEAN DEFAULT false`; // 관리자 승인 후에만 배너 노출
+  await sql`ALTER TABLE cafe_promos ADD COLUMN IF NOT EXISTS style INT DEFAULT 1`; // 사장님이 고른 템플릿(1~10)
   ready = true;
 }
 const authed = (req: NextRequest) => !!req.headers.get("x-admin-password") && req.headers.get("x-admin-password") === process.env.ADMIN_PASSWORD;
@@ -47,6 +48,12 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     const cafeId = Number(body.cafeId);
     if (!cafeId) return NextResponse.json({ ok: false, error: "cafeId 필요" }, { status: 400 });
+    // 스타일(템플릿)만 변경 — 내용·승인은 그대로(템플릿은 외형만 바꿈)
+    if (body.styleOnly) {
+      await sql`UPDATE cafe_promos SET style=${Math.min(Math.max(Number(body.style) || 1, 1), 10)}, updated_at=now() WHERE cafe_id=${cafeId}`;
+      const r = (await sql`SELECT * FROM cafe_promos WHERE cafe_id=${cafeId}`)[0];
+      return NextResponse.json({ ok: true, promo: r });
+    }
     const intro = String(body.intro ?? "").slice(0, 1000);
     const photos: string[] = Array.isArray(body.photos) ? body.photos.slice(0, 3).filter((p: any) => typeof p === "string") : [];
     const publish = !!body.publish;
@@ -72,6 +79,7 @@ export async function POST(req: NextRequest) {
         ON CONFLICT (cafe_id) DO UPDATE SET intro=EXCLUDED.intro, photos=EXCLUDED.photos, published=true, approved=false, updated_at=now()`;
       if (pending) await sql`UPDATE cafe_promos SET ai_pending=true WHERE cafe_id=${cafeId}`;
     }
+    if (body.style) await sql`UPDATE cafe_promos SET style=${Math.min(Math.max(Number(body.style) || 1, 1), 10)} WHERE cafe_id=${cafeId}`;
     const row = (await sql`SELECT * FROM cafe_promos WHERE cafe_id=${cafeId}`)[0];
     return NextResponse.json({ ok: true, promo: row, generated: !!ai, pending });
   } catch (e) {
