@@ -60,7 +60,17 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-bold mb-2">7. 문의</h2>
+            <h2 className="text-lg font-bold mb-2">7. 사장님 회원·구독 서비스 (해당 시)</h2>
+            <ul className="list-disc ml-5 space-y-1">
+              <li>사장님이 카페 등록·쇼케이스·유료 구독을 이용할 때는 <b>이름·이메일·연락처·가게 정보</b>와, 결제 시 <b>결제대행사(PG)를 통한 결제 정보</b>가 처리될 수 있습니다. (카드번호 등 민감 결제정보는 PG사가 처리하며 본 서비스는 보관하지 않습니다.)</li>
+              <li><b>이용 목적</b>: 회원 식별·구독 관리·결제·고객지원. <b>보유기간</b>: 회원 탈퇴 또는 목적 달성 시까지(관계 법령상 보존의무가 있으면 그 기간).</li>
+              <li>업로드한 홍보 영상·사진·글은 <b>승인 후 카페 상세에 공개</b>되며, 사장님 요청 시 내려집니다.</li>
+              <li>접근 통제·암호화 등 합리적 <b>안전조치</b>를 적용하며, 제3자에게 판매하지 않습니다.</li>
+            </ul>
+          </section>
+
+          <section>
+            <h2 className="text-lg font-bold mb-2">8. 문의</h2>
             <p>개인정보 관련 문의: <b>kyh30628@gmail.com</b></p>
           </section>
         </div>
