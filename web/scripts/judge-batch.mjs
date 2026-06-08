@@ -15,6 +15,11 @@ import { query } from "@anthropic-ai/claude-agent-sdk";
 
 const APP_URL = process.env.APP_URL || "https://coffee-lab-product-builder.vercel.app";
 const PW = process.env.ADMIN_PASSWORD || "";
+
+// 구독 세션 한도/레이트 등은 '문제'가 아니라 정상 종료로 본다(진행분은 이미 저장됨, 내일 04:00 이어감).
+const isLimit = (e) => /session limit|rate limit|429|usage limit|overloaded|exceeded/i.test(String(e?.message ?? e));
+process.on("unhandledRejection", (e) => { if (isLimit(e)) { console.log("구독 한도 도달(비동기) — 오늘은 여기까지. 내일 04:00 이어서 심사."); process.exit(0); } console.error("unhandledRejection:", e); process.exit(0); });
+process.on("uncaughtException", (e) => { if (isLimit(e)) { console.log("구독 한도 도달 — 오늘은 종료. 내일 이어서."); process.exit(0); } console.error("uncaughtException:", e); process.exit(0); });
 const MODEL = process.env.JUDGE_MODEL || "claude-haiku-4-5"; // 분류 작업이라 Haiku로 충분 + 한도·속도 유리
 const MAX_CAFES = Number(process.env.JUDGE_MAX || 150); // 1회 상한(Haiku는 한도 여유 큼 + 도달 시 우아한 중단)
 
@@ -79,4 +84,7 @@ async function main() {
   }
   console.log(`\n완료: ${done}곳 판정, 공개 ${published}곳.`);
 }
-main().catch((e) => { console.error(e); process.exit(1); });
+main().catch((e) => {
+  if (isLimit(e)) { console.log("구독 한도 도달 — 오늘은 종료(진행분 저장). 내일 04:00 이어서."); process.exit(0); }
+  console.error(e); process.exit(0); // 야간 best-effort 배치 — 에러도 로그만 남기고 깨끗이 종료(진행분은 저장됨)
+});

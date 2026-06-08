@@ -55,4 +55,6 @@ async function main() {
   }
   console.log(`완료: ${ok}/${pend.length} 생성.`);
 }
-main().catch((e) => { console.error(e); process.exit(1); });
+const isLimit = (e) => /session limit|rate limit|429|usage limit|overloaded|exceeded/i.test(String(e?.message ?? e));
+process.on("unhandledRejection", (e) => { console.log(isLimit(e) ? "구독 한도 — 홍보 생성 오늘 종료, 내일 이어서." : "promo unhandled: " + String(e).slice(0, 120)); process.exit(0); });
+main().catch((e) => { if (isLimit(e)) console.log("구독 한도 — 홍보 생성 오늘 종료, 내일 이어서."); else console.error(e); process.exit(0); });

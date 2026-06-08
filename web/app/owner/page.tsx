@@ -96,15 +96,14 @@ export default function OwnerPage() {
 
   return (
     <div className="min-h-screen bg-[#f4ece0] text-[#2b2018]" style={{ fontFamily: "'Gowun Batang', serif" }}>
-      <header className="bg-[#2b2018] text-[#f4ece0] px-5 py-4 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
+      <header className="bg-[#2b2018] text-[#f4ece0] px-4 py-3 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
           <BackLink to="/" label="홈" className="text-[#cbb89f] shrink-0" />
-          <div className="min-w-0"><div className="text-[#d4a574] text-[10px] tracking-[0.2em] uppercase">For Owners</div><h1 className="text-lg font-bold truncate">사장님 카페 분석</h1></div>
+          <h1 className="text-[15px] font-bold truncate">사장님 분석</h1>
         </div>
-        <div className="flex items-center gap-2.5 shrink-0">
-          <a href="/pricing" className="text-xs bg-[#e8b87a] text-[#2b2018] rounded-full px-3 py-1.5 whitespace-nowrap font-bold">💎 요금제</a>
-          <a href="/cafe/register" className="text-xs bg-[#9c6b3f] text-[#f4ece0] rounded-full px-3 py-1.5 whitespace-nowrap">📋 카페 등록</a>
-          <a href="/" className="text-xs text-[#cbb89f] underline">지도로</a>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <a href="/pricing" className="text-[11px] bg-[#e8b87a] text-[#2b2018] rounded-full px-2.5 py-1.5 whitespace-nowrap font-bold">💎 요금제</a>
+          <a href="/cafe/register" className="text-[11px] bg-[#9c6b3f] text-[#f4ece0] rounded-full px-2.5 py-1.5 whitespace-nowrap">📋 등록</a>
         </div>
       </header>
 
