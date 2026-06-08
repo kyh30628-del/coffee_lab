@@ -44,6 +44,7 @@ ul{margin:5px 0 5px 18px}li{margin:3px 0}
 <tr><td>로그인한 Gmail ≠ 신청자여도 되나?</td><td>기술적으로는 가능하나 <b>권장하지 않음.</b> 양식엔 '연락처 이메일'을 따로 적고 회신은 거기로 옵니다. 다만 <b>할당량 받을 Google Cloud 프로젝트를 소유한 계정으로 로그인 + 그 계정을 연락처로</b> 쓰는 게 검증·적용이 깔끔합니다. (= 유튜브 키 만든 그 계정으로 로그인)</td></tr>
 <tr><td>비용은?</td><td><b>무료.</b> 단 구글이 <b>실제 검토(audit)</b>를 합니다. 승인까지 며칠~몇 주, 회신 기한은 공지 없음.</td></tr>
 <tr><td>꼭 필요한 준비물?</td><td>① Cloud <b>프로젝트 번호</b> ② <b>공개 개인정보처리방침 URL</b> ③ 홈/약관/방침 <b>스크린샷</b> (아래 §1)</td></tr>
+<tr><td>나중에 <b>사장님 구독(유료)</b>으로 가도 약관 위반 아닌가?</td><td><b>아니요(조건부 OK).</b> 구독이 <b>내 분석·마케팅 도구</b> 판매면 됨. 유튜브 데이터/영상을 팔거나 페이월 뒤에 두면 위반. 자세한 선은 <b>§3</b>.</td></tr>
 </table>
 <div class="box warn"><b>가장 흔한 거부 사유</b> — ① 공개 개인정보처리방침 없음 ② 사용 사례가 모호 ③ 스크래핑·대량다운로드처럼 보임. 이 가이드는 셋 다 피하도록 작성돼 있습니다.</div>
 </div>
@@ -91,10 +92,14 @@ https://coffee-lab-product-builder.vercel.app/terms  (이용약관)</div>
 metropolitan area. I use the YouTube Data API (search.list, videos.list,
 commentThreads.list) to find public videos about specific local cafes by name,
 and retrieve only the video title, description, publish date, and a few top
-comments to cross-verify and enrich publicly sourced review data. I do NOT
-download, host, embed, or re-host any video content. Every video is linked back
-to YouTube via a "Watch on YouTube" link. I request a higher daily quota to
-backfill metadata for ~3,000 local cafes (currently limited to ~95/day).</div>
+comment TEXTS (no commenter identity/usernames) to cross-verify and enrich
+publicly sourced review data. I do NOT download, host, embed, or re-host any
+video; every video links back to YouTube and watching is always free (never
+gated behind login, payment, or subscription). The service is free for
+consumers; I plan a future paid subscription for cafe OWNERS offering my own
+marketing/analytics tools — NOT access to, or resale of, YouTube data or
+metrics. I request a higher daily quota to backfill metadata for ~3,000 local
+cafes (currently limited to ~95/day).</div>
 </div>
 
 <!-- 2 섹션별 입력값 (B) -->
@@ -147,9 +152,35 @@ to the original YouTube videos, no downloading or re-hosting.</div>
 <div class="box hl"><b>필수 첨부</b>: §1의 스크린샷 3장(홈·개인정보처리방침·이용약관) + (가점) 카페 상세의 ▶YouTube 화면.</div>
 </div>
 
-<!-- 3 제출 후 -->
+<!-- 3 약관 준수 -->
+<div class="page brk">
+<h2><span class="n">3.</span> 약관·법적 리스크 체크 (심사 통과 핵심)</h2>
+<p class="lead">심사는 결국 "약관 위반 여부"를 봅니다. 우리가 지키는 선과, 무료→유료(사장님 구독) 전환 시 주의점.</p>
+<h3>✅ 우리가 지키는 선 (이대로면 안전)</h3>
+<table>
+<tr><th style="width:32%">항목</th><th>우리 상태</th></tr>
+<tr><td>영상 재호스팅</td><td>안 함 — 메타데이터만, 원본 YouTube로 링크</td></tr>
+<tr><td>영상 시청 제한</td><td>없음 — 클릭하면 바로 재생. <b>구독·로그인·요금 뒤에 숨기지 않음</b></td></tr>
+<tr><td>댓글 개인정보</td><td>댓글 <b>텍스트만</b>. 작성자 아이디·채널·프로필 <b>미수집</b>, @멘션 제거</td></tr>
+<tr><td>유튜브 데이터 재판매</td><td>안 함 — 구독은 <b>사장님용 마케팅·분석 도구</b> 판매, 유튜브 데이터/지표 판매 아님</td></tr>
+<tr><td>파생 지표 판매</td><td>안 함 — 점수는 네이버 후기 중심, 유튜브는 '언급 여부' 보조</td></tr>
+<tr><td>저장·삭제</td><td>교차검증 캐시만, 주기 갱신, 정책 한도(통상 30일) 내 보관, 삭제요청 30일 내</td></tr>
+</table>
+<div class="box warn"><b>구독(유료) 전환 — 이 3가지만 지키면 OK</b><br>① 구독 명목은 "유튜브 영상 보기"가 아니라 <b>사장님 분석·마케팅 도구</b> ② 어떤 영상도 <b>페이월 뒤에 두지 않기</b> ③ 유튜브 통계(조회·참여)를 가공해 <b>"유튜브 성과 분석"으로 팔지 않기</b>.</div>
+<h3>⚠️ 흔한 탈락 사유 (우리는 회피)</h3>
+<ul>
+<li>유튜브 데이터 재판매 / 유튜브 대체 서비스 → 우리는 '안내·검증 보조 소스'</li>
+<li>영상 시청 페이월 → 항상 무료 클릭 재생</li>
+<li>스크래핑 → 공식 API만 사용</li>
+<li>댓글 작성자 등 개인정보 수집·프로파일링 → 텍스트만, 식별정보 없음</li>
+</ul>
+<div class="box hl"><b>방침에 명시 완료</b> — <span class="val">/privacy</span> 에 "댓글 텍스트만·식별정보 없음·시청 무제한·30일 캐시·삭제·YouTube API 약관 준수"가 적혀 있어 심사에 유리합니다.</div>
+<p class="small">근거: developers.google.com/youtube/terms (API Services Terms of Service · Developer Policies, 2026 개정 기준)</p>
+</div>
+
+<!-- 4 제출 후 -->
 <div class="page">
-<h2><span class="n">3.</span> 제출 · 그 후 · 핵심 체크</h2>
+<h2><span class="n">4.</span> 제출 · 그 후 · 핵심 체크</h2>
 <h3>제출 전 마지막 체크</h3>
 <p><span class="chk"></span> 로그인 = 유튜브 키 만든 그 Google 계정인가</p>
 <p><span class="chk"></span> 개인정보처리방침·이용약관 페이지가 <b>공개 URL</b>로 열리는가</p>
