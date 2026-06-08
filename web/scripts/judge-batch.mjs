@@ -15,8 +15,8 @@ import { query } from "@anthropic-ai/claude-agent-sdk";
 
 const APP_URL = process.env.APP_URL || "https://coffee-lab-product-builder.vercel.app";
 const PW = process.env.ADMIN_PASSWORD || "";
-const MODEL = process.env.JUDGE_MODEL || "claude-sonnet-4-5";
-const MAX_CAFES = Number(process.env.JUDGE_MAX || 60); // 1회 실행 상한(구독 세션 한도 보호 — 400은 한도 초과)
+const MODEL = process.env.JUDGE_MODEL || "claude-haiku-4-5"; // 분류 작업이라 Haiku로 충분 + 한도·속도 유리
+const MAX_CAFES = Number(process.env.JUDGE_MAX || 150); // 1회 상한(Haiku는 한도 여유 큼 + 도달 시 우아한 중단)
 
 const RUBRIC = `너는 카페 리뷰 품질의 '최종 심사관'이다. 규칙 필터를 통과한 후보 스니펫들을 다시 엄격히 심사해, 그 카페의 '진짜 방문 후기'이면서 소비자에게 도움되는 양질의 글만 통과시킨다(거짓양성도 걸러낸다).
 - about=true: 그 카페(또는 같은 지역·컨셉·메뉴가 일치하는 그 가게)를 실제로 방문해 쓴 글. 이름이 글자 그대로 없어도 내용·맥락(지역·분위기·메뉴·방문경험)이 그 카페를 가리키면 true.
