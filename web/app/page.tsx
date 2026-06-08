@@ -13,6 +13,7 @@ type Cafe = {
   synth_grade: string | null; synth_identity: string | null;
   synth_count: number | null; synth_reviews?: EvidenceReview[] | null;
   char_scores?: Record<string, number> | null;
+  featured?: boolean;
 };
 type DCafe = { id: number; name: string; area: string; lat: number; lng: number; grade: string | null; count: number | null; identity: string | null; note: string | null; beanNote: string[]; reason?: string };
 type Discover = { headlineA: DCafe | null; headlineB: DCafe | null; top3: DCafe[]; fresh: DCafe[]; specialty: DCafe[]; featured?: DCafe[]; scopeCount: number };
@@ -77,16 +78,20 @@ const TONES = ["#6f4e37", "#5f7355", "#9c6b3f", "#3a2e28", "#8a5a24"];
 
 function makePinHtml(c: Cafe, isMatch: boolean, isFocus = false): string {
   const grade = c.synth_grade ?? "발굴";
-  const color = isFocus ? "#b5703c" : isMatch ? "#5f7355" : (GRADE_STYLE[grade]?.bg ?? "#9c6b3f");
-  const size = isFocus ? 44 : isMatch ? 36 : 28;
+  const feat = !!c.featured && !isFocus; // ✨ 우선 노출 — 골드 핀 강조(포커스 핀이 우선)
+  const color = isFocus ? "#b5703c" : feat ? "#e0a32e" : isMatch ? "#5f7355" : (GRADE_STYLE[grade]?.bg ?? "#9c6b3f");
+  const size = isFocus ? 44 : feat ? 38 : isMatch ? 36 : 28;
   const ring = isFocus
     ? "box-shadow:0 0 0 6px rgba(181,112,60,0.4),0 3px 10px rgba(0,0,0,0.4);"
+    : feat ? "box-shadow:0 0 0 4px rgba(224,163,46,0.45),0 2px 8px rgba(0,0,0,0.35);"
     : isMatch ? "box-shadow:0 0 0 4px rgba(95,115,85,0.3),0 2px 6px rgba(0,0,0,0.3);" : "box-shadow:0 1px 4px rgba(0,0,0,0.3);";
-  const labelStyle = isFocus ? "background:#b5703c;color:#fff;font-weight:700;" : "background:rgba(253,250,244,0.95);color:#2b2018;font-weight:600;";
+  const labelStyle = isFocus ? "background:#b5703c;color:#fff;font-weight:700;"
+    : feat ? "background:#e0a32e;color:#2b2018;font-weight:700;" : "background:rgba(253,250,244,0.95);color:#2b2018;font-weight:600;";
+  const glyph = isFocus ? "📍" : feat ? "⭐" : "☕";
   return `<div style="transform:translate(-50%,-100%);text-align:center;">
     <div style="width:${size}px;height:${size}px;background:${color};border:2px solid #fdfaf4;border-radius:50% 50% 50% 0;transform:rotate(-45deg);${ring}display:flex;align-items:center;justify-content:center;margin:0 auto;">
-      <span style="transform:rotate(45deg);font-size:${isFocus ? 18 : isMatch ? 14 : 11}px;">${isFocus ? "📍" : "☕"}</span></div>
-    <div style="margin-top:2px;${labelStyle}padding:1px 5px;border-radius:7px;font-size:${isFocus ? 10 : 9}px;white-space:nowrap;display:inline-block;">${c.name}${isFocus ? "" : isMatch ? " ✓" : ""}</div>
+      <span style="transform:rotate(45deg);font-size:${isFocus ? 18 : isMatch || feat ? 14 : 11}px;">${glyph}</span></div>
+    <div style="margin-top:2px;${labelStyle}padding:1px 5px;border-radius:7px;font-size:${isFocus ? 10 : 9}px;white-space:nowrap;display:inline-block;">${c.name}${isFocus ? "" : feat ? " ⭐" : isMatch ? " ✓" : ""}</div>
   </div>`;
 }
 function topChars(c: Cafe, n = 4) {
@@ -266,7 +271,7 @@ export default function Home() {
       const isFocus = c.id === focusId;
       const isMatch = matchSet.has(c.id);
       const icon = L.divIcon({ className: "", html: makePinHtml(c, isMatch, isFocus), iconSize: [0, 0] });
-      const m = L.marker([c.lat, c.lng], { icon, zIndexOffset: isFocus ? 3000 : isMatch ? 1000 : 0 }).addTo(layerRef.current).on("click", () => setSelected(c));
+      const m = L.marker([c.lat, c.lng], { icon, zIndexOffset: isFocus ? 3000 : c.featured ? 2000 : isMatch ? 1000 : 0 }).addTo(layerRef.current).on("click", () => setSelected(c));
       if (isFocus) { m.bindPopup(`<b>${c.name}</b><br>${c.area}`); m.openPopup(); }
     });
     // 핀 고정 중이면 그 카페로 이동(아래 focus 효과)에 맡기고 fitBounds 생략

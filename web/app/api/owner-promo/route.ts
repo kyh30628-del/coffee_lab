@@ -23,7 +23,6 @@ async function ensurePromo() {
   await sql`ALTER TABLE cafe_promos ADD COLUMN IF NOT EXISTS featured BOOLEAN DEFAULT false`; // 우선 노출(유료 상품, 관리자 토글)
   await sql`ALTER TABLE cafe_promos ADD COLUMN IF NOT EXISTS featured_until TIMESTAMPTZ`;     // 구독 기간 — 만료 시 자동 해제
   await sql`ALTER TABLE cafe_promos ADD COLUMN IF NOT EXISTS coupon TEXT`;                    // 🎟 쿠폰·프로모션(혜택 문구)
-  await sql`ALTER TABLE cafe_promos ADD COLUMN IF NOT EXISTS trial_used BOOLEAN DEFAULT false`; // 🎁 14일 무료체험 1회 사용 여부
   await sql`ALTER TABLE cafe_promos ADD COLUMN IF NOT EXISTS views INT DEFAULT 0`;   // 1차 성과: 노출(조회)
   await sql`ALTER TABLE cafe_promos ADD COLUMN IF NOT EXISTS clicks INT DEFAULT 0`;  // 클릭
   await sql`ALTER TABLE cafe_promos ADD COLUMN IF NOT EXISTS plays INT DEFAULT 0`;   // 영상 재생
@@ -67,15 +66,6 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     const cafeId = Number(body.cafeId);
     if (!cafeId) return NextResponse.json({ ok: false, error: "cafeId 필요" }, { status: 400 });
-    // 🎁 우선노출 14일 무료 체험 — 카페당 1회. (승인된 홍보가 있어야 노출됨)
-    if (body.trial) {
-      const cur = (await sql`SELECT trial_used FROM cafe_promos WHERE cafe_id=${cafeId}`)[0];
-      if (!cur) return NextResponse.json({ ok: false, error: "먼저 쇼케이스를 저장해 주세요" }, { status: 400 });
-      if (cur.trial_used) return NextResponse.json({ ok: false, error: "무료 체험은 1회만 가능해요" }, { status: 400 });
-      await sql`UPDATE cafe_promos SET featured=true, featured_until = now() + make_interval(days => 14), trial_used=true WHERE cafe_id=${cafeId}`;
-      const r = (await sql`SELECT * FROM cafe_promos WHERE cafe_id=${cafeId}`)[0];
-      return NextResponse.json({ ok: true, promo: r, trial: true });
-    }
     // 🎟 쿠폰(혜택 문구)만 저장 — 내용·승인 유지
     if (body.couponOnly) {
       await sql`UPDATE cafe_promos SET coupon=${String(body.coupon ?? "").slice(0, 60) || null}, updated_at=now() WHERE cafe_id=${cafeId}`;

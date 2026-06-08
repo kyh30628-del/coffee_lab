@@ -7,12 +7,14 @@ export async function GET() {
   try {
     await ensureSchema();
     const cafes = await sql`
-      SELECT id, name, area, lat, lng, vibe, note, signature,
-             synth_grade, synth_count, synth_identity,
-             acidity, body, sweet, roasts_own, uses, tone, photo_url, hours, phone, char_scores
-      FROM cafes
-      WHERE published = true
-      ORDER BY (note IS NOT NULL AND note <> '') DESC, synth_count DESC NULLS LAST
+      SELECT c.id, c.name, c.area, c.lat, c.lng, c.vibe, c.note, c.signature,
+             c.synth_grade, c.synth_count, c.synth_identity,
+             c.acidity, c.body, c.sweet, c.roasts_own, c.uses, c.tone, c.photo_url, c.hours, c.phone, c.char_scores,
+             COALESCE(p.featured AND p.approved AND (p.featured_until IS NULL OR p.featured_until > now()), false) AS featured
+      FROM cafes c
+      LEFT JOIN cafe_promos p ON p.cafe_id = c.id
+      WHERE c.published = true
+      ORDER BY (c.note IS NOT NULL AND c.note <> '') DESC, c.synth_count DESC NULLS LAST
     `;
     return NextResponse.json({ ok: true, cafes });
   } catch (e) {

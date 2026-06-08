@@ -27,11 +27,6 @@ export default function Showcase({ cafeId, cafeName, pw }: { cafeId: number; caf
     try { const r = await fetch("/api/owner-promo", { method: "POST", headers: { ...hdr, "Content-Type": "application/json" }, body: JSON.stringify({ cafeId, couponOnly: true, coupon }) }); const d = await r.json(); if (d.ok) { setPromo(d.promo); setMsg("🎟 쿠폰 저장됨"); } } catch {}
     setBusy(false);
   };
-  const startTrial = async () => {
-    setBusy(true);
-    try { const r = await fetch("/api/owner-promo", { method: "POST", headers: { ...hdr, "Content-Type": "application/json" }, body: JSON.stringify({ cafeId, trial: true }) }); const d = await r.json(); if (d.ok) { setPromo(d.promo); setMsg("🎁 14일 무료 체험 시작! 홈 ‘추천 카페’에 노출돼요"); } else setMsg(d.error ?? "오류"); } catch {}
-    setBusy(false);
-  };
 
   const resizeImg = (file: File): Promise<string> => new Promise((res) => {
     const img = new Image(); const fr = new FileReader();
@@ -120,10 +115,6 @@ export default function Showcase({ cafeId, cafeName, pw }: { cafeId: number; caf
             <div className="bg-black/25 rounded-lg py-2 text-center"><div className="text-lg font-bold text-[#e8b87a]">{promo.clicks ?? 0}</div><div className="text-[9px] text-[#cbb89f]">클릭</div></div>
             <div className="bg-black/25 rounded-lg py-2 text-center"><div className="text-lg font-bold text-[#e8b87a]">{promo.plays ?? 0}</div><div className="text-[9px] text-[#cbb89f]">영상 재생</div></div>
           </div>
-          {/* 🎁 무료 체험 */}
-          {!promo.featured && !promo.trial_used && (
-            <button disabled={busy} onClick={startTrial} className="w-full mt-2 bg-[#e8b87a] text-[#2b2018] rounded-lg py-2 text-[12px] font-bold disabled:opacity-50">🎁 우선 노출 14일 무료 체험 시작</button>
-          )}
         </div>
       )}
 
