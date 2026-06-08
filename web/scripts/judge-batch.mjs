@@ -23,14 +23,15 @@ process.on("uncaughtException", (e) => { if (isLimit(e)) { console.log("구독 �
 const MODEL = process.env.JUDGE_MODEL || "claude-haiku-4-5"; // 분류 작업이라 Haiku로 충분 + 한도·속도 유리
 const MAX_CAFES = Number(process.env.JUDGE_MAX || 150); // 1회 상한(Haiku는 한도 여유 큼 + 도달 시 우아한 중단)
 
-const RUBRIC = `너는 카페 리뷰 품질의 '최종 심사관'이다. 규칙 필터를 통과한 후보 스니펫들을 다시 엄격히 심사해, 그 카페의 '진짜 방문 후기'이면서 소비자에게 도움되는 양질의 글만 통과시킨다(거짓양성도 걸러낸다).
-- about=true: 그 카페(또는 같은 지역·컨셉·메뉴가 일치하는 그 가게)를 실제로 방문해 쓴 글. 이름이 글자 그대로 없어도 내용·맥락(지역·분위기·메뉴·방문경험)이 그 카페를 가리키면 true.
-- about=false: 다른 가게·동명 카페·무관한 글(단어만 우연히 겹침), 나열식 맛집 모음에 이름만 끼인 글.
-- helpful=true: 맛·분위기·메뉴·서비스 등 구체 경험/평가가 담겨 도움됨. false: 광고·협찬 위주, 내용 없는 단순 언급, 사진만.
+const RUBRIC = `너는 카페 리뷰 품질의 '최종 심사관'이다. 규칙 필터를 통과한 후보들을 '본문 내용'으로 엄격·공정하게 심사한다.
+- about=true: 본문에 '이 카페'에 대한 구체적 내용(메뉴·맛·커피·분위기·방문경험)이 '충분히' 담긴 글. 한 글에서 다른 가게(점심·디저트·다른 코스 등)를 함께 언급하더라도, 이 카페 내용이 충분하면 true. 상호가 글자 그대로 없어도 맥락(지역·메뉴·경험)이 이 카페를 가리키면 true.
+- about=false: 이 카페 내용이 거의 없이 '상호만 스쳐 지나간' 글(맛집 나열에 이름만 끼인 경우), 또는 본문이 '동명의 다른 가게'를 가리키는 글.
+- helpful=true: 이 카페에 대한 구체 경험·평가가 있어 도움됨. false: 광고·협찬 위주, 내용 없는 단순 언급, 사진만.
+핵심 원칙: '다른 가게를 같이 언급했다'는 이유만으로 버리지 마라. 오직 '이 카페 내용의 충분함'으로 판단한다. 내용이 혼재되고 이 카페 분량마저 부실할 때만 false.
 판정이 애매하면 보수적으로 false. 반드시 JSON 배열로만 답한다(설명·코드블록 금지): [{"i":번호,"about":true/false,"helpful":true/false}]`;
 
 async function judge(cafeName, area, items) {
-  const list = items.map((b, i) => `#${i} 제목:"${(b.title || "").slice(0, 120)}" 내용:"${(b.body || "").slice(0, 300)}"`).join("\n");
+  const list = items.map((b, i) => `#${i} 제목:"${(b.title || "").slice(0, 120)}" 내용:"${(b.body || "").slice(0, 600)}"`).join("\n");
   const prompt = `대상 카페: "${cafeName}" (${area})\n\n스니펫:\n${list}`;
   let text = "";
   for await (const msg of query({ prompt, options: { systemPrompt: RUBRIC, model: MODEL, maxTurns: 1, allowedTools: [] } })) {

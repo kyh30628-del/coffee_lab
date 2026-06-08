@@ -51,9 +51,18 @@ function maskPII(s: string): string {
     .replace(/\b\d{2,4}[-\s.]\d{3,4}[-\s.]\d{4}\b/g, "***-****-****")
     .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, "***@***");
 }
-function toQuote(text: string, maxLen = 80): string {
-  const t = maskPII(text.trim());
-  return t.length <= maxLen ? t : t.slice(0, maxLen) + "…";
+const COFFEE_TERMS = /커피|카페|라떼|아메리카노|원두|로스팅|에스프레소|디저트|케이크|베이커리|빵|브런치|분위기|인테리어|메뉴|음료|핸드드립|드립|콜드브루|바리스타|좌석|자리|맛있|고소|산미|크림|디카페인|플랫화이트|감성|예쁘|아늑|향/;
+// 표시 인용문: '이 카페·커피' 관련 문장을 우선 골라 1줄로. 다른 가게(점심·디저트 등)를 함께 적은
+// 글이어도 카페 내용이 담긴 문장이 보이게 → 멀티 언급 글도 의미 있게 활용.
+function toQuote(text: string, name = "", maxLen = 90): string {
+  const masked = maskPII(text.trim());
+  const sentences = masked.split(/(?<=[.!?。…])\s+|\n+|\s{2,}/).map((s) => s.trim()).filter((s) => s.length >= 5);
+  if (sentences.length <= 1) return masked.length <= maxLen ? masked : masked.slice(0, maxLen) + "…";
+  const namePart = name.replace(/\s+/g, "").slice(0, 4);
+  const score = (s: string) => (namePart && s.replace(/\s+/g, "").includes(namePart) ? 3 : 0) + (COFFEE_TERMS.test(s) ? 2 : 0);
+  let best = sentences[0], bestSc = score(sentences[0]);
+  for (const s of sentences) { const sc = score(s); if (sc > bestSc) { best = s; bestSc = sc; } }
+  return best.length <= maxLen ? best : best.slice(0, maxLen) + "…";
 }
 const dedupeKey = (s: string) => s.toLowerCase().replace(/\s+/g, "").slice(0, 60);
 
@@ -119,7 +128,7 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
 
       if (t.link || src.source === "google") {
         evidence.push({
-          quote: toQuote(t.text), link: t.link, source: t.source, date: t.date,
+          quote: toQuote(t.text, name), link: t.link, source: t.source, date: t.date,
           trust: verdict, score, why: reasons.slice(0, 3),
         });
       }

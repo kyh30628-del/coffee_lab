@@ -55,7 +55,12 @@ async function main() {
     const issue = String(v.issue || "").slice(0, 200);
     await sql`INSERT INTO grounding_checks (cafe_id, grounded, issue, checked_at) VALUES (${c.id}, ${grounded}, ${issue}, now())
       ON CONFLICT (cafe_id) DO UPDATE SET grounded = ${grounded}, issue = ${issue}, checked_at = now()`;
-    done++; if (!grounded) { flagged++; console.log(`⚠ ${c.name}: ${issue}`); }
+    done++;
+    if (!grounded) {
+      flagged++; console.log(`⚠ ${c.name}: ${issue}`);
+      // 되먹임: 업체혼동·환각 의심 카페는 판정 큐로 재투입 → 판정 AI가 본문 재심사(동명 다른 가게 제거)
+      await sql`UPDATE cafes SET llm_judged_at = NULL WHERE id = ${c.id}`;
+    }
     await new Promise((r) => setTimeout(r, 200));
   }
   console.log(`\n그라운딩 검사 완료: ${done}곳 검사, ${flagged}곳 환각 의심(human review 필요).`);
