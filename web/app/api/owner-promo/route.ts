@@ -30,10 +30,8 @@ export async function GET(req: NextRequest) {
     const cafeId = Number(req.nextUrl.searchParams.get("cafeId"));
     if (!cafeId) return NextResponse.json({ ok: false, error: "cafeId 필요" }, { status: 400 });
     const row = (await sql`SELECT * FROM cafe_promos WHERE cafe_id=${cafeId} LIMIT 1`)[0];
-    // 소비자(비관리자)는 '관리자 승인 + 로컬 환경'에서만 본다(배포본엔 노출 안 함). 관리자는 전부.
-    const host = req.headers.get("host") || "";
-    const isLocal = /^(localhost|127\.|0\.0\.0\.0|\[?::1\]?|192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host);
-    if (!row || (!authed(req) && (!row.approved || !isLocal))) return NextResponse.json({ ok: true, promo: null });
+    // 소비자(비관리자)는 '관리자 승인된' 홍보만 본다(배포 포함). 관리자는 미리보기 위해 전부.
+    if (!row || (!authed(req) && !row.approved)) return NextResponse.json({ ok: true, promo: null });
     return NextResponse.json({ ok: true, promo: row });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });

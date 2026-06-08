@@ -18,11 +18,16 @@ export const SHOWCASE_CSS = `
 .scb{position:relative;width:100%;overflow:hidden}
 .scb .scbg,.scb .scimg{position:absolute;inset:0;width:100%;height:100%}
 .scb .scimg{object-fit:cover}
-.scb .lab{position:absolute;top:13px;left:14px;z-index:6;font-size:9px;font-weight:700;letter-spacing:1px;padding:4px 10px;border-radius:99px;display:inline-flex;align-items:center;overflow:hidden}
+.scb .scbg,.scb .scimg{animation:scDrift 15s ease-in-out infinite alternate}
+.scb .lab{position:absolute;top:13px;left:14px;z-index:6;font-size:9px;font-weight:700;letter-spacing:1px;padding:4px 10px;border-radius:99px;display:inline-flex;align-items:center;overflow:hidden;animation:scLabIn .55s cubic-bezier(.2,.9,.3,1.3) both}
 .scb .ct{position:absolute;left:18px;right:18px;bottom:16px;z-index:5}
-.scb .tg{font-size:11.5px;margin-bottom:5px}
-.scb .hd{font-weight:900;line-height:1.12;white-space:pre-line}
+.scb .tg{font-size:11.5px;margin-bottom:5px;animation:scUp .6s .12s both}
+.scb .hd{font-weight:900;line-height:1.12;white-space:pre-line;animation:scRise .7s .24s both}
 .scb .row{display:flex;gap:5px;margin-top:11px;flex-wrap:wrap}
+.scb .row .chip{animation:scUp .5s both}
+.scb .row .chip:nth-child(1){animation-delay:.42s}.scb .row .chip:nth-child(2){animation-delay:.52s}.scb .row .chip:nth-child(3){animation-delay:.62s}
+.scb .cta{animation:scUp .5s .45s both,scBounce 1.6s 1s ease-in-out infinite}
+.scb .ln,.scb .est{animation:scUp .5s .5s both}
 .scb .chip{font-size:10px;padding:3px 9px;border-radius:99px}
 @keyframes scKen{0%{transform:scale(1.04)}100%{transform:scale(1.14) translate(-2%,-3%)}}
 @keyframes scUp{from{opacity:0;transform:translateY(15px)}to{opacity:1;transform:translateY(0)}}
@@ -42,12 +47,15 @@ export const SHOWCASE_CSS = `
 @keyframes scFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
 @keyframes scHue{0%{filter:hue-rotate(0)}100%{filter:hue-rotate(18deg)}}
 @keyframes scLab{0%,100%{transform:translateY(0)}50%{transform:translateY(-2.5px)}}
+@keyframes scDrift{0%{transform:scale(1.04)}100%{transform:scale(1.09) translate(-1.5%,-2%)}}
+@keyframes scLabIn{0%{opacity:0;transform:scale(.55) translateY(-7px)}100%{opacity:1;transform:scale(1) translateY(0)}}
+@keyframes scRise{from{opacity:0;transform:translateY(18px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
 
 /* 1 매거진 */
 .sc1 .scbg{background:radial-gradient(120% 90% at 70% 25%,#c79a62,#7a5230 50%,#3a2516)}
 .sc1 .scbg,.sc1 .scimg{animation:scKen 11s ease-in-out infinite alternate}
 .sc1 .ov{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.9),transparent 50%)}
-.sc1 .lab{background:#e8b87a;color:#2b2018;animation:scLab 3s ease-in-out infinite}
+.sc1 .lab{background:#e8b87a;color:#2b2018;animation:scLabIn .55s cubic-bezier(.2,.9,.3,1.3) both,scLab 3s 1s ease-in-out infinite}
 .sc1 .lab i{position:absolute;inset:0;background:linear-gradient(105deg,transparent 32%,rgba(255,255,255,.8) 50%,transparent 68%);animation:scShine 3.6s ease-in-out infinite}
 .sc1 .ct{color:#fff}.sc1 .tg{color:#f3d9a8;animation:scUp .6s .1s both}
 .sc1 .hd{font-size:25px;text-shadow:0 2px 14px rgba(0,0,0,.6);animation:scUp .65s .25s both}
@@ -59,8 +67,8 @@ export const SHOWCASE_CSS = `
 .sc2 .ov2{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.85),transparent 55%)}
 .sc2 .lab{color:#e8b87a;border:1px solid rgba(232,184,122,.6)}
 .sc2 .ct{color:#fff}.sc2 .tg{color:#e8b87a}
-.sc2 .hd{font-size:25px;animation:scGlow 2.6s ease-in-out infinite}
-.sc2 .cta{display:inline-block;margin-top:11px;font-size:11px;font-weight:700;color:#14100c;background:#e8b87a;padding:6px 14px;border-radius:99px;animation:scBounce 1.6s ease-in-out infinite}
+.sc2 .hd{font-size:25px;animation:scRise .7s .24s both,scGlow 2.6s 1.1s ease-in-out infinite}
+.sc2 .cta{display:inline-block;margin-top:11px;font-size:11px;font-weight:700;color:#14100c;background:#e8b87a;padding:6px 14px;border-radius:99px}
 
 /* 3 시네마틱 */
 .sc3 .scbg{background:radial-gradient(120% 90% at 50% 35%,#6b4e34,#241608)}
@@ -71,7 +79,7 @@ export const SHOWCASE_CSS = `
 .sc3 .bar.t{top:0;animation:scBarT 1s ease-out both}.sc3 .bar.b{bottom:0;animation:scBarB 1s ease-out both}
 .sc3 .lab{background:#e8b87a;color:#2b2018;top:34px}
 .sc3 .ct{color:#fff;bottom:36px}.sc3 .tg{letter-spacing:1px;color:#d9c4a0}
-.sc3 .hd{font-size:22px}.sc3 .hd .w{display:inline-block;animation:scWord .5s both}
+.sc3 .hd{font-size:22px;animation:none}.sc3 .hd .w{display:inline-block;animation:scWord .5s both}
 .sc3 .hd .w:nth-child(1){animation-delay:1.1s}.sc3 .hd .w:nth-child(2){animation-delay:1.25s}.sc3 .hd .w:nth-child(3){animation-delay:1.4s}.sc3 .hd .w:nth-child(4){animation-delay:1.55s}
 .sc3 .chip{background:rgba(255,255,255,.16);color:#fff;border:1px solid rgba(255,255,255,.3)}
 
