@@ -34,6 +34,7 @@ export default function AdminPage() {
   const [showAuto, setShowAuto] = useState(false);
   const [q, setQ] = useState("");
   const [review, setReview] = useState<any[]>([]);
+  const [subs, setSubs] = useState<any[]>([]);
 
   const load = async (password: string) => {
     setMsg("불러오는 중...");
@@ -44,6 +45,7 @@ export default function AdminPage() {
     else { setMsg("오류: " + d.error); return; }
     fetch("/api/admin/stats", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((s) => { if (s.ok) setStats(s); }).catch(() => {});
     loadReview(password);
+    fetch("/api/sub-request", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) setSubs(d.requests ?? []); }).catch(() => {});
   };
 
   const act = async (id: number, action: string, published?: boolean) => {
@@ -123,6 +125,26 @@ export default function AdminPage() {
           <h1 className="text-2xl font-bold">관리자 대시보드</h1>
           <button onClick={() => load(pw)} className="ml-auto text-xs px-3 py-1.5 rounded-lg bg-stone-200 text-stone-700">새로고침</button>
         </div>
+
+        {/* ===== 💎 구독 신청 ===== */}
+        {subs.length > 0 && (
+          <div className="mb-6">
+            <div className="text-xs font-bold text-amber-600 uppercase tracking-wider mb-2">💎 홍보팩 구독 신청 ({subs.length})</div>
+            <div className="space-y-2">
+              {subs.map((s) => (
+                <div key={s.id} className="bg-white rounded-xl border border-amber-200 p-3 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <span className="font-bold text-sm">{s.cafe_name}</span>
+                    <span className="text-[11px] text-stone-400 ml-2">{s.plan}</span>
+                    <div className="text-[12px] text-stone-600 truncate">📞 {s.contact}</div>
+                  </div>
+                  <span className="text-[10px] text-stone-400 shrink-0">{new Date(s.created_at).toLocaleDateString("ko-KR")}</span>
+                </div>
+              ))}
+            </div>
+            <p className="text-[10px] text-stone-400 mt-1.5">연락처로 결제 안내 후, 아래 쇼케이스에서 ⭐우선노출을 켜주세요.</p>
+          </div>
+        )}
 
         {/* ===== 🎀 쇼케이스 승인 · AI 카피 생성 ===== */}
         {(

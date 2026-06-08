@@ -102,6 +102,7 @@ export default function OwnerPage() {
           <div className="min-w-0"><div className="text-[#d4a574] text-[10px] tracking-[0.2em] uppercase">For Owners</div><h1 className="text-lg font-bold truncate">사장님 카페 분석</h1></div>
         </div>
         <div className="flex items-center gap-2.5 shrink-0">
+          <a href="/pricing" className="text-xs bg-[#e8b87a] text-[#2b2018] rounded-full px-3 py-1.5 whitespace-nowrap font-bold">💎 요금제</a>
           <a href="/cafe/register" className="text-xs bg-[#9c6b3f] text-[#f4ece0] rounded-full px-3 py-1.5 whitespace-nowrap">📋 카페 등록</a>
           <a href="/" className="text-xs text-[#cbb89f] underline">지도로</a>
         </div>
