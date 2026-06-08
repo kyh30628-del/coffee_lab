@@ -715,6 +715,14 @@ function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; 
                 <ShowcaseBanner style={promo.style || 1} headline={promo.ai_headline} tagline={promo.ai_tagline} points={Array.isArray(promo.ai_points) ? promo.ai_points : []} photo={promo.photos?.[0] || null} height="16rem" />
               </div>
             )}
+            {/* 🎟 방문 혜택(쿠폰) */}
+            {promo.coupon && (
+              <div className="flex items-center gap-2 bg-[#fff4e0] border-y border-[#e8d3a8] px-4 py-2.5">
+                <span className="text-[15px]">🎟</span>
+                <span className="text-[13px] text-[#7a4f1a] font-medium leading-snug flex-1">{promo.coupon}</span>
+                <span className="text-[9px] text-[#b08a4a] shrink-0">사장님 제공</span>
+              </div>
+            )}
           </>
         )}
         {/* 쇼케이스 배너가 있으면 기본 사진/띠는 생략(중복·잘림 방지) */}

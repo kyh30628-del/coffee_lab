@@ -11,9 +11,17 @@ export async function POST(req: NextRequest) {
     const cafeId = Number(body.cafeId);
     const type = String(body.type ?? "");
     if (!cafeId || !["view", "click", "play"].includes(type)) return NextResponse.json({ ok: false }, { status: 400 });
-    if (type === "view") await sql`UPDATE cafe_promos SET views = COALESCE(views,0)+1 WHERE cafe_id=${cafeId} AND approved=true`;
-    else if (type === "click") await sql`UPDATE cafe_promos SET clicks = COALESCE(clicks,0)+1 WHERE cafe_id=${cafeId} AND approved=true`;
-    else await sql`UPDATE cafe_promos SET plays = COALESCE(plays,0)+1 WHERE cafe_id=${cafeId} AND approved=true`;
+    await sql`CREATE TABLE IF NOT EXISTS promo_daily (cafe_id INT, day DATE, views INT DEFAULT 0, clicks INT DEFAULT 0, plays INT DEFAULT 0, PRIMARY KEY (cafe_id, day))`;
+    if (type === "view") {
+      await sql`UPDATE cafe_promos SET views = COALESCE(views,0)+1 WHERE cafe_id=${cafeId} AND approved=true`;
+      await sql`INSERT INTO promo_daily (cafe_id, day, views) VALUES (${cafeId}, CURRENT_DATE, 1) ON CONFLICT (cafe_id, day) DO UPDATE SET views = promo_daily.views + 1`;
+    } else if (type === "click") {
+      await sql`UPDATE cafe_promos SET clicks = COALESCE(clicks,0)+1 WHERE cafe_id=${cafeId} AND approved=true`;
+      await sql`INSERT INTO promo_daily (cafe_id, day, clicks) VALUES (${cafeId}, CURRENT_DATE, 1) ON CONFLICT (cafe_id, day) DO UPDATE SET clicks = promo_daily.clicks + 1`;
+    } else {
+      await sql`UPDATE cafe_promos SET plays = COALESCE(plays,0)+1 WHERE cafe_id=${cafeId} AND approved=true`;
+      await sql`INSERT INTO promo_daily (cafe_id, day, plays) VALUES (${cafeId}, CURRENT_DATE, 1) ON CONFLICT (cafe_id, day) DO UPDATE SET plays = promo_daily.plays + 1`;
+    }
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ ok: false }, { status: 500 });

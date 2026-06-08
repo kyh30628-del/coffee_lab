@@ -6,17 +6,32 @@ import ShowcaseBanner, { SHOWCASE_CSS, SHOWCASE_TEMPLATES } from "./ShowcaseBann
 // 사장님 쇼케이스 편집기 — 글·사진 → AI 홍보물 요청 → (배치 생성) → 관리자 승인 → 카페 상세 배너.
 export default function Showcase({ cafeId, cafeName, pw }: { cafeId: number; cafeName: string; pw: string }) {
   const [promo, setPromo] = useState<any>(null);
+  const [month, setMonth] = useState<any>(null);
+  const [coupon, setCoupon] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const hdr = { "x-admin-password": pw };
+  const reload = () => fetch(`/api/owner-promo?cafeId=${cafeId}`, { headers: hdr }).then((r) => r.json())
+    .then((d) => { setPromo(d.promo ?? { intro: "", photos: [] }); setMonth(d.month ?? null); setCoupon(d.promo?.coupon ?? ""); });
 
   useEffect(() => {
-    let live = true; setPromo(null); setMsg("");
+    let live = true; setPromo(null); setMonth(null); setMsg("");
     fetch(`/api/owner-promo?cafeId=${cafeId}`, { headers: hdr }).then((r) => r.json())
-      .then((d) => { if (live) setPromo(d.promo ?? { intro: "", photos: [] }); })
+      .then((d) => { if (live) { setPromo(d.promo ?? { intro: "", photos: [] }); setMonth(d.month ?? null); setCoupon(d.promo?.coupon ?? ""); } })
       .catch(() => { if (live) setPromo({ intro: "", photos: [] }); });
     return () => { live = false; };
   }, [cafeId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const saveCoupon = async () => {
+    setBusy(true);
+    try { const r = await fetch("/api/owner-promo", { method: "POST", headers: { ...hdr, "Content-Type": "application/json" }, body: JSON.stringify({ cafeId, couponOnly: true, coupon }) }); const d = await r.json(); if (d.ok) { setPromo(d.promo); setMsg("🎟 쿠폰 저장됨"); } } catch {}
+    setBusy(false);
+  };
+  const startTrial = async () => {
+    setBusy(true);
+    try { const r = await fetch("/api/owner-promo", { method: "POST", headers: { ...hdr, "Content-Type": "application/json" }, body: JSON.stringify({ cafeId, trial: true }) }); const d = await r.json(); if (d.ok) { setPromo(d.promo); setMsg("🎁 14일 무료 체험 시작! 홈 ‘추천 카페’에 노출돼요"); } else setMsg(d.error ?? "오류"); } catch {}
+    setBusy(false);
+  };
 
   const resizeImg = (file: File): Promise<string> => new Promise((res) => {
     const img = new Image(); const fr = new FileReader();
@@ -82,10 +97,43 @@ export default function Showcase({ cafeId, cafeName, pw }: { cafeId: number; caf
             <span className="text-[11px] text-[#cbb89f]">📊 우리 가게 홍보 성과</span>
             {promo?.featured && <span className="text-[9px] bg-[#e8b87a] text-[#2b2018] px-1.5 py-0.5 rounded-full font-bold">⭐ 우선 노출 중{promo.featured_until ? ` (D-${Math.max(0, Math.ceil((new Date(promo.featured_until).getTime() - Date.now()) / 86400000))})` : ""}</span>}
           </div>
+          {/* 이번 달 리포트 */}
+          {month && (
+            <div className="bg-black/25 rounded-lg px-3 py-2 mb-1.5">
+              <div className="text-[10px] text-[#cbb89f] mb-1">이번 달
+                {month.prevViews > 0 && month.views !== month.prevViews && (
+                  <span className={month.views >= month.prevViews ? "text-emerald-300 ml-1.5" : "text-rose-300 ml-1.5"}>
+                    {month.views >= month.prevViews ? "▲" : "▼"} 지난달 대비 {Math.abs(Math.round((month.views - month.prevViews) / month.prevViews * 100))}%
+                  </span>
+                )}
+              </div>
+              <div className="flex gap-4 text-[12px] text-[#f4ece0]">
+                <span>노출 <b className="text-[#e8b87a]">{month.views}</b></span>
+                <span>클릭 <b className="text-[#e8b87a]">{month.clicks}</b></span>
+                <span>재생 <b className="text-[#e8b87a]">{month.plays}</b></span>
+              </div>
+            </div>
+          )}
+          <div className="text-[9px] text-[#a8927a] mb-1">누적</div>
           <div className="grid grid-cols-3 gap-1.5">
             <div className="bg-black/25 rounded-lg py-2 text-center"><div className="text-lg font-bold text-[#e8b87a]">{promo.views ?? 0}</div><div className="text-[9px] text-[#cbb89f]">노출(조회)</div></div>
             <div className="bg-black/25 rounded-lg py-2 text-center"><div className="text-lg font-bold text-[#e8b87a]">{promo.clicks ?? 0}</div><div className="text-[9px] text-[#cbb89f]">클릭</div></div>
             <div className="bg-black/25 rounded-lg py-2 text-center"><div className="text-lg font-bold text-[#e8b87a]">{promo.plays ?? 0}</div><div className="text-[9px] text-[#cbb89f]">영상 재생</div></div>
+          </div>
+          {/* 🎁 무료 체험 */}
+          {!promo.featured && !promo.trial_used && (
+            <button disabled={busy} onClick={startTrial} className="w-full mt-2 bg-[#e8b87a] text-[#2b2018] rounded-lg py-2 text-[12px] font-bold disabled:opacity-50">🎁 우선 노출 14일 무료 체험 시작</button>
+          )}
+        </div>
+      )}
+
+      {/* 🎟 쿠폰·프로모션 — 손님 유입 */}
+      {promo?.approved && (
+        <div className="mb-3">
+          <div className="text-[11px] text-[#cbb89f] mb-1.5">🎟 방문 혜택 (카페 상세에 노출 → 손님 유입)</div>
+          <div className="flex gap-1.5">
+            <input value={coupon} onChange={(e) => setCoupon(e.target.value)} maxLength={60} placeholder="예) 이 글 보고 오면 사이즈업 ☕" className="flex-1 rounded-lg px-3 py-2 text-[12.5px] text-[#2b2018] bg-[#fdfaf4]" />
+            <button disabled={busy} onClick={saveCoupon} className="bg-[#9c6b3f] text-[#f4ece0] rounded-lg px-3.5 text-[13px] font-bold disabled:opacity-50">저장</button>
           </div>
         </div>
       )}
