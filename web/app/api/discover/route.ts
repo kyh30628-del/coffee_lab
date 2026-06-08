@@ -74,8 +74,14 @@ export async function GET(req: NextRequest) {
       : (verifiedByReview[0] ? slim(verifiedByReview[0], "top") : (byReview[0] ? slim(byReview[0], "top") : null));
     const usedIds = new Set([headlineA?.id, headlineB?.id].filter(Boolean));
 
+    // ✨ 우선 노출(featured) — 유료 상품. 승인+featured 카페를 상단 슬롯으로.
+    const featRows = await sql`SELECT cafe_id FROM cafe_promos WHERE featured = true AND approved = true` as unknown as { cafe_id: number }[];
+    const featSet = new Set(featRows.map((r) => Number(r.cafe_id)));
+    const featured = byReview.filter((c) => featSet.has(Number(c.id))).slice(0, 6).map((c: any) => ({ ...slim(c, "top"), featured: true }));
+
     return NextResponse.json({
       ok: true, region: region || "전체", scopeCount: scope.length,
+      featured,
       headlineA, headlineB,
       // 헤드라인 제외 후 잘라서 항상 꽉 채움(공개 카페가 충분하면 Top3=3개)
       top3: byReview.filter((c) => !usedIds.has(c.id)).slice(0, 3).map((c: any) => slim(c, "top")),

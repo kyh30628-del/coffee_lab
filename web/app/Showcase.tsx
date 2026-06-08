@@ -75,6 +75,21 @@ export default function Showcase({ cafeId, cafeName, pw }: { cafeId: number; caf
       </div>
       <p className="text-[12px] text-[#cbb89f] leading-relaxed mb-3"><b className="text-[#f4ece0]">{cafeName}</b> · 홍보 <b className="text-[#f4ece0]">문구를 적으면 AI가 요약</b>해 어필 카피로, 또는 <b className="text-[#f4ece0]">홍보 영상</b>을 올릴 수 있어요. <b className="text-[#f4ece0]">관리자 승인</b> 후 카페 상세 맨 위에 노출돼요.</p>
 
+      {/* 📊 성과 분석 — 우리 앱 1차 데이터 */}
+      {promo?.approved && (
+        <div className="mb-3">
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="text-[11px] text-[#cbb89f]">📊 우리 가게 홍보 성과</span>
+            {promo?.featured && <span className="text-[9px] bg-[#e8b87a] text-[#2b2018] px-1.5 py-0.5 rounded-full font-bold">⭐ 우선 노출 중</span>}
+          </div>
+          <div className="grid grid-cols-3 gap-1.5">
+            <div className="bg-black/25 rounded-lg py-2 text-center"><div className="text-lg font-bold text-[#e8b87a]">{promo.views ?? 0}</div><div className="text-[9px] text-[#cbb89f]">노출(조회)</div></div>
+            <div className="bg-black/25 rounded-lg py-2 text-center"><div className="text-lg font-bold text-[#e8b87a]">{promo.clicks ?? 0}</div><div className="text-[9px] text-[#cbb89f]">클릭</div></div>
+            <div className="bg-black/25 rounded-lg py-2 text-center"><div className="text-lg font-bold text-[#e8b87a]">{promo.plays ?? 0}</div><div className="text-[9px] text-[#cbb89f]">영상 재생</div></div>
+          </div>
+        </div>
+      )}
+
       {/* 표시 방식 — 영상 또는 템플릿(글) */}
       <div className="mb-3">
         <div className="text-[11px] text-[#cbb89f] mb-1.5">표시 방식 — 영상 또는 템플릿(글)을 고르세요 (<a href="/showcase-styles" target="_blank" className="underline">템플릿 샘플 보기</a>)</div>

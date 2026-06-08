@@ -53,7 +53,7 @@ export default function AdminPage() {
 
   // 🎀 쇼케이스 승인
   const loadReview = (password: string) => fetch("/api/promo-queue?review=1", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) setReview(d.review ?? []); }).catch(() => {});
-  const promoAct = async (cafeId: number, action: "approve" | "reject" | "generate") => {
+  const promoAct = async (cafeId: number, action: "approve" | "reject" | "generate" | "feature" | "unfeature") => {
     await fetch("/api/promo-queue", { method: "POST", headers: { "Content-Type": "application/json", "x-admin-password": pw }, body: JSON.stringify({ cafeId, [action]: true }) });
     loadReview(pw);
   };
@@ -161,10 +161,22 @@ export default function AdminPage() {
                     ) : (
                       <button onClick={() => promoAct(p.cafe_id, "generate")} className="w-full py-2.5 text-sm font-bold text-white bg-stone-800 rounded-lg">🤖 AI 어필 카피 생성</button>
                     )}
+                    {/* 📊 성과(1차 데이터) — 공개 중일 때 */}
+                    {p.approved && (
+                      <div className="flex gap-2 mt-2 text-[11px] text-stone-500">
+                        <span>👁 노출 <b className="text-stone-700">{p.views ?? 0}</b></span>
+                        <span>· 클릭 <b className="text-stone-700">{p.clicks ?? 0}</b></span>
+                        <span>· 재생 <b className="text-stone-700">{p.plays ?? 0}</b></span>
+                      </div>
+                    )}
                   </div>
                   <div className="flex border-t border-stone-100">
-                    <button onClick={() => promoAct(p.cafe_id, "approve")} disabled={!p.ai_headline && !p.video_url} className="flex-1 py-2.5 text-sm font-bold text-emerald-700 disabled:text-stone-300">✓ 승인 (노출)</button>
-                    <button onClick={() => promoAct(p.cafe_id, "reject")} className="flex-1 py-2.5 text-sm text-rose-600 border-l border-stone-100">✕ 반려</button>
+                    {!p.approved ? (
+                      <button onClick={() => promoAct(p.cafe_id, "approve")} disabled={!p.ai_headline && !p.video_url} className="flex-1 py-2.5 text-sm font-bold text-emerald-700 disabled:text-stone-300">✓ 승인 (노출)</button>
+                    ) : (
+                      <button onClick={() => promoAct(p.cafe_id, p.featured ? "unfeature" : "feature")} className={`flex-1 py-2.5 text-sm font-bold ${p.featured ? "text-amber-700 bg-amber-50" : "text-stone-700"}`}>{p.featured ? "⭐ 우선노출 ON (해제)" : "☆ 우선노출 켜기 (유료)"}</button>
+                    )}
+                    <button onClick={() => promoAct(p.cafe_id, "reject")} className="flex-1 py-2.5 text-sm text-rose-600 border-l border-stone-100">✕ {p.approved ? "내리기" : "반려"}</button>
                   </div>
                 </div>
               ))}

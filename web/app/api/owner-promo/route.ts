@@ -20,6 +20,10 @@ async function ensurePromo() {
   await sql`ALTER TABLE cafe_promos ADD COLUMN IF NOT EXISTS approved BOOLEAN DEFAULT false`; // 관리자 승인 후에만 배너 노출
   await sql`ALTER TABLE cafe_promos ADD COLUMN IF NOT EXISTS style INT DEFAULT 1`; // 사장님이 고른 템플릿(1~10), 0=영상
   await sql`ALTER TABLE cafe_promos ADD COLUMN IF NOT EXISTS video_url TEXT`; // 홍보 영상(Vercel Blob URL)
+  await sql`ALTER TABLE cafe_promos ADD COLUMN IF NOT EXISTS featured BOOLEAN DEFAULT false`; // 우선 노출(유료 상품, 관리자 토글)
+  await sql`ALTER TABLE cafe_promos ADD COLUMN IF NOT EXISTS views INT DEFAULT 0`;   // 1차 성과: 노출(조회)
+  await sql`ALTER TABLE cafe_promos ADD COLUMN IF NOT EXISTS clicks INT DEFAULT 0`;  // 클릭
+  await sql`ALTER TABLE cafe_promos ADD COLUMN IF NOT EXISTS plays INT DEFAULT 0`;   // 영상 재생
   ready = true;
 }
 const authed = (req: NextRequest) => !!req.headers.get("x-admin-password") && req.headers.get("x-admin-password") === process.env.ADMIN_PASSWORD;
