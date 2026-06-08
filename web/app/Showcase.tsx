@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
-import ShowcaseBanner, { SHOWCASE_CSS, SHOWCASE_TEMPLATES, toVideoEmbed } from "./ShowcaseBanner";
+import { upload } from "@vercel/blob/client";
+import ShowcaseBanner, { SHOWCASE_CSS, SHOWCASE_TEMPLATES } from "./ShowcaseBanner";
 
 // 사장님 쇼케이스 편집기 — 글·사진 → AI 홍보물 요청 → (배치 생성) → 관리자 승인 → 카페 상세 배너.
 export default function Showcase({ cafeId, cafeName, pw }: { cafeId: number; cafeName: string; pw: string }) {
@@ -30,18 +31,21 @@ export default function Showcase({ cafeId, cafeName, pw }: { cafeId: number; caf
     // 이미 생성된 홍보면 스타일만 즉시 저장(내용·승인 유지)
     if (promo?.ai_headline) { try { await fetch("/api/owner-promo", { method: "POST", headers: { ...hdr, "Content-Type": "application/json" }, body: JSON.stringify({ cafeId, styleOnly: true, style: n }) }); } catch {} }
   };
-  const [vidLink, setVidLink] = useState("");
-  const saveVideoLink = async () => {
-    const link = vidLink.trim();
-    if (!/^https?:\/\//.test(link)) { setMsg("유튜브/비메오 영상 링크를 붙여넣어 주세요 (https://…)"); return; }
-    setBusy(true); setMsg("저장 중…");
+  const [vidBusy, setVidBusy] = useState(false);
+  const onVideo = async (e: any) => {
+    const f = e.target.files?.[0]; e.target.value = ""; if (!f) return;
+    const dur = await new Promise<number>((res) => { const v = document.createElement("video"); v.preload = "metadata"; v.onloadedmetadata = () => res(v.duration); v.onerror = () => res(0); v.src = URL.createObjectURL(f); });
+    if (dur > 210) { setMsg("영상이 너무 길어요 — 3분 30초 이내로 올려주세요"); return; }
+    if (f.size > 300 * 1024 * 1024) { setMsg("파일이 너무 큽니다 (300MB 이내)"); return; }
+    setVidBusy(true); setMsg("영상 업로드 중… (잠시 걸려요)");
     try {
-      const r = await fetch("/api/owner-promo", { method: "POST", headers: { ...hdr, "Content-Type": "application/json" }, body: JSON.stringify({ cafeId, mode: "video", video_url: link }) });
+      const blob = await upload(`showcase/${cafeId}-${Date.now()}.${(f.name.split(".").pop() || "mp4")}`, f, { access: "public", handleUploadUrl: "/api/showcase-video", clientPayload: pw });
+      const r = await fetch("/api/owner-promo", { method: "POST", headers: { ...hdr, "Content-Type": "application/json" }, body: JSON.stringify({ cafeId, mode: "video", video_url: blob.url }) });
       const d = await r.json();
-      if (d.ok) { setPromo(d.promo); setVidLink(""); setMsg("✅ 영상 링크 저장 — 관리자 승인 후 노출돼요"); }
+      if (d.ok) { setPromo(d.promo); setMsg("✅ 영상 업로드 완료 — 관리자 승인 후 노출돼요"); }
       else setMsg("저장 오류: " + (d.error ?? ""));
-    } catch { setMsg("네트워크 오류"); }
-    setBusy(false);
+    } catch (err) { setMsg("영상 업로드 실패: " + String(err).slice(0, 70)); }
+    setVidBusy(false);
   };
   const submit = async () => {
     setBusy(true); setMsg("요청 보내는 중…");
@@ -69,16 +73,16 @@ export default function Showcase({ cafeId, cafeName, pw }: { cafeId: number; caf
         <h3 className="text-base font-bold">우리 가게 쇼케이스</h3>
         <span className="text-[9px] bg-[#e8b87a] text-[#2b2018] px-1.5 py-0.5 rounded-full font-bold ml-auto">구독 미리보기</span>
       </div>
-      <p className="text-[12px] text-[#cbb89f] leading-relaxed mb-3"><b className="text-[#f4ece0]">{cafeName}</b> · 홍보 <b className="text-[#f4ece0]">문구를 적으면 AI가 요약</b>해 어필 카피로, 또는 <b className="text-[#f4ece0]">유튜브 영상 링크</b>를 붙일 수 있어요. <b className="text-[#f4ece0]">관리자 승인</b> 후 카페 상세 맨 위에 노출돼요.</p>
+      <p className="text-[12px] text-[#cbb89f] leading-relaxed mb-3"><b className="text-[#f4ece0]">{cafeName}</b> · 홍보 <b className="text-[#f4ece0]">문구를 적으면 AI가 요약</b>해 어필 카피로, 또는 <b className="text-[#f4ece0]">홍보 영상</b>을 올릴 수 있어요. <b className="text-[#f4ece0]">관리자 승인</b> 후 카페 상세 맨 위에 노출돼요.</p>
 
       {/* 표시 방식 — 영상 또는 템플릿(글) */}
       <div className="mb-3">
         <div className="text-[11px] text-[#cbb89f] mb-1.5">표시 방식 — 영상 또는 템플릿(글)을 고르세요 (<a href="/showcase-styles" target="_blank" className="underline">템플릿 샘플 보기</a>)</div>
         <div className="flex gap-1.5 overflow-x-auto pb-1.5 -mx-1 px-1">
-          <button onClick={() => setPromo((p: any) => ({ ...(p ?? {}), style: 0 }))}
-            className={`shrink-0 text-[10.5px] px-2.5 py-1.5 rounded-full border whitespace-nowrap ${promo?.style === 0 ? "bg-[#e8b87a] text-[#2b2018] border-[#e8b87a] font-bold" : "border-[#7a5c3c] text-[#cbb89f]"}`}>
-            🎬 영상 링크
-          </button>
+          <label className={`shrink-0 text-[10.5px] px-2.5 py-1.5 rounded-full border whitespace-nowrap cursor-pointer ${promo?.style === 0 ? "bg-[#e8b87a] text-[#2b2018] border-[#e8b87a] font-bold" : "border-[#7a5c3c] text-[#cbb89f]"}`}>
+            🎬 영상 업로드
+            <input type="file" accept="video/*" onChange={onVideo} className="hidden" />
+          </label>
           {SHOWCASE_TEMPLATES.map((t) => {
             const on = (promo?.style || 1) === t.id;
             return (
@@ -92,21 +96,20 @@ export default function Showcase({ cafeId, cafeName, pw }: { cafeId: number; caf
       </div>
 
       {promo?.style === 0 ? (
-        // ===== 영상 링크 모드 =====
+        // ===== 영상 모드 =====
         <div>
-          <div className="flex gap-1.5 mb-2">
-            <input value={vidLink} onChange={(e) => setVidLink(e.target.value)} placeholder="유튜브 영상 링크 붙여넣기 (https://youtu.be/…)" className="flex-1 rounded-lg px-3 py-2 text-[12.5px] text-[#2b2018] bg-[#fdfaf4]" />
-            <button disabled={busy} onClick={saveVideoLink} className="bg-[#e8b87a] text-[#2b2018] rounded-lg px-3.5 text-[13px] font-bold disabled:opacity-50">저장</button>
-          </div>
-          <p className="text-[10.5px] text-[#cbb89f] mb-2">유튜브에 영상을 올리고(공개/일부공개) 주소창의 링크를 붙여넣으면 카페 상세에 바로 재생돼요. 비메오도 지원.</p>
-          {promo?.video_url && (
-            toVideoEmbed(promo.video_url) ? (
-              <div className="rounded-xl overflow-hidden border border-[#5a4633] bg-black aspect-video">
-                <iframe src={toVideoEmbed(promo.video_url)!} className="w-full h-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
+          {promo?.video_url ? (
+            <>
+              <div className="rounded-xl overflow-hidden border border-[#5a4633] mb-2 bg-black">
+                <video src={promo.video_url} controls playsInline preload="metadata" className="w-full max-h-56" />
               </div>
-            ) : (
-              <a href={promo.video_url} target="_blank" rel="noopener noreferrer" className="block text-center bg-[#3a2a1c] rounded-lg py-3 text-[12.5px] text-[#e8b87a]">▶ 등록된 영상 링크 열기 (임베드 미지원 형식)</a>
-            )
+              <label className="block text-center text-[11px] text-[#e8b87a] underline cursor-pointer">다른 영상으로 교체<input type="file" accept="video/*" onChange={onVideo} className="hidden" /></label>
+            </>
+          ) : (
+            <label className="block border-2 border-dashed border-[#9c6b3f] rounded-xl py-7 text-center text-[#cbb89f] text-[13px] cursor-pointer">
+              {vidBusy ? "업로드 중…" : <>🎬 홍보 영상 올리기 (탭하여 선택)<br /><span className="text-[10.5px] opacity-80">최대 3분 30초 · 300MB · mp4/mov</span></>}
+              <input type="file" accept="video/*" onChange={onVideo} className="hidden" disabled={vidBusy} />
+            </label>
           )}
         </div>
       ) : (

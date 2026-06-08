@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import InfoDot from "./InfoDot";
-import ShowcaseBanner, { SHOWCASE_CSS, toVideoEmbed } from "./ShowcaseBanner";
+import ShowcaseBanner, { SHOWCASE_CSS } from "./ShowcaseBanner";
 
 type EvidenceReview = { quote: string; link?: string; source?: string; date?: string; trust?: "verified" | "reference" | "rejected"; score?: number; why?: string[] };
 type QualityStats = { raw: number; verified: number; reference: number; rejected: number; rejectReasons?: Record<string, number> };
@@ -699,12 +699,8 @@ function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; 
           <>
             <style dangerouslySetInnerHTML={{ __html: SHOWCASE_CSS }} />
             {promo.style === 0 && promo.video_url ? (
-              <div className="relative w-full bg-black aspect-video">
-                {toVideoEmbed(promo.video_url) ? (
-                  <iframe src={toVideoEmbed(promo.video_url)!} className="absolute inset-0 w-full h-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen title="사장님 쇼케이스 영상" />
-                ) : (
-                  <a href={promo.video_url} target="_blank" rel="noopener noreferrer" className="absolute inset-0 flex items-center justify-center text-[#e8b87a] bg-[#2b2018]">▶ 사장님 홍보 영상 보기</a>
-                )}
+              <div className="relative w-full bg-black" style={{ height: "16rem" }}>
+                <video src={promo.video_url} controls playsInline preload="metadata" className="w-full h-full object-contain bg-black" />
                 <span className="absolute top-3 left-3 z-10 text-[9px] font-bold text-[#2b2018] bg-[#e8b87a] px-2.5 py-1 rounded-full shadow-md pointer-events-none">🎀 사장님 쇼케이스</span>
               </div>
             ) : (

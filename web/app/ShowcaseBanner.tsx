@@ -1,15 +1,6 @@
 // 쇼케이스 배너 10종 템플릿 — 데모 페이지·카페 상세·사장님 미리보기 공용.
 // 각 스타일은 사진(있으면 배경) 위에 고유한 오버레이·타이포·악센트·애니메이션을 입힌다.
 
-// 외부 영상 링크 → 임베드 URL. 유튜브/비메오 지원, 그 외엔 null(링크 버튼으로 대체).
-export function toVideoEmbed(url?: string | null): string | null {
-  if (!url) return null;
-  let m;
-  if ((m = url.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/|live\/)|youtu\.be\/)([\w-]{6,})/))) return `https://www.youtube.com/embed/${m[1]}`;
-  if ((m = url.match(/vimeo\.com\/(?:video\/)?(\d+)/))) return `https://player.vimeo.com/video/${m[1]}`;
-  return null;
-}
-
 export const SHOWCASE_TEMPLATES = [
   { id: 1, name: "프리미엄 매거진", desc: "줌·골드 샤인 · 고급 정통" },
   { id: 2, name: "네온 스포트라이트", desc: "글로우·CTA · 트렌디 핫플" },
