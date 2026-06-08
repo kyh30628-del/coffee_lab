@@ -124,10 +124,11 @@ export default function AdminPage() {
           <button onClick={() => load(pw)} className="ml-auto text-xs px-3 py-1.5 rounded-lg bg-stone-200 text-stone-700">새로고침</button>
         </div>
 
-        {/* ===== 🎀 쇼케이스 승인 대기 ===== */}
-        {review.length > 0 && (
+        {/* ===== 🎀 쇼케이스 승인 · AI 카피 생성 ===== */}
+        {(
           <div className="mb-6">
-            <div className="text-xs font-bold text-amber-600 uppercase tracking-wider mb-2">🎀 쇼케이스 승인 대기 ({review.length})</div>
+            <div className="text-xs font-bold text-amber-600 uppercase tracking-wider mb-2">🎀 쇼케이스 승인 · AI 카피 생성 ({review.length})</div>
+            {review.length === 0 && <p className="text-[12px] text-stone-400 bg-white rounded-xl border p-4">대기 중인 사장님 쇼케이스 요청이 없어요. 사장님이 글(또는 영상)을 저장하면 여기에서 <b className="text-stone-600">🤖 AI 어필 카피 생성</b> → <b className="text-stone-600">✓ 승인</b> 할 수 있어요.</p>}
             <div className="space-y-3">
               {review.map((p) => (
                 <div key={p.cafe_id} className="bg-white rounded-xl border border-amber-200 overflow-hidden">
