@@ -53,19 +53,14 @@ export async function GET(req: NextRequest) {
       FROM cafes WHERE published = true` as unknown as any[];
     const scope = region ? all.filter((c) => guOf(c.area) === region) : all;
 
-    // 🏆 Top 3 (리뷰 수)
-    const top3 = [...scope].sort((a, b) => (b.synth_count ?? 0) - (a.synth_count ?? 0)).slice(0, 3).map((c:any)=>slim(c,"top"));
+    // 정렬된 후보 — 헤드라인 제외 '후' 잘라야 개수가 안 줄어든다(예: Top3가 2개로 줄던 버그)
+    const byReview = [...scope].sort((a, b) => (b.synth_count ?? 0) - (a.synth_count ?? 0));
+    const byNew = [...scope].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    const bySpecialty = scope.filter((c) => c.synth_grade === "검증" && ((c.char_scores ?? {}).roast ?? 0) >= 2)
+      .sort((a, b) => ((b.char_scores ?? {}).roast ?? 0) - ((a.char_scores ?? {}).roast ?? 0));
 
-    // ✨ 새로 발견 (최근 등록 5)
-    const fresh = [...scope].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 5).map((c:any)=>slim(c,"fresh"));
-
-    // 🔥 스페셜티 픽 (검증등급 + 직접로스팅 점수 높은 순)
-    const specialty = scope.filter((c) => c.synth_grade === "검증" && ((c.char_scores ?? {}).roast ?? 0) >= 2)
-      .sort((a, b) => ((b.char_scores ?? {}).roast ?? 0) - ((a.char_scores ?? {}).roast ?? 0)).slice(0, 5).map((c:any)=>slim(c,"specialty"));
-
-    // 헤드라인 a: 리뷰 수 1위 (가장 검증된 곳)
-    // headlineB 먼저 결정 (로스팅 점수 최고 = 주목할 로스터리)
-    const headlineB = specialty[0] ?? null;
+    // 헤드라인 b: 스페셜티 중 직접로스팅 점수 최고 (주목할 로스터리)
+    const headlineB = bySpecialty[0] ? slim(bySpecialty[0], "specialty") : null;
 
     // headlineA = 검증 스페셜티 대표 (검증 + 로스팅 확실(roast>=5) 중 리뷰 1위, headlineB와 중복 회피)
     const verifiedScope = scope.filter((c: any) => c.synth_grade === "검증");
@@ -76,16 +71,16 @@ export async function GET(req: NextRequest) {
       .filter((c: any) => c.id !== headlineB?.id)
       .sort((a: any, b: any) => (b.synth_count ?? 0) - (a.synth_count ?? 0));
     const headlineA = strongRoast.length > 0 ? slim(strongRoast[0], "top")
-      : (verifiedByReview[0] ? slim(verifiedByReview[0], "top") : (top3[0] ?? null));
-    // 헤드라인 b: 스페셜티 중 직접로스팅 점수 최고 (커피에 진심인 집)
+      : (verifiedByReview[0] ? slim(verifiedByReview[0], "top") : (byReview[0] ? slim(byReview[0], "top") : null));
     const usedIds = new Set([headlineA?.id, headlineB?.id].filter(Boolean));
 
     return NextResponse.json({
       ok: true, region: region || "전체", scopeCount: scope.length,
       headlineA, headlineB,
-      top3: top3.filter((c) => !usedIds.has(c.id)),
-      fresh: fresh.filter((c) => !usedIds.has(c.id)),
-      specialty: specialty.filter((c) => !usedIds.has(c.id)),
+      // 헤드라인 제외 후 잘라서 항상 꽉 채움(공개 카페가 충분하면 Top3=3개)
+      top3: byReview.filter((c) => !usedIds.has(c.id)).slice(0, 3).map((c: any) => slim(c, "top")),
+      fresh: byNew.filter((c) => !usedIds.has(c.id)).slice(0, 5).map((c: any) => slim(c, "fresh")),
+      specialty: bySpecialty.filter((c) => !usedIds.has(c.id)).slice(0, 5).map((c: any) => slim(c, "specialty")),
     });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
