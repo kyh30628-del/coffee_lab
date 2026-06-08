@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import BackLink from "../BackLink";
+import { toVideoEmbed } from "../ShowcaseBanner";
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis,
   AreaChart, Area, CartesianGrid, Tooltip } from "recharts";
 
@@ -142,7 +143,11 @@ export default function AdminPage() {
                       p.video_url ? (
                         <div className="rounded-lg overflow-hidden bg-black">
                           <span className="text-[10px] text-amber-600 px-1">🎬 영상 (소비자 노출 예정)</span>
-                          <video src={p.video_url} controls playsInline preload="metadata" className="w-full max-h-48" />
+                          {toVideoEmbed(p.video_url) ? (
+                            <div className="aspect-video"><iframe src={toVideoEmbed(p.video_url)!} className="w-full h-full" allow="encrypted-media; picture-in-picture" allowFullScreen title="쇼케이스 영상" /></div>
+                          ) : (
+                            <a href={p.video_url} target="_blank" rel="noopener noreferrer" className="block p-3 text-[12px] text-amber-300 break-all">▶ {p.video_url}</a>
+                          )}
                         </div>
                       ) : <p className="text-[12px] text-stone-400">영상 업로드 대기 중</p>
                     ) : p.ai_headline ? (
