@@ -35,8 +35,8 @@ export default function Showcase({ cafeId, cafeName, pw }: { cafeId: number; caf
   const onVideo = async (e: any) => {
     const f = e.target.files?.[0]; e.target.value = ""; if (!f) return;
     const dur = await new Promise<number>((res) => { const v = document.createElement("video"); v.preload = "metadata"; v.onloadedmetadata = () => res(v.duration); v.onerror = () => res(0); v.src = URL.createObjectURL(f); });
-    if (dur > 210) { setMsg("영상이 너무 길어요 — 3분 30초 이내로 올려주세요"); return; }
-    if (f.size > 300 * 1024 * 1024) { setMsg("파일이 너무 큽니다 (300MB 이내)"); return; }
+    if (dur > 0 && dur > 23) { setMsg("영상이 너무 길어요 — 20초 이내로 올려주세요"); return; }
+    if (f.size > 80 * 1024 * 1024) { setMsg("파일이 너무 큽니다 (80MB 이내). 20초 정도로 짧게 찍어주세요"); return; }
     setVidBusy(true); setMsg("영상 업로드 중… (잠시 걸려요)");
     try {
       const blob = await upload(`showcase/${cafeId}-${Date.now()}.${(f.name.split(".").pop() || "mp4")}`, f, { access: "public", handleUploadUrl: "/api/showcase-video", clientPayload: pw });
@@ -107,7 +107,7 @@ export default function Showcase({ cafeId, cafeName, pw }: { cafeId: number; caf
             </>
           ) : (
             <label className="block border-2 border-dashed border-[#9c6b3f] rounded-xl py-7 text-center text-[#cbb89f] text-[13px] cursor-pointer">
-              {vidBusy ? "업로드 중…" : <>🎬 홍보 영상 올리기 (탭하여 선택)<br /><span className="text-[10.5px] opacity-80">최대 3분 30초 · 300MB · mp4/mov</span></>}
+              {vidBusy ? "업로드 중…" : <>🎬 홍보 영상 올리기 (탭하여 선택)<br /><span className="text-[10.5px] opacity-80">약 20초 이내 · 80MB · mp4/mov</span></>}
               <input type="file" accept="video/*" onChange={onVideo} className="hidden" disabled={vidBusy} />
             </label>
           )}

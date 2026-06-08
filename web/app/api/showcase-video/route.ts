@@ -15,7 +15,7 @@ export async function POST(req: Request): Promise<NextResponse> {
         if (!clientPayload || clientPayload !== process.env.ADMIN_PASSWORD) throw new Error("unauthorized");
         return {
           allowedContentTypes: ["video/mp4", "video/quicktime", "video/webm", "video/x-m4v"],
-          maximumSizeInBytes: 300 * 1024 * 1024, // ~300MB (2~3분 영상 여유)
+          maximumSizeInBytes: 80 * 1024 * 1024, // ~80MB (20초 영상 — 폰 1080p도 충분, 남용 차단)
           addRandomSuffix: true,
         };
       },
