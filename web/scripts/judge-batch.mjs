@@ -16,7 +16,7 @@ import { query } from "@anthropic-ai/claude-agent-sdk";
 const APP_URL = process.env.APP_URL || "https://coffee-lab-product-builder.vercel.app";
 const PW = process.env.ADMIN_PASSWORD || "";
 const MODEL = process.env.JUDGE_MODEL || "claude-sonnet-4-5";
-const MAX_CAFES = Number(process.env.JUDGE_MAX || 400); // 1회 실행 상한(크레딧 보호)
+const MAX_CAFES = Number(process.env.JUDGE_MAX || 60); // 1회 실행 상한(구독 세션 한도 보호 — 400은 한도 초과)
 
 const RUBRIC = `너는 카페 리뷰 품질의 '최종 심사관'이다. 규칙 필터를 통과한 후보 스니펫들을 다시 엄격히 심사해, 그 카페의 '진짜 방문 후기'이면서 소비자에게 도움되는 양질의 글만 통과시킨다(거짓양성도 걸러낸다).
 - about=true: 그 카페(또는 같은 지역·컨셉·메뉴가 일치하는 그 가게)를 실제로 방문해 쓴 글. 이름이 글자 그대로 없어도 내용·맥락(지역·분위기·메뉴·방문경험)이 그 카페를 가리키면 true.
@@ -47,13 +47,24 @@ async function apply(cafeId, decisions) {
 
 async function main() {
   if (!PW) { console.error("ADMIN_PASSWORD 미설정"); process.exit(1); }
-  let done = 0, published = 0;
-  while (done < MAX_CAFES) {
+  let done = 0, published = 0, stop = false;
+  while (done < MAX_CAFES && !stop) {
     const { ok, cafes, remaining, noBorderline } = await getCandidates(25);
     if (!ok) { console.error("candidates 실패"); break; }
     if (cafes.length === 0) { console.log(`심사 대상 카페 없음(스킵 ${noBorderline}). 남은 후보 ${remaining}.`); if (remaining === 0) break; continue; }
     for (const c of cafes) {
-      const verdicts = await judge(c.name, c.area, c.candidates);
+      let verdicts;
+      try {
+        verdicts = await judge(c.name, c.area, c.candidates);
+      } catch (e) {
+        const msg = String(e);
+        if (/session limit|rate limit|429|usage limit|overloaded/i.test(msg)) {
+          console.log(`\n구독 한도 도달 — 오늘은 여기까지(${done}곳 완료). 진행분은 저장됨, 내일 04:00 배치가 이어서 심사.`);
+          stop = true; break;
+        }
+        console.log(`  ✗ ${c.name}: ${msg.slice(0, 80)} — 건너뜀`);
+        continue;
+      }
       // 후보 전체에 대한 keep/drop 결정(Sonnet 최종)
       const decisions = {};
       if (Array.isArray(verdicts)) for (const v of verdicts) { const key = c.candidates[v?.i]?.key; if (key) decisions[key] = !!(v.about && v.helpful); }
