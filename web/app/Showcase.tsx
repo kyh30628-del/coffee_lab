@@ -123,8 +123,8 @@ export default function Showcase({ cafeId, cafeName, pw }: { cafeId: number; caf
         <div className="mb-3">
           <div className="text-[11px] text-[#cbb89f] mb-1.5">🎟 방문 혜택 (카페 상세에 노출 → 손님 유입)</div>
           <div className="flex gap-1.5">
-            <input value={coupon} onChange={(e) => setCoupon(e.target.value)} maxLength={60} placeholder="예) 이 글 보고 오면 사이즈업 ☕" className="flex-1 rounded-lg px-3 py-2 text-[12.5px] text-[#2b2018] bg-[#fdfaf4]" />
-            <button disabled={busy} onClick={saveCoupon} className="bg-[#9c6b3f] text-[#f4ece0] rounded-lg px-3.5 text-[13px] font-bold disabled:opacity-50">저장</button>
+            <input value={coupon} onChange={(e) => setCoupon(e.target.value)} maxLength={60} placeholder="예) 이 글 보고 오면 사이즈업 ☕" className="flex-1 min-w-0 rounded-lg px-3 py-2 text-[12.5px] text-[#2b2018] bg-[#fdfaf4]" />
+            <button disabled={busy} onClick={saveCoupon} className="shrink-0 bg-[#9c6b3f] text-[#f4ece0] rounded-lg px-4 text-[13px] font-bold disabled:opacity-50">저장</button>
           </div>
         </div>
       )}
@@ -183,7 +183,7 @@ export default function Showcase({ cafeId, cafeName, pw }: { cafeId: number; caf
               </label>
             )}
           </div>
-          <button disabled={busy} onClick={submit} className="w-full bg-[#e8b87a] text-[#2b2018] rounded-lg py-2.5 text-sm font-bold disabled:opacity-50 mb-2">💾 저장하고 검토 요청 (관리자가 AI 카피 생성)</button>
+          <button disabled={busy} onClick={submit} className="w-full bg-[#e8b87a] text-[#2b2018] rounded-lg py-2.5 font-bold disabled:opacity-50 mb-2 text-center leading-tight">💾 저장하고 검토 요청<br /><span className="text-[10px] font-normal opacity-80">(관리자가 AI 카피 생성)</span></button>
           {promo?.ai_headline && (
             <div className="mt-1">
               <div className="text-[10px] text-[#cbb89f] mb-1">미리보기 — 위에서 스타일을 바꾸면 바로 반영돼요</div>
