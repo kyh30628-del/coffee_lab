@@ -53,7 +53,7 @@ export default function AdminPage() {
 
   // 🎀 쇼케이스 승인
   const loadReview = (password: string) => fetch("/api/promo-queue?review=1", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) setReview(d.review ?? []); }).catch(() => {});
-  const promoAct = async (cafeId: number, action: "approve" | "reject") => {
+  const promoAct = async (cafeId: number, action: "approve" | "reject" | "generate") => {
     await fetch("/api/promo-queue", { method: "POST", headers: { "Content-Type": "application/json", "x-admin-password": pw }, body: JSON.stringify({ cafeId, [action]: true }) });
     loadReview(pw);
   };
@@ -155,7 +155,11 @@ export default function AdminPage() {
                           {Array.isArray(p.ai_points) && p.ai_points.length > 0 && <div className="flex flex-wrap gap-1 mt-1.5">{p.ai_points.map((pt: string, i: number) => <span key={i} className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full">{pt}</span>)}</div>}
                         </div>
                       </div>
-                    ) : <p className="text-[12px] text-stone-400">AI 카피 생성 대기 중 — 로컬 배치 실행 후 다시 확인</p>}
+                    ) : p.ai_pending ? (
+                      <p className="text-[12px] text-amber-600">🕐 AI 생성 요청됨 — 로컬 배치가 처리 후 여기에 미리보기가 떠요</p>
+                    ) : (
+                      <button onClick={() => promoAct(p.cafe_id, "generate")} className="w-full py-2.5 text-sm font-bold text-white bg-stone-800 rounded-lg">🤖 AI 어필 카피 생성</button>
+                    )}
                   </div>
                   <div className="flex border-t border-stone-100">
                     <button onClick={() => promoAct(p.cafe_id, "approve")} disabled={!p.ai_headline && !p.video_url} className="flex-1 py-2.5 text-sm font-bold text-emerald-700 disabled:text-stone-300">✓ 승인 (노출)</button>

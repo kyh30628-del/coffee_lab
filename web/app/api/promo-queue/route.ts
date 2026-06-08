@@ -43,6 +43,7 @@ export async function POST(req: NextRequest) {
     if (!cafeId) return NextResponse.json({ ok: false, error: "cafeId 필요" }, { status: 400 });
     // 관리자 승인/반려
     if (body.approve) { await sql`UPDATE cafe_promos SET approved=true WHERE cafe_id=${cafeId}`; return NextResponse.json({ ok: true, approved: true }); }
+    if (body.generate) { await sql`UPDATE cafe_promos SET ai_pending=true, updated_at=now() WHERE cafe_id=${cafeId}`; return NextResponse.json({ ok: true, queued: true }); } // 관리자만 AI 생성 트리거 → 로컬 배치가 처리
     if (body.reject) { await sql`UPDATE cafe_promos SET approved=false, published=false WHERE cafe_id=${cafeId}`; return NextResponse.json({ ok: true, rejected: true }); }
     if (body.fail) { await sql`UPDATE cafe_promos SET ai_pending=false WHERE cafe_id=${cafeId}`; return NextResponse.json({ ok: true, cleared: true }); }
     const headline = String(body.headline ?? "").slice(0, 24);

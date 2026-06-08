@@ -50,9 +50,9 @@ export default function Showcase({ cafeId, cafeName, pw }: { cafeId: number; caf
   const submit = async () => {
     setBusy(true); setMsg("요청 보내는 중…");
     try {
-      const r = await fetch("/api/owner-promo", { method: "POST", headers: { ...hdr, "Content-Type": "application/json" }, body: JSON.stringify({ cafeId, intro: promo?.intro ?? "", photos: promo?.photos ?? [], style: promo?.style || 1, generate: true }) });
+      const r = await fetch("/api/owner-promo", { method: "POST", headers: { ...hdr, "Content-Type": "application/json" }, body: JSON.stringify({ cafeId, intro: promo?.intro ?? "", photos: promo?.photos ?? [], style: promo?.style || 1 }) });
       const d = await r.json();
-      if (d.ok) { setPromo(d.promo); setMsg(d.generated ? "✨ 생성 완료 — 관리자 승인 후 노출돼요" : "✨ 요청 접수 — AI 생성 후 관리자 승인을 거쳐 노출돼요"); }
+      if (d.ok) { setPromo(d.promo); setMsg("💾 저장 완료 — 관리자가 검토 후 AI 어필 카피를 생성·노출해요"); }
       else setMsg("오류: " + (d.error ?? ""));
     } catch { setMsg("네트워크 오류"); }
     setBusy(false);
@@ -61,9 +61,9 @@ export default function Showcase({ cafeId, cafeName, pw }: { cafeId: number; caf
   if (!promo) return <p className="text-[12px] text-[#a8927a]">불러오는 중…</p>;
   const status = promo.style === 0
     ? (promo.video_url ? (promo.approved ? "🟢 공개 중 — 카페 상세에 영상이 노출돼요" : "🟡 영상 — 관리자 승인 대기 중") : "🎬 홍보 영상을 올려주세요")
-    : promo.ai_pending ? "🕐 AI 생성 대기 중 (내 PC 배치가 처리)"
+    : promo.ai_pending ? "🕐 관리자가 생성 요청함 — AI 카피 생성 중"
       : promo.ai_headline ? (promo.approved ? "🟢 공개 중 — 카페 상세 상단에 노출돼요" : "🟡 관리자 승인 대기 중")
-        : "홍보 문구를 적고 'AI 어필 카피 만들기'를 눌러주세요";
+        : "🟡 저장 후 관리자가 검토·생성합니다 (문구를 적고 저장해 주세요)";
 
   return (
     <div className="bg-gradient-to-br from-[#2b2018] to-[#4a3424] text-[#f4ece0] rounded-2xl p-4 sm:p-5">
@@ -129,7 +129,7 @@ export default function Showcase({ cafeId, cafeName, pw }: { cafeId: number; caf
               </label>
             )}
           </div>
-          <button disabled={busy} onClick={submit} className="w-full bg-[#e8b87a] text-[#2b2018] rounded-lg py-2.5 text-sm font-bold disabled:opacity-50 mb-2">✨ AI 어필 카피 만들기 (관리자 승인 후 노출)</button>
+          <button disabled={busy} onClick={submit} className="w-full bg-[#e8b87a] text-[#2b2018] rounded-lg py-2.5 text-sm font-bold disabled:opacity-50 mb-2">💾 저장하고 검토 요청 (관리자가 AI 카피 생성)</button>
           {promo?.ai_headline && (
             <div className="mt-1">
               <div className="text-[10px] text-[#cbb89f] mb-1">미리보기 — 위에서 스타일을 바꾸면 바로 반영돼요</div>
