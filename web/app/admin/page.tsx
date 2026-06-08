@@ -37,12 +37,13 @@ export default function AdminPage() {
   const [subs, setSubs] = useState<any[]>([]);
   const [purged, setPurged] = useState(0);
   const [verify, setVerify] = useState<any>(null);
+  const [grounding, setGrounding] = useState<any>(null);
   const [verifying, setVerifying] = useState(false);
 
-  const loadVerify = (password: string) => fetch("/api/cron-verify?latest=1", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) setVerify(d.report); }).catch(() => {});
+  const loadVerify = (password: string) => fetch("/api/cron-verify?latest=1", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) { setVerify(d.report); setGrounding(d.grounding); } }).catch(() => {});
   const runVerify = async () => {
     setVerifying(true);
-    try { const r = await fetch("/api/cron-verify", { headers: { "x-admin-password": pw } }); const d = await r.json(); if (d.ok) setVerify({ ran_at: d.ranAt, status: d.status, fails: d.fails, warns: d.warns, checks: d.checks }); } catch {}
+    try { const r = await fetch("/api/cron-verify", { headers: { "x-admin-password": pw } }); const d = await r.json(); if (d.ok) { setVerify({ ran_at: d.ranAt, status: d.status, fails: d.fails, warns: d.warns, checks: d.checks }); setGrounding(d.grounding); } } catch {}
     setVerifying(false);
   };
 
@@ -162,6 +163,24 @@ export default function AdminPage() {
               </div>
             </div>
           ) : <p className="text-[12px] text-stone-400">검증 리포트 없음 — '지금 검사'를 눌러 실행하세요.</p>}
+
+          {/* 🧠 LLM 그라운딩(보조) */}
+          {grounding && grounding.total > 0 && (
+            <div className={`mt-2 rounded-xl border p-3 ${grounding.flagged > 0 ? "bg-amber-50 border-amber-200" : "bg-stone-50 border-stone-200"}`}>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-[13px] font-bold">🧠 LLM 그라운딩 (보조 · 환각 탐지)</span>
+                <span className="text-[11px] text-stone-500 ml-auto">{grounding.total}곳 검사 · 의심 <b className={grounding.flagged > 0 ? "text-amber-600" : "text-emerald-600"}>{grounding.flagged}</b></span>
+              </div>
+              {grounding.flagged > 0 ? (
+                <div className="space-y-0.5">
+                  {grounding.samples.map((s: any, i: number) => (
+                    <div key={i} className="text-[11px] text-stone-600"><b>{s.s}</b>: {s.issue || "근거 불충분"}</div>
+                  ))}
+                  <p className="text-[10px] text-stone-400 mt-1">⚠ LLM 추정이라 자동조치 안 함 — 사람이 확인 후 재합성/수정하세요.</p>
+                </div>
+              ) : <p className="text-[11px] text-emerald-600">의심 항목 없음 — 생성 정체성이 근거 후기와 일치.</p>}
+            </div>
+          )}
         </div>
 
         {/* ===== 💎 구독 신청 ===== */}

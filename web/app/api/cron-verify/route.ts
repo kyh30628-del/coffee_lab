@@ -99,10 +99,19 @@ export async function GET(req: NextRequest) {
     await ensureSchema();
     await sql`CREATE TABLE IF NOT EXISTS verify_reports (id SERIAL PRIMARY KEY, ran_at TIMESTAMPTZ DEFAULT now(), status TEXT, fails INT, warns INT, checks JSONB)`;
 
+    // 🧠 LLM 그라운딩(보조 레이어) 요약 — 로컬 verify-grounding 배치가 적재한 결과 조회
+    const grounding = await (async () => {
+      try {
+        const g = (await sql`SELECT count(*)::int total, count(*) FILTER (WHERE NOT grounded)::int flagged, max(checked_at) last FROM grounding_checks`)[0] as any;
+        const samples = await sql`SELECT c.name s, g.issue FROM grounding_checks g JOIN cafes c ON c.id = g.cafe_id WHERE NOT g.grounded ORDER BY g.checked_at DESC LIMIT 6` as unknown as any[];
+        return { total: g.total ?? 0, flagged: g.flagged ?? 0, last: g.last, samples };
+      } catch { return null; }
+    })();
+
     // 최신 리포트만 조회(관리자 화면용 — 재실행 안 함)
     if (req.nextUrl.searchParams.get("latest")) {
       const r = (await sql`SELECT ran_at, status, fails, warns, checks FROM verify_reports ORDER BY ran_at DESC LIMIT 1`)[0] as any;
-      return NextResponse.json({ ok: true, report: r ?? null });
+      return NextResponse.json({ ok: true, report: r ?? null, grounding });
     }
 
     const checks = await runChecks();
@@ -113,7 +122,7 @@ export async function GET(req: NextRequest) {
     await sql`INSERT INTO verify_reports (status, fails, warns, checks) VALUES (${status}, ${fails}, ${warns}, ${JSON.stringify(checks)})`;
     await sql`DELETE FROM verify_reports WHERE id NOT IN (SELECT id FROM verify_reports ORDER BY ran_at DESC LIMIT 60)`; // 최근 60건만 보관
 
-    return NextResponse.json({ ok: true, ranAt: new Date().toISOString(), status, fails, warns, checks });
+    return NextResponse.json({ ok: true, ranAt: new Date().toISOString(), status, fails, warns, checks, grounding });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
