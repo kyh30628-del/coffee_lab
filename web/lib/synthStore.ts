@@ -17,7 +17,15 @@ async function ensureCols() {
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS raw_collected_at TIMESTAMPTZ`;
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS llm_judged_at TIMESTAMPTZ`;
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS yt_checked_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS judge_decisions JSONB`; // 판정 AI 결정(key→keep/drop) 영구 보존 → 재합성해도 유지
   ensured = true;
+}
+
+// 저장된 판정 결정(영구). 재합성 시에도 동명/무관 제거가 유지되도록 모든 합성에 주입.
+async function loadDecisions(cafeId: number): Promise<Record<string, boolean>> {
+  const row = (await sql`SELECT judge_decisions FROM cafes WHERE id=${cafeId}`)[0];
+  const d = row?.judge_decisions;
+  return d && typeof d === "object" ? d : {};
 }
 
 function rawToSources(raw: RawItem[]): RawSource[] {
@@ -87,7 +95,8 @@ export async function synthAndStore(cafe: { id: number; name: string; area: stri
   }
 
   const area = cafe.area ? [cafe.area] : [];
-  let result = collectAndSynthesize(cafe.name, area, sources);
+  const decisions = await loadDecisions(cafe.id); // 과거 판정 AI 결정 유지(동명/무관 제거 영구)
+  let result = collectAndSynthesize(cafe.name, area, sources, { decisions });
 
   // 서버측 보조 LLM 재판정(키 있을 때만). 품질 본판정은 로컬 Sonnet 배치(judge-candidates/apply)가 담당.
   let rescued = 0;
@@ -120,9 +129,12 @@ export async function applyDecisions(cafe: { id: number; name: string; area: str
   await ensureCols();
   const raw = await loadRaw(cafe.id);
   if (!raw.length) { await sql`UPDATE cafes SET llm_judged_at=now() WHERE id=${cafe.id}`; return { id: cafe.id, approved: 0, grade: null, published: false, reason: "raw 없음" }; }
-  const result = collectAndSynthesize(cafe.name, cafe.area ? [cafe.area] : [], rawToSources(raw), { decisions });
+  // 기존 결정과 병합 → 영구 저장(재합성해도 유지). 새 판정이 우선.
+  const merged = { ...(await loadDecisions(cafe.id)), ...decisions };
+  const result = collectAndSynthesize(cafe.name, cafe.area ? [cafe.area] : [], rawToSources(raw), { decisions: merged });
+  await sql`UPDATE cafes SET judge_decisions=${JSON.stringify(merged)} WHERE id=${cafe.id}`;
   const stored = await storeResult(cafe.id, result, true);
-  const approved = Object.values(decisions).filter(Boolean).length;
+  const approved = Object.values(merged).filter(Boolean).length;
   return { id: cafe.id, name: cafe.name, approved, judged: Object.keys(decisions).length, ...stored };
 }
 
