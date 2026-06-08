@@ -15,14 +15,15 @@ export default function Pricing() {
   const [open, setOpen] = useState(false);
   const [cafe, setCafe] = useState("");
   const [contact, setContact] = useState("");
+  const [consent, setConsent] = useState(false);
   const [done, setDone] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const submit = async () => {
-    if (!cafe.trim() || !contact.trim()) return;
+    if (!cafe.trim() || !contact.trim() || !consent) return;
     setBusy(true);
     try {
-      const r = await fetch("/api/sub-request", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cafeName: cafe, contact, plan: "홍보팩" }) });
+      const r = await fetch("/api/sub-request", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cafeName: cafe, contact, plan: "홍보팩", consent: true }) });
       const d = await r.json();
       if (d.ok) setDone(true);
     } catch {}
@@ -87,7 +88,11 @@ export default function Pricing() {
                 <p className="text-[12px] text-[#6b5a48] mb-4">가게명과 연락처를 남겨주시면 결제·세팅을 안내해 드려요.</p>
                 <input value={cafe} onChange={(e) => setCafe(e.target.value)} placeholder="가게명" className="w-full rounded-lg border border-[#d9c9b0] px-3 py-2.5 text-[14px] mb-2 bg-white" />
                 <input value={contact} onChange={(e) => setContact(e.target.value)} placeholder="연락처 (전화 또는 이메일)" className="w-full rounded-lg border border-[#d9c9b0] px-3 py-2.5 text-[14px] mb-3 bg-white" />
-                <button disabled={busy || !cafe.trim() || !contact.trim()} onClick={submit} className="w-full bg-[#e8b87a] text-[#2b2018] rounded-lg py-3 font-bold disabled:opacity-50">{busy ? "보내는 중…" : "신청 보내기"}</button>
+                <label className="flex items-start gap-2 mb-3 cursor-pointer">
+                  <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5 shrink-0" />
+                  <span className="text-[11.5px] text-[#52402e] leading-snug"><b>(필수)</b> 구독 안내를 위한 가게명·연락처 수집·이용에 동의합니다. 연락처는 <b>암호화 저장</b>되고 목적 달성 후 파기됩니다. <a href="/privacy" target="_blank" className="text-[#9c6b3f] underline">개인정보처리방침</a></span>
+                </label>
+                <button disabled={busy || !cafe.trim() || !contact.trim() || !consent} onClick={submit} className="w-full bg-[#e8b87a] text-[#2b2018] rounded-lg py-3 font-bold disabled:opacity-50">{busy ? "보내는 중…" : "신청 보내기"}</button>
               </>
             )}
           </div>

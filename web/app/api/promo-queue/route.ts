@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
     if (req.nextUrl.searchParams.get("review")) {
       // 승인 대기 + 공개 중인 홍보 모두(미승인 먼저) — 승인·우선노출·성과 관리
       const rows = await sql`
-        SELECT p.cafe_id, p.intro, p.photos, p.ai_headline, p.ai_tagline, p.ai_points, p.ai_pending, p.approved, p.style, p.video_url, p.featured, p.views, p.clicks, p.plays, c.name, c.area
+        SELECT p.cafe_id, p.intro, p.photos, p.ai_headline, p.ai_tagline, p.ai_points, p.ai_pending, p.approved, p.style, p.video_url, p.featured, p.featured_until, p.views, p.clicks, p.plays, c.name, c.area
         FROM cafe_promos p JOIN cafes c ON c.id = p.cafe_id
         WHERE p.published = true ORDER BY p.approved ASC, p.updated_at DESC LIMIT 80`;
       return NextResponse.json({ ok: true, review: rows });
@@ -45,8 +45,12 @@ export async function POST(req: NextRequest) {
     // 관리자 승인/반려
     if (body.approve) { await sql`UPDATE cafe_promos SET approved=true WHERE cafe_id=${cafeId}`; return NextResponse.json({ ok: true, approved: true }); }
     if (body.generate) { await sql`UPDATE cafe_promos SET ai_pending=true, updated_at=now() WHERE cafe_id=${cafeId}`; return NextResponse.json({ ok: true, queued: true }); } // 관리자만 AI 생성 트리거 → 로컬 배치가 처리
-    if (body.feature) { await sql`UPDATE cafe_promos SET featured=true WHERE cafe_id=${cafeId}`; return NextResponse.json({ ok: true, featured: true }); }       // 우선 노출 ON(유료 상품)
-    if (body.unfeature) { await sql`UPDATE cafe_promos SET featured=false WHERE cafe_id=${cafeId}`; return NextResponse.json({ ok: true, featured: false }); }
+    if (body.feature) { // 우선 노출 ON — 구독 기간만큼(기본 30일). 만료 시 자동 해제.
+      const days = Math.min(Math.max(Number(body.days) || 30, 1), 365);
+      await sql`UPDATE cafe_promos SET featured=true, featured_until = now() + make_interval(days => ${days}) WHERE cafe_id=${cafeId}`;
+      return NextResponse.json({ ok: true, featured: true, days });
+    }
+    if (body.unfeature) { await sql`UPDATE cafe_promos SET featured=false, featured_until=NULL WHERE cafe_id=${cafeId}`; return NextResponse.json({ ok: true, featured: false }); }
     if (body.reject) { await sql`UPDATE cafe_promos SET approved=false, published=false WHERE cafe_id=${cafeId}`; return NextResponse.json({ ok: true, rejected: true }); }
     if (body.fail) { await sql`UPDATE cafe_promos SET ai_pending=false WHERE cafe_id=${cafeId}`; return NextResponse.json({ ok: true, cleared: true }); }
     const headline = String(body.headline ?? "").slice(0, 24);

@@ -80,7 +80,7 @@ export default function Showcase({ cafeId, cafeName, pw }: { cafeId: number; caf
         <div className="mb-3">
           <div className="flex items-center gap-2 mb-1.5">
             <span className="text-[11px] text-[#cbb89f]">📊 우리 가게 홍보 성과</span>
-            {promo?.featured && <span className="text-[9px] bg-[#e8b87a] text-[#2b2018] px-1.5 py-0.5 rounded-full font-bold">⭐ 우선 노출 중</span>}
+            {promo?.featured && <span className="text-[9px] bg-[#e8b87a] text-[#2b2018] px-1.5 py-0.5 rounded-full font-bold">⭐ 우선 노출 중{promo.featured_until ? ` (D-${Math.max(0, Math.ceil((new Date(promo.featured_until).getTime() - Date.now()) / 86400000))})` : ""}</span>}
           </div>
           <div className="grid grid-cols-3 gap-1.5">
             <div className="bg-black/25 rounded-lg py-2 text-center"><div className="text-lg font-bold text-[#e8b87a]">{promo.views ?? 0}</div><div className="text-[9px] text-[#cbb89f]">노출(조회)</div></div>

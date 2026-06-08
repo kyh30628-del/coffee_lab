@@ -74,10 +74,18 @@ export async function GET(req: NextRequest) {
       : (verifiedByReview[0] ? slim(verifiedByReview[0], "top") : (byReview[0] ? slim(byReview[0], "top") : null));
     const usedIds = new Set([headlineA?.id, headlineB?.id].filter(Boolean));
 
-    // ✨ 우선 노출(featured) — 유료 상품. 승인+featured 카페를 상단 슬롯으로.
-    const featRows = await sql`SELECT cafe_id FROM cafe_promos WHERE featured = true AND approved = true` as unknown as { cafe_id: number }[];
+    // ✨ 우선 노출(featured) — 유료 상품. 기간(featured_until) 만료 시 자동 제외.
+    // 상한(FEAT_CAP) + 구독자 많으면 매일 로테이션 → 변별력 유지 + 공정 노출.
+    const FEAT_CAP = 6;
+    const featRows = await sql`SELECT cafe_id FROM cafe_promos WHERE featured = true AND approved = true AND (featured_until IS NULL OR featured_until > now())` as unknown as { cafe_id: number }[];
     const featSet = new Set(featRows.map((r) => Number(r.cafe_id)));
-    const featured = byReview.filter((c) => featSet.has(Number(c.id))).slice(0, 6).map((c: any) => ({ ...slim(c, "top"), featured: true }));
+    let pool = byReview.filter((c) => featSet.has(Number(c.id)));
+    if (pool.length > FEAT_CAP) {
+      const day = Math.floor(Date.now() / 86400000);   // 일 단위 회전(매일 다른 카페 노출)
+      const off = day % pool.length;
+      pool = [...pool.slice(off), ...pool.slice(0, off)];
+    }
+    const featured = pool.slice(0, FEAT_CAP).map((c: any) => ({ ...slim(c, "top"), featured: true }));
 
     return NextResponse.json({
       ok: true, region: region || "전체", scopeCount: scope.length,
