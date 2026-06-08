@@ -40,9 +40,13 @@ export async function fetchYouTubeReviews(name: string, area: string): Promise<{
           const cres = await fetch(`${API}/commentThreads?key=${KEY}&part=snippet&videoId=${v.id}&maxResults=3&order=relevance&textFormat=plainText`);
           if (cres.ok) {
             const cd = await cres.json();
+            // 개인정보 보호(YouTube 정책): 댓글 '텍스트'만 — 작성자 아이디·채널·프로필은 수집/저장 안 함.
+            // 텍스트 안의 @아이디 멘션도 제거해 식별정보를 남기지 않는다.
             comments = (cd.items ?? [])
               .map((c: any) => c?.snippet?.topLevelComment?.snippet?.textDisplay ?? "")
-              .filter(Boolean).map((t: string) => t.replace(/\s+/g, " ").slice(0, 110)).join(" · ");
+              .filter(Boolean)
+              .map((t: string) => t.replace(/@[\w.\-가-힣]+/g, "").replace(/\s+/g, " ").trim().slice(0, 110))
+              .filter(Boolean).join(" · ");
           }
         } catch { /* 댓글 비활성/오류 무시 */ }
       }

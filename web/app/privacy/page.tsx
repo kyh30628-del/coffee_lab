@@ -33,9 +33,11 @@ export default function PrivacyPage() {
             <h2 className="text-lg font-bold mb-2">3. YouTube API Services 이용</h2>
             <p>본 서비스는 <b>YouTube API Services</b>를 사용합니다. 이용으로써 사용자는 <a className="text-[#9c6b3f] underline" href="https://www.youtube.com/t/terms" target="_blank" rel="noopener noreferrer">YouTube 이용약관</a>에 동의하는 것으로 간주됩니다.</p>
             <ul className="list-disc ml-5 mt-2 space-y-1">
-              <li>우리는 카페 관련 <b>공개 영상의 메타데이터(제목·설명·게시일·상위 댓글)만</b> 조회·표시하며, <b>영상 파일을 다운로드·저장·재호스팅하지 않습니다.</b></li>
-              <li>영상은 항상 <b>원본 YouTube로 링크(▶ 영상 보기)</b>합니다.</li>
-              <li>Google이 수집·이용하는 정보는 <a className="text-[#9c6b3f] underline" href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Google 개인정보처리방침</a>을 따릅니다.</li>
+              <li>우리는 카페 관련 <b>공개 영상의 메타데이터(제목·설명·게시일)와 상위 댓글의 ‘텍스트’만</b> 조회·표시하며, <b>영상 파일을 다운로드·저장·재호스팅하지 않습니다.</b></li>
+              <li><b>댓글 작성자의 아이디·채널·프로필 등 개인 식별정보는 수집·저장하지 않습니다</b>(댓글 텍스트만, @멘션도 제거). 사용자를 추적·식별하거나 프로필을 만들지 않습니다.</li>
+              <li>영상 출처로 표기되는 <b>채널명은 저작자 표시(attribution)</b> 목적이며, 영상은 항상 <b>원본 YouTube로 링크(▶ 영상 보기)</b>됩니다. 영상 시청에 <b>요금·구독·로그인 등 어떤 제한도 두지 않습니다.</b></li>
+              <li>받은 API 데이터는 <b>교차검증 목적의 캐시</b>로만 두고 주기적으로 갱신하며, 정책 한도(통상 30일) 내 보관 후 갱신·파기합니다. 삭제 요청 시 30일 내 처리합니다.</li>
+              <li>본 서비스는 <a className="text-[#9c6b3f] underline" href="https://developers.google.com/youtube/terms/api-services-terms-of-service" target="_blank" rel="noopener noreferrer">YouTube API Services 약관</a> 및 <a className="text-[#9c6b3f] underline" href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Google 개인정보처리방침</a>을 준수합니다.</li>
             </ul>
           </section>
 
