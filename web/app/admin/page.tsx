@@ -35,6 +35,7 @@ export default function AdminPage() {
   const [q, setQ] = useState("");
   const [review, setReview] = useState<any[]>([]);
   const [subs, setSubs] = useState<any[]>([]);
+  const [purged, setPurged] = useState(0);
 
   const load = async (password: string) => {
     setMsg("불러오는 중...");
@@ -45,7 +46,7 @@ export default function AdminPage() {
     else { setMsg("오류: " + d.error); return; }
     fetch("/api/admin/stats", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((s) => { if (s.ok) setStats(s); }).catch(() => {});
     loadReview(password);
-    fetch("/api/sub-request", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) setSubs(d.requests ?? []); }).catch(() => {});
+    fetch("/api/sub-request", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) { setSubs(d.requests ?? []); setPurged(d.purgedRecently ?? 0); } }).catch(() => {});
   };
 
   const act = async (id: number, action: string, published?: boolean) => {
@@ -127,9 +128,10 @@ export default function AdminPage() {
         </div>
 
         {/* ===== 💎 구독 신청 ===== */}
-        {subs.length > 0 && (
+        {(subs.length > 0 || purged > 0) && (
           <div className="mb-6">
             <div className="text-xs font-bold text-amber-600 uppercase tracking-wider mb-2">💎 홍보팩 구독 신청 ({subs.length})</div>
+            {purged > 0 && <div className="bg-rose-50 border border-rose-200 rounded-lg px-3 py-2 mb-2 text-[11.5px] text-rose-700">🔔 보유기간 만료로 <b>{purged}건의 개인정보가 자동 삭제</b>됐어요. 해당 사장님께 다시 연락하려면 <b>재수집·재동의</b>가 필요합니다.</div>}
             <div className="space-y-2">
               {subs.map((s) => (
                 <div key={s.id} className="bg-white rounded-xl border border-amber-200 p-3 flex items-center justify-between gap-3">
@@ -138,11 +140,14 @@ export default function AdminPage() {
                     <span className="text-[11px] text-stone-400 ml-2">{s.plan}</span>
                     <div className="text-[12px] text-stone-600 truncate">📞 {s.contact}</div>
                   </div>
-                  <span className="text-[10px] text-stone-400 shrink-0">{new Date(s.created_at).toLocaleDateString("ko-KR")}</span>
+                  <div className="text-right shrink-0">
+                    <div className="text-[10px] text-stone-400">{new Date(s.created_at).toLocaleDateString("ko-KR")}</div>
+                    {s.delete_in != null && <div className="text-[9px] text-rose-400">자동삭제 D-{s.delete_in}</div>}
+                  </div>
                 </div>
               ))}
             </div>
-            <p className="text-[10px] text-stone-400 mt-1.5">연락처로 결제 안내 후, 아래 쇼케이스에서 ⭐우선노출을 켜주세요.</p>
+            <p className="text-[10px] text-stone-400 mt-1.5">연락처는 암호화 저장되며 보유기간 만료 시 자동 삭제됩니다. 결제 안내 후 아래 쇼케이스에서 ⭐우선노출을 켜주세요.</p>
           </div>
         )}
 
