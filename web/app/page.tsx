@@ -699,9 +699,13 @@ function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; 
           <>
             <style dangerouslySetInnerHTML={{ __html: SHOWCASE_CSS }} />
             {promo.style === 0 && promo.video_url ? (
-              <div className="relative w-full bg-black" style={{ height: "16rem" }}>
-                <video src={promo.video_url} controls playsInline preload="metadata" className="w-full h-full object-contain bg-black" />
-                <span className="absolute top-3 left-3 z-10 text-[9px] font-bold text-[#2b2018] bg-[#e8b87a] px-2.5 py-1 rounded-full shadow-md pointer-events-none">🎀 사장님 쇼케이스</span>
+              // 🖼 액자형 — 따뜻한 매트 + 패딩 + 테두리·그림자
+              <div className="w-full px-4 pt-4 pb-3" style={{ background: "linear-gradient(135deg,#f4ece0,#e8dcc8)" }}>
+                <div className="relative rounded-xl overflow-hidden shadow-lg ring-1 ring-[#cbb89f] bg-black">
+                  <video src={promo.video_url} controls playsInline preload="metadata" className="w-full block bg-black" style={{ maxHeight: "22rem" }} />
+                  <span className="absolute top-2.5 left-2.5 z-10 text-[9px] font-bold text-[#2b2018] bg-[#e8b87a] px-2.5 py-1 rounded-full shadow-md pointer-events-none">🎀 사장님 쇼케이스</span>
+                </div>
+                <div className="text-center text-[10px] text-[#9c6b3f] mt-2 tracking-wide">사장님이 직접 올린 우리 가게 영상</div>
               </div>
             ) : (
               <ShowcaseBanner style={promo.style || 1} headline={promo.ai_headline} tagline={promo.ai_tagline} points={Array.isArray(promo.ai_points) ? promo.ai_points : []} photo={promo.photos?.[0] || null} height="16rem" />
