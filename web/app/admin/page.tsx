@@ -138,7 +138,14 @@ export default function AdminPage() {
                       {p.ai_pending && <span className="text-[10px] bg-stone-200 text-stone-600 px-1.5 py-0.5 rounded-full ml-auto">AI 생성 대기</span>}
                     </div>
                     {p.intro && <p className="text-[12px] text-stone-500 mb-2 line-clamp-2">사장님 글: {p.intro}</p>}
-                    {p.ai_headline ? (
+                    {p.style === 0 ? (
+                      p.video_url ? (
+                        <div className="rounded-lg overflow-hidden bg-black">
+                          <span className="text-[10px] text-amber-600 px-1">🎬 영상 (소비자 노출 예정)</span>
+                          <video src={p.video_url} controls playsInline preload="metadata" className="w-full max-h-48" />
+                        </div>
+                      ) : <p className="text-[12px] text-stone-400">영상 업로드 대기 중</p>
+                    ) : p.ai_headline ? (
                       <div className="rounded-lg overflow-hidden bg-stone-900 text-stone-50">
                         {p.photos?.[0] && <img src={p.photos[0]} alt="" className="w-full h-28 object-cover" />}
                         <div className="p-3">
@@ -151,7 +158,7 @@ export default function AdminPage() {
                     ) : <p className="text-[12px] text-stone-400">AI 카피 생성 대기 중 — 로컬 배치 실행 후 다시 확인</p>}
                   </div>
                   <div className="flex border-t border-stone-100">
-                    <button onClick={() => promoAct(p.cafe_id, "approve")} disabled={!p.ai_headline} className="flex-1 py-2.5 text-sm font-bold text-emerald-700 disabled:text-stone-300">✓ 승인 (노출)</button>
+                    <button onClick={() => promoAct(p.cafe_id, "approve")} disabled={!p.ai_headline && !p.video_url} className="flex-1 py-2.5 text-sm font-bold text-emerald-700 disabled:text-stone-300">✓ 승인 (노출)</button>
                     <button onClick={() => promoAct(p.cafe_id, "reject")} className="flex-1 py-2.5 text-sm text-rose-600 border-l border-stone-100">✕ 반려</button>
                   </div>
                 </div>

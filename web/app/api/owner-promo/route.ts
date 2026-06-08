@@ -18,7 +18,8 @@ async function ensurePromo() {
   )`;
   await sql`ALTER TABLE cafe_promos ADD COLUMN IF NOT EXISTS ai_pending BOOLEAN DEFAULT false`;
   await sql`ALTER TABLE cafe_promos ADD COLUMN IF NOT EXISTS approved BOOLEAN DEFAULT false`; // 관리자 승인 후에만 배너 노출
-  await sql`ALTER TABLE cafe_promos ADD COLUMN IF NOT EXISTS style INT DEFAULT 1`; // 사장님이 고른 템플릿(1~10)
+  await sql`ALTER TABLE cafe_promos ADD COLUMN IF NOT EXISTS style INT DEFAULT 1`; // 사장님이 고른 템플릿(1~10), 0=영상
+  await sql`ALTER TABLE cafe_promos ADD COLUMN IF NOT EXISTS video_url TEXT`; // 홍보 영상(Vercel Blob URL)
   ready = true;
 }
 const authed = (req: NextRequest) => !!req.headers.get("x-admin-password") && req.headers.get("x-admin-password") === process.env.ADMIN_PASSWORD;
@@ -49,6 +50,15 @@ export async function POST(req: NextRequest) {
     // 스타일(템플릿)만 변경 — 내용·승인은 그대로(템플릿은 외형만 바꿈)
     if (body.styleOnly) {
       await sql`UPDATE cafe_promos SET style=${Math.min(Math.max(Number(body.style) || 1, 1), 10)}, updated_at=now() WHERE cafe_id=${cafeId}`;
+      const r = (await sql`SELECT * FROM cafe_promos WHERE cafe_id=${cafeId}`)[0];
+      return NextResponse.json({ ok: true, promo: r });
+    }
+    // 영상 모드 — 업로드된 Blob URL 저장(style=0=영상). 관리자 승인 후 노출.
+    if (body.mode === "video") {
+      const vurl = typeof body.video_url === "string" ? body.video_url : null;
+      await sql`INSERT INTO cafe_promos (cafe_id, video_url, style, published, approved, updated_at)
+        VALUES (${cafeId}, ${vurl}, 0, true, false, now())
+        ON CONFLICT (cafe_id) DO UPDATE SET video_url=${vurl}, style=0, published=true, approved=false, updated_at=now()`;
       const r = (await sql`SELECT * FROM cafe_promos WHERE cafe_id=${cafeId}`)[0];
       return NextResponse.json({ ok: true, promo: r });
     }

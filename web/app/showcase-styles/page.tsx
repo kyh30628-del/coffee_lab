@@ -35,7 +35,6 @@ export default function ShowcaseStyles() {
                 </div>
                 <div className="rounded-2xl overflow-hidden shadow-lg bg-[#fdfaf4]">
                   <ShowcaseBanner style={t.id} scene={s.scene} headline={s.headline} tagline={s.tagline} points={s.points} cta={s.cta} height="220px" />
-                  <div className="p-3"><div className="font-bold text-[15px] text-[#2b2018]">{s.cafe}</div><div className="text-[11px] text-[#9c6b3f]">{s.area}</div></div>
                 </div>
               </div>
             );

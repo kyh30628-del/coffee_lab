@@ -685,7 +685,7 @@ function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; 
   useEffect(() => {
     let live = true; setLoadingRev(true); setPromo(null);
     fetch(`/api/cafe-detail?id=${cafe.id}`).then((r) => r.json()).then((d) => { if (live) { setReviews(d.reviews ?? []); setQuality(d.quality ?? null); setLlmJudged(!!d.llmJudged); setLoadingRev(false); } }).catch(() => { if (live) setLoadingRev(false); });
-    fetch(`/api/owner-promo?cafeId=${cafe.id}`).then((r) => r.json()).then((d) => { if (live && d.promo?.ai_headline) setPromo(d.promo); }).catch(() => {});
+    fetch(`/api/owner-promo?cafeId=${cafe.id}`).then((r) => r.json()).then((d) => { if (live && d.promo && (d.promo.ai_headline || d.promo.video_url)) setPromo(d.promo); }).catch(() => {});
     return () => { live = false; };
   }, [cafe.id]);
   const kept = quality ? quality.verified + quality.reference : 0;
@@ -694,11 +694,18 @@ function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; 
     <div className="fixed inset-0 z-[3000]" style={{ fontFamily: "'Gowun Batang', serif" }}>
       <div onClick={onClose} className="absolute inset-0 bg-black/30" />
       <aside className="absolute top-0 right-0 w-full md:max-w-md bg-[#fdfaf4] shadow-2xl overflow-y-auto" style={{ height: "100dvh" }}>
-        {/* 사장님 쇼케이스 홍보 배너 — 사장님이 고른 10종 템플릿 */}
+        {/* 사장님 쇼케이스 — 영상(style 0) 또는 10종 템플릿 */}
         {promo && (
           <>
             <style dangerouslySetInnerHTML={{ __html: SHOWCASE_CSS }} />
-            <ShowcaseBanner style={promo.style || 1} headline={promo.ai_headline} tagline={promo.ai_tagline} points={Array.isArray(promo.ai_points) ? promo.ai_points : []} photo={promo.photos?.[0] || null} height="16rem" />
+            {promo.style === 0 && promo.video_url ? (
+              <div className="relative w-full bg-black" style={{ height: "16rem" }}>
+                <video src={promo.video_url} controls playsInline preload="metadata" className="w-full h-full object-contain bg-black" />
+                <span className="absolute top-3 left-3 z-10 text-[9px] font-bold text-[#2b2018] bg-[#e8b87a] px-2.5 py-1 rounded-full shadow-md pointer-events-none">🎀 사장님 쇼케이스</span>
+              </div>
+            ) : (
+              <ShowcaseBanner style={promo.style || 1} headline={promo.ai_headline} tagline={promo.ai_tagline} points={Array.isArray(promo.ai_points) ? promo.ai_points : []} photo={promo.photos?.[0] || null} height="16rem" />
+            )}
           </>
         )}
         {/* 쇼케이스 배너가 있으면 기본 사진/띠는 생략(중복·잘림 방지) */}

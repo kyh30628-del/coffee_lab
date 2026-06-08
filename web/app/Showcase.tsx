@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import { upload } from "@vercel/blob/client";
 import ShowcaseBanner, { SHOWCASE_CSS, SHOWCASE_TEMPLATES } from "./ShowcaseBanner";
 
 // 사장님 쇼케이스 편집기 — 글·사진 → AI 홍보물 요청 → (배치 생성) → 관리자 승인 → 카페 상세 배너.
@@ -30,6 +31,22 @@ export default function Showcase({ cafeId, cafeName, pw }: { cafeId: number; caf
     // 이미 생성된 홍보면 스타일만 즉시 저장(내용·승인 유지)
     if (promo?.ai_headline) { try { await fetch("/api/owner-promo", { method: "POST", headers: { ...hdr, "Content-Type": "application/json" }, body: JSON.stringify({ cafeId, styleOnly: true, style: n }) }); } catch {} }
   };
+  const [vidBusy, setVidBusy] = useState(false);
+  const onVideo = async (e: any) => {
+    const f = e.target.files?.[0]; e.target.value = ""; if (!f) return;
+    const dur = await new Promise<number>((res) => { const v = document.createElement("video"); v.preload = "metadata"; v.onloadedmetadata = () => res(v.duration); v.onerror = () => res(0); v.src = URL.createObjectURL(f); });
+    if (dur > 210) { setMsg("영상이 너무 길어요 — 3분 30초 이내로 올려주세요"); return; }
+    if (f.size > 300 * 1024 * 1024) { setMsg("파일이 너무 큽니다 (300MB 이내)"); return; }
+    setVidBusy(true); setMsg("영상 업로드 중… (잠시 걸려요)");
+    try {
+      const blob = await upload(`showcase/${cafeId}-${Date.now()}.${(f.name.split(".").pop() || "mp4")}`, f, { access: "public", handleUploadUrl: "/api/showcase-video", clientPayload: pw });
+      const r = await fetch("/api/owner-promo", { method: "POST", headers: { ...hdr, "Content-Type": "application/json" }, body: JSON.stringify({ cafeId, mode: "video", video_url: blob.url }) });
+      const d = await r.json();
+      if (d.ok) { setPromo(d.promo); setMsg("✅ 영상 업로드 완료 — 관리자 승인 후 노출돼요"); }
+      else setMsg("저장 오류: " + (d.error ?? ""));
+    } catch (err) { setMsg("영상 업로드 실패: " + String(err).slice(0, 70)); }
+    setVidBusy(false);
+  };
   const submit = async () => {
     setBusy(true); setMsg("요청 보내는 중…");
     try {
@@ -42,9 +59,11 @@ export default function Showcase({ cafeId, cafeName, pw }: { cafeId: number; caf
   };
 
   if (!promo) return <p className="text-[12px] text-[#a8927a]">불러오는 중…</p>;
-  const status = promo.ai_pending ? "🕐 AI 생성 대기 중 (내 PC 배치가 처리)"
-    : promo.ai_headline ? (promo.approved ? "🟢 공개 중 — 카페 상세 상단에 노출돼요" : "🟡 관리자 승인 대기 중")
-      : "글·사진을 적고 'AI 홍보물 만들기'를 눌러주세요";
+  const status = promo.style === 0
+    ? (promo.video_url ? (promo.approved ? "🟢 공개 중 — 카페 상세에 영상이 노출돼요" : "🟡 영상 — 관리자 승인 대기 중") : "🎬 홍보 영상을 올려주세요")
+    : promo.ai_pending ? "🕐 AI 생성 대기 중 (내 PC 배치가 처리)"
+      : promo.ai_headline ? (promo.approved ? "🟢 공개 중 — 카페 상세 상단에 노출돼요" : "🟡 관리자 승인 대기 중")
+        : "홍보 문구를 적고 'AI 어필 카피 만들기'를 눌러주세요";
 
   return (
     <div className="bg-gradient-to-br from-[#2b2018] to-[#4a3424] text-[#f4ece0] rounded-2xl p-4 sm:p-5">
@@ -54,28 +73,16 @@ export default function Showcase({ cafeId, cafeName, pw }: { cafeId: number; caf
         <h3 className="text-base font-bold">우리 가게 쇼케이스</h3>
         <span className="text-[9px] bg-[#e8b87a] text-[#2b2018] px-1.5 py-0.5 rounded-full font-bold ml-auto">구독 미리보기</span>
       </div>
-      <p className="text-[12px] text-[#cbb89f] leading-relaxed mb-3"><b className="text-[#f4ece0]">{cafeName}</b> · 글·사진을 올리면 <b className="text-[#f4ece0]">AI가 홍보 카피</b>를 만들고, <b className="text-[#f4ece0]">관리자 승인</b> 후 카페 상세 맨 위에 노출돼요.</p>
+      <p className="text-[12px] text-[#cbb89f] leading-relaxed mb-3"><b className="text-[#f4ece0]">{cafeName}</b> · 홍보 <b className="text-[#f4ece0]">문구를 적으면 AI가 요약</b>해 어필 카피로, 또는 <b className="text-[#f4ece0]">홍보 영상</b>을 올릴 수 있어요. <b className="text-[#f4ece0]">관리자 승인</b> 후 카페 상세 맨 위에 노출돼요.</p>
 
-      <textarea value={promo?.intro ?? ""} onChange={(e) => setPromo((p: any) => ({ ...(p ?? {}), intro: e.target.value }))} placeholder="우리 가게 소개를 자유롭게 — 시그니처, 분위기, 사장님 한마디 등" rows={3} className="w-full rounded-lg p-3 text-[13px] text-[#2b2018] bg-[#fdfaf4] mb-2 resize-none" />
-
-      <div className="flex gap-2 flex-wrap mb-2.5">
-        {(promo?.photos ?? []).map((url: string, i: number) => (
-          <div key={i} className="relative w-16 h-16 rounded-lg overflow-hidden">
-            <img src={url} alt="" className="w-full h-full object-cover" />
-            <button onClick={() => rmPhoto(i)} className="absolute top-0 right-0 bg-black/60 text-white text-[11px] w-4.5 h-4.5 leading-none flex items-center justify-center rounded-bl">×</button>
-          </div>
-        ))}
-        {(promo?.photos?.length ?? 0) < 3 && (
-          <label className="w-16 h-16 rounded-lg border-2 border-dashed border-[#9c6b3f] flex items-center justify-center text-[#cbb89f] text-2xl cursor-pointer">+
-            <input type="file" accept="image/*" onChange={onPhoto} className="hidden" />
-          </label>
-        )}
-      </div>
-
-      {/* 🎨 템플릿 선택 (10종) */}
+      {/* 표시 방식 — 영상 또는 템플릿(글) */}
       <div className="mb-3">
-        <div className="text-[11px] text-[#cbb89f] mb-1.5">🎨 홍보 스타일 — 우리 가게에 어울리는 템플릿을 골라보세요 (<a href="/showcase-styles" target="_blank" className="underline">샘플 보기</a>)</div>
+        <div className="text-[11px] text-[#cbb89f] mb-1.5">표시 방식 — 영상 또는 템플릿(글)을 고르세요 (<a href="/showcase-styles" target="_blank" className="underline">템플릿 샘플 보기</a>)</div>
         <div className="flex gap-1.5 overflow-x-auto pb-1.5 -mx-1 px-1">
+          <label className={`shrink-0 text-[10.5px] px-2.5 py-1.5 rounded-full border whitespace-nowrap cursor-pointer ${promo?.style === 0 ? "bg-[#e8b87a] text-[#2b2018] border-[#e8b87a] font-bold" : "border-[#7a5c3c] text-[#cbb89f]"}`}>
+            🎬 영상 업로드
+            <input type="file" accept="video/*" onChange={onVideo} className="hidden" />
+          </label>
           {SHOWCASE_TEMPLATES.map((t) => {
             const on = (promo?.style || 1) === t.id;
             return (
@@ -88,17 +95,52 @@ export default function Showcase({ cafeId, cafeName, pw }: { cafeId: number; caf
         </div>
       </div>
 
-      <button disabled={busy} onClick={submit} className="w-full bg-[#e8b87a] text-[#2b2018] rounded-lg py-2.5 text-sm font-bold disabled:opacity-50 mb-2">✨ AI 홍보물 만들기 (관리자 승인 후 노출)</button>
-      {msg && <p className="text-[11px] text-[#e8b87a] mb-2">{msg}</p>}
-
-      {promo?.ai_headline && (
-        <div className="mt-1">
-          <div className="text-[10px] text-[#cbb89f] mb-1">미리보기 — 위에서 스타일을 바꾸면 바로 반영돼요</div>
-          <div className="rounded-xl overflow-hidden border border-[#5a4633]">
-            <ShowcaseBanner style={promo.style || 1} headline={promo.ai_headline} tagline={promo.ai_tagline} points={Array.isArray(promo.ai_points) ? promo.ai_points : []} photo={promo.photos?.[0] || null} height="200px" />
+      {promo?.style === 0 ? (
+        // ===== 영상 모드 =====
+        <div>
+          {promo?.video_url ? (
+            <>
+              <div className="rounded-xl overflow-hidden border border-[#5a4633] mb-2 bg-black">
+                <video src={promo.video_url} controls playsInline preload="metadata" className="w-full max-h-56" />
+              </div>
+              <label className="block text-center text-[11px] text-[#e8b87a] underline cursor-pointer">다른 영상으로 교체<input type="file" accept="video/*" onChange={onVideo} className="hidden" /></label>
+            </>
+          ) : (
+            <label className="block border-2 border-dashed border-[#9c6b3f] rounded-xl py-7 text-center text-[#cbb89f] text-[13px] cursor-pointer">
+              {vidBusy ? "업로드 중…" : <>🎬 홍보 영상 올리기 (탭하여 선택)<br /><span className="text-[10.5px] opacity-80">최대 3분 30초 · 300MB · mp4/mov</span></>}
+              <input type="file" accept="video/*" onChange={onVideo} className="hidden" disabled={vidBusy} />
+            </label>
+          )}
+        </div>
+      ) : (
+        // ===== 템플릿(글) 모드 =====
+        <div>
+          <textarea value={promo?.intro ?? ""} onChange={(e) => setPromo((p: any) => ({ ...(p ?? {}), intro: e.target.value }))} placeholder="우리 가게 홍보 문구를 자유롭게 — AI가 요약해 어필 카피로 만들어요" rows={3} className="w-full rounded-lg p-3 text-[13px] text-[#2b2018] bg-[#fdfaf4] mb-2 resize-none" />
+          <div className="flex gap-2 flex-wrap mb-2.5">
+            {(promo?.photos ?? []).map((url: string, i: number) => (
+              <div key={i} className="relative w-16 h-16 rounded-lg overflow-hidden">
+                <img src={url} alt="" className="w-full h-full object-cover" />
+                <button onClick={() => rmPhoto(i)} className="absolute top-0 right-0 bg-black/60 text-white text-[11px] w-4.5 h-4.5 leading-none flex items-center justify-center rounded-bl">×</button>
+              </div>
+            ))}
+            {(promo?.photos?.length ?? 0) < 3 && (
+              <label className="w-16 h-16 rounded-lg border-2 border-dashed border-[#9c6b3f] flex items-center justify-center text-[#cbb89f] text-2xl cursor-pointer">+
+                <input type="file" accept="image/*" onChange={onPhoto} className="hidden" />
+              </label>
+            )}
           </div>
+          <button disabled={busy} onClick={submit} className="w-full bg-[#e8b87a] text-[#2b2018] rounded-lg py-2.5 text-sm font-bold disabled:opacity-50 mb-2">✨ AI 어필 카피 만들기 (관리자 승인 후 노출)</button>
+          {promo?.ai_headline && (
+            <div className="mt-1">
+              <div className="text-[10px] text-[#cbb89f] mb-1">미리보기 — 위에서 스타일을 바꾸면 바로 반영돼요</div>
+              <div className="rounded-xl overflow-hidden border border-[#5a4633]">
+                <ShowcaseBanner style={promo.style || 1} headline={promo.ai_headline} tagline={promo.ai_tagline} points={Array.isArray(promo.ai_points) ? promo.ai_points : []} photo={promo.photos?.[0] || null} height="200px" />
+              </div>
+            </div>
+          )}
         </div>
       )}
+      {msg && <p className="text-[11px] text-[#e8b87a] mt-2">{msg}</p>}
       <p className="text-[10.5px] text-[#cbb89f] mt-2">{status}</p>
     </div>
   );

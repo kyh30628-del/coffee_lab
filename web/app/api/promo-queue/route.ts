@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
     // review=1: 관리자 승인 대기(생성 완료 & 미승인). 기본: 로컬 배치용 AI 생성 대기.
     if (req.nextUrl.searchParams.get("review")) {
       const rows = await sql`
-        SELECT p.cafe_id, p.intro, p.photos, p.ai_headline, p.ai_tagline, p.ai_points, p.ai_pending, p.approved, c.name, c.area
+        SELECT p.cafe_id, p.intro, p.photos, p.ai_headline, p.ai_tagline, p.ai_points, p.ai_pending, p.approved, p.style, p.video_url, c.name, c.area
         FROM cafe_promos p JOIN cafes c ON c.id = p.cafe_id
         WHERE p.published = true AND p.approved = false ORDER BY p.updated_at DESC LIMIT 50`;
       return NextResponse.json({ ok: true, review: rows });
