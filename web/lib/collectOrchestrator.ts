@@ -44,8 +44,15 @@ export type CollectResult = {
   quality: QualityStats;
 };
 
+// 표시 인용문에서 개인정보(전화·이메일) 마스킹 — 원문에 연락처가 섞여 들어와도 노출 금지
+function maskPII(s: string): string {
+  return s
+    .replace(/01[0-9][-\s.]?\d{3,4}[-\s.]?\d{4}/g, "010-****-****")
+    .replace(/\b\d{2,4}[-\s.]\d{3,4}[-\s.]\d{4}\b/g, "***-****-****")
+    .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, "***@***");
+}
 function toQuote(text: string, maxLen = 80): string {
-  const t = text.trim();
+  const t = maskPII(text.trim());
   return t.length <= maxLen ? t : t.slice(0, maxLen) + "…";
 }
 const dedupeKey = (s: string) => s.toLowerCase().replace(/\s+/g, "").slice(0, 60);
@@ -130,7 +137,15 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
   evidence.sort((a, b) =>
     (order[a.trust ?? "reference"] - order[b.trust ?? "reference"]) ||
     (b.date ?? "").localeCompare(a.date ?? ""));
-  let topEvidence = evidence.slice(0, 6);
+  // 표시 근거는 같은 링크 1건만 — 중복 글 노출 방지 안전장치(상위 6개 선택 전 dedup)
+  const evSeen = new Set<string>();
+  const evDedup = evidence.filter((e) => {
+    const k = (e.link ?? "").trim().toLowerCase().replace(/^https?:\/\//, "").replace(/^m\./, "").replace(/[#?].*$/, "").replace(/\/+$/, "");
+    if (!k) return true;
+    if (evSeen.has(k)) return false;
+    evSeen.add(k); return true;
+  });
+  let topEvidence = evDedup.slice(0, 6);
   // 유튜브 최소 1개 노출: 검증·참고 통과한 유튜브 영상이 있으면 상위 6개에 최소 하나 포함
   // (이미 있으면 그대로, 없으면 가장 우선인 유튜브를 끝자리에 끼움). 유튜브 없으면 네이버로 채워짐.
   const isYt = (e: EvidenceReview) => /youtu\.?be/.test(e.link ?? "");

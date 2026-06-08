@@ -36,6 +36,15 @@ export default function AdminPage() {
   const [review, setReview] = useState<any[]>([]);
   const [subs, setSubs] = useState<any[]>([]);
   const [purged, setPurged] = useState(0);
+  const [verify, setVerify] = useState<any>(null);
+  const [verifying, setVerifying] = useState(false);
+
+  const loadVerify = (password: string) => fetch("/api/cron-verify?latest=1", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) setVerify(d.report); }).catch(() => {});
+  const runVerify = async () => {
+    setVerifying(true);
+    try { const r = await fetch("/api/cron-verify", { headers: { "x-admin-password": pw } }); const d = await r.json(); if (d.ok) setVerify({ ran_at: d.ranAt, status: d.status, fails: d.fails, warns: d.warns, checks: d.checks }); } catch {}
+    setVerifying(false);
+  };
 
   const load = async (password: string) => {
     setMsg("불러오는 중...");
@@ -47,6 +56,7 @@ export default function AdminPage() {
     fetch("/api/admin/stats", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((s) => { if (s.ok) setStats(s); }).catch(() => {});
     loadReview(password);
     fetch("/api/sub-request", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) { setSubs(d.requests ?? []); setPurged(d.purgedRecently ?? 0); } }).catch(() => {});
+    loadVerify(password);
   };
 
   const act = async (id: number, action: string, published?: boolean) => {
@@ -125,6 +135,33 @@ export default function AdminPage() {
           <BackLink to="/" label="홈" className="text-stone-500" />
           <h1 className="text-2xl font-bold">관리자 대시보드</h1>
           <button onClick={() => load(pw)} className="ml-auto text-xs px-3 py-1.5 rounded-lg bg-stone-200 text-stone-700">새로고침</button>
+        </div>
+
+        {/* ===== 🛡️ 검증 에이전트(레드팀) ===== */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-bold text-stone-500 uppercase tracking-wider">🛡️ 데이터 검증 (레드팀 · 매일 자동)</span>
+            <button onClick={runVerify} disabled={verifying} className="text-[11px] bg-stone-800 text-white rounded-full px-3 py-1 disabled:opacity-50">{verifying ? "검사 중…" : "지금 검사"}</button>
+          </div>
+          {verify ? (
+            <div className={`rounded-xl border p-3 ${verify.status === "pass" ? "bg-emerald-50 border-emerald-200" : verify.status === "warn" ? "bg-amber-50 border-amber-200" : "bg-rose-50 border-rose-200"}`}>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-lg">{verify.status === "pass" ? "✅" : verify.status === "warn" ? "🟡" : "🔴"}</span>
+                <span className="font-bold text-sm">{verify.status === "pass" ? "전체 정상 — 한치의 오차 없음" : verify.status === "warn" ? `주의 ${verify.warns}건` : `오류 ${verify.fails}건 — 즉시 확인 필요`}</span>
+                <span className="text-[10px] text-stone-400 ml-auto">{verify.ran_at ? new Date(verify.ran_at).toLocaleString("ko-KR") : ""}</span>
+              </div>
+              <div className="space-y-1">
+                {(verify.checks ?? []).map((c: any) => (
+                  <div key={c.key} className="flex items-center gap-2 text-[12px]">
+                    <span>{c.count === 0 ? "🟢" : c.severity === "fail" ? "🔴" : "🟡"}</span>
+                    <span className="flex-1 text-stone-700">{c.label}</span>
+                    {c.count > 0 && c.samples?.length > 0 && <span className="text-[10px] text-stone-400 truncate max-w-[40%]">{c.samples.slice(0, 2).join(", ")}</span>}
+                    <span className={c.count > 0 ? (c.severity === "fail" ? "text-rose-600 font-bold" : "text-amber-600 font-bold") : "text-stone-300"}>{c.count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : <p className="text-[12px] text-stone-400">검증 리포트 없음 — '지금 검사'를 눌러 실행하세요.</p>}
         </div>
 
         {/* ===== 💎 구독 신청 ===== */}

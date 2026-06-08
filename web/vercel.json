@@ -15,6 +15,10 @@
     {
       "path": "/api/cron-grow",
       "schedule": "0 18 * * *"
+    },
+    {
+      "path": "/api/cron-verify",
+      "schedule": "0 21 * * *"
     }
   ]
 }

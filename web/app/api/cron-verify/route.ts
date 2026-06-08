@@ -1,0 +1,120 @@
+import { NextRequest, NextResponse } from "next/server";
+import { sql, ensureSchema } from "@/lib/db";
+export const runtime = "nodejs";
+export const maxDuration = 60;
+
+// 🛡️ 검증 에이전트(레드팀) — 결정론적 불변식 검사. LLM 미사용 → 검사기 자체에 환각·오차 없음.
+// 데이터·기능의 무결성을 매일 검사하고 verify_reports에 저장. 관리자 화면이 최신 리포트 표시.
+const authed = (req: NextRequest) => {
+  const pw = req.headers.get("x-admin-password");
+  if (pw && pw === process.env.ADMIN_PASSWORD) return true;
+  const secret = process.env.CRON_SECRET;
+  const auth = req.headers.get("authorization");
+  return !!secret && auth === `Bearer ${secret}`;
+};
+
+type Check = { key: string; label: string; severity: "fail" | "warn"; count: number; samples: string[] };
+
+async function n(q: Promise<any[]>): Promise<number> { return Number((await q)[0]?.n ?? 0); }
+async function samp(q: Promise<any[]>): Promise<string[]> { return (await q).map((r: any) => String(r.s)).slice(0, 6); }
+
+async function runChecks(): Promise<Check[]> {
+  const checks: Check[] = [];
+  const add = (key: string, label: string, severity: "fail" | "warn", count: number, samples: string[]) =>
+    checks.push({ key, label, severity, count, samples });
+
+  // 1. 숫자 일관성: 전체 = 옥석(검증+참고) + 노이즈
+  add("count_consistency", "후기 수 일관성 (전체 = 옥석 + 노이즈)", "fail",
+    await n(sql`SELECT count(*)::int n FROM cafes WHERE synth_quality->>'raw' IS NOT NULL
+      AND (synth_quality->>'raw')::int <> (synth_quality->>'verified')::int + (synth_quality->>'reference')::int + (synth_quality->>'rejected')::int`),
+    await samp(sql`SELECT name s FROM cafes WHERE synth_quality->>'raw' IS NOT NULL
+      AND (synth_quality->>'raw')::int <> (synth_quality->>'verified')::int + (synth_quality->>'reference')::int + (synth_quality->>'rejected')::int LIMIT 6`));
+
+  // 2. 등급 유효성: 공개 카페는 검증/참고/발굴 중 하나
+  add("grade_validity", "등급 값 유효성 (검증/참고/발굴)", "fail",
+    await n(sql`SELECT count(*)::int n FROM cafes WHERE published AND (synth_grade IS NULL OR synth_grade NOT IN ('검증','참고','발굴'))`),
+    await samp(sql`SELECT name s FROM cafes WHERE published AND (synth_grade IS NULL OR synth_grade NOT IN ('검증','참고','발굴')) LIMIT 6`));
+
+  // 3. 고아 데이터: 공개인데 분석/후기 없음
+  add("orphan_published", "공개 카페 분석 데이터 누락", "fail",
+    await n(sql`SELECT count(*)::int n FROM cafes WHERE published AND (synth_reviews IS NULL OR jsonb_array_length(synth_reviews)=0 OR synth_grade IS NULL)`),
+    await samp(sql`SELECT name s FROM cafes WHERE published AND (synth_reviews IS NULL OR jsonb_array_length(synth_reviews)=0 OR synth_grade IS NULL) LIMIT 6`));
+
+  // 4. 근거 후기 필수필드: quote/link 누락
+  add("review_fields", "근거 후기 필수필드(인용·링크) 누락", "fail",
+    await n(sql`SELECT count(DISTINCT c.id)::int n FROM cafes c, jsonb_array_elements(c.synth_reviews) r
+      WHERE c.published AND (coalesce(r->>'quote','')='' OR coalesce(r->>'link','')='')`),
+    await samp(sql`SELECT DISTINCT c.name s FROM cafes c, jsonb_array_elements(c.synth_reviews) r
+      WHERE c.published AND (coalesce(r->>'quote','')='' OR coalesce(r->>'link','')='') LIMIT 6`));
+
+  // 5. PII 누출: 표시 인용문에 전화/이메일
+  add("pii_leak", "근거 후기에 개인정보(전화·이메일) 노출", "fail",
+    await n(sql`SELECT count(DISTINCT c.id)::int n FROM cafes c, jsonb_array_elements(c.synth_reviews) r
+      WHERE c.published AND (r->>'quote' ~ '01[0-9][- ]?[0-9]{3,4}[- ]?[0-9]{4}' OR r->>'quote' ~ '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}')`),
+    await samp(sql`SELECT DISTINCT c.name s FROM cafes c, jsonb_array_elements(c.synth_reviews) r
+      WHERE c.published AND (r->>'quote' ~ '01[0-9][- ]?[0-9]{3,4}[- ]?[0-9]{4}' OR r->>'quote' ~ '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}') LIMIT 6`));
+
+  // 6. 링크 형식: http로 시작하지 않는 출처 링크
+  add("link_format", "출처 링크 형식 오류(http 아님)", "fail",
+    await n(sql`SELECT count(DISTINCT c.id)::int n FROM cafes c, jsonb_array_elements(c.synth_reviews) r
+      WHERE c.published AND r->>'link' IS NOT NULL AND r->>'link' NOT LIKE 'http%'`),
+    await samp(sql`SELECT DISTINCT c.name s FROM cafes c, jsonb_array_elements(c.synth_reviews) r
+      WHERE c.published AND r->>'link' IS NOT NULL AND r->>'link' NOT LIKE 'http%' LIMIT 6`));
+
+  // 7. 좌표 범위: 수도권 밖
+  add("coord_bounds", "지도 좌표 범위 이탈(수도권 밖)", "fail",
+    await n(sql`SELECT count(*)::int n FROM cafes WHERE published AND (lat IS NULL OR lng IS NULL OR lat < 36.8 OR lat > 38.3 OR lng < 124.5 OR lng > 127.9)`),
+    await samp(sql`SELECT name s FROM cafes WHERE published AND (lat IS NULL OR lng IS NULL OR lat < 36.8 OR lat > 38.3 OR lng < 124.5 OR lng > 127.9) LIMIT 6`));
+
+  // 8. 중복 근거 후기: 한 카페 내 같은 링크 중복
+  add("duplicate_links", "근거 후기 링크 중복", "warn",
+    await n(sql`SELECT count(*)::int n FROM (SELECT c.id, r->>'link' lk FROM cafes c, jsonb_array_elements(c.synth_reviews) r
+      WHERE c.published AND r->>'link' IS NOT NULL GROUP BY c.id, r->>'link' HAVING count(*)>1) x`),
+    await samp(sql`SELECT DISTINCT c.name s FROM cafes c, jsonb_array_elements(c.synth_reviews) r
+      WHERE c.published AND r->>'link' IS NOT NULL GROUP BY c.id, c.name, r->>'link' HAVING count(*)>1 LIMIT 6`));
+
+  // 9. 출처 표기 누락: 약관상 attribution 필수
+  add("source_attribution", "출처(source) 표기 누락", "warn",
+    await n(sql`SELECT count(DISTINCT c.id)::int n FROM cafes c, jsonb_array_elements(c.synth_reviews) r
+      WHERE c.published AND coalesce(r->>'source','')=''`),
+    await samp(sql`SELECT DISTINCT c.name s FROM cafes c, jsonb_array_elements(c.synth_reviews) r
+      WHERE c.published AND coalesce(r->>'source','')='' LIMIT 6`));
+
+  // 10. 우선노출 정합성: 만료/미승인인데 featured
+  add("featured_stale", "우선노출 플래그 정합성(만료·미승인)", "warn",
+    await n(sql`SELECT count(*)::int n FROM cafe_promos WHERE featured AND (NOT approved OR (featured_until IS NOT NULL AND featured_until < now()))`),
+    await samp(sql`SELECT cafe_id::text s FROM cafe_promos WHERE featured AND (NOT approved OR (featured_until IS NOT NULL AND featured_until < now())) LIMIT 6`));
+
+  // 11. 승인 홍보 내용 누락
+  add("promo_empty", "승인된 홍보에 내용 없음", "warn",
+    await n(sql`SELECT count(*)::int n FROM cafe_promos WHERE approved AND coalesce(ai_headline,'')='' AND coalesce(video_url,'')='' AND coalesce(intro,'')=''`),
+    await samp(sql`SELECT cafe_id::text s FROM cafe_promos WHERE approved AND coalesce(ai_headline,'')='' AND coalesce(video_url,'')='' AND coalesce(intro,'')='' LIMIT 6`));
+
+  return checks;
+}
+
+export async function GET(req: NextRequest) {
+  try {
+    if (!authed(req)) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+    await ensureSchema();
+    await sql`CREATE TABLE IF NOT EXISTS verify_reports (id SERIAL PRIMARY KEY, ran_at TIMESTAMPTZ DEFAULT now(), status TEXT, fails INT, warns INT, checks JSONB)`;
+
+    // 최신 리포트만 조회(관리자 화면용 — 재실행 안 함)
+    if (req.nextUrl.searchParams.get("latest")) {
+      const r = (await sql`SELECT ran_at, status, fails, warns, checks FROM verify_reports ORDER BY ran_at DESC LIMIT 1`)[0] as any;
+      return NextResponse.json({ ok: true, report: r ?? null });
+    }
+
+    const checks = await runChecks();
+    const fails = checks.filter((c) => c.severity === "fail" && c.count > 0).length;
+    const warns = checks.filter((c) => c.severity === "warn" && c.count > 0).length;
+    const status = fails > 0 ? "fail" : warns > 0 ? "warn" : "pass";
+
+    await sql`INSERT INTO verify_reports (status, fails, warns, checks) VALUES (${status}, ${fails}, ${warns}, ${JSON.stringify(checks)})`;
+    await sql`DELETE FROM verify_reports WHERE id NOT IN (SELECT id FROM verify_reports ORDER BY ran_at DESC LIMIT 60)`; // 최근 60건만 보관
+
+    return NextResponse.json({ ok: true, ranAt: new Date().toISOString(), status, fails, warns, checks });
+  } catch (e) {
+    return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
+  }
+}
