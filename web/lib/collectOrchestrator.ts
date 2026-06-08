@@ -60,7 +60,10 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
   const borderline: BorderlineItem[] = []; // LLM 재판정 대상(경계)
   const auditItems: BorderlineItem[] = []; // Sonnet 최종 심사 대상(규칙상 on-topic 전체)
   const seen = new Set<string>();
+  const seenLinks = new Set<string>();     // 같은 글(URL) 중복 수집 제거용
   const stats: QualityStats = { raw: 0, verified: 0, reference: 0, rejected: 0, rejectReasons: {} };
+  // 블로그 URL 정규화(프로토콜·m.·쿼리·해시·끝슬래시 무시) → 같은 글 1회만
+  const linkKeyOf = (u?: string) => (u ?? "").trim().toLowerCase().replace(/^https?:\/\//, "").replace(/^m\./, "").replace(/[#?].*$/, "").replace(/\/+$/, "");
 
   for (const src of sources) {
     const weight = SRC_WEIGHT[src.source];
@@ -69,8 +72,11 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
 
     for (const t of src.texts) {
       stats.raw++;
+      // 같은 글이 다른 검색어로 여러 번 수집되는 것 제거(같은 URL = 같은 후기 1건)
+      const lk = linkKeyOf(t.link);
+      if (lk) { if (seenLinks.has(lk)) continue; seenLinks.add(lk); }
       const key = dedupeKey(t.text);
-      if (seen.has(key)) continue;        // 교차 출처 중복 제거
+      if (seen.has(key)) continue;        // 교차 출처 중복(스니펫 동일) 제거
       seen.add(key);
 
       const rule = verifyReview({ title: t.title, body: t.desc ?? t.text, name, areaTerms: area, source: kind });
