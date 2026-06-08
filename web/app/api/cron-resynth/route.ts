@@ -23,6 +23,13 @@ export async function GET(req: NextRequest) {
     await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS char_scores JSONB`;
     await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_quality JSONB`;
     await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS review_dates JSONB`;
+
+    // 🔒 약관 준수: 수집한 외부 글(raw 스니펫)은 영구 보관하지 않고 '한시적 캐시'로만 둔다.
+    // 90일 지난 raw는 파기 → warmup(00:10)이 필요 시 새로 수집. (표시용 1줄 인용·링크·파생분석은 유지)
+    const RAW_TTL_DAYS = Number(process.env.RAW_TTL_DAYS || 90);
+    const purged = await sql`UPDATE cafes SET raw_reviews = NULL
+      WHERE raw_reviews IS NOT NULL AND raw_collected_at < now() - make_interval(days => ${RAW_TTL_DAYS})
+      RETURNING id` as unknown as { id: number }[];
     // 한 번 실행에 3곳씩만 (비용·시간 보호). 매주 돌면 3곳씩 천천히 최신화.
     const targets = await sql`
       SELECT id, name, area FROM cafes
@@ -37,7 +44,7 @@ export async function GET(req: NextRequest) {
       catch (e) { results.push({ name: cafe.name, ok: false, error: String(e) }); }
       await new Promise((r) => setTimeout(r, 400));
     }
-    return NextResponse.json({ ok: true, ranAt: new Date().toISOString(), results });
+    return NextResponse.json({ ok: true, ranAt: new Date().toISOString(), rawPurged: purged.length, results });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
