@@ -23,6 +23,11 @@ type Stats = {
 };
 
 const GRADE_COLOR: Record<string, string> = { 검증: "#5f7355", 참고: "#9c6b3f", 발굴: "#a8927a", 미합성: "#cbd5e1" };
+function groupByDate(rows: any[]): Record<string, any[]> {
+  const g: Record<string, any[]> = {};
+  for (const r of rows) { const d = new Date(r.yt_checked_at).toLocaleDateString("ko-KR"); (g[d] ??= []).push(r); }
+  return g;
+}
 const BAR = "#9c6b3f";
 
 export default function AdminPage() {
@@ -39,6 +44,7 @@ export default function AdminPage() {
   const [verify, setVerify] = useState<any>(null);
   const [grounding, setGrounding] = useState<any>(null);
   const [verifying, setVerifying] = useState(false);
+  const [yt, setYt] = useState<any>(null);
 
   const loadVerify = (password: string) => fetch("/api/cron-verify?latest=1", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) { setVerify(d.report); setGrounding(d.grounding); } }).catch(() => {});
   const runVerify = async () => {
@@ -58,6 +64,7 @@ export default function AdminPage() {
     loadReview(password);
     fetch("/api/sub-request", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) { setSubs(d.requests ?? []); setPurged(d.purgedRecently ?? 0); } }).catch(() => {});
     loadVerify(password);
+    fetch("/api/yt-report", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) setYt(d); }).catch(() => {});
   };
 
   const act = async (id: number, action: string, published?: boolean) => {
@@ -182,6 +189,36 @@ export default function AdminPage() {
             </div>
           )}
         </div>
+
+        {/* ===== 📺 유튜브 수집 현황 ===== */}
+        {yt && (
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold text-stone-500 uppercase tracking-wider">📺 유튜브 수집 현황</span>
+              <span className="text-[11px] text-stone-500">보유 <b className="text-rose-600">{yt.withYt}</b>곳 · 오늘 {yt.checkedToday} · 남은 {yt.remaining}</span>
+            </div>
+            {yt.rows?.length > 0 ? (
+              <div className="space-y-3">
+                {Object.entries(groupByDate(yt.rows)).map(([date, cafes]: any) => (
+                  <div key={date}>
+                    <div className="text-[11px] font-bold text-stone-600 mb-1">📅 {date} <span className="text-stone-400 font-normal">({cafes.length}곳 수집)</span></div>
+                    <div className="space-y-1.5">
+                      {cafes.map((c: any) => (
+                        <div key={c.id} className="bg-white rounded-lg border border-stone-100 p-2">
+                          <div className="text-[12px] font-bold text-stone-800">{c.name} <span className="text-[10px] text-stone-400 font-normal">{c.area}</span> <span className="text-[10px] text-rose-500">▶{c.videos?.length || 0}</span></div>
+                          {(c.videos || []).map((v: any, i: number) => (
+                            <a key={i} href={v.l} target="_blank" rel="noopener noreferrer" className="block text-[11px] text-blue-600 truncate hover:underline">▶ {v.q}{v.s ? ` · ${v.s}` : ""}</a>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : <p className="text-[12px] text-stone-400">최근 30일 유튜브 수집 없음.</p>}
+            <p className="text-[10px] text-stone-400 mt-1.5">유튜브 API 쿼터 한도로 매일 조금씩 수집(매일 04:00 백필). 남은 {yt.remaining}곳 순차 진행.</p>
+          </div>
+        )}
 
         {/* ===== 💎 구독 신청 ===== */}
         {(subs.length > 0 || purged > 0) && (
