@@ -28,6 +28,10 @@ async function loadDecisions(cafeId: number): Promise<Record<string, boolean>> {
   return d && typeof d === "object" ? d : {};
 }
 
+// 짝 없는 유니코드 서로게이트 제거 → raw JSONB 저장 깨짐 방지(이모지 잘림 등, 모든 소스 공통)
+const stripBad = (s: any) => typeof s === "string" ? s.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "") : s;
+const cleanRaw = (raw: RawItem[]): RawItem[] => raw.map((r) => ({ ...r, text: stripBad(r.text), title: stripBad(r.title), desc: stripBad(r.desc) }));
+
 function rawToSources(raw: RawItem[]): RawSource[] {
   const g = raw.filter((r) => r.source === "google").map((r) => ({ text: r.text, time: r.time }));
   const b = raw.filter((r) => r.source === "blog").map((r) => ({ text: r.text, title: r.title, desc: r.desc, time: r.time, link: r.link, date: r.date, source: r.srcName }));
@@ -64,7 +68,7 @@ async function gatherRaw(cafe: { id: number; name: string; area: string }, refre
     ytErr = !!yt.apiError;
   }
   if (raw.length === 0 && (web.apiError || ytErr)) return { raw: [], fromCache: false, apiFailed: true };
-  await sql`UPDATE cafes SET raw_reviews=${JSON.stringify(raw)}, raw_collected_at=now() WHERE id=${cafe.id}`;
+  await sql`UPDATE cafes SET raw_reviews=${JSON.stringify(cleanRaw(raw))}, raw_collected_at=now() WHERE id=${cafe.id}`;
   return { raw, fromCache: false, apiFailed: false };
 }
 
@@ -149,7 +153,7 @@ export async function backfillYouTube(cafe: { id: number; name: string; area: st
   await sql`UPDATE cafes SET yt_checked_at=now() WHERE id=${cafe.id}`;
   if (!yt.snippets.length) return "none";
   for (const s of yt.snippets) raw.push({ source: "youtube", text: s.text, title: s.title, desc: s.desc, time: s.time, link: s.link, date: s.date, srcName: s.source });
-  await sql`UPDATE cafes SET raw_reviews=${JSON.stringify(raw)}, raw_collected_at=now() WHERE id=${cafe.id}`;
+  await sql`UPDATE cafes SET raw_reviews=${JSON.stringify(cleanRaw(raw))}, raw_collected_at=now() WHERE id=${cafe.id}`;
   const result = collectAndSynthesize(cafe.name, cafe.area ? [cafe.area] : [], rawToSources(raw));
   await storeResult(cafe.id, result, false);
   return "added";

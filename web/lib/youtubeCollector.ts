@@ -8,6 +8,8 @@ const KEY = process.env.YOUTUBE_API_KEY;
 export const hasYouTubeKey = () => !!KEY;
 const API = "https://www.googleapis.com/youtube/v3";
 
+// 짝 없는 유니코드 서로게이트 제거 — slice가 이모지를 반으로 자르면 JSON 저장이 깨지므로(백필 크래시 방지)
+const stripBadUnicode = (s: string) => s.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "");
 const fmtDate = (iso?: string) => (iso && iso.length >= 10 ? iso.slice(0, 10).replace(/-/g, ".") : "");
 const toTime = (iso?: string) => { if (!iso) return undefined; const t = Date.parse(iso); return isNaN(t) ? undefined : Math.floor(t / 1000); };
 
@@ -45,7 +47,7 @@ export async function fetchYouTubeReviews(name: string, area: string): Promise<{
             comments = (cd.items ?? [])
               .map((c: any) => c?.snippet?.topLevelComment?.snippet?.textDisplay ?? "")
               .filter(Boolean)
-              .map((t: string) => t.replace(/@[\w.\-가-힣]+/g, "").replace(/\s+/g, " ").trim().slice(0, 110))
+              .map((t: string) => stripBadUnicode(t.replace(/@[\w.\-가-힣]+/g, "").replace(/\s+/g, " ").trim().slice(0, 110)))
               .filter(Boolean).join(" · ");
           }
         } catch { /* 댓글 비활성/오류 무시 */ }
@@ -53,8 +55,8 @@ export async function fetchYouTubeReviews(name: string, area: string): Promise<{
       const text = `${title} ${desc}${comments ? ` 댓글: ${comments}` : ""}`.replace(/\s+/g, " ").trim();
       if (text.length < 15) continue;
       snippets.push({
-        text, title,
-        desc: `${desc}${comments ? ` · 댓글: ${comments}` : ""}`.slice(0, 320),
+        text: stripBadUnicode(text), title: stripBadUnicode(title),
+        desc: stripBadUnicode(`${desc}${comments ? ` · 댓글: ${comments}` : ""}`.slice(0, 320)),
         time: toTime(sn.publishedAt),
         link: `https://www.youtube.com/watch?v=${v.id}`,
         source: sn.channelTitle || "YouTube",
