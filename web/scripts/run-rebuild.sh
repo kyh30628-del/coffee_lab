@@ -8,8 +8,8 @@ cd "$(dirname "$0")/.." || exit 1
 unset ANTHROPIC_API_KEY   # Max 구독 사용(API키로 새지 않게)
 LOG=/tmp/coffee-rebuild.log
 echo "=== 재정비 시작 $(date) ===" >> "$LOG"
-# 1) 재합성(규칙·dedup·인용 갱신 + 판정 결정 영구반영 + 큐 복귀)
-/usr/local/bin/node --import tsx scripts/resynth-all.mjs >> "$LOG" 2>&1
+# 1) 재합성(규칙·dedup·인용 갱신) + 루브릭 변경 반영 위해 전체 재판정 큐 복귀(REJUDGE=1)
+REJUDGE=1 /usr/local/bin/node --import tsx scripts/resynth-all.mjs >> "$LOG" 2>&1
 # 2) AI 맥락 판정(애매한 후기 재심사 — 상한 크게, 한도 시 우아하게 중단·다음 04:00 이어감)
 JUDGE_MAX=${JUDGE_MAX:-3000} /usr/local/bin/node scripts/judge-batch.mjs >> "$LOG" 2>&1
 # 3) 그라운딩(환각·업체혼동 재검증)

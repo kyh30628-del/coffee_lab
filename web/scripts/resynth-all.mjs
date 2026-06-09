@@ -21,8 +21,14 @@ for (const c of rows) {
     if (done % 200 === 0) console.log(`  …${done}/${rows.length} (중복제거로 수치 감소 ${dropped}곳)`);
   } catch (e) { fail++; if (fail <= 5) console.log(`  ✗ ${c.name}: ${String(e).slice(0, 70)}`); }
 }
-// Sonnet 판정됐던 카페 → 재판정 큐로 복귀
-const cleared = await sql`UPDATE cafes SET llm_judged_at=NULL WHERE llm_judged_at IS NOT NULL AND raw_reviews IS NOT NULL`;
 console.log(`\n완료: ${done} 재합성, ${fail} 실패. 중복으로 수치 줄어든 카페 ${dropped}곳.`);
-console.log(`Sonnet 재판정 큐 복귀(llm_judged_at 초기화): 다음 04:00 배치가 dedup 반영해 재심사.`);
+// 판정 결정은 영구 저장(judge_decisions)돼 재합성에 자동 반영되므로, 기본은 llm_judged_at을 '지우지 않는다'.
+// → 판정은 raw가 새로 바뀐 카페(llm_judged_at < raw_collected_at)만 효율적으로 재처리.
+// 루브릭을 바꿔 '전체 재판정'이 필요할 때만 REJUDGE=1로 명시 초기화.
+if (process.env.REJUDGE === "1") {
+  await sql`UPDATE cafes SET llm_judged_at=NULL WHERE llm_judged_at IS NOT NULL AND raw_reviews IS NOT NULL`;
+  console.log(`REJUDGE=1 → 전체 판정 큐 초기화(루브릭 변경 반영용).`);
+} else {
+  console.log(`판정 큐 유지(영구 결정 자동반영) — 변경된 카페만 다음 배치가 재판정.`);
+}
 process.exit(0);
