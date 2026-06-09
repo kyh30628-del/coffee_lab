@@ -20,12 +20,14 @@ export async function GET(req: NextRequest) {
     await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS llm_judged_at TIMESTAMPTZ`;
     const limit = Math.min(Math.max(Number(req.nextUrl.searchParams.get("limit")) || 20, 1), 40);
 
-    // raw가 있고, 아직 판정 안 했거나 raw가 갱신된(stale) 카페 우선
+    await sql`CREATE TABLE IF NOT EXISTS grounding_checks (cafe_id INT PRIMARY KEY, grounded BOOLEAN, issue TEXT, checked_at TIMESTAMPTZ DEFAULT now())`;
+    // 우선순위: ① 그라운딩이 환각·업체혼동 의심한 카페(즉시 재판정) → ② 미판정/stale 순
     const targets = (await sql`
-      SELECT id, name, area FROM cafes
-      WHERE raw_reviews IS NOT NULL
-        AND (llm_judged_at IS NULL OR llm_judged_at < raw_collected_at)
-      ORDER BY llm_judged_at ASC NULLS FIRST
+      SELECT c.id, c.name, c.area FROM cafes c
+      LEFT JOIN grounding_checks g ON g.cafe_id = c.id
+      WHERE c.raw_reviews IS NOT NULL
+        AND (c.llm_judged_at IS NULL OR c.llm_judged_at < c.raw_collected_at)
+      ORDER BY (g.grounded = false) DESC NULLS LAST, c.llm_judged_at ASC NULLS FIRST
       LIMIT ${limit}`) as unknown as { id: number; name: string; area: string }[];
 
     const cafes = [];
