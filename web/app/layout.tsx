@@ -4,6 +4,12 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "동네 커피 노트 — 취향으로 찾는 동네 카페",
   description: "수도권 동네 로스터리·카페를 취향과 근거로 안내합니다. 네이버 공개 후기를 교차검증해 산미·바디·단맛까지.",
+  manifest: "/manifest.json",
+  icons: {
+    icon: [{ url: "/icon-192.png", sizes: "192x192", type: "image/png" }, { url: "/icon-512.png", sizes: "512x512", type: "image/png" }],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
+  appleWebApp: { capable: true, title: "커피 노트", statusBarStyle: "black-translucent" },
 };
 
 // 모바일 최적화: 화면 꽉 채우고, 사용자 확대로 깨지지 않게
