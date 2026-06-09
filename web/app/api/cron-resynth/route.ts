@@ -30,6 +30,16 @@ export async function GET(req: NextRequest) {
     const purged = await sql`UPDATE cafes SET raw_reviews = NULL
       WHERE raw_reviews IS NOT NULL AND raw_collected_at < now() - make_interval(days => ${RAW_TTL_DAYS})
       RETURNING id` as unknown as { id: number }[];
+
+    // 📺 YouTube 개발자 정책 준수: 저장한 유튜브 API 데이터는 30일마다 갱신/삭제.
+    // 30일 지난 카페의 유튜브 항목을 raw에서 제거 + yt_checked_at 초기화 → 백필이 최신으로 재수집.
+    const YT_TTL_DAYS = Number(process.env.YT_TTL_DAYS || 30);
+    const ytRefreshed = await sql`UPDATE cafes
+      SET raw_reviews = COALESCE((SELECT jsonb_agg(e) FROM jsonb_array_elements(raw_reviews) e WHERE e->>'source' <> 'youtube'), '[]'::jsonb),
+          yt_checked_at = NULL
+      WHERE yt_checked_at IS NOT NULL AND yt_checked_at < now() - make_interval(days => ${YT_TTL_DAYS})
+        AND raw_reviews @> '[{"source":"youtube"}]'
+      RETURNING id` as unknown as { id: number }[];
     // 한 번 실행에 3곳씩만 (비용·시간 보호). 매주 돌면 3곳씩 천천히 최신화.
     const targets = await sql`
       SELECT id, name, area FROM cafes
@@ -44,7 +54,7 @@ export async function GET(req: NextRequest) {
       catch (e) { results.push({ name: cafe.name, ok: false, error: String(e) }); }
       await new Promise((r) => setTimeout(r, 400));
     }
-    return NextResponse.json({ ok: true, ranAt: new Date().toISOString(), rawPurged: purged.length, results });
+    return NextResponse.json({ ok: true, ranAt: new Date().toISOString(), rawPurged: purged.length, ytRefreshed: ytRefreshed.length, results });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
