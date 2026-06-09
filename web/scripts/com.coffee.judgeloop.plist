@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- 판정+그라운딩을 하루 여러 번(09·14·19·23시) 자동 실행 → Max 한도 갱신마다 backlog 이어서 처리.
+     04:00 본배치(com.coffee.judge)는 promo·youtube까지 포함. 이건 판정 보충 루프.
+     load: launchctl load ~/Library/LaunchAgents/com.coffee.judgeloop.plist -->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.coffee.judgeloop</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/wangwida/coffee-platform/web/scripts/run-judgeloop.sh</string>
+  </array>
+  <key>StartCalendarInterval</key>
+  <array>
+    <dict><key>Hour</key><integer>9</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>14</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>19</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>23</integer><key>Minute</key><integer>0</integer></dict>
+  </array>
+  <key>RunAtLoad</key>
+  <false/>
+  <key>StandardOutPath</key>
+  <string>/tmp/coffee-judgeloop.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/coffee-judgeloop.err.log</string>
+</dict>
+</plist>
