@@ -154,14 +154,12 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
     if (evSeen.has(k)) return false;
     evSeen.add(k); return true;
   });
-  let topEvidence = evDedup.slice(0, 6);
-  // 유튜브 최소 1개 노출: 검증·참고 통과한 유튜브 영상이 있으면 상위 6개에 최소 하나 포함
-  // (이미 있으면 그대로, 없으면 가장 우선인 유튜브를 끝자리에 끼움). 유튜브 없으면 네이버로 채워짐.
+  // 유튜브는 카페당 '정확히 1건'만 — 가장 우선인 유튜브 1개를 끝자리에 예약, 나머지 5칸은 블로그/구글.
+  // (있으면 1개 보장, 2개 이상이면 1개로 제한, 없으면 6칸 모두 글로 채움.)
   const isYt = (e: EvidenceReview) => /youtu\.?be/.test(e.link ?? "");
-  if (!topEvidence.some(isYt)) {
-    const bestYt = evidence.find(isYt);
-    if (bestYt) topEvidence = [...topEvidence.slice(0, 5), bestYt];
-  }
+  const bestYt = evDedup.find(isYt);
+  const nonYt = evDedup.filter((e) => !isYt(e));
+  let topEvidence = bestYt ? [...nonYt.slice(0, 5), bestYt] : nonYt.slice(0, 6);
 
   const synth = synthesize(name, verifiedReviews);
   synth.grade = grade;              // 신뢰 리뷰 수 기준으로 등급 통일
