@@ -43,8 +43,11 @@ async function judge(cafeName, area, items) {
   catch { return null; }
 }
 
+// 타겟 모드: JUDGE_AREA(지역) 또는 JUDGE_CAFE_ID(단건) → 해당 카페만 강제 재판정(단일 패스)
+const TARGET = process.env.JUDGE_AREA ? `&area=${encodeURIComponent(process.env.JUDGE_AREA)}` : (process.env.JUDGE_CAFE_ID ? `&cafeId=${process.env.JUDGE_CAFE_ID}` : "");
+const TARGETED = !!TARGET;
 async function getCandidates(limit) {
-  const r = await fetch(`${APP_URL}/api/judge-candidates?limit=${limit}`, { headers: { "x-admin-password": PW } });
+  const r = await fetch(`${APP_URL}/api/judge-candidates?limit=${limit}${TARGET}`, { headers: { "x-admin-password": PW } });
   if (!r.ok) throw new Error(`candidates ${r.status}`);
   return r.json();
 }
@@ -57,9 +60,9 @@ async function main() {
   if (!PW) { console.error("ADMIN_PASSWORD 미설정"); process.exit(1); }
   let done = 0, published = 0, stop = false;
   while (done < MAX_CAFES && !stop) {
-    const { ok, cafes, remaining, noBorderline } = await getCandidates(25);
+    const { ok, cafes, remaining, noBorderline } = await getCandidates(TARGETED ? 40 : 25);
     if (!ok) { console.error("candidates 실패"); break; }
-    if (cafes.length === 0) { console.log(`심사 대상 카페 없음(스킵 ${noBorderline}). 남은 후보 ${remaining}.`); if (remaining === 0) break; continue; }
+    if (cafes.length === 0) { console.log(`심사 대상 카페 없음(스킵 ${noBorderline}). 남은 후보 ${remaining}.`); break; }
     // 동시 판정(서브프로세스 병렬) → SDK 오버헤드를 묶어 처리량 ~3배
     const CONC = Number(process.env.JUDGE_CONC || 3);
     for (let bi = 0; bi < cafes.length && !stop; bi += CONC) {
@@ -82,6 +85,7 @@ async function main() {
       }
     }
     console.log(`  …진행 ${done} (공개 ${published}), 남은 후보 ${remaining}`);
+    if (TARGETED) break; // 타겟 모드는 단일 패스(재호출 시 같은 카페 반복 방지)
   }
   console.log(`\n완료: ${done}곳 판정, 공개 ${published}곳.`);
 }

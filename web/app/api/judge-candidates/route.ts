@@ -19,16 +19,27 @@ export async function GET(req: NextRequest) {
     await ensureSchema();
     await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS llm_judged_at TIMESTAMPTZ`;
     const limit = Math.min(Math.max(Number(req.nextUrl.searchParams.get("limit")) || 20, 1), 40);
+    const area = (req.nextUrl.searchParams.get("area") || "").trim();
+    const cafeId = Number(req.nextUrl.searchParams.get("cafeId")) || 0;
 
     await sql`CREATE TABLE IF NOT EXISTS grounding_checks (cafe_id INT PRIMARY KEY, grounded BOOLEAN, issue TEXT, checked_at TIMESTAMPTZ DEFAULT now())`;
-    // 우선순위: ① 그라운딩이 환각·업체혼동 의심한 카페(즉시 재판정) → ② 미판정/stale 순
-    const targets = (await sql`
-      SELECT c.id, c.name, c.area FROM cafes c
-      LEFT JOIN grounding_checks g ON g.cafe_id = c.id
-      WHERE c.raw_reviews IS NOT NULL
-        AND (c.llm_judged_at IS NULL OR c.llm_judged_at < c.raw_collected_at)
-      ORDER BY (g.grounded = false) DESC NULLS LAST, c.llm_judged_at ASC NULLS FIRST
-      LIMIT ${limit}`) as unknown as { id: number; name: string; area: string }[];
+    let targets: { id: number; name: string; area: string }[];
+    if (cafeId) {
+      // 특정 카페 강제 재판정
+      targets = (await sql`SELECT id, name, area FROM cafes WHERE id = ${cafeId} AND raw_reviews IS NOT NULL`) as unknown as typeof targets;
+    } else if (area) {
+      // 지역 타겟: 판정 여부 무관하게 강제 재판정(오염 일괄 정리용)
+      targets = (await sql`SELECT id, name, area FROM cafes WHERE raw_reviews IS NOT NULL AND area ILIKE ${"%" + area + "%"} ORDER BY synth_count DESC NULLS LAST LIMIT ${limit}`) as unknown as typeof targets;
+    } else {
+      // 기본 큐: ① 그라운딩 의심(즉시 재판정) → ② 미판정/stale 순
+      targets = (await sql`
+        SELECT c.id, c.name, c.area FROM cafes c
+        LEFT JOIN grounding_checks g ON g.cafe_id = c.id
+        WHERE c.raw_reviews IS NOT NULL
+          AND (c.llm_judged_at IS NULL OR c.llm_judged_at < c.raw_collected_at)
+        ORDER BY (g.grounded = false) DESC NULLS LAST, c.llm_judged_at ASC NULLS FIRST
+        LIMIT ${limit}`) as unknown as typeof targets;
+    }
 
     const cafes = [];
     let advanced = 0;
