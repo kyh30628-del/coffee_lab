@@ -4,7 +4,6 @@ export PATH="/usr/local/bin:/Users/wangwida/.local/bin:/opt/homebrew/bin:$PATH"
 cd "$(dirname "$0")/.." || exit 1
 [ -f scripts/.judge.env ] && source scripts/.judge.env
 unset ANTHROPIC_API_KEY   # 설정돼 있으면 구독 대신 API키로 가버리므로 해제
-/usr/local/bin/node scripts/promo-batch.mjs >> /tmp/coffee-promo.log 2>&1   # 사장님 홍보 카피 생성(Max 구독)
-/usr/local/bin/node --import tsx scripts/youtube-backfill.mjs >> /tmp/coffee-yt.log 2>&1   # 유튜브 백필(인기순, 쿼터 내)
-JUDGE_MAX=5000 JUDGE_CONC=3 /usr/local/bin/node scripts/judge-batch.mjs >> /tmp/coffee-judge.log 2>&1   # 새벽: 풀 사용·3병렬 판정
-exec /usr/local/bin/node scripts/verify-grounding.mjs >> /tmp/coffee-grounding.log 2>&1   # 🧠 LLM 그라운딩(환각 탐지·보조)
+# 낮 12:00 보조 배치(판정과 예산 분리 — 판정은 judgeloop 전담). promo는 대기 시만, youtube는 쿼터 내.
+/usr/local/bin/node scripts/promo-batch.mjs >> /tmp/coffee-promo.log 2>&1
+exec /usr/local/bin/node --import tsx scripts/youtube-backfill.mjs >> /tmp/coffee-yt.log 2>&1
