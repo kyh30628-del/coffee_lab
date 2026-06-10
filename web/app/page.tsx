@@ -304,13 +304,23 @@ export default function Home() {
     const L = LRef.current;
     if (!L || !mapObj.current || !layerRef.current) return;
     layerRef.current.clearLayers();
-    filtered.forEach((c) => {
+    // '전체'(지역·결·포커스 미선택)일 땐 마커를 인기순 상위로 제한 — 3천개를 한꺼번에 DOM으로 그리면
+    //  메인 스레드가 막혀 지역선택 레이어가 잠깐 뭉개짐. 지역/결을 고르면 그 범위 전체를 그린다.
+    const scoped = !!(sido || sigungu || focusId || tasteKey);
+    const toRender = scoped ? filtered : filtered.slice(0, 400);
+    // 배치 추가: 마커를 다 만든 뒤 레이어그룹에 한 번에 붙여 리플로우 최소화
+    const markers = toRender.map((c) => {
       const isFocus = c.id === focusId;
       const isMatch = matchSet.has(c.id);
       const icon = L.divIcon({ className: "", html: makePinHtml(c, isMatch, isFocus), iconSize: [0, 0] });
-      const m = L.marker([c.lat, c.lng], { icon, zIndexOffset: isFocus ? 3000 : c.featured ? 2000 : isMatch ? 1000 : 0 }).addTo(layerRef.current).on("click", () => setSelected(c));
-      if (isFocus) { m.bindPopup(`<b>${c.name}</b><br>${c.area}`); m.openPopup(); }
+      const m = L.marker([c.lat, c.lng], { icon, zIndexOffset: isFocus ? 3000 : c.featured ? 2000 : isMatch ? 1000 : 0 }).on("click", () => setSelected(c));
+      if (isFocus) { m.bindPopup(`<b>${c.name}</b><br>${c.area}`); }
+      return m;
     });
+    const group = L.layerGroup(markers);
+    layerRef.current.addLayer(group);
+    const focusM = focusId ? markers[toRender.findIndex((c) => c.id === focusId)] : null;
+    if (focusM) focusM.openPopup();
     // 핀 고정 중이면 그 카페로 이동(아래 focus 효과)에 맡기고 fitBounds 생략
     if (focusId) {
       /* focus effect가 setView 처리 */
