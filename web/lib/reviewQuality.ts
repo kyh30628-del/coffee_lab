@@ -166,6 +166,25 @@ export function verifyReview(input: QualityInput): QualityResult {
   if (otherGuInTitle && !areaPresent) {
     return { verdict: "rejected", score: 8, reasons: [`다른 지점 추정(제목 '${otherGuInTitle}', 대상 지역 언급 없음)`], signals: sig };
   }
+  // 지점(브랜치) 구분: 이 카페가 '○○점'이면, 후기가 '이 지점(지점명·지역)'을 가리켜야 인정.
+  //   다른 지점명(예: '마곡점')이 박혀 있고 이 지점 신호가 없으면 다른 지점 후기 → 배제.
+  const myBranch = input.name.match(/([가-힣A-Za-z0-9]{2,})점\s*$/)?.[1];
+  if (myBranch) {
+    const fullT = `${title} ${body}`;
+    const branchSignal = (myBranch !== "본" && fullT.includes(myBranch)) || areaPresent; // 지점명 또는 대상 지역어
+    const NON_BRANCH = /^(장점|단점|시점|관점|초점|약점|강점|정점|요점|중점|종점|만점|채점|별점|평점|빵점|백점|영점|매점|거점|기점|이점|반점|중간점|문제점|차이점|공통점|장단점)$/;
+    const otherBranchTok = (fullT.match(/([가-힣]{2,})점/g) ?? [])
+      .map((t) => t.replace(/점$/, ""))
+      .find((nm) => nm.length >= 2 && nm !== myBranch && nm !== "본" && !NON_BRANCH.test(nm + "점")
+        && !input.name.includes(nm) && !areaTerms.some((a) => a.includes(nm) || nm.includes(guShort(a))));
+    if (otherBranchTok && !branchSignal) {
+      return { verdict: "rejected", score: 6, reasons: [`다른 지점 후기('${otherBranchTok}점', 이 지점 신호 없음)`], signals: sig };
+    }
+    // 브랜드만 일치하고 '이 지점' 신호가 전혀 없음 → verified 불가, 경계(LLM이 지점 확인)
+    if (!branchSignal && (visit || substance >= 1)) {
+      return { verdict: "rejected", score: 20, reasons: ["지점 불명확(브랜드만 일치) — LLM이 지점 확인"], borderline: true, signals: sig };
+    }
+  }
   if (generic && !nameInTitle) {
     return { verdict: "rejected", score: 5, reasons: ["일반 교양/정보글(그 카페 후기 아님)"], signals: sig };
   }
