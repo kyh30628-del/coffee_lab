@@ -53,7 +53,7 @@ export default function Pricing() {
           <div className="flex items-baseline justify-between mb-1">
             <div className="font-bold text-lg">우리가게 홍보팩</div>
           </div>
-          <div className="mb-3"><span className="text-2xl font-bold text-[#e8b87a]">₩29,000</span><span className="text-[12px] text-[#cbb89f]"> / 월</span></div>
+          <div className="mb-3"><span className="text-2xl font-bold text-[#e8b87a]">₩9,900</span><span className="text-[12px] text-[#cbb89f]"> / 월</span></div>
           <ul className="space-y-1.5 text-[13px]">{PRO.map((f) => <li key={f} className="text-[#f0e6d4]">{f}</li>)}</ul>
           <div className="mt-4 bg-black/25 rounded-lg px-3 py-2 text-[11.5px] text-[#e8b87a] text-center">🔥 우리 동네 <b>추천 6자리 한정</b> · 자리 차면 대기</div>
           <button onClick={() => setOpen(true)} className="w-full mt-3 bg-[#e8b87a] text-[#2b2018] rounded-lg py-3 font-bold">구독 신청하기</button>

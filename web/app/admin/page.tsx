@@ -46,6 +46,9 @@ export default function AdminPage() {
   const [verifying, setVerifying] = useState(false);
   const [yt, setYt] = useState<any>(null);
   const [jstatus, setJstatus] = useState<any>(null);
+  const [subscribers, setSubscribers] = useState<any[]>([]);
+  const loadSubscribers = (password: string) => fetch("/api/subscription?all=1", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) setSubscribers(d.subs ?? []); }).catch(() => {});
+  const subAct = async (id: number, action: string) => { try { await fetch("/api/subscription", { method: "POST", headers: { "x-admin-password": pw, "Content-Type": "application/json" }, body: JSON.stringify({ id, action }) }); loadSubscribers(pw); fetch("/api/judge-status", { headers: { "x-admin-password": pw } }); } catch {} };
 
   const loadVerify = (password: string) => fetch("/api/cron-verify?latest=1", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) { setVerify(d.report); setGrounding(d.grounding); } }).catch(() => {});
   const runVerify = async () => {
@@ -67,6 +70,7 @@ export default function AdminPage() {
     loadVerify(password);
     fetch("/api/yt-report", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) setYt(d); }).catch(() => {});
     fetch("/api/judge-status", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) setJstatus(d); }).catch(() => {});
+    loadSubscribers(password);
   };
 
   const act = async (id: number, action: string, published?: boolean) => {
@@ -242,6 +246,35 @@ export default function AdminPage() {
               </div>
             ) : <p className="text-[12px] text-stone-400">최근 30일 유튜브 수집 없음.</p>}
             <p className="text-[10px] text-stone-400 mt-1.5">유튜브 API 쿼터 한도로 매일 조금씩 수집(매일 04:00 백필). 남은 {yt.remaining}곳 순차 진행.</p>
+          </div>
+        )}
+
+        {/* ===== 💳 구독 회원 관리 ===== */}
+        {subscribers.length > 0 && (
+          <div className="mb-6">
+            <div className="text-xs font-bold text-amber-600 uppercase tracking-wider mb-2">💳 구독 회원 ({subscribers.length})</div>
+            <div className="space-y-2">
+              {subscribers.map((s) => {
+                const dleft = s.expires_at ? Math.max(0, Math.ceil((new Date(s.expires_at).getTime() - Date.now()) / 86400000)) : null;
+                const stColor = s.status === "active" ? "text-emerald-600" : s.status === "pending" ? "text-amber-600" : "text-stone-400";
+                const stLabel = s.status === "active" ? "활성" : s.status === "pending" ? "대기" : s.status === "expired" ? "만료" : s.status === "cancelled" ? "해지" : s.status;
+                return (
+                  <div key={s.id} className="bg-white rounded-xl border border-amber-200 p-3">
+                    <div className="min-w-0">
+                      <span className="font-bold text-sm">{s.cafe_name}</span>
+                      <span className={`text-[11px] ml-2 font-bold ${stColor}`}>{stLabel}{s.status === "active" && dleft != null ? ` · D-${dleft}` : ""}</span>
+                      <div className="text-[12px] text-stone-600 truncate">{s.owner_name} · 📞 {s.contact} · ₩{(s.price ?? 9900).toLocaleString()}/월</div>
+                    </div>
+                    <div className="flex gap-2 mt-2">
+                      {s.status !== "active" && <button onClick={() => subAct(s.id, "activate")} className="flex-1 py-1.5 text-[12px] font-bold text-emerald-700 bg-emerald-50 rounded-lg">✓ 활성화(30일)</button>}
+                      {s.status === "active" && <button onClick={() => subAct(s.id, "extend")} className="flex-1 py-1.5 text-[12px] font-bold text-stone-700 bg-stone-100 rounded-lg">+30일 연장</button>}
+                      {s.status === "active" && <button onClick={() => subAct(s.id, "cancel")} className="flex-1 py-1.5 text-[12px] text-rose-600 bg-rose-50 rounded-lg">해지</button>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="text-[10px] text-stone-400 mt-1.5">활성화 시 우선노출(featured) 자동 ON·만료/해지 시 OFF. 연락처는 암호화 저장.</p>
           </div>
         )}
 

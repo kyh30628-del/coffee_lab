@@ -6,6 +6,7 @@ import { BarChart, Bar, XAxis, YAxis, Cell, ResponsiveContainer,
 import BackLink from "../BackLink";
 import InfoDot from "../InfoDot";
 import Showcase from "../Showcase";
+import Subscribe from "../Subscribe";
 
 type RankItem = { rank: number; name: string; count: number; grade: string | null; isMe: boolean };
 type CharItem = { key: string; label: string; emoji: string; me: number; avg: number; diff: number; meRaw?: number; hoodPenetration?: number };
@@ -250,6 +251,7 @@ export default function OwnerPage() {
               </div>
               <p className="text-[11px] text-[#8a7458] mt-1.5">위 후기 분석은 <b>무료</b> · 아래는 <b>홍보팩(구독)</b>이에요</p>
             </div>
+            {insight?.me?.id && <div className="mb-2.5"><Subscribe cafeId={insight.me.id} cafeName={insight.me.name} pw={pw ?? ""} /></div>}
             <button onClick={() => setShowShowcase(true)} className="w-full bg-gradient-to-r from-[#9c6b3f] to-[#2b2018] text-[#f4ece0] rounded-xl py-3.5 font-medium">🎀 쇼케이스·우선노출·성과 (홍보팩)</button>
             <p className="text-[10px] text-[#a8927a] mt-3 text-center leading-relaxed">분석은 네이버 공개 후기를 교차검증한 데이터 기반입니다(무료). '결'은 측정값이 아니라 리뷰에서 자주 언급되는 정도입니다.</p>
           </div>
