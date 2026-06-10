@@ -146,6 +146,13 @@ export default function Home() {
   const [mapReady, setMapReady] = useState(false); // 지도 초기화 완료 신호(마커 재렌더용)
 
   useEffect(() => { fetch("/api/cafes").then((r) => r.json()).then((d) => setCafes(d.cafes ?? [])).catch(() => {}); }, []);
+  // 공유 링크(/?cafe=id)로 도착하면 해당 카페 상세를 자동으로 연다(1회)
+  const deepLinked = useRef(false);
+  useEffect(() => {
+    if (deepLinked.current || !cafes.length || typeof window === "undefined") return;
+    const id = Number(new URLSearchParams(window.location.search).get("cafe"));
+    if (id) { const c = cafes.find((x) => x.id === id); if (c) { setSelected(c); deepLinked.current = true; } }
+  }, [cafes]);
 
   // 익명 식별자 준비 + 역할(세션 단위) 복원. 위치 동의는 캐시하지 않음(매 세션 새로).
   useEffect(() => {
@@ -722,6 +729,15 @@ function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; 
   }, [cafe.id]);
   const kept = quality ? quality.verified + quality.reference : 0;
   const chars = topChars(cafe, 4);
+  const [shared, setShared] = useState(false);
+  const shareCafe = async () => {
+    const url = `${typeof window !== "undefined" ? window.location.origin : "https://dongnecoffeenote.com"}/c/${cafe.id}`;
+    const title = `${cafe.name} (${cafe.area}) — 동네 커피 노트`;
+    try {
+      if (typeof navigator !== "undefined" && (navigator as any).share) await (navigator as any).share({ title, text: title, url });
+      else { await navigator.clipboard.writeText(url); setShared(true); setTimeout(() => setShared(false), 1800); }
+    } catch { /* 사용자 취소 */ }
+  };
   return (
     <div className="fixed inset-0 z-[3000]" style={{ fontFamily: "'Gowun Batang', serif" }}>
       <div onClick={onClose} className="absolute inset-0 bg-black/30" />
@@ -758,8 +774,11 @@ function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; 
         {!promo && (cafe.photo_url ? <div className="h-40 w-full"><img src={cafe.photo_url} alt={cafe.name} className="w-full h-full object-cover" /></div> : <div className="h-28 w-full" style={{ background: "linear-gradient(135deg,#c8893f,#8a5a24)" }} />)}
         <div className="p-5">
           <div className="flex items-center justify-between mb-1">
-            <div className="flex items-center gap-2"><h3 className="text-xl font-bold text-[#2b2018]">{cafe.name}</h3>{g && <span className="text-[10px] text-white px-2 py-0.5 rounded-full" style={{ background: g.bg }}>{g.label}</span>}</div>
-            <button onClick={onClose} className="text-3xl text-[#9c6b3f] leading-none px-2">×</button>
+            <div className="flex items-center gap-2 min-w-0"><h3 className="text-xl font-bold text-[#2b2018] truncate">{cafe.name}</h3>{g && <span className="text-[10px] text-white px-2 py-0.5 rounded-full shrink-0" style={{ background: g.bg }}>{g.label}</span>}</div>
+            <div className="flex items-center gap-1 shrink-0">
+              <button onClick={shareCafe} aria-label="공유" className="flex items-center gap-1 text-[#9c6b3f] border border-[#e0d2bd] rounded-full px-2.5 py-1 text-[12px] font-medium">{shared ? "✓ 복사됨" : "🔗 공유"}</button>
+              <button onClick={onClose} className="text-3xl text-[#9c6b3f] leading-none px-1">×</button>
+            </div>
           </div>
           <div className="text-[#9c6b3f] text-sm mb-3">{cafe.area} · {cafe.vibe}</div>
           {cafe.note && <p className="text-[15px] text-[#3d2f22] font-medium leading-relaxed mb-4">“{cafe.note}”</p>}

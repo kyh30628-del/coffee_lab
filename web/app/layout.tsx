@@ -6,6 +6,17 @@ export const metadata: Metadata = {
   title: "동네 커피 노트 — 취향으로 찾는 동네 카페",
   description: "수도권 동네 로스터리·카페를 취향과 근거로 안내합니다. 네이버 공개 후기를 교차검증해 산미·바디·단맛까지.",
   manifest: "/manifest.json",
+  openGraph: {
+    type: "website", siteName: "동네 커피 노트", locale: "ko_KR",
+    title: "동네 커피 노트 — 취향으로 찾는 동네 카페",
+    description: "수도권 동네 카페를 취향과 데이터로 안내해요. 네이버 공개 후기를 교차검증한 산미·바디·단맛·결.",
+    images: ["/og.png"],
+  },
+  twitter: { card: "summary_large_image", title: "동네 커피 노트", description: "취향으로 찾는 우리 동네 카페", images: ["/og.png"] },
+  verification: {
+    google: process.env.GOOGLE_SITE_VERIFICATION,
+    other: process.env.NAVER_SITE_VERIFICATION ? { "naver-site-verification": process.env.NAVER_SITE_VERIFICATION } : {},
+  },
   icons: {
     icon: [{ url: "/icon-192.png", sizes: "192x192", type: "image/png" }, { url: "/icon-512.png", sizes: "512x512", type: "image/png" }],
     apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
