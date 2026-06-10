@@ -40,6 +40,14 @@ function toGu(area: string): { sido: string; sigungu: string } {
 
 const CONSENT_VERSION = "v1";
 
+// 두 좌표 간 거리(미터) — 구독 카페 500m 반경 판정용
+function distM(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371000, toR = (d: number) => (d * Math.PI) / 180;
+  const dLat = toR(lat2 - lat1), dLng = toR(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toR(lat1)) * Math.cos(toR(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
 // 외부 지오코딩 없이, 보유 카페 좌표로 사용자의 '가장 가까운 동네'를 역산.
 // 가까운 7곳의 다수결 시·군·구를 채택. 30km 밖이면 수도권 밖으로 보고 null.
 function nearestRegion(cafes: Cafe[], lat: number, lng: number): { sido: string; sigungu: string; distKm: number } | null {
@@ -169,6 +177,19 @@ export default function Home() {
         setSido(r.sido); setSigungu(r.sigungu);
         setAutoGu(r.sigungu); setGeoMsg("");
         postConsent(true, { region: `${r.sido} ${r.sigungu}`, lat: latitude, lng: longitude });
+        // 🎀 구독(featured) 카페가 500m 이내면 — 최초 1회만 상세 모달 자동 노출
+        try {
+          const seen: number[] = JSON.parse(localStorage.getItem("dcn_geo_promo") || "[]");
+          const near = cafes
+            .filter((c) => c.featured && c.lat && c.lng && !seen.includes(c.id))
+            .map((c) => ({ c, d: distM(latitude, longitude, c.lat, c.lng) }))
+            .filter((x) => x.d <= 500)
+            .sort((a, b) => a.d - b.d);
+          if (near.length) {
+            setTimeout(() => setSelected(near[0].c), 600); // 위치 반영 후 살짝 뒤에
+            localStorage.setItem("dcn_geo_promo", JSON.stringify([...seen, near[0].c.id]));
+          }
+        } catch {}
       },
       (err) => setGeoMsg(err.code === 1 ? "위치 권한이 거부됐어요 (브라우저 설정에서 허용 가능)" : "위치를 가져오지 못했어요"),
       { enableHighAccuracy: false, timeout: 8000, maximumAge: 0 }, // 매번 현재 위치 새로 수집
