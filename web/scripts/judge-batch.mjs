@@ -33,7 +33,7 @@ const RUBRIC = `너는 카페 리뷰 품질의 '최종 심사관'이다. 규칙 
 판정이 애매하면 보수적으로 false. 반드시 JSON 배열로만 답한다(설명·코드블록 금지): [{"i":번호,"about":true/false,"helpful":true/false}]`;
 
 async function judge(cafeName, area, items) {
-  const list = items.map((b, i) => `#${i} 제목:"${(b.title || "").slice(0, 120)}" 내용:"${(b.body || "").slice(0, 600)}"`).join("\n");
+  const list = items.map((b, i) => `#${i} 제목:"${(b.title || "").slice(0, 90)}" 내용:"${(b.body || "").slice(0, 380)}"`).join("\n");
   const prompt = `대상 카페: "${cafeName}" (${area})\n\n스니펫:\n${list}`;
   let text = "";
   for await (const msg of query({ prompt, options: { systemPrompt: RUBRIC, model: MODEL, maxTurns: 1, allowedTools: [] } })) {
@@ -60,28 +60,26 @@ async function main() {
     const { ok, cafes, remaining, noBorderline } = await getCandidates(25);
     if (!ok) { console.error("candidates 실패"); break; }
     if (cafes.length === 0) { console.log(`심사 대상 카페 없음(스킵 ${noBorderline}). 남은 후보 ${remaining}.`); if (remaining === 0) break; continue; }
-    for (const c of cafes) {
-      let verdicts;
-      try {
-        verdicts = await judge(c.name, c.area, c.candidates);
-      } catch (e) {
-        const msg = String(e);
-        if (/session limit|rate limit|429|usage limit|overloaded/i.test(msg)) {
-          console.log(`\n구독 한도 도달 — 오늘은 여기까지(${done}곳 완료). 진행분은 저장됨, 내일 04:00 배치가 이어서 심사.`);
-          stop = true; break;
-        }
-        console.log(`  ✗ ${c.name}: ${msg.slice(0, 80)} — 건너뜀`);
-        continue;
+    // 동시 판정(서브프로세스 병렬) → SDK 오버헤드를 묶어 처리량 ~3배
+    const CONC = Number(process.env.JUDGE_CONC || 3);
+    for (let bi = 0; bi < cafes.length && !stop; bi += CONC) {
+      const batch = cafes.slice(bi, bi + CONC);
+      const results = await Promise.all(batch.map(async (c) => {
+        try { return { c, verdicts: await judge(c.name, c.area, c.candidates) }; }
+        catch (e) { return { c, limit: isLimit(e), err: String(e) }; }
+      }));
+      for (const r of results) {
+        if (r.limit) { console.log(`\n구독 한도 도달 — 여기까지(${done}곳 완료). 진행분 저장, 다음 리셋에 이어감.`); stop = true; break; }
+        if (!r.verdicts || !Array.isArray(r.verdicts)) { if (r.err) console.log(`  ✗ ${r.c.name}: ${r.err.slice(0, 60)} — 건너뜀`); continue; }
+        const decisions = {};
+        for (const v of r.verdicts) { const key = r.c.candidates[v?.i]?.key; if (key) decisions[key] = !!(v.about && v.helpful); }
+        const approved = Object.values(decisions).filter(Boolean).length;
+        const res = await apply(r.c.cafeId, decisions);
+        if (res?.published) published++;
+        done++;
+        console.log(`[${done}] ${r.c.name}: 후보 ${r.c.candidates.length} → 양질 ${approved} | 등급 ${res?.grade ?? "?"} 공개 ${res?.published ?? "?"}`);
+        if (done >= MAX_CAFES) { stop = true; break; }
       }
-      // 후보 전체에 대한 keep/drop 결정(Sonnet 최종)
-      const decisions = {};
-      if (Array.isArray(verdicts)) for (const v of verdicts) { const key = c.candidates[v?.i]?.key; if (key) decisions[key] = !!(v.about && v.helpful); }
-      const approved = Object.values(decisions).filter(Boolean).length;
-      const res = await apply(c.cafeId, decisions);
-      if (res?.published) published++;
-      done++;
-      console.log(`[${done}] ${c.name}: 후보 ${c.candidates.length} → 양질 ${approved} | 등급 ${res?.grade ?? "?"} 공개 ${res?.published ?? "?"}`);
-      if (done >= MAX_CAFES) break;
     }
     console.log(`  …진행 ${done} (공개 ${published}), 남은 후보 ${remaining}`);
   }
