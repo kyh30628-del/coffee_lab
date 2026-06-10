@@ -153,6 +153,12 @@ export default function Home() {
     const id = Number(new URLSearchParams(window.location.search).get("cafe"));
     if (id) { const c = cafes.find((x) => x.id === id); if (c) { setSelected(c); deepLinked.current = true; } }
   }, [cafes]);
+  // 취향 공유 링크(/?taste=key)로 도착하면 해당 결을 자동 선택
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const t = new URLSearchParams(window.location.search).get("taste");
+    if (t && TASTE_CHOICES.some((x) => x.key === t)) setTasteKey(t);
+  }, []);
 
   // 익명 식별자 준비 + 역할(세션 단위) 복원. 위치 동의는 캐시하지 않음(매 세션 새로).
   useEffect(() => {
@@ -687,7 +693,12 @@ function MapControls({ sido, sigungu, onSido, setSigungu, tasteKey, setTasteKey,
             </button>
           ))}
         </div>
-        {tasteKey && <p className="text-xs text-[#9c6b3f] mt-2">'{TASTE_CHOICES.find((t) => t.key === tasteKey)?.label}' 결이 자주 언급되는 {matchSet.size}곳만 보는 중</p>}
+        {tasteKey && (
+          <div className="mt-2 flex items-center justify-between gap-2">
+            <p className="text-xs text-[#9c6b3f]">'{TASTE_CHOICES.find((t) => t.key === tasteKey)?.label}' 결이 자주 언급되는 {matchSet.size}곳만 보는 중</p>
+            <a href={`/taste/${tasteKey}`} className="text-[11px] font-bold text-[#9c6b3f] border border-[#d9c9b0] rounded-full px-2.5 py-1 shrink-0 whitespace-nowrap">🔗 내 취향 공유</a>
+          </div>
+        )}
       </div>
       <div>
         <div className="flex items-baseline justify-between mb-2.5">

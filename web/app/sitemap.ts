@@ -14,9 +14,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const cafeUrls: MetadataRoute.Sitemap = cafes.map((c) => ({
     url: `${SITE}/c/${c.id}`, changeFrequency: "weekly", priority: 0.7,
   }));
+  const tasteUrls: MetadataRoute.Sitemap = ["roast", "work", "quiet", "dessert"].map((t) => ({
+    url: `${SITE}/taste/${t}`, changeFrequency: "monthly", priority: 0.6,
+  }));
   return [
     { url: SITE, changeFrequency: "daily", priority: 1 },
     { url: `${SITE}/pricing`, changeFrequency: "monthly", priority: 0.5 },
+    ...tasteUrls,
     ...cafeUrls,
   ];
 }
