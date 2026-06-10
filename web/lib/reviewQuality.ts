@@ -121,11 +121,13 @@ export function verifyReview(input: QualityInput): QualityResult {
   // ---- 블로그/카페글: 주제성 + 내용성 + 관련성 검증 ----
   // 구별 토큰(지역어·일반어 제거). 토큰이 비면 전체 이름으로만 매칭.
   const tokens = coreTokens(input.name, areaTerms);
+  const coreEmpty = tokens.length === 0; // 이름이 흔한구문/일반어뿐(예: '좋은커피') → 원문 '붙임' 일치만 인정
   const distinct = tokens.length ? tokens : (nameN ? [input.name] : []);
-  const inTitleFull = !!nameN && titleN.includes(nameN);
-  const inBodyFull = !!nameN && bodyN.includes(nameN);
-  const distinctInTitle = distinct.some((tk) => titleN.includes(norm(tk)));
-  const distinctInBody = distinct.some((tk) => bodyN.includes(norm(tk)));
+  // 흔한구문 이름은 띄어쓰기 보존이 핵심: '좋은커피'(가게)는 원문에 붙어서, '좋은 커피'(맛 표현)는 배제.
+  const inTitleFull = coreEmpty ? title.includes(input.name) : (!!nameN && titleN.includes(nameN));
+  const inBodyFull = coreEmpty ? body.includes(input.name) : (!!nameN && bodyN.includes(nameN));
+  const distinctInTitle = coreEmpty ? inTitleFull : distinct.some((tk) => titleN.includes(norm(tk)));
+  const distinctInBody = coreEmpty ? inBodyFull : distinct.some((tk) => bodyN.includes(norm(tk)));
   const visit = has(fullL, VISIT_CUES);
   const substance = SUBSTANCE_CUES.filter((k) => fullL.includes(k.toLowerCase())).length;
   const areaPresent = areaTerms.length ? areaTerms.some((a) => `${title} ${body}`.includes(a)) : false;
