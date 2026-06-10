@@ -2,7 +2,7 @@ import { neon } from "@neondatabase/serverless";
 import { readFileSync } from "fs";
 for (const l of readFileSync(".env.local","utf8").split("\n")) { const m=l.match(/^([A-Z_0-9]+)=(.*)$/); if(m) process.env[m[1]]=m[2].replace(/^["']|["']$/g,""); }
 delete process.env.ANTHROPIC_API_KEY;
-const { synthAndStore } = await import("./lib/synthStore.ts");
+const { synthAndStore } = await import("../lib/synthStore.ts");
 const sql = neon(process.env.DATABASE_URL);
 const rows = await sql`SELECT id, name, area, synth_count FROM cafes WHERE raw_reviews IS NOT NULL AND name ~ '점\s*$' ORDER BY id`;
 console.log(`지점 카페(이름 '○○점'): ${rows.length}곳 재합성`);
