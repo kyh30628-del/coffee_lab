@@ -79,6 +79,9 @@ const countOccur = (t: string, kw: string) => kw ? t.split(kw).length - 1 : 0;
 
 const GENERIC_SUFFIX = /(카페|커피|로스터리|베이커리|디저트|coffee|cafe|점|본점)$/i;
 const GENERIC_WORD = new Set(["카페", "커피", "점", "본점", "로스터리", "베이커리", "디저트", "coffee", "cafe"]);
+// 너무 흔해서 '식별어'가 못 되는 형용사·일반어. 이것만 남으면 전체 이름 일치를 요구(오매칭 방지).
+// 예: "좋은커피" → 접미 '커피' 제거 후 '좋은'만 남는데, '분위기 좋은 카페'처럼 모든 후기에 나옴.
+const NAME_STOPWORD = new Set(["좋은", "맛있는", "맛있는집", "예쁜", "멋진", "행복", "행복한", "우리", "우리집", "작은", "큰", "조용한", "따뜻한", "정직한", "데일리", "오늘", "하루", "그날", "모닝", "감성", "분위기", "힐링", "달콤한", "새로운"]);
 const LOC_SUFFIX = /(역|동|구|시|군|읍|면|로|길|가)$/; // 지역어 접미
 
 // 카페명 '구별 토큰' = 일반어·지역어·대상지역어를 뺀 고유 식별어.
@@ -89,6 +92,7 @@ function coreTokens(name: string, areaTerms: string[]): string[] {
     .map((t) => t.replace(GENERIC_SUFFIX, "").trim())
     .filter((t) => t.length >= 2)
     .filter((t) => !GENERIC_WORD.has(t.toLowerCase()))
+    .filter((t) => !NAME_STOPWORD.has(t.toLowerCase()))
     .filter((t) => !an.some((a) => a.includes(norm(t)) || norm(t).includes(a)))
     .filter((t) => !LOC_SUFFIX.test(t));
 }
