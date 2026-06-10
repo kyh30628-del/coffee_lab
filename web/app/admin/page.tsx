@@ -47,6 +47,8 @@ export default function AdminPage() {
   const [yt, setYt] = useState<any>(null);
   const [jstatus, setJstatus] = useState<any>(null);
   const [subscribers, setSubscribers] = useState<any[]>([]);
+  const [showSubsModal, setShowSubsModal] = useState(false);
+  const [showYtModal, setShowYtModal] = useState(false);
   const loadSubscribers = (password: string) => fetch("/api/subscription?all=1", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) setSubscribers(d.subs ?? []); }).catch(() => {});
   const subAct = async (id: number, action: string) => { try { await fetch("/api/subscription", { method: "POST", headers: { "x-admin-password": pw, "Content-Type": "application/json" }, body: JSON.stringify({ id, action }) }); loadSubscribers(pw); fetch("/api/judge-status", { headers: { "x-admin-password": pw } }); } catch {} };
 
@@ -219,12 +221,20 @@ export default function AdminPage() {
           )}
         </div>
 
-        {/* ===== 📺 유튜브 수집 현황 ===== */}
-        {yt && (
-          <div className="mb-6">
+        {/* ===== 모달 트리거 (구독 카페 현황 · 유튜브 수집) ===== */}
+        <div className="flex gap-2 mb-6">
+          <button onClick={() => setShowSubsModal(true)} className="flex-1 py-2.5 text-[13px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-xl">💳 구독 카페 현황{subscribers.length ? ` (${subscribers.length})` : ""}</button>
+          <button onClick={() => setShowYtModal(true)} className="flex-1 py-2.5 text-[13px] font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded-xl">📺 유튜브 수집{yt?.withYt != null ? ` (${yt.withYt})` : ""}</button>
+        </div>
+
+        {/* 📺 유튜브 수집 현황 모달 */}
+        {showYtModal && yt && (
+          <div className="fixed inset-0 z-[6000]" onClick={() => setShowYtModal(false)}>
+            <div className="absolute inset-0 bg-black/50" />
+            <div className="absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto bg-stone-50 rounded-t-2xl p-4 sm:inset-0 sm:m-auto sm:max-w-md sm:h-fit sm:max-h-[85vh] sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-stone-500 uppercase tracking-wider">📺 유튜브 수집 현황</span>
-              <span className="text-[11px] text-stone-500">보유 <b className="text-rose-600">{yt.withYt}</b>곳 · 오늘 {yt.checkedToday} · 남은 {yt.remaining}</span>
+              <span className="text-sm font-bold text-stone-800">📺 유튜브 수집 현황 <span className="text-[11px] text-stone-400 font-normal">보유 {yt.withYt}·오늘 {yt.checkedToday}·남은 {yt.remaining}</span></span>
+              <button onClick={() => setShowYtModal(false)} className="text-2xl text-stone-400 leading-none">×</button>
             </div>
             {yt.rows?.length > 0 ? (
               <div className="space-y-3">
@@ -245,14 +255,18 @@ export default function AdminPage() {
                 ))}
               </div>
             ) : <p className="text-[12px] text-stone-400">최근 30일 유튜브 수집 없음.</p>}
-            <p className="text-[10px] text-stone-400 mt-1.5">유튜브 API 쿼터 한도로 매일 조금씩 수집(매일 04:00 백필). 남은 {yt.remaining}곳 순차 진행.</p>
+            <p className="text-[10px] text-stone-400 mt-2">유튜브 API 쿼터 한도로 매일 조금씩 수집(04:00 백필). 남은 {yt.remaining}곳 순차 진행.</p>
+            </div>
           </div>
         )}
 
-        {/* ===== 💳 구독 회원 관리 ===== */}
-        {subscribers.length > 0 && (
-          <div className="mb-6">
-            <div className="text-xs font-bold text-amber-600 uppercase tracking-wider mb-2">💳 구독 회원 ({subscribers.length})</div>
+        {/* 💳 구독 카페 현황 모달 */}
+        {showSubsModal && (
+          <div className="fixed inset-0 z-[6000]" onClick={() => setShowSubsModal(false)}>
+            <div className="absolute inset-0 bg-black/50" />
+            <div className="absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto bg-stone-50 rounded-t-2xl p-4 sm:inset-0 sm:m-auto sm:max-w-md sm:h-fit sm:max-h-[85vh] sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3"><span className="text-sm font-bold text-stone-800">💳 구독 카페 현황 ({subscribers.length})</span><button onClick={() => setShowSubsModal(false)} className="text-2xl text-stone-400 leading-none">×</button></div>
+            {subscribers.length > 0 ? (
             <div className="space-y-2">
               {subscribers.map((s) => {
                 const dleft = s.expires_at ? Math.max(0, Math.ceil((new Date(s.expires_at).getTime() - Date.now()) / 86400000)) : null;
@@ -274,7 +288,9 @@ export default function AdminPage() {
                 );
               })}
             </div>
-            <p className="text-[10px] text-stone-400 mt-1.5">활성화 시 우선노출(featured) 자동 ON·만료/해지 시 OFF. 연락처는 암호화 저장.</p>
+            ) : <p className="text-[13px] text-stone-400 py-3 text-center">구독 회원이 아직 없어요.</p>}
+            <p className="text-[10px] text-stone-400 mt-2">활성화 시 우선노출 자동 ON·만료/해지 시 OFF. 연락처는 암호화 저장.</p>
+            </div>
           </div>
         )}
 
