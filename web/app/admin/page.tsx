@@ -277,7 +277,8 @@ export default function AdminPage() {
                     <div className="min-w-0">
                       <span className="font-bold text-sm">{s.cafe_name}</span>
                       <span className={`text-[11px] ml-2 font-bold ${stColor}`}>{stLabel}{s.status === "active" && dleft != null ? ` · D-${dleft}` : ""}</span>
-                      <div className="text-[12px] text-stone-600 truncate">{s.owner_name} · 📞 {s.contact} · ₩{(s.price ?? 9900).toLocaleString()}/월</div>
+                      <div className="text-[12px] text-stone-600 truncate">{s.owner_name} · 📞 {s.contact}{s.email ? ` · ✉️ ${s.email}` : ""} · ₩{(s.price ?? 9900).toLocaleString()}/월</div>
+                      {s.status === "active" && s.pin && <div className="text-[12px] mt-1">🔑 PIN <b className="font-mono tracking-wider text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">{s.pin}</b> <span className="text-[10px] text-stone-400">(이메일 발송 · 사장님 로그인용)</span></div>}
                     </div>
                     <div className="flex gap-2 mt-2">
                       {s.status !== "active" && <button onClick={() => subAct(s.id, "activate")} className="flex-1 py-1.5 text-[12px] font-bold text-emerald-700 bg-emerald-50 rounded-lg">✓ 활성화(30일)</button>}

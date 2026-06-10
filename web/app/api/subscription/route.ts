@@ -1,12 +1,40 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
 import { encryptPII, decryptPII } from "@/lib/crypto";
+import crypto from "crypto";
 export const runtime = "nodejs";
 
-// 💳 구독 회원(카페별). 사장님 회원가입 → 관리자 활성화(featured 연동) → 만료/해지 관리.
+// 💳 구독 회원(카페별). 요금제(/pricing)에서 회원가입 → 관리자 활성화 → PIN 발급(이메일)·featured 연동.
 const PLAN = "홍보팩";
 const PRICE = 9900;
 const authed = (req: NextRequest) => !!req.headers.get("x-admin-password") && req.headers.get("x-admin-password") === process.env.ADMIN_PASSWORD;
+
+// 영문+숫자 8자리 PIN(혼동 문자 제외)
+function genPin(): string {
+  const cs = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  return Array.from({ length: 8 }, () => cs[crypto.randomInt(cs.length)]).join("");
+}
+// 등록 이메일로 PIN 발송(Resend). 키 없으면 미발송(관리자 화면에서 PIN 확인·전달).
+async function sendPinEmail(to: string, pin: string, cafeName: string): Promise<boolean> {
+  const key = process.env.RESEND_API_KEY;
+  if (!key || !to || !to.includes("@")) return false;
+  try {
+    const r = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        from: process.env.RESEND_FROM || "동네 커피 노트 <onboarding@resend.dev>",
+        to: [to],
+        subject: "[동네 커피 노트] 구독 승인 — 사장님 PIN 번호",
+        html: `<div style="font-family:sans-serif"><p><b>${cafeName}</b> 사장님, 홍보팩 구독이 승인됐어요.</p>
+          <p>사장님 화면에서 아래 PIN으로 로그인하시면 <b>내 카페로 바로</b> 들어갑니다.</p>
+          <p style="font-size:24px;font-weight:bold;letter-spacing:3px;background:#f4ece0;padding:14px 18px;border-radius:10px;display:inline-block">${pin}</p>
+          <p style="color:#888;font-size:13px">PIN은 본인만 알 수 있게 보관하세요.</p></div>`,
+      }),
+    });
+    return r.ok;
+  } catch { return false; }
+}
 
 async function ensure() {
   await sql`CREATE TABLE IF NOT EXISTS subscriptions (
@@ -15,6 +43,7 @@ async function ensure() {
     status TEXT DEFAULT 'pending', started_at TIMESTAMPTZ, expires_at TIMESTAMPTZ,
     consent BOOLEAN DEFAULT false, consent_at TIMESTAMPTZ, created_at TIMESTAMPTZ DEFAULT now(), updated_at TIMESTAMPTZ DEFAULT now()
   )`;
+  await sql`ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS pin TEXT`; // 승인 시 발급되는 사장님 로그인 PIN
   // 만료 자동 반영: 기간 지난 active → expired + featured 해제
   await sql`UPDATE subscriptions SET status='expired', updated_at=now() WHERE status='active' AND expires_at < now()`;
   await sql`UPDATE cafe_promos SET featured=false WHERE cafe_id IN (SELECT cafe_id FROM subscriptions WHERE status='expired') AND featured_until < now()`;
@@ -25,7 +54,7 @@ export async function GET(req: NextRequest) {
     await ensureSchema(); await ensure();
     if (req.nextUrl.searchParams.get("all")) {
       if (!authed(req)) return NextResponse.json({ ok: false }, { status: 401 });
-      const rows = await sql`SELECT id, cafe_id, cafe_name, owner_name, contact, email, plan, price, status, started_at, expires_at, created_at FROM subscriptions ORDER BY (status='pending') DESC, created_at DESC LIMIT 200` as unknown as any[];
+      const rows = await sql`SELECT id, cafe_id, cafe_name, owner_name, contact, email, plan, price, status, pin, started_at, expires_at, created_at FROM subscriptions ORDER BY (status='pending') DESC, created_at DESC LIMIT 200` as unknown as any[];
       return NextResponse.json({ ok: true, subs: rows.map((r) => ({ ...r, contact: decryptPII(r.contact), email: decryptPII(r.email) })) });
     }
     // 사장님: 본인 카페 구독 상태
@@ -39,23 +68,25 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    if (!authed(req)) return NextResponse.json({ ok: false }, { status: 401 });
     await ensureSchema(); await ensure();
     const b = await req.json().catch(() => ({}));
 
-    // 관리자 액션: 활성화/해지/연장
+    // 관리자 액션: 활성화/해지/연장 (관리자 인증 필요)
     if (b.action) {
+      if (!authed(req)) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
       const id = Number(b.id);
       if (!id) return NextResponse.json({ ok: false, error: "id 필요" }, { status: 400 });
-      const s = (await sql`SELECT cafe_id, expires_at FROM subscriptions WHERE id=${id}`)[0] as any;
+      const s = (await sql`SELECT cafe_id, cafe_name, email, expires_at, pin FROM subscriptions WHERE id=${id}`)[0] as any;
       if (!s) return NextResponse.json({ ok: false, error: "구독 없음" }, { status: 404 });
       const days = Math.min(Math.max(Number(b.days) || 30, 1), 365);
       if (b.action === "activate") {
-        await sql`UPDATE subscriptions SET status='active', started_at=now(), expires_at=now()+make_interval(days=>${days}), updated_at=now() WHERE id=${id}`;
+        const pin = s.pin || genPin(); // 재활성화면 기존 PIN 유지
+        await sql`UPDATE subscriptions SET status='active', started_at=now(), expires_at=now()+make_interval(days=>${days}), pin=${pin}, updated_at=now() WHERE id=${id}`;
         if (s.cafe_id) await sql`INSERT INTO cafe_promos (cafe_id, featured, featured_until, approved, published, updated_at)
           VALUES (${s.cafe_id}, true, now()+make_interval(days=>${days}), true, true, now())
           ON CONFLICT (cafe_id) DO UPDATE SET featured=true, featured_until=now()+make_interval(days=>${days}), approved=true`;
-        return NextResponse.json({ ok: true, status: "active" });
+        const emailed = await sendPinEmail(decryptPII(s.email ?? ""), pin, s.cafe_name ?? "");
+        return NextResponse.json({ ok: true, status: "active", pin, emailed });
       }
       if (b.action === "extend") {
         await sql`UPDATE subscriptions SET status='active', expires_at=GREATEST(coalesce(expires_at,now()),now())+make_interval(days=>${days}), updated_at=now() WHERE id=${id}`;

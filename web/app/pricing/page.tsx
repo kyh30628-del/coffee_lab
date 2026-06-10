@@ -13,17 +13,27 @@ const PRO = [
 
 export default function Pricing() {
   const [open, setOpen] = useState(false);
-  const [cafe, setCafe] = useState("");
+  const [cafeQ, setCafeQ] = useState("");
+  const [sug, setSug] = useState<{ id: number; name: string; area: string }[]>([]);
+  const [picked, setPicked] = useState<{ id: number; name: string } | null>(null);
+  const [ownerName, setOwnerName] = useState("");
   const [contact, setContact] = useState("");
+  const [email, setEmail] = useState("");
   const [consent, setConsent] = useState(false);
   const [done, setDone] = useState(false);
   const [busy, setBusy] = useState(false);
 
+  const onCafeQ = async (v: string) => {
+    setCafeQ(v); setPicked(null);
+    if (v.trim().length < 1) { setSug([]); return; }
+    try { const d = await (await fetch(`/api/cafe-names?q=${encodeURIComponent(v.trim())}`)).json(); setSug(d.cafes ?? []); } catch {}
+  };
+
   const submit = async () => {
-    if (!cafe.trim() || !contact.trim() || !consent) return;
+    if (!picked || !ownerName.trim() || !contact.trim() || !email.trim() || !consent) return;
     setBusy(true);
     try {
-      const r = await fetch("/api/sub-request", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cafeName: cafe, contact, plan: "홍보팩", consent: true }) });
+      const r = await fetch("/api/subscription", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cafeId: picked.id, cafeName: picked.name, ownerName, contact, email, consent: true }) });
       const d = await r.json();
       if (d.ok) setDone(true);
     } catch {}
@@ -79,21 +89,33 @@ export default function Pricing() {
             {done ? (
               <div className="text-center py-6">
                 <div className="text-3xl mb-2">🎉</div>
-                <div className="font-bold text-[#2b2018] mb-1">신청 접수됐어요</div>
-                <p className="text-[13px] text-[#6b5a48]">남겨주신 연락처로 <b>결제·세팅 안내</b>를 곧 드릴게요.</p>
-                <button onClick={() => { setOpen(false); setDone(false); setCafe(""); setContact(""); }} className="w-full mt-5 bg-[#2b2018] text-[#f4ece0] rounded-lg py-2.5 text-sm">닫기</button>
+                <div className="font-bold text-[#2b2018] mb-1">구독 신청 완료</div>
+                <p className="text-[13px] text-[#6b5a48]">관리자 승인 후 <b>등록하신 이메일로 PIN 번호</b>가 발송돼요. 그 PIN으로 사장님 화면에 로그인하시면 내 카페로 바로 들어갑니다.</p>
+                <button onClick={() => { setOpen(false); setDone(false); setPicked(null); setCafeQ(""); setOwnerName(""); setContact(""); setEmail(""); }} className="w-full mt-5 bg-[#2b2018] text-[#f4ece0] rounded-lg py-2.5 text-sm">닫기</button>
               </div>
             ) : (
               <>
-                <h3 className="font-bold text-[#2b2018] text-lg mb-1">홍보팩 구독 신청</h3>
-                <p className="text-[12px] text-[#6b5a48] mb-4">가게명과 연락처를 남겨주시면 결제·세팅을 안내해 드려요.</p>
-                <input value={cafe} onChange={(e) => setCafe(e.target.value)} placeholder="가게명" className="w-full rounded-lg border border-[#d9c9b0] px-3 py-2.5 text-[14px] mb-2 bg-white" />
-                <input value={contact} onChange={(e) => setContact(e.target.value)} placeholder="연락처 (전화 또는 이메일)" className="w-full rounded-lg border border-[#d9c9b0] px-3 py-2.5 text-[14px] mb-3 bg-white" />
+                <h3 className="font-bold text-[#2b2018] text-lg mb-1">홍보팩 구독 신청 <span className="text-[#9c6b3f] text-[14px]">₩9,900/월</span></h3>
+                <p className="text-[12px] text-[#6b5a48] mb-3">내 카페를 선택하고 정보를 남겨주세요. 승인되면 <b>이메일로 PIN</b>을 보내드려요.</p>
+                <div className="relative mb-2">
+                  <input value={picked ? picked.name : cafeQ} onChange={(e) => onCafeQ(e.target.value)} placeholder="내 카페 이름 검색" className="w-full rounded-lg border border-[#d9c9b0] px-3 py-2.5 text-[14px] bg-white" />
+                  {picked && <span className="absolute right-3 top-2.5 text-[12px] text-emerald-600 font-bold">✓ 선택됨</span>}
+                  {!picked && sug.length > 0 && (
+                    <div className="absolute z-10 left-0 right-0 mt-1 bg-white border border-[#d9c9b0] rounded-lg shadow-lg max-h-44 overflow-y-auto">
+                      {sug.map((c) => (
+                        <button key={c.id} onClick={() => { setPicked({ id: c.id, name: c.name }); setSug([]); }} className="w-full text-left px-3 py-2 text-[13px] hover:bg-[#f4ece0] border-b border-[#f0e6d4] last:border-0"><b>{c.name}</b> <span className="text-[11px] text-[#a8927a]">{c.area}</span></button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <input value={ownerName} onChange={(e) => setOwnerName(e.target.value)} placeholder="사장님 성함" className="w-full rounded-lg border border-[#d9c9b0] px-3 py-2.5 text-[14px] mb-2 bg-white" />
+                <input value={contact} onChange={(e) => setContact(e.target.value)} placeholder="연락처 (전화)" className="w-full rounded-lg border border-[#d9c9b0] px-3 py-2.5 text-[14px] mb-2 bg-white" />
+                <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="이메일 (PIN 받을 주소)" className="w-full rounded-lg border border-[#d9c9b0] px-3 py-2.5 text-[14px] mb-3 bg-white" />
                 <label className="flex items-start gap-2 mb-3 cursor-pointer">
                   <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5 shrink-0" />
-                  <span className="text-[11.5px] text-[#52402e] leading-snug"><b>(필수)</b> 구독 안내를 위한 가게명·연락처 수집·이용에 동의합니다. 연락처는 <b>암호화 저장</b>되고 목적 달성 후 파기됩니다. <a href="/privacy" target="_blank" className="text-[#9c6b3f] underline">개인정보처리방침</a></span>
+                  <span className="text-[11.5px] text-[#52402e] leading-snug"><b>(필수)</b> 구독 관리·PIN 발송을 위한 개인정보 수집·이용 동의. 연락처·이메일은 <b>암호화 저장</b>됩니다. <a href="/privacy" target="_blank" className="text-[#9c6b3f] underline">방침</a></span>
                 </label>
-                <button disabled={busy || !cafe.trim() || !contact.trim() || !consent} onClick={submit} className="w-full bg-[#e8b87a] text-[#2b2018] rounded-lg py-3 font-bold disabled:opacity-50">{busy ? "보내는 중…" : "신청 보내기"}</button>
+                <button disabled={busy || !picked || !ownerName.trim() || !contact.trim() || !email.trim() || !consent} onClick={submit} className="w-full bg-[#e8b87a] text-[#2b2018] rounded-lg py-3 font-bold disabled:opacity-50">{busy ? "신청 중…" : "구독 신청"}</button>
               </>
             )}
           </div>

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
+import { ownerScope } from "@/lib/ownerAuth";
 export const runtime = "nodejs";
 
 const REGIONS: Record<string, string[]> = {
@@ -25,16 +26,16 @@ const CHAR_AXES = [
 
 export async function GET(req: NextRequest) {
   try {
-    // 관리자 전용: 비밀번호 필요
-    if (req.headers.get("x-admin-password") !== process.env.ADMIN_PASSWORD) {
-      return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
-    }
+    // 관리자(전체) 또는 활성 구독 PIN(본인 카페만)
+    const scope = await ownerScope(req);
+    if (scope === null) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
     await ensureSchema();
     const name = req.nextUrl.searchParams.get("name") ?? "";
     if (!name) return NextResponse.json({ ok: false, error: "name 필요" }, { status: 400 });
 
     const me = (await sql`SELECT id, name, area, synth_grade, synth_count, synth_identity, char_scores, review_dates FROM cafes WHERE name = ${name} LIMIT 1`)[0];
     if (!me) return NextResponse.json({ ok: false, error: "카페를 찾을 수 없음" }, { status: 404 });
+    if (scope !== "admin" && Number(me.id) !== scope) return NextResponse.json({ ok: false, error: "본인 카페만 조회할 수 있어요" }, { status: 403 });
 
     const myGu = guOf(me.area);
     const all = await sql`SELECT name, area, synth_grade, synth_count, synth_identity, char_scores FROM cafes WHERE published = true` as unknown as any[];

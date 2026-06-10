@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
 import { generatePromo } from "@/lib/promoAgent";
+import { ownerScope } from "@/lib/ownerAuth";
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
@@ -36,11 +37,13 @@ export async function GET(req: NextRequest) {
     await ensureSchema(); await ensurePromo();
     const cafeId = Number(req.nextUrl.searchParams.get("cafeId"));
     if (!cafeId) return NextResponse.json({ ok: false, error: "cafeId 필요" }, { status: 400 });
+    const scope = await ownerScope(req);
+    const isOwner = scope === "admin" || scope === cafeId; // 관리자 또는 본인 카페 PIN
     const row = (await sql`SELECT * FROM cafe_promos WHERE cafe_id=${cafeId} LIMIT 1`)[0];
-    // 소비자(비관리자)는 '관리자 승인된' 홍보만 본다(배포 포함). 관리자는 미리보기 위해 전부.
-    if (!row || (!authed(req) && !row.approved)) return NextResponse.json({ ok: true, promo: null });
+    // 소비자(비인증)는 '관리자 승인된' 홍보만 본다(배포 포함). 사장님은 미리보기 위해 전부.
+    if (!row || (!isOwner && !row.approved)) return NextResponse.json({ ok: true, promo: null });
     // 사장님(인증)에겐 월간 성과 리포트도 함께
-    if (authed(req)) {
+    if (isOwner) {
       try {
         await sql`CREATE TABLE IF NOT EXISTS promo_daily (cafe_id INT, day DATE, views INT DEFAULT 0, clicks INT DEFAULT 0, plays INT DEFAULT 0, PRIMARY KEY (cafe_id, day))`;
         const m = (await sql`SELECT
@@ -61,11 +64,12 @@ export async function GET(req: NextRequest) {
 // POST (관리자): { cafeId, intro, photos[], publish, generate } — 저장 + (generate면 AI 카피 생성)
 export async function POST(req: NextRequest) {
   try {
-    if (!authed(req)) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
     await ensureSchema(); await ensurePromo();
     const body = await req.json().catch(() => ({}));
     const cafeId = Number(body.cafeId);
     if (!cafeId) return NextResponse.json({ ok: false, error: "cafeId 필요" }, { status: 400 });
+    const scope = await ownerScope(req); // 관리자(전체) 또는 본인 카페 PIN만
+    if (scope !== "admin" && scope !== cafeId) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
     // 🎟 쿠폰(혜택 문구)만 저장 — 내용·승인 유지
     if (body.couponOnly) {
       await sql`UPDATE cafe_promos SET coupon=${String(body.coupon ?? "").slice(0, 60) || null}, updated_at=now() WHERE cafe_id=${cafeId}`;

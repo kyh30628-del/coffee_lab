@@ -4,13 +4,13 @@ import { upload } from "@vercel/blob/client";
 import ShowcaseBanner, { SHOWCASE_CSS, SHOWCASE_TEMPLATES } from "./ShowcaseBanner";
 
 // 사장님 쇼케이스 편집기 — 글·사진 → AI 홍보물 요청 → (배치 생성) → 관리자 승인 → 카페 상세 배너.
-export default function Showcase({ cafeId, cafeName, pw }: { cafeId: number; cafeName: string; pw: string }) {
+export default function Showcase({ cafeId, cafeName, pw, pin }: { cafeId: number; cafeName: string; pw: string; pin?: string }) {
   const [promo, setPromo] = useState<any>(null);
   const [month, setMonth] = useState<any>(null);
   const [coupon, setCoupon] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
-  const hdr = { "x-admin-password": pw };
+  const hdr = { "x-admin-password": pw, "x-owner-pin": pin ?? "" };
   const reload = () => fetch(`/api/owner-promo?cafeId=${cafeId}`, { headers: hdr }).then((r) => r.json())
     .then((d) => { setPromo(d.promo ?? { intro: "", photos: [] }); setMonth(d.month ?? null); setCoupon(d.promo?.coupon ?? ""); });
 

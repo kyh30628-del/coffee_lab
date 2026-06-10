@@ -6,7 +6,6 @@ import { BarChart, Bar, XAxis, YAxis, Cell, ResponsiveContainer,
 import BackLink from "../BackLink";
 import InfoDot from "../InfoDot";
 import Showcase from "../Showcase";
-import Subscribe from "../Subscribe";
 
 type RankItem = { rank: number; name: string; count: number; grade: string | null; isMe: boolean };
 type CharItem = { key: string; label: string; emoji: string; me: number; avg: number; diff: number; meRaw?: number; hoodPenetration?: number };
@@ -60,14 +59,31 @@ export default function OwnerPage() {
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState("rank");
   const [showShowcase, setShowShowcase] = useState(false);
-  // 인증은 랜딩(사장님)에서 끝남 — 세션 비밀번호 사용. 없으면 홈(랜딩)으로.
+  // 인증: 관리자 비밀번호(전체 접근) 또는 구독 PIN(본인 카페만 고정).
   const [pw, setPw] = useState<string | null>(null);
+  const [pin, setPin] = useState<string | null>(null);
+  const [locked, setLocked] = useState<{ id: number; name: string } | null>(null); // PIN 모드 = 본인 카페 고정
+  const [authReady, setAuthReady] = useState(false);
+  const [pinInput, setPinInput] = useState("");
+  const [pinErr, setPinErr] = useState("");
   useEffect(() => {
-    const p = typeof window !== "undefined" ? sessionStorage.getItem("dcn_owner_pw") : null;
-    if (!p) { window.location.replace("/"); return; }
-    setPw(p);
+    if (typeof window === "undefined") return;
+    const p = sessionStorage.getItem("dcn_owner_pw");
+    const pn = sessionStorage.getItem("dcn_owner_pin"), cf = sessionStorage.getItem("dcn_owner_cafe");
+    if (pn && cf) { try { setPin(pn); setLocked(JSON.parse(cf)); } catch {} }
+    else if (p) setPw(p);
+    setAuthReady(true);
   }, []);
-  const hdr = { "x-admin-password": pw ?? "" };
+  const hdr = { "x-admin-password": pw ?? "", "x-owner-pin": pin ?? "" };
+  const pinLogin = async () => {
+    setPinErr("");
+    try {
+      const r = await fetch("/api/owner-auth", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pin: pinInput.trim() }) });
+      const d = await r.json();
+      if (d.ok) { const c = { id: d.cafeId, name: d.cafeName }; sessionStorage.setItem("dcn_owner_pin", pinInput.trim().toUpperCase()); sessionStorage.setItem("dcn_owner_cafe", JSON.stringify(c)); setPin(pinInput.trim().toUpperCase()); setLocked(c); }
+      else setPinErr(d.error ?? "오류");
+    } catch { setPinErr("연결 오류"); }
+  };
 
   const search = async () => {
     if (!q.trim()) return;
@@ -80,12 +96,23 @@ export default function OwnerPage() {
     try { const r = await fetch(`/api/owner-insight?name=${encodeURIComponent(name)}`, { headers: hdr }); const d = await r.json(); if (d.ok) setInsight(d); } catch {}
     setLoading(false);
   };
+  // PIN 모드: 본인 카페 자동 로드(검색 없이 바로 진입)
+  useEffect(() => { if (locked) loadInsight(locked.name); }, [locked]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 세션 인증 확인 중(없으면 위 effect가 홈으로 보냄)
-  if (!pw) {
+  if (!authReady) return <div className="min-h-screen bg-[#f4ece0] text-[#9c6b3f] flex items-center justify-center" style={{ fontFamily: "'Gowun Batang', serif" }}>확인 중…</div>;
+  // 미인증 → 구독 PIN 로그인(관리자/등록은 홈에서)
+  if (!pw && !pin) {
     return (
-      <div className="min-h-screen bg-[#f4ece0] text-[#9c6b3f] flex items-center justify-center" style={{ fontFamily: "'Gowun Batang', serif" }}>
-        인증 확인 중…
+      <div className="min-h-screen bg-[#f4ece0] text-[#2b2018] flex items-center justify-center px-6" style={{ fontFamily: "'Gowun Batang', serif" }}>
+        <div className="w-full max-w-sm">
+          <div className="text-[#9c6b3f] text-xs tracking-[0.3em] uppercase mb-2 text-center">For Owners</div>
+          <h1 className="text-2xl font-bold mb-1 text-center">사장님 로그인</h1>
+          <p className="text-[13px] text-[#6b5a48] mb-5 text-center">구독 승인 후 <b>이메일로 받은 PIN</b>으로 들어오세요.</p>
+          <input value={pinInput} onChange={(e) => setPinInput(e.target.value.toUpperCase())} onKeyDown={(e) => e.key === "Enter" && pinLogin()} placeholder="PIN 8자리" maxLength={8} className="w-full rounded-xl border border-[#cbb89f] px-4 py-3 text-center text-xl tracking-[6px] font-bold bg-white mb-2" />
+          {pinErr && <p className="text-[12px] text-rose-500 text-center mb-2">{pinErr}</p>}
+          <button onClick={pinLogin} disabled={pinInput.trim().length < 6} className="w-full bg-[#2b2018] text-[#f4ece0] rounded-xl py-3 font-bold disabled:opacity-40">내 카페 들어가기</button>
+          <div className="flex justify-between mt-4 text-[12px]"><a href="/pricing" className="text-[#9c6b3f] underline">구독 신청</a><a href="/" className="text-[#9c6b3f] underline">홈으로</a></div>
+        </div>
         <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet" />
       </div>
     );
@@ -109,7 +136,8 @@ export default function OwnerPage() {
       </header>
 
       <div className="max-w-2xl mx-auto px-4 sm:px-5 py-6">
-        {!insight && (
+        {!insight && locked && <p className="text-[#6b5a48] text-sm py-10 text-center">내 카페 불러오는 중…</p>}
+        {!insight && !locked && (
           <>
             <p className="text-[#6b5a48] text-sm mb-4 leading-relaxed">우리 카페를 검색하면, 같은 동네 카페들과 비교한 <strong>순위·성격·구성</strong>과 <strong>데이터 기반 액션 플랜</strong>을 보여드려요.</p>
             <div className="flex gap-2 mb-4">
@@ -129,7 +157,8 @@ export default function OwnerPage() {
 
         {insight && (
           <div>
-            <button onClick={() => setInsight(null)} className="text-xs text-[#9c6b3f] underline mb-4">← 다른 카페 검색</button>
+            {!locked && <button onClick={() => setInsight(null)} className="text-xs text-[#9c6b3f] underline mb-4">← 다른 카페 검색</button>}
+            {locked && <div className="flex items-center gap-2 mb-4"><span className="text-[10px] font-bold bg-[#e8b87a] text-[#2b2018] px-2 py-0.5 rounded-full">✅ 구독 사장님</span><span className="text-[11px] text-[#8a7458]">내 카페 전용 화면</span><button onClick={() => { sessionStorage.removeItem("dcn_owner_pin"); sessionStorage.removeItem("dcn_owner_cafe"); location.reload(); }} className="ml-auto text-[11px] text-[#9c6b3f] underline">로그아웃</button></div>}
 
             <div className="bg-white rounded-2xl p-4 sm:p-5 border border-[#ece0cd] mb-4">
               <div className="flex items-center gap-2 mb-1">
@@ -251,7 +280,6 @@ export default function OwnerPage() {
               </div>
               <p className="text-[11px] text-[#8a7458] mt-1.5">위 후기 분석은 <b>무료</b> · 아래는 <b>홍보팩(구독)</b>이에요</p>
             </div>
-            {insight?.me?.id && <div className="mb-2.5"><Subscribe cafeId={insight.me.id} cafeName={insight.me.name} pw={pw ?? ""} /></div>}
             <button onClick={() => setShowShowcase(true)} className="w-full bg-gradient-to-r from-[#9c6b3f] to-[#2b2018] text-[#f4ece0] rounded-xl py-3.5 font-medium">🎀 쇼케이스·우선노출·성과 (홍보팩)</button>
             <p className="text-[10px] text-[#a8927a] mt-3 text-center leading-relaxed">분석은 네이버 공개 후기를 교차검증한 데이터 기반입니다(무료). '결'은 측정값이 아니라 리뷰에서 자주 언급되는 정도입니다.</p>
           </div>
@@ -267,7 +295,7 @@ export default function OwnerPage() {
               <button onClick={() => setShowShowcase(false)} className="text-2xl text-[#9c6b3f] leading-none px-1 shrink-0">×</button>
             </div>
             <div className="flex-1 overflow-y-auto p-4">
-              <Showcase cafeId={insight.me.id} cafeName={insight.me.name} pw={pw ?? ""} />
+              <Showcase cafeId={insight.me.id} cafeName={insight.me.name} pw={pw ?? ""} pin={pin ?? ""} />
             </div>
           </div>
         </div>
