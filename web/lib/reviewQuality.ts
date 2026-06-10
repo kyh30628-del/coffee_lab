@@ -86,7 +86,7 @@ const LOC_SUFFIX = /(역|동|구|시|군|읍|면|로|길|가)$/; // 지역어 �
 
 // 카페명 '구별 토큰' = 일반어·지역어·대상지역어를 뺀 고유 식별어.
 // 예: "을지로 문덕카페" → ["문덕"] ("을지로"는 위치어로 제거).
-function coreTokens(name: string, areaTerms: string[]): string[] {
+export function coreTokens(name: string, areaTerms: string[]): string[] {
   const an = areaTerms.map((a) => norm(a)).filter(Boolean);
   return name.split(/\s+/)
     .map((t) => t.replace(GENERIC_SUFFIX, "").trim())
