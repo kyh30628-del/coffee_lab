@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
 import { generatePromo } from "@/lib/promoAgent";
 import { ownerScope } from "@/lib/ownerAuth";
+import { subscriptionLive } from "@/lib/flags";
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
@@ -41,7 +42,7 @@ export async function GET(req: NextRequest) {
     const isOwner = scope === "admin" || scope === cafeId; // 관리자 또는 본인 카페 PIN
     const row = (await sql`SELECT * FROM cafe_promos WHERE cafe_id=${cafeId} LIMIT 1`)[0];
     // 소비자(비인증)는 '관리자 승인된' 홍보만 본다(배포 포함). 사장님은 미리보기 위해 전부.
-    if (!row || (!isOwner && !row.approved)) return NextResponse.json({ ok: true, promo: null });
+    if (!row || (!isOwner && (!row.approved || !subscriptionLive()))) return NextResponse.json({ ok: true, promo: null });
     // 사장님(인증)에겐 월간 성과 리포트도 함께
     if (isOwner) {
       try {

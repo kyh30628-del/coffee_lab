@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
+import { subscriptionLive } from "@/lib/flags";
 export const runtime = "nodejs";
 
 const REGIONS: Record<string, string[]> = {
@@ -89,7 +90,8 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       ok: true, region: region || "전체", scopeCount: scope.length,
-      featured,
+      featured: subscriptionLive() ? featured : [], // 구독 라이브 전엔 소비자에 '추천 카페' 숨김
+
       headlineA, headlineB,
       // 헤드라인 제외 후 잘라서 항상 꽉 채움(공개 카페가 충분하면 Top3=3개)
       top3: byReview.filter((c) => !usedIds.has(c.id)).slice(0, 3).map((c: any) => slim(c, "top")),
