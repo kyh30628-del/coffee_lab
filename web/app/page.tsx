@@ -177,17 +177,20 @@ export default function Home() {
         setSido(r.sido); setSigungu(r.sigungu);
         setAutoGu(r.sigungu); setGeoMsg("");
         postConsent(true, { region: `${r.sido} ${r.sigungu}`, lat: latitude, lng: longitude });
-        // 🎀 구독(featured) 카페가 500m 이내면 — 최초 1회만 상세 모달 자동 노출
+        // 🎀 구독(featured) 카페가 500m 이내면 — 카페별 '하루 1회' 상세 모달 자동 노출(다음날 또 지나가면 다시)
         try {
-          const seen: number[] = JSON.parse(localStorage.getItem("dcn_geo_promo") || "[]");
+          const KEY = "dcn_geo_promo";
+          const today = new Date().toLocaleDateString();
+          const seen: Record<string, string> = JSON.parse(localStorage.getItem(KEY) || "{}");
           const near = cafes
-            .filter((c) => c.featured && c.lat && c.lng && !seen.includes(c.id))
+            .filter((c) => c.featured && c.lat && c.lng && seen[c.id] !== today)
             .map((c) => ({ c, d: distM(latitude, longitude, c.lat, c.lng) }))
             .filter((x) => x.d <= 500)
             .sort((a, b) => a.d - b.d);
           if (near.length) {
             setTimeout(() => setSelected(near[0].c), 600); // 위치 반영 후 살짝 뒤에
-            localStorage.setItem("dcn_geo_promo", JSON.stringify([...seen, near[0].c.id]));
+            seen[near[0].c.id] = today;
+            localStorage.setItem(KEY, JSON.stringify(seen));
           }
         } catch {}
       },
