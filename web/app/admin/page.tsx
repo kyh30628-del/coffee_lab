@@ -45,6 +45,7 @@ export default function AdminPage() {
   const [grounding, setGrounding] = useState<any>(null);
   const [verifying, setVerifying] = useState(false);
   const [yt, setYt] = useState<any>(null);
+  const [jstatus, setJstatus] = useState<any>(null);
 
   const loadVerify = (password: string) => fetch("/api/cron-verify?latest=1", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) { setVerify(d.report); setGrounding(d.grounding); } }).catch(() => {});
   const runVerify = async () => {
@@ -65,6 +66,7 @@ export default function AdminPage() {
     fetch("/api/sub-request", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) { setSubs(d.requests ?? []); setPurged(d.purgedRecently ?? 0); } }).catch(() => {});
     loadVerify(password);
     fetch("/api/yt-report", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) setYt(d); }).catch(() => {});
+    fetch("/api/judge-status", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) setJstatus(d); }).catch(() => {});
   };
 
   const act = async (id: number, action: string, published?: boolean) => {
@@ -144,6 +146,29 @@ export default function AdminPage() {
           <h1 className="text-2xl font-bold">관리자 대시보드</h1>
           <button onClick={() => load(pw)} className="ml-auto text-xs px-3 py-1.5 rounded-lg bg-stone-200 text-stone-700">새로고침</button>
         </div>
+
+        {/* ===== 🧮 AI 판정 진행 ===== */}
+        {jstatus && (
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xs font-bold text-stone-500 uppercase tracking-wider">🧮 AI 맥락 판정 진행 (새벽 00:30~06:00 자동)</span>
+              <span className="text-[11px] text-stone-500">{jstatus.last ? `최근 ${new Date(jstatus.last).toLocaleString("ko-KR")}` : ""}</span>
+            </div>
+            <div className="bg-white rounded-xl border border-stone-200 p-3">
+              <div className="flex items-end justify-between mb-1.5">
+                <span className="text-2xl font-bold text-stone-800">{jstatus.pct}%</span>
+                <span className="text-[12px] text-stone-500">{jstatus.done?.toLocaleString()} / {jstatus.total?.toLocaleString()}곳 완료</span>
+              </div>
+              <div className="w-full h-3 bg-stone-100 rounded-full overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-emerald-400 to-emerald-600 rounded-full transition-all" style={{ width: `${jstatus.pct}%` }} />
+              </div>
+              <div className="flex gap-3 mt-2 text-[12px] text-stone-500">
+                <span>대기 <b className="text-amber-600">{jstatus.queue?.toLocaleString()}</b>곳</span>
+                <span>· 오늘 판정 <b className="text-stone-700">{jstatus.today}</b>곳</span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ===== 🛡️ 검증 에이전트(레드팀) ===== */}
         <div className="mb-6">

@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<!-- 판정 전용 루프. 새벽(23·01·03·05시)=판정만 최대(2h마다, 리셋 다 잡음), 낮(08·11·14·17·20시)=70%+그라운딩.
-     promo/youtube는 12:00 본배치(com.coffee.judge)로 분리 → 새벽 판정 예산 안 빼앗음.
-     load: launchctl load ~/Library/LaunchAgents/com.coffee.judgeloop.plist -->
+<!-- 새벽 00:30·02:30·04:30에만 판정 풀 실행(00:30~06:00 창). 낮엔 안 돔(토큰 절약).
+     한도 시 중단 → 다음 새벽 슬롯이 이어감. load: launchctl load ~/Library/LaunchAgents/com.coffee.judgeloop.plist -->
 <plist version="1.0">
 <dict>
   <key>Label</key>
@@ -14,15 +13,9 @@
   </array>
   <key>StartCalendarInterval</key>
   <array>
-    <dict><key>Hour</key><integer>23</integer><key>Minute</key><integer>0</integer></dict>
-    <dict><key>Hour</key><integer>1</integer><key>Minute</key><integer>0</integer></dict>
-    <dict><key>Hour</key><integer>3</integer><key>Minute</key><integer>0</integer></dict>
-    <dict><key>Hour</key><integer>5</integer><key>Minute</key><integer>0</integer></dict>
-    <dict><key>Hour</key><integer>8</integer><key>Minute</key><integer>0</integer></dict>
-    <dict><key>Hour</key><integer>11</integer><key>Minute</key><integer>0</integer></dict>
-    <dict><key>Hour</key><integer>14</integer><key>Minute</key><integer>0</integer></dict>
-    <dict><key>Hour</key><integer>17</integer><key>Minute</key><integer>0</integer></dict>
-    <dict><key>Hour</key><integer>20</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>0</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Hour</key><integer>2</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Hour</key><integer>4</integer><key>Minute</key><integer>30</integer></dict>
   </array>
   <key>RunAtLoad</key>
   <false/>
