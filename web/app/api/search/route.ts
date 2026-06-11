@@ -94,7 +94,9 @@ export async function GET(req: NextRequest) {
     if (!nocache) {
       const hit = (await sql`SELECT payload FROM search_cache WHERE qkey=${qkey} AND created_at > now() - (${CACHE_TTL_HOURS} || ' hours')::interval LIMIT 1`)[0];
       if (hit?.payload && Array.isArray(hit.payload.results) && hit.payload.results.length > 0) {
-        return NextResponse.json({ ...hit.payload, cached: true });
+        return NextResponse.json({ ...hit.payload, cached: true }, {
+          headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" },
+        });
       }
     }
 
@@ -181,7 +183,9 @@ export async function GET(req: NextRequest) {
       sql`INSERT INTO search_cache (qkey, payload, created_at) VALUES (${qkey}, ${JSON.stringify(payload)}, now())
           ON CONFLICT (qkey) DO UPDATE SET payload=EXCLUDED.payload, created_at=now()`.catch(() => {});
     }
-    return NextResponse.json(payload);
+    return NextResponse.json(payload, {
+      headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" },
+    });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
