@@ -7,6 +7,7 @@ import { fetchWebReviews } from "./webSearchCollector";
 import { fetchYouTubeReviews } from "./youtubeCollector";
 import { collectAndSynthesize, type RawSource, type BorderlineItem, type CollectResult } from "./collectOrchestrator";
 import { judgeReviews, hasJudgeKey } from "./reviewJudge";
+import { isNonCafe } from "./discover";
 
 type RawItem = { source: "google" | "blog" | "youtube"; text: string; title?: string; desc?: string; time?: number; link?: string; date?: string; srcName?: string };
 
@@ -73,12 +74,13 @@ async function gatherRaw(cafe: { id: number; name: string; area: string }, refre
 }
 
 // 합성 결과를 DB에 저장(공용). llmJudged=true면 llm_judged_at도 기록.
-async function storeResult(cafeId: number, result: CollectResult, llmJudged: boolean) {
+async function storeResult(cafeId: number, name: string, result: CollectResult, llmJudged: boolean) {
   const { synth, collected, grade, charScores, evidenceReviews, reviewDates, quality } = result;
   const c = synth.coords;
   const basisLine = ["acidity", "body", "sweet"].filter((ax) => c[ax] != null)
     .map((ax) => `${ax === "acidity" ? "산미" : ax === "body" ? "바디" : "단맛"} ${synth.basis[ax]}`).join(" / ");
-  const publish = grade === "검증" || grade === "참고";
+  // 공개 가드: 등급 충족 + 비카페(교회·도서관·고로케 등) 아님. 재합성 때도 비카페는 영구 비공개.
+  const publish = (grade === "검증" || grade === "참고") && !isNonCafe(name, "");
   if (llmJudged) {
     await sql`UPDATE cafes SET synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${JSON.stringify(evidenceReviews)}, char_scores=${JSON.stringify(charScores)}, synth_quality=${JSON.stringify(quality)}, review_dates=${JSON.stringify(reviewDates)}, synth_updated=now(), llm_judged_at=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN 36.8 AND 38.3 AND lng BETWEEN 124.5 AND 127.9) WHERE id=${cafeId}`;
   } else {
@@ -113,7 +115,7 @@ export async function synthAndStore(cafe: { id: number; name: string; area: stri
       if (whitelist.size > 0) { result = collectAndSynthesize(cafe.name, area, sources, { whitelist }); rescued = whitelist.size; }
     }
   }
-  const stored = await storeResult(cafe.id, result, false);
+  const stored = await storeResult(cafe.id, cafe.name, result, false);
   return { id: cafe.id, name: cafe.name, ok: true, ...stored, rescued, fromCache };
 }
 
@@ -137,7 +139,7 @@ export async function applyDecisions(cafe: { id: number; name: string; area: str
   const merged = { ...(await loadDecisions(cafe.id)), ...decisions };
   const result = collectAndSynthesize(cafe.name, cafe.area ? [cafe.area] : [], rawToSources(raw), { decisions: merged });
   await sql`UPDATE cafes SET judge_decisions=${JSON.stringify(merged)} WHERE id=${cafe.id}`;
-  const stored = await storeResult(cafe.id, result, true);
+  const stored = await storeResult(cafe.id, cafe.name, result, true);
   const approved = Object.values(merged).filter(Boolean).length;
   return { id: cafe.id, name: cafe.name, approved, judged: Object.keys(decisions).length, ...stored };
 }
@@ -155,7 +157,7 @@ export async function backfillYouTube(cafe: { id: number; name: string; area: st
   for (const s of yt.snippets) raw.push({ source: "youtube", text: s.text, title: s.title, desc: s.desc, time: s.time, link: s.link, date: s.date, srcName: s.source });
   await sql`UPDATE cafes SET raw_reviews=${JSON.stringify(cleanRaw(raw))}, raw_collected_at=now() WHERE id=${cafe.id}`;
   const result = collectAndSynthesize(cafe.name, cafe.area ? [cafe.area] : [], rawToSources(raw));
-  await storeResult(cafe.id, result, false);
+  await storeResult(cafe.id, cafe.name, result, false);
   return "added";
 }
 

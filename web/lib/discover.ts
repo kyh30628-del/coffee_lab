@@ -7,7 +7,14 @@ const SECRET = process.env.NAVER_CLIENT_SECRET;
 
 // 대규모 저가 프랜차이즈 제외(스페셜티 체인은 유지)
 const FRANCHISE = ["스타벅스", "투썸", "이디야", "메가커피", "메가엠지씨", "빽다방", "컴포즈", "커피빈", "할리스", "엔제리너스", "파스쿠찌", "탐앤탐스", "폴바셋", "드롭탑", "요거프레소", "더벤티", "매머드", "공차", "스무디킹", "스벅", "투썸플레이스", "카페베네", "페이바", "감성커피", "더카페", "코너스톤", "하삼동", "매가", "벤티", "고나우", "만랩", "토프레소", "셀렉토", "더리터", "달콤커피", "커피스미스", "주커피", "백억커피", "쥬씨", "더치앤빈", "빈스빈스", "커피명가", "커피에반하다", "카페보니또", "더착한커피", "감탄커피"];
-const NON_CAFE = ["고로케", "정육", "마트", "편의점", "세탁", "미용", "약국", "치킨", "피자", "분식", "국밥", "삼겹", "횟집", "노래", "PC방", "문구", "부동산", "학원", "병원", "은행"];
+// 이름에 들어있으면(지점이어도) 비카페인 '음식·소매' 키워드
+const NON_CAFE = ["고로케", "정육", "세탁소", "치킨집", "피자", "분식", "국밥", "삼겹", "횟집", "노래방", "PC방", "문구"];
+// 이름이 이 시설명으로 '끝'나면(지점 ○○점 제외) 카페가 아닌 시설 자체
+const NON_CAFE_END = /(교회|성당|사찰|법당|학교|유치원|어린이집|병원|의원|한의원|치과|약국|도서관|주민센터|행정복지센터|우체국|경찰서|소방서|구청|시청)$/;
+// 카페류 신호(이름·카테고리에 있으면 무조건 통과 — 북카페·○○병원점 같은 정상 카페 보호)
+const CAFE_HINT = /(카페|까페|커피|coffee|로스터|베이커리|제과|제빵|디저트|브런치|에스프레소|라떼|티하우스|찻집)/i;
+// 네이버 카테고리가 명백히 비카페
+const NON_CAFE_CAT = /(종교|교회|성당|병원|의원|약국|학교|학원|유치원|관공서|주민센터|도서관|은행|부동산|미용|헬스|정비|주유|편의점|세탁|정육|문구)/;
 
 export const DISCOVER_KEYWORDS = ["로스터리", "스페셜티커피", "직접로스팅", "핸드드립", "싱글오리진", "자가배전", "드립커피전문점", "에스프레소바", "커피 맛집", "동네카페", "작은카페", "감성카페", "디저트카페", "베이커리카페", "브런치카페", "분위기좋은카페", "조용한카페", "루프탑카페", "북카페", "빈티지카페"];
 
@@ -25,7 +32,14 @@ export const METRO_REGIONS: { region: string; areaLabel: string }[] = (() => {
 
 const stripTags = (s: string) => (s || "").replace(/<[^>]+>/g, "").replace(/&[a-z]+;/g, "").trim();
 const isFranchise = (name: string) => { const n = name.replace(/\s/g, ""); return FRANCHISE.some((f) => n.includes(f)); };
-const isNonCafe = (name: string, category: string) => { const blob = (name + category).replace(/\s/g, ""); return NON_CAFE.some((k) => blob.includes(k)); };
+export const isNonCafe = (name: string, category: string) => {
+  const n = (name || "").replace(/\s/g, ""), cat = category || "";
+  if (CAFE_HINT.test(n) || CAFE_HINT.test(cat)) return false;       // 카페류면 통과(○○병원점·북카페 보호)
+  if (NON_CAFE.some((k) => n.includes(k))) return true;             // 음식/소매 키워드(고로케·정육…)
+  if (NON_CAFE_CAT.test(cat)) return true;                          // 비카페 카테고리(교회·도서관·병원…)
+  if (!/점$/.test(n) && NON_CAFE_END.test(n)) return true;          // 시설명으로 끝 & 지점 아님(열방교회·○○도서관)
+  return false;
+};
 
 async function localSearch(query: string) {
   const url = `https://openapi.naver.com/v1/search/local.json?query=${encodeURIComponent(query)}&display=5&sort=comment`;
