@@ -119,6 +119,19 @@ export function coreTokens(name: string, areaTerms: string[]): string[] {
     .filter((t) => !LOC_SUFFIX.test(t));
 }
 
+// 노이즈 게이트: 후기들이 '실제로 그 카페'를 말하는 비율(이름 일관성).
+//   개별 verifyReview를 통과해도, 묶어 보면 카페명이 거의 안 나오면 오염 의심.
+//   유형별 규칙으로 못 잡은 오염(부분문자열·구문·신종)을 공개 전에 잡는 안전망.
+export function nameCoherence(name: string, quotes: string[]): number {
+  const qs = (quotes || []).filter(Boolean);
+  if (!qs.length) return 1; // 표본 없으면 보류(공개 막지 않음)
+  const toks = coreTokens(name, []);
+  const terms = toks.length ? toks : [name];
+  let hit = 0;
+  for (const q of qs) if (terms.some((t) => nameHit(q, norm(q), t))) hit++;
+  return hit / qs.length;
+}
+
 export function verifyReview(input: QualityInput): QualityResult {
   const title = (input.title ?? "").trim();
   const body = (input.body ?? "").trim();

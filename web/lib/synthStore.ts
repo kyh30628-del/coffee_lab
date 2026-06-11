@@ -8,6 +8,7 @@ import { fetchYouTubeReviews } from "./youtubeCollector";
 import { collectAndSynthesize, type RawSource, type BorderlineItem, type CollectResult } from "./collectOrchestrator";
 import { judgeReviews, hasJudgeKey } from "./reviewJudge";
 import { isNonCafe } from "./discover";
+import { nameCoherence } from "./reviewQuality";
 
 type RawItem = { source: "google" | "blog" | "youtube"; text: string; title?: string; desc?: string; time?: number; link?: string; date?: string; srcName?: string };
 
@@ -79,14 +80,17 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   const c = synth.coords;
   const basisLine = ["acidity", "body", "sweet"].filter((ax) => c[ax] != null)
     .map((ax) => `${ax === "acidity" ? "산미" : ax === "body" ? "바디" : "단맛"} ${synth.basis[ax]}`).join(" / ");
-  // 공개 가드: 등급 충족 + 비카페(교회·도서관·고로케 등) 아님. 재합성 때도 비카페는 영구 비공개.
-  const publish = (grade === "검증" || grade === "참고") && !isNonCafe(name, "");
+  // 공개 가드: 등급 충족 + 비카페 아님 + 노이즈 게이트(후기가 실제 그 카페 얘기인지).
+  //   노이즈: 후기 10건+인데 이름 일관성<40% → 오염 의심 → 공개 보류(LLM 재판정 대기). 사용자에 garbage 안 나감.
+  const coherence = nameCoherence(name, (evidenceReviews as any[]).map((r) => r?.quote || ""));
+  const noisy = collected >= 10 && coherence < 0.4;
+  const publish = (grade === "검증" || grade === "참고") && !isNonCafe(name, "") && !noisy;
   if (llmJudged) {
     await sql`UPDATE cafes SET synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${JSON.stringify(evidenceReviews)}, char_scores=${JSON.stringify(charScores)}, synth_quality=${JSON.stringify(quality)}, review_dates=${JSON.stringify(reviewDates)}, synth_updated=now(), llm_judged_at=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN 36.8 AND 38.3 AND lng BETWEEN 124.5 AND 127.9) WHERE id=${cafeId}`;
   } else {
     await sql`UPDATE cafes SET synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${JSON.stringify(evidenceReviews)}, char_scores=${JSON.stringify(charScores)}, synth_quality=${JSON.stringify(quality)}, review_dates=${JSON.stringify(reviewDates)}, synth_updated=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN 36.8 AND 38.3 AND lng BETWEEN 124.5 AND 127.9) WHERE id=${cafeId}`;
   }
-  return { grade, collected, published: publish, evidence: evidenceReviews.length };
+  return { grade, collected, published: publish, evidence: evidenceReviews.length, coherence: Math.round(coherence * 100), noisy };
 }
 
 // opts.refresh=true면 새로 수집(최신성). 기본은 캐시 재사용(쿼터 절약).
