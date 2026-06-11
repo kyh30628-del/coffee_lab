@@ -8,7 +8,7 @@ for (const l of env.split("\n")) { const m = l.match(/^([A-Z_0-9]+)=(.*)$/); if 
 const { synthAndStore } = await import("../lib/synthStore.ts");
 const { sql } = await import("../lib/db.ts");
 
-const MAX = Number(process.env.WARMUP_MAX || 800);   // 1회 상한(4시간마다 도니 분산)
+const MAX = Number(process.env.WARMUP_MAX || 400);   // 1회 상한(4시간마다 도니 분산)
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let done = 0, skipped = 0, consecSkip = 0, consecErr = 0, stop = "";
 

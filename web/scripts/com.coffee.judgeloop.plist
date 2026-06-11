@@ -1,33 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<!-- AI 판정 하루 종일: 새벽(01·03·05) 풀 + 낮(08·11·14·17·20·23) 70%. Max 리셋마다 이어 처리.
-     load: launchctl load ~/Library/LaunchAgents/com.coffee.judgeloop.plist -->
-<plist version="1.0">
-<dict>
-  <key>Label</key>
-  <string>com.coffee.judgeloop</string>
-  <key>ProgramArguments</key>
-  <array>
-    <string>/bin/bash</string>
-    <string>/Users/wangwida/coffee-platform/web/scripts/run-judgeloop.sh</string>
-  </array>
-  <key>StartCalendarInterval</key>
-  <array>
-    <dict><key>Hour</key><integer>1</integer><key>Minute</key><integer>0</integer></dict>
-    <dict><key>Hour</key><integer>3</integer><key>Minute</key><integer>0</integer></dict>
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.coffee.judgeloop</string>
+  <key>ProgramArguments</key><array><string>/bin/bash</string><string>/Users/wangwida/coffee-platform/web/scripts/run-judgeloop.sh</string></array>
+  <key>StartCalendarInterval</key><array>
+    <dict><key>Hour</key><integer>2</integer><key>Minute</key><integer>0</integer></dict>
     <dict><key>Hour</key><integer>5</integer><key>Minute</key><integer>0</integer></dict>
-    <dict><key>Hour</key><integer>8</integer><key>Minute</key><integer>0</integer></dict>
-    <dict><key>Hour</key><integer>11</integer><key>Minute</key><integer>0</integer></dict>
-    <dict><key>Hour</key><integer>14</integer><key>Minute</key><integer>0</integer></dict>
-    <dict><key>Hour</key><integer>17</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>13</integer><key>Minute</key><integer>0</integer></dict>
     <dict><key>Hour</key><integer>20</integer><key>Minute</key><integer>0</integer></dict>
-    <dict><key>Hour</key><integer>23</integer><key>Minute</key><integer>0</integer></dict>
   </array>
-  <key>RunAtLoad</key>
-  <false/>
-  <key>StandardOutPath</key>
-  <string>/tmp/coffee-judgeloop.out.log</string>
-  <key>StandardErrorPath</key>
-  <string>/tmp/coffee-judgeloop.err.log</string>
-</dict>
-</plist>
+  <key>RunAtLoad</key><false/>
+  <key>StandardOutPath</key><string>/tmp/coffee-judgeloop.out.log</string>
+  <key>StandardErrorPath</key><string>/tmp/coffee-judgeloop.err.log</string>
+</dict></plist>

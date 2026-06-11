@@ -4,12 +4,9 @@
   <key>Label</key><string>com.coffee.warmup</string>
   <key>ProgramArguments</key><array><string>/bin/bash</string><string>/Users/wangwida/coffee-platform/web/scripts/run-warmup.sh</string></array>
   <key>StartCalendarInterval</key><array>
-    <dict><key>Hour</key><integer>0</integer><key>Minute</key><integer>10</integer></dict>
-    <dict><key>Hour</key><integer>4</integer><key>Minute</key><integer>10</integer></dict>
-    <dict><key>Hour</key><integer>8</integer><key>Minute</key><integer>10</integer></dict>
-    <dict><key>Hour</key><integer>12</integer><key>Minute</key><integer>10</integer></dict>
-    <dict><key>Hour</key><integer>16</integer><key>Minute</key><integer>10</integer></dict>
-    <dict><key>Hour</key><integer>20</integer><key>Minute</key><integer>10</integer></dict>
+    <dict><key>Hour</key><integer>1</integer><key>Minute</key><integer>10</integer></dict>
+    <dict><key>Hour</key><integer>11</integer><key>Minute</key><integer>10</integer></dict>
+    <dict><key>Hour</key><integer>19</integer><key>Minute</key><integer>10</integer></dict>
   </array>
   <key>RunAtLoad</key><false/>
   <key>StandardOutPath</key><string>/tmp/coffee-warmup.out.log</string>
