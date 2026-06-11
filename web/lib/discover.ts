@@ -12,9 +12,7 @@ const NON_CAFE = ["고로케", "정육", "세탁소", "치킨집", "피자", "�
 // 이름이 이 시설명으로 '끝'나면(지점 ○○점 제외) 카페가 아닌 시설 자체
 const NON_CAFE_END = /(교회|성당|사찰|법당|학교|유치원|어린이집|병원|의원|한의원|치과|약국|도서관|주민센터|행정복지센터|우체국|경찰서|소방서|구청|시청)$/;
 // 카페류 신호(이름·카테고리에 있으면 무조건 통과 — 북카페·○○병원점 같은 정상 카페 보호)
-const CAFE_HINT = /(카페|까페|커피|coffee|로스터|베이커리|제과|제빵|디저트|브런치|에스프레소|라떼|티하우스|찻집)/i;
-// 네이버 카테고리가 명백히 비카페
-const NON_CAFE_CAT = /(종교|교회|성당|병원|의원|약국|학교|학원|유치원|관공서|주민센터|도서관|은행|부동산|미용|헬스|정비|주유|편의점|세탁|정육|문구)/;
+const CAFE_HINT = /(카페|까페|커피|coffee|로스터|베이커리|제과|제빵|디저트|브런치|에스프레소|라떼|티하우스|찻집|도넛|음료|아이스크림|와플|케이크|빙수|스무디|쥬스|gelato|젤라또|tea)/i;
 
 export const DISCOVER_KEYWORDS = ["로스터리", "스페셜티커피", "직접로스팅", "핸드드립", "싱글오리진", "자가배전", "드립커피전문점", "에스프레소바", "커피 맛집", "동네카페", "작은카페", "감성카페", "디저트카페", "베이커리카페", "브런치카페", "분위기좋은카페", "조용한카페", "루프탑카페", "북카페", "빈티지카페"];
 
@@ -34,9 +32,11 @@ const stripTags = (s: string) => (s || "").replace(/<[^>]+>/g, "").replace(/&[a-
 const isFranchise = (name: string) => { const n = name.replace(/\s/g, ""); return FRANCHISE.some((f) => n.includes(f)); };
 export const isNonCafe = (name: string, category: string) => {
   const n = (name || "").replace(/\s/g, ""), cat = category || "";
-  if (CAFE_HINT.test(n) || CAFE_HINT.test(cat)) return false;       // 카페류면 통과(○○병원점·북카페 보호)
+  if (CAFE_HINT.test(n) || CAFE_HINT.test(cat)) return false;       // 카페류(이름/카테고리) → 통과(○○병원점·북카페·노티드 보호)
+  // 네이버 카테고리가 있는데 카페류가 아니면 비카페(식당·방앗간·공방·서점·장소대여…) — 가장 정확한 신호
+  if (cat) return true;
+  // 카테고리 불명일 때만 이름 기반 보조 판단
   if (NON_CAFE.some((k) => n.includes(k))) return true;             // 음식/소매 키워드(고로케·정육…)
-  if (NON_CAFE_CAT.test(cat)) return true;                          // 비카페 카테고리(교회·도서관·병원…)
   if (!/점$/.test(n) && NON_CAFE_END.test(n)) return true;          // 시설명으로 끝 & 지점 아님(열방교회·○○도서관)
   return false;
 };
