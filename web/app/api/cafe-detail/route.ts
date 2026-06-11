@@ -11,7 +11,9 @@ export async function GET(req: NextRequest) {
     const reviews = rows[0]?.synth_reviews ?? [];
     const quality = rows[0]?.synth_quality ?? null;
     const llmJudged = !!rows[0]?.llm_judged_at;
-    return NextResponse.json({ ok: true, reviews, quality, llmJudged });
+    return NextResponse.json({ ok: true, reviews, quality, llmJudged }, {
+      headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" },
+    });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
