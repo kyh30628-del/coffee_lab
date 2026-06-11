@@ -77,11 +77,33 @@ const norm = (s: string) => (s || "").toLowerCase().replace(/\s+/g, "");
 const has = (t: string, kws: string[]) => kws.some((k) => t.includes(k.toLowerCase()));
 const countOccur = (t: string, kw: string) => kw ? t.split(kw).length - 1 : 0;
 
+// 단어 경계 매칭: term이 더 긴 한글/영숫자 단어의 '일부'로 박힌 경우 제외.
+//   예: '바이트'가 '에이바이트키친'·'남산바이트'의 일부면 불인정. (조사는 뒤에 붙으니 '앞 글자'만 검사)
+function boundedHit(rawText: string, term: string): boolean {
+  const t = rawText || "", q = (term || "").trim();
+  if (!q) return false;
+  let i = t.indexOf(q);
+  while (i !== -1) {
+    const before = i > 0 ? t[i - 1] : " ";
+    if (!/[가-힣a-zA-Z0-9]/.test(before)) return true; // 앞이 경계(공백·구두점·시작)면 진짜 매칭
+    i = t.indexOf(q, i + 1);
+  }
+  return false;
+}
+// 짧은 이름(≤4)은 경계 매칭(부분문자열 오매칭 방지), 긴 이름은 일반 정규화 매칭.
+function nameHit(rawText: string, normText: string, term: string): boolean {
+  const tn = norm(term);
+  if (!tn) return false;
+  return tn.length > 4 ? normText.includes(tn) : boundedHit(rawText, term);
+}
+
 const GENERIC_SUFFIX = /(카페|커피|로스터리|베이커리|디저트|coffee|cafe|점|본점)$/i;
 const GENERIC_WORD = new Set(["카페", "커피", "점", "본점", "로스터리", "베이커리", "디저트", "coffee", "cafe"]);
 // 너무 흔해서 '식별어'가 못 되는 형용사·일반어. 이것만 남으면 전체 이름 일치를 요구(오매칭 방지).
 // 예: "좋은커피" → 접미 '커피' 제거 후 '좋은'만 남는데, '분위기 좋은 카페'처럼 모든 후기에 나옴.
-const NAME_STOPWORD = new Set(["좋은", "맛있는", "맛있는집", "예쁜", "멋진", "행복", "행복한", "우리", "우리집", "작은", "큰", "조용한", "따뜻한", "정직한", "데일리", "오늘", "하루", "그날", "모닝", "감성", "분위기", "힐링", "달콤한", "새로운"]);
+const NAME_STOPWORD = new Set(["좋은", "맛있는", "맛있는집", "예쁜", "멋진", "행복", "행복한", "우리", "우리집", "작은", "큰", "조용한", "따뜻한", "정직한", "데일리", "오늘", "하루", "그날", "모닝", "감성", "분위기", "힐링", "달콤한", "새로운",
+  // 음료·메뉴명 — 모든 카페 후기에 등장하므로 식별어 불가(예: '아메리카노' 카페는 모든 후기와 매칭됨)
+  "아메리카노", "라떼", "에스프레소", "카푸치노", "카페라떼", "콜드브루", "바닐라라떼", "카라멜마키아토", "플랫화이트", "카페모카", "모카", "아인슈페너", "마키아토", "콘파나", "디카페인", "녹차라떼", "초코라떼", "밀크티"]);
 const LOC_SUFFIX = /(역|동|구|시|군|읍|면|로|길|가)$/; // 지역어 접미
 
 // 카페명 '구별 토큰' = 일반어·지역어·대상지역어를 뺀 고유 식별어.
@@ -124,10 +146,10 @@ export function verifyReview(input: QualityInput): QualityResult {
   const coreEmpty = tokens.length === 0; // 이름이 흔한구문/일반어뿐(예: '좋은커피') → 원문 '붙임' 일치만 인정
   const distinct = tokens.length ? tokens : (nameN ? [input.name] : []);
   // 흔한구문 이름은 띄어쓰기 보존이 핵심: '좋은커피'(가게)는 원문에 붙어서, '좋은 커피'(맛 표현)는 배제.
-  const inTitleFull = coreEmpty ? title.includes(input.name) : (!!nameN && titleN.includes(nameN));
-  const inBodyFull = coreEmpty ? body.includes(input.name) : (!!nameN && bodyN.includes(nameN));
-  const distinctInTitle = coreEmpty ? inTitleFull : distinct.some((tk) => titleN.includes(norm(tk)));
-  const distinctInBody = coreEmpty ? inBodyFull : distinct.some((tk) => bodyN.includes(norm(tk)));
+  const inTitleFull = coreEmpty ? title.includes(input.name) : nameHit(title, titleN, input.name);
+  const inBodyFull = coreEmpty ? body.includes(input.name) : nameHit(body, bodyN, input.name);
+  const distinctInTitle = coreEmpty ? inTitleFull : distinct.some((tk) => nameHit(title, titleN, tk));
+  const distinctInBody = coreEmpty ? inBodyFull : distinct.some((tk) => nameHit(body, bodyN, tk));
   const visit = has(fullL, VISIT_CUES);
   const substance = SUBSTANCE_CUES.filter((k) => fullL.includes(k.toLowerCase())).length;
   const areaPresent = areaTerms.length ? areaTerms.some((a) => `${title} ${body}`.includes(a)) : false;
