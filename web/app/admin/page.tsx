@@ -51,6 +51,13 @@ export default function AdminPage() {
   const [showYtModal, setShowYtModal] = useState(false);
   const loadSubscribers = (password: string) => fetch("/api/subscription?all=1", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) setSubscribers(d.subs ?? []); }).catch(() => {});
   const subAct = async (id: number, action: string) => { try { await fetch("/api/subscription", { method: "POST", headers: { "x-admin-password": pw, "Content-Type": "application/json" }, body: JSON.stringify({ id, action }) }); loadSubscribers(pw); fetch("/api/judge-status", { headers: { "x-admin-password": pw } }); } catch {} };
+  // 🧮 AI 판정 진행 자동 갱신(20초) — 백그라운드 판정이 실시간 반영되게(새로고침 불필요)
+  useEffect(() => {
+    if (!authed || !pw) return;
+    const tick = () => fetch("/api/judge-status", { headers: { "x-admin-password": pw } }).then((x) => x.json()).then((d) => { if (d.ok) setJstatus(d); }).catch(() => {});
+    const id = setInterval(tick, 20000);
+    return () => clearInterval(id);
+  }, [authed, pw]);
 
   const loadVerify = (password: string) => fetch("/api/cron-verify?latest=1", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) { setVerify(d.report); setGrounding(d.grounding); } }).catch(() => {});
   const runVerify = async () => {
