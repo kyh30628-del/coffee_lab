@@ -4,10 +4,7 @@
   <key>Label</key><string>com.coffee.judgeloop</string>
   <key>ProgramArguments</key><array><string>/bin/bash</string><string>/Users/wangwida/coffee-platform/web/scripts/run-judgeloop.sh</string></array>
   <key>StartCalendarInterval</key><array>
-    <dict><key>Hour</key><integer>2</integer><key>Minute</key><integer>0</integer></dict>
-    <dict><key>Hour</key><integer>5</integer><key>Minute</key><integer>0</integer></dict>
-    <dict><key>Hour</key><integer>13</integer><key>Minute</key><integer>0</integer></dict>
-    <dict><key>Hour</key><integer>20</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Minute</key><integer>5</integer></dict>
   </array>
   <key>RunAtLoad</key><false/>
   <key>StandardOutPath</key><string>/tmp/coffee-judgeloop.out.log</string>

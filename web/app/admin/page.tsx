@@ -160,24 +160,53 @@ export default function AdminPage() {
           <button onClick={() => load(pw)} className="ml-auto text-xs px-3 py-1.5 rounded-lg bg-stone-200 text-stone-700">새로고침</button>
         </div>
 
-        {/* ===== 🧮 AI 판정 진행 ===== */}
+        {/* ===== 🔄 실시간 자동화 현황 (10초 갱신) ===== */}
         {jstatus && (
-          <div className="mb-6">
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-xs font-bold text-stone-500 uppercase tracking-wider">🧮 AI 맥락 판정 진행 (새벽 00:30~06:00 자동)</span>
-              <span className="text-[11px] text-stone-500">{jstatus.last ? `최근 ${new Date(jstatus.last).toLocaleString("ko-KR")}` : ""}</span>
-            </div>
+          <div className="mb-6 space-y-3">
+            <span className="text-xs font-bold text-stone-500 uppercase tracking-wider">🔄 자동화 현황 (10초 갱신)</span>
+
+            {/* AI 판정 */}
             <div className="bg-white rounded-xl border border-stone-200 p-3">
-              <div className="flex items-end justify-between mb-1.5">
-                <span className="text-2xl font-bold text-stone-800">{jstatus.pct}%</span>
-                <span className="text-[12px] text-stone-500">{jstatus.done?.toLocaleString()} / {jstatus.total?.toLocaleString()}곳 완료</span>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[12px] font-bold text-stone-700">🧮 AI 맥락 판정</span>
+                <span className="text-[11px] text-stone-400">{jstatus.last ? `최근 ${new Date(jstatus.last).toLocaleString("ko-KR")}` : "미실행"}</span>
               </div>
-              <div className="w-full h-3 bg-stone-100 rounded-full overflow-hidden">
+              <div className="flex items-end justify-between mb-1.5">
+                <span className="text-xl font-bold text-stone-800">{jstatus.pct}%</span>
+                <span className="text-[11px] text-stone-500">{jstatus.done?.toLocaleString()} / {jstatus.total?.toLocaleString()}곳</span>
+              </div>
+              <div className="w-full h-2 bg-stone-100 rounded-full overflow-hidden mb-1.5">
                 <div className="h-full bg-gradient-to-r from-emerald-400 to-emerald-600 rounded-full transition-all" style={{ width: `${jstatus.pct}%` }} />
               </div>
-              <div className="flex gap-3 mt-2 text-[12px] text-stone-500">
+              <div className="flex gap-3 text-[11px] text-stone-500">
                 <span>대기 <b className="text-amber-600">{jstatus.queue?.toLocaleString()}</b>곳</span>
-                <span>· 오늘 판정 <b className="text-stone-700">{jstatus.today}</b>곳</span>
+                <span>· 오늘 <b className="text-emerald-600">{jstatus.today}</b>곳 판정</span>
+              </div>
+            </div>
+
+            {/* 수집·공개 */}
+            <div className="bg-white rounded-xl border border-stone-200 p-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[12px] font-bold text-stone-700">📡 카페 수집·공개</span>
+                <span className="text-[11px] text-stone-400">오늘 신규 <b className="text-blue-600">{jstatus.newToday ?? 0}</b>곳</span>
+              </div>
+              <div className="flex gap-4 text-[11px] text-stone-500">
+                <span>전체 <b className="text-stone-700">{jstatus.cafesTotal?.toLocaleString()}</b>곳</span>
+                <span>공개 <b className="text-emerald-600">{jstatus.cafesPub?.toLocaleString()}</b>곳</span>
+                <span>수집대기 <b className="text-amber-600">{jstatus.collectQueue?.toLocaleString()}</b>곳</span>
+              </div>
+            </div>
+
+            {/* 유튜브 */}
+            <div className="bg-white rounded-xl border border-stone-200 p-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[12px] font-bold text-stone-700">📺 유튜브 수집</span>
+                <span className="text-[11px] text-stone-400">{jstatus.ytLast ? `최근 ${new Date(jstatus.ytLast).toLocaleString("ko-KR")}` : "미실행"}</span>
+              </div>
+              <div className="flex gap-4 text-[11px] text-stone-500">
+                <span>수집완료 <b className="text-stone-700">{jstatus.ytTotal?.toLocaleString()}</b>곳</span>
+                <span>오늘 <b className="text-emerald-600">{jstatus.ytToday ?? 0}</b>곳</span>
+                <span>대기 <b className="text-amber-600">{jstatus.ytQueue?.toLocaleString()}</b>곳</span>
               </div>
             </div>
           </div>

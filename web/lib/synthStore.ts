@@ -84,8 +84,12 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   //   노이즈: 후기 10건+인데 이름 일관성<40% → 오염 의심 → 공개 보류(LLM 재판정 대기). 사용자에 garbage 안 나감.
   const coherence = nameCoherence(name, (evidenceReviews as any[]).map((r) => r?.quote || ""));
   const noisy = collected >= 10 && coherence < 0.4;
-  // 프랜차이즈 제외(STATUS.md 원칙) — 발굴뿐 아니라 공개 게이트에서도 영구 차단(어느 경로로 들어와도).
-  const publish = (grade === "검증" || grade === "참고") && !isNonCafe(name, "") && !isFranchise(name) && !noisy;
+  // 네이버 카테고리 기반 검증 — 이름 기반보다 정확. 카테고리가 있는데 카페류 아니면 차단.
+  const catRow = (await sql`SELECT naver_category FROM cafes WHERE id=${cafeId} LIMIT 1`)[0];
+  const naverCat = catRow?.naver_category || "";
+  const isCafeCat = !naverCat || /카페|디저트|베이커리|브런치|로스터|티하우스|찻집/i.test(naverCat);
+  // 프랜차이즈 제외(STATUS.md 원칙) — 발굴뿐 아니라 공개 게이트에서도 영구 차단.
+  const publish = (grade === "검증" || grade === "참고") && isCafeCat && !isNonCafe(name, naverCat) && !isFranchise(name) && !noisy;
   if (llmJudged) {
     await sql`UPDATE cafes SET synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${JSON.stringify(evidenceReviews)}, char_scores=${JSON.stringify(charScores)}, synth_quality=${JSON.stringify(quality)}, review_dates=${JSON.stringify(reviewDates)}, synth_updated=now(), llm_judged_at=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN 36.8 AND 38.3 AND lng BETWEEN 124.5 AND 127.9) WHERE id=${cafeId}`;
   } else {
