@@ -742,6 +742,8 @@ function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; 
   const [llmJudged, setLlmJudged] = useState(false);
   const [loadingRev, setLoadingRev] = useState(true);
   const [promo, setPromo] = useState<any>(null);
+  const [showAllReviews, setShowAllReviews] = useState(false);
+  const [reviewFilter, setReviewFilter] = useState<"all" | "exact" | "partial" | "ai">("all");
   useEffect(() => {
     let live = true; setLoadingRev(true); setPromo(null);
     fetch(`/api/cafe-detail?id=${cafe.id}`).then((r) => r.json()).then((d) => { if (live) { setReviews(d.reviews ?? []); setQuality(d.quality ?? null); setLlmJudged(!!d.llmJudged); setLoadingRev(false); } }).catch(() => { if (live) setLoadingRev(false); });
@@ -831,10 +833,85 @@ function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; 
             </div>
           )}
           {!loadingRev && reviews.length > 0 && (
-            <div className="mb-4">
-              <div className="text-[11px] text-[#a8927a] mb-2">이 분석의 근거가 된 실제 후기 (네이버 공개 글)</div>
-              <div className="space-y-3">
-                {reviews.map((rv, i) => (
+            <div className=”mb-4”>
+              <div className=”flex items-center justify-between mb-2”>
+                <div className=”text-[11px] text-[#a8927a]”>이 분석의 근거가 된 실제 후기 (네이버 공개 글)</div>
+                <button onClick={() => setShowAllReviews(true)} className=”text-[11px] text-[#9c6b3f] font-medium underline”>전체 {reviews.length}건 보기 →</button>
+              </div>
+              <div className=”space-y-3”>
+                {reviews.slice(0, 3).map((rv, i) => (
+                  <div key={i} className=”border-b border-[#f0e6d4] pb-3 last:border-0”>
+                    <div className=”flex items-center gap-1.5 mb-1 flex-wrap”>
+                      {rv.trust === “verified”
+                        ? <span className=”text-[9px] text-white px-1.5 py-0.5 rounded-full” style={{ background: “#5f7355” }}>검증 ✓</span>
+                        : rv.trust === “reference”
+                        ? <span className=”text-[9px] text-white px-1.5 py-0.5 rounded-full” style={{ background: “#9c6b3f” }}>참고</span>
+                        : null}
+                      {rv.why?.some((w) => w.includes(“AI 검증”))
+                        ? <span className=”text-[9px] text-white px-1.5 py-0.5 rounded-full” style={{ background: “#7c5cbf” }}>✨ AI 검증</span>
+                        : rv.why?.[0] && <span className=”text-[10px] text-[#8a7458]”>{rv.why[0]}</span>}
+                    </div>
+                    {rv.link
+                      ? <a href={rv.link} target=”_blank” rel=”noopener noreferrer” className=”block text-[13px] text-[#3d2f22] leading-relaxed hover:text-[#9c6b3f] hover:underline transition-colors”>”{rv.quote}”</a>
+                      : <div className=”text-[13px] text-[#3d2f22] leading-relaxed”>”{rv.quote}”</div>}
+                    <div className=”flex items-center gap-2 mt-1.5 text-[10px] text-[#a8927a]”>
+                      {rv.link && /youtu\.?be/.test(rv.link) && <span className=”text-white rounded-[3px] px-1 py-0.5” style={{ background: “#c4302b”, fontSize: “8px” }}>▶ YouTube</span>}
+                      <span>{rv.source}</span>{rv.date && <span>· {rv.date}</span>}
+                      {rv.link && (/youtu\.?be/.test(rv.link)
+                        ? <a href={rv.link} target=”_blank” rel=”noopener noreferrer” className=”text-[#c4302b] font-medium ml-auto”>영상 보기 →</a>
+                        : <a href={rv.link} target=”_blank” rel=”noopener noreferrer” className=”text-[#9c6b3f] underline ml-auto”>원문 →</a>)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {reviews.length > 3 && (
+                <button onClick={() => setShowAllReviews(true)} className=”w-full mt-2 py-2 text-[12px] text-[#9c6b3f] border border-[#e6d9c8] rounded-lg”>
+                  + {reviews.length - 3}건 더 보기
+                </button>
+              )}
+            </div>
+          )}
+
+          <div className=”flex gap-2 mt-2”>
+            <button onClick={onMap} className="flex-1 text-center border border-[#cbb89f] text-[#524434] rounded-lg py-3 text-sm font-medium">지도에서 위치 보기</button>
+            <a href={`https://map.kakao.com/?q=${encodeURIComponent(cafe.name + " " + cafe.area)}`} target="_blank" rel="noopener noreferrer" className="flex-1 text-center bg-[#2b2018] text-[#f4ece0] rounded-lg py-3 text-sm font-medium flex items-center justify-center">길찾기</a>
+          </div>
+        </div>
+
+        {/* ===== 전체 리뷰 모달 ===== */}
+        {showAllReviews && (
+          <div className="fixed inset-0 z-[300] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.45)" }} onClick={() => setShowAllReviews(false)}>
+            <div className="w-full max-w-lg bg-[#fdf8f2] rounded-t-2xl max-h-[85dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-[#f0e6d4]">
+                <div>
+                  <div className="font-bold text-[#2b2018] text-[15px]">{cafe.name} 전체 후기</div>
+                  <div className="text-[11px] text-[#a8927a] mt-0.5">총 {reviews.length}건</div>
+                </div>
+                <button onClick={() => setShowAllReviews(false)} className="text-2xl text-[#a8927a] leading-none">×</button>
+              </div>
+              <div className="flex gap-1.5 px-4 py-2.5 border-b border-[#f0e6d4] overflow-x-auto">
+                {(["all","exact","partial","ai"] as const).map((v) => {
+                  const label = v === "all" ? "전체" : v === "exact" ? "완전일치" : v === "partial" ? "일부일치" : "AI 검증";
+                  const cnt = v === "all" ? reviews.length
+                    : v === "exact" ? reviews.filter(r => r.why?.some(w => w.includes("완전일치") || w.includes("exact"))).length
+                    : v === "partial" ? reviews.filter(r => r.trust === "verified" && !r.why?.some(w => w.includes("AI 검증"))).length
+                    : reviews.filter(r => r.why?.some(w => w.includes("AI 검증"))).length;
+                  return (
+                    <button key={v} onClick={() => setReviewFilter(v)}
+                      className={`flex-shrink-0 px-3 py-1.5 rounded-full text-[11px] font-medium transition-colors ${reviewFilter === v ? "bg-[#2b2018] text-[#f4ece0]" : "bg-white border border-[#e6d9c8] text-[#7a6452]"}`}>
+                      {label}{cnt > 0 && <span className="opacity-60 ml-0.5">({cnt})</span>}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="overflow-y-auto flex-1 px-4 py-3 space-y-3">
+                {reviews.filter(rv => {
+                  if (reviewFilter === "all") return true;
+                  if (reviewFilter === "exact") return rv.why?.some(w => w.includes("완전일치") || w.includes("exact"));
+                  if (reviewFilter === "partial") return rv.trust === "verified" && !rv.why?.some(w => w.includes("AI 검증"));
+                  if (reviewFilter === "ai") return rv.why?.some(w => w.includes("AI 검증"));
+                  return true;
+                }).map((rv, i) => (
                   <div key={i} className="border-b border-[#f0e6d4] pb-3 last:border-0">
                     <div className="flex items-center gap-1.5 mb-1 flex-wrap">
                       {rv.trust === "verified"
@@ -847,8 +924,8 @@ function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; 
                         : rv.why?.[0] && <span className="text-[10px] text-[#8a7458]">{rv.why[0]}</span>}
                     </div>
                     {rv.link
-                      ? <a href={rv.link} target=”_blank” rel=”noopener noreferrer” className=”block text-[13px] text-[#3d2f22] leading-relaxed hover:text-[#9c6b3f] hover:underline transition-colors”>”{rv.quote}”</a>
-                      : <div className=”text-[13px] text-[#3d2f22] leading-relaxed”>”{rv.quote}”</div>}
+                      ? <a href={rv.link} target="_blank" rel="noopener noreferrer" className="block text-[13px] text-[#3d2f22] leading-relaxed hover:text-[#9c6b3f] hover:underline transition-colors">"{rv.quote}"</a>
+                      : <div className="text-[13px] text-[#3d2f22] leading-relaxed">"{rv.quote}"</div>}
                     <div className="flex items-center gap-2 mt-1.5 text-[10px] text-[#a8927a]">
                       {rv.link && /youtu\.?be/.test(rv.link) && <span className="text-white rounded-[3px] px-1 py-0.5" style={{ background: "#c4302b", fontSize: "8px" }}>▶ YouTube</span>}
                       <span>{rv.source}</span>{rv.date && <span>· {rv.date}</span>}
@@ -860,12 +937,8 @@ function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; 
                 ))}
               </div>
             </div>
-          )}
-          <div className="flex gap-2 mt-2">
-            <button onClick={onMap} className="flex-1 text-center border border-[#cbb89f] text-[#524434] rounded-lg py-3 text-sm font-medium">지도에서 위치 보기</button>
-            <a href={`https://map.kakao.com/?q=${encodeURIComponent(cafe.name + " " + cafe.area)}`} target="_blank" rel="noopener noreferrer" className="flex-1 text-center bg-[#2b2018] text-[#f4ece0] rounded-lg py-3 text-sm font-medium flex items-center justify-center">길찾기</a>
           </div>
-        </div>
+        )}
       </aside>
     </div>
   );
