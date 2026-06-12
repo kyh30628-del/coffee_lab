@@ -37,7 +37,8 @@ export type CollectResult = {
   grade: "검증" | "참고" | "발굴";
   charScores: Record<string, number>;
   perSource: { source: string; raw: number; kept: number }[];
-  evidenceReviews: EvidenceReview[];
+  evidenceReviews: EvidenceReview[];   // 상위 6건 (기본 표시용)
+  allEvidence: EvidenceReview[];        // 옥석 전체 (전체보기용)
   reviewDates: string[];
   borderline: BorderlineItem[]; // 카페명 불명확하나 후기 맥락 있음 → LLM 재판정 대상(경계)
   auditItems: BorderlineItem[]; // 규칙상 on-topic 전체 → Sonnet 최종 심사 대상
@@ -160,11 +161,13 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
   const bestYt = evDedup.find(isYt);
   const nonYt = evDedup.filter((e) => !isYt(e));
   let topEvidence = bestYt ? [...nonYt.slice(0, 5), bestYt] : nonYt.slice(0, 6);
+  // 옥석 전체(노이즈 제거 후 verified+reference 전부) — 전체보기용
+  const allEvidence = evDedup;
 
   const synth = synthesize(name, verifiedReviews);
-  synth.grade = grade;              // 신뢰 리뷰 수 기준으로 등급 통일
+  synth.grade = grade;
   synth.reviewCount = trustCount;
   const charScores = computeCharScores(verifiedTexts);
 
-  return { synth, collected: trustCount, grade, charScores, perSource, evidenceReviews: topEvidence, reviewDates, borderline, auditItems, quality: stats };
+  return { synth, collected: trustCount, grade, charScores, perSource, evidenceReviews: topEvidence, allEvidence, reviewDates, borderline, auditItems, quality: stats };
 }
