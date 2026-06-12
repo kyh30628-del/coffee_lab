@@ -798,19 +798,19 @@ function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; 
           const THEMES = [
             // 1. 서비스 시그니처 — 따뜻한 커피브라운
             { bg: "linear-gradient(135deg,#f4ece0 0%,#e8d5b0 40%,#c8893f 100%)", border: "#c8893f", text: "#3d2518", sub: "#7a4f1a",
-              quote: "오늘도 한 잔의 여유를, 당신의 동네 카페에서.", icon: "☕" },
+              quote: "오늘도 한 잔의 여유를, 당신의 동네 카페에서." },
             // 2. 맑은 하늘 — 스카이블루
             { bg: "linear-gradient(135deg,#e8f4fd 0%,#b8dcf5 50%,#7ab8e8 100%)", border: "#5a9fd4", text: "#1a3a52", sub: "#3a6a8a",
-              quote: "맑은 하늘처럼, 오늘 하루도 가볍게.", icon: "🌤" },
+              quote: "맑은 하늘처럼, 오늘 하루도 가볍게." },
             // 3. 에메랄드 빛 바다 — 그린-씰
             { bg: "linear-gradient(135deg,#e0f5f0 0%,#8dd9c4 50%,#2aab8c 100%)", border: "#1a8a70", text: "#0d3028", sub: "#1a6050",
-              quote: "커피 한 모금에 파도 소리가 들리는 것 같아.", icon: "🌊" },
+              quote: "커피 한 모금에 파도 소리가 들리는 것 같아." },
             // 4. 푸르른 나무 — 포레스트 그린
             { bg: "linear-gradient(135deg,#e8f3e4 0%,#a8d48a 50%,#5a9e3a 100%)", border: "#3a7a1e", text: "#1a2e10", sub: "#2e5a18",
-              quote: "나무 아래 자리처럼, 이 카페가 쉼이 되길.", icon: "🌿" },
+              quote: "나무 아래 자리처럼, 이 카페가 쉼이 되길." },
             // 5. 따스한 햇살 — 골든 선셋
             { bg: "linear-gradient(135deg,#fff8e8 0%,#fde28a 50%,#f0a832 100%)", border: "#d48a10", text: "#3a2808", sub: "#7a5010",
-              quote: "햇살 좋은 창가 자리, 오늘의 커피와 함께.", icon: "☀️" },
+              quote: "햇살 좋은 창가 자리, 오늘의 커피와 함께." },
           ];
           const t = THEMES[cafe.id % THEMES.length];
           return (
@@ -823,7 +823,6 @@ function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; 
               }}>
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">
-                    <div className="text-[22px] mb-1">{t.icon}</div>
                     <div className="text-[13px] font-semibold leading-snug" style={{ color: t.text }}>{t.quote}</div>
                     <div className="text-[10px] mt-2 font-medium tracking-wide" style={{ color: t.sub }}>동네 커피 노트 · 데이터 기반 카페 가이드</div>
                   </div>
@@ -862,16 +861,9 @@ function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; 
           {cafe.signature && <div className="text-sm text-[#6b5a48] mb-4"><span className="text-[#9c6b3f]">추천 </span>{cafe.signature}</div>}
           {/* ===== 버튼 3개 — 리뷰 위에 배치, 눈에 잘 띄게 ===== */}
           <div className="flex gap-2 mb-4">
-            <button onClick={onMap} className="flex-1 flex items-center justify-center gap-1 border-2 border-[#cbb89f] text-[#524434] rounded-xl py-2.5 text-[12px] font-semibold bg-white hover:bg-[#fdf6ee] transition-colors">
-              <span>🗺</span> 지도
-            </button>
-            <a href={`https://map.kakao.com/?q=${encodeURIComponent(cafe.name + " " + cafe.area)}`} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center gap-1 bg-[#2b2018] text-[#f4ece0] rounded-xl py-2.5 text-[12px] font-semibold hover:bg-[#3d2f22] transition-colors">
-              <span>📍</span> 길찾기
-            </a>
-            <a href={`https://m.place.naver.com/place/list?query=${encodeURIComponent(cafe.name + " " + cafe.area)}`} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center gap-1 border-2 rounded-xl py-2.5 text-[12px] font-semibold bg-white hover:bg-[#f0fef8] transition-colors" style={{ borderColor: "#03c75a", color: "#03c75a" }}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="#03c75a"><path d="M16.273 12.845L7.376 0H0v24h7.727V11.155L16.624 24H24V0h-7.727z"/></svg>
-              메뉴·시간
-            </a>
+            <button onClick={onMap} className="flex-1 text-center border-2 border-[#cbb89f] text-[#524434] rounded-xl py-2.5 text-[12px] font-semibold bg-white hover:bg-[#fdf6ee] transition-colors">지도에서 위치</button>
+            <a href={`https://map.kakao.com/?q=${encodeURIComponent(cafe.name + " " + cafe.area)}`} target="_blank" rel="noopener noreferrer" className="flex-1 text-center bg-[#2b2018] text-[#f4ece0] rounded-xl py-2.5 text-[12px] font-semibold hover:bg-[#3d2f22] transition-colors flex items-center justify-center">길찾기</a>
+            <a href={`https://m.place.naver.com/place/list?query=${encodeURIComponent(cafe.name + " " + cafe.area)}`} target="_blank" rel="noopener noreferrer" className="flex-1 text-center border-2 rounded-xl py-2.5 text-[12px] font-semibold bg-white hover:bg-[#f0fef8] transition-colors flex items-center justify-center" style={{ borderColor: "#03c75a", color: "#03c75a" }}>메뉴·시간</a>
           </div>
 
           {loadingRev && <div className="text-[11px] text-[#a8927a] mb-4">근거 후기 불러오는 중...</div>}
