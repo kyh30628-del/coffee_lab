@@ -743,7 +743,7 @@ function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; 
   const [loadingRev, setLoadingRev] = useState(true);
   const [promo, setPromo] = useState<any>(null);
   const [showAllReviews, setShowAllReviews] = useState(false);
-  const [reviewFilter, setReviewFilter] = useState<"all" | "exact" | "partial" | "ai">("all");
+  const [reviewFilter, setReviewFilter] = useState<"all" | "verified" | "reference" | "ai">("all");
   useEffect(() => {
     let live = true; setLoadingRev(true); setPromo(null);
     fetch(`/api/cafe-detail?id=${cafe.id}`).then((r) => r.json()).then((d) => { if (live) { setReviews(d.reviews ?? []); setQuality(d.quality ?? null); setLlmJudged(!!d.llmJudged); setLoadingRev(false); } }).catch(() => { if (live) setLoadingRev(false); });
@@ -839,7 +839,7 @@ function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; 
                 <button onClick={() => setShowAllReviews(true)} className="text-[11px] text-[#9c6b3f] font-medium underline">{"전체 "}{reviews.length}{"건 보기 →"}</button>
               </div>
               <div className="space-y-3">
-                {reviews.slice(0, 3).map((rv, i) => (
+                {reviews.slice(0, 6).map((rv, i) => (
                   <div key={i} className="border-b border-[#f0e6d4] pb-3 last:border-0">
                     <div className="flex items-center gap-1.5 mb-1 flex-wrap">
                       {rv.trust === "verified"
@@ -864,9 +864,9 @@ function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; 
                   </div>
                 ))}
               </div>
-              {reviews.length > 3 && (
+              {reviews.length > 6 && (
                 <button onClick={() => setShowAllReviews(true)} className="w-full mt-2 py-2 text-[12px] text-[#9c6b3f] border border-[#e6d9c8] rounded-lg">
-                  + {reviews.length - 3}건 더 보기
+                  + {reviews.length - 6}건 더 보기
                 </button>
               )}
             </div>
@@ -885,19 +885,23 @@ function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; 
               <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-[#f0e6d4]">
                 <div>
                   <div className="font-bold text-[#2b2018] text-[15px]">{cafe.name} 전체 후기</div>
-                  <div className="text-[11px] text-[#a8927a] mt-0.5">총 {reviews.length}건</div>
+                  <div className="text-[11px] text-[#a8927a] mt-0.5">
+                    검증 {reviews.filter(r => r.trust === "verified").length} · 참고 {reviews.filter(r => r.trust === "reference").length} · 총 {reviews.length}건
+                    {quality && quality.rejected > 0 && <span className="ml-1 text-[#c0a08a]">/ 제외 {quality.rejected}건</span>}
+                  </div>
                 </div>
                 <button onClick={() => setShowAllReviews(false)} className="text-2xl text-[#a8927a] leading-none">×</button>
               </div>
               <div className="flex gap-1.5 px-4 py-2.5 border-b border-[#f0e6d4] overflow-x-auto">
-                {(["all","exact","partial","ai"] as const).map((v) => {
-                  const label = v === "all" ? "전체" : v === "exact" ? "완전일치" : v === "partial" ? "일부일치" : "AI 검증";
-                  const cnt = v === "all" ? reviews.length
-                    : v === "exact" ? reviews.filter(r => r.why?.some(w => w.includes("완전일치") || w.includes("exact"))).length
-                    : v === "partial" ? reviews.filter(r => r.trust === "verified" && !r.why?.some(w => w.includes("AI 검증"))).length
-                    : reviews.filter(r => r.why?.some(w => w.includes("AI 검증"))).length;
+                {(["all","verified","reference","ai"] as const).map((v) => {
+                  const filtered = v === "all" ? reviews
+                    : v === "verified" ? reviews.filter(r => r.trust === "verified" && !r.why?.some(w => w.includes("AI 검증")))
+                    : v === "reference" ? reviews.filter(r => r.trust === "reference")
+                    : reviews.filter(r => r.why?.some(w => w.includes("AI 검증")));
+                  const label = v === "all" ? "전체" : v === "verified" ? "검증" : v === "reference" ? "참고" : "AI 검증";
+                  const cnt = filtered.length;
                   return (
-                    <button key={v} onClick={() => setReviewFilter(v)}
+                    <button key={v} onClick={() => setReviewFilter(v as any)}
                       className={`flex-shrink-0 px-3 py-1.5 rounded-full text-[11px] font-medium transition-colors ${reviewFilter === v ? "bg-[#2b2018] text-[#f4ece0]" : "bg-white border border-[#e6d9c8] text-[#7a6452]"}`}>
                       {label}{cnt > 0 && <span className="opacity-60 ml-0.5">({cnt})</span>}
                     </button>
@@ -907,8 +911,8 @@ function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; 
               <div className="overflow-y-auto flex-1 px-4 py-3 space-y-3">
                 {reviews.filter(rv => {
                   if (reviewFilter === "all") return true;
-                  if (reviewFilter === "exact") return rv.why?.some(w => w.includes("완전일치") || w.includes("exact"));
-                  if (reviewFilter === "partial") return rv.trust === "verified" && !rv.why?.some(w => w.includes("AI 검증"));
+                  if (reviewFilter === "verified") return rv.trust === "verified" && !rv.why?.some(w => w.includes("AI 검증"));
+                  if (reviewFilter === "reference") return rv.trust === "reference";
                   if (reviewFilter === "ai") return rv.why?.some(w => w.includes("AI 검증"));
                   return true;
                 }).map((rv, i) => (
