@@ -743,7 +743,7 @@ function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; 
   const [loadingRev, setLoadingRev] = useState(true);
   const [promo, setPromo] = useState<any>(null);
   const [showAllReviews, setShowAllReviews] = useState(false);
-  const [reviewFilter, setReviewFilter] = useState<"all" | "verified" | "reference" | "ai">("all");
+  const [reviewFilter, setReviewFilter] = useState<"all" | "verified" | "reference" | "ai" | "youtube">("all");
   useEffect(() => {
     let live = true; setLoadingRev(true); setPromo(null);
     fetch(`/api/cafe-detail?id=${cafe.id}`).then((r) => r.json()).then((d) => { if (live) { setReviews(d.reviews ?? []); setQuality(d.quality ?? null); setLlmJudged(!!d.llmJudged); setLoadingRev(false); } }).catch(() => { if (live) setLoadingRev(false); });
@@ -880,40 +880,58 @@ function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; 
 
         {/* ===== 전체 리뷰 모달 — aside 안에 두되 fixed로 overlay ===== */}
         {showAllReviews && (
-          <div className="fixed inset-0 z-[3100] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.45)" }} onClick={() => setShowAllReviews(false)}>
-            <div className="w-full max-w-lg bg-[#fdf8f2] rounded-t-2xl max-h-[85dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+          <div className="fixed inset-0 z-[3100] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)" }} onClick={() => setShowAllReviews(false)}>
+            <div className="w-full max-w-lg bg-[#fdf8f2] rounded-t-2xl max-h-[90dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+              {/* 헤더 */}
               <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-[#f0e6d4]">
                 <div>
-                  <div className="font-bold text-[#2b2018] text-[15px]">{cafe.name} 전체 후기</div>
-                  <div className="text-[11px] text-[#a8927a] mt-0.5">
-                    검증 {reviews.filter(r => r.trust === "verified").length} · 참고 {reviews.filter(r => r.trust === "reference").length} · 총 {reviews.length}건
-                    {quality && quality.rejected > 0 && <span className="ml-1 text-[#c0a08a]">/ 제외 {quality.rejected}건</span>}
+                  <div className="font-bold text-[#2b2018] text-[15px]">{cafe.name}</div>
+                  <div className="flex items-center gap-2 mt-0.5 text-[11px] text-[#a8927a]">
+                    <span>검증 <b className="text-[#5f7355]">{reviews.filter(r => r.trust === "verified").length}</b></span>
+                    <span>· 참고 <b className="text-[#9c6b3f]">{reviews.filter(r => r.trust === "reference").length}</b></span>
+                    <span>· 총 <b className="text-[#2b2018]">{reviews.length}</b>건</span>
+                    {quality && quality.rejected > 0 && <span className="text-[#c0a08a]">/ 제외 {quality.rejected}</span>}
                   </div>
                 </div>
-                <button onClick={() => setShowAllReviews(false)} className="text-2xl text-[#a8927a] leading-none">×</button>
+                <button onClick={() => setShowAllReviews(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-[#f0e6d4] text-[#7a6452] text-lg leading-none">×</button>
               </div>
-              <div className="flex gap-1.5 px-4 py-2.5 border-b border-[#f0e6d4] overflow-x-auto">
-                {(["all","verified","reference","ai"] as const).map((v) => {
-                  const filtered = v === "all" ? reviews
-                    : v === "verified" ? reviews.filter(r => r.trust === "verified" && !r.why?.some(w => w.includes("AI 검증")))
-                    : v === "reference" ? reviews.filter(r => r.trust === "reference")
-                    : reviews.filter(r => r.why?.some(w => w.includes("AI 검증")));
-                  const label = v === "all" ? "전체" : v === "verified" ? "검증" : v === "reference" ? "참고" : "AI 검증";
-                  const cnt = filtered.length;
-                  return (
-                    <button key={v} onClick={() => setReviewFilter(v as any)}
-                      className={`flex-shrink-0 px-3 py-1.5 rounded-full text-[11px] font-medium transition-colors ${reviewFilter === v ? "bg-[#2b2018] text-[#f4ece0]" : "bg-white border border-[#e6d9c8] text-[#7a6452]"}`}>
-                      {label}{cnt > 0 && <span className="opacity-60 ml-0.5">({cnt})</span>}
-                    </button>
-                  );
-                })}
+              {/* 필터 — wrap으로 잘림 방지 */}
+              <div className="px-4 py-2.5 border-b border-[#f0e6d4]">
+                <div className="flex flex-wrap gap-1.5">
+                  {(["all","verified","reference","ai","youtube"] as const).map((v) => {
+                    const isYt = (r: EvidenceReview) => /youtu\.?be/i.test(r.link ?? "");
+                    const filtered = v === "all" ? reviews
+                      : v === "verified" ? reviews.filter(r => r.trust === "verified" && !r.why?.some(w => w.includes("AI 검증")))
+                      : v === "reference" ? reviews.filter(r => r.trust === "reference")
+                      : v === "ai" ? reviews.filter(r => r.why?.some(w => w.includes("AI 검증")))
+                      : reviews.filter(isYt);
+                    const label = v === "all" ? "전체" : v === "verified" ? "검증 ✓" : v === "reference" ? "참고" : v === "ai" ? "AI 검증" : "YouTube";
+                    const active = reviewFilter === v;
+                    const ytColor = v === "youtube";
+                    return (
+                      <button key={v} onClick={() => setReviewFilter(v as any)}
+                        className={`px-3 py-1.5 rounded-full text-[11px] font-medium transition-all ${
+                          active
+                            ? ytColor ? "text-white" : "bg-[#2b2018] text-[#f4ece0]"
+                            : "bg-white border border-[#e6d9c8] text-[#7a6452]"
+                        }`}
+                        style={active && ytColor ? { background: "#c4302b" } : {}}>
+                        {label}
+                        {filtered.length > 0 && <span className={`ml-1 ${active ? "opacity-75" : "opacity-50"}`}>({filtered.length})</span>}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
+              {/* 리뷰 목록 */}
               <div className="overflow-y-auto flex-1 px-4 py-3 space-y-3">
                 {reviews.filter(rv => {
+                  const isYt = /youtu\.?be/i.test(rv.link ?? "");
                   if (reviewFilter === "all") return true;
                   if (reviewFilter === "verified") return rv.trust === "verified" && !rv.why?.some(w => w.includes("AI 검증"));
                   if (reviewFilter === "reference") return rv.trust === "reference";
                   if (reviewFilter === "ai") return rv.why?.some(w => w.includes("AI 검증"));
+                  if (reviewFilter === "youtube") return isYt;
                   return true;
                 }).map((rv, i) => (
                   <div key={i} className="border-b border-[#f0e6d4] pb-3 last:border-0">
