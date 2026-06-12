@@ -15,6 +15,17 @@ function guOf(area: string): string {
   if (a.includes("구리")) return "구리시";
   return a;
 }
+// region 파라미터를 DB area와 매칭하는 함수 — 인천 구는 "연수구" → "인천 연수구" 변환
+function matchRegion(area: string, region: string): boolean {
+  if (!region) return true;
+  const g = guOf(area);
+  if (g === region) return true;
+  // 인천 구 이름만 넘어온 경우 ("연수구") → "인천 연수구"와 비교
+  if (g === "인천 " + region) return true;
+  // "인천" 전체
+  if (region === "인천" && (area ?? "").startsWith("인천")) return true;
+  return false;
+}
 const CHAR_LABELS: Record<string, { label: string; emoji: string }> = {
   roast: { label: "직접로스팅", emoji: "🔥" }, work: { label: "작업하기 좋은", emoji: "💻" },
   quiet: { label: "조용한", emoji: "🤍" }, dessert: { label: "디저트", emoji: "🍰" },
@@ -52,7 +63,7 @@ export async function GET(req: NextRequest) {
     const all = await sql`
       SELECT id, name, area, lat, lng, synth_grade, synth_count, synth_identity, note, char_scores, created_at
       FROM cafes WHERE published = true` as unknown as any[];
-    const scope = region ? all.filter((c) => guOf(c.area) === region) : all;
+    const scope = region ? all.filter((c) => matchRegion(c.area, region)) : all;
 
     // 정렬된 후보 — 헤드라인 제외 '후' 잘라야 개수가 안 줄어든다(예: Top3가 2개로 줄던 버그)
     const byReview = [...scope].sort((a, b) => (b.synth_count ?? 0) - (a.synth_count ?? 0));
