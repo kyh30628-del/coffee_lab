@@ -138,7 +138,9 @@ export async function getAuditCandidates(cafe: { id: number; name: string; area:
   const raw = await loadRaw(cafe.id);
   if (!raw.length) return { candidates: [], hasRaw: false };
   const result = collectAndSynthesize(cafe.name, cafe.area ? [cafe.area] : [], rawToSources(raw));
-  return { candidates: result.auditItems, hasRaw: true };
+  // 토큰 최적화: AI에는 '경계(규칙이 애매하다고 판단한 것)'만 보냄.
+  //   명확한 검증·참고는 규칙이 이미 판정했으므로 AI 재확인 불필요 → 토큰 70~90% 절감.
+  return { candidates: result.borderline, hasRaw: true };
 }
 
 // Sonnet 최종 결정(key→keep/drop)을 적용해 재합성·저장 + llm_judged_at 기록.
