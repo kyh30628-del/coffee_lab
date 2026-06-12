@@ -794,9 +794,23 @@ function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; 
           </>
         )}
         {/* 상단 테마 배너 — 5종 랜덤, 액자 느낌 */}
-        {!promo && (cafe.photo_url
-          ? <div className="h-44 w-full"><img src={cafe.photo_url} alt={cafe.name} className="w-full h-full object-cover" /></div>
-          : <div className="h-32 w-full" style={{ background: "linear-gradient(135deg,#e8d5b0 0%,#c8893f 55%,#8a5a24 100%)" }} />
+        {!promo && (
+          <div style={{ background: "#2b2018", fontFamily: "'Gowun Batang', serif" }} className="w-full px-5 pt-5 pb-4">
+            <style>{`
+              @keyframes dcnShimmerB { to { background-position: 230% center; } }
+              .dcn-title-b {
+                display: inline-block;
+                background: linear-gradient(110deg,#efe6d6 33%,#f7d9a0 47%,#e8b87a 50%,#f7d9a0 53%,#efe6d6 67%);
+                background-size: 240% auto; -webkit-background-clip: text; background-clip: text;
+                -webkit-text-fill-color: transparent; color: transparent;
+                animation: dcnShimmerB 6s linear infinite;
+              }
+            `}</style>
+            <div className="dcn-title-b text-[1.15rem] font-bold tracking-tight leading-snug mb-1">동네 커피 노트</div>
+            <p className="text-[11px] leading-relaxed" style={{ color: "#cbb89f" }}>
+              별점 말고, <span style={{ color: "#e8b87a", fontWeight: 700 }}>검증된 후기</span>로 고르세요.
+            </p>
+          </div>
         )}
         <div className="p-5">
           <div className="flex items-center justify-between mb-1">
