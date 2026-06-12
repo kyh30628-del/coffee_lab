@@ -161,7 +161,10 @@ export function verifyReview(input: QualityInput): QualityResult {
   // 흔한구문 이름은 띄어쓰기 보존이 핵심: '좋은커피'(가게)는 원문에 붙어서, '좋은 커피'(맛 표현)는 배제.
   const inTitleFull = coreEmpty ? title.includes(input.name) : nameHit(title, titleN, input.name);
   const inBodyFull = coreEmpty ? body.includes(input.name) : nameHit(body, bodyN, input.name);
-  const distinctInTitle = coreEmpty ? inTitleFull : distinct.some((tk) => nameHit(title, titleN, tk));
+  // 지역어 제외한 고유 식별 토큰 — 지역어만 제목에 있는 건 nameInTitle 기여 안 함
+  const nonAreaTokens = tokens.filter((tk) => !areaTerms.some((a) => norm(a).includes(norm(tk)) || norm(tk).includes(norm(a))));
+  const identTokens = nonAreaTokens.length ? nonAreaTokens : tokens; // 비면 원래대로
+  const distinctInTitle = coreEmpty ? inTitleFull : identTokens.some((tk) => nameHit(title, titleN, tk));
   const distinctInBody = coreEmpty ? inBodyFull : distinct.some((tk) => nameHit(body, bodyN, tk));
   const visit = has(fullL, VISIT_CUES);
   const substance = SUBSTANCE_CUES.filter((k) => fullL.includes(k.toLowerCase())).length;
@@ -192,6 +195,22 @@ export function verifyReview(input: QualityInput): QualityResult {
     return ctx
       ? { verdict: "rejected", score: 22, reasons: ["카페명 불명확하나 후기 맥락 있음(LLM 재판정 대상)"], borderline: true, signals: sig }
       : { verdict: "rejected", score: 0, reasons: ["카페명이 제목·본문에 없음(무관/동명)"], signals: sig };
+  }
+  // ★ 핵심 규칙: 제목이 '다른 카페'를 선언 — 우리 카페는 본문에 잠깐 언급된 것.
+  //   카페힌트 있는 긴 제목인데 우리 카페 고유명(비지역 토큰)이 제목에 없으면 → 다른 카페 후기.
+  //   예) "오렌지어웨이크에서 라떼" → body에 커피스탑 있어도 reject
+  if (!inTitleFull && nameInBody && titleHasCafeWord && title.length > 10) {
+    // 지역어가 아닌 고유 토큰이 제목에 있어야 우리 카페 글로 인정
+    const LOC_LIKE = /^(서울|경기|인천|부산|광화문|홍대|강남|신촌|이태원|합정|연남|성수|건대|혜화|압구정|청담|종로|명동|마포|여의도|잠실|판교|분당|수원|일산|상암|공덕|망원|을지로|동대문|신림|노원|구로|가산|당산|영등포|신도림|용산|왕십리|서초|방배|사당|구리|하남|의정부|부천|안양|평택|송파)$/;
+    // inTitleFull이 false지만 listicle이거나 제목이 단순 탐방형(지역+카페만)이면 통과
+    const simpleAreaTitle = /^[가-힣\s]+\s*(카페|커피)\s*(추천|탐방|맛집|top\d*|best|\d+선|필수|명소|핫플)/i.test(title)
+      || /^(카페|커피)\s*(추천|탐방|맛집|top\d*|best|\d+선)/i.test(title);
+    const specificInTitle = inTitleFull || simpleAreaTitle || tokens
+      .filter(tk => tk.length >= 2 && !LOC_LIKE.test(tk))
+      .some(tk => nameHit(title, titleN, tk) || titleN.includes(norm(tk)));
+    if (!specificInTitle) {
+      return { verdict: "rejected", score: 3, reasons: ["제목이 다른 카페를 가리킴(우리 카페는 본문에만 언급)"], signals: sig };
+    }
   }
   // 동명 카페: 제목이 수도권 밖 도시인데 대상 지역어가 어디에도 없음 → 다른 지역 동명점
   if (foreignInTitle && !areaPresent) {
