@@ -876,6 +876,14 @@ function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; 
             <button onClick={onMap} className="flex-1 text-center border border-[#cbb89f] text-[#524434] rounded-lg py-3 text-sm font-medium">지도에서 위치 보기</button>
             <a href={`https://map.kakao.com/?q=${encodeURIComponent(cafe.name + " " + cafe.area)}`} target="_blank" rel="noopener noreferrer" className="flex-1 text-center bg-[#2b2018] text-[#f4ece0] rounded-lg py-3 text-sm font-medium flex items-center justify-center">길찾기</a>
           </div>
+          {/* 네이버 플레이스 — 메뉴·영업시간·개요가 가장 잘 보이는 페이지 */}
+          <a
+            href={`https://m.place.naver.com/place/list?query=${encodeURIComponent(cafe.name + " " + cafe.area)}`}
+            target="_blank" rel="noopener noreferrer"
+            className="flex items-center justify-center gap-1.5 w-full mt-2 py-2.5 rounded-lg text-[13px] font-medium border border-[#e0e0e0] text-[#03c75a] bg-white hover:bg-[#f5fef8] transition-colors">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="#03c75a"><path d="M16.273 12.845L7.376 0H0v24h7.727V11.155L16.624 24H24V0h-7.727z"/></svg>
+            네이버 플레이스에서 메뉴·영업시간 보기
+          </a>
         </div>
 
         {/* ===== 전체 리뷰 모달 — aside 안에 두되 fixed로 overlay ===== */}
