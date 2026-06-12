@@ -836,7 +836,7 @@ function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; 
             <div className=”mb-4”>
               <div className=”flex items-center justify-between mb-2”>
                 <div className=”text-[11px] text-[#a8927a]”>이 분석의 근거가 된 실제 후기 (네이버 공개 글)</div>
-                <button onClick={() => setShowAllReviews(true)} className=”text-[11px] text-[#9c6b3f] font-medium underline”>전체 {reviews.length}건 보기 →</button>
+                <button onClick={() => setShowAllReviews(true)} className=”text-[11px] text-[#9c6b3f] font-medium underline”>{“전체 “}{reviews.length}{“건 보기 →”}</button>
               </div>
               <div className=”space-y-3”>
                 {reviews.slice(0, 3).map((rv, i) => (
@@ -878,9 +878,9 @@ function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; 
           </div>
         </div>
 
-        {/* ===== 전체 리뷰 모달 ===== */}
+        {/* ===== 전체 리뷰 모달 — aside 안에 두되 fixed로 overlay ===== */}
         {showAllReviews && (
-          <div className="fixed inset-0 z-[300] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.45)" }} onClick={() => setShowAllReviews(false)}>
+          <div className="fixed inset-0 z-[3100] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.45)" }} onClick={() => setShowAllReviews(false)}>
             <div className="w-full max-w-lg bg-[#fdf8f2] rounded-t-2xl max-h-[85dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-[#f0e6d4]">
                 <div>
