@@ -531,8 +531,8 @@ export default function Home() {
                 {discover.headlineA && <HeadlineCard c={discover.headlineA} kicker="이번 주 가장 많이 이야기된 곳" tone={0} />}
                 {discover.headlineB && <HeadlineCard c={discover.headlineB} kicker="🔥 커피에 진심인 집 — 스페셜티 스포트라이트" tone={1} />}
                 {discover.featured && discover.featured.length > 0 && <Row title="✨ 추천 카페" items={discover.featured} sub="쇼케이스" info={<>사장님이 직접 <b>홍보 중인 쇼케이스 카페</b>예요(우선 노출). 후기·등급은 다른 카페와 똑같이 검증된 값이에요.</>} />}
-                {momentum && momentum.rising.length > 0 && <Row title="📈 요즘 뜨는 카페" items={momentum.rising} sub="최근 입소문 순" info={<>별점 대신 <b>검증된 진짜 후기가 요즘 얼마나 빨리 느는지</b>로 뽑은 ‘뜨는 카페’예요. 최근 3개월 검증 후기가 많을수록 상위로 올라가요.</>} />}
-                <Row title="🏆 리뷰 많은 Top 3" items={discover.top3} sub="검증 리뷰 많은 순" info={<>이 동네에서 <b>검증·참고 후기(옥석)가 가장 많은</b> 카페 순서예요. 광고·가짜·무관 글은 제외한 ‘진짜 후기 수’ 기준입니다.</>} />
+                {momentum && momentum.rising.length > 0 && <Row title="📈 요즘 뜨는 카페" items={momentum.rising} sub="최근 입소문 순" info={<>별점 대신 <b>검증된 진짜 후기가 요즘 얼마나 빨리 느는지</b>로 뽑은 '뜨는 카페'예요. 최근 3개월 검증 후기가 많을수록 상위로 올라가요.</>} />}
+                <Row title="🏆 리뷰 많은 Top 3" items={discover.top3} sub="검증 리뷰 많은 순" info={<>이 동네에서 <b>검증·참고 후기(옥석)가 가장 많은</b> 카페 순서예요. 광고·가짜·무관 글은 제외한 '진짜 후기 수' 기준입니다.</>} />
                 <Row title="🔥 스페셜티 픽" items={discover.specialty} sub="로스팅 언급 순" info={<>검증된 카페 중 <b>직접 로스팅·스페셜티가 후기에 자주 언급된</b> 곳이에요. 커피에 진심인 집 위주로 보여줘요.</>} />
                 <button onClick={() => { if (homeSido) { setSido(homeSido); setSigungu(homeGu); } setFocusId(null); setSheetOpen(true); setTab("map"); }} className="w-full bg-[#2b2018] text-[#f4ece0] rounded-xl py-3.5 font-medium mt-2">🗺 {homeGu ? `${homeGu} 지도로 보기` : "지도에서 전체 둘러보기"} →</button>
               </>
@@ -694,7 +694,7 @@ function MapControls({ sido, sigungu, onSido, setSigungu, tasteKey, setTasteKey,
         {(sido || sigungu) && <button onClick={() => { if (clearAuto) clearAuto(); else { onSido(""); setSigungu(""); } }} className="text-xs text-[#9c6b3f] underline mt-2">전체</button>}
       </div>
       <div className="mb-5">
-        <div className="text-sm font-bold text-[#52402e] mb-2.5 flex items-center gap-1.5">☕ 어떤 카페 찾으세요?<InfoDot title="‘결’로 거르기"><b>결</b>은 후기에서 자주 언급되는 카페의 성격이에요(조용·작업·디저트·로스팅 등). 고르면 그 결이 강한 카페만 핀·목록에 뜨고, <b>그 결이 많이 언급된 순</b>으로 정렬돼요. 측정값이 아니라 ‘리뷰에서 자주 나온 정도’입니다.</InfoDot></div>
+        <div className="text-sm font-bold text-[#52402e] mb-2.5 flex items-center gap-1.5">☕ 어떤 카페 찾으세요?<InfoDot title="'결'로 거르기"><b>결</b>은 후기에서 자주 언급되는 카페의 성격이에요(조용·작업·디저트·로스팅 등). 고르면 그 결이 강한 카페만 핀·목록에 뜨고, <b>그 결이 많이 언급된 순</b>으로 정렬돼요. 측정값이 아니라 '리뷰에서 자주 나온 정도'입니다.</InfoDot></div>
         <div className="grid grid-cols-2 gap-2.5">
           {TASTE_CHOICES.map((t) => (
             <button key={t.key} onClick={() => setTasteKey(tasteKey === t.key ? null : t.key)} className={`rounded-xl p-3 text-left border transition-colors ${tasteKey === t.key ? "bg-[#2b2018] text-[#f4ece0] border-[#2b2018]" : "bg-white text-[#2b2018] border-[#cbb89f]"}`}>
@@ -804,7 +804,7 @@ function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; 
             </div>
           </div>
           <div className="text-[#9c6b3f] text-sm mb-3">{cafe.area} · {cafe.vibe}</div>
-          {cafe.note && <p className="text-[15px] text-[#3d2f22] font-medium leading-relaxed mb-4">“{cafe.note}”</p>}
+          {cafe.note && <p className="text-[15px] text-[#3d2f22] font-medium leading-relaxed mb-4">"{cafe.note}"</p>}
           {chars.length > 0 && (
             <div className="bg-[#efe9dd] rounded-lg px-4 py-3 mb-4 border border-[#ddd0bb]">
               <div className="text-[11px] text-[#8a7458] uppercase tracking-wider mb-2">이 카페가 자주 언급되는 결</div>
@@ -823,7 +823,7 @@ function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; 
             <div className="bg-[#eef3ea] border border-[#cfe0c2] rounded-lg px-4 py-2.5 mb-4">
               <div className="text-[11px] text-[#4f6a43] leading-relaxed flex items-start gap-1">
                 <span className="flex-1">🔍 네이버·유튜브 공개 글 <b>{quality.raw}건</b>{quality.duplicates ? <>(중복 {quality.duplicates}건 별도 제거)</> : null}을 검증해, 다른 가게·모음글·동명 카페 등 <b>노이즈 {quality.rejected}건</b>을 걸러내고<b> 옥석 {kept}건</b>만 분석에 썼어요.</span>
-                <InfoDot title="옥석 검증이 뭐예요?"><b>이 서비스의 핵심</b>이에요. 수천 개 공개 후기에서 ① 광고·협찬, ② 카페명만 스친 글, ③ ‘맛집 N곳’ 나열식, ④ 다른 지역·다른 지점의 <b>동명(同名)</b> 카페 글을 규칙으로 걸러내고, <b>Claude AI</b>가 내용·맥락까지 읽어 <b>진짜 방문 후기만</b> 남겨요. 모든 판정엔 근거가 붙습니다.</InfoDot>
+                <InfoDot title="옥석 검증이 뭐예요?"><b>이 서비스의 핵심</b>이에요. 수천 개 공개 후기에서 ① 광고·협찬, ② 카페명만 스친 글, ③ '맛집 N곳' 나열식, ④ 다른 지역·다른 지점의 <b>동명(同名)</b> 카페 글을 규칙으로 걸러내고, <b>Claude AI</b>가 내용·맥락까지 읽어 <b>진짜 방문 후기만</b> 남겨요. 모든 판정엔 근거가 붙습니다.</InfoDot>
               </div>
               {llmJudged && (
                 <div className="mt-2 pt-2 border-t border-[#cfe0c2] text-[11px] text-[#5a3a82] font-medium flex items-center gap-1">
@@ -833,46 +833,46 @@ function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; 
             </div>
           )}
           {!loadingRev && reviews.length > 0 && (
-            <div className=”mb-4”>
-              <div className=”flex items-center justify-between mb-2”>
-                <div className=”text-[11px] text-[#a8927a]”>이 분석의 근거가 된 실제 후기 (네이버 공개 글)</div>
-                <button onClick={() => setShowAllReviews(true)} className=”text-[11px] text-[#9c6b3f] font-medium underline”>{“전체 “}{reviews.length}{“건 보기 →”}</button>
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-[11px] text-[#a8927a]">이 분석의 근거가 된 실제 후기 (네이버 공개 글)</div>
+                <button onClick={() => setShowAllReviews(true)} className="text-[11px] text-[#9c6b3f] font-medium underline">{"전체 "}{reviews.length}{"건 보기 →"}</button>
               </div>
-              <div className=”space-y-3”>
+              <div className="space-y-3">
                 {reviews.slice(0, 3).map((rv, i) => (
-                  <div key={i} className=”border-b border-[#f0e6d4] pb-3 last:border-0”>
-                    <div className=”flex items-center gap-1.5 mb-1 flex-wrap”>
-                      {rv.trust === “verified”
-                        ? <span className=”text-[9px] text-white px-1.5 py-0.5 rounded-full” style={{ background: “#5f7355” }}>검증 ✓</span>
-                        : rv.trust === “reference”
-                        ? <span className=”text-[9px] text-white px-1.5 py-0.5 rounded-full” style={{ background: “#9c6b3f” }}>참고</span>
+                  <div key={i} className="border-b border-[#f0e6d4] pb-3 last:border-0">
+                    <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                      {rv.trust === "verified"
+                        ? <span className="text-[9px] text-white px-1.5 py-0.5 rounded-full" style={{ background: "#5f7355" }}>검증 ✓</span>
+                        : rv.trust === "reference"
+                        ? <span className="text-[9px] text-white px-1.5 py-0.5 rounded-full" style={{ background: "#9c6b3f" }}>참고</span>
                         : null}
-                      {rv.why?.some((w) => w.includes(“AI 검증”))
-                        ? <span className=”text-[9px] text-white px-1.5 py-0.5 rounded-full” style={{ background: “#7c5cbf” }}>✨ AI 검증</span>
-                        : rv.why?.[0] && <span className=”text-[10px] text-[#8a7458]”>{rv.why[0]}</span>}
+                      {rv.why?.some((w) => w.includes("AI 검증"))
+                        ? <span className="text-[9px] text-white px-1.5 py-0.5 rounded-full" style={{ background: "#7c5cbf" }}>✨ AI 검증</span>
+                        : rv.why?.[0] && <span className="text-[10px] text-[#8a7458]">{rv.why[0]}</span>}
                     </div>
                     {rv.link
-                      ? <a href={rv.link} target=”_blank” rel=”noopener noreferrer” className=”block text-[13px] text-[#3d2f22] leading-relaxed hover:text-[#9c6b3f] hover:underline transition-colors”>”{rv.quote}”</a>
-                      : <div className=”text-[13px] text-[#3d2f22] leading-relaxed”>”{rv.quote}”</div>}
-                    <div className=”flex items-center gap-2 mt-1.5 text-[10px] text-[#a8927a]”>
-                      {rv.link && /youtu\.?be/.test(rv.link) && <span className=”text-white rounded-[3px] px-1 py-0.5” style={{ background: “#c4302b”, fontSize: “8px” }}>▶ YouTube</span>}
+                      ? <a href={rv.link} target="_blank" rel="noopener noreferrer" className="block text-[13px] text-[#3d2f22] leading-relaxed hover:text-[#9c6b3f] hover:underline transition-colors">"{rv.quote}"</a>
+                      : <div className="text-[13px] text-[#3d2f22] leading-relaxed">"{rv.quote}"</div>}
+                    <div className="flex items-center gap-2 mt-1.5 text-[10px] text-[#a8927a]">
+                      {rv.link && /youtu\.?be/.test(rv.link) && <span className="text-white rounded-[3px] px-1 py-0.5" style={{ background: "#c4302b", fontSize: "8px" }}>▶ YouTube</span>}
                       <span>{rv.source}</span>{rv.date && <span>· {rv.date}</span>}
                       {rv.link && (/youtu\.?be/.test(rv.link)
-                        ? <a href={rv.link} target=”_blank” rel=”noopener noreferrer” className=”text-[#c4302b] font-medium ml-auto”>영상 보기 →</a>
-                        : <a href={rv.link} target=”_blank” rel=”noopener noreferrer” className=”text-[#9c6b3f] underline ml-auto”>원문 →</a>)}
+                        ? <a href={rv.link} target="_blank" rel="noopener noreferrer" className="text-[#c4302b] font-medium ml-auto">영상 보기 →</a>
+                        : <a href={rv.link} target="_blank" rel="noopener noreferrer" className="text-[#9c6b3f] underline ml-auto">원문 →</a>)}
                     </div>
                   </div>
                 ))}
               </div>
               {reviews.length > 3 && (
-                <button onClick={() => setShowAllReviews(true)} className=”w-full mt-2 py-2 text-[12px] text-[#9c6b3f] border border-[#e6d9c8] rounded-lg”>
+                <button onClick={() => setShowAllReviews(true)} className="w-full mt-2 py-2 text-[12px] text-[#9c6b3f] border border-[#e6d9c8] rounded-lg">
                   + {reviews.length - 3}건 더 보기
                 </button>
               )}
             </div>
           )}
 
-          <div className=”flex gap-2 mt-2”>
+          <div className="flex gap-2 mt-2">
             <button onClick={onMap} className="flex-1 text-center border border-[#cbb89f] text-[#524434] rounded-lg py-3 text-sm font-medium">지도에서 위치 보기</button>
             <a href={`https://map.kakao.com/?q=${encodeURIComponent(cafe.name + " " + cafe.area)}`} target="_blank" rel="noopener noreferrer" className="flex-1 text-center bg-[#2b2018] text-[#f4ece0] rounded-lg py-3 text-sm font-medium flex items-center justify-center">길찾기</a>
           </div>
