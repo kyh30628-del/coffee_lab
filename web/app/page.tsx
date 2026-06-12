@@ -860,8 +860,8 @@ function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; 
             </div>
           )}
           <div className="flex gap-2 mt-2">
-            <button onClick={onMap} className="flex-1 text-center bg-[#2b2018] text-[#f4ece0] rounded-lg py-3 text-sm font-medium">지도에서 위치 보기</button>
-            <a href={`https://map.kakao.com/?q=${encodeURIComponent(cafe.name + " " + cafe.area)}`} target="_blank" rel="noopener noreferrer" className="px-4 text-center border border-[#cbb89f] text-[#524434] rounded-lg py-3 text-sm font-medium flex items-center">길찾기</a>
+            <button onClick={onMap} className="flex-1 text-center border border-[#cbb89f] text-[#524434] rounded-lg py-3 text-sm font-medium">지도에서 위치 보기</button>
+            <a href={`https://map.kakao.com/?q=${encodeURIComponent(cafe.name + " " + cafe.area)}`} target="_blank" rel="noopener noreferrer" className="flex-1 text-center bg-[#2b2018] text-[#f4ece0] rounded-lg py-3 text-sm font-medium flex items-center justify-center">길찾기</a>
           </div>
         </div>
       </aside>
