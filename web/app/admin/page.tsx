@@ -46,6 +46,7 @@ export default function AdminPage() {
   const [verifying, setVerifying] = useState(false);
   const [yt, setYt] = useState<any>(null);
   const [jstatus, setJstatus] = useState<any>(null);
+  const [auditFlags, setAuditFlags] = useState<any>(null);
   const [subscribers, setSubscribers] = useState<any[]>([]);
   const [showSubsModal, setShowSubsModal] = useState(false);
   const [showYtModal, setShowYtModal] = useState(false);
@@ -54,7 +55,10 @@ export default function AdminPage() {
   // 🧮 AI 판정 진행 자동 갱신(20초) — 백그라운드 판정이 실시간 반영되게(새로고침 불필요)
   useEffect(() => {
     if (!authed || !pw) return;
-    const tick = () => fetch("/api/judge-status", { headers: { "x-admin-password": pw } }).then((x) => x.json()).then((d) => { if (d.ok) setJstatus(d); }).catch(() => {});
+    const tick = () => {
+      fetch("/api/judge-status", { headers: { "x-admin-password": pw } }).then((x) => x.json()).then((d) => { if (d.ok) setJstatus(d); }).catch(() => {});
+      fetch("/api/audit-flags", { headers: { "x-admin-password": pw } }).then((x) => x.json()).then((d) => { if (d.ok) setAuditFlags(d); }).catch(() => {});
+    };
     const id = setInterval(tick, 20000);
     return () => clearInterval(id);
   }, [authed, pw]);
@@ -209,6 +213,28 @@ export default function AdminPage() {
                 <span>대기 <b className="text-amber-600">{jstatus.ytQueue?.toLocaleString()}</b>곳</span>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* ===== 🚨 품질 감사 플래그 ===== */}
+        {auditFlags && (auditFlags.flags?.filter((f: any) => !f.resolved).length > 0) && (
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold text-red-500 uppercase tracking-wider">🚨 품질 오염 감지 ({auditFlags.flags.filter((f: any) => !f.resolved).length}건)</span>
+              <span className="text-[11px] text-stone-400">{auditFlags.lastAudit}</span>
+            </div>
+            <div className="bg-red-50 border border-red-200 rounded-xl p-3 space-y-1.5">
+              {auditFlags.flags.filter((f: any) => !f.resolved).slice(0, 8).map((f: any, i: number) => (
+                <div key={i} className="text-[11px] text-red-700">
+                  <b>{f.cafe_name}</b> — {f.detail?.slice(0, 60)}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {auditFlags && auditFlags.flags?.filter((f: any) => !f.resolved).length === 0 && (
+          <div className="mb-6 bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-[11px] text-emerald-700">
+            ✅ 품질 감사 이상 없음 — {auditFlags.lastAudit}
           </div>
         )}
 
