@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
       sql`SELECT
         count(*) FILTER (WHERE raw_reviews IS NOT NULL)::int total,
         count(*) FILTER (WHERE llm_judged_at IS NOT NULL)::int judged,
-        count(*) FILTER (WHERE raw_reviews IS NOT NULL AND (llm_judged_at IS NULL OR llm_judged_at < raw_collected_at))::int queue,
+        count(*) FILTER (WHERE raw_reviews IS NOT NULL AND published = true AND (llm_judged_at IS NULL OR llm_judged_at < raw_collected_at))::int queue,
         count(*) FILTER (WHERE llm_judged_at::date = CURRENT_DATE)::int today,
         max(llm_judged_at) AS last FROM cafes`,
       sql`SELECT

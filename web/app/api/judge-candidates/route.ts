@@ -36,6 +36,7 @@ export async function GET(req: NextRequest) {
         SELECT c.id, c.name, c.area FROM cafes c
         LEFT JOIN grounding_checks g ON g.cafe_id = c.id
         WHERE c.raw_reviews IS NOT NULL
+          AND c.published = true
           AND (c.llm_judged_at IS NULL OR c.llm_judged_at < c.raw_collected_at)
         ORDER BY (g.grounded = false) DESC NULLS LAST, c.llm_judged_at ASC NULLS FIRST
         LIMIT ${limit}`) as unknown as typeof targets;
@@ -48,7 +49,7 @@ export async function GET(req: NextRequest) {
       if (!hasRaw || candidates.length === 0) { await markJudged(cafe.id); advanced++; continue; }
       cafes.push({ cafeId: cafe.id, name: cafe.name, area: cafe.area, candidates: candidates.slice(0, 50) });
     }
-    const remaining = (await sql`SELECT COUNT(*)::int n FROM cafes WHERE raw_reviews IS NOT NULL AND (llm_judged_at IS NULL OR llm_judged_at < raw_collected_at)`)[0].n;
+    const remaining = (await sql`SELECT COUNT(*)::int n FROM cafes WHERE raw_reviews IS NOT NULL AND published = true AND (llm_judged_at IS NULL OR llm_judged_at < raw_collected_at)`)[0].n;
     return NextResponse.json({ ok: true, cafes, scanned: targets.length, noBorderline: advanced, remaining });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
