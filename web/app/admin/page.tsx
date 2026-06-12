@@ -83,6 +83,7 @@ export default function AdminPage() {
     loadVerify(password);
     fetch("/api/yt-report", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) setYt(d); }).catch(() => {});
     fetch("/api/judge-status", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) setJstatus(d); }).catch(() => {});
+    fetch("/api/audit-flags", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) setAuditFlags(d); }).catch(() => {});
     loadSubscribers(password);
   };
 
