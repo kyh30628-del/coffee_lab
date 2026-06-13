@@ -579,19 +579,17 @@ export default function Home() {
           <div className="absolute inset-0 md:relative md:flex-1 md:p-5">
             <div ref={mapRef} className="w-full h-full md:rounded-2xl overflow-hidden bg-[#e8e0d3] z-0" />
             {/* 내 카페(MY PIN) — 지도 상단 */}
-            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[1100] flex gap-2">
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[1100] flex gap-2 max-w-[calc(100vw-1.5rem)]">
               <button onClick={() => { if (myLocked) setShowMyMemory(true); else setMyPinMode((v) => !v); }}
-                className={`px-3.5 py-2 rounded-full text-[12px] font-bold shadow-lg transition-colors ${myPinMode ? "text-white" : "bg-white text-[#d6336c] border border-[#f0c4d4]"}`}
+                className={`inline-flex items-center gap-1 h-9 px-3.5 rounded-full text-[12px] font-bold shadow-lg whitespace-nowrap transition-colors ${myPinMode ? "text-white" : "bg-white text-[#d6336c] border border-[#f0c4d4]"}`}
                 style={myPinMode ? { background: "#d6336c" } : {}}>
-                {myLocked ? "🔒 내 카페" : `❤ 내 카페${myCafeIds.size ? ` ${myCafeIds.size}` : ""}`}
-              </button>
-              <button onClick={() => setShowMyCafeReg(true)}
-                className="px-3.5 py-2 rounded-full text-[12px] font-bold shadow-lg bg-[#2b2018] text-[#f4ece0]">
-                + 등록
+                <span className="text-[14px] leading-none">{myLocked ? "🔒" : "❤"}</span>
+                <span>내 카페{!myLocked && myCafeIds.size ? ` ${myCafeIds.size}` : ""}</span>
               </button>
               <button onClick={() => setShowMyMemory(true)} aria-label="추억 보관소"
-                className="px-3.5 py-2 rounded-full text-[12px] font-bold shadow-lg bg-white text-[#9c6b3f] border border-[#e6d9c8]">
-                🗃 추억 보관소
+                className="inline-flex items-center gap-1 h-9 px-3.5 rounded-full text-[12px] font-bold shadow-lg whitespace-nowrap bg-white text-[#9c6b3f] border border-[#e6d9c8]">
+                <span className="text-[14px] leading-none">🗃</span>
+                <span>추억 보관소</span>
               </button>
             </div>
           </div>
@@ -613,6 +611,7 @@ export default function Home() {
       {showMyCafeReg && <MyCafeRegModal cafes={cafes} device={deviceId} visits={myVisits} pin={sessionPin} onClose={() => setShowMyCafeReg(false)} onDone={() => { reloadMyCafes(deviceId, sessionPin); setMyPinMode(true); }} />}
       {showMyMemory && <MyMemoryModal device={deviceId} visits={myVisits} locked={myLocked} sessionPin={sessionPin}
         onClose={() => setShowMyMemory(false)}
+        onRegister={() => { setShowMyMemory(false); setShowMyCafeReg(true); }}
         onUnlock={(p: string) => { try { sessionStorage.setItem("dcn_pin", p); } catch {} setSessionPin(p); setMyLocked(false); reloadMyCafes(deviceId, p); }}
         onLock={() => { try { sessionStorage.removeItem("dcn_pin"); } catch {} setSessionPin(""); reloadMyCafes(deviceId, ""); }}
         onRestore={(dev: string) => { try { localStorage.setItem("dcn_device", dev); } catch {} setDeviceId(dev); reloadMyCafes(dev, ""); setMyPinMode(true); }} />}
@@ -1022,7 +1021,7 @@ function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; 
                 </div>
               </div>
               {/* 리뷰 목록 */}
-              <div className="overflow-y-auto flex-1 px-4 py-3 space-y-3">
+              <div className="overflow-y-auto flex-1 px-4 py-3 space-y-3 pb-[calc(0.75rem_+_env(safe-area-inset-bottom))]">
                 {reviews.filter(rv => {
                   const isYt = /youtu\.?be/i.test(rv.link ?? "");
                   if (reviewFilter === "all") return true;
@@ -1183,7 +1182,7 @@ function MyCafeRegModal({ cafes, device, visits, pin = "", onClose, onDone }: { 
           </div>
           <button onClick={onClose} className="w-8 h-8 rounded-full bg-[#f0e6d4] text-[#7a6452] text-lg">×</button>
         </div>
-        <div className="overflow-y-auto flex-1 p-4 space-y-3">
+        <div className="overflow-y-auto flex-1 p-4 space-y-3 pb-[calc(1rem_+_env(safe-area-inset-bottom))]">
           {!picked ? (
             <>
               <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="카페 이름 검색"
@@ -1232,7 +1231,7 @@ function MyCafeRegModal({ cafes, device, visits, pin = "", onClose, onDone }: { 
 }
 
 // 내 기억 관리 — 백업코드 발급/복원 + PDF·JSON 내보내기 (개인정보 0)
-function MyMemoryModal({ device, visits, locked = false, sessionPin = "", onClose, onRestore, onUnlock, onLock }: { device: string; visits: any[]; locked?: boolean; sessionPin?: string; onClose: () => void; onRestore: (dev: string) => void; onUnlock?: (pin: string) => void; onLock?: () => void }) {
+function MyMemoryModal({ device, visits, locked = false, sessionPin = "", onClose, onRestore, onUnlock, onLock, onRegister }: { device: string; visits: any[]; locked?: boolean; sessionPin?: string; onClose: () => void; onRestore: (dev: string) => void; onUnlock?: (pin: string) => void; onLock?: () => void; onRegister?: () => void }) {
   const [code, setCode] = useState("");
   const [inputCode, setInputCode] = useState("");
   const [busy, setBusy] = useState(false);
@@ -1355,10 +1354,15 @@ function MyMemoryModal({ device, visits, locked = false, sessionPin = "", onClos
             <button onClick={onClose} className="w-8 h-8 rounded-full bg-[#f0e6d4] text-[#7a6452] text-lg">×</button>
           </div>
         </div>
-        <div className="overflow-y-auto flex-1 p-4 space-y-5">
+        <div className="overflow-y-auto flex-1 p-4 space-y-5 pb-[calc(1rem_+_env(safe-area-inset-bottom))]">
           <p className="text-[12px] text-[#7a6452] leading-relaxed bg-[#f3ede1] rounded-lg px-3 py-2.5">
             <b className="text-[#2b2018]">이 기기의 내 추억 {visits.length}곳</b>만 보여요(다른 사람 기록은 절대 보이지 않아요). 가입·개인정보 없이, <b>백업 코드</b>로 다른 기기에서 불러오거나 <b>파일로 내려받아</b> 영구 보관할 수 있어요.
           </p>
+
+          {/* 새 추억 등록 — 보관소의 대표 액션 */}
+          <button onClick={() => onRegister?.()} className="w-full inline-flex items-center justify-center gap-1.5 bg-[#d6336c] text-white rounded-xl py-3 text-[14px] font-bold shadow-sm">
+            <span className="text-[16px] leading-none">➕</span> 새 카페 추억 등록하기
+          </button>
 
           {/* 백업 코드 */}
           <div>
