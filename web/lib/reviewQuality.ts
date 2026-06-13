@@ -154,8 +154,12 @@ export function nameCoherence(name: string, quotes: string[]): number {
   if (!qs.length) return 1; // 표본 없으면 보류(공개 막지 않음)
   const toks = coreTokens(name, []);
   const terms = toks.length ? toks : [name];
+  const nameN = norm(name); // 전체 이름(붙여쓰기) — '성북동빵공장'처럼 토큰 경계검사가 놓치는 경우 보완
   let hit = 0;
-  for (const q of qs) if (terms.some((t) => nameHit(q, norm(q), t))) hit++;
+  for (const q of qs) {
+    const qN = norm(q);
+    if ((nameN.length >= 4 && qN.includes(nameN)) || terms.some((t) => nameHit(q, qN, t))) hit++;
+  }
   return hit / qs.length;
 }
 

@@ -81,9 +81,10 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   const basisLine = ["acidity", "body", "sweet"].filter((ax) => c[ax] != null)
     .map((ax) => `${ax === "acidity" ? "산미" : ax === "body" ? "바디" : "단맛"} ${synth.basis[ax]}`).join(" / ");
   // 공개 가드: 등급 충족 + 비카페 아님 + 노이즈 게이트(후기가 실제 그 카페 얘기인지).
-  //   노이즈: 후기 10건+인데 이름 일관성<40% → 오염 의심 → 공개 보류(LLM 재판정 대기). 사용자에 garbage 안 나감.
+  //   노이즈: 공개건수(5+)인데 이름 일관성<40% → 오염 의심 → 공개 보류. 사용자에 garbage 안 나감.
+  //   저건수도 적용('만조커피 9건'이 전부 동네 딴 가게였던 사례 차단). 전체이름 매칭은 nameCoherence가 보완.
   const coherence = nameCoherence(name, (evidenceReviews as any[]).map((r) => r?.quote || ""));
-  const noisy = collected >= 10 && coherence < 0.4;
+  const noisy = collected >= 5 && coherence < 0.4;
   // 네이버 카테고리 기반 검증 — 이름 기반보다 정확. 카테고리가 있는데 카페류 아니면 차단.
   const catRow = (await sql`SELECT naver_category FROM cafes WHERE id=${cafeId} LIMIT 1`)[0];
   const naverCat = catRow?.naver_category || "";
