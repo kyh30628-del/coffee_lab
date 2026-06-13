@@ -80,6 +80,17 @@
 | **cron-resynth** | `0 4 * * 1` | 매주 월 **13시** | 전체 재합성(규칙 갱신 반영) | ✗ | Neon |
 | **cron-snapshot** | `0 4 * * 0` | 매주 일 **13시** | 평점/리뷰수 시계열 스냅샷 → 모멘텀(뜨는 카페) | ✗ | Neon |
 
+### 3-B-2. 자율 운영 관제탑 (Control Tower) ★자동화 두뇌★
+
+| 에이전트 | 스케줄(UTC) | KST | 무엇을 하나 | 비용 |
+|---|---|---|---|---|
+| **orchestrator** | `0 */4 * * *` | 4시간마다 | 전 에이전트가 만든 **실제 데이터 신호**로 가동·건강 추론(거짓 불가) → 합성 적체 **자가치유**(무료) → 멈춤 **경보** → 상태 저장 | 토큰 0 |
+
+- 신호: `raw_collected_at`(수집)·`synth_updated`(합성)·`llm_judged_at`(판정)·`verify_reports.ran_at`(검증)·`embed_updated`(임베딩)·`audit_flags`(감사)·`discovery_state`(발굴).
+- 건강: 각 에이전트 ok/지연/멈춤/주의 + 종합 healthy/degraded/critical.
+- `GET /api/orchestrator` (현황 공개) / `?heal=1`(인증, 자가치유). 관리자 대시보드 **🛰️ 관제 패널**에 신호등으로 표시.
+- ⚠️ **남은 의존성**: AI 판정(judgeloop)은 로컬 Mac+Max 구독 토큰으로 도므로, Mac이 꺼지면 판정만 멈춤(관제탑이 '판정 멈춤' 경보). 클라우드 이관 시 24/7 무인 가능(토큰 보안·함수 시간 트레이드오프).
+
 ### 3-C. 요청 시 동작(에이전트 아님, API)
 
 지도(`cafes`/`cafe-discover`), 상세(`cafe-detail`), 검색(`search`), 모멘텀(`momentum`),
