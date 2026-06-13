@@ -112,6 +112,29 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   return { grade, collected, published: publish, ruleOk, pipeline: newPst, evidence: evidenceReviews.length, coherence: Math.round(coherence * 100), noisy };
 }
 
+// 🧼 PII 자동 세척 — 공개 인용문에서 전화·이메일·핸들 제거(레드팀 pii_leak 자가치유).
+//   레드팀 규칙으로 위반 카페만 골라 in-place 마스킹 → 토큰 0, 4시간마다 관제탑이 가동.
+export async function scrubPublishedPII(): Promise<{ scrubbed: number; names: string[] }> {
+  const { maskPII } = await import("./collectOrchestrator");
+  // 레드팀과 동일 규칙으로 위반 카페만 선별(대용량 fetch 회피)
+  const bad = (await sql`
+    SELECT DISTINCT c.id, c.name FROM cafes c, jsonb_array_elements(c.synth_reviews) r
+    WHERE c.published AND (r->>'quote' ~ '01[0-9][- ]?[0-9]{3,4}[- ]?[0-9]{4}'
+      OR r->>'quote' ~ '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
+      OR r->>'quote' ~ '\\m0(2|[3-6][0-9])[-. ]?[0-9]{3,4}[-. ]?[0-9]{4}\\M')
+    LIMIT 200`) as any[];
+  const names: string[] = [];
+  for (const c of bad) {
+    const [row] = await sql`SELECT synth_reviews, synth_reviews_all FROM cafes WHERE id=${c.id}` as any[];
+    const scrub = (arr: any[]) => Array.isArray(arr) ? arr.map((r) => ({ ...r, quote: maskPII(r?.quote || "") })) : arr;
+    const sr = scrub(row?.synth_reviews);
+    const sra = scrub(row?.synth_reviews_all);
+    await sql`UPDATE cafes SET synth_reviews=${JSON.stringify(sr)}, synth_reviews_all=${JSON.stringify(sra)} WHERE id=${c.id}`;
+    names.push(c.name);
+  }
+  return { scrubbed: bad.length, names: names.slice(0, 10) };
+}
+
 // 🚦 파이프라인 finalizer — 모든 게이트 통과한 신규 카페만 공개로 승격.
 //   게이트: ① 규칙 합성 통과(pending = 이미 규칙OK) ② AI 판정 완료 ③ 임베딩 완료
 //           ④ 등급 검증/참고 ⑤ 좌표 수도권 ⑥ 미해결 오염플래그 없음.

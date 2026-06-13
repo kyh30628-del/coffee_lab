@@ -10,7 +10,7 @@
     },
     {
       "path": "/api/cron-embed",
-      "schedule": "0 22 * * *"
+      "schedule": "0 */4 * * *"
     },
     {
       "path": "/api/cron-grow",
