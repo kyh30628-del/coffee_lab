@@ -86,7 +86,8 @@ export async function GET(req: NextRequest) {
     // 품질감사: 미해결 플래그 기준(가동 시각은 flag 생성 시각으로 근사)
     {
       const open = af?.open ?? 0;
-      agents.push({ key: "audit", label: "품질 자가감사", lastRun: af?.last_flag ?? null, ageH: ageHours(af?.last_flag ?? null, now), cadenceH: 30, status: open > 0 ? "warn" : "ok", queue: open, note: open ? `미해결 오염 ${open}건` : "오염 없음" });
+      const aAge = ageHours(af?.last_flag ?? null, now);
+      agents.push({ key: "audit", label: "품질 자가감사", lastRun: af?.last_flag ?? null, ageH: aAge == null ? null : Math.round(aAge * 10) / 10, cadenceH: 30, status: open > 0 ? "warn" : "ok", queue: open, note: open ? `미해결 오염 ${open}건` : "오염 없음" });
     }
 
     // ── 4) 종합 건강 ──
