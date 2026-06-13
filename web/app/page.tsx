@@ -579,9 +579,9 @@ export default function Home() {
                 className="px-3.5 py-2 rounded-full text-[12px] font-bold shadow-lg bg-[#2b2018] text-[#f4ece0]">
                 + 등록
               </button>
-              <button onClick={() => setShowMyMemory(true)} aria-label="내 기억 관리"
-                className="w-9 h-9 rounded-full text-[15px] shadow-lg bg-white text-[#7a6452] border border-[#e6d9c8] flex items-center justify-center">
-                ⚙
+              <button onClick={() => setShowMyMemory(true)} aria-label="추억 보관소"
+                className="px-3.5 py-2 rounded-full text-[12px] font-bold shadow-lg bg-white text-[#9c6b3f] border border-[#e6d9c8]">
+                🗃 추억 보관소
               </button>
             </div>
           </div>
@@ -1275,12 +1275,12 @@ function MyMemoryModal({ device, visits, onClose, onRestore }: { device: string;
     <div className="fixed inset-0 z-[5000] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)", fontFamily: "'Gowun Batang', serif" }} onClick={onClose}>
       <div className="w-full max-w-lg bg-[#fdfaf4] rounded-t-2xl max-h-[88dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-[#f0e6d4]">
-          <div className="font-bold text-[#2b2018] text-[15px]">⚙ 내 기억 관리</div>
+          <div className="font-bold text-[#2b2018] text-[15px]">🗃 추억 보관소</div>
           <button onClick={onClose} className="w-8 h-8 rounded-full bg-[#f0e6d4] text-[#7a6452] text-lg">×</button>
         </div>
         <div className="overflow-y-auto flex-1 p-4 space-y-5">
           <p className="text-[12px] text-[#7a6452] leading-relaxed bg-[#f3ede1] rounded-lg px-3 py-2.5">
-            내 기억 <b className="text-[#2b2018]">{visits.length}곳</b>은 이 기기에 저장돼 있어요. 가입·개인정보 없이, <b>백업 코드</b>로 다른 기기에서 불러오거나 <b>파일로 내려받아</b> 영구 보관할 수 있어요.
+            <b className="text-[#2b2018]">이 기기의 내 추억 {visits.length}곳</b>만 보여요(다른 사람 기록은 절대 보이지 않아요). 가입·개인정보 없이, <b>백업 코드</b>로 다른 기기에서 불러오거나 <b>파일로 내려받아</b> 영구 보관할 수 있어요.
           </p>
 
           {/* 백업 코드 */}
@@ -1300,7 +1300,7 @@ function MyMemoryModal({ device, visits, onClose, onRestore }: { device: string;
           <div>
             <div className="text-[13px] font-bold text-[#2b2018] mb-1.5">② 코드로 복원 (기기 바꿨을 때)</div>
             <div className="flex gap-2">
-              <input value={inputCode} onChange={(e) => setInputCode(e.target.value)} placeholder="COFFEE-XXXX"
+              <input value={inputCode} onChange={(e) => setInputCode(e.target.value)} placeholder="COFFEE-XXXXXX"
                 className="flex-1 border border-[#cbb89f] rounded-lg px-3 py-2.5 text-[14px] bg-white uppercase" />
               <button onClick={restore} disabled={busy} className="px-4 bg-[#9c6b3f] text-white rounded-lg text-[13px] font-bold disabled:opacity-60">불러오기</button>
             </div>

@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
   // 중복 안 나게 생성
   let code = "";
   for (let t = 0; t < 5; t++) {
-    code = `COFFEE-${gen(4)}`;
+    code = `COFFEE-${gen(6)}`;
     const [c] = await sql`SELECT 1 FROM recovery_codes WHERE code = ${code} LIMIT 1` as any[];
     if (!c) break;
   }
