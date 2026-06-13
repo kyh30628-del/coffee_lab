@@ -1,6 +1,6 @@
 // 수집 오케스트레이터 (PRINCIPLES §1·§2·§3·§4·§7)
 // 모든 수집 글을 '리뷰 품질 검증 엔진'에 통과시켜 옥석을 가린 뒤에만 합성·집계·노출한다.
-import { verifyReview, type QualityVerdict, type SourceKind } from "./reviewQuality";
+import { verifyReview, coreTokens, type QualityVerdict, type SourceKind } from "./reviewQuality";
 import { synthesize, type Review, type SynthResult } from "./synthEngine";
 import { computeCharScores } from "./charScore";
 import type { WebSnippet } from "./webSearchCollector";
@@ -163,10 +163,20 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
     const months = (nowT - t) / 2.63e9;
     return months <= 1 ? 30 : Math.max(0, 30 - months * 1.3);
   };
+  // 인용문에 '이 카페명'이 실제로 들어간 근거를 최우선(+35) — 리스트형 글에서 옆 가게 인용이 대표로 뜨는 것 방지.
+  //   (삭제가 아니라 재정렬 — 진짜 후기는 보존하되, 카페를 직접 가리키는 인용을 top-6에 올림)
+  const coreToks = coreTokens(name, area).map((t) => t.replace(/\s/g, "").toLowerCase());
+  const nameNorm = name.replace(/\s/g, "").toLowerCase();
+  const quoteHasName = (q?: string): boolean => {
+    if (!q) return false;
+    const n = q.replace(/\s/g, "").toLowerCase();
+    return coreToks.length ? coreToks.some((t) => n.includes(t)) : n.includes(nameNorm);
+  };
   const rank = (e: EvidenceReview): number =>
     (typeof e.score === "number" ? e.score : 50) +
     (e.trust === "verified" ? 20 : e.trust === "reference" ? 0 : -15) +
-    recency(e.date);
+    recency(e.date) +
+    (quoteHasName(e.quote) ? 35 : 0);
   evidence.sort((a, b) => rank(b) - rank(a));
   // 표시 근거는 같은 링크 1건만 — 중복 글 노출 방지 안전장치(상위 6개 선택 전 dedup)
   const evSeen = new Set<string>();
