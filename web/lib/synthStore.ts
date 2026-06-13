@@ -209,14 +209,13 @@ export async function synthAndStore(cafe: { id: number; name: string; area: stri
 // ── 로컬 Sonnet 배치용 ───────────────────────────────────────────────
 // 캐시된 raw로 '규칙상 on-topic 후보 전체'를 추출(서버, LLM 없음). Sonnet이 최종 심사.
 // raw 없으면 hasRaw:false.
-export async function getAuditCandidates(cafe: { id: number; name: string; area: string }, deep = false): Promise<{ candidates: BorderlineItem[]; hasRaw: boolean }> {
+export async function getAuditCandidates(cafe: { id: number; name: string; area: string }): Promise<{ candidates: BorderlineItem[]; hasRaw: boolean }> {
   await ensureCols();
   const raw = await loadRaw(cafe.id);
   if (!raw.length) return { candidates: [], hasRaw: false };
   const result = collectAndSynthesize(cafe.name, cafe.area ? [cafe.area] : [], rawToSources(raw));
-  // 토큰 최적화: 평소엔 '경계(규칙이 애매)'만 AI에 보냄(70~90% 절감).
-  //   deep=true(그라운딩 의심 카페): on-topic '전체'를 AI에 보내 리스트형 오염(옆 가게 인용)까지 제거.
-  return { candidates: deep ? result.auditItems : result.borderline, hasRaw: true };
+  // 토큰 최적화: AI에는 '경계(규칙이 애매)'만 보냄(70~90% 절감). 명확한 검증·참고는 규칙 신뢰.
+  return { candidates: result.borderline, hasRaw: true };
 }
 
 // Sonnet 최종 결정(key→keep/drop)을 적용해 재합성·저장 + llm_judged_at 기록.
