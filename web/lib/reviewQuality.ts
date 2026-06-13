@@ -106,8 +106,15 @@ const NAME_STOPWORD = new Set(["좋은", "맛있는", "맛있는집", "예쁜", 
   "아메리카노", "라떼", "에스프레소", "카푸치노", "카페라떼", "콜드브루", "바닐라라떼", "카라멜마키아토", "플랫화이트", "카페모카", "모카", "아인슈페너", "마키아토", "콘파나", "디카페인", "녹차라떼", "초코라떼", "밀크티"]);
 const LOC_SUFFIX = /(역|동|구|시|군|읍|면|로|길|가)$/; // 지역어 접미
 
-// 카페명 '구별 토큰' = 일반어·지역어·대상지역어를 뺀 고유 식별어.
-// 예: "을지로 문덕카페" → ["문덕"] ("을지로"는 위치어로 제거).
+// 쇼핑몰·백화점·복합몰·랜드마크 — 카페명에 들어가도 '식별어'가 아니라 '위치 수식어'.
+// 같은 몰의 다른 가게 후기가 딸려오는 오염 방지(예: '앤티앤스 스타필드 위례' ← '스타필드'·'위례'는 식별어 아님).
+const VENUE_WORDS = ["스타필드", "롯데몰", "롯데백화점", "롯데마트", "롯데프리미엄", "현대백화점", "현대시티", "더현대", "신세계백화점", "신세계", "이마트", "홈플러스", "코스트코", "타임스퀘어", "아이파크몰", "스퀘어원", "엔터식스", "갤러리아", "아울렛", "프리미엄아울렛", "메가박스", "이케아", "가든파이브", "디큐브", "에이케이플라자", "akplaza", "세이브존", "뉴코아", "모다아울렛", "현대프리미엄", "롯데아울렛"];
+// 신도시·생활권 수식어(시·군·구가 아닌 동네名) — 위치 수식어로만 작동
+const DISTRICT_WORDS = ["위례", "미사", "다산", "별내", "광교", "동탄", "운정", "송도", "청라", "영종", "마곡", "지축", "삼송", "향동", "고덕", "감일", "갈매", "한강신도시", "위례신도시"];
+const isVenueTok = (t: string) => { const n = norm(t); return VENUE_WORDS.some((v) => n.includes(norm(v))) || DISTRICT_WORDS.some((d) => n.includes(norm(d))); };
+
+// 카페명 '구별 토큰' = 일반어·지역어·대상지역어·몰/랜드마크를 뺀 고유 식별어.
+// 예: "을지로 문덕카페" → ["문덕"]("을지로" 제거). "앤티앤스 스타필드 위례" → ["앤티앤스"]("스타필드"·"위례" 제거).
 export function coreTokens(name: string, areaTerms: string[]): string[] {
   const an = areaTerms.map((a) => norm(a)).filter(Boolean);
   return name.split(/\s+/)
@@ -116,7 +123,8 @@ export function coreTokens(name: string, areaTerms: string[]): string[] {
     .filter((t) => !GENERIC_WORD.has(t.toLowerCase()))
     .filter((t) => !NAME_STOPWORD.has(t.toLowerCase()))
     .filter((t) => !an.some((a) => a.includes(norm(t)) || norm(t).includes(a)))
-    .filter((t) => !LOC_SUFFIX.test(t));
+    .filter((t) => !LOC_SUFFIX.test(t))
+    .filter((t) => !isVenueTok(t));
 }
 
 // 노이즈 게이트: 후기들이 '실제로 그 카페'를 말하는 비율(이름 일관성).
