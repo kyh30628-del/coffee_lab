@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-06-12T22:26:25",
+  "generated_at": "2026-06-13T22:05:54",
   "inputs": {
-    "coffee_c_usd_lb": 2.538,
+    "coffee_c_usd_lb": 2.572,
     "coffee_c_date": "2026-06-12",
     "coffee_c_source": "Yahoo Finance KC=F (ICE Coffee C, delayed)",
     "usd_krw": 1527.0,
@@ -132,11 +132,11 @@
     "roast_loss_rate": 0.17
   },
   "signal": {
-    "current": 2.538,
+    "current": 2.572,
     "low": 2.444,
     "high": 3.0585,
-    "avg": 2.729,
-    "position_pct": 15.3,
+    "avg": 2.7302,
+    "position_pct": 20.8,
     "label": "저점권",
     "tone": "good",
     "trend": "상승",
@@ -144,7 +144,7 @@
   },
   "summary": {
     "headline": "지금은 구매하기 유리한 구간입니다 (시세 저점권)",
-    "detail": "현재 Coffee C $2.538/lb, 추세 상승 · 관세 0% 중 India이(가) 원가상 유리 · 최근 환율 상승 → 원화 원가 상방 압력",
+    "detail": "현재 Coffee C $2.572/lb, 추세 상승 · 관세 0% 중 India이(가) 원가상 유리 · 최근 환율 상승 → 원화 원가 상방 압력",
     "tone": "good"
   },
   "rows": [
@@ -153,209 +153,209 @@
       "note": "프리미엄·FTA미적용 2%",
       "point_diff": 1000,
       "tariff": 0.02,
-      "fob_usd_lb": 2.638,
-      "green_krw_per_kg": 11538,
-      "roasted_krw_per_kg": 13901,
-      "change_1d": 0.2,
-      "change_7d": 1.3
+      "fob_usd_lb": 2.672,
+      "green_krw_per_kg": 11683,
+      "roasted_krw_per_kg": 14076,
+      "change_1d": 1.5,
+      "change_7d": 2.5
     },
     {
       "origin": "Colombia",
       "note": "프리미엄·한콜FTA 0%",
       "point_diff": 1000,
       "tariff": 0.0,
-      "fob_usd_lb": 2.638,
-      "green_krw_per_kg": 11317,
-      "roasted_krw_per_kg": 13635,
-      "change_1d": 0.2,
-      "change_7d": 1.3
+      "fob_usd_lb": 2.672,
+      "green_krw_per_kg": 11459,
+      "roasted_krw_per_kg": 13807,
+      "change_1d": 1.5,
+      "change_7d": 2.5
     },
     {
       "origin": "Costa Rica",
       "note": "프리미엄·한중미FTA 0%",
       "point_diff": 1000,
       "tariff": 0.0,
-      "fob_usd_lb": 2.638,
-      "green_krw_per_kg": 11317,
-      "roasted_krw_per_kg": 13635,
-      "change_1d": 0.2,
-      "change_7d": 1.3
+      "fob_usd_lb": 2.672,
+      "green_krw_per_kg": 11459,
+      "roasted_krw_per_kg": 13807,
+      "change_1d": 1.5,
+      "change_7d": 2.5
     },
     {
       "origin": "Tanzania",
       "note": "par·FTA미적용 2%",
       "point_diff": 0,
       "tariff": 0.02,
-      "fob_usd_lb": 2.538,
-      "green_krw_per_kg": 11111,
-      "roasted_krw_per_kg": 13387,
-      "change_1d": 0.2,
-      "change_7d": 1.3
+      "fob_usd_lb": 2.572,
+      "green_krw_per_kg": 11256,
+      "roasted_krw_per_kg": 13562,
+      "change_1d": 1.5,
+      "change_7d": 2.6
     },
     {
       "origin": "Uganda",
       "note": "par·FTA미적용 2%",
       "point_diff": 0,
       "tariff": 0.02,
-      "fob_usd_lb": 2.538,
-      "green_krw_per_kg": 11111,
-      "roasted_krw_per_kg": 13387,
-      "change_1d": 0.2,
-      "change_7d": 1.3
+      "fob_usd_lb": 2.572,
+      "green_krw_per_kg": 11256,
+      "roasted_krw_per_kg": 13562,
+      "change_1d": 1.5,
+      "change_7d": 2.6
     },
     {
       "origin": "Papua New Guinea",
       "note": "par·FTA미적용 2%",
       "point_diff": 0,
       "tariff": 0.02,
-      "fob_usd_lb": 2.538,
-      "green_krw_per_kg": 11111,
-      "roasted_krw_per_kg": 13387,
-      "change_1d": 0.2,
-      "change_7d": 1.3
+      "fob_usd_lb": 2.572,
+      "green_krw_per_kg": 11256,
+      "roasted_krw_per_kg": 13562,
+      "change_1d": 1.5,
+      "change_7d": 2.6
     },
     {
       "origin": "Guatemala",
       "note": "프리미엄·한중미FTA 0%",
       "point_diff": 500,
       "tariff": 0.0,
-      "fob_usd_lb": 2.588,
-      "green_krw_per_kg": 11108,
-      "roasted_krw_per_kg": 13383,
-      "change_1d": 0.2,
-      "change_7d": 1.3
+      "fob_usd_lb": 2.622,
+      "green_krw_per_kg": 11250,
+      "roasted_krw_per_kg": 13555,
+      "change_1d": 1.5,
+      "change_7d": 2.6
     },
     {
       "origin": "Burundi",
       "note": "디스카운트·FTA미적용 2%",
       "point_diff": -100,
       "tariff": 0.02,
-      "fob_usd_lb": 2.528,
-      "green_krw_per_kg": 11069,
-      "roasted_krw_per_kg": 13336,
-      "change_1d": 0.2,
-      "change_7d": 1.3
+      "fob_usd_lb": 2.562,
+      "green_krw_per_kg": 11214,
+      "roasted_krw_per_kg": 13510,
+      "change_1d": 1.5,
+      "change_7d": 2.6
     },
     {
       "origin": "Rwanda",
       "note": "디스카운트·FTA미적용 2%",
       "point_diff": -100,
       "tariff": 0.02,
-      "fob_usd_lb": 2.528,
-      "green_krw_per_kg": 11069,
-      "roasted_krw_per_kg": 13336,
-      "change_1d": 0.2,
-      "change_7d": 1.3
+      "fob_usd_lb": 2.562,
+      "green_krw_per_kg": 11214,
+      "roasted_krw_per_kg": 13510,
+      "change_1d": 1.5,
+      "change_7d": 2.6
     },
     {
       "origin": "Venezuela",
       "note": "디스카운트·FTA미적용 2%",
       "point_diff": -100,
       "tariff": 0.02,
-      "fob_usd_lb": 2.528,
-      "green_krw_per_kg": 11069,
-      "roasted_krw_per_kg": 13336,
-      "change_1d": 0.2,
-      "change_7d": 1.3
+      "fob_usd_lb": 2.562,
+      "green_krw_per_kg": 11214,
+      "roasted_krw_per_kg": 13510,
+      "change_1d": 1.5,
+      "change_7d": 2.6
     },
     {
       "origin": "Dominican Republic",
       "note": "디스카운트·FTA미적용 2%",
       "point_diff": -400,
       "tariff": 0.02,
-      "fob_usd_lb": 2.498,
-      "green_krw_per_kg": 10941,
-      "roasted_krw_per_kg": 13182,
-      "change_1d": 0.2,
-      "change_7d": 1.3
+      "fob_usd_lb": 2.532,
+      "green_krw_per_kg": 11086,
+      "roasted_krw_per_kg": 13356,
+      "change_1d": 1.6,
+      "change_7d": 2.6
     },
     {
       "origin": "Ecuador",
       "note": "디스카운트·FTA미적용 2%",
       "point_diff": -400,
       "tariff": 0.02,
-      "fob_usd_lb": 2.498,
-      "green_krw_per_kg": 10941,
-      "roasted_krw_per_kg": 13182,
-      "change_1d": 0.2,
-      "change_7d": 1.3
+      "fob_usd_lb": 2.532,
+      "green_krw_per_kg": 11086,
+      "roasted_krw_per_kg": 13356,
+      "change_1d": 1.6,
+      "change_7d": 2.6
     },
     {
       "origin": "Mexico",
       "note": "par·한중미FTA 발효국 0%",
       "point_diff": 0,
       "tariff": 0.0,
-      "fob_usd_lb": 2.538,
-      "green_krw_per_kg": 10899,
-      "roasted_krw_per_kg": 13131,
-      "change_1d": 0.2,
-      "change_7d": 1.3
+      "fob_usd_lb": 2.572,
+      "green_krw_per_kg": 11041,
+      "roasted_krw_per_kg": 13303,
+      "change_1d": 1.5,
+      "change_7d": 2.6
     },
     {
       "origin": "El Salvador",
       "note": "par·한중미FTA 0%",
       "point_diff": 0,
       "tariff": 0.0,
-      "fob_usd_lb": 2.538,
-      "green_krw_per_kg": 10899,
-      "roasted_krw_per_kg": 13131,
-      "change_1d": 0.2,
-      "change_7d": 1.3
+      "fob_usd_lb": 2.572,
+      "green_krw_per_kg": 11041,
+      "roasted_krw_per_kg": 13303,
+      "change_1d": 1.5,
+      "change_7d": 2.6
     },
     {
       "origin": "Nicaragua",
       "note": "par·한중미FTA 0%",
       "point_diff": 0,
       "tariff": 0.0,
-      "fob_usd_lb": 2.538,
-      "green_krw_per_kg": 10899,
-      "roasted_krw_per_kg": 13131,
-      "change_1d": 0.2,
-      "change_7d": 1.3
+      "fob_usd_lb": 2.572,
+      "green_krw_per_kg": 11041,
+      "roasted_krw_per_kg": 13303,
+      "change_1d": 1.5,
+      "change_7d": 2.6
     },
     {
       "origin": "Honduras",
       "note": "par·한중미FTA 0%",
       "point_diff": 0,
       "tariff": 0.0,
-      "fob_usd_lb": 2.538,
-      "green_krw_per_kg": 10899,
-      "roasted_krw_per_kg": 13131,
-      "change_1d": 0.2,
-      "change_7d": 1.3
+      "fob_usd_lb": 2.572,
+      "green_krw_per_kg": 11041,
+      "roasted_krw_per_kg": 13303,
+      "change_1d": 1.5,
+      "change_7d": 2.6
     },
     {
       "origin": "Peru",
       "note": "par·한페루FTA 0%",
       "point_diff": 0,
       "tariff": 0.0,
-      "fob_usd_lb": 2.538,
-      "green_krw_per_kg": 10899,
-      "roasted_krw_per_kg": 13131,
-      "change_1d": 0.2,
-      "change_7d": 1.3
+      "fob_usd_lb": 2.572,
+      "green_krw_per_kg": 11041,
+      "roasted_krw_per_kg": 13303,
+      "change_1d": 1.5,
+      "change_7d": 2.6
     },
     {
       "origin": "Panama",
       "note": "par·한중미FTA 0%",
       "point_diff": 0,
       "tariff": 0.0,
-      "fob_usd_lb": 2.538,
-      "green_krw_per_kg": 10899,
-      "roasted_krw_per_kg": 13131,
-      "change_1d": 0.2,
-      "change_7d": 1.3
+      "fob_usd_lb": 2.572,
+      "green_krw_per_kg": 11041,
+      "roasted_krw_per_kg": 13303,
+      "change_1d": 1.5,
+      "change_7d": 2.6
     },
     {
       "origin": "India",
       "note": "디스카운트·한인도CEPA 0%",
       "point_diff": -100,
       "tariff": 0.0,
-      "fob_usd_lb": 2.528,
-      "green_krw_per_kg": 10857,
-      "roasted_krw_per_kg": 13081,
-      "change_1d": 0.2,
-      "change_7d": 1.3
+      "fob_usd_lb": 2.562,
+      "green_krw_per_kg": 10999,
+      "roasted_krw_per_kg": 13252,
+      "change_1d": 1.5,
+      "change_7d": 2.6
     }
   ]
 }
