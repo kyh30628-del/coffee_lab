@@ -204,6 +204,22 @@ export default function AdminPage() {
                   </div>
                 ))}
               </div>
+              {tower.pipeline && (
+                <div className="mt-3 rounded-xl bg-stone-50 border border-stone-100 p-2.5">
+                  <div className="text-[10px] font-bold text-stone-500 mb-1.5">신규 카페 조립라인 (발굴→합성→AI판정→임베딩→공개) {tower.pipeline.promotedThisRun > 0 && <span className="text-emerald-600">· 방금 {tower.pipeline.promotedThisRun}곳 공개</span>}</div>
+                  <div className="flex items-stretch gap-1 overflow-x-auto">
+                    {tower.pipeline.stages.map((s: any, i: number) => (
+                      <div key={s.key} className="flex items-center gap-1 shrink-0">
+                        <div className={`px-2 py-1 rounded-lg text-center min-w-[52px] ${s.key === "live" ? "bg-emerald-100 text-emerald-700" : s.key === "rejected" ? "bg-stone-200 text-stone-500" : s.count > 0 ? "bg-amber-100 text-amber-700" : "bg-white text-stone-400 border border-stone-100"}`}>
+                          <div className="text-[13px] font-bold leading-none">{s.count?.toLocaleString() ?? 0}</div>
+                          <div className="text-[9px] mt-0.5 whitespace-nowrap">{s.label}</div>
+                        </div>
+                        {i < tower.pipeline.stages.length - 2 && <span className="text-stone-300 text-[10px]">→</span>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-stone-500">
                 <span>공개 <b className="text-stone-700">{tower.coverage?.published?.toLocaleString()}</b>/{tower.coverage?.total?.toLocaleString()}</span>
                 <span>raw {tower.coverage?.rawCachedPct}%</span>

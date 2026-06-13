@@ -95,9 +95,11 @@ export async function discoverRegion(region: string, areaLabel: string, keywords
     const exists = await sql`SELECT id FROM cafes WHERE name = ${it.name} OR (ABS(lat - ${it.lat}) < 0.0005 AND ABS(lng - ${it.lng}) < 0.0005) LIMIT 1`;
     if (exists.length > 0) { skipped++; continue; }
     const pseudoId = `nl_${it.name.replace(/\s/g, "")}_${Math.round(it.lat * 1e5)}`;
+    // 신규 카페는 pipeline_status='new'로 태어남 → 풀 게이트(합성·AI판정·임베딩·검증) 통과 후에만 공개.
+    await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS pipeline_status TEXT`.catch(() => {});
     await sql`
-      INSERT INTO cafes (place_id, name, area, address, lat, lng, source, published, roasts_own)
-      VALUES (${pseudoId}, ${it.name}, ${storeArea}, ${it.address}, ${it.lat}, ${it.lng}, 'discover', false, false)
+      INSERT INTO cafes (place_id, name, area, address, lat, lng, source, published, roasts_own, pipeline_status)
+      VALUES (${pseudoId}, ${it.name}, ${storeArea}, ${it.address}, ${it.lat}, ${it.lng}, 'discover', false, false, 'new')
       ON CONFLICT (place_id) DO NOTHING`;
     inserted++;
   }

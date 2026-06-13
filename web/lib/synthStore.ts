@@ -90,15 +90,52 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   const naverCat = catRow?.naver_category || "";
   const isCafeCat = !naverCat || /카페|디저트|베이커리|브런치|로스터|티하우스|찻집/i.test(naverCat);
   // 프랜차이즈 제외(STATUS.md 원칙) — 발굴뿐 아니라 공개 게이트에서도 영구 차단.
-  const publish = (grade === "검증" || grade === "참고") && isCafeCat && !isNonCafe(name, naverCat) && !isFranchise(name) && !noisy;
+  const ruleOk = (grade === "검증" || grade === "참고") && isCafeCat && !isNonCafe(name, naverCat) && !isFranchise(name) && !noisy;
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_reviews_all JSONB`.catch(() => {});
+  await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS pipeline_status TEXT`.catch(() => {});
   const allEv = JSON.stringify(allEvidence ?? evidenceReviews);
+
+  // 🔒 진정한 자동화 게이트: 신규 카페(pipeline_status=new/pending/rejected)는 규칙 통과해도 즉시 공개하지 않는다.
+  //   AI 판정·임베딩·검증을 다 통과한 뒤 finalizer가 'live'로 승격할 때만 공개.
+  //   기존 카페(pipeline_status=NULL=grandfather, 또는 이미 live)는 현행대로 규칙 게이트로 공개.
+  const cur = (await sql`SELECT pipeline_status FROM cafes WHERE id=${cafeId} LIMIT 1`)[0] as any;
+  const pst: string | null = cur?.pipeline_status ?? null;
+  const inPipeline = pst === "new" || pst === "pending" || pst === "rejected";
+  const newPst = inPipeline ? (ruleOk ? "pending" : "rejected") : pst; // 파이프라인 카페만 상태 갱신, 아니면 보존
+  const publish = inPipeline ? false : ruleOk; // 파이프라인 카페는 항상 비공개(승격 전), 나머지는 규칙대로
+
   if (llmJudged) {
-    await sql`UPDATE cafes SET synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${JSON.stringify(evidenceReviews)}, synth_reviews_all=${allEv}, char_scores=${JSON.stringify(charScores)}, synth_quality=${JSON.stringify(quality)}, review_dates=${JSON.stringify(reviewDates)}, synth_updated=now(), llm_judged_at=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN 36.8 AND 38.3 AND lng BETWEEN 124.5 AND 127.9) WHERE id=${cafeId}`;
+    await sql`UPDATE cafes SET synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${JSON.stringify(evidenceReviews)}, synth_reviews_all=${allEv}, char_scores=${JSON.stringify(charScores)}, synth_quality=${JSON.stringify(quality)}, review_dates=${JSON.stringify(reviewDates)}, pipeline_status=${newPst}, synth_updated=now(), llm_judged_at=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN 36.8 AND 38.3 AND lng BETWEEN 124.5 AND 127.9) WHERE id=${cafeId}`;
   } else {
-    await sql`UPDATE cafes SET synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${JSON.stringify(evidenceReviews)}, synth_reviews_all=${allEv}, char_scores=${JSON.stringify(charScores)}, synth_quality=${JSON.stringify(quality)}, review_dates=${JSON.stringify(reviewDates)}, synth_updated=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN 36.8 AND 38.3 AND lng BETWEEN 124.5 AND 127.9) WHERE id=${cafeId}`;
+    await sql`UPDATE cafes SET synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${JSON.stringify(evidenceReviews)}, synth_reviews_all=${allEv}, char_scores=${JSON.stringify(charScores)}, synth_quality=${JSON.stringify(quality)}, review_dates=${JSON.stringify(reviewDates)}, pipeline_status=${newPst}, synth_updated=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN 36.8 AND 38.3 AND lng BETWEEN 124.5 AND 127.9) WHERE id=${cafeId}`;
   }
-  return { grade, collected, published: publish, evidence: evidenceReviews.length, coherence: Math.round(coherence * 100), noisy };
+  return { grade, collected, published: publish, ruleOk, pipeline: newPst, evidence: evidenceReviews.length, coherence: Math.round(coherence * 100), noisy };
+}
+
+// 🚦 파이프라인 finalizer — 모든 게이트 통과한 신규 카페만 공개로 승격.
+//   게이트: ① 규칙 합성 통과(pending = 이미 규칙OK) ② AI 판정 완료 ③ 임베딩 완료
+//           ④ 등급 검증/참고 ⑤ 좌표 수도권 ⑥ 미해결 오염플래그 없음.
+//   하나라도 미충족이면 pending 유지(절대 노출 안 됨). 한치의 오차 없이 전 에이전트 통과 시에만 live.
+export async function finalizePipeline(): Promise<{ promoted: number; names: string[]; pending: number; stuck: any }> {
+  await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS pipeline_status TEXT`.catch(() => {});
+  const promoted = (await sql`
+    UPDATE cafes SET published = true, pipeline_status = 'live'
+    WHERE pipeline_status = 'pending'
+      AND llm_judged_at IS NOT NULL
+      AND embedding IS NOT NULL
+      AND synth_grade IN ('검증','참고')
+      AND lat IS NOT NULL AND lat BETWEEN 36.8 AND 38.3 AND lng BETWEEN 124.5 AND 127.9
+      AND NOT EXISTS (SELECT 1 FROM audit_flags af WHERE af.cafe_id = cafes.id AND NOT af.resolved)
+    RETURNING name`) as any[];
+  // 남은 pending이 어느 게이트에서 막혔는지 진단(관제용)
+  const [p] = await sql`SELECT
+    COUNT(*) FILTER (WHERE pipeline_status='pending')::int pending,
+    COUNT(*) FILTER (WHERE pipeline_status='pending' AND llm_judged_at IS NULL)::int wait_judge,
+    COUNT(*) FILTER (WHERE pipeline_status='pending' AND llm_judged_at IS NOT NULL AND embedding IS NULL)::int wait_embed,
+    COUNT(*) FILTER (WHERE pipeline_status='new')::int wait_synth,
+    COUNT(*) FILTER (WHERE pipeline_status='rejected')::int rejected
+    FROM cafes` as any[];
+  return { promoted: promoted.length, names: promoted.map((r) => r.name).slice(0, 10), pending: p.pending, stuck: { wait_synth: p.wait_synth, wait_judge: p.wait_judge, wait_embed: p.wait_embed, rejected: p.rejected } };
 }
 
 // opts.refresh=true면 새로 수집(최신성). 기본은 캐시 재사용(쿼터 절약).

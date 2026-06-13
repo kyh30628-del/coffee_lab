@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
-import { synthAndStore } from "@/lib/synthStore";
+import { synthAndStore, finalizePipeline } from "@/lib/synthStore";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
@@ -63,12 +63,31 @@ export async function GET(req: NextRequest) {
     const af = (await sql`SELECT COUNT(*) FILTER (WHERE NOT resolved)::int open, MAX(flagged_at) last_flag FROM audit_flags`)[0] as any;
     const ds = (await sql`SELECT MIN(last_run) oldest, COUNT(*) FILTER (WHERE last_run < now() - interval '3 days')::int behind, COUNT(*)::int n FROM discovery_state`)[0] as any;
 
-    // ── 2) 자가 치유: 합성 적체(raw 있는데 미합성) 메움 ──
-    if (heal && c.synth_q > 0) {
-      const todo = await sql`SELECT id, name, area FROM cafes WHERE raw_reviews IS NOT NULL AND synth_updated IS NULL LIMIT 20`;
-      let done = 0;
-      for (const cf of todo as any[]) { try { await synthAndStore(cf, { refresh: false }); done++; } catch {} }
-      if (done) healed.push(`합성 적체 ${done}건 처리`);
+    // 파이프라인 진행 상황(신규 카페 조립라인)
+    const pl = (await sql`SELECT
+      COUNT(*) FILTER (WHERE pipeline_status='new')::int p_new,
+      COUNT(*) FILTER (WHERE pipeline_status='pending')::int p_pending,
+      COUNT(*) FILTER (WHERE pipeline_status='pending' AND llm_judged_at IS NULL)::int wait_judge,
+      COUNT(*) FILTER (WHERE pipeline_status='pending' AND llm_judged_at IS NOT NULL AND embedding IS NULL)::int wait_embed,
+      COUNT(*) FILTER (WHERE pipeline_status='pending' AND llm_judged_at IS NOT NULL AND embedding IS NOT NULL)::int ready,
+      COUNT(*) FILTER (WHERE pipeline_status='live')::int live,
+      COUNT(*) FILTER (WHERE pipeline_status='rejected')::int rejected
+      FROM cafes`)[0] as any;
+
+    // ── 2) 자가 치유 ──
+    let promoted = 0;
+    if (heal) {
+      // (a) 합성 적체(raw 있는데 미합성) 메움 → 신규 'new'가 'pending'으로 진행
+      if (c.synth_q > 0) {
+        const todo = await sql`SELECT id, name, area FROM cafes WHERE raw_reviews IS NOT NULL AND synth_updated IS NULL LIMIT 20`;
+        let done = 0;
+        for (const cf of todo as any[]) { try { await synthAndStore(cf, { refresh: false }); done++; } catch {} }
+        if (done) healed.push(`합성 적체 ${done}건 처리`);
+      }
+      // (b) 풀 게이트 통과한 pending → 자동 공개 승격(finalizer)
+      const fin = await finalizePipeline();
+      promoted = fin.promoted;
+      if (fin.promoted > 0) healed.push(`전 에이전트 통과 ${fin.promoted}곳 자동 공개(${fin.names.slice(0, 3).join(", ")}${fin.promoted > 3 ? " 외" : ""})`);
     }
 
     // ── 3) 에이전트별 건강 판정 ──
@@ -98,11 +117,25 @@ export async function GET(req: NextRequest) {
     const alerts = agents.filter((a) => a.status === "stalled").map((a) => `${a.label} 멈춤(${a.ageH}h 전 마지막 가동)`);
 
     const pct = (n: number) => (c.total ? Math.round((n / c.total) * 100) : 0);
+    // 신규 카페 조립라인(발굴→합성→AI판정→임베딩→공개). 각 단계 대기 수 = '어디서 막혔나'.
+    const pipeline = {
+      stages: [
+        { key: "new", label: "발굴", count: pl.p_new, note: "합성 대기" },
+        { key: "pending", label: "검증중", count: pl.p_pending, note: "공개 전 게이트" },
+        { key: "wait_judge", label: "AI판정 대기", count: pl.wait_judge, note: "새벽 판정" },
+        { key: "wait_embed", label: "임베딩 대기", count: pl.wait_embed, note: "" },
+        { key: "ready", label: "승격 준비", count: pl.ready, note: "곧 공개" },
+        { key: "live", label: "공개됨", count: pl.live, note: "전 게이트 통과" },
+        { key: "rejected", label: "차단", count: pl.rejected, note: "품질 미달" },
+      ],
+      promotedThisRun: promoted,
+    };
+
     const health = {
       generatedAt: new Date(now).toISOString(),
       overall, alerts, healed,
       coverage: { total: c.total, published: c.published, rawCachedPct: pct(c.raw_cached), judgedPct: pct(c.judged), embeddedPct: pct(c.embedded) },
-      agents,
+      pipeline, agents,
     };
 
     await sql`INSERT INTO orchestrator_state (id, health, updated_at) VALUES (1, ${JSON.stringify(health)}, now())

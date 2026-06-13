@@ -19,12 +19,15 @@ export async function GET(req: NextRequest) {
     await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS embed_updated TIMESTAMPTZ`;
 
     // NULL(미임베딩) 먼저, 그다음 재합성으로 오래된(embed_updated < synth_updated) 것 갱신.
+    await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS pipeline_status TEXT`.catch(() => {});
+    // 신규 pending도 임베딩(공개 게이트 통과에 필요) — pending 최우선, 그다음 공개 카페.
     const rows = (await sql`
       SELECT id, name, area, synth_identity, signature, note, vibe, uses, beans, char_scores, synth_reviews
       FROM cafes
-      WHERE published = true
+      WHERE (published = true OR pipeline_status = 'pending')
+        AND synth_updated IS NOT NULL
         AND (embedding IS NULL OR embed_updated IS NULL OR embed_updated < synth_updated)
-      ORDER BY (embedding IS NOT NULL), embed_updated ASC NULLS FIRST
+      ORDER BY (pipeline_status = 'pending') DESC NULLS LAST, (embedding IS NOT NULL), embed_updated ASC NULLS FIRST
       LIMIT 100`) as unknown as any[];
 
     let updated = 0;
