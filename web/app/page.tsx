@@ -84,22 +84,25 @@ const CHAR_LABELS: Record<string, { label: string; emoji: string }> = {
 const GRADE_STYLE: Record<string, { bg: string; label: string }> = { 검증: { bg: "#5f7355", label: "검증" }, 참고: { bg: "#9c6b3f", label: "참고" }, 발굴: { bg: "#a8927a", label: "발굴" } };
 const TONES = ["#6f4e37", "#5f7355", "#9c6b3f", "#3a2e28", "#8a5a24"];
 
-function makePinHtml(c: Cafe, isMatch: boolean, isFocus = false): string {
+function makePinHtml(c: Cafe, isMatch: boolean, isFocus = false, isMine = false): string {
   const grade = c.synth_grade ?? "발굴";
   const feat = !!c.featured && !isFocus; // ✨ 우선 노출 — 골드 핀 강조(포커스 핀이 우선)
-  const color = isFocus ? "#b5703c" : feat ? "#e0a32e" : isMatch ? "#5f7355" : (GRADE_STYLE[grade]?.bg ?? "#9c6b3f");
-  const size = isFocus ? 44 : feat ? 38 : isMatch ? 36 : 28;
-  const ring = isFocus
-    ? "box-shadow:0 0 0 6px rgba(181,112,60,0.4),0 3px 10px rgba(0,0,0,0.4);"
+  // 내 카페(MY PIN) — 핑크/레드 하트 핀으로 최우선 강조
+  const color = isMine ? "#d6336c" : isFocus ? "#b5703c" : feat ? "#e0a32e" : isMatch ? "#5f7355" : (GRADE_STYLE[grade]?.bg ?? "#9c6b3f");
+  const size = isMine ? 42 : isFocus ? 44 : feat ? 38 : isMatch ? 36 : 28;
+  const ring = isMine
+    ? "box-shadow:0 0 0 5px rgba(214,51,108,0.4),0 3px 10px rgba(0,0,0,0.4);"
+    : isFocus ? "box-shadow:0 0 0 6px rgba(181,112,60,0.4),0 3px 10px rgba(0,0,0,0.4);"
     : feat ? "box-shadow:0 0 0 4px rgba(224,163,46,0.45),0 2px 8px rgba(0,0,0,0.35);"
     : isMatch ? "box-shadow:0 0 0 4px rgba(95,115,85,0.3),0 2px 6px rgba(0,0,0,0.3);" : "box-shadow:0 1px 4px rgba(0,0,0,0.3);";
-  const labelStyle = isFocus ? "background:#b5703c;color:#fff;font-weight:700;"
+  const labelStyle = isMine ? "background:#d6336c;color:#fff;font-weight:700;"
+    : isFocus ? "background:#b5703c;color:#fff;font-weight:700;"
     : feat ? "background:#e0a32e;color:#2b2018;font-weight:700;" : "background:rgba(253,250,244,0.95);color:#2b2018;font-weight:600;";
-  const glyph = isFocus ? "📍" : feat ? "⭐" : "☕";
+  const glyph = isMine ? "❤" : isFocus ? "📍" : feat ? "⭐" : "☕";
   return `<div style="transform:translate(-50%,-100%);text-align:center;">
     <div style="width:${size}px;height:${size}px;background:${color};border:2px solid #fdfaf4;border-radius:50% 50% 50% 0;transform:rotate(-45deg);${ring}display:flex;align-items:center;justify-content:center;margin:0 auto;">
       <span style="transform:rotate(45deg);font-size:${isFocus ? 18 : isMatch || feat ? 14 : 11}px;">${glyph}</span></div>
-    <div style="margin-top:2px;${labelStyle}padding:1px 5px;border-radius:7px;font-size:${isFocus ? 10 : 9}px;white-space:nowrap;display:inline-block;">${c.name}${isFocus ? "" : feat ? " ⭐" : isMatch ? " ✓" : ""}</div>
+    <div style="margin-top:2px;${labelStyle}padding:1px 5px;border-radius:7px;font-size:${isFocus || isMine ? 10 : 9}px;white-space:nowrap;display:inline-block;">${c.name}${isMine ? " ❤" : isFocus ? "" : feat ? " ⭐" : isMatch ? " ✓" : ""}</div>
   </div>`;
 }
 function topChars(c: Cafe, n = 4) {
@@ -118,6 +121,16 @@ export default function Home() {
   const [sheetOpen, setSheetOpen] = useState(true); // 모바일 바텀시트 펼침/접힘
   const [focusTarget, setFocusTarget] = useState<{ lat: number; lng: number } | null>(null); // 지도에서 위치 보기
   const [focusId, setFocusId] = useState<number | null>(null); // 핀 고정 강조할 카페
+  // 내 카페(MY PIN) — 익명 기기기반
+  const [deviceId, setDeviceId] = useState("");
+  const [myCafeIds, setMyCafeIds] = useState<Set<number>>(new Set());
+  const [myPinMode, setMyPinMode] = useState(false);
+  const [showMyCafeReg, setShowMyCafeReg] = useState(false);
+  const reloadMyCafes = (dev: string) => fetch(`/api/my-cafe?device=${dev}`).then((r) => r.json()).then((d) => { if (d.ok) setMyCafeIds(new Set((d.cafes ?? []).map((c: any) => c.id))); }).catch(() => {});
+  useEffect(() => {
+    let dev = ""; try { dev = localStorage.getItem("dcn_device") || ""; if (!dev) { dev = (crypto.randomUUID?.() || String(Math.random()).slice(2) + Date.now()); localStorage.setItem("dcn_device", dev); } } catch {}
+    setDeviceId(dev); if (dev) reloadMyCafes(dev);
+  }, []);
   // 자연어 검색
   const [showSearch, setShowSearch] = useState(false);
   const [searchQ, setSearchQ] = useState("");
@@ -307,12 +320,16 @@ export default function Home() {
     // '전체'(지역·결·포커스 미선택)일 땐 마커를 인기순 상위로 제한 — 3천개를 한꺼번에 DOM으로 그리면
     //  메인 스레드가 막혀 지역선택 레이어가 잠깐 뭉개짐. 지역/결을 고르면 그 범위 전체를 그린다.
     const scoped = !!(sido || sigungu || focusId || tasteKey);
-    const toRender = scoped ? filtered : filtered.slice(0, 400);
+    // MY PIN 모드: 내가 등록한 카페만 표시
+    const toRender = myPinMode
+      ? filtered.filter((c) => myCafeIds.has(c.id))
+      : (scoped ? filtered : filtered.slice(0, 400));
     // 배치 추가: 마커를 다 만든 뒤 레이어그룹에 한 번에 붙여 리플로우 최소화
     const markers = toRender.map((c) => {
       const isFocus = c.id === focusId;
       const isMatch = matchSet.has(c.id);
-      const icon = L.divIcon({ className: "", html: makePinHtml(c, isMatch, isFocus), iconSize: [0, 0] });
+      const isMine = myCafeIds.has(c.id);
+      const icon = L.divIcon({ className: "", html: makePinHtml(c, isMatch, isFocus, isMine), iconSize: [0, 0] });
       const m = L.marker([c.lat, c.lng], { icon, zIndexOffset: isFocus ? 3000 : c.featured ? 2000 : isMatch ? 1000 : 0 }).on("click", () => setSelected(c));
       if (isFocus) { m.bindPopup(`<b>${c.name}</b><br>${c.area}`); }
       return m;
@@ -328,7 +345,7 @@ export default function Home() {
       const lats = filtered.map((c) => c.lat), lngs = filtered.map((c) => c.lng);
       mapObj.current.fitBounds(L.latLngBounds([[Math.min(...lats), Math.min(...lngs)], [Math.max(...lats), Math.max(...lngs)]]), { padding: [50, 50], maxZoom: 15 });
     } else if (sido && SIDO_CENTER[sido]) { const [la, ln, z] = SIDO_CENTER[sido]; mapObj.current.setView([la, ln], z); }
-  }, [filtered, matchSet, sido, sigungu, tab, focusId, mapReady]);
+  }, [filtered, matchSet, sido, sigungu, tab, focusId, mapReady, myPinMode, myCafeIds]);
 
   const onSido = (v: string) => { setSido(v); setSigungu(""); setFocusId(null); };
 
@@ -548,6 +565,18 @@ export default function Home() {
         <div className="flex-1 relative md:flex overflow-hidden">
           <div className="absolute inset-0 md:relative md:flex-1 md:p-5">
             <div ref={mapRef} className="w-full h-full md:rounded-2xl overflow-hidden bg-[#e8e0d3] z-0" />
+            {/* 내 카페(MY PIN) — 지도 상단 */}
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[1100] flex gap-2">
+              <button onClick={() => setMyPinMode((v) => !v)}
+                className={`px-3.5 py-2 rounded-full text-[12px] font-bold shadow-lg transition-colors ${myPinMode ? "text-white" : "bg-white text-[#d6336c] border border-[#f0c4d4]"}`}
+                style={myPinMode ? { background: "#d6336c" } : {}}>
+                ❤ 내 카페{myCafeIds.size ? ` ${myCafeIds.size}` : ""}
+              </button>
+              <button onClick={() => setShowMyCafeReg(true)}
+                className="px-3.5 py-2 rounded-full text-[12px] font-bold shadow-lg bg-[#2b2018] text-[#f4ece0]">
+                + 등록
+              </button>
+            </div>
           </div>
           <aside className="hidden md:block md:w-[380px] md:h-full bg-[#fdfaf4] border-l border-[#ece0cd] overflow-y-auto p-6 relative z-10">
             <MapControls {...{ sido, sigungu, onSido, setSigungu, tasteKey, setTasteKey, filtered, matchSet, setSelected, openLocation, autoGu, geoMsg, clearAuto }} />
@@ -563,6 +592,8 @@ export default function Home() {
           </div>
         </div>
       )}
+
+      {showMyCafeReg && <MyCafeRegModal cafes={cafes} device={deviceId} onClose={() => setShowMyCafeReg(false)} onDone={() => { reloadMyCafes(deviceId); setMyPinMode(true); }} />}
 
       {selected && <CafePanel cafe={selected} onClose={() => setSelected(null)} onMap={() => {
         if (selected.lat && selected.lng) {
@@ -837,7 +868,6 @@ function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; 
           {cafe.signature && <div className="text-sm text-[#6b5a48] mb-4"><span className="text-[#9c6b3f]">추천 </span>{cafe.signature}</div>}
           {/* ===== 버튼 3개 — 리뷰 위에 배치, 눈에 잘 띄게 ===== */}
           <div className="flex gap-2 mb-4">
-            <button onClick={onMap} className="flex-1 text-center border-2 border-[#cbb89f] text-[#524434] rounded-xl py-2.5 text-[12px] font-semibold bg-white hover:bg-[#fdf6ee] transition-colors">지도에서 위치</button>
             <a href={`https://map.kakao.com/?q=${encodeURIComponent(cafe.name + " " + cafe.area)}`} target="_blank" rel="noopener noreferrer" className="flex-1 text-center bg-[#2b2018] text-[#f4ece0] rounded-xl py-2.5 text-[12px] font-semibold hover:bg-[#3d2f22] transition-colors flex items-center justify-center">길찾기</a>
             <a href={`/api/naver-place-redirect?id=${cafe.id}`} target="_blank" rel="noopener noreferrer" className="flex-1 text-center border-2 rounded-xl py-2.5 text-[12px] font-semibold bg-white hover:bg-[#f0fef8] transition-colors flex items-center justify-center gap-1" style={{ borderColor: "#03c75a", color: "#03c75a" }}>
               <svg width="11" height="11" viewBox="0 0 24 24" fill="#03c75a"><path d="M16.273 12.845L7.376 0H0v24h7.727V11.155L16.624 24H24V0h-7.727z"/></svg>
@@ -985,6 +1015,98 @@ function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; 
           </div>
         )}
       </aside>
+    </div>
+  );
+}
+
+// 내 카페 등록 모달 — 검색→선택→사진→확인(30m 위치인증)→저장
+function MyCafeRegModal({ cafes, device, onClose, onDone }: { cafes: Cafe[]; device: string; onClose: () => void; onDone: () => void }) {
+  const [q, setQ] = useState("");
+  const [picked, setPicked] = useState<Cafe | null>(null);
+  const [photo, setPhoto] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  const results = useMemo(() => {
+    const k = q.replace(/\s/g, "").toLowerCase();
+    if (k.length < 1) return [];
+    return cafes.filter((c) => (c.name + c.area).replace(/\s/g, "").toLowerCase().includes(k)).slice(0, 20);
+  }, [q, cafes]);
+
+  // 사진 선택 → 캔버스로 1000px 리사이즈(용량·전송 최적화)
+  const onPhoto = (e: any) => {
+    const f = e.target.files?.[0]; if (!f) return;
+    const img = new Image();
+    img.onload = () => {
+      const max = 1000, scale = Math.min(1, max / Math.max(img.width, img.height));
+      const cv = document.createElement("canvas");
+      cv.width = Math.round(img.width * scale); cv.height = Math.round(img.height * scale);
+      cv.getContext("2d")!.drawImage(img, 0, 0, cv.width, cv.height);
+      setPhoto(cv.toDataURL("image/jpeg", 0.82));
+    };
+    img.src = URL.createObjectURL(f);
+  };
+
+  const submit = () => {
+    if (!picked) { setMsg("카페를 선택해주세요"); return; }
+    if (!navigator.geolocation) { setMsg("이 브라우저는 위치를 지원하지 않아요"); return; }
+    setBusy(true); setMsg("현재 위치 확인 중...");
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      try {
+        const r = await fetch("/api/my-cafe", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ cafeId: picked.id, device, userLat: pos.coords.latitude, userLng: pos.coords.longitude, photoBase64: photo }),
+        });
+        const d = await r.json();
+        if (d.ok) { onDone(); onClose(); }
+        else { setMsg(d.error || "등록 실패"); setBusy(false); }
+      } catch { setMsg("네트워크 오류"); setBusy(false); }
+    }, () => { setMsg("위치 권한을 허용해주세요 (카페 30m 인증 필요)"); setBusy(false); }, { enableHighAccuracy: true, timeout: 10000 });
+  };
+
+  return (
+    <div className="fixed inset-0 z-[5000] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)", fontFamily: "'Gowun Batang', serif" }} onClick={onClose}>
+      <div className="w-full max-w-lg bg-[#fdfaf4] rounded-t-2xl max-h-[88dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-[#f0e6d4]">
+          <div className="font-bold text-[#2b2018] text-[15px]">❤ 내 카페 등록</div>
+          <button onClick={onClose} className="w-8 h-8 rounded-full bg-[#f0e6d4] text-[#7a6452] text-lg">×</button>
+        </div>
+        <div className="overflow-y-auto flex-1 p-4 space-y-3">
+          {!picked ? (
+            <>
+              <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="카페 이름 검색"
+                className="w-full border border-[#cbb89f] rounded-lg px-3 py-2.5 text-base bg-white" />
+              <div className="space-y-1">
+                {results.map((c) => (
+                  <button key={c.id} onClick={() => { setPicked(c); setMsg(""); }} className="w-full text-left px-3 py-2.5 rounded-lg bg-white border border-[#e6d9c8] hover:bg-[#fdf6ee]">
+                    <div className="text-[14px] font-medium text-[#2b2018]">{c.name}</div>
+                    <div className="text-[11px] text-[#9c6b3f]">{c.area}</div>
+                  </button>
+                ))}
+                {q.length >= 1 && results.length === 0 && <p className="text-[12px] text-[#a8927a] px-1">검색 결과가 없어요</p>}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center justify-between bg-white border border-[#e6d9c8] rounded-lg px-3 py-2.5">
+                <div><div className="text-[14px] font-bold text-[#2b2018]">{picked.name}</div><div className="text-[11px] text-[#9c6b3f]">{picked.area}</div></div>
+                <button onClick={() => { setPicked(null); setPhoto(null); }} className="text-[11px] text-[#9c6b3f] underline">변경</button>
+              </div>
+              <label className="block">
+                <div className="text-[12px] text-[#7a6452] mb-1.5 font-medium">방문 사진 (선택)</div>
+                {photo ? <img src={photo} alt="미리보기" className="w-full rounded-lg border border-[#e6d9c8]" style={{ maxHeight: "16rem", objectFit: "cover" }} />
+                  : <div className="w-full py-8 rounded-lg border-2 border-dashed border-[#cbb89f] text-center text-[12px] text-[#9c6b3f] bg-white">사진 추가하기</div>}
+                <input type="file" accept="image/*" capture="environment" onChange={onPhoto} className="hidden" />
+              </label>
+              <p className="text-[11px] text-[#a8927a] leading-relaxed">※ 타인의 얼굴·개인정보가 담긴 사진은 올리지 마세요. 등록 시 카페 30m 이내에서만 인증돼요.</p>
+              {msg && <p className="text-[12px] text-[#c0392b]">{msg}</p>}
+              <button onClick={submit} disabled={busy} className="w-full bg-[#d6336c] text-white rounded-xl py-3 font-bold text-[14px] disabled:opacity-60">
+                {busy ? "확인 중..." : "확인 (위치 인증 후 등록)"}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
