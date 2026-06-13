@@ -775,6 +775,29 @@ function MapControls({ sido, sigungu, onSido, setSigungu, tasteKey, setTasteKey,
   );
 }
 
+// 후기 인용문에서 소비자가 한눈에 파악하도록 핵심어를 형광펜 강조.
+// 길이 내림차순(긴 표현 우선 매칭). 메뉴·맛표현·공간/분위기·추천신호.
+const HL_TERMS = [
+  // 메뉴 (긴 것 우선)
+  "아메리카노","에스프레소","카푸치노","플랫화이트","핸드드립","콜드브루","디카페인","싱글오리진","아인슈페너","바닐라라떼","말차라떼","크로플","휘낭시에","마들렌","티라미수","크루아상","브런치","베이글","스콘","쿠키","케이크","디저트","라떼","드립","원두","로스팅","빵",
+  // 맛 표현
+  "부드러운","부드럽","고소한","고소","산미","진하고","진한","달콤","달달","쌉싸름","풍미","향긋","깔끔","담백","구수",
+  // 공간/분위기
+  "분위기","인테리어","아늑","감성","조용","루프탑","테라스","통창","채광","햇살","빈티지","모던","넓은","넓고","아담","좌석","자리","콘센트","작업하기","공부하기","뷰가","뷰",
+  // 서비스/추천 신호
+  "친절","사장님","인생","최고","강추","추천","재방문","또 가고","만족","예쁜","예쁘","아기자기","분좋카",
+];
+const HL_RE = new RegExp("(" + HL_TERMS.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|") + ")", "g");
+const HL_SET = new Set(HL_TERMS);
+function hlQuote(text?: string) {
+  if (!text) return text ?? "";
+  return text.split(HL_RE).map((p, i) =>
+    HL_SET.has(p)
+      ? <b key={i} style={{ fontWeight: 600, color: "#2b2018", background: "linear-gradient(transparent 58%, #f6dca6 58%)", borderRadius: "1px", padding: "0 1px" }}>{p}</b>
+      : <span key={i}>{p}</span>
+  );
+}
+
 function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; onMap: () => void }) {
   const g = cafe.synth_grade ? GRADE_STYLE[cafe.synth_grade] : null;
   const [reviews, setReviews] = useState<EvidenceReview[]>([]);
@@ -918,8 +941,8 @@ function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; 
                         : rv.why?.[0] && <span className="text-[10px] text-[#8a7458]">{rv.why[0]}</span>}
                     </div>
                     {rv.link
-                      ? <a href={rv.link} target="_blank" rel="noopener noreferrer" className="block text-[13px] text-[#3d2f22] leading-relaxed hover:text-[#9c6b3f] hover:underline transition-colors">"{rv.quote}"</a>
-                      : <div className="text-[13px] text-[#3d2f22] leading-relaxed">"{rv.quote}"</div>}
+                      ? <a href={rv.link} target="_blank" rel="noopener noreferrer" className="block text-[13.5px] text-[#3d2f22] leading-[1.75] hover:text-[#9c6b3f] transition-colors">"{hlQuote(rv.quote)}"</a>
+                      : <div className="text-[13.5px] text-[#3d2f22] leading-[1.75]">"{hlQuote(rv.quote)}"</div>}
                     <div className="flex items-center gap-2 mt-1.5 text-[10px] text-[#a8927a]">
                       {rv.link && /youtu\.?be/.test(rv.link) && <span className="text-white rounded-[3px] px-1 py-0.5" style={{ background: "#c4302b", fontSize: "8px" }}>▶ YouTube</span>}
                       <span>{rv.source}</span>{rv.date && <span>· {rv.date}</span>}
@@ -1008,8 +1031,8 @@ function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; 
                         : rv.why?.[0] && <span className="text-[10px] text-[#8a7458]">{rv.why[0]}</span>}
                     </div>
                     {rv.link
-                      ? <a href={rv.link} target="_blank" rel="noopener noreferrer" className="block text-[13px] text-[#3d2f22] leading-relaxed hover:text-[#9c6b3f] hover:underline transition-colors">"{rv.quote}"</a>
-                      : <div className="text-[13px] text-[#3d2f22] leading-relaxed">"{rv.quote}"</div>}
+                      ? <a href={rv.link} target="_blank" rel="noopener noreferrer" className="block text-[13.5px] text-[#3d2f22] leading-[1.75] hover:text-[#9c6b3f] transition-colors">"{hlQuote(rv.quote)}"</a>
+                      : <div className="text-[13.5px] text-[#3d2f22] leading-[1.75]">"{hlQuote(rv.quote)}"</div>}
                     <div className="flex items-center gap-2 mt-1.5 text-[10px] text-[#a8927a]">
                       {rv.link && /youtu\.?be/.test(rv.link) && <span className="text-white rounded-[3px] px-1 py-0.5" style={{ background: "#c4302b", fontSize: "8px" }}>▶ YouTube</span>}
                       <span>{rv.source}</span>{rv.date && <span>· {rv.date}</span>}
