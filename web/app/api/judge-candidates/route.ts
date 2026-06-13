@@ -43,10 +43,12 @@ export async function GET(req: NextRequest) {
         LIMIT ${limit}`) as unknown as typeof targets;
     }
 
+    // 그라운딩 의심(업체혼동·환각) 카페는 '깊은 재심사' — on-topic 전체를 AI에 보내 리스트형 오염 제거.
+    const flaggedIds = new Set<number>((await sql`SELECT cafe_id FROM grounding_checks WHERE grounded = false` as any[]).map((r: any) => r.cafe_id));
     const cafes = [];
     let advanced = 0;
     for (const cafe of targets) {
-      const { candidates, hasRaw } = await getAuditCandidates(cafe);
+      const { candidates, hasRaw } = await getAuditCandidates(cafe, flaggedIds.has((cafe as any).id));
       if (!hasRaw || candidates.length === 0) { await markJudged(cafe.id); advanced++; continue; }
       cafes.push({ cafeId: cafe.id, name: cafe.name, area: cafe.area, candidates: candidates.slice(0, 50) });
     }

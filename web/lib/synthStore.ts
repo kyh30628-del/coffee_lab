@@ -135,6 +135,21 @@ export async function scrubPublishedPII(): Promise<{ scrubbed: number; names: st
   return { scrubbed: bad.length, names: names.slice(0, 10) };
 }
 
+// 🩺 LLM 그라운딩 의심(업체혼동·환각) 자가치유 — 재합성으로 교정(개선엔진: 오염제거·로스팅환각 차단).
+//   아직 교정 안 된 것(synth_updated <= 그라운딩 검사시각)만 재합성 → 로컬 그라운딩이 재검사해 플래그 해소.
+export async function healGroundingSuspects(): Promise<{ resynthed: number; names: string[]; suspects: number }> {
+  await sql`CREATE TABLE IF NOT EXISTS grounding_checks (cafe_id INT PRIMARY KEY, grounded BOOLEAN, issue TEXT, checked_at TIMESTAMPTZ DEFAULT now())`.catch(() => {});
+  const bad = (await sql`
+    SELECT c.id, c.name, c.area FROM grounding_checks g JOIN cafes c ON c.id = g.cafe_id
+    WHERE g.grounded = false AND c.published = true
+      AND (c.synth_updated IS NULL OR c.synth_updated <= g.checked_at)
+    ORDER BY g.checked_at ASC LIMIT 15`) as any[];
+  const names: string[] = [];
+  for (const c of bad) { try { await synthAndStore({ id: c.id, name: c.name, area: c.area }, { refresh: false }); names.push(c.name); } catch {} }
+  const [s] = await sql`SELECT COUNT(*)::int n FROM grounding_checks WHERE grounded = false` as any[];
+  return { resynthed: bad.length, names: names.slice(0, 8), suspects: s.n };
+}
+
 // 🚦 파이프라인 finalizer — 모든 게이트 통과한 신규 카페만 공개로 승격.
 //   게이트: ① 규칙 합성 통과(pending = 이미 규칙OK) ② AI 판정 완료 ③ 임베딩 완료
 //           ④ 등급 검증/참고 ⑤ 좌표 수도권 ⑥ 미해결 오염플래그 없음.
@@ -194,14 +209,14 @@ export async function synthAndStore(cafe: { id: number; name: string; area: stri
 // ── 로컬 Sonnet 배치용 ───────────────────────────────────────────────
 // 캐시된 raw로 '규칙상 on-topic 후보 전체'를 추출(서버, LLM 없음). Sonnet이 최종 심사.
 // raw 없으면 hasRaw:false.
-export async function getAuditCandidates(cafe: { id: number; name: string; area: string }): Promise<{ candidates: BorderlineItem[]; hasRaw: boolean }> {
+export async function getAuditCandidates(cafe: { id: number; name: string; area: string }, deep = false): Promise<{ candidates: BorderlineItem[]; hasRaw: boolean }> {
   await ensureCols();
   const raw = await loadRaw(cafe.id);
   if (!raw.length) return { candidates: [], hasRaw: false };
   const result = collectAndSynthesize(cafe.name, cafe.area ? [cafe.area] : [], rawToSources(raw));
-  // 토큰 최적화: AI에는 '경계(규칙이 애매하다고 판단한 것)'만 보냄.
-  //   명확한 검증·참고는 규칙이 이미 판정했으므로 AI 재확인 불필요 → 토큰 70~90% 절감.
-  return { candidates: result.borderline, hasRaw: true };
+  // 토큰 최적화: 평소엔 '경계(규칙이 애매)'만 AI에 보냄(70~90% 절감).
+  //   deep=true(그라운딩 의심 카페): on-topic '전체'를 AI에 보내 리스트형 오염(옆 가게 인용)까지 제거.
+  return { candidates: deep ? result.auditItems : result.borderline, hasRaw: true };
 }
 
 // Sonnet 최종 결정(key→keep/drop)을 적용해 재합성·저장 + llm_judged_at 기록.

@@ -28,7 +28,8 @@ const USE_SIGNALS: Record<string, string[]> = {
   빵: ["빵","베이커리","스콘","크루아상","디저트","케이크","티라미수","bread","bakery","scone","croissant","dessert","cake","tiramisu","pastry"],
 };
 const OP_SIGNALS: Record<string, string[]> = {
-  직접로스팅: ["직접 로스팅","로스팅","자가배전","직접 볶","로스터리","roast","roasted","roasting","in-house","in house"],
+  // ⚠️ 강한 신호만 — 단순 "로스팅"(다크로스팅 등 맛표현)·"roast"는 제외(환각 방지). 정체성 주장은 2건+ 필요(buildIdentity).
+  직접로스팅: ["직접 로스팅","직접로스팅","자가배전","직접 볶","직접볶","로스터리","빈투바","bean to bar","in-house roast","in house roast","house roasted","roast in-house","직접 볶은","직접 볶아","로스팅합니다","로스팅 합니다"],
   원두판매: ["원두 판매","원두 구매","원두 사","원두 한봉","bag of bean","beans to take","buy a bag","roasted coffee beans"],
   권위: ["블루리본","수상","10년 연속","미슐랭","blue ribbon","best specialty","key player","reputation","hidden gem"],
 };
@@ -121,7 +122,7 @@ export function synthesize(name: string, reviews: Review[]): SynthResult {
 
 function buildIdentity(coords: Record<string, number | null>, basis: Record<string, string>, uses: Record<string, number>, ops: Record<string, number>) {
   const p: string[] = [];
-  if (ops["직접로스팅"]) p.push(`직접 로스팅(${ops["직접로스팅"]}건)`);
+  if ((ops["직접로스팅"] ?? 0) >= 2) p.push(`직접 로스팅(${ops["직접로스팅"]}건)`); // 1건은 환각 위험 → 2건+만 주장
   const a = coords.acidity, b = coords.body, s = coords.sweet;
   if (a != null && a >= 0.65) p.push(`산미 또렷`);
   if (a != null && a <= 0.35) p.push(`산미 낮고 부드러움`);

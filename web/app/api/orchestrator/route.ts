@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
-import { synthAndStore, finalizePipeline, scrubPublishedPII } from "@/lib/synthStore";
+import { synthAndStore, finalizePipeline, scrubPublishedPII, healGroundingSuspects } from "@/lib/synthStore";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
@@ -61,6 +61,8 @@ export async function GET(req: NextRequest) {
       FROM cafes`)[0] as any;
     const vr = (await sql`SELECT ran_at, fails, warns, status FROM verify_reports ORDER BY ran_at DESC LIMIT 1`)[0] as any;
     const af = (await sql`SELECT COUNT(*) FILTER (WHERE NOT resolved)::int open, MAX(flagged_at) last_flag FROM audit_flags`)[0] as any;
+    await sql`CREATE TABLE IF NOT EXISTS grounding_checks (cafe_id INT PRIMARY KEY, grounded BOOLEAN, issue TEXT, checked_at TIMESTAMPTZ DEFAULT now())`.catch(() => {});
+    const gr = (await sql`SELECT COUNT(*) FILTER (WHERE NOT grounded)::int suspect, MAX(checked_at) last FROM grounding_checks`)[0] as any;
     const ds = (await sql`SELECT MIN(last_run) oldest, COUNT(*) FILTER (WHERE last_run < now() - interval '3 days')::int behind, COUNT(*)::int n FROM discovery_state`)[0] as any;
 
     // 파이프라인 진행 상황(신규 카페 조립라인)
@@ -90,6 +92,8 @@ export async function GET(req: NextRequest) {
       if (fin.promoted > 0) healed.push(`전 에이전트 통과 ${fin.promoted}곳 자동 공개(${fin.names.slice(0, 3).join(", ")}${fin.promoted > 3 ? " 외" : ""})`);
       // (c) 레드팀 PII 누출 자가치유 — 공개 인용문 전화·이메일·핸들 제거
       try { const pii = await scrubPublishedPII(); if (pii.scrubbed > 0) healed.push(`PII 세척 ${pii.scrubbed}곳(${pii.names.slice(0, 3).join(", ")})`); } catch {}
+      // (d) LLM 그라운딩 의심(업체혼동·환각) 자가치유 — 재합성 교정(로컬 그라운딩이 재검사해 플래그 해소)
+      try { const gr = await healGroundingSuspects(); if (gr.resynthed > 0) healed.push(`그라운딩 의심 ${gr.resynthed}곳 재합성 교정`); } catch {}
     }
 
     // ── 3) 에이전트별 건강 판정 ──
@@ -109,6 +113,11 @@ export async function GET(req: NextRequest) {
       const open = af?.open ?? 0;
       const aAge = ageHours(af?.last_flag ?? null, now);
       agents.push({ key: "audit", label: "품질 자가감사", lastRun: af?.last_flag ?? null, ageH: aAge == null ? null : Math.round(aAge * 10) / 10, cadenceH: 30, status: open > 0 ? "warn" : "ok", queue: open, note: open ? `미해결 오염 ${open}건` : "오염 없음" });
+    }
+    {
+      const sus = gr?.suspect ?? 0;
+      const gAge = ageHours(gr?.last ?? null, now);
+      agents.push({ key: "grounding", label: "LLM 그라운딩", lastRun: gr?.last ?? null, ageH: gAge == null ? null : Math.round(gAge * 10) / 10, cadenceH: 30, status: sus > 0 ? "warn" : "ok", queue: sus, note: sus ? `환각·혼동 의심 ${sus}건(재합성 교정중)` : "의심 없음" });
     }
 
     // ── 4) 종합 건강 ──
