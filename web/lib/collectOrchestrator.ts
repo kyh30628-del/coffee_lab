@@ -142,11 +142,25 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
   const trustCount = stats.verified + stats.reference;
   const grade: "검증" | "참고" | "발굴" = trustCount >= 30 ? "검증" : trustCount >= 5 ? "참고" : "발굴";
 
-  // 근거 리뷰: 검증 우선 → 최신순, 최대 6개
-  const order: Record<string, number> = { verified: 0, reference: 1 };
-  evidence.sort((a, b) =>
-    (order[a.trust ?? "reference"] - order[b.trust ?? "reference"]) ||
-    (b.date ?? "").localeCompare(a.date ?? ""));
+  // 근거 리뷰: 복합 랭크(정확도 score + 신뢰등급 + 최신성)로 '가장 정확하고 가장 최신' 순. 최대 6개.
+  const nowT = Date.now();
+  const parseYmd = (d?: string): number | null => {
+    if (!d) return null;
+    const m = String(d).match(/(\d{4})[.\-/년\s]+(\d{1,2})(?:[.\-/월\s]+(\d{1,2}))?/);
+    if (!m) return null;
+    const t = new Date(+m[1], +m[2] - 1, m[3] ? +m[3] : 15).getTime();
+    return isNaN(t) ? null : t;
+  };
+  const recency = (d?: string): number => {
+    const t = parseYmd(d); if (t == null) return 8;
+    const months = (nowT - t) / 2.63e9;
+    return months <= 1 ? 30 : Math.max(0, 30 - months * 1.3);
+  };
+  const rank = (e: EvidenceReview): number =>
+    (typeof e.score === "number" ? e.score : 50) +
+    (e.trust === "verified" ? 20 : e.trust === "reference" ? 0 : -15) +
+    recency(e.date);
+  evidence.sort((a, b) => rank(b) - rank(a));
   // 표시 근거는 같은 링크 1건만 — 중복 글 노출 방지 안전장치(상위 6개 선택 전 dedup)
   const evSeen = new Set<string>();
   const evDedup = evidence.filter((e) => {
