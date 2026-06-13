@@ -127,6 +127,7 @@ export default function Home() {
   const [myVisits, setMyVisits] = useState<any[]>([]);
   const [myPinMode, setMyPinMode] = useState(false);
   const [showMyCafeReg, setShowMyCafeReg] = useState(false);
+  const [showMyMemory, setShowMyMemory] = useState(false);
   const reloadMyCafes = (dev: string) => fetch(`/api/my-cafe?device=${dev}`).then((r) => r.json()).then((d) => { if (d.ok) { setMyVisits(d.cafes ?? []); setMyCafeIds(new Set((d.cafes ?? []).map((c: any) => c.id))); } }).catch(() => {});
   useEffect(() => {
     let dev = ""; try { dev = localStorage.getItem("dcn_device") || ""; if (!dev) { dev = (crypto.randomUUID?.() || String(Math.random()).slice(2) + Date.now()); localStorage.setItem("dcn_device", dev); } } catch {}
@@ -446,7 +447,8 @@ export default function Home() {
           <h1 className="dcn-title text-[2.9rem] sm:text-[3.3rem] leading-[1.12] font-bold tracking-tight">동네 커피 노트</h1>
         </div>
         <p className="dcn-rise text-[16px] text-[#f4ece0] mb-2 text-center leading-relaxed font-bold" style={{ animationDelay: ".28s" }}>별점 말고, <span className="text-[#e8b87a]">검증된 후기</span>로 고르세요.</p>
-        <p className="dcn-rise text-[13px] text-[#cbb89f] mb-10 text-center leading-relaxed" style={{ animationDelay: ".42s" }}>수천 개 후기 중 광고·협찬·무관한 글은 버리고,<br /><b className="text-[#f4ece0]">진짜 방문 후기</b>만 가려냈어요.</p>
+        <p className="dcn-rise text-[15px] text-[#f4ece0] mb-2 text-center leading-relaxed font-bold" style={{ animationDelay: ".35s" }}>그리고 <span className="text-[#e8b87a]">내 카페의 추억</span>을 <span style={{ color: "#d6336c" }}>❤</span>로 간직하세요.</p>
+        <p className="dcn-rise text-[13px] text-[#cbb89f] mb-10 text-center leading-relaxed" style={{ animationDelay: ".42s" }}>광고·협찬·무관한 글은 버리고 <b className="text-[#f4ece0]">진짜 방문 후기</b>만 가려내고,<br />내가 다녀온 카페의 <b className="text-[#f4ece0]">추억</b>은 지도에 기록해 간직·공유해요.</p>
         <div className="dcn-rise w-full max-w-sm space-y-3" style={{ animationDelay: ".56s" }}>
           <button onClick={chooseConsumer} className="w-full bg-[#f4ece0] text-[#2b2018] rounded-2xl py-5 px-5 text-left shadow-lg active:scale-[0.99] transition">
             <div className="text-lg font-bold">☕ 소비자로 시작하기</div>
@@ -577,6 +579,10 @@ export default function Home() {
                 className="px-3.5 py-2 rounded-full text-[12px] font-bold shadow-lg bg-[#2b2018] text-[#f4ece0]">
                 + 등록
               </button>
+              <button onClick={() => setShowMyMemory(true)} aria-label="내 기억 관리"
+                className="w-9 h-9 rounded-full text-[15px] shadow-lg bg-white text-[#7a6452] border border-[#e6d9c8] flex items-center justify-center">
+                ⚙
+              </button>
             </div>
           </div>
           <aside className="hidden md:block md:w-[380px] md:h-full bg-[#fdfaf4] border-l border-[#ece0cd] overflow-y-auto p-6 relative z-10">
@@ -595,6 +601,8 @@ export default function Home() {
       )}
 
       {showMyCafeReg && <MyCafeRegModal cafes={cafes} device={deviceId} visits={myVisits} onClose={() => setShowMyCafeReg(false)} onDone={() => { reloadMyCafes(deviceId); setMyPinMode(true); }} />}
+      {showMyMemory && <MyMemoryModal device={deviceId} visits={myVisits} onClose={() => setShowMyMemory(false)}
+        onRestore={(dev: string) => { try { localStorage.setItem("dcn_device", dev); } catch {} setDeviceId(dev); reloadMyCafes(dev); setMyPinMode(true); }} />}
 
       {selected && <CafePanel cafe={selected} onClose={() => setSelected(null)} onMap={() => {
         if (selected.lat && selected.lng) {
@@ -1029,7 +1037,8 @@ function MyCafeRegModal({ cafes, device, visits, onClose, onDone }: { cafes: Caf
   const [favorite, setFavorite] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
-  const [done, setDone] = useState<string | null>(null); // 저장 성공 멘트(카페명)
+  const [staged, setStaged] = useState(false); // 1단계: 위치인증 임시저장 완료 → 추억 기록 팝업
+  const [done, setDone] = useState<string | null>(null); // 2단계: 최종 기록 성공 멘트(카페명)
 
   const results = useMemo(() => {
     const k = q.replace(/\s/g, "").toLowerCase();
@@ -1060,7 +1069,8 @@ function MyCafeRegModal({ cafes, device, visits, onClose, onDone }: { cafes: Caf
     img.src = URL.createObjectURL(f);
   };
 
-  const submit = () => {
+  // 1단계: 위치 인증 → 임시저장(그 카페에서의 경험임을 보증)
+  const stage = () => {
     if (!picked) { setMsg("카페를 선택해주세요"); return; }
     if (!navigator.geolocation) { setMsg("이 브라우저는 위치를 지원하지 않아요"); return; }
     setBusy(true); setMsg("현재 위치 확인 중...");
@@ -1068,14 +1078,49 @@ function MyCafeRegModal({ cafes, device, visits, onClose, onDone }: { cafes: Caf
       try {
         const r = await fetch("/api/my-cafe", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ cafeId: picked.id, device, userLat: pos.coords.latitude, userLng: pos.coords.longitude, photoBase64: photo, memory, favorite }),
+          body: JSON.stringify({ action: "stage", cafeId: picked.id, device, userLat: pos.coords.latitude, userLng: pos.coords.longitude, photoBase64: photo, memory, favorite }),
         });
         const d = await r.json();
-        if (d.ok) { setDone(picked.name); onDone(); }
-        else { setMsg(d.error || "등록 실패"); setBusy(false); }
+        if (d.ok) { setStaged(true); setMsg(""); setBusy(false); } // 위치인증 통과 → 추억 기록 팝업
+        else { setMsg(d.error || "임시저장 실패"); setBusy(false); }
       } catch { setMsg("네트워크 오류"); setBusy(false); }
     }, () => { setMsg("위치 권한을 허용해주세요 (카페 30m 인증 필요)"); setBusy(false); }, { enableHighAccuracy: true, timeout: 10000 });
   };
+
+  // 2단계: 추억을 기록합니다 — 위치 비교 없이 최종 DB 기록
+  const commit = async () => {
+    if (!picked) return;
+    setBusy(true); setMsg("");
+    try {
+      const r = await fetch("/api/my-cafe", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "commit", cafeId: picked.id, device, memory, favorite }),
+      });
+      const d = await r.json();
+      if (d.ok) { setDone(picked.name); onDone(); }
+      else { setMsg(d.error || "기록 실패"); setBusy(false); setStaged(false); }
+    } catch { setMsg("네트워크 오류"); setBusy(false); }
+  };
+
+  // 1단계 완료 → "추억을 기록합니다" 확인 팝업 (위치 비교 없이 최종 기록)
+  if (staged && !done) {
+    return (
+      <div className="fixed inset-0 z-[5000] flex items-center justify-center px-6" style={{ background: "rgba(43,32,24,0.6)", fontFamily: "'Gowun Batang', serif" }} onClick={() => !busy && setStaged(false)}>
+        <div className="bg-[#fdfaf4] rounded-2xl px-7 py-8 text-center max-w-xs shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="text-[34px] mb-2">📖</div>
+          <div className="text-[17px] font-bold text-[#2b2018] mb-1.5">추억을 기록합니다</div>
+          <div className="text-[13px] text-[#7a6452] leading-relaxed">
+            <b className="text-[#d6336c]">{picked?.name}</b> 위치 인증이 끝났어요.<br />
+            이 경험을 내 지도에 영구 기록할까요?
+          </div>
+          <div className="text-[11px] text-[#a8927a] mt-2 leading-relaxed">위치 인증으로 <b>진짜 그 카페에서의 경험</b>임이 확인됐어요.</div>
+          {msg && <p className="text-[12px] text-[#c0392b] mt-2">{msg}</p>}
+          <button onClick={commit} disabled={busy} className="mt-5 w-full bg-[#d6336c] text-white rounded-xl py-3 font-bold text-[14px] disabled:opacity-60">{busy ? "기록 중..." : "추억을 기록합니다"}</button>
+          <button onClick={() => setStaged(false)} disabled={busy} className="mt-2 w-full text-[#9c6b3f] text-[13px] py-1">다시 확인할게요</button>
+        </div>
+      </div>
+    );
+  }
 
   // 저장 성공 — 예쁜 멘트
   if (done) {
@@ -1137,13 +1182,118 @@ function MyCafeRegModal({ cafes, device, visits, onClose, onDone }: { cafes: Caf
                   className="w-full border border-[#cbb89f] rounded-lg px-3 py-2.5 text-[14px] bg-white resize-none leading-relaxed" />
                 <div className="text-right text-[10px] text-[#a8927a]">{memory.length}/2000</div>
               </div>
-              <p className="text-[11px] text-[#a8927a] leading-relaxed">※ 타인의 얼굴·개인정보가 담긴 사진은 올리지 마세요. 등록 시 카페 30m 이내에서만 인증돼요.</p>
+              <p className="text-[11px] text-[#a8927a] leading-relaxed">※ 타인의 얼굴·개인정보가 담긴 사진은 올리지 마세요. <b>카페 30m 이내</b>에서 위치 인증을 해야 "진짜 그 카페 경험"으로 임시저장돼요. 그다음 <b>추억 기록</b> 확인을 거쳐 영구 저장됩니다.</p>
               {msg && <p className="text-[12px] text-[#c0392b]">{msg}</p>}
-              <button onClick={submit} disabled={busy} className="w-full bg-[#d6336c] text-white rounded-xl py-3 font-bold text-[14px] disabled:opacity-60">
-                {busy ? "확인 중..." : "최종 저장 (위치 인증 후)"}
+              <button onClick={stage} disabled={busy} className="w-full bg-[#d6336c] text-white rounded-xl py-3 font-bold text-[14px] disabled:opacity-60">
+                {busy ? "위치 확인 중..." : "이 카페에서 위치 인증 (임시저장)"}
               </button>
             </>
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// 내 기억 관리 — 백업코드 발급/복원 + PDF·JSON 내보내기 (개인정보 0)
+function MyMemoryModal({ device, visits, onClose, onRestore }: { device: string; visits: any[]; onClose: () => void; onRestore: (dev: string) => void }) {
+  const [code, setCode] = useState("");
+  const [inputCode, setInputCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  const issueCode = async () => {
+    setBusy(true); setMsg("");
+    try {
+      const r = await fetch("/api/my-cafe/backup", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ device }) });
+      const d = await r.json();
+      if (d.ok) setCode(d.code); else setMsg(d.error || "발급 실패");
+    } catch { setMsg("네트워크 오류"); }
+    setBusy(false);
+  };
+
+  const restore = async () => {
+    const c = inputCode.trim().toUpperCase();
+    if (!c) { setMsg("코드를 입력해주세요"); return; }
+    setBusy(true); setMsg("");
+    try {
+      const r = await fetch(`/api/my-cafe/backup?code=${encodeURIComponent(c)}`);
+      const d = await r.json();
+      if (d.ok) { onRestore(d.device); onClose(); }
+      else { setMsg(d.error || "복원 실패"); }
+    } catch { setMsg("네트워크 오류"); }
+    setBusy(false);
+  };
+
+  const exportJSON = () => {
+    const data = { service: "동네 커피 노트 — 내 기억", exportedAt: new Date().toISOString(), count: visits.length,
+      records: visits.map((v) => ({ cafe: v.name, area: v.area, favorite: !!v.favorite, memory: v.memory ?? "", photo: v.photo_url ?? null, date: v.created_at })) };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `내커피기억_${new Date().toISOString().slice(0, 10)}.json`; a.click();
+  };
+
+  const exportPDF = () => {
+    const rows = visits.map((v) => `
+      <div style="border:1px solid #e6d9c8;border-radius:12px;padding:14px;margin-bottom:12px;page-break-inside:avoid;">
+        <div style="font-weight:700;font-size:15px;color:#2b2018;">${v.favorite ? "★ " : ""}${(v.name || "").replace(/</g, "&lt;")} <span style="font-weight:400;font-size:11px;color:#9c6b3f;">${(v.area || "")}</span></div>
+        ${v.photo_url ? `<img src="${v.photo_url}" style="max-width:100%;max-height:240px;border-radius:8px;margin:8px 0;object-fit:cover;" />` : ""}
+        ${v.memory ? `<div style="font-size:13px;color:#52402e;line-height:1.7;white-space:pre-wrap;margin-top:6px;">${(v.memory).replace(/</g, "&lt;")}</div>` : ""}
+        <div style="font-size:10px;color:#a8927a;margin-top:8px;">${new Date(v.created_at).toLocaleString("ko-KR")}</div>
+      </div>`).join("");
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>내 커피 기억</title>
+      <style>body{font-family:'Gowun Batang',serif;background:#fdfaf4;color:#2b2018;padding:24px;max-width:600px;margin:0 auto;}h1{font-size:22px;}</style></head>
+      <body><h1>☕ 동네 커피 노트 — 내 기억</h1><p style="color:#7a6452;font-size:12px;">총 ${visits.length}곳 · 내보낸 날짜 ${new Date().toLocaleDateString("ko-KR")}</p>${rows}
+      <script>window.onload=function(){setTimeout(function(){window.print();},400);}</script></body></html>`;
+    const w = window.open("", "_blank");
+    if (w) { w.document.write(html); w.document.close(); } else setMsg("팝업이 차단됐어요. 팝업을 허용해주세요.");
+  };
+
+  return (
+    <div className="fixed inset-0 z-[5000] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)", fontFamily: "'Gowun Batang', serif" }} onClick={onClose}>
+      <div className="w-full max-w-lg bg-[#fdfaf4] rounded-t-2xl max-h-[88dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-[#f0e6d4]">
+          <div className="font-bold text-[#2b2018] text-[15px]">⚙ 내 기억 관리</div>
+          <button onClick={onClose} className="w-8 h-8 rounded-full bg-[#f0e6d4] text-[#7a6452] text-lg">×</button>
+        </div>
+        <div className="overflow-y-auto flex-1 p-4 space-y-5">
+          <p className="text-[12px] text-[#7a6452] leading-relaxed bg-[#f3ede1] rounded-lg px-3 py-2.5">
+            내 기억 <b className="text-[#2b2018]">{visits.length}곳</b>은 이 기기에 저장돼 있어요. 가입·개인정보 없이, <b>백업 코드</b>로 다른 기기에서 불러오거나 <b>파일로 내려받아</b> 영구 보관할 수 있어요.
+          </p>
+
+          {/* 백업 코드 */}
+          <div>
+            <div className="text-[13px] font-bold text-[#2b2018] mb-1.5">① 백업 코드 (다른 기기에서 불러오기)</div>
+            {code ? (
+              <div className="bg-white border-2 border-[#d6336c] rounded-xl p-3 text-center">
+                <div className="text-[20px] font-bold tracking-widest text-[#d6336c]">{code}</div>
+                <div className="text-[11px] text-[#a8927a] mt-1">이 코드를 메모해두세요. 잃어버리면 복구할 수 없어요(= 우리도 누구 건지 몰라요).</div>
+              </div>
+            ) : (
+              <button onClick={issueCode} disabled={busy} className="w-full bg-[#2b2018] text-[#f4ece0] rounded-lg py-2.5 text-[13px] font-bold disabled:opacity-60">{busy ? "발급 중..." : "백업 코드 발급"}</button>
+            )}
+          </div>
+
+          {/* 복원 */}
+          <div>
+            <div className="text-[13px] font-bold text-[#2b2018] mb-1.5">② 코드로 복원 (기기 바꿨을 때)</div>
+            <div className="flex gap-2">
+              <input value={inputCode} onChange={(e) => setInputCode(e.target.value)} placeholder="COFFEE-XXXX"
+                className="flex-1 border border-[#cbb89f] rounded-lg px-3 py-2.5 text-[14px] bg-white uppercase" />
+              <button onClick={restore} disabled={busy} className="px-4 bg-[#9c6b3f] text-white rounded-lg text-[13px] font-bold disabled:opacity-60">불러오기</button>
+            </div>
+          </div>
+
+          {/* 내보내기 */}
+          <div>
+            <div className="text-[13px] font-bold text-[#2b2018] mb-1.5">③ 내 기기에 영구 보관 (다운로드)</div>
+            <div className="flex gap-2">
+              <button onClick={exportPDF} disabled={!visits.length} className="flex-1 border-2 border-[#cbb89f] text-[#524434] rounded-lg py-2.5 text-[13px] font-bold bg-white disabled:opacity-50">PDF로 저장</button>
+              <button onClick={exportJSON} disabled={!visits.length} className="flex-1 border-2 border-[#cbb89f] text-[#524434] rounded-lg py-2.5 text-[13px] font-bold bg-white disabled:opacity-50">JSON으로 저장</button>
+            </div>
+            <p className="text-[10px] text-[#a8927a] mt-1.5">PDF는 보기 좋게, JSON은 백업·재가져오기용. 파일은 본인 기기에만 저장돼요.</p>
+          </div>
+
+          {msg && <p className="text-[12px] text-[#c0392b]">{msg}</p>}
         </div>
       </div>
     </div>

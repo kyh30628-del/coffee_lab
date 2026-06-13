@@ -16,6 +16,8 @@ async function ensure() {
   )`;
   await sql`ALTER TABLE user_visits ADD COLUMN IF NOT EXISTS memory TEXT`.catch(() => {});
   await sql`ALTER TABLE user_visits ADD COLUMN IF NOT EXISTS favorite BOOLEAN DEFAULT false`.catch(() => {});
+  // finalized: 위치인증(임시저장) 후 "추억을 기록합니다" 확정 단계. 기존 행은 DEFAULT true로 자동 백필(이미 노출 중이던 기록 유지).
+  await sql`ALTER TABLE user_visits ADD COLUMN IF NOT EXISTS finalized BOOLEAN DEFAULT true`.catch(() => {});
 }
 
 // 하버사인 거리(m)
@@ -36,27 +38,47 @@ export async function GET(req: NextRequest) {
   const rows = await sql`
     SELECT c.id, c.name, c.area, c.lat, c.lng, v.photo_url, v.memory, v.favorite, v.created_at
     FROM user_visits v JOIN cafes c ON c.id = v.cafe_id
-    WHERE v.device_id = ${device} AND v.verified = true
+    WHERE v.device_id = ${device} AND v.verified = true AND v.finalized = true
     ORDER BY v.favorite DESC, v.created_at DESC`;
   return NextResponse.json({ ok: true, cafes: rows });
 }
 
-// 내 카페 등록: 30m 위치 인증 통과 시만 저장
+// 내 카페 등록 — 2단계
+//  action="stage"(기본): ★30m 위치 인증 필수 → 임시저장(finalized=false). "그 카페에서의 경험"임을 보증.
+//  action="commit": 위치 비교 없음 → "추억을 기록합니다" 확정(finalized=true). 아무데서나 가능.
 export async function POST(req: NextRequest) {
   try {
     await ensure();
     const body = await req.json();
-    const { cafeId, device, userLat, userLng, photoBase64, memory, favorite } = body;
-    if (!cafeId || !device || userLat == null || userLng == null)
-      return NextResponse.json({ ok: false, error: "필수값 누락" }, { status: 400 });
+    const { action, cafeId, device, userLat, userLng, photoBase64, memory, favorite } = body;
+    if (!cafeId || !device) return NextResponse.json({ ok: false, error: "필수값 누락" }, { status: 400 });
 
     const [cafe] = await sql`SELECT id, name, lat, lng FROM cafes WHERE id = ${cafeId} AND published = true LIMIT 1` as any[];
     if (!cafe || cafe.lat == null) return NextResponse.json({ ok: false, error: "카페를 찾을 수 없어요" }, { status: 404 });
 
-    // ★ 30m 위치 인증
+    const mem = typeof memory === "string" && memory.trim() ? memory.slice(0, 2000) : null;
+    const fav = !!favorite;
+
+    // ── 2단계: 최종 기록(추억을 기록합니다) — 위치 비교 없음 ──
+    if (action === "commit") {
+      // 임시저장(위치인증 통과한 stage)이 선행돼야 함
+      const [staged] = await sql`SELECT id FROM user_visits WHERE cafe_id = ${cafeId} AND device_id = ${device} LIMIT 1` as any[];
+      if (!staged) return NextResponse.json({ ok: false, error: "먼저 카페에서 위치 인증(임시저장)을 해주세요." }, { status: 409 });
+      await sql`UPDATE user_visits SET
+          finalized = true,
+          memory = COALESCE(${mem}, memory),
+          favorite = ${fav},
+          created_at = now()
+        WHERE cafe_id = ${cafeId} AND device_id = ${device}`;
+      return NextResponse.json({ ok: true, cafe: { id: cafe.id, name: cafe.name }, finalized: true });
+    }
+
+    // ── 1단계: 임시저장 — 30m 위치 인증 필수 ──
+    if (userLat == null || userLng == null)
+      return NextResponse.json({ ok: false, error: "위치 정보가 필요해요" }, { status: 400 });
     const d = distM(Number(userLat), Number(userLng), Number(cafe.lat), Number(cafe.lng));
     if (d > RADIUS_M)
-      return NextResponse.json({ ok: false, error: `카페에서 ${Math.round(d)}m 떨어져 있어요. ${RADIUS_M}m 안에서 등록할 수 있어요.`, dist: Math.round(d) }, { status: 403 });
+      return NextResponse.json({ ok: false, error: `카페에서 ${Math.round(d)}m 떨어져 있어요. ${RADIUS_M}m 안에서 임시저장할 수 있어요.`, dist: Math.round(d) }, { status: 403 });
 
     // 사진 Blob 업로드(있으면)
     let photoUrl: string | null = null;
@@ -67,17 +89,16 @@ export async function POST(req: NextRequest) {
       photoUrl = blob.url;
     }
 
-    const mem = typeof memory === "string" && memory.trim() ? memory.slice(0, 2000) : null;
-    const fav = !!favorite;
-
-    await sql`INSERT INTO user_visits (cafe_id, device_id, photo_url, memory, favorite, verified)
-      VALUES (${cafeId}, ${device}, ${photoUrl}, ${mem}, ${fav}, true)
+    // 신규는 finalized=false(임시), 기존 기록 재편집이면 기존 finalized 유지(노출 끊기지 않게)
+    await sql`INSERT INTO user_visits (cafe_id, device_id, photo_url, memory, favorite, verified, finalized)
+      VALUES (${cafeId}, ${device}, ${photoUrl}, ${mem}, ${fav}, true, false)
       ON CONFLICT (cafe_id, device_id) DO UPDATE SET
         photo_url = COALESCE(EXCLUDED.photo_url, user_visits.photo_url),
         memory = COALESCE(EXCLUDED.memory, user_visits.memory),
-        favorite = EXCLUDED.favorite, verified = true, created_at = now()`;
+        favorite = EXCLUDED.favorite, verified = true,
+        finalized = user_visits.finalized, created_at = now()`;
 
-    return NextResponse.json({ ok: true, cafe: { id: cafe.id, name: cafe.name }, dist: Math.round(d) });
+    return NextResponse.json({ ok: true, staged: true, cafe: { id: cafe.id, name: cafe.name }, dist: Math.round(d) });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
