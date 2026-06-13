@@ -106,9 +106,21 @@ const NAME_STOPWORD = new Set(["좋은", "맛있는", "맛있는집", "예쁜", 
   "아메리카노", "라떼", "에스프레소", "카푸치노", "카페라떼", "콜드브루", "바닐라라떼", "카라멜마키아토", "플랫화이트", "카페모카", "모카", "아인슈페너", "마키아토", "콘파나", "디카페인", "녹차라떼", "초코라떼", "밀크티"]);
 const LOC_SUFFIX = /(역|동|구|시|군|읍|면|로|길|가)$/; // 지역어 접미
 
-// 쇼핑몰·백화점·복합몰·랜드마크 — 카페명에 들어가도 '식별어'가 아니라 '위치 수식어'.
-// 같은 몰의 다른 가게 후기가 딸려오는 오염 방지(예: '앤티앤스 스타필드 위례' ← '스타필드'·'위례'는 식별어 아님).
-const VENUE_WORDS = ["스타필드", "롯데몰", "롯데백화점", "롯데마트", "롯데프리미엄", "현대백화점", "현대시티", "더현대", "신세계백화점", "신세계", "이마트", "홈플러스", "코스트코", "타임스퀘어", "아이파크몰", "스퀘어원", "엔터식스", "갤러리아", "아울렛", "프리미엄아울렛", "메가박스", "이케아", "가든파이브", "디큐브", "에이케이플라자", "akplaza", "세이브존", "뉴코아", "모다아울렛", "현대프리미엄", "롯데아울렛"];
+// 한 건물·복합시설에 여러 가게가 모인 '위치 수식어'(카페명에 들어가도 식별어 아님).
+// 같은 시설 안 다른 가게 후기가 딸려오는 오염 방지(예: '앤티앤스 스타필드 위례' ← '스타필드'는 식별어 아님).
+// ⚠️ 브랜드의 일부인 단어(대학=와플대학, 센터=센터커피, 상가=몽상가)는 넣지 않는다. '브랜드 토큰 남을 때만 제거' 안전장치와 함께 동작.
+const VENUE_WORDS = [
+  // 백화점·쇼핑몰·아울렛·마트
+  "스타필드", "롯데몰", "롯데백화점", "롯데마트", "롯데프리미엄", "롯데아울렛", "현대백화점", "현대시티", "현대프리미엄", "더현대", "신세계백화점", "신세계", "이마트", "트레이더스", "홈플러스", "코스트코", "타임스퀘어", "아이파크몰", "스퀘어원", "엔터식스", "갤러리아", "아울렛", "프리미엄아울렛", "이케아", "가든파이브", "디큐브", "에이케이플라자", "akplaza", "세이브존", "뉴코아", "모다아울렛",
+  // 푸드코트·식품관(몰 내부 구역)
+  "푸드코트", "푸드애비뉴", "푸드홀", "잇토피아", "식품관", "스위트파크",
+  // 휴게소·터미널·공항·역사(교통 복합시설)
+  "휴게소", "고속터미널", "종합터미널", "터미널", "도심공항", "공항", "역사", "환승센터",
+  // 병원·대학·문화/영화관(복합 건물)
+  "병원", "대학교", "캠퍼스", "롯데시네마", "cgv", "메가박스", "아쿠아리움", "컨벤션",
+  // 호텔·타워·전통시장
+  "호텔", "타워", "광장시장", "통인시장",
+];
 // 신도시·생활권 수식어(시·군·구가 아닌 동네名) — 위치 수식어로만 작동
 const DISTRICT_WORDS = ["위례", "미사", "다산", "별내", "광교", "동탄", "운정", "송도", "청라", "영종", "마곡", "지축", "삼송", "향동", "고덕", "감일", "갈매", "한강신도시", "위례신도시"];
 const isVenueTok = (t: string) => { const n = norm(t); return VENUE_WORDS.some((v) => n.includes(norm(v))) || DISTRICT_WORDS.some((d) => n.includes(norm(d))); };
@@ -120,15 +132,18 @@ const isVenueTok = (t: string) => { const n = norm(t); return VENUE_WORDS.some((
 //   - "미사강변 북카페" → ["미사강변"] (브랜드 없음 → '미사강변'이 유일 정체성이므로 유지)
 export function coreTokens(name: string, areaTerms: string[]): string[] {
   const an = areaTerms.map((a) => norm(a)).filter(Boolean);
-  const base = name.split(/\s+/)
-    .map((t) => t.replace(GENERIC_SUFFIX, "").trim())
-    .filter((t) => t.length >= 2)
-    .filter((t) => !GENERIC_WORD.has(t.toLowerCase()))
-    .filter((t) => !NAME_STOPWORD.has(t.toLowerCase()))
-    .filter((t) => !an.some((a) => a.includes(norm(t)) || norm(t).includes(a)))
-    .filter((t) => !LOC_SUFFIX.test(t));
-  const branded = base.filter((t) => !isVenueTok(t));
-  return branded.length ? branded : base; // 브랜드 토큰이 남으면 몰/신도시 제거, 없으면 원래 유지
+  // 접미(점·카페 등) 제거 '전' 원본 토큰도 함께 보관 → venue 검사는 원본에도 적용
+  // (예: '롯데백화점'에서 '점'이 떨어져 '롯데백화'가 되면 venue 매칭을 빠져나가는 것 방지)
+  const parts = name.split(/\s+/)
+    .map((raw) => ({ raw, core: raw.replace(GENERIC_SUFFIX, "").trim() }))
+    .filter(({ core }) => core.length >= 2)
+    .filter(({ core }) => !GENERIC_WORD.has(core.toLowerCase()))
+    .filter(({ core }) => !NAME_STOPWORD.has(core.toLowerCase()))
+    .filter(({ core }) => !an.some((a) => a.includes(norm(core)) || norm(core).includes(a)))
+    .filter(({ core }) => !LOC_SUFFIX.test(core));
+  const base = parts.map((p) => p.core);
+  const branded = parts.filter((p) => !isVenueTok(p.raw) && !isVenueTok(p.core)).map((p) => p.core);
+  return branded.length ? branded : base; // 브랜드 토큰이 남으면 venue/신도시 제거, 없으면 원래 유지
 }
 
 // 노이즈 게이트: 후기들이 '실제로 그 카페'를 말하는 비율(이름 일관성).
