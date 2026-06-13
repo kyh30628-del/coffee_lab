@@ -47,6 +47,7 @@ export default function AdminPage() {
   const [yt, setYt] = useState<any>(null);
   const [jstatus, setJstatus] = useState<any>(null);
   const [auditFlags, setAuditFlags] = useState<any>(null);
+  const [tower, setTower] = useState<any>(null);
   const [subscribers, setSubscribers] = useState<any[]>([]);
   const [showSubsModal, setShowSubsModal] = useState(false);
   const [showYtModal, setShowYtModal] = useState(false);
@@ -60,7 +61,9 @@ export default function AdminPage() {
     const tick = () => {
       fetch("/api/judge-status", { headers: { "x-admin-password": pw } }).then((x) => x.json()).then((d) => { if (d.ok) setJstatus(d); }).catch(() => {});
       fetch("/api/audit-flags", { headers: { "x-admin-password": pw } }).then((x) => x.json()).then((d) => { if (d.ok) setAuditFlags(d); }).catch(() => {});
+      fetch("/api/orchestrator").then((x) => x.json()).then((d) => { if (d.ok) setTower(d); }).catch(() => {});
     };
+    tick();
     const id = setInterval(tick, 20000);
     return () => clearInterval(id);
   }, [authed, pw]);
@@ -166,6 +169,51 @@ export default function AdminPage() {
           <h1 className="text-2xl font-bold">관리자 대시보드</h1>
           <button onClick={() => load(pw)} className="ml-auto text-xs px-3 py-1.5 rounded-lg bg-stone-200 text-stone-700">새로고침</button>
         </div>
+
+        {/* ===== 🛰️ 자율 운영 관제탑 ===== */}
+        {tower && (() => {
+          const dot: Record<string, string> = { ok: "bg-emerald-500", behind: "bg-amber-500", stalled: "bg-red-500", warn: "bg-amber-500", idle: "bg-stone-300" };
+          const oc: Record<string, string> = { healthy: "border-emerald-300 bg-emerald-50 text-emerald-700", degraded: "border-amber-300 bg-amber-50 text-amber-700", critical: "border-red-300 bg-red-50 text-red-700" };
+          const ocl: Record<string, string> = { healthy: "정상 가동", degraded: "주의", critical: "위험" };
+          const sl: Record<string, string> = { ok: "정상", behind: "지연", stalled: "멈춤", warn: "주의", idle: "대기" };
+          const ago = (h: number | null) => h == null ? "기록 없음" : h < 1 ? "방금" : h < 24 ? `${Math.round(h)}시간 전` : `${Math.round(h / 24)}일 전`;
+          return (
+            <div className="mb-4 rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-bold text-stone-500 uppercase tracking-wider">🛰️ 자율 운영 관제탑</span>
+                <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full border ${oc[tower.overall] || oc.degraded}`}>{ocl[tower.overall] || tower.overall}</span>
+              </div>
+              {tower.alerts?.length > 0 && (
+                <div className="mb-2.5 text-[11px] text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">⚠ {tower.alerts.join(" · ")}</div>
+              )}
+              {tower.healed?.length > 0 && (
+                <div className="mb-2.5 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">🔧 자가치유: {tower.healed.join(" · ")}</div>
+              )}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {tower.agents?.map((a: any) => (
+                  <div key={a.key} className="rounded-xl border border-stone-100 bg-stone-50 px-3 py-2.5">
+                    <div className="flex items-center gap-1.5">
+                      <span className={`w-2 h-2 rounded-full ${dot[a.status] || "bg-stone-300"}`} />
+                      <span className="text-[12px] font-bold text-stone-800 truncate">{a.label}</span>
+                    </div>
+                    <div className="mt-1 flex items-center justify-between text-[10px] text-stone-500">
+                      <span>{sl[a.status] || a.status} · {ago(a.ageH)}</span>
+                      {a.queue > 0 && <span className="text-amber-600 font-bold">대기 {a.queue.toLocaleString()}</span>}
+                    </div>
+                    <div className="text-[10px] text-stone-400 mt-0.5 truncate">{a.note}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-stone-500">
+                <span>공개 <b className="text-stone-700">{tower.coverage?.published?.toLocaleString()}</b>/{tower.coverage?.total?.toLocaleString()}</span>
+                <span>raw {tower.coverage?.rawCachedPct}%</span>
+                <span>판정 {tower.coverage?.judgedPct}%</span>
+                <span>임베딩 {tower.coverage?.embeddedPct}%</span>
+                <span className="ml-auto text-stone-400">갱신 {new Date(tower.generatedAt).toLocaleTimeString("ko-KR")}</span>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* ===== 🔄 실시간 자동화 현황 (10초 갱신) ===== */}
         {jstatus && (
