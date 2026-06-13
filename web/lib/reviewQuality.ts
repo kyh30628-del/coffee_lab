@@ -113,18 +113,22 @@ const VENUE_WORDS = ["스타필드", "롯데몰", "롯데백화점", "롯데마�
 const DISTRICT_WORDS = ["위례", "미사", "다산", "별내", "광교", "동탄", "운정", "송도", "청라", "영종", "마곡", "지축", "삼송", "향동", "고덕", "감일", "갈매", "한강신도시", "위례신도시"];
 const isVenueTok = (t: string) => { const n = norm(t); return VENUE_WORDS.some((v) => n.includes(norm(v))) || DISTRICT_WORDS.some((d) => n.includes(norm(d))); };
 
-// 카페명 '구별 토큰' = 일반어·지역어·대상지역어·몰/랜드마크를 뺀 고유 식별어.
-// 예: "을지로 문덕카페" → ["문덕"]("을지로" 제거). "앤티앤스 스타필드 위례" → ["앤티앤스"]("스타필드"·"위례" 제거).
+// 카페명 '구별 토큰' = 일반어·지역어·대상지역어를 뺀 고유 식별어.
+// 예: "을지로 문덕카페" → ["문덕"]("을지로" 제거).
+// 몰/신도시어(스타필드·위례 등)는 '다른 브랜드 토큰이 남을 때만' 위치수식어로 제거한다.
+//   - "앤티앤스 스타필드 위례" → ["앤티앤스"] (브랜드 남음 → 몰/신도시 제거)
+//   - "미사강변 북카페" → ["미사강변"] (브랜드 없음 → '미사강변'이 유일 정체성이므로 유지)
 export function coreTokens(name: string, areaTerms: string[]): string[] {
   const an = areaTerms.map((a) => norm(a)).filter(Boolean);
-  return name.split(/\s+/)
+  const base = name.split(/\s+/)
     .map((t) => t.replace(GENERIC_SUFFIX, "").trim())
     .filter((t) => t.length >= 2)
     .filter((t) => !GENERIC_WORD.has(t.toLowerCase()))
     .filter((t) => !NAME_STOPWORD.has(t.toLowerCase()))
     .filter((t) => !an.some((a) => a.includes(norm(t)) || norm(t).includes(a)))
-    .filter((t) => !LOC_SUFFIX.test(t))
-    .filter((t) => !isVenueTok(t));
+    .filter((t) => !LOC_SUFFIX.test(t));
+  const branded = base.filter((t) => !isVenueTok(t));
+  return branded.length ? branded : base; // 브랜드 토큰이 남으면 몰/신도시 제거, 없으면 원래 유지
 }
 
 // 노이즈 게이트: 후기들이 '실제로 그 카페'를 말하는 비율(이름 일관성).
