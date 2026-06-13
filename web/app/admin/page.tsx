@@ -50,6 +50,8 @@ export default function AdminPage() {
   const [subscribers, setSubscribers] = useState<any[]>([]);
   const [showSubsModal, setShowSubsModal] = useState(false);
   const [showYtModal, setShowYtModal] = useState(false);
+  const [showVisits, setShowVisits] = useState(false);
+  const [visits, setVisits] = useState<any>(null);
   const loadSubscribers = (password: string) => fetch("/api/subscription?all=1", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) setSubscribers(d.subs ?? []); }).catch(() => {});
   const subAct = async (id: number, action: string) => { try { await fetch("/api/subscription", { method: "POST", headers: { "x-admin-password": pw, "Content-Type": "application/json" }, body: JSON.stringify({ id, action }) }); loadSubscribers(pw); fetch("/api/judge-status", { headers: { "x-admin-password": pw } }); } catch {} };
   // 🧮 AI 판정 진행 자동 갱신(20초) — 백그라운드 판정이 실시간 반영되게(새로고침 불필요)
@@ -284,11 +286,41 @@ export default function AdminPage() {
           )}
         </div>
 
-        {/* ===== 모달 트리거 (구독 카페 현황 · 유튜브 수집) ===== */}
-        <div className="flex gap-2 mb-6">
+        {/* ===== 모달 트리거 (구독 카페 현황 · 유튜브 수집 · 내 카페 기록) ===== */}
+        <div className="flex gap-2 mb-6 flex-wrap">
           <button onClick={() => setShowSubsModal(true)} className="flex-1 py-2.5 text-[13px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-xl">💳 구독 카페 현황{subscribers.length ? ` (${subscribers.length})` : ""}</button>
           <button onClick={() => setShowYtModal(true)} className="flex-1 py-2.5 text-[13px] font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded-xl">📺 유튜브 수집{yt?.withYt != null ? ` (${yt.withYt})` : ""}</button>
+          <button onClick={() => { setShowVisits(true); fetch("/api/admin/visits", { headers: { "x-admin-password": pw } }).then((x) => x.json()).then((d) => { if (d.ok) setVisits(d); }); }} className="flex-1 py-2.5 text-[13px] font-bold text-pink-700 bg-pink-50 border border-pink-200 rounded-xl">❤ 내 카페 기록{visits?.stat?.total != null ? ` (${visits.stat.total})` : ""}</button>
         </div>
+
+        {/* ❤ 내 카페 방문기록 모달 */}
+        {showVisits && (
+          <div className="fixed inset-0 z-[6000] flex items-end justify-center bg-black/40" onClick={() => setShowVisits(false)}>
+            <div className="w-full max-w-2xl bg-white rounded-t-2xl max-h-[88dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between px-4 py-3 border-b">
+                <span className="text-sm font-bold text-stone-800">❤ 내 카페 방문기록 {visits?.stat && <span className="text-[11px] text-stone-400 font-normal">총 {visits.stat.total} · 사용자 {visits.stat.users} · 즐겨찾기 {visits.stat.favs}</span>}</span>
+                <button onClick={() => setShowVisits(false)} className="text-2xl text-stone-400 leading-none">×</button>
+              </div>
+              <div className="overflow-y-auto flex-1 p-3 space-y-2">
+                {(visits?.visits ?? []).map((v: any) => (
+                  <div key={v.id} className="flex gap-3 border border-stone-200 rounded-xl p-3">
+                    {v.photo_url && <img src={v.photo_url} alt="" className="w-16 h-16 rounded-lg object-cover shrink-0" />}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        {v.favorite && <span className="text-amber-500">★</span>}
+                        <b className="text-[13px] text-stone-800">{v.cafe_name}</b>
+                        <span className="text-[10px] text-stone-400">{v.area}</span>
+                      </div>
+                      {v.memory && <div className="text-[12px] text-stone-600 mt-1 leading-relaxed whitespace-pre-wrap">{v.memory}</div>}
+                      <div className="text-[10px] text-stone-400 mt-1">{new Date(v.created_at).toLocaleString("ko-KR")} · 익명 {String(v.device_id).slice(0, 6)}</div>
+                    </div>
+                  </div>
+                ))}
+                {(!visits?.visits || visits.visits.length === 0) && <p className="text-[12px] text-stone-400 text-center py-6">아직 등록된 방문 기록이 없어요.</p>}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* 📺 유튜브 수집 현황 모달 */}
         {showYtModal && yt && (

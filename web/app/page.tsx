@@ -124,9 +124,10 @@ export default function Home() {
   // 내 카페(MY PIN) — 익명 기기기반
   const [deviceId, setDeviceId] = useState("");
   const [myCafeIds, setMyCafeIds] = useState<Set<number>>(new Set());
+  const [myVisits, setMyVisits] = useState<any[]>([]);
   const [myPinMode, setMyPinMode] = useState(false);
   const [showMyCafeReg, setShowMyCafeReg] = useState(false);
-  const reloadMyCafes = (dev: string) => fetch(`/api/my-cafe?device=${dev}`).then((r) => r.json()).then((d) => { if (d.ok) setMyCafeIds(new Set((d.cafes ?? []).map((c: any) => c.id))); }).catch(() => {});
+  const reloadMyCafes = (dev: string) => fetch(`/api/my-cafe?device=${dev}`).then((r) => r.json()).then((d) => { if (d.ok) { setMyVisits(d.cafes ?? []); setMyCafeIds(new Set((d.cafes ?? []).map((c: any) => c.id))); } }).catch(() => {});
   useEffect(() => {
     let dev = ""; try { dev = localStorage.getItem("dcn_device") || ""; if (!dev) { dev = (crypto.randomUUID?.() || String(Math.random()).slice(2) + Date.now()); localStorage.setItem("dcn_device", dev); } } catch {}
     setDeviceId(dev); if (dev) reloadMyCafes(dev);
@@ -593,7 +594,7 @@ export default function Home() {
         </div>
       )}
 
-      {showMyCafeReg && <MyCafeRegModal cafes={cafes} device={deviceId} onClose={() => setShowMyCafeReg(false)} onDone={() => { reloadMyCafes(deviceId); setMyPinMode(true); }} />}
+      {showMyCafeReg && <MyCafeRegModal cafes={cafes} device={deviceId} visits={myVisits} onClose={() => setShowMyCafeReg(false)} onDone={() => { reloadMyCafes(deviceId); setMyPinMode(true); }} />}
 
       {selected && <CafePanel cafe={selected} onClose={() => setSelected(null)} onMap={() => {
         if (selected.lat && selected.lng) {
@@ -1020,18 +1021,30 @@ function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; 
 }
 
 // 내 카페 등록 모달 — 검색→선택→사진→확인(30m 위치인증)→저장
-function MyCafeRegModal({ cafes, device, onClose, onDone }: { cafes: Cafe[]; device: string; onClose: () => void; onDone: () => void }) {
+function MyCafeRegModal({ cafes, device, visits, onClose, onDone }: { cafes: Cafe[]; device: string; visits: any[]; onClose: () => void; onDone: () => void }) {
   const [q, setQ] = useState("");
   const [picked, setPicked] = useState<Cafe | null>(null);
   const [photo, setPhoto] = useState<string | null>(null);
+  const [memory, setMemory] = useState("");
+  const [favorite, setFavorite] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
+  const [done, setDone] = useState<string | null>(null); // 저장 성공 멘트(카페명)
 
   const results = useMemo(() => {
     const k = q.replace(/\s/g, "").toLowerCase();
     if (k.length < 1) return [];
     return cafes.filter((c) => (c.name + c.area).replace(/\s/g, "").toLowerCase().includes(k)).slice(0, 20);
   }, [q, cafes]);
+
+  // 카페 선택 시 기존 기록(기억·즐겨찾기) 불러오기
+  const pick = (c: Cafe) => {
+    setPicked(c); setMsg("");
+    const prev = visits.find((v) => v.id === c.id);
+    setMemory(prev?.memory ?? "");
+    setFavorite(!!prev?.favorite);
+    setPhoto(null); // 새 사진은 다시 첨부(기존 사진은 서버에 유지됨)
+  };
 
   // 사진 선택 → 캔버스로 1000px 리사이즈(용량·전송 최적화)
   const onPhoto = (e: any) => {
@@ -1055,20 +1068,38 @@ function MyCafeRegModal({ cafes, device, onClose, onDone }: { cafes: Cafe[]; dev
       try {
         const r = await fetch("/api/my-cafe", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ cafeId: picked.id, device, userLat: pos.coords.latitude, userLng: pos.coords.longitude, photoBase64: photo }),
+          body: JSON.stringify({ cafeId: picked.id, device, userLat: pos.coords.latitude, userLng: pos.coords.longitude, photoBase64: photo, memory, favorite }),
         });
         const d = await r.json();
-        if (d.ok) { onDone(); onClose(); }
+        if (d.ok) { setDone(picked.name); onDone(); }
         else { setMsg(d.error || "등록 실패"); setBusy(false); }
       } catch { setMsg("네트워크 오류"); setBusy(false); }
     }, () => { setMsg("위치 권한을 허용해주세요 (카페 30m 인증 필요)"); setBusy(false); }, { enableHighAccuracy: true, timeout: 10000 });
   };
 
+  // 저장 성공 — 예쁜 멘트
+  if (done) {
+    return (
+      <div className="fixed inset-0 z-[5000] flex items-center justify-center px-6" style={{ background: "rgba(43,32,24,0.6)", fontFamily: "'Gowun Batang', serif" }} onClick={onClose}>
+        <div className="bg-[#fdfaf4] rounded-2xl px-7 py-8 text-center max-w-xs shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="text-[40px] mb-2">❤</div>
+          <div className="text-[16px] font-bold text-[#2b2018] mb-1.5">기억이 저장됐어요</div>
+          <div className="text-[13px] text-[#7a6452] leading-relaxed"><b className="text-[#d6336c]">{done}</b>에서의 소중한 기억이<br />지도에 ❤로 노출돼요.</div>
+          <button onClick={onClose} className="mt-5 w-full bg-[#d6336c] text-white rounded-xl py-2.5 font-bold text-[14px]">확인</button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-[5000] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)", fontFamily: "'Gowun Batang', serif" }} onClick={onClose}>
-      <div className="w-full max-w-lg bg-[#fdfaf4] rounded-t-2xl max-h-[88dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full max-w-lg bg-[#fdfaf4] rounded-t-2xl max-h-[90dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        {/* 헤더 — 즐겨찾기 별 */}
         <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-[#f0e6d4]">
-          <div className="font-bold text-[#2b2018] text-[15px]">❤ 내 카페 등록</div>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setFavorite((v) => !v)} aria-label="즐겨찾기" className="text-[22px] leading-none" style={{ color: favorite ? "#f0a832" : "#d8cab4" }}>{favorite ? "★" : "☆"}</button>
+            <div className="font-bold text-[#2b2018] text-[15px]">내 카페 등록</div>
+          </div>
           <button onClick={onClose} className="w-8 h-8 rounded-full bg-[#f0e6d4] text-[#7a6452] text-lg">×</button>
         </div>
         <div className="overflow-y-auto flex-1 p-4 space-y-3">
@@ -1078,9 +1109,9 @@ function MyCafeRegModal({ cafes, device, onClose, onDone }: { cafes: Cafe[]; dev
                 className="w-full border border-[#cbb89f] rounded-lg px-3 py-2.5 text-base bg-white" />
               <div className="space-y-1">
                 {results.map((c) => (
-                  <button key={c.id} onClick={() => { setPicked(c); setMsg(""); }} className="w-full text-left px-3 py-2.5 rounded-lg bg-white border border-[#e6d9c8] hover:bg-[#fdf6ee]">
-                    <div className="text-[14px] font-medium text-[#2b2018]">{c.name}</div>
-                    <div className="text-[11px] text-[#9c6b3f]">{c.area}</div>
+                  <button key={c.id} onClick={() => pick(c)} className="w-full text-left px-3 py-2.5 rounded-lg bg-white border border-[#e6d9c8] hover:bg-[#fdf6ee] flex items-center justify-between">
+                    <div><div className="text-[14px] font-medium text-[#2b2018]">{c.name}</div><div className="text-[11px] text-[#9c6b3f]">{c.area}</div></div>
+                    {visits.some((v) => v.id === c.id) && <span className="text-[10px] text-[#d6336c] font-bold">❤ 기록있음</span>}
                   </button>
                 ))}
                 {q.length >= 1 && results.length === 0 && <p className="text-[12px] text-[#a8927a] px-1">검색 결과가 없어요</p>}
@@ -1098,10 +1129,18 @@ function MyCafeRegModal({ cafes, device, onClose, onDone }: { cafes: Cafe[]; dev
                   : <div className="w-full py-8 rounded-lg border-2 border-dashed border-[#cbb89f] text-center text-[12px] text-[#9c6b3f] bg-white">사진 추가하기</div>}
                 <input type="file" accept="image/*" capture="environment" onChange={onPhoto} className="hidden" />
               </label>
+              {/* 기억 — 카페에서의 나의 경험 */}
+              <div>
+                <div className="text-[12px] text-[#7a6452] mb-1.5 font-medium">기억 — 이 카페에서의 나의 경험</div>
+                <textarea value={memory} onChange={(e) => setMemory(e.target.value)} rows={4} maxLength={2000}
+                  placeholder="오늘의 커피, 분위기, 함께한 사람… 소중한 순간을 적어보세요."
+                  className="w-full border border-[#cbb89f] rounded-lg px-3 py-2.5 text-[14px] bg-white resize-none leading-relaxed" />
+                <div className="text-right text-[10px] text-[#a8927a]">{memory.length}/2000</div>
+              </div>
               <p className="text-[11px] text-[#a8927a] leading-relaxed">※ 타인의 얼굴·개인정보가 담긴 사진은 올리지 마세요. 등록 시 카페 30m 이내에서만 인증돼요.</p>
               {msg && <p className="text-[12px] text-[#c0392b]">{msg}</p>}
               <button onClick={submit} disabled={busy} className="w-full bg-[#d6336c] text-white rounded-xl py-3 font-bold text-[14px] disabled:opacity-60">
-                {busy ? "확인 중..." : "확인 (위치 인증 후 등록)"}
+                {busy ? "확인 중..." : "최종 저장 (위치 인증 후)"}
               </button>
             </>
           )}

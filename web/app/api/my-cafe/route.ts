@@ -14,6 +14,8 @@ async function ensure() {
     created_at TIMESTAMPTZ DEFAULT now(),
     UNIQUE(cafe_id, device_id)
   )`;
+  await sql`ALTER TABLE user_visits ADD COLUMN IF NOT EXISTS memory TEXT`.catch(() => {});
+  await sql`ALTER TABLE user_visits ADD COLUMN IF NOT EXISTS favorite BOOLEAN DEFAULT false`.catch(() => {});
 }
 
 // 하버사인 거리(m)
@@ -24,18 +26,18 @@ function distM(la1: number, ln1: number, la2: number, ln2: number) {
   return 2 * R * Math.asin(Math.sqrt(a));
 }
 
-const RADIUS_M = 30; // 인증 반경
+const RADIUS_M = 30;
 
-// 내가 등록한 카페 목록 (지도 MY PIN용)
+// 내 기록 목록 (지도 MY PIN + 과거 기억 확인용)
 export async function GET(req: NextRequest) {
   await ensure();
   const device = req.nextUrl.searchParams.get("device");
   if (!device) return NextResponse.json({ ok: true, cafes: [] });
   const rows = await sql`
-    SELECT c.id, c.name, c.area, c.lat, c.lng, v.photo_url, v.created_at
+    SELECT c.id, c.name, c.area, c.lat, c.lng, v.photo_url, v.memory, v.favorite, v.created_at
     FROM user_visits v JOIN cafes c ON c.id = v.cafe_id
     WHERE v.device_id = ${device} AND v.verified = true
-    ORDER BY v.created_at DESC`;
+    ORDER BY v.favorite DESC, v.created_at DESC`;
   return NextResponse.json({ ok: true, cafes: rows });
 }
 
@@ -44,7 +46,7 @@ export async function POST(req: NextRequest) {
   try {
     await ensure();
     const body = await req.json();
-    const { cafeId, device, userLat, userLng, photoBase64 } = body;
+    const { cafeId, device, userLat, userLng, photoBase64, memory, favorite } = body;
     if (!cafeId || !device || userLat == null || userLng == null)
       return NextResponse.json({ ok: false, error: "필수값 누락" }, { status: 400 });
 
@@ -65,9 +67,15 @@ export async function POST(req: NextRequest) {
       photoUrl = blob.url;
     }
 
-    await sql`INSERT INTO user_visits (cafe_id, device_id, photo_url, verified)
-      VALUES (${cafeId}, ${device}, ${photoUrl}, true)
-      ON CONFLICT (cafe_id, device_id) DO UPDATE SET photo_url = COALESCE(EXCLUDED.photo_url, user_visits.photo_url), verified = true, created_at = now()`;
+    const mem = typeof memory === "string" && memory.trim() ? memory.slice(0, 2000) : null;
+    const fav = !!favorite;
+
+    await sql`INSERT INTO user_visits (cafe_id, device_id, photo_url, memory, favorite, verified)
+      VALUES (${cafeId}, ${device}, ${photoUrl}, ${mem}, ${fav}, true)
+      ON CONFLICT (cafe_id, device_id) DO UPDATE SET
+        photo_url = COALESCE(EXCLUDED.photo_url, user_visits.photo_url),
+        memory = COALESCE(EXCLUDED.memory, user_visits.memory),
+        favorite = EXCLUDED.favorite, verified = true, created_at = now()`;
 
     return NextResponse.json({ ok: true, cafe: { id: cafe.id, name: cafe.name }, dist: Math.round(d) });
   } catch (e) {
