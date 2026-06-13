@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { put } from "@vercel/blob";
+import { hashPin } from "@/lib/pin";
 export const runtime = "nodejs";
 
 // 방문 기록 테이블 (익명 기기기반). 사용자 raw 좌표는 저장 안 함(개인정보 최소화).
@@ -18,6 +19,8 @@ async function ensure() {
   await sql`ALTER TABLE user_visits ADD COLUMN IF NOT EXISTS favorite BOOLEAN DEFAULT false`.catch(() => {});
   // finalized: 위치인증(임시저장) 후 "추억을 기록합니다" 확정 단계. 기존 행은 DEFAULT true로 자동 백필(이미 노출 중이던 기록 유지).
   await sql`ALTER TABLE user_visits ADD COLUMN IF NOT EXISTS finalized BOOLEAN DEFAULT true`.catch(() => {});
+  // 공용 PC 잠금 PIN(기기별). GET에서 잠금 판단에 사용.
+  await sql`CREATE TABLE IF NOT EXISTS device_pins (device_id TEXT PRIMARY KEY, pin_hash TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT now())`.catch(() => {});
 }
 
 // 하버사인 거리(m)
@@ -35,6 +38,13 @@ export async function GET(req: NextRequest) {
   await ensure();
   const device = req.nextUrl.searchParams.get("device");
   if (!device) return NextResponse.json({ ok: true, cafes: [] });
+  // 공용 PC 잠금: PIN이 설정돼 있고 올바른 PIN이 없으면 기록을 내주지 않음(locked)
+  const [pinRow] = await sql`SELECT pin_hash FROM device_pins WHERE device_id = ${device} LIMIT 1` as any[];
+  if (pinRow) {
+    const pin = req.nextUrl.searchParams.get("pin") || "";
+    if (!pin || pinRow.pin_hash !== hashPin(device, pin))
+      return NextResponse.json({ ok: true, locked: true, hasPin: true, cafes: [] });
+  }
   const rows = await sql`
     SELECT c.id, c.name, c.area, c.lat, c.lng, v.photo_url, v.memory, v.favorite, v.created_at
     FROM user_visits v JOIN cafes c ON c.id = v.cafe_id
@@ -50,8 +60,13 @@ export async function POST(req: NextRequest) {
   try {
     await ensure();
     const body = await req.json();
-    const { action, cafeId, device, userLat, userLng, photoBase64, memory, favorite } = body;
+    const { action, cafeId, device, userLat, userLng, photoBase64, memory, favorite, pin } = body;
     if (!cafeId || !device) return NextResponse.json({ ok: false, error: "필수값 누락" }, { status: 400 });
+
+    // 공용 PC 잠금: PIN 설정된 기기는 올바른 PIN 없이 기록 추가/수정 불가
+    const [pinRow] = await sql`SELECT pin_hash FROM device_pins WHERE device_id = ${device} LIMIT 1` as any[];
+    if (pinRow && pinRow.pin_hash !== hashPin(device, pin || ""))
+      return NextResponse.json({ ok: false, locked: true, error: "잠금 상태예요. PIN을 먼저 입력해주세요." }, { status: 403 });
 
     const [cafe] = await sql`SELECT id, name, lat, lng FROM cafes WHERE id = ${cafeId} AND published = true LIMIT 1` as any[];
     if (!cafe || cafe.lat == null) return NextResponse.json({ ok: false, error: "카페를 찾을 수 없어요" }, { status: 404 });

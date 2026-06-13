@@ -128,10 +128,20 @@ export default function Home() {
   const [myPinMode, setMyPinMode] = useState(false);
   const [showMyCafeReg, setShowMyCafeReg] = useState(false);
   const [showMyMemory, setShowMyMemory] = useState(false);
-  const reloadMyCafes = (dev: string) => fetch(`/api/my-cafe?device=${dev}`).then((r) => r.json()).then((d) => { if (d.ok) { setMyVisits(d.cafes ?? []); setMyCafeIds(new Set((d.cafes ?? []).map((c: any) => c.id))); } }).catch(() => {});
+  const [myLocked, setMyLocked] = useState(false); // 공용 PC 잠금 상태
+  const [sessionPin, setSessionPin] = useState(""); // 이번 세션에 입력한 PIN(해제용)
+  const reloadMyCafes = (dev: string, pin = "") => fetch(`/api/my-cafe?device=${dev}${pin ? `&pin=${encodeURIComponent(pin)}` : ""}`).then((r) => r.json()).then((d) => {
+    if (d.ok) {
+      setMyLocked(!!d.locked);
+      setMyVisits(d.cafes ?? []);
+      setMyCafeIds(new Set((d.cafes ?? []).map((c: any) => c.id)));
+      if (d.locked) setMyPinMode(false);
+    }
+  }).catch(() => {});
   useEffect(() => {
     let dev = ""; try { dev = localStorage.getItem("dcn_device") || ""; if (!dev) { dev = (crypto.randomUUID?.() || String(Math.random()).slice(2) + Date.now()); localStorage.setItem("dcn_device", dev); } } catch {}
-    setDeviceId(dev); if (dev) reloadMyCafes(dev);
+    let pin = ""; try { pin = sessionStorage.getItem("dcn_pin") || ""; } catch {}
+    setDeviceId(dev); setSessionPin(pin); if (dev) reloadMyCafes(dev, pin);
   }, []);
   // 자연어 검색
   const [showSearch, setShowSearch] = useState(false);
@@ -570,10 +580,10 @@ export default function Home() {
             <div ref={mapRef} className="w-full h-full md:rounded-2xl overflow-hidden bg-[#e8e0d3] z-0" />
             {/* 내 카페(MY PIN) — 지도 상단 */}
             <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[1100] flex gap-2">
-              <button onClick={() => setMyPinMode((v) => !v)}
+              <button onClick={() => { if (myLocked) setShowMyMemory(true); else setMyPinMode((v) => !v); }}
                 className={`px-3.5 py-2 rounded-full text-[12px] font-bold shadow-lg transition-colors ${myPinMode ? "text-white" : "bg-white text-[#d6336c] border border-[#f0c4d4]"}`}
                 style={myPinMode ? { background: "#d6336c" } : {}}>
-                ❤ 내 카페{myCafeIds.size ? ` ${myCafeIds.size}` : ""}
+                {myLocked ? "🔒 내 카페" : `❤ 내 카페${myCafeIds.size ? ` ${myCafeIds.size}` : ""}`}
               </button>
               <button onClick={() => setShowMyCafeReg(true)}
                 className="px-3.5 py-2 rounded-full text-[12px] font-bold shadow-lg bg-[#2b2018] text-[#f4ece0]">
@@ -600,9 +610,12 @@ export default function Home() {
         </div>
       )}
 
-      {showMyCafeReg && <MyCafeRegModal cafes={cafes} device={deviceId} visits={myVisits} onClose={() => setShowMyCafeReg(false)} onDone={() => { reloadMyCafes(deviceId); setMyPinMode(true); }} />}
-      {showMyMemory && <MyMemoryModal device={deviceId} visits={myVisits} onClose={() => setShowMyMemory(false)}
-        onRestore={(dev: string) => { try { localStorage.setItem("dcn_device", dev); } catch {} setDeviceId(dev); reloadMyCafes(dev); setMyPinMode(true); }} />}
+      {showMyCafeReg && <MyCafeRegModal cafes={cafes} device={deviceId} visits={myVisits} pin={sessionPin} onClose={() => setShowMyCafeReg(false)} onDone={() => { reloadMyCafes(deviceId, sessionPin); setMyPinMode(true); }} />}
+      {showMyMemory && <MyMemoryModal device={deviceId} visits={myVisits} locked={myLocked} sessionPin={sessionPin}
+        onClose={() => setShowMyMemory(false)}
+        onUnlock={(p: string) => { try { sessionStorage.setItem("dcn_pin", p); } catch {} setSessionPin(p); setMyLocked(false); reloadMyCafes(deviceId, p); }}
+        onLock={() => { try { sessionStorage.removeItem("dcn_pin"); } catch {} setSessionPin(""); reloadMyCafes(deviceId, ""); }}
+        onRestore={(dev: string) => { try { localStorage.setItem("dcn_device", dev); } catch {} setDeviceId(dev); reloadMyCafes(dev, ""); setMyPinMode(true); }} />}
 
       {selected && <CafePanel cafe={selected} onClose={() => setSelected(null)} onMap={() => {
         if (selected.lat && selected.lng) {
@@ -1052,7 +1065,7 @@ function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; 
 }
 
 // 내 카페 등록 모달 — 검색→선택→사진→확인(30m 위치인증)→저장
-function MyCafeRegModal({ cafes, device, visits, onClose, onDone }: { cafes: Cafe[]; device: string; visits: any[]; onClose: () => void; onDone: () => void }) {
+function MyCafeRegModal({ cafes, device, visits, pin = "", onClose, onDone }: { cafes: Cafe[]; device: string; visits: any[]; pin?: string; onClose: () => void; onDone: () => void }) {
   const [q, setQ] = useState("");
   const [picked, setPicked] = useState<Cafe | null>(null);
   const [photo, setPhoto] = useState<string | null>(null);
@@ -1101,7 +1114,7 @@ function MyCafeRegModal({ cafes, device, visits, onClose, onDone }: { cafes: Caf
       try {
         const r = await fetch("/api/my-cafe", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "stage", cafeId: picked.id, device, userLat: pos.coords.latitude, userLng: pos.coords.longitude, photoBase64: photo, memory, favorite }),
+          body: JSON.stringify({ action: "stage", cafeId: picked.id, device, pin, userLat: pos.coords.latitude, userLng: pos.coords.longitude, photoBase64: photo, memory, favorite }),
         });
         const d = await r.json();
         if (d.ok) { setStaged(true); setMsg(""); setBusy(false); } // 위치인증 통과 → 추억 기록 팝업
@@ -1117,7 +1130,7 @@ function MyCafeRegModal({ cafes, device, visits, onClose, onDone }: { cafes: Caf
     try {
       const r = await fetch("/api/my-cafe", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "commit", cafeId: picked.id, device, memory, favorite }),
+        body: JSON.stringify({ action: "commit", cafeId: picked.id, device, pin, memory, favorite }),
       });
       const d = await r.json();
       if (d.ok) { setDone(picked.name); onDone(); }
@@ -1219,11 +1232,53 @@ function MyCafeRegModal({ cafes, device, visits, onClose, onDone }: { cafes: Caf
 }
 
 // 내 기억 관리 — 백업코드 발급/복원 + PDF·JSON 내보내기 (개인정보 0)
-function MyMemoryModal({ device, visits, onClose, onRestore }: { device: string; visits: any[]; onClose: () => void; onRestore: (dev: string) => void }) {
+function MyMemoryModal({ device, visits, locked = false, sessionPin = "", onClose, onRestore, onUnlock, onLock }: { device: string; visits: any[]; locked?: boolean; sessionPin?: string; onClose: () => void; onRestore: (dev: string) => void; onUnlock?: (pin: string) => void; onLock?: () => void }) {
   const [code, setCode] = useState("");
   const [inputCode, setInputCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
+  // PIN 잠금
+  const [hasPin, setHasPin] = useState(false);
+  const [unlockPin, setUnlockPin] = useState("");
+  const [pinMode, setPinMode] = useState<"" | "set" | "change" | "remove">("");
+  const [pinA, setPinA] = useState(""); // 현재/새 PIN
+  const [pinB, setPinB] = useState(""); // 변경 시 새 PIN
+
+  useEffect(() => {
+    fetch(`/api/my-cafe/pin?device=${device}`).then((r) => r.json()).then((d) => { if (d.ok) setHasPin(!!d.hasPin); }).catch(() => {});
+  }, [device]);
+
+  const pinApi = (body: any) => fetch("/api/my-cafe/pin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ device, ...body }) }).then((r) => r.json());
+
+  const doUnlock = async () => {
+    if (!unlockPin) { setMsg("PIN을 입력해주세요"); return; }
+    setBusy(true); setMsg("");
+    const d = await pinApi({ action: "verify", pin: unlockPin }).catch(() => ({ ok: false }));
+    setBusy(false);
+    if (d.ok && d.valid) { onUnlock?.(unlockPin); setUnlockPin(""); }
+    else setMsg("PIN이 올바르지 않아요");
+  };
+  const doSetPin = async () => {
+    setBusy(true); setMsg("");
+    const d = await pinApi({ action: "set", pin: pinA }).catch(() => ({ ok: false }));
+    setBusy(false);
+    if (d.ok) { setHasPin(true); setPinMode(""); onUnlock?.(pinA); setPinA(""); setMsg("PIN이 설정됐어요. 이제 이 기기는 PIN 없이는 기록이 안 보여요."); }
+    else setMsg(d.error || "설정 실패");
+  };
+  const doChangePin = async () => {
+    setBusy(true); setMsg("");
+    const d = await pinApi({ action: "change", pin: pinA, newPin: pinB }).catch(() => ({ ok: false }));
+    setBusy(false);
+    if (d.ok) { setPinMode(""); onUnlock?.(pinB); setPinA(""); setPinB(""); setMsg("PIN을 변경했어요."); }
+    else setMsg(d.error || "변경 실패");
+  };
+  const doRemovePin = async () => {
+    setBusy(true); setMsg("");
+    const d = await pinApi({ action: "remove", pin: pinA }).catch(() => ({ ok: false }));
+    setBusy(false);
+    if (d.ok) { setHasPin(false); setPinMode(""); setPinA(""); setMsg("PIN을 해제했어요."); }
+    else setMsg(d.error || "해제 실패");
+  };
 
   const issueCode = async () => {
     setBusy(true); setMsg("");
@@ -1271,12 +1326,34 @@ function MyMemoryModal({ device, visits, onClose, onRestore }: { device: string;
     if (w) { w.document.write(html); w.document.close(); } else setMsg("팝업이 차단됐어요. 팝업을 허용해주세요.");
   };
 
+  // 잠금 상태 — PIN 입력 화면만 노출(기록 안 보임)
+  if (locked) {
+    return (
+      <div className="fixed inset-0 z-[5000] flex items-center justify-center px-6" style={{ background: "rgba(43,32,24,0.6)", fontFamily: "'Gowun Batang', serif" }} onClick={onClose}>
+        <div className="bg-[#fdfaf4] rounded-2xl px-7 py-8 text-center max-w-xs w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="text-[34px] mb-2">🔒</div>
+          <div className="text-[16px] font-bold text-[#2b2018] mb-1">잠긴 추억 보관소</div>
+          <div className="text-[12px] text-[#7a6452] leading-relaxed mb-4">공용 PC 보호를 위해 PIN으로 잠겨 있어요.<br />내 PIN을 입력하면 내 기록만 보여요.</div>
+          <input value={unlockPin} onChange={(e) => setUnlockPin(e.target.value.replace(/\D/g, ""))} inputMode="numeric" maxLength={8}
+            onKeyDown={(e) => e.key === "Enter" && doUnlock()} autoFocus placeholder="PIN (숫자)"
+            className="w-full border border-[#cbb89f] rounded-lg px-3 py-2.5 text-[18px] text-center tracking-[0.4em] bg-white mb-2" />
+          {msg && <p className="text-[12px] text-[#c0392b] mb-2">{msg}</p>}
+          <button onClick={doUnlock} disabled={busy} className="w-full bg-[#2b2018] text-[#f4ece0] rounded-xl py-2.5 font-bold text-[14px] disabled:opacity-60">{busy ? "확인 중..." : "잠금 해제"}</button>
+          <button onClick={onClose} className="mt-2 w-full text-[#9c6b3f] text-[13px] py-1">닫기</button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-[5000] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)", fontFamily: "'Gowun Batang', serif" }} onClick={onClose}>
       <div className="w-full max-w-lg bg-[#fdfaf4] rounded-t-2xl max-h-[88dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-[#f0e6d4]">
           <div className="font-bold text-[#2b2018] text-[15px]">🗃 추억 보관소</div>
-          <button onClick={onClose} className="w-8 h-8 rounded-full bg-[#f0e6d4] text-[#7a6452] text-lg">×</button>
+          <div className="flex items-center gap-2">
+            {hasPin && <button onClick={() => onLock?.()} className="text-[11px] font-bold text-[#9c6b3f] border border-[#e6d9c8] rounded-full px-2.5 py-1">🔒 지금 잠그기</button>}
+            <button onClick={onClose} className="w-8 h-8 rounded-full bg-[#f0e6d4] text-[#7a6452] text-lg">×</button>
+          </div>
         </div>
         <div className="overflow-y-auto flex-1 p-4 space-y-5">
           <p className="text-[12px] text-[#7a6452] leading-relaxed bg-[#f3ede1] rounded-lg px-3 py-2.5">
@@ -1314,6 +1391,53 @@ function MyMemoryModal({ device, visits, onClose, onRestore }: { device: string;
               <button onClick={exportJSON} disabled={!visits.length} className="flex-1 border-2 border-[#cbb89f] text-[#524434] rounded-lg py-2.5 text-[13px] font-bold bg-white disabled:opacity-50">JSON으로 저장</button>
             </div>
             <p className="text-[10px] text-[#a8927a] mt-1.5">PDF는 보기 좋게, JSON은 백업·재가져오기용. 파일은 본인 기기에만 저장돼요.</p>
+          </div>
+
+          {/* ④ 공용 PC 잠금 (PIN) */}
+          <div className="border-t border-[#f0e6d4] pt-4">
+            <div className="text-[13px] font-bold text-[#2b2018] mb-1.5">④ 공용 PC 잠금 (PIN)</div>
+            {!hasPin ? (
+              pinMode === "set" ? (
+                <div className="space-y-2">
+                  <input value={pinA} onChange={(e) => setPinA(e.target.value.replace(/\D/g, ""))} inputMode="numeric" maxLength={8} placeholder="새 PIN (숫자 4~8자리)"
+                    className="w-full border border-[#cbb89f] rounded-lg px-3 py-2.5 text-[15px] tracking-[0.3em] bg-white" />
+                  <div className="flex gap-2">
+                    <button onClick={doSetPin} disabled={busy || pinA.length < 4} className="flex-1 bg-[#2b2018] text-[#f4ece0] rounded-lg py-2.5 text-[13px] font-bold disabled:opacity-50">설정</button>
+                    <button onClick={() => { setPinMode(""); setPinA(""); }} className="px-4 text-[#9c6b3f] text-[13px]">취소</button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <button onClick={() => { setPinMode("set"); setMsg(""); }} className="w-full border-2 border-[#cbb89f] text-[#524434] rounded-lg py-2.5 text-[13px] font-bold bg-white">PIN 설정하기</button>
+                  <p className="text-[10px] text-[#a8927a] mt-1.5">PIN을 걸면 이 기기에서 <b>PIN을 입력해야만</b> 내 추억이 보여요. 카페·도서관 등 공용 PC에서 추천해요.</p>
+                </>
+              )
+            ) : pinMode === "change" ? (
+              <div className="space-y-2">
+                <input value={pinA} onChange={(e) => setPinA(e.target.value.replace(/\D/g, ""))} inputMode="numeric" maxLength={8} placeholder="현재 PIN"
+                  className="w-full border border-[#cbb89f] rounded-lg px-3 py-2.5 text-[15px] tracking-[0.3em] bg-white" />
+                <input value={pinB} onChange={(e) => setPinB(e.target.value.replace(/\D/g, ""))} inputMode="numeric" maxLength={8} placeholder="새 PIN (4~8자리)"
+                  className="w-full border border-[#cbb89f] rounded-lg px-3 py-2.5 text-[15px] tracking-[0.3em] bg-white" />
+                <div className="flex gap-2">
+                  <button onClick={doChangePin} disabled={busy || pinB.length < 4} className="flex-1 bg-[#2b2018] text-[#f4ece0] rounded-lg py-2.5 text-[13px] font-bold disabled:opacity-50">변경</button>
+                  <button onClick={() => { setPinMode(""); setPinA(""); setPinB(""); }} className="px-4 text-[#9c6b3f] text-[13px]">취소</button>
+                </div>
+              </div>
+            ) : pinMode === "remove" ? (
+              <div className="space-y-2">
+                <input value={pinA} onChange={(e) => setPinA(e.target.value.replace(/\D/g, ""))} inputMode="numeric" maxLength={8} placeholder="현재 PIN (해제 확인)"
+                  className="w-full border border-[#cbb89f] rounded-lg px-3 py-2.5 text-[15px] tracking-[0.3em] bg-white" />
+                <div className="flex gap-2">
+                  <button onClick={doRemovePin} disabled={busy} className="flex-1 bg-[#c0392b] text-white rounded-lg py-2.5 text-[13px] font-bold disabled:opacity-50">PIN 해제</button>
+                  <button onClick={() => { setPinMode(""); setPinA(""); }} className="px-4 text-[#9c6b3f] text-[13px]">취소</button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <button onClick={() => { setPinMode("change"); setMsg(""); }} className="flex-1 border-2 border-[#cbb89f] text-[#524434] rounded-lg py-2.5 text-[13px] font-bold bg-white">PIN 변경</button>
+                <button onClick={() => { setPinMode("remove"); setMsg(""); }} className="flex-1 border-2 border-[#e3b8b0] text-[#c0392b] rounded-lg py-2.5 text-[13px] font-bold bg-white">PIN 해제</button>
+              </div>
+            )}
           </div>
 
           {msg && <p className="text-[12px] text-[#c0392b]">{msg}</p>}
