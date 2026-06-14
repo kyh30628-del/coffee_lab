@@ -53,7 +53,8 @@ export async function GET(req: NextRequest) {
       if (r90 < 3) continue; // 최근 버즈가 의미 있는 곳만
       const share = total > 0 ? r90 / total : 0;
       const delta = hasDelta && deltaMap.has(c.id) ? total - (deltaMap.get(c.id) ?? total) : null;
-      let score = r90 * (0.6 + 0.8 * Math.min(share, 1));
+      // '요즘 뜨는' = 가장 최근 한 달(30일)을 가장 무겁게(×2) + 3개월(90일) 버즈 + 최근 집중도 보정.
+      let score = r30 * 2 + r90 * (0.6 + 0.8 * Math.min(share, 1));
       if (delta && delta > 0) score += delta * 3;
       const reason = (delta && delta > 0)
         ? `최근 검증후기 +${delta}건 늘며 상승세 · 3개월 ${r90}건`
