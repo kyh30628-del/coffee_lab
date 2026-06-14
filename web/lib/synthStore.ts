@@ -101,9 +101,10 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   const cur = (await sql`SELECT pipeline_status FROM cafes WHERE id=${cafeId} LIMIT 1`)[0] as any;
   const pst: string | null = cur?.pipeline_status ?? null;
   const held = pst === "held"; // 그라운딩 '근거0건' 확정 보류 — 재합성해도 비공개 고정(규칙이 못 잡는 의미적 오염)
+  const stuckNoise = pst === "noise" || noisy; // 노이즈(이름 오염)로 한번 걸리면 영구 탈락 — 재합성해도 비공개 고정(사장님: 제거된 노이즈는 항상 탈락)
   const inPipeline = pst === "new" || pst === "pending" || pst === "rejected";
-  const newPst = held ? "held" : inPipeline ? (ruleOk ? "pending" : "rejected") : pst;
-  const publish = (held || inPipeline) ? false : ruleOk; // held·파이프라인은 비공개 고정, 나머지는 규칙대로
+  const newPst = held ? "held" : stuckNoise ? "noise" : inPipeline ? (ruleOk ? "pending" : "rejected") : pst;
+  const publish = (held || stuckNoise || inPipeline) ? false : ruleOk; // held·노이즈·파이프라인은 비공개 고정, 나머지는 규칙대로
 
   if (llmJudged) {
     await sql`UPDATE cafes SET synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${JSON.stringify(evidenceReviews)}, synth_reviews_all=${allEv}, char_scores=${JSON.stringify(charScores)}, synth_quality=${JSON.stringify(quality)}, review_dates=${JSON.stringify(reviewDates)}, pipeline_status=${newPst}, synth_updated=now(), llm_judged_at=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN 36.8 AND 38.3 AND lng BETWEEN 124.5 AND 127.9) WHERE id=${cafeId}`;
