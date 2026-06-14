@@ -76,12 +76,22 @@ export async function GET(req: NextRequest) {
       COUNT(*) FILTER (WHERE pipeline_status='rejected')::int rejected
       FROM cafes`)[0] as any;
 
+    // 오늘(KST) 수집·진행 현황 + 동 백필 커버리지 — 관리자 '오늘의 수집' 패널용. KST 자정 기준 인라인.
+    const td = (await sql`SELECT
+      COUNT(*) FILTER (WHERE created_at >= date_trunc('day', now() AT TIME ZONE 'Asia/Seoul') AT TIME ZONE 'Asia/Seoul')::int new_today,
+      COUNT(*) FILTER (WHERE synth_updated >= date_trunc('day', now() AT TIME ZONE 'Asia/Seoul') AT TIME ZONE 'Asia/Seoul')::int synth_today,
+      COUNT(*) FILTER (WHERE published AND synth_updated >= date_trunc('day', now() AT TIME ZONE 'Asia/Seoul') AT TIME ZONE 'Asia/Seoul')::int published_today,
+      COUNT(*) FILTER (WHERE dong IS NOT NULL)::int has_dong,
+      COUNT(*) FILTER (WHERE pipeline_status='noise')::int noise,
+      COUNT(*) FILTER (WHERE pipeline_status='new')::int new_q
+      FROM cafes`)[0] as any;
+
     // ── 2) 자가 치유 ──
     let promoted = 0;
     if (heal) {
       // (a) 합성 적체(raw 있는데 미합성) 메움 → 신규 'new'가 'pending'으로 진행
       if (c.synth_q > 0) {
-        const todo = await sql`SELECT id, name, area FROM cafes WHERE raw_reviews IS NOT NULL AND synth_updated IS NULL LIMIT 20`;
+        const todo = await sql`SELECT id, name, area FROM cafes WHERE raw_reviews IS NOT NULL AND synth_updated IS NULL LIMIT 50`;
         let done = 0;
         for (const cf of todo as any[]) { try { await synthAndStore(cf, { refresh: false }); done++; } catch {} }
         if (done) healed.push(`합성 적체 ${done}건 처리`);
@@ -147,7 +157,8 @@ export async function GET(req: NextRequest) {
     const health = {
       generatedAt: new Date(now).toISOString(),
       overall, alerts, healed,
-      coverage: { total: c.total, published: c.published, rawCachedPct: pct(c.raw_cached), judgedPct: pct(c.judged), embeddedPct: pct(c.embedded) },
+      coverage: { total: c.total, published: c.published, rawCachedPct: pct(c.raw_cached), judgedPct: pct(c.judged), embeddedPct: pct(c.embedded), dongPct: pct(td.has_dong) },
+      today: { newCafes: td.new_today, synthesized: td.synth_today, published: td.published_today, hasDong: td.has_dong, dongPct: pct(td.has_dong), noise: td.noise, newQueue: td.new_q },
       pipeline, agents,
     };
 

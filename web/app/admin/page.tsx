@@ -189,6 +189,26 @@ export default function AdminPage() {
               {tower.healed?.length > 0 && (
                 <div className="mb-2.5 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">🔧 자가치유: {tower.healed.join(" · ")}</div>
               )}
+              {tower.today && (
+                <div className="mb-2.5">
+                  <div className="text-[10px] font-bold text-stone-500 mb-1.5">📅 오늘의 수집 (KST · 자동 갱신)</div>
+                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
+                    {[
+                      { l: "오늘 신규발굴", v: tower.today.newCafes, c: "text-amber-700 bg-amber-50 border-amber-200" },
+                      { l: "오늘 합성", v: tower.today.synthesized, c: "text-sky-700 bg-sky-50 border-sky-200" },
+                      { l: "오늘 공개", v: tower.today.published, c: "text-emerald-700 bg-emerald-50 border-emerald-200" },
+                      { l: "동 채움", v: `${tower.today.dongPct}%`, c: "text-stone-700 bg-stone-50 border-stone-200" },
+                      { l: "노이즈탈락", v: tower.today.noise, c: "text-stone-500 bg-stone-50 border-stone-200" },
+                      { l: "합성대기", v: tower.today.newQueue, c: "text-amber-600 bg-amber-50 border-amber-200" },
+                    ].map((t) => (
+                      <div key={t.l} className={`rounded-xl border px-2 py-2 text-center ${t.c}`}>
+                        <div className="text-[15px] font-extrabold leading-none">{typeof t.v === "number" ? t.v.toLocaleString() : t.v}</div>
+                        <div className="text-[9px] mt-1 font-bold whitespace-nowrap">{t.l}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {tower.agents?.map((a: any) => (
                   <div key={a.key} className="rounded-xl border border-stone-100 bg-stone-50 px-3 py-2.5">
