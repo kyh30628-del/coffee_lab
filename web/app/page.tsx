@@ -29,13 +29,17 @@ const REGIONS: Record<string, string[]> = {
   인천: ["중구","동구","미추홀구","연수구","남동구","부평구","계양구","서구","강화군","옹진군"],
 };
 const SIDO_CENTER: Record<string, [number, number, number]> = { 서울: [37.5665, 126.978, 11], 경기: [37.4138, 127.5183, 9], 인천: [37.4563, 126.7052, 11] };
+// area별 결과 캐시 — area 종류는 ~64개뿐이라, 1만건을 매번 64개 순회(64만 연산)하던 걸 O(1)로.
+const _guCache = new Map<string, { sido: string; sigungu: string }>();
 function toGu(area: string): { sido: string; sigungu: string } {
   const a = (area ?? "").trim();
-  if (a.includes("인천")) { for (const gu of REGIONS["인천"]) { if (a.includes(gu)) return { sido: "인천", sigungu: gu }; } return { sido: "인천", sigungu: "" }; }
-  for (const [sido, list] of Object.entries(REGIONS)) { for (const gu of list) { if (a.includes(gu)) return { sido, sigungu: gu }; } }
-  if (a.includes("구리")) return { sido: "경기", sigungu: "구리시" };
-  if (a.includes("하남")) return { sido: "경기", sigungu: "하남시" };
-  return { sido: "", sigungu: "" };
+  const hit = _guCache.get(a); if (hit) return hit;
+  let res: { sido: string; sigungu: string } = { sido: "", sigungu: "" };
+  if (a.includes("인천")) { res = { sido: "인천", sigungu: "" }; for (const gu of REGIONS["인천"]) { if (a.includes(gu)) { res = { sido: "인천", sigungu: gu }; break; } } }
+  else { outer: for (const [sido, list] of Object.entries(REGIONS)) { for (const gu of list) { if (a.includes(gu)) { res = { sido, sigungu: gu }; break outer; } } }
+    if (!res.sigungu) { if (a.includes("구리")) res = { sido: "경기", sigungu: "구리시" }; else if (a.includes("하남")) res = { sido: "경기", sigungu: "하남시" }; } }
+  _guCache.set(a, res);
+  return res;
 }
 
 const CONSENT_VERSION = "v1";
@@ -632,13 +636,14 @@ export default function Home() {
     // 주의: 의존성에 tab을 넣지 말 것(탭 전환마다 재렌더되어 느려짐). 데이터/필터 변경 시에만.
   }, [filtered, matchSet, sido, sigungu, focusId, mapReady, myPinMode, myCafeIds, othersMode, othersPins, drawMarkers]);
 
-  // 줌·이동이 끝나면 현재 화면에 맞춰 마커를 다시 그린다 → 줌인 시 그 영역 핀이 동적으로 전환됨.
+  // 줌·이동이 끝나면 개별 카페 레벨일 때만 다시 그린다(뷰포트 캡). 집계 원형마커는 화면과 무관하므로 팬마다 재집계 안 함 → 1만건에서도 가벼움.
   useEffect(() => {
     const map = mapObj.current;
     if (!map || !mapReady) return;
-    map.on("moveend", drawMarkers);
-    return () => { map.off("moveend", drawMarkers); };
-  }, [drawMarkers, mapReady]);
+    const onMove = () => { if (dong || focusId || myPinMode || othersMode) drawMarkers(); };
+    map.on("moveend", onMove);
+    return () => { map.off("moveend", onMove); };
+  }, [drawMarkers, mapReady, dong, focusId, myPinMode, othersMode]);
 
   // 다른 사람은 — 토글 켜면 집계 핀 로드(한 번)
   useEffect(() => {
