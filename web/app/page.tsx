@@ -371,20 +371,40 @@ export default function Home() {
   // 뒤로가기 가드: 현재 UI 레이어를 ref로 추적(리스너에서 최신값 참조)
   const uiRef = useRef<{ selected: boolean; showSearch: boolean; showConsent: boolean; tab: string; role: string | null; ownerPwModal: boolean }>({ selected: false, showSearch: false, showConsent: false, tab: "home", role: null, ownerPwModal: false });
   uiRef.current = { selected: !!selected, showSearch, showConsent, tab, role, ownerPwModal };
-  // 뒤로가기: 모달 닫기 → 지도→홈 → 홈→랜딩 → 랜딩에서 '한 번 더' 후 종료
+  // 위에서 연 레이어를 우선순위대로 즉시 닫는다(공통). allowMapBack=false면 지도→홈은 건너뜀(지도 패닝과 충돌 방지).
+  const closeTopLayer = (allowMapBack = true) => {
+    const u = uiRef.current;
+    if (u.ownerPwModal) { setOwnerPwModal(false); return true; }
+    if (u.showSearch) { setShowSearch(false); return true; }
+    if (u.selected) { setSelected(null); return true; }
+    if (u.showConsent) { setShowConsent(false); return true; }
+    if (allowMapBack && u.tab === "map") { setTab("home"); return true; }
+    if (u.tab === "home" && u.role !== null) { try { sessionStorage.removeItem("dcn_role"); } catch {} setRole(null); return true; }
+    return false;
+  };
+  // 뒤로가기 처리
   useEffect(() => {
+    const iosPWA = typeof navigator !== "undefined" && (navigator as { standalone?: boolean }).standalone === true;
+    if (iosPWA) {
+      // iOS 홈화면 PWA: history 가로채기를 쓰면 OS의 느린 뒤로가기 슬라이드 애니메이션이 끼어든다.
+      // → history를 건드리지 않고(애니메이션 없음) 좌측 엣지 스와이프를 직접 감지해 즉시 닫는다.
+      let sx = 0, sy = 0, track = false;
+      const onStart = (e: TouchEvent) => { const t = e.touches[0]; if (t && t.clientX <= 30) { sx = t.clientX; sy = t.clientY; track = true; } else track = false; };
+      const onEnd = (e: TouchEvent) => {
+        if (!track) return; track = false;
+        const t = e.changedTouches[0]; if (!t) return;
+        if (t.clientX - sx > 55 && Math.abs(t.clientY - sy) < 45) closeTopLayer(false); // 좌→우 스와이프 = 뒤로가기(즉시). 지도→홈은 제외(패닝 충돌 방지)
+      };
+      window.addEventListener("touchstart", onStart, { passive: true });
+      window.addEventListener("touchend", onEnd, { passive: true });
+      return () => { window.removeEventListener("touchstart", onStart); window.removeEventListener("touchend", onEnd); };
+    }
+    // 안드로이드/브라우저: 하드웨어 뒤로가기 버튼을 위해 history 기반 유지
     history.pushState(null, "", location.href);
     let lastBack = 0;
     const rearm = () => history.pushState(null, "", location.href);
     const onPop = () => {
-      const u = uiRef.current;
-      if (u.ownerPwModal) { setOwnerPwModal(false); rearm(); return; }
-      if (u.showSearch) { setShowSearch(false); rearm(); return; }
-      if (u.selected) { setSelected(null); rearm(); return; }
-      if (u.showConsent) { setShowConsent(false); rearm(); return; }
-      if (u.tab === "map") { setTab("home"); rearm(); return; }
-      if (u.role !== null) { try { sessionStorage.removeItem("dcn_role"); } catch {} setRole(null); rearm(); return; } // 홈 → 랜딩
-      // 랜딩: 한 번 더 누르면 종료
+      if (closeTopLayer()) { rearm(); return; }
       if (Date.now() - lastBack < 2000) { window.removeEventListener("popstate", onPop); history.back(); return; }
       lastBack = Date.now(); setBackToast(true); setTimeout(() => setBackToast(false), 2000); rearm();
     };
