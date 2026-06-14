@@ -709,12 +709,14 @@ export default function Home() {
       {/* 하단 빠른 액션 바 — 모바일 전용. 홈 인디케이터 안전영역까지 배경이 채워짐 */}
       <nav className="md:hidden shrink-0 bg-[#fdfaf4] border-t border-[#ece0cd] flex items-stretch" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
         {[
+          { k: "home", label: "홈", icon: <path d="M3 11.2 12 4l9 7.2M5.5 9.7V20h13V9.7" />, fill: false },
           { k: "fav", label: "즐겨찾기", icon: <path d="M12 4.5l2.3 4.7 5.2.8-3.75 3.65.9 5.15L12 16.9l-4.65 2.45.9-5.15L4.5 10l5.2-.8z" />, fill: true },
           { k: "search", label: "검색", icon: <><circle cx="11" cy="11" r="6.5" /><path d="M16 16l4.5 4.5" /></>, fill: false },
           { k: "loc", label: "내 위치", icon: <><path d="M12 21c4.2-4 7-7.2 7-10.5A7 7 0 0 0 5 10.5C5 13.8 7.8 17 12 21Z" /><circle cx="12" cy="10.5" r="2.4" /></>, fill: false },
         ].map((a) => (
           <button key={a.k} onClick={() => {
-            if (a.k === "fav") setShowFavs(true);
+            if (a.k === "home") setTab("home");
+            else if (a.k === "fav") setShowFavs(true);
             else if (a.k === "search") { setSearchRes(null); setSearchQ(""); setShowSearch(true); }
             else openLocation();
           }} className="flex-1 flex flex-col items-center justify-center gap-0.5 py-1.5 active:bg-[#f3ede1]" aria-label={a.label}>
