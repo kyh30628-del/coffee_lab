@@ -617,13 +617,14 @@ export default function Home() {
     } else if (myPinMode || othersMode) {
       const src = myPinMode ? filtered.filter((c) => myCafeIds.has(c.id)) : othersPins;
       const pts = src.map((c: any) => [c.lat, c.lng] as [number, number]).filter((p) => p[0] && p[1]);
-      if (pts.length) map.fitBounds(L.latLngBounds(pts), { padding: [60, 60], maxZoom: pts.length === 1 ? 14 : 15 });
-      else if (sido && SIDO_CENTER[sido]) { const [la, ln, z] = SIDO_CENTER[sido]; map.setView([la, ln], z); }
+      if (pts.length) map.flyToBounds(L.latLngBounds(pts), { padding: [60, 60], maxZoom: pts.length === 1 ? 14 : 15, duration: 0.7 });
+      else if (sido && SIDO_CENTER[sido]) { const [la, ln, z] = SIDO_CENTER[sido]; map.flyTo([la, ln], z, { duration: 0.7 }); }
     } else if (filtered.length > 0 && (sido || sigungu)) {
+      // 선택 지역으로 부드럽게 줌인 → 하위(구/동) 집계 마커 표시. 다이나믹 드릴다운.
       const lats = filtered.map((c) => c.lat), lngs = filtered.map((c) => c.lng);
-      map.fitBounds(L.latLngBounds([[Math.min(...lats), Math.min(...lngs)], [Math.max(...lats), Math.max(...lngs)]]), { padding: [50, 50], maxZoom: 15 });
-    } else if (sido && SIDO_CENTER[sido]) { const [la, ln, z] = SIDO_CENTER[sido]; map.setView([la, ln], z); }
-    else { map.setView([37.5, 127.05], 9); } // 전체(시도 미선택) → 수도권 전역으로 줌아웃해 시도 집계 원형 표시
+      map.flyToBounds(L.latLngBounds([[Math.min(...lats), Math.min(...lngs)], [Math.max(...lats), Math.max(...lngs)]]), { padding: [50, 50], maxZoom: 15, duration: 0.7 });
+    } else if (sido && SIDO_CENTER[sido]) { const [la, ln, z] = SIDO_CENTER[sido]; map.flyTo([la, ln], z, { duration: 0.7 }); }
+    else { map.flyTo([37.5, 127.05], 9, { duration: 0.7 }); } // 전체(시도 미선택) → 수도권 전역으로 부드럽게 줌아웃해 시도 집계 원형 표시
     drawMarkers();
     // 주의: 의존성에 tab을 넣지 말 것(탭 전환마다 재렌더되어 느려짐). 데이터/필터 변경 시에만.
   }, [filtered, matchSet, sido, sigungu, focusId, mapReady, myPinMode, myCafeIds, othersMode, othersPins, drawMarkers]);
