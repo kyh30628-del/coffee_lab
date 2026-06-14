@@ -14,13 +14,21 @@ let done = 0, skipped = 0, consecSkip = 0, consecErr = 0, stop = "";
 
 try {
   while (done + skipped < MAX && !stop) {
-    let rows;
-    try { rows = await sql`SELECT id, name, area FROM cafes WHERE raw_reviews IS NULL ORDER BY id LIMIT 10`; }
+    // ① 신규(raw 없음) 우선 수집. ② 신규가 없으면 '가장 오래 전 수집된 카페부터' 후기 재수집(refresh)으로 신선도 유지.
+    //    → 큐가 비어도 멈추지 않고 네이버 한도를 매일 후기 갱신에 활용(사장님 지적: 시키지 않으면 안 돈다 → 상시 자동 갱신).
+    let rows, refresh = false;
+    try {
+      rows = await sql`SELECT id, name, area FROM cafes WHERE raw_reviews IS NULL ORDER BY id LIMIT 10`;
+      if (!rows.length) {
+        rows = await sql`SELECT id, name, area FROM cafes ORDER BY raw_collected_at ASC NULLS FIRST LIMIT 10`;
+        refresh = true; // 재수집 모드(네이버 새로 호출). synthAndStore가 raw_collected_at=now()로 갱신 → 자동 순환
+      }
+    }
     catch (e) { stop = "DB 조회 실패(쿼터?) — 중단, 다음 회차 재개: " + String(e).slice(0, 50); break; }
-    if (!rows.length) { stop = "raw NULL 카페 없음 — 전체 완료"; break; }
+    if (!rows.length) { stop = "카페 없음"; break; }
     for (const c of rows) {
       try {
-        const r = await synthAndStore(c, { refresh: false });
+        const r = await synthAndStore(c, { refresh });
         if (r && r.skipped) { skipped++; consecSkip++; }
         else { done++; consecSkip = 0; consecErr = 0; if (done % 20 === 0) console.log(`  …${done}곳 수집 (${c.name})`); }
       } catch (e) {
