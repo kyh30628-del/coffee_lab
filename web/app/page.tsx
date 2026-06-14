@@ -471,14 +471,19 @@ export default function Home() {
       <div className="flex flex-col items-center justify-center px-6" style={{ minHeight: "100dvh", background: "#2b2018", color: "#f4ece0", fontFamily: "'Gowun Batang', serif" }}>
         <style>{`
           @keyframes dcnRise { from { opacity:0; transform: translateY(22px); } to { opacity:1; transform: translateY(0); } }
-          @keyframes dcnShimmer { to { background-position: 230% center; } }
+          /* 홀로그램: 무지갯빛이 가로로 천천히 흐르며 미세하게 색조가 도는 은은한 효과(평평·베벨 없음) */
+          @keyframes dcnHolo {
+            0%   { background-position:   0% 50%; filter: hue-rotate(0deg); }
+            50%  { background-position: 100% 50%; filter: hue-rotate(-7deg); }
+            100% { background-position:   0% 50%; filter: hue-rotate(0deg); }
+          }
           .dcn-rise { animation: dcnRise .9s cubic-bezier(.2,.7,.2,1) both; }
           .dcn-title {
             display:inline-block;
-            background: linear-gradient(110deg,#efe6d6 33%,#f7d9a0 47%,#e8b87a 50%,#f7d9a0 53%,#efe6d6 67%);
-            background-size: 240% auto; -webkit-background-clip:text; background-clip:text;
+            background: linear-gradient(100deg,#efe7d9 0%,#f3d7a8 16%,#ecc4cf 32%,#c8ddd9 50%,#d7cde8 68%,#f3d7a8 84%,#efe7d9 100%);
+            background-size: 220% auto; -webkit-background-clip:text; background-clip:text;
             -webkit-text-fill-color:transparent; color:transparent;
-            animation: dcnRise 1s cubic-bezier(.2,.7,.2,1) both, dcnShimmer 6s linear .9s infinite;
+            animation: dcnRise 1s cubic-bezier(.2,.7,.2,1) both, dcnHolo 11s ease-in-out .9s infinite;
           }
           @keyframes dcnSteam {
             0%   { opacity:0; transform: translateY(2px) translateX(0) scaleX(.8); }
@@ -914,13 +919,17 @@ function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; 
         {!promo && (
           <div style={{ background: "#2b2018", fontFamily: "'Gowun Batang', serif" }} className="w-full px-5 pt-5 pb-4">
             <style>{`
-              @keyframes dcnShimmerB { to { background-position: 230% center; } }
+              @keyframes dcnHoloB {
+                0%   { background-position:   0% 50%; filter: hue-rotate(0deg); }
+                50%  { background-position: 100% 50%; filter: hue-rotate(-7deg); }
+                100% { background-position:   0% 50%; filter: hue-rotate(0deg); }
+              }
               .dcn-title-b {
                 display: inline-block;
-                background: linear-gradient(110deg,#efe6d6 33%,#f7d9a0 47%,#e8b87a 50%,#f7d9a0 53%,#efe6d6 67%);
-                background-size: 240% auto; -webkit-background-clip: text; background-clip: text;
+                background: linear-gradient(100deg,#efe7d9 0%,#f3d7a8 16%,#ecc4cf 32%,#c8ddd9 50%,#d7cde8 68%,#f3d7a8 84%,#efe7d9 100%);
+                background-size: 220% auto; -webkit-background-clip: text; background-clip: text;
                 -webkit-text-fill-color: transparent; color: transparent;
-                animation: dcnShimmerB 6s linear infinite;
+                animation: dcnHoloB 11s ease-in-out infinite;
               }
             `}</style>
             <div className="dcn-title-b text-[1.15rem] font-bold tracking-tight leading-snug mb-1">동네 커피 노트</div>
