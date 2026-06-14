@@ -38,17 +38,18 @@ async function main() {
   if (!process.env.CLAUDE_CODE_OAUTH_TOKEN) { console.error("CLAUDE_CODE_OAUTH_TOKEN 필요(scripts/.judge.env)"); process.exit(0); }
   await sql`CREATE TABLE IF NOT EXISTS grounding_checks (cafe_id INT PRIMARY KEY, grounded BOOLEAN, issue TEXT, checked_at TIMESTAMPTZ DEFAULT now())`;
   // ONLY=suspects: 의심(grounded=false)만 재검사(자가치유 후 플래그 해소용). 기본: 교정된 의심 우선 → 미검사 → 오래된 순.
+  // held(근거0건 보류) 카페도 재검사 대상에 포함 → 개선되면 grounded=true로 복귀 가능(데드락 방지).
   const onlySuspects = process.env.GROUNDING_ONLY === "suspects";
   const rows = onlySuspects
     ? await sql`
         SELECT c.id, c.name, c.synth_identity, c.synth_reviews FROM cafes c
         JOIN grounding_checks g ON g.cafe_id = c.id
-        WHERE c.published AND g.grounded = false AND c.synth_identity IS NOT NULL AND c.synth_reviews IS NOT NULL AND jsonb_array_length(c.synth_reviews) > 0
+        WHERE (c.published OR c.pipeline_status = 'held') AND g.grounded = false AND c.synth_identity IS NOT NULL AND c.synth_reviews IS NOT NULL AND jsonb_array_length(c.synth_reviews) > 0
         ORDER BY g.checked_at ASC LIMIT ${MAX}`
     : await sql`
         SELECT c.id, c.name, c.synth_identity, c.synth_reviews FROM cafes c
         LEFT JOIN grounding_checks g ON g.cafe_id = c.id
-        WHERE c.published AND c.synth_identity IS NOT NULL AND c.synth_reviews IS NOT NULL AND jsonb_array_length(c.synth_reviews) > 0
+        WHERE (c.published OR c.pipeline_status = 'held') AND c.synth_identity IS NOT NULL AND c.synth_reviews IS NOT NULL AND jsonb_array_length(c.synth_reviews) > 0
         ORDER BY (g.grounded = false AND c.synth_updated > g.checked_at) DESC, g.checked_at ASC NULLS FIRST LIMIT ${MAX}`;
   let done = 0, flagged = 0;
   for (const c of rows) {

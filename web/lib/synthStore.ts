@@ -100,9 +100,10 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   //   기존 카페(pipeline_status=NULL=grandfather, 또는 이미 live)는 현행대로 규칙 게이트로 공개.
   const cur = (await sql`SELECT pipeline_status FROM cafes WHERE id=${cafeId} LIMIT 1`)[0] as any;
   const pst: string | null = cur?.pipeline_status ?? null;
+  const held = pst === "held"; // 그라운딩 '근거0건' 확정 보류 — 재합성해도 비공개 고정(규칙이 못 잡는 의미적 오염)
   const inPipeline = pst === "new" || pst === "pending" || pst === "rejected";
-  const newPst = inPipeline ? (ruleOk ? "pending" : "rejected") : pst; // 파이프라인 카페만 상태 갱신, 아니면 보존
-  const publish = inPipeline ? false : ruleOk; // 파이프라인 카페는 항상 비공개(승격 전), 나머지는 규칙대로
+  const newPst = held ? "held" : inPipeline ? (ruleOk ? "pending" : "rejected") : pst;
+  const publish = (held || inPipeline) ? false : ruleOk; // held·파이프라인은 비공개 고정, 나머지는 규칙대로
 
   if (llmJudged) {
     await sql`UPDATE cafes SET synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${JSON.stringify(evidenceReviews)}, synth_reviews_all=${allEv}, char_scores=${JSON.stringify(charScores)}, synth_quality=${JSON.stringify(quality)}, review_dates=${JSON.stringify(reviewDates)}, pipeline_status=${newPst}, synth_updated=now(), llm_judged_at=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN 36.8 AND 38.3 AND lng BETWEEN 124.5 AND 127.9) WHERE id=${cafeId}`;
@@ -133,6 +134,30 @@ export async function scrubPublishedPII(): Promise<{ scrubbed: number; names: st
     names.push(c.name);
   }
   return { scrubbed: bad.length, names: names.slice(0, 10) };
+}
+
+// 🚷 그라운딩 '근거 0건'(전부 다른 가게) 확정 카페 자동 보류(비공개). 진짜 근거 일부 있는 곳은 제외.
+//   release: 재그라운딩에서 grounded=true로 바뀐 held 카페는 'live'로 복귀(데이터 개선 시 자동 복원).
+export async function holdZeroEvidenceSuspects(): Promise<{ held: number; released: number; names: string[] }> {
+  await sql`CREATE TABLE IF NOT EXISTS grounding_checks (cafe_id INT PRIMARY KEY, grounded BOOLEAN, issue TEXT, checked_at TIMESTAMPTZ DEFAULT now())`.catch(() => {});
+  // 보류: grounded=false + 이슈가 '진짜 근거 0건'임을 명시(전부 다른 가게 / 후기 0건 / 자체 없음).
+  //   ⚠️ '모두 커피특성으로 재표현'(업종오인=코끼리베이글) 같은 건 제외 — 진짜 근거 있는 곳은 유지.
+  const heldRows = (await sql`
+    UPDATE cafes SET published = false, pipeline_status = 'held'
+    WHERE pipeline_status IS DISTINCT FROM 'held'
+      AND id IN (
+        SELECT g.cafe_id FROM grounding_checks g
+        WHERE g.grounded = false AND (
+          g.issue ~ '(후기[^,.]{0,6}0건|커피 후기 0|후기[^,.]{0,4}자체 없|전부 다른 (가게|업체|점포)|전부 카페가 아|건 전부.{0,16}(다른|아님|아닌|카페가 아))'
+        ))
+    RETURNING name`) as any[];
+  // 복귀: held였는데 재그라운딩에서 grounded=true → 다시 live(다음 재합성이 규칙대로 공개)
+  const rel = (await sql`
+    UPDATE cafes SET pipeline_status = 'live'
+    WHERE pipeline_status = 'held'
+      AND id IN (SELECT cafe_id FROM grounding_checks WHERE grounded = true)
+    RETURNING name`) as any[];
+  return { held: heldRows.length, released: rel.length, names: heldRows.map((r) => r.name).slice(0, 8) };
 }
 
 // 🩺 LLM 그라운딩 의심(업체혼동·환각) 자가치유 — 재합성으로 교정(개선엔진: 오염제거·로스팅환각 차단).
