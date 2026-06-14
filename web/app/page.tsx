@@ -121,48 +121,6 @@ function topChars(c: Cafe, n = 4) {
   return Object.entries(cs).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, n).map(([k, v]) => ({ ...(CHAR_LABELS[k] ?? { label: k, emoji: "" }), score: v }));
 }
 
-// 앱 실행 인트로 — 잔이 팝업되며 둥실 떠오르고 홀로그램 색조가 도는 애니메이션, 2초 후 페이드아웃.
-function SplashScreen({ onSkip }: { onSkip: () => void }) {
-  return (
-    <div onClick={onSkip} className="dcn-splash" style={{ position: "fixed", inset: 0, zIndex: 9999, background: "#2b2018", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", paddingTop: "env(safe-area-inset-top)", fontFamily: "'Gowun Batang', serif" }}>
-      <style>{`
-        @keyframes dcnSplashOut { 0%,60% { opacity:1; } 100% { opacity:0; visibility:hidden; } }
-        @keyframes dcnPop { 0% { transform:scale(.62) translateY(8px); opacity:0; } 60% { transform:scale(1.05) translateY(0); opacity:1; } 100% { transform:scale(1); } }
-        @keyframes dcnRingS { 0% { transform:scale(.7); opacity:.4; } 100% { transform:scale(1.55); opacity:0; } }
-        .dcn-splash { animation: dcnSplashOut 1s ease forwards; }
-        .dcn-splash-pop { animation: dcnPop .5s cubic-bezier(.2,.8,.3,1.25) both; transform-origin:center bottom; }
-        .dcn-splash-ring { animation: dcnRingS 1s ease-out .2s 1 forwards; transform-origin:center; }
-        .dcn-splash-ttl { animation: dcnPop .55s cubic-bezier(.2,.8,.3,1.1) .16s both; }
-        @media (prefers-reduced-motion: reduce) { .dcn-splash{animation:none} .dcn-splash-pop,.dcn-splash-ring,.dcn-splash-ttl{ animation:none; } }
-      `}</style>
-      <div className="dcn-splash-pop" style={{ position: "relative" }}>
-        <span className="dcn-splash-ring" style={{ position: "absolute", inset: 0, margin: "auto", width: 128, height: 128, top: 0, bottom: 0, left: 0, right: 0, borderRadius: "50%", border: "2px solid rgba(243,215,168,0.5)" }} />
-        <svg className="dcn-splash-cup" width="128" height="128" viewBox="0 0 512 512" aria-label="동네 커피 노트" role="img">
-          <defs>
-            <linearGradient id="holoSp" x1="0.2" y1="0" x2="0.5" y2="1">
-              <stop offset="0" stopColor="#f8f1e3" /><stop offset="0.5" stopColor="#efd9b2" /><stop offset="1" stopColor="#e0c293" />
-            </linearGradient>
-            <linearGradient id="saucerSp" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stopColor="#ecd6b2" /><stop offset="1" stopColor="#cdaf83" />
-            </linearGradient>
-          </defs>
-          <g fill="none" stroke="#f3e7d0" strokeWidth="11" strokeLinecap="round" opacity="0.45">
-            <path d="M214 168 c -15 -16 13 -28 0 -50 c -13 -22 15 -30 0 -50" />
-            <path d="M256 162 c -15 -16 13 -28 0 -50 c -13 -22 15 -30 0 -50" />
-            <path d="M298 168 c -15 -16 13 -28 0 -50 c -13 -22 15 -30 0 -50" />
-          </g>
-          <ellipse cx="256" cy="374" rx="152" ry="30" fill="url(#saucerSp)" />
-          <path d="M348 244 a 40 40 0 0 1 0 76" fill="none" stroke="url(#holoSp)" strokeWidth="22" strokeLinecap="round" />
-          <path d="M152 216 L172 330 Q177 358 210 360 H302 Q335 358 340 330 L360 216 Z" fill="url(#holoSp)" />
-          <ellipse cx="256" cy="216" rx="104" ry="22" fill="#f4e8d2" />
-          <ellipse cx="256" cy="216" rx="90" ry="16" fill="#4a2f1d" />
-        </svg>
-      </div>
-      <div className="dcn-splash-ttl" style={{ marginTop: 16, fontSize: 25, fontWeight: 700, letterSpacing: "-0.01em", color: "#f0dcb6" }}>동네 커피 노트</div>
-    </div>
-  );
-}
-
 export default function Home() {
   const [cafes, setCafes] = useState<Cafe[]>([]);
   const [selected, setSelected] = useState<Cafe | null>(null);
@@ -210,14 +168,6 @@ export default function Home() {
   const anonRef = useRef("");
   // 랜딩/역할 분리 + 사장님 인증 + 뒤로가기 안내
   const [role, setRole] = useState<"consumer" | "owner" | null>(null);
-  const [splash, setSplash] = useState(false); // 앱 실행 인트로(애니메이션 잔)
-  useEffect(() => {
-    let shown = false; try { shown = sessionStorage.getItem("dcn_splash") === "1"; } catch {}
-    if (shown) return;
-    setSplash(true); try { sessionStorage.setItem("dcn_splash", "1"); } catch {}
-    const t = setTimeout(() => setSplash(false), 1000);
-    return () => clearTimeout(t);
-  }, []);
   const [ownerPwModal, setOwnerPwModal] = useState(false);
   const [ownerPw, setOwnerPw] = useState("");
   const [ownerErr, setOwnerErr] = useState("");
@@ -514,9 +464,6 @@ export default function Home() {
       setOwnerPwModal(false); setRole("owner");
     } catch { setOwnerErr("네트워크 오류"); }
   };
-
-  // ── 앱 실행 인트로(애니메이션 잔) ──
-  if (splash) return <SplashScreen onSkip={() => setSplash(false)} />;
 
   // ── 랜딩(초기화면): 소비자 / 사장님 분리 ──
   if (role === null) {
