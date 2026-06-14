@@ -8,7 +8,9 @@ const SECRET = process.env.NAVER_CLIENT_SECRET;
 // 대규모 저가 프랜차이즈 제외(스페셜티 체인은 유지)
 const FRANCHISE = ["스타벅스", "투썸", "이디야", "메가커피", "메가엠지씨", "메가MGC", "메가mgc", "빽다방", "컴포즈", "커피빈", "할리스", "엔제리너스", "파스쿠찌", "탐앤탐스", "폴바셋", "드롭탑", "요거프레소", "더벤티", "매머드", "공차", "스무디킹", "스벅", "투썸플레이스", "카페베네", "페이바", "감성커피", "더카페", "코너스톤", "하삼동", "매가", "벤티", "고나우", "만랩", "토프레소", "셀렉토", "더리터", "달콤커피", "커피스미스", "주커피", "백억커피", "쥬씨", "더치앤빈", "빈스빈스", "커피명가", "커피에반하다", "카페보니또", "더착한커피", "감탄커피",
   // 베이커리·도넛·아이스크림 대기업 프랜차이즈(원칙: 프랜차이즈 제외)
-  "던킨", "파리바게뜨", "파리바게트", "뚜레쥬르", "뚜레주르", "베스킨라빈스", "배스킨라빈스", "베스킨라", "배스킨라", "크리스피크림", "설빙", "나뚜루", "커피베이", "디저트39"];
+  "던킨", "파리바게뜨", "파리바게트", "뚜레쥬르", "뚜레주르", "베스킨라빈스", "배스킨라빈스", "베스킨라", "배스킨라", "크리스피크림", "설빙", "나뚜루", "커피베이", "디저트39",
+  // 추가 누락분(베이커리·카페·디저트 대기업 프랜차이즈)
+  "아티제", "카페마마스", "빈스앤베리즈", "그라찌에", "브레댄코", "띠아모", "콜드스톤", "하겐다즈", "커피니", "신라명과"];
 // 이름에 들어있으면(지점이어도) 비카페인 '음식·소매' 키워드
 const NON_CAFE = ["고로케", "정육", "세탁소", "치킨집", "피자", "분식", "국밥", "삼겹", "횟집", "노래방", "PC방", "문구"];
 // 이름이 이 시설명으로 '끝'나면(지점 ○○점 제외) 카페가 아닌 시설 자체
@@ -146,7 +148,7 @@ async function localSearch(query: string) {
     name: stripTags(it.title),
     address: it.roadAddress || it.address || "",
     dong: parseDong(it.address || ""), // 지번에서 동/읍/면 추출(계층 필터·지도 집계용)
-    category: it.category || "",
+    category: stripTags(it.category || ""),
     lng: it.mapx ? Number(it.mapx) / 1e7 : null,
     lat: it.mapy ? Number(it.mapy) / 1e7 : null,
   }));
@@ -181,19 +183,21 @@ export async function discoverRegion(region: string, areaLabel: string, keywords
 
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS pipeline_status TEXT`.catch(() => {});
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS dong TEXT`.catch(() => {});
+  await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS naver_category TEXT`.catch(() => {});
   let inserted = 0, skipped = 0, backfilled = 0;
   for (const it of found) {
-    const exists = await sql`SELECT id, dong FROM cafes WHERE name = ${it.name} OR (ABS(lat - ${it.lat}) < 0.0005 AND ABS(lng - ${it.lng}) < 0.0005) LIMIT 1`;
+    const exists = await sql`SELECT id, dong, naver_category FROM cafes WHERE name = ${it.name} OR (ABS(lat - ${it.lat}) < 0.0005 AND ABS(lng - ${it.lng}) < 0.0005) LIMIT 1`;
     if (exists.length > 0) {
-      // 기존 카페: 동 정보가 없으면 지번에서 파싱한 동으로 백필(추가 호출 없이 발굴 중 채움).
+      // 기존 카페: 동·카테고리 정보가 없으면 발굴 중 백필(추가 호출 없이). 카테고리는 비카페 게이트 정확도에 중요.
       if (it.dong && !exists[0].dong) { await sql`UPDATE cafes SET dong = ${it.dong} WHERE id = ${exists[0].id}`; backfilled++; }
+      if (it.category && !exists[0].naver_category) { await sql`UPDATE cafes SET naver_category = ${it.category} WHERE id = ${exists[0].id}`; }
       skipped++; continue;
     }
     const pseudoId = `nl_${it.name.replace(/\s/g, "")}_${Math.round(it.lat * 1e5)}`;
     // 신규 카페는 pipeline_status='new'로 태어남 → 풀 게이트(합성·AI판정·임베딩·검증) 통과 후에만 공개.
     await sql`
-      INSERT INTO cafes (place_id, name, area, dong, address, lat, lng, source, published, roasts_own, pipeline_status)
-      VALUES (${pseudoId}, ${it.name}, ${storeArea}, ${it.dong}, ${it.address}, ${it.lat}, ${it.lng}, 'discover', false, false, 'new')
+      INSERT INTO cafes (place_id, name, area, dong, naver_category, address, lat, lng, source, published, roasts_own, pipeline_status)
+      VALUES (${pseudoId}, ${it.name}, ${storeArea}, ${it.dong}, ${it.category}, ${it.address}, ${it.lat}, ${it.lng}, 'discover', false, false, 'new')
       ON CONFLICT (place_id) DO NOTHING`;
     inserted++;
   }

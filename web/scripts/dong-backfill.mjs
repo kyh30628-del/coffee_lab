@@ -7,6 +7,7 @@ for (const l of env.split("\n")) { const m = l.match(/^([A-Z_0-9]+)=(.*)$/); if 
 
 const { parseDong } = await import("../lib/discover.ts");
 const { sql } = await import("../lib/db.ts");
+const { isFranchise, isNonCafe } = await import("../lib/discover.ts");
 const ID = process.env.NAVER_CLIENT_ID, SECRET = process.env.NAVER_CLIENT_SECRET;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const strip = (s) => (s || "").replace(/<[^>]+>/g, "").trim();
@@ -17,27 +18,37 @@ async function search(q) {
   if (r.status === 429) return { quota: true, items: [] };
   if (!r.ok) return { items: [] };
   const d = await r.json();
-  return { items: (d.items ?? []).map((it) => ({ name: strip(it.title), jibun: it.address || "", lat: it.mapy ? Number(it.mapy) / 1e7 : null, lng: it.mapx ? Number(it.mapx) / 1e7 : null })) };
+  return { items: (d.items ?? []).map((it) => ({ name: strip(it.title), jibun: it.address || "", category: strip(it.category || ""), lat: it.mapy ? Number(it.mapy) / 1e7 : null, lng: it.mapx ? Number(it.mapx) / 1e7 : null })) };
 }
 
-let done = 0, miss = 0, cursor = 0, stop = "";
+await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS naver_category TEXT`.catch(() => {});
+let done = 0, miss = 0, refiltered = 0, cursor = 0, stop = "";
 const MAX = Number(process.env.DONG_MAX || 20000);
 try {
   while (done + miss < MAX && !stop) {
-    const rows = await sql`SELECT id, name, area, lat, lng FROM cafes WHERE dong IS NULL AND lat IS NOT NULL AND id > ${cursor} ORDER BY id LIMIT 25`;
-    if (!rows.length) { stop = "동 없는 카페 소진 — 완료"; break; }
+    // 동 또는 카테고리가 비어 있는 카페 — 한 번의 검색으로 동+카테고리 백필 + 비카페/프랜차이즈 재필터.
+    const rows = await sql`SELECT id, name, area, lat, lng FROM cafes WHERE (dong IS NULL OR naver_category IS NULL) AND lat IS NOT NULL AND id > ${cursor} ORDER BY id LIMIT 25`;
+    if (!rows.length) { stop = "동·카테고리 미보유 카페 소진 — 완료"; break; }
     for (const c of rows) {
       cursor = c.id;
       try {
         const res = await search(`${c.name} ${c.area}`);
         if (res.quota) { stop = "네이버 한도 도달 — 중단(다음날 재개)"; break; }
-        // 좌표 100m 이내 일치 우선, 없으면 이름 일치, 없으면 1순위
         const m = res.items.find((it) => it.lat && Math.abs(it.lat - c.lat) < 0.001 && Math.abs(it.lng - c.lng) < 0.001)
           || res.items.find((it) => it.name.replace(/\s/g, "") === c.name.replace(/\s/g, ""))
           || res.items[0];
         const dong = m ? parseDong(m.jibun) : null;
-        if (dong) { await sql`UPDATE cafes SET dong = ${dong} WHERE id = ${c.id}`; done++; if (done % 50 === 0) console.log(`  …${done}곳 동 채움 (${c.name}→${dong})`); }
+        const cat = m ? (m.category || "") : "";
+        if (dong) { await sql`UPDATE cafes SET dong = ${dong} WHERE id = ${c.id}`; done++; }
         else miss++;
+        if (cat) await sql`UPDATE cafes SET naver_category = ${cat} WHERE id = ${c.id}`;
+        else await sql`UPDATE cafes SET naver_category = COALESCE(naver_category, '') WHERE id = ${c.id}`; // 빈값 표시(재처리 방지)
+        // 재필터: 카테고리 확보 후 프랜차이즈·비카페면 즉시 비공개(공개돼 있던 것 정리)
+        if (isFranchise(c.name) || isNonCafe(c.name, cat)) {
+          const u = await sql`UPDATE cafes SET published = false, pipeline_status = 'rejected' WHERE id = ${c.id} AND published = true RETURNING 1`;
+          if (u.length) { refiltered++; console.log(`  ⛔ 비공개(비카페/프랜차이즈): ${c.name} [${cat || '카테고리없음'}]`); }
+        }
+        if ((done + miss) % 100 === 0) console.log(`  …진행 ${done + miss} (동채움 ${done}·재필터 ${refiltered})`);
       } catch (e) { miss++; }
       await sleep(210);
     }
@@ -45,7 +56,7 @@ try {
 } catch (e) { stop = "예외 — 중단: " + String(e).slice(0, 60); }
 
 let remain = "?";
-try { remain = (await sql`SELECT COUNT(*)::int n FROM cafes WHERE dong IS NULL AND lat IS NOT NULL`)[0].n; } catch {}
+try { remain = (await sql`SELECT COUNT(*)::int n FROM cafes WHERE (dong IS NULL OR naver_category IS NULL) AND lat IS NOT NULL`)[0].n; } catch {}
 console.log(stop || "상한 도달");
-console.log(`동 백필: 이번 ${done}곳 채움 · 미매칭 ${miss} · 남은 동없음 ${remain}`);
+console.log(`메타백필+재필터: 동채움 ${done} · 미매칭 ${miss} · 비카페/프랜차이즈 비공개 ${refiltered} · 남은 ${remain}`);
 process.exit(0);
