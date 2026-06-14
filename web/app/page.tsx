@@ -124,7 +124,7 @@ function topChars(c: Cafe, n = 4) {
 // 즐겨찾기(★ 북마크) 모달 — 카페 상세에서 북마크한 카페 목록(내 카페 등록과 별개). 탭하면 상세로.
 function FavoritesModal({ items, onClose, onOpen, onRemove }: { items: Cafe[]; onClose: () => void; onOpen: (c: Cafe) => void; onRemove: (id: number) => void }) {
   return (
-    <div className="fixed inset-0 z-[5000] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)", fontFamily: "'Gowun Batang', serif" }} onClick={onClose}>
+    <div className="fixed inset-0 z-[5000] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)", fontFamily: "'Gowun Batang', AppleMyungjo, 'Apple SD Gothic Neo', 'Noto Serif KR', serif" }} onClick={onClose}>
       <div className="w-full max-w-lg bg-[#fdfaf4] rounded-t-2xl max-h-[80dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-[#f0e6d4]">
           <div className="font-bold text-[#2b2018] text-[15px]"><span style={{ color: "#f0a832" }}>★</span> 즐겨찾기 <span className="text-[#a8927a] text-[12px] font-normal">{items.length}곳</span></div>
@@ -339,9 +339,8 @@ export default function Home() {
     setSearchLoading(false);
   };
 
-  // 지도 탭 진입 시 지도 초기화. 탭을 떠나면 지도를 파괴(분리된 DOM에 남는 버그 방지).
+  // 지도 1회 초기화 후 계속 유지(컨테이너는 숨김 상태로도 항상 마운트). 탭 전환 시 파괴/재생성하지 않음 → 전환 즉각.
   useEffect(() => {
-    if (tab !== "map") return;
     let cancelled = false;
     (async () => {
       const L = (await import("leaflet")).default;
@@ -351,7 +350,7 @@ export default function Home() {
       mapObj.current = L.map(mapRef.current, { zoomControl: true, attributionControl: false }).setView([37.5, 127.05], 10);
       L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", { subdomains: "abcd", maxZoom: 20 }).addTo(mapObj.current);
       layerRef.current = L.layerGroup().addTo(mapObj.current);
-      setTimeout(() => mapObj.current?.invalidateSize(), 150);
+      setTimeout(() => mapObj.current?.invalidateSize(), 60);
       setMapReady(true); // 초기화 완료 → 마커 effect 재실행 트리거
     })();
     return () => {
@@ -359,6 +358,10 @@ export default function Home() {
       if (mapObj.current) { try { mapObj.current.remove(); } catch {} mapObj.current = null; layerRef.current = null; }
       setMapReady(false);
     };
+  }, []);
+  // 지도 탭 진입 시 사이즈 보정(숨김→표시 전환 대응)
+  useEffect(() => {
+    if (tab === "map" && mapObj.current) { const t = setTimeout(() => mapObj.current?.invalidateSize(), 50); return () => clearTimeout(t); }
   }, [tab]);
 
   // '지도에서 위치 보기' — 지도 준비되면 해당 좌표로 이동(핀은 아래 마커 effect가 그림)
@@ -512,18 +515,18 @@ export default function Home() {
   // ── 랜딩(초기화면): 소비자 / 사장님 분리 ──
   if (role === null) {
     return (
-      <div className="flex flex-col items-center justify-center px-6" style={{ minHeight: "100dvh", paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)", background: "#2b2018", color: "#f4ece0", fontFamily: "'Gowun Batang', serif" }}>
+      <div className="flex flex-col items-center justify-center px-6" style={{ minHeight: "100dvh", paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)", background: "#2b2018", color: "#f4ece0", fontFamily: "'Gowun Batang', AppleMyungjo, 'Apple SD Gothic Neo', 'Noto Serif KR', serif" }}>
         <style>{`
           @keyframes dcnRise { from { opacity:0; transform: translateY(22px); } to { opacity:1; transform: translateY(0); } }
           /* 홀로그램: 무지갯빛이 가로로 천천히 흐르며 미세하게 색조가 도는 은은한 효과(평평·베벨 없음) */
           @keyframes dcnHolo { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
-          .dcn-rise { animation: dcnRise .9s cubic-bezier(.2,.7,.2,1) both; }
+          .dcn-rise { animation: dcnRise .4s cubic-bezier(.2,.7,.2,1) both; }
           .dcn-title {
             display:inline-block;
             background: linear-gradient(100deg,#efe2cd 0%,#f3d7a8 28%,#e8b87a 50%,#f3d7a8 72%,#efe2cd 100%);
             background-size: 220% auto; -webkit-background-clip:text; background-clip:text;
             -webkit-text-fill-color:transparent; color:transparent;
-            animation: dcnRise 1s cubic-bezier(.2,.7,.2,1) both, dcnHolo 9s ease-in-out .9s infinite;
+            animation: dcnRise .45s cubic-bezier(.2,.7,.2,1) both, dcnHolo 9s ease-in-out .45s infinite;
           }
           @keyframes dcnSteam {
             0%   { opacity:0; transform: translateY(2px) translateX(0) scaleX(.8); }
@@ -547,10 +550,10 @@ export default function Home() {
         <div className="dcn-cup mb-5">
           <h1 className="dcn-title text-[2.9rem] sm:text-[3.3rem] leading-[1.12] font-bold tracking-tight">동네 커피 노트</h1>
         </div>
-        <p className="dcn-rise text-[16px] text-[#f4ece0] mb-2 text-center leading-relaxed font-bold" style={{ animationDelay: ".28s" }}>별점 말고, <span className="text-[#e8b87a]">검증된 후기</span>로 고르세요.</p>
-        <p className="dcn-rise text-[15px] text-[#f4ece0] mb-2 text-center leading-relaxed font-bold" style={{ animationDelay: ".35s" }}>그리고 <span className="text-[#e8b87a]">내 카페의 추억</span>을 <span style={{ color: "#d6336c" }}>❤</span>로 간직하세요.</p>
-        <p className="dcn-rise text-[13px] text-[#cbb89f] mb-10 text-center leading-relaxed" style={{ animationDelay: ".42s" }}>광고·협찬·무관한 글은 버리고 <b className="text-[#f4ece0]">진짜 방문 후기</b>만 가려내고,<br />내가 다녀온 카페의 <b className="text-[#f4ece0]">추억</b>은 지도에 기록해 간직·공유해요.</p>
-        <div className="dcn-rise w-full max-w-sm space-y-3" style={{ animationDelay: ".56s" }}>
+        <p className="dcn-rise text-[16px] text-[#f4ece0] mb-2 text-center leading-relaxed font-bold" style={{ animationDelay: ".05s" }}>별점 말고, <span className="text-[#e8b87a]">검증된 후기</span>로 고르세요.</p>
+        <p className="dcn-rise text-[15px] text-[#f4ece0] mb-2 text-center leading-relaxed font-bold" style={{ animationDelay: ".1s" }}>그리고 <span className="text-[#e8b87a]">내 카페의 추억</span>을 <span style={{ color: "#d6336c" }}>❤</span>로 간직하세요.</p>
+        <p className="dcn-rise text-[13px] text-[#cbb89f] mb-10 text-center leading-relaxed" style={{ animationDelay: ".14s" }}>광고·협찬·무관한 글은 버리고 <b className="text-[#f4ece0]">진짜 방문 후기</b>만 가려내고,<br />내가 다녀온 카페의 <b className="text-[#f4ece0]">추억</b>은 지도에 기록해 간직·공유해요.</p>
+        <div className="dcn-rise w-full max-w-sm space-y-3" style={{ animationDelay: ".18s" }}>
           <button onClick={chooseConsumer} className="w-full bg-[#f4ece0] text-[#2b2018] rounded-2xl py-5 px-5 text-left shadow-lg active:scale-[0.99] transition">
             <div className="text-lg font-bold">☕ 소비자로 시작하기</div>
             <div className="text-[12px] text-[#7c6a55] mt-0.5">진짜 후기로 고른 우리 동네 카페</div>
@@ -592,7 +595,7 @@ export default function Home() {
   }
 
   return (
-    <div className="flex flex-col bg-[#f4ece0]" style={{ position: "fixed", inset: 0, fontFamily: "'Gowun Batang', serif" }}>
+    <div className="flex flex-col bg-[#f4ece0]" style={{ position: "fixed", inset: 0, fontFamily: "'Gowun Batang', AppleMyungjo, 'Apple SD Gothic Neo', 'Noto Serif KR', serif" }}>
       <header className="shrink-0 bg-[#2b2018] text-[#f4ece0] z-[1500] flex items-center justify-between px-4 gap-3" style={{ height: "calc(3.5rem + env(safe-area-inset-top))", paddingTop: "env(safe-area-inset-top)" }}>
         <div className="flex items-center gap-3 min-w-0">
           <button onClick={() => { try { sessionStorage.removeItem("dcn_role"); } catch {} setRole(null); }} className="text-lg font-bold shrink-0" aria-label="랜딩으로">동네 커피 노트</button>
@@ -664,8 +667,8 @@ export default function Home() {
       )}
 
       {/* 지도 탭 */}
-      {tab === "map" && (
-        <div className="flex-1 relative md:flex overflow-hidden">
+      {/* 지도 블록은 항상 마운트하고 비활성 탭에선 숨김 → 탭 전환 시 지도 파괴/재생성 없음(빠른 전환) */}
+      <div className="flex-1 relative md:flex overflow-hidden" style={{ display: tab === "map" ? undefined : "none" }}>
           <div className="absolute inset-0 md:relative md:flex-1 md:p-5">
             <div ref={mapRef} className="w-full h-full md:rounded-2xl overflow-hidden bg-[#e8e0d3] z-0" />
             {/* 내 카페(MY PIN) / 다른 사람은 — 지도 상단 */}
@@ -697,7 +700,6 @@ export default function Home() {
             </div>
           </div>
         </div>
-      )}
 
       {tab === "memory" && <MemoryTab device={deviceId} visits={myVisits} locked={myLocked} sessionPin={sessionPin}
         onRegister={() => setShowMyCafeReg(true)}
@@ -705,8 +707,8 @@ export default function Home() {
         onLock={() => { try { sessionStorage.removeItem("dcn_pin"); } catch {} setSessionPin(""); reloadMyCafes(deviceId, ""); }}
         onRestore={(dev: string) => { try { localStorage.setItem("dcn_device", dev); } catch {} setDeviceId(dev); reloadMyCafes(dev, ""); }} />}
 
-      {/* 하단 빠른 액션 바 — 모바일 전용. 헤더와 같은 다크 톤 → 홈 인디케이터 영역까지 자연스럽게 이어짐 */}
-      <nav className="md:hidden shrink-0 bg-[#2b2018] flex items-stretch" style={{ paddingBottom: "env(safe-area-inset-bottom)", boxShadow: "0 -1px 0 #3d2f22" }}>
+      {/* 하단 빠른 액션 바 — 모바일 전용. 본문과 같은 크림색(이음새 없음) + 버튼을 맨 아래로(빈 공간 최소화) */}
+      <nav className="md:hidden shrink-0 bg-[#fdfaf4] flex items-end" style={{ paddingBottom: "max(4px, calc(env(safe-area-inset-bottom) - 10px))", boxShadow: "0 -1px 0 rgba(0,0,0,0.04)" }}>
         {[
           { k: "home", label: "홈", icon: <path d="M3 11.2 12 4l9 7.2M5.5 9.7V20h13V9.7" />, fill: false },
           { k: "fav", label: "즐겨찾기", icon: <path d="M12 4.5l2.3 4.7 5.2.8-3.75 3.65.9 5.15L12 16.9l-4.65 2.45.9-5.15L4.5 10l5.2-.8z" />, fill: true },
@@ -718,9 +720,9 @@ export default function Home() {
             else if (a.k === "fav") setShowFavs(true);
             else if (a.k === "search") { setSearchRes(null); setSearchQ(""); setShowSearch(true); }
             else openLocation();
-          }} className="flex-1 flex flex-col items-center justify-center gap-1 pt-2 pb-1.5 active:bg-[#3d2f22]" style={{ minHeight: 54 }} aria-label={a.label}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill={a.fill ? "#f0a832" : "none"} stroke={a.fill ? "#f0a832" : "#cbb89f"} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>{a.icon}</svg>
-            <span className="text-[10px] font-bold leading-none whitespace-nowrap" style={{ color: a.fill ? "#f0a832" : "#cbb89f" }}>{a.label}</span>
+          }} className="flex-1 flex flex-col items-center justify-center gap-0.5 pt-1.5 pb-1 active:bg-[#f0e6d4]" aria-label={a.label}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill={a.fill ? "#d6336c" : "none"} stroke={a.fill ? "#d6336c" : "#8a7458"} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>{a.icon}</svg>
+            <span className="text-[10px] font-bold leading-none whitespace-nowrap" style={{ color: a.fill ? "#d6336c" : "#8a7458" }}>{a.label}</span>
           </button>
         ))}
       </nav>
@@ -949,7 +951,7 @@ function CafePanel({ cafe, onClose, onMap, bookmarked = false, onToggleBookmark 
     } catch { /* 사용자 취소 */ }
   };
   return (
-    <div className="fixed inset-0 z-[3000]" style={{ fontFamily: "'Gowun Batang', serif" }}>
+    <div className="fixed inset-0 z-[3000]" style={{ fontFamily: "'Gowun Batang', AppleMyungjo, 'Apple SD Gothic Neo', 'Noto Serif KR', serif" }}>
       <div onClick={onClose} className="absolute inset-0 bg-black/30" />
       <aside className="absolute top-0 right-0 w-full md:max-w-md bg-[#fdfaf4] shadow-2xl overflow-y-auto" style={{ height: "100dvh", paddingTop: "env(safe-area-inset-top)" }}>
         {/* 사장님 쇼케이스 — 영상(style 0) 또는 10종 템플릿 */}
@@ -982,7 +984,7 @@ function CafePanel({ cafe, onClose, onMap, bookmarked = false, onToggleBookmark 
         )}
         {/* 상단 테마 배너 — 5종 랜덤, 액자 느낌 */}
         {!promo && (
-          <div style={{ background: "#2b2018", fontFamily: "'Gowun Batang', serif" }} className="w-full px-5 pt-5 pb-4">
+          <div style={{ background: "#2b2018", fontFamily: "'Gowun Batang', AppleMyungjo, 'Apple SD Gothic Neo', 'Noto Serif KR', serif" }} className="w-full px-5 pt-5 pb-4">
             <style>{`
               @keyframes dcnHoloB { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
               .dcn-title-b {
@@ -1253,7 +1255,7 @@ function MyCafeRegModal({ cafes, device, visits, pin = "", onClose, onDone }: { 
   // 1단계 완료 → "추억을 기록합니다" 확인 팝업 (위치 비교 없이 최종 기록)
   if (staged && !done) {
     return (
-      <div className="fixed inset-0 z-[5000] flex items-center justify-center px-6" style={{ background: "rgba(43,32,24,0.6)", fontFamily: "'Gowun Batang', serif" }} onClick={() => !busy && setStaged(false)}>
+      <div className="fixed inset-0 z-[5000] flex items-center justify-center px-6" style={{ background: "rgba(43,32,24,0.6)", fontFamily: "'Gowun Batang', AppleMyungjo, 'Apple SD Gothic Neo', 'Noto Serif KR', serif" }} onClick={() => !busy && setStaged(false)}>
         <div className="bg-[#fdfaf4] rounded-2xl px-7 py-8 text-center max-w-xs shadow-2xl" onClick={(e) => e.stopPropagation()}>
           <div className="text-[34px] mb-2">📖</div>
           <div className="text-[17px] font-bold text-[#2b2018] mb-1.5">추억을 기록합니다</div>
@@ -1273,7 +1275,7 @@ function MyCafeRegModal({ cafes, device, visits, pin = "", onClose, onDone }: { 
   // 저장 성공 — 예쁜 멘트
   if (done) {
     return (
-      <div className="fixed inset-0 z-[5000] flex items-center justify-center px-6" style={{ background: "rgba(43,32,24,0.6)", fontFamily: "'Gowun Batang', serif" }} onClick={onClose}>
+      <div className="fixed inset-0 z-[5000] flex items-center justify-center px-6" style={{ background: "rgba(43,32,24,0.6)", fontFamily: "'Gowun Batang', AppleMyungjo, 'Apple SD Gothic Neo', 'Noto Serif KR', serif" }} onClick={onClose}>
         <div className="bg-[#fdfaf4] rounded-2xl px-7 py-8 text-center max-w-xs shadow-2xl" onClick={(e) => e.stopPropagation()}>
           <div className="text-[40px] mb-2">❤</div>
           <div className="text-[16px] font-bold text-[#2b2018] mb-1.5">기억이 저장됐어요</div>
@@ -1285,7 +1287,7 @@ function MyCafeRegModal({ cafes, device, visits, pin = "", onClose, onDone }: { 
   }
 
   return (
-    <div className="fixed inset-0 z-[5000] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)", fontFamily: "'Gowun Batang', serif" }} onClick={onClose}>
+    <div className="fixed inset-0 z-[5000] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)", fontFamily: "'Gowun Batang', AppleMyungjo, 'Apple SD Gothic Neo', 'Noto Serif KR', serif" }} onClick={onClose}>
       <div className="w-full max-w-lg bg-[#fdfaf4] rounded-t-2xl max-h-[90dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         {/* 헤더 — 즐겨찾기 별 */}
         <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-[#f0e6d4]">
@@ -1364,7 +1366,7 @@ function MemoryTab({ device, visits, locked = false, sessionPin = "", onRegister
 
   if (locked) {
     return (
-      <div className="flex-1 overflow-y-auto flex items-start justify-center px-6 pt-16" style={{ fontFamily: "'Gowun Batang', serif" }}>
+      <div className="flex-1 overflow-y-auto flex items-start justify-center px-6 pt-16" style={{ fontFamily: "'Gowun Batang', AppleMyungjo, 'Apple SD Gothic Neo', 'Noto Serif KR', serif" }}>
         <div className="bg-white rounded-2xl px-7 py-8 text-center max-w-xs w-full shadow-sm border border-[#ece0cd]">
           <div className="text-[34px] mb-2">🔒</div>
           <div className="text-[16px] font-bold text-[#2b2018] mb-1">잠긴 추억 보관소</div>
@@ -1378,7 +1380,7 @@ function MemoryTab({ device, visits, locked = false, sessionPin = "", onRegister
   }
 
   return (
-    <div className="flex-1 overflow-y-auto" style={{ fontFamily: "'Gowun Batang', serif" }}>
+    <div className="flex-1 overflow-y-auto" style={{ fontFamily: "'Gowun Batang', AppleMyungjo, 'Apple SD Gothic Neo', 'Noto Serif KR', serif" }}>
       <div className="max-w-lg mx-auto px-4 py-5 pb-[calc(2rem_+_env(safe-area-inset-bottom))]">
         <div className="flex items-center justify-between mb-3">
           <div>
@@ -1498,7 +1500,7 @@ function MemorySettingsModal({ device, visits, hasPin, onPinChange, onClose, onR
   };
 
   return (
-    <div className="fixed inset-0 z-[5000] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)", fontFamily: "'Gowun Batang', serif" }} onClick={onClose}>
+    <div className="fixed inset-0 z-[5000] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)", fontFamily: "'Gowun Batang', AppleMyungjo, 'Apple SD Gothic Neo', 'Noto Serif KR', serif" }} onClick={onClose}>
       <div className="w-full max-w-lg bg-[#fdfaf4] rounded-t-2xl max-h-[88dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-[#f0e6d4]">
           <div className="font-bold text-[#2b2018] text-[15px]">⚙ 설정</div>

@@ -25,7 +25,8 @@ html { background: #fdfaf4; }
 body {
   background: #fdfaf4;
   color: var(--foreground);
-  font-family: "Gowun Batang", serif;
+  /* Gowun Batang 로딩 전 iOS/안드로이드 시스템 명조체로 즉시 표시 → 글자 점진 로딩(빈 글자) 방지 */
+  font-family: "Gowun Batang", AppleMyungjo, "Apple SD Gothic Neo", "Noto Serif KR", serif;
 }
 
 @keyframes fadeIn { from { opacity: 0; transform: translate(-50%, 4px); } to { opacity: 1; transform: translate(-50%, 0); } }
