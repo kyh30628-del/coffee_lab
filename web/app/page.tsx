@@ -587,7 +587,6 @@ export default function Home() {
             한 번 더 누르면 나가요
           </div>
         )}
-        <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet" />
       </div>
     );
   }
@@ -706,8 +705,8 @@ export default function Home() {
         onLock={() => { try { sessionStorage.removeItem("dcn_pin"); } catch {} setSessionPin(""); reloadMyCafes(deviceId, ""); }}
         onRestore={(dev: string) => { try { localStorage.setItem("dcn_device", dev); } catch {} setDeviceId(dev); reloadMyCafes(dev, ""); }} />}
 
-      {/* 하단 빠른 액션 바 — 모바일 전용. 홈 인디케이터 안전영역까지 배경이 채워짐 */}
-      <nav className="md:hidden shrink-0 bg-[#fdfaf4] border-t border-[#ece0cd] flex items-stretch" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+      {/* 하단 빠른 액션 바 — 모바일 전용. 헤더와 같은 다크 톤 → 홈 인디케이터 영역까지 자연스럽게 이어짐 */}
+      <nav className="md:hidden shrink-0 bg-[#2b2018] flex items-stretch" style={{ paddingBottom: "env(safe-area-inset-bottom)", boxShadow: "0 -1px 0 #3d2f22" }}>
         {[
           { k: "home", label: "홈", icon: <path d="M3 11.2 12 4l9 7.2M5.5 9.7V20h13V9.7" />, fill: false },
           { k: "fav", label: "즐겨찾기", icon: <path d="M12 4.5l2.3 4.7 5.2.8-3.75 3.65.9 5.15L12 16.9l-4.65 2.45.9-5.15L4.5 10l5.2-.8z" />, fill: true },
@@ -719,9 +718,9 @@ export default function Home() {
             else if (a.k === "fav") setShowFavs(true);
             else if (a.k === "search") { setSearchRes(null); setSearchQ(""); setShowSearch(true); }
             else openLocation();
-          }} className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 active:bg-[#f3ede1]" style={{ minHeight: 52 }} aria-label={a.label}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill={a.fill ? "#d6336c" : "none"} stroke={a.fill ? "#d6336c" : "#7a6452"} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>{a.icon}</svg>
-            <span className="text-[10px] font-bold leading-none whitespace-nowrap" style={{ color: a.fill ? "#d6336c" : "#7a6452" }}>{a.label}</span>
+          }} className="flex-1 flex flex-col items-center justify-center gap-1 pt-2 pb-1.5 active:bg-[#3d2f22]" style={{ minHeight: 54 }} aria-label={a.label}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill={a.fill ? "#f0a832" : "none"} stroke={a.fill ? "#f0a832" : "#cbb89f"} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>{a.icon}</svg>
+            <span className="text-[10px] font-bold leading-none whitespace-nowrap" style={{ color: a.fill ? "#f0a832" : "#cbb89f" }}>{a.label}</span>
           </button>
         ))}
       </nav>
@@ -827,7 +826,6 @@ export default function Home() {
           한 번 더 누르면 나가요
         </div>
       )}
-      <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet" />
     </div>
   );
 }
