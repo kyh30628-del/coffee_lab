@@ -43,6 +43,38 @@ export const METRO_REGIONS: { region: string; areaLabel: string }[] = (() => {
   return out;
 })();
 
+// 동(洞) 단위 정밀 발굴용 — 구 검색('강동구 카페')은 인기 상위 5곳(프랜차이즈·기수집)만 나와 롱테일 독립카페를 놓침.
+// '강동구 상일동 로스터리'처럼 동+키워드로 좁히면 동네 독립카페가 잡힌다. 서울 25개 구 전체.
+const SEOUL_DONGS: Record<string, string[]> = {
+  강남구: ["역삼동", "삼성동", "대치동", "논현동", "압구정동", "청담동", "신사동", "도곡동", "개포동", "일원동", "수서동", "세곡동"],
+  강동구: ["강일동", "상일동", "명일동", "고덕동", "암사동", "천호동", "성내동", "길동", "둔촌동"],
+  강북구: ["미아동", "수유동", "번동", "우이동"],
+  강서구: ["화곡동", "등촌동", "가양동", "마곡동", "방화동", "공항동", "염창동", "발산동", "우장산동"],
+  관악구: ["봉천동", "신림동", "남현동", "서울대입구", "샤로수길"],
+  광진구: ["자양동", "구의동", "광장동", "화양동", "군자동", "중곡동", "건대입구"],
+  구로구: ["구로동", "신도림동", "개봉동", "고척동", "오류동", "항동", "가리봉동"],
+  금천구: ["가산동", "독산동", "시흥동"],
+  노원구: ["상계동", "중계동", "하계동", "공릉동", "월계동"],
+  도봉구: ["쌍문동", "방학동", "창동", "도봉동"],
+  동대문구: ["전농동", "답십리동", "장안동", "청량리동", "회기동", "휘경동", "이문동", "제기동", "용두동"],
+  동작구: ["노량진동", "상도동", "사당동", "대방동", "신대방동", "흑석동"],
+  마포구: ["합정동", "서교동", "망원동", "연남동", "성산동", "상암동", "공덕동", "아현동", "대흥동", "염리동", "도화동", "연트럴파크"],
+  서대문구: ["홍제동", "홍은동", "남가좌동", "북가좌동", "연희동", "신촌동", "대현동", "충정로"],
+  서초구: ["서초동", "반포동", "잠원동", "방배동", "양재동", "내곡동"],
+  성동구: ["성수동", "왕십리동", "행당동", "금호동", "옥수동", "응봉동", "마장동", "사근동", "송정동", "서울숲"],
+  성북구: ["성북동", "동선동", "돈암동", "안암동", "보문동", "정릉동", "길음동", "종암동", "석관동", "장위동"],
+  송파구: ["잠실동", "신천동", "풍납동", "송파동", "석촌동", "가락동", "문정동", "장지동", "방이동", "오금동", "거여동", "마천동"],
+  양천구: ["목동", "신정동", "신월동"],
+  영등포구: ["여의도동", "영등포동", "당산동", "양평동", "문래동", "신길동", "대림동", "도림동"],
+  용산구: ["이태원동", "한남동", "후암동", "용산동", "청파동", "효창동", "원효로", "한강로", "보광동", "서빙고동", "경리단길", "해방촌"],
+  은평구: ["응암동", "녹번동", "불광동", "갈현동", "구산동", "대조동", "역촌동", "증산동", "수색동", "진관동"],
+  종로구: ["청운동", "사직동", "삼청동", "가회동", "혜화동", "명륜동", "인사동", "평창동", "부암동", "익선동", "효자동", "서촌"],
+  중구: ["명동", "충무로", "을지로", "신당동", "황학동", "회현동", "정동", "약수동", "다산동"],
+  중랑구: ["면목동", "상봉동", "중화동", "묵동", "망우동", "신내동"],
+};
+// 동 발굴용 핵심 키워드(독립·스페셜티 위주 — 프랜차이즈가 상위를 점령하지 않는 검색어)
+const DONG_KEYWORDS = ["카페", "로스터리", "스페셜티커피", "핸드드립", "직접로스팅", "디저트카페", "베이커리카페", "감성카페", "브런치카페"];
+
 const stripTags = (s: string) => (s || "").replace(/<[^>]+>/g, "").replace(/&[a-z]+;/g, "").trim();
 export const isFranchise = (name: string) => { const n = name.replace(/\s/g, ""); return FRANCHISE.some((f) => n.includes(f)); };
 export const isNonCafe = (name: string, category: string) => {
@@ -77,8 +109,8 @@ export async function discoverRegion(region: string, areaLabel: string, keywords
   const storeArea = areaLabel || region;
   const seen = new Set<string>();
   const found: any[] = [];
-  for (const kw of keywords) {
-    const items = await localSearch(`${region} ${kw}`);
+  const collect = async (query: string) => {
+    const items = await localSearch(query);
     for (const it of items) {
       if (!it.name || !it.lat || !it.lng) continue;
       if (isFranchise(it.name) || isNonCafe(it.name, it.category)) continue;
@@ -87,8 +119,16 @@ export async function discoverRegion(region: string, areaLabel: string, keywords
       seen.add(key);
       found.push(it);
     }
-    await new Promise((r) => setTimeout(r, 250));
-  }
+    await new Promise((r) => setTimeout(r, 220));
+  };
+
+  // ① 동(洞) 단위 정밀 발굴 — 동네 독립카페 롱테일(구 단위는 인기 상위 5곳만 나옴). 서울만 동 목록 보유.
+  const gu = region.split(" ").pop() ?? region;
+  const dongs = SEOUL_DONGS[gu] ?? [];
+  for (const dong of dongs) for (const kw of DONG_KEYWORDS) await collect(`${gu} ${dong} ${kw}`);
+
+  // ② 구 단위 광역 발굴 — 동 목록이 없는 경기·인천, 그리고 서울 보완.
+  for (const kw of keywords) await collect(`${region} ${kw}`);
 
   let inserted = 0, skipped = 0;
   for (const it of found) {
