@@ -7,8 +7,9 @@ for (const l of env.split("\n")) { const m = l.match(/^([A-Z_0-9]+)=(.*)$/); if 
 const { discoverRegion, METRO_REGIONS } = await import("../lib/discover.ts");
 const { sql } = await import("../lib/db.ts");
 
-const onlySido = process.env.SWEEP_SIDO || ""; // 예: '서울'. 비우면 전체.
-const regions = METRO_REGIONS.filter((r) => !onlySido || r.region.startsWith(onlySido));
+const onlySido = process.env.SWEEP_SIDO || ""; // 예: '서울' 또는 '경기,인천'. 비우면 전체.
+const sidos = onlySido.split(",").map((s) => s.trim()).filter(Boolean);
+const regions = METRO_REGIONS.filter((r) => !sidos.length || sidos.some((s) => r.region.startsWith(s)));
 let totalNew = 0, done = 0;
 console.log(`발굴 스윕 시작 — 대상 ${regions.length}개 지역${onlySido ? ` (${onlySido})` : ""}`);
 
