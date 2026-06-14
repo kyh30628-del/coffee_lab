@@ -702,7 +702,7 @@ export default function Home() {
 
       {/* 홈 = 잡지 1면 */}
       {tab === "home" && (
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto" style={{ paddingBottom: "calc(3rem + env(safe-area-inset-bottom))" }}>
           <div className="max-w-2xl mx-auto px-5 py-6">
             <div className="text-center mb-6">
               <div className="text-[10px] tracking-[0.3em] uppercase text-[#9c6b3f]">데이터로 큐레이션하는</div>
@@ -784,7 +784,7 @@ export default function Home() {
           <aside className="hidden md:block md:w-[380px] md:h-full bg-[#fdfaf4] border-l border-[#ece0cd] overflow-y-auto p-6 relative z-10">
             <MapControls {...{ sido, sigungu, onSido, setSigungu, tasteKey, setTasteKey, filtered, matchSet, setSelected, openLocation, autoGu, geoMsg, clearAuto }} />
           </aside>
-          <div className="md:hidden absolute left-0 right-0 bottom-0 bg-[#fdfaf4] rounded-t-3xl shadow-[0_-4px_24px_rgba(0,0,0,0.18)] z-[1200] flex flex-col transition-transform duration-300 ease-out will-change-transform" style={{ height: "72dvh", transform: sheetOpen ? "translateY(0)" : "translateY(calc(72dvh - 60px))" }}>
+          <div className="md:hidden absolute left-0 right-0 bg-[#fdfaf4] rounded-t-3xl shadow-[0_-4px_24px_rgba(0,0,0,0.18)] z-[1200] flex flex-col transition-transform duration-300 ease-out will-change-transform" style={{ bottom: "calc(2.75rem + env(safe-area-inset-bottom))", height: "72dvh", transform: sheetOpen ? "translateY(0)" : "translateY(calc(72dvh - 60px))" }}>
             <button onClick={() => setSheetOpen((o) => !o)} className="shrink-0 w-full pt-3 pb-2.5 flex flex-col items-center gap-1.5" aria-expanded={sheetOpen}>
               <div className="w-10 h-1.5 bg-[#cbb89f] rounded-full" />
               <span className="text-[11px] font-bold text-[#9c6b3f]">{sheetOpen ? "지도 보기 ▾" : `지역·필터 펼치기 ▴ (${filtered.length})`}</span>
@@ -802,8 +802,8 @@ export default function Home() {
         onLock={() => { try { sessionStorage.removeItem("dcn_pin"); } catch {} setSessionPin(""); reloadMyCafes(deviceId, ""); }}
         onRestore={(dev: string) => { try { localStorage.setItem("dcn_device", dev); } catch {} setDeviceId(dev); reloadMyCafes(dev, ""); }} />}
 
-      {/* 하단 빠른 액션 바 — 모바일 전용. 본문과 같은 크림색(이음새 없음) + 버튼을 맨 아래로(빈 공간 최소화) */}
-      <nav className="md:hidden shrink-0 flex items-end" style={{ background: tab === "map" ? "#fdfaf4" : "#f4ece0", paddingBottom: 0 }}>
+      {/* 하단 빠른 액션 바 — 모바일 전용. 뷰포트 바닥에 직접 고정 + 안전영역(홈인디케이터)까지 바 색으로 채움(네이버 방식) */}
+      <nav className="md:hidden flex items-end" style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 40, background: tab === "map" ? "#fdfaf4" : "#f4ece0", paddingBottom: "env(safe-area-inset-bottom)" }}>
         {[
           { k: "home", label: "홈", icon: <path d="M3 11.2 12 4l9 7.2M5.5 9.7V20h13V9.7" />, fill: false },
           { k: "fav", label: "즐겨찾기", icon: <path d="M12 4.5l2.3 4.7 5.2.8-3.75 3.65.9 5.15L12 16.9l-4.65 2.45.9-5.15L4.5 10l5.2-.8z" />, fill: true },
@@ -1477,7 +1477,7 @@ function MemoryTab({ device, visits, locked = false, sessionPin = "", onRegister
 
   return (
     <div className="flex-1 overflow-y-auto" style={{ fontFamily: "'Gowun Batang', AppleMyungjo, 'Apple SD Gothic Neo', 'Noto Serif KR', serif" }}>
-      <div className="max-w-lg mx-auto px-4 py-5 pb-[calc(2rem_+_env(safe-area-inset-bottom))]">
+      <div className="max-w-lg mx-auto px-4 py-5 pb-[calc(4rem_+_env(safe-area-inset-bottom))]">
         <div className="flex items-center justify-between mb-3">
           <div>
             <div className="text-[17px] font-bold text-[#2b2018]">🗃 추억 보관소</div>
