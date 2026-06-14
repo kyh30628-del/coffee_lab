@@ -21,9 +21,9 @@
 
 /* iOS PWA: 홈인디케이터 안전영역에 흰 띠가 비치지 않게 앱 메인 배경(크림)으로 고정.
    라이트/다크 모드 무관 — 하단 safe-area가 크림 앱 화면과 자연스럽게 이어짐. */
-html { background: #fdfaf4; }
+html { background: #f4ece0; }
 body {
-  background: #fdfaf4;
+  background: #f4ece0;
   color: var(--foreground);
   /* Gowun Batang 로딩 전 iOS/안드로이드 시스템 명조체로 즉시 표시 → 글자 점진 로딩(빈 글자) 방지 */
   font-family: "Gowun Batang", AppleMyungjo, "Apple SD Gothic Neo", "Noto Serif KR", serif;

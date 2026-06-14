@@ -288,6 +288,7 @@ export default function Home() {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapObj = useRef<any>(null);
   const layerRef = useRef<any>(null);
+  const edgeSwipe = useRef<{ x: number; y: number } | null>(null); // 지도 좌측 엣지 스와이프 추적
   const LRef = useRef<any>(null);
   const [mapReady, setMapReady] = useState(false); // 지도 초기화 완료 신호(마커 재렌더용)
 
@@ -733,6 +734,10 @@ export default function Home() {
       <div className="flex-1 relative md:flex overflow-hidden" style={{ display: tab === "map" ? undefined : "none" }}>
           <div className="absolute inset-0 md:relative md:flex-1 md:p-5">
             <div ref={mapRef} className="w-full h-full md:rounded-2xl overflow-hidden bg-[#e8e0d3] z-0" />
+            {/* 좌측 엣지 스와이프 → 홈. 얇은 캐처 스트립으로 지도 패닝과 충돌 방지(모바일 전용) */}
+            <div className="md:hidden absolute left-0 top-0 bottom-0 w-7 z-[1150]" style={{ touchAction: "pan-y" }}
+              onTouchStart={(e) => { const t = e.touches[0]; edgeSwipe.current = { x: t.clientX, y: t.clientY }; }}
+              onTouchEnd={(e) => { const s = edgeSwipe.current; edgeSwipe.current = null; if (!s) return; const t = e.changedTouches[0]; if (t && t.clientX - s.x > 45 && Math.abs(t.clientY - s.y) < 45) setTab("home"); }} />
             {/* 내 카페(MY PIN) / 다른 사람은 — 지도 상단 */}
             <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[1100] flex gap-2 max-w-[calc(100vw-1.5rem)]">
               <button onClick={() => { if (myLocked) setTab("memory"); else setMyPinMode((v) => !v); }}
@@ -781,7 +786,7 @@ export default function Home() {
         onRestore={(dev: string) => { try { localStorage.setItem("dcn_device", dev); } catch {} setDeviceId(dev); reloadMyCafes(dev, ""); }} />}
 
       {/* 하단 빠른 액션 바 — 모바일 전용. 본문과 같은 크림색(이음새 없음) + 버튼을 맨 아래로(빈 공간 최소화) */}
-      <nav className="md:hidden shrink-0 bg-[#fdfaf4] flex items-end" style={{ paddingBottom: 0, boxShadow: "0 -1px 0 rgba(0,0,0,0.04)" }}>
+      <nav className="md:hidden shrink-0 flex items-end" style={{ background: tab === "map" ? "#fdfaf4" : "#f4ece0", paddingBottom: "env(safe-area-inset-bottom)", boxShadow: "0 -1px 0 rgba(0,0,0,0.05)" }}>
         {[
           { k: "home", label: "홈", icon: <path d="M3 11.2 12 4l9 7.2M5.5 9.7V20h13V9.7" />, fill: false },
           { k: "fav", label: "즐겨찾기", icon: <path d="M12 4.5l2.3 4.7 5.2.8-3.75 3.65.9 5.15L12 16.9l-4.65 2.45.9-5.15L4.5 10l5.2-.8z" />, fill: true },
