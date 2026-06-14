@@ -468,7 +468,7 @@ export default function Home() {
   // ── 랜딩(초기화면): 소비자 / 사장님 분리 ──
   if (role === null) {
     return (
-      <div className="flex flex-col items-center justify-center px-6" style={{ minHeight: "100dvh", background: "#2b2018", color: "#f4ece0", fontFamily: "'Gowun Batang', serif" }}>
+      <div className="flex flex-col items-center justify-center px-6" style={{ minHeight: "100dvh", paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)", background: "#2b2018", color: "#f4ece0", fontFamily: "'Gowun Batang', serif" }}>
         <style>{`
           @keyframes dcnRise { from { opacity:0; transform: translateY(22px); } to { opacity:1; transform: translateY(0); } }
           /* 홀로그램: 무지갯빛이 가로로 천천히 흐르며 미세하게 색조가 도는 은은한 효과(평평·베벨 없음) */
@@ -576,7 +576,7 @@ export default function Home() {
 
   return (
     <div className="flex flex-col bg-[#f4ece0]" style={{ height: "100dvh", fontFamily: "'Gowun Batang', serif" }}>
-      <header className="shrink-0 bg-[#2b2018] text-[#f4ece0] z-[1500] h-14 flex items-center justify-between px-4 gap-3">
+      <header className="shrink-0 bg-[#2b2018] text-[#f4ece0] z-[1500] flex items-center justify-between px-4 gap-3" style={{ height: "calc(3.5rem + env(safe-area-inset-top))", paddingTop: "env(safe-area-inset-top)" }}>
         <div className="flex items-center gap-3 min-w-0">
           <button onClick={() => { try { sessionStorage.removeItem("dcn_role"); } catch {} setRole(null); }} className="text-lg font-bold shrink-0" aria-label="랜딩으로">동네 커피 노트</button>
           {/* 홈/지도/추억 토글 */}
@@ -912,7 +912,7 @@ function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; 
   return (
     <div className="fixed inset-0 z-[3000]" style={{ fontFamily: "'Gowun Batang', serif" }}>
       <div onClick={onClose} className="absolute inset-0 bg-black/30" />
-      <aside className="absolute top-0 right-0 w-full md:max-w-md bg-[#fdfaf4] shadow-2xl overflow-y-auto" style={{ height: "100dvh" }}>
+      <aside className="absolute top-0 right-0 w-full md:max-w-md bg-[#fdfaf4] shadow-2xl overflow-y-auto" style={{ height: "100dvh", paddingTop: "env(safe-area-inset-top)" }}>
         {/* 사장님 쇼케이스 — 영상(style 0) 또는 10종 템플릿 */}
         {promo && (
           <>
