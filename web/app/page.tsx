@@ -497,10 +497,36 @@ export default function Home() {
           .dcn-s1 { left:39%; animation: dcnSteam 4.4s ease-in-out 1.4s infinite; }
           .dcn-s2 { left:50%; animation: dcnSteam 5.0s ease-in-out 2.2s infinite; }
           .dcn-s3 { left:61%; animation: dcnSteam 4.7s ease-in-out 3.0s infinite; }
-          @media (prefers-reduced-motion: reduce) { .dcn-rise,.dcn-title { animation: dcnRise .01s both; } .dcn-title{ -webkit-text-fill-color:#f4ece0; color:#f4ece0; } .dcn-steam{ display:none; } }
+          /* 진입 심볼: 은은히 둥실 + 홀로그램 색조가 미세하게 도는 효과 */
+          @keyframes dcnFade { from { opacity:0; } to { opacity:1; } }
+          @keyframes dcnFloat { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
+          @keyframes dcnSymHolo { 0%,100% { filter: hue-rotate(0deg) saturate(1); } 50% { filter: hue-rotate(-13deg) saturate(1.12); } }
+          .dcn-symbol { display:block; margin:0 auto 12px; animation: dcnFade .9s ease both, dcnFloat 6s ease-in-out .9s infinite, dcnSymHolo 9s ease-in-out infinite; }
+          @media (prefers-reduced-motion: reduce) { .dcn-rise,.dcn-title { animation: dcnRise .01s both; } .dcn-title{ -webkit-text-fill-color:#f4ece0; color:#f4ece0; } .dcn-steam{ display:none; } .dcn-symbol{ animation: dcnFade .01s both; } }
         `}</style>
         <div className="dcn-cup mb-5">
-          <span className="dcn-steam dcn-s1" /><span className="dcn-steam dcn-s2" /><span className="dcn-steam dcn-s3" />
+          <svg className="dcn-symbol" width="104" height="104" viewBox="0 0 512 512" aria-label="동네 커피 노트" role="img">
+            <defs>
+              <linearGradient id="holoSym" x1="0" y1="0" x2="1" y2="0.35">
+                <stop offset="0" stopColor="#efe7d9" /><stop offset="0.30" stopColor="#f3d7a8" />
+                <stop offset="0.52" stopColor="#eec6cf" /><stop offset="0.72" stopColor="#cbded8" />
+                <stop offset="1" stopColor="#d8cde6" />
+              </linearGradient>
+              <linearGradient id="saucerSym" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stopColor="#f0ddc0" /><stop offset="1" stopColor="#d3b388" />
+              </linearGradient>
+            </defs>
+            <g fill="none" stroke="#efe2cd" strokeWidth="11" strokeLinecap="round" opacity="0.5">
+              <path d="M214 168 c -15 -16 13 -28 0 -50 c -13 -22 15 -30 0 -50" />
+              <path d="M256 162 c -15 -16 13 -28 0 -50 c -13 -22 15 -30 0 -50" />
+              <path d="M298 168 c -15 -16 13 -28 0 -50 c -13 -22 15 -30 0 -50" />
+            </g>
+            <ellipse cx="256" cy="374" rx="152" ry="30" fill="url(#saucerSym)" />
+            <path d="M348 244 a 40 40 0 0 1 0 76" fill="none" stroke="url(#holoSym)" strokeWidth="22" strokeLinecap="round" />
+            <path d="M152 216 L172 330 Q177 358 210 360 H302 Q335 358 340 330 L360 216 Z" fill="url(#holoSym)" />
+            <ellipse cx="256" cy="216" rx="104" ry="22" fill="url(#holoSym)" />
+            <ellipse cx="256" cy="216" rx="90" ry="16" fill="#3f2819" />
+          </svg>
           <h1 className="dcn-title text-[2.9rem] sm:text-[3.3rem] leading-[1.12] font-bold tracking-tight">동네 커피 노트</h1>
         </div>
         <p className="dcn-rise text-[16px] text-[#f4ece0] mb-2 text-center leading-relaxed font-bold" style={{ animationDelay: ".28s" }}>별점 말고, <span className="text-[#e8b87a]">검증된 후기</span>로 고르세요.</p>
