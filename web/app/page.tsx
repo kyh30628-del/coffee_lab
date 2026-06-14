@@ -495,7 +495,9 @@ export default function Home() {
       const lats = filtered.map((c) => c.lat), lngs = filtered.map((c) => c.lng);
       mapObj.current.fitBounds(L.latLngBounds([[Math.min(...lats), Math.min(...lngs)], [Math.max(...lats), Math.max(...lngs)]]), { padding: [50, 50], maxZoom: 15 });
     } else if (sido && SIDO_CENTER[sido]) { const [la, ln, z] = SIDO_CENTER[sido]; mapObj.current.setView([la, ln], z); }
-  }, [filtered, matchSet, sido, sigungu, tab, focusId, mapReady, myPinMode, myCafeIds, othersMode, othersPins]);
+    // 주의: 의존성에 tab을 넣지 말 것. 지도는 1회 생성 후 유지되므로 탭 전환 시 마커를 다시 그릴 필요가 없고,
+    // 넣으면 뒤로가기/탭전환마다 수백 개 마커를 재생성+fitBounds 해 전환이 느려진다. 데이터/필터 변경 시에만 갱신.
+  }, [filtered, matchSet, sido, sigungu, focusId, mapReady, myPinMode, myCafeIds, othersMode, othersPins]);
 
   // 다른 사람은 — 토글 켜면 집계 핀 로드(한 번)
   useEffect(() => {
@@ -714,7 +716,7 @@ export default function Home() {
         onRestore={(dev: string) => { try { localStorage.setItem("dcn_device", dev); } catch {} setDeviceId(dev); reloadMyCafes(dev, ""); }} />}
 
       {/* 하단 빠른 액션 바 — 모바일 전용. 본문과 같은 크림색(이음새 없음) + 버튼을 맨 아래로(빈 공간 최소화) */}
-      <nav className="md:hidden shrink-0 bg-[#fdfaf4] flex items-end" style={{ paddingBottom: "max(4px, calc(env(safe-area-inset-bottom) - 10px))", boxShadow: "0 -1px 0 rgba(0,0,0,0.04)" }}>
+      <nav className="md:hidden shrink-0 bg-[#fdfaf4] flex items-end" style={{ paddingBottom: 0, boxShadow: "0 -1px 0 rgba(0,0,0,0.04)" }}>
         {[
           { k: "home", label: "홈", icon: <path d="M3 11.2 12 4l9 7.2M5.5 9.7V20h13V9.7" />, fill: false },
           { k: "fav", label: "즐겨찾기", icon: <path d="M12 4.5l2.3 4.7 5.2.8-3.75 3.65.9 5.15L12 16.9l-4.65 2.45.9-5.15L4.5 10l5.2-.8z" />, fill: true },
