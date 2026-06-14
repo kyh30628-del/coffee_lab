@@ -803,7 +803,7 @@ export default function Home() {
         onRestore={(dev: string) => { try { localStorage.setItem("dcn_device", dev); } catch {} setDeviceId(dev); reloadMyCafes(dev, ""); }} />}
 
       {/* 하단 빠른 액션 바 — 모바일 전용. 본문과 같은 크림색(이음새 없음) + 버튼을 맨 아래로(빈 공간 최소화) */}
-      <nav className="md:hidden shrink-0 flex items-end" style={{ background: tab === "map" ? "#fdfaf4" : "#f4ece0", paddingBottom: "env(safe-area-inset-bottom)", boxShadow: "0 -1px 0 rgba(0,0,0,0.05)" }}>
+      <nav className="md:hidden shrink-0 flex items-end" style={{ background: tab === "map" ? "#fdfaf4" : "#f4ece0", paddingBottom: 0, boxShadow: "0 -1px 0 rgba(0,0,0,0.05)" }}>
         {[
           { k: "home", label: "홈", icon: <path d="M3 11.2 12 4l9 7.2M5.5 9.7V20h13V9.7" />, fill: false },
           { k: "fav", label: "즐겨찾기", icon: <path d="M12 4.5l2.3 4.7 5.2.8-3.75 3.65.9 5.15L12 16.9l-4.65 2.45.9-5.15L4.5 10l5.2-.8z" />, fill: true },
