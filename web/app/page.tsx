@@ -557,7 +557,7 @@ export default function Home() {
           <div className="flex bg-[#3d2f22] rounded-full p-0.5">
             {(["home", "map", "memory"] as const).map((t) => (
               <button key={t} onClick={() => setTab(t)} className={`px-2.5 sm:px-3 py-1.5 text-xs font-bold rounded-full transition-colors whitespace-nowrap ${tab === t ? "bg-[#f4ece0] text-[#2b2018]" : "text-[#cbb89f]"}`}>
-                {t === "home" ? "홈" : t === "map" ? "지도" : "🗃 추억"}
+                {t === "home" ? "홈" : t === "map" ? "지도" : "추억"}
               </button>
             ))}
           </div>
@@ -608,7 +608,7 @@ export default function Home() {
                 {discover.headlineA && <HeadlineCard c={discover.headlineA} kicker="이번 주 가장 많이 이야기된 곳" tone={0} />}
                 {discover.headlineB && <HeadlineCard c={discover.headlineB} kicker="🔥 커피에 진심인 집 — 스페셜티 스포트라이트" tone={1} />}
                 {discover.featured && discover.featured.length > 0 && <Row title="✨ 추천 카페" items={discover.featured} sub="쇼케이스" info={<>사장님이 직접 <b>홍보 중인 쇼케이스 카페</b>예요(우선 노출). 후기·등급은 다른 카페와 똑같이 검증된 값이에요.</>} />}
-                {momentum && momentum.rising.length > 0 && <Row title="📈 요즘 뜨는 카페" items={momentum.rising} sub="최근 입소문 순" info={<>별점 대신 <b>검증된 진짜 후기가 요즘 얼마나 빨리 느는지</b>로 뽑은 '뜨는 카페'예요. 최근 3개월 검증 후기가 많을수록 상위로 올라가요.</>} />}
+                {momentum && momentum.rising.length > 0 && <Row title="📈 요즘 뜨는 카페" items={momentum.rising.slice(0, 5)} sub="최근 입소문 순" info={<>별점 대신 <b>검증된 진짜 후기가 요즘 얼마나 빨리 느는지</b>로 뽑은 '뜨는 카페'예요. 최근 3개월 검증 후기가 많을수록 상위로 올라가요.</>} />}
                 <Row title="🏆 리뷰 많은 Top 3" items={discover.top3} sub="검증 리뷰 많은 순" info={<>이 동네에서 <b>검증·참고 후기(옥석)가 가장 많은</b> 카페 순서예요. 광고·가짜·무관 글은 제외한 '진짜 후기 수' 기준입니다.</>} />
                 <Row title="🔥 스페셜티 픽" items={discover.specialty} sub="로스팅 언급 순" info={<>검증된 카페 중 <b>직접 로스팅·스페셜티가 후기에 자주 언급된</b> 곳이에요. 커피에 진심인 집 위주로 보여줘요.</>} />
                 <button onClick={() => { if (homeSido) { setSido(homeSido); setSigungu(homeGu); } setFocusId(null); setSheetOpen(true); setTab("map"); }} className="w-full bg-[#2b2018] text-[#f4ece0] rounded-xl py-3.5 font-medium mt-2">🗺 {homeGu ? `${homeGu} 지도로 보기` : "지도에서 전체 둘러보기"} →</button>
