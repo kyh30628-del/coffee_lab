@@ -339,8 +339,14 @@ export default function Home() {
     setSearchLoading(false);
   };
 
-  // 지도 1회 초기화 후 계속 유지(컨테이너는 숨김 상태로도 항상 마운트). 탭 전환 시 파괴/재생성하지 않음 → 전환 즉각.
+  // 지도: 처음 '지도' 탭을 열 때(컨테이너가 실제로 보일 때) 1회 초기화하고 이후 계속 유지.
+  // 탭 전환 시 파괴/재생성하지 않음 → 전환 즉각. 단 랜딩(role===null) 복귀 시엔 div가 사라지므로 파괴.
   useEffect(() => {
+    if (role === null) { // 랜딩으로 이탈 → 분리된 DOM에 남지 않게 파괴(재진입 시 새로 초기화)
+      if (mapObj.current) { try { mapObj.current.remove(); } catch {} mapObj.current = null; layerRef.current = null; setMapReady(false); }
+      return;
+    }
+    if (tab !== "map" || mapObj.current) return; // 지도 탭을 실제로 열 때 1회 초기화(숨김 상태 초기화 금지)
     let cancelled = false;
     (async () => {
       const L = (await import("leaflet")).default;
@@ -353,15 +359,14 @@ export default function Home() {
       setTimeout(() => mapObj.current?.invalidateSize(), 60);
       setMapReady(true); // 초기화 완료 → 마커 effect 재실행 트리거
     })();
-    return () => {
-      cancelled = true;
-      if (mapObj.current) { try { mapObj.current.remove(); } catch {} mapObj.current = null; layerRef.current = null; }
-      setMapReady(false);
-    };
-  }, []);
-  // 지도 탭 진입 시 사이즈 보정(숨김→표시 전환 대응)
+    return () => { cancelled = true; };
+  }, [tab, role]);
+  // 지도 탭 재진입 시 사이즈 보정(숨김→표시 전환 대응). 여러 타이밍에 호출해 확실히 렌더.
   useEffect(() => {
-    if (tab === "map" && mapObj.current) { const t = setTimeout(() => mapObj.current?.invalidateSize(), 50); return () => clearTimeout(t); }
+    if (tab === "map" && mapObj.current) {
+      const ts = [50, 200, 450].map((d) => setTimeout(() => mapObj.current?.invalidateSize(), d));
+      return () => ts.forEach(clearTimeout);
+    }
   }, [tab]);
 
   // '지도에서 위치 보기' — 지도 준비되면 해당 좌표로 이동(핀은 아래 마커 effect가 그림)
