@@ -6,7 +6,7 @@ import ShowcaseBanner, { SHOWCASE_CSS } from "./ShowcaseBanner";
 type EvidenceReview = { quote: string; link?: string; source?: string; date?: string; trust?: "verified" | "reference" | "rejected"; score?: number; why?: string[] };
 type QualityStats = { raw: number; verified: number; reference: number; rejected: number; duplicates?: number; rejectReasons?: Record<string, number> };
 type Cafe = {
-  id: number; name: string; area: string; lat: number; lng: number;
+  id: number; name: string; area: string; dong?: string | null; lat: number; lng: number;
   hours: string; phone: string; roasts_own: boolean; signature: string; uses: string;
   vibe: string; note: string; tone: string; photo_url: string | null;
   acidity: number; body: number; sweet: number;
@@ -786,10 +786,11 @@ export default function Home() {
           <aside className="hidden md:block md:w-[380px] md:h-full bg-[#fdfaf4] border-l border-[#ece0cd] overflow-y-auto p-6 relative z-10">
             <MapControls {...{ sido, sigungu, onSido, setSigungu, tasteKey, setTasteKey, filtered, matchSet, setSelected, openLocation, autoGu, geoMsg, clearAuto }} />
           </aside>
-          <div className="md:hidden absolute left-0 right-0 bg-[#fdfaf4] rounded-t-3xl shadow-[0_-4px_24px_rgba(0,0,0,0.18)] z-[1200] flex flex-col transition-transform duration-300 ease-out will-change-transform" style={{ bottom: "3.25rem", height: "72dvh", transform: sheetOpen ? "translateY(0)" : "translateY(calc(72dvh - 60px))" }}>
-            <button onClick={() => setSheetOpen((o) => !o)} className="shrink-0 w-full pt-3 pb-2.5 flex flex-col items-center gap-1.5" aria-expanded={sheetOpen}>
-              <div className="w-10 h-1.5 bg-[#cbb89f] rounded-full" />
-              <span className="text-[11px] font-bold text-[#9c6b3f]">{sheetOpen ? "지도 보기 ▾" : `지역·필터 펼치기 ▴ (${filtered.length})`}</span>
+          <div className="md:hidden absolute left-0 right-0 bg-[#fdfaf4] rounded-t-3xl shadow-[0_-4px_24px_rgba(0,0,0,0.18)] z-[1200] flex flex-col transition-transform duration-300 ease-out will-change-transform" style={{ bottom: "3.25rem", height: "72dvh", transform: sheetOpen ? "translateY(0)" : "translateY(calc(72dvh - 2.75rem))" }}>
+            {/* 접힘 시 정확히 이 핸들(2.75rem)까지만 보이게 — 아래 목록이 삐져나오지 않음 */}
+            <button onClick={() => setSheetOpen((o) => !o)} className="shrink-0 w-full flex flex-col items-center justify-center gap-1" style={{ height: "2.75rem" }} aria-expanded={sheetOpen}>
+              <div className="w-9 h-1 bg-[#cbb89f] rounded-full" />
+              <span className="text-[11px] font-bold text-[#9c6b3f] leading-none">{sheetOpen ? "지도 보기 ▾" : `지역·필터 펼치기 ▴ (${filtered.length})`}</span>
             </button>
             <div className="flex-1 overflow-y-auto px-5 pb-8" style={{ WebkitOverflowScrolling: "touch" }}>
               <MapControls {...{ sido, sigungu, onSido, setSigungu, tasteKey, setTasteKey, filtered, matchSet, setSelected, openLocation, autoGu, geoMsg, clearAuto }} />

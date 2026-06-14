@@ -117,6 +117,13 @@ const DONGS: Record<string, string[]> = {
 const DONG_KEYWORDS = ["카페", "로스터리", "스페셜티커피", "핸드드립", "직접로스팅", "디저트카페", "베이커리카페", "감성카페", "브런치카페"];
 
 const stripTags = (s: string) => (s || "").replace(/<[^>]+>/g, "").replace(/&[a-z]+;/g, "").trim();
+// 지번주소에서 동/읍/면 추출 — '서울특별시 강동구 상일동 502' → '상일동', '경기도 수원시 장안구 정자동' → '정자동'.
+// 구/시/군 뒤에 오는 동·읍·면·가 토큰. 행정동 숫자(여의도동·1가 등) 포함.
+export function parseDong(jibun: string): string | null {
+  if (!jibun) return null;
+  const m = jibun.match(/(?:구|시|군)\s+([가-힣]+[0-9]?(?:동|읍|면|가))/);
+  return m ? m[1] : null;
+}
 export const isFranchise = (name: string) => { const n = name.replace(/\s/g, ""); return FRANCHISE.some((f) => n.includes(f)); };
 export const isNonCafe = (name: string, category: string) => {
   const n = (name || "").replace(/\s/g, ""), cat = category || "";
@@ -138,6 +145,7 @@ async function localSearch(query: string) {
   return (data.items ?? []).map((it: any) => ({
     name: stripTags(it.title),
     address: it.roadAddress || it.address || "",
+    dong: parseDong(it.address || ""), // 지번에서 동/읍/면 추출(계층 필터·지도 집계용)
     category: it.category || "",
     lng: it.mapx ? Number(it.mapx) / 1e7 : null,
     lat: it.mapy ? Number(it.mapy) / 1e7 : null,
@@ -171,18 +179,23 @@ export async function discoverRegion(region: string, areaLabel: string, keywords
   // ② 구 단위 광역 발굴 — 동 목록이 없는 경기·인천, 그리고 서울 보완.
   for (const kw of keywords) await collect(`${region} ${kw}`);
 
-  let inserted = 0, skipped = 0;
+  await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS pipeline_status TEXT`.catch(() => {});
+  await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS dong TEXT`.catch(() => {});
+  let inserted = 0, skipped = 0, backfilled = 0;
   for (const it of found) {
-    const exists = await sql`SELECT id FROM cafes WHERE name = ${it.name} OR (ABS(lat - ${it.lat}) < 0.0005 AND ABS(lng - ${it.lng}) < 0.0005) LIMIT 1`;
-    if (exists.length > 0) { skipped++; continue; }
+    const exists = await sql`SELECT id, dong FROM cafes WHERE name = ${it.name} OR (ABS(lat - ${it.lat}) < 0.0005 AND ABS(lng - ${it.lng}) < 0.0005) LIMIT 1`;
+    if (exists.length > 0) {
+      // 기존 카페: 동 정보가 없으면 지번에서 파싱한 동으로 백필(추가 호출 없이 발굴 중 채움).
+      if (it.dong && !exists[0].dong) { await sql`UPDATE cafes SET dong = ${it.dong} WHERE id = ${exists[0].id}`; backfilled++; }
+      skipped++; continue;
+    }
     const pseudoId = `nl_${it.name.replace(/\s/g, "")}_${Math.round(it.lat * 1e5)}`;
     // 신규 카페는 pipeline_status='new'로 태어남 → 풀 게이트(합성·AI판정·임베딩·검증) 통과 후에만 공개.
-    await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS pipeline_status TEXT`.catch(() => {});
     await sql`
-      INSERT INTO cafes (place_id, name, area, address, lat, lng, source, published, roasts_own, pipeline_status)
-      VALUES (${pseudoId}, ${it.name}, ${storeArea}, ${it.address}, ${it.lat}, ${it.lng}, 'discover', false, false, 'new')
+      INSERT INTO cafes (place_id, name, area, dong, address, lat, lng, source, published, roasts_own, pipeline_status)
+      VALUES (${pseudoId}, ${it.name}, ${storeArea}, ${it.dong}, ${it.address}, ${it.lat}, ${it.lng}, 'discover', false, false, 'new')
       ON CONFLICT (place_id) DO NOTHING`;
     inserted++;
   }
-  return { region, found: found.length, inserted, skipped, names: found.map((f) => f.name) };
+  return { region, found: found.length, inserted, skipped, backfilled, names: found.map((f) => f.name) };
 }
