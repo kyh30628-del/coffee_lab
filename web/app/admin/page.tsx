@@ -162,7 +162,7 @@ export default function AdminPage() {
   const keptPct = ct?.quality?.raw ? Math.round(((ct.quality.raw - ct.quality.rejected) / ct.quality.raw) * 100) : 0;
 
   return (
-    <main className="min-h-screen bg-stone-100 p-4 sm:p-6">
+    <main className="min-h-screen bg-stone-100 p-4 sm:p-6" style={{ paddingTop: "calc(1rem + env(safe-area-inset-top))" }}>
       <div className="max-w-3xl mx-auto">
         <div className="flex items-center gap-3 mb-6">
           <BackLink to="/" label="홈" className="text-stone-500" />

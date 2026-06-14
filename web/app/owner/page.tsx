@@ -124,7 +124,7 @@ export default function OwnerPage() {
 
   return (
     <div className="min-h-screen bg-[#f4ece0] text-[#2b2018]" style={{ fontFamily: "'Gowun Batang', serif" }}>
-      <header className="bg-[#2b2018] text-[#f4ece0] px-4 py-3 flex items-center justify-between gap-2">
+      <header className="bg-[#2b2018] text-[#f4ece0] px-4 pb-3 flex items-center justify-between gap-2" style={{ paddingTop: "calc(0.75rem + env(safe-area-inset-top))" }}>
         <div className="flex items-center gap-2 min-w-0">
           <BackLink to="/" label="홈" className="text-[#cbb89f] shrink-0" />
           <h1 className="text-[15px] font-bold truncate">사장님 분석</h1>
