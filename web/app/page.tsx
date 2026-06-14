@@ -105,6 +105,17 @@ function makePinHtml(c: Cafe, isMatch: boolean, isFocus = false, isMine = false)
     <div style="margin-top:2px;${labelStyle}padding:1px 5px;border-radius:7px;font-size:${isFocus || isMine ? 10 : 9}px;white-space:nowrap;display:inline-block;">${c.name}${isMine ? " ❤" : isFocus ? "" : feat ? " ⭐" : isMatch ? " ✓" : ""}</div>
   </div>`;
 }
+// 다른 사람들의 집계 핀 — 등록 인원수 표시, 인기 많을수록 크게(원형, 카페핀과 구분).
+function makeCountPinHtml(p: { name: string; cnt: number }, maxCnt: number): string {
+  const t = Math.min(1, p.cnt / Math.max(1, maxCnt));
+  const size = Math.round(28 + t * 26);
+  const esc = (p.name || "").replace(/</g, "&lt;");
+  return `<div style="transform:translate(-50%,-100%);text-align:center;">
+    <div style="width:${size}px;height:${size}px;background:#5f7355;border:2px solid #fdfaf4;border-radius:50%;box-shadow:0 0 0 ${3 + Math.round(t * 4)}px rgba(95,115,85,0.25),0 2px 8px rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;margin:0 auto;">
+      <span style="color:#fff;font-weight:800;font-size:${Math.round(12 + t * 6)}px;">${p.cnt}</span></div>
+    <div style="margin-top:2px;background:#5f7355;color:#fff;font-weight:700;padding:1px 5px;border-radius:7px;font-size:9px;white-space:nowrap;display:inline-block;">${esc} · ${p.cnt}명</div>
+  </div>`;
+}
 function topChars(c: Cafe, n = 4) {
   const cs = c.char_scores ?? {};
   return Object.entries(cs).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, n).map(([k, v]) => ({ ...(CHAR_LABELS[k] ?? { label: k, emoji: "" }), score: v }));
@@ -113,7 +124,7 @@ function topChars(c: Cafe, n = 4) {
 export default function Home() {
   const [cafes, setCafes] = useState<Cafe[]>([]);
   const [selected, setSelected] = useState<Cafe | null>(null);
-  const [tab, setTab] = useState<"home" | "map">("home");
+  const [tab, setTab] = useState<"home" | "map" | "memory">("home");
   const [discover, setDiscover] = useState<Discover | null>(null);
   const [momentum, setMomentum] = useState<{ rising: DCafe[] } | null>(null);
   const [homeSido, setHomeSido] = useState("");
@@ -127,7 +138,8 @@ export default function Home() {
   const [myVisits, setMyVisits] = useState<any[]>([]);
   const [myPinMode, setMyPinMode] = useState(false);
   const [showMyCafeReg, setShowMyCafeReg] = useState(false);
-  const [showMyMemory, setShowMyMemory] = useState(false);
+  const [othersMode, setOthersMode] = useState(false); // 다른 사람은 — 집계 핀
+  const [othersPins, setOthersPins] = useState<{ id: number; name: string; area: string; lat: number; lng: number; cnt: number }[]>([]);
   const [myLocked, setMyLocked] = useState(false); // 공용 PC 잠금 상태
   const [sessionPin, setSessionPin] = useState(""); // 이번 세션에 입력한 PIN(해제용)
   const reloadMyCafes = (dev: string, pin = "") => fetch(`/api/my-cafe?device=${dev}${pin ? `&pin=${encodeURIComponent(pin)}` : ""}`).then((r) => r.json()).then((d) => {
@@ -332,11 +344,12 @@ export default function Home() {
     // '전체'(지역·결·포커스 미선택)일 땐 마커를 인기순 상위로 제한 — 3천개를 한꺼번에 DOM으로 그리면
     //  메인 스레드가 막혀 지역선택 레이어가 잠깐 뭉개짐. 지역/결을 고르면 그 범위 전체를 그린다.
     const scoped = !!(sido || sigungu || focusId || tasteKey);
-    // MY PIN 모드: 내가 등록한 카페만 표시
+    // 기본 카페 레이어: MY PIN이면 내 카페만, 다른사람 전용이면 비움(아래 집계레이어), 아니면 일반.
     const toRender = myPinMode
       ? filtered.filter((c) => myCafeIds.has(c.id))
+      : othersMode
+      ? []
       : (scoped ? filtered : filtered.slice(0, 400));
-    // 배치 추가: 마커를 다 만든 뒤 레이어그룹에 한 번에 붙여 리플로우 최소화
     const markers = toRender.map((c) => {
       const isFocus = c.id === focusId;
       const isMatch = matchSet.has(c.id);
@@ -346,18 +359,47 @@ export default function Home() {
       if (isFocus) { m.bindPopup(`<b>${c.name}</b><br>${c.area}`); }
       return m;
     });
+    // 다른 사람은 — 집계 핀 레이어(지역 선택 시 그 지역만). 등록 인원수 표시, 인기순 크기.
+    if (othersMode && othersPins.length) {
+      const inScope = (p: { area: string }) => {
+        if (!sido && !sigungu) return true;
+        const g = toGu(p.area);
+        if (sido && g.sido !== sido) return false;
+        if (sigungu && g.sigungu !== sigungu) return false;
+        return true;
+      };
+      const op = othersPins.filter(inScope);
+      const maxCnt = op.reduce((m, p) => Math.max(m, p.cnt), 1);
+      for (const p of op) {
+        const icon = L.divIcon({ className: "", html: makeCountPinHtml(p, maxCnt), iconSize: [0, 0] });
+        const m = L.marker([p.lat, p.lng], { icon, zIndexOffset: 500 + p.cnt }).on("click", () => { const cf = cafes.find((c) => c.id === p.id); if (cf) setSelected(cf); });
+        markers.push(m);
+      }
+    }
     const group = L.layerGroup(markers);
     layerRef.current.addLayer(group);
     const focusM = focusId ? markers[toRender.findIndex((c) => c.id === focusId)] : null;
     if (focusM) focusM.openPopup();
-    // 핀 고정 중이면 그 카페로 이동(아래 focus 효과)에 맡기고 fitBounds 생략
+    // 화면 맞추기: 포커스 > 특수모드(내핀/다른사람) 핀들 > 지역 > 시도중심.
+    const fit = (pts: [number, number][]) => { if (pts.length) mapObj.current.fitBounds(L.latLngBounds(pts), { padding: [60, 60], maxZoom: pts.length === 1 ? 14 : 15 }); };
     if (focusId) {
       /* focus effect가 setView 처리 */
+    } else if (myPinMode || othersMode) {
+      // 내 핀/다른사람 핀이 전체보기·지역 어디서든 화면에 들어오게 맞춤
+      const pts: [number, number][] = markers.map((m: any) => { const ll = m.getLatLng(); return [ll.lat, ll.lng]; });
+      if (pts.length) fit(pts);
+      else if (sido && SIDO_CENTER[sido]) { const [la, ln, z] = SIDO_CENTER[sido]; mapObj.current.setView([la, ln], z); }
     } else if (filtered.length > 0 && (sido || sigungu)) {
       const lats = filtered.map((c) => c.lat), lngs = filtered.map((c) => c.lng);
       mapObj.current.fitBounds(L.latLngBounds([[Math.min(...lats), Math.min(...lngs)], [Math.max(...lats), Math.max(...lngs)]]), { padding: [50, 50], maxZoom: 15 });
     } else if (sido && SIDO_CENTER[sido]) { const [la, ln, z] = SIDO_CENTER[sido]; mapObj.current.setView([la, ln], z); }
-  }, [filtered, matchSet, sido, sigungu, tab, focusId, mapReady, myPinMode, myCafeIds]);
+  }, [filtered, matchSet, sido, sigungu, tab, focusId, mapReady, myPinMode, myCafeIds, othersMode, othersPins]);
+
+  // 다른 사람은 — 토글 켜면 집계 핀 로드(한 번)
+  useEffect(() => {
+    if (!othersMode || othersPins.length) return;
+    fetch(`/api/my-cafe/popular?device=${deviceId}`).then((r) => r.json()).then((d) => { if (d.ok) setOthersPins(d.pins ?? []); }).catch(() => {});
+  }, [othersMode, deviceId]);
 
   const onSido = (v: string) => { setSido(v); setSigungu(""); setFocusId(null); };
 
@@ -506,11 +548,11 @@ export default function Home() {
       <header className="shrink-0 bg-[#2b2018] text-[#f4ece0] z-[1500] h-14 flex items-center justify-between px-4 gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <button onClick={() => { try { sessionStorage.removeItem("dcn_role"); } catch {} setRole(null); }} className="text-lg font-bold shrink-0" aria-label="랜딩으로">동네 커피 노트</button>
-          {/* 홈/지도 토글 */}
+          {/* 홈/지도/추억 토글 */}
           <div className="flex bg-[#3d2f22] rounded-full p-0.5">
-            {(["home", "map"] as const).map((t) => (
-              <button key={t} onClick={() => setTab(t)} className={`px-3 py-1.5 text-xs font-bold rounded-full transition-colors ${tab === t ? "bg-[#f4ece0] text-[#2b2018]" : "text-[#cbb89f]"}`}>
-                {t === "home" ? "홈" : "지도"}
+            {(["home", "map", "memory"] as const).map((t) => (
+              <button key={t} onClick={() => setTab(t)} className={`px-2.5 sm:px-3 py-1.5 text-xs font-bold rounded-full transition-colors whitespace-nowrap ${tab === t ? "bg-[#f4ece0] text-[#2b2018]" : "text-[#cbb89f]"}`}>
+                {t === "home" ? "홈" : t === "map" ? "지도" : "🗃 추억"}
               </button>
             ))}
           </div>
@@ -578,18 +620,19 @@ export default function Home() {
         <div className="flex-1 relative md:flex overflow-hidden">
           <div className="absolute inset-0 md:relative md:flex-1 md:p-5">
             <div ref={mapRef} className="w-full h-full md:rounded-2xl overflow-hidden bg-[#e8e0d3] z-0" />
-            {/* 내 카페(MY PIN) — 지도 상단 */}
+            {/* 내 카페(MY PIN) / 다른 사람은 — 지도 상단 */}
             <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[1100] flex gap-2 max-w-[calc(100vw-1.5rem)]">
-              <button onClick={() => { if (myLocked) setShowMyMemory(true); else setMyPinMode((v) => !v); }}
+              <button onClick={() => { if (myLocked) setTab("memory"); else setMyPinMode((v) => !v); }}
                 className={`inline-flex items-center gap-1 h-9 px-3.5 rounded-full text-[12px] font-bold shadow-lg whitespace-nowrap transition-colors ${myPinMode ? "text-white" : "bg-white text-[#d6336c] border border-[#f0c4d4]"}`}
                 style={myPinMode ? { background: "#d6336c" } : {}}>
                 <span className="text-[14px] leading-none">{myLocked ? "🔒" : "❤"}</span>
                 <span>내 카페{!myLocked && myCafeIds.size ? ` ${myCafeIds.size}` : ""}</span>
               </button>
-              <button onClick={() => setShowMyMemory(true)} aria-label="추억 보관소"
-                className="inline-flex items-center gap-1 h-9 px-3.5 rounded-full text-[12px] font-bold shadow-lg whitespace-nowrap bg-white text-[#9c6b3f] border border-[#e6d9c8]">
-                <span className="text-[14px] leading-none">🗃</span>
-                <span>추억 보관소</span>
+              <button onClick={() => setOthersMode((v) => !v)} aria-label="다른 사람은"
+                className={`inline-flex items-center gap-1 h-9 px-3.5 rounded-full text-[12px] font-bold shadow-lg whitespace-nowrap transition-colors ${othersMode ? "text-white" : "bg-white text-[#5f7355] border border-[#cfe0c2]"}`}
+                style={othersMode ? { background: "#5f7355" } : {}}>
+                <span className="text-[14px] leading-none">👥</span>
+                <span>다른 사람은{othersMode && othersPins.length ? ` ${othersPins.length}` : ""}</span>
               </button>
             </div>
           </div>
@@ -608,13 +651,12 @@ export default function Home() {
         </div>
       )}
 
-      {showMyCafeReg && <MyCafeRegModal cafes={cafes} device={deviceId} visits={myVisits} pin={sessionPin} onClose={() => setShowMyCafeReg(false)} onDone={() => { reloadMyCafes(deviceId, sessionPin); setMyPinMode(true); }} />}
-      {showMyMemory && <MyMemoryModal device={deviceId} visits={myVisits} locked={myLocked} sessionPin={sessionPin}
-        onClose={() => setShowMyMemory(false)}
-        onRegister={() => { setShowMyMemory(false); setShowMyCafeReg(true); }}
+      {tab === "memory" && <MemoryTab device={deviceId} visits={myVisits} locked={myLocked} sessionPin={sessionPin}
+        onRegister={() => setShowMyCafeReg(true)}
         onUnlock={(p: string) => { try { sessionStorage.setItem("dcn_pin", p); } catch {} setSessionPin(p); setMyLocked(false); reloadMyCafes(deviceId, p); }}
         onLock={() => { try { sessionStorage.removeItem("dcn_pin"); } catch {} setSessionPin(""); reloadMyCafes(deviceId, ""); }}
-        onRestore={(dev: string) => { try { localStorage.setItem("dcn_device", dev); } catch {} setDeviceId(dev); reloadMyCafes(dev, ""); setMyPinMode(true); }} />}
+        onRestore={(dev: string) => { try { localStorage.setItem("dcn_device", dev); } catch {} setDeviceId(dev); reloadMyCafes(dev, ""); }} />}
+      {showMyCafeReg && <MyCafeRegModal cafes={cafes} device={deviceId} visits={myVisits} pin={sessionPin} onClose={() => setShowMyCafeReg(false)} onDone={() => { reloadMyCafes(deviceId, sessionPin); }} />}
 
       {selected && <CafePanel cafe={selected} onClose={() => setSelected(null)} onMap={() => {
         if (selected.lat && selected.lng) {
@@ -1231,32 +1273,91 @@ function MyCafeRegModal({ cafes, device, visits, pin = "", onClose, onDone }: { 
 }
 
 // 내 기억 관리 — 백업코드 발급/복원 + PDF·JSON 내보내기 (개인정보 0)
-function MyMemoryModal({ device, visits, locked = false, sessionPin = "", onClose, onRestore, onUnlock, onLock, onRegister }: { device: string; visits: any[]; locked?: boolean; sessionPin?: string; onClose: () => void; onRestore: (dev: string) => void; onUnlock?: (pin: string) => void; onLock?: () => void; onRegister?: () => void }) {
-  const [code, setCode] = useState("");
-  const [inputCode, setInputCode] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState("");
-  // PIN 잠금
+// 추억 보관소 탭 — 등록 + 내 카페 목록 + 설정버튼. 잠금 시 PIN 입력 화면.
+function MemoryTab({ device, visits, locked = false, sessionPin = "", onRegister, onUnlock, onLock, onRestore }: { device: string; visits: any[]; locked?: boolean; sessionPin?: string; onRegister: () => void; onUnlock?: (pin: string) => void; onLock?: () => void; onRestore: (dev: string) => void }) {
+  const [showSettings, setShowSettings] = useState(false);
   const [hasPin, setHasPin] = useState(false);
   const [unlockPin, setUnlockPin] = useState("");
-  const [pinMode, setPinMode] = useState<"" | "set" | "change" | "remove">("");
-  const [pinA, setPinA] = useState(""); // 현재/새 PIN
-  const [pinB, setPinB] = useState(""); // 변경 시 새 PIN
-
-  useEffect(() => {
-    fetch(`/api/my-cafe/pin?device=${device}`).then((r) => r.json()).then((d) => { if (d.ok) setHasPin(!!d.hasPin); }).catch(() => {});
-  }, [device]);
-
-  const pinApi = (body: any) => fetch("/api/my-cafe/pin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ device, ...body }) }).then((r) => r.json());
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  useEffect(() => { fetch(`/api/my-cafe/pin?device=${device}`).then((r) => r.json()).then((d) => { if (d.ok) setHasPin(!!d.hasPin); }).catch(() => {}); }, [device]);
 
   const doUnlock = async () => {
     if (!unlockPin) { setMsg("PIN을 입력해주세요"); return; }
     setBusy(true); setMsg("");
-    const d = await pinApi({ action: "verify", pin: unlockPin }).catch(() => ({ ok: false }));
+    const d = await fetch("/api/my-cafe/pin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ device, action: "verify", pin: unlockPin }) }).then((r) => r.json()).catch(() => ({ ok: false }));
     setBusy(false);
-    if (d.ok && d.valid) { onUnlock?.(unlockPin); setUnlockPin(""); }
-    else setMsg("PIN이 올바르지 않아요");
+    if (d.ok && d.valid) { onUnlock?.(unlockPin); setUnlockPin(""); } else setMsg("PIN이 올바르지 않아요");
   };
+  const fmtDate = (s?: string) => { if (!s) return ""; const d = new Date(s); return isNaN(d.getTime()) ? "" : d.toLocaleString("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }); };
+
+  if (locked) {
+    return (
+      <div className="flex-1 overflow-y-auto flex items-start justify-center px-6 pt-16" style={{ fontFamily: "'Gowun Batang', serif" }}>
+        <div className="bg-white rounded-2xl px-7 py-8 text-center max-w-xs w-full shadow-sm border border-[#ece0cd]">
+          <div className="text-[34px] mb-2">🔒</div>
+          <div className="text-[16px] font-bold text-[#2b2018] mb-1">잠긴 추억 보관소</div>
+          <div className="text-[12px] text-[#7a6452] leading-relaxed mb-4">공용 PC 보호를 위해 PIN으로 잠겨 있어요.<br />내 PIN을 입력하면 내 기록만 보여요.</div>
+          <input value={unlockPin} onChange={(e) => setUnlockPin(e.target.value.replace(/\D/g, ""))} inputMode="numeric" maxLength={8} onKeyDown={(e) => e.key === "Enter" && doUnlock()} autoFocus placeholder="PIN (숫자)" className="w-full border border-[#cbb89f] rounded-lg px-3 py-2.5 text-[18px] text-center tracking-[0.4em] bg-white mb-2" />
+          {msg && <p className="text-[12px] text-[#c0392b] mb-2">{msg}</p>}
+          <button onClick={doUnlock} disabled={busy} className="w-full bg-[#2b2018] text-[#f4ece0] rounded-xl py-2.5 font-bold text-[14px] disabled:opacity-60">{busy ? "확인 중..." : "잠금 해제"}</button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex-1 overflow-y-auto" style={{ fontFamily: "'Gowun Batang', serif" }}>
+      <div className="max-w-lg mx-auto px-4 py-5 pb-[calc(2rem_+_env(safe-area-inset-bottom))]">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <div className="text-[17px] font-bold text-[#2b2018]">🗃 추억 보관소</div>
+            <div className="text-[11px] text-[#a8927a]">이 기기의 내 추억 {visits.length}곳 · 다른 사람 기록은 안 보여요</div>
+          </div>
+          <button onClick={() => setShowSettings(true)} className="inline-flex items-center gap-1 h-9 px-3 rounded-full text-[12px] font-bold bg-white text-[#7a6452] border border-[#e6d9c8] shrink-0">⚙ 설정</button>
+        </div>
+        <button onClick={onRegister} className="w-full inline-flex items-center justify-center gap-1.5 bg-[#d6336c] text-white rounded-xl py-3.5 text-[14px] font-bold shadow-sm mb-4">
+          <span className="text-[16px] leading-none">➕</span> 새 카페 추억 등록하기
+        </button>
+        {visits.length === 0 ? (
+          <div className="text-center text-[#a8927a] text-[13px] py-14 bg-white rounded-2xl border border-[#ece0cd] leading-relaxed">아직 등록한 추억이 없어요.<br />카페에서 위치 인증하고 첫 추억을 남겨보세요.</div>
+        ) : (
+          <div className="space-y-2.5">
+            {visits.map((v) => (
+              <div key={v.id} className="bg-white rounded-2xl border border-[#ece0cd] p-3.5 flex gap-3">
+                {v.photo_url ? <img src={v.photo_url} alt="" className="w-16 h-16 rounded-xl object-cover shrink-0" /> : <div className="w-16 h-16 rounded-xl bg-[#f3ede1] flex items-center justify-center text-[22px] shrink-0">{v.favorite ? "★" : "☕"}</div>}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    {v.favorite && <span className="text-[#f0a832] text-[13px]">★</span>}
+                    <span className="font-bold text-[#2b2018] text-[14px] truncate">{v.name}</span>
+                    <span className="text-[10px] text-[#9c6b3f] shrink-0">{v.area}</span>
+                  </div>
+                  {v.memory ? <p className="text-[12px] text-[#52402e] leading-relaxed mt-0.5 line-clamp-2">{v.memory}</p> : <p className="text-[12px] text-[#bcae9b] mt-0.5">기억 메모 없음</p>}
+                  <div className="text-[10px] text-[#a8927a] mt-1">{fmtDate(v.created_at)}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      {showSettings && <MemorySettingsModal device={device} visits={visits} hasPin={hasPin} onPinChange={setHasPin} onClose={() => setShowSettings(false)} onRestore={onRestore} onUnlock={onUnlock} onLock={onLock} />}
+    </div>
+  );
+}
+
+// 추억 보관소 설정 모달 — ①백업코드 ②복원 ③내보내기 ④PIN
+function MemorySettingsModal({ device, visits, hasPin, onPinChange, onClose, onRestore, onUnlock, onLock }: { device: string; visits: any[]; hasPin: boolean; onPinChange: (v: boolean) => void; onClose: () => void; onRestore: (dev: string) => void; onUnlock?: (pin: string) => void; onLock?: () => void }) {
+  const [code, setCode] = useState("");
+  const [inputCode, setInputCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [pinMode, setPinMode] = useState<"" | "set" | "change" | "remove">("");
+  const [pinA, setPinA] = useState("");
+  const [pinB, setPinB] = useState("");
+  const setHasPin = onPinChange;
+
+  const pinApi = (body: any) => fetch("/api/my-cafe/pin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ device, ...body }) }).then((r) => r.json());
+
   const doSetPin = async () => {
     setBusy(true); setMsg("");
     const d = await pinApi({ action: "set", pin: pinA }).catch(() => ({ ok: false }));
@@ -1325,44 +1426,20 @@ function MyMemoryModal({ device, visits, locked = false, sessionPin = "", onClos
     if (w) { w.document.write(html); w.document.close(); } else setMsg("팝업이 차단됐어요. 팝업을 허용해주세요.");
   };
 
-  // 잠금 상태 — PIN 입력 화면만 노출(기록 안 보임)
-  if (locked) {
-    return (
-      <div className="fixed inset-0 z-[5000] flex items-center justify-center px-6" style={{ background: "rgba(43,32,24,0.6)", fontFamily: "'Gowun Batang', serif" }} onClick={onClose}>
-        <div className="bg-[#fdfaf4] rounded-2xl px-7 py-8 text-center max-w-xs w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
-          <div className="text-[34px] mb-2">🔒</div>
-          <div className="text-[16px] font-bold text-[#2b2018] mb-1">잠긴 추억 보관소</div>
-          <div className="text-[12px] text-[#7a6452] leading-relaxed mb-4">공용 PC 보호를 위해 PIN으로 잠겨 있어요.<br />내 PIN을 입력하면 내 기록만 보여요.</div>
-          <input value={unlockPin} onChange={(e) => setUnlockPin(e.target.value.replace(/\D/g, ""))} inputMode="numeric" maxLength={8}
-            onKeyDown={(e) => e.key === "Enter" && doUnlock()} autoFocus placeholder="PIN (숫자)"
-            className="w-full border border-[#cbb89f] rounded-lg px-3 py-2.5 text-[18px] text-center tracking-[0.4em] bg-white mb-2" />
-          {msg && <p className="text-[12px] text-[#c0392b] mb-2">{msg}</p>}
-          <button onClick={doUnlock} disabled={busy} className="w-full bg-[#2b2018] text-[#f4ece0] rounded-xl py-2.5 font-bold text-[14px] disabled:opacity-60">{busy ? "확인 중..." : "잠금 해제"}</button>
-          <button onClick={onClose} className="mt-2 w-full text-[#9c6b3f] text-[13px] py-1">닫기</button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="fixed inset-0 z-[5000] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)", fontFamily: "'Gowun Batang', serif" }} onClick={onClose}>
       <div className="w-full max-w-lg bg-[#fdfaf4] rounded-t-2xl max-h-[88dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-[#f0e6d4]">
-          <div className="font-bold text-[#2b2018] text-[15px]">🗃 추억 보관소</div>
+          <div className="font-bold text-[#2b2018] text-[15px]">⚙ 설정</div>
           <div className="flex items-center gap-2">
-            {hasPin && <button onClick={() => onLock?.()} className="text-[11px] font-bold text-[#9c6b3f] border border-[#e6d9c8] rounded-full px-2.5 py-1">🔒 지금 잠그기</button>}
+            {hasPin && <button onClick={() => { onLock?.(); onClose(); }} className="text-[11px] font-bold text-[#9c6b3f] border border-[#e6d9c8] rounded-full px-2.5 py-1">🔒 지금 잠그기</button>}
             <button onClick={onClose} className="w-8 h-8 rounded-full bg-[#f0e6d4] text-[#7a6452] text-lg">×</button>
           </div>
         </div>
         <div className="overflow-y-auto flex-1 p-4 space-y-5 pb-[calc(1rem_+_env(safe-area-inset-bottom))]">
           <p className="text-[12px] text-[#7a6452] leading-relaxed bg-[#f3ede1] rounded-lg px-3 py-2.5">
-            <b className="text-[#2b2018]">이 기기의 내 추억 {visits.length}곳</b>만 보여요(다른 사람 기록은 절대 보이지 않아요). 가입·개인정보 없이, <b>백업 코드</b>로 다른 기기에서 불러오거나 <b>파일로 내려받아</b> 영구 보관할 수 있어요.
+            가입·개인정보 없이 — <b>백업 코드</b>로 다른 기기에서 불러오거나 <b>파일로 내려받아</b> 영구 보관, 공용 PC는 <b>PIN</b>으로 잠글 수 있어요.
           </p>
-
-          {/* 새 추억 등록 — 보관소의 대표 액션 */}
-          <button onClick={() => onRegister?.()} className="w-full inline-flex items-center justify-center gap-1.5 bg-[#d6336c] text-white rounded-xl py-3 text-[14px] font-bold shadow-sm">
-            <span className="text-[16px] leading-none">➕</span> 새 카페 추억 등록하기
-          </button>
 
           {/* 백업 코드 */}
           <div>
