@@ -593,7 +593,7 @@ export default function Home() {
   }
 
   return (
-    <div className="flex flex-col bg-[#f4ece0]" style={{ height: "100dvh", fontFamily: "'Gowun Batang', serif" }}>
+    <div className="flex flex-col bg-[#f4ece0]" style={{ position: "fixed", inset: 0, fontFamily: "'Gowun Batang', serif" }}>
       <header className="shrink-0 bg-[#2b2018] text-[#f4ece0] z-[1500] flex items-center justify-between px-4 gap-3" style={{ height: "calc(3.5rem + env(safe-area-inset-top))", paddingTop: "env(safe-area-inset-top)" }}>
         <div className="flex items-center gap-3 min-w-0">
           <button onClick={() => { try { sessionStorage.removeItem("dcn_role"); } catch {} setRole(null); }} className="text-lg font-bold shrink-0" aria-label="랜딩으로">동네 커피 노트</button>
@@ -719,9 +719,9 @@ export default function Home() {
             else if (a.k === "fav") setShowFavs(true);
             else if (a.k === "search") { setSearchRes(null); setSearchQ(""); setShowSearch(true); }
             else openLocation();
-          }} className="flex-1 flex flex-col items-center justify-center gap-0.5 py-1.5 active:bg-[#f3ede1]" aria-label={a.label}>
-            <svg width="23" height="23" viewBox="0 0 24 24" fill={a.fill ? "#d6336c" : "none"} stroke={a.fill ? "#d6336c" : "#7a6452"} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{a.icon}</svg>
-            <span className="text-[10px] font-bold" style={{ color: a.fill ? "#d6336c" : "#7a6452" }}>{a.label}</span>
+          }} className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 active:bg-[#f3ede1]" style={{ minHeight: 52 }} aria-label={a.label}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill={a.fill ? "#d6336c" : "none"} stroke={a.fill ? "#d6336c" : "#7a6452"} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>{a.icon}</svg>
+            <span className="text-[10px] font-bold leading-none whitespace-nowrap" style={{ color: a.fill ? "#d6336c" : "#7a6452" }}>{a.label}</span>
           </button>
         ))}
       </nav>
@@ -744,7 +744,7 @@ export default function Home() {
       {showSearch && (
         <div className="fixed inset-0 z-[4000] flex items-start justify-center sm:p-6">
           <div className="absolute inset-0 bg-black/40" onClick={() => setShowSearch(false)} />
-          <div className="relative bg-[#fdfaf4] w-full sm:max-w-lg h-full sm:h-auto sm:max-h-[85vh] sm:rounded-2xl flex flex-col shadow-2xl" style={{ height: "100dvh" }}>
+          <div className="relative bg-[#fdfaf4] w-full sm:max-w-lg h-full sm:h-auto sm:max-h-[85vh] sm:rounded-2xl flex flex-col shadow-2xl overflow-hidden" style={{ height: "100dvh", paddingTop: "env(safe-area-inset-top)" }}>
             <div className="shrink-0 p-4 border-b border-[#ece0cd]">
               <div className="flex items-center gap-2">
                 <input autoFocus value={searchQ} onChange={(e) => setSearchQ(e.target.value)} onKeyDown={(e) => e.key === "Enter" && runSearch(searchQ)}
@@ -759,7 +759,7 @@ export default function Home() {
                 ))}
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto p-4">
+            <div className="flex-1 overflow-y-auto p-4 pb-[calc(1rem_+_env(safe-area-inset-bottom))]">
               {searchLoading ? <p className="text-center text-[#a8927a] py-10">찾는 중…</p>
                 : !searchRes ? <p className="text-center text-[#a8927a] py-10 text-sm leading-relaxed">"비 오는 날 혼자 조용히", "감성 사진 데이트"처럼<br />구체적이지 않아도 떠오르는 느낌으로 찾아드려요.</p>
                 : (
