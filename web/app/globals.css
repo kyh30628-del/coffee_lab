@@ -34,15 +34,15 @@ body {
 /* 은은한 금빛 shimmer — 로고/타이틀에 천천히 한 줄기 빛이 흐름(과하지 않게) */
 @keyframes dcnShimmer { 0% { background-position: 0% 50%; } 100% { background-position: -200% 50%; } }
 .dcn-shimmer {
-  background: linear-gradient(100deg, #f4ece0 0%, #f4ece0 40%, #eccf94 50%, #f4ece0 60%, #f4ece0 100%);
-  background-size: 200% auto; -webkit-background-clip: text; background-clip: text;
+  background: linear-gradient(100deg, #ede0c8 0%, #ede0c8 38%, #ffe7a3 47%, #fff3cf 50%, #ffe7a3 53%, #ede0c8 62%, #ede0c8 100%);
+  background-size: 220% auto; -webkit-background-clip: text; background-clip: text;
   -webkit-text-fill-color: transparent; color: transparent;
-  animation: dcnShimmer 7s linear infinite;
+  animation: dcnShimmer 4.5s linear infinite;
 }
 .dcn-shimmer-dark {
-  background: linear-gradient(100deg, #2b2018 0%, #2b2018 40%, #a9743f 50%, #2b2018 60%, #2b2018 100%);
-  background-size: 200% auto; -webkit-background-clip: text; background-clip: text;
+  background: linear-gradient(100deg, #2b2018 0%, #2b2018 38%, #c98a3f 47%, #e6a94e 50%, #c98a3f 53%, #2b2018 62%, #2b2018 100%);
+  background-size: 220% auto; -webkit-background-clip: text; background-clip: text;
   -webkit-text-fill-color: transparent; color: transparent;
-  animation: dcnShimmer 7s linear infinite;
+  animation: dcnShimmer 4.5s linear infinite;
 }
 @media (prefers-reduced-motion: reduce) { .dcn-shimmer, .dcn-shimmer-dark { animation: none; } }

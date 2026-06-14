@@ -1021,7 +1021,7 @@ function MapControls({ sido, sigungu, dong, onSido, onSigungu, setDong, dongOpti
             <option value="">시·군·구</option>{sido && REGIONS[sido].map((g: string) => <option key={g} value={g}>{g}</option>)}
           </select>
           <select value={dong} onChange={(e) => setDong(e.target.value)} disabled={!sigungu || !(dongOptions?.length)} className="flex-1 min-w-0 border border-[#cbb89f] rounded-lg px-2.5 py-2.5 text-[15px] bg-white text-[#2b2018] disabled:opacity-50">
-            <option value="">{sigungu && !(dongOptions?.length) ? "동·면(수집중)" : "동·면"}</option>{(dongOptions ?? []).map((d: string) => <option key={d} value={d}>{d}</option>)}
+            <option value="">{sigungu && !(dongOptions?.length) ? "우리 동네(수집중)" : "우리 동네"}</option>{(dongOptions ?? []).map((d: string) => <option key={d} value={d}>{d}</option>)}
           </select>
         </div>
         {geoMsg && <div className="text-[10px] text-[#a8927a] mt-1.5">{geoMsg}</div>}
