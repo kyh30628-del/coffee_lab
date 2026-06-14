@@ -137,12 +137,16 @@ const Row = memo(function Row({ title, items, sub, info, onOpen }: { title: stri
 // 지역 집계 원형마커(전체/시도/시군구 레벨) — 개수와 크기로 밀집도 표현. 좌표 중심에 배치(translate -50%,-50%).
 function makeRegionPinHtml(label: string, cnt: number, maxCnt: number): string {
   const t = Math.min(1, cnt / Math.max(1, maxCnt));
-  const size = Math.round(42 + t * 36); // 42~78px
+  const size = Math.round(40 + t * 30); // 40~70px
   const esc = (label || "").replace(/</g, "&lt;");
-  return `<div style="transform:translate(-50%,-50%);text-align:center;cursor:pointer;">
-    <div style="width:${size}px;height:${size}px;background:rgba(156,107,63,0.93);border:3px solid #fdfaf4;border-radius:50%;box-shadow:0 0 0 ${4 + Math.round(t * 5)}px rgba(156,107,63,0.22),0 3px 10px rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;margin:0 auto;">
-      <span style="color:#fff;font-weight:800;font-size:${Math.round(14 + t * 6)}px;line-height:1;">${cnt}</span></div>
-    <div style="margin-top:3px;background:#2b2018;color:#fff;font-weight:700;padding:1px 7px;border-radius:8px;font-size:11px;white-space:nowrap;display:inline-block;">${esc}</div>
+  return `<div style="transform:translate(-50%,-50%);text-align:center;">
+    <div style="width:${size}px;height:${size}px;border-radius:50%;
+      background:radial-gradient(circle at 34% 28%, #a9743f 0%, #7c5230 62%, #5f3f25 100%);
+      border:2px solid rgba(253,250,244,0.96);
+      box-shadow:0 0 0 ${3 + Math.round(t * 4)}px rgba(124,82,48,0.16), 0 5px 14px rgba(60,40,25,0.42);
+      display:flex;align-items:center;justify-content:center;margin:0 auto;">
+      <span style="color:#fdf3e6;font-weight:800;font-size:${Math.round(13 + t * 5)}px;letter-spacing:-0.3px;line-height:1;text-shadow:0 1px 2px rgba(0,0,0,0.28);">${cnt}</span></div>
+    <div style="margin-top:5px;background:rgba(43,32,24,0.9);color:#f0dfc8;font-weight:600;padding:2px 9px;border-radius:10px;font-size:11px;white-space:nowrap;display:inline-block;box-shadow:0 2px 6px rgba(0,0,0,0.22);">${esc}</div>
   </div>`;
 }
 
@@ -152,19 +156,17 @@ function makePinHtml(c: Cafe, isMatch: boolean, isFocus = false, isMine = false)
   // 내 카페(MY PIN) — 핑크/레드 하트 핀으로 최우선 강조
   const color = isMine ? "#d6336c" : isFocus ? "#b5703c" : feat ? "#e0a32e" : isMatch ? "#5f7355" : (GRADE_STYLE[grade]?.bg ?? "#9c6b3f");
   const size = isMine ? 42 : isFocus ? 44 : feat ? 38 : isMatch ? 36 : 28;
-  const ring = isMine
-    ? "box-shadow:0 0 0 5px rgba(214,51,108,0.4),0 3px 10px rgba(0,0,0,0.4);"
-    : isFocus ? "box-shadow:0 0 0 6px rgba(181,112,60,0.4),0 3px 10px rgba(0,0,0,0.4);"
-    : feat ? "box-shadow:0 0 0 4px rgba(224,163,46,0.45),0 2px 8px rgba(0,0,0,0.35);"
-    : isMatch ? "box-shadow:0 0 0 4px rgba(95,115,85,0.3),0 2px 6px rgba(0,0,0,0.3);" : "box-shadow:0 1px 4px rgba(0,0,0,0.3);";
+  // 부드럽게 번지는 링(rgba) + 깊이감 있는 드롭섀도 — 색은 의미 유지, 스타일만 세련되게
+  const halo = isMine ? `0 0 0 5px rgba(214,51,108,0.28)` : isFocus ? `0 0 0 6px rgba(181,112,60,0.3)` : feat ? `0 0 0 4px rgba(224,163,46,0.32)` : isMatch ? `0 0 0 4px rgba(95,115,85,0.26)` : `0 0 0 2px rgba(156,107,63,0.18)`;
+  const ring = `box-shadow:${halo}, 0 4px 11px rgba(50,33,20,0.4);`;
   const labelStyle = isMine ? "background:#d6336c;color:#fff;font-weight:700;"
     : isFocus ? "background:#b5703c;color:#fff;font-weight:700;"
-    : feat ? "background:#e0a32e;color:#2b2018;font-weight:700;" : "background:rgba(253,250,244,0.95);color:#2b2018;font-weight:600;";
+    : feat ? "background:#e0a32e;color:#2b2018;font-weight:700;" : "background:rgba(253,250,244,0.96);color:#2b2018;font-weight:600;";
   const glyph = isMine ? "❤" : isFocus ? "📍" : feat ? "⭐" : "☕";
   return `<div style="transform:translate(-50%,-100%);text-align:center;">
-    <div style="width:${size}px;height:${size}px;background:${color};border:2px solid #fdfaf4;border-radius:50% 50% 50% 0;transform:rotate(-45deg);${ring}display:flex;align-items:center;justify-content:center;margin:0 auto;">
-      <span style="transform:rotate(45deg);font-size:${isFocus ? 18 : isMatch || feat ? 14 : 11}px;">${glyph}</span></div>
-    <div style="margin-top:2px;${labelStyle}padding:1px 5px;border-radius:7px;font-size:${isFocus || isMine ? 10 : 9}px;white-space:nowrap;display:inline-block;">${c.name}${isMine ? " ❤" : isFocus ? "" : feat ? " ⭐" : isMatch ? " ✓" : ""}</div>
+    <div style="width:${size}px;height:${size}px;background:${color};background-image:radial-gradient(circle at 34% 28%, rgba(255,255,255,0.42), rgba(255,255,255,0) 58%);border:2px solid #fdfaf4;border-radius:50% 50% 50% 0;transform:rotate(-45deg);${ring}display:flex;align-items:center;justify-content:center;margin:0 auto;">
+      <span style="transform:rotate(45deg);font-size:${isFocus ? 18 : isMatch || feat ? 14 : 11}px;filter:drop-shadow(0 1px 1px rgba(0,0,0,0.22));">${glyph}</span></div>
+    <div style="margin-top:3px;${labelStyle}padding:1.5px 6px;border-radius:8px;font-size:${isFocus || isMine ? 10 : 9}px;white-space:nowrap;display:inline-block;box-shadow:0 2px 5px rgba(0,0,0,0.16);">${c.name}${isMine ? " ❤" : isFocus ? "" : feat ? " ⭐" : isMatch ? " ✓" : ""}</div>
   </div>`;
 }
 // 다른 사람들의 집계 핀 — 등록 인원수 표시, 인기 많을수록 크게(원형, 카페핀과 구분).
@@ -306,6 +308,24 @@ export default function Home() {
   const [mapReady, setMapReady] = useState(false); // 지도 초기화 완료 신호(마커 재렌더용)
 
   useEffect(() => { fetch("/api/cafes").then((r) => r.json()).then((d) => setCafes(d.cafes ?? [])).catch(() => {}); }, []);
+  // 자동 업데이트: 앱 복귀/포커스/로드 시 서버 배포버전과 비교 → 다르면 새로고침(PWA·PC·모바일 항상 최신). 같은 버전엔 1회만 시도(루프 방지).
+  useEffect(() => {
+    const mine = process.env.NEXT_PUBLIC_BUILD_ID;
+    if (!mine) return;
+    const check = () => {
+      if (document.visibilityState !== "visible") return;
+      fetch("/api/version", { cache: "no-store" }).then((r) => r.json()).then((d) => {
+        if (d?.v && d.v !== mine) {
+          let last = ""; try { last = sessionStorage.getItem("dcn_rv") || ""; } catch {}
+          if (last !== d.v) { try { sessionStorage.setItem("dcn_rv", d.v); } catch {} location.reload(); }
+        }
+      }).catch(() => {});
+    };
+    document.addEventListener("visibilitychange", check);
+    window.addEventListener("focus", check);
+    check();
+    return () => { document.removeEventListener("visibilitychange", check); window.removeEventListener("focus", check); };
+  }, []);
   // 공유 링크(/?cafe=id)로 도착하면 해당 카페 상세를 자동으로 연다(1회)
   const deepLinked = useRef(false);
   useEffect(() => {
@@ -727,7 +747,7 @@ export default function Home() {
     <div className="flex flex-col bg-[#f4ece0]" style={{ position: "fixed", inset: 0, fontFamily: "'Gowun Batang', AppleMyungjo, 'Apple SD Gothic Neo', 'Noto Serif KR', serif" }}>
       <header className="shrink-0 bg-[#2b2018] text-[#f4ece0] z-[1500] flex items-center justify-between px-4 gap-3" style={{ height: "calc(3.5rem + env(safe-area-inset-top))", paddingTop: "env(safe-area-inset-top)" }}>
         <div className="flex items-center gap-3 min-w-0">
-          <button onClick={() => { try { sessionStorage.removeItem("dcn_role"); } catch {} setRole(null); }} className="text-lg font-bold shrink-0" aria-label="랜딩으로">동네 커피 노트</button>
+          <button onClick={() => { try { sessionStorage.removeItem("dcn_role"); } catch {} setRole(null); }} className="text-lg font-bold shrink-0 dcn-shimmer" aria-label="랜딩으로">동네 커피 노트</button>
           {/* 홈/지도/추억 토글 */}
           <div className="flex bg-[#3d2f22] rounded-full p-0.5">
             {(["home", "map", "memory"] as const).map((t) => (
@@ -755,7 +775,7 @@ export default function Home() {
           <div className="max-w-2xl mx-auto px-5 py-6">
             <div className="text-center mb-6">
               <div className="text-[10px] tracking-[0.3em] uppercase text-[#9c6b3f]">데이터로 큐레이션하는</div>
-              <div className="text-xl font-bold text-[#2b2018] border-y-2 border-[#2b2018] py-2 mt-1">{homeGu ? `${homeGu}의 오늘의 커피` : "오늘의 동네 커피"}</div>
+              <div className="text-xl font-bold border-y-2 border-[#2b2018] py-2 mt-1 dcn-shimmer-dark">{homeGu ? `${homeGu}의 오늘의 커피` : "오늘의 동네 커피"}</div>
               {/* 시·도 → 시·군·구 → 동·면 계층 선택(우리 동네). 검색 돋보기 제거. */}
               <div className="flex gap-1.5 justify-center mt-3 flex-wrap">
                 <select value={homeSido} onChange={(e) => { setHomeSido(e.target.value); setHomeGu(""); setHomeDong(""); }} className="border border-[#cbb89f] rounded-lg px-2.5 py-2 text-sm bg-white text-[#2b2018]">
@@ -765,7 +785,7 @@ export default function Home() {
                   <option value="">시·군·구</option>{homeSido && REGIONS[homeSido].map((g) => <option key={g} value={g}>{g}</option>)}
                 </select>
                 <select value={homeDong} onChange={(e) => setHomeDong(e.target.value)} disabled={!homeGu || !homeDongOptions.length} className="border border-[#cbb89f] rounded-lg px-2.5 py-2 text-sm bg-white text-[#2b2018] disabled:opacity-40">
-                  <option value="">{homeGu && !homeDongOptions.length ? "동·면 (수집중)" : "동·면"}</option>{homeDongOptions.map((d) => <option key={d} value={d}>{d}</option>)}
+                  <option value="">{homeGu && !homeDongOptions.length ? "우리 동네 (수집중)" : "우리 동네"}</option>{homeDongOptions.map((d) => <option key={d} value={d}>{d}</option>)}
                 </select>
               </div>
               <div className="mt-2.5 flex flex-col items-center gap-1">
