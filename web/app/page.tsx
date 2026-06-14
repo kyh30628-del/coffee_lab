@@ -393,7 +393,7 @@ export default function Home() {
       ? filtered.filter((c) => myCafeIds.has(c.id))
       : othersMode
       ? []
-      : (scoped ? filtered : filtered.slice(0, 400));
+      : (scoped ? filtered : filtered.slice(0, 180)); // 모바일 렌더 부담↓: 전체보기는 상위 180만(지역 선택 시 전체)
     const markers = toRender.map((c) => {
       const isFocus = c.id === focusId;
       const isMatch = matchSet.has(c.id);
