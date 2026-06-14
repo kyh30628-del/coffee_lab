@@ -805,7 +805,7 @@ export default function Home() {
         onRestore={(dev: string) => { try { localStorage.setItem("dcn_device", dev); } catch {} setDeviceId(dev); reloadMyCafes(dev, ""); }} />}
 
       {/* 하단 빠른 액션 바 — 모바일 전용. 뷰포트 바닥에 직접 고정 + 안전영역(홈인디케이터)까지 바 색으로 채움(네이버 방식) */}
-      <nav className="md:hidden flex items-stretch" style={{ position: "fixed", left: 0, right: 0, bottom: 0, height: "3.25rem", zIndex: 40, background: tab === "map" ? "#fdfaf4" : "#f4ece0" }}>
+      <nav className="md:hidden flex items-stretch" style={{ position: "fixed", left: 0, right: 0, bottom: 0, height: "3.25rem", zIndex: 1300, background: tab === "map" ? "#fdfaf4" : "#f4ece0", boxShadow: "0 -1px 0 rgba(0,0,0,0.06)" }}>
         {[
           { k: "home", label: "홈", icon: <path d="M3 11.2 12 4l9 7.2M5.5 9.7V20h13V9.7" />, fill: false },
           { k: "fav", label: "즐겨찾기", icon: <path d="M12 4.5l2.3 4.7 5.2.8-3.75 3.65.9 5.15L12 16.9l-4.65 2.45.9-5.15L4.5 10l5.2-.8z" />, fill: true },
