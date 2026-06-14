@@ -161,30 +161,34 @@ function SplashScreen() {
   );
 }
 
-// 즐겨찾기(★) 모달 — 내 추억 중 별표한 카페 목록. 탭하면 상세로.
-function FavoritesModal({ favs, onClose, onOpen, onRegister }: { favs: any[]; onClose: () => void; onOpen: (id: number) => void; onRegister: () => void }) {
+// 즐겨찾기(★ 북마크) 모달 — 카페 상세에서 북마크한 카페 목록(내 카페 등록과 별개). 탭하면 상세로.
+function FavoritesModal({ items, onClose, onOpen, onRemove }: { items: Cafe[]; onClose: () => void; onOpen: (c: Cafe) => void; onRemove: (id: number) => void }) {
   return (
     <div className="fixed inset-0 z-[5000] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)", fontFamily: "'Gowun Batang', serif" }} onClick={onClose}>
       <div className="w-full max-w-lg bg-[#fdfaf4] rounded-t-2xl max-h-[80dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-[#f0e6d4]">
-          <div className="font-bold text-[#2b2018] text-[15px]"><span style={{ color: "#f0a832" }}>★</span> 즐겨찾기 <span className="text-[#a8927a] text-[12px] font-normal">{favs.length}곳</span></div>
+          <div className="font-bold text-[#2b2018] text-[15px]"><span style={{ color: "#f0a832" }}>★</span> 즐겨찾기 <span className="text-[#a8927a] text-[12px] font-normal">{items.length}곳</span></div>
           <button onClick={onClose} className="w-8 h-8 rounded-full bg-[#f0e6d4] text-[#7a6452] text-lg">×</button>
         </div>
         <div className="overflow-y-auto flex-1 p-3 space-y-2 pb-[calc(1rem_+_env(safe-area-inset-bottom))]">
-          {favs.length === 0 ? (
+          {items.length === 0 ? (
             <div className="text-center text-[#a8927a] text-[13px] py-12 leading-relaxed">
-              아직 즐겨찾기한 카페가 없어요.<br />추억 등록 시 ★를 누르면 여기에 모여요.
-              <button onClick={onRegister} className="mt-4 block mx-auto bg-[#d6336c] text-white rounded-xl px-5 py-2.5 text-[13px] font-bold">➕ 추억 등록하기</button>
+              아직 즐겨찾기한 카페가 없어요.<br />카페 상세에서 <span style={{ color: "#f0a832" }}>★</span>를 누르면 여기에 모여요.
             </div>
-          ) : favs.map((v) => (
-            <button key={v.id} onClick={() => onOpen(v.id)} className="w-full text-left bg-white rounded-xl border border-[#ece0cd] p-3 flex gap-3 items-center active:bg-[#fdf6ee]">
-              {v.photo_url ? <img src={v.photo_url} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0" /> : <div className="w-12 h-12 rounded-lg bg-[#f3ede1] flex items-center justify-center text-[18px] shrink-0">★</div>}
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5"><span className="text-[#f0a832] text-[13px]">★</span><span className="font-bold text-[#2b2018] text-[14px] truncate">{v.name}</span><span className="text-[10px] text-[#9c6b3f] shrink-0">{v.area}</span></div>
-                {v.memory && <p className="text-[12px] text-[#52402e] mt-0.5 line-clamp-1">{v.memory}</p>}
-              </div>
-              <span className="text-[#cbb89f] text-[18px]">›</span>
-            </button>
+          ) : items.map((c) => (
+            <div key={c.id} className="bg-white rounded-xl border border-[#ece0cd] p-3 flex gap-2 items-center">
+              <button onClick={() => onOpen(c)} className="flex-1 min-w-0 text-left flex items-center gap-2 active:opacity-70">
+                <div className="w-10 h-10 rounded-lg bg-[#f3ede1] flex items-center justify-center text-[16px] shrink-0">☕</div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-bold text-[#2b2018] text-[14px] truncate">{c.name}</span>
+                    {c.synth_grade && GRADE_STYLE[c.synth_grade] && <span className="text-[9px] text-white px-1.5 py-0.5 rounded-full shrink-0" style={{ background: GRADE_STYLE[c.synth_grade].bg }}>{c.synth_grade}</span>}
+                  </div>
+                  <div className="text-[11px] text-[#9c6b3f]">{c.area}{c.synth_count ? ` · 리뷰 ${c.synth_count}` : ""}</div>
+                </div>
+              </button>
+              <button onClick={() => onRemove(c.id)} aria-label="즐겨찾기 해제" className="shrink-0 text-[#f0a832] text-[20px] px-1.5 active:scale-90">★</button>
+            </div>
           ))}
         </div>
       </div>
@@ -214,6 +218,7 @@ export default function Home() {
   const [othersPins, setOthersPins] = useState<{ id: number; name: string; area: string; lat: number; lng: number; cnt: number }[]>([]);
   const [myLocked, setMyLocked] = useState(false); // 공용 PC 잠금 상태
   const [sessionPin, setSessionPin] = useState(""); // 이번 세션에 입력한 PIN(해제용)
+  const [bookmarkIds, setBookmarkIds] = useState<Set<number>>(new Set()); // 카페 북마크(내 카페 등록과 별개)
   const reloadMyCafes = (dev: string, pin = "") => fetch(`/api/my-cafe?device=${dev}${pin ? `&pin=${encodeURIComponent(pin)}` : ""}`).then((r) => r.json()).then((d) => {
     if (d.ok) {
       setMyLocked(!!d.locked);
@@ -222,10 +227,17 @@ export default function Home() {
       if (d.locked) setMyPinMode(false);
     }
   }).catch(() => {});
+  const reloadBookmarks = (dev: string) => fetch(`/api/bookmark?device=${dev}`).then((r) => r.json()).then((d) => { if (d.ok) setBookmarkIds(new Set(d.ids ?? [])); }).catch(() => {});
+  const toggleBookmark = async (cafeId: number) => {
+    const cur = bookmarkIds.has(cafeId);
+    setBookmarkIds((prev) => { const n = new Set(prev); if (cur) n.delete(cafeId); else n.add(cafeId); return n; }); // 낙관적 업데이트
+    try { await fetch("/api/bookmark", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ device: deviceId, cafeId, action: "toggle" }) }); }
+    catch { reloadBookmarks(deviceId); }
+  };
   useEffect(() => {
     let dev = ""; try { dev = localStorage.getItem("dcn_device") || ""; if (!dev) { dev = (crypto.randomUUID?.() || String(Math.random()).slice(2) + Date.now()); localStorage.setItem("dcn_device", dev); } } catch {}
     let pin = ""; try { pin = sessionStorage.getItem("dcn_pin") || ""; } catch {}
-    setDeviceId(dev); setSessionPin(pin); if (dev) reloadMyCafes(dev, pin);
+    setDeviceId(dev); setSessionPin(pin); if (dev) { reloadMyCafes(dev, pin); reloadBookmarks(dev); }
   }, []);
   // 자연어 검색
   const [showSearch, setShowSearch] = useState(false);
@@ -762,12 +774,12 @@ export default function Home() {
           </button>
         ))}
       </nav>
-      {showFavs && <FavoritesModal favs={myVisits.filter((v: any) => v.favorite)} onClose={() => setShowFavs(false)}
-        onOpen={(id: number) => { const c = cafes.find((x) => x.id === id); setShowFavs(false); if (c) setSelected(c); }}
-        onRegister={() => { setShowFavs(false); setShowMyCafeReg(true); }} />}
+      {showFavs && <FavoritesModal items={cafes.filter((c) => bookmarkIds.has(c.id))} onClose={() => setShowFavs(false)}
+        onOpen={(c: Cafe) => { setShowFavs(false); setSelected(c); }}
+        onRemove={(id: number) => toggleBookmark(id)} />}
       {showMyCafeReg && <MyCafeRegModal cafes={cafes} device={deviceId} visits={myVisits} pin={sessionPin} onClose={() => setShowMyCafeReg(false)} onDone={() => { reloadMyCafes(deviceId, sessionPin); }} />}
 
-      {selected && <CafePanel cafe={selected} onClose={() => setSelected(null)} onMap={() => {
+      {selected && <CafePanel cafe={selected} bookmarked={bookmarkIds.has(selected.id)} onToggleBookmark={() => toggleBookmark(selected.id)} onClose={() => setSelected(null)} onMap={() => {
         if (selected.lat && selected.lng) {
           const g = toGu(selected.area);
           if (g.sido) { setSido(g.sido); setSigungu(g.sigungu); }
@@ -961,7 +973,7 @@ function hlQuote(text?: string) {
   );
 }
 
-function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; onMap: () => void }) {
+function CafePanel({ cafe, onClose, onMap, bookmarked = false, onToggleBookmark }: { cafe: Cafe; onClose: () => void; onMap: () => void; bookmarked?: boolean; onToggleBookmark?: () => void }) {
   const g = cafe.synth_grade ? GRADE_STYLE[cafe.synth_grade] : null;
   const [reviews, setReviews] = useState<EvidenceReview[]>([]);
   const [quality, setQuality] = useState<QualityStats | null>(null);
@@ -1042,6 +1054,7 @@ function CafePanel({ cafe, onClose, onMap }: { cafe: Cafe; onClose: () => void; 
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-2 min-w-0"><h3 className="text-xl font-bold text-[#2b2018] truncate">{cafe.name}</h3>{g && <span className="text-[10px] text-white px-2 py-0.5 rounded-full shrink-0" style={{ background: g.bg }}>{g.label}</span>}</div>
             <div className="flex items-center gap-1 shrink-0">
+              <button onClick={onToggleBookmark} aria-label="즐겨찾기" className="flex items-center gap-1 border rounded-full px-2.5 py-1 text-[12px] font-medium transition-colors" style={bookmarked ? { color: "#fff", background: "#f0a832", borderColor: "#f0a832" } : { color: "#9c6b3f", borderColor: "#e0d2bd" }}>{bookmarked ? "★ 즐겨찾기" : "☆ 즐겨찾기"}</button>
               <button onClick={shareCafe} aria-label="공유" className="flex items-center gap-1 text-[#9c6b3f] border border-[#e0d2bd] rounded-full px-2.5 py-1 text-[12px] font-medium">{shared ? "✓ 복사됨" : "🔗 공유"}</button>
               <button onClick={onClose} className="text-3xl text-[#9c6b3f] leading-none px-1">×</button>
             </div>
