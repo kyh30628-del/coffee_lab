@@ -166,6 +166,21 @@ function makeCountPinHtml(p: { name: string; cnt: number }, maxCnt: number): str
     <div style="margin-top:2px;background:#5f7355;color:#fff;font-weight:700;padding:1px 5px;border-radius:7px;font-size:9px;white-space:nowrap;display:inline-block;">${esc} · ${p.cnt}명</div>
   </div>`;
 }
+
+// 병합 핀 — 내가 저장한 카페를 다른 사람도 저장한 경우. 핑크 하트(내 추억) + 초록 인원 배지(다른 사람)로 한 핀에 표현.
+function makeMinePinHtml(c: Cafe, othersCnt: number): string {
+  const badge = othersCnt > 0
+    ? `<div style="position:absolute;top:-7px;right:-12px;background:#5f7355;color:#fff;border:2px solid #fdfaf4;border-radius:11px;min-width:22px;height:22px;line-height:18px;padding:0 5px;font-size:11px;font-weight:800;box-shadow:0 1px 4px rgba(0,0,0,0.35);">${othersCnt}</div>`
+    : "";
+  return `<div style="transform:translate(-50%,-100%);text-align:center;">
+    <div style="position:relative;width:42px;height:42px;margin:0 auto;">
+      <div style="width:42px;height:42px;background:#d6336c;border:2px solid #fdfaf4;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 0 0 5px rgba(214,51,108,0.4),0 3px 10px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;">
+        <span style="transform:rotate(45deg);font-size:13px;">❤</span></div>
+      ${badge}
+    </div>
+    <div style="margin-top:2px;background:#d6336c;color:#fff;font-weight:700;padding:1px 6px;border-radius:7px;font-size:10px;white-space:nowrap;display:inline-block;">${c.name} ❤${othersCnt > 0 ? ` · ${othersCnt}명` : ""}</div>
+  </div>`;
+}
 function topChars(c: Cafe, n = 4) {
   const cs = c.char_scores ?? {};
   return Object.entries(cs).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, n).map(([k, v]) => ({ ...(CHAR_LABELS[k] ?? { label: k, emoji: "" }), score: v }));
@@ -444,6 +459,18 @@ export default function Home() {
     const L = LRef.current; const map = mapObj.current;
     if (!L || !map || !layerRef.current) return;
     layerRef.current.clearLayers();
+    // 다른 사람 집계(현재 지역 스코프) — 카페별 저장 인원수. 내 카페와 겹치면 핀을 하나로 병합한다.
+    const inScope = (p: { area: string }) => {
+      if (!sido && !sigungu) return true;
+      const g = toGu(p.area);
+      if (sido && g.sido !== sido) return false;
+      if (sigungu && g.sigungu !== sigungu) return false;
+      return true;
+    };
+    const op = othersMode ? othersPins.filter(inScope) : [];
+    const othersCntById = new Map(op.map((p) => [p.id, p.cnt] as [number, number]));
+    const maxCnt = op.reduce((m, p) => Math.max(m, p.cnt), 1);
+
     const base = myPinMode ? filtered.filter((c) => myCafeIds.has(c.id)) : othersMode ? [] : filtered;
     // 화면(bounds) 안의 핀만 — 줌인하면 영역이 좁아져 그 동네 핀이 전부 드러나고, 줌아웃하면 많아지므로 인기순 상위로 제한해 가독성 유지.
     let toRender = base;
@@ -457,23 +484,18 @@ export default function Home() {
       const isFocus = c.id === focusId;
       const isMatch = matchSet.has(c.id);
       const isMine = myCafeIds.has(c.id);
-      const icon = L.divIcon({ className: "", html: makePinHtml(c, isMatch, isFocus, isMine), iconSize: [0, 0] });
-      const m = L.marker([c.lat, c.lng], { icon, zIndexOffset: isFocus ? 3000 : c.featured ? 2000 : isMatch ? 1000 : 0 }).on("click", () => setSelected(c));
+      const cnt = othersCntById.get(c.id) ?? 0;
+      // 내 카페 + 다른 사람도 저장 → 병합 핀(하트+인원배지). 내 핀은 항상 맨 위(z 4000).
+      const html = isMine && cnt > 0 ? makeMinePinHtml(c, cnt) : makePinHtml(c, isMatch, isFocus, isMine);
+      const icon = L.divIcon({ className: "", html, iconSize: [0, 0] });
+      const m = L.marker([c.lat, c.lng], { icon, zIndexOffset: isMine ? 4000 : isFocus ? 3000 : c.featured ? 2000 : isMatch ? 1000 : 0 }).on("click", () => setSelected(c));
       if (isFocus) { m.bindPopup(`<b>${c.name}</b><br>${c.area}`); }
       return m;
     });
-    // 다른 사람은 — 집계 핀 레이어(지역 선택 시 그 지역만). 등록 인원수 표시, 인기순 크기.
-    if (othersMode && othersPins.length) {
-      const inScope = (p: { area: string }) => {
-        if (!sido && !sigungu) return true;
-        const g = toGu(p.area);
-        if (sido && g.sido !== sido) return false;
-        if (sigungu && g.sigungu !== sigungu) return false;
-        return true;
-      };
-      const op = othersPins.filter(inScope);
-      const maxCnt = op.reduce((m, p) => Math.max(m, p.cnt), 1);
+    // 다른 사람은 — 집계 핀 레이어. 단, 내 카페로 이미 병합된 건 제외(겹침 방지).
+    if (othersMode && op.length) {
       for (const p of op) {
+        if (myPinMode && myCafeIds.has(p.id)) continue; // 내 하트 핀에 병합됨
         const icon = L.divIcon({ className: "", html: makeCountPinHtml(p, maxCnt), iconSize: [0, 0] });
         const m = L.marker([p.lat, p.lng], { icon, zIndexOffset: 500 + p.cnt }).on("click", () => { const cf = cafes.find((c) => c.id === p.id); if (cf) setSelected(cf); });
         markers.push(m);
@@ -706,6 +728,14 @@ export default function Home() {
                 <span>다른 사람은{othersMode && othersPins.length ? ` ${othersPins.length}` : ""}</span>
               </button>
             </div>
+            {/* 범례 — 두 핀의 의미 안내(켜졌을 때만). 같은 카페면 핀이 하나로 병합됨 */}
+            {(myPinMode || othersMode) && (
+              <div className="absolute top-3 left-3 z-[1100] bg-white/95 backdrop-blur rounded-xl shadow-lg px-3 py-2 text-[11px] text-[#4a3a2a] leading-snug max-w-[150px]">
+                {myPinMode && <div className="flex items-center gap-1.5 mb-0.5"><span className="inline-block w-3 h-3 rounded-full" style={{ background: "#d6336c" }} />❤ 내가 저장한 카페</div>}
+                {othersMode && <div className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-full" style={{ background: "#5f7355" }} />숫자 = 저장한 사람 수</div>}
+                {myPinMode && othersMode && <div className="mt-1 pt-1 border-t border-[#eee2d2] text-[10px] text-[#8a7458]">같은 카페면 ❤에 인원 배지로 합쳐져요</div>}
+              </div>
+            )}
           </div>
           <aside className="hidden md:block md:w-[380px] md:h-full bg-[#fdfaf4] border-l border-[#ece0cd] overflow-y-auto p-6 relative z-10">
             <MapControls {...{ sido, sigungu, onSido, setSigungu, tasteKey, setTasteKey, filtered, matchSet, setSelected, openLocation, autoGu, geoMsg, clearAuto }} />
