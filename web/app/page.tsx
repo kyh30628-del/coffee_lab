@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
 import InfoDot from "./InfoDot";
 import ShowcaseBanner, { SHOWCASE_CSS } from "./ShowcaseBanner";
 
@@ -83,6 +83,56 @@ const CHAR_LABELS: Record<string, { label: string; emoji: string }> = {
 };
 const GRADE_STYLE: Record<string, { bg: string; label: string }> = { 검증: { bg: "#5f7355", label: "검증" }, 참고: { bg: "#9c6b3f", label: "참고" }, 발굴: { bg: "#a8927a", label: "발굴" } };
 const TONES = ["#6f4e37", "#5f7355", "#9c6b3f", "#3a2e28", "#8a5a24"];
+
+// 홈 잡지 카드 — 모듈 스코프(컴포넌트 내부 정의 금지). 내부에 두면 렌더마다 재마운트되어 뒤로가기/탭전환이 느려짐.
+const HeadlineCard = memo(function HeadlineCard({ c, kicker, tone, onOpen }: { c: DCafe; kicker: string; tone: number; onOpen: (id: number) => void }) {
+  return (
+    <button onClick={() => onOpen(c.id)} className="w-full text-left rounded-2xl overflow-hidden shadow-md mb-4" style={{ background: TONES[tone] }}>
+      <div className="p-5 text-[#f4ece0]">
+        <div className="text-[10px] tracking-[0.25em] uppercase text-[#e8d4b0] mb-2">{kicker}</div>
+        <div className="flex items-center gap-2 mb-1">
+          <h2 className="text-2xl font-bold leading-tight">{c.name}</h2>
+          {c.grade && <span className="text-[10px] bg-[#f4ece0]/20 px-2 py-0.5 rounded-full">{c.grade}</span>}
+        </div>
+        <div className="text-[12px] text-[#e8d4b0] mb-2">{c.area} · 리뷰 {c.count ?? 0}건</div>
+        {c.identity && <p className="text-[13px] text-[#f0e6d4] leading-relaxed mb-3 line-clamp-2">{c.identity}</p>}
+        {c.beanNote.length > 0 && <div className="flex flex-wrap gap-1.5">{c.beanNote.map((b) => <span key={b} className="text-[10px] bg-[#f4ece0]/15 px-2 py-0.5 rounded-full">{b}</span>)}</div>}
+      </div>
+    </button>
+  );
+});
+const Row = memo(function Row({ title, items, sub, info, onOpen }: { title: string; items: DCafe[]; sub?: string; info?: React.ReactNode; onOpen: (id: number) => void }) {
+  if (!items?.length) return null;
+  return (
+    <div className="mb-7">
+      <div className="flex items-baseline justify-between mb-1 pb-1 border-b-2 border-[#2b2018]">
+        <div className="text-base font-bold text-[#2b2018] flex items-center gap-1.5">{title}{info && <InfoDot title={title.replace(/^[^가-힣A-Za-z]+/, "")}>{info}</InfoDot>}</div>
+        {sub && <div className="text-[10px] text-[#9c6b3f] shrink-0">↕ {sub}</div>}
+      </div>
+      {/* 바깥은 가로 스크롤, 위쪽 패딩 안에 말풍선이 들어가 잘리지 않음 */}
+      <div className="flex gap-3 overflow-x-auto pt-2 pb-2" style={{ WebkitOverflowScrolling: "touch" }}>
+        {items.map((c) => (
+          <div key={c.id} className="shrink-0 w-48">
+            <button onClick={() => onOpen(c.id)} className="w-full text-left bg-white rounded-xl p-3.5 border border-[#ece0cd] hover:border-[#9c6b3f] hover:shadow-md transition-all h-full flex flex-col">
+              <div className="flex items-center gap-1 mb-1">
+                <span className="font-bold text-sm text-[#2b2018] truncate">{c.name}</span>
+                {c.grade && GRADE_STYLE[c.grade] && <span className="text-[8px] text-white px-1 py-0.5 rounded-full shrink-0" style={{ background: GRADE_STYLE[c.grade].bg }}>{c.grade}</span>}
+              </div>
+              <div className="text-[10px] text-[#a8927a] mb-1.5">{c.area} · 리뷰 {c.count ?? 0}</div>
+              {c.beanNote.length > 0 && <div className="flex flex-wrap gap-1 mb-2">{c.beanNote.map((b) => <span key={b} className="text-[9px] bg-[#f0e6d4] text-[#8a6d3f] px-1.5 py-0.5 rounded-full">{b}</span>)}</div>}
+              {c.reason && (
+                <div className="mt-auto pt-2 border-t border-[#f0e6d4]">
+                  <div className="text-[8px] tracking-wider uppercase text-[#b08440] mb-0.5">📰 선정 이유</div>
+                  <p className="text-[10.5px] text-[#5a4a38] leading-relaxed">{c.reason}</p>
+                </div>
+              )}
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+});
 
 function makePinHtml(c: Cafe, isMatch: boolean, isFocus = false, isMine = false): string {
   const grade = c.synth_grade ?? "발굴";
@@ -301,7 +351,7 @@ export default function Home() {
   useEffect(() => { const u = homeGu ? `/api/discover?region=${encodeURIComponent(homeGu)}` : "/api/discover"; setDiscover(null); fetch(u).then((r) => r.json()).then((d) => { if (d.ok) setDiscover(d); }).catch(() => {}); }, [homeGu]);
   useEffect(() => { const u = homeGu ? `/api/momentum?region=${encodeURIComponent(homeGu)}` : "/api/momentum"; setMomentum(null); fetch(u).then((r) => r.json()).then((d) => { if (d.ok) setMomentum({ rising: d.rising ?? [] }); }).catch(() => {}); }, [homeGu]);
 
-  const openById = (id: number) => { const c = cafes.find((x) => x.id === id); if (c) setSelected(c); };
+  const openById = useCallback((id: number) => { const c = cafes.find((x) => x.id === id); if (c) setSelected(c); }, [cafes]);
 
   // 뒤로가기 가드: 현재 UI 레이어를 ref로 추적(리스너에서 최신값 참조)
   const uiRef = useRef<{ selected: boolean; showSearch: boolean; showConsent: boolean; tab: string; role: string | null; ownerPwModal: boolean }>({ selected: false, showSearch: false, showConsent: false, tab: "home", role: null, ownerPwModal: false });
@@ -456,55 +506,6 @@ export default function Home() {
   const onSido = (v: string) => { setSido(v); setSigungu(""); setFocusId(null); };
 
   // ===== 잡지 카드 컴포넌트 =====
-  const HeadlineCard = ({ c, kicker, tone }: { c: DCafe; kicker: string; tone: number }) => (
-    <button onClick={() => openById(c.id)} className="w-full text-left rounded-2xl overflow-hidden shadow-md mb-4" style={{ background: TONES[tone] }}>
-      <div className="p-5 text-[#f4ece0]">
-        <div className="text-[10px] tracking-[0.25em] uppercase text-[#e8d4b0] mb-2">{kicker}</div>
-        <div className="flex items-center gap-2 mb-1">
-          <h2 className="text-2xl font-bold leading-tight">{c.name}</h2>
-          {c.grade && <span className="text-[10px] bg-[#f4ece0]/20 px-2 py-0.5 rounded-full">{c.grade}</span>}
-        </div>
-        <div className="text-[12px] text-[#e8d4b0] mb-2">{c.area} · 리뷰 {c.count ?? 0}건</div>
-        {c.identity && <p className="text-[13px] text-[#f0e6d4] leading-relaxed mb-3 line-clamp-2">{c.identity}</p>}
-        {c.beanNote.length > 0 && <div className="flex flex-wrap gap-1.5">{c.beanNote.map((b) => <span key={b} className="text-[10px] bg-[#f4ece0]/15 px-2 py-0.5 rounded-full">{b}</span>)}</div>}
-      </div>
-    </button>
-  );
-  const Row = ({ title, items, sub, info }: { title: string; items: DCafe[]; sub?: string; info?: any }) => {
-    if (!items?.length) return null;
-    return (
-      <div className="mb-7">
-        <div className="flex items-baseline justify-between mb-1 pb-1 border-b-2 border-[#2b2018]">
-          <div className="text-base font-bold text-[#2b2018] flex items-center gap-1.5">{title}{info && <InfoDot title={title.replace(/^[^가-힣A-Za-z]+/, "")}>{info}</InfoDot>}</div>
-          {sub && <div className="text-[10px] text-[#9c6b3f] shrink-0">↕ {sub}</div>}
-        </div>
-        {/* 바깥은 가로 스크롤, 위쪽 패딩 안에 말풍선이 들어가 잘리지 않음 */}
-        <div className="flex gap-3 overflow-x-auto pt-2 pb-2" style={{ WebkitOverflowScrolling: "touch" }}>
-          {items.map((c) => {
-            return (
-              <div key={c.id} className="shrink-0 w-48">
-                <button onClick={() => openById(c.id)} className="w-full text-left bg-white rounded-xl p-3.5 border border-[#ece0cd] hover:border-[#9c6b3f] hover:shadow-md transition-all h-full flex flex-col">
-                  <div className="flex items-center gap-1 mb-1">
-                    <span className="font-bold text-sm text-[#2b2018] truncate">{c.name}</span>
-                    {c.grade && GRADE_STYLE[c.grade] && <span className="text-[8px] text-white px-1 py-0.5 rounded-full shrink-0" style={{ background: GRADE_STYLE[c.grade].bg }}>{c.grade}</span>}
-                  </div>
-                  <div className="text-[10px] text-[#a8927a] mb-1.5">{c.area} · 리뷰 {c.count ?? 0}</div>
-                  {c.beanNote.length > 0 && <div className="flex flex-wrap gap-1 mb-2">{c.beanNote.map((b) => <span key={b} className="text-[9px] bg-[#f0e6d4] text-[#8a6d3f] px-1.5 py-0.5 rounded-full">{b}</span>)}</div>}
-                  {c.reason && (
-                    <div className="mt-auto pt-2 border-t border-[#f0e6d4]">
-                      <div className="text-[8px] tracking-wider uppercase text-[#b08440] mb-0.5">📰 선정 이유</div>
-                      <p className="text-[10.5px] text-[#5a4a38] leading-relaxed">{c.reason}</p>
-                    </div>
-                  )}
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  };
-
   const chooseConsumer = () => { try { sessionStorage.setItem("dcn_role", "consumer"); } catch {} setRole("consumer"); };
   const submitOwner = async () => {
     setOwnerErr("");
@@ -656,12 +657,12 @@ export default function Home() {
             </div>
             {!discover ? <p className="text-center text-[#a8927a] py-10">불러오는 중...</p> : (
               <>
-                {discover.headlineA && <HeadlineCard c={discover.headlineA} kicker="이번 주 가장 많이 이야기된 곳" tone={0} />}
-                {discover.headlineB && <HeadlineCard c={discover.headlineB} kicker="🔥 커피에 진심인 집 — 스페셜티 스포트라이트" tone={1} />}
-                {discover.featured && discover.featured.length > 0 && <Row title="✨ 추천 카페" items={discover.featured} sub="쇼케이스" info={<>사장님이 직접 <b>홍보 중인 쇼케이스 카페</b>예요(우선 노출). 후기·등급은 다른 카페와 똑같이 검증된 값이에요.</>} />}
-                {momentum && momentum.rising.length > 0 && <Row title="📈 요즘 뜨는 카페" items={momentum.rising.slice(0, 5)} sub="최근 입소문 순" info={<>별점 대신 <b>검증된 진짜 후기가 요즘 얼마나 빨리 느는지</b>로 뽑은 '뜨는 카페'예요. 최근 3개월 검증 후기가 많을수록 상위로 올라가요.</>} />}
-                <Row title="🏆 리뷰 많은 Top 3" items={discover.top3} sub="검증 리뷰 많은 순" info={<>이 동네에서 <b>검증·참고 후기(옥석)가 가장 많은</b> 카페 순서예요. 광고·가짜·무관 글은 제외한 '진짜 후기 수' 기준입니다.</>} />
-                <Row title="🔥 스페셜티 픽" items={discover.specialty} sub="로스팅 언급 순" info={<>검증된 카페 중 <b>직접 로스팅·스페셜티가 후기에 자주 언급된</b> 곳이에요. 커피에 진심인 집 위주로 보여줘요.</>} />
+                {discover.headlineA && <HeadlineCard c={discover.headlineA} kicker="이번 주 가장 많이 이야기된 곳" tone={0} onOpen={openById} />}
+                {discover.headlineB && <HeadlineCard c={discover.headlineB} kicker="🔥 커피에 진심인 집 — 스페셜티 스포트라이트" tone={1} onOpen={openById} />}
+                {discover.featured && discover.featured.length > 0 && <Row title="✨ 추천 카페" items={discover.featured} onOpen={openById} sub="쇼케이스" info={<>사장님이 직접 <b>홍보 중인 쇼케이스 카페</b>예요(우선 노출). 후기·등급은 다른 카페와 똑같이 검증된 값이에요.</>} />}
+                {momentum && momentum.rising.length > 0 && <Row title="📈 요즘 뜨는 카페" items={momentum.rising.slice(0, 5)} onOpen={openById} sub="최근 입소문 순" info={<>별점 대신 <b>검증된 진짜 후기가 요즘 얼마나 빨리 느는지</b>로 뽑은 '뜨는 카페'예요. 최근 3개월 검증 후기가 많을수록 상위로 올라가요.</>} />}
+                <Row title="🏆 리뷰 많은 Top 3" items={discover.top3} onOpen={openById} sub="검증 리뷰 많은 순" info={<>이 동네에서 <b>검증·참고 후기(옥석)가 가장 많은</b> 카페 순서예요. 광고·가짜·무관 글은 제외한 '진짜 후기 수' 기준입니다.</>} />
+                <Row title="🔥 스페셜티 픽" items={discover.specialty} onOpen={openById} sub="로스팅 언급 순" info={<>검증된 카페 중 <b>직접 로스팅·스페셜티가 후기에 자주 언급된</b> 곳이에요. 커피에 진심인 집 위주로 보여줘요.</>} />
                 <button onClick={() => { if (homeSido) { setSido(homeSido); setSigungu(homeGu); } setFocusId(null); setSheetOpen(true); setTab("map"); }} className="w-full bg-[#2b2018] text-[#f4ece0] rounded-xl py-3.5 font-medium mt-2">🗺 {homeGu ? `${homeGu} 지도로 보기` : "지도에서 전체 둘러보기"} →</button>
               </>
             )}
