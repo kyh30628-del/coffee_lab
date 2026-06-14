@@ -288,7 +288,6 @@ export default function Home() {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapObj = useRef<any>(null);
   const layerRef = useRef<any>(null);
-  const edgeSwipe = useRef<{ x: number; y: number } | null>(null); // 지도 좌측 엣지 스와이프 추적
   const LRef = useRef<any>(null);
   const [mapReady, setMapReady] = useState(false); // 지도 초기화 완료 신호(마커 재렌더용)
 
@@ -406,7 +405,10 @@ export default function Home() {
     const isIOS = typeof navigator !== "undefined" && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent)));
     if (isIOS) {
       let sx = 0, sy = 0, edge = false, decided = false, block = false;
-      const onStart = (e: TouchEvent) => { const t = e.touches[0]; edge = !!(t && t.clientX <= 26); decided = false; block = false; if (edge) { sx = t.clientX; sy = t.clientY; } };
+      const onStart = (e: TouchEvent) => {
+        const t = e.touches[0]; edge = !!(t && t.clientX <= 26); decided = false; block = false;
+        if (edge) { sx = t.clientX; sy = t.clientY; if (uiRef.current.tab === "map") { try { mapObj.current?.dragging?.disable(); } catch {} } } // 지도 패닝 잠시 끔(엣지 뒤로가기 우선)
+      };
       const onMove = (e: TouchEvent) => {
         if (!edge) return;
         const t = e.touches[0]; if (!t) return;
@@ -421,7 +423,8 @@ export default function Home() {
         if (block && e.cancelable) e.preventDefault(); // 네이티브 느린 뒤로가기 슬라이드 차단(첫 움직임부터)
       };
       const onEnd = (e: TouchEvent) => {
-        if (edge && block) { const t = e.changedTouches[0]; if (t && t.clientX - sx > 40 && Math.abs(t.clientY - sy) < 70) doClose(false); } // 지도→홈은 캐처 스트립이 처리
+        if (edge && block) { const t = e.changedTouches[0]; if (t && t.clientX - sx > 40 && Math.abs(t.clientY - sy) < 70) doClose(true); } // 모든 화면 동일: 오버레이/추억→홈/지도→홈/홈→랜딩
+        if (edge && uiRef.current.tab === "map") { try { mapObj.current?.dragging?.enable(); } catch {} } // 지도 패닝 복구
         edge = false; decided = false; block = false;
       };
       document.addEventListener("touchstart", onStart, { passive: true });
@@ -754,10 +757,6 @@ export default function Home() {
       <div className="flex-1 relative md:flex overflow-hidden" style={{ display: tab === "map" ? undefined : "none" }}>
           <div className="absolute inset-0 md:relative md:flex-1 md:p-5">
             <div ref={mapRef} className="w-full h-full md:rounded-2xl overflow-hidden bg-[#e8e0d3] z-0" />
-            {/* 좌측 엣지 스와이프 → 홈. 얇은 캐처 스트립으로 지도 패닝과 충돌 방지(모바일 전용) */}
-            <div className="md:hidden absolute left-0 top-0 bottom-0 w-7 z-[1150]" style={{ touchAction: "pan-y" }}
-              onTouchStart={(e) => { const t = e.touches[0]; edgeSwipe.current = { x: t.clientX, y: t.clientY }; }}
-              onTouchEnd={(e) => { const s = edgeSwipe.current; edgeSwipe.current = null; if (!s) return; const t = e.changedTouches[0]; if (t && t.clientX - s.x > 45 && Math.abs(t.clientY - s.y) < 45) setTab("home"); }} />
             {/* 내 카페(MY PIN) / 다른 사람은 — 지도 상단 */}
             <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[1100] flex gap-2 max-w-[calc(100vw-1.5rem)]">
               <button onClick={() => { if (myLocked) setTab("memory"); else setMyPinMode((v) => !v); }}
