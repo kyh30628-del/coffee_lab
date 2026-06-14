@@ -134,6 +134,18 @@ const Row = memo(function Row({ title, items, sub, info, onOpen }: { title: stri
   );
 });
 
+// 지역 집계 원형마커(전체/시도/시군구 레벨) — 개수와 크기로 밀집도 표현. 좌표 중심에 배치(translate -50%,-50%).
+function makeRegionPinHtml(label: string, cnt: number, maxCnt: number): string {
+  const t = Math.min(1, cnt / Math.max(1, maxCnt));
+  const size = Math.round(42 + t * 36); // 42~78px
+  const esc = (label || "").replace(/</g, "&lt;");
+  return `<div style="transform:translate(-50%,-50%);text-align:center;cursor:pointer;">
+    <div style="width:${size}px;height:${size}px;background:rgba(156,107,63,0.93);border:3px solid #fdfaf4;border-radius:50%;box-shadow:0 0 0 ${4 + Math.round(t * 5)}px rgba(156,107,63,0.22),0 3px 10px rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;margin:0 auto;">
+      <span style="color:#fff;font-weight:800;font-size:${Math.round(14 + t * 6)}px;line-height:1;">${cnt}</span></div>
+    <div style="margin-top:3px;background:#2b2018;color:#fff;font-weight:700;padding:1px 7px;border-radius:8px;font-size:11px;white-space:nowrap;display:inline-block;">${esc}</div>
+  </div>`;
+}
+
 function makePinHtml(c: Cafe, isMatch: boolean, isFocus = false, isMine = false): string {
   const grade = c.synth_grade ?? "발굴";
   const feat = !!c.featured && !isFocus; // ✨ 우선 노출 — 골드 핀 강조(포커스 핀이 우선)
@@ -229,6 +241,7 @@ export default function Home() {
   const [momentum, setMomentum] = useState<{ rising: DCafe[] } | null>(null);
   const [homeSido, setHomeSido] = useState("");
   const [homeGu, setHomeGu] = useState("");
+  const [homeDong, setHomeDong] = useState(""); // 우리 동네(동/면)
   const [sheetOpen, setSheetOpen] = useState(true); // 모바일 바텀시트 펼침/접힘
   const [focusTarget, setFocusTarget] = useState<{ lat: number; lng: number } | null>(null); // 지도에서 위치 보기
   const [focusId, setFocusId] = useState<number | null>(null); // 핀 고정 강조할 카페
@@ -285,6 +298,7 @@ export default function Home() {
   const [tasteKey, setTasteKey] = useState<string | null>(null);
   const [sido, setSido] = useState("");
   const [sigungu, setSigungu] = useState("");
+  const [dong, setDong] = useState(""); // 동/면 단위 — 선택 시 개별 카페, 미선택 시 집계
   const mapRef = useRef<HTMLDivElement>(null);
   const mapObj = useRef<any>(null);
   const layerRef = useRef<any>(null);
@@ -362,7 +376,7 @@ export default function Home() {
   const onAgree = () => { setShowConsent(false); setConsent("agreed"); postConsent(true); detectLocation(); };
   const onDecline = () => { setShowConsent(false); setConsent("declined"); postConsent(false); };
   const openLocation = () => { if (consent === "agreed") detectLocation(); else setShowConsent(true); };
-  const clearAuto = () => { setHomeSido(""); setHomeGu(""); setAutoGu(""); setSido(""); setSigungu(""); setGeoMsg(""); };
+  const clearAuto = () => { setHomeSido(""); setHomeGu(""); setHomeDong(""); setAutoGu(""); setSido(""); setSigungu(""); setDong(""); setGeoMsg(""); };
   useEffect(() => { const u = homeGu ? `/api/discover?region=${encodeURIComponent(homeGu)}` : "/api/discover"; setDiscover(null); fetch(u).then((r) => r.json()).then((d) => { if (d.ok) setDiscover(d); }).catch(() => {}); }, [homeGu]);
   useEffect(() => { const u = homeGu ? `/api/momentum?region=${encodeURIComponent(homeGu)}` : "/api/momentum"; setMomentum(null); fetch(u).then((r) => r.json()).then((d) => { if (d.ok) setMomentum({ rising: d.rising ?? [] }); }).catch(() => {}); }, [homeGu]);
 
@@ -491,8 +505,9 @@ export default function Home() {
     const g = toGu(c.area);
     if (sido && g.sido !== sido) return false;
     if (sigungu && g.sigungu !== sigungu) return false;
+    if (dong && (c.dong || "기타") !== dong) return false;
     return true;
-  }), [cafes, sido, sigungu]);
+  }), [cafes, sido, sigungu, dong]);
   const matchSet = useMemo(() => {
     if (!tasteKey) return new Set<number>();
     return new Set(filtered.filter((c) => ((c.char_scores ?? {})[tasteKey] ?? 0) > 0).map((c) => c.id));
@@ -503,52 +518,75 @@ export default function Home() {
     const L = LRef.current; const map = mapObj.current;
     if (!L || !map || !layerRef.current) return;
     layerRef.current.clearLayers();
-    // 다른 사람 집계(현재 지역 스코프) — 카페별 저장 인원수. 내 카페와 겹치면 핀을 하나로 병합한다.
-    const inScope = (p: { area: string }) => {
-      if (!sido && !sigungu) return true;
-      const g = toGu(p.area);
-      if (sido && g.sido !== sido) return false;
-      if (sigungu && g.sigungu !== sigungu) return false;
-      return true;
-    };
-    const op = othersMode ? othersPins.filter(inScope) : [];
-    const othersCntById = new Map(op.map((p) => [p.id, p.cnt] as [number, number]));
-    const maxCnt = op.reduce((m, p) => Math.max(m, p.cnt), 1);
 
-    const base = myPinMode ? filtered.filter((c) => myCafeIds.has(c.id)) : othersMode ? [] : filtered;
-    // 화면(bounds) 안의 핀만 — 줌인하면 영역이 좁아져 그 동네 핀이 전부 드러나고, 줌아웃하면 많아지므로 인기순 상위로 제한해 가독성 유지.
-    let toRender = base;
-    if (!myPinMode && !othersMode) {
-      const b = map.getBounds().pad(0.2);
-      const inView = base.filter((c) => b.contains([c.lat, c.lng] as [number, number]));
-      const CAP = 160;
-      toRender = inView.length > CAP ? [...inView].sort((a, c) => (c.synth_count ?? 0) - (a.synth_count ?? 0)).slice(0, CAP) : inView;
+    // ===== 내 카페(MY PIN) / 다른 사람 모드: 개별 표시(집계 안 함) =====
+    if (myPinMode || othersMode) {
+      const inScope = (p: { area: string }) => {
+        if (!sido && !sigungu) return true;
+        const g = toGu(p.area);
+        if (sido && g.sido !== sido) return false;
+        if (sigungu && g.sigungu !== sigungu) return false;
+        return true;
+      };
+      const op = othersMode ? othersPins.filter(inScope) : [];
+      const othersCntById = new Map(op.map((p) => [p.id, p.cnt] as [number, number]));
+      const maxCnt = op.reduce((m, p) => Math.max(m, p.cnt), 1);
+      const base = myPinMode ? filtered.filter((c) => myCafeIds.has(c.id)) : [];
+      const markers = base.map((c) => {
+        const isMine = myCafeIds.has(c.id);
+        const cnt = othersCntById.get(c.id) ?? 0;
+        const html = isMine && cnt > 0 ? makeMinePinHtml(c, cnt) : makePinHtml(c, matchSet.has(c.id), c.id === focusId, isMine);
+        return L.marker([c.lat, c.lng], { icon: L.divIcon({ className: "", html, iconSize: [0, 0] }), zIndexOffset: 4000 }).on("click", () => setSelected(c));
+      });
+      if (othersMode && op.length) for (const p of op) {
+        if (myPinMode && myCafeIds.has(p.id)) continue;
+        markers.push(L.marker([p.lat, p.lng], { icon: L.divIcon({ className: "", html: makeCountPinHtml(p, maxCnt), iconSize: [0, 0] }), zIndexOffset: 500 + p.cnt }).on("click", () => { const cf = cafes.find((c) => c.id === p.id); if (cf) setSelected(cf); }));
+      }
+      layerRef.current.addLayer(L.layerGroup(markers));
+      return;
     }
+
+    // ===== 일반 모드: 계층 집계. 전체→시도원형, 시도→구원형, 구→동원형, 동(또는 포커스)→개별 카페 =====
+    const level = sigungu ? (dong ? "cafe" : "dong") : (sido ? "gu" : "sido");
+    if (level !== "cafe" && !focusId) {
+      const keyFn = level === "sido" ? (c: Cafe) => toGu(c.area).sido
+        : level === "gu" ? (c: Cafe) => toGu(c.area).sigungu
+        : (c: Cafe) => c.dong || "기타";
+      const groups = new Map<string, { lat: number; lng: number; n: number }>();
+      for (const c of filtered) {
+        const k = keyFn(c); if (!k) continue;
+        const g = groups.get(k) ?? { lat: 0, lng: 0, n: 0 };
+        g.lat += c.lat; g.lng += c.lng; g.n++; groups.set(k, g);
+      }
+      const arr = [...groups.entries()].map(([k, g]) => ({ key: k, lat: g.lat / g.n, lng: g.lng / g.n, n: g.n }));
+      const maxN = arr.reduce((m, g) => Math.max(m, g.n), 1);
+      const markers = arr.map((g) => L.marker([g.lat, g.lng], { icon: L.divIcon({ className: "", html: makeRegionPinHtml(g.key, g.n, maxN), iconSize: [0, 0] }), zIndexOffset: g.n })
+        .on("click", () => {
+          if (level === "sido") { setSido(g.key); setSigungu(""); setDong(""); }
+          else if (level === "gu") { setSigungu(g.key); setDong(""); }
+          else setDong(g.key);
+        }));
+      layerRef.current.addLayer(L.layerGroup(markers));
+      return;
+    }
+
+    // 동 선택(또는 포커스): 개별 카페 — 화면 안 + 너무 많으면 인기순 상위 제한
+    const b = map.getBounds().pad(0.2);
+    const inView = filtered.filter((c) => b.contains([c.lat, c.lng] as [number, number]));
+    const CAP = 160;
+    const toRender = inView.length > CAP ? [...inView].sort((a, c) => (c.synth_count ?? 0) - (a.synth_count ?? 0)).slice(0, CAP) : inView;
     const markers = toRender.map((c) => {
       const isFocus = c.id === focusId;
       const isMatch = matchSet.has(c.id);
       const isMine = myCafeIds.has(c.id);
-      const cnt = othersCntById.get(c.id) ?? 0;
-      // 내 카페 + 다른 사람도 저장 → 병합 핀(하트+인원배지). 내 핀은 항상 맨 위(z 4000).
-      const html = isMine && cnt > 0 ? makeMinePinHtml(c, cnt) : makePinHtml(c, isMatch, isFocus, isMine);
-      const icon = L.divIcon({ className: "", html, iconSize: [0, 0] });
-      const m = L.marker([c.lat, c.lng], { icon, zIndexOffset: isMine ? 4000 : isFocus ? 3000 : c.featured ? 2000 : isMatch ? 1000 : 0 }).on("click", () => setSelected(c));
-      if (isFocus) { m.bindPopup(`<b>${c.name}</b><br>${c.area}`); }
+      const m = L.marker([c.lat, c.lng], { icon: L.divIcon({ className: "", html: makePinHtml(c, isMatch, isFocus, isMine), iconSize: [0, 0] }), zIndexOffset: isFocus ? 3000 : c.featured ? 2000 : isMatch ? 1000 : 0 }).on("click", () => setSelected(c));
+      if (isFocus) m.bindPopup(`<b>${c.name}</b><br>${c.area}`);
       return m;
     });
-    // 다른 사람은 — 집계 핀 레이어. 단, 내 카페로 이미 병합된 건 제외(겹침 방지).
-    if (othersMode && op.length) {
-      for (const p of op) {
-        if (myPinMode && myCafeIds.has(p.id)) continue; // 내 하트 핀에 병합됨
-        const icon = L.divIcon({ className: "", html: makeCountPinHtml(p, maxCnt), iconSize: [0, 0] });
-        const m = L.marker([p.lat, p.lng], { icon, zIndexOffset: 500 + p.cnt }).on("click", () => { const cf = cafes.find((c) => c.id === p.id); if (cf) setSelected(cf); });
-        markers.push(m);
-      }
-    }
     layerRef.current.addLayer(L.layerGroup(markers));
     const focusM = focusId ? markers[toRender.findIndex((c) => c.id === focusId)] : null;
     if (focusM) (focusM as any).openPopup();
-  }, [filtered, matchSet, sido, sigungu, focusId, myPinMode, myCafeIds, othersMode, othersPins, cafes]);
+  }, [filtered, matchSet, sido, sigungu, dong, focusId, myPinMode, myCafeIds, othersMode, othersPins, cafes]);
 
   // 데이터/지역/모드 변경 시: 화면을 맞춘 뒤 마커를 그린다(맞춘 화면 기준으로 그려짐).
   useEffect(() => {
@@ -565,6 +603,7 @@ export default function Home() {
       const lats = filtered.map((c) => c.lat), lngs = filtered.map((c) => c.lng);
       map.fitBounds(L.latLngBounds([[Math.min(...lats), Math.min(...lngs)], [Math.max(...lats), Math.max(...lngs)]]), { padding: [50, 50], maxZoom: 15 });
     } else if (sido && SIDO_CENTER[sido]) { const [la, ln, z] = SIDO_CENTER[sido]; map.setView([la, ln], z); }
+    else { map.setView([37.5, 127.05], 9); } // 전체(시도 미선택) → 수도권 전역으로 줌아웃해 시도 집계 원형 표시
     drawMarkers();
     // 주의: 의존성에 tab을 넣지 말 것(탭 전환마다 재렌더되어 느려짐). 데이터/필터 변경 시에만.
   }, [filtered, matchSet, sido, sigungu, focusId, mapReady, myPinMode, myCafeIds, othersMode, othersPins, drawMarkers]);
@@ -583,7 +622,11 @@ export default function Home() {
     fetch(`/api/my-cafe/popular?device=${deviceId}`).then((r) => r.json()).then((d) => { if (d.ok) setOthersPins(d.pins ?? []); }).catch(() => {});
   }, [othersMode, deviceId]);
 
-  const onSido = (v: string) => { setSido(v); setSigungu(""); setFocusId(null); };
+  const onSido = (v: string) => { setSido(v); setSigungu(""); setDong(""); setFocusId(null); };
+  const onSigungu = (v: string) => { setSigungu(v); setDong(""); setFocusId(null); };
+  // 현재 시군구의 동/면 목록(카페 보유 동만) — 계층 셀렉트·집계용
+  const dongOptions = useMemo(() => sigungu ? [...new Set(cafes.filter((c) => toGu(c.area).sigungu === sigungu && c.dong).map((c) => c.dong as string))].sort() : [], [cafes, sigungu]);
+  const homeDongOptions = useMemo(() => homeGu ? [...new Set(cafes.filter((c) => toGu(c.area).sigungu === homeGu && c.dong).map((c) => c.dong as string))].sort() : [], [cafes, homeGu]);
 
   // ===== 잡지 카드 컴포넌트 =====
   const chooseConsumer = () => { try { sessionStorage.setItem("dcn_role", "consumer"); } catch {} setRole("consumer"); };
@@ -713,14 +756,17 @@ export default function Home() {
             <div className="text-center mb-6">
               <div className="text-[10px] tracking-[0.3em] uppercase text-[#9c6b3f]">데이터로 큐레이션하는</div>
               <div className="text-xl font-bold text-[#2b2018] border-y-2 border-[#2b2018] py-2 mt-1">{homeGu ? `${homeGu}의 오늘의 커피` : "오늘의 동네 커피"}</div>
-              <div className="flex gap-2 justify-center mt-3">
-                <select value={homeSido} onChange={(e) => { setHomeSido(e.target.value); setHomeGu(""); }} className="border border-[#cbb89f] rounded-lg px-3 py-2 text-sm bg-white text-[#2b2018]">
-                  <option value="">시·도 전체</option>{Object.keys(REGIONS).map((s) => <option key={s} value={s}>{s}</option>)}
+              {/* 시·도 → 시·군·구 → 동·면 계층 선택(우리 동네). 검색 돋보기 제거. */}
+              <div className="flex gap-1.5 justify-center mt-3 flex-wrap">
+                <select value={homeSido} onChange={(e) => { setHomeSido(e.target.value); setHomeGu(""); setHomeDong(""); }} className="border border-[#cbb89f] rounded-lg px-2.5 py-2 text-sm bg-white text-[#2b2018]">
+                  <option value="">시·도</option>{Object.keys(REGIONS).map((s) => <option key={s} value={s}>{s}</option>)}
                 </select>
-                <select value={homeGu} onChange={(e) => setHomeGu(e.target.value)} disabled={!homeSido} className="border border-[#cbb89f] rounded-lg px-3 py-2 text-sm bg-white text-[#2b2018] disabled:opacity-50">
-                  <option value="">우리 동네 선택</option>{homeSido && REGIONS[homeSido].map((g) => <option key={g} value={g}>{g}</option>)}
+                <select value={homeGu} onChange={(e) => { setHomeGu(e.target.value); setHomeDong(""); }} disabled={!homeSido} className="border border-[#cbb89f] rounded-lg px-2.5 py-2 text-sm bg-white text-[#2b2018] disabled:opacity-40">
+                  <option value="">시·군·구</option>{homeSido && REGIONS[homeSido].map((g) => <option key={g} value={g}>{g}</option>)}
                 </select>
-                <button onClick={() => { setSearchRes(null); setSearchQ(""); setShowSearch(true); }} aria-label="느낌으로 검색" className="border border-[#cbb89f] rounded-lg px-3 py-2 bg-white text-[#2b2018] hover:bg-[#f0e6d4]">🔍</button>
+                <select value={homeDong} onChange={(e) => setHomeDong(e.target.value)} disabled={!homeGu || !homeDongOptions.length} className="border border-[#cbb89f] rounded-lg px-2.5 py-2 text-sm bg-white text-[#2b2018] disabled:opacity-40">
+                  <option value="">{homeGu && !homeDongOptions.length ? "동·면 (수집중)" : "동·면"}</option>{homeDongOptions.map((d) => <option key={d} value={d}>{d}</option>)}
+                </select>
               </div>
               <div className="mt-2.5 flex flex-col items-center gap-1">
                 {autoGu ? (
@@ -743,7 +789,7 @@ export default function Home() {
                 {momentum && momentum.rising.length > 0 && <Row title="📈 요즘 뜨는 카페" items={momentum.rising.slice(0, 5)} onOpen={openById} sub="최근 입소문 순" info={<>별점 대신 <b>검증된 진짜 후기가 요즘 얼마나 빨리 느는지</b>로 뽑은 '뜨는 카페'예요. 최근 3개월 검증 후기가 많을수록 상위로 올라가요.</>} />}
                 <Row title="🏆 리뷰 많은 Top 3" items={discover.top3} onOpen={openById} sub="검증 리뷰 많은 순" info={<>이 동네에서 <b>검증·참고 후기(옥석)가 가장 많은</b> 카페 순서예요. 광고·가짜·무관 글은 제외한 '진짜 후기 수' 기준입니다.</>} />
                 <Row title="🔥 스페셜티 픽" items={discover.specialty} onOpen={openById} sub="로스팅 언급 순" info={<>검증된 카페 중 <b>직접 로스팅·스페셜티가 후기에 자주 언급된</b> 곳이에요. 커피에 진심인 집 위주로 보여줘요.</>} />
-                <button onClick={() => { if (homeSido) { setSido(homeSido); setSigungu(homeGu); } setFocusId(null); setSheetOpen(true); setTab("map"); }} className="w-full bg-[#2b2018] text-[#f4ece0] rounded-xl py-3.5 font-medium mt-2">🗺 {homeGu ? `${homeGu} 지도로 보기` : "지도에서 전체 둘러보기"} →</button>
+                <button onClick={() => { setSido(homeSido); setSigungu(homeGu); setDong(homeDong); setFocusId(null); setSheetOpen(false); setTab("map"); }} className="w-full bg-[#2b2018] text-[#f4ece0] rounded-xl py-3.5 font-medium mt-2">🗺 {homeDong ? `${homeDong} 지도로 보기` : homeGu ? `${homeGu} 지도로 보기` : "지도에서 전체 둘러보기"} →</button>
               </>
             )}
             <p className="text-[10px] text-[#a8927a] mt-6 text-center leading-relaxed">모든 큐레이션은 네이버 공개 후기를 교차검증한 데이터 기반입니다.</p>
@@ -784,7 +830,7 @@ export default function Home() {
           {/* MapControls(지역/결/목록)는 무겁다(전체 정렬). 지도 탭일 때만 마운트 → 다른 화면 상태변경 시 재조정/정렬 안 함. 지도 div는 위에서 항상 유지. */}
           {tab === "map" && (<>
           <aside className="hidden md:block md:w-[380px] md:h-full bg-[#fdfaf4] border-l border-[#ece0cd] overflow-y-auto p-6 relative z-10">
-            <MapControls {...{ sido, sigungu, onSido, setSigungu, tasteKey, setTasteKey, filtered, matchSet, setSelected, openLocation, autoGu, geoMsg, clearAuto }} />
+            <MapControls {...{ sido, sigungu, dong, onSido, onSigungu, setDong, dongOptions, tasteKey, setTasteKey, filtered, matchSet, setSelected, openLocation, autoGu, geoMsg, clearAuto }} />
           </aside>
           <div className="md:hidden absolute left-0 right-0 bg-[#fdfaf4] rounded-t-3xl shadow-[0_-4px_24px_rgba(0,0,0,0.18)] z-[1200] flex flex-col transition-transform duration-300 ease-out will-change-transform" style={{ bottom: "3.25rem", height: "72dvh", transform: sheetOpen ? "translateY(0)" : "translateY(calc(72dvh - 2.75rem))" }}>
             {/* 접힘 시 정확히 이 핸들(2.75rem)까지만 보이게 — 아래 목록이 삐져나오지 않음 */}
@@ -793,7 +839,7 @@ export default function Home() {
               <span className="text-[11px] font-bold text-[#9c6b3f] leading-none">{sheetOpen ? "지도 보기 ▾" : `지역·필터 펼치기 ▴ (${filtered.length})`}</span>
             </button>
             <div className="flex-1 overflow-y-auto px-5 pb-8" style={{ WebkitOverflowScrolling: "touch" }}>
-              <MapControls {...{ sido, sigungu, onSido, setSigungu, tasteKey, setTasteKey, filtered, matchSet, setSelected, openLocation, autoGu, geoMsg, clearAuto }} />
+              <MapControls {...{ sido, sigungu, dong, onSido, onSigungu, setDong, dongOptions, tasteKey, setTasteKey, filtered, matchSet, setSelected, openLocation, autoGu, geoMsg, clearAuto }} />
             </div>
           </div>
           </>)}
@@ -930,7 +976,7 @@ export default function Home() {
   );
 }
 
-function MapControls({ sido, sigungu, onSido, setSigungu, tasteKey, setTasteKey, filtered, matchSet, setSelected, openLocation, autoGu, geoMsg, clearAuto }: any) {
+function MapControls({ sido, sigungu, dong, onSido, onSigungu, setDong, dongOptions, tasteKey, setTasteKey, filtered, matchSet, setSelected, openLocation, autoGu, geoMsg, clearAuto }: any) {
   // 정렬: 카테고리(결) 선택 시 그 결이 강한 순, 아니면 검증 리뷰 많은 순. 검색범주 안에서도 동일 기준.
   const sortLabel = tasteKey ? `'${TASTE_CHOICES.find((t: any) => t.key === tasteKey)?.label}' 결 강한 순` : "검증 리뷰 많은 순";
   // 전체 정렬은 무거우므로 메모이즈 — 모달 열고닫기 등으로 재렌더돼도 filtered/tasteKey/matchSet가 그대로면 재정렬 안 함.
@@ -947,16 +993,19 @@ function MapControls({ sido, sigungu, onSido, setSigungu, tasteKey, setTasteKey,
             ? <span className="text-[11px] text-[#5f7355] bg-[#eef3ea] border border-[#cfe0c2] rounded-full px-2 py-0.5">내 위치 <b>{autoGu}</b></span>
             : <button onClick={openLocation} className="text-[11px] text-white bg-[#5f7355] rounded-full px-2.5 py-1 font-medium">📍 내 위치로</button>}
         </div>
-        <div className="flex gap-2">
-          <select value={sido} onChange={(e) => onSido(e.target.value)} className="flex-1 border border-[#cbb89f] rounded-lg px-3 py-2.5 text-base bg-white text-[#2b2018]">
+        <div className="flex gap-1.5">
+          <select value={sido} onChange={(e) => onSido(e.target.value)} className="flex-1 min-w-0 border border-[#cbb89f] rounded-lg px-2.5 py-2.5 text-[15px] bg-white text-[#2b2018]">
             <option value="">시·도</option>{Object.keys(REGIONS).map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
-          <select value={sigungu} onChange={(e) => setSigungu(e.target.value)} disabled={!sido} className="flex-1 border border-[#cbb89f] rounded-lg px-3 py-2.5 text-base bg-white text-[#2b2018] disabled:opacity-50">
+          <select value={sigungu} onChange={(e) => onSigungu(e.target.value)} disabled={!sido} className="flex-1 min-w-0 border border-[#cbb89f] rounded-lg px-2.5 py-2.5 text-[15px] bg-white text-[#2b2018] disabled:opacity-50">
             <option value="">시·군·구</option>{sido && REGIONS[sido].map((g: string) => <option key={g} value={g}>{g}</option>)}
+          </select>
+          <select value={dong} onChange={(e) => setDong(e.target.value)} disabled={!sigungu || !(dongOptions?.length)} className="flex-1 min-w-0 border border-[#cbb89f] rounded-lg px-2.5 py-2.5 text-[15px] bg-white text-[#2b2018] disabled:opacity-50">
+            <option value="">{sigungu && !(dongOptions?.length) ? "동·면(수집중)" : "동·면"}</option>{(dongOptions ?? []).map((d: string) => <option key={d} value={d}>{d}</option>)}
           </select>
         </div>
         {geoMsg && <div className="text-[10px] text-[#a8927a] mt-1.5">{geoMsg}</div>}
-        {(sido || sigungu) && <button onClick={() => { if (clearAuto) clearAuto(); else { onSido(""); setSigungu(""); } }} className="text-xs text-[#9c6b3f] underline mt-2">전체</button>}
+        {(sido || sigungu || dong) && <button onClick={() => { if (clearAuto) clearAuto(); else { onSido(""); } }} className="text-xs text-[#9c6b3f] underline mt-2">전체</button>}
       </div>
       <div className="mb-5">
         <div className="text-sm font-bold text-[#52402e] mb-2.5 flex items-center gap-1.5">☕ 어떤 카페 찾으세요?<InfoDot title="'결'로 거르기"><b>결</b>은 후기에서 자주 언급되는 카페의 성격이에요(조용·작업·디저트·로스팅 등). 고르면 그 결이 강한 카페만 핀·목록에 뜨고, <b>그 결이 많이 언급된 순</b>으로 정렬돼요. 측정값이 아니라 '리뷰에서 자주 나온 정도'입니다.</InfoDot></div>
