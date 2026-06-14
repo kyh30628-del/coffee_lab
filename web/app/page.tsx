@@ -161,6 +161,37 @@ function SplashScreen() {
   );
 }
 
+// 즐겨찾기(★) 모달 — 내 추억 중 별표한 카페 목록. 탭하면 상세로.
+function FavoritesModal({ favs, onClose, onOpen, onRegister }: { favs: any[]; onClose: () => void; onOpen: (id: number) => void; onRegister: () => void }) {
+  return (
+    <div className="fixed inset-0 z-[5000] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)", fontFamily: "'Gowun Batang', serif" }} onClick={onClose}>
+      <div className="w-full max-w-lg bg-[#fdfaf4] rounded-t-2xl max-h-[80dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-[#f0e6d4]">
+          <div className="font-bold text-[#2b2018] text-[15px]"><span style={{ color: "#f0a832" }}>★</span> 즐겨찾기 <span className="text-[#a8927a] text-[12px] font-normal">{favs.length}곳</span></div>
+          <button onClick={onClose} className="w-8 h-8 rounded-full bg-[#f0e6d4] text-[#7a6452] text-lg">×</button>
+        </div>
+        <div className="overflow-y-auto flex-1 p-3 space-y-2 pb-[calc(1rem_+_env(safe-area-inset-bottom))]">
+          {favs.length === 0 ? (
+            <div className="text-center text-[#a8927a] text-[13px] py-12 leading-relaxed">
+              아직 즐겨찾기한 카페가 없어요.<br />추억 등록 시 ★를 누르면 여기에 모여요.
+              <button onClick={onRegister} className="mt-4 block mx-auto bg-[#d6336c] text-white rounded-xl px-5 py-2.5 text-[13px] font-bold">➕ 추억 등록하기</button>
+            </div>
+          ) : favs.map((v) => (
+            <button key={v.id} onClick={() => onOpen(v.id)} className="w-full text-left bg-white rounded-xl border border-[#ece0cd] p-3 flex gap-3 items-center active:bg-[#fdf6ee]">
+              {v.photo_url ? <img src={v.photo_url} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0" /> : <div className="w-12 h-12 rounded-lg bg-[#f3ede1] flex items-center justify-center text-[18px] shrink-0">★</div>}
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5"><span className="text-[#f0a832] text-[13px]">★</span><span className="font-bold text-[#2b2018] text-[14px] truncate">{v.name}</span><span className="text-[10px] text-[#9c6b3f] shrink-0">{v.area}</span></div>
+                {v.memory && <p className="text-[12px] text-[#52402e] mt-0.5 line-clamp-1">{v.memory}</p>}
+              </div>
+              <span className="text-[#cbb89f] text-[18px]">›</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   const [cafes, setCafes] = useState<Cafe[]>([]);
   const [selected, setSelected] = useState<Cafe | null>(null);
@@ -178,6 +209,7 @@ export default function Home() {
   const [myVisits, setMyVisits] = useState<any[]>([]);
   const [myPinMode, setMyPinMode] = useState(false);
   const [showMyCafeReg, setShowMyCafeReg] = useState(false);
+  const [showFavs, setShowFavs] = useState(false); // 즐겨찾기(★ 카페) 모달
   const [othersMode, setOthersMode] = useState(false); // 다른 사람은 — 집계 핀
   const [othersPins, setOthersPins] = useState<{ id: number; name: string; area: string; lat: number; lng: number; cnt: number }[]>([]);
   const [myLocked, setMyLocked] = useState(false); // 공용 PC 잠금 상태
@@ -712,6 +744,27 @@ export default function Home() {
         onUnlock={(p: string) => { try { sessionStorage.setItem("dcn_pin", p); } catch {} setSessionPin(p); setMyLocked(false); reloadMyCafes(deviceId, p); }}
         onLock={() => { try { sessionStorage.removeItem("dcn_pin"); } catch {} setSessionPin(""); reloadMyCafes(deviceId, ""); }}
         onRestore={(dev: string) => { try { localStorage.setItem("dcn_device", dev); } catch {} setDeviceId(dev); reloadMyCafes(dev, ""); }} />}
+
+      {/* 하단 빠른 액션 바 — 모바일 전용. 홈 인디케이터 안전영역까지 배경이 채워짐 */}
+      <nav className="md:hidden shrink-0 bg-[#fdfaf4] border-t border-[#ece0cd] flex items-stretch" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+        {[
+          { k: "fav", label: "즐겨찾기", icon: <path d="M12 4.5l2.3 4.7 5.2.8-3.75 3.65.9 5.15L12 16.9l-4.65 2.45.9-5.15L4.5 10l5.2-.8z" />, fill: true },
+          { k: "search", label: "검색", icon: <><circle cx="11" cy="11" r="6.5" /><path d="M16 16l4.5 4.5" /></>, fill: false },
+          { k: "loc", label: "내 위치", icon: <><path d="M12 21c4.2-4 7-7.2 7-10.5A7 7 0 0 0 5 10.5C5 13.8 7.8 17 12 21Z" /><circle cx="12" cy="10.5" r="2.4" /></>, fill: false },
+        ].map((a) => (
+          <button key={a.k} onClick={() => {
+            if (a.k === "fav") setShowFavs(true);
+            else if (a.k === "search") { setSearchRes(null); setSearchQ(""); setShowSearch(true); }
+            else openLocation();
+          }} className="flex-1 flex flex-col items-center justify-center gap-0.5 py-1.5 active:bg-[#f3ede1]" aria-label={a.label}>
+            <svg width="23" height="23" viewBox="0 0 24 24" fill={a.fill ? "#d6336c" : "none"} stroke={a.fill ? "#d6336c" : "#7a6452"} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{a.icon}</svg>
+            <span className="text-[10px] font-bold" style={{ color: a.fill ? "#d6336c" : "#7a6452" }}>{a.label}</span>
+          </button>
+        ))}
+      </nav>
+      {showFavs && <FavoritesModal favs={myVisits.filter((v: any) => v.favorite)} onClose={() => setShowFavs(false)}
+        onOpen={(id: number) => { const c = cafes.find((x) => x.id === id); setShowFavs(false); if (c) setSelected(c); }}
+        onRegister={() => { setShowFavs(false); setShowMyCafeReg(true); }} />}
       {showMyCafeReg && <MyCafeRegModal cafes={cafes} device={deviceId} visits={myVisits} pin={sessionPin} onClose={() => setShowMyCafeReg(false)} onDone={() => { reloadMyCafes(deviceId, sessionPin); }} />}
 
       {selected && <CafePanel cafe={selected} onClose={() => setSelected(null)} onMap={() => {
