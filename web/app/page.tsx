@@ -379,8 +379,9 @@ export default function Home() {
     if (u.showSearch) { setShowSearch(false); return true; }
     if (u.selected) { setSelected(null); return true; }
     if (u.showConsent) { setShowConsent(false); return true; }
-    if (allowMapBack && u.tab === "map") { setTab("home"); return true; }
-    if (u.tab === "home" && u.role !== null) { try { sessionStorage.removeItem("dcn_role"); } catch {} setRole(null); return true; }
+    if (u.tab === "memory") { setTab("home"); return true; } // 추억 → 홈
+    if (allowMapBack && u.tab === "map") { setTab("home"); return true; } // 지도 → 홈(iOS는 캐처 스트립이 처리)
+    if (u.tab === "home" && u.role !== null) { try { sessionStorage.removeItem("dcn_role"); } catch {} setRole(null); return true; } // 홈 → 랜딩
     return false;
   };
   // 뒤로가기 처리
@@ -578,7 +579,7 @@ export default function Home() {
   // ── 랜딩(초기화면): 소비자 / 사장님 분리 ──
   if (role === null) {
     return (
-      <div className="flex flex-col items-center justify-center px-6" style={{ minHeight: "100dvh", paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)", background: "#2b2018", color: "#f4ece0", fontFamily: "'Gowun Batang', AppleMyungjo, 'Apple SD Gothic Neo', 'Noto Serif KR', serif" }}>
+      <div className="flex flex-col items-center justify-center px-6 overflow-y-auto" style={{ position: "fixed", inset: 0, paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)", background: "#2b2018", color: "#f4ece0", fontFamily: "'Gowun Batang', AppleMyungjo, 'Apple SD Gothic Neo', 'Noto Serif KR', serif" }}>
         <style>{`
           @keyframes dcnRise { from { opacity:0; transform: translateY(22px); } to { opacity:1; transform: translateY(0); } }
           /* 홀로그램: 무지갯빛이 가로로 천천히 흐르며 미세하게 색조가 도는 은은한 효과(평평·베벨 없음) */
