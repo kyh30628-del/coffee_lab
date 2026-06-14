@@ -121,6 +121,46 @@ function topChars(c: Cafe, n = 4) {
   return Object.entries(cs).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, n).map(([k, v]) => ({ ...(CHAR_LABELS[k] ?? { label: k, emoji: "" }), score: v }));
 }
 
+// 앱 실행 인트로 — 따뜻한 커피잔 + 타이틀, 부드러운 페이드(과한 모션 없음). 1.5초.
+function SplashScreen() {
+  return (
+    <div className="dcn-intro" style={{ position: "fixed", inset: 0, zIndex: 9999, background: "#2b2018", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", paddingTop: "env(safe-area-inset-top)", fontFamily: "'Gowun Batang', serif" }}>
+      <style>{`
+        @keyframes dcnIntroOut { 0%,72% { opacity:1; } 100% { opacity:0; visibility:hidden; } }
+        @keyframes dcnIntroIn { 0% { opacity:0; transform:translateY(8px) scale(.96); } 100% { opacity:1; transform:translateY(0) scale(1); } }
+        .dcn-intro { animation: dcnIntroOut 1.5s ease forwards; }
+        .dcn-intro-cup { animation: dcnIntroIn .7s cubic-bezier(.2,.7,.2,1) both; }
+        .dcn-intro-ttl { animation: dcnIntroIn .7s cubic-bezier(.2,.7,.2,1) .12s both; }
+        @media (prefers-reduced-motion: reduce){ .dcn-intro,.dcn-intro-cup,.dcn-intro-ttl{ animation:none; } }
+      `}</style>
+      <svg className="dcn-intro-cup" width="116" height="116" viewBox="0 0 512 512" aria-label="동네 커피 노트" role="img">
+        <defs>
+          <linearGradient id="cupIn" x1="0.2" y1="0" x2="0.5" y2="1">
+            <stop offset="0" stopColor="#f8f1e3" /><stop offset="0.5" stopColor="#efd9b2" /><stop offset="1" stopColor="#e0c293" />
+          </linearGradient>
+          <linearGradient id="sauIn" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#ecd6b2" /><stop offset="1" stopColor="#cdaf83" />
+          </linearGradient>
+          <linearGradient id="cofIn" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#5a3c25" /><stop offset="1" stopColor="#3d2718" />
+          </linearGradient>
+        </defs>
+        <g fill="none" stroke="#f3e7d0" strokeWidth="11" strokeLinecap="round" opacity="0.45">
+          <path d="M214 168 c -15 -16 13 -28 0 -50 c -13 -22 15 -30 0 -50" />
+          <path d="M256 162 c -15 -16 13 -28 0 -50 c -13 -22 15 -30 0 -50" />
+          <path d="M298 168 c -15 -16 13 -28 0 -50 c -13 -22 15 -30 0 -50" />
+        </g>
+        <ellipse cx="256" cy="374" rx="152" ry="30" fill="url(#sauIn)" />
+        <path d="M348 244 a 40 40 0 0 1 0 76" fill="none" stroke="url(#cupIn)" strokeWidth="22" strokeLinecap="round" />
+        <path d="M152 216 L172 330 Q177 358 210 360 H302 Q335 358 340 330 L360 216 Z" fill="url(#cupIn)" />
+        <ellipse cx="256" cy="216" rx="104" ry="22" fill="#f4e8d2" />
+        <ellipse cx="256" cy="216" rx="90" ry="16" fill="url(#cofIn)" />
+      </svg>
+      <div className="dcn-intro-ttl" style={{ marginTop: 16, fontSize: 25, fontWeight: 700, letterSpacing: "-0.01em", color: "#f0dcb6" }}>동네 커피 노트</div>
+    </div>
+  );
+}
+
 export default function Home() {
   const [cafes, setCafes] = useState<Cafe[]>([]);
   const [selected, setSelected] = useState<Cafe | null>(null);
@@ -168,6 +208,14 @@ export default function Home() {
   const anonRef = useRef("");
   // 랜딩/역할 분리 + 사장님 인증 + 뒤로가기 안내
   const [role, setRole] = useState<"consumer" | "owner" | null>(null);
+  const [splash, setSplash] = useState(false); // 앱 실행 인트로(1.5초)
+  useEffect(() => {
+    let shown = false; try { shown = sessionStorage.getItem("dcn_splash") === "1"; } catch {}
+    if (shown) return;
+    setSplash(true); try { sessionStorage.setItem("dcn_splash", "1"); } catch {}
+    const t = setTimeout(() => setSplash(false), 1500);
+    return () => clearTimeout(t);
+  }, []);
   const [ownerPwModal, setOwnerPwModal] = useState(false);
   const [ownerPw, setOwnerPw] = useState("");
   const [ownerErr, setOwnerErr] = useState("");
@@ -464,6 +512,9 @@ export default function Home() {
       setOwnerPwModal(false); setRole("owner");
     } catch { setOwnerErr("네트워크 오류"); }
   };
+
+  // ── 앱 실행 인트로(1.5초) ──
+  if (splash) return <SplashScreen />;
 
   // ── 랜딩(초기화면): 소비자 / 사장님 분리 ──
   if (role === null) {
