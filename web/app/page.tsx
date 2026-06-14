@@ -386,32 +386,48 @@ export default function Home() {
   };
   // 뒤로가기 처리
   useEffect(() => {
-    const iosPWA = typeof navigator !== "undefined" && (navigator as { standalone?: boolean }).standalone === true;
-    if (iosPWA) {
-      // iOS 홈화면 PWA: history 가로채기를 쓰면 OS의 느린 뒤로가기 슬라이드 애니메이션이 끼어든다.
-      // → history를 건드리지 않고(애니메이션 없음) 좌측 엣지 스와이프를 직접 감지해 즉시 닫는다.
-      let sx = 0, sy = 0, track = false;
-      const onStart = (e: TouchEvent) => { const t = e.touches[0]; if (t && t.clientX <= 30) { sx = t.clientX; sy = t.clientY; track = true; } else track = false; };
-      const onEnd = (e: TouchEvent) => {
-        if (!track) return; track = false;
-        const t = e.changedTouches[0]; if (!t) return;
-        if (t.clientX - sx > 55 && Math.abs(t.clientY - sy) < 45) closeTopLayer(false); // 좌→우 스와이프 = 뒤로가기(즉시). 지도→홈은 제외(패닝 충돌 방지)
-      };
-      window.addEventListener("touchstart", onStart, { passive: true });
-      window.addEventListener("touchend", onEnd, { passive: true });
-      return () => { window.removeEventListener("touchstart", onStart); window.removeEventListener("touchend", onEnd); };
-    }
-    // 안드로이드/브라우저: 하드웨어 뒤로가기 버튼을 위해 history 기반 유지
+    let last = 0;
+    const doClose = (allowMap = true) => { if (Date.now() - last < 350) return false; const ok = closeTopLayer(allowMap); if (ok) last = Date.now(); return ok; };
+
+    // history 기반(툴바·하드웨어 뒤로가기). 모든 플랫폼 유지 — 사이트를 벗어나지 않고 레이어를 닫음.
     history.pushState(null, "", location.href);
     let lastBack = 0;
     const rearm = () => history.pushState(null, "", location.href);
     const onPop = () => {
-      if (closeTopLayer()) { rearm(); return; }
+      if (doClose(true)) { rearm(); return; }
       if (Date.now() - lastBack < 2000) { window.removeEventListener("popstate", onPop); history.back(); return; }
       lastBack = Date.now(); setBackToast(true); setTimeout(() => setBackToast(false), 2000); rearm();
     };
     window.addEventListener("popstate", onPop);
-    return () => window.removeEventListener("popstate", onPop);
+
+    // iOS(PWA·Safari 공통): 좌측 엣지에서 우측으로 끄는 '뒤로가기 스와이프'의 느린 네이티브 슬라이드 애니메이션을
+    // touchmove preventDefault로 차단하고, 직접 감지해 즉시 닫는다. (세로 스크롤·왼쪽 스와이프·탭은 그대로)
+    let cleanupTouch = () => {};
+    const isIOS = typeof navigator !== "undefined" && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent)));
+    if (isIOS) {
+      let sx = 0, sy = 0, track = false, horiz = false;
+      const onStart = (e: TouchEvent) => { const t = e.touches[0]; if (t && t.clientX <= 28) { sx = t.clientX; sy = t.clientY; track = true; horiz = false; } else track = false; };
+      const onMove = (e: TouchEvent) => {
+        if (!track) return;
+        const t = e.touches[0]; if (!t) return;
+        const dx = t.clientX - sx, dy = t.clientY - sy;
+        if (!horiz) {
+          if (dx > 8 && Math.abs(dx) > Math.abs(dy)) horiz = true;             // 오른쪽(뒤로가기 방향)만 가로채기
+          else if (Math.abs(dx) > 8 || Math.abs(dy) > 8) { track = false; return; } // 왼쪽/세로 스크롤은 간섭 안 함
+        }
+        if (horiz && e.cancelable) e.preventDefault();                         // 네이티브 느린 뒤로가기 슬라이드 차단
+      };
+      const onEnd = (e: TouchEvent) => {
+        if (track && horiz) { const t = e.changedTouches[0]; if (t && t.clientX - sx > 45 && Math.abs(t.clientY - sy) < 60) doClose(false); } // 지도→홈은 캐처 스트립이 처리
+        track = false; horiz = false;
+      };
+      document.addEventListener("touchstart", onStart, { passive: true });
+      document.addEventListener("touchmove", onMove, { passive: false });
+      document.addEventListener("touchend", onEnd, { passive: true });
+      cleanupTouch = () => { document.removeEventListener("touchstart", onStart); document.removeEventListener("touchmove", onMove); document.removeEventListener("touchend", onEnd); };
+    }
+
+    return () => { window.removeEventListener("popstate", onPop); cleanupTouch(); };
   }, []);
 
   const runSearch = async (query: string) => {
