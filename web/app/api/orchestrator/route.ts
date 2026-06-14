@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
       MAX(llm_judged_at) last_judge,
       MAX(embed_updated) last_embed,
       COUNT(*) FILTER (WHERE raw_reviews IS NOT NULL AND synth_updated IS NULL)::int synth_q,
-      COUNT(*) FILTER (WHERE published AND raw_reviews IS NOT NULL AND llm_judged_at IS NULL)::int judge_q,
+      COUNT(*) FILTER (WHERE (published OR pipeline_status='pending') AND raw_reviews IS NOT NULL AND (llm_judged_at IS NULL OR llm_judged_at < raw_collected_at))::int judge_q,
       COUNT(*) FILTER (WHERE embedding IS NULL)::int embed_q
       FROM cafes`)[0] as any;
     const vr = (await sql`SELECT ran_at, fails, warns, status FROM verify_reports ORDER BY ran_at DESC LIMIT 1`)[0] as any;
