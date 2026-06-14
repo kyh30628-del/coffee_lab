@@ -3,7 +3,7 @@ import { sql, ensureSchema } from "@/lib/db";
 import { discoverRegion, METRO_REGIONS } from "@/lib/discover";
 import { synthAndStore } from "@/lib/synthStore";
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300; // 여러 지역 발굴 + 합성 (플랜 상한까지 사용)
 
 // 정확도 우선 '카페 성장 에이전트' (PRINCIPLES §0·§1·§2·§7).
 // 매일: ① 가장 오래된 지역을 순회 발굴(프랜차이즈 제외, 합법 네이버 소스)
@@ -20,13 +20,26 @@ export async function GET(req: NextRequest) {
     // 지역 시드(최초 1회)
     for (const r of METRO_REGIONS) await sql`INSERT INTO discovery_state (region, area_label) VALUES (${r.region}, ${r.areaLabel}) ON CONFLICT (region) DO NOTHING`;
 
-    // ① 가장 오래된 지역 1곳 발굴
-    const target = (await sql`SELECT region, area_label FROM discovery_state ORDER BY last_run ASC NULLS FIRST LIMIT 1`)[0];
-    let discovery: any = null;
-    if (target) {
-      discovery = await discoverRegion(target.region, target.area_label ?? target.region);
-      await sql`UPDATE discovery_state SET last_run=now(), last_found=${discovery.found}, last_inserted=${discovery.inserted} WHERE region=${target.region}`;
+    // ① 가장 오래된 지역부터 '시간 예산(40초) 내에서 여러 곳' 발굴 — 매일 네이버 한도를 실제로 활용해
+    //    미발굴 지역(수십 곳)을 빠르게 순회한다. (1곳/일 → 수십일 걸리던 문제 해소)
+    const GROW_BUDGET_MS = 40_000;
+    const t0 = Date.now();
+    const discoveries: { region: string; found?: number; inserted?: number; error?: string }[] = [];
+    while (Date.now() - t0 < GROW_BUDGET_MS) {
+      const target = (await sql`SELECT region, area_label FROM discovery_state ORDER BY last_run ASC NULLS FIRST LIMIT 1`)[0] as { region: string; area_label: string } | undefined;
+      if (!target) break;
+      try {
+        const d = await discoverRegion(target.region, target.area_label ?? target.region);
+        await sql`UPDATE discovery_state SET last_run=now(), last_found=${d.found}, last_inserted=${d.inserted} WHERE region=${target.region}`;
+        discoveries.push({ region: d.region, found: d.found, inserted: d.inserted });
+      } catch (e) {
+        await sql`UPDATE discovery_state SET last_run=now() WHERE region=${target.region}`; // 실패해도 last_run 갱신(무한루프·재시도 폭주 방지)
+        discoveries.push({ region: target.region, error: String(e).slice(0, 60) });
+        break; // 네이버 한도/오류 시 이번 회차 발굴 중단(다음 cron에서 이어감)
+      }
     }
+    const discovery = discoveries[discoveries.length - 1] ?? null;
+    const totalInserted = discoveries.reduce((s, d) => s + (d.inserted ?? 0), 0);
 
     // ② 합성/재판정 — 미합성(신규) 우선, 그다음 가장 오래된 순으로 순회.
     //    각 카페가 synthAndStore(규칙+LLM 맥락 재판정)를 거쳐 정확도가 지속적으로 올라간다.
@@ -42,9 +55,11 @@ export async function GET(req: NextRequest) {
     const pendingNew = (await sql`SELECT COUNT(*)::int n FROM cafes WHERE synth_updated IS NULL`)[0].n;
     const published = synth.filter((s: any) => s.published).length;
 
+    const remainingRegions = (await sql`SELECT COUNT(*)::int n FROM discovery_state WHERE last_run IS NULL`)[0].n;
     return NextResponse.json({
       ok: true, ranAt: new Date().toISOString(),
-      discovered: discovery ? { region: discovery.region, found: discovery.found, inserted: discovery.inserted } : null,
+      regionsSwept: discoveries.length, totalInserted, discoveries, remainingRegions,
+      lastDiscovery: discovery,
       synthesized: synth.length, published, llmRescued: rescued, pendingNew,
     });
   } catch (e) {
