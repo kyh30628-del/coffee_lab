@@ -620,9 +620,12 @@ export default function Home() {
       if (pts.length) map.flyToBounds(L.latLngBounds(pts), { padding: [60, 60], maxZoom: pts.length === 1 ? 14 : 15, duration: 0.7 });
       else if (sido && SIDO_CENTER[sido]) { const [la, ln, z] = SIDO_CENTER[sido]; map.flyTo([la, ln], z, { duration: 0.7 }); }
     } else if (filtered.length > 0 && (sido || sigungu)) {
-      // 선택 지역으로 부드럽게 줌인 → 하위(구/동) 집계 마커 표시. 다이나믹 드릴다운.
-      const lats = filtered.map((c) => c.lat), lngs = filtered.map((c) => c.lng);
-      map.flyToBounds(L.latLngBounds([[Math.min(...lats), Math.min(...lngs)], [Math.max(...lats), Math.max(...lngs)]]), { padding: [50, 50], maxZoom: 15, duration: 0.7 });
+      // 선택 지역으로 부드럽게 '줌인' → 하위(구/동) 집계 마커 표시. 이상치(엉뚱한 좌표) 4%는 무시해야 경계가 안 부풀고 제대로 줌인됨.
+      const la = filtered.map((c) => c.lat).sort((a, b) => a - b);
+      const ln = filtered.map((c) => c.lng).sort((a, b) => a - b);
+      const q = (arr: number[], p: number) => arr[Math.min(arr.length - 1, Math.max(0, Math.floor(arr.length * p)))];
+      const bounds = L.latLngBounds([[q(la, 0.04), q(ln, 0.04)], [q(la, 0.96), q(ln, 0.96)]]);
+      map.flyToBounds(bounds, { padding: [40, 40], maxZoom: 16, duration: 0.7 });
     } else if (sido && SIDO_CENTER[sido]) { const [la, ln, z] = SIDO_CENTER[sido]; map.flyTo([la, ln], z, { duration: 0.7 }); }
     else { map.flyTo([37.5, 127.05], 9, { duration: 0.7 }); } // 전체(시도 미선택) → 수도권 전역으로 부드럽게 줌아웃해 시도 집계 원형 표시
     drawMarkers();
