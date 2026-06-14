@@ -405,21 +405,24 @@ export default function Home() {
     let cleanupTouch = () => {};
     const isIOS = typeof navigator !== "undefined" && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent)));
     if (isIOS) {
-      let sx = 0, sy = 0, track = false, horiz = false;
-      const onStart = (e: TouchEvent) => { const t = e.touches[0]; if (t && t.clientX <= 28) { sx = t.clientX; sy = t.clientY; track = true; horiz = false; } else track = false; };
+      let sx = 0, sy = 0, edge = false, decided = false, block = false;
+      const onStart = (e: TouchEvent) => { const t = e.touches[0]; edge = !!(t && t.clientX <= 26); decided = false; block = false; if (edge) { sx = t.clientX; sy = t.clientY; } };
       const onMove = (e: TouchEvent) => {
-        if (!track) return;
+        if (!edge) return;
         const t = e.touches[0]; if (!t) return;
         const dx = t.clientX - sx, dy = t.clientY - sy;
-        if (!horiz) {
-          if (dx > 8 && Math.abs(dx) > Math.abs(dy)) horiz = true;             // 오른쪽(뒤로가기 방향)만 가로채기
-          else if (Math.abs(dx) > 8 || Math.abs(dy) > 8) { track = false; return; } // 왼쪽/세로 스크롤은 간섭 안 함
+        if (!decided) {
+          if (Math.abs(dx) > 6 || Math.abs(dy) > 6) {
+            decided = true;
+            block = dx > 0 && Math.abs(dx) >= Math.abs(dy); // 오른쪽 수평 = 뒤로가기 → 차단. 세로/왼쪽 = 스크롤 허용
+            if (!block) { edge = false; return; }
+          } else { if (e.cancelable) e.preventDefault(); return; } // 방향 미정: 작은 움직임도 막아 네이티브 제스처 시작 억제
         }
-        if (horiz && e.cancelable) e.preventDefault();                         // 네이티브 느린 뒤로가기 슬라이드 차단
+        if (block && e.cancelable) e.preventDefault(); // 네이티브 느린 뒤로가기 슬라이드 차단(첫 움직임부터)
       };
       const onEnd = (e: TouchEvent) => {
-        if (track && horiz) { const t = e.changedTouches[0]; if (t && t.clientX - sx > 45 && Math.abs(t.clientY - sy) < 60) doClose(false); } // 지도→홈은 캐처 스트립이 처리
-        track = false; horiz = false;
+        if (edge && block) { const t = e.changedTouches[0]; if (t && t.clientX - sx > 40 && Math.abs(t.clientY - sy) < 70) doClose(false); } // 지도→홈은 캐처 스트립이 처리
+        edge = false; decided = false; block = false;
       };
       document.addEventListener("touchstart", onStart, { passive: true });
       document.addEventListener("touchmove", onMove, { passive: false });
