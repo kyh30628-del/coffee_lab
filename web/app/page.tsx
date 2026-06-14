@@ -439,19 +439,20 @@ export default function Home() {
     return new Set(filtered.filter((c) => ((c.char_scores ?? {})[tasteKey] ?? 0) > 0).map((c) => c.id));
   }, [filtered, tasteKey]);
 
-  useEffect(() => {
-    const L = LRef.current;
-    if (!L || !mapObj.current || !layerRef.current) return;
+  // 현재 지도 화면(bounds)+줌에 맞춰 마커를 그린다 — 줌인하면 그 영역 핀이 동적으로 드러나고, 줌아웃이면 화면 안 인기순 상위만.
+  const drawMarkers = useCallback(() => {
+    const L = LRef.current; const map = mapObj.current;
+    if (!L || !map || !layerRef.current) return;
     layerRef.current.clearLayers();
-    // '전체'(지역·결·포커스 미선택)일 땐 마커를 인기순 상위로 제한 — 3천개를 한꺼번에 DOM으로 그리면
-    //  메인 스레드가 막혀 지역선택 레이어가 잠깐 뭉개짐. 지역/결을 고르면 그 범위 전체를 그린다.
-    const scoped = !!(sido || sigungu || focusId || tasteKey);
-    // 기본 카페 레이어: MY PIN이면 내 카페만, 다른사람 전용이면 비움(아래 집계레이어), 아니면 일반.
-    const toRender = myPinMode
-      ? filtered.filter((c) => myCafeIds.has(c.id))
-      : othersMode
-      ? []
-      : (scoped ? filtered : filtered.slice(0, 180)); // 모바일 렌더 부담↓: 전체보기는 상위 180만(지역 선택 시 전체)
+    const base = myPinMode ? filtered.filter((c) => myCafeIds.has(c.id)) : othersMode ? [] : filtered;
+    // 화면(bounds) 안의 핀만 — 줌인하면 영역이 좁아져 그 동네 핀이 전부 드러나고, 줌아웃하면 많아지므로 인기순 상위로 제한해 가독성 유지.
+    let toRender = base;
+    if (!myPinMode && !othersMode) {
+      const b = map.getBounds().pad(0.2);
+      const inView = base.filter((c) => b.contains([c.lat, c.lng] as [number, number]));
+      const CAP = 160;
+      toRender = inView.length > CAP ? [...inView].sort((a, c) => (c.synth_count ?? 0) - (a.synth_count ?? 0)).slice(0, CAP) : inView;
+    }
     const markers = toRender.map((c) => {
       const isFocus = c.id === focusId;
       const isMatch = matchSet.has(c.id);
@@ -478,26 +479,37 @@ export default function Home() {
         markers.push(m);
       }
     }
-    const group = L.layerGroup(markers);
-    layerRef.current.addLayer(group);
+    layerRef.current.addLayer(L.layerGroup(markers));
     const focusM = focusId ? markers[toRender.findIndex((c) => c.id === focusId)] : null;
-    if (focusM) focusM.openPopup();
-    // 화면 맞추기: 포커스 > 특수모드(내핀/다른사람) 핀들 > 지역 > 시도중심.
-    const fit = (pts: [number, number][]) => { if (pts.length) mapObj.current.fitBounds(L.latLngBounds(pts), { padding: [60, 60], maxZoom: pts.length === 1 ? 14 : 15 }); };
+    if (focusM) (focusM as any).openPopup();
+  }, [filtered, matchSet, sido, sigungu, focusId, myPinMode, myCafeIds, othersMode, othersPins, cafes]);
+
+  // 데이터/지역/모드 변경 시: 화면을 맞춘 뒤 마커를 그린다(맞춘 화면 기준으로 그려짐).
+  useEffect(() => {
+    const L = LRef.current; const map = mapObj.current;
+    if (!L || !map || !layerRef.current) return;
     if (focusId) {
       /* focus effect가 setView 처리 */
     } else if (myPinMode || othersMode) {
-      // 내 핀/다른사람 핀이 전체보기·지역 어디서든 화면에 들어오게 맞춤
-      const pts: [number, number][] = markers.map((m: any) => { const ll = m.getLatLng(); return [ll.lat, ll.lng]; });
-      if (pts.length) fit(pts);
-      else if (sido && SIDO_CENTER[sido]) { const [la, ln, z] = SIDO_CENTER[sido]; mapObj.current.setView([la, ln], z); }
+      const src = myPinMode ? filtered.filter((c) => myCafeIds.has(c.id)) : othersPins;
+      const pts = src.map((c: any) => [c.lat, c.lng] as [number, number]).filter((p) => p[0] && p[1]);
+      if (pts.length) map.fitBounds(L.latLngBounds(pts), { padding: [60, 60], maxZoom: pts.length === 1 ? 14 : 15 });
+      else if (sido && SIDO_CENTER[sido]) { const [la, ln, z] = SIDO_CENTER[sido]; map.setView([la, ln], z); }
     } else if (filtered.length > 0 && (sido || sigungu)) {
       const lats = filtered.map((c) => c.lat), lngs = filtered.map((c) => c.lng);
-      mapObj.current.fitBounds(L.latLngBounds([[Math.min(...lats), Math.min(...lngs)], [Math.max(...lats), Math.max(...lngs)]]), { padding: [50, 50], maxZoom: 15 });
-    } else if (sido && SIDO_CENTER[sido]) { const [la, ln, z] = SIDO_CENTER[sido]; mapObj.current.setView([la, ln], z); }
-    // 주의: 의존성에 tab을 넣지 말 것. 지도는 1회 생성 후 유지되므로 탭 전환 시 마커를 다시 그릴 필요가 없고,
-    // 넣으면 뒤로가기/탭전환마다 수백 개 마커를 재생성+fitBounds 해 전환이 느려진다. 데이터/필터 변경 시에만 갱신.
-  }, [filtered, matchSet, sido, sigungu, focusId, mapReady, myPinMode, myCafeIds, othersMode, othersPins]);
+      map.fitBounds(L.latLngBounds([[Math.min(...lats), Math.min(...lngs)], [Math.max(...lats), Math.max(...lngs)]]), { padding: [50, 50], maxZoom: 15 });
+    } else if (sido && SIDO_CENTER[sido]) { const [la, ln, z] = SIDO_CENTER[sido]; map.setView([la, ln], z); }
+    drawMarkers();
+    // 주의: 의존성에 tab을 넣지 말 것(탭 전환마다 재렌더되어 느려짐). 데이터/필터 변경 시에만.
+  }, [filtered, matchSet, sido, sigungu, focusId, mapReady, myPinMode, myCafeIds, othersMode, othersPins, drawMarkers]);
+
+  // 줌·이동이 끝나면 현재 화면에 맞춰 마커를 다시 그린다 → 줌인 시 그 영역 핀이 동적으로 전환됨.
+  useEffect(() => {
+    const map = mapObj.current;
+    if (!map || !mapReady) return;
+    map.on("moveend", drawMarkers);
+    return () => { map.off("moveend", drawMarkers); };
+  }, [drawMarkers, mapReady]);
 
   // 다른 사람은 — 토글 켜면 집계 핀 로드(한 번)
   useEffect(() => {
