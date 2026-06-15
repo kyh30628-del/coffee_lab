@@ -141,12 +141,17 @@ export const isNonCafe = (name: string, category: string) => {
   if (MANUAL_NONCAFE.some((b) => n.includes(b.replace(/\s/g, "")))) return true; // 직접 지목 비카페(차덕분 등) — 카테고리 무관 확실 차단
   if (NON_CAFE_OVERRIDE.test(n) || NON_CAFE_OVERRIDE.test(cat)) return true; // 키즈·스터디·만화·실내놀이터 등
   if (cat) {
-    // ⚠️ 네이버는 카페를 '음식점>카페,디저트'로 분류(카페가 음식점의 하위). 전체 문자열의 '음식점'으로 판단하면 진짜 카페가 잘못 잘림.
-    //    반드시 마지막 '>' 뒤(리프)로 본다. 그리고 '카페·디저트류 리프만 통과'하는 허용목록 방식 — 음식점·정육·청과 등은 전부 비카페.
-    const leaf = (cat.split(">").pop() || "").trim();
-    if (/(카페|커피|로스터|찻집|티하우스|차전문|디저트|베이커리|제과|브런치|도넛|케이크|타르트|마카롱|와플|아이스크림|빙수|젤라또|크레페|츄러스|티룸|밀크티|버블티|쿠키|푸딩|스무디|베이글|초콜릿|쇼콜라)/.test(leaf)) return false;
-    if (leaf === "차") return false; // 네이버 '카페,디저트>차' 리프 — 독립 찻집(차전문은 위에서 통과). 차 프랜차이즈는 FRANCHISE가 차단
-    return true; // 카페·디저트 리프가 아니면 비카페(음식점·한식·정육·청과·서점·공방 등)
+    // 카테고리 경로를 '구간(segment)'으로 본다. 네이버='카페,디저트>와플', 카카오='음식점 > 카페 > 커피전문점 > {브랜드}'
+    //  처럼 형식이 다르므로, 리프만 보면 브랜드명이 끝일 때(읍천리382 등) 진짜 카페를 놓친다.
+    const segs = cat.split(">").map((s) => s.trim()).filter(Boolean);
+    const cafeKw = /(카페|커피|로스터|찻집|티하우스|차전문|디저트|베이커리|제과|브런치|도넛|케이크|타르트|마카롱|와플|아이스크림|빙수|젤라또|크레페|츄러스|티룸|밀크티|버블티|쿠키|푸딩|스무디|베이글|초콜릿|쇼콜라)/;
+    const top = segs[0] || "", second = segs[1] || "", leaf = segs[segs.length - 1] || "";
+    // (1) '음식점 > 카페…'(카카오·네이버 공통): 2번째 구간이 카페/커피면 카페. 양식·한식·분식 등은 비카페.
+    if (top === "음식점") return /(카페|커피)/.test(second) ? false : true;
+    // (2) '카페,디저트 > …'(네이버 최상위): 리프가 카페·디저트류면 카페. 찐빵·떡 등 비-디저트 리프는 비카페.
+    if (/^(카페|디저트)/.test(top)) return (cafeKw.test(leaf) || leaf === "차") ? false : true;
+    // (3) 그 외 최상위(서비스,산업·문화,예술·교육·제조 등) → 비카페. '차,커피 제조업' 같은 오인 방지.
+    return true;
   }
   // 카테고리 불명 → 이름 기반 보조
   if (CAFE_HINT.test(n)) return false;
