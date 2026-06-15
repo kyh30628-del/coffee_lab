@@ -51,13 +51,14 @@ export async function GET(req: NextRequest) {
       COUNT(*) FILTER (WHERE raw_reviews IS NOT NULL)::int raw_cached,
       COUNT(*) FILTER (WHERE llm_judged_at IS NOT NULL)::int judged,
       COUNT(*) FILTER (WHERE embedding IS NOT NULL)::int embedded,
+      COUNT(*) FILTER (WHERE published AND embedding IS NOT NULL)::int pub_embedded,
       MAX(raw_collected_at) last_collect,
       MAX(synth_updated) last_synth,
       MAX(llm_judged_at) last_judge,
       MAX(embed_updated) last_embed,
       COUNT(*) FILTER (WHERE raw_reviews IS NOT NULL AND synth_updated IS NULL)::int synth_q,
       COUNT(*) FILTER (WHERE (published OR pipeline_status='pending') AND raw_reviews IS NOT NULL AND (llm_judged_at IS NULL OR llm_judged_at < raw_collected_at))::int judge_q,
-      COUNT(*) FILTER (WHERE embedding IS NULL)::int embed_q
+      COUNT(*) FILTER (WHERE embedding IS NULL AND (published OR pipeline_status='pending') AND synth_identity IS NOT NULL)::int embed_q
       FROM cafes`)[0] as any;
     const vr = (await sql`SELECT ran_at, fails, warns, status FROM verify_reports ORDER BY ran_at DESC LIMIT 1`)[0] as any;
     const af = (await sql`SELECT COUNT(*) FILTER (WHERE NOT resolved)::int open, MAX(flagged_at) last_flag FROM audit_flags`)[0] as any;
@@ -118,7 +119,7 @@ export async function GET(req: NextRequest) {
     add("collect", "수집 (warmup·grow)", c.last_collect, 16, c.synth_q, `발굴 지역 지연 ${ds.behind}/${ds.n}`);
     add("synth", "합성 (옥석·등급)", c.last_synth, 24, c.synth_q, c.synth_q ? "미합성 적체" : "적체 없음");
     add("judge", "AI 판정 (Haiku·새벽)", c.last_judge, 30, c.judge_q, `판정 대기 ${c.judge_q}`);
-    add("embed", "임베딩", c.last_embed, 30, c.embed_q, `미임베딩 ${c.embed_q}`);
+    add("embed", "임베딩", c.last_embed, 30, c.embed_q, c.embed_q ? `미임베딩 ${c.embed_q}` : `완료(공개 ${c.published ? Math.round((c.pub_embedded / c.published) * 100) : 0}%)`);
     add("verify", "검증 레드팀", vr?.ran_at ?? null, 30, (vr?.fails ?? 0) + (vr?.warns ?? 0), vr ? `fail ${vr.fails}·warn ${vr.warns}` : "리포트 없음");
     // 품질감사: 미해결 플래그 기준(가동 시각은 flag 생성 시각으로 근사)
     {
@@ -157,7 +158,7 @@ export async function GET(req: NextRequest) {
     const health = {
       generatedAt: new Date(now).toISOString(),
       overall, alerts, healed,
-      coverage: { total: c.total, published: c.published, rawCachedPct: pct(c.raw_cached), judgedPct: pct(c.judged), embeddedPct: pct(c.embedded), dongPct: pct(td.has_dong) },
+      coverage: { total: c.total, published: c.published, rawCachedPct: pct(c.raw_cached), judgedPct: pct(c.judged), embeddedPct: c.published ? Math.round((c.pub_embedded / c.published) * 100) : 0, dongPct: pct(td.has_dong) },
       today: { newCafes: td.new_today, synthesized: td.synth_today, published: td.published_today, hasDong: td.has_dong, dongPct: pct(td.has_dong), noise: td.noise, newQueue: td.new_q },
       pipeline, agents,
     };
