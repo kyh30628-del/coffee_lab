@@ -21,7 +21,7 @@ export async function GET() {
     // 엣지 캐시: 공개 카페 목록은 밤에만 바뀌므로 CDN이 5분 캐시 + 1일간 stale 제공(즉시 응답).
     // → 방문 폭증에도 DB는 5분에 한 번만 맞고, 나머지는 CDN이 받아냄(용량 10~100배).
     return NextResponse.json({ ok: true, cafes: out }, {
-      headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" },
+      headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300" },
     });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e), cafes: [] }, { status: 500 });

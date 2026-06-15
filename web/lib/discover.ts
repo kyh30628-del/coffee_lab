@@ -120,6 +120,8 @@ const DONGS: Record<string, string[]> = {
 // 동 발굴용 핵심 키워드(독립·스페셜티 위주 — 프랜차이즈가 상위를 점령하지 않는 검색어)
 const DONG_KEYWORDS = ["카페", "로스터리", "스페셜티커피", "핸드드립", "직접로스팅", "디저트카페", "베이커리카페", "감성카페", "브런치카페"];
 
+// 사장님이 직접 '비카페'로 지목한 곳 — 카테고리가 비어 규칙이 못 잡는 케이스를 이름으로 확실히 차단.
+const MANUAL_NONCAFE = ["차덕분"];
 const stripTags = (s: string) => (s || "").replace(/<[^>]+>/g, "").replace(/&[a-z]+;/g, "").trim();
 // 지번주소에서 동/읍/면 추출 — '서울특별시 강동구 상일동 502' → '상일동', '경기도 수원시 장안구 정자동' → '정자동'.
 // 구/시/군 뒤에 오는 동·읍·면·가 토큰. 행정동 숫자(여의도동·1가 등) 포함.
@@ -134,6 +136,7 @@ export const isFranchise = (name: string) => { const n = name.replace(/\s/g, "")
 //       반드시 마지막 > 뒤(리프)로 봐야 와플대학·아이스크림·음식점을 제대로 거른다.
 export const isNonCafe = (name: string, category: string) => {
   const n = (name || "").replace(/\s/g, ""), cat = category || "";
+  if (MANUAL_NONCAFE.some((b) => n.includes(b.replace(/\s/g, "")))) return true; // 직접 지목 비카페(차덕분 등) — 카테고리 무관 확실 차단
   if (NON_CAFE_OVERRIDE.test(n) || NON_CAFE_OVERRIDE.test(cat)) return true; // 키즈·스터디·만화·실내놀이터 등
   if (cat) {
     // ⚠️ 네이버는 카페를 '음식점>카페,디저트'로 분류(카페가 음식점의 하위). 전체 문자열의 '음식점'으로 판단하면 진짜 카페가 잘못 잘림.
