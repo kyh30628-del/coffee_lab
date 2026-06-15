@@ -129,7 +129,9 @@ const stripTags = (s: string) => (s || "").replace(/<[^>]+>/g, "").replace(/&[a-
 // 구/시/군 뒤에 오는 동·읍·면·가 토큰. 행정동 숫자(여의도동·1가 등) 포함.
 export function parseDong(jibun: string): string | null {
   if (!jibun) return null;
-  const m = jibun.match(/(?:구|시|군)\s+([가-힣]+[0-9]?(?:동|읍|면|가))/);
+  // ★ 음수 룩어헤드(?![가-힣]) 필수: '서울특별시 강동구'에서 '시 강동'을 잡아 dong='강동'으로 만들던 버그 방지.
+  //   동 뒤에 한글이 더 오면(강동'구', 강동'대로') 그건 동이 아니므로 거부 → 진짜 동(천호동 등)을 찾는다.
+  const m = jibun.match(/(?:구|시|군)\s+([가-힣]+[0-9]?(?:동|읍|면|가))(?![가-힣])/);
   return m ? m[1] : null;
 }
 export const isFranchise = (name: string) => { const n = name.replace(/\s/g, ""); return FRANCHISE.some((f) => n.includes(f)); };
