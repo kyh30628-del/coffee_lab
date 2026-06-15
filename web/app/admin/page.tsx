@@ -49,6 +49,7 @@ export default function AdminPage() {
   const [auditFlags, setAuditFlags] = useState<any>(null);
   const [tower, setTower] = useState<any>(null);
   const [selAgent, setSelAgent] = useState<any>(null);
+  const [towerFull, setTowerFull] = useState(false);
   const [subscribers, setSubscribers] = useState<any[]>([]);
   const [showSubsModal, setShowSubsModal] = useState(false);
   const [showYtModal, setShowYtModal] = useState(false);
@@ -212,6 +213,27 @@ export default function AdminPage() {
             );
           };
           const Arrow = () => <span className="shrink-0 self-center text-stone-300 text-base select-none px-px">→</span>;
+          // 전체화면용 큰 단계 카드 — 신호등+아이콘+이름+설명+대기, 안 잘리게 가로 꽉
+          const BigStep = ({ a, arrow }: { a: any; arrow?: boolean }) => {
+            if (!a) return null;
+            const d = DESC[a.key];
+            return (
+              <>
+                <button onClick={() => setSelAgent(a)} className={`w-full flex items-center gap-3 rounded-2xl border-2 ${nodeBorder[a.status] || nodeBorder.idle} bg-white px-3.5 py-3 text-left hover:shadow-lg transition active:scale-[0.99]`}>
+                  <Light status={a.status} />
+                  <span className="text-2xl leading-none shrink-0">{d?.icon || "•"}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-extrabold text-stone-800 text-[14px] leading-tight">{a.label}</div>
+                    <div className="text-[11px] text-stone-500 leading-snug mt-0.5 line-clamp-2">{d?.what || a.note}</div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    {a.queue > 0 ? <div className="text-amber-600 font-extrabold text-[13px]">대기<br />{a.queue.toLocaleString()}</div> : <div className="text-stone-400 text-[11px]">{ago(a.ageH)}</div>}
+                  </div>
+                </button>
+                {arrow && <div className="flex justify-center py-0.5 text-stone-400 text-xl leading-none select-none">↓</div>}
+              </>
+            );
+          };
           const flow = ["collect", "synth", "judge", "embed"].map((k) => byKey[k]).filter(Boolean);
           const redteam = ["verify", "grounding", "audit"].map((k) => byKey[k]).filter(Boolean);
           return (
@@ -219,7 +241,10 @@ export default function AdminPage() {
             <div className="mb-4 rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-xs font-bold text-stone-500 uppercase tracking-wider">🛰️ 자율 운영 관제탑</span>
-                <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full border ${oc[tower.overall] || oc.degraded}`}>{ocl[tower.overall] || tower.overall}</span>
+                <div className="flex items-center gap-1.5">
+                  <button onClick={() => setTowerFull(true)} className="text-[11px] font-bold px-2.5 py-1 rounded-full border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100">⛶ 전체화면</button>
+                  <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full border ${oc[tower.overall] || oc.degraded}`}>{ocl[tower.overall] || tower.overall}</span>
+                </div>
               </div>
               {tower.alerts?.length > 0 && (
                 <div className="mb-2.5 text-[11px] text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">⚠ {tower.alerts.join(" · ")}</div>
@@ -305,7 +330,7 @@ export default function AdminPage() {
               const stLabel = sl[selAgent.status] || selAgent.status;
               const pill = selAgent.status === "ok" ? "bg-emerald-100 text-emerald-700" : selAgent.status === "stalled" ? "bg-red-100 text-red-700" : selAgent.status === "idle" ? "bg-stone-100 text-stone-500" : "bg-amber-100 text-amber-700";
               return (
-                <div onClick={() => setSelAgent(null)} className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-4">
+                <div onClick={() => setSelAgent(null)} className="fixed inset-0 z-[70] bg-black/40 flex items-end sm:items-center justify-center p-4">
                   <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
                     <div className="flex items-start gap-2.5 mb-2">
                       <span className="text-2xl leading-none">{d.icon || "•"}</span>
@@ -328,6 +353,55 @@ export default function AdminPage() {
                 </div>
               );
             })()}
+            {towerFull && (
+              <div className="fixed inset-0 z-[60] bg-stone-900/95 overflow-y-auto">
+                <div className="max-w-2xl mx-auto px-4 py-5 pb-16">
+                  <div className="flex items-center justify-between mb-4 sticky top-0 bg-stone-900/95 -mx-4 px-4 py-2 z-10">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">🛰️</span>
+                      <span className="text-white font-extrabold text-sm">자율 운영 관제탑</span>
+                      <Light status={tower.overall === "healthy" ? "ok" : tower.overall === "critical" ? "stalled" : "warn"} />
+                    </div>
+                    <button onClick={() => setTowerFull(false)} className="text-stone-300 text-[13px] font-bold rounded-full border border-stone-600 px-3 py-1 hover:bg-stone-800">✕ 닫기</button>
+                  </div>
+                  {tower.alerts?.length > 0 && <div className="mb-2 text-[11px] text-red-300 bg-red-950/60 border border-red-900 rounded-lg px-3 py-2">⚠ {tower.alerts.join(" · ")}</div>}
+                  {tower.healed?.length > 0 && <div className="mb-2 text-[11px] text-emerald-300 bg-emerald-950/50 border border-emerald-900 rounded-lg px-3 py-2">🔧 자가치유: {tower.healed.join(" · ")}</div>}
+                  <div className="text-[11px] font-extrabold text-stone-300 mb-2 mt-1">📥 데이터 생성 라인 · 수집 → 공개</div>
+                  <div>
+                    {flow.map((a: any) => <BigStep key={a.key} a={a} arrow />)}
+                    <button onClick={() => setTowerFull(false)} className="w-full flex items-center gap-3 rounded-2xl border-2 border-emerald-400 bg-emerald-50 px-3.5 py-3 text-left">
+                      <Light status="ok" />
+                      <span className="text-2xl leading-none shrink-0">✅</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-extrabold text-emerald-800 text-[14px] leading-tight">공개 — 소비자 화면 노출</div>
+                        <div className="text-[11px] text-emerald-600 mt-0.5">전 게이트를 통과한 카페만 지도·목록에 나타납니다.</div>
+                      </div>
+                      <div className="text-emerald-700 font-extrabold text-[13px] text-right shrink-0">{tower.coverage?.published?.toLocaleString()}<br />곳</div>
+                    </button>
+                  </div>
+                  <div className="text-[11px] font-extrabold text-stone-300 mt-5 mb-2">🛡️ 검증 레드팀 · 위 전체를 상시 감시</div>
+                  <div className="space-y-2">
+                    {redteam.map((a: any) => <BigStep key={a.key} a={a} />)}
+                  </div>
+                  <div className="mt-5 rounded-2xl bg-stone-800/60 border border-stone-700 p-3">
+                    <div className="text-[10px] font-bold text-stone-400 mb-2">📊 조립라인 현황 (각 단계 카페 수)</div>
+                    <div className="flex flex-wrap gap-x-3 gap-y-1.5 text-[11px] text-stone-300">
+                      {tower.pipeline?.stages?.filter((s: any) => s.key !== "rejected").map((s: any) => (
+                        <span key={s.key}><b className="text-white">{s.count?.toLocaleString() ?? 0}</b> {s.label}</span>
+                      ))}
+                    </div>
+                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-stone-400 mt-2 pt-2 border-t border-stone-700">
+                      <span>공개 {tower.coverage?.published?.toLocaleString()}/{tower.coverage?.total?.toLocaleString()}</span>
+                      <span>raw {tower.coverage?.rawCachedPct}%</span>
+                      <span>판정 {tower.coverage?.judgedPct}%</span>
+                      <span>임베딩 {tower.coverage?.embeddedPct}%</span>
+                      <span>동 {tower.coverage?.dongPct}%</span>
+                    </div>
+                  </div>
+                  <div className="text-[10px] text-stone-500 text-center mt-4">노드를 누르면 상세 설명 · 신호등 깜빡임 = 작동 중 · 20초마다 자동 갱신</div>
+                </div>
+              </div>
+            )}
             </>
           );
         })()}
