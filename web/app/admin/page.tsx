@@ -10,7 +10,7 @@ type Cafe = {
 };
 type Stats = {
   content: {
-    total: number; published: number; hidden: number; owner_pending: number; embedded: number; has_dates: number; raw_cached: number; llm_judged: number;
+    total: number; published: number; hidden: number; owner_pending: number; embedded: number; pub_embedded: number; pub_has_dates: number; has_dates: number; raw_cached: number; llm_judged: number;
     grades: { grade: string; n: number }[];
     quality: { avg_noise_pct: number | null; raw: number; rejected: number };
     topRegions: { region: string; n: number }[];
