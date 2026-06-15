@@ -57,16 +57,22 @@ export default function AdminPage() {
   const [visits, setVisits] = useState<any>(null);
   const loadSubscribers = (password: string) => fetch("/api/subscription?all=1", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) setSubscribers(d.subs ?? []); }).catch(() => {});
   const subAct = async (id: number, action: string) => { try { await fetch("/api/subscription", { method: "POST", headers: { "x-admin-password": pw, "Content-Type": "application/json" }, body: JSON.stringify({ id, action }) }); loadSubscribers(pw); fetch("/api/judge-status", { headers: { "x-admin-password": pw } }); } catch {} };
-  // 🧮 AI 판정 진행 자동 갱신(20초) — 백그라운드 판정이 실시간 반영되게(새로고침 불필요)
+  // 🔄 모든 숫자 실시간 갱신 — no-store(캐시 없음)로 매번 DB 최신값. 폴링·로그인 둘 다 이 함수 사용.
+  const refreshNumbers = (password: string) => {
+    const h: RequestInit = { headers: { "x-admin-password": password }, cache: "no-store" };
+    fetch("/api/admin/stats", h).then((x) => x.json()).then((s) => { if (s.ok) setStats(s); }).catch(() => {});
+    fetch("/api/orchestrator", { cache: "no-store" }).then((x) => x.json()).then((d) => { if (d.ok) setTower(d); }).catch(() => {});
+    fetch("/api/judge-status", h).then((x) => x.json()).then((d) => { if (d.ok) setJstatus(d); }).catch(() => {});
+    fetch("/api/audit-flags", h).then((x) => x.json()).then((d) => { if (d.ok) setAuditFlags(d); }).catch(() => {});
+    fetch("/api/sub-request", h).then((x) => x.json()).then((d) => { if (d.ok) { setSubs(d.requests ?? []); setPurged(d.purgedRecently ?? 0); } }).catch(() => {});
+    fetch("/api/yt-report", h).then((x) => x.json()).then((d) => { if (d.ok) setYt(d); }).catch(() => {});
+    fetch("/api/cron-verify?latest=1", h).then((x) => x.json()).then((d) => { if (d.ok) { setVerify(d.report); setGrounding(d.grounding); } }).catch(() => {});
+  };
+  // 🧮 전 지표 자동 갱신(15초) — 백그라운드 작업이 실시간 반영(새로고침 불필요)
   useEffect(() => {
     if (!authed || !pw) return;
-    const tick = () => {
-      fetch("/api/judge-status", { headers: { "x-admin-password": pw } }).then((x) => x.json()).then((d) => { if (d.ok) setJstatus(d); }).catch(() => {});
-      fetch("/api/audit-flags", { headers: { "x-admin-password": pw } }).then((x) => x.json()).then((d) => { if (d.ok) setAuditFlags(d); }).catch(() => {});
-      fetch("/api/orchestrator").then((x) => x.json()).then((d) => { if (d.ok) setTower(d); }).catch(() => {});
-    };
-    tick();
-    const id = setInterval(tick, 20000);
+    refreshNumbers(pw);
+    const id = setInterval(() => refreshNumbers(pw), 15000);
     return () => clearInterval(id);
   }, [authed, pw]);
 
@@ -84,13 +90,8 @@ export default function AdminPage() {
     const d = await r.json();
     if (d.ok) { setCafes(d.cafes); setAuthed(true); setMsg(""); }
     else { setMsg("오류: " + d.error); return; }
-    fetch("/api/admin/stats", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((s) => { if (s.ok) setStats(s); }).catch(() => {});
+    refreshNumbers(password);
     loadReview(password);
-    fetch("/api/sub-request", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) { setSubs(d.requests ?? []); setPurged(d.purgedRecently ?? 0); } }).catch(() => {});
-    loadVerify(password);
-    fetch("/api/yt-report", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) setYt(d); }).catch(() => {});
-    fetch("/api/judge-status", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) setJstatus(d); }).catch(() => {});
-    fetch("/api/audit-flags", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) setAuditFlags(d); }).catch(() => {});
     loadSubscribers(password);
   };
 
@@ -733,8 +734,8 @@ export default function AdminPage() {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
                 <div><div className="text-xl font-bold text-[#9c6b3f]">{ct.quality.avg_noise_pct ?? 0}%</div><div className="text-[11px] text-stone-500">평균 노이즈 제거</div></div>
                 <div><div className="text-xl font-bold text-emerald-600">{keptPct}%</div><div className="text-[11px] text-stone-500">옥석 채택률</div></div>
-                <div><div className="text-xl font-bold text-stone-900">{ct.total ? Math.round((ct.embedded / ct.total) * 100) : 0}%</div><div className="text-[11px] text-stone-500">임베딩 커버리지</div></div>
-                <div><div className="text-xl font-bold text-stone-900">{ct.total ? Math.round((ct.has_dates / ct.total) * 100) : 0}%</div><div className="text-[11px] text-stone-500">리뷰주기 데이터</div></div>
+                <div><div className="text-xl font-bold text-stone-900">{ct.published ? Math.round(((ct.pub_embedded ?? 0) / ct.published) * 100) : 0}%</div><div className="text-[11px] text-stone-500">임베딩 커버리지<br/>(공개 기준)</div></div>
+                <div><div className="text-xl font-bold text-stone-900">{ct.published ? Math.round(((ct.pub_has_dates ?? 0) / ct.published) * 100) : 0}%</div><div className="text-[11px] text-stone-500">리뷰주기 데이터<br/>(공개 기준)</div></div>
               </div>
               <p className="text-[11px] text-stone-400 mt-2.5 text-center">총 수집 {ct.quality.raw?.toLocaleString()}건 중 노이즈 {ct.quality.rejected?.toLocaleString()}건 제거 → 옥석 {(ct.quality.raw - ct.quality.rejected).toLocaleString()}건</p>
             </Card>

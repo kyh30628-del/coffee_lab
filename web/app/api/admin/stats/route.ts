@@ -34,6 +34,8 @@ export async function GET(req: NextRequest) {
       COUNT(*) FILTER (WHERE NOT published)::int hidden,
       COUNT(*) FILTER (WHERE NOT published AND source='owner')::int owner_pending,
       COUNT(*) FILTER (WHERE embedding IS NOT NULL)::int embedded,
+      COUNT(*) FILTER (WHERE published AND embedding IS NOT NULL)::int pub_embedded,
+      COUNT(*) FILTER (WHERE published AND review_dates IS NOT NULL)::int pub_has_dates,
       COUNT(*) FILTER (WHERE review_dates IS NOT NULL)::int has_dates,
       COUNT(*) FILTER (WHERE raw_reviews IS NOT NULL)::int raw_cached,
       COUNT(*) FILTER (WHERE llm_judged_at IS NOT NULL)::int llm_judged
