@@ -39,17 +39,23 @@ async function main() {
   await sql`CREATE TABLE IF NOT EXISTS grounding_checks (cafe_id INT PRIMARY KEY, grounded BOOLEAN, issue TEXT, checked_at TIMESTAMPTZ DEFAULT now())`;
   // ONLY=suspects: 의심(grounded=false)만 재검사(자가치유 후 플래그 해소용). 기본: 교정된 의심 우선 → 미검사 → 오래된 순.
   // held(근거0건 보류) 카페도 재검사 대상에 포함 → 개선되면 grounded=true로 복귀 가능(데드락 방지).
+  // ★ 순서 게이트: 'AI 판정 완료(llm_judged_at >= raw_collected_at)' 카페만 그라운딩. 판정이 후기 선별·재합성으로
+  //   소개글을 바꾸므로, 판정 전 그라운딩은 무효가 됨. 판정 끝난 것만 검증 → 항상 올바른 순서, 헛검사 0.
+  //   또 g.checked_at < synth_updated(합성 갱신 후) 또는 미검사만 → 변경 없으면 재검 안 함.
   const onlySuspects = process.env.GROUNDING_ONLY === "suspects";
   const rows = onlySuspects
     ? await sql`
         SELECT c.id, c.name, c.synth_identity, c.synth_reviews FROM cafes c
         JOIN grounding_checks g ON g.cafe_id = c.id
         WHERE (c.published OR c.pipeline_status = 'held') AND g.grounded = false AND c.synth_identity IS NOT NULL AND c.synth_reviews IS NOT NULL AND jsonb_array_length(c.synth_reviews) > 0
+          AND c.llm_judged_at IS NOT NULL AND c.llm_judged_at >= c.raw_collected_at
         ORDER BY g.checked_at ASC LIMIT ${MAX}`
     : await sql`
         SELECT c.id, c.name, c.synth_identity, c.synth_reviews FROM cafes c
         LEFT JOIN grounding_checks g ON g.cafe_id = c.id
         WHERE (c.published OR c.pipeline_status = 'held') AND c.synth_identity IS NOT NULL AND c.synth_reviews IS NOT NULL AND jsonb_array_length(c.synth_reviews) > 0
+          AND c.llm_judged_at IS NOT NULL AND c.llm_judged_at >= c.raw_collected_at
+          AND (g.checked_at IS NULL OR g.checked_at < c.synth_updated)
         ORDER BY (g.grounded = false AND c.synth_updated > g.checked_at) DESC, g.checked_at ASC NULLS FIRST LIMIT ${MAX}`;
   let done = 0, flagged = 0;
   for (const c of rows) {
