@@ -28,7 +28,7 @@ const REGIONS: Record<string, string[]> = {
   경기: ["수원시","성남시","고양시","용인시","부천시","안산시","안양시","남양주시","화성시","평택시","의정부시","시흥시","파주시","김포시","광명시","광주시","군포시","하남시","오산시","양주시","구리시","안성시","포천시","의왕시","여주시","동두천시","과천시","이천시","양평군","가평군","연천군"],
   인천: ["중구","동구","미추홀구","연수구","남동구","부평구","계양구","서구","강화군","옹진군"],
 };
-const SIDO_CENTER: Record<string, [number, number, number]> = { 서울: [37.5665, 126.978, 11], 경기: [37.4138, 127.5183, 9], 인천: [37.4563, 126.7052, 11] };
+const SIDO_CENTER: Record<string, [number, number, number]> = { 서울: [37.5665, 126.978, 11], 경기: [37.37, 127.105, 9], 인천: [37.4563, 126.7052, 11] };
 // area별 결과 캐시 — area 종류는 ~64개뿐이라, 1만건을 매번 64개 순회(64만 연산)하던 걸 O(1)로.
 const _guCache = new Map<string, { sido: string; sigungu: string }>();
 function toGu(area: string): { sido: string; sigungu: string } {
@@ -593,6 +593,24 @@ export default function Home() {
         return { key: k, lat: fixed ? fixed[0] : g.lat / g.n, lng: fixed ? fixed[1] : g.lng / g.n, n: g.n };
       });
       const maxN = arr.reduce((m, g) => Math.max(m, g.n), 1);
+      // 겹침 제거: 화면 픽셀 공간에서 원형이 서로 안 겹치게 밀어냄(큰 것 먼저 자리잡고 작은 걸 밀어냄). 가독성↑
+      const sizeOf = (n: number) => 40 + Math.sqrt(Math.min(1, n / maxN)) * 44;
+      const pj = arr.map((g) => ({ g, p: map.latLngToContainerPoint([g.lat, g.lng]) })).sort((a, b) => b.g.n - a.g.n);
+      const placed: { x: number; y: number; r: number }[] = [];
+      pj.forEach((item, i) => {
+        let x = item.p.x, y = item.p.y; const r = sizeOf(item.g.n) / 2;
+        for (let it = 0; it < 24; it++) {
+          let moved = false;
+          for (const q of placed) {
+            const need = r + q.r + 12; let dx = x - q.x, dy = y - q.y, d = Math.hypot(dx, dy);
+            if (d < need) { if (d < 0.5) { dx = Math.cos(i * 2.4); dy = Math.sin(i * 2.4); d = 1; } const push = need - d; x += (dx / d) * push; y += (dy / d) * push; moved = true; }
+          }
+          if (!moved) break;
+        }
+        placed.push({ x, y, r });
+        const ll = map.containerPointToLatLng(L.point(x, y));
+        item.g.lat = ll.lat; item.g.lng = ll.lng;
+      });
       const markers = arr.map((g) => L.marker([g.lat, g.lng], { icon: L.divIcon({ className: "", html: makeRegionPinHtml(g.key, g.n, maxN), iconSize: [0, 0] }), zIndexOffset: g.n })
         .on("click", () => {
           if (level === "sido") { setSido(g.key); setSigungu(""); setDong(""); }
@@ -650,9 +668,12 @@ export default function Home() {
   useEffect(() => {
     const map = mapObj.current;
     if (!map || !mapReady) return;
-    const onMove = () => { if (dong || focusId || myPinMode || othersMode) drawMarkers(); };
+    const isAgg = !(dong || focusId || myPinMode || othersMode);
+    const onMove = () => { if (!isAgg) drawMarkers(); };               // 개별 카페 레벨: 뷰포트 캡 재그림
+    const onZoom = () => { if (isAgg) drawMarkers(); };                 // 집계 레벨: 새 줌에 맞춰 겹침제거 재배치
     map.on("moveend", onMove);
-    return () => { map.off("moveend", onMove); };
+    map.on("zoomend", onZoom);
+    return () => { map.off("moveend", onMove); map.off("zoomend", onZoom); };
   }, [drawMarkers, mapReady, dong, focusId, myPinMode, othersMode]);
 
   // 다른 사람은 — 토글 켜면 집계 핀 로드(한 번)
