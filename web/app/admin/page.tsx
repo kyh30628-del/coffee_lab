@@ -272,51 +272,20 @@ export default function AdminPage() {
                   </div>
                 </div>
               )}
-              {/* 관제탑 통합 보드 — 흐름·구조·신호등을 한 영역에 */}
-              <div className="rounded-2xl border border-stone-200 bg-gradient-to-b from-indigo-50/60 via-white to-white p-3.5 pt-4 mb-2.5">
-                {/* 본부 + 종합 신호등 */}
-                <div className="flex items-center justify-center gap-2 mb-3.5">
-                  <span className="text-sm">🛰️</span>
-                  <span className="text-[11.5px] font-extrabold text-indigo-700">관제탑 · 지시 · 통제 · 모니터링</span>
-                  <Light status={tower.overall === "healthy" ? "ok" : tower.overall === "critical" ? "stalled" : "warn"} />
-                </div>
-                {/* 생성 파이프라인(좌→우) */}
-                <div className="flex items-start justify-center gap-0.5 overflow-x-auto pb-1">
-                  {flow.map((a: any, i: number) => (
-                    <div key={a.key} className="flex items-start gap-0.5">
-                      {i > 0 && <Arrow />}
-                      <Node a={a} />
-                    </div>
-                  ))}
-                  <Arrow />
-                  <div className="relative shrink-0 w-[84px] rounded-2xl border-2 border-emerald-300 bg-emerald-50 px-1.5 pt-2.5 pb-2 text-center">
-                    <div className="flex justify-center -mt-[18px] mb-1"><Light status="ok" /></div>
-                    <div className="text-[17px] leading-none">✅</div>
-                    <div className="text-[10.5px] font-extrabold text-emerald-700 mt-1">공개</div>
-                    <div className="text-[9px] mt-0.5 font-bold text-emerald-600">{tower.coverage?.published?.toLocaleString()}곳</div>
-                  </div>
-                </div>
-                {/* 감시 연결선 */}
-                <div className="flex items-center justify-center my-2.5">
-                  <div className="h-px flex-1 bg-stone-200" />
-                  <span className="px-2 text-[9px] font-bold text-stone-400 whitespace-nowrap">⬇ 검증 레드팀이 위 전체를 상시 감시</span>
-                  <div className="h-px flex-1 bg-stone-200" />
-                </div>
-                {/* 검증 레드팀(같은 보드 내) */}
-                <div className="flex items-start justify-center gap-2 overflow-x-auto pb-1">
-                  {redteam.map((a: any) => <Node key={a.key} a={a} />)}
-                </div>
-                {/* 조립라인 카운트 — 한 줄로 */}
-                {tower.pipeline && (
-                  <div className="mt-3 flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1 text-[9.5px] text-stone-500 border-t border-stone-100 pt-2.5">
-                    {tower.pipeline.stages.filter((s: any) => s.key !== "rejected").map((s: any) => (
-                      <span key={s.key}><b className={s.count > 0 ? "text-stone-700" : "text-stone-300"}>{s.count?.toLocaleString() ?? 0}</b> {s.label}</span>
-                    ))}
-                    {tower.pipeline.promotedThisRun > 0 && <span className="text-emerald-600 font-bold">· 방금 {tower.pipeline.promotedThisRun}곳 공개</span>}
-                  </div>
-                )}
-                <div className="text-[9px] text-stone-400 mt-2 text-center">💡 노드를 누르면 상세 설명 · <span className="text-emerald-600 font-bold">신호등 깜빡임 = 작동 중</span></div>
+              {/* 메인은 간단히: 에이전트 상태 칩 + 전체 흐름 버튼(상세 흐름은 전체화면) */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 mb-2">
+                {tower.agents?.map((a: any) => {
+                  const working = (a.queue > 0 || (a.ageH != null && a.ageH < 0.5)) && a.status !== "stalled";
+                  return (
+                    <button key={a.key} onClick={() => setSelAgent(a)} className="flex items-center gap-1.5 rounded-xl border border-stone-100 bg-stone-50 px-2.5 py-2 text-left hover:bg-stone-100 transition">
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${dot[a.status] || "bg-stone-300"} ${working ? "acc-blink" : ""}`} />
+                      <span className="text-[11px] font-bold text-stone-700 truncate flex-1">{a.label.split(" (")[0]}</span>
+                      {a.queue > 0 && <span className="text-[9px] font-bold text-amber-600 shrink-0">{a.queue.toLocaleString()}</span>}
+                    </button>
+                  );
+                })}
               </div>
+              <button onClick={() => setTowerFull(true)} className="w-full mb-2.5 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-700 text-[12px] font-bold py-2 hover:bg-indigo-100 transition">⛶ 관제탑 전체 흐름 보기 (수집 → 공개)</button>
               <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-stone-500">
                 <span>공개 <b className="text-stone-700">{tower.coverage?.published?.toLocaleString()}</b>/{tower.coverage?.total?.toLocaleString()}</span>
                 <span>raw {tower.coverage?.rawCachedPct}%</span>
