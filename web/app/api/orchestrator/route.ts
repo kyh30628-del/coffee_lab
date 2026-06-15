@@ -65,6 +65,10 @@ export async function GET(req: NextRequest) {
     await sql`CREATE TABLE IF NOT EXISTS grounding_checks (cafe_id INT PRIMARY KEY, grounded BOOLEAN, issue TEXT, checked_at TIMESTAMPTZ DEFAULT now())`.catch(() => {});
     const gr = (await sql`SELECT COUNT(*) FILTER (WHERE NOT grounded)::int suspect, MAX(checked_at) last FROM grounding_checks`)[0] as any;
     const ds = (await sql`SELECT MIN(last_run) oldest, COUNT(*) FILTER (WHERE last_run < now() - interval '3 days')::int behind, COUNT(*)::int n FROM discovery_state`)[0] as any;
+    // 로컬 배치 하트비트 — 실패(크래시 등)·정체를 관제탑이 잡아 경보. (예: dong-backfill ReferenceError)
+    await sql`CREATE TABLE IF NOT EXISTS agent_runs (job TEXT PRIMARY KEY, ran_at TIMESTAMPTZ DEFAULT now(), ok BOOLEAN DEFAULT true, detail TEXT, processed INT DEFAULT 0)`.catch(() => {});
+    const jobRuns = (await sql`SELECT job, to_char(ran_at,'MM-DD HH24:MI') ran, ok, detail, EXTRACT(EPOCH FROM (now()-ran_at))/3600 age_h FROM agent_runs`.catch(() => [])) as any[];
+    const jobFails = jobRuns.filter((j) => j.ok === false).map((j) => `${j.job} 오류(${j.ran}): ${(j.detail || "").slice(0, 70)}`);
 
     // 파이프라인 진행 상황(신규 카페 조립라인)
     const pl = (await sql`SELECT
@@ -135,10 +139,11 @@ export async function GET(req: NextRequest) {
 
     // ── 4) 종합 건강 ──
     const core = agents.filter((a) => ["collect", "synth", "judge"].includes(a.key));
-    const overall = core.some((a) => a.status === "stalled") ? "critical"
+    const overall = (core.some((a) => a.status === "stalled") || jobFails.length) ? "critical"
       : agents.some((a) => a.status === "stalled" || a.status === "behind" || a.status === "warn") ? "degraded"
       : "healthy";
-    const alerts = agents.filter((a) => a.status === "stalled").map((a) => `${a.label} 멈춤(${a.ageH}h 전 마지막 가동)`);
+    // 배치 크래시·실패를 최상단 경보로 — '관제탑이 잡아서 알림'
+    const alerts = [...jobFails, ...agents.filter((a) => a.status === "stalled").map((a) => `${a.label} 멈춤(${a.ageH}h 전 마지막 가동)`)];
 
     const pct = (n: number) => (c.total ? Math.round((n / c.total) * 100) : 0);
     // 신규 카페 조립라인(발굴→합성→AI판정→임베딩→공개). 각 단계 대기 수 = '어디서 막혔나'.

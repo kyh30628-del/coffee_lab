@@ -142,7 +142,7 @@ const Row = memo(function Row({ title, items, sub, info, onOpen }: { title: stri
 function makeRegionPinHtml(label: string, cnt: number, maxCnt: number): string {
   // sqrt 스케일 — 한 지역이 압도적이어도 작은 지역끼리 크기 차이가 보이게(선형은 다 최소크기로 뭉침).
   const t = Math.sqrt(Math.min(1, cnt / Math.max(1, maxCnt)));
-  const size = Math.round(40 + t * 44); // 40~84px
+  const size = Math.round(26 + t * 28); // 26~54px (작게 — 겹침 최소화)
   // 농도 색: 적을수록 밝은 카라멜 → 많을수록 진한 에스프레소. 색만 봐도 어디가 많은지 한눈에.
   const lerp = (a: number, b: number) => Math.round(a + (b - a) * t);
   const r = lerp(206, 92), g = lerp(160, 56), b = lerp(110, 33);
@@ -151,11 +151,11 @@ function makeRegionPinHtml(label: string, cnt: number, maxCnt: number): string {
   return `<div class="dcn-region-pin" style="transform:translate(-50%,-50%);text-align:center;cursor:pointer;">
     <div style="width:${size}px;height:${size}px;border-radius:50%;
       background:radial-gradient(circle at 33% 27%, ${main} 0%, ${dark} 80%);
-      border:2.5px solid rgba(253,250,244,0.97);
-      box-shadow:0 0 0 ${2 + Math.round(t * 5)}px rgba(124,82,48,0.14), 0 6px 16px rgba(50,33,20,0.46);
+      border:2px solid rgba(253,250,244,0.97);
+      box-shadow:0 0 0 ${1 + Math.round(t * 3)}px rgba(124,82,48,0.13), 0 4px 11px rgba(50,33,20,0.42);
       display:flex;align-items:center;justify-content:center;margin:0 auto;">
-      <span style="color:#fdf3e6;font-weight:800;font-size:${Math.round(13 + t * 7)}px;letter-spacing:-0.4px;line-height:1;text-shadow:0 1px 2px rgba(0,0,0,0.3);">${cnt}</span></div>
-    <div style="margin-top:5px;background:rgba(43,32,24,0.92);color:#f3e6d2;font-weight:700;padding:2.5px 10px;border-radius:11px;font-size:11px;white-space:nowrap;display:inline-block;box-shadow:0 2px 7px rgba(0,0,0,0.25);">${esc}</div>
+      <span style="color:#fdf3e6;font-weight:800;font-size:${Math.round(11 + t * 5)}px;letter-spacing:-0.4px;line-height:1;text-shadow:0 1px 2px rgba(0,0,0,0.3);">${cnt}</span></div>
+    <div style="margin-top:3px;background:rgba(43,32,24,0.9);color:#f3e6d2;font-weight:600;padding:1.5px 7px;border-radius:9px;font-size:10px;white-space:nowrap;display:inline-block;box-shadow:0 2px 5px rgba(0,0,0,0.22);">${esc}</div>
   </div>`;
 }
 
@@ -593,24 +593,7 @@ export default function Home() {
         return { key: k, lat: fixed ? fixed[0] : g.lat / g.n, lng: fixed ? fixed[1] : g.lng / g.n, n: g.n };
       });
       const maxN = arr.reduce((m, g) => Math.max(m, g.n), 1);
-      // 겹침 제거: 화면 픽셀 공간에서 원형이 서로 안 겹치게 밀어냄(큰 것 먼저 자리잡고 작은 걸 밀어냄). 가독성↑
-      const sizeOf = (n: number) => 40 + Math.sqrt(Math.min(1, n / maxN)) * 44;
-      const pj = arr.map((g) => ({ g, p: map.latLngToContainerPoint([g.lat, g.lng]) })).sort((a, b) => b.g.n - a.g.n);
-      const placed: { x: number; y: number; r: number }[] = [];
-      pj.forEach((item, i) => {
-        let x = item.p.x, y = item.p.y; const r = sizeOf(item.g.n) / 2;
-        for (let it = 0; it < 24; it++) {
-          let moved = false;
-          for (const q of placed) {
-            const need = r + q.r + 12; let dx = x - q.x, dy = y - q.y, d = Math.hypot(dx, dy);
-            if (d < need) { if (d < 0.5) { dx = Math.cos(i * 2.4); dy = Math.sin(i * 2.4); d = 1; } const push = need - d; x += (dx / d) * push; y += (dy / d) * push; moved = true; }
-          }
-          if (!moved) break;
-        }
-        placed.push({ x, y, r });
-        const ll = map.containerPointToLatLng(L.point(x, y));
-        item.g.lat = ll.lat; item.g.lng = ll.lng;
-      });
+      // 마커는 실제 위치(시도=고정중심, 구·동=카페 centroid)에 왜곡 없이 그대로. 겹치면 줌인해 하위 단계로.
       const markers = arr.map((g) => L.marker([g.lat, g.lng], { icon: L.divIcon({ className: "", html: makeRegionPinHtml(g.key, g.n, maxN), iconSize: [0, 0] }), zIndexOffset: g.n })
         .on("click", () => {
           if (level === "sido") { setSido(g.key); setSigungu(""); setDong(""); }
@@ -668,12 +651,9 @@ export default function Home() {
   useEffect(() => {
     const map = mapObj.current;
     if (!map || !mapReady) return;
-    const isAgg = !(dong || focusId || myPinMode || othersMode);
-    const onMove = () => { if (!isAgg) drawMarkers(); };               // 개별 카페 레벨: 뷰포트 캡 재그림
-    const onZoom = () => { if (isAgg) drawMarkers(); };                 // 집계 레벨: 새 줌에 맞춰 겹침제거 재배치
+    const onMove = () => { if (dong || focusId || myPinMode || othersMode) drawMarkers(); }; // 개별 카페 레벨만 뷰포트 재그림
     map.on("moveend", onMove);
-    map.on("zoomend", onZoom);
-    return () => { map.off("moveend", onMove); map.off("zoomend", onZoom); };
+    return () => { map.off("moveend", onMove); };
   }, [drawMarkers, mapReady, dong, focusId, myPinMode, othersMode]);
 
   // 다른 사람은 — 토글 켜면 집계 핀 로드(한 번)

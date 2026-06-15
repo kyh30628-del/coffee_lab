@@ -8,6 +8,8 @@ for (const l of env.split("\n")) { const m = l.match(/^([A-Z_0-9]+)=(.*)$/); if 
 const { parseDong } = await import("../lib/discover.ts");
 const { sql } = await import("../lib/db.ts");
 const { isFranchise, isNonCafe } = await import("../lib/discover.ts");
+const { recordRun, guardJob } = await import("../lib/heartbeat.ts");
+guardJob("dong-backfill"); // 잡히지 않은 크래시(ReferenceError 등)도 관제탑이 보게 기록
 const ID = process.env.NAVER_CLIENT_ID, SECRET = process.env.NAVER_CLIENT_SECRET;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const strip = (s) => (s || "").replace(/<[^>]+>/g, "").trim();
@@ -22,13 +24,13 @@ async function search(q) {
 }
 
 await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS naver_category TEXT`.catch(() => {});
-let done = 0, miss = 0, refiltered = 0, cursor = 0, stop = "";
+let done = 0, miss = 0, refiltered = 0, republished = 0, cursor = 0, stop = "";
 const MAX = Number(process.env.DONG_MAX || 20000);
 try {
-  let republished = 0;
   while (done + miss < MAX && !stop) {
-    // 카테고리 없는 카페 우선(검증 대기 보류분 → 카페면 공개 복귀, 비카페면 차단). 그다음 동만 없는 것.
-    const rows = await sql`SELECT id, name, area, lat, lng, synth_grade, needs_category FROM cafes WHERE (naver_category IS NULL OR naver_category='' OR dong IS NULL) AND lat IS NOT NULL AND id > ${cursor} ORDER BY (naver_category IS NULL OR naver_category='') DESC, id LIMIT 25`;
+    // ★ 커서(id>cursor)와 정렬을 반드시 id로 일치시킬 것. 카테고리우선 정렬은 커서가 점프해
+    //   하위 id의 동없는 카페를 통째로 스킵시키는 버그를 유발(45%에서 멈춘 원인). 순수 id 순으로 전수 처리.
+    const rows = await sql`SELECT id, name, area, lat, lng, synth_grade, needs_category FROM cafes WHERE (naver_category IS NULL OR naver_category='' OR dong IS NULL) AND lat IS NOT NULL AND id > ${cursor} AND (${Number(process.env.SHARDS || 1)} = 1 OR id % ${Number(process.env.SHARDS || 1)} = ${Number(process.env.SHARD || 0)}) ORDER BY id LIMIT 25`;
     if (!rows.length) { stop = "동·카테고리 미보유 카페 소진 — 완료"; break; }
     for (const c of rows) {
       cursor = c.id;
@@ -66,4 +68,5 @@ try { const r = await sql`SELECT count(*) FILTER(WHERE published)::int pub, coun
 console.log(stop || "상한 도달");
 console.log(`자율검증 백필: 동채움 ${done} · 카페복귀 ${republished} · 비카페차단 ${refiltered} · 카테고리미보유 남음 ${remain}`);
 console.log(`→ 공개(검증완료) ${pub} · 검증대기 보류 ${held}`);
+await recordRun("dong-backfill", !stop.startsWith("예외"), stop || `완료(동 ${done})`, done); // 한도·완료=정상, 예외=실패
 process.exit(0);
