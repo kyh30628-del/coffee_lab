@@ -31,15 +31,15 @@ export async function GET(req: NextRequest) {
       // 지역 타겟: 판정 여부 무관하게 강제 재판정(오염 일괄 정리용)
       targets = (await sql`SELECT id, name, area FROM cafes WHERE raw_reviews IS NOT NULL AND area ILIKE ${"%" + area + "%"} ORDER BY synth_count DESC NULLS LAST LIMIT ${limit}`) as unknown as typeof targets;
     } else {
-      // 기본 큐: ① 신규 파이프라인(pending) 우선 — 공개 전 필수 판정 → ② 그라운딩 의심 → ③ 미판정/stale
-      //   대상 = 공개 카페 OR 신규 pending(공개 전 게이트). 비카페·rejected·junk(NULL 미공개)는 제외 → 토큰 절약.
+      // 기본 큐(자율 판정 순서 고정): 기존 공개 → 기존 비공개 → 신규 공개 → 신규 비공개.
+      //   기존/신규 경계 = 2026-06-14(동단위 신규 발굴 배치 시작일). 그 전 = 기존, 그 이후 = 신규.
+      //   raw 있는 카페 전부 대상(비공개 포함) — 기존 비공개도 맥락 재판정해 옥석 가림. 그룹 내 그라운딩 의심·오래된 것 우선.
       targets = (await sql`
         SELECT c.id, c.name, c.area FROM cafes c
         LEFT JOIN grounding_checks g ON g.cafe_id = c.id
         WHERE c.raw_reviews IS NOT NULL
-          AND (c.published = true OR c.pipeline_status = 'pending')
           AND (c.llm_judged_at IS NULL OR c.llm_judged_at < c.raw_collected_at)
-        ORDER BY (c.pipeline_status = 'pending') DESC NULLS LAST, (g.grounded = false) DESC NULLS LAST, c.llm_judged_at ASC NULLS FIRST
+        ORDER BY COALESCE(c.created_at < '2026-06-14', true) DESC, c.published DESC, (g.grounded = false) DESC NULLS LAST, c.llm_judged_at ASC NULLS FIRST
         LIMIT ${limit}`) as unknown as typeof targets;
     }
 
@@ -50,8 +50,12 @@ export async function GET(req: NextRequest) {
       if (!hasRaw || candidates.length === 0) { await markJudged(cafe.id); advanced++; continue; }
       cafes.push({ cafeId: cafe.id, name: cafe.name, area: cafe.area, candidates: candidates.slice(0, 50) });
     }
-    const remaining = (await sql`SELECT COUNT(*)::int n FROM cafes WHERE raw_reviews IS NOT NULL AND (published = true OR pipeline_status = 'pending') AND (llm_judged_at IS NULL OR llm_judged_at < raw_collected_at)`)[0].n;
-    return NextResponse.json({ ok: true, cafes, scanned: targets.length, noBorderline: advanced, remaining });
+    const remaining = (await sql`SELECT COUNT(*)::int n FROM cafes WHERE raw_reviews IS NOT NULL AND (llm_judged_at IS NULL OR llm_judged_at < raw_collected_at)`)[0].n;
+    // 기존/신규 그룹별 남은 판정 수도 함께 — 자율 진행률 가시화
+    const byGroup = (await sql`SELECT COALESCE(created_at < '2026-06-14', true) AS existing, published, COUNT(*)::int n FROM cafes WHERE raw_reviews IS NOT NULL AND (llm_judged_at IS NULL OR llm_judged_at < raw_collected_at) GROUP BY 1,2`) as { existing: boolean; published: boolean; n: number }[];
+    const g = (e: boolean, p: boolean) => byGroup.find((x) => x.existing === e && x.published === p)?.n || 0;
+    const queue = { existingPublished: g(true, true), existingUnpublished: g(true, false), newPublished: g(false, true), newUnpublished: g(false, false) };
+    return NextResponse.json({ ok: true, cafes, scanned: targets.length, noBorderline: advanced, remaining, queue });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
