@@ -52,3 +52,8 @@ body {
 .acc-blink { animation: accBlink 1.05s steps(1, end) infinite; }
 .acc-lamp { box-shadow: 0 0 6px 1px currentColor; }
 @media (prefers-reduced-motion: reduce) { .acc-blink { animation: none; opacity: 1; } }
+
+/* 지도 지역 집계 원형 — 호버 시 살짝 확대(클릭 가능 느낌) */
+.dcn-region-pin { transition: transform .14s ease; }
+.dcn-region-pin:hover { transform: translate(-50%, -50%) scale(1.09) !important; }
+@media (prefers-reduced-motion: reduce) { .dcn-region-pin { transition: none; } }

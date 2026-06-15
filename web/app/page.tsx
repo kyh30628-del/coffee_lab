@@ -140,17 +140,22 @@ const Row = memo(function Row({ title, items, sub, info, onOpen }: { title: stri
 
 // 지역 집계 원형마커(전체/시도/시군구 레벨) — 개수와 크기로 밀집도 표현. 좌표 중심에 배치(translate -50%,-50%).
 function makeRegionPinHtml(label: string, cnt: number, maxCnt: number): string {
-  const t = Math.min(1, cnt / Math.max(1, maxCnt));
-  const size = Math.round(40 + t * 30); // 40~70px
+  // sqrt 스케일 — 한 지역이 압도적이어도 작은 지역끼리 크기 차이가 보이게(선형은 다 최소크기로 뭉침).
+  const t = Math.sqrt(Math.min(1, cnt / Math.max(1, maxCnt)));
+  const size = Math.round(40 + t * 44); // 40~84px
+  // 농도 색: 적을수록 밝은 카라멜 → 많을수록 진한 에스프레소. 색만 봐도 어디가 많은지 한눈에.
+  const lerp = (a: number, b: number) => Math.round(a + (b - a) * t);
+  const r = lerp(206, 92), g = lerp(160, 56), b = lerp(110, 33);
+  const main = `rgb(${r},${g},${b})`, dark = `rgb(${Math.round(r * 0.68)},${Math.round(g * 0.68)},${Math.round(b * 0.68)})`;
   const esc = (label || "").replace(/</g, "&lt;");
-  return `<div style="transform:translate(-50%,-50%);text-align:center;">
+  return `<div class="dcn-region-pin" style="transform:translate(-50%,-50%);text-align:center;cursor:pointer;">
     <div style="width:${size}px;height:${size}px;border-radius:50%;
-      background:radial-gradient(circle at 34% 28%, #a9743f 0%, #7c5230 62%, #5f3f25 100%);
-      border:2px solid rgba(253,250,244,0.96);
-      box-shadow:0 0 0 ${3 + Math.round(t * 4)}px rgba(124,82,48,0.16), 0 5px 14px rgba(60,40,25,0.42);
+      background:radial-gradient(circle at 33% 27%, ${main} 0%, ${dark} 80%);
+      border:2.5px solid rgba(253,250,244,0.97);
+      box-shadow:0 0 0 ${2 + Math.round(t * 5)}px rgba(124,82,48,0.14), 0 6px 16px rgba(50,33,20,0.46);
       display:flex;align-items:center;justify-content:center;margin:0 auto;">
-      <span style="color:#fdf3e6;font-weight:800;font-size:${Math.round(13 + t * 5)}px;letter-spacing:-0.3px;line-height:1;text-shadow:0 1px 2px rgba(0,0,0,0.28);">${cnt}</span></div>
-    <div style="margin-top:5px;background:rgba(43,32,24,0.9);color:#f0dfc8;font-weight:600;padding:2px 9px;border-radius:10px;font-size:11px;white-space:nowrap;display:inline-block;box-shadow:0 2px 6px rgba(0,0,0,0.22);">${esc}</div>
+      <span style="color:#fdf3e6;font-weight:800;font-size:${Math.round(13 + t * 7)}px;letter-spacing:-0.4px;line-height:1;text-shadow:0 1px 2px rgba(0,0,0,0.3);">${cnt}</span></div>
+    <div style="margin-top:5px;background:rgba(43,32,24,0.92);color:#f3e6d2;font-weight:700;padding:2.5px 10px;border-radius:11px;font-size:11px;white-space:nowrap;display:inline-block;box-shadow:0 2px 7px rgba(0,0,0,0.25);">${esc}</div>
   </div>`;
 }
 
@@ -582,7 +587,11 @@ export default function Home() {
         const g = groups.get(k) ?? { lat: 0, lng: 0, n: 0 };
         g.lat += c.lat; g.lng += c.lng; g.n++; groups.set(k, g);
       }
-      const arr = [...groups.entries()].map(([k, g]) => ({ key: k, lat: g.lat / g.n, lng: g.lng / g.n, n: g.n }));
+      // 시도 레벨은 고정 중심(경기는 서울을 둘러싸 centroid가 서울 위에 겹침). 구·동은 데이터 centroid.
+      const arr = [...groups.entries()].map(([k, g]) => {
+        const fixed = level === "sido" ? SIDO_CENTER[k] : undefined;
+        return { key: k, lat: fixed ? fixed[0] : g.lat / g.n, lng: fixed ? fixed[1] : g.lng / g.n, n: g.n };
+      });
       const maxN = arr.reduce((m, g) => Math.max(m, g.n), 1);
       const markers = arr.map((g) => L.marker([g.lat, g.lng], { icon: L.divIcon({ className: "", html: makeRegionPinHtml(g.key, g.n, maxN), iconSize: [0, 0] }), zIndexOffset: g.n })
         .on("click", () => {
@@ -628,8 +637,9 @@ export default function Home() {
       const la = filtered.map((c) => c.lat).sort((a, b) => a - b);
       const ln = filtered.map((c) => c.lng).sort((a, b) => a - b);
       const q = (arr: number[], p: number) => arr[Math.min(arr.length - 1, Math.max(0, Math.floor(arr.length * p)))];
-      const bounds = L.latLngBounds([[q(la, 0.04), q(ln, 0.04)], [q(la, 0.96), q(ln, 0.96)]]);
-      map.flyToBounds(bounds, { padding: [40, 40], maxZoom: 16, duration: 0.7 });
+      // 2%만 클리핑(엉뚱 좌표 제거) — 너무 자르면 경기 외곽시(포천·평택 등)가 빠지므로 지역이 화면에 꽉 차게.
+      const bounds = L.latLngBounds([[q(la, 0.02), q(ln, 0.02)], [q(la, 0.98), q(ln, 0.98)]]);
+      map.flyToBounds(bounds, { padding: [50, 50], maxZoom: 15, duration: 0.7 });
     } else if (sido && SIDO_CENTER[sido]) { const [la, ln, z] = SIDO_CENTER[sido]; map.flyTo([la, ln], z, { duration: 0.7 }); }
     else { map.flyTo([37.5, 127.05], 9, { duration: 0.7 }); } // 전체(시도 미선택) → 수도권 전역으로 부드럽게 줌아웃해 시도 집계 원형 표시
     drawMarkers();
