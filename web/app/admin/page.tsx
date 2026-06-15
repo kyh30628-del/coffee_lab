@@ -189,27 +189,29 @@ export default function AdminPage() {
             grounding: { icon: "🔬", what: "만든 소개글이 실제 후기에 근거가 있는지(지어낸 환각 아닌지) 검사합니다. AI 판정이 끝난 카페만 검증해 순서가 꼬이지 않습니다.", sched: "판정 완료분 대상 상시", feeds: "환각 의심 시 → 판정 큐로 재투입" },
             audit: { icon: "🧹", what: "오염·중복 등 품질 플래그를 찾아 자동으로 수정합니다.", sched: "매일 3:30", feeds: "자동 교정 후 해소" },
           };
-          const dotPulse: Record<string, string> = { ok: "bg-emerald-500", behind: "bg-amber-500", stalled: "bg-red-500", warn: "bg-amber-500", idle: "bg-stone-300" };
-          const ringC: Record<string, string> = { ok: "bg-emerald-400", behind: "bg-amber-400", stalled: "bg-red-400", warn: "bg-amber-400", idle: "bg-stone-300" };
-          const nodeBorder: Record<string, string> = { ok: "border-emerald-200 bg-emerald-50", behind: "border-amber-200 bg-amber-50", stalled: "border-red-200 bg-red-50", warn: "border-amber-200 bg-amber-50", idle: "border-stone-200 bg-stone-50" };
-          // 노드 렌더: 깜빡임(작업중=ping), 상태색, 대기배지, 클릭 시 상세
+          const nodeBorder: Record<string, string> = { ok: "border-emerald-200", behind: "border-amber-300", stalled: "border-red-300", warn: "border-amber-300", idle: "border-stone-200" };
+          // 신호등: 빨강·노랑·초록 3구. 상태에 맞는 램프만 켜져 깜빡(idle은 초록 약하게 점등).
+          const Light = ({ status }: { status: string }) => (
+            <div className="inline-flex items-center gap-[3px] rounded-full bg-stone-800 px-[5px] py-[3px] shadow-sm">
+              <span className={`w-[7px] h-[7px] rounded-full ${status === "stalled" ? "bg-red-500 text-red-500 acc-lamp acc-blink" : "bg-stone-600"}`} />
+              <span className={`w-[7px] h-[7px] rounded-full ${status === "warn" || status === "behind" ? "bg-amber-400 text-amber-400 acc-lamp acc-blink" : "bg-stone-600"}`} />
+              <span className={`w-[7px] h-[7px] rounded-full ${status === "ok" ? "bg-emerald-400 text-emerald-400 acc-lamp acc-blink" : status === "idle" ? "bg-emerald-700" : "bg-stone-600"}`} />
+            </div>
+          );
+          // 노드: 위에 신호등, 아이콘·이름·대기/마지막. 클릭 시 상세.
           const Node = ({ a }: { a: any }) => {
             if (!a) return null;
-            const working = (a.queue > 0 || (a.ageH != null && a.ageH < 0.5)) && a.status !== "stalled";
             const d = DESC[a.key];
             return (
-              <button onClick={() => setSelAgent(a)} className={`relative shrink-0 w-[88px] rounded-2xl border ${nodeBorder[a.status] || nodeBorder.idle} px-2 py-2.5 text-center transition hover:scale-[1.04] hover:shadow-md active:scale-95`}>
-                {working && <span className={`absolute -inset-px rounded-2xl ${ringC[a.status] || ringC.idle} opacity-20 animate-ping`} />}
-                <span className={`absolute top-1.5 right-1.5 w-2 h-2 rounded-full ${dotPulse[a.status] || dotPulse.idle} ${working ? "animate-pulse" : ""}`} />
-                <div className="relative">
-                  <div className="text-lg leading-none">{d?.icon || "•"}</div>
-                  <div className="text-[10.5px] font-extrabold text-stone-800 mt-1 leading-tight truncate">{a.label.split(" (")[0]}</div>
-                  {a.queue > 0 ? <div className="text-[9px] mt-0.5 font-bold text-amber-600">대기 {a.queue.toLocaleString()}</div> : <div className="text-[9px] mt-0.5 text-stone-400">{ago(a.ageH)}</div>}
-                </div>
+              <button onClick={() => setSelAgent(a)} className={`relative shrink-0 w-[84px] rounded-2xl border-2 ${nodeBorder[a.status] || nodeBorder.idle} bg-white px-1.5 pt-2.5 pb-2 text-center transition hover:shadow-md hover:-translate-y-0.5 active:scale-95`}>
+                <div className="flex justify-center -mt-[18px] mb-1"><Light status={a.status} /></div>
+                <div className="text-[17px] leading-none">{d?.icon || "•"}</div>
+                <div className="text-[10.5px] font-extrabold text-stone-800 mt-1 leading-tight">{a.label.split(" (")[0]}</div>
+                <div className="text-[9px] mt-0.5 font-bold">{a.queue > 0 ? <span className="text-amber-600">대기 {a.queue.toLocaleString()}</span> : <span className="text-stone-400">{ago(a.ageH)}</span>}</div>
               </button>
             );
           };
-          const Arrow = () => <span className="shrink-0 self-center text-stone-300 text-sm select-none">→</span>;
+          const Arrow = () => <span className="shrink-0 self-center text-stone-300 text-base select-none px-px">→</span>;
           const flow = ["collect", "synth", "judge", "embed"].map((k) => byKey[k]).filter(Boolean);
           const redteam = ["verify", "grounding", "audit"].map((k) => byKey[k]).filter(Boolean);
           return (
@@ -245,53 +247,51 @@ export default function AdminPage() {
                   </div>
                 </div>
               )}
-              {/* 관제탑 → 에이전트 지시·통제 시각화 */}
-              <div className="rounded-2xl border border-stone-200 bg-gradient-to-b from-indigo-50/40 to-white p-3 mb-2.5">
-                <div className="flex items-center justify-center mb-1">
-                  <div className="relative inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3.5 py-1.5">
-                    <span className="absolute -inset-px rounded-full bg-indigo-300 opacity-20 animate-ping" />
-                    <span className="relative text-sm">🛰️</span>
-                    <span className="relative text-[11px] font-extrabold text-indigo-700">관제탑 · 지시 · 통제 · 모니터링</span>
-                  </div>
+              {/* 관제탑 통합 보드 — 흐름·구조·신호등을 한 영역에 */}
+              <div className="rounded-2xl border border-stone-200 bg-gradient-to-b from-indigo-50/60 via-white to-white p-3.5 pt-4 mb-2.5">
+                {/* 본부 + 종합 신호등 */}
+                <div className="flex items-center justify-center gap-2 mb-3.5">
+                  <span className="text-sm">🛰️</span>
+                  <span className="text-[11.5px] font-extrabold text-indigo-700">관제탑 · 지시 · 통제 · 모니터링</span>
+                  <Light status={tower.overall === "healthy" ? "ok" : tower.overall === "critical" ? "stalled" : "warn"} />
                 </div>
-                <div className="flex justify-center text-stone-300 text-xs leading-none mb-1.5 select-none">│</div>
-                <div className="text-[9px] font-bold text-stone-400 mb-1 pl-0.5">데이터 생성 라인 (좌 → 우 흐름)</div>
-                <div className="flex items-stretch gap-1 overflow-x-auto pb-1">
+                {/* 생성 파이프라인(좌→우) */}
+                <div className="flex items-start justify-center gap-0.5 overflow-x-auto pb-1">
                   {flow.map((a: any, i: number) => (
-                    <div key={a.key} className="flex items-stretch gap-1">
+                    <div key={a.key} className="flex items-start gap-0.5">
                       {i > 0 && <Arrow />}
                       <Node a={a} />
                     </div>
                   ))}
                   <Arrow />
-                  <div className="relative shrink-0 w-[88px] rounded-2xl border border-emerald-300 bg-emerald-100 px-2 py-2.5 text-center self-stretch">
-                    <div className="text-lg leading-none">✅</div>
+                  <div className="relative shrink-0 w-[84px] rounded-2xl border-2 border-emerald-300 bg-emerald-50 px-1.5 pt-2.5 pb-2 text-center">
+                    <div className="flex justify-center -mt-[18px] mb-1"><Light status="ok" /></div>
+                    <div className="text-[17px] leading-none">✅</div>
                     <div className="text-[10.5px] font-extrabold text-emerald-700 mt-1">공개</div>
                     <div className="text-[9px] mt-0.5 font-bold text-emerald-600">{tower.coverage?.published?.toLocaleString()}곳</div>
                   </div>
                 </div>
-                <div className="text-[9px] font-bold text-stone-400 mt-2 mb-1 pl-0.5">검증 레드팀 (병렬 감시)</div>
-                <div className="flex items-stretch gap-1.5 overflow-x-auto pb-1">
+                {/* 감시 연결선 */}
+                <div className="flex items-center justify-center my-2.5">
+                  <div className="h-px flex-1 bg-stone-200" />
+                  <span className="px-2 text-[9px] font-bold text-stone-400 whitespace-nowrap">⬇ 검증 레드팀이 위 전체를 상시 감시</span>
+                  <div className="h-px flex-1 bg-stone-200" />
+                </div>
+                {/* 검증 레드팀(같은 보드 내) */}
+                <div className="flex items-start justify-center gap-2 overflow-x-auto pb-1">
                   {redteam.map((a: any) => <Node key={a.key} a={a} />)}
                 </div>
-                <div className="text-[9px] text-stone-400 mt-1.5 text-center">💡 노드를 누르면 상세 설명 · <span className="text-amber-500 font-bold">깜빡이면 작업 중</span></div>
-              </div>
-              {tower.pipeline && (
-                <div className="mt-3 rounded-xl bg-stone-50 border border-stone-100 p-2.5">
-                  <div className="text-[10px] font-bold text-stone-500 mb-1.5">신규 카페 조립라인 (발굴→합성→AI판정→임베딩→공개) {tower.pipeline.promotedThisRun > 0 && <span className="text-emerald-600">· 방금 {tower.pipeline.promotedThisRun}곳 공개</span>}</div>
-                  <div className="flex items-stretch gap-1 overflow-x-auto">
-                    {tower.pipeline.stages.map((s: any, i: number) => (
-                      <div key={s.key} className="flex items-center gap-1 shrink-0">
-                        <div className={`px-2 py-1 rounded-lg text-center min-w-[52px] ${s.key === "live" ? "bg-emerald-100 text-emerald-700" : s.key === "rejected" ? "bg-stone-200 text-stone-500" : s.count > 0 ? "bg-amber-100 text-amber-700" : "bg-white text-stone-400 border border-stone-100"}`}>
-                          <div className="text-[13px] font-bold leading-none">{s.count?.toLocaleString() ?? 0}</div>
-                          <div className="text-[9px] mt-0.5 whitespace-nowrap">{s.label}</div>
-                        </div>
-                        {i < tower.pipeline.stages.length - 2 && <span className="text-stone-300 text-[10px]">→</span>}
-                      </div>
+                {/* 조립라인 카운트 — 한 줄로 */}
+                {tower.pipeline && (
+                  <div className="mt-3 flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1 text-[9.5px] text-stone-500 border-t border-stone-100 pt-2.5">
+                    {tower.pipeline.stages.filter((s: any) => s.key !== "rejected").map((s: any) => (
+                      <span key={s.key}><b className={s.count > 0 ? "text-stone-700" : "text-stone-300"}>{s.count?.toLocaleString() ?? 0}</b> {s.label}</span>
                     ))}
+                    {tower.pipeline.promotedThisRun > 0 && <span className="text-emerald-600 font-bold">· 방금 {tower.pipeline.promotedThisRun}곳 공개</span>}
                   </div>
-                </div>
-              )}
+                )}
+                <div className="text-[9px] text-stone-400 mt-2 text-center">💡 노드를 누르면 상세 설명 · <span className="text-emerald-600 font-bold">신호등 깜빡임 = 작동 중</span></div>
+              </div>
               <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-stone-500">
                 <span>공개 <b className="text-stone-700">{tower.coverage?.published?.toLocaleString()}</b>/{tower.coverage?.total?.toLocaleString()}</span>
                 <span>raw {tower.coverage?.rawCachedPct}%</span>

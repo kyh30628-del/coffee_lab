@@ -46,3 +46,9 @@ body {
   animation: dcnShimmer 2s ease-out infinite;
 }
 @media (prefers-reduced-motion: reduce) { .dcn-shimmer, .dcn-shimmer-dark { animation: none; } }
+
+/* 관제탑 신호등 — 작동 중 램프가 또렷이 켜졌다 꺼졌다(깜빡) */
+@keyframes accBlink { 0%, 48% { opacity: 1; } 49%, 100% { opacity: 0.16; } }
+.acc-blink { animation: accBlink 1.05s steps(1, end) infinite; }
+.acc-lamp { box-shadow: 0 0 6px 1px currentColor; }
+@media (prefers-reduced-motion: reduce) { .acc-blink { animation: none; opacity: 1; } }
