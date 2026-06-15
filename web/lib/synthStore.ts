@@ -85,12 +85,13 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   //   저건수도 적용('만조커피 9건'이 전부 동네 딴 가게였던 사례 차단). 전체이름 매칭은 nameCoherence가 보완.
   const coherence = nameCoherence(name, (evidenceReviews as any[]).map((r) => r?.quote || ""));
   const noisy = collected >= 5 && coherence < 0.4;
-  // 네이버 카테고리 기반 검증 — 이름 기반보다 정확. 카테고리가 있는데 카페류 아니면 차단.
+  // 🔒 카테고리 필수 검증 — 카테고리 없이는 카페/비카페 구분 불가 → 공개 금지(검증된 카페만 노출). 정체성·신뢰의 핵심.
   const catRow = (await sql`SELECT naver_category FROM cafes WHERE id=${cafeId} LIMIT 1`)[0];
-  const naverCat = catRow?.naver_category || "";
-  const isCafeCat = !naverCat || /카페|디저트|베이커리|브런치|로스터|티하우스|찻집/i.test(naverCat);
-  // 프랜차이즈 제외(STATUS.md 원칙) — 발굴뿐 아니라 공개 게이트에서도 영구 차단.
-  const ruleOk = (grade === "검증" || grade === "참고") && isCafeCat && !isNonCafe(name, naverCat) && !isFranchise(name) && !noisy;
+  const naverCat = (catRow?.naver_category || "").trim();
+  const hasCategory = naverCat.length > 0;                 // 카테고리 존재 필수
+  const isCafeCat = hasCategory && !isNonCafe(name, naverCat); // 카테고리가 카페·디저트류여야 통과(리프 기준)
+  // 프랜차이즈 제외 + 카테고리 필수 + 비카페 차단 — 공개 게이트.
+  const ruleOk = (grade === "검증" || grade === "참고") && isCafeCat && !isFranchise(name) && !noisy;
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_reviews_all JSONB`.catch(() => {});
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS pipeline_status TEXT`.catch(() => {});
   const allEv = JSON.stringify(allEvidence ?? evidenceReviews);

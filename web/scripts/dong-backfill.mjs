@@ -25,9 +25,10 @@ await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS naver_category TEXT`.catch(
 let done = 0, miss = 0, refiltered = 0, cursor = 0, stop = "";
 const MAX = Number(process.env.DONG_MAX || 20000);
 try {
+  let republished = 0;
   while (done + miss < MAX && !stop) {
-    // 동 또는 카테고리가 비어 있는 카페 — 한 번의 검색으로 동+카테고리 백필 + 비카페/프랜차이즈 재필터.
-    const rows = await sql`SELECT id, name, area, lat, lng FROM cafes WHERE (dong IS NULL OR naver_category IS NULL) AND lat IS NOT NULL AND id > ${cursor} ORDER BY id LIMIT 25`;
+    // 카테고리 없는 카페 우선(검증 대기 보류분 → 카페면 공개 복귀, 비카페면 차단). 그다음 동만 없는 것.
+    const rows = await sql`SELECT id, name, area, lat, lng, synth_grade, needs_category FROM cafes WHERE (naver_category IS NULL OR naver_category='' OR dong IS NULL) AND lat IS NOT NULL AND id > ${cursor} ORDER BY (naver_category IS NULL OR naver_category='') DESC, id LIMIT 25`;
     if (!rows.length) { stop = "동·카테고리 미보유 카페 소진 — 완료"; break; }
     for (const c of rows) {
       cursor = c.id;
@@ -41,22 +42,28 @@ try {
         const cat = m ? (m.category || "") : "";
         if (dong) { await sql`UPDATE cafes SET dong = ${dong} WHERE id = ${c.id}`; done++; }
         else miss++;
-        if (cat) await sql`UPDATE cafes SET naver_category = ${cat} WHERE id = ${c.id}`;
-        else await sql`UPDATE cafes SET naver_category = COALESCE(naver_category, '') WHERE id = ${c.id}`; // 빈값 표시(재처리 방지)
-        // 재필터: 카테고리 확보 후 프랜차이즈·비카페면 즉시 비공개(공개돼 있던 것 정리)
-        if (isFranchise(c.name) || isNonCafe(c.name, cat)) {
-          const u = await sql`UPDATE cafes SET published = false, pipeline_status = 'rejected' WHERE id = ${c.id} AND published = true RETURNING 1`;
-          if (u.length) { refiltered++; console.log(`  ⛔ 비공개(비카페/프랜차이즈): ${c.name} [${cat || '카테고리없음'}]`); }
+        await sql`UPDATE cafes SET naver_category = ${cat || ""} WHERE id = ${c.id}`;
+        // 카테고리 확보 → 자가 검증: 카페·디저트면 (보류였으면) 공개 복귀, 비카페·프랜차이즈면 차단.
+        const bad = isFranchise(c.name) || isNonCafe(c.name, cat) || !cat;
+        if (bad) {
+          const u = await sql`UPDATE cafes SET published = false, needs_category = false, pipeline_status = CASE WHEN ${!cat} THEN pipeline_status ELSE 'rejected' END WHERE id = ${c.id} AND published = true RETURNING 1`;
+          if (u.length) { refiltered++; console.log(`  ⛔ 비공개: ${c.name} [${cat || '카테고리없음'}]`); }
+        } else if (c.needs_category) {
+          // 카페로 검증됨 → 공개 복귀(등급 보유 + 좌표 유효)
+          const u = await sql`UPDATE cafes SET needs_category = false, published = (synth_grade IN ('검증','참고') AND lat BETWEEN 36.8 AND 38.3 AND lng BETWEEN 124.5 AND 127.9), pipeline_status = CASE WHEN synth_grade IN ('검증','참고') THEN 'live' ELSE pipeline_status END WHERE id = ${c.id} RETURNING published`;
+          if (u[0]?.published) republished++;
         }
-        if ((done + miss) % 100 === 0) console.log(`  …진행 ${done + miss} (동채움 ${done}·재필터 ${refiltered})`);
+        if ((done + miss) % 100 === 0) console.log(`  …진행 ${done + miss} (동 ${done}·복귀 ${republished}·차단 ${refiltered})`);
       } catch (e) { miss++; }
       await sleep(210);
     }
   }
 } catch (e) { stop = "예외 — 중단: " + String(e).slice(0, 60); }
 
-let remain = "?";
-try { remain = (await sql`SELECT COUNT(*)::int n FROM cafes WHERE (dong IS NULL OR naver_category IS NULL) AND lat IS NOT NULL`)[0].n; } catch {}
+let remain = "?", held = "?", pub = "?";
+try { remain = (await sql`SELECT COUNT(*)::int n FROM cafes WHERE (naver_category IS NULL OR naver_category='') AND lat IS NOT NULL`)[0].n; } catch {}
+try { const r = await sql`SELECT count(*) FILTER(WHERE published)::int pub, count(*) FILTER(WHERE needs_category AND NOT published)::int held FROM cafes`; held = r[0].held; pub = r[0].pub; } catch {}
 console.log(stop || "상한 도달");
-console.log(`메타백필+재필터: 동채움 ${done} · 미매칭 ${miss} · 비카페/프랜차이즈 비공개 ${refiltered} · 남은 ${remain}`);
+console.log(`자율검증 백필: 동채움 ${done} · 카페복귀 ${republished} · 비카페차단 ${refiltered} · 카테고리미보유 남음 ${remain}`);
+console.log(`→ 공개(검증완료) ${pub} · 검증대기 보류 ${held}`);
 process.exit(0);
