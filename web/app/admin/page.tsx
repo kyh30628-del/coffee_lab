@@ -48,6 +48,7 @@ export default function AdminPage() {
   const [jstatus, setJstatus] = useState<any>(null);
   const [auditFlags, setAuditFlags] = useState<any>(null);
   const [tower, setTower] = useState<any>(null);
+  const [selAgent, setSelAgent] = useState<any>(null);
   const [subscribers, setSubscribers] = useState<any[]>([]);
   const [showSubsModal, setShowSubsModal] = useState(false);
   const [showYtModal, setShowYtModal] = useState(false);
@@ -177,7 +178,42 @@ export default function AdminPage() {
           const ocl: Record<string, string> = { healthy: "정상 가동", degraded: "주의", critical: "위험" };
           const sl: Record<string, string> = { ok: "정상", behind: "지연", stalled: "멈춤", warn: "주의", idle: "대기" };
           const ago = (h: number | null) => h == null ? "기록 없음" : h < 1 ? "방금" : h < 24 ? `${Math.round(h)}시간 전` : `${Math.round(h / 24)}일 전`;
+          const byKey: Record<string, any> = Object.fromEntries((tower.agents || []).map((a: any) => [a.key, a]));
+          // 에이전트별 상세 설명(클릭 시 표시)
+          const DESC: Record<string, { icon: string; what: string; sched: string; feeds: string }> = {
+            collect: { icon: "🔍", what: "네이버 지역검색으로 수도권 신규 카페를 동(洞) 단위로 발굴하고, 오래된 카페의 후기를 다시 수집합니다. 모든 데이터의 출발점입니다.", sched: "warmup 1·11·19시 / grow 발굴 매일 3시", feeds: "수집한 raw 후기를 → 합성으로 넘김" },
+            synth: { icon: "⚗️", what: "수집한 후기를 분석해 6축 취향·등급·한줄 정체성을 만들고, 게이트로 노이즈·비카페·프랜차이즈를 걸러냅니다. (LLM 미사용, 규칙 기반이라 환각 0)", sched: "수집 직후 자동 + 관제탑이 4시간마다 적체 메움", feeds: "검증된 카페를 → AI 판정·임베딩으로" },
+            judge: { icon: "🧠", what: "Claude가 후기 본문을 한 건씩 읽어 같은 이름의 딴 가게·엉뚱한 후기를 제거합니다. 토큰을 쓰므로 새벽에만, 기존공개→기존비공개→신규 순으로 돕니다.", sched: "새벽 0·2·4시 (Claude 구독 한도 내)", feeds: "선별된 후기를 → 재합성·그라운딩으로" },
+            embed: { icon: "🔢", what: "카페 설명을 의미 벡터로 변환해 '부드러운 산미' 같은 의미검색이 되게 합니다. (Google Gemini)", sched: "4시간마다", feeds: "공개 준비 완료 신호" },
+            verify: { icon: "🛡️", what: "후기수 일관성·PII 노출·좌표 범위·출처 표기 등 11종 규칙을 무오차로 점검합니다. (SQL 불변식, 토큰 0)", sched: "매일 6시", feeds: "이상 발견 시 자동 보류 처리" },
+            grounding: { icon: "🔬", what: "만든 소개글이 실제 후기에 근거가 있는지(지어낸 환각 아닌지) 검사합니다. AI 판정이 끝난 카페만 검증해 순서가 꼬이지 않습니다.", sched: "판정 완료분 대상 상시", feeds: "환각 의심 시 → 판정 큐로 재투입" },
+            audit: { icon: "🧹", what: "오염·중복 등 품질 플래그를 찾아 자동으로 수정합니다.", sched: "매일 3:30", feeds: "자동 교정 후 해소" },
+          };
+          const dotPulse: Record<string, string> = { ok: "bg-emerald-500", behind: "bg-amber-500", stalled: "bg-red-500", warn: "bg-amber-500", idle: "bg-stone-300" };
+          const ringC: Record<string, string> = { ok: "bg-emerald-400", behind: "bg-amber-400", stalled: "bg-red-400", warn: "bg-amber-400", idle: "bg-stone-300" };
+          const nodeBorder: Record<string, string> = { ok: "border-emerald-200 bg-emerald-50", behind: "border-amber-200 bg-amber-50", stalled: "border-red-200 bg-red-50", warn: "border-amber-200 bg-amber-50", idle: "border-stone-200 bg-stone-50" };
+          // 노드 렌더: 깜빡임(작업중=ping), 상태색, 대기배지, 클릭 시 상세
+          const Node = ({ a }: { a: any }) => {
+            if (!a) return null;
+            const working = (a.queue > 0 || (a.ageH != null && a.ageH < 0.5)) && a.status !== "stalled";
+            const d = DESC[a.key];
+            return (
+              <button onClick={() => setSelAgent(a)} className={`relative shrink-0 w-[88px] rounded-2xl border ${nodeBorder[a.status] || nodeBorder.idle} px-2 py-2.5 text-center transition hover:scale-[1.04] hover:shadow-md active:scale-95`}>
+                {working && <span className={`absolute -inset-px rounded-2xl ${ringC[a.status] || ringC.idle} opacity-20 animate-ping`} />}
+                <span className={`absolute top-1.5 right-1.5 w-2 h-2 rounded-full ${dotPulse[a.status] || dotPulse.idle} ${working ? "animate-pulse" : ""}`} />
+                <div className="relative">
+                  <div className="text-lg leading-none">{d?.icon || "•"}</div>
+                  <div className="text-[10.5px] font-extrabold text-stone-800 mt-1 leading-tight truncate">{a.label.split(" (")[0]}</div>
+                  {a.queue > 0 ? <div className="text-[9px] mt-0.5 font-bold text-amber-600">대기 {a.queue.toLocaleString()}</div> : <div className="text-[9px] mt-0.5 text-stone-400">{ago(a.ageH)}</div>}
+                </div>
+              </button>
+            );
+          };
+          const Arrow = () => <span className="shrink-0 self-center text-stone-300 text-sm select-none">→</span>;
+          const flow = ["collect", "synth", "judge", "embed"].map((k) => byKey[k]).filter(Boolean);
+          const redteam = ["verify", "grounding", "audit"].map((k) => byKey[k]).filter(Boolean);
           return (
+            <>
             <div className="mb-4 rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-xs font-bold text-stone-500 uppercase tracking-wider">🛰️ 자율 운영 관제탑</span>
@@ -209,20 +245,36 @@ export default function AdminPage() {
                   </div>
                 </div>
               )}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {tower.agents?.map((a: any) => (
-                  <div key={a.key} className="rounded-xl border border-stone-100 bg-stone-50 px-3 py-2.5">
-                    <div className="flex items-center gap-1.5">
-                      <span className={`w-2 h-2 rounded-full ${dot[a.status] || "bg-stone-300"}`} />
-                      <span className="text-[12px] font-bold text-stone-800 truncate">{a.label}</span>
-                    </div>
-                    <div className="mt-1 flex items-center justify-between text-[10px] text-stone-500">
-                      <span>{sl[a.status] || a.status} · {ago(a.ageH)}</span>
-                      {a.queue > 0 && <span className="text-amber-600 font-bold">대기 {a.queue.toLocaleString()}</span>}
-                    </div>
-                    <div className="text-[10px] text-stone-400 mt-0.5 truncate">{a.note}</div>
+              {/* 관제탑 → 에이전트 지시·통제 시각화 */}
+              <div className="rounded-2xl border border-stone-200 bg-gradient-to-b from-indigo-50/40 to-white p-3 mb-2.5">
+                <div className="flex items-center justify-center mb-1">
+                  <div className="relative inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3.5 py-1.5">
+                    <span className="absolute -inset-px rounded-full bg-indigo-300 opacity-20 animate-ping" />
+                    <span className="relative text-sm">🛰️</span>
+                    <span className="relative text-[11px] font-extrabold text-indigo-700">관제탑 · 지시 · 통제 · 모니터링</span>
                   </div>
-                ))}
+                </div>
+                <div className="flex justify-center text-stone-300 text-xs leading-none mb-1.5 select-none">│</div>
+                <div className="text-[9px] font-bold text-stone-400 mb-1 pl-0.5">데이터 생성 라인 (좌 → 우 흐름)</div>
+                <div className="flex items-stretch gap-1 overflow-x-auto pb-1">
+                  {flow.map((a: any, i: number) => (
+                    <div key={a.key} className="flex items-stretch gap-1">
+                      {i > 0 && <Arrow />}
+                      <Node a={a} />
+                    </div>
+                  ))}
+                  <Arrow />
+                  <div className="relative shrink-0 w-[88px] rounded-2xl border border-emerald-300 bg-emerald-100 px-2 py-2.5 text-center self-stretch">
+                    <div className="text-lg leading-none">✅</div>
+                    <div className="text-[10.5px] font-extrabold text-emerald-700 mt-1">공개</div>
+                    <div className="text-[9px] mt-0.5 font-bold text-emerald-600">{tower.coverage?.published?.toLocaleString()}곳</div>
+                  </div>
+                </div>
+                <div className="text-[9px] font-bold text-stone-400 mt-2 mb-1 pl-0.5">검증 레드팀 (병렬 감시)</div>
+                <div className="flex items-stretch gap-1.5 overflow-x-auto pb-1">
+                  {redteam.map((a: any) => <Node key={a.key} a={a} />)}
+                </div>
+                <div className="text-[9px] text-stone-400 mt-1.5 text-center">💡 노드를 누르면 상세 설명 · <span className="text-amber-500 font-bold">깜빡이면 작업 중</span></div>
               </div>
               {tower.pipeline && (
                 <div className="mt-3 rounded-xl bg-stone-50 border border-stone-100 p-2.5">
@@ -248,6 +300,35 @@ export default function AdminPage() {
                 <span className="ml-auto text-stone-400">갱신 {new Date(tower.generatedAt).toLocaleTimeString("ko-KR")}</span>
               </div>
             </div>
+            {selAgent && (() => {
+              const d = DESC[selAgent.key] || ({} as any);
+              const stLabel = sl[selAgent.status] || selAgent.status;
+              const pill = selAgent.status === "ok" ? "bg-emerald-100 text-emerald-700" : selAgent.status === "stalled" ? "bg-red-100 text-red-700" : selAgent.status === "idle" ? "bg-stone-100 text-stone-500" : "bg-amber-100 text-amber-700";
+              return (
+                <div onClick={() => setSelAgent(null)} className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-4">
+                  <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+                    <div className="flex items-start gap-2.5 mb-2">
+                      <span className="text-2xl leading-none">{d.icon || "•"}</span>
+                      <div className="min-w-0">
+                        <div className="text-base font-extrabold text-stone-800 leading-tight">{selAgent.label}</div>
+                        <span className={`inline-block mt-1 text-[11px] font-bold px-2 py-0.5 rounded-full ${pill}`}>{stLabel}</span>
+                      </div>
+                      <button onClick={() => setSelAgent(null)} className="ml-auto text-stone-400 text-2xl leading-none px-1">×</button>
+                    </div>
+                    <p className="text-[13px] text-stone-700 mt-1.5 leading-relaxed">{d.what || selAgent.note}</p>
+                    <div className="mt-3 space-y-1.5 text-[12px] border-t border-stone-100 pt-3">
+                      <div className="flex gap-2"><span className="text-stone-400 w-16 shrink-0">⏰ 주기</span><span className="text-stone-700">{d.sched || "—"}</span></div>
+                      <div className="flex gap-2"><span className="text-stone-400 w-16 shrink-0">➡️ 다음</span><span className="text-stone-700">{d.feeds || "—"}</span></div>
+                      <div className="flex gap-2"><span className="text-stone-400 w-16 shrink-0">🕐 마지막</span><span className="text-stone-700">{ago(selAgent.ageH)}</span></div>
+                      {selAgent.queue > 0 && <div className="flex gap-2"><span className="text-stone-400 w-16 shrink-0">📋 대기</span><span className="text-amber-600 font-bold">{selAgent.queue.toLocaleString()}건</span></div>}
+                      <div className="flex gap-2"><span className="text-stone-400 w-16 shrink-0">📝 현황</span><span className="text-stone-700">{selAgent.note}</span></div>
+                    </div>
+                    <button onClick={() => setSelAgent(null)} className="mt-4 w-full rounded-xl bg-stone-800 text-white text-[13px] font-bold py-2.5">닫기</button>
+                  </div>
+                </div>
+              );
+            })()}
+            </>
           );
         })()}
 
