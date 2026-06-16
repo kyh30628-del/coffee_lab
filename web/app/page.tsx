@@ -539,7 +539,7 @@ export default function Home() {
       L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: '&copy; OpenStreetMap' }).addTo(mapObj.current);
       // 채도 크게 낮추고 밝기 올려 녹지·토지구획 색을 가라앉힘 → 도로·시설·역·카페가 도드라짐. 웜톤은 유지, 라벨 대비 유지.
       const tp = mapObj.current.getPane("tilePane");
-      if (tp) tp.style.filter = "sepia(0.22) saturate(0.58) brightness(1.08) contrast(1.03)";
+      if (tp) tp.style.filter = "sepia(0.18) saturate(0.32) brightness(1.1) contrast(1.04)";
       layerRef.current = L.layerGroup().addTo(mapObj.current);
       setTimeout(() => mapObj.current?.invalidateSize(), 60);
       setMapReady(true); // 초기화 완료 → 마커 effect 재실행 트리거
