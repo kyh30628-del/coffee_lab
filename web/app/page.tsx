@@ -422,11 +422,11 @@ export default function Home() {
     if (u.selected) { setSelected(null); return true; }
     if (u.showConsent) { setShowConsent(false); return true; }
     if (u.tab === "memory") { setTab("home"); return true; } // 추억 → 홈
-    // 지도: 뒤로가기로 지역 계층을 한 단계 올라감 (동→구/시→시도→전체→홈)
+    // 지도: 뒤로가기로 지역 계층을 올라감 (동→구/시→수도권전체(서울·인천·경기)→홈)
     if (u.tab === "map") {
-      if (u.dong) { setDong(""); return true; }                                    // 동/면 → 구/시
-      if (u.sigungu) { setSigungu(""); setDong(""); return true; }                  // 구/시 → 시도
-      if (u.sido) { setSido(""); setSigungu(""); setDong(""); return true; }        // 시도 → 수도권 전체
+      if (u.dong) { setDong(""); return true; }                                    // 동/면 → 구/시(동 마커)
+      if (u.sigungu) { setSido(""); setSigungu(""); setDong(""); return true; }     // 구/시 → 지도 초기화면(서울·인천·경기)
+      if (u.sido) { setSido(""); setSigungu(""); setDong(""); return true; }        // 시도(구 마커) → 전체
       if (allowMapBack) { setTab("home"); return true; }                            // 전체 → 홈(iOS는 캐처 스트립이 처리)
       return false;
     }
