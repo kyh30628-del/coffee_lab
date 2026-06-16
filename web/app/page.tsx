@@ -179,18 +179,18 @@ function makePinHtml(c: Cafe, isMatch: boolean, isFocus = false, isMine = false)
   const feat = !!c.featured && !isFocus; // ✨ 우선 노출 — 골드 핀 강조(포커스 핀이 우선)
   // 내 카페(MY PIN) — 핑크/레드 하트 핀으로 최우선 강조
   const color = isMine ? "#d6336c" : isFocus ? "#b5703c" : feat ? "#e0a32e" : isMatch ? "#5f7355" : (GRADE_STYLE[grade]?.bg ?? "#9c6b3f");
-  const size = isMine ? 42 : isFocus ? 44 : feat ? 38 : isMatch ? 36 : 28;
+  const size = isMine ? 46 : isFocus ? 48 : feat ? 42 : isMatch ? 40 : 33;
   // 부드럽게 번지는 링(rgba) + 깊이감 있는 드롭섀도 — 색은 의미 유지, 스타일만 세련되게
-  const halo = isMine ? `0 0 0 5px rgba(214,51,108,0.28)` : isFocus ? `0 0 0 6px rgba(181,112,60,0.3)` : feat ? `0 0 0 4px rgba(224,163,46,0.32)` : isMatch ? `0 0 0 4px rgba(95,115,85,0.26)` : `0 0 0 2px rgba(156,107,63,0.18)`;
-  const ring = `box-shadow:${halo}, 0 4px 11px rgba(50,33,20,0.4);`;
+  const halo = isMine ? `0 0 0 5px rgba(214,51,108,0.3)` : isFocus ? `0 0 0 6px rgba(181,112,60,0.32)` : feat ? `0 0 0 5px rgba(224,163,46,0.34)` : isMatch ? `0 0 0 5px rgba(95,115,85,0.3)` : `0 0 0 3px rgba(156,107,63,0.3)`;
+  const ring = `box-shadow:${halo}, 0 5px 14px rgba(50,33,20,0.5);`;
   const labelStyle = isMine ? "background:#d6336c;color:#fff;font-weight:700;"
     : isFocus ? "background:#b5703c;color:#fff;font-weight:700;"
     : feat ? "background:#e0a32e;color:#2b2018;font-weight:700;" : "background:rgba(253,250,244,0.96);color:#2b2018;font-weight:600;";
   const glyph = isMine ? "❤" : isFocus ? "📍" : feat ? "⭐" : "☕";
   return `<div style="transform:translate(-50%,-100%);text-align:center;">
     <div style="width:${size}px;height:${size}px;background:${color};background-image:radial-gradient(circle at 34% 28%, rgba(255,255,255,0.42), rgba(255,255,255,0) 58%);border:2px solid #fdfaf4;border-radius:50% 50% 50% 0;transform:rotate(-45deg);${ring}display:flex;align-items:center;justify-content:center;margin:0 auto;">
-      <span style="transform:rotate(45deg);font-size:${isFocus ? 18 : isMatch || feat ? 14 : 11}px;filter:drop-shadow(0 1px 1px rgba(0,0,0,0.22));">${glyph}</span></div>
-    <div style="margin-top:3px;${labelStyle}padding:1.5px 6px;border-radius:8px;font-size:${isFocus || isMine ? 10 : 9}px;white-space:nowrap;display:inline-block;box-shadow:0 2px 5px rgba(0,0,0,0.16);">${c.name}${isMine ? " ❤" : isFocus ? "" : feat ? " ⭐" : isMatch ? " ✓" : ""}</div>
+      <span style="transform:rotate(45deg);font-size:${isFocus ? 20 : isMatch || feat ? 16 : 14}px;filter:drop-shadow(0 1px 1px rgba(0,0,0,0.25));">${glyph}</span></div>
+    <div style="margin-top:3px;${labelStyle}padding:2px 7px;border-radius:8px;font-size:${isFocus || isMine ? 11 : 10}px;white-space:nowrap;display:inline-block;box-shadow:0 2px 6px rgba(0,0,0,0.28);">${c.name}${isMine ? " ❤" : isFocus ? "" : feat ? " ⭐" : isMatch ? " ✓" : ""}</div>
   </div>`;
 }
 // 다른 사람들의 집계 핀 — 등록 인원수 표시, 인기 많을수록 크게(원형, 카페핀과 구분).
@@ -533,13 +533,12 @@ export default function Home() {
       await import("leaflet/dist/leaflet.css");
       if (cancelled || !mapRef.current || mapObj.current) return;
       LRef.current = L;
-      mapObj.current = L.map(mapRef.current, { zoomControl: true, attributionControl: true }).setView([37.5, 127.05], 10);
-      mapObj.current.attributionControl.setPrefix("");
-      // 한글 지명 OSM 베이스. 카페 탐색에 필요한 만큼만(랜드마크는 절제), 커피 특색은 마커가 담당.
-      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: '&copy; OpenStreetMap' }).addTo(mapObj.current);
-      // 옅은 웜톤 + 채도 낮춰 빽빽한 색감은 가라앉히고, 대비는 유지해 라벨은 선명하게.
+      mapObj.current = L.map(mapRef.current, { zoomControl: true, attributionControl: false }).setView([37.5, 127.05], 10);
+      // 정갈한 웜톤 베이스(CartoDB Voyager) — OSM 표준의 토지구획·녹지 텍스처 없이 도로·시설·라벨이 또렷.
+      // 상세 줌에선 동·도로·역명이 한글로 표기됨. 커피 특색은 옅은 웜톤 + 마커가 담당.
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", { subdomains: "abcd", maxZoom: 20 }).addTo(mapObj.current);
       const tp = mapObj.current.getPane("tilePane");
-      if (tp) tp.style.filter = "sepia(0.28) saturate(0.8) brightness(1.06) contrast(1.0)";
+      if (tp) tp.style.filter = "sepia(0.18) saturate(0.96) brightness(1.0)";
       layerRef.current = L.layerGroup().addTo(mapObj.current);
       setTimeout(() => mapObj.current?.invalidateSize(), 60);
       setMapReady(true); // 초기화 완료 → 마커 effect 재실행 트리거
