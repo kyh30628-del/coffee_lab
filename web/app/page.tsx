@@ -207,8 +207,10 @@ function applyTogglesToMap(ml: any, showStreets: boolean, showBus: boolean): voi
       try {
         if (_origPoiFilter[ly.id] === undefined) _origPoiFilter[ly.id] = ml.getFilter(ly.id) ?? null;
         const orig = _origPoiFilter[ly.id];
+        // 버스 토글 OFF → 버스 + 베이스맵 파란 지하철/철도 아이콘(rail/railway)까지 제외(내 호선 색뱃지만 남겨 깔끔).
+        const excl: any = ["match", ["get", "class"], ["bus", "rail", "railway"], false, true];
         if (showBus) ml.setFilter(ly.id, orig);
-        else ml.setFilter(ly.id, orig ? ["all", orig, ["!=", ["get", "class"], "bus"]] : ["!=", ["get", "class"], "bus"]);
+        else ml.setFilter(ly.id, orig ? ["all", orig, excl] : excl);
       } catch {}
     }
   }
@@ -791,8 +793,8 @@ export default function Home() {
       // 🚇 구/동 집계 레벨에서도 줌인(z≥12)하면 지하철역 표시 — 위치 가늠
       const az = map.getZoom();
       if (az >= 12 && stations.length) {
-        const ab = map.getBounds().pad(0.2);
-        const stns = stations.filter((s) => ab.contains([s.lat, s.lng] as [number, number])).slice(0, 24);
+        const ab = map.getBounds().pad(0.1);
+        const stns = stations.filter((s) => ab.contains([s.lat, s.lng] as [number, number])).slice(0, 80); // 모든 호선 역이 다 보이게(상한 넉넉히)
         const stnLayer = stns.map((s) => L.marker([s.lat, s.lng], { icon: L.divIcon({ className: "", html: makeStationHtml(s.n, s.c, s.r), iconSize: [0, 0] }), interactive: false, zIndexOffset: -300 }));
         if (stnLayer.length) layerRef.current.addLayer(L.layerGroup(stnLayer));
       }
