@@ -161,17 +161,17 @@ function makeRegionPinHtml(label: string, cnt: number, maxCnt: number): string {
 
 // 위치 가늠용 지하철역 마커(개별 카페 레벨에서만). 카페 핀과 구분되게 파란 점 + 역명.
 function makeStationHtml(name: string): string {
-  // 지하철역 — 파란 'M' 뱃지 + 진한 파랑 테두리 라벨로 도드라지게
+  // 지하철역 — 깊은 파랑 'M' 뱃지 + 흰 라벨, 그림자 강화로 깊은 톤 위에서 또렷하게
   return `<div style="transform:translate(-50%,-50%);display:flex;align-items:center;gap:3px;white-space:nowrap;">
-    <span style="width:14px;height:14px;border-radius:50%;background:linear-gradient(#3d86d6,#2a64a8);border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.5);flex:none;display:flex;align-items:center;justify-content:center;font-size:9px;line-height:1;color:#fff;font-weight:900;">M</span>
-    <span style="font-size:11px;font-weight:800;color:#16406e;background:#fff;border:1.5px solid #2f6fb0;padding:1px 5px;border-radius:7px;box-shadow:0 1px 2px rgba(0,0,0,0.25);">${(name || "").replace(/</g, "&lt;")}역</span>
+    <span style="width:15px;height:15px;border-radius:50%;background:linear-gradient(#3a7fcc,#214f86);border:2px solid #fff;box-shadow:0 1.5px 4px rgba(0,0,0,0.55);flex:none;display:flex;align-items:center;justify-content:center;font-size:9.5px;line-height:1;color:#fff;font-weight:900;">M</span>
+    <span style="font-size:11.5px;font-weight:800;color:#13365f;background:#fff;border:1.5px solid #2a64a8;padding:1px 6px;border-radius:7px;box-shadow:0 1.5px 4px rgba(0,0,0,0.42);">${(name || "").replace(/</g, "&lt;")}역</span>
   </div>`;
 }
 function makeLandmarkHtml(name: string, icon: string): string {
-  // 대형 랜드마크 — 유형 아이콘 + 호박색 라벨(역/카페와 구분되게)
+  // 대형 랜드마크 — 유형 아이콘 + 크림/호박 라벨(커피 테마와 조화), 그림자 강화로 또렷하게
   return `<div style="transform:translate(-50%,-50%);display:flex;align-items:center;gap:3px;white-space:nowrap;">
-    <span style="font-size:16px;line-height:1;filter:drop-shadow(0 1px 1.5px rgba(0,0,0,0.45));flex:none;">${icon}</span>
-    <span style="font-size:11px;font-weight:800;color:#6b4310;background:#fff7e6;border:1.5px solid #e0a83c;padding:1px 5px;border-radius:7px;box-shadow:0 1px 2px rgba(0,0,0,0.22);">${(name || "").replace(/</g, "&lt;")}</span>
+    <span style="font-size:17px;line-height:1;filter:drop-shadow(0 1.5px 2px rgba(0,0,0,0.5));flex:none;">${icon}</span>
+    <span style="font-size:11.5px;font-weight:800;color:#5a3608;background:#fffaf0;border:1.5px solid #cf922f;padding:1px 6px;border-radius:7px;box-shadow:0 1.5px 4px rgba(0,0,0,0.4);">${(name || "").replace(/</g, "&lt;")}</span>
   </div>`;
 }
 function makePinHtml(c: Cafe, isMatch: boolean, isFocus = false, isMine = false): string {
@@ -539,7 +539,8 @@ export default function Home() {
       L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: '&copy; OpenStreetMap' }).addTo(mapObj.current);
       // 커피 테마에 맞춰 타일에 따뜻한 크림/세피아 톤 필터 적용(라벨·작은 랜드마크는 그대로, 색감만 보정)
       const tp = mapObj.current.getPane("tilePane");
-      if (tp) tp.style.filter = "sepia(0.34) saturate(0.82) brightness(1.05) contrast(0.92) hue-rotate(-7deg)";
+      // 더 깊고 차분한 세피아(채도는 낮춰 차분, 대비는 살짝 올려 또렷). 마커가 위에서 도드라짐.
+      if (tp) tp.style.filter = "sepia(0.48) saturate(0.7) brightness(0.95) contrast(1.04) hue-rotate(-8deg)";
       layerRef.current = L.layerGroup().addTo(mapObj.current);
       setTimeout(() => mapObj.current?.invalidateSize(), 60);
       setMapReady(true); // 초기화 완료 → 마커 effect 재실행 트리거
