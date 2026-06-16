@@ -533,12 +533,13 @@ export default function Home() {
       await import("leaflet/dist/leaflet.css");
       if (cancelled || !mapRef.current || mapObj.current) return;
       LRef.current = L;
-      mapObj.current = L.map(mapRef.current, { zoomControl: true, attributionControl: false }).setView([37.5, 127.05], 10);
-      // 정갈한 웜톤 베이스(CartoDB Voyager) — OSM 표준의 토지구획·녹지 텍스처 없이 도로·시설·라벨이 또렷.
-      // 상세 줌에선 동·도로·역명이 한글로 표기됨. 커피 특색은 옅은 웜톤 + 마커가 담당.
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", { subdomains: "abcd", maxZoom: 20 }).addTo(mapObj.current);
+      mapObj.current = L.map(mapRef.current, { zoomControl: true, attributionControl: true }).setView([37.5, 127.05], 10);
+      mapObj.current.attributionControl.setPrefix("");
+      // 한글 OSM 베이스 유지(스타일 그대로). 타일은 안 바꿈.
+      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: '&copy; OpenStreetMap' }).addTo(mapObj.current);
+      // 채도 크게 낮추고 밝기 올려 녹지·토지구획 색을 가라앉힘 → 도로·시설·역·카페가 도드라짐. 웜톤은 유지, 라벨 대비 유지.
       const tp = mapObj.current.getPane("tilePane");
-      if (tp) tp.style.filter = "sepia(0.18) saturate(0.96) brightness(1.0)";
+      if (tp) tp.style.filter = "sepia(0.22) saturate(0.58) brightness(1.08) contrast(1.03)";
       layerRef.current = L.layerGroup().addTo(mapObj.current);
       setTimeout(() => mapObj.current?.invalidateSize(), 60);
       setMapReady(true); // 초기화 완료 → 마커 effect 재실행 트리거
