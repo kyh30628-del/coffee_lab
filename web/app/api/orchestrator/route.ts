@@ -70,6 +70,22 @@ export async function GET(req: NextRequest) {
     const jobRuns = (await sql`SELECT job, to_char(ran_at,'MM-DD HH24:MI') ran, ok, detail, EXTRACT(EPOCH FROM (now()-ran_at))/3600 age_h FROM agent_runs`.catch(() => [])) as any[];
     const jobFails = jobRuns.filter((j) => j.ok === false).map((j) => `${j.job} 오류(${j.ran}): ${(j.detail || "").slice(0, 70)}`);
 
+    // 🔎 공개 데이터 무결성 실시간 자가검증 — 사장님이 잡은 버그 유형을 관제탑이 매번 스스로 검사.
+    //   (동 형식·동=구명 오추출·동-구 불일치·카테고리 누락·좌표 오류) 위반 시 즉시 경보.
+    const ig = (await sql`SELECT
+      COUNT(*) FILTER (WHERE dong IS NOT NULL AND (area=dong||'구' OR area=dong||'시' OR area=dong||'군'))::int dong_isgu,
+      COUNT(*) FILTER (WHERE dong IS NOT NULL AND dong !~ '(동|읍|면|가)$')::int dong_badfmt,
+      COUNT(*) FILTER (WHERE naver_category IS NULL OR naver_category='')::int pub_nocat,
+      COUNT(*) FILTER (WHERE lat IS NULL OR lat NOT BETWEEN 36.8 AND 38.3 OR lng NOT BETWEEN 124.5 AND 127.9)::int pub_badcoord,
+      COUNT(*) FILTER (WHERE synth_identity IS NULL OR synth_identity='')::int pub_noidentity
+      FROM cafes WHERE published = true`)[0] as any;
+    const integrity: string[] = [];
+    if (ig.dong_isgu > 0) integrity.push(`동 오추출(구명) ${ig.dong_isgu}건`);
+    if (ig.dong_badfmt > 0) integrity.push(`동 형식오류 ${ig.dong_badfmt}건`);
+    if (ig.pub_nocat > 0) integrity.push(`공개인데 카테고리없음 ${ig.pub_nocat}건`);
+    if (ig.pub_badcoord > 0) integrity.push(`공개 좌표오류 ${ig.pub_badcoord}건`);
+    if (ig.pub_noidentity > 0) integrity.push(`공개인데 정체성없음 ${ig.pub_noidentity}건`);
+
     // 파이프라인 진행 상황(신규 카페 조립라인)
     const pl = (await sql`SELECT
       COUNT(*) FILTER (WHERE pipeline_status='new')::int p_new,
@@ -141,11 +157,11 @@ export async function GET(req: NextRequest) {
 
     // ── 4) 종합 건강 ──
     const core = agents.filter((a) => ["collect", "synth", "judge"].includes(a.key));
-    const overall = (core.some((a) => a.status === "stalled") || jobFails.length) ? "critical"
+    const overall = (core.some((a) => a.status === "stalled") || jobFails.length || integrity.length) ? "critical"
       : agents.some((a) => a.status === "stalled" || a.status === "behind" || a.status === "warn") ? "degraded"
       : "healthy";
-    // 배치 크래시·실패를 최상단 경보로 — '관제탑이 잡아서 알림'
-    const alerts = [...jobFails, ...agents.filter((a) => a.status === "stalled").map((a) => `${a.label} 멈춤(${a.ageH}h 전 마지막 가동)`)];
+    // 배치 크래시·실패 + 데이터 무결성 위반을 최상단 경보로 — '관제탑이 잡아서 알림'
+    const alerts = [...jobFails, ...integrity.map((s) => `🔎 무결성: ${s}`), ...agents.filter((a) => a.status === "stalled").map((a) => `${a.label} 멈춤(${a.ageH}h 전 마지막 가동)`)];
 
     const pct = (n: number) => (c.total ? Math.round((n / c.total) * 100) : 0);
     // 신규 카페 조립라인(발굴→합성→AI판정→임베딩→공개). 각 단계 대기 수 = '어디서 막혔나'.
