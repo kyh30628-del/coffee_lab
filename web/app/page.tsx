@@ -596,11 +596,22 @@ export default function Home() {
               try { ml.setLayoutProperty(ly.id, "visibility", "none"); } catch {}
               continue;
             }
-            if (ly.type === "fill" && /building/i.test(ly.id)) { try { ml.setPaintProperty(ly.id, "fill-color", "#e9dfcc"); } catch {} continue; }
+            if (ly.type === "fill" && /building/i.test(ly.id)) { try { ml.setPaintProperty(ly.id, "fill-color", "#ece2cf"); ml.setPaintProperty(ly.id, "fill-outline-color", "#dccfb4"); } catch {} continue; }
+            // 주요 도로 강조색(웜 앰버) — 큰길이 한눈에. 물길/철도는 기본 유지.
+            if (ly.type === "line" && /(motorway|trunk|primary)/i.test(ly.id) && !/casing|bridge|tunnel/i.test(ly.id)) {
+              try { ml.setPaintProperty(ly.id, "line-color", "#e6a23c"); } catch {}
+            }
             if (ly.type === "symbol") {
               const tf = (ly as any).layout && (ly as any).layout["text-field"];
               if (tf && JSON.stringify(tf).includes("name")) {
                 try { ml.setLayoutProperty(ly.id, "text-field", KO_LABEL); } catch {}
+              }
+              // 🏪 POI(상호·상가)를 풍성하게 — 더 일찍 보이게(줌 2단계↓) + 가독성 헤일로 + 강조색(교통=파랑, 그 외=커피브라운)
+              if (/poi/i.test(ly.id)) {
+                try { if (typeof (ly as any).minzoom === "number") ml.setLayerZoomRange(ly.id, Math.max(12, (ly as any).minzoom - 2), (ly as any).maxzoom ?? 24); } catch {}
+                try { ml.setPaintProperty(ly.id, "text-color", /transit/i.test(ly.id) ? "#235a86" : "#4a3526"); } catch {}
+                try { ml.setPaintProperty(ly.id, "text-halo-color", "#fdf7ec"); ml.setPaintProperty(ly.id, "text-halo-width", 1.4); } catch {}
+                try { ml.setLayoutProperty(ly.id, "icon-size", 1.15); } catch {}
               }
             }
           }
