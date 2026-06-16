@@ -294,6 +294,19 @@ export default function AdminPage() {
                 })}
               </div>
               <button onClick={() => setTowerFull(true)} className="w-full mb-2.5 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-700 text-[12px] font-bold py-2 hover:bg-indigo-100 transition">⛶ 관제탑 전체 흐름 보기 (수집 → 공개)</button>
+              {/* 🔬 그라운딩 의심 목록 — 무엇이 오염/환각으로 잡혔는지 명시 */}
+              {tower.grounding && (tower.grounding.backlog > 0 || tower.grounding.suspectCount > 0) && (
+                <div className="mb-2.5 rounded-xl border border-rose-200 bg-rose-50/60 p-2.5">
+                  <div className="text-[11px] font-bold text-rose-800 mb-1.5">🔬 LLM 그라운딩 — 검사대기 {tower.grounding.backlog?.toLocaleString()} · 의심 {tower.grounding.suspectCount}건 (판정완료분만)</div>
+                  {tower.grounding.suspects?.length > 0 ? (
+                    <div className="space-y-1 max-h-44 overflow-y-auto">
+                      {tower.grounding.suspects.map((s: any, i: number) => (
+                        <div key={i} className="text-[10.5px] leading-snug"><b className="text-rose-700">{s.name}</b> <span className="text-stone-400">{s.area}</span><br /><span className="text-stone-600">{s.issue}</span></div>
+                      ))}
+                    </div>
+                  ) : <div className="text-[10.5px] text-stone-500">의심 0건 — 깨끗</div>}
+                </div>
+              )}
               <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-stone-500">
                 <span>공개 <b className="text-stone-700">{tower.coverage?.published?.toLocaleString()}</b>/{tower.coverage?.total?.toLocaleString()}</span>
                 <span>raw {tower.coverage?.rawCachedPct}%</span>
