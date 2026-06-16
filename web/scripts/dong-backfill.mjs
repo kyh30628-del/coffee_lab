@@ -26,24 +26,28 @@ async function search(q) {
 await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS naver_category TEXT`.catch(() => {});
 let done = 0, miss = 0, refiltered = 0, republished = 0, cursor = 0, stop = "";
 const MAX = Number(process.env.DONG_MAX || 20000);
+const REVAL = process.env.REVALIDATE === "1"; // 전수 재검증: 모든 카페 재조회, 구 불일치 동은 교정/제거
+let corrected = 0;
 try {
   while (done + miss < MAX && !stop) {
     // ★ 커서(id>cursor)와 정렬을 반드시 id로 일치시킬 것. 카테고리우선 정렬은 커서가 점프해
     //   하위 id의 동없는 카페를 통째로 스킵시키는 버그를 유발(45%에서 멈춘 원인). 순수 id 순으로 전수 처리.
-    const rows = await sql`SELECT id, name, area, lat, lng, synth_grade, needs_category FROM cafes WHERE (naver_category IS NULL OR naver_category='' OR dong IS NULL) AND lat IS NOT NULL AND id > ${cursor} AND (${Number(process.env.SHARDS || 1)} = 1 OR id % ${Number(process.env.SHARDS || 1)} = ${Number(process.env.SHARD || 0)}) ORDER BY id LIMIT 25`;
+    const rows = await sql`SELECT id, name, area, lat, lng, synth_grade, needs_category, dong FROM cafes WHERE (${REVAL} OR naver_category IS NULL OR naver_category='' OR dong IS NULL) AND lat IS NOT NULL AND id > ${cursor} AND (${Number(process.env.SHARDS || 1)} = 1 OR id % ${Number(process.env.SHARDS || 1)} = ${Number(process.env.SHARD || 0)}) ORDER BY id LIMIT 25`;
     if (!rows.length) { stop = "동·카테고리 미보유 카페 소진 — 완료"; break; }
     for (const c of rows) {
       cursor = c.id;
       try {
         const res = await search(`${c.name} ${c.area}`);
         if (res.quota) { stop = "네이버 한도 도달 — 중단(다음날 재개)"; break; }
-        const m = res.items.find((it) => it.lat && Math.abs(it.lat - c.lat) < 0.001 && Math.abs(it.lng - c.lng) < 0.001)
-          || res.items.find((it) => it.name.replace(/\s/g, "") === c.name.replace(/\s/g, ""))
-          || res.items[0];
+        // ★ 정확도 핵심: 좌표 근접 + '지번의 구가 카페 area와 일치'해야 채택. 딴 동네 동명 카페(수석동/강동구) 차단.
+        const guN = (c.area || "").replace(/\s/g, "");
+        const inGu = (it) => guN && (it.jibun || "").replace(/\s/g, "").includes(guN);
+        const m = res.items.find((it) => it.lat && Math.abs(it.lat - c.lat) < 0.0015 && Math.abs(it.lng - c.lng) < 0.0015 && inGu(it))
+          || res.items.find((it) => it.name.replace(/\s/g, "") === c.name.replace(/\s/g, "") && inGu(it));
         const dong = m ? parseDong(m.jibun) : null;
         const cat = m ? (m.category || "") : "";
-        if (dong) { await sql`UPDATE cafes SET dong = ${dong} WHERE id = ${c.id}`; done++; }
-        else miss++;
+        if (dong) { if (dong !== c.dong) { await sql`UPDATE cafes SET dong = ${dong} WHERE id = ${c.id}`; if (c.dong) corrected++; } done++; }
+        else { if (REVAL && c.dong) { await sql`UPDATE cafes SET dong = NULL WHERE id = ${c.id}`; corrected++; } miss++; } // 검증 실패한 기존 잘못된 동 제거
         await sql`UPDATE cafes SET naver_category = ${cat || ""} WHERE id = ${c.id}`;
         // 카테고리 확보 → 자가 검증: 카페·디저트면 (보류였으면) 공개 복귀, 비카페·프랜차이즈면 차단.
         const bad = isFranchise(c.name) || isNonCafe(c.name, cat) || !cat;
@@ -66,7 +70,7 @@ let remain = "?", held = "?", pub = "?";
 try { remain = (await sql`SELECT COUNT(*)::int n FROM cafes WHERE (naver_category IS NULL OR naver_category='') AND lat IS NOT NULL`)[0].n; } catch {}
 try { const r = await sql`SELECT count(*) FILTER(WHERE published)::int pub, count(*) FILTER(WHERE needs_category AND NOT published)::int held FROM cafes`; held = r[0].held; pub = r[0].pub; } catch {}
 console.log(stop || "상한 도달");
-console.log(`자율검증 백필: 동채움 ${done} · 카페복귀 ${republished} · 비카페차단 ${refiltered} · 카테고리미보유 남음 ${remain}`);
+console.log(`자율검증 백필: 동채움 ${done} · 동교정/제거 ${corrected} · 카페복귀 ${republished} · 비카페차단 ${refiltered} · 카테고리미보유 남음 ${remain}`);
 console.log(`→ 공개(검증완료) ${pub} · 검증대기 보류 ${held}`);
 await recordRun("dong-backfill", !stop.startsWith("예외"), stop || `완료(동 ${done})`, done); // 한도·완료=정상, 예외=실패
 process.exit(0);
