@@ -764,14 +764,21 @@ export default function Home() {
       return;
     }
 
-    // ===== 일반 모드: 계층 집계. 전체→시도원형, 시도→구원형, 구→동원형, 동(또는 포커스)→개별 카페 =====
-    const level = sigungu ? (dong ? "cafe" : "dong") : (sido ? "gu" : "sido");
-    if (level !== "cafe" && !focusId) {
+    // ===== 줌 기반 계층(자유 줌·이동도 자연스럽게). 화면이 곧 상태: 시도→구→동 집계, z≥15/동선택=개별 카페 실시간 =====
+    const z = map.getZoom();
+    const b = map.getBounds().pad(0.2);
+    const level = (dong || focusId || z >= 15) ? "cafe"
+      : (sigungu || z >= 13) ? "dong"
+      : (sido || z >= 11) ? "gu"
+      : "sido";
+    if (level !== "cafe") {
       const keyFn = level === "sido" ? (c: Cafe) => toGu(c.area).sido
         : level === "gu" ? (c: Cafe) => toGu(c.area).sigungu
         : (c: Cafe) => c.dong || "기타";
+      // 시도(전역 개요)는 전체 카페로 고정중심 집계, 구·동은 '화면 안' 카페만 집계 → 이동/줌 시 실시간으로 드러남.
+      const gsrc = level === "sido" ? filtered : filtered.filter((c) => b.contains([c.lat, c.lng] as [number, number]));
       const groups = new Map<string, { lat: number; lng: number; n: number }>();
-      for (const c of filtered) {
+      for (const c of gsrc) {
         const k = keyFn(c); if (!k) continue;
         const g = groups.get(k) ?? { lat: 0, lng: 0, n: 0 };
         g.lat += c.lat; g.lng += c.lng; g.n++; groups.set(k, g);
@@ -782,7 +789,6 @@ export default function Home() {
         return { key: k, lat: fixed ? fixed[0] : g.lat / g.n, lng: fixed ? fixed[1] : g.lng / g.n, n: g.n };
       });
       const maxN = arr.reduce((m, g) => Math.max(m, g.n), 1);
-      // 마커는 실제 위치(시도=고정중심, 구·동=카페 centroid)에 왜곡 없이 그대로. 겹치면 줌인해 하위 단계로.
       const markers = arr.map((g) => L.marker([g.lat, g.lng], { icon: L.divIcon({ className: "", html: makeRegionPinHtml(g.key, g.n, maxN), iconSize: [0, 0] }), zIndexOffset: g.n })
         .on("click", () => {
           if (level === "sido") { setSido(g.key); setSigungu(""); setDong(""); }
@@ -790,20 +796,12 @@ export default function Home() {
           else setDong(g.key);
         }));
       layerRef.current.addLayer(L.layerGroup(markers));
-      // 🚇 구/동 집계 레벨에서도 줌인(z≥12)하면 지하철역 표시 — 위치 가늠
-      const az = map.getZoom();
-      if (az >= 12 && stations.length) {
-        const ab = map.getBounds().pad(0.1);
-        const stns = stations.filter((s) => ab.contains([s.lat, s.lng] as [number, number])).slice(0, 80); // 모든 호선 역이 다 보이게(상한 넉넉히)
-        const stnLayer = stns.map((s) => L.marker([s.lat, s.lng], { icon: L.divIcon({ className: "", html: makeStationHtml(s.n, s.c, s.r), iconSize: [0, 0] }), interactive: false, zIndexOffset: -300 }));
-        if (stnLayer.length) layerRef.current.addLayer(L.layerGroup(stnLayer));
-      }
       return;
     }
 
-    // 동 선택(또는 포커스): 개별 카페 — 화면 안 + 너무 많으면 인기순 상위 제한
-    const b = map.getBounds().pad(0.2);
-    const inView = filtered.filter((c) => b.contains([c.lat, c.lng] as [number, number]));
+    // 동 선택/포커스/줌인(z≥15): 화면에 보이는 개별 카페를 실시간 렌더. 동 미선택 줌인 시엔 지역필터 없이 '뷰포트 전체' 카페.
+    const src = (!dong && !focusId) ? cafes.filter((c) => c.lat && c.lng) : filtered;
+    const inView = src.filter((c) => b.contains([c.lat, c.lng] as [number, number]));
     const CAP = 160;
     const toRender = inView.length > CAP ? [...inView].sort((a, c) => (c.synth_count ?? 0) - (a.synth_count ?? 0)).slice(0, CAP) : inView;
     const markers = toRender.map((c) => {
@@ -814,8 +812,7 @@ export default function Home() {
       if (isFocus) m.bindPopup(`<b>${c.name}</b><br>${c.area}`);
       return m;
     });
-    // 🚇🏬 위치 가늠용 지하철역·대형 랜드마크 — 개별 카페 레벨(줌인)에서만, 화면 안만. 카페보다 아래·비클릭.
-    const z = map.getZoom();
+    // 🚇🏬 지하철역·대형 랜드마크 — 개별 카페(동) 레벨에서만, 화면 안만. 카페보다 아래·비클릭.
     if (z >= 13) {
       if (landmarks.length) {
         // 큰 랜드마크(우선순위≥3: 몰·백화점·대학·경기장·타워·공항·궁·테마파크)만, 화면당 최대 8개 — 군더더기 제거
@@ -867,7 +864,7 @@ export default function Home() {
   useEffect(() => {
     const map = mapObj.current;
     if (!map || !mapReady) return;
-    const onMove = () => { if (dong || focusId || myPinMode || othersMode || (mapObj.current && mapObj.current.getZoom() >= 12)) drawMarkers(); }; // 개별 카페 + 줌인(z≥12) 시 뷰포트 재그림(역 갱신)
+    const onMove = () => drawMarkers(); // 이동/줌 끝나면 항상 화면 기준 재그림(줌인=개별카페 실시간, 줌아웃=집계 원형). z15 경계 전환도 매끄럽게.
     map.on("moveend", onMove);
     return () => { map.off("moveend", onMove); };
   }, [drawMarkers, mapReady, dong, focusId, myPinMode, othersMode]);
@@ -1088,8 +1085,8 @@ export default function Home() {
                 <span>다른 사람은{othersMode && othersPins.length ? ` ${othersPins.length}` : ""}</span>
               </button>
             </div>
-            {/* 🗺️ 지도 표시 토글 — 우측 상단(길이름/버스정류장 켜고 끄기) */}
-            <div className="absolute top-3 right-3 z-[1100] flex flex-col gap-1.5 items-end">
+            {/* 🗺️ 지도 표시 토글 — 우측(상단 컨트롤과 겹치지 않게 한 줄 아래로) */}
+            <div className="absolute top-14 right-3 z-[1100] flex flex-col gap-1.5 items-end">
               <button onClick={() => setShowStreets((v) => !v)}
                 className={`inline-flex items-center gap-1 h-8 px-2.5 rounded-full text-[11px] font-bold shadow-lg whitespace-nowrap transition-colors ${showStreets ? "bg-[#5b4636] text-white" : "bg-white/95 text-[#8a7458] border border-[#e0d3bd]"}`}>
                 <span className="text-[12px] leading-none">🛣️</span><span>길이름 {showStreets ? "ON" : "OFF"}</span>
