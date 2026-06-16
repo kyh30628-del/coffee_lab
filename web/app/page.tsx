@@ -570,9 +570,16 @@ export default function Home() {
         (window as any).maplibregl = maplibregl;
         const gl = (L as any).maplibreGL({ style: "https://tiles.openfreemap.org/styles/liberty", attribution: "&copy; OpenStreetMap" });
         gl.addTo(mapObj.current);
+        // 커피 테마와 조화 — 벡터 위에 아주 옅은 크림 톤(tilePane=벡터 캔버스). 라벨 가독성 유지되는 약한 강도.
+        const tp = mapObj.current.getPane("tilePane");
+        if (tp) tp.style.filter = "sepia(0.1) saturate(0.96) brightness(1.01)";
         const ml = gl.getMaplibreMap();
+        // 전 세계 한글 표기 — name:ko 우선(없으면 현지명→로마자). ko가 없는 한국 지명은 name이 한글이라 안전.
+        const KO_LABEL: any = ["coalesce", ["get", "name:ko"], ["get", "name"], ["get", "name:latin"]];
         ml.on("load", () => {
           try {
+            // 크림 배경 + 건물 따뜻한 톤(녹지 숨김으로 배경이 넓게 드러남 → 크림으로 보임)
+            try { ml.setPaintProperty("background", "background-color", "#f3ecdb"); } catch {}
             for (const ly of (ml.getStyle().layers || [])) {
               const sl = (ly as any)["source-layer"] || "";
               // 녹지·토지구획·공원·산 → 숨김 (물·도로·건물·라벨은 유지)
@@ -580,11 +587,13 @@ export default function Home() {
                 try { ml.setLayoutProperty(ly.id, "visibility", "none"); } catch {}
                 continue;
               }
-              // 한글 라벨 — name 기반 심볼 레이어만 name:ko→name 우선(번지수 등은 건드리지 않음)
+              // 건물 — 옅은 크림/베이지로 통일
+              if (ly.type === "fill" && /building/i.test(ly.id)) { try { ml.setPaintProperty(ly.id, "fill-color", "#e9dfcc"); } catch {} continue; }
+              // 한글 라벨 — name 기반 심볼 레이어 전부 name:ko 우선(전 세계 국가·지명)
               if (ly.type === "symbol") {
                 const tf = (ly as any).layout && (ly as any).layout["text-field"];
                 if (tf && JSON.stringify(tf).includes("name")) {
-                  try { ml.setLayoutProperty(ly.id, "text-field", ["coalesce", ["get", "name:ko"], ["get", "name"], ["get", "name:latin"]]); } catch {}
+                  try { ml.setLayoutProperty(ly.id, "text-field", KO_LABEL); } catch {}
                 }
               }
             }
