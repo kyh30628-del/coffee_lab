@@ -412,8 +412,8 @@ export default function Home() {
   const openById = useCallback((id: number) => { const c = cafes.find((x) => x.id === id); if (c) setSelected(c); }, [cafes]);
 
   // 뒤로가기 가드: 현재 UI 레이어를 ref로 추적(리스너에서 최신값 참조)
-  const uiRef = useRef<{ selected: boolean; showSearch: boolean; showConsent: boolean; tab: string; role: string | null; ownerPwModal: boolean }>({ selected: false, showSearch: false, showConsent: false, tab: "home", role: null, ownerPwModal: false });
-  uiRef.current = { selected: !!selected, showSearch, showConsent, tab, role, ownerPwModal };
+  const uiRef = useRef<{ selected: boolean; showSearch: boolean; showConsent: boolean; tab: string; role: string | null; ownerPwModal: boolean; sido: string; sigungu: string; dong: string }>({ selected: false, showSearch: false, showConsent: false, tab: "home", role: null, ownerPwModal: false, sido: "", sigungu: "", dong: "" });
+  uiRef.current = { selected: !!selected, showSearch, showConsent, tab, role, ownerPwModal, sido, sigungu, dong };
   // 위에서 연 레이어를 우선순위대로 즉시 닫는다(공통). allowMapBack=false면 지도→홈은 건너뜀(지도 패닝과 충돌 방지).
   const closeTopLayer = (allowMapBack = true) => {
     const u = uiRef.current;
@@ -422,7 +422,14 @@ export default function Home() {
     if (u.selected) { setSelected(null); return true; }
     if (u.showConsent) { setShowConsent(false); return true; }
     if (u.tab === "memory") { setTab("home"); return true; } // 추억 → 홈
-    if (allowMapBack && u.tab === "map") { setTab("home"); return true; } // 지도 → 홈(iOS는 캐처 스트립이 처리)
+    // 지도: 뒤로가기로 지역 계층을 한 단계 올라감 (동→구/시→시도→전체→홈)
+    if (u.tab === "map") {
+      if (u.dong) { setDong(""); return true; }                                    // 동/면 → 구/시
+      if (u.sigungu) { setSigungu(""); setDong(""); return true; }                  // 구/시 → 시도
+      if (u.sido) { setSido(""); setSigungu(""); setDong(""); return true; }        // 시도 → 수도권 전체
+      if (allowMapBack) { setTab("home"); return true; }                            // 전체 → 홈(iOS는 캐처 스트립이 처리)
+      return false;
+    }
     if (u.tab === "home" && u.role !== null) { try { sessionStorage.removeItem("dcn_role"); } catch {} setRole(null); return true; } // 홈 → 랜딩
     return false;
   };
