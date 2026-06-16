@@ -188,7 +188,8 @@ function makeIslandHtml(name: string): string {
     <span style="font-size:11px;font-weight:800;color:#1c3d6e;background:#fff;border:1.5px solid #2f6fb0;padding:1px 5px;border-radius:7px;box-shadow:0 1px 3px rgba(0,0,0,0.35);">${name}</span>
   </div>`;
 }
-// 길이름(transportation_name)·버스정류장(poi_transit) 토글 — 벡터 레이어 visibility 제어
+// 길이름(transportation_name)·버스정류장 토글 — 벡터 레이어 visibility/filter 제어
+const _origPoiFilter: Record<string, any> = {}; // poi_r* 원본 필터 보존(버스 제외 토글 복원용)
 function applyTogglesToMap(ml: any, showStreets: boolean, showBus: boolean): void {
   if (!ml) return;
   let style: any;
@@ -198,8 +199,17 @@ function applyTogglesToMap(ml: any, showStreets: boolean, showBus: boolean): voi
     if (ly.type === "symbol" && (sl === "transportation_name" || /road_label|highway[-_]?name|road[-_]?name|street/i.test(ly.id))) {
       try { ml.setLayoutProperty(ly.id, "visibility", showStreets ? "visible" : "none"); } catch {}
     }
+    // 버스: poi_transit(버스+철도+공항 아이콘) 전체 + 일반 POI(poi_r*)에 섞인 버스(class=bus)까지 제외해야 '버스 전체' 숨김.
     if (/poi_transit/i.test(ly.id)) {
       try { ml.setLayoutProperty(ly.id, "visibility", showBus ? "visible" : "none"); } catch {}
+    }
+    if (/^poi_r\d/i.test(ly.id)) {
+      try {
+        if (_origPoiFilter[ly.id] === undefined) _origPoiFilter[ly.id] = ml.getFilter(ly.id) ?? null;
+        const orig = _origPoiFilter[ly.id];
+        if (showBus) ml.setFilter(ly.id, orig);
+        else ml.setFilter(ly.id, orig ? ["all", orig, ["!=", ["get", "class"], "bus"]] : ["!=", ["get", "class"], "bus"]);
+      } catch {}
     }
   }
 }
@@ -652,6 +662,10 @@ export default function Home() {
                 try { ml.setPaintProperty(ly.id, "text-color", /transit/i.test(ly.id) ? "#235a86" : "#4a3526"); } catch {}
                 try { ml.setPaintProperty(ly.id, "text-halo-color", "#fdf7ec"); ml.setPaintProperty(ly.id, "text-halo-width", 1.4); } catch {}
                 try { ml.setLayoutProperty(ly.id, "icon-size", 1.15); } catch {}
+                // 최대 줌인 시 교회·음식점·상가까지 '다 보이게' — 고줌(z16 아이콘 / z17 글자)에서 겹침 허용(그 아래는 정갈하게 충돌처리)
+                try { ml.setLayoutProperty(ly.id, "icon-allow-overlap", ["step", ["zoom"], false, 16, true]); } catch {}
+                try { ml.setLayoutProperty(ly.id, "text-allow-overlap", ["step", ["zoom"], false, 17, true]); } catch {}
+                try { ml.setLayoutProperty(ly.id, "text-optional", true); } catch {}
               }
             }
           }
@@ -774,6 +788,14 @@ export default function Home() {
           else setDong(g.key);
         }));
       layerRef.current.addLayer(L.layerGroup(markers));
+      // 🚇 구/동 집계 레벨에서도 줌인(z≥12)하면 지하철역 표시 — 위치 가늠
+      const az = map.getZoom();
+      if (az >= 12 && stations.length) {
+        const ab = map.getBounds().pad(0.2);
+        const stns = stations.filter((s) => ab.contains([s.lat, s.lng] as [number, number])).slice(0, 24);
+        const stnLayer = stns.map((s) => L.marker([s.lat, s.lng], { icon: L.divIcon({ className: "", html: makeStationHtml(s.n, s.c, s.r), iconSize: [0, 0] }), interactive: false, zIndexOffset: -300 }));
+        if (stnLayer.length) layerRef.current.addLayer(L.layerGroup(stnLayer));
+      }
       return;
     }
 
@@ -843,7 +865,7 @@ export default function Home() {
   useEffect(() => {
     const map = mapObj.current;
     if (!map || !mapReady) return;
-    const onMove = () => { if (dong || focusId || myPinMode || othersMode) drawMarkers(); }; // 개별 카페 레벨만 뷰포트 재그림
+    const onMove = () => { if (dong || focusId || myPinMode || othersMode || (mapObj.current && mapObj.current.getZoom() >= 12)) drawMarkers(); }; // 개별 카페 + 줌인(z≥12) 시 뷰포트 재그림(역 갱신)
     map.on("moveend", onMove);
     return () => { map.off("moveend", onMove); };
   }, [drawMarkers, mapReady, dong, focusId, myPinMode, othersMode]);

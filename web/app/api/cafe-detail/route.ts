@@ -10,18 +10,18 @@ function parseYmd(d?: string): number | null {
   const t = new Date(+m[1], +m[2] - 1, m[3] ? +m[3] : 15).getTime();
   return isNaN(t) ? null : t;
 }
-// 최신성 보너스(0~30): 이번 달 30, ~12개월 ~14, ~23개월+ 0, 날짜미상 8(중립)
+// 최신성 보너스(0~45): 이번 달 45, 이후 월 2점씩 감쇠, 날짜미상 12(중립). 최신성을 강하게 반영.
 function recencyBonus(d: string | undefined, nowT: number): number {
   const t = parseYmd(d);
-  if (t == null) return 8;
+  if (t == null) return 12;
   const months = (nowT - t) / 2.63e9;
-  if (months <= 1) return 30;
-  return Math.max(0, 30 - months * 1.3);
+  if (months <= 1) return 45;
+  return Math.max(0, 45 - months * 2);
 }
-// 복합 랭크 = 정확도(score) + 신뢰등급(검증 우대) + 최신성. '가장 정확하고 가장 최신인' 리뷰가 위로.
+// 복합 랭크 = 정확도(score) + 신뢰등급(검증 강하게 우대/거절 강한 페널티) + 최신성. '정확도 높고 가장 최신'이 위로.
 function rankScore(e: any, nowT: number): number {
   const score = typeof e?.score === "number" ? e.score : 50;
-  const trust = e?.trust === "verified" ? 20 : e?.trust === "reference" ? 0 : -15;
+  const trust = e?.trust === "verified" ? 25 : e?.trust === "reference" ? 0 : -40;
   return score + trust + recencyBonus(e?.date, nowT);
 }
 
