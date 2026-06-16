@@ -81,15 +81,41 @@ export async function GET(req: NextRequest) {
       COUNT(*) FILTER (WHERE dong IS NOT NULL AND dong !~ '(동|읍|면|가)$')::int dong_badfmt,
       COUNT(*) FILTER (WHERE naver_category IS NULL OR naver_category='')::int pub_nocat,
       COUNT(*) FILTER (WHERE lat IS NULL OR lat NOT BETWEEN 36.8 AND 38.3 OR lng NOT BETWEEN 124.5 AND 127.9)::int pub_badcoord,
-      COUNT(*) FILTER (WHERE synth_identity IS NULL OR synth_identity='')::int pub_noidentity
+      COUNT(*) FILTER (WHERE synth_identity IS NULL OR synth_identity='')::int pub_noidentity,
+      -- 도(道) 교차오염: area의 도(인천%→인천, 끝이 구→서울, 끝이 시/군→경기)와 주소의 도가 다름 (예: area=강동구인데 주소=경기 남양주)
+      COUNT(*) FILTER (WHERE address IS NOT NULL AND address<>''
+        AND (CASE WHEN area LIKE '인천%' THEN '인천' WHEN area ~ '구$' THEN '서울' WHEN area ~ '(시|군)$' THEN '경기' END) IS NOT NULL
+        AND (CASE WHEN address LIKE '서울%' THEN '서울' WHEN address LIKE '인천%' THEN '인천' WHEN address LIKE '경기%' THEN '경기' END) IS NOT NULL
+        AND (CASE WHEN area LIKE '인천%' THEN '인천' WHEN area ~ '구$' THEN '서울' WHEN area ~ '(시|군)$' THEN '경기' END)
+         <> (CASE WHEN address LIKE '서울%' THEN '서울' WHEN address LIKE '인천%' THEN '인천' WHEN address LIKE '경기%' THEN '경기' END))::int area_xprov
       FROM cafes WHERE published = true`)[0] as any;
     // 결정론적 '진짜 에러'는 검출 즉시 자율 교정(컨펌 불필요). 교정 실패 시에만 integrity 경보로 남김.
     // ⚠️ 자율교정은 '안전·결정론적인 것만' — 단, 비공개로 만드는 조치는 1회 상한(대량삭제 차단). pub_nocat는
     //   기존 검증카페까지 숨겨 인천 사태를 유발 → 자동 비공개에서 제외(카테고리 없음=비카페 아님). 동 교정만 무제한.
     const integrity: string[] = [];
-    if (ig.dong_isgu || ig.dong_badfmt || ig.pub_badcoord || ig.pub_noidentity) {
+    if (ig.dong_isgu || ig.dong_badfmt || ig.pub_badcoord || ig.pub_noidentity || ig.area_xprov) {
       const fixes: string[] = [];
       try {
+        // 도 교차오염: area를 주소 기준으로 교정(공개/비공개 불문, 비공개 조치 아님 → 안전). 추출 실패 시 건드리지 않음.
+        if (ig.area_xprov) {
+          const r = await sql`UPDATE cafes SET area = CASE
+              WHEN address LIKE '서울%' THEN substring(address from '([가-힣]+구)')
+              WHEN address LIKE '인천%' THEN '인천 ' || substring(address from '인천광역시[ ]+([가-힣]+[구군])')
+              WHEN address LIKE '경기%' THEN substring(address from '경기도[ ]+([가-힣]+[시군])')
+            END, updated_at=now()
+            WHERE address IS NOT NULL AND address<>''
+              AND (CASE WHEN area LIKE '인천%' THEN '인천' WHEN area ~ '구$' THEN '서울' WHEN area ~ '(시|군)$' THEN '경기' END) IS NOT NULL
+              AND (CASE WHEN address LIKE '서울%' THEN '서울' WHEN address LIKE '인천%' THEN '인천' WHEN address LIKE '경기%' THEN '경기' END) IS NOT NULL
+              AND (CASE WHEN area LIKE '인천%' THEN '인천' WHEN area ~ '구$' THEN '서울' WHEN area ~ '(시|군)$' THEN '경기' END)
+               <> (CASE WHEN address LIKE '서울%' THEN '서울' WHEN address LIKE '인천%' THEN '인천' WHEN address LIKE '경기%' THEN '경기' END)
+              AND (CASE
+                WHEN address LIKE '서울%' THEN substring(address from '([가-힣]+구)')
+                WHEN address LIKE '인천%' THEN '인천 ' || substring(address from '인천광역시[ ]+([가-힣]+[구군])')
+                WHEN address LIKE '경기%' THEN substring(address from '경기도[ ]+([가-힣]+[시군])')
+              END) IS NOT NULL
+            RETURNING 1`;
+          if (r.length) fixes.push(`도 교차오염 ${r.length}곳 area 교정(주소기준)`);
+        }
         if (ig.dong_isgu) { const r = await sql`UPDATE cafes SET dong=NULL WHERE dong IS NOT NULL AND (area=dong||'구' OR area=dong||'시' OR area=dong||'군') RETURNING 1`; if (r.length) fixes.push(`동=구명 ${r.length}곳 제거`); }
         if (ig.dong_badfmt) { const r = await sql`UPDATE cafes SET dong=NULL WHERE dong IS NOT NULL AND dong !~ '(동|읍|면|가)$' RETURNING 1`; if (r.length) fixes.push(`동형식오류 ${r.length}곳 제거`); }
         // 비공개 조치는 소수일 때만 자동(20건 초과면 대량 의심 → 자동조치 보류하고 경보로 surface)
