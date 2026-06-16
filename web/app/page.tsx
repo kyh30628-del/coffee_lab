@@ -560,11 +560,38 @@ export default function Home() {
       LRef.current = L;
       mapObj.current = L.map(mapRef.current, { zoomControl: true, attributionControl: true }).setView([37.5, 127.05], 10);
       mapObj.current.attributionControl.setPrefix("");
-      // 한글 OSM 베이스 유지(스타일 그대로). 타일은 안 바꿈.
+      // 폴백용 래스터 OSM(벡터 로드 실패 시에만 보임 — 벡터가 위에서 덮음).
       L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: '&copy; OpenStreetMap' }).addTo(mapObj.current);
-      // 채도 크게 낮추고 밝기 올려 녹지·토지구획 색을 가라앉힘 → 도로·시설·역·카페가 도드라짐. 웜톤은 유지, 라벨 대비 유지.
-      const tp = mapObj.current.getPane("tilePane");
-      if (tp) tp.style.filter = "sepia(0.18) saturate(0.32) brightness(1.1) contrast(1.04)";
+      // 🗺️ 벡터 OSM(OSM Liberty) — 녹지·토지구획·산 레이어를 꺼 도로·시설·역·카페가 또렷. 한글 라벨 유지. (래스터는 못 끄므로 벡터로 전환)
+      try {
+        const maplibregl = (await import("maplibre-gl")).default;
+        await import("maplibre-gl/dist/maplibre-gl.css");
+        await import("@maplibre/maplibre-gl-leaflet");
+        (window as any).maplibregl = maplibregl;
+        const gl = (L as any).maplibreGL({ style: "https://tiles.openfreemap.org/styles/liberty", attribution: "&copy; OpenStreetMap" });
+        gl.addTo(mapObj.current);
+        const ml = gl.getMaplibreMap();
+        ml.on("load", () => {
+          try {
+            for (const ly of (ml.getStyle().layers || [])) {
+              const sl = (ly as any)["source-layer"] || "";
+              // 녹지·토지구획·공원·산 → 숨김 (물·도로·건물·라벨은 유지)
+              if (["landuse", "landcover", "park"].includes(sl) || /landuse|landcover|wood|grass|park|forest|cemetery|farmland|meadow|scrub|wetland|golf|pitch/i.test(ly.id)) {
+                try { ml.setLayoutProperty(ly.id, "visibility", "none"); } catch {}
+                continue;
+              }
+              // 한글 라벨 — name 기반 심볼 레이어만 name:ko→name 우선(번지수 등은 건드리지 않음)
+              if (ly.type === "symbol") {
+                const tf = (ly as any).layout && (ly as any).layout["text-field"];
+                if (tf && JSON.stringify(tf).includes("name")) {
+                  try { ml.setLayoutProperty(ly.id, "text-field", ["coalesce", ["get", "name:ko"], ["get", "name"], ["get", "name:latin"]]); } catch {}
+                }
+              }
+            }
+          } catch {}
+        });
+        ml.on("error", () => {}); // 벡터 타일 일시 오류는 무시(폴백 래스터 존재)
+      } catch { /* 벡터 초기화 실패 → 래스터 폴백 유지 */ }
       layerRef.current = L.layerGroup().addTo(mapObj.current);
       setTimeout(() => mapObj.current?.invalidateSize(), 60);
       setMapReady(true); // 초기화 완료 → 마커 effect 재실행 트리거
