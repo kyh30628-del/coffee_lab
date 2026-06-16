@@ -537,6 +537,9 @@ export default function Home() {
       mapObj.current.attributionControl.setPrefix("");
       // 한글 지명 표기를 위해 OSM 표준 타일 사용(지명이 한국어 name 태그 기준)
       L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: '&copy; OpenStreetMap' }).addTo(mapObj.current);
+      // 커피 테마에 맞춰 타일에 따뜻한 크림/세피아 톤 필터 적용(라벨·작은 랜드마크는 그대로, 색감만 보정)
+      const tp = mapObj.current.getPane("tilePane");
+      if (tp) tp.style.filter = "sepia(0.34) saturate(0.82) brightness(1.05) contrast(0.92) hue-rotate(-7deg)";
       layerRef.current = L.layerGroup().addTo(mapObj.current);
       setTimeout(() => mapObj.current?.invalidateSize(), 60);
       setMapReady(true); // 초기화 완료 → 마커 effect 재실행 트리거
