@@ -181,6 +181,28 @@ function makeLandmarkHtml(name: string, icon: string): string {
     <span style="font-size:10.5px;font-weight:700;color:#6b4310;background:rgba(255,250,240,0.95);border:1px solid #e3c79a;padding:0.5px 5px;border-radius:6px;box-shadow:0 1px 2px rgba(0,0,0,0.14);">${(name || "").replace(/</g, "&lt;")}</span>
   </div>`;
 }
+function makeIslandHtml(name: string): string {
+  // 영토 표현 — 독도/울릉도. 태극 느낌 + 라벨.
+  return `<div style="transform:translate(-50%,-50%);display:flex;align-items:center;gap:3px;white-space:nowrap;">
+    <span style="font-size:13px;line-height:1;">🇰🇷</span>
+    <span style="font-size:11px;font-weight:800;color:#1c3d6e;background:#fff;border:1.5px solid #2f6fb0;padding:1px 5px;border-radius:7px;box-shadow:0 1px 3px rgba(0,0,0,0.35);">${name}</span>
+  </div>`;
+}
+// 길이름(transportation_name)·버스정류장(poi_transit) 토글 — 벡터 레이어 visibility 제어
+function applyTogglesToMap(ml: any, showStreets: boolean, showBus: boolean): void {
+  if (!ml) return;
+  let style: any;
+  try { if (!(ml.isStyleLoaded && ml.isStyleLoaded())) return; style = ml.getStyle(); } catch { return; }
+  for (const ly of (style.layers || [])) {
+    const sl = (ly as any)["source-layer"] || "";
+    if (ly.type === "symbol" && (sl === "transportation_name" || /road_label|highway[-_]?name|road[-_]?name|street/i.test(ly.id))) {
+      try { ml.setLayoutProperty(ly.id, "visibility", showStreets ? "visible" : "none"); } catch {}
+    }
+    if (/poi_transit/i.test(ly.id)) {
+      try { ml.setLayoutProperty(ly.id, "visibility", showBus ? "visible" : "none"); } catch {}
+    }
+  }
+}
 function makeMyLocHtml(): string {
   // 내 현재 위치 — 파란 점(펄스 느낌의 후광)
   return `<div style="transform:translate(-50%,-50%);"><span style="display:block;width:18px;height:18px;border-radius:50%;background:#2f6fb0;border:3px solid #fff;box-shadow:0 0 0 5px rgba(47,111,176,0.28),0 1px 5px rgba(0,0,0,0.45);"></span></div>`;
@@ -299,6 +321,11 @@ export default function Home() {
   const [othersPins, setOthersPins] = useState<{ id: number; name: string; area: string; lat: number; lng: number; cnt: number }[]>([]);
   const [nearMe, setNearMe] = useState<{ lat: number; lng: number } | null>(null); // '내 주변 500m' 현재 위치(누를 때마다 갱신)
   const [nearMsg, setNearMsg] = useState("");
+  const mlRef = useRef<any>(null); // maplibre 벡터 맵(레이어 토글용)
+  const [showStreets, setShowStreets] = useState(true); // 길이름 표시
+  const [showBus, setShowBus] = useState(true); // 버스정류장 표시
+  const showStreetsRef = useRef(true); showStreetsRef.current = showStreets;
+  const showBusRef = useRef(true); showBusRef.current = showBus;
   const [myLocked, setMyLocked] = useState(false); // 공용 PC 잠금 상태
   const [sessionPin, setSessionPin] = useState(""); // 이번 세션에 입력한 PIN(해제용)
   const [bookmarkIds, setBookmarkIds] = useState<Set<number>>(new Set()); // 카페 북마크(내 카페 등록과 별개)
@@ -582,6 +609,7 @@ export default function Home() {
         if (tp) tp.style.filter = "sepia(0.1) saturate(0.96) brightness(1.01)";
         const ml = gl.getMaplibreMap();
         (window as any).__ml = ml; // 디버그 핸들
+        mlRef.current = ml; // 레이어 토글용
         // 전 세계 한글 표기 — name:ko 우선(없으면 현지명→로마자). ko가 없는 한국 지명은 name이 한글이라 안전.
         const KO_LABEL: any = ["coalesce", ["get", "name:ko"], ["get", "name"], ["get", "name:latin"]];
         // 녹지숨김·크림·한글 적용 — 1회만. 레이스(스타일이 리스너보다 먼저 로드) 방지: 즉시+load+styledata 모두에서 시도하되,
@@ -627,6 +655,8 @@ export default function Home() {
               }
             }
           }
+          // 초기 토글 상태(길이름/버스정류장) 반영
+          try { applyTogglesToMap(ml, showStreetsRef.current, showBusRef.current); } catch {}
         };
         ml.on("load", applyVectorStyle);
         ml.on("styledata", applyVectorStyle); // 스타일 로드/변경 시마다 시도(레이스 방지의 핵심, applied로 1회 보장)
@@ -637,6 +667,9 @@ export default function Home() {
         L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: '&copy; OpenStreetMap' }).addTo(mapObj.current);
       }
       layerRef.current = L.layerGroup().addTo(mapObj.current);
+      // 🇰🇷 독도·울릉도 — 항상 표시(영토 표현). layerRef가 아니라 맵에 직접 붙여 drawMarkers 갱신에도 유지.
+      L.marker([37.2429, 131.8665], { icon: L.divIcon({ className: "", html: makeIslandHtml("독도"), iconSize: [0, 0] }), interactive: false, zIndexOffset: 500 }).addTo(mapObj.current);
+      L.marker([37.4845, 130.9057], { icon: L.divIcon({ className: "", html: makeIslandHtml("울릉도"), iconSize: [0, 0] }), interactive: false, zIndexOffset: 500 }).addTo(mapObj.current);
       setTimeout(() => mapObj.current?.invalidateSize(), 60);
       setMapReady(true); // 초기화 완료 → 마커 effect 재실행 트리거
     })();
@@ -814,6 +847,14 @@ export default function Home() {
     map.on("moveend", onMove);
     return () => { map.off("moveend", onMove); };
   }, [drawMarkers, mapReady, dong, focusId, myPinMode, othersMode]);
+
+  // 길이름·버스정류장 토글 → 벡터 레이어 visibility 적용(스타일 로드 후엔 styledata로도 한 번 더 보장)
+  useEffect(() => {
+    if (!mapReady) return;
+    applyTogglesToMap(mlRef.current, showStreets, showBus);
+    const ml = mlRef.current;
+    if (ml) { const h = () => applyTogglesToMap(ml, showStreetsRef.current, showBusRef.current); ml.once && ml.once("idle", h); }
+  }, [showStreets, showBus, mapReady]);
 
   // 다른 사람은 — 토글 켜면 집계 핀 로드(한 번)
   useEffect(() => {
@@ -1021,6 +1062,17 @@ export default function Home() {
                 style={othersMode ? { background: "#5f7355" } : {}}>
                 <span className="text-[14px] leading-none">👥</span>
                 <span>다른 사람은{othersMode && othersPins.length ? ` ${othersPins.length}` : ""}</span>
+              </button>
+            </div>
+            {/* 🗺️ 지도 표시 토글 — 우측 상단(길이름/버스정류장 켜고 끄기) */}
+            <div className="absolute top-3 right-3 z-[1100] flex flex-col gap-1.5 items-end">
+              <button onClick={() => setShowStreets((v) => !v)}
+                className={`inline-flex items-center gap-1 h-8 px-2.5 rounded-full text-[11px] font-bold shadow-lg whitespace-nowrap transition-colors ${showStreets ? "bg-[#5b4636] text-white" : "bg-white/95 text-[#8a7458] border border-[#e0d3bd]"}`}>
+                <span className="text-[12px] leading-none">🛣️</span><span>길이름 {showStreets ? "ON" : "OFF"}</span>
+              </button>
+              <button onClick={() => setShowBus((v) => !v)}
+                className={`inline-flex items-center gap-1 h-8 px-2.5 rounded-full text-[11px] font-bold shadow-lg whitespace-nowrap transition-colors ${showBus ? "bg-[#235a86] text-white" : "bg-white/95 text-[#8a7458] border border-[#bcd0e0]"}`}>
+                <span className="text-[12px] leading-none">🚌</span><span>버스 {showBus ? "ON" : "OFF"}</span>
               </button>
             </div>
             {/* 📍 내 주변 안내/해제 — 활성 또는 안내 메시지 있을 때 */}
