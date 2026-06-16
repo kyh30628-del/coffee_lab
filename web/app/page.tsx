@@ -560,9 +560,9 @@ export default function Home() {
       LRef.current = L;
       mapObj.current = L.map(mapRef.current, { zoomControl: true, attributionControl: true }).setView([37.5, 127.05], 10);
       mapObj.current.attributionControl.setPrefix("");
-      // 폴백용 래스터 OSM(벡터 로드 실패 시에만 보임 — 벡터가 위에서 덮음).
-      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: '&copy; OpenStreetMap' }).addTo(mapObj.current);
-      // 🗺️ 벡터 OSM(OSM Liberty) — 녹지·토지구획·산 레이어를 꺼 도로·시설·역·카페가 또렷. 한글 라벨 유지. (래스터는 못 끄므로 벡터로 전환)
+      // ⚠️ 래스터 OSM은 항상 깔면 안 됨 — Leaflet z-index 상 벡터 캔버스를 덮어 녹지가 그대로 보였음(검증 완료).
+      //    그래서 벡터 '초기화 실패 시에만' 폴백으로 깐다.
+      // 🗺️ 벡터 OSM(OSM Liberty) — 녹지·토지구획·산·지형래스터를 꺼 도로·시설·역·카페가 또렷. 한글 라벨 유지.
       try {
         const maplibregl = (await import("maplibre-gl")).default;
         await import("maplibre-gl/dist/maplibre-gl.css");
@@ -608,8 +608,11 @@ export default function Home() {
         ml.on("load", applyVectorStyle);
         ml.on("styledata", applyVectorStyle); // 스타일 로드/변경 시마다 시도(레이스 방지의 핵심, applied로 1회 보장)
         applyVectorStyle(); // 이미 로드됐으면 즉시
-        ml.on("error", () => {}); // 벡터 타일 일시 오류는 무시(폴백 래스터 존재)
-      } catch { /* 벡터 초기화 실패(예: WebGL 미지원) → 래스터 폴백 유지 */ }
+        ml.on("error", () => {}); // 벡터 타일 일시 오류는 무시
+      } catch {
+        // 벡터 초기화 실패(예: WebGL 미지원) → 래스터 OSM 폴백(이 경우에만)
+        L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: '&copy; OpenStreetMap' }).addTo(mapObj.current);
+      }
       layerRef.current = L.layerGroup().addTo(mapObj.current);
       setTimeout(() => mapObj.current?.invalidateSize(), 60);
       setMapReady(true); // 초기화 완료 → 마커 effect 재실행 트리거
