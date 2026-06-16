@@ -161,9 +161,17 @@ function makeRegionPinHtml(label: string, cnt: number, maxCnt: number): string {
 
 // 위치 가늠용 지하철역 마커(개별 카페 레벨에서만). 카페 핀과 구분되게 파란 점 + 역명.
 function makeStationHtml(name: string): string {
-  return `<div style="transform:translate(-50%,-50%);display:flex;align-items:center;gap:2px;white-space:nowrap;">
-    <span style="width:8px;height:8px;border-radius:50%;background:#2f6fb0;border:1.5px solid #fff;box-shadow:0 1px 2px rgba(0,0,0,0.35);flex:none;"></span>
-    <span style="font-size:9.5px;font-weight:700;color:#23527c;background:rgba(255,255,255,0.82);padding:0 3px;border-radius:4px;">${(name || "").replace(/</g, "&lt;")}역</span>
+  // 지하철역 — 파란 'M' 뱃지 + 진한 파랑 테두리 라벨로 도드라지게
+  return `<div style="transform:translate(-50%,-50%);display:flex;align-items:center;gap:3px;white-space:nowrap;">
+    <span style="width:14px;height:14px;border-radius:50%;background:linear-gradient(#3d86d6,#2a64a8);border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.5);flex:none;display:flex;align-items:center;justify-content:center;font-size:9px;line-height:1;color:#fff;font-weight:900;">M</span>
+    <span style="font-size:11px;font-weight:800;color:#16406e;background:#fff;border:1.5px solid #2f6fb0;padding:1px 5px;border-radius:7px;box-shadow:0 1px 2px rgba(0,0,0,0.25);">${(name || "").replace(/</g, "&lt;")}역</span>
+  </div>`;
+}
+function makeLandmarkHtml(name: string, icon: string): string {
+  // 대형 랜드마크 — 유형 아이콘 + 호박색 라벨(역/카페와 구분되게)
+  return `<div style="transform:translate(-50%,-50%);display:flex;align-items:center;gap:3px;white-space:nowrap;">
+    <span style="font-size:16px;line-height:1;filter:drop-shadow(0 1px 1.5px rgba(0,0,0,0.45));flex:none;">${icon}</span>
+    <span style="font-size:11px;font-weight:800;color:#6b4310;background:#fff7e6;border:1.5px solid #e0a83c;padding:1px 5px;border-radius:7px;box-shadow:0 1px 2px rgba(0,0,0,0.22);">${(name || "").replace(/</g, "&lt;")}</span>
   </div>`;
 }
 function makePinHtml(c: Cafe, isMatch: boolean, isFocus = false, isMine = false): string {
@@ -254,7 +262,11 @@ function FavoritesModal({ items, onClose, onOpen, onRemove }: { items: Cafe[]; o
 export default function Home() {
   const [cafes, setCafes] = useState<Cafe[]>([]);
   const [stations, setStations] = useState<[string, number, number][]>([]); // 위치 가늠용 지하철역(이름,위도,경도)
-  useEffect(() => { fetch("/data/stations.json").then((r) => r.json()).then((d) => Array.isArray(d) && setStations(d)).catch(() => {}); }, []);
+  const [landmarks, setLandmarks] = useState<[string, number, number, string, number][]>([]); // 랜드마크(이름,위도,경도,아이콘,우선순위)
+  useEffect(() => {
+    fetch("/data/stations.json").then((r) => r.json()).then((d) => Array.isArray(d) && setStations(d)).catch(() => {});
+    fetch("/data/landmarks.json").then((r) => r.json()).then((d) => Array.isArray(d) && setLandmarks(d)).catch(() => {});
+  }, []);
   const [selected, setSelected] = useState<Cafe | null>(null);
   const [tab, setTab] = useState<"home" | "map" | "memory">("home");
   const [discover, setDiscover] = useState<Discover | null>(null);
@@ -521,8 +533,10 @@ export default function Home() {
       await import("leaflet/dist/leaflet.css");
       if (cancelled || !mapRef.current || mapObj.current) return;
       LRef.current = L;
-      mapObj.current = L.map(mapRef.current, { zoomControl: true, attributionControl: false }).setView([37.5, 127.05], 10);
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", { subdomains: "abcd", maxZoom: 20 }).addTo(mapObj.current);
+      mapObj.current = L.map(mapRef.current, { zoomControl: true, attributionControl: true }).setView([37.5, 127.05], 10);
+      mapObj.current.attributionControl.setPrefix("");
+      // 한글 지명 표기를 위해 OSM 표준 타일 사용(지명이 한국어 name 태그 기준)
+      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: '&copy; OpenStreetMap' }).addTo(mapObj.current);
       layerRef.current = L.layerGroup().addTo(mapObj.current);
       setTimeout(() => mapObj.current?.invalidateSize(), 60);
       setMapReady(true); // 초기화 완료 → 마커 effect 재실행 트리거
@@ -633,17 +647,27 @@ export default function Home() {
       if (isFocus) m.bindPopup(`<b>${c.name}</b><br>${c.area}`);
       return m;
     });
-    // 🚇 위치 가늠용 지하철역 — 개별 카페 레벨(줌인)에서만, 화면 안 역만. 카페보다 아래·비클릭.
+    // 🚇🏬 위치 가늠용 지하철역·대형 랜드마크 — 개별 카페 레벨(줌인)에서만, 화면 안만. 카페보다 아래·비클릭.
     const z = map.getZoom();
-    if (z >= 13 && stations.length) {
-      const stns = stations.filter(([, la, lo]) => b.contains([la, lo] as [number, number])).slice(0, 24);
-      const stnLayer = stns.map(([nm, la, lo]) => L.marker([la, lo], { icon: L.divIcon({ className: "", html: makeStationHtml(nm), iconSize: [0, 0] }), interactive: false, zIndexOffset: -1000 }));
-      if (stnLayer.length) layerRef.current.addLayer(L.layerGroup(stnLayer));
+    if (z >= 13) {
+      if (landmarks.length) {
+        const lms = landmarks
+          .filter(([, la, lo]) => b.contains([la, lo] as [number, number]))
+          .sort((a, c) => c[4] - a[4]) // 우선순위(공항·타워·몰·경기장·궁) 높은 것 먼저
+          .slice(0, 14);
+        const lmLayer = lms.map(([nm, la, lo, ic]) => L.marker([la, lo], { icon: L.divIcon({ className: "", html: makeLandmarkHtml(nm, ic), iconSize: [0, 0] }), interactive: false, zIndexOffset: -800 }));
+        if (lmLayer.length) layerRef.current.addLayer(L.layerGroup(lmLayer));
+      }
+      if (stations.length) {
+        const stns = stations.filter(([, la, lo]) => b.contains([la, lo] as [number, number])).slice(0, 22);
+        const stnLayer = stns.map(([nm, la, lo]) => L.marker([la, lo], { icon: L.divIcon({ className: "", html: makeStationHtml(nm), iconSize: [0, 0] }), interactive: false, zIndexOffset: -1000 }));
+        if (stnLayer.length) layerRef.current.addLayer(L.layerGroup(stnLayer));
+      }
     }
     layerRef.current.addLayer(L.layerGroup(markers));
     const focusM = focusId ? markers[toRender.findIndex((c) => c.id === focusId)] : null;
     if (focusM) (focusM as any).openPopup();
-  }, [filtered, matchSet, sido, sigungu, dong, focusId, myPinMode, myCafeIds, othersMode, othersPins, cafes, stations]);
+  }, [filtered, matchSet, sido, sigungu, dong, focusId, myPinMode, myCafeIds, othersMode, othersPins, cafes, stations, landmarks]);
 
   // 데이터/지역/모드 변경 시: 화면을 맞춘 뒤 마커를 그린다(맞춘 화면 기준으로 그려짐).
   useEffect(() => {
