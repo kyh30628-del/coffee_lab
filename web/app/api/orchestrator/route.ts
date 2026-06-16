@@ -79,12 +79,19 @@ export async function GET(req: NextRequest) {
       COUNT(*) FILTER (WHERE lat IS NULL OR lat NOT BETWEEN 36.8 AND 38.3 OR lng NOT BETWEEN 124.5 AND 127.9)::int pub_badcoord,
       COUNT(*) FILTER (WHERE synth_identity IS NULL OR synth_identity='')::int pub_noidentity
       FROM cafes WHERE published = true`)[0] as any;
+    // 결정론적 '진짜 에러'는 검출 즉시 자율 교정(컨펌 불필요). 교정 실패 시에만 integrity 경보로 남김.
     const integrity: string[] = [];
-    if (ig.dong_isgu > 0) integrity.push(`동 오추출(구명) ${ig.dong_isgu}건`);
-    if (ig.dong_badfmt > 0) integrity.push(`동 형식오류 ${ig.dong_badfmt}건`);
-    if (ig.pub_nocat > 0) integrity.push(`공개인데 카테고리없음 ${ig.pub_nocat}건`);
-    if (ig.pub_badcoord > 0) integrity.push(`공개 좌표오류 ${ig.pub_badcoord}건`);
-    if (ig.pub_noidentity > 0) integrity.push(`공개인데 정체성없음 ${ig.pub_noidentity}건`);
+    if (ig.dong_isgu || ig.dong_badfmt || ig.pub_nocat || ig.pub_badcoord || ig.pub_noidentity) {
+      const fixes: string[] = [];
+      try {
+        if (ig.dong_isgu) { const r = await sql`UPDATE cafes SET dong=NULL WHERE dong IS NOT NULL AND (area=dong||'구' OR area=dong||'시' OR area=dong||'군') RETURNING 1`; if (r.length) fixes.push(`동=구명 ${r.length}곳 제거`); }
+        if (ig.dong_badfmt) { const r = await sql`UPDATE cafes SET dong=NULL WHERE dong IS NOT NULL AND dong !~ '(동|읍|면|가)$' RETURNING 1`; if (r.length) fixes.push(`동형식오류 ${r.length}곳 제거`); }
+        if (ig.pub_noidentity) { const r = await sql`UPDATE cafes SET published=false WHERE published AND (synth_identity IS NULL OR synth_identity='') RETURNING 1`; if (r.length) fixes.push(`정체성없음 ${r.length}곳 비공개`); }
+        if (ig.pub_badcoord) { const r = await sql`UPDATE cafes SET published=false WHERE published AND (lat IS NULL OR lat NOT BETWEEN 36.8 AND 38.3 OR lng NOT BETWEEN 124.5 AND 127.9) RETURNING 1`; if (r.length) fixes.push(`좌표오류 ${r.length}곳 비공개`); }
+        if (ig.pub_nocat) { const r = await sql`UPDATE cafes SET published=false, needs_category=true WHERE published AND (naver_category IS NULL OR naver_category='') RETURNING 1`; if (r.length) fixes.push(`카테고리없음 ${r.length}곳 보류`); }
+      } catch (e) { integrity.push(`무결성 자동교정 실패(즉시 확인): ${String(e).slice(0, 50)}`); }
+      if (fixes.length) healed.push(`🔧 무결성 자율교정: ${fixes.join(", ")}`);
+    }
 
     // ⚠️ 위험/의심 선제 탐지 — 하드 위반은 아니지만 '문제 발생 소지' 있는 것을 수면 위로 올림(사장님이 보게).
     const risks: string[] = [];
