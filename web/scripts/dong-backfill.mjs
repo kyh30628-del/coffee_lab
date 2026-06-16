@@ -39,21 +39,24 @@ try {
       try {
         const res = await search(`${c.name} ${c.area}`);
         if (res.quota) { stop = "네이버 한도 도달 — 중단(다음날 재개)"; break; }
-        // ★ 정확도 핵심: 좌표 근접 + '지번의 구가 카페 area와 일치'해야 채택. 딴 동네 동명 카페(수석동/강동구) 차단.
-        const guN = (c.area || "").replace(/\s/g, "");
-        const inGu = (it) => guN && (it.jibun || "").replace(/\s/g, "").includes(guN);
-        const m = res.items.find((it) => it.lat && Math.abs(it.lat - c.lat) < 0.0015 && Math.abs(it.lng - c.lng) < 0.0015 && inGu(it))
+        // ★ 매칭: 좌표 일치=같은 장소(그것만으로 충분). 이름매칭일 때만 구(區) 검증.
+        //   구 토큰은 '인천 서구'→'서구'처럼 마지막 구/시/군 토큰만 뽑음(지번 '인천광역시 서구'와 매칭되게).
+        const guTok = ((c.area || "").match(/[가-힣]+[구시군]/g) || []).pop() || "";
+        const inGu = (it) => guTok && (it.jibun || "").replace(/\s/g, "").includes(guTok.replace(/\s/g, ""));
+        const m = res.items.find((it) => it.lat && Math.abs(it.lat - c.lat) < 0.0015 && Math.abs(it.lng - c.lng) < 0.0015)
           || res.items.find((it) => it.name.replace(/\s/g, "") === c.name.replace(/\s/g, "") && inGu(it));
         const dong = m ? parseDong(m.jibun) : null;
         const cat = m ? (m.category || "") : "";
         if (dong) { if (dong !== c.dong) { await sql`UPDATE cafes SET dong = ${dong} WHERE id = ${c.id}`; if (c.dong) corrected++; } done++; }
-        else { if (REVAL && c.dong) { await sql`UPDATE cafes SET dong = NULL WHERE id = ${c.id}`; corrected++; } miss++; } // 검증 실패한 기존 잘못된 동 제거
-        await sql`UPDATE cafes SET naver_category = ${cat || ""} WHERE id = ${c.id}`;
-        // 카테고리 확보 → 자가 검증: 카페·디저트면 (보류였으면) 공개 복귀, 비카페·프랜차이즈면 차단.
-        const bad = isFranchise(c.name) || isNonCafe(c.name, cat) || !cat;
+        else { if (REVAL && c.dong) { await sql`UPDATE cafes SET dong = NULL WHERE id = ${c.id}`; corrected++; } miss++; }
+        if (cat) await sql`UPDATE cafes SET naver_category = ${cat} WHERE id = ${c.id}`; // ★ 미스(cat 없음)면 기존 카테고리 안 지움
+        // ★ 비공개는 '카테고리가 실제로 비카페일 때'만. 검색 미스(cat 없음)로는 절대 비공개 안 함(인천 대량삭제 버그 방지).
+        const bad = isFranchise(c.name) || (cat && isNonCafe(c.name, cat));
         if (bad) {
-          const u = await sql`UPDATE cafes SET published = false, needs_category = false, pipeline_status = CASE WHEN ${!cat} THEN pipeline_status ELSE 'rejected' END WHERE id = ${c.id} AND published = true RETURNING 1`;
-          if (u.length) { refiltered++; console.log(`  ⛔ 비공개: ${c.name} [${cat || '카테고리없음'}]`); }
+          const u = await sql`UPDATE cafes SET published = false, needs_category = false, pipeline_status = 'rejected' WHERE id = ${c.id} AND published = true RETURNING 1`;
+          if (u.length) { refiltered++; console.log(`  ⛔ 비공개: ${c.name} [${cat || '프랜차이즈'}]`); }
+          // 🛑 안전 차단기: 한 회차 비공개가 40건 넘으면 대량삭제 의심 → 즉시 중단(점검 필요). 신뢰 보호.
+          if (refiltered > 40) { stop = `안전차단: 비공개 ${refiltered}건 초과 — 대량 비공개 의심, 중단(점검 필요)`; break; }
         } else if (c.needs_category) {
           // 카페로 검증됨 → 공개 복귀(등급 보유 + 좌표 유효)
           const u = await sql`UPDATE cafes SET needs_category = false, published = (synth_grade IN ('검증','참고') AND lat BETWEEN 36.8 AND 38.3 AND lng BETWEEN 124.5 AND 127.9), pipeline_status = CASE WHEN synth_grade IN ('검증','참고') THEN 'live' ELSE pipeline_status END WHERE id = ${c.id} RETURNING published`;
@@ -72,5 +75,5 @@ try { const r = await sql`SELECT count(*) FILTER(WHERE published)::int pub, coun
 console.log(stop || "상한 도달");
 console.log(`자율검증 백필: 동채움 ${done} · 동교정/제거 ${corrected} · 카페복귀 ${republished} · 비카페차단 ${refiltered} · 카테고리미보유 남음 ${remain}`);
 console.log(`→ 공개(검증완료) ${pub} · 검증대기 보류 ${held}`);
-await recordRun("dong-backfill", !stop.startsWith("예외"), stop || `완료(동 ${done})`, done); // 한도·완료=정상, 예외=실패
+await recordRun("dong-backfill", !stop.startsWith("예외") && !stop.startsWith("안전차단"), stop || `완료(동 ${done})`, done); // 예외·안전차단=실패(관제탑 경보)
 process.exit(0);
