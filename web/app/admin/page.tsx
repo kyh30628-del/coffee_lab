@@ -256,14 +256,15 @@ export default function AdminPage() {
               {tower.today && (
                 <div className="mb-2.5">
                   <div className="text-[10px] font-bold text-stone-500 mb-1.5">📅 오늘의 수집 (KST · 자동 갱신)</div>
-                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
+                  <div className="grid grid-cols-3 sm:grid-cols-7 gap-1.5">
                     {[
                       { l: "오늘 신규발굴", v: tower.today.newCafes, c: "text-amber-700 bg-amber-50 border-amber-200" },
-                      { l: "오늘 합성", v: tower.today.synthesized, c: "text-sky-700 bg-sky-50 border-sky-200" },
-                      { l: "오늘 공개", v: tower.today.published, c: "text-emerald-700 bg-emerald-50 border-emerald-200" },
+                      { l: "오늘 합성처리", v: tower.today.synthesized, c: "text-sky-700 bg-sky-50 border-sky-200" },
+                      { l: "오늘 신규공개", v: tower.today.published, c: "text-emerald-700 bg-emerald-50 border-emerald-200" },
                       { l: "동 채움", v: `${tower.today.dongPct}%`, c: "text-stone-700 bg-stone-50 border-stone-200" },
                       { l: "노이즈탈락", v: tower.today.noise, c: "text-stone-500 bg-stone-50 border-stone-200" },
                       { l: "합성대기", v: tower.today.newQueue, c: "text-amber-600 bg-amber-50 border-amber-200" },
+                      { l: "유튜브 수집(누적)", v: tower.today.ytTotal ?? 0, c: "text-rose-700 bg-rose-50 border-rose-200" },
                     ].map((t) => (
                       <div key={t.l} className={`rounded-xl border px-2 py-2 text-center ${t.c}`}>
                         <div className="text-[15px] font-extrabold leading-none">{typeof t.v === "number" ? t.v.toLocaleString() : t.v}</div>

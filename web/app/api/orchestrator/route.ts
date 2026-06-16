@@ -85,10 +85,12 @@ export async function GET(req: NextRequest) {
     const td = (await sql`SELECT
       COUNT(*) FILTER (WHERE created_at >= date_trunc('day', now() AT TIME ZONE 'Asia/Seoul') AT TIME ZONE 'Asia/Seoul')::int new_today,
       COUNT(*) FILTER (WHERE synth_updated >= date_trunc('day', now() AT TIME ZONE 'Asia/Seoul') AT TIME ZONE 'Asia/Seoul')::int synth_today,
-      COUNT(*) FILTER (WHERE published AND synth_updated >= date_trunc('day', now() AT TIME ZONE 'Asia/Seoul') AT TIME ZONE 'Asia/Seoul')::int published_today,
+      COUNT(*) FILTER (WHERE published AND created_at >= date_trunc('day', now() AT TIME ZONE 'Asia/Seoul') AT TIME ZONE 'Asia/Seoul')::int published_today,
       COUNT(*) FILTER (WHERE dong IS NOT NULL)::int has_dong,
       COUNT(*) FILTER (WHERE pipeline_status='noise')::int noise,
-      COUNT(*) FILTER (WHERE pipeline_status='new')::int new_q
+      COUNT(*) FILTER (WHERE pipeline_status='new')::int new_q,
+      COUNT(*) FILTER (WHERE yt_checked_at >= date_trunc('day', now() AT TIME ZONE 'Asia/Seoul') AT TIME ZONE 'Asia/Seoul')::int yt_today,
+      COUNT(*) FILTER (WHERE yt_checked_at IS NOT NULL)::int yt_total
       FROM cafes`)[0] as any;
 
     // ── 2) 자가 치유 ──
@@ -164,7 +166,7 @@ export async function GET(req: NextRequest) {
       generatedAt: new Date(now).toISOString(),
       overall, alerts, healed,
       coverage: { total: c.total, published: c.published, rawCachedPct: pct(c.raw_cached), judgedPct: pct(c.judged), embeddedPct: c.published ? Math.round((c.pub_embedded / c.published) * 100) : 0, dongPct: pct(td.has_dong) },
-      today: { newCafes: td.new_today, synthesized: td.synth_today, published: td.published_today, hasDong: td.has_dong, dongPct: pct(td.has_dong), noise: td.noise, newQueue: td.new_q },
+      today: { newCafes: td.new_today, synthesized: td.synth_today, published: td.published_today, hasDong: td.has_dong, dongPct: pct(td.has_dong), noise: td.noise, newQueue: td.new_q, ytToday: td.yt_today, ytTotal: td.yt_total },
       pipeline, agents,
     };
 
