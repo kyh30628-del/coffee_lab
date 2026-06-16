@@ -161,17 +161,17 @@ function makeRegionPinHtml(label: string, cnt: number, maxCnt: number): string {
 
 // 위치 가늠용 지하철역 마커(개별 카페 레벨에서만). 카페 핀과 구분되게 파란 점 + 역명.
 function makeStationHtml(name: string): string {
-  // 지하철역 — 깊은 파랑 'M' 뱃지 + 흰 라벨, 그림자 강화로 깊은 톤 위에서 또렷하게
+  // 지하철역 — 작은 파랑 점 + 깔끔한 흰 라벨. 정갈하되 또렷, 튀지 않게.
   return `<div style="transform:translate(-50%,-50%);display:flex;align-items:center;gap:3px;white-space:nowrap;">
-    <span style="width:15px;height:15px;border-radius:50%;background:linear-gradient(#3a7fcc,#214f86);border:2px solid #fff;box-shadow:0 1.5px 4px rgba(0,0,0,0.55);flex:none;display:flex;align-items:center;justify-content:center;font-size:9.5px;line-height:1;color:#fff;font-weight:900;">M</span>
-    <span style="font-size:11.5px;font-weight:800;color:#13365f;background:#fff;border:1.5px solid #2a64a8;padding:1px 6px;border-radius:7px;box-shadow:0 1.5px 4px rgba(0,0,0,0.42);">${(name || "").replace(/</g, "&lt;")}역</span>
+    <span style="width:9px;height:9px;border-radius:50%;background:#2f6fb0;border:2px solid #fff;box-shadow:0 1px 2px rgba(0,0,0,0.3);flex:none;"></span>
+    <span style="font-size:10.5px;font-weight:700;color:#1f4d80;background:rgba(255,255,255,0.95);border:1px solid #c3d4e6;padding:0.5px 5px;border-radius:6px;box-shadow:0 1px 2px rgba(0,0,0,0.16);">${(name || "").replace(/</g, "&lt;")}역</span>
   </div>`;
 }
 function makeLandmarkHtml(name: string, icon: string): string {
-  // 대형 랜드마크 — 유형 아이콘 + 크림/호박 라벨(커피 테마와 조화), 그림자 강화로 또렷하게
+  // 대형 랜드마크 — 유형 아이콘 + 옅은 크림 라벨. 커피 톤과 조화, 차분하게.
   return `<div style="transform:translate(-50%,-50%);display:flex;align-items:center;gap:3px;white-space:nowrap;">
-    <span style="font-size:17px;line-height:1;filter:drop-shadow(0 1.5px 2px rgba(0,0,0,0.5));flex:none;">${icon}</span>
-    <span style="font-size:11.5px;font-weight:800;color:#5a3608;background:#fffaf0;border:1.5px solid #cf922f;padding:1px 6px;border-radius:7px;box-shadow:0 1.5px 4px rgba(0,0,0,0.4);">${(name || "").replace(/</g, "&lt;")}</span>
+    <span style="font-size:14px;line-height:1;filter:drop-shadow(0 1px 1px rgba(0,0,0,0.3));flex:none;">${icon}</span>
+    <span style="font-size:10.5px;font-weight:700;color:#6b4310;background:rgba(255,250,240,0.95);border:1px solid #e3c79a;padding:0.5px 5px;border-radius:6px;box-shadow:0 1px 2px rgba(0,0,0,0.14);">${(name || "").replace(/</g, "&lt;")}</span>
   </div>`;
 }
 function makePinHtml(c: Cafe, isMatch: boolean, isFocus = false, isMine = false): string {
@@ -533,14 +533,12 @@ export default function Home() {
       await import("leaflet/dist/leaflet.css");
       if (cancelled || !mapRef.current || mapObj.current) return;
       LRef.current = L;
-      mapObj.current = L.map(mapRef.current, { zoomControl: true, attributionControl: true }).setView([37.5, 127.05], 10);
-      mapObj.current.attributionControl.setPrefix("");
-      // 한글 지명 표기를 위해 OSM 표준 타일 사용(지명이 한국어 name 태그 기준)
-      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: '&copy; OpenStreetMap' }).addTo(mapObj.current);
-      // 커피 테마에 맞춰 타일에 따뜻한 크림/세피아 톤 필터 적용(라벨·작은 랜드마크는 그대로, 색감만 보정)
+      mapObj.current = L.map(mapRef.current, { zoomControl: true, attributionControl: false }).setView([37.5, 127.05], 10);
+      // 정갈한 웜톤 베이스(CartoDB Voyager). 카페 탐색에 필요한 정보만 깔끔히, 커피 특색은 마커가 담당.
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", { subdomains: "abcd", maxZoom: 20 }).addTo(mapObj.current);
+      // 베이스를 살짝만 따뜻하게(아주 옅게) — 라벨 선명도는 유지
       const tp = mapObj.current.getPane("tilePane");
-      // 더 깊고 차분한 세피아(채도는 낮춰 차분, 대비는 살짝 올려 또렷). 마커가 위에서 도드라짐.
-      if (tp) tp.style.filter = "sepia(0.48) saturate(0.7) brightness(0.95) contrast(1.04) hue-rotate(-8deg)";
+      if (tp) tp.style.filter = "sepia(0.1) saturate(0.96) brightness(1.0)";
       layerRef.current = L.layerGroup().addTo(mapObj.current);
       setTimeout(() => mapObj.current?.invalidateSize(), 60);
       setMapReady(true); // 초기화 완료 → 마커 effect 재실행 트리거
@@ -655,15 +653,16 @@ export default function Home() {
     const z = map.getZoom();
     if (z >= 13) {
       if (landmarks.length) {
+        // 큰 랜드마크(우선순위≥3: 몰·백화점·대학·경기장·타워·공항·궁·테마파크)만, 화면당 최대 8개 — 군더더기 제거
         const lms = landmarks
-          .filter(([, la, lo]) => b.contains([la, lo] as [number, number]))
-          .sort((a, c) => c[4] - a[4]) // 우선순위(공항·타워·몰·경기장·궁) 높은 것 먼저
-          .slice(0, 14);
+          .filter(([, la, lo, , pr]) => pr >= 3 && b.contains([la, lo] as [number, number]))
+          .sort((a, c) => c[4] - a[4])
+          .slice(0, 8);
         const lmLayer = lms.map(([nm, la, lo, ic]) => L.marker([la, lo], { icon: L.divIcon({ className: "", html: makeLandmarkHtml(nm, ic), iconSize: [0, 0] }), interactive: false, zIndexOffset: -800 }));
         if (lmLayer.length) layerRef.current.addLayer(L.layerGroup(lmLayer));
       }
       if (stations.length) {
-        const stns = stations.filter(([, la, lo]) => b.contains([la, lo] as [number, number])).slice(0, 22);
+        const stns = stations.filter(([, la, lo]) => b.contains([la, lo] as [number, number])).slice(0, 16);
         const stnLayer = stns.map(([nm, la, lo]) => L.marker([la, lo], { icon: L.divIcon({ className: "", html: makeStationHtml(nm), iconSize: [0, 0] }), interactive: false, zIndexOffset: -1000 }));
         if (stnLayer.length) layerRef.current.addLayer(L.layerGroup(stnLayer));
       }
