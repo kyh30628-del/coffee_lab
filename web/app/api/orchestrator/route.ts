@@ -100,7 +100,7 @@ export async function GET(req: NextRequest) {
       } catch (e) { integrity.push(`무결성 자동교정 실패(즉시 확인): ${String(e).slice(0, 50)}`); }
       if (fixes.length) healed.push(`🔧 무결성 자율교정: ${fixes.join(", ")}`);
     }
-    if (ig.pub_nocat > 0) integrity.push(`공개인데 카테고리없음 ${ig.pub_nocat}곳(자동조치 안 함 — 백필이 보강)`);
+    // 카테고리 미보유는 위험/경보 아님 — 검증된 카페라 지장 없음. 카테고리 에이전트에 '주의' 숫자로만 표시.
     // 🛑 지역 통째 사라짐 감지 — 카페 30곳+ 지역인데 공개 0 = 대량 비공개 버그(인천 사태). 정상 지역은 항상 일부 공개됨.
     const regionGone = (await sql`SELECT area, COUNT(*)::int tot FROM cafes WHERE area IS NOT NULL GROUP BY area HAVING COUNT(*) >= 30 AND COUNT(*) FILTER (WHERE published) = 0`.catch(() => [])) as any[];
     if (regionGone.length) integrity.push(`⚠️지역 통째 비공개 ${regionGone.length}곳(${regionGone.slice(0, 3).map((r) => r.area).join("·")}) — 대량삭제 의심`);
@@ -179,9 +179,10 @@ export async function GET(req: NextRequest) {
     // 카테고리·동 채움 단계도 개별 모니터(발굴~수집 세분화)
     {
       const catRun = jobRuns.find((j: any) => j.job === "dong-backfill");
-      const heldCat = (await sql`SELECT COUNT(*)::int n FROM cafes WHERE needs_category AND NOT published`.catch(() => [{ n: 0 }]))[0] as any;
+      const pubNoCat = (await sql`SELECT COUNT(*)::int n FROM cafes WHERE published AND (naver_category IS NULL OR naver_category='')`.catch(() => [{ n: 0 }]))[0] as any;
       const cAge = ageHours(catRun?.ran_at ?? null, now);
-      agents.push({ key: "category", label: "카테고리 검증", lastRun: catRun?.ran_at ?? null, ageH: cAge == null ? null : Math.round(cAge * 10) / 10, cadenceH: 26, status: heldCat.n > 100 ? "warn" : "ok", queue: heldCat.n, note: heldCat.n ? `카테고리 검증대기 ${heldCat.n}` : "검증 완료" });
+      // 카테고리 미보유는 '주의'(warn=노랑)지 위험 아님 — 검증된 카페라 지장 없음.
+      agents.push({ key: "category", label: "카테고리 검증", lastRun: catRun?.ran_at ?? null, ageH: cAge == null ? null : Math.round(cAge * 10) / 10, cadenceH: 26, status: pubNoCat.n > 0 ? "warn" : "ok", queue: pubNoCat.n, note: pubNoCat.n ? `미보유 ${pubNoCat.n}(검증카페·지장없음)` : "전수 완료" });
       const pubND = (await sql`SELECT COUNT(*)::int n FROM cafes WHERE published AND dong IS NULL`.catch(() => [{ n: 0 }]))[0] as any;
       const dAge = ageHours(catRun?.ran_at ?? null, now);
       agents.push({ key: "dongfill", label: "동 채움 (백필)", lastRun: catRun?.ran_at ?? null, ageH: dAge == null ? null : Math.round(dAge * 10) / 10, cadenceH: 26, status: pubND.n > 50 ? "warn" : "ok", queue: pubND.n, note: pubND.n ? `공개 동없음 ${pubND.n}` : "공개 동 100%" });
