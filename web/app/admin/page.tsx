@@ -248,7 +248,13 @@ export default function AdminPage() {
                 </div>
               </div>
               {tower.alerts?.length > 0 && (
-                <div className="mb-2.5 text-[11px] text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">⚠ {tower.alerts.join(" · ")}</div>
+                <div className="mb-2.5 text-[11px] text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">🚨 경보(즉시조치): {tower.alerts.join(" · ")}</div>
+              )}
+              {tower.risks?.length > 0 && (
+                <div className="mb-2.5 text-[11px] text-amber-800 bg-amber-50 border border-amber-300 rounded-lg px-3 py-2">⚠️ 위험·의심(점검필요): {tower.risks.join(" · ")}</div>
+              )}
+              {(!tower.alerts?.length && !tower.risks?.length) && (
+                <div className="mb-2.5 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">✅ 무결성·위험 검사 통과 — 이상 없음(숫자 신뢰 가능)</div>
               )}
               {tower.healed?.length > 0 && (
                 <div className="mb-2.5 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">🔧 자가치유: {tower.healed.join(" · ")}</div>

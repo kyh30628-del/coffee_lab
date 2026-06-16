@@ -67,7 +67,7 @@ export async function GET(req: NextRequest) {
     const ds = (await sql`SELECT MIN(last_run) oldest, COUNT(*) FILTER (WHERE last_run < now() - interval '3 days')::int behind, COUNT(*)::int n FROM discovery_state`)[0] as any;
     // 로컬 배치 하트비트 — 실패(크래시 등)·정체를 관제탑이 잡아 경보. (예: dong-backfill ReferenceError)
     await sql`CREATE TABLE IF NOT EXISTS agent_runs (job TEXT PRIMARY KEY, ran_at TIMESTAMPTZ DEFAULT now(), ok BOOLEAN DEFAULT true, detail TEXT, processed INT DEFAULT 0)`.catch(() => {});
-    const jobRuns = (await sql`SELECT job, to_char(ran_at,'MM-DD HH24:MI') ran, ok, detail, EXTRACT(EPOCH FROM (now()-ran_at))/3600 age_h FROM agent_runs`.catch(() => [])) as any[];
+    const jobRuns = (await sql`SELECT job, ran_at, to_char(ran_at,'MM-DD HH24:MI') ran, ok, detail, EXTRACT(EPOCH FROM (now()-ran_at))/3600 age_h FROM agent_runs`.catch(() => [])) as any[];
     const jobFails = jobRuns.filter((j) => j.ok === false).map((j) => `${j.job} 오류(${j.ran}): ${(j.detail || "").slice(0, 70)}`);
 
     // 🔎 공개 데이터 무결성 실시간 자가검증 — 사장님이 잡은 버그 유형을 관제탑이 매번 스스로 검사.
@@ -85,6 +85,22 @@ export async function GET(req: NextRequest) {
     if (ig.pub_nocat > 0) integrity.push(`공개인데 카테고리없음 ${ig.pub_nocat}건`);
     if (ig.pub_badcoord > 0) integrity.push(`공개 좌표오류 ${ig.pub_badcoord}건`);
     if (ig.pub_noidentity > 0) integrity.push(`공개인데 정체성없음 ${ig.pub_noidentity}건`);
+
+    // ⚠️ 위험/의심 선제 탐지 — 하드 위반은 아니지만 '문제 발생 소지' 있는 것을 수면 위로 올림(사장님이 보게).
+    const risks: string[] = [];
+    // (동-구 불일치는 백필이 출처에서 '지번 구=area' 검증으로 예방 → 휴리스틱 노이즈 대신 무결성 dong_isgu가 확정 검출)
+    // 오염/환각 의심(그라운딩이 잡은 것)
+    if ((gr?.suspect ?? 0) > 0) risks.push(`오염·환각 의심 ${gr.suspect}건(그라운딩 — 재검 대기)`);
+    // 3) 발굴 3일+ 지연 지역
+    if ((ds?.behind ?? 0) > 0) risks.push(`발굴 3일+ 지연 지역 ${ds.behind}곳`);
+    // 4) 미해결 품질 오염 플래그
+    if ((af?.open ?? 0) > 0) risks.push(`미해결 오염 플래그 ${af.open}건`);
+    // 5) 동 채움 미흡 지역(공개 10곳+인데 동 90% 미만)
+    const dgap = (await sql`SELECT COUNT(*)::int n FROM (SELECT area FROM cafes WHERE published GROUP BY area HAVING COUNT(*) >= 10 AND COUNT(*) FILTER (WHERE dong IS NOT NULL)::float / COUNT(*) < 0.9) x`.catch(() => [{ n: 0 }]))[0] as any;
+    if (dgap.n > 0) risks.push(`동 채움 미흡 지역 ${dgap.n}곳(<90%)`);
+    // 6) 임베딩 미완(의미검색 누락) — 공개인데 임베딩 없는 카페
+    const noemb = (await sql`SELECT COUNT(*)::int n FROM cafes WHERE published AND embedding IS NULL`.catch(() => [{ n: 0 }]))[0] as any;
+    if (noemb.n > 0) risks.push(`의미검색 누락 ${noemb.n}곳(임베딩 대기)`);
 
     // 파이프라인 진행 상황(신규 카페 조립라인)
     const pl = (await sql`SELECT
@@ -138,8 +154,19 @@ export async function GET(req: NextRequest) {
       let status: AgentHealth["status"] = freshness(ageH, cadenceH);
       agents.push({ key, label, lastRun: last, ageH: ageH == null ? null : Math.round(ageH * 10) / 10, cadenceH, status, queue, note });
     };
-    add("collect", "수집 (warmup·grow)", c.last_collect, 16, c.synth_q, `발굴 지역 지연 ${ds.behind}/${ds.n}`);
+    add("discover", "발굴 (grow·지역수색)", c.last_collect, 24, ds.behind, ds.behind ? `${ds.behind}/${ds.n} 지역 3일+ 지연` : `${ds.n}개 지역 순환중`);
+    add("collect", "수집 (warmup·raw)", c.last_collect, 16, c.synth_q, `raw 수집·재수집`);
     add("synth", "합성 (옥석·등급)", c.last_synth, 24, c.synth_q, c.synth_q ? "미합성 적체" : "적체 없음");
+    // 카테고리·동 채움 단계도 개별 모니터(발굴~수집 세분화)
+    {
+      const catRun = jobRuns.find((j: any) => j.job === "dong-backfill");
+      const heldCat = (await sql`SELECT COUNT(*)::int n FROM cafes WHERE needs_category AND NOT published`.catch(() => [{ n: 0 }]))[0] as any;
+      const cAge = ageHours(catRun?.ran_at ?? null, now);
+      agents.push({ key: "category", label: "카테고리 검증", lastRun: catRun?.ran_at ?? null, ageH: cAge == null ? null : Math.round(cAge * 10) / 10, cadenceH: 26, status: heldCat.n > 100 ? "warn" : "ok", queue: heldCat.n, note: heldCat.n ? `카테고리 검증대기 ${heldCat.n}` : "검증 완료" });
+      const pubND = (await sql`SELECT COUNT(*)::int n FROM cafes WHERE published AND dong IS NULL`.catch(() => [{ n: 0 }]))[0] as any;
+      const dAge = ageHours(catRun?.ran_at ?? null, now);
+      agents.push({ key: "dongfill", label: "동 채움 (백필)", lastRun: catRun?.ran_at ?? null, ageH: dAge == null ? null : Math.round(dAge * 10) / 10, cadenceH: 26, status: pubND.n > 50 ? "warn" : "ok", queue: pubND.n, note: pubND.n ? `공개 동없음 ${pubND.n}` : "공개 동 100%" });
+    }
     add("judge", "AI 판정 (Haiku·새벽)", c.last_judge, 30, c.judge_q, `판정 대기 ${c.judge_q}`);
     add("embed", "임베딩", c.last_embed, 30, c.embed_q, c.embed_q ? `미임베딩 ${c.embed_q}` : `완료(공개 ${c.published ? Math.round((c.pub_embedded / c.published) * 100) : 0}%)`);
     add("verify", "검증 레드팀", vr?.ran_at ?? null, 30, (vr?.fails ?? 0) + (vr?.warns ?? 0), vr ? `fail ${vr.fails}·warn ${vr.warns}` : "리포트 없음");
@@ -180,7 +207,7 @@ export async function GET(req: NextRequest) {
 
     const health = {
       generatedAt: new Date(now).toISOString(),
-      overall, alerts, healed,
+      overall, alerts, healed, risks, integrity,
       coverage: { total: c.total, published: c.published, rawCachedPct: pct(c.raw_cached), judgedPct: pct(c.judged), embeddedPct: c.published ? Math.round((c.pub_embedded / c.published) * 100) : 0, dongPct: pct(td.has_dong) },
       today: { newCafes: td.new_today, synthesized: td.synth_today, published: td.published_today, hasDong: td.has_dong, dongPct: pct(td.has_dong), noise: td.noise, newQueue: td.new_q, ytToday: td.yt_today, ytTotal: td.yt_total },
       pipeline, agents,
