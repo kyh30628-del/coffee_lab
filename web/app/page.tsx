@@ -174,6 +174,10 @@ function makeLandmarkHtml(name: string, icon: string): string {
     <span style="font-size:10.5px;font-weight:700;color:#6b4310;background:rgba(255,250,240,0.95);border:1px solid #e3c79a;padding:0.5px 5px;border-radius:6px;box-shadow:0 1px 2px rgba(0,0,0,0.14);">${(name || "").replace(/</g, "&lt;")}</span>
   </div>`;
 }
+function makeMyLocHtml(): string {
+  // 내 현재 위치 — 파란 점(펄스 느낌의 후광)
+  return `<div style="transform:translate(-50%,-50%);"><span style="display:block;width:18px;height:18px;border-radius:50%;background:#2f6fb0;border:3px solid #fff;box-shadow:0 0 0 5px rgba(47,111,176,0.28),0 1px 5px rgba(0,0,0,0.45);"></span></div>`;
+}
 function makePinHtml(c: Cafe, isMatch: boolean, isFocus = false, isMine = false): string {
   const grade = c.synth_grade ?? "발굴";
   const feat = !!c.featured && !isFocus; // ✨ 우선 노출 — 골드 핀 강조(포커스 핀이 우선)
@@ -286,6 +290,8 @@ export default function Home() {
   const [showFavs, setShowFavs] = useState(false); // 즐겨찾기(★ 카페) 모달
   const [othersMode, setOthersMode] = useState(false); // 다른 사람은 — 집계 핀
   const [othersPins, setOthersPins] = useState<{ id: number; name: string; area: string; lat: number; lng: number; cnt: number }[]>([]);
+  const [nearMe, setNearMe] = useState<{ lat: number; lng: number } | null>(null); // '내 주변 500m' 현재 위치(누를 때마다 갱신)
+  const [nearMsg, setNearMsg] = useState("");
   const [myLocked, setMyLocked] = useState(false); // 공용 PC 잠금 상태
   const [sessionPin, setSessionPin] = useState(""); // 이번 세션에 입력한 PIN(해제용)
   const [bookmarkIds, setBookmarkIds] = useState<Set<number>>(new Set()); // 카페 북마크(내 카페 등록과 별개)
@@ -426,6 +432,24 @@ export default function Home() {
   const onAgree = () => { setShowConsent(false); setConsent("agreed"); postConsent(true); detectLocation(); };
   const onDecline = () => { setShowConsent(false); setConsent("declined"); postConsent(false); };
   const openLocation = () => { if (consent === "agreed") detectLocation(); else setShowConsent(true); };
+  // 📍 '내 주변 500m' — 누를 때마다 현재 위치를 새로 받아 그 지점 반경 500m 카페만 렌더(서버 전송 없음, 클라이언트 전용).
+  const showNearMe = () => {
+    if (!navigator.geolocation) { setNearMsg("이 브라우저는 위치를 지원하지 않아요"); return; }
+    setNearMsg("내 위치 확인 중…");
+    setMyPinMode(false); setOthersMode(false); // 모드 상호배타
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        setNearMe({ lat: latitude, lng: longitude });
+        setNearMsg("");
+        const map = mapObj.current;
+        if (map) map.setView([latitude, longitude], 16); // 500m 반경이 화면에 들어오는 줌
+      },
+      (err) => setNearMsg(err.code === 1 ? "위치 권한이 거부됐어요 (브라우저 설정에서 허용 가능)" : "위치를 가져오지 못했어요"),
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }, // 누를 때마다 현재 위치 새로
+    );
+  };
+  const clearNearMe = () => { setNearMe(null); setNearMsg(""); };
   const clearAuto = () => { setHomeSido(""); setHomeGu(""); setHomeDong(""); setAutoGu(""); setSido(""); setSigungu(""); setDong(""); setGeoMsg(""); };
   useEffect(() => { const u = homeGu ? `/api/discover?region=${encodeURIComponent(homeGu)}` : "/api/discover"; setDiscover(null); fetch(u).then((r) => r.json()).then((d) => { if (d.ok) setDiscover(d); }).catch(() => {}); }, [homeGu]);
   useEffect(() => { const u = homeGu ? `/api/momentum?region=${encodeURIComponent(homeGu)}` : "/api/momentum"; setMomentum(null); fetch(u).then((r) => r.json()).then((d) => { if (d.ok) setMomentum({ rising: d.rising ?? [] }); }).catch(() => {}); }, [homeGu]);
@@ -433,8 +457,8 @@ export default function Home() {
   const openById = useCallback((id: number) => { const c = cafes.find((x) => x.id === id); if (c) setSelected(c); }, [cafes]);
 
   // 뒤로가기 가드: 현재 UI 레이어를 ref로 추적(리스너에서 최신값 참조)
-  const uiRef = useRef<{ selected: boolean; showSearch: boolean; showConsent: boolean; tab: string; role: string | null; ownerPwModal: boolean; sido: string; sigungu: string; dong: string }>({ selected: false, showSearch: false, showConsent: false, tab: "home", role: null, ownerPwModal: false, sido: "", sigungu: "", dong: "" });
-  uiRef.current = { selected: !!selected, showSearch, showConsent, tab, role, ownerPwModal, sido, sigungu, dong };
+  const uiRef = useRef<{ selected: boolean; showSearch: boolean; showConsent: boolean; tab: string; role: string | null; ownerPwModal: boolean; sido: string; sigungu: string; dong: string; nearMe: boolean }>({ selected: false, showSearch: false, showConsent: false, tab: "home", role: null, ownerPwModal: false, sido: "", sigungu: "", dong: "", nearMe: false });
+  uiRef.current = { selected: !!selected, showSearch, showConsent, tab, role, ownerPwModal, sido, sigungu, dong, nearMe: !!nearMe };
   // 위에서 연 레이어를 우선순위대로 즉시 닫는다(공통). allowMapBack=false면 지도→홈은 건너뜀(지도 패닝과 충돌 방지).
   const closeTopLayer = (allowMapBack = true) => {
     const u = uiRef.current;
@@ -445,6 +469,7 @@ export default function Home() {
     if (u.tab === "memory") { setTab("home"); return true; } // 추억 → 홈
     // 지도: 뒤로가기로 지역 계층을 올라감 (동→구/시→수도권전체(서울·인천·경기)→홈)
     if (u.tab === "map") {
+      if (u.nearMe) { setNearMe(null); setNearMsg(""); return true; }               // 📍 내 주변 → 해제(일반 지도)
       if (u.dong) { setDong(""); return true; }                                    // 동/면 → 구/시(동 마커)
       if (u.sigungu) { setSido(""); setSigungu(""); setDong(""); return true; }     // 구/시 → 지도 초기화면(서울·인천·경기)
       if (u.sido) { setSido(""); setSigungu(""); setDong(""); return true; }        // 시도(구 마커) → 전체
@@ -581,6 +606,17 @@ export default function Home() {
     if (!L || !map || !layerRef.current) return;
     layerRef.current.clearLayers();
 
+    // ===== 📍 내 주변 500m: 현재 위치 + 반경 원 + 500m 이내 카페만 =====
+    if (nearMe) {
+      const R = 500;
+      layerRef.current.addLayer(L.circle([nearMe.lat, nearMe.lng], { radius: R, color: "#2f6fb0", weight: 1.5, fillColor: "#2f6fb0", fillOpacity: 0.08, interactive: false }));
+      layerRef.current.addLayer(L.marker([nearMe.lat, nearMe.lng], { icon: L.divIcon({ className: "", html: makeMyLocHtml(), iconSize: [0, 0] }), zIndexOffset: 6000, interactive: false }));
+      const near = cafes.filter((c) => c.lat && c.lng && distM(nearMe.lat, nearMe.lng, c.lat, c.lng) <= R);
+      const markers = near.map((c) => L.marker([c.lat, c.lng], { icon: L.divIcon({ className: "", html: makePinHtml(c, matchSet.has(c.id), c.id === focusId, myCafeIds.has(c.id)), iconSize: [0, 0] }), zIndexOffset: c.id === focusId ? 3000 : c.featured ? 2000 : 100 }).on("click", () => setSelected(c)));
+      layerRef.current.addLayer(L.layerGroup(markers));
+      return;
+    }
+
     // ===== 내 카페(MY PIN) / 다른 사람 모드: 개별 표시(집계 안 함) =====
     if (myPinMode || othersMode) {
       const inScope = (p: { area: string }) => {
@@ -671,12 +707,13 @@ export default function Home() {
     layerRef.current.addLayer(L.layerGroup(markers));
     const focusM = focusId ? markers[toRender.findIndex((c) => c.id === focusId)] : null;
     if (focusM) (focusM as any).openPopup();
-  }, [filtered, matchSet, sido, sigungu, dong, focusId, myPinMode, myCafeIds, othersMode, othersPins, cafes, stations, landmarks]);
+  }, [filtered, matchSet, sido, sigungu, dong, focusId, myPinMode, myCafeIds, othersMode, othersPins, cafes, stations, landmarks, nearMe]);
 
   // 데이터/지역/모드 변경 시: 화면을 맞춘 뒤 마커를 그린다(맞춘 화면 기준으로 그려짐).
   useEffect(() => {
     const L = LRef.current; const map = mapObj.current;
     if (!L || !map || !layerRef.current) return;
+    if (nearMe) { drawMarkers(); return; } // 📍 내 주변 모드: showNearMe가 이미 setView함 → flyTo 충돌 방지, 그리기만
     if (focusId) {
       /* focus effect가 setView 처리 */
     } else if (myPinMode || othersMode) {
@@ -696,7 +733,7 @@ export default function Home() {
     else { map.flyTo([37.5, 127.05], 9, { duration: 0.7 }); } // 전체(시도 미선택) → 수도권 전역으로 부드럽게 줌아웃해 시도 집계 원형 표시
     drawMarkers();
     // 주의: 의존성에 tab을 넣지 말 것(탭 전환마다 재렌더되어 느려짐). 데이터/필터 변경 시에만.
-  }, [filtered, matchSet, sido, sigungu, focusId, mapReady, myPinMode, myCafeIds, othersMode, othersPins, drawMarkers]);
+  }, [filtered, matchSet, sido, sigungu, focusId, mapReady, myPinMode, myCafeIds, othersMode, othersPins, drawMarkers, nearMe]);
 
   // 줌·이동이 끝나면 개별 카페 레벨일 때만 다시 그린다(뷰포트 캡). 집계 원형마커는 화면과 무관하므로 팬마다 재집계 안 함 → 1만건에서도 가벼움.
   useEffect(() => {
@@ -896,19 +933,32 @@ export default function Home() {
             <div ref={mapRef} className="w-full h-full md:rounded-2xl overflow-hidden bg-[#e8e0d3] z-0" />
             {/* 내 카페(MY PIN) / 다른 사람은 — 지도 상단 */}
             <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[1100] flex gap-2 max-w-[calc(100vw-1.5rem)]">
-              <button onClick={() => { if (myLocked) setTab("memory"); else setMyPinMode((v) => !v); }}
+              <button onClick={showNearMe} aria-label="내 주변 500m"
+                className={`inline-flex items-center gap-1 h-9 px-3.5 rounded-full text-[12px] font-bold shadow-lg whitespace-nowrap transition-colors ${nearMe ? "text-white" : "bg-white text-[#2f6fb0] border border-[#bcd4ea]"}`}
+                style={nearMe ? { background: "#2f6fb0" } : {}}>
+                <span className="text-[14px] leading-none">📍</span>
+                <span>내 주변{nearMe ? " ↻" : ""}</span>
+              </button>
+              <button onClick={() => { setNearMe(null); if (myLocked) setTab("memory"); else setMyPinMode((v) => !v); }}
                 className={`inline-flex items-center gap-1 h-9 px-3.5 rounded-full text-[12px] font-bold shadow-lg whitespace-nowrap transition-colors ${myPinMode ? "text-white" : "bg-white text-[#d6336c] border border-[#f0c4d4]"}`}
                 style={myPinMode ? { background: "#d6336c" } : {}}>
                 <span className="text-[14px] leading-none">{myLocked ? "🔒" : "❤"}</span>
                 <span>내 카페{!myLocked && myCafeIds.size ? ` ${myCafeIds.size}` : ""}</span>
               </button>
-              <button onClick={() => setOthersMode((v) => !v)} aria-label="다른 사람은"
+              <button onClick={() => { setNearMe(null); setOthersMode((v) => !v); }} aria-label="다른 사람은"
                 className={`inline-flex items-center gap-1 h-9 px-3.5 rounded-full text-[12px] font-bold shadow-lg whitespace-nowrap transition-colors ${othersMode ? "text-white" : "bg-white text-[#5f7355] border border-[#cfe0c2]"}`}
                 style={othersMode ? { background: "#5f7355" } : {}}>
                 <span className="text-[14px] leading-none">👥</span>
                 <span>다른 사람은{othersMode && othersPins.length ? ` ${othersPins.length}` : ""}</span>
               </button>
             </div>
+            {/* 📍 내 주변 안내/해제 — 활성 또는 안내 메시지 있을 때 */}
+            {(nearMe || nearMsg) && (
+              <div className="absolute top-[3.25rem] left-1/2 -translate-x-1/2 z-[1100] bg-white/95 backdrop-blur rounded-full shadow-lg px-3 py-1.5 text-[11px] text-[#23527c] flex items-center gap-2 whitespace-nowrap">
+                <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: "#2f6fb0" }} />
+                {nearMsg ? <span>{nearMsg}</span> : <><span>내 위치 반경 <b>500m</b> 카페</span><button onClick={clearNearMe} className="text-[#8a7458] font-bold ml-0.5">✕ 해제</button></>}
+              </div>
+            )}
             {/* 범례 — 두 핀의 의미 안내(켜졌을 때만). 같은 카페면 핀이 하나로 병합됨 */}
             {(myPinMode || othersMode) && (
               <div className="absolute top-3 left-3 z-[1100] bg-white/95 backdrop-blur rounded-xl shadow-lg px-3 py-2 text-[11px] text-[#4a3a2a] leading-snug max-w-[150px]">
