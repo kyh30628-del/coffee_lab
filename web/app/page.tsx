@@ -160,11 +160,18 @@ function makeRegionPinHtml(label: string, cnt: number, maxCnt: number): string {
 }
 
 // 위치 가늠용 지하철역 마커(개별 카페 레벨에서만). 카페 핀과 구분되게 파란 점 + 역명.
-function makeStationHtml(name: string): string {
-  // 지하철역 — 작은 파랑 점 + 깔끔한 흰 라벨. 정갈하되 또렷, 튀지 않게.
+function makeStationHtml(name: string, colors: string[], refs: string[]): string {
+  // 지하철역 — 호선별 색 번호 뱃지(환승역=여러 개) + 역명. 버스정류장(베이스맵 아이콘)과 명확히 구분.
+  const cols = colors && colors.length ? colors : ["#2f6fb0"];
+  const badge = (c: string, r: string) => {
+    const m = (r || "").match(/^(\d+)호선/);
+    const lbl = m ? m[1] : (r || "").replace(/호선|선/g, "").slice(0, 3) || "·";
+    return `<span style="background:${c};color:#fff;font-size:9px;font-weight:900;line-height:1;min-width:14px;height:15px;display:inline-flex;align-items:center;justify-content:center;border-radius:8px;padding:0 3px;border:1.5px solid #fff;box-shadow:0 1px 2px rgba(0,0,0,0.4);">${lbl}</span>`;
+  };
+  const badges = cols.map((c, i) => badge(c, refs && refs[i])).join("");
   return `<div style="transform:translate(-50%,-50%);display:flex;align-items:center;gap:3px;white-space:nowrap;">
-    <span style="width:9px;height:9px;border-radius:50%;background:#2f6fb0;border:2px solid #fff;box-shadow:0 1px 2px rgba(0,0,0,0.3);flex:none;"></span>
-    <span style="font-size:10.5px;font-weight:700;color:#1f4d80;background:rgba(255,255,255,0.95);border:1px solid #c3d4e6;padding:0.5px 5px;border-radius:6px;box-shadow:0 1px 2px rgba(0,0,0,0.16);">${(name || "").replace(/</g, "&lt;")}역</span>
+    <span style="display:flex;gap:2px;">${badges}</span>
+    <span style="font-size:11px;font-weight:800;color:#1f2d3d;background:#fff;border:1px solid #d4dce3;padding:1px 5px;border-radius:7px;box-shadow:0 1px 3px rgba(0,0,0,0.3);">${(name || "").replace(/</g, "&lt;")}역</span>
   </div>`;
 }
 function makeLandmarkHtml(name: string, icon: string): string {
@@ -265,7 +272,7 @@ function FavoritesModal({ items, onClose, onOpen, onRemove }: { items: Cafe[]; o
 
 export default function Home() {
   const [cafes, setCafes] = useState<Cafe[]>([]);
-  const [stations, setStations] = useState<[string, number, number][]>([]); // 위치 가늠용 지하철역(이름,위도,경도)
+  const [stations, setStations] = useState<{ n: string; lat: number; lng: number; c: string[]; r: string[] }[]>([]); // 지하철역(이름,좌표,호선색,호선명)
   const [landmarks, setLandmarks] = useState<[string, number, number, string, number][]>([]); // 랜드마크(이름,위도,경도,아이콘,우선순위)
   useEffect(() => {
     fetch("/data/stations.json").then((r) => r.json()).then((d) => Array.isArray(d) && setStations(d)).catch(() => {});
@@ -591,9 +598,14 @@ export default function Home() {
             const sl = (ly as any)["source-layer"] || "";
             // 지형 음영 래스터(natural_earth/ne2) → 숨김. 저해상도가 확대돼 큰 녹색 덩어리로 보이던 원인.
             if (ly.type === "raster") { try { ml.setLayoutProperty(ly.id, "visibility", "none"); } catch {} continue; }
-            // 녹지·토지구획·공원·산 → 숨김 (물·도로·건물·라벨은 유지)
-            if (["landuse", "landcover", "park"].includes(sl) || /landuse|landcover|wood|grass|park|forest|cemetery|farmland|meadow|scrub|wetland|golf|pitch/i.test(ly.id)) {
+            // 토지구획(지적도) 파셀만 숨김 — landuse_residential/pitch/track/school 등
+            if (sl === "landuse" || (/landuse/i.test(ly.id) && ly.type === "fill")) {
               try { ml.setLayoutProperty(ly.id, "visibility", "none"); } catch {}
+              continue;
+            }
+            // 산·녹지(공원/숲/잔디): '색+이름'만 — 옅고 차분한 녹색으로 보이게(빽빽한 텍스처 없이). 이름 라벨은 심볼이라 유지됨.
+            if ((sl === "landcover" || sl === "park") && (ly.type === "fill" || ly.type === "fill-extrusion")) {
+              try { ml.setPaintProperty(ly.id, "fill-color", "#d7e4c2"); ml.setPaintProperty(ly.id, "fill-opacity", 0.5); ml.setLayoutProperty(ly.id, "visibility", "visible"); } catch {}
               continue;
             }
             if (ly.type === "fill" && /building/i.test(ly.id)) { try { ml.setPaintProperty(ly.id, "fill-color", "#ece2cf"); ml.setPaintProperty(ly.id, "fill-outline-color", "#dccfb4"); } catch {} continue; }
@@ -608,7 +620,7 @@ export default function Home() {
               }
               // 🏪 POI(상호·상가)를 풍성하게 — 더 일찍 보이게(줌 2단계↓) + 가독성 헤일로 + 강조색(교통=파랑, 그 외=커피브라운)
               if (/poi/i.test(ly.id)) {
-                try { if (typeof (ly as any).minzoom === "number") ml.setLayerZoomRange(ly.id, Math.max(12, (ly as any).minzoom - 2), (ly as any).maxzoom ?? 24); } catch {}
+                try { if (typeof (ly as any).minzoom === "number") ml.setLayerZoomRange(ly.id, Math.max(11, (ly as any).minzoom - 3), (ly as any).maxzoom ?? 24); } catch {}
                 try { ml.setPaintProperty(ly.id, "text-color", /transit/i.test(ly.id) ? "#235a86" : "#4a3526"); } catch {}
                 try { ml.setPaintProperty(ly.id, "text-halo-color", "#fdf7ec"); ml.setPaintProperty(ly.id, "text-halo-width", 1.4); } catch {}
                 try { ml.setLayoutProperty(ly.id, "icon-size", 1.15); } catch {}
@@ -758,8 +770,8 @@ export default function Home() {
         if (lmLayer.length) layerRef.current.addLayer(L.layerGroup(lmLayer));
       }
       if (stations.length) {
-        const stns = stations.filter(([, la, lo]) => b.contains([la, lo] as [number, number])).slice(0, 16);
-        const stnLayer = stns.map(([nm, la, lo]) => L.marker([la, lo], { icon: L.divIcon({ className: "", html: makeStationHtml(nm), iconSize: [0, 0] }), interactive: false, zIndexOffset: -1000 }));
+        const stns = stations.filter((s) => b.contains([s.lat, s.lng] as [number, number])).slice(0, 20);
+        const stnLayer = stns.map((s) => L.marker([s.lat, s.lng], { icon: L.divIcon({ className: "", html: makeStationHtml(s.n, s.c, s.r), iconSize: [0, 0] }), interactive: false, zIndexOffset: -300 }));
         if (stnLayer.length) layerRef.current.addLayer(L.layerGroup(stnLayer));
       }
     }
