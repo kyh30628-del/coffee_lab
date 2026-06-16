@@ -574,31 +574,38 @@ export default function Home() {
         const tp = mapObj.current.getPane("tilePane");
         if (tp) tp.style.filter = "sepia(0.1) saturate(0.96) brightness(1.01)";
         const ml = gl.getMaplibreMap();
+        (window as any).__ml = ml; // 디버그 핸들
         // 전 세계 한글 표기 — name:ko 우선(없으면 현지명→로마자). ko가 없는 한국 지명은 name이 한글이라 안전.
         const KO_LABEL: any = ["coalesce", ["get", "name:ko"], ["get", "name"], ["get", "name:latin"]];
-        ml.on("load", () => {
-          try {
-            // 크림 배경 + 건물 따뜻한 톤(녹지 숨김으로 배경이 넓게 드러남 → 크림으로 보임)
-            try { ml.setPaintProperty("background", "background-color", "#f3ecdb"); } catch {}
-            for (const ly of (ml.getStyle().layers || [])) {
-              const sl = (ly as any)["source-layer"] || "";
-              // 녹지·토지구획·공원·산 → 숨김 (물·도로·건물·라벨은 유지)
-              if (["landuse", "landcover", "park"].includes(sl) || /landuse|landcover|wood|grass|park|forest|cemetery|farmland|meadow|scrub|wetland|golf|pitch/i.test(ly.id)) {
-                try { ml.setLayoutProperty(ly.id, "visibility", "none"); } catch {}
-                continue;
-              }
-              // 건물 — 옅은 크림/베이지로 통일
-              if (ly.type === "fill" && /building/i.test(ly.id)) { try { ml.setPaintProperty(ly.id, "fill-color", "#e9dfcc"); } catch {} continue; }
-              // 한글 라벨 — name 기반 심볼 레이어 전부 name:ko 우선(전 세계 국가·지명)
-              if (ly.type === "symbol") {
-                const tf = (ly as any).layout && (ly as any).layout["text-field"];
-                if (tf && JSON.stringify(tf).includes("name")) {
-                  try { ml.setLayoutProperty(ly.id, "text-field", KO_LABEL); } catch {}
-                }
+        // 녹지숨김·크림·한글 적용 — 1회만. 레이스(스타일이 리스너보다 먼저 로드) 방지: 즉시+load+styledata 모두에서 시도하되,
+        // 스타일이 완전히 로드된 뒤 단 한 번 적용(setX가 다시 styledata를 유발 → applied 플래그로 무한루프 차단).
+        let applied = false;
+        const applyVectorStyle = () => {
+          if (applied) return;
+          let style: any;
+          try { if (!(ml.isStyleLoaded && ml.isStyleLoaded())) return; style = ml.getStyle(); } catch { return; }
+          if (!style || !style.layers) return;
+          applied = true;
+          try { ml.setPaintProperty("background", "background-color", "#f3ecdb"); } catch {}
+          for (const ly of style.layers) {
+            const sl = (ly as any)["source-layer"] || "";
+            // 녹지·토지구획·공원·산 → 숨김 (물·도로·건물·라벨은 유지)
+            if (["landuse", "landcover", "park"].includes(sl) || /landuse|landcover|wood|grass|park|forest|cemetery|farmland|meadow|scrub|wetland|golf|pitch/i.test(ly.id)) {
+              try { ml.setLayoutProperty(ly.id, "visibility", "none"); } catch {}
+              continue;
+            }
+            if (ly.type === "fill" && /building/i.test(ly.id)) { try { ml.setPaintProperty(ly.id, "fill-color", "#e9dfcc"); } catch {} continue; }
+            if (ly.type === "symbol") {
+              const tf = (ly as any).layout && (ly as any).layout["text-field"];
+              if (tf && JSON.stringify(tf).includes("name")) {
+                try { ml.setLayoutProperty(ly.id, "text-field", KO_LABEL); } catch {}
               }
             }
-          } catch {}
-        });
+          }
+        };
+        ml.on("load", applyVectorStyle);
+        ml.on("styledata", applyVectorStyle); // 스타일 로드/변경 시마다 시도(레이스 방지의 핵심, applied로 1회 보장)
+        applyVectorStyle(); // 이미 로드됐으면 즉시
         ml.on("error", () => {}); // 벡터 타일 일시 오류는 무시(폴백 래스터 존재)
       } catch { /* 벡터 초기화 실패(예: WebGL 미지원) → 래스터 폴백 유지 */ }
       layerRef.current = L.layerGroup().addTo(mapObj.current);
