@@ -589,6 +589,8 @@ export default function Home() {
           try { ml.setPaintProperty("background", "background-color", "#f3ecdb"); } catch {}
           for (const ly of style.layers) {
             const sl = (ly as any)["source-layer"] || "";
+            // 지형 음영 래스터(natural_earth/ne2) → 숨김. 저해상도가 확대돼 큰 녹색 덩어리로 보이던 원인.
+            if (ly.type === "raster") { try { ml.setLayoutProperty(ly.id, "visibility", "none"); } catch {} continue; }
             // 녹지·토지구획·공원·산 → 숨김 (물·도로·건물·라벨은 유지)
             if (["landuse", "landcover", "park"].includes(sl) || /landuse|landcover|wood|grass|park|forest|cemetery|farmland|meadow|scrub|wetland|golf|pitch/i.test(ly.id)) {
               try { ml.setLayoutProperty(ly.id, "visibility", "none"); } catch {}
