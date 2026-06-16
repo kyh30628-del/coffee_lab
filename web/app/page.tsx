@@ -600,7 +600,7 @@ export default function Home() {
           } catch {}
         });
         ml.on("error", () => {}); // 벡터 타일 일시 오류는 무시(폴백 래스터 존재)
-      } catch { /* 벡터 초기화 실패 → 래스터 폴백 유지 */ }
+      } catch { /* 벡터 초기화 실패(예: WebGL 미지원) → 래스터 폴백 유지 */ }
       layerRef.current = L.layerGroup().addTo(mapObj.current);
       setTimeout(() => mapObj.current?.invalidateSize(), 60);
       setMapReady(true); // 초기화 완료 → 마커 effect 재실행 트리거
