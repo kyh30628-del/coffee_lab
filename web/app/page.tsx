@@ -771,8 +771,10 @@ export default function Home() {
     // ===== 줌 기반 계층(자유 줌·이동도 자연스럽게). 화면이 곧 상태: 시도→구→동 집계, z≥15/동선택=개별 카페 실시간 =====
     const z = map.getZoom();
     const b = map.getBounds().pad(0.2);
-    const level = (dong || focusId || z >= 15) ? "cafe"
-      : (sigungu || z >= 13) ? "dong"
+    // 동/면 레벨(z≥13)부터 개별 카페를 뷰포트 기준 실시간 렌더(이동 때마다 화면 속 카페 갱신).
+    //   동 집계 원형은 시군구를 드롭다운으로 고른 '탐색' 상태에서만(줌인 전 동 고르기용). z≥13이면 줌이 우선=카페.
+    const level = (dong || focusId || z >= 13) ? "cafe"
+      : sigungu ? "dong"
       : (sido || z >= 11) ? "gu"
       : "sido";
     if (level !== "cafe") {
