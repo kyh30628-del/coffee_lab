@@ -97,8 +97,8 @@ function nameHit(rawText: string, normText: string, term: string): boolean {
   return tn.length > 4 ? normText.includes(tn) : boundedHit(rawText, term);
 }
 
-const GENERIC_SUFFIX = /(카페|커피|로스터리|베이커리|디저트|coffee|cafe|점|본점)$/i;
-const GENERIC_WORD = new Set(["카페", "커피", "점", "본점", "로스터리", "베이커리", "디저트", "coffee", "cafe", "책방", "북카페"]);
+const GENERIC_SUFFIX = /(카페|커피|로스터리|로스터스|로스터즈|로스터|로스팅|베이커리|디저트|coffee|cafe|roasters?|roastery|roasteries|점|본점)$/i;
+const GENERIC_WORD = new Set(["카페", "커피", "점", "본점", "로스터리", "로스터스", "로스터즈", "로스터", "로스팅", "베이커리", "디저트", "coffee", "cafe", "roasters", "roaster", "roastery", "roasteries", "책방", "북카페"]);
 // 너무 흔해서 '식별어'가 못 되는 형용사·일반어. 이것만 남으면 전체 이름 일치를 요구(오매칭 방지).
 // 예: "좋은커피" → 접미 '커피' 제거 후 '좋은'만 남는데, '분위기 좋은 카페'처럼 모든 후기에 나옴.
 const NAME_STOPWORD = new Set(["좋은", "맛있는", "맛있는집", "예쁜", "멋진", "행복", "행복한", "우리", "우리집", "작은", "큰", "조용한", "따뜻한", "정직한", "데일리", "오늘", "하루", "그날", "모닝", "감성", "분위기", "힐링", "달콤한", "새로운",
@@ -130,6 +130,30 @@ const VENUE_WORDS = [
 const DISTRICT_WORDS = ["위례", "미사", "다산", "별내", "광교", "동탄", "운정", "송도", "청라", "영종", "마곡", "지축", "삼송", "향동", "고덕", "감일", "갈매", "한강신도시", "위례신도시"];
 const isVenueTok = (t: string) => { const n = norm(t); return VENUE_WORDS.some((v) => n.includes(norm(v))) || DISTRICT_WORDS.some((d) => n.includes(norm(d))); };
 
+// 지역/생활권/신도시 이름 — 카페명 식별 토큰이 '못' 된다.
+//   예: "평촌커피" → 접미 '커피' 제거 후 '평촌'만 남는데, '평촌'은 그 지역 모든 카페 후기에 나옴
+//   → 식별어로 쓰면 평촌 지역 아무 카페·심지어 콜밴·샷시수리 글까지 매칭됨(실측 392/632 오통과).
+//   이런 토큰만 남으면 coreEmpty 처리 → '전체 이름 원문 일치'만 인정(오매칭 차단).
+//   ⚠️ 시·군·구는 areaTerms로 이미 걸러지므로 여기엔 '구보다 작은 생활권·신도시·역세권' 위주로 둔다.
+const AREA_NAME = new Set([
+  ...DISTRICT_WORDS,
+  // 안양·군포·의왕
+  "평촌", "산본", "인덕원", "범계", "관양", "호계",
+  // 부천·광명·시흥
+  "중동", "상동", "소사", "철산", "하안", "배곧", "정왕", "은계", "장현",
+  // 고양·파주
+  "일산", "백석", "마두", "주엽", "대화", "화정", "행신", "능곡", "삼송", "원흥", "지축", "탄현", "식사", "풍산", "교하",
+  // 성남·용인·수원
+  "분당", "판교", "정자", "서현", "수내", "야탑", "이매", "죽전", "수지", "기흥", "동백", "영통", "광교", "권선", "인계",
+  // 남양주·구리·하남
+  "다산", "별내", "갈매", "평내", "호평", "덕소", "미사", "위례", "감일", "교산",
+  // 의정부·양주·동두천·포천
+  "옥정", "회천", "고읍", "민락", "녹양",
+  // 김포·인천
+  "구래", "장기", "운양", "풍무", "한강신도시", "마산", "송도", "청라", "영종", "검단", "논현", "서창",
+]);
+const isAreaTok = (t: string) => { const n = norm(t); return n.length >= 2 && (AREA_NAME.has(t) || [...AREA_NAME].some((a) => norm(a) === n)); };
+
 // 카페명 '구별 토큰' = 일반어·지역어·대상지역어를 뺀 고유 식별어.
 // 예: "을지로 문덕카페" → ["문덕"]("을지로" 제거).
 // 몰/신도시어(스타필드·위례 등)는 '다른 브랜드 토큰이 남을 때만' 위치수식어로 제거한다.
@@ -144,6 +168,7 @@ export function coreTokens(name: string, areaTerms: string[]): string[] {
     .filter(({ core }) => core.length >= 2)
     .filter(({ core }) => !GENERIC_WORD.has(core.toLowerCase()))
     .filter(({ core }) => !NAME_STOPWORD.has(core.toLowerCase()))
+    .filter(({ core }) => !isAreaTok(core)) // 지역·생활권명은 식별어 불가(평촌·일산·분당…) → 빠지면 전체이름 일치 요구
     .filter(({ core }) => !an.some((a) => a.includes(norm(core)) || norm(core).includes(a)))
     .filter(({ core }) => !LOC_SUFFIX.test(core));
   const base = parts.map((p) => p.core);

@@ -199,6 +199,10 @@ function applyTogglesToMap(ml: any, showStreets: boolean, showBus: boolean): voi
     if (ly.type === "symbol" && (sl === "transportation_name" || /road_label|highway[-_]?name|road[-_]?name|street/i.test(ly.id))) {
       try { ml.setLayoutProperty(ly.id, "visibility", showStreets ? "visible" : "none"); } catch {}
     }
+    // 건물 타일: 길이름 토글과 함께 숨김(사장님 요청 — 길이름 OFF면 건물 폴리곤도 OFF로 깔끔).
+    if (/building/i.test(ly.id) && (ly.type === "fill" || ly.type === "fill-extrusion" || ly.type === "line")) {
+      try { ml.setLayoutProperty(ly.id, "visibility", showStreets ? "visible" : "none"); } catch {}
+    }
     // 버스: poi_transit(버스+철도+공항 아이콘) 전체 + 일반 POI(poi_r*)에 섞인 버스(class=bus)까지 제외해야 '버스 전체' 숨김.
     if (/poi_transit/i.test(ly.id)) {
       try { ml.setLayoutProperty(ly.id, "visibility", showBus ? "visible" : "none"); } catch {}
@@ -1734,7 +1738,7 @@ function MyCafeRegModal({ cafes, device, visits, pin = "", onClose, onDone }: { 
           {!picked ? (
             <>
               <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="카페 이름 검색"
-                className="w-full border border-[#cbb89f] rounded-lg px-3 py-2.5 text-base bg-white" />
+                className="w-full border border-[#cbb89f] rounded-lg px-3 py-2.5 text-base text-[#2b2018] bg-white" />
               <div className="space-y-1">
                 {results.map((c) => (
                   <button key={c.id} onClick={() => pick(c)} className="w-full text-left px-3 py-2.5 rounded-lg bg-white border border-[#e6d9c8] hover:bg-[#fdf6ee] flex items-center justify-between">
@@ -1762,7 +1766,7 @@ function MyCafeRegModal({ cafes, device, visits, pin = "", onClose, onDone }: { 
                 <div className="text-[12px] text-[#7a6452] mb-1.5 font-medium">기억 — 이 카페에서의 나의 경험</div>
                 <textarea value={memory} onChange={(e) => setMemory(e.target.value)} rows={4} maxLength={2000}
                   placeholder="오늘의 커피, 분위기, 함께한 사람… 소중한 순간을 적어보세요."
-                  className="w-full border border-[#cbb89f] rounded-lg px-3 py-2.5 text-[14px] bg-white resize-none leading-relaxed" />
+                  className="w-full border border-[#cbb89f] rounded-lg px-3 py-2.5 text-[14px] text-[#2b2018] bg-white resize-none leading-relaxed" />
                 <div className="text-right text-[10px] text-[#a8927a]">{memory.length}/2000</div>
               </div>
               <p className="text-[11px] text-[#a8927a] leading-relaxed">※ 타인의 얼굴·개인정보가 담긴 사진은 올리지 마세요. <b>카페 30m 이내</b>에서 위치 인증을 해야 "진짜 그 카페 경험"으로 임시저장돼요. 그다음 <b>추억 기록</b> 확인을 거쳐 영구 저장됩니다.</p>
