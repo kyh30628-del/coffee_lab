@@ -5,8 +5,10 @@
 // 실행: node scripts/verify-grounding.mjs  (CLAUDE_CODE_OAUTH_TOKEN 필요, ANTHROPIC_API_KEY unset)
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import { neon } from "@neondatabase/serverless";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
+import { GROUNDING_SYS, buildGroundingPrompt, parseGrounding } from "./_grounding-rubric.mjs";
 
+if (existsSync(new URL("./.ai-paused", import.meta.url))) { console.log("⏸ .ai-paused — 그라운딩 일시정지(Claude 한도 보호)"); process.exit(0); }
 const env = readFileSync(new URL("../.env.local", import.meta.url), "utf8");
 for (const l of env.split("\n")) { const m = l.match(/^([A-Z_0-9]+)=(.*)$/); if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^["']|["']$/g, ""); }
 const sql = neon(process.env.DATABASE_URL);
@@ -17,21 +19,13 @@ const isLimit = (e) => /session limit|rate limit|429|usage limit|overloaded|exce
 process.on("unhandledRejection", (e) => { console.log(isLimit(e) ? "구독 한도 — 오늘 종료, 내일 이어서." : "unhandled: " + String(e).slice(0, 100)); process.exit(0); });
 process.on("uncaughtException", (e) => { console.log(isLimit(e) ? "구독 한도 — 종료." : "uncaught: " + String(e).slice(0, 100)); process.exit(0); });
 
-const SYS = `너는 '업체 혼동'과 '환각'만 잡는 감사관이다. 그 두 가지 외에는 절대 문제삼지 않는다.
-절대 문제삼지 말 것: 맛·성격 특성(산미·바디·단맛·로스팅 등) 강조, 언급 '횟수' 차이, 표현·뉘앙스 차이 — 이것들은 전체 후기 집계라 일부 인용에 없어도 정상이다(전부 grounded=true).
-오직 다음 두 가지만 grounded=false:
-1) 업체 혼동: 근거 후기의 상당수(여러 건)가 이 카페가 아니라 '다른 가게'(동명 다른 업체·다른 업종·다른 메뉴의 가게)를 가리킨다.
-2) 환각: 후기에 전혀 근거 없는 구체적 사실(없는 수상·없는 메뉴·지어낸 역사 등)을 만들어냈다.
-확신이 없으면 grounded=true. 반드시 JSON으로만: {"grounded":true/false,"issue":"업체혼동/환각만 한 줄, 없으면 빈 문자열"}`;
-
 async function check(name, identity, quotes) {
-  const list = quotes.map((q, i) => `${i + 1}. ${q}`).join("\n");
-  const prompt = `카페: "${name}"\n생성된 정체성: "${identity}"\n\n근거 후기:\n${list}`;
+  const prompt = buildGroundingPrompt(name, identity, quotes);
   let text = "";
-  for await (const msg of query({ prompt, options: { systemPrompt: SYS, model: MODEL, maxTurns: 1, allowedTools: [] } })) {
+  for await (const msg of query({ prompt, options: { systemPrompt: GROUNDING_SYS, model: MODEL, maxTurns: 1, allowedTools: [] } })) {
     if (msg.type === "result" && msg.subtype === "success") text = msg.result;
   }
-  try { const m = text.match(/\{[\s\S]*\}/); return JSON.parse(m ? m[0] : text); } catch { return null; }
+  return parseGrounding(text);
 }
 
 async function main() {
