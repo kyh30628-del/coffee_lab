@@ -49,6 +49,7 @@ export default function AdminPage() {
   const [auditFlags, setAuditFlags] = useState<any>(null);
   const [tower, setTower] = useState<any>(null);
   const [selAgent, setSelAgent] = useState<any>(null);
+  const [todayDetail, setTodayDetail] = useState<any>(null); // 오늘의 수집 카드 클릭 → 상세 목록 모달
   const [towerFull, setTowerFull] = useState(false);
   const [subscribers, setSubscribers] = useState<any[]>([]);
   const [showSubsModal, setShowSubsModal] = useState(false);
@@ -57,6 +58,15 @@ export default function AdminPage() {
   const [visits, setVisits] = useState<any>(null);
   const loadSubscribers = (password: string) => fetch("/api/subscription?all=1", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) setSubscribers(d.subs ?? []); }).catch(() => {});
   const subAct = async (id: number, action: string) => { try { await fetch("/api/subscription", { method: "POST", headers: { "x-admin-password": pw, "Content-Type": "application/json" }, body: JSON.stringify({ id, action }) }); loadSubscribers(pw); fetch("/api/judge-status", { headers: { "x-admin-password": pw } }); } catch {} };
+  // '오늘의 수집' 카드 클릭 → 그 지표에 해당하는 카페 목록을 모달로(orchestrator와 동일 KST 필터).
+  const openToday = (metric: string, label: string) => {
+    if (!metric) return;
+    setTodayDetail({ metric, label, loading: true, cafes: [] });
+    fetch(`/api/admin/today-detail?metric=${metric}`, { headers: { "x-admin-password": pw }, cache: "no-store" })
+      .then((x) => x.json())
+      .then((d) => setTodayDetail({ metric, label, loading: false, cafes: d.ok ? d.cafes ?? [] : [], capped: d.capped, error: d.ok ? null : d.error }))
+      .catch(() => setTodayDetail({ metric, label, loading: false, cafes: [], error: "불러오기 실패" }));
+  };
   // 🔄 모든 숫자 실시간 갱신 — no-store(캐시 없음)로 매번 DB 최신값. 폴링·로그인 둘 다 이 함수 사용.
   const refreshNumbers = (password: string) => {
     const h: RequestInit = { headers: { "x-admin-password": password }, cache: "no-store" };
@@ -266,18 +276,19 @@ export default function AdminPage() {
                   <div className="text-[10px] font-bold text-stone-500 mb-1.5">📅 오늘의 수집 (KST · 자동 갱신)</div>
                   <div className="grid grid-cols-3 sm:grid-cols-7 gap-1.5">
                     {[
-                      { l: "오늘 신규발굴", v: tower.today.newCafes, c: "text-amber-700 bg-amber-50 border-amber-200" },
-                      { l: "오늘 합성처리", v: tower.today.synthesized, c: "text-sky-700 bg-sky-50 border-sky-200" },
-                      { l: "오늘 신규공개", v: tower.today.published, c: "text-emerald-700 bg-emerald-50 border-emerald-200" },
-                      { l: "동 채움", v: `${tower.today.dongPct}%`, c: "text-stone-700 bg-stone-50 border-stone-200" },
-                      { l: "노이즈탈락", v: tower.today.noise, c: "text-stone-500 bg-stone-50 border-stone-200" },
-                      { l: "합성대기", v: tower.today.newQueue, c: "text-amber-600 bg-amber-50 border-amber-200" },
-                      { l: "유튜브 수집(누적)", v: tower.today.ytTotal ?? 0, c: "text-rose-700 bg-rose-50 border-rose-200" },
+                      { l: "오늘 신규발굴", v: tower.today.newCafes, c: "text-amber-700 bg-amber-50 border-amber-200", m: "newCafes" },
+                      { l: "오늘 합성처리", v: tower.today.synthesized, c: "text-sky-700 bg-sky-50 border-sky-200", m: "synthesized" },
+                      { l: "오늘 신규공개", v: tower.today.published, c: "text-emerald-700 bg-emerald-50 border-emerald-200", m: "published" },
+                      { l: "동 채움", v: `${tower.today.dongPct}%`, c: "text-stone-700 bg-stone-50 border-stone-200", m: "dongMissing" },
+                      { l: "노이즈탈락", v: tower.today.noise, c: "text-stone-500 bg-stone-50 border-stone-200", m: "noise" },
+                      { l: "합성대기", v: tower.today.newQueue, c: "text-amber-600 bg-amber-50 border-amber-200", m: "newQueue" },
+                      { l: "유튜브 수집(누적)", v: tower.today.ytTotal ?? 0, c: "text-rose-700 bg-rose-50 border-rose-200", m: "yt" },
                     ].map((t) => (
-                      <div key={t.l} className={`rounded-xl border px-2 py-2 text-center ${t.c}`}>
+                      <button key={t.l} onClick={() => openToday(t.m, t.l)} title="클릭하면 상세 목록"
+                        className={`rounded-xl border px-2 py-2 text-center transition hover:brightness-95 hover:shadow-sm cursor-pointer ${t.c}`}>
                         <div className="text-[15px] font-extrabold leading-none">{typeof t.v === "number" ? t.v.toLocaleString() : t.v}</div>
                         <div className="text-[9px] mt-1 font-bold whitespace-nowrap">{t.l}</div>
-                      </div>
+                      </button>
                     ))}
                   </div>
                 </div>
@@ -345,6 +356,49 @@ export default function AdminPage() {
                 </div>
               );
             })()}
+            {/* 오늘의 수집 카드 상세 — 카페 목록 모달 */}
+            {todayDetail && (
+              <div onClick={() => setTodayDetail(null)} className="fixed inset-0 z-[75] bg-black/40 flex items-end sm:items-center justify-center p-4">
+                <div onClick={(e) => e.stopPropagation()} className="w-full max-w-lg max-h-[80vh] flex flex-col rounded-2xl bg-white p-5 shadow-xl">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-base font-extrabold text-stone-800">📅 {todayDetail.label}</span>
+                    {!todayDetail.loading && <span className="text-[12px] font-bold text-stone-500">{todayDetail.cafes.length.toLocaleString()}곳{todayDetail.capped ? "+" : ""}</span>}
+                    <button onClick={() => setTodayDetail(null)} className="ml-auto text-stone-400 text-2xl leading-none px-1">×</button>
+                  </div>
+                  <div className="overflow-y-auto flex-1 -mx-1 px-1">
+                    {todayDetail.loading ? (
+                      <div className="text-[13px] text-stone-400 text-center py-8">불러오는 중…</div>
+                    ) : todayDetail.error ? (
+                      <div className="text-[13px] text-red-600 text-center py-8">에러: {todayDetail.error}</div>
+                    ) : todayDetail.cafes.length === 0 ? (
+                      <div className="text-[13px] text-stone-400 text-center py-8">해당 카페가 없습니다.</div>
+                    ) : (
+                      <div className="divide-y divide-stone-100">
+                        {todayDetail.cafes.map((c: any) => {
+                          const inner = (
+                            <>
+                              <div className="min-w-0 flex-1">
+                                <div className="text-[13px] font-bold text-stone-800 truncate">{c.name}{c.published && <span className="text-[10px] text-indigo-400 font-normal"> ↗</span>}</div>
+                                <div className="text-[11px] text-stone-500 truncate">{c.area}{c.dong ? ` · ${c.dong}` : ""}{c.source ? ` · ${c.source}` : ""}{c.at ? ` · ${c.at}` : ""}</div>
+                              </div>
+                              {c.grade && <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${c.grade === "검증" ? "bg-emerald-100 text-emerald-700" : c.grade === "참고" ? "bg-sky-100 text-sky-700" : "bg-stone-100 text-stone-500"}`}>{c.grade}{c.cnt != null ? ` ${c.cnt}` : ""}</span>}
+                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${c.published ? "bg-emerald-50 text-emerald-600 border border-emerald-200" : "bg-stone-50 text-stone-400 border border-stone-200"}`}>{c.published ? "공개" : "비공개"}</span>
+                            </>
+                          );
+                          return c.published ? (
+                            <a key={c.id} href={`/c/${c.id}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 py-2 hover:bg-stone-50 rounded-lg px-1.5">{inner}</a>
+                          ) : (
+                            <div key={c.id} className="flex items-center gap-2 py-2 px-1.5">{inner}</div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                  {todayDetail.capped && <div className="text-[10px] text-stone-400 text-center pt-2">최대 500곳까지 표시</div>}
+                  <button onClick={() => setTodayDetail(null)} className="mt-3 w-full rounded-xl bg-stone-800 text-white text-[13px] font-bold py-2.5 shrink-0">닫기</button>
+                </div>
+              </div>
+            )}
             {towerFull && (
               <div className="fixed inset-0 z-[60] bg-stone-900/95 overflow-y-auto">
                 <div className="max-w-2xl mx-auto px-4 py-5 pb-16">
