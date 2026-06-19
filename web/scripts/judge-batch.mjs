@@ -1,6 +1,7 @@
-// 로컬 Sonnet 리뷰 판정 배치 (Claude Max 구독으로 실행).
-// 사장님 머신에서 주기 실행 → 공유 DB의 '경계 리뷰'를 Sonnet이 맥락 판정 → 양질만 공개.
+// 로컬 리뷰 판정 배치 (Claude Max 구독으로 실행).
+// 사장님 머신에서 주기 실행 → 공유 DB의 '경계 리뷰'를 Haiku가 맥락 판정 → 양질만 공개.
 // 웹앱(Vercel)은 LLM 호출 없이 결과만 서빙. (PRINCIPLES §1·§5)
+// 판정 기준(정밀 루브릭)은 scripts/_judge-rubric.mjs 단일 출처 — Batches 경로(batch-judge.mjs)와 동일.
 //
 // 준비(최초 1회):
 //   1) npm i @anthropic-ai/claude-agent-sdk        (web/ 폴더에서)
@@ -12,6 +13,7 @@
 // 실행: node scripts/judge-batch.mjs
 
 import { query } from "@anthropic-ai/claude-agent-sdk";
+import { JUDGE_RUBRIC, buildJudgePrompt, parseJudgeVerdicts } from "./_judge-rubric.mjs";
 
 const APP_URL = process.env.APP_URL || "https://coffee-lab-product-builder.vercel.app";
 const PW = process.env.ADMIN_PASSWORD || "";
@@ -23,27 +25,13 @@ process.on("uncaughtException", (e) => { if (isLimit(e)) { console.log("구독 �
 const MODEL = process.env.JUDGE_MODEL || "claude-haiku-4-5"; // 분류 작업이라 Haiku로 충분 + 한도·속도 유리
 const MAX_CAFES = Number(process.env.JUDGE_MAX || 150); // 1회 상한(Haiku는 한도 여유 큼 + 도달 시 우아한 중단)
 
-const RUBRIC = `너는 카페 리뷰 품질의 '최종 심사관'이다. 규칙 필터를 통과한 후보들을 '본문 내용'으로 엄격·공정하게 심사한다.
-- about=true: 본문에 '이 카페'에 대한 구체적 내용(메뉴·맛·커피·분위기·방문경험)이 '충분히' 담긴 글. 한 글에서 다른 가게(점심·디저트·다른 코스 등)를 함께 언급하더라도, 이 카페 내용이 충분하면 true. 상호가 글자 그대로 없어도 맥락(지역·메뉴·경험)이 이 카페를 가리키면 true.
-- about=false: 이 카페 내용이 거의 없이 '상호만 스쳐 지나간' 글(맛집 나열에 이름만 끼인 경우), 또는 본문이 '동명의 다른 가게'를 가리키는 글.
-- ★업종 구분: 대상은 '카페/커피 전문점'이다. 본문이 명백히 '다른 업종'(와인바·레스토랑·술집·해산물·고기집·떡볶이·베이커리 전문점 등)을 가리키면, 상호에 같은 단어가 들어가도 about=false. 예: 대상이 카페 '오이스터'인데 본문이 와인바 '더즌 오이스터 한남'이면 false.
-- ★상호 변형: 상호 앞뒤에 다른 고유명사가 붙은 가게(예: '더즌 오이스터' ≠ '오이스터')는 다른 가게일 가능성이 높으니 본문 업종·위치로 신중히 구분.
-- ★지점 구분: 대상이 '○○점'(지점)이면, 본문이 '그 지점(지점명·동·지역)'을 가리켜야 about=true. 같은 브랜드라도 '다른 지점'(예: 대상이 '펠어커피초코 갈매점'인데 본문이 '마곡점' 또는 마곡/강서 위치)이면 about=false. 지점·지역이 전혀 안 나오고 브랜드명만 있으면 about=false(어느 지점인지 특정 불가).
-- helpful=true: 이 카페에 대한 구체 경험·평가가 있어 도움됨. false: 광고·협찬 위주, 내용 없는 단순 언급, 사진만.
-- ★제목 우선: 제목이 '다른 카페'를 명시하면(예: 제목에 다른 상호명) 본문에 우리 카페가 잠깐 나와도 about=false. 제목이 그 글의 주제다.
-- ★엄격 기본값: 이 후보들은 '규칙이 애매하다고 판단한 것'만 모은 것이다. 확신이 없으면 무조건 false. '아마 맞을 것 같다' 수준이면 false. 본문에서 '이 카페를 방문해 직접 경험한 게 명확'할 때만 true.
-핵심 원칙: 의심스러우면 버린다. 우리 서비스의 생명은 '정확도'다. 잘못 넣는 것보다 빠뜨리는 게 낫다.
-판정이 조금이라도 애매하면 false. 반드시 JSON 배열로만 답한다(설명·코드블록 금지): [{"i":번호,"about":true/false,"helpful":true/false}]`;
-
 async function judge(cafeName, area, items) {
-  const list = items.map((b, i) => `#${i} 제목:"${(b.title || "").slice(0, 90)}" 내용:"${(b.body || "").slice(0, 380)}"`).join("\n");
-  const prompt = `대상 카페: "${cafeName}" (${area})\n\n스니펫:\n${list}`;
+  const prompt = buildJudgePrompt(cafeName, area, items.map((b, i) => ({ i, title: b.title, body: b.body })));
   let text = "";
-  for await (const msg of query({ prompt, options: { systemPrompt: RUBRIC, model: MODEL, maxTurns: 1, allowedTools: [] } })) {
+  for await (const msg of query({ prompt, options: { systemPrompt: JUDGE_RUBRIC, model: MODEL, maxTurns: 1, allowedTools: [] } })) {
     if (msg.type === "result" && msg.subtype === "success") text = msg.result;
   }
-  try { const m = text.match(/\[[\s\S]*\]/); return JSON.parse(m ? m[0] : text); }
-  catch { return null; }
+  return parseJudgeVerdicts(text);
 }
 
 // 타겟 모드: JUDGE_AREA(지역) 또는 JUDGE_CAFE_ID(단건) → 해당 카페만 강제 재판정(단일 패스)
@@ -60,6 +48,8 @@ async function apply(cafeId, decisions) {
 }
 
 async function main() {
+  const { existsSync } = await import("node:fs");
+  if (existsSync(new URL("./.ai-paused", import.meta.url))) { console.log("⏸ .ai-paused — AI 판정 일시정지(Claude 한도 보호)"); process.exit(0); }
   if (!PW) { console.error("ADMIN_PASSWORD 미설정"); process.exit(1); }
   let done = 0, published = 0, stop = false;
   while (done < MAX_CAFES && !stop) {

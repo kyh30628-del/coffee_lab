@@ -7,7 +7,7 @@
 
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 const GOOGLE_KEY = process.env.GOOGLE_AI_KEY || process.env.GOOGLE_API_KEY_1;
-export const CLAUDE_MODEL = "claude-haiku-4-5";
+const CLAUDE_MODEL = "claude-haiku-4-5";
 const GEMINI_MODEL = "gemini-2.0-flash-lite";
 
 export const hasJudgeKey = () => !!(ANTHROPIC_KEY || GOOGLE_KEY);
@@ -17,7 +17,7 @@ export type JudgeItem = { i: number; title: string; body: string };
 export type JudgeVerdict = { i: number; about: boolean; helpful: boolean; reason: string };
 
 // 정적 판정 기준(프롬프트 캐싱 대상 — 모든 카페 판정에서 재사용)
-export const RUBRIC = `너는 카페 리뷰 품질 심사관이다. 블로그 스니펫들이 특정 카페의 '진짜 방문 후기'이면서 소비자에게 도움이 되는 양질의 글인지 각각 판정한다.
+const RUBRIC = `너는 카페 리뷰 품질 심사관이다. 블로그 스니펫들이 특정 카페의 '진짜 방문 후기'이면서 소비자에게 도움이 되는 양질의 글인지 각각 판정한다.
 
 판정 기준:
 - about=true: 그 카페(또는 같은 지역·컨셉·메뉴가 일치하는 그 가게)를 실제로 방문해 쓴 글. 이름이 글자 그대로 없어도 내용·맥락(지역, 분위기, 메뉴, 방문 경험)이 그 카페를 가리키면 true.
@@ -26,12 +26,12 @@ export const RUBRIC = `너는 카페 리뷰 품질 심사관이다. 블로그 �
 
 반드시 JSON 배열로만 답한다(설명·코드블록 금지): [{"i":번호,"about":true/false,"helpful":true/false,"reason":"15자 이내"}]`;
 
-export function buildUserText(cafeName: string, area: string, items: JudgeItem[]): string {
+function buildUserText(cafeName: string, area: string, items: JudgeItem[]): string {
   const list = items.map((it) => `#${it.i} 제목:"${(it.title || "").slice(0, 120)}" 내용:"${(it.body || "").slice(0, 300)}"`).join("\n");
   return `대상 카페: "${cafeName}" (${area})\n\n스니펫:\n${list}`;
 }
 
-export function parseVerdicts(text: string): Map<number, JudgeVerdict> | null {
+function parseVerdicts(text: string): Map<number, JudgeVerdict> | null {
   try {
     const m = text.match(/\[[\s\S]*\]/); // JSON 배열만 추출(코드블록 등 방어)
     const arr = JSON.parse(m ? m[0] : text) as JudgeVerdict[];

@@ -20,7 +20,7 @@ const PER_CAFE = Number(process.env.JUDGE_PER_CAFE || 35);    // 카페당 경�
 const MAX_PER_BATCH = 50000;                                  // 안전 청크(한도 10만/256MB 이내)
 const MANIFEST = process.env.JUDGE_MANIFEST || "/tmp/coffee-batch-judge.json";
 
-const { RUBRIC, buildUserText, parseVerdicts } = await import("../lib/reviewJudge.ts");
+const { JUDGE_RUBRIC, buildJudgePrompt, parseJudgeVerdicts } = await import("./_judge-rubric.mjs"); // 정밀 루브릭(단일 출처, 파일럿 검증)
 const { getAuditCandidates, applyDecisions, markJudged } = await import("../lib/synthStore.ts");
 const { createBatch, getBatch, streamResults, BATCH_PRICE_IN: PRICE_IN, BATCH_PRICE_OUT: PRICE_OUT } = await import("../lib/anthropicBatch.ts");
 const { sql } = await import("../lib/db.ts");
@@ -47,8 +47,8 @@ async function build() {
       custom_id: `cafe_${c.id}`,
       params: {
         model: MODEL, max_tokens: 1500,
-        system: [{ type: "text", text: RUBRIC, cache_control: { type: "ephemeral" } }],
-        messages: [{ role: "user", content: buildUserText(c.name, c.area ?? "", judgeItems) }],
+        system: [{ type: "text", text: JUDGE_RUBRIC, cache_control: { type: "ephemeral" } }],
+        messages: [{ role: "user", content: buildJudgePrompt(c.name, c.area ?? "", judgeItems) }],
       },
     });
     cafes[`cafe_${c.id}`] = { id: c.id, name: c.name, area: c.area ?? "", keys: items.map((it) => it.key) };
@@ -97,9 +97,11 @@ async function apply() {
       if (res.result?.type !== "succeeded") { errored++; continue; } // 미과금 — 다음 회차 재시도
       const u = res.result.message?.usage; if (u) { inTok += (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0); outTok += u.output_tokens || 0; }
       const text = res.result.message?.content?.find((x) => x.type === "text")?.text || "";
-      const verdicts = parseVerdicts(text); // Map i->{about,helpful}
+      const arr = parseJudgeVerdicts(text); // [{i,about,helpful}]
+      const byI = new Map();
+      if (Array.isArray(arr)) for (const v of arr) if (typeof v?.i === "number") byI.set(v.i, v);
       const decisions = {};
-      entry.keys.forEach((k, i) => { const v = verdicts?.get(i); decisions[k] = !!(v && v.about && v.helpful); });
+      entry.keys.forEach((k, i) => { const v = byI.get(i); decisions[k] = !!(v && v.about && v.helpful); });
       try {
         const r = await applyDecisions({ id: entry.id, name: entry.name, area: entry.area }, decisions);
         appliedCafes++;
