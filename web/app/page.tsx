@@ -202,7 +202,9 @@ function makeIslandHtml(name: string): string {
   </div>`;
 }
 // 길이름(transportation_name)·버스정류장 토글 — 벡터 레이어 visibility/filter 제어
-const _origPoiFilter: Record<string, any> = {}; // poi_r* 원본 필터 보존(버스 제외 토글 복원용)
+const _origPoiFilter: Record<string, any> = {}; // poi_r* 원본 필터 보존(토글 복원용)
+// '상세' OFF에도 지도에 남길 주요 시설 클래스(공원·학교 등). 나머지 잡POI(식당·상점·편의점…)는 숨김.
+const MAJOR_POI = ["park", "garden", "school", "college", "university", "kindergarten", "hospital", "clinic", "stadium", "museum", "library", "zoo", "attraction", "theme_park", "aquarium", "cemetery", "townhall", "town_hall"];
 function applyTogglesToMap(ml: any, showStreets: boolean, showBus: boolean): void {
   if (!ml) return;
   let style: any;
@@ -220,14 +222,17 @@ function applyTogglesToMap(ml: any, showStreets: boolean, showBus: boolean): voi
     if (/poi_transit/i.test(ly.id)) {
       try { ml.setLayoutProperty(ly.id, "visibility", showBus ? "visible" : "none"); } catch {}
     }
-    if (/^poi_r\d/i.test(ly.id)) {
+    if (/^poi_/i.test(ly.id) && !/transit/i.test(ly.id)) {
       try {
         if (_origPoiFilter[ly.id] === undefined) _origPoiFilter[ly.id] = ml.getFilter(ly.id) ?? null;
         const orig = _origPoiFilter[ly.id];
-        // 버스 토글 OFF → 버스 + 베이스맵 파란 지하철/철도 아이콘(rail/railway)까지 제외(내 호선 색뱃지만 남겨 깔끔).
-        const excl: any = ["match", ["get", "class"], ["bus", "rail", "railway"], false, true];
-        if (showBus) ml.setFilter(ly.id, orig);
-        else ml.setFilter(ly.id, orig ? ["all", orig, excl] : excl);
+        const conds: any[] = [];
+        if (orig) conds.push(orig);
+        // 버스 OFF → 버스·철도 교통 아이콘 제외(내 호선 색뱃지만 남김)
+        if (!showBus) conds.push(["match", ["get", "class"], ["bus", "rail", "railway"], false, true]);
+        // 상세 OFF → 주요 시설(공원·학교·대학·병원 등)만 남기고 잡POI(식당·상점·편의점…) 숨김
+        if (!showStreets) conds.push(["match", ["get", "class"], MAJOR_POI, true, false]);
+        ml.setFilter(ly.id, conds.length === 0 ? null : conds.length === 1 ? conds[0] : ["all", ...conds]);
       } catch {}
     }
   }
@@ -351,8 +356,8 @@ export default function Home() {
   const [nearMe, setNearMe] = useState<{ lat: number; lng: number } | null>(null); // '내 주변 500m' 현재 위치(누를 때마다 갱신)
   const [nearMsg, setNearMsg] = useState("");
   const mlRef = useRef<any>(null); // maplibre 벡터 맵(레이어 토글용)
-  const [showStreets, setShowStreets] = useState(true); // 길이름 표시
-  const [showBus, setShowBus] = useState(true); // 버스정류장 표시
+  const [showStreets, setShowStreets] = useState(false); // '상세'(길이름·건물·잡POI) — 기본 OFF로 깔끔
+  const [showBus, setShowBus] = useState(false); // 버스/교통 아이콘 — 기본 OFF
   const showStreetsRef = useRef(true); showStreetsRef.current = showStreets;
   const showBusRef = useRef(true); showBusRef.current = showBus;
   const [myLocked, setMyLocked] = useState(false); // 공용 PC 잠금 상태
@@ -1128,7 +1133,7 @@ export default function Home() {
             <div className="absolute top-14 right-3 z-[1100] flex flex-col gap-1.5 items-end">
               <button onClick={() => setShowStreets((v) => !v)}
                 className={`inline-flex items-center gap-1 h-8 px-2.5 rounded-full text-[11px] font-bold shadow-lg whitespace-nowrap transition-colors ${showStreets ? "bg-[#5b4636] text-white" : "bg-white/95 text-[#8a7458] border border-[#e0d3bd]"}`}>
-                <span className="text-[12px] leading-none">🛣️</span><span>길이름 {showStreets ? "ON" : "OFF"}</span>
+                <span className="text-[12px] leading-none">🏷️</span><span>상세 {showStreets ? "ON" : "OFF"}</span>
               </button>
               <button onClick={() => setShowBus((v) => !v)}
                 className={`inline-flex items-center gap-1 h-8 px-2.5 rounded-full text-[11px] font-bold shadow-lg whitespace-nowrap transition-colors ${showBus ? "bg-[#235a86] text-white" : "bg-white/95 text-[#8a7458] border border-[#bcd0e0]"}`}>
