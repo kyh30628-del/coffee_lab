@@ -184,6 +184,17 @@ export async function GET(req: NextRequest) {
       const fin = await finalizePipeline();
       promoted = fin.promoted;
       if (fin.promoted > 0) healed.push(`전 에이전트 통과 ${fin.promoted}곳 자동 공개(${fin.names.slice(0, 3).join(", ")}${fin.promoted > 3 ? " 외" : ""})`);
+      // (b-2) 좌표 백필 지연으로 굳은 미공개 복원 — 합성 시점엔 좌표 없거나 박스 밖이라 published=false로 굳었으나,
+      //   이후 지오코딩 백필로 박스 안에 들어온 카페. pipeline_status='live'(그라운딩 보류 'held' 아님) + 검증/참고면 공개해야 정상.
+      //   (광주시 통째 비공개 경보의 근본 원인 — 재합성 없이도 자동 복원)
+      try {
+        const r = await sql`UPDATE cafes SET published=true, updated_at=now()
+          WHERE pipeline_status='live' AND NOT published
+            AND synth_grade IN ('검증','참고')
+            AND lat BETWEEN 36.8 AND 38.3 AND lng BETWEEN 124.5 AND 127.9
+          RETURNING 1`;
+        if (r.length) healed.push(`좌표백필 미공개 ${r.length}곳 자동 복원(live+박스안+검증/참고)`);
+      } catch {}
       // (c) 레드팀 PII 누출 자가치유 — 공개 인용문 전화·이메일·핸들 제거
       try { const pii = await scrubPublishedPII(); if (pii.scrubbed > 0) healed.push(`PII 세척 ${pii.scrubbed}곳(${pii.names.slice(0, 3).join(", ")})`); } catch {}
       // (d) LLM 그라운딩 의심(업체혼동·환각) 자가치유 — 재합성 교정(로컬 그라운딩이 재검사해 플래그 해소)
