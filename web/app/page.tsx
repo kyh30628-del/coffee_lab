@@ -391,7 +391,6 @@ export default function Home() {
   const mapObj = useRef<any>(null);
   const layerRef = useRef<any>(null);
   const LRef = useRef<any>(null);
-  const cafeMarkersRef = useRef<Map<number, any>>(new Map()); // 카페 마커 id→marker (diff 렌더용: 이동 시 기존 유지=부드러움)
   const [mapReady, setMapReady] = useState(false); // 지도 초기화 완료 신호(마커 재렌더용)
 
   useEffect(() => { fetch("/api/cafes").then((r) => r.json()).then((d) => setCafes(d.cafes ?? [])).catch(() => {}); }, []);
@@ -726,36 +725,13 @@ export default function Home() {
   }, [filtered, tasteKey]);
 
   // 현재 지도 화면(bounds)+줌에 맞춰 마커를 그린다 — 줌인하면 그 영역 핀이 동적으로 드러나고, 줌아웃이면 화면 안 인기순 상위만.
-  const drawMarkers = useCallback((incremental = false, cafesOnly = false) => {
+  const drawMarkers = useCallback(() => {
     const L = LRef.current; const map = mapObj.current;
     if (!L || !map || !layerRef.current) return;
-    // 카페 마커는 layerRef와 별개로 지도에 직접 올려 diff 관리(이동 시 기존 마커 유지 → 부드럽게 따라옴, 깜빡임 0).
-    const clearCafeMarkers = () => { for (const m of cafeMarkersRef.current.values()) { try { map.removeLayer(m); } catch {} } cafeMarkersRef.current.clear(); };
-
-    // ⚡ 라이브 이동(드래그/관성 throttle): 카페 마커만 diff. 역·랜드마크·집계는 건드리지 않음 → 초경량·완전 매끄러움.
-    //   (역/랜드마크 갱신은 멈춤(moveend) 시에만. 이동 중엔 기존 마커가 지도 따라 자연스럽게 이동.)
-    if (cafesOnly) {
-      const zz = map.getZoom(); const bb = map.getBounds(); // 정확히 현재 화면 안만(pad 없음)
-      const cafeLevel = !nearMe && !myPinMode && !othersMode && (!!dong || !!focusId || zz >= 13);
-      if (!cafeLevel) return; // 집계/모드 레벨은 멈출 때 처리(moveend)
-      const csrc = (!dong && !focusId) ? cafes.filter((c) => c.lat && c.lng) : filtered;
-      const cin = csrc.filter((c) => bb.contains([c.lat, c.lng] as [number, number]));
-      const cto = cin.length > 160 ? [...cin].sort((a, c) => (c.synth_count ?? 0) - (a.synth_count ?? 0)).slice(0, 160) : cin;
-      const reg = cafeMarkersRef.current;
-      const want = new Set(cto.map((c) => c.id));
-      for (const [id, m] of reg) if (!want.has(id)) { try { map.removeLayer(m); } catch {} reg.delete(id); }
-      for (const c of cto) {
-        if (reg.has(c.id)) continue;
-        const m = L.marker([c.lat, c.lng], { icon: L.divIcon({ className: "", html: makePinHtml(c, matchSet.has(c.id), c.id === focusId, myCafeIds.has(c.id)), iconSize: [0, 0] }), zIndexOffset: c.id === focusId ? 3000 : c.featured ? 2000 : matchSet.has(c.id) ? 1000 : 0 }).on("click", () => setSelected(c));
-        m.addTo(map); reg.set(c.id, m);
-      }
-      return;
-    }
-    layerRef.current.clearLayers(); // 집계·역·랜드마크 등 가벼운 것만(카페 마커는 여기 없음)
+    layerRef.current.clearLayers();
 
     // ===== 📍 내 주변 500m: 현재 위치 + 반경 원 + 500m 이내 카페만 =====
     if (nearMe) {
-      clearCafeMarkers();
       const R = 500;
       layerRef.current.addLayer(L.circle([nearMe.lat, nearMe.lng], { radius: R, color: "#2f6fb0", weight: 1.5, fillColor: "#2f6fb0", fillOpacity: 0.08, interactive: false }));
       layerRef.current.addLayer(L.marker([nearMe.lat, nearMe.lng], { icon: L.divIcon({ className: "", html: makeMyLocHtml(), iconSize: [0, 0] }), zIndexOffset: 6000, interactive: false }));
@@ -767,7 +743,6 @@ export default function Home() {
 
     // ===== 내 카페(MY PIN) / 다른 사람 모드: 개별 표시(집계 안 함) =====
     if (myPinMode || othersMode) {
-      clearCafeMarkers();
       const inScope = (p: { area: string }) => {
         if (!sido && !sigungu) return true;
         const g = toGu(p.area);
@@ -795,15 +770,12 @@ export default function Home() {
 
     // ===== 줌 기반 계층(자유 줌·이동도 자연스럽게). 화면이 곧 상태: 시도→구→동 집계, z≥15/동선택=개별 카페 실시간 =====
     const z = map.getZoom();
-    const b = map.getBounds(); // 정확히 현재 화면 안만 — 이동하면 그 화면 지역 카페만(나머지 숨김)
-    // z≥12(구·동네 줌)부터 개별 카페를 뷰포트 기준 실시간 렌더(이동 때마다 화면 속 카페 갱신).
-    //   일반 브라우징 줌에서 바로 카페 핀이 보이도록 낮춤. 시·도 광역(z≤11)에서만 숫자 집계 원형.
-    const level = (dong || focusId || z >= 13) ? "cafe"
-      : sigungu ? "dong"
+    const b = map.getBounds().pad(0.2);
+    const level = (dong || focusId || z >= 15) ? "cafe"
+      : (sigungu || z >= 13) ? "dong"
       : (sido || z >= 11) ? "gu"
       : "sido";
     if (level !== "cafe") {
-      clearCafeMarkers(); // 집계 레벨로 가면 개별 카페 마커 제거
       const keyFn = level === "sido" ? (c: Cafe) => toGu(c.area).sido
         : level === "gu" ? (c: Cafe) => toGu(c.area).sigungu
         : (c: Cafe) => c.dong || "기타";
@@ -836,21 +808,14 @@ export default function Home() {
     const inView = src.filter((c) => b.contains([c.lat, c.lng] as [number, number]));
     const CAP = 160;
     const toRender = inView.length > CAP ? [...inView].sort((a, c) => (c.synth_count ?? 0) - (a.synth_count ?? 0)).slice(0, CAP) : inView;
-    // 풀 갱신(상태변경)일 땐 기존 마커 비우고 새로(HTML 갱신). 이동(incremental)일 땐 유지하며 diff만.
-    if (!incremental) clearCafeMarkers();
-    const reg = cafeMarkersRef.current;
-    const want = new Set(toRender.map((c) => c.id));
-    for (const [id, m] of reg) if (!want.has(id)) { try { map.removeLayer(m); } catch {} reg.delete(id); } // 화면 밖 = 제거
-    for (const c of toRender) {
-      if (reg.has(c.id)) continue; // 이미 떠 있으면 그대로(부드럽게 따라옴)
+    const markers = toRender.map((c) => {
       const isFocus = c.id === focusId;
       const isMatch = matchSet.has(c.id);
       const isMine = myCafeIds.has(c.id);
       const m = L.marker([c.lat, c.lng], { icon: L.divIcon({ className: "", html: makePinHtml(c, isMatch, isFocus, isMine), iconSize: [0, 0] }), zIndexOffset: isFocus ? 3000 : c.featured ? 2000 : isMatch ? 1000 : 0 }).on("click", () => setSelected(c));
       if (isFocus) m.bindPopup(`<b>${c.name}</b><br>${c.area}`);
-      m.addTo(map);
-      reg.set(c.id, m);
-    }
+      return m;
+    });
     // 🚇🏬 지하철역·대형 랜드마크 — 개별 카페(동) 레벨에서만, 화면 안만. 카페보다 아래·비클릭.
     if (z >= 13) {
       if (landmarks.length) {
@@ -868,7 +833,9 @@ export default function Home() {
         if (stnLayer.length) layerRef.current.addLayer(L.layerGroup(stnLayer));
       }
     }
-    if (focusId) { const fm = cafeMarkersRef.current.get(focusId); if (fm) { try { fm.openPopup(); } catch {} } }
+    layerRef.current.addLayer(L.layerGroup(markers));
+    const focusM = focusId ? markers[toRender.findIndex((c) => c.id === focusId)] : null;
+    if (focusM) (focusM as any).openPopup();
   }, [filtered, matchSet, sido, sigungu, dong, focusId, myPinMode, myCafeIds, othersMode, othersPins, cafes, stations, landmarks, nearMe]);
 
   // 데이터/지역/모드 변경 시: 화면을 맞춘 뒤 마커를 그린다(맞춘 화면 기준으로 그려짐).
@@ -897,20 +864,13 @@ export default function Home() {
     // 주의: 의존성에 tab을 넣지 말 것(탭 전환마다 재렌더되어 느려짐). 데이터/필터 변경 시에만.
   }, [filtered, matchSet, sido, sigungu, focusId, mapReady, myPinMode, myCafeIds, othersMode, othersPins, drawMarkers, nearMe]);
 
-  // 이동 중 실시간 갱신(드래그·관성 중에도 화면 속 카페가 따라옴) + 멈춤 시 최종 정확 렌더.
-  //   moveend만 쓰면 관성 글라이드가 끝나야 갱신돼 '느리다'고 느껴짐 → move를 throttle(~140ms)로 라이브 갱신.
+  // 줌·이동이 끝나면 개별 카페 레벨일 때만 다시 그린다(뷰포트 캡). 집계 원형마커는 화면과 무관하므로 팬마다 재집계 안 함 → 1만건에서도 가벼움.
   useEffect(() => {
     const map = mapObj.current;
     if (!map || !mapReady) return;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    const liveDraw = () => { // 드래그/관성 중: ~110ms throttle, '카페만 diff'(역/집계 안 건드림) → 초경량·완전 매끄러움
-      if (timer) return;
-      timer = setTimeout(() => { timer = null; drawMarkers(true, true); }, 110);
-    };
-    const finalDraw = () => { if (timer) { clearTimeout(timer); timer = null; } drawMarkers(true); }; // 멈춤 시: 카페 diff + 역/랜드마크 최종 갱신
-    map.on("move", liveDraw);
-    map.on("moveend", finalDraw);
-    return () => { map.off("move", liveDraw); map.off("moveend", finalDraw); if (timer) clearTimeout(timer); };
+    const onMove = () => drawMarkers(); // 이동/줌 끝나면 항상 화면 기준 재그림(줌인=개별카페 실시간, 줌아웃=집계 원형). z15 경계 전환도 매끄럽게.
+    map.on("moveend", onMove);
+    return () => { map.off("moveend", onMove); };
   }, [drawMarkers, mapReady, dong, focusId, myPinMode, othersMode]);
 
   // 길이름·버스정류장 토글 → 벡터 레이어 visibility 적용(스타일 로드 후엔 styledata로도 한 번 더 보장)
