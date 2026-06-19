@@ -114,7 +114,7 @@ const Row = memo(function Row({ title, items, sub, info, onOpen }: { title: stri
         {sub && <div className="text-[10px] text-[#9c6b3f] shrink-0">↕ {sub}</div>}
       </div>
       {/* 바깥은 가로 스크롤, 위쪽 패딩 안에 말풍선이 들어가 잘리지 않음 */}
-      <div className="flex gap-3 overflow-x-auto pt-2 pb-2" style={{ WebkitOverflowScrolling: "touch" }}>
+      <div className="flex gap-3 overflow-x-auto pt-2 pb-2 dcn-hscroll" style={{ WebkitOverflowScrolling: "touch" }}>
         {items.map((c) => (
           <div key={c.id} className="shrink-0 w-48">
             <button onClick={() => onOpen(c.id)} className="w-full text-left bg-white rounded-xl p-3.5 border border-[#ece0cd] hover:border-[#9c6b3f] hover:shadow-md transition-all h-full flex flex-col">
@@ -885,8 +885,8 @@ export default function Home() {
     } else if (myPinMode || othersMode) {
       const src = myPinMode ? filtered.filter((c) => myCafeIds.has(c.id)) : othersPins;
       const pts = src.map((c: any) => [c.lat, c.lng] as [number, number]).filter((p) => p[0] && p[1]);
-      if (pts.length) map.flyToBounds(L.latLngBounds(pts), { padding: [60, 60], maxZoom: pts.length === 1 ? 14 : 15, duration: 0.7 });
-      else if (sido && SIDO_CENTER[sido]) { const [la, ln, z] = SIDO_CENTER[sido]; map.flyTo([la, ln], z, { duration: 0.7 }); }
+      if (pts.length) map.flyToBounds(L.latLngBounds(pts), { padding: [60, 60], maxZoom: pts.length === 1 ? 14 : 15, duration: 0.45 });
+      else if (sido && SIDO_CENTER[sido]) { const [la, ln, z] = SIDO_CENTER[sido]; map.flyTo([la, ln], z, { duration: 0.45 }); }
     } else if (filtered.length > 0 && (sido || sigungu)) {
       // 선택 지역으로 부드럽게 '줌인' → 하위(구/동) 집계 마커 표시. 이상치(엉뚱한 좌표) 4%는 무시해야 경계가 안 부풀고 제대로 줌인됨.
       const la = filtered.map((c) => c.lat).sort((a, b) => a - b);
@@ -894,9 +894,9 @@ export default function Home() {
       const q = (arr: number[], p: number) => arr[Math.min(arr.length - 1, Math.max(0, Math.floor(arr.length * p)))];
       // 2%만 클리핑(엉뚱 좌표 제거) — 너무 자르면 경기 외곽시(포천·평택 등)가 빠지므로 지역이 화면에 꽉 차게.
       const bounds = L.latLngBounds([[q(la, 0.02), q(ln, 0.02)], [q(la, 0.98), q(ln, 0.98)]]);
-      map.flyToBounds(bounds, { padding: [50, 50], maxZoom: 15, duration: 0.7 });
-    } else if (sido && SIDO_CENTER[sido]) { const [la, ln, z] = SIDO_CENTER[sido]; map.flyTo([la, ln], z, { duration: 0.7 }); }
-    else { map.flyTo([37.5, 127.05], 9, { duration: 0.7 }); } // 전체(시도 미선택) → 수도권 전역으로 부드럽게 줌아웃해 시도 집계 원형 표시
+      map.flyToBounds(bounds, { padding: [50, 50], maxZoom: 15, duration: 0.45 });
+    } else if (sido && SIDO_CENTER[sido]) { const [la, ln, z] = SIDO_CENTER[sido]; map.flyTo([la, ln], z, { duration: 0.45 }); }
+    else { map.flyTo([37.5, 127.05], 9, { duration: 0.45 }); } // 전체(시도 미선택) → 수도권 전역으로 부드럽게 줌아웃해 시도 집계 원형 표시
     drawMarkers();
     // 주의: 의존성에 tab을 넣지 말 것(탭 전환마다 재렌더되어 느려짐). 데이터/필터 변경 시에만.
   }, [filtered, matchSet, sido, sigungu, focusId, mapReady, myPinMode, myCafeIds, othersMode, othersPins, drawMarkers, nearMe]);
@@ -906,11 +906,11 @@ export default function Home() {
     const map = mapObj.current;
     if (!map || !mapReady) return;
     let timer: ReturnType<typeof setTimeout> | null = null;
-    const live = () => { if (timer) return; timer = setTimeout(() => { timer = null; drawMarkers(); }, 150); }; // 드래그/관성 중 ~150ms마다
-    const final = () => { if (timer) { clearTimeout(timer); timer = null; } drawMarkers(); }; // 멈춤 시 최종(정확한 클러스터)
-    map.on("move", live);
+    const live = () => { if (timer) return; timer = setTimeout(() => { timer = null; drawMarkers(); }, 120); }; // 유저 드래그 중 ~120ms마다 재클러스터(반응)
+    const final = () => { if (timer) { clearTimeout(timer); timer = null; } drawMarkers(); }; // 멈춤·줌끝·날아가기 끝 → 최종 1회
+    map.on("drag", live);   // ★ 유저 손가락 팬에만 라이브 → flyTo(뒤로가기 줌아웃)·줌 중엔 안 걸려 전환이 매끄러움(끝나서 한 번만 재그림)
     map.on("moveend", final);
-    return () => { map.off("move", live); map.off("moveend", final); if (timer) clearTimeout(timer); };
+    return () => { map.off("drag", live); map.off("moveend", final); if (timer) clearTimeout(timer); };
   }, [drawMarkers, mapReady, dong, focusId, myPinMode, othersMode]);
 
   // 길이름·버스정류장 토글 → 벡터 레이어 visibility 적용(스타일 로드 후엔 styledata로도 한 번 더 보장)
