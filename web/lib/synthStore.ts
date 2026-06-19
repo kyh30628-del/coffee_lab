@@ -12,6 +12,26 @@ import { nameCoherence } from "./reviewQuality";
 
 type RawItem = { source: "google" | "blog" | "youtube"; text: string; title?: string; desc?: string; time?: number; link?: string; date?: string; srcName?: string };
 
+// 🛡️ jsonb 안전 직렬화: 인용문이 이모지(서로게이트쌍) 중간에서 잘리면 짝 없는 서로게이트가 남고,
+//   JSON.stringify는 이를 \udXXX 이스케이프로 내보내지만 PostgreSQL jsonb는 이를 거부한다
+//   ("invalid input syntax for type json"). NUL(\u0000)도 jsonb 불가. → 저장 전 문자열에서 둘 다 제거.
+function jsonbSafe<T>(v: T): T {
+  if (typeof v === "string") {
+    return v
+      .replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/g, "") // 짝 없는 high 서로게이트
+      .replace(/(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "") // 짝 없는 low 서로게이트
+      .replace(/\u0000/g, "") as unknown as T;            // NUL
+  }
+  if (Array.isArray(v)) return v.map(jsonbSafe) as unknown as T;
+  if (v && typeof v === "object") {
+    const o: Record<string, unknown> = {};
+    for (const k in v as Record<string, unknown>) o[k] = jsonbSafe((v as Record<string, unknown>)[k]);
+    return o as unknown as T;
+  }
+  return v;
+}
+const safeJson = (obj: unknown): string => JSON.stringify(jsonbSafe(obj));
+
 let ensured = false;
 async function ensureCols() {
   if (ensured) return;
@@ -70,7 +90,7 @@ async function gatherRaw(cafe: { id: number; name: string; area: string }, refre
     ytErr = !!yt.apiError;
   }
   if (raw.length === 0 && (web.apiError || ytErr)) return { raw: [], fromCache: false, apiFailed: true };
-  await sql`UPDATE cafes SET raw_reviews=${JSON.stringify(cleanRaw(raw))}, raw_collected_at=now() WHERE id=${cafe.id}`;
+  await sql`UPDATE cafes SET raw_reviews=${safeJson(cleanRaw(raw))}, raw_collected_at=now() WHERE id=${cafe.id}`;
   return { raw, fromCache: false, apiFailed: false };
 }
 
@@ -94,7 +114,7 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   const ruleOk = (grade === "검증" || grade === "참고") && isCafeCat && !isFranchise(name) && !noisy;
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_reviews_all JSONB`.catch(() => {});
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS pipeline_status TEXT`.catch(() => {});
-  const allEv = JSON.stringify(allEvidence ?? evidenceReviews);
+  const allEv = safeJson(allEvidence ?? evidenceReviews);
 
   // 🔒 진정한 자동화 게이트: 신규 카페(pipeline_status=new/pending/rejected)는 규칙 통과해도 즉시 공개하지 않는다.
   //   AI 판정·임베딩·검증을 다 통과한 뒤 finalizer가 'live'로 승격할 때만 공개.
@@ -108,9 +128,9 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   const publish = (held || stuckNoise || inPipeline) ? false : ruleOk; // held·노이즈·파이프라인은 비공개 고정, 나머지는 규칙대로
 
   if (llmJudged) {
-    await sql`UPDATE cafes SET synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${JSON.stringify(evidenceReviews)}, synth_reviews_all=${allEv}, char_scores=${JSON.stringify(charScores)}, synth_quality=${JSON.stringify(quality)}, review_dates=${JSON.stringify(reviewDates)}, pipeline_status=${newPst}, synth_updated=now(), llm_judged_at=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN 36.8 AND 38.3 AND lng BETWEEN 124.5 AND 127.9) WHERE id=${cafeId}`;
+    await sql`UPDATE cafes SET synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${safeJson(evidenceReviews)}, synth_reviews_all=${allEv}, char_scores=${safeJson(charScores)}, synth_quality=${safeJson(quality)}, review_dates=${safeJson(reviewDates)}, pipeline_status=${newPst}, synth_updated=now(), llm_judged_at=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN 36.8 AND 38.3 AND lng BETWEEN 124.5 AND 127.9) WHERE id=${cafeId}`;
   } else {
-    await sql`UPDATE cafes SET synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${JSON.stringify(evidenceReviews)}, synth_reviews_all=${allEv}, char_scores=${JSON.stringify(charScores)}, synth_quality=${JSON.stringify(quality)}, review_dates=${JSON.stringify(reviewDates)}, pipeline_status=${newPst}, synth_updated=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN 36.8 AND 38.3 AND lng BETWEEN 124.5 AND 127.9) WHERE id=${cafeId}`;
+    await sql`UPDATE cafes SET synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${safeJson(evidenceReviews)}, synth_reviews_all=${allEv}, char_scores=${safeJson(charScores)}, synth_quality=${safeJson(quality)}, review_dates=${safeJson(reviewDates)}, pipeline_status=${newPst}, synth_updated=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN 36.8 AND 38.3 AND lng BETWEEN 124.5 AND 127.9) WHERE id=${cafeId}`;
   }
   return { grade, collected, published: publish, ruleOk, pipeline: newPst, evidence: evidenceReviews.length, coherence: Math.round(coherence * 100), noisy };
 }
@@ -132,7 +152,7 @@ export async function scrubPublishedPII(): Promise<{ scrubbed: number; names: st
     const scrub = (arr: any[]) => Array.isArray(arr) ? arr.map((r) => ({ ...r, quote: maskPII(r?.quote || "") })) : arr;
     const sr = scrub(row?.synth_reviews);
     const sra = scrub(row?.synth_reviews_all);
-    await sql`UPDATE cafes SET synth_reviews=${JSON.stringify(sr)}, synth_reviews_all=${JSON.stringify(sra)} WHERE id=${c.id}`;
+    await sql`UPDATE cafes SET synth_reviews=${safeJson(sr)}, synth_reviews_all=${safeJson(sra)} WHERE id=${c.id}`;
     names.push(c.name);
   }
   return { scrubbed: bad.length, names: names.slice(0, 10) };
@@ -253,7 +273,7 @@ export async function applyDecisions(cafe: { id: number; name: string; area: str
   // 기존 결정과 병합 → 영구 저장(재합성해도 유지). 새 판정이 우선.
   const merged = { ...(await loadDecisions(cafe.id)), ...decisions };
   const result = collectAndSynthesize(cafe.name, cafe.area ? [cafe.area] : [], rawToSources(raw), { decisions: merged });
-  await sql`UPDATE cafes SET judge_decisions=${JSON.stringify(merged)} WHERE id=${cafe.id}`;
+  await sql`UPDATE cafes SET judge_decisions=${safeJson(merged)} WHERE id=${cafe.id}`;
   const stored = await storeResult(cafe.id, cafe.name, result, true);
   const approved = Object.values(merged).filter(Boolean).length;
   return { id: cafe.id, name: cafe.name, approved, judged: Object.keys(decisions).length, ...stored };
@@ -270,7 +290,7 @@ export async function backfillYouTube(cafe: { id: number; name: string; area: st
   await sql`UPDATE cafes SET yt_checked_at=now() WHERE id=${cafe.id}`;
   if (!yt.snippets.length) return "none";
   for (const s of yt.snippets) raw.push({ source: "youtube", text: s.text, title: s.title, desc: s.desc, time: s.time, link: s.link, date: s.date, srcName: s.source });
-  await sql`UPDATE cafes SET raw_reviews=${JSON.stringify(cleanRaw(raw))}, raw_collected_at=now() WHERE id=${cafe.id}`;
+  await sql`UPDATE cafes SET raw_reviews=${safeJson(cleanRaw(raw))}, raw_collected_at=now() WHERE id=${cafe.id}`;
   const result = collectAndSynthesize(cafe.name, cafe.area ? [cafe.area] : [], rawToSources(raw));
   await storeResult(cafe.id, cafe.name, result, false);
   return "added";
