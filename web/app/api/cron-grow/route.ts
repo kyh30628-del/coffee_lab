@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
 import { discoverRegion, METRO_REGIONS } from "@/lib/discover";
 import { synthAndStore } from "@/lib/synthStore";
+import { mineArea } from "@/lib/reviewMiner";
 export const runtime = "nodejs";
 export const maxDuration = 300; // 여러 지역 발굴 + 합성 (플랜 상한까지 사용)
 
@@ -41,6 +42,18 @@ export async function GET(req: NextRequest) {
     const discovery = discoveries[discoveries.length - 1] ?? null;
     const totalInserted = discoveries.reduce((s, d) => s + (d.inserted ?? 0), 0);
 
+    // ①-B 리뷰 속 숨은 카페 발굴 — 이미 수집한 raw_reviews에서 상호 추출→네이버 검증→신규 적재(토큰 0).
+    //     가장 오래 채굴 안 된 지역 1곳만 바운드(maxCalls)로 처리 → 매일 조금씩 수도권 순회(네이버 한도·함수시간 안전).
+    await sql`ALTER TABLE discovery_state ADD COLUMN IF NOT EXISTS last_mined TIMESTAMPTZ`.catch(() => {});
+    let mining: any = null;
+    try {
+      const mt = (await sql`SELECT region, area_label FROM discovery_state ORDER BY last_mined ASC NULLS FIRST LIMIT 1`)[0] as { region: string; area_label: string } | undefined;
+      if (mt) {
+        mining = await mineArea(mt.area_label ?? mt.region, { maxCalls: 25, apply: true });
+        await sql`UPDATE discovery_state SET last_mined=now() WHERE region=${mt.region}`;
+      }
+    } catch (e) { mining = { error: String(e).slice(0, 80) }; }
+
     // ② 합성/재판정 — 미합성(신규) 우선, 그다음 가장 오래된 순으로 순회.
     //    각 카페가 synthAndStore(규칙+LLM 맥락 재판정)를 거쳐 정확도가 지속적으로 올라간다.
     //    Gemini 쿼터 소진 시 LLM은 자동 폴백(규칙 결과 유지) → 한도 회복되면 다음 회차부터 재판정.
@@ -59,7 +72,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       ok: true, ranAt: new Date().toISOString(),
       regionsSwept: discoveries.length, totalInserted, discoveries, remainingRegions,
-      lastDiscovery: discovery,
+      lastDiscovery: discovery, mining,
       synthesized: synth.length, published, llmRescued: rescued, pendingNew,
     });
   } catch (e) {
