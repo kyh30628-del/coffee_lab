@@ -735,8 +735,8 @@ export default function Home() {
     // ⚡ 라이브 이동(드래그/관성 throttle): 카페 마커만 diff. 역·랜드마크·집계는 건드리지 않음 → 초경량·완전 매끄러움.
     //   (역/랜드마크 갱신은 멈춤(moveend) 시에만. 이동 중엔 기존 마커가 지도 따라 자연스럽게 이동.)
     if (cafesOnly) {
-      const zz = map.getZoom(); const bb = map.getBounds().pad(0.2);
-      const cafeLevel = !nearMe && !myPinMode && !othersMode && (!!dong || !!focusId || zz >= 12);
+      const zz = map.getZoom(); const bb = map.getBounds(); // 정확히 현재 화면 안만(pad 없음)
+      const cafeLevel = !nearMe && !myPinMode && !othersMode && (!!dong || !!focusId || zz >= 13);
       if (!cafeLevel) return; // 집계/모드 레벨은 멈출 때 처리(moveend)
       const csrc = (!dong && !focusId) ? cafes.filter((c) => c.lat && c.lng) : filtered;
       const cin = csrc.filter((c) => bb.contains([c.lat, c.lng] as [number, number]));
@@ -795,12 +795,12 @@ export default function Home() {
 
     // ===== 줌 기반 계층(자유 줌·이동도 자연스럽게). 화면이 곧 상태: 시도→구→동 집계, z≥15/동선택=개별 카페 실시간 =====
     const z = map.getZoom();
-    const b = map.getBounds().pad(0.2);
+    const b = map.getBounds(); // 정확히 현재 화면 안만 — 이동하면 그 화면 지역 카페만(나머지 숨김)
     // z≥12(구·동네 줌)부터 개별 카페를 뷰포트 기준 실시간 렌더(이동 때마다 화면 속 카페 갱신).
     //   일반 브라우징 줌에서 바로 카페 핀이 보이도록 낮춤. 시·도 광역(z≤11)에서만 숫자 집계 원형.
-    const level = (dong || focusId || z >= 12) ? "cafe"
+    const level = (dong || focusId || z >= 13) ? "cafe"
       : sigungu ? "dong"
-      : (sido || z >= 10) ? "gu"
+      : (sido || z >= 11) ? "gu"
       : "sido";
     if (level !== "cafe") {
       clearCafeMarkers(); // 집계 레벨로 가면 개별 카페 마커 제거
