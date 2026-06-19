@@ -866,13 +866,20 @@ export default function Home() {
     // 주의: 의존성에 tab을 넣지 말 것(탭 전환마다 재렌더되어 느려짐). 데이터/필터 변경 시에만.
   }, [filtered, matchSet, sido, sigungu, focusId, mapReady, myPinMode, myCafeIds, othersMode, othersPins, drawMarkers, nearMe]);
 
-  // 줌·이동이 끝나면 개별 카페 레벨일 때만 다시 그린다(뷰포트 캡). 집계 원형마커는 화면과 무관하므로 팬마다 재집계 안 함 → 1만건에서도 가벼움.
+  // 이동 중 실시간 갱신(드래그·관성 중에도 화면 속 카페가 따라옴) + 멈춤 시 최종 정확 렌더.
+  //   moveend만 쓰면 관성 글라이드가 끝나야 갱신돼 '느리다'고 느껴짐 → move를 throttle(~140ms)로 라이브 갱신.
   useEffect(() => {
     const map = mapObj.current;
     if (!map || !mapReady) return;
-    const onMove = () => drawMarkers(); // 이동/줌 끝나면 항상 화면 기준 재그림(줌인=개별카페 실시간, 줌아웃=집계 원형). z15 경계 전환도 매끄럽게.
-    map.on("moveend", onMove);
-    return () => { map.off("moveend", onMove); };
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const liveDraw = () => { // 드래그/관성 중: 최대 ~140ms마다 1회(트레일링 throttle) → 가볍고 즉각적
+      if (timer) return;
+      timer = setTimeout(() => { timer = null; drawMarkers(); }, 140);
+    };
+    const finalDraw = () => { if (timer) { clearTimeout(timer); timer = null; } drawMarkers(); }; // 멈춤 시 최종 1회(정확)
+    map.on("move", liveDraw);
+    map.on("moveend", finalDraw);
+    return () => { map.off("move", liveDraw); map.off("moveend", finalDraw); if (timer) clearTimeout(timer); };
   }, [drawMarkers, mapReady, dong, focusId, myPinMode, othersMode]);
 
   // 길이름·버스정류장 토글 → 벡터 레이어 visibility 적용(스타일 로드 후엔 styledata로도 한 번 더 보장)
