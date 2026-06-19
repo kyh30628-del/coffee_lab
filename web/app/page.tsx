@@ -819,7 +819,9 @@ export default function Home() {
 
     // z≥13 카페 레벨: 픽셀 그리드 클러스터링 — 가까운 카페는 ●N 뭉치, 단독은 핀. 줌인하면 셀이 작아져 자동 분리.
     //   마커 수가 화면 셀 수(~수십개)로 한정 → 카페가 몇천이든 항상 깔끔. 이동/줌 시 뷰포트 재클러스터.
-    const src = (!dong && !focusId) ? cafes.filter((c) => c.lat && c.lng) : filtered;
+    // ★ 항상 전체 카페에서 '현재 화면(viewport)'만 거른다. 지역 선택(시/구/동)은 지도를 그쪽으로 옮길 뿐,
+    //   카페 집합을 고정하지 않는다 → 이동하면 그 화면 카페로 계속 바뀜(선택 지역에 고정 안 됨).
+    const src = cafes.filter((c) => c.lat && c.lng);
     const inView = src.filter((c) => b.contains([c.lat, c.lng] as [number, number]));
     const CELL = 64; // 화면상 셀 크기(px) — 이 안의 카페끼리 한 뭉치. 줌인하면 px 간격 벌어져 쪼개짐.
     const cells = new Map<string, Cafe[]>();
