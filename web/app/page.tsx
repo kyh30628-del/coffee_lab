@@ -159,6 +159,19 @@ function makeRegionPinHtml(label: string, cnt: number, maxCnt: number): string {
   </div>`;
 }
 
+// 카페 클러스터 뱃지 — 가까운 카페 여러 개를 한 뭉치로(픽셀 그리드). 개수 표시, 클릭하면 줌인되어 쪼개짐.
+//   집계 원형(makeRegionPinHtml=행정구역)과 달리 화면상 근접도 기준. 취향매칭 카페 포함 시 앰버 강조.
+function makeClusterHtml(cnt: number, hasMatch: boolean): string {
+  const size = cnt >= 100 ? 46 : cnt >= 30 ? 42 : cnt >= 10 ? 37 : 33;
+  const bg = hasMatch ? "linear-gradient(135deg,#d49a4e 0%,#a85f1c 85%)" : "linear-gradient(135deg,#7c5230 0%,#4a3220 85%)";
+  return `<div style="transform:translate(-50%,-50%);cursor:pointer;">
+    <div style="width:${size}px;height:${size}px;border-radius:50%;background:${bg};
+      border:2.5px solid rgba(253,250,244,0.96);box-shadow:0 0 0 3px rgba(124,82,48,0.12),0 3px 9px rgba(50,33,20,0.42);
+      display:flex;align-items:center;justify-content:center;">
+      <span style="color:#fff;font-weight:800;font-size:${cnt >= 100 ? 12 : 13}px;letter-spacing:-0.3px;line-height:1;text-shadow:0 1px 2px rgba(0,0,0,0.3);">${cnt}</span>
+    </div></div>`;
+}
+
 // 위치 가늠용 지하철역 마커(개별 카페 레벨에서만). 카페 핀과 구분되게 파란 점 + 역명.
 function makeStationHtml(name: string, colors: string[], refs: string[]): string {
   // 지하철역 — 호선별 색 번호 뱃지(환승역=여러 개) + 역명. 버스정류장(베이스맵 아이콘)과 명확히 구분.
@@ -771,8 +784,9 @@ export default function Home() {
     // ===== 줌 기반 계층(자유 줌·이동도 자연스럽게). 화면이 곧 상태: 시도→구→동 집계, z≥15/동선택=개별 카페 실시간 =====
     const z = map.getZoom();
     const b = map.getBounds().pad(0.2);
-    const level = (dong || focusId || z >= 15) ? "cafe"
-      : (sigungu || z >= 13) ? "dong"
+    // z≥13(구·동네 줌)부터 카페 — 단, 개별 핀이 아니라 '클러스터'로 묶어 깔끔하게(아래). 광역만 행정 집계.
+    const level = (dong || focusId || z >= 13) ? "cafe"
+      : sigungu ? "dong"
       : (sido || z >= 11) ? "gu"
       : "sido";
     if (level !== "cafe") {
@@ -803,19 +817,36 @@ export default function Home() {
       return;
     }
 
-    // 동 선택/포커스/줌인(z≥15): 화면에 보이는 개별 카페를 실시간 렌더. 동 미선택 줌인 시엔 지역필터 없이 '뷰포트 전체' 카페.
+    // z≥13 카페 레벨: 픽셀 그리드 클러스터링 — 가까운 카페는 ●N 뭉치, 단독은 핀. 줌인하면 셀이 작아져 자동 분리.
+    //   마커 수가 화면 셀 수(~수십개)로 한정 → 카페가 몇천이든 항상 깔끔. 이동/줌 시 뷰포트 재클러스터.
     const src = (!dong && !focusId) ? cafes.filter((c) => c.lat && c.lng) : filtered;
     const inView = src.filter((c) => b.contains([c.lat, c.lng] as [number, number]));
-    const CAP = 160;
-    const toRender = inView.length > CAP ? [...inView].sort((a, c) => (c.synth_count ?? 0) - (a.synth_count ?? 0)).slice(0, CAP) : inView;
-    const markers = toRender.map((c) => {
-      const isFocus = c.id === focusId;
-      const isMatch = matchSet.has(c.id);
-      const isMine = myCafeIds.has(c.id);
+    const CELL = 64; // 화면상 셀 크기(px) — 이 안의 카페끼리 한 뭉치. 줌인하면 px 간격 벌어져 쪼개짐.
+    const cells = new Map<string, Cafe[]>();
+    for (const c of inView) {
+      const p = map.project([c.lat, c.lng], z);
+      const k = Math.floor(p.x / CELL) + ":" + Math.floor(p.y / CELL);
+      const arr = cells.get(k); if (arr) arr.push(c); else cells.set(k, [c]);
+    }
+    const markers: any[] = [];
+    let focusM: any = null;
+    const addPin = (c: Cafe, forceFocus = false) => {
+      const isFocus = forceFocus || c.id === focusId, isMatch = matchSet.has(c.id), isMine = myCafeIds.has(c.id);
       const m = L.marker([c.lat, c.lng], { icon: L.divIcon({ className: "", html: makePinHtml(c, isMatch, isFocus, isMine), iconSize: [0, 0] }), zIndexOffset: isFocus ? 3000 : c.featured ? 2000 : isMatch ? 1000 : 0 }).on("click", () => setSelected(c));
-      if (isFocus) m.bindPopup(`<b>${c.name}</b><br>${c.area}`);
-      return m;
-    });
+      if (isFocus) { m.bindPopup(`<b>${c.name}</b><br>${c.area}`); focusM = m; }
+      markers.push(m);
+    };
+    for (const items of cells.values()) {
+      const fIdx = focusId ? items.findIndex((c) => c.id === focusId) : -1; // 포커스 카페는 뭉치지 말고 단독 핀
+      let pts = items;
+      if (fIdx >= 0) { addPin(items[fIdx], true); pts = items.filter((_, i) => i !== fIdx); }
+      if (pts.length === 0) continue;
+      if (pts.length === 1) { addPin(pts[0]); continue; }
+      const cx = pts.reduce((s, c) => s + c.lat, 0) / pts.length; // 2개+ → 클러스터 뱃지(centroid), 클릭 시 줌인
+      const cy = pts.reduce((s, c) => s + c.lng, 0) / pts.length;
+      const hasMatch = pts.some((c) => matchSet.has(c.id));
+      markers.push(L.marker([cx, cy], { icon: L.divIcon({ className: "", html: makeClusterHtml(pts.length, hasMatch), iconSize: [0, 0] }), zIndexOffset: 100 }).on("click", () => map.setView([cx, cy], Math.min(z + 2, 18), { animate: true })));
+    }
     // 🚇🏬 지하철역·대형 랜드마크 — 개별 카페(동) 레벨에서만, 화면 안만. 카페보다 아래·비클릭.
     if (z >= 13) {
       if (landmarks.length) {
@@ -834,7 +865,6 @@ export default function Home() {
       }
     }
     layerRef.current.addLayer(L.layerGroup(markers));
-    const focusM = focusId ? markers[toRender.findIndex((c) => c.id === focusId)] : null;
     if (focusM) (focusM as any).openPopup();
   }, [filtered, matchSet, sido, sigungu, dong, focusId, myPinMode, myCafeIds, othersMode, othersPins, cafes, stations, landmarks, nearMe]);
 
@@ -864,13 +894,16 @@ export default function Home() {
     // 주의: 의존성에 tab을 넣지 말 것(탭 전환마다 재렌더되어 느려짐). 데이터/필터 변경 시에만.
   }, [filtered, matchSet, sido, sigungu, focusId, mapReady, myPinMode, myCafeIds, othersMode, othersPins, drawMarkers, nearMe]);
 
-  // 줌·이동이 끝나면 개별 카페 레벨일 때만 다시 그린다(뷰포트 캡). 집계 원형마커는 화면과 무관하므로 팬마다 재집계 안 함 → 1만건에서도 가벼움.
+  // 이동 중 실시간 재클러스터(드래그·관성 throttle) + 멈춤 시 최종. 클러스터라 마커 수가 적어(~수십개) 이동마다 갱신해도 가볍고 깔끔.
   useEffect(() => {
     const map = mapObj.current;
     if (!map || !mapReady) return;
-    const onMove = () => drawMarkers(); // 이동/줌 끝나면 항상 화면 기준 재그림(줌인=개별카페 실시간, 줌아웃=집계 원형). z15 경계 전환도 매끄럽게.
-    map.on("moveend", onMove);
-    return () => { map.off("moveend", onMove); };
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const live = () => { if (timer) return; timer = setTimeout(() => { timer = null; drawMarkers(); }, 150); }; // 드래그/관성 중 ~150ms마다
+    const final = () => { if (timer) { clearTimeout(timer); timer = null; } drawMarkers(); }; // 멈춤 시 최종(정확한 클러스터)
+    map.on("move", live);
+    map.on("moveend", final);
+    return () => { map.off("move", live); map.off("moveend", final); if (timer) clearTimeout(timer); };
   }, [drawMarkers, mapReady, dong, focusId, myPinMode, othersMode]);
 
   // 길이름·버스정류장 토글 → 벡터 레이어 visibility 적용(스타일 로드 후엔 styledata로도 한 번 더 보장)
