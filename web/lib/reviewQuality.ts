@@ -221,15 +221,22 @@ export function verifyReview(input: QualityInput): QualityResult {
   // 구별 토큰(지역어·일반어 제거). 토큰이 비면 전체 이름으로만 매칭.
   const tokens = coreTokens(input.name, areaTerms);
   const coreEmpty = tokens.length === 0; // 이름이 흔한구문/일반어뿐(예: '좋은커피') → 원문 '붙임' 일치만 인정
+  // 🛡️ 짧은 단일토큰('나무 로스터리'→["나무"])은 다른 업체('나무사이로')의 '부분문자열'로 오매칭됨.
+  //   → 토큰 대신 '전체 이름(정규화)' 일치만 인정해 차단. (전체이름이 토큰보다 길 때만 = 한 글자 가게 제외)
+  const nameRawN = norm(input.name);
+  const onlyTok = tokens.length === 1 ? norm(tokens[0]) : "";
+  const weakSingle = onlyTok.length >= 1 && onlyTok.length <= 2 && nameRawN.length > onlyTok.length;
+  const reqFull = coreEmpty || weakSingle;
   const distinct = tokens.length ? tokens : (nameN ? [input.name] : []);
   // 흔한구문 이름은 띄어쓰기 보존이 핵심: '좋은커피'(가게)는 원문에 붙어서, '좋은 커피'(맛 표현)는 배제.
-  const inTitleFull = coreEmpty ? title.includes(input.name) : nameHit(title, titleN, input.name);
-  const inBodyFull = coreEmpty ? body.includes(input.name) : nameHit(body, bodyN, input.name);
+  //   짧은 단일토큰은 정규화 전체이름 일치(나무로스터리)로 — 부분문자열 오매칭 차단.
+  const inTitleFull = coreEmpty ? title.includes(input.name) : weakSingle ? titleN.includes(nameRawN) : nameHit(title, titleN, input.name);
+  const inBodyFull = coreEmpty ? body.includes(input.name) : weakSingle ? bodyN.includes(nameRawN) : nameHit(body, bodyN, input.name);
   // 지역어 제외한 고유 식별 토큰 — 지역어만 제목에 있는 건 nameInTitle 기여 안 함
   const nonAreaTokens = tokens.filter((tk) => !areaTerms.some((a) => norm(a).includes(norm(tk)) || norm(tk).includes(norm(a))));
   const identTokens = nonAreaTokens.length ? nonAreaTokens : tokens; // 비면 원래대로
-  const distinctInTitle = coreEmpty ? inTitleFull : identTokens.some((tk) => nameHit(title, titleN, tk));
-  const distinctInBody = coreEmpty ? inBodyFull : distinct.some((tk) => nameHit(body, bodyN, tk));
+  const distinctInTitle = reqFull ? inTitleFull : identTokens.some((tk) => nameHit(title, titleN, tk));
+  const distinctInBody = reqFull ? inBodyFull : distinct.some((tk) => nameHit(body, bodyN, tk));
   const visit = has(fullL, VISIT_CUES);
   const substance = SUBSTANCE_CUES.filter((k) => fullL.includes(k.toLowerCase())).length;
   const areaPresent = areaTerms.length ? areaTerms.some((a) => `${title} ${body}`.includes(a)) : false;
