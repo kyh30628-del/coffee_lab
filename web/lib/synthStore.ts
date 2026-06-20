@@ -25,7 +25,12 @@ function jsonbSafe<T>(v: T): T {
   if (Array.isArray(v)) return v.map(jsonbSafe) as unknown as T;
   if (v && typeof v === "object") {
     const o: Record<string, unknown> = {};
-    for (const k in v as Record<string, unknown>) o[k] = jsonbSafe((v as Record<string, unknown>)[k]);
+    // ⚠️ 값뿐 아니라 '키'도 짝없는 서로게이트 제거 — judge_decisions 키가 이모지 인용문에서 와
+    //   서로게이트를 가지면 jsonb 거부(카페아리 무한루프 원인). 정제 후 키 충돌 시 마지막 값.
+    for (const k in v as Record<string, unknown>) {
+      const ck = k.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "");
+      o[ck] = jsonbSafe((v as Record<string, unknown>)[k]);
+    }
     return o as unknown as T;
   }
   return v;

@@ -48,7 +48,7 @@ const processOne = async (c) => {
   const decisions = {};
   for (const v of verdicts) { const k = candidates[v?.i]?.key; if (k) decisions[k] = !!(v.about && v.helpful); }
   try { const r = await applyDecisions({ id: c.id, name: c.name, area: c.area ?? "" }, decisions); llm++; done++; if (r?.published) pub++; }
-  catch (e) { console.log(`✗ apply ${c.name}: ${String(e.message||e).slice(0,50)}`); }
+  catch (e) { console.log(`✗ apply ${c.name}: ${String(e.message||e).slice(0,50)} — 스킵(markJudged)`); try { await markJudged(c.id); } catch {} } // 실패분 스킵 → 무한루프 방지
   if (done % 50 === 0) console.log(`  …판정 ${done} (LLM ${llm}·무과금 ${freeMarked}·공개 ${pub})`);
 };
 do {
