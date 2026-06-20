@@ -352,6 +352,10 @@ export default function Home() {
   const [showMyCafeReg, setShowMyCafeReg] = useState(false);
   const [showFavs, setShowFavs] = useState(false); // 즐겨찾기(★ 카페) 모달
   const [othersMode, setOthersMode] = useState(false); // 다른 사람은 — 집계 핀
+  const [explain, setExplain] = useState<null | "mine" | "others">(null); // 내카페/다른사람 설명 모달
+  const explainSuppressed = (t: "mine" | "others") => { try { return Number(localStorage.getItem(`dcn-explain-${t}`) || 0) > Date.now(); } catch { return false; } };
+  const suppressExplain = (t: "mine" | "others") => { try { localStorage.setItem(`dcn-explain-${t}`, String(Date.now() + 7 * 864e5)); } catch {} };
+  const revealMode = (t: "mine" | "others") => { if (t === "mine") setMyPinMode(true); else setOthersMode(true); };
   const [othersPins, setOthersPins] = useState<{ id: number; name: string; area: string; lat: number; lng: number; cnt: number }[]>([]);
   const [nearMe, setNearMe] = useState<{ lat: number; lng: number } | null>(null); // '내 주변 500m' 현재 위치(누를 때마다 갱신)
   const [nearMsg, setNearMsg] = useState("");
@@ -1069,7 +1073,7 @@ export default function Home() {
                 <select value={homeGu} onChange={(e) => { setHomeGu(e.target.value); setHomeDong(""); }} disabled={!homeSido} className="border border-[#cbb89f] rounded-lg px-2.5 py-2 text-sm bg-white text-[#2b2018] disabled:opacity-40">
                   <option value="">시·군·구</option>{homeSido && REGIONS[homeSido].map((g) => <option key={g} value={g}>{g}</option>)}
                 </select>
-                <select value={homeDong} onChange={(e) => setHomeDong(e.target.value)} disabled={!homeGu || !homeDongOptions.length} className="border border-[#cbb89f] rounded-lg px-2.5 py-2 text-sm bg-white text-[#2b2018] disabled:opacity-40">
+                <select value={homeDong} onChange={(e) => { const d = e.target.value; setHomeDong(d); if (d) { setSido(homeSido); setSigungu(homeGu); setDong(d); setFocusId(null); setSheetOpen(false); setTab("map"); } }} disabled={!homeGu || !homeDongOptions.length} className="border border-[#cbb89f] rounded-lg px-2.5 py-2 text-sm bg-white text-[#2b2018] disabled:opacity-40">
                   <option value="">{homeGu && !homeDongOptions.length ? "우리 동네 (수집중)" : "우리 동네"}</option>{homeDongOptions.map((d) => <option key={d} value={d}>{d}</option>)}
                 </select>
               </div>
@@ -1116,13 +1120,13 @@ export default function Home() {
                 <span className="text-[14px] leading-none">📍</span>
                 <span>내 주변{nearMe ? " ↻" : ""}</span>
               </button>
-              <button onClick={() => { setNearMe(null); if (myLocked) setTab("memory"); else setMyPinMode((v) => !v); }}
+              <button onClick={() => { setNearMe(null); if (myLocked) { setTab("memory"); return; } if (myPinMode) { setMyPinMode(false); return; } explainSuppressed("mine") ? setMyPinMode(true) : setExplain("mine"); }}
                 className={`inline-flex items-center gap-1 h-9 px-3.5 rounded-full text-[12px] font-bold shadow-lg whitespace-nowrap transition-colors ${myPinMode ? "text-white" : "bg-white text-[#d6336c] border border-[#f0c4d4]"}`}
                 style={myPinMode ? { background: "#d6336c" } : {}}>
                 <span className="text-[14px] leading-none">{myLocked ? "🔒" : "❤"}</span>
                 <span>내 카페{!myLocked && myCafeIds.size ? ` ${myCafeIds.size}` : ""}</span>
               </button>
-              <button onClick={() => { setNearMe(null); setOthersMode((v) => !v); }} aria-label="다른 사람은"
+              <button onClick={() => { setNearMe(null); if (othersMode) { setOthersMode(false); return; } explainSuppressed("others") ? setOthersMode(true) : setExplain("others"); }} aria-label="다른 사람은"
                 className={`inline-flex items-center gap-1 h-9 px-3.5 rounded-full text-[12px] font-bold shadow-lg whitespace-nowrap transition-colors ${othersMode ? "text-white" : "bg-white text-[#5f7355] border border-[#cfe0c2]"}`}
                 style={othersMode ? { background: "#5f7355" } : {}}>
                 <span className="text-[14px] leading-none">👥</span>
@@ -1214,6 +1218,30 @@ export default function Home() {
         setSheetOpen(false); setSelected(null); setTab("map");
       }} />}
 
+      {/* 내 카페 / 다른 사람 — 처음 켤 때 설명 모달(닫기=표시, 일주일 안보기) */}
+      {explain && (
+        <div className="fixed inset-0 z-[4500] flex items-center justify-center p-5">
+          <div className="absolute inset-0 bg-black/45" onClick={() => { const t = explain; setExplain(null); revealMode(t); }} />
+          <div className="relative bg-[#fdfaf4] w-full max-w-sm rounded-2xl shadow-2xl p-5">
+            {explain === "mine" ? (
+              <>
+                <div className="text-[16px] font-bold text-[#d6336c] mb-2">❤ 내 카페</div>
+                <p className="text-[13.5px] text-[#3d2f22] leading-relaxed">지도에서 <b>내가 직접 등록한 카페</b>만 ❤ 핀으로 모아 보여줘요. 다녀온 카페를 추억으로 남기고 <b>나만의 지도</b>를 만들어 보세요. <span className="text-[#a8927a]">(이 기기에만 저장돼요.)</span></p>
+              </>
+            ) : (
+              <>
+                <div className="text-[16px] font-bold text-[#5f7355] mb-2">👥 다른 사람은</div>
+                <p className="text-[13.5px] text-[#3d2f22] leading-relaxed"><b>다른 사람들이 등록한 카페</b>를 지역별로 모아 👥 인원수로 보여줘요. 많이 등록된 곳일수록 크게 표시돼, <b>동네에서 사랑받는 카페</b>를 한눈에 볼 수 있어요.</p>
+              </>
+            )}
+            <div className="flex gap-2 mt-5">
+              <button onClick={() => { const t = explain; setExplain(null); revealMode(t); }} className="flex-1 bg-[#2b2018] text-[#f4ece0] rounded-lg py-2.5 text-sm font-bold">닫기</button>
+              <button onClick={() => { const t = explain; suppressExplain(t); setExplain(null); revealMode(t); }} className="flex-1 bg-white border border-[#cbb89f] text-[#6b5a48] rounded-lg py-2.5 text-[13px]">일주일 동안 보지 않기</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 느낌으로 검색 (시맨틱 + exact, 선택 동네 범위) */}
       {showSearch && (
         <div className="fixed inset-0 z-[4000] flex items-start justify-center sm:p-6">
@@ -1222,11 +1250,12 @@ export default function Home() {
             <div className="shrink-0 p-4 border-b border-[#ece0cd]">
               <div className="flex items-center gap-2">
                 <input autoFocus value={searchQ} onChange={(e) => setSearchQ(e.target.value)} onKeyDown={(e) => e.key === "Enter" && runSearch(searchQ)}
-                  placeholder={`${homeGu || "수도권"}에서 느낌으로 찾기`} className="flex-1 border border-[#cbb89f] rounded-lg px-3 py-2.5 text-base bg-white text-[#2b2018]" />
+                  placeholder={`느낌 또는 ☕카페 이름으로 찾기`} className="flex-1 border border-[#cbb89f] rounded-lg px-3 py-2.5 text-base bg-white text-[#2b2018]" />
                 <button onClick={() => runSearch(searchQ)} className="bg-[#2b2018] text-[#f4ece0] rounded-lg px-4 py-2.5 text-sm font-medium shrink-0">검색</button>
                 <button onClick={() => setShowSearch(false)} className="text-2xl text-[#9c6b3f] leading-none px-1 shrink-0">×</button>
               </div>
-              <div className="text-[11px] text-[#a8927a] mt-2">{homeGu ? `📍 ${homeGu} 안에서` : "수도권 전체에서"} · 떠오르는 느낌을 자유롭게 적어보세요</div>
+              <div className="text-[11px] text-[#5f7355] mt-2 font-medium">💡 “비 오는 날 조용히” 같은 <b>느낌</b>은 물론, <b>카페 이름</b>을 바로 적어도 찾아드려요.</div>
+              <div className="text-[11px] text-[#a8927a] mt-1">{homeGu ? `📍 ${homeGu} 안에서` : "수도권 전체에서"} 검색</div>
               <div className="flex flex-wrap gap-1.5 mt-2">
                 {SEARCH_EXAMPLES.map((ex) => (
                   <button key={ex} onClick={() => runSearch(ex)} className="text-[11px] text-[#6b5a48] bg-[#f0e6d4] rounded-full px-2.5 py-1">{ex}</button>
