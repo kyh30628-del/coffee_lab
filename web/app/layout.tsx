@@ -38,7 +38,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="ko" className="h-full antialiased">
+    <html lang="ko" className="h-full subpixel-antialiased">
       <head>
         {/* 폰트를 문서 head에서 조기 연결·로딩 → 아이폰에서 글자가 점점 뜨던 문제 완화 */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />

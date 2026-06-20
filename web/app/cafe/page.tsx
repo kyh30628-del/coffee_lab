@@ -95,13 +95,13 @@ function CafeCard({ c, pref, top, onShowEvidence }: { c: Cafe; pref: { acidity: 
 
   return (
     <article className="bg-[#fdfaf4] rounded-2xl p-4 shadow-[0_4px_24px_rgba(80,50,20,0.08)] border border-[#ece0cd] flex flex-col">
-      {top && <div className="text-[10px] font-bold text-[#9c6b3f] uppercase tracking-wider mb-2">★ 당신께 가장 가까운 곳</div>}
+      {top && <div className="text-[10px] font-bold text-[#7a4d1c] uppercase tracking-wider mb-2">★ 당신께 가장 가까운 곳</div>}
       <Visual c={c} />
       <div className="flex items-center gap-1.5 flex-wrap mb-1">
         <h2 className="text-xl font-bold leading-tight">{c.name}</h2>
         {g && <span className="text-[10px] text-white px-2 py-0.5 rounded-full" style={{ background: g.bg }}>{g.label}</span>}
       </div>
-      <div className="text-[#9c6b3f] text-xs mb-2">{c.vibe}</div>
+      <div className="text-[#7a4d1c] text-xs mb-2">{c.vibe}</div>
 
       {/* 특징 태그 — 대부분 카페가 가진 특징을 정보로 표시 */}
       {tags.length > 0 && (
@@ -129,7 +129,7 @@ function CafeCard({ c, pref, top, onShowEvidence }: { c: Cafe; pref: { acidity: 
         <button onClick={() => hasReviews && onShowEvidence(c)} disabled={!hasReviews}
           className={`mb-3 text-left rounded-lg px-3 py-2 flex items-center justify-between transition-colors ${hasReviews ? "bg-[#f0e6d4] hover:bg-[#e9dcc4] cursor-pointer" : "bg-[#f0e6d4]"}`}>
           <span className="text-[12px] text-[#8a6d3f]">📋 리뷰 {c.synth_count}건 종합 {hasReviews && "· 근거 보기"}</span>
-          {hasReviews && <span className="text-[#9c6b3f] text-xs">→</span>}
+          {hasReviews && <span className="text-[#7a4d1c] text-xs">→</span>}
         </button>
       )}
 
@@ -143,7 +143,7 @@ function CafeCard({ c, pref, top, onShowEvidence }: { c: Cafe; pref: { acidity: 
       )}
 
       <div className="mt-auto">
-        {c.signature && <div className="text-[12px] text-[#6b5a48] mb-2"><span className="text-[#9c6b3f]">추천 </span>{c.signature}</div>}
+        {c.signature && <div className="text-[12px] text-[#6b5a48] mb-2"><span className="text-[#7a4d1c]">추천 </span>{c.signature}</div>}
         <div className="flex gap-2">
           <a href={`https://map.kakao.com/?q=${encodeURIComponent(c.name + " " + c.area)}`} target="_blank" rel="noopener noreferrer" className="flex-1 text-center bg-[#2b2018] text-[#f4ece0] rounded-lg py-2 text-xs font-medium hover:bg-[#3d2f22] transition-colors">지도·길찾기</a>
           {c.phone && <a href={`tel:${c.phone}`} className="px-3 text-center bg-transparent border border-[#cbb89f] text-[#524434] rounded-lg py-2 text-xs font-medium flex items-center">전화</a>}
@@ -164,23 +164,23 @@ function EvidencePanel({ cafe, onClose }: { cafe: Cafe | null; onClose: () => vo
         <div className="p-6">
           <div className="flex items-center justify-between mb-1">
             <h3 className="text-2xl font-bold">{cafe.name}</h3>
-            <button onClick={onClose} className="text-2xl text-[#9c6b3f] leading-none">×</button>
+            <button onClick={onClose} className="text-2xl text-[#7a4d1c] leading-none">×</button>
           </div>
-          <div className="text-[#9c6b3f] text-sm mb-4">리뷰 {cafe.synth_count}건 종합 · 근거</div>
+          <div className="text-[#7a4d1c] text-sm mb-4">리뷰 {cafe.synth_count}건 종합 · 근거</div>
           {cafe.synth_identity && <div className="bg-[#efe9dd] rounded-lg px-4 py-3 mb-4 text-[14px] text-[#52402e]">{cafe.synth_identity}</div>}
-          <div className="text-[11px] text-[#a8927a] mb-3">이 분석의 근거가 된 실제 후기 (네이버 공개 글)</div>
+          <div className="text-[11px] text-[#6b5847] mb-3">이 분석의 근거가 된 실제 후기 (네이버 공개 글)</div>
           <div className="space-y-3">
             {reviews.map((rv, i) => (
               <div key={i} className="border-b border-[#f0e6d4] pb-3 last:border-0">
                 <div className="text-[14px] text-[#3d2f22] leading-relaxed">“{rv.quote}”</div>
-                <div className="flex items-center gap-2 mt-1.5 text-[11px] text-[#a8927a]">
+                <div className="flex items-center gap-2 mt-1.5 text-[11px] text-[#6b5847]">
                   <span>{rv.source}</span>{rv.date && <span>· {rv.date}</span>}
-                  {rv.link && <a href={rv.link} target="_blank" rel="noopener noreferrer" className="text-[#9c6b3f] underline ml-auto">원문 보기 →</a>}
+                  {rv.link && <a href={rv.link} target="_blank" rel="noopener noreferrer" className="text-[#7a4d1c] underline ml-auto">원문 보기 →</a>}
                 </div>
               </div>
             ))}
           </div>
-          <div className="text-[10px] text-[#a8927a] mt-6 leading-relaxed">네이버 공개 검색 결과의 요약·출처 링크입니다. 원문 저작권은 각 작성자에게 있습니다.</div>
+          <div className="text-[10px] text-[#6b5847] mt-6 leading-relaxed">네이버 공개 검색 결과의 요약·출처 링크입니다. 원문 저작권은 각 작성자에게 있습니다.</div>
         </div>
       </aside>
     </>
@@ -215,8 +215,8 @@ export default function CafePage() {
   if (step === "purpose") {
     return (
       <Shell wide={false}>
-        <BackLink to="/" label="홈" className="text-[#9c6b3f] mb-4" />
-        <div className="text-[#9c6b3f] text-xs tracking-[0.4em] uppercase mb-4">강동·구리 동네 커피 노트</div>
+        <BackLink to="/" label="홈" className="text-[#7a4d1c] mb-4" />
+        <div className="text-[#7a4d1c] text-xs tracking-[0.4em] uppercase mb-4">강동·구리 동네 커피 노트</div>
         <h1 className="text-4xl font-bold leading-snug mb-3">오늘 커피,<br />뭐 하러 가세요?</h1>
         <p className="text-[#6b5a48] mb-10 leading-relaxed">목적과 취향을 알려주시면, 거기 딱 맞는 동네 로스터리를 <strong className="text-[#2b2018]">근거와 함께</strong> 추천해드려요.</p>
         <div className="grid grid-cols-2 gap-3">
@@ -227,7 +227,7 @@ export default function CafePage() {
             </button>
           ))}
         </div>
-        <button onClick={() => { setPurpose(""); setStep("taste"); }} className="mt-6 text-sm text-[#9c6b3f] underline">목적 상관없이 취향만으로 →</button>
+        <button onClick={() => { setPurpose(""); setStep("taste"); }} className="mt-6 text-sm text-[#7a4d1c] underline">목적 상관없이 취향만으로 →</button>
       </Shell>
     );
   }
@@ -235,7 +235,7 @@ export default function CafePage() {
   if (step === "taste") {
     return (
       <Shell wide={false}>
-        <button onClick={() => setStep("purpose")} className="text-xs text-[#9c6b3f] underline mb-6">← 목적 다시</button>
+        <button onClick={() => setStep("purpose")} className="text-xs text-[#7a4d1c] underline mb-6">← 목적 다시</button>
         <h1 className="text-3xl font-bold leading-snug mb-2">어떤 커피 좋아해요?</h1>
         <p className="text-[#6b5a48] mb-8 leading-relaxed">동네 카페 리뷰에서 가장 많이 갈리는 취향이에요. 하나 고르면 맞는 집을 근거와 함께 찾아드려요.</p>
         <div className="grid grid-cols-2 gap-3">
@@ -248,7 +248,7 @@ export default function CafePage() {
             </button>
           ))}
         </div>
-        <button onClick={() => { setTastePref(null); setStep("result"); }} className="mt-6 text-sm text-[#9c6b3f] underline">취향 상관없이 전체 보기 →</button>
+        <button onClick={() => { setTastePref(null); setStep("result"); }} className="mt-6 text-sm text-[#7a4d1c] underline">취향 상관없이 전체 보기 →</button>
       </Shell>
     );
   }
@@ -258,10 +258,10 @@ export default function CafePage() {
       <div className="max-w-4xl mx-auto px-6 py-10">
         <header className="mb-6 flex items-center justify-between">
           <div>
-            <div className="text-[#9c6b3f] text-[11px] tracking-[0.3em] uppercase">강동·구리 동네 커피 노트</div>
+            <div className="text-[#7a4d1c] text-[11px] tracking-[0.3em] uppercase">강동·구리 동네 커피 노트</div>
             <h1 className="text-2xl font-bold mt-1">{purpose ? `${PURPOSES.find((p) => p.key === purpose)?.label}` : "전체"}{tastePref ? " · 취향 맞춤" : ""}</h1>
           </div>
-          <button onClick={() => setStep("purpose")} className="text-xs text-[#9c6b3f] underline">처음부터</button>
+          <button onClick={() => setStep("purpose")} className="text-xs text-[#7a4d1c] underline">처음부터</button>
         </header>
 
         {loading ? <p className="text-[#6b5a48]">불러오는 중...</p>
@@ -272,8 +272,8 @@ export default function CafePage() {
             </div>
           )}
 
-        <a href="/cafe/register" className="block mt-10 text-center text-sm text-[#9c6b3f] underline">사장님이세요? 우리 가게 등록하기 →</a>
-        <footer className="mt-8 pt-6 border-t border-[#d9c9b0] text-[11px] text-[#a8927a] leading-relaxed">위치·시간·평점은 공개 정보 · 리뷰 종합 분석은 네이버 공개 후기를 교차검증한 결과이며 근거 원문을 함께 제공합니다. 강동·구리 지역.</footer>
+        <a href="/cafe/register" className="block mt-10 text-center text-sm text-[#7a4d1c] underline">사장님이세요? 우리 가게 등록하기 →</a>
+        <footer className="mt-8 pt-6 border-t border-[#d9c9b0] text-[11px] text-[#6b5847] leading-relaxed">위치·시간·평점은 공개 정보 · 리뷰 종합 분석은 네이버 공개 후기를 교차검증한 결과이며 근거 원문을 함께 제공합니다. 강동·구리 지역.</footer>
       </div>
       <EvidencePanel cafe={evidenceCafe} onClose={() => setEvidenceCafe(null)} />
       <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet" />
