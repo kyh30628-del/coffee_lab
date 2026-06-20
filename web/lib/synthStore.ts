@@ -243,9 +243,11 @@ export async function synthAndStore(cafe: { id: number; name: string; area: stri
   const decisions = await loadDecisions(cafe.id); // 과거 판정 AI 결정 유지(동명/무관 제거 영구)
   let result = collectAndSynthesize(cafe.name, area, sources, { decisions });
 
-  // 서버측 보조 LLM 재판정(키 있을 때만). 품질 본판정은 로컬 Sonnet 배치(judge-candidates/apply)가 담당.
+  // 서버측 보조 LLM 재판정. ⚠️ 기본 OFF — 실시간 API($1/$5)는 비싸므로 안 씀(INLINE_JUDGE=1일 때만).
+  //   판정은 cron-batch-judge(Batches 50%할인) + 로컬 구독 드레인이 담당. 여기선 규칙+과거결정만 적용,
+  //   경계 리뷰는 llm_judged_at NULL로 남겨 배치 판정 큐로 보냄(드리프트·중복과금 0).
   let rescued = 0;
-  if (hasJudgeKey() && result.borderline.length > 0) {
+  if (process.env.INLINE_JUDGE === "1" && hasJudgeKey() && result.borderline.length > 0) {
     const items = result.borderline.slice(0, 35).map((b, i) => ({ i, title: b.title ?? "", body: b.body }));
     const verdicts = await judgeReviews(cafe.name, cafe.area ?? "", items);
     if (verdicts) {
