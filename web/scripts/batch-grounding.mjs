@@ -15,6 +15,7 @@ const MODEL = process.env.GROUNDING_MODEL || "claude-haiku-4-5";
 const LIMIT = Number(process.env.GROUNDING_LIMIT || 50);
 const MAX_PER_BATCH = 50000;
 const MANIFEST = process.env.GROUNDING_MANIFEST || "/tmp/coffee-batch-grounding.json";
+const ID_MAX = Number(process.env.GROUNDING_ID_MAX || 2147483647); // 이 id 이하만(구독 러너와 구간 분할 → 겹침 0)
 
 const { GROUNDING_SYS, buildGroundingPrompt, parseGrounding } = await import("./_grounding-rubric.mjs");
 const { createBatch, getBatch, streamResults, BATCH_PRICE_IN: PRICE_IN, BATCH_PRICE_OUT: PRICE_OUT } = await import("../lib/anthropicBatch.ts");
@@ -31,6 +32,7 @@ async function build() {
     WHERE (c.published OR c.pipeline_status = 'held') AND c.synth_identity IS NOT NULL
       AND c.synth_reviews IS NOT NULL AND jsonb_array_length(c.synth_reviews) > 0
       AND c.llm_judged_at IS NOT NULL AND c.llm_judged_at >= c.raw_collected_at
+      AND c.id <= ${ID_MAX}
       AND (g.checked_at IS NULL OR g.checked_at < c.synth_updated)
     ORDER BY (g.grounded = false AND c.synth_updated > g.checked_at) DESC, g.checked_at ASC NULLS FIRST
     LIMIT ${LIMIT}`;
