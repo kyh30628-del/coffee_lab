@@ -245,7 +245,7 @@ export async function GET(req: NextRequest) {
     {
       const sus = gr?.suspect ?? 0;
       const gAge = ageHours(gr?.last ?? null, now);
-      agents.push({ key: "grounding", label: "LLM 그라운딩", lastRun: gr?.last ?? null, ageH: gAge == null ? null : Math.round(gAge * 10) / 10, cadenceH: 30, status: (sus > 0 || grBacklog.n > 0) ? "warn" : "ok", queue: grBacklog.n, note: `검사대기 ${grBacklog.n} · 의심 ${sus}건` });
+      agents.push({ key: "grounding", label: "LLM 그라운딩", lastRun: gr?.last ?? null, ageH: gAge == null ? null : Math.round(gAge * 10) / 10, cadenceH: 30, status: (sus > 0 || grBacklog.n > 0) ? "warn" : "ok", queue: grBacklog.n, note: `미검사 ${grBacklog.n} · 의심 ${sus}건(전부 비공개 보류 — 소비자 노출 안됨)` });
     }
 
     // ── 4) 종합 건강 ──
