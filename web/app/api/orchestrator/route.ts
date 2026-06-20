@@ -48,6 +48,7 @@ export async function GET(req: NextRequest) {
     const c = (await sql`SELECT
       COUNT(*)::int total,
       COUNT(*) FILTER (WHERE published)::int published,
+      COUNT(*) FILTER (WHERE published AND llm_judged_at IS NOT NULL)::int pub_judged,
       COUNT(*) FILTER (WHERE raw_reviews IS NOT NULL)::int raw_cached,
       COUNT(*) FILTER (WHERE llm_judged_at IS NOT NULL)::int judged,
       COUNT(*) FILTER (WHERE embedding IS NOT NULL)::int embedded,
@@ -232,7 +233,7 @@ export async function GET(req: NextRequest) {
       const dAge = ageHours(catRun?.ran_at ?? null, now);
       agents.push({ key: "dongfill", label: "동 채움 (백필)", lastRun: catRun?.ran_at ?? null, ageH: dAge == null ? null : Math.round(dAge * 10) / 10, cadenceH: 26, status: pubND.n > 50 ? "warn" : "ok", queue: pubND.n, note: pubND.n ? `공개 동없음 ${pubND.n}` : "공개 동 100%" });
     }
-    add("judge", "AI 판정 (Haiku·새벽)", c.last_judge, 30, c.judge_q, `판정 대기 ${c.judge_q} (신규 ${jb.fresh} + 그라운딩 재검 ${jb.reground})`);
+    add("judge", "AI 판정 (Haiku·새벽)", c.last_judge, 30, c.judge_q, `공개카페 판정 완료 ${c.published ? Math.round((c.pub_judged / c.published) * 100) : 0}% (${c.pub_judged}/${c.published}) · 미판정 ${c.judge_q}=재검 ${jb.reground}+신규 ${jb.fresh}`);
     add("embed", "임베딩", c.last_embed, 30, c.embed_q, c.embed_q ? `미임베딩 ${c.embed_q}` : `완료(공개 ${c.published ? Math.round((c.pub_embedded / c.published) * 100) : 0}%)`);
     add("verify", "검증 레드팀", vr?.ran_at ?? null, 30, (vr?.fails ?? 0) + (vr?.warns ?? 0), vr ? `fail ${vr.fails}·warn ${vr.warns}` : "리포트 없음");
     // 품질감사: 미해결 플래그 기준(가동 시각은 flag 생성 시각으로 근사)
