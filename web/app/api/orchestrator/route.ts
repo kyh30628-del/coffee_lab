@@ -54,6 +54,7 @@ export async function GET(req: NextRequest) {
       COUNT(*) FILTER (WHERE embedding IS NOT NULL)::int embedded,
       COUNT(*) FILTER (WHERE published AND embedding IS NOT NULL)::int pub_embedded,
       MAX(raw_collected_at) last_collect,
+      MAX(raw_checked_at) last_check,
       MAX(synth_updated) last_synth,
       MAX(llm_judged_at) last_judge,
       MAX(embed_updated) last_embed,
@@ -235,8 +236,11 @@ export async function GET(req: NextRequest) {
       let status: AgentHealth["status"] = freshness(ageH, cadenceH);
       agents.push({ key, label, lastRun: last, ageH: ageH == null ? null : Math.round(ageH * 10) / 10, cadenceH, status, queue, note });
     };
-    add("discover", "발굴 (grow·지역수색)", c.last_collect, 24, ds.behind, ds.behind ? `${ds.behind}/${ds.n} 지역 3일+ 지연` : `${ds.n}개 지역 순환중`);
-    add("collect", "수집 (warmup·raw)", c.last_collect, 16, c.synth_q, `raw 수집·재수집`);
+    // 신선도는 '수집을 시도한 시각'(raw_checked_at)으로 판단 — 재수집이 돌아도 내용이 같으면 raw_collected_at은 안 변하므로,
+    //   raw_collected_at으로 신선도를 보면 멀쩡히 도는데도 stale로 오인됨(들쭉날쭉 수정의 부작용 차단).
+    const lastCheck = c.last_check ?? c.last_collect;
+    add("discover", "발굴 (grow·지역수색)", lastCheck, 24, ds.behind, ds.behind ? `${ds.behind}/${ds.n} 지역 3일+ 지연` : `${ds.n}개 지역 순환중`);
+    add("collect", "수집 (warmup·raw)", lastCheck, 16, c.synth_q, `raw 수집·재수집`);
     add("synth", "합성 (옥석·등급)", c.last_synth, 24, c.synth_q, c.synth_q ? "미합성 적체" : "적체 없음");
     // 카테고리·동 채움 단계도 개별 모니터(발굴~수집 세분화)
     {

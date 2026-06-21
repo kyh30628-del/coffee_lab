@@ -299,7 +299,7 @@ export default function AdminPage() {
                       { l: "오늘 합성처리", v: tower.today.synthesized, c: "text-sky-700 bg-sky-50 border-sky-200", m: "synthesized" },
                       { l: "오늘 신규공개", v: tower.today.published, c: "text-emerald-700 bg-emerald-50 border-emerald-200", m: "published" },
                       { l: "동 채움", v: `${tower.today.dongPct}%`, c: "text-stone-700 bg-stone-50 border-stone-200", m: "dongMissing" },
-                      { l: "노이즈탈락", v: tower.today.noise, c: "text-stone-500 bg-stone-50 border-stone-200", m: "noise" },
+                      { l: "노이즈탈락(누적)", v: tower.today.noise, c: "text-stone-500 bg-stone-50 border-stone-200", m: "noise" },
                       { l: "합성대기", v: tower.today.newQueue, c: "text-amber-600 bg-amber-50 border-amber-200", m: "newQueue" },
                       { l: "유튜브 수집(누적)", v: tower.today.ytTotal ?? 0, c: "text-rose-700 bg-rose-50 border-rose-200", m: "yt" },
                     ].map((t) => (
