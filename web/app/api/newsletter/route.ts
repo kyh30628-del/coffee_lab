@@ -50,10 +50,10 @@ export async function POST(req: NextRequest) {
     // 관리자 본인 메일로 미리보기 1통
     const id = Number(b.id), to = String(b.email || "").trim();
     if (!to.includes("@")) return NextResponse.json({ ok: false, error: "이메일 필요" }, { status: 400 });
-    const nl = (await sql`SELECT title, sections FROM newsletters WHERE id=${id}`)[0] as any;
+    const nl = (await sql`SELECT title, sections, issue_no FROM newsletters WHERE id=${id}`)[0] as any;
     if (!nl) return NextResponse.json({ ok: false, error: "없음" }, { status: 404 });
     const site = (process.env.NEXT_PUBLIC_SITE_URL || "https://dongnecoffeenote.com").replace(/\/$/, "");
-    const { subject, html } = renderNewsletterEmail({ title: nl.title, sections: nl.sections }, site, to);
+    const { subject, html } = renderNewsletterEmail({ title: nl.title, sections: nl.sections }, site, to, nl.issue_no);
     const key = process.env.RESEND_API_KEY;
     if (!key) return NextResponse.json({ ok: false, error: "RESEND 키 없음" });
     const rr = await fetch("https://api.resend.com/emails", { method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" }, body: JSON.stringify({ from: process.env.RESEND_FROM || "동네 커피 노트 <onboarding@resend.dev>", to: [to], subject: "[미리보기] " + subject, html }) });

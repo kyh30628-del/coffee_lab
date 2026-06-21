@@ -72,36 +72,80 @@ export function applyGuards(nl: Newsletter): Newsletter {
   return nl;
 }
 
-// ── 감성 이메일 HTML 렌더(수신거부 링크 포함) ──
-export function renderNewsletterEmail(nl: Newsletter, site: string, email: string): { subject: string; html: string } {
+// ── 📰 신문 지면 스타일 이메일 렌더(제호·발행일·헤드라인·카테고리·요약 기사·단 구분, 수신거부 포함) ──
+export function renderNewsletterEmail(nl: Newsletter, site: string, email: string, issueNo?: number): { subject: string; html: string } {
   const esc = (s: string) => String(s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
   const unsub = `${site}/unsubscribe?e=${encodeURIComponent(email)}&t=${optoutToken(email)}`;
-  const subject = `☕ ${nl.title || "사장님 위클리"}`;
-  const sectionsHtml = (nl.sections || []).map((sec) => {
-    const items = (sec.items || []).map((it) => {
-      const src = it.source_url ? ` <a href="${esc(it.source_url)}" style="color:#9c6b3f;font-size:11px;">[출처]</a>` : "";
-      const why = it.why ? `<div style="font-size:12.5px;color:#7c6a55;margin-top:3px;">↳ ${esc(it.why)}</div>` : "";
-      return `<li style="margin:0 0 10px;font-size:14px;color:#3d2f22;line-height:1.7;">${esc(it.text)}${src}${why}</li>`;
-    }).join("");
-    const intro = sec.intro ? `<p style="font-size:13px;color:#6b5a48;margin:2px 0 8px;">${esc(sec.intro)}</p>` : "";
-    return `<tr><td style="padding:18px 28px 4px;">
-      <div style="font-size:16px;font-weight:700;color:#2b2018;border-bottom:2px solid #efe2cd;padding-bottom:6px;margin-bottom:8px;">${esc(sec.title)}</div>
-      ${intro}<ul style="margin:0;padding-left:18px;">${items}</ul></td></tr>`;
-  }).join("");
-  const html = `<div style="margin:0;padding:0;background:#efe7d8;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#efe7d8;padding:30px 12px;"><tr><td align="center">
-      <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#fffdf9;border:1px solid #e7dcc6;border-radius:18px;overflow:hidden;font-family:'Nanum Myeongjo',Georgia,'Apple SD Gothic Neo',serif;">
-        <tr><td style="background:#2b2018;padding:18px 28px;">
-          <span style="color:#e8b87a;font-size:12px;letter-spacing:3px;">☕ 동네 커피 노트 · 사장님 위클리</span>
-          <div style="color:#fffdf9;font-size:19px;font-weight:700;margin-top:6px;">${esc(nl.title || "이번 주 트렌드")}</div>
+  const subject = `📰 ${nl.title || "사장님 위클리"} — 동네 커피 노트`;
+  const SERIF = "Georgia,'Nanum Myeongjo','Apple SD Gothic Neo',serif";
+  const KICKER: Record<string, string> = { tldr: "BRIEFING", radar: "TREND RADAR", coffee: "COFFEE", dessert: "DESSERT", cafes: "CAFE", action: "PLAYBOOK", news: "IN BRIEF" };
+  const d = new Date();
+  const dateLine = `제${issueNo ?? nl.issue_no ?? 1}호 · ${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일`;
+  const src = (u?: string) => (u ? ` <a href="${esc(u)}" style="color:#8a6d3b;font-size:10px;text-decoration:none;">[출처]</a>` : "");
+
+  const renderSection = (sec: NLSection, i: number): string => {
+    const kicker = KICKER[sec.key] || "TREND";
+    const rule = i === 0 ? "" : "border-top:1px solid #d9cfb8;";
+    // 트렌드 레이더: 2단 키워드 표(신문 단 느낌)
+    if (sec.key === "radar") {
+      const cells = (sec.items || []).map((it) => `
+        <td width="50%" valign="top" style="padding:6px 10px 6px 0;border-bottom:1px dotted #d9cfb8;">
+          <div style="font-size:14px;font-weight:700;color:#2b2018;">${esc(it.text)}${src(it.source_url)}</div>
+          ${it.why ? `<div style="font-size:11.5px;color:#7c6a55;margin-top:2px;">${esc(it.why)}</div>` : ""}
+        </td>`);
+      const rows: string[] = [];
+      for (let k = 0; k < cells.length; k += 2) rows.push(`<tr>${cells[k] || ""}${cells[k + 1] || '<td width="50%"></td>'}</tr>`);
+      return `<tr><td style="padding:14px 26px 8px;${rule}">
+        <div style="font-size:10px;letter-spacing:2px;color:#a8852f;font-weight:700;">${kicker}</div>
+        <div style="font-size:18px;font-weight:800;color:#2b2018;margin:2px 0 8px;">${esc(sec.title.replace(/^[^ ]+ /, ""))}</div>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows.join("")}</table></td></tr>`;
+    }
+    // TLDR: 헤드라인 브리핑 박스
+    if (sec.key === "tldr") {
+      const lis = (sec.items || []).map((it) => `<li style="font-size:13.5px;color:#3d2f22;line-height:1.7;margin-bottom:3px;">${esc(it.text)}</li>`).join("");
+      return `<tr><td style="padding:6px 26px 10px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1.5px solid #2b2018;"><tr><td style="padding:12px 16px;background:#f3ecda;">
+          <div style="font-size:10px;letter-spacing:2px;color:#2b2018;font-weight:700;margin-bottom:5px;">📌 이번 주 헤드라인</div>
+          <ul style="margin:0;padding-left:18px;">${lis}</ul></td></tr></table></td></tr>`;
+    }
+    // 일반 기사: 카테고리 + 헤드라인 + 요약 단락들
+    const arts = (sec.items || []).map((it) => `
+      <p style="margin:0 0 9px;font-size:13.5px;color:#3d2f22;line-height:1.75;">
+        <b style="color:#2b2018;">${it.flag ? "⚠️ " : ""}${esc(it.text)}</b>${src(it.source_url)}
+        ${it.why ? `<br><span style="font-size:12px;color:#8a6d3b;font-style:italic;">→ 우리 가게엔: ${esc(it.why)}</span>` : ""}
+      </p>`).join("");
+    return `<tr><td style="padding:14px 26px 6px;${rule}">
+      <div style="font-size:10px;letter-spacing:2px;color:#a8852f;font-weight:700;">${kicker}</div>
+      <div style="font-size:18px;font-weight:800;color:#2b2018;margin:2px 0 8px;line-height:1.25;">${esc(sec.title.replace(/^[^ ]+ /, ""))}</div>
+      ${arts}</td></tr>`;
+  };
+  const sectionsHtml = (nl.sections || []).map(renderSection).join("");
+
+  const html = `<div style="margin:0;padding:0;background:#e7e0d0;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#e7e0d0;padding:26px 10px;"><tr><td align="center">
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#fbf8ef;border:1px solid #cabd9c;font-family:${SERIF};">
+        <!-- 제호(MASTHEAD) -->
+        <tr><td style="padding:18px 26px 6px;border-top:5px double #2b2018;text-align:center;">
+          <div style="font-size:11px;letter-spacing:3px;color:#8a6d3b;">THE NEIGHBORHOOD COFFEE NOTE</div>
+          <div style="font-size:30px;font-weight:800;color:#2b2018;letter-spacing:-0.5px;margin:2px 0;">동네 커피 노트 <span style="font-size:15px;font-weight:400;">· 사장님 위클리</span></div>
+        </td></tr>
+        <tr><td style="padding:0 26px;">
+          <table role="presentation" width="100%" style="border-top:1.5px solid #2b2018;border-bottom:1.5px solid #2b2018;"><tr>
+            <td style="padding:4px 0;font-size:11px;color:#5a4a36;">${dateLine}</td>
+            <td align="right" style="padding:4px 0;font-size:11px;color:#5a4a36;">커피 · 카페 · 디저트 주간</td>
+          </tr></table>
+        </td></tr>
+        <!-- 헤드라인 -->
+        <tr><td style="padding:16px 26px 4px;text-align:center;">
+          <div style="font-size:25px;font-weight:800;color:#1d1610;line-height:1.3;">${esc(nl.title || "이번 주 트렌드")}</div>
         </td></tr>
         ${sectionsHtml}
-        <tr><td style="background:#faf4ea;border-top:1px solid #efe2cd;padding:18px 28px;">
-          <p style="font-size:11.5px;color:#9c8569;margin:0;line-height:1.7;">본 메일은 <b>구독·체험 사장님</b>께 발송되는 정보성 뉴스레터입니다. 외부 콘텐츠는 요약·출처 링크로 제공되며 원문 저작권은 각 매체에 있습니다.</p>
-          <p style="font-size:11px;color:#bcae98;margin:8px 0 0;">더 이상 받지 않으시려면 <a href="${unsub}" style="color:#9c6b3f;">수신거부</a> · 문의 kyh30628@gmail.com</p>
+        <!-- 발행 -->
+        <tr><td style="padding:16px 26px 20px;border-top:2px solid #2b2018;">
+          <p style="font-size:11px;color:#8a7458;margin:0;line-height:1.7;">발행 · <b>동네 커피 노트</b> 편집부 | 본 지면은 <b>구독·체험 사장님</b>께 보내는 정보성 뉴스레터입니다. 외부 콘텐츠는 요약·출처 링크로 제공하며 원문 저작권은 각 매체에 있습니다.</p>
+          <p style="font-size:11px;color:#b09a78;margin:7px 0 0;">수신을 원치 않으시면 <a href="${unsub}" style="color:#8a6d3b;">수신거부</a> · 문의 kyh30628@gmail.com</p>
         </td></tr>
       </table>
-      <div style="font-size:11px;color:#b3a489;margin-top:12px;">동네 커피 노트 · 진짜 후기로 고른 우리 동네 카페</div>
     </td></tr></table></div>`;
   return { subject, html };
 }
@@ -130,7 +174,7 @@ export async function sendNewsletter(id: number): Promise<{ ok: boolean; sent: n
   const recips = await getRecipients();
   let sent = 0, failed = 0;
   for (const r of recips) {
-    const { subject, html } = renderNewsletterEmail({ title: nl.title, sections: nl.sections } as Newsletter, site, r.email);
+    const { subject, html } = renderNewsletterEmail({ title: nl.title, sections: nl.sections } as Newsletter, site, r.email, nl.issue_no);
     const ok = await resendSend(r.email, subject, html);
     await sql`INSERT INTO newsletter_sends (newsletter_id, sub_id, email, status) VALUES (${id}, ${r.subId}, ${r.email}, ${ok ? "sent" : "failed"})`;
     ok ? sent++ : failed++;
