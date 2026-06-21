@@ -187,6 +187,14 @@ function makeStationHtml(name: string, colors: string[], refs: string[]): string
     <span style="font-size:13px;font-weight:800;color:#1f2d3d;background:#fff;border:1px solid #d4dce3;padding:2px 7px;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.32);">${(name || "").replace(/</g, "&lt;")}역</span>
   </div>`;
 }
+// 지하철 출구 마커 — 파란 번호 배지 + '출구' 라벨(역 마커와 구분, 높은 줌에서만). 비클릭.
+function makeExitHtml(num: string): string {
+  const n = (num || "").replace(/</g, "").slice(0, 3);
+  return `<div style="transform:translate(-50%,-50%);display:flex;align-items:center;gap:2px;white-space:nowrap;">
+    <span style="background:#1f5fa8;color:#fff;font-size:10px;font-weight:900;line-height:1;min-width:14px;height:15px;display:inline-flex;align-items:center;justify-content:center;border-radius:4px;border:1.5px solid #fff;box-shadow:0 1px 2px rgba(0,0,0,0.45);">${n || "·"}</span>
+    <span style="font-size:8.5px;font-weight:800;color:#1f5fa8;background:rgba(255,255,255,0.92);border:1px solid #cfe0f0;border-radius:3px;padding:0 2.5px;line-height:1.5;">출구</span>
+  </div>`;
+}
 function makeLandmarkHtml(name: string, icon: string): string {
   // 대형 랜드마크 — 유형 아이콘 + 옅은 크림 라벨. 커피 톤과 조화, 차분하게.
   return `<div style="transform:translate(-50%,-50%);display:flex;align-items:center;gap:3px;white-space:nowrap;">
@@ -330,8 +338,10 @@ export default function Home() {
   const [cafes, setCafes] = useState<Cafe[]>([]);
   const [stations, setStations] = useState<{ n: string; lat: number; lng: number; c: string[]; r: string[] }[]>([]); // 지하철역(이름,좌표,호선색,호선명)
   const [landmarks, setLandmarks] = useState<[string, number, number, string, number][]>([]); // 랜드마크(이름,위도,경도,아이콘,우선순위)
+  const [exits, setExits] = useState<{ lat: number; lng: number; n: string }[]>([]); // 지하철 출구(좌표, 번호)
   useEffect(() => {
     fetch("/data/stations.json").then((r) => r.json()).then((d) => Array.isArray(d) && setStations(d)).catch(() => {});
+    fetch("/data/exits.json").then((r) => r.json()).then((d) => Array.isArray(d) && setExits(d)).catch(() => {});
     fetch("/data/landmarks.json").then((r) => r.json()).then((d) => Array.isArray(d) && setLandmarks(d)).catch(() => {});
   }, []);
   const [selected, setSelected] = useState<Cafe | null>(null);
@@ -874,10 +884,16 @@ export default function Home() {
         const stnLayer = stns.map((s) => L.marker([s.lat, s.lng], { icon: L.divIcon({ className: "", html: makeStationHtml(s.n, s.c, s.r), iconSize: [0, 0] }), interactive: false, zIndexOffset: -300 }));
         if (stnLayer.length) layerRef.current.addLayer(L.layerGroup(stnLayer));
       }
+      // 지하철 출구 — 더 확대(z≥15)했을 때만, 화면 안 최대 26개. 역 마커보다 위(찾기 쉽게).
+      if (z >= 15 && exits.length) {
+        const exs = exits.filter((e) => b.contains([e.lat, e.lng] as [number, number])).slice(0, 26);
+        const exLayer = exs.map((e) => L.marker([e.lat, e.lng], { icon: L.divIcon({ className: "", html: makeExitHtml(e.n), iconSize: [0, 0] }), interactive: false, zIndexOffset: -250 }));
+        if (exLayer.length) layerRef.current.addLayer(L.layerGroup(exLayer));
+      }
     }
     layerRef.current.addLayer(L.layerGroup(markers));
     if (focusM) (focusM as any).openPopup();
-  }, [filtered, matchSet, sido, sigungu, dong, focusId, myPinMode, myCafeIds, othersMode, othersPins, cafes, stations, landmarks, nearMe]);
+  }, [filtered, matchSet, sido, sigungu, dong, focusId, myPinMode, myCafeIds, othersMode, othersPins, cafes, stations, exits, landmarks, nearMe]);
 
   // 데이터/지역/모드 변경 시: 화면을 맞춘 뒤 마커를 그린다(맞춘 화면 기준으로 그려짐).
   useEffect(() => {
