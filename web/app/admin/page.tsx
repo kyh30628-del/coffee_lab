@@ -675,9 +675,10 @@ export default function AdminPage() {
                       </div>
                       {s.status === "active" && s.pin && <div className="text-[12px] mt-1">🔑 PIN <b className="font-mono tracking-wider text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">{s.pin}</b> <span className="text-[10px] text-stone-400">(이메일 발송 · 사장님 로그인용)</span></div>}
                     </div>
+                    {s.status !== "active" && !s.cafe_published && <div className="mt-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5">⚠️ 카페 <b>미공개</b> — 검수·공개(필요 시 분석 생성) 후에 승인할 수 있어요.</div>}
                     <div className="flex gap-2 mt-2">
-                      {s.status !== "active" && <button onClick={() => subAct(s.id, "activate", 7)} className="flex-1 py-1.5 text-[12px] font-bold text-blue-700 bg-blue-50 rounded-lg">✓ 체험 승인(7일)</button>}
-                      {s.status !== "active" && <button onClick={() => subAct(s.id, "activate", 30)} className="flex-1 py-1.5 text-[12px] font-bold text-emerald-700 bg-emerald-50 rounded-lg">✓ 구독 승인(30일)</button>}
+                      {s.status !== "active" && <button onClick={() => subAct(s.id, "activate", 7)} disabled={!s.cafe_published} title={s.cafe_published ? "" : "카페가 공개된 뒤 승인할 수 있어요"} className="flex-1 py-1.5 text-[12px] font-bold text-blue-700 bg-blue-50 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed">✓ 체험 승인(7일)</button>}
+                      {s.status !== "active" && <button onClick={() => subAct(s.id, "activate", 30)} disabled={!s.cafe_published} title={s.cafe_published ? "" : "카페가 공개된 뒤 승인할 수 있어요"} className="flex-1 py-1.5 text-[12px] font-bold text-emerald-700 bg-emerald-50 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed">✓ 구독 승인(30일)</button>}
                       {s.status === "active" && <button onClick={() => subAct(s.id, "extend", 30)} className="flex-1 py-1.5 text-[12px] font-bold text-stone-700 bg-stone-100 rounded-lg">+30일 연장</button>}
                       {s.status === "active" && <button onClick={() => subAct(s.id, "cancel")} className="flex-1 py-1.5 text-[12px] text-rose-600 bg-rose-50 rounded-lg">해지</button>}
                       {s.status !== "suspended" && s.status !== "cancelled" && <button onClick={() => suspendSub(s.id, s.cafe_name)} className="flex-1 py-1.5 text-[12px] font-bold text-white bg-rose-600 rounded-lg">🚫 사칭/위반 즉시정지</button>}

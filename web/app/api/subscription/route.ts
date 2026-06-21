@@ -97,7 +97,7 @@ export async function GET(req: NextRequest) {
     await ensureSchema(); await ensure();
     if (req.nextUrl.searchParams.get("all")) {
       if (!authed(req)) return NextResponse.json({ ok: false }, { status: 401 });
-      const rows = await sql`SELECT id, cafe_id, cafe_name, owner_name, contact, email, plan, price, status, pin, started_at, expires_at, created_at, biz_reg_url, biz_no, attested, signup_ip, signup_ua, verified, suspend_reason, suspended_at FROM subscriptions ORDER BY (status='pending') DESC, created_at DESC LIMIT 200` as unknown as any[];
+      const rows = await sql`SELECT s.id, s.cafe_id, s.cafe_name, s.owner_name, s.contact, s.email, s.plan, s.price, s.status, s.pin, s.started_at, s.expires_at, s.created_at, s.biz_reg_url, s.biz_no, s.attested, s.signup_ip, s.signup_ua, s.verified, s.suspend_reason, s.suspended_at, COALESCE(c.published, false) AS cafe_published FROM subscriptions s LEFT JOIN cafes c ON c.id = s.cafe_id ORDER BY (s.status='pending') DESC, s.created_at DESC LIMIT 200` as unknown as any[];
       return NextResponse.json({ ok: true, subs: rows.map((r) => ({ ...r, contact: decryptPII(r.contact), email: decryptPII(r.email) })) });
     }
     // 사장님: 본인 카페 구독 상태
