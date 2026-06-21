@@ -53,12 +53,26 @@ export default function AdminPage() {
   const [towerFull, setTowerFull] = useState(false);
   const [subscribers, setSubscribers] = useState<any[]>([]);
   const [showSubsModal, setShowSubsModal] = useState(false);
+  // 📰 뉴스레터
+  const [showNL, setShowNL] = useState(false);
+  const [nlList, setNlList] = useState<any[]>([]);
+  const [nlRecipients, setNlRecipients] = useState(0);
+  const [nlSel, setNlSel] = useState<any>(null);     // 선택한 뉴스레터 전문
+  const [nlBusy, setNlBusy] = useState("");
+  const [nlMsg, setNlMsg] = useState("");
   const [showYtModal, setShowYtModal] = useState(false);
   const [showVisits, setShowVisits] = useState(false);
   const [visits, setVisits] = useState<any>(null);
   const loadSubscribers = (password: string) => fetch("/api/subscription?all=1", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) setSubscribers(d.subs ?? []); }).catch(() => {});
   const subAct = async (id: number, action: string, days?: number, reason?: string) => { try { await fetch("/api/subscription", { method: "POST", headers: { "x-admin-password": pw, "Content-Type": "application/json" }, body: JSON.stringify({ id, action, ...(days ? { days } : {}), ...(reason ? { reason } : {}) }) }); loadSubscribers(pw); fetch("/api/judge-status", { headers: { "x-admin-password": pw } }); } catch {} };
   const suspendSub = (id: number, cafe: string) => { const reason = window.prompt(`🚫 "${cafe}" 이용 즉시정지\n사칭/위반 사유를 적어주세요(증빙으로 기록됩니다). PIN 접근·우선노출이 즉시 차단됩니다.`); if (reason != null) subAct(id, "suspend", undefined, reason || "사유 미기재"); };
+  // 📰 뉴스레터
+  const NLH = () => ({ "x-admin-password": pw, "Content-Type": "application/json" });
+  const loadNL = () => fetch("/api/newsletter", { headers: { "x-admin-password": pw } }).then((x) => x.json()).then((d) => { if (d.ok) { setNlList(d.list ?? []); setNlRecipients(d.recipients ?? 0); } }).catch(() => {});
+  const nlOpen = async (id: number) => { const d = await (await fetch(`/api/newsletter?id=${id}`, { headers: { "x-admin-password": pw } })).json(); if (d.ok) { setNlSel(d.newsletter); setNlRecipients(d.recipients ?? nlRecipients); } };
+  const nlPost = async (body: any) => (await fetch("/api/newsletter", { method: "POST", headers: NLH(), body: JSON.stringify(body) })).json();
+  const nlGenerate = async () => { setNlBusy("generate"); setNlMsg(""); const d = await nlPost({ action: "generate" }); setNlBusy(""); if (d.ok) { setNlMsg(`초안 생성됨 (비용 $${(d.cost ?? 0).toFixed(3)})`); await loadNL(); if (d.id) nlOpen(d.id); } else setNlMsg("생성 실패: " + (d.error || "")); };
+  const nlAct = async (action: string, id: number, extra?: any) => { setNlBusy(action); const d = await nlPost({ action, id, ...extra }); setNlBusy(""); if (action === "send") setNlMsg(d.ok ? `발송 완료 — 성공 ${d.sent} / 실패 ${d.failed}` : "발송 실패: " + (d.error || "")); else if (action === "test") setNlMsg(d.ok ? "미리보기 메일 발송됨" : "실패: " + (d.error || "")); await loadNL(); if (id) nlOpen(id); };
   // '오늘의 수집' 카드 클릭 → 그 지표에 해당하는 카페 목록을 모달로(orchestrator와 동일 KST 필터).
   const openToday = (metric: string, label: string) => {
     if (!metric) return;
@@ -104,6 +118,7 @@ export default function AdminPage() {
     refreshNumbers(password);
     loadReview(password);
     loadSubscribers(password);
+    fetch("/api/newsletter", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) { setNlList(d.list ?? []); setNlRecipients(d.recipients ?? 0); } }).catch(() => {});
   };
 
   const act = async (id: number, action: string, published?: boolean) => {
@@ -581,6 +596,7 @@ export default function AdminPage() {
         {/* ===== 모달 트리거 (구독 카페 현황 · 유튜브 수집 · 내 카페 기록) ===== */}
         <div className="flex gap-2 mb-6 flex-wrap">
           <button onClick={() => setShowSubsModal(true)} className="flex-1 py-2.5 text-[13px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-xl">💳 구독 카페 현황{subscribers.length ? ` (${subscribers.length})` : ""}</button>
+          <button onClick={() => { setShowNL(true); loadNL(); }} className="flex-1 py-2.5 text-[13px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-xl">📰 주간 뉴스레터{nlList.length ? ` (${nlList.length})` : ""}</button>
           <button onClick={() => setShowYtModal(true)} className="flex-1 py-2.5 text-[13px] font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded-xl">📺 유튜브 수집{yt?.withYt != null ? ` (${yt.withYt})` : ""}</button>
           <button onClick={() => { setShowVisits(true); fetch("/api/admin/visits", { headers: { "x-admin-password": pw } }).then((x) => x.json()).then((d) => { if (d.ok) setVisits(d); }); }} className="flex-1 py-2.5 text-[13px] font-bold text-pink-700 bg-pink-50 border border-pink-200 rounded-xl">❤ 내 카페 기록{visits?.stat?.total != null ? ` (${visits.stat.total})` : ""}</button>
         </div>
@@ -690,6 +706,80 @@ export default function AdminPage() {
             </div>
             ) : <p className="text-[13px] text-stone-400 py-3 text-center">구독 회원이 아직 없어요.</p>}
             <p className="text-[10px] text-stone-400 mt-2">활성화 시 우선노출 자동 ON·만료/해지 시 OFF. 연락처는 암호화 저장.</p>
+            </div>
+          </div>
+        )}
+
+        {/* 📰 주간 뉴스레터 모달 */}
+        {showNL && (
+          <div className="fixed inset-0 z-[6000]" onClick={() => { setShowNL(false); setNlSel(null); }}>
+            <div className="absolute inset-0 bg-black/50" />
+            <div className="absolute inset-x-0 bottom-0 max-h-[90vh] overflow-y-auto bg-stone-50 rounded-t-2xl p-4 sm:inset-0 sm:m-auto sm:max-w-2xl sm:h-fit sm:max-h-[90vh] sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-bold text-stone-800">📰 주간 뉴스레터 <span className="text-[11px] text-stone-500 font-normal">· 수신대상 {nlRecipients}명(구독+체험)</span></span>
+                <button onClick={() => { setShowNL(false); setNlSel(null); }} className="text-2xl text-stone-400 leading-none">×</button>
+              </div>
+              <div className="flex gap-2 mb-2">
+                <button onClick={nlGenerate} disabled={!!nlBusy} className="flex-1 py-2 text-[13px] font-bold text-white bg-indigo-600 rounded-lg disabled:opacity-50">{nlBusy === "generate" ? "생성 중…(웹서치)" : "✨ 이번 주 뉴스레터 생성"}</button>
+              </div>
+              {nlMsg && <div className="text-[11.5px] text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg px-2.5 py-1.5 mb-2">{nlMsg}</div>}
+              <p className="text-[10.5px] text-stone-400 mb-2">생성은 Sonnet+웹서치로 트렌드를 종합합니다(API 크레딧 필요). 출처 없는 사실·과장 표현은 자동 ⚠️ 플래그.</p>
+
+              {/* 목록 */}
+              <div className="space-y-1.5 mb-3">
+                {nlList.map((n) => (
+                  <button key={n.id} onClick={() => nlOpen(n.id)} className={`w-full text-left rounded-lg border px-3 py-2 ${nlSel?.id === n.id ? "border-indigo-300 bg-indigo-50" : "border-stone-200 bg-white"}`}>
+                    <div className="flex items-center gap-2 text-[12px]">
+                      <span className="font-bold">#{n.issue_no} {n.title}</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded ${n.status === "sent" ? "bg-emerald-100 text-emerald-700" : n.status === "approved" ? "bg-blue-100 text-blue-700" : "bg-stone-100 text-stone-500"}`}>{n.status}</span>
+                      {n.flags?.length > 0 && <span className="text-[10px] text-amber-700">⚠️ {n.flags.length}</span>}
+                      {n.sent_count > 0 && <span className="text-[10px] text-stone-400 ml-auto">발송 {n.sent_count}</span>}
+                    </div>
+                  </button>
+                ))}
+                {nlList.length === 0 && <p className="text-[12px] text-stone-400 text-center py-3">아직 생성된 뉴스레터가 없어요.</p>}
+              </div>
+
+              {/* 선택 전문 */}
+              {nlSel && (
+                <div className="border-t border-stone-200 pt-3">
+                  {nlSel.flags?.length > 0 && (
+                    <div className="text-[11.5px] text-amber-800 bg-amber-50 border border-amber-300 rounded-lg px-3 py-2 mb-2">
+                      ⚠️ 확인 필요 {nlSel.flags.length}건: {nlSel.flags.slice(0, 4).join(" · ")}
+                    </div>
+                  )}
+                  <div className="bg-white rounded-xl border border-stone-200 p-3 mb-2 max-h-72 overflow-y-auto">
+                    <div className="font-bold text-[15px] mb-2">{nlSel.title}</div>
+                    {(nlSel.sections || []).map((sec: any, si: number) => (
+                      <div key={si} className="mb-2.5">
+                        <div className="text-[12.5px] font-bold text-stone-700 border-b border-stone-100 pb-0.5 mb-1">{sec.title}</div>
+                        <ul className="space-y-1">
+                          {(sec.items || []).map((it: any, ii: number) => (
+                            <li key={ii} className="text-[12px] text-stone-700 leading-snug">
+                              {it.flag && <span className="text-amber-700 font-bold">⚠️ </span>}{it.text}
+                              {it.why && <span className="text-stone-400"> ↳ {it.why}</span>}
+                              {it.source_url && <a href={it.source_url} target="_blank" className="text-indigo-600 text-[10px] ml-1">[출처]</a>}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                  {/* 편집(JSON) */}
+                  <details className="mb-2">
+                    <summary className="text-[11px] text-stone-500 cursor-pointer">✏️ 직접 편집(JSON) — 문구·항목 수정</summary>
+                    <textarea id="nlEdit" defaultValue={JSON.stringify(nlSel.sections, null, 2)} className="w-full h-40 mt-1 text-[11px] font-mono border border-stone-300 rounded-lg p-2 bg-white" />
+                    <button onClick={() => { try { const secs = JSON.parse((document.getElementById("nlEdit") as HTMLTextAreaElement).value); nlAct("update", nlSel.id, { title: nlSel.title, sections: secs }); } catch { setNlMsg("JSON 형식 오류"); } }} className="mt-1 px-3 py-1.5 text-[12px] font-bold text-stone-700 bg-stone-100 rounded-lg">저장</button>
+                  </details>
+                  <div className="flex flex-wrap gap-2">
+                    {nlSel.status === "draft" && <button onClick={() => nlAct("approve", nlSel.id)} className="flex-1 py-2 text-[12px] font-bold text-blue-700 bg-blue-50 rounded-lg">✓ 승인</button>}
+                    <button onClick={() => nlAct("test", nlSel.id, { email: "kyh30628@gmail.com" })} disabled={!!nlBusy} className="flex-1 py-2 text-[12px] font-bold text-stone-700 bg-stone-100 rounded-lg">📨 미리보기 메일</button>
+                    {nlSel.status === "approved" && <button onClick={() => { if (confirm(`구독+체험 ${nlRecipients}명에게 발송할까요?`)) nlAct("send", nlSel.id); }} disabled={!!nlBusy} className="flex-1 py-2 text-[12px] font-bold text-white bg-emerald-600 rounded-lg">🚀 발송 ({nlRecipients})</button>}
+                    {nlSel.status === "sent" && <span className="flex-1 py-2 text-[12px] font-bold text-emerald-700 text-center">✅ 발송 완료 ({nlSel.sent_count})</span>}
+                    <button onClick={() => { if (confirm("삭제할까요?")) { nlAct("delete", nlSel.id); setNlSel(null); } }} className="px-3 py-2 text-[12px] text-rose-600 bg-rose-50 rounded-lg">삭제</button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
