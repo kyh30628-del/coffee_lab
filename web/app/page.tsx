@@ -1067,6 +1067,7 @@ export default function Home() {
         </div>
         <p className="text-[10px] text-[#8a7458] mt-10 text-center leading-relaxed">네이버·구글·유튜브 공개 후기 교차검증 + AI 맥락 판정<br />광고·협찬·무관 글은 자동 제외</p>
         <div className="mt-3 text-[10px] text-[#8a7458] flex gap-3">
+          <a href="/area" className="underline">동네별 카페</a>
           <a href="/privacy" className="underline">개인정보처리방침</a>
           <a href="/terms" className="underline">이용약관</a>
         </div>
