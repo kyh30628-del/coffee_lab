@@ -187,12 +187,12 @@ function makeStationHtml(name: string, colors: string[], refs: string[]): string
     <span style="font-size:15px;font-weight:800;color:#1f2d3d;background:#fff;border:1px solid #d4dce3;padding:3px 9px;border-radius:9px;box-shadow:0 1px 3px rgba(0,0,0,0.32);">${(name || "").replace(/</g, "&lt;")}역</span>
   </div>`;
 }
-// 지하철 출구 마커 — 파란 번호 배지 + '출구' 라벨(역 마커와 구분, 높은 줌에서만). 비클릭.
+// 지하철 출구 마커 — 서울메트로식 파란 번호 사각(↗=나가는 길). 역 연결선과 함께 '역 소속 출구'로 읽힘. 비클릭.
 function makeExitHtml(num: string): string {
   const n = (num || "").replace(/</g, "").slice(0, 3);
-  return `<div style="transform:translate(-50%,-50%);display:flex;align-items:center;gap:2px;white-space:nowrap;">
-    <span style="background:#1f5fa8;color:#fff;font-size:10px;font-weight:900;line-height:1;min-width:14px;height:15px;display:inline-flex;align-items:center;justify-content:center;border-radius:4px;border:1.5px solid #fff;box-shadow:0 1px 2px rgba(0,0,0,0.45);">${n || "·"}</span>
-    <span style="font-size:8.5px;font-weight:800;color:#1f5fa8;background:rgba(255,255,255,0.92);border:1px solid #cfe0f0;border-radius:3px;padding:0 2.5px;line-height:1.5;">출구</span>
+  return `<div style="transform:translate(-50%,-50%);position:relative;width:18px;height:18px;">
+    <span style="position:absolute;inset:0;background:#0d5bb5;color:#fff;font-size:10.5px;font-weight:900;display:flex;align-items:center;justify-content:center;border-radius:4px;border:1.5px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.4);">${n || "·"}</span>
+    <span style="position:absolute;top:-4px;right:-4px;font-size:8px;color:#0d5bb5;background:#fff;border-radius:50%;width:10px;height:10px;line-height:10px;text-align:center;box-shadow:0 1px 2px rgba(0,0,0,0.3);">↗</span>
   </div>`;
 }
 function makeLandmarkHtml(name: string, icon: string): string {
@@ -770,14 +770,14 @@ export default function Home() {
       const lz = map.getZoom();
       if (lines.length && lz >= 11) {
         const lb = map.getBounds().pad(0.35);
-        const w = lz >= 15 ? 5.5 : lz >= 13 ? 4 : 3;
-        const lineLayer: any[] = [];
+        const w = lz >= 16 ? 6 : lz >= 14 ? 4.5 : lz >= 12 ? 3.5 : 2.5;
+        const cas: any[] = [], col: any[] = []; // 케이싱 전부 먼저(아래) → 색선(위): 교차역에서 흰테 안 겹쳐 깔끔
         for (const ln of lines) for (const seg of ln.segs) {
           if (!seg.some(([la, lo]) => lb.contains([la, lo] as [number, number]))) continue;
-          lineLayer.push(L.polyline(seg, { color: "#ffffff", weight: w + 3, opacity: 0.55, interactive: false, lineJoin: "round", lineCap: "round" }));
-          lineLayer.push(L.polyline(seg, { color: ln.color, weight: w, opacity: lz >= 13 ? 0.78 : 0.62, interactive: false, lineJoin: "round", lineCap: "round" }));
+          cas.push(L.polyline(seg, { color: "#ffffff", weight: w + 3, opacity: 0.85, interactive: false, lineJoin: "round", lineCap: "round" }));
+          col.push(L.polyline(seg, { color: ln.color, weight: w, opacity: lz >= 13 ? 0.92 : 0.72, interactive: false, lineJoin: "round", lineCap: "round" }));
         }
-        if (lineLayer.length) layerRef.current.addLayer(L.layerGroup(lineLayer));
+        if (cas.length) layerRef.current.addLayer(L.layerGroup([...cas, ...col]));
       }
     }
 
@@ -908,14 +908,19 @@ export default function Home() {
       if (z >= 15 && exits.length) {
         const exs = exits.filter((e) => b.contains([e.lat, e.lng] as [number, number])).slice(0, 26);
         const nearStns = stations.filter((s) => b.pad(0.1).contains([s.lat, s.lng] as [number, number]));
-        const links: any[] = [];
+        const casLinks: any[] = [], links: any[] = [];
         const exLayer = exs.map((e) => {
           let best: { lat: number; lng: number } | null = null, bd = Infinity;
-          for (const s of nearStns) { const d = Math.abs(s.lat - e.lat) + Math.abs(s.lng - e.lng); if (d < bd) { bd = d; best = s; } }
-          if (best && bd < 0.006) links.push(L.polyline([[best.lat, best.lng], [e.lat, e.lng]], { color: "#1f5fa8", weight: 1.5, opacity: 0.45, dashArray: "2,3", interactive: false }));
+          for (const s of nearStns) { const d = (s.lat - e.lat) ** 2 + (s.lng - e.lng) ** 2; if (d < bd) { bd = d; best = s; } }
+          // ~300m 이내일 때만 연결(실제 그 역 출구). 흰 케이싱 + 파란 실선 = 깔끔한 연결.
+          if (best && bd < 1.1e-5) {
+            const path = [[best.lat, best.lng], [e.lat, e.lng]] as [number, number][];
+            casLinks.push(L.polyline(path, { color: "#ffffff", weight: 3.5, opacity: 0.8, interactive: false, lineCap: "round" }));
+            links.push(L.polyline(path, { color: "#0d5bb5", weight: 1.8, opacity: 0.7, interactive: false, lineCap: "round" }));
+          }
           return L.marker([e.lat, e.lng], { icon: L.divIcon({ className: "", html: makeExitHtml(e.n), iconSize: [0, 0] }), interactive: false, zIndexOffset: -250 });
         });
-        if (links.length) layerRef.current.addLayer(L.layerGroup(links));   // 커넥터 먼저(아래)
+        if (casLinks.length) layerRef.current.addLayer(L.layerGroup([...casLinks, ...links]));   // 커넥터(아래)
         if (exLayer.length) layerRef.current.addLayer(L.layerGroup(exLayer));
       }
     }
