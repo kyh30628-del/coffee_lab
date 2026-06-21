@@ -1,9 +1,9 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
-// 사장님 카페 정보 입력 모달(공용) — /pricing(구독)·랜딩(7일 체험) 둘 다 사용.
-//   카페 검색·선택 → 성함·연락처·이메일·동의 → /api/subscription(pending). 승인 시 이메일로 PIN.
-export default function OwnerSignupModal({ open, onClose, trial = false }: { open: boolean; onClose: () => void; trial?: boolean }) {
+// 사장님 카페 정보 입력 모달(공용) — /pricing(구독)·랜딩(7일 체험)·카페 등록 직후(prefillCafe) 사용.
+//   카페 검색·선택(또는 prefill 고정) → 성함·연락처·이메일·동의 → /api/subscription(pending). 승인 시 이메일로 PIN.
+export default function OwnerSignupModal({ open, onClose, trial = false, prefillCafe }: { open: boolean; onClose: () => void; trial?: boolean; prefillCafe?: { id: number; name: string } | null }) {
   const [cafeQ, setCafeQ] = useState("");
   const [sug, setSug] = useState<{ id: number; name: string; area: string }[]>([]);
   const [picked, setPicked] = useState<{ id: number; name: string } | null>(null);
@@ -19,8 +19,10 @@ export default function OwnerSignupModal({ open, onClose, trial = false }: { ope
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
+  // 등록 직후 진입: 그 카페로 고정(검색 없이)
+  useEffect(() => { if (open && prefillCafe) setPicked(prefillCafe); }, [open, prefillCafe]);
   if (!open) return null;
-  const reset = () => { setDone(false); setPicked(null); setCafeQ(""); setOwnerName(""); setContact(""); setEmail(""); setBizNo(""); setBizRegBase64(""); setBizRegName(""); setConsent(false); setAttest(false); setSug([]); setErr(""); };
+  const reset = () => { setDone(false); setPicked(prefillCafe ?? null); setCafeQ(""); setOwnerName(""); setContact(""); setEmail(""); setBizNo(""); setBizRegBase64(""); setBizRegName(""); setConsent(false); setAttest(false); setSug([]); setErr(""); };
   const close = () => { reset(); onClose(); };
   const onFile = (f: File | undefined) => {
     if (!f) return;
@@ -67,19 +69,25 @@ export default function OwnerSignupModal({ open, onClose, trial = false }: { ope
               <h3 className="font-bold text-lg">{trial ? "✨ 7일 무료 체험 신청" : "홍보팩 구독 신청"}</h3>
               <button onClick={close} className="text-2xl text-[#bcae98] leading-none -mt-1">×</button>
             </div>
-            <p className="text-[12px] text-[#6b5a48] mb-3">내 카페를 선택하고 정보를 남겨주세요. 승인되면 <b>이메일로 키(PIN)</b>를 보내드려요.{trial ? " 결제 없이 7일간 모든 사장님 기능을 써보실 수 있어요." : ""}</p>
-            <div className="relative mb-2">
-              <input value={picked ? picked.name : cafeQ} onChange={(e) => onCafeQ(e.target.value)} placeholder="내 카페 이름 검색" className="w-full rounded-lg border border-[#d9c9b0] px-3 py-2.5 text-[14px] bg-white" />
-              {picked && <span className="absolute right-3 top-2.5 text-[12px] text-emerald-600 font-bold">✓ 선택됨</span>}
-              {!picked && sug.length > 0 && (
-                <div className="absolute z-10 left-0 right-0 mt-1 bg-white border border-[#d9c9b0] rounded-lg shadow-lg max-h-44 overflow-y-auto">
-                  {sug.map((c) => (
-                    <button key={c.id} onClick={() => { setPicked({ id: c.id, name: c.name }); setSug([]); }} className="w-full text-left px-3 py-2 text-[13px] hover:bg-[#f4ece0] border-b border-[#f0e6d4] last:border-0"><b>{c.name}</b> <span className="text-[11px] text-[#a8927a]">{c.area}</span></button>
-                  ))}
+            <p className="text-[12px] text-[#6b5a48] mb-3">{prefillCafe ? "방금 등록한 카페로 체험을 신청합니다. 사장님 정보를 남겨주세요." : "내 카페를 선택하고 정보를 남겨주세요."} 승인되면 <b>이메일로 키(PIN)</b>를 보내드려요.{trial ? " 결제 없이 7일간 모든 사장님 기능을 써보실 수 있어요." : ""}</p>
+            {prefillCafe ? (
+              <div className="mb-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-[14px]"><b>{prefillCafe.name}</b><span className="text-[12px] text-emerald-600 font-bold ml-2">✓ 방금 등록한 내 카페</span><div className="text-[11px] text-[#8a7458] mt-0.5">검증·공개되면 승인 후 키를 보내드려요.</div></div>
+            ) : (
+              <>
+                <div className="relative mb-2">
+                  <input value={picked ? picked.name : cafeQ} onChange={(e) => onCafeQ(e.target.value)} placeholder="내 카페 이름 검색" className="w-full rounded-lg border border-[#d9c9b0] px-3 py-2.5 text-[14px] bg-white" />
+                  {picked && <span className="absolute right-3 top-2.5 text-[12px] text-emerald-600 font-bold">✓ 선택됨</span>}
+                  {!picked && sug.length > 0 && (
+                    <div className="absolute z-10 left-0 right-0 mt-1 bg-white border border-[#d9c9b0] rounded-lg shadow-lg max-h-44 overflow-y-auto">
+                      {sug.map((c) => (
+                        <button key={c.id} onClick={() => { setPicked({ id: c.id, name: c.name }); setSug([]); }} className="w-full text-left px-3 py-2 text-[13px] hover:bg-[#f4ece0] border-b border-[#f0e6d4] last:border-0"><b>{c.name}</b> <span className="text-[11px] text-[#a8927a]">{c.area}</span></button>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-            <p className="text-[11px] text-[#8a7458] -mt-0.5 mb-2">내 카페가 목록에 없나요? <a href="/cafe/register" className="text-[#9c6b3f] font-bold underline">카페 등록 신청 →</a> <span className="text-[#bcae98]">(검증 후 분석·체험 이용 가능)</span></p>
+                <p className="text-[11px] text-[#8a7458] -mt-0.5 mb-2">내 카페가 목록에 없나요? <a href="/cafe/register" className="text-[#9c6b3f] font-bold underline">카페 등록 신청 →</a> <span className="text-[#bcae98]">(검증 후 분석·체험 이용 가능)</span></p>
+              </>
+            )}
             <input value={ownerName} onChange={(e) => setOwnerName(e.target.value)} placeholder="사장님 성함" className="w-full rounded-lg border border-[#d9c9b0] px-3 py-2.5 text-[14px] mb-2 bg-white" />
             <input value={contact} onChange={(e) => setContact(e.target.value)} placeholder="연락처 (전화)" className="w-full rounded-lg border border-[#d9c9b0] px-3 py-2.5 text-[14px] mb-2 bg-white" />
             <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="이메일 (키 받을 주소)" className="w-full rounded-lg border border-[#d9c9b0] px-3 py-2.5 text-[14px] mb-2 bg-white" />

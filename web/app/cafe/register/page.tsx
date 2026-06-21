@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import BackLink from "../../BackLink";
+import OwnerSignupModal from "../../OwnerSignupModal";
 
 const USE_OPTIONS = ["작업", "혼자", "수다", "빵", "사진", "단골"];
 
@@ -15,6 +16,9 @@ export default function RegisterPage() {
   // 카페명 자동완성 — 기존 카페 보완 or 신규 작성
   const [nameSug, setNameSug] = useState<{ id: number; name: string; area: string }[]>([]);
   const [supplementId, setSupplementId] = useState<number | null>(null);
+  const [wantTrial, setWantTrial] = useState(false);                         // 등록과 함께 7일 체험 신청
+  const [newCafe, setNewCafe] = useState<{ id: number; name: string } | null>(null);
+  const [showTrial, setShowTrial] = useState(false);
   const nameLookup = async (v: string) => {
     if (v.trim().length < 1) { setNameSug([]); return; }
     try { const d = await (await fetch(`/api/cafe-names?q=${encodeURIComponent(v.trim())}`)).json(); setNameSug(d.cafes ?? []); } catch {}
@@ -32,7 +36,12 @@ export default function RegisterPage() {
         body: JSON.stringify({ ...form, uses, supplementId }),
       });
       const d = await r.json();
-      if (d.ok) setStatus("done");
+      if (d.ok) {
+        const cafe = supplementId ? { id: supplementId, name: form.name } : (d.cafeId ? { id: d.cafeId, name: d.cafeName ?? form.name } : null);
+        setNewCafe(cafe);
+        setStatus("done");
+        if (wantTrial && cafe) setShowTrial(true);   // 등록과 동시에 체험 신청 모달 열기
+      }
       else { setStatus("error"); setErr(d.error ?? "오류가 발생했습니다."); }
     } catch { setStatus("error"); setErr("네트워크 오류. 다시 시도해주세요."); }
   };
@@ -52,8 +61,12 @@ export default function RegisterPage() {
           <p className="text-[13px] text-[#8a7458] leading-relaxed mt-3 bg-[#f4ece0] rounded-xl px-4 py-3">
             가게가 <b>검증·공개</b>되면, 사장님 화면에서 <b>내 카페 분석</b>과 <b>7일 무료 체험</b>을 이용하실 수 있어요. 준비되면 안내드릴게요.
           </p>
-          <a href="/cafe" className="inline-block mt-6 text-[#9c6b3f] underline text-sm">가이드 둘러보기 →</a>
+          {newCafe && (
+            <button onClick={() => setShowTrial(true)} className="w-full mt-4 bg-[#e8b87a] text-[#2b2018] rounded-lg py-3 font-bold">🎁 이어서 7일 무료 체험 신청하기</button>
+          )}
+          <a href="/cafe" className="inline-block mt-5 text-[#9c6b3f] underline text-sm">가이드 둘러보기 →</a>
         </div>
+        <OwnerSignupModal open={showTrial} onClose={() => setShowTrial(false)} trial prefillCafe={newCafe} />
         <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet" />
       </main>
     );
@@ -146,16 +159,23 @@ export default function RegisterPage() {
             <textarea className={`${field} h-24 resize-none`} value={form.note} onChange={(e) => set("note", e.target.value)} placeholder="우리 가게 커피를 한 문장으로 소개한다면?" />
           </div>
 
+          {/* 🎁 등록과 함께 7일 무료 체험 신청 */}
+          <label className="flex items-start gap-2.5 rounded-xl border border-[#e8b87a] bg-[#fbf3e6] px-3.5 py-3 cursor-pointer">
+            <input type="checkbox" checked={wantTrial} onChange={(e) => setWantTrial(e.target.checked)} className="mt-0.5 w-4 h-4 accent-[#9c6b3f] shrink-0" />
+            <span className="text-[13px] text-[#52402e] leading-snug"><b>🎁 등록과 함께 7일 무료 체험도 신청할게요</b><br /><span className="text-[11.5px] text-[#8a7458]">등록 직후 사장님 정보·사업자등록증을 받고, 가게가 검증·공개되면 승인해 이메일로 키를 보내드려요.</span></span>
+          </label>
+
           {err && <p className="text-red-700 text-sm">{err}</p>}
 
           <button onClick={submit} disabled={status === "sending"}
             className="w-full bg-[#2b2018] text-[#f4ece0] rounded-lg py-3.5 font-medium hover:bg-[#3d2f22] transition-colors disabled:opacity-50">
-            {status === "sending" ? "보내는 중..." : "등록 신청하기"}
+            {status === "sending" ? "보내는 중..." : wantTrial ? "등록하고 체험 신청하기" : "등록 신청하기"}
           </button>
           <p className="text-[11px] text-[#a8927a] text-center">신청 후 확인을 거쳐 가이드에 노출됩니다.</p>
         </div>
 
       </div>
+      <OwnerSignupModal open={showTrial} onClose={() => setShowTrial(false)} trial prefillCafe={newCafe} />
       <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet" />
     </main>
   );
