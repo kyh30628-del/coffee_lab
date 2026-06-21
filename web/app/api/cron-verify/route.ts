@@ -95,6 +95,12 @@ async function runChecks(): Promise<Check[]> {
     await n(sql`SELECT count(*)::int n FROM cafe_promos pr WHERE NOT EXISTS (SELECT 1 FROM cafes c WHERE c.id=pr.cafe_id)`),
     await samp(sql`SELECT pr.cafe_id::text s FROM cafe_promos pr WHERE NOT EXISTS (SELECT 1 FROM cafes c WHERE c.id=pr.cafe_id) LIMIT 6`));
 
+  // 13. 🛡️ 근거후기-카페명 불일치(동명·프랜차이즈 지점 오염) — 해자의 핵심. 자가치유가 못 잡은 잔존분.
+  //   '바빈스 식당리뷰' 유형: 화면에 뜬 후기가 실제 그 카페 얘기가 아닌 것. 소비자 직접 노출 = 즉시 타격.
+  add("evidence_contamination", "근거후기가 카페명과 불일치(동명 오염)", "fail",
+    await n(sql`SELECT count(*)::int n FROM audit_flags WHERE issue='근거오염' AND NOT resolved`),
+    await samp(sql`SELECT cafe_name s FROM audit_flags WHERE issue='근거오염' AND NOT resolved ORDER BY flagged_at DESC LIMIT 6`));
+
   return checks;
 }
 

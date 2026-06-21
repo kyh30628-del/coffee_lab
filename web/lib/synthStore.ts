@@ -346,11 +346,20 @@ export async function healLowCoherence(limit = 250, threshold = 0.4): Promise<{ 
     try { await synthAndStore({ id: r.id, name: r.name, area: r.area }, { refresh: false }); } catch { continue; }
     const after = (await sql`SELECT published, synth_reviews FROM cafes WHERE id=${r.id}`)[0] as any;
     healedNames.push(r.name);
+    let resolved = true;
     if (after?.published) {
       const q2 = (after.synth_reviews || []).map((e: any) => e?.quote || "").filter(Boolean);
       const coh2 = nameCoherence(r.name, q2);
-      if (coh2 < threshold) stillBad.push({ id: r.id, name: r.name, coh: Math.round(coh2 * 100) / 100 });
+      if (coh2 < threshold) {
+        resolved = false;
+        stillBad.push({ id: r.id, name: r.name, coh: Math.round(coh2 * 100) / 100 });
+        // 🚩 레드팀/품질감사가 세도록 audit_flags에 영구 기록(교정 후에도 카페명 불일치 = 진짜 문제).
+        await sql`INSERT INTO audit_flags (cafe_id, cafe_name, issue, detail, resolved) VALUES (${r.id}, ${r.name}, ${"근거오염"}, ${`표시 근거후기 카페명 일치율 ${Math.round(coh2 * 100)}%`}, false)
+          ON CONFLICT DO NOTHING`.catch(() => {});
+      }
     }
+    // 교정으로 해소되면(비공개되거나 일치율 회복) 기존 근거오염 플래그 해제.
+    if (resolved) await sql`UPDATE audit_flags SET resolved=true WHERE cafe_id=${r.id} AND issue=${"근거오염"} AND NOT resolved`.catch(() => {});
   }
   return { scanned, healed: healedNames.length, stillBad, names: healedNames.slice(0, 8) };
 }
