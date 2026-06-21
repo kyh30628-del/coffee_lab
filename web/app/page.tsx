@@ -339,9 +339,11 @@ export default function Home() {
   const [stations, setStations] = useState<{ n: string; lat: number; lng: number; c: string[]; r: string[] }[]>([]); // 지하철역(이름,좌표,호선색,호선명)
   const [landmarks, setLandmarks] = useState<[string, number, number, string, number][]>([]); // 랜드마크(이름,위도,경도,아이콘,우선순위)
   const [exits, setExits] = useState<{ lat: number; lng: number; n: string }[]>([]); // 지하철 출구(좌표, 번호)
+  const [lines, setLines] = useState<{ ref: string; color: string; segs: [number, number][][] }[]>([]); // 호선 노선(역 순서 폴리라인, 끊긴 구간 분리)
   useEffect(() => {
     fetch("/data/stations.json").then((r) => r.json()).then((d) => Array.isArray(d) && setStations(d)).catch(() => {});
     fetch("/data/exits.json").then((r) => r.json()).then((d) => Array.isArray(d) && setExits(d)).catch(() => {});
+    fetch("/data/lines.json").then((r) => r.json()).then((d) => Array.isArray(d) && setLines(d)).catch(() => {});
     fetch("/data/landmarks.json").then((r) => r.json()).then((d) => Array.isArray(d) && setLandmarks(d)).catch(() => {});
   }, []);
   const [selected, setSelected] = useState<Cafe | null>(null);
@@ -762,6 +764,23 @@ export default function Home() {
     if (!L || !map || !layerRef.current) return;
     layerRef.current.clearLayers();
 
+    // 🚇 호선 노선 라인 — 가장 아래 깔아 '역들이 호선으로 연결된' 노선도 느낌. z≥11(광역권 윤곽)부터.
+    //   흰 케이싱 위에 호선색 + 둥근 조인 = 전철 노선도 스타일. 비클릭. 화면 안 노선만.
+    {
+      const lz = map.getZoom();
+      if (lines.length && lz >= 11) {
+        const lb = map.getBounds().pad(0.35);
+        const w = lz >= 15 ? 5.5 : lz >= 13 ? 4 : 3;
+        const lineLayer: any[] = [];
+        for (const ln of lines) for (const seg of ln.segs) {
+          if (!seg.some(([la, lo]) => lb.contains([la, lo] as [number, number]))) continue;
+          lineLayer.push(L.polyline(seg, { color: "#ffffff", weight: w + 3, opacity: 0.55, interactive: false, lineJoin: "round", lineCap: "round" }));
+          lineLayer.push(L.polyline(seg, { color: ln.color, weight: w, opacity: lz >= 13 ? 0.78 : 0.62, interactive: false, lineJoin: "round", lineCap: "round" }));
+        }
+        if (lineLayer.length) layerRef.current.addLayer(L.layerGroup(lineLayer));
+      }
+    }
+
     // ===== 📍 내 주변 500m: 현재 위치 + 반경 원 + 500m 이내 카페만 =====
     if (nearMe) {
       const R = 500;
@@ -885,15 +904,24 @@ export default function Home() {
         if (stnLayer.length) layerRef.current.addLayer(L.layerGroup(stnLayer));
       }
       // 지하철 출구 — 더 확대(z≥15)했을 때만, 화면 안 최대 26개. 역 마커보다 위(찾기 쉽게).
+      //   각 출구 → 가장 가까운 역(≈350m 내)으로 점선 커넥터를 깔아 '역-출구가 연결된' 느낌을 준다.
       if (z >= 15 && exits.length) {
         const exs = exits.filter((e) => b.contains([e.lat, e.lng] as [number, number])).slice(0, 26);
-        const exLayer = exs.map((e) => L.marker([e.lat, e.lng], { icon: L.divIcon({ className: "", html: makeExitHtml(e.n), iconSize: [0, 0] }), interactive: false, zIndexOffset: -250 }));
+        const nearStns = stations.filter((s) => b.pad(0.1).contains([s.lat, s.lng] as [number, number]));
+        const links: any[] = [];
+        const exLayer = exs.map((e) => {
+          let best: { lat: number; lng: number } | null = null, bd = Infinity;
+          for (const s of nearStns) { const d = Math.abs(s.lat - e.lat) + Math.abs(s.lng - e.lng); if (d < bd) { bd = d; best = s; } }
+          if (best && bd < 0.006) links.push(L.polyline([[best.lat, best.lng], [e.lat, e.lng]], { color: "#1f5fa8", weight: 1.5, opacity: 0.45, dashArray: "2,3", interactive: false }));
+          return L.marker([e.lat, e.lng], { icon: L.divIcon({ className: "", html: makeExitHtml(e.n), iconSize: [0, 0] }), interactive: false, zIndexOffset: -250 });
+        });
+        if (links.length) layerRef.current.addLayer(L.layerGroup(links));   // 커넥터 먼저(아래)
         if (exLayer.length) layerRef.current.addLayer(L.layerGroup(exLayer));
       }
     }
     layerRef.current.addLayer(L.layerGroup(markers));
     if (focusM) (focusM as any).openPopup();
-  }, [filtered, matchSet, sido, sigungu, dong, focusId, myPinMode, myCafeIds, othersMode, othersPins, cafes, stations, exits, landmarks, nearMe]);
+  }, [filtered, matchSet, sido, sigungu, dong, focusId, myPinMode, myCafeIds, othersMode, othersPins, cafes, stations, exits, lines, landmarks, nearMe]);
 
   // 데이터/지역/모드 변경 시: 화면을 맞춘 뒤 마커를 그린다(맞춘 화면 기준으로 그려짐).
   useEffect(() => {
