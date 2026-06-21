@@ -131,7 +131,8 @@ export default function OwnerPage() {
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
           <a href="/pricing" className="text-[11px] bg-[#e8b87a] text-[#2b2018] rounded-full px-2.5 py-1.5 whitespace-nowrap font-bold">💎 요금제</a>
-          <a href="/cafe/register" className="text-[11px] bg-[#9c6b3f] text-[#f4ece0] rounded-full px-2.5 py-1.5 whitespace-nowrap">📋 등록</a>
+          {/* '내 카페 등록'은 카페가 아직 없는 사장님용 → PIN으로 본인 카페에 들어온 사장님에겐 숨김 */}
+          {!locked && <a href="/cafe/register" className="text-[11px] bg-[#9c6b3f] text-[#f4ece0] rounded-full px-2.5 py-1.5 whitespace-nowrap">📋 등록</a>}
         </div>
       </header>
 

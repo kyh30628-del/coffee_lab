@@ -79,6 +79,7 @@ export default function OwnerSignupModal({ open, onClose, trial = false }: { ope
                 </div>
               )}
             </div>
+            <p className="text-[11px] text-[#8a7458] -mt-0.5 mb-2">내 카페가 목록에 없나요? <a href="/cafe/register" className="text-[#9c6b3f] font-bold underline">카페 등록 신청 →</a> <span className="text-[#bcae98]">(검증 후 분석·체험 이용 가능)</span></p>
             <input value={ownerName} onChange={(e) => setOwnerName(e.target.value)} placeholder="사장님 성함" className="w-full rounded-lg border border-[#d9c9b0] px-3 py-2.5 text-[14px] mb-2 bg-white" />
             <input value={contact} onChange={(e) => setContact(e.target.value)} placeholder="연락처 (전화)" className="w-full rounded-lg border border-[#d9c9b0] px-3 py-2.5 text-[14px] mb-2 bg-white" />
             <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="이메일 (키 받을 주소)" className="w-full rounded-lg border border-[#d9c9b0] px-3 py-2.5 text-[14px] mb-2 bg-white" />

@@ -49,6 +49,9 @@ export default function RegisterPage() {
             보내주신 정보를 확인한 뒤 가이드에 실어드릴게요.
             커피를 아는 사람들에게 사장님 가게가 제대로 소개되도록 정성껏 다듬겠습니다.
           </p>
+          <p className="text-[13px] text-[#8a7458] leading-relaxed mt-3 bg-[#f4ece0] rounded-xl px-4 py-3">
+            가게가 <b>검증·공개</b>되면, 사장님 화면에서 <b>내 카페 분석</b>과 <b>7일 무료 체험</b>을 이용하실 수 있어요. 준비되면 안내드릴게요.
+          </p>
           <a href="/cafe" className="inline-block mt-6 text-[#9c6b3f] underline text-sm">가이드 둘러보기 →</a>
         </div>
         <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet" />
