@@ -163,7 +163,11 @@ const isAreaTok = (t: string) => { const n = norm(t); return n.length >= 2 && (A
 //   - "앤티앤스 스타필드 위례" → ["앤티앤스"] (브랜드 남음 → 몰/신도시 제거)
 //   - "미사강변 북카페" → ["미사강변"] (브랜드 없음 → '미사강변'이 유일 정체성이므로 유지)
 export function coreTokens(name: string, areaTerms: string[]): string[] {
-  const an = areaTerms.map((a) => norm(a)).filter(Boolean);
+  // 행정 접미사(시·군·구·읍·면·동·리)를 뗀 변형도 비교군에 포함 → 지점명에서 나온 병합 지역어
+  //   ('남양주오남점'→'남양주오남')를 areaTerms('남양주시'·'오남읍')와 매칭시켜 식별어에서 제외.
+  //   (프랜차이즈 'OO점'이 같은 지역 다른 업종 'OO점' 리뷰를 끌어오던 동명 오염의 근본 차단)
+  const stripAdmin = (n: string) => { const s = n.replace(/(특별시|광역시|시|군|구|읍|면|동|리)$/, ""); return s.length >= 2 && s !== n ? s : ""; };
+  const an = areaTerms.flatMap((a) => { const n = norm(a); const s = stripAdmin(n); return s ? [n, s] : [n]; }).filter(Boolean);
   // 접미(점·카페 등) 제거 '전' 원본 토큰도 함께 보관 → venue 검사는 원본에도 적용
   // (예: '롯데백화점'에서 '점'이 떨어져 '롯데백화'가 되면 venue 매칭을 빠져나가는 것 방지)
   const parts = name.split(/\s+/)
