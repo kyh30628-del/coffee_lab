@@ -774,7 +774,7 @@ export default function AdminPage() {
                   <div className="flex flex-wrap gap-2">
                     {nlSel.status === "draft" && <button onClick={() => nlAct("approve", nlSel.id)} className="flex-1 py-2 text-[12px] font-bold text-blue-700 bg-blue-50 rounded-lg">✓ 승인</button>}
                     <button onClick={() => nlAct("test", nlSel.id, { email: "kyh30628@gmail.com" })} disabled={!!nlBusy} className="flex-1 py-2 text-[12px] font-bold text-stone-700 bg-stone-100 rounded-lg">📨 미리보기 메일</button>
-                    {nlSel.status === "approved" && <button onClick={() => { if (confirm(`구독+체험 ${nlRecipients}명에게 발송할까요?`)) nlAct("send", nlSel.id); }} disabled={!!nlBusy} className="flex-1 py-2 text-[12px] font-bold text-white bg-emerald-600 rounded-lg">🚀 발송 ({nlRecipients})</button>}
+                    {nlSel.status === "approved" && <button onClick={() => { if (confirm(`구독+체험 ${nlRecipients}명에게 일괄 전송할까요?`)) nlAct("send", nlSel.id); }} disabled={!!nlBusy} className="flex-1 py-2 text-[12px] font-bold text-white bg-emerald-600 rounded-lg">🚀 구독자 일괄 전송 ({nlRecipients}명)</button>}
                     {nlSel.status === "sent" && <span className="flex-1 py-2 text-[12px] font-bold text-emerald-700 text-center">✅ 발송 완료 ({nlSel.sent_count})</span>}
                     <button onClick={() => { if (confirm("삭제할까요?")) { nlAct("delete", nlSel.id); setNlSel(null); } }} className="px-3 py-2 text-[12px] text-rose-600 bg-rose-50 rounded-lg">삭제</button>
                   </div>
