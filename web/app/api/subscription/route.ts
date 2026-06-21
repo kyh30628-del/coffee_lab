@@ -53,6 +53,8 @@ async function ensure() {
   await sql`ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS signup_ip TEXT`;
   await sql`ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS signup_ua TEXT`;
   await sql`ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS verified BOOLEAN DEFAULT false`; // 관리자 서류 대조 완료 표시
+  await sql`ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS suspend_reason TEXT`;            // 사칭/위반 즉시정지 사유(증빙)
+  await sql`ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS suspended_at TIMESTAMPTZ`;
   // 만료 자동 반영: 기간 지난 active → expired + featured 해제
   await sql`UPDATE subscriptions SET status='expired', updated_at=now() WHERE status='active' AND expires_at < now()`;
   await sql`UPDATE cafe_promos SET featured=false WHERE cafe_id IN (SELECT cafe_id FROM subscriptions WHERE status='expired') AND featured_until < now()`;
@@ -63,7 +65,7 @@ export async function GET(req: NextRequest) {
     await ensureSchema(); await ensure();
     if (req.nextUrl.searchParams.get("all")) {
       if (!authed(req)) return NextResponse.json({ ok: false }, { status: 401 });
-      const rows = await sql`SELECT id, cafe_id, cafe_name, owner_name, contact, email, plan, price, status, pin, started_at, expires_at, created_at, biz_reg_url, biz_no, attested, signup_ip, signup_ua, verified FROM subscriptions ORDER BY (status='pending') DESC, created_at DESC LIMIT 200` as unknown as any[];
+      const rows = await sql`SELECT id, cafe_id, cafe_name, owner_name, contact, email, plan, price, status, pin, started_at, expires_at, created_at, biz_reg_url, biz_no, attested, signup_ip, signup_ua, verified, suspend_reason, suspended_at FROM subscriptions ORDER BY (status='pending') DESC, created_at DESC LIMIT 200` as unknown as any[];
       return NextResponse.json({ ok: true, subs: rows.map((r) => ({ ...r, contact: decryptPII(r.contact), email: decryptPII(r.email) })) });
     }
     // 사장님: 본인 카페 구독 상태
@@ -109,6 +111,13 @@ export async function POST(req: NextRequest) {
         await sql`UPDATE subscriptions SET status='cancelled', updated_at=now() WHERE id=${id}`;
         if (s.cafe_id) await sql`UPDATE cafe_promos SET featured=false, featured_until=NULL WHERE cafe_id=${s.cafe_id}`;
         return NextResponse.json({ ok: true, status: "cancelled" });
+      }
+      // 🚫 사칭·위반 즉시정지 — PIN 접근 즉시 차단(owner-auth가 active만 허용) + 우선노출 OFF. 기록은 증빙 보존(삭제 안 함).
+      if (b.action === "suspend") {
+        const reason = String(b.reason ?? "").slice(0, 300);
+        await sql`UPDATE subscriptions SET status='suspended', suspend_reason=${reason}, suspended_at=now(), updated_at=now() WHERE id=${id}`;
+        if (s.cafe_id) await sql`UPDATE cafe_promos SET featured=false, featured_until=NULL WHERE cafe_id=${s.cafe_id}`;
+        return NextResponse.json({ ok: true, status: "suspended" });
       }
       return NextResponse.json({ ok: false, error: "알 수 없는 action" }, { status: 400 });
     }

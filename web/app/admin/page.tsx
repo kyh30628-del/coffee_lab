@@ -57,7 +57,8 @@ export default function AdminPage() {
   const [showVisits, setShowVisits] = useState(false);
   const [visits, setVisits] = useState<any>(null);
   const loadSubscribers = (password: string) => fetch("/api/subscription?all=1", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) setSubscribers(d.subs ?? []); }).catch(() => {});
-  const subAct = async (id: number, action: string, days?: number) => { try { await fetch("/api/subscription", { method: "POST", headers: { "x-admin-password": pw, "Content-Type": "application/json" }, body: JSON.stringify({ id, action, ...(days ? { days } : {}) }) }); loadSubscribers(pw); fetch("/api/judge-status", { headers: { "x-admin-password": pw } }); } catch {} };
+  const subAct = async (id: number, action: string, days?: number, reason?: string) => { try { await fetch("/api/subscription", { method: "POST", headers: { "x-admin-password": pw, "Content-Type": "application/json" }, body: JSON.stringify({ id, action, ...(days ? { days } : {}), ...(reason ? { reason } : {}) }) }); loadSubscribers(pw); fetch("/api/judge-status", { headers: { "x-admin-password": pw } }); } catch {} };
+  const suspendSub = (id: number, cafe: string) => { const reason = window.prompt(`🚫 "${cafe}" 이용 즉시정지\n사칭/위반 사유를 적어주세요(증빙으로 기록됩니다). PIN 접근·우선노출이 즉시 차단됩니다.`); if (reason != null) subAct(id, "suspend", undefined, reason || "사유 미기재"); };
   // '오늘의 수집' 카드 클릭 → 그 지표에 해당하는 카페 목록을 모달로(orchestrator와 동일 KST 필터).
   const openToday = (metric: string, label: string) => {
     if (!metric) return;
@@ -656,8 +657,8 @@ export default function AdminPage() {
             <div className="space-y-2">
               {subscribers.map((s) => {
                 const dleft = s.expires_at ? Math.max(0, Math.ceil((new Date(s.expires_at).getTime() - Date.now()) / 86400000)) : null;
-                const stColor = s.status === "active" ? "text-emerald-600" : s.status === "pending" ? "text-amber-600" : "text-stone-400";
-                const stLabel = s.status === "active" ? "활성" : s.status === "pending" ? "대기" : s.status === "expired" ? "만료" : s.status === "cancelled" ? "해지" : s.status;
+                const stColor = s.status === "active" ? "text-emerald-600" : s.status === "pending" ? "text-amber-600" : s.status === "suspended" ? "text-rose-600" : "text-stone-400";
+                const stLabel = s.status === "active" ? "활성" : s.status === "pending" ? "대기" : s.status === "expired" ? "만료" : s.status === "cancelled" ? "해지" : s.status === "suspended" ? "🚫 정지" : s.status;
                 return (
                   <div key={s.id} className="bg-white rounded-xl border border-amber-200 p-3">
                     <div className="min-w-0">
@@ -679,7 +680,9 @@ export default function AdminPage() {
                       {s.status !== "active" && <button onClick={() => subAct(s.id, "activate", 30)} className="flex-1 py-1.5 text-[12px] font-bold text-emerald-700 bg-emerald-50 rounded-lg">✓ 구독 승인(30일)</button>}
                       {s.status === "active" && <button onClick={() => subAct(s.id, "extend", 30)} className="flex-1 py-1.5 text-[12px] font-bold text-stone-700 bg-stone-100 rounded-lg">+30일 연장</button>}
                       {s.status === "active" && <button onClick={() => subAct(s.id, "cancel")} className="flex-1 py-1.5 text-[12px] text-rose-600 bg-rose-50 rounded-lg">해지</button>}
+                      {s.status !== "suspended" && s.status !== "cancelled" && <button onClick={() => suspendSub(s.id, s.cafe_name)} className="flex-1 py-1.5 text-[12px] font-bold text-white bg-rose-600 rounded-lg">🚫 사칭/위반 즉시정지</button>}
                     </div>
+                    {s.status === "suspended" && s.suspend_reason && <div className="mt-2 text-[11px] text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-2 py-1.5">🚫 정지 사유: {s.suspend_reason}{s.suspended_at ? ` · ${new Date(s.suspended_at).toLocaleString("ko-KR")}` : ""}</div>}
                   </div>
                 );
               })}

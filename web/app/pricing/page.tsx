@@ -56,6 +56,11 @@ export default function Pricing() {
         </div>
 
         <p className="text-[11px] text-[#8a7458] text-center leading-relaxed">소비자에게 보여지는 후기·등급은 모든 카페가 동일하게 검증됩니다. 홍보팩은 <b>노출·홍보 도구</b>이며, 후기 평가를 돈으로 바꾸지 않습니다.</p>
+        <div className="mt-4 flex justify-center gap-3 text-[11px] text-[#9c6b3f]">
+          <a href="/business" className="underline">사업자정보·환불정책</a>
+          <a href="/terms" className="underline">이용약관</a>
+          <a href="/privacy" className="underline">개인정보처리방침</a>
+        </div>
       </div>
 
       <OwnerSignupModal open={open} onClose={() => setOpen(false)} trial={trial} />
