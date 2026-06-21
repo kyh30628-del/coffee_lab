@@ -1053,13 +1053,18 @@ export default function Home() {
         <div className="dcn-cup mb-5">
           <h1 className="dcn-title text-[2.9rem] sm:text-[3.3rem] leading-[1.12] font-bold tracking-tight">동네 커피 노트</h1>
         </div>
-        <p className="dcn-rise text-[16px] text-[#f4ece0] mb-2 text-center leading-relaxed font-bold" style={{ animationDelay: ".05s" }}>별점 말고, <span className="text-[#e8b87a]">검증된 후기</span>로 고르세요.</p>
-        <p className="dcn-rise text-[15px] text-[#f4ece0] mb-2 text-center leading-relaxed font-bold" style={{ animationDelay: ".1s" }}>그리고 <span className="text-[#e8b87a]">내 카페의 추억</span>을 <span style={{ color: "#d6336c" }}>❤</span>로 간직하세요.</p>
-        <p className="dcn-rise text-[13px] text-[#cbb89f] mb-10 text-center leading-relaxed" style={{ animationDelay: ".14s" }}>광고·협찬·무관한 글은 버리고 <b className="text-[#f4ece0]">진짜 방문 후기</b>만 가려내고,<br />내가 다녀온 카페의 <b className="text-[#f4ece0]">추억</b>은 지도에 기록해 간직·공유해요.</p>
+        <p className="dcn-rise text-[17px] text-[#f4ece0] mb-1.5 text-center leading-snug font-bold" style={{ animationDelay: ".05s" }}>별점도 광고도 아닌, <span className="text-[#e8b87a]">진짜 후기</span>.</p>
+        <p className="dcn-rise text-[15px] text-[#f4ece0] mb-2 text-center leading-relaxed font-bold" style={{ animationDelay: ".1s" }}>우리 동네에서 <span className="text-[#e8b87a]">오늘 내 기분에 맞는 카페</span>를 골라드려요.</p>
+        <p className="dcn-rise text-[13px] text-[#cbb89f] mb-5 text-center leading-relaxed" style={{ animationDelay: ".14s" }}>네이버·구글·유튜브 진짜 후기만 교차검증해 <b className="text-[#f4ece0]">협찬·가짜 후기는 빼고</b> — 작업·조용·디저트, <b className="text-[#f4ece0]">내 취향</b>대로. 마음에 든 곳은 <span style={{ color: "#d6336c" }}>❤</span>로 기록해 <b className="text-[#f4ece0]">나만의 동네 지도</b>를 만들어요.</p>
+        <div className="dcn-rise flex flex-wrap justify-center gap-1.5 mb-8 max-w-xs" style={{ animationDelay: ".16s" }}>
+          {[["🚫", "광고·가짜후기 없음"], ["📍", "우리 동네·내 취향"], ["☕", "카페만, 깊게"]].map(([e, t]) => (
+            <span key={t} className="text-[11.5px] text-[#e8b87a] border border-[#5b4636] rounded-full px-2.5 py-1 whitespace-nowrap">{e} {t}</span>
+          ))}
+        </div>
         <div className="dcn-rise w-full max-w-sm space-y-3" style={{ animationDelay: ".18s" }}>
           <button onClick={chooseConsumer} className="w-full bg-[#f4ece0] text-[#2b2018] rounded-2xl py-5 px-5 text-left shadow-lg active:scale-[0.99] transition">
-            <div className="text-lg font-bold">☕ 소비자로 시작하기</div>
-            <div className="text-[12px] text-[#7c6a55] mt-0.5">진짜 후기로 고른 우리 동네 카페</div>
+            <div className="text-lg font-bold">☕ 우리 동네 카페 보러가기</div>
+            <div className="text-[12px] text-[#7c6a55] mt-0.5">진짜 후기로 검증 · 내 취향에 딱 맞게</div>
           </button>
           <button onClick={() => { setOwnerPw(""); setOwnerErr(""); setOwnerPin(""); setOwnerPinErr(""); setOwnerAdminMode(false); setOwnerPwModal(true); }} className="w-full border border-[#9c6b3f] text-[#f4ece0] rounded-2xl py-5 px-5 text-left active:scale-[0.99] transition">
             <div className="text-lg font-bold">🏪 사장님으로 시작하기</div>
