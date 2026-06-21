@@ -87,6 +87,7 @@ async function ensure() {
   await sql`ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS verified BOOLEAN DEFAULT false`; // 관리자 서류 대조 완료 표시
   await sql`ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS suspend_reason TEXT`;            // 사칭/위반 즉시정지 사유(증빙)
   await sql`ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS suspended_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS newsletter_opt_in BOOLEAN DEFAULT true`; // 주간 뉴스레터 수신동의
   // 만료 자동 반영: 기간 지난 active → expired + featured 해제
   await sql`UPDATE subscriptions SET status='expired', updated_at=now() WHERE status='active' AND expires_at < now()`;
   await sql`UPDATE cafe_promos SET featured=false WHERE cafe_id IN (SELECT cafe_id FROM subscriptions WHERE status='expired') AND featured_until < now()`;
@@ -185,9 +186,10 @@ export async function POST(req: NextRequest) {
     const isTrial = !!b.trial;                          // 7일 무료 체험 신청 — 관리자가 7일로 승인
     const plan = isTrial ? "7일 체험" : PLAN;
     const price = isTrial ? 0 : PRICE;
-    await sql`INSERT INTO subscriptions (cafe_id, cafe_name, owner_name, contact, email, plan, price, status, consent, consent_at, biz_reg_url, biz_no, attested, attested_at, signup_ip, signup_ua)
-      VALUES (${cafeId}, ${cafeName}, ${ownerName}, ${encryptPII(contact)}, ${encryptPII(email)}, ${plan}, ${price}, 'pending', true, now(), ${bizRegUrl}, ${bizNo}, true, now(), ${ip}, ${ua})
-      ON CONFLICT (cafe_id) DO UPDATE SET owner_name=${ownerName}, contact=${encryptPII(contact)}, email=${encryptPII(email)}, plan=${plan}, price=${price}, biz_reg_url=${bizRegUrl}, biz_no=${bizNo}, attested=true, attested_at=now(), signup_ip=${ip}, signup_ua=${ua}, verified=false, status='pending', updated_at=now()`;
+    const optIn = b.newsletter !== false;   // 뉴스레터 수신동의(기본 true)
+    await sql`INSERT INTO subscriptions (cafe_id, cafe_name, owner_name, contact, email, plan, price, status, consent, consent_at, biz_reg_url, biz_no, attested, attested_at, signup_ip, signup_ua, newsletter_opt_in)
+      VALUES (${cafeId}, ${cafeName}, ${ownerName}, ${encryptPII(contact)}, ${encryptPII(email)}, ${plan}, ${price}, 'pending', true, now(), ${bizRegUrl}, ${bizNo}, true, now(), ${ip}, ${ua}, ${optIn})
+      ON CONFLICT (cafe_id) DO UPDATE SET owner_name=${ownerName}, contact=${encryptPII(contact)}, email=${encryptPII(email)}, plan=${plan}, price=${price}, biz_reg_url=${bizRegUrl}, biz_no=${bizNo}, attested=true, attested_at=now(), signup_ip=${ip}, signup_ua=${ua}, newsletter_opt_in=${optIn}, verified=false, status='pending', updated_at=now()`;
     return NextResponse.json({ ok: true });
   } catch (e) { return NextResponse.json({ ok: false, error: String(e) }, { status: 500 }); }
 }

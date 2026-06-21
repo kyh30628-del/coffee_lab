@@ -15,6 +15,7 @@ export default function OwnerSignupModal({ open, onClose, trial = false, prefill
   const [bizRegName, setBizRegName] = useState("");
   const [consent, setConsent] = useState(false);
   const [attest, setAttest] = useState(false);            // 사업주 본인확인 법적 동의
+  const [news, setNews] = useState(true);                 // 주간 뉴스레터 수신동의(선택, 기본 ON)
   const [done, setDone] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -44,7 +45,7 @@ export default function OwnerSignupModal({ open, onClose, trial = false, prefill
     if (!canSubmit) return;
     setBusy(true); setErr("");
     try {
-      const r = await fetch("/api/subscription", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cafeId: picked!.id, cafeName: picked!.name, ownerName, contact, email, bizNo, bizRegBase64, consent: true, attest: true, trial }) });
+      const r = await fetch("/api/subscription", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cafeId: picked!.id, cafeName: picked!.name, ownerName, contact, email, bizNo, bizRegBase64, consent: true, attest: true, newsletter: news, trial }) });
       const d = await r.json();
       if (d.ok) setDone(true);
       else setErr(d.error || "신청에 실패했어요");
@@ -110,6 +111,10 @@ export default function OwnerSignupModal({ open, onClose, trial = false, prefill
             <label className="flex items-start gap-2 mb-3 cursor-pointer">
               <input type="checkbox" checked={attest} onChange={(e) => setAttest(e.target.checked)} className="mt-0.5 shrink-0" />
               <span className="text-[11.5px] text-[#52402e] leading-snug"><b>(필수)</b> 본인은 <b>해당 매장의 사업주 또는 정당한 운영 권한자</b>이며, 제출한 사업자등록증이 진본임을 확인합니다. <b>허위·사칭 신청 시</b> 이용이 제한되고 관련 법령에 따라 민·형사상 책임을 질 수 있음에 동의합니다.</span>
+            </label>
+            <label className="flex items-start gap-2 mb-3 cursor-pointer">
+              <input type="checkbox" checked={news} onChange={(e) => setNews(e.target.checked)} className="mt-0.5 shrink-0" />
+              <span className="text-[11.5px] text-[#52402e] leading-snug"><b>(선택)</b> 📰 <b>주간 커피·디저트 트렌드 뉴스레터</b> 받기. 광고성 정보 수신에 동의합니다(언제든 메일 하단 <b>수신거부</b> 가능).</span>
             </label>
             {err && <p className="text-[12px] text-[#c0392b] mb-2">{err}</p>}
             <button disabled={busy || !canSubmit} onClick={submit} className="w-full bg-[#e8b87a] text-[#2b2018] rounded-lg py-3 font-bold disabled:opacity-50">{busy ? "신청 중…" : trial ? "7일 체험 신청" : "구독 신청"}</button>
