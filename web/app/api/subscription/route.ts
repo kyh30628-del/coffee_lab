@@ -112,9 +112,12 @@ export async function POST(req: NextRequest) {
     const email = String(b.email ?? "").trim().slice(0, 120);
     if (!cafeId || !ownerName || !contact) return NextResponse.json({ ok: false, error: "카페·이름·연락처 필요" }, { status: 400 });
     if (!b.consent) return NextResponse.json({ ok: false, error: "개인정보 동의 필요" }, { status: 400 });
+    const isTrial = !!b.trial;                          // 7일 무료 체험 신청 — 관리자가 7일로 승인
+    const plan = isTrial ? "7일 체험" : PLAN;
+    const price = isTrial ? 0 : PRICE;
     await sql`INSERT INTO subscriptions (cafe_id, cafe_name, owner_name, contact, email, plan, price, status, consent, consent_at)
-      VALUES (${cafeId}, ${cafeName}, ${ownerName}, ${encryptPII(contact)}, ${encryptPII(email)}, ${PLAN}, ${PRICE}, 'pending', true, now())
-      ON CONFLICT (cafe_id) DO UPDATE SET owner_name=${ownerName}, contact=${encryptPII(contact)}, email=${encryptPII(email)}, status=CASE WHEN subscriptions.status='active' THEN 'active' ELSE 'pending' END, updated_at=now()`;
+      VALUES (${cafeId}, ${cafeName}, ${ownerName}, ${encryptPII(contact)}, ${encryptPII(email)}, ${plan}, ${price}, 'pending', true, now())
+      ON CONFLICT (cafe_id) DO UPDATE SET owner_name=${ownerName}, contact=${encryptPII(contact)}, email=${encryptPII(email)}, plan=${plan}, price=${price}, status=CASE WHEN subscriptions.status='active' THEN 'active' ELSE 'pending' END, updated_at=now()`;
     return NextResponse.json({ ok: true });
   } catch (e) { return NextResponse.json({ ok: false, error: String(e) }, { status: 500 }); }
 }

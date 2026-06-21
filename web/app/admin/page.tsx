@@ -57,7 +57,7 @@ export default function AdminPage() {
   const [showVisits, setShowVisits] = useState(false);
   const [visits, setVisits] = useState<any>(null);
   const loadSubscribers = (password: string) => fetch("/api/subscription?all=1", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) setSubscribers(d.subs ?? []); }).catch(() => {});
-  const subAct = async (id: number, action: string) => { try { await fetch("/api/subscription", { method: "POST", headers: { "x-admin-password": pw, "Content-Type": "application/json" }, body: JSON.stringify({ id, action }) }); loadSubscribers(pw); fetch("/api/judge-status", { headers: { "x-admin-password": pw } }); } catch {} };
+  const subAct = async (id: number, action: string, days?: number) => { try { await fetch("/api/subscription", { method: "POST", headers: { "x-admin-password": pw, "Content-Type": "application/json" }, body: JSON.stringify({ id, action, ...(days ? { days } : {}) }) }); loadSubscribers(pw); fetch("/api/judge-status", { headers: { "x-admin-password": pw } }); } catch {} };
   // '오늘의 수집' 카드 클릭 → 그 지표에 해당하는 카페 목록을 모달로(orchestrator와 동일 KST 필터).
   const openToday = (metric: string, label: string) => {
     if (!metric) return;
@@ -667,8 +667,9 @@ export default function AdminPage() {
                       {s.status === "active" && s.pin && <div className="text-[12px] mt-1">🔑 PIN <b className="font-mono tracking-wider text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">{s.pin}</b> <span className="text-[10px] text-stone-400">(이메일 발송 · 사장님 로그인용)</span></div>}
                     </div>
                     <div className="flex gap-2 mt-2">
-                      {s.status !== "active" && <button onClick={() => subAct(s.id, "activate")} className="flex-1 py-1.5 text-[12px] font-bold text-emerald-700 bg-emerald-50 rounded-lg">✓ 활성화(30일)</button>}
-                      {s.status === "active" && <button onClick={() => subAct(s.id, "extend")} className="flex-1 py-1.5 text-[12px] font-bold text-stone-700 bg-stone-100 rounded-lg">+30일 연장</button>}
+                      {s.status !== "active" && <button onClick={() => subAct(s.id, "activate", 7)} className="flex-1 py-1.5 text-[12px] font-bold text-blue-700 bg-blue-50 rounded-lg">✓ 체험 승인(7일)</button>}
+                      {s.status !== "active" && <button onClick={() => subAct(s.id, "activate", 30)} className="flex-1 py-1.5 text-[12px] font-bold text-emerald-700 bg-emerald-50 rounded-lg">✓ 구독 승인(30일)</button>}
+                      {s.status === "active" && <button onClick={() => subAct(s.id, "extend", 30)} className="flex-1 py-1.5 text-[12px] font-bold text-stone-700 bg-stone-100 rounded-lg">+30일 연장</button>}
                       {s.status === "active" && <button onClick={() => subAct(s.id, "cancel")} className="flex-1 py-1.5 text-[12px] text-rose-600 bg-rose-50 rounded-lg">해지</button>}
                     </div>
                   </div>

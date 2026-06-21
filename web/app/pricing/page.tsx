@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import BackLink from "../BackLink";
+import OwnerSignupModal from "../OwnerSignupModal";
 
 const FREE = ["카페 정보 등록·보완", "검색·지도 기본 노출", "후기 요약 열람"];
 const PRO = [
@@ -13,32 +14,7 @@ const PRO = [
 
 export default function Pricing() {
   const [open, setOpen] = useState(false);
-  const [cafeQ, setCafeQ] = useState("");
-  const [sug, setSug] = useState<{ id: number; name: string; area: string }[]>([]);
-  const [picked, setPicked] = useState<{ id: number; name: string } | null>(null);
-  const [ownerName, setOwnerName] = useState("");
-  const [contact, setContact] = useState("");
-  const [email, setEmail] = useState("");
-  const [consent, setConsent] = useState(false);
-  const [done, setDone] = useState(false);
-  const [busy, setBusy] = useState(false);
-
-  const onCafeQ = async (v: string) => {
-    setCafeQ(v); setPicked(null);
-    if (v.trim().length < 1) { setSug([]); return; }
-    try { const d = await (await fetch(`/api/cafe-names?q=${encodeURIComponent(v.trim())}`)).json(); setSug(d.cafes ?? []); } catch {}
-  };
-
-  const submit = async () => {
-    if (!picked || !ownerName.trim() || !contact.trim() || !email.trim() || !consent) return;
-    setBusy(true);
-    try {
-      const r = await fetch("/api/subscription", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cafeId: picked.id, cafeName: picked.name, ownerName, contact, email, consent: true }) });
-      const d = await r.json();
-      if (d.ok) setDone(true);
-    } catch {}
-    setBusy(false);
-  };
+  const [trial, setTrial] = useState(false);
 
   return (
     <main className="min-h-screen bg-[#f4ece0] text-[#2b2018]" style={{ fontFamily: "'Gowun Batang', serif" }}>
@@ -66,8 +42,9 @@ export default function Pricing() {
           <div className="mb-3"><span className="text-2xl font-bold text-[#e8b87a]">₩9,900</span><span className="text-[12px] text-[#cbb89f]"> / 월</span></div>
           <ul className="space-y-1.5 text-[13px]">{PRO.map((f) => <li key={f} className="text-[#f0e6d4]">{f}</li>)}</ul>
           <div className="mt-4 bg-black/25 rounded-lg px-3 py-2 text-[11.5px] text-[#e8b87a] text-center">🔥 우리 동네 <b>추천 6자리 한정</b> · 자리 차면 대기</div>
-          <button onClick={() => setOpen(true)} className="w-full mt-3 bg-[#e8b87a] text-[#2b2018] rounded-lg py-3 font-bold">구독 신청하기</button>
-          <p className="text-[10.5px] text-[#cbb89f] mt-2 text-center">신청하면 결제·세팅을 안내해 드려요</p>
+          <button onClick={() => { setTrial(true); setOpen(true); }} className="w-full mt-3 bg-white text-[#2b2018] rounded-lg py-3 font-bold">✨ 7일 무료 체험</button>
+          <button onClick={() => { setTrial(false); setOpen(true); }} className="w-full mt-2 bg-[#e8b87a] text-[#2b2018] rounded-lg py-3 font-bold">구독 신청하기</button>
+          <p className="text-[10.5px] text-[#cbb89f] mt-2 text-center">체험은 결제 없이 7일 · 신청하면 결제·세팅을 안내해 드려요</p>
         </div>
 
         {/* 프리미엄(준비중) */}
@@ -81,46 +58,7 @@ export default function Pricing() {
         <p className="text-[11px] text-[#8a7458] text-center leading-relaxed">소비자에게 보여지는 후기·등급은 모든 카페가 동일하게 검증됩니다. 홍보팩은 <b>노출·홍보 도구</b>이며, 후기 평가를 돈으로 바꾸지 않습니다.</p>
       </div>
 
-      {/* 구독 신청 모달 */}
-      {open && (
-        <div className="fixed inset-0 z-[5000]" onClick={() => setOpen(false)}>
-          <div className="absolute inset-0 bg-black/45" />
-          <div className="absolute inset-x-0 bottom-0 sm:inset-0 sm:m-auto sm:w-[360px] sm:h-fit bg-[#fdfaf4] rounded-t-2xl sm:rounded-2xl p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            {done ? (
-              <div className="text-center py-6">
-                <div className="text-3xl mb-2">🎉</div>
-                <div className="font-bold text-[#2b2018] mb-1">구독 신청 완료</div>
-                <p className="text-[13px] text-[#6b5a48]">관리자 승인 후 <b>등록하신 이메일로 PIN 번호</b>가 발송돼요. 그 PIN으로 사장님 화면에 로그인하시면 내 카페로 바로 들어갑니다.</p>
-                <button onClick={() => { setOpen(false); setDone(false); setPicked(null); setCafeQ(""); setOwnerName(""); setContact(""); setEmail(""); }} className="w-full mt-5 bg-[#2b2018] text-[#f4ece0] rounded-lg py-2.5 text-sm">닫기</button>
-              </div>
-            ) : (
-              <>
-                <h3 className="font-bold text-[#2b2018] text-lg mb-1">홍보팩 구독 신청 <span className="text-[#9c6b3f] text-[14px]">₩9,900/월</span></h3>
-                <p className="text-[12px] text-[#6b5a48] mb-3">내 카페를 선택하고 정보를 남겨주세요. 승인되면 <b>이메일로 PIN</b>을 보내드려요.</p>
-                <div className="relative mb-2">
-                  <input value={picked ? picked.name : cafeQ} onChange={(e) => onCafeQ(e.target.value)} placeholder="내 카페 이름 검색" className="w-full rounded-lg border border-[#d9c9b0] px-3 py-2.5 text-[14px] bg-white" />
-                  {picked && <span className="absolute right-3 top-2.5 text-[12px] text-emerald-600 font-bold">✓ 선택됨</span>}
-                  {!picked && sug.length > 0 && (
-                    <div className="absolute z-10 left-0 right-0 mt-1 bg-white border border-[#d9c9b0] rounded-lg shadow-lg max-h-44 overflow-y-auto">
-                      {sug.map((c) => (
-                        <button key={c.id} onClick={() => { setPicked({ id: c.id, name: c.name }); setSug([]); }} className="w-full text-left px-3 py-2 text-[13px] hover:bg-[#f4ece0] border-b border-[#f0e6d4] last:border-0"><b>{c.name}</b> <span className="text-[11px] text-[#a8927a]">{c.area}</span></button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <input value={ownerName} onChange={(e) => setOwnerName(e.target.value)} placeholder="사장님 성함" className="w-full rounded-lg border border-[#d9c9b0] px-3 py-2.5 text-[14px] mb-2 bg-white" />
-                <input value={contact} onChange={(e) => setContact(e.target.value)} placeholder="연락처 (전화)" className="w-full rounded-lg border border-[#d9c9b0] px-3 py-2.5 text-[14px] mb-2 bg-white" />
-                <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="이메일 (PIN 받을 주소)" className="w-full rounded-lg border border-[#d9c9b0] px-3 py-2.5 text-[14px] mb-3 bg-white" />
-                <label className="flex items-start gap-2 mb-3 cursor-pointer">
-                  <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5 shrink-0" />
-                  <span className="text-[11.5px] text-[#52402e] leading-snug"><b>(필수)</b> 구독 관리·PIN 발송을 위한 개인정보 수집·이용 동의. 연락처·이메일은 <b>암호화 저장</b>됩니다. <a href="/privacy" target="_blank" className="text-[#9c6b3f] underline">방침</a></span>
-                </label>
-                <button disabled={busy || !picked || !ownerName.trim() || !contact.trim() || !email.trim() || !consent} onClick={submit} className="w-full bg-[#e8b87a] text-[#2b2018] rounded-lg py-3 font-bold disabled:opacity-50">{busy ? "신청 중…" : "구독 신청"}</button>
-              </>
-            )}
-          </div>
-        </div>
-      )}
+      <OwnerSignupModal open={open} onClose={() => setOpen(false)} trial={trial} />
       <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet" />
     </main>
   );

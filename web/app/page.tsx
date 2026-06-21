@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
 import InfoDot from "./InfoDot";
 import ShowcaseBanner, { SHOWCASE_CSS } from "./ShowcaseBanner";
+import OwnerSignupModal from "./OwnerSignupModal";
 
 type EvidenceReview = { quote: string; link?: string; source?: string; date?: string; trust?: "verified" | "reference" | "rejected"; score?: number; why?: string[] };
 type QualityStats = { raw: number; verified: number; reference: number; rejected: number; duplicates?: number; rejectReasons?: Record<string, number> };
@@ -415,6 +416,10 @@ export default function Home() {
   const [ownerPwModal, setOwnerPwModal] = useState(false);
   const [ownerPw, setOwnerPw] = useState("");
   const [ownerErr, setOwnerErr] = useState("");
+  const [ownerPin, setOwnerPin] = useState("");        // 사장님 키(PIN) 로그인
+  const [ownerPinErr, setOwnerPinErr] = useState("");
+  const [ownerAdminMode, setOwnerAdminMode] = useState(false); // 모달 내 '관리자 로그인' 토글
+  const [showSignup, setShowSignup] = useState(false); // 7일 체험 신청 모달
   const [backToast, setBackToast] = useState(false);
   // 지도용 상태
   const [tasteKey, setTasteKey] = useState<string | null>(null);
@@ -541,11 +546,12 @@ export default function Home() {
   const openById = useCallback((id: number) => { const c = cafes.find((x) => x.id === id); if (c) setSelected(c); }, [cafes]);
 
   // 뒤로가기 가드: 현재 UI 레이어를 ref로 추적(리스너에서 최신값 참조)
-  const uiRef = useRef<{ selected: boolean; showSearch: boolean; showConsent: boolean; tab: string; role: string | null; ownerPwModal: boolean; sido: string; sigungu: string; dong: string; nearMe: boolean }>({ selected: false, showSearch: false, showConsent: false, tab: "home", role: null, ownerPwModal: false, sido: "", sigungu: "", dong: "", nearMe: false });
-  uiRef.current = { selected: !!selected, showSearch, showConsent, tab, role, ownerPwModal, sido, sigungu, dong, nearMe: !!nearMe };
+  const uiRef = useRef<{ selected: boolean; showSearch: boolean; showConsent: boolean; tab: string; role: string | null; ownerPwModal: boolean; showSignup: boolean; sido: string; sigungu: string; dong: string; nearMe: boolean }>({ selected: false, showSearch: false, showConsent: false, tab: "home", role: null, ownerPwModal: false, showSignup: false, sido: "", sigungu: "", dong: "", nearMe: false });
+  uiRef.current = { selected: !!selected, showSearch, showConsent, tab, role, ownerPwModal, showSignup, sido, sigungu, dong, nearMe: !!nearMe };
   // 위에서 연 레이어를 우선순위대로 즉시 닫는다(공통). allowMapBack=false면 지도→홈은 건너뜀(지도 패닝과 충돌 방지).
   const closeTopLayer = (allowMapBack = true) => {
     const u = uiRef.current;
+    if (u.showSignup) { setShowSignup(false); return true; }
     if (u.ownerPwModal) { setOwnerPwModal(false); return true; }
     if (u.showSearch) { setShowSearch(false); return true; }
     if (u.selected) { setSelected(null); return true; }
@@ -984,6 +990,22 @@ export default function Home() {
       setOwnerPwModal(false); setRole("owner");
     } catch { setOwnerErr("네트워크 오류"); }
   };
+  // 사장님 키(PIN) 로그인 — 발급받은 키로 본인 카페 분석 화면(/owner)으로 바로 진입.
+  const submitOwnerPin = async () => {
+    setOwnerPinErr("");
+    const pin = ownerPin.trim().toUpperCase();
+    if (pin.length < 6) { setOwnerPinErr("키(PIN)를 입력하세요"); return; }
+    try {
+      const r = await fetch("/api/owner-auth", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pin }) });
+      const d = await r.json();
+      if (!d.ok) { setOwnerPinErr(d.error ?? "유효하지 않은 키예요"); return; }
+      try {
+        sessionStorage.setItem("dcn_owner_pin", pin);
+        sessionStorage.setItem("dcn_owner_cafe", JSON.stringify({ id: d.cafeId, name: d.cafeName }));
+      } catch {}
+      window.location.href = "/owner"; // 내 카페 분석으로 바로
+    } catch { setOwnerPinErr("네트워크 오류"); }
+  };
 
   // ── 랜딩(초기화면): 소비자 / 사장님 분리 ──
   if (role === null) {
@@ -1031,9 +1053,9 @@ export default function Home() {
             <div className="text-lg font-bold">☕ 소비자로 시작하기</div>
             <div className="text-[12px] text-[#7c6a55] mt-0.5">진짜 후기로 고른 우리 동네 카페</div>
           </button>
-          <button onClick={() => { setOwnerPw(""); setOwnerErr(""); setOwnerPwModal(true); }} className="w-full border border-[#9c6b3f] text-[#f4ece0] rounded-2xl py-5 px-5 text-left active:scale-[0.99] transition">
+          <button onClick={() => { setOwnerPw(""); setOwnerErr(""); setOwnerPin(""); setOwnerPinErr(""); setOwnerAdminMode(false); setOwnerPwModal(true); }} className="w-full border border-[#9c6b3f] text-[#f4ece0] rounded-2xl py-5 px-5 text-left active:scale-[0.99] transition">
             <div className="text-lg font-bold">🏪 사장님으로 시작하기</div>
-            <div className="text-[12px] text-[#cbb89f] mt-0.5">검증된 후기로 내 카페 경쟁력 진단</div>
+            <div className="text-[12px] text-[#cbb89f] mt-0.5">검증된 후기로 내 카페 경쟁력 진단 · <b className="text-[#e8b87a]">7일 무료 체험</b></div>
           </button>
         </div>
         <p className="text-[10px] text-[#8a7458] mt-10 text-center leading-relaxed">네이버·구글·유튜브 공개 후기 교차검증 + AI 맥락 판정<br />광고·협찬·무관 글은 자동 제외</p>
@@ -1046,18 +1068,40 @@ export default function Home() {
           <div className="fixed inset-0 z-[5000] flex items-center justify-center px-6">
             <div className="absolute inset-0 bg-black/50" onClick={() => setOwnerPwModal(false)} />
             <div className="relative bg-[#fdfaf4] text-[#2b2018] w-full max-w-sm rounded-2xl p-6 shadow-2xl">
-              <h3 className="text-lg font-bold mb-1">🔒 사장님 인증</h3>
-              <p className="text-[13px] text-[#6b5a48] mb-3">관리자 비밀번호를 입력하세요.</p>
-              <input autoFocus type="password" value={ownerPw} onChange={(e) => setOwnerPw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submitOwner()}
-                placeholder="관리자 비밀번호" className="w-full border border-[#cbb89f] rounded-lg px-3 py-2.5 text-base bg-white mb-2" />
-              {ownerErr && <p className="text-[12px] text-[#c0392b] mb-2">{ownerErr}</p>}
-              <div className="flex gap-2">
-                <button onClick={submitOwner} className="flex-1 bg-[#2b2018] text-[#f4ece0] rounded-xl py-2.5 font-medium">확인</button>
-                <button onClick={() => setOwnerPwModal(false)} className="px-4 text-[#9c6b3f]">취소</button>
-              </div>
+              {/* 우측 상단: 7일 무료 체험 */}
+              <button onClick={() => setShowSignup(true)} className="absolute top-4 right-4 text-[11px] font-bold bg-[#e8b87a] text-[#2b2018] px-3 py-1.5 rounded-full shadow active:scale-95">✨ 7일 무료 체험</button>
+              {ownerAdminMode ? (
+                <>
+                  <h3 className="text-lg font-bold mb-1">🔒 관리자 로그인</h3>
+                  <p className="text-[13px] text-[#6b5a48] mb-3">관리자 비밀번호를 입력하세요.</p>
+                  <input autoFocus type="password" value={ownerPw} onChange={(e) => setOwnerPw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submitOwner()}
+                    placeholder="관리자 비밀번호" className="w-full border border-[#cbb89f] rounded-lg px-3 py-2.5 text-base bg-white mb-2" />
+                  {ownerErr && <p className="text-[12px] text-[#c0392b] mb-2">{ownerErr}</p>}
+                  <div className="flex gap-2">
+                    <button onClick={submitOwner} className="flex-1 bg-[#2b2018] text-[#f4ece0] rounded-xl py-2.5 font-medium">확인</button>
+                    <button onClick={() => setOwnerPwModal(false)} className="px-4 text-[#9c6b3f]">취소</button>
+                  </div>
+                  <button onClick={() => { setOwnerAdminMode(false); setOwnerErr(""); }} className="block w-full text-center text-[12px] text-[#9c6b3f] underline mt-3">← 사장님 키 로그인</button>
+                </>
+              ) : (
+                <>
+                  <h3 className="text-lg font-bold mb-1 pr-24">🏪 사장님 로그인</h3>
+                  <p className="text-[13px] text-[#6b5a48] mb-3">이메일로 받은 <b>키(PIN)</b>를 입력하면 내 카페 분석으로 바로 들어갑니다.</p>
+                  <input autoFocus value={ownerPin} onChange={(e) => setOwnerPin(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submitOwnerPin()}
+                    placeholder="발급받은 키(PIN)" className="w-full border border-[#cbb89f] rounded-lg px-3 py-2.5 text-base bg-white mb-2 tracking-widest font-mono uppercase" />
+                  {ownerPinErr && <p className="text-[12px] text-[#c0392b] mb-2">{ownerPinErr}</p>}
+                  <div className="flex gap-2">
+                    <button onClick={submitOwnerPin} className="flex-1 bg-[#2b2018] text-[#f4ece0] rounded-xl py-2.5 font-bold">내 카페 들어가기</button>
+                    <button onClick={() => setOwnerPwModal(false)} className="px-4 text-[#9c6b3f]">취소</button>
+                  </div>
+                  <p className="text-[12px] text-[#6b5a48] text-center mt-3">키가 없으세요? <button onClick={() => setShowSignup(true)} className="text-[#9c6b3f] font-bold underline">7일 무료 체험 신청</button></p>
+                  <button onClick={() => { setOwnerAdminMode(true); setOwnerPinErr(""); }} className="block w-full text-center text-[11px] text-[#bcae98] underline mt-2">관리자세요? 관리자 로그인</button>
+                </>
+              )}
             </div>
           </div>
         )}
+        <OwnerSignupModal open={showSignup} onClose={() => setShowSignup(false)} trial />
         {backToast && (
           <div className="fixed left-1/2 -translate-x-1/2 bottom-8 z-[6000] bg-[#f4ece0] text-[#2b2018] text-sm px-5 py-3 rounded-full shadow-xl">
             한 번 더 누르면 나가요
