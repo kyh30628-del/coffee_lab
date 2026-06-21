@@ -2,6 +2,7 @@ import { sql } from "@/lib/db";
 
 // 프로그래매틱 SEO(동네×취향) 데이터 — 검증 카페 목록을 지역·취향별로 조회.
 export const SITE = "https://dongnecoffeenote.com";
+export const OG_HINT = "영수증 리뷰·광고 빼고 진짜 후기로 검증 · dongnecoffeenote.com";
 
 export type Taste = { key: string; label: string; short: string; emoji: string; desc: string };
 // char_scores 키와 1:1 (mood/work/quiet/roast/space/dessert)

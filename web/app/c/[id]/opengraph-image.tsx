@@ -1,0 +1,18 @@
+import { sql } from "@/lib/db";
+import { ogCard, OG_SIZE } from "@/lib/ogCard";
+
+export const runtime = "nodejs";
+export const revalidate = 86400;
+export const size = OG_SIZE;
+export const contentType = "image/png";
+export const alt = "동네 커피 노트 — 검증한 동네 카페";
+
+export default async function Image({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  let cafe: any = null;
+  try { cafe = (await sql`SELECT name, area, dong, synth_grade, synth_identity FROM cafes WHERE id=${Number(id)} AND published`)[0]; } catch {}
+  if (!cafe) return ogCard({ title: "동네 커피 노트", subtitle: "진짜 후기로 고른 우리 동네 카페" });
+  const loc = [cafe.area, cafe.dong].filter(Boolean).join(" ");
+  const sub = cafe.synth_identity ? String(cafe.synth_identity).slice(0, 60) : loc;
+  return ogCard({ title: cafe.name, subtitle: sub, badge: cafe.synth_grade || undefined, footer: `${loc} · 진짜 후기로 검증` });
+}

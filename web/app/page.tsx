@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
 import InfoDot from "./InfoDot";
 import ShowcaseBanner, { SHOWCASE_CSS } from "./ShowcaseBanner";
 import OwnerSignupModal from "./OwnerSignupModal";
+import KakaoShare from "./KakaoShare";
 
 type EvidenceReview = { quote: string; link?: string; source?: string; date?: string; trust?: "verified" | "reference" | "rejected"; score?: number; why?: string[] };
 type QualityStats = { raw: number; verified: number; reference: number; rejected: number; duplicates?: number; rejectReasons?: Record<string, number> };
@@ -1626,6 +1627,14 @@ function CafePanel({ cafe, onClose, onMap, bookmarked = false, onToggleBookmark 
               메뉴·시간
             </a>
           </div>
+          <KakaoShare
+            title={`${cafe.name} (${cafe.area})`}
+            description={((cafe as any).identity || cafe.signature || "진짜 후기로 검증한 우리 동네 카페")}
+            imageUrl={`https://dongnecoffeenote.com/c/${cafe.id}/opengraph-image`}
+            link={`https://dongnecoffeenote.com/c/${cafe.id}`}
+            label="🟡 카카오톡으로 공유"
+            className="w-full text-center mb-4 bg-[#FEE500] text-[#3c1e1e] rounded-xl py-2.5 text-[12px] font-bold"
+          />
 
           {loadingRev && <div className="text-[11px] text-[#a8927a] mb-4">근거 후기 불러오는 중...</div>}
           {!loadingRev && quality && quality.raw > 0 && (

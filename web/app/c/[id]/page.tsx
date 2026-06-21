@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { sql } from "@/lib/db";
+import KakaoShare from "../../KakaoShare";
 
 export const runtime = "nodejs";
 export const revalidate = 3600; // ISR 1시간
@@ -33,8 +34,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title, description: desc,
     alternates: { canonical: url },
-    openGraph: { title, description: desc, url, siteName: "동네 커피 노트", type: "article", locale: "ko_KR", images: ["/og.png"] },
-    twitter: { card: "summary_large_image", title, description: desc, images: ["/og.png"] },
+    // og:image·twitter:image는 같은 폴더의 opengraph-image.tsx(동적 카드)가 자동 적용됨.
+    openGraph: { title, description: desc, url, siteName: "동네 커피 노트", type: "article", locale: "ko_KR" },
+    twitter: { card: "summary_large_image", title, description: desc },
   };
 }
 
@@ -71,6 +73,14 @@ export default async function CafePage({ params }: Props) {
           )}
           <p className="text-[12.5px] text-[#8a7458] mb-6 leading-relaxed">네이버 공개 후기 <b>{c.synth_count ?? 0}건</b>을 교차검증한 데이터 기반 소개예요. (절대 평가가 아니라 후기에서 자주 언급된 정도입니다)</p>
           <Link href={`/?cafe=${c.id}`} className="block w-full text-center bg-[#2b2018] text-[#f4ece0] rounded-xl py-3.5 font-bold">지도·근거 후기 보기 →</Link>
+          <KakaoShare
+            title={`${c.name} (${c.area})`}
+            description={(c.synth_identity || "진짜 후기로 검증한 동네 카페").slice(0, 80)}
+            imageUrl={`${SITE}/c/${c.id}/opengraph-image`}
+            link={`${SITE}/c/${c.id}`}
+            label="🟡 카카오톡으로 공유"
+            className="block w-full text-center mt-2.5 bg-[#FEE500] text-[#3c1e1e] rounded-xl py-3 font-bold"
+          />
         </div>
       </div>
     </main>

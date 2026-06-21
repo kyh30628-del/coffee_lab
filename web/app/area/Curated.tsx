@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { TASTES, SITE, type SeoCafe } from "@/lib/seoData";
+import KakaoShare from "../KakaoShare";
 
 const GRADE_BG: Record<string, string> = { 검증: "#5f7355", 참고: "#9c6b3f", 발굴: "#a8927a" };
 
@@ -52,6 +53,15 @@ export default function Curated({ area, tasteKey, heading, intro, cafes, regions
 
         <div className="mt-7">
           <Link href={`/?region=${encodeURIComponent(area)}`} className="block w-full bg-[#2b2018] text-[#f4ece0] rounded-xl py-3 text-center font-bold">{area} 카페 앱에서 더 보기 →</Link>
+          <KakaoShare
+            title={heading}
+            description="영수증 리뷰·광고 빼고 진짜 후기로 검증한 우리 동네 카페"
+            imageUrl={`${canonical}/opengraph-image`}
+            link={canonical}
+            label="🟡 카카오톡으로 공유"
+            className="block w-full text-center mt-2 bg-[#FEE500] text-[#3c1e1e] rounded-xl py-2.5 font-bold"
+          />
+          <link rel="preconnect" href="https://t1.kakaocdn.net" />
         </div>
 
         {/* 다른 지역 크로스링크 */}
