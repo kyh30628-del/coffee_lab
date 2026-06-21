@@ -1055,9 +1055,9 @@ export default function Home() {
         </div>
         <p className="dcn-rise text-[17px] text-[#f4ece0] mb-1.5 text-center leading-snug font-bold" style={{ animationDelay: ".05s" }}>별점도 광고도 아닌, <span className="text-[#e8b87a]">진짜 후기</span>.</p>
         <p className="dcn-rise text-[15px] text-[#f4ece0] mb-2 text-center leading-relaxed font-bold" style={{ animationDelay: ".1s" }}>우리 동네에서 <span className="text-[#e8b87a]">오늘 내 기분에 맞는 카페</span>를 골라드려요.</p>
-        <p className="dcn-rise text-[13px] text-[#cbb89f] mb-5 text-center leading-relaxed" style={{ animationDelay: ".14s" }}>네이버·구글·유튜브 진짜 후기만 교차검증해 <b className="text-[#f4ece0]">협찬·가짜 후기는 빼고</b> — 작업·조용·디저트, <b className="text-[#f4ece0]">내 취향</b>대로. 마음에 든 곳은 <span style={{ color: "#d6336c" }}>❤</span>로 기록해 <b className="text-[#f4ece0]">나만의 동네 지도</b>를 만들어요.</p>
+        <p className="dcn-rise text-[13px] text-[#cbb89f] mb-5 text-center leading-relaxed" style={{ animationDelay: ".14s" }}>작업·조용·디저트, <b className="text-[#f4ece0]">내 취향</b>대로. 마음에 든 곳은 <span style={{ color: "#d6336c" }}>❤</span>로 <b className="text-[#f4ece0]">나만의 동네 지도</b>에.</p>
         <div className="dcn-rise flex flex-wrap justify-center gap-1.5 mb-8 max-w-xs" style={{ animationDelay: ".16s" }}>
-          {["별점, 이제 그만 믿어요", "우리 동네에도, 명작이 있어요", "그날의 커피를 기억해요"].map((t) => (
+          {["별점, 이제 그만 믿어요", "우리 동네에도, 명작이 있어요", "옥석만 남겼어요"].map((t) => (
             <span key={t} className="text-[12px] text-[#e8b87a] border border-[#5b4636] rounded-full px-3 py-1 whitespace-nowrap">{t}</span>
           ))}
         </div>
