@@ -170,7 +170,9 @@ export function coreTokens(name: string, areaTerms: string[]): string[] {
   const an = areaTerms.flatMap((a) => { const n = norm(a); const s = stripAdmin(n); return s ? [n, s] : [n]; }).filter(Boolean);
   // 접미(점·카페 등) 제거 '전' 원본 토큰도 함께 보관 → venue 검사는 원본에도 적용
   // (예: '롯데백화점'에서 '점'이 떨어져 '롯데백화'가 되면 venue 매칭을 빠져나가는 것 방지)
-  const parts = name.split(/\s+/)
+  // 공백뿐 아니라 한글↔영문/숫자 경계로도 분리 → '노원두물마루COFFEESNACK'처럼 붙은 이름에서
+  //   한글 식별어('노원두물마루')를 분리(영문 접미사 통째로 토큰화돼 일치율 0 되는 오판 방지).
+  const parts = name.split(/\s+/).flatMap((w) => w.split(/(?<=[가-힣])(?=[A-Za-z0-9])|(?<=[A-Za-z0-9])(?=[가-힣])/))
     .map((raw) => ({ raw, core: raw.replace(GENERIC_SUFFIX, "").trim() }))
     .filter(({ core }) => core.length >= 2)
     .filter(({ core }) => !GENERIC_WORD.has(core.toLowerCase()))

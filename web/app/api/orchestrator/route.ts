@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
-import { synthAndStore, finalizePipeline, scrubPublishedPII, healGroundingSuspects, holdZeroEvidenceSuspects, healLowCoherence } from "@/lib/synthStore";
+import { synthAndStore, finalizePipeline, scrubPublishedPII, healGroundingSuspects, holdZeroEvidenceSuspects, healPublishedAudit } from "@/lib/synthStore";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
@@ -85,6 +85,8 @@ export async function GET(req: NextRequest) {
     const grHeld = (await sql`SELECT COUNT(*)::int n FROM grounding_checks g JOIN cafes c ON c.id = g.cafe_id WHERE NOT g.grounded AND NOT c.published`.catch(() => [{ n: 0 }]))[0] as any;
     const grSuspects = (await sql`SELECT c.name, c.area, g.issue FROM grounding_checks g JOIN cafes c ON c.id = g.cafe_id WHERE NOT g.grounded AND c.llm_judged_at IS NOT NULL AND c.llm_judged_at >= c.raw_collected_at ORDER BY g.checked_at DESC LIMIT 20`.catch(() => [])) as any[];
     const ds = (await sql`SELECT MIN(last_run) oldest, COUNT(*) FILTER (WHERE last_run < now() - interval '3 days')::int behind, COUNT(*)::int n FROM discovery_state`)[0] as any;
+    // 통합 재검증 자가감사 커버리지 — 공개 카페가 '현재 규칙'으로 며칠 안에 1회씩 재검되는지(규칙 드리프트 치유 진행률).
+    const auditCov = (await sql`SELECT COUNT(*) FILTER (WHERE published AND audit_checked_at >= now() - interval '7 days')::int a7, COUNT(*) FILTER (WHERE published)::int pub, MAX(audit_checked_at) last_audit FROM cafes`.catch(() => [{ a7: 0, pub: 0, last_audit: null }]))[0] as any;
     // 로컬 배치 하트비트 — 실패(크래시 등)·정체를 관제탑이 잡아 경보. (예: dong-backfill ReferenceError)
     await sql`CREATE TABLE IF NOT EXISTS agent_runs (job TEXT PRIMARY KEY, ran_at TIMESTAMPTZ DEFAULT now(), ok BOOLEAN DEFAULT true, detail TEXT, processed INT DEFAULT 0)`.catch(() => {});
     const jobRuns = (await sql`SELECT job, ran_at, to_char(ran_at,'MM-DD HH24:MI') ran, ok, detail, EXTRACT(EPOCH FROM (now()-ran_at))/3600 age_h FROM agent_runs`.catch(() => [])) as any[];
@@ -227,8 +229,14 @@ export async function GET(req: NextRequest) {
       try { const gr = await healGroundingSuspects(); if (gr.resynthed > 0) healed.push(`그라운딩 의심 ${gr.resynthed}곳 재합성 교정`); } catch {}
       // (e) 그라운딩 '근거0건' 확정 카페 자동 보류(비공개) + 개선 시 복귀
       try { const z = await holdZeroEvidenceSuspects(); if (z.held > 0) healed.push(`근거0건 ${z.held}곳 자동 비공개(${z.names.slice(0, 3).join(", ")})`); if (z.released > 0) healed.push(`복원 ${z.released}곳`); } catch {}
-      // (f) 표시 근거후기가 카페명과 안 맞는 오염(동명·프랜차이즈 지점) 상시 재검·자가치유 — '바빈스 식당리뷰' 유형.
-      try { const lc = await healLowCoherence(); if (lc.healed > 0) healed.push(`근거 오염 ${lc.healed}곳 재합성 교정(${lc.names.slice(0, 3).join(", ")})`); if (lc.stillBad.length > 0) integrity.push(`근거 오염 잔존 ${lc.stillBad.length}곳(교정후에도 카페명 불일치) — 점검필요: ${lc.stillBad.slice(0, 3).map((b) => b.name).join(", ")}`); } catch {}
+      // (f) 통합 재검증 자가치유 — 공개 카페를 커서로 순환하며 현재의 모든 게이트(비카페·프랜차이즈·광고·동명오염·등급)로
+      //     재합성. 규칙 개선이 기존 공개 데이터에 며칠 안에 자동 반영됨. 대량 비공개는 규칙회귀로 보고 즉시 중단·경보.
+      try {
+        const au = await healPublishedAudit();
+        if (au.unpublished > 0) healed.push(`재검증 자가치유 ${au.unpublished}곳 비공개(규칙 위반: ${au.names.slice(0, 3).join(", ")})`);
+        if (au.flagged > 0) integrity.push(`근거 오염 ${au.flagged}곳(재합성후에도 카페명 불일치) — 점검필요`);
+        if (au.regression) integrity.push(`🚨재검증 대량 비공개(${au.unpublished}곳+) — 규칙 회귀 의심, 자가치유 중단됨·즉시 점검`);
+      } catch {}
     }
 
     // ── 3) 에이전트별 건강 판정 ──
@@ -273,6 +281,13 @@ export async function GET(req: NextRequest) {
       // 감사 대기(backlog)만으론 경고색 안 띄움 — 백그라운드 큐는 정상. 의심(소비자 노출)·크론 정지(48h+)만 warn.
       const grStale = gAge != null && gAge > 48;
       agents.push({ key: "grounding", label: "LLM 그라운딩", lastRun: gr?.last ?? null, ageH: gAge == null ? null : Math.round(gAge * 10) / 10, cadenceH: 30, status: (sus > 0 || grStale) ? "warn" : "ok", queue: grBacklog.n, note: `감사 대기 ${grBacklog.n}(백그라운드) · 보류 ${grHeld.n}곳(문제 발견→비공개, 소비자 노출 차단)${grStale ? " · ⚠️크론 48h+ 정지" : ""}` });
+    }
+    // 통합 재검증 자가감사 — 공개 카페를 현재 규칙으로 순환 재검(규칙 개선이 기존 데이터에 자동 반영). 7일 내 미재검분이 많으면 정체.
+    {
+      const a7 = auditCov?.a7 ?? 0, pub = auditCov?.pub ?? 1;
+      const covPct = pub ? Math.round((a7 / pub) * 100) : 0;
+      const aaAge = ageHours(auditCov?.last_audit ?? null, now);
+      agents.push({ key: "selfaudit", label: "재검증 자가감사", lastRun: auditCov?.last_audit ?? null, ageH: aaAge == null ? null : Math.round(aaAge * 10) / 10, cadenceH: 8, status: aaAge != null && aaAge > 12 ? "warn" : "ok", queue: Math.max(0, pub - a7), note: `7일내 재검 ${a7}/${pub}(${covPct}%) · 전 공개카페를 현재 규칙으로 순환 재검증(드리프트 자동치유)` });
     }
 
     // ── 4) 종합 건강 ──

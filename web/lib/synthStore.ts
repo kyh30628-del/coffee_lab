@@ -122,29 +122,34 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   //   저건수도 적용('만조커피 9건'이 전부 동네 딴 가게였던 사례 차단). 전체이름 매칭은 nameCoherence가 보완.
   const coherence = nameCoherence(name, (evidenceReviews as any[]).map((r) => r?.quote || ""));
   const noisy = collected >= 5 && coherence < 0.4;
-  // 🔒 카테고리 필수 검증 — 카테고리 없이는 카페/비카페 구분 불가 → 공개 금지(검증된 카페만 노출). 정체성·신뢰의 핵심.
-  const catRow = (await sql`SELECT naver_category FROM cafes WHERE id=${cafeId} LIMIT 1`)[0];
-  const naverCat = (catRow?.naver_category || "").trim();
-  const hasCategory = naverCat.length > 0;                 // 카테고리 존재 필수
-  const isCafeCat = hasCategory && !isNonCafe(name, naverCat); // 카테고리가 카페·디저트류여야 통과(리프 기준)
-  // 프랜차이즈 제외 + 카테고리 필수 + 비카페 차단 — 공개 게이트.
-  const ruleOk = (grade === "검증" || grade === "참고") && isCafeCat && !isFranchise(name) && !noisy;
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_reviews_all JSONB`.catch(() => {});
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS pipeline_status TEXT`.catch(() => {});
   const allEv = safeJson(allEvidence ?? evidenceReviews);
-
-  // 🔒 진정한 자동화 게이트: 신규 카페(pipeline_status=new/pending/rejected)는 규칙 통과해도 즉시 공개하지 않는다.
-  //   AI 판정·임베딩·검증을 다 통과한 뒤 finalizer가 'live'로 승격할 때만 공개.
-  //   기존 카페(pipeline_status=NULL=grandfather, 또는 이미 live)는 현행대로 규칙 게이트로 공개.
-  const cur = (await sql`SELECT pipeline_status, synth_identity, synth_count, synth_updated, jsonb_array_length(COALESCE(synth_reviews,'[]'::jsonb)) prev_ev FROM cafes WHERE id=${cafeId} LIMIT 1`)[0] as any;
+  // 현재 상태(파이프라인 단계·카테고리·이전 합성값) 먼저 — 카테고리 게이트 분기에 pst 필요.
+  const cur = (await sql`SELECT pipeline_status, naver_category, synth_identity, synth_count, synth_updated, jsonb_array_length(COALESCE(synth_reviews,'[]'::jsonb)) prev_ev FROM cafes WHERE id=${cafeId} LIMIT 1`)[0] as any;
   const pst: string | null = cur?.pipeline_status ?? null;
-  // 🔁 재합성 결과가 이전과 사실상 동일하면 synth_updated를 그대로 둔다 → 그라운딩이 무효화되지 않아
-  //   '재합성→그라운딩 stale→재검'의 무의미한 순환을 막는다(정체성·수집수·근거수가 모두 같으면 미변경으로 간주).
+  const inPipeline = pst === "new" || pst === "pending" || pst === "rejected"; // 신규 카페(공개 전 게이트)
+
+  // 🔒 카테고리·비카페 게이트.
+  //   신규(파이프라인) 카페: 카테고리 필수 — 카테고리 없이는 카페/비카페 구분 불가 → 공개 금지.
+  //   기존 공개(grandfather/live) 카페: '카테고리 없음'만으로 내리지 않는다 — 카테고리 없음 ≠ 비카페(인천 사태 방지).
+  //     이름 기반 비카페 판정만 적용(식당·정육·병원 등 명백한 비카페는 카테고리 없어도 제외, 정상 카페는 유지).
+  const naverCat = (cur?.naver_category || "").trim();
+  const hasCategory = naverCat.length > 0;
+  //   신규 카페: 카테고리 필수 + 카테고리 기반 비카페 차단(엄격).
+  //   기존 공개(grandfather/live) 카페: 카테고리 재분류로 내리지 않는다 — 검증 후기(일치율·등급)가 곧 카페 증명.
+  //     이름 기반 비카페('식당·정육·병원' 등 명백한 것)만 적용. ('쇼핑,유통>차,커피' 소매카페·카테고리 누락 오비공개 방지)
+  const isCafeCat = inPipeline ? (hasCategory && !isNonCafe(name, naverCat)) : !isNonCafe(name, "");
+  // 프랜차이즈 제외 + 카페 카테고리 + 노이즈 아님 — 공개 게이트.
+  const ruleOk = (grade === "검증" || grade === "참고") && isCafeCat && !isFranchise(name) && !noisy;
+
+  // 🔒 진정한 자동화 게이트: 신규 카페는 규칙 통과해도 즉시 공개 안 함 — AI 판정·임베딩·검증 통과 후 finalizer가 'live'로 승격할 때만.
+  //   기존 카페(grandfather/live)는 규칙 게이트로 공개.
+  // 🔁 재합성 결과가 이전과 사실상 동일하면 synth_updated 유지 → 그라운딩 무효화·재검 순환 방지.
   const unchanged = !!(cur?.synth_updated && cur.synth_identity === synth.identity && Number(cur.synth_count) === collected && Number(cur.prev_ev) === (evidenceReviews as any[]).length);
   const synthTs = unchanged ? cur.synth_updated : new Date();
-  const held = pst === "held"; // 그라운딩 '근거0건' 확정 보류 — 재합성해도 비공개 고정(규칙이 못 잡는 의미적 오염)
-  const stuckNoise = pst === "noise" || noisy; // 노이즈(이름 오염)로 한번 걸리면 영구 탈락 — 재합성해도 비공개 고정(사장님: 제거된 노이즈는 항상 탈락)
-  const inPipeline = pst === "new" || pst === "pending" || pst === "rejected";
+  const held = pst === "held"; // 그라운딩 '근거0건' 확정 보류 — 재합성해도 비공개 고정
+  const stuckNoise = pst === "noise" || noisy; // 노이즈(이름 오염) 한번 걸리면 영구 탈락
   const newPst = held ? "held" : stuckNoise ? "noise" : inPipeline ? (ruleOk ? "pending" : "rejected") : pst;
   const publish = (held || stuckNoise || inPipeline) ? false : ruleOk; // held·노이즈·파이프라인은 비공개 고정, 나머지는 규칙대로
 
@@ -325,41 +330,42 @@ export async function markJudged(cafeId: number) {
   await sql`UPDATE cafes SET llm_judged_at=now() WHERE id=${cafeId}`;
 }
 
-// 🛡️ 자가치유: 공개 카페의 '화면 노출 근거 후기'가 실제로 그 카페 얘기인지 상시 재검(이름 일관성).
-//   합성 시점 게이트(noise)를 빠져나간 오염(동명·프랜차이즈 지점 등 신종 변종)을 사후에 잡는 안전망.
-//   낮으면 재합성 → 게이트가 자동 비공개/보류. coherence_checked_at 커서로 전 공개카페를 순환 검사.
-//   반환: 검사수·교정수·교정후에도 여전히 낮은(진짜 문제) 목록.
-export async function healLowCoherence(limit = 250, threshold = 0.4): Promise<{ scanned: number; healed: number; stillBad: { id: number; name: string; coh: number }[]; names: string[] }> {
+// 🛡️ 통합 자가치유: 공개 카페를 커서로 순환하며 '현재의 모든 게이트'로 재검증·교정.
+//   재합성(synthAndStore)은 비카페·프랜차이즈·광고·동명오염·노이즈·등급·좌표 게이트를 전부 다시 적용한다.
+//   → 규칙을 고치면(coreTokens·숫자토큰 등) 기존 공개 데이터도 며칠 안에 자동으로 따라온다(드리프트 치유).
+//   audit_checked_at 커서로 전 공개카페를 ~며칠 주기로 1회씩 재검. 재합성으로 비공개되면 그게 곧 교정.
+//   교정 후에도 근거가 카페명과 안 맞으면 audit_flags(근거오염)로 레드팀에 남긴다.
+//   🚨 안전장치: 한 회차 비공개가 unpubCap 초과 = 규칙 회귀(인천 사태) 의심 → 즉시 중단·경보(대량삭제 차단).
+export async function healPublishedAudit(limit = 200, unpubCap = 60): Promise<{ scanned: number; unpublished: number; flagged: number; regression: boolean; names: string[] }> {
   await ensureCols();
-  await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS coherence_checked_at TIMESTAMPTZ`.catch(() => {});
-  const rows = (await sql`SELECT id, name, area, synth_reviews FROM cafes
-    WHERE published AND synth_reviews IS NOT NULL AND jsonb_array_length(synth_reviews) >= 3
-    ORDER BY coherence_checked_at ASC NULLS FIRST LIMIT ${limit}`) as unknown as any[];
-  let scanned = 0; const healedNames: string[] = []; const stillBad: { id: number; name: string; coh: number }[] = [];
+  await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS audit_checked_at TIMESTAMPTZ`.catch(() => {});
+  const rows = (await sql`SELECT id, name, area FROM cafes
+    WHERE published AND raw_reviews IS NOT NULL
+    ORDER BY audit_checked_at ASC NULLS FIRST LIMIT ${limit}`) as unknown as any[];
+  let scanned = 0, unpublished = 0, flagged = 0; const names: string[] = []; let regression = false;
   for (const r of rows) {
-    scanned++;
-    const quotes = (r.synth_reviews || []).map((e: any) => e?.quote || "").filter(Boolean);
-    const coh = nameCoherence(r.name, quotes);
-    await sql`UPDATE cafes SET coherence_checked_at=now() WHERE id=${r.id}`.catch(() => {});
-    if (coh >= threshold) continue;
-    // 오염 의심 → 재합성(수정된 규칙·게이트 적용). 게이트가 noise/등급미달이면 자동 비공개.
+    const before = (await sql`SELECT published FROM cafes WHERE id=${r.id}`)[0] as any;
     try { await synthAndStore({ id: r.id, name: r.name, area: r.area }, { refresh: false }); } catch { continue; }
+    await sql`UPDATE cafes SET audit_checked_at=now() WHERE id=${r.id}`.catch(() => {});
+    scanned++;
     const after = (await sql`SELECT published, synth_reviews FROM cafes WHERE id=${r.id}`)[0] as any;
-    healedNames.push(r.name);
-    let resolved = true;
+    if (before?.published && !after?.published) {
+      unpublished++; names.push(r.name);
+      if (unpublished > unpubCap) { regression = true; break; } // 대량 비공개 = 규칙 회귀 의심 → 중단
+      continue;
+    }
     if (after?.published) {
-      const q2 = (after.synth_reviews || []).map((e: any) => e?.quote || "").filter(Boolean);
-      const coh2 = nameCoherence(r.name, q2);
-      if (coh2 < threshold) {
-        resolved = false;
-        stillBad.push({ id: r.id, name: r.name, coh: Math.round(coh2 * 100) / 100 });
-        // 🚩 레드팀/품질감사가 세도록 audit_flags에 영구 기록(교정 후에도 카페명 불일치 = 진짜 문제).
-        await sql`INSERT INTO audit_flags (cafe_id, cafe_name, issue, detail, resolved) VALUES (${r.id}, ${r.name}, ${"근거오염"}, ${`표시 근거후기 카페명 일치율 ${Math.round(coh2 * 100)}%`}, false)
-          ON CONFLICT DO NOTHING`.catch(() => {});
+      const q = (after.synth_reviews || []).map((e: any) => e?.quote || "").filter(Boolean);
+      const coh = q.length >= 3 ? nameCoherence(r.name, q) : 1;
+      if (coh < 0.4) {
+        flagged++;
+        await sql`INSERT INTO audit_flags (cafe_id, cafe_name, issue, detail, resolved)
+          SELECT ${r.id}, ${r.name}, ${"근거오염"}, ${`재합성후에도 카페명 일치율 ${Math.round(coh * 100)}%`}, false
+          WHERE NOT EXISTS (SELECT 1 FROM audit_flags WHERE cafe_id=${r.id} AND issue=${"근거오염"} AND NOT resolved)`.catch(() => {});
+      } else {
+        await sql`UPDATE audit_flags SET resolved=true WHERE cafe_id=${r.id} AND issue=${"근거오염"} AND NOT resolved`.catch(() => {});
       }
     }
-    // 교정으로 해소되면(비공개되거나 일치율 회복) 기존 근거오염 플래그 해제.
-    if (resolved) await sql`UPDATE audit_flags SET resolved=true WHERE cafe_id=${r.id} AND issue=${"근거오염"} AND NOT resolved`.catch(() => {});
   }
-  return { scanned, healed: healedNames.length, stillBad, names: healedNames.slice(0, 8) };
+  return { scanned, unpublished, flagged, regression, names: names.slice(0, 8) };
 }
