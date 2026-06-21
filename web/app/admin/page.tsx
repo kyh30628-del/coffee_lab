@@ -263,10 +263,13 @@ export default function AdminPage() {
                 <div className="mb-2.5 text-[11px] text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">🚨 경보(즉시조치): {tower.alerts.join(" · ")}</div>
               )}
               {tower.risks?.length > 0 && (
-                <div className="mb-2.5 text-[11px] text-amber-800 bg-amber-50 border border-amber-300 rounded-lg px-3 py-2">⚠️ 위험·의심(점검필요): {tower.risks.join(" · ")}</div>
+                <div className="mb-2.5 text-[11px] text-red-700 bg-red-50 border border-red-300 rounded-lg px-3 py-2">🔴 위험(해자·소비자 타격): {tower.risks.join(" · ")}</div>
               )}
               {(!tower.alerts?.length && !tower.risks?.length) && (
-                <div className="mb-2.5 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">✅ 무결성·위험 검사 통과 — 이상 없음(숫자 신뢰 가능)</div>
+                <div className="mb-2.5 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">✅ 위험·해자 검사 통과 — 소비자 노출 손상 없음(숫자 신뢰 가능)</div>
+              )}
+              {tower.notices?.length > 0 && (
+                <div className="mb-2.5 text-[11px] text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">🛠 주의(백그라운드 — 자동 처리, 소비자 무관): {tower.notices.join(" · ")}</div>
               )}
               {tower.healed?.length > 0 && (
                 <div className="mb-2.5 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">🔧 자가치유: {tower.healed.join(" · ")}</div>
@@ -307,17 +310,20 @@ export default function AdminPage() {
                 })}
               </div>
               <button onClick={() => setTowerFull(true)} className="w-full mb-2.5 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-700 text-[12px] font-bold py-2 hover:bg-indigo-100 transition">⛶ 관제탑 전체 흐름 보기 (수집 → 공개)</button>
-              {/* 🔬 그라운딩 의심 목록 — 무엇이 오염/환각으로 잡혔는지 명시 */}
+              {/* 🔬 그라운딩 — 의심(소비자 노출)은 빨강, 감사 대기는 백그라운드 큐(중립색)로 구분 */}
               {tower.grounding && (tower.grounding.backlog > 0 || tower.grounding.suspectCount > 0) && (
-                <div className="mb-2.5 rounded-xl border border-rose-200 bg-rose-50/60 p-2.5">
-                  <div className="text-[11px] font-bold text-rose-800 mb-1.5">🔬 LLM 그라운딩 — 검사대기 {tower.grounding.backlog?.toLocaleString()} · 의심 {tower.grounding.suspectCount}건 (판정완료분만)</div>
-                  {tower.grounding.suspects?.length > 0 ? (
+                <div className={`mb-2.5 rounded-xl border p-2.5 ${tower.grounding.suspectCount > 0 ? "border-rose-200 bg-rose-50/60" : "border-slate-200 bg-slate-50"}`}>
+                  <div className="text-[11px] font-bold mb-1.5 text-stone-700">
+                    🔬 LLM 그라운딩 · 의심 <b className={tower.grounding.suspectCount > 0 ? "text-rose-700" : "text-emerald-600"}>{tower.grounding.suspectCount}건</b>
+                    <span className="font-normal text-slate-500"> · 감사 대기 {tower.grounding.backlog?.toLocaleString()}곳 (백그라운드 — 크론 자동, 소비자 무관)</span>
+                  </div>
+                  {tower.grounding.suspectCount > 0 ? (
                     <div className="space-y-1 max-h-44 overflow-y-auto">
-                      {tower.grounding.suspects.map((s: any, i: number) => (
+                      {tower.grounding.suspects?.map((s: any, i: number) => (
                         <div key={i} className="text-[10.5px] leading-snug"><b className="text-rose-700">{s.name}</b> <span className="text-stone-400">{s.area}</span><br /><span className="text-stone-600">{s.issue}</span></div>
                       ))}
                     </div>
-                  ) : <div className="text-[10.5px] text-stone-500">의심 0건 — 깨끗</div>}
+                  ) : <div className="text-[10.5px] text-emerald-600">의심 0건 — 소비자에 보이는 오염·환각 없음 ✓</div>}
                 </div>
               )}
               <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-stone-500">

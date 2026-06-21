@@ -144,20 +144,30 @@ export async function GET(req: NextRequest) {
     if (regionGone.length) integrity.push(`⚠️지역 통째 비공개 ${regionGone.length}곳(${regionGone.slice(0, 3).map((r) => r.area).join("·")}) — 대량삭제 의심`);
 
     // ⚠️ 위험/의심 선제 탐지 — 하드 위반은 아니지만 '문제 발생 소지' 있는 것을 수면 위로 올림(사장님이 보게).
+    // ── 경보 2단계 분리 ──────────────────────────────────────────────
+    //   위험(risks, 빨강) = '소비자에게 즉시 타격' 또는 '해자(옥석 큐레이션) 훼손' 또는 '엔진 정지'일 때만.
+    //   주의(notices, 회색) = 백그라운드 대기열·자가치유 진행분. 소비자에 보이는 손상 아님 → 경보 아님.
+    const PUB = c.published || 1;
     const risks: string[] = [];
-    // (동-구 불일치는 백필이 출처에서 '지번 구=area' 검증으로 예방 → 휴리스틱 노이즈 대신 무결성 dong_isgu가 확정 검출)
-    // 오염/환각 의심(그라운딩이 잡은 것)
-    if ((gr?.suspect ?? 0) > 0) risks.push(`오염·환각 의심 ${gr.suspect}건(그라운딩 — 재검 대기)`);
-    // 3) 발굴 3일+ 지연 지역
-    if ((ds?.behind ?? 0) > 0) risks.push(`발굴 3일+ 지연 지역 ${ds.behind}곳`);
-    // 4) 미해결 품질 오염 플래그
-    if ((af?.open ?? 0) > 0) risks.push(`미해결 오염 플래그 ${af.open}건`);
-    // 5) 동 채움 미흡 지역(공개 10곳+인데 동 90% 미만)
+    const notices: string[] = [];
+
+    // 소비자에게 '잘못된 데이터'(그라운딩 업체혼동·환각)가 공개 노출 = 해자(옥석) 직접 훼손.
+    //   소수(<0.5% & <30)는 비공개 처리로 정리되는 수준 → 주의. 그 이상이면 해자 타격 → 위험.
+    const suspect = gr?.suspect ?? 0;
+    if (suspect > 0) {
+      if (suspect >= Math.max(30, Math.round(PUB * 0.005))) risks.push(`소비자 노출 오염·환각 ${suspect}곳 — 해자(큐레이션) 훼손, 즉시 정리`);
+      else notices.push(`품질 의심 ${suspect}곳(소수 — 비공개 처리 대상)`);
+    }
+    // 아래는 모두 '소비자에 보이는 손상 아님' = 주의(백그라운드). 진행 속도·완성도·감사 대기.
+    if ((ds?.behind ?? 0) > 0) notices.push(`발굴 3일+ 지연 지역 ${ds.behind}곳`);
+    if ((af?.open ?? 0) > 0) notices.push(`오염 플래그 ${af.open}건(검토 대기)`);
     const dgap = (await sql`SELECT COUNT(*)::int n FROM (SELECT area FROM cafes WHERE published GROUP BY area HAVING COUNT(*) >= 10 AND COUNT(*) FILTER (WHERE dong IS NOT NULL)::float / COUNT(*) < 0.9) x`.catch(() => [{ n: 0 }]))[0] as any;
-    if (dgap.n > 0) risks.push(`동 채움 미흡 지역 ${dgap.n}곳(<90%)`);
-    // 6) 임베딩 미완(의미검색 누락) — 공개인데 임베딩 없는 카페
+    if (dgap.n > 0) notices.push(`동 채움 미흡 지역 ${dgap.n}곳(<90%)`);
+    // 임베딩 대기 = 의미검색만 일부 누락(카페는 정상 노출) → 주의. 단, 절반 이상이면 검색 핵심기능 타격 → 위험.
     const noemb = (await sql`SELECT COUNT(*)::int n FROM cafes WHERE published AND embedding IS NULL`.catch(() => [{ n: 0 }]))[0] as any;
-    if (noemb.n > 0) risks.push(`의미검색 누락 ${noemb.n}곳(임베딩 대기)`);
+    if (noemb.n > 0) { if (noemb.n > PUB * 0.5) risks.push(`의미검색 대량 누락 ${noemb.n}곳 — 검색 기능 타격`); else notices.push(`의미검색 임베딩 대기 ${noemb.n}곳`); }
+    // 그라운딩 감사 대기(백그라운드) — 카페는 규칙+판정 게이트를 이미 통과. 감사는 추가 안전망일 뿐 → 큰 적체만 정보성 주의.
+    if (grBacklog.n > 300) notices.push(`그라운딩 감사 대기 ${grBacklog.n}곳(백그라운드 — 크론 자동 처리)`);
 
     // 파이프라인 진행 상황(신규 카페 조립라인)
     const pl = (await sql`SELECT
@@ -248,12 +258,16 @@ export async function GET(req: NextRequest) {
     {
       const sus = gr?.suspect ?? 0;
       const gAge = ageHours(gr?.last ?? null, now);
-      agents.push({ key: "grounding", label: "LLM 그라운딩", lastRun: gr?.last ?? null, ageH: gAge == null ? null : Math.round(gAge * 10) / 10, cadenceH: 30, status: (sus > 0 || grBacklog.n > 0) ? "warn" : "ok", queue: grBacklog.n, note: `미검사 ${grBacklog.n} · 보류 ${grHeld.n}곳(문제 발견→비공개, 소비자 노출 차단)` });
+      // 감사 대기(backlog)만으론 경고색 안 띄움 — 백그라운드 큐는 정상. 의심(소비자 노출)·크론 정지(48h+)만 warn.
+      const grStale = gAge != null && gAge > 48;
+      agents.push({ key: "grounding", label: "LLM 그라운딩", lastRun: gr?.last ?? null, ageH: gAge == null ? null : Math.round(gAge * 10) / 10, cadenceH: 30, status: (sus > 0 || grStale) ? "warn" : "ok", queue: grBacklog.n, note: `감사 대기 ${grBacklog.n}(백그라운드) · 보류 ${grHeld.n}곳(문제 발견→비공개, 소비자 노출 차단)${grStale ? " · ⚠️크론 48h+ 정지" : ""}` });
     }
 
     // ── 4) 종합 건강 ──
     const core = agents.filter((a) => ["collect", "synth", "judge"].includes(a.key));
-    const overall = (core.some((a) => a.status === "stalled") || jobFails.length || integrity.length) ? "critical"
+    // 위험(risks)·엔진정지·무결성위반·배치크래시 = critical(빨강). 에이전트 멈춤·지연·경고 = degraded(노랑).
+    //   주의(notices)는 백그라운드 대기열이라 전체 상태를 떨어뜨리지 않음 — 정보로만 표시(소비자 무관).
+    const overall = (core.some((a) => a.status === "stalled") || jobFails.length || integrity.length || risks.length) ? "critical"
       : agents.some((a) => a.status === "stalled" || a.status === "behind" || a.status === "warn") ? "degraded"
       : "healthy";
     // 배치 크래시·실패 + 데이터 무결성 위반을 최상단 경보로 — '관제탑이 잡아서 알림'
@@ -276,7 +290,7 @@ export async function GET(req: NextRequest) {
 
     const health = {
       generatedAt: new Date(now).toISOString(),
-      overall, alerts, healed, risks, integrity,
+      overall, alerts, healed, risks, notices, integrity,
       coverage: { total: c.total, published: c.published, rawCachedPct: pct(c.raw_cached), judgedPct: pct(c.judged), embeddedPct: c.published ? Math.round((c.pub_embedded / c.published) * 100) : 0, dongPct: pct(td.has_dong) },
       today: { newCafes: td.new_today, synthesized: td.synth_today, published: td.published_today, hasDong: td.has_dong, dongPct: pct(td.has_dong), noise: td.noise, newQueue: td.new_q, ytToday: td.yt_today, ytTotal: td.yt_total },
       pipeline, agents,
