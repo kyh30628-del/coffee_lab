@@ -14,10 +14,11 @@ async function naver(kind: "news" | "blog", query: string, sort = "date"): Promi
   } catch { return []; }
 }
 
+// 섹션 개수·필수필드는 newsletter.ts의 NL_SPEC가 최종 강제. 여기 n은 SPEC(각 3개)에 맞춤.
 const CAT = [
-  { key: "coffee", title: "☕ 커피 인사이트", q: ["커피 트렌드", "디카페인 커피", "스페셜티 커피 카페"], n: 2, tip: "원두·로스팅·디카페인 기준을 메뉴판에 한 줄로 명시 → 신뢰 포인트." },
+  { key: "coffee", title: "☕ 커피 인사이트", q: ["커피 트렌드", "디카페인 커피", "스페셜티 커피 카페"], n: 3, tip: "원두·로스팅·디카페인 기준을 메뉴판에 한 줄로 명시 → 신뢰 포인트." },
   { key: "dessert", title: "🍰 디저트 스포트라이트", q: ["디저트 신메뉴 카페", "빙수 신메뉴", "베이커리 인기 메뉴"], n: 3, tip: "사진 잘 받는 시그니처 1종을 주말 한정으로 테스트." },
-  { key: "cafes", title: "🔥 뜨는 카페 동향", q: ["요즘 뜨는 카페", "신상 카페 성수 연남", "카페 트렌드"], n: 2, tip: "큰 인테리어 대신 우리만의 '한 장면'(사진 포인트)을 만들기." },
+  { key: "cafes", title: "🔥 뜨는 카페 동향", q: ["요즘 뜨는 카페", "신상 카페 성수 연남", "카페 트렌드"], n: 3, tip: "큰 인테리어 대신 우리만의 '한 장면'(사진 포인트)을 만들기." },
 ];
 
 export async function generateNewsletterFree(): Promise<{ ok: boolean; newsletter?: Newsletter; id?: number; cost?: number; error?: string }> {
@@ -48,13 +49,20 @@ export async function generateNewsletterFree(): Promise<{ ok: boolean; newslette
     if (items[0]) leads.push(items[0].text);
   }
   if (!sections.length) return { ok: false, error: "네이버 검색 결과 없음(쿼터 초과 가능)" };
+  // 📊 트렌드 레이더(SPEC 필수 섹션) — 키워드 3개 + 출처
+  let radarPool: { title: string; desc: string; link: string }[] = [];
+  for (const q of ["카페 트렌드 키워드", "요즘 카페 인기 메뉴", "카페 신메뉴 트렌드"]) radarPool = radarPool.concat(await naver("news", q));
+  if (radarPool.length < 3) for (const q of ["카페 트렌드"]) radarPool = radarPool.concat(await naver("blog", q, "sim"));
+  const radarItems = pick(radarPool, 3);
+  const radar = radarItems.length ? [{ key: "radar", title: "📊 트렌드 레이더", intro: "우리 가게엔: 이번 주 키워드 중 우리 컨셉에 맞는 1개만 골라 작게 적용해보세요.", items: radarItems }] : [];
   // 짧은 뉴스 모음
   let newsPool: { title: string; desc: string; link: string }[] = [];
   for (const q of ["카페 신메뉴", "카페 베이커리 트렌드", "프랜차이즈 커피 신메뉴"]) newsPool = newsPool.concat(await naver("news", q));
   const news = pick(newsPool, 4).map((i) => ({ text: i.text, source_url: i.source_url }));
   const tldr = { key: "tldr", title: "📌 이번 주 한눈에", items: leads.slice(0, 3).map((t) => ({ text: t })) };
   const action = { key: "action", title: "💡 이번 주 사장님 액션", items: CAT.map((c) => ({ text: c.tip })) };
-  const allSections = [tldr, ...sections, action, ...(news.length ? [{ key: "news", title: "📰 짧은 업계 뉴스", items: news }] : [])];
+  // 순서·제목은 applyGuards(NL_SPEC)가 최종 강제하므로 조립 순서는 무관 — 필수 섹션을 모두 넣기만 하면 됨.
+  const allSections = [tldr, ...radar, ...sections, action, ...(news.length ? [{ key: "news", title: "📰 짧은 업계 뉴스", items: news }] : [])];
 
   const d = new Date();
   const title = `이번 주 커피·디저트 트렌드 (${d.getMonth() + 1}월 ${d.getDate()}일)`;
@@ -79,6 +87,8 @@ const SYS = `너는 한국 커피·카페·디저트 업계 주간 트렌드 뉴
 3) 원문을 베끼지 말고 '직접 요약'한다(항목당 1~2문장). 저작권 안전을 위해 길게 인용하지 않는다.
 4) 과장·미검증 단정·의료효능 표현 금지. 차분하고 신뢰감 있는 톤.
 5) 각 항목에 사장님이 '우리 가게에 어떻게 적용'할지 한 줄(why)을 단다.
+6) 섹션은 tldr·radar·coffee·dessert·cafes·action·news 7개를 모두 포함하고 순서를 지킨다.
+   각 섹션은 정확히 3개 항목(news만 3~4개). radar·coffee·dessert·cafes는 항목마다 source_url과 why 필수.
 출력: 아래 JSON '한 개'만. 설명·코드블록·여는말 금지.
 {"title":"이번 주 제목","sections":[
  {"key":"tldr","title":"📌 이번 주 한눈에","items":[{"text":"요약 3개 정도"}]},

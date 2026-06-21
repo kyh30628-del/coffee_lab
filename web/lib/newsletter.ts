@@ -50,24 +50,50 @@ export function verifyOptout(email: string, token: string): boolean {
   return !!email && !!token && crypto.timingSafeEqual(Buffer.from(optoutToken(email)), Buffer.from(token));
 }
 
-// ── 저작권·컴플라이언스 결정적 가드 ──
-//   요약 길이 제한(원문 복제 방지), 금지/과장 표현 차단, 출처 없는 사실주장 ⚠️ 플래그.
+// ── 🔒 내용 규칙(고정 SPEC) ─────────────────────────────────────────
+//   섹션 순서·제목·항목수·필수필드를 한 곳에서 정의 → 누가 만들든(나·네이버·소넷) 동일하게 강제.
+//   주간물 일관성의 '단일 기준'. key는 렌더러 KICKER와 1:1 일치(틀과 내용규칙을 같은 키로 묶음).
+export const NL_SPEC = [
+  { key: "tldr",    title: "📌 이번 주 한눈에",     min: 3, max: 3, needWhy: false, needSource: false },
+  { key: "radar",   title: "📊 트렌드 레이더",       min: 3, max: 3, needWhy: true,  needSource: true },
+  { key: "coffee",  title: "☕ 커피 인사이트",       min: 3, max: 3, needWhy: true,  needSource: true },
+  { key: "dessert", title: "🍰 디저트 스포트라이트", min: 3, max: 3, needWhy: true,  needSource: true },
+  { key: "cafes",   title: "🔥 뜨는 카페 동향",      min: 3, max: 3, needWhy: true,  needSource: true },
+  { key: "action",  title: "💡 이번 주 사장님 액션", min: 3, max: 3, needWhy: false, needSource: false },
+  { key: "news",    title: "📰 짧은 업계 뉴스",      min: 3, max: 4, needWhy: false, needSource: true },
+] as const;
+
+// ── 저작권·컴플라이언스 + 내용규칙 결정적 가드 ──
+//   (a) 요약 길이 제한(원문 복제 방지) (b) 금지/과장 표현 차단 (c) SPEC 강제:
+//   섹션 순서·제목 고정, 항목수 상한 트림·하한 미달 플래그, 필수 출처·'우리 가게엔' 누락 플래그.
 const BANNED = /(100% 보장|확실히 낫는다|치료에 효과|의학적 효능|최고의 [^ ]+ 1위 보장)/;
 export function applyGuards(nl: Newsletter): Newsletter {
   const flags: string[] = [];
   const MAX = 220; // 항목 텍스트 길이 상한(요약 강제 = 저작권 안전)
-  for (const sec of nl.sections || []) {
-    for (const it of sec.items || []) {
+  const byKey = new Map<string, NLSection>();
+  for (const s of nl.sections || []) if (s?.key) byKey.set(s.key, s);
+
+  const out: NLSection[] = [];
+  for (const spec of NL_SPEC) {
+    const src = byKey.get(spec.key);
+    const title = spec.title;                          // 제목은 SPEC로 고정(표현 드리프트 차단)
+    const items = (src?.items || []).slice(0, spec.max); // 상한 초과분 잘라냄
+    for (const it of items) {
       if (it.text && it.text.length > MAX) it.text = it.text.slice(0, MAX) + "…";
       if (it.why && it.why.length > MAX) it.why = it.why.slice(0, MAX) + "…";
-      if (BANNED.test(`${it.text} ${it.why || ""}`)) { it.flag = "금지·과장 표현"; flags.push(`[${sec.title}] 금지·과장 표현: ${it.text.slice(0, 30)}`); }
-      // 사실성 섹션(트렌드/뉴스/커피/디저트)인데 출처 없으면 확인필요
-      if (["radar", "coffee", "dessert", "cafes", "news"].includes(sec.key) && !it.source_url && !it.flag) {
-        it.flag = "출처 없음 — 확인필요"; flags.push(`[${sec.title}] 출처 없음: ${it.text.slice(0, 30)}`);
-      }
+      if (BANNED.test(`${it.text} ${it.why || ""}`)) { it.flag = "금지·과장 표현"; flags.push(`[${title}] 금지·과장 표현: ${it.text.slice(0, 30)}`); }
+      else if (spec.needSource && !it.source_url) { it.flag = "출처 없음 — 확인필요"; flags.push(`[${title}] 출처 없음: ${it.text.slice(0, 30)}`); }
       if (it.flag) it.verified = false;
     }
+    if (items.length < spec.min) flags.push(`[${title}] 항목 부족 — ${spec.min}개 필요, 현재 ${items.length}개`);
+    // '우리 가게엔' 적용 팁은 섹션 단위로 강제 — intro(네이버 경로) 또는 모든 항목 why(나·소넷 경로) 둘 중 하나면 통과.
+    if (spec.needWhy && items.length > 0 && !src?.intro && !items.every((it) => it.why)) flags.push(`[${title}] '우리 가게엔' 적용 팁 누락(섹션 intro 또는 항목별 why 필요)`);
+    if (items.length > 0) out.push({ key: spec.key, title, intro: src?.intro, items });
   }
+  // SPEC 외 섹션은 버림(틀 고정).
+  for (const s of nl.sections || []) if (s?.key && !NL_SPEC.some((x) => x.key === s.key)) flags.push(`규격 외 섹션 '${s.key}' 제외됨`);
+
+  nl.sections = out;
   nl.flags = flags;
   return nl;
 }
