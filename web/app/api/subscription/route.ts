@@ -15,23 +15,55 @@ function genPin(): string {
   const cs = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   return Array.from({ length: 8 }, () => cs[crypto.randomInt(cs.length)]).join("");
 }
-// 등록 이메일로 PIN 발송(Resend). 키 없으면 미발송(관리자 화면에서 PIN 확인·전달).
-async function sendPinEmail(to: string, pin: string, cafeName: string): Promise<boolean> {
+// 등록 이메일로 PIN(내 카페 열쇠) 발송(Resend). 키 없으면 미발송(관리자 화면에서 PIN 확인·전달).
+//   동네 커피 노트 톤(따뜻한 세리프·크림/커피색) + 손님 후기가 모인 '우리 가게 이야기' 정서. 체험/구독 분기.
+async function sendPinEmail(to: string, pin: string, cafeName: string, days = 30): Promise<boolean> {
   const key = process.env.RESEND_API_KEY;
   if (!key || !to || !to.includes("@")) return false;
+  const site = (process.env.NEXT_PUBLIC_SITE_URL || "https://dongnecoffeenote.com").replace(/\/$/, "");
+  const esc = (s: string) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
+  const name = esc(cafeName || "우리 카페");
+  const isTrial = days <= 7;
+  const kicker = isTrial ? "7일 무료 체험이 시작됐어요" : "우리 가게 이야기가 시작됐어요";
+  const body = isTrial
+    ? `우리 동네 누군가는 오늘도 사장님 가게의 커피 한 잔을 기억합니다. 손님들이 남긴 진심 어린 후기가 모여 만든 <b style="color:#5b4636">‘우리 가게 이야기’</b>를, 지금부터 <b style="color:#5b4636">7일 동안</b> 마음껏 들여다보세요.`
+    : `수많은 손님이 남긴 진심이 모여 사장님 가게만의 색깔이 되었어요. 이제 그 이야기와 함께, 우리 가게를 더 오래 빛나게 해보세요.`;
+  const footer = isTrial
+    ? `지금 7일 무료 체험이 시작됐어요. 기간이 끝나도 구독으로 언제든 이어갈 수 있어요.`
+    : `우리가게 홍보팩 구독이 시작됐어요. 함께해 주셔서 고맙습니다.`;
+  const subject = isTrial ? `☕ ${cafeName} 사장님, 우리 가게 이야기를 열어보세요 (7일 무료 체험)` : `☕ ${cafeName} 사장님, 우리 가게 이야기가 시작됐어요`;
+  const html = `<div style="margin:0;padding:0;background:#efe7d8;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#efe7d8;padding:32px 12px;"><tr><td align="center">
+      <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;background:#fffdf9;border:1px solid #e7dcc6;border-radius:18px;overflow:hidden;font-family:'Nanum Myeongjo',Georgia,'Apple SD Gothic Neo',serif;">
+        <tr><td style="background:#2b2018;padding:16px 28px;"><span style="color:#e8b87a;font-size:12px;letter-spacing:3px;">☕ 동네 커피 노트</span></td></tr>
+        <tr><td style="padding:30px 28px 6px;">
+          <div style="font-size:13px;color:#b07d3e;letter-spacing:0.5px;margin-bottom:8px;">${kicker}</div>
+          <div style="font-size:22px;font-weight:700;color:#2b2018;line-height:1.4;">${name} 사장님,</div>
+          <p style="font-size:15px;color:#52402e;line-height:1.9;margin:16px 0 0;">${body}</p>
+        </td></tr>
+        <tr><td style="padding:22px 28px 6px;">
+          <div style="background:#f4ece0;border:1px dashed #d8c4a3;border-radius:14px;padding:18px;text-align:center;">
+            <div style="font-size:12px;color:#9c6b3f;letter-spacing:1px;margin-bottom:10px;">🔑 내 카페 열쇠</div>
+            <div style="font-size:30px;font-weight:800;letter-spacing:8px;color:#2b2018;font-family:'Courier New',monospace;">${esc(pin)}</div>
+          </div>
+        </td></tr>
+        <tr><td style="padding:10px 28px 28px;" align="center">
+          <a href="${site}/owner" style="display:inline-block;background:#2b2018;color:#f4ece0;text-decoration:none;font-size:15px;font-weight:700;padding:14px 30px;border-radius:30px;">내 카페 이야기 보러 가기 →</a>
+          <p style="font-size:12px;color:#a8927a;margin:14px 0 0;line-height:1.7;">화면에서 위 열쇠를 입력하면 <b style="color:#7c6a55;">내 카페로 바로</b> 들어가요.</p>
+        </td></tr>
+        <tr><td style="background:#faf4ea;border-top:1px solid #efe2cd;padding:18px 28px;">
+          <p style="font-size:12px;color:#9c8569;margin:0;line-height:1.7;">${footer}</p>
+          <p style="font-size:11px;color:#bcae98;margin:8px 0 0;">열쇠는 본인만 알 수 있게 보관해 주세요 · 문의 kyh30628@gmail.com</p>
+        </td></tr>
+      </table>
+      <div style="font-size:11px;color:#b3a489;margin-top:14px;font-family:'Apple SD Gothic Neo',serif;">동네 커피 노트 · 진짜 후기로 고른 우리 동네 카페</div>
+    </td></tr></table>
+  </div>`;
   try {
     const r = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        from: process.env.RESEND_FROM || "동네 커피 노트 <onboarding@resend.dev>",
-        to: [to],
-        subject: "[동네 커피 노트] 구독 승인 — 사장님 PIN 번호",
-        html: `<div style="font-family:sans-serif"><p><b>${cafeName}</b> 사장님, 홍보팩 구독이 승인됐어요.</p>
-          <p>사장님 화면에서 아래 PIN으로 로그인하시면 <b>내 카페로 바로</b> 들어갑니다.</p>
-          <p style="font-size:24px;font-weight:bold;letter-spacing:3px;background:#f4ece0;padding:14px 18px;border-radius:10px;display:inline-block">${pin}</p>
-          <p style="color:#888;font-size:13px">PIN은 본인만 알 수 있게 보관하세요.</p></div>`,
-      }),
+      body: JSON.stringify({ from: process.env.RESEND_FROM || "동네 커피 노트 <onboarding@resend.dev>", to: [to], subject, html }),
     });
     return r.ok;
   } catch { return false; }
@@ -96,7 +128,7 @@ export async function POST(req: NextRequest) {
         if (s.cafe_id) await sql`INSERT INTO cafe_promos (cafe_id, featured, featured_until, approved, published, updated_at)
           VALUES (${s.cafe_id}, true, now()+make_interval(days=>${days}), true, true, now())
           ON CONFLICT (cafe_id) DO UPDATE SET featured=true, featured_until=now()+make_interval(days=>${days}), approved=true`;
-        const emailed = await sendPinEmail(decryptPII(s.email ?? ""), pin, s.cafe_name ?? "");
+        const emailed = await sendPinEmail(decryptPII(s.email ?? ""), pin, s.cafe_name ?? "", days);
         return NextResponse.json({ ok: true, status: "active", pin, emailed });
       }
       if (b.action === "extend") {
