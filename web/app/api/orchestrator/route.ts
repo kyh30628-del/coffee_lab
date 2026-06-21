@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
-import { synthAndStore, finalizePipeline, scrubPublishedPII, healGroundingSuspects, holdZeroEvidenceSuspects } from "@/lib/synthStore";
+import { synthAndStore, finalizePipeline, scrubPublishedPII, healGroundingSuspects, holdZeroEvidenceSuspects, healLowCoherence } from "@/lib/synthStore";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
@@ -227,6 +227,8 @@ export async function GET(req: NextRequest) {
       try { const gr = await healGroundingSuspects(); if (gr.resynthed > 0) healed.push(`그라운딩 의심 ${gr.resynthed}곳 재합성 교정`); } catch {}
       // (e) 그라운딩 '근거0건' 확정 카페 자동 보류(비공개) + 개선 시 복귀
       try { const z = await holdZeroEvidenceSuspects(); if (z.held > 0) healed.push(`근거0건 ${z.held}곳 자동 비공개(${z.names.slice(0, 3).join(", ")})`); if (z.released > 0) healed.push(`복원 ${z.released}곳`); } catch {}
+      // (f) 표시 근거후기가 카페명과 안 맞는 오염(동명·프랜차이즈 지점) 상시 재검·자가치유 — '바빈스 식당리뷰' 유형.
+      try { const lc = await healLowCoherence(); if (lc.healed > 0) healed.push(`근거 오염 ${lc.healed}곳 재합성 교정(${lc.names.slice(0, 3).join(", ")})`); if (lc.stillBad.length > 0) integrity.push(`근거 오염 잔존 ${lc.stillBad.length}곳(교정후에도 카페명 불일치) — 점검필요: ${lc.stillBad.slice(0, 3).map((b) => b.name).join(", ")}`); } catch {}
     }
 
     // ── 3) 에이전트별 건강 판정 ──

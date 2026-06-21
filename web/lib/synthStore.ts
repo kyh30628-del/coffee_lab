@@ -324,3 +324,33 @@ export async function markJudged(cafeId: number) {
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS llm_judged_at TIMESTAMPTZ`;
   await sql`UPDATE cafes SET llm_judged_at=now() WHERE id=${cafeId}`;
 }
+
+// 🛡️ 자가치유: 공개 카페의 '화면 노출 근거 후기'가 실제로 그 카페 얘기인지 상시 재검(이름 일관성).
+//   합성 시점 게이트(noise)를 빠져나간 오염(동명·프랜차이즈 지점 등 신종 변종)을 사후에 잡는 안전망.
+//   낮으면 재합성 → 게이트가 자동 비공개/보류. coherence_checked_at 커서로 전 공개카페를 순환 검사.
+//   반환: 검사수·교정수·교정후에도 여전히 낮은(진짜 문제) 목록.
+export async function healLowCoherence(limit = 250, threshold = 0.4): Promise<{ scanned: number; healed: number; stillBad: { id: number; name: string; coh: number }[]; names: string[] }> {
+  await ensureCols();
+  await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS coherence_checked_at TIMESTAMPTZ`.catch(() => {});
+  const rows = (await sql`SELECT id, name, area, synth_reviews FROM cafes
+    WHERE published AND synth_reviews IS NOT NULL AND jsonb_array_length(synth_reviews) >= 3
+    ORDER BY coherence_checked_at ASC NULLS FIRST LIMIT ${limit}`) as unknown as any[];
+  let scanned = 0; const healedNames: string[] = []; const stillBad: { id: number; name: string; coh: number }[] = [];
+  for (const r of rows) {
+    scanned++;
+    const quotes = (r.synth_reviews || []).map((e: any) => e?.quote || "").filter(Boolean);
+    const coh = nameCoherence(r.name, quotes);
+    await sql`UPDATE cafes SET coherence_checked_at=now() WHERE id=${r.id}`.catch(() => {});
+    if (coh >= threshold) continue;
+    // 오염 의심 → 재합성(수정된 규칙·게이트 적용). 게이트가 noise/등급미달이면 자동 비공개.
+    try { await synthAndStore({ id: r.id, name: r.name, area: r.area }, { refresh: false }); } catch { continue; }
+    const after = (await sql`SELECT published, synth_reviews FROM cafes WHERE id=${r.id}`)[0] as any;
+    healedNames.push(r.name);
+    if (after?.published) {
+      const q2 = (after.synth_reviews || []).map((e: any) => e?.quote || "").filter(Boolean);
+      const coh2 = nameCoherence(r.name, q2);
+      if (coh2 < threshold) stillBad.push({ id: r.id, name: r.name, coh: Math.round(coh2 * 100) / 100 });
+    }
+  }
+  return { scanned, healed: healedNames.length, stillBad, names: healedNames.slice(0, 8) };
+}
