@@ -19,7 +19,7 @@ type Insight = {
   similar: { name: string; grade: string | null; count: number | null }[];
   actions: Action[]; reviewCadence?: ReviewCadence;
 };
-const GRADE_BG: Record<string, string> = { 검증: "#5f7355", 참고: "#9c6b3f", 발굴: "#a8927a" };
+const GRADE_BG: Record<string, string> = { 검증: "#5f7355", 참고: "#9c6b3f", 후보: "#a8927a" };
 const PIE_COLORS = ["#9c6b3f", "#5f7355", "#c8893f", "#6f4e37", "#c97a6d", "#a8927a"];
 const TABS = [{ k: "rank", l: "📊 순위" }, { k: "radar", l: "🕸️ 성격" }, { k: "pie", l: "🍩 구성" }];
 const TONE: Record<string, { bg: string; border: string; tag: string }> = {

@@ -87,7 +87,7 @@ const CHAR_LABELS: Record<string, { label: string; emoji: string }> = {
   quiet: { label: "조용한", emoji: "🤍" }, dessert: { label: "디저트", emoji: "🍰" },
   mood: { label: "분위기", emoji: "📸" }, space: { label: "넓은공간", emoji: "🪑" },
 };
-const GRADE_STYLE: Record<string, { bg: string; label: string }> = { 검증: { bg: "#5f7355", label: "검증" }, 참고: { bg: "#9c6b3f", label: "참고" }, 발굴: { bg: "#a8927a", label: "발굴" } };
+const GRADE_STYLE: Record<string, { bg: string; label: string }> = { 검증: { bg: "#5f7355", label: "검증" }, 참고: { bg: "#9c6b3f", label: "참고" }, 후보: { bg: "#a8927a", label: "후보" } };
 const TONES = ["#6f4e37", "#5f7355", "#9c6b3f", "#3a2e28", "#8a5a24"];
 
 // 홈 잡지 카드 — 모듈 스코프(컴포넌트 내부 정의 금지). 내부에 두면 렌더마다 재마운트되어 뒤로가기/탭전환이 느려짐.
@@ -252,7 +252,7 @@ function makeMyLocHtml(): string {
   return `<div style="transform:translate(-50%,-50%);"><span style="display:block;width:18px;height:18px;border-radius:50%;background:#2f6fb0;border:3px solid #fff;box-shadow:0 0 0 5px rgba(47,111,176,0.28),0 1px 5px rgba(0,0,0,0.45);"></span></div>`;
 }
 function makePinHtml(c: Cafe, isMatch: boolean, isFocus = false, isMine = false): string {
-  const grade = c.synth_grade ?? "발굴";
+  const grade = c.synth_grade ?? "후보";
   const feat = !!c.featured && !isFocus; // ✨ 우선 노출 — 골드 핀 강조(포커스 핀이 우선)
   // 내 카페(MY PIN) — 핑크/레드 하트 핀으로 최우선 강조
   const color = isMine ? "#d6336c" : isFocus ? "#b5703c" : feat ? "#e0a32e" : isMatch ? "#5f7355" : (GRADE_STYLE[grade]?.bg ?? "#9c6b3f");

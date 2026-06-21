@@ -251,8 +251,8 @@ export async function synthAndStore(cafe: { id: number; name: string; area: stri
   if (apiFailed) return { id: cafe.id, name: cafe.name, ok: false, reason: "수집 API 오류/쿼터 — 보존", skipped: true };
   const sources = rawToSources(raw);
   if (sources.length === 0) {
-    await sql`UPDATE cafes SET synth_grade='발굴', synth_count=0, synth_updated=now(), published=false WHERE id=${cafe.id}`;
-    return { id: cafe.id, name: cafe.name, ok: false, reason: "수집 0", grade: "발굴", published: false, fromCache };
+    await sql`UPDATE cafes SET synth_grade='후보', synth_count=0, synth_updated=now(), published=false WHERE id=${cafe.id}`;
+    return { id: cafe.id, name: cafe.name, ok: false, reason: "수집 0", grade: "후보", published: false, fromCache };
   }
 
   const area = cafe.area ? [cafe.area] : [];

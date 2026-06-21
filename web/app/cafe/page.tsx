@@ -37,7 +37,7 @@ const TONES: Record<string, { from: string; to: string; ink: string }> = {
   steel: { from: "#7d8794", to: "#454d57", ink: "#fff" }, cream: { from: "#d8c3a0", to: "#a8895f", ink: "#3d2a1d" },
 };
 const GRADE_STYLE: Record<string, { bg: string; label: string }> = {
-  검증: { bg: "#5f7355", label: "검증" }, 참고: { bg: "#9c6b3f", label: "참고" }, 발굴: { bg: "#a8927a", label: "발굴" },
+  검증: { bg: "#5f7355", label: "검증" }, 참고: { bg: "#9c6b3f", label: "참고" }, 후보: { bg: "#a8927a", label: "후보" },
 };
 
 // 특징 태그 — '대부분 카페가 가진' 특징을 데이터로 뽑아 표시 (질문 아닌 정보)

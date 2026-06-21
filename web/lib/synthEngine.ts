@@ -67,7 +67,7 @@ function scanAxis(text: string, cfg: { strong: string[]; weak: string[] }, amb: 
 }
 
 export type SynthResult = {
-  name: string; reviewCount: number; grade: "검증" | "참고" | "발굴";
+  name: string; reviewCount: number; grade: "검증" | "참고" | "후보";
   coords: Record<string, number | null>; basis: Record<string, string>;
   uses: Record<string, number>; ops: Record<string, number>;
   evidence: Record<string, { kind: string; snip: string }[]>;
@@ -113,7 +113,7 @@ export function synthesize(name: string, reviews: Review[]): SynthResult {
     if (c) ops[o] = c;
   }
 
-  const grade = n >= 30 ? "검증" : n >= 5 ? "참고" : "발굴";
+  const grade = n >= 30 ? "검증" : n >= 5 ? "참고" : "후보";
   const evidence: Record<string, { kind: string; snip: string }[]> = {};
   axes.forEach((a) => (evidence[a] = stat[a].ev.slice(0, 3)));
 

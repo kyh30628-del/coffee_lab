@@ -30,10 +30,10 @@ async function runChecks(): Promise<Check[]> {
     await samp(sql`SELECT name s FROM cafes WHERE synth_quality->>'raw' IS NOT NULL
       AND (synth_quality->>'raw')::int <> (synth_quality->>'verified')::int + (synth_quality->>'reference')::int + (synth_quality->>'rejected')::int LIMIT 6`));
 
-  // 2. 등급 유효성: 공개 카페는 검증/참고/발굴 중 하나
-  add("grade_validity", "등급 값 유효성 (검증/참고/발굴)", "fail",
-    await n(sql`SELECT count(*)::int n FROM cafes WHERE published AND (synth_grade IS NULL OR synth_grade NOT IN ('검증','참고','발굴'))`),
-    await samp(sql`SELECT name s FROM cafes WHERE published AND (synth_grade IS NULL OR synth_grade NOT IN ('검증','참고','발굴')) LIMIT 6`));
+  // 2. 등급 유효성: 공개 카페는 검증/참고/후보 중 하나
+  add("grade_validity", "등급 값 유효성 (검증/참고/후보)", "fail",
+    await n(sql`SELECT count(*)::int n FROM cafes WHERE published AND (synth_grade IS NULL OR synth_grade NOT IN ('검증','참고','후보'))`),
+    await samp(sql`SELECT name s FROM cafes WHERE published AND (synth_grade IS NULL OR synth_grade NOT IN ('검증','참고','후보')) LIMIT 6`));
 
   // 3. 고아 데이터: 공개인데 분석/후기 없음
   add("orphan_published", "공개 카페 분석 데이터 누락", "fail",

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { TASTES, SITE, type SeoCafe } from "@/lib/seoData";
 import KakaoShare from "../KakaoShare";
 
-const GRADE_BG: Record<string, string> = { 검증: "#5f7355", 참고: "#9c6b3f", 발굴: "#a8927a" };
+const GRADE_BG: Record<string, string> = { 검증: "#5f7355", 참고: "#9c6b3f", 후보: "#a8927a" };
 
 // 동네×취향 검증 카페 큐레이션 — SEO 콘텐츠 페이지 공용 렌더(서버 컴포넌트).
 export default function Curated({ area, tasteKey, heading, intro, cafes, regions, canonical }: {

@@ -22,7 +22,7 @@ type Stats = {
   };
 };
 
-const GRADE_COLOR: Record<string, string> = { 검증: "#5f7355", 참고: "#9c6b3f", 발굴: "#a8927a", 미합성: "#cbd5e1" };
+const GRADE_COLOR: Record<string, string> = { 검증: "#5f7355", 참고: "#9c6b3f", 후보: "#a8927a", 미합성: "#cbd5e1" };
 function groupByDate(rows: any[]): Record<string, any[]> {
   const g: Record<string, any[]> = {};
   for (const r of rows) { const d = new Date(r.yt_checked_at).toLocaleDateString("ko-KR"); (g[d] ??= []).push(r); }
@@ -879,7 +879,7 @@ export default function AdminPage() {
 
         {ct && (
           <div className="grid sm:grid-cols-2 gap-3 mb-4">
-            <Card title="등급 분포 (공개)" note="검증 30+ · 참고 5~30 · 발굴 5미만(자동 비공개)">
+            <Card title="등급 분포 (공개)" note="검증 30+ · 참고 5~30 · 후보 5미만(자동 비공개)">
               <ResponsiveContainer width="100%" height={180}>
                 <PieChart>
                   <Pie data={ct.grades} dataKey="n" nameKey="grade" cx="50%" cy="50%" innerRadius={42} outerRadius={70} paddingAngle={2}
@@ -976,7 +976,7 @@ export default function AdminPage() {
         </section>
         <section className="mb-6">
           <h2 className="text-sm font-bold text-stone-700 mb-1">🔍 자동수집 미공개 · 데이터 부족 ({autoHidden.length})</h2>
-          <p className="text-[11px] text-stone-400 mb-2">검증 리뷰 5건 미만(발굴)으로 자동 비공개. 사람 요청 아님 · 리뷰 쌓이면 자동 공개.</p>
+          <p className="text-[11px] text-stone-400 mb-2">검증 리뷰 5건 미만(후보)으로 자동 비공개. 사람 요청 아님 · 리뷰 쌓이면 자동 공개.</p>
           {autoHidden.length === 0 ? <p className="text-sm text-stone-400">없음</p> : (
             <>
               <button onClick={() => setShowAuto((v) => !v)} className="text-xs px-3 py-1.5 rounded-lg bg-stone-200 text-stone-700 mb-2">{showAuto ? "접기 ▲" : `목록 펼치기 ▼ (${autoHidden.length})`}</button>
