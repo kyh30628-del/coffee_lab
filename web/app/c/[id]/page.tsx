@@ -57,7 +57,19 @@ export default async function CafePage({ params }: Props) {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet" />
       <div className="max-w-xl mx-auto px-5 py-8">
-        <Link href="/" className="text-[#9c6b3f] text-sm">← 동네 커피 노트</Link>
+        <div className="flex items-center justify-between gap-2">
+          <Link href="/" className="text-[#9c6b3f] text-sm">← 동네 커피 노트</Link>
+          <KakaoShare
+            title={`${c.name} (${c.area})`}
+            description={(c.synth_identity || "진짜 후기로 검증한 동네 카페").slice(0, 80)}
+            imageUrl={`${SITE}/c/${c.id}/opengraph-image`}
+            link={`${SITE}/c/${c.id}`}
+            className="flex items-center gap-1.5 bg-[#FEE500] text-[#3c1e1e] rounded-full pl-2.5 pr-3 py-1.5 text-[12px] font-bold"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="#3c1e1e"><path d="M12 3C6.5 3 2 6.6 2 11c0 2.8 1.9 5.3 4.7 6.7-.2.7-.7 2.6-.8 3-.1.5.2.5.4.4.2-.1 2.6-1.8 3.7-2.5.6.1 1.3.1 2 .1 5.5 0 10-3.6 10-8S17.5 3 12 3z"/></svg>
+            공유
+          </KakaoShare>
+        </div>
         <div className="mt-5">
           <div className="flex items-center gap-2 mb-1 flex-wrap">
             <h1 className="text-2xl font-bold">{c.name}</h1>
@@ -73,14 +85,6 @@ export default async function CafePage({ params }: Props) {
           )}
           <p className="text-[12.5px] text-[#8a7458] mb-6 leading-relaxed">네이버 공개 후기 <b>{c.synth_count ?? 0}건</b>을 교차검증한 데이터 기반 소개예요. (절대 평가가 아니라 후기에서 자주 언급된 정도입니다)</p>
           <Link href={`/?cafe=${c.id}`} className="block w-full text-center bg-[#2b2018] text-[#f4ece0] rounded-xl py-3.5 font-bold">지도·근거 후기 보기 →</Link>
-          <KakaoShare
-            title={`${c.name} (${c.area})`}
-            description={(c.synth_identity || "진짜 후기로 검증한 동네 카페").slice(0, 80)}
-            imageUrl={`${SITE}/c/${c.id}/opengraph-image`}
-            link={`${SITE}/c/${c.id}`}
-            label="🟡 카카오톡으로 공유"
-            className="block w-full text-center mt-2.5 bg-[#FEE500] text-[#3c1e1e] rounded-xl py-3 font-bold"
-          />
         </div>
       </div>
     </main>

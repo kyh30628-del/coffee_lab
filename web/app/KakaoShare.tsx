@@ -18,8 +18,8 @@ function loadKakao(): Promise<any> {
   });
 }
 
-export default function KakaoShare({ title, description, imageUrl, link, label = "🟡 카톡 공유", className }: {
-  title: string; description: string; imageUrl: string; link: string; label?: string; className?: string;
+export default function KakaoShare({ title, description, imageUrl, link, label = "🟡 카톡 공유", className, children }: {
+  title: string; description: string; imageUrl: string; link: string; label?: string; className?: string; children?: React.ReactNode;
 }) {
   const [msg, setMsg] = useState("");
   const onClick = useCallback(async () => {
@@ -39,5 +39,5 @@ export default function KakaoShare({ title, description, imageUrl, link, label =
     if (nav.share) { try { await nav.share({ title, text: description, url: link }); return; } catch {} }
     try { await navigator.clipboard.writeText(link); setMsg("링크 복사됨"); setTimeout(() => setMsg(""), 1500); } catch {}
   }, [title, description, imageUrl, link]);
-  return <button onClick={onClick} className={className} type="button">{msg || label}</button>;
+  return <button onClick={onClick} className={className} type="button">{msg || children || label}</button>;
 }
