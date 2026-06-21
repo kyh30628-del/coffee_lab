@@ -90,6 +90,11 @@ async function runChecks(): Promise<Check[]> {
     await n(sql`SELECT count(*)::int n FROM cafe_promos WHERE approved AND coalesce(ai_headline,'')='' AND coalesce(video_url,'')='' AND coalesce(intro,'')=''`),
     await samp(sql`SELECT cafe_id::text s FROM cafe_promos WHERE approved AND coalesce(ai_headline,'')='' AND coalesce(video_url,'')='' AND coalesce(intro,'')='' LIMIT 6`));
 
+  // 12. 고아 홍보: 존재하지 않는 카페를 가리키는 홍보(삭제된 카페·테스트 잔재). 추천 슬롯 오염 방지.
+  add("orphan_promo", "고아 홍보(존재하지 않는 카페)", "warn",
+    await n(sql`SELECT count(*)::int n FROM cafe_promos pr WHERE NOT EXISTS (SELECT 1 FROM cafes c WHERE c.id=pr.cafe_id)`),
+    await samp(sql`SELECT pr.cafe_id::text s FROM cafe_promos pr WHERE NOT EXISTS (SELECT 1 FROM cafes c WHERE c.id=pr.cafe_id) LIMIT 6`));
+
   return checks;
 }
 
