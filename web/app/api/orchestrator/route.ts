@@ -69,10 +69,12 @@ export async function GET(req: NextRequest) {
     //   (그라운딩 apply가 의심분을 판정 큐로 되먹이면 judge_q가 뛰는데, 이 분해가 그 이유를 숫자로 보여줌)
     const jb = (await sql`SELECT
       COUNT(*) FILTER (WHERE g.cafe_id IS NOT NULL AND NOT g.grounded)::int reground,
+      COUNT(*) FILTER (WHERE (g.cafe_id IS NULL OR g.grounded) AND c.llm_judged_at IS NULL)::int newjudge,
+      COUNT(*) FILTER (WHERE (g.cafe_id IS NULL OR g.grounded) AND c.llm_judged_at IS NOT NULL)::int recollect,
       COUNT(*) FILTER (WHERE g.cafe_id IS NULL OR g.grounded)::int fresh
       FROM cafes c LEFT JOIN grounding_checks g ON g.cafe_id = c.id
       WHERE (c.published OR c.pipeline_status='pending') AND c.raw_reviews IS NOT NULL
-        AND (c.llm_judged_at IS NULL OR c.llm_judged_at < c.raw_collected_at)`.catch(() => [{ reground: 0, fresh: 0 }]))[0] as any;
+        AND (c.llm_judged_at IS NULL OR c.llm_judged_at < c.raw_collected_at)`.catch(() => [{ reground: 0, newjudge: 0, recollect: 0, fresh: 0 }]))[0] as any;
     // 그라운딩 '의심(재검 대기)' = 실제 미처리 = '공개 중'이면서 '현재(재합성 후) 검사 결과'가 의심인 것만 센다.
     //   stale 플래그(재합성으로 무효)·보류(이미 비공개=처리됨)는 미처리가 아니므로 제외 → 화면이 '진짜 남은 일'만 표시.
     const gr = (await sql`SELECT COUNT(*) FILTER (WHERE NOT g.grounded)::int suspect, MAX(g.checked_at) last FROM grounding_checks g JOIN cafes c ON c.id = g.cafe_id WHERE c.published AND g.checked_at >= c.synth_updated AND c.llm_judged_at IS NOT NULL AND c.llm_judged_at >= c.raw_collected_at`)[0] as any;
@@ -247,7 +249,7 @@ export async function GET(req: NextRequest) {
       const dAge = ageHours(catRun?.ran_at ?? null, now);
       agents.push({ key: "dongfill", label: "동 채움 (백필)", lastRun: catRun?.ran_at ?? null, ageH: dAge == null ? null : Math.round(dAge * 10) / 10, cadenceH: 26, status: pubND.n > 50 ? "warn" : "ok", queue: pubND.n, note: pubND.n ? `공개 동없음 ${pubND.n}` : "공개 동 100%" });
     }
-    add("judge", "AI 판정 (Haiku·새벽)", c.last_judge, 30, c.judge_q, `공개카페 판정 완료 ${c.published ? Math.round((c.pub_judged / c.published) * 100) : 0}% (${c.pub_judged}/${c.published}) · 미판정 ${c.judge_q}=재검 ${jb.reground}+신규 ${jb.fresh}`);
+    add("judge", "AI 판정 (Haiku·새벽)", c.last_judge, 30, c.judge_q, `공개카페 판정 완료 ${c.published ? Math.round((c.pub_judged / c.published) * 100) : 0}% (${c.pub_judged}/${c.published}) · 미판정 ${c.judge_q}=신규 ${jb.newjudge}+재수집변경 ${jb.recollect}+그라운딩재검 ${jb.reground}`);
     add("embed", "임베딩", c.last_embed, 30, c.embed_q, c.embed_q ? `미임베딩 ${c.embed_q}` : `완료(공개 ${c.published ? Math.round((c.pub_embedded / c.published) * 100) : 0}%)`);
     add("verify", "검증 레드팀", vr?.ran_at ?? null, 30, (vr?.fails ?? 0) + (vr?.warns ?? 0), vr ? `fail ${vr.fails}·warn ${vr.warns}` : "리포트 없음");
     // 품질감사: 미해결 플래그 기준(가동 시각은 flag 생성 시각으로 근사)
@@ -278,7 +280,7 @@ export async function GET(req: NextRequest) {
     // 신규 카페 조립라인(발굴→합성→AI판정→임베딩→공개). 각 단계 대기 수 = '어디서 막혔나'.
     const pipeline = {
       stages: [
-        { key: "new", label: "발굴", count: pl.p_new, note: "합성 대기" },
+        { key: "new", label: "신규수집", count: pl.p_new, note: "합성 대기(=pipeline_status:new)" },
         { key: "pending", label: "검증중", count: pl.p_pending, note: "공개 전 게이트" },
         { key: "wait_judge", label: "AI판정 대기", count: pl.wait_judge, note: "새벽 판정" },
         { key: "wait_embed", label: "임베딩 대기", count: pl.wait_embed, note: "" },

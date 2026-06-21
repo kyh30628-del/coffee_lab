@@ -42,6 +42,8 @@ async function ensureCols() {
   if (ensured) return;
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS raw_reviews JSONB`;
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS raw_collected_at TIMESTAMPTZ`;
+  // raw_checked_at: 재수집을 '시도'한 시각(커서 전용). raw_collected_at(=내용이 실제 바뀐 시각, 판정 큐 트리거)과 분리.
+  await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS raw_checked_at TIMESTAMPTZ`;
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS llm_judged_at TIMESTAMPTZ`;
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS yt_checked_at TIMESTAMPTZ`;
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS judge_decisions JSONB`; // 판정 AI 결정(key→keep/drop) 영구 보존 → 재합성해도 유지
@@ -95,7 +97,17 @@ async function gatherRaw(cafe: { id: number; name: string; area: string }, refre
     ytErr = !!yt.apiError;
   }
   if (raw.length === 0 && (web.apiError || ytErr)) return { raw: [], fromCache: false, apiFailed: true };
-  await sql`UPDATE cafes SET raw_reviews=${safeJson(cleanRaw(raw))}, raw_collected_at=now() WHERE id=${cafe.id}`;
+  // 내용 비교: 재수집했는데 후기가 그대로면 raw_collected_at을 건드리지 않는다(= 재판정 큐에 다시 안 올라감).
+  // raw_checked_at만 갱신 → 커서는 계속 순환하되, 헛 재판정(토큰 낭비)·관제탑 숫자 들쭉날쭉이 사라진다.
+  const cleaned = cleanRaw(raw);
+  const sig = (a: RawItem[]) => a.map((r) => `${r.source}${r.text || ""}${r.title || ""}${r.desc || ""}`).sort().join("");
+  let changed = true;
+  try { const prev = await loadRaw(cafe.id); if (prev.length === cleaned.length && sig(prev) === sig(cleaned)) changed = false; } catch { /* 비교 실패 시 안전하게 변경으로 간주 */ }
+  if (changed) {
+    await sql`UPDATE cafes SET raw_reviews=${safeJson(cleaned)}, raw_collected_at=now(), raw_checked_at=now() WHERE id=${cafe.id}`;
+  } else {
+    await sql`UPDATE cafes SET raw_checked_at=now() WHERE id=${cafe.id}`;
+  }
   return { raw, fromCache: false, apiFailed: false };
 }
 

@@ -20,8 +20,8 @@ try {
     try {
       rows = await sql`SELECT id, name, area FROM cafes WHERE raw_reviews IS NULL ORDER BY id LIMIT 10`;
       if (!rows.length) {
-        rows = await sql`SELECT id, name, area FROM cafes ORDER BY raw_collected_at ASC NULLS FIRST LIMIT 10`;
-        refresh = true; // 재수집 모드(네이버 새로 호출). synthAndStore가 raw_collected_at=now()로 갱신 → 자동 순환
+        rows = await sql`SELECT id, name, area FROM cafes ORDER BY COALESCE(raw_checked_at, raw_collected_at) ASC NULLS FIRST LIMIT 10`;
+        refresh = true; // 재수집 모드(네이버 새로 호출). gatherRaw가 raw_checked_at=now()로 갱신 → 자동 순환(내용 바뀐 것만 raw_collected_at 갱신=재판정)
       }
     }
     catch (e) { stop = "DB 조회 실패(쿼터?) — 중단, 다음 회차 재개: " + String(e).slice(0, 50); break; }
