@@ -179,12 +179,12 @@ function makeStationHtml(name: string, colors: string[], refs: string[]): string
   const badge = (c: string, r: string) => {
     const m = (r || "").match(/^(\d+)호선/);
     const lbl = m ? m[1] : (r || "").replace(/호선|선/g, "").slice(0, 3) || "·";
-    return `<span style="background:${c};color:#fff;font-size:11px;font-weight:900;line-height:1;min-width:18px;height:19px;display:inline-flex;align-items:center;justify-content:center;border-radius:10px;padding:0 4px;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.45);">${lbl}</span>`;
+    return `<span style="background:${c};color:#fff;font-size:13px;font-weight:900;line-height:1;min-width:22px;height:23px;display:inline-flex;align-items:center;justify-content:center;border-radius:12px;padding:0 5px;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.45);">${lbl}</span>`;
   };
   const badges = cols.map((c, i) => badge(c, refs && refs[i])).join("");
-  return `<div style="transform:translate(-50%,-50%);display:flex;align-items:center;gap:4px;white-space:nowrap;">
+  return `<div style="transform:translate(-50%,-50%);display:flex;align-items:center;gap:5px;white-space:nowrap;">
     <span style="display:flex;gap:3px;">${badges}</span>
-    <span style="font-size:13px;font-weight:800;color:#1f2d3d;background:#fff;border:1px solid #d4dce3;padding:2px 7px;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.32);">${(name || "").replace(/</g, "&lt;")}역</span>
+    <span style="font-size:15px;font-weight:800;color:#1f2d3d;background:#fff;border:1px solid #d4dce3;padding:3px 9px;border-radius:9px;box-shadow:0 1px 3px rgba(0,0,0,0.32);">${(name || "").replace(/</g, "&lt;")}역</span>
   </div>`;
 }
 // 지하철 출구 마커 — 파란 번호 배지 + '출구' 라벨(역 마커와 구분, 높은 줌에서만). 비클릭.
