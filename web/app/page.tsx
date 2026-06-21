@@ -187,12 +187,12 @@ function makeStationHtml(name: string, colors: string[], refs: string[]): string
     <span style="font-size:15px;font-weight:800;color:#1f2d3d;background:#fff;border:1px solid #d4dce3;padding:3px 9px;border-radius:9px;box-shadow:0 1px 3px rgba(0,0,0,0.32);">${(name || "").replace(/</g, "&lt;")}역</span>
   </div>`;
 }
-// 지하철 출구 마커 — 서울메트로식 파란 번호 사각(↗=나가는 길). 역 연결선과 함께 '역 소속 출구'로 읽힘. 비클릭.
+// 지하철 출구 마커 — 서울메트로식 파란 번호 사각(↗). 연결선 없이도 눈에 확 띄게 크고 진하게. 비클릭.
 function makeExitHtml(num: string): string {
   const n = (num || "").replace(/</g, "").slice(0, 3);
-  return `<div style="transform:translate(-50%,-50%);position:relative;width:18px;height:18px;">
-    <span style="position:absolute;inset:0;background:#0d5bb5;color:#fff;font-size:10.5px;font-weight:900;display:flex;align-items:center;justify-content:center;border-radius:4px;border:1.5px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.4);">${n || "·"}</span>
-    <span style="position:absolute;top:-4px;right:-4px;font-size:8px;color:#0d5bb5;background:#fff;border-radius:50%;width:10px;height:10px;line-height:10px;text-align:center;box-shadow:0 1px 2px rgba(0,0,0,0.3);">↗</span>
+  return `<div style="transform:translate(-50%,-50%);position:relative;width:24px;height:24px;">
+    <span style="position:absolute;inset:0;background:#0a57b8;color:#fff;font-size:13px;font-weight:900;display:flex;align-items:center;justify-content:center;border-radius:6px;border:2.5px solid #fff;box-shadow:0 2px 6px rgba(10,55,120,0.55);">${n || "·"}</span>
+    <span style="position:absolute;top:-6px;right:-6px;font-size:10px;font-weight:900;color:#0a57b8;background:#fff;border-radius:50%;width:13px;height:13px;line-height:13px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,0.4);">↗</span>
   </div>`;
 }
 function makeLandmarkHtml(name: string, icon: string): string {
@@ -765,19 +765,19 @@ export default function Home() {
     layerRef.current.clearLayers();
 
     // 🚇 호선 노선 라인 — 가장 아래 깔아 '역들이 호선으로 연결된' 느낌. z≥11부터.
-    //   얇은 점선(호선색)으로 은은하게 — 카페 콘텐츠를 가리지 않게. 비클릭. 화면 안 노선만.
+    //   실선(호선색) + 얇은 흰 케이싱 → 전철 노선도 룩. 비클릭. 화면 안 노선만.
     {
       const lz = map.getZoom();
       if (lines.length && lz >= 11) {
         const lb = map.getBounds().pad(0.35);
-        const w = lz >= 16 ? 2.6 : lz >= 14 ? 2.2 : lz >= 12 ? 1.8 : 1.4;
-        const dash = lz >= 14 ? "1,7" : "1,6"; // 둥근 점(dot) 패턴
-        const lineLayer: any[] = [];
+        const w = lz >= 16 ? 4 : lz >= 14 ? 3.2 : lz >= 12 ? 2.4 : 1.8;
+        const cas: any[] = [], col: any[] = []; // 케이싱 전부 먼저(아래) → 색선(위): 교차역 흰테 안 겹침
         for (const ln of lines) for (const seg of ln.segs) {
           if (!seg.some(([la, lo]) => lb.contains([la, lo] as [number, number]))) continue;
-          lineLayer.push(L.polyline(seg, { color: ln.color, weight: w, opacity: lz >= 13 ? 0.82 : 0.6, interactive: false, lineCap: "round", lineJoin: "round", dashArray: dash }));
+          cas.push(L.polyline(seg, { color: "#ffffff", weight: w + 2.5, opacity: 0.7, interactive: false, lineJoin: "round", lineCap: "round" }));
+          col.push(L.polyline(seg, { color: ln.color, weight: w, opacity: lz >= 13 ? 0.9 : 0.7, interactive: false, lineJoin: "round", lineCap: "round" }));
         }
-        if (lineLayer.length) layerRef.current.addLayer(L.layerGroup(lineLayer));
+        if (cas.length) layerRef.current.addLayer(L.layerGroup([...cas, ...col]));
       }
     }
 
@@ -903,31 +903,10 @@ export default function Home() {
         const stnLayer = stns.map((s) => L.marker([s.lat, s.lng], { icon: L.divIcon({ className: "", html: makeStationHtml(s.n, s.c, s.r), iconSize: [0, 0] }), interactive: false, zIndexOffset: -300 }));
         if (stnLayer.length) layerRef.current.addLayer(L.layerGroup(stnLayer));
       }
-      // 지하철 출구 — z≥15에서, 화면 안 최대 26개. 각 출구 → 가장 가까운 역으로 '부드러운 곡선'(직선 아님)
-      //   으로 살짝 휘어 연결 → 역에서 갈라져 나온 출구처럼 자연스럽게 읽힘. 가까운 출구만(≈250m).
+      // 지하철 출구 — z≥15에서, 화면 안 최대 26개. 연결선 없이 출구 마커만 도드라지게(역 근처에 모여 보임).
       if (z >= 15 && exits.length) {
         const exs = exits.filter((e) => b.contains([e.lat, e.lng] as [number, number])).slice(0, 26);
-        const nearStns = stations.filter((s) => b.pad(0.1).contains([s.lat, s.lng] as [number, number]));
-        // 한 역에 여러 출구 → 휘는 방향을 번갈아 줘서 부채살처럼 퍼지게(겹침 방지)
-        const fan = new Map<any, number>();
-        const links: any[] = [];
-        const exLayer = exs.map((e) => {
-          let best: { lat: number; lng: number } | null = null, bd = Infinity;
-          for (const s of nearStns) { const d = (s.lat - e.lat) ** 2 + (s.lng - e.lng) ** 2; if (d < bd) { bd = d; best = s; } }
-          if (best && bd < 7e-6) {
-            const k = fan.get(best) ?? 0; fan.set(best, k + 1);
-            const bend = (k % 2 === 0 ? 1 : -1) * 0.16;                 // 좌우 번갈아 휨
-            const dlat = e.lat - best.lat, dlng = e.lng - best.lng;
-            const mlat = (best.lat + e.lat) / 2 - dlng * bend;          // 수직 오프셋 = 곡선 제어점
-            const mlng = (best.lng + e.lng) / 2 + dlat * bend;
-            const pts: [number, number][] = [];
-            for (let t = 0; t <= 1.0001; t += 0.125) { const u = 1 - t; pts.push([u * u * best.lat + 2 * u * t * mlat + t * t * e.lat, u * u * best.lng + 2 * u * t * mlng + t * t * e.lng]); }
-            links.push(L.polyline(pts, { color: "#ffffff", weight: 3, opacity: 0.75, interactive: false, lineCap: "round", lineJoin: "round" }));
-            links.push(L.polyline(pts, { color: "#0d5bb5", weight: 1.4, opacity: 0.7, interactive: false, lineCap: "round", lineJoin: "round" }));
-          }
-          return L.marker([e.lat, e.lng], { icon: L.divIcon({ className: "", html: makeExitHtml(e.n), iconSize: [0, 0] }), interactive: false, zIndexOffset: -250 });
-        });
-        if (links.length) layerRef.current.addLayer(L.layerGroup(links));   // 곡선 커넥터(아래)
+        const exLayer = exs.map((e) => L.marker([e.lat, e.lng], { icon: L.divIcon({ className: "", html: makeExitHtml(e.n), iconSize: [0, 0] }), interactive: false, zIndexOffset: 200 }));
         if (exLayer.length) layerRef.current.addLayer(L.layerGroup(exLayer));
       }
     }
