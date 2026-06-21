@@ -764,20 +764,20 @@ export default function Home() {
     if (!L || !map || !layerRef.current) return;
     layerRef.current.clearLayers();
 
-    // 🚇 호선 노선 라인 — 가장 아래 깔아 '역들이 호선으로 연결된' 노선도 느낌. z≥11(광역권 윤곽)부터.
-    //   흰 케이싱 위에 호선색 + 둥근 조인 = 전철 노선도 스타일. 비클릭. 화면 안 노선만.
+    // 🚇 호선 노선 라인 — 가장 아래 깔아 '역들이 호선으로 연결된' 느낌. z≥11부터.
+    //   얇은 점선(호선색)으로 은은하게 — 카페 콘텐츠를 가리지 않게. 비클릭. 화면 안 노선만.
     {
       const lz = map.getZoom();
       if (lines.length && lz >= 11) {
         const lb = map.getBounds().pad(0.35);
-        const w = lz >= 16 ? 6 : lz >= 14 ? 4.5 : lz >= 12 ? 3.5 : 2.5;
-        const cas: any[] = [], col: any[] = []; // 케이싱 전부 먼저(아래) → 색선(위): 교차역에서 흰테 안 겹쳐 깔끔
+        const w = lz >= 16 ? 2.6 : lz >= 14 ? 2.2 : lz >= 12 ? 1.8 : 1.4;
+        const dash = lz >= 14 ? "1,7" : "1,6"; // 둥근 점(dot) 패턴
+        const lineLayer: any[] = [];
         for (const ln of lines) for (const seg of ln.segs) {
           if (!seg.some(([la, lo]) => lb.contains([la, lo] as [number, number]))) continue;
-          cas.push(L.polyline(seg, { color: "#ffffff", weight: w + 3, opacity: 0.85, interactive: false, lineJoin: "round", lineCap: "round" }));
-          col.push(L.polyline(seg, { color: ln.color, weight: w, opacity: lz >= 13 ? 0.92 : 0.72, interactive: false, lineJoin: "round", lineCap: "round" }));
+          lineLayer.push(L.polyline(seg, { color: ln.color, weight: w, opacity: lz >= 13 ? 0.82 : 0.6, interactive: false, lineCap: "round", lineJoin: "round", dashArray: dash }));
         }
-        if (cas.length) layerRef.current.addLayer(L.layerGroup([...cas, ...col]));
+        if (lineLayer.length) layerRef.current.addLayer(L.layerGroup(lineLayer));
       }
     }
 
@@ -903,24 +903,31 @@ export default function Home() {
         const stnLayer = stns.map((s) => L.marker([s.lat, s.lng], { icon: L.divIcon({ className: "", html: makeStationHtml(s.n, s.c, s.r), iconSize: [0, 0] }), interactive: false, zIndexOffset: -300 }));
         if (stnLayer.length) layerRef.current.addLayer(L.layerGroup(stnLayer));
       }
-      // 지하철 출구 — 더 확대(z≥15)했을 때만, 화면 안 최대 26개. 역 마커보다 위(찾기 쉽게).
-      //   각 출구 → 가장 가까운 역(≈350m 내)으로 점선 커넥터를 깔아 '역-출구가 연결된' 느낌을 준다.
+      // 지하철 출구 — z≥15에서, 화면 안 최대 26개. 각 출구 → 가장 가까운 역으로 '부드러운 곡선'(직선 아님)
+      //   으로 살짝 휘어 연결 → 역에서 갈라져 나온 출구처럼 자연스럽게 읽힘. 가까운 출구만(≈250m).
       if (z >= 15 && exits.length) {
         const exs = exits.filter((e) => b.contains([e.lat, e.lng] as [number, number])).slice(0, 26);
         const nearStns = stations.filter((s) => b.pad(0.1).contains([s.lat, s.lng] as [number, number]));
-        const casLinks: any[] = [], links: any[] = [];
+        // 한 역에 여러 출구 → 휘는 방향을 번갈아 줘서 부채살처럼 퍼지게(겹침 방지)
+        const fan = new Map<any, number>();
+        const links: any[] = [];
         const exLayer = exs.map((e) => {
           let best: { lat: number; lng: number } | null = null, bd = Infinity;
           for (const s of nearStns) { const d = (s.lat - e.lat) ** 2 + (s.lng - e.lng) ** 2; if (d < bd) { bd = d; best = s; } }
-          // ~300m 이내일 때만 연결(실제 그 역 출구). 흰 케이싱 + 파란 실선 = 깔끔한 연결.
-          if (best && bd < 1.1e-5) {
-            const path = [[best.lat, best.lng], [e.lat, e.lng]] as [number, number][];
-            casLinks.push(L.polyline(path, { color: "#ffffff", weight: 3.5, opacity: 0.8, interactive: false, lineCap: "round" }));
-            links.push(L.polyline(path, { color: "#0d5bb5", weight: 1.8, opacity: 0.7, interactive: false, lineCap: "round" }));
+          if (best && bd < 7e-6) {
+            const k = fan.get(best) ?? 0; fan.set(best, k + 1);
+            const bend = (k % 2 === 0 ? 1 : -1) * 0.16;                 // 좌우 번갈아 휨
+            const dlat = e.lat - best.lat, dlng = e.lng - best.lng;
+            const mlat = (best.lat + e.lat) / 2 - dlng * bend;          // 수직 오프셋 = 곡선 제어점
+            const mlng = (best.lng + e.lng) / 2 + dlat * bend;
+            const pts: [number, number][] = [];
+            for (let t = 0; t <= 1.0001; t += 0.125) { const u = 1 - t; pts.push([u * u * best.lat + 2 * u * t * mlat + t * t * e.lat, u * u * best.lng + 2 * u * t * mlng + t * t * e.lng]); }
+            links.push(L.polyline(pts, { color: "#ffffff", weight: 3, opacity: 0.75, interactive: false, lineCap: "round", lineJoin: "round" }));
+            links.push(L.polyline(pts, { color: "#0d5bb5", weight: 1.4, opacity: 0.7, interactive: false, lineCap: "round", lineJoin: "round" }));
           }
           return L.marker([e.lat, e.lng], { icon: L.divIcon({ className: "", html: makeExitHtml(e.n), iconSize: [0, 0] }), interactive: false, zIndexOffset: -250 });
         });
-        if (casLinks.length) layerRef.current.addLayer(L.layerGroup([...casLinks, ...links]));   // 커넥터(아래)
+        if (links.length) layerRef.current.addLayer(L.layerGroup(links));   // 곡선 커넥터(아래)
         if (exLayer.length) layerRef.current.addLayer(L.layerGroup(exLayer));
       }
     }
