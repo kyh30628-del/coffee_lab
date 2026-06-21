@@ -720,10 +720,10 @@ export default function AdminPage() {
                 <button onClick={() => { setShowNL(false); setNlSel(null); }} className="text-2xl text-stone-400 leading-none">×</button>
               </div>
               <div className="flex gap-2 mb-2">
-                <button onClick={nlGenerate} disabled={!!nlBusy} className="flex-1 py-2 text-[13px] font-bold text-white bg-indigo-600 rounded-lg disabled:opacity-50">{nlBusy === "generate" ? "생성 중…(웹서치)" : "✨ 이번 주 뉴스레터 생성"}</button>
+                <button onClick={nlGenerate} disabled={!!nlBusy} className="flex-1 py-2 text-[13px] font-bold text-white bg-indigo-600 rounded-lg disabled:opacity-50">{nlBusy === "generate" ? "생성 중…(네이버 수집)" : "✨ 이번 주 뉴스레터 생성 (무료)"}</button>
               </div>
               {nlMsg && <div className="text-[11.5px] text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg px-2.5 py-1.5 mb-2">{nlMsg}</div>}
-              <p className="text-[10.5px] text-stone-400 mb-2">생성은 Sonnet+웹서치로 트렌드를 종합합니다(API 크레딧 필요). 출처 없는 사실·과장 표현은 자동 ⚠️ 플래그.</p>
+              <p className="text-[10.5px] text-stone-400 mb-2">기본 생성은 <b>네이버 검색(무료)</b>으로 최신 기사를 모읍니다(크레딧 0). 출처 없는 사실·과장 표현은 자동 ⚠️ 플래그. 더 풍성한 에디토리얼은 제작자가 별도 생성해 드립니다.</p>
 
               {/* 목록 */}
               <div className="space-y-1.5 mb-3">

@@ -1,5 +1,70 @@
 import { sql } from "@/lib/db";
-import { ensureNewsletterSchema, applyGuards, type Newsletter } from "@/lib/newsletter";
+import { ensureNewsletterSchema, applyGuards, type Newsletter, type NLItem } from "@/lib/newsletter";
+
+// ── 🆓 네이버 오픈 API(검색)로 무료 생성 — Anthropic 크레딧 불필요. 관리자 버튼 기본 경로. ──
+const NID = process.env.NAVER_CLIENT_ID, NSEC = process.env.NAVER_CLIENT_SECRET;
+const strip = (s: string) => (s || "").replace(/<[^>]+>/g, "").replace(/&quot;/g, '"').replace(/&amp;/g, "&").replace(/&[a-z]+;/g, " ").replace(/\s+/g, " ").trim();
+async function naver(kind: "news" | "blog", query: string, sort = "date"): Promise<{ title: string; desc: string; link: string }[]> {
+  if (!NID || !NSEC) return [];
+  try {
+    const r = await fetch(`https://openapi.naver.com/v1/search/${kind}.json?query=${encodeURIComponent(query)}&display=15&sort=${sort}`, { headers: { "X-Naver-Client-Id": NID, "X-Naver-Client-Secret": NSEC } });
+    if (!r.ok) return [];
+    const d = await r.json();
+    return (d.items ?? []).map((it: any) => ({ title: strip(it.title), desc: strip(it.description), link: it.originallink || it.link })).filter((x: any) => x.title.length >= 8);
+  } catch { return []; }
+}
+
+const CAT = [
+  { key: "coffee", title: "☕ 커피 인사이트", q: ["커피 트렌드", "디카페인 커피", "스페셜티 커피 카페"], n: 2, tip: "원두·로스팅·디카페인 기준을 메뉴판에 한 줄로 명시 → 신뢰 포인트." },
+  { key: "dessert", title: "🍰 디저트 스포트라이트", q: ["디저트 신메뉴 카페", "빙수 신메뉴", "베이커리 인기 메뉴"], n: 3, tip: "사진 잘 받는 시그니처 1종을 주말 한정으로 테스트." },
+  { key: "cafes", title: "🔥 뜨는 카페 동향", q: ["요즘 뜨는 카페", "신상 카페 성수 연남", "카페 트렌드"], n: 2, tip: "큰 인테리어 대신 우리만의 '한 장면'(사진 포인트)을 만들기." },
+];
+
+export async function generateNewsletterFree(): Promise<{ ok: boolean; newsletter?: Newsletter; id?: number; cost?: number; error?: string }> {
+  if (!NID || !NSEC) return { ok: false, error: "NAVER_CLIENT_ID/SECRET 미설정" };
+  await ensureNewsletterSchema();
+  const seenLink = new Set<string>(), seenTitle = new Set<string>();
+  const pick = (items: { title: string; desc: string; link: string }[], n: number): NLItem[] => {
+    const out: NLItem[] = [];
+    for (const it of items) {
+      const tkey = it.title.slice(0, 16);
+      if (!it.link || seenLink.has(it.link) || seenTitle.has(tkey)) continue;
+      seenLink.add(it.link); seenTitle.add(tkey);
+      out.push({ text: it.title, note: it.desc ? it.desc.slice(0, 90) : undefined, source_url: it.link });
+      if (out.length >= n) break;
+    }
+    return out;
+  };
+  const sections: any[] = [];
+  const leads: string[] = [];
+  for (const c of CAT) {
+    let pool: { title: string; desc: string; link: string }[] = [];
+    for (const q of c.q) pool = pool.concat(await naver("news", q));
+    if (pool.length < c.n) for (const q of c.q) pool = pool.concat(await naver("blog", q, "sim"));
+    const items = pick(pool, c.n);
+    if (!items.length) continue;
+    // 섹션 팁(우리 가게엔)을 마지막 항목 why에 합치지 않고 별도 인트로로
+    sections.push({ key: c.key, title: c.title, intro: `우리 가게엔: ${c.tip}`, items });
+    if (items[0]) leads.push(items[0].text);
+  }
+  if (!sections.length) return { ok: false, error: "네이버 검색 결과 없음(쿼터 초과 가능)" };
+  // 짧은 뉴스 모음
+  let newsPool: { title: string; desc: string; link: string }[] = [];
+  for (const q of ["카페 신메뉴", "카페 베이커리 트렌드", "프랜차이즈 커피 신메뉴"]) newsPool = newsPool.concat(await naver("news", q));
+  const news = pick(newsPool, 4).map((i) => ({ text: i.text, source_url: i.source_url }));
+  const tldr = { key: "tldr", title: "📌 이번 주 한눈에", items: leads.slice(0, 3).map((t) => ({ text: t })) };
+  const action = { key: "action", title: "💡 이번 주 사장님 액션", items: CAT.map((c) => ({ text: c.tip })) };
+  const allSections = [tldr, ...sections, action, ...(news.length ? [{ key: "news", title: "📰 짧은 업계 뉴스", items: news }] : [])];
+
+  const d = new Date();
+  const title = `이번 주 커피·디저트 트렌드 (${d.getMonth() + 1}월 ${d.getDate()}일)`;
+  const guarded = applyGuards({ title, sections: allSections });
+  const issueNo = ((await sql`SELECT COALESCE(MAX(issue_no),0)+1 n FROM newsletters`)[0] as any).n;
+  const row = (await sql`INSERT INTO newsletters (issue_no, week_of, status, title, sections, flags, model, cost)
+    VALUES (${issueNo}, ${d.toISOString().slice(0, 10)}, 'draft', ${guarded.title}, ${JSON.stringify(guarded.sections)}, ${JSON.stringify(guarded.flags || [])}, 'naver-free', 0)
+    RETURNING id`)[0] as any;
+  return { ok: true, newsletter: { ...guarded, id: row.id, issue_no: issueNo }, id: row.id, cost: 0 };
+}
 
 // 📰 뉴스레터 생성기 — Claude Sonnet + web_search 서버툴로 수집·종합 → 섹션 JSON.
 //   출처 URL 강제, 요약 only(저작권), 사장님 액션 포함. 결정적 가드는 applyGuards가 마무리.

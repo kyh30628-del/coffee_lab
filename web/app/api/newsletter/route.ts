@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { ensureNewsletterSchema, applyGuards, sendNewsletter, renderNewsletterEmail, getRecipients, type Newsletter } from "@/lib/newsletter";
-import { generateNewsletter } from "@/lib/newsletterGen";
+import { generateNewsletter, generateNewsletterFree } from "@/lib/newsletterGen";
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
@@ -28,7 +28,8 @@ export async function POST(req: NextRequest) {
   const action = String(b.action || "");
 
   if (action === "generate") {
-    const r = await generateNewsletter();
+    // 기본: 네이버 검색 무료 생성(크레딧 0). b.llm=true면 Sonnet+웹서치 고급 생성(크레딧).
+    const r = b.llm ? await generateNewsletter() : await generateNewsletterFree();
     return NextResponse.json(r);
   }
   if (action === "update") {

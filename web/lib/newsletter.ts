@@ -5,7 +5,7 @@ import crypto from "crypto";
 // 📰 구독 사장님 주간 트렌드 뉴스레터 — 코어(스키마·수신자·가드·이메일·발송·수신거부).
 //   생성(LLM)은 newsletterGen.ts. 이 파일은 LLM 없이 동작/테스트 가능.
 
-export type NLItem = { text: string; why?: string; source_url?: string; verified?: boolean; flag?: string };
+export type NLItem = { text: string; note?: string; why?: string; source_url?: string; verified?: boolean; flag?: string };
 export type NLSection = { key: string; title: string; intro?: string; items: NLItem[] };
 export type Newsletter = { id?: number; issue_no?: number; week_of?: string; title: string; sections: NLSection[]; flags?: string[]; status?: string };
 
@@ -112,13 +112,15 @@ export function renderNewsletterEmail(nl: Newsletter, site: string, email: strin
           <div style="font-size:10.5px;letter-spacing:2.5px;color:${INK};font-weight:700;margin-bottom:7px;">📌 이번 주 헤드라인</div>
           <table role="presentation" cellpadding="0" cellspacing="0">${lis}</table></td></tr></table></td></tr>`;
     }
-    // 일반 기사: 카테고리 + 헤드라인 + 요약 + 하이라이트 팁
+    // 일반 기사: 카테고리 + 헤드라인 + (섹션 팁) + 요약 단락 + 하이라이트 팁
     const arts = (sec.items || []).map((it) => `
       <div style="margin:0 0 12px;">
         <p style="margin:0;font-size:14px;color:${BODY};line-height:1.72;"><b style="color:${INK};">${it.flag ? "⚠️ " : ""}${esc(it.text)}</b>${src(it.source_url)}</p>
+        ${it.note ? `<div style="font-size:12.5px;color:${MUTED};line-height:1.6;margin-top:2px;">${esc(it.note)}</div>` : ""}
         ${tip(it.why)}
       </div>`).join("");
-    return `<tr><td style="padding:16px 26px 8px;${rule}">${sectionTitle(kicker, sec.title)}${arts}</td></tr>`;
+    const intro = sec.intro ? tip(sec.intro.replace(/^우리 가게엔[:：]\s*/, "")) : "";
+    return `<tr><td style="padding:16px 26px 8px;${rule}">${sectionTitle(kicker, sec.title)}${intro}${arts}</td></tr>`;
   };
   const sectionsHtml = (nl.sections || []).map(renderSection).join("");
 
