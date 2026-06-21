@@ -2,7 +2,7 @@ import BackLink from "../BackLink";
 export const metadata = { title: "이용약관 · 동네 커피 노트" };
 
 export default function TermsPage() {
-  const updated = "2026-06-08";
+  const updated = "2026-06-21";
   return (
     <main className="min-h-screen bg-[#f4ece0] text-[#2b2018]" style={{ fontFamily: "'Gowun Batang', serif" }}>
       <div className="max-w-2xl mx-auto px-6 py-12">
@@ -55,12 +55,36 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-bold mb-2">6. 책임의 한계</h2>
-            <p>본 서비스는 정보 제공을 목적으로 하며, 정보의 정확성·최신성을 보장하기 위해 노력하나 이용으로 발생한 결과에 대해 법이 허용하는 범위에서 책임을 지지 않습니다. 사장님이 제출·게시한 정보의 진위와 그로 인한 분쟁의 책임은 해당 사장님에게 있습니다.</p>
+            <h2 className="text-lg font-bold mb-2">6. 유료서비스·정기결제·해지·환불</h2>
+            <ul className="list-disc ml-5 space-y-1">
+              <li><b>7일 무료 체험</b>: 결제 없이 7일간 사장님 기능을 이용합니다. 무료이므로 환불 대상이 아니며, 기간 종료 시 자동으로 접근이 만료됩니다.</li>
+              <li><b>우리가게 홍보팩(유료 구독)</b>: 회원이 등록한 결제수단으로 <b>월 단위 요금이 자동 결제·자동 갱신</b>됩니다. 결제 전 금액·주기·갱신 방식을 고지합니다.</li>
+              <li><b>요금 증액 또는 무료→유료 전환</b> 시에는 <b>시행 전 사전에 동의</b>를 받으며, 동의하지 않으면 정기결제는 진행되지 않습니다.</li>
+              <li><b>해지</b>: 사장님 화면 또는 고객센터(kyh30628@gmail.com)로 언제든 <b>해지(차기 결제 중지) 또는 즉시 해지</b>할 수 있습니다.</li>
+              <li><b>청약철회·환불</b>은 <a href="/business" className="text-[#9c6b3f] underline">「사업자정보·환불 정책」</a>에 따릅니다. 디지털 서비스 특성상 <b>이미 사용·개시한 기능</b>은 청약철회가 제한될 수 있으나, 본 서비스는 <b>7일 무료 체험(시험 사용)</b>을 제공하여 철회권 행사가 방해되지 않도록 합니다(「전자상거래법」 제17조). 환불은 <b>원결제수단으로 3영업일 이내</b> 처리하며, 정당한 사유 없이 지연 시 법정 지연배상금(연 15%)을 더해 지급합니다.</li>
+            </ul>
           </section>
 
           <section>
-            <h2 className="text-lg font-bold mb-2">7. 문의</h2>
+            <h2 className="text-lg font-bold mb-2">7. 약관 변경·회원 탈퇴·이용 제한</h2>
+            <ul className="list-disc ml-5 space-y-1">
+              <li>본 약관을 개정할 때는 <b>시행일 7일 전</b>(회원에게 불리하거나 중대한 변경은 <b>30일 전</b>) 서비스 내 공지하며, 시행일까지 거부 의사를 표시하지 않으면 동의한 것으로 봅니다. 동의하지 않는 회원은 이용계약을 해지할 수 있습니다.</li>
+              <li>회원은 언제든지 <b>탈퇴</b>할 수 있습니다. 본 서비스는 약관 위반, <b>사칭·허위 신청</b>, 관계 법령 위반이 있는 경우 사전 통지 없이 이용을 <b>제한·정지·해지</b>할 수 있습니다.</li>
+            </ul>
+          </section>
+
+          <section>
+            <h2 className="text-lg font-bold mb-2">8. 책임의 한계</h2>
+            <p>본 서비스는 정보 제공을 목적으로 하며, 정보의 정확성·최신성을 보장하기 위해 노력하나 이용으로 발생한 결과에 대해 법이 허용하는 범위에서 책임을 지지 않습니다. 천재지변·통신장애 등 불가항력, 회원의 귀책으로 인한 손해, 회원 상호 간 또는 회원과 제3자 간 분쟁에 대해서는 책임지지 않습니다. 사장님이 제출·게시한 정보의 진위와 그로 인한 분쟁의 책임은 해당 사장님에게 있습니다.</p>
+          </section>
+
+          <section>
+            <h2 className="text-lg font-bold mb-2">9. 분쟁 해결·준거법</h2>
+            <p>본 약관은 <b>대한민국 법</b>을 준거법으로 합니다. 분쟁은 우선 협의로 해결하되, 미해결 시 공정거래위원회 「소비자분쟁해결기준」 및 <b>한국소비자원·전자거래/콘텐츠분쟁조정위원회</b>의 조정을 신청할 수 있으며, 소(訴)는 「민사소송법」상 관할 법원에 제기합니다.</p>
+          </section>
+
+          <section>
+            <h2 className="text-lg font-bold mb-2">10. 문의</h2>
             <p>kyh30628@gmail.com</p>
           </section>
         </div>
