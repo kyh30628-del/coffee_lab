@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { sql } from "@/lib/db";
+import { getRegions, TASTES } from "@/lib/seoData";
 
 export const runtime = "nodejs";
 export const revalidate = 86400; // 하루
@@ -17,10 +18,21 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const tasteUrls: MetadataRoute.Sitemap = ["roast", "work", "quiet", "dessert"].map((t) => ({
     url: `${SITE}/taste/${t}`, changeFrequency: "monthly", priority: 0.6,
   }));
+  // 프로그래매틱 SEO: 동네별 + 동네×취향
+  const regions = await getRegions();
+  const regionUrls: MetadataRoute.Sitemap = regions.map((r) => ({
+    url: `${SITE}/area/${encodeURIComponent(r.area)}`, changeFrequency: "weekly", priority: 0.8,
+  }));
+  const regionTasteUrls: MetadataRoute.Sitemap = regions.flatMap((r) =>
+    TASTES.map((t) => ({ url: `${SITE}/area/${encodeURIComponent(r.area)}/${t.key}`, changeFrequency: "weekly" as const, priority: 0.6 }))
+  );
   return [
     { url: SITE, changeFrequency: "daily", priority: 1 },
+    { url: `${SITE}/area`, changeFrequency: "daily", priority: 0.9 },
     { url: `${SITE}/pricing`, changeFrequency: "monthly", priority: 0.5 },
     ...tasteUrls,
+    ...regionUrls,
+    ...regionTasteUrls,
     ...cafeUrls,
   ];
 }

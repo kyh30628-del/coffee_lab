@@ -461,8 +461,15 @@ export default function Home() {
   // 취향 공유 링크(/?taste=key)로 도착하면 해당 결을 자동 선택
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const t = new URLSearchParams(window.location.search).get("taste");
+    const sp = new URLSearchParams(window.location.search);
+    const t = sp.get("taste");
     if (t && TASTE_CHOICES.some((x) => x.key === t)) setTasteKey(t);
+    // SEO 동네 페이지(/area/…)에서 '카페 더 보기'로 진입 → 랜딩 건너뛰고 소비자 화면 + 해당 지역 추천
+    const region = sp.get("region");
+    if (region) {
+      try { sessionStorage.setItem("dcn_role", "consumer"); } catch {}
+      setRole("consumer"); setHomeGu(region); setTab("home");
+    }
   }, []);
 
   // 익명 식별자 준비 + 역할(세션 단위) 복원. 위치 동의는 캐시하지 않음(매 세션 새로).
