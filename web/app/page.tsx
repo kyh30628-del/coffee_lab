@@ -1242,12 +1242,12 @@ export default function Home() {
             {explain === "mine" ? (
               <>
                 <div className="text-[16px] font-bold text-[#d6336c] mb-2">❤ 내 카페</div>
-                <p className="text-[13.5px] text-[#3d2f22] leading-relaxed">지도에서 <b>내가 직접 등록한 카페</b>만 ❤ 핀으로 모아 보여줘요. 다녀온 카페를 추억으로 남기고 <b>나만의 지도</b>를 만들어 보세요. <span className="text-[#a8927a]">(이 기기에만 저장돼요.)</span></p>
+                <p className="text-[13.5px] text-[#3d2f22] leading-relaxed">내가 머문 카페, 그날의 커피와 순간을 <b>❤로 기록한 추억</b>들이에요. 지도 위에 하나둘 모아 <b>나만의 추억 지도</b>를 그려가요. <span className="text-[#a8927a]">(이 기기에만 소중히 담겨요.)</span></p>
               </>
             ) : (
               <>
                 <div className="text-[16px] font-bold text-[#5f7355] mb-2">👥 다른 사람은</div>
-                <p className="text-[13.5px] text-[#3d2f22] leading-relaxed"><b>다른 사람들이 등록한 카페</b>를 지역별로 모아 👥 인원수로 보여줘요. 많이 등록된 곳일수록 크게 표시돼, <b>동네에서 사랑받는 카페</b>를 한눈에 볼 수 있어요.</p>
+                <p className="text-[13.5px] text-[#3d2f22] leading-relaxed">다른 사람들이 <b>마음에 담아둔 카페</b>들이에요. 추억이 많이 쌓인 곳일수록 크게 피어나, <b>동네에서 사랑받는 카페</b>가 한눈에 보여요.</p>
               </>
             )}
             <div className="flex gap-2 mt-5">
