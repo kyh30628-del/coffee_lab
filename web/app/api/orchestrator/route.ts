@@ -249,7 +249,10 @@ export async function GET(req: NextRequest) {
       const dAge = ageHours(catRun?.ran_at ?? null, now);
       agents.push({ key: "dongfill", label: "동 채움 (백필)", lastRun: catRun?.ran_at ?? null, ageH: dAge == null ? null : Math.round(dAge * 10) / 10, cadenceH: 26, status: pubND.n > 50 ? "warn" : "ok", queue: pubND.n, note: pubND.n ? `공개 동없음 ${pubND.n}` : "공개 동 100%" });
     }
-    add("judge", "AI 판정 (Haiku·새벽)", c.last_judge, 30, c.judge_q, `공개카페 판정 완료 ${c.published ? Math.round((c.pub_judged / c.published) * 100) : 0}% (${c.pub_judged}/${c.published}) · 미판정 ${c.judge_q}=신규 ${jb.newjudge}+재수집변경 ${jb.recollect}+그라운딩재검 ${jb.reground}`);
+    // 미판정 내역은 0인 항목은 숨기고 실제 남은 것만 표기(사장님: 헷갈릴 내용 말고 사실만).
+    const jbParts = ([["신규", jb.newjudge], ["재수집변경", jb.recollect], ["그라운딩재검", jb.reground]] as [string, number][]).filter(([, n]) => n > 0).map(([k, n]) => `${k} ${n}`);
+    const judgePct = c.published ? Math.round((c.pub_judged / c.published) * 100) : 0;
+    add("judge", "AI 판정 (Haiku·새벽)", c.last_judge, 30, c.judge_q, `공개카페 판정 완료 ${judgePct}% (${c.pub_judged}/${c.published}) · 미판정 ${c.judge_q}${jbParts.length > 1 ? `(${jbParts.join("+")})` : ""}`);
     add("embed", "임베딩", c.last_embed, 30, c.embed_q, c.embed_q ? `미임베딩 ${c.embed_q}` : `완료(공개 ${c.published ? Math.round((c.pub_embedded / c.published) * 100) : 0}%)`);
     add("verify", "검증 레드팀", vr?.ran_at ?? null, 30, (vr?.fails ?? 0) + (vr?.warns ?? 0), vr ? `fail ${vr.fails}·warn ${vr.warns}` : "리포트 없음");
     // 품질감사: 미해결 플래그 기준(가동 시각은 flag 생성 시각으로 근사)
