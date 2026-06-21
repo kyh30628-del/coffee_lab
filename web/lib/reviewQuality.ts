@@ -229,7 +229,9 @@ export function verifyReview(input: QualityInput): QualityResult {
   //   → 토큰 대신 '전체 이름(정규화)' 일치만 인정해 차단. (전체이름이 토큰보다 길 때만 = 한 글자 가게 제외)
   const nameRawN = norm(input.name);
   const onlyTok = tokens.length === 1 ? norm(tokens[0]) : "";
-  const weakSingle = onlyTok.length >= 1 && onlyTok.length <= 2 && nameRawN.length > onlyTok.length;
+  // 짧은 단일토큰(≤2자)뿐 아니라 '숫자만'인 단일토큰('102커피'→"102")도 약함 — 주소 번지('102호')·다른 업체에
+  //   오매칭됨. → 전체 이름('102커피') 원문 일치만 인정해 차단.
+  const weakSingle = onlyTok.length >= 1 && (onlyTok.length <= 2 || /^[0-9]+$/.test(onlyTok)) && nameRawN.length > onlyTok.length;
   const reqFull = coreEmpty || weakSingle;
   const distinct = tokens.length ? tokens : (nameN ? [input.name] : []);
   // 흔한구문 이름은 띄어쓰기 보존이 핵심: '좋은커피'(가게)는 원문에 붙어서, '좋은 커피'(맛 표현)는 배제.
