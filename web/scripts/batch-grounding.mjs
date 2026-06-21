@@ -27,7 +27,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function build() {
   await sql`CREATE TABLE IF NOT EXISTS grounding_checks (cafe_id INT PRIMARY KEY, grounded BOOLEAN, issue TEXT, checked_at TIMESTAMPTZ DEFAULT now())`;
   const rows = await sql`
-    SELECT c.id, c.name, c.synth_identity, c.synth_reviews FROM cafes c
+    SELECT c.id, c.name, c.area, c.dong, c.synth_identity, c.synth_reviews FROM cafes c
     LEFT JOIN grounding_checks g ON g.cafe_id = c.id
     WHERE (c.published OR c.pipeline_status = 'held') AND c.synth_identity IS NOT NULL
       AND c.synth_reviews IS NOT NULL AND jsonb_array_length(c.synth_reviews) > 0
@@ -48,7 +48,7 @@ async function build() {
       params: {
         model: MODEL, max_tokens: 300,
         system: [{ type: "text", text: GROUNDING_SYS, cache_control: { type: "ephemeral" } }],
-        messages: [{ role: "user", content: buildGroundingPrompt(c.name, c.synth_identity, quotes) }],
+        messages: [{ role: "user", content: buildGroundingPrompt(c.name, c.synth_identity, quotes, [c.area, c.dong].filter(Boolean).join(" ")) }],
       },
     });
     cafes[`cafe_${c.id}`] = { id: c.id, name: c.name };

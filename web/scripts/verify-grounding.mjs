@@ -23,8 +23,8 @@ const isLimit = (e) => /session limit|rate limit|429|usage limit|overloaded|exce
 process.on("unhandledRejection", (e) => { console.log(isLimit(e) ? "구독 한도 — 오늘 종료, 내일 이어서." : "unhandled: " + String(e).slice(0, 100)); process.exit(0); });
 process.on("uncaughtException", (e) => { console.log(isLimit(e) ? "구독 한도 — 종료." : "uncaught: " + String(e).slice(0, 100)); process.exit(0); });
 
-async function check(name, identity, quotes) {
-  const prompt = buildGroundingPrompt(name, identity, quotes);
+async function check(name, identity, quotes, area) {
+  const prompt = buildGroundingPrompt(name, identity, quotes, area);
   let text = "";
   for await (const msg of query({ prompt, options: { systemPrompt: GROUNDING_SYS, model: MODEL, maxTurns: 1, allowedTools: [] } })) {
     if (msg.type === "result" && msg.subtype === "success") text = msg.result;
@@ -43,13 +43,13 @@ async function main() {
   const onlySuspects = process.env.GROUNDING_ONLY === "suspects";
   const fetchBatch = async () => onlySuspects
     ? await sql`
-        SELECT c.id, c.name, c.synth_identity, c.synth_reviews FROM cafes c
+        SELECT c.id, c.name, c.area, c.dong, c.synth_identity, c.synth_reviews FROM cafes c
         JOIN grounding_checks g ON g.cafe_id = c.id
         WHERE (c.published OR c.pipeline_status = 'held') AND g.grounded = false AND c.synth_identity IS NOT NULL AND c.synth_reviews IS NOT NULL AND jsonb_array_length(c.synth_reviews) > 0
           AND c.llm_judged_at IS NOT NULL AND c.llm_judged_at >= c.raw_collected_at
         ORDER BY g.checked_at ASC LIMIT ${MAX}`
     : await sql`
-        SELECT c.id, c.name, c.synth_identity, c.synth_reviews FROM cafes c
+        SELECT c.id, c.name, c.area, c.dong, c.synth_identity, c.synth_reviews FROM cafes c
         LEFT JOIN grounding_checks g ON g.cafe_id = c.id
         WHERE (c.published OR c.pipeline_status = 'held') AND c.synth_identity IS NOT NULL AND c.synth_reviews IS NOT NULL AND jsonb_array_length(c.synth_reviews) > 0
           AND c.llm_judged_at IS NOT NULL AND c.llm_judged_at >= c.raw_collected_at
@@ -63,7 +63,7 @@ async function main() {
     const quotes = (c.synth_reviews || []).map((r) => r.quote).filter(Boolean).slice(0, 6);
     if (!quotes.length) return;
     let v;
-    try { v = await check(c.name, c.synth_identity, quotes); }
+    try { v = await check(c.name, c.synth_identity, quotes, [c.area, c.dong].filter(Boolean).join(" ")); }
     catch (e) { if (isLimit(e)) { stop = true; console.log(`구독 한도 — ${done}곳 완료, 다음에 이어서.`); return; } console.log(`✗ ${c.name}: ${String(e).slice(0, 60)}`); return; }
     if (!v) return;
     const grounded = v.grounded !== false;
