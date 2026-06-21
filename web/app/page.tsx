@@ -1600,7 +1600,16 @@ function CafePanel({ cafe, onClose, onMap, bookmarked = false, onToggleBookmark 
             <div className="flex items-center gap-2 min-w-0"><h3 className="text-xl font-bold text-[#2b2018] truncate">{cafe.name}</h3>{g && <span className="text-[10px] text-white px-2 py-0.5 rounded-full shrink-0" style={{ background: g.bg }}>{g.label}</span>}</div>
             <div className="flex items-center gap-1 shrink-0">
               <button onClick={onToggleBookmark} aria-label="즐겨찾기" className="flex items-center gap-1 border rounded-full px-2.5 py-1 text-[12px] font-medium transition-colors" style={bookmarked ? { color: "#fff", background: "#f0a832", borderColor: "#f0a832" } : { color: "#9c6b3f", borderColor: "#e0d2bd" }}>{bookmarked ? "★ 즐겨찾기" : "☆ 즐겨찾기"}</button>
-              <button onClick={shareCafe} aria-label="공유" className="flex items-center gap-1 text-[#9c6b3f] border border-[#e0d2bd] rounded-full px-2.5 py-1 text-[12px] font-medium">{shared ? "✓ 복사됨" : "🔗 공유"}</button>
+              <KakaoShare
+                title={`${cafe.name} (${cafe.area})`}
+                description={((cafe as any).identity || cafe.signature || "진짜 후기로 검증한 우리 동네 카페")}
+                imageUrl={`https://dongnecoffeenote.com/c/${cafe.id}/opengraph-image`}
+                link={`https://dongnecoffeenote.com/c/${cafe.id}`}
+                className="flex items-center gap-1 bg-[#FEE500] text-[#3c1e1e] rounded-full pl-2 pr-2.5 py-1 text-[12px] font-bold"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="#3c1e1e"><path d="M12 3C6.5 3 2 6.6 2 11c0 2.8 1.9 5.3 4.7 6.7-.2.7-.7 2.6-.8 3-.1.5.2.5.4.4.2-.1 2.6-1.8 3.7-2.5.6.1 1.3.1 2 .1 5.5 0 10-3.6 10-8S17.5 3 12 3z"/></svg>
+                공유
+              </KakaoShare>
               <button onClick={onClose} className="text-3xl text-[#9c6b3f] leading-none px-1">×</button>
             </div>
           </div>
@@ -1627,14 +1636,6 @@ function CafePanel({ cafe, onClose, onMap, bookmarked = false, onToggleBookmark 
               메뉴·시간
             </a>
           </div>
-          <KakaoShare
-            title={`${cafe.name} (${cafe.area})`}
-            description={((cafe as any).identity || cafe.signature || "진짜 후기로 검증한 우리 동네 카페")}
-            imageUrl={`https://dongnecoffeenote.com/c/${cafe.id}/opengraph-image`}
-            link={`https://dongnecoffeenote.com/c/${cafe.id}`}
-            label="🟡 카카오톡으로 공유"
-            className="w-full text-center mb-4 bg-[#FEE500] text-[#3c1e1e] rounded-xl py-2.5 text-[12px] font-bold"
-          />
 
           {loadingRev && <div className="text-[11px] text-[#a8927a] mb-4">근거 후기 불러오는 중...</div>}
           {!loadingRev && quality && quality.raw > 0 && (
