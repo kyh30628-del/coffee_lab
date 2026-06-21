@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
       const days = Math.min(Math.max(Number(b.days) || 30, 1), 365);
       if (b.action === "activate") {
         const pin = s.pin || genPin(); // 재활성화면 기존 PIN 유지
-        await sql`UPDATE subscriptions SET status='active', started_at=now(), expires_at=now()+make_interval(days=>${days}), pin=${pin}, updated_at=now() WHERE id=${id}`;
+        await sql`UPDATE subscriptions SET status='active', started_at=now(), expires_at=now()+make_interval(days=>${days}), pin=${pin}, verified=true, updated_at=now() WHERE id=${id}`;
         if (s.cafe_id) await sql`INSERT INTO cafe_promos (cafe_id, featured, featured_until, approved, published, updated_at)
           VALUES (${s.cafe_id}, true, now()+make_interval(days=>${days}), true, true, now())
           ON CONFLICT (cafe_id) DO UPDATE SET featured=true, featured_until=now()+make_interval(days=>${days}), approved=true`;
