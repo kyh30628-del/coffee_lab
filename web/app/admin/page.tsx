@@ -663,7 +663,15 @@ export default function AdminPage() {
                     <div className="min-w-0">
                       <span className="font-bold text-sm">{s.cafe_name}</span>
                       <span className={`text-[11px] ml-2 font-bold ${stColor}`}>{stLabel}{s.status === "active" && dleft != null ? ` · D-${dleft}` : ""}</span>
-                      <div className="text-[12px] text-stone-600 truncate">{s.owner_name} · 📞 {s.contact}{s.email ? ` · ✉️ ${s.email}` : ""} · ₩{(s.price ?? 9900).toLocaleString()}/월</div>
+                      <div className="text-[12px] text-stone-600 truncate">{s.owner_name} · 📞 {s.contact}{s.email ? ` · ✉️ ${s.email}` : ""} · {s.plan}{s.price ? ` ₩${s.price.toLocaleString()}` : " 무료"}</div>
+                      {/* 🔒 사칭 방지 증빙 — 승인 전 대조: 사업자등록증·대표자명·번호·동의·접속기록 */}
+                      <div className="mt-1.5 rounded-lg bg-amber-50/70 border border-amber-100 p-2 text-[11px] text-stone-600 space-y-0.5">
+                        <div className="font-bold text-amber-800">🔒 인증 서류 (승인 전 대조)</div>
+                        {s.biz_reg_url ? <a href={s.biz_reg_url} target="_blank" rel="noopener" className="inline-flex items-center gap-1 text-blue-700 underline font-bold">🧾 사업자등록증 보기</a> : <span className="text-rose-600">⚠️ 사업자등록증 없음</span>}
+                        <div>대표자명 대조: <b>{s.owner_name}</b>{s.biz_no ? ` · 사업자번호 ${s.biz_no}` : ""}</div>
+                        <div>{s.attested ? "✅ 본인확인(사업주) 법적 동의" : "❌ 본인확인 미동의"}{s.signup_ip ? ` · IP ${s.signup_ip}` : ""}</div>
+                        <div className="text-[10px] text-stone-400">대표자명·상호가 이 카페와 일치하는지 확인 후 승인하세요.</div>
+                      </div>
                       {s.status === "active" && s.pin && <div className="text-[12px] mt-1">🔑 PIN <b className="font-mono tracking-wider text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">{s.pin}</b> <span className="text-[10px] text-stone-400">(이메일 발송 · 사장님 로그인용)</span></div>}
                     </div>
                     <div className="flex gap-2 mt-2">

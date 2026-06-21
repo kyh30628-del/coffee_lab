@@ -10,27 +10,43 @@ export default function OwnerSignupModal({ open, onClose, trial = false }: { ope
   const [ownerName, setOwnerName] = useState("");
   const [contact, setContact] = useState("");
   const [email, setEmail] = useState("");
+  const [bizNo, setBizNo] = useState("");
+  const [bizRegBase64, setBizRegBase64] = useState("");   // 사업자등록증 이미지(증빙)
+  const [bizRegName, setBizRegName] = useState("");
   const [consent, setConsent] = useState(false);
+  const [attest, setAttest] = useState(false);            // 사업주 본인확인 법적 동의
   const [done, setDone] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
 
   if (!open) return null;
-  const reset = () => { setDone(false); setPicked(null); setCafeQ(""); setOwnerName(""); setContact(""); setEmail(""); setConsent(false); setSug([]); };
+  const reset = () => { setDone(false); setPicked(null); setCafeQ(""); setOwnerName(""); setContact(""); setEmail(""); setBizNo(""); setBizRegBase64(""); setBizRegName(""); setConsent(false); setAttest(false); setSug([]); setErr(""); };
   const close = () => { reset(); onClose(); };
+  const onFile = (f: File | undefined) => {
+    if (!f) return;
+    if (!f.type.startsWith("image/")) { setErr("이미지 파일만 올려주세요"); return; }
+    if (f.size > 8 * 1024 * 1024) { setErr("이미지는 8MB 이하로 올려주세요"); return; }
+    setErr("");
+    const r = new FileReader();
+    r.onload = () => { setBizRegBase64(String(r.result || "")); setBizRegName(f.name); };
+    r.readAsDataURL(f);
+  };
 
   const onCafeQ = async (v: string) => {
     setCafeQ(v); setPicked(null);
     if (v.trim().length < 1) { setSug([]); return; }
     try { const d = await (await fetch(`/api/cafe-names?q=${encodeURIComponent(v.trim())}`)).json(); setSug(d.cafes ?? []); } catch {}
   };
+  const canSubmit = !!picked && !!ownerName.trim() && !!contact.trim() && !!email.trim() && !!bizRegBase64 && consent && attest;
   const submit = async () => {
-    if (!picked || !ownerName.trim() || !contact.trim() || !email.trim() || !consent) return;
-    setBusy(true);
+    if (!canSubmit) return;
+    setBusy(true); setErr("");
     try {
-      const r = await fetch("/api/subscription", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cafeId: picked.id, cafeName: picked.name, ownerName, contact, email, consent: true, trial }) });
+      const r = await fetch("/api/subscription", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cafeId: picked!.id, cafeName: picked!.name, ownerName, contact, email, bizNo, bizRegBase64, consent: true, attest: true, trial }) });
       const d = await r.json();
       if (d.ok) setDone(true);
-    } catch {}
+      else setErr(d.error || "신청에 실패했어요");
+    } catch { setErr("네트워크 오류 — 다시 시도해 주세요"); }
     setBusy(false);
   };
 
@@ -65,12 +81,28 @@ export default function OwnerSignupModal({ open, onClose, trial = false }: { ope
             </div>
             <input value={ownerName} onChange={(e) => setOwnerName(e.target.value)} placeholder="사장님 성함" className="w-full rounded-lg border border-[#d9c9b0] px-3 py-2.5 text-[14px] mb-2 bg-white" />
             <input value={contact} onChange={(e) => setContact(e.target.value)} placeholder="연락처 (전화)" className="w-full rounded-lg border border-[#d9c9b0] px-3 py-2.5 text-[14px] mb-2 bg-white" />
-            <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="이메일 (키 받을 주소)" className="w-full rounded-lg border border-[#d9c9b0] px-3 py-2.5 text-[14px] mb-3 bg-white" />
-            <label className="flex items-start gap-2 mb-3 cursor-pointer">
-              <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5 shrink-0" />
-              <span className="text-[11.5px] text-[#52402e] leading-snug"><b>(필수)</b> 승인·키(PIN) 발송을 위한 개인정보 수집·이용 동의. 연락처·이메일은 <b>암호화 저장</b>됩니다. <a href="/privacy" target="_blank" className="text-[#9c6b3f] underline">방침</a></span>
+            <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="이메일 (키 받을 주소)" className="w-full rounded-lg border border-[#d9c9b0] px-3 py-2.5 text-[14px] mb-2 bg-white" />
+            <input value={bizNo} onChange={(e) => setBizNo(e.target.value)} inputMode="numeric" placeholder="사업자등록번호 (선택, 숫자만)" className="w-full rounded-lg border border-[#d9c9b0] px-3 py-2.5 text-[14px] mb-2 bg-white" />
+            {/* 사업자등록증 이미지(필수) — 사칭 방지 증빙 */}
+            <label className="block mb-2">
+              <div className="text-[11.5px] font-bold text-[#52402e] mb-1">사업자등록증 사진 <span className="text-[#c0392b]">(필수)</span></div>
+              <div className="flex items-center gap-2">
+                <span className="shrink-0 rounded-lg bg-[#2b2018] text-[#f4ece0] text-[12px] font-bold px-3 py-2">{bizRegBase64 ? "다시 선택" : "📷 이미지 선택"}</span>
+                <span className="text-[11px] text-[#8a7458] truncate">{bizRegName || "대표자명·상호가 보이게 촬영/스캔"}</span>
+                <input type="file" accept="image/*" onChange={(e) => onFile(e.target.files?.[0])} className="hidden" />
+              </div>
+              {bizRegBase64 && <img src={bizRegBase64} alt="사업자등록증 미리보기" className="mt-2 w-full max-h-40 object-contain rounded-lg border border-[#e6dcc8] bg-white" />}
             </label>
-            <button disabled={busy || !picked || !ownerName.trim() || !contact.trim() || !email.trim() || !consent} onClick={submit} className="w-full bg-[#e8b87a] text-[#2b2018] rounded-lg py-3 font-bold disabled:opacity-50">{busy ? "신청 중…" : trial ? "7일 체험 신청" : "구독 신청"}</button>
+            <label className="flex items-start gap-2 mb-2 cursor-pointer">
+              <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5 shrink-0" />
+              <span className="text-[11.5px] text-[#52402e] leading-snug"><b>(필수)</b> 승인·키(PIN) 발송을 위한 개인정보 수집·이용 동의. 연락처·이메일·서류는 <b>암호화/안전 저장</b>됩니다. <a href="/privacy" target="_blank" className="text-[#9c6b3f] underline">방침</a></span>
+            </label>
+            <label className="flex items-start gap-2 mb-3 cursor-pointer">
+              <input type="checkbox" checked={attest} onChange={(e) => setAttest(e.target.checked)} className="mt-0.5 shrink-0" />
+              <span className="text-[11.5px] text-[#52402e] leading-snug"><b>(필수)</b> 본인은 <b>해당 매장의 사업주 또는 정당한 운영 권한자</b>이며, 제출한 사업자등록증이 진본임을 확인합니다. <b>허위·사칭 신청 시</b> 이용이 제한되고 관련 법령에 따라 민·형사상 책임을 질 수 있음에 동의합니다.</span>
+            </label>
+            {err && <p className="text-[12px] text-[#c0392b] mb-2">{err}</p>}
+            <button disabled={busy || !canSubmit} onClick={submit} className="w-full bg-[#e8b87a] text-[#2b2018] rounded-lg py-3 font-bold disabled:opacity-50">{busy ? "신청 중…" : trial ? "7일 체험 신청" : "구독 신청"}</button>
           </>
         )}
       </div>

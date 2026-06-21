@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
 import { encryptPII, decryptPII } from "@/lib/crypto";
+import { put } from "@vercel/blob";
 import crypto from "crypto";
 export const runtime = "nodejs";
 
@@ -44,6 +45,14 @@ async function ensure() {
     consent BOOLEAN DEFAULT false, consent_at TIMESTAMPTZ, created_at TIMESTAMPTZ DEFAULT now(), updated_at TIMESTAMPTZ DEFAULT now()
   )`;
   await sql`ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS pin TEXT`; // 승인 시 발급되는 사장님 로그인 PIN
+  // 사장님 인증(사칭 방지) 증빙 — 사업자등록증 이미지·번호·법적 동의·접속기록(IP/UA). 분쟁 시 추적·법적 근거.
+  await sql`ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS biz_reg_url TEXT`;
+  await sql`ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS biz_no TEXT`;
+  await sql`ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS attested BOOLEAN DEFAULT false`;
+  await sql`ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS attested_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS signup_ip TEXT`;
+  await sql`ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS signup_ua TEXT`;
+  await sql`ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS verified BOOLEAN DEFAULT false`; // 관리자 서류 대조 완료 표시
   // 만료 자동 반영: 기간 지난 active → expired + featured 해제
   await sql`UPDATE subscriptions SET status='expired', updated_at=now() WHERE status='active' AND expires_at < now()`;
   await sql`UPDATE cafe_promos SET featured=false WHERE cafe_id IN (SELECT cafe_id FROM subscriptions WHERE status='expired') AND featured_until < now()`;
@@ -54,7 +63,7 @@ export async function GET(req: NextRequest) {
     await ensureSchema(); await ensure();
     if (req.nextUrl.searchParams.get("all")) {
       if (!authed(req)) return NextResponse.json({ ok: false }, { status: 401 });
-      const rows = await sql`SELECT id, cafe_id, cafe_name, owner_name, contact, email, plan, price, status, pin, started_at, expires_at, created_at FROM subscriptions ORDER BY (status='pending') DESC, created_at DESC LIMIT 200` as unknown as any[];
+      const rows = await sql`SELECT id, cafe_id, cafe_name, owner_name, contact, email, plan, price, status, pin, started_at, expires_at, created_at, biz_reg_url, biz_no, attested, signup_ip, signup_ua, verified FROM subscriptions ORDER BY (status='pending') DESC, created_at DESC LIMIT 200` as unknown as any[];
       return NextResponse.json({ ok: true, subs: rows.map((r) => ({ ...r, contact: decryptPII(r.contact), email: decryptPII(r.email) })) });
     }
     // 사장님: 본인 카페 구독 상태
@@ -110,14 +119,34 @@ export async function POST(req: NextRequest) {
     const ownerName = String(b.ownerName ?? "").trim().slice(0, 40);
     const contact = String(b.contact ?? "").trim().slice(0, 120);
     const email = String(b.email ?? "").trim().slice(0, 120);
+    const bizNo = String(b.bizNo ?? "").replace(/[^0-9]/g, "").slice(0, 12); // 사업자등록번호(선택, 숫자만)
     if (!cafeId || !ownerName || !contact) return NextResponse.json({ ok: false, error: "카페·이름·연락처 필요" }, { status: 400 });
     if (!b.consent) return NextResponse.json({ ok: false, error: "개인정보 동의 필요" }, { status: 400 });
+    if (!b.attest) return NextResponse.json({ ok: false, error: "사업주 본인확인 동의가 필요합니다" }, { status: 400 });
+    // 🔒 사칭 방지: 이미 인증된 사장님이 이용 중인 카페는 새 신청으로 덮어쓸 수 없음(탈취 차단).
+    const existing = (await sql`SELECT status FROM subscriptions WHERE cafe_id=${cafeId}`)[0] as any;
+    if (existing?.status === "active") return NextResponse.json({ ok: false, error: "이미 인증된 사장님이 이용 중인 카페예요. 본인 매장인데 문제가 있다면 고객센터로 문의해 주세요." }, { status: 409 });
+    // 사업자등록증 이미지(필수) — 증빙용 Blob 저장. 분쟁 시 위·변조 여부로 책임 추궁 근거.
+    let bizRegUrl: string | null = null;
+    if (typeof b.bizRegBase64 === "string" && b.bizRegBase64.startsWith("data:image")) {
+      try {
+        const buf = Buffer.from(b.bizRegBase64.split(",")[1], "base64");
+        if (buf.length > 8 * 1024 * 1024) return NextResponse.json({ ok: false, error: "이미지는 8MB 이하로 올려주세요" }, { status: 400 });
+        const mime = b.bizRegBase64.slice(5).split(";")[0] || "image/jpeg";
+        const ext = (mime.split("/")[1] || "jpg").replace(/[^a-z0-9]/gi, "");
+        const blob = await put(`owner-docs/${cafeId}-${Date.now()}.${ext}`, buf, { access: "public", contentType: mime });
+        bizRegUrl = blob.url;
+      } catch { return NextResponse.json({ ok: false, error: "이미지 업로드 실패 — 다시 시도해 주세요" }, { status: 500 }); }
+    }
+    if (!bizRegUrl) return NextResponse.json({ ok: false, error: "사업자등록증 이미지가 필요합니다" }, { status: 400 });
+    const ip = (req.headers.get("x-forwarded-for") ?? req.headers.get("x-real-ip") ?? "").split(",")[0].trim().slice(0, 60);
+    const ua = (req.headers.get("user-agent") ?? "").slice(0, 200);
     const isTrial = !!b.trial;                          // 7일 무료 체험 신청 — 관리자가 7일로 승인
     const plan = isTrial ? "7일 체험" : PLAN;
     const price = isTrial ? 0 : PRICE;
-    await sql`INSERT INTO subscriptions (cafe_id, cafe_name, owner_name, contact, email, plan, price, status, consent, consent_at)
-      VALUES (${cafeId}, ${cafeName}, ${ownerName}, ${encryptPII(contact)}, ${encryptPII(email)}, ${plan}, ${price}, 'pending', true, now())
-      ON CONFLICT (cafe_id) DO UPDATE SET owner_name=${ownerName}, contact=${encryptPII(contact)}, email=${encryptPII(email)}, plan=${plan}, price=${price}, status=CASE WHEN subscriptions.status='active' THEN 'active' ELSE 'pending' END, updated_at=now()`;
+    await sql`INSERT INTO subscriptions (cafe_id, cafe_name, owner_name, contact, email, plan, price, status, consent, consent_at, biz_reg_url, biz_no, attested, attested_at, signup_ip, signup_ua)
+      VALUES (${cafeId}, ${cafeName}, ${ownerName}, ${encryptPII(contact)}, ${encryptPII(email)}, ${plan}, ${price}, 'pending', true, now(), ${bizRegUrl}, ${bizNo}, true, now(), ${ip}, ${ua})
+      ON CONFLICT (cafe_id) DO UPDATE SET owner_name=${ownerName}, contact=${encryptPII(contact)}, email=${encryptPII(email)}, plan=${plan}, price=${price}, biz_reg_url=${bizRegUrl}, biz_no=${bizNo}, attested=true, attested_at=now(), signup_ip=${ip}, signup_ua=${ua}, verified=false, status='pending', updated_at=now()`;
     return NextResponse.json({ ok: true });
   } catch (e) { return NextResponse.json({ ok: false, error: String(e) }, { status: 500 }); }
 }
