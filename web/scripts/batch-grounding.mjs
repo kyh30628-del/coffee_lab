@@ -34,8 +34,9 @@ async function build() {
       AND c.llm_judged_at IS NOT NULL AND c.llm_judged_at >= c.raw_collected_at
       AND c.id <= ${ID_MAX}
       AND (g.checked_at IS NULL OR g.checked_at < c.synth_updated)
-      -- 효율: 결정론적 일치율이 명확히 높은(≥0.75) 카페는 LLM 그라운딩 생략. 애매(<0.75)·보류(held)만 검사.
-      AND (COALESCE(c.synth_coherence, 0) < 0.75 OR c.pipeline_status = 'held')
+      -- ⚠️ 일치율(synth_coherence)로 그라운딩을 건너뛰면 안 됨: 일치율은 '이름 토큰'만 봐서 지역어·지점
+      --   혼동 오염(예: 봉명동내커피 금천독산점=일치율1.0인데 근거가 전부 미용실·던킨)에는 눈멀어 있음.
+      --   그라운딩이 바로 그걸 잡으므로 coherence 게이트 적용 금지. 효율은 '1회 검사 후 캐시(미변경 재검 안 함)'로만.
     ORDER BY (g.grounded = false AND c.synth_updated > g.checked_at) DESC, g.checked_at ASC NULLS FIRST
     LIMIT ${LIMIT}`;
   console.log(`[build] 그라운딩 대상 ${rows.length} (LIMIT=${LIMIT}, 판정완료+미검사/stale)`);
