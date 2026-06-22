@@ -56,6 +56,10 @@ const GENERIC_CUES = ["란 무엇", "이란?", "뜻과", "종류별", "조절하
   "what is", "how to", "guide to", "정의", "알아보", "효능", "원리", "역사"];
 
 const AD = /(협찬|광고|체험단|제공받|원고료|소정의|무료로 제공|대가성|sponsored|paid partnership|ad\b)/i;
+// 진짜 광고/협찬 신호(불명확한 '광고' 단독 제외) — 검증 후기에서 제외 대상.
+const AD_STRONG = /(협찬|체험단|제공\s*받|원고료|소정의|대가성|대가를?\s*받|무료로?\s*제공|유료\s*광고|광고\s*입니다|sponsored|paid partnership)/i;
+// 면책 문구('협찬 없이'·'광고 아님'·'내돈내산') — 이건 진짜 후기이므로 제외하면 안 됨.
+const AD_DISCLAIM = /(협찬|광고|제공|대가|유료)\s*(아닌|아니|아님|없이|없는|없습니다|없음|받지\s*않)|내\s*돈\s*내산/;
 
 // 수도권 밖 주요 도시·도(이 DB는 수도권 전용 → 제목이 이 지역이면 동명 카페일 확률 높음)
 const NON_METRO = ["충주", "청주", "충북", "충남", "대전", "세종", "천안", "아산", "대구", "부산", "울산", "포항",
@@ -210,7 +214,9 @@ export function verifyReview(input: QualityInput): QualityResult {
   const titleN = norm(title), bodyN = norm(body);
   const nameN = norm(input.name);
   const areaTerms = input.areaTerms ?? [];
-  const sponsored = AD.test(fullL);
+  // 진짜 광고/협찬(면책 문구 제외)이면 검증 후기에서 제외 — 랜딩 약속('광고·협찬 자동 제외')과 일치.
+  const sponsored = AD_STRONG.test(fullL) && !AD_DISCLAIM.test(fullL);
+  if (sponsored) return { verdict: "rejected", score: 0, reasons: ["광고·협찬 글 — 자동 제외"], signals: { nameInTitle: false, nameInBody: false, visit: false, substance: 0, listicle: false, sponsored: true, areaMatch: false } };
 
   // ---- 구글 실제 방문 리뷰: 장소에 직접 달린 리뷰이므로 신뢰. 내용량만 본다 ----
   if (input.source === "google") {
