@@ -5,6 +5,7 @@ import ShowcaseBanner, { SHOWCASE_CSS } from "./ShowcaseBanner";
 import OwnerSignupModal from "./OwnerSignupModal";
 import VisitorReviews from "./VisitorReviews";
 import KakaoShare from "./KakaoShare";
+import { buildAxisDist, cafeProfile, type AxisDist } from "@/lib/cafeProfile";
 
 type EvidenceReview = { quote: string; link?: string; source?: string; date?: string; trust?: "verified" | "reference" | "rejected"; score?: number; why?: string[] };
 type QualityStats = { raw: number; verified: number; reference: number; rejected: number; duplicates?: number; rejectReasons?: Record<string, number> };
@@ -782,6 +783,8 @@ export default function Home() {
     if (!tasteKey) return new Set<number>();
     return new Set(filtered.filter((c) => ((c.char_scores ?? {})[tasteKey] ?? 0) > 0).map((c) => c.id));
   }, [filtered, tasteKey]);
+  // 전체 카페 대비 '결' 상대분포 — 카페 강점/아쉬운점 산출용(한 번 계산해 상세패널에 전달).
+  const axisDist = useMemo<AxisDist>(() => buildAxisDist(cafes), [cafes]);
 
   // 현재 지도 화면(bounds)+줌에 맞춰 마커를 그린다 — 줌인하면 그 영역 핀이 동적으로 드러나고, 줌아웃이면 화면 안 인기순 상위만.
   const drawMarkers = useCallback(() => {
@@ -1313,7 +1316,7 @@ export default function Home() {
         onRemove={(id: number) => toggleBookmark(id)} />}
       {showMyCafeReg && <MyCafeRegModal cafes={cafes} device={deviceId} visits={myVisits} pin={sessionPin} initialCafeId={editCafeId} onClose={() => { setShowMyCafeReg(false); setEditCafeId(null); }} onDone={() => { reloadMyCafes(deviceId, sessionPin); }} />}
 
-      {selected && <CafePanel cafe={selected} bookmarked={bookmarkIds.has(selected.id)} onToggleBookmark={() => toggleBookmark(selected.id)} onClose={() => setSelected(null)} onMap={() => {
+      {selected && <CafePanel cafe={selected} dist={axisDist} bookmarked={bookmarkIds.has(selected.id)} onToggleBookmark={() => toggleBookmark(selected.id)} onClose={() => setSelected(null)} onMap={() => {
         if (selected.lat && selected.lng) {
           const g = toGu(selected.area);
           if (g.sido) { setSido(g.sido); setSigungu(g.sigungu); }
@@ -1535,7 +1538,7 @@ function hlQuote(text?: string) {
   );
 }
 
-function CafePanel({ cafe, onClose, onMap, bookmarked = false, onToggleBookmark }: { cafe: Cafe; onClose: () => void; onMap: () => void; bookmarked?: boolean; onToggleBookmark?: () => void }) {
+function CafePanel({ cafe, dist, onClose, onMap, bookmarked = false, onToggleBookmark }: { cafe: Cafe; dist: AxisDist; onClose: () => void; onMap: () => void; bookmarked?: boolean; onToggleBookmark?: () => void }) {
   const g = cafe.synth_grade ? GRADE_STYLE[cafe.synth_grade] : null;
   const [reviews, setReviews] = useState<EvidenceReview[]>([]);
   const [quality, setQuality] = useState<QualityStats | null>(null);
@@ -1554,6 +1557,7 @@ function CafePanel({ cafe, onClose, onMap, bookmarked = false, onToggleBookmark 
   }, [cafe.id]);
   const kept = quality ? quality.verified + quality.reference : 0;
   const chars = topChars(cafe, 4);
+  const profile = useMemo(() => cafeProfile(cafe, dist), [cafe, dist]); // 전체 대비 강점/아쉬운점
   const [shared, setShared] = useState(false);
   // 부드러운 슬라이드인 등장 — 마운트 직후 한 프레임 뒤 transition을 트리거(오른쪽에서 미끄러져 들어옴).
   const [shown, setShown] = useState(false);
@@ -1637,14 +1641,41 @@ function CafePanel({ cafe, onClose, onMap, bookmarked = false, onToggleBookmark 
           </div>
           <div className="text-[#9c6b3f] text-sm mb-3">{cafe.area} · {cafe.vibe}</div>
           {cafe.note && <p className="text-[15px] text-[#3d2f22] font-medium leading-relaxed mb-4">"{cafe.note}"</p>}
-          {chars.length > 0 && (
+          {/* ⭐ 한눈에 판단 — 전체 카페 대비 강점/아쉬운점(리뷰 옥석 보기 전 직관 판단의 핵심) */}
+          {profile.ok ? (
+            <div className="bg-[#efe9dd] rounded-xl px-4 py-3.5 mb-4 border border-[#ddd0bb]">
+              <div className="text-[11px] text-[#8a7458] uppercase tracking-wider mb-2.5">한눈에 보기 <span className="lowercase tracking-normal">· 전체 카페 대비</span></div>
+              {profile.strong.length > 0 && (
+                <div className={profile.weak.length > 0 ? "mb-3" : ""}>
+                  <div className="text-[11px] font-bold text-[#3f7a4f] mb-1.5">👍 이런 점이 강해요</div>
+                  <div className="flex flex-col gap-1.5">
+                    {profile.strong.map((s) => (
+                      <div key={s.key} className="flex items-center gap-2 text-[13.5px] text-[#3d2f22]">
+                        <span className="text-[15px]">{s.emoji}</span><span className="font-semibold">{s.text}</span>
+                        <span className="ml-auto text-[10.5px] font-bold text-[#3f7a4f] bg-[#e3f0e6] px-2 py-[3px] rounded-full whitespace-nowrap">상위 {s.topPct}%</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {profile.weak.length > 0 && (
+                <div>
+                  <div className="text-[11px] font-bold text-[#9c6b3f] mb-1.5">🔎 참고하세요</div>
+                  <div className="flex flex-col gap-1">
+                    {profile.weak.map((w) => (
+                      <div key={w.key} className="flex items-center gap-2 text-[12.5px] text-[#8a7458]"><span className="text-[14px] opacity-70">{w.emoji}</span><span>{w.text}</span></div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <p className="text-[10px] text-[#a8927a] mt-2.5 leading-relaxed">검증된 후기에서 자주 언급된 정도를 전체 카페와 비교한 <b>상대 위치</b>예요. 절대 평가가 아닙니다.</p>
+            </div>
+          ) : chars.length > 0 && (
             <div className="bg-[#efe9dd] rounded-lg px-4 py-3 mb-4 border border-[#ddd0bb]">
               <div className="text-[11px] text-[#8a7458] uppercase tracking-wider mb-2">이 카페가 자주 언급되는 결</div>
-              <div className="flex flex-wrap gap-1.5">{chars.map((ch) => <span key={ch.label} className="text-[12px] bg-white text-[#52402e] px-2.5 py-1 rounded-full border border-[#e0d4c0]">{ch.emoji} {ch.label} <span className="text-[#a8927a]">{ch.score}</span></span>)}</div>
+              <div className="flex flex-wrap gap-1.5">{chars.map((ch) => <span key={ch.label} className="text-[12px] bg-white text-[#52402e] px-2.5 py-1 rounded-full border border-[#e0d4c0]">{ch.emoji} {ch.label}</span>)}</div>
             </div>
           )}
-          {/* 방문자 후기 — 상단 강조 버튼(목록 → 상세 모달). 공개 방문기록 있을 때만. */}
-          {userReviews.length > 0 && <div className="mb-4"><VisitorReviews reviews={userReviews} /></div>}
           {cafe.synth_identity && (
             <div className="bg-[#efe9dd] rounded-lg px-4 py-3 mb-4 border border-[#ddd0bb]">
               <div className="text-[11px] text-[#8a7458] uppercase tracking-wider mb-1">리뷰 {cafe.synth_count}건 종합 분석</div>
@@ -1652,6 +1683,8 @@ function CafePanel({ cafe, onClose, onMap, bookmarked = false, onToggleBookmark 
             </div>
           )}
           {cafe.signature && <div className="text-sm text-[#6b5a48] mb-4"><span className="text-[#9c6b3f]">추천 </span>{cafe.signature}</div>}
+          {/* 방문자 후기 — 길찾기 버튼 바로 위에 배치(목록 → 상세 모달). 공개 방문기록 있을 때만. */}
+          {userReviews.length > 0 && <div className="mb-4"><VisitorReviews reviews={userReviews} /></div>}
           {/* ===== 버튼 3개 — 리뷰 위에 배치, 눈에 잘 띄게 ===== */}
           <div className="flex gap-2 mb-4">
             <a href={`https://map.kakao.com/?q=${encodeURIComponent(cafe.name + " " + cafe.area)}`} target="_blank" rel="noopener noreferrer" className="flex-1 text-center bg-[#2b2018] text-[#f4ece0] rounded-xl py-2.5 text-[12px] font-semibold hover:bg-[#3d2f22] transition-colors flex items-center justify-center">길찾기</a>
