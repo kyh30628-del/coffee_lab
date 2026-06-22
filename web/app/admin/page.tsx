@@ -495,9 +495,14 @@ export default function AdminPage() {
                 <div className="h-full bg-gradient-to-r from-emerald-400 to-emerald-600 rounded-full transition-all" style={{ width: `${jstatus.pct}%` }} />
               </div>
               <div className="flex gap-3 text-[11px] text-stone-500">
-                <span>대기 <b className="text-amber-600">{jstatus.queue?.toLocaleString()}</b>곳</span>
+                <span>판정 대기 <b className="text-stone-600">{jstatus.queue?.toLocaleString()}</b>곳</span>
                 <span>· 오늘 <b className="text-emerald-600">{jstatus.today}</b>곳 판정</span>
               </div>
+              <p className="text-[10px] text-stone-400 mt-1.5 leading-relaxed">
+                ℹ️ 새벽 Batches가 자동 처리하는 <b>정상 대기열</b>입니다(적체·위험 아님). 후기가 규칙상 명확한 곳은
+                <b> 토큰 없이 즉시 완료</b>되고, 같은 이름·맥락이 <b>애매한 '경계 리뷰'가 있는 곳만</b> LLM이 판정합니다.
+                공개 카페는 이미 규칙으로 검증돼 노출 중이며, 판정은 추가 정제 레이어라 대기 숫자는 품질 문제와 무관합니다.
+              </p>
             </div>
 
             {/* 수집·공개 */}
