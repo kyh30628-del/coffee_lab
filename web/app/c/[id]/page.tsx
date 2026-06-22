@@ -95,8 +95,8 @@ export default async function CafePage({ params }: Props) {
               <div className="flex flex-wrap gap-2">{tags.map((t) => <span key={t} className="text-[13px] bg-[#efe6d6] rounded-full px-3 py-1">{t}</span>)}</div>
             </div>
           )}
+          {userReviews.length > 0 && <div className="mb-4"><VisitorReviews reviews={userReviews} /></div>}
           <p className="text-[12.5px] text-[#8a7458] mb-6 leading-relaxed">네이버 공개 후기 <b>{c.synth_count ?? 0}건</b>을 교차검증한 데이터 기반 소개예요. (절대 평가가 아니라 후기에서 자주 언급된 정도입니다)</p>
-          {userReviews.length > 0 && <div className="mb-6"><VisitorReviews reviews={userReviews} /></div>}
           <Link href={`/?cafe=${c.id}`} className="block w-full text-center bg-[#2b2018] text-[#f4ece0] rounded-xl py-3.5 font-bold">지도·근거 후기 보기 →</Link>
         </div>
       </div>

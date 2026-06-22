@@ -1642,6 +1642,8 @@ function CafePanel({ cafe, onClose, onMap, bookmarked = false, onToggleBookmark 
               <div className="flex flex-wrap gap-1.5">{chars.map((ch) => <span key={ch.label} className="text-[12px] bg-white text-[#52402e] px-2.5 py-1 rounded-full border border-[#e0d4c0]">{ch.emoji} {ch.label} <span className="text-[#a8927a]">{ch.score}</span></span>)}</div>
             </div>
           )}
+          {/* 방문자 후기 — 상단 강조 버튼(목록 → 상세 모달). 공개 방문기록 있을 때만. */}
+          {userReviews.length > 0 && <div className="mb-4"><VisitorReviews reviews={userReviews} /></div>}
           {cafe.synth_identity && (
             <div className="bg-[#efe9dd] rounded-lg px-4 py-3 mb-4 border border-[#ddd0bb]">
               <div className="text-[11px] text-[#8a7458] uppercase tracking-wider mb-1">리뷰 {cafe.synth_count}건 종합 분석</div>
@@ -1709,13 +1711,6 @@ function CafePanel({ cafe, onClose, onMap, bookmarked = false, onToggleBookmark 
                   + {reviews.length - 6}건 더 보기
                 </button>
               )}
-            </div>
-          )}
-
-          {/* ===== 방문자 후기 — 버튼 → 목록(최신순) → 상세 모달 (공용 컴포넌트) ===== */}
-          {userReviews.length > 0 && (
-            <div className="px-4 pb-5 pt-1">
-              <VisitorReviews reviews={userReviews} />
             </div>
           )}
 

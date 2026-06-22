@@ -12,13 +12,13 @@ export default function VisitorReviews({ reviews }: { reviews: R[] }) {
   if (!reviews?.length) return null;
   return (
     <>
-      <button onClick={() => setOpenList(true)} className="w-full flex items-center justify-between gap-2 bg-white border border-[#e6dcc8] rounded-xl px-4 py-3 text-left hover:border-[#d6b9c4] transition">
-        <span className="flex items-center gap-1.5">
-          <span className="text-[14px]">🧡</span>
-          <span className="text-[13.5px] font-bold text-[#2b2018]">방문자 후기</span>
-          <span className="text-[11px] text-[#9c6b3f]">위치 인증 방문 {reviews.length}건</span>
+      <button onClick={() => setOpenList(true)} className="w-full flex items-center justify-between gap-2 bg-[#fdeef2] border border-[#f3c9d8] rounded-xl px-4 py-3 text-left hover:bg-[#fbe3ea] transition shadow-sm">
+        <span className="flex items-center gap-1.5 min-w-0">
+          <span className="text-[15px]">🧡</span>
+          <span className="text-[13.5px] font-bold text-[#b03a5b]">방문자 후기</span>
+          <span className="text-[11px] text-[#c47a90] shrink-0">위치 인증 방문 {reviews.length}건</span>
         </span>
-        <span className="text-[#9c6b3f] text-[13px]">›</span>
+        <span className="text-[#d6336c] text-[15px] font-bold shrink-0">›</span>
       </button>
 
       {/* 목록 모달(최신순) */}
