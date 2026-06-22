@@ -125,7 +125,7 @@ const LOC_SUFFIX = /(역|동|구|시|군|읍|면|로|길|가)$/; // 지역어 �
 // ⚠️ 브랜드의 일부인 단어(대학=와플대학, 센터=센터커피, 상가=몽상가)는 넣지 않는다. '브랜드 토큰 남을 때만 제거' 안전장치와 함께 동작.
 const VENUE_WORDS = [
   // 백화점·쇼핑몰·아울렛·마트
-  "스타필드", "롯데몰", "롯데백화점", "롯데마트", "롯데프리미엄", "롯데아울렛", "현대백화점", "현대시티", "현대프리미엄", "더현대", "신세계백화점", "신세계", "이마트", "트레이더스", "홈플러스", "코스트코", "타임스퀘어", "아이파크몰", "스퀘어원", "엔터식스", "갤러리아", "아울렛", "프리미엄아울렛", "이케아", "가든파이브", "디큐브", "에이케이플라자", "akplaza", "세이브존", "뉴코아", "모다아울렛",
+  "스타필드", "타임빌라스", "롯데몰", "롯데백화점", "롯데마트", "롯데프리미엄", "롯데아울렛", "현대백화점", "현대시티", "현대프리미엄", "더현대", "신세계백화점", "신세계", "이마트", "트레이더스", "홈플러스", "코스트코", "타임스퀘어", "아이파크몰", "스퀘어원", "엔터식스", "갤러리아", "아울렛", "프리미엄아울렛", "이케아", "가든파이브", "디큐브", "에이케이플라자", "akplaza", "세이브존", "뉴코아", "모다아울렛",
   // 푸드코트·식품관(몰 내부 구역)
   "푸드코트", "푸드애비뉴", "푸드홀", "잇토피아", "식품관", "스위트파크",
   // 휴게소·터미널·공항·역사(교통 복합시설)
@@ -178,16 +178,25 @@ export function coreTokens(name: string, areaTerms: string[]): string[] {
   // (예: '롯데백화점'에서 '점'이 떨어져 '롯데백화'가 되면 venue 매칭을 빠져나가는 것 방지)
   // 공백뿐 아니라 한글↔영문/숫자 경계로도 분리 → '노원두물마루COFFEESNACK'처럼 붙은 이름에서
   //   한글 식별어('노원두물마루')를 분리(영문 접미사 통째로 토큰화돼 일치율 0 되는 오판 방지).
-  const parts = name.split(/\s+/).flatMap((w) => w.split(/(?<=[가-힣])(?=[A-Za-z0-9])|(?<=[A-Za-z0-9])(?=[가-힣])/))
-    .map((raw) => ({ raw, core: raw.replace(GENERIC_SUFFIX, "").trim() }))
+  // 지점 표식('○○점')에서 나온 토큰 = 지점 랜드마크(봉천·뱅뱅사거리·신대방삼거리·수원). 브랜드가 아니라
+  //   같은 자리 다른 업체와 공유하는 위치어 → 식별 매칭에서 제외(브랜드 토큰만 남을 때). '코르누코피아 뱅뱅사거리점'에
+  //   딸려오던 '자연곳간 뱅뱅사거리점' 같은 옆가게 오염의 근본 차단. (브랜드가 없으면 위치어라도 정체성이므로 유지)
+  //   ⚠️ 지점 검출은 '공백 단어' 단위로 — '상암DMC점'은 한글↔영문 분리로 [상암,DMC,점]이 돼 점 표식을 잃으므로,
+  //   분리 전에 단어가 '점'으로 끝나는지를 먼저 판정해 하위 토큰 전체에 branch 플래그를 내린다.
+  const isBranchWord = (w: string) => /점$/.test(w) && !GENERIC_WORD.has(norm(w)) && w.replace(GENERIC_SUFFIX, "").trim().length >= 1;
+  const parts = name.split(/\s+/).flatMap((w) => { const branch = isBranchWord(w);
+      return w.split(/(?<=[가-힣])(?=[A-Za-z0-9])|(?<=[A-Za-z0-9])(?=[가-힣])/).map((raw) => ({ raw, branch })); })
+    .map(({ raw, branch }) => ({ raw, core: raw.replace(GENERIC_SUFFIX, "").trim(), branch }))
     .filter(({ core }) => core.length >= 2)
     .filter(({ core }) => !GENERIC_WORD.has(core.toLowerCase()))
     .filter(({ core }) => !NAME_STOPWORD.has(core.toLowerCase()))
     .filter(({ core }) => !isAreaTok(core)) // 지역·생활권명은 식별어 불가(평촌·일산·분당…) → 빠지면 전체이름 일치 요구
     .filter(({ core }) => !an.some((a) => a.includes(norm(core)) || norm(core).includes(a)))
     .filter(({ core }) => !LOC_SUFFIX.test(core));
-  const base = parts.map((p) => p.core);
-  const branded = parts.filter((p) => !isVenueTok(p.raw) && !isVenueTok(p.core)).map((p) => p.core);
+  const nonBranch = parts.filter((p) => !p.branch);
+  const pool = nonBranch.length ? nonBranch : parts; // 지점어만 있는 이름(브랜드 없음)은 그대로 유지
+  const base = pool.map((p) => p.core);
+  const branded = pool.filter((p) => !isVenueTok(p.raw) && !isVenueTok(p.core)).map((p) => p.core);
   return branded.length ? branded : base; // 브랜드 토큰이 남으면 venue/신도시 제거, 없으면 원래 유지
 }
 
