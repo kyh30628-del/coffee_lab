@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
 import InfoDot from "./InfoDot";
 import ShowcaseBanner, { SHOWCASE_CSS } from "./ShowcaseBanner";
 import OwnerSignupModal from "./OwnerSignupModal";
+import VisitorReviews from "./VisitorReviews";
 import KakaoShare from "./KakaoShare";
 
 type EvidenceReview = { quote: string; link?: string; source?: string; date?: string; trust?: "verified" | "reference" | "rejected"; score?: number; why?: string[] };
@@ -1711,27 +1712,10 @@ function CafePanel({ cafe, onClose, onMap, bookmarked = false, onToggleBookmark 
             </div>
           )}
 
-          {/* ===== 방문자 후기 — 사용자가 '공개'로 남긴 위치인증 방문기록(익명) ===== */}
+          {/* ===== 방문자 후기 — 버튼 → 목록(최신순) → 상세 모달 (공용 컴포넌트) ===== */}
           {userReviews.length > 0 && (
             <div className="px-4 pb-5 pt-1">
-              <div className="flex items-center gap-1.5 mb-2">
-                <span className="text-[13px] font-bold text-[#2b2018]">🧡 방문자 후기</span>
-                <span className="text-[10px] text-[#9c6b3f]">위치 인증 방문 {userReviews.length}건 · 공개</span>
-              </div>
-              <div className="space-y-2.5">
-                {userReviews.map((u, i) => (
-                  <div key={i} className="bg-white rounded-xl border border-[#ece0cd] p-3">
-                    {u.photos.length > 0 && (
-                      <div className="flex gap-1.5 overflow-x-auto mb-2 -mx-0.5 px-0.5">
-                        {u.photos.map((p, j) => <img key={j} src={p} alt="" className="h-28 rounded-lg border border-[#e6d9c8] object-cover shrink-0" />)}
-                      </div>
-                    )}
-                    {u.memory && <p className="text-[13px] text-[#2b2018] leading-relaxed whitespace-pre-wrap">{u.memory}</p>}
-                    <div className="text-[10px] text-[#a8927a] mt-1.5">{u.favorite ? "★ " : ""}방문자 · {u.date ? new Date(u.date).toLocaleDateString("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit" }) : ""}</div>
-                  </div>
-                ))}
-              </div>
-              <p className="text-[10px] text-[#bcae9b] mt-2 leading-relaxed">동네 커피 노트 사용자가 <b>카페 30m 위치 인증</b>을 거쳐 남긴 공개 방문 기록이에요. (익명)</p>
+              <VisitorReviews reviews={userReviews} />
             </div>
           )}
 
