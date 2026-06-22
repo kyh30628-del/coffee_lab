@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
 import { synthAndStore, finalizePipeline, scrubPublishedPII, healGroundingSuspects, holdZeroEvidenceSuspects, healPublishedAudit } from "@/lib/synthStore";
 export const runtime = "nodejs";
-export const maxDuration = 200; // 재검증 자가감사(healPublishedAudit) 배치 여유
+export const maxDuration = 300; // 재검증 자가감사(healPublishedAudit) 배치 여유(Vercel 표준 상한)
 
 // 🛰️ 자율 운영 관제탑(Control Tower)
 // 각 에이전트가 '만든 실제 데이터'로 가동 여부를 추론(거짓 불가) → 건강 판정 → 적체는 자가 치유 → 멈춤은 경보.
