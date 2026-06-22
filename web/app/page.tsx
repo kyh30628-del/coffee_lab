@@ -575,13 +575,14 @@ export default function Home() {
     if (u.selected) { setSelected(null); return true; }
     if (u.showConsent) { setShowConsent(false); return true; }
     if (u.tab === "memory") { setTab("home"); return true; } // 추억 → 홈
-    // 지도: 뒤로가기로 지역 계층을 올라감 (동→구/시→수도권전체(서울·인천·경기)→홈)
+    // 지도: 뒤로가기로 지역 계층을 올라감 (동→구/시→수도권 최상위(서울·인천·경기)→홈)
     if (u.tab === "map") {
       if (u.nearMe) { setNearMe(null); setNearMsg(""); return true; }               // 📍 내 주변 → 해제(일반 지도)
       if (u.dong) { setDong(""); return true; }                                    // 동/면 → 구/시(동 마커)
-      if (u.sigungu) { setSido(""); setSigungu(""); setDong(""); return true; }     // 구/시 → 지도 초기화면(서울·인천·경기)
-      if (u.sido) { setSido(""); setSigungu(""); setDong(""); return true; }        // 시도(구 마커) → 전체
-      if (allowMapBack) { setTab("home"); return true; }                            // 전체 → 홈(iOS는 캐처 스트립이 처리)
+      if (u.sigungu) { setSido(""); setSigungu(""); setDong(""); return true; }     // 구/시 → 최상위(서울·인천·경기)
+      // 최상위 지역선택 레벨(시도 구마커 또는 전체 서울/경기/인천) → 바로 홈. (중간 '전체' 거치는 한 단계 제거)
+      if (u.sido) { setSido(""); setSigungu(""); setDong(""); setTab("home"); return true; } // 시도(구 마커) → 홈
+      if (allowMapBack) { setTab("home"); return true; }                            // 전체(서울/경기/인천) → 홈
       return false;
     }
     if (u.tab === "home" && u.role !== null) { try { sessionStorage.removeItem("dcn_role"); } catch {} setRole(null); return true; } // 홈 → 랜딩
