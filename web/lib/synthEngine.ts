@@ -120,17 +120,24 @@ export function synthesize(name: string, reviews: Review[]): SynthResult {
   return { name, reviewCount: n, grade, coords, basis, uses, ops, evidence, identity: buildIdentity(coords, basis, uses, ops) };
 }
 
+// 리뷰 종합 한 줄 — 검증 후기에서 실제로 드러난 신호만(환각 금지) 따뜻하고 와닿게, 절제해서.
+//   군더더기('(N건)'·따옴표) 빼고 소비자가 바로 그려지는 표현으로. 풍성함은 위 '강점/아쉬운점' 블록이 보완.
+const USE_PHRASE: Record<string, string> = {
+  작업: "작업·공부하기 좋은 곳", 혼자: "혼자 조용히 머물기 좋은 곳", 수다: "함께 도란도란 이야기 나누기 좋은 곳",
+  사진: "사진 찍기 좋은 분위기", 빵: "빵·디저트가 특히 자주 언급되는 곳",
+};
 function buildIdentity(coords: Record<string, number | null>, basis: Record<string, string>, uses: Record<string, number>, ops: Record<string, number>) {
   const p: string[] = [];
-  if ((ops["직접로스팅"] ?? 0) >= 2) p.push(`직접 로스팅(${ops["직접로스팅"]}건)`); // 1건은 환각 위험 → 2건+만 주장
+  if ((ops["직접로스팅"] ?? 0) >= 2) p.push("직접 로스팅하는 곳"); // 1건은 환각 위험 → 2건+만 주장
   const a = coords.acidity, b = coords.body, s = coords.sweet;
-  if (a != null && a >= 0.65) p.push(`산미 또렷`);
-  if (a != null && a <= 0.35) p.push(`산미 낮고 부드러움`);
-  if (b != null && b >= 0.65) p.push(`묵직·고소`);
-  if (b != null && b <= 0.35) p.push(`가볍고 부드러운 바디`);
-  if (s != null && s >= 0.65) p.push(`단맛·디저트 강점`);
+  if (a != null && a >= 0.65) p.push("산미가 또렷한 커피");
+  else if (a != null && a <= 0.35) p.push("부드럽고 산미가 낮은 커피");
+  if (b != null && b >= 0.65) p.push("묵직하고 고소한 바디");
+  else if (b != null && b <= 0.35) p.push("가볍고 부드러운 바디");
+  if (s != null && s >= 0.65) p.push("단맛이 좋은 디저트");
   const tu = Object.entries(uses).sort((x, y) => y[1] - x[1])[0];
-  if (tu) p.push(`'${tu[0]}'에 적합(${tu[1]}건)`);
-  if (ops["권위"]) p.push("외부 평판 언급");
-  return p.length ? p.join(" · ") : "데이터 부족 — 추가 수집 필요";
+  if (tu && USE_PHRASE[tu[0]]) p.push(USE_PHRASE[tu[0]]);
+  if (ops["원두판매"] && p.length < 4) p.push("원두도 살 수 있는 곳");
+  if (ops["권위"]) p.push("매체·평단에 소개된 곳");
+  return p.length ? p.join(" · ") : "후기가 더 모이면 분석이 또렷해져요";
 }
