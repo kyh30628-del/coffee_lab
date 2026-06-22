@@ -80,7 +80,8 @@ export async function GET(req: NextRequest) {
     //   stale 플래그(재합성으로 무효)·보류(이미 비공개=처리됨)는 미처리가 아니므로 제외 → 화면이 '진짜 남은 일'만 표시.
     const gr = (await sql`SELECT COUNT(*) FILTER (WHERE NOT g.grounded)::int suspect, MAX(g.checked_at) last FROM grounding_checks g JOIN cafes c ON c.id = g.cafe_id WHERE c.published AND g.checked_at >= c.synth_updated AND c.llm_judged_at IS NOT NULL AND c.llm_judged_at >= c.raw_collected_at`)[0] as any;
     // 그라운딩 백로그(판정완료인데 아직 그라운딩 안 한 공개 카페) + 의심 목록(이름·사유) — 관리자에 명시.
-    const grBacklog = (await sql`SELECT COUNT(*)::int n FROM cafes c WHERE c.published AND c.raw_reviews IS NOT NULL AND c.synth_identity IS NOT NULL AND c.llm_judged_at IS NOT NULL AND c.llm_judged_at >= c.raw_collected_at AND NOT EXISTS (SELECT 1 FROM grounding_checks g WHERE g.cafe_id = c.id AND g.checked_at >= c.synth_updated)`.catch(() => [{ n: 0 }]))[0] as any;
+    // 효율: 일치율 명확히 높은(≥0.75) 카페는 그라운딩 불필요 → 백로그는 '애매(<0.75)·미채점'만 집계.
+    const grBacklog = (await sql`SELECT COUNT(*)::int n FROM cafes c WHERE c.published AND c.raw_reviews IS NOT NULL AND c.synth_identity IS NOT NULL AND c.llm_judged_at IS NOT NULL AND c.llm_judged_at >= c.raw_collected_at AND COALESCE(c.synth_coherence, 0) < 0.75 AND NOT EXISTS (SELECT 1 FROM grounding_checks g WHERE g.cafe_id = c.id AND g.checked_at >= c.synth_updated)`.catch(() => [{ n: 0 }]))[0] as any;
     // 그라운딩이 문제로 판정해 '비공개 보류'한 카페(소비자 노출 차단됨) — 진짜 처리 필요분.
     const grHeld = (await sql`SELECT COUNT(*)::int n FROM grounding_checks g JOIN cafes c ON c.id = g.cafe_id WHERE NOT g.grounded AND NOT c.published`.catch(() => [{ n: 0 }]))[0] as any;
     const grSuspects = (await sql`SELECT c.name, c.area, g.issue FROM grounding_checks g JOIN cafes c ON c.id = g.cafe_id WHERE NOT g.grounded AND c.llm_judged_at IS NOT NULL AND c.llm_judged_at >= c.raw_collected_at ORDER BY g.checked_at DESC LIMIT 20`.catch(() => [])) as any[];
