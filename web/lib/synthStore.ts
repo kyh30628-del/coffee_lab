@@ -336,7 +336,7 @@ export async function markJudged(cafeId: number) {
 //   audit_checked_at 커서로 전 공개카페를 ~며칠 주기로 1회씩 재검. 재합성으로 비공개되면 그게 곧 교정.
 //   교정 후에도 근거가 카페명과 안 맞으면 audit_flags(근거오염)로 레드팀에 남긴다.
 //   🚨 안전장치: 한 회차 비공개가 unpubCap 초과 = 규칙 회귀(인천 사태) 의심 → 즉시 중단·경보(대량삭제 차단).
-export async function healPublishedAudit(limit = 400, unpubCap = 100): Promise<{ scanned: number; unpublished: number; flagged: number; regression: boolean; names: string[] }> {
+export async function healPublishedAudit(limit = 800, unpubCap = 160): Promise<{ scanned: number; unpublished: number; flagged: number; regression: boolean; names: string[] }> {
   await ensureCols();
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS audit_checked_at TIMESTAMPTZ`.catch(() => {});
   const rows = (await sql`SELECT id, name, area FROM cafes
