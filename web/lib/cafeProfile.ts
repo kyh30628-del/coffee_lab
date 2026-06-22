@@ -65,11 +65,52 @@ export function cafeProfile(cafe: CafeLite, dist: AxisDist): CafeProfile {
   // 강점이 하나도 없으면(평범) 가장 높은 축 1개라도(언급 2건+) 보여줌 — 판단 단서 제공.
   if (strong.length === 0) strong = ranked.filter((r) => r.raw >= 2).sort((a, b) => b.p - a.p).slice(0, 1);
   const strongKeys = new Set(strong.map((s) => s.key));
-  // 아쉬운점: 하위 ~30% + 약점 문구 있는 축, 강점과 중복 제외. 백분위 낮은 순 최대 2개.
-  const weak = ranked.filter((r) => r.p <= 0.32 && WEAK[r.key] && !strongKeys.has(r.key)).sort((a, b) => a.p - b.p).slice(0, 2);
+  // 아쉬운점: 중앙값 아래(상대적으로 약한) 축 중 약점 문구 있는 것, 강점 제외. 백분위 낮은 순 최대 2개.
+  //   (강점과 균형 있게 '항상 같이' 보여주기 위해 하위 50%까지 넓힘 — 사장님 요청)
+  const weak = ranked.filter((r) => r.p < 0.50 && WEAK[r.key] && !strongKeys.has(r.key)).sort((a, b) => a.p - b.p).slice(0, 2);
   return {
     strong: strong.map((r) => ({ key: r.key, label: r.label, emoji: r.emoji, text: STRONG[r.key] ?? r.label, topPct: r.topPct })),
     weak: weak.map((r) => ({ key: r.key, label: r.label, emoji: r.emoji, text: WEAK[r.key], topPct: r.topPct })),
     ok: strong.length > 0 || weak.length > 0,
   };
+}
+
+// ── 리뷰 핵심 하이라이트 ──────────────────────────────────────────────
+// 옥석(검증) 리뷰들에서 '소비자가 꼭 볼 구체 포인트'를 빈도로 추출. 6개 결보다 구체적·실질적.
+// 측정값이 아니라 검증 후기에 실제로 자주 나온 것 → '데이터 기반 분석'의 실체.
+const HIGHLIGHTS: { label: string; emoji: string; kws: string[] }[] = [
+  { label: "통창·창밖 뷰", emoji: "🪟", kws: ["통창", "큰 창", "창밖", "창가", "뷰맛집", "뷰가 좋", "뷰가 예"] },
+  { label: "루프탑·테라스", emoji: "🌿", kws: ["루프탑", "옥상", "테라스"] },
+  { label: "정원·자연 뷰", emoji: "🌳", kws: ["정원", "마당", "가든", "숲", "산뷰", "산 뷰", "자연 속", "초록"] },
+  { label: "강·바다 뷰", emoji: "🌊", kws: ["한강", "강뷰", "강 뷰", "오션", "바다뷰", "바다 뷰", "호수", "리버뷰"] },
+  { label: "넓고 탁 트인 공간", emoji: "🏛️", kws: ["넓", "대형", "탁 트", "층고", "웅장", "규모"] },
+  { label: "주차 편함", emoji: "🅿️", kws: ["주차"] },
+  { label: "수제·당일 베이킹", emoji: "🥐", kws: ["직접 만든", "직접 만드", "수제", "당일 생산", "직접 구운", "홈메이드", "매장에서 구"] },
+  { label: "커피가 맛있는", emoji: "☕", kws: ["커피가 맛", "커피 맛있", "원두가 좋", "스페셜티", "핸드드립", "산미가", "고소"] },
+  { label: "디저트 맛집", emoji: "🍰", kws: ["디저트가 맛", "케이크 맛", "빵이 맛", "휘낭시에", "크로플", "스콘", "꾸덕"] },
+  { label: "브런치 좋은", emoji: "🍳", kws: ["브런치", "샌드위치", "에그", "팬케이크", "프렌치토스트"] },
+  { label: "조용·차분한", emoji: "🤍", kws: ["조용", "차분", "한적", "고요", "한산"] },
+  { label: "감성·사진 맛집", emoji: "📸", kws: ["감성", "예쁘", "인스타", "사진 찍", "포토", "분위기 좋"] },
+  { label: "아늑·따뜻한", emoji: "🕯️", kws: ["아늑", "포근", "아담", "따뜻한 분위"] },
+  { label: "작업·노트북", emoji: "💻", kws: ["작업", "노트북", "콘센트", "공부하기"] },
+  { label: "친절한 응대", emoji: "🙂", kws: ["친절", "사장님이 좋", "응대가 좋", "서비스가 좋", "사장님 친"] },
+  { label: "가성비 좋은", emoji: "💸", kws: ["가성비", "가격이 착", "합리적인 가격", "저렴"] },
+  { label: "웨이팅·인기", emoji: "🔥", kws: ["웨이팅", "오픈런", "줄 서", "대기", "핫플", "줄을 서"] },
+  { label: "데이트·기념일", emoji: "💕", kws: ["데이트", "기념일", "프러포즈", "특별한 날"] },
+  { label: "반려동물 동반", emoji: "🐾", kws: ["애견", "반려", "강아지 동반", "펫", "노견"] },
+  { label: "늦게까지·심야", emoji: "🌙", kws: ["늦게까지", "심야", "24시", "밤늦", "새벽까지"] },
+];
+
+export type Highlight = { label: string; emoji: string; count: number };
+// 검증 리뷰 텍스트들(인용/본문)에서 피처별 '언급 후기 수'를 세어 상위 N개 반환.
+export function extractHighlights(texts: string[], topN = 6): Highlight[] {
+  const arr = (texts || []).map((t) => (t || "").toLowerCase()).filter(Boolean);
+  if (arr.length < 4) return []; // 표본 부족
+  const minCount = Math.max(2, Math.round(arr.length * 0.06)); // 우연 1건 제외, 6%+ 패턴만
+  const out: Highlight[] = [];
+  for (const f of HIGHLIGHTS) {
+    const c = arr.filter((t) => f.kws.some((k) => t.includes(k.toLowerCase()))).length;
+    if (c >= minCount) out.push({ label: f.label, emoji: f.emoji, count: c });
+  }
+  return out.sort((a, b) => b.count - a.count).slice(0, topN);
 }

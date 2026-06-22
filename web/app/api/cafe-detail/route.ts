@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
+import { extractHighlights } from "@/lib/cafeProfile";
 export const runtime = "nodejs";
 
 // 리뷰 게시일 파싱(YYYY.MM.DD / YYYY-MM / YYYY년 MM월 등) → ms
@@ -38,7 +39,9 @@ export async function GET(req: NextRequest) {
     const reviews = Array.isArray(raw) ? [...raw].sort((a, b) => rankScore(b, nowT) - rankScore(a, nowT)) : raw;
     const quality = rows[0]?.synth_quality ?? null;
     const llmJudged = !!rows[0]?.llm_judged_at;
-    return NextResponse.json({ ok: true, area: rows[0]?.area ?? null, reviews, quality, llmJudged }, {
+    // 옥석 리뷰에서 소비자가 꼭 볼 구체 포인트를 빈도로 추출(데이터 기반 핵심)
+    const highlights = extractHighlights((Array.isArray(reviews) ? reviews : []).map((r: any) => r?.quote || ""));
+    return NextResponse.json({ ok: true, area: rows[0]?.area ?? null, reviews, quality, llmJudged, highlights }, {
       headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" },
     });
   } catch (e) {

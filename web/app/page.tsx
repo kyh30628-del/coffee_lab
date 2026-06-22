@@ -1548,9 +1548,10 @@ function CafePanel({ cafe, dist, onClose, onMap, bookmarked = false, onToggleBoo
   const [showAllReviews, setShowAllReviews] = useState(false);
   const [reviewFilter, setReviewFilter] = useState<"all" | "verified" | "reference" | "ai" | "youtube">("all");
   const [userReviews, setUserReviews] = useState<{ memory: string; photos: string[]; favorite: boolean; date: string }[]>([]); // 공개 방문자 후기
+  const [highlights, setHighlights] = useState<{ label: string; emoji: string; count: number }[]>([]); // 옥석 리뷰 데이터 핵심
   useEffect(() => {
-    let live = true; setLoadingRev(true); setPromo(null); setUserReviews([]);
-    fetch(`/api/cafe-detail?id=${cafe.id}`).then((r) => r.json()).then((d) => { if (live) { setReviews(d.reviews ?? []); setQuality(d.quality ?? null); setLlmJudged(!!d.llmJudged); setLoadingRev(false); } }).catch(() => { if (live) setLoadingRev(false); });
+    let live = true; setLoadingRev(true); setPromo(null); setUserReviews([]); setHighlights([]);
+    fetch(`/api/cafe-detail?id=${cafe.id}`).then((r) => r.json()).then((d) => { if (live) { setReviews(d.reviews ?? []); setQuality(d.quality ?? null); setLlmJudged(!!d.llmJudged); setHighlights(d.highlights ?? []); setLoadingRev(false); } }).catch(() => { if (live) setLoadingRev(false); });
     fetch(`/api/owner-promo?cafeId=${cafe.id}`).then((r) => r.json()).then((d) => { if (live && d.promo && (d.promo.ai_headline || d.promo.video_url)) { setPromo(d.promo); trackPromo(cafe.id, "view"); } }).catch(() => {});
     fetch(`/api/cafe-reviews?cafeId=${cafe.id}`).then((r) => r.json()).then((d) => { if (live && d.ok) setUserReviews(d.reviews ?? []); }).catch(() => {});
     return () => { live = false; };
@@ -1646,13 +1647,13 @@ function CafePanel({ cafe, dist, onClose, onMap, bookmarked = false, onToggleBoo
             <div className="bg-[#efe9dd] rounded-xl px-4 py-3.5 mb-4 border border-[#ddd0bb]">
               <div className="text-[11px] text-[#8a7458] uppercase tracking-wider mb-2.5">한눈에 보기 <span className="lowercase tracking-normal">· 전체 카페 대비</span></div>
               {profile.strong.length > 0 && (
-                <div className={profile.weak.length > 0 ? "mb-3" : ""}>
+                <div className={profile.weak.length > 0 ? "mb-2.5" : ""}>
                   <div className="text-[11px] font-bold text-[#3f7a4f] mb-1.5">👍 이런 점이 강해요</div>
                   <div className="flex flex-col gap-1.5">
                     {profile.strong.map((s) => (
-                      <div key={s.key} className="flex items-center gap-2 text-[13.5px] text-[#3d2f22]">
-                        <span className="text-[15px]">{s.emoji}</span><span className="font-semibold">{s.text}</span>
-                        <span className="ml-auto text-[10.5px] font-bold text-[#3f7a4f] bg-[#e3f0e6] px-2 py-[3px] rounded-full whitespace-nowrap">상위 {s.topPct}%</span>
+                      <div key={s.key} className="flex items-center gap-2 bg-[#e8f3ea] border border-[#c6e2cc] rounded-lg px-2.5 py-1.5">
+                        <span className="text-[15px]">{s.emoji}</span><span className="text-[13.5px] font-bold text-[#2f5f3c]">{s.text}</span>
+                        <span className="ml-auto text-[10.5px] font-bold text-white bg-[#3f7a4f] px-2 py-[3px] rounded-full whitespace-nowrap">상위 {s.topPct}%</span>
                       </div>
                     ))}
                   </div>
@@ -1660,10 +1661,12 @@ function CafePanel({ cafe, dist, onClose, onMap, bookmarked = false, onToggleBoo
               )}
               {profile.weak.length > 0 && (
                 <div>
-                  <div className="text-[11px] font-bold text-[#9c6b3f] mb-1.5">🔎 참고하세요</div>
-                  <div className="flex flex-col gap-1">
+                  <div className="text-[11px] font-bold text-[#b06a2e] mb-1.5">🔎 이런 점은 참고하세요</div>
+                  <div className="flex flex-col gap-1.5">
                     {profile.weak.map((w) => (
-                      <div key={w.key} className="flex items-center gap-2 text-[12.5px] text-[#8a7458]"><span className="text-[14px] opacity-70">{w.emoji}</span><span>{w.text}</span></div>
+                      <div key={w.key} className="flex items-center gap-2 bg-[#f6ecdf] border border-[#e6d2b5] rounded-lg px-2.5 py-1.5">
+                        <span className="text-[14px]">{w.emoji}</span><span className="text-[12.5px] font-medium text-[#8a6534]">{w.text}</span>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -1676,10 +1679,22 @@ function CafePanel({ cafe, dist, onClose, onMap, bookmarked = false, onToggleBoo
               <div className="flex flex-wrap gap-1.5">{chars.map((ch) => <span key={ch.label} className="text-[12px] bg-white text-[#52402e] px-2.5 py-1 rounded-full border border-[#e0d4c0]">{ch.emoji} {ch.label}</span>)}</div>
             </div>
           )}
-          {cafe.synth_identity && (
-            <div className="bg-[#efe9dd] rounded-lg px-4 py-3 mb-4 border border-[#ddd0bb]">
-              <div className="text-[11px] text-[#8a7458] uppercase tracking-wider mb-1">리뷰 {cafe.synth_count}건 종합 분석</div>
-              <div className="text-[14px] text-[#52402e] leading-snug">{cafe.synth_identity}</div>
+          {(highlights.length > 0 || cafe.synth_identity) && (
+            <div className="bg-[#efe9dd] rounded-xl px-4 py-3.5 mb-4 border border-[#ddd0bb]">
+              <div className="text-[11px] text-[#8a7458] uppercase tracking-wider mb-2">📊 리뷰 데이터 분석 <span className="lowercase tracking-normal">· 검증 후기 {cafe.synth_count}건</span></div>
+              {highlights.length > 0 && (
+                <div className="mb-2.5">
+                  <div className="text-[10.5px] text-[#9c6b3f] mb-1.5">후기에서 가장 많이 언급된 것 (괄호=언급 후기 수)</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {highlights.map((h, i) => (
+                      <span key={h.label} className={`text-[12.5px] rounded-full px-2.5 py-1 border font-semibold ${i === 0 ? "bg-[#2b2018] text-[#f4ece0] border-[#2b2018]" : "bg-white text-[#52402e] border-[#d8c8ad]"}`}>
+                        {h.emoji} {h.label} <span className={i === 0 ? "text-[#e8b87a]" : "text-[#a8927a]"}>{h.count}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {cafe.synth_identity && <div className="text-[13.5px] text-[#52402e] leading-relaxed">{cafe.synth_identity}</div>}
             </div>
           )}
           {cafe.signature && <div className="text-sm text-[#6b5a48] mb-4"><span className="text-[#9c6b3f]">추천 </span>{cafe.signature}</div>}
