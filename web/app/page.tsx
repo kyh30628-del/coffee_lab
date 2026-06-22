@@ -456,8 +456,8 @@ export default function Home() {
   const deepLinked = useRef(false);
   useEffect(() => {
     if (deepLinked.current || !cafes.length || typeof window === "undefined") return;
-    const id = Number(new URLSearchParams(window.location.search).get("cafe"));
-    if (id) { const c = cafes.find((x) => x.id === id); if (c) { setSelected(c); deepLinked.current = true; } }
+    const id = new URLSearchParams(window.location.search).get("cafe");
+    if (id) { const c = cafes.find((x) => String(x.id) === id); if (c) { setSelected(c); deepLinked.current = true; } }
   }, [cafes]);
   // 취향 공유 링크(/?taste=key)로 도착하면 해당 결을 자동 선택
   useEffect(() => {
