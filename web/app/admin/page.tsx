@@ -328,20 +328,18 @@ export default function AdminPage() {
                 })}
               </div>
               <button onClick={() => setTowerFull(true)} className="w-full mb-2.5 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-700 text-[12px] font-bold py-2 hover:bg-indigo-100 transition">⛶ 관제탑 전체 흐름 보기 (수집 → 공개)</button>
-              {/* 🔬 그라운딩 — 의심(소비자 노출)은 빨강, 감사 대기는 백그라운드 큐(중립색)로 구분 */}
-              {tower.grounding && (tower.grounding.backlog > 0 || tower.grounding.suspectCount > 0) && (
-                <div className={`mb-2.5 rounded-xl border p-2.5 ${tower.grounding.suspectCount > 0 ? "border-rose-200 bg-rose-50/60" : "border-slate-200 bg-slate-50"}`}>
+              {/* 🔬 그라운딩 — '소비자 노출 의심'이 있을 때만 빨강 경보. 0이면 표시 안 함(아래 검증 패널이 0 확인).
+                   (그라운딩은 결정론적 규칙으로 대체됨 — 안 줄어드는 '감사 대기' 백로그는 오해라 미표시) */}
+              {tower.grounding && tower.grounding.suspectCount > 0 && (
+                <div className="mb-2.5 rounded-xl border p-2.5 border-rose-200 bg-rose-50/60">
                   <div className="text-[11px] font-bold mb-1.5 text-stone-700">
-                    🔬 LLM 그라운딩 · 의심 <b className={tower.grounding.suspectCount > 0 ? "text-rose-700" : "text-emerald-600"}>{tower.grounding.suspectCount}건</b>
-                    <span className="font-normal text-slate-500"> · 감사 대기 {tower.grounding.backlog?.toLocaleString()}곳 (백그라운드 — 크론 자동, 소비자 무관)</span>
+                    🔬 LLM 그라운딩 · 소비자 노출 의심 <b className="text-rose-700">{tower.grounding.suspectCount}건</b>
                   </div>
-                  {tower.grounding.suspectCount > 0 ? (
-                    <div className="space-y-1 max-h-44 overflow-y-auto">
-                      {tower.grounding.suspects?.map((s: any, i: number) => (
-                        <div key={i} className="text-[10.5px] leading-snug"><b className="text-rose-700">{s.name}</b> <span className="text-stone-400">{s.area}</span><br /><span className="text-stone-600">{s.issue}</span></div>
-                      ))}
-                    </div>
-                  ) : <div className="text-[10.5px] text-emerald-600">의심 0건 — 소비자에 보이는 오염·환각 없음 ✓</div>}
+                  <div className="space-y-1 max-h-44 overflow-y-auto">
+                    {tower.grounding.suspects?.map((s: any, i: number) => (
+                      <div key={i} className="text-[10.5px] leading-snug"><b className="text-rose-700">{s.name}</b> <span className="text-stone-400">{s.area}</span><br /><span className="text-stone-600">{s.issue}</span></div>
+                    ))}
+                  </div>
                 </div>
               )}
               <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-stone-500">
@@ -484,9 +482,10 @@ export default function AdminPage() {
             {/* AI 판정 */}
             <div className="bg-white rounded-xl border border-stone-200 p-3">
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[12px] font-bold text-stone-700">🧮 AI 맥락 판정</span>
+                <span className="text-[12px] font-bold text-stone-700">🧮 AI 맥락 판정 <span className="font-normal text-stone-400">(보조 정제)</span></span>
                 <span className="text-[11px] text-stone-400">{jstatus.last ? `최근 ${new Date(jstatus.last).toLocaleString("ko-KR")}` : "미실행"}</span>
               </div>
+              <div className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2 py-1 mb-1.5">소비자 노출 정상 ✅ <span className="font-normal text-emerald-600">— 공개 카페는 규칙으로 검증돼 노출 중. 아래 '대기'는 그 위 선택적 정제일 뿐 품질·위험과 무관.</span></div>
               <div className="flex items-end justify-between mb-1.5">
                 <span className="text-xl font-bold text-stone-800">{jstatus.pct}%</span>
                 <span className="text-[11px] text-stone-500">{jstatus.done?.toLocaleString()} / {jstatus.total?.toLocaleString()}곳</span>
@@ -499,9 +498,9 @@ export default function AdminPage() {
                 <span>· 오늘 <b className="text-emerald-600">{jstatus.today}</b>곳 판정</span>
               </div>
               <p className="text-[10px] text-stone-400 mt-1.5 leading-relaxed">
-                ℹ️ 새벽 Batches가 자동 처리하는 <b>정상 대기열</b>입니다(적체·위험 아님). 후기가 규칙상 명확한 곳은
-                <b> 토큰 없이 즉시 완료</b>되고, 같은 이름·맥락이 <b>애매한 '경계 리뷰'가 있는 곳만</b> LLM이 판정합니다.
-                공개 카페는 이미 규칙으로 검증돼 노출 중이며, 판정은 추가 정제 레이어라 대기 숫자는 품질 문제와 무관합니다.
+                ℹ️ '판정 대기' = 같은 이름의 딴 가게·맥락이 <b>애매한 '경계 리뷰'가 있어 LLM 확인이 필요한 곳</b>입니다.
+                새벽 Batches가 크레딧 한도 내에서 자동 처리합니다(경계 리뷰 없는 곳은 무과금 자동완료). <b>공개 카페는 이미
+                규칙으로 검증돼 정상 노출 중</b>이고 판정은 그 위 정제 레이어라, 이 대기 숫자는 <b>소비자 품질·위험과 무관</b>합니다(적체·고장 아님).
               </p>
             </div>
 
@@ -582,22 +581,27 @@ export default function AdminPage() {
           ) : <p className="text-[12px] text-stone-400">검증 리포트 없음 — '지금 검사'를 눌러 실행하세요.</p>}
 
           {/* 🧠 LLM 그라운딩(보조) */}
-          {grounding && grounding.total > 0 && (
-            <div className={`mt-2 rounded-xl border p-3 ${grounding.flagged > 0 ? "bg-amber-50 border-amber-200" : "bg-stone-50 border-stone-200"}`}>
+          {grounding && grounding.total > 0 && (() => {
+            const pub = grounding.publicFlagged ?? grounding.flagged ?? 0; // 소비자 노출 의심(실제 영향)
+            const held = grounding.held ?? 0;                              // 비공개 보류(소비자 안 보임)
+            return (
+            <div className={`mt-2 rounded-xl border p-3 ${pub > 0 ? "bg-amber-50 border-amber-200" : "bg-emerald-50 border-emerald-200"}`}>
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-[13px] font-bold">🧠 LLM 그라운딩 (보조 · 환각 탐지)</span>
-                <span className="text-[11px] text-stone-500 ml-auto">{grounding.total}곳 검사 · 의심 <b className={grounding.flagged > 0 ? "text-amber-600" : "text-emerald-600"}>{grounding.flagged}</b></span>
+                <span className={`text-[12px] font-bold ml-auto ${pub > 0 ? "text-amber-700" : "text-emerald-700"}`}>{pub > 0 ? `⚠ 노출 오염 ${pub}건` : "소비자 노출 오염 0건 ✅"}</span>
               </div>
-              {grounding.flagged > 0 ? (
+              {pub > 0 ? (
                 <div className="space-y-0.5">
                   {grounding.samples.map((s: any, i: number) => (
                     <div key={i} className="text-[11px] text-stone-600"><b>{s.s}</b>: {s.issue || "근거 불충분"}</div>
                   ))}
-                  <p className="text-[10px] text-stone-400 mt-1">⚠ LLM 추정이라 자동조치 안 함 — 사람이 확인 후 재합성/수정하세요.</p>
+                  <p className="text-[10px] text-stone-400 mt-1">⚠ 공개 노출 중 — 사람이 확인 후 재합성/비공개 처리하세요.</p>
                 </div>
-              ) : <p className="text-[11px] text-emerald-600">의심 항목 없음 — 생성 정체성이 근거 후기와 일치.</p>}
+              ) : <p className="text-[11px] text-emerald-700">공개 카페 전부 근거 일치 — 소비자에게 보이는 오염·환각 <b>없음</b>.</p>}
+              <p className="text-[10px] text-stone-400 mt-1.5">{grounding.total?.toLocaleString()}곳 누적 검사{held > 0 ? ` · 비공개 보류 ${held}곳(소비자 안 보임 — 이미 차단됨)` : ""}</p>
             </div>
-          )}
+            );
+          })()}
         </div>
 
         {/* ===== 모달 트리거 (구독 카페 현황 · 유튜브 수집 · 내 카페 기록) ===== */}

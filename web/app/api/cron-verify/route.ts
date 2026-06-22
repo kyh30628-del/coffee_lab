@@ -128,9 +128,15 @@ export async function GET(req: NextRequest) {
     // 🧠 LLM 그라운딩(보조 레이어) 요약 — 로컬 verify-grounding 배치가 적재한 결과 조회
     const grounding = await (async () => {
       try {
-        const g = (await sql`SELECT count(*)::int total, count(*) FILTER (WHERE NOT grounded)::int flagged, max(checked_at) last FROM grounding_checks`)[0] as any;
-        const samples = await sql`SELECT c.name s, g.issue FROM grounding_checks g JOIN cafes c ON c.id = g.cafe_id WHERE NOT g.grounded ORDER BY g.checked_at DESC LIMIT 6` as unknown as any[];
-        return { total: g.total ?? 0, flagged: g.flagged ?? 0, last: g.last, samples };
+        // 공개(소비자 노출) / 비공개(보류 — 소비자 안 보임)를 분리 → 화면이 '소비자 영향'을 사실대로 표시.
+        const g = (await sql`SELECT count(*)::int total,
+          count(*) FILTER (WHERE NOT gc.grounded)::int flagged,
+          count(*) FILTER (WHERE NOT gc.grounded AND c.published)::int public_flagged,
+          count(*) FILTER (WHERE NOT gc.grounded AND NOT c.published)::int held,
+          max(gc.checked_at) last FROM grounding_checks gc JOIN cafes c ON c.id = gc.cafe_id`)[0] as any;
+        // 샘플은 '공개중 의심'(=실제 소비자 영향)만. 비공개 보류는 이미 차단돼 노출 0.
+        const samples = await sql`SELECT c.name s, gc.issue FROM grounding_checks gc JOIN cafes c ON c.id = gc.cafe_id WHERE NOT gc.grounded AND c.published ORDER BY gc.checked_at DESC LIMIT 6` as unknown as any[];
+        return { total: g.total ?? 0, flagged: g.flagged ?? 0, publicFlagged: g.public_flagged ?? 0, held: g.held ?? 0, last: g.last, samples };
       } catch { return null; }
     })();
 
