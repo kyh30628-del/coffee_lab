@@ -4,21 +4,23 @@
 import { CHAR_AXES } from "./charScore";
 
 export type CafeLite = { char_scores?: Record<string, number> | null; synth_count?: number | null };
-export type AxisDist = Record<string, number[]>; // 축 → 전체 카페의 '리뷰당 언급률' 정렬 배열
+// 축 → 전체 카페의 '리뷰당 언급률' 정렬 배열(percentile용) + 평균 '언급 건수'(비교 표시용)
+export type AxisDist = { rates: Record<string, number[]>; avg: Record<string, number> };
 
 const MIN_CNT = 8; // 표본 너무 적으면 비율이 튀므로 분포·판단에서 제외
 
-// 전체 카페에서 축별 '리뷰당 언급률' 분포(정렬)를 만든다. (클라/서버 공용)
+// 전체 카페에서 축별 언급률 분포(정렬) + 평균 언급 건수를 만든다. (클라/서버 공용)
 export function buildAxisDist(cafes: CafeLite[]): AxisDist {
-  const d: AxisDist = {};
-  for (const ax of CHAR_AXES) d[ax.key] = [];
+  const rates: Record<string, number[]> = {}, sum: Record<string, number> = {}, num: Record<string, number> = {};
+  for (const ax of CHAR_AXES) { rates[ax.key] = []; sum[ax.key] = 0; num[ax.key] = 0; }
   for (const c of cafes) {
     const cnt = c.synth_count ?? 0; if (cnt < MIN_CNT) continue;
     const cs = c.char_scores ?? {};
-    for (const ax of CHAR_AXES) d[ax.key].push((cs[ax.key] ?? 0) / cnt);
+    for (const ax of CHAR_AXES) { const v = cs[ax.key] ?? 0; rates[ax.key].push(v / cnt); sum[ax.key] += v; num[ax.key]++; }
   }
-  for (const ax of CHAR_AXES) d[ax.key].sort((a, b) => a - b);
-  return d;
+  const avg: Record<string, number> = {};
+  for (const ax of CHAR_AXES) { rates[ax.key].sort((a, b) => a - b); avg[ax.key] = num[ax.key] ? Math.round(sum[ax.key] / num[ax.key]) : 0; }
+  return { rates, avg };
 }
 
 // 정렬 배열에서 v의 백분위(0~1) = v 이하인 비율.
@@ -47,7 +49,7 @@ const WEAK: Record<string, string> = {
   roast: "", // 로스팅 미언급은 약점으로 안 봄(대부분 카페가 안 함)
 };
 
-export type ProfileItem = { key: string; label: string; emoji: string; text: string; topPct: number };
+export type ProfileItem = { key: string; label: string; emoji: string; text: string; topPct: number; count: number; avg: number };
 export type CafeProfile = { strong: ProfileItem[]; weak: ProfileItem[]; ok: boolean };
 
 // 한 카페의 강점/아쉬운점 산출. dist는 buildAxisDist 결과.
@@ -56,9 +58,9 @@ export function cafeProfile(cafe: CafeLite, dist: AxisDist): CafeProfile {
   const cs = cafe.char_scores ?? {};
   if (cnt < MIN_CNT) return { strong: [], weak: [], ok: false };
   const ranked = CHAR_AXES.map((ax) => {
-    const rate = (cs[ax.key] ?? 0) / cnt;
-    const p = percentile(dist[ax.key], rate);
-    return { key: ax.key, label: ax.label, emoji: ax.emoji, raw: cs[ax.key] ?? 0, p, topPct: Math.max(1, Math.round((1 - p) * 100)) };
+    const raw = cs[ax.key] ?? 0;
+    const p = percentile(dist.rates[ax.key], raw / cnt);
+    return { key: ax.key, label: ax.label, emoji: ax.emoji, raw, avg: dist.avg[ax.key] ?? 0, p, topPct: Math.max(1, Math.round((1 - p) * 100)) };
   });
   // 강점: 상위 ~30% 이상 + 최소 언급 2건(우연 1건 제외). 백분위 높은 순 최대 3개.
   let strong = ranked.filter((r) => r.p >= 0.70 && r.raw >= 2).sort((a, b) => b.p - a.p).slice(0, 3);
@@ -68,9 +70,11 @@ export function cafeProfile(cafe: CafeLite, dist: AxisDist): CafeProfile {
   // 아쉬운점: 중앙값 아래(상대적으로 약한) 축 중 약점 문구 있는 것, 강점 제외. 백분위 낮은 순 최대 2개.
   //   (강점과 균형 있게 '항상 같이' 보여주기 위해 하위 50%까지 넓힘 — 사장님 요청)
   const weak = ranked.filter((r) => r.p < 0.50 && WEAK[r.key] && !strongKeys.has(r.key)).sort((a, b) => a.p - b.p).slice(0, 2);
+  const mk = (r: typeof ranked[number], textMap: Record<string, string>): ProfileItem =>
+    ({ key: r.key, label: r.label, emoji: r.emoji, text: textMap[r.key] ?? r.label, topPct: r.topPct, count: r.raw, avg: r.avg });
   return {
-    strong: strong.map((r) => ({ key: r.key, label: r.label, emoji: r.emoji, text: STRONG[r.key] ?? r.label, topPct: r.topPct })),
-    weak: weak.map((r) => ({ key: r.key, label: r.label, emoji: r.emoji, text: WEAK[r.key], topPct: r.topPct })),
+    strong: strong.map((r) => mk(r, STRONG)),
+    weak: weak.map((r) => mk(r, WEAK)),
     ok: strong.length > 0 || weak.length > 0,
   };
 }
