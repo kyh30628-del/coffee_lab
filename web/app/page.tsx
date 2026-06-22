@@ -2012,6 +2012,7 @@ function MyCafeRegModal({ cafes, device, visits, pin = "", initialCafeId = null,
 // 추억 보관소 탭 — 등록 + 내 카페 목록 + 설정버튼. 잠금 시 PIN 입력 화면.
 function MemoryTab({ device, visits, locked = false, sessionPin = "", onRegister, onEdit, onUnlock, onLock, onRestore }: { device: string; visits: any[]; locked?: boolean; sessionPin?: string; onRegister: () => void; onEdit?: (cafeId: number) => void; onUnlock?: (pin: string) => void; onLock?: () => void; onRestore: (dev: string) => void }) {
   const [showSettings, setShowSettings] = useState(false);
+  const [viewVisit, setViewVisit] = useState<any>(null); // 추억 보기 모달(클릭 시 먼저 내용 표시 → 수정 버튼)
   const [hasPin, setHasPin] = useState(false);
   const [unlockPin, setUnlockPin] = useState("");
   const [busy, setBusy] = useState(false);
@@ -2062,7 +2063,7 @@ function MemoryTab({ device, visits, locked = false, sessionPin = "", onRegister
             {visits.map((v) => {
               const photoCount = Array.isArray(v.photos) ? v.photos.length : (v.photo_url ? 1 : 0);
               return (
-              <button key={v.id} type="button" onClick={() => onEdit?.(v.id)} className="w-full text-left bg-white rounded-2xl border border-[#ece0cd] p-3.5 flex gap-3 hover:border-[#d6b9c4] active:scale-[0.995] transition">
+              <button key={v.id} type="button" onClick={() => setViewVisit(v)} className="w-full text-left bg-white rounded-2xl border border-[#ece0cd] p-3.5 flex gap-3 hover:border-[#d6b9c4] active:scale-[0.995] transition">
                 <div className="relative w-16 h-16 shrink-0">
                   {v.photo_url ? <img src={v.photo_url} alt="" className="w-16 h-16 rounded-xl object-cover" /> : <div className="w-16 h-16 rounded-xl bg-[#f3ede1] flex items-center justify-center text-[22px]">{v.favorite ? "★" : "☕"}</div>}
                   {photoCount > 1 && <span className="absolute bottom-0.5 right-0.5 bg-black/60 text-white text-[9px] px-1 rounded">📷{photoCount}</span>}
@@ -2072,7 +2073,7 @@ function MemoryTab({ device, visits, locked = false, sessionPin = "", onRegister
                     {v.favorite && <span className="text-[#f0a832] text-[13px]">★</span>}
                     <span className="font-bold text-[#2b2018] text-[14px] truncate">{v.name}</span>
                     <span className="text-[10px] text-[#9c6b3f] shrink-0">{v.area}</span>
-                    <span className="ml-auto text-[10px] text-[#bcae9b] shrink-0">수정 ✎</span>
+                    <span className="ml-auto text-[10px] text-[#bcae9b] shrink-0">보기 ›</span>
                   </div>
                   {v.memory ? <p className="text-[12px] text-[#52402e] leading-relaxed mt-0.5 line-clamp-2">{v.memory}</p> : <p className="text-[12px] text-[#bcae9b] mt-0.5">기억 메모 없음</p>}
                   <div className="text-[10px] text-[#a8927a] mt-1">{fmtDate(v.created_at)}</div>
@@ -2084,6 +2085,38 @@ function MemoryTab({ device, visits, locked = false, sessionPin = "", onRegister
         )}
       </div>
       {showSettings && <MemorySettingsModal device={device} visits={visits} hasPin={hasPin} onPinChange={setHasPin} onClose={() => setShowSettings(false)} onRestore={onRestore} onUnlock={onUnlock} onLock={onLock} />}
+      {viewVisit && (() => {
+        const vphotos: string[] = Array.isArray(viewVisit.photos) && viewVisit.photos.length ? viewVisit.photos : (viewVisit.photo_url ? [viewVisit.photo_url] : []);
+        return (
+          <div className="fixed inset-0 z-[5000] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)", fontFamily: "'Gowun Batang', AppleMyungjo, 'Apple SD Gothic Neo', 'Noto Serif KR', serif" }} onClick={() => setViewVisit(null)}>
+            <div className="w-full max-w-lg bg-[#fdfaf4] rounded-t-2xl max-h-[90dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-[#f0e6d4]">
+                <div className="flex items-center gap-2 min-w-0">
+                  {viewVisit.favorite && <span className="text-[#f0a832] text-[18px] leading-none">★</span>}
+                  <div className="font-bold text-[#2b2018] text-[15px] truncate">{viewVisit.name}</div>
+                  <span className="text-[11px] text-[#9c6b3f] shrink-0">{viewVisit.area}</span>
+                </div>
+                <button onClick={() => setViewVisit(null)} className="w-8 h-8 rounded-full bg-[#f0e6d4] text-[#7a6452] text-lg shrink-0">×</button>
+              </div>
+              <div className="overflow-y-auto flex-1 p-4 space-y-3">
+                {vphotos.length > 0 && (
+                  <div className="flex gap-2 overflow-x-auto -mx-1 px-1 pb-1">
+                    {vphotos.map((p, i) => <img key={i} src={p} alt="" className="h-44 rounded-lg border border-[#e6d9c8] object-cover shrink-0" />)}
+                  </div>
+                )}
+                <div>
+                  <div className="text-[12px] text-[#7a6452] mb-1 font-medium">기억</div>
+                  {viewVisit.memory ? <p className="text-[14px] text-[#2b2018] leading-relaxed whitespace-pre-wrap">{viewVisit.memory}</p> : <p className="text-[13px] text-[#bcae9b]">기억 메모 없음</p>}
+                </div>
+                <div className="text-[11px] text-[#a8927a]">{fmtDate(viewVisit.created_at)}{viewVisit.favorite ? " · ★ 즐겨찾기" : ""}</div>
+              </div>
+              <div className="p-4 border-t border-[#f0e6d4] pb-[calc(1rem_+_env(safe-area-inset-bottom))]">
+                <button onClick={() => { const id = viewVisit.id; setViewVisit(null); onEdit?.(id); }} className="w-full bg-[#d6336c] text-white rounded-xl py-3 font-bold text-[14px]">✎ 수정하기</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
