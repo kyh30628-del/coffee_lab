@@ -1549,6 +1549,9 @@ function CafePanel({ cafe, onClose, onMap, bookmarked = false, onToggleBookmark 
   const kept = quality ? quality.verified + quality.reference : 0;
   const chars = topChars(cafe, 4);
   const [shared, setShared] = useState(false);
+  // 부드러운 슬라이드인 등장 — 마운트 직후 한 프레임 뒤 transition을 트리거(오른쪽에서 미끄러져 들어옴).
+  const [shown, setShown] = useState(false);
+  useEffect(() => { const r = requestAnimationFrame(() => setShown(true)); return () => cancelAnimationFrame(r); }, []);
   const shareCafe = async () => {
     const url = `${typeof window !== "undefined" ? window.location.origin : "https://dongnecoffeenote.com"}/c/${cafe.id}`;
     const title = `${cafe.name} (${cafe.area}) — 동네 커피 노트`;
@@ -1558,9 +1561,9 @@ function CafePanel({ cafe, onClose, onMap, bookmarked = false, onToggleBookmark 
     } catch { /* 사용자 취소 */ }
   };
   return (
-    <div className="fixed inset-0 z-[3000]" style={{ fontFamily: "'Gowun Batang', AppleMyungjo, 'Apple SD Gothic Neo', 'Noto Serif KR', serif" }}>
-      <div onClick={onClose} className="absolute inset-0 bg-black/30" />
-      <aside className="absolute top-0 right-0 w-full md:max-w-md bg-[#fdfaf4] shadow-2xl overflow-y-auto" style={{ height: "100dvh", paddingTop: "env(safe-area-inset-top)" }}>
+    <div className="fixed inset-0 z-[3000] overflow-hidden" style={{ fontFamily: "'Gowun Batang', AppleMyungjo, 'Apple SD Gothic Neo', 'Noto Serif KR', serif" }}>
+      <div onClick={onClose} className={`absolute inset-0 bg-black/30 transition-opacity duration-300 ${shown ? "opacity-100" : "opacity-0"}`} />
+      <aside className={`absolute top-0 right-0 w-full md:max-w-md bg-[#fdfaf4] shadow-2xl overflow-y-auto transition-transform duration-300 ease-out motion-reduce:transition-none ${shown ? "translate-x-0" : "translate-x-full"}`} style={{ height: "100dvh", paddingTop: "env(safe-area-inset-top)" }}>
         {/* 사장님 쇼케이스 — 영상(style 0) 또는 10종 템플릿 */}
         {promo && (
           <>
