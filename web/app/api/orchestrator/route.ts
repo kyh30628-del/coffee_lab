@@ -173,8 +173,7 @@ export async function GET(req: NextRequest) {
     // 임베딩 대기 = 의미검색만 일부 누락(카페는 정상 노출) → 주의. 단, 절반 이상이면 검색 핵심기능 타격 → 위험.
     const noemb = (await sql`SELECT COUNT(*)::int n FROM cafes WHERE published AND embedding IS NULL`.catch(() => [{ n: 0 }]))[0] as any;
     if (noemb.n > 0) { if (noemb.n > PUB * 0.5) risks.push(`의미검색 대량 누락 ${noemb.n}곳 — 검색 기능 타격`); else notices.push(`의미검색 임베딩 대기 ${noemb.n}곳`); }
-    // 그라운딩 감사 대기(백그라운드) — 카페는 규칙+판정 게이트를 이미 통과. 감사는 추가 안전망일 뿐 → 큰 적체만 정보성 주의.
-    if (grBacklog.n > 300) notices.push(`그라운딩 감사 대기 ${grBacklog.n}곳(백그라운드 — 크론 자동 처리)`);
+    // 그라운딩은 결정론적 규칙으로 대체됨 — '감사 대기' 백로그는 안 줄어드는 무의미 숫자라 notice에서 제외.
 
     // 파이프라인 진행 상황(신규 카페 조립라인)
     const pl = (await sql`SELECT
@@ -266,8 +265,7 @@ export async function GET(req: NextRequest) {
     }
     // 미판정 내역은 0인 항목은 숨기고 실제 남은 것만 표기(사장님: 헷갈릴 내용 말고 사실만).
     const jbParts = ([["신규", jb.newjudge], ["재수집변경", jb.recollect], ["그라운딩재검", jb.reground]] as [string, number][]).filter(([, n]) => n > 0).map(([k, n]) => `${k} ${n}`);
-    const judgePct = c.published ? Math.round((c.pub_judged / c.published) * 100) : 0;
-    add("judge", "AI 판정 (Haiku·새벽)", c.last_judge, 30, c.judge_q, `공개카페 판정 완료 ${judgePct}% (${c.pub_judged}/${c.published}) · 미판정 ${c.judge_q}${jbParts.length > 1 ? `(${jbParts.join("+")})` : ""}`);
+    add("judge", "AI 판정 (Haiku·새벽·보조정제)", c.last_judge, 30, c.judge_q, `공개카페는 규칙검증돼 노출중 · LLM 보조정제 대기 ${c.judge_q}곳(새벽 Batches 자동·소비자 품질무관)${jbParts.length > 1 ? ` [${jbParts.join("+")}]` : ""}`);
     add("embed", "임베딩", c.last_embed, 30, c.embed_q, c.embed_q ? `미임베딩 ${c.embed_q}` : `완료(공개 ${c.published ? Math.round((c.pub_embedded / c.published) * 100) : 0}%)`);
     add("verify", "검증 레드팀", vr?.ran_at ?? null, 30, (vr?.fails ?? 0) + (vr?.warns ?? 0), vr ? `fail ${vr.fails}·warn ${vr.warns}` : "리포트 없음");
     // 품질감사: 미해결 플래그 기준(가동 시각은 flag 생성 시각으로 근사)
@@ -279,9 +277,9 @@ export async function GET(req: NextRequest) {
     {
       const sus = gr?.suspect ?? 0;
       const gAge = ageHours(gr?.last ?? null, now);
-      // 감사 대기(backlog)만으론 경고색 안 띄움 — 백그라운드 큐는 정상. 의심(소비자 노출)·크론 정지(48h+)만 warn.
-      const grStale = gAge != null && gAge > 48;
-      agents.push({ key: "grounding", label: "LLM 그라운딩", lastRun: gr?.last ?? null, ageH: gAge == null ? null : Math.round(gAge * 10) / 10, cadenceH: 30, status: (sus > 0 || grStale) ? "warn" : "ok", queue: grBacklog.n, note: `감사 대기 ${grBacklog.n}(백그라운드) · 보류 ${grHeld.n}곳(문제 발견→비공개, 소비자 노출 차단)${grStale ? " · ⚠️크론 48h+ 정지" : ""}` });
+      // 그라운딩은 결정론적 규칙(브랜드토큰·거래글·비카페업종)으로 대체됨 — 안 줄어드는 '감사 대기' 백로그는
+      //   의미 없으니 큐로 안 씀. 에이전트 지표 = '소비자 노출 의심'(공개중)만. 의심>0일 때만 warn.
+      agents.push({ key: "grounding", label: "LLM 그라운딩", lastRun: gr?.last ?? null, ageH: gAge == null ? null : Math.round(gAge * 10) / 10, cadenceH: 30, status: sus > 0 ? "warn" : "ok", queue: sus, note: `결정론적 규칙으로 대체 · 소비자 노출 의심 ${sus}건 · 비공개 보류 ${grHeld.n}곳(소비자 안 보임)` });
     }
     // 통합 재검증 자가감사 — 공개 카페를 현재 규칙으로 순환 재검(규칙 개선이 기존 데이터에 자동 반영). 7일 내 미재검분이 많으면 정체.
     {
