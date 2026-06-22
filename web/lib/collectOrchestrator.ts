@@ -111,10 +111,13 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
       if (rule.borderline) borderline.push({ key, title: t.title, body: t.desc ?? t.text });
 
       // 효과 판정: decisions(Sonnet 최종 심사) > whitelist(보조) > 규칙
+      //   단 '광고·협찬'(sponsored)은 판정결정·whitelist로도 못 살림 — 랜딩 약속(광고 자동 제외)은 절대 우선.
+      const isAd = !!rule.signals?.sponsored;
       let verdict = rule.verdict;
       let reasons = rule.reasons;
       let score = rule.score;
-      if (opts?.decisions && key in opts.decisions) {
+      if (isAd) { verdict = "rejected"; reasons = ["광고·협찬 — 자동 제외(판정보다 우선)"]; score = 0; }
+      else if (opts?.decisions && key in opts.decisions) {
         if (opts.decisions[key]) { verdict = rule.verdict === "verified" ? "verified" : "reference"; reasons = ["✨ AI 검증: 실제 후기"]; score = 80; }
         else { verdict = "rejected"; reasons = ["AI 판정: 무관/저품질 제외"]; score = 0; }
       } else if (whitelist?.has(key)) { verdict = "verified"; reasons = ["✨ AI 검증: 실제 후기"]; score = 75; }

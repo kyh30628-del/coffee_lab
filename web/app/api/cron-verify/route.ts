@@ -105,11 +105,11 @@ async function runChecks(): Promise<Check[]> {
   //   면책 문구('협찬 없이'·'광고 아님'·내돈내산)는 진짜 후기이므로 제외(오탐 방지) — verifyReview의 AD_STRONG/AD_DISCLAIM과 동일 기준.
   add("ad_evidence", "근거후기에 광고·협찬 신호", "warn",
     await n(sql`SELECT count(DISTINCT c.id)::int n FROM cafes c, jsonb_array_elements(c.synth_reviews) r
-      WHERE c.published AND r->>'quote' ~ '(협찬|제공\\s*받|원고료|소정의|체험단|유료\\s?광고|광고입니다|대가를\\s?받)'
-        AND r->>'quote' !~ '(협찬|광고|제공|대가|유료)\\s*(아닌|아니|아님|없이|없는|없습니다|없음|받지\\s*않)|내\\s*돈\\s*내산'`),
+      WHERE c.published AND r->>'quote' ~ '(협찬|제공[[:space:]]*받|원고료|소정의|체험단|유료[[:space:]]*광고|광고입니다|대가를[[:space:]]*받)'
+        AND r->>'quote' !~ '(협찬|광고|제공|대가|유료)[[:space:]]*(아닌|아니|아님|없이|없는|없습니다|없음|받지[[:space:]]*않)'`),
     await samp(sql`SELECT DISTINCT c.name s FROM cafes c, jsonb_array_elements(c.synth_reviews) r
-      WHERE c.published AND r->>'quote' ~ '(협찬|제공\\s*받|원고료|소정의|체험단|유료\\s?광고|광고입니다|대가를\\s?받)'
-        AND r->>'quote' !~ '(협찬|광고|제공|대가|유료)\\s*(아닌|아니|아님|없이|없는|없습니다|없음|받지\\s*않)|내\\s*돈\\s*내산' LIMIT 6`));
+      WHERE c.published AND r->>'quote' ~ '(협찬|제공[[:space:]]*받|원고료|소정의|체험단|유료[[:space:]]*광고|광고입니다|대가를[[:space:]]*받)'
+        AND r->>'quote' !~ '(협찬|광고|제공|대가|유료)[[:space:]]*(아닌|아니|아님|없이|없는|없습니다|없음|받지[[:space:]]*않)' LIMIT 6`));
 
   // 15. 중복 공개 카페: 같은 이름+지역이 2개 이상 공개(같은 가게 중복 적재) → 사용자 혼란·신뢰 훼손.
   add("duplicate_published", "중복 공개 카페(같은 이름+지역)", "warn",
