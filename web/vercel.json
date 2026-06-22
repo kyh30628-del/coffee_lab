@@ -22,7 +22,7 @@
     },
     {
       "path": "/api/orchestrator?heal=1",
-      "schedule": "0 */2 * * *"
+      "schedule": "0 * * * *"
     },
     {
       "path": "/api/cron-batch-judge",
