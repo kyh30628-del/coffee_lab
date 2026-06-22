@@ -471,6 +471,14 @@ export default function Home() {
       try { sessionStorage.setItem("dcn_role", "consumer"); } catch {}
       setRole("consumer"); setHomeGu(region); setTab("home");
     }
+    // 카카오 공유 링크(/?cafe=id)로 도착 → 랜딩 건너뛰고 소비자 화면 + 해당 카페 지역 로드.
+    //   (지역 cafes가 로드되면 위 [cafes] 핸들러가 해당 카페 상세를 자동으로 연다)
+    const cafeId = Number(sp.get("cafe"));
+    if (cafeId) {
+      try { sessionStorage.setItem("dcn_role", "consumer"); } catch {}
+      setRole("consumer"); setTab("home");
+      fetch(`/api/cafe-detail?id=${cafeId}`).then((r) => r.json()).then((d) => { if (d?.area) setHomeGu(d.area); }).catch(() => {});
+    }
   }, []);
 
   // 익명 식별자 준비 + 역할(세션 단위) 복원. 위치 동의는 캐시하지 않음(매 세션 새로).
@@ -1054,10 +1062,10 @@ export default function Home() {
           <h1 className="dcn-title text-[2.9rem] sm:text-[3.3rem] leading-[1.12] font-bold tracking-tight">동네 커피 노트</h1>
         </div>
         <p className="dcn-rise text-[17px] text-[#f4ece0] mb-1.5 text-center leading-snug font-bold" style={{ animationDelay: ".05s" }}>별점도 광고도 아닌, <span className="text-[#e8b87a]">진짜 후기</span>.</p>
-        <p className="dcn-rise text-[15px] text-[#f4ece0] mb-2 text-center leading-relaxed font-bold" style={{ animationDelay: ".1s" }}>우리 동네에서 <span className="text-[#e8b87a]">오늘 내 기분에 맞는 카페</span>를 골라드려요.</p>
-        <p className="dcn-rise text-[13px] text-[#cbb89f] mb-5 text-center leading-relaxed" style={{ animationDelay: ".14s" }}>작업·조용·디저트, <b className="text-[#f4ece0]">내 취향</b>대로. 마음에 든 곳은 <span style={{ color: "#d6336c" }}>❤</span>로 <b className="text-[#f4ece0]">나만의 동네 지도</b>에.</p>
+        <p className="dcn-rise text-[15px] text-[#f4ece0] mb-2 text-center leading-relaxed font-bold" style={{ animationDelay: ".1s" }}>우리 동네 카페, <span className="text-[#e8b87a]">진짜 후기만 가려</span> 골라드려요.</p>
+        <p className="dcn-rise text-[13px] text-[#cbb89f] mb-5 text-center leading-relaxed" style={{ animationDelay: ".14s" }}>마음에 든 곳은 <span style={{ color: "#d6336c" }}>❤</span>로 <b className="text-[#f4ece0]">나만의 동네 지도</b>에.</p>
         <div className="dcn-rise flex flex-wrap justify-center gap-1.5 mb-8 max-w-xs" style={{ animationDelay: ".16s" }}>
-          {["별점, 이제 그만 믿어요", "우리 동네에도, 명작이 있어요", "옥석만 남겼어요"].map((t) => (
+          {["별점, 이제 그만 믿어요", "리뷰 옥석만 남겼어요"].map((t) => (
             <span key={t} className="text-[12px] text-[#e8b87a] border border-[#5b4636] rounded-full px-3 py-1 whitespace-nowrap">{t}</span>
           ))}
         </div>
@@ -1067,7 +1075,7 @@ export default function Home() {
             <div className="text-[12px] text-[#7c6a55] mt-0.5">진짜 후기로 검증 · 내 취향에 딱 맞게</div>
           </button>
           <button onClick={() => { setOwnerPw(""); setOwnerErr(""); setOwnerPin(""); setOwnerPinErr(""); setOwnerAdminMode(false); setOwnerPwModal(true); }} className="w-full border border-[#9c6b3f] text-[#f4ece0] rounded-2xl py-5 px-5 text-left active:scale-[0.99] transition">
-            <div className="text-lg font-bold">🏪 사장님으로 시작하기</div>
+            <div className="text-lg font-bold">🏪 우리 카페 경쟁력 보러가기</div>
             <div className="text-[12px] text-[#cbb89f] mt-0.5">검증된 후기로 내 카페 경쟁력 진단 · <b className="text-[#e8b87a]">7일 무료 체험</b></div>
           </button>
         </div>

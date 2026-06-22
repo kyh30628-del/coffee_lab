@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
     await ensureSchema();
     const id = req.nextUrl.searchParams.get("id");
     if (!id) return NextResponse.json({ ok: false, error: "id 필요" }, { status: 400 });
-    const rows = await sql`SELECT synth_reviews, synth_reviews_all, synth_quality, llm_judged_at FROM cafes WHERE id=${id} LIMIT 1`;
+    const rows = await sql`SELECT area, synth_reviews, synth_reviews_all, synth_quality, llm_judged_at FROM cafes WHERE id=${id} LIMIT 1`;
     // 전체보기용: synth_reviews_all(옥석 전체) 우선, 없으면 기존 top6
     const raw = (rows[0]?.synth_reviews_all ?? rows[0]?.synth_reviews ?? []) as any[];
     // 정확도+신뢰+최신성 복합 정렬 → 상위 6건(대표)·전체보기 모두 '완벽한 리뷰' 순서로 노출
@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
     const reviews = Array.isArray(raw) ? [...raw].sort((a, b) => rankScore(b, nowT) - rankScore(a, nowT)) : raw;
     const quality = rows[0]?.synth_quality ?? null;
     const llmJudged = !!rows[0]?.llm_judged_at;
-    return NextResponse.json({ ok: true, reviews, quality, llmJudged }, {
+    return NextResponse.json({ ok: true, area: rows[0]?.area ?? null, reviews, quality, llmJudged }, {
       headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" },
     });
   } catch (e) {
