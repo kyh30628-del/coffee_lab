@@ -581,14 +581,13 @@ export default function AdminPage() {
           ) : <p className="text-[12px] text-stone-400">검증 리포트 없음 — '지금 검사'를 눌러 실행하세요.</p>}
 
           {/* 🧠 LLM 그라운딩(보조) */}
-          {grounding && grounding.total > 0 && (() => {
-            const pub = grounding.publicFlagged ?? grounding.flagged ?? 0; // 소비자 노출 의심(실제 영향)
-            const held = grounding.held ?? 0;                              // 비공개 보류(소비자 안 보임)
+          {grounding && (() => {
+            const pub = grounding.publicFlagged ?? grounding.flagged ?? 0; // 지금 공개 카페 중 오염 노출(현재 상태)
             return (
             <div className={`mt-2 rounded-xl border p-3 ${pub > 0 ? "bg-amber-50 border-amber-200" : "bg-emerald-50 border-emerald-200"}`}>
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-[13px] font-bold">🧠 LLM 그라운딩 (보조 · 환각 탐지)</span>
-                <span className={`text-[12px] font-bold ml-auto ${pub > 0 ? "text-amber-700" : "text-emerald-700"}`}>{pub > 0 ? `⚠ 노출 오염 ${pub}건` : "소비자 노출 오염 0건 ✅"}</span>
+                <span className="text-[13px] font-bold">🧠 그라운딩 (소비자 노출 오염 검사)</span>
+                <span className={`text-[12px] font-bold ml-auto ${pub > 0 ? "text-amber-700" : "text-emerald-700"}`}>{pub > 0 ? `⚠ 노출 오염 ${pub}건` : "현재 0건 ✅"}</span>
               </div>
               {pub > 0 ? (
                 <div className="space-y-0.5">
@@ -597,8 +596,7 @@ export default function AdminPage() {
                   ))}
                   <p className="text-[10px] text-stone-400 mt-1">⚠ 공개 노출 중 — 사람이 확인 후 재합성/비공개 처리하세요.</p>
                 </div>
-              ) : <p className="text-[11px] text-emerald-700">공개 카페 전부 근거 일치 — 소비자에게 보이는 오염·환각 <b>없음</b>.</p>}
-              <p className="text-[10px] text-stone-400 mt-1.5">{grounding.total?.toLocaleString()}곳 누적 검사{held > 0 ? ` · 비공개 보류 ${held}곳(소비자 안 보임 — 이미 차단됨)` : ""}</p>
+              ) : <p className="text-[11px] text-emerald-700">지금 공개 중인 카페 전부 근거 일치 — 소비자에게 보이는 오염 <b>없음</b>.</p>}
             </div>
             );
           })()}

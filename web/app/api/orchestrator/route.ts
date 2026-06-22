@@ -83,7 +83,6 @@ export async function GET(req: NextRequest) {
     // 그라운딩 백로그 = 판정완료·미검(또는 재합성으로 stale)인 공개 카페. (일치율 게이트 금지 — 그 지표는 지역어 오염에 눈멀어 있음)
     const grBacklog = (await sql`SELECT COUNT(*)::int n FROM cafes c WHERE c.published AND c.raw_reviews IS NOT NULL AND c.synth_identity IS NOT NULL AND c.llm_judged_at IS NOT NULL AND c.llm_judged_at >= c.raw_collected_at AND NOT EXISTS (SELECT 1 FROM grounding_checks g WHERE g.cafe_id = c.id AND g.checked_at >= c.synth_updated)`.catch(() => [{ n: 0 }]))[0] as any;
     // 그라운딩이 문제로 판정해 '비공개 보류'한 카페(소비자 노출 차단됨) — 진짜 처리 필요분.
-    const grHeld = (await sql`SELECT COUNT(*)::int n FROM grounding_checks g JOIN cafes c ON c.id = g.cafe_id WHERE NOT g.grounded AND NOT c.published`.catch(() => [{ n: 0 }]))[0] as any;
     const grSuspects = (await sql`SELECT c.name, c.area, g.issue FROM grounding_checks g JOIN cafes c ON c.id = g.cafe_id WHERE NOT g.grounded AND c.llm_judged_at IS NOT NULL AND c.llm_judged_at >= c.raw_collected_at ORDER BY g.checked_at DESC LIMIT 20`.catch(() => [])) as any[];
     const ds = (await sql`SELECT MIN(last_run) oldest, COUNT(*) FILTER (WHERE last_run < now() - interval '3 days')::int behind, COUNT(*)::int n FROM discovery_state`)[0] as any;
     // 통합 재검증 자가감사 커버리지 — 공개 카페가 '현재 규칙'으로 며칠 안에 1회씩 재검되는지(규칙 드리프트 치유 진행률).
@@ -279,7 +278,7 @@ export async function GET(req: NextRequest) {
       const gAge = ageHours(gr?.last ?? null, now);
       // 그라운딩은 결정론적 규칙(브랜드토큰·거래글·비카페업종)으로 대체됨 — 안 줄어드는 '감사 대기' 백로그는
       //   의미 없으니 큐로 안 씀. 에이전트 지표 = '소비자 노출 의심'(공개중)만. 의심>0일 때만 warn.
-      agents.push({ key: "grounding", label: "LLM 그라운딩", lastRun: gr?.last ?? null, ageH: gAge == null ? null : Math.round(gAge * 10) / 10, cadenceH: 30, status: sus > 0 ? "warn" : "ok", queue: sus, note: `결정론적 규칙으로 대체 · 소비자 노출 의심 ${sus}건 · 비공개 보류 ${grHeld.n}곳(소비자 안 보임)` });
+      agents.push({ key: "grounding", label: "그라운딩 (노출 오염 검사)", lastRun: gr?.last ?? null, ageH: gAge == null ? null : Math.round(gAge * 10) / 10, cadenceH: 30, status: sus > 0 ? "warn" : "ok", queue: sus, note: sus > 0 ? `소비자 노출 오염 ${sus}건 — 확인 필요` : `현재 소비자 노출 오염 0건 · 규칙으로 상시 검증` });
     }
     // 통합 재검증 자가감사 — 공개 카페를 현재 규칙으로 순환 재검(규칙 개선이 기존 데이터에 자동 반영). 7일 내 미재검분이 많으면 정체.
     {
