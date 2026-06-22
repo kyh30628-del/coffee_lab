@@ -21,6 +21,8 @@ async function ensure() {
   await sql`ALTER TABLE user_visits ADD COLUMN IF NOT EXISTS finalized BOOLEAN DEFAULT true`.catch(() => {});
   // photos: 방문 사진 최대 5장(URL 배열). photo_url은 대표(첫 장) — 지도·내보내기 호환 유지.
   await sql`ALTER TABLE user_visits ADD COLUMN IF NOT EXISTS photos JSONB`.catch(() => {});
+  // is_public: 공개 선택 시 다른 사용자에게 카페 상세의 '방문자 후기'로 노출(기본 비공개).
+  await sql`ALTER TABLE user_visits ADD COLUMN IF NOT EXISTS is_public BOOLEAN DEFAULT false`.catch(() => {});
   // 공용 PC 잠금 PIN(기기별). GET에서 잠금 판단에 사용.
   await sql`CREATE TABLE IF NOT EXISTS device_pins (device_id TEXT PRIMARY KEY, pin_hash TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT now())`.catch(() => {});
 }
@@ -48,7 +50,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ ok: true, locked: true, hasPin: true, cafes: [] });
   }
   const rows = await sql`
-    SELECT c.id, c.name, c.area, c.lat, c.lng, v.photo_url, v.photos, v.memory, v.favorite, v.created_at
+    SELECT c.id, c.name, c.area, c.lat, c.lng, v.photo_url, v.photos, v.memory, v.favorite, v.is_public, v.created_at
     FROM user_visits v JOIN cafes c ON c.id = v.cafe_id
     WHERE v.device_id = ${device} AND v.verified = true AND v.finalized = true
     ORDER BY v.favorite DESC, v.created_at DESC`;
@@ -62,7 +64,8 @@ export async function POST(req: NextRequest) {
   try {
     await ensure();
     const body = await req.json();
-    const { action, cafeId, device, userLat, userLng, photoBase64, photosBase64, memory, favorite, pin } = body;
+    const { action, cafeId, device, userLat, userLng, photoBase64, photosBase64, memory, favorite, isPublic, pin } = body;
+    const pub = !!isPublic;
     if (!cafeId || !device) return NextResponse.json({ ok: false, error: "필수값 누락" }, { status: 400 });
 
     // 공용 PC 잠금: PIN 설정된 기기는 올바른 PIN 없이 기록 추가/수정 불가
@@ -101,6 +104,7 @@ export async function POST(req: NextRequest) {
           finalized = true,
           memory = COALESCE(${mem}, memory),
           favorite = ${fav},
+          is_public = ${pub},
           photo_url = COALESCE(${photoUrl}, photo_url),
           photos = COALESCE(${photosJson}, photos),
           created_at = now()
@@ -116,13 +120,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: `카페에서 ${Math.round(d)}m 떨어져 있어요. ${RADIUS_M}m 안에서 임시저장할 수 있어요.`, dist: Math.round(d) }, { status: 403 });
 
     // 신규는 finalized=false(임시), 기존 기록 재편집이면 기존 finalized 유지(노출 끊기지 않게)
-    await sql`INSERT INTO user_visits (cafe_id, device_id, photo_url, photos, memory, favorite, verified, finalized)
-      VALUES (${cafeId}, ${device}, ${photoUrl}, ${photosJson}, ${mem}, ${fav}, true, false)
+    await sql`INSERT INTO user_visits (cafe_id, device_id, photo_url, photos, memory, favorite, is_public, verified, finalized)
+      VALUES (${cafeId}, ${device}, ${photoUrl}, ${photosJson}, ${mem}, ${fav}, ${pub}, true, false)
       ON CONFLICT (cafe_id, device_id) DO UPDATE SET
         photo_url = COALESCE(EXCLUDED.photo_url, user_visits.photo_url),
         photos = COALESCE(EXCLUDED.photos, user_visits.photos),
         memory = COALESCE(EXCLUDED.memory, user_visits.memory),
-        favorite = EXCLUDED.favorite, verified = true,
+        favorite = EXCLUDED.favorite, is_public = EXCLUDED.is_public, verified = true,
         finalized = user_visits.finalized, created_at = now()`;
 
     return NextResponse.json({ ok: true, staged: true, cafe: { id: cafe.id, name: cafe.name }, dist: Math.round(d) });

@@ -40,11 +40,22 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
+async function getPublicReviews(cafeId: number) {
+  try {
+    await sql`ALTER TABLE user_visits ADD COLUMN IF NOT EXISTS is_public BOOLEAN DEFAULT false`.catch(() => {});
+    const rows = await sql`SELECT memory, photos, photo_url, favorite, created_at FROM user_visits
+      WHERE cafe_id=${cafeId} AND is_public=true AND finalized=true AND verified=true AND (COALESCE(memory,'')<>'' OR photo_url IS NOT NULL)
+      ORDER BY created_at DESC LIMIT 20`;
+    return (rows as any[]).map((r) => ({ memory: r.memory || "", photos: Array.isArray(r.photos) && r.photos.length ? r.photos : (r.photo_url ? [r.photo_url] : []), favorite: !!r.favorite }));
+  } catch { return []; }
+}
+
 export default async function CafePage({ params }: Props) {
   const { id } = await params;
   const c = await getCafe(id);
   if (!c) notFound();
   const tags = topTags(c.char_scores);
+  const userReviews = await getPublicReviews(c.id);
   const grade = c.synth_grade || "";
   const jsonLd = {
     "@context": "https://schema.org", "@type": "CafeOrCoffeeShop",
@@ -84,6 +95,24 @@ export default async function CafePage({ params }: Props) {
             </div>
           )}
           <p className="text-[12.5px] text-[#8a7458] mb-6 leading-relaxed">네이버 공개 후기 <b>{c.synth_count ?? 0}건</b>을 교차검증한 데이터 기반 소개예요. (절대 평가가 아니라 후기에서 자주 언급된 정도입니다)</p>
+          {userReviews.length > 0 && (
+            <div className="mb-6">
+              <div className="text-sm font-bold text-[#52402e] mb-2">🧡 방문자 후기 <span className="text-[11px] font-normal text-[#9c6b3f]">위치 인증 방문 {userReviews.length}건 · 공개</span></div>
+              <div className="space-y-2.5">
+                {userReviews.map((u, i) => (
+                  <div key={i} className="bg-white rounded-xl border border-[#e6dcc8] p-3.5">
+                    {u.photos.length > 0 && (
+                      <div className="flex gap-1.5 overflow-x-auto mb-2">
+                        {u.photos.map((p: string, j: number) => <img key={j} src={p} alt="" className="h-28 rounded-lg border border-[#e6dcc8] object-cover shrink-0" />)}
+                      </div>
+                    )}
+                    {u.memory && <p className="text-[13.5px] text-[#2b2018] leading-relaxed whitespace-pre-wrap">{u.memory}</p>}
+                    <div className="text-[11px] text-[#a8927a] mt-1.5">{u.favorite ? "★ " : ""}방문자 (익명)</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           <Link href={`/?cafe=${c.id}`} className="block w-full text-center bg-[#2b2018] text-[#f4ece0] rounded-xl py-3.5 font-bold">지도·근거 후기 보기 →</Link>
         </div>
       </div>

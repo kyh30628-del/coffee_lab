@@ -1542,10 +1542,12 @@ function CafePanel({ cafe, onClose, onMap, bookmarked = false, onToggleBookmark 
   const [promo, setPromo] = useState<any>(null);
   const [showAllReviews, setShowAllReviews] = useState(false);
   const [reviewFilter, setReviewFilter] = useState<"all" | "verified" | "reference" | "ai" | "youtube">("all");
+  const [userReviews, setUserReviews] = useState<{ memory: string; photos: string[]; favorite: boolean; date: string }[]>([]); // 공개 방문자 후기
   useEffect(() => {
-    let live = true; setLoadingRev(true); setPromo(null);
+    let live = true; setLoadingRev(true); setPromo(null); setUserReviews([]);
     fetch(`/api/cafe-detail?id=${cafe.id}`).then((r) => r.json()).then((d) => { if (live) { setReviews(d.reviews ?? []); setQuality(d.quality ?? null); setLlmJudged(!!d.llmJudged); setLoadingRev(false); } }).catch(() => { if (live) setLoadingRev(false); });
     fetch(`/api/owner-promo?cafeId=${cafe.id}`).then((r) => r.json()).then((d) => { if (live && d.promo && (d.promo.ai_headline || d.promo.video_url)) { setPromo(d.promo); trackPromo(cafe.id, "view"); } }).catch(() => {});
+    fetch(`/api/cafe-reviews?cafeId=${cafe.id}`).then((r) => r.json()).then((d) => { if (live && d.ok) setUserReviews(d.reviews ?? []); }).catch(() => {});
     return () => { live = false; };
   }, [cafe.id]);
   const kept = quality ? quality.verified + quality.reference : 0;
@@ -1709,6 +1711,30 @@ function CafePanel({ cafe, onClose, onMap, bookmarked = false, onToggleBookmark 
             </div>
           )}
 
+          {/* ===== 방문자 후기 — 사용자가 '공개'로 남긴 위치인증 방문기록(익명) ===== */}
+          {userReviews.length > 0 && (
+            <div className="px-4 pb-5 pt-1">
+              <div className="flex items-center gap-1.5 mb-2">
+                <span className="text-[13px] font-bold text-[#2b2018]">🧡 방문자 후기</span>
+                <span className="text-[10px] text-[#9c6b3f]">위치 인증 방문 {userReviews.length}건 · 공개</span>
+              </div>
+              <div className="space-y-2.5">
+                {userReviews.map((u, i) => (
+                  <div key={i} className="bg-white rounded-xl border border-[#ece0cd] p-3">
+                    {u.photos.length > 0 && (
+                      <div className="flex gap-1.5 overflow-x-auto mb-2 -mx-0.5 px-0.5">
+                        {u.photos.map((p, j) => <img key={j} src={p} alt="" className="h-28 rounded-lg border border-[#e6d9c8] object-cover shrink-0" />)}
+                      </div>
+                    )}
+                    {u.memory && <p className="text-[13px] text-[#2b2018] leading-relaxed whitespace-pre-wrap">{u.memory}</p>}
+                    <div className="text-[10px] text-[#a8927a] mt-1.5">{u.favorite ? "★ " : ""}방문자 · {u.date ? new Date(u.date).toLocaleDateString("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit" }) : ""}</div>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[10px] text-[#bcae9b] mt-2 leading-relaxed">동네 커피 노트 사용자가 <b>카페 30m 위치 인증</b>을 거쳐 남긴 공개 방문 기록이에요. (익명)</p>
+            </div>
+          )}
+
         </div>
 
         {/* ===== 전체 리뷰 모달 — aside 안에 두되 fixed로 overlay ===== */}
@@ -1806,6 +1832,7 @@ function MyCafeRegModal({ cafes, device, visits, pin = "", initialCafeId = null,
   const [photos, setPhotos] = useState<string[]>([]); // 방문 사진 최대 5장(기존 URL + 새 base64 혼재 가능)
   const [memory, setMemory] = useState("");
   const [favorite, setFavorite] = useState(false);
+  const [isPublic, setIsPublic] = useState(false); // 공개 선택 시 카페 상세에 '방문자 후기'로 노출(기본 비공개)
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const [staged, setStaged] = useState(false); // 1단계: 위치인증 임시저장 완료 → 추억 기록 팝업
@@ -1823,6 +1850,7 @@ function MyCafeRegModal({ cafes, device, visits, pin = "", initialCafeId = null,
     const prev = visits.find((v) => v.id === c.id);
     setMemory(prev?.memory ?? "");
     setFavorite(!!prev?.favorite);
+    setIsPublic(!!prev?.is_public);
     const existing = Array.isArray(prev?.photos) ? prev.photos : (prev?.photo_url ? [prev.photo_url] : []);
     setPhotos(existing.slice(0, 5));
   };
@@ -1864,7 +1892,7 @@ function MyCafeRegModal({ cafes, device, visits, pin = "", initialCafeId = null,
       try {
         const r = await fetch("/api/my-cafe", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "stage", cafeId: picked.id, device, pin, userLat: pos.coords.latitude, userLng: pos.coords.longitude, photosBase64: photos, memory, favorite }),
+          body: JSON.stringify({ action: "stage", cafeId: picked.id, device, pin, userLat: pos.coords.latitude, userLng: pos.coords.longitude, photosBase64: photos, memory, favorite, isPublic }),
         });
         const d = await r.json();
         if (d.ok) { setStaged(true); setMsg(""); setBusy(false); } // 위치인증 통과 → 추억 기록 팝업
@@ -1880,7 +1908,7 @@ function MyCafeRegModal({ cafes, device, visits, pin = "", initialCafeId = null,
     try {
       const r = await fetch("/api/my-cafe", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "commit", cafeId: picked.id, device, pin, memory, favorite, ...(sendPhotos ? { photosBase64: photos } : {}) }),
+        body: JSON.stringify({ action: "commit", cafeId: picked.id, device, pin, memory, favorite, isPublic, ...(sendPhotos ? { photosBase64: photos } : {}) }),
       });
       const d = await r.json();
       if (d.ok) { setDone(picked.name); onDone(); }
@@ -1982,6 +2010,21 @@ function MyCafeRegModal({ cafes, device, visits, pin = "", initialCafeId = null,
                   placeholder="오늘의 커피, 분위기, 함께한 사람… 소중한 순간을 적어보세요."
                   className="w-full border border-[#cbb89f] rounded-lg px-3 py-2.5 text-[14px] text-[#2b2018] bg-white resize-none leading-relaxed" />
                 <div className="text-right text-[10px] text-[#a8927a]">{memory.length}/2000</div>
+              </div>
+              {/* 공개 설정 — 공개 시 카페 상세에 익명 방문자 후기로 노출(리뷰 재활용) */}
+              <div>
+                <div className="text-[12px] text-[#7a6452] mb-1.5 font-medium">공개 설정</div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button type="button" onClick={() => setIsPublic(false)} className={`rounded-lg border px-3 py-2.5 text-left transition ${!isPublic ? "border-[#d6336c] bg-[#fdf0f4]" : "border-[#e6d9c8] bg-white"}`}>
+                    <div className="text-[13px] font-bold text-[#2b2018]">🔒 비공개</div>
+                    <div className="text-[10px] text-[#9c6b3f] mt-0.5">나만 보는 추억</div>
+                  </button>
+                  <button type="button" onClick={() => setIsPublic(true)} className={`rounded-lg border px-3 py-2.5 text-left transition ${isPublic ? "border-[#d6336c] bg-[#fdf0f4]" : "border-[#e6d9c8] bg-white"}`}>
+                    <div className="text-[13px] font-bold text-[#2b2018]">🌐 공개</div>
+                    <div className="text-[10px] text-[#9c6b3f] mt-0.5">카페 상세에 익명 후기로</div>
+                  </button>
+                </div>
+                {isPublic && <p className="text-[10px] text-[#a8927a] mt-1.5">공개하면 다른 사람이 이 카페를 볼 때 <b>익명</b>으로 사진·기억이 보여요. 타인 얼굴·개인정보가 담긴 사진은 올리지 마세요.</p>}
               </div>
               {visits.some((v) => v.id === picked.id) ? (
                 <>
