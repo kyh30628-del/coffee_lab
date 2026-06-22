@@ -55,24 +55,27 @@ export async function GET(req: NextRequest) {
     const requests: any[] = [];
     const manifestCafes: Record<string, any> = {};
     for (const c of rows) {
-      const { candidates, hasRaw } = await getAuditCandidates({ id: c.id, name: c.name, area: c.area ?? "" });
-      if (!hasRaw) continue;
-      const items = candidates.slice(0, PER_CAFE);
-      if (items.length === 0) { await markJudged(c.id); noCand++; continue; } // 경계 없음 → 무과금 판정완료
-      requests.push({
-        custom_id: `cafe_${c.id}`,
-        params: {
-          model: CLAUDE_MODEL, max_tokens: 1500,
-          system: [{ type: "text", text: RUBRIC, cache_control: { type: "ephemeral" } }],
-          messages: [{ role: "user", content: buildUserText(c.name, c.area ?? "", items.map((it: any, i: number) => ({ i, title: it.title || "", body: it.body || "" }))) }],
-        },
-      });
-      manifestCafes[`cafe_${c.id}`] = { id: c.id, name: c.name, area: c.area ?? "", keys: items.map((it: any) => it.key) };
+      try { // 한 카페 오류(데이터·합성)로 전체 빌드가 멈추지 않게 격리
+        const { candidates, hasRaw } = await getAuditCandidates({ id: c.id, name: c.name, area: c.area ?? "" });
+        if (!hasRaw) continue;
+        const items = candidates.slice(0, PER_CAFE).filter((it: any) => it && it.key);
+        if (items.length === 0) { await markJudged(c.id); noCand++; continue; } // 후보 없음 → 무과금 판정완료
+        requests.push({
+          custom_id: `cafe_${c.id}`,
+          params: {
+            model: CLAUDE_MODEL, max_tokens: 1500,
+            system: [{ type: "text", text: RUBRIC, cache_control: { type: "ephemeral" } }],
+            messages: [{ role: "user", content: buildUserText(c.name, c.area ?? "", items.map((it: any, i: number) => ({ i, title: it.title || "", body: it.body || "" }))) }],
+          },
+        });
+        manifestCafes[`cafe_${c.id}`] = { id: c.id, name: c.name, area: c.area ?? "", keys: items.map((it: any) => it.key) };
+      } catch { try { await markJudged(c.id); } catch {} }
     }
     if (requests.length > 0) {
       const b = await createBatch(KEY, requests);
       batchId = b.id;
-      await sql`INSERT INTO judge_batches (batch_id, manifest) VALUES (${b.id}, ${JSON.stringify({ cafes: manifestCafes })}) ON CONFLICT (batch_id) DO NOTHING`;
+      try { await sql`INSERT INTO judge_batches (batch_id, manifest) VALUES (${b.id}, ${JSON.stringify({ cafes: manifestCafes })}::jsonb) ON CONFLICT (batch_id) DO NOTHING`; }
+      catch (e) { return NextResponse.json({ ok: false, error: "manifest 저장 실패", detail: String(e).slice(0, 120), batchId: b.id }); }
       submitted = requests.length;
     }
 

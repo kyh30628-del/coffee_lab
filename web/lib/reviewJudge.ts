@@ -48,7 +48,7 @@ async function judgeClaude(cafeName: string, area: string, items: JudgeItem[]): 
       headers: { "x-api-key": ANTHROPIC_KEY!, "anthropic-version": "2023-06-01", "content-type": "application/json" },
       body: JSON.stringify({
         model: CLAUDE_MODEL,
-        max_tokens: 1500,
+        max_tokens: Math.min(8000, 600 + items.length * 40), // 항목수 비례 동적(100건≈4600) — 출력 잘림→JSON 파싱 실패 방지
         // 정적 기준은 캐시(ephemeral)로 재사용 → 비용·지연 절감
         system: [{ type: "text", text: RUBRIC, cache_control: { type: "ephemeral" } }],
         messages: [{ role: "user", content: buildUserText(cafeName, area, items) }],
