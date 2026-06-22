@@ -19,6 +19,8 @@ async function ensure() {
   await sql`ALTER TABLE user_visits ADD COLUMN IF NOT EXISTS favorite BOOLEAN DEFAULT false`.catch(() => {});
   // finalized: 위치인증(임시저장) 후 "추억을 기록합니다" 확정 단계. 기존 행은 DEFAULT true로 자동 백필(이미 노출 중이던 기록 유지).
   await sql`ALTER TABLE user_visits ADD COLUMN IF NOT EXISTS finalized BOOLEAN DEFAULT true`.catch(() => {});
+  // photos: 방문 사진 최대 5장(URL 배열). photo_url은 대표(첫 장) — 지도·내보내기 호환 유지.
+  await sql`ALTER TABLE user_visits ADD COLUMN IF NOT EXISTS photos JSONB`.catch(() => {});
   // 공용 PC 잠금 PIN(기기별). GET에서 잠금 판단에 사용.
   await sql`CREATE TABLE IF NOT EXISTS device_pins (device_id TEXT PRIMARY KEY, pin_hash TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT now())`.catch(() => {});
 }
@@ -46,7 +48,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ ok: true, locked: true, hasPin: true, cafes: [] });
   }
   const rows = await sql`
-    SELECT c.id, c.name, c.area, c.lat, c.lng, v.photo_url, v.memory, v.favorite, v.created_at
+    SELECT c.id, c.name, c.area, c.lat, c.lng, v.photo_url, v.photos, v.memory, v.favorite, v.created_at
     FROM user_visits v JOIN cafes c ON c.id = v.cafe_id
     WHERE v.device_id = ${device} AND v.verified = true AND v.finalized = true
     ORDER BY v.favorite DESC, v.created_at DESC`;
@@ -60,7 +62,7 @@ export async function POST(req: NextRequest) {
   try {
     await ensure();
     const body = await req.json();
-    const { action, cafeId, device, userLat, userLng, photoBase64, memory, favorite, pin } = body;
+    const { action, cafeId, device, userLat, userLng, photoBase64, photosBase64, memory, favorite, pin } = body;
     if (!cafeId || !device) return NextResponse.json({ ok: false, error: "필수값 누락" }, { status: 400 });
 
     // 공용 PC 잠금: PIN 설정된 기기는 올바른 PIN 없이 기록 추가/수정 불가
@@ -74,15 +76,33 @@ export async function POST(req: NextRequest) {
     const mem = typeof memory === "string" && memory.trim() ? memory.slice(0, 2000) : null;
     const fav = !!favorite;
 
-    // ── 2단계: 최종 기록(추억을 기록합니다) — 위치 비교 없음 ──
+    // 사진 Blob 업로드 — 최대 5장. data:image면 업로드, 이미 http URL이면 유지(수정모드 기존 사진). (commit·stage 공용)
+    const incoming: string[] = (Array.isArray(photosBase64) ? photosBase64 : (photoBase64 ? [photoBase64] : []))
+      .filter((p: any) => typeof p === "string").slice(0, 5);
+    const photoUrls: string[] = [];
+    for (const p of incoming) {
+      if (p.startsWith("http")) { photoUrls.push(p); continue; }
+      if (p.startsWith("data:image")) {
+        const buf = Buffer.from(p.split(",")[1], "base64");
+        const blob = await put(`visits/${device.slice(0, 8)}-${cafeId}-${Date.now()}-${photoUrls.length}.jpg`, buf, { access: "public", contentType: "image/jpeg" });
+        photoUrls.push(blob.url);
+      }
+    }
+    const photoUrl = photoUrls[0] ?? null;                 // 대표(첫 장)
+    const photosJson = photoUrls.length ? JSON.stringify(photoUrls) : null;
+
+    // ── 최종 기록(추억을 기록합니다) / 기존 기록 수정 — 위치 비교 없음 ──
+    //   신규는 stage(위치인증) 후 commit. 기존 기록은 행이 이미 있으니 위치 없이 메모·사진·즐겨찾기 수정 가능
+    //   (집에서 갤러리 사진 추가 등). 행이 없으면 '먼저 위치 인증' 안내.
     if (action === "commit") {
-      // 임시저장(위치인증 통과한 stage)이 선행돼야 함
       const [staged] = await sql`SELECT id FROM user_visits WHERE cafe_id = ${cafeId} AND device_id = ${device} LIMIT 1` as any[];
       if (!staged) return NextResponse.json({ ok: false, error: "먼저 카페에서 위치 인증(임시저장)을 해주세요." }, { status: 409 });
       await sql`UPDATE user_visits SET
           finalized = true,
           memory = COALESCE(${mem}, memory),
           favorite = ${fav},
+          photo_url = COALESCE(${photoUrl}, photo_url),
+          photos = COALESCE(${photosJson}, photos),
           created_at = now()
         WHERE cafe_id = ${cafeId} AND device_id = ${device}`;
       return NextResponse.json({ ok: true, cafe: { id: cafe.id, name: cafe.name }, finalized: true });
@@ -95,20 +115,12 @@ export async function POST(req: NextRequest) {
     if (d > RADIUS_M)
       return NextResponse.json({ ok: false, error: `카페에서 ${Math.round(d)}m 떨어져 있어요. ${RADIUS_M}m 안에서 임시저장할 수 있어요.`, dist: Math.round(d) }, { status: 403 });
 
-    // 사진 Blob 업로드(있으면)
-    let photoUrl: string | null = null;
-    if (photoBase64 && typeof photoBase64 === "string" && photoBase64.startsWith("data:image")) {
-      const b64 = photoBase64.split(",")[1];
-      const buf = Buffer.from(b64, "base64");
-      const blob = await put(`visits/${device.slice(0, 8)}-${cafeId}-${Date.now()}.jpg`, buf, { access: "public", contentType: "image/jpeg" });
-      photoUrl = blob.url;
-    }
-
     // 신규는 finalized=false(임시), 기존 기록 재편집이면 기존 finalized 유지(노출 끊기지 않게)
-    await sql`INSERT INTO user_visits (cafe_id, device_id, photo_url, memory, favorite, verified, finalized)
-      VALUES (${cafeId}, ${device}, ${photoUrl}, ${mem}, ${fav}, true, false)
+    await sql`INSERT INTO user_visits (cafe_id, device_id, photo_url, photos, memory, favorite, verified, finalized)
+      VALUES (${cafeId}, ${device}, ${photoUrl}, ${photosJson}, ${mem}, ${fav}, true, false)
       ON CONFLICT (cafe_id, device_id) DO UPDATE SET
         photo_url = COALESCE(EXCLUDED.photo_url, user_visits.photo_url),
+        photos = COALESCE(EXCLUDED.photos, user_visits.photos),
         memory = COALESCE(EXCLUDED.memory, user_visits.memory),
         favorite = EXCLUDED.favorite, verified = true,
         finalized = user_visits.finalized, created_at = now()`;

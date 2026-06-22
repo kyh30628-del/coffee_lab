@@ -364,6 +364,7 @@ export default function Home() {
   const [myVisits, setMyVisits] = useState<any[]>([]);
   const [myPinMode, setMyPinMode] = useState(false);
   const [showMyCafeReg, setShowMyCafeReg] = useState(false);
+  const [editCafeId, setEditCafeId] = useState<number | null>(null); // 추억 수정모드: 클릭한 카페 id
   const [showFavs, setShowFavs] = useState(false); // 즐겨찾기(★ 카페) 모달
   const [othersMode, setOthersMode] = useState(false); // 다른 사람은 — 집계 핀
   const [explain, setExplain] = useState<null | "mine" | "others">(null); // 내카페/다른사람 설명 모달
@@ -1280,7 +1281,8 @@ export default function Home() {
         </div>
 
       {tab === "memory" && <MemoryTab device={deviceId} visits={myVisits} locked={myLocked} sessionPin={sessionPin}
-        onRegister={() => setShowMyCafeReg(true)}
+        onRegister={() => { setEditCafeId(null); setShowMyCafeReg(true); }}
+        onEdit={(id: number) => { setEditCafeId(id); setShowMyCafeReg(true); }}
         onUnlock={(p: string) => { try { sessionStorage.setItem("dcn_pin", p); } catch {} setSessionPin(p); setMyLocked(false); reloadMyCafes(deviceId, p); }}
         onLock={() => { try { sessionStorage.removeItem("dcn_pin"); } catch {} setSessionPin(""); reloadMyCafes(deviceId, ""); }}
         onRestore={(dev: string) => { try { localStorage.setItem("dcn_device", dev); } catch {} setDeviceId(dev); reloadMyCafes(dev, ""); }} />}
@@ -1307,7 +1309,7 @@ export default function Home() {
       {showFavs && <FavoritesModal items={cafes.filter((c) => bookmarkIds.has(c.id))} onClose={() => setShowFavs(false)}
         onOpen={(c: Cafe) => { setShowFavs(false); setSelected(c); }}
         onRemove={(id: number) => toggleBookmark(id)} />}
-      {showMyCafeReg && <MyCafeRegModal cafes={cafes} device={deviceId} visits={myVisits} pin={sessionPin} onClose={() => setShowMyCafeReg(false)} onDone={() => { reloadMyCafes(deviceId, sessionPin); }} />}
+      {showMyCafeReg && <MyCafeRegModal cafes={cafes} device={deviceId} visits={myVisits} pin={sessionPin} initialCafeId={editCafeId} onClose={() => { setShowMyCafeReg(false); setEditCafeId(null); }} onDone={() => { reloadMyCafes(deviceId, sessionPin); }} />}
 
       {selected && <CafePanel cafe={selected} bookmarked={bookmarkIds.has(selected.id)} onToggleBookmark={() => toggleBookmark(selected.id)} onClose={() => setSelected(null)} onMap={() => {
         if (selected.lat && selected.lng) {
@@ -1798,10 +1800,10 @@ function CafePanel({ cafe, onClose, onMap, bookmarked = false, onToggleBookmark 
 }
 
 // 내 카페 등록 모달 — 검색→선택→사진→확인(30m 위치인증)→저장
-function MyCafeRegModal({ cafes, device, visits, pin = "", onClose, onDone }: { cafes: Cafe[]; device: string; visits: any[]; pin?: string; onClose: () => void; onDone: () => void }) {
+function MyCafeRegModal({ cafes, device, visits, pin = "", initialCafeId = null, onClose, onDone }: { cafes: Cafe[]; device: string; visits: any[]; pin?: string; initialCafeId?: number | null; onClose: () => void; onDone: () => void }) {
   const [q, setQ] = useState("");
   const [picked, setPicked] = useState<Cafe | null>(null);
-  const [photo, setPhoto] = useState<string | null>(null);
+  const [photos, setPhotos] = useState<string[]>([]); // 방문 사진 최대 5장(기존 URL + 새 base64 혼재 가능)
   const [memory, setMemory] = useState("");
   const [favorite, setFavorite] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -1815,28 +1817,43 @@ function MyCafeRegModal({ cafes, device, visits, pin = "", onClose, onDone }: { 
     return cafes.filter((c) => (c.name + c.area).replace(/\s/g, "").toLowerCase().includes(k)).slice(0, 20);
   }, [q, cafes]);
 
-  // 카페 선택 시 기존 기록(기억·즐겨찾기) 불러오기
+  // 카페 선택 시 기존 기록(기억·즐겨찾기·사진) 불러오기 — 수정모드면 기존 사진도 그대로 보여줌
   const pick = (c: Cafe) => {
     setPicked(c); setMsg("");
     const prev = visits.find((v) => v.id === c.id);
     setMemory(prev?.memory ?? "");
     setFavorite(!!prev?.favorite);
-    setPhoto(null); // 새 사진은 다시 첨부(기존 사진은 서버에 유지됨)
+    const existing = Array.isArray(prev?.photos) ? prev.photos : (prev?.photo_url ? [prev.photo_url] : []);
+    setPhotos(existing.slice(0, 5));
   };
+  // 수정모드: 추억 항목 클릭으로 들어오면 해당 카페를 자동 선택 + 기존 내용 프리필
+  useEffect(() => {
+    if (initialCafeId == null) return;
+    const c = cafes.find((x) => x.id === initialCafeId);
+    if (c) pick(c);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialCafeId]);
 
-  // 사진 선택 → 캔버스로 1000px 리사이즈(용량·전송 최적화)
+  // 사진 선택(여러 장) → 각각 캔버스로 1000px 리사이즈. 갤러리/카메라 모두 허용(capture 미지정). 최대 5장.
   const onPhoto = (e: any) => {
-    const f = e.target.files?.[0]; if (!f) return;
-    const img = new Image();
-    img.onload = () => {
-      const max = 1000, scale = Math.min(1, max / Math.max(img.width, img.height));
-      const cv = document.createElement("canvas");
-      cv.width = Math.round(img.width * scale); cv.height = Math.round(img.height * scale);
-      cv.getContext("2d")!.drawImage(img, 0, 0, cv.width, cv.height);
-      setPhoto(cv.toDataURL("image/jpeg", 0.82));
-    };
-    img.src = URL.createObjectURL(f);
+    const files = Array.from(e.target.files || []) as File[];
+    if (!files.length) return;
+    const room = Math.max(0, 5 - photos.length);
+    files.slice(0, room).forEach((f) => {
+      const img = new Image();
+      img.onload = () => {
+        const max = 1000, scale = Math.min(1, max / Math.max(img.width, img.height));
+        const cv = document.createElement("canvas");
+        cv.width = Math.round(img.width * scale); cv.height = Math.round(img.height * scale);
+        cv.getContext("2d")!.drawImage(img, 0, 0, cv.width, cv.height);
+        const url = cv.toDataURL("image/jpeg", 0.82);
+        setPhotos((prev) => prev.length >= 5 ? prev : [...prev, url]);
+      };
+      img.src = URL.createObjectURL(f);
+    });
+    e.target.value = ""; // 같은 파일 다시 고를 수 있게 초기화
   };
+  const removePhoto = (i: number) => setPhotos((prev) => prev.filter((_, idx) => idx !== i));
 
   // 1단계: 위치 인증 → 임시저장(그 카페에서의 경험임을 보증)
   const stage = () => {
@@ -1847,7 +1864,7 @@ function MyCafeRegModal({ cafes, device, visits, pin = "", onClose, onDone }: { 
       try {
         const r = await fetch("/api/my-cafe", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "stage", cafeId: picked.id, device, pin, userLat: pos.coords.latitude, userLng: pos.coords.longitude, photoBase64: photo, memory, favorite }),
+          body: JSON.stringify({ action: "stage", cafeId: picked.id, device, pin, userLat: pos.coords.latitude, userLng: pos.coords.longitude, photosBase64: photos, memory, favorite }),
         });
         const d = await r.json();
         if (d.ok) { setStaged(true); setMsg(""); setBusy(false); } // 위치인증 통과 → 추억 기록 팝업
@@ -1857,13 +1874,13 @@ function MyCafeRegModal({ cafes, device, visits, pin = "", onClose, onDone }: { 
   };
 
   // 2단계: 추억을 기록합니다 — 위치 비교 없이 최종 DB 기록
-  const commit = async () => {
+  const commit = async (sendPhotos = false) => {
     if (!picked) return;
     setBusy(true); setMsg("");
     try {
       const r = await fetch("/api/my-cafe", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "commit", cafeId: picked.id, device, pin, memory, favorite }),
+        body: JSON.stringify({ action: "commit", cafeId: picked.id, device, pin, memory, favorite, ...(sendPhotos ? { photosBase64: photos } : {}) }),
       });
       const d = await r.json();
       if (d.ok) { setDone(picked.name); onDone(); }
@@ -1884,7 +1901,7 @@ function MyCafeRegModal({ cafes, device, visits, pin = "", onClose, onDone }: { 
           </div>
           <div className="text-[11px] text-[#a8927a] mt-2 leading-relaxed">위치 인증으로 <b>진짜 그 카페에서의 경험</b>임이 확인됐어요.</div>
           {msg && <p className="text-[12px] text-[#c0392b] mt-2">{msg}</p>}
-          <button onClick={commit} disabled={busy} className="mt-5 w-full bg-[#d6336c] text-white rounded-xl py-3 font-bold text-[14px] disabled:opacity-60">{busy ? "기록 중..." : "추억을 기록합니다"}</button>
+          <button onClick={() => commit(false)} disabled={busy} className="mt-5 w-full bg-[#d6336c] text-white rounded-xl py-3 font-bold text-[14px] disabled:opacity-60">{busy ? "기록 중..." : "추억을 기록합니다"}</button>
           <button onClick={() => setStaged(false)} disabled={busy} className="mt-2 w-full text-[#9c6b3f] text-[13px] py-1">다시 확인할게요</button>
         </div>
       </div>
@@ -1935,14 +1952,29 @@ function MyCafeRegModal({ cafes, device, visits, pin = "", onClose, onDone }: { 
             <>
               <div className="flex items-center justify-between bg-white border border-[#e6d9c8] rounded-lg px-3 py-2.5">
                 <div><div className="text-[14px] font-bold text-[#2b2018]">{picked.name}</div><div className="text-[11px] text-[#9c6b3f]">{picked.area}</div></div>
-                <button onClick={() => { setPicked(null); setPhoto(null); }} className="text-[11px] text-[#9c6b3f] underline">변경</button>
+                <button onClick={() => { setPicked(null); setPhotos([]); }} className="text-[11px] text-[#9c6b3f] underline">변경</button>
               </div>
-              <label className="block">
-                <div className="text-[12px] text-[#7a6452] mb-1.5 font-medium">방문 사진 (선택)</div>
-                {photo ? <img src={photo} alt="미리보기" className="w-full rounded-lg border border-[#e6d9c8]" style={{ maxHeight: "16rem", objectFit: "cover" }} />
-                  : <div className="w-full py-8 rounded-lg border-2 border-dashed border-[#cbb89f] text-center text-[12px] text-[#9c6b3f] bg-white">사진 추가하기</div>}
-                <input type="file" accept="image/*" capture="environment" onChange={onPhoto} className="hidden" />
-              </label>
+              <div>
+                <div className="text-[12px] text-[#7a6452] mb-1.5 font-medium">방문 사진 (최대 5장 · 선택)</div>
+                <div className="grid grid-cols-3 gap-2">
+                  {photos.map((p, i) => (
+                    <div key={i} className="relative aspect-square">
+                      <img src={p} alt="" className="w-full h-full rounded-lg border border-[#e6d9c8] object-cover" />
+                      <button type="button" onClick={() => removePhoto(i)} aria-label="삭제"
+                        className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[#2b2018] text-white text-[11px] leading-none shadow">×</button>
+                    </div>
+                  ))}
+                  {photos.length < 5 && (
+                    <label className="aspect-square rounded-lg border-2 border-dashed border-[#cbb89f] bg-white flex flex-col items-center justify-center text-[#9c6b3f] cursor-pointer">
+                      <span className="text-[20px] leading-none">＋</span>
+                      <span className="text-[10px] mt-0.5">사진 추가</span>
+                      <span className="text-[9px] text-[#bcae9b]">{photos.length}/5</span>
+                      <input type="file" accept="image/*" multiple onChange={onPhoto} className="hidden" />
+                    </label>
+                  )}
+                </div>
+                <p className="text-[10px] text-[#a8927a] mt-1">갤러리에서 여러 장 선택하거나 카메라로 촬영할 수 있어요.</p>
+              </div>
               {/* 기억 — 카페에서의 나의 경험 */}
               <div>
                 <div className="text-[12px] text-[#7a6452] mb-1.5 font-medium">기억 — 이 카페에서의 나의 경험</div>
@@ -1951,11 +1983,23 @@ function MyCafeRegModal({ cafes, device, visits, pin = "", onClose, onDone }: { 
                   className="w-full border border-[#cbb89f] rounded-lg px-3 py-2.5 text-[14px] text-[#2b2018] bg-white resize-none leading-relaxed" />
                 <div className="text-right text-[10px] text-[#a8927a]">{memory.length}/2000</div>
               </div>
-              <p className="text-[11px] text-[#a8927a] leading-relaxed">※ 타인의 얼굴·개인정보가 담긴 사진은 올리지 마세요. <b>카페 30m 이내</b>에서 위치 인증을 해야 "진짜 그 카페 경험"으로 임시저장돼요. 그다음 <b>추억 기록</b> 확인을 거쳐 영구 저장됩니다.</p>
-              {msg && <p className="text-[12px] text-[#c0392b]">{msg}</p>}
-              <button onClick={stage} disabled={busy} className="w-full bg-[#d6336c] text-white rounded-xl py-3 font-bold text-[14px] disabled:opacity-60">
-                {busy ? "위치 확인 중..." : "이 카페에서 위치 인증 (임시저장)"}
-              </button>
+              {visits.some((v) => v.id === picked.id) ? (
+                <>
+                  <p className="text-[11px] text-[#a8927a] leading-relaxed">※ 이미 기록한 추억이에요. 사진(갤러리에서 추가 가능)·기억을 고치고 저장하세요. <b>이미 인증된 방문</b>이라 위치 확인은 다시 안 해도 돼요.</p>
+                  {msg && <p className="text-[12px] text-[#c0392b]">{msg}</p>}
+                  <button onClick={() => commit(true)} disabled={busy} className="w-full bg-[#d6336c] text-white rounded-xl py-3 font-bold text-[14px] disabled:opacity-60">
+                    {busy ? "저장 중..." : "수정 저장"}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <p className="text-[11px] text-[#a8927a] leading-relaxed">※ 타인의 얼굴·개인정보가 담긴 사진은 올리지 마세요. <b>카페 30m 이내</b>에서 위치 인증을 해야 "진짜 그 카페 경험"으로 임시저장돼요. 그다음 <b>추억 기록</b> 확인을 거쳐 영구 저장됩니다.</p>
+                  {msg && <p className="text-[12px] text-[#c0392b]">{msg}</p>}
+                  <button onClick={stage} disabled={busy} className="w-full bg-[#d6336c] text-white rounded-xl py-3 font-bold text-[14px] disabled:opacity-60">
+                    {busy ? "위치 확인 중..." : "이 카페에서 위치 인증 (임시저장)"}
+                  </button>
+                </>
+              )}
             </>
           )}
         </div>
@@ -1966,7 +2010,7 @@ function MyCafeRegModal({ cafes, device, visits, pin = "", onClose, onDone }: { 
 
 // 내 기억 관리 — 백업코드 발급/복원 + PDF·JSON 내보내기 (개인정보 0)
 // 추억 보관소 탭 — 등록 + 내 카페 목록 + 설정버튼. 잠금 시 PIN 입력 화면.
-function MemoryTab({ device, visits, locked = false, sessionPin = "", onRegister, onUnlock, onLock, onRestore }: { device: string; visits: any[]; locked?: boolean; sessionPin?: string; onRegister: () => void; onUnlock?: (pin: string) => void; onLock?: () => void; onRestore: (dev: string) => void }) {
+function MemoryTab({ device, visits, locked = false, sessionPin = "", onRegister, onEdit, onUnlock, onLock, onRestore }: { device: string; visits: any[]; locked?: boolean; sessionPin?: string; onRegister: () => void; onEdit?: (cafeId: number) => void; onUnlock?: (pin: string) => void; onLock?: () => void; onRestore: (dev: string) => void }) {
   const [showSettings, setShowSettings] = useState(false);
   const [hasPin, setHasPin] = useState(false);
   const [unlockPin, setUnlockPin] = useState("");
@@ -2015,20 +2059,27 @@ function MemoryTab({ device, visits, locked = false, sessionPin = "", onRegister
           <div className="text-center text-[#a8927a] text-[13px] py-14 bg-white rounded-2xl border border-[#ece0cd] leading-relaxed">아직 등록한 추억이 없어요.<br />카페에서 위치 인증하고 첫 추억을 남겨보세요.</div>
         ) : (
           <div className="space-y-2.5">
-            {visits.map((v) => (
-              <div key={v.id} className="bg-white rounded-2xl border border-[#ece0cd] p-3.5 flex gap-3">
-                {v.photo_url ? <img src={v.photo_url} alt="" className="w-16 h-16 rounded-xl object-cover shrink-0" /> : <div className="w-16 h-16 rounded-xl bg-[#f3ede1] flex items-center justify-center text-[22px] shrink-0">{v.favorite ? "★" : "☕"}</div>}
+            {visits.map((v) => {
+              const photoCount = Array.isArray(v.photos) ? v.photos.length : (v.photo_url ? 1 : 0);
+              return (
+              <button key={v.id} type="button" onClick={() => onEdit?.(v.id)} className="w-full text-left bg-white rounded-2xl border border-[#ece0cd] p-3.5 flex gap-3 hover:border-[#d6b9c4] active:scale-[0.995] transition">
+                <div className="relative w-16 h-16 shrink-0">
+                  {v.photo_url ? <img src={v.photo_url} alt="" className="w-16 h-16 rounded-xl object-cover" /> : <div className="w-16 h-16 rounded-xl bg-[#f3ede1] flex items-center justify-center text-[22px]">{v.favorite ? "★" : "☕"}</div>}
+                  {photoCount > 1 && <span className="absolute bottom-0.5 right-0.5 bg-black/60 text-white text-[9px] px-1 rounded">📷{photoCount}</span>}
+                </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
                     {v.favorite && <span className="text-[#f0a832] text-[13px]">★</span>}
                     <span className="font-bold text-[#2b2018] text-[14px] truncate">{v.name}</span>
                     <span className="text-[10px] text-[#9c6b3f] shrink-0">{v.area}</span>
+                    <span className="ml-auto text-[10px] text-[#bcae9b] shrink-0">수정 ✎</span>
                   </div>
                   {v.memory ? <p className="text-[12px] text-[#52402e] leading-relaxed mt-0.5 line-clamp-2">{v.memory}</p> : <p className="text-[12px] text-[#bcae9b] mt-0.5">기억 메모 없음</p>}
                   <div className="text-[10px] text-[#a8927a] mt-1">{fmtDate(v.created_at)}</div>
                 </div>
-              </div>
-            ))}
+              </button>
+              );
+            })}
           </div>
         )}
       </div>
