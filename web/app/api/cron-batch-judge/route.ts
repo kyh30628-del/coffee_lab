@@ -47,11 +47,13 @@ export async function GET(req: NextRequest) {
     }
 
     // ── ② 판정 대기 카페로 새 배치 제출 ──
+    //   ⚠️ 우선순위: 신규(pending) 먼저! pending은 판정이 '공개 필수 게이트'라 미루면 영영 공개 안 됨.
+    //   공개카페 재정제(보조)는 그 다음. (이전엔 published DESC라 신규가 영영 차례 안 와 적체됨)
     let submitted = 0, noCand = 0, batchId: string | null = null;
     const rows = (await sql`SELECT id, name, area FROM cafes
       WHERE (published OR pipeline_status = 'pending') AND raw_reviews IS NOT NULL
         AND (llm_judged_at IS NULL OR llm_judged_at < raw_collected_at)
-      ORDER BY published DESC, id LIMIT ${BUILD_LIMIT}`) as any[];
+      ORDER BY (pipeline_status = 'pending') DESC, published DESC, id LIMIT ${BUILD_LIMIT}`) as any[];
     const requests: any[] = [];
     const manifestCafes: Record<string, any> = {};
     for (const c of rows) {
