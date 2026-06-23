@@ -49,6 +49,7 @@ async function ensureCols() {
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS judge_decisions JSONB`; // 판정 AI 결정(key→keep/drop) 영구 보존 → 재합성해도 유지
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_coherence REAL`; // 근거후기 이름일관성(0~1) — 그라운딩을 '애매한 곳'에만 돌리는 효율 게이트용
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS offctx_rate REAL`; // 표시 리뷰 중 '카페 맥락어 없는 비율'(0~1) — 규칙-사각 오염(딴업종·문구이름) 관제탑 감시 지표
+  await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS offctx_ok BOOLEAN DEFAULT false`; // 사람이 '진짜 카페'로 확인한 화이트리스트 → offctx 점검목록서 제외(프록시 오탐 반복 방지)
   ensured = true;
 }
 // 카페·식음료 맥락어 — 검증 리뷰가 '실제로 카페 얘기'인지 가늠. 없는 비율↑ = 딴 업종/콘텐츠 오염 의심.

@@ -177,8 +177,9 @@ export async function GET(req: NextRequest) {
     //   그라운딩(LLM)이 못 보던 사각지대를 결정론적으로 상시 감시. 소비자 노출이라 임계 넘으면 위험.
     // ⚠️ PROXY(맥락어 없음)라 진짜 카페(찻집·북카페·시적이름)도 오탐됨 → '위험(빨강)' 금지, 항상 '주의'(점검 권장 목록).
     //   사람이 목록 보고 진짜 오염만 비공개. 헛경보(red) 방지가 핵심.
-    const offctx = (await sql`SELECT COUNT(*)::int n FROM cafes WHERE published AND offctx_rate >= 0.55`.catch(() => [{ n: 0 }]))[0] as any;
-    const offctxSuspects = (await sql`SELECT name, area, round(offctx_rate::numeric, 2) AS rate FROM cafes WHERE published AND offctx_rate >= 0.55 ORDER BY offctx_rate DESC LIMIT 30`.catch(() => [])) as any[];
+    // offctx_ok=true = 사람이 '진짜 카페'로 확인한 화이트리스트 → 점검목록서 제외(프록시 오탐 반복표시 방지).
+    const offctx = (await sql`SELECT COUNT(*)::int n FROM cafes WHERE published AND offctx_rate >= 0.55 AND NOT COALESCE(offctx_ok, false)`.catch(() => [{ n: 0 }]))[0] as any;
+    const offctxSuspects = (await sql`SELECT name, area, round(offctx_rate::numeric, 2) AS rate FROM cafes WHERE published AND offctx_rate >= 0.55 AND NOT COALESCE(offctx_ok, false) ORDER BY offctx_rate DESC LIMIT 30`.catch(() => [])) as any[];
     if (offctx.n > 0) notices.push(`리뷰 맥락 의심 ${offctx.n}곳(점검 권장 — 일부 진짜 카페 포함될 수 있음)`);
 
     // 파이프라인 진행 상황(신규 카페 조립라인)
