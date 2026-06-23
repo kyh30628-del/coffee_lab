@@ -67,7 +67,10 @@ function toQuote(text: string, name = "", maxLen = 90): string {
   const sentences = masked.split(/(?<=[.!?。…])\s+|\n+|\s{2,}/).map((s) => s.trim()).filter((s) => s.length >= 5);
   if (sentences.length <= 1) return masked.length <= maxLen ? masked : masked.slice(0, maxLen) + "…";
   const namePart = name.replace(/\s+/g, "").slice(0, 4);
-  const score = (s: string) => (namePart && s.replace(/\s+/g, "").includes(namePart) ? 3 : 0) + (COFFEE_TERMS.test(s) ? 2 : 0);
+  // 카페 내용(4) > 이름(2). 시·문학·게임 등 비카페 문장은 회피(-6) — 이름이 시 제목('비에도 지지않고')인
+  //   카페에서 진짜 후기가 시 구절을 인용해도, 대표 인용은 '카페 내용 문장'이 뜨도록.
+  const OFFTOPIC_SENT = /(미야자와|겐지|그림책|바람에도\s*지지|폭풍에도\s*지지|더위에도\s*지지|눈에도\s*지지|독후감|책추천|시\s*한\s*편|문학|독서모임|월드컵|게임\s*이벤트)/;
+  const score = (s: string) => (COFFEE_TERMS.test(s) ? 4 : 0) + (namePart && s.replace(/\s+/g, "").includes(namePart) ? 2 : 0) - (OFFTOPIC_SENT.test(s) ? 6 : 0);
   let best = sentences[0], bestSc = score(sentences[0]);
   for (const s of sentences) { const sc = score(s); if (sc > bestSc) { best = s; bestSc = sc; } }
   return best.length <= maxLen ? best : best.slice(0, maxLen) + "…";
