@@ -4,23 +4,24 @@
 import { CHAR_AXES } from "./charScore";
 
 export type CafeLite = { char_scores?: Record<string, number> | null; synth_count?: number | null };
-// 축 → 전체 카페의 '리뷰당 언급률' 정렬 배열(percentile용) + 평균 '언급 건수'(비교 표시용)
-export type AxisDist = { rates: Record<string, number[]>; avg: Record<string, number> };
+// 축 → 전체 카페의 '후기 1건당 언급률' 정렬 배열(percentile·평균 모두 이 정규화 값 기준 = 공정한 기준).
+//   ⚠️ 원시 건수 평균은 후기 많은 카페가 당연히 큰 '왜곡'이라 안 씀 — 반드시 '후기당 비율'로 비교.
+export type AxisDist = { rates: Record<string, number[]>; avgRate: Record<string, number> };
 
 const MIN_CNT = 8; // 표본 너무 적으면 비율이 튀므로 분포·판단에서 제외
 
-// 전체 카페에서 축별 언급률 분포(정렬) + 평균 언급 건수를 만든다. (클라/서버 공용)
+// 전체 카페에서 축별 '후기당 언급률' 분포(정렬) + 평균 언급률을 만든다. (클라/서버 공용)
 export function buildAxisDist(cafes: CafeLite[]): AxisDist {
-  const rates: Record<string, number[]> = {}, sum: Record<string, number> = {}, num: Record<string, number> = {};
-  for (const ax of CHAR_AXES) { rates[ax.key] = []; sum[ax.key] = 0; num[ax.key] = 0; }
+  const rates: Record<string, number[]> = {}, sum: Record<string, number> = {};
+  for (const ax of CHAR_AXES) { rates[ax.key] = []; sum[ax.key] = 0; }
   for (const c of cafes) {
     const cnt = c.synth_count ?? 0; if (cnt < MIN_CNT) continue;
     const cs = c.char_scores ?? {};
-    for (const ax of CHAR_AXES) { const v = cs[ax.key] ?? 0; rates[ax.key].push(v / cnt); sum[ax.key] += v; num[ax.key]++; }
+    for (const ax of CHAR_AXES) { const r = (cs[ax.key] ?? 0) / cnt; rates[ax.key].push(r); sum[ax.key] += r; }
   }
-  const avg: Record<string, number> = {};
-  for (const ax of CHAR_AXES) { rates[ax.key].sort((a, b) => a - b); avg[ax.key] = num[ax.key] ? Math.round(sum[ax.key] / num[ax.key]) : 0; }
-  return { rates, avg };
+  const avgRate: Record<string, number> = {};
+  for (const ax of CHAR_AXES) { rates[ax.key].sort((a, b) => a - b); avgRate[ax.key] = rates[ax.key].length ? sum[ax.key] / rates[ax.key].length : 0; }
+  return { rates, avgRate };
 }
 
 // 정렬 배열에서 v의 백분위(0~1) = v 이하인 비율.
@@ -49,7 +50,8 @@ const WEAK: Record<string, string> = {
   roast: "", // 로스팅 미언급은 약점으로 안 봄(대부분 카페가 안 함)
 };
 
-export type ProfileItem = { key: string; label: string; emoji: string; text: string; topPct: number; count: number; avg: number };
+// topPct = 전체 상위 %(후기당 언급률 순위), botPct = 하위 %, mult = 평균 대비 배수(후기당 비율 기준).
+export type ProfileItem = { key: string; label: string; emoji: string; text: string; topPct: number; botPct: number; mult: number };
 export type CafeProfile = { strong: ProfileItem[]; weak: ProfileItem[]; ok: boolean };
 
 // 한 카페의 강점/아쉬운점 산출. dist는 buildAxisDist 결과.
@@ -58,20 +60,21 @@ export function cafeProfile(cafe: CafeLite, dist: AxisDist): CafeProfile {
   const cs = cafe.char_scores ?? {};
   if (cnt < MIN_CNT) return { strong: [], weak: [], ok: false };
   const ranked = CHAR_AXES.map((ax) => {
-    const raw = cs[ax.key] ?? 0;
-    const p = percentile(dist.rates[ax.key], raw / cnt);
-    return { key: ax.key, label: ax.label, emoji: ax.emoji, raw, avg: dist.avg[ax.key] ?? 0, p, topPct: Math.max(1, Math.round((1 - p) * 100)) };
+    const rate = (cs[ax.key] ?? 0) / cnt;              // 이 카페의 후기당 언급률
+    const ar = dist.avgRate[ax.key] ?? 0;              // 전체 평균 언급률(같은 기준)
+    const p = percentile(dist.rates[ax.key], rate);
+    const mult = ar > 0 ? rate / ar : (rate > 0 ? 99 : 0);
+    return { key: ax.key, label: ax.label, emoji: ax.emoji, raw: cs[ax.key] ?? 0, p,
+      topPct: Math.max(1, Math.round((1 - p) * 100)), botPct: Math.max(1, Math.round(p * 100)), mult };
   });
-  // 강점: 상위 ~30% 이상 + 최소 언급 2건(우연 1건 제외). 백분위 높은 순 최대 3개.
-  let strong = ranked.filter((r) => r.p >= 0.70 && r.raw >= 2).sort((a, b) => b.p - a.p).slice(0, 3);
-  // 강점이 하나도 없으면(평범) 가장 높은 축 1개라도(언급 2건+) 보여줌 — 판단 단서 제공.
-  if (strong.length === 0) strong = ranked.filter((r) => r.raw >= 2).sort((a, b) => b.p - a.p).slice(0, 1);
+  // 선정 기준 = '평균 대비 배수'(표시값과 일치 → 모순 없음). 강점=평균보다 확실히 많음, 약점=확실히 적음.
+  //   강점: 평균의 1.3배+ & 최소 언급 2건. 배수 큰 순 최대 3개.
+  const strong = ranked.filter((r) => r.mult >= 1.3 && r.raw >= 2).sort((a, b) => b.mult - a.mult).slice(0, 3);
   const strongKeys = new Set(strong.map((s) => s.key));
-  // 아쉬운점: 중앙값 아래(상대적으로 약한) 축 중 약점 문구 있는 것, 강점 제외. 백분위 낮은 순 최대 2개.
-  //   (강점과 균형 있게 '항상 같이' 보여주기 위해 하위 50%까지 넓힘 — 사장님 요청)
-  const weak = ranked.filter((r) => r.p < 0.50 && WEAK[r.key] && !strongKeys.has(r.key)).sort((a, b) => a.p - b.p).slice(0, 2);
+  // 약점: 평균의 0.6배 이하(확실히 적음) & 약점 문구 있는 축, 강점 제외. 배수 작은 순 최대 2개.
+  const weak = ranked.filter((r) => r.mult <= 0.6 && WEAK[r.key] && !strongKeys.has(r.key)).sort((a, b) => a.mult - b.mult).slice(0, 2);
   const mk = (r: typeof ranked[number], textMap: Record<string, string>): ProfileItem =>
-    ({ key: r.key, label: r.label, emoji: r.emoji, text: textMap[r.key] ?? r.label, topPct: r.topPct, count: r.raw, avg: r.avg });
+    ({ key: r.key, label: r.label, emoji: r.emoji, text: textMap[r.key] ?? r.label, topPct: r.topPct, botPct: r.botPct, mult: Math.round(r.mult * 10) / 10 });
   return {
     strong: strong.map((r) => mk(r, STRONG)),
     weak: weak.map((r) => mk(r, WEAK)),
@@ -105,6 +108,16 @@ const HIGHLIGHTS: { label: string; emoji: string; kws: string[] }[] = [
   { label: "데이트·기념일", emoji: "💕", kws: ["데이트", "기념일", "프러포즈", "특별한 날", "데이트 코스"] },
   { label: "반려동물 동반", emoji: "🐾", kws: ["애견", "반려동물", "강아지 동반", "강아지와", "펫 동반", "반려견"] },
   { label: "늦게까지·심야", emoji: "🌙", kws: ["늦게까지", "심야", "24시", "밤늦", "새벽까지"] },
+  { label: "차·티 전문", emoji: "🍵", kws: ["차가 맛있", "전통차", "말차 맛", "티룸", "차 전문", "수제 차", "다양한 차", "티 페어링"] },
+  { label: "비건·건강한", emoji: "🌱", kws: ["비건", "글루텐프리", "글루텐 프리", "건강한 빵", "건강한 디저트", "건강한 재료"] },
+  { label: "책·북카페", emoji: "📚", kws: ["북카페", "책방", "책이 많", "책 읽기 좋", "독서하기 좋"] },
+  { label: "전시·작품", emoji: "🖼️", kws: ["전시회", "전시 공간", "작품 전시", "그림이 걸", "갤러리처럼"] },
+  { label: "단체·모임룸", emoji: "👥", kws: ["단체석", "모임하기 좋", "룸이 있", "대관 가능", "단체 가능", "프라이빗 룸"] },
+  { label: "노키즈존", emoji: "🚸", kws: ["노키즈"] },
+  { label: "빈티지·레트로", emoji: "🪑", kws: ["빈티지", "레트로", "앤티크", "옛날 감성", "고재 가구"] },
+  { label: "한옥·전통", emoji: "🏯", kws: ["한옥", "고택", "전통 가옥"] },
+  { label: "식물·플랜테리어", emoji: "🪴", kws: ["플랜테리어", "식물이 가득", "온실 같", "보타닉", "그린 가득"] },
+  { label: "와인·주류", emoji: "🍷", kws: ["와인 한잔", "와인바", "칵테일", "보틀숍", "주류도 판"] },
 ];
 
 // 부정 맥락 가드 — 키워드 바로 주변(앞3·뒤7자)에 부정어 있으면 그 언급은 '긍정 아님'으로 제외.

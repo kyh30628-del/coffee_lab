@@ -132,7 +132,7 @@ export default async function CafePage({ params }: Props) {
                       <div key={s.key} className="flex items-center gap-2 bg-[#e8f3ea] border border-[#c6e2cc] rounded-lg px-2.5 py-1.5">
                         <span className="text-[15px]">{s.emoji}</span><span className="text-[13.5px] font-bold text-[#2f5f3c]">{s.text}</span>
                         <span className="ml-auto flex items-center gap-1.5 whitespace-nowrap">
-                          <span className="text-[10.5px] text-[#6f9577]">{s.count}<span className="text-[#a8927a]"> / 평균 {s.avg}</span></span>
+                          <span className="text-[10.5px] text-[#6f9577]">평균의 {s.mult}배</span>
                           <span className="text-[10.5px] font-bold text-white bg-[#3f7a4f] px-2 py-[3px] rounded-full">상위 {s.topPct}%</span>
                         </span>
                       </div>
@@ -147,13 +147,13 @@ export default async function CafePage({ params }: Props) {
                     {profile.weak.map((w) => (
                       <div key={w.key} className="flex items-center gap-2 bg-[#f6ecdf] border border-[#e6d2b5] rounded-lg px-2.5 py-1.5">
                         <span className="text-[14px]">{w.emoji}</span><span className="text-[12.5px] font-medium text-[#8a6534]">{w.text}</span>
-                        <span className="ml-auto text-[10.5px] text-[#b9935f] whitespace-nowrap">{w.count} / 평균 {w.avg}</span>
+                        <span className="ml-auto text-[10.5px] text-[#b9935f] whitespace-nowrap">{w.mult < 0.2 ? "거의 언급 없음" : `평균의 ${w.mult}배`}</span>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
-              <p className="text-[10px] text-[#a8927a] mt-2.5 leading-relaxed">'언급수 / 평균'은 이 카페와 전체 카페 평균 언급 건수, '상위 %'는 전체 대비 순위예요. 절대 평가가 아닙니다.</p>
+              <p className="text-[10px] text-[#a8927a] mt-2.5 leading-relaxed">기준은 <b>후기 1건당 언급 비율</b>이에요 — 후기 수가 많고 적음을 보정한 공정한 비교입니다. '평균의 N배'·'상위/하위 %'는 전체 카페와 같은 기준으로 비교한 값. 절대 평가가 아닙니다.</p>
             </div>
           ) : tags.length > 0 && (
             <div className="mb-4">
