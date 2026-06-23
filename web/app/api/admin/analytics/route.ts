@@ -26,6 +26,32 @@ export async function GET(req: NextRequest) {
       FROM user_consents WHERE ${BOT}`
     ).catch(() => [{}]))[0] as any;
 
+    // 🟢 실시간 접속 — 최근 5분/30분 활성(방문핑이 last_seen 갱신)
+    const live = (await sql.query(
+      `SELECT COUNT(*) FILTER (WHERE last_seen > now()-interval '5 minutes')::int active5,
+              COUNT(*) FILTER (WHERE last_seen > now()-interval '30 minutes')::int active30
+       FROM user_consents WHERE ${BOT}`
+    ).catch(() => [{ active5: 0, active30: 0 }]))[0] as any;
+    // 오늘(KST) 접속자·페이지뷰
+    const todayVisitors = (await sql.query(
+      `SELECT COUNT(*)::int n FROM user_consents
+       WHERE (last_seen AT TIME ZONE 'Asia/Seoul')::date = (now() AT TIME ZONE 'Asia/Seoul')::date AND ${BOT}`
+    ).catch(() => [{ n: 0 }]))[0]?.n ?? 0;
+    const todayPv = (await sql`SELECT COUNT(*)::int n FROM traffic_events
+       WHERE (ts AT TIME ZONE 'Asia/Seoul')::date = (now() AT TIME ZONE 'Asia/Seoul')::date`.catch(() => [{ n: 0 }]))[0]?.n ?? 0;
+    // 위치 동의 퍼널 — 방문 → 위치동의 → 위치공유(region 보유)
+    const consent = (await sql.query(
+      `SELECT COUNT(*)::int pinged,
+              COUNT(*) FILTER (WHERE agreed IS TRUE)::int agreed,
+              COUNT(*) FILTER (WHERE region IS NOT NULL)::int located
+       FROM user_consents WHERE ${BOT}`
+    ).catch(() => [{ pinged: 0, agreed: 0, located: 0 }]))[0] as any;
+    // 방문자 지역 분포(위치 공유한 방문자)
+    const visitorRegions = (await sql.query(
+      `SELECT region, COUNT(*)::int n FROM user_consents
+       WHERE region IS NOT NULL AND ${BOT} GROUP BY region ORDER BY n DESC LIMIT 12`
+    ).catch(() => [])) as any[];
+
     // 유입경로 — 고유 방문자·평균 재방문·비중
     const sources = (await sql.query(
       `SELECT COALESCE(NULLIF(src,''),'미상') AS src, COUNT(*)::int visitors,
@@ -108,6 +134,10 @@ export async function GET(req: NextRequest) {
         new7: kpi?.new7 ?? 0, new30: kpi?.new30 ?? 0, returning30: kpi?.returning30 ?? 0,
         totalVisits: kpi?.totalvisits ?? 0, pageviews30d,
       },
+      realtime: { active5: live?.active5 ?? 0, active30: live?.active30 ?? 0 },
+      today: { visitors: todayVisitors, pageviews: todayPv },
+      consent: { pinged: consent?.pinged ?? 0, agreed: consent?.agreed ?? 0, located: consent?.located ?? 0 },
+      visitorRegions,
       sources, retention: { newcomers: retention?.newcomers ?? 0, returning: retention?.ret ?? 0 },
       devices, daily, pageBuckets, topCafes, topRegions, hours,
       funnel: { visitors: funnel?.visitors ?? 0, viewedCafe: funnel?.viewed_cafe ?? 0, browsed: funnel?.browsed ?? 0, engaged },

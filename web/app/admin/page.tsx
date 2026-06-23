@@ -360,58 +360,20 @@ export default function AdminPage() {
                   <p className="text-[10px] text-stone-400 mt-1">사각 오염 감시용 watchlist — <b>일부는 진짜 카페(찻집·북카페·시적이름) 오탐</b>. 사람이 확인 후 진짜 오염만 비공개. (헛경보 방지로 위험 아닌 주의)</p>
                 </div>
               )}
-              {/* 📈 유입 분석 — 네이버·구글 없이 우리 DB(user_consents·traffic_events)로 자체 집계 */}
+              {/* 📊 접속·유입 — 요약 진입 카드(상세는 전용 대시보드 1곳으로 일원화) */}
               {tower.traffic && (
-                <div className="mb-2.5 rounded-xl border border-sky-200 bg-sky-50/50 p-2.5">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-[11px] font-bold text-stone-700">📈 유입 분석 <span className="font-normal text-stone-400">· 우리 DB · 최근 30일</span></span>
-                    <button onClick={openAnalytics} className="text-[11px] font-bold text-sky-700 bg-white border border-sky-200 rounded-full px-2.5 py-0.5 hover:bg-sky-100 transition shrink-0">전체 분석 보기 →</button>
+                <button onClick={openAnalytics} className="w-full mb-2.5 rounded-xl border border-sky-200 bg-sky-50/60 p-2.5 text-left hover:bg-sky-100/70 transition">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[11px] font-bold text-stone-700">📊 접속·유입 현황</span>
+                    <span className="text-[11px] font-bold text-sky-700">전체 대시보드 →</span>
                   </div>
-                  <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10.5px] text-stone-600 mb-2">
+                  <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10.5px] text-stone-600">
                     <span>오늘 <b className="text-sky-700">{tower.traffic.dau}</b></span>
                     <span>주간 <b className="text-sky-700">{tower.traffic.wau}</b></span>
                     <span>월간 <b className="text-sky-700">{tower.traffic.mau}</b></span>
-                    <span>신규7일 <b className="text-sky-700">{tower.traffic.new7}</b></span>
-                    <span>페이지뷰 <b className="text-sky-700">{(tower.traffic.pageviews30d ?? 0).toLocaleString()}</b></span>
+                    <span>재방문 <b className="text-stone-700">{tower.traffic.retention?.returning ?? 0}</b></span>
                   </div>
-                  <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-stone-500 mb-2">
-                    <span>신규 <b className="text-stone-700">{tower.traffic.retention?.newcomers ?? 0}</b> · 재방문 <b className="text-stone-700">{tower.traffic.retention?.returning ?? 0}</b></span>
-                    {(tower.traffic.funnel?.visitors ?? 0) > 0 && (
-                      <span>카페조회 전환 <b className="text-emerald-700">{Math.round((tower.traffic.funnel.viewedCafe / tower.traffic.funnel.visitors) * 100)}%</b> <span className="text-stone-400">({tower.traffic.funnel.viewedCafe}/{tower.traffic.funnel.visitors})</span></span>
-                    )}
-                  </div>
-                  {tower.traffic.sources?.length > 0 && (
-                    <div className="mb-2">
-                      <div className="text-[10px] font-bold text-stone-500 mb-0.5">유입경로</div>
-                      <div className="flex flex-wrap gap-1">
-                        {tower.traffic.sources.map((s: any, i: number) => (
-                          <span key={i} className="text-[10px] bg-white border border-sky-100 rounded px-1.5 py-0.5 text-stone-600">{s.s} <b className="text-sky-700">{s.n}</b></span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {tower.traffic.pageBuckets?.length > 0 && (
-                    <div className="mb-2">
-                      <div className="text-[10px] font-bold text-stone-500 mb-0.5">인기 페이지 유형</div>
-                      <div className="flex flex-wrap gap-1">
-                        {tower.traffic.pageBuckets.map((b: any, i: number) => (
-                          <span key={i} className="text-[10px] bg-white border border-sky-100 rounded px-1.5 py-0.5 text-stone-600">{b.bucket} <b className="text-sky-700">{(b.views ?? 0).toLocaleString()}</b></span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {tower.traffic.topCafes?.length > 0 && (
-                    <div>
-                      <div className="text-[10px] font-bold text-stone-500 mb-0.5">인기 카페 (조회순)</div>
-                      <div className="space-y-0.5 max-h-32 overflow-y-auto">
-                        {tower.traffic.topCafes.map((c: any, i: number) => (
-                          <div key={i} className="text-[10.5px] leading-snug flex justify-between"><span><b className="text-stone-700">{c.name}</b> <span className="text-stone-400">{c.area}</span></span><span className="text-sky-700 font-bold shrink-0 ml-2">{(c.views ?? 0).toLocaleString()}회</span></div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {(tower.traffic.pageviews30d ?? 0) === 0 && <p className="text-[10px] text-stone-400">아직 페이지뷰 데이터 수집 전 — 배포 후 방문부터 쌓입니다.</p>}
-                </div>
+                </button>
               )}
               <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-stone-500">
                 <span>공개 <b className="text-stone-700">{tower.coverage?.published?.toLocaleString()}</b>/{tower.coverage?.total?.toLocaleString()}</span>
@@ -673,8 +635,9 @@ export default function AdminPage() {
           })()}
         </div>
 
-        {/* ===== 모달 트리거 (구독 카페 현황 · 유튜브 수집 · 내 카페 기록) ===== */}
+        {/* ===== 모달 트리거 (접속·유입 현황 · 구독 카페 현황 · 유튜브 수집 · 내 카페 기록) ===== */}
         <div className="flex gap-2 mb-6 flex-wrap">
+          <button onClick={openAnalytics} className="flex-1 py-2.5 text-[13px] font-bold text-sky-700 bg-sky-50 border border-sky-200 rounded-xl">📊 접속·유입 현황{tower?.traffic?.dau != null ? ` (오늘 ${tower.traffic.dau})` : ""}</button>
           <button onClick={() => setShowSubsModal(true)} className="flex-1 py-2.5 text-[13px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-xl">💳 구독 카페 현황{subscribers.length ? ` (${subscribers.length})` : ""}</button>
           <button onClick={() => { setShowNL(true); loadNL(); }} className="flex-1 py-2.5 text-[13px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-xl">📰 주간 뉴스레터{nlList.length ? ` (${nlList.length})` : ""}</button>
           <button onClick={() => setShowYtModal(true)} className="flex-1 py-2.5 text-[13px] font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded-xl">📺 유튜브 수집{yt?.withYt != null ? ` (${yt.withYt})` : ""}</button>
@@ -796,7 +759,7 @@ export default function AdminPage() {
             <div className="min-h-full flex items-start justify-center p-2 sm:p-4">
               <div className="bg-stone-50 rounded-2xl w-full max-w-3xl shadow-2xl my-2" onClick={(e) => e.stopPropagation()}>
                 <div className="sticky top-0 z-10 bg-white border-b border-stone-200 px-4 py-3 flex items-center justify-between rounded-t-2xl">
-                  <span className="text-[14px] font-extrabold text-stone-800">📈 유입 분석 <span className="text-[11px] font-normal text-stone-400">· 우리 DB 자체 집계 · 최근 30일</span></span>
+                  <span className="text-[14px] font-extrabold text-stone-800">📊 접속·유입 현황 <span className="text-[11px] font-normal text-stone-400">· 우리 DB 자체 집계</span></span>
                   <div className="flex items-center gap-2">
                     <button onClick={() => loadAnalytics(pw)} className="text-[11px] font-bold text-stone-500 border border-stone-200 rounded-full px-2.5 py-1 hover:bg-stone-100">↻ 새로고침</button>
                     <button onClick={() => setShowAnalytics(false)} className="text-stone-400 hover:text-stone-700 text-lg leading-none px-1">✕</button>
@@ -817,8 +780,18 @@ export default function AdminPage() {
                   const dev: Record<string, number> = { mobile: 0, desktop: 0 }; (a.devices || []).forEach((d: any) => { dev[d.dev] = d.n; });
                   const devTotal = dev.mobile + dev.desktop || 1;
                   const noEvents = (a.kpi?.pageviews30d ?? 0) === 0;
+                  const maxVReg = Math.max(1, ...(a.visitorRegions || []).map((r: any) => r.n));
+                  const cs = a.consent || {};
                   return (
                     <div className="p-4 space-y-4">
+                      {/* 🟢 실시간 · 오늘 */}
+                      <div className="bg-white rounded-xl border border-stone-200 p-2.5 flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center gap-1.5">
+                          <span className="relative flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span></span>
+                          <span className="text-[11px] text-stone-600">실시간 접속 <b className="text-emerald-600">{a.realtime?.active5 ?? 0}</b>명 <span className="text-stone-400">(5분) · 30분 {a.realtime?.active30 ?? 0}</span></span>
+                        </div>
+                        <div className="text-[11px] text-stone-600">오늘 방문 <b className="text-sky-700">{a.today?.visitors ?? 0}</b> · 페이지뷰 <b className="text-sky-700">{(a.today?.pageviews ?? 0).toLocaleString()}</b></div>
+                      </div>
                       <div className="grid grid-cols-3 gap-2">
                         {[
                           { l: "월간 방문자", v: a.kpi?.mau, sub: `주간 ${a.kpi?.wau} · 오늘 ${a.kpi?.dau}` },
@@ -906,6 +879,30 @@ export default function AdminPage() {
                               <div className="h-1.5 bg-stone-100 rounded-full overflow-hidden mt-0.5"><div className="h-full bg-violet-300 rounded-full" style={{ width: `${r.views / maxRegion * 100}%` }}></div></div>
                             </div>
                           ))}</div>}
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div className="bg-white rounded-xl border border-stone-200 p-3">
+                          <div className="text-[11px] font-bold text-stone-600 mb-2">방문자 지역 <span className="font-normal text-stone-400">(위치 공유)</span></div>
+                          {(a.visitorRegions || []).length === 0 ? <p className="text-[11px] text-stone-400">위치 공유 데이터 없음</p> : a.visitorRegions.map((r: any, i: number) => (
+                            <div key={i} className="mb-1">
+                              <div className="flex justify-between text-[10.5px]"><span className="text-stone-600">{r.region}</span><span className="text-stone-500">{r.n}</span></div>
+                              <div className="h-1.5 bg-stone-100 rounded-full overflow-hidden mt-0.5"><div className="h-full bg-rose-300 rounded-full" style={{ width: `${r.n / maxVReg * 100}%` }}></div></div>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="bg-white rounded-xl border border-stone-200 p-3">
+                          <div className="text-[11px] font-bold text-stone-600 mb-2">위치 동의 퍼널</div>
+                          {[
+                            { l: "방문(핑)", v: cs.pinged, pct: 100 },
+                            { l: "위치 동의", v: cs.agreed, pct: cs.pinged ? Math.round(cs.agreed / cs.pinged * 100) : 0 },
+                            { l: "위치 공유", v: cs.located, pct: cs.pinged ? Math.round(cs.located / cs.pinged * 100) : 0 },
+                          ].map((s, i) => (
+                            <div key={i} className="mb-1.5">
+                              <div className="flex justify-between text-[10.5px] mb-0.5"><span className="text-stone-600">{s.l}</span><span className="font-bold text-stone-700">{(s.v ?? 0).toLocaleString()} <span className="text-stone-400 font-normal">{s.pct}%</span></span></div>
+                              <div className="h-2 bg-stone-100 rounded-full overflow-hidden"><div className="h-full bg-rose-400 rounded-full" style={{ width: `${s.pct}%` }}></div></div>
+                            </div>
+                          ))}
                         </div>
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
