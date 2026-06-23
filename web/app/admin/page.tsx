@@ -782,33 +782,49 @@ export default function AdminPage() {
                   const noEvents = (a.kpi?.pageviews30d ?? 0) === 0;
                   const maxVReg = Math.max(1, ...(a.visitorRegions || []).map((r: any) => r.n));
                   const cs = a.consent || {};
+                  const newPct = a.kpi?.mau ? Math.round(a.retention?.newcomers / a.kpi.mau * 100) : 0;
+                  const retPct = a.kpi?.mau ? Math.round(a.retention?.returning / a.kpi.mau * 100) : 0;
+                  const mobPct = Math.round(dev.mobile / devTotal * 100);
+                  const srcTotal = (a.sources || []).reduce((t: number, x: any) => t + x.visitors, 0) || 1;
+                  let peakH = -1, peakN = -1; Object.entries(hourMap).forEach(([h, n]) => { if ((n as number) > peakN) { peakN = n as number; peakH = +h; } });
+                  const fSteps = [
+                    { l: "방문", v: f.visitors, pct: 100 },
+                    { l: "카페 상세 조회", v: f.viewedCafe, pct: f.visitors ? Math.round(f.viewedCafe / f.visitors * 100) : 0 },
+                    { l: "여러 카페 탐색", v: f.engaged, pct: f.visitors ? Math.round(f.engaged / f.visitors * 100) : 0 },
+                  ];
                   return (
                     <div className="p-4 space-y-4">
+                      <p className="text-[10.5px] text-stone-500 bg-stone-100/70 rounded-lg px-3 py-2 leading-relaxed">우리 사이트 방문 데이터를 <b className="text-stone-600">외부 도구 없이 직접</b> 모은 현황입니다. 방문자·유입경로·재방문·지역은 지금 정확하고, 페이지 단위(추이·인기카페·시간대)는 최근 도입돼 방문이 쌓이며 채워집니다.</p>
                       {/* 🟢 실시간 · 오늘 */}
-                      <div className="bg-white rounded-xl border border-stone-200 p-2.5 flex items-center justify-between flex-wrap gap-2">
-                        <div className="flex items-center gap-1.5">
-                          <span className="relative flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span></span>
-                          <span className="text-[11px] text-stone-600">실시간 접속 <b className="text-emerald-600">{a.realtime?.active5 ?? 0}</b>명 <span className="text-stone-400">(5분) · 30분 {a.realtime?.active30 ?? 0}</span></span>
+                      <div className="bg-white rounded-xl border border-stone-200 p-3">
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <div className="flex items-center gap-1.5">
+                            <span className="relative flex h-2.5 w-2.5"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span></span>
+                            <span className="text-[12px] font-bold text-stone-700">실시간 <span className="text-emerald-600 text-[16px]">{a.realtime?.active5 ?? 0}</span>명 접속 중</span>
+                          </div>
+                          <div className="text-[11px] text-stone-500">30분 내 {a.realtime?.active30 ?? 0}명 · 오늘 방문 <b className="text-sky-700">{a.today?.visitors ?? 0}</b> · 페이지뷰 <b className="text-sky-700">{(a.today?.pageviews ?? 0).toLocaleString()}</b></div>
                         </div>
-                        <div className="text-[11px] text-stone-600">오늘 방문 <b className="text-sky-700">{a.today?.visitors ?? 0}</b> · 페이지뷰 <b className="text-sky-700">{(a.today?.pageviews ?? 0).toLocaleString()}</b></div>
+                        <p className="text-[9.5px] text-stone-400 mt-1.5">지금 사이트에 머무는 사람(최근 5분 활동)과 오늘 다녀간 수입니다.</p>
                       </div>
                       <div className="grid grid-cols-3 gap-2">
                         {[
-                          { l: "월간 방문자", v: a.kpi?.mau, sub: `주간 ${a.kpi?.wau} · 오늘 ${a.kpi?.dau}` },
-                          { l: "페이지뷰(30일)", v: a.kpi?.pageviews30d, sub: `방문당 ${a.kpi?.mau ? (a.kpi.pageviews30d / a.kpi.mau).toFixed(1) : "-"}회` },
-                          { l: "재방문율", v: `${retRate}%`, sub: `재방문 ${a.retention?.returning} / 신규 ${a.retention?.newcomers}` },
+                          { ic: "👥", l: "월간 방문자", v: a.kpi?.mau, sub: `주간 ${a.kpi?.wau} · 오늘 ${a.kpi?.dau}`, desc: "30일 순방문자(중복 제외)" },
+                          { ic: "📄", l: "페이지뷰", v: a.kpi?.pageviews30d, sub: `방문당 ${a.kpi?.mau ? (a.kpi.pageviews30d / a.kpi.mau).toFixed(1) : "-"}장`, desc: "열어본 화면 총수(30일)" },
+                          { ic: "🔁", l: "재방문율", v: `${retRate}%`, sub: `재방문 ${a.retention?.returning}·신규 ${a.retention?.newcomers}`, desc: "다시 찾은 사람 비율" },
                         ].map((k, i) => (
                           <div key={i} className="bg-white rounded-xl border border-stone-200 p-2.5">
-                            <div className="text-[10px] text-stone-400 font-bold">{k.l}</div>
-                            <div className="text-[20px] font-extrabold text-stone-800 leading-tight">{typeof k.v === "number" ? k.v?.toLocaleString() : k.v}</div>
-                            <div className="text-[9.5px] text-stone-400">{k.sub}</div>
+                            <div className="text-[10px] text-stone-400 font-bold">{k.ic} {k.l}</div>
+                            <div className="text-[22px] font-extrabold text-stone-800 leading-tight">{typeof k.v === "number" ? k.v?.toLocaleString() : k.v}</div>
+                            <div className="text-[9.5px] text-stone-500">{k.sub}</div>
+                            <div className="text-[9px] text-stone-400 mt-0.5 leading-tight">{k.desc}</div>
                           </div>
                         ))}
                       </div>
                       {noEvents && <div className="bg-amber-50 border border-amber-200 rounded-xl p-2.5 text-[11px] text-amber-800">📊 페이지뷰 단위 지표(추이·인기카페·퍼널·시간대)는 방금 추적 시작 — 방문이 쌓이며 채워집니다. 방문자·유입경로·재방문은 지금부터 정확합니다.</div>}
                       {(a.daily || []).length > 0 && (
                         <div className="bg-white rounded-xl border border-stone-200 p-3">
-                          <div className="text-[11px] font-bold text-stone-600 mb-2">일별 방문 추이 (최근 14일)</div>
+                          <div className="text-[12px] font-bold text-stone-700">일별 방문 추이 <span className="font-normal text-stone-400 text-[10px]">최근 14일</span></div>
+                          <p className="text-[9.5px] text-stone-400 mb-2">날짜별 방문자 수 — 늘고 주는 흐름을 봅니다. (막대에 마우스 올리면 상세)</p>
                           <div className="flex items-end gap-1 h-24">
                             {a.daily.map((d: any, i: number) => (
                               <div key={i} className="flex-1 flex flex-col items-center justify-end gap-0.5">
@@ -821,49 +837,57 @@ export default function AdminPage() {
                       )}
                       {f.visitors > 0 && (
                         <div className="bg-white rounded-xl border border-stone-200 p-3">
-                          <div className="text-[11px] font-bold text-stone-600 mb-2">전환 퍼널</div>
-                          {[
-                            { l: "방문", v: f.visitors, pct: 100 },
-                            { l: "카페 상세 조회", v: f.viewedCafe, pct: f.visitors ? Math.round(f.viewedCafe / f.visitors * 100) : 0 },
-                            { l: "여러 카페 탐색(2곳+)", v: f.engaged, pct: f.visitors ? Math.round(f.engaged / f.visitors * 100) : 0 },
-                          ].map((s, i) => (
-                            <div key={i} className="mb-1.5">
-                              <div className="flex justify-between text-[10.5px] mb-0.5"><span className="text-stone-600">{s.l}</span><span className="font-bold text-stone-700">{s.v?.toLocaleString()} <span className="text-stone-400 font-normal">{s.pct}%</span></span></div>
-                              <div className="h-2.5 bg-stone-100 rounded-full overflow-hidden"><div className="h-full bg-emerald-400 rounded-full" style={{ width: `${s.pct}%` }}></div></div>
+                          <div className="text-[12px] font-bold text-stone-700">전환 퍼널</div>
+                          <p className="text-[9.5px] text-stone-400 mb-2">방문 → 카페를 실제로 열어봄 → 여러 곳 비교(몰입). 단계마다 몇 %가 남는지 봅니다.</p>
+                          {fSteps.map((s, i) => (
+                            <div key={i}>
+                              <div className="flex justify-between text-[10.5px] mb-0.5"><span className="text-stone-600">{s.l}</span><span className="font-bold text-stone-700">{s.v?.toLocaleString()}명 <span className="text-emerald-600">{s.pct}%</span></span></div>
+                              <div className="h-3.5 bg-stone-100 rounded-full overflow-hidden"><div className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-full" style={{ width: `${Math.max(s.pct, 3)}%` }}></div></div>
+                              {i < fSteps.length - 1 && <div className="text-[8.5px] text-rose-400 text-center my-0.5">▼ {fSteps[i].pct - fSteps[i + 1].pct}%p 이탈</div>}
                             </div>
                           ))}
                         </div>
                       )}
                       <div className="bg-white rounded-xl border border-stone-200 p-3">
-                        <div className="text-[11px] font-bold text-stone-600 mb-2">유입경로 <span className="font-normal text-stone-400">(방문자 · 평균 재방문)</span></div>
+                        <div className="text-[12px] font-bold text-stone-700">유입경로</div>
+                        <p className="text-[9.5px] text-stone-400 mb-2">어디서 들어왔는지(네이버·구글·직접·공유…). '평균'은 그 경로 방문자의 재방문 횟수 — 높을수록 충성도↑.</p>
                         {(a.sources || []).length === 0 ? <p className="text-[11px] text-stone-400">데이터 없음</p> : a.sources.map((s: any, i: number) => (
                           <div key={i} className="mb-1.5">
-                            <div className="flex justify-between text-[10.5px] mb-0.5"><span className="text-stone-600 font-medium">{s.src}</span><span className="text-stone-500">{s.visitors}명 <span className="text-stone-400">· 평균 {s.avg_visits}회</span></span></div>
+                            <div className="flex justify-between text-[10.5px] mb-0.5"><span className="text-stone-600 font-medium">{s.src === "미상" ? "미상 (추적 도입 전 방문)" : s.src}</span><span className="text-stone-500">{s.visitors}명 <span className="text-stone-400">({Math.round(s.visitors / srcTotal * 100)}%) · 평균 {s.avg_visits}회</span></span></div>
                             <div className="h-2 bg-stone-100 rounded-full overflow-hidden"><div className="h-full bg-sky-400 rounded-full" style={{ width: `${(s.visitors / maxSrc) * 100}%` }}></div></div>
                           </div>
                         ))}
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <div className="bg-white rounded-xl border border-stone-200 p-3">
-                          <div className="text-[11px] font-bold text-stone-600 mb-2">신규 vs 재방문</div>
-                          <div className="flex h-4 rounded-full overflow-hidden bg-stone-100">
-                            <div className="bg-indigo-400" style={{ width: `${a.kpi?.mau ? (a.retention?.newcomers / a.kpi.mau * 100) : 0}%` }}></div>
-                            <div className="bg-amber-400" style={{ width: `${a.kpi?.mau ? (a.retention?.returning / a.kpi.mau * 100) : 0}%` }}></div>
+                          <div className="text-[12px] font-bold text-stone-700">신규 vs 재방문</div>
+                          <p className="text-[9.5px] text-stone-400 mb-2">처음 온 사람 vs 다시 온 사람.</p>
+                          <div className="flex h-5 rounded-full overflow-hidden bg-stone-100 text-[9px] font-bold text-white">
+                            <div className="bg-indigo-400 flex items-center justify-center" style={{ width: `${newPct}%` }}>{newPct >= 14 && `${newPct}%`}</div>
+                            <div className="bg-amber-400 flex items-center justify-center" style={{ width: `${retPct}%` }}>{retPct >= 14 && `${retPct}%`}</div>
                           </div>
-                          <div className="flex justify-between text-[10px] mt-1"><span className="text-indigo-600 font-bold">신규 {a.retention?.newcomers}</span><span className="text-amber-600 font-bold">재방문 {a.retention?.returning}</span></div>
+                          <div className="flex gap-3 text-[10px] mt-1.5">
+                            <span className="flex items-center gap-1 text-stone-500"><span className="w-2 h-2 rounded-full bg-indigo-400 inline-block"></span>신규 <b className="text-stone-700">{a.retention?.newcomers}</b></span>
+                            <span className="flex items-center gap-1 text-stone-500"><span className="w-2 h-2 rounded-full bg-amber-400 inline-block"></span>재방문 <b className="text-stone-700">{a.retention?.returning}</b></span>
+                          </div>
                         </div>
                         <div className="bg-white rounded-xl border border-stone-200 p-3">
-                          <div className="text-[11px] font-bold text-stone-600 mb-2">기기</div>
-                          <div className="flex h-4 rounded-full overflow-hidden bg-stone-100">
-                            <div className="bg-teal-400" style={{ width: `${dev.mobile / devTotal * 100}%` }}></div>
-                            <div className="bg-stone-400" style={{ width: `${dev.desktop / devTotal * 100}%` }}></div>
+                          <div className="text-[12px] font-bold text-stone-700">접속 기기</div>
+                          <p className="text-[9.5px] text-stone-400 mb-2">모바일 vs PC 비율.</p>
+                          <div className="flex h-5 rounded-full overflow-hidden bg-stone-100 text-[9px] font-bold text-white">
+                            <div className="bg-teal-400 flex items-center justify-center" style={{ width: `${mobPct}%` }}>{mobPct >= 14 && `${mobPct}%`}</div>
+                            <div className="bg-stone-400 flex items-center justify-center" style={{ width: `${100 - mobPct}%` }}>{(100 - mobPct) >= 14 && `${100 - mobPct}%`}</div>
                           </div>
-                          <div className="flex justify-between text-[10px] mt-1"><span className="text-teal-600 font-bold">📱 {Math.round(dev.mobile / devTotal * 100)}%</span><span className="text-stone-500 font-bold">💻 {Math.round(dev.desktop / devTotal * 100)}%</span></div>
+                          <div className="flex gap-3 text-[10px] mt-1.5">
+                            <span className="flex items-center gap-1 text-stone-500"><span className="w-2 h-2 rounded-full bg-teal-400 inline-block"></span>📱 모바일 <b className="text-stone-700">{dev.mobile}</b></span>
+                            <span className="flex items-center gap-1 text-stone-500"><span className="w-2 h-2 rounded-full bg-stone-400 inline-block"></span>💻 PC <b className="text-stone-700">{dev.desktop}</b></span>
+                          </div>
                         </div>
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         <div className="bg-white rounded-xl border border-stone-200 p-3">
-                          <div className="text-[11px] font-bold text-stone-600 mb-2">인기 카페 (조회순)</div>
+                          <div className="text-[12px] font-bold text-stone-700">인기 카페 <span className="font-normal text-stone-400 text-[10px]">조회순</span></div>
+                          <p className="text-[9.5px] text-stone-400 mb-2">가장 많이 열어본 카페 — 어떤 곳에 관심이 몰리는지.</p>
                           {(a.topCafes || []).length === 0 ? <p className="text-[11px] text-stone-400">데이터 쌓이는 중</p> : <div className="space-y-1 max-h-56 overflow-y-auto">{a.topCafes.map((c: any, i: number) => (
                             <div key={i} className="text-[10.5px]">
                               <div className="flex justify-between"><span className="text-stone-700 font-medium truncate">{i + 1}. {c.name} <span className="text-stone-400 font-normal">{c.area}</span></span><span className="text-sky-700 font-bold shrink-0 ml-1">{c.views}</span></div>
@@ -872,7 +896,8 @@ export default function AdminPage() {
                           ))}</div>}
                         </div>
                         <div className="bg-white rounded-xl border border-stone-200 p-3">
-                          <div className="text-[11px] font-bold text-stone-600 mb-2">인기 지역 (카페 조회)</div>
+                          <div className="text-[12px] font-bold text-stone-700">인기 지역 <span className="font-normal text-stone-400 text-[10px]">카페 조회 기준</span></div>
+                          <p className="text-[9.5px] text-stone-400 mb-2">조회된 카페가 어느 동네에 몰리는지 — 수요 지도.</p>
                           {(a.topRegions || []).length === 0 ? <p className="text-[11px] text-stone-400">데이터 쌓이는 중</p> : <div className="space-y-1 max-h-56 overflow-y-auto">{a.topRegions.map((r: any, i: number) => (
                             <div key={i} className="text-[10.5px]">
                               <div className="flex justify-between"><span className="text-stone-700 font-medium">{r.area}</span><span className="text-stone-500 shrink-0 ml-1">{r.views}</span></div>
@@ -883,7 +908,8 @@ export default function AdminPage() {
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         <div className="bg-white rounded-xl border border-stone-200 p-3">
-                          <div className="text-[11px] font-bold text-stone-600 mb-2">방문자 지역 <span className="font-normal text-stone-400">(위치 공유)</span></div>
+                          <div className="text-[12px] font-bold text-stone-700">방문자 지역 <span className="font-normal text-stone-400 text-[10px]">위치 공유</span></div>
+                          <p className="text-[9.5px] text-stone-400 mb-2">위치 안내에 동의한 방문자가 어디서 접속하는지.</p>
                           {(a.visitorRegions || []).length === 0 ? <p className="text-[11px] text-stone-400">위치 공유 데이터 없음</p> : a.visitorRegions.map((r: any, i: number) => (
                             <div key={i} className="mb-1">
                               <div className="flex justify-between text-[10.5px]"><span className="text-stone-600">{r.region}</span><span className="text-stone-500">{r.n}</span></div>
@@ -892,7 +918,8 @@ export default function AdminPage() {
                           ))}
                         </div>
                         <div className="bg-white rounded-xl border border-stone-200 p-3">
-                          <div className="text-[11px] font-bold text-stone-600 mb-2">위치 동의 퍼널</div>
+                          <div className="text-[12px] font-bold text-stone-700">위치 동의 퍼널</div>
+                          <p className="text-[9.5px] text-stone-400 mb-2">방문 → 위치 안내 동의 → 실제 위치 공유까지 단계별 비율.</p>
                           {[
                             { l: "방문(핑)", v: cs.pinged, pct: 100 },
                             { l: "위치 동의", v: cs.agreed, pct: cs.pinged ? Math.round(cs.agreed / cs.pinged * 100) : 0 },
@@ -907,7 +934,8 @@ export default function AdminPage() {
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         <div className="bg-white rounded-xl border border-stone-200 p-3">
-                          <div className="text-[11px] font-bold text-stone-600 mb-2">페이지 유형</div>
+                          <div className="text-[12px] font-bold text-stone-700">페이지 유형</div>
+                          <p className="text-[9.5px] text-stone-400 mb-2">어떤 화면(홈·카페상세·지역·취향)을 많이 보는지.</p>
                           {(a.pageBuckets || []).length === 0 ? <p className="text-[11px] text-stone-400">데이터 쌓이는 중</p> : a.pageBuckets.map((b: any, i: number) => (
                             <div key={i} className="mb-1">
                               <div className="flex justify-between text-[10.5px]"><span className="text-stone-600">{b.bucket}</span><span className="text-stone-500">{b.views.toLocaleString()}</span></div>
@@ -916,11 +944,12 @@ export default function AdminPage() {
                           ))}
                         </div>
                         <div className="bg-white rounded-xl border border-stone-200 p-3">
-                          <div className="text-[11px] font-bold text-stone-600 mb-2">시간대 (KST)</div>
+                          <div className="text-[12px] font-bold text-stone-700">시간대 분포 <span className="font-normal text-stone-400 text-[10px]">KST</span></div>
+                          <p className="text-[9.5px] text-stone-400 mb-2">하루 중 사람이 몰리는 시간{peakH >= 0 ? <> — <b className="text-orange-500">피크 {peakH}시</b></> : ""}. 콘텐츠 발행 타이밍 참고.</p>
                           {(a.hours || []).length === 0 ? <p className="text-[11px] text-stone-400">데이터 쌓이는 중</p> : <div className="flex items-end gap-px h-16">{Array.from({ length: 24 }).map((_, h) => (
-                            <div key={h} className="flex-1 bg-orange-300 rounded-t" style={{ height: `${((hourMap[h] || 0) / maxHour) * 100}%`, minHeight: "1px" }} title={`${h}시: ${hourMap[h] || 0}`}></div>
+                            <div key={h} className={`flex-1 rounded-t ${h === peakH ? "bg-orange-500" : "bg-orange-300"}`} style={{ height: `${((hourMap[h] || 0) / maxHour) * 100}%`, minHeight: "1px" }} title={`${h}시: ${hourMap[h] || 0}회`}></div>
                           ))}</div>}
-                          <div className="flex justify-between text-[8px] text-stone-300 mt-0.5"><span>0시</span><span>12시</span><span>23시</span></div>
+                          <div className="flex justify-between text-[8px] text-stone-300 mt-0.5"><span>0시</span><span>6시</span><span>12시</span><span>18시</span><span>23시</span></div>
                         </div>
                       </div>
                       <p className="text-[9.5px] text-stone-400 text-center pt-1">전부 우리 DB 자체 집계 · 외부(네이버·구글) 의존 0 · 갱신 {new Date(a.generatedAt).toLocaleTimeString("ko-KR")}</p>
