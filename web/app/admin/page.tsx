@@ -51,6 +51,10 @@ export default function AdminPage() {
   const [selAgent, setSelAgent] = useState<any>(null);
   const [todayDetail, setTodayDetail] = useState<any>(null); // 오늘의 수집 카드 클릭 → 상세 목록 모달
   const [towerFull, setTowerFull] = useState(false);
+  const [showAnalytics, setShowAnalytics] = useState(false);
+  const [analytics, setAnalytics] = useState<any>(null);
+  const loadAnalytics = (password: string) => { setAnalytics(null); fetch("/api/admin/analytics", { headers: { "x-admin-password": password }, cache: "no-store" }).then((x) => x.json()).then((d) => { if (d.ok) setAnalytics(d); }).catch(() => {}); };
+  const openAnalytics = () => { setShowAnalytics(true); loadAnalytics(pw); };
   const [subscribers, setSubscribers] = useState<any[]>([]);
   const [showSubsModal, setShowSubsModal] = useState(false);
   // 📰 뉴스레터
@@ -359,7 +363,10 @@ export default function AdminPage() {
               {/* 📈 유입 분석 — 네이버·구글 없이 우리 DB(user_consents·traffic_events)로 자체 집계 */}
               {tower.traffic && (
                 <div className="mb-2.5 rounded-xl border border-sky-200 bg-sky-50/50 p-2.5">
-                  <div className="text-[11px] font-bold mb-1.5 text-stone-700">📈 유입 분석 <span className="font-normal text-stone-400">· 우리 DB 자체 집계 · 최근 30일</span></div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[11px] font-bold text-stone-700">📈 유입 분석 <span className="font-normal text-stone-400">· 우리 DB · 최근 30일</span></span>
+                    <button onClick={openAnalytics} className="text-[11px] font-bold text-sky-700 bg-white border border-sky-200 rounded-full px-2.5 py-0.5 hover:bg-sky-100 transition shrink-0">전체 분석 보기 →</button>
+                  </div>
                   <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10.5px] text-stone-600 mb-2">
                     <span>오늘 <b className="text-sky-700">{tower.traffic.dau}</b></span>
                     <span>주간 <b className="text-sky-700">{tower.traffic.wau}</b></span>
@@ -779,6 +786,151 @@ export default function AdminPage() {
             </div>
             ) : <p className="text-[13px] text-stone-400 py-3 text-center">구독 회원이 아직 없어요.</p>}
             <p className="text-[10px] text-stone-400 mt-2">활성화 시 우선노출 자동 ON·만료/해지 시 OFF. 연락처는 암호화 저장.</p>
+            </div>
+          </div>
+        )}
+
+        {/* 📈 유입 분석 전체화면 */}
+        {showAnalytics && (
+          <div className="fixed inset-0 z-[6000] bg-black/50 overflow-y-auto" onClick={() => setShowAnalytics(false)}>
+            <div className="min-h-full flex items-start justify-center p-2 sm:p-4">
+              <div className="bg-stone-50 rounded-2xl w-full max-w-3xl shadow-2xl my-2" onClick={(e) => e.stopPropagation()}>
+                <div className="sticky top-0 z-10 bg-white border-b border-stone-200 px-4 py-3 flex items-center justify-between rounded-t-2xl">
+                  <span className="text-[14px] font-extrabold text-stone-800">📈 유입 분석 <span className="text-[11px] font-normal text-stone-400">· 우리 DB 자체 집계 · 최근 30일</span></span>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => loadAnalytics(pw)} className="text-[11px] font-bold text-stone-500 border border-stone-200 rounded-full px-2.5 py-1 hover:bg-stone-100">↻ 새로고침</button>
+                    <button onClick={() => setShowAnalytics(false)} className="text-stone-400 hover:text-stone-700 text-lg leading-none px-1">✕</button>
+                  </div>
+                </div>
+                {!analytics ? (
+                  <div className="p-10 text-center text-stone-400 text-[13px]">불러오는 중…</div>
+                ) : (() => {
+                  const a = analytics; const f = a.funnel || {};
+                  const retRate = a.kpi?.mau ? Math.round((a.retention?.returning / a.kpi.mau) * 100) : 0;
+                  const maxDaily = Math.max(1, ...(a.daily || []).map((d: any) => d.visitors));
+                  const maxSrc = Math.max(1, ...(a.sources || []).map((s: any) => s.visitors));
+                  const maxRegion = Math.max(1, ...(a.topRegions || []).map((r: any) => r.views));
+                  const maxCafe = Math.max(1, ...(a.topCafes || []).map((c: any) => c.views));
+                  const maxBucket = Math.max(1, ...(a.pageBuckets || []).map((b: any) => b.views));
+                  const maxHour = Math.max(1, ...(a.hours || []).map((h: any) => h.n));
+                  const hourMap: Record<number, number> = {}; (a.hours || []).forEach((h: any) => { hourMap[h.h] = h.n; });
+                  const dev: Record<string, number> = { mobile: 0, desktop: 0 }; (a.devices || []).forEach((d: any) => { dev[d.dev] = d.n; });
+                  const devTotal = dev.mobile + dev.desktop || 1;
+                  const noEvents = (a.kpi?.pageviews30d ?? 0) === 0;
+                  return (
+                    <div className="p-4 space-y-4">
+                      <div className="grid grid-cols-3 gap-2">
+                        {[
+                          { l: "월간 방문자", v: a.kpi?.mau, sub: `주간 ${a.kpi?.wau} · 오늘 ${a.kpi?.dau}` },
+                          { l: "페이지뷰(30일)", v: a.kpi?.pageviews30d, sub: `방문당 ${a.kpi?.mau ? (a.kpi.pageviews30d / a.kpi.mau).toFixed(1) : "-"}회` },
+                          { l: "재방문율", v: `${retRate}%`, sub: `재방문 ${a.retention?.returning} / 신규 ${a.retention?.newcomers}` },
+                        ].map((k, i) => (
+                          <div key={i} className="bg-white rounded-xl border border-stone-200 p-2.5">
+                            <div className="text-[10px] text-stone-400 font-bold">{k.l}</div>
+                            <div className="text-[20px] font-extrabold text-stone-800 leading-tight">{typeof k.v === "number" ? k.v?.toLocaleString() : k.v}</div>
+                            <div className="text-[9.5px] text-stone-400">{k.sub}</div>
+                          </div>
+                        ))}
+                      </div>
+                      {noEvents && <div className="bg-amber-50 border border-amber-200 rounded-xl p-2.5 text-[11px] text-amber-800">📊 페이지뷰 단위 지표(추이·인기카페·퍼널·시간대)는 방금 추적 시작 — 방문이 쌓이며 채워집니다. 방문자·유입경로·재방문은 지금부터 정확합니다.</div>}
+                      {(a.daily || []).length > 0 && (
+                        <div className="bg-white rounded-xl border border-stone-200 p-3">
+                          <div className="text-[11px] font-bold text-stone-600 mb-2">일별 방문 추이 (최근 14일)</div>
+                          <div className="flex items-end gap-1 h-24">
+                            {a.daily.map((d: any, i: number) => (
+                              <div key={i} className="flex-1 flex flex-col items-center justify-end gap-0.5">
+                                <div className="w-full bg-sky-400 rounded-t" style={{ height: `${(d.visitors / maxDaily) * 100}%`, minHeight: "2px" }} title={`${d.day}: 방문 ${d.visitors}·뷰 ${d.pageviews}`}></div>
+                                <span className="text-[7px] text-stone-400">{d.day.slice(3)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {f.visitors > 0 && (
+                        <div className="bg-white rounded-xl border border-stone-200 p-3">
+                          <div className="text-[11px] font-bold text-stone-600 mb-2">전환 퍼널</div>
+                          {[
+                            { l: "방문", v: f.visitors, pct: 100 },
+                            { l: "카페 상세 조회", v: f.viewedCafe, pct: f.visitors ? Math.round(f.viewedCafe / f.visitors * 100) : 0 },
+                            { l: "여러 카페 탐색(2곳+)", v: f.engaged, pct: f.visitors ? Math.round(f.engaged / f.visitors * 100) : 0 },
+                          ].map((s, i) => (
+                            <div key={i} className="mb-1.5">
+                              <div className="flex justify-between text-[10.5px] mb-0.5"><span className="text-stone-600">{s.l}</span><span className="font-bold text-stone-700">{s.v?.toLocaleString()} <span className="text-stone-400 font-normal">{s.pct}%</span></span></div>
+                              <div className="h-2.5 bg-stone-100 rounded-full overflow-hidden"><div className="h-full bg-emerald-400 rounded-full" style={{ width: `${s.pct}%` }}></div></div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <div className="bg-white rounded-xl border border-stone-200 p-3">
+                        <div className="text-[11px] font-bold text-stone-600 mb-2">유입경로 <span className="font-normal text-stone-400">(방문자 · 평균 재방문)</span></div>
+                        {(a.sources || []).length === 0 ? <p className="text-[11px] text-stone-400">데이터 없음</p> : a.sources.map((s: any, i: number) => (
+                          <div key={i} className="mb-1.5">
+                            <div className="flex justify-between text-[10.5px] mb-0.5"><span className="text-stone-600 font-medium">{s.src}</span><span className="text-stone-500">{s.visitors}명 <span className="text-stone-400">· 평균 {s.avg_visits}회</span></span></div>
+                            <div className="h-2 bg-stone-100 rounded-full overflow-hidden"><div className="h-full bg-sky-400 rounded-full" style={{ width: `${(s.visitors / maxSrc) * 100}%` }}></div></div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="bg-white rounded-xl border border-stone-200 p-3">
+                          <div className="text-[11px] font-bold text-stone-600 mb-2">신규 vs 재방문</div>
+                          <div className="flex h-4 rounded-full overflow-hidden bg-stone-100">
+                            <div className="bg-indigo-400" style={{ width: `${a.kpi?.mau ? (a.retention?.newcomers / a.kpi.mau * 100) : 0}%` }}></div>
+                            <div className="bg-amber-400" style={{ width: `${a.kpi?.mau ? (a.retention?.returning / a.kpi.mau * 100) : 0}%` }}></div>
+                          </div>
+                          <div className="flex justify-between text-[10px] mt-1"><span className="text-indigo-600 font-bold">신규 {a.retention?.newcomers}</span><span className="text-amber-600 font-bold">재방문 {a.retention?.returning}</span></div>
+                        </div>
+                        <div className="bg-white rounded-xl border border-stone-200 p-3">
+                          <div className="text-[11px] font-bold text-stone-600 mb-2">기기</div>
+                          <div className="flex h-4 rounded-full overflow-hidden bg-stone-100">
+                            <div className="bg-teal-400" style={{ width: `${dev.mobile / devTotal * 100}%` }}></div>
+                            <div className="bg-stone-400" style={{ width: `${dev.desktop / devTotal * 100}%` }}></div>
+                          </div>
+                          <div className="flex justify-between text-[10px] mt-1"><span className="text-teal-600 font-bold">📱 {Math.round(dev.mobile / devTotal * 100)}%</span><span className="text-stone-500 font-bold">💻 {Math.round(dev.desktop / devTotal * 100)}%</span></div>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div className="bg-white rounded-xl border border-stone-200 p-3">
+                          <div className="text-[11px] font-bold text-stone-600 mb-2">인기 카페 (조회순)</div>
+                          {(a.topCafes || []).length === 0 ? <p className="text-[11px] text-stone-400">데이터 쌓이는 중</p> : <div className="space-y-1 max-h-56 overflow-y-auto">{a.topCafes.map((c: any, i: number) => (
+                            <div key={i} className="text-[10.5px]">
+                              <div className="flex justify-between"><span className="text-stone-700 font-medium truncate">{i + 1}. {c.name} <span className="text-stone-400 font-normal">{c.area}</span></span><span className="text-sky-700 font-bold shrink-0 ml-1">{c.views}</span></div>
+                              <div className="h-1.5 bg-stone-100 rounded-full overflow-hidden mt-0.5"><div className="h-full bg-sky-300 rounded-full" style={{ width: `${c.views / maxCafe * 100}%` }}></div></div>
+                            </div>
+                          ))}</div>}
+                        </div>
+                        <div className="bg-white rounded-xl border border-stone-200 p-3">
+                          <div className="text-[11px] font-bold text-stone-600 mb-2">인기 지역 (카페 조회)</div>
+                          {(a.topRegions || []).length === 0 ? <p className="text-[11px] text-stone-400">데이터 쌓이는 중</p> : <div className="space-y-1 max-h-56 overflow-y-auto">{a.topRegions.map((r: any, i: number) => (
+                            <div key={i} className="text-[10.5px]">
+                              <div className="flex justify-between"><span className="text-stone-700 font-medium">{r.area}</span><span className="text-stone-500 shrink-0 ml-1">{r.views}</span></div>
+                              <div className="h-1.5 bg-stone-100 rounded-full overflow-hidden mt-0.5"><div className="h-full bg-violet-300 rounded-full" style={{ width: `${r.views / maxRegion * 100}%` }}></div></div>
+                            </div>
+                          ))}</div>}
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div className="bg-white rounded-xl border border-stone-200 p-3">
+                          <div className="text-[11px] font-bold text-stone-600 mb-2">페이지 유형</div>
+                          {(a.pageBuckets || []).length === 0 ? <p className="text-[11px] text-stone-400">데이터 쌓이는 중</p> : a.pageBuckets.map((b: any, i: number) => (
+                            <div key={i} className="mb-1">
+                              <div className="flex justify-between text-[10.5px]"><span className="text-stone-600">{b.bucket}</span><span className="text-stone-500">{b.views.toLocaleString()}</span></div>
+                              <div className="h-1.5 bg-stone-100 rounded-full overflow-hidden mt-0.5"><div className="h-full bg-stone-400 rounded-full" style={{ width: `${b.views / maxBucket * 100}%` }}></div></div>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="bg-white rounded-xl border border-stone-200 p-3">
+                          <div className="text-[11px] font-bold text-stone-600 mb-2">시간대 (KST)</div>
+                          {(a.hours || []).length === 0 ? <p className="text-[11px] text-stone-400">데이터 쌓이는 중</p> : <div className="flex items-end gap-px h-16">{Array.from({ length: 24 }).map((_, h) => (
+                            <div key={h} className="flex-1 bg-orange-300 rounded-t" style={{ height: `${((hourMap[h] || 0) / maxHour) * 100}%`, minHeight: "1px" }} title={`${h}시: ${hourMap[h] || 0}`}></div>
+                          ))}</div>}
+                          <div className="flex justify-between text-[8px] text-stone-300 mt-0.5"><span>0시</span><span>12시</span><span>23시</span></div>
+                        </div>
+                      </div>
+                      <p className="text-[9.5px] text-stone-400 text-center pt-1">전부 우리 DB 자체 집계 · 외부(네이버·구글) 의존 0 · 갱신 {new Date(a.generatedAt).toLocaleTimeString("ko-KR")}</p>
+                    </div>
+                  );
+                })()}
+              </div>
             </div>
           </div>
         )}
