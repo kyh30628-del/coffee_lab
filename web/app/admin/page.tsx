@@ -55,6 +55,9 @@ export default function AdminPage() {
   const [analytics, setAnalytics] = useState<any>(null);
   const loadAnalytics = (password: string) => { setAnalytics(null); fetch("/api/admin/analytics", { headers: { "x-admin-password": password }, cache: "no-store" }).then((x) => x.json()).then((d) => { if (d.ok) setAnalytics(d); }).catch(() => {}); };
   const openAnalytics = () => { setShowAnalytics(true); loadAnalytics(pw); };
+  const [showBorderline, setShowBorderline] = useState(false);
+  const [blData, setBlData] = useState<any>(null);
+  const loadBorderline = (password: string) => fetch("/api/admin/borderline", { headers: { "x-admin-password": password }, cache: "no-store" }).then((x) => x.json()).then((d) => { if (d.ok) setBlData(d); }).catch(() => {});
   const [subscribers, setSubscribers] = useState<any[]>([]);
   const [showSubsModal, setShowSubsModal] = useState(false);
   // 📰 뉴스레터
@@ -96,6 +99,7 @@ export default function AdminPage() {
     fetch("/api/sub-request", h).then((x) => x.json()).then((d) => { if (d.ok) { setSubs(d.requests ?? []); setPurged(d.purgedRecently ?? 0); } }).catch(() => {});
     fetch("/api/yt-report", h).then((x) => x.json()).then((d) => { if (d.ok) setYt(d); }).catch(() => {});
     fetch("/api/cron-verify?latest=1", h).then((x) => x.json()).then((d) => { if (d.ok) { setVerify(d.report); setGrounding(d.grounding); } }).catch(() => {});
+    loadBorderline(password);
   };
   // 🧮 전 지표 자동 갱신(15초) — 백그라운드 작업이 실시간 반영(새로고침 불필요)
   useEffect(() => {
@@ -373,6 +377,16 @@ export default function AdminPage() {
                     <span>월간 <b className="text-sky-700">{tower.traffic.mau}</b></span>
                     <span>재방문 <b className="text-stone-700">{tower.traffic.retention?.returning ?? 0}</b></span>
                   </div>
+                </button>
+              )}
+              {/* 🤖 LLM 보강 대기 — 경계후기는 노출서 제외(소비자 신뢰 유지), LLM 판정 후 확인분만 보강 */}
+              {blData?.summary?.cafes > 0 && (
+                <button onClick={() => setShowBorderline(true)} className="w-full mb-2.5 rounded-xl border border-violet-200 bg-violet-50/60 p-2.5 text-left hover:bg-violet-100/70 transition">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-stone-700">🤖 LLM 보강 대기 <span className="font-normal text-stone-400">· 경계후기는 노출서 제외(신뢰 유지)</span></span>
+                    <span className="text-[11px] font-bold text-violet-700">목록 →</span>
+                  </div>
+                  <div className="text-[10.5px] text-stone-600 mt-0.5">카페 <b className="text-violet-700">{blData.summary.cafes.toLocaleString()}</b>곳 · 대기 경계후기 <b className="text-violet-700">{blData.summary.reviews.toLocaleString()}</b>건 <span className="text-stone-400">— 크레딧 복구 시 LLM 평가·확인분만 보강</span></div>
                 </button>
               )}
               <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-stone-500">
@@ -749,6 +763,34 @@ export default function AdminPage() {
             </div>
             ) : <p className="text-[13px] text-stone-400 py-3 text-center">구독 회원이 아직 없어요.</p>}
             <p className="text-[10px] text-stone-400 mt-2">활성화 시 우선노출 자동 ON·만료/해지 시 OFF. 연락처는 암호화 저장.</p>
+            </div>
+          </div>
+        )}
+
+        {/* 🤖 LLM 보강 대기 목록 */}
+        {showBorderline && (
+          <div className="fixed inset-0 z-[6000] bg-black/50 overflow-y-auto" onClick={() => setShowBorderline(false)}>
+            <div className="min-h-full flex items-start justify-center p-2 sm:p-4">
+              <div className="bg-stone-50 rounded-2xl w-full max-w-2xl shadow-2xl my-2" onClick={(e) => e.stopPropagation()}>
+                <div className="sticky top-0 z-10 bg-white border-b border-stone-200 px-4 py-3 flex items-center justify-between rounded-t-2xl">
+                  <span className="text-[14px] font-extrabold text-stone-800">🤖 LLM 보강 대기 <span className="text-[11px] font-normal text-stone-400">· 노출엔 경계후기 제외됨</span></span>
+                  <button onClick={() => setShowBorderline(false)} className="text-stone-400 hover:text-stone-700 text-lg leading-none px-1">✕</button>
+                </div>
+                <div className="p-4">
+                  <p className="text-[11px] text-stone-500 bg-stone-100 rounded-lg px-3 py-2 mb-3 leading-relaxed">아래 카페는 <b className="text-stone-600">깨끗한 후기만 노출 중</b>이고(소비자 신뢰 유지), 추가로 발견된 '경계후기'(같은 이름 딴 지점·업종 모호 등)는 <b className="text-stone-600">화면에서 빠진 채</b> LLM 판정을 기다립니다. 크레딧 복구 시 LLM이 평가해 <b className="text-stone-600">진짜로 확인된 것만</b> 노출에 보강됩니다. (숫자: 노출 / 경계대기)</p>
+                  {!blData?.list?.length ? <p className="text-center text-stone-400 py-8 text-[13px]">보강 대기 카페가 없습니다.</p> : (
+                    <div className="space-y-1">
+                      {blData.list.map((c: any) => (
+                        <div key={c.id} className="flex items-center justify-between bg-white rounded-lg border border-stone-200 px-2.5 py-1.5">
+                          <span className="text-[11px] text-stone-700 truncate mr-2"><b>{c.name}</b> <span className="text-stone-400 font-normal">{c.area}</span> <span className="text-[9px] text-stone-400">{c.synth_grade}</span></span>
+                          <span className="text-[10.5px] shrink-0 whitespace-nowrap"><b className="text-emerald-600">{c.shown}</b> <span className="text-stone-300">/</span> <b className="text-violet-600">{c.borderline}</b></span>
+                        </div>
+                      ))}
+                      {blData.list.length >= 200 && <p className="text-[10px] text-stone-400 text-center pt-1">상위 200곳 표시 (경계후기 많은 순)</p>}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         )}
