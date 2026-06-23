@@ -175,12 +175,11 @@ export async function GET(req: NextRequest) {
     // 그라운딩은 결정론적 규칙으로 대체됨 — '감사 대기' 백로그는 안 줄어드는 무의미 숫자라 notice에서 제외.
     // 🛡️ 리뷰-카페 불일치(규칙-사각 오염) — 표시 리뷰에 카페 맥락어가 없는 비율↑ = 딴 업종·문구이름 오염 의심.
     //   그라운딩(LLM)이 못 보던 사각지대를 결정론적으로 상시 감시. 소비자 노출이라 임계 넘으면 위험.
+    // ⚠️ PROXY(맥락어 없음)라 진짜 카페(찻집·북카페·시적이름)도 오탐됨 → '위험(빨강)' 금지, 항상 '주의'(점검 권장 목록).
+    //   사람이 목록 보고 진짜 오염만 비공개. 헛경보(red) 방지가 핵심.
     const offctx = (await sql`SELECT COUNT(*)::int n FROM cafes WHERE published AND offctx_rate >= 0.55`.catch(() => [{ n: 0 }]))[0] as any;
-    const offctxSuspects = (await sql`SELECT name, area, round(offctx_rate::numeric, 2) AS rate FROM cafes WHERE published AND offctx_rate >= 0.55 ORDER BY offctx_rate DESC LIMIT 20`.catch(() => [])) as any[];
-    if (offctx.n > 0) {
-      if (offctx.n >= Math.max(20, Math.round(PUB * 0.004))) risks.push(`리뷰-카페 불일치 의심 ${offctx.n}곳 — 표시 리뷰에 카페 맥락 없음(딴 업종·오염 의심), 점검 필요`);
-      else notices.push(`리뷰 맥락 의심 ${offctx.n}곳(점검 권장)`);
-    }
+    const offctxSuspects = (await sql`SELECT name, area, round(offctx_rate::numeric, 2) AS rate FROM cafes WHERE published AND offctx_rate >= 0.55 ORDER BY offctx_rate DESC LIMIT 30`.catch(() => [])) as any[];
+    if (offctx.n > 0) notices.push(`리뷰 맥락 의심 ${offctx.n}곳(점검 권장 — 일부 진짜 카페 포함될 수 있음)`);
 
     // 파이프라인 진행 상황(신규 카페 조립라인)
     const pl = (await sql`SELECT
