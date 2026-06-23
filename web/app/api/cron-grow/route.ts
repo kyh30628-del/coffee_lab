@@ -21,18 +21,20 @@ export async function GET(req: NextRequest) {
     // 지역 시드(최초 1회)
     for (const r of METRO_REGIONS) await sql`INSERT INTO discovery_state (region, area_label) VALUES (${r.region}, ${r.areaLabel}) ON CONFLICT (region) DO NOTHING`;
 
-    // ① 가장 오래된 지역부터 '시간 예산(260초) 내에서 여러 곳' 발굴 — 매일 네이버 한도를 실제로 활용해
-    //    미발굴 지역(수십 곳)을 빠르게 순회한다. maxDuration=300초 기준, 마이닝·합성 여유 40초 확보.
+    // ① 가장 오래된 지역부터 '시간 예산(260초)' 내 공격적 발굴 — sort=comment+random 2패스 + 동/도로
+    //    지리 세분화로 검색 창을 최대화(프랜차이즈에 묻힌 리뷰 많은 동네카페 발굴력↑). 호출량이 커서
+    //    1회차당 1~2지역만 깊게 훑고(셔플로 매번 다른 영역 커버), deadline으로 함수시간 내 안전 중단.
+    //    maxDuration=300초 기준, 마이닝·합성 여유 40초 확보.
     const GROW_BUDGET_MS = 260_000;
     const t0 = Date.now();
-    const discoveries: { region: string; found?: number; inserted?: number; error?: string }[] = [];
+    const discoveries: { region: string; found?: number; inserted?: number; stopped?: boolean; error?: string }[] = [];
     while (Date.now() - t0 < GROW_BUDGET_MS) {
       const target = (await sql`SELECT region, area_label FROM discovery_state ORDER BY last_run ASC NULLS FIRST LIMIT 1`)[0] as { region: string; area_label: string } | undefined;
       if (!target) break;
       try {
-        const d = await discoverRegion(target.region, target.area_label ?? target.region);
+        const d = await discoverRegion(target.region, target.area_label ?? target.region, undefined, { deadlineMs: t0 + GROW_BUDGET_MS, sorts: ["comment", "random"] });
         await sql`UPDATE discovery_state SET last_run=now(), last_found=${d.found}, last_inserted=${d.inserted} WHERE region=${target.region}`;
-        discoveries.push({ region: d.region, found: d.found, inserted: d.inserted });
+        discoveries.push({ region: d.region, found: d.found, inserted: d.inserted, stopped: d.stopped });
       } catch (e) {
         await sql`UPDATE discovery_state SET last_run=now() WHERE region=${target.region}`; // 실패해도 last_run 갱신(무한루프·재시도 폭주 방지)
         discoveries.push({ region: target.region, error: String(e).slice(0, 60) });

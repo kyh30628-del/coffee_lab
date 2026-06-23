@@ -174,8 +174,8 @@ export const isNonCafe = (name: string, category: string) => {
   return false;
 };
 
-async function localSearch(query: string) {
-  const url = `https://openapi.naver.com/v1/search/local.json?query=${encodeURIComponent(query)}&display=5&sort=comment`;
+async function localSearch(query: string, sort: "comment" | "random" = "comment") {
+  const url = `https://openapi.naver.com/v1/search/local.json?query=${encodeURIComponent(query)}&display=5&sort=${sort}`;
   const res = await fetch(url, { headers: { "X-Naver-Client-Id": ID!, "X-Naver-Client-Secret": SECRET! } });
   if (!res.ok) return [];
   const data = await res.json();
@@ -190,13 +190,19 @@ async function localSearch(query: string) {
 }
 
 // 한 지역 발굴: region=검색용(예 '서울 강동구'), areaLabel=저장용(예 '강동구')
-export async function discoverRegion(region: string, areaLabel: string, keywords: string[] = DISCOVER_KEYWORDS) {
+// 공격적 커버리지: sort=comment+random 2패스 + 동/도로 지리 세분화로 '검색 창'을 최대화 →
+//   프랜차이즈에 묻힌 리뷰 많은 동네카페를 더 건진다(쿼리당 5캡은 못 넘으니 창 다각화가 유일한 길).
+//   deadlineMs로 함수시간 내 안전 중단 + 작업 셔플 → 부분 실행이어도 매 회차 다른 영역을 커버.
+export async function discoverRegion(region: string, areaLabel: string, keywords: string[] = DISCOVER_KEYWORDS, opts: { deadlineMs?: number; sorts?: ("comment" | "random")[] } = {}) {
   if (!ID || !SECRET) throw new Error("네이버 키 미설정");
+  const sorts = opts.sorts ?? ["comment"];
+  const deadline = opts.deadlineMs ?? Infinity;
   const storeArea = areaLabel || region;
   const seen = new Set<string>();
   const found: any[] = [];
-  const collect = async (query: string) => {
-    const items = await localSearch(query);
+  let stopped = false;
+  const collect = async (query: string, sort: "comment" | "random") => {
+    const items = await localSearch(query, sort);
     for (const it of items) {
       if (!it.name || !it.lat || !it.lng) continue;
       if (isFranchise(it.name) || isNonCafe(it.name, it.category)) continue;
@@ -208,13 +214,36 @@ export async function discoverRegion(region: string, areaLabel: string, keywords
     await new Promise((r) => setTimeout(r, 220));
   };
 
-  // ① 동(洞) 단위 정밀 발굴 — 동네 독립카페 롱테일(구 단위는 인기 상위 5곳만 나옴). 서울만 동 목록 보유.
   const gu = region.split(" ").pop() ?? region;
   const dongs = DONGS[gu] ?? [];
-  for (const dong of dongs) for (const kw of DONG_KEYWORDS) await collect(`${gu} ${dong} ${kw}`);
 
-  // ② 구 단위 광역 발굴 — 동 목록이 없는 경기·인천, 그리고 서울 보완.
-  for (const kw of keywords) await collect(`${region} ${kw}`);
+  // ── 검색 작업 풀: (지리단위 × 키워드 × sort). 셔플 후 deadline까지 처리.
+  const tasks: { q: string; sort: "comment" | "random" }[] = [];
+  for (const sort of sorts) {
+    // ① 동(洞) 단위 정밀 발굴(서울만 동 목록 보유) ② 구 단위 광역(경기·인천 + 서울 보완)
+    for (const dong of dongs) for (const kw of DONG_KEYWORDS) tasks.push({ q: `${gu} ${dong} ${kw}`, sort });
+    for (const kw of keywords) tasks.push({ q: `${region} ${kw}`, sort });
+  }
+  // ③ 지리 세분화 — 이미 보유한 카페 주소에서 도로명 추출 → 도로 단위로 더 잘게(상위5 창 증가).
+  try {
+    const addrRows = (await sql`SELECT address FROM cafes WHERE area = ${storeArea} AND address IS NOT NULL`) as unknown as { address: string }[];
+    const roadFreq = new Map<string, number>();
+    for (const r of addrRows) {
+      const m = (r.address || "").match(/([가-힣A-Za-z0-9]+(?:대로|로|길))\s*\d/);
+      if (m) roadFreq.set(m[1], (roadFreq.get(m[1]) ?? 0) + 1);
+    }
+    const roads = [...roadFreq.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12).map(([r]) => r);
+    const CORE = ["카페", "로스터리", "디저트", "베이커리", "브런치", "도넛"];
+    for (const sort of sorts) for (const road of roads) for (const kw of CORE) tasks.push({ q: `${road} ${kw}`, sort });
+  } catch { /* 주소 없으면 도로 세분화 생략 */ }
+
+  // 셔플(Fisher–Yates) — 부분 실행 시 특정 동·키워드에 편중되지 않게.
+  for (let i = tasks.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [tasks[i], tasks[j]] = [tasks[j], tasks[i]]; }
+
+  for (const t of tasks) {
+    if (Date.now() > deadline) { stopped = true; break; }
+    await collect(t.q, t.sort);
+  }
 
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS pipeline_status TEXT`.catch(() => {});
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS dong TEXT`.catch(() => {});
@@ -236,5 +265,5 @@ export async function discoverRegion(region: string, areaLabel: string, keywords
       ON CONFLICT (place_id) DO NOTHING`;
     inserted++;
   }
-  return { region, found: found.length, inserted, skipped, backfilled, names: found.map((f) => f.name) };
+  return { region, found: found.length, inserted, skipped, backfilled, stopped, tasks: tasks.length, names: found.map((f) => f.name) };
 }
