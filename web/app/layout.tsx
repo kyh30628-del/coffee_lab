@@ -1,5 +1,8 @@
 import type { Metadata, Viewport } from "next";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
+import VisitPing from "./VisitPing";
+import NaverAnalytics from "./NaverAnalytics";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://dongnecoffeenote.com"),
@@ -45,7 +48,12 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" />
       </head>
-      <body className="min-h-full">{children}</body>
+      <body className="min-h-full">
+        {children}
+        <VisitPing />
+        <Analytics />
+        <NaverAnalytics />
+      </body>
     </html>
   );
 }

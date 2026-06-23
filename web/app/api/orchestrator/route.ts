@@ -182,6 +182,27 @@ export async function GET(req: NextRequest) {
     const offctxSuspects = (await sql`SELECT name, area, round(offctx_rate::numeric, 2) AS rate FROM cafes WHERE published AND offctx_rate >= 0.55 AND NOT COALESCE(offctx_ok, false) ORDER BY offctx_rate DESC LIMIT 30`.catch(() => [])) as any[];
     if (offctx.n > 0) notices.push(`리뷰 맥락 의심 ${offctx.n}곳(점검 권장 — 일부 진짜 카페 포함될 수 있음)`);
 
+    // 📊 유입(트래픽) — 깜깜이 탈출. user_consents(익명 방문핑) 기반 활성자 + 유입경로 첫터치.
+    //   봇 UA 제외. src 컬럼은 신규(이전 방문자는 NULL→집계서 '미상') → 앞으로 유입분부터 출처 채워짐.
+    const BOT = `COALESCE(user_agent,'') !~* 'bot|crawl|spider|slurp|bingpreview|facebookexternalhit|headless|preview'`;
+    const traffic = (await sql.query(
+      `SELECT
+        COUNT(*) FILTER (WHERE last_seen > now()-interval '7 days')::int wau,
+        COUNT(*) FILTER (WHERE last_seen > now()-interval '30 days')::int mau,
+        COUNT(*) FILTER (WHERE last_seen > now()-interval '1 day')::int dau,
+        COUNT(*) FILTER (WHERE created_at > now()-interval '7 days')::int new7
+      FROM user_consents WHERE ${BOT}`
+    ).catch(() => [{ wau: 0, mau: 0, dau: 0, new7: 0 }]))[0] as any;
+    const trafficSources = (await sql.query(
+      `SELECT COALESCE(NULLIF(src,''),'미상') AS s, COUNT(*)::int n
+       FROM user_consents
+       WHERE last_seen > now()-interval '30 days' AND ${BOT}
+       GROUP BY 1 ORDER BY n DESC LIMIT 12`
+    ).catch(() => [])) as any[];
+    if ((traffic?.mau ?? 0) > 0 && trafficSources.every((r) => r.s === "미상")) {
+      notices.push(`유입경로 데이터 수집 시작 — 출처는 다음 방문분부터 채워집니다(현재 방문자 출처 '미상')`);
+    }
+
     // 파이프라인 진행 상황(신규 카페 조립라인)
     const pl = (await sql`SELECT
       COUNT(*) FILTER (WHERE pipeline_status='new')::int p_new,
@@ -329,6 +350,7 @@ export async function GET(req: NextRequest) {
       pipeline, agents,
       grounding: { suspectCount: gr?.suspect ?? 0, backlog: grBacklog.n, suspects: grSuspects },
       offctx: { count: offctx.n, suspects: offctxSuspects },
+      traffic: { dau: traffic?.dau ?? 0, wau: traffic?.wau ?? 0, mau: traffic?.mau ?? 0, new7: traffic?.new7 ?? 0, sources: trafficSources },
     };
 
     await sql`INSERT INTO orchestrator_state (id, health, updated_at) VALUES (1, ${JSON.stringify(health)}, now())

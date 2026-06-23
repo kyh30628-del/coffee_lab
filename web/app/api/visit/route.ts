@@ -14,10 +14,35 @@ async function ensure() {
       user_agent TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now())`;
   await sql`ALTER TABLE user_consents ADD COLUMN IF NOT EXISTS visit_count INT DEFAULT 1`;
   await sql`ALTER TABLE user_consents ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ`;
+  // 유입경로 첫터치(first-touch) 집계 — '어디서 왔나'. 한 번 기록되면 덮어쓰지 않음(COALESCE).
+  await sql`ALTER TABLE user_consents ADD COLUMN IF NOT EXISTS src TEXT`;
+  await sql`ALTER TABLE user_consents ADD COLUMN IF NOT EXISTS referrer TEXT`;
+  await sql`ALTER TABLE user_consents ADD COLUMN IF NOT EXISTS utm_source TEXT`;
+  await sql`ALTER TABLE user_consents ADD COLUMN IF NOT EXISTS utm_medium TEXT`;
+  await sql`ALTER TABLE user_consents ADD COLUMN IF NOT EXISTS utm_campaign TEXT`;
+  await sql`ALTER TABLE user_consents ADD COLUMN IF NOT EXISTS landing TEXT`;
   // 방문핑 행은 동의 '미정'(NULL)이어야 거절(false)과 구분됨
   await sql`ALTER TABLE user_consents ALTER COLUMN agreed DROP NOT NULL`;
   await sql`ALTER TABLE user_consents ALTER COLUMN agreed DROP DEFAULT`;
   ensured = true;
+}
+
+// referrer/UTM → 출처 버킷. utm_source가 있으면 우선(우리가 붙인 공유링크 식별).
+function sourceBucket(ref: string, utmSource: string): string {
+  const s = (utmSource || "").toLowerCase().trim();
+  if (s) return s.slice(0, 40);
+  const r = (ref || "").toLowerCase();
+  if (!r) return "direct";
+  if (r.includes("naver.")) return "naver";
+  if (r.includes("google.")) return "google";
+  if (r.includes("instagram.")) return "instagram";
+  if (r.includes("threads.")) return "threads";
+  if (r.includes("daum.") || r.includes("kakao")) return "kakao";
+  if (r.includes("youtube.") || r.includes("youtu.be")) return "youtube";
+  if (r.includes("facebook.") || r.includes("fb.")) return "facebook";
+  if (r.includes("bing.")) return "bing";
+  if (r.includes("dongnecoffeenote.com")) return "internal";
+  try { return new URL(ref).hostname.replace(/^www\./, "").slice(0, 40); } catch { return "other"; }
 }
 
 export async function POST(req: NextRequest) {
@@ -28,13 +53,27 @@ export async function POST(req: NextRequest) {
     const anonId = String(b.anonId ?? "").slice(0, 64);
     if (!anonId) return NextResponse.json({ ok: false }, { status: 400 });
     const ua = (req.headers.get("user-agent") ?? "").slice(0, 200);
-    // 방문 기록: 첫 방문이면 행 생성(동의 미정=NULL), 재방문이면 카운트·최근시각 갱신
+    // 유입경로: 클라가 보낸 referrer/UTM(세션 첫 핑만) + 헤더 referer 폴백
+    const ref = String(b.ref ?? req.headers.get("referer") ?? "").slice(0, 300);
+    const utmSource = String(b.utm_source ?? "").slice(0, 60);
+    const utmMedium = String(b.utm_medium ?? "").slice(0, 60);
+    const utmCampaign = String(b.utm_campaign ?? "").slice(0, 80);
+    const landing = String(b.path ?? "").slice(0, 200);
+    const src = sourceBucket(ref, utmSource);
+    // 방문 기록: 첫 방문이면 행 생성(동의 미정=NULL), 재방문이면 카운트·최근시각 갱신.
+    // 출처(src/referrer/utm/landing)는 첫터치만 보존 — 이미 있으면 덮어쓰지 않음(COALESCE).
     await sql`
-      INSERT INTO user_consents (anon_id, visit_count, last_seen, user_agent)
-      VALUES (${anonId}, 1, now(), ${ua})
+      INSERT INTO user_consents (anon_id, visit_count, last_seen, user_agent, src, referrer, utm_source, utm_medium, utm_campaign, landing)
+      VALUES (${anonId}, 1, now(), ${ua}, ${src}, ${ref}, ${utmSource}, ${utmMedium}, ${utmCampaign}, ${landing})
       ON CONFLICT (anon_id) DO UPDATE SET
         visit_count = COALESCE(user_consents.visit_count, 1) + 1,
-        last_seen = now()`;
+        last_seen = now(),
+        src = COALESCE(user_consents.src, EXCLUDED.src),
+        referrer = COALESCE(NULLIF(user_consents.referrer, ''), NULLIF(EXCLUDED.referrer, '')),
+        utm_source = COALESCE(NULLIF(user_consents.utm_source, ''), NULLIF(EXCLUDED.utm_source, '')),
+        utm_medium = COALESCE(NULLIF(user_consents.utm_medium, ''), NULLIF(EXCLUDED.utm_medium, '')),
+        utm_campaign = COALESCE(NULLIF(user_consents.utm_campaign, ''), NULLIF(EXCLUDED.utm_campaign, '')),
+        landing = COALESCE(NULLIF(user_consents.landing, ''), NULLIF(EXCLUDED.landing, ''))`;
     return NextResponse.json({ ok: true });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
