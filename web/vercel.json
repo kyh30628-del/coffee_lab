@@ -17,6 +17,10 @@
       "schedule": "0 */3 * * *"
     },
     {
+      "path": "/api/cron-synth",
+      "schedule": "30 1-23/2 * * *"
+    },
+    {
       "path": "/api/cron-verify",
       "schedule": "0 21 * * *"
     },
