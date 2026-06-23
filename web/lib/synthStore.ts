@@ -123,7 +123,7 @@ async function gatherRaw(cafe: { id: number; name: string; area: string }, refre
 
 // 합성 결과를 DB에 저장(공용). llmJudged=true면 llm_judged_at도 기록.
 async function storeResult(cafeId: number, name: string, result: CollectResult, llmJudged: boolean) {
-  const { synth, collected, grade, charScores, evidenceReviews, allEvidence, reviewDates, quality } = result;
+  const { synth, collected, grade, charScores, evidenceReviews, allEvidence, reviewDates, quality, borderline } = result;
   const c = synth.coords;
   const basisLine = ["acidity", "body", "sweet"].filter((ax) => c[ax] != null)
     .map((ax) => `${ax === "acidity" ? "산미" : ax === "body" ? "바디" : "단맛"} ${synth.basis[ax]}`).join(" / ");
@@ -133,8 +133,12 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   const coherence = nameCoherence(name, (evidenceReviews as any[]).map((r) => r?.quote || ""));
   const offctx = offctxRate(((allEvidence ?? evidenceReviews) as any[]).map((r) => r?.quote || "")); // 맥락없음 비율(관제탑 감시)
   const noisy = collected >= 5 && coherence < 0.4;
+  // 🔀 판정 분기 신호: '애매하면 LLM' — 경계후기(다른업종/지점불명확/카페명모호) 존재 OR 이름일관성↓ OR 맥락오염↑.
+  //   명확(needs_llm=false)이면 finalizer가 규칙만으로 공개, 애매(true)면 LLM 판정 통과해야 공개.
+  const needsLLM = (borderline?.length ?? 0) > 0 || coherence < 0.55 || offctx >= 0.5;
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_reviews_all JSONB`.catch(() => {});
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS pipeline_status TEXT`.catch(() => {});
+  await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS needs_llm BOOLEAN`.catch(() => {});
   const allEv = safeJson(allEvidence ?? evidenceReviews);
   // 현재 상태(파이프라인 단계·카테고리·이전 합성값) 먼저 — 카테고리 게이트 분기에 pst 필요.
   const cur = (await sql`SELECT pipeline_status, naver_category, synth_identity, synth_count, synth_updated, jsonb_array_length(COALESCE(synth_reviews,'[]'::jsonb)) prev_ev FROM cafes WHERE id=${cafeId} LIMIT 1`)[0] as any;
@@ -165,9 +169,9 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   const publish = (held || stuckNoise || inPipeline) ? false : ruleOk; // held·노이즈·파이프라인은 비공개 고정, 나머지는 규칙대로
 
   if (llmJudged) {
-    await sql`UPDATE cafes SET synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_coherence=${coherence}, offctx_rate=${offctx}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${safeJson(evidenceReviews)}, synth_reviews_all=${allEv}, char_scores=${safeJson(charScores)}, synth_quality=${safeJson(quality)}, review_dates=${safeJson(reviewDates)}, pipeline_status=${newPst}, synth_updated=${synthTs}, llm_judged_at=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN 36.8 AND 38.3 AND lng BETWEEN 124.5 AND 127.9) WHERE id=${cafeId}`;
+    await sql`UPDATE cafes SET synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_coherence=${coherence}, offctx_rate=${offctx}, needs_llm=${needsLLM}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${safeJson(evidenceReviews)}, synth_reviews_all=${allEv}, char_scores=${safeJson(charScores)}, synth_quality=${safeJson(quality)}, review_dates=${safeJson(reviewDates)}, pipeline_status=${newPst}, synth_updated=${synthTs}, llm_judged_at=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN 36.8 AND 38.3 AND lng BETWEEN 124.5 AND 127.9) WHERE id=${cafeId}`;
   } else {
-    await sql`UPDATE cafes SET synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_coherence=${coherence}, offctx_rate=${offctx}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${safeJson(evidenceReviews)}, synth_reviews_all=${allEv}, char_scores=${safeJson(charScores)}, synth_quality=${safeJson(quality)}, review_dates=${safeJson(reviewDates)}, pipeline_status=${newPst}, synth_updated=${synthTs}, published=(${publish} AND lat IS NOT NULL AND lat BETWEEN 36.8 AND 38.3 AND lng BETWEEN 124.5 AND 127.9) WHERE id=${cafeId}`;
+    await sql`UPDATE cafes SET synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_coherence=${coherence}, offctx_rate=${offctx}, needs_llm=${needsLLM}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${safeJson(evidenceReviews)}, synth_reviews_all=${allEv}, char_scores=${safeJson(charScores)}, synth_quality=${safeJson(quality)}, review_dates=${safeJson(reviewDates)}, pipeline_status=${newPst}, synth_updated=${synthTs}, published=(${publish} AND lat IS NOT NULL AND lat BETWEEN 36.8 AND 38.3 AND lng BETWEEN 124.5 AND 127.9) WHERE id=${cafeId}`;
   }
   return { grade, collected, published: publish, ruleOk, pipeline: newPst, evidence: evidenceReviews.length, coherence: Math.round(coherence * 100), noisy };
 }
@@ -234,20 +238,28 @@ export async function healGroundingSuspects(): Promise<{ resynthed: number; name
   return { resynthed: bad.length, names: names.slice(0, 8), suspects: s.n };
 }
 
-// 🚦 파이프라인 finalizer — 모든 게이트 통과한 신규 카페만 공개로 승격.
-//   게이트: ① 규칙 합성 통과(pending = 이미 규칙OK) ② AI 판정 완료 ③ 임베딩 완료
-//           ④ 등급 검증/참고 ⑤ 좌표 수도권 ⑥ 미해결 오염플래그 없음.
-//   하나라도 미충족이면 pending 유지(절대 노출 안 됨). 한치의 오차 없이 전 에이전트 통과 시에만 live.
+// 🚦 파이프라인 finalizer — 게이트 통과한 신규 카페를 공개로 승격.
+//   공통 게이트: ① 규칙 합성 통과(pending=규칙OK) ② 임베딩 완료 ③ 등급 검증/참고
+//               ④ 좌표 수도권 ⑤ 미해결 오염플래그 없음.
+//   ⑥ 판정 분기(의사결정 틀 ①규칙먼저 ③LLM은 애매할 때만):
+//      · 규칙으로 '명확'(근거후기 이름일관성↑·맥락오염↓·경계후기 없음) → LLM 없이 규칙으로 공개.
+//      · '애매'(경계후기 있음·일관성↓·오염↑) → LLM 판정(llm_judged_at) 통과해야만 공개(심화 검증 보류).
+//   needs_llm: 신규 합성분은 정확 신호 저장. 기존분(NULL)은 coherence·offctx 프록시로 판단.
 export async function finalizePipeline(): Promise<{ promoted: number; names: string[]; pending: number; stuck: any }> {
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS pipeline_status TEXT`.catch(() => {});
+  await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS needs_llm BOOLEAN`.catch(() => {});
   const promoted = (await sql`
     UPDATE cafes SET published = true, pipeline_status = 'live'
     WHERE pipeline_status = 'pending'
-      AND llm_judged_at IS NOT NULL
       AND embedding IS NOT NULL
       AND synth_grade IN ('검증','참고')
       AND lat IS NOT NULL AND lat BETWEEN 36.8 AND 38.3 AND lng BETWEEN 124.5 AND 127.9
       AND NOT EXISTS (SELECT 1 FROM audit_flags af WHERE af.cafe_id = cafes.id AND NOT af.resolved)
+      AND (
+        llm_judged_at IS NOT NULL                                                          -- LLM 판정 완료(애매했던 것도 통과)
+        OR needs_llm = false                                                               -- 규칙으로 명확(신규 저장분)
+        OR (needs_llm IS NULL AND COALESCE(synth_coherence,0) >= 0.55 AND COALESCE(offctx_rate,0) < 0.5)  -- 기존분 프록시
+      )
     RETURNING name`) as any[];
   // 남은 pending이 어느 게이트에서 막혔는지 진단(관제용)
   const [p] = await sql`SELECT
