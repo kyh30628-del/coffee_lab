@@ -21,9 +21,9 @@ export async function GET(req: NextRequest) {
     // 지역 시드(최초 1회)
     for (const r of METRO_REGIONS) await sql`INSERT INTO discovery_state (region, area_label) VALUES (${r.region}, ${r.areaLabel}) ON CONFLICT (region) DO NOTHING`;
 
-    // ① 가장 오래된 지역부터 '시간 예산(40초) 내에서 여러 곳' 발굴 — 매일 네이버 한도를 실제로 활용해
-    //    미발굴 지역(수십 곳)을 빠르게 순회한다. (1곳/일 → 수십일 걸리던 문제 해소)
-    const GROW_BUDGET_MS = 40_000;
+    // ① 가장 오래된 지역부터 '시간 예산(260초) 내에서 여러 곳' 발굴 — 매일 네이버 한도를 실제로 활용해
+    //    미발굴 지역(수십 곳)을 빠르게 순회한다. maxDuration=300초 기준, 마이닝·합성 여유 40초 확보.
+    const GROW_BUDGET_MS = 260_000;
     const t0 = Date.now();
     const discoveries: { region: string; found?: number; inserted?: number; error?: string }[] = [];
     while (Date.now() - t0 < GROW_BUDGET_MS) {
@@ -57,7 +57,7 @@ export async function GET(req: NextRequest) {
     // ② 합성/재판정 — 미합성(신규) 우선, 그다음 가장 오래된 순으로 순회.
     //    각 카페가 synthAndStore(규칙+LLM 맥락 재판정)를 거쳐 정확도가 지속적으로 올라간다.
     //    Gemini 쿼터 소진 시 LLM은 자동 폴백(규칙 결과 유지) → 한도 회복되면 다음 회차부터 재판정.
-    const targets = (await sql`SELECT id, name, area FROM cafes ORDER BY synth_updated ASC NULLS FIRST LIMIT 12`) as unknown as { id: number; name: string; area: string }[];
+    const targets = (await sql`SELECT id, name, area FROM cafes ORDER BY synth_updated ASC NULLS FIRST LIMIT 5`) as unknown as { id: number; name: string; area: string }[];
     const synth = [];
     let rescued = 0;
     for (const cafe of targets) {

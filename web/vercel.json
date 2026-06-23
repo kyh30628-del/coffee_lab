@@ -14,7 +14,7 @@
     },
     {
       "path": "/api/cron-grow",
-      "schedule": "0 18 * * *"
+      "schedule": "0 */3 * * *"
     },
     {
       "path": "/api/cron-verify",
