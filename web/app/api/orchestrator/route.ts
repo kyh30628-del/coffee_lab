@@ -211,9 +211,9 @@ export async function GET(req: NextRequest) {
     // 신규 vs 재방문(최근 30일 활성)
     const retention = (await sql.query(
       `SELECT COUNT(*) FILTER (WHERE COALESCE(visit_count,1) <= 1)::int newcomers,
-              COUNT(*) FILTER (WHERE COALESCE(visit_count,1) > 1)::int returning
+              COUNT(*) FILTER (WHERE COALESCE(visit_count,1) > 1)::int ret
        FROM user_consents WHERE last_seen > now()-interval '30 days' AND ${BOT}`
-    ).catch(() => [{ newcomers: 0, returning: 0 }]))[0] as any;
+    ).catch(() => [{ newcomers: 0, ret: 0 }]))[0] as any;
 
     // 📈 페이지뷰 분석(traffic_events) — 자체 집계. 90일 보존(여기서 정리).
     await sql`DELETE FROM traffic_events WHERE ts < now() - interval '90 days'`.catch(() => {});
@@ -390,7 +390,7 @@ export async function GET(req: NextRequest) {
       traffic: {
         dau: traffic?.dau ?? 0, wau: traffic?.wau ?? 0, mau: traffic?.mau ?? 0, new7: traffic?.new7 ?? 0,
         sources: trafficSources, sourceEngage,
-        retention: { newcomers: retention?.newcomers ?? 0, returning: retention?.returning ?? 0 },
+        retention: { newcomers: retention?.newcomers ?? 0, returning: retention?.ret ?? 0 },
         pageviews30d, pageBuckets, topCafes,
         funnel: { visitors: funnel?.visitors ?? 0, viewedCafe: funnel?.viewed_cafe ?? 0 },
       },
