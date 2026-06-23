@@ -3,7 +3,8 @@
 // 그 카피 + 사장님 사진을 합쳐 카페 상세 상단 '홍보 배너'로 렌더(=홍보물).
 // 인증: 콘솔 ANTHROPIC_API_KEY 우선, 없으면 구독 CLAUDE_CODE_OAUTH_TOKEN(Bearer) 폴백.
 const CONSOLE_KEY = process.env.ANTHROPIC_API_KEY;
-const OAUTH = process.env.CLAUDE_CODE_OAUTH_TOKEN;
+// 구독토큰은 사장님이 명시(ALLOW_SUB_TOKEN=1)할 때만 — 기본 OFF. 콘솔키 없으면 홍보 생성 생략(구독토큰 미사용).
+const OAUTH = process.env.ALLOW_SUB_TOKEN === "1" ? process.env.CLAUDE_CODE_OAUTH_TOKEN : undefined;
 export const hasPromoLLM = () => !!(CONSOLE_KEY || OAUTH);
 const MODEL = process.env.PROMO_MODEL || "claude-sonnet-4-5";
 function authHeaders(): Record<string, string> {

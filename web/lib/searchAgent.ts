@@ -3,7 +3,9 @@
 // 인증: 콘솔 API 키(ANTHROPIC_API_KEY, 종량·권장) 우선. 없으면 구독 토큰
 // (CLAUDE_CODE_OAUTH_TOKEN, Bearer) 폴백 — 단 프로덕션 트래픽엔 레이트리밋/ToS 주의.
 const CONSOLE_KEY = process.env.ANTHROPIC_API_KEY;
-const OAUTH = process.env.CLAUDE_CODE_OAUTH_TOKEN;
+// 구독토큰은 사장님이 명시(ALLOW_SUB_TOKEN=1)할 때만 — 기본 OFF. 라이브 검색이 구독토큰으로 폴백돼
+//   밤새 사장님 토큰 리밋 걸린 사고(2026-06-23) 방지. 콘솔키 없으면 LLM 재정렬 생략(기본 순위 사용).
+const OAUTH = process.env.ALLOW_SUB_TOKEN === "1" ? process.env.CLAUDE_CODE_OAUTH_TOKEN : undefined;
 export const hasSearchLLM = () => !!(CONSOLE_KEY || OAUTH);
 const MODEL = process.env.SEARCH_MODEL || "claude-sonnet-4-5";
 function authHeaders(): Record<string, string> {
