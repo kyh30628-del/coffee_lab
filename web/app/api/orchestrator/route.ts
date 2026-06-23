@@ -173,6 +173,14 @@ export async function GET(req: NextRequest) {
     const noemb = (await sql`SELECT COUNT(*)::int n FROM cafes WHERE published AND embedding IS NULL`.catch(() => [{ n: 0 }]))[0] as any;
     if (noemb.n > 0) { if (noemb.n > PUB * 0.5) risks.push(`의미검색 대량 누락 ${noemb.n}곳 — 검색 기능 타격`); else notices.push(`의미검색 임베딩 대기 ${noemb.n}곳`); }
     // 그라운딩은 결정론적 규칙으로 대체됨 — '감사 대기' 백로그는 안 줄어드는 무의미 숫자라 notice에서 제외.
+    // 🛡️ 리뷰-카페 불일치(규칙-사각 오염) — 표시 리뷰에 카페 맥락어가 없는 비율↑ = 딴 업종·문구이름 오염 의심.
+    //   그라운딩(LLM)이 못 보던 사각지대를 결정론적으로 상시 감시. 소비자 노출이라 임계 넘으면 위험.
+    const offctx = (await sql`SELECT COUNT(*)::int n FROM cafes WHERE published AND offctx_rate >= 0.55`.catch(() => [{ n: 0 }]))[0] as any;
+    const offctxSuspects = (await sql`SELECT name, area, round(offctx_rate::numeric, 2) AS rate FROM cafes WHERE published AND offctx_rate >= 0.55 ORDER BY offctx_rate DESC LIMIT 20`.catch(() => [])) as any[];
+    if (offctx.n > 0) {
+      if (offctx.n >= Math.max(20, Math.round(PUB * 0.004))) risks.push(`리뷰-카페 불일치 의심 ${offctx.n}곳 — 표시 리뷰에 카페 맥락 없음(딴 업종·오염 의심), 점검 필요`);
+      else notices.push(`리뷰 맥락 의심 ${offctx.n}곳(점검 권장)`);
+    }
 
     // 파이프라인 진행 상황(신규 카페 조립라인)
     const pl = (await sql`SELECT
@@ -320,6 +328,7 @@ export async function GET(req: NextRequest) {
       today: { newCafes: td.new_today, synthesized: td.synth_today, published: td.published_today, hasDong: td.has_dong, dongPct: pct(td.has_dong), noise: td.noise, newQueue: td.new_q, ytToday: td.yt_today, ytTotal: td.yt_total },
       pipeline, agents,
       grounding: { suspectCount: gr?.suspect ?? 0, backlog: grBacklog.n, suspects: grSuspects },
+      offctx: { count: offctx.n, suspects: offctxSuspects },
     };
 
     await sql`INSERT INTO orchestrator_state (id, health, updated_at) VALUES (1, ${JSON.stringify(health)}, now())

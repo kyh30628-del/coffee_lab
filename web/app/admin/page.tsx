@@ -342,6 +342,20 @@ export default function AdminPage() {
                   </div>
                 </div>
               )}
+              {/* 🛡️ 리뷰-카페 불일치 감시 — 표시 리뷰에 카페 맥락 없는 비율↑ = 규칙-사각 오염(딴업종·문구이름). 있을 때만 빨강 */}
+              {tower.offctx && tower.offctx.count > 0 && (
+                <div className="mb-2.5 rounded-xl border p-2.5 border-rose-200 bg-rose-50/60">
+                  <div className="text-[11px] font-bold mb-1.5 text-stone-700">
+                    🛡️ 리뷰-카페 불일치 의심 <b className="text-rose-700">{tower.offctx.count}곳</b> <span className="font-normal text-stone-500">· 표시 리뷰에 카페 맥락 없음(딴 업종/오염 의심)</span>
+                  </div>
+                  <div className="space-y-0.5 max-h-44 overflow-y-auto">
+                    {tower.offctx.suspects?.map((s: any, i: number) => (
+                      <div key={i} className="text-[10.5px] leading-snug"><b className="text-rose-700">{s.name}</b> <span className="text-stone-400">{s.area}</span> <span className="text-stone-500">맥락없음 {Math.round((s.rate ?? 0) * 100)}%</span></div>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-stone-400 mt-1">규칙·그라운딩이 못 잡는 사각 오염 — 사람이 확인 후 비공개/정리. (PROXY라 일부 진짜 카페 오탐 가능)</p>
+                </div>
+              )}
               <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-stone-500">
                 <span>공개 <b className="text-stone-700">{tower.coverage?.published?.toLocaleString()}</b>/{tower.coverage?.total?.toLocaleString()}</span>
                 <span>raw {tower.coverage?.rawCachedPct}%</span>
