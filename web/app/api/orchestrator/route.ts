@@ -202,6 +202,43 @@ export async function GET(req: NextRequest) {
     if ((traffic?.mau ?? 0) > 0 && trafficSources.every((r) => r.s === "미상")) {
       notices.push(`유입경로 데이터 수집 시작 — 출처는 다음 방문분부터 채워집니다(현재 방문자 출처 '미상')`);
     }
+    // 출처별 참여도(평균 재방문수) — 어디서 온 사람이 더 들러붙나.
+    const sourceEngage = (await sql.query(
+      `SELECT COALESCE(NULLIF(src,''),'미상') AS s, COUNT(*)::int n, ROUND(AVG(COALESCE(visit_count,1))::numeric,1) AS avg_visits
+       FROM user_consents WHERE last_seen > now()-interval '30 days' AND ${BOT}
+       GROUP BY 1 ORDER BY n DESC LIMIT 8`
+    ).catch(() => [])) as any[];
+    // 신규 vs 재방문(최근 30일 활성)
+    const retention = (await sql.query(
+      `SELECT COUNT(*) FILTER (WHERE COALESCE(visit_count,1) <= 1)::int newcomers,
+              COUNT(*) FILTER (WHERE COALESCE(visit_count,1) > 1)::int returning
+       FROM user_consents WHERE last_seen > now()-interval '30 days' AND ${BOT}`
+    ).catch(() => [{ newcomers: 0, returning: 0 }]))[0] as any;
+
+    // 📈 페이지뷰 분석(traffic_events) — 자체 집계. 90일 보존(여기서 정리).
+    await sql`DELETE FROM traffic_events WHERE ts < now() - interval '90 days'`.catch(() => {});
+    const pageBuckets = (await sql`
+      SELECT CASE
+        WHEN path = '/' OR path = '' OR path IS NULL THEN '홈'
+        WHEN path LIKE '/c/%' THEN '카페상세'
+        WHEN path LIKE '/area%' THEN '지역'
+        WHEN path LIKE '/taste%' THEN '취향'
+        WHEN path LIKE '/owner%' OR path LIKE '/cafe%' THEN '사장님'
+        ELSE '기타' END AS bucket,
+        COUNT(*)::int views, COUNT(DISTINCT anon_id)::int uniques
+      FROM traffic_events WHERE ts > now()-interval '30 days'
+      GROUP BY 1 ORDER BY views DESC`.catch(() => [])) as any[];
+    const topCafes = (await sql`
+      SELECT c.name, c.area, COUNT(*)::int views, COUNT(DISTINCT te.anon_id)::int uniques
+      FROM traffic_events te JOIN cafes c ON te.path = '/c/' || c.id
+      WHERE te.ts > now()-interval '30 days'
+      GROUP BY c.id, c.name, c.area ORDER BY views DESC LIMIT 10`.catch(() => [])) as any[];
+    // 퍼널: 방문자 중 카페상세까지 본 비율(둘러보기→몰입 전환)
+    const funnel = (await sql`
+      SELECT COUNT(DISTINCT anon_id)::int visitors,
+             COUNT(DISTINCT anon_id) FILTER (WHERE path LIKE '/c/%')::int viewed_cafe
+      FROM traffic_events WHERE ts > now()-interval '30 days'`.catch(() => [{ visitors: 0, viewed_cafe: 0 }]))[0] as any;
+    const pageviews30d = (await sql`SELECT COUNT(*)::int n FROM traffic_events WHERE ts > now()-interval '30 days'`.catch(() => [{ n: 0 }]))[0]?.n ?? 0;
 
     // 파이프라인 진행 상황(신규 카페 조립라인)
     const pl = (await sql`SELECT
@@ -350,7 +387,13 @@ export async function GET(req: NextRequest) {
       pipeline, agents,
       grounding: { suspectCount: gr?.suspect ?? 0, backlog: grBacklog.n, suspects: grSuspects },
       offctx: { count: offctx.n, suspects: offctxSuspects },
-      traffic: { dau: traffic?.dau ?? 0, wau: traffic?.wau ?? 0, mau: traffic?.mau ?? 0, new7: traffic?.new7 ?? 0, sources: trafficSources },
+      traffic: {
+        dau: traffic?.dau ?? 0, wau: traffic?.wau ?? 0, mau: traffic?.mau ?? 0, new7: traffic?.new7 ?? 0,
+        sources: trafficSources, sourceEngage,
+        retention: { newcomers: retention?.newcomers ?? 0, returning: retention?.returning ?? 0 },
+        pageviews30d, pageBuckets, topCafes,
+        funnel: { visitors: funnel?.visitors ?? 0, viewedCafe: funnel?.viewed_cafe ?? 0 },
+      },
     };
 
     await sql`INSERT INTO orchestrator_state (id, health, updated_at) VALUES (1, ${JSON.stringify(health)}, now())

@@ -24,6 +24,9 @@ async function ensure() {
   // 방문핑 행은 동의 '미정'(NULL)이어야 거절(false)과 구분됨
   await sql`ALTER TABLE user_consents ALTER COLUMN agreed DROP NOT NULL`;
   await sql`ALTER TABLE user_consents ALTER COLUMN agreed DROP DEFAULT`;
+  // 페이지뷰 이벤트(자체 분석 — 인기페이지·퍼널·체류). 90일 보존(orchestrator가 정리).
+  await sql`CREATE TABLE IF NOT EXISTS traffic_events (id BIGSERIAL PRIMARY KEY, anon_id TEXT, path TEXT, src TEXT, ts TIMESTAMPTZ NOT NULL DEFAULT now())`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_traffic_events_ts ON traffic_events (ts)`;
   ensured = true;
 }
 
@@ -74,6 +77,10 @@ export async function POST(req: NextRequest) {
         utm_medium = COALESCE(NULLIF(user_consents.utm_medium, ''), NULLIF(EXCLUDED.utm_medium, '')),
         utm_campaign = COALESCE(NULLIF(user_consents.utm_campaign, ''), NULLIF(EXCLUDED.utm_campaign, '')),
         landing = COALESCE(NULLIF(user_consents.landing, ''), NULLIF(EXCLUDED.landing, ''))`;
+    // 봇 UA는 페이지뷰 이벤트에서 제외(분석 정확도). 사람 방문만 적재.
+    if (!/bot|crawl|spider|slurp|bingpreview|facebookexternalhit|headless|preview/i.test(ua)) {
+      await sql`INSERT INTO traffic_events (anon_id, path, src) VALUES (${anonId}, ${landing}, ${src})`.catch(() => {});
+    }
     return NextResponse.json({ ok: true });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });

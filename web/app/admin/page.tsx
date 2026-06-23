@@ -356,6 +356,56 @@ export default function AdminPage() {
                   <p className="text-[10px] text-stone-400 mt-1">사각 오염 감시용 watchlist — <b>일부는 진짜 카페(찻집·북카페·시적이름) 오탐</b>. 사람이 확인 후 진짜 오염만 비공개. (헛경보 방지로 위험 아닌 주의)</p>
                 </div>
               )}
+              {/* 📈 유입 분석 — 네이버·구글 없이 우리 DB(user_consents·traffic_events)로 자체 집계 */}
+              {tower.traffic && (
+                <div className="mb-2.5 rounded-xl border border-sky-200 bg-sky-50/50 p-2.5">
+                  <div className="text-[11px] font-bold mb-1.5 text-stone-700">📈 유입 분석 <span className="font-normal text-stone-400">· 우리 DB 자체 집계 · 최근 30일</span></div>
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10.5px] text-stone-600 mb-2">
+                    <span>오늘 <b className="text-sky-700">{tower.traffic.dau}</b></span>
+                    <span>주간 <b className="text-sky-700">{tower.traffic.wau}</b></span>
+                    <span>월간 <b className="text-sky-700">{tower.traffic.mau}</b></span>
+                    <span>신규7일 <b className="text-sky-700">{tower.traffic.new7}</b></span>
+                    <span>페이지뷰 <b className="text-sky-700">{(tower.traffic.pageviews30d ?? 0).toLocaleString()}</b></span>
+                  </div>
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-stone-500 mb-2">
+                    <span>신규 <b className="text-stone-700">{tower.traffic.retention?.newcomers ?? 0}</b> · 재방문 <b className="text-stone-700">{tower.traffic.retention?.returning ?? 0}</b></span>
+                    {(tower.traffic.funnel?.visitors ?? 0) > 0 && (
+                      <span>카페조회 전환 <b className="text-emerald-700">{Math.round((tower.traffic.funnel.viewedCafe / tower.traffic.funnel.visitors) * 100)}%</b> <span className="text-stone-400">({tower.traffic.funnel.viewedCafe}/{tower.traffic.funnel.visitors})</span></span>
+                    )}
+                  </div>
+                  {tower.traffic.sources?.length > 0 && (
+                    <div className="mb-2">
+                      <div className="text-[10px] font-bold text-stone-500 mb-0.5">유입경로</div>
+                      <div className="flex flex-wrap gap-1">
+                        {tower.traffic.sources.map((s: any, i: number) => (
+                          <span key={i} className="text-[10px] bg-white border border-sky-100 rounded px-1.5 py-0.5 text-stone-600">{s.s} <b className="text-sky-700">{s.n}</b></span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {tower.traffic.pageBuckets?.length > 0 && (
+                    <div className="mb-2">
+                      <div className="text-[10px] font-bold text-stone-500 mb-0.5">인기 페이지 유형</div>
+                      <div className="flex flex-wrap gap-1">
+                        {tower.traffic.pageBuckets.map((b: any, i: number) => (
+                          <span key={i} className="text-[10px] bg-white border border-sky-100 rounded px-1.5 py-0.5 text-stone-600">{b.bucket} <b className="text-sky-700">{(b.views ?? 0).toLocaleString()}</b></span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {tower.traffic.topCafes?.length > 0 && (
+                    <div>
+                      <div className="text-[10px] font-bold text-stone-500 mb-0.5">인기 카페 (조회순)</div>
+                      <div className="space-y-0.5 max-h-32 overflow-y-auto">
+                        {tower.traffic.topCafes.map((c: any, i: number) => (
+                          <div key={i} className="text-[10.5px] leading-snug flex justify-between"><span><b className="text-stone-700">{c.name}</b> <span className="text-stone-400">{c.area}</span></span><span className="text-sky-700 font-bold shrink-0 ml-2">{(c.views ?? 0).toLocaleString()}회</span></div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {(tower.traffic.pageviews30d ?? 0) === 0 && <p className="text-[10px] text-stone-400">아직 페이지뷰 데이터 수집 전 — 배포 후 방문부터 쌓입니다.</p>}
+                </div>
+              )}
               <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-stone-500">
                 <span>공개 <b className="text-stone-700">{tower.coverage?.published?.toLocaleString()}</b>/{tower.coverage?.total?.toLocaleString()}</span>
                 <span>raw {tower.coverage?.rawCachedPct}%</span>
