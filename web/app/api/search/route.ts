@@ -173,6 +173,29 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // ===== 상호(카페명) 직접 매칭 — 시맨틱/재정렬이 놓치는 '이름 검색'을 항상 보장(최상단 고정) =====
+    //   '마루빈'처럼 의미가 없는 상호는 임베딩으로 안 떠서 사라지던 버그 차단. 띄어쓰기 무시 매칭.
+    try {
+      const dq = ql.replace(/\s+/g, "");
+      if (dq.length >= 2) {
+        const nameRows = (await sql.query(
+          `SELECT ${FIELDS} FROM cafes WHERE published = true
+             AND replace(lower(name), ' ', '') LIKE $1
+             AND ($2 = '' OR area ILIKE $3 OR area ILIKE $4)
+           ORDER BY (replace(lower(name), ' ', '') = $5) DESC, synth_count DESC NULLS LAST LIMIT 8`,
+          [`%${dq}%`, region, p1, p2, dq],
+        )) as unknown as any[];
+        if (nameRows.length > 0) {
+          const have = new Set(results.map((r: any) => r.id));
+          const nameResults = nameRows.filter((c) => !have.has(c.id)).map((c) => ({
+            id: c.id, name: c.name, area: c.area, grade: c.synth_grade, count: c.synth_count,
+            identity: c.synth_identity, score: 9999, reasons: ["카페명 일치"],
+          }));
+          if (nameResults.length > 0) results = [...nameResults, ...results].slice(0, 24);
+        }
+      }
+    } catch { /* 상호매칭 실패해도 기존 결과 유지 */ }
+
     const payload = {
       ok: true, mode, region: region || "수도권 전체", q,
       concepts: hitConcepts.map((c) => c.label),
