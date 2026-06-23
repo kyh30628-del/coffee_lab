@@ -133,9 +133,14 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   const coherence = nameCoherence(name, (evidenceReviews as any[]).map((r) => r?.quote || ""));
   const offctx = offctxRate(((allEvidence ?? evidenceReviews) as any[]).map((r) => r?.quote || "")); // 맥락없음 비율(관제탑 감시)
   const noisy = collected >= 5 && coherence < 0.4;
-  // 🔀 판정 분기 신호: '애매하면 LLM' — 경계후기(다른업종/지점불명확/카페명모호) 존재 OR 이름일관성↓ OR 맥락오염↑.
-  //   명확(needs_llm=false)이면 finalizer가 규칙만으로 공개, 애매(true)면 LLM 판정 통과해야 공개.
-  const needsLLM = (borderline?.length ?? 0) > 0 || coherence < 0.55 || offctx >= 0.5;
+  // 🔀 판정 분기 신호: 진짜 '맥락판단'이 필요한 경우만 LLM으로(규칙 우선 극대화).
+  //   ⚠️ 경계후기 존재만으로 LLM 보내지 않음 — 경계후기는 어차피 합성서 제외되어 공개 내용에 안 들어가고,
+  //      이미 '깨끗한 후기'로 검증/참고 등급이 난 카페는 규칙으로 공개해도 안전(품질 위험 0).
+  //   LLM 필요 = ① 근거 자체가 애매(이름일관성<0.55 OR 맥락오염≥0.5)  또는
+  //             ② '후보'등급(깨끗한 후기 부족)인데 경계후기를 살리면 등급이 오를 여지 있음(LLM이 복원).
+  const ambiguousEvidence = coherence < 0.55 || offctx >= 0.5;
+  const recoverableEdge = grade === "후보" && (borderline?.length ?? 0) > 0;
+  const needsLLM = ambiguousEvidence || recoverableEdge;
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_reviews_all JSONB`.catch(() => {});
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS pipeline_status TEXT`.catch(() => {});
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS needs_llm BOOLEAN`.catch(() => {});
