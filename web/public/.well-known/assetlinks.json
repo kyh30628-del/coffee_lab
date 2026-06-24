@@ -3,9 +3,9 @@
     "relation": ["delegate_permission/common.handle_all_urls"],
     "target": {
       "namespace": "android_app",
-      "package_name": "com.dongnecoffeenote.app",
+      "package_name": "com.dongnecoffeenote.twa",
       "sha256_cert_fingerprints": [
-        "REPLACE_WITH_PLAY_APP_SIGNING_SHA256_FINGERPRINT"
+        "4D:99:9A:F9:A3:CB:C8:65:FF:BB:8D:E5:7A:23:8E:DD:34:F8:49:42:C7:E2:D9:CB:04:BF:8A:EB:52:2F:1D:BA"
       ]
     }
   }
