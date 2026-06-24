@@ -290,20 +290,23 @@ export async function GET(req: NextRequest) {
       } catch {}
       // (c) 레드팀 PII 누출 자가치유 — 공개 인용문 전화·이메일·핸들 제거
       try { const pii = await scrubPublishedPII(); if (pii.scrubbed > 0) healed.push(`PII 세척 ${pii.scrubbed}곳(${pii.names.slice(0, 3).join(", ")})`); } catch {}
+      let unpubThisRun = 0; // 비공개 발생 시 검색캐시 자동 무효화용(소비자 검색에 비공개 카페가 남는 것 방지)
       // (d) LLM 그라운딩 의심(업체혼동·환각) 자가치유 — 재합성 교정(로컬 그라운딩이 재검사해 플래그 해소)
       try { const gr = await healGroundingSuspects(); if (gr.resynthed > 0) healed.push(`그라운딩 의심 ${gr.resynthed}곳 재합성 교정`); } catch {}
       // (e) 그라운딩 '근거0건' 확정 카페 자동 보류(비공개) + 개선 시 복귀
-      try { const z = await holdZeroEvidenceSuspects(); if (z.held > 0) healed.push(`근거0건 ${z.held}곳 자동 비공개(${z.names.slice(0, 3).join(", ")})`); if (z.released > 0) healed.push(`복원 ${z.released}곳`); } catch {}
+      try { const z = await holdZeroEvidenceSuspects(); if (z.held > 0) { unpubThisRun += z.held; healed.push(`근거0건 ${z.held}곳 자동 비공개(${z.names.slice(0, 3).join(", ")})`); } if (z.released > 0) healed.push(`복원 ${z.released}곳`); } catch {}
       // (e-2) '절대 카페 아님' 카테고리 자동 비공개 — 그랜드파더 비카페(건설·수목원·병원·미용·캠핑 등)를 카테고리로 자동 솎음(수기 불필요)
-      try { const nc = await healNonCafeCategory(); if (nc.held > 0) healed.push(`비카페 카테고리 ${nc.held}곳 자동 비공개(${nc.names.slice(0, 3).join(", ")})`); } catch {}
+      try { const nc = await healNonCafeCategory(); if (nc.held > 0) { unpubThisRun += nc.held; healed.push(`비카페 카테고리 ${nc.held}곳 자동 비공개(${nc.names.slice(0, 3).join(", ")})`); } } catch {}
       // (f) 통합 재검증 자가치유 — 공개 카페를 커서로 순환하며 현재의 모든 게이트(비카페·프랜차이즈·광고·동명오염·등급)로
       //     재합성. 규칙 개선이 기존 공개 데이터에 며칠 안에 자동 반영됨. 대량 비공개는 규칙회귀로 보고 즉시 중단·경보.
       try {
         const au = await healPublishedAudit();
-        if (au.unpublished > 0) healed.push(`재검증 자가치유 ${au.unpublished}곳 비공개(규칙 위반: ${au.names.slice(0, 3).join(", ")})`);
+        if (au.unpublished > 0) { unpubThisRun += au.unpublished; healed.push(`재검증 자가치유 ${au.unpublished}곳 비공개(규칙 위반: ${au.names.slice(0, 3).join(", ")})`); }
         if (au.flagged > 0) integrity.push(`근거 오염 ${au.flagged}곳(재합성후에도 카페명 불일치) — 점검필요`);
         if (au.regression) integrity.push(`🚨재검증 대량 비공개(${au.unpublished}곳+) — 규칙 회귀 의심, 자가치유 중단됨·즉시 점검`);
       } catch {}
+      // (g) 비공개 발생 시 검색캐시 무효화 — 비공개 카페가 캐시된 검색결과에 남는 것 즉시 차단.
+      if (unpubThisRun > 0) { try { await sql`DELETE FROM search_cache`; healed.push(`검색캐시 정리(비공개 ${unpubThisRun}곳 반영)`); } catch {} }
     }
 
     // ── 3) 에이전트별 건강 판정 ──

@@ -78,7 +78,7 @@ async function ensureCache() {
   await sql`CREATE TABLE IF NOT EXISTS search_cache (qkey TEXT PRIMARY KEY, payload JSONB NOT NULL, created_at TIMESTAMPTZ DEFAULT now())`;
   cacheReady = true;
 }
-const CACHE_TTL_HOURS = 12;
+const CACHE_TTL_HOURS = 3; // 12→3시간: 비공개 카페가 캐시에 남는 시간 단축(heal이 비공개 발생 시 즉시 무효화도 함)
 
 export async function GET(req: NextRequest) {
   try {
