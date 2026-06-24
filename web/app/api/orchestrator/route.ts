@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
-import { synthAndStore, finalizePipeline, scrubPublishedPII, healGroundingSuspects, holdZeroEvidenceSuspects, healPublishedAudit } from "@/lib/synthStore";
+import { synthAndStore, finalizePipeline, scrubPublishedPII, healGroundingSuspects, holdZeroEvidenceSuspects, healPublishedAudit, healNonCafeCategory } from "@/lib/synthStore";
 export const runtime = "nodejs";
 export const maxDuration = 120; // 재검증 자가감사(healPublishedAudit) 배치 여유
 
@@ -294,6 +294,8 @@ export async function GET(req: NextRequest) {
       try { const gr = await healGroundingSuspects(); if (gr.resynthed > 0) healed.push(`그라운딩 의심 ${gr.resynthed}곳 재합성 교정`); } catch {}
       // (e) 그라운딩 '근거0건' 확정 카페 자동 보류(비공개) + 개선 시 복귀
       try { const z = await holdZeroEvidenceSuspects(); if (z.held > 0) healed.push(`근거0건 ${z.held}곳 자동 비공개(${z.names.slice(0, 3).join(", ")})`); if (z.released > 0) healed.push(`복원 ${z.released}곳`); } catch {}
+      // (e-2) '절대 카페 아님' 카테고리 자동 비공개 — 그랜드파더 비카페(건설·수목원·병원·미용·캠핑 등)를 카테고리로 자동 솎음(수기 불필요)
+      try { const nc = await healNonCafeCategory(); if (nc.held > 0) healed.push(`비카페 카테고리 ${nc.held}곳 자동 비공개(${nc.names.slice(0, 3).join(", ")})`); } catch {}
       // (f) 통합 재검증 자가치유 — 공개 카페를 커서로 순환하며 현재의 모든 게이트(비카페·프랜차이즈·광고·동명오염·등급)로
       //     재합성. 규칙 개선이 기존 공개 데이터에 며칠 안에 자동 반영됨. 대량 비공개는 규칙회귀로 보고 즉시 중단·경보.
       try {

@@ -230,6 +230,21 @@ export async function holdZeroEvidenceSuspects(): Promise<{ held: number; releas
   return { held: heldRows.length, released: rel.length, names: heldRows.map((r) => r.name).slice(0, 8) };
 }
 
+// 🚫 '절대 카페 아님' 카테고리 자동 비공개 — 발굴 후 카테고리 알려지기 전 먼저 공개됐던 그랜드파더 비카페
+//   (건설·페인트·수목원·동물원·병원·미용·캠핑·서점체인 등)를 카테고리로 자동 솎는다. 더는 수기로 안 잡게.
+//   ⚠️ 인천 사태 방지 가드: '커피가공(로스터리)·북카페' 등 애매한 건 카페 키워드(카테고리·이름)로 제외.
+//   '카테고리 없음'으로는 절대 안 내림(누락 ≠ 비카페) — '명백한 비카페 카테고리가 박혀 있을 때'만.
+export async function healNonCafeCategory(): Promise<{ held: number; names: string[] }> {
+  const rows = (await sql`
+    UPDATE cafes SET published = false, pipeline_status = 'held'
+    WHERE published = true AND naver_category IS NOT NULL
+      AND naver_category ~ '(건설|미장|타일|방수|도배|식물원|수목원|동물원|자동차|정비소|주유|부동산|공인중개|병원|의원|약국|한의원|치과|동물병원|미용실|헤어샵|네일|왁싱|에스테틱|피부관리|펜션|모텔|캠핑,야영|글램핑|변호사|법무사|세무사|회계|보험|은행|증권|독서실|고시원|장례|예식장|웨딩홀)'
+      AND naver_category !~ '(카페|커피|로스터|디저트|베이커리|제과|브런치|찻집|티룸|티하우스)'
+      AND name !~ '(카페|커피|로스터|디저트|베이커리|제과|찻집|티하우스|북카페|coffee|cafe)'
+    RETURNING name`) as any[];
+  return { held: rows.length, names: rows.map((r) => r.name).slice(0, 10) };
+}
+
 // 🩺 LLM 그라운딩 의심(업체혼동·환각) 자가치유 — 재합성으로 교정(개선엔진: 오염제거·로스팅환각 차단).
 //   아직 교정 안 된 것(synth_updated <= 그라운딩 검사시각)만 재합성 → 로컬 그라운딩이 재검사해 플래그 해소.
 export async function healGroundingSuspects(): Promise<{ resynthed: number; names: string[]; suspects: number }> {
