@@ -564,6 +564,19 @@ export default function Home() {
 
   const openById = useCallback((id: number) => { const c = cafes.find((x) => x.id === id); if (c) setSelected(c); }, [cafes]);
 
+  // 📊 카페 상세 조회 추적 — SPA라 URL이 안 바뀌므로(상태로만 염) 명시적 이벤트로 기록.
+  //   인기 카페·전환 퍼널·여러 카페 탐색 패턴 집계의 근거(관제탑 유입 분석). 익명 anon_id만, 개인정보 0.
+  const lastTracked = useRef<number | null>(null);
+  useEffect(() => {
+    if (!selected || lastTracked.current === selected.id) return;
+    lastTracked.current = selected.id;
+    try {
+      const a = localStorage.getItem("dcn_anon");
+      if (!a) return;
+      fetch("/api/visit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ anonId: a, path: `/c/${selected.id}` }), keepalive: true }).catch(() => {});
+    } catch {}
+  }, [selected]);
+
   // 뒤로가기 가드: 현재 UI 레이어를 ref로 추적(리스너에서 최신값 참조)
   const uiRef = useRef<{ selected: boolean; showSearch: boolean; showConsent: boolean; tab: string; role: string | null; ownerPwModal: boolean; showSignup: boolean; sido: string; sigungu: string; dong: string; nearMe: boolean }>({ selected: false, showSearch: false, showConsent: false, tab: "home", role: null, ownerPwModal: false, showSignup: false, sido: "", sigungu: "", dong: "", nearMe: false });
   uiRef.current = { selected: !!selected, showSearch, showConsent, tab, role, ownerPwModal, showSignup, sido, sigungu, dong, nearMe: !!nearMe };

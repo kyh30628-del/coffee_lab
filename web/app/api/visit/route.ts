@@ -77,8 +77,8 @@ export async function POST(req: NextRequest) {
         utm_medium = COALESCE(NULLIF(user_consents.utm_medium, ''), NULLIF(EXCLUDED.utm_medium, '')),
         utm_campaign = COALESCE(NULLIF(user_consents.utm_campaign, ''), NULLIF(EXCLUDED.utm_campaign, '')),
         landing = COALESCE(NULLIF(user_consents.landing, ''), NULLIF(EXCLUDED.landing, ''))`;
-    // 봇 UA는 페이지뷰 이벤트에서 제외(분석 정확도). 사람 방문만 적재.
-    if (!/bot|crawl|spider|slurp|bingpreview|facebookexternalhit|headless|preview/i.test(ua)) {
+    // 봇 UA·빈 경로는 페이지뷰 이벤트서 제외(분석 정확도). 실제 경로의 사람 방문만 적재.
+    if (landing && !/bot|crawl|spider|slurp|bingpreview|facebookexternalhit|headless|preview/i.test(ua)) {
       await sql`INSERT INTO traffic_events (anon_id, path, src) VALUES (${anonId}, ${landing}, ${src})`.catch(() => {});
     }
     return NextResponse.json({ ok: true });
