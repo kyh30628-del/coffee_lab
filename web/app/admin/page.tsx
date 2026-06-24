@@ -53,7 +53,8 @@ export default function AdminPage() {
   const [towerFull, setTowerFull] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [analytics, setAnalytics] = useState<any>(null);
-  const loadAnalytics = (password: string) => { setAnalytics(null); fetch("/api/admin/analytics", { headers: { "x-admin-password": password }, cache: "no-store" }).then((x) => x.json()).then((d) => { if (d.ok) setAnalytics(d); }).catch(() => {}); };
+  // silent=true면 로딩 표시 없이 조용히 갱신(자동 폴링용 — 화면 깜빡임 방지)
+  const loadAnalytics = (password: string, silent = false) => { if (!silent) setAnalytics(null); fetch("/api/admin/analytics", { headers: { "x-admin-password": password }, cache: "no-store" }).then((x) => x.json()).then((d) => { if (d.ok) setAnalytics(d); }).catch(() => {}); };
   const openAnalytics = () => { setShowAnalytics(true); loadAnalytics(pw); };
   const [showBorderline, setShowBorderline] = useState(false);
   const [blData, setBlData] = useState<any>(null);
@@ -108,6 +109,12 @@ export default function AdminPage() {
     const id = setInterval(() => refreshNumbers(pw), 15000);
     return () => clearInterval(id);
   }, [authed, pw]);
+  // 📈 접속·유입 대시보드가 열려있는 동안 20초마다 자동 갱신(실시간) — 조용히(silent) 갱신해 깜빡임 없음
+  useEffect(() => {
+    if (!showAnalytics || !pw) return;
+    const id = setInterval(() => loadAnalytics(pw, true), 20000);
+    return () => clearInterval(id);
+  }, [showAnalytics, pw]);
 
   const loadVerify = (password: string) => fetch("/api/cron-verify?latest=1", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) { setVerify(d.report); setGrounding(d.grounding); } }).catch(() => {});
   const runVerify = async () => {
