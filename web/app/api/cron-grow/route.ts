@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
     //    지리 세분화로 검색 창을 최대화(프랜차이즈에 묻힌 리뷰 많은 동네카페 발굴력↑). 호출량이 커서
     //    1회차당 1~2지역만 깊게 훑고(셔플로 매번 다른 영역 커버), deadline으로 함수시간 내 안전 중단.
     //    maxDuration=300초 기준, 마이닝·합성 여유 40초 확보.
-    const GROW_BUDGET_MS = 260_000;
+    const GROW_BUDGET_MS = 225_000; // 발굴 225s + 마이닝·합성 여유 → maxDuration 300s 안전마진(실측 290s→타임아웃 위험 해소)
     const t0 = Date.now();
     const discoveries: { region: string; found?: number; inserted?: number; stopped?: boolean; error?: string }[] = [];
     while (Date.now() - t0 < GROW_BUDGET_MS) {
