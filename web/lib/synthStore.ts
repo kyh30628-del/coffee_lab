@@ -238,9 +238,13 @@ export async function healNonCafeCategory(): Promise<{ held: number; names: stri
   const rows = (await sql`
     UPDATE cafes SET published = false, pipeline_status = 'held'
     WHERE published = true AND naver_category IS NOT NULL
-      AND naver_category ~ '(건설|미장|타일|방수|도배|식물원|수목원|동물원|자동차|정비소|주유|부동산|공인중개|병원|의원|약국|한의원|치과|동물병원|미용실|헤어샵|네일|왁싱|에스테틱|피부관리|펜션|모텔|캠핑,야영|글램핑|변호사|법무사|세무사|회계|보험|은행|증권|독서실|고시원|장례|예식장|웨딩홀)'
+      AND (
+        naver_category ~ '(건설|미장|타일|방수|도배|식물원|수목원|동물원|자동차|정비소|주유|부동산|공인중개|병원|의원|약국|한의원|치과|동물병원|미용실|헤어샵|네일|왁싱|에스테틱|피부관리|펜션|모텔|캠핑,야영|글램핑|변호사|법무사|세무사|회계|보험|은행|증권|독서실|고시원|장례|예식장|웨딩홀|장소대여)'
+        -- 음식점은 '명백한 식당 업종'만(양식·브런치·피자·이탈리아는 카페와 겹쳐 제외). 음식점>카페/디저트는 아래 카페 가드가 보존.
+        OR naver_category ~ '음식점>(일식|한식|중식|분식|고기|육류|치킨|족발|보쌈|곱창|막창|횟집|>회|국밥|찌개|전골|샤브|뷔페|돼지|소고기|닭|오리|장어|해물|냉면|칼국수|쌈밥|백반|기사식당|순대|감자탕|마라)'
+      )
       AND naver_category !~ '(카페|커피|로스터|디저트|베이커리|제과|브런치|찻집|티룸|티하우스)'
-      AND name !~ '(카페|커피|로스터|디저트|베이커리|제과|찻집|티하우스|북카페|coffee|cafe)'
+      AND name !~ '(카페|까페|커피|로스터|디저트|베이커리|제과|찻집|티하우스|북카페|coffee|cafe)'
     RETURNING name`) as any[];
   return { held: rows.length, names: rows.map((r) => r.name).slice(0, 10) };
 }
