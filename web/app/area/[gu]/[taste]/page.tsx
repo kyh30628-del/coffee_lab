@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import Curated from "../../Curated";
 import { getRegions, getRegionTasteCafes, TASTES, tasteByKey, SITE } from "@/lib/seoData";
 
-export const revalidate = 86400;
+export const revalidate = 1800; // 30분 — 비공개/신규 반영 빠르게(이전 1일)
 
 export async function generateStaticParams() {
   const regions = await getRegions();

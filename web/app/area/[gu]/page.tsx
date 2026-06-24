@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Curated from "../Curated";
 import { getRegions, getRegionCafes, SITE } from "@/lib/seoData";
 
-export const revalidate = 86400; // 하루
+export const revalidate = 1800; // 30분 — 비공개/신규 반영 빠르게(이전 1일)
 
 export async function generateStaticParams() {
   const regions = await getRegions();
