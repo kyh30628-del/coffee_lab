@@ -20,6 +20,8 @@ export async function GET(req: NextRequest) {
     if (secret && req.headers.get("authorization") !== `Bearer ${secret}`) {
       return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
     }
+    // 🛑 사장님 지시로 AI 판정 배치 전면 중단 (비용·토큰 우려). 재개하려면 이 한 줄만 제거.
+    return NextResponse.json({ ok: false, disabled: true, note: "AI 판정 배치 중단됨(사장님 지시)" });
     const KEY = process.env.ANTHROPIC_API_KEY;
     if (!KEY) return NextResponse.json({ ok: false, error: "ANTHROPIC_API_KEY 미설정 — 판정 비활성" });
     await ensureSchema();
