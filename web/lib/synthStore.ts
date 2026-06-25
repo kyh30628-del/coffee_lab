@@ -7,7 +7,7 @@ import { fetchWebReviews } from "./webSearchCollector";
 import { fetchYouTubeReviews } from "./youtubeCollector";
 import { collectAndSynthesize, type RawSource, type BorderlineItem, type CollectResult } from "./collectOrchestrator";
 import { judgeReviews, hasJudgeKey } from "./reviewJudge";
-import { isNonCafe, isFranchise } from "./discover";
+import { isNonCafe, isFranchise, isGenericFoodName } from "./discover";
 import { nameCoherence } from "./reviewQuality";
 
 type RawItem = { source: "google" | "blog" | "youtube"; text: string; title?: string; desc?: string; time?: number; link?: string; date?: string; srcName?: string };
@@ -132,7 +132,8 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   //   저건수도 적용('만조커피 9건'이 전부 동네 딴 가게였던 사례 차단). 전체이름 매칭은 nameCoherence가 보완.
   const coherence = nameCoherence(name, (evidenceReviews as any[]).map((r) => r?.quote || ""));
   const offctx = offctxRate(((allEvidence ?? evidenceReviews) as any[]).map((r) => r?.quote || "")); // 맥락없음 비율(관제탑 감시)
-  const noisy = collected >= 5 && coherence < 0.4;
+  //   + 이름이 '일반 음식·메뉴어'(베이글·아메리카노 등)면 음식 리뷰가 전부 매칭돼 식별 불가 → 노이즈로 공개 차단.
+  const noisy = (collected >= 5 && coherence < 0.4) || isGenericFoodName(name);
   // 🔀 판정 분기 신호: 진짜 '맥락판단'이 필요한 경우만 LLM으로(규칙 우선 극대화).
   //   ⚠️ 경계후기 존재만으로 LLM 보내지 않음 — 경계후기는 어차피 합성서 제외되어 공개 내용에 안 들어가고,
   //      이미 '깨끗한 후기'로 검증/참고 등급이 난 카페는 규칙으로 공개해도 안전(품질 위험 0).
