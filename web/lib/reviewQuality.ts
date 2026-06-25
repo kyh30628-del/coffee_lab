@@ -349,6 +349,12 @@ export function verifyReview(input: QualityInput): QualityResult {
   if (otherGuInTitle && !areaPresent) {
     return { verdict: "rejected", score: 8, reasons: [`다른 지점 추정(제목 '${otherGuInTitle}', 대상 지역 언급 없음)`], signals: sig };
   }
+  // 신도시·생활권(청라·송도·동탄 등) 동명 지점: 제목에 '점'이 안 붙어도, 다른 생활권名이 박히고
+  //   대상 지역어(시·동)가 어디에도 없으면 다른 지점/동명 카페로 본다. (areaTerms에 우리 동洞 포함 → 우리 생활권은 제외됨)
+  const otherDistrictInTitle = DISTRICT_WORDS.find((d) => title.includes(d) && !areaTerms.some((a) => a.includes(d)));
+  if (otherDistrictInTitle && !areaPresent) {
+    return { verdict: "rejected", score: 7, reasons: [`다른 생활권 동명 카페 추정(제목 '${otherDistrictInTitle}', 대상 지역 언급 없음)`], signals: sig };
+  }
   // 일반어 '○○점'(지점명이 아님) 제외 — 합성어 오매칭 차단. 예: 음식점·전문점·정기점(검)·관점·시점…
   const NON_BRANCH = /^(장점|단점|시점|관점|초점|약점|강점|정점|요점|중점|종점|만점|채점|별점|평점|빵점|백점|영점|매점|거점|기점|이점|반점|중간점|문제점|차이점|공통점|장단점|단골점|식당점|간점|걸점|음식점|전문점|정기점|가맹점|직영점|대리점|편의점|무인점|할인점|판매점|취약점|허점|접점|교점|꼭짓점|꼭지점|시발점|출발점|도달점|분기점|기준점|소수점|득점|실점|승점|벌점|가점|감점|배점|기본점|가산점)$/;
   // 🔀 [모든 카페] 같은 이름 '다른 지점(△△점)' 명시 감지 — 카페 이름이 '○○점'이 아니어도 적용.
