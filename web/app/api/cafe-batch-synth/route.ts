@@ -36,8 +36,12 @@ export async function POST(req: NextRequest) {
     const refresh = !!body.refresh; // true면 새로 수집(쿼터 사용), 기본은 저장된 raw 재사용
     // populate 모드: raw 캐시 '없는' 카페만 수집(예열·쿼터 효율 — 이미 캐시된 건 건드리지 않음)
     const populate = body.mode === "populate";
+    // ids 지정: 특정 카페만 캐시로 재합성(규칙 변경 즉시 적용·검증용)
+    const ids = Array.isArray(body.ids) ? body.ids.map(Number).filter((n: number) => Number.isFinite(n)).slice(0, 50) : null;
 
-    const targets = populate
+    const targets = ids
+      ? (await sql`SELECT id, name, area FROM cafes WHERE id = ANY(${ids})`) as unknown as { id: number; name: string; area: string }[]
+      : populate
       ? (await sql`SELECT id, name, area FROM cafes WHERE raw_reviews IS NULL ORDER BY id ASC LIMIT ${limit}`) as unknown as { id: number; name: string; area: string }[]
       : (await sql`SELECT id, name, area FROM cafes ORDER BY synth_updated ASC NULLS FIRST LIMIT ${limit}`) as unknown as { id: number; name: string; area: string }[];
 
