@@ -349,13 +349,32 @@ export function verifyReview(input: QualityInput): QualityResult {
   if (otherGuInTitle && !areaPresent) {
     return { verdict: "rejected", score: 8, reasons: [`다른 지점 추정(제목 '${otherGuInTitle}', 대상 지역 언급 없음)`], signals: sig };
   }
+  // 일반어 '○○점'(지점명이 아님) 제외 — 합성어 오매칭 차단. 예: 음식점·전문점·정기점(검)·관점·시점…
+  const NON_BRANCH = /^(장점|단점|시점|관점|초점|약점|강점|정점|요점|중점|종점|만점|채점|별점|평점|빵점|백점|영점|매점|거점|기점|이점|반점|중간점|문제점|차이점|공통점|장단점|단골점|식당점|간점|걸점|음식점|전문점|정기점|가맹점|직영점|대리점|편의점|무인점|할인점|판매점|취약점|허점|접점|교점|꼭짓점|꼭지점|시발점|출발점|도달점|분기점|기준점|소수점|득점|실점|승점|벌점|가점|감점|배점|기본점|가산점)$/;
+  // 🔀 [모든 카페] 같은 이름 '다른 지점(△△점)' 명시 감지 — 카페 이름이 '○○점'이 아니어도 적용.
+  //   리뷰에 '△△점'(다른 지점)이 박혀 있고, 이 카페의 '동(洞)'이 리뷰 어디에도 없으면 = 다른 지점 후기 → 배제.
+  //   ⚠️ '市'가 아니라 '洞' 기준: '분당점'은 성남시라서 市로 보면 통과돼버림 → 금광동(이 카페 동)이 없으면 다른 지점.
+  //   정보(지점명·지역)가 본문에 다 적혀 있으니 LLM 없이 규칙으로 거른다.
+  {
+    const fullT = `${title} ${body}`;
+    const dongTerm = areaTerms.find((a) => /(동|읍|면|가|리)$/.test(a));
+    const dongCore = dongTerm ? dongTerm.replace(/(동|읍|면|가|리)$/, "") : "";
+    const dongHere = dongTerm ? (fullT.includes(dongTerm) || (dongCore.length >= 2 && fullT.includes(dongCore))) : areaPresent;
+    const otherBranch = (fullT.match(/([가-힣]{2,})점/g) ?? [])
+      .map((t) => t.replace(/점$/, ""))
+      .find((nm) => nm.length >= 2 && nm !== "본" && !NON_BRANCH.test(nm + "점")
+        && !input.name.includes(nm)
+        && !areaTerms.some((a) => a.includes(nm) || nm.includes(guShort(a))));
+    if (otherBranch && !dongHere && (nameInTitle || nameInBody)) {
+      return { verdict: "rejected", score: 6, reasons: [`다른 지점 후기('${otherBranch}점' 명시, 이 동네 '${dongTerm ?? areaTerms[0] ?? ""}' 신호 없음)`], signals: sig };
+    }
+  }
   // 지점(브랜치) 구분: 이 카페가 '○○점'이면, 후기가 '이 지점(지점명·지역)'을 가리켜야 인정.
   //   다른 지점명(예: '마곡점')이 박혀 있고 이 지점 신호가 없으면 다른 지점 후기 → 배제.
   const myBranch = input.name.match(/([가-힣A-Za-z0-9]{2,})점\s*$/)?.[1];
   if (myBranch) {
     const fullT = `${title} ${body}`;
     const branchSignal = (myBranch !== "본" && fullT.includes(myBranch)) || areaPresent; // 지점명 또는 대상 지역어
-    const NON_BRANCH = /^(장점|단점|시점|관점|초점|약점|강점|정점|요점|중점|종점|만점|채점|별점|평점|빵점|백점|영점|매점|거점|기점|이점|반점|중간점|문제점|차이점|공통점|장단점)$/;
     const otherBranchTok = (fullT.match(/([가-힣]{2,})점/g) ?? [])
       .map((t) => t.replace(/점$/, ""))
       .find((nm) => nm.length >= 2 && nm !== myBranch && nm !== "본" && !NON_BRANCH.test(nm + "점")

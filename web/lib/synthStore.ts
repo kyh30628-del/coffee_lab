@@ -10,6 +10,13 @@ import { judgeReviews, hasJudgeKey } from "./reviewJudge";
 import { isNonCafe, isFranchise, isGenericFoodName } from "./discover";
 import { nameCoherence } from "./reviewQuality";
 
+// 카페 지역어(시 + 동洞) — 동까지 넘겨야 reviewQuality가 '분당점=성남시' 같은 市단위 동명 지점 오인을 거른다.
+async function areaTermsFor(id: number, area?: string | null): Promise<string[]> {
+  const terms = area ? [area] : [];
+  try { const r = (await sql`SELECT dong FROM cafes WHERE id=${id}`) as any[]; const d = r[0]?.dong; if (d && !terms.includes(d)) terms.push(d); } catch {}
+  return terms;
+}
+
 type RawItem = { source: "google" | "blog" | "youtube"; text: string; title?: string; desc?: string; time?: number; link?: string; date?: string; srcName?: string };
 
 // 🛡️ jsonb 안전 직렬화: 인용문이 이모지(서로게이트쌍) 중간에서 잘리면 짝 없는 서로게이트가 남고,
@@ -310,7 +317,7 @@ export async function synthAndStore(cafe: { id: number; name: string; area: stri
     return { id: cafe.id, name: cafe.name, ok: false, reason: "수집 0", grade: "후보", published: false, fromCache };
   }
 
-  const area = cafe.area ? [cafe.area] : [];
+  const area = await areaTermsFor(cafe.id, cafe.area);
   const decisions = await loadDecisions(cafe.id); // 과거 판정 AI 결정 유지(동명/무관 제거 영구)
   let result = collectAndSynthesize(cafe.name, area, sources, { decisions });
 
@@ -338,7 +345,7 @@ export async function getAuditCandidates(cafe: { id: number; name: string; area:
   await ensureCols();
   const raw = await loadRaw(cafe.id);
   if (!raw.length) return { candidates: [], hasRaw: false };
-  const result = collectAndSynthesize(cafe.name, cafe.area ? [cafe.area] : [], rawToSources(raw));
+  const result = collectAndSynthesize(cafe.name, await areaTermsFor(cafe.id, cafe.area), rawToSources(raw));
   // 토큰 최적화: AI에는 '경계(규칙이 애매)'만 보냄(70~90% 절감). 명확한 검증·참고는 규칙 신뢰.
   return { candidates: result.borderline, hasRaw: true };
 }
@@ -350,7 +357,7 @@ export async function applyDecisions(cafe: { id: number; name: string; area: str
   if (!raw.length) { await sql`UPDATE cafes SET llm_judged_at=now() WHERE id=${cafe.id}`; return { id: cafe.id, approved: 0, grade: null, published: false, reason: "raw 없음" }; }
   // 기존 결정과 병합 → 영구 저장(재합성해도 유지). 새 판정이 우선.
   const merged = { ...(await loadDecisions(cafe.id)), ...decisions };
-  const result = collectAndSynthesize(cafe.name, cafe.area ? [cafe.area] : [], rawToSources(raw), { decisions: merged });
+  const result = collectAndSynthesize(cafe.name, await areaTermsFor(cafe.id, cafe.area), rawToSources(raw), { decisions: merged });
   await sql`UPDATE cafes SET judge_decisions=${safeJson(merged)} WHERE id=${cafe.id}`;
   const stored = await storeResult(cafe.id, cafe.name, result, true);
   const approved = Object.values(merged).filter(Boolean).length;
@@ -369,7 +376,7 @@ export async function backfillYouTube(cafe: { id: number; name: string; area: st
   if (!yt.snippets.length) return "none";
   for (const s of yt.snippets) raw.push({ source: "youtube", text: s.text, title: s.title, desc: s.desc, time: s.time, link: s.link, date: s.date, srcName: s.source });
   await sql`UPDATE cafes SET raw_reviews=${safeJson(cleanRaw(raw))}, raw_collected_at=now() WHERE id=${cafe.id}`;
-  const result = collectAndSynthesize(cafe.name, cafe.area ? [cafe.area] : [], rawToSources(raw));
+  const result = collectAndSynthesize(cafe.name, await areaTermsFor(cafe.id, cafe.area), rawToSources(raw));
   await storeResult(cafe.id, cafe.name, result, false);
   return "added";
 }
