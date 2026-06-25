@@ -59,6 +59,7 @@ export default function OwnerPage() {
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState("rank");
   const [showShowcase, setShowShowcase] = useState(false);
+  const [openAct, setOpenAct] = useState<Set<number>>(new Set()); // 액션플랜: 펼친 항목(기본 전체 접힘)
   // 인증: 관리자 비밀번호(전체 접근) 또는 구독 PIN(본인 카페만 고정).
   const [pw, setPw] = useState<string | null>(null);
   const [pin, setPin] = useState<string | null>(null);
@@ -92,7 +93,7 @@ export default function OwnerPage() {
     setLoading(false);
   };
   const loadInsight = async (name: string) => {
-    setLoading(true); setResults([]); setTab("rank");
+    setLoading(true); setResults([]); setTab("rank"); setOpenAct(new Set());
     try { const r = await fetch(`/api/owner-insight?name=${encodeURIComponent(name)}`, { headers: hdr }); const d = await r.json(); if (d.ok) setInsight(d); } catch {}
     setLoading(false);
   };
@@ -172,17 +173,27 @@ export default function OwnerPage() {
 
             {/* 액션 플랜 — 가장 위에, 핵심 */}
             <div className="mb-4">
-              <div className="text-sm font-bold text-[#52402e] mb-2.5 flex items-center gap-1.5">💡 데이터 기반 액션 플랜<InfoDot title="액션 플랜이 뭐예요?">일반론이 아니라 <b>우리 카페의 검증된 후기 데이터에서만</b> 나오는 구체 제안이에요. 같은 동네 카페와 비교해 <b>차별점·빈 포지션(아무도 안 하는 강점)·매몰점·보완점·순위 전략</b>을 알려드려요.</InfoDot></div>
-              <div className="space-y-2.5">
+              <div className="text-sm font-bold text-[#52402e] mb-1 flex items-center gap-1.5">💡 데이터 기반 액션 플랜<InfoDot title="액션 플랜이 뭐예요?">일반론이 아니라 <b>우리 카페의 검증된 후기 데이터에서만</b> 나오는 구체 제안이에요. 같은 동네 카페와 비교해 <b>차별점·빈 포지션(아무도 안 하는 강점)·매몰점·보완점·순위 전략</b>을 알려드려요.</InfoDot></div>
+              <div className="text-[11px] text-[#a8927a] mb-2.5">제목을 눌러 상세 내용을 펼쳐보세요</div>
+              <div className="space-y-2">
                 {insight.actions.map((a, i) => {
                   const t = TONE[a.tone];
+                  const open = openAct.has(i);
                   return (
-                    <div key={i} className="rounded-xl p-4 border" style={{ background: t.bg, borderColor: t.border }}>
-                      <div className="flex items-center gap-2 mb-1.5">
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white" style={{ background: t.tag }}>{a.type}</span>
-                        <span className="text-sm font-bold text-[#2b2018]">{a.title}</span>
-                      </div>
-                      <p className="text-[13px] text-[#52402e] leading-relaxed">{renderEmphasis(a.body, t.tag)}</p>
+                    <div key={i} className="rounded-xl border overflow-hidden" style={{ background: t.bg, borderColor: t.border }}>
+                      <button
+                        type="button"
+                        onClick={() => setOpenAct((prev) => { const n = new Set(prev); n.has(i) ? n.delete(i) : n.add(i); return n; })}
+                        aria-expanded={open}
+                        className="w-full flex items-center gap-2 px-4 py-3 text-left"
+                      >
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white shrink-0" style={{ background: t.tag }}>{a.type}</span>
+                        <span className="text-sm font-bold text-[#2b2018] flex-1">{a.title}</span>
+                        <svg viewBox="0 0 20 20" className={`w-4 h-4 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`} fill="none" stroke={t.tag} strokeWidth="2.2"><path d="M5 8l5 5 5-5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                      </button>
+                      {open && (
+                        <p className="text-[13px] text-[#52402e] leading-relaxed px-4 pb-3.5 -mt-0.5">{renderEmphasis(a.body, t.tag)}</p>
+                      )}
                     </div>
                   );
                 })}
