@@ -171,6 +171,26 @@ export default function OwnerPage() {
               <div className="text-sm font-bold">{insight.gu} {insight.hoodCount}곳 중 <span className="text-[#9c6b3f]">{insight.rank}위</span></div>
             </div>
 
+            {/* 📣 공유 리포트 — 손님·SNS에 공유해 단골·신규 유입 (B2B 바이럴) */}
+            {insight.me.id && (() => {
+              const shareUrl = `https://dongnecoffeenote.com/share/${insight.me.id}`;
+              const qr = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=8&data=${encodeURIComponent(shareUrl)}`;
+              return (
+                <div className="bg-[#fff8ee] rounded-2xl p-4 border border-[#e7d3b3] mb-4">
+                  <div className="text-sm font-bold text-[#7a5a2e] mb-1">📣 우리 카페 검증 리포트 공유하기</div>
+                  <p className="text-[12px] text-[#8a7458] mb-3 leading-relaxed">"{insight.gu} {insight.rank}위" 리포트를 손님·SNS·매장 QR로 공유하면 단골·신규 유입에 도움이 돼요. 광고 아닌 <b>검증 데이터</b>라 신뢰가 높습니다.</p>
+                  <div className="flex items-center gap-3">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={qr} alt="공유 QR" width={84} height={84} className="rounded-lg border border-[#ece0cd] bg-white shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <a href={shareUrl} target="_blank" rel="noreferrer" className="block text-[12px] text-[#9c6b3f] underline break-all mb-2">{shareUrl}</a>
+                      <button onClick={() => { navigator.clipboard?.writeText(shareUrl); }} className="text-[12px] font-bold bg-[#9c6b3f] text-white rounded-lg px-3 py-1.5">링크 복사</button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* 액션 플랜 — 가장 위에, 핵심 */}
             <div className="mb-4">
               <div className="text-sm font-bold text-[#52402e] mb-1 flex items-center gap-1.5">💡 데이터 기반 액션 플랜<InfoDot title="액션 플랜이 뭐예요?">일반론이 아니라 <b>우리 카페의 검증된 후기 데이터에서만</b> 나오는 구체 제안이에요. 같은 동네 카페와 비교해 <b>차별점·빈 포지션(아무도 안 하는 강점)·매몰점·보완점·순위 전략</b>을 알려드려요.</InfoDot></div>
