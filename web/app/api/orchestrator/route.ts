@@ -181,6 +181,16 @@ export async function GET(req: NextRequest) {
     const offctx = (await sql`SELECT COUNT(*)::int n FROM cafes WHERE published AND offctx_rate >= 0.55 AND NOT COALESCE(offctx_ok, false)`.catch(() => [{ n: 0 }]))[0] as any;
     const offctxSuspects = (await sql`SELECT name, area, round(offctx_rate::numeric, 2) AS rate FROM cafes WHERE published AND offctx_rate >= 0.55 AND NOT COALESCE(offctx_ok, false) ORDER BY offctx_rate DESC LIMIT 30`.catch(() => [])) as any[];
     if (offctx.n > 0) notices.push(`리뷰 맥락 의심 ${offctx.n}곳(점검 권장 — 일부 진짜 카페 포함될 수 있음)`);
+    // 🤖 규칙갭 자가학습 에이전트 — 직전 실행에서 자동학습/승인대기/롤백한 내역을 surface.
+    try {
+      const rg = (await sql`SELECT learned, pending, ran_at FROM rulegap_runs ORDER BY id DESC LIMIT 1`)[0] as any;
+      if (rg) {
+        const la = (rg.learned || []).filter((l: any) => l.action === "applied");
+        const pd = (rg.pending || []);
+        if (la.length > 0) healed.push(`규칙 자가학습 ${la.length}건 자동적용(${la.slice(0, 3).map((l: any) => l.term).join("·")})`);
+        if (pd.length > 0) notices.push(`규칙갭 승인대기 ${pd.length}건(로직·고위험 — ${pd.slice(0, 3).map((p: any) => p.term).join("·")} 등, 검토 후 적용)`);
+      }
+    } catch {}
 
     // 📊 유입(트래픽) — 깜깜이 탈출. user_consents(익명 방문핑) 기반 활성자 + 유입경로 첫터치.
     //   봇 UA 제외. src 컬럼은 신규(이전 방문자는 NULL→집계서 '미상') → 앞으로 유입분부터 출처 채워짐.
