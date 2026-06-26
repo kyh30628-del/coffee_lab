@@ -9,6 +9,7 @@ import { collectAndSynthesize, type RawSource, type BorderlineItem, type Collect
 import { judgeReviews, hasJudgeKey } from "./reviewJudge";
 import { isNonCafe, isFranchise, isGenericFoodName } from "./discover";
 import { nameCoherence } from "./reviewQuality";
+import { loadLearnedTerms } from "./learnedTerms";
 
 // 카페 지역어(시 + 동洞) — 동까지 넘겨야 reviewQuality가 '분당점=성남시' 같은 市단위 동명 지점 오인을 거른다.
 async function areaTermsFor(id: number, area?: string | null): Promise<string[]> {
@@ -309,6 +310,7 @@ export async function finalizePipeline(): Promise<{ promoted: number; names: str
 // opts.refresh=true면 새로 수집(최신성). 기본은 캐시 재사용(쿼터 절약).
 export async function synthAndStore(cafe: { id: number; name: string; area: string }, opts?: { refresh?: boolean }) {
   await ensureCols();
+  await loadLearnedTerms(); // 학습된 규칙 사전 캐시 갱신(TTL 60s — 핫패스 비용 0)
   const { raw, fromCache, apiFailed } = await gatherRaw(cafe, !!opts?.refresh);
   if (apiFailed) return { id: cafe.id, name: cafe.name, ok: false, reason: "수집 API 오류/쿼터 — 보존", skipped: true };
   const sources = rawToSources(raw);

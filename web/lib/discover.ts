@@ -1,6 +1,7 @@
 // 카페 발굴 (PRINCIPLES §0·§2): 합법 소스(네이버 지역검색)로 동네·스페셜티 카페 수집.
 // 대규모 프랜차이즈·비(非)카페 제외. 중복(이름/좌표 근사) 제외. 비공개로 적재 후 합성 단계에서 검증.
 import { sql } from "./db";
+import { getLearned } from "./learnedTerms";
 
 const ID = process.env.NAVER_CLIENT_ID;
 const SECRET = process.env.NAVER_CLIENT_SECRET;
@@ -144,7 +145,7 @@ export function parseDong(jibun: string): string | null {
   const m = jibun.match(/(?:구|시|군)\s+([가-힣]+[0-9]?(?:동|읍|면|가))(?![가-힣])/);
   return m ? m[1] : null;
 }
-export const isFranchise = (name: string) => { const n = name.replace(/\s/g, ""); return FRANCHISE.some((f) => n.includes(f)); };
+export const isFranchise = (name: string) => { const n = name.replace(/\s/g, ""); return FRANCHISE.some((f) => n.includes(f)) || [...getLearned("franchise")].some((f) => n.includes(f)); };
 
 // 🚫 이름 자체가 '일반 음식·메뉴어'인 카페 → 이름으로 식별 불가(그 음식 리뷰가 전부 매칭돼 coherence=1.0 오인).
 //   예: '베이글'·'아메리카노'·'빵' 카페는 빵·음료 리뷰를 긁어옴 → 공개 금지. (정확히 그 단어 하나일 때만)
@@ -155,7 +156,7 @@ const GENERIC_FOOD_NAMES = new Set([
   "약과", "꽈배기", "츄러스", "버블티", "밀크티", "에스프레소", "아메리카노", "카푸치노", "녹차", "말차",
   "단팥빵", "식빵", "샌드위치", "피자", "떡", "한과", "차", "티", "원두", "로스팅", "스무디", "에이드",
 ]);
-export const isGenericFoodName = (name: string) => GENERIC_FOOD_NAMES.has((name || "").replace(/\s/g, ""));
+export const isGenericFoodName = (name: string) => { const n = (name || "").replace(/\s/g, ""); return GENERIC_FOOD_NAMES.has(n) || getLearned("generic").has(n); };
 // 엄격 비카페 판정 — 정체성(진짜 커피 카페)을 지키기 위해 카테고리 '리프(끝)'로 판단.
 // 핵심: 네이버는 '카페,디저트>와플'처럼 앞에 '카페'를 붙임 → 앞부분 매칭은 와플·아이스크림·음식점도 통과시킴(버그).
 //       반드시 마지막 > 뒤(리프)로 봐야 와플대학·아이스크림·음식점을 제대로 거른다.
