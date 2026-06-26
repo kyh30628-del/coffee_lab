@@ -110,13 +110,19 @@ export async function GET(req: NextRequest) {
     //   (콘셉트 적합성=비공개 결정이라 자동 아님. 애견카페 같은 누락을 사장님 발견 전에 먼저 잡는다)
     const GOOD_CAT = /(카페|커피|로스터|디저트|베이커리|제과|브런치|찻집|티룸|티하우스|빵|케이크|케익|도넛|도너츠|베이글|아이스크림|빙수|마카롱|와플|스무디|주스|에이드|쿠키|타르트|푸딩|차,)/;
     const OFF_CAT = /(애견|애완|반려동물|펫카페|고양이카페|동물카페|키즈|실내놀이터|놀이방|스터디카페|독서실|만화방|만화카페|룸카페|멀티방|파티룸|방탈출|보드게임|보드카페|볼링|당구|스크린골프|골프연습|코인노래|노래방|찜질방|사우나|클라이밍|트램폴린|트램펄린|서점)/;
-    const catRows = (await sql`SELECT COALESCE(naver_category,'') cat, COUNT(*)::int n FROM cafes WHERE published=true GROUP BY 1`) as { cat: string; n: number }[];
+    const GOOD_NAME = /(카페|까페|커피|로스터|로스팅|브런치|디저트|베이커리|베이글|제과|찻집|티하우스|coffee|cafe)/i;
+    const catCafes = (await sql`SELECT id, name, COALESCE(naver_category,'') cat FROM cafes WHERE published=true AND naver_category IS NOT NULL AND naver_category <> ''`) as { id: number; name: string; cat: string }[];
+    const unknownByCat: Record<string, { n: number; samples: number[] }> = {};
     let offConcept = 0;
-    for (const r of catRows) {
-      if (!r.cat) continue;
-      if (GOOD_CAT.test(r.cat)) continue;              // 명백한 카페 — 통과
-      if (OFF_CAT.test(r.cat)) { offConcept += r.n; continue; } // 기존 규칙이 잡는 오프콘셉(heal이 처리) — 카운트만
-      pending.push({ kind: "category_unknown", term: r.cat, cafes: r.n, reason: "업종이 카페 화이트리스트에 없음 — 콘셉트 적합성 검토(승인)" });
+    for (const c of catCafes) {
+      if (GOOD_CAT.test(c.cat)) continue;                 // 카페 업종 — 통과
+      if (OFF_CAT.test(c.cat)) { offConcept++; continue; } // 오프콘셉(heal 처리)
+      if (GOOD_NAME.test(c.name)) continue;               // 업종은 애매해도 '이름이 카페형'(로스터리 등 오분류) — 통과
+      const e = unknownByCat[c.cat] || (unknownByCat[c.cat] = { n: 0, samples: [] });
+      e.n++; if (e.samples.length < 6) e.samples.push(c.id);
+    }
+    for (const [cat, e] of Object.entries(unknownByCat).sort((a, b) => b[1].n - a[1].n)) {
+      pending.push({ kind: "category_unknown", term: cat, cafes: e.n, samples: e.samples, reason: "업종·이름 모두 카페 신호 없음 — 콘셉트 적합성 검토(승인)" });
     }
     if (offConcept > 0) pending.push({ kind: "category_offconcept", term: "(오프콘셉 잔여)", cafes: offConcept, reason: "오프콘셉 업종 공개 중 — heal이 자동 비공개 예정" });
 
