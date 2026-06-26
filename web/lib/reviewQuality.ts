@@ -20,6 +20,7 @@ export type QualityInput = {
   body: string;         // 본문/설명/리뷰 텍스트
   name: string;         // 카페명
   areaTerms?: string[]; // 지역어(동명 카페·관련성 검증)
+  addr?: string;        // 카페 등록주소(도로명) — 리뷰 주소 불일치 검증용
   source: SourceKind;
 };
 
@@ -420,6 +421,23 @@ export function verifyReview(input: QualityInput): QualityResult {
     const CAFE_FOOD = /(빙수|디저트|커피|케이크|케익|베이커리|빵|음료|라떼|브런치|아메리카노|에스프레소|찹쌀떡|마카롱|스콘|와플|쿠키|티라미수|푸딩|크로플|에이드|스무디|찻집|로스팅|원두|드립|초콜릿|아이스크림|젤라또)/;
     if (adj.test(norm(fullT)) || (RESTAURANT_MAIN.test(fullT) && !CAFE_FOOD.test(fullT))) {
       return { verdict: "rejected", score: 5, reasons: ["같은 상호 다른 음식점 후기(식당메뉴 위주, 카페 맥락 없음)"], signals: sig };
+    }
+  }
+  // 📍 주소 검증(구조적 해법): 리뷰가 '풀주소(시·군·구 + 도로명+번지)'를 명시하는데, 그 구와 도로명이
+  //   카페 등록주소와 '둘 다' 다르고 카페 주소도 본문에 없으면 = 같은 이름 다른 위치 업체 후기 → 배제.
+  //   ⚠️ 구만/도로만 다른 건 인접구·근처도로 오탐(9%)이라 제외. '둘 다 다를 때만' = 1% 고정밀(측정 검증).
+  if (input.addr) {
+    const guOf = (s: string) => [...new Set(s.match(/[가-힣]{2,4}(시|군|구)/g) ?? [])];
+    const roadOf = (s: string) => (s.match(/[가-힣A-Za-z0-9]{2,}(?:대로|로|길)/g) ?? []).map((r) => r.replace(/\s*\d+(번?길)?$/, "").replace(/\d+$/, "")).filter((r) => r.length >= 2);
+    const cGu = guOf(input.addr), cRoad = roadOf(input.addr);
+    const fullT = `${title} ${body}`;
+    if (cGu.length && cRoad.length && /[가-힣]{2,4}(시|군|구)\s*[가-힣]{0,5}\s*[가-힣A-Za-z0-9]{2,}(대로|로|길)\s*\d/.test(fullT)) {
+      const rGu = guOf(fullT), rRoad = roadOf(fullT);
+      const guDiff = rGu.length > 0 && !rGu.some((g) => cGu.includes(g));
+      const roadDiff = rRoad.length > 0 && !rRoad.some((rr) => cRoad.some((cc) => cc.includes(rr) || rr.includes(cc)));
+      if (guDiff && roadDiff) {
+        return { verdict: "rejected", score: 5, reasons: ["다른 위치 업체 후기(리뷰 주소가 등록 구·도로명과 모두 불일치)"], signals: sig };
+      }
     }
   }
   if (generic && !nameInTitle) {
