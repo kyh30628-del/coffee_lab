@@ -412,10 +412,14 @@ export function verifyReview(input: QualityInput): QualityResult {
   //   = 같은 이름 다른 음식점 후기 → 배제. 빙수·디저트 후기는 살리고 찌개·백반만 거른다.
   //   (카페 자신이 그 메뉴명을 가진 경우는 제외 — '○○김치찌개'라는 카페명이면 적용 안 함)
   if ((nameInTitle || nameInBody) && nameN.length >= 2 && !RESTAURANT_MAIN.test(nameN)) {
+    const fullT = `${title} ${body}`;
     const esc = nameN.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const adj = new RegExp(esc + RESTAURANT_MAIN_ADJ);
-    if (adj.test(norm(`${title} ${body}`))) {
-      return { verdict: "rejected", score: 5, reasons: ["같은 상호 다른 음식점 후기(카페명+식당메뉴 결합)"], signals: sig };
+    // ① 이름±식당메뉴 인접(따옴표·공백 등 비한글 구분 허용, 양방향): '장꼬방묵은김치찌개'·"'장꼬방' 김치찌개"
+    const adj = new RegExp(esc + "[^가-힣]{0,4}" + RESTAURANT_MAIN_SRC + "|" + RESTAURANT_MAIN_SRC + "[^가-힣]{0,4}" + esc);
+    // ② 카페명이 있고 식당메뉴가 있는데 카페·디저트어가 하나도 없음 = 순수 식당 후기('김치찌개 맛집 장꼬방')
+    const CAFE_FOOD = /(빙수|디저트|커피|케이크|케익|베이커리|빵|음료|라떼|브런치|아메리카노|에스프레소|찹쌀떡|마카롱|스콘|와플|쿠키|티라미수|푸딩|크로플|에이드|스무디|찻집|로스팅|원두|드립|초콜릿|아이스크림|젤라또)/;
+    if (adj.test(norm(fullT)) || (RESTAURANT_MAIN.test(fullT) && !CAFE_FOOD.test(fullT))) {
+      return { verdict: "rejected", score: 5, reasons: ["같은 상호 다른 음식점 후기(식당메뉴 위주, 카페 맥락 없음)"], signals: sig };
     }
   }
   if (generic && !nameInTitle) {
