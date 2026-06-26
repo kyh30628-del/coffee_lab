@@ -80,6 +80,13 @@ async function ensureCache() {
 }
 const CACHE_TTL_HOURS = 3; // 12→3시간: 비공개 카페가 캐시에 남는 시간 단축(heal이 비공개 발생 시 즉시 무효화도 함)
 
+// 🔎 검색 수요 로깅(비차단) — 무엇을 찾고 결과가 충분했는지 적재. cron-demand가 수요-공급 갭 분석.
+function logSearch(q: string, region: string, results: number, mode: string) {
+  if (!q || q.length < 1) return;
+  sql`CREATE TABLE IF NOT EXISTS search_log (id BIGSERIAL PRIMARY KEY, q TEXT, region TEXT, results INT, mode TEXT, ts TIMESTAMPTZ DEFAULT now())`.catch(() => {});
+  sql`INSERT INTO search_log (q, region, results, mode) VALUES (${q.slice(0, 80)}, ${(region || "").slice(0, 40)}, ${results}, ${mode})`.catch(() => {});
+}
+
 export async function GET(req: NextRequest) {
   try {
     await ensureSchema();
@@ -94,6 +101,7 @@ export async function GET(req: NextRequest) {
     if (!nocache) {
       const hit = (await sql`SELECT payload FROM search_cache WHERE qkey=${qkey} AND created_at > now() - (${CACHE_TTL_HOURS} || ' hours')::interval LIMIT 1`)[0];
       if (hit?.payload && Array.isArray(hit.payload.results) && hit.payload.results.length > 0) {
+        logSearch(q, region, Number(hit.payload?.count ?? 0), "cache");
         return NextResponse.json({ ...hit.payload, cached: true }, {
           headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" },
         });
@@ -206,6 +214,7 @@ export async function GET(req: NextRequest) {
       sql`INSERT INTO search_cache (qkey, payload, created_at) VALUES (${qkey}, ${JSON.stringify(payload)}, now())
           ON CONFLICT (qkey) DO UPDATE SET payload=EXCLUDED.payload, created_at=now()`.catch(() => {});
     }
+    logSearch(q, region, results.length, mode); // 🔎 수요 로깅(수요-공급 갭·발굴 우선순위·콘텐츠 소재)
     return NextResponse.json(payload, {
       headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" },
     });

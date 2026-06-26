@@ -43,6 +43,10 @@
     {
       "path": "/api/cron-closure",
       "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/cron-demand",
+      "schedule": "0 8 * * *"
     }
   ]
 }
