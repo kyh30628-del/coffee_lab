@@ -179,10 +179,11 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   // 🔁 재합성 결과가 이전과 사실상 동일하면 synth_updated 유지 → 그라운딩 무효화·재검 순환 방지.
   const unchanged = !!(cur?.synth_updated && cur.synth_identity === synth.identity && Number(cur.synth_count) === collected && Number(cur.prev_ev) === (evidenceReviews as any[]).length);
   const synthTs = unchanged ? cur.synth_updated : new Date();
+  const excluded = pst === "excluded"; // 콘셉트/업종/오염 '영구 제외'(비카페·식당·이름충돌) — 어떤 자동복원도 안 풂. 사람만 해제.
   const held = pst === "held"; // 그라운딩 '근거0건' 확정 보류 — 재합성해도 비공개 고정
   const stuckNoise = pst === "noise" || noisy; // 노이즈(이름 오염) 한번 걸리면 영구 탈락
-  const newPst = held ? "held" : stuckNoise ? "noise" : inPipeline ? (ruleOk ? "pending" : "rejected") : pst;
-  const publish = (held || stuckNoise || inPipeline) ? false : ruleOk; // held·노이즈·파이프라인은 비공개 고정, 나머지는 규칙대로
+  const newPst = excluded ? "excluded" : held ? "held" : stuckNoise ? "noise" : inPipeline ? (ruleOk ? "pending" : "rejected") : pst;
+  const publish = (excluded || held || stuckNoise || inPipeline) ? false : ruleOk; // 제외·held·노이즈·파이프라인은 비공개 고정
 
   if (llmJudged) {
     await sql`UPDATE cafes SET synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_coherence=${coherence}, offctx_rate=${offctx}, needs_llm=${needsLLM}, borderline_count=${blCount}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${safeJson(evidenceReviews)}, synth_reviews_all=${allEv}, char_scores=${safeJson(charScores)}, synth_quality=${safeJson(quality)}, review_dates=${safeJson(reviewDates)}, pipeline_status=${newPst}, synth_updated=${synthTs}, llm_judged_at=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN 36.8 AND 38.3 AND lng BETWEEN 124.5 AND 127.9) WHERE id=${cafeId}`;
@@ -245,7 +246,7 @@ export async function holdZeroEvidenceSuspects(): Promise<{ held: number; releas
 //   '카테고리 없음'으로는 절대 안 내림(누락 ≠ 비카페) — '명백한 비카페 카테고리가 박혀 있을 때'만.
 export async function healNonCafeCategory(): Promise<{ held: number; names: string[] }> {
   const rows = (await sql`
-    UPDATE cafes SET published = false, pipeline_status = 'held'
+    UPDATE cafes SET published = false, pipeline_status = 'excluded'
     WHERE published = true AND naver_category IS NOT NULL
       AND (
         naver_category ~ '(건설|미장|타일|방수|도배|식물원|수목원|동물원|자동차|정비소|주유|부동산|공인중개|병원|의원|약국|한의원|치과|동물병원|미용실|헤어샵|네일|왁싱|에스테틱|피부관리|펜션|모텔|캠핑,야영|글램핑|변호사|법무사|세무사|회계|보험|은행|증권|독서실|고시원|장례|예식장|웨딩홀|장소대여)'
@@ -259,7 +260,7 @@ export async function healNonCafeCategory(): Promise<{ held: number; names: stri
   //   애견·고양이·키즈·스터디·만화·룸·보드게임·방탈출·노래·찜질방 + 서점(소매). 이 서비스는 커피/디저트 카페만 다룬다.
   //   (북카페·갤러리카페·플라워카페·브런치 등 '커피를 파는' 곳은 보존 — 여기 패턴에 없음)
   const off = (await sql`
-    UPDATE cafes SET published = false, pipeline_status = 'held'
+    UPDATE cafes SET published = false, pipeline_status = 'excluded'
     WHERE published = true AND naver_category IS NOT NULL
       AND naver_category ~ '(애견|애완|반려동물|펫카페|고양이카페|동물카페|키즈|실내놀이터|놀이방|스터디카페|독서실|만화방|만화카페|룸카페|멀티방|파티룸|방탈출|보드게임|보드카페|볼링|당구|스크린골프|골프연습|코인노래|노래방|찜질방|사우나|클라이밍|트램폴린|트램펄린|서점)'
     RETURNING name`) as any[];
