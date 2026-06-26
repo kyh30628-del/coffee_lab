@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
 import { embedBatch, toVectorLiteral, EMBED_DIM, hasEmbedKey, buildCafeEmbedText } from "@/lib/embed";
+import { PRIORITY_AREAS } from "@/lib/discover";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
@@ -27,7 +28,7 @@ export async function GET(req: NextRequest) {
       WHERE (published = true OR pipeline_status = 'pending')
         AND synth_updated IS NOT NULL
         AND (embedding IS NULL OR embed_updated IS NULL OR embed_updated < synth_updated)
-      ORDER BY (pipeline_status = 'pending') DESC NULLS LAST, (embedding IS NOT NULL), embed_updated ASC NULLS FIRST
+      ORDER BY (pipeline_status = 'pending') DESC NULLS LAST, (area = ANY(${PRIORITY_AREAS})) DESC, (embedding IS NOT NULL), embed_updated ASC NULLS FIRST
       LIMIT 600`) as unknown as any[];
 
     let updated = 0;

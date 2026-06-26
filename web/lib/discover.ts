@@ -41,6 +41,11 @@ export const DISCOVER_KEYWORDS = [
   "라떼맛집", "아메리카노맛집", "비건카페", "밀크티전문점", "차전문점",
 ];
 
+// 🎯 우선 지역(사장님 지정) — 신규 합성·임베딩·공개·발굴에서 항상 먼저 처리.
+//   cafes.area는 접두사 없음("송파구"), discovery_state.region은 접두사 있음("서울 송파구") → 두 형식 분리.
+export const PRIORITY_AREAS = ["송파구", "강동구", "구리시"];
+export const PRIORITY_REGIONS = ["서울 강동구", "서울 송파구", "경기 구리시"];
+
 // 수도권 전 지역 (검색용 region, 저장용 areaLabel) — 에이전트가 순회 발굴
 export const METRO_REGIONS: { region: string; areaLabel: string }[] = (() => {
   const R: Record<string, string[]> = {

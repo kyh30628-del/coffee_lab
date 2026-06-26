@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
-import { discoverRegion, METRO_REGIONS } from "@/lib/discover";
+import { discoverRegion, METRO_REGIONS, PRIORITY_REGIONS } from "@/lib/discover";
 import { synthAndStore } from "@/lib/synthStore";
 import { mineArea } from "@/lib/reviewMiner";
 export const runtime = "nodejs";
@@ -29,7 +29,9 @@ export async function GET(req: NextRequest) {
     const t0 = Date.now();
     const discoveries: { region: string; found?: number; inserted?: number; stopped?: boolean; error?: string }[] = [];
     while (Date.now() - t0 < GROW_BUDGET_MS) {
-      const target = (await sql`SELECT region, area_label FROM discovery_state ORDER BY last_run ASC NULLS FIRST LIMIT 1`)[0] as { region: string; area_label: string } | undefined;
+      // 🎯 우선 지역은 6시간 이상 지났으면 큐 맨앞으로(다른 지역 굶기지 않게 신선도 바닥만 보장), 그 외엔 오래된 순.
+      const target = (await sql`SELECT region, area_label FROM discovery_state
+        ORDER BY (region = ANY(${PRIORITY_REGIONS}) AND (last_run IS NULL OR last_run < now() - interval '6 hours')) DESC, last_run ASC NULLS FIRST LIMIT 1`)[0] as { region: string; area_label: string } | undefined;
       if (!target) break;
       try {
         const d = await discoverRegion(target.region, target.area_label ?? target.region, undefined, { deadlineMs: t0 + GROW_BUDGET_MS, sorts: ["comment", "random"] });

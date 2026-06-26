@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
 import { synthAndStore } from "@/lib/synthStore";
+import { PRIORITY_AREAS } from "@/lib/discover";
 export const runtime = "nodejs";
 export const maxDuration = 300; // 신규 큐를 시간예산껏 비움
 
@@ -20,7 +21,7 @@ export async function GET(req: NextRequest) {
     let processed = 0, published = 0, skipped = 0, failed = 0;
     // 미합성 우선(신규), 가장 오래된 순. 시간예산까지 배치로 순회.
     while (Date.now() - t0 < BUDGET_MS) {
-      const batch = (await sql`SELECT id, name, area FROM cafes WHERE synth_updated IS NULL ORDER BY created_at ASC NULLS FIRST LIMIT 8`) as unknown as { id: number; name: string; area: string }[];
+      const batch = (await sql`SELECT id, name, area FROM cafes WHERE synth_updated IS NULL ORDER BY (area = ANY(${PRIORITY_AREAS})) DESC, created_at ASC NULLS FIRST LIMIT 8`) as unknown as { id: number; name: string; area: string }[];
       if (!batch.length) break;
       for (const cafe of batch) {
         if (Date.now() - t0 >= BUDGET_MS) break;
