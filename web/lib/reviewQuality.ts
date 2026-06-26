@@ -64,6 +64,11 @@ const AD_STRONG = /(협찬|체험단|제공\s*받|원고료|소정의|대가성|
 //   ⚠️ '내돈내산'은 면책 아님 — '체험단으로 갔지만 (이전엔)내돈내산' 같이 실제 협찬받은 글에도 붙으므로,
 //      능동적 협찬신호(체험단·협찬받음·제공받음)가 있으면 제외(엄격 — 진짜 후기 해자).
 const AD_DISCLAIM = /(협찬|광고|제공|대가|유료|체험단)\s*([xX✕✖]|아닌|아니|아님|없이|없는|없습니다|없음|받지\s*않)|비협찬/;
+// 식당 메인 메뉴어(카페 아닌 '음식점' 시그널). 같은 상호 다른 음식점('장꼬방'+'묵은김치찌개') 후기 분리용.
+//   카페가 흔히 파는 것(토스트·샌드위치·파스타·브런치)은 제외 — 명백한 한식·중식 '식당 본메뉴'만.
+const RESTAURANT_MAIN_SRC = "(묵은김치|김치찌개|된장찌개|부대찌개|동태찌개|순두부찌개|순두부|찌개|찌게|백반|국밥|순대국|해장국|감자탕|짜장면|짜장|짬뽕|탕수육|보쌈|족발|곱창|막창|삼겹살|갈비탕|갈비찜|불고기|제육|돈가스|돈까스|냉면|칼국수|쌈밥|한정식|매운탕|추어탕|설렁탕|곰탕|닭갈비|찜닭|아구찜|해물찜|쌀국수|분식)";
+const RESTAURANT_MAIN = new RegExp(RESTAURANT_MAIN_SRC);
+const RESTAURANT_MAIN_ADJ = "[가-힣]{0,4}" + RESTAURANT_MAIN_SRC;
 
 // 수도권 밖 주요 도시·도(이 DB는 수도권 전용 → 제목이 이 지역이면 동명 카페일 확률 높음)
 const NON_METRO = ["충주", "청주", "충북", "충남", "대전", "세종", "천안", "아산", "대구", "부산", "울산", "포항",
@@ -401,6 +406,16 @@ export function verifyReview(input: QualityInput): QualityResult {
     // 브랜드만 일치하고 '이 지점' 신호가 전혀 없음 → verified 불가, 경계(LLM이 지점 확인)
     if (!branchSignal && (visit || substance >= 1)) {
       return { verdict: "rejected", score: 20, reasons: ["지점 불명확(브랜드만 일치) — LLM이 지점 확인"], borderline: true, signals: sig };
+    }
+  }
+  // 🍲 같은 상호 '다른 음식점' 분리: 카페명 바로 뒤에 식당 메인메뉴어가 붙으면('장꼬방'→'장꼬방묵은김치찌개전문')
+  //   = 같은 이름 다른 음식점 후기 → 배제. 빙수·디저트 후기는 살리고 찌개·백반만 거른다.
+  //   (카페 자신이 그 메뉴명을 가진 경우는 제외 — '○○김치찌개'라는 카페명이면 적용 안 함)
+  if ((nameInTitle || nameInBody) && nameN.length >= 2 && !RESTAURANT_MAIN.test(nameN)) {
+    const esc = nameN.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const adj = new RegExp(esc + RESTAURANT_MAIN_ADJ);
+    if (adj.test(norm(`${title} ${body}`))) {
+      return { verdict: "rejected", score: 5, reasons: ["같은 상호 다른 음식점 후기(카페명+식당메뉴 결합)"], signals: sig };
     }
   }
   if (generic && !nameInTitle) {
