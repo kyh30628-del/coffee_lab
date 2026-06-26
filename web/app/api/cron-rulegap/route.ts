@@ -14,9 +14,13 @@ export const maxDuration = 300;
 const guShort = (a: string) => String(a).replace(/(특별자치시|특별자치도|광역시|특별시|자치시|자치구|시|군|구|도)$/, "");
 const NON_BRANCH = /(백화점|면세점|서점|문고점|전문점|체인점|할인점|편의점|음식점|분식점|노점|상점|약국점|마트점|장점|단점|시점|관점|초점|약점|강점|정점|요점|중점|종점|만점|채점|별점|평점|빵점|매점|거점|기점|이점|반점|문제점|차이점|공통점|장단점|정기점|가맹점|직영점|무인점|판매점|득점|실점|승점|벌점|가점|감점|배점)$/;
 const STOP = new Set(["오늘","어제","내일","요즘","이번","다음","지난","우리","여기","거기","저기","그곳","이곳","정말","진짜","그냥","조금","너무","완전","약간","아주","매우","커피","카페","메뉴","사장","직원","가격","분위기","자리","주차","방문","후기","추천","시간","요일","평일","주말","오전","오후","매일","자주","근처","우리집","본점","지점"]);
-// 비카페 업체어(다른 업종 후기를 끌어온 이름충돌·오염 신호) vs 카페어
-const NONCAFE_ENTITY = /(헬스장|휘트니스|피트니스|캠핑장|글램핑|펜션|모텔|호텔|필라테스|요가원|학원|병원|의원|치과|약국|향수공방|공방|독서실|고시원|낚시터|골프장|볼링장|당구장|찜질방|사우나|편의점|세븐일레븐|한정식|밴댕이|솥밥|회무침|민박|수목원|식물원|동물원|캠핑|글램)/g;
+// 비카페 '업체 정체성' 어(이름충돌로 다른 업종 후기를 끌어온 신호) vs 카페어.
+//   ⚠️ 위치형 단어(병원·호텔·식물원·학원)는 제외 — 'OO병원점' 같은 정상 카페·베이커리가 거기 위치한 경우라 오탐.
+//   여기엔 '그 가게가 곧 그 업종'인 정체성 단어만(캠핑장·펜션·헬스장·공방·한정식 등).
+const NONCAFE_ENTITY = /(헬스장|휘트니스|피트니스|캠핑장|글램핑|글램핑장|펜션|모텔|민박|필라테스|요가원|향수공방|도자기공방|공방|낚시터|볼링장|당구장|찜질방|사우나|한정식|밴댕이무침|회무침|솥밥|매운탕|숙소|객실|입실|퇴실|차박|오토캠핑)/g;
 const CAFE_TERM = /(커피|아메리카노|라떼|에스프레소|디저트|케이크|스콘|베이글|브런치|원두|카페|음료|마카롱|와플|빙수|로스팅|드립)/g;
+// 이름이 카페/베이커리형이면 오염 의심에서 제외(곤트란쉐리에·타르데마 베이커리 등 정상 브랜드의 병원점·식물원점 오탐 방지)
+const GOOD_NAME = /(카페|까페|커피|로스터|로스팅|브런치|디저트|베이커리|베이글|제과|찻집|티하우스|coffee|cafe)/i;
 const DISTRICT_THRESHOLD = 5; // 생활권 자동학습: 이만큼의 서로 다른 카페에서 오염으로 등장해야
 
 const authed = (req: NextRequest) => {
@@ -68,7 +72,7 @@ export async function GET(req: NextRequest) {
         // 이름충돌·오염 감지: 노출리뷰가 비카페 업체어(헬스장·캠핑장·공방·펜션·한정식 등)에 지배되면 의심.
         const allTxt = revs.map((r: any) => (typeof r === "string" ? r : (r.quote || r.title || "")) || "").join(" ");
         const ncN = (allTxt.match(NONCAFE_ENTITY) || []).length, cfN = (allTxt.match(CAFE_TERM) || []).length;
-        if (ncN >= 3 && ncN > cfN * 2) pollutedCafes.push({ id: c.id, name: c.name, nc: ncN, cf: cfN });
+        if (ncN >= 3 && ncN > cfN * 2 && !GOOD_NAME.test(c.name)) pollutedCafes.push({ id: c.id, name: c.name, nc: ncN, cf: cfN });
         for (const r of revs) {
           const txt: string = (typeof r === "string" ? r : (r.quote || r.title || "")) || "";
           const dongHere = !!dong && (txt.includes(dong) || (dongCore.length >= 2 && txt.includes(dongCore)));
@@ -118,7 +122,6 @@ export async function GET(req: NextRequest) {
     //   (콘셉트 적합성=비공개 결정이라 자동 아님. 애견카페 같은 누락을 사장님 발견 전에 먼저 잡는다)
     const GOOD_CAT = /(카페|커피|로스터|디저트|베이커리|제과|브런치|찻집|티룸|티하우스|빵|케이크|케익|도넛|도너츠|베이글|아이스크림|빙수|마카롱|와플|스무디|주스|에이드|쿠키|타르트|푸딩|차,)/;
     const OFF_CAT = /(애견|애완|반려동물|펫카페|고양이카페|동물카페|키즈|실내놀이터|놀이방|스터디카페|독서실|만화방|만화카페|룸카페|멀티방|파티룸|방탈출|보드게임|보드카페|볼링|당구|스크린골프|골프연습|코인노래|노래방|찜질방|사우나|클라이밍|트램폴린|트램펄린|서점)/;
-    const GOOD_NAME = /(카페|까페|커피|로스터|로스팅|브런치|디저트|베이커리|베이글|제과|찻집|티하우스|coffee|cafe)/i;
     const okIds = new Set(((await sql`SELECT term FROM learned_terms WHERE kind='cafe_ok' AND status='active'`) as { term: string }[]).map((r) => String(r.term)));
     const catCafes = (await sql`SELECT id, name, COALESCE(naver_category,'') cat FROM cafes WHERE published=true AND naver_category IS NOT NULL AND naver_category <> ''`) as { id: number; name: string; cat: string }[];
     const unknownByCat: Record<string, { n: number; samples: number[] }> = {};
