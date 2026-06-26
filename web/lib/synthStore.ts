@@ -141,8 +141,16 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   const loc = (await sql`SELECT area, dong FROM cafes WHERE id=${cafeId}`)[0] as any; // 지역어(시+동) — coherence가 지역어를 식별토큰서 빼게
   const coherence = nameCoherence(name, (evidenceReviews as any[]).map((r) => r?.quote || ""), [loc?.area, loc?.dong].filter(Boolean));
   const offctx = offctxRate(((allEvidence ?? evidenceReviews) as any[]).map((r) => r?.quote || "")); // 맥락없음 비율(관제탑 감시)
+  // 🚨 비카페 업체 지배: 노출 리뷰가 '다른 업종 업체어'(킥복싱·냉삼·만두·미용실·펜션…)에 지배되면
+  //   이름이 겹쳐 coherence가 속아도(라온=라온킥복싱, PLMM사가정=사가정 만두집) 오염 → 공개 차단.
+  //   카페어보다 비카페어가 많고 다수 후기에 퍼져 있을 때만(근처 헬스장 한번 언급한 정상카페는 통과).
+  const qz = (evidenceReviews as any[]).map((r) => String(r?.quote || ""));
+  const NCE = /(킥복싱|복싱|헬스장|휘트니스|피트니스|필라테스|요가원|냉삼|삼겹살|족발|보쌈|곱창|막창|만두|국밥|칼국수|순대|감자탕|미용실|네일|왁싱|에스테틱|피부관리|학원|아카데미|병원|의원|치과|약국|한의원|펜션|모텔|민박|캠핑장|글램핑|공방|낚시터|볼링장|당구장|찜질방|사우나|킨더|유치원|어린이집|키즈|독서실|고시원|부동산|중개)/;
+  const CFE = /(커피|카페|디저트|베이커리|브런치|라떼|아메리카노|에스프레소|원두|음료|케이크|스콘|베이글|빙수|로스팅|드립|티룸)/;
+  const entN = qz.filter((q) => NCE.test(q)).length, cfeN = qz.filter((q) => CFE.test(q)).length;
+  const entityPolluted = qz.length >= 4 && entN >= Math.ceil(qz.length * 0.4) && entN > cfeN;
   //   + 이름이 '일반 음식·메뉴어'(베이글·아메리카노 등)면 음식 리뷰가 전부 매칭돼 식별 불가 → 노이즈로 공개 차단.
-  const noisy = (collected >= 5 && coherence < 0.4) || isGenericFoodName(name);
+  const noisy = (collected >= 5 && coherence < 0.4) || isGenericFoodName(name) || entityPolluted;
   // 🔀 판정 분기 신호: 진짜 '맥락판단'이 필요한 경우만 LLM으로(규칙 우선 극대화).
   //   ⚠️ 경계후기 존재만으로 LLM 보내지 않음 — 경계후기는 어차피 합성서 제외되어 공개 내용에 안 들어가고,
   //      이미 '깨끗한 후기'로 검증/참고 등급이 난 카페는 규칙으로 공개해도 안전(품질 위험 0).
