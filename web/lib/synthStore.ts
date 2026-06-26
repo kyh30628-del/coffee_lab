@@ -138,7 +138,8 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   // 공개 가드: 등급 충족 + 비카페 아님 + 노이즈 게이트(후기가 실제 그 카페 얘기인지).
   //   노이즈: 공개건수(5+)인데 이름 일관성<40% → 오염 의심 → 공개 보류. 사용자에 garbage 안 나감.
   //   저건수도 적용('만조커피 9건'이 전부 동네 딴 가게였던 사례 차단). 전체이름 매칭은 nameCoherence가 보완.
-  const coherence = nameCoherence(name, (evidenceReviews as any[]).map((r) => r?.quote || ""));
+  const loc = (await sql`SELECT area, dong FROM cafes WHERE id=${cafeId}`)[0] as any; // 지역어(시+동) — coherence가 지역어를 식별토큰서 빼게
+  const coherence = nameCoherence(name, (evidenceReviews as any[]).map((r) => r?.quote || ""), [loc?.area, loc?.dong].filter(Boolean));
   const offctx = offctxRate(((allEvidence ?? evidenceReviews) as any[]).map((r) => r?.quote || "")); // 맥락없음 비율(관제탑 감시)
   //   + 이름이 '일반 음식·메뉴어'(베이글·아메리카노 등)면 음식 리뷰가 전부 매칭돼 식별 불가 → 노이즈로 공개 차단.
   const noisy = (collected >= 5 && coherence < 0.4) || isGenericFoodName(name);
@@ -424,7 +425,7 @@ export async function healPublishedAudit(limit = 600, unpubCap = 120): Promise<{
     }
     if (after?.published) {
       const q = (after.synth_reviews || []).map((e: any) => e?.quote || "").filter(Boolean);
-      const coh = q.length >= 3 ? nameCoherence(r.name, q) : 1;
+      const coh = q.length >= 3 ? nameCoherence(r.name, q, [r.area]) : 1;
       if (coh < 0.4) {
         flagged++;
         await sql`INSERT INTO audit_flags (cafe_id, cafe_name, issue, detail, resolved)

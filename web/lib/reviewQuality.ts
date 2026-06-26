@@ -150,6 +150,8 @@ const VENUE_WORDS = [
   "병원", "대학교", "캠퍼스", "롯데시네마", "cgv", "메가박스", "아쿠아리움", "컨벤션",
   // 호텔·타워·전통시장
   "호텔", "타워", "광장시장", "통인시장",
+  // 구조·테마 수식어(같은 유형 다른 가게와 공유 — 식별어 불가): '옛날에 한옥카페'가 '풍물기행 한옥카페' 리뷰를 끌어오던 오염 차단
+  "한옥", "고택", "정원", "농원", "수목원", "식물원", "온실", "루프탑", "옥상", "테라스", "한옥카페", "감성카페", "대형카페", "정원카페", "마을",
 ];
 // 신도시·생활권 수식어(시·군·구가 아닌 동네名) — 위치 수식어로만 작동
 const DISTRICT_WORDS = ["위례", "미사", "다산", "별내", "광교", "동탄", "운정", "송도", "청라", "영종", "마곡", "지축", "삼송", "향동", "고덕", "감일", "갈매", "한강신도시", "위례신도시"];
@@ -219,10 +221,12 @@ export function coreTokens(name: string, areaTerms: string[]): string[] {
 // 노이즈 게이트: 후기들이 '실제로 그 카페'를 말하는 비율(이름 일관성).
 //   개별 verifyReview를 통과해도, 묶어 보면 카페명이 거의 안 나오면 오염 의심.
 //   유형별 규칙으로 못 잡은 오염(부분문자열·구문·신종)을 공개 전에 잡는 안전망.
-export function nameCoherence(name: string, quotes: string[]): number {
+export function nameCoherence(name: string, quotes: string[], areaTerms: string[] = []): number {
   const qs = (quotes || []).filter(Boolean);
   if (!qs.length) return 1; // 표본 없으면 보류(공개 막지 않음)
-  const toks = coreTokens(name, []);
+  // ⚠️ areaTerms를 넘겨야 지역어('사가정'·'진리')가 식별토큰에서 빠진다 — 안 넘기면 지역어가 같은 동네
+  //   다른 업체(사가정 만두집·미용실) 리뷰와 매칭돼 오염 카페가 일치율 100%로 게이트를 통과한다.
+  const toks = coreTokens(name, areaTerms);
   const terms = toks.length ? toks : [name];
   const nameN = norm(name); // 전체 이름(붙여쓰기) — '성북동빵공장'처럼 토큰 경계검사가 놓치는 경우 보완
   let hit = 0;
