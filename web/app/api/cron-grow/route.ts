@@ -35,6 +35,12 @@ export async function GET(req: NextRequest) {
       if (!target) break;
       try {
         const d = await discoverRegion(target.region, target.area_label ?? target.region, undefined, { deadlineMs: t0 + GROW_BUDGET_MS, sorts: ["comment", "random"] });
+        if ((d as any).apiError) {
+          // 🛑 네이버 쿼터 소진 — 빈 채로 last_run을 굳히지 않는다(지역이 '발굴완료'로 잘못 마킹돼 한동안 재발굴 안 되는 버그 방지).
+          //   last_run 그대로 두고 이번 회차 중단 → 쿼터 회복되는 다음 cron이 이 지역부터 다시 시도.
+          discoveries.push({ region: d.region, error: "naver-quota(보존)" });
+          break;
+        }
         await sql`UPDATE discovery_state SET last_run=now(), last_found=${d.found}, last_inserted=${d.inserted} WHERE region=${target.region}`;
         discoveries.push({ region: d.region, found: d.found, inserted: d.inserted, stopped: d.stopped });
       } catch (e) {

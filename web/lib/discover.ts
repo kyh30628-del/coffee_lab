@@ -194,7 +194,7 @@ export const isNonCafe = (name: string, category: string) => {
 async function localSearch(query: string, sort: "comment" | "random" = "comment") {
   const url = `https://openapi.naver.com/v1/search/local.json?query=${encodeURIComponent(query)}&display=5&sort=${sort}`;
   const res = await fetch(url, { headers: { "X-Naver-Client-Id": ID!, "X-Naver-Client-Secret": SECRET! } });
-  if (!res.ok) return [];
+  if (!res.ok) return null; // 쿼터(429)·API 오류 → null로 신호(빈 결과 [] 와 구분: '못 가져옴' vs '진짜 없음')
   const data = await res.json();
   return (data.items ?? []).map((it: any) => ({
     name: stripTags(it.title),
@@ -218,8 +218,10 @@ export async function discoverRegion(region: string, areaLabel: string, keywords
   const seen = new Set<string>();
   const found: any[] = [];
   let stopped = false;
+  let apiFails = 0; // 네이버 쿼터/API 실패 횟수 — found=0인데 이게 >0이면 '진짜 빈 지역'이 아니라 쿼터 소진
   const collect = async (query: string, sort: "comment" | "random") => {
     const items = await localSearch(query, sort);
+    if (items === null) { apiFails++; await new Promise((r) => setTimeout(r, 220)); return; }
     for (const it of items) {
       if (!it.name || !it.lat || !it.lng) continue;
       if (isFranchise(it.name) || isNonCafe(it.name, it.category)) continue;
@@ -282,5 +284,7 @@ export async function discoverRegion(region: string, areaLabel: string, keywords
       ON CONFLICT (place_id) DO NOTHING`;
     inserted++;
   }
-  return { region, found: found.length, inserted, skipped, backfilled, stopped, tasks: tasks.length, names: found.map((f) => f.name) };
+  // apiError: 아무것도 못 건졌는데 API 실패가 있었음 = 쿼터 소진(진짜 빈 지역 아님) → 호출부가 last_run 안 굳히게.
+  const apiError = found.length === 0 && apiFails > 0;
+  return { region, found: found.length, inserted, skipped, backfilled, stopped, apiError, apiFails, tasks: tasks.length, names: found.map((f) => f.name) };
 }
