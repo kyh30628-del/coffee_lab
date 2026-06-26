@@ -3,6 +3,7 @@ import { sql, ensureSchema } from "@/lib/db";
 import { discoverRegion, METRO_REGIONS, PRIORITY_REGIONS } from "@/lib/discover";
 import { synthAndStore } from "@/lib/synthStore";
 import { mineArea } from "@/lib/reviewMiner";
+import { recordRun } from "@/lib/agentLog";
 export const runtime = "nodejs";
 export const maxDuration = 300; // 여러 지역 발굴 + 합성 (플랜 상한까지 사용)
 
@@ -79,6 +80,7 @@ export async function GET(req: NextRequest) {
     const published = synth.filter((s: any) => s.published).length;
 
     const remainingRegions = (await sql`SELECT COUNT(*)::int n FROM discovery_state WHERE last_run IS NULL`)[0].n;
+    await recordRun("cron-grow", true, `발굴 ${discoveries.length}지역 신규 ${totalInserted} 합성 ${synth.length} 공개 ${published}`, totalInserted);
     return NextResponse.json({
       ok: true, ranAt: new Date().toISOString(),
       regionsSwept: discoveries.length, totalInserted, discoveries, remainingRegions,
@@ -86,6 +88,7 @@ export async function GET(req: NextRequest) {
       synthesized: synth.length, published, llmRescued: rescued, pendingNew,
     });
   } catch (e) {
+    await recordRun("cron-grow", false, String(e).slice(0, 150));
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
 }

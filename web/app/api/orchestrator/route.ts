@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
-import { synthAndStore, finalizePipeline, scrubPublishedPII, healGroundingSuspects, holdZeroEvidenceSuspects, healPublishedAudit, healNonCafeCategory } from "@/lib/synthStore";
+import { synthAndStore, finalizePipeline, scrubPublishedPII, healGroundingSuspects, holdZeroEvidenceSuspects, healPublishedAudit, healNonCafeCategory, healOutOfBox } from "@/lib/synthStore";
+import { recordRun } from "@/lib/agentLog";
 export const runtime = "nodejs";
 export const maxDuration = 120; // 재검증 자가감사(healPublishedAudit) 배치 여유
 
@@ -307,6 +308,7 @@ export async function GET(req: NextRequest) {
       try { const z = await holdZeroEvidenceSuspects(); if (z.held > 0) { unpubThisRun += z.held; healed.push(`근거0건 ${z.held}곳 자동 비공개(${z.names.slice(0, 3).join(", ")})`); } if (z.released > 0) healed.push(`복원 ${z.released}곳`); } catch {}
       // (e-2) '절대 카페 아님' 카테고리 자동 비공개 — 그랜드파더 비카페(건설·수목원·병원·미용·캠핑 등)를 카테고리로 자동 솎음(수기 불필요)
       try { const nc = await healNonCafeCategory(); if (nc.held > 0) { unpubThisRun += nc.held; healed.push(`비카페 카테고리 ${nc.held}곳 자동 비공개(${nc.names.slice(0, 3).join(", ")})`); } } catch {}
+      try { const ob = await healOutOfBox(); if (ob.excluded > 0) { unpubThisRun += ob.excluded; healed.push(`수도권 밖(비수도권) ${ob.excluded}곳 자동 제외(${ob.names.slice(0, 3).join(", ")})`); } } catch {}
       // (f) 통합 재검증 자가치유 — 공개 카페를 커서로 순환하며 현재의 모든 게이트(비카페·프랜차이즈·광고·동명오염·등급)로
       //     재합성. 규칙 개선이 기존 공개 데이터에 며칠 안에 자동 반영됨. 대량 비공개는 규칙회귀로 보고 즉시 중단·경보.
       try {
@@ -414,8 +416,10 @@ export async function GET(req: NextRequest) {
     await sql`INSERT INTO orchestrator_state (id, health, updated_at) VALUES (1, ${JSON.stringify(health)}, now())
       ON CONFLICT (id) DO UPDATE SET health = EXCLUDED.health, updated_at = now()`;
 
+    if (heal) await recordRun("orchestrator-heal", true, `${overall} · 자동조치 ${healed.length}건`, healed.length);
     return NextResponse.json({ ok: true, ...health });
   } catch (e) {
+    if (req.nextUrl.searchParams.get("heal") === "1") await recordRun("orchestrator-heal", false, String(e).slice(0, 150));
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
 }

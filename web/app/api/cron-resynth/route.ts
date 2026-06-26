@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
 import { synthAndStore } from "@/lib/synthStore";
+import { recordRun } from "@/lib/agentLog";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -54,8 +55,10 @@ export async function GET(req: NextRequest) {
       catch (e) { results.push({ name: cafe.name, ok: false, error: String(e) }); }
       await new Promise((r) => setTimeout(r, 400));
     }
+    await recordRun("cron-resynth", true, `raw정리 ${purged.length} 유튜브 ${ytRefreshed.length} 재합성 ${results.length}`, results.length);
     return NextResponse.json({ ok: true, ranAt: new Date().toISOString(), rawPurged: purged.length, ytRefreshed: ytRefreshed.length, results });
   } catch (e) {
+    await recordRun("cron-resynth", false, String(e).slice(0, 150));
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
 }

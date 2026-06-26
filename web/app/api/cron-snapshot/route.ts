@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { recordRun } from "@/lib/agentLog";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
@@ -22,6 +23,7 @@ export async function GET(req: NextRequest) {
       if ((d.remaining ?? 0) === 0 || (d.recorded ?? 0) === 0) break;
       await new Promise((x) => setTimeout(x, 300));
     }
+    await recordRun("cron-snapshot", true, `스냅샷 ${totalRecorded} ${rounds}라운드`, totalRecorded);
     return NextResponse.json({ ok: true, ranAt: new Date().toISOString(), totalRecorded, rounds });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });

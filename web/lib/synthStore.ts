@@ -282,6 +282,16 @@ export async function healNonCafeCategory(): Promise<{ held: number; names: stri
   return { held: rows.length + off.length, names: [...rows.map((r) => r.name), ...off.map((r) => r.name)].slice(0, 12) };
 }
 
+// 🗺️ 수도권 박스 밖(비수도권 동명업체) 자동 제외 — 어느 적재 경로(발굴·마이닝·상가·수집)로 들어왔든
+//   2시간마다 일괄 정리. 공개 게이트가 노출은 이미 막지만, DB 청결 + 합성·임베딩 낭비 제거 + 미래 경로까지 커버하는 안전망.
+export async function healOutOfBox(): Promise<{ excluded: number; names: string[] }> {
+  const rows = (await sql`UPDATE cafes SET published = false, pipeline_status = 'excluded', updated_at = now()
+    WHERE lat IS NOT NULL AND NOT (lat BETWEEN 36.8 AND 38.3 AND lng BETWEEN 124.5 AND 127.9)
+      AND pipeline_status IS DISTINCT FROM 'excluded'
+    RETURNING name`) as any[];
+  return { excluded: rows.length, names: rows.map((r) => r.name).slice(0, 8) };
+}
+
 // 🩺 LLM 그라운딩 의심(업체혼동·환각) 자가치유 — 재합성으로 교정(개선엔진: 오염제거·로스팅환각 차단).
 //   아직 교정 안 된 것(synth_updated <= 그라운딩 검사시각)만 재합성 → 로컬 그라운딩이 재검사해 플래그 해소.
 export async function healGroundingSuspects(): Promise<{ resynthed: number; names: string[]; suspects: number }> {

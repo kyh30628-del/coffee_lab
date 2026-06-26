@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
 import { synthAndStore } from "@/lib/synthStore";
 import { PRIORITY_AREAS } from "@/lib/discover";
+import { recordRun } from "@/lib/agentLog";
 export const runtime = "nodejs";
 export const maxDuration = 300; // 신규 큐를 시간예산껏 비움
 
@@ -35,8 +36,10 @@ export async function GET(req: NextRequest) {
       }
     }
     const pendingNew = (await sql`SELECT COUNT(*)::int n FROM cafes WHERE synth_updated IS NULL`)[0].n;
+    await recordRun("cron-synth", true, `합성 ${processed} 공개 ${published} 실패 ${failed} 신규대기 ${pendingNew}`, processed);
     return NextResponse.json({ ok: true, ranAt: new Date().toISOString(), processed, published, skipped, failed, pendingNew });
   } catch (e) {
+    await recordRun("cron-synth", false, String(e).slice(0, 150));
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
 }

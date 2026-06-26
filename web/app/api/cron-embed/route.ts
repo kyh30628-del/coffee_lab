@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
 import { embedBatch, toVectorLiteral, EMBED_DIM, hasEmbedKey, buildCafeEmbedText } from "@/lib/embed";
 import { PRIORITY_AREAS } from "@/lib/discover";
+import { recordRun } from "@/lib/agentLog";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
@@ -42,8 +43,10 @@ export async function GET(req: NextRequest) {
       }
     }
     const remain = (await sql`SELECT COUNT(*)::int n FROM cafes WHERE published = true AND embedding IS NULL`)[0].n;
+    await recordRun("cron-embed", true, `임베딩 ${updated} 남음 ${remain}`, updated);
     return NextResponse.json({ ok: true, ranAt: new Date().toISOString(), embedded: updated, remaining: remain });
   } catch (e) {
+    await recordRun("cron-embed", false, String(e).slice(0, 150));
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
 }

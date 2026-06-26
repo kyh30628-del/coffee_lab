@@ -68,6 +68,8 @@ export async function mineArea(areaLabel: string, opts?: { maxCalls?: number; ap
     const lat = Number(hit.mapy) / 1e7, lng = Number(hit.mapx) / 1e7;
     const nN = norm(name);
     if (!name || !lat || !lng || isNaN(lat) || isNaN(lng)) continue;
+    // 🗺️ 수도권 박스 밖(비수도권 동명업체)은 적재 안 함 — 네이버가 타지역 지점 반환해도 서비스(수도권)와 무관.
+    if (!(lat >= 36.8 && lat <= 38.3 && lng >= 124.5 && lng <= 127.9)) continue;
     // 최종 중복: 이름 또는 좌표 근사 또는 이번 배치 중복
     if (seen.has(nN) || haveN.some((h) => h.includes(nN) || nN.includes(h))
       || all.some((a) => a.lat && Math.abs(a.lat - lat) < 0.0005 && Math.abs(a.lng - lng) < 0.0005)) continue;

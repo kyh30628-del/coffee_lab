@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
+import { recordRun } from "@/lib/agentLog";
 import { proposeCategories } from "@/lib/categoryDiscover";
 
 export const runtime = "nodejs";
@@ -26,6 +27,7 @@ export async function GET(req: NextRequest) {
     const cands = await proposeCategories(quotes);
     if (!cands) return NextResponse.json({ ok: false, error: "발굴 실패(크레딧/오류) — 다음 달 재시도" });
     await sql`INSERT INTO category_candidates (candidates) VALUES (${JSON.stringify(cands)}::jsonb)`;
+    await recordRun("cron-discover-categories", true, `카테고리후보 ${cands.length}`, cands.length);
     return NextResponse.json({ ok: true, found: cands.length, candidates: cands, note: "후보 저장됨 — 검토 후 cafeProfile.ts에 추가" });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: String(e?.message ?? e).slice(0, 200) }, { status: 500 });

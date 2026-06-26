@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { ensureLearnedTable, loadLearnedTerms, getLearned, applyLearned, rollbackLearned } from "@/lib/learnedTerms";
+import { recordRun } from "@/lib/agentLog";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -148,6 +149,7 @@ export async function GET(req: NextRequest) {
     // 기록(검증·롤백 기준 + 관제탑 노출용)
     if (!dry) await sql`INSERT INTO rulegap_runs (published_before, learned, pending) VALUES (${pubNow}, ${JSON.stringify(learned)}::jsonb, ${JSON.stringify(pending)}::jsonb)`;
 
+    if (!dry) await recordRun("cron-rulegap", true, `학습 ${learned.length} 승인대기 ${pending.length} 롤백 ${rolledBack.length}`, learned.length);
     return NextResponse.json({
       ok: true, dry, ranAt: new Date().toISOString(), scanned,
       rolledBack,
@@ -155,6 +157,7 @@ export async function GET(req: NextRequest) {
       pendingCount: pending.length, pending: pending.slice(0, 30),
     });
   } catch (e: any) {
+    await recordRun("cron-rulegap", false, String(e?.message ?? e).slice(0, 150));
     return NextResponse.json({ ok: false, error: String(e?.message ?? e).slice(0, 300) }, { status: 500 });
   }
 }
