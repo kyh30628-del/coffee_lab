@@ -206,6 +206,22 @@ async function localSearch(query: string, sort: "comment" | "random" = "comment"
   }));
 }
 
+// 🔎 폐업 재확인: 카페가 네이버에 '아직 존재'하나? (닫힌 카페는 사라짐) — 권위적 신호.
+//   true=존재(이름매칭+좌표근접), false=명백히 없음, null=API오류/쿼터(판단보류).
+//   이전(확장이전)은 네이버에 있으므로 true → 유지(주소만 stale). 폐업은 검색에서 사라져 false.
+export async function naverExists(name: string, area: string, lat: number | null, lng: number | null): Promise<boolean | null> {
+  const items = await localSearch(`${area ?? ""} ${name}`.trim());
+  if (items === null) return null; // 쿼터/오류 → 판단 보류
+  const nm = (s: string) => (s || "").replace(/\s/g, "").toLowerCase();
+  const nN = nm(name);
+  return items.some((it: any) => {
+    const iN = nm(it.name);
+    const nameMatch = iN.length >= 2 && (iN.includes(nN) || nN.includes(iN));
+    const near = lat != null && it.lat != null && Math.abs(it.lat - lat) < 0.004 && Math.abs(it.lng - lng!) < 0.004;
+    return nameMatch && (near || lat == null);
+  });
+}
+
 // 한 지역 발굴: region=검색용(예 '서울 강동구'), areaLabel=저장용(예 '강동구')
 // 공격적 커버리지: sort=comment+random 2패스 + 동/도로 지리 세분화로 '검색 창'을 최대화 →
 //   프랜차이즈에 묻힌 리뷰 많은 동네카페를 더 건진다(쿼리당 5캡은 못 넘으니 창 다각화가 유일한 길).
