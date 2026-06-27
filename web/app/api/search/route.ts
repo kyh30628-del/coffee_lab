@@ -118,7 +118,8 @@ export async function GET(req: NextRequest) {
     const ql = q.toLowerCase();
     const tokens = Array.from(new Set(ql.split(/[\s,./?!~"'()]+/).filter((t) => t.length >= 2)));
     const hitConcepts = CONCEPTS.filter((c) => c.triggers.some((t) => ql.includes(t)));
-    const short = region.replace(/(특별시|광역시|시|군|구)$/, "");
+    const shortRaw = region.replace(/(특별시|광역시|시|군|구)$/, "");
+    const short = shortRaw.length >= 2 ? shortRaw : region; // '중구'→'중'(1자)는 중랑구까지 오매칭 → 전체이름 유지
     const p1 = `%${region}%`, p2 = `%${short}%`;
 
     let mode: "semantic" | "keyword" | "ai" = "keyword";
