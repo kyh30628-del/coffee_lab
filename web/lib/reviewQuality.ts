@@ -325,6 +325,12 @@ export function verifyReview(input: QualityInput): QualityResult {
       ? { verdict: "rejected", score: 18, reasons: ["제목은 다른 업종이나 본문에 카페 언급 — LLM 재판정"], borderline: true, signals: sig }
       : { verdict: "rejected", score: 4, reasons: ["다른 업종 글(제목이 비카페 업종)"], signals: sig };
   }
+  // [동명 비카페 업체] 비카페 업종어가 제목에 있고 카페맥락(커피·라떼·디저트…)이 글 전체에 전무하면,
+  //   카페명이 그 업체 상호 일부로 포함돼 nameInTitle을 우회해도 배제(봄날←필라테스 더 봄날, 마중←바다마중 횟집).
+  //   가드: CAFE_CONTEXT가 하나라도 있으면 진짜 카페 후기로 보고 통과(혼재 업체·실제 후기 보호 → 오탐 차단).
+  if (NONCAFE_BIZ.test(title) && !CAFE_CONTEXT.test(fullL)) {
+    return { verdict: "rejected", score: 4, reasons: ["동명 비카페 업체(업종어 지배·카페맥락 전무)"], signals: sig };
+  }
   // [비카페 주제 글] 문학·독서·게임·미디어 주제(시·그림책·게임 등)가 강하게 드러나는데 '카페 맥락어가
   //   전혀 없음' → 카페 이름이 유명 문구라서 딸려온 글(비에도지지않고=시). 카페 맥락 있으면 보존.
   if (OFFTOPIC_TOPIC.test(fullL) && !CAFE_CONTEXT.test(fullL)) {
