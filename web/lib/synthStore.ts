@@ -305,6 +305,25 @@ export async function healOutOfBox(): Promise<{ excluded: number; names: string[
   return { excluded: rows.length + adr.length, names };
 }
 
+// 🏷️ area 라벨 교정 — 발굴 당시 검색지역으로 area가 붙어 실제 주소 도시와 어긋나는 문제(경기 시/군·서울 구).
+//   검색·필터·SEO·폐업체크 오염 + closure 오탐 유발. 주소에서 진짜 도시를 파싱해 교정(2시간마다 안전망).
+export async function healAreaLabel(): Promise<{ fixed: number; names: string[] }> {
+  // 서울: 주소 구 ≠ area 구 (인천 제외). substring으로 주소의 첫 구 토큰 추출.
+  const seoul = (await sql`UPDATE cafes SET area = substring(address from '서울[^ ]* ([가-힣]+구)'), closure_misses = 0, updated_at = now()
+    WHERE address LIKE '서울%' AND area LIKE '%구' AND area NOT LIKE '인천%'
+      AND substring(address from '서울[^ ]* ([가-힣]+구)') IS NOT NULL
+      AND substring(address from '서울[^ ]* ([가-힣]+구)') <> area
+    RETURNING name`) as any[];
+  // 경기: 주소 시/군 ≠ area 시/군.
+  const gg = (await sql`UPDATE cafes SET area = substring(address from '경기[^ ]* ([가-힣]+[시군])'), closure_misses = 0, updated_at = now()
+    WHERE address LIKE '경기%' AND (area LIKE '%시' OR area LIKE '%군')
+      AND substring(address from '경기[^ ]* ([가-힣]+[시군])') IS NOT NULL
+      AND substring(address from '경기[^ ]* ([가-힣]+[시군])') <> area
+    RETURNING name`) as any[];
+  const names = [...seoul, ...gg].map((r) => r.name).slice(0, 8);
+  return { fixed: seoul.length + gg.length, names };
+}
+
 // 🩺 LLM 그라운딩 의심(업체혼동·환각) 자가치유 — 재합성으로 교정(개선엔진: 오염제거·로스팅환각 차단).
 //   아직 교정 안 된 것(synth_updated <= 그라운딩 검사시각)만 재합성 → 로컬 그라운딩이 재검사해 플래그 해소.
 export async function healGroundingSuspects(): Promise<{ resynthed: number; names: string[]; suspects: number }> {
