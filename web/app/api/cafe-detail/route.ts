@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
     await ensureSchema();
     const id = req.nextUrl.searchParams.get("id");
     if (!id) return NextResponse.json({ ok: false, error: "id 필요" }, { status: 400 });
-    const rows = await sql`SELECT area, synth_reviews, synth_reviews_all, synth_quality, llm_judged_at, synth_menu, price_hint, reputation_note FROM cafes WHERE id=${id} LIMIT 1`;
+    const rows = await sql`SELECT area, synth_reviews, synth_reviews_all, synth_quality, llm_judged_at, reputation_note FROM cafes WHERE id=${id} LIMIT 1`;
     // 전체보기용: synth_reviews_all(옥석 전체) 우선, 없으면 기존 top6
     const raw = (rows[0]?.synth_reviews_all ?? rows[0]?.synth_reviews ?? []) as any[];
     // 정확도+신뢰+최신성 복합 정렬 → 상위 6건(대표)·전체보기 모두 '완벽한 리뷰' 순서로 노출
@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
     const llmJudged = !!rows[0]?.llm_judged_at;
     // 옥석 리뷰에서 소비자가 꼭 볼 구체 포인트를 빈도로 추출(데이터 기반 핵심)
     const highlights = extractHighlights((Array.isArray(reviews) ? reviews : []).map((r: any) => r?.quote || ""));
-    return NextResponse.json({ ok: true, area: rows[0]?.area ?? null, reviews, quality, llmJudged, highlights, menu: rows[0]?.synth_menu ?? null, priceHint: rows[0]?.price_hint ?? null, reputationNote: rows[0]?.reputation_note ?? null }, {
+    return NextResponse.json({ ok: true, area: rows[0]?.area ?? null, reviews, quality, llmJudged, highlights, reputationNote: rows[0]?.reputation_note ?? null }, {
       headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" },
     });
   } catch (e) {

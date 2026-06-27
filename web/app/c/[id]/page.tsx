@@ -25,7 +25,7 @@ async function getCafe(id: string) {
   const n = Number(id);
   if (!Number.isFinite(n) || n <= 0) return null;
   try {
-    return (await sql`SELECT id, name, area, synth_grade, synth_identity, synth_count, char_scores, synth_reviews_all, synth_reviews, synth_menu, price_hint, reputation_note FROM cafes WHERE id=${n} AND published=true LIMIT 1`)[0] as any ?? null;
+    return (await sql`SELECT id, name, area, synth_grade, synth_identity, synth_count, char_scores, synth_reviews_all, synth_reviews, reputation_note FROM cafes WHERE id=${n} AND published=true LIMIT 1`)[0] as any ?? null;
   } catch { return null; }
 }
 function topTags(cs: any): string[] {
@@ -120,7 +120,6 @@ export default async function CafePage({ params }: Props) {
               )}
             </div>
           )}
-          {/* 메뉴·가격은 카테고리화 한계로 잠정 비노출(추후 LLM으로 주력메뉴+실가격 정확 추출 예정). 평판은 유지. */}
           {/* ⚖️ 평판 신선도 — 최근 평이 갈리거나 노후하면 투명하게 안내 */}
           {c.reputation_note && (
             <div className="bg-[#fbf3ea] rounded-xl px-4 py-2.5 mb-3 border border-[#e7d3b3]">
@@ -172,6 +171,11 @@ export default async function CafePage({ params }: Props) {
           {/* 방문자 후기 — 하단 버튼 바로 위 */}
           {userReviews.length > 0 && <div className="mb-4"><VisitorReviews reviews={userReviews} /></div>}
           <Link href={`/?cafe=${c.id}`} className="block w-full text-center bg-[#2b2018] text-[#f4ece0] rounded-xl py-3.5 font-bold">지도·근거 후기 보기 →</Link>
+          {/* 메뉴·가격·영업시간은 권위 원천(네이버 플레이스)으로 연결 — 항상 정확·최신 */}
+          <a href={`/api/naver-place-redirect?id=${c.id}`} target="_blank" rel="noopener noreferrer" className="mt-2.5 flex items-center justify-center gap-1.5 w-full text-center border-2 rounded-xl py-3 text-[13px] font-semibold bg-white" style={{ borderColor: "#03c75a", color: "#03c75a" }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="#03c75a"><path d="M16.273 12.845L7.376 0H0v24h7.727V11.155L16.624 24H24V0h-7.727z"/></svg>
+            네이버에서 메뉴·가격·영업시간 보기
+          </a>
         </div>
       </div>
     </main>
