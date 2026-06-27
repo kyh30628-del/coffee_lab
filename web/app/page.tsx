@@ -1569,12 +1569,10 @@ function CafePanel({ cafe, dist, onClose, onMap, bookmarked = false, onToggleBoo
   const [reviewFilter, setReviewFilter] = useState<"all" | "verified" | "reference" | "ai" | "youtube">("all");
   const [userReviews, setUserReviews] = useState<{ memory: string; photos: string[]; favorite: boolean; date: string }[]>([]); // 공개 방문자 후기
   const [highlights, setHighlights] = useState<{ label: string; emoji: string; count: number }[]>([]); // 옥석 리뷰 데이터 핵심
-  const [menu, setMenu] = useState<{ items: string[]; signature: string | null } | null>(null);
-  const [priceHint, setPriceHint] = useState<string | null>(null);
   const [reputationNote, setReputationNote] = useState<string | null>(null);
   useEffect(() => {
-    let live = true; setLoadingRev(true); setPromo(null); setUserReviews([]); setHighlights([]); setMenu(null); setPriceHint(null); setReputationNote(null);
-    fetch(`/api/cafe-detail?id=${cafe.id}`).then((r) => r.json()).then((d) => { if (live) { setReviews(d.reviews ?? []); setQuality(d.quality ?? null); setLlmJudged(!!d.llmJudged); setHighlights(d.highlights ?? []); setMenu(d.menu ?? null); setPriceHint(d.priceHint ?? null); setReputationNote(d.reputationNote ?? null); setLoadingRev(false); } }).catch(() => { if (live) setLoadingRev(false); });
+    let live = true; setLoadingRev(true); setPromo(null); setUserReviews([]); setHighlights([]); setReputationNote(null);
+    fetch(`/api/cafe-detail?id=${cafe.id}`).then((r) => r.json()).then((d) => { if (live) { setReviews(d.reviews ?? []); setQuality(d.quality ?? null); setLlmJudged(!!d.llmJudged); setHighlights(d.highlights ?? []); setReputationNote(d.reputationNote ?? null); setLoadingRev(false); } }).catch(() => { if (live) setLoadingRev(false); });
     fetch(`/api/owner-promo?cafeId=${cafe.id}`).then((r) => r.json()).then((d) => { if (live && d.promo && (d.promo.ai_headline || d.promo.video_url)) { setPromo(d.promo); trackPromo(cafe.id, "view"); } }).catch(() => {});
     fetch(`/api/cafe-reviews?cafeId=${cafe.id}`).then((r) => r.json()).then((d) => { if (live && d.ok) setUserReviews(d.reviews ?? []); }).catch(() => {});
     return () => { live = false; };
@@ -1686,20 +1684,7 @@ function CafePanel({ cafe, dist, onClose, onMap, bookmarked = false, onToggleBoo
               )}
             </div>
           )}
-          {/* ☕ 뭐 먹지 — 메뉴·가격 (검증 리뷰에서 추출한 의사결정 정보) */}
-          {((menu?.items?.length ?? 0) > 0 || priceHint) && (
-            <div className="bg-white rounded-xl px-4 py-3.5 mb-3 border border-[#e0d4bd]">
-              <div className="text-[11px] font-bold text-[#7a5f3c] uppercase tracking-wider mb-2">☕ 뭐 먹지 <span className="font-normal lowercase tracking-normal text-[#9c6b3f]">· 후기에 자주 나온 메뉴</span></div>
-              {(menu?.items?.length ?? 0) > 0 && (
-                <div className="flex flex-wrap gap-1.5 mb-1">
-                  {menu!.items.slice(0, 5).map((m, i) => (
-                    <span key={i} className={`text-[12.5px] rounded-full px-2.5 py-1 font-semibold ${i === 0 ? "bg-[#9c6b3f] text-white" : "bg-[#f4ece0] text-[#52402e]"}`}>{i === 0 ? "⭐ " : ""}{m}</span>
-                  ))}
-                </div>
-              )}
-              {priceHint && <div className="text-[12px] text-[#8a7458] mt-1">💰 음료 가격대 <b className="text-[#52402e]">{priceHint}</b> <span className="text-[10px] text-[#bcab92]">· 후기 언급 기준</span></div>}
-            </div>
-          )}
+          {/* 메뉴·가격은 카테고리화 한계로 잠정 비노출(추후 LLM으로 주력메뉴+실가격 정확 추출 예정). 평판은 유지. */}
           {reputationNote && (
             <div className="bg-[#fbf3ea] rounded-xl px-4 py-2.5 mb-3 border border-[#e7d3b3]">
               <div className="text-[12px] text-[#8a6a3a]">⚖️ <b>참고</b> · {reputationNote}</div>

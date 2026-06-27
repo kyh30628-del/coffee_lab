@@ -120,20 +120,7 @@ export default async function CafePage({ params }: Props) {
               )}
             </div>
           )}
-          {/* ☕ 시그니처·메뉴·가격 — 의사결정 정보(검증 리뷰에서 추출) */}
-          {((c.synth_menu?.items?.length ?? 0) > 0 || c.price_hint) && (
-            <div className="bg-white rounded-xl px-4 py-3.5 mb-3 border border-[#e0d4bd]">
-              <div className="text-[11px] font-bold text-[#7a5f3c] uppercase tracking-wider mb-2">☕ 뭐 먹지 · 후기에서 자주 언급된 메뉴</div>
-              {(c.synth_menu?.items?.length ?? 0) > 0 && (
-                <div className="flex flex-wrap gap-1.5 mb-1">
-                  {c.synth_menu.items.slice(0, 5).map((m: string, i: number) => (
-                    <span key={i} className={`text-[12.5px] rounded-full px-2.5 py-1 font-semibold ${i === 0 ? "bg-[#9c6b3f] text-white" : "bg-[#f4ece0] text-[#52402e]"}`}>{i === 0 ? "⭐ " : ""}{m}</span>
-                  ))}
-                </div>
-              )}
-              {c.price_hint && <div className="text-[12px] text-[#8a7458] mt-1">💰 음료 가격대 <b className="text-[#52402e]">{c.price_hint}</b> <span className="text-[10px] text-[#bcab92]">· 후기 언급 기준</span></div>}
-            </div>
-          )}
+          {/* 메뉴·가격은 카테고리화 한계로 잠정 비노출(추후 LLM으로 주력메뉴+실가격 정확 추출 예정). 평판은 유지. */}
           {/* ⚖️ 평판 신선도 — 최근 평이 갈리거나 노후하면 투명하게 안내 */}
           {c.reputation_note && (
             <div className="bg-[#fbf3ea] rounded-xl px-4 py-2.5 mb-3 border border-[#e7d3b3]">
