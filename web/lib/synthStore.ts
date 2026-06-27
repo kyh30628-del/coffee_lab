@@ -285,11 +285,24 @@ export async function healNonCafeCategory(): Promise<{ held: number; names: stri
 // 🗺️ 수도권 박스 밖(비수도권 동명업체) 자동 제외 — 어느 적재 경로(발굴·마이닝·상가·수집)로 들어왔든
 //   2시간마다 일괄 정리. 공개 게이트가 노출은 이미 막지만, DB 청결 + 합성·임베딩 낭비 제거 + 미래 경로까지 커버하는 안전망.
 export async function healOutOfBox(): Promise<{ excluded: number; names: string[] }> {
+  // ① 좌표 박스 밖
   const rows = (await sql`UPDATE cafes SET published = false, pipeline_status = 'excluded', updated_at = now()
     WHERE lat IS NOT NULL AND NOT (lat BETWEEN 36.8 AND 38.3 AND lng BETWEEN 124.5 AND 127.9)
       AND pipeline_status IS DISTINCT FROM 'excluded'
     RETURNING name`) as any[];
-  return { excluded: rows.length, names: rows.map((r) => r.name).slice(0, 8) };
+  // ② 주소 시·도가 비수도권 — 좌표가 박스에 걸쳐도(천안·당진·춘천 등 경계지역) 주소가 진짜 근거.
+  //    area가 수도권 시로 잘못 붙는 경계 카페 방어. 주소 '접두'로만 판단(경기 광주시 오인 방지 위해 '광주광역시'만).
+  const adr = (await sql`UPDATE cafes SET published = false, pipeline_status = 'excluded', updated_at = now()
+    WHERE address IS NOT NULL
+      AND (address LIKE '충청%' OR address LIKE '충북%' OR address LIKE '충남%'
+        OR address LIKE '강원%' OR address LIKE '전라%' OR address LIKE '전북%' OR address LIKE '전남%'
+        OR address LIKE '경상%' OR address LIKE '경북%' OR address LIKE '경남%'
+        OR address LIKE '대전%' OR address LIKE '대구%' OR address LIKE '부산%' OR address LIKE '울산%'
+        OR address LIKE '광주광역시%' OR address LIKE '세종%' OR address LIKE '제주%')
+      AND pipeline_status IS DISTINCT FROM 'excluded'
+    RETURNING name`) as any[];
+  const names = [...rows, ...adr].map((r) => r.name).slice(0, 8);
+  return { excluded: rows.length + adr.length, names };
 }
 
 // 🩺 LLM 그라운딩 의심(업체혼동·환각) 자가치유 — 재합성으로 교정(개선엔진: 오염제거·로스팅환각 차단).
