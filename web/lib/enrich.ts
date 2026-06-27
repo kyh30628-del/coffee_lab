@@ -6,18 +6,20 @@ const MENU_RE = new RegExp(`([가-힣A-Za-z]{1,5})\\s?${MENU_SUFFIX}`, "g");
 const PLAIN_RE = new RegExp(MENU_SUFFIX, "g");
 const MENU_STOP = new Set(["그냥", "보통", "여기", "이런", "저런", "다른", "추천", "인기", "대표", "시그니처", "오늘", "그날", "메뉴", "주문", "가격", "한잔", "하나", "이번", "신메뉴", "신상", "맛집", "존맛", "강추", "유명", "동네", "근처", "여기서", "정말", "진짜", "완전", "최고", "후기", "방문", "사진", "분위기", "내돈내산"]);
 const MENU_WORDS_RE = new RegExp(MENU_SUFFIX + "$"); // 접두사가 그 자체로 메뉴어로 끝나면(맘모스'빵') 결합 방지
-// 접두사가 '포함'하면 안 되는 군더더기(맛집·유명·좋은·역·점 등) — "커피맛집라떼"·"행궁동케이크"·"유명한타르트" 차단
-const PREFIX_BAD = /(맛집|유명|존맛|강추|좋은|있는|진짜|정말|완전|인기|대표|신상|추천|핫한|여기|근처|동네|본점|역|점$|동$|가본|먹은|시킨)/;
+// 접두사가 '포함'하면 안 되는 군더더기(맛집·유명·위치어 등) — "커피맛집라떼"·"강남구청젤라또"·"서울젤라또" 차단
+const PREFIX_BAD = /(맛집|유명|존맛|강추|좋은|있는|진짜|정말|완전|인기|대표|신상|추천|핫한|여기|근처|동네|본점|가본|먹은|시킨|구청|시청|서울|인천|경기|광역시|특별시|사거리|입구|역$|점$|동$|구$|시$|읍$|면$|로$|길$)/;
 
-export function extractMenu(quotes: string[]): { items: string[]; signature: string | null } {
+export function extractMenu(quotes: string[], areaTerms: string[] = []): { items: string[]; signature: string | null } {
+  // 카페 자기 동네名(강남·금광동·역삼 등)을 접두사에서 제거 — "역삼라떼"·"금광동소금빵" 차단
+  const areaCores = areaTerms.flatMap((a) => { const s = String(a || "").replace(/(특별시|광역시|시|군|구|읍|면|동|가|리)$/, ""); return s.length >= 2 ? [s] : []; });
   const freq = new Map<string, number>();
   for (const q of quotes) {
     const t = String(q || "");
     // ① 수식어+메뉴어(흑임자라떼·수플레팬케이크) 우선
     for (const m of t.matchAll(MENU_RE)) {
       const pre = (m[1] || "").trim();
-      // 접두사가 비었거나·스톱워드·군더더기 포함·메뉴어로 끝남(맘모스빵 결합) → 단독 메뉴어만 인정
-      if (pre.length < 1 || MENU_STOP.has(pre) || PREFIX_BAD.test(pre) || MENU_WORDS_RE.test(pre)) continue;
+      // 접두사가 비었거나·스톱워드·군더더기·동네名 포함·메뉴어로 끝남 → 단독 메뉴어만 인정
+      if (pre.length < 1 || MENU_STOP.has(pre) || PREFIX_BAD.test(pre) || MENU_WORDS_RE.test(pre) || areaCores.some((a) => pre.includes(a))) continue;
       const full = (pre + m[2]).replace(/\s/g, "");
       if (full.length >= 3 && full.length <= 10) freq.set(full, (freq.get(full) ?? 0) + 1);
     }

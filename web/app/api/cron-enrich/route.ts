@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
     await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS enriched_at TIMESTAMPTZ`.catch(() => {});
 
     const limit = Math.min(Math.max(Number(req.nextUrl.searchParams.get("limit")) || 400, 1), 1000);
-    const rows = (await sql`SELECT id, name, synth_reviews, raw_reviews, review_dates FROM cafes
+    const rows = (await sql`SELECT id, name, area, dong, synth_reviews, raw_reviews, review_dates FROM cafes
       WHERE published AND synth_reviews IS NOT NULL
         AND (enriched_at IS NULL OR enriched_at < synth_updated)
       ORDER BY enriched_at ASC NULLS FIRST LIMIT ${limit}`) as any[];
@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
       // 메뉴·가격: 원본 본문(하이라이트엔 가격 없음 → raw 전문에서). 빈도기반이라 카페 실제 메뉴가 우세.
       const rawBodies = parse(c.raw_reviews).slice(0, 120).map((r: any) => String(r?.text || r?.desc || r?.title || "")).filter(Boolean);
 
-      const menu = extractMenu(rawBodies.length ? rawBodies : verifiedQuotes);
+      const menu = extractMenu(rawBodies.length ? rawBodies : verifiedQuotes, [c.area, c.dong].filter(Boolean));
       const price = extractPrice(rawBodies);
       const rep = reputationSignals(verifiedQuotes, c.review_dates);
 
