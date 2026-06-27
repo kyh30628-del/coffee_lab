@@ -24,23 +24,24 @@ export async function GET(req: NextRequest) {
     await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS reputation_note TEXT`.catch(() => {});
     await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS enriched_at TIMESTAMPTZ`.catch(() => {});
 
-    const limit = Math.min(Math.max(Number(req.nextUrl.searchParams.get("limit")) || 600, 1), 1500);
-    const rows = (await sql`SELECT id, name, synth_reviews, review_dates FROM cafes
+    const limit = Math.min(Math.max(Number(req.nextUrl.searchParams.get("limit")) || 400, 1), 1000);
+    const rows = (await sql`SELECT id, name, synth_reviews, raw_reviews, review_dates FROM cafes
       WHERE published AND synth_reviews IS NOT NULL
         AND (enriched_at IS NULL OR enriched_at < synth_updated)
       ORDER BY enriched_at ASC NULLS FIRST LIMIT ${limit}`) as any[];
 
     let processed = 0, withMenu = 0, withPrice = 0, declining = 0;
     const declineNames: string[] = [];
+    const parse = (o: any): any[] => { let a = o; if (typeof a === "string") { try { a = JSON.parse(a); } catch { return []; } } return Array.isArray(a) ? a : (a && a.reviews) || []; };
     for (const c of rows) {
-      let revs: any = c.synth_reviews;
-      if (typeof revs === "string") { try { revs = JSON.parse(revs); } catch { revs = []; } }
-      if (!Array.isArray(revs)) revs = (revs && revs.reviews) || [];
-      const quotes = revs.map((r: any) => (typeof r === "string" ? r : (r.quote || r.title || ""))).filter(Boolean);
+      // 평판·감성: 검증 노출본(옥석, 오염 적음)
+      const verifiedQuotes = parse(c.synth_reviews).map((r: any) => (typeof r === "string" ? r : (r.quote || r.title || ""))).filter(Boolean);
+      // 메뉴·가격: 원본 본문(하이라이트엔 가격 없음 → raw 전문에서). 빈도기반이라 카페 실제 메뉴가 우세.
+      const rawBodies = parse(c.raw_reviews).slice(0, 120).map((r: any) => String(r?.text || r?.desc || r?.title || "")).filter(Boolean);
 
-      const menu = extractMenu(quotes);
-      const price = extractPrice(quotes);
-      const rep = reputationSignals(quotes, c.review_dates);
+      const menu = extractMenu(rawBodies.length ? rawBodies : verifiedQuotes);
+      const price = extractPrice(rawBodies);
+      const rep = reputationSignals(verifiedQuotes, c.review_dates);
 
       if (menu.items.length) withMenu++;
       if (price) withPrice++;
