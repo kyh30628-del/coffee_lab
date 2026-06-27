@@ -21,6 +21,8 @@ export async function GET(req: NextRequest) {
     await sql`CREATE TABLE IF NOT EXISTS discovery_state (region TEXT PRIMARY KEY, area_label TEXT, last_run TIMESTAMPTZ, last_found INT, last_inserted INT)`;
     // 지역 시드(최초 1회)
     for (const r of METRO_REGIONS) await sql`INSERT INTO discovery_state (region, area_label) VALUES (${r.region}, ${r.areaLabel}) ON CONFLICT (region) DO NOTHING`;
+    // 🎯 demand→grow 자율 루프: 에이전트(Claude Code)가 수요·공급갭을 추론해 채우는 타겟 큐. 비면 기존 신선도 순회로 폴백.
+    await sql`CREATE TABLE IF NOT EXISTS discovery_targets (id SERIAL PRIMARY KEY, region TEXT, area_label TEXT, keywords JSONB, reason TEXT, priority INT DEFAULT 0, status TEXT DEFAULT 'pending', created_at TIMESTAMPTZ DEFAULT now(), consumed_at TIMESTAMPTZ, found INT, inserted INT)`.catch(() => {});
 
     // ① 가장 오래된 지역부터 '시간 예산(260초)' 내 공격적 발굴 — sort=comment+random 2패스 + 동/도로
     //    지리 세분화로 검색 창을 최대화(프랜차이즈에 묻힌 리뷰 많은 동네카페 발굴력↑). 호출량이 커서
@@ -28,24 +30,27 @@ export async function GET(req: NextRequest) {
     //    maxDuration=300초 기준, 마이닝·합성 여유 40초 확보.
     const GROW_BUDGET_MS = 225_000; // 발굴 225s + 마이닝·합성 여유 → maxDuration 300s 안전마진(실측 290s→타임아웃 위험 해소)
     const t0 = Date.now();
-    const discoveries: { region: string; found?: number; inserted?: number; stopped?: boolean; error?: string }[] = [];
+    const discoveries: { region: string; found?: number; inserted?: number; stopped?: boolean; error?: string; agent?: boolean }[] = [];
     while (Date.now() - t0 < GROW_BUDGET_MS) {
-      // 🎯 우선 지역은 6시간 이상 지났으면 큐 맨앞으로(다른 지역 굶기지 않게 신선도 바닥만 보장), 그 외엔 오래된 순.
-      const target = (await sql`SELECT region, area_label FROM discovery_state
-        ORDER BY (region = ANY(${PRIORITY_REGIONS}) AND (last_run IS NULL OR last_run < now() - interval '6 hours')) DESC, last_run ASC NULLS FIRST LIMIT 1`)[0] as { region: string; area_label: string } | undefined;
+      // 🎯 에이전트가 demand→supply 추론으로 고른 타겟을 최우선 소비(자율 루프). 없으면 기존 신선도 큐로 폴백.
+      const at = (await sql`SELECT id, region, area_label, keywords FROM discovery_targets WHERE status='pending' ORDER BY priority DESC, created_at ASC LIMIT 1`)[0] as any;
+      const target = at ?? ((await sql`SELECT region, area_label FROM discovery_state
+        ORDER BY (region = ANY(${PRIORITY_REGIONS}) AND (last_run IS NULL OR last_run < now() - interval '6 hours')) DESC, last_run ASC NULLS FIRST LIMIT 1`)[0] as { region: string; area_label: string } | undefined);
       if (!target) break;
+      const kw = at && Array.isArray(at.keywords) && at.keywords.length ? (at.keywords as string[]) : undefined;
       try {
-        const d = await discoverRegion(target.region, target.area_label ?? target.region, undefined, { deadlineMs: t0 + GROW_BUDGET_MS, sorts: ["comment", "random"] });
+        const d = await discoverRegion(target.region, target.area_label ?? target.region, kw, { deadlineMs: t0 + GROW_BUDGET_MS, sorts: ["comment", "random"] });
         if ((d as any).apiError) {
-          // 🛑 네이버 쿼터 소진 — 빈 채로 last_run을 굳히지 않는다(지역이 '발굴완료'로 잘못 마킹돼 한동안 재발굴 안 되는 버그 방지).
-          //   last_run 그대로 두고 이번 회차 중단 → 쿼터 회복되는 다음 cron이 이 지역부터 다시 시도.
+          // 🛑 네이버 쿼터 소진 — last_run/큐 그대로 두고 중단(다음 cron이 쿼터 회복 후 재시도).
           discoveries.push({ region: d.region, error: "naver-quota(보존)" });
           break;
         }
-        await sql`UPDATE discovery_state SET last_run=now(), last_found=${d.found}, last_inserted=${d.inserted} WHERE region=${target.region}`;
-        discoveries.push({ region: d.region, found: d.found, inserted: d.inserted, stopped: d.stopped });
+        if (at) await sql`UPDATE discovery_targets SET status='done', consumed_at=now(), found=${d.found}, inserted=${d.inserted} WHERE id=${at.id}`;
+        else await sql`UPDATE discovery_state SET last_run=now(), last_found=${d.found}, last_inserted=${d.inserted} WHERE region=${target.region}`;
+        discoveries.push({ region: d.region, found: d.found, inserted: d.inserted, stopped: d.stopped, agent: !!at });
       } catch (e) {
-        await sql`UPDATE discovery_state SET last_run=now() WHERE region=${target.region}`; // 실패해도 last_run 갱신(무한루프·재시도 폭주 방지)
+        if (at) await sql`UPDATE discovery_targets SET status='done', consumed_at=now() WHERE id=${at.id}`; // 실패해도 큐서 빼 무한루프 방지
+        else await sql`UPDATE discovery_state SET last_run=now() WHERE region=${target.region}`;
         discoveries.push({ region: target.region, error: String(e).slice(0, 60) });
         break; // 네이버 한도/오류 시 이번 회차 발굴 중단(다음 cron에서 이어감)
       }
