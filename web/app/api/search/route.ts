@@ -25,6 +25,13 @@ const CONCEPTS: { id: string; triggers: string[]; axis?: string; taste?: string;
 function inRegion(area: string, region: string): boolean {
   if (!region) return true;
   const a = area ?? "";
+  // 🗺️ 인천 동명 구(중구·동구) 구분: 인천 area는 "인천 OO"로 저장, 서울/경기는 접두사 없음.
+  //   region이 "인천 OO"면 인천만, 아니면 인천 카페는 제외(서울 중구 ≠ 인천 중구).
+  if (region.startsWith("인천")) {
+    const gu = region.replace(/^인천\s*/, "");
+    return a.startsWith("인천") && (a.includes(gu) || a.includes(region));
+  }
+  if (a.startsWith("인천")) return false;
   if (a.includes(region)) return true;
   const short = region.replace(/(특별시|광역시|시|군|구)$/, "");
   return short.length >= 2 && a.includes(short);

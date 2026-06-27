@@ -18,13 +18,12 @@ function guOf(area: string): string {
 // region 파라미터를 DB area와 매칭하는 함수 — 인천 구는 "연수구" → "인천 연수구" 변환
 function matchRegion(area: string, region: string): boolean {
   if (!region) return true;
-  const g = guOf(area);
-  if (g === region) return true;
-  // 인천 구 이름만 넘어온 경우 ("연수구") → "인천 연수구"와 비교
-  if (g === "인천 " + region) return true;
-  // "인천" 전체
-  if (region === "인천" && (area ?? "").startsWith("인천")) return true;
-  return false;
+  const a = area ?? "";
+  // 🗺️ 인천 동명 구(중구·동구) 구분: region="인천 OO"면 인천만, bare면 인천 제외(서울 중구≠인천 중구)
+  if (region === "인천") return a.startsWith("인천");
+  if (region.startsWith("인천")) { const gu = region.replace(/^인천\s*/, ""); return a.startsWith("인천") && a.includes(gu); }
+  if (a.startsWith("인천")) return false;
+  return guOf(area) === region;
 }
 const CHAR_LABELS: Record<string, { label: string; emoji: string }> = {
   roast: { label: "직접로스팅", emoji: "🔥" }, work: { label: "작업하기 좋은", emoji: "💻" },

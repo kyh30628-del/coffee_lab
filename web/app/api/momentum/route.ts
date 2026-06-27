@@ -15,6 +15,12 @@ const recentN = (dates: unknown, days: number): number => {
 function inRegion(area: string, region: string): boolean {
   if (!region) return true;
   const a = area ?? "";
+  // 인천 동명 구(중구·동구) 구분 — search/route.ts와 동일 기준
+  if (region.startsWith("인천")) {
+    const gu = region.replace(/^인천\s*/, "");
+    return a.startsWith("인천") && (a.includes(gu) || a.includes(region));
+  }
+  if (a.startsWith("인천")) return false;
   if (a.includes(region)) return true;
   const s = region.replace(/(특별시|광역시|시|군|구)$/, "");
   return s.length >= 2 && a.includes(s);

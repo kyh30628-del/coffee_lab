@@ -559,8 +559,10 @@ export default function Home() {
   };
   const clearNearMe = () => { setNearMe(null); setNearMsg(""); };
   const clearAuto = () => { setHomeSido(""); setHomeGu(""); setHomeDong(""); setAutoGu(""); setSido(""); setSigungu(""); setDong(""); setGeoMsg(""); };
-  useEffect(() => { const u = homeGu ? `/api/discover?region=${encodeURIComponent(homeGu)}` : "/api/discover"; setDiscover(null); fetch(u).then((r) => r.json()).then((d) => { if (d.ok) setDiscover(d); }).catch(() => {}); }, [homeGu]);
-  useEffect(() => { const u = homeGu ? `/api/momentum?region=${encodeURIComponent(homeGu)}` : "/api/momentum"; setMomentum(null); fetch(u).then((r) => r.json()).then((d) => { if (d.ok) setMomentum({ rising: d.rising ?? [] }); }).catch(() => {}); }, [homeGu]);
+  // 인천 동명 구(중구·동구) 구분: 인천이면 "인천 OO"로 넘겨야 백엔드가 서울과 안 헷갈림
+  const homeRegion = homeGu ? (homeSido === "인천" ? `인천 ${homeGu}` : homeGu) : "";
+  useEffect(() => { const u = homeRegion ? `/api/discover?region=${encodeURIComponent(homeRegion)}` : "/api/discover"; setDiscover(null); fetch(u).then((r) => r.json()).then((d) => { if (d.ok) setDiscover(d); }).catch(() => {}); }, [homeRegion]);
+  useEffect(() => { const u = homeRegion ? `/api/momentum?region=${encodeURIComponent(homeRegion)}` : "/api/momentum"; setMomentum(null); fetch(u).then((r) => r.json()).then((d) => { if (d.ok) setMomentum({ rising: d.rising ?? [] }); }).catch(() => {}); }, [homeRegion]);
 
   const openById = useCallback((id: number) => { const c = cafes.find((x) => x.id === id); if (c) setSelected(c); }, [cafes]);
 
@@ -660,7 +662,7 @@ export default function Home() {
     if (!qq) return;
     setSearchQ(qq); setSearchLoading(true); setSearchRes(null);
     try {
-      const u = `/api/search?q=${encodeURIComponent(qq)}${homeGu ? `&region=${encodeURIComponent(homeGu)}` : ""}`;
+      const u = `/api/search?q=${encodeURIComponent(qq)}${homeRegion ? `&region=${encodeURIComponent(homeRegion)}` : ""}`;
       const d = await (await fetch(u)).json();
       if (d.ok) setSearchRes(d);
     } catch {}
@@ -1010,8 +1012,8 @@ export default function Home() {
   const onSido = (v: string) => { setSido(v); setSigungu(""); setDong(""); setFocusId(null); };
   const onSigungu = (v: string) => { setSigungu(v); setDong(""); setFocusId(null); };
   // 현재 시군구의 동/면 목록(카페 보유 동만) — 계층 셀렉트·집계용
-  const dongOptions = useMemo(() => sigungu ? [...new Set(cafes.filter((c) => toGu(c.area).sigungu === sigungu && c.dong).map((c) => c.dong as string))].sort() : [], [cafes, sigungu]);
-  const homeDongOptions = useMemo(() => homeGu ? [...new Set(cafes.filter((c) => toGu(c.area).sigungu === homeGu && c.dong).map((c) => c.dong as string))].sort() : [], [cafes, homeGu]);
+  const dongOptions = useMemo(() => sigungu ? [...new Set(cafes.filter((c) => { const g = toGu(c.area); return g.sigungu === sigungu && (!sido || g.sido === sido) && c.dong; }).map((c) => c.dong as string))].sort() : [], [cafes, sigungu, sido]);
+  const homeDongOptions = useMemo(() => homeGu ? [...new Set(cafes.filter((c) => { const g = toGu(c.area); return g.sigungu === homeGu && (!homeSido || g.sido === homeSido) && c.dong; }).map((c) => c.dong as string))].sort() : [], [cafes, homeGu, homeSido]);
 
   // ===== 잡지 카드 컴포넌트 =====
   const chooseConsumer = () => { try { sessionStorage.setItem("dcn_role", "consumer"); } catch {} setRole("consumer"); };
