@@ -222,6 +222,32 @@ export async function naverExists(name: string, area: string, lat: number | null
   });
 }
 
+// 🔎 폐업 재확인(보수판) — 네이버 지역검색 API는 5개·인기순이라 흔한 이름은 진짜 있어도 상위5위 밖이면 누락.
+//   그래서 '못 찾음'을 폐업으로 단정 못 함. 여러 쿼리(이름+구·이름+동·이름만)로 recall을 올려
+//   하나라도 좌표 근처 매칭되면 '영업중 확정'(false 오탐 최소화). 그래도 false는 '의심'일 뿐 폐업확정 아님.
+//   반환: true=존재(어느 쿼리든 매칭), false=모든 쿼리서 미발견, null=모든 쿼리가 쿼터/오류(판단보류).
+export async function naverExistsRobust(name: string, area: string, dong: string, lat: number | null, lng: number | null): Promise<boolean | null> {
+  const nm = (s: string) => (s || "").replace(/\s/g, "").toLowerCase();
+  const nN = nm(name);
+  const queries = [`${area ?? ""} ${name}`.trim(), dong ? `${dong} ${name}`.trim() : "", name.trim()]
+    .filter((q, i, a) => q && a.indexOf(q) === i);
+  let anyOk = false;
+  for (const q of queries) {
+    const items = await localSearch(q);
+    if (items === null) { await new Promise((r) => setTimeout(r, 200)); continue; } // 이 쿼리만 쿼터 → 다음 쿼리 시도
+    anyOk = true;
+    const hit = items.some((it: any) => {
+      const iN = nm(it.name);
+      const nameMatch = iN.length >= 2 && (iN.includes(nN) || nN.includes(iN));
+      const near = lat != null && it.lat != null && Math.abs(it.lat - lat) < 0.005 && Math.abs(it.lng - lng!) < 0.005;
+      return nameMatch && (near || lat == null);
+    });
+    if (hit) return true; // 어느 쿼리든 찾으면 영업중 확정
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  return anyOk ? false : null; // 최소 한 쿼리라도 성공했는데 다 미발견 → false(의심). 전부 쿼터 → null(보류)
+}
+
 // 한 지역 발굴: region=검색용(예 '서울 강동구'), areaLabel=저장용(예 '강동구')
 // 공격적 커버리지: sort=comment+random 2패스 + 동/도로 지리 세분화로 '검색 창'을 최대화 →
 //   프랜차이즈에 묻힌 리뷰 많은 동네카페를 더 건진다(쿼리당 5캡은 못 넘으니 창 다각화가 유일한 길).
