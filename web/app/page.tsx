@@ -472,7 +472,12 @@ export default function Home() {
     const region = sp.get("region");
     if (region) {
       try { sessionStorage.setItem("dcn_role", "consumer"); } catch {}
-      setRole("consumer"); setHomeGu(region); setTab("home");
+      setRole("consumer");
+      // "인천 동구"·"중구" 등 → sido+gu로 분리(안 그러면 동 옵션·지도 필터가 'sigungu==="인천 동구"'로 깨짐)
+      const g = toGu(region);
+      if (g.sido && g.sigungu) { setHomeSido(g.sido); setHomeGu(g.sigungu); }
+      else setHomeGu(region);
+      setTab("home");
     }
     // 카카오 공유 링크(/?cafe=id)로 도착 → 랜딩 건너뛰고 소비자 화면 + 해당 카페 지역 로드.
     //   (지역 cafes가 로드되면 위 [cafes] 핸들러가 해당 카페 상세를 자동으로 연다)
