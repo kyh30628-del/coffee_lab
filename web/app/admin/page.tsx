@@ -214,6 +214,12 @@ export default function AdminPage() {
           <button onClick={() => load(pw)} className="ml-auto text-xs px-3 py-1.5 rounded-lg bg-stone-200 text-stone-700">새로고침</button>
         </div>
 
+        {/* 🎩 조직 관제(기획조정실 자율조직 브리핑) — 카페-데이터 관제탑과 별개. 모바일 전용 화면으로. */}
+        <a href="/admin/org" className="flex items-center justify-between mb-5 rounded-2xl border border-amber-300 bg-gradient-to-r from-amber-50 to-stone-50 px-4 py-3 hover:from-amber-100 transition">
+          <span className="flex items-center gap-2"><span className="text-lg">🎩</span><span className="font-bold text-stone-800">조직 관제 (기획조정실)</span><span className="text-[11px] text-stone-500">자율 에이전트 일일 브리핑·결재·토큰</span></span>
+          <span className="text-amber-600 font-bold">→</span>
+        </a>
+
         {/* ===== 🛰️ 자율 운영 관제탑 ===== */}
         {tower && (() => {
           const dot: Record<string, string> = { ok: "bg-emerald-500", behind: "bg-amber-500", stalled: "bg-red-500", warn: "bg-amber-500", idle: "bg-stone-300" };
