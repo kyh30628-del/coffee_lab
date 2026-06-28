@@ -114,6 +114,9 @@ export default function OrgDashboard() {
   const [openId, setOpenId] = useState<number | null>(null);
   const [showWO, setShowWO] = useState(false);
   const [showMeet, setShowMeet] = useState(false);
+  const [showPending, setShowPending] = useState(false);
+  const [showDeleg, setShowDeleg] = useState(false);
+  const [showCoord, setShowCoord] = useState(false);
   const [member, setMember] = useState<{ k: string; n: string; t: string } | null>(null);
   const [dec, setDec] = useState<{ pending: any[]; delegated: any[]; recent: any[] }>({ pending: [], delegated: [], recent: [] });
   const [coord, setCoord] = useState<{ open: any[]; resolved: any[] }>({ open: [], resolved: [] });
@@ -200,10 +203,14 @@ export default function OrgDashboard() {
           ) : <div style={{ fontSize: 11.5, color: "#9c8a6c" }}>오늘 실행 데이터 없음 — 사이클(08:00) 후 집계</div>}
         </div>
 
-        {/* 🔔 결재 — 승인 클릭 시 실행 */}
+        {/* 🔔 결재 — 승인 클릭 시 실행 (접이식·기본 접힘) */}
         <div style={{ ...card, marginTop: 10 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "#9c6b3f", marginBottom: 2 }}>🔔 CEO 결재 대기 ({dec.pending.length})</div>
-          <div style={{ fontSize: 10.5, color: "#9c8a6c", marginBottom: 8 }}>치명적·비가역(L3)만 — 카페 비공개·등급변경·새 규칙로직·외부발송. 운영결정(L1·L2)은 본부·기조실장 전결.</div>
+          <button onClick={() => setShowPending(!showPending)} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: dec.pending.length ? "#b03a3a" : "#9c6b3f" }}>{showPending ? "▾" : "▸"} 🔔 CEO 결재 대기 ({dec.pending.length})</span>
+            <span style={{ fontSize: 10.5, color: "#9c8a6c" }}>{showPending ? "접기" : dec.pending.length ? "결재하기" : "보기"}</span>
+          </button>
+          {showPending && <>
+          <div style={{ fontSize: 10.5, color: "#9c8a6c", margin: "6px 0 8px" }}>치명적·비가역(L3)만 — 카페 비공개·등급변경·새 규칙로직·외부발송. 운영결정(L1·L2)은 본부·기조실장 전결.</div>
           {dec.pending.length === 0 ? <div style={{ color: "#3f7a4f", fontSize: 13 }}>대기 중인 결재 없음 ✅</div> :
             dec.pending.map((d) => (
               <div key={d.id} style={{ border: "1px solid #e6d8bf", borderRadius: 11, padding: 12, marginBottom: 10, background: "#fffdf8" }}>
@@ -221,12 +228,17 @@ export default function OrgDashboard() {
               </div>
             ))}
           {dec.recent.length > 0 && <div style={{ fontSize: 10.5, color: "#9c8a6c", marginTop: 6 }}>최근 처리: {dec.recent.slice(0, 4).map((r) => `${r.title}(${r.status})`).join(" · ")}</div>}
+          </>}
         </div>
 
-        {/* 🟢 하위 전결 FYI — 본부(L1)·기조실장(L2)이 자체 처리한 결정. 상시 일일 항목(0건이어도 노출). */}
+        {/* 🟢 하위 전결 FYI — 본부(L1)·기조실장(L2)이 자체 처리한 결정. 접이식·기본 접힘. */}
         <div style={{ ...card, marginTop: 10 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#3f7a4f", marginBottom: 2 }}>🟢 전결 처리내역 (L1·L2 사후보고)</div>
-          <div style={{ fontSize: 10.5, color: "#9c8a6c", marginBottom: 8 }}>본부·기조실장이 권한 내 결정·집행 — CEO 결재 불필요, 매일 가시성만.</div>
+          <button onClick={() => setShowDeleg(!showDeleg)} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "#3f7a4f" }}>{showDeleg ? "▾" : "▸"} 🟢 전결 처리내역 ({dec.delegated.length})</span>
+            <span style={{ fontSize: 10.5, color: "#9c8a6c" }}>{showDeleg ? "접기" : "보기"}</span>
+          </button>
+          {showDeleg && <>
+          <div style={{ fontSize: 10.5, color: "#9c8a6c", margin: "6px 0 8px" }}>본부·기조실장이 권한 내 결정·집행 — CEO 결재 불필요, 사후 가시성.</div>
           {dec.delegated.length > 0 ? dec.delegated.map((d) => (
             <div key={d.id} style={{ display: "flex", gap: 7, alignItems: "center", padding: "5px 0", borderBottom: "1px solid #f0e8d8", fontSize: 12 }}>
               <span style={{ background: d.tier === "L1" ? "#6b8fae" : "#9c7bbf", color: "#fff", fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 20 }}>{d.tier}</span>
@@ -234,11 +246,16 @@ export default function OrgDashboard() {
               <span style={{ fontSize: 10, color: "#9c8a6c" }}>{d.decided_by} · {d.at}</span>
             </div>
           )) : <div style={{ fontSize: 12, color: "#9c8a6c" }}>최근 전결 처리 없음</div>}
+          </>}
         </div>
 
-        {/* 🤝 협업 현황 — 경영지원팀 주관 코디네이션 */}
+        {/* 🤝 협업 현황 — 경영지원팀 주관 코디네이션 (접이식·기본 접힘) */}
         <div style={{ ...card, marginTop: 10 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "#9c6b3f", marginBottom: 8 }}>🤝 협업 현황 ({coord.open.length}) <span style={{ fontSize: 10, fontWeight: 400, color: "#9c8a6c" }}>· 경영지원팀 주관</span></div>
+          <button onClick={() => setShowCoord(!showCoord)} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: "#9c6b3f" }}>{showCoord ? "▾" : "▸"} 🤝 협업 현황 ({coord.open.length}) <span style={{ fontSize: 10, fontWeight: 400, color: "#9c8a6c" }}>· 경영지원팀 주관</span></span>
+            <span style={{ fontSize: 10.5, color: "#9c8a6c" }}>{showCoord ? "접기" : "보기"}</span>
+          </button>
+          {showCoord && <div style={{ marginTop: 8 }}>
           {coord.open.length === 0 ? <div style={{ color: "#3f7a4f", fontSize: 13 }}>진행 중인 부서 간 협업 없음</div> :
             coord.open.map((c) => (
               <div key={c.id} style={{ border: "1px solid #e6d8bf", borderRadius: 10, padding: "9px 11px", marginBottom: 8, background: "#fbfaf5" }}>
@@ -252,6 +269,7 @@ export default function OrgDashboard() {
               </div>
             ))}
           {coord.resolved.length > 0 && <div style={{ fontSize: 10.5, color: "#9c8a6c", marginTop: 4 }}>최근 해결: {coord.resolved.slice(0, 3).map((r: any) => r.topic).join(" · ")}</div>}
+          </div>}
         </div>
 
         {/* 🗓️ 조간회의록 (07:00) — 기획조정실장 주관·비서실장 간사 */}
