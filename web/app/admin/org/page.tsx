@@ -77,6 +77,7 @@ export default function OrgDashboard() {
   const [brief, setBrief] = useState<any>(null);
   const [briefs, setBriefs] = useState<any[]>([]);
   const [openId, setOpenId] = useState<number | null>(null);
+  const [showWO, setShowWO] = useState(false);
   const [dec, setDec] = useState<{ pending: any[]; delegated: any[]; recent: any[] }>({ pending: [], delegated: [], recent: [] });
   const [coord, setCoord] = useState<{ open: any[]; resolved: any[] }>({ open: [], resolved: [] });
   const [err, setErr] = useState(""); const [loading, setLoading] = useState(false);
@@ -215,6 +216,17 @@ export default function OrgDashboard() {
             ))}
           {coord.resolved.length > 0 && <div style={{ fontSize: 10.5, color: "#9c8a6c", marginTop: 4 }}>최근 해결: {coord.resolved.slice(0, 3).map((r: any) => r.topic).join(" · ")}</div>}
         </div>
+
+        {/* 📋 비서실장 업무지시 (WORK-ORDER) — 다음 사이클 본부별 명확한 지시 */}
+        {brief?.work_order && (
+          <div style={{ ...card, marginTop: 10 }} className="ex">
+            <button onClick={() => setShowWO(!showWO)} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "#6a468c" }}>{showWO ? "▾" : "▸"} 🗂️ 비서실장 업무지시 (다음 사이클)</span>
+              <span style={{ fontSize: 10.5, color: "#9c8a6c" }}>{showWO ? "접기" : "본부별 지시 보기"}</span>
+            </button>
+            {showWO && <div style={{ marginTop: 8 }} dangerouslySetInnerHTML={{ __html: md2html(brief.work_order) }} />}
+          </div>
+        )}
 
         <div style={{ ...card, marginTop: 10 }} className="ex">
           <div style={{ fontSize: 13, fontWeight: 700, color: "#9c6b3f", marginBottom: 6 }}>📋 EXECUTIVE 일일보고서 (최근 10일 · 시간별)</div>

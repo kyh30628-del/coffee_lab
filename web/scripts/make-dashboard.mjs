@@ -41,6 +41,9 @@ function md2html(md) {
   const execF = `${AR}/EXECUTIVE-latest.md`;
   const execMd = existsSync(execF) ? readFileSync(execF, "utf8") : "_오늘 EXECUTIVE 보고서가 아직 없습니다._";
   const execMtime = existsSync(execF) ? statSync(execF).mtime : new Date();
+  // ①-b WORK-ORDER(비서실장 업무지시) — 본부별 명확한 지시. 모바일 노출용.
+  const woF = "/Users/wangwida/coffee-platform/agents/WORK-ORDER.md";
+  const workOrder = existsSync(woF) ? readFileSync(woF, "utf8") : "";
 
   // ② 토큰 사용량(오늘)
   let tokRows = [], tokTotal = { i: 0, o: 0, c: 0 };
@@ -124,6 +127,7 @@ function md2html(md) {
   try {
     await sql`CREATE TABLE IF NOT EXISTS org_briefings (id SERIAL PRIMARY KEY, created_at TIMESTAMPTZ DEFAULT now(), executive_md TEXT, approvals JSONB, token_today JSONB, crons JSONB, metrics JSONB)`;
     await sql`ALTER TABLE org_briefings ADD COLUMN IF NOT EXISTS delegated JSONB`.catch(() => {});
+    await sql`ALTER TABLE org_briefings ADD COLUMN IF NOT EXISTS work_order TEXT`.catch(() => {});
     const tokJ = JSON.stringify({ input: tokTotal.i, output: tokTotal.o, cost: tokTotal.c, byAgent: tokRows.slice(0, 8) });
     const apprJ = JSON.stringify(props.map((p) => p.replace(/-proposals.*/, "")));
     const cronJ = JSON.stringify(crons.slice(0, 12).map((c) => ({ job: c.job, ok: c.ok, h: Number(c.h) })));
@@ -133,11 +137,11 @@ function md2html(md) {
     //   새로 안 쌓고 *최신 행의 라이브 지표만 갱신*. 새 보고서면 작성시각(파일 mtime)으로 INSERT.
     const last = await sql`SELECT id, executive_md FROM org_briefings ORDER BY created_at DESC LIMIT 1`;
     if (last[0] && last[0].executive_md === execMd) {
-      await sql`UPDATE org_briefings SET token_today=${tokJ}::jsonb, crons=${cronJ}::jsonb, metrics=${metJ}::jsonb, delegated=${delJ}::jsonb, approvals=${apprJ}::jsonb WHERE id=${last[0].id}`;
-      console.log("↻ 보고서 내용 동일 — 중복 저장 안 함, 라이브 지표만 갱신");
+      await sql`UPDATE org_briefings SET token_today=${tokJ}::jsonb, crons=${cronJ}::jsonb, metrics=${metJ}::jsonb, delegated=${delJ}::jsonb, approvals=${apprJ}::jsonb, work_order=${workOrder} WHERE id=${last[0].id}`;
+      console.log("↻ 보고서 내용 동일 — 중복 저장 안 함, 라이브 지표·업무지시만 갱신");
     } else {
-      await sql`INSERT INTO org_briefings (created_at, executive_md, approvals, token_today, crons, metrics, delegated)
-        VALUES (${execMtime.toISOString()}, ${execMd}, ${apprJ}::jsonb, ${tokJ}::jsonb, ${cronJ}::jsonb, ${metJ}::jsonb, ${delJ}::jsonb)`;
+      await sql`INSERT INTO org_briefings (created_at, executive_md, approvals, token_today, crons, metrics, delegated, work_order)
+        VALUES (${execMtime.toISOString()}, ${execMd}, ${apprJ}::jsonb, ${tokJ}::jsonb, ${cronJ}::jsonb, ${metJ}::jsonb, ${delJ}::jsonb, ${workOrder})`;
       console.log("✅ 새 보고서 저장(작성시각", execMtime.toISOString(), ")");
     }
     await sql`DELETE FROM org_briefings WHERE created_at < now() - interval '10 days'`; // 10일치 보존(내용 바뀐 보고서만 시간별 누적)

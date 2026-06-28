@@ -12,10 +12,11 @@ export async function GET(req: NextRequest) {
   try {
     await sql`CREATE TABLE IF NOT EXISTS org_briefings (id SERIAL PRIMARY KEY, created_at TIMESTAMPTZ DEFAULT now(), executive_md TEXT, approvals JSONB, token_today JSONB, crons JSONB, metrics JSONB)`.catch(() => {});
     // 10일치 전부(하루 여러 건 시간별 구분), 최신순. 하루에 여러 번 생성되면 각각 시각으로 구분해 남긴다.
+    await sql`ALTER TABLE org_briefings ADD COLUMN IF NOT EXISTS work_order TEXT`.catch(() => {});
     const briefs = await sql`SELECT id,
         to_char(created_at AT TIME ZONE 'Asia/Seoul','YYYY-MM-DD') AS day,
         to_char(created_at AT TIME ZONE 'Asia/Seoul','HH24:MI') AS time,
-        created_at, executive_md, approvals, token_today, crons, metrics
+        created_at, executive_md, approvals, token_today, crons, metrics, work_order
       FROM org_briefings
       WHERE created_at > now() - interval '10 days'
       ORDER BY created_at DESC
