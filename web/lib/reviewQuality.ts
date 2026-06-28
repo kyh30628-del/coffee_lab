@@ -331,6 +331,27 @@ export function verifyReview(input: QualityInput): QualityResult {
   if (NONCAFE_BIZ.test(title) && !CAFE_CONTEXT.test(fullL)) {
     return { verdict: "rejected", score: 4, reasons: ["동명 비카페 업체(업종어 지배·카페맥락 전무)"], signals: sig };
   }
+  // [글루드 동명 업체] 카페명이 '다른 상호의 일부'로만 등장(다올→다올커텐) + 카페맥락 전무 → 다른 업체.
+  //   카페명 바로 뒤 글자가 '조사'가 아닌 한글이면 글루드(다른 단어). 독립 출현(조사·경계) 0 + 글루드 2+ 일 때만(보수).
+  if (!/\s/.test(input.name.trim()) && input.name.trim().length >= 2 && !CAFE_CONTEXT.test(fullL)) {
+    const nm0 = input.name.trim();
+    const rawT = `${title} ${body}`;
+    const PART = "이가은는을를에의도만로와과랑까부터요입예네죠및한"; // 조사·종결 시작 글자(독립 출현 보호)
+    let glued = 0, clean = 0, i = 0;
+    while ((i = rawT.indexOf(nm0, i)) >= 0) {
+      const c = rawT[i + nm0.length] || "";
+      if (!c || !/[가-힣]/.test(c) || PART.includes(c)) clean++; else glued++;
+      i += nm0.length;
+    }
+    if (glued >= 2 && clean === 0) {
+      return { verdict: "rejected", score: 4, reasons: ["글루드 동명 업체(카페명이 다른 상호의 일부)"], signals: sig };
+    }
+  }
+  // [인물 직함 블로그] 카페명이 미용·의료 개인 직함(팀장·원장·디자이너 등)+서비스어와 결합 + 카페맥락 전무 → 개인 블로그(테오 팀장).
+  const PERSON_TITLE_RE = /(팀장|원장|수석\s*디자이너|담당\s*디자이너|디자이너|실장|강사|코치|점장)\s*(님|입니다|인데|블로그|시술|복구|매직|교정|관리|상담|케어|예약|디자인|이에요|에요)/;
+  if (PERSON_TITLE_RE.test(`${title} ${body}`) && !CAFE_CONTEXT.test(fullL)) {
+    return { verdict: "rejected", score: 5, reasons: ["인물 직함 블로그(미용·의료 개인 — 카페 아님)"], signals: sig };
+  }
   // [비카페 주제 글] 문학·독서·게임·미디어 주제(시·그림책·게임 등)가 강하게 드러나는데 '카페 맥락어가
   //   전혀 없음' → 카페 이름이 유명 문구라서 딸려온 글(비에도지지않고=시). 카페 맥락 있으면 보존.
   if (OFFTOPIC_TOPIC.test(fullL) && !CAFE_CONTEXT.test(fullL)) {
