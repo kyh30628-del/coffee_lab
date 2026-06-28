@@ -74,6 +74,8 @@ export default function OwnerPage() {
     if (pn && cf) { try { setPin(pn); setLocked(JSON.parse(cf)); } catch {} }
     else if (p) setPw(p);
     setAuthReady(true);
+    // /c/[id] 사장님 CTA에서 ?name=으로 진입 시 검색창 프리필(decisions #15)
+    try { const nm = new URLSearchParams(window.location.search).get("name"); if (nm && !pn) setQ(nm); } catch {}
   }, []);
   const hdr = { "x-admin-password": pw ?? "", "x-owner-pin": pin ?? "" };
   const pinLogin = async () => {
