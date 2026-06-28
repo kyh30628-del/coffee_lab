@@ -120,6 +120,7 @@ export default function OrgDashboard() {
   const [member, setMember] = useState<{ k: string; n: string; t: string } | null>(null);
   const [dec, setDec] = useState<{ pending: any[]; delegated: any[]; recent: any[] }>({ pending: [], delegated: [], recent: [] });
   const [coord, setCoord] = useState<{ open: any[]; resolved: any[] }>({ open: [], resolved: [] });
+  const [issues, setIssues] = useState<any[]>([]);
   const [err, setErr] = useState(""); const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState<number | null>(null);
   const [showOrg, setShowOrg] = useState(false);
@@ -132,10 +133,12 @@ export default function OrgDashboard() {
       fetch("/api/admin/org-briefing", { headers: { "x-admin-password": password }, cache: "no-store" }).then((r) => r.json()),
       fetch("/api/admin/decisions", { headers: { "x-admin-password": password }, cache: "no-store" }).then((r) => r.json()),
       fetch("/api/admin/coordination", { headers: { "x-admin-password": password }, cache: "no-store" }).then((r) => r.json()),
-    ]).then(([b, d, co]) => {
+      fetch("/api/admin/issues", { headers: { "x-admin-password": password }, cache: "no-store" }).then((r) => r.json()),
+    ]).then(([b, d, co, iss]) => {
       if (b.ok) { setBrief(b.brief); setBriefs(b.briefs || (b.brief ? [b.brief] : [])); localStorage.setItem("adm_pw", password); } else if (!silent) setErr("비밀번호 확인");
       if (d.ok) setDec({ pending: d.pending || [], delegated: d.delegated || [], recent: d.recent || [] });
       if (co.ok) setCoord({ open: co.open || [], resolved: co.resolved || [] });
+      if (iss.ok) setIssues(iss.open || []);
       if (b.ok) setSynced(new Date().toLocaleTimeString("ko-KR"));
     }).catch(() => { if (!silent) setErr("불러오기 실패"); }).finally(() => { if (!silent) setLoading(false); });
   };
@@ -184,6 +187,26 @@ export default function OrgDashboard() {
           <div style={card}><div style={lbl}>📊 오늘 토큰(in)</div><div style={big}>{fmt(tok.input || 0)}</div><div style={sub}>비용프록시 ${Number(tok.cost || 0).toFixed(2)}</div></div>
           <div style={card}><div style={lbl}>📈 공개 카페</div><div style={big}>{(+m.pub || 0).toLocaleString()}</div><div style={sub}>검증 {(+m.v || 0).toLocaleString()}</div></div>
           <div style={card}><div style={lbl}>🤖 크론</div><div style={big}>{crons.filter((c: any) => c.ok).length}/{crons.length} ✅</div></div>
+        </div>
+
+        {/* 🚨 RM 실시간 이슈 — 문제 발견 즉시 RM 자동분류(기조실장 명의)·본부 배정 */}
+        <div style={{ ...card, marginTop: 10, border: issues.length ? "2px solid #b03a3a" : "1px solid #bcd4bc" }}>
+          <div style={{ fontSize: 13.5, fontWeight: 700, color: issues.length ? "#b03a3a" : "#3f7a4f", marginBottom: 2 }}>
+            🚨 RM 실시간 이슈 ({issues.length}) {issues.length > 0 && <span style={{ fontSize: 10, fontWeight: 700, color: "#b03a3a" }}>· HIGH {issues.filter((i) => i.severity === "HIGH").length}</span>}
+          </div>
+          <div style={{ fontSize: 10.5, color: "#9c8a6c", marginBottom: 8 }}>관제탑 어디서든 문제 발견 즉시 RM팀이 분류(기획조정실장 명의) → 담당 본부 배정 → 실시간 조치.</div>
+          {issues.length === 0 ? <div style={{ color: "#3f7a4f", fontSize: 13 }}>현재 열린 이슈 없음 ✅</div> :
+            issues.map((i) => (
+              <div key={i.ikey} style={{ border: "1px solid #e6d8bf", borderRadius: 10, padding: "9px 11px", marginBottom: 8, background: i.severity === "HIGH" ? "#fff6f4" : "#fbfaf5" }}>
+                <div style={{ display: "flex", gap: 5, alignItems: "center", flexWrap: "wrap" }}>
+                  <span style={{ background: sevC[i.severity] || "#888", color: "#fff", fontSize: 9.5, fontWeight: 700, padding: "2px 7px", borderRadius: 20 }}>{i.severity}</span>
+                  <span style={{ fontSize: 9.5, color: "#8a7458", background: "#f0e8d8", padding: "2px 6px", borderRadius: 20 }}>{i.source}</span>
+                  <span style={{ fontWeight: 700, fontSize: 12.5 }}>{i.title}</span>
+                </div>
+                {i.detail && <div style={{ fontSize: 11, color: "#5a4631", margin: "4px 0 3px", lineHeight: 1.4 }}>{i.detail}</div>}
+                <div style={{ fontSize: 10.5, color: "#9c8a6c" }}>→ 배정: <b style={{ color: "#7a5a2a" }}>{i.team}</b> · 기획조정실장 명의(RM 분류) · 발견 {i.seen}{Number(i.hrs) >= 24 ? ` · ${Math.floor(Number(i.hrs) / 24)}일 경과` : ""}</div>
+              </div>
+            ))}
         </div>
 
         {/* 💰 오늘 토큰 사용 — 상시 일일 항목(묻지 않아도 매일 보임) */}
