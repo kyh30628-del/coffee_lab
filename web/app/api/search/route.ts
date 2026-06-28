@@ -67,6 +67,12 @@ function lexicalScore(c: any, tokens: string[], hitConcepts: typeof CONCEPTS) {
 
 const FIELDS = `id, name, area, synth_grade, synth_count, synth_identity, signature, note, vibe, uses, beans, char_scores, synth_reviews, synth_acidity, synth_body, synth_sweet`;
 
+// 등급 가중치 — '검증'이 '참고'보다 위 노출(동네 커피 노트의 약속). 절대 우선은 아니고 가산.
+const gradeBonus = (g?: string): number => (g === "검증" ? 25 : g === "참고" ? 8 : 0);
+// 일반 카테고리·개념 단어 — 이런 검색은 '이름이 그 단어인 카페'가 아니라 '그 부류 옥석'을 원함.
+//   → 이름 직접매칭(9999 최상단 고정)을 건너뛰어 등급순 노출이 살게 한다(참고가 검증 위로 가던 버그 차단).
+const CATEGORY_WORD = new Set(["로스터리", "로스터스", "로스터즈", "로스팅", "핸드드립", "드립", "베이커리", "디저트", "브런치", "스페셜티", "에스프레소", "아메리카노", "라떼", "콜드브루", "원두", "제과", "빵집", "북카페", "카페", "커피", "커피숍", "커피전문점"]);
+
 // Claude 후보용: char_scores → 한국어 특징 태그, 검증 리뷰 → 인용
 const AXIS_LABEL: Record<string, string> = Object.fromEntries(CONCEPTS.filter((c) => c.axis).map((c) => [c.axis as string, c.label]));
 function charTags(cs: any): string {
@@ -147,7 +153,7 @@ export async function GET(req: NextRequest) {
             scored = rows.map((c) => {
               const { exact, concept, reasons } = lexicalScore(c, tokens, hitConcepts);
               const sim = Number(c.sim) || 0;
-              const total = sim * 100 + exact + concept; // 의미 유사도가 1차, 키워드·느낌이 가산
+              const total = sim * 100 + exact + concept + gradeBonus(c.synth_grade); // 의미 유사도 1차 + 키워드·느낌 + 등급(검증 우대)
               const why = [`의미 유사 ${Math.round(sim * 100)}%`, ...reasons];
               return { id: c.id, name: c.name, area: c.area, grade: c.synth_grade, count: c.synth_count, identity: c.synth_identity, score: Math.round(total * 10) / 10, reasons: why.slice(0, 3) };
             });
@@ -164,8 +170,8 @@ export async function GET(req: NextRequest) {
       for (const c of rows) {
         if (!inRegion(c.area ?? "", region)) continue;
         const { exact, concept, reasons } = lexicalScore(c, tokens, hitConcepts);
-        const total = exact + concept;
-        if (total <= 0) continue;
+        const total = exact + concept + (exact + concept > 0 ? gradeBonus(c.synth_grade) : 0);
+        if (exact + concept <= 0) continue;
         byId.set(c.id, c);
         scored.push({ id: c.id, name: c.name, area: c.area, grade: c.synth_grade, count: c.synth_count, identity: c.synth_identity, score: Math.round(total * 10) / 10, reasons: reasons.slice(0, 3) });
       }
@@ -191,23 +197,33 @@ export async function GET(req: NextRequest) {
 
     // ===== 상호(카페명) 직접 매칭 — 시맨틱/재정렬이 놓치는 '이름 검색'을 항상 보장(최상단 고정) =====
     //   '마루빈'처럼 의미가 없는 상호는 임베딩으로 안 떠서 사라지던 버그 차단. 띄어쓰기 무시 매칭.
+    //   ⚠️ 단, '로스터리·핸드드립·베이커리' 같은 카테고리·개념 단어 검색은 *이름이 그 단어인 카페*가 아니라
+    //   '그 부류 옥석'을 원하므로 이름매칭 9999 고정을 건너뛴다(참고 카페가 검증 위로 가던 버그 차단).
     try {
       const dq = ql.replace(/\s+/g, "");
-      if (dq.length >= 2) {
+      const isCategory = CATEGORY_WORD.has(dq) || tokens.every((t) => CATEGORY_WORD.has(t));
+      if (dq.length >= 2 && !isCategory) {
         const nameRows = (await sql.query(
           `SELECT ${FIELDS} FROM cafes WHERE published = true
              AND replace(lower(name), ' ', '') LIKE $1
              AND ($2 = '' OR area ILIKE $3 OR area ILIKE $4)
-           ORDER BY (replace(lower(name), ' ', '') = $5) DESC, synth_count DESC NULLS LAST LIMIT 8`,
+           ORDER BY (replace(lower(name), ' ', '') = $5) DESC, (synth_grade = '검증') DESC, synth_count DESC NULLS LAST LIMIT 8`,
           [`%${dq}%`, region, p1, p2, dq],
         )) as unknown as any[];
         if (nameRows.length > 0) {
           const have = new Set(results.map((r: any) => r.id));
-          const nameResults = nameRows.filter((c) => !have.has(c.id)).map((c) => ({
-            id: c.id, name: c.name, area: c.area, grade: c.synth_grade, count: c.synth_count,
-            identity: c.synth_identity, score: 9999, reasons: ["카페명 일치"],
-          }));
-          if (nameResults.length > 0) results = [...nameResults, ...results].slice(0, 24);
+          // 정확히 이름이 일치하는 것만 최상단 고정(9999). 부분일치는 등급가점만 받아 일반 랭킹과 경쟁.
+          const norm = (s: string) => (s || "").toLowerCase().replace(/\s+/g, "");
+          const nameResults = nameRows.filter((c) => !have.has(c.id)).map((c) => {
+            const exactName = norm(c.name) === dq;
+            return {
+              id: c.id, name: c.name, area: c.area, grade: c.synth_grade, count: c.synth_count,
+              identity: c.synth_identity,
+              score: exactName ? 9999 : 200 + gradeBonus(c.synth_grade) + Math.min(50, Number(c.synth_count) || 0),
+              reasons: ["카페명 일치"],
+            };
+          });
+          if (nameResults.length > 0) results = [...nameResults, ...results].sort((a: any, b: any) => b.score - a.score).slice(0, 24);
         }
       }
     } catch { /* 상호매칭 실패해도 기존 결과 유지 */ }
