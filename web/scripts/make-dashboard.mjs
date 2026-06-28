@@ -68,6 +68,13 @@ function md2html(md) {
   // ④ 오늘 결재 대기(proposals)
   const props = existsSync(AR) ? readdirSync(AR).filter((f) => f.includes("proposals") && f.includes(today)) : [];
 
+  // ⑤ 전결 처리내역(L1·L2) — 위임전결 사후보고. CEO가 결재한 게 아니라 본부·기조실장이 자체 처리한 것.
+  let delegated = [];
+  try {
+    delegated = await sql`SELECT title, team, tier, COALESCE(decided_by, CASE tier WHEN 'L1' THEN '본부 전결' WHEN 'L2' THEN '기조실장 전결' ELSE '전결' END) decided_by, status, to_char(COALESCE(decided_at,created_at),'MM-DD HH24:MI') at
+      FROM decisions WHERE tier IN ('L1','L2') AND COALESCE(decided_at,created_at) > now() - interval '26 hours' ORDER BY COALESCE(decided_at,created_at) DESC LIMIT 20`;
+  } catch {}
+
   const fmt = (n) => (n >= 1000 ? (n / 1000).toFixed(0) + "K" : n);
   const html = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta http-equiv="refresh" content="300">
 <title>☕ 관제 대시보드 — 동네 커피 노트</title>
@@ -105,6 +112,7 @@ function md2html(md) {
    <span class="big" style="font-size:20px">${(+metrics.v || 0).toLocaleString()}</span><span class="lbl">검증</span><br>
    <span class="lbl">합성 대기 ${metrics.q || 0}건</span></div>
  <div class="card"><h2>🤖 크론 건강</h2><table>${crons.slice(0, 8).map((c) => `<tr><td>${c.ok ? "✅" : "<span class='bad'>❌</span>"} ${esc(c.job)}</td><td style="text-align:right;color:#9c8a6c">${Number(c.h) < 1 ? Math.round(Number(c.h) * 60) + "분 전" : Number(c.h).toFixed(1) + "h 전"}</td></tr>`).join("")}</table></div>
+ <div class="card full"><h2>📋 전결 처리내역 (L1·L2 위임전결 — 사후보고)</h2>${delegated.length ? `<table>${delegated.map((d) => `<tr><td><span class="pill" style="background:${d.tier === "L1" ? "#dfeaf3" : "#ece3f5"};border-color:${d.tier === "L1" ? "#6b8fae" : "#9c7bbf"}">${d.tier}</span></td><td>${esc(d.title)}</td><td style="color:#9c8a6c">${esc(d.team || "")}</td><td style="text-align:right;color:#9c8a6c">${esc(d.decided_by)} · ${d.at}</td></tr>`).join("")}</table><p style="font-size:11px;color:#9c8a6c">최근 24h 본부·기조실장이 권한 내 결정·집행한 건. CEO 결재 불요 — 사후 가시성용.</p>` : `<p class="ok">최근 24h 전결 처리 없음</p>`}</div>
  <div class="card full exec"><h2>📋 오늘의 EXECUTIVE 보고</h2>${md2html(execMd)}</div>
 </div>
 <div class="foot">소비자의 마인드로 사고하고, 소비자 경험을 최우선한다 · 5분마다 자동 새로고침</div>
@@ -114,12 +122,14 @@ function md2html(md) {
   // DB 푸시 — 배포된 모바일 관리자화면(/admin/org)이 읽게
   try {
     await sql`CREATE TABLE IF NOT EXISTS org_briefings (id SERIAL PRIMARY KEY, created_at TIMESTAMPTZ DEFAULT now(), executive_md TEXT, approvals JSONB, token_today JSONB, crons JSONB, metrics JSONB)`;
-    await sql`INSERT INTO org_briefings (executive_md, approvals, token_today, crons, metrics) VALUES (
+    await sql`ALTER TABLE org_briefings ADD COLUMN IF NOT EXISTS delegated JSONB`.catch(() => {});
+    await sql`INSERT INTO org_briefings (executive_md, approvals, token_today, crons, metrics, delegated) VALUES (
       ${execMd},
       ${JSON.stringify(props.map((p) => p.replace(/-proposals.*/, "")))}::jsonb,
       ${JSON.stringify({ input: tokTotal.i, output: tokTotal.o, cost: tokTotal.c, byAgent: tokRows.slice(0, 8) })}::jsonb,
       ${JSON.stringify(crons.slice(0, 12).map((c) => ({ job: c.job, ok: c.ok, h: Number(c.h) })))}::jsonb,
-      ${JSON.stringify(metrics)}::jsonb)`;
+      ${JSON.stringify(metrics)}::jsonb,
+      ${JSON.stringify(delegated)}::jsonb)`;
     await sql`DELETE FROM org_briefings WHERE created_at < now() - interval '7 days'`;
     console.log("✅ org_briefings DB 푸시 완료(모바일 관리자화면용)");
   } catch (e) { console.log("⚠️ DB 푸시 실패:", String(e).slice(0, 60)); }
