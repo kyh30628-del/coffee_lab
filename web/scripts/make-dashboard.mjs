@@ -1,6 +1,6 @@
 // 동네 커피 노트 — 일일 대시보드 생성기 (비서실장 호출, 결정론·토큰0)
 // agent-reports/의 EXECUTIVE·proposals·USAGE.tsv·DB를 읽어 DASHBOARD.html 한 장으로.
-import { readFileSync, existsSync, readdirSync, writeFileSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync, writeFileSync, statSync } from "node:fs";
 import { neon } from "@neondatabase/serverless";
 
 const AR = "/Users/wangwida/coffee-platform/agent-reports";
@@ -37,9 +37,10 @@ function md2html(md) {
 }
 
 (async () => {
-  // ① EXECUTIVE
+  // ① EXECUTIVE — 내용 + '작성 시각'(파일 mtime). 보고서는 chief-manager가 사이클당 1회 새로 쓴다.
   const execF = `${AR}/EXECUTIVE-latest.md`;
   const execMd = existsSync(execF) ? readFileSync(execF, "utf8") : "_오늘 EXECUTIVE 보고서가 아직 없습니다._";
+  const execMtime = existsSync(execF) ? statSync(execF).mtime : new Date();
 
   // ② 토큰 사용량(오늘)
   let tokRows = [], tokTotal = { i: 0, o: 0, c: 0 };
@@ -123,15 +124,23 @@ function md2html(md) {
   try {
     await sql`CREATE TABLE IF NOT EXISTS org_briefings (id SERIAL PRIMARY KEY, created_at TIMESTAMPTZ DEFAULT now(), executive_md TEXT, approvals JSONB, token_today JSONB, crons JSONB, metrics JSONB)`;
     await sql`ALTER TABLE org_briefings ADD COLUMN IF NOT EXISTS delegated JSONB`.catch(() => {});
-    await sql`INSERT INTO org_briefings (executive_md, approvals, token_today, crons, metrics, delegated) VALUES (
-      ${execMd},
-      ${JSON.stringify(props.map((p) => p.replace(/-proposals.*/, "")))}::jsonb,
-      ${JSON.stringify({ input: tokTotal.i, output: tokTotal.o, cost: tokTotal.c, byAgent: tokRows.slice(0, 8) })}::jsonb,
-      ${JSON.stringify(crons.slice(0, 12).map((c) => ({ job: c.job, ok: c.ok, h: Number(c.h) })))}::jsonb,
-      ${JSON.stringify(metrics)}::jsonb,
-      ${JSON.stringify(delegated)}::jsonb)`;
-    await sql`DELETE FROM org_briefings WHERE created_at < now() - interval '10 days'`; // 10일치 보존(하루 여러 건 시간별 유지)
-    console.log("✅ org_briefings DB 푸시 완료(모바일 관리자화면용)");
+    const tokJ = JSON.stringify({ input: tokTotal.i, output: tokTotal.o, cost: tokTotal.c, byAgent: tokRows.slice(0, 8) });
+    const apprJ = JSON.stringify(props.map((p) => p.replace(/-proposals.*/, "")));
+    const cronJ = JSON.stringify(crons.slice(0, 12).map((c) => ({ job: c.job, ok: c.ok, h: Number(c.h) })));
+    const metJ = JSON.stringify(metrics);
+    const delJ = JSON.stringify(delegated);
+    // ⚠️ 보고서는 '내용이 바뀌었을 때만' 새 항목으로. 같은 EXECUTIVE를 다시 스냅샷하면 중복(같은 보고서 2건)이라
+    //   새로 안 쌓고 *최신 행의 라이브 지표만 갱신*. 새 보고서면 작성시각(파일 mtime)으로 INSERT.
+    const last = await sql`SELECT id, executive_md FROM org_briefings ORDER BY created_at DESC LIMIT 1`;
+    if (last[0] && last[0].executive_md === execMd) {
+      await sql`UPDATE org_briefings SET token_today=${tokJ}::jsonb, crons=${cronJ}::jsonb, metrics=${metJ}::jsonb, delegated=${delJ}::jsonb, approvals=${apprJ}::jsonb WHERE id=${last[0].id}`;
+      console.log("↻ 보고서 내용 동일 — 중복 저장 안 함, 라이브 지표만 갱신");
+    } else {
+      await sql`INSERT INTO org_briefings (created_at, executive_md, approvals, token_today, crons, metrics, delegated)
+        VALUES (${execMtime.toISOString()}, ${execMd}, ${apprJ}::jsonb, ${tokJ}::jsonb, ${cronJ}::jsonb, ${metJ}::jsonb, ${delJ}::jsonb)`;
+      console.log("✅ 새 보고서 저장(작성시각", execMtime.toISOString(), ")");
+    }
+    await sql`DELETE FROM org_briefings WHERE created_at < now() - interval '10 days'`; // 10일치 보존(내용 바뀐 보고서만 시간별 누적)
   } catch (e) { console.log("⚠️ DB 푸시 실패:", String(e).slice(0, 60)); }
 
   console.log("✅ DASHBOARD.html 생성:", `${AR}/DASHBOARD.html`, `(토큰 today ${tokTotal.i} in · 결재 ${props.length} · 크론 ${crons.length})`);
