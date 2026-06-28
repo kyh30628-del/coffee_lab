@@ -44,9 +44,16 @@ export async function detectIssues(): Promise<Issue[]> {
   const missCoord = await one(sql`SELECT count(*) c FROM cafes WHERE published AND (lat IS NULL OR lng IS NULL OR lat=0 OR lng=0)`);
   if (missCoord > 0) out.push({ ikey: "integ:misscoord", source: "정합성", severity: "MED", type: "필드누락", title: `좌표 없는 공개 ${missCoord}곳`, detail: "지도·박스검증 불가", team: "품질본부" });
 
-  // 3) 결재·전결 적체
-  const oldPending = await one(sql`SELECT count(*) c FROM decisions WHERE status='pending' AND COALESCE(tier,'L3')='L3' AND created_at < now() - interval '1 day'`);
-  if (oldPending > 0) out.push({ ikey: "approval:aging", source: "결재", severity: "MED", type: "결재 적체", title: `CEO 결재 ${oldPending}건 1일+ 미처리`, detail: "치명적(L3) 결재가 하루 넘게 대기 — 독촉 필요", team: "기획조정실" });
+  // 3) 결재 대기 (L3) — 각 건을 담당 본부로 라우팅(즉시, 나이 무관)
+  const pend = (await sql`SELECT id, title, team, severity FROM decisions WHERE status='pending' AND COALESCE(tier,'L3')='L3' ORDER BY id`) as any[];
+  for (const p of pend) out.push({ ikey: `approval:${p.id}`, source: "결재", severity: (p.severity === "HIGH" ? "HIGH" : "MED"), type: "CEO 결재 대기", title: `결재 대기: ${p.title}`.slice(0, 80), detail: "CEO 모바일 결재 필요(L3 치명적)", team: p.team || "기획조정실" });
+  // 3-b) 승인됐으나 집행 안 된 작업(agent_task) — 기조실장·담당 본부 실행 대기
+  const appr = (await sql`SELECT id, title, team FROM decisions WHERE status='approved' ORDER BY id`) as any[];
+  for (const a of appr) out.push({ ikey: `exec:${a.id}`, source: "집행", severity: "MED", type: "집행 대기", title: `집행 대기: ${a.title}`.slice(0, 80), detail: "승인 완료 — 담당 본부 구현·집행 대기(전결/배분)", team: a.team || "기획조정실" });
+
+  // 3-c) 판정 적체 (needs_llm — judgeloop 정지 시 누적)
+  const needsLlm = await one(sql`SELECT count(*) c FROM cafes WHERE needs_llm=true`);
+  if (needsLlm >= 300) out.push({ ikey: "ops:needsllm", source: "품질", severity: (needsLlm >= 1000 ? "HIGH" : "MED"), type: "판정 적체", title: `AI 판정 대기 ${needsLlm.toLocaleString()}건`, detail: "경계 리뷰 판정 적체(judgeloop 재개 결정 대기) — 합성 정밀도 영향", team: "품질본부" });
 
   // 4) 협업 지연 (2일+)
   const lateCoord = (await sql`SELECT count(*) c FROM coordination WHERE status IN ('open','in_progress') AND created_at < now() - interval '2 days'`.catch(() => [{ c: 0 }])) as any[];
