@@ -59,6 +59,17 @@ export async function detectIssues(): Promise<Issue[]> {
   const lateCoord = (await sql`SELECT count(*) c FROM coordination WHERE status IN ('open','in_progress') AND created_at < now() - interval '2 days'`.catch(() => [{ c: 0 }])) as any[];
   if (Number(lateCoord[0].c) > 0) out.push({ ikey: "coord:late", source: "협업", severity: "MED", type: "협업 지연", title: `미해결 협업 ${lateCoord[0].c}건 2일+`, detail: "부서 간 조율이 2일 넘게 안 풀림", team: "경영지원본부" });
 
+  // ★ 메인 관제탑(/admin)이 띄우는 이상과 동일 소스 — 대시보드에 뜨는 모든 이상은 RM 이슈로 전달된다(CEO 지시).
+  // 6) 품질 오염 감지 (audit_flags 미해결) — 자가감사 근거오염·중복 플래그
+  const af = (await sql`SELECT cafe_name FROM audit_flags WHERE issue!='audit_complete' AND COALESCE(resolved,false)=false ORDER BY flagged_at DESC LIMIT 10`.catch(() => [])) as any[];
+  if (af.length > 0) out.push({ ikey: "quality:auditflags", source: "품질감사", severity: "HIGH", type: "품질 오염", title: `품질 오염 감지 ${af.length}건`, detail: `근거오염·중복 등 자가감사 플래그(미해결): ${af.slice(0, 5).map((x) => x.cafe_name).join(", ")}`.slice(0, 200), team: "품질본부" });
+  // 7) 그라운딩 의심 (소개글 환각 의심)
+  const gr = await one(sql`SELECT count(*) c FROM grounding_checks WHERE grounded=false`.catch(() => [{ c: 0 }] as any));
+  if (gr >= 20) out.push({ ikey: "quality:grounding", source: "그라운딩", severity: "MED", type: "환각 의심", title: `그라운딩 의심 ${gr}건`, detail: "소개글이 후기 근거 부족(환각 의심) — 판정 큐 재투입·재합성 대상", team: "품질본부" });
+  // 8) 리뷰 맥락 watchlist (offctx — 위험 아님·주의)
+  const offc = await one(sql`SELECT count(*) c FROM cafes WHERE published AND offctx_rate>=0.5 AND COALESCE(offctx_ok,false)=false`.catch(() => [{ c: 0 }] as any));
+  if (offc >= 5) out.push({ ikey: "quality:offctx", source: "맥락점검", severity: "LOW", type: "맥락 watchlist", title: `리뷰 맥락 점검 ${offc}곳`, detail: "표시 리뷰에 카페 맥락 적음(일부 오탐 가능·위험 아님) — 사람 확인 후 진짜 오염만 처리", team: "품질본부" });
+
   // 5) 운영 백로그
   const closureBack = await one(sql`SELECT count(*) c FROM cafes WHERE published AND closure_misses>=3`);
   if (closureBack > 0) out.push({ ikey: "ops:closureback", source: "운영", severity: "MED", type: "폐업 검토대기", title: `폐업 검토대기 ${closureBack}곳`, detail: "3회+ 미발견 — 정밀확인·결재 필요(자동삭제 안 함)", team: "운영본부" });
