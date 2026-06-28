@@ -113,13 +113,16 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
       if (rule.verdict !== "rejected" || rule.borderline) auditItems.push({ key, title: t.title, body: t.desc ?? t.text });
       if (rule.borderline) borderline.push({ key, title: t.title, body: t.desc ?? t.text });
 
-      // 효과 판정: decisions(Sonnet 최종 심사) > whitelist(보조) > 규칙
-      //   단 '광고·협찬'(sponsored)은 판정결정·whitelist로도 못 살림 — 랜딩 약속(광고 자동 제외)은 절대 우선.
+      // 효과 판정 우선순위: 광고·하드 구조거절 = 절대(판정·whitelist로 못 살림) > decisions(과거 AI 심사) > whitelist > 규칙.
+      //   ⚠️ 하드 구조거절(동명 비카페·필라테스·글루드·OFFTOPIC·SEO·인물직함 등 borderline 아닌 reject)은 광고처럼 *규칙 절대 우선*.
+      //   (스테일 "유지" 결정이 구조적 오염을 덮어 검증 카페가 정화 안 되던 버그 차단 — 2026-06-28)
       const isAd = !!rule.signals?.sponsored;
+      const hardReject = rule.verdict === "rejected" && !rule.borderline; // 경계 아닌 구조적 하드 거절
       let verdict = rule.verdict;
       let reasons = rule.reasons;
       let score = rule.score;
       if (isAd) { verdict = "rejected"; reasons = ["광고·협찬 — 자동 제외(판정보다 우선)"]; score = 0; }
+      else if (hardReject) { /* 규칙 하드 거절 — 과거 결정·whitelist로 못 살림(규칙 절대 우선) */ }
       else if (opts?.decisions && key in opts.decisions) {
         if (opts.decisions[key]) { verdict = rule.verdict === "verified" ? "verified" : "reference"; reasons = ["✨ AI 검증: 실제 후기"]; score = 80; }
         else { verdict = "rejected"; reasons = ["AI 판정: 무관/저품질 제외"]; score = 0; }
