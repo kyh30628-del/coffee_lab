@@ -194,6 +194,19 @@ const AREA_NAME = new Set([
 ]);
 const isAreaTok = (t: string) => { const n = norm(t); return n.length >= 2 && (AREA_NAME.has(t) || [...AREA_NAME].some((a) => norm(a) === n)); };
 
+// 카페명 끝에 붙은 'SEO 서술어 꼬리'(원두·핸드드립·로스팅·베이커리·브런치…)를 제거해 진짜 상호만 남긴다.
+//   네이버 상호를 '구구커피 원두 핸드드립 로스팅'처럼 키워드로 등록한 카페가, 그 일반어를 '식별토큰'으로 삼아
+//   다른 로스터리 후기를 무더기 매칭하고 nameCoherence 게이트(원두·핸드드립이 1.0으로 부풀림)까지 뚫던 오염의 근본 차단.
+//   ⚠️ '꼬리'만 제거(앞 토큰은 보존), 전부 서술어면(예:'원두로스팅카페') 원본 유지 — 단일 상호('커피나무')는 손대지 않음. (2026-06-28)
+const NAME_DESC_TAIL = new Set(["원두", "핸드드립", "핸드드립커피", "드립", "드립커피", "로스팅", "로스터리", "로스터스", "로스터즈", "로스터", "베이커리", "브런치", "디저트", "디저트카페", "스페셜티", "에스프레소", "아메리카노", "라떼", "콜드브루", "홈카페", "제과", "제과점", "케이크", "케익", "케잌", "베이킹", "커피전문점", "전문점", "핸드메이드", "수제", "수제청", "커피", "카페"]);
+export function cleanCafeName(name: string): string {
+  const parts = (name || "").trim().split(/\s+/);
+  let end = parts.length;
+  while (end > 1 && NAME_DESC_TAIL.has(parts[end - 1])) end--;
+  const cleaned = parts.slice(0, end).join(" ").trim();
+  return cleaned.length >= 2 ? cleaned : name; // 비면 원본 보존(파괴 금지)
+}
+
 // 카페명 '구별 토큰' = 일반어·지역어·대상지역어를 뺀 고유 식별어.
 // 예: "을지로 문덕카페" → ["문덕"]("을지로" 제거).
 // 몰/신도시어(스타필드·위례 등)는 '다른 브랜드 토큰이 남을 때만' 위치수식어로 제거한다.
