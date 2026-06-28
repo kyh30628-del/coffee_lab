@@ -72,12 +72,48 @@ const ORG = {
   ],
 };
 
+// 가동 멤버 의미·역할 — 카드 클릭 시 팝업 설명
+const MEMBER_INFO: Record<string, string> = {
+  "정합성 에이전트": "데이터 정합성 담당. 좌표 박스·area=주소 일치·중복·필드 무결성을 매일 점검하고, 안전·가역한 건 자동 치유한다.",
+  "룰갭 에이전트": "데이터를 보고 새 오염 패턴을 발굴해 검증 규칙(reviewQuality)을 보완. 사전은 자동, 로직 변경은 CEO 승인.",
+  "품질레드팀 에이전트": "검증 카페를 적대적으로 재검증. 옥석 자격 미달·오염을 색출해 비공개/강등을 제안(L3).",
+  "심층판정 에이전트(로컬·무료)": "규칙이 애매한 '경계' 리뷰를 AI가 의미판정·그라운딩. 로컬 Claude Code(구독·과금0)로 격일 실행.",
+  "발굴 에이전트": "수요·공급 갭을 추론해 발굴 타겟 지역을 큐에 적재. 전수가 아닌 '다양성' 큐레이션.",
+  "폐업 에이전트": "다중 증거로 폐업 의심을 보수적으로 조사(자동삭제 금지·미발견≠폐업). 평판 신선도도 점검.",
+  "검색품질 에이전트": "실제 질의로 검색·추천 품질을 검증. 옥석 상위노출·카페명 1위 고정·빈결과 방지.",
+  "마케팅 에이전트": "무료 소비자 유입·바이럴 연구·기획(B2C). 과장 금지, 발행은 CEO 승인.",
+  "B2B영업 에이전트": "유료 구독 전환 연구·사장님 아웃리치 퍼널(B2B). 발송은 CEO 승인.",
+  "전략 에이전트": "시장조사·경쟁 벤치마킹·약점 진단·발전 방향·예측. 방향 결정은 CEO(격일).",
+  "평가 에이전트": "주간 조직 평가·스코어카드(소비자경험 최상 가중)·MVP·개선과제.",
+  "법무 에이전트": "약관·구독토큰 안전선·PII·AI OFF·외부 API 약관 감사.",
+  "재무 에이전트": "과금0 유지·콘솔키 크레딧·네이버/Google 쿼터·토큰 실측 감시.",
+  "경영지원 에이전트": "에이전트·크론 가동률 관제 + 본부·팀 간 협업 코디네이션 주관.",
+  "리스크 에이전트": "의존성·법·신뢰·사업·기술 리스크를 적극 발굴·등급화하고 해결주체 본부를 지정.",
+  "cron-sentinel": "데이터 정합성 파수꾼. 매일 전 축을 스캔해 안전한 건 자동치유하고 잔여는 경보. 사장님이 발견하기 전에 먼저.",
+  "orchestrator-heal": "2시간마다 파이프라인을 자가치유(area·박스밖·중복 등 가역 교정).",
+  "cron-rulegap": "학습된 오염 사전을 매일 자동 반영(로직 변경은 승인 대상).",
+  "reviewQuality(verifyReview)": "합성할 때마다 실시간으로 옥석을 거르는 결정론 규칙 엔진(동명비카페·주소·오염·이름정제).",
+  "cron-verify": "매일 검증 카페의 15종 무결성을 점검.",
+  "cron-grow": "2시간마다 발굴 큐를 소비해 신규 카페를 수집.",
+  "cron-demand": "매일 검색 로그에서 수요갭·핫지역을 분석.",
+  "cron-newsletter": "주간 뉴스레터 발행(현재 보류).",
+  "cron-closure": "6시간마다 폐업 의심을 재확인. 보수적 — 자동삭제 안 하고 다중증거·검토대기만.",
+  "cron-enrich": "3시간마다 카페 평판 신선도·하락을 감지.",
+  "cron-synth": "매시간 미합성 신규 카페를 옥석 합성(규칙 기반·무료).",
+  "cron-embed": "매시간 검색용 임베딩을 생성(Google).",
+  "cron-resynth": "주간 전체 카페를 재합성해 최신 규칙을 반영.",
+  "cron-snapshot": "주간 핵심 지표를 스냅샷으로 보존.",
+  "api/search": "매 요청 검색 서빙. 카페명 직접매칭을 1위로 고정 + 시맨틱(임베딩).",
+  "api/momentum·cafeProfile": "매 요청 추천·카페 상세 서빙. 취향 6축 매칭·강약(언급률 percentile)·하이라이트.",
+};
+
 export default function OrgDashboard() {
   const [pw, setPw] = useState("");
   const [brief, setBrief] = useState<any>(null);
   const [briefs, setBriefs] = useState<any[]>([]);
   const [openId, setOpenId] = useState<number | null>(null);
   const [showWO, setShowWO] = useState(false);
+  const [member, setMember] = useState<{ k: string; n: string; t: string } | null>(null);
   const [dec, setDec] = useState<{ pending: any[]; delegated: any[]; recent: any[] }>({ pending: [], delegated: [], recent: [] });
   const [coord, setCoord] = useState<{ open: any[]; resolved: any[] }>({ open: [], resolved: [] });
   const [err, setErr] = useState(""); const [loading, setLoading] = useState(false);
@@ -294,9 +330,9 @@ export default function OrgDashboard() {
                         <div style={{ fontSize: 10.5, color: "#9c8a6c", marginLeft: 16, lineHeight: 1.35 }}>{t.s}</div>
                         {t.w && <div style={{ marginLeft: 16, marginTop: 3, display: "flex", flexWrap: "wrap", gap: 4 }}>
                           {t.w.map((m: any, mi: number) => (
-                            <span key={mi} style={{ fontSize: 10, background: m.k === "⚙️" ? "#eef3ee" : m.k === "🌐" ? "#eef0f6" : "#f6efe2", border: `1px solid ${m.k === "⚙️" ? "#bcd4bc" : m.k === "🌐" ? "#c2c8e0" : "#e2cfa8"}`, borderRadius: 6, padding: "1.5px 6px", color: "#5a4631" }}>
+                            <button key={mi} onClick={() => setMember(m)} style={{ fontSize: 10, background: m.k === "⚙️" ? "#eef3ee" : m.k === "🌐" ? "#eef0f6" : "#f6efe2", border: `1px solid ${m.k === "⚙️" ? "#bcd4bc" : m.k === "🌐" ? "#c2c8e0" : "#e2cfa8"}`, borderRadius: 6, padding: "2px 6px", color: "#5a4631", cursor: "pointer", fontFamily: "inherit" }}>
                               {m.k} {m.n} <span style={{ color: "#9c8a6c" }}>· {m.t}</span>
-                            </span>
+                            </button>
                           ))}
                         </div>}
                       </div>
@@ -308,6 +344,23 @@ export default function OrgDashboard() {
             <div style={{ marginTop: 10, fontSize: 11, color: "#9c6b3f", borderTop: "1px dashed #d8c4a0", paddingTop: 10 }}>
               실행: 현업 본부 매일 자율 가동 → 기조실장 종합 → CEO 보고. 결재는 기조실장이 담당 본부·팀에 배분. (전략기획·경영지원은 격일)
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 가동 멤버 의미·역할 팝업 */}
+      {member && (
+        <div onClick={() => setMember(null)} style={{ position: "fixed", inset: 0, background: "rgba(20,14,10,.55)", zIndex: 70, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 14, padding: 18, maxWidth: 340, width: "100%", boxShadow: "0 10px 40px rgba(0,0,0,.3)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 4 }}>
+              <span style={{ fontSize: 18 }}>{member.k}</span>
+              <span style={{ fontSize: 14.5, fontWeight: 700, color: "#2b2018" }}>{member.n}</span>
+            </div>
+            <div style={{ fontSize: 11, color: "#9c8a6c", marginBottom: 9 }}>
+              {member.k === "⚙️" ? "결정론 크론 · 상시 자동" : member.k === "🌐" ? "API · 실시간 서빙" : "LLM 에이전트 · 배치"} · 가동 {member.t}
+            </div>
+            <div style={{ fontSize: 12.5, color: "#3d2f22", lineHeight: 1.6 }}>{MEMBER_INFO[member.n] || "설명 준비 중."}</div>
+            <button onClick={() => setMember(null)} style={{ marginTop: 12, width: "100%", padding: 9, background: "#efe7d8", color: "#5a4631", border: "1px solid #ddc9a8", borderRadius: 9, fontWeight: 700, fontSize: 12.5, fontFamily: "inherit" }}>닫기</button>
           </div>
         </div>
       )}
