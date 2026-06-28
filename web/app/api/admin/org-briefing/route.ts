@@ -11,8 +11,14 @@ export async function GET(req: NextRequest) {
   }
   try {
     await sql`CREATE TABLE IF NOT EXISTS org_briefings (id SERIAL PRIMARY KEY, created_at TIMESTAMPTZ DEFAULT now(), executive_md TEXT, approvals JSONB, token_today JSONB, crons JSONB, metrics JSONB)`.catch(() => {});
-    const r = await sql`SELECT created_at, executive_md, approvals, token_today, crons, metrics FROM org_briefings ORDER BY created_at DESC LIMIT 1` as any[];
-    return NextResponse.json({ ok: true, brief: r[0] ?? null }, { headers: { "Cache-Control": "no-store" } });
+    // 일자별 최신 1건 × 7일(최신순). 하루에 여러 번 생성돼도 그날 마지막 보고서만.
+    const briefs = await sql`SELECT DISTINCT ON ((created_at AT TIME ZONE 'Asia/Seoul')::date)
+        to_char((created_at AT TIME ZONE 'Asia/Seoul')::date,'YYYY-MM-DD') AS day, created_at, executive_md, approvals, token_today, crons, metrics
+      FROM org_briefings
+      ORDER BY (created_at AT TIME ZONE 'Asia/Seoul')::date DESC, created_at DESC
+      LIMIT 7` as any[];
+    // brief = 오늘(최신) — 상단 토큰·크론·수치 카드용(하위호환).
+    return NextResponse.json({ ok: true, brief: briefs[0] ?? null, briefs }, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }

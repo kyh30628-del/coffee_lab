@@ -61,6 +61,8 @@ const ORG = {
 export default function OrgDashboard() {
   const [pw, setPw] = useState("");
   const [brief, setBrief] = useState<any>(null);
+  const [briefs, setBriefs] = useState<any[]>([]);
+  const [openDay, setOpenDay] = useState<string | null>(null);
   const [dec, setDec] = useState<{ pending: any[]; delegated: any[]; recent: any[] }>({ pending: [], delegated: [], recent: [] });
   const [coord, setCoord] = useState<{ open: any[]; resolved: any[] }>({ open: [], resolved: [] });
   const [err, setErr] = useState(""); const [loading, setLoading] = useState(false);
@@ -76,7 +78,7 @@ export default function OrgDashboard() {
       fetch("/api/admin/decisions", { headers: { "x-admin-password": password }, cache: "no-store" }).then((r) => r.json()),
       fetch("/api/admin/coordination", { headers: { "x-admin-password": password }, cache: "no-store" }).then((r) => r.json()),
     ]).then(([b, d, co]) => {
-      if (b.ok) { setBrief(b.brief); localStorage.setItem("adm_pw", password); } else if (!silent) setErr("비밀번호 확인");
+      if (b.ok) { setBrief(b.brief); setBriefs(b.briefs || (b.brief ? [b.brief] : [])); localStorage.setItem("adm_pw", password); } else if (!silent) setErr("비밀번호 확인");
       if (d.ok) setDec({ pending: d.pending || [], delegated: d.delegated || [], recent: d.recent || [] });
       if (co.ok) setCoord({ open: co.open || [], resolved: co.resolved || [] });
       if (b.ok) setSynced(new Date().toLocaleTimeString("ko-KR"));
@@ -201,8 +203,22 @@ export default function OrgDashboard() {
         </div>
 
         <div style={{ ...card, marginTop: 10 }} className="ex">
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#9c6b3f", marginBottom: 6 }}>📋 오늘의 EXECUTIVE</div>
-          <div dangerouslySetInnerHTML={{ __html: md2html(brief.executive_md || "_보고서 없음_") }} />
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#9c6b3f", marginBottom: 6 }}>📋 EXECUTIVE 일일보고서 (최근 7일)</div>
+          {briefs.length === 0 ? <div style={{ fontSize: 12, color: "#9c8a6c" }}>보고서 없음</div> :
+            briefs.map((bf: any, i: number) => {
+              const day = bf.day || String(bf.created_at || "").slice(0, 10);
+              const open = openDay === day; // 기본 전부 접힘 — 클릭한 날짜만 펼침
+              const wd = ["일", "월", "화", "수", "목", "금", "토"][new Date(day + "T00:00:00+09:00").getDay()];
+              return (
+                <div key={day} style={{ borderBottom: "1px solid #ece0c8" }}>
+                  <button onClick={() => setOpenDay(open ? null : day)} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", padding: "11px 2px", cursor: "pointer", fontFamily: "inherit" }}>
+                    <span style={{ fontWeight: 700, fontSize: 13, color: "#5a4631" }}>{open ? "▾" : "▸"} {day} ({wd}){i === 0 && <span style={{ fontSize: 10, color: "#c98a3c", fontWeight: 400 }}> · 최신</span>}</span>
+                    <span style={{ fontSize: 10.5, color: "#9c8a6c" }}>{open ? "접기" : "보기"}</span>
+                  </button>
+                  {open && <div style={{ padding: "2px 2px 12px" }} dangerouslySetInnerHTML={{ __html: md2html(bf.executive_md || "_이 날짜 보고서 내용 없음_") }} />}
+                </div>
+              );
+            })}
         </div>
         <div style={{ marginTop: 12, textAlign: "center", fontSize: 11.5, color: "#3f7a4f", fontWeight: 600 }}>🟢 실시간 자동 갱신 중{synced && <span style={{ color: "#9c8a6c", fontWeight: 400 }}> · 마지막 동기 {synced}</span>}</div>
         <div style={{ textAlign: "center", color: "#9c8a6c", fontSize: 11, margin: "10px 0 16px" }}>소비자 경험을 최우선한다 · 기획조정실</div>
