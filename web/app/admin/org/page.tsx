@@ -117,6 +117,8 @@ export default function OrgDashboard() {
   const [showPending, setShowPending] = useState(false);
   const [showDeleg, setShowDeleg] = useState(false);
   const [showCoord, setShowCoord] = useState(false);
+  const [showIssues, setShowIssues] = useState(false);
+  const [showTok, setShowTok] = useState(false);
   const [member, setMember] = useState<{ k: string; n: string; t: string } | null>(null);
   const [dec, setDec] = useState<{ pending: any[]; delegated: any[]; recent: any[] }>({ pending: [], delegated: [], recent: [] });
   const [coord, setCoord] = useState<{ open: any[]; resolved: any[] }>({ open: [], resolved: [] });
@@ -189,11 +191,15 @@ export default function OrgDashboard() {
           <div style={card}><div style={lbl}>🤖 크론</div><div style={big}>{crons.filter((c: any) => c.ok).length}/{crons.length} ✅</div></div>
         </div>
 
-        {/* 🚨 RM 실시간 이슈 — 문제 발견 즉시 RM 자동분류(기조실장 명의)·본부 배정 */}
+        {/* 🚨 RM 실시간 이슈 — 접이식·기본 접힘(헤더에 건수·HIGH 표시) */}
         <div style={{ ...card, marginTop: 10, border: issues.length ? "2px solid #b03a3a" : "1px solid #bcd4bc" }}>
-          <div style={{ fontSize: 13.5, fontWeight: 700, color: issues.length ? "#b03a3a" : "#3f7a4f", marginBottom: 2 }}>
-            🚨 RM 실시간 이슈 ({issues.length}) {issues.length > 0 && <span style={{ fontSize: 10, fontWeight: 700, color: "#b03a3a" }}>· HIGH {issues.filter((i) => i.severity === "HIGH").length}</span>}
-          </div>
+          <button onClick={() => setShowIssues(!showIssues)} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
+            <span style={{ fontSize: 13.5, fontWeight: 700, color: issues.length ? "#b03a3a" : "#3f7a4f" }}>
+              {showIssues ? "▾" : "▸"} 🚨 RM 실시간 이슈 ({issues.length}) {issues.length > 0 && <span style={{ fontSize: 10, fontWeight: 700, color: "#b03a3a" }}>· HIGH {issues.filter((i) => i.severity === "HIGH").length}</span>}
+            </span>
+            <span style={{ fontSize: 10.5, color: "#9c8a6c" }}>{showIssues ? "접기" : issues.length ? "조치 보기" : "보기"}</span>
+          </button>
+          {showIssues && <div style={{ marginTop: 8 }}>
           <div style={{ fontSize: 10.5, color: "#9c8a6c", marginBottom: 8 }}>관제탑 어디서든 문제 발견 즉시 RM팀이 분류(기획조정실장 명의) → 담당 본부 배정 → 실시간 조치.</div>
           {issues.length === 0 ? <div style={{ color: "#3f7a4f", fontSize: 13 }}>현재 열린 이슈 없음 ✅</div> :
             issues.map((i) => (
@@ -207,11 +213,16 @@ export default function OrgDashboard() {
                 <div style={{ fontSize: 10.5, color: "#9c8a6c" }}>→ 배정: <b style={{ color: "#7a5a2a" }}>{i.team}</b> · 기획조정실장 명의(RM 분류) · 발견 {i.seen}{Number(i.hrs) >= 24 ? ` · ${Math.floor(Number(i.hrs) / 24)}일 경과` : ""}</div>
               </div>
             ))}
+          </div>}
         </div>
 
-        {/* 💰 오늘 토큰 사용 — 상시 일일 항목(묻지 않아도 매일 보임) */}
+        {/* 💰 오늘 토큰 사용 — 접이식·기본 접힘 */}
         <div style={{ ...card, marginTop: 10 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#9c6b3f", marginBottom: 2 }}>💰 오늘 토큰 사용 (실측)</div>
+          <button onClick={() => setShowTok(!showTok)} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "#9c6b3f" }}>{showTok ? "▾" : "▸"} 💰 오늘 토큰 사용 ({fmt(tok.input || 0)} in · ${Number(tok.cost || 0).toFixed(2)})</span>
+            <span style={{ fontSize: 10.5, color: "#9c8a6c" }}>{showTok ? "접기" : "보기"}</span>
+          </button>
+          {showTok && <div style={{ marginTop: 8 }}>
           <div style={{ fontSize: 10.5, color: "#9c8a6c", marginBottom: 8 }}>구독 기반이라 실청구 0 · 비용프록시는 콘솔키 환산 참고치</div>
           <div style={{ display: "flex", gap: 14, alignItems: "baseline", marginBottom: 8 }}>
             <div><span style={{ fontSize: 22, fontWeight: 700, color: "#c98a3c" }}>{fmt(tok.input || 0)}</span><span style={{ fontSize: 11, color: "#9c6b3f" }}> in</span></div>
@@ -224,6 +235,7 @@ export default function OrgDashboard() {
                 <span>{i + 1}. {a.a}</span><span style={{ color: "#9c8a6c" }}>{fmt(a.i || 0)} tok · {a.n}회</span>
               </div>))}</div>
           ) : <div style={{ fontSize: 11.5, color: "#9c8a6c" }}>오늘 실행 데이터 없음 — 사이클(08:00) 후 집계</div>}
+          </div>}
         </div>
 
         {/* 🔔 결재 — 승인 클릭 시 실행 (접이식·기본 접힘) */}
