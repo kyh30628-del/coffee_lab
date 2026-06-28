@@ -12,3 +12,9 @@ web/.next/
 data-engine/data/raw/
 # 로그
 data-engine/daily.log
+
+# 로컬 자율 에이전트(구독 기반·배포 안 함)
+/agents/
+/agent-reports/
+.DS_Store
+web/agent-reports

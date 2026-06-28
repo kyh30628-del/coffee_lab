@@ -324,6 +324,29 @@ export async function healAreaLabel(): Promise<{ fixed: number; names: string[] 
   return { fixed: seoul.length + gg.length, names };
 }
 
+// 🔁 명백 중복 자동 해소 — 정규화 이름 동일 + 좌표 ~55m(같은 자리 같은 이름=같은 카페). 후기 많은 쪽만 남김(보수).
+const normNameForDup = (s: string) => (s || "").replace(/\s/g, "").replace(/(\d+호?점|본점|지점)$/, "").toLowerCase();
+export async function healExactDuplicates(): Promise<{ resolved: number; pairs: string[] }> {
+  const rows = (await sql`SELECT id, name, lat, lng, COALESCE(synth_count,0) sc FROM cafes WHERE published AND lat IS NOT NULL`) as any[];
+  const grp: Record<string, any[]> = {};
+  for (const r of rows) {
+    const k = normNameForDup(r.name) + "@" + Math.round(r.lat * 2000) + "_" + Math.round(r.lng * 2000);
+    (grp[k] = grp[k] || []).push(r);
+  }
+  const pairs: string[] = [];
+  let resolved = 0;
+  for (const g of Object.values(grp)) {
+    if (g.length < 2) continue;
+    g.sort((a, b) => b.sc - a.sc || a.id - b.id);
+    for (const loser of g.slice(1)) {
+      await sql`UPDATE cafes SET published = false, pipeline_status = 'excluded', updated_at = now() WHERE id = ${loser.id}`.catch(() => {});
+      resolved++;
+      if (pairs.length < 6) pairs.push(`${loser.name} → ${g[0].name}(유지)`);
+    }
+  }
+  return { resolved, pairs };
+}
+
 // 🩺 LLM 그라운딩 의심(업체혼동·환각) 자가치유 — 재합성으로 교정(개선엔진: 오염제거·로스팅환각 차단).
 //   아직 교정 안 된 것(synth_updated <= 그라운딩 검사시각)만 재합성 → 로컬 그라운딩이 재검사해 플래그 해소.
 export async function healGroundingSuspects(): Promise<{ resynthed: number; names: string[]; suspects: number }> {
