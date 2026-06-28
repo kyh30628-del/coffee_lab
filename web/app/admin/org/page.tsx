@@ -29,32 +29,46 @@ const ORG = {
   ceo: "CEO (대표이사)",
   chief: "🎩 기획조정실장 (2인자·브레인·종합)",
   secretary: "🗂️ 비서실장 (일정·일지·원칙)",
+  // w: 가동 멤버 — 🧠배치(LLM 에이전트)·⚙️상시(결정론 크론)·🌐실시간(API). 결정론 크론도 팀 소속이다.
   divisions: [
     { n: "🟦 품질본부", c: "#3a6ea5", teams: [
-      { n: "데이터정합성팀", s: "수도권·area·중복·필드 무결성 스캔·자동치유" },
-      { n: "리뷰품질팀", s: "옥석 검증규칙(동명비카페·주소·오염) 발굴·적용" },
-      { n: "검증심사팀", s: "검증 등급 자격 적대검증·15점검" },
-      { n: "심층판정팀", s: "AI판정·그라운딩 — 경계 리뷰 의미판정·환각차단" }] },
+      { n: "데이터정합성팀", s: "수도권·area·중복·필드 무결성 스캔·자동치유", w: [
+        { k: "🧠", n: "정합성 에이전트", t: "매일" }, { k: "⚙️", n: "cron-sentinel", t: "매일 00시" }, { k: "⚙️", n: "orchestrator-heal", t: "2시간마다" }] },
+      { n: "리뷰품질팀", s: "옥석 검증규칙(동명비카페·주소·오염) 발굴·적용", w: [
+        { k: "🧠", n: "룰갭 에이전트", t: "매일" }, { k: "⚙️", n: "cron-rulegap", t: "매일 01:30" }, { k: "⚙️", n: "reviewQuality(verifyReview)", t: "실시간(합성마다)" }] },
+      { n: "검증심사팀", s: "검증 등급 자격 적대검증·15점검", w: [
+        { k: "🧠", n: "품질레드팀 에이전트", t: "매일" }, { k: "⚙️", n: "cron-verify", t: "매일 06시" }] },
+      { n: "심층판정팀", s: "AI판정·그라운딩 — 경계 리뷰 의미판정·환각차단", w: [
+        { k: "🧠", n: "심층판정 에이전트(로컬·무료)", t: "격일" }] }] },
     { n: "🟩 성장본부", c: "#3f7a4f", teams: [
-      { n: "발굴전략팀", s: "수요·공급갭 추론 → 발굴 타겟 적재" },
-      { n: "콘텐츠·SEO팀", s: "롱테일 SEO 발행 (보류)" }] },
+      { n: "발굴전략팀", s: "수요·공급갭 추론 → 발굴 타겟 적재", w: [
+        { k: "🧠", n: "발굴 에이전트", t: "매일" }, { k: "⚙️", n: "cron-grow", t: "2시간마다" }, { k: "⚙️", n: "cron-demand", t: "매일 17시" }] },
+      { n: "콘텐츠·SEO팀", s: "롱테일 SEO 발행 (보류)", w: [
+        { k: "⚙️", n: "cron-newsletter", t: "주간(보류)" }] }] },
     { n: "🟧 운영본부", c: "#b06a2e", teams: [
-      { n: "생애주기팀", s: "폐업 다중증거 조사·평판 신선도" },
-      { n: "합성·데이터팀", s: "합성·임베딩·자가치유 (결정론)" }] },
+      { n: "생애주기팀", s: "폐업 다중증거 조사·평판 신선도", w: [
+        { k: "🧠", n: "폐업 에이전트", t: "매일" }, { k: "⚙️", n: "cron-closure", t: "6시간마다(1·7·13·19)" }, { k: "⚙️", n: "cron-enrich", t: "3시간마다" }] },
+      { n: "합성·데이터팀", s: "합성·임베딩·자가치유 (결정론)", w: [
+        { k: "⚙️", n: "cron-synth", t: "매시간" }, { k: "⚙️", n: "cron-embed", t: "매시간" }, { k: "⚙️", n: "cron-resynth", t: "주간(월)" }, { k: "⚙️", n: "cron-snapshot", t: "주간(일)" }] }] },
     { n: "🟪 경험본부 ★", c: "#2a7a72", note: "소비자 최전선", teams: [
-      { n: "검색품질팀", s: "실제 질의로 검색·추천 품질 검증" },
-      { n: "추천·피드팀", s: "취향 6축 매칭·피드 품질 감시" }] },
+      { n: "검색품질팀", s: "실제 질의로 검색·추천 품질 검증", w: [
+        { k: "🧠", n: "검색품질 에이전트", t: "매일" }, { k: "🌐", n: "api/search", t: "실시간(매 요청)" }] },
+      { n: "추천·피드팀", s: "취향 6축 매칭·피드 품질 감시", w: [
+        { k: "🌐", n: "api/momentum·cafeProfile", t: "실시간(매 요청)" }] }] },
     { n: "🟥 영업본부", c: "#b03a3a", teams: [
-      { n: "마케팅팀 (B2C)", s: "무료 소비자 유입·바이럴 연구·기획" },
-      { n: "사장님영업팀 (B2B)", s: "유료 구독 전환 연구·아웃리치" }] },
+      { n: "마케팅팀 (B2C)", s: "무료 소비자 유입·바이럴 연구·기획", w: [
+        { k: "🧠", n: "마케팅 에이전트", t: "매일" }] },
+      { n: "사장님영업팀 (B2B)", s: "유료 구독 전환 연구·아웃리치", w: [
+        { k: "🧠", n: "B2B영업 에이전트", t: "매일" }] }] },
     { n: "🟫 전략기획본부", c: "#7a5a2a", note: "격일", teams: [
-      { n: "전략기획팀", s: "시장조사·벤치마킹·약점보완·예측" }] },
+      { n: "전략기획팀", s: "시장조사·벤치마킹·약점보완·예측", w: [
+        { k: "🧠", n: "전략 에이전트", t: "격일" }] }] },
     { n: "🏛️ 경영지원본부", c: "#6a468c", note: "격일", teams: [
-      { n: "인사팀", s: "주간 평가·스코어카드·MVP·문화" },
-      { n: "법무팀", s: "약관·구독토큰·PII·AI OFF 감사" },
-      { n: "재무팀", s: "과금0·쿼터·크레딧·토큰 실측 감시" },
-      { n: "경영지원팀", s: "가동률 관제 + 협업 코디네이션 주관" },
-      { n: "리스크매니지먼트팀", s: "직·간접 리스크 발굴·조율" }] },
+      { n: "인사팀", s: "주간 평가·스코어카드·MVP·문화", w: [{ k: "🧠", n: "평가 에이전트", t: "격일" }] },
+      { n: "법무팀", s: "약관·구독토큰·PII·AI OFF 감사", w: [{ k: "🧠", n: "법무 에이전트", t: "격일" }] },
+      { n: "재무팀", s: "과금0·쿼터·크레딧·토큰 실측 감시", w: [{ k: "🧠", n: "재무 에이전트", t: "격일" }] },
+      { n: "경영지원팀", s: "가동률 관제 + 협업 코디네이션 주관", w: [{ k: "🧠", n: "경영지원 에이전트", t: "격일" }] },
+      { n: "리스크매니지먼트팀", s: "직·간접 리스크 발굴·조율", w: [{ k: "🧠", n: "리스크 에이전트", t: "격일" }] }] },
   ],
 };
 
@@ -237,6 +251,9 @@ export default function OrgDashboard() {
               <div style={{ fontSize: 16, fontWeight: 700, color: "#2b2018" }}>🏢 자율 조직도</div>
               <button onClick={() => setShowOrg(false)} style={{ background: "none", border: "none", fontSize: 20, color: "#9c8a6c" }}>✕</button>
             </div>
+            <div style={{ fontSize: 10.5, color: "#6b5640", marginBottom: 12, lineHeight: 1.5, background: "#efe2cf", borderRadius: 8, padding: "7px 10px" }}>
+              서비스 전 영역에 주인 팀이 있습니다. 각 팀의 가동 멤버: <b>🧠 배치</b>(LLM 에이전트·하루1회/격일) · <b>⚙️ 상시</b>(결정론 크론·매시간~매일 자동) · <b>🌐 실시간</b>(API·매 요청). 결정론 크론도 팀 소속입니다.
+            </div>
             {/* CEO */}
             <div style={{ display: "flex", justifyContent: "center" }}>
               <span style={{ background: "#2b2018", color: "#e8b87a", fontWeight: 700, fontSize: 14, padding: "7px 16px", borderRadius: 10 }}>👤 {ORG.ceo}</span>
@@ -257,12 +274,19 @@ export default function OrgDashboard() {
                     {d.note && <span style={{ fontSize: 10, color: "#9c8a6c", fontWeight: 700 }}>· {d.note}</span>}
                   </div>
                   <div style={{ borderLeft: `2px solid ${d.c}`, marginLeft: 12, paddingLeft: 12, marginTop: 5, opacity: 0.95 }}>
-                    {d.teams.map((t) => (
-                      <div key={t.n} style={{ margin: "5px 0" }}>
+                    {d.teams.map((t: any) => (
+                      <div key={t.n} style={{ margin: "6px 0" }}>
                         <div style={{ fontSize: 12.5, color: "#3d2f22", display: "flex", alignItems: "center", gap: 5, fontWeight: 600 }}>
                           <span style={{ color: d.c, fontFamily: "monospace" }}>└</span>{t.n}
                         </div>
                         <div style={{ fontSize: 10.5, color: "#9c8a6c", marginLeft: 16, lineHeight: 1.35 }}>{t.s}</div>
+                        {t.w && <div style={{ marginLeft: 16, marginTop: 3, display: "flex", flexWrap: "wrap", gap: 4 }}>
+                          {t.w.map((m: any, mi: number) => (
+                            <span key={mi} style={{ fontSize: 10, background: m.k === "⚙️" ? "#eef3ee" : m.k === "🌐" ? "#eef0f6" : "#f6efe2", border: `1px solid ${m.k === "⚙️" ? "#bcd4bc" : m.k === "🌐" ? "#c2c8e0" : "#e2cfa8"}`, borderRadius: 6, padding: "1.5px 6px", color: "#5a4631" }}>
+                              {m.k} {m.n} <span style={{ color: "#9c8a6c" }}>· {m.t}</span>
+                            </span>
+                          ))}
+                        </div>}
                       </div>
                     ))}
                   </div>
