@@ -130,7 +130,7 @@ function md2html(md) {
       ${JSON.stringify(crons.slice(0, 12).map((c) => ({ job: c.job, ok: c.ok, h: Number(c.h) })))}::jsonb,
       ${JSON.stringify(metrics)}::jsonb,
       ${JSON.stringify(delegated)}::jsonb)`;
-    await sql`DELETE FROM org_briefings WHERE created_at < now() - interval '7 days'`;
+    await sql`DELETE FROM org_briefings WHERE created_at < now() - interval '10 days'`; // 10일치 보존(하루 여러 건 시간별 유지)
     console.log("✅ org_briefings DB 푸시 완료(모바일 관리자화면용)");
   } catch (e) { console.log("⚠️ DB 푸시 실패:", String(e).slice(0, 60)); }
 

@@ -11,13 +11,16 @@ export async function GET(req: NextRequest) {
   }
   try {
     await sql`CREATE TABLE IF NOT EXISTS org_briefings (id SERIAL PRIMARY KEY, created_at TIMESTAMPTZ DEFAULT now(), executive_md TEXT, approvals JSONB, token_today JSONB, crons JSONB, metrics JSONB)`.catch(() => {});
-    // 일자별 최신 1건 × 7일(최신순). 하루에 여러 번 생성돼도 그날 마지막 보고서만.
-    const briefs = await sql`SELECT DISTINCT ON ((created_at AT TIME ZONE 'Asia/Seoul')::date)
-        to_char((created_at AT TIME ZONE 'Asia/Seoul')::date,'YYYY-MM-DD') AS day, created_at, executive_md, approvals, token_today, crons, metrics
+    // 10일치 전부(하루 여러 건 시간별 구분), 최신순. 하루에 여러 번 생성되면 각각 시각으로 구분해 남긴다.
+    const briefs = await sql`SELECT id,
+        to_char(created_at AT TIME ZONE 'Asia/Seoul','YYYY-MM-DD') AS day,
+        to_char(created_at AT TIME ZONE 'Asia/Seoul','HH24:MI') AS time,
+        created_at, executive_md, approvals, token_today, crons, metrics
       FROM org_briefings
-      ORDER BY (created_at AT TIME ZONE 'Asia/Seoul')::date DESC, created_at DESC
-      LIMIT 7` as any[];
-    // brief = 오늘(최신) — 상단 토큰·크론·수치 카드용(하위호환).
+      WHERE created_at > now() - interval '10 days'
+      ORDER BY created_at DESC
+      LIMIT 80` as any[];
+    // brief = 최신 — 상단 토큰·크론·수치 카드용(하위호환).
     return NextResponse.json({ ok: true, brief: briefs[0] ?? null, briefs }, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });

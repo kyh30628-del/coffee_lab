@@ -62,7 +62,7 @@ export default function OrgDashboard() {
   const [pw, setPw] = useState("");
   const [brief, setBrief] = useState<any>(null);
   const [briefs, setBriefs] = useState<any[]>([]);
-  const [openDay, setOpenDay] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<number | null>(null);
   const [dec, setDec] = useState<{ pending: any[]; delegated: any[]; recent: any[] }>({ pending: [], delegated: [], recent: [] });
   const [coord, setCoord] = useState<{ open: any[]; resolved: any[] }>({ open: [], resolved: [] });
   const [err, setErr] = useState(""); const [loading, setLoading] = useState(false);
@@ -203,19 +203,24 @@ export default function OrgDashboard() {
         </div>
 
         <div style={{ ...card, marginTop: 10 }} className="ex">
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#9c6b3f", marginBottom: 6 }}>📋 EXECUTIVE 일일보고서 (최근 7일)</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#9c6b3f", marginBottom: 6 }}>📋 EXECUTIVE 일일보고서 (최근 10일 · 시간별)</div>
           {briefs.length === 0 ? <div style={{ fontSize: 12, color: "#9c8a6c" }}>보고서 없음</div> :
             briefs.map((bf: any, i: number) => {
               const day = bf.day || String(bf.created_at || "").slice(0, 10);
-              const open = openDay === day; // 기본 전부 접힘 — 클릭한 날짜만 펼침
+              const time = bf.time || String(bf.created_at || "").slice(11, 16);
+              const open = openId === bf.id; // 기본 전부 접힘 — 클릭한 항목만 펼침
               const wd = ["일", "월", "화", "수", "목", "금", "토"][new Date(day + "T00:00:00+09:00").getDay()];
+              const newDay = i === 0 || (briefs[i - 1]?.day !== day); // 날짜 바뀌는 지점에 구분선
               return (
-                <div key={day} style={{ borderBottom: "1px solid #ece0c8" }}>
-                  <button onClick={() => setOpenDay(open ? null : day)} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", padding: "11px 2px", cursor: "pointer", fontFamily: "inherit" }}>
-                    <span style={{ fontWeight: 700, fontSize: 13, color: "#5a4631" }}>{open ? "▾" : "▸"} {day} ({wd}){i === 0 && <span style={{ fontSize: 10, color: "#c98a3c", fontWeight: 400 }}> · 최신</span>}</span>
-                    <span style={{ fontSize: 10.5, color: "#9c8a6c" }}>{open ? "접기" : "보기"}</span>
-                  </button>
-                  {open && <div style={{ padding: "2px 2px 12px" }} dangerouslySetInnerHTML={{ __html: md2html(bf.executive_md || "_이 날짜 보고서 내용 없음_") }} />}
+                <div key={bf.id ?? i}>
+                  {newDay && <div style={{ fontSize: 11, fontWeight: 700, color: "#9c6b3f", marginTop: i === 0 ? 0 : 8, padding: "4px 2px 2px", borderTop: i === 0 ? "none" : "1px solid #e6d8bf" }}>{day} ({wd})</div>}
+                  <div style={{ borderBottom: "1px solid #f0e8d8" }}>
+                    <button onClick={() => setOpenId(open ? null : bf.id)} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", padding: "9px 2px", cursor: "pointer", fontFamily: "inherit" }}>
+                      <span style={{ fontWeight: 600, fontSize: 12.5, color: "#5a4631" }}>{open ? "▾" : "▸"} {time}{i === 0 && <span style={{ fontSize: 10, color: "#c98a3c", fontWeight: 400 }}> · 최신</span>}</span>
+                      <span style={{ fontSize: 10.5, color: "#9c8a6c" }}>{open ? "접기" : "보기"}</span>
+                    </button>
+                    {open && <div style={{ padding: "2px 2px 12px" }} dangerouslySetInnerHTML={{ __html: md2html(bf.executive_md || "_이 보고서 내용 없음_") }} />}
+                  </div>
                 </div>
               );
             })}
