@@ -24,19 +24,21 @@ function md2html(md: string) {
   close(); return html;
 }
 
-// 조직도(계층) — 모달 시각화용
-const ORG = [
-  { n: "CEO (대표이사)", c: "#2b2018", lv: 0 },
-  { n: "🎩 기획조정실장 (2인자·브레인)", c: "#c98a3c", lv: 1 },
-  { n: "🗂️ 비서실장 — 일정·일지·원칙", c: "#8a7458", lv: 2 },
-  { n: "🟦 품질본부", c: "#3a6ea5", lv: 2, teams: "데이터정합성·리뷰품질·검증심사·심층판정" },
-  { n: "🟩 성장본부", c: "#3f7a4f", lv: 2, teams: "발굴전략·(콘텐츠SEO 보류)" },
-  { n: "🟧 운영본부", c: "#b06a2e", lv: 2, teams: "생애주기·합성데이터" },
-  { n: "🟪 경험본부 ★", c: "#2a7a72", lv: 2, teams: "검색품질·추천피드 (소비자 최전선)" },
-  { n: "🟥 영업본부", c: "#b03a3a", lv: 2, teams: "마케팅(B2C)·사장님영업(B2B)" },
-  { n: "🟫 전략기획본부 (격일)", c: "#7a5a2a", lv: 2, teams: "시장조사·벤치마킹·약점보완·예측" },
-  { n: "🏛️ 경영지원본부 (격일)", c: "#6a468c", lv: 2, teams: "인사·법무·재무·경영지원·리스크매니지먼트" },
-];
+// 조직도(계층) — 본부→팀 단위까지. 모달 도식화용
+const ORG = {
+  ceo: "CEO (대표이사)",
+  chief: "🎩 기획조정실장 (2인자·브레인·종합)",
+  secretary: "🗂️ 비서실장 (일정·일지·원칙)",
+  divisions: [
+    { n: "🟦 품질본부", c: "#3a6ea5", teams: ["데이터정합성팀", "리뷰품질팀", "검증심사팀", "심층판정팀"] },
+    { n: "🟩 성장본부", c: "#3f7a4f", teams: ["발굴전략팀", "콘텐츠·SEO팀 (보류)"] },
+    { n: "🟧 운영본부", c: "#b06a2e", teams: ["생애주기팀", "합성·데이터팀"] },
+    { n: "🟪 경험본부 ★", c: "#2a7a72", teams: ["검색품질팀", "추천·피드팀"], note: "소비자 최전선" },
+    { n: "🟥 영업본부", c: "#b03a3a", teams: ["마케팅팀 (B2C)", "사장님영업팀 (B2B)"] },
+    { n: "🟫 전략기획본부", c: "#7a5a2a", teams: ["전략기획팀 (시장조사·벤치마킹·예측)"], note: "격일" },
+    { n: "🏛️ 경영지원본부", c: "#6a468c", teams: ["인사팀", "법무팀", "재무팀", "경영지원팀", "리스크매니지먼트팀"], note: "격일" },
+  ],
+};
 
 export default function OrgDashboard() {
   const [pw, setPw] = useState("");
@@ -138,17 +140,37 @@ export default function OrgDashboard() {
               <div style={{ fontSize: 16, fontWeight: 700, color: "#2b2018" }}>🏢 자율 조직도</div>
               <button onClick={() => setShowOrg(false)} style={{ background: "none", border: "none", fontSize: 20, color: "#9c8a6c" }}>✕</button>
             </div>
-            {ORG.map((o, i) => (
-              <div key={i} style={{ marginLeft: o.lv * 16, marginBottom: 6 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: o.c, display: "inline-block" }} />
-                  <span style={{ fontWeight: o.lv < 2 ? 700 : 600, fontSize: o.lv === 0 ? 15 : 13.5, color: o.lv === 0 ? "#2b2018" : o.c }}>{o.n}</span>
+            {/* CEO */}
+            <div style={{ display: "flex", justifyContent: "center" }}>
+              <span style={{ background: "#2b2018", color: "#e8b87a", fontWeight: 700, fontSize: 14, padding: "7px 16px", borderRadius: 10 }}>👤 {ORG.ceo}</span>
+            </div>
+            <div style={{ width: 2, height: 14, background: "#c98a3c", margin: "0 auto" }} />
+            {/* 기획조정실장 */}
+            <div style={{ display: "flex", justifyContent: "center" }}>
+              <span style={{ background: "#c98a3c", color: "#fff", fontWeight: 700, fontSize: 13.5, padding: "7px 16px", borderRadius: 10, textAlign: "center" }}>{ORG.chief}</span>
+            </div>
+            <div style={{ width: 2, height: 14, background: "#c98a3c", margin: "0 auto" }} />
+            {/* 비서실장 + 본부 트리 */}
+            <div style={{ borderLeft: "2px solid #d8c4a0", marginLeft: 10, paddingLeft: 14, marginTop: 2 }}>
+              <div style={{ background: "#efe2cf", color: "#6b5640", fontWeight: 600, fontSize: 12.5, padding: "5px 10px", borderRadius: 8, marginBottom: 10, display: "inline-block" }}>{ORG.secretary}</div>
+              {ORG.divisions.map((d) => (
+                <div key={d.n} style={{ marginBottom: 12 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                    <span style={{ background: d.c, color: "#fff", fontWeight: 700, fontSize: 13, padding: "4px 11px", borderRadius: 8 }}>{d.n}</span>
+                    {d.note && <span style={{ fontSize: 10, color: "#9c8a6c", fontWeight: 700 }}>· {d.note}</span>}
+                  </div>
+                  <div style={{ borderLeft: `2px solid ${d.c}`, marginLeft: 12, paddingLeft: 12, marginTop: 5, opacity: 0.95 }}>
+                    {d.teams.map((t) => (
+                      <div key={t} style={{ fontSize: 12.5, color: "#3d2f22", margin: "3px 0", display: "flex", alignItems: "center", gap: 5 }}>
+                        <span style={{ color: d.c, fontFamily: "monospace" }}>└</span>{t}
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                {o.teams && <div style={{ marginLeft: 14, fontSize: 11, color: "#8a7458" }}>└ {o.teams}</div>}
-              </div>
-            ))}
-            <div style={{ marginTop: 12, fontSize: 11, color: "#9c6b3f", borderTop: "1px dashed #d8c4a0", paddingTop: 10 }}>
-              실행: 매일 현업 본부 자율 가동 → 기획조정실장 종합 → CEO 보고. 결재는 기조실장이 담당 본부에 배분.
+              ))}
+            </div>
+            <div style={{ marginTop: 10, fontSize: 11, color: "#9c6b3f", borderTop: "1px dashed #d8c4a0", paddingTop: 10 }}>
+              실행: 현업 본부 매일 자율 가동 → 기조실장 종합 → CEO 보고. 결재는 기조실장이 담당 본부·팀에 배분. (전략기획·경영지원은 격일)
             </div>
           </div>
         </div>
