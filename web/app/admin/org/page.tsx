@@ -129,6 +129,23 @@ export default function OrgDashboard() {
           <div style={card}><div style={lbl}>🤖 크론</div><div style={big}>{crons.filter((c: any) => c.ok).length}/{crons.length} ✅</div></div>
         </div>
 
+        {/* 💰 오늘 토큰 사용 — 상시 일일 항목(묻지 않아도 매일 보임) */}
+        <div style={{ ...card, marginTop: 10 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#9c6b3f", marginBottom: 2 }}>💰 오늘 토큰 사용 (실측)</div>
+          <div style={{ fontSize: 10.5, color: "#9c8a6c", marginBottom: 8 }}>구독 기반이라 실청구 0 · 비용프록시는 콘솔키 환산 참고치</div>
+          <div style={{ display: "flex", gap: 14, alignItems: "baseline", marginBottom: 8 }}>
+            <div><span style={{ fontSize: 22, fontWeight: 700, color: "#c98a3c" }}>{fmt(tok.input || 0)}</span><span style={{ fontSize: 11, color: "#9c6b3f" }}> in</span></div>
+            <div><span style={{ fontSize: 18, fontWeight: 700, color: "#c98a3c" }}>{fmt(tok.output || 0)}</span><span style={{ fontSize: 11, color: "#9c6b3f" }}> out</span></div>
+            <div><span style={{ fontSize: 15, fontWeight: 700, color: "#5a4631" }}>${Number(tok.cost || 0).toFixed(2)}</span><span style={{ fontSize: 11, color: "#9c8a6c" }}> 프록시</span></div>
+          </div>
+          {(tok.byAgent || []).length > 0 ? (
+            <div>{(tok.byAgent || []).slice(0, 5).map((a: any, i: number) => (
+              <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5, padding: "3px 0", borderBottom: "1px solid #f0e8d8", color: "#5a4631" }}>
+                <span>{i + 1}. {a.a}</span><span style={{ color: "#9c8a6c" }}>{fmt(a.i || 0)} tok · {a.n}회</span>
+              </div>))}</div>
+          ) : <div style={{ fontSize: 11.5, color: "#9c8a6c" }}>오늘 실행 데이터 없음 — 사이클(08:00) 후 집계</div>}
+        </div>
+
         {/* 🔔 결재 — 승인 클릭 시 실행 */}
         <div style={{ ...card, marginTop: 10 }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: "#9c6b3f", marginBottom: 2 }}>🔔 CEO 결재 대기 ({dec.pending.length})</div>
@@ -152,20 +169,18 @@ export default function OrgDashboard() {
           {dec.recent.length > 0 && <div style={{ fontSize: 10.5, color: "#9c8a6c", marginTop: 6 }}>최근 처리: {dec.recent.slice(0, 4).map((r) => `${r.title}(${r.status})`).join(" · ")}</div>}
         </div>
 
-        {/* 🟢 하위 전결 FYI — 본부(L1)·기조실장(L2)이 자체 처리한 결정. CEO는 보기만(결재 불요). */}
-        {dec.delegated.length > 0 && (
-          <div style={{ ...card, marginTop: 10 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#3f7a4f", marginBottom: 2 }}>🟢 하위 전결 처리 (FYI)</div>
-            <div style={{ fontSize: 10.5, color: "#9c8a6c", marginBottom: 8 }}>본부·기조실장이 권한 내 결정·집행 — CEO 결재 불필요, 가시성만.</div>
-            {dec.delegated.map((d) => (
-              <div key={d.id} style={{ display: "flex", gap: 7, alignItems: "center", padding: "5px 0", borderBottom: "1px solid #f0e8d8", fontSize: 12 }}>
-                <span style={{ background: d.tier === "L1" ? "#6b8fae" : "#9c7bbf", color: "#fff", fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 20 }}>{d.tier}</span>
-                <span style={{ flex: 1, color: "#5a4631" }}>{d.title}</span>
-                <span style={{ fontSize: 10, color: "#9c8a6c" }}>{d.decided_by} · {d.at}</span>
-              </div>
-            ))}
-          </div>
-        )}
+        {/* 🟢 하위 전결 FYI — 본부(L1)·기조실장(L2)이 자체 처리한 결정. 상시 일일 항목(0건이어도 노출). */}
+        <div style={{ ...card, marginTop: 10 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#3f7a4f", marginBottom: 2 }}>🟢 전결 처리내역 (L1·L2 사후보고)</div>
+          <div style={{ fontSize: 10.5, color: "#9c8a6c", marginBottom: 8 }}>본부·기조실장이 권한 내 결정·집행 — CEO 결재 불필요, 매일 가시성만.</div>
+          {dec.delegated.length > 0 ? dec.delegated.map((d) => (
+            <div key={d.id} style={{ display: "flex", gap: 7, alignItems: "center", padding: "5px 0", borderBottom: "1px solid #f0e8d8", fontSize: 12 }}>
+              <span style={{ background: d.tier === "L1" ? "#6b8fae" : "#9c7bbf", color: "#fff", fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 20 }}>{d.tier}</span>
+              <span style={{ flex: 1, color: "#5a4631" }}>{d.title}</span>
+              <span style={{ fontSize: 10, color: "#9c8a6c" }}>{d.decided_by} · {d.at}</span>
+            </div>
+          )) : <div style={{ fontSize: 12, color: "#9c8a6c" }}>최근 전결 처리 없음</div>}
+        </div>
 
         {/* 🤝 협업 현황 — 경영지원팀 주관 코디네이션 */}
         <div style={{ ...card, marginTop: 10 }}>
