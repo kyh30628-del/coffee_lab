@@ -44,6 +44,7 @@ export default function OrgDashboard() {
   const [pw, setPw] = useState("");
   const [brief, setBrief] = useState<any>(null);
   const [dec, setDec] = useState<{ pending: any[]; recent: any[] }>({ pending: [], recent: [] });
+  const [coord, setCoord] = useState<{ open: any[]; resolved: any[] }>({ open: [], resolved: [] });
   const [err, setErr] = useState(""); const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState<number | null>(null);
   const [showOrg, setShowOrg] = useState(false);
@@ -54,9 +55,11 @@ export default function OrgDashboard() {
     Promise.all([
       fetch("/api/admin/org-briefing", { headers: { "x-admin-password": password }, cache: "no-store" }).then((r) => r.json()),
       fetch("/api/admin/decisions", { headers: { "x-admin-password": password }, cache: "no-store" }).then((r) => r.json()),
-    ]).then(([b, d]) => {
+      fetch("/api/admin/coordination", { headers: { "x-admin-password": password }, cache: "no-store" }).then((r) => r.json()),
+    ]).then(([b, d, co]) => {
       if (b.ok) { setBrief(b.brief); localStorage.setItem("adm_pw", password); } else setErr("비밀번호 확인");
       if (d.ok) setDec({ pending: d.pending || [], recent: d.recent || [] });
+      if (co.ok) setCoord({ open: co.open || [], resolved: co.resolved || [] });
     }).catch(() => setErr("불러오기 실패")).finally(() => setLoading(false));
   };
   useEffect(() => { const p = localStorage.getItem("adm_pw"); if (p) { setPw(p); load(p); } }, []);
@@ -124,6 +127,24 @@ export default function OrgDashboard() {
           {dec.recent.length > 0 && <div style={{ fontSize: 10.5, color: "#9c8a6c", marginTop: 6 }}>최근 처리: {dec.recent.slice(0, 4).map((r) => `${r.title}(${r.status})`).join(" · ")}</div>}
         </div>
 
+        {/* 🤝 협업 현황 — 경영지원팀 주관 코디네이션 */}
+        <div style={{ ...card, marginTop: 10 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#9c6b3f", marginBottom: 8 }}>🤝 협업 현황 ({coord.open.length}) <span style={{ fontSize: 10, fontWeight: 400, color: "#9c8a6c" }}>· 경영지원팀 주관</span></div>
+          {coord.open.length === 0 ? <div style={{ color: "#3f7a4f", fontSize: 13 }}>진행 중인 부서 간 협업 없음</div> :
+            coord.open.map((c) => (
+              <div key={c.id} style={{ border: "1px solid #e6d8bf", borderRadius: 10, padding: "9px 11px", marginBottom: 8, background: "#fbfaf5" }}>
+                <div style={{ display: "flex", gap: 5, alignItems: "center", flexWrap: "wrap" }}>
+                  <span style={{ background: typeC[c.type] || "#888", color: "#fff", fontSize: 9.5, fontWeight: 700, padding: "2px 7px", borderRadius: 20 }}>{typeLabel[c.type] || c.type}</span>
+                  {Number(c.days) >= 2 && <span style={{ background: "#b03a3a", color: "#fff", fontSize: 9.5, fontWeight: 700, padding: "2px 7px", borderRadius: 20 }}>지연</span>}
+                  <span style={{ fontWeight: 700, fontSize: 12.5 }}>{c.topic}</span>
+                </div>
+                <div style={{ fontSize: 11, color: "#8a7458", margin: "4px 0 2px" }}>{c.from_team} <span style={{ color: "#c98a3c" }}>→</span> {c.to_team}</div>
+                {c.detail && <div style={{ fontSize: 11.5, color: "#5a4631", lineHeight: 1.45 }}>{c.detail}</div>}
+              </div>
+            ))}
+          {coord.resolved.length > 0 && <div style={{ fontSize: 10.5, color: "#9c8a6c", marginTop: 4 }}>최근 해결: {coord.resolved.slice(0, 3).map((r: any) => r.topic).join(" · ")}</div>}
+        </div>
+
         <div style={{ ...card, marginTop: 10 }} className="ex">
           <div style={{ fontSize: 13, fontWeight: 700, color: "#9c6b3f", marginBottom: 6 }}>📋 오늘의 EXECUTIVE</div>
           <div dangerouslySetInnerHTML={{ __html: md2html(brief.executive_md || "_보고서 없음_") }} />
@@ -184,3 +205,5 @@ const card: React.CSSProperties = { background: "#fff", border: "1px solid #ddc9
 const lbl: React.CSSProperties = { fontSize: 11, color: "#9c6b3f" };
 const big: React.CSSProperties = { fontSize: 22, fontWeight: 700, color: "#c98a3c" };
 const sub: React.CSSProperties = { fontSize: 10, color: "#9c8a6c" };
+const typeC: Record<string, string> = { help: "#3a6ea5", handoff: "#3f7a4f", cowork: "#7a5a2a", dependency: "#b06a2e" };
+const typeLabel: Record<string, string> = { help: "도움요청", handoff: "인계", cowork: "코웍", dependency: "의존" };
