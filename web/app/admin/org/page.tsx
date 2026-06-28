@@ -61,7 +61,7 @@ const ORG = {
 export default function OrgDashboard() {
   const [pw, setPw] = useState("");
   const [brief, setBrief] = useState<any>(null);
-  const [dec, setDec] = useState<{ pending: any[]; recent: any[] }>({ pending: [], recent: [] });
+  const [dec, setDec] = useState<{ pending: any[]; delegated: any[]; recent: any[] }>({ pending: [], delegated: [], recent: [] });
   const [coord, setCoord] = useState<{ open: any[]; resolved: any[] }>({ open: [], resolved: [] });
   const [err, setErr] = useState(""); const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState<number | null>(null);
@@ -77,7 +77,7 @@ export default function OrgDashboard() {
       fetch("/api/admin/coordination", { headers: { "x-admin-password": password }, cache: "no-store" }).then((r) => r.json()),
     ]).then(([b, d, co]) => {
       if (b.ok) { setBrief(b.brief); localStorage.setItem("adm_pw", password); } else if (!silent) setErr("비밀번호 확인");
-      if (d.ok) setDec({ pending: d.pending || [], recent: d.recent || [] });
+      if (d.ok) setDec({ pending: d.pending || [], delegated: d.delegated || [], recent: d.recent || [] });
       if (co.ok) setCoord({ open: co.open || [], resolved: co.resolved || [] });
       if (b.ok) setSynced(new Date().toLocaleTimeString("ko-KR"));
     }).catch(() => { if (!silent) setErr("불러오기 실패"); }).finally(() => { if (!silent) setLoading(false); });
@@ -131,7 +131,8 @@ export default function OrgDashboard() {
 
         {/* 🔔 결재 — 승인 클릭 시 실행 */}
         <div style={{ ...card, marginTop: 10 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "#9c6b3f", marginBottom: 8 }}>🔔 결재 대기 ({dec.pending.length})</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#9c6b3f", marginBottom: 2 }}>🔔 CEO 결재 대기 ({dec.pending.length})</div>
+          <div style={{ fontSize: 10.5, color: "#9c8a6c", marginBottom: 8 }}>치명적·비가역(L3)만 — 카페 비공개·등급변경·새 규칙로직·외부발송. 운영결정(L1·L2)은 본부·기조실장 전결.</div>
           {dec.pending.length === 0 ? <div style={{ color: "#3f7a4f", fontSize: 13 }}>대기 중인 결재 없음 ✅</div> :
             dec.pending.map((d) => (
               <div key={d.id} style={{ border: "1px solid #e6d8bf", borderRadius: 11, padding: 12, marginBottom: 10, background: "#fffdf8" }}>
@@ -150,6 +151,21 @@ export default function OrgDashboard() {
             ))}
           {dec.recent.length > 0 && <div style={{ fontSize: 10.5, color: "#9c8a6c", marginTop: 6 }}>최근 처리: {dec.recent.slice(0, 4).map((r) => `${r.title}(${r.status})`).join(" · ")}</div>}
         </div>
+
+        {/* 🟢 하위 전결 FYI — 본부(L1)·기조실장(L2)이 자체 처리한 결정. CEO는 보기만(결재 불요). */}
+        {dec.delegated.length > 0 && (
+          <div style={{ ...card, marginTop: 10 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#3f7a4f", marginBottom: 2 }}>🟢 하위 전결 처리 (FYI)</div>
+            <div style={{ fontSize: 10.5, color: "#9c8a6c", marginBottom: 8 }}>본부·기조실장이 권한 내 결정·집행 — CEO 결재 불필요, 가시성만.</div>
+            {dec.delegated.map((d) => (
+              <div key={d.id} style={{ display: "flex", gap: 7, alignItems: "center", padding: "5px 0", borderBottom: "1px solid #f0e8d8", fontSize: 12 }}>
+                <span style={{ background: d.tier === "L1" ? "#6b8fae" : "#9c7bbf", color: "#fff", fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 20 }}>{d.tier}</span>
+                <span style={{ flex: 1, color: "#5a4631" }}>{d.title}</span>
+                <span style={{ fontSize: 10, color: "#9c8a6c" }}>{d.decided_by} · {d.at}</span>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* 🤝 협업 현황 — 경영지원팀 주관 코디네이션 */}
         <div style={{ ...card, marginTop: 10 }}>

@@ -3,15 +3,20 @@ import { sql } from "@/lib/db";
 
 export const runtime = "nodejs";
 
-// 🔔 결재 항목 — 자율 조직이 올린 '구조화된 의사결정'. CEO가 모바일에서 승인→실행.
+// 🔔 결재 항목 — 자율 조직이 올린 '구조화된 의사결정'. 위임전결(DoA) 4단계로 라우팅:
+//   L0 실무 자율(decisions 안 거침) · L1 본부 전결 · L2 기조실장 전결 · L3 CEO 결재(치명적·비가역).
+//   CEO 모바일엔 **L3만** 결재 대기로 노출 → 운영결정에 안 시달림. L1/L2는 '전결 처리됨(FYI)'로만 보임.
 //   action_type: unpublish | downgrade | restore | requeue_resynth | agent_task(기조실장 배분)
 async function ensure() {
   await sql`CREATE TABLE IF NOT EXISTS decisions (
     id SERIAL PRIMARY KEY, created_at TIMESTAMPTZ DEFAULT now(),
     title TEXT, detail TEXT, team TEXT, severity TEXT,
     action_type TEXT, action_params JSONB,
-    status TEXT DEFAULT 'pending', decided_at TIMESTAMPTZ, result TEXT
+    status TEXT DEFAULT 'pending', decided_at TIMESTAMPTZ, result TEXT,
+    tier TEXT, decided_by TEXT
   )`.catch(() => {});
+  await sql`ALTER TABLE decisions ADD COLUMN IF NOT EXISTS tier TEXT`.catch(() => {});
+  await sql`ALTER TABLE decisions ADD COLUMN IF NOT EXISTS decided_by TEXT`.catch(() => {});
 }
 
 export async function GET(req: NextRequest) {
@@ -19,9 +24,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   try {
     await ensure();
-    const pending = await sql`SELECT id,title,detail,team,severity,action_type,action_params FROM decisions WHERE status='pending' ORDER BY CASE severity WHEN 'HIGH' THEN 0 WHEN 'MED' THEN 1 ELSE 2 END, created_at DESC` as any[];
-    const recent = await sql`SELECT id,title,status,result,to_char(decided_at,'MM-DD HH24:MI') decided FROM decisions WHERE status<>'pending' ORDER BY decided_at DESC LIMIT 8` as any[];
-    return NextResponse.json({ ok: true, pending, recent }, { headers: { "Cache-Control": "no-store" } });
+    // CEO 결재 대기 = L3(치명적·비가역)만. tier 없는 레거시는 안전하게 L3 취급.
+    const pending = await sql`SELECT id,title,detail,team,severity,action_type,action_params,tier FROM decisions WHERE status='pending' AND COALESCE(tier,'L3')='L3' ORDER BY CASE severity WHEN 'HIGH' THEN 0 WHEN 'MED' THEN 1 ELSE 2 END, created_at DESC` as any[];
+    // 하위 전결(L1 본부·L2 기조실장) 처리분 — CEO엔 FYI(가시성만, 결재 불요).
+    const delegated = await sql`SELECT id,title,team,tier,COALESCE(decided_by, CASE tier WHEN 'L1' THEN '본부 전결' WHEN 'L2' THEN '기조실장 전결' ELSE '전결' END) decided_by,status,to_char(COALESCE(decided_at,created_at),'MM-DD HH24:MI') at FROM decisions WHERE tier IN ('L1','L2') ORDER BY COALESCE(decided_at,created_at) DESC LIMIT 8` as any[];
+    const recent = await sql`SELECT id,title,status,result,tier,to_char(decided_at,'MM-DD HH24:MI') decided FROM decisions WHERE status<>'pending' ORDER BY decided_at DESC LIMIT 8` as any[];
+    return NextResponse.json({ ok: true, pending, delegated, recent }, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
