@@ -113,6 +113,7 @@ export default function OrgDashboard() {
   const [briefs, setBriefs] = useState<any[]>([]);
   const [openId, setOpenId] = useState<number | null>(null);
   const [showWO, setShowWO] = useState(false);
+  const [showMeet, setShowMeet] = useState(false);
   const [member, setMember] = useState<{ k: string; n: string; t: string } | null>(null);
   const [dec, setDec] = useState<{ pending: any[]; delegated: any[]; recent: any[] }>({ pending: [], delegated: [], recent: [] });
   const [coord, setCoord] = useState<{ open: any[]; resolved: any[] }>({ open: [], resolved: [] });
@@ -253,11 +254,22 @@ export default function OrgDashboard() {
           {coord.resolved.length > 0 && <div style={{ fontSize: 10.5, color: "#9c8a6c", marginTop: 4 }}>최근 해결: {coord.resolved.slice(0, 3).map((r: any) => r.topic).join(" · ")}</div>}
         </div>
 
-        {/* 📋 비서실장 업무지시 (WORK-ORDER) — 다음 사이클 본부별 명확한 지시 */}
+        {/* 🗓️ 조간회의록 (07:00) — 기획조정실장 주관·비서실장 간사 */}
+        {brief?.meeting && (
+          <div style={{ ...card, marginTop: 10 }} className="ex">
+            <button onClick={() => setShowMeet(!showMeet)} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "#2a7a72" }}>{showMeet ? "▾" : "▸"} 🗓️ 조간회의록 (매일 07:00)</span>
+              <span style={{ fontSize: 10.5, color: "#9c8a6c" }}>{showMeet ? "접기" : "회의 결과 보기"}</span>
+            </button>
+            {showMeet && <div style={{ marginTop: 8 }} dangerouslySetInnerHTML={{ __html: md2html(brief.meeting) }} />}
+          </div>
+        )}
+
+        {/* 📋 기획조정실장 업무지시 (WORK-ORDER) — 다음 사이클 본부별 명확한 지시 */}
         {brief?.work_order && (
           <div style={{ ...card, marginTop: 10 }} className="ex">
             <button onClick={() => setShowWO(!showWO)} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: "#6a468c" }}>{showWO ? "▾" : "▸"} 🗂️ 비서실장 업무지시 (다음 사이클)</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "#6a468c" }}>{showWO ? "▾" : "▸"} 🗂️ 기획조정실장 업무지시 (다음 사이클)</span>
               <span style={{ fontSize: 10.5, color: "#9c8a6c" }}>{showWO ? "접기" : "본부별 지시 보기"}</span>
             </button>
             {showWO && <div style={{ marginTop: 8 }} dangerouslySetInnerHTML={{ __html: md2html(brief.work_order) }} />}
