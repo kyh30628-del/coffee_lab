@@ -274,12 +274,19 @@ export async function healNonCafeCategory(): Promise<{ held: number; names: stri
     RETURNING name`) as any[];
   // 🐶 오프콘셉 '○○카페' — 업종에 '카페'가 들어가도, 커피·디저트 취향 큐레이션과 안 맞는 '활동 목적' 공간은 제외.
   //   애견·고양이·키즈·스터디·만화·룸·보드게임·방탈출·노래·찜질방 + 서점(소매). 이 서비스는 커피/디저트 카페만 다룬다.
-  //   (북카페·갤러리카페·플라워카페·브런치 등 '커피를 파는' 곳은 보존 — 여기 패턴에 없음)
+  //   📚 북카페·도서관 — 책/독서가 메인, 커피는 부차 → CEO 지시(2026-06)로 제외. 갤러리·플라워카페는 커피가 메인이라 보존.
+  //   카테고리(카페,디저트>북카페·교육,학문>도서관) + 이름(○○북카페) 양쪽으로 잡는다.
   const off = (await sql`
     UPDATE cafes SET published = false, pipeline_status = 'excluded'
     WHERE published = true AND naver_category IS NOT NULL
-      AND naver_category ~ '(애견|애완|반려동물|펫카페|고양이카페|동물카페|키즈|실내놀이터|놀이방|스터디카페|독서실|만화방|만화카페|룸카페|멀티방|파티룸|방탈출|보드게임|보드카페|볼링|당구|스크린골프|골프연습|코인노래|노래방|찜질방|사우나|클라이밍|트램폴린|트램펄린|서점)'
+      AND naver_category ~ '(애견|애완|반려동물|펫카페|고양이카페|동물카페|키즈|실내놀이터|놀이방|스터디카페|독서실|만화방|만화카페|룸카페|멀티방|파티룸|방탈출|보드게임|보드카페|볼링|당구|스크린골프|골프연습|코인노래|노래방|찜질방|사우나|클라이밍|트램폴린|트램펄린|서점|북카페|도서관)'
     RETURNING name`) as any[];
+  // 📚 북카페 — 카테고리가 일반(카페,디저트>카페)으로 붙어도 이름에 '북카페'면 책 메인 → 제외.
+  const bookByName = (await sql`
+    UPDATE cafes SET published = false, pipeline_status = 'excluded'
+    WHERE published = true AND name ~ '북카페|북 ?카페'
+    RETURNING name`) as any[];
+  off.push(...bookByName);
   return { held: rows.length + off.length, names: [...rows.map((r) => r.name), ...off.map((r) => r.name)].slice(0, 12) };
 }
 
