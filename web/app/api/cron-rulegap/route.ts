@@ -125,18 +125,39 @@ export async function GET(req: NextRequest) {
     const OFF_CAT = /(애견|애완|반려동물|펫카페|고양이카페|동물카페|키즈|실내놀이터|놀이방|스터디카페|독서실|만화방|만화카페|룸카페|멀티방|파티룸|방탈출|보드게임|보드카페|볼링|당구|스크린골프|골프연습|코인노래|노래방|찜질방|사우나|클라이밍|트램폴린|트램펄린|서점|북카페|도서관)/;
     const okIds = new Set(((await sql`SELECT term FROM learned_terms WHERE kind='cafe_ok' AND status='active'`) as { term: string }[]).map((r) => String(r.term)));
     const catCafes = (await sql`SELECT id, name, COALESCE(naver_category,'') cat FROM cafes WHERE published=true AND naver_category IS NOT NULL AND naver_category <> ''`) as { id: number; name: string; cat: string }[];
-    const unknownByCat: Record<string, { n: number; samples: number[] }> = {};
+    const unknownCafes: { id: number; name: string; cat: string }[] = [];
     let offConcept = 0;
     for (const c of catCafes) {
       if (OFF_CAT.test(c.cat)) { offConcept++; continue; } // 오프콘셉(heal 처리) — '○○카페'도 잡게 GOOD보다 먼저
       if (GOOD_CAT.test(c.cat)) continue;                 // 카페 업종 — 통과
       if (GOOD_NAME.test(c.name)) continue;               // 업종은 애매해도 '이름이 카페형'(로스터리 등 오분류) — 통과
       if (okIds.has(String(c.id))) continue;               // 사람이 검토·승인(유지)한 카페 — 재플래그 안 함
-      const e = unknownByCat[c.cat] || (unknownByCat[c.cat] = { n: 0, samples: [] });
-      e.n++; if (e.samples.length < 6) e.samples.push(c.id);
+      unknownCafes.push(c);
     }
-    for (const [cat, e] of Object.entries(unknownByCat).sort((a, b) => b[1].n - a[1].n)) {
-      pending.push({ kind: "category_unknown", term: cat, cafes: e.n, samples: e.samples, reason: "업종·이름 모두 카페 신호 없음 — 콘셉트 적합성 검토(승인)" });
+    // 🔧 자동 종결 — '음식점>...' 식당 카테고리 + 노출리뷰에 커피 정체성(커피·라떼·원두·디저트·베이커리·브런치 등)이
+    //    하나도 없으면 = 명백한 식당(빌라드코스테스=빠에야 레스토랑 류) → 결정론적 자동 비공개. '처리중' 위장으로 안 띄움.
+    //    커피 정체성이 하나라도 있으면(양식 브런치카페 등 하이브리드 가능) → 기조실장 검토로 남김(승인대기).
+    const COFFEE_ID = /커피|라떼|아메리카노|원두|에스프레소|핸드드립|콜드브루|드립|카페|까페|디저트|베이커리|빵|브런치|케이크|스콘|크로플|마카롱|음료|티룸|찻집|로스터/;
+    let autoExcluded = 0;
+    const stillUnknownByCat: Record<string, { n: number; samples: number[] }> = {};
+    if (unknownCafes.length) {
+      const ids = unknownCafes.map((c) => c.id);
+      const rev = (await sql`SELECT id, COALESCE(synth_reviews::text, '') t FROM cafes WHERE id = ANY(${ids})`) as { id: number; t: string }[];
+      const revMap = new Map(rev.map((r) => [Number(r.id), r.t]));
+      for (const c of unknownCafes) {
+        const isFood = /^음식점>/.test(c.cat);
+        const txt = revMap.get(Number(c.id)) || "";
+        if (isFood && txt && !COFFEE_ID.test(txt)) {
+          await sql`UPDATE cafes SET published = false, pipeline_status = 'excluded' WHERE id = ${c.id} AND published = true`;
+          autoExcluded++;
+          continue; // 결정론적 종결 — 승인대기로 안 올림
+        }
+        const e = stillUnknownByCat[c.cat] || (stillUnknownByCat[c.cat] = { n: 0, samples: [] });
+        e.n++; if (e.samples.length < 6) e.samples.push(c.id);
+      }
+    }
+    for (const [cat, e] of Object.entries(stillUnknownByCat).sort((a, b) => b[1].n - a[1].n)) {
+      pending.push({ kind: "category_unknown", term: cat, cafes: e.n, samples: e.samples, reason: "비카페 업종이나 커피 정체성 일부 있음 — 기조실장 당일 검토(콘셉트 적합성)" });
     }
     if (offConcept > 0) pending.push({ kind: "category_offconcept", term: "(오프콘셉 잔여)", cafes: offConcept, reason: "오프콘셉 업종 공개 중 — heal이 자동 비공개 예정" });
 
@@ -149,10 +170,10 @@ export async function GET(req: NextRequest) {
     // 기록(검증·롤백 기준 + 관제탑 노출용)
     if (!dry) await sql`INSERT INTO rulegap_runs (published_before, learned, pending) VALUES (${pubNow}, ${JSON.stringify(learned)}::jsonb, ${JSON.stringify(pending)}::jsonb)`;
 
-    if (!dry) await recordRun("cron-rulegap", true, `학습 ${learned.length} 승인대기 ${pending.length} 롤백 ${rolledBack.length}`, learned.length);
+    if (!dry) await recordRun("cron-rulegap", true, `학습 ${learned.length} 승인대기 ${pending.length} 식당자동제외 ${autoExcluded} 롤백 ${rolledBack.length}`, learned.length);
     return NextResponse.json({
       ok: true, dry, ranAt: new Date().toISOString(), scanned,
-      rolledBack,
+      rolledBack, autoExcluded,
       learnedCount: learned.length, learned,
       pendingCount: pending.length, pending: pending.slice(0, 30),
     });
