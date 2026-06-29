@@ -506,7 +506,7 @@ export async function healPublishedAudit(limit = 600, unpubCap = 120): Promise<{
     }
     if (after?.published) {
       const q = (after.synth_reviews || []).map((e: any) => e?.quote || "").filter(Boolean);
-      const coh = q.length >= 3 ? nameCoherence(r.name, q, [r.area]) : 1;
+      const coh = q.length >= 3 ? nameCoherence(cleanCafeName(r.name), q, [r.area]) : 1; // ★ storeResult와 동일하게 정제이름 사용 — '교동89 카페'·'토팡가 커피 로스터스' 같은 서술어 상호를 오염으로 오탐하던 버그 차단
       if (coh < 0.4) {
         flagged++;
         await sql`INSERT INTO audit_flags (cafe_id, cafe_name, issue, detail, resolved)
