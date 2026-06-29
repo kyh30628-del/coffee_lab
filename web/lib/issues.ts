@@ -4,7 +4,7 @@ import { sql } from "./db";
 // 관제탑 어디서든 문제가 발견되는 즉시 issues 테이블에 적재하고, RM 분류 규칙으로 담당 본부에 자동 배정한다.
 // "기획조정실장 명의로 RM팀이 분류 → 각 본부 실시간 조치"의 결정론 백본. LLM(RM 에이전트)은 배치로 정제·심화.
 
-export type Issue = { ikey: string; source: string; severity: "HIGH" | "MED" | "LOW"; type: string; title: string; detail: string; team: string };
+export type Issue = { ikey: string; source: string; severity: "HIGH" | "MED" | "LOW"; type: string; title: string; detail: string; team: string; state?: "처리중" | "결재대기" | "OUTSTANDING"; note?: string };
 
 // 크론 → 소속 본부 (이슈 라우팅)
 const CRON_TEAM: Record<string, string> = {
@@ -21,6 +21,8 @@ export async function ensureIssues() {
     status TEXT DEFAULT 'open',
     first_seen TIMESTAMPTZ DEFAULT now(), last_seen TIMESTAMPTZ DEFAULT now(), resolved_at TIMESTAMPTZ
   )`.catch(() => {});
+  await sql`ALTER TABLE issues ADD COLUMN IF NOT EXISTS state TEXT`.catch(() => {});
+  await sql`ALTER TABLE issues ADD COLUMN IF NOT EXISTS note TEXT`.catch(() => {});
 }
 
 const one = async (q: any): Promise<number> => Number((await q)[0].c);
@@ -46,10 +48,10 @@ export async function detectIssues(): Promise<Issue[]> {
 
   // 3) 결재 대기 (L3) — 각 건을 담당 본부로 라우팅(즉시, 나이 무관)
   const pend = (await sql`SELECT id, title, team, severity FROM decisions WHERE status='pending' AND COALESCE(tier,'L3')='L3' ORDER BY id`) as any[];
-  for (const p of pend) out.push({ ikey: `approval:${p.id}`, source: "결재", severity: (p.severity === "HIGH" ? "HIGH" : "MED"), type: "CEO 결재 대기", title: `결재 대기: ${p.title}`.slice(0, 80), detail: "CEO 모바일 결재 필요(L3 치명적)", team: p.team || "기획조정실" });
+  for (const p of pend) out.push({ ikey: `approval:${p.id}`, source: "결재", severity: (p.severity === "HIGH" ? "HIGH" : "MED"), type: "CEO 결재 대기", title: `결재 대기: ${p.title}`.slice(0, 80), detail: "CEO 모바일 결재 필요(L3 치명적)", team: p.team || "기획조정실", state: "결재대기", note: "CEO 승인 요청" });
   // 3-b) 승인됐으나 집행 안 된 작업(agent_task) — 기조실장·담당 본부 실행 대기
   const appr = (await sql`SELECT id, title, team FROM decisions WHERE status='approved' ORDER BY id`) as any[];
-  for (const a of appr) out.push({ ikey: `exec:${a.id}`, source: "집행", severity: "MED", type: "집행 대기", title: `집행 대기: ${a.title}`.slice(0, 80), detail: "승인 완료 — 담당 본부 구현·집행 대기(전결/배분)", team: a.team || "기획조정실" });
+  for (const a of appr) out.push({ ikey: `exec:${a.id}`, source: "집행", severity: "MED", type: "집행 대기", title: `집행 대기: ${a.title}`.slice(0, 80), detail: "승인 완료 — 담당 본부 구현·집행 대기(전결/배분)", team: a.team || "기획조정실", state: "처리중", note: "승인됨 — 집행 중" });
 
   // 3-c) 판정 적체 (needs_llm) — 단, judgeloop 재개를 CEO가 이미 결정(반려/현상유지)했으면 '수용된 상태'라 이슈로 안 띄움.
   //   (CEO: 이미 결정한 걸 계속 현황으로 띄우지 마라.)
@@ -72,9 +74,13 @@ export async function detectIssues(): Promise<Issue[]> {
     const h = row?.health || {};
     const route = (t: string) => /규칙갭|룰갭/.test(t) ? "품질본부/룰갭팀" : /폐업|closure/.test(t) ? "운영본부" : /검색|추천|momentum/.test(t) ? "경험본부" : /임베딩|합성|동\b|backfill/.test(t) ? "운영본부" : /발굴|grow/.test(t) ? "성장본부" : "품질본부";
     const slug = (p: string, t: string) => p + ":" + t.replace(/[0-9,]/g, "").replace(/\s+/g, "").slice(0, 48); // 숫자 제거 → 카운트 바뀌어도 같은 ikey
-    for (const t of (h.risks || []) as string[]) out.push({ ikey: slug("tower-risk", t), source: "관제탑·위험", severity: "HIGH", type: "위험", title: String(t).slice(0, 95), detail: "메인 관제탑 위험(빨강) — 소비자 타격/해자 훼손, 즉시 조치", team: route(String(t)) });
-    for (const t of (h.integrity || []) as string[]) out.push({ ikey: slug("tower-integ", t), source: "관제탑·정합성", severity: "MED", type: "정합성", title: String(t).slice(0, 95), detail: "메인 관제탑 정합성 경보", team: "품질본부" });
-    for (const t of (h.notices || []) as string[]) out.push({ ikey: slug("tower-notice", t), source: "관제탑·주의", severity: "LOW", type: "주의", title: String(t).slice(0, 95), detail: "메인 관제탑 주의(점검 권장) — 담당 본부 트리아지", team: route(String(t)) });
+    for (const t of (h.risks || []) as string[]) out.push({ ikey: slug("tower-risk", t), source: "관제탑·위험", severity: "HIGH", type: "위험", title: String(t).slice(0, 95), detail: "메인 관제탑 위험(빨강) — 소비자 타격/해자 훼손, 즉시 조치", team: route(String(t)), state: "결재대기", note: "CEO 결재 자동 상신" });
+    for (const t of (h.integrity || []) as string[]) out.push({ ikey: slug("tower-integ", t), source: "관제탑·정합성", severity: "MED", type: "정합성", title: String(t).slice(0, 95), detail: "메인 관제탑 정합성 경보", team: "품질본부", state: "처리중", note: "자가치유·담당 본부 처리 중" });
+    for (const t of (h.notices || []) as string[]) {
+      // 발굴 지연은 cron-grow가 우선처리로 소진 중 → 처리중. 그 외 주의는 담당 본부 트리아지.
+      const isGrow = /발굴.*(지연|미발굴)/.test(t);
+      out.push({ ikey: slug("tower-notice", t), source: "관제탑·주의", severity: "LOW", type: "주의", title: String(t).slice(0, 95), detail: "메인 관제탑 주의(점검 권장) — 담당 본부 트리아지", team: route(String(t)), state: "처리중", note: isGrow ? "cron-grow 우선처리·소진 중" : "담당 본부 매 사이클 트리아지" });
+    }
   } catch { /* orchestrator_state 없으면 아래 직접 체크가 안전망 */ }
 
   // 5) 운영 백로그
@@ -92,9 +98,10 @@ export async function syncIssues() {
   const found = await detectIssues();
   const keys = found.map((i) => i.ikey);
   for (const i of found) {
-    await sql`INSERT INTO issues (ikey, source, severity, type, title, detail, team, status, last_seen)
-      VALUES (${i.ikey}, ${i.source}, ${i.severity}, ${i.type}, ${i.title}, ${i.detail}, ${i.team}, 'open', now())
-      ON CONFLICT (ikey) DO UPDATE SET severity=${i.severity}, title=${i.title}, detail=${i.detail}, team=${i.team}, last_seen=now(),
+    const st = i.state ?? "처리중"; // 기본: 담당 본부가 매 사이클 처리 중
+    await sql`INSERT INTO issues (ikey, source, severity, type, title, detail, team, status, state, note, last_seen)
+      VALUES (${i.ikey}, ${i.source}, ${i.severity}, ${i.type}, ${i.title}, ${i.detail}, ${i.team}, 'open', ${st}, ${i.note ?? null}, now())
+      ON CONFLICT (ikey) DO UPDATE SET severity=${i.severity}, title=${i.title}, detail=${i.detail}, team=${i.team}, state=${st}, note=${i.note ?? null}, last_seen=now(),
         status=CASE WHEN issues.status='resolved' THEN 'open' ELSE issues.status END,
         resolved_at=CASE WHEN issues.status='resolved' THEN NULL ELSE issues.resolved_at END`;
   }
@@ -114,6 +121,6 @@ export async function syncIssues() {
     } catch { /* decisions 미존재 등 — 무시 */ }
   }
 
-  const open = (await sql`SELECT ikey, source, severity, type, title, detail, team, status, to_char(first_seen AT TIME ZONE 'Asia/Seoul','MM-DD HH24:MI') seen, EXTRACT(EPOCH FROM (now()-first_seen))/3600 hrs FROM issues WHERE status<>'resolved' ORDER BY CASE severity WHEN 'HIGH' THEN 0 WHEN 'MED' THEN 1 ELSE 2 END, first_seen ASC`) as any[];
+  const open = (await sql`SELECT ikey, source, severity, type, title, detail, team, status, state, note, to_char(first_seen AT TIME ZONE 'Asia/Seoul','MM-DD HH24:MI') seen, EXTRACT(EPOCH FROM (now()-first_seen))/3600 hrs FROM issues WHERE status<>'resolved' ORDER BY CASE state WHEN '결재대기' THEN 0 WHEN 'OUTSTANDING' THEN 1 ELSE 2 END, CASE severity WHEN 'HIGH' THEN 0 WHEN 'MED' THEN 1 ELSE 2 END, first_seen ASC`) as any[];
   return open;
 }

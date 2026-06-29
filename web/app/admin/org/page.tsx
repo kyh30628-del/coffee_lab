@@ -200,17 +200,17 @@ export default function OrgDashboard() {
             <span style={{ fontSize: 10.5, color: "#9c8a6c" }}>{showIssues ? "접기" : issues.length ? "조치 보기" : "보기"}</span>
           </button>
           {showIssues && <div style={{ marginTop: 8 }}>
-          <div style={{ fontSize: 10.5, color: "#9c8a6c", marginBottom: 8 }}>관제탑 어디서든 문제 발견 즉시 RM팀이 분류(기획조정실장 명의) → 담당 본부 배정 → 실시간 조치.</div>
+          <div style={{ fontSize: 10.5, color: "#9c8a6c", marginBottom: 8 }}>발견 즉시 RM 분류·담당 배정. 상태: <b style={{ color: "#3f7a4f" }}>🔵처리중</b>(팀이 처리 중) · <b style={{ color: "#b06a2e" }}>🔔결재대기</b>(CEO 승인 요청) · <b style={{ color: "#b03a3a" }}>🔴OUTSTANDING</b>(즉시해결 불가·중대). 해결되면 자동 사라짐.</div>
           {issues.length === 0 ? <div style={{ color: "#3f7a4f", fontSize: 13 }}>현재 열린 이슈 없음 ✅</div> :
             issues.map((i) => (
               <div key={i.ikey} style={{ border: "1px solid #e6d8bf", borderRadius: 10, padding: "9px 11px", marginBottom: 8, background: i.severity === "HIGH" ? "#fff6f4" : "#fbfaf5" }}>
                 <div style={{ display: "flex", gap: 5, alignItems: "center", flexWrap: "wrap" }}>
+                  {(() => { const st = i.state || "처리중"; const c = st === "결재대기" ? "#b06a2e" : st === "OUTSTANDING" ? "#b03a3a" : "#3f7a4f"; const ic = st === "결재대기" ? "🔔" : st === "OUTSTANDING" ? "🔴" : "🔵"; return <span style={{ background: c, color: "#fff", fontSize: 9.5, fontWeight: 700, padding: "2px 7px", borderRadius: 20 }}>{ic} {st}</span>; })()}
                   <span style={{ background: sevC[i.severity] || "#888", color: "#fff", fontSize: 9.5, fontWeight: 700, padding: "2px 7px", borderRadius: 20 }}>{i.severity}</span>
-                  <span style={{ fontSize: 9.5, color: "#8a7458", background: "#f0e8d8", padding: "2px 6px", borderRadius: 20 }}>{i.source}</span>
                   <span style={{ fontWeight: 700, fontSize: 12.5 }}>{i.title}</span>
                 </div>
                 {i.detail && <div style={{ fontSize: 11, color: "#5a4631", margin: "4px 0 3px", lineHeight: 1.4 }}>{i.detail}</div>}
-                <div style={{ fontSize: 10.5, color: "#9c8a6c" }}>→ 배정: <b style={{ color: "#7a5a2a" }}>{i.team}</b> · 기획조정실장 명의(RM 분류) · 발견 {i.seen}{Number(i.hrs) >= 24 ? ` · ${Math.floor(Number(i.hrs) / 24)}일 경과` : ""}</div>
+                <div style={{ fontSize: 10.5, color: "#9c8a6c" }}>→ <b style={{ color: "#7a5a2a" }}>{i.team}</b>{i.note ? ` · ${i.note}` : ""} · 발견 {i.seen}{Number(i.hrs) >= 24 ? ` · ${Math.floor(Number(i.hrs) / 24)}일 경과` : ""}</div>
               </div>
             ))}
           </div>}
