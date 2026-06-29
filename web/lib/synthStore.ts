@@ -342,6 +342,27 @@ export async function healRestaurantByReview(): Promise<{ held: number; names: s
   return { held: kill.length, names: names.slice(0, 12) };
 }
 
+// 🎯 일반 비카페 자동 비공개 (유형 불문 단일 신호) — 카페면 노출리뷰에 '카페 정체성'(커피·디저트·베이커리·차)이
+//   반드시 있다. 3건+ 노출리뷰에 그게 하나도 없으면 = 유형 불문 비카페(김밥집·음식점·냉장고매장·캠핑대리점·대학교
+//   ·동명오염 등). 만화·식당·술집을 따로 코딩 안 해도 미래 어떤 유형이든 이 한 규칙으로 잡힌다.
+//   ⚠️ FP 차단: BELONGS 그물을 매우 넓게(차/찻집 포함 — 한글 \b 안 먹혀 구체어 나열). '카페' 단어만 있어도 통과.
+//      찻집(대추차·오미자차)이 안 죽게 차 계열 필수. 3건 미만(미검증)은 안 건드림.
+const CAFE_BELONGS = /커피|라떼|라테|아메리카노|원두|에스프레소|핸드드립|콜드브루|드립|카페|까페|coffee|cafe|음료|스무디|에이드|찻집|차한잔|전통차|대추차|오미자|쌍화|유자차|생강차|한방차|꽃차|허브|녹차|말차|홍차|보이차|국화차|캐모마일|페퍼민트|루이보스|얼그레이|밀크티|버블티|아이스티|디저트|베이커리|제과|빵|식빵|소금빵|베이글|꽈배기|고로케|크로켓|핫도그|도넛|도너츠|케이크|케익|타르트|쿠키|마카롱|스콘|크로플|와플|파이|휘낭시에|마들렌|젤라또|아이스크림|빙수|푸딩|초콜릿|쇼콜라|아포가토|크림|우유|밀크|과자|전병|약과|한과|구움과자|샌드위치|브런치|토스트|크로와상|크루아상|프레첼/;
+export async function healNonCafeByReview(): Promise<{ held: number; names: string[] }> {
+  const cand = (await sql`SELECT id, name, synth_reviews FROM cafes WHERE published = true AND synth_reviews IS NOT NULL`) as any[];
+  const kill: number[] = []; const names: string[] = [];
+  for (const c of cand) {
+    let sr: any = c.synth_reviews; try { sr = JSON.parse(sr); } catch { /* obj */ }
+    const arr = Array.isArray(sr) ? sr : (sr && Array.isArray(sr.quotes) ? sr.quotes : []);
+    const texts = (arr as any[]).map((q) => typeof q === "string" ? q : (q?.text || q?.quote || "")).filter(Boolean);
+    if (texts.length < 3) continue;            // 미검증(노출리뷰<3) 보호
+    if (texts.some((t) => CAFE_BELONGS.test(t))) continue; // 카페 정체성 1건이라도 있으면 보존
+    kill.push(c.id); names.push(c.name);
+  }
+  if (kill.length) await sql`UPDATE cafes SET published = false, pipeline_status = 'excluded' WHERE id = ANY(${kill})`;
+  return { held: kill.length, names: names.slice(0, 12) };
+}
+
 // 🗺️ 수도권 박스 밖(비수도권 동명업체) 자동 제외 — 어느 적재 경로(발굴·마이닝·상가·수집)로 들어왔든
 //   2시간마다 일괄 정리. 공개 게이트가 노출은 이미 막지만, DB 청결 + 합성·임베딩 낭비 제거 + 미래 경로까지 커버하는 안전망.
 export async function healOutOfBox(): Promise<{ excluded: number; names: string[] }> {
