@@ -168,7 +168,7 @@ export async function GET(req: NextRequest) {
       else notices.push(`품질 의심 ${suspect}곳(소수 — 비공개 처리 대상)`);
     }
     // 아래는 모두 '소비자에 보이는 손상 아님' = 주의(백그라운드). 진행 속도·완성도·감사 대기.
-    if ((ds?.behind ?? 0) > 0) notices.push(`발굴 3일+ 지연 지역 ${ds.behind}곳`);
+    if ((ds?.behind ?? 0) > 0) notices.push(`발굴 7일+ 미발굴 지역 ${ds.behind}곳(굶은 로테이션 — cron-grow 우선처리 중)`);
     if ((af?.open ?? 0) > 0) notices.push(`오염 플래그 ${af.open}건(검토 대기)`);
     const dgap = (await sql`SELECT COUNT(*)::int n FROM (SELECT area FROM cafes WHERE published GROUP BY area HAVING COUNT(*) >= 10 AND COUNT(*) FILTER (WHERE dong IS NOT NULL)::float / COUNT(*) < 0.9) x`.catch(() => [{ n: 0 }]))[0] as any;
     if (dgap.n > 0) notices.push(`동 채움 미흡 지역 ${dgap.n}곳(<90%)`);
