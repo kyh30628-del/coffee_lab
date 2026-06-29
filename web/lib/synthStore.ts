@@ -296,7 +296,8 @@ export async function healNonCafeCategory(): Promise<{ held: number; names: stri
 //      '업종명사 + 카페 자기이름이 같은 리뷰에' 함께 나오는 비율(self-bound)이 강한 우세(≥0.66)일 때만 비공개.
 //      self<우세 = 오염/2차 언급 → 손대지 않음(이름정합 healer가 따로 처리). 임계 0.66은 '카페 이스트↔디 이스트'
 //      같은 짧은토큰 충돌 오탐을 배제하려 0.5가 아닌 0.66로 잡음(드라이런 검증).
-const OFFCONCEPT_VENUE = /애견카페|애견\s*카페|고양이카페|고양이\s*카페|동물카페|반려동물\s*카페|키즈카페|키즈\s*카페|만화카페|만화\s*카페|만화방|보드게임카페|보드게임\s*카페|방탈출|룸익스케이프|멀티방/;
+// 전 오프콘셉 업종(카테고리 OFF 리스트와 동기화) — 네이버가 일반 '카페'로 분류해도 리뷰내용 self-bound로 잡는다.
+const OFFCONCEPT_VENUE = /애견카페|애견\s*카페|고양이카페|고양이\s*카페|동물카페|반려동물\s*카페|키즈카페|키즈\s*카페|만화카페|만화\s*카페|만화방|보드게임카페|보드게임\s*카페|방탈출|룸익스케이프|멀티방|룸카페|파티룸|스터디카페|스터디\s*룸|독서실|코인노래|노래방|피씨방|pc방|볼링장|당구장|스크린골프|골프연습|찜질방|사우나|클라이밍/i;
 function offconceptBrand(name: string): string {
   return (name || "").replace(/^카페\s+/, "").replace(/\s+\S*점$/, "").trim().split(/\s+/)[0] || "";
 }
@@ -304,7 +305,7 @@ export async function healOffConceptByReview(): Promise<{ held: number; names: s
   const cand = (await sql`
     SELECT id, name, synth_reviews FROM cafes
     WHERE published = true AND synth_reviews IS NOT NULL
-      AND synth_reviews::text ~* '애견카페|고양이카페|동물카페|키즈카페|만화카페|만화방|보드게임카페|방탈출|룸익스케이프|멀티방'`) as any[];
+      AND synth_reviews::text ~* '애견카페|고양이카페|동물카페|키즈카페|만화카페|만화방|보드게임카페|방탈출|룸익스케이프|멀티방|룸카페|파티룸|스터디카페|스터디룸|독서실|코인노래|노래방|피씨방|pc방|볼링장|당구장|스크린골프|골프연습|찜질방|사우나|클라이밍'`) as any[];
   const killIds: number[] = []; const killNames: string[] = [];
   for (const c of cand) {
     let sr: any = c.synth_reviews; try { sr = JSON.parse(sr); } catch { /* already obj */ }
