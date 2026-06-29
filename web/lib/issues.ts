@@ -66,9 +66,9 @@ export async function detectIssues(): Promise<Issue[]> {
   // 7) 그라운딩 의심 (소개글 환각 의심)
   const gr = await one(sql`SELECT count(*) c FROM grounding_checks WHERE grounded=false`.catch(() => [{ c: 0 }] as any));
   if (gr >= 20) out.push({ ikey: "quality:grounding", source: "그라운딩", severity: "MED", type: "환각 의심", title: `그라운딩 의심 ${gr}건`, detail: "소개글이 후기 근거 부족(환각 의심) — 판정 큐 재투입·재합성 대상", team: "품질본부" });
-  // 8) 리뷰 맥락 watchlist (offctx — 위험 아님·주의)
-  const offc = await one(sql`SELECT count(*) c FROM cafes WHERE published AND offctx_rate>=0.5 AND COALESCE(offctx_ok,false)=false`.catch(() => [{ c: 0 }] as any));
-  if (offc >= 5) out.push({ ikey: "quality:offctx", source: "맥락점검", severity: "LOW", type: "맥락 watchlist", title: `리뷰 맥락 점검 ${offc}곳`, detail: "표시 리뷰에 카페 맥락 적음(일부 오탐 가능·위험 아님) — 사람 확인 후 진짜 오염만 처리", team: "품질본부" });
+  // 8) 리뷰 맥락 watchlist (offctx — 위험 아님·주의). 임계는 메인 관제탑(orchestrator 0.55)과 일치시켜 숫자 충돌 방지.
+  const offc = await one(sql`SELECT count(*) c FROM cafes WHERE published AND offctx_rate>=0.55 AND COALESCE(offctx_ok,false)=false`.catch(() => [{ c: 0 }] as any));
+  if (offc >= 1) out.push({ ikey: "quality:offctx", source: "맥락점검", severity: "LOW", type: "맥락 watchlist", title: `리뷰 맥락 점검 ${offc}곳`, detail: "표시 리뷰에 카페 맥락 적음(일부 오탐 가능·위험 아님) — 품질본부 트리아지: 진짜 카페(찻집·북카페·시적이름)면 offctx_ok=true로 정리, 진짜 오염이면 비공개 권고", team: "품질본부" });
 
   // 5) 운영 백로그
   const closureBack = await one(sql`SELECT count(*) c FROM cafes WHERE published AND closure_misses>=3`);
