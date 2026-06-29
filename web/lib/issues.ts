@@ -51,9 +51,13 @@ export async function detectIssues(): Promise<Issue[]> {
   const appr = (await sql`SELECT id, title, team FROM decisions WHERE status='approved' ORDER BY id`) as any[];
   for (const a of appr) out.push({ ikey: `exec:${a.id}`, source: "집행", severity: "MED", type: "집행 대기", title: `집행 대기: ${a.title}`.slice(0, 80), detail: "승인 완료 — 담당 본부 구현·집행 대기(전결/배분)", team: a.team || "기획조정실" });
 
-  // 3-c) 판정 적체 (needs_llm — judgeloop 정지 시 누적)
-  const needsLlm = await one(sql`SELECT count(*) c FROM cafes WHERE needs_llm=true`);
-  if (needsLlm >= 300) out.push({ ikey: "ops:needsllm", source: "품질", severity: (needsLlm >= 1000 ? "HIGH" : "MED"), type: "판정 적체", title: `AI 판정 대기 ${needsLlm.toLocaleString()}건`, detail: "경계 리뷰 판정 적체(judgeloop 재개 결정 대기) — 합성 정밀도 영향", team: "품질본부" });
+  // 3-c) 판정 적체 (needs_llm) — 단, judgeloop 재개를 CEO가 이미 결정(반려/현상유지)했으면 '수용된 상태'라 이슈로 안 띄움.
+  //   (CEO: 이미 결정한 걸 계속 현황으로 띄우지 마라.)
+  const jdDecided = await one(sql`SELECT count(*) c FROM decisions WHERE (title ILIKE '%judgeloop%' OR title ILIKE '%판정%재개%') AND status IN ('rejected','done')`.catch(() => [{ c: 0 }] as any));
+  if (jdDecided === 0) {
+    const needsLlm = await one(sql`SELECT count(*) c FROM cafes WHERE needs_llm=true`);
+    if (needsLlm >= 300) out.push({ ikey: "ops:needsllm", source: "품질", severity: (needsLlm >= 1000 ? "HIGH" : "MED"), type: "판정 적체", title: `AI 판정 대기 ${needsLlm.toLocaleString()}건`, detail: "경계 리뷰 판정 적체 — judgeloop 재개 결정 필요(CEO)", team: "품질본부" });
+  }
 
   // 4) 협업 지연 (2일+)
   const lateCoord = (await sql`SELECT count(*) c FROM coordination WHERE status IN ('open','in_progress') AND created_at < now() - interval '2 days'`.catch(() => [{ c: 0 }])) as any[];
@@ -97,6 +101,19 @@ export async function syncIssues() {
   // 이번에 안 잡힌 기존 open 이슈 = 해소됨
   if (keys.length) await sql`UPDATE issues SET status='resolved', resolved_at=now() WHERE status<>'resolved' AND ikey <> ALL(${keys})`;
   else await sql`UPDATE issues SET status='resolved', resolved_at=now() WHERE status<>'resolved'`;
+
+  // ★ 액션 루프: HIGH 이슈는 자동으로 CEO 결재(L3)로 상신한다 — "위험 높으면 결재 올려라"(CEO).
+  //   중복 방지: 같은 ikey로 이미 미결(pending/approved) 결재가 있으면 skip. 이슈 해소되면 결재는 별도 처리(CEO/기조실장).
+  for (const i of found.filter((x) => x.severity === "HIGH")) {
+    try {
+      const dup = (await sql`SELECT 1 FROM decisions WHERE action_params->>'ikey'=${i.ikey} AND status IN ('pending','approved') LIMIT 1`) as any[];
+      if (!dup.length) {
+        await sql`INSERT INTO decisions (title, detail, team, severity, tier, action_type, action_params)
+          VALUES (${("[RM] " + i.title).slice(0, 120)}, ${(i.detail + " — RM 자동 상신(위험). 담당 본부가 조사·조치, 비가역이면 CEO 승인.").slice(0, 400)}, ${i.team}, 'HIGH', 'L3', 'agent_task', ${JSON.stringify({ ikey: i.ikey })}::jsonb)`;
+      }
+    } catch { /* decisions 미존재 등 — 무시 */ }
+  }
+
   const open = (await sql`SELECT ikey, source, severity, type, title, detail, team, status, to_char(first_seen AT TIME ZONE 'Asia/Seoul','MM-DD HH24:MI') seen, EXTRACT(EPOCH FROM (now()-first_seen))/3600 hrs FROM issues WHERE status<>'resolved' ORDER BY CASE severity WHEN 'HIGH' THEN 0 WHEN 'MED' THEN 1 ELSE 2 END, first_seen ASC`) as any[];
   return open;
 }
