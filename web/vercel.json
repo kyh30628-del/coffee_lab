@@ -59,6 +59,10 @@
     {
       "path": "/api/cron-issues",
       "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron-selfaudit",
+      "schedule": "20 22 * * *"
     }
   ]
 }
