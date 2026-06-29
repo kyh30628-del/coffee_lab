@@ -18,3 +18,10 @@ data-engine/daily.log
 /agent-reports/
 .DS_Store
 web/agent-reports
+
+# 자동생성(B2B 데이터 크론) — 매 사이클 갱신돼 git 충돌 유발 → 추적 제외
+web/public/data/cost.json
+web/public/data/timeseries.json
+data-engine/data/clean/coffee_c.csv
+data-engine/data/clean/fx_usd_krw.csv
+*.pptx
