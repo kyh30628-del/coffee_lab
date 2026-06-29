@@ -1,4 +1,47 @@
 import { sql } from "./db";
+import { nameCoherence, cleanCafeName } from "./reviewQuality";
+
+const parseRv = (o: any): string[] => {
+  let a = o; if (typeof a === "string") { try { a = JSON.parse(a); } catch { return []; } }
+  const arr = Array.isArray(a) ? a : (a?.reviews ?? []);
+  return arr.map((x: any) => x?.quote || x?.title || x?.text || "").filter(Boolean);
+};
+
+// 🔧 자동 교정 — 탐지된 오염을 결정론으로 *스스로 처리*한다(매 30분 cron-issues). 사람·배치 안 기다림.
+//   audit_flags·offctx 각 카페를 cleanCafeName 일치율로 판정: 진짜 카페(오탐)=자동 정리, 진짜 오염=비공개 결재 자동 상신.
+//   → 대시보드 오염이 무인으로 *줄어들고*, CEO 손이 필요한 것만 결재로 올라온다.
+export async function autoCorrect(): Promise<{ resolved: number; escalated: number; log: string[] }> {
+  const log: string[] = []; let resolved = 0, escalated = 0;
+  // 대상: 미해결 audit_flags(근거오염) + offctx 높은 공개 카페
+  const targets = (await sql`
+    SELECT DISTINCT c.id, c.name, c.area, c.synth_reviews
+    FROM cafes c
+    WHERE c.published AND (
+      EXISTS (SELECT 1 FROM audit_flags a WHERE a.cafe_id=c.id AND a.issue!='audit_complete' AND NOT COALESCE(a.resolved,false))
+      OR (c.offctx_rate >= 0.55 AND NOT COALESCE(c.offctx_ok,false))
+    ) LIMIT 40`.catch(() => [])) as any[];
+  for (const c of targets) {
+    const q = parseRv(c.synth_reviews); if (q.length < 3) continue;
+    const coh = nameCoherence(cleanCafeName(c.name), q, [c.area]);
+    if (coh >= 0.5) {
+      // 진짜 카페(오탐) → 자동 정리: 플래그 해소 + offctx 화이트리스트
+      await sql`UPDATE audit_flags SET resolved=true WHERE cafe_id=${c.id} AND NOT COALESCE(resolved,false)`.catch(() => {});
+      await sql`UPDATE cafes SET offctx_ok=true WHERE id=${c.id}`.catch(() => {});
+      resolved++; if (log.length < 8) log.push(`오탐정리 ${c.name}(${Math.round(coh * 100)}%)`);
+    } else if (coh < 0.35) {
+      // 진짜 오염 → 비공개 결재 자동 상신(중복방지). CEO 한 번 승인하면 비공개.
+      const ik = `autopollute:${c.id}`;
+      const dup = (await sql`SELECT 1 FROM decisions WHERE action_params->>'ikey'=${ik} AND status IN('pending','approved') LIMIT 1`.catch(() => [])) as any[];
+      if (!dup.length) {
+        await sql`INSERT INTO decisions (title,detail,team,severity,tier,action_type,action_params)
+          VALUES (${`[자동] 오염 카페 비공개 — ${c.name}`.slice(0, 110)}, ${`근거오염 자동탐지: 노출후기가 실제 그 카페를 거의 안 말함(cleanName 일치율 ${Math.round(coh * 100)}%). 비공개 권고.`}, '품질본부', 'HIGH', 'L3', 'unpublish', ${JSON.stringify({ ids: [c.id], ikey: ik })}::jsonb)`.catch(() => {});
+        escalated++; if (log.length < 8) log.push(`오염→결재상신 ${c.name}(${Math.round(coh * 100)}%)`);
+      }
+    }
+    // 0.35~0.5 = 애매 → 레드팀 판단(그대로)
+  }
+  return { resolved, escalated, log };
+}
 
 // 🚨 실시간 이슈 탐지·라우팅 엔진 (결정론·무료).
 // 관제탑 어디서든 문제가 발견되는 즉시 issues 테이블에 적재하고, RM 분류 규칙으로 담당 본부에 자동 배정한다.
