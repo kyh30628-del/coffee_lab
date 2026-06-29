@@ -311,7 +311,7 @@ export default function OrgDashboard() {
         {brief?.meeting && (
           <div style={{ ...card, marginTop: 10 }} className="ex">
             <button onClick={() => setShowMeet(!showMeet)} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: "#2a7a72" }}>{showMeet ? "▾" : "▸"} 🗓️ 조간회의록 (매일 07:00)</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "#2a7a72" }}>{showMeet ? "▾" : "▸"} 🗓️ 조간회의록 (주간·월요일)</span>
               <span style={{ fontSize: 10.5, color: "#9c8a6c" }}>{showMeet ? "접기" : "회의 결과 보기"}</span>
             </button>
             {showMeet && <div style={{ marginTop: 8 }} dangerouslySetInnerHTML={{ __html: md2html(brief.meeting) }} />}
