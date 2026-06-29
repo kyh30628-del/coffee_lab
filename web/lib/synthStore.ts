@@ -157,7 +157,15 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   const entN = qz.filter((q) => NCE.test(q)).length, cfeN = qz.filter((q) => CFE.test(q)).length;
   const entityPolluted = qz.length >= 4 && entN >= Math.ceil(qz.length * 0.4) && entN > cfeN;
   //   + 이름이 '일반 음식·메뉴어'(베이글·아메리카노 등)면 음식 리뷰가 전부 매칭돼 식별 불가 → 노이즈로 공개 차단.
-  const noisy = (collected >= 5 && coherence < 0.4) || isGenericFoodName(name) || entityPolluted;
+  // 🎯 실시간 비카페·오프콘셉 차단 (합성 '그 순간' = 발견 즉시). autoCorrect 폴링·배치 전에 발행 자체를 막아 보드에 안 뜨게.
+  //   ① 커피 정체성 0: 노출후기 3건+에 카페 정체성(커피·디저트·베이커리·차/찻집) 단어가 하나도 없으면 비카페(식당·김밥·소매·오염).
+  //   ② 오프콘셉: 활동공간 업종명사(애견·키즈·만화·보드게임·룸·파티룸 등)가 카페 자기이름과 함께 우세(≥0.66) → 활동공간.
+  const _belongsHit = qz.filter((q) => CAFE_BELONGS.test(q)).length;
+  const noCafeIdentity = collected >= 3 && _belongsHit === 0;
+  const _ob = offconceptBrand(name);
+  const _offHit = qz.filter((q) => OFFCONCEPT_VENUE.test(q));
+  const offConceptHit = _offHit.length >= 3 && _ob.length >= 2 && (_offHit.filter((q) => q.includes(_ob)).length / Math.max(qz.length, 1)) >= 0.66;
+  const noisy = (collected >= 5 && coherence < 0.4) || isGenericFoodName(name) || entityPolluted || noCafeIdentity || offConceptHit;
   // 🔀 판정 분기 신호: 진짜 '맥락판단'이 필요한 경우만 LLM으로(규칙 우선 극대화).
   //   ⚠️ 경계후기 존재만으로 LLM 보내지 않음 — 경계후기는 어차피 합성서 제외되어 공개 내용에 안 들어가고,
   //      이미 '깨끗한 후기'로 검증/참고 등급이 난 카페는 규칙으로 공개해도 안전(품질 위험 0).
