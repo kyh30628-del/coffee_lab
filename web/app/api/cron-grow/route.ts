@@ -32,9 +32,11 @@ export async function GET(req: NextRequest) {
     const t0 = Date.now();
     const discoveries: { region: string; found?: number; inserted?: number; stopped?: boolean; error?: string; agent?: boolean }[] = [];
     while (Date.now() - t0 < GROW_BUDGET_MS) {
-      // 🎯 에이전트가 demand→supply 추론으로 고른 타겟을 최우선 소비(자율 루프). 없으면 기존 신선도 큐로 폴백.
-      const at = (await sql`SELECT id, region, area_label, keywords FROM discovery_targets WHERE status='pending' ORDER BY priority DESC, created_at ASC LIMIT 1`)[0] as any;
-      const target = at ?? ((await sql`SELECT region, area_label FROM discovery_state
+      // ⚠️ starvation 차단: 5일+ 굶은 로테이션 지역이 있으면 그걸 *먼저* 처리(타겟이 항상 우선해 기본 로테이션이
+      //   15일까지 굶던 버그). 굶은 지역 없으면 평소대로 에이전트 타겟 우선 → 신선도 큐 폴백.
+      const starved = (await sql`SELECT region, area_label FROM discovery_state WHERE last_run < now() - interval '5 days' ORDER BY last_run ASC NULLS FIRST LIMIT 1`)[0] as { region: string; area_label: string } | undefined;
+      const at = starved ? null : (await sql`SELECT id, region, area_label, keywords FROM discovery_targets WHERE status='pending' ORDER BY priority DESC, created_at ASC LIMIT 1`)[0] as any;
+      const target = starved ?? at ?? ((await sql`SELECT region, area_label FROM discovery_state
         ORDER BY (region = ANY(${PRIORITY_REGIONS}) AND (last_run IS NULL OR last_run < now() - interval '6 hours')) DESC, last_run ASC NULLS FIRST LIMIT 1`)[0] as { region: string; area_label: string } | undefined);
       if (!target) break;
       const kw = at && Array.isArray(at.keywords) && at.keywords.length ? (at.keywords as string[]) : undefined;

@@ -85,7 +85,9 @@ export async function GET(req: NextRequest) {
     const grBacklog = (await sql`SELECT COUNT(*)::int n FROM cafes c WHERE c.published AND c.raw_reviews IS NOT NULL AND c.synth_identity IS NOT NULL AND c.llm_judged_at IS NOT NULL AND c.llm_judged_at >= c.raw_collected_at AND NOT EXISTS (SELECT 1 FROM grounding_checks g WHERE g.cafe_id = c.id AND g.checked_at >= c.synth_updated)`.catch(() => [{ n: 0 }]))[0] as any;
     // 그라운딩이 문제로 판정해 '비공개 보류'한 카페(소비자 노출 차단됨) — 진짜 처리 필요분.
     const grSuspects = (await sql`SELECT c.name, c.area, g.issue FROM grounding_checks g JOIN cafes c ON c.id = g.cafe_id WHERE NOT g.grounded AND c.llm_judged_at IS NOT NULL AND c.llm_judged_at >= c.raw_collected_at ORDER BY g.checked_at DESC LIMIT 20`.catch(() => [])) as any[];
-    const ds = (await sql`SELECT MIN(last_run) oldest, COUNT(*) FILTER (WHERE last_run < now() - interval '3 days')::int behind, COUNT(*)::int n FROM discovery_state`)[0] as any;
+    // 발굴은 '다양성(전수 아님)' 전략 — 전 지역 3일 신선도는 불필요. 로테이션 현실(64지역·하루 12회=~5일 한바퀴)에 맞춰
+    //   '진짜 굶은 지역'(7일+)만 지연으로 본다. 그 미만은 정상 로테이션이라 노이즈 아님.
+    const ds = (await sql`SELECT MIN(last_run) oldest, COUNT(*) FILTER (WHERE last_run < now() - interval '7 days')::int behind, COUNT(*)::int n FROM discovery_state`)[0] as any;
     // 통합 재검증 자가감사 커버리지 — 공개 카페가 '현재 규칙'으로 며칠 안에 1회씩 재검되는지(규칙 드리프트 치유 진행률).
     const auditCov = (await sql`SELECT COUNT(*) FILTER (WHERE published AND audit_checked_at >= now() - interval '7 days')::int a7, COUNT(*) FILTER (WHERE published)::int pub, MAX(audit_checked_at) last_audit FROM cafes`.catch(() => [{ a7: 0, pub: 0, last_audit: null }]))[0] as any;
     // 로컬 배치 하트비트 — 실패(크래시 등)·정체를 관제탑이 잡아 경보. (예: dong-backfill ReferenceError)
