@@ -1,5 +1,6 @@
 import { sql } from "./db";
 import { nameCoherence, cleanCafeName } from "./reviewQuality";
+import { healNonCafeCategory, healOffConceptByReview, healRestaurantByReview } from "./synthStore";
 
 const parseRv = (o: any): string[] => {
   let a = o; if (typeof a === "string") { try { a = JSON.parse(a); } catch { return []; } }
@@ -12,6 +13,12 @@ const parseRv = (o: any): string[] => {
 //   → 대시보드 오염이 무인으로 *줄어들고*, CEO 손이 필요한 것만 결재로 올라온다.
 export async function autoCorrect(): Promise<{ resolved: number; escalated: number; log: string[] }> {
   const log: string[] = []; let resolved = 0, escalated = 0;
+  // 🔄 상시 결정론 해결 — 배치(2h heal·daily rulegap)를 안 기다리고, 탐지 패스(cron-issues 30분 + 대시보드 로드)마다
+  //   즉시 종결한다. 대표님: "개별 이슈는 즉시 실행. 왜 배치주기를 기다리냐." → 결정론 해결을 탐지 시점에 합침.
+  //   배치 크론은 전체 리프레시 백스톱으로 유지(이중 안전망). 결정론·무료·멱등이라 자주 돌려도 안전.
+  try { const nc = await healNonCafeCategory(); if (nc.held) { resolved += nc.held; if (log.length < 8) log.push(`비카페 카테고리 ${nc.held}곳 즉시 비공개`); } } catch { /* graceful */ }
+  try { const oc = await healOffConceptByReview(); if (oc.held) { resolved += oc.held; if (log.length < 8) log.push(`오프콘셉(활동공간) ${oc.held}곳 즉시 비공개`); } } catch { /* graceful */ }
+  try { const rs = await healRestaurantByReview(); if (rs.held) { resolved += rs.held; if (log.length < 8) log.push(`식당 ${rs.held}곳 즉시 비공개`); } } catch { /* graceful */ }
   // 대상: 미해결 audit_flags(근거오염) + offctx 높은 공개 카페
   const targets = (await sql`
     SELECT DISTINCT c.id, c.name, c.area, c.synth_reviews

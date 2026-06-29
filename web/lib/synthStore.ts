@@ -324,6 +324,24 @@ export async function healOffConceptByReview(): Promise<{ held: number; names: s
   return { held: killIds.length, names: killNames.slice(0, 12) };
 }
 
+// 🍽️ 식당 자동 비공개 — 카페와 겹쳐 카테고리 게이트가 안 거른 '음식점>' 계열(양식·이탈리·다이닝·바·아시안·퓨전 등)
+//   중, 이름도 카페형이 아니고 노출리뷰에 커피 정체성(커피·라떼·원두·디저트·베이커리·브런치 등)이 전무하면 = 명백한 식당
+//   (빌라드코스테스=빠에야 레스토랑 류) → 결정론적 비공개. 커피 정체성 하나라도 있으면(양식 브런치카페 37.5·노멀브런치) 보존.
+//   ⚠️ '음식점>카페,디저트'(몬스터커피 등)는 카테고리에 '카페' 있어 제외. 리뷰 없으면 안 건드림(미검증 보호).
+export async function healRestaurantByReview(): Promise<{ held: number; names: string[] }> {
+  const cand = (await sql`
+    SELECT id, name, COALESCE(synth_reviews::text, '') t FROM cafes
+    WHERE published = true AND naver_category IS NOT NULL
+      AND naver_category ~ '음식점>'
+      AND naver_category !~ '카페|커피|디저트|베이커리|제과|브런치|찻집|티룸|티하우스'
+      AND name !~ '카페|까페|커피|로스터|디저트|베이커리|제과|찻집|티하우스|coffee|cafe'`) as any[];
+  const COFFEE_ID = /커피|라떼|아메리카노|원두|에스프레소|핸드드립|콜드브루|드립|카페|까페|디저트|베이커리|빵|브런치|케이크|스콘|크로플|마카롱|음료|티룸|찻집|로스터/;
+  const kill: number[] = []; const names: string[] = [];
+  for (const c of cand) { if (c.t && !COFFEE_ID.test(c.t)) { kill.push(c.id); names.push(c.name); } }
+  if (kill.length) await sql`UPDATE cafes SET published = false, pipeline_status = 'excluded' WHERE id = ANY(${kill})`;
+  return { held: kill.length, names: names.slice(0, 12) };
+}
+
 // 🗺️ 수도권 박스 밖(비수도권 동명업체) 자동 제외 — 어느 적재 경로(발굴·마이닝·상가·수집)로 들어왔든
 //   2시간마다 일괄 정리. 공개 게이트가 노출은 이미 막지만, DB 청결 + 합성·임베딩 낭비 제거 + 미래 경로까지 커버하는 안전망.
 export async function healOutOfBox(): Promise<{ excluded: number; names: string[] }> {

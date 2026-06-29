@@ -58,7 +58,7 @@
     },
     {
       "path": "/api/cron-issues",
-      "schedule": "*/30 * * * *"
+      "schedule": "*/10 * * * *"
     }
   ]
 }
