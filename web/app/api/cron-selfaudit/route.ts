@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { recordRun } from "@/lib/agentLog";
 import { autoCorrect } from "@/lib/issues";
+import { pushTrigger } from "@/lib/auditTrigger";
 
 export const runtime = "nodejs";
 
@@ -79,6 +80,8 @@ export async function GET(req: NextRequest) {
                   ${`상시 자율진단이 자동교정으로 해소 못 한 중대 이상(${f.count}건). 담당 ${f.team}. 기조실장 1차 조사 → 대표님 판단 필요.`},
                   ${f.team}, 'HIGH', 'L3', 'investigate', ${JSON.stringify({ ikey: ik, check: f.check, count: f.count })}::jsonb)`.catch(() => {});
         escalated.push(f.check);
+        // 🔔 자동해결 못한 중대 이상 = 판단 필요 → 이벤트형 트리거. 로컬 watcher가 self-audit LLM을 즉시 깨운다.
+        await pushTrigger("selfaudit_critical", f.check, `${f.check} (${f.count}건·${f.team})`, "HIGH");
       }
     }
 

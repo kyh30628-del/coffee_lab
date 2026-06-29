@@ -1,4 +1,5 @@
 import { sql } from "./db";
+import { pushTrigger } from "./auditTrigger";
 
 // 크론 실패 → 담당 본부 (issues.ts CRON_TEAM과 동기화 — 순환참조 피해 인라인)
 const CRONFAIL_TEAM: Record<string, string> = {
@@ -29,4 +30,6 @@ export async function recordRun(job: string, ok: boolean, detail = "", processed
       await sql`UPDATE issues SET status='resolved', resolved_at=now() WHERE ikey=${ik} AND status='open'`;
     }
   } catch { /* issues 테이블 미존재 등 — cron-issues 폴이 백스톱 */ }
+  // 🔔 크론 실패 = 판단 필요한 이산 이벤트 → 이벤트형 트리거. 로컬 watcher가 self-audit LLM을 깨워 근본원인 조사.
+  if (!ok) await pushTrigger("cron_fail", job, detail, "HIGH");
 }
