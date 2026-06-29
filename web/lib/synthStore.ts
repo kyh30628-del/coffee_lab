@@ -290,6 +290,39 @@ export async function healNonCafeCategory(): Promise<{ held: number; names: stri
   return { held: rows.length + off.length, names: [...rows.map((r) => r.name), ...off.map((r) => r.name)].slice(0, 12) };
 }
 
+// 🎯 노출리뷰 기반 오프콘셉 자동 비공개 — 네이버가 '카페,디저트'로 뭉뚱그려 카테고리 게이트를 통과하지만
+//   실제론 애견·고양이·키즈·만화·보드게임·방탈출 같은 '활동공간'인 곳을 노출리뷰 내용으로 잡는다.
+//   ⚠️ 오염(다른 업체 리뷰 섞임: '몬스터커피'에 '몬스터핸드 보드게임카페' 리뷰)을 실수로 죽이지 않도록,
+//      '업종명사 + 카페 자기이름이 같은 리뷰에' 함께 나오는 비율(self-bound)이 강한 우세(≥0.66)일 때만 비공개.
+//      self<우세 = 오염/2차 언급 → 손대지 않음(이름정합 healer가 따로 처리). 임계 0.66은 '카페 이스트↔디 이스트'
+//      같은 짧은토큰 충돌 오탐을 배제하려 0.5가 아닌 0.66로 잡음(드라이런 검증).
+const OFFCONCEPT_VENUE = /애견카페|애견\s*카페|고양이카페|고양이\s*카페|동물카페|반려동물\s*카페|키즈카페|키즈\s*카페|만화카페|만화\s*카페|만화방|보드게임카페|보드게임\s*카페|방탈출|룸익스케이프|멀티방/;
+function offconceptBrand(name: string): string {
+  return (name || "").replace(/^카페\s+/, "").replace(/\s+\S*점$/, "").trim().split(/\s+/)[0] || "";
+}
+export async function healOffConceptByReview(): Promise<{ held: number; names: string[] }> {
+  const cand = (await sql`
+    SELECT id, name, synth_reviews FROM cafes
+    WHERE published = true AND synth_reviews IS NOT NULL
+      AND synth_reviews::text ~* '애견카페|고양이카페|동물카페|키즈카페|만화카페|만화방|보드게임카페|방탈출|룸익스케이프|멀티방'`) as any[];
+  const killIds: number[] = []; const killNames: string[] = [];
+  for (const c of cand) {
+    let sr: any = c.synth_reviews; try { sr = JSON.parse(sr); } catch { /* already obj */ }
+    const arr = Array.isArray(sr) ? sr : (sr && Array.isArray(sr.quotes) ? sr.quotes : []);
+    const texts = (arr as any[]).map((q) => typeof q === "string" ? q : (q?.text || q?.quote || "")).filter(Boolean);
+    if (texts.length < 3) continue;
+    const b = offconceptBrand(c.name); if (b.length < 2) continue;
+    const hard = texts.filter((t) => OFFCONCEPT_VENUE.test(t));
+    if (hard.length < 3) continue; // 최소 3건 우세
+    const self = hard.filter((t) => t.includes(b) || t.includes(c.name));
+    if (self.length / texts.length >= 0.66) { killIds.push(c.id); killNames.push(c.name); }
+  }
+  if (killIds.length) {
+    await sql`UPDATE cafes SET published = false, pipeline_status = 'excluded' WHERE id = ANY(${killIds})`;
+  }
+  return { held: killIds.length, names: killNames.slice(0, 12) };
+}
+
 // 🗺️ 수도권 박스 밖(비수도권 동명업체) 자동 제외 — 어느 적재 경로(발굴·마이닝·상가·수집)로 들어왔든
 //   2시간마다 일괄 정리. 공개 게이트가 노출은 이미 막지만, DB 청결 + 합성·임베딩 낭비 제거 + 미래 경로까지 커버하는 안전망.
 export async function healOutOfBox(): Promise<{ excluded: number; names: string[] }> {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
-import { synthAndStore, finalizePipeline, scrubPublishedPII, healGroundingSuspects, holdZeroEvidenceSuspects, healPublishedAudit, healNonCafeCategory, healOutOfBox, healAreaLabel } from "@/lib/synthStore";
+import { synthAndStore, finalizePipeline, scrubPublishedPII, healGroundingSuspects, holdZeroEvidenceSuspects, healPublishedAudit, healNonCafeCategory, healOutOfBox, healAreaLabel, healOffConceptByReview } from "@/lib/synthStore";
 import { recordRun } from "@/lib/agentLog";
 export const runtime = "nodejs";
 export const maxDuration = 120; // 재검증 자가감사(healPublishedAudit) 배치 여유
@@ -310,6 +310,8 @@ export async function GET(req: NextRequest) {
       try { const z = await holdZeroEvidenceSuspects(); if (z.held > 0) { unpubThisRun += z.held; healed.push(`근거0건 ${z.held}곳 자동 비공개(${z.names.slice(0, 3).join(", ")})`); } if (z.released > 0) healed.push(`복원 ${z.released}곳`); } catch {}
       // (e-2) '절대 카페 아님' 카테고리 자동 비공개 — 그랜드파더 비카페(건설·수목원·병원·미용·캠핑 등)를 카테고리로 자동 솎음(수기 불필요)
       try { const nc = await healNonCafeCategory(); if (nc.held > 0) { unpubThisRun += nc.held; healed.push(`비카페 카테고리 ${nc.held}곳 자동 비공개(${nc.names.slice(0, 3).join(", ")})`); } } catch {}
+      // (e-2b) 노출리뷰 기반 오프콘셉 — 네이버가 '카페'로 분류했지만 리뷰는 애견·키즈·만화·보드게임 등 활동공간(자기이름+업종 우세)
+      try { const oc = await healOffConceptByReview(); if (oc.held > 0) { unpubThisRun += oc.held; healed.push(`리뷰기반 오프콘셉 ${oc.held}곳 자동 비공개(${oc.names.slice(0, 3).join(", ")})`); } } catch {}
       try { const ob = await healOutOfBox(); if (ob.excluded > 0) { unpubThisRun += ob.excluded; healed.push(`수도권 밖(비수도권) ${ob.excluded}곳 자동 제외(${ob.names.slice(0, 3).join(", ")})`); } } catch {}
       // (e-3) area 라벨 교정 — 발굴지역으로 잘못 붙은 area를 실제 주소 도시로(검색·필터·폐업체크 오탐 차단)
       try { const al = await healAreaLabel(); if (al.fixed > 0) healed.push(`area 라벨 ${al.fixed}곳 주소기준 교정(${al.names.slice(0, 3).join(", ")})`); } catch {}
@@ -335,7 +337,7 @@ export async function GET(req: NextRequest) {
     // 신선도는 '수집을 시도한 시각'(raw_checked_at)으로 판단 — 재수집이 돌아도 내용이 같으면 raw_collected_at은 안 변하므로,
     //   raw_collected_at으로 신선도를 보면 멀쩡히 도는데도 stale로 오인됨(들쭉날쭉 수정의 부작용 차단).
     const lastCheck = c.last_check ?? c.last_collect;
-    add("discover", "발굴 (grow·지역수색)", lastCheck, 24, ds.behind, ds.behind ? `${ds.behind}/${ds.n} 지역 3일+ 지연` : `${ds.n}개 지역 순환중`);
+    add("discover", "발굴 (grow·지역수색)", lastCheck, 24, ds.behind, ds.behind ? `${ds.behind}/${ds.n} 지역 7일+ 미발굴(굶음)` : `${ds.n}개 지역 순환중`);
     add("collect", "수집 (warmup·raw)", lastCheck, 16, c.synth_q, `raw 수집·재수집`);
     add("synth", "합성 (옥석·등급)", c.last_synth, 24, c.synth_q, c.synth_q ? "미합성 적체" : "적체 없음");
     // 카테고리·동 채움 단계도 개별 모니터(발굴~수집 세분화)
