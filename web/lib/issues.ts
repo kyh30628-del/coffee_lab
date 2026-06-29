@@ -59,16 +59,19 @@ export async function detectIssues(): Promise<Issue[]> {
   const lateCoord = (await sql`SELECT count(*) c FROM coordination WHERE status IN ('open','in_progress') AND created_at < now() - interval '2 days'`.catch(() => [{ c: 0 }])) as any[];
   if (Number(lateCoord[0].c) > 0) out.push({ ikey: "coord:late", source: "협업", severity: "MED", type: "협업 지연", title: `미해결 협업 ${lateCoord[0].c}건 2일+`, detail: "부서 간 조율이 2일 넘게 안 풀림", team: "경영지원본부" });
 
-  // ★ 메인 관제탑(/admin)이 띄우는 이상과 동일 소스 — 대시보드에 뜨는 모든 이상은 RM 이슈로 전달된다(CEO 지시).
-  // 6) 품질 오염 감지 (audit_flags 미해결) — 자가감사 근거오염·중복 플래그
-  const af = (await sql`SELECT cafe_name FROM audit_flags WHERE issue!='audit_complete' AND COALESCE(resolved,false)=false ORDER BY flagged_at DESC LIMIT 10`.catch(() => [])) as any[];
-  if (af.length > 0) out.push({ ikey: "quality:auditflags", source: "품질감사", severity: "HIGH", type: "품질 오염", title: `품질 오염 감지 ${af.length}건`, detail: `근거오염·중복 등 자가감사 플래그(미해결): ${af.slice(0, 5).map((x) => x.cafe_name).join(", ")}`.slice(0, 200), team: "품질본부" });
-  // 7) 그라운딩 의심 (소개글 환각 의심)
-  const gr = await one(sql`SELECT count(*) c FROM grounding_checks WHERE grounded=false`.catch(() => [{ c: 0 }] as any));
-  if (gr >= 20) out.push({ ikey: "quality:grounding", source: "그라운딩", severity: "MED", type: "환각 의심", title: `그라운딩 의심 ${gr}건`, detail: "소개글이 후기 근거 부족(환각 의심) — 판정 큐 재투입·재합성 대상", team: "품질본부" });
-  // 8) 리뷰 맥락 watchlist (offctx — 위험 아님·주의). 임계는 메인 관제탑(orchestrator 0.55)과 일치시켜 숫자 충돌 방지.
-  const offc = await one(sql`SELECT count(*) c FROM cafes WHERE published AND offctx_rate>=0.55 AND COALESCE(offctx_ok,false)=false`.catch(() => [{ c: 0 }] as any));
-  if (offc >= 1) out.push({ ikey: "quality:offctx", source: "맥락점검", severity: "LOW", type: "맥락 watchlist", title: `리뷰 맥락 점검 ${offc}곳`, detail: "표시 리뷰에 카페 맥락 적음(일부 오탐 가능·위험 아님) — 품질본부 트리아지: 진짜 카페(찻집·북카페·시적이름)면 offctx_ok=true로 정리, 진짜 오염이면 비공개 권고", team: "품질본부" });
+  // ★★ 메인 관제탑(/admin) 전체 미러 — orchestrator가 계산해 둔 risks(위험)·notices(주의)·integrity(정합성)를
+  //   '통째로' RM 이슈로 변환한다. 대시보드에 뜨는 *모든* 주의·오염·위험이 자동 전달되고, 앞으로 새 신호가
+  //   관제탑에 추가돼도 코드 수정 없이 자동으로 흐른다(CEO 지시: 하나씩 땜질 금지·전수 자동). orchestrator_state는
+  //   2시간마다 크론 + 대시보드 볼 때마다 갱신되므로 최신.
+  try {
+    const row = (await sql`SELECT health FROM orchestrator_state WHERE id=1`)[0] as any;
+    const h = row?.health || {};
+    const route = (t: string) => /규칙갭|룰갭/.test(t) ? "품질본부/룰갭팀" : /폐업|closure/.test(t) ? "운영본부" : /검색|추천|momentum/.test(t) ? "경험본부" : /임베딩|합성|동\b|backfill/.test(t) ? "운영본부" : /발굴|grow/.test(t) ? "성장본부" : "품질본부";
+    const slug = (p: string, t: string) => p + ":" + t.replace(/[0-9,]/g, "").replace(/\s+/g, "").slice(0, 48); // 숫자 제거 → 카운트 바뀌어도 같은 ikey
+    for (const t of (h.risks || []) as string[]) out.push({ ikey: slug("tower-risk", t), source: "관제탑·위험", severity: "HIGH", type: "위험", title: String(t).slice(0, 95), detail: "메인 관제탑 위험(빨강) — 소비자 타격/해자 훼손, 즉시 조치", team: route(String(t)) });
+    for (const t of (h.integrity || []) as string[]) out.push({ ikey: slug("tower-integ", t), source: "관제탑·정합성", severity: "MED", type: "정합성", title: String(t).slice(0, 95), detail: "메인 관제탑 정합성 경보", team: "품질본부" });
+    for (const t of (h.notices || []) as string[]) out.push({ ikey: slug("tower-notice", t), source: "관제탑·주의", severity: "LOW", type: "주의", title: String(t).slice(0, 95), detail: "메인 관제탑 주의(점검 권장) — 담당 본부 트리아지", team: route(String(t)) });
+  } catch { /* orchestrator_state 없으면 아래 직접 체크가 안전망 */ }
 
   // 5) 운영 백로그
   const closureBack = await one(sql`SELECT count(*) c FROM cafes WHERE published AND closure_misses>=3`);
