@@ -48,10 +48,10 @@ export async function detectIssues(): Promise<Issue[]> {
 
   // 3) 결재 대기 (L3) — 각 건을 담당 본부로 라우팅(즉시, 나이 무관)
   const pend = (await sql`SELECT id, title, team, severity FROM decisions WHERE status='pending' AND COALESCE(tier,'L3')='L3' ORDER BY id`) as any[];
-  for (const p of pend) out.push({ ikey: `approval:${p.id}`, source: "결재", severity: (p.severity === "HIGH" ? "HIGH" : "MED"), type: "CEO 결재 대기", title: `결재 대기: ${p.title}`.slice(0, 80), detail: "CEO 모바일 결재 필요(L3 치명적)", team: p.team || "기획조정실", state: "결재대기", note: "CEO 승인 요청" });
+  for (const p of pend) out.push({ ikey: `approval:${p.id}`, source: "결재", severity: (p.severity === "HIGH" ? "HIGH" : "MED"), type: "CEO 결재 대기", title: `결재 대기: ${p.title}`.slice(0, 80), detail: "CEO 모바일 결재 필요(L3 치명적)", team: p.team || "기획조정실", state: "결재대기", note: "CEO 승인 시 즉시 집행" });
   // 3-b) 승인됐으나 집행 안 된 작업(agent_task) — 기조실장·담당 본부 실행 대기
   const appr = (await sql`SELECT id, title, team FROM decisions WHERE status='approved' ORDER BY id`) as any[];
-  for (const a of appr) out.push({ ikey: `exec:${a.id}`, source: "집행", severity: "MED", type: "집행 대기", title: `집행 대기: ${a.title}`.slice(0, 80), detail: "승인 완료 — 담당 본부 구현·집행 대기(전결/배분)", team: a.team || "기획조정실", state: "처리중", note: "승인됨 — 집행 중" });
+  for (const a of appr) out.push({ ikey: `exec:${a.id}`, source: "집행", severity: "MED", type: "집행 대기", title: `집행 대기: ${a.title}`.slice(0, 80), detail: "승인 완료 — 담당 본부 구현·집행 대기(전결/배분)", team: a.team || "기획조정실", state: "처리중", note: "기조실장·담당 본부가 집행 중 (다음 사이클 완료 목표)" });
 
   // 3-c) 판정 적체 (needs_llm) — 단, judgeloop 재개를 CEO가 이미 결정(반려/현상유지)했으면 '수용된 상태'라 이슈로 안 띄움.
   //   (CEO: 이미 결정한 걸 계속 현황으로 띄우지 마라.)
@@ -74,20 +74,22 @@ export async function detectIssues(): Promise<Issue[]> {
     const h = row?.health || {};
     const route = (t: string) => /규칙갭|룰갭/.test(t) ? "품질본부/룰갭팀" : /폐업|closure/.test(t) ? "운영본부" : /검색|추천|momentum/.test(t) ? "경험본부" : /임베딩|합성|동\b|backfill/.test(t) ? "운영본부" : /발굴|grow/.test(t) ? "성장본부" : "품질본부";
     const slug = (p: string, t: string) => p + ":" + t.replace(/[0-9,]/g, "").replace(/\s+/g, "").slice(0, 48); // 숫자 제거 → 카운트 바뀌어도 같은 ikey
-    for (const t of (h.risks || []) as string[]) out.push({ ikey: slug("tower-risk", t), source: "관제탑·위험", severity: "HIGH", type: "위험", title: String(t).slice(0, 95), detail: "메인 관제탑 위험(빨강) — 소비자 타격/해자 훼손, 즉시 조치", team: route(String(t)), state: "결재대기", note: "CEO 결재 자동 상신" });
-    for (const t of (h.integrity || []) as string[]) out.push({ ikey: slug("tower-integ", t), source: "관제탑·정합성", severity: "MED", type: "정합성", title: String(t).slice(0, 95), detail: "메인 관제탑 정합성 경보", team: "품질본부", state: "처리중", note: "자가치유·담당 본부 처리 중" });
+    for (const t of (h.risks || []) as string[]) out.push({ ikey: slug("tower-risk", t), source: "관제탑·위험", severity: "HIGH", type: "위험", title: String(t).slice(0, 95), detail: "메인 관제탑 위험(빨강) — 소비자 타격/해자 훼손, 즉시 조치", team: route(String(t)), state: "결재대기", note: "CEO 승인 시 즉시 — 자동 결재 상신됨" });
+    for (const t of (h.integrity || []) as string[]) out.push({ ikey: slug("tower-integ", t), source: "관제탑·정합성", severity: "MED", type: "정합성", title: String(t).slice(0, 95), detail: "메인 관제탑 정합성 경보", team: "품질본부", state: "처리중", note: "orchestrator-heal이 2시간마다 자동치유" });
     for (const t of (h.notices || []) as string[]) {
-      // 발굴 지연은 cron-grow가 우선처리로 소진 중 → 처리중. 그 외 주의는 담당 본부 트리아지.
+      // 발굴 지연은 cron-grow가 우선처리로 소진 중. 그 외 주의는 다음 배치 사이클(08·17시)에 담당 본부 트리아지.
       const isGrow = /발굴.*(지연|미발굴)/.test(t);
-      out.push({ ikey: slug("tower-notice", t), source: "관제탑·주의", severity: "LOW", type: "주의", title: String(t).slice(0, 95), detail: "메인 관제탑 주의(점검 권장) — 담당 본부 트리아지", team: route(String(t)), state: "처리중", note: isGrow ? "cron-grow 우선처리·소진 중" : "담당 본부 매 사이클 트리아지" });
+      const isRule = /규칙갭|룰갭/.test(t);
+      const when = isGrow ? "cron-grow가 2시간마다 굶은 지역 우선 발굴 (자동 소진)" : isRule ? "다음 룰갭 사이클(매일 01:30) + 기조실장 검토" : "다음 배치 사이클(08·17시) 담당 본부 처리";
+      out.push({ ikey: slug("tower-notice", t), source: "관제탑·주의", severity: "LOW", type: "주의", title: String(t).slice(0, 95), detail: "메인 관제탑 주의(점검 권장)", team: route(String(t)), state: "처리중", note: when });
     }
   } catch { /* orchestrator_state 없으면 아래 직접 체크가 안전망 */ }
 
   // 5) 운영 백로그
   const closureBack = await one(sql`SELECT count(*) c FROM cafes WHERE published AND closure_misses>=3`);
-  if (closureBack > 0) out.push({ ikey: "ops:closureback", source: "운영", severity: "MED", type: "폐업 검토대기", title: `폐업 검토대기 ${closureBack}곳`, detail: "3회+ 미발견 — 정밀확인·결재 필요(자동삭제 안 함)", team: "운영본부" });
+  if (closureBack > 0) out.push({ ikey: "ops:closureback", source: "운영", severity: "MED", type: "폐업 검토대기", title: `폐업 검토대기 ${closureBack}곳`, detail: "3회+ 미발견 — 정밀확인 후 결재(자동삭제 안 함)", state: "처리중", note: "cron-closure 6시간마다 재확인 + 운영본부 정밀확인 후 결재", team: "운영본부" });
   const synthBack = await one(sql`SELECT count(*) c FROM cafes WHERE synth_updated IS NULL`);
-  if (synthBack > 200) out.push({ ikey: "ops:synthback", source: "운영", severity: "LOW", type: "합성 대기", title: `합성 대기 ${synthBack}건`, detail: "신규 합성 적체 — cron-synth 처리량 점검", team: "운영본부" });
+  if (synthBack > 200) out.push({ ikey: "ops:synthback", source: "운영", severity: "LOW", type: "합성 대기", title: `합성 대기 ${synthBack}건`, detail: "신규 카페 합성 대기", state: "처리중", note: "cron-synth가 매시간(:45) 처리 — 시간 두고 소진", team: "운영본부" });
 
   return out;
 }
