@@ -1,6 +1,6 @@
 import { sql } from "./db";
 import { nameCoherence, cleanCafeName } from "./reviewQuality";
-import { healNonCafeCategory, healOffConceptByReview, healRestaurantByReview, healNonCafeByReview } from "./synthStore";
+import { healNonCafeCategory, healOffConceptByReview, healRestaurantByReview, healNonCafeByReview, healOutOfBox, healAreaLabel } from "./synthStore";
 
 const parseRv = (o: any): string[] => {
   let a = o; if (typeof a === "string") { try { a = JSON.parse(a); } catch { return []; } }
@@ -20,6 +20,9 @@ export async function autoCorrect(): Promise<{ resolved: number; escalated: numb
   try { const oc = await healOffConceptByReview(); if (oc.held) { resolved += oc.held; if (log.length < 8) log.push(`오프콘셉(활동공간) ${oc.held}곳 즉시 비공개`); } } catch { /* graceful */ }
   try { const rs = await healRestaurantByReview(); if (rs.held) { resolved += rs.held; if (log.length < 8) log.push(`식당 ${rs.held}곳 즉시 비공개`); } } catch { /* graceful */ }
   try { const nx = await healNonCafeByReview(); if (nx.held) { resolved += nx.held; if (log.length < 8) log.push(`비카페(커피정체성0) ${nx.held}곳 즉시 비공개: ${nx.names.slice(0, 3).join(", ")}`); } } catch { /* graceful */ }
+  // 정합성도 같은 실시간 경로로 — 박스밖(비수도권)·area라벨 오류를 2시간 배치 대신 여기서 즉시 교정.
+  try { const ob = await healOutOfBox(); if (ob.excluded) { resolved += ob.excluded; if (log.length < 8) log.push(`수도권밖 ${ob.excluded}곳 즉시 제외`); } } catch { /* graceful */ }
+  try { const al = await healAreaLabel(); if (al.fixed) { resolved += al.fixed; if (log.length < 8) log.push(`area라벨 ${al.fixed}곳 즉시 교정`); } } catch { /* graceful */ }
   // 대상: 미해결 audit_flags(근거오염) + offctx 높은 공개 카페
   const targets = (await sql`
     SELECT DISTINCT c.id, c.name, c.area, c.synth_reviews

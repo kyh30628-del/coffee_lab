@@ -3,6 +3,7 @@ import { sql, ensureSchema } from "@/lib/db";
 import { synthAndStore } from "@/lib/synthStore";
 import { PRIORITY_AREAS } from "@/lib/discover";
 import { recordRun } from "@/lib/agentLog";
+import { autoCorrect } from "@/lib/issues";
 export const runtime = "nodejs";
 export const maxDuration = 300; // 신규 큐를 시간예산껏 비움
 
@@ -36,8 +37,10 @@ export async function GET(req: NextRequest) {
       }
     }
     const pendingNew = (await sql`SELECT COUNT(*)::int n FROM cafes WHERE synth_updated IS NULL`)[0].n;
-    await recordRun("cron-synth", true, `합성 ${processed} 공개 ${published} 실패 ${failed} 신규대기 ${pendingNew}`, processed);
-    return NextResponse.json({ ok: true, ranAt: new Date().toISOString(), processed, published, skipped, failed, pendingNew });
+    // 🔄 합성 직후 즉시 정리 — 새로 공개된 데이터에 비카페·오염·정합성 문제가 있으면 그 자리에서 해결(10분 폴링 안 기다림).
+    const ac = await autoCorrect().catch(() => ({ resolved: 0, escalated: 0, log: [] as string[] }));
+    await recordRun("cron-synth", true, `합성 ${processed} 공개 ${published} 실패 ${failed} 신규대기 ${pendingNew}${ac.resolved ? ` · 즉시정리 ${ac.resolved}` : ""}`, processed);
+    return NextResponse.json({ ok: true, ranAt: new Date().toISOString(), processed, published, skipped, failed, pendingNew, autoCorrect: ac });
   } catch (e) {
     await recordRun("cron-synth", false, String(e).slice(0, 150));
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
