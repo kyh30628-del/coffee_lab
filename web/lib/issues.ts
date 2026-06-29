@@ -139,11 +139,12 @@ export async function detectIssues(): Promise<Issue[]> {
     }
   } catch { /* orchestrator_state 없으면 아래 직접 체크가 안전망 */ }
 
-  // 5) 운영 백로그
+  // 5) 폐업 검토대기 — 3회+ 미발견은 비공개 결재가 필요한 '진짜 처리 대상'(자동삭제 안 함). 유지.
   const closureBack = await one(sql`SELECT count(*) c FROM cafes WHERE published AND closure_misses>=3`);
   if (closureBack > 0) out.push({ ikey: "ops:closureback", source: "운영", severity: "MED", type: "폐업 검토대기", title: `폐업 검토대기 ${closureBack}곳`, detail: "3회+ 미발견 — 정밀확인 후 결재(자동삭제 안 함)", state: "처리중", note: "cron-closure 6시간마다 재확인 + 운영본부 정밀확인 후 결재", team: "운영본부" });
-  const synthBack = await one(sql`SELECT count(*) c FROM cafes WHERE synth_updated IS NULL`);
-  if (synthBack > 200) out.push({ ikey: "ops:synthback", source: "운영", severity: "LOW", type: "합성 대기", title: `합성 대기 ${synthBack}건`, detail: "신규 카페 합성 대기", state: "처리중", note: "cron-synth가 매시간(:45) 처리 — 시간 두고 소진", team: "운영본부" });
+  // ⚠️ 합성 대기·임베딩 대기 등 '정상 파이프라인 백로그'는 이슈로 안 띄운다 — cron이 자동 처리하는 평상 상태일 뿐
+  //   문제가 아니다(CEO: 정상 운영상태를 이슈로 띄워 보드가 항상 차보이게 하지 마라). cron-synth가 *고장*나면
+  //   '크론 실패'(위 1번)로 잡힌다 → 그게 진짜 문제.
 
   return out;
 }
