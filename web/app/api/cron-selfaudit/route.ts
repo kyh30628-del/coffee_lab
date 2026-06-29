@@ -59,11 +59,14 @@ export async function GET(req: NextRequest) {
     }
 
     // ── 4) 크론·에이전트 건강 ──
-    const crons = (await sql`SELECT DISTINCT ON (job) job, ok, ran_at FROM agent_runs ORDER BY job, ran_at DESC`) as any[];
+    const crons = (await sql`SELECT DISTINCT ON (job) job, ok, ran_at, processed FROM agent_runs ORDER BY job, ran_at DESC`) as any[];
     for (const c of crons) {
       if (!c.ok) findings.push({ check: `크론 실패 ${c.job}`, count: 1, team: "경영지원본부", critical: true });
       const ageH = (Date.now() - new Date(c.ran_at).getTime()) / 3.6e6;
-      if (ageH > maxH(c.job)) findings.push({ check: `크론 정지의심 ${c.job} (${Math.round(ageH)}h)`, count: 1, team: "경영지원본부", critical: true });
+      // ⚠️ 오탐 방지(2026-06-30, 자율진단 에이전트 발견): '정상 실행했는데 할 일 0(휴면)'은 정지가 아님.
+      //   dong-backfill('소진·완료')·demand(수요갭0)·sentinel(치유0) 등이 ok·processed=0로 자연 휴면 → '정지의심' 제외.
+      const dormantIdle = c.ok && Number(c.processed || 0) === 0;
+      if (ageH > maxH(c.job) && !dormantIdle) findings.push({ check: `크론 정지의심 ${c.job} (${Math.round(ageH)}h)`, count: 1, team: "경영지원본부", critical: true });
     }
 
     // ── 5) 자가검증: CEO 결재가 방치되는지 (실행·피드백 누수 감시) ──
