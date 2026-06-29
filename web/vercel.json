@@ -62,7 +62,7 @@
     },
     {
       "path": "/api/cron-selfaudit",
-      "schedule": "20 22 * * *"
+      "schedule": "20 */6 * * *"
     }
   ]
 }
