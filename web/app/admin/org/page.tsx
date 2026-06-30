@@ -111,6 +111,64 @@ const MEMBER_INFO: Record<string, string> = {
   "api/momentum·cafeProfile": "매 요청 추천·카페 상세 서빙. 취향 6축 매칭·강약(언급률 percentile)·하이라이트.",
 };
 
+// 💬 관제 챗봇 — 플로팅 아이콘 → 모달. claude -p(구독) 경유 답을 폴링. 24h 기록.
+function ChatWidget({ pw }: { pw: string }) {
+  const [open, setOpen] = useState(false);
+  const [msgs, setMsgs] = useState<{ role: string; content: string }[]>([]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  useEffect(() => {
+    if (open && pw) {
+      fetch("/api/admin/chat", { headers: { "x-admin-password": pw }, cache: "no-store" }).then((r) => r.json()).then((d) => {
+        if (d.ok && d.history) { const m: any[] = []; for (const h of d.history) { m.push({ role: "user", content: h.question }); if (h.answer) m.push({ role: "assistant", content: h.answer }); } setMsgs(m); }
+      }).catch(() => {});
+    }
+  }, [open, pw]);
+  const send = async () => {
+    const q = input.trim(); if (!q || loading) return;
+    setInput(""); setMsgs((m) => [...m, { role: "user", content: q }]); setLoading(true);
+    try {
+      const r = await fetch("/api/admin/chat", { method: "POST", headers: { "x-admin-password": pw, "Content-Type": "application/json" }, body: JSON.stringify({ message: q, history: msgs.slice(-8) }) }).then((x) => x.json());
+      if (!r.ok) { setMsgs((m) => [...m, { role: "assistant", content: "⚠️ " + (r.error || "오류") }]); setLoading(false); return; }
+      for (let i = 0; i < 45; i++) {
+        await new Promise((res) => setTimeout(res, 2500));
+        const p = await fetch(`/api/admin/chat?id=${r.id}`, { headers: { "x-admin-password": pw }, cache: "no-store" }).then((x) => x.json());
+        if (p.ok && p.status === "done") { setMsgs((m) => [...m, { role: "assistant", content: p.answer || "(빈 응답)" }]); break; }
+        if (i === 44) setMsgs((m) => [...m, { role: "assistant", content: "⏱ 응답 지연 — 로컬 워커/맥 가동 여부 확인 필요." }]);
+      }
+    } catch { setMsgs((m) => [...m, { role: "assistant", content: "⚠️ 네트워크 오류" }]); }
+    setLoading(false);
+  };
+  return (
+    <>
+      <button onClick={() => setOpen(true)} style={{ position: "fixed", bottom: 18, right: 18, width: 54, height: 54, borderRadius: 27, background: "#2b2018", color: "#e8b87a", border: "2px solid #c98a3c", fontSize: 24, boxShadow: "0 3px 12px rgba(0,0,0,0.3)", zIndex: 50, cursor: "pointer" }}>💬</button>
+      {open && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 100, display: "flex", flexDirection: "column", justifyContent: "flex-end" }} onClick={() => setOpen(false)}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: "#f7f1e4", borderRadius: "16px 16px 0 0", maxWidth: 640, width: "100%", margin: "0 auto", height: "82vh", display: "flex", flexDirection: "column" }}>
+            <div style={{ background: "#2b2018", color: "#e8b87a", padding: "12px 16px", borderRadius: "16px 16px 0 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <b style={{ fontSize: 14 }}>💬 관제 챗봇 <span style={{ fontSize: 10, color: "#cbb38c" }}>실시간 전 상태·대시보드</span></b>
+              <span onClick={() => setOpen(false)} style={{ cursor: "pointer", fontSize: 16 }}>✕</span>
+            </div>
+            <div style={{ flex: 1, overflowY: "auto", padding: 12 }}>
+              {msgs.length === 0 && <div style={{ color: "#9c8a6c", fontSize: 12, lineHeight: 1.6 }}>실시간 상태를 물어보세요.<br />예: "발행 몇 개야?" · "결재 대기 뭐 있어?" · "self-audit 언제 돌아?" · "floor 기준 뭐야?"</div>}
+              {msgs.map((m, i) => (
+                <div key={i} style={{ display: "flex", justifyContent: m.role === "user" ? "flex-end" : "flex-start", margin: "6px 0" }}>
+                  <div style={{ maxWidth: "84%", padding: "8px 11px", borderRadius: 12, fontSize: 13, lineHeight: 1.55, whiteSpace: "pre-wrap", background: m.role === "user" ? "#c98a3c" : "#fff", color: m.role === "user" ? "#fff" : "#2b2018", border: m.role === "user" ? "none" : "1px solid #e6d8bf" }}>{m.content}</div>
+                </div>
+              ))}
+              {loading && <div style={{ color: "#9c8a6c", fontSize: 12, margin: "6px 0" }}>💭 claude(구독)가 답변 생성 중… (~20-40초)</div>}
+            </div>
+            <div style={{ display: "flex", gap: 6, padding: 10, borderTop: "1px solid #e6d8bf" }}>
+              <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") send(); }} placeholder="질문…" disabled={loading} style={{ flex: 1, padding: 10, borderRadius: 9, border: "1px solid #ddc9a8", fontSize: 13 }} />
+              <button onClick={send} disabled={loading} style={{ padding: "10px 16px", background: "#2b2018", color: "#e8b87a", border: "none", borderRadius: 9, fontWeight: 700, opacity: loading ? 0.5 : 1 }}>전송</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 export default function OrgDashboard() {
   const [pw, setPw] = useState("");
   const [brief, setBrief] = useState<any>(null);
@@ -448,6 +506,7 @@ export default function OrgDashboard() {
       )}
 
       {toast && <div style={{ position: "fixed", bottom: 20, left: "50%", transform: "translateX(-50%)", background: "#2b2018", color: "#fff", padding: "10px 18px", borderRadius: 22, fontSize: 13, zIndex: 60, maxWidth: "90%", textAlign: "center" }}>{toast}</div>}
+      <ChatWidget pw={pw} />
     </main>
   );
 }
