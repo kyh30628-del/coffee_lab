@@ -200,6 +200,8 @@ export default function OrgDashboard() {
 
   const [synced, setSynced] = useState("");
   const [live, setLive] = useState<any>(null);
+  const [jobs, setJobs] = useState<any>(null);
+  const [showJobs, setShowJobs] = useState(false);
   const load = (password: string, silent = false) => {
     if (!silent) { setLoading(true); setErr(""); }
     Promise.all([
@@ -208,12 +210,14 @@ export default function OrgDashboard() {
       fetch("/api/admin/coordination", { headers: { "x-admin-password": password }, cache: "no-store" }).then((r) => r.json()),
       fetch("/api/admin/issues", { headers: { "x-admin-password": password }, cache: "no-store" }).then((r) => r.json()),
       fetch("/api/admin/metrics", { headers: { "x-admin-password": password }, cache: "no-store" }).then((r) => r.json()).catch(() => ({ ok: false })),
-    ]).then(([b, d, co, iss, lv]) => {
+      fetch("/api/admin/jobs", { headers: { "x-admin-password": password }, cache: "no-store" }).then((r) => r.json()).catch(() => ({ ok: false })),
+    ]).then(([b, d, co, iss, lv, jb]) => {
       if (b.ok) { setBrief(b.brief); setBriefs(b.briefs || (b.brief ? [b.brief] : [])); localStorage.setItem("adm_pw", password); } else if (!silent) setErr("비밀번호 확인");
       if (d.ok) setDec({ pending: d.pending || [], delegated: d.delegated || [], recent: d.recent || [] });
       if (co.ok) setCoord({ open: co.open || [], resolved: co.resolved || [] });
       if (iss.ok) setIssues(iss.open || []);
       if (lv && lv.ok) setLive(lv);
+      if (jb && jb.ok) setJobs(jb);
       setSynced(new Date().toLocaleTimeString("ko-KR"));
     }).catch(() => { if (!silent) setErr("불러오기 실패"); }).finally(() => { if (!silent) setLoading(false); });
   };
@@ -262,6 +266,31 @@ export default function OrgDashboard() {
           <div style={card}><div style={lbl}>📊 오늘 토큰(in)</div><div style={big}>{fmt(tok.input || 0)}</div><div style={sub}>비용프록시 ${Number(tok.cost || 0).toFixed(2)}</div></div>
           <div style={card}><div style={lbl}>📈 공개 카페</div><div style={big}>{(live?.pub ?? (+m.pub || 0)).toLocaleString()}</div><div style={sub}>검증 {(live?.v ?? (+m.v || 0)).toLocaleString()}{live?.backlog ? ` · 대기 ${live.backlog}` : ""}</div></div>
           <div style={card}><div style={lbl}>🤖 크론</div><div style={big}>{live ? `${live.cronOk}/${live.cronTotal}` : `${crons.filter((c: any) => c.ok).length}/${crons.length}`} {(live ? live.cronFail?.length === 0 : crons.every((c: any) => c.ok)) ? "✅" : "⚠️"}</div></div>
+        </div>
+
+        {/* 🛠 로컬 잡 상태 — 접이식·기본 접힘(헤더에 정상/정지 요약). 8개 launchd 잡 하트비트 기준 실시간 */}
+        <div style={{ ...card, marginTop: 10, border: jobs?.bad ? "2px solid #b03a3a" : "1px solid #ddc9a8" }}>
+          <button onClick={() => setShowJobs(!showJobs)} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
+            <span style={{ fontSize: 13.5, fontWeight: 700, color: jobs?.bad ? "#b03a3a" : "#3f7a4f" }}>
+              {showJobs ? "▾" : "▸"} 🛠 잡 상태 ({jobs?.total ?? 8}){jobs?.bad ? <span style={{ fontSize: 10, fontWeight: 700, color: "#b03a3a" }}> · ⚠️ 정지 {jobs.bad}</span> : <span style={{ fontSize: 10, color: "#3f7a4f" }}> · 전체 정상 ✅</span>}
+            </span>
+          </button>
+          {showJobs && jobs?.jobs && (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7, marginTop: 10 }}>
+              {jobs.jobs.map((j: any) => {
+                const c = j.state === "정상" ? "#3f7a4f" : "#b03a3a";
+                const dot = j.state === "정상" ? "🟢" : j.state === "실패" ? "🔴" : "🟠";
+                const age = j.ageMin == null ? "기록없음" : j.ageMin < 60 ? `${j.ageMin}분 전` : j.ageMin < 1440 ? `${Math.round(j.ageMin / 60)}시간 전` : `${Math.round(j.ageMin / 1440)}일 전`;
+                return (
+                  <div key={j.job} style={{ background: "#fbf6ec", border: `1px solid ${j.state === "정상" ? "#e6d8bf" : "#e6b3b3"}`, borderRadius: 9, padding: "8px 9px" }}>
+                    <div style={{ fontSize: 12.5, fontWeight: 700, color: "#2b2018" }}>{dot} {j.label}</div>
+                    <div style={{ fontSize: 10, color: c, fontWeight: 700, marginTop: 2 }}>{j.state} · {age}</div>
+                    <div style={{ fontSize: 9.5, color: "#9c8a6c", marginTop: 2 }}>{j.team} · {j.sched}</div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* 🚨 RM 실시간 이슈 — 접이식·기본 접힘(헤더에 건수·HIGH 표시) */}
