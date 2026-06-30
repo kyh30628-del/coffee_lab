@@ -260,7 +260,7 @@ export default function OrgDashboard() {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 12 }}>
           <div style={card}><div style={lbl}>🔔 결재 대기</div><div style={big}>{dec.pending.length}건</div></div>
           <div style={card}><div style={lbl}>📊 오늘 토큰(in)</div><div style={big}>{fmt(tok.input || 0)}</div><div style={sub}>비용프록시 ${Number(tok.cost || 0).toFixed(2)}</div></div>
-          <div style={card}><div style={lbl}>📈 공개 카페</div><div style={big}>{(live?.pub ?? +m.pub ?? 0).toLocaleString()}</div><div style={sub}>검증 {(live?.v ?? +m.v ?? 0).toLocaleString()}{live?.backlog ? ` · 대기 ${live.backlog}` : ""}</div></div>
+          <div style={card}><div style={lbl}>📈 공개 카페</div><div style={big}>{(live?.pub ?? (+m.pub || 0)).toLocaleString()}</div><div style={sub}>검증 {(live?.v ?? (+m.v || 0)).toLocaleString()}{live?.backlog ? ` · 대기 ${live.backlog}` : ""}</div></div>
           <div style={card}><div style={lbl}>🤖 크론</div><div style={big}>{live ? `${live.cronOk}/${live.cronTotal}` : `${crons.filter((c: any) => c.ok).length}/${crons.length}`} {(live ? live.cronFail?.length === 0 : crons.every((c: any) => c.ok)) ? "✅" : "⚠️"}</div></div>
         </div>
 
