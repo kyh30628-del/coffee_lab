@@ -23,6 +23,17 @@ export async function autoCorrect(): Promise<{ resolved: number; escalated: numb
   // 정합성도 같은 실시간 경로로 — 박스밖(비수도권)·area라벨 오류를 2시간 배치 대신 여기서 즉시 교정.
   try { const ob = await healOutOfBox(); if (ob.excluded) { resolved += ob.excluded; if (log.length < 8) log.push(`수도권밖 ${ob.excluded}곳 즉시 제외`); } } catch { /* graceful */ }
   try { const al = await healAreaLabel(); if (al.fixed) { resolved += al.fixed; if (log.length < 8) log.push(`area라벨 ${al.fixed}곳 즉시 교정`); } } catch { /* graceful */ }
+  // 🔧 승인된 '결정론 집행' 결정을 그 자리에서 실집행+done — 집행 루프 닫기(더는 '처리중'으로 안 쌓임).
+  //   action_type='unpublish'(ids 명시)만 자동집행. agent_task·investigate(구현·판단 필요)는 자동집행 안 하고 OUTSTANDING으로 정직 표시.
+  try {
+    const dec = (await sql`SELECT id, action_params FROM decisions WHERE status='approved' AND action_type='unpublish'`.catch(() => [])) as any[];
+    for (const d of dec) {
+      const ids = Array.isArray(d.action_params?.ids) ? d.action_params.ids : [];
+      if (ids.length) await sql`UPDATE cafes SET published=false, pipeline_status='excluded' WHERE id = ANY(${ids})`.catch(() => {});
+      await sql`UPDATE decisions SET status='done', result='auto-executed', decided_at=now() WHERE id=${d.id}`.catch(() => {});
+      resolved++; if (log.length < 8) log.push(`승인결정 즉시집행 #${d.id}(${ids.length}곳 비공개)`);
+    }
+  } catch { /* graceful */ }
   // 대상: 미해결 audit_flags(근거오염) + offctx 높은 공개 카페
   const targets = (await sql`
     SELECT DISTINCT c.id, c.name, c.area, c.synth_reviews
@@ -103,9 +114,18 @@ export async function detectIssues(): Promise<Issue[]> {
   // 3) 결재 대기 (L3) — 각 건을 담당 본부로 라우팅(즉시, 나이 무관)
   const pend = (await sql`SELECT id, title, team, severity FROM decisions WHERE status='pending' AND COALESCE(tier,'L3')='L3' ORDER BY id`) as any[];
   for (const p of pend) out.push({ ikey: `approval:${p.id}`, source: "결재", severity: (p.severity === "HIGH" ? "HIGH" : "MED"), type: "CEO 결재 대기", title: `결재 대기: ${p.title}`.slice(0, 80), detail: "CEO 모바일 결재 필요(L3 치명적)", team: p.team || "기획조정실", state: "결재대기", note: "CEO 승인 시 즉시 집행" });
-  // 3-b) 승인됐으나 집행 안 된 작업(agent_task) — 기조실장·담당 본부 실행 대기
-  const appr = (await sql`SELECT id, title, team FROM decisions WHERE status='approved' ORDER BY id`) as any[];
-  for (const a of appr) out.push({ ikey: `exec:${a.id}`, source: "집행", severity: "MED", type: "집행 대기", title: `집행 대기: ${a.title}`.slice(0, 80), detail: "승인 완료 — 담당 본부 구현·집행 대기(전결/배분)", team: a.team || "기획조정실", state: "처리중", note: "기조실장·담당 본부가 집행 중 (다음 사이클 완료 목표)" });
+  // 3-b) 승인됐으나 집행 안 된 작업 — 정직하게 표시. '처리중(집행 중)' 거짓 금지: 집행기 없는 건 경과시간 보여주고 OUTSTANDING.
+  //   결정론 집행 대상(unpublish)은 autoCorrect가 즉시 집행+done 처리하므로 여기 거의 안 남는다. 남는 건 구현·판단 필요한 진짜 작업.
+  const appr = (await sql`SELECT id, title, team, action_type, EXTRACT(EPOCH FROM (now()-COALESCE(decided_at,created_at)))/3600 age FROM decisions WHERE status='approved' ORDER BY id`) as any[];
+  for (const a of appr) {
+    const h = Math.round(Number(a.age) || 0);
+    const stale = h >= 2; // 2h+ 미집행 = 막힌 것(처리중 아님)
+    out.push({ ikey: `exec:${a.id}`, source: "집행", severity: stale ? "HIGH" : "MED", type: stale ? "집행 정체" : "집행 착수대기",
+      title: `${stale ? "집행 정체" : "집행 대기"}: ${a.title}`.slice(0, 80),
+      detail: `승인됨 · ${h}h 미집행 · ${a.action_type === "unpublish" ? "자동집행 대상" : "구현/판단 필요(에이전트·기조실장)"}`,
+      team: a.team || "기획조정실", state: stale ? "OUTSTANDING" : "처리중",
+      note: stale ? `승인 후 ${h}h 미집행 — 집행기 없음. 담당 본부/기조실장이 직접 구현하거나 CEO 재결재 필요.` : "승인 직후 — 집행 착수 대기" });
+  }
 
   // 3-c) 판정 적체 (needs_llm) — 단, judgeloop 재개를 CEO가 이미 결정(반려/현상유지)했으면 '수용된 상태'라 이슈로 안 띄움.
   //   (CEO: 이미 결정한 걸 계속 현황으로 띄우지 마라.)
