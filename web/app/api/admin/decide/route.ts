@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
     } catch (e) {
       status = "failed"; result = "실행 오류: " + String(e).slice(0, 80);
     }
-    await sql`UPDATE decisions SET status=${status}, decided_at=now(), result=${result} WHERE id=${id}`;
+    await sql`UPDATE decisions SET status=${status}, decided_at=now(), result=${result}, decided_by='CEO' WHERE id=${id}`;
     return NextResponse.json({ ok: true, status, result, affected });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });

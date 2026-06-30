@@ -34,6 +34,14 @@ export async function autoCorrect(): Promise<{ resolved: number; escalated: numb
       resolved++; if (log.length < 8) log.push(`승인결정 즉시집행 #${d.id}(${ids.length}곳 비공개)`);
     }
   } catch { /* graceful */ }
+  // 🛑 L3 자가승인 환원(2026-06-30, 재발방지): L3는 *오직 CEO*(모바일=decided_by 'CEO')만 승인. 에이전트가 agent_task/investigate
+  //   L3를 'approved'로 자가승인하면 집행기 없이 '처리중' 좀비가 됨 → 그런 건 pending으로 되돌려 CEO 결재로(정직). CEO 승인분은 보존.
+  try {
+    const rev = (await sql`UPDATE decisions SET status='pending'
+      WHERE status='approved' AND COALESCE(tier,'L3')='L3' AND action_type IN ('agent_task','investigate')
+        AND COALESCE(decided_by,'') <> 'CEO' RETURNING id`.catch(() => [])) as any[];
+    if (rev.length) { if (log.length < 8) log.push(`L3 자가승인 ${rev.length}건 → CEO 결재로 환원(#${rev.map((r) => r.id).join(",")})`); }
+  } catch { /* graceful */ }
   // 대상: 미해결 audit_flags(근거오염) + offctx 높은 공개 카페
   const targets = (await sql`
     SELECT DISTINCT c.id, c.name, c.area, c.synth_reviews
@@ -119,12 +127,14 @@ export async function detectIssues(): Promise<Issue[]> {
   const appr = (await sql`SELECT id, title, team, action_type, EXTRACT(EPOCH FROM (now()-COALESCE(decided_at,created_at)))/3600 age FROM decisions WHERE status='approved' ORDER BY id`) as any[];
   for (const a of appr) {
     const h = Math.round(Number(a.age) || 0);
-    const stale = h >= 2; // 2h+ 미집행 = 막힌 것(처리중 아님)
-    out.push({ ikey: `exec:${a.id}`, source: "집행", severity: stale ? "HIGH" : "MED", type: stale ? "집행 정체" : "집행 착수대기",
-      title: `${stale ? "집행 정체" : "집행 대기"}: ${a.title}`.slice(0, 80),
-      detail: `승인됨 · ${h}h 미집행 · ${a.action_type === "unpublish" ? "자동집행 대상" : "구현/판단 필요(에이전트·기조실장)"}`,
-      team: a.team || "기획조정실", state: stale ? "OUTSTANDING" : "처리중",
-      note: stale ? `승인 후 ${h}h 미집행 — 집행기 없음. 담당 본부/기조실장이 직접 구현하거나 CEO 재결재 필요.` : "승인 직후 — 집행 착수 대기" });
+    // 🚫 '처리중'(=10분 자동교정)은 autoCorrect가 *진짜 자동집행*하는 타입(unpublish)만. agent_task/investigate는 구현·판단이
+    //    필요해 자동처리 안 되므로 '처리중'으로 띄우면 거짓("10분 지나도 안 됨" 클레임 원인) → 항상 OUTSTANDING으로 정직 표시.
+    const autoExec = a.action_type === "unpublish";
+    out.push({ ikey: `exec:${a.id}`, source: "집행", severity: autoExec ? "MED" : "HIGH", type: autoExec ? "집행 대기" : "집행 정체(자동 불가)",
+      title: `집행 ${autoExec ? "대기" : "정체"}: ${a.title}`.slice(0, 80),
+      detail: `승인됨 · ${h}h 미집행 · ${autoExec ? "autoCorrect 자동집행 대상(~10분)" : "구현/판단 필요 — 자동처리 대상 아님"}`,
+      team: a.team || "기획조정실", state: autoExec ? "처리중" : "OUTSTANDING",
+      note: autoExec ? "autoCorrect 다음 사이클 자동집행(~10분)" : `구현/판단 필요(자동 안 됨) — 기조실장·담당이 직접 집행하거나 CEO 재결재. ${h}h째.` });
   }
 
   // 3-c) 판정 적체 (needs_llm) — 단, judgeloop 재개를 CEO가 이미 결정(반려/현상유지)했으면 '수용된 상태'라 이슈로 안 띄움.
