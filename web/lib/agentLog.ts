@@ -4,9 +4,12 @@ import { pushTrigger } from "./auditTrigger";
 // 크론 실패 → 담당 본부 (issues.ts CRON_TEAM과 동기화 — 순환참조 피해 인라인)
 const CRONFAIL_TEAM: Record<string, string> = {
   "cron-synth": "운영본부", "cron-resynth": "운영본부", "cron-embed": "운영본부", "cron-snapshot": "운영본부",
-  "orchestrator-heal": "품질본부", "cron-sentinel": "품질본부", "cron-verify": "품질본부", "cron-rulegap": "품질본부", "cron-selfaudit": "품질본부",
-  "cron-grow": "성장본부", "cron-demand": "성장본부", "cron-newsletter": "성장본부",
+  "orchestrator-heal": "품질본부", "cron-sentinel": "품질본부", "cron-verify": "품질본부", "cron-rulegap": "품질본부", "cron-selfaudit": "품질본부", "cron-batch-judge": "품질본부",
+  "cron-grow": "성장본부", "cron-demand": "성장본부", "cron-newsletter": "성장본부", "cron-discover-categories": "성장본부", "cafe-collect": "성장본부",
   "cron-closure": "운영본부", "cron-enrich": "운영본부",
+  // 로컬 launchd 잡(하트비트 경유) — cron-selfaudit JOB_TEAM과 동기화
+  "youtube-backfill": "품질본부", "dong-backfill": "운영본부", "weekly-evaluation": "전략기획본부",
+  "chief-manager": "기획조정실", "self-audit": "기획조정실", "audit-watch": "기획조정실", "chat-watch": "경영지원본부",
 };
 
 // 에이전트(cron) 실행 로그 — agent_runs에 job별 최신 1행(upsert). 관제탑 모니터링 사각지대 제거.

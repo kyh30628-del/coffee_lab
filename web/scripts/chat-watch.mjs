@@ -67,6 +67,11 @@ async function tick() {
   busy = false;
 }
 
+// 💓 하트비트 — 상주 데몬이라 종료 trap이 없으므로 60초마다 agent_runs에 생존 기록(담당: 경영지원본부).
+//   60초+ 갱신 끊기면 = 데몬 죽음 → 자율진단이 감지(EXPECT_MAX_H 'chat-watch' 1h).
+async function heartbeat() { try { await sql`INSERT INTO agent_runs (job, ran_at, ok, detail, processed) VALUES ('chat-watch', now(), true, '관제 챗봇 상주', 0) ON CONFLICT (job) DO UPDATE SET ran_at=now(), ok=true, detail='관제 챗봇 상주'`; } catch {} }
+setInterval(heartbeat, 60000); heartbeat();
+
 console.log("chat-watch 시작 (3초 폴링)");
 setInterval(tick, 1500);
 tick();

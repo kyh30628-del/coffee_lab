@@ -16,9 +16,27 @@ const EXPECT_MAX_H: Record<string, number> = {
   "cron-snapshot": 200, "cron-resynth": 200, "cron-newsletter": 200, "cron-discover-categories": 800,
   "cron-verify": 30, "cron-sentinel": 30, "cron-demand": 30, "cron-rulegap": 30, "cron-closure": 12,
   "cron-grow": 6, "cron-enrich": 8, "cron-embed": 4, "cron-synth": 4, "cron-issues": 2,
-  "youtube-backfill": 30, // 일배치(16:30 KST) + 버퍼 — 30h 넘게 안 돌면 정지의심 → CEO 결재상신
+  // ── 로컬 launchd 잡(하트비트로 agent_runs 기록) — Vercel 크론과 달리 안 넣으면 관제 사각 ──
+  "youtube-backfill": 30, // 일배치 16:30 KST + 버퍼
+  "chief-manager": 20,    // 일간 사이클 08·17시
+  "dong-backfill": 30,    // 일배치 00:10 (dong-backfill.mjs가 이미 이 이름으로 기록)
+  "self-audit": 30,       // 일배치 01시
+  "weekly-evaluation": 30, // 매일 09시(격일 게이트지만 스킵도 하트비트)
+  "audit-watch": 1,       // 이벤트 워처 5분
+  "chat-watch": 1,        // 관제 챗봇 상주(60초 하트비트)
 };
 const maxH = (job: string) => EXPECT_MAX_H[job] ?? 8;
+
+// 잡 → 담당 본부 (실패·정지 시 결재상신·이슈 자동 배정). agentLog.ts CRONFAIL_TEAM과 동기화(순환참조 피해 인라인).
+const JOB_TEAM: Record<string, string> = {
+  "youtube-backfill": "품질본부", "cron-verify": "품질본부", "cron-sentinel": "품질본부", "cron-rulegap": "품질본부", "cron-selfaudit": "품질본부", "cron-batch-judge": "품질본부",
+  "dong-backfill": "운영본부", "cron-synth": "운영본부", "cron-resynth": "운영본부", "cron-embed": "운영본부", "cron-snapshot": "운영본부", "cron-enrich": "운영본부", "cron-closure": "운영본부",
+  "cron-grow": "성장본부", "cron-demand": "성장본부", "cron-discover-categories": "성장본부", "cafe-collect": "성장본부", "cron-newsletter": "성장본부",
+  "weekly-evaluation": "전략기획본부",
+  "chief-manager": "기획조정실", "self-audit": "기획조정실", "audit-watch": "기획조정실",
+  "chat-watch": "경영지원본부",
+};
+const teamOf = (job: string) => JOB_TEAM[job] ?? "경영지원본부";
 
 export async function GET(req: NextRequest) {
   const secret = process.env.CRON_SECRET;
@@ -62,12 +80,12 @@ export async function GET(req: NextRequest) {
     // ── 4) 크론·에이전트 건강 ──
     const crons = (await sql`SELECT DISTINCT ON (job) job, ok, ran_at, processed FROM agent_runs ORDER BY job, ran_at DESC`) as any[];
     for (const c of crons) {
-      if (!c.ok) findings.push({ check: `크론 실패 ${c.job}`, count: 1, team: "경영지원본부", critical: true });
+      if (!c.ok) findings.push({ check: `크론 실패 ${c.job}`, count: 1, team: teamOf(c.job), critical: true });
       const ageH = (Date.now() - new Date(c.ran_at).getTime()) / 3.6e6;
       // ⚠️ 오탐 방지(2026-06-30, 자율진단 에이전트 발견): '정상 실행했는데 할 일 0(휴면)'은 정지가 아님.
       //   dong-backfill('소진·완료')·demand(수요갭0)·sentinel(치유0) 등이 ok·processed=0로 자연 휴면 → '정지의심' 제외.
       const dormantIdle = c.ok && Number(c.processed || 0) === 0;
-      if (ageH > maxH(c.job) && !dormantIdle) findings.push({ check: `크론 정지의심 ${c.job} (${Math.round(ageH)}h)`, count: 1, team: "경영지원본부", critical: true });
+      if (ageH > maxH(c.job) && !dormantIdle) findings.push({ check: `크론 정지의심 ${c.job} (${Math.round(ageH)}h)`, count: 1, team: teamOf(c.job), critical: true });
     }
 
     // ── 5) 자가검증: CEO 결재가 방치되는지 (실행·피드백 누수 감시) ──
