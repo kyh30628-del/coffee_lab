@@ -28,7 +28,7 @@ async function ground() {
 
 function askClaude(prompt) {
   return new Promise((res) => {
-    execFile("claude", ["-p", prompt, "--model", "claude-haiku-4-5", "--dangerously-skip-permissions", "--allowedTools", "Bash", "--max-turns", "6", "--output-format", "json"],
+    execFile("claude", ["-p", prompt, "--model", "sonnet", "--dangerously-skip-permissions", "--allowedTools", "Bash", "--max-turns", "8", "--output-format", "json"],
       { cwd: "/Users/wangwida/coffee-platform/web", maxBuffer: 16 * 1024 * 1024, timeout: 120000, env: { ...process.env, PATH: "/Users/wangwida/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin" } },
       (err, stdout) => { try { res(JSON.parse(stdout).result || "(빈 응답)"); } catch { res(err ? `(LLM 오류: ${String(err).slice(0, 80)})` : "(응답 파싱 실패)"); } });
   });
