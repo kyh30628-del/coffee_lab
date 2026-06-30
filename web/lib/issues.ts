@@ -198,8 +198,11 @@ export async function syncIssues() {
   else await sql`UPDATE issues SET status='resolved', resolved_at=now() WHERE status<>'resolved'`;
 
   // ★ 액션 루프: HIGH 이슈는 자동으로 CEO 결재(L3)로 상신한다 — "위험 높으면 결재 올려라"(CEO).
-  //   중복 방지: 같은 ikey로 이미 미결(pending/approved) 결재가 있으면 skip. 이슈 해소되면 결재는 별도 처리(CEO/기조실장).
-  for (const i of found.filter((x) => x.severity === "HIGH")) {
+  //   중복 방지: 같은 ikey로 이미 미결(pending/approved) 결재가 있으면 skip.
+  //   🛑 자기증폭 차단(2026-06-30): 결재·집행 미러 이슈(approval:/exec:)는 *이미 결재에서 파생된* 이슈라 재상신하면
+  //      결재→이슈→결재 무한루프('[RM] 결재대기: [RM] 집행정체:…' 증식)가 된다 → 이 둘은 절대 재상신 안 함. '진짜 문제'만 상신.
+  const ESCALATE_SKIP = /^(approval|exec):/;
+  for (const i of found.filter((x) => x.severity === "HIGH" && !ESCALATE_SKIP.test(x.ikey))) {
     try {
       const dup = (await sql`SELECT 1 FROM decisions WHERE action_params->>'ikey'=${i.ikey} AND status IN ('pending','approved') LIMIT 1`) as any[];
       if (!dup.length) {
