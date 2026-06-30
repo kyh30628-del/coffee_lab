@@ -20,8 +20,13 @@ export async function GET(req: NextRequest) {
     if (secret && req.headers.get("authorization") !== `Bearer ${secret}`) {
       return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
     }
-    // 🛑 사장님 지시로 AI 판정 배치 전면 중단 (비용·토큰 우려). 재개하려면 이 한 줄만 제거.
-    return NextResponse.json({ ok: false, disabled: true, note: "AI 판정 배치 중단됨(사장님 지시)" });
+    // 🛑 AI 판정 배치 상시(자동제출) OFF — 대표님 지시(비용 통제). 백로그가 쌓이면 '몰아서 청산'만 수동 허용.
+    //   ⚠️ 어떤 스케줄러(vercel cron·launchd·에이전트)에도 등록 금지 — 이 게이트가 자동제출을 막는 최후 방어선.
+    //   수동 청산: ?manual=1 + CRON_SECRET 일 때만 동작(예약/자동 호출은 manual 없으니 차단). 결정론 엔진은 별개로 상시 가동.
+    const manual = req.nextUrl.searchParams.get("manual") === "1";
+    if (!manual) {
+      return NextResponse.json({ ok: false, disabled: true, mode: "manual-only", note: "AI 판정 상시 OFF(대표님 지시) — 수동 청산은 ?manual=1 로만" });
+    }
     const KEY = process.env.ANTHROPIC_API_KEY;
     if (!KEY) return NextResponse.json({ ok: false, error: "ANTHROPIC_API_KEY 미설정 — 판정 비활성" });
     await ensureSchema();
