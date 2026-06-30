@@ -139,6 +139,11 @@ function ChatWidget({ pw }: { pw: string }) {
     } catch { setMsgs((m) => [...m, { role: "assistant", content: "⚠️ 네트워크 오류" }]); }
     setLoading(false);
   };
+  const clearHistory = async () => {
+    if (loading || !confirm("24시간 대화기록을 모두 삭제할까요?")) return;
+    try { await fetch("/api/admin/chat", { method: "DELETE", headers: { "x-admin-password": pw } }); } catch {}
+    setMsgs([]);
+  };
   return (
     <>
       <button onClick={() => setOpen(true)} style={{ position: "fixed", bottom: 18, right: 18, width: 54, height: 54, borderRadius: 27, background: "#2b2018", color: "#e8b87a", border: "2px solid #c98a3c", fontSize: 24, boxShadow: "0 3px 12px rgba(0,0,0,0.3)", zIndex: 50, cursor: "pointer" }}>💬</button>
@@ -147,7 +152,10 @@ function ChatWidget({ pw }: { pw: string }) {
           <div onClick={(e) => e.stopPropagation()} style={{ background: "#f7f1e4", borderRadius: "16px 16px 0 0", maxWidth: 640, width: "100%", margin: "0 auto", height: "82vh", display: "flex", flexDirection: "column" }}>
             <div style={{ background: "#2b2018", color: "#e8b87a", padding: "12px 16px", borderRadius: "16px 16px 0 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <b style={{ fontSize: 14 }}>💬 관제 챗봇 <span style={{ fontSize: 10, color: "#cbb38c" }}>실시간 전 상태·대시보드</span></b>
-              <span onClick={() => setOpen(false)} style={{ cursor: "pointer", fontSize: 16 }}>✕</span>
+              <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                <span onClick={clearHistory} title="24h 대화기록 삭제" style={{ cursor: "pointer", fontSize: 13, color: "#cbb38c" }}>🗑 기록삭제</span>
+                <span onClick={() => setOpen(false)} style={{ cursor: "pointer", fontSize: 16 }}>✕</span>
+              </div>
             </div>
             <div style={{ flex: 1, overflowY: "auto", padding: 12 }}>
               {msgs.length === 0 && <div style={{ color: "#9c8a6c", fontSize: 12, lineHeight: 1.6 }}>실시간 상태를 물어보세요.<br />예: "발행 몇 개야?" · "결재 대기 뭐 있어?" · "self-audit 언제 돌아?" · "floor 기준 뭐야?"</div>}

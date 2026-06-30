@@ -44,3 +44,11 @@ export async function GET(req: NextRequest) {
   const rows = (await sql`SELECT question, answer, status, to_char(created_at AT TIME ZONE 'Asia/Seoul','HH24:MI') t FROM chat_queue WHERE created_at > now()-interval '24 hours' ORDER BY id ASC LIMIT 100`.catch(() => [])) as any[];
   return NextResponse.json({ ok: true, history: rows });
 }
+
+// 대화기록 전체 삭제
+export async function DELETE(req: NextRequest) {
+  if (req.headers.get("x-admin-password") !== process.env.ADMIN_PASSWORD)
+    return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  const r = (await sql`DELETE FROM chat_queue RETURNING id`.catch(() => [])) as any[];
+  return NextResponse.json({ ok: true, deleted: r.length });
+}
