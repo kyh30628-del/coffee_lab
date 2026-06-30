@@ -119,23 +119,10 @@ export async function detectIssues(): Promise<Issue[]> {
   const missCoord = await one(sql`SELECT count(*) c FROM cafes WHERE published AND (lat IS NULL OR lng IS NULL OR lat=0 OR lng=0)`);
   if (missCoord > 0) out.push({ ikey: "integ:misscoord", source: "정합성", severity: "MED", type: "필드누락", title: `좌표 없는 공개 ${missCoord}곳`, detail: "지도·박스검증 불가", team: "품질본부" });
 
-  // 3) 결재 대기 (L3) — 각 건을 담당 본부로 라우팅(즉시, 나이 무관)
-  const pend = (await sql`SELECT id, title, team, severity, recommendation FROM decisions WHERE status='pending' AND COALESCE(tier,'L3')='L3' ORDER BY id`) as any[];
-  for (const p of pend) out.push({ ikey: `approval:${p.id}`, source: "결재", severity: (p.severity === "HIGH" ? "HIGH" : "MED"), type: "CEO 결재 대기", title: `결재 대기: ${p.title}`.slice(0, 80), detail: "CEO 모바일 결재 필요(L3 치명적)", team: p.team || "기획조정실", state: "결재대기", note: p.recommendation ? `💬 기조실장 의견: ${p.recommendation}` : "CEO 승인 시 즉시 집행 — 기조실장 의견 작성 중" });
-  // 3-b) 승인됐으나 집행 안 된 작업 — 정직하게 표시. '처리중(집행 중)' 거짓 금지: 집행기 없는 건 경과시간 보여주고 OUTSTANDING.
-  //   결정론 집행 대상(unpublish)은 autoCorrect가 즉시 집행+done 처리하므로 여기 거의 안 남는다. 남는 건 구현·판단 필요한 진짜 작업.
-  const appr = (await sql`SELECT id, title, team, action_type, EXTRACT(EPOCH FROM (now()-COALESCE(decided_at,created_at)))/3600 age FROM decisions WHERE status='approved' ORDER BY id`) as any[];
-  for (const a of appr) {
-    const h = Math.round(Number(a.age) || 0);
-    // 🚫 '처리중'(=10분 자동교정)은 autoCorrect가 *진짜 자동집행*하는 타입(unpublish)만. agent_task/investigate는 구현·판단이
-    //    필요해 자동처리 안 되므로 '처리중'으로 띄우면 거짓("10분 지나도 안 됨" 클레임 원인) → 항상 OUTSTANDING으로 정직 표시.
-    const autoExec = a.action_type === "unpublish";
-    out.push({ ikey: `exec:${a.id}`, source: "집행", severity: autoExec ? "MED" : "HIGH", type: autoExec ? "집행 대기" : "집행 정체(자동 불가)",
-      title: `집행 ${autoExec ? "대기" : "정체"}: ${a.title}`.slice(0, 80),
-      detail: `승인됨 · ${h}h 미집행 · ${autoExec ? "autoCorrect 자동집행 대상(~10분)" : "구현/판단 필요 — 자동처리 대상 아님"}`,
-      team: a.team || "기획조정실", state: autoExec ? "처리중" : "OUTSTANDING",
-      note: autoExec ? "autoCorrect 다음 사이클 자동집행(~10분)" : `구현/판단 필요(자동 안 됨) — 기조실장·담당이 직접 집행하거나 CEO 재결재. ${h}h째.` });
-  }
+  // 3) ⛔ 결재(decisions) 미러링 제거 — 구조적 분리(2026-06-30, CEO "몇 번을 말하냐").
+  //   결재·승인·집행은 *결재 워크플로우*이고, 이미 전용 '🔔 CEO 결재 대기' 섹션(승인버튼·기조실장 의견 포함)에서 본다.
+  //   그걸 실시간 이슈 보드에도 거울처럼 비추니, 결재의 모든 상태변화(자가승인·집행대기 등)가 보드 좀비/거짓처리중/루프가 됐다.
+  //   → 이슈 보드는 *결정론 실시간 문제*만. 결재는 결재 섹션만. 두 워크플로우를 섞지 않는다. (반복 버그 클래스의 근본 차단)
 
   // 3-c) 판정 적체 (needs_llm) — 단, judgeloop 재개를 CEO가 이미 결정(반려/현상유지)했으면 '수용된 상태'라 이슈로 안 띄움.
   //   (CEO: 이미 결정한 걸 계속 현황으로 띄우지 마라.)
@@ -207,20 +194,10 @@ export async function syncIssues() {
   if (keys.length) await sql`UPDATE issues SET status='resolved', resolved_at=now() WHERE status<>'resolved' AND ikey <> ALL(${keys})`;
   else await sql`UPDATE issues SET status='resolved', resolved_at=now() WHERE status<>'resolved'`;
 
-  // ★ 액션 루프: HIGH 이슈는 자동으로 CEO 결재(L3)로 상신한다 — "위험 높으면 결재 올려라"(CEO).
-  //   중복 방지: 같은 ikey로 이미 미결(pending/approved) 결재가 있으면 skip.
-  //   🛑 자기증폭 차단(2026-06-30): 결재·집행 미러 이슈(approval:/exec:)는 *이미 결재에서 파생된* 이슈라 재상신하면
-  //      결재→이슈→결재 무한루프('[RM] 결재대기: [RM] 집행정체:…' 증식)가 된다 → 이 둘은 절대 재상신 안 함. '진짜 문제'만 상신.
-  const ESCALATE_SKIP = /^(approval|exec):/;
-  for (const i of found.filter((x) => x.severity === "HIGH" && !ESCALATE_SKIP.test(x.ikey))) {
-    try {
-      const dup = (await sql`SELECT 1 FROM decisions WHERE action_params->>'ikey'=${i.ikey} AND status IN ('pending','approved') LIMIT 1`) as any[];
-      if (!dup.length) {
-        await sql`INSERT INTO decisions (title, detail, team, severity, tier, action_type, action_params)
-          VALUES (${("[RM] " + i.title).slice(0, 120)}, ${(i.detail + " — RM 자동 상신(위험). 담당 본부가 조사·조치, 비가역이면 CEO 승인.").slice(0, 400)}, ${i.team}, 'HIGH', 'L3', 'agent_task', ${JSON.stringify({ ikey: i.ikey })}::jsonb)`;
-      }
-    } catch { /* decisions 미존재 등 — 무시 */ }
-  }
+  // ⛔ HIGH 이슈 → 자동 결재상신 *제거*(2026-06-30, 구조분리). 이슈가 결재를 만들고 결재가 이슈가 되는 *순환 자체*를 끊는다.
+  //   이슈는 보드에 그대로 보이고(가시성), autoCorrect가 결정론으로 자동조치한다. 진짜 CEO 판단이 필요한 건 *에이전트가
+  //   직접 pending 결재로 상신*(전용 결재 섹션). 실제 오염 비공개 결재는 autoCorrect의 오염 상신(위 56행)이 담당.
+  //   → 이슈 워크플로우와 결재 워크플로우가 더는 서로를 만들지 않는다. 좀비·루프·거짓처리중 클래스 원천 소멸.
 
   const open = (await sql`SELECT ikey, source, severity, type, title, detail, team, status, state, note, to_char(first_seen AT TIME ZONE 'Asia/Seoul','MM-DD HH24:MI') seen, EXTRACT(EPOCH FROM (now()-first_seen))/3600 hrs FROM issues WHERE status<>'resolved' ORDER BY CASE state WHEN '결재대기' THEN 0 WHEN 'OUTSTANDING' THEN 1 ELSE 2 END, CASE severity WHEN 'HIGH' THEN 0 WHEN 'MED' THEN 1 ELSE 2 END, first_seen ASC`) as any[];
   return open;
