@@ -61,6 +61,21 @@ const today = new Date().toISOString().slice(0, 10);
     L.push("");
   } catch (e) { L.push(`(리포트 목록 실패)\n`); }
 
+  // 5) self-audit 토큰 추세 (레이트리밋 감시 — 대표님 지시 2026-06-30). 결정론·읽기전용. chief-manager가 EXECUTIVE에 포함.
+  try {
+    const up = `${AR}/USAGE.tsv`;
+    if (existsSync(up)) {
+      const rows = readFileSync(up, "utf8").trim().split("\n").map((r) => r.split("\t")).filter((r) => r[1] && r[1].includes("self-audit"));
+      const byDay = {};
+      for (const r of rows) { const d = (r[0] || "").slice(0, 10); const t = parseInt(r[5]) || 0; (byDay[d] = byDay[d] || { n: 0, t: 0 }); byDay[d].n++; byDay[d].t += t; }
+      const days = Object.entries(byDay).slice(-5);
+      L.push(`## 🔎 self-audit 토큰 추세 (레이트리밋 감시)`);
+      L.push(days.map(([d, v]) => `${d.slice(5)}: ${v.n}회·${v.t}턴`).join(" · ") || "데이터 없음");
+      if (days.length >= 3) { const last = days[days.length - 1][1].t; const avg = days.slice(0, -1).reduce((s, [, v]) => s + v.t, 0) / (days.length - 1); if (last > avg * 1.8 && last > 120) L.push(`⚠️ 오늘 self-audit 턴(${last})이 최근 평균(${Math.round(avg)})의 1.8배+ — 주기(현 01·08·17시+이벤트5분) 재검토 권고`); }
+      L.push("");
+    }
+  } catch (e) { /* graceful */ }
+
   const out = L.join("\n");
   writeFileSync(`${AR}/DIGEST.md`, out);
   console.log(`✅ DIGEST.md 생성 (${out.length}자, ${(out.length / 1024).toFixed(1)}KB)`);
