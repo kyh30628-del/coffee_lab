@@ -22,6 +22,7 @@ const EXPECT_MAX_H: Record<string, number> = {
   "dong-backfill": 30,    // 일배치 00:10 (dong-backfill.mjs가 이미 이 이름으로 기록)
   "self-audit": 30,       // 일배치 01시
   "weekly-evaluation": 30, // 매일 09시(격일 게이트지만 스킵도 하트비트)
+  "qualityaudit": 30,     // 일배치 03:30 (제목오염 샘플링·재합성)
   "audit-watch": 1,       // 이벤트 워처 5분
   "chat-watch": 1,        // 관제 챗봇 상주(60초 하트비트)
 };
@@ -29,7 +30,7 @@ const maxH = (job: string) => EXPECT_MAX_H[job] ?? 8;
 
 // 잡 → 담당 본부 (실패·정지 시 결재상신·이슈 자동 배정). agentLog.ts CRONFAIL_TEAM과 동기화(순환참조 피해 인라인).
 const JOB_TEAM: Record<string, string> = {
-  "youtube-backfill": "품질본부", "cron-verify": "품질본부", "cron-sentinel": "품질본부", "cron-rulegap": "품질본부", "cron-selfaudit": "품질본부", "cron-batch-judge": "품질본부",
+  "youtube-backfill": "품질본부", "qualityaudit": "품질본부", "cron-verify": "품질본부", "cron-sentinel": "품질본부", "cron-rulegap": "품질본부", "cron-selfaudit": "품질본부", "cron-batch-judge": "품질본부",
   "dong-backfill": "운영본부", "cron-synth": "운영본부", "cron-resynth": "운영본부", "cron-embed": "운영본부", "cron-snapshot": "운영본부", "cron-enrich": "운영본부", "cron-closure": "운영본부",
   "cron-grow": "성장본부", "cron-demand": "성장본부", "cron-discover-categories": "성장본부", "cafe-collect": "성장본부", "cron-newsletter": "성장본부",
   "weekly-evaluation": "전략기획본부",

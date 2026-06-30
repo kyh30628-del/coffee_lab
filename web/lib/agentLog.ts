@@ -8,7 +8,7 @@ const CRONFAIL_TEAM: Record<string, string> = {
   "cron-grow": "성장본부", "cron-demand": "성장본부", "cron-newsletter": "성장본부", "cron-discover-categories": "성장본부", "cafe-collect": "성장본부",
   "cron-closure": "운영본부", "cron-enrich": "운영본부",
   // 로컬 launchd 잡(하트비트 경유) — cron-selfaudit JOB_TEAM과 동기화
-  "youtube-backfill": "품질본부", "dong-backfill": "운영본부", "weekly-evaluation": "전략기획본부",
+  "youtube-backfill": "품질본부", "qualityaudit": "품질본부", "dong-backfill": "운영본부", "weekly-evaluation": "전략기획본부",
   "chief-manager": "기획조정실", "self-audit": "기획조정실", "audit-watch": "기획조정실", "chat-watch": "경영지원본부",
 };
 
