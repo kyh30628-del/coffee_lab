@@ -96,6 +96,8 @@ const OFFTOPIC_TOPIC = /(미야자와|겐지|그림책|동화책|독서모임|�
 const LOCAL_SEO_SERVICES = /(개인회생|채무조정|파산신청|전세사기|보증금반환|명도소송|이혼소송|교통사고\s*변호사|형사전문|법률상담|샤시교체|창호견적|도배시공|입주청소|이사비용|하수구\s*뚫|누수탐지|배관수리|보일러수리|설비업체|임플란트\s*시술|성형수술|도수치료|비수술치료|산후조리|피부관리\s*시술|탈모치료|치아교정|렌탈정수기|법무사|등기대행|세무대리|노무상담|하자보수|줄눈시공|곰팡이제거|에어컨청소|입주\s*청소|상조\s*가입|법무법인|상간녀소송|상간남소송|음주운전\s*변호사|강제추행\s*변호사|성범죄\s*전문\s*변호사|성범죄변호사|수임료|포장이사|유품정리|변기막힘|하수구청소|결로공사|고독사청소|특수청소|웨딩홀|예식장|스드메)/;
 // 진짜 카페 글이면 거의 항상 들어가는 '강한 카페 맥락'(점·일반어 제외 — 오탐 방지)
 const CAFE_CONTEXT = /(카페|커피|라떼|아메리카노|에스프레소|콜드브루|핸드드립|디저트|케이크|베이커리|메뉴판?|음료|원두|바리스타|좌석|매장|사장님|주문|아인슈페너|브런치|로스팅|카공|cafe|coffee|latte)/i;
+// 룰갭 제안15: 1~2글자/일반어 카페명은 SEO·무관 글에 '문장 성분'으로 우연일치 → 카페 맥락 없으면 오염. (길이≤2 + 아래 3+글자 일반어)
+const COMMON_WORD_NAMES = new Set(["일상적", "마찬가지", "그리고", "오래오래", "이러쿵", "어쩌면"]);
 // ★ 비카페 업종이 '제목을 지배'할 때의 가드 — 매장·음료·주문·메뉴·좌석은 피부관리/필라테스 등 비카페도 흔히 써서
 //   가드를 뚫는다('피부관리 하이드뷰티…매장 전화번호'→결). 이 경로엔 진짜 커피전문 어휘(카페·커피·디저트·원두…)만 인정(2026-06-28).
 const CAFE_CONTEXT_STRONG = /(카페|커피|라떼|아메리카노|에스프레소|콜드브루|핸드드립|디저트|케이크|베이커리|빵|제과|원두|바리스타|아인슈페너|브런치|로스팅|카공|cafe|coffee|latte)/i;
@@ -376,6 +378,14 @@ export function verifyReview(input: QualityInput): QualityResult {
   //   전혀 없음' → 카페 이름이 유명 문구라서 딸려온 글(비에도지지않고=시). 카페 맥락 있으면 보존.
   if (OFFTOPIC_TOPIC.test(fullL) && !CAFE_CONTEXT.test(fullL)) {
     return { verdict: "rejected", score: 3, reasons: ["비카페 주제 글(문학·게임·미디어·뮤지컬·방송)"], signals: sig };
+  }
+  // [nameAsWord 오염 — 룰갭 제안15] 1~2글자/일반어 카페명(이해·봄·탐·결·수·목이·일상적…)이 법률·의료·시공·운송 SEO나
+  //   무관 글에 '문장 성분(동사/형용사)'으로 우연일치해 통과하던 것 차단. 짧은/일반어 이름 + 카페 맥락(CAFE_CONTEXT·카페어)
+  //   전무 → 카페와 무관한 글로 거절. 진짜 후기는 카페 맥락어가 있어 보존(tsx 실측: 이해 43·봄 64·탐 46건 유지). 정상 이름(3+글자)은 영향 없음.
+  const nameClean = (nameN || "").replace(/\s/g, "");
+  const nameRisky = (nameClean.length >= 1 && nameClean.length <= 2) || COMMON_WORD_NAMES.has(nameClean);
+  if (nameRisky && !CAFE_CONTEXT.test(fullL) && !titleHasCafeWord && !bodyHasCafeWord) {
+    return { verdict: "rejected", score: 2, reasons: ["초단어·일반어 카페명 우연일치(카페 맥락 전무) — nameAsWord 오염"], signals: sig };
   }
   // [지역 SEO 서비스 블로그] 법률·시공·의료·청소 SEO 글이 카페명(일상어)을 제목에 끼움 + 카페맥락 전무 → 무관 홍보글(이해·공유·유지…).
   if (LOCAL_SEO_SERVICES.test(`${title} ${body}`) && !CAFE_CONTEXT.test(fullL) && !bodyHasCafeWord) {
