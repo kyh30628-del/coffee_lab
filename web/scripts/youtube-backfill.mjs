@@ -14,11 +14,16 @@ const MAX = Number(process.env.YT_MAX || 90); // 유튜브 일일 쿼터 안전�
 let added = 0, none = 0, processed = 0, quota = false;
 
 while (processed < MAX && !quota) {
+  // 공개 우선 타깃팅(CEO 결정): 사용자가 실제 보는 카페부터 — 공개 > 비공개, 검증 > 참고 > 후보, 그 안에서 리뷰 많은 순.
   const rows = await sql`
     SELECT id, name, area FROM cafes
     WHERE raw_reviews IS NOT NULL AND yt_checked_at IS NULL
       AND NOT (raw_reviews @> '[{"source":"youtube"}]')
-    ORDER BY synth_count DESC NULLS LAST LIMIT 5`;
+    ORDER BY published DESC NULLS LAST,
+             (synth_grade='검증') DESC,
+             (synth_grade='참고') DESC,
+             synth_count DESC NULLS LAST
+    LIMIT 5`;
   if (!rows.length) { console.log("유튜브 백필 대상 없음 — 전체 완료"); break; }
   for (const c of rows) {
     const r = await backfillYouTube(c);
