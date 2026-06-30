@@ -149,26 +149,26 @@ function ChatWidget({ pw }: { pw: string }) {
       <button onClick={() => setOpen(true)} style={{ position: "fixed", bottom: 18, right: 18, width: 54, height: 54, borderRadius: 27, background: "#2b2018", color: "#e8b87a", border: "2px solid #c98a3c", fontSize: 24, boxShadow: "0 3px 12px rgba(0,0,0,0.3)", zIndex: 50, cursor: "pointer" }}>💬</button>
       {open && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 100, display: "flex", flexDirection: "column", justifyContent: "flex-end" }} onClick={() => setOpen(false)}>
-          <div onClick={(e) => e.stopPropagation()} style={{ background: "#f7f1e4", borderRadius: "16px 16px 0 0", maxWidth: 640, width: "100%", margin: "0 auto", height: "82vh", display: "flex", flexDirection: "column" }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: "#f7f1e4", borderRadius: "16px 16px 0 0", maxWidth: 640, width: "100%", margin: "0 auto", height: "86vh", display: "flex", flexDirection: "column" }}>
             <div style={{ background: "#2b2018", color: "#e8b87a", padding: "12px 16px", borderRadius: "16px 16px 0 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <b style={{ fontSize: 14 }}>💬 관제 챗봇 <span style={{ fontSize: 10, color: "#cbb38c" }}>실시간 전 상태·대시보드</span></b>
-              <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                <span onClick={clearHistory} title="24h 대화기록 삭제" style={{ cursor: "pointer", fontSize: 13, color: "#cbb38c" }}>🗑 기록삭제</span>
-                <span onClick={() => setOpen(false)} style={{ cursor: "pointer", fontSize: 16 }}>✕</span>
+              <b style={{ fontSize: 15 }}>💬 관제 챗봇</b>
+              <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+                <span onClick={clearHistory} title="24h 대화기록 삭제" style={{ cursor: "pointer", fontSize: 17 }}>🗑</span>
+                <span onClick={() => setOpen(false)} style={{ cursor: "pointer", fontSize: 18 }}>✕</span>
               </div>
             </div>
             <div style={{ flex: 1, overflowY: "auto", padding: 12 }}>
-              {msgs.length === 0 && <div style={{ color: "#9c8a6c", fontSize: 12, lineHeight: 1.6 }}>실시간 상태를 물어보세요.<br />예: "발행 몇 개야?" · "결재 대기 뭐 있어?" · "self-audit 언제 돌아?" · "floor 기준 뭐야?"</div>}
+              {msgs.length === 0 && <div style={{ color: "#9c8a6c", fontSize: 13, lineHeight: 1.7 }}>실시간 상태를 물어보세요.<br />예: "발행 몇 개야?" · "결재 대기 뭐 있어?" · "self-audit 언제 돌아?" · "floor 기준 뭐야?"</div>}
               {msgs.map((m, i) => (
                 <div key={i} style={{ display: "flex", justifyContent: m.role === "user" ? "flex-end" : "flex-start", margin: "6px 0" }}>
-                  <div style={{ maxWidth: "84%", padding: "8px 11px", borderRadius: 12, fontSize: 13, lineHeight: 1.55, whiteSpace: "pre-wrap", background: m.role === "user" ? "#c98a3c" : "#fff", color: m.role === "user" ? "#fff" : "#2b2018", border: m.role === "user" ? "none" : "1px solid #e6d8bf" }}>{m.content}</div>
+                  <div style={{ maxWidth: "88%", padding: "9px 12px", borderRadius: 13, fontSize: 14.5, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word", background: m.role === "user" ? "#c98a3c" : "#fff", color: m.role === "user" ? "#fff" : "#2b2018", border: m.role === "user" ? "none" : "1px solid #e6d8bf" }}>{m.content}</div>
                 </div>
               ))}
-              {loading && <div style={{ color: "#9c8a6c", fontSize: 12, margin: "6px 0" }}>💭 claude(구독)가 답변 생성 중… (~20-40초)</div>}
+              {loading && <div style={{ color: "#9c8a6c", fontSize: 13, margin: "6px 0" }}>💭 claude(구독)가 답변 생성 중… (~20-40초)</div>}
             </div>
-            <div style={{ display: "flex", gap: 6, padding: 10, borderTop: "1px solid #e6d8bf" }}>
-              <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") send(); }} placeholder="질문…" disabled={loading} style={{ flex: 1, padding: 10, borderRadius: 9, border: "1px solid #ddc9a8", fontSize: 13 }} />
-              <button onClick={send} disabled={loading} style={{ padding: "10px 16px", background: "#2b2018", color: "#e8b87a", border: "none", borderRadius: 9, fontWeight: 700, opacity: loading ? 0.5 : 1 }}>전송</button>
+            <div style={{ display: "flex", gap: 7, padding: "10px 10px calc(10px + env(safe-area-inset-bottom))", borderTop: "1px solid #e6d8bf" }}>
+              <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") send(); }} placeholder="질문…" disabled={loading} style={{ flex: 1, minWidth: 0, padding: "11px 13px", borderRadius: 10, border: "1px solid #ddc9a8", fontSize: 16 }} />
+              <button onClick={send} disabled={loading} style={{ padding: "0 18px", background: "#2b2018", color: "#e8b87a", border: "none", borderRadius: 10, fontWeight: 700, fontSize: 15, flexShrink: 0, opacity: loading ? 0.5 : 1 }}>전송</button>
             </div>
           </div>
         </div>
