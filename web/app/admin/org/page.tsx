@@ -210,7 +210,19 @@ export default function OrgDashboard() {
                   <span style={{ fontWeight: 700, fontSize: 12.5 }}>{i.title}</span>
                 </div>
                 {i.detail && <div style={{ fontSize: 11, color: "#5a4631", margin: "4px 0 3px", lineHeight: 1.4 }}>{i.detail}</div>}
-                <div style={{ fontSize: 10.5, color: "#9c8a6c" }}>→ <b style={{ color: "#7a5a2a" }}>{i.team}</b>{i.note ? ` · ${i.note}` : ""} · 발견 {i.seen}{Number(i.hrs) >= 24 ? ` · ${Math.floor(Number(i.hrs) / 24)}일 경과` : ""}</div>
+                {(() => {
+                  const st = i.state || "처리중";
+                  const eta = st === "결재대기" ? "대표님 결재 시 즉시 집행"
+                    : st === "OUTSTANDING" ? "기조실장 집행 — 시점 추적 중(자동 미해결)"
+                    : (i.note && /(시간|매시|매 |분|즉시|:\d|주기|사이클|일\b)/.test(i.note)) ? i.note
+                    : "다음 자동 교정 사이클 (~10분 주기)";
+                  const elapsed = Number(i.hrs) >= 24 ? `${Math.floor(Number(i.hrs) / 24)}일 경과` : Number(i.hrs) >= 1 ? `${Math.floor(Number(i.hrs))}시간 경과` : "방금";
+                  return (
+                    <div style={{ fontSize: 10.5, color: "#9c8a6c", lineHeight: 1.55 }}>
+                      🕐 <b>발생</b> {i.seen} ({elapsed}) · ⏱ <b>조치예상</b> {eta} · 담당 <b style={{ color: "#7a5a2a" }}>{i.team}</b>
+                    </div>
+                  );
+                })()}
               </div>
             ))}
           </div>}
