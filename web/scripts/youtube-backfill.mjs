@@ -8,6 +8,7 @@ for (const l of env.split("\n")) { const m = l.match(/^([A-Z_0-9]+)=(.*)$/); if 
 
 const { backfillYouTube } = await import("../lib/synthStore.ts");
 const { sql } = await import("../lib/db.ts");
+const { recordRun } = await import("../lib/agentLog.ts");
 
 await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS yt_checked_at TIMESTAMPTZ`;
 const MAX = Number(process.env.YT_MAX || 90); // 유튜브 일일 쿼터 안전선
@@ -37,4 +38,6 @@ while (processed < MAX && !quota) {
 }
 const remain = (await sql`SELECT COUNT(*)::int n FROM cafes WHERE raw_reviews IS NOT NULL AND yt_checked_at IS NULL AND NOT (raw_reviews @> '[{"source":"youtube"}]')`)[0].n;
 console.log(`\n유튜브 백필 종료: 추가 ${added} · 영상없음 ${none} · 처리 ${processed} · 남은 대상 ${remain}`);
+// 자율진단이 정지를 감지하도록 agent_runs에 기록(재발방지). 쿼터소진도 정상 종료로 기록.
+await recordRun("youtube-backfill", true, `추가 ${added}·영상없음 ${none}·처리 ${processed}·남은 ${remain}${quota ? "·쿼터소진" : ""}`, processed).catch(() => {});
 process.exit(0);

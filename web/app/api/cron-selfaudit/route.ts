@@ -16,6 +16,7 @@ const EXPECT_MAX_H: Record<string, number> = {
   "cron-snapshot": 200, "cron-resynth": 200, "cron-newsletter": 200, "cron-discover-categories": 800,
   "cron-verify": 30, "cron-sentinel": 30, "cron-demand": 30, "cron-rulegap": 30, "cron-closure": 12,
   "cron-grow": 6, "cron-enrich": 8, "cron-embed": 4, "cron-synth": 4, "cron-issues": 2,
+  "youtube-backfill": 30, // 일배치(16:30 KST) + 버퍼 — 30h 넘게 안 돌면 정지의심 → CEO 결재상신
 };
 const maxH = (job: string) => EXPECT_MAX_H[job] ?? 8;
 
