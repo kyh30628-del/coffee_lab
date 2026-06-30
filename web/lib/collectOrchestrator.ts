@@ -156,7 +156,10 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
   // 신뢰 헤드라인 숫자 = 노이즈 제거 후 '주제가 맞는 진짜 리뷰' 수(검증+참고).
   // rejected(동명·모음언급·무관·내용없음)만 버린 뒤 남은 옥석. 등급도 이 기준.
   const trustCount = stats.verified + stats.reference;
-  const grade: "검증" | "참고" | "후보" = trustCount >= 30 ? "검증" : trustCount >= 5 ? "참고" : "후보";
+  // 공개 floor 5→1 (2026-06-30, CEO "검증리뷰 3개 미만도 살려"). 검증리뷰 1개라도 있으면 참고(공개).
+  //   얇아도 *진짜* 카페는 살린다 — 오염/비카페는 coherence·noisy·카테고리 게이트가 별도로 막으므로 옥석은 유지.
+  //   0개(보여줄 것 없음)만 후보 보류.
+  const grade: "검증" | "참고" | "후보" = trustCount >= 30 ? "검증" : trustCount >= 1 ? "참고" : "후보";
 
   // 근거 리뷰: 복합 랭크(정확도 score + 신뢰등급 + 최신성)로 '가장 정확하고 가장 최신' 순. 최대 6개.
   const nowT = Date.now();
