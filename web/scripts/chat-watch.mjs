@@ -10,7 +10,7 @@ const one = async (q) => { try { return Number((await q)[0].c); } catch { return
 
 const KB = `너는 '동네 커피 노트'(dongnecoffeenote.com) 운영 관제 챗봇이다. CEO(대표님)에게 *정확히, 간결히* 답한다. **질문 답변 전용 — 작업 지시·데이터 변경은 절대 하지 않는다(읽기전용).**
 DB접속: web/.env.local의 DATABASE_URL, Bash로 node+@neondatabase/serverless로 *읽기전용 SELECT*만. 🚫 UPDATE/DELETE/INSERT 절대 금지.
-[규칙] [라이브 상태]·[지식] 근거로 답. 부족하면 읽기전용 SELECT 조회. 숫자 실측, 모르면 "확인 필요". 지어내지 마라.
+[규칙] **답의 근거 수치는 거의 다 아래 [라이브 상태]에 이미 있다 — 가급적 그걸로 바로 답하라.** Bash DB조회는 [라이브 상태]에 없는 값이 꼭 필요할 때만(읽기전용 SELECT). 숫자 실측, 모르면 "확인 필요". 지어내지 마라. **반드시 마지막엔 텍스트로 답을 마무리하라.**
 [서식] 답은 **마크다운**으로 구조화 — 핵심은 **표**·**목록**·**굵게**. 화면이 HTML로 렌더. 장황 금지, 모바일에서 짧고 한눈에.
 [지식: 조직] CEO→기획조정실장(2인자)─직할 자율진단감사실(self-audit)·비서실장. 6본부: 품질·성장·운영·경험·영업·전략기획(주간)·경영지원(주간). DoA: L0팀·L1본부·L2기조실장·L3 CEO만 결재.
 [지식: 스케줄KST] 상시: audit-watch 5분, cron-issues 10분(RM탐지+autoCorrect), embed/synth 매시, heal·grow 2h, enrich 3h, selfaudit 6h. 하루: 00 sentinel·01 self-audit·01:30 rulegap·06 verify·08/17 전체사이클(LLM)·17 demand·04/10/16/22 closure. LLM=로컬claude-p(구독$0)·결정론=Vercel크론.
@@ -26,12 +26,26 @@ async function ground() {
   return L.join("\n");
 }
 
-function askClaude(prompt) {
+// claude -p 1회 호출. tools=true면 Bash 허용(추가조회 가능), false면 도구 없이 그라운딩만으로 즉답 강제(턴 소진 불가).
+function runClaude(prompt, tools) {
   return new Promise((res) => {
-    execFile("claude", ["-p", prompt, "--model", "sonnet", "--dangerously-skip-permissions", "--allowedTools", "Bash", "--max-turns", "8", "--output-format", "json"],
-      { cwd: "/Users/wangwida/coffee-platform/web", maxBuffer: 16 * 1024 * 1024, timeout: 120000, env: { ...process.env, PATH: "/Users/wangwida/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin" } },
-      (err, stdout) => { try { res(JSON.parse(stdout).result || "(빈 응답)"); } catch { res(err ? `(LLM 오류: ${String(err).slice(0, 80)})` : "(응답 파싱 실패)"); } });
+    const args = ["-p", prompt, "--model", "sonnet", "--dangerously-skip-permissions", "--max-turns", tools ? "24" : "2", "--output-format", "json"];
+    if (tools) args.splice(args.indexOf("--max-turns"), 0, "--allowedTools", "Bash");
+    execFile("claude", args,
+      { cwd: "/Users/wangwida/coffee-platform/web", maxBuffer: 16 * 1024 * 1024, timeout: 150000, env: { ...process.env, PATH: "/Users/wangwida/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin" } },
+      (err, stdout) => { try { res((JSON.parse(stdout).result || "").trim()); } catch { res(err ? `__ERR__${String(err).slice(0, 80)}` : ""); } });
   });
+}
+
+async function askClaude(prompt) {
+  // 1차: Bash 허용(24턴). 빈응답이면 = Bash 탐색에 턴 소진하고 텍스트 못 냄 → 2차: 도구 없이 그라운딩만으로 즉답.
+  let a = await runClaude(prompt, true);
+  if (!a || a.startsWith("__ERR__")) {
+    const a2 = await runClaude(prompt + "\n\n(추가조회 없이, 위 [라이브 상태]만 근거로 지금 바로 텍스트로 답하라.)", false);
+    if (a2 && !a2.startsWith("__ERR__")) return a2;
+    return a.startsWith("__ERR__") ? `(LLM 오류: ${a.slice(7)})` : (a2.startsWith("__ERR__") ? `(LLM 오류: ${a2.slice(7)})` : "(빈 응답 — 다시 질문해 주세요)");
+  }
+  return a;
 }
 
 let busy = false;
