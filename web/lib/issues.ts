@@ -63,8 +63,8 @@ export async function autoCorrect(): Promise<{ resolved: number; escalated: numb
       const ik = `autopollute:${c.id}`;
       const dup = (await sql`SELECT 1 FROM decisions WHERE action_params->>'ikey'=${ik} AND status IN('pending','approved') LIMIT 1`.catch(() => [])) as any[];
       if (!dup.length) {
-        await sql`INSERT INTO decisions (title,detail,team,severity,tier,action_type,action_params)
-          VALUES (${`[자동] 오염 카페 비공개 — ${c.name}`.slice(0, 110)}, ${`근거오염 자동탐지: 노출후기가 실제 그 카페를 거의 안 말함(cleanName 일치율 ${Math.round(coh * 100)}%). 비공개 권고.`}, '품질본부', 'HIGH', 'L3', 'unpublish', ${JSON.stringify({ ids: [c.id], ikey: ik })}::jsonb)`.catch(() => {});
+        await sql`INSERT INTO decisions (title,detail,team,severity,tier,action_type,action_params,recommendation)
+          VALUES (${`[자동] 오염 카페 비공개 — ${c.name}`.slice(0, 110)}, ${`근거오염 자동탐지: 노출후기가 실제 그 카페를 거의 안 말함(cleanName 일치율 ${Math.round(coh * 100)}%).`}, '품질본부', 'HIGH', 'L3', 'unpublish', ${JSON.stringify({ ids: [c.id], ikey: ik })}::jsonb, ${`승인 권합니다. 노출후기가 다른 카페를 가리키는 구구커피류 오염(일치율 ${Math.round(coh * 100)}%)이라 비공개해도 실손실 적습니다.`})`.catch(() => {});
         escalated++; if (log.length < 8) log.push(`오염→결재상신 ${c.name}(${Math.round(coh * 100)}%)`);
       }
     }

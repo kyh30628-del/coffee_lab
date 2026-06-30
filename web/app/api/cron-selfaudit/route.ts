@@ -78,10 +78,11 @@ export async function GET(req: NextRequest) {
       const ik = `selfaudit:${f.check}`.slice(0, 120);
       const dup = (await sql`SELECT 1 FROM decisions WHERE action_params->>'ikey'=${ik} AND status IN('pending','approved') LIMIT 1`.catch(() => [])) as any[];
       if (!dup.length) {
-        await sql`INSERT INTO decisions (title, detail, team, severity, tier, action_type, action_params)
+        await sql`INSERT INTO decisions (title, detail, team, severity, tier, action_type, action_params, recommendation)
           VALUES (${`[자율진단] ${f.check}`.slice(0, 110)},
                   ${`상시 자율진단이 자동교정으로 해소 못 한 중대 이상(${f.count}건). 담당 ${f.team}. 기조실장 1차 조사 → 대표님 판단 필요.`},
-                  ${f.team}, 'HIGH', 'L3', 'investigate', ${JSON.stringify({ ikey: ik, check: f.check, count: f.count })}::jsonb)`.catch(() => {});
+                  ${f.team}, 'HIGH', 'L3', 'investigate', ${JSON.stringify({ ikey: ik, check: f.check, count: f.count })}::jsonb,
+                  ${`결정론 자동교정이 못 푼 중대 이상이라 ${f.team} 조사·조치가 필요합니다. 승인 시 해당 본부에 배정합니다.`})`.catch(() => {});
         escalated.push(f.check);
         // 🔔 자동해결 못한 중대 이상 = 판단 필요 → 이벤트형 트리거. 로컬 watcher가 self-audit LLM을 즉시 깨운다.
         await pushTrigger("selfaudit_critical", f.check, `${f.check} (${f.count}건·${f.team})`, "HIGH");
