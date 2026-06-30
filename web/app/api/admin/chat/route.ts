@@ -13,6 +13,7 @@ async function ensure() {
     id SERIAL PRIMARY KEY, question TEXT, history JSONB, status TEXT DEFAULT 'pending',
     answer TEXT, mode TEXT, created_at TIMESTAMPTZ DEFAULT now(), answered_at TIMESTAMPTZ
   )`.catch(() => {});
+  await sql`CREATE TABLE IF NOT EXISTS work_orders (id SERIAL PRIMARY KEY, command TEXT, action TEXT, tier TEXT, created_at TIMESTAMPTZ DEFAULT now())`.catch(() => {}); // 챗봇 작업지시 감사
   await sql`DELETE FROM chat_queue WHERE created_at < now()-interval '24 hours'`.catch(() => {}); // 24h 보존
 }
 
