@@ -161,7 +161,7 @@ function ChatWidget({ pw }: { pw: string }) {
               {msgs.length === 0 && <div style={{ color: "#9c8a6c", fontSize: 13, lineHeight: 1.7 }}>실시간 상태를 물어보세요.<br />예: "발행 몇 개야?" · "결재 대기 뭐 있어?" · "self-audit 언제 돌아?" · "floor 기준 뭐야?"</div>}
               {msgs.map((m, i) => (
                 <div key={i} style={{ display: "flex", justifyContent: m.role === "user" ? "flex-end" : "flex-start", margin: "6px 0" }}>
-                  <div style={{ maxWidth: "88%", padding: "9px 12px", borderRadius: 13, fontSize: 14.5, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word", background: m.role === "user" ? "#c98a3c" : "#fff", color: m.role === "user" ? "#fff" : "#2b2018", border: m.role === "user" ? "none" : "1px solid #e6d8bf" }}>{m.content}</div>
+                  <div className={m.role === "assistant" ? "ex" : ""} style={{ maxWidth: "88%", padding: "9px 12px", borderRadius: 13, fontSize: 14.5, lineHeight: 1.6, whiteSpace: m.role === "user" ? "pre-wrap" : "normal", wordBreak: "break-word", background: m.role === "user" ? "#c98a3c" : "#fff", color: m.role === "user" ? "#fff" : "#2b2018", border: m.role === "user" ? "none" : "1px solid #e6d8bf" }}>{m.role === "assistant" ? <div dangerouslySetInnerHTML={{ __html: md2html(m.content) }} /> : m.content}</div>
                 </div>
               ))}
               {loading && <div style={{ color: "#9c8a6c", fontSize: 13, margin: "6px 0" }}>💭 claude(구독)가 답변 생성 중… (~20-40초)</div>}
