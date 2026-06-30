@@ -17,6 +17,7 @@ async function ensure() {
   )`.catch(() => {});
   await sql`ALTER TABLE decisions ADD COLUMN IF NOT EXISTS tier TEXT`.catch(() => {});
   await sql`ALTER TABLE decisions ADD COLUMN IF NOT EXISTS decided_by TEXT`.catch(() => {});
+  await sql`ALTER TABLE decisions ADD COLUMN IF NOT EXISTS recommendation TEXT`.catch(() => {}); // 💬 기조실장 의견(결재 참고)
 }
 
 export async function GET(req: NextRequest) {
@@ -25,7 +26,7 @@ export async function GET(req: NextRequest) {
   try {
     await ensure();
     // CEO 결재 대기 = L3(치명적·비가역)만. tier 없는 레거시는 안전하게 L3 취급.
-    const pending = await sql`SELECT id,title,detail,team,severity,action_type,action_params,tier FROM decisions WHERE status='pending' AND COALESCE(tier,'L3')='L3' ORDER BY CASE severity WHEN 'HIGH' THEN 0 WHEN 'MED' THEN 1 ELSE 2 END, created_at DESC` as any[];
+    const pending = await sql`SELECT id,title,detail,team,severity,action_type,action_params,tier,recommendation FROM decisions WHERE status='pending' AND COALESCE(tier,'L3')='L3' ORDER BY CASE severity WHEN 'HIGH' THEN 0 WHEN 'MED' THEN 1 ELSE 2 END, created_at DESC` as any[];
     // 하위 전결(L1 본부·L2 기조실장) 처리분 — CEO엔 FYI(가시성만, 결재 불요).
     const delegated = await sql`SELECT id,title,team,tier,COALESCE(decided_by, CASE tier WHEN 'L1' THEN '본부 전결' WHEN 'L2' THEN '기조실장 전결' ELSE '전결' END) decided_by,status,to_char(COALESCE(decided_at,created_at),'MM-DD HH24:MI') at FROM decisions WHERE tier IN ('L1','L2') ORDER BY COALESCE(decided_at,created_at) DESC LIMIT 8` as any[];
     const recent = await sql`SELECT id,title,status,result,tier,to_char(decided_at,'MM-DD HH24:MI') decided FROM decisions WHERE status<>'pending' ORDER BY decided_at DESC LIMIT 8` as any[];

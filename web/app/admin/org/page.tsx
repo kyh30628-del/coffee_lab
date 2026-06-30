@@ -255,6 +255,7 @@ export default function OrgDashboard() {
                   {d.team && <span style={{ fontSize: 10, color: "#9c8a6c" }}>· {d.team}</span>}
                 </div>
                 {d.detail && <div style={{ fontSize: 12, color: "#5a4631", margin: "6px 0", lineHeight: 1.5 }}>{d.detail}</div>}
+                {d.recommendation && <div style={{ fontSize: 12, color: "#2f5d3a", background: "#eef6ee", border: "1px solid #cfe6cf", borderRadius: 8, padding: "7px 9px", margin: "6px 0", lineHeight: 1.5 }}><b>💬 기조실장 의견</b> · {d.recommendation}</div>}
                 <div style={{ fontSize: 10.5, color: "#9c8a6c", marginBottom: 8 }}>실행: {d.action_type === "agent_task" ? "기조실장이 담당 본부 배분" : `${d.action_type}${d.action_params?.ids ? ` (${d.action_params.ids.length}곳)` : ""}`}</div>
                 <div style={{ display: "flex", gap: 8 }}>
                   <button disabled={busy === d.id} onClick={() => decide(d.id, "approve")} style={{ flex: 2, padding: 10, background: "#3f7a4f", color: "#fff", border: "none", borderRadius: 9, fontWeight: 700, fontSize: 13, opacity: busy === d.id ? 0.5 : 1 }}>{busy === d.id ? "실행 중…" : "✅ 승인 · 실행"}</button>

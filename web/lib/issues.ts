@@ -112,8 +112,8 @@ export async function detectIssues(): Promise<Issue[]> {
   if (missCoord > 0) out.push({ ikey: "integ:misscoord", source: "정합성", severity: "MED", type: "필드누락", title: `좌표 없는 공개 ${missCoord}곳`, detail: "지도·박스검증 불가", team: "품질본부" });
 
   // 3) 결재 대기 (L3) — 각 건을 담당 본부로 라우팅(즉시, 나이 무관)
-  const pend = (await sql`SELECT id, title, team, severity FROM decisions WHERE status='pending' AND COALESCE(tier,'L3')='L3' ORDER BY id`) as any[];
-  for (const p of pend) out.push({ ikey: `approval:${p.id}`, source: "결재", severity: (p.severity === "HIGH" ? "HIGH" : "MED"), type: "CEO 결재 대기", title: `결재 대기: ${p.title}`.slice(0, 80), detail: "CEO 모바일 결재 필요(L3 치명적)", team: p.team || "기획조정실", state: "결재대기", note: "CEO 승인 시 즉시 집행" });
+  const pend = (await sql`SELECT id, title, team, severity, recommendation FROM decisions WHERE status='pending' AND COALESCE(tier,'L3')='L3' ORDER BY id`) as any[];
+  for (const p of pend) out.push({ ikey: `approval:${p.id}`, source: "결재", severity: (p.severity === "HIGH" ? "HIGH" : "MED"), type: "CEO 결재 대기", title: `결재 대기: ${p.title}`.slice(0, 80), detail: "CEO 모바일 결재 필요(L3 치명적)", team: p.team || "기획조정실", state: "결재대기", note: p.recommendation ? `💬 기조실장 의견: ${p.recommendation}` : "CEO 승인 시 즉시 집행 — 기조실장 의견 작성 중" });
   // 3-b) 승인됐으나 집행 안 된 작업 — 정직하게 표시. '처리중(집행 중)' 거짓 금지: 집행기 없는 건 경과시간 보여주고 OUTSTANDING.
   //   결정론 집행 대상(unpublish)은 autoCorrect가 즉시 집행+done 처리하므로 여기 거의 안 남는다. 남는 건 구현·판단 필요한 진짜 작업.
   const appr = (await sql`SELECT id, title, team, action_type, EXTRACT(EPOCH FROM (now()-COALESCE(decided_at,created_at)))/3600 age FROM decisions WHERE status='approved' ORDER BY id`) as any[];
