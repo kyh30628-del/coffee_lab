@@ -18,6 +18,15 @@ export const JOB_TEAM: Record<string, string> = {
   "chief-manager": "기획조정실", "self-audit": "기획조정실", "audit-watch": "기획조정실",
   "dev-pipeline": "기획조정실", "dev-deploy": "기획조정실",
   "chat-watch": "경영지원본부",
+  // 리프 에이전트(run-daily/weekly 내부, _run.sh 하트비트) — 실패만 감지(staleness는 chief-manager가 대표)
+  "integrity-agent": "품질본부", "rulegap-agent": "품질본부", "quality-redteam-agent": "품질본부", "deep-judge-agent": "품질본부",
+  "demand-grow-agent": "성장본부", "marketing-agent": "성장본부",
+  "search-quality-agent": "경험본부", "b2b-sales-agent": "영업본부", "closure-agent": "운영본부",
+  "chief-manager-agent": "기획조정실", "chief-secretary-agent": "기획조정실", "self-audit-agent": "기획조정실",
+  "morning-meeting-agent": "기획조정실", "dev-agent": "기획조정실",
+  "evaluation": "전략기획본부", "strategy-agent": "전략기획본부",
+  "team-legal-agent": "경영지원본부", "team-finance-agent": "경영지원본부", "team-ops-support-agent": "경영지원본부",
+  "risk-mgmt-agent": "경영지원본부", "support-office-director": "경영지원본부",
   // 제거된 잡(plist .disabled) — 재활성 시 팀 배정용으로만 유지. EXPECT_MAX_H엔 절대 넣지 말 것(정지 오탐).
   "dong-backfill": "운영본부", "qualityaudit": "품질본부",
 };
@@ -35,8 +44,8 @@ export const EXPECT_MAX_H: Record<string, number> = {
   // 로컬 launchd 잡
   "youtube-backfill": 30, // 일배치 16:30 KST + 버퍼
   "chief-manager": 20,    // 일간 사이클 08·17시 KST
-  "self-audit": 14,       // 매일 09·15·21시 KST 3회 + 일간 사이클 내 실행 (최대 공백 밤 12h + 버퍼)
-  "weekly-evaluation": 30, // 매일 09시 KST(격일 게이트지만 스킵도 하트비트)
+  "self-audit": 16,       // 매일 11:30·15:30·21:30 KST 3회 + 일간 사이클 내 실행 (최대 공백 밤 14h + 버퍼)
+  "weekly-evaluation": 30, // 매일 10:30 KST(격일 게이트지만 스킵도 하트비트)
   "audit-watch": 1,       // 이벤트 워처 5분
   "chat-watch": 1,        // 관제 챗봇 상주(60초 하트비트)
   "dev-pipeline": 1,      // 개발 파이프라인 5분

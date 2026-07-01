@@ -188,14 +188,15 @@ export default function OrgDashboard() {
   const [showWO, setShowWO] = useState(false);
   const [showMeet, setShowMeet] = useState(false);
   const [showPending, setShowPending] = useState(false);
+  const [showDeferred, setShowDeferred] = useState(false);
   const [showInProg, setShowInProg] = useState(false);
   const [showDeleg, setShowDeleg] = useState(false);
   const [showCoord, setShowCoord] = useState(false);
   const [showIssues, setShowIssues] = useState(false);
   const [showTok, setShowTok] = useState(false);
   const [member, setMember] = useState<{ k: string; n: string; t: string } | null>(null);
-  const [dec, setDec] = useState<{ pending: any[]; delegated: any[]; recent: any[]; inProgress: any[] }>({ pending: [], delegated: [], recent: [], inProgress: [] });
-  const [coord, setCoord] = useState<{ open: any[]; resolved: any[] }>({ open: [], resolved: [] });
+  const [dec, setDec] = useState<{ pending: any[]; delegated: any[]; recent: any[]; inProgress: any[]; deferred: any[] }>({ pending: [], delegated: [], recent: [], inProgress: [], deferred: [] });
+  const [coord, setCoord] = useState<{ open: any[]; resolved: any[]; overdue: number }>({ open: [], resolved: [], overdue: 0 });
   const [issues, setIssues] = useState<any[]>([]);
   const [err, setErr] = useState(""); const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState<number | null>(null);
@@ -221,8 +222,8 @@ export default function OrgDashboard() {
     ]).then(([b, d, co, iss, lv, jb, dp]) => {
       if (dp && dp.ok) setDevpipe(dp);
       if (b.ok) { setBrief(b.brief); setBriefs(b.briefs || (b.brief ? [b.brief] : [])); localStorage.setItem("adm_pw", password); } else if (!silent) setErr("비밀번호 확인");
-      if (d.ok) setDec({ pending: d.pending || [], delegated: d.delegated || [], recent: d.recent || [], inProgress: d.inProgress || [] });
-      if (co.ok) setCoord({ open: co.open || [], resolved: co.resolved || [] });
+      if (d.ok) setDec({ pending: d.pending || [], delegated: d.delegated || [], recent: d.recent || [], inProgress: d.inProgress || [], deferred: d.deferred || [] });
+      if (co.ok) setCoord({ open: co.open || [], resolved: co.resolved || [], overdue: co.overdue || 0 }); // overdue 보존 — 접힌 헤더 '⚠️ 지연 N' 배선
       if (iss.ok) setIssues(iss.open || []);
       if (lv && lv.ok) setLive(lv);
       if (jb && jb.ok) setJobs(jb);
@@ -449,6 +450,31 @@ export default function OrgDashboard() {
           </>}
         </div>
 
+        {/* ⏸️ 보류(deferred·resolved) — 어느 목록에도 안 잡히던 림보 결재의 가시성 확보. 접이식·기본 접힘.
+            decide API가 status='pending'만 처리하므로 승인/반려 버튼 재사용 불가 → 목록 표시만. */}
+        {dec.deferred.length > 0 && (
+          <div style={{ ...card, marginTop: 10 }}>
+            <button onClick={() => setShowDeferred(!showDeferred)} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "#8a6534" }}>{showDeferred ? "▾" : "▸"} ⏸️ 보류 (deferred) ({dec.deferred.length})</span>
+              <span style={{ fontSize: 10.5, color: "#9c8a6c" }}>{showDeferred ? "접기" : "보기"}</span>
+            </button>
+            {showDeferred && <>
+            <div style={{ fontSize: 10.5, color: "#9c8a6c", margin: "6px 0 8px" }}>보류·종결(deferred/resolved) 상태의 결재 — 결재·실행 큐 어디에도 안 잡히던 건. 재개하려면 기조실장에게 재상신 지시.</div>
+            {dec.deferred.map((d) => (
+              <div key={d.id} style={{ border: "1px solid #e6d8bf", borderRadius: 10, padding: "9px 11px", marginBottom: 8, background: "#fbfaf5" }}>
+                <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                  <span style={{ background: d.status === "deferred" ? "#8a6534" : "#9c8a6c", color: "#fff", fontSize: 9.5, fontWeight: 700, padding: "2px 7px", borderRadius: 20 }}>{d.status === "deferred" ? "⏸️ 보류" : "종결"}</span>
+                  {d.tier && <span style={{ background: "#6b8fae", color: "#fff", fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 20 }}>{d.tier}</span>}
+                  <span style={{ fontWeight: 700, fontSize: 12.5 }}>#{d.id} {d.title}</span>
+                </div>
+                <div style={{ fontSize: 10.5, color: "#9c8a6c", marginTop: 3 }}>{d.team || "-"} · {d.created_at}</div>
+                {d.recommendation && <div style={{ fontSize: 11.5, color: "#2f5d3a", background: "#eef6ee", border: "1px solid #cfe6cf", borderRadius: 8, padding: "6px 8px", marginTop: 5, lineHeight: 1.5 }}><b>💬 기조실장 의견</b> · {d.recommendation}</div>}
+              </div>
+            ))}
+            </>}
+          </div>
+        )}
+
         {/* 🔧 실행 중 — 승인됐지만 아직 완료 안 된 실무형(실세계·판단 필요). 끝난 것/진행중 구분. 접이식·기본 접힘. */}
         <div style={{ ...card, marginTop: 10 }}>
           <button onClick={() => setShowInProg(!showInProg)} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
@@ -497,7 +523,7 @@ export default function OrgDashboard() {
           {coord.open.length === 0 ? <div style={{ color: "#3f7a4f", fontSize: 13 }}>진행 중인 부서 간 협업 없음</div> :
             coord.open.map((c: any) => {
               const stg = c.stage || "요청";
-              const stageC: Record<string, string> = { "요청": "#8a7458", "조율": "#c98a3c", "수신확인": "#2a7a72", "지연": "#b03a3a" };
+              const stageC: Record<string, string> = { "요청": "#8a7458", "조율": "#c98a3c", "수신확인": "#2a7a72", "지연": "#b03a3a", "CEO결재": "#6a468c", "개발승인": "#3a6ea5", "CEO정체판단": "#a53a6e", "기조실장 재배정": "#3f7a4f" };
               return (
               <div key={c.id} style={{ border: `1px solid ${stg === "지연" ? "#e6b3b3" : "#e6d8bf"}`, borderRadius: 10, padding: "9px 11px", marginBottom: 8, background: stg === "지연" ? "#fdf3f3" : "#fbfaf5" }}>
                 <div style={{ display: "flex", gap: 5, alignItems: "center", flexWrap: "wrap" }}>

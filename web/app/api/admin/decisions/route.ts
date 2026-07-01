@@ -35,7 +35,10 @@ export async function GET(req: NextRequest) {
       FROM decisions WHERE status='approved' AND action_type IN ('agent_task','route_coord','investigate') ORDER BY created_at ASC` as any[];
     // 최근 처리 = 종료된 것만(진행중은 위 inProgress로 분리 — 중복 표시 방지).
     const recent = await sql`SELECT id,title,status,result,tier,to_char(decided_at,'MM-DD HH24:MI') decided FROM decisions WHERE status IN ('done','rejected','failed') ORDER BY decided_at DESC LIMIT 8` as any[];
-    return NextResponse.json({ ok: true, pending, delegated, recent, inProgress }, { headers: { "Cache-Control": "no-store" } });
+    // ⏸️ 보류·기타 종결 — status='deferred'/'resolved'는 pending/delegated/inProgress/recent 어디에도 안 잡혀
+    //   '보이지 않는 림보'가 됨(감사 #27·#30·#33·#34) → CEO 가시성 확보용으로 별도 노출.
+    const deferred = await sql`SELECT id,title,team,tier,status,to_char(created_at,'MM-DD HH24:MI') created_at,recommendation FROM decisions WHERE status IN ('deferred','resolved') ORDER BY decisions.created_at DESC` as any[];
+    return NextResponse.json({ ok: true, pending, delegated, recent, inProgress, deferred }, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }

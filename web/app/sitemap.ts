@@ -3,7 +3,7 @@ import { sql } from "@/lib/db";
 import { getRegions, TASTES } from "@/lib/seoData";
 
 export const runtime = "nodejs";
-export const revalidate = 86400; // 하루
+export const revalidate = 3600; // 감사수리: 결재 집행(공개/비공개) 반영 지연 축소 — 페이지(3600)와 짝 맞춤
 
 const SITE = "https://dongnecoffeenote.com";
 

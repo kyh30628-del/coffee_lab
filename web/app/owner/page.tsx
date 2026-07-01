@@ -56,6 +56,7 @@ export default function OwnerPage() {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<{ id: number; name: string; area: string }[]>([]);
   const [insight, setInsight] = useState<Insight | null>(null);
+  const [insightErr, setInsightErr] = useState(""); // 감사수리: 실패 응답(409 미공개 등)이 버려져 locked 모드에서 로딩이 영원히 남던 것 — 서버 문구 표시
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState("rank");
   const [showShowcase, setShowShowcase] = useState(false);
@@ -95,8 +96,13 @@ export default function OwnerPage() {
     setLoading(false);
   };
   const loadInsight = async (name: string) => {
-    setLoading(true); setResults([]); setTab("rank"); setOpenAct(new Set());
-    try { const r = await fetch(`/api/owner-insight?name=${encodeURIComponent(name)}`, { headers: hdr }); const d = await r.json(); if (d.ok) setInsight(d); } catch {}
+    setLoading(true); setResults([]); setTab("rank"); setOpenAct(new Set()); setInsightErr("");
+    try {
+      const r = await fetch(`/api/owner-insight?name=${encodeURIComponent(name)}`, { headers: hdr });
+      const d = await r.json();
+      if (d.ok) setInsight(d);
+      else setInsightErr(d.error || d.message || "일시적 오류 — 잠시 후 다시 시도해 주세요");
+    } catch { setInsightErr("일시적 오류 — 잠시 후 다시 시도해 주세요"); }
     setLoading(false);
   };
   // PIN 모드: 본인 카페 자동 로드(검색 없이 바로 진입)
@@ -140,7 +146,7 @@ export default function OwnerPage() {
       </header>
 
       <div className="max-w-2xl mx-auto px-4 sm:px-5 py-6">
-        {!insight && locked && <p className="text-[#6b5a48] text-sm py-10 text-center">내 카페 불러오는 중…</p>}
+        {!insight && locked && <p className="text-[#6b5a48] text-sm py-10 text-center">{insightErr || "내 카페 불러오는 중…"}</p>}
         {!insight && !locked && (
           <>
             <p className="text-[#6b5a48] text-sm mb-4 leading-relaxed">우리 카페를 검색하면, 같은 동네 카페들과 비교한 <strong>순위·성격·구성</strong>과 <strong>데이터 기반 액션 플랜</strong>을 보여드려요.</p>

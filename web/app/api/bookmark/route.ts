@@ -15,15 +15,20 @@ async function ensure() {
 
 // GET ?device= : 내 북마크 카페 목록(상세 표시용)
 export async function GET(req: NextRequest) {
-  await ensure();
-  const device = req.nextUrl.searchParams.get("device") || "";
-  if (!device) return NextResponse.json({ ok: true, ids: [], cafes: [] });
-  const rows = await sql`
-    SELECT c.id, c.name, c.area, c.lat, c.lng, c.synth_grade, c.synth_count, b.created_at
-    FROM bookmarks b JOIN cafes c ON c.id = b.cafe_id
-    WHERE b.device_id = ${device}
-    ORDER BY b.created_at DESC`;
-  return NextResponse.json({ ok: true, ids: rows.map((r: any) => r.id), cafes: rows });
+  // 감사수리: try/catch 부재로 DB 예외가 미처리 500으로 새던 것 보완(내부 문자열 비노출)
+  try {
+    await ensure();
+    const device = req.nextUrl.searchParams.get("device") || "";
+    if (!device) return NextResponse.json({ ok: true, ids: [], cafes: [] });
+    const rows = await sql`
+      SELECT c.id, c.name, c.area, c.lat, c.lng, c.synth_grade, c.synth_count, b.created_at
+      FROM bookmarks b JOIN cafes c ON c.id = b.cafe_id
+      WHERE b.device_id = ${device}
+      ORDER BY b.created_at DESC`;
+    return NextResponse.json({ ok: true, ids: rows.map((r: any) => r.id), cafes: rows });
+  } catch {
+    return NextResponse.json({ ok: false, error: "일시적 오류 — 잠시 후 다시 시도해 주세요", ids: [], cafes: [] }, { status: 500 });
+  }
 }
 
 // POST {device, cafeId, action: add|remove|toggle}

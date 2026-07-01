@@ -2,7 +2,7 @@ import { sql } from "@/lib/db";
 import { ogCard, OG_SIZE } from "@/lib/ogCard";
 
 export const runtime = "nodejs";
-export const revalidate = 86400;
+export const revalidate = 3600; // 감사수리: 결재 집행(공개/비공개) 반영 지연 축소 — 페이지(3600)와 짝 맞춤
 export const size = OG_SIZE;
 export const contentType = "image/png";
 export const alt = "동네 커피 노트 — 검증한 동네 카페";

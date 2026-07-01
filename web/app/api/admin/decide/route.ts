@@ -9,11 +9,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   try {
     const { id, decision } = await req.json();
-    const d = (await sql`SELECT * FROM decisions WHERE id=${id} AND status='pending'`)[0] as any;
+    // deferred(보류)도 CEO가 직접 종결 가능(2026-07-02) — 보류가 어느 화면에도 없는 림보가 되던 문제의 마감재
+    const d = (await sql`SELECT * FROM decisions WHERE id=${id} AND status IN ('pending','deferred')`)[0] as any;
     if (!d) return NextResponse.json({ ok: false, error: "이미 처리됐거나 없는 결재" }, { status: 404 });
 
     if (decision === "reject") {
-      await sql`UPDATE decisions SET status='rejected', decided_at=now(), result='CEO 반려' WHERE id=${id}`;
+      await sql`UPDATE decisions SET status='rejected', decided_at=now(), result='CEO 반려', decided_by='CEO' WHERE id=${id}`;
       // 개발 결재 반려 → 연결 협업 '종결'(status=resolved). stage만 바꾸면 status=open 좀비로 남아 협업 카운트 부풀리고
       //   기한 지나면 '지연'으로 튀어 이중 좀비가 됨 → route_coord 반려와 동일하게 resolved 처리(좀비 원천 차단).
       if (d.action_type === "dev_task" && d.action_params?.coord)
@@ -65,7 +66,11 @@ export async function POST(req: NextRequest) {
         default:
           status = "approved"; result = "승인 기록(수동 실행 필요)";
       }
-      if (["unpublish", "downgrade", "restore", "requeue_resynth"].includes(d.action_type)) await sql`DELETE FROM search_cache`.catch(() => {});
+      // 공개상태·등급 변경 = 전 캐시 레이어 무효화(search_cache + ISR /c/[id]·share·area·sitemap) — 2026-07-02
+      if (["unpublish", "downgrade", "restore", "requeue_resynth"].includes(d.action_type)) {
+        const { invalidateCafeCaches } = await import("@/lib/cafeCacheInvalidate");
+        await invalidateCafeCaches(ids).catch(() => {});
+      }
     } catch (e) {
       status = "failed"; result = "실행 오류: " + String(e).slice(0, 80);
     }

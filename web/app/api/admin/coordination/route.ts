@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
         EXTRACT(EPOCH FROM (now()-created_at))/86400 days
       FROM coordination WHERE status IN ('open','in_progress')
       ORDER BY (COALESCE(stage,'')='지연') DESC, created_at ASC` as any[];
-    const resolved = await sql`SELECT id,from_team,to_team,topic,resolution,to_char(resolved_at,'MM-DD') d FROM coordination WHERE status='resolved' ORDER BY resolved_at DESC LIMIT 5` as any[];
+    const resolved = await sql`SELECT id,from_team,to_team,topic,resolution,to_char(resolved_at,'MM-DD') d FROM coordination WHERE status='resolved' ORDER BY resolved_at DESC NULLS LAST LIMIT 5` as any[];
     const overdue = (open as any[]).filter((c) => c.stage === "지연").length;
     return NextResponse.json({ ok: true, open, resolved, overdue }, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {

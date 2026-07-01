@@ -4,4 +4,10 @@
 export PATH="/usr/local/bin:/Users/wangwida/.local/bin:/opt/homebrew/bin:$PATH"
 cd "$(dirname "$0")/.." || exit 1
 echo "[$(date)] === 유튜브 백필 시작 ===" >> /tmp/coffee-youtube-backfill.log
-exec /usr/local/bin/node --import tsx scripts/youtube-backfill.mjs >> /tmp/coffee-youtube-backfill.log 2>&1
+# 2026-07-02: exec 제거 — 크래시 시에도 실패 하트비트를 남긴다(과거: 성공 시에만 mjs가 recordRun → 중도 크래시 무음 실종).
+/usr/local/bin/node --import tsx scripts/youtube-backfill.mjs >> /tmp/coffee-youtube-backfill.log 2>&1
+c=$?
+if [ "$c" -ne 0 ]; then
+  /usr/local/bin/node --import tsx scripts/heartbeat.mjs youtube-backfill "$c" "비정상 종료(exit $c) — /tmp/coffee-youtube-backfill.log 확인" >> /tmp/coffee-heartbeat.log 2>&1
+fi
+exit $c

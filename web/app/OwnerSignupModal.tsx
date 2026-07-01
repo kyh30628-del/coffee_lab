@@ -30,9 +30,20 @@ export default function OwnerSignupModal({ open, onClose, trial = false, prefill
     if (!f.type.startsWith("image/")) { setErr("이미지 파일만 올려주세요"); return; }
     if (f.size > 8 * 1024 * 1024) { setErr("이미지는 8MB 이하로 올려주세요"); return; }
     setErr("");
-    const r = new FileReader();
-    r.onload = () => { setBizRegBase64(String(r.result || "")); setBizRegName(f.name); };
-    r.readAsDataURL(f);
+    // 감사수리: 원본 base64 전송이 Vercel 4.5MB 본문 한도에서 413 → 업로드 전 캔버스 리사이즈(최대 1600px, JPEG 0.85)
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(img.src);
+      const max = 1600, scale = Math.min(1, max / Math.max(img.width, img.height));
+      const cv = document.createElement("canvas");
+      cv.width = Math.round(img.width * scale); cv.height = Math.round(img.height * scale);
+      cv.getContext("2d")!.drawImage(img, 0, 0, cv.width, cv.height);
+      const url = cv.toDataURL("image/jpeg", 0.85);
+      if (url.length * 0.75 > 4 * 1024 * 1024) { setErr("이미지 용량이 너무 커요 — 4MB 이하로 줄이거나 낮은 해상도로 다시 촬영해 주세요"); return; }
+      setBizRegBase64(url); setBizRegName(f.name);
+    };
+    img.onerror = () => { URL.revokeObjectURL(img.src); setErr("이미지를 읽을 수 없어요 — 다른 파일로 시도해 주세요"); };
+    img.src = URL.createObjectURL(f);
   };
 
   const onCafeQ = async (v: string) => {

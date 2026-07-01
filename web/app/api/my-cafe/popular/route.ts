@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
     const device = req.nextUrl.searchParams.get("device") || "";
     const rows = await sql`
       SELECT c.id, c.name, c.area, c.lat, c.lng, COUNT(DISTINCT v.device_id)::int cnt
-      FROM user_visits v JOIN cafes c ON c.id = v.cafe_id
+      FROM user_visits v JOIN cafes c ON c.id = v.cafe_id AND c.published = true -- 감사수리: 비공개 카페가 방문집계 핀으로 노출되던 누수 차단
       WHERE v.verified = true AND v.finalized = true
         AND v.device_id <> ${device}
         AND c.lat IS NOT NULL

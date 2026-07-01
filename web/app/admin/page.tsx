@@ -51,6 +51,9 @@ export default function AdminPage() {
   const [selAgent, setSelAgent] = useState<any>(null);
   const [todayDetail, setTodayDetail] = useState<any>(null); // 오늘의 수집 카드 클릭 → 상세 목록 모달
   const [towerFull, setTowerFull] = useState(false);
+  // 📐 CEO 확정 규율: 모든 섹션 기본 접힘 + 클릭 토글 + 접힌 헤더에 건수·HIGH 요약 (org 페이지와 동일 패턴, 세션 내 useState)
+  const [openSecs, setOpenSecs] = useState<Record<string, boolean>>({});
+  const toggleSec = (k: string) => setOpenSecs((s) => ({ ...s, [k]: !s[k] }));
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [analytics, setAnalytics] = useState<any>(null);
   // silent=true면 로딩 표시 없이 조용히 갱신(자동 폴링용 — 화면 깜빡임 방지)
@@ -291,13 +294,19 @@ export default function AdminPage() {
           return (
             <>
             <div className="mb-4 rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-bold text-stone-500 uppercase tracking-wider">🛰️ 자율 운영 관제탑</span>
+              <div className="flex items-center justify-between">
+                <button onClick={() => toggleSec("tower")} className="text-xs font-bold text-stone-500 uppercase tracking-wider text-left">
+                  {openSecs.tower ? "▾" : "▸"} 🛰️ 자율 운영 관제탑{" "}
+                  {((tower.alerts?.length || 0) + (tower.risks?.length || 0)) > 0 && <span className="text-red-600 normal-case">🔴{(tower.alerts?.length || 0) + (tower.risks?.length || 0)}</span>}{" "}
+                  {(tower.notices?.length || 0) > 0 && <span className="text-amber-600 normal-case">🟡{tower.notices.length}</span>}
+                  {!((tower.alerts?.length || 0) + (tower.risks?.length || 0)) && !(tower.notices?.length || 0) && <span className="text-emerald-600 normal-case">✅</span>}
+                </button>
                 <div className="flex items-center gap-1.5">
                   <button onClick={() => setTowerFull(true)} className="text-[11px] font-bold px-2.5 py-1 rounded-full border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100">⛶ 전체화면</button>
                   <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full border ${oc[tower.overall] || oc.degraded}`}>{ocl[tower.overall] || tower.overall}</span>
                 </div>
               </div>
+              {openSecs.tower && <div className="mt-3">
               {tower.alerts?.length > 0 && (
                 <div className="mb-2.5 text-[11px] text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">🚨 경보(즉시조치): {tower.alerts.join(" · ")}</div>
               )}
@@ -409,6 +418,7 @@ export default function AdminPage() {
                 <span>임베딩 {tower.coverage?.embeddedPct}%</span>
                 <span className="ml-auto text-stone-400">갱신 {new Date(tower.generatedAt).toLocaleTimeString("ko-KR")}</span>
               </div>
+              </div>}
             </div>
             {selAgent && (() => {
               const d = DESC[selAgent.key] || ({} as any);
@@ -537,7 +547,11 @@ export default function AdminPage() {
         {/* ===== 🔄 실시간 자동화 현황 (10초 갱신) ===== */}
         {jstatus && (
           <div className="mb-6 space-y-3">
-            <span className="text-xs font-bold text-stone-500 uppercase tracking-wider">🔄 자동화 현황 (10초 갱신)</span>
+            <button onClick={() => toggleSec("auto")} className="w-full flex items-center justify-between text-left">
+              <span className="text-xs font-bold text-stone-500 uppercase tracking-wider">{openSecs.auto ? "▾" : "▸"} 🔄 자동화 현황 <span className="normal-case font-normal text-stone-400">· 판정대기 {jstatus.queue?.toLocaleString() ?? 0} · 오늘신규 {jstatus.newToday ?? 0}</span></span>
+              <span className="text-[10px] text-stone-400 shrink-0">{openSecs.auto ? "접기" : "보기"}</span>
+            </button>
+            {openSecs.auto && <>
 
             {/* AI 판정 */}
             <div className="bg-white rounded-xl border border-stone-200 p-3">
@@ -589,37 +603,46 @@ export default function AdminPage() {
                 <span>대기 <b className="text-amber-600">{jstatus.ytQueue?.toLocaleString()}</b>곳</span>
               </div>
             </div>
+            </>}
           </div>
         )}
 
-        {/* ===== 🚨 품질 감사 플래그 ===== */}
-        {auditFlags && (auditFlags.flags?.filter((f: any) => !f.resolved).length > 0) && (
-          <div className="mb-6">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-red-500 uppercase tracking-wider">🚨 품질 오염 감지 ({auditFlags.flags.filter((f: any) => !f.resolved).length}건)</span>
-              <span className="text-[11px] text-stone-400">{auditFlags.lastAudit}</span>
-            </div>
-            <div className="bg-red-50 border border-red-200 rounded-xl p-3 space-y-1.5">
-              {auditFlags.flags.filter((f: any) => !f.resolved).slice(0, 8).map((f: any, i: number) => (
-                <div key={i} className="text-[11px] text-red-700">
-                  <b>{f.cafe_name}</b> — {f.detail?.slice(0, 60)}
+        {/* ===== 🚨 품질 감사 플래그 (접이식·기본 접힘 — 헤더에 건수) ===== */}
+        {auditFlags && (() => {
+          const unresolved = auditFlags.flags?.filter((f: any) => !f.resolved) ?? [];
+          return (
+            <div className="mb-6">
+              <button onClick={() => toggleSec("audit")} className="w-full flex items-center justify-between text-left mb-2">
+                <span className={`text-xs font-bold uppercase tracking-wider ${unresolved.length ? "text-red-500" : "text-stone-500"}`}>{openSecs.audit ? "▾" : "▸"} {unresolved.length ? `🚨 품질 오염 감지 (${unresolved.length}건)` : "✅ 품질 오염 감지 (0건)"}</span>
+                <span className="text-[11px] text-stone-400 shrink-0">{auditFlags.lastAudit}</span>
+              </button>
+              {openSecs.audit && (unresolved.length > 0 ? (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-3 space-y-1.5">
+                  {unresolved.slice(0, 8).map((f: any, i: number) => (
+                    <div key={i} className="text-[11px] text-red-700">
+                      <b>{f.cafe_name}</b> — {f.detail?.slice(0, 60)}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-[11px] text-emerald-700">
+                  ✅ 품질 감사 이상 없음 — {auditFlags.lastAudit}
                 </div>
               ))}
             </div>
-          </div>
-        )}
-        {auditFlags && auditFlags.flags?.filter((f: any) => !f.resolved).length === 0 && (
-          <div className="mb-6 bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-[11px] text-emerald-700">
-            ✅ 품질 감사 이상 없음 — {auditFlags.lastAudit}
-          </div>
-        )}
+          );
+        })()}
 
         {/* ===== 🛡️ 검증 에이전트(레드팀) ===== */}
         <div className="mb-6">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-stone-500 uppercase tracking-wider">🛡️ 데이터 검증 (레드팀 · 매일 자동)</span>
+            <button onClick={() => toggleSec("verify")} className="text-xs font-bold text-stone-500 uppercase tracking-wider text-left">
+              {openSecs.verify ? "▾" : "▸"} 🛡️ 데이터 검증 <span className="normal-case font-normal text-stone-400">·</span>{" "}
+              {verify ? (verify.status === "pass" ? <span className="text-emerald-600 normal-case">정상 ✅</span> : verify.status === "warn" ? <span className="text-amber-600 normal-case">🟡 주의 {verify.warns}</span> : <span className="text-red-600 normal-case">🔴 오류 {verify.fails}</span>) : <span className="normal-case font-normal text-stone-400">리포트 없음</span>}
+            </button>
             <button onClick={runVerify} disabled={verifying} className="text-[11px] bg-stone-800 text-white rounded-full px-3 py-1 disabled:opacity-50">{verifying ? "검사 중…" : "지금 검사"}</button>
           </div>
+          {openSecs.verify && <>
           {verify ? (
             <div className={`rounded-xl border p-3 ${verify.status === "pass" ? "bg-emerald-50 border-emerald-200" : verify.status === "warn" ? "bg-amber-50 border-amber-200" : "bg-rose-50 border-rose-200"}`}>
               <div className="flex items-center gap-2 mb-2">
@@ -660,6 +683,7 @@ export default function AdminPage() {
             </div>
             );
           })()}
+          </>}
         </div>
 
         {/* ===== 모달 트리거 (접속·유입 현황 · 구독 카페 현황 · 유튜브 수집 · 내 카페 기록) ===== */}
@@ -1117,7 +1141,11 @@ export default function AdminPage() {
         {/* ===== 🎀 쇼케이스 승인 · AI 카피 생성 ===== */}
         {(
           <div className="mb-6">
-            <div className="text-xs font-bold text-amber-600 uppercase tracking-wider mb-2">🎀 쇼케이스 승인 · AI 카피 생성 ({review.length})</div>
+            <button onClick={() => toggleSec("promo")} className="w-full flex items-center justify-between text-left mb-2">
+              <span className="text-xs font-bold text-amber-600 uppercase tracking-wider">{openSecs.promo ? "▾" : "▸"} 🎀 쇼케이스 승인 · AI 카피 생성 ({review.length})</span>
+              <span className="text-[10px] text-stone-400 shrink-0">{openSecs.promo ? "접기" : "보기"}</span>
+            </button>
+            {openSecs.promo && <>
             {review.length === 0 && <p className="text-[12px] text-stone-400 bg-white rounded-xl border p-4">대기 중인 사장님 쇼케이스 요청이 없어요. 사장님이 글(또는 영상)을 저장하면 여기에서 <b className="text-stone-600">🤖 AI 어필 카피 생성</b> → <b className="text-stone-600">✓ 승인</b> 할 수 있어요.</p>}
             <div className="space-y-3">
               {review.map((p) => (
@@ -1171,11 +1199,16 @@ export default function AdminPage() {
                 </div>
               ))}
             </div>
+            </>}
           </div>
         )}
 
-        {/* ===== 콘텐츠 현황 ===== */}
-        <div className="text-xs font-bold text-stone-400 uppercase tracking-wider mb-2">콘텐츠 현황</div>
+        {/* ===== 콘텐츠 현황 (접이식·기본 접힘) ===== */}
+        <button onClick={() => toggleSec("content")} className="w-full flex items-center justify-between text-left mb-2">
+          <span className="text-xs font-bold text-stone-400 uppercase tracking-wider">{openSecs.content ? "▾" : "▸"} 콘텐츠 현황 <span className="normal-case font-normal">· 공개 {ct?.published?.toLocaleString() ?? "·"} · 전체 {ct?.total?.toLocaleString() ?? "·"}</span></span>
+          <span className="text-[10px] text-stone-400 shrink-0">{openSecs.content ? "접기" : "보기"}</span>
+        </button>
+        {openSecs.content && <>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
           <Kpi label="전체 카페" value={ct?.total ?? "·"} />
           <Kpi label="공개 중" value={ct?.published ?? "·"} color="text-emerald-600" />
@@ -1232,9 +1265,14 @@ export default function AdminPage() {
             </Card>
           </div>
         )}
+        </>}
 
-        {/* ===== 접속/방문자 (익명) ===== */}
-        <div className="text-xs font-bold text-stone-400 uppercase tracking-wider mb-2">접속 · 방문자 현황</div>
+        {/* ===== 접속/방문자 (익명 · 접이식·기본 접힘) ===== */}
+        <button onClick={() => toggleSec("visitors")} className="w-full flex items-center justify-between text-left mb-2">
+          <span className="text-xs font-bold text-stone-400 uppercase tracking-wider">{openSecs.visitors ? "▾" : "▸"} 접속 · 방문자 현황 <span className="normal-case font-normal">· 총 {vs?.total?.toLocaleString() ?? "·"} · 7일 활성 {vs?.active7d ?? "·"}</span></span>
+          <span className="text-[10px] text-stone-400 shrink-0">{openSecs.visitors ? "접기" : "보기"}</span>
+        </button>
+        {openSecs.visitors && <>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
           <Kpi label="총 방문자" value={vs?.total ?? "·"} sub="익명 식별자 기준" />
           <Kpi label="위치 동의" value={vs?.agreed ?? "·"} color="text-emerald-600" sub={`동의율 ${agreeRate}%`} />
@@ -1271,9 +1309,14 @@ export default function AdminPage() {
           </div>
         )}
         <p className="text-[10px] text-stone-400 mb-6">합법·익명 수집만: 브라우저 익명 식별자, (동의 시) 대략 지역(≈500m). 이름·연락처·정밀위치는 수집하지 않습니다.</p>
+        </>}
 
-        {/* ===== 검수 관리 ===== */}
-        <div className="text-xs font-bold text-stone-400 uppercase tracking-wider mb-2">검수 관리</div>
+        {/* ===== 검수 관리 (접이식·기본 접힘) ===== */}
+        <button onClick={() => toggleSec("inspect")} className="w-full flex items-center justify-between text-left mb-2">
+          <span className="text-xs font-bold text-stone-400 uppercase tracking-wider">{openSecs.inspect ? "▾" : "▸"} 검수 관리 <span className={`normal-case ${ownerPending.length ? "font-bold text-blue-600" : "font-normal"}`}>· 사장님 대기 {ownerPending.length}</span> <span className="normal-case font-normal">· 자동 비공개 {autoHidden.length}</span></span>
+          <span className="text-[10px] text-stone-400 shrink-0">{openSecs.inspect ? "접기" : "보기"}</span>
+        </button>
+        {openSecs.inspect && <>
         <section className="mb-4">
           <h2 className="text-sm font-bold text-stone-700 mb-1">🙋 사장님 등록 검수 대기 ({ownerPending.length})</h2>
           <p className="text-[11px] text-stone-400 mb-2">사장님이 <b>/cafe/register</b>로 직접 등록한 가게. 확인 후 공개/삭제.</p>
@@ -1290,6 +1333,7 @@ export default function AdminPage() {
             </>
           )}
         </section>
+        </>}
 
         {/* ===== 카페 검색 관리 (1000+ 전체 나열 대신 검색) ===== */}
         <div className="text-xs font-bold text-stone-400 uppercase tracking-wider mb-2">카페 검색 관리</div>

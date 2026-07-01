@@ -10,11 +10,11 @@
     },
     {
       "path": "/api/cron-embed",
-      "schedule": "0 * * * *"
+      "schedule": "5 * * * *"
     },
     {
       "path": "/api/cron-grow",
-      "schedule": "0 */2 * * *"
+      "schedule": "10 */2 * * *"
     },
     {
       "path": "/api/cron-synth",
@@ -26,7 +26,7 @@
     },
     {
       "path": "/api/orchestrator?heal=1",
-      "schedule": "0 */2 * * *"
+      "schedule": "25 */2 * * *"
     },
     {
       "path": "/api/cron-newsletter",
@@ -50,7 +50,7 @@
     },
     {
       "path": "/api/cron-enrich",
-      "schedule": "0 */3 * * *"
+      "schedule": "40 */3 * * *"
     },
     {
       "path": "/api/cron-sentinel",

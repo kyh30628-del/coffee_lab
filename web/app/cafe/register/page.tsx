@@ -53,7 +53,8 @@ export default function RegisterPage() {
       <main className="min-h-screen bg-[#f4ece0] text-[#2b2018] flex items-center justify-center p-6" style={{ fontFamily: "'Gowun Batang', serif" }}>
         <div className="bg-[#fdfaf4] rounded-2xl p-10 text-center max-w-md border border-[#ece0cd]">
           <div className="text-4xl mb-4">☕</div>
-          <h1 className="text-2xl font-bold mb-3">등록 신청이 접수됐어요</h1>
+          {/* 감사수리: 기존 카페 보완 제보는 신규 등록과 구분해 안내 */}
+          <h1 className="text-2xl font-bold mb-3">{supplementId ? "보완 제보가 접수됐어요" : "등록 신청이 접수됐어요"}</h1>
           <p className="text-[#6b5a48] leading-relaxed">
             보내주신 정보를 확인한 뒤 가이드에 실어드릴게요.
             커피를 아는 사람들에게 사장님 가게가 제대로 소개되도록 정성껏 다듬겠습니다.
