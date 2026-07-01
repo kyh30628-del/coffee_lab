@@ -59,8 +59,8 @@ for (const d of rows) {
       await sql`UPDATE decisions SET result='병합 충돌 → 최신 main 기반 자동 재빌드(잦은 실패 아님, 자가치유)', action_params = action_params - 'dev_status' - 'dev_claimed' - 'branch' WHERE id=${d.id}`.catch(() => {});
       console.log(`  ♻️ #${d.id} 병합충돌 → 재빌드 예약(자가치유)`);
     } else {
-      await sql`UPDATE decisions SET result=${`배포 실패: ${msg.slice(0, 120)}`}, action_params = action_params || '{"dev_status":"deploy_failed"}'::jsonb WHERE id=${d.id}`.catch(() => {});
-      console.log(`  ❌ 배포 실패: ${msg.slice(0, 100)}`);
+      await sql`UPDATE decisions SET result=${`배포 오류(재시도 필요): ${msg.slice(0, 110)}`}, action_params = action_params || '{"dev_status":"배포오류"}'::jsonb WHERE id=${d.id}`.catch(() => {});
+      console.log(`  ⚠️ 배포 오류: ${msg.slice(0, 100)}`);
     }
   } finally {
     gunlock();
