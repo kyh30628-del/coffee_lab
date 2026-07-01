@@ -48,10 +48,20 @@ for (const d of rows) {
     try { git(`branch -d ${br}`); } catch { /* 브랜치 삭제 실패 무시 */ }
     console.log(`  ✅ 배포완료${live ? "·반영확인" : ""} ${sha.slice(0, 8)}`);
   } catch (e) {
+    const msg = String(e.message || e);
     try { git("merge --abort"); } catch {}
-    try { git("checkout main"); } catch {}
-    await sql`UPDATE decisions SET result=${`배포 실패: ${String(e.message || e).slice(0, 120)}`}, action_params = action_params || '{"dev_status":"deploy_failed"}'::jsonb WHERE id=${d.id}`.catch(() => {});
-    console.log(`  ❌ 배포 실패: ${String(e.message || e).slice(0, 100)}`);
+    try { git("checkout -f main"); git("reset --hard origin/main"); } catch {}
+    // ♻️ 병합 충돌 = 오래된 브랜치가 그새 배포된 다른 변경과 겹침 → 실패가 아니라 '최신 기반 자동 재빌드'로 자가치유.
+    //   (병렬 브랜치가 같은 파일을 건드릴 때 필연. 재빌드하면 이미 배포된 코드 위에서 다시 구현 → 충돌 소멸.)
+    const conflict = /conflict|merge failed|not something we can merge|Automatic merge/i.test(msg);
+    if (conflict && br) {
+      try { git(`branch -D ${br}`); } catch {}
+      await sql`UPDATE decisions SET result='병합 충돌 → 최신 main 기반 자동 재빌드(잦은 실패 아님, 자가치유)', action_params = action_params - 'dev_status' - 'dev_claimed' - 'branch' WHERE id=${d.id}`.catch(() => {});
+      console.log(`  ♻️ #${d.id} 병합충돌 → 재빌드 예약(자가치유)`);
+    } else {
+      await sql`UPDATE decisions SET result=${`배포 실패: ${msg.slice(0, 120)}`}, action_params = action_params || '{"dev_status":"deploy_failed"}'::jsonb WHERE id=${d.id}`.catch(() => {});
+      console.log(`  ❌ 배포 실패: ${msg.slice(0, 100)}`);
+    }
   } finally {
     gunlock();
   }
