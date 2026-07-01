@@ -323,8 +323,8 @@ export default function OrgDashboard() {
             {showDev && <div style={{ marginTop: 8 }}>
               {devpipe.jobs.map((j: any) => {
                 // 사실대로 — '실패' 왜곡 금지. 색: 회색=중립, 자주=배포대기, 청록=진행, 주황=조치필요, 빨강=진짜오류
-                const sc: Record<string, string> = { "개발대기": "#8a7458", "배포대기": "#6a468c", "빌드오류": "#b03a3a", "구현불가": "#9c8a6c", "스코프반려": "#b06a2e", "deploy_approved": "#2a7a72", "배포오류": "#b06a2e" };
-                const sl: Record<string, string> = { "개발대기": "개발 대기", "배포대기": "검증완료·배포대기", "빌드오류": "빌드 오류(수정 필요)", "구현불가": "코드 변경 불필요/불가", "스코프반려": "스코프 반려(목적 외 파일)", "deploy_approved": "배포 진행 중", "배포오류": "배포 오류(자동 재시도)" };
+                const sc: Record<string, string> = { "개발대기": "#8a7458", "building": "#2a7a72", "배포대기": "#6a468c", "빌드오류": "#b03a3a", "구현불가": "#9c8a6c", "스코프반려": "#b06a2e", "deploy_approved": "#2a7a72", "배포오류": "#b06a2e" };
+                const sl: Record<string, string> = { "개발대기": "개발 대기", "building": "구현 중", "배포대기": "검증완료·배포대기", "빌드오류": "빌드 오류(수정 필요)", "구현불가": "코드 변경 불필요/불가", "스코프반려": "스코프 반려(목적 외 파일)", "deploy_approved": "배포 진행 중", "배포오류": "배포 오류(자동 재시도)" };
                 return (
                   <div key={j.id} style={{ border: `1px solid ${j.dev_status === "배포대기" ? "#d3c0e6" : "#e6d8bf"}`, borderRadius: 10, padding: "9px 11px", marginBottom: 8, background: j.dev_status === "배포대기" ? "#faf7fd" : "#fbfaf5" }}>
                     <div style={{ display: "flex", gap: 5, alignItems: "center", flexWrap: "wrap" }}>
