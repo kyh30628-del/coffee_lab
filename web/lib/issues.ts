@@ -111,11 +111,13 @@ export async function coordinationLifecycle(): Promise<{ routed: number; overdue
       AND NOT EXISTS (SELECT 1 FROM decisions d WHERE d.action_params->>'coord' = c.id::text)`.catch(() => [])) as any[];
   let devEsc = 0;
   for (const c of dev) {
+    // 책임 귀속 = 요청 본부(from_team). '개발팀'은 팀이 아니라 공유 개발 실행 유닛(기조실 직할)이 실행. 소유는 요청 본부.
+    const owner = c.from_team || "기획조정실";
     await sql`INSERT INTO decisions (title, detail, team, severity, tier, action_type, action_params, recommendation)
       VALUES (${`[개발] ${c.topic}`.slice(0, 110)},
-              ${`협업 #${c.id} (${c.from_team}→${c.to_team}): ${String(c.detail || c.topic || "").slice(0, 180)}`},
-              ${c.to_team || "개발팀"}, 'MED', 'L3', 'dev_task', ${JSON.stringify({ coord: String(c.id) })}::jsonb,
-              ${`에이전트가 자동 못 푸는 코드 변경 건입니다. 승인하시면 개발에 착수합니다(코드 작성→검증→배포). 반려 시 협업은 보류됩니다.`})`.catch(() => {});
+              ${`요청: ${owner} · 실행: 개발 실행 유닛(협업 #${c.id}). ${String(c.detail || c.topic || "").slice(0, 170)}`},
+              ${owner}, 'MED', 'L3', 'dev_task', ${JSON.stringify({ coord: String(c.id), owner })}::jsonb,
+              ${`${owner}가 요청한 코드 변경 건입니다(어느 본부도 코드를 안 짜므로 공유 개발 실행 유닛이 담당). 승인하시면 개발 착수(코드→검증→배포), 반려 시 보류.`})`.catch(() => {});
     await sql`UPDATE coordination SET stage='CEO결재' WHERE id=${c.id}`.catch(() => {});
     devEsc++;
   }
