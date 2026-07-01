@@ -402,22 +402,27 @@ export default function OrgDashboard() {
         {/* 🤝 협업 현황 — 경영지원팀 주관 코디네이션 (접이식·기본 접힘) */}
         <div style={{ ...card, marginTop: 10 }}>
           <button onClick={() => setShowCoord(!showCoord)} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
-            <span style={{ fontSize: 14, fontWeight: 700, color: "#9c6b3f" }}>{showCoord ? "▾" : "▸"} 🤝 협업 현황 ({coord.open.length}) <span style={{ fontSize: 10, fontWeight: 400, color: "#9c8a6c" }}>· 경영지원팀 주관</span></span>
+            <span style={{ fontSize: 14, fontWeight: 700, color: (coord as any).overdue ? "#b03a3a" : "#9c6b3f" }}>{showCoord ? "▾" : "▸"} 🤝 협업 현황 ({coord.open.length}){(coord as any).overdue ? <span style={{ fontSize: 10, fontWeight: 700, color: "#b03a3a" }}> · ⚠️ 지연 {(coord as any).overdue}</span> : null} <span style={{ fontSize: 10, fontWeight: 400, color: "#9c8a6c" }}>· 경영지원팀 주관</span></span>
             <span style={{ fontSize: 10.5, color: "#9c8a6c" }}>{showCoord ? "접기" : "보기"}</span>
           </button>
           {showCoord && <div style={{ marginTop: 8 }}>
+          <div style={{ fontSize: 10, color: "#9c8a6c", marginBottom: 6 }}>흐름: 요청 → 조율 → 수신확인 → 완료 (기한초과 시 지연·재촉)</div>
           {coord.open.length === 0 ? <div style={{ color: "#3f7a4f", fontSize: 13 }}>진행 중인 부서 간 협업 없음</div> :
-            coord.open.map((c) => (
-              <div key={c.id} style={{ border: "1px solid #e6d8bf", borderRadius: 10, padding: "9px 11px", marginBottom: 8, background: "#fbfaf5" }}>
+            coord.open.map((c: any) => {
+              const stg = c.stage || "요청";
+              const stageC: Record<string, string> = { "요청": "#8a7458", "조율": "#c98a3c", "수신확인": "#2a7a72", "지연": "#b03a3a" };
+              return (
+              <div key={c.id} style={{ border: `1px solid ${stg === "지연" ? "#e6b3b3" : "#e6d8bf"}`, borderRadius: 10, padding: "9px 11px", marginBottom: 8, background: stg === "지연" ? "#fdf3f3" : "#fbfaf5" }}>
                 <div style={{ display: "flex", gap: 5, alignItems: "center", flexWrap: "wrap" }}>
                   <span style={{ background: typeC[c.type] || "#888", color: "#fff", fontSize: 9.5, fontWeight: 700, padding: "2px 7px", borderRadius: 20 }}>{typeLabel[c.type] || c.type}</span>
-                  {Number(c.days) >= 2 && <span style={{ background: "#b03a3a", color: "#fff", fontSize: 9.5, fontWeight: 700, padding: "2px 7px", borderRadius: 20 }}>지연</span>}
+                  <span style={{ background: stageC[stg] || "#888", color: "#fff", fontSize: 9.5, fontWeight: 700, padding: "2px 7px", borderRadius: 20 }}>{stg}</span>
+                  {c.due_h != null && stg !== "지연" && <span style={{ fontSize: 9.5, color: Number(c.due_h) < 0 ? "#b03a3a" : "#9c8a6c" }}>{Number(c.due_h) >= 0 ? `${c.due_h}h 내` : "기한초과"}</span>}
                   <span style={{ fontWeight: 700, fontSize: 12.5 }}>{c.topic}</span>
                 </div>
                 <div style={{ fontSize: 11, color: "#8a7458", margin: "4px 0 2px" }}>{c.from_team} <span style={{ color: "#c98a3c" }}>→</span> {c.to_team}</div>
                 {c.detail && <div style={{ fontSize: 11.5, color: "#5a4631", lineHeight: 1.45 }}>{c.detail}</div>}
               </div>
-            ))}
+            );})}
           {coord.resolved.length > 0 && <div style={{ fontSize: 10.5, color: "#9c8a6c", marginTop: 4 }}>최근 해결: {coord.resolved.slice(0, 3).map((r: any) => r.topic).join(" · ")}</div>}
           </div>}
         </div>

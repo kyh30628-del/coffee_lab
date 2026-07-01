@@ -1,6 +1,7 @@
 import { sql } from "./db";
 import { nameCoherence, cleanCafeName } from "./reviewQuality";
 import { healNonCafeCategory, healOffConceptByReview, healRestaurantByReview, healNonCafeByReview, healOutOfBox, healAreaLabel } from "./synthStore";
+import { pushTrigger } from "./auditTrigger";
 
 const parseRv = (o: any): string[] => {
   let a = o; if (typeof a === "string") { try { a = JSON.parse(a); } catch { return []; } }
@@ -77,7 +78,33 @@ export async function autoCorrect(): Promise<{ resolved: number; escalated: numb
     }
     // 0.35~0.5 = 애매 → 레드팀 판단(그대로)
   }
+  // 🤝 협업 생애주기도 매 사이클 굴린다(요청→조율→기한→지연 재상신). 결정론 백본.
+  try { const cl = await coordinationLifecycle(); resolved += cl.routed; escalated += cl.overdue; for (const m of cl.log) if (log.length < 10) log.push(m); } catch { /* graceful */ }
   return { resolved, escalated, log };
+}
+
+// 🤝 협업 생애주기(결정론 백본) — 요청(open) → 조율(기조실장 배정·기한) → [받은 팀 에이전트가 수신확인·조치·완료] → 지연 시 재상신.
+//   에이전트가 '넘기고 끝'이던 걸(open 방치) 매끄러운 흐름으로: 기한 부여 + 과기한 자동 재상신(담당 에이전트 이벤트 기동).
+//   stage: 요청 → 조율 → 수신확인 → 완료 / 지연. 실제 조치는 담당 팀 에이전트(수신확인·resolved), 여긴 흐름·기한·재촉만.
+export async function coordinationLifecycle(): Promise<{ routed: number; overdue: number; log: string[] }> {
+  const log: string[] = []; let routed = 0, overdue = 0;
+  await sql`ALTER TABLE coordination ADD COLUMN IF NOT EXISTS stage TEXT`.catch(() => {});
+  await sql`ALTER TABLE coordination ADD COLUMN IF NOT EXISTS due_at TIMESTAMPTZ`.catch(() => {});
+  await sql`ALTER TABLE coordination ADD COLUMN IF NOT EXISTS accepted_at TIMESTAMPTZ`.catch(() => {});
+  await sql`ALTER TABLE coordination ADD COLUMN IF NOT EXISTS escalated_at TIMESTAMPTZ`.catch(() => {});
+  // 1) 요청 → 조율: 신규/미배정 open에 기한 부여(기조실장 결정론 라우팅). help=6h·cowork=12h·handoff/기타=24h.
+  const r = (await sql`UPDATE coordination
+    SET stage='조율',
+        due_at = created_at + (CASE type WHEN 'help' THEN interval '6 hours' WHEN 'cowork' THEN interval '12 hours' ELSE interval '24 hours' END)
+    WHERE status IN ('open','in_progress') AND due_at IS NULL RETURNING id`.catch(() => [])) as any[];
+  routed = r.length; if (routed && log.length < 6) log.push(`협업 ${routed}건 조율·기한배정`);
+  // 2) 과기한 미해결 → '지연'으로 재상신 + 담당 에이전트 이벤트 기동(재촉). 이미 지연표시된 건 debounce(pushTrigger 동일 kind+ref 스킵).
+  const od = (await sql`UPDATE coordination SET stage='지연', escalated_at=now()
+    WHERE status IN ('open','in_progress') AND due_at < now() AND COALESCE(stage,'') <> '지연'
+    RETURNING id, to_team, topic`.catch(() => [])) as any[];
+  for (const c of od) await pushTrigger("coord_overdue", String(c.id), `협업 지연 #${c.id} → ${c.to_team || "미배정"}: ${String(c.topic || "").slice(0, 60)}`, "MED").catch(() => {});
+  overdue = od.length; if (overdue && log.length < 6) log.push(`협업 지연 ${overdue}건 재상신(담당 재촉)`);
+  return { routed, overdue, log };
 }
 
 // 🚨 실시간 이슈 탐지·라우팅 엔진 (결정론·무료).
@@ -139,9 +166,9 @@ export async function detectIssues(): Promise<Issue[]> {
     if (needsLlm >= 300) out.push({ ikey: "ops:needsllm", source: "품질", severity: (needsLlm >= 1000 ? "HIGH" : "MED"), type: "판정 적체", title: `AI 판정 대기 ${needsLlm.toLocaleString()}건`, detail: "경계 리뷰 판정 적체 — judgeloop 재개 결정 필요(CEO)", team: "품질본부" });
   }
 
-  // 4) 협업 지연 (2일+)
-  const lateCoord = (await sql`SELECT count(*) c FROM coordination WHERE status IN ('open','in_progress') AND created_at < now() - interval '2 days'`.catch(() => [{ c: 0 }])) as any[];
-  if (Number(lateCoord[0].c) > 0) out.push({ ikey: "coord:late", source: "협업", severity: "MED", type: "협업 지연", title: `미해결 협업 ${lateCoord[0].c}건 2일+`, detail: "부서 간 조율이 2일 넘게 안 풀림", team: "경영지원본부", state: "OUTSTANDING", note: "담당 팀 handoff 지연 — 자동교정 대상 아님(팀이 처리해야 해소)" });
+  // 4) 협업 지연 — 생애주기에서 '지연'(과기한)으로 재상신된 건. 담당 팀 에이전트가 조치해야 해소(자동교정 대상 아님).
+  const lateCoord = (await sql`SELECT count(*) c FROM coordination WHERE status IN ('open','in_progress') AND stage='지연'`.catch(() => [{ c: 0 }])) as any[];
+  if (Number(lateCoord[0].c) > 0) out.push({ ikey: "coord:late", source: "협업", severity: "MED", type: "협업 지연", title: `협업 지연 ${lateCoord[0].c}건(기한초과·재촉됨)`, detail: "받은 팀이 기한 내 확인·조치 안 함 — 담당 에이전트 이벤트 기동으로 재촉 중", team: "경영지원본부", state: "OUTSTANDING", note: "담당 팀 에이전트가 수신확인·조치해야 해소(coord_overdue 트리거로 재촉)" });
 
   // ★ 빠르게 바뀌는 오염 신호는 DB '직접 실시간' 조회(관제탑 캐시는 stale될 수 있음 → 사장님이 본 3건을 RM이 1건만 보던 버그).
   //   품질 오염(audit_flags)·그라운딩 의심·리뷰 맥락(offctx)을 *항상 최신*으로 잡는다.
