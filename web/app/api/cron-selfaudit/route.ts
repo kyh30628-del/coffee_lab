@@ -25,6 +25,7 @@ const EXPECT_MAX_H: Record<string, number> = {
   "qualityaudit": 30,     // 일배치 03:30 (제목오염 샘플링·재합성)
   "audit-watch": 1,       // 이벤트 워처 5분
   "chat-watch": 1,        // 관제 챗봇 상주(60초 하트비트)
+  "dev-pipeline": 1,      // 개발 파이프라인 10분(배포+빌드)
 };
 const maxH = (job: string) => EXPECT_MAX_H[job] ?? 8;
 
@@ -34,7 +35,7 @@ const JOB_TEAM: Record<string, string> = {
   "dong-backfill": "운영본부", "cron-synth": "운영본부", "cron-resynth": "운영본부", "cron-embed": "운영본부", "cron-snapshot": "운영본부", "cron-enrich": "운영본부", "cron-closure": "운영본부",
   "cron-grow": "성장본부", "cron-demand": "성장본부", "cron-discover-categories": "성장본부", "cafe-collect": "성장본부", "cron-newsletter": "성장본부",
   "weekly-evaluation": "전략기획본부",
-  "chief-manager": "기획조정실", "self-audit": "기획조정실", "audit-watch": "기획조정실",
+  "chief-manager": "기획조정실", "self-audit": "기획조정실", "audit-watch": "기획조정실", "dev-pipeline": "기획조정실",
   "chat-watch": "경영지원본부",
 };
 const teamOf = (job: string) => JOB_TEAM[job] ?? "경영지원본부";

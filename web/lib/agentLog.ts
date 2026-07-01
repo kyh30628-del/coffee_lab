@@ -9,7 +9,7 @@ const CRONFAIL_TEAM: Record<string, string> = {
   "cron-closure": "운영본부", "cron-enrich": "운영본부",
   // 로컬 launchd 잡(하트비트 경유) — cron-selfaudit JOB_TEAM과 동기화
   "youtube-backfill": "품질본부", "qualityaudit": "품질본부", "dong-backfill": "운영본부", "weekly-evaluation": "전략기획본부",
-  "chief-manager": "기획조정실", "self-audit": "기획조정실", "audit-watch": "기획조정실", "chat-watch": "경영지원본부",
+  "chief-manager": "기획조정실", "self-audit": "기획조정실", "audit-watch": "기획조정실", "chat-watch": "경영지원본부", "dev-pipeline": "기획조정실",
 };
 
 // 에이전트(cron) 실행 로그 — agent_runs에 job별 최신 1행(upsert). 관제탑 모니터링 사각지대 제거.

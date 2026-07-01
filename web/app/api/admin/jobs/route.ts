@@ -14,6 +14,7 @@ const JOB_META: Record<string, { label: string; team: string; sched: string; max
   "dong-backfill":     { label: "동·카테고리 백필", team: "운영본부",     sched: "00:10",  maxH: 30 },
   "weekly-evaluation": { label: "주간 거버넌스",    team: "전략기획본부", sched: "09시",   maxH: 30 },
   "chat-watch":        { label: "관제 챗봇",        team: "경영지원본부", sched: "상주",   maxH: 1 },
+  "dev-pipeline":      { label: "개발 파이프라인",  team: "기획조정실",   sched: "10분",   maxH: 1 },
 };
 
 export async function GET(req: NextRequest) {
