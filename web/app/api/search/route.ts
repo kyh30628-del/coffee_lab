@@ -43,6 +43,26 @@ const CONCEPTS: { id: string; triggers: string[]; axis?: string; taste?: string;
   { id: "sweet", triggers: ["단맛", "카라멜", "바닐라", "꿀", "초콜릿", "달콤한"], taste: "sweet", label: "단맛" },
 ];
 
+// 서울 25개 구 목록 (cafes.area에는 접두사 없이 "마포구" 형태로 저장)
+const SEOUL_GU = [
+  "종로구","중구","용산구","성동구","광진구","동대문구","중랑구","성북구",
+  "강북구","도봉구","노원구","은평구","서대문구","마포구","양천구","강서구",
+  "구로구","금천구","영등포구","동작구","관악구","서초구","강남구","송파구","강동구",
+];
+// 경기도 시·군 목록
+const GYEONGGI_SI = [
+  "수원시","성남시","의정부시","안양시","부천시","광명시","평택시","동두천시",
+  "안산시","고양시","과천시","구리시","남양주시","오산시","시흥시","군포시",
+  "의왕시","하남시","용인시","파주시","이천시","안성시","김포시","화성시",
+  "광주시","양주시","포천시","여주시","연천군","가평군","양평군",
+];
+// 광역명("서울","경기") → 하위 행정구역 목록. 없으면 null.
+function metroAreaList(region: string): string[] | null {
+  if (region === "서울" || region === "서울특별시") return SEOUL_GU;
+  if (region === "경기" || region === "경기도") return GYEONGGI_SI;
+  return null;
+}
+
 function inRegion(area: string, region: string): boolean {
   if (!region) return true;
   const a = area ?? "";
@@ -53,6 +73,9 @@ function inRegion(area: string, region: string): boolean {
     return a.startsWith("인천") && (a.includes(gu) || a.includes(region));
   }
   if (a.startsWith("인천")) return false;
+  // 서울·경기 광역명 → 하위 구/시 목록으로 확장 매칭
+  const metroList = metroAreaList(region);
+  if (metroList) return metroList.some((g) => a.includes(g));
   if (a.includes(region)) return true;
   const short = region.replace(/(특별시|광역시|시|군|구)$/, "");
   return short.length >= 2 && a.includes(short);
@@ -148,6 +171,7 @@ export async function GET(req: NextRequest) {
     const shortRaw = region.replace(/(특별시|광역시|시|군|구)$/, "");
     const short = shortRaw.length >= 2 ? shortRaw : region; // '중구'→'중'(1자)는 중랑구까지 오매칭 → 전체이름 유지
     const p1 = `%${region}%`, p2 = `%${short}%`;
+    const metroList = metroAreaList(region);
 
     let mode: "semantic" | "keyword" | "ai" = "keyword";
     let scored: any[] = [];
@@ -159,15 +183,25 @@ export async function GET(req: NextRequest) {
         const qvec = await embedQuery(q);
         if (qvec) {
           const lit = toVectorLiteral(qvec);
-          const rows = (await sql.query(
-            `SELECT ${FIELDS}, 1 - (embedding <=> $1::vector) AS sim
-             FROM cafes
-             WHERE published = true AND embedding IS NOT NULL
-               AND ($2 = '' OR area ILIKE $3 OR area ILIKE $4)
-             ORDER BY embedding <=> $1::vector
-             LIMIT 80`,
-            [lit, region, p1, p2],
-          )) as unknown as any[];
+          const rows = metroList
+            ? (await sql.query(
+                `SELECT ${FIELDS}, 1 - (embedding <=> $1::vector) AS sim
+                 FROM cafes
+                 WHERE published = true AND embedding IS NOT NULL
+                   AND area = ANY($2::text[])
+                 ORDER BY embedding <=> $1::vector
+                 LIMIT 80`,
+                [lit, metroList],
+              )) as unknown as any[]
+            : (await sql.query(
+                `SELECT ${FIELDS}, 1 - (embedding <=> $1::vector) AS sim
+                 FROM cafes
+                 WHERE published = true AND embedding IS NOT NULL
+                   AND ($2 = '' OR area ILIKE $3 OR area ILIKE $4)
+                 ORDER BY embedding <=> $1::vector
+                 LIMIT 80`,
+                [lit, region, p1, p2],
+              )) as unknown as any[];
           if (rows.length > 0) {
             mode = "semantic";
             for (const c of rows) byId.set(c.id, c);
@@ -224,13 +258,21 @@ export async function GET(req: NextRequest) {
       const dq = ql.replace(/\s+/g, "");
       const isCategory = CATEGORY_WORD.has(dq) || tokens.every((t) => CATEGORY_WORD.has(t));
       if (dq.length >= 2 && !isCategory) {
-        const nameRows = (await sql.query(
-          `SELECT ${FIELDS} FROM cafes WHERE published = true
-             AND replace(lower(name), ' ', '') LIKE $1
-             AND ($2 = '' OR area ILIKE $3 OR area ILIKE $4)
-           ORDER BY (replace(lower(name), ' ', '') = $5) DESC, (synth_grade = '검증') DESC, synth_count DESC NULLS LAST LIMIT 8`,
-          [`%${dq}%`, region, p1, p2, dq],
-        )) as unknown as any[];
+        const nameRows = metroList
+          ? (await sql.query(
+              `SELECT ${FIELDS} FROM cafes WHERE published = true
+                 AND replace(lower(name), ' ', '') LIKE $1
+                 AND area = ANY($2::text[])
+               ORDER BY (replace(lower(name), ' ', '') = $3) DESC, (synth_grade = '검증') DESC, synth_count DESC NULLS LAST LIMIT 8`,
+              [`%${dq}%`, metroList, dq],
+            )) as unknown as any[]
+          : (await sql.query(
+              `SELECT ${FIELDS} FROM cafes WHERE published = true
+                 AND replace(lower(name), ' ', '') LIKE $1
+                 AND ($2 = '' OR area ILIKE $3 OR area ILIKE $4)
+               ORDER BY (replace(lower(name), ' ', '') = $5) DESC, (synth_grade = '검증') DESC, synth_count DESC NULLS LAST LIMIT 8`,
+              [`%${dq}%`, region, p1, p2, dq],
+            )) as unknown as any[];
         if (nameRows.length > 0) {
           const have = new Set(results.map((r: any) => r.id));
           // 정확히 이름이 일치하는 것만 최상단 고정(9999). 부분일치는 등급가점만 받아 일반 랭킹과 경쟁.
