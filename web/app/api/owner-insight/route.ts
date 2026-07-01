@@ -23,20 +23,25 @@ export async function GET(req: NextRequest) {
     const name = req.nextUrl.searchParams.get("name") ?? "";
     if (!name) return NextResponse.json({ ok: false, error: "name 필요" }, { status: 400 });
 
-    const me = (await sql`SELECT id, name, area, synth_grade, synth_count, synth_identity, char_scores, review_dates, published FROM cafes WHERE name = ${name} LIMIT 1`)[0];
+    // 🛡️ 동명(同名) 카페 오식별 방지(2026-07-02 감사): PIN 인증은 cafe_id(scope) 기반이므로 비-admin은
+    //   이름이 아니라 *인증된 id*로 직접 조회한다. (과거 WHERE name=... LIMIT 1이 같은 이름의 다른 카페를
+    //   먼저 잡으면 진짜 사장님이 403을 받던 버그.) admin은 이름으로 임의 카페 조회 유지.
+    const me = scope === "admin"
+      ? (await sql`SELECT id, name, area, synth_grade, synth_count, synth_identity, char_scores, review_dates, published FROM cafes WHERE name = ${name} LIMIT 1`)[0]
+      : (await sql`SELECT id, name, area, synth_grade, synth_count, synth_identity, char_scores, review_dates, published FROM cafes WHERE id = ${scope} LIMIT 1`)[0];
     if (!me) return NextResponse.json({ ok: false, error: "카페를 찾을 수 없음" }, { status: 404 });
-    if (scope !== "admin" && Number(me.id) !== scope) return NextResponse.json({ ok: false, error: "본인 카페만 조회할 수 있어요" }, { status: 403 });
     // 미공개 카페는 공개 동네 순위 모집단에 없어 rank=0·차트 부재가 됨 → 순위·인사이트를 내지 않고 명확히 안내.
     if (!me.published) return NextResponse.json({ ok: false, error: "아직 공개 전이라 동네 순위·인사이트를 낼 수 없어요(공개 후 이용 가능)." }, { status: 409 });
 
     const myGu = guOf(me.area);
-    const all = await sql`SELECT name, area, synth_grade, synth_count, synth_identity, char_scores FROM cafes WHERE published = true` as unknown as any[];
+    // id 포함 — 동명 카페를 이름이 아니라 id로 식별(순위·isMe 오표시 방지, 2026-07-02).
+    const all = await sql`SELECT id, name, area, synth_grade, synth_count, synth_identity, char_scores FROM cafes WHERE published = true` as unknown as any[];
     const hood = all.filter((c) => guOf(c.area) === myGu);
 
-    // 순위
+    // 순위 — 본인 식별은 id 기준(동명 카페가 있어도 정확)
     const sorted = [...hood].sort((a, b) => (b.synth_count ?? 0) - (a.synth_count ?? 0));
-    const rank = sorted.findIndex((c) => c.name === me.name) + 1;
-    const rankList = sorted.map((c, i) => ({ rank: i + 1, name: c.name, count: c.synth_count ?? 0, grade: c.synth_grade, isMe: c.name === me.name }));
+    const rank = sorted.findIndex((c) => Number(c.id) === Number(me.id)) + 1;
+    const rankList = sorted.map((c, i) => ({ rank: i + 1, name: c.name, count: c.synth_count ?? 0, grade: c.synth_grade, isMe: Number(c.id) === Number(me.id) }));
 
     // ===== 축별 점수화 (절대 카운트 → 같은 동네 분포 내 백분위 0~100) =====
     // PRINCIPLES §3/§5: 절대점수 대신 분포 내 상대 위치로 변환·정규화.
@@ -76,7 +81,7 @@ export async function GET(req: NextRequest) {
 
     // 비슷한 카페
     const myV = CHAR_AXES.map((ax) => (me.char_scores ?? {})[ax.key] ?? 0);
-    const similar = hood.filter((c) => c.name !== me.name).map((c) => {
+    const similar = hood.filter((c) => Number(c.id) !== Number(me.id)).map((c) => {
       const v = CHAR_AXES.map((ax) => (c.char_scores ?? {})[ax.key] ?? 0);
       return { name: c.name, grade: c.synth_grade, count: c.synth_count, dist: Math.sqrt(myV.reduce((s, x, i) => s + (x - v[i]) ** 2, 0)) };
     }).sort((a, b) => a.dist - b.dist).slice(0, 3);

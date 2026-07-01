@@ -18,10 +18,10 @@ export async function GET(req: NextRequest) {
     if (!me || !me.published) return NextResponse.json({ ok: false, error: "공개된 카페가 아닙니다" }, { status: 404 });
 
     const myGu = guOf(me.area);
-    const hood = (await sql`SELECT name, area, synth_count, char_scores FROM cafes WHERE published = true`) as any[];
+    const hood = (await sql`SELECT id, name, area, synth_count, char_scores FROM cafes WHERE published = true`) as any[];
     const inHood = hood.filter((c) => guOf(c.area) === myGu);
     const sorted = [...inHood].sort((a, b) => (b.synth_count ?? 0) - (a.synth_count ?? 0));
-    const rank = sorted.findIndex((c) => c.name === me.name) + 1;
+    const rank = sorted.findIndex((c) => Number(c.id) === Number(me.id)) + 1; // 동명 카페 순위 오식별 방지(2026-07-02)
 
     // 대표 강점: 내 점수 높고 동네에서 흔치 않은 축(차별점)
     const cs = me.char_scores || {};
