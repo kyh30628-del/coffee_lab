@@ -105,7 +105,18 @@ export async function GET(req: NextRequest) {
       headlineA, headlineB,
       // 헤드라인 제외 후 잘라서 항상 꽉 채움(공개 카페가 충분하면 Top3=3개)
       top3: byReview.filter((c) => !usedIds.has(c.id)).slice(0, 3).map((c: any) => slim(c, "top")),
-      fresh: byNew.filter((c) => !usedIds.has(c.id)).slice(0, 5).map((c: any) => slim(c, "fresh")),
+      // 최신순 상위 20 → 같은 구/시 최대 2개 제한 → 최신순 5개 (지역 편향 방지)
+      fresh: (() => {
+        const candidates = byNew.filter((c) => !usedIds.has(c.id)).slice(0, 20);
+        const areaCnt = new Map<string, number>();
+        const deduped: any[] = [];
+        for (const c of candidates) {
+          const gu = guOf(c.area ?? "");
+          const n = areaCnt.get(gu) ?? 0;
+          if (n < 2) { deduped.push(c); areaCnt.set(gu, n + 1); }
+        }
+        return deduped.slice(0, 5).map((c: any) => slim(c, "fresh"));
+      })(),
       specialty: bySpecialty.filter((c) => !usedIds.has(c.id)).slice(0, 5).map((c: any) => slim(c, "specialty")),
     }, {
       // 엣지 캐시(지역별로 따로 캐시됨). 추천·featured는 5분 신선도면 충분.
