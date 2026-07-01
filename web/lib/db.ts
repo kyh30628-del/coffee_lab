@@ -1,4 +1,3 @@
-// dev-pipeline smoke test ok
 import { neon } from "@neondatabase/serverless";
 
 export const sql = neon(process.env.DATABASE_URL!);
