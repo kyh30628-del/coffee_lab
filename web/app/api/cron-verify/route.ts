@@ -130,13 +130,16 @@ export async function GET(req: NextRequest) {
     const grounding = await (async () => {
       try {
         // 공개(소비자 노출) / 비공개(보류 — 소비자 안 보임)를 분리 → 화면이 '소비자 영향'을 사실대로 표시.
+        // ⚠️ 신선도 필터 필수(gc.checked_at >= c.synth_updated AND c.llm_judged_at IS NOT NULL):
+        //   재합성(synth_updated) 이후 재검 안 된 flag는 '지금 없는 옛 소개글'을 가리키는 stale.
+        //   이걸 빼면 RM보드·관제탑(둘 다 이 조건)과 숫자가 어긋나 유령 '오염 N건'이 영구 잔존. 조건은 각 위치에 정적 인라인.
         const g = (await sql`SELECT count(*)::int total,
-          count(*) FILTER (WHERE NOT gc.grounded)::int flagged,
-          count(*) FILTER (WHERE NOT gc.grounded AND c.published)::int public_flagged,
-          count(*) FILTER (WHERE NOT gc.grounded AND NOT c.published)::int held,
+          count(*) FILTER (WHERE NOT gc.grounded AND gc.checked_at >= c.synth_updated AND c.llm_judged_at IS NOT NULL)::int flagged,
+          count(*) FILTER (WHERE NOT gc.grounded AND c.published AND gc.checked_at >= c.synth_updated AND c.llm_judged_at IS NOT NULL)::int public_flagged,
+          count(*) FILTER (WHERE NOT gc.grounded AND NOT c.published AND gc.checked_at >= c.synth_updated AND c.llm_judged_at IS NOT NULL)::int held,
           max(gc.checked_at) last FROM grounding_checks gc JOIN cafes c ON c.id = gc.cafe_id`)[0] as any;
-        // 샘플은 '공개중 의심'(=실제 소비자 영향)만. 비공개 보류는 이미 차단돼 노출 0.
-        const samples = await sql`SELECT c.name s, gc.issue FROM grounding_checks gc JOIN cafes c ON c.id = gc.cafe_id WHERE NOT gc.grounded AND c.published ORDER BY gc.checked_at DESC LIMIT 6` as unknown as any[];
+        // 샘플은 '공개중 의심'(=실제 소비자 영향)만. 비공개 보류는 이미 차단돼 노출 0. (동일 신선도 필터)
+        const samples = await sql`SELECT c.name s, gc.issue FROM grounding_checks gc JOIN cafes c ON c.id = gc.cafe_id WHERE NOT gc.grounded AND c.published AND gc.checked_at >= c.synth_updated AND c.llm_judged_at IS NOT NULL ORDER BY gc.checked_at DESC LIMIT 6` as unknown as any[];
         return { total: g.total ?? 0, flagged: g.flagged ?? 0, publicFlagged: g.public_flagged ?? 0, held: g.held ?? 0, last: g.last, samples };
       } catch { return null; }
     })();
