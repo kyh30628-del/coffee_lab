@@ -167,6 +167,22 @@ export async function GET(req: NextRequest) {
       pending.push({ kind: "review_pollution", term: p.name, cafes: 1, samples: [p.id], reason: `노출리뷰가 비카페 업체어 ${p.nc}회(카페어 ${p.cf}) — 이름충돌/오염 의심, 검토 후 비공개(승인)` });
     }
 
+    // ✅ 승인대기(review_pollution)는 '스냅샷'에만 두면 결재수단이 없어 RM보드에 '처리중' 좀비가 됨(CEO 지적 2026-07-01).
+    //   → autoCorrect와 같은 unpublish 결재 레일로 상신(idempotent ikey=autopollute:id로 중복방지). CEO 승인 시 즉시 비공개 집행.
+    if (!dry) {
+      for (const p of pollutedCafes.filter((p) => !okIds2.has(String(p.id)))) {
+        const ik = `autopollute:${p.id}`;
+        const dup = (await sql`SELECT 1 FROM decisions WHERE action_params->>'ikey'=${ik} AND status IN('pending','approved','done','rejected','deferred') LIMIT 1`.catch(() => [])) as any[];
+        if (!dup.length) {
+          await sql`INSERT INTO decisions (title,detail,team,severity,tier,action_type,action_params,recommendation)
+            VALUES (${`[룰갭] 오염 카페 비공개 — ${p.name}`.slice(0, 110)},
+                    ${`규칙갭 자가진단: 노출리뷰가 비카페 업체어 ${p.nc}회·카페어 ${p.cf}회로 이름충돌/오염 의심(카페#${p.id}).`.slice(0, 200)},
+                    '품질본부', 'HIGH', 'L3', 'unpublish', ${JSON.stringify({ ids: [p.id], ikey: ik })}::jsonb,
+                    ${`승인 권합니다. 노출후기가 다른 업체를 가리켜 이 카페 소개로 부적합(카페어 ${p.cf}회)이라 비공개해도 실손실 적습니다.`})`.catch(() => {});
+        }
+      }
+    }
+
     // 기록(검증·롤백 기준 + 관제탑 노출용)
     if (!dry) await sql`INSERT INTO rulegap_runs (published_before, learned, pending) VALUES (${pubNow}, ${JSON.stringify(learned)}::jsonb, ${JSON.stringify(pending)}::jsonb)`;
 
