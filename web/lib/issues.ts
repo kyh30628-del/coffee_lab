@@ -23,6 +23,13 @@ export async function autoCorrect(): Promise<{ resolved: number; escalated: numb
   // 정합성도 같은 실시간 경로로 — 박스밖(비수도권)·area라벨 오류를 2시간 배치 대신 여기서 즉시 교정.
   try { const ob = await healOutOfBox(); if (ob.excluded) { resolved += ob.excluded; if (log.length < 8) log.push(`수도권밖 ${ob.excluded}곳 즉시 제외`); } } catch { /* graceful */ }
   try { const al = await healAreaLabel(); if (al.fixed) { resolved += al.fixed; if (log.length < 8) log.push(`area라벨 ${al.fixed}곳 즉시 교정`); } } catch { /* graceful */ }
+  // 🟢 L2 전결(기획조정실장 권한) — 결정론 액션은 다음 사이클(≤10분)에 자동 승인. CEO 트리거 불필요(오탐·오염 수정=L2 전결).
+  //   L3(CEO 전용)는 절대 자동승인 안 함(아래 환원 가드가 지킴). 실무형(agent_task·investigate)도 제외 — 진짜 작업 필요.
+  try {
+    const l2 = (await sql`UPDATE decisions SET status='approved', decided_at=now(), decided_by='기조실장(전결)', result='L2 전결 자동승인'
+      WHERE status='pending' AND tier='L2' AND action_type='unpublish' RETURNING id`.catch(() => [])) as any[];
+    if (l2.length) { if (log.length < 8) log.push(`L2 전결 자동승인 ${l2.length}건(#${l2.map((r) => r.id).join(",")})`); }
+  } catch { /* graceful */ }
   // 🔧 승인된 '결정론 집행' 결정을 그 자리에서 실집행+done — 집행 루프 닫기(더는 '처리중'으로 안 쌓임).
   //   action_type='unpublish'(ids 명시)만 자동집행. agent_task·investigate(구현·판단 필요)는 자동집행 안 하고 OUTSTANDING으로 정직 표시.
   try {
@@ -64,7 +71,7 @@ export async function autoCorrect(): Promise<{ resolved: number; escalated: numb
       const dup = (await sql`SELECT 1 FROM decisions WHERE action_params->>'ikey'=${ik} AND status IN('pending','approved') LIMIT 1`.catch(() => [])) as any[];
       if (!dup.length) {
         await sql`INSERT INTO decisions (title,detail,team,severity,tier,action_type,action_params,recommendation)
-          VALUES (${`[자동] 오염 카페 비공개 — ${c.name}`.slice(0, 110)}, ${`근거오염 자동탐지: 노출후기가 실제 그 카페를 거의 안 말함(cleanName 일치율 ${Math.round(coh * 100)}%).`}, '품질본부', 'HIGH', 'L3', 'unpublish', ${JSON.stringify({ ids: [c.id], ikey: ik })}::jsonb, ${`승인 권합니다. 노출후기가 다른 카페를 가리키는 구구커피류 오염(일치율 ${Math.round(coh * 100)}%)이라 비공개해도 실손실 적습니다.`})`.catch(() => {});
+          VALUES (${`[자동] 오염 카페 비공개 — ${c.name}`.slice(0, 110)}, ${`근거오염 자동탐지: 노출후기가 실제 그 카페를 거의 안 말함(cleanName 일치율 ${Math.round(coh * 100)}%).`}, '품질본부', 'HIGH', 'L2', 'unpublish', ${JSON.stringify({ ids: [c.id], ikey: ik })}::jsonb, ${`명백 오염(일치율 ${Math.round(coh * 100)}%) — 기조실장 전결로 다음 사이클 자동 비공개. 노출후기가 다른 카페를 가리켜 실손실 없음.`})`.catch(() => {});
         escalated++; if (log.length < 8) log.push(`오염→결재상신 ${c.name}(${Math.round(coh * 100)}%)`);
       }
     }

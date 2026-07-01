@@ -177,8 +177,8 @@ export async function GET(req: NextRequest) {
           await sql`INSERT INTO decisions (title,detail,team,severity,tier,action_type,action_params,recommendation)
             VALUES (${`[룰갭] 오염 카페 비공개 — ${p.name}`.slice(0, 110)},
                     ${`규칙갭 자가진단: 노출리뷰가 비카페 업체어 ${p.nc}회·카페어 ${p.cf}회로 이름충돌/오염 의심(카페#${p.id}).`.slice(0, 200)},
-                    '품질본부', 'HIGH', 'L3', 'unpublish', ${JSON.stringify({ ids: [p.id], ikey: ik })}::jsonb,
-                    ${`승인 권합니다. 노출후기가 다른 업체를 가리켜 이 카페 소개로 부적합(카페어 ${p.cf}회)이라 비공개해도 실손실 적습니다.`})`.catch(() => {});
+                    '품질본부', 'HIGH', 'L2', 'unpublish', ${JSON.stringify({ ids: [p.id], ikey: ik })}::jsonb,
+                    ${`명백 오염(카페어 ${p.cf}회) — 기조실장 전결로 다음 사이클 자동 비공개. 노출후기가 다른 업체를 가리켜 실손실 없음.`})`.catch(() => {});
         }
       }
     }
