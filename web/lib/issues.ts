@@ -104,10 +104,19 @@ export async function coordinationLifecycle(): Promise<{ routed: number; overdue
     RETURNING id, to_team, topic`.catch(() => [])) as any[];
   for (const c of od) await pushTrigger("coord_overdue", String(c.id), `협업 지연 #${c.id} → ${c.to_team || "미배정"}: ${String(c.topic || "").slice(0, 60)}`, "MED").catch(() => {});
   overdue = od.length; if (overdue && log.length < 6) log.push(`협업 지연 ${overdue}건 재상신(담당 재촉)`);
-  // 3) 개발·데이터 handoff = 에이전트가 자동 못 푸는 '코드 변경·배포' → 무조건 CEO 결재(L3 dev_task). CEO 승인 시 개발 실행.
-  //    (데이터 조작=L2 자동 vs 코드변경=L3 CEO. 파급·되돌림 난이도가 커서 CEO 게이트.) coord당 1건만(idempotent).
+  // 3a) 순수 데이터 조작(재합성·큐·grounding 등, 코드 아님) → 운영본부 자율 처리로 재배정(CEO 게이트 없음).
+  //     '데이터엔지니어링팀' handoff 중 개발이 아닌 것을 운영본부 인박스로 넘겨 에이전트·크론이 자동 처리(L2/결정론).
+  const dataOps = (await sql`UPDATE coordination
+    SET to_team='운영본부', stage='조율',
+        detail = COALESCE(detail,'') || ' [기조실장 라우팅: 데이터 조작 → 운영본부 자동처리(재합성/큐/정합성), CEO 게이트 불필요]'
+    WHERE status IN ('open','in_progress') AND to_team ~ '데이터|엔지니어' AND to_team !~ '개발'
+    RETURNING id`.catch(() => [])) as any[];
+  if (dataOps.length && log.length < 6) log.push(`데이터 조작 ${dataOps.length}건 → 운영본부 자율처리(CEO 제외)`);
+
+  // 3b) 코드 개발(개발팀 handoff)만 → 무조건 CEO 결재(L3 dev_task). CEO 승인 시 개발 실행.
+  //     (데이터 조작=운영본부 자동 vs 코드변경=L3 CEO. 파급·되돌림이 커서 코드만 CEO 게이트.) coord당 1건(idempotent).
   const dev = (await sql`SELECT id, from_team, to_team, topic, detail FROM coordination c
-    WHERE c.status IN ('open','in_progress') AND (c.to_team ~ '개발|데이터|엔지니어|dev')
+    WHERE c.status IN ('open','in_progress') AND (c.to_team ~ '개발|dev')
       AND NOT EXISTS (SELECT 1 FROM decisions d WHERE d.action_params->>'coord' = c.id::text)`.catch(() => [])) as any[];
   let devEsc = 0;
   for (const c of dev) {
