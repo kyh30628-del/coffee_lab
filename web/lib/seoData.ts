@@ -39,3 +39,10 @@ export async function getRegionTasteCafes(area: string, tasteKey: string, limit 
       ORDER BY (char_scores->>${tasteKey})::int DESC, synth_count DESC NULLS LAST LIMIT ${limit}`) as unknown as SeoCafe[];
   } catch { return []; }
 }
+
+// 지역×취향 공개 카페 곳수 — 취향 페이지 "N곳" 카피의 실제 값(표시 30개를 곳수로 오용 금지).
+export async function getRegionTasteCount(area: string, tasteKey: string): Promise<number> {
+  try {
+    return Number(((await sql`SELECT count(*)::int n FROM cafes WHERE published AND area=${area} AND COALESCE((char_scores->>${tasteKey})::int, 0) > 0`)[0] as any)?.n ?? 0);
+  } catch { return 0; }
+}

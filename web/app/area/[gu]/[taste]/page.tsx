@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Curated from "../../Curated";
-import { getRegions, getRegionTasteCafes, TASTES, tasteByKey, SITE } from "@/lib/seoData";
+import { getRegions, getRegionTasteCafes, getRegionTasteCount, TASTES, tasteByKey, SITE } from "@/lib/seoData";
 
 export const revalidate = 1800; // 30분 — 비공개/신규 반영 빠르게(이전 1일)
 
@@ -36,8 +36,8 @@ export default async function RegionTastePage({ params }: Props) {
   const area = decodeURIComponent(gu);
   const t = tasteByKey(taste);
   if (!t) notFound();
-  const [cafes, regions] = await Promise.all([getRegionTasteCafes(area, taste, 30), getRegions()]);
+  const [cafes, regions, total] = await Promise.all([getRegionTasteCafes(area, taste, 30), getRegions(), getRegionTasteCount(area, taste)]);
   const heading = `${area} ${t.label} 카페`;
-  const intro = `${area}에서 ${t.desc} 카페 ${cafes.length}곳을 진짜 후기로 검증해 골랐어요.`;
+  const intro = `${area}에서 ${t.desc} 카페 ${total || cafes.length}곳을 진짜 후기로 검증해 골랐어요.`;
   return <Curated area={area} tasteKey={taste} heading={heading} intro={intro} cafes={cafes} regions={regions} canonical={`${SITE}/area/${encodeURIComponent(area)}/${taste}`} />;
 }

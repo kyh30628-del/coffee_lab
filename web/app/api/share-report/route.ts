@@ -1,16 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
 import { CHAR_AXES } from "@/lib/charScore";
+import { guOf } from "@/lib/region";
 
 export const runtime = "nodejs";
 
 // 📣 공개 '사장님 리포트' — 카페별 순위·정체성·대표 강점(전부 이미 공개된 큐레이션 데이터).
 //   사장님 아웃리치: 이 리포트 링크/QR을 사장님이 보고 공유 → 유입(B2B 바이럴). 인증 없음(공개 카페만).
-const guOf = (area: string) => {
-  const a = (area || "").trim();
-  if (a.startsWith("인천") || a.startsWith("서울") || a.startsWith("경기")) return a.split(/\s+/)[1] || a;
-  return a;
-};
+//   동네 분류(guOf)는 lib/region 단일출처 — 예전 로컬 `split[1]`은 '서울 중구'와 '인천 중구'를 한 풀로 병합했다.
 
 export async function GET(req: NextRequest) {
   try {

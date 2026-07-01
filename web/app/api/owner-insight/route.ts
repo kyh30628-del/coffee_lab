@@ -1,20 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
 import { ownerScope } from "@/lib/ownerAuth";
+import { guOf } from "@/lib/region";
 export const runtime = "nodejs";
 
-const REGIONS: Record<string, string[]> = {
-  서울: ["강남구","강동구","강북구","강서구","관악구","광진구","구로구","금천구","노원구","도봉구","동대문구","동작구","마포구","서대문구","서초구","성동구","성북구","송파구","양천구","영등포구","용산구","은평구","종로구","중구","중랑구"],
-  경기: ["수원시","성남시","고양시","용인시","부천시","안산시","안양시","남양주시","화성시","평택시","의정부시","시흥시","파주시","김포시","광명시","광주시","군포시","하남시","오산시","양주시","구리시","안성시","포천시","의왕시","여주시","동두천시","과천시","이천시","양평군","가평군","연천군"],
-  인천: ["중구","동구","미추홀구","연수구","남동구","부평구","계양구","서구","강화군","옹진군"],
-};
-function guOf(area: string): string {
-  const a = (area ?? "").trim();
-  if (a.includes("인천")) { for (const g of REGIONS["인천"]) if (a.includes(g)) return "인천 " + g; return "인천"; }
-  for (const list of Object.values(REGIONS)) for (const g of list) if (a.includes(g)) return g;
-  if (a.includes("구리")) return "구리시";
-  return a;
-}
+// guOf(동네 분류)는 lib/region 단일출처 사용 — 예전 로컬 REGIONS 부분매칭은 '인천 남동구→동구' 오분류 버그가 있었다.
 const CHAR_AXES = [
   { key: "roast", label: "직접로스팅", emoji: "🔥" },
   { key: "work", label: "작업·공부", emoji: "💻" },
@@ -33,9 +23,11 @@ export async function GET(req: NextRequest) {
     const name = req.nextUrl.searchParams.get("name") ?? "";
     if (!name) return NextResponse.json({ ok: false, error: "name 필요" }, { status: 400 });
 
-    const me = (await sql`SELECT id, name, area, synth_grade, synth_count, synth_identity, char_scores, review_dates FROM cafes WHERE name = ${name} LIMIT 1`)[0];
+    const me = (await sql`SELECT id, name, area, synth_grade, synth_count, synth_identity, char_scores, review_dates, published FROM cafes WHERE name = ${name} LIMIT 1`)[0];
     if (!me) return NextResponse.json({ ok: false, error: "카페를 찾을 수 없음" }, { status: 404 });
     if (scope !== "admin" && Number(me.id) !== scope) return NextResponse.json({ ok: false, error: "본인 카페만 조회할 수 있어요" }, { status: 403 });
+    // 미공개 카페는 공개 동네 순위 모집단에 없어 rank=0·차트 부재가 됨 → 순위·인사이트를 내지 않고 명확히 안내.
+    if (!me.published) return NextResponse.json({ ok: false, error: "아직 공개 전이라 동네 순위·인사이트를 낼 수 없어요(공개 후 이용 가능)." }, { status: 409 });
 
     const myGu = guOf(me.area);
     const all = await sql`SELECT name, area, synth_grade, synth_count, synth_identity, char_scores FROM cafes WHERE published = true` as unknown as any[];

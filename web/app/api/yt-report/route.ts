@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
+import { dailyCounts } from "@/lib/metrics";
 export const runtime = "nodejs";
 
 // 📺 유튜브 수집 현황 — 매일 어떤 카페에 어떤 유튜브 영상이 수집됐는지(쿼터 한도라 더디게 진행).
@@ -20,9 +21,10 @@ export async function GET(req: NextRequest) {
       ORDER BY c.yt_checked_at DESC LIMIT 100` as unknown as any[];
     const stat = (await sql`SELECT
       (SELECT count(DISTINCT c.id) FROM cafes c, jsonb_array_elements(c.synth_reviews) r WHERE r->>'link' ILIKE '%youtu%')::int withyt,
-      (SELECT count(*) FROM cafes WHERE raw_reviews IS NOT NULL AND yt_checked_at IS NULL)::int remaining,
-      (SELECT count(*) FROM cafes WHERE yt_checked_at::date = CURRENT_DATE)::int checked_today`)[0] as any;
-    return NextResponse.json({ ok: true, rows, withYt: stat.withyt, remaining: stat.remaining, checkedToday: stat.checked_today });
+      (SELECT count(*) FROM cafes WHERE raw_reviews IS NOT NULL AND yt_checked_at IS NULL)::int remaining`)[0] as any;
+    // '오늘 확인'은 KST 기준 lib/metrics 단일출처 사용 — 예전 UTC(CURRENT_DATE)는 새벽 0~9시 KST분을 누락(90 vs 180).
+    const daily = await dailyCounts();
+    return NextResponse.json({ ok: true, rows, withYt: stat.withyt, remaining: stat.remaining, checkedToday: daily.yt });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Curated from "../Curated";
 import { getRegions, getRegionCafes, SITE } from "@/lib/seoData";
+import { regionPublishedCount } from "@/lib/region";
 
 export const revalidate = 1800; // 30분 — 비공개/신규 반영 빠르게(이전 1일)
 
@@ -29,8 +30,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function RegionPage({ params }: Props) {
   const { gu } = await params;
   const area = decodeURIComponent(gu);
-  const [cafes, regions] = await Promise.all([getRegionCafes(area, 30), getRegions()]);
+  const [cafes, regions, total] = await Promise.all([getRegionCafes(area, 30), getRegions(), regionPublishedCount(area)]);
   const heading = `${area} 카페 추천`;
-  const intro = `${area}에서 가볼 만한 동네 카페 ${cafes.length}곳을 진짜 후기로 검증해 모았어요. 취향별로도 골라보세요.`;
+  const intro = `${area}에서 가볼 만한 동네 카페 ${total || cafes.length}곳을 진짜 후기로 검증해 모았어요. 취향별로도 골라보세요.`;
   return <Curated area={area} heading={heading} intro={intro} cafes={cafes} regions={regions} canonical={`${SITE}/area/${encodeURIComponent(area)}`} />;
 }

@@ -63,7 +63,7 @@ export async function GET(req: NextRequest) {
       COUNT(*) FILTER (WHERE created_at > now() - interval '7 days')::int new7d,
       ROUND(AVG(COALESCE(visit_count,1))::numeric, 2) avg_visits
       FROM user_consents`)[0];
-    const daily = await sql`SELECT to_char(created_at,'MM-DD') d, COUNT(*)::int n FROM user_consents WHERE created_at > now() - interval '14 days' GROUP BY d ORDER BY d`;
+    const daily = await sql`SELECT to_char(created_at AT TIME ZONE 'Asia/Seoul','MM-DD') d, COUNT(*)::int n FROM user_consents WHERE created_at > now() - interval '14 days' GROUP BY d ORDER BY d`;
     const visitorRegions = await sql`SELECT region, COUNT(*)::int n FROM user_consents WHERE region IS NOT NULL GROUP BY region ORDER BY n DESC LIMIT 10`;
 
     return NextResponse.json({
