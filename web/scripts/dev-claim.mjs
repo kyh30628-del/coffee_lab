@@ -1,0 +1,19 @@
+// 개발 태스크 원자적 클레임 — stale 'building' 리셋 후, 승인·미빌드 태스크를 최대 K건 'building'으로 잠그고 id 출력.
+//   병렬 디스패처가 각 id를 별도 워크트리 에이전트에 배정(중복 방지). 사용: node --import tsx dev-claim.mjs <K>
+import { readFileSync } from "fs";
+import { neon } from "@neondatabase/serverless";
+for (const l of readFileSync(new URL("../.env.local", import.meta.url), "utf8").split("\n")) { const m = l.match(/^([A-Z_0-9]+)=(.*)$/); if (m) process.env[m[1]] = m[2].replace(/^["']|["']$/g, ""); }
+const sql = neon(process.env.DATABASE_URL);
+const K = Math.max(1, Math.min(6, Number(process.argv[2] || 3)));
+
+// 1) stale 'building'(30분+ 미완) → 미빌드로 리셋(재시도 가능)
+await sql`UPDATE decisions SET action_params = action_params - 'dev_status' - 'dev_claimed'
+  WHERE action_type='dev_task' AND status='approved' AND action_params->>'dev_status'='building'
+    AND (action_params->>'dev_claimed')::timestamptz < now() - interval '30 minutes'`.catch(() => {});
+// 2) 최대 K건 원자적 클레임
+const rows = await sql`UPDATE decisions SET action_params = action_params || jsonb_build_object('dev_status','building','dev_claimed', now()::text)
+  WHERE id IN (
+    SELECT id FROM decisions WHERE action_type='dev_task' AND status='approved' AND (action_params->>'dev_status') IS NULL
+    ORDER BY id LIMIT ${K} FOR UPDATE SKIP LOCKED
+  ) RETURNING id`.catch(() => []);
+console.log(rows.map((r) => r.id).join(" "));
