@@ -42,5 +42,7 @@ export async function ensureSchema() {
     )`;
   // 동/면 단위 계층 필터·지도 집계용(지번에서 파싱해 발굴 중 채움)
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS dong TEXT`.catch(() => {});
+  // B2B 아웃리치 DM 타깃용 인스타그램 URL
+  await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS instagram_url TEXT`.catch(() => {});
   ensured = true;
 }
