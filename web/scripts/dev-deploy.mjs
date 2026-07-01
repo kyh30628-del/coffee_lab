@@ -1,10 +1,15 @@
 // 🚀 개발 배포 워커(결정론·무LLM) — CEO가 '배포' 확정한 dev_task(dev_status='deploy_approved')를
 //   브랜치를 main에 merge + push(=Vercel 배포) + /api/version 반영 확인 → decision done · coordination resolved.
 //   서버(Vercel)는 배포 못 하므로 로컬에서만. 실패 시 정직히 기록(deploy_failed), main 오염 안 되게 안전 처리.
-import { readFileSync } from "node:fs";
+import { readFileSync, mkdirSync, rmdirSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { neon } from "@neondatabase/serverless";
 const ROOT = "/Users/wangwida/coffee-platform";
+// 메인 레포 git 조작 전역 락(빌드 워커와 레이스 방지). mkdir 원자성.
+const GLOCK = "/tmp/coffee-gitrepo.lock";
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+async function glock() { for (let i = 0; i < 200; i++) { try { mkdirSync(GLOCK); return true; } catch { await sleep(400); } } return false; }
+const gunlock = () => { try { rmdirSync(GLOCK); } catch {} };
 const env = readFileSync(`${ROOT}/web/.env.local`, "utf8");
 for (const l of env.split("\n")) { const m = l.match(/^([A-Z_0-9]+)=(.*)$/); if (m) process.env[m[1]] = m[2].replace(/^["']|["']$/g, ""); }
 const sql = neon(process.env.DATABASE_URL);
@@ -17,7 +22,9 @@ for (const d of rows) {
   const br = d.action_params?.branch;
   const coord = d.action_params?.coord;
   console.log(`\n[배포] #${d.id} ${d.title} (${br})`);
+  const locked = await glock();
   try {
+    if (!locked) throw new Error("git락 타임아웃");
     if (!br) throw new Error("branch 없음");
     git("checkout main");
     git("pull --rebase origin main");
@@ -44,6 +51,8 @@ for (const d of rows) {
     try { git("checkout main"); } catch {}
     await sql`UPDATE decisions SET result=${`배포 실패: ${String(e.message || e).slice(0, 120)}`}, action_params = action_params || '{"dev_status":"deploy_failed"}'::jsonb WHERE id=${d.id}`.catch(() => {});
     console.log(`  ❌ 배포 실패: ${String(e.message || e).slice(0, 100)}`);
+  } finally {
+    gunlock();
   }
 }
 process.exit(0);
