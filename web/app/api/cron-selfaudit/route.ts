@@ -11,34 +11,9 @@ export const runtime = "nodejs";
 //   기획조정실장(LLM)이 이 결과를 매일 감시·심화. "대표님이 발견하기 전에 내가 먼저."
 //   결정론·무료·멱등. 판단이 필요한 비결정 영역만 사람(CEO/기조실장)에게 올린다.
 
-// 크론별 정상 최대 경과(시간) — 주간/월간 크론을 '지연'으로 오탐하지 않게.
-const EXPECT_MAX_H: Record<string, number> = {
-  "cron-snapshot": 200, "cron-resynth": 200, "cron-newsletter": 200, "cron-discover-categories": 800,
-  "cron-verify": 30, "cron-sentinel": 30, "cron-demand": 30, "cron-rulegap": 30, "cron-closure": 12,
-  "cron-grow": 6, "cron-enrich": 8, "cron-embed": 4, "cron-synth": 4, "cron-issues": 2,
-  // ── 로컬 launchd 잡(하트비트로 agent_runs 기록) — Vercel 크론과 달리 안 넣으면 관제 사각 ──
-  "youtube-backfill": 30, // 일배치 16:30 KST + 버퍼
-  "chief-manager": 20,    // 일간 사이클 08·17시
-  "dong-backfill": 30,    // 일배치 00:10 (dong-backfill.mjs가 이미 이 이름으로 기록)
-  "self-audit": 30,       // 일배치 01시
-  "weekly-evaluation": 30, // 매일 09시(격일 게이트지만 스킵도 하트비트)
-  "qualityaudit": 30,     // 일배치 03:30 (제목오염 샘플링·재합성)
-  "audit-watch": 1,       // 이벤트 워처 5분
-  "chat-watch": 1,        // 관제 챗봇 상주(60초 하트비트)
-  "dev-pipeline": 1,      // 개발 파이프라인 10분(배포+빌드)
-};
-const maxH = (job: string) => EXPECT_MAX_H[job] ?? 8;
-
-// 잡 → 담당 본부 (실패·정지 시 결재상신·이슈 자동 배정). agentLog.ts CRONFAIL_TEAM과 동기화(순환참조 피해 인라인).
-const JOB_TEAM: Record<string, string> = {
-  "youtube-backfill": "품질본부", "qualityaudit": "품질본부", "cron-verify": "품질본부", "cron-sentinel": "품질본부", "cron-rulegap": "품질본부", "cron-selfaudit": "품질본부", "cron-batch-judge": "품질본부",
-  "dong-backfill": "운영본부", "cron-synth": "운영본부", "cron-resynth": "운영본부", "cron-embed": "운영본부", "cron-snapshot": "운영본부", "cron-enrich": "운영본부", "cron-closure": "운영본부",
-  "cron-grow": "성장본부", "cron-demand": "성장본부", "cron-discover-categories": "성장본부", "cafe-collect": "성장본부", "cron-newsletter": "성장본부",
-  "weekly-evaluation": "전략기획본부",
-  "chief-manager": "기획조정실", "self-audit": "기획조정실", "audit-watch": "기획조정실", "dev-pipeline": "기획조정실",
-  "chat-watch": "경영지원본부",
-};
-const teamOf = (job: string) => JOB_TEAM[job] ?? "경영지원본부";
+// 잡별 감시 계약(정상 최대 경과·담당 본부) = lib/jobTeams.ts **단일 출처**(2026-07-02 수리).
+//   과거: ①3벌 맵 drift ②제거된 잡(dong-backfill·qualityaudit) 잔존 ③주석과 실제 주기 불일치("self-audit 01시").
+import { EXPECT_MAX_H, teamOf } from "@/lib/jobTeams";
 
 export async function GET(req: NextRequest) {
   const secret = process.env.CRON_SECRET;
@@ -80,14 +55,17 @@ export async function GET(req: NextRequest) {
     }
 
     // ── 4) 크론·에이전트 건강 ──
+    //   🛡️ 2026-07-02 전면 수리: 과거 dormantIdle(ok && processed==0) 면제가 하트비트 잡(항상 processed=0) 전원을
+    //   정지감지에서 영구 제외 → "8개 잡 감시망"이 구조적으로 죽어 있었음(7/1 17시 12에이전트 전멸도 무감지).
+    //   새 계약: **EXPECT_MAX_H에 등록된 잡만 staleness 감시**(등록=계약, 주기적 잡은 휴면이어도 ran_at이 갱신되므로
+    //   오탐 없음). 미등록 잡(일회성 스크립트·제거된 잡 잔류 기록)은 실패(ok=false)만 감지 — 영구 오탐 클래스 차단.
     const crons = (await sql`SELECT DISTINCT ON (job) job, ok, ran_at, processed FROM agent_runs ORDER BY job, ran_at DESC`) as any[];
     for (const c of crons) {
       if (!c.ok) findings.push({ check: `크론 실패 ${c.job}`, count: 1, team: teamOf(c.job), critical: true });
+      const expect = EXPECT_MAX_H[c.job];
+      if (expect == null) continue; // 감시 계약 없는 잡은 staleness 미적용
       const ageH = (Date.now() - new Date(c.ran_at).getTime()) / 3.6e6;
-      // ⚠️ 오탐 방지(2026-06-30, 자율진단 에이전트 발견): '정상 실행했는데 할 일 0(휴면)'은 정지가 아님.
-      //   dong-backfill('소진·완료')·demand(수요갭0)·sentinel(치유0) 등이 ok·processed=0로 자연 휴면 → '정지의심' 제외.
-      const dormantIdle = c.ok && Number(c.processed || 0) === 0;
-      if (ageH > maxH(c.job) && !dormantIdle) findings.push({ check: `크론 정지의심 ${c.job} (${Math.round(ageH)}h)`, count: 1, team: teamOf(c.job), critical: true });
+      if (ageH > expect) findings.push({ check: `크론 정지의심 ${c.job} (${Math.round(ageH)}h)`, count: 1, team: teamOf(c.job), critical: true });
     }
 
     // ── 5) 자가검증: CEO 결재가 방치되는지 (실행·피드백 누수 감시) ──

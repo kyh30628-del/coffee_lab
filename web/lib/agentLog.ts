@@ -1,16 +1,6 @@
 import { sql } from "./db";
 import { pushTrigger } from "./auditTrigger";
-
-// 크론 실패 → 담당 본부 (issues.ts CRON_TEAM과 동기화 — 순환참조 피해 인라인)
-const CRONFAIL_TEAM: Record<string, string> = {
-  "cron-synth": "운영본부", "cron-resynth": "운영본부", "cron-embed": "운영본부", "cron-snapshot": "운영본부",
-  "orchestrator-heal": "품질본부", "cron-sentinel": "품질본부", "cron-verify": "품질본부", "cron-rulegap": "품질본부", "cron-selfaudit": "품질본부", "cron-batch-judge": "품질본부",
-  "cron-grow": "성장본부", "cron-demand": "성장본부", "cron-newsletter": "성장본부", "cron-discover-categories": "성장본부", "cafe-collect": "성장본부",
-  "cron-closure": "운영본부", "cron-enrich": "운영본부",
-  // 로컬 launchd 잡(하트비트 경유) — cron-selfaudit JOB_TEAM과 동기화
-  "youtube-backfill": "품질본부", "qualityaudit": "품질본부", "dong-backfill": "운영본부", "weekly-evaluation": "전략기획본부",
-  "chief-manager": "기획조정실", "self-audit": "기획조정실", "audit-watch": "기획조정실", "chat-watch": "경영지원본부", "dev-pipeline": "기획조정실",
-};
+import { teamOf } from "./jobTeams"; // 단일 사실 출처(2026-07-02 — 3벌 맵 drift 수리)
 
 // 에이전트(cron) 실행 로그 — agent_runs에 job별 최신 1행(upsert). 관제탑 모니터링 사각지대 제거.
 //   side-effect 타임스탬프(synth_updated 등)에 의존하던 것을 명시 로그로 보완: 잡이 일을 하기 전에 죽어도 ok=false로 잡힘.
@@ -25,7 +15,7 @@ export async function recordRun(job: string, ok: boolean, detail = "", processed
   try {
     const ik = `cronfail:${job}`;
     if (!ok) {
-      const team = CRONFAIL_TEAM[job] || "경영지원본부";
+      const team = teamOf(job);
       await sql`INSERT INTO issues (ikey, source, severity, type, title, detail, team, status, state, note, first_seen, last_seen)
         VALUES (${ik}, '크론', 'HIGH', '크론 실패', ${`${job} 실패`}, ${String(detail).slice(0, 200)}, ${team}, 'open', '처리중', '실패 즉시 자동감지·본부배정', now(), now())
         ON CONFLICT (ikey) DO UPDATE SET status='open', severity='HIGH', detail=EXCLUDED.detail, team=EXCLUDED.team, last_seen=now(), state='처리중', resolved_at=NULL`;

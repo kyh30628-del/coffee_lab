@@ -2,6 +2,8 @@ import { sql } from "./db";
 import { nameCoherence, cleanCafeName } from "./reviewQuality";
 import { healNonCafeCategory, healOffConceptByReview, healRestaurantByReview, healNonCafeByReview, healOutOfBox, healAreaLabel } from "./synthStore";
 import { pushTrigger } from "./auditTrigger";
+import { teamOf } from "./jobTeams";
+import { invalidateCafeCaches } from "./cafeCacheInvalidate";
 
 const parseRv = (o: any): string[] => {
   let a = o; if (typeof a === "string") { try { a = JSON.parse(a); } catch { return []; } }
@@ -33,20 +35,27 @@ export async function autoCorrect(): Promise<{ resolved: number; escalated: numb
   } catch { /* graceful */ }
   // 🔧 승인된 '결정론 집행' 결정을 그 자리에서 실집행+done — 집행 루프 닫기(더는 '처리중'으로 안 쌓임).
   //   action_type='unpublish'(ids 명시)만 자동집행. agent_task·investigate(구현·판단 필요)는 자동집행 안 하고 OUTSTANDING으로 정직 표시.
+  //   🛡️ 집행 자격 검증(2026-07-02 감사): L2(기조실장 전결) 또는 decided_by='CEO'인 승인만 집행.
+  //   과거엔 approved+unpublish면 tier·승인자 무검증 집행 → 에이전트 자가승인 L3도 실집행되던 구멍.
   try {
-    const dec = (await sql`SELECT id, action_params FROM decisions WHERE status='approved' AND action_type='unpublish'`.catch(() => [])) as any[];
+    const dec = (await sql`SELECT id, action_params FROM decisions WHERE status='approved' AND action_type='unpublish'
+      AND (COALESCE(tier,'L3')='L2' OR decided_by='CEO')`.catch(() => [])) as any[];
     for (const d of dec) {
       const ids = Array.isArray(d.action_params?.ids) ? d.action_params.ids : [];
-      if (ids.length) await sql`UPDATE cafes SET published=false, pipeline_status='excluded' WHERE id = ANY(${ids})`.catch(() => {});
+      if (ids.length) {
+        await sql`UPDATE cafes SET published=false, pipeline_status='excluded' WHERE id = ANY(${ids})`.catch(() => {});
+        await invalidateCafeCaches(ids.map(Number)).catch(() => {}); // DB+CDN+ISR 전 레이어 즉시 반영
+      }
       await sql`UPDATE decisions SET status='done', result='auto-executed', decided_at=now() WHERE id=${d.id}`.catch(() => {});
       resolved++; if (log.length < 8) log.push(`승인결정 즉시집행 #${d.id}(${ids.length}곳 비공개)`);
     }
   } catch { /* graceful */ }
-  // 🛑 L3 자가승인 환원(2026-06-30, 재발방지): L3는 *오직 CEO*(모바일=decided_by 'CEO')만 승인. 에이전트가 agent_task/investigate
-  //   L3를 'approved'로 자가승인하면 집행기 없이 '처리중' 좀비가 됨 → 그런 건 pending으로 되돌려 CEO 결재로(정직). CEO 승인분은 보존.
+  // 🛑 L3 자가승인 환원(2026-06-30, 재발방지 / 2026-07-02 전 action_type 확대): L3는 *오직 CEO*(모바일=decided_by 'CEO')만 승인.
+  //   에이전트가 L3를 'approved'로 자가승인하면 pending으로 되돌려 CEO 결재로(정직). CEO 승인분은 보존.
+  //   (과거 agent_task/investigate만 커버 → unpublish/dev_task 자가승인이 안 걸리던 구멍. DB 실측: L3 unpublish done 19건 중 14건 decided_by≠CEO.)
   try {
     const rev = (await sql`UPDATE decisions SET status='pending'
-      WHERE status='approved' AND COALESCE(tier,'L3')='L3' AND action_type IN ('agent_task','investigate')
+      WHERE status='approved' AND COALESCE(tier,'L3')='L3'
         AND COALESCE(decided_by,'') <> 'CEO' RETURNING id`.catch(() => [])) as any[];
     if (rev.length) { if (log.length < 8) log.push(`L3 자가승인 ${rev.length}건 → CEO 결재로 환원(#${rev.map((r) => r.id).join(",")})`); }
   } catch { /* graceful */ }
@@ -69,7 +78,10 @@ export async function autoCorrect(): Promise<{ resolved: number; escalated: numb
     } else if (coh < 0.35) {
       // 진짜 오염 → 비공개 결재 자동 상신(중복방지). CEO 한 번 승인하면 비공개.
       const ik = `autopollute:${c.id}`;
-      const dup = (await sql`SELECT 1 FROM decisions WHERE action_params->>'ikey'=${ik} AND status IN('pending','approved') LIMIT 1`.catch(() => [])) as any[];
+      // 🛑 중복방지에 rejected·done·deferred 포함(2026-07-02): 과거 pending/approved만 검사해
+      //   CEO가 **반려**해도 다음 사이클 재상신→L2 자동승인→자동집행으로 반려가 1분 만에 뒤집힘(#49→#50 실사고).
+      //   CEO가 한 번 결정한 카페는 재상신하지 않는다(cron-rulegap 레일과 동일 기준).
+      const dup = (await sql`SELECT 1 FROM decisions WHERE action_params->>'ikey'=${ik} AND status IN('pending','approved','done','rejected','deferred') LIMIT 1`.catch(() => [])) as any[];
       if (!dup.length) {
         await sql`INSERT INTO decisions (title,detail,team,severity,tier,action_type,action_params,recommendation)
           VALUES (${`[자동] 오염 카페 비공개 — ${c.name}`.slice(0, 110)}, ${`근거오염 자동탐지: 노출후기가 실제 그 카페를 거의 안 말함(cleanName 일치율 ${Math.round(coh * 100)}%).`}, '품질본부', 'HIGH', 'L2', 'unpublish', ${JSON.stringify({ ids: [c.id], ikey: ik })}::jsonb, ${`명백 오염(일치율 ${Math.round(coh * 100)}%) — 기조실장 전결로 다음 사이클 자동 비공개. 노출후기가 다른 카페를 가리켜 실손실 없음.`})`.catch(() => {});
@@ -99,8 +111,11 @@ export async function coordinationLifecycle(): Promise<{ routed: number; overdue
     WHERE status IN ('open','in_progress') AND due_at IS NULL RETURNING id`.catch(() => [])) as any[];
   routed = r.length; if (routed && log.length < 6) log.push(`협업 ${routed}건 조율·기한배정`);
   // 2) 과기한 미해결 → '지연'으로 재상신 + 담당 에이전트 이벤트 기동(재촉). 이미 지연표시된 건 debounce(pushTrigger 동일 kind+ref 스킵).
+  //   ⚠️ CEO 게이트 계류(CEO결재·CEO정체판단)는 '지연'이 아니다(2026-07-02) — 결재 대기가 정상 상태인데
+  //   지연으로 강등하면 재촉 트리거+이슈 이중분류로 3분면이 오염된다.
   const od = (await sql`UPDATE coordination SET stage='지연', escalated_at=now()
     WHERE status IN ('open','in_progress') AND due_at < now() AND escalated_at IS NULL
+      AND COALESCE(stage,'') NOT IN ('CEO결재','CEO정체판단')
     RETURNING id, to_team, topic`.catch(() => [])) as any[];
   for (const c of od) await pushTrigger("coord_overdue", String(c.id), `협업 지연 #${c.id} → ${c.to_team || "미배정"}: ${String(c.topic || "").slice(0, 60)}`, "MED").catch(() => {});
   overdue = od.length; if (overdue && log.length < 6) log.push(`협업 지연 ${overdue}건 재상신(담당 재촉)`);
@@ -189,13 +204,7 @@ export async function coordinationLifecycle(): Promise<{ routed: number; overdue
 
 export type Issue = { ikey: string; source: string; severity: "HIGH" | "MED" | "LOW"; type: string; title: string; detail: string; team: string; state?: "처리중" | "결재대기" | "OUTSTANDING"; note?: string };
 
-// 크론 → 소속 본부 (이슈 라우팅)
-const CRON_TEAM: Record<string, string> = {
-  "cron-synth": "운영본부", "cron-resynth": "운영본부", "cron-embed": "운영본부", "cron-snapshot": "운영본부",
-  "orchestrator-heal": "품질본부", "cron-sentinel": "품질본부", "cron-verify": "품질본부", "cron-rulegap": "품질본부",
-  "cron-grow": "성장본부", "cron-demand": "성장본부", "cron-newsletter": "성장본부",
-  "cron-closure": "운영본부", "cron-enrich": "운영본부",
-};
+// 크론 → 소속 본부: lib/jobTeams.ts 단일 출처 사용(2026-07-02 — 3벌 drift로 cron-issues가 팀을 덮어쓰던 사고 수리)
 
 export async function ensureIssues() {
   await sql`CREATE TABLE IF NOT EXISTS issues (
@@ -215,7 +224,7 @@ export async function detectIssues(): Promise<Issue[]> {
   const out: Issue[] = [];
   // 1) 크론·에이전트 실패 (job별 최신이 실패)
   const crons = (await sql`SELECT DISTINCT ON (job) job, ok, detail FROM agent_runs ORDER BY job, ran_at DESC`) as any[];
-  for (const c of crons) if (!c.ok) out.push({ ikey: `cronfail:${c.job}`, source: "크론", severity: "HIGH", type: "크론 실패", title: `${c.job} 실패`, detail: String(c.detail || "").slice(0, 200), team: CRON_TEAM[c.job] || "경영지원본부" });
+  for (const c of crons) if (!c.ok) out.push({ ikey: `cronfail:${c.job}`, source: "크론", severity: "HIGH", type: "크론 실패", title: `${c.job} 실패`, detail: String(c.detail || "").slice(0, 200), team: teamOf(c.job) });
 
   // 2) 데이터 정합성 위반 (sentinel 축)
   const outBox = await one(sql`SELECT count(*) c FROM cafes WHERE published AND (lat<36.8 OR lat>38.3 OR lng<124.5 OR lng>127.9)`);
@@ -264,7 +273,8 @@ export async function detectIssues(): Promise<Issue[]> {
     const h = row?.health || {};
     const route = (t: string) => /규칙갭|룰갭/.test(t) ? "품질본부/룰갭팀" : /폐업|closure/.test(t) ? "운영본부" : /검색|추천|momentum/.test(t) ? "경험본부" : /임베딩|합성|동\b|backfill/.test(t) ? "운영본부" : /발굴|grow/.test(t) ? "성장본부" : "품질본부";
     const slug = (p: string, t: string) => p + ":" + t.replace(/[0-9,]/g, "").replace(/\s+/g, "").slice(0, 48); // 숫자 제거 → 카운트 바뀌어도 같은 ikey
-    for (const t of (h.risks || []) as string[]) out.push({ ikey: slug("tower-risk", t), source: "관제탑·위험", severity: "HIGH", type: "위험", title: String(t).slice(0, 95), detail: "메인 관제탑 위험(빨강) — 소비자 타격/해자 훼손, 즉시 조치", team: route(String(t)), state: "결재대기", note: "CEO 승인 시 즉시 — 자동 결재 상신됨" });
+    // state는 사실대로(2026-07-02): 자동 결재상신은 06-30에 제거됐으므로 '결재대기' 표기는 화면≠사실이었음.
+    for (const t of (h.risks || []) as string[]) out.push({ ikey: slug("tower-risk", t), source: "관제탑·위험", severity: "HIGH", type: "위험", title: String(t).slice(0, 95), detail: "메인 관제탑 위험(빨강) — 소비자 타격/해자 훼손, 즉시 조치", team: route(String(t)), state: "OUTSTANDING", note: "담당 본부 즉시 조치 대상 — CEO 판단 필요 시 에이전트가 직접 결재 상신" });
     for (const t of (h.integrity || []) as string[]) out.push({ ikey: slug("tower-integ", t), source: "관제탑·정합성", severity: "MED", type: "정합성", title: String(t).slice(0, 95), detail: "메인 관제탑 정합성 경보", team: "품질본부", state: "처리중", note: "orchestrator-heal이 2시간마다 자동치유" });
     for (const t of (h.notices || []) as string[]) {
       // 오염 플래그·그라운딩·리뷰 맥락은 위에서 'DB 직접 실시간'으로 잡으므로 미러에선 건너뜀(중복·stale 방지).

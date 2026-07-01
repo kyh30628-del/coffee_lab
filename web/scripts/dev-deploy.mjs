@@ -19,6 +19,7 @@ const git = (c) => execSync(`git -C ${ROOT} ${c}`, { encoding: "utf8", stdio: ["
 const rows = await sql`SELECT id, title, action_params FROM decisions WHERE action_type='dev_task' AND (action_params->>'dev_status')='deploy_approved' ORDER BY id`;
 if (!rows.length) { console.log("배포 대상 없음"); process.exit(0); }
 
+let anyUnverified = false;
 for (const d of rows) {
   const br = d.action_params?.branch;
   const coord = d.action_params?.coord;
@@ -27,10 +28,14 @@ for (const d of rows) {
   try {
     if (!locked) throw new Error("git락 타임아웃");
     if (!br) throw new Error("branch 없음");
+    // 🛡️ 사람 작업 보호(2026-07-02): 메인 레포에 커밋 안 된 tracked 변경이 있으면 배포 중단.
+    //   (아래 checkout -f + reset --hard가 CEO의 로컬 수정을 무경고 삭제하던 구멍. untracked는 reset이 안 지움.)
+    const dirty = git("status --porcelain").split("\n").filter((l) => l && !l.startsWith("??"));
+    if (dirty.length) throw new Error(`메인 레포에 커밋 안 된 변경 ${dirty.length}건 — 사람 작업 보호로 배포 중단: ${dirty.slice(0, 3).join(" | ").slice(0, 120)}`);
     git("fetch origin main -q");
-    git("checkout -f main");         // -f: 잔여 미스테이지 변경 폐기(배포시 main은 클린이어야) — 순간 레이스 방지
+    git("checkout -f main");         // -f: 잔여 미스테이지 변경 폐기(위 dirty 가드 통과 후에만 도달)
     git("reset --hard origin/main"); // 원격 main에 정확히 정렬(rebase 실패 회피)
-    git(`merge --no-ff ${br} -m "deploy: #${d.id} ${String(d.title).slice(0, 60)}\n\nCEO 배포 확정. Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"`);
+    git(`merge --no-ff ${br} -m "deploy: #${d.id} ${String(d.title).slice(0, 60)}\n\nCEO 배포 확정. Co-Authored-By: Claude <noreply@anthropic.com>"`);
     const sha = git("rev-parse HEAD");
     git("push origin main");
     // 배포 반영 확인(최대 ~3.5분)
@@ -42,12 +47,21 @@ for (const d of rows) {
       } catch {}
       await new Promise((x) => setTimeout(x, 15000));
     }
-    await sql`UPDATE decisions SET status='done', decided_at=now(), decided_by='CEO',
-      result=${`배포완료${live ? "·반영확인" : "(반영 확인중)"} ${br}`},
-      action_params = action_params || ${JSON.stringify({ dev_status: "deployed", sha })}::jsonb WHERE id=${d.id}`;
-    if (coord) await sql`UPDATE coordination SET status='resolved', resolved_at=now(), stage='완료', resolution=${`개발·배포 완료(#${d.id})`} WHERE id=${Number(coord)}`.catch(() => {});
-    try { git(`branch -d ${br}`); } catch { /* 브랜치 삭제 실패 무시 */ }
-    console.log(`  ✅ 배포완료${live ? "·반영확인" : ""} ${sha.slice(0, 8)}`);
+    // 🛡️ 정직한 종결(2026-07-02): 반영 확인 전엔 done으로 닫지 않는다 — 과거 live=false(예: Vercel 프로덕션
+    //   빌드 실패)여도 'deployed·done' 확정 → 프로덕션 미반영인데 추적 주체가 사라지던 구멍.
+    if (live) {
+      await sql`UPDATE decisions SET status='done', decided_at=now(), decided_by='CEO',
+        result=${`배포완료·반영확인 ${br}`},
+        action_params = action_params || ${JSON.stringify({ dev_status: "deployed", sha })}::jsonb WHERE id=${d.id}`;
+      if (coord) await sql`UPDATE coordination SET status='resolved', resolved_at=now(), stage='완료', resolution=${`개발·배포 완료(#${d.id})`} WHERE id=${Number(coord)}`.catch(() => {});
+      try { git(`branch -d ${br}`); } catch { /* 브랜치 삭제 실패 무시 */ }
+      console.log(`  ✅ 배포완료·반영확인 ${sha.slice(0, 8)}`);
+    } else {
+      anyUnverified = true;
+      await sql`UPDATE decisions SET result=${`push 완료·프로덕션 반영 미확인(${sha.slice(0, 8)}) — Vercel 빌드 점검 필요`},
+        action_params = action_params || ${JSON.stringify({ dev_status: "반영미확인", sha })}::jsonb WHERE id=${d.id}`;
+      console.log(`  ⚠️ #${d.id} push됐으나 반영 미확인 — 결재 미종결(추적 유지)`);
+    }
   } catch (e) {
     const msg = String(e.message || e);
     // 🔎 결정론적 충돌 감지: 병합 미해결(unmerged) 파일 존재로 판정 — 로케일·출력스트림 무관.
@@ -68,7 +82,10 @@ for (const d of rows) {
       console.log(`  ⚠️ 배포 오류: ${msg.slice(0, 100)}`);
     }
   } finally {
-    gunlock();
+    // 🛡️ 락 소유권(2026-07-02): 내가 획득한 락만 해제 — 과거 glock 타임아웃(=남이 보유 중) 후에도
+    //   finally가 무조건 rmdir → 남의 락을 파괴해 빌드/배포 상호배제가 소멸하던 P0(git 레이스 재발 경로).
+    if (locked) gunlock();
   }
 }
-process.exit(0);
+// 반영 미확인 건이 있으면 비정상 종료 → 래퍼 하트비트(ok=false)로 즉시 이슈화·본부 배정.
+process.exit(anyUnverified ? 1 : 0);
