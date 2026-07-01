@@ -13,7 +13,8 @@ const gunlock = () => { try { rmdirSync(GLOCK); } catch {} };
 const env = readFileSync(`${ROOT}/web/.env.local`, "utf8");
 for (const l of env.split("\n")) { const m = l.match(/^([A-Z_0-9]+)=(.*)$/); if (m) process.env[m[1]] = m[2].replace(/^["']|["']$/g, ""); }
 const sql = neon(process.env.DATABASE_URL);
-const git = (c) => execSync(`git -C ${ROOT} ${c}`, { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] }).trim();
+// LC_ALL=C: git 출력을 영어로 고정(로케일 무관 파싱). 결정론적 충돌 감지는 아래 ls-files -u로.
+const git = (c) => execSync(`git -C ${ROOT} ${c}`, { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"], env: { ...process.env, LC_ALL: "C", LANG: "C" } }).trim();
 
 const rows = await sql`SELECT id, title, action_params FROM decisions WHERE action_type='dev_task' AND (action_params->>'dev_status')='deploy_approved' ORDER BY id`;
 if (!rows.length) { console.log("배포 대상 없음"); process.exit(0); }
@@ -49,11 +50,15 @@ for (const d of rows) {
     console.log(`  ✅ 배포완료${live ? "·반영확인" : ""} ${sha.slice(0, 8)}`);
   } catch (e) {
     const msg = String(e.message || e);
+    // 🔎 결정론적 충돌 감지: 병합 미해결(unmerged) 파일 존재로 판정 — 로케일·출력스트림 무관.
+    //   (git 충돌 문구는 stdout·현지어라 e.message 문자열 매칭으론 못 잡음. 반드시 merge --abort 전에 검사.)
+    let conflict = false;
+    try { conflict = git("ls-files -u").length > 0; } catch {}
+    if (!conflict) conflict = /conflict|충돌|merge failed|병합.*실패|not something we can merge|Automatic merge|자동 병합/i.test(msg);
     try { git("merge --abort"); } catch {}
     try { git("checkout -f main"); git("reset --hard origin/main"); } catch {}
     // ♻️ 병합 충돌 = 오래된 브랜치가 그새 배포된 다른 변경과 겹침 → 실패가 아니라 '최신 기반 자동 재빌드'로 자가치유.
     //   (병렬 브랜치가 같은 파일을 건드릴 때 필연. 재빌드하면 이미 배포된 코드 위에서 다시 구현 → 충돌 소멸.)
-    const conflict = /conflict|merge failed|not something we can merge|Automatic merge/i.test(msg);
     if (conflict && br) {
       try { git(`branch -D ${br}`); } catch {}
       await sql`UPDATE decisions SET result='병합 충돌 → 최신 main 기반 자동 재빌드(잦은 실패 아님, 자가치유)', action_params = action_params - 'dev_status' - 'dev_claimed' - 'branch' WHERE id=${d.id}`.catch(() => {});
