@@ -18,10 +18,11 @@ export async function GET() {
     `;
     // 구독 라이브 전: featured(금색 핀·추천)는 소비자에 숨김(관리자 전용)
     const out = subscriptionLive() ? cafes : (cafes as any[]).map((c) => ({ ...c, featured: false }));
-    // 엣지 캐시: 공개 카페 목록은 밤에만 바뀌므로 CDN이 5분 캐시 + 1일간 stale 제공(즉시 응답).
-    // → 방문 폭증에도 DB는 5분에 한 번만 맞고, 나머지는 CDN이 받아냄(용량 10~100배).
+    // ⚡ 항상 최신: 비공개/복원 결재가 지도에 즉시 반영돼야 하므로 CDN이 stale을 못 내보내게 매 요청 재검증.
+    //   (예전 s-maxage=60·swr=300은 비공개 후 최대 ~6분 지도가 옛 데이터를 보여주는 '반영 지연'의 원인이었음.)
+    //   저트래픽 구간엔 부하 무시 가능. 트래픽 성장 시 tag기반 on-demand 무효화로 캐시 재도입 예정.
     return NextResponse.json({ ok: true, cafes: out }, {
-      headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300" },
+      headers: { "Cache-Control": "public, max-age=0, must-revalidate" },
     });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e), cafes: [] }, { status: 500 });
