@@ -24,6 +24,23 @@ const CAFE_TERM = /(커피|아메리카노|라떼|에스프레소|디저트|케�
 const GOOD_NAME = /(카페|까페|커피|로스터|로스팅|브런치|디저트|베이커리|베이글|제과|찻집|티하우스|coffee|cafe)/i;
 const DISTRICT_THRESHOLD = 5; // 생활권 자동학습: 이만큼의 서로 다른 카페에서 오염으로 등장해야
 
+// 🏷️ 룰갭 제안16: 도로명 주소형 카페명 — 카페명이 '자기 등록주소의 도로명(번지 앞 토큰)'과 그대로 같으면
+//   상호가 아니라 주소 파편이 name에 잘못 들어간 것(SEO 도로명 키워드 오염). 자기 주소 대조라 오탐 없음
+//   (예: '카페알로'·'아지트로'처럼 우연히 로/길로 끝나는 진짜 상호는 자기 주소 도로명과 다르므로 제외됨).
+const ADDR_ROAD_TOKEN_RE = /([가-힣0-9]{2,}(?:로|길))\s+[0-9]/;
+function isRoadNameCafeName(name: string, addr: string | null | undefined): boolean {
+  const n = (name || "").trim();
+  if (n.length < 2 || !/(로|길)$/.test(n)) return false;
+  const m = (addr || "").match(ADDR_ROAD_TOKEN_RE);
+  const token = m ? m[1] : "";
+  return !!token && (token === n || token.endsWith(n));
+}
+// 🏷️ 룰갭 제안17: 아파트단지명 포함 카페명 — 'N차아파트'류 단지 표기가 상호에 그대로 박히면
+//   실제 카페가 아니라 그 아파트 단지 입주민 공동시설(북카페·커뮤니티실 등)일 확률이 매우 높음.
+//   ⚠️ '아파트먼트'(도화아파트먼트 등 실존 카페 브랜드)는 차수 표기가 없어 이 패턴에 안 걸림.
+const APT_UNIT_RE = /[0-9]+\s*차\s*아파트|아파트\s*[0-9]+\s*단지|[0-9]+\s*단지\s*아파트/;
+const isApartmentComplexName = (name: string): boolean => APT_UNIT_RE.test(name || "");
+
 const authed = (req: NextRequest) => {
   const secret = process.env.CRON_SECRET;
   if (req.headers.get("x-admin-password") && req.headers.get("x-admin-password") === process.env.ADMIN_PASSWORD) return true;
@@ -179,6 +196,38 @@ export async function GET(req: NextRequest) {
                     ${`규칙갭 자가진단: 노출리뷰가 비카페 업체어 ${p.nc}회·카페어 ${p.cf}회로 이름충돌/오염 의심(카페#${p.id}).`.slice(0, 200)},
                     '품질본부', 'HIGH', 'L2', 'unpublish', ${JSON.stringify({ ids: [p.id], ikey: ik })}::jsonb,
                     ${`명백 오염(카페어 ${p.cf}회) — 기조실장 전결로 다음 사이클 자동 비공개. 노출후기가 다른 업체를 가리켜 실손실 없음.`})`.catch(() => {});
+        }
+      }
+    }
+
+    // 룰갭 제안16+17: 도로명·아파트단지명 카페명(#58) — 공개여부 무관 스캔(잠재노출·synth 둘 다 대상).
+    //   결정론(자기 주소 대조 / N차아파트 표기)이라 자동학습 대상 아님 — review_pollution과 같은 승인대기 레일로만 상신(자동 비공개 아님).
+    const nameCandidates = (await sql`
+      SELECT id, name, address, published FROM cafes
+      WHERE COALESCE(pipeline_status,'') <> 'excluded' AND (name ~ '(로|길)$' OR name LIKE '%아파트%')
+    `) as { id: number; name: string; address: string | null; published: boolean }[];
+    const roadNameHits = nameCandidates.filter((c) => isRoadNameCafeName(c.name, c.address));
+    const aptNameHits = nameCandidates.filter((c) => isApartmentComplexName(c.name));
+    for (const c of roadNameHits) {
+      pending.push({ kind: "road_name", term: c.name, cafes: 1, samples: [c.id], reason: `카페명이 등록주소 도로명과 일치(SEO 도로명 오염 의심${c.published ? "·공개중" : ""}) — 검토 후 비공개(승인)` });
+    }
+    for (const c of aptNameHits) {
+      pending.push({ kind: "apt_complex_name", term: c.name, cafes: 1, samples: [c.id], reason: `카페명에 아파트단지 표기(N차아파트) — 입주민시설 의심${c.published ? "·공개중" : ""} — 검토 후 비공개(승인)` });
+    }
+    if (!dry) {
+      const nameHits = [
+        ...roadNameHits.map((c) => ({ c, ikind: "roadname", label: "도로명" })),
+        ...aptNameHits.map((c) => ({ c, ikind: "aptname", label: "아파트단지명" })),
+      ];
+      for (const { c, ikind, label } of nameHits) {
+        const ik = `${ikind}:${c.id}`;
+        const dup = (await sql`SELECT 1 FROM decisions WHERE action_params->>'ikey'=${ik} AND status IN('pending','approved','done','rejected','deferred') LIMIT 1`.catch(() => [])) as any[];
+        if (!dup.length) {
+          await sql`INSERT INTO decisions (title,detail,team,severity,tier,action_type,action_params,recommendation)
+            VALUES (${`[룰갭] ${label} 카페명 오염 — ${c.name}`.slice(0, 110)},
+                    ${`규칙갭 제안16+17 자가진단: 카페명이 ${label === "도로명" ? "등록주소 도로명과 일치" : "아파트단지 표기(N차아파트) 포함"}(카페#${c.id}, 등록주소: ${c.address ?? "정보없음"}).`.slice(0, 200)},
+                    '품질본부', 'HIGH', 'L2', 'unpublish', ${JSON.stringify({ ids: [c.id], ikey: ik })}::jsonb,
+                    ${`상호가 아니라 주소/단지 표기 파편으로 추정(${label}) — 기조실장 전결로 다음 사이클 자동 비공개.`})`.catch(() => {});
         }
       }
     }
