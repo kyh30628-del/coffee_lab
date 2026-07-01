@@ -15,12 +15,11 @@ export const maxDuration = 300;
 const STALE_MONTHS = 15;   // 최신 리뷰가 이만큼 지난 카페만 재확인 대상(활발한 카페는 명백히 영업중 → 스킵)
 const PER_RUN = 35;        // 회당 네이버 재확인 수(쿼터 절약)
 
-// review_dates(캐시)는 raw_reviews보다 낡을 수 있어 폐업 오탐을 유발함 → raw_reviews(원본) 기준으로 계산.
-const latestReviewMonths = (raw_reviews: any): number | null => {
-  let d = raw_reviews;
-  if (typeof d === "string") { try { d = JSON.parse(d); } catch { return null; } }
-  const arr: any[] = Array.isArray(d) ? d : [];
-  const ts = arr.map((x) => new Date(String(x?.date ?? "").replace(/\./g, "-")).getTime()).filter((t) => !isNaN(t));
+// review_dates(캐시)는 raw_reviews보다 낡을 수 있어 폐업 오탐 유발 → raw_reviews(원본)의 날짜만 계산.
+//   ⚠️ raw_reviews 전체를 JS로 끌어오면 64MB 초과(Neon 507)라, SQL에서 date 배열만 추출해 넘김(아래 쿼리).
+const latestReviewMonths = (dates: any): number | null => {
+  const arr: any[] = Array.isArray(dates) ? dates : [];
+  const ts = arr.map((x) => new Date(String(x ?? "").replace(/\./g, "-")).getTime()).filter((t) => !isNaN(t));
   if (!ts.length) return null;
   return (Date.now() - Math.max(...ts)) / (30 * 86400000);
 };
@@ -38,14 +37,19 @@ export async function GET(req: NextRequest) {
     await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS closure_misses INT DEFAULT 0`.catch(() => {});
 
     // 오래 안 본 공개 카페부터 커서로 순회. 활발한(최근 리뷰) 카페는 재확인 스킵(checked_at만 갱신).
-    const rows = (await sql`SELECT id, name, area, dong, lat, lng, raw_reviews, COALESCE(closure_misses,0) misses
+    // ⚡ raw_reviews 전체(거대 jsonb) 대신 date 배열만 SQL에서 추출 — 64MB 초과(507) 방지 + 원본 신선도 유지.
+    const rows = (await sql`SELECT id, name, area, dong, lat, lng,
+        CASE WHEN jsonb_typeof(raw_reviews)='array'
+             THEN (SELECT array_agg(r->>'date') FROM jsonb_array_elements(raw_reviews) r)
+             ELSE NULL END AS raw_dates,
+        COALESCE(closure_misses,0) misses
       FROM cafes WHERE published AND raw_reviews IS NOT NULL
       ORDER BY closure_checked_at ASC NULLS FIRST LIMIT 400`) as any[];
 
     let checked = 0, alive = 0, quotaStop = false, skippedFresh = 0, newSuspect = 0;
     const suspectNames: string[] = [];
     for (const c of rows) {
-      const mo = latestReviewMonths(c.raw_reviews);
+      const mo = latestReviewMonths(c.raw_dates);
       if (mo != null && mo < STALE_MONTHS) { // 활발 → 영업중 명백, 네이버 호출 없이 통과
         await sql`UPDATE cafes SET closure_checked_at = now(), closure_misses = 0 WHERE id = ${c.id}`.catch(() => {});
         skippedFresh++; continue;
