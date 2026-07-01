@@ -132,13 +132,15 @@ export async function coordinationLifecycle(): Promise<{ routed: number; overdue
   }
   if (devEsc && log.length < 6) log.push(`개발 협업 ${devEsc}건 → CEO 결재 상신`);
 
-  // 4) 🚫 좀비 차단(터미널 에스컬레이션): '지연'이 재촉 후에도 2차 기한(18h)까지 미해결 + 연결 결재 없음 →
+  // 4) 🚫 좀비 차단(터미널 에스컬레이션): '지연'이 30분 내 미해결 + 연결 결재 없음 →
   //    무한 재촉(nag) 대신 CEO 조치경로 판단 결재를 1건 상신(coord당 idempotent) + stage 전환으로 지연 루프서 제거.
+  //    타이트 관리(CEO 지시): 지연되면 30분만 유예하고 바로 CEO에게 올린다. cron-issues가 매 10분 도므로 지연 후 30~40분 내 상신.
+  //    (자율 유예는 due_at=6~24h 단계에서 이미 부여됨 — 담당 에이전트/크론이 자기 주기에 처리할 창.)
   //    근거: 담당 크론/팀이 못 푸는 handoff(코드필요·자동수정불가)는 조치처가 없어 영구 좀비였음. '모든 항목은 조치처를 가진다' 강제.
   //    개발 handoff은 3b가 이미 dev_task 상신하므로 제외. 결재는 coordination을 생성하지 않음 → 미러/루프 구조적 불가.
   const stuck = (await sql`SELECT id, from_team, to_team, topic, detail FROM coordination c
     WHERE c.status IN ('open','in_progress') AND c.stage='지연'
-      AND c.escalated_at < now() - interval '18 hours'
+      AND c.escalated_at < now() - interval '30 minutes'
       AND c.to_team !~ '개발|dev'
       AND NOT EXISTS (SELECT 1 FROM decisions d WHERE d.action_params->>'coord' = c.id::text)`.catch(() => [])) as any[];
   let termEsc = 0;
