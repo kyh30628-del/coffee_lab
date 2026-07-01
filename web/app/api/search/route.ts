@@ -56,6 +56,22 @@ const GYEONGGI_SI = [
   "의왕시","하남시","용인시","파주시","이천시","안성시","김포시","화성시",
   "광주시","양주시","포천시","여주시","연천군","가평군","양평군",
 ];
+// 동네·상권명 → 행정구 매핑 (region 없는 검색에서 "홍대" → "마포구" 자동 추출)
+const DONG_TO_GU: Record<string, string> = {
+  "홍대": "마포구", "합정": "마포구", "망원": "마포구", "연남": "마포구", "상암": "마포구",
+  "이태원": "용산구", "한남": "용산구", "해방촌": "용산구", "경리단": "용산구",
+  "성수": "성동구", "서울숲": "성동구", "왕십리": "성동구",
+  "강남": "강남구", "신사": "강남구", "압구정": "강남구", "청담": "강남구", "역삼": "강남구", "논현": "강남구",
+  "서초": "서초구", "방배": "서초구", "반포": "서초구",
+  "잠실": "송파구", "석촌": "송파구",
+  "을지로": "중구", "명동": "중구",
+  "종로": "종로구", "광화문": "종로구", "인사동": "종로구",
+  "신촌": "서대문구", "연희": "서대문구",
+  "건대": "광진구", "뚝섬": "광진구",
+  "여의도": "영등포구", "당산": "영등포구",
+  "목동": "양천구", "마곡": "강서구",
+  "가산": "금천구", "구로": "구로구",
+};
 // 광역명("서울","경기") → 하위 행정구역 목록. 없으면 null.
 function metroAreaList(region: string): string[] | null {
   if (region === "서울" || region === "서울특별시") return SEOUL_GU;
@@ -151,9 +167,21 @@ export async function GET(req: NextRequest) {
     const region = (req.nextUrl.searchParams.get("region") ?? "").trim();
     if (q.length < 1) return NextResponse.json({ ok: false, error: "검색어 필요" }, { status: 400 });
 
+    const ql = q.toLowerCase();
+    const tokens = Array.from(new Set(ql.split(/[\s,./?!~"'()]+/).filter((t) => t.length >= 2)));
+    const hitConcepts = CONCEPTS.filter((c) => c.triggers.some((t) => ql.includes(t)));
+    let effectiveRegion = region;
+    if (!effectiveRegion) {
+      for (const tok of tokens) {
+        if (DONG_TO_GU[tok]) { effectiveRegion = DONG_TO_GU[tok]; break; }
+        if (SEOUL_GU.includes(tok)) { effectiveRegion = tok; break; }
+        if (GYEONGGI_SI.includes(tok)) { effectiveRegion = tok; break; }
+      }
+    }
+
     // 캐시 조회: 같은 질문+지역이면 즉시 반환(LLM·임베딩 호출 0)
     await ensureCache();
-    const qkey = q.toLowerCase().replace(/\s+/g, " ").trim() + "|" + region;
+    const qkey = q.toLowerCase().replace(/\s+/g, " ").trim() + "|" + effectiveRegion;
     const nocache = req.nextUrl.searchParams.get("nocache") === "1";
     if (!nocache) {
       const hit = (await sql`SELECT payload FROM search_cache WHERE qkey=${qkey} AND created_at > now() - (${CACHE_TTL_HOURS} || ' hours')::interval LIMIT 1`)[0];
@@ -164,14 +192,10 @@ export async function GET(req: NextRequest) {
         });
       }
     }
-
-    const ql = q.toLowerCase();
-    const tokens = Array.from(new Set(ql.split(/[\s,./?!~"'()]+/).filter((t) => t.length >= 2)));
-    const hitConcepts = CONCEPTS.filter((c) => c.triggers.some((t) => ql.includes(t)));
-    const shortRaw = region.replace(/(특별시|광역시|시|군|구)$/, "");
-    const short = shortRaw.length >= 2 ? shortRaw : region; // '중구'→'중'(1자)는 중랑구까지 오매칭 → 전체이름 유지
-    const p1 = `%${region}%`, p2 = `%${short}%`;
-    const metroList = metroAreaList(region);
+    const shortRaw = effectiveRegion.replace(/(특별시|광역시|시|군|구)$/, "");
+    const short = shortRaw.length >= 2 ? shortRaw : effectiveRegion; // '중구'→'중'(1자)는 중랑구까지 오매칭 → 전체이름 유지
+    const p1 = `%${effectiveRegion}%`, p2 = `%${short}%`;
+    const metroList = metroAreaList(effectiveRegion);
 
     let mode: "semantic" | "keyword" | "ai" = "keyword";
     let scored: any[] = [];
@@ -200,7 +224,7 @@ export async function GET(req: NextRequest) {
                    AND ($2 = '' OR area ILIKE $3 OR area ILIKE $4)
                  ORDER BY embedding <=> $1::vector
                  LIMIT 80`,
-                [lit, region, p1, p2],
+                [lit, effectiveRegion, p1, p2],
               )) as unknown as any[];
           if (rows.length > 0) {
             mode = "semantic";
@@ -223,7 +247,7 @@ export async function GET(req: NextRequest) {
     if (scored.length === 0) {
       const rows = (await sql.query(`SELECT ${FIELDS} FROM cafes WHERE published = true`)) as unknown as any[];
       for (const c of rows) {
-        if (!inRegion(c.area ?? "", region)) continue;
+        if (!inRegion(c.area ?? "", effectiveRegion)) continue;
         const { exact, concept, reasons } = lexicalScore(c, tokens, hitConcepts);
         const total = exact + concept + (exact + concept > 0 ? gradeBonus(c.synth_grade) : 0);
         if (exact + concept <= 0) continue;
@@ -271,7 +295,7 @@ export async function GET(req: NextRequest) {
                  AND replace(lower(name), ' ', '') LIKE $1
                  AND ($2 = '' OR area ILIKE $3 OR area ILIKE $4)
                ORDER BY (replace(lower(name), ' ', '') = $5) DESC, (synth_grade = '검증') DESC, synth_count DESC NULLS LAST LIMIT 8`,
-              [`%${dq}%`, region, p1, p2, dq],
+              [`%${dq}%`, effectiveRegion, p1, p2, dq],
             )) as unknown as any[];
         if (nameRows.length > 0) {
           const have = new Set(results.map((r: any) => r.id));
@@ -293,7 +317,7 @@ export async function GET(req: NextRequest) {
 
     const coverageNote = detectOutOfCoverage(q, region);
     const payload: Record<string, unknown> = {
-      ok: true, mode, region: region || "수도권 전체", q,
+      ok: true, mode, region: effectiveRegion || "수도권 전체", q,
       concepts: hitConcepts.map((c) => c.label),
       count: results.length, results,
     };
