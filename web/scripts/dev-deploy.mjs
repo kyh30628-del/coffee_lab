@@ -26,8 +26,9 @@ for (const d of rows) {
   try {
     if (!locked) throw new Error("git락 타임아웃");
     if (!br) throw new Error("branch 없음");
-    git("checkout main");
-    git("pull --rebase origin main");
+    git("fetch origin main -q");
+    git("checkout -f main");         // -f: 잔여 미스테이지 변경 폐기(배포시 main은 클린이어야) — 순간 레이스 방지
+    git("reset --hard origin/main"); // 원격 main에 정확히 정렬(rebase 실패 회피)
     git(`merge --no-ff ${br} -m "deploy: #${d.id} ${String(d.title).slice(0, 60)}\n\nCEO 배포 확정. Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"`);
     const sha = git("rev-parse HEAD");
     git("push origin main");
