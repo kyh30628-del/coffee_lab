@@ -188,12 +188,13 @@ export default function OrgDashboard() {
   const [showWO, setShowWO] = useState(false);
   const [showMeet, setShowMeet] = useState(false);
   const [showPending, setShowPending] = useState(false);
+  const [showInProg, setShowInProg] = useState(false);
   const [showDeleg, setShowDeleg] = useState(false);
   const [showCoord, setShowCoord] = useState(false);
   const [showIssues, setShowIssues] = useState(false);
   const [showTok, setShowTok] = useState(false);
   const [member, setMember] = useState<{ k: string; n: string; t: string } | null>(null);
-  const [dec, setDec] = useState<{ pending: any[]; delegated: any[]; recent: any[] }>({ pending: [], delegated: [], recent: [] });
+  const [dec, setDec] = useState<{ pending: any[]; delegated: any[]; recent: any[]; inProgress: any[] }>({ pending: [], delegated: [], recent: [], inProgress: [] });
   const [coord, setCoord] = useState<{ open: any[]; resolved: any[] }>({ open: [], resolved: [] });
   const [issues, setIssues] = useState<any[]>([]);
   const [err, setErr] = useState(""); const [loading, setLoading] = useState(false);
@@ -220,7 +221,7 @@ export default function OrgDashboard() {
     ]).then(([b, d, co, iss, lv, jb, dp]) => {
       if (dp && dp.ok) setDevpipe(dp);
       if (b.ok) { setBrief(b.brief); setBriefs(b.briefs || (b.brief ? [b.brief] : [])); localStorage.setItem("adm_pw", password); } else if (!silent) setErr("비밀번호 확인");
-      if (d.ok) setDec({ pending: d.pending || [], delegated: d.delegated || [], recent: d.recent || [] });
+      if (d.ok) setDec({ pending: d.pending || [], delegated: d.delegated || [], recent: d.recent || [], inProgress: d.inProgress || [] });
       if (co.ok) setCoord({ open: co.open || [], resolved: co.resolved || [] });
       if (iss.ok) setIssues(iss.open || []);
       if (lv && lv.ok) setLive(lv);
@@ -434,6 +435,24 @@ export default function OrgDashboard() {
               </div>
             ))}
           {dec.recent.length > 0 && <div style={{ fontSize: 10.5, color: "#9c8a6c", marginTop: 6 }}>최근 처리: {dec.recent.slice(0, 4).map((r) => `${r.title}(${r.status})`).join(" · ")}</div>}
+          </>}
+        </div>
+
+        {/* 🔧 실행 중 — 승인됐지만 아직 완료 안 된 실무형(실세계·판단 필요). 끝난 것/진행중 구분. 접이식·기본 접힘. */}
+        <div style={{ ...card, marginTop: 10 }}>
+          <button onClick={() => setShowInProg(!showInProg)} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: dec.inProgress.length ? "#8a6534" : "#3f7a4f" }}>{showInProg ? "▾" : "▸"} 🔧 실행 중 ({dec.inProgress.length})</span>
+            <span style={{ fontSize: 10.5, color: "#9c8a6c" }}>{showInProg ? "접기" : "보기"}</span>
+          </button>
+          {showInProg && <>
+          <div style={{ fontSize: 10.5, color: "#9c8a6c", margin: "6px 0 8px" }}>CEO 승인 후 담당 본부가 실제 실행 중인 실무(방문·정책·룰적용 등). 완료되면 자동으로 여기서 빠짐.</div>
+          {dec.inProgress.length > 0 ? dec.inProgress.map((d) => (
+            <div key={d.id} style={{ display: "flex", gap: 7, alignItems: "center", padding: "5px 0", borderBottom: "1px solid #f0e8d8", fontSize: 12 }}>
+              <span style={{ background: "#c08a3e", color: "#fff", fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 20 }}>실행중</span>
+              <span style={{ flex: 1, color: "#5a4631" }}>{d.title}</span>
+              <span style={{ fontSize: 10, color: d.age_h >= 72 ? "#b03a3a" : "#9c8a6c" }}>{d.team || "-"} · {d.age_h}h</span>
+            </div>
+          )) : <div style={{ fontSize: 12, color: "#3f7a4f" }}>진행 중인 실무 없음 ✅</div>}
           </>}
         </div>
 

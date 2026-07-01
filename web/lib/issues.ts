@@ -155,6 +155,16 @@ export async function coordinationLifecycle(): Promise<{ routed: number; overdue
     termEsc++;
   }
   if (termEsc && log.length < 6) log.push(`정체 협업 ${termEsc}건 → CEO 조치판단 상신(좀비 차단)`);
+
+  // 5) ✅ 끝난 결재 자동 종결(껍데기 안 남긴다): 연결된 협업이 이미 해소된 결재(route_coord·agent_task)는 자동 done.
+  //    linkage: decisions.action_params.coord → 그 coordination이 resolved면 실무도 끝난 것 → 'approved'에 안 쌓이게 닫음.
+  const closedDec = (await sql`UPDATE decisions d SET status='done', decided_at=now(),
+      result = COALESCE(d.result,'') || ' [연결 협업 종결로 자동 완료]'
+    WHERE d.status IN ('approved','pending') AND d.action_type IN ('route_coord','agent_task')
+      AND d.action_params->>'coord' IS NOT NULL
+      AND EXISTS (SELECT 1 FROM coordination c WHERE c.id::text = d.action_params->>'coord' AND c.status IN ('resolved','closed','done'))
+    RETURNING id`.catch(() => [])) as any[];
+  if (closedDec.length && log.length < 6) log.push(`끝난 결재 ${closedDec.length}건 자동 종결(#${closedDec.map((r) => r.id).join(",")})`);
   return { routed, overdue, log };
 }
 
