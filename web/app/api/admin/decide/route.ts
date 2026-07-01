@@ -14,9 +14,10 @@ export async function POST(req: NextRequest) {
 
     if (decision === "reject") {
       await sql`UPDATE decisions SET status='rejected', decided_at=now(), result='CEO 반려' WHERE id=${id}`;
-      // 개발 결재 반려 → 연결된 협업 보류 표시(재상신 안 되게)
+      // 개발 결재 반려 → 연결 협업 '종결'(status=resolved). stage만 바꾸면 status=open 좀비로 남아 협업 카운트 부풀리고
+      //   기한 지나면 '지연'으로 튀어 이중 좀비가 됨 → route_coord 반려와 동일하게 resolved 처리(좀비 원천 차단).
       if (d.action_type === "dev_task" && d.action_params?.coord)
-        await sql`UPDATE coordination SET stage='보류(CEO반려)' WHERE id=${Number(d.action_params.coord)}`.catch(() => {});
+        await sql`UPDATE coordination SET status='resolved', resolved_at=now(), stage='보류(CEO반려)', resolution=COALESCE(resolution,'')||' [dev_task CEO반려 → 폐기 종결]' WHERE id=${Number(d.action_params.coord)}`.catch(() => {});
       // 정체판단 반려 → 연결 협업 폐기 종결(더는 재촉 안 함 = 좀비 종료)
       if (d.action_type === "route_coord" && d.action_params?.coord)
         await sql`UPDATE coordination SET status='resolved', resolved_at=now(), stage='폐기(CEO반려)', resolution=COALESCE(resolution,'')||' [CEO 정체판단 반려 → 폐기 종결]' WHERE id=${Number(d.action_params.coord)}`.catch(() => {});

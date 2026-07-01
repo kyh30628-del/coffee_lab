@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
     // 🔧 실행 중 — 승인됐지만 아직 완료 안 된 실무형(agent_task·route_coord). CEO가 '진행 중인 실제 일'을 한눈에(끝남/진행중/막힘 구분).
     const inProgress = await sql`SELECT id,title,team,action_type,tier,to_char(created_at,'MM-DD HH24:MI') at,
         round(extract(epoch from (now()-created_at))/3600)::int age_h
-      FROM decisions WHERE status='approved' AND action_type IN ('agent_task','route_coord') ORDER BY created_at ASC` as any[];
+      FROM decisions WHERE status='approved' AND action_type IN ('agent_task','route_coord','investigate') ORDER BY created_at ASC` as any[];
     // 최근 처리 = 종료된 것만(진행중은 위 inProgress로 분리 — 중복 표시 방지).
     const recent = await sql`SELECT id,title,status,result,tier,to_char(decided_at,'MM-DD HH24:MI') decided FROM decisions WHERE status IN ('done','rejected','failed') ORDER BY decided_at DESC LIMIT 8` as any[];
     return NextResponse.json({ ok: true, pending, delegated, recent, inProgress }, { headers: { "Cache-Control": "no-store" } });

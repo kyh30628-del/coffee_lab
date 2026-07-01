@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
 import { synthAndStore, finalizePipeline, scrubPublishedPII, healGroundingSuspects, holdZeroEvidenceSuspects, healPublishedAudit, healNonCafeCategory, healOutOfBox, healAreaLabel, healOffConceptByReview } from "@/lib/synthStore";
 import { recordRun } from "@/lib/agentLog";
+import { judgeQueueCount, dailyCounts } from "@/lib/metrics";
 export const runtime = "nodejs";
 export const maxDuration = 120; // 재검증 자가감사(healPublishedAudit) 배치 여유
 
@@ -60,9 +61,11 @@ export async function GET(req: NextRequest) {
       MAX(llm_judged_at) last_judge,
       MAX(embed_updated) last_embed,
       COUNT(*) FILTER (WHERE raw_reviews IS NOT NULL AND synth_updated IS NULL)::int synth_q,
-      COUNT(*) FILTER (WHERE (published OR pipeline_status='pending') AND raw_reviews IS NOT NULL AND (llm_judged_at IS NULL OR llm_judged_at < raw_collected_at))::int judge_q,
       COUNT(*) FILTER (WHERE embedding IS NULL AND (published OR pipeline_status='pending') AND synth_identity IS NOT NULL)::int embed_q
       FROM cafes`)[0] as any;
+    // 판정 대기·오늘 지표 = lib/metrics 단일출처(judge-status와 동일 정의 — 화면별 숫자 어긋남 구조적 차단).
+    const judgeQ = await judgeQueueCount();
+    const daily = await dailyCounts();
     const vr = (await sql`SELECT ran_at, fails, warns, status FROM verify_reports ORDER BY ran_at DESC LIMIT 1`)[0] as any;
     // open = '실제 카페 오염' 플래그만(cafe_id 있고 'audit_complete' 같은 시스템 로그 제외). last_flag=실행 시각.
     const af = (await sql`SELECT COUNT(*) FILTER (WHERE NOT resolved AND cafe_id IS NOT NULL AND issue <> 'audit_complete')::int open, MAX(flagged_at) last_flag FROM audit_flags`)[0] as any;
@@ -264,15 +267,14 @@ export async function GET(req: NextRequest) {
       COUNT(*) FILTER (WHERE pipeline_status='rejected')::int rejected
       FROM cafes`)[0] as any;
 
-    // 오늘(KST) 수집·진행 현황 + 동 백필 커버리지 — 관리자 '오늘의 수집' 패널용. KST 자정 기준 인라인.
+    // 오늘 수집·진행 현황 + 동 백필 커버리지 — 관리자 '오늘의 수집' 패널용.
+    //   ⚠️ new_today·yt_today(오늘 신규·유튜브)는 위 daily(lib/metrics·KST)에서 가져온다 — 화면별 정의 어긋남 방지.
     const td = (await sql`SELECT
-      COUNT(*) FILTER (WHERE created_at >= date_trunc('day', now() AT TIME ZONE 'Asia/Seoul') AT TIME ZONE 'Asia/Seoul')::int new_today,
       COUNT(*) FILTER (WHERE synth_updated >= date_trunc('day', now() AT TIME ZONE 'Asia/Seoul') AT TIME ZONE 'Asia/Seoul')::int synth_today,
       COUNT(*) FILTER (WHERE published AND created_at >= date_trunc('day', now() AT TIME ZONE 'Asia/Seoul') AT TIME ZONE 'Asia/Seoul')::int published_today,
       COUNT(*) FILTER (WHERE dong IS NOT NULL)::int has_dong,
       COUNT(*) FILTER (WHERE pipeline_status='noise')::int noise,
       COUNT(*) FILTER (WHERE pipeline_status='new')::int new_q,
-      COUNT(*) FILTER (WHERE yt_checked_at >= date_trunc('day', now() AT TIME ZONE 'Asia/Seoul') AT TIME ZONE 'Asia/Seoul')::int yt_today,
       COUNT(*) FILTER (WHERE yt_checked_at IS NOT NULL)::int yt_total
       FROM cafes`)[0] as any;
 
@@ -353,7 +355,7 @@ export async function GET(req: NextRequest) {
     }
     // 미판정 내역은 0인 항목은 숨기고 실제 남은 것만 표기(사장님: 헷갈릴 내용 말고 사실만).
     const jbParts = ([["신규", jb.newjudge], ["재수집변경", jb.recollect], ["그라운딩재검", jb.reground]] as [string, number][]).filter(([, n]) => n > 0).map(([k, n]) => `${k} ${n}`);
-    add("judge", "AI 판정 (Haiku·새벽·보조정제)", c.last_judge, 30, c.judge_q, `공개카페는 규칙검증돼 노출중 · LLM 보조정제 대기 ${c.judge_q}곳(새벽 Batches 자동·소비자 품질무관)${jbParts.length > 1 ? ` [${jbParts.join("+")}]` : ""}`);
+    add("judge", "AI 판정 (Haiku·새벽·보조정제)", c.last_judge, 30, judgeQ, `공개카페는 규칙검증돼 노출중 · LLM 보조정제 대기 ${judgeQ}곳(새벽 Batches 자동·소비자 품질무관)${jbParts.length > 1 ? ` [${jbParts.join("+")}]` : ""}`);
     add("embed", "임베딩", c.last_embed, 30, c.embed_q, c.embed_q ? `미임베딩 ${c.embed_q}` : `완료(공개 ${c.published ? Math.round((c.pub_embedded / c.published) * 100) : 0}%)`);
     add("verify", "검증 레드팀", vr?.ran_at ?? null, 30, (vr?.fails ?? 0) + (vr?.warns ?? 0), vr ? `fail ${vr.fails}·warn ${vr.warns}` : "리포트 없음");
     // 품질감사: 미해결 플래그 기준(가동 시각은 flag 생성 시각으로 근사)
@@ -406,7 +408,7 @@ export async function GET(req: NextRequest) {
       generatedAt: new Date(now).toISOString(),
       overall, alerts, healed, risks, notices, integrity,
       coverage: { total: c.total, published: c.published, rawCachedPct: pct(c.raw_cached), judgedPct: pct(c.judged), embeddedPct: c.published ? Math.round((c.pub_embedded / c.published) * 100) : 0, dongPct: pct(td.has_dong) },
-      today: { newCafes: td.new_today, synthesized: td.synth_today, published: td.published_today, hasDong: td.has_dong, dongPct: pct(td.has_dong), noise: td.noise, newQueue: td.new_q, ytToday: td.yt_today, ytTotal: td.yt_total },
+      today: { newCafes: daily.newCafes, synthesized: td.synth_today, published: td.published_today, hasDong: td.has_dong, dongPct: pct(td.has_dong), noise: td.noise, newQueue: td.new_q, ytToday: daily.yt, ytTotal: td.yt_total },
       pipeline, agents,
       grounding: { suspectCount: gr?.suspect ?? 0, backlog: grBacklog.n, suspects: grSuspects },
       offctx: { count: offctx.n, suspects: offctxSuspects },

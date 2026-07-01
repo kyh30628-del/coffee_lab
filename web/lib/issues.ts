@@ -165,6 +165,21 @@ export async function coordinationLifecycle(): Promise<{ routed: number; overdue
       AND EXISTS (SELECT 1 FROM coordination c WHERE c.id::text = d.action_params->>'coord' AND c.status IN ('resolved','closed','done'))
     RETURNING id`.catch(() => [])) as any[];
   if (closedDec.length && log.length < 6) log.push(`끝난 결재 ${closedDec.length}건 자동 종결(#${closedDec.map((r) => r.id).join(",")})`);
+
+  // 6) ✅ 조사(investigate) 결재 자동 종결: 자가진단이 '크론 실패/정지'로 올린 investigate는 조사대상 크론이
+  //    다시 정상(최신 run ok)이면 조사할 게 사라진 것 → 자동 done. (안 그러면 크론이 잠깐 삐끗할 때마다 안 닫히는 좀비 누적.)
+  //    check 예: "크론 실패 cron-closure" → job 'cron-closure' 추출 후 agent_runs 최신 run ok면 종결. 파싱 불가/미정상이면 그대로 둠(안전).
+  const closedInv = (await sql`UPDATE decisions d SET status='done', decided_at=now(),
+      result = COALESCE(d.result,'') || ' [조사대상 크론 정상화 → 자동 종결]'
+    WHERE d.status IN ('approved','pending') AND d.action_type='investigate'
+      AND d.action_params->>'check' ~ '크론 (실패|정지)'
+      AND EXISTS (
+        SELECT 1 FROM agent_runs a
+        WHERE a.job = split_part(regexp_replace(d.action_params->>'check', '^.*크론 (정지의심|정지|실패) ', ''), ' ', 1)
+          AND a.ran_at = (SELECT MAX(ran_at) FROM agent_runs a2 WHERE a2.job = a.job)
+          AND a.ok = true)
+    RETURNING id`.catch(() => [])) as any[];
+  if (closedInv.length && log.length < 6) log.push(`조사 결재 ${closedInv.length}건 자동 종결(크론 정상화)`);
   return { routed, overdue, log };
 }
 

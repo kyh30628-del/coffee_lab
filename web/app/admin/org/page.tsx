@@ -256,6 +256,17 @@ export default function OrgDashboard() {
     setBusy(null); setTimeout(() => setToast(""), 4000);
   };
 
+  const completeTask = async (id: number) => {
+    if (!confirm("이 실무를 '완료' 처리합니다(실행 중에서 제거). 진행할까요?")) return;
+    setBusy(id);
+    try {
+      const r = await fetch("/api/admin/complete-task", { method: "POST", headers: { "x-admin-password": pw, "Content-Type": "application/json" }, body: JSON.stringify({ id }) }).then((x) => x.json());
+      setToast(r.ok ? "✅ 완료 처리됨" : `⚠️ ${r.error}`);
+      load(pw);
+    } catch { setToast("⚠️ 처리 실패"); }
+    setBusy(null); setTimeout(() => setToast(""), 4000);
+  };
+
   const tok = brief?.token_today || {}; const crons = brief?.crons || []; const m = brief?.metrics || {};
   const fmt = (n: number) => (n >= 1000 ? Math.round(n / 1000) + "K" : n || 0);
   const sevC: Record<string, string> = { HIGH: "#b03a3a", MED: "#b06a2e", LOW: "#6a5a48" };
@@ -451,6 +462,7 @@ export default function OrgDashboard() {
               <span style={{ background: "#c08a3e", color: "#fff", fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 20 }}>실행중</span>
               <span style={{ flex: 1, color: "#5a4631" }}>{d.title}</span>
               <span style={{ fontSize: 10, color: d.age_h >= 72 ? "#b03a3a" : "#9c8a6c" }}>{d.team || "-"} · {d.age_h}h</span>
+              <button disabled={busy === d.id} onClick={() => completeTask(d.id)} style={{ fontSize: 10, fontWeight: 700, color: "#3f7a4f", background: "#eef5ef", border: "1px solid #cfe3d2", borderRadius: 7, padding: "2px 8px", cursor: "pointer", opacity: busy === d.id ? 0.5 : 1 }}>완료</button>
             </div>
           )) : <div style={{ fontSize: 12, color: "#3f7a4f" }}>진행 중인 실무 없음 ✅</div>}
           </>}
