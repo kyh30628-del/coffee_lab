@@ -202,6 +202,8 @@ export default function OrgDashboard() {
   const [live, setLive] = useState<any>(null);
   const [jobs, setJobs] = useState<any>(null);
   const [showJobs, setShowJobs] = useState(false);
+  const [devpipe, setDevpipe] = useState<any>(null);
+  const [showDev, setShowDev] = useState(false);
   const load = (password: string, silent = false) => {
     if (!silent) { setLoading(true); setErr(""); }
     Promise.all([
@@ -211,7 +213,9 @@ export default function OrgDashboard() {
       fetch("/api/admin/issues", { headers: { "x-admin-password": password }, cache: "no-store" }).then((r) => r.json()),
       fetch("/api/admin/metrics", { headers: { "x-admin-password": password }, cache: "no-store" }).then((r) => r.json()).catch(() => ({ ok: false })),
       fetch("/api/admin/jobs", { headers: { "x-admin-password": password }, cache: "no-store" }).then((r) => r.json()).catch(() => ({ ok: false })),
-    ]).then(([b, d, co, iss, lv, jb]) => {
+      fetch("/api/admin/dev-pipeline", { headers: { "x-admin-password": password }, cache: "no-store" }).then((r) => r.json()).catch(() => ({ ok: false })),
+    ]).then(([b, d, co, iss, lv, jb, dp]) => {
+      if (dp && dp.ok) setDevpipe(dp);
       if (b.ok) { setBrief(b.brief); setBriefs(b.briefs || (b.brief ? [b.brief] : [])); localStorage.setItem("adm_pw", password); } else if (!silent) setErr("비밀번호 확인");
       if (d.ok) setDec({ pending: d.pending || [], delegated: d.delegated || [], recent: d.recent || [] });
       if (co.ok) setCoord({ open: co.open || [], resolved: co.resolved || [] });
@@ -232,6 +236,17 @@ export default function OrgDashboard() {
     try {
       const r = await fetch("/api/admin/decide", { method: "POST", headers: { "x-admin-password": pw, "Content-Type": "application/json" }, body: JSON.stringify({ id, decision }) }).then((x) => x.json());
       setToast(r.ok ? `✅ ${decision === "approve" ? "승인·실행" : "반려"}: ${r.result || ""}` : `⚠️ ${r.error}`);
+      load(pw);
+    } catch { setToast("⚠️ 처리 실패"); }
+    setBusy(null); setTimeout(() => setToast(""), 4000);
+  };
+
+  const devAction = async (id: number, action: "deploy" | "discard") => {
+    if (action === "deploy" && !confirm("이 브랜치를 main에 배포(git push)합니다. 진행할까요?")) return;
+    setBusy(id);
+    try {
+      const r = await fetch("/api/admin/dev-action", { method: "POST", headers: { "x-admin-password": pw, "Content-Type": "application/json" }, body: JSON.stringify({ id, action }) }).then((x) => x.json());
+      setToast(r.ok ? `✅ ${action === "deploy" ? "배포 확정 — 진행 중" : "폐기"}` : `⚠️ ${r.error}`);
       load(pw);
     } catch { setToast("⚠️ 처리 실패"); }
     setBusy(null); setTimeout(() => setToast(""), 4000);
@@ -292,6 +307,43 @@ export default function OrgDashboard() {
             </div>
           )}
         </div>
+
+        {/* 🛠 개발 파이프라인 — 승인된 dev_task 진행(개발대기→배포대기→배포). 배포대기는 CEO 배포/폐기 조치 */}
+        {devpipe?.jobs?.length > 0 && (
+          <div style={{ ...card, marginTop: 10, border: devpipe.waiting ? "2px solid #6a468c" : "1px solid #ddc9a8" }}>
+            <button onClick={() => setShowDev(!showDev)} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
+              <span style={{ fontSize: 13.5, fontWeight: 700, color: devpipe.waiting ? "#6a468c" : "#9c6b3f" }}>
+                {showDev ? "▾" : "▸"} 🛠 개발 파이프라인 ({devpipe.jobs.length}){devpipe.waiting ? <span style={{ fontSize: 10, fontWeight: 700, color: "#6a468c" }}> · 🚀 배포대기 {devpipe.waiting}</span> : null}
+              </span>
+              <span style={{ fontSize: 10.5, color: "#9c8a6c" }}>승인→브랜치구현→검증→배포</span>
+            </button>
+            {showDev && <div style={{ marginTop: 8 }}>
+              {devpipe.jobs.map((j: any) => {
+                const sc: Record<string, string> = { "개발대기": "#8a7458", "배포대기": "#6a468c", "build_failed": "#b03a3a", "deploy_approved": "#2a7a72", "deploy_failed": "#b03a3a" };
+                const sl: Record<string, string> = { "개발대기": "개발 대기", "배포대기": "배포대기(검증완료)", "build_failed": "빌드 실패", "deploy_approved": "배포 중", "deploy_failed": "배포 실패" };
+                return (
+                  <div key={j.id} style={{ border: `1px solid ${j.dev_status === "배포대기" ? "#d3c0e6" : "#e6d8bf"}`, borderRadius: 10, padding: "9px 11px", marginBottom: 8, background: j.dev_status === "배포대기" ? "#faf7fd" : "#fbfaf5" }}>
+                    <div style={{ display: "flex", gap: 5, alignItems: "center", flexWrap: "wrap" }}>
+                      <span style={{ background: sc[j.dev_status] || "#888", color: "#fff", fontSize: 9.5, fontWeight: 700, padding: "2px 7px", borderRadius: 20 }}>{sl[j.dev_status] || j.dev_status}</span>
+                      <span style={{ fontWeight: 700, fontSize: 12.5 }}>#{j.id} {j.title.replace(/^\[개발\]\s*/, "")}</span>
+                    </div>
+                    {j.summary && <div style={{ fontSize: 11.5, color: "#5a4631", lineHeight: 1.45, margin: "4px 0 2px" }}>{j.summary}</div>}
+                    {j.branch && <div style={{ fontSize: 10, color: "#9c8a6c" }}>🌿 {j.branch}{j.result ? ` · ${j.result}` : ""}</div>}
+                    {j.dev_status === "배포대기" && (
+                      <div style={{ display: "flex", gap: 6, marginTop: 7 }}>
+                        <button disabled={busy === j.id} onClick={() => devAction(j.id, "deploy")} style={{ flex: 1, padding: "7px 0", background: "#6a468c", color: "#fff", border: "none", borderRadius: 8, fontWeight: 700, fontSize: 12.5 }}>🚀 배포</button>
+                        <button disabled={busy === j.id} onClick={() => devAction(j.id, "discard")} style={{ flex: 1, padding: "7px 0", background: "#efe7d8", color: "#8a5a5a", border: "1px solid #d8c4a4", borderRadius: 8, fontWeight: 700, fontSize: 12.5 }}>폐기</button>
+                      </div>
+                    )}
+                    {j.dev_status === "build_failed" && (
+                      <button disabled={busy === j.id} onClick={() => devAction(j.id, "discard")} style={{ marginTop: 7, width: "100%", padding: "6px 0", background: "#efe7d8", color: "#8a5a5a", border: "1px solid #d8c4a4", borderRadius: 8, fontWeight: 700, fontSize: 12 }}>폐기</button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>}
+          </div>
+        )}
 
         {/* 🚨 RM 실시간 이슈 — 접이식·기본 접힘(헤더에 건수·HIGH 표시) */}
         <div style={{ ...card, marginTop: 10, border: issues.length ? "2px solid #b03a3a" : "1px solid #bcd4bc" }}>
