@@ -25,3 +25,8 @@ web/public/data/timeseries.json
 data-engine/data/clean/coffee_c.csv
 data-engine/data/clean/fx_usd_krw.csv
 *.pptx
+
+# stray/leftover (dev-agent 오염 방지)
+/_tri.mts
+/web/agents/
+/web/redteam-query.ts
