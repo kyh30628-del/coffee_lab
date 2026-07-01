@@ -10,6 +10,27 @@ export const maxDuration = 30;
 // - exact/개념: 질의 토큰을 카페 텍스트·검증 리뷰에서 직접 매칭 + 느낌→신호 가산(근거 노출).
 // 키 없으면 키워드 기반으로 자동 폴백. 점수는 DB 실제값만 사용(환각 금지).
 
+// 수도권(서울·경기·인천) 외 지역 키워드 — query 또는 region에 포함 시 미서비스 안내
+const OUT_OF_COVERAGE_KEYWORDS = [
+  "부산", "대구", "대전", "광주", "울산", "세종",
+  "강원", "충북", "충남", "충청", "전북", "전남", "전라", "경북", "경남", "경상", "제주",
+  "춘천", "원주", "강릉", "속초", "포항", "경주", "안동", "구미",
+  "창원", "진주", "통영", "김해", "거제", "양산", "밀양",
+  "전주", "군산", "익산", "목포", "순천", "여수", "광양",
+  "청주", "충주", "제천", "천안", "아산", "공주", "서산",
+  "제주시", "서귀포",
+];
+
+function detectOutOfCoverage(q: string, region: string): string | null {
+  const text = (q + " " + region).toLowerCase();
+  for (const kw of OUT_OF_COVERAGE_KEYWORDS) {
+    if (text.includes(kw)) {
+      return `현재 동네 커피 노트는 수도권(서울·경기·인천)만 서비스합니다. '${kw}' 지역 카페는 아직 포함되어 있지 않아요. 수도권 검색어로 다시 시도해 보세요.`;
+    }
+  }
+  return null;
+}
+
 const CONCEPTS: { id: string; triggers: string[]; axis?: string; taste?: string; uses?: string[]; label: string }[] = [
   { id: "quiet", triggers: ["조용", "혼자", "차분", "사색", "고요", "한적", "혼카", "평온", "힐링", "나홀로", "한가"], axis: "quiet", uses: ["혼자"], label: "조용·혼자" },
   { id: "work", triggers: ["작업", "공부", "노트북", "콘센트", "스터디", "와이파이", "오래", "독서", "집중", "책"], axis: "work", uses: ["작업"], label: "작업·공부" },
@@ -228,11 +249,13 @@ export async function GET(req: NextRequest) {
       }
     } catch { /* 상호매칭 실패해도 기존 결과 유지 */ }
 
-    const payload = {
+    const coverageNote = detectOutOfCoverage(q, region);
+    const payload: Record<string, unknown> = {
       ok: true, mode, region: region || "수도권 전체", q,
       concepts: hitConcepts.map((c) => c.label),
       count: results.length, results,
     };
+    if (coverageNote) payload.coverageNote = coverageNote;
     // 결과가 있으면 캐시에 저장(다음 동일 질문은 재계산 0)
     if (results.length > 0) {
       sql`INSERT INTO search_cache (qkey, payload, created_at) VALUES (${qkey}, ${JSON.stringify(payload)}, now())
