@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
     const q = (req.nextUrl.searchParams.get("q") ?? "").trim();
     if (q.length < 1) return NextResponse.json({ ok: true, cafes: [] });
     const rows = await sql`SELECT id, name, area FROM cafes WHERE name ILIKE ${"%" + q + "%"} ORDER BY synth_count DESC NULLS LAST LIMIT 8`;
-    return NextResponse.json({ ok: true, cafes: rows }, { headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" } });
+    return NextResponse.json({ ok: true, cafes: rows }, { headers: { "Cache-Control": "public, max-age=0, must-revalidate" } });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }

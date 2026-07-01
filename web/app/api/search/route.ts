@@ -188,7 +188,7 @@ export async function GET(req: NextRequest) {
       if (hit?.payload && Array.isArray(hit.payload.results) && hit.payload.results.length > 0) {
         logSearch(q, region, Number(hit.payload?.count ?? 0), "cache");
         return NextResponse.json({ ...hit.payload, cached: true }, {
-          headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" },
+          headers: { "Cache-Control": "public, max-age=0, must-revalidate" },
         });
       }
     }
@@ -329,7 +329,7 @@ export async function GET(req: NextRequest) {
     }
     logSearch(q, region, results.length, mode); // 🔎 수요 로깅(수요-공급 갭·발굴 우선순위·콘텐츠 소재)
     return NextResponse.json(payload, {
-      headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" },
+      headers: { "Cache-Control": "public, max-age=0, must-revalidate" },
     });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });

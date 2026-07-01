@@ -52,7 +52,7 @@ export async function GET() {
     ].filter((t) => t.cafes.length > 0)
      .map((t) => ({ ...t, cafes: t.cafes.slice(0, 6) }));
 
-    return NextResponse.json({ themes, total: rows.length }, { headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" } });
+    return NextResponse.json({ themes, total: rows.length }, { headers: { "Cache-Control": "public, max-age=0, must-revalidate" } });
   } catch (e) {
     return NextResponse.json({ themes: [], error: String(e) }, { status: 500 });
   }

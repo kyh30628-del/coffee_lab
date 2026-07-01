@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
       HAVING COUNT(DISTINCT v.device_id) > 0
       ORDER BY cnt DESC
       LIMIT 1000`;
-    return NextResponse.json({ ok: true, pins: rows }, { headers: { "Cache-Control": "public, s-maxage=120, stale-while-revalidate=600" } });
+    return NextResponse.json({ ok: true, pins: rows }, { headers: { "Cache-Control": "public, max-age=0, must-revalidate" } });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e), pins: [] }, { status: 500 });
   }

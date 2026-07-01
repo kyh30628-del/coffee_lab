@@ -119,7 +119,7 @@ export async function GET(req: NextRequest) {
       specialty: bySpecialty.filter((c) => !usedIds.has(c.id)).slice(0, 5).map((c: any) => slim(c, "specialty")),
     }, {
       // 엣지 캐시(지역별로 따로 캐시됨). 추천·featured는 5분 신선도면 충분.
-      headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" },
+      headers: { "Cache-Control": "public, max-age=0, must-revalidate" },
     });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });

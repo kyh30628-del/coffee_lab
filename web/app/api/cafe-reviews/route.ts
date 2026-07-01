@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
       date: r.created_at,
     }));
     return NextResponse.json({ ok: true, count: reviews.length, reviews }, {
-      headers: { "Cache-Control": "public, s-maxage=120, stale-while-revalidate=600" },
+      headers: { "Cache-Control": "public, max-age=0, must-revalidate" },
     });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });

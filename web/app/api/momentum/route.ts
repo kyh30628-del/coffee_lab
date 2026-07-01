@@ -70,7 +70,7 @@ export async function GET(req: NextRequest) {
     scored.sort((a, b) => b._s - a._s);
     const rising = scored.slice(0, 12).map(({ _s, ...x }) => x);
     return NextResponse.json({ ok: true, region: region || "수도권 전체", hasDelta, count: rising.length, rising }, {
-      headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" },
+      headers: { "Cache-Control": "public, max-age=0, must-revalidate" },
     });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
