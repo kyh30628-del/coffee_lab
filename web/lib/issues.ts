@@ -100,7 +100,7 @@ export async function coordinationLifecycle(): Promise<{ routed: number; overdue
   routed = r.length; if (routed && log.length < 6) log.push(`협업 ${routed}건 조율·기한배정`);
   // 2) 과기한 미해결 → '지연'으로 재상신 + 담당 에이전트 이벤트 기동(재촉). 이미 지연표시된 건 debounce(pushTrigger 동일 kind+ref 스킵).
   const od = (await sql`UPDATE coordination SET stage='지연', escalated_at=now()
-    WHERE status IN ('open','in_progress') AND due_at < now() AND COALESCE(stage,'') <> '지연'
+    WHERE status IN ('open','in_progress') AND due_at < now() AND escalated_at IS NULL
     RETURNING id, to_team, topic`.catch(() => [])) as any[];
   for (const c of od) await pushTrigger("coord_overdue", String(c.id), `협업 지연 #${c.id} → ${c.to_team || "미배정"}: ${String(c.topic || "").slice(0, 60)}`, "MED").catch(() => {});
   overdue = od.length; if (overdue && log.length < 6) log.push(`협업 지연 ${overdue}건 재상신(담당 재촉)`);
@@ -131,6 +131,28 @@ export async function coordinationLifecycle(): Promise<{ routed: number; overdue
     devEsc++;
   }
   if (devEsc && log.length < 6) log.push(`개발 협업 ${devEsc}건 → CEO 결재 상신`);
+
+  // 4) 🚫 좀비 차단(터미널 에스컬레이션): '지연'이 재촉 후에도 2차 기한(18h)까지 미해결 + 연결 결재 없음 →
+  //    무한 재촉(nag) 대신 CEO 조치경로 판단 결재를 1건 상신(coord당 idempotent) + stage 전환으로 지연 루프서 제거.
+  //    근거: 담당 크론/팀이 못 푸는 handoff(코드필요·자동수정불가)는 조치처가 없어 영구 좀비였음. '모든 항목은 조치처를 가진다' 강제.
+  //    개발 handoff은 3b가 이미 dev_task 상신하므로 제외. 결재는 coordination을 생성하지 않음 → 미러/루프 구조적 불가.
+  const stuck = (await sql`SELECT id, from_team, to_team, topic, detail FROM coordination c
+    WHERE c.status IN ('open','in_progress') AND c.stage='지연'
+      AND c.escalated_at < now() - interval '18 hours'
+      AND c.to_team !~ '개발|dev'
+      AND NOT EXISTS (SELECT 1 FROM decisions d WHERE d.action_params->>'coord' = c.id::text)`.catch(() => [])) as any[];
+  let termEsc = 0;
+  for (const c of stuck) {
+    const owner = c.from_team || "기획조정실";
+    await sql`INSERT INTO decisions (title, detail, team, severity, tier, action_type, action_params, recommendation)
+      VALUES (${`[정체] ${c.topic}`.slice(0, 110)},
+              ${`협업 #${c.id}(${owner}→${c.to_team || "미배정"})가 재촉 후에도 미해결. 담당 크론/팀이 자체 처리 못함. ${String(c.detail || "").slice(0, 180)}`},
+              ${owner}, 'MED', 'L3', 'route_coord', ${JSON.stringify({ coord: String(c.id) })}::jsonb,
+              ${"조치경로 판단: 승인 시 기조실장이 실제 조치항목(코드=dev_task·비공개·검색제한)으로 재배정, 반려 시 폐기."})`.catch(() => {});
+    await sql`UPDATE coordination SET stage='CEO정체판단' WHERE id=${c.id}`.catch(() => {});
+    termEsc++;
+  }
+  if (termEsc && log.length < 6) log.push(`정체 협업 ${termEsc}건 → CEO 조치판단 상신(좀비 차단)`);
   return { routed, overdue, log };
 }
 
