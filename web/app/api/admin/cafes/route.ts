@@ -38,6 +38,9 @@ export async function POST(req: NextRequest) {
     } else {
       return NextResponse.json({ ok: false, error: "unknown action" }, { status: 400 });
     }
+    // 수동 숨기기/삭제도 결재 집행과 동일하게 전 캐시 레이어 무효화(2026-07-02 감사)
+    const { invalidateCafeCaches } = await import("@/lib/cafeCacheInvalidate");
+    await invalidateCafeCaches([Number(id)]).catch(() => {});
     return NextResponse.json({ ok: true });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });

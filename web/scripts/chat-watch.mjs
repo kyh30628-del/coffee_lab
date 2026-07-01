@@ -13,7 +13,7 @@ DB접속: web/.env.local의 DATABASE_URL, Bash로 node+@neondatabase/serverless�
 [규칙] **답의 근거 수치는 거의 다 아래 [라이브 상태]에 이미 있다 — 가급적 그걸로 바로 답하라.** Bash DB조회는 [라이브 상태]에 없는 값이 꼭 필요할 때만(읽기전용 SELECT). 숫자 실측, 모르면 "확인 필요". 지어내지 마라. **반드시 마지막엔 텍스트로 답을 마무리하라.**
 [서식] 답은 **마크다운**으로 구조화 — 핵심은 **표**·**목록**·**굵게**. 화면이 HTML로 렌더. 장황 금지, 모바일에서 짧고 한눈에.
 [지식: 조직] CEO→기획조정실장(2인자)─직할 자율진단감사실(self-audit)·비서실장. 6본부: 품질·성장·운영·경험·영업·전략기획(주간)·경영지원(주간). DoA: L0팀·L1본부·L2기조실장·L3 CEO만 결재.
-[지식: 스케줄KST] 상시: audit-watch 5분, cron-issues 10분(RM탐지+autoCorrect), embed/synth 매시, heal·grow 2h, enrich 3h, selfaudit 6h. 하루: 00 sentinel·01 self-audit·01:30 rulegap·06 verify·08/17 전체사이클(LLM)·17 demand·04/10/16/22 closure. LLM=로컬claude-p(구독$0)·결정론=Vercel크론.
+[지식: 스케줄KST] 상시: audit-watch 5분(트리거 감시+cron-selfaudit 워치독)·dev-pipeline 5분·dev-deploy 2분·cron-issues 10분(RM탐지+autoCorrect)·chat-watch 상주. 매시: embed :05·synth :45. 주기: grow(홀수시:10)·heal(홀수시:25) 2h·enrich 3h(:40)·selfaudit 6h(03/09/15/21시 :20). 하루: 00 sentinel·01:30 rulegap·06 verify·08/17 전체사이클(LLM)·10:30 주간거버넌스(격일게이트)·11:30/15:30/21:30 self-audit(LLM)·16:30 youtube-backfill·17 demand·04/10/16/22 closure. 주간: 일13 snapshot·월13 resynth·일20:07 newsletter. LLM=로컬claude-p(구독$0)·결정론=Vercel크론.
 [지식: 품질기준] 검증옥석=verifyReview로 가비지(동명·무관·광고·SEO·nameAsWord) 제거 후 옥석만 카운트. 공개floor=검증리뷰 3건+(참고)·30+(검증)·0~2(후보보류). nameAsWord필터=초단어/일반어명 오염거절. 오염게이트=cleanCafeName·offctx·coherence·off-concept·비카페카테고리·합성순간차단. AI판정=상시OFF수동청산(콘솔키). 수도권만·카카오로컬불가.`;
 
 async function ground() {
