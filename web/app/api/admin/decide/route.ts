@@ -14,6 +14,9 @@ export async function POST(req: NextRequest) {
 
     if (decision === "reject") {
       await sql`UPDATE decisions SET status='rejected', decided_at=now(), result='CEO 반려' WHERE id=${id}`;
+      // 개발 결재 반려 → 연결된 협업 보류 표시(재상신 안 되게)
+      if (d.action_type === "dev_task" && d.action_params?.coord)
+        await sql`UPDATE coordination SET stage='보류(CEO반려)' WHERE id=${Number(d.action_params.coord)}`.catch(() => {});
       return NextResponse.json({ ok: true, status: "rejected" });
     }
 
@@ -42,6 +45,12 @@ export async function POST(req: NextRequest) {
         case "agent_task": {
           // 코드·에이전트 필요 → 서버 즉시 실행 불가. 승인만 기록, 기조실장이 배분.
           status = "approved"; result = `승인됨 — 기획조정실장이 ${d.team || "담당 본부"}에 배분·실행 예정`; break;
+        }
+        case "dev_task": {
+          // 개발(코드 변경·배포) 승인 → 개발 실행 대기 큐로. 연결 협업 stage=개발승인. 실제 개발은 개발 실행 경로가 처리.
+          status = "approved"; result = "CEO 승인 — 개발 착수 대기(코드 작성→검증→배포)";
+          if (p.coord) await sql`UPDATE coordination SET stage='개발승인' WHERE id=${Number(p.coord)}`.catch(() => {});
+          break;
         }
         default:
           status = "approved"; result = "승인 기록(수동 실행 필요)";

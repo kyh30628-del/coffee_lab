@@ -104,6 +104,22 @@ export async function coordinationLifecycle(): Promise<{ routed: number; overdue
     RETURNING id, to_team, topic`.catch(() => [])) as any[];
   for (const c of od) await pushTrigger("coord_overdue", String(c.id), `협업 지연 #${c.id} → ${c.to_team || "미배정"}: ${String(c.topic || "").slice(0, 60)}`, "MED").catch(() => {});
   overdue = od.length; if (overdue && log.length < 6) log.push(`협업 지연 ${overdue}건 재상신(담당 재촉)`);
+  // 3) 개발·데이터 handoff = 에이전트가 자동 못 푸는 '코드 변경·배포' → 무조건 CEO 결재(L3 dev_task). CEO 승인 시 개발 실행.
+  //    (데이터 조작=L2 자동 vs 코드변경=L3 CEO. 파급·되돌림 난이도가 커서 CEO 게이트.) coord당 1건만(idempotent).
+  const dev = (await sql`SELECT id, from_team, to_team, topic, detail FROM coordination c
+    WHERE c.status IN ('open','in_progress') AND (c.to_team ~ '개발|데이터|엔지니어|dev')
+      AND NOT EXISTS (SELECT 1 FROM decisions d WHERE d.action_params->>'coord' = c.id::text)`.catch(() => [])) as any[];
+  let devEsc = 0;
+  for (const c of dev) {
+    await sql`INSERT INTO decisions (title, detail, team, severity, tier, action_type, action_params, recommendation)
+      VALUES (${`[개발] ${c.topic}`.slice(0, 110)},
+              ${`협업 #${c.id} (${c.from_team}→${c.to_team}): ${String(c.detail || c.topic || "").slice(0, 180)}`},
+              ${c.to_team || "개발팀"}, 'MED', 'L3', 'dev_task', ${JSON.stringify({ coord: String(c.id) })}::jsonb,
+              ${`에이전트가 자동 못 푸는 코드 변경 건입니다. 승인하시면 개발에 착수합니다(코드 작성→검증→배포). 반려 시 협업은 보류됩니다.`})`.catch(() => {});
+    await sql`UPDATE coordination SET stage='CEO결재' WHERE id=${c.id}`.catch(() => {});
+    devEsc++;
+  }
+  if (devEsc && log.length < 6) log.push(`개발 협업 ${devEsc}건 → CEO 결재 상신`);
   return { routed, overdue, log };
 }
 
