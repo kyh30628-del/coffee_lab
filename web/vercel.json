@@ -61,6 +61,10 @@
       "schedule": "*/10 * * * *"
     },
     {
+      "path": "/api/cron-coord-consumer",
+      "schedule": "15 * * * *"
+    },
+    {
       "path": "/api/cron-selfaudit",
       "schedule": "20 */6 * * *"
     }

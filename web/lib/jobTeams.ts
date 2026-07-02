@@ -11,7 +11,7 @@ export const JOB_TEAM: Record<string, string> = {
   "cron-selfaudit": "품질본부", "cron-batch-judge": "품질본부",
   "cron-grow": "성장본부", "cron-demand": "성장본부", "cron-newsletter": "성장본부", "cron-discover-categories": "성장본부",
   "cafe-collect": "성장본부",
-  "cron-issues": "경영지원본부",
+  "cron-issues": "경영지원본부", "cron-coord-consumer": "경영지원본부",
   // 로컬 launchd 잡(하트비트 경유)
   "youtube-backfill": "품질본부",
   "weekly-evaluation": "전략기획본부",
@@ -39,7 +39,7 @@ export const EXPECT_MAX_H: Record<string, number> = {
   // Vercel 크론 (스케줄 + 버퍼)
   "cron-snapshot": 200, "cron-resynth": 200, "cron-newsletter": 200, "cron-discover-categories": 800,
   "cron-verify": 30, "cron-sentinel": 30, "cron-demand": 30, "cron-rulegap": 30, "cron-closure": 12,
-  "cron-grow": 6, "cron-enrich": 8, "cron-embed": 4, "cron-synth": 4, "cron-issues": 2,
+  "cron-grow": 6, "cron-enrich": 8, "cron-embed": 4, "cron-synth": 4, "cron-issues": 2, "cron-coord-consumer": 2,
   "orchestrator-heal": 6,
   // 로컬 launchd 잡
   "youtube-backfill": 30, // 일배치 16:30 KST + 버퍼
