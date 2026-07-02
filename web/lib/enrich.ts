@@ -64,7 +64,8 @@ const parseDates = (review_dates: any): number[] => {
   let d = review_dates;
   if (typeof d === "string") { try { d = JSON.parse(d); } catch { return []; } }
   const arr: string[] = Array.isArray(d) ? d : (d && typeof d === "object" ? Object.values(d).flat() as string[] : []);
-  return arr.map((x) => new Date(String(x).replace(/\./g, "-")).getTime()).filter((t) => !isNaN(t));
+  // "1990.01.01"은 네이버 발행일 파싱 실패 시의 무음 기본값(오염분) — 신선도 계산에서 제외.
+  return arr.filter((x) => String(x) !== "1990.01.01").map((x) => new Date(String(x).replace(/\./g, "-")).getTime()).filter((t) => !isNaN(t));
 };
 
 export function reputationSignals(quotes: string[], review_dates: any): { recentRatio: number; neg: number; pos: number; declineNote: string | null } {
