@@ -24,5 +24,10 @@ export async function recordRun(job: string, ok: boolean, detail = "", processed
     }
   } catch { /* issues 테이블 미존재 등 — cron-issues 폴이 백스톱 */ }
   // 🔔 크론 실패 = 판단 필요한 이산 이벤트 → 이벤트형 트리거. 로컬 watcher가 self-audit LLM을 깨워 근본원인 조사.
-  if (!ok) await pushTrigger("cron_fail", job, detail, "HIGH");
+  //   🚫 두 경우는 트리거 제외(2026-07-02, 자기증폭·폭풍 근본차단):
+  //   ① self-audit-agent 자신의 실패 — 트리거 워처가 깨우는 대상이 자기라 '실패→트리거→자기기동→실패' 무한루프(레이트리밋 시 27회 폭풍)를 만든다.
+  //   ② 레이트리밋/세션한도 — 계정 전역·일시적이라 LLM을 깨워도 함께 막혀 무의미. 대량 동시실패가 트리거 홍수를 일으킨다.
+  //   두 경우 모두 실패 하트비트·이슈는 남겨 가시성은 유지하고, LLM 기동(트리거)만 생략한다.
+  const isRateLimit = /session limit|rate limit|hit your (usage|session)|resets \d|한도/i.test(String(detail));
+  if (!ok && job !== "self-audit-agent" && !isRateLimit) await pushTrigger("cron_fail", job, detail, "HIGH");
 }
