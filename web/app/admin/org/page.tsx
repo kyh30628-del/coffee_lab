@@ -77,25 +77,6 @@ const ORG = {
   ],
 };
 
-// 📊 조직 집계 — ORG(단일 출처)에서 실시간 계산. 하드코딩 금지 → 조직도와 절대 어긋나지 않음(드리프트 차단).
-//   🧠=LLM 에이전트 · ⚙️=상시/크론(결정론) · 🌐=실시간 API · 🚀=배포 워커.
-const ORG_STATS = (() => {
-  let bonbu = 0, sil = 0, teams = 0, agent = 0, cron = 0, api = 0, deploy = 0;
-  for (const d of ORG.divisions) {
-    if (/본부/.test(d.n)) bonbu++; else sil++;
-    for (const t of (d.teams || [])) {
-      teams++;
-      for (const w of ((t as any).w || [])) {
-        if (w.k === "🧠") agent++;
-        else if (w.k === "⚙️") cron++;
-        else if (w.k === "🌐") api++;
-        else if (w.k === "🚀") deploy++;
-      }
-    }
-  }
-  return { bonbu, sil, teams, agent, cron, api, deploy };
-})();
-
 // 가동 멤버 의미·역할 — 카드 클릭 시 팝업 설명
 const MEMBER_INFO: Record<string, string> = {
   "자율진단 에이전트(self-audit)": "기조실장 직할. 매 사이클 전 서비스를 스스로 진단해 결정론·메트릭이 못 잡는 *새 유형* 문제를 발굴. 못 푸는 건 기조실장→CEO 결재로 상신. 변화 없으면 ≤3턴 종료(값쌈). 기조실장이 매일 작동·사각 감시.",
@@ -315,17 +296,7 @@ export default function OrgDashboard() {
           <div style={card}><div style={lbl}>🔔 결재 대기</div><div style={big}>{dec.pending.length}건</div></div>
           <div style={card}><div style={lbl}>📊 오늘 토큰(in)</div><div style={big}>{fmt(tok.input || 0)}</div><div style={sub}>비용프록시 ${Number(tok.cost || 0).toFixed(2)}</div></div>
           <div style={card}><div style={lbl}>📈 공개 카페</div><div style={big}>{(live?.pub ?? (+m.pub || 0)).toLocaleString()}</div><div style={sub}>검증 {(live?.v ?? (+m.v || 0)).toLocaleString()}{live?.backlog ? ` · 대기 ${live.backlog}` : ""}</div></div>
-          <div style={card}><div style={lbl}>🤖 크론 가동</div><div style={big}>{live ? `${live.cronOk}/${live.cronTotal}` : `${crons.filter((c: any) => c.ok).length}/${crons.length}`} {(live ? live.cronFail?.length === 0 : crons.every((c: any) => c.ok)) ? "✅" : "⚠️"}</div><div style={sub}>실시간 성공/전체</div></div>
-        </div>
-
-        {/* 🏢 조직 구성 집계 — ORG(조직도 단일출처)에서 계산 → 조직도와 항상 일치. 오케스트레이터/에이전트/크론/api 구분. */}
-        <div style={{ ...card, marginTop: 8 }}>
-          <div style={lbl}>🏢 조직 구성 <span style={{ fontWeight: 400, color: "#b7a789" }}>(조직도 기준)</span></div>
-          <div style={{ fontSize: 12.5, color: "#5a4631", lineHeight: 1.7, marginTop: 4 }}>
-            <b>🎛️ 오케스트레이터</b> · 본부 {ORG_STATS.bonbu} · 실 {ORG_STATS.sil}<br />
-            <b>🧠 에이전트</b> · 팀 {ORG_STATS.teams} · LLM {ORG_STATS.agent}<br />
-            <b>⚙️ 크론</b> · {ORG_STATS.cron}{"  "}·{"  "}<b>🌐 api</b> · {ORG_STATS.api}{"  "}·{"  "}<b>🚀 배포</b> · {ORG_STATS.deploy}
-          </div>
+          <div style={card}><div style={lbl}>🤖 자율 잡 가동</div><div style={big}>{live ? `${live.cronOk}/${live.cronTotal}` : `${crons.filter((c: any) => c.ok).length}/${crons.length}`} {(live ? live.cronFail?.length === 0 : crons.every((c: any) => c.ok)) ? "✅" : "⚠️"}</div><div style={sub}>성공/전체(크론·에이전트·워커)</div></div>
         </div>
 
         {/* 🛠 로컬 잡 상태 — 접이식·기본 접힘(헤더에 정상/정지 요약). 8개 launchd 잡 하트비트 기준 실시간 */}

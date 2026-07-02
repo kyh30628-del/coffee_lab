@@ -549,7 +549,7 @@ export default function AdminPage() {
         {/* ===== 🔄 실시간 자동화 현황 (10초 갱신) ===== */}
         {jstatus && (
           <div className="mb-6 space-y-3">
-            <button onClick={() => toggleSec("auto")} className="w-full flex items-center justify-between text-left">
+            <button onClick={() => toggleSec("auto")} className="w-full flex items-center justify-between text-left border-t border-stone-200 pt-5">
               <span className="text-xs font-bold text-stone-500 uppercase tracking-wider">{openSecs.auto ? "▾" : "▸"} 🔄 자동화 현황 <span className="normal-case font-normal text-stone-400">· 판정대기 {jstatus.queue?.toLocaleString() ?? 0} · 오늘신규 {jstatus.newToday ?? 0}</span></span>
               <span className="text-[10px] text-stone-400 shrink-0">{openSecs.auto ? "접기" : "보기"}</span>
             </button>
@@ -614,7 +614,7 @@ export default function AdminPage() {
           const unresolved = auditFlags.flags?.filter((f: any) => !f.resolved) ?? [];
           return (
             <div className="mb-6">
-              <button onClick={() => toggleSec("audit")} className="w-full flex items-center justify-between text-left mb-2">
+              <button onClick={() => toggleSec("audit")} className="w-full flex items-center justify-between text-left mb-2 border-t border-stone-200 pt-5">
                 <span className={`text-xs font-bold uppercase tracking-wider ${unresolved.length ? "text-red-500" : "text-stone-500"}`}>{openSecs.audit ? "▾" : "▸"} {unresolved.length ? `🚨 품질 오염 감지 (${unresolved.length}건)` : "✅ 품질 오염 감지 (0건)"}</span>
                 <span className="text-[11px] text-stone-400 shrink-0">{auditFlags.lastAudit}</span>
               </button>
@@ -636,7 +636,7 @@ export default function AdminPage() {
         })()}
 
         {/* ===== 🛡️ 검증 에이전트(레드팀) ===== */}
-        <div className="mb-6">
+        <div className="mb-6 border-t border-stone-200 pt-5">
           <div className="flex items-center justify-between mb-2">
             <button onClick={() => toggleSec("verify")} className="text-xs font-bold text-stone-500 uppercase tracking-wider text-left">
               {openSecs.verify ? "▾" : "▸"} 🛡️ 데이터 검증 <span className="normal-case font-normal text-stone-400">·</span>{" "}
@@ -1143,7 +1143,7 @@ export default function AdminPage() {
         {/* ===== 🎀 쇼케이스 승인 · AI 카피 생성 ===== */}
         {(
           <div className="mb-6">
-            <button onClick={() => toggleSec("promo")} className="w-full flex items-center justify-between text-left mb-2">
+            <button onClick={() => toggleSec("promo")} className="w-full flex items-center justify-between text-left mb-2 border-t border-stone-200 pt-5">
               <span className="text-xs font-bold text-amber-600 uppercase tracking-wider">{openSecs.promo ? "▾" : "▸"} 🎀 쇼케이스 승인 · AI 카피 생성 ({review.length})</span>
               <span className="text-[10px] text-stone-400 shrink-0">{openSecs.promo ? "접기" : "보기"}</span>
             </button>
@@ -1206,7 +1206,7 @@ export default function AdminPage() {
         )}
 
         {/* ===== 콘텐츠 현황 (접이식·기본 접힘) ===== */}
-        <button onClick={() => toggleSec("content")} className="w-full flex items-center justify-between text-left mb-2">
+        <button onClick={() => toggleSec("content")} className="w-full flex items-center justify-between text-left mb-2 border-t border-stone-200 pt-5">
           <span className="text-xs font-bold text-stone-400 uppercase tracking-wider">{openSecs.content ? "▾" : "▸"} 콘텐츠 현황 <span className="normal-case font-normal">· 공개 {ct?.published?.toLocaleString() ?? "·"} · 전체 {ct?.total?.toLocaleString() ?? "·"}</span></span>
           <span className="text-[10px] text-stone-400 shrink-0">{openSecs.content ? "접기" : "보기"}</span>
         </button>
@@ -1270,7 +1270,7 @@ export default function AdminPage() {
         </>}
 
         {/* ===== 접속/방문자 (익명 · 접이식·기본 접힘) ===== */}
-        <button onClick={() => toggleSec("visitors")} className="w-full flex items-center justify-between text-left mb-2">
+        <button onClick={() => toggleSec("visitors")} className="w-full flex items-center justify-between text-left mb-2 border-t border-stone-200 pt-5">
           <span className="text-xs font-bold text-stone-400 uppercase tracking-wider">{openSecs.visitors ? "▾" : "▸"} 접속 · 방문자 현황 <span className="normal-case font-normal">· 총 {vs?.total?.toLocaleString() ?? "·"} · 7일 활성 {vs?.active7d ?? "·"}</span></span>
           <span className="text-[10px] text-stone-400 shrink-0">{openSecs.visitors ? "접기" : "보기"}</span>
         </button>
@@ -1314,7 +1314,7 @@ export default function AdminPage() {
         </>}
 
         {/* ===== 검수 관리 (접이식·기본 접힘) ===== */}
-        <button onClick={() => toggleSec("inspect")} className="w-full flex items-center justify-between text-left mb-2">
+        <button onClick={() => toggleSec("inspect")} className="w-full flex items-center justify-between text-left mb-2 border-t border-stone-200 pt-5">
           <span className="text-xs font-bold text-stone-400 uppercase tracking-wider">{openSecs.inspect ? "▾" : "▸"} 검수 관리 <span className={`normal-case ${ownerPending.length ? "font-bold text-blue-600" : "font-normal"}`}>· 사장님 대기 {ownerPending.length}</span> <span className="normal-case font-normal">· 자동 비공개 {autoHidden.length}</span></span>
           <span className="text-[10px] text-stone-400 shrink-0">{openSecs.inspect ? "접기" : "보기"}</span>
         </button>
