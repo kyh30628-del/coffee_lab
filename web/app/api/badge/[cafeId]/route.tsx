@@ -174,6 +174,7 @@ export async function GET(
               {/* Rank number */}
               <div
                 style={{
+                  display: "flex",
                   fontSize: 220,
                   fontWeight: 700,
                   color: "#D4A853",
@@ -186,6 +187,7 @@ export async function GET(
             </div>
             <div
               style={{
+                display: "flex",
                 fontSize: 36,
                 color: "#F5E6C880",
                 marginTop: 24,
@@ -215,6 +217,7 @@ export async function GET(
             />
             <div
               style={{
+                display: "flex",
                 fontSize: 36,
                 color: "#D4A853CC",
                 letterSpacing: 4,
