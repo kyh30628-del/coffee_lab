@@ -106,7 +106,8 @@ export async function GET(req: NextRequest) {
       // 헤드라인 제외 후 잘라서 항상 꽉 채움(공개 카페가 충분하면 Top3=3개)
       top3: byReview.filter((c) => !usedIds.has(c.id)).slice(0, 3).map((c: any) => slim(c, "top")),
       fresh: (() => {
-        const candidates = byNew.filter((c) => !usedIds.has(c.id) && c.synth_grade === "검증").slice(0, 60);
+        // 검증 등급이라도 리뷰가 적으면(예: count=6) 신뢰도 낮음 → 최소 리뷰수 기준 추가(제안F)
+        const candidates = byNew.filter((c) => !usedIds.has(c.id) && c.synth_grade === "검증" && (c.synth_count ?? 0) >= 20).slice(0, 60);
         const areaCnt = new Map<string, number>();
         const deduped: any[] = [];
         for (const c of candidates) {
