@@ -4,29 +4,9 @@
 // 수집된 스니펫은 다른 소스와 동일하게 '리뷰 품질 검증 엔진'을 통과해야 채택된다.
 import type { WebSnippet } from "./webSearchCollector";
 
-// 🔑 다중 키 로테이션 — 키 1개당 하루 10,000유닛(검색 100유닛=~95곳/일). 키를 추가할수록 하루 처리량 배수.
-//   403/429(쿼터 소진)면 다음 키로 전진. 프로세스 시작마다 keyIdx=0(일일 리셋과 동일). 전 키 소진 시에만 quota.
-const KEYS = [
-  process.env.YOUTUBE_API_KEY,
-  process.env.YOUTUBE_API_KEY_2,
-  process.env.YOUTUBE_API_KEY_3,
-  process.env.YOUTUBE_API_KEY_4,
-].filter((k): k is string => !!k && k.length > 10);
-export const hasYouTubeKey = () => KEYS.length > 0;
-export const youTubeKeyCount = () => KEYS.length;
+const KEY = process.env.YOUTUBE_API_KEY;
+export const hasYouTubeKey = () => !!KEY;
 const API = "https://www.googleapis.com/youtube/v3";
-
-let keyIdx = 0; // 현재 키. 403/429면 전진(오늘 복귀 안 함).
-// 키 로테이션 fetch: 쿼터(403/429)면 다음 키로 재시도. 전 키 소진 시 null(=quota 신호). 성공 응답은 미소비로 반환.
-async function ytFetch(pathAndQuery: string): Promise<Response | null> {
-  while (keyIdx < KEYS.length) {
-    const sep = pathAndQuery.includes("?") ? "&" : "?";
-    const res = await fetch(`${API}/${pathAndQuery}${sep}key=${KEYS[keyIdx]}`);
-    if (res.status === 403 || res.status === 429) { keyIdx++; continue; } // 이 키 소진 → 다음
-    return res;
-  }
-  return null; // 전 키 소진
-}
 
 // 짝 없는 유니코드 서로게이트 제거 — slice가 이모지를 반으로 자르면 JSON 저장이 깨지므로(백필 크래시 방지)
 const stripBadUnicode = (s: string) => s.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "");
@@ -35,18 +15,16 @@ const toTime = (iso?: string) => { if (!iso) return undefined; const t = Date.pa
 
 // 카페 영상 검색 → 상세 → 상위 댓글. 쿼터 절약: 검색 1회(100유닛)+영상상세 1유닛+댓글 상위 4개 영상만.
 export async function fetchYouTubeReviews(name: string, area: string): Promise<{ snippets: WebSnippet[]; apiError?: boolean }> {
-  if (!KEYS.length) return { snippets: [] };
+  if (!KEY) return { snippets: [] };
   try {
     const q = area ? `${name} ${area} 카페` : `${name} 카페`;
-    const sres = await ytFetch(`search?part=snippet&type=video&maxResults=8&order=relevance&relevanceLanguage=ko&q=${encodeURIComponent(q)}`);
-    if (sres === null) return { snippets: [], apiError: true }; // 전 키 소진 = quota
-    if (!sres.ok) return { snippets: [], apiError: sres.status === 403 || sres.status === 429 };
+    const sres = await fetch(`${API}/search?key=${KEY}&part=snippet&type=video&maxResults=8&order=relevance&relevanceLanguage=ko&q=${encodeURIComponent(q)}`);
+    if (!sres.ok) return { snippets: [], apiError: sres.status === 403 || sres.status === 429 || !sres.ok };
     const sdata = await sres.json();
     const ids: string[] = (sdata.items ?? []).map((it: any) => it?.id?.videoId).filter(Boolean);
     if (ids.length === 0) return { snippets: [] };
 
-    const vres = await ytFetch(`videos?part=snippet&id=${ids.join(",")}`);
-    if (vres === null) return { snippets: [], apiError: true };
+    const vres = await fetch(`${API}/videos?key=${KEY}&part=snippet&id=${ids.join(",")}`);
     if (!vres.ok) return { snippets: [], apiError: true };
     const vdata = await vres.json();
     const vids: any[] = vdata.items ?? [];
@@ -61,8 +39,8 @@ export async function fetchYouTubeReviews(name: string, area: string): Promise<{
       let comments = "";
       if (i < 4) {
         try {
-          const cres = await ytFetch(`commentThreads?part=snippet&videoId=${v.id}&maxResults=3&order=relevance&textFormat=plainText`);
-          if (cres && cres.ok) {
+          const cres = await fetch(`${API}/commentThreads?key=${KEY}&part=snippet&videoId=${v.id}&maxResults=3&order=relevance&textFormat=plainText`);
+          if (cres.ok) {
             const cd = await cres.json();
             // 개인정보 보호(YouTube 정책): 댓글 '텍스트'만 — 작성자 아이디·채널·프로필은 수집/저장 안 함.
             // 텍스트 안의 @아이디 멘션도 제거해 식별정보를 남기지 않는다.

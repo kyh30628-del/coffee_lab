@@ -11,9 +11,7 @@ const { sql } = await import("../lib/db.ts");
 const { recordRun } = await import("../lib/agentLog.ts");
 
 await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS yt_checked_at TIMESTAMPTZ`;
-// 유튜브 일일 쿼터 안전선 — 키 1개당 ~95곳. 키 로테이션(YOUTUBE_API_KEY_2·_3…) 개수에 비례해 자동 확장.
-const KEY_COUNT = ["YOUTUBE_API_KEY", "YOUTUBE_API_KEY_2", "YOUTUBE_API_KEY_3", "YOUTUBE_API_KEY_4"].filter((k) => (process.env[k] || "").length > 10).length || 1;
-const MAX = Number(process.env.YT_MAX || 95 * KEY_COUNT);
+const MAX = Number(process.env.YT_MAX || 90); // 유튜브 일일 쿼터 안전선
 let added = 0, none = 0, processed = 0, quota = false;
 
 while (processed < MAX && !quota) {
@@ -41,5 +39,5 @@ while (processed < MAX && !quota) {
 const remain = (await sql`SELECT COUNT(*)::int n FROM cafes WHERE raw_reviews IS NOT NULL AND yt_checked_at IS NULL AND NOT (raw_reviews @> '[{"source":"youtube"}]')`)[0].n;
 console.log(`\n유튜브 백필 종료: 추가 ${added} · 영상없음 ${none} · 처리 ${processed} · 남은 대상 ${remain}`);
 // 자율진단이 정지를 감지하도록 agent_runs에 기록(재발방지). 쿼터소진도 정상 종료로 기록.
-await recordRun("youtube-backfill", true, `추가 ${added}·영상없음 ${none}·처리 ${processed}·남은 ${remain}·키${KEY_COUNT}(상한${MAX})${quota ? "·전키소진" : ""}`, processed).catch(() => {});
+await recordRun("youtube-backfill", true, `추가 ${added}·영상없음 ${none}·처리 ${processed}·남은 ${remain}${quota ? "·쿼터소진" : ""}`, processed).catch(() => {});
 process.exit(0);
