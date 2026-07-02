@@ -8,14 +8,17 @@ const SECRET = process.env.NAVER_CLIENT_SECRET;
 function stripTags(s: string): string {
   return (s || "").replace(/<[^>]+>/g, "").replace(/&[a-z]+;/g, " ").replace(/\s+/g, " ").trim();
 }
+// 네이버가 tistory 태그/카테고리·`/m` 목록 URL 등 개별 발행일을 못 뽑는 글에 postdate="19900101"을
+// 무음 기본값으로 채워 보내는 경우가 있음 — 파싱 실패로 취급해 날짜없음(undefined) 처리.
+const isSentinelDate = (d: string) => d === "19900101";
 function parseDate(d?: string): number | undefined {
-  if (!d || d.length !== 8) return undefined;
+  if (!d || d.length !== 8 || isSentinelDate(d)) return undefined;
   const y = +d.slice(0, 4), m = +d.slice(4, 6), day = +d.slice(6, 8);
   const t = new Date(y, m - 1, day).getTime();
   return isNaN(t) ? undefined : Math.floor(t / 1000);
 }
 function fmtDate(d?: string): string {
-  if (!d || d.length !== 8) return "";
+  if (!d || d.length !== 8 || isSentinelDate(d)) return "";
   return `${d.slice(0, 4)}.${d.slice(4, 6)}.${d.slice(6, 8)}`;
 }
 

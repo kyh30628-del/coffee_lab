@@ -141,11 +141,13 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
       const reps = verdict === "verified" ? Math.max(1, Math.round(weight)) : 1;
       for (let i = 0; i < reps; i++) verifiedReviews.push({ text: t.text, time: t.time });
       verifiedTexts.push(t.text);
-      if (t.date && /^\d{4}\.\d{2}\.\d{2}$/.test(t.date)) reviewDates.push(t.date);
+      // "1990.01.01"은 네이버가 발행일 파싱 실패 시 보내는 무음 기본값(캐시된 raw_reviews에도 남아있을 수 있음) — 날짜없음 취급.
+      const dateOk = !!t.date && t.date !== "1990.01.01" && /^\d{4}\.\d{2}\.\d{2}$/.test(t.date);
+      if (dateOk) reviewDates.push(t.date as string);
 
       if (t.link || src.source === "google") {
         evidence.push({
-          quote: toQuote(t.text, name), link: t.link, source: t.source, date: t.date,
+          quote: toQuote(t.text, name), link: t.link, source: t.source, date: dateOk ? t.date : undefined,
           trust: verdict, score, why: reasons.slice(0, 3),
         });
       }
