@@ -3,18 +3,18 @@ import { sql } from "@/lib/db";
 
 export const runtime = "nodejs";
 
-// 🛠 로컬 launchd 잡 8종 상태 — agent_runs(하트비트) 기준 실시간. 관제 화면 잡 상태 카드용.
-//   정지 판정: 마지막 기록이 maxH(주기+버퍼) 초과면 stale. cron-selfaudit EXPECT_MAX_H와 동기화.
+// 🛠 로컬 launchd 잡 상태 — agent_runs(하트비트) 기준 실시간. 관제 화면 잡 상태 카드용.
+//   정지 판정: 마지막 기록이 maxH(주기+버퍼) 초과면 stale. maxH는 lib/jobTeams.ts EXPECT_MAX_H와 일치시킬 것.
+//   ⚠️ 제거된 잡(qualityaudit·dong-backfill .disabled)은 여기 넣지 말 것 — 하트비트 행이 없어 '미기록=오류'로 오표시됨(2026-07-02 수정).
 const JOB_META: Record<string, { label: string; team: string; sched: string; maxH: number }> = {
-  "chief-manager":     { label: "일간 사이클",      team: "기획조정실",   sched: "08·17시", maxH: 20 },
-  "self-audit":        { label: "자율진단",         team: "기획조정실",   sched: "01시",   maxH: 30 },
-  "audit-watch":       { label: "이벤트 워처",      team: "기획조정실",   sched: "5분",    maxH: 1 },
-  "youtube-backfill":  { label: "유튜브 수집",      team: "품질본부",     sched: "16:30",  maxH: 30 },
-  "qualityaudit":      { label: "품질 감사",        team: "품질본부",     sched: "03:30",  maxH: 30 },
-  "dong-backfill":     { label: "동·카테고리 백필", team: "운영본부",     sched: "00:10",  maxH: 30 },
-  "weekly-evaluation": { label: "주간 거버넌스",    team: "전략기획본부", sched: "09시",   maxH: 30 },
-  "chat-watch":        { label: "관제 챗봇",        team: "경영지원본부", sched: "상주",   maxH: 1 },
-  "dev-pipeline":      { label: "개발 파이프라인",  team: "기획조정실",   sched: "10분",   maxH: 1 },
+  "chief-manager":     { label: "일간 사이클",      team: "기획조정실",   sched: "08·17시",          maxH: 20 },
+  "self-audit":        { label: "자율진단",         team: "기획조정실",   sched: "11:30·15:30·21:30", maxH: 16 },
+  "audit-watch":       { label: "이벤트 워처",      team: "기획조정실",   sched: "5분",              maxH: 1 },
+  "dev-pipeline":      { label: "개발 파이프라인",  team: "기획조정실",   sched: "5분",              maxH: 1 },
+  "dev-deploy":        { label: "배포 워커",        team: "기획조정실",   sched: "2분",              maxH: 1 },
+  "youtube-backfill":  { label: "유튜브 수집",      team: "품질본부",     sched: "16:30",            maxH: 30 },
+  "weekly-evaluation": { label: "주간 거버넌스",    team: "전략기획본부", sched: "10:30(격일)",       maxH: 30 },
+  "chat-watch":        { label: "관제 챗봇",        team: "경영지원본부", sched: "상주",             maxH: 1 },
 };
 
 export async function GET(req: NextRequest) {
