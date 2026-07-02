@@ -7,7 +7,10 @@
 //           ⑤애매하면 human(열린 채 보존, 임의 추정 집행 금지).
 import { sql } from "@/lib/db";
 
-export type CoordKlass = "L2_resynth" | "L3_dev" | "route_rulegap" | "human";
+// ⚠️ 2026-07-02 검증 교훈: L2 재합성 자동조치를 제거했다. 실측 결과 재합성은 (a)이름 우연일치 혼입
+//   (b)review_dates 정체(날짜파서 뿌리)를 **못 고치는데도** resolved로 닫아 '거짓 해결'을 만들었다.
+//   신뢰 가능한 자동 L2 조치가 확인되기 전까지 소비기는 **라우팅·에스컬레이션·회신만**(가역·정직).
+export type CoordKlass = "L3_dev" | "route_rulegap" | "human";
 export type CoordTriage = {
   id: number; from_team: string; to_team: string; topic: string;
   klass: CoordKlass; cafeIds: number[]; action: string; resolution: string;
@@ -22,19 +25,17 @@ export function extractCafeIds(text: string): number[] {
   return [...ids];
 }
 
-// 결정론 트리아지 — 순서 있음. 애매하면 human(임의 추정 금지).
-export function classify(topic: string, detail: string, cafeIds: number[], toTeam: string): { klass: CoordKlass; action: string; resolution: string } {
+// 결정론 트리아지 — 순서 있음. 애매하면 human(임의 추정 금지). 재합성 자동'해결' 없음(위 교훈).
+export function classify(topic: string, detail: string, _cafeIds: number[], toTeam: string): { klass: CoordKlass; action: string; resolution: string } {
   const t = `${topic} ${detail}`;
-  // 1) 데이터op(재합성·review_dates·misses) + 카페id 확정 → L2 가역 집행
-  if (/재합성|resynth|review_dates|재계산|misses|synth_updated/i.test(t) && cafeIds.length)
-    return { klass: "L2_resynth", action: `재합성 큐 ${cafeIds.length}곳`, resolution: `재합성 큐 집행(L2) — id ${cafeIds.join(",")}. 다음 synth 사이클(~1h) 반영. 요청부서 재확인 요망.` };
-  // 2) 코드 변경 신호 → L3 결재 상신(사람 게이트)
-  if (/파서|파싱|추출기|코드\s?수정|버그|헤더|컬럼|route\.ts|lib\//i.test(t) || /null\s?반환|is_synthetic/i.test(t))
+  // 1) 코드 변경 신호(파서·컬럼·헤더 등) 또는 날짜파싱/review_dates 정체(파서 뿌리) → L3 결재 상신(사람 게이트)
+  if (/파서|파싱|추출기|코드\s?수정|버그|헤더|컬럼|route\.ts|lib\/|null\s?반환|is_synthetic/i.test(t)
+      || /review_dates|1990\.01\.01|날짜/i.test(t))
     return { klass: "L3_dev", action: "L3 dev 결재 상신", resolution: "코드 변경 필요 → L3 결재 상신(승인 시 자동 빌드→기조실장 회귀검증→배포)." };
-  // 3) 규칙 개선 신호 → 룰갭 라우팅(단, 이미 품질/룰갭행이면 그 팀 인박스이므로 재라우팅 금지 → human)
-  if ((/규칙|룰갭|앵커|우연일치|오탐\s?규칙|place_id/i.test(t)) && !/품질|룰갭/.test(toTeam))
-    return { klass: "route_rulegap", action: "리뷰품질팀(룰갭) 라우팅", resolution: "규칙 개선 대상 → 리뷰품질팀(룰갭) 라우팅." };
-  // 4) 그 외 → 사람 판단(열린 채 보존)
+  // 2) 오염·혼입·규칙 신호 → 룰갭 라우팅(재합성은 못 고침이 실측됨 → 규칙 개선으로). 이미 품질/룰갭행이면 human.
+  if ((/혼입|무관|우연일치|오염|규칙|룰갭|앵커|오탐|place_id/i.test(t)) && !/품질|룰갭/.test(toTeam))
+    return { klass: "route_rulegap", action: "리뷰품질팀(룰갭) 라우팅", resolution: "재합성으로 미해결(실측) → 규칙 개선(주소/place_id 앵커) 대상. 리뷰품질팀 라우팅. 잔존 심하면 요청부서 TIER1 비공개 재상정 바람." };
+  // 3) 그 외 → 사람 판단(열린 채 보존)
   return { klass: "human", action: "기조실장 수동 판단 필요", resolution: "" };
 }
 
@@ -58,12 +59,9 @@ export async function consumeCoordination(opts: { dryRun: boolean; limit?: numbe
   return { handled, skippedHuman, total: rows.length, report };
 }
 
-// 실제 집행(live) — 각 유형별. 가역·사람게이트만.
+// 실제 집행(live) — 라우팅·에스컬레이션·회신만(자동 데이터변경 없음, 사람게이트 유지).
 async function execute(item: CoordTriage, detail: string): Promise<void> {
-  if (item.klass === "L2_resynth") {
-    if (item.cafeIds.length) await sql`UPDATE cafes SET synth_updated=NULL WHERE id=ANY(${item.cafeIds})`.catch(() => {});
-    await sql`UPDATE coordination SET status='resolved', resolved_at=now(), stage='소비기 처리·회신', resolution=${item.resolution} WHERE id=${item.id}`;
-  } else if (item.klass === "L3_dev") {
+  if (item.klass === "L3_dev") {
     const d = (await sql`INSERT INTO decisions (title, detail, team, severity, action_type, tier, status, recommendation)
       VALUES (${`[개발] 협업 #${item.id}: ${item.topic}`.slice(0, 120)}, ${`출처 협업 #${item.id}(${item.from_team}). ${detail}`.slice(0, 900)},
         ${item.to_team}, ${"MED"}, ${"dev_task"}, ${"L3"}, ${"pending"}, ${"협업 소비기 자동 상신 — 승인 시 자동 빌드→기조실장 회귀검증→배포."}) RETURNING id`) as any[];
