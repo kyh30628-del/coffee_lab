@@ -52,7 +52,9 @@ export default function AdminPage() {
   const [todayDetail, setTodayDetail] = useState<any>(null); // 오늘의 수집 카드 클릭 → 상세 목록 모달
   const [towerFull, setTowerFull] = useState(false);
   // 📐 CEO 확정 규율: 모든 섹션 기본 접힘 + 클릭 토글 + 접힌 헤더에 건수·HIGH 요약 (org 페이지와 동일 패턴, 세션 내 useState)
-  const [openSecs, setOpenSecs] = useState<Record<string, boolean>>({});
+  // 본체 대시보드: 핵심 운영 섹션(관제탑·자동화 현황)은 기본 펼침, 나머지는 접힘(CEO 확정 2026-07-02).
+  //   '전부 접힘'은 org(조직 관제) 전용 규율 — 본체는 운영상태를 한눈에 봐야 해 핵심만 펼친다.
+  const [openSecs, setOpenSecs] = useState<Record<string, boolean>>({ tower: true, auto: true });
   const toggleSec = (k: string) => setOpenSecs((s) => ({ ...s, [k]: !s[k] }));
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [analytics, setAnalytics] = useState<any>(null);
