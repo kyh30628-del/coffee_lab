@@ -61,7 +61,7 @@
       "schedule": "*/10 * * * *"
     },
     {
-      "path": "/api/cron-coord-consumer",
+      "path": "/api/cron-coord-consumer?mode=live",
       "schedule": "15 * * * *"
     },
     {
