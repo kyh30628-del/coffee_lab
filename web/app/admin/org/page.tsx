@@ -40,14 +40,14 @@ const ORG = {
       { n: "데이터정합성팀", s: "수도권·area·중복·필드 무결성 스캔·자동치유", w: [
         { k: "🧠", n: "정합성 에이전트", t: "매일" }, { k: "⚙️", n: "cron-sentinel", t: "매일 00시" }, { k: "⚙️", n: "orchestrator-heal", t: "2시간마다" }] },
       { n: "리뷰품질팀", s: "옥석 검증규칙(동명비카페·주소·오염) 발굴·적용", w: [
-        { k: "🧠", n: "룰갭 에이전트", t: "매일" }, { k: "⚙️", n: "cron-rulegap", t: "매일 01:30" }, { k: "⚙️", n: "reviewQuality(verifyReview)", t: "실시간(합성마다)" }] },
+        { k: "🧠", n: "룰갭 에이전트", t: "매일" }, { k: "⚙️", n: "cron-rulegap", t: "매일 01:30" }, { k: "🌐", n: "reviewQuality(verifyReview)", t: "실시간(합성마다)" }] },
       { n: "검증심사팀", s: "검증 등급 자격 적대검증·15점검", w: [
         { k: "🧠", n: "품질레드팀 에이전트", t: "매일" }, { k: "⚙️", n: "cron-verify", t: "매일 06시" }] },
       { n: "심층판정팀", s: "AI판정·그라운딩 — 경계 리뷰 의미판정·환각차단", w: [
         { k: "🧠", n: "심층판정 에이전트(로컬·무료)", t: "격일" }] }] },
     { n: "🟩 성장본부", c: "#3f7a4f", teams: [
       { n: "발굴전략팀", s: "수요·공급갭 추론 → 발굴 타겟 적재", w: [
-        { k: "🧠", n: "발굴 에이전트", t: "매일" }, { k: "⚙️", n: "cron-grow", t: "2시간마다" }, { k: "⚙️", n: "cron-demand", t: "매일 17시" }] },
+        { k: "🧠", n: "발굴 에이전트", t: "매일" }, { k: "⚙️", n: "cron-grow", t: "2시간마다" }, { k: "⚙️", n: "cron-demand", t: "매일 17시" }, { k: "⚙️", n: "cron-discover-categories", t: "월 1회(1일 05시)" }] },
       { n: "콘텐츠·SEO팀", s: "롱테일 SEO 발행 (보류)", w: [
         { k: "⚙️", n: "cron-newsletter", t: "주간(보류)" }] }] },
     { n: "🟧 운영본부", c: "#b06a2e", teams: [
@@ -72,10 +72,29 @@ const ORG = {
       { n: "인사팀", s: "주간 평가·스코어카드·MVP·문화", w: [{ k: "🧠", n: "평가 에이전트", t: "격일" }] },
       { n: "법무팀", s: "약관·구독토큰·PII·AI OFF 감사", w: [{ k: "🧠", n: "법무 에이전트", t: "격일" }] },
       { n: "재무팀", s: "과금0·쿼터·크레딧·토큰 실측 감시", w: [{ k: "🧠", n: "재무 에이전트", t: "격일" }] },
-      { n: "경영지원팀", s: "가동률 관제 + 협업 코디네이션 주관", w: [{ k: "🧠", n: "경영지원 에이전트", t: "격일" }] },
+      { n: "경영지원팀", s: "가동률 관제 + 협업 코디네이션 주관", w: [{ k: "🧠", n: "경영지원 에이전트", t: "격일" }, { k: "⚙️", n: "cron-coord-consumer", t: "매시 :15(협업 자동종결)" }, { k: "⚙️", n: "cron-issues", t: "10분(RM 이슈)" }] },
       { n: "리스크매니지먼트팀", s: "직·간접 리스크 발굴·조율", w: [{ k: "🧠", n: "리스크 에이전트", t: "격일" }] }] },
   ],
 };
+
+// 📊 조직 집계 — ORG(단일 출처)에서 실시간 계산. 하드코딩 금지 → 조직도와 절대 어긋나지 않음(드리프트 차단).
+//   🧠=LLM 에이전트 · ⚙️=상시/크론(결정론) · 🌐=실시간 API · 🚀=배포 워커.
+const ORG_STATS = (() => {
+  let bonbu = 0, sil = 0, teams = 0, agent = 0, cron = 0, api = 0, deploy = 0;
+  for (const d of ORG.divisions) {
+    if (/본부/.test(d.n)) bonbu++; else sil++;
+    for (const t of (d.teams || [])) {
+      teams++;
+      for (const w of ((t as any).w || [])) {
+        if (w.k === "🧠") agent++;
+        else if (w.k === "⚙️") cron++;
+        else if (w.k === "🌐") api++;
+        else if (w.k === "🚀") deploy++;
+      }
+    }
+  }
+  return { bonbu, sil, teams, agent, cron, api, deploy };
+})();
 
 // 가동 멤버 의미·역할 — 카드 클릭 시 팝업 설명
 const MEMBER_INFO: Record<string, string> = {
@@ -296,7 +315,17 @@ export default function OrgDashboard() {
           <div style={card}><div style={lbl}>🔔 결재 대기</div><div style={big}>{dec.pending.length}건</div></div>
           <div style={card}><div style={lbl}>📊 오늘 토큰(in)</div><div style={big}>{fmt(tok.input || 0)}</div><div style={sub}>비용프록시 ${Number(tok.cost || 0).toFixed(2)}</div></div>
           <div style={card}><div style={lbl}>📈 공개 카페</div><div style={big}>{(live?.pub ?? (+m.pub || 0)).toLocaleString()}</div><div style={sub}>검증 {(live?.v ?? (+m.v || 0)).toLocaleString()}{live?.backlog ? ` · 대기 ${live.backlog}` : ""}</div></div>
-          <div style={card}><div style={lbl}>🤖 크론</div><div style={big}>{live ? `${live.cronOk}/${live.cronTotal}` : `${crons.filter((c: any) => c.ok).length}/${crons.length}`} {(live ? live.cronFail?.length === 0 : crons.every((c: any) => c.ok)) ? "✅" : "⚠️"}</div></div>
+          <div style={card}><div style={lbl}>🤖 크론 가동</div><div style={big}>{live ? `${live.cronOk}/${live.cronTotal}` : `${crons.filter((c: any) => c.ok).length}/${crons.length}`} {(live ? live.cronFail?.length === 0 : crons.every((c: any) => c.ok)) ? "✅" : "⚠️"}</div><div style={sub}>실시간 성공/전체</div></div>
+        </div>
+
+        {/* 🏢 조직 구성 집계 — ORG(조직도 단일출처)에서 계산 → 조직도와 항상 일치. 오케스트레이터/에이전트/크론/api 구분. */}
+        <div style={{ ...card, marginTop: 8 }}>
+          <div style={lbl}>🏢 조직 구성 <span style={{ fontWeight: 400, color: "#b7a789" }}>(조직도 기준)</span></div>
+          <div style={{ fontSize: 12.5, color: "#5a4631", lineHeight: 1.7, marginTop: 4 }}>
+            <b>🎛️ 오케스트레이터</b> · 본부 {ORG_STATS.bonbu} · 실 {ORG_STATS.sil}<br />
+            <b>🧠 에이전트</b> · 팀 {ORG_STATS.teams} · LLM {ORG_STATS.agent}<br />
+            <b>⚙️ 크론</b> · {ORG_STATS.cron}{"  "}·{"  "}<b>🌐 api</b> · {ORG_STATS.api}{"  "}·{"  "}<b>🚀 배포</b> · {ORG_STATS.deploy}
+          </div>
         </div>
 
         {/* 🛠 로컬 잡 상태 — 접이식·기본 접힘(헤더에 정상/정지 요약). 8개 launchd 잡 하트비트 기준 실시간 */}
