@@ -336,8 +336,8 @@ export default function OrgDashboard() {
             {showDev && <div style={{ marginTop: 8 }}>
               {devpipe.jobs.map((j: any) => {
                 // 사실대로 — '실패' 왜곡 금지. 색: 회색=중립, 자주=배포대기, 청록=진행, 주황=조치필요, 빨강=진짜오류
-                const sc: Record<string, string> = { "개발대기": "#8a7458", "building": "#2a7a72", "배포대기": "#6a468c", "빌드오류": "#b03a3a", "구현불가": "#9c8a6c", "스코프반려": "#b06a2e", "deploy_approved": "#2a7a72", "배포오류": "#b06a2e" };
-                const sl: Record<string, string> = { "개발대기": "개발 대기", "building": "구현 중", "배포대기": "검증완료·배포대기", "빌드오류": "빌드 오류(수정 필요)", "구현불가": "코드 변경 불필요/불가", "스코프반려": "스코프 반려(목적 외 파일)", "deploy_approved": "배포 진행 중", "배포오류": "배포 오류(자동 재시도)" };
+                const sc: Record<string, string> = { "개발대기": "#8a7458", "building": "#2a7a72", "배포대기": "#6a468c", "빌드오류": "#b03a3a", "구현불가": "#9c8a6c", "스코프반려": "#b06a2e", "회귀반려": "#b06a2e", "deploy_approved": "#2a7a72", "배포오류": "#b06a2e" };
+                const sl: Record<string, string> = { "개발대기": "개발 대기", "building": "구현 중", "배포대기": "검증완료·배포대기", "빌드오류": "빌드 오류(수정 필요)", "구현불가": "코드 변경 불필요/불가", "스코프반려": "스코프 반려(목적 외 파일)", "회귀반려": "회귀검증 반려(재작업/폐기)", "deploy_approved": "배포 진행 중", "배포오류": "배포 오류(자동 재시도)" };
                 return (
                   <div key={j.id} style={{ border: `1px solid ${j.dev_status === "배포대기" ? "#d3c0e6" : "#e6d8bf"}`, borderRadius: 10, padding: "9px 11px", marginBottom: 8, background: j.dev_status === "배포대기" ? "#faf7fd" : "#fbfaf5" }}>
                     <div style={{ display: "flex", gap: 5, alignItems: "center", flexWrap: "wrap" }}>
@@ -352,7 +352,7 @@ export default function OrgDashboard() {
                         <button disabled={busy === j.id} onClick={() => devAction(j.id, "discard")} style={{ flex: 1, padding: "7px 0", background: "#efe7d8", color: "#8a5a5a", border: "1px solid #d8c4a4", borderRadius: 8, fontWeight: 700, fontSize: 12.5 }}>폐기</button>
                       </div>
                     )}
-                    {["빌드오류", "구현불가", "스코프반려"].includes(j.dev_status) && (
+                    {["빌드오류", "구현불가", "스코프반려", "회귀반려"].includes(j.dev_status) && (
                       <button disabled={busy === j.id} onClick={() => devAction(j.id, "discard")} style={{ marginTop: 7, width: "100%", padding: "6px 0", background: "#efe7d8", color: "#8a5a5a", border: "1px solid #d8c4a4", borderRadius: 8, fontWeight: 700, fontSize: 12 }}>폐기</button>
                     )}
                   </div>
@@ -450,8 +450,8 @@ export default function OrgDashboard() {
           </>}
         </div>
 
-        {/* ⏸️ 보류(deferred·resolved) — 어느 목록에도 안 잡히던 림보 결재의 가시성 확보. 접이식·기본 접힘.
-            decide API가 status='pending'만 처리하므로 승인/반려 버튼 재사용 불가 → 목록 표시만. */}
+        {/* ⏸️ 보류(deferred·resolved) — 림보 결재의 가시성+의사결정 확보. 접이식·기본 접힘.
+            decide API가 deferred도 처리(2026-07-02) → status='deferred'는 재개/종결 버튼으로 화면에서 바로 결정. resolved(종결)는 표시만. */}
         {dec.deferred.length > 0 && (
           <div style={{ ...card, marginTop: 10 }}>
             <button onClick={() => setShowDeferred(!showDeferred)} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
@@ -459,7 +459,7 @@ export default function OrgDashboard() {
               <span style={{ fontSize: 10.5, color: "#9c8a6c" }}>{showDeferred ? "접기" : "보기"}</span>
             </button>
             {showDeferred && <>
-            <div style={{ fontSize: 10.5, color: "#9c8a6c", margin: "6px 0 8px" }}>보류·종결(deferred/resolved) 상태의 결재 — 결재·실행 큐 어디에도 안 잡히던 건. 재개하려면 기조실장에게 재상신 지시.</div>
+            <div style={{ fontSize: 10.5, color: "#9c8a6c", margin: "6px 0 8px" }}>보류 상태의 결재 — 여기서 바로 결정하세요. <b style={{ color: "#3f7a4f" }}>▶ 재개</b>(활성 큐로 되돌림 → 기조실장이 배분·실행) · <b style={{ color: "#8a5a5a" }}>종결</b>(폐기). 자동 만료 없음 — 결정 전까지 계속 떠 있습니다.</div>
             {dec.deferred.map((d) => (
               <div key={d.id} style={{ border: "1px solid #e6d8bf", borderRadius: 10, padding: "9px 11px", marginBottom: 8, background: "#fbfaf5" }}>
                 <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
@@ -469,6 +469,12 @@ export default function OrgDashboard() {
                 </div>
                 <div style={{ fontSize: 10.5, color: "#9c8a6c", marginTop: 3 }}>{d.team || "-"} · {d.created_at}</div>
                 {d.recommendation && <div style={{ fontSize: 11.5, color: "#2f5d3a", background: "#eef6ee", border: "1px solid #cfe6cf", borderRadius: 8, padding: "6px 8px", marginTop: 5, lineHeight: 1.5 }}><b>💬 기조실장 의견</b> · {d.recommendation}</div>}
+                {d.status === "deferred" && (
+                  <div style={{ display: "flex", gap: 6, marginTop: 7 }}>
+                    <button disabled={busy === d.id} onClick={() => decide(d.id, "approve")} style={{ flex: 1, padding: "7px 0", background: "#3f7a4f", color: "#fff", border: "none", borderRadius: 8, fontWeight: 700, fontSize: 12.5, opacity: busy === d.id ? 0.5 : 1 }}>▶ 재개</button>
+                    <button disabled={busy === d.id} onClick={() => { if (confirm(`#${d.id} 종결(폐기)합니다. 되돌리려면 다시 상신해야 합니다.`)) decide(d.id, "reject"); }} style={{ flex: 1, padding: "7px 0", background: "#efe7d8", color: "#8a5a5a", border: "1px solid #d8c4a4", borderRadius: 8, fontWeight: 700, fontSize: 12.5, opacity: busy === d.id ? 0.5 : 1 }}>종결</button>
+                  </div>
+                )}
               </div>
             ))}
             </>}
