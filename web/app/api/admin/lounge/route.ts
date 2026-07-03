@@ -14,6 +14,7 @@ async function ensure() {
   )`.catch(() => {});
   await sql`CREATE TABLE IF NOT EXISTS peer_reviews (id SERIAL PRIMARY KEY, reviewer TEXT, target TEXT, note TEXT, created_at TIMESTAMPTZ DEFAULT now())`.catch(() => {});
   await sql`CREATE TABLE IF NOT EXISTS org_reports (kind TEXT PRIMARY KEY, title TEXT, md TEXT, updated_at TIMESTAMPTZ DEFAULT now())`.catch(() => {});
+  await sql`CREATE TABLE IF NOT EXISTS team_kpis (id SERIAL PRIMARY KEY, scope TEXT, week_start DATE, goal TEXT, updated_by TEXT, updated_at TIMESTAMPTZ DEFAULT now(), UNIQUE(scope, week_start))`.catch(() => {});
 }
 
 export async function GET(req: NextRequest) {
@@ -45,7 +46,12 @@ export async function GET(req: NextRequest) {
   // 🏅 인사팀 조직평가·주간 리포트(로컬에서 push-report.mjs로 밀어넣은 것)
   const reports = (await sql`SELECT kind, title, md, to_char(updated_at AT TIME ZONE 'Asia/Seoul','MM-DD') d FROM org_reports ORDER BY kind`.catch(() => [])) as any[];
 
-  return NextResponse.json({ ok: true, perf, brief, coord, decisions, today, comments, peers, reports });
+  // 🎯 이번 주 팀·본부 목표·KPI (scope=팀명 또는 본부명)
+  const kpiRows = (await sql`SELECT scope, goal, updated_by, to_char(week_start,'MM-DD') wk FROM team_kpis WHERE week_start = date_trunc('week', now() AT TIME ZONE 'Asia/Seoul')::date`.catch(() => [])) as any[];
+  const kpi: Record<string, any> = {};
+  for (const k of kpiRows) kpi[k.scope] = { goal: k.goal, by: k.updated_by, wk: k.wk };
+
+  return NextResponse.json({ ok: true, perf, brief, coord, decisions, today, comments, peers, reports, kpi });
 }
 
 // CEO 코멘트 남기기 — { target: "div:..."|"team:..."|"member:...", body }
@@ -53,7 +59,15 @@ export async function POST(req: NextRequest) {
   if (!auth(req)) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   await ensure();
   try {
-    const { target, body } = await req.json();
+    const b = await req.json();
+    // 🎯 CEO·기조실장 목표설정/수정 — { kpiScope: "팀명|본부명", goal }
+    if (b.kpiScope && typeof b.goal === "string") {
+      await sql`INSERT INTO team_kpis (scope, week_start, goal, updated_by)
+        VALUES (${String(b.kpiScope).slice(0, 80)}, date_trunc('week', now() AT TIME ZONE 'Asia/Seoul')::date, ${b.goal.slice(0, 320)}, 'CEO')
+        ON CONFLICT (scope, week_start) DO UPDATE SET goal=EXCLUDED.goal, updated_by='CEO', updated_at=now()`.catch(() => {});
+      return NextResponse.json({ ok: true });
+    }
+    const { target, body } = b;
     if (!target || !body || typeof body !== "string") return NextResponse.json({ ok: false, error: "target·body 필요" }, { status: 400 });
     const r = (await sql`INSERT INTO lounge_comments (target, body) VALUES (${String(target).slice(0, 80)}, ${body.slice(0, 1000)}) RETURNING id`) as any[];
     return NextResponse.json({ ok: true, id: r[0].id });

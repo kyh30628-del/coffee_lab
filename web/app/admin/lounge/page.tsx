@@ -42,6 +42,7 @@ type Data = {
   comments: { id: number; target: string; author: string; body: string; t: string }[];
   peers: { id: number; reviewer: string; target: string; note: string; t: string }[];
   reports: { kind: string; title: string; md: string; d: string }[];
+  kpi: Record<string, { goal: string; by: string; wk: string }>;
 };
 // 잡키 → 읽기 좋은 직원명
 const reviewerName = (job: string) => JOB_TO_MEMBER[job]?.name || job;
@@ -79,6 +80,8 @@ export default function Lounge() {
   const [composer, setComposer] = useState<{ target: string; label: string } | null>(null);
   const [draft, setDraft] = useState("");
   const [info, setInfo] = useState<string | null>(null);
+  const [kpiEdit, setKpiEdit] = useState<{ scope: string; label: string } | null>(null);
+  const [kpiDraft, setKpiDraft] = useState("");
 
   const load = useCallback(async (p: string) => {
     try {
@@ -106,6 +109,11 @@ export default function Lounge() {
     if (!composer || !draft.trim()) return;
     await fetch("/api/admin/lounge", { method: "POST", headers: { "x-admin-password": pw, "Content-Type": "application/json" }, body: JSON.stringify({ target: composer.target, body: draft.trim() }) });
     setDraft(""); setComposer(null); load(pw);
+  };
+  const submitKpi = async () => {
+    if (!kpiEdit || !kpiDraft.trim()) return;
+    await fetch("/api/admin/lounge", { method: "POST", headers: { "x-admin-password": pw, "Content-Type": "application/json" }, body: JSON.stringify({ kpiScope: kpiEdit.scope, goal: kpiDraft.trim() }) });
+    setKpiDraft(""); setKpiEdit(null); load(pw);
   };
   const delComment = async (id: number) => { await fetch(`/api/admin/lounge?id=${id}`, { method: "DELETE", headers: { "x-admin-password": pw } }); load(pw); };
 
@@ -213,6 +221,16 @@ export default function Lounge() {
               </div>
               {isOpen && (
                 <div style={{ background: "#f7f1e4", border: `1px solid ${d.c}33`, borderTop: "none", borderRadius: "0 0 12px 12px", padding: 10 }}>
+                  {/* 본부 이번 주 목표 */}
+                  {data?.kpi?.[d.n] ? (
+                    <div style={{ fontSize: 11.5, background: "#fff7e8", border: "1px solid #f0dcae", borderRadius: 8, padding: "6px 9px", marginBottom: 9, lineHeight: 1.45 }}>
+                      <b style={{ color: "#b5852a" }}>📅 본부 주간 목표</b> <span style={{ color: "#c9a86a", fontSize: 10 }}>({data.kpi[d.n].by === "CEO" ? "대표님 설정" : "수립"})</span>
+                      <span onClick={() => { setKpiEdit({ scope: d.n, label: d.n }); setKpiDraft(data!.kpi[d.n].goal); }} style={{ float: "right", cursor: "pointer", color: "#c9a86a" }}>✎</span>
+                      <div style={{ color: "#7a5f2a" }}>{data.kpi[d.n].goal}</div>
+                    </div>
+                  ) : (
+                    <div onClick={() => { setKpiEdit({ scope: d.n, label: d.n }); setKpiDraft(""); }} style={{ fontSize: 10.5, color: "#c0a878", marginBottom: 9, cursor: "pointer" }}>📅 본부 주간 목표 미수립 — 설정하기</div>
+                  )}
                   {d.teams.map((t) => {
                     const tr = rollup(teamMembers(t), perf);
                     const tgt = `team:${t.n}`;
@@ -224,6 +242,16 @@ export default function Lounge() {
                           <button onClick={() => setComposer({ target: tgt, label: t.n })} title="팀에 코멘트" style={{ border: "none", background: "#f0e6d4", borderRadius: 7, fontSize: 12, padding: "2px 7px", cursor: "pointer" }}>💬</button>
                         </div>
                         {t.s && <div style={{ fontSize: 11.5, color: "#8a7a5c", marginTop: 3, lineHeight: 1.45 }}><b style={{ color: "#7a6a4c" }}>🎯 맡은 일</b> · {t.s}</div>}
+                        {/* 이번 주 목표·KPI */}
+                        {data?.kpi?.[t.n] ? (
+                          <div style={{ fontSize: 11.5, background: "#fff7e8", border: "1px solid #f0dcae", borderRadius: 8, padding: "5px 8px", marginTop: 5, lineHeight: 1.45 }}>
+                            <b style={{ color: "#b5852a" }}>📅 이번 주 목표·KPI</b> <span style={{ color: "#c9a86a", fontSize: 10 }}>({data.kpi[t.n].by === "CEO" ? "대표님 설정" : "팀 수립"})</span>
+                            <span onClick={() => { setKpiEdit({ scope: t.n, label: t.n }); setKpiDraft(data!.kpi[t.n].goal); }} style={{ float: "right", cursor: "pointer", color: "#c9a86a", fontSize: 11 }}>✎</span>
+                            <div style={{ color: "#7a5f2a" }}>{data.kpi[t.n].goal}</div>
+                          </div>
+                        ) : (
+                          <div onClick={() => { setKpiEdit({ scope: t.n, label: t.n }); setKpiDraft(""); }} style={{ fontSize: 10.5, color: "#c0a878", marginTop: 5, cursor: "pointer" }}>📅 이번 주 목표 미수립 — 설정하기</div>
+                        )}
                         <div style={{ fontSize: 10.5, color: "#a89878", fontWeight: 700, margin: "7px 0 1px" }}>📋 한 일 (최근)</div>
                         {/* 직원들 */}
                         <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
@@ -298,6 +326,21 @@ export default function Lounge() {
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
               <button onClick={() => setComposer(null)} style={{ flex: 1, padding: 11, background: "#e8ddc8", color: "#6b5d4a", border: "none", borderRadius: 9, fontWeight: 700 }}>취소</button>
               <button onClick={submitComment} disabled={!draft.trim()} style={{ flex: 2, padding: 11, background: "#2b2018", color: "#e8b87a", border: "none", borderRadius: 9, fontWeight: 700, opacity: draft.trim() ? 1 : 0.5 }}>남기기</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 주간 목표·KPI 설정 */}
+      {kpiEdit && (
+        <div onClick={() => setKpiEdit(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 100, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: "#f7f1e4", borderRadius: "16px 16px 0 0", padding: 16, maxWidth: 640, width: "100%" }}>
+            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>📅 {kpiEdit.label} — 이번 주 목표·KPI</div>
+            <div style={{ fontSize: 11, color: "#9c8a6c", marginBottom: 8 }}>측정 가능하게 지표=목표치로. 예: “검증 승격 20건, 신규 발굴 40곳, 오염 0건”</div>
+            <textarea value={kpiDraft} onChange={(e) => setKpiDraft(e.target.value)} autoFocus placeholder="이번 주 목표와 KPI 지표·목표치…" style={{ width: "100%", height: 84, padding: 10, border: "1px solid #ddc9a8", borderRadius: 10, fontSize: 15, boxSizing: "border-box", resize: "none" }} />
+            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+              <button onClick={() => setKpiEdit(null)} style={{ flex: 1, padding: 11, background: "#e8ddc8", color: "#6b5d4a", border: "none", borderRadius: 9, fontWeight: 700 }}>취소</button>
+              <button onClick={submitKpi} disabled={!kpiDraft.trim()} style={{ flex: 2, padding: 11, background: "#b5852a", color: "#fff", border: "none", borderRadius: 9, fontWeight: 700, opacity: kpiDraft.trim() ? 1 : 0.5 }}>목표 확정</button>
             </div>
           </div>
         </div>

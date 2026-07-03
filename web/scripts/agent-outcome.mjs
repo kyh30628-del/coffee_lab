@@ -7,16 +7,28 @@ for (const l of env.split("\n")) { const m = l.match(/^([A-Z_0-9]+)=(.*)$/); if 
 
 const { recordRun } = await import("../lib/agentLog.ts");
 const { sql } = await import("../lib/db.ts");
+const { JOB_TO_MEMBER } = await import("../lib/org.ts");
 
 const job = process.argv[2];
 const jf = process.argv[3];
 let result = "";
 try { result = String(JSON.parse(readFileSync(jf, "utf8")).result || ""); } catch { /* 빈 결과 */ }
+const isEmptyVal = (s) => !s || /^(없(음|다|어|네)|변화\s*없|해당\s*없음|n\/?a|none|생략)/i.test(String(s).trim());
 
 // 성과 한 줄 — 없으면 "완료"
 let perf = "완료";
 const pm = result.match(/성과\s*[:：]\s*(.+)/);
 if (pm && pm[1].trim()) perf = pm[1].trim().slice(0, 220);
+
+// 주간목표·KPI → team_kpis (팀별·주별). 그 주 최초 실행이 목표를 확정 → 주중 안정(준수 대상 고정).
+await sql`CREATE TABLE IF NOT EXISTS team_kpis (id SERIAL PRIMARY KEY, scope TEXT, week_start DATE, goal TEXT, updated_by TEXT, updated_at TIMESTAMPTZ DEFAULT now(), UNIQUE(scope, week_start))`.catch(() => {});
+const gm = result.match(/주간목표\s*[:：]\s*(.+)/);
+const team = JOB_TO_MEMBER[job]?.team;
+if (gm && !isEmptyVal(gm[1]) && team) {
+  const goal = gm[1].trim().slice(0, 320);
+  await sql`INSERT INTO team_kpis (scope, week_start, goal, updated_by) VALUES (${team}, date_trunc('week', now() AT TIME ZONE 'Asia/Seoul')::date, ${goal}, ${job}) ON CONFLICT (scope, week_start) DO NOTHING`.catch(() => {});
+}
+await sql`DELETE FROM team_kpis WHERE week_start < (now() AT TIME ZONE 'Asia/Seoul')::date - interval '35 days'`.catch(() => {}); // 5주 보존
 
 // 동료평가 — "동료평가: 대상 | 한 줄 평가" (여러 줄 가능)
 await sql`CREATE TABLE IF NOT EXISTS peer_reviews (id SERIAL PRIMARY KEY, reviewer TEXT, target TEXT, note TEXT, created_at TIMESTAMPTZ DEFAULT now())`.catch(() => {});
