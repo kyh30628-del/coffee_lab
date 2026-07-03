@@ -232,7 +232,7 @@ export default function Lounge() {
                       <div style={{ color: "#7a5f2a" }}>{data.kpi[d.n].goal}</div>
                     </div>
                   ) : (
-                    <div onClick={() => { setKpiEdit({ scope: d.n, label: d.n }); setKpiDraft(""); }} style={{ fontSize: 10.5, color: "#c0a878", marginBottom: 9, cursor: "pointer" }}>📅 본부 주간 목표 미수립 — 설정하기</div>
+                    <div onClick={() => { setKpiEdit({ scope: d.n, label: d.n }); setKpiDraft(""); }} style={{ fontSize: 10.5, color: "#c0a878", marginBottom: 9, cursor: "pointer" }}>📅 본부 주간 목표 대기 — 자율 수립 예정(클릭 시 대표님 지정)</div>
                   )}
                   {d.teams.map((t) => {
                     const tr = rollup(teamMembers(t), perf);
@@ -253,7 +253,7 @@ export default function Lounge() {
                             <div style={{ color: "#7a5f2a" }}>{data.kpi[t.n].goal}</div>
                           </div>
                         ) : (
-                          <div onClick={() => { setKpiEdit({ scope: t.n, label: t.n }); setKpiDraft(""); }} style={{ fontSize: 10.5, color: "#c0a878", marginTop: 5, cursor: "pointer" }}>📅 이번 주 목표 미수립 — 설정하기</div>
+                          <div onClick={() => { setKpiEdit({ scope: t.n, label: t.n }); setKpiDraft(""); }} style={{ fontSize: 10.5, color: "#c0a878", marginTop: 5, cursor: "pointer" }}>📅 이번 주 목표 대기 — 팀이 자율 수립 예정(클릭 시 대표님 지정)</div>
                         )}
                         <div style={{ fontSize: 10.5, color: "#a89878", fontWeight: 700, margin: "7px 0 1px" }}>📋 한 일 (최근)</div>
                         {/* 직원들 */}
