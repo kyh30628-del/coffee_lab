@@ -46,9 +46,9 @@ export async function GET(req: NextRequest) {
       }
     } catch { /* 스냅샷 없음 → 버즈만 사용 */ }
 
-    const rows = (await sql`SELECT id, name, area, synth_grade, synth_count, synth_identity, review_dates
+    const rows = (await sql`SELECT id, name, area, synth_grade, synth_count, synth_identity, review_dates, char_scores
       FROM cafes WHERE published = true AND review_dates IS NOT NULL`) as unknown as
-      { id: number; name: string; area: string; synth_grade: string | null; synth_count: number | null; synth_identity: string | null; review_dates: unknown }[];
+      { id: number; name: string; area: string; synth_grade: string | null; synth_count: number | null; synth_identity: string | null; review_dates: unknown; char_scores: Record<string, number> | null }[];
 
     const scored: any[] = [];
     for (const c of rows) {
@@ -62,6 +62,12 @@ export async function GET(req: NextRequest) {
       // '요즘 뜨는' = 가장 최근 한 달(30일)을 가장 무겁게(×2) + 3개월(90일) 버즈 + 최근 집중도 보정.
       let score = r30 * 2 + r90 * (0.6 + 0.8 * Math.min(share, 1));
       if (delta && delta > 0) score += delta * 3;
+      // 커피 카테고리 정체성 보너스 — 디저트/베이커리 언급이 다른 특성보다 두드러지지 않는 곳만 부여.
+      // 베이커리류가 리뷰 회전(버즈)만으로 '요즘 뜨는'을 과점하는 편향 완화(결함C).
+      const cs = c.char_scores ?? {};
+      const dessert = cs.dessert ?? 0;
+      const coffeeAxes = (cs.roast ?? 0) + (cs.work ?? 0) + (cs.quiet ?? 0) + (cs.mood ?? 0) + (cs.space ?? 0);
+      if (dessert <= coffeeAxes) score *= 1.25;
       const reason = (delta && delta > 0)
         ? `최근 검증후기 +${delta}건 늘며 상승세 · 3개월 ${r90}건`
         : (r30 >= 2 ? `최근 3개월 ${r90}건 (한 달새 ${r30}건) 입소문` : `최근 3개월 검증후기 ${r90}건 집중`);
