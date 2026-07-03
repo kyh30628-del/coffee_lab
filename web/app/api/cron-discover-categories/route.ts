@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
     if (secret && req.headers.get("authorization") !== `Bearer ${secret}` && req.headers.get("x-admin-password") !== process.env.ADMIN_PASSWORD) {
       return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
     }
-    if (!process.env.ANTHROPIC_API_KEY) return NextResponse.json({ ok: false, error: "ANTHROPIC_API_KEY 미설정 — 발굴 비활성" });
+    if (!process.env.ANTHROPIC_API_KEY) { await recordRun("cron-discover-categories", false, "ANTHROPIC_API_KEY 미설정 — 발굴 비활성").catch(() => {}); return NextResponse.json({ ok: false, error: "ANTHROPIC_API_KEY 미설정 — 발굴 비활성" }); }
     await ensureSchema();
     await sql`CREATE TABLE IF NOT EXISTS category_candidates (id SERIAL PRIMARY KEY, found_at TIMESTAMPTZ DEFAULT now(), candidates JSONB, applied BOOLEAN DEFAULT false)`;
 
@@ -25,11 +25,12 @@ export async function GET(req: NextRequest) {
     for (const r of rows) for (const e of (Array.isArray(r.synth_reviews_all) ? r.synth_reviews_all : []).slice(0, 4)) if (e?.quote) quotes.push(e.quote);
 
     const cands = await proposeCategories(quotes);
-    if (!cands) return NextResponse.json({ ok: false, error: "발굴 실패(크레딧/오류) — 다음 달 재시도" });
+    if (!cands) { await recordRun("cron-discover-categories", false, "발굴 실패(크레딧/오류) — 다음 달 재시도").catch(() => {}); return NextResponse.json({ ok: false, error: "발굴 실패(크레딧/오류) — 다음 달 재시도" }); }
     await sql`INSERT INTO category_candidates (candidates) VALUES (${JSON.stringify(cands)}::jsonb)`;
     await recordRun("cron-discover-categories", true, `카테고리후보 ${cands.length}`, cands.length);
     return NextResponse.json({ ok: true, found: cands.length, candidates: cands, note: "후보 저장됨 — 검토 후 cafeProfile.ts에 추가" });
   } catch (e: any) {
+    await recordRun("cron-discover-categories", false, `에러: ${String(e?.message ?? e).slice(0, 120)}`).catch(() => {});
     return NextResponse.json({ ok: false, error: String(e?.message ?? e).slice(0, 200) }, { status: 500 });
   }
 }
