@@ -8,10 +8,9 @@ const env = readFileSync("/Users/wangwida/coffee-platform/web/.env.local", "utf8
 const sql = neon(env.match(/DATABASE_URL="?([^"\n]+)/)[1].trim());
 const one = async (q) => { try { return Number((await q)[0].c); } catch { return "?"; } };
 
-const KB = `너는 '동네 커피 노트'(dongnecoffeenote.com) 운영 관제 챗봇이다. CEO(대표님)에게 *정확히, 간결히* 답한다. **질문 답변 전용 — 작업 지시·데이터 변경은 절대 하지 않는다(읽기전용).**
-DB접속: web/.env.local의 DATABASE_URL, Bash로 node+@neondatabase/serverless로 *읽기전용 SELECT*만. 🚫 UPDATE/DELETE/INSERT 절대 금지.
-[규칙] **답의 근거 수치는 거의 다 아래 [라이브 상태]에 이미 있다 — 가급적 그걸로 바로 답하라.** Bash DB조회는 [라이브 상태]에 없는 값이 꼭 필요할 때만(읽기전용 SELECT). 숫자 실측, 모르면 "확인 필요". 지어내지 마라. **반드시 마지막엔 텍스트로 답을 마무리하라.**
-[서식] 답은 **마크다운**으로 구조화 — 핵심은 **표**·**목록**·**굵게**. 화면이 HTML로 렌더. 장황 금지, 모바일에서 짧고 한눈에.
+const KB = `너는 '동네 커피 노트'(dongnecoffeenote.com)의 **기획조정실장** — 대표님(CEO) 직속 2인자이자 관제 상황을 꿰고 있는 참모다. 대표님 질문에 **똑똑하고 자연스럽게, 핵심만** 답한다. 공손하되 직언하고, 도움이 되면 한발 앞서 제안한다. **읽기전용 — 작업 지시·데이터 변경은 절대 안 한다.**
+[말투] 사람처럼 자연스러운 문장으로. 짧은 질문엔 한두 문장으로 시원하게. 표·목록은 수치를 여러 개 비교할 때'만', 딱딱한 보고서 톤·굵게 남발 금지. 모바일에서 읽기 좋게 간결히. (답은 마크다운, 화면이 HTML 렌더)
+[정확성] 근거 수치는 거의 다 아래 [라이브 상태]에 있다 — 그걸로 바로 답하라. 숫자는 실측만, 모르면 "확인 필요"라 하고 절대 지어내지 마라. 라이브 상태에 없는 값이 꼭 필요하면 다른 말 없이 \`[NEED_DB]\`만 출력해 추가조회를 요청하라(읽기전용 SELECT로 확인해준다). 🚫 UPDATE/DELETE/INSERT 절대 금지.
 [지식: 조직] CEO→기획조정실장(2인자)─직할 자율진단감사실(self-audit)·비서실장. 6본부: 품질·성장·운영·경험·영업·전략기획(주간)·경영지원(주간). DoA: L0팀·L1본부·L2기조실장·L3 CEO만 결재.
 [지식: 스케줄KST] 상시: audit-watch 5분(트리거 감시+cron-selfaudit 워치독)·dev-pipeline 5분·dev-deploy 2분·cron-issues 10분(RM탐지+autoCorrect)·chat-watch 상주. 매시: embed :05·synth :45. 주기: grow(홀수시:10)·heal(홀수시:25) 2h·enrich 3h(:40)·selfaudit 6h(03/09/15/21시 :20). 하루: 00 sentinel·01:30 rulegap·06 verify·08/17 전체사이클(LLM)·10:30 주간거버넌스(격일게이트)·11:30/15:30/21:30 self-audit(LLM)·16:30 youtube-backfill·17 demand·04/10/16/22 closure. 주간: 일13 snapshot·월13 resynth·일20:07 newsletter. LLM=로컬claude-p(구독$0)·결정론=Vercel크론.
 [지식: 품질기준] 검증옥석=verifyReview로 가비지(동명·무관·광고·SEO·nameAsWord) 제거 후 옥석만 카운트. 공개floor=검증리뷰 3건+(참고)·30+(검증)·0~2(후보보류). nameAsWord필터=초단어/일반어명 오염거절. 오염게이트=cleanCafeName·offctx·coherence·off-concept·비카페카테고리·합성순간차단. AI판정=상시OFF수동청산(콘솔키). 수도권만·카카오로컬불가.`;
@@ -29,23 +28,25 @@ async function ground() {
 // claude -p 1회 호출. tools=true면 Bash 허용(추가조회 가능), false면 도구 없이 그라운딩만으로 즉답 강제(턴 소진 불가).
 function runClaude(prompt, tools) {
   return new Promise((res) => {
-    const args = ["-p", prompt, "--model", "sonnet", "--dangerously-skip-permissions", "--max-turns", tools ? "10" : "2", "--output-format", "json"];
+    const args = ["-p", prompt, "--model", "sonnet", "--dangerously-skip-permissions", "--max-turns", tools ? "6" : "2", "--output-format", "json"];
     if (tools) args.splice(args.indexOf("--max-turns"), 0, "--allowedTools", "Bash");
     execFile("claude", args,
-      { cwd: "/Users/wangwida/coffee-platform/web", maxBuffer: 16 * 1024 * 1024, timeout: tools ? 75000 : 50000, env: { ...process.env, PATH: "/Users/wangwida/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin" } },
+      { cwd: "/Users/wangwida/coffee-platform/web", maxBuffer: 16 * 1024 * 1024, timeout: tools ? 75000 : 40000, env: { ...process.env, PATH: "/Users/wangwida/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin" } },
       (err, stdout) => { try { res((JSON.parse(stdout).result || "").trim()); } catch { res(err ? `__ERR__${String(err).slice(0, 80)}` : ""); } });
   });
 }
 
-async function askClaude(prompt) {
-  // 1차: Bash 허용(24턴). 빈응답이면 = Bash 탐색에 턴 소진하고 텍스트 못 냄 → 2차: 도구 없이 그라운딩만으로 즉답.
-  let a = await runClaude(prompt, true);
-  if (!a || a.startsWith("__ERR__")) {
-    const a2 = await runClaude(prompt + "\n\n(추가조회 없이, 위 [라이브 상태]만 근거로 지금 바로 텍스트로 답하라.)", false);
-    if (a2 && !a2.startsWith("__ERR__")) return a2;
-    return a.startsWith("__ERR__") ? `(LLM 오류: ${a.slice(7)})` : (a2.startsWith("__ERR__") ? `(LLM 오류: ${a2.slice(7)})` : "(빈 응답 — 다시 질문해 주세요)");
-  }
-  return a;
+async function askClaude(base) {
+  // 1차(빠름): 도구 없이 그라운딩만으로 즉답. DB가 꼭 필요한 질문이면 모델이 [NEED_DB]만 출력 → 2차로 승격.
+  const fast = await runClaude(base + "\n\n위 [라이브 상태]에 근거가 있으면 바로 자연스럽게 답하라. **라이브 상태에 없는 값(지역별·특정 카페·기간별 등)이 필요하면, 사과·설명 절대 하지 말고 정확히 `[NEED_DB]` 한 줄만 출력하라. '못 드린다/안 잡혀 있다'고 답하지 말고 반드시 [NEED_DB]로.**", false);
+  if (fast && !fast.startsWith("__ERR__") && !fast.includes("[NEED_DB]")) return fast;
+  // 2차(에스컬레이션): Bash 읽기전용 조회 허용.
+  const deep = await runClaude(base + "\n\nBash에서 node+@neondatabase/serverless로 web/.env.local의 DATABASE_URL에 접속해 **읽기전용 SELECT만** 실행해 확인한 뒤, 자연스럽게 답하라. 🚫 UPDATE/DELETE/INSERT 절대 금지. 반드시 마지막엔 텍스트로 답을 마무리하라.", true);
+  if (deep && !deep.startsWith("__ERR__")) return deep;
+  // 폴백: 빠른경로가 뭔가 냈으면 그거라도(마커 제거).
+  if (fast && !fast.startsWith("__ERR__")) return fast.replace("[NEED_DB]", "").trim() || "(확인 필요 — 다시 질문해 주세요)";
+  const err = fast.startsWith("__ERR__") ? fast.slice(7) : (deep && deep.startsWith("__ERR__") ? deep.slice(7) : "");
+  return err ? `(LLM 오류: ${err})` : "(빈 응답 — 다시 질문해 주세요)";
 }
 
 let busy = false;
@@ -58,8 +59,8 @@ async function tick() {
       await sql`UPDATE chat_queue SET status='processing' WHERE id=${id}`;
       const g = await ground();
       const hist = Array.isArray(history) ? history.map((h) => `${h.role === "user" ? "Q" : "A"}: ${String(h.content).slice(0, 300)}`).join("\n") : "";
-      const prompt = `${KB}\n\n${g}\n\n${hist ? "[직전 대화]\n" + hist + "\n\n" : ""}[질문] ${question}\n\n위 라이브 상태·지식에 근거해 정확·간결하게 답하라(필요시 Bash로 DB 추가조회).`;
-      const answer = await askClaude(prompt);
+      const base = `${KB}\n\n${g}\n\n${hist ? "[직전 대화]\n" + hist + "\n\n" : ""}[질문] ${question}`;
+      const answer = await askClaude(base);
       await sql`UPDATE chat_queue SET answer=${answer.slice(0, 6000)}, status='done', mode='claude-p', answered_at=now() WHERE id=${id}`;
       console.log(`[${new Date().toISOString()}] answered #${id}`);
     }
