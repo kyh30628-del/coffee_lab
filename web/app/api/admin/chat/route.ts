@@ -36,6 +36,27 @@ export async function GET(req: NextRequest) {
   if (req.headers.get("x-admin-password") !== process.env.ADMIN_PASSWORD)
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   await ensure();
+  // 🗺️ 지역 전용 모드 — 결정론 SQL 즉답(LLM 안 씀·$0). dong(동)·area(구/시) 매칭 집계.
+  const region = req.nextUrl.searchParams.get("region");
+  if (region !== null) {
+    const q = region.trim().slice(0, 40);
+    if (!q) return NextResponse.json({ ok: false, error: "지역명을 입력하세요" }, { status: 400 });
+    const like = `%${q}%`;
+    try {
+      const a = (await sql`SELECT
+        count(*) FILTER (WHERE published)::int pub,
+        count(*) FILTER (WHERE published AND synth_grade='검증')::int verified,
+        count(*) FILTER (WHERE published AND synth_grade='참고')::int ref,
+        count(*) FILTER (WHERE NOT published)::int unpub,
+        count(*)::int total
+        FROM cafes WHERE dong LIKE ${like} OR area LIKE ${like}`)[0] as any;
+      const names = ((await sql`SELECT name FROM cafes WHERE published AND (dong LIKE ${like} OR area LIKE ${like})
+        ORDER BY (synth_grade='검증') DESC, synth_count DESC NULLS LAST LIMIT 8`) as any[]).map((r) => r.name);
+      return NextResponse.json({ ok: true, region: q, pub: a.pub, verified: a.verified, ref: a.ref, unpub: a.unpub, total: a.total, names });
+    } catch (e) {
+      return NextResponse.json({ ok: false, error: String(e).slice(0, 120) }, { status: 500 });
+    }
+  }
   const id = req.nextUrl.searchParams.get("id");
   if (id) {
     const r = (await sql`SELECT status, answer, mode FROM chat_queue WHERE id=${Number(id)}`.catch(() => [])) as any[];

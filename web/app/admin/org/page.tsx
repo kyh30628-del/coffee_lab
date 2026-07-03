@@ -120,6 +120,7 @@ function ChatWidget({ pw }: { pw: string }) {
   const [msgs, setMsgs] = useState<{ role: string; content: string }[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [mode, setMode] = useState<"chat" | "region">("chat");
   useEffect(() => {
     if (open && pw) {
       fetch("/api/admin/chat", { headers: { "x-admin-password": pw }, cache: "no-store" }).then((r) => r.json()).then((d) => {
@@ -142,6 +143,17 @@ function ChatWidget({ pw }: { pw: string }) {
     } catch { setMsgs((m) => [...m, { role: "assistant", content: "⚠️ 네트워크 오류" }]); }
     setLoading(false);
   };
+  const sendRegion = async () => {
+    const q = input.trim(); if (!q || loading) return;
+    setInput(""); setMsgs((m) => [...m, { role: "user", content: `🗺️ ${q}` }]); setLoading(true);
+    try {
+      const r = await fetch(`/api/admin/chat?region=${encodeURIComponent(q)}`, { headers: { "x-admin-password": pw }, cache: "no-store" }).then((x) => x.json());
+      if (!r.ok) setMsgs((m) => [...m, { role: "assistant", content: "⚠️ " + (r.error || "오류") }]);
+      else if (r.total === 0) setMsgs((m) => [...m, { role: "assistant", content: `**${q}** — 등록된 카페가 없어요. 동은 '성수동', 구/시는 '강남구'·'수원시' 형식으로 입력해 주세요.` }]);
+      else setMsgs((m) => [...m, { role: "assistant", content: `**${q}** 지역\n\n- 발행(공개): **${r.pub}곳** (검증 ${r.verified} · 참고 ${r.ref})\n- 비공개/후보: ${r.unpub}곳 · 전체 등록 ${r.total}곳${r.names?.length ? `\n\n**대표 카페**: ${r.names.join(" · ")}` : ""}` }]);
+    } catch { setMsgs((m) => [...m, { role: "assistant", content: "⚠️ 네트워크 오류" }]); }
+    setLoading(false);
+  };
   const clearHistory = async () => {
     if (loading || !confirm("24시간 대화기록을 모두 삭제할까요?")) return;
     try { await fetch("/api/admin/chat", { method: "DELETE", headers: { "x-admin-password": pw } }); } catch {}
@@ -160,18 +172,25 @@ function ChatWidget({ pw }: { pw: string }) {
                 <span onClick={() => setOpen(false)} style={{ cursor: "pointer", fontSize: 18 }}>✕</span>
               </div>
             </div>
+            <div style={{ display: "flex", gap: 6, padding: "8px 12px 0" }}>
+              {(["chat", "region"] as const).map((mo) => (
+                <button key={mo} onClick={() => setMode(mo)} style={{ flex: 1, padding: "7px 0", borderRadius: 8, fontSize: 12.5, fontWeight: 700, cursor: "pointer", border: "1px solid " + (mode === mo ? "#c98a3c" : "#e0d2b8"), background: mode === mo ? "#2b2018" : "#fff", color: mode === mo ? "#e8b87a" : "#8a7a5c" }}>{mo === "chat" ? "💬 일반" : "🗺️ 지역"}</button>
+              ))}
+            </div>
             <div style={{ flex: 1, overflowY: "auto", padding: 12 }}>
-              {msgs.length === 0 && <div style={{ color: "#9c8a6c", fontSize: 13, lineHeight: 1.7 }}>실시간 상태를 물어보세요.<br />예: "발행 몇 개야?" · "결재 대기 뭐 있어?" · "self-audit 언제 돌아?" · "floor 기준 뭐야?"</div>}
+              {msgs.length === 0 && (mode === "chat"
+                ? <div style={{ color: "#9c8a6c", fontSize: 13, lineHeight: 1.7 }}>실시간 상태를 물어보세요.<br />예: "발행 몇 개야?" · "결재 대기 뭐 있어?" · "self-audit 언제 돌아?" · "floor 기준 뭐야?"</div>
+                : <div style={{ color: "#9c8a6c", fontSize: 13, lineHeight: 1.7 }}>동/구 이름을 넣으면 <b>즉시</b> 집계해요(LLM 안 씀·빠름).<br />예: "성수동" · "강남구" · "연남동" · "수원시"</div>)}
               {msgs.map((m, i) => (
                 <div key={i} style={{ display: "flex", justifyContent: m.role === "user" ? "flex-end" : "flex-start", margin: "6px 0" }}>
                   <div className={m.role === "assistant" ? "ex" : ""} style={{ maxWidth: "88%", padding: "9px 12px", borderRadius: 13, fontSize: 14.5, lineHeight: 1.6, whiteSpace: m.role === "user" ? "pre-wrap" : "normal", wordBreak: "break-word", background: m.role === "user" ? "#c98a3c" : "#fff", color: m.role === "user" ? "#fff" : "#2b2018", border: m.role === "user" ? "none" : "1px solid #e6d8bf" }}>{m.role === "assistant" ? <div dangerouslySetInnerHTML={{ __html: md2html(m.content) }} /> : m.content}</div>
                 </div>
               ))}
-              {loading && <div style={{ color: "#9c8a6c", fontSize: 13, margin: "6px 0" }}>💭 claude(구독)가 답변 생성 중… (~20-40초)</div>}
+              {loading && <div style={{ color: "#9c8a6c", fontSize: 13, margin: "6px 0" }}>{mode === "region" ? "🗺️ 집계 중…" : "💭 claude(구독)가 답변 생성 중… (~20-40초)"}</div>}
             </div>
             <div style={{ display: "flex", gap: 7, padding: "10px 10px calc(10px + env(safe-area-inset-bottom))", borderTop: "1px solid #e6d8bf" }}>
-              <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") send(); }} placeholder="질문…" disabled={loading} style={{ flex: 1, minWidth: 0, padding: "11px 13px", borderRadius: 10, border: "1px solid #ddc9a8", fontSize: 16 }} />
-              <button onClick={send} disabled={loading} style={{ padding: "0 18px", background: "#2b2018", color: "#e8b87a", border: "none", borderRadius: 10, fontWeight: 700, fontSize: 15, flexShrink: 0, opacity: loading ? 0.5 : 1 }}>전송</button>
+              <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") (mode === "region" ? sendRegion() : send()); }} placeholder={mode === "region" ? "동/구 이름 (예: 성수동, 강남구)" : "질문…"} disabled={loading} style={{ flex: 1, minWidth: 0, padding: "11px 13px", borderRadius: 10, border: "1px solid #ddc9a8", fontSize: 16 }} />
+              <button onClick={() => (mode === "region" ? sendRegion() : send())} disabled={loading} style={{ padding: "0 18px", background: "#2b2018", color: "#e8b87a", border: "none", borderRadius: 10, fontWeight: 700, fontSize: 15, flexShrink: 0, opacity: loading ? 0.5 : 1 }}>전송</button>
             </div>
           </div>
         </div>
