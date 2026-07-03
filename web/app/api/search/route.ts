@@ -133,6 +133,31 @@ const gradeBonus = (g?: string): number => (g === "검증" ? 25 : g === "참고"
 // 일반 카테고리·개념 단어 — 이런 검색은 '이름이 그 단어인 카페'가 아니라 '그 부류 옥석'을 원함.
 //   → 이름 직접매칭(9999 최상단 고정)을 건너뛰어 등급순 노출이 살게 한다(참고가 검증 위로 가던 버그 차단).
 const CATEGORY_WORD = new Set(["로스터리", "로스터스", "로스터즈", "로스팅", "핸드드립", "드립", "베이커리", "디저트", "브런치", "스페셜티", "에스프레소", "아메리카노", "라떼", "콜드브루", "원두", "제과", "빵집", "북카페", "카페", "커피", "커피숍", "커피전문점"]);
+// 브랜드 상호가 영문(STARBUCKS 등)으로 등록돼 한글 질의(스타벅스)와 표기가 달라 이름 직접매칭이 누락되던 버그(#120) —
+//   실제 상호가 그 브랜드를 리뷰에서만 언급한 무관 카페보다 랭킹이 밀리던 원인. 한글↔영문 별칭을 매칭에 포함시켜 방지.
+const BRAND_ALIAS: Record<string, string[]> = {
+  "스타벅스": ["starbucks"], "이디야": ["ediya"], "투썸플레이스": ["twosome", "twosomeplace"],
+  "커피빈": ["coffeebean", "thecoffeebean"], "폴바셋": ["paulbassett"], "블루보틀": ["bluebottle"],
+  "할리스": ["hollys"], "탐앤탐스": ["tomntoms", "tomandtoms"], "빽다방": ["paikscoffee"],
+  "메가커피": ["megacoffee", "megamgccoffee"], "컴포즈커피": ["composecoffee"], "매머드커피": ["mammothcoffee"],
+};
+
+// 체인·다지점 브랜드 독점 방지 — "로스터리" 같은 카테고리 검색 상위권이 한 브랜드 지점들로만 채워지던 버그(#120).
+//   상호 첫 단어를 브랜드 키로 보고 같은 키는 최대 CHAIN_CAP개까지만 순위를 지키고, 초과분은 뒤로 밀어(제거 아님)
+//   다른 브랜드가 상위에 섞이게 한다. 상호 직접검색(아래 이름매칭 블록)은 이 함수 이후에 추가되므로 영향 없음.
+const CHAIN_CAP = 2;
+const chainKeyOf = (name: string): string => { const parts = (name ?? "").trim().split(/\s+/); return parts.length >= 2 ? parts[0] : (name ?? ""); };
+function diversifyChains<T extends { name: string }>(list: T[]): T[] {
+  const count = new Map<string, number>();
+  const kept: T[] = [];
+  const overflow: T[] = [];
+  for (const r of list) {
+    const key = chainKeyOf(r.name);
+    const n = count.get(key) ?? 0;
+    if (n < CHAIN_CAP) { kept.push(r); count.set(key, n + 1); } else overflow.push(r);
+  }
+  return [...kept, ...overflow];
+}
 
 // Claude 후보용: char_scores → 한국어 특징 태그, 검증 리뷰 → 인용
 const AXIS_LABEL: Record<string, string> = Object.fromEntries(CONCEPTS.filter((c) => c.axis).map((c) => [c.axis as string, c.label]));
@@ -276,6 +301,7 @@ export async function GET(req: NextRequest) {
         results = ranked.map((r) => { const s = sById.get(r.id); return s ? { ...s, reasons: r.reason ? [r.reason] : s.reasons } : null; }).filter(Boolean).slice(0, 24) as any[];
       }
     }
+    results = diversifyChains(results);
 
     // ===== 상호(카페명) 직접 매칭 — 시맨틱/재정렬이 놓치는 '이름 검색'을 항상 보장(최상단 고정) =====
     //   '마루빈'처럼 의미가 없는 상호는 임베딩으로 안 떠서 사라지던 버그 차단. 띄어쓰기 무시 매칭.
@@ -285,27 +311,31 @@ export async function GET(req: NextRequest) {
       const dq = ql.replace(/\s+/g, "");
       const isCategory = CATEGORY_WORD.has(dq) || tokens.every((t) => CATEGORY_WORD.has(t));
       if (dq.length >= 2 && !isCategory) {
+        // 브랜드가 영문 상호로 등록된 경우(STARBUCKS 등)를 대비해 한글 질의에 별칭을 더해 함께 매칭.
+        const dqVariants = Array.from(new Set([dq, ...(BRAND_ALIAS[dq] ?? [])]));
+        const likePatterns = dqVariants.map((v) => `%${v}%`);
         const nameRows = metroList
           ? (await sql.query(
               `SELECT ${FIELDS} FROM cafes WHERE published = true
-                 AND replace(lower(name), ' ', '') LIKE $1
+                 AND replace(lower(name), ' ', '') LIKE ANY($1::text[])
                  AND area = ANY($2::text[])
-               ORDER BY (replace(lower(name), ' ', '') = $3) DESC, (synth_grade = '검증') DESC, synth_count DESC NULLS LAST LIMIT 8`,
-              [`%${dq}%`, metroList, dq],
+               ORDER BY (replace(lower(name), ' ', '') = ANY($3::text[])) DESC, (synth_grade = '검증') DESC, synth_count DESC NULLS LAST LIMIT 8`,
+              [likePatterns, metroList, dqVariants],
             )) as unknown as any[]
           : (await sql.query(
               `SELECT ${FIELDS} FROM cafes WHERE published = true
-                 AND replace(lower(name), ' ', '') LIKE $1
+                 AND replace(lower(name), ' ', '') LIKE ANY($1::text[])
                  AND ($2 = '' OR area ILIKE $3 OR area ILIKE $4)
-               ORDER BY (replace(lower(name), ' ', '') = $5) DESC, (synth_grade = '검증') DESC, synth_count DESC NULLS LAST LIMIT 8`,
-              [`%${dq}%`, effectiveRegion, p1, p2, dq],
+               ORDER BY (replace(lower(name), ' ', '') = ANY($5::text[])) DESC, (synth_grade = '검증') DESC, synth_count DESC NULLS LAST LIMIT 8`,
+              [likePatterns, effectiveRegion, p1, p2, dqVariants],
             )) as unknown as any[];
         if (nameRows.length > 0) {
           const have = new Set(results.map((r: any) => r.id));
           // 정확히 이름이 일치하는 것만 최상단 고정(9999). 부분일치는 등급가점만 받아 일반 랭킹과 경쟁.
           const norm = (s: string) => (s || "").toLowerCase().replace(/\s+/g, "");
+          const variantSet = new Set(dqVariants);
           const nameResults = nameRows.filter((c) => !have.has(c.id)).map((c) => {
-            const exactName = norm(c.name) === dq;
+            const exactName = variantSet.has(norm(c.name));
             return {
               id: c.id, name: c.name, area: c.area, grade: c.synth_grade, count: c.synth_count,
               identity: c.synth_identity,
