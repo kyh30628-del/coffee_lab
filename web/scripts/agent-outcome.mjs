@@ -21,11 +21,14 @@ if (pm && pm[1].trim()) perf = pm[1].trim().slice(0, 220);
 // 동료평가 — "동료평가: 대상 | 한 줄 평가" (여러 줄 가능)
 await sql`CREATE TABLE IF NOT EXISTS peer_reviews (id SERIAL PRIMARY KEY, reviewer TEXT, target TEXT, note TEXT, created_at TIMESTAMPTZ DEFAULT now())`.catch(() => {});
 const evals = [...result.matchAll(/동료평가\s*[:：]\s*(.+)/g)].map((m) => m[1].trim()).filter(Boolean);
+const isEmpty = (s) => !s || /^(없(음|다|어|네)|해당\s*없음|n\/?a|none|생략)/i.test(s.trim());
 for (const e of evals.slice(0, 3)) {
   const parts = e.split(/[|｜]/);
-  const target = parts.length > 1 ? parts[0].trim().slice(0, 60) : "";
-  const note = (parts.length > 1 ? parts.slice(1).join("|") : parts[0]).trim().slice(0, 220);
-  if (note) await sql`INSERT INTO peer_reviews (reviewer, target, note) VALUES (${job}, ${target}, ${note})`.catch(() => {});
+  if (parts.length < 2) continue; // 대상 미지정(진짜 평가는 대상을 지목) → 스킵
+  const target = parts[0].trim().slice(0, 60);
+  const note = parts.slice(1).join("|").trim().slice(0, 220);
+  if (isEmpty(target) || isEmpty(note)) continue; // '없음' 류 노이즈 스킵
+  await sql`INSERT INTO peer_reviews (reviewer, target, note) VALUES (${job}, ${target}, ${note})`.catch(() => {});
 }
 await sql`DELETE FROM peer_reviews WHERE created_at < now()-interval '14 days'`.catch(() => {}); // 2주 보존
 
