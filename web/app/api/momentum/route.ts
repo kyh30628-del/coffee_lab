@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
+import { dessertDominance } from "@/lib/charScore";
 export const runtime = "nodejs";
 
 // "📈 요즘 뜨는 카페" — 별점(미제공) 대신 우리 소유 데이터로 모멘텀 산출.
@@ -62,12 +63,12 @@ export async function GET(req: NextRequest) {
       // '요즘 뜨는' = 가장 최근 한 달(30일)을 가장 무겁게(×2) + 3개월(90일) 버즈 + 최근 집중도 보정.
       let score = r30 * 2 + r90 * (0.6 + 0.8 * Math.min(share, 1));
       if (delta && delta > 0) score += delta * 3;
-      // 커피 카테고리 정체성 보너스 — 디저트/베이커리 언급이 다른 특성보다 두드러지지 않는 곳만 부여.
-      // 베이커리류가 리뷰 회전(버즈)만으로 '요즘 뜨는'을 과점하는 편향 완화(결함C).
-      const cs = c.char_scores ?? {};
-      const dessert = cs.dessert ?? 0;
-      const coffeeAxes = (cs.roast ?? 0) + (cs.work ?? 0) + (cs.quiet ?? 0) + (cs.mood ?? 0) + (cs.space ?? 0);
-      if (dessert <= coffeeAxes) score *= 1.25;
+      // 커피 카테고리 정체성 보정 — 디저트 우세 카페는 '요즘 뜨는'에서 제외하고, 정체성 유지 카페만 가점.
+      // 베이커리류가 리뷰 회전(버즈)만으로 '요즘 뜨는'을 과점하던 편향 완화(결함C, 배포abe8e99가 가점만으로는
+      // 미달성 — 디저트 우세 카페 자체를 걸러야 함. coordination#88).
+      const { bonus, dominant } = dessertDominance(c.char_scores);
+      if (dominant) continue;
+      if (bonus) score *= 1.25;
       const reason = (delta && delta > 0)
         ? `최근 검증후기 +${delta}건 늘며 상승세 · 3개월 ${r90}건`
         : (r30 >= 2 ? `최근 3개월 ${r90}건 (한 달새 ${r30}건) 입소문` : `최근 3개월 검증후기 ${r90}건 집중`);
