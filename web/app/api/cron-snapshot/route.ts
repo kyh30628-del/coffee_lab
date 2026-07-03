@@ -26,6 +26,7 @@ export async function GET(req: NextRequest) {
     await recordRun("cron-snapshot", true, `스냅샷 ${totalRecorded} ${rounds}라운드`, totalRecorded);
     return NextResponse.json({ ok: true, ranAt: new Date().toISOString(), totalRecorded, rounds });
   } catch (e) {
+    await recordRun("cron-snapshot", false, `에러: ${String(e).slice(0, 120)}`).catch(() => {});
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
 }
