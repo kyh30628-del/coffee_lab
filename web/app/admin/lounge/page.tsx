@@ -2,19 +2,33 @@
 import { useState, useEffect, useCallback } from "react";
 import { ORG, MEMBER_INFO, JOB_TO_MEMBER, type Team, type Division, type Worker } from "@/lib/org";
 
-// 경량 마크다운(조간회의록 렌더용) — 제목·목록·굵게
+// 경량 마크다운(회의록·조직평가 렌더용) — 제목·목록·굵게·표
 function md2html(md: string) {
   const esc = (s: string) => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   const inline = (t: string) => esc(t).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
-  let html = "", inList = false;
-  const close = () => { if (inList) { html += "</ul>"; inList = false; } };
+  let html = "", inList = false; let tbl: string[] = [];
+  const closeList = () => { if (inList) { html += "</ul>"; inList = false; } };
+  const flushTbl = () => {
+    if (!tbl.length) return;
+    const rows = tbl.filter((r) => !/^\s*\|?[\s:|-]+\|?\s*$/.test(r)); // |---| 구분행 제거
+    html += "<div style='overflow-x:auto;margin:4px 0'><table style='border-collapse:collapse;font-size:10.5px;width:100%'>";
+    rows.forEach((r, i) => {
+      const cells = r.replace(/^\s*\||\|\s*$/g, "").split("|").map((c) => c.trim());
+      const tag = i === 0 ? "th" : "td";
+      html += "<tr>" + cells.map((c) => `<${tag} style="border:1px solid #e0d2b8;padding:3px 6px;text-align:left;${i === 0 ? "background:#f0e6d4" : ""}">${inline(c)}</${tag}>`).join("") + "</tr>";
+    });
+    html += "</table></div>"; tbl = [];
+  };
   for (const ln of String(md || "").split("\n")) {
-    if (/^#{1,4}\s/.test(ln)) { close(); html += `<div style="font-weight:700;margin:8px 0 3px">${inline(ln.replace(/^#+\s/, ""))}</div>`; }
+    if (/^\s*\|.*\|/.test(ln)) { closeList(); tbl.push(ln); continue; }
+    flushTbl();
+    if (/^#{1,4}\s/.test(ln)) { closeList(); html += `<div style="font-weight:700;margin:8px 0 3px">${inline(ln.replace(/^#+\s/, ""))}</div>`; }
     else if (/^[-*]\s/.test(ln)) { if (!inList) { html += "<ul style='margin:2px 0;padding-left:16px'>"; inList = true; } html += `<li>${inline(ln.replace(/^[-*]\s/, ""))}</li>`; }
-    else if (ln.trim() === "") { close(); }
-    else { close(); html += `<div>${inline(ln)}</div>`; }
+    else if (/^>\s/.test(ln)) { closeList(); html += `<div style="border-left:3px solid #ddc9a8;padding-left:8px;color:#8a7a5c;margin:3px 0">${inline(ln.replace(/^>\s/, ""))}</div>`; }
+    else if (ln.trim() === "") { closeList(); }
+    else { closeList(); html += `<div>${inline(ln)}</div>`; }
   }
-  close();
+  flushTbl(); closeList();
   return html;
 }
 
@@ -27,6 +41,7 @@ type Data = {
   today: { runs: number; ok: number };
   comments: { id: number; target: string; author: string; body: string; t: string }[];
   peers: { id: number; reviewer: string; target: string; note: string; t: string }[];
+  reports: { kind: string; title: string; md: string; d: string }[];
 };
 // 잡키 → 읽기 좋은 직원명
 const reviewerName = (job: string) => JOB_TO_MEMBER[job]?.name || job;
@@ -60,6 +75,7 @@ export default function Lounge() {
   const [showFeed, setShowFeed] = useState(true);
   const [showPeers, setShowPeers] = useState(true);
   const [showMeeting, setShowMeeting] = useState(false);
+  const [openReport, setOpenReport] = useState<string | null>(null);
   const [composer, setComposer] = useState<{ target: string; label: string } | null>(null);
   const [draft, setDraft] = useState("");
   const [info, setInfo] = useState<string | null>(null);
@@ -127,6 +143,17 @@ export default function Lounge() {
           </div>
         </div>
 
+        {/* 인사팀 조직평가·주간 리포트 */}
+        {(data?.reports || []).map((r) => (
+          <div key={r.kind} style={{ background: "#fff", border: "1px solid #e6d8bf", borderRadius: 12, marginBottom: 10, overflow: "hidden" }}>
+            <div onClick={() => setOpenReport((o) => (o === r.kind ? null : r.kind))} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 14px", cursor: "pointer", background: r.kind === "weekly-eval" ? "#faf3e8" : "#fff" }}>
+              <b style={{ fontSize: 13.5 }}>🏅 {r.title}</b>
+              <span style={{ fontSize: 11.5, color: "#9c8a6c" }}>{r.d} · {openReport === r.kind ? "접기 ▾" : "펼치기 ▸"}</span>
+            </div>
+            {openReport === r.kind && <div style={{ padding: "4px 14px 14px", fontSize: 12, lineHeight: 1.65, color: "#4a3f34", maxHeight: "62vh", overflowY: "auto" }} dangerouslySetInnerHTML={{ __html: md2html(r.md) }} />}
+          </div>
+        ))}
+
         {/* 공유회 피드 */}
         <Section title="📢 공유회 — 오늘의 회의·자율 협업" open={showFeed} onToggle={() => setShowFeed((v) => !v)} summary={`협업 ${data?.coord?.length ?? 0} · 결재 ${data?.decisions?.length ?? 0}`}>
           {data?.brief && (
@@ -176,7 +203,7 @@ export default function Lounge() {
         {/* 본부 → 팀 → 직원 */}
         {ORG.divisions.map((d) => {
           const dr = rollup(divMembers(d), perf);
-          const isOpen = open[d.n] ?? true;
+          const isOpen = open[d.n] ?? false;
           return (
             <div key={d.n} style={{ marginBottom: 10 }}>
               <div onClick={() => setOpen((o) => ({ ...o, [d.n]: !isOpen }))} style={{ display: "flex", alignItems: "center", gap: 8, background: d.c, color: "#fff", padding: "11px 14px", borderRadius: isOpen ? "12px 12px 0 0" : 12, cursor: "pointer" }}>
@@ -196,7 +223,8 @@ export default function Lounge() {
                           <RateBadge rate={tr.rate} />
                           <button onClick={() => setComposer({ target: tgt, label: t.n })} title="팀에 코멘트" style={{ border: "none", background: "#f0e6d4", borderRadius: 7, fontSize: 12, padding: "2px 7px", cursor: "pointer" }}>💬</button>
                         </div>
-                        {t.s && <div style={{ fontSize: 11.5, color: "#8a7a5c", marginTop: 2, lineHeight: 1.4 }}>{t.s}</div>}
+                        {t.s && <div style={{ fontSize: 11.5, color: "#8a7a5c", marginTop: 3, lineHeight: 1.45 }}><b style={{ color: "#7a6a4c" }}>🎯 맡은 일</b> · {t.s}</div>}
+                        <div style={{ fontSize: 10.5, color: "#a89878", fontWeight: 700, margin: "7px 0 1px" }}>📋 한 일 (최근)</div>
                         {/* 직원들 */}
                         <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
                           {t.w.map((w) => {

@@ -13,6 +13,7 @@ async function ensure() {
     body TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT now()
   )`.catch(() => {});
   await sql`CREATE TABLE IF NOT EXISTS peer_reviews (id SERIAL PRIMARY KEY, reviewer TEXT, target TEXT, note TEXT, created_at TIMESTAMPTZ DEFAULT now())`.catch(() => {});
+  await sql`CREATE TABLE IF NOT EXISTS org_reports (kind TEXT PRIMARY KEY, title TEXT, md TEXT, updated_at TIMESTAMPTZ DEFAULT now())`.catch(() => {});
 }
 
 export async function GET(req: NextRequest) {
@@ -41,7 +42,10 @@ export async function GET(req: NextRequest) {
   // 🔄 다면평가 — 에이전트들이 서로 남긴 동료평가(reviewer=잡키, target=대상 팀/에이전트, note=한 줄)
   const peers = (await sql`SELECT id, reviewer, target, note, to_char(created_at AT TIME ZONE 'Asia/Seoul','MM-DD HH24:MI') t FROM peer_reviews ORDER BY created_at DESC LIMIT 60`.catch(() => [])) as any[];
 
-  return NextResponse.json({ ok: true, perf, brief, coord, decisions, today, comments, peers });
+  // 🏅 인사팀 조직평가·주간 리포트(로컬에서 push-report.mjs로 밀어넣은 것)
+  const reports = (await sql`SELECT kind, title, md, to_char(updated_at AT TIME ZONE 'Asia/Seoul','MM-DD') d FROM org_reports ORDER BY kind`.catch(() => [])) as any[];
+
+  return NextResponse.json({ ok: true, perf, brief, coord, decisions, today, comments, peers, reports });
 }
 
 // CEO 코멘트 남기기 — { target: "div:..."|"team:..."|"member:...", body }
