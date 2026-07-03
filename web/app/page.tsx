@@ -457,6 +457,7 @@ export default function Home() {
   }, []);
   // 공유 링크(/?cafe=id)로 도착하면 해당 카페 상세를 자동으로 연다(1회)
   const deepLinked = useRef(false);
+  const regionCtr = useRef<[number, number, number] | null>(null); // 관제 지역카드 딥링크(?clat&clng&cz) → 지도 센터링(필터 무변경)
   useEffect(() => {
     if (deepLinked.current || !cafes.length || typeof window === "undefined") return;
     const id = new URLSearchParams(window.location.search).get("cafe");
@@ -477,7 +478,10 @@ export default function Home() {
       const g = toGu(region);
       if (g.sido && g.sigungu) { setHomeSido(g.sido); setHomeGu(g.sigungu); }
       else setHomeGu(region);
-      setTab("home");
+      // 관제 지역카드 딥링크(?clat&clng&cz): 좌표 있으면 필터 안 걸고 그 지점으로 지도만 센터링(동/구 정밀). 없으면 홈.
+      const clat = Number(sp.get("clat")), clng = Number(sp.get("clng")), cz = Number(sp.get("cz"));
+      if (clat && clng) { regionCtr.current = [clat, clng, cz || 14]; setTab("map"); }
+      else setTab("home");
     }
     // 카카오 공유 링크(/?cafe=id)로 도착 → 랜딩 건너뛰고 소비자 화면 + 해당 카페 지역 로드.
     //   (지역 cafes가 로드되면 위 [cafes] 핸들러가 해당 카페 상세를 자동으로 연다)
@@ -966,6 +970,8 @@ export default function Home() {
   useEffect(() => {
     const L = LRef.current; const map = mapObj.current;
     if (!L || !map || !layerRef.current) return;
+    // 관제 지역카드 딥링크: 카페 로드되면 지정 좌표로 1회 센터링 후 소진(이후 정상 동작). regionCtr 없으면 무영향(일반 사용).
+    if (regionCtr.current && filtered.length > 0) { const [la, ln, z] = regionCtr.current; regionCtr.current = null; map.setView([la, ln], z, { animate: false }); drawMarkers(); return; }
     if (nearMe) { drawMarkers(); return; } // 📍 내 주변 모드: showNearMe가 이미 setView함 → flyTo 충돌 방지, 그리기만
     if (focusId) {
       /* focus effect가 setView 처리 */

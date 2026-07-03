@@ -49,14 +49,19 @@ export async function GET(req: NextRequest) {
         count(*) FILTER (WHERE published AND synth_grade='참고')::int ref,
         count(*) FILTER (WHERE NOT published)::int unpub,
         count(*)::int total,
-        max(synth_updated) FILTER (WHERE published) last_pub
+        max(synth_updated) FILTER (WHERE published) last_pub,
+        avg(lat) FILTER (WHERE published) clat, avg(lng) FILTER (WHERE published) clng
         FROM cafes WHERE dong LIKE ${like} OR area LIKE ${like}`)[0] as any;
       const names = ((await sql`SELECT name FROM cafes WHERE published AND (dong LIKE ${like} OR area LIKE ${like})
         ORDER BY (synth_grade='검증') DESC, synth_count DESC NULLS LAST LIMIT 8`) as any[]).map((r) => r.name);
       // 대표 구/시(지도 링크용) — toGu가 area만 받아, 매칭 카페 중 최다 area로 지도를 건다(동·구·시 모두 안전).
       const gu = ((await sql`SELECT area FROM cafes WHERE published AND (dong LIKE ${like} OR area LIKE ${like})
         GROUP BY area ORDER BY count(*) DESC LIMIT 1`)[0] as any)?.area || q;
-      return NextResponse.json({ ok: true, region: q, pub: a.pub, verified: a.verified, ref: a.ref, unpub: a.unpub, total: a.total, last_pub: a.last_pub, gu, names });
+      // 질문이 동을 지목했으면 정확한 동名(지도 동 필터=정확일치라). 구/시 질문이면 매칭 없어 null.
+      const dong = ((await sql`SELECT dong FROM cafes WHERE published AND dong LIKE ${like}
+        GROUP BY dong ORDER BY count(*) DESC LIMIT 1`)[0] as any)?.dong || null;
+      // 지도 센터링용 중심좌표 + 줌(동 매칭이면 촘촘히 15, 구/시면 13). 필터 안 걸고 이 지점으로만 이동.
+      return NextResponse.json({ ok: true, region: q, pub: a.pub, verified: a.verified, ref: a.ref, unpub: a.unpub, total: a.total, last_pub: a.last_pub, gu, dong, clat: a.clat, clng: a.clng, cz: dong ? 15 : 13, names });
     } catch (e) {
       return NextResponse.json({ ok: false, error: String(e).slice(0, 120) }, { status: 500 });
     }
