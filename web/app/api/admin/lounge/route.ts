@@ -1,0 +1,63 @@
+import { NextRequest, NextResponse } from "next/server";
+import { sql } from "@/lib/db";
+
+export const runtime = "nodejs";
+
+// 🏛️ 전사 라운지 데이터 — 직원(잡)별 성과 + 공유회 피드(조간회의·업무지시·자율협업·결재) + CEO 코멘트.
+//   조직 구조(본부→팀→직원)는 클라가 lib/org.ts에서 직접 읽고, 여기선 성과·피드·코멘트만 준다.
+const auth = (req: NextRequest) => req.headers.get("x-admin-password") === process.env.ADMIN_PASSWORD;
+
+async function ensure() {
+  await sql`CREATE TABLE IF NOT EXISTS lounge_comments (
+    id SERIAL PRIMARY KEY, target TEXT NOT NULL, author TEXT DEFAULT 'CEO',
+    body TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT now()
+  )`.catch(() => {});
+}
+
+export async function GET(req: NextRequest) {
+  if (!auth(req)) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  await ensure();
+  // 직원(잡)별 성과 — 최근 실행 + 최근 7일 성공률
+  const perfRows = (await sql`SELECT job, ok, processed, ran_at,
+      left(coalesce(detail,''), 90) detail,
+      (SELECT count(*) FILTER (WHERE ok) FROM agent_runs a2 WHERE a2.job=a1.job AND a2.ran_at>now()-interval '7 days')::int ok7,
+      (SELECT count(*) FROM agent_runs a2 WHERE a2.job=a1.job AND a2.ran_at>now()-interval '7 days')::int tot7
+    FROM (SELECT DISTINCT ON (job) * FROM agent_runs ORDER BY job, ran_at DESC) a1`.catch(() => [])) as any[];
+  const perf: Record<string, any> = {};
+  for (const r of perfRows) perf[r.job] = { ok: r.ok, processed: r.processed, ranAt: r.ran_at, detail: r.detail, ok7: r.ok7, tot7: r.tot7 };
+
+  // 공유회 피드
+  const brief = ((await sql`SELECT meeting, work_order, to_char(created_at AT TIME ZONE 'Asia/Seoul','MM-DD') d FROM org_briefings ORDER BY created_at DESC LIMIT 1`.catch(() => []))[0] as any) || null;
+  const coord = (await sql`SELECT id, from_team, to_team, topic, status, resolution,
+      to_char(created_at AT TIME ZONE 'Asia/Seoul','MM-DD HH24:MI') t FROM coordination ORDER BY created_at DESC LIMIT 20`.catch(() => [])) as any[];
+  const decisions = (await sql`SELECT id, title, team, recommendation FROM decisions WHERE status='pending' AND COALESCE(tier,'L3')='L3' ORDER BY id`.catch(() => [])) as any[];
+
+  // 성과 요약(전사) — 오늘 실행·성공률
+  const today = ((await sql`SELECT count(*)::int runs, count(*) FILTER (WHERE ok)::int ok FROM agent_runs WHERE ran_at > (now() AT TIME ZONE 'Asia/Seoul')::date`.catch(() => [{ runs: 0, ok: 0 }]))[0]) as any;
+
+  const comments = (await sql`SELECT id, target, author, body, to_char(created_at AT TIME ZONE 'Asia/Seoul','MM-DD HH24:MI') t FROM lounge_comments ORDER BY created_at DESC LIMIT 200`.catch(() => [])) as any[];
+
+  return NextResponse.json({ ok: true, perf, brief, coord, decisions, today, comments });
+}
+
+// CEO 코멘트 남기기 — { target: "div:..."|"team:..."|"member:...", body }
+export async function POST(req: NextRequest) {
+  if (!auth(req)) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  await ensure();
+  try {
+    const { target, body } = await req.json();
+    if (!target || !body || typeof body !== "string") return NextResponse.json({ ok: false, error: "target·body 필요" }, { status: 400 });
+    const r = (await sql`INSERT INTO lounge_comments (target, body) VALUES (${String(target).slice(0, 80)}, ${body.slice(0, 1000)}) RETURNING id`) as any[];
+    return NextResponse.json({ ok: true, id: r[0].id });
+  } catch (e) {
+    return NextResponse.json({ ok: false, error: String(e).slice(0, 120) }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  if (!auth(req)) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  const id = Number(req.nextUrl.searchParams.get("id"));
+  if (!id) return NextResponse.json({ ok: false, error: "id 필요" }, { status: 400 });
+  await sql`DELETE FROM lounge_comments WHERE id=${id}`.catch(() => {});
+  return NextResponse.json({ ok: true });
+}
