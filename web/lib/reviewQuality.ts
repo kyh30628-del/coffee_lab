@@ -444,7 +444,12 @@ export function verifyReview(input: QualityInput): QualityResult {
     const fullT = `${title} ${body}`;
     const dongTerm = areaTerms.find((a) => /(동|읍|면|가|리)$/.test(a));
     const dongCore = dongTerm ? dongTerm.replace(/(동|읍|면|가|리)$/, "") : "";
-    const dongHere = dongTerm ? (fullT.includes(dongTerm) || (dongCore.length >= 2 && fullT.includes(dongCore))) : areaPresent;
+    // ⚠️ [룰갭19] 카페명=동네이름(예: "원곡")이면 dongCore도 "원곡"이 돼, 카페명이 텍스트에
+    //   있기만 해도(이 체크 자체가 nameInTitle/nameInBody 전제) dongHere가 항상 참이 돼 무력화된다.
+    //   이 경우엔 실제 카페 맥락어(CAFE_CONTEXT)까지 있어야 '이 동네(카페) 신호'로 인정한다.
+    const nameEqualsDong = dongCore.length >= 2 && nameN === norm(dongCore);
+    let dongHere = dongTerm ? (fullT.includes(dongTerm) || (dongCore.length >= 2 && fullT.includes(dongCore))) : areaPresent;
+    if (nameEqualsDong) dongHere = dongHere && CAFE_CONTEXT.test(fullL);
     const otherBranch = (fullT.match(/([가-힣]{2,})점/g) ?? [])
       .map((t) => t.replace(/점$/, ""))
       .find((nm) => nm.length >= 2 && nm !== "본" && !isNonBranchWord(nm + "점")
