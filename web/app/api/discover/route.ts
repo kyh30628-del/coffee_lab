@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
 import { subscriptionLive } from "@/lib/flags";
+import { dessertDominance } from "@/lib/charScore";
 export const runtime = "nodejs";
 
 const REGIONS: Record<string, string[]> = {
@@ -107,7 +108,8 @@ export async function GET(req: NextRequest) {
       top3: byReview.filter((c) => !usedIds.has(c.id)).slice(0, 3).map((c: any) => slim(c, "top")),
       fresh: (() => {
         // 검증 등급이라도 리뷰가 적으면(예: count=6) 신뢰도 낮음 → 최소 리뷰수 기준 추가(제안F)
-        const candidates = byNew.filter((c) => !usedIds.has(c.id) && c.synth_grade === "검증" && (c.synth_count ?? 0) >= 20).slice(0, 60);
+        // + 디저트 우세 카페는 momentum과 동일 기준으로 제외(결함C, coordination#88 — fresh엔 이 편향완화가 누락돼 있었음)
+        const candidates = byNew.filter((c) => !usedIds.has(c.id) && c.synth_grade === "검증" && (c.synth_count ?? 0) >= 20 && !dessertDominance(c.char_scores).dominant).slice(0, 60);
         const areaCnt = new Map<string, number>();
         const deduped: any[] = [];
         for (const c of candidates) {
