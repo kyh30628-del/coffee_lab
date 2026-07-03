@@ -459,7 +459,11 @@ export function verifyReview(input: QualityInput): QualityResult {
   const myBranch = input.name.match(/([가-힣A-Za-z0-9]{2,})점\s*$/)?.[1];
   if (myBranch) {
     const fullT = `${title} ${body}`;
-    const branchSignal = (myBranch !== "본" && fullT.includes(myBranch)) || areaPresent; // 지점명 또는 대상 지역어
+    // [룰갭23] 지점명이 도로명(○○로·○○길)이면 그 도로 전체를 공유하는 위치어일 뿐 지점 식별력이 없음.
+    //   구·동 수준의 areaPresent만으로 통과시키면 같은 도로 '다른 건물'의 무관업체를 다 흡수한다
+    //   (카페인24 인천은하수로점 ← 같은 도로 다른 건물 '5PM sunset hour' 오염, 실측). 도로명 지점은 지점명 실제 일치만 인정.
+    const branchIsRoadName = /(로|길)$/.test(myBranch);
+    const branchSignal = (myBranch !== "본" && fullT.includes(myBranch)) || (!branchIsRoadName && areaPresent); // 지점명 또는(도로명 지점이 아닐 때만) 대상 지역어
     const otherBranchTok = (fullT.match(/([가-힣]{2,})점/g) ?? [])
       .map((t) => t.replace(/점$/, ""))
       .find((nm) => nm.length >= 2 && nm !== myBranch && nm !== "본" && !isNonBranchWord(nm + "점")
