@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 
 function md2html(md: string) {
   const esc = (s: string) => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  const inline = (t: string) => esc(t).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/`(.+?)`/g, "<code>$1</code>");
+  const inline = (t: string) => esc(t).replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" target="_blank" rel="noopener" style="color:#9c6b3f;text-decoration:underline">$1</a>').replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/`(.+?)`/g, "<code>$1</code>");
   const lines = String(md || "").split("\n");
   let html = "", inTable = false, inList = false;
   const close = () => { if (inList) { html += "</ul>"; inList = false; } if (inTable) { html += "</table>"; inTable = false; } };
@@ -150,7 +150,7 @@ function ChatWidget({ pw }: { pw: string }) {
       const r = await fetch(`/api/admin/chat?region=${encodeURIComponent(q)}`, { headers: { "x-admin-password": pw }, cache: "no-store" }).then((x) => x.json());
       if (!r.ok) setMsgs((m) => [...m, { role: "assistant", content: "⚠️ " + (r.error || "오류") }]);
       else if (r.total === 0) setMsgs((m) => [...m, { role: "assistant", content: `**${q}** — 등록된 카페가 없어요. 동은 '성수동', 구/시는 '강남구'·'수원시' 형식으로 입력해 주세요.` }]);
-      else setMsgs((m) => [...m, { role: "assistant", content: `**${q}** 지역\n\n- 발행(공개): **${r.pub}곳** (검증 ${r.verified} · 참고 ${r.ref})\n- 비공개/후보: ${r.unpub}곳 · 전체 등록 ${r.total}곳${r.names?.length ? `\n\n**대표 카페**: ${r.names.join(" · ")}` : ""}` }]);
+      else setMsgs((m) => [...m, { role: "assistant", content: `**${q}** 지역\n\n- 발행(공개): **${r.pub}곳** (검증 ${r.verified} · 참고 ${r.ref})\n- 비공개/후보: ${r.unpub}곳 · 전체 등록 ${r.total}곳${r.last_pub ? `\n- 최종 발행: ${String(r.last_pub).slice(0, 10).replace(/-/g, ".")}` : ""}${r.names?.length ? `\n\n**대표 카페**: ${r.names.join(" · ")}` : ""}\n\n[🗺️ 지도에서 ${r.gu || q} 보기](/?region=${encodeURIComponent(r.gu || q)})` }]);
     } catch { setMsgs((m) => [...m, { role: "assistant", content: "⚠️ 네트워크 오류" }]); }
     setLoading(false);
   };

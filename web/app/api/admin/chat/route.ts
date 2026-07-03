@@ -48,11 +48,15 @@ export async function GET(req: NextRequest) {
         count(*) FILTER (WHERE published AND synth_grade='검증')::int verified,
         count(*) FILTER (WHERE published AND synth_grade='참고')::int ref,
         count(*) FILTER (WHERE NOT published)::int unpub,
-        count(*)::int total
+        count(*)::int total,
+        max(synth_updated) FILTER (WHERE published) last_pub
         FROM cafes WHERE dong LIKE ${like} OR area LIKE ${like}`)[0] as any;
       const names = ((await sql`SELECT name FROM cafes WHERE published AND (dong LIKE ${like} OR area LIKE ${like})
         ORDER BY (synth_grade='검증') DESC, synth_count DESC NULLS LAST LIMIT 8`) as any[]).map((r) => r.name);
-      return NextResponse.json({ ok: true, region: q, pub: a.pub, verified: a.verified, ref: a.ref, unpub: a.unpub, total: a.total, names });
+      // 대표 구/시(지도 링크용) — toGu가 area만 받아, 매칭 카페 중 최다 area로 지도를 건다(동·구·시 모두 안전).
+      const gu = ((await sql`SELECT area FROM cafes WHERE published AND (dong LIKE ${like} OR area LIKE ${like})
+        GROUP BY area ORDER BY count(*) DESC LIMIT 1`)[0] as any)?.area || q;
+      return NextResponse.json({ ok: true, region: q, pub: a.pub, verified: a.verified, ref: a.ref, unpub: a.unpub, total: a.total, last_pub: a.last_pub, gu, names });
     } catch (e) {
       return NextResponse.json({ ok: false, error: String(e).slice(0, 120) }, { status: 500 });
     }
