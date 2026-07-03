@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { ORG, MEMBER_INFO, type Team, type Division, type Worker } from "@/lib/org";
+import { ORG, MEMBER_INFO, JOB_TO_MEMBER, type Team, type Division, type Worker } from "@/lib/org";
 
 // 경량 마크다운(조간회의록 렌더용) — 제목·목록·굵게
 function md2html(md: string) {
@@ -26,7 +26,10 @@ type Data = {
   decisions: { id: number; title: string; team: string; recommendation: string }[];
   today: { runs: number; ok: number };
   comments: { id: number; target: string; author: string; body: string; t: string }[];
+  peers: { id: number; reviewer: string; target: string; note: string; t: string }[];
 };
+// 잡키 → 읽기 좋은 직원명
+const reviewerName = (job: string) => JOB_TO_MEMBER[job]?.name || job;
 
 const ago = (iso: string) => {
   if (!iso) return "";
@@ -55,6 +58,7 @@ export default function Lounge() {
   const [err, setErr] = useState("");
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [showFeed, setShowFeed] = useState(true);
+  const [showPeers, setShowPeers] = useState(true);
   const [showMeeting, setShowMeeting] = useState(false);
   const [composer, setComposer] = useState<{ target: string; label: string } | null>(null);
   const [draft, setDraft] = useState("");
@@ -81,6 +85,7 @@ export default function Lounge() {
   const doLogin = () => { if (pw) { localStorage.setItem("adm_pw", pw); load(pw); } };
   const perf = data?.perf || {};
   const commentsFor = (target: string) => (data?.comments || []).filter((c) => c.target === target);
+  const peersFor = (name: string) => (data?.peers || []).filter((p) => p.target && (p.target.includes(name) || name.includes(p.target)));
   const submitComment = async () => {
     if (!composer || !draft.trim()) return;
     await fetch("/api/admin/lounge", { method: "POST", headers: { "x-admin-password": pw, "Content-Type": "application/json" }, body: JSON.stringify({ target: composer.target, body: draft.trim() }) });
@@ -157,6 +162,17 @@ export default function Lounge() {
           ))}
         </Section>
 
+        {/* 다면평가 — 에이전트 상호평가 */}
+        <Section title="🔄 다면평가 — 에이전트 상호평가" open={showPeers} onToggle={() => setShowPeers((v) => !v)} summary={`${data?.peers?.length ?? 0}건`}>
+          {(data?.peers || []).length === 0 && <div style={{ fontSize: 12, color: "#9c8a6c", padding: "2px" }}>아직 상호평가 없음 — 에이전트가 다음 실행에서 서로의 산출물을 평가하면 여기 쌓입니다.</div>}
+          {(data?.peers || []).map((p) => (
+            <div key={p.id} style={{ padding: "7px 2px", borderBottom: "1px solid #ece1cc" }}>
+              <div style={{ fontSize: 12.5, lineHeight: 1.45 }}><b style={{ color: "#6a468c" }}>{reviewerName(p.reviewer)}</b> → <b>{p.target || "전반"}</b></div>
+              <div style={{ fontSize: 12, color: "#5c4f40", lineHeight: 1.45 }}>{p.note} <span style={{ fontSize: 10.5, color: "#a89878" }}>· {p.t}</span></div>
+            </div>
+          ))}
+        </Section>
+
         {/* 본부 → 팀 → 직원 */}
         {ORG.divisions.map((d) => {
           const dr = rollup(divMembers(d), perf);
@@ -203,6 +219,9 @@ export default function Lounge() {
                                   </div>
                                 )}
                                 {p?.detail && p.detail !== "완료" && <div style={{ fontSize: 11, color: "#6b5d4a", marginTop: 3, lineHeight: 1.4 }}>📤 {p.detail}</div>}
+                                {peersFor(w.n).slice(0, 3).map((pr) => (
+                                  <div key={pr.id} style={{ fontSize: 11, color: "#6a468c", background: "#f3eef8", border: "1px solid #ddd0ea", borderRadius: 7, padding: "4px 7px", marginTop: 4, lineHeight: 1.4 }}>🔄 <b>{reviewerName(pr.reviewer)}</b>: {pr.note}</div>
+                                ))}
                                 {commentsFor(mtgt).map((c) => (
                                   <div key={c.id} style={{ fontSize: 11.5, background: "#eef6ee", border: "1px solid #cfe6cf", borderRadius: 7, padding: "5px 7px", marginTop: 5, lineHeight: 1.4 }}>
                                     <b style={{ color: "#2f5d3a" }}>💬 {c.author}</b> <span style={{ color: "#a89878" }}>{c.t}</span> <span onClick={() => delComment(c.id)} style={{ float: "right", cursor: "pointer", color: "#b0967d" }}>✕</span>

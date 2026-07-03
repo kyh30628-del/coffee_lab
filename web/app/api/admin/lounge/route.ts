@@ -12,6 +12,7 @@ async function ensure() {
     id SERIAL PRIMARY KEY, target TEXT NOT NULL, author TEXT DEFAULT 'CEO',
     body TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT now()
   )`.catch(() => {});
+  await sql`CREATE TABLE IF NOT EXISTS peer_reviews (id SERIAL PRIMARY KEY, reviewer TEXT, target TEXT, note TEXT, created_at TIMESTAMPTZ DEFAULT now())`.catch(() => {});
 }
 
 export async function GET(req: NextRequest) {
@@ -37,7 +38,10 @@ export async function GET(req: NextRequest) {
 
   const comments = (await sql`SELECT id, target, author, body, to_char(created_at AT TIME ZONE 'Asia/Seoul','MM-DD HH24:MI') t FROM lounge_comments ORDER BY created_at DESC LIMIT 200`.catch(() => [])) as any[];
 
-  return NextResponse.json({ ok: true, perf, brief, coord, decisions, today, comments });
+  // 🔄 다면평가 — 에이전트들이 서로 남긴 동료평가(reviewer=잡키, target=대상 팀/에이전트, note=한 줄)
+  const peers = (await sql`SELECT id, reviewer, target, note, to_char(created_at AT TIME ZONE 'Asia/Seoul','MM-DD HH24:MI') t FROM peer_reviews ORDER BY created_at DESC LIMIT 60`.catch(() => [])) as any[];
+
+  return NextResponse.json({ ok: true, perf, brief, coord, decisions, today, comments, peers });
 }
 
 // CEO 코멘트 남기기 — { target: "div:..."|"team:..."|"member:...", body }
