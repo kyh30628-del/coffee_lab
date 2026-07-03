@@ -2,7 +2,7 @@ import { sql } from "./db";
 import { nameCoherence, cleanCafeName } from "./reviewQuality";
 import { healNonCafeCategory, healOffConceptByReview, healRestaurantByReview, healNonCafeByReview, healOutOfBox, healAreaLabel } from "./synthStore";
 import { pushTrigger } from "./auditTrigger";
-import { teamOf } from "./jobTeams";
+import { teamOf, JOB_TEAM, EXPECT_MAX_H } from "./jobTeams";
 import { invalidateCafeCaches } from "./cafeCacheInvalidate";
 
 const parseRv = (o: any): string[] => {
@@ -195,6 +195,23 @@ export async function coordinationLifecycle(): Promise<{ routed: number; overdue
           AND a.ok = true)
     RETURNING id`.catch(() => [])) as any[];
   if (closedInv.length && log.length < 6) log.push(`조사 결재 ${closedInv.length}건 자동 종결(크론 정상화)`);
+
+  // 6b) ✅ 은퇴 크론 조사(investigate) 결재 정리(2026-07-03, 협업#82): 위 6번은 '크론이 다시 정상화'만 감지하는데,
+  //    jobTeams.ts에서 감시계약(EXPECT_MAX_H)이 해지된 잡(=JOB_TEAM엔 있으나 EXPECT_MAX_H엔 없음)은 의도적으로
+  //    비활성 상태를 유지해 다시는 ok=true 하트비트가 안 온다 → 6번 조건이 영원히 안 맞아 조사 결재가 좀비로 남는다.
+  //    또한 과거 'resolved'(현재 코드 경로에 없는 비표준 status)로 수동 종결된 건도 defr 목록에 영구 재노출됐다
+  //    (decision #30: dong-backfill 정지의심 — .plist.disabled로 이미 의도적 은퇴 확정). 감시계약 해지=은퇴 확정으로
+  //    보고 그 잡을 조사한 investigate 결재를 정상 종결한다.
+  const retiredJobs = Object.keys(JOB_TEAM).filter((j) => EXPECT_MAX_H[j] == null);
+  const closedRetired = retiredJobs.length
+    ? ((await sql`UPDATE decisions d SET status='done', decided_at=now(),
+        result = COALESCE(d.result,'') || ' [대상 크론 의도적 은퇴 확인(jobTeams.ts 감시계약 해지) → 자동 종결]'
+      WHERE d.status IN ('approved','pending','resolved') AND d.action_type='investigate'
+        AND d.action_params->>'check' ~ '크론 (실패|정지)'
+        AND split_part(regexp_replace(d.action_params->>'check', '^.*크론 (정지의심|정지|실패) ', ''), ' ', 1) = ANY(${retiredJobs})
+      RETURNING id`.catch(() => [])) as any[])
+    : [];
+  if (closedRetired.length && log.length < 6) log.push(`은퇴크론 조사 결재 ${closedRetired.length}건 자동 종결(#${closedRetired.map((r) => r.id).join(",")})`);
   return { routed, overdue, log };
 }
 
