@@ -151,16 +151,19 @@ export default function Lounge() {
           </div>
         </div>
 
-        {/* 인사팀 조직평가·주간 리포트 */}
-        {(data?.reports || []).map((r) => (
-          <div key={r.kind} style={{ background: "#fff", border: "1px solid #e6d8bf", borderRadius: 12, marginBottom: 10, overflow: "hidden" }}>
-            <div onClick={() => setOpenReport((o) => (o === r.kind ? null : r.kind))} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 14px", cursor: "pointer", background: r.kind === "weekly-eval" ? "#faf3e8" : "#fff" }}>
-              <b style={{ fontSize: 13.5 }}>🏅 {r.title}</b>
-              <span style={{ fontSize: 11.5, color: "#9c8a6c" }}>{r.d} · {openReport === r.kind ? "접기 ▾" : "펼치기 ▸"}</span>
+        {/* 전략 밸류업 제언·인사팀 조직평가·주간 리포트 */}
+        {(data?.reports || []).map((r) => {
+          const meta = r.kind === "strategy-valueup" ? { ic: "🚀", bg: "#eef4ff", bd: "#c9d9f0" } : r.kind === "weekly-eval" ? { ic: "🏅", bg: "#faf3e8", bd: "#e6d8bf" } : { ic: "📄", bg: "#fff", bd: "#e6d8bf" };
+          return (
+            <div key={r.kind} style={{ background: "#fff", border: `1px solid ${meta.bd}`, borderRadius: 12, marginBottom: 10, overflow: "hidden" }}>
+              <div onClick={() => setOpenReport((o) => (o === r.kind ? null : r.kind))} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 14px", cursor: "pointer", background: meta.bg }}>
+                <b style={{ fontSize: 13.5 }}>{meta.ic} {r.title}</b>
+                <span style={{ fontSize: 11.5, color: "#9c8a6c" }}>{r.d} · {openReport === r.kind ? "접기 ▾" : "펼치기 ▸"}</span>
+              </div>
+              {openReport === r.kind && <div style={{ padding: "4px 14px 14px", fontSize: 12, lineHeight: 1.65, color: "#4a3f34", maxHeight: "62vh", overflowY: "auto" }} dangerouslySetInnerHTML={{ __html: md2html(r.md) }} />}
             </div>
-            {openReport === r.kind && <div style={{ padding: "4px 14px 14px", fontSize: 12, lineHeight: 1.65, color: "#4a3f34", maxHeight: "62vh", overflowY: "auto" }} dangerouslySetInnerHTML={{ __html: md2html(r.md) }} />}
-          </div>
-        ))}
+          );
+        })}
 
         {/* 공유회 피드 */}
         <Section title="📢 공유회 — 오늘의 회의·자율 협업" open={showFeed} onToggle={() => setShowFeed((v) => !v)} summary={`협업 ${data?.coord?.length ?? 0} · 결재 ${data?.decisions?.length ?? 0}`}>
