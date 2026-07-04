@@ -147,7 +147,7 @@ export default function OwnerPage() {
 
       <div className="max-w-2xl mx-auto px-4 sm:px-5 py-6">
         {!insight && locked && <p className="text-[#6b5a48] text-sm py-10 text-center">{insightErr || "내 카페 불러오는 중…"}</p>}
-        {!insight && !locked && (
+        {!insight && !locked && !pin && (
           <>
             <p className="text-[#6b5a48] text-sm mb-4 leading-relaxed">우리 카페를 검색하면, 같은 동네 카페들과 비교한 <strong>순위·성격·구성</strong>과 <strong>데이터 기반 액션 플랜</strong>을 보여드려요.</p>
             <div className="flex gap-2 mb-4">
@@ -167,7 +167,7 @@ export default function OwnerPage() {
 
         {insight && (
           <div>
-            {!locked && <button onClick={() => setInsight(null)} className="text-xs text-[#9c6b3f] underline mb-4">← 다른 카페 검색</button>}
+            {!locked && !pin && <button onClick={() => setInsight(null)} className="text-xs text-[#9c6b3f] underline mb-4">← 다른 카페 검색</button>}
             {locked && <div className="flex items-center gap-2 mb-4"><span className="text-[10px] font-bold bg-[#e8b87a] text-[#2b2018] px-2 py-0.5 rounded-full">✅ 구독 사장님</span><span className="text-[11px] text-[#8a7458]">내 카페 전용 화면</span><button onClick={() => { sessionStorage.removeItem("dcn_owner_pin"); sessionStorage.removeItem("dcn_owner_cafe"); location.reload(); }} className="ml-auto text-[11px] text-[#9c6b3f] underline">로그아웃</button></div>}
 
             <div className="bg-white rounded-2xl p-4 sm:p-5 border border-[#ece0cd] mb-4">

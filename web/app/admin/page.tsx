@@ -821,6 +821,23 @@ export default function AdminPage() {
                       </div>
                       {s.status === "active" && s.pin && <div className="text-[12px] mt-1">🔑 PIN <b className="font-mono tracking-wider text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">{s.pin}</b> {s.pin_emailed_at ? <span className="text-[10px] text-emerald-600">✅ 이메일 발송됨 · 사장님 로그인용</span> : <span className="text-[10px] text-rose-500">⚠️ 이메일 미발송 — 이 PIN을 직접 전달하세요</span>}</div>}
                       {s.newsletter_opt_in && <div className="text-[10px] text-stone-400 mt-0.5">📰 주간 레터 수신동의 — 매주 트렌드 레터 발송 대상</div>}
+                      {/* 📈 접속 모니터링 — PIN 발급 사장님이 실제 로그인·사용하는지 */}
+                      {s.status === "active" && s.pin && (() => {
+                        const ago = (v: any) => { if (!v) return ""; const ms = Date.now() - new Date(v).getTime(); const d = Math.floor(ms / 86400000), h = Math.floor(ms / 3600000), m = Math.floor(ms / 60000); return d > 0 ? `${d}일 전` : h > 0 ? `${h}시간 전` : m > 0 ? `${m}분 전` : "방금"; };
+                        const EV: Record<string, string> = { login: "🔑 로그인", view_analysis: "📊 분석 조회" };
+                        const never = !s.login_count;
+                        const issuedAgo = s.pin_emailed_at ? Math.floor((Date.now() - new Date(s.pin_emailed_at).getTime()) / 86400000) : null;
+                        const evs = Array.isArray(s.recent_events) ? s.recent_events : [];
+                        return (
+                          <div className={`mt-1.5 rounded-lg border p-2 text-[11px] ${never ? "bg-rose-50 border-rose-200" : "bg-sky-50 border-sky-100"}`}>
+                            <div className={`font-bold ${never ? "text-rose-700" : "text-sky-800"}`}>📈 접속 모니터링</div>
+                            {never
+                              ? <div className="text-rose-600">🔴 <b>아직 한 번도 로그인 안 함</b>{issuedAgo != null ? ` — PIN 발급 ${issuedAgo}일째 미접속` : ""}. 사용 안내(온보딩)가 필요해요.</div>
+                              : <div className="text-stone-600">✅ 로그인 <b className="text-sky-700">{s.login_count}회</b> · 최근 접속 <b>{ago(s.last_seen_at)}</b>{s.first_login_at ? ` · 첫 접속 ${new Date(s.first_login_at).toLocaleDateString("ko-KR")}` : ""}</div>}
+                            {evs.length > 0 && <div className="mt-1 flex flex-wrap gap-1">{evs.slice(0, 6).map((e: any, i: number) => <span key={i} className="text-[10px] bg-white/70 border border-stone-200 rounded px-1.5 py-0.5 text-stone-500">{EV[e.event] || e.event} · {ago(e.at)}</span>)}</div>}
+                          </div>
+                        );
+                      })()}
                     </div>
                     {s.status !== "active" && !s.cafe_published && <div className="mt-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5">⚠️ 카페 <b>미공개</b> — 검수·공개(필요 시 분석 생성) 후에 승인할 수 있어요.</div>}
                     <div className="flex gap-2 mt-2">

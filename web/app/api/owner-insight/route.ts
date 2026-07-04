@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
 import { ownerScope } from "@/lib/ownerAuth";
+import { recordOwnerActivity } from "@/lib/ownerActivity";
 import { guOf } from "@/lib/region";
 export const runtime = "nodejs";
 
@@ -30,6 +31,7 @@ export async function GET(req: NextRequest) {
       ? (await sql`SELECT id, name, area, synth_grade, synth_count, synth_identity, char_scores, review_dates, published FROM cafes WHERE name = ${name} LIMIT 1`)[0]
       : (await sql`SELECT id, name, area, synth_grade, synth_count, synth_identity, char_scores, review_dates, published FROM cafes WHERE id = ${scope} LIMIT 1`)[0];
     if (!me) return NextResponse.json({ ok: false, error: "카페를 찾을 수 없음" }, { status: 404 });
+    if (scope !== "admin") await recordOwnerActivity(Number(scope), "view_analysis"); // 📊 PIN 사장님 분석 조회 기록(모니터링)
     // 미공개 카페는 공개 동네 순위 모집단에 없어 rank=0·차트 부재가 됨 → 순위·인사이트를 내지 않고 명확히 안내.
     if (!me.published) return NextResponse.json({ ok: false, error: "아직 공개 전이라 동네 순위·인사이트를 낼 수 없어요(공개 후 이용 가능)." }, { status: 409 });
 

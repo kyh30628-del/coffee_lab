@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
+import { recordOwnerLogin } from "@/lib/ownerActivity";
 export const runtime = "nodejs";
 
 // 사장님 PIN 로그인 — 유효한 PIN(활성 구독)이면 본인 카페 정보 반환. 다른 카페 접근 불가의 근거.
@@ -17,6 +18,7 @@ export async function POST(req: NextRequest) {
       await sql`UPDATE subscriptions SET status='expired', updated_at=now() WHERE pin=${pin} AND status='active'`.catch(() => {});
       return NextResponse.json({ ok: false, error: "이용 기간이 만료됐어요. 구독하시면 계속 이용할 수 있어요." }, { status: 401 });
     }
+    await recordOwnerLogin(r.cafe_id); // 📊 접속 모니터링 — 로그인 이력·최근접속·횟수 기록
     return NextResponse.json({ ok: true, cafeId: r.cafe_id, cafeName: r.cafe_name, expiresAt: r.expires_at });
   } catch (e) { return NextResponse.json({ ok: false, error: String(e) }, { status: 500 }); }
 }
