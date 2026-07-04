@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
 import { embedQuery, toVectorLiteral, hasEmbedKey } from "@/lib/embed";
-import { hasSearchLLM, rerankWithClaude, type SearchCand } from "@/lib/searchAgent";
+import { hasSearchLLM, rerankWithClaude, lastRerankError, type SearchCand } from "@/lib/searchAgent";
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
@@ -184,10 +184,11 @@ const CACHE_TTL_HOURS = 3; // 12→3시간: 비공개 카페가 캐시에 남는
 
 // 🔎 검색 수요 로깅(비차단) — 무엇을 찾고 결과가 충분했는지 적재. cron-demand가 수요-공급 갭 분석.
 //   내부 헬스체크 호출(X-Internal-Check 헤더)은 실사용자 수요가 아니므로 제외 — 아니면 수요분석이 봇을 실사용자로 오인(#113).
-function logSearch(q: string, region: string, results: number, mode: string, internal: boolean) {
+function logSearch(q: string, region: string, results: number, mode: string, internal: boolean, aiErr?: string | null) {
   if (!q || q.length < 1 || internal) return;
   sql`CREATE TABLE IF NOT EXISTS search_log (id BIGSERIAL PRIMARY KEY, q TEXT, region TEXT, results INT, mode TEXT, ts TIMESTAMPTZ DEFAULT now())`.catch(() => {});
-  sql`INSERT INTO search_log (q, region, results, mode) VALUES (${q.slice(0, 80)}, ${(region || "").slice(0, 40)}, ${results}, ${mode})`.catch(() => {});
+  sql`ALTER TABLE search_log ADD COLUMN IF NOT EXISTS ai_err TEXT`.catch(() => {});
+  sql`INSERT INTO search_log (q, region, results, mode, ai_err) VALUES (${q.slice(0, 80)}, ${(region || "").slice(0, 40)}, ${results}, ${mode}, ${aiErr ?? null})`.catch(() => {});
 }
 
 export async function GET(req: NextRequest) {
@@ -292,12 +293,14 @@ export async function GET(req: NextRequest) {
     // ===== Claude Sonnet 맥락 재정렬 (콘솔 API 키 있을 때) =====
     // 후보를 압축해 보내고, 질문 의도에 맞는 곳만 선별·정렬. 실패/키없음 시 위 점수순 폴백.
     let results = scored.slice(0, 24);
+    let aiErr: string | null = null; // 결재#135: rerankWithClaude 실패 사유(검색 로그에 함께 적재)
     if (hasSearchLLM() && scored.length > 0) {
       const cands: SearchCand[] = scored.slice(0, 25).map((s) => {
         const c = byId.get(s.id) ?? {};
         return { id: s.id, name: s.name, area: s.area, identity: c.synth_identity ?? s.identity, tags: charTags(c.char_scores), quotes: quotesOf(c.synth_reviews) };
       });
       const ranked = await rerankWithClaude(q, region, cands);
+      aiErr = ranked ? null : lastRerankError(); // await 직후 즉시 캡처 — 동시 요청 간 모듈 전역상태 덮어쓰기 방지
       if (ranked && ranked.length > 0) {
         mode = "ai";
         const sById = new Map(scored.map((s) => [s.id, s]));
@@ -382,7 +385,7 @@ export async function GET(req: NextRequest) {
       sql`INSERT INTO search_cache (qkey, payload, created_at) VALUES (${qkey}, ${JSON.stringify(payload)}, now())
           ON CONFLICT (qkey) DO UPDATE SET payload=EXCLUDED.payload, created_at=now()`.catch(() => {});
     }
-    logSearch(q, region, results.length, mode, isInternalCheck); // 🔎 수요 로깅(수요-공급 갭·발굴 우선순위·콘텐츠 소재)
+    logSearch(q, region, results.length, mode, isInternalCheck, aiErr); // 🔎 수요 로깅(수요-공급 갭·발굴 우선순위·콘텐츠 소재)
     return NextResponse.json(payload, {
       headers: { "Cache-Control": "public, max-age=0, must-revalidate" },
     });
