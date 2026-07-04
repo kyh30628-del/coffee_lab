@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
 import { subscriptionLive } from "@/lib/flags";
 import { dessertDominance } from "@/lib/charScore";
+import { rotateFeatured } from "@/lib/exposureRotation";
 export const runtime = "nodejs";
 
 const REGIONS: Record<string, string[]> = {
@@ -87,17 +88,14 @@ export async function GET(req: NextRequest) {
     const usedIds = new Set([headlineA?.id, headlineB?.id].filter(Boolean));
 
     // ✨ 우선 노출(featured) — 유료 상품. 기간(featured_until) 만료 시 자동 제외.
-    // 상한(FEAT_CAP) + 구독자 많으면 매일 로테이션 → 변별력 유지 + 공정 노출.
+    // 🔁 공정 노출: 리뷰 수와 무관하게 구독 카페가 균등하게 순번을 나눈다(다 같은 돈 낸 자리).
+    //    피크 시간대엔 짧은 슬라이스로 자주 회전 → 프라임타임(상단 자리 포함)을 모두가 균등히.
+    //    scope가 지역(동네)으로 필터돼 있어, 지역 쿼리 시 동네 단위로 순번이 돈다. (lib/exposureRotation.ts)
     const FEAT_CAP = 6;
     const featRows = await sql`SELECT cafe_id FROM cafe_promos WHERE featured = true AND approved = true AND (featured_until IS NULL OR featured_until > now())` as unknown as { cafe_id: number }[];
     const featSet = new Set(featRows.map((r) => Number(r.cafe_id)));
-    let pool = byReview.filter((c) => featSet.has(Number(c.id)));
-    if (pool.length > FEAT_CAP) {
-      const day = Math.floor(Date.now() / 86400000);   // 일 단위 회전(매일 다른 카페 노출)
-      const off = day % pool.length;
-      pool = [...pool.slice(off), ...pool.slice(0, off)];
-    }
-    const featured = pool.slice(0, FEAT_CAP).map((c: any) => ({ ...slim(c, "top"), featured: true }));
+    const featPool = scope.filter((c) => featSet.has(Number(c.id))); // 리뷰순 아님 — 회전 함수가 균등 순번 결정
+    const featured = rotateFeatured(featPool, FEAT_CAP).map((c: any) => ({ ...slim(c, "top"), featured: true }));
 
     return NextResponse.json({
       ok: true, region: region || "전체", scopeCount: scope.length,
