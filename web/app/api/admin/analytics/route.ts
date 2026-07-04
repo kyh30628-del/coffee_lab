@@ -128,7 +128,22 @@ export async function GET(req: NextRequest) {
 
     const pageviews30d = (await sql`SELECT COUNT(*)::int n FROM traffic_events WHERE ts > now()-interval '30 days'`.catch(() => [{ n: 0 }]))[0]?.n ?? 0;
 
+    // 🧑 진짜 사용자 신호 — 봇으로 설명 안 되는 신호(재방문·기능사용·검색유입 재방문율)
+    const cohort = (await sql.query(
+      `SELECT COUNT(*) FILTER (WHERE COALESCE(visit_count,1)>=2)::int r2,
+              COUNT(*) FILTER (WHERE COALESCE(visit_count,1)>=3)::int r3,
+              COUNT(*) FILTER (WHERE COALESCE(visit_count,1)>=5)::int r5
+       FROM user_consents WHERE last_seen>now()-interval '30 days' AND ${BOT}`).catch(() => [{}]))[0] as any;
+    const consentReal = (await sql`SELECT COUNT(*)::int n FROM user_consents WHERE agreed IS TRUE AND NOT COALESCE(internal,false)`.catch(() => [{ n: 0 }]))[0]?.n ?? 0;
+    const tasteN = (await sql`SELECT COUNT(*)::int n FROM taste_logs`.catch(() => [{ n: 0 }]))[0]?.n ?? 0;
+    const bookmarkN = (await sql`SELECT COUNT(*)::int n FROM bookmarks`.catch(() => [{ n: 0 }]))[0]?.n ?? 0;
+    const realSources = (await sql.query(
+      `SELECT src, COUNT(*)::int visitors, COUNT(*) FILTER (WHERE COALESCE(visit_count,1)>=2)::int returned, ROUND(AVG(COALESCE(visit_count,1))::numeric,1) avg_visits
+       FROM user_consents WHERE src IN('naver','google','instagram','youtube','threads','kakao') AND last_seen>now()-interval '30 days' AND ${BOT}
+       GROUP BY 1 ORDER BY visitors DESC`).catch(() => [])) as any[];
+
     return NextResponse.json({
+      realUsers: { r2: cohort?.r2 ?? 0, r3: cohort?.r3 ?? 0, r5: cohort?.r5 ?? 0, consent: consentReal, taste: tasteN, bookmark: bookmarkN }, realSources,
       ok: true, generatedAt: new Date().toISOString(),
       kpi: {
         dau: kpi?.dau ?? 0, wau: kpi?.wau ?? 0, mau: kpi?.mau ?? 0,
