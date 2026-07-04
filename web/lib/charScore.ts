@@ -24,11 +24,14 @@ export function computeCharScores(texts: string[]): Record<string, number> {
 }
 
 // 디저트/베이커리 우세 카페가 '요즘 뜨는'·'새로 발견' 등 커피 랭킹을 리뷰 회전만으로 과점하는 편향 방지(결함C).
-//   dominant: 디저트 언급이 커피축(roast+work+quiet+mood+space) 대비 2배 넘게 두드러지면 커피 랭킹에서 제외.
-//   bonus: 반대로 디저트가 커피축을 넘지 않는 곳은(=커피 정체성 유지) 소폭 가점.
+//   dominant: roast(커피 정체성) 언급 자체가 없고 디저트 언급이 유의미하면 제외.
+//     ⚠️ coffeeAxes(roast+work+quiet+mood+space) 합산 대비 판정은 폐기 — mood·space 등 범용 축이 커서
+//     조건이 사실상 안 걸렸다(결재#124 배포 후에도 roast=0 카페 비중 42%→58%로 악화, 결재#127 근본원인).
+//   bonus: 디저트가 커피축을 넘지 않는 곳은(=커피 정체성 유지) 소폭 가점.
 export function dessertDominance(cs: Record<string, number> | null | undefined): { bonus: boolean; dominant: boolean } {
   const c = cs ?? {};
   const dessert = c.dessert ?? 0;
-  const coffeeAxes = (c.roast ?? 0) + (c.work ?? 0) + (c.quiet ?? 0) + (c.mood ?? 0) + (c.space ?? 0);
-  return { bonus: dessert <= coffeeAxes, dominant: dessert > coffeeAxes * 2 };
+  const roast = c.roast ?? 0;
+  const coffeeAxes = roast + (c.work ?? 0) + (c.quiet ?? 0) + (c.mood ?? 0) + (c.space ?? 0);
+  return { bonus: dessert <= coffeeAxes, dominant: roast === 0 && dessert > 20 };
 }
