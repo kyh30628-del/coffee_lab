@@ -23,7 +23,7 @@ export const JOB_TEAM: Record<string, string> = {
   "demand-grow-agent": "성장본부", "marketing-agent": "성장본부",
   "search-quality-agent": "경험본부", "b2b-sales-agent": "영업본부", "closure-agent": "운영본부",
   "chief-manager-agent": "기획조정실", "chief-secretary-agent": "기획조정실", "self-audit-agent": "기획조정실",
-  "morning-meeting-agent": "기획조정실", "dev-agent": "기획조정실",
+  "dev-agent": "기획조정실",
   "evaluation": "전략기획본부", "strategy-agent": "전략기획본부",
   "team-legal-agent": "경영지원본부", "team-finance-agent": "경영지원본부", "team-ops-support-agent": "경영지원본부",
   "risk-mgmt-agent": "경영지원본부", "support-office-director": "경영지원본부",

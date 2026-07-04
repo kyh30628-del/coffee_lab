@@ -190,14 +190,13 @@ export default function Lounge() {
 
         {/* 공유회 피드 */}
         <Section title="📢 공유회 — 오늘의 회의·자율 협업" open={showFeed} onToggle={() => setShowFeed((v) => !v)} summary={`최근 협업 ${data?.coord?.length ?? 0} · 결재 ${data?.decisions?.length ?? 0}`}>
-          {data?.brief && (
+          {data?.brief?.work_order && (
             <div style={{ background: "#fff", border: "1px solid #e6d8bf", borderRadius: 12, padding: 12, marginBottom: 10 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }} onClick={() => setShowMeeting((v) => !v)}>
-                <b style={{ fontSize: 13.5 }}>🗒️ 조간 회의록 · {data.brief.d}</b>
+                <b style={{ fontSize: 13.5 }}>📋 기획조정실장 업무지시 · {data.brief.d}</b>
                 <span style={{ fontSize: 12, color: "#9c8a6c" }}>{showMeeting ? "접기 ▾" : "펼치기 ▸"}</span>
               </div>
-              {showMeeting && <div style={{ fontSize: 12.5, lineHeight: 1.6, marginTop: 8, color: "#4a3f34" }} dangerouslySetInnerHTML={{ __html: md2html(data.brief.meeting || "_회의록 없음_") }} />}
-              {showMeeting && data.brief.work_order && <div style={{ fontSize: 12.5, lineHeight: 1.6, marginTop: 10, paddingTop: 10, borderTop: "1px dashed #e0d2b8", color: "#4a3f34" }}><b>📋 업무지시</b><div dangerouslySetInnerHTML={{ __html: md2html(data.brief.work_order) }} /></div>}
+              {showMeeting && <div style={{ fontSize: 12.5, lineHeight: 1.6, marginTop: 8, color: "#4a3f34" }} dangerouslySetInnerHTML={{ __html: md2html(data.brief.work_order) }} />}
             </div>
           )}
           {(data?.decisions?.length ?? 0) > 0 && (

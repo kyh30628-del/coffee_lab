@@ -77,6 +77,8 @@ export default function AdminPage() {
   const [rotation, setRotation] = useState<any>(null);
   const loadRotation = () => fetch("/api/admin/rotation", { headers: { "x-admin-password": pw }, cache: "no-store" }).then((x) => x.json()).then((d) => { if (d.ok) setRotation(d); }).catch(() => {});
   const openRotation = () => { setShowRotation(true); loadRotation(); };
+  const [orgAct, setOrgAct] = useState<any>(null); // 본부별 활동 현황(상시 노출)
+  const loadOrgActivity = (password: string) => fetch("/api/admin/org-activity", { headers: { "x-admin-password": password }, cache: "no-store" }).then((x) => x.json()).then((d) => { if (d.ok) setOrgAct(d); }).catch(() => {});
   // 📰 뉴스레터
   const [showNL, setShowNL] = useState(false);
   const [nlList, setNlList] = useState<any[]>([]);
@@ -161,6 +163,7 @@ export default function AdminPage() {
     refreshNumbers(password);
     loadReview(password);
     loadSubscribers(password);
+    loadOrgActivity(password);
     fetch("/api/newsletter", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) { setNlList(d.list ?? []); setNlRecipients(d.recipients ?? 0); } }).catch(() => {});
   };
 
@@ -732,6 +735,36 @@ export default function AdminPage() {
           <button onClick={() => { setShowVisits(true); fetch("/api/admin/visits", { headers: { "x-admin-password": pw } }).then((x) => x.json()).then((d) => { if (d.ok) setVisits(d); }); }} className="flex-1 py-2.5 text-[13px] font-bold text-pink-700 bg-pink-50 border border-pink-200 rounded-xl">❤ 내 카페 기록{visits?.stat?.total != null ? ` (${visits.stat.total})` : ""}</button>
           <button onClick={openRotation} className="flex-1 py-2.5 text-[13px] font-bold text-teal-800 bg-teal-50 border border-teal-300 rounded-xl">🔁 노출 로테이션 현황</button>
         </div>
+
+        {/* ===== 🏛️ 본부별 활동 현황 (상시 노출 — 조직이 실제로 일하는지 한눈에) ===== */}
+        {orgAct && (
+          <div className="mb-6 border-t-2 border-stone-300 pt-6 mt-2">
+            <div className="flex items-center justify-between mb-2 flex-wrap gap-1">
+              <span className="text-[13px] font-extrabold text-stone-800">🏛️ 본부별 활동 현황</span>
+              <span className="text-[11px] font-bold text-stone-600">
+                24h {orgAct.totalRan24h}회 실행 · 다음 현업 사이클 <b className="text-teal-700">{orgAct.nextCycleHour}시</b>({orgAct.nextCycleToday ? "오늘" : "내일"} · {Math.floor(orgAct.minsToNext / 60)}h{orgAct.minsToNext % 60}m 후)
+              </span>
+            </div>
+            <div className="text-[10.5px] text-stone-500 mb-2">현업 사이클 {orgAct.cycles.join("·")}시 (하루 3회) · 크론은 상시 자체 주기</div>
+            <div className="grid grid-cols-2 gap-1.5">
+              {orgAct.teams.map((t: any) => {
+                const fresh = t.lastH < 24; const warn = t.lastH >= 48;
+                return (
+                  <div key={t.team} className={`rounded-lg border px-2.5 py-2 ${!t.ok ? "bg-rose-50 border-rose-300" : warn ? "bg-amber-50 border-amber-300" : "bg-white border-stone-300"}`}>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[13px]">{!t.ok ? "🔴" : fresh ? "🟢" : "🟡"}</span>
+                      <span className="text-[12.5px] font-bold text-stone-800 truncate">{t.team}</span>
+                    </div>
+                    <div className="text-[10.5px] text-stone-500 mt-0.5 truncate">
+                      {t.lastH < 1 ? "방금" : `${t.lastH}h 전`} · {t.lastJob} <span className="text-stone-400">({t.ran24h}/{t.jobs})</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <button onClick={() => loadOrgActivity(pw)} className="mt-2 text-[11px] font-bold text-stone-600">↻ 새로고침</button>
+          </div>
+        )}
 
         {/* ❤ 내 카페 방문기록 모달 */}
         {showVisits && (

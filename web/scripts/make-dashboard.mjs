@@ -44,8 +44,8 @@ function md2html(md) {
   // ①-b WORK-ORDER(기획조정실장 업무지시) — 본부별 명확한 지시. 모바일 노출용.
   const woF = "/Users/wangwida/coffee-platform/agents/WORK-ORDER.md";
   const workOrder = existsSync(woF) ? readFileSync(woF, "utf8") : "";
-  // ①-c 조간회의록(07:00) — 모바일 노출용.
-  const meetingMd = existsSync(`${AR}/MEETING-latest.md`) ? readFileSync(`${AR}/MEETING-latest.md`, "utf8") : "";
+  // ①-c 조간회의 폐지(2026-07-04 CEO) — 라운지 주2회 공유 + 상시 협업으로 대체. meeting 컬럼은 빈값 유지.
+  const meetingMd = "";
 
   // ② 토큰 사용량(오늘)
   let tokRows = [], tokTotal = { i: 0, o: 0, c: 0 };
