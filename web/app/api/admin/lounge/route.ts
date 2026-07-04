@@ -46,12 +46,21 @@ export async function GET(req: NextRequest) {
   // 🏅 인사팀 조직평가·주간 리포트(로컬에서 push-report.mjs로 밀어넣은 것)
   const reports = (await sql`SELECT kind, title, md, to_char(updated_at AT TIME ZONE 'Asia/Seoul','MM-DD') d FROM org_reports ORDER BY kind`.catch(() => [])) as any[];
 
+  // 🧭 유입 북극성 — 네이버·구글 검색 유입 방문자 + 재방문율(진짜 유입 핵심 증거). 봇·크롤러·내부 제외.
+  const NOISE = `COALESCE(user_agent,'') !~* 'bot|crawl|spider|slurp|bingpreview|facebookexternalhit|headless|preview' AND COALESCE(src,'') !~* 'findelio|blinkx|semrush|ahrefs|dataprovider|dotbot|petalbot|yandex|mj12|serpstat' AND NOT COALESCE(internal,false)`;
+  const acqRows = (await sql.query(
+    `SELECT src, COUNT(*)::int visitors, COUNT(*) FILTER (WHERE COALESCE(visit_count,1)>=2)::int returned
+     FROM user_consents WHERE src IN ('naver','google') AND last_seen > now()-interval '30 days' AND ${NOISE} GROUP BY src`
+  ).catch(() => [])) as any[];
+  const acq: Record<string, any> = { naver: { visitors: 0, returned: 0 }, google: { visitors: 0, returned: 0 } };
+  for (const r of acqRows) acq[r.src] = { visitors: r.visitors, returned: r.returned };
+
   // 🎯 이번 주 팀·본부 목표·KPI (scope=팀명 또는 본부명)
   const kpiRows = (await sql`SELECT scope, goal, updated_by, to_char(week_start,'MM-DD') wk FROM team_kpis WHERE week_start = date_trunc('week', now() AT TIME ZONE 'Asia/Seoul')::date`.catch(() => [])) as any[];
   const kpi: Record<string, any> = {};
   for (const k of kpiRows) kpi[k.scope] = { goal: k.goal, by: k.updated_by, wk: k.wk };
 
-  return NextResponse.json({ ok: true, perf, brief, coord, decisions, today, comments, peers, reports, kpi });
+  return NextResponse.json({ ok: true, perf, brief, coord, decisions, today, comments, peers, reports, kpi, acq });
 }
 
 // CEO 코멘트 남기기 — { target: "div:..."|"team:..."|"member:...", body }

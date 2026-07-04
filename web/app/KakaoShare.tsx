@@ -22,6 +22,14 @@ export default function KakaoShare({ title, description, imageUrl, link, label =
   title: string; description: string; imageUrl: string; link: string; label?: string; className?: string; children?: React.ReactNode;
 }) {
   const [msg, setMsg] = useState("");
+  // 공유 클릭 기록(바이럴 신호) — 어떤 채널로 타인에게 공유했는지. anon_id로 내부 구분.
+  const track = useCallback((channel: string) => {
+    try {
+      const a = typeof window !== "undefined" ? localStorage.getItem("dcn_anon") || "" : "";
+      const path = typeof window !== "undefined" ? window.location.pathname : "";
+      fetch("/api/track-share", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ anonId: a, path, channel }), keepalive: true }).catch(() => {});
+    } catch {}
+  }, []);
   const onClick = useCallback(async () => {
     const Kakao = await loadKakao();
     if (Kakao?.Share) {
@@ -31,13 +39,14 @@ export default function KakaoShare({ title, description, imageUrl, link, label =
           content: { title, description, imageUrl, link: { mobileWebUrl: link, webUrl: link } },
           buttons: [{ title: "카페 보러가기", link: { mobileWebUrl: link, webUrl: link } }],
         });
+        track("kakao");
         return;
       } catch {}
     }
     // 폴백
     const nav = navigator as any;
-    if (nav.share) { try { await nav.share({ title, text: description, url: link }); return; } catch {} }
-    try { await navigator.clipboard.writeText(link); setMsg("링크 복사됨"); setTimeout(() => setMsg(""), 1500); } catch {}
-  }, [title, description, imageUrl, link]);
+    if (nav.share) { try { await nav.share({ title, text: description, url: link }); track("web"); return; } catch {} }
+    try { await navigator.clipboard.writeText(link); track("clipboard"); setMsg("링크 복사됨"); setTimeout(() => setMsg(""), 1500); } catch {}
+  }, [title, description, imageUrl, link, track]);
   return <button onClick={onClick} className={className} type="button">{msg || children || label}</button>;
 }

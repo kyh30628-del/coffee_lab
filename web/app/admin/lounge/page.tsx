@@ -43,6 +43,7 @@ type Data = {
   peers: { id: number; reviewer: string; target: string; note: string; t: string }[];
   reports: { kind: string; title: string; md: string; d: string }[];
   kpi: Record<string, { goal: string; by: string; wk: string }>;
+  acq: Record<string, { visitors: number; returned: number }>;
 };
 // 잡키 → 읽기 좋은 직원명
 const reviewerName = (job: string) => JOB_TO_MEMBER[job]?.name || job;
@@ -150,6 +151,28 @@ export default function Lounge() {
             👑 {ORG.ceo} · {ORG.chief} · {ORG.secretary}
           </div>
         </div>
+
+        {/* 🧭 진짜 유입 북극성 — 검색 유입 재방문율 (상시 노출) */}
+        {data?.acq && (
+          <div style={{ background: "linear-gradient(135deg,#0f5132,#157347)", color: "#eafaf0", borderRadius: 12, padding: "12px 14px", marginBottom: 10 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 6 }}>🧭 진짜 유입 신호 <span style={{ fontWeight: 400, fontSize: 10, opacity: 0.8 }}>· 검색으로 와서 다시 오는 사람 (봇·내부 제외, 30일)</span></div>
+            <div style={{ display: "flex", gap: 18, flexWrap: "wrap" }}>
+              {[["네이버", "naver"], ["구글", "google"]].map(([label, key]) => {
+                const a = data.acq[key] || { visitors: 0, returned: 0 };
+                const rate = a.visitors ? Math.round((100 * a.returned) / a.visitors) : 0;
+                return (
+                  <div key={key} style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                    <span style={{ fontSize: 11.5, opacity: 0.85 }}>{label}</span>
+                    <b style={{ fontSize: 19 }}>{a.visitors}</b>
+                    <span style={{ fontSize: 11, opacity: 0.85 }}>명 · 재방문</span>
+                    <b style={{ fontSize: 16, color: rate >= 30 ? "#8fe0a8" : "#e9d38a" }}>{rate}%</b>
+                    <span style={{ fontSize: 10.5, opacity: 0.7 }}>({a.returned}명)</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* 전략 밸류업 제언·인사팀 조직평가·주간 리포트 */}
         {(data?.reports || []).map((r) => {

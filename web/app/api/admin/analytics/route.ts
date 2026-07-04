@@ -143,8 +143,24 @@ export async function GET(req: NextRequest) {
        FROM user_consents WHERE src IN('naver','google','instagram','youtube','threads','kakao') AND last_seen>now()-interval '30 days' AND ${BOT}
        GROUP BY 1 ORDER BY visitors DESC`).catch(() => [])) as any[];
 
+    // 📣 공유 기록 — 사용자가 카페를 타인에게 공유한 이벤트(바이럴). 내부(대표·팀) 제외.
+    await sql`CREATE TABLE IF NOT EXISTS share_events (id BIGSERIAL PRIMARY KEY, anon_id TEXT, path TEXT, cafe_id INT, channel TEXT, ts TIMESTAMPTZ NOT NULL DEFAULT now())`.catch(() => {});
+    const shares = (await sql`SELECT COUNT(*)::int total,
+        COUNT(*) FILTER (WHERE channel='kakao')::int kakao,
+        COUNT(*) FILTER (WHERE channel='web')::int web,
+        COUNT(*) FILTER (WHERE channel='clipboard')::int clip,
+        COUNT(DISTINCT s.anon_id)::int sharers,
+        COUNT(*) FILTER (WHERE s.ts > (now() AT TIME ZONE 'Asia/Seoul')::date)::int today
+      FROM share_events s LEFT JOIN user_consents u ON s.anon_id = u.anon_id
+      WHERE s.ts > now()-interval '30 days' AND NOT COALESCE(u.internal, false)`.catch(() => [{}]))[0] as any;
+    const topShared = (await sql`SELECT c.name, c.area, COUNT(*)::int n
+      FROM share_events s JOIN cafes c ON s.cafe_id = c.id LEFT JOIN user_consents u ON s.anon_id = u.anon_id
+      WHERE s.ts > now()-interval '30 days' AND NOT COALESCE(u.internal, false)
+      GROUP BY c.id, c.name, c.area ORDER BY n DESC LIMIT 6`.catch(() => [])) as any[];
+
     return NextResponse.json({
       realUsers: { r2: cohort?.r2 ?? 0, r3: cohort?.r3 ?? 0, r5: cohort?.r5 ?? 0, consent: consentReal, taste: tasteN, bookmark: bookmarkN }, realSources,
+      shares: { total: shares?.total ?? 0, kakao: shares?.kakao ?? 0, web: shares?.web ?? 0, clip: shares?.clip ?? 0, sharers: shares?.sharers ?? 0, today: shares?.today ?? 0 }, topShared,
       ok: true, generatedAt: new Date().toISOString(),
       kpi: {
         dau: kpi?.dau ?? 0, wau: kpi?.wau ?? 0, mau: kpi?.mau ?? 0,
