@@ -22,9 +22,15 @@ const SYSTEM = `너는 동네 카페 검색 도우미다. 사용자의 자연어
 - 절대 없는 카페를 지어내지 말고, 주어진 후보의 id만 사용한다.
 반드시 JSON 배열로만 답한다(설명·코드블록 금지): [{"id":번호,"reason":"..."}] — 가장 잘 맞는 순서, 최대 12개, 안 맞으면 제외.`;
 
+// rerankWithClaude 실패 원인(결재#135) — 실패해도 null만 반환해 호출부 시그니처는 그대로 두되,
+// 마지막 실패 사유를 여기 남겨 호출부가 검색 로그에 함께 적재(read-only DB 조회만으로 원인 특정 가능하게).
+let lastRerankErr: string | null = null;
+export const lastRerankError = () => lastRerankErr;
+
 // 후보를 Claude Sonnet이 질문 맥락에 맞게 선별·정렬. 실패/키없음 시 null(호출부 폴백).
 export async function rerankWithClaude(query: string, region: string, cands: SearchCand[]): Promise<{ id: number; reason: string }[] | null> {
-  if (!hasSearchLLM() || cands.length === 0) return null;
+  if (!hasSearchLLM()) { lastRerankErr = "no_key"; return null; }
+  if (cands.length === 0) { lastRerankErr = "no_cands"; return null; }
   const list = cands.map((c) => `- id:${c.id} | ${c.name} (${c.area}) | ${c.identity ?? ""} | 특징:${c.tags ?? "-"} | 후기:${(c.quotes ?? "").slice(0, 180)}`).join("\n");
   const user = `질문: "${query}"\n지역: ${region || "수도권 전체"}\n\n후보 카페 ${cands.length}곳:\n${list}`;
   try {
@@ -33,13 +39,21 @@ export async function rerankWithClaude(query: string, region: string, cands: Sea
       headers: { "content-type": "application/json", ...authHeaders() },
       body: JSON.stringify({ model: MODEL, max_tokens: 1400, system: SYSTEM, messages: [{ role: "user", content: user }] }),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      lastRerankErr = `http_${res.status}:${body.slice(0, 160)}`;
+      return null;
+    }
     const data = await res.json();
     const text = data?.content?.[0]?.text ?? "";
     const m = text.match(/\[[\s\S]*\]/);
-    if (!m) return null;
+    if (!m) { lastRerankErr = `no_json:${String(text).slice(0, 120)}`; return null; }
     const arr = JSON.parse(m[0]);
-    if (!Array.isArray(arr)) return null;
+    if (!Array.isArray(arr)) { lastRerankErr = "not_array"; return null; }
+    lastRerankErr = null;
     return arr.filter((x: any) => x && typeof x.id === "number").map((x: any) => ({ id: x.id, reason: String(x.reason ?? "").slice(0, 80) }));
-  } catch { return null; }
+  } catch (e) {
+    lastRerankErr = `exception:${String((e as Error)?.message ?? e).slice(0, 160)}`;
+    return null;
+  }
 }
