@@ -66,6 +66,8 @@ export default function AdminPage() {
   const loadBorderline = (password: string) => fetch("/api/admin/borderline", { headers: { "x-admin-password": password }, cache: "no-store" }).then((x) => x.json()).then((d) => { if (d.ok) setBlData(d); }).catch(() => {});
   const [subscribers, setSubscribers] = useState<any[]>([]);
   const [showSubsModal, setShowSubsModal] = useState(false);
+  const [emailReady, setEmailReady] = useState<boolean | null>(null); // 이 환경에 이메일 발송키 있는지
+  const [subMsg, setSubMsg] = useState(""); // 승인 결과(키 발송 성공/실패) 안내
   // 📰 뉴스레터
   const [showNL, setShowNL] = useState(false);
   const [nlList, setNlList] = useState<any[]>([]);
@@ -76,8 +78,18 @@ export default function AdminPage() {
   const [showYtModal, setShowYtModal] = useState(false);
   const [showVisits, setShowVisits] = useState(false);
   const [visits, setVisits] = useState<any>(null);
-  const loadSubscribers = (password: string) => fetch("/api/subscription?all=1", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) setSubscribers(d.subs ?? []); }).catch(() => {});
-  const subAct = async (id: number, action: string, days?: number, reason?: string) => { try { await fetch("/api/subscription", { method: "POST", headers: { "x-admin-password": pw, "Content-Type": "application/json" }, body: JSON.stringify({ id, action, ...(days ? { days } : {}), ...(reason ? { reason } : {}) }) }); loadSubscribers(pw); fetch("/api/judge-status", { headers: { "x-admin-password": pw } }); } catch {} };
+  const loadSubscribers = (password: string) => fetch("/api/subscription?all=1", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) { setSubscribers(d.subs ?? []); setEmailReady(!!d.emailReady); } }).catch(() => {});
+  const subAct = async (id: number, action: string, days?: number, reason?: string) => {
+    try {
+      const d = await (await fetch("/api/subscription", { method: "POST", headers: { "x-admin-password": pw, "Content-Type": "application/json" }, body: JSON.stringify({ id, action, ...(days ? { days } : {}), ...(reason ? { reason } : {}) }) })).json().catch(() => ({}));
+      if (action === "activate") {
+        if (!d.ok) setSubMsg("❌ 승인 실패: " + (d.error || "알 수 없는 오류"));
+        else if (d.emailed) setSubMsg(`✅ 승인 완료 · 키(PIN ${d.pin})가 ${d.email || "등록 이메일"}로 자동 발송됐어요.`);
+        else setSubMsg(`⚠️ 승인은 됐지만 이메일 자동발송 실패 — PIN ${d.pin}을 사장님께 직접 전달하세요 (이메일 미설정/주소 오류).`);
+      }
+      loadSubscribers(pw); fetch("/api/judge-status", { headers: { "x-admin-password": pw } });
+    } catch { setSubMsg("❌ 처리 중 오류가 났어요. 다시 시도해 주세요."); }
+  };
   const suspendSub = (id: number, cafe: string) => { const reason = window.prompt(`🚫 "${cafe}" 이용 즉시정지\n사칭/위반 사유를 적어주세요(증빙으로 기록됩니다). PIN 접근·우선노출이 즉시 차단됩니다.`); if (reason != null) subAct(id, "suspend", undefined, reason || "사유 미기재"); };
   // 📰 뉴스레터
   const NLH = () => ({ "x-admin-password": pw, "Content-Type": "application/json" });
@@ -764,7 +776,11 @@ export default function AdminPage() {
           <div className="fixed inset-0 z-[6000]" onClick={() => setShowSubsModal(false)}>
             <div className="absolute inset-0 bg-black/50" />
             <div className="absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto bg-stone-50 rounded-t-2xl p-4 sm:inset-0 sm:m-auto sm:max-w-md sm:h-fit sm:max-h-[85vh] sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-3"><span className="text-sm font-bold text-stone-800">💳 구독 카페 현황 ({subscribers.length})</span><button onClick={() => setShowSubsModal(false)} className="text-2xl text-stone-400 leading-none">×</button></div>
+            <div className="flex items-center justify-between mb-3"><span className="text-sm font-bold text-stone-800">💳 구독 카페 현황 ({subscribers.length})</span><button onClick={() => { setShowSubsModal(false); setSubMsg(""); }} className="text-2xl text-stone-400 leading-none">×</button></div>
+            {/* 📧 이메일 발송 준비 상태 — 승인 시 키 자동발송 가능 여부(프로덕션 env) */}
+            {emailReady === false && <div className="mb-3 text-[11px] text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-2.5 py-2">🚨 이 환경에 <b>이메일 발송키(RESEND)가 없어요</b>. 승인해도 키가 자동 발송되지 않으니, 승인 후 <b>PIN을 사장님께 직접 전달</b>해야 해요. (Vercel 환경변수 RESEND_API_KEY 설정 필요)</div>}
+            {emailReady === true && <div className="mb-3 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-2">📧 이메일 발송 준비됨 — 승인하면 키(PIN)가 사장님 이메일로 <b>자동 발송</b>돼요.</div>}
+            {subMsg && <div className="mb-3 text-[12px] text-stone-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-2 flex items-start gap-2"><span className="flex-1">{subMsg}</span><button onClick={() => setSubMsg("")} className="text-stone-400 shrink-0">×</button></div>}
             {subscribers.length > 0 ? (
             <div className="space-y-2">
               {subscribers.map((s) => {
@@ -785,7 +801,8 @@ export default function AdminPage() {
                         <div>{s.attested ? "✅ 본인확인(사업주) 법적 동의" : "❌ 본인확인 미동의"}{s.signup_ip ? ` · IP ${s.signup_ip}` : ""}</div>
                         <div className="text-[10px] text-stone-400">대표자명·상호가 이 카페와 일치하는지 확인 후 승인하세요.</div>
                       </div>
-                      {s.status === "active" && s.pin && <div className="text-[12px] mt-1">🔑 PIN <b className="font-mono tracking-wider text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">{s.pin}</b> <span className="text-[10px] text-stone-400">(이메일 발송 · 사장님 로그인용)</span></div>}
+                      {s.status === "active" && s.pin && <div className="text-[12px] mt-1">🔑 PIN <b className="font-mono tracking-wider text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">{s.pin}</b> {s.pin_emailed_at ? <span className="text-[10px] text-emerald-600">✅ 이메일 발송됨 · 사장님 로그인용</span> : <span className="text-[10px] text-rose-500">⚠️ 이메일 미발송 — 이 PIN을 직접 전달하세요</span>}</div>}
+                      {s.newsletter_opt_in && <div className="text-[10px] text-stone-400 mt-0.5">📰 주간 레터 수신동의 — 매주 트렌드 레터 발송 대상</div>}
                     </div>
                     {s.status !== "active" && !s.cafe_published && <div className="mt-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5">⚠️ 카페 <b>미공개</b> — 검수·공개(필요 시 분석 생성) 후에 승인할 수 있어요.</div>}
                     <div className="flex gap-2 mt-2">

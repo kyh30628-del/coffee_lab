@@ -88,6 +88,7 @@ async function ensure() {
   await sql`ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS suspend_reason TEXT`;            // 사칭/위반 즉시정지 사유(증빙)
   await sql`ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS suspended_at TIMESTAMPTZ`;
   await sql`ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS newsletter_opt_in BOOLEAN DEFAULT true`; // 주간 뉴스레터 수신동의
+  await sql`ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS pin_emailed_at TIMESTAMPTZ`;             // 키 이메일 실제 발송 성공 시각(발송 증빙)
   // 만료 자동 반영: 기간 지난 active → expired + featured 해제
   await sql`UPDATE subscriptions SET status='expired', updated_at=now() WHERE status='active' AND expires_at < now()`;
   await sql`UPDATE cafe_promos SET featured=false WHERE cafe_id IN (SELECT cafe_id FROM subscriptions WHERE status='expired') AND featured_until < now()`;
@@ -98,8 +99,9 @@ export async function GET(req: NextRequest) {
     await ensureSchema(); await ensure();
     if (req.nextUrl.searchParams.get("all")) {
       if (!authed(req)) return NextResponse.json({ ok: false }, { status: 401 });
-      const rows = await sql`SELECT s.id, s.cafe_id, s.cafe_name, s.owner_name, s.contact, s.email, s.plan, s.price, s.status, s.pin, s.started_at, s.expires_at, s.created_at, s.biz_reg_url, s.biz_no, s.attested, s.signup_ip, s.signup_ua, s.verified, s.suspend_reason, s.suspended_at, COALESCE(c.published, false) AS cafe_published FROM subscriptions s LEFT JOIN cafes c ON c.id = s.cafe_id ORDER BY (s.status='pending') DESC, s.created_at DESC LIMIT 200` as unknown as any[];
-      return NextResponse.json({ ok: true, subs: rows.map((r) => ({ ...r, contact: decryptPII(r.contact), email: decryptPII(r.email) })) });
+      const rows = await sql`SELECT s.id, s.cafe_id, s.cafe_name, s.owner_name, s.contact, s.email, s.plan, s.price, s.status, s.pin, s.pin_emailed_at, s.newsletter_opt_in, s.started_at, s.expires_at, s.created_at, s.biz_reg_url, s.biz_no, s.attested, s.signup_ip, s.signup_ua, s.verified, s.suspend_reason, s.suspended_at, COALESCE(c.published, false) AS cafe_published FROM subscriptions s LEFT JOIN cafes c ON c.id = s.cafe_id ORDER BY (s.status='pending') DESC, s.created_at DESC LIMIT 200` as unknown as any[];
+      // emailReady: 이 환경(프로덕션 포함)에 Resend 키가 있어야 승인 시 키 이메일이 자동 발송됨
+      return NextResponse.json({ ok: true, emailReady: !!process.env.RESEND_API_KEY, subs: rows.map((r) => ({ ...r, contact: decryptPII(r.contact), email: decryptPII(r.email) })) });
     }
     // 사장님: 본인 카페 구독 상태
     if (!authed(req)) return NextResponse.json({ ok: false }, { status: 401 });
@@ -130,7 +132,8 @@ export async function POST(req: NextRequest) {
           VALUES (${s.cafe_id}, true, now()+make_interval(days=>${days}), true, true, now())
           ON CONFLICT (cafe_id) DO UPDATE SET featured=true, featured_until=now()+make_interval(days=>${days}), approved=true`;
         const emailed = await sendPinEmail(decryptPII(s.email ?? ""), pin, s.cafe_name ?? "", days);
-        return NextResponse.json({ ok: true, status: "active", pin, emailed });
+        if (emailed) await sql`UPDATE subscriptions SET pin_emailed_at=now() WHERE id=${id}`;
+        return NextResponse.json({ ok: true, status: "active", pin, emailed, email: decryptPII(s.email ?? "") });
       }
       if (b.action === "extend") {
         await sql`UPDATE subscriptions SET status='active', expires_at=GREATEST(coalesce(expires_at,now()),now())+make_interval(days=>${days}), updated_at=now() WHERE id=${id}`;

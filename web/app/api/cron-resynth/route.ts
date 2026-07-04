@@ -41,13 +41,24 @@ export async function GET(req: NextRequest) {
       WHERE yt_checked_at IS NOT NULL AND yt_checked_at < now() - make_interval(days => ${YT_TTL_DAYS})
         AND raw_reviews @> '[{"source":"youtube"}]'
       RETURNING id` as unknown as { id: number }[];
-    // 한 번 실행에 3곳씩만 (비용·시간 보호). 매주 돌면 3곳씩 천천히 최신화.
-    const targets = await sql`
+    // 🎯 유료(active 구독) 사장님 카페 우선 — 사장님이 보는 분석이 항상 최신이도록. 2일 이상 지난 구독 카페 먼저.
+    const subTargets = await sql`
+      SELECT c.id, c.name, c.area FROM cafes c
+      JOIN subscriptions s ON s.cafe_id = c.id AND s.status = 'active'
+      WHERE c.published = true AND (c.synth_updated IS NULL OR c.synth_updated < now() - interval '2 days')
+      ORDER BY c.synth_updated ASC NULLS FIRST
+      LIMIT 3
+    ` as unknown as { id: number; name: string; area: string }[];
+    // 일반 순환 — 한 번에 3곳씩(비용·시간 보호), 가장 오래 갱신 안 된 순.
+    const genTargets = await sql`
       SELECT id, name, area FROM cafes
       WHERE published = true
       ORDER BY synth_updated ASC NULLS FIRST
       LIMIT 3
     ` as unknown as { id: number; name: string; area: string }[];
+    // 구독 카페 우선 + 일반 순환, 중복 제거, 최대 4곳(구독자 있을 때만 1곳 추가 비용).
+    const seen = new Set<number>();
+    const targets = [...subTargets, ...genTargets].filter((c) => (seen.has(c.id) ? false : (seen.add(c.id), true))).slice(0, 4);
 
     const results = [];
     for (const cafe of targets) {
@@ -55,7 +66,7 @@ export async function GET(req: NextRequest) {
       catch (e) { results.push({ name: cafe.name, ok: false, error: String(e) }); }
       await new Promise((r) => setTimeout(r, 400));
     }
-    await recordRun("cron-resynth", true, `raw정리 ${purged.length} 유튜브 ${ytRefreshed.length} 재합성 ${results.length}`, results.length);
+    await recordRun("cron-resynth", true, `raw정리 ${purged.length} 유튜브 ${ytRefreshed.length} 재합성 ${results.length}(구독우선 ${subTargets.length})`, results.length);
     return NextResponse.json({ ok: true, ranAt: new Date().toISOString(), rawPurged: purged.length, ytRefreshed: ytRefreshed.length, results });
   } catch (e) {
     await recordRun("cron-resynth", false, String(e).slice(0, 150));

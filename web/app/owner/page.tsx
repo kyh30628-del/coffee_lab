@@ -199,6 +199,14 @@ export default function OwnerPage() {
               );
             })()}
 
+            {/* 📰 주간 레터 안내 — 구독 사장님에게 제공되는 서비스임을 명시(로그인 사장님만) */}
+            {locked && (
+              <div className="bg-[#f0f5ee] rounded-2xl p-4 border border-[#d6e3ca] mb-4">
+                <div className="text-sm font-bold text-[#3f5a37] mb-1">📰 매주 트렌드 레터를 보내드려요</div>
+                <p className="text-[12px] text-[#5a6f52] leading-relaxed">가입하신 이메일로 <b>매주 커피·디저트 트렌드와 사장님 액션 팁</b>을 담은 주간 레터가 자동으로 도착해요. 우리 동네·업계 흐름을 놓치지 않게요. 원치 않으시면 레터 맨 아래 수신거부로 언제든 끌 수 있어요.</p>
+              </div>
+            )}
+
             {/* 액션 플랜 — 가장 위에, 핵심 */}
             <div className="mb-4">
               <div className="text-sm font-bold text-[#52402e] mb-1 flex items-center gap-1.5">💡 데이터 기반 액션 플랜<InfoDot title="액션 플랜이 뭐예요?">일반론이 아니라 <b>우리 카페의 검증된 후기 데이터에서만</b> 나오는 구체 제안이에요. 같은 동네 카페와 비교해 <b>차별점·빈 포지션(아무도 안 하는 강점)·매몰점·보완점·순위 전략</b>을 알려드려요.</InfoDot></div>
