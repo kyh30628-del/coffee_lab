@@ -4,6 +4,13 @@ import { ensureNewsletterSchema, applyGuards, type Newsletter, type NLItem } fro
 // ── 🆓 네이버 오픈 API(검색)로 무료 생성 — Anthropic 크레딧 불필요. 관리자 버튼 기본 경로. ──
 const NID = process.env.NAVER_CLIENT_ID, NSEC = process.env.NAVER_CLIENT_SECRET;
 const strip = (s: string) => (s || "").replace(/<[^>]+>/g, "").replace(/&quot;/g, '"').replace(/&amp;/g, "&").replace(/&[a-z]+;/g, " ").replace(/\s+/g, " ").trim();
+
+// 🎯 본질 유지: 커피·디저트·카페 기사만 남긴다. 네이버 검색은 넓게 매칭돼 딴 주제(가전·연예·TV맛집·호텔다이닝·경제)가 섞이므로 필수 필터.
+// 핵심어(커피·카페·디저트·베이커리·원두 등)가 '제목'에 있어야 진짜 관련 기사. desc만 매칭하면 여행·유통 기사가 샌다.
+const ON_TOPIC = /커피|원두|로스팅|디카페인|에스프레소|아메리카노|라떼|콜드브루|드립|스페셜티|바리스타|카페|디저트|베이커리|제과|케이크|크루아상|스콘|타르트|마카롱|휘낭시에|빙수|젤라또|파티스리/;
+const OFF_TOPIC = /생생정보|생방송|맛집오늘|요즘 ?뜨는 ?top|화덕|생선구이|막국수|국밥|삼겹|횟집|한정식|밥솥|가전|냉장고|세탁기|드라마|배우|영화|아이돌|가수|연예|콘서트|앨범|항공|비행|공항|에어프랑스|다이닝|레고랜드|워터파크|놀이공원|여행|호텔|리조트|주식|증시|코스피|분양|아파트|부동산|정치|국회|선거|코인|가상자산|보험|은행|카드사|아마존|프라임데이|메디큐브|화장품|의약품|백화점|카페24|모두투어|유니클로|젝시믹스|골프|신상브리핑/i;
+// 제목에 핵심어 있고(ON_TOPIC), 제목·본문 어디에도 딴 주제어 없어야 통과.
+const relevant = (it: { title: string; desc: string }) => ON_TOPIC.test(it.title) && !OFF_TOPIC.test(it.title + " " + (it.desc || ""));
 async function naver(kind: "news" | "blog", query: string, sort = "date"): Promise<{ title: string; desc: string; link: string }[]> {
   if (!NID || !NSEC) return [];
   try {
@@ -16,9 +23,9 @@ async function naver(kind: "news" | "blog", query: string, sort = "date"): Promi
 
 // 섹션 개수·필수필드는 newsletter.ts의 NL_SPEC가 최종 강제. 여기 n은 SPEC(각 3개)에 맞춤.
 const CAT = [
-  { key: "coffee", title: "☕ 커피 인사이트", q: ["커피 트렌드", "디카페인 커피", "스페셜티 커피 카페"], n: 3, tip: "원두·로스팅·디카페인 기준을 메뉴판에 한 줄로 명시 → 신뢰 포인트." },
-  { key: "dessert", title: "🍰 디저트 스포트라이트", q: ["디저트 신메뉴 카페", "빙수 신메뉴", "베이커리 인기 메뉴"], n: 3, tip: "사진 잘 받는 시그니처 1종을 주말 한정으로 테스트." },
-  { key: "cafes", title: "🔥 뜨는 카페 동향", q: ["요즘 뜨는 카페", "신상 카페 성수 연남", "카페 트렌드"], n: 3, tip: "큰 인테리어 대신 우리만의 '한 장면'(사진 포인트)을 만들기." },
+  { key: "coffee", title: "☕ 커피 인사이트", q: ["스페셜티 커피 트렌드", "디카페인 원두 카페", "커피 프랜차이즈 신메뉴"], n: 3, tip: "원두·로스팅·디카페인 기준을 메뉴판에 한 줄로 명시 → 신뢰 포인트." },
+  { key: "dessert", title: "🍰 디저트 스포트라이트", q: ["카페 디저트 신메뉴", "베이커리 신상 메뉴", "빙수 카페 신메뉴"], n: 3, tip: "사진 잘 받는 시그니처 1종을 주말 한정으로 테스트." },
+  { key: "cafes", title: "🔥 뜨는 카페 동향", q: ["성수 신상 카페", "감성 카페 신상 오픈", "카페 창업 트렌드"], n: 3, tip: "큰 인테리어 대신 우리만의 '한 장면'(사진 포인트)을 만들기." },
 ];
 
 export async function generateNewsletterFree(): Promise<{ ok: boolean; newsletter?: Newsletter; id?: number; cost?: number; error?: string }> {
@@ -28,6 +35,7 @@ export async function generateNewsletterFree(): Promise<{ ok: boolean; newslette
   const pick = (items: { title: string; desc: string; link: string }[], n: number): NLItem[] => {
     const out: NLItem[] = [];
     for (const it of items) {
+      if (!relevant(it)) continue; // 🎯 커피·디저트·카페 아닌 기사 제외(본질 유지)
       const tkey = it.title.slice(0, 16);
       if (!it.link || seenLink.has(it.link) || seenTitle.has(tkey)) continue;
       seenLink.add(it.link); seenTitle.add(tkey);
@@ -51,7 +59,7 @@ export async function generateNewsletterFree(): Promise<{ ok: boolean; newslette
   if (!sections.length) return { ok: false, error: "네이버 검색 결과 없음(쿼터 초과 가능)" };
   // 📊 트렌드 레이더(SPEC 필수 섹션) — 키워드 3개 + 출처
   let radarPool: { title: string; desc: string; link: string }[] = [];
-  for (const q of ["카페 트렌드 키워드", "요즘 카페 인기 메뉴", "카페 신메뉴 트렌드"]) radarPool = radarPool.concat(await naver("news", q));
+  for (const q of ["카페 인기 메뉴 트렌드", "커피 카페 신메뉴", "카페 신메뉴 트렌드"]) radarPool = radarPool.concat(await naver("news", q));
   if (radarPool.length < 3) for (const q of ["카페 트렌드"]) radarPool = radarPool.concat(await naver("blog", q, "sim"));
   const radarItems = pick(radarPool, 3);
   const radar = radarItems.length ? [{ key: "radar", title: "📊 트렌드 레이더", intro: "우리 가게엔: 이번 주 키워드 중 우리 컨셉에 맞는 1개만 골라 작게 적용해보세요.", items: radarItems }] : [];
@@ -86,6 +94,7 @@ const SYS = `너는 한국 커피·카페·디저트 업계 주간 트렌드 뉴
 2) 모든 '사실 주장'에는 반드시 실제 검색에서 확인한 출처 URL(source_url)을 붙인다. 출처 없으면 항목에서 제외한다.
 3) 원문을 베끼지 말고 '직접 요약'한다(항목당 1~2문장). 저작권 안전을 위해 길게 인용하지 않는다.
 4) 과장·미검증 단정·의료효능 표현 금지. 차분하고 신뢰감 있는 톤.
+4-1) ⛔ 본질 유지: 오직 '커피·카페·디저트/베이커리' 주제만. 소형가전·연예/배우·드라마·TV맛집(생생정보 등)·일반 식당(생선구이·국밥·고기)·호텔/항공 라운지 다이닝·경제/주식/부동산 등 딴 주제는 절대 포함 금지. 애매하면 뺀다.
 5) 각 항목에 사장님이 '우리 가게에 어떻게 적용'할지 한 줄(why)을 단다.
 6) 섹션은 tldr·radar·coffee·dessert·cafes·action·news 7개를 모두 포함하고 순서를 지킨다.
    각 섹션은 정확히 3개 항목(news만 3~4개). radar·coffee·dessert·cafes는 항목마다 source_url과 why 필수.
