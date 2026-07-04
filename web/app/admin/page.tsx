@@ -73,6 +73,10 @@ export default function AdminPage() {
   const [onboard, setOnboard] = useState<any>(null);     // {trial:{subject,html}, paid:{subject,html}}
   const [onboardTab, setOnboardTab] = useState<"trial" | "paid">("trial");
   const openOnboard = () => { setShowOnboard(true); if (!onboard) fetch("/api/onboarding-preview", { headers: { "x-admin-password": pw } }).then((x) => x.json()).then((d) => { if (d.ok) setOnboard(d); }).catch(() => {}); };
+  const [showRotation, setShowRotation] = useState(false); // 노출 로테이션 현황 모달
+  const [rotation, setRotation] = useState<any>(null);
+  const loadRotation = () => fetch("/api/admin/rotation", { headers: { "x-admin-password": pw }, cache: "no-store" }).then((x) => x.json()).then((d) => { if (d.ok) setRotation(d); }).catch(() => {});
+  const openRotation = () => { setShowRotation(true); loadRotation(); };
   // 📰 뉴스레터
   const [showNL, setShowNL] = useState(false);
   const [nlList, setNlList] = useState<any[]>([]);
@@ -266,7 +270,7 @@ export default function AdminPage() {
             discover: { icon: "🧭", what: "수도권 동네를 순회하며 새 카페를 발굴합니다. 전수가 아니라 '다양성' 위주로 동네마다 골고루 — 옥석 큐레이션 컨셉. (지연=네이버 한도 분산, 위험 아님)", sched: "grow 매일 3시", feeds: "발굴한 카페를 → 수집·합성으로" },
             selfaudit: { icon: "🔁", what: "공개된 모든 카페를 커서로 돌아가며 '현재 규칙'으로 다시 검증합니다. 규칙을 고치면 기존 데이터가 자동으로 따라오고(드리프트 치유), 광고·동명오염 등이 사후에 끼면 자동 제외·비공개합니다. 캐시 재합성이라 토큰·API 비용 0. (대량 비공개는 규칙 회귀로 보고 자동 중단·경보)", sched: "2시간마다 600곳 (~하루 1바퀴)", feeds: "오염 발견 시 자동 비공개·근거오염 플래그" },
           };
-          const nodeBorder: Record<string, string> = { ok: "border-emerald-200", behind: "border-amber-300", stalled: "border-red-300", warn: "border-amber-300", idle: "border-stone-200" };
+          const nodeBorder: Record<string, string> = { ok: "border-emerald-200", behind: "border-amber-300", stalled: "border-red-300", warn: "border-amber-300", idle: "border-stone-300" };
           // 신호등: 빨강·노랑·초록 3구. 상태에 맞는 램프만 켜져 깜빡(idle은 초록 약하게 점등).
           const Light = ({ status }: { status: string }) => (
             <div className="inline-flex items-center gap-[3px] rounded-full bg-stone-800 px-[5px] py-[3px] shadow-sm">
@@ -314,9 +318,9 @@ export default function AdminPage() {
           const redteam = ["verify", "grounding", "audit"].map((k) => byKey[k]).filter(Boolean);
           return (
             <>
-            <div className="mb-4 rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+            <div className="mb-4 rounded-2xl border border-stone-300 bg-white p-4 shadow-sm">
               <div className="flex items-center justify-between">
-                <button onClick={() => toggleSec("tower")} className="text-xs font-bold text-stone-500 uppercase tracking-wider text-left">
+                <button onClick={() => toggleSec("tower")} className="text-xs font-bold text-stone-700 uppercase tracking-wider text-left">
                   {openSecs.tower ? "▾" : "▸"} 🛰️ 자율 운영 관제탑{" "}
                   {((tower.alerts?.length || 0) + (tower.risks?.length || 0)) > 0 && <span className="text-red-600 normal-case">🔴{(tower.alerts?.length || 0) + (tower.risks?.length || 0)}</span>}{" "}
                   {(tower.notices?.length || 0) > 0 && <span className="text-amber-600 normal-case">🟡{tower.notices.length}</span>}
@@ -348,12 +352,12 @@ export default function AdminPage() {
                   <div className="text-[10px] font-bold text-stone-500 mb-1.5">📅 오늘의 수집 (KST · 자동 갱신)</div>
                   <div className="grid grid-cols-3 sm:grid-cols-7 gap-1.5">
                     {[
-                      { l: "오늘 신규발굴", v: tower.today.newCafes, c: "text-amber-700 bg-amber-50 border-amber-200", m: "newCafes" },
+                      { l: "오늘 신규발굴", v: tower.today.newCafes, c: "text-amber-700 bg-amber-50 border-amber-300", m: "newCafes" },
                       { l: "오늘 합성처리", v: tower.today.synthesized, c: "text-sky-700 bg-sky-50 border-sky-200", m: "synthesized" },
                       { l: "오늘 신규공개", v: tower.today.published, c: "text-emerald-700 bg-emerald-50 border-emerald-200", m: "published" },
-                      { l: "동 채움", v: `${tower.today.dongPct}%`, c: "text-stone-700 bg-stone-50 border-stone-200", m: "dongMissing" },
-                      { l: "노이즈탈락(누적)", v: tower.today.noise, c: "text-stone-500 bg-stone-50 border-stone-200", m: "noise" },
-                      { l: "합성대기", v: tower.today.newQueue, c: "text-amber-600 bg-amber-50 border-amber-200", m: "newQueue" },
+                      { l: "동 채움", v: `${tower.today.dongPct}%`, c: "text-stone-700 bg-stone-50 border-stone-300", m: "dongMissing" },
+                      { l: "노이즈탈락(누적)", v: tower.today.noise, c: "text-stone-500 bg-stone-50 border-stone-300", m: "noise" },
+                      { l: "합성대기", v: tower.today.newQueue, c: "text-amber-600 bg-amber-50 border-amber-300", m: "newQueue" },
                       { l: "유튜브 수집(누적)", v: tower.today.ytTotal ?? 0, c: "text-rose-700 bg-rose-50 border-rose-200", m: "yt" },
                     ].map((t) => (
                       <button key={t.l} onClick={() => openToday(t.m, t.l)} title="클릭하면 상세 목록"
@@ -370,7 +374,7 @@ export default function AdminPage() {
                 {tower.agents?.map((a: any) => {
                   const working = (a.queue > 0 || (a.ageH != null && a.ageH < 0.5)) && a.status !== "stalled";
                   return (
-                    <button key={a.key} onClick={() => setSelAgent(a)} className="flex items-center gap-1.5 rounded-xl border border-stone-100 bg-stone-50 px-2.5 py-2 text-left hover:bg-stone-100 transition">
+                    <button key={a.key} onClick={() => setSelAgent(a)} className="flex items-center gap-1.5 rounded-xl border border-stone-300 bg-stone-50 px-2.5 py-2 text-left hover:bg-stone-100 transition">
                       <span className={`w-2 h-2 rounded-full shrink-0 ${dot[a.status] || "bg-stone-300"} ${working ? "acc-blink" : ""}`} />
                       <span className="text-[11px] font-bold text-stone-700 truncate flex-1">{a.label.split(" (")[0]}</span>
                       {a.queue > 0 && <span className="text-[9px] font-bold text-amber-600 shrink-0">{a.queue.toLocaleString()}</span>}
@@ -395,7 +399,7 @@ export default function AdminPage() {
               )}
               {/* 🛡️ 리뷰-카페 불일치 감시 — 표시 리뷰에 카페 맥락 없는 비율↑ = 규칙-사각 오염(딴업종·문구이름). 있을 때만 빨강 */}
               {tower.offctx && tower.offctx.count > 0 && (
-                <div className="mb-2.5 rounded-xl border p-2.5 border-amber-200 bg-amber-50/60">
+                <div className="mb-2.5 rounded-xl border p-2.5 border-amber-300 bg-amber-50/60">
                   <div className="text-[11px] font-bold mb-1.5 text-stone-700">
                     🔎 리뷰 맥락 점검 목록 <b className="text-amber-700">{tower.offctx.count}곳</b> <span className="font-normal text-stone-500">· 위험 아님 · 표시 리뷰에 카페 맥락 적음(점검 권장)</span>
                   </div>
@@ -457,7 +461,7 @@ export default function AdminPage() {
                       <button onClick={() => setSelAgent(null)} className="ml-auto text-stone-400 text-2xl leading-none px-1">×</button>
                     </div>
                     <p className="text-[13px] text-stone-700 mt-1.5 leading-relaxed">{d.what || selAgent.note}</p>
-                    <div className="mt-3 space-y-1.5 text-[12px] border-t border-stone-100 pt-3">
+                    <div className="mt-3 space-y-1.5 text-[12px] border-t border-stone-300 pt-3">
                       <div className="flex gap-2"><span className="text-stone-400 w-16 shrink-0">⏰ 주기</span><span className="text-stone-700">{d.sched || "—"}</span></div>
                       <div className="flex gap-2"><span className="text-stone-400 w-16 shrink-0">➡️ 다음</span><span className="text-stone-700">{d.feeds || "—"}</span></div>
                       <div className="flex gap-2"><span className="text-stone-400 w-16 shrink-0">🕐 마지막</span><span className="text-stone-700">{ago(selAgent.ageH)}</span></div>
@@ -495,7 +499,7 @@ export default function AdminPage() {
                                 <div className="text-[11px] text-stone-500 truncate">{c.area}{c.dong ? ` · ${c.dong}` : ""}{c.source ? ` · ${c.source}` : ""}{c.at ? ` · ${c.at}` : ""}</div>
                               </div>
                               {c.grade && <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${c.grade === "검증" ? "bg-emerald-100 text-emerald-700" : c.grade === "참고" ? "bg-sky-100 text-sky-700" : "bg-stone-100 text-stone-500"}`}>{c.grade}{c.cnt != null ? ` ${c.cnt}` : ""}</span>}
-                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${c.published ? "bg-emerald-50 text-emerald-600 border border-emerald-200" : "bg-stone-50 text-stone-400 border border-stone-200"}`}>{c.published ? "공개" : "비공개"}</span>
+                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${c.published ? "bg-emerald-50 text-emerald-600 border border-emerald-200" : "bg-stone-50 text-stone-400 border border-stone-300"}`}>{c.published ? "공개" : "비공개"}</span>
                             </>
                           );
                           return c.published ? (
@@ -568,14 +572,14 @@ export default function AdminPage() {
         {/* ===== 🔄 실시간 자동화 현황 (10초 갱신) ===== */}
         {jstatus && (
           <div className="mb-6 space-y-3">
-            <button onClick={() => toggleSec("auto")} className="w-full flex items-center justify-between text-left border-t border-stone-200 pt-5">
-              <span className="text-xs font-bold text-stone-500 uppercase tracking-wider">{openSecs.auto ? "▾" : "▸"} 🔄 자동화 현황 <span className="normal-case font-normal text-stone-400">· 판정대기 {jstatus.queue?.toLocaleString() ?? 0} · 오늘신규 {jstatus.newToday ?? 0}</span></span>
+            <button onClick={() => toggleSec("auto")} className="w-full flex items-center justify-between text-left border-t border-stone-300 pt-5">
+              <span className="text-xs font-bold text-stone-700 uppercase tracking-wider">{openSecs.auto ? "▾" : "▸"} 🔄 자동화 현황 <span className="normal-case font-normal text-stone-400">· 판정대기 {jstatus.queue?.toLocaleString() ?? 0} · 오늘신규 {jstatus.newToday ?? 0}</span></span>
               <span className="text-[10px] text-stone-400 shrink-0">{openSecs.auto ? "접기" : "보기"}</span>
             </button>
             {openSecs.auto && <>
 
             {/* AI 판정 */}
-            <div className="bg-white rounded-xl border border-stone-200 p-3">
+            <div className="bg-white rounded-xl border border-stone-300 p-3">
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-[12px] font-bold text-stone-700">🧮 AI 맥락 판정 <span className="font-normal text-stone-400">(보조 정제)</span></span>
                 <span className="text-[11px] text-stone-400">{jstatus.last ? `최근 ${new Date(jstatus.last).toLocaleString("ko-KR")}` : "미실행"}</span>
@@ -600,7 +604,7 @@ export default function AdminPage() {
             </div>
 
             {/* 수집·공개 */}
-            <div className="bg-white rounded-xl border border-stone-200 p-3">
+            <div className="bg-white rounded-xl border border-stone-300 p-3">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[12px] font-bold text-stone-700">📡 카페 수집·공개</span>
                 <span className="text-[11px] text-stone-400">오늘 신규 <b className="text-blue-600">{jstatus.newToday ?? 0}</b>곳</span>
@@ -613,7 +617,7 @@ export default function AdminPage() {
             </div>
 
             {/* 유튜브 */}
-            <div className="bg-white rounded-xl border border-stone-200 p-3">
+            <div className="bg-white rounded-xl border border-stone-300 p-3">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[12px] font-bold text-stone-700">📺 유튜브 수집</span>
                 <span className="text-[11px] text-stone-400">{jstatus.ytLast ? `최근 ${new Date(jstatus.ytLast).toLocaleString("ko-KR")}` : "미실행"}</span>
@@ -633,7 +637,7 @@ export default function AdminPage() {
           const unresolved = auditFlags.flags?.filter((f: any) => !f.resolved) ?? [];
           return (
             <div className="mb-6">
-              <button onClick={() => toggleSec("audit")} className="w-full flex items-center justify-between text-left mb-2 border-t border-stone-200 pt-5">
+              <button onClick={() => toggleSec("audit")} className="w-full flex items-center justify-between text-left mb-2 border-t border-stone-300 pt-5">
                 <span className={`text-xs font-bold uppercase tracking-wider ${unresolved.length ? "text-red-500" : "text-stone-500"}`}>{openSecs.audit ? "▾" : "▸"} {unresolved.length ? `🚨 품질 오염 감지 (${unresolved.length}건)` : "✅ 품질 오염 감지 (0건)"}</span>
                 <span className="text-[11px] text-stone-400 shrink-0">{auditFlags.lastAudit}</span>
               </button>
@@ -655,9 +659,9 @@ export default function AdminPage() {
         })()}
 
         {/* ===== 🛡️ 검증 에이전트(레드팀) ===== */}
-        <div className="mb-6 border-t border-stone-200 pt-5">
+        <div className="mb-6 border-t border-stone-300 pt-5">
           <div className="flex items-center justify-between mb-2">
-            <button onClick={() => toggleSec("verify")} className="text-xs font-bold text-stone-500 uppercase tracking-wider text-left">
+            <button onClick={() => toggleSec("verify")} className="text-xs font-bold text-stone-700 uppercase tracking-wider text-left">
               {openSecs.verify ? "▾" : "▸"} 🛡️ 데이터 검증 <span className="normal-case font-normal text-stone-400">·</span>{" "}
               {verify ? (verify.status === "pass" ? <span className="text-emerald-600 normal-case">정상 ✅</span> : verify.status === "warn" ? <span className="text-amber-600 normal-case">🟡 주의 {verify.warns}</span> : <span className="text-red-600 normal-case">🔴 오류 {verify.fails}</span>) : <span className="normal-case font-normal text-stone-400">리포트 없음</span>}
             </button>
@@ -665,7 +669,7 @@ export default function AdminPage() {
           </div>
           {openSecs.verify && <>
           {verify ? (
-            <div className={`rounded-xl border p-3 ${verify.status === "pass" ? "bg-emerald-50 border-emerald-200" : verify.status === "warn" ? "bg-amber-50 border-amber-200" : "bg-rose-50 border-rose-200"}`}>
+            <div className={`rounded-xl border p-3 ${verify.status === "pass" ? "bg-emerald-50 border-emerald-200" : verify.status === "warn" ? "bg-amber-50 border-amber-300" : "bg-rose-50 border-rose-200"}`}>
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-lg">{verify.status === "pass" ? "✅" : verify.status === "warn" ? "🟡" : "🔴"}</span>
                 <span className="font-bold text-sm">{verify.status === "pass" ? "전체 정상 — 한치의 오차 없음" : verify.status === "warn" ? `주의 ${verify.warns}건` : `오류 ${verify.fails}건 — 즉시 확인 필요`}</span>
@@ -688,7 +692,7 @@ export default function AdminPage() {
           {grounding && (() => {
             const pub = grounding.publicFlagged ?? grounding.flagged ?? 0; // 지금 공개 카페 중 오염 노출(현재 상태)
             return (
-            <div className={`mt-2 rounded-xl border p-3 ${pub > 0 ? "bg-amber-50 border-amber-200" : "bg-emerald-50 border-emerald-200"}`}>
+            <div className={`mt-2 rounded-xl border p-3 ${pub > 0 ? "bg-amber-50 border-amber-300" : "bg-emerald-50 border-emerald-200"}`}>
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-[13px] font-bold">🧠 그라운딩 (소비자 노출 오염 검사)</span>
                 <span className={`text-[12px] font-bold ml-auto ${pub > 0 ? "text-amber-700" : "text-emerald-700"}`}>{pub > 0 ? `⚠ 노출 오염 ${pub}건` : "현재 0건 ✅"}</span>
@@ -722,10 +726,11 @@ export default function AdminPage() {
         {/* ===== 모달 트리거 (접속·유입 현황 · 구독 카페 현황 · 유튜브 수집 · 내 카페 기록) ===== */}
         <div className="flex gap-2 mb-6 flex-wrap">
           <button onClick={openAnalytics} className="flex-1 py-2.5 text-[13px] font-bold text-sky-700 bg-sky-50 border border-sky-200 rounded-xl">📊 접속·유입 현황{tower?.traffic?.dau != null ? ` (오늘 ${tower.traffic.dau})` : ""}</button>
-          <button onClick={() => setShowSubsModal(true)} className="flex-1 py-2.5 text-[13px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-xl">💳 구독 카페 현황{subscribers.length ? ` (${subscribers.length})` : ""}</button>
+          <button onClick={() => setShowSubsModal(true)} className="flex-1 py-2.5 text-[13px] font-bold text-amber-700 bg-amber-50 border border-amber-300 rounded-xl">💳 구독 카페 현황{subscribers.length ? ` (${subscribers.length})` : ""}</button>
           <button onClick={() => { setShowNL(true); loadNL(); }} className="flex-1 py-2.5 text-[13px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-xl">📰 주간 뉴스레터{nlList.length ? ` (${nlList.length})` : ""}</button>
           <button onClick={() => setShowYtModal(true)} className="flex-1 py-2.5 text-[13px] font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded-xl">📺 유튜브 수집{yt?.withYt != null ? ` (${yt.withYt})` : ""}</button>
           <button onClick={() => { setShowVisits(true); fetch("/api/admin/visits", { headers: { "x-admin-password": pw } }).then((x) => x.json()).then((d) => { if (d.ok) setVisits(d); }); }} className="flex-1 py-2.5 text-[13px] font-bold text-pink-700 bg-pink-50 border border-pink-200 rounded-xl">❤ 내 카페 기록{visits?.stat?.total != null ? ` (${visits.stat.total})` : ""}</button>
+          <button onClick={openRotation} className="flex-1 py-2.5 text-[13px] font-bold text-teal-800 bg-teal-50 border border-teal-300 rounded-xl">🔁 노출 로테이션 현황</button>
         </div>
 
         {/* ❤ 내 카페 방문기록 모달 */}
@@ -738,7 +743,7 @@ export default function AdminPage() {
               </div>
               <div className="overflow-y-auto flex-1 p-3 space-y-2">
                 {(visits?.visits ?? []).map((v: any) => (
-                  <div key={v.id} className="flex gap-3 border border-stone-200 rounded-xl p-3">
+                  <div key={v.id} className="flex gap-3 border border-stone-300 rounded-xl p-3">
                     {v.photo_url && <img src={v.photo_url} alt="" className="w-16 h-16 rounded-lg object-cover shrink-0" />}
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
@@ -773,7 +778,7 @@ export default function AdminPage() {
                     <div className="text-[11px] font-bold text-stone-600 mb-1">📅 {date} <span className="text-stone-400 font-normal">({cafes.length}곳 수집)</span></div>
                     <div className="space-y-1.5">
                       {cafes.map((c: any) => (
-                        <div key={c.id} className="bg-white rounded-lg border border-stone-100 p-2">
+                        <div key={c.id} className="bg-white rounded-lg border border-stone-300 p-2">
                           <div className="text-[12px] font-bold text-stone-800">{c.name} <span className="text-[10px] text-stone-400 font-normal">{c.area}</span> <span className="text-[10px] text-rose-500">▶{c.videos?.length || 0}</span></div>
                           {(c.videos || []).map((v: any, i: number) => (
                             <a key={i} href={v.l} target="_blank" rel="noopener noreferrer" className="block text-[11px] text-blue-600 truncate hover:underline">▶ {v.q}{v.s ? ` · ${v.s}` : ""}</a>
@@ -797,14 +802,14 @@ export default function AdminPage() {
             <div className="absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto bg-stone-50 rounded-t-2xl p-4 sm:inset-0 sm:m-auto sm:max-w-md sm:h-fit sm:max-h-[85vh] sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-2"><span className="text-sm font-bold text-stone-800">💳 구독 카페 현황 ({subscribers.length})</span><button onClick={() => { setShowSubsModal(false); setSubMsg(""); }} className="text-2xl text-stone-400 leading-none">×</button></div>
             {/* 📧 승인 시 사장님께 자동 발송되는 온보딩 메일(서비스 사용법 + 전용 서비스 안내) 내용 확인 */}
-            <button onClick={openOnboard} className="w-full mb-3 text-left bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-[12px] font-bold text-amber-800">📧 승인 시 발송되는 온보딩 메일 내용 보기 →</button>
+            <button onClick={openOnboard} className="w-full mb-3 text-left bg-amber-50 border border-amber-300 rounded-lg px-3 py-2 text-[12px] font-bold text-amber-800">📧 승인 시 발송되는 온보딩 메일 내용 보기 →</button>
             {/* 📧 이메일 발송 준비 상태 — 승인 시 키 자동발송 가능 여부(프로덕션 env) */}
             {emailReady === false && <div className="mb-3 text-[11px] text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-2.5 py-2">🚨 이 환경에 <b>이메일 발송키(RESEND)가 없어요</b>. 승인해도 키가 자동 발송되지 않으니, 승인 후 <b>PIN을 사장님께 직접 전달</b>해야 해요. (Vercel 환경변수 RESEND_API_KEY 설정 필요)</div>}
             {emailReady === true && <div className="mb-3 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-2">📧 이메일 발송 준비됨 — 승인하면 키(PIN)가 사장님 이메일로 <b>자동 발송</b>돼요.</div>}
             {/* ✨ 소비자 노출(우선노출) 실제 작동 여부 — SUBSCRIPTION_LIVE */}
             {liveExposure === false && <div className="mb-3 text-[11px] text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-2.5 py-2">🚨 <b>소비자 노출 OFF</b> — 구독 사장님이 featured(우선노출)여도 지도 금색핀·추천카페·쇼케이스가 <b>손님에게 안 보입니다</b>. 유료 사장님이 있으면 Vercel 환경변수 <b>SUBSCRIPTION_LIVE=true</b>로 켜야 노출됩니다.</div>}
             {liveExposure === true && <div className="mb-3 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-2">✨ 소비자 노출 ON — 구독 사장님 우선노출(금색핀·추천카페·쇼케이스)이 손님에게 정상 노출됩니다.</div>}
-            {subMsg && <div className="mb-3 text-[12px] text-stone-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-2 flex items-start gap-2"><span className="flex-1">{subMsg}</span><button onClick={() => setSubMsg("")} className="text-stone-400 shrink-0">×</button></div>}
+            {subMsg && <div className="mb-3 text-[12px] text-stone-800 bg-amber-50 border border-amber-300 rounded-lg px-2.5 py-2 flex items-start gap-2"><span className="flex-1">{subMsg}</span><button onClick={() => setSubMsg("")} className="text-stone-400 shrink-0">×</button></div>}
             {subscribers.length > 0 ? (
             <div className="space-y-2">
               {subscribers.map((s) => {
@@ -812,7 +817,7 @@ export default function AdminPage() {
                 const stColor = s.status === "active" ? "text-emerald-600" : s.status === "pending" ? "text-amber-600" : s.status === "suspended" ? "text-rose-600" : "text-stone-400";
                 const stLabel = s.status === "active" ? "활성" : s.status === "pending" ? "대기" : s.status === "expired" ? "만료" : s.status === "cancelled" ? "해지" : s.status === "suspended" ? "🚫 정지" : s.status;
                 return (
-                  <div key={s.id} className="bg-white rounded-xl border border-amber-200 p-3">
+                  <div key={s.id} className="bg-white rounded-xl border border-amber-300 p-3">
                     <div className="min-w-0">
                       <span className="font-bold text-sm">{s.cafe_name}</span>
                       <span className={`text-[11px] ml-2 font-bold ${stColor}`}>{stLabel}{s.status === "active" && dleft != null ? ` · D-${dleft}` : ""}</span>
@@ -840,12 +845,12 @@ export default function AdminPage() {
                             {never
                               ? <div className="text-rose-600">🔴 <b>아직 한 번도 로그인 안 함</b>{issuedAgo != null ? ` — PIN 발급 ${issuedAgo}일째 미접속` : ""}. 사용 안내(온보딩)가 필요해요.</div>
                               : <div className="text-stone-600">✅ 로그인 <b className="text-sky-700">{s.login_count}회</b> · 최근 접속 <b>{ago(s.last_seen_at)}</b>{s.first_login_at ? ` · 첫 접속 ${new Date(s.first_login_at).toLocaleDateString("ko-KR")}` : ""}</div>}
-                            {evs.length > 0 && <div className="mt-1 flex flex-wrap gap-1">{evs.slice(0, 6).map((e: any, i: number) => <span key={i} className="text-[10px] bg-white/70 border border-stone-200 rounded px-1.5 py-0.5 text-stone-500">{EV[e.event] || e.event} · {ago(e.at)}</span>)}</div>}
+                            {evs.length > 0 && <div className="mt-1 flex flex-wrap gap-1">{evs.slice(0, 6).map((e: any, i: number) => <span key={i} className="text-[10px] bg-white/70 border border-stone-300 rounded px-1.5 py-0.5 text-stone-500">{EV[e.event] || e.event} · {ago(e.at)}</span>)}</div>}
                           </div>
                         );
                       })()}
                     </div>
-                    {s.status !== "active" && !s.cafe_published && <div className="mt-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5">⚠️ 카페 <b>미공개</b> — 검수·공개(필요 시 분석 생성) 후에 승인할 수 있어요.</div>}
+                    {s.status !== "active" && !s.cafe_published && <div className="mt-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-300 rounded-lg px-2 py-1.5">⚠️ 카페 <b>미공개</b> — 검수·공개(필요 시 분석 생성) 후에 승인할 수 있어요.</div>}
                     <div className="flex gap-2 mt-2">
                       {s.status !== "active" && <button onClick={() => subAct(s.id, "activate", 7)} disabled={!s.cafe_published} title={s.cafe_published ? "" : "카페가 공개된 뒤 승인할 수 있어요"} className="flex-1 py-1.5 text-[12px] font-bold text-blue-700 bg-blue-50 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed">✓ 체험 승인(7일)</button>}
                       {s.status !== "active" && <button onClick={() => subAct(s.id, "activate", 30)} disabled={!s.cafe_published} title={s.cafe_published ? "" : "카페가 공개된 뒤 승인할 수 있어요"} className="flex-1 py-1.5 text-[12px] font-bold text-emerald-700 bg-emerald-50 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed">✓ 구독 승인(30일)</button>}
@@ -869,7 +874,7 @@ export default function AdminPage() {
           <div className="fixed inset-0 z-[6000] bg-black/50 overflow-y-auto" onClick={() => setShowBorderline(false)}>
             <div className="min-h-full flex items-start justify-center p-2 sm:p-4">
               <div className="bg-stone-50 rounded-2xl w-full max-w-2xl shadow-2xl my-2" onClick={(e) => e.stopPropagation()}>
-                <div className="sticky top-0 z-10 bg-white border-b border-stone-200 px-4 py-3 flex items-center justify-between rounded-t-2xl">
+                <div className="sticky top-0 z-10 bg-white border-b border-stone-300 px-4 py-3 flex items-center justify-between rounded-t-2xl">
                   <span className="text-[14px] font-extrabold text-stone-800">🤖 LLM 보강 대기 <span className="text-[11px] font-normal text-stone-400">· 노출엔 경계후기 제외됨</span></span>
                   <button onClick={() => setShowBorderline(false)} className="text-stone-400 hover:text-stone-700 text-lg leading-none px-1">✕</button>
                 </div>
@@ -878,7 +883,7 @@ export default function AdminPage() {
                   {!blData?.list?.length ? <p className="text-center text-stone-400 py-8 text-[13px]">보강 대기 카페가 없습니다.</p> : (
                     <div className="space-y-1">
                       {blData.list.map((c: any) => (
-                        <div key={c.id} className="flex items-center justify-between bg-white rounded-lg border border-stone-200 px-2.5 py-1.5">
+                        <div key={c.id} className="flex items-center justify-between bg-white rounded-lg border border-stone-300 px-2.5 py-1.5">
                           <span className="text-[11px] text-stone-700 truncate mr-2"><b>{c.name}</b> <span className="text-stone-400 font-normal">{c.area}</span> <span className="text-[9px] text-stone-400">{c.synth_grade}</span></span>
                           <span className="text-[10.5px] shrink-0 whitespace-nowrap"><b className="text-emerald-600">{c.shown}</b> <span className="text-stone-300">/</span> <b className="text-violet-600">{c.borderline}</b></span>
                         </div>
@@ -897,10 +902,10 @@ export default function AdminPage() {
           <div className="fixed inset-0 z-[6000] bg-black/50 overflow-y-auto" onClick={() => setShowAnalytics(false)}>
             <div className="min-h-full flex items-start justify-center p-2 sm:p-4">
               <div className="bg-stone-50 rounded-2xl w-full max-w-3xl shadow-2xl my-2" onClick={(e) => e.stopPropagation()}>
-                <div className="sticky top-0 z-10 bg-white border-b border-stone-200 px-4 py-3 flex items-center justify-between rounded-t-2xl">
+                <div className="sticky top-0 z-10 bg-white border-b border-stone-300 px-4 py-3 flex items-center justify-between rounded-t-2xl">
                   <span className="text-[14px] font-extrabold text-stone-800">📊 접속·유입 현황 <span className="text-[11px] font-normal text-stone-400">· 진짜 외부 사용자만 (대표·팀·봇 제외)</span></span>
                   <div className="flex items-center gap-2">
-                    <button onClick={() => loadAnalytics(pw)} className="text-[11px] font-bold text-stone-500 border border-stone-200 rounded-full px-2.5 py-1 hover:bg-stone-100">↻ 새로고침</button>
+                    <button onClick={() => loadAnalytics(pw)} className="text-[11px] font-bold text-stone-500 border border-stone-300 rounded-full px-2.5 py-1 hover:bg-stone-100">↻ 새로고침</button>
                     <button onClick={() => setShowAnalytics(false)} className="text-stone-400 hover:text-stone-700 text-lg leading-none px-1">✕</button>
                   </div>
                 </div>
@@ -935,7 +940,7 @@ export default function AdminPage() {
                     <div className="p-4 space-y-4">
                       <p className="text-[10.5px] text-stone-500 bg-stone-100/70 rounded-lg px-3 py-2 leading-relaxed">우리 사이트 방문을 <b className="text-stone-600">외부 도구 없이 직접</b> 모은 현황입니다. <b className="text-emerald-700">대표·팀(내부)과 봇은 자동 제외</b>돼 아래 숫자는 모두 <b className="text-stone-600">진짜 외부 방문자</b>입니다. 실시간·방문자·유입경로·재방문은 정확하고, 페이지 단위(추이·인기카페)는 방문이 쌓이며 채워집니다. <span className="text-stone-400">※ 유입경로 '미상'은 추적 도입 전 옛 방문 또는 앱·북마크 유입(카톡·인스타 인앱은 경로가 안 남습니다).</span></p>
                       {/* 🟢 실시간 · 오늘 */}
-                      <div className="bg-white rounded-xl border border-stone-200 p-3">
+                      <div className="bg-white rounded-xl border border-stone-300 p-3">
                         <div className="flex items-center justify-between flex-wrap gap-2">
                           <div className="flex items-center gap-1.5">
                             <span className="relative flex h-2.5 w-2.5"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span></span>
@@ -951,7 +956,7 @@ export default function AdminPage() {
                           { ic: "📄", l: "페이지뷰", v: a.kpi?.pageviews30d, sub: `방문당 ${a.kpi?.mau ? (a.kpi.pageviews30d / a.kpi.mau).toFixed(1) : "-"}장`, desc: "열어본 화면 총수(30일)" },
                           { ic: "🔁", l: "재방문율", v: `${retRate}%`, sub: `재방문 ${a.retention?.returning}·신규 ${a.retention?.newcomers}`, desc: "다시 찾은 사람 비율" },
                         ].map((k, i) => (
-                          <div key={i} className="bg-white rounded-xl border border-stone-200 p-2.5">
+                          <div key={i} className="bg-white rounded-xl border border-stone-300 p-2.5">
                             <div className="text-[10px] text-stone-400 font-bold">{k.ic} {k.l}</div>
                             <div className="text-[22px] font-extrabold text-stone-800 leading-tight">{typeof k.v === "number" ? k.v?.toLocaleString() : k.v}</div>
                             <div className="text-[9.5px] text-stone-500">{k.sub}</div>
@@ -980,7 +985,7 @@ export default function AdminPage() {
                       )}
                       {/* 📣 공유(바이럴) 기록 */}
                       {a.shares && (
-                        <div className="bg-white rounded-xl border border-stone-200 p-3">
+                        <div className="bg-white rounded-xl border border-stone-300 p-3">
                           <div className="text-[12px] font-bold text-stone-700 mb-1.5">📣 공유(바이럴) 기록 <span className="font-normal text-[10px] text-stone-400">· 사용자가 카페를 타인에게 공유한 횟수</span></div>
                           <div className="flex items-center gap-x-3 gap-y-1 flex-wrap text-[11px]">
                             <span>30일 <b className="text-[16px] text-rose-600">{a.shares.total}</b>회 <span className="text-stone-400">(오늘 {a.shares.today})</span></span>
@@ -988,13 +993,13 @@ export default function AdminPage() {
                             <span className="text-stone-400">카톡 {a.shares.kakao} · 웹공유 {a.shares.web} · 링크복사 {a.shares.clip}</span>
                           </div>
                           {(a.topShared || []).length > 0 ? (
-                            <div className="mt-2 pt-2 border-t border-stone-100 text-[10.5px] text-stone-600"><span className="text-stone-400">많이 공유된 카페: </span>{a.topShared.map((c: any, i: number) => <span key={i} className="mr-1.5"><b>{c.name}</b>({c.n})</span>)}</div>
+                            <div className="mt-2 pt-2 border-t border-stone-300 text-[10.5px] text-stone-600"><span className="text-stone-400">많이 공유된 카페: </span>{a.topShared.map((c: any, i: number) => <span key={i} className="mr-1.5"><b>{c.name}</b>({c.n})</span>)}</div>
                           ) : <p className="text-[9.5px] text-stone-400 mt-1.5">아직 공유 기록 없음 — 방금 추적 시작(공유 버튼 클릭 시 채워집니다). 내부(대표·팀) 공유는 제외됩니다.</p>}
                         </div>
                       )}
-                      {noEvents && <div className="bg-amber-50 border border-amber-200 rounded-xl p-2.5 text-[11px] text-amber-800">📊 페이지뷰 단위 지표(추이·인기카페·퍼널·시간대)는 방금 추적 시작 — 방문이 쌓이며 채워집니다. 방문자·유입경로·재방문은 지금부터 정확합니다.</div>}
+                      {noEvents && <div className="bg-amber-50 border border-amber-300 rounded-xl p-2.5 text-[11px] text-amber-800">📊 페이지뷰 단위 지표(추이·인기카페·퍼널·시간대)는 방금 추적 시작 — 방문이 쌓이며 채워집니다. 방문자·유입경로·재방문은 지금부터 정확합니다.</div>}
                       {(a.daily || []).length > 0 && (
-                        <div className="bg-white rounded-xl border border-stone-200 p-3">
+                        <div className="bg-white rounded-xl border border-stone-300 p-3">
                           <div className="text-[12px] font-bold text-stone-700">일별 방문 추이 <span className="font-normal text-stone-400 text-[10px]">최근 14일</span></div>
                           <p className="text-[9.5px] text-stone-400 mb-2">날짜별 방문자 수 — 늘고 주는 흐름을 봅니다. (막대에 마우스 올리면 상세)</p>
                           <div className="flex items-end gap-1 h-24">
@@ -1008,7 +1013,7 @@ export default function AdminPage() {
                         </div>
                       )}
                       {f.visitors > 0 && (
-                        <div className="bg-white rounded-xl border border-stone-200 p-3">
+                        <div className="bg-white rounded-xl border border-stone-300 p-3">
                           <div className="text-[12px] font-bold text-stone-700">전환 퍼널</div>
                           <p className="text-[9.5px] text-stone-400 mb-2">방문 → 카페를 실제로 열어봄 → 여러 곳 비교(몰입). 단계마다 몇 %가 남는지 봅니다.</p>
                           {fSteps.map((s, i) => (
@@ -1020,7 +1025,7 @@ export default function AdminPage() {
                           ))}
                         </div>
                       )}
-                      <div className="bg-white rounded-xl border border-stone-200 p-3">
+                      <div className="bg-white rounded-xl border border-stone-300 p-3">
                         <div className="text-[12px] font-bold text-stone-700">유입경로</div>
                         <p className="text-[9.5px] text-stone-400 mb-2">어디서 들어왔는지(네이버·구글·직접·공유…). '평균'은 그 경로 방문자의 재방문 횟수 — 높을수록 충성도↑.</p>
                         {(a.sources || []).length === 0 ? <p className="text-[11px] text-stone-400">데이터 없음</p> : a.sources.map((s: any, i: number) => (
@@ -1031,7 +1036,7 @@ export default function AdminPage() {
                         ))}
                       </div>
                       <div className="grid grid-cols-2 gap-2">
-                        <div className="bg-white rounded-xl border border-stone-200 p-3">
+                        <div className="bg-white rounded-xl border border-stone-300 p-3">
                           <div className="text-[12px] font-bold text-stone-700">신규 vs 재방문</div>
                           <p className="text-[9.5px] text-stone-400 mb-2">처음 온 사람 vs 다시 온 사람.</p>
                           <div className="flex h-5 rounded-full overflow-hidden bg-stone-100 text-[9px] font-bold text-white">
@@ -1043,7 +1048,7 @@ export default function AdminPage() {
                             <span className="flex items-center gap-1 text-stone-500"><span className="w-2 h-2 rounded-full bg-amber-400 inline-block"></span>재방문 <b className="text-stone-700">{a.retention?.returning}</b></span>
                           </div>
                         </div>
-                        <div className="bg-white rounded-xl border border-stone-200 p-3">
+                        <div className="bg-white rounded-xl border border-stone-300 p-3">
                           <div className="text-[12px] font-bold text-stone-700">접속 기기</div>
                           <p className="text-[9.5px] text-stone-400 mb-2">모바일 vs PC 비율.</p>
                           <div className="flex h-5 rounded-full overflow-hidden bg-stone-100 text-[9px] font-bold text-white">
@@ -1057,7 +1062,7 @@ export default function AdminPage() {
                         </div>
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        <div className="bg-white rounded-xl border border-stone-200 p-3">
+                        <div className="bg-white rounded-xl border border-stone-300 p-3">
                           <div className="text-[12px] font-bold text-stone-700">인기 카페 <span className="font-normal text-stone-400 text-[10px]">조회순</span></div>
                           <p className="text-[9.5px] text-stone-400 mb-2">가장 많이 열어본 카페 — 어떤 곳에 관심이 몰리는지.</p>
                           {(a.topCafes || []).length === 0 ? <p className="text-[11px] text-stone-400">데이터 쌓이는 중</p> : <div className="space-y-1 max-h-56 overflow-y-auto">{a.topCafes.map((c: any, i: number) => (
@@ -1067,7 +1072,7 @@ export default function AdminPage() {
                             </div>
                           ))}</div>}
                         </div>
-                        <div className="bg-white rounded-xl border border-stone-200 p-3">
+                        <div className="bg-white rounded-xl border border-stone-300 p-3">
                           <div className="text-[12px] font-bold text-stone-700">인기 지역 <span className="font-normal text-stone-400 text-[10px]">카페 조회 기준</span></div>
                           <p className="text-[9.5px] text-stone-400 mb-2">조회된 카페가 어느 동네에 몰리는지 — 수요 지도.</p>
                           {(a.topRegions || []).length === 0 ? <p className="text-[11px] text-stone-400">데이터 쌓이는 중</p> : <div className="space-y-1 max-h-56 overflow-y-auto">{a.topRegions.map((r: any, i: number) => (
@@ -1079,7 +1084,7 @@ export default function AdminPage() {
                         </div>
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        <div className="bg-white rounded-xl border border-stone-200 p-3">
+                        <div className="bg-white rounded-xl border border-stone-300 p-3">
                           <div className="text-[12px] font-bold text-stone-700">방문자 지역 <span className="font-normal text-stone-400 text-[10px]">위치 공유</span></div>
                           <p className="text-[9.5px] text-stone-400 mb-2">위치 안내에 동의한 방문자가 어디서 접속하는지.</p>
                           {(a.visitorRegions || []).length === 0 ? <p className="text-[11px] text-stone-400">위치 공유 데이터 없음</p> : a.visitorRegions.map((r: any, i: number) => (
@@ -1089,7 +1094,7 @@ export default function AdminPage() {
                             </div>
                           ))}
                         </div>
-                        <div className="bg-white rounded-xl border border-stone-200 p-3">
+                        <div className="bg-white rounded-xl border border-stone-300 p-3">
                           <div className="text-[12px] font-bold text-stone-700">위치 동의 퍼널</div>
                           <p className="text-[9.5px] text-stone-400 mb-2">방문 → 위치 안내 동의 → 실제 위치 공유까지 단계별 비율.</p>
                           {[
@@ -1105,7 +1110,7 @@ export default function AdminPage() {
                         </div>
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        <div className="bg-white rounded-xl border border-stone-200 p-3">
+                        <div className="bg-white rounded-xl border border-stone-300 p-3">
                           <div className="text-[12px] font-bold text-stone-700">페이지 유형</div>
                           <p className="text-[9.5px] text-stone-400 mb-2">어떤 화면(홈·카페상세·지역·취향)을 많이 보는지.</p>
                           {(a.pageBuckets || []).length === 0 ? <p className="text-[11px] text-stone-400">데이터 쌓이는 중</p> : a.pageBuckets.map((b: any, i: number) => (
@@ -1115,7 +1120,7 @@ export default function AdminPage() {
                             </div>
                           ))}
                         </div>
-                        <div className="bg-white rounded-xl border border-stone-200 p-3">
+                        <div className="bg-white rounded-xl border border-stone-300 p-3">
                           <div className="text-[12px] font-bold text-stone-700">시간대 분포 <span className="font-normal text-stone-400 text-[10px]">KST</span></div>
                           <p className="text-[9.5px] text-stone-400 mb-2">하루 중 사람이 몰리는 시간{peakH >= 0 ? <> — <b className="text-orange-500">피크 {peakH}시</b></> : ""}. 콘텐츠 발행 타이밍 참고.</p>
                           {(a.hours || []).length === 0 ? <p className="text-[11px] text-stone-400">데이터 쌓이는 중</p> : <div className="flex items-end gap-px h-16">{Array.from({ length: 24 }).map((_, h) => (
@@ -1145,11 +1150,73 @@ export default function AdminPage() {
               ) : (
                 <>
                   <div className="flex gap-1.5 mb-2">
-                    <button onClick={() => setOnboardTab("trial")} className={`flex-1 py-2 text-[12px] font-bold rounded-lg border ${onboardTab === "trial" ? "bg-amber-100 border-amber-300 text-amber-800" : "bg-white border-stone-200 text-stone-500"}`}>🎁 7일 체험 승인 시</button>
-                    <button onClick={() => setOnboardTab("paid")} className={`flex-1 py-2 text-[12px] font-bold rounded-lg border ${onboardTab === "paid" ? "bg-amber-100 border-amber-300 text-amber-800" : "bg-white border-stone-200 text-stone-500"}`}>☕ 구독 승인 시</button>
+                    <button onClick={() => setOnboardTab("trial")} className={`flex-1 py-2 text-[12px] font-bold rounded-lg border ${onboardTab === "trial" ? "bg-amber-100 border-amber-300 text-amber-800" : "bg-white border-stone-300 text-stone-500"}`}>🎁 7일 체험 승인 시</button>
+                    <button onClick={() => setOnboardTab("paid")} className={`flex-1 py-2 text-[12px] font-bold rounded-lg border ${onboardTab === "paid" ? "bg-amber-100 border-amber-300 text-amber-800" : "bg-white border-stone-300 text-stone-500"}`}>☕ 구독 승인 시</button>
                   </div>
-                  <div className="text-[11px] text-stone-600 bg-white border border-stone-200 rounded-lg px-2.5 py-2 mb-2"><b>제목:</b> {onboard[onboardTab].subject}</div>
-                  <iframe title="온보딩 메일 미리보기" srcDoc={onboard[onboardTab].html} className="w-full h-[60vh] bg-white rounded-lg border border-stone-200" />
+                  <div className="text-[11px] text-stone-600 bg-white border border-stone-300 rounded-lg px-2.5 py-2 mb-2"><b>제목:</b> {onboard[onboardTab].subject}</div>
+                  <iframe title="온보딩 메일 미리보기" srcDoc={onboard[onboardTab].html} className="w-full h-[60vh] bg-white rounded-lg border border-stone-300" />
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* 🔁 노출 로테이션 현황 모달 — 지금 누가 어떤 순서로 노출되는지(전체+구/군), 피크·다음 회전 */}
+        {showRotation && (
+          <div className="fixed inset-0 z-[6500]" onClick={() => setShowRotation(false)}>
+            <div className="absolute inset-0 bg-black/50" />
+            <div className="absolute inset-x-0 bottom-0 max-h-[90vh] overflow-y-auto bg-stone-50 rounded-t-2xl p-4 sm:inset-0 sm:m-auto sm:max-w-lg sm:h-fit sm:max-h-[90vh] sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-1"><span className="text-sm font-bold text-stone-900">🔁 노출 로테이션 현황</span><button onClick={() => setShowRotation(false)} className="text-2xl text-stone-500 leading-none">×</button></div>
+              {!rotation ? (
+                <div className="py-10 text-center text-stone-500 text-[13px]">불러오는 중…</div>
+              ) : (
+                <>
+                  <div className="flex flex-wrap gap-1.5 mb-2 text-[11px] font-bold">
+                    <span className={`px-2 py-1 rounded-full border ${rotation.isPeak ? "bg-teal-100 border-teal-400 text-teal-900" : "bg-stone-100 border-stone-300 text-stone-600"}`}>{rotation.isPeak ? "🔥 피크타임" : "🌙 비피크"} · {rotation.peakWindow}</span>
+                    <span className="px-2 py-1 rounded-full border bg-white border-stone-300 text-stone-700">{rotation.sliceMin}분 회전 · 다음 회전 {rotation.nextRotateInMin}분 후</span>
+                    <span className="px-2 py-1 rounded-full border bg-white border-stone-300 text-stone-700">구독 {rotation.total}곳 · 노출 자리 {rotation.cap}</span>
+                    {!rotation.liveExposure && <span className="px-2 py-1 rounded-full border bg-amber-50 border-amber-400 text-amber-800">소비자 노출 OFF — 아래는 ‘예정’ 순서</span>}
+                  </div>
+                  <p className="text-[11px] text-stone-600 mb-3">🟢=지금 노출 중(상위 {rotation.cap}), ⚪=대기(다음 차례). 20분마다 순번이 한 칸씩 돌고, 피크(09~17시)를 모든 카페가 똑같이 나눠 가져요.</p>
+                  {rotation.total === 0 ? (
+                    <div className="py-6 text-center text-stone-500 text-[13px]">아직 우선노출(featured) 구독 카페가 없어요.</div>
+                  ) : (
+                    <>
+                      {/* 전체 */}
+                      <div className="mb-3">
+                        <div className="text-[12px] font-bold text-stone-800 mb-1.5 border-b-2 border-stone-300 pb-1">🌐 전체 노출 순서</div>
+                        <div className="space-y-1">
+                          {rotation.global.map((c: any) => (
+                            <div key={c.id} className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 border ${c.onair ? "bg-teal-50 border-teal-300" : "bg-white border-stone-300"}`}>
+                              <span className="text-[12px] w-5 text-center font-bold text-stone-500">{c.rank}</span>
+                              <span className="text-[13px]">{c.onair ? "🟢" : "⚪"}</span>
+                              <span className="text-[13px] font-bold text-stone-800 flex-1 truncate">{c.name}</span>
+                              <span className="text-[10px] text-stone-500 truncate max-w-[90px]">{c.area}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      {/* 구/군별 */}
+                      <div className="text-[12px] font-bold text-stone-800 mb-1.5 border-b-2 border-stone-300 pb-1">🏙️ 구·군별 노출 순서</div>
+                      <div className="space-y-2.5">
+                        {rotation.byGu.map((g: any) => (
+                          <div key={g.gu} className="rounded-lg border border-stone-300 bg-white p-2">
+                            <div className="text-[12px] font-bold text-stone-800 mb-1">{g.gu} <span className="font-normal text-stone-500">· {g.count}곳</span></div>
+                            <div className="space-y-1">
+                              {g.order.map((c: any) => (
+                                <div key={c.id} className={`flex items-center gap-2 rounded px-2 py-1 ${c.onair ? "bg-teal-50" : ""}`}>
+                                  <span className="text-[11px] w-4 text-center font-bold text-stone-500">{c.rank}</span>
+                                  <span className="text-[12px]">{c.onair ? "🟢" : "⚪"}</span>
+                                  <span className="text-[12.5px] font-bold text-stone-800 flex-1 truncate">{c.name}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  <button onClick={loadRotation} className="mt-3 w-full py-2 text-[12px] font-bold text-stone-700 bg-stone-200 border border-stone-300 rounded-lg">↻ 새로고침</button>
                 </>
               )}
             </div>
@@ -1174,7 +1241,7 @@ export default function AdminPage() {
               {/* 목록 */}
               <div className="space-y-1.5 mb-3">
                 {nlList.map((n) => (
-                  <button key={n.id} onClick={() => nlOpen(n.id)} className={`w-full text-left rounded-lg border px-3 py-2 ${nlSel?.id === n.id ? "border-indigo-300 bg-indigo-50" : "border-stone-200 bg-white"}`}>
+                  <button key={n.id} onClick={() => nlOpen(n.id)} className={`w-full text-left rounded-lg border px-3 py-2 ${nlSel?.id === n.id ? "border-indigo-300 bg-indigo-50" : "border-stone-300 bg-white"}`}>
                     <div className="flex items-center gap-2 text-[12px]">
                       <span className="font-bold">#{n.issue_no} {n.title}</span>
                       <span className={`text-[10px] px-1.5 py-0.5 rounded ${n.status === "sent" ? "bg-emerald-100 text-emerald-700" : n.status === "approved" ? "bg-blue-100 text-blue-700" : "bg-stone-100 text-stone-500"}`}>{n.status}</span>
@@ -1188,17 +1255,17 @@ export default function AdminPage() {
 
               {/* 선택 전문 */}
               {nlSel && (
-                <div className="border-t border-stone-200 pt-3">
+                <div className="border-t border-stone-300 pt-3">
                   {nlSel.flags?.length > 0 && (
                     <div className="text-[11.5px] text-amber-800 bg-amber-50 border border-amber-300 rounded-lg px-3 py-2 mb-2">
                       ⚠️ 확인 필요 {nlSel.flags.length}건: {nlSel.flags.slice(0, 4).join(" · ")}
                     </div>
                   )}
-                  <div className="bg-white rounded-xl border border-stone-200 p-3 mb-2 max-h-72 overflow-y-auto">
+                  <div className="bg-white rounded-xl border border-stone-300 p-3 mb-2 max-h-72 overflow-y-auto">
                     <div className="font-bold text-[15px] mb-2">{nlSel.title}</div>
                     {(nlSel.sections || []).map((sec: any, si: number) => (
                       <div key={si} className="mb-2.5">
-                        <div className="text-[12.5px] font-bold text-stone-700 border-b border-stone-100 pb-0.5 mb-1">{sec.title}</div>
+                        <div className="text-[12.5px] font-bold text-stone-700 border-b border-stone-300 pb-0.5 mb-1">{sec.title}</div>
                         <ul className="space-y-1">
                           {(sec.items || []).map((it: any, ii: number) => (
                             <li key={ii} className="text-[12px] text-stone-700 leading-snug">
@@ -1237,7 +1304,7 @@ export default function AdminPage() {
             {purged > 0 && <div className="bg-rose-50 border border-rose-200 rounded-lg px-3 py-2 mb-2 text-[11.5px] text-rose-700">🔔 보유기간 만료로 <b>{purged}건의 개인정보가 자동 삭제</b>됐어요. 해당 사장님께 다시 연락하려면 <b>재수집·재동의</b>가 필요합니다.</div>}
             <div className="space-y-2">
               {subs.map((s) => (
-                <div key={s.id} className="bg-white rounded-xl border border-amber-200 p-3 flex items-center justify-between gap-3">
+                <div key={s.id} className="bg-white rounded-xl border border-amber-300 p-3 flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <span className="font-bold text-sm">{s.cafe_name}</span>
                     <span className="text-[11px] text-stone-400 ml-2">{s.plan}</span>
@@ -1257,7 +1324,7 @@ export default function AdminPage() {
         {/* ===== 🎀 쇼케이스 승인 · AI 카피 생성 ===== */}
         {(
           <div className="mb-6">
-            <button onClick={() => toggleSec("promo")} className="w-full flex items-center justify-between text-left mb-2 border-t border-stone-200 pt-5">
+            <button onClick={() => toggleSec("promo")} className="w-full flex items-center justify-between text-left mb-2 border-t border-stone-300 pt-5">
               <span className="text-xs font-bold text-amber-600 uppercase tracking-wider">{openSecs.promo ? "▾" : "▸"} 🎀 쇼케이스 승인 · AI 카피 생성 ({review.length})</span>
               <span className="text-[10px] text-stone-400 shrink-0">{openSecs.promo ? "접기" : "보기"}</span>
             </button>
@@ -1265,7 +1332,7 @@ export default function AdminPage() {
             {review.length === 0 && <p className="text-[12px] text-stone-400 bg-white rounded-xl border p-4">대기 중인 사장님 쇼케이스 요청이 없어요. 사장님이 글(또는 영상)을 저장하면 여기에서 <b className="text-stone-600">🤖 AI 어필 카피 생성</b> → <b className="text-stone-600">✓ 승인</b> 할 수 있어요.</p>}
             <div className="space-y-3">
               {review.map((p) => (
-                <div key={p.cafe_id} className="bg-white rounded-xl border border-amber-200 overflow-hidden">
+                <div key={p.cafe_id} className="bg-white rounded-xl border border-amber-300 overflow-hidden">
                   <div className="p-3">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="font-bold text-sm">{p.name}</span>
@@ -1304,13 +1371,13 @@ export default function AdminPage() {
                       </div>
                     )}
                   </div>
-                  <div className="flex border-t border-stone-100">
+                  <div className="flex border-t border-stone-300">
                     {!p.approved ? (
                       <button onClick={() => promoAct(p.cafe_id, "approve")} disabled={!p.ai_headline && !p.video_url} className="flex-1 py-2.5 text-sm font-bold text-emerald-700 disabled:text-stone-300">✓ 승인 (노출)</button>
                     ) : (
                       <button onClick={() => promoAct(p.cafe_id, p.featured ? "unfeature" : "feature")} className={`flex-1 py-2.5 text-sm font-bold ${p.featured ? "text-amber-700 bg-amber-50" : "text-stone-700"}`}>{p.featured ? "⭐ 우선노출 ON (해제)" : "☆ 우선노출 켜기 (유료)"}</button>
                     )}
-                    <button onClick={() => promoAct(p.cafe_id, "reject")} className="flex-1 py-2.5 text-sm text-rose-600 border-l border-stone-100">✕ {p.approved ? "내리기" : "반려"}</button>
+                    <button onClick={() => promoAct(p.cafe_id, "reject")} className="flex-1 py-2.5 text-sm text-rose-600 border-l border-stone-300">✕ {p.approved ? "내리기" : "반려"}</button>
                   </div>
                 </div>
               ))}
@@ -1320,7 +1387,7 @@ export default function AdminPage() {
         )}
 
         {/* ===== 콘텐츠 현황 (접이식·기본 접힘) ===== */}
-        <button onClick={() => toggleSec("content")} className="w-full flex items-center justify-between text-left mb-2 border-t border-stone-200 pt-5">
+        <button onClick={() => toggleSec("content")} className="w-full flex items-center justify-between text-left mb-2 border-t border-stone-300 pt-5">
           <span className="text-xs font-bold text-stone-400 uppercase tracking-wider">{openSecs.content ? "▾" : "▸"} 콘텐츠 현황 <span className="normal-case font-normal">· 공개 {ct?.published?.toLocaleString() ?? "·"} · 전체 {ct?.total?.toLocaleString() ?? "·"}</span></span>
           <span className="text-[10px] text-stone-400 shrink-0">{openSecs.content ? "접기" : "보기"}</span>
         </button>
@@ -1384,7 +1451,7 @@ export default function AdminPage() {
         </>}
 
         {/* ===== 접속/방문자 (익명 · 접이식·기본 접힘) ===== */}
-        <button onClick={() => toggleSec("visitors")} className="w-full flex items-center justify-between text-left mb-2 border-t border-stone-200 pt-5">
+        <button onClick={() => toggleSec("visitors")} className="w-full flex items-center justify-between text-left mb-2 border-t border-stone-300 pt-5">
           <span className="text-xs font-bold text-stone-400 uppercase tracking-wider">{openSecs.visitors ? "▾" : "▸"} 접속 · 방문자 현황 <span className="normal-case font-normal">· 총 {vs?.total?.toLocaleString() ?? "·"} · 7일 활성 {vs?.active7d ?? "·"}</span></span>
           <span className="text-[10px] text-stone-400 shrink-0">{openSecs.visitors ? "접기" : "보기"}</span>
         </button>
@@ -1428,7 +1495,7 @@ export default function AdminPage() {
         </>}
 
         {/* ===== 검수 관리 (접이식·기본 접힘) ===== */}
-        <button onClick={() => toggleSec("inspect")} className="w-full flex items-center justify-between text-left mb-2 border-t border-stone-200 pt-5">
+        <button onClick={() => toggleSec("inspect")} className="w-full flex items-center justify-between text-left mb-2 border-t border-stone-300 pt-5">
           <span className="text-xs font-bold text-stone-400 uppercase tracking-wider">{openSecs.inspect ? "▾" : "▸"} 검수 관리 <span className={`normal-case ${ownerPending.length ? "font-bold text-blue-600" : "font-normal"}`}>· 사장님 대기 {ownerPending.length}</span> <span className="normal-case font-normal">· 자동 비공개 {autoHidden.length}</span></span>
           <span className="text-[10px] text-stone-400 shrink-0">{openSecs.inspect ? "접기" : "보기"}</span>
         </button>
