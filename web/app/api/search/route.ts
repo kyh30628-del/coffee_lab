@@ -146,7 +146,10 @@ const BRAND_ALIAS: Record<string, string[]> = {
 //   상호 첫 단어를 브랜드 키로 보고 같은 키는 최대 CHAIN_CAP개까지만 순위를 지키고, 초과분은 뒤로 밀어(제거 아님)
 //   다른 브랜드가 상위에 섞이게 한다. 상호 직접검색(아래 이름매칭 블록)은 이 함수 이후에 추가되므로 영향 없음.
 const CHAIN_CAP = 2;
-const chainKeyOf = (name: string): string => { const parts = (name ?? "").trim().split(/\s+/); return parts.length >= 2 ? parts[0] : (name ?? ""); };
+// 마지막 단어(지점명: "역삼점" 등)를 뺀 나머지를 공백 없이 합쳐 키로 삼는다 —
+// "로스터리 락온"(2단어 브랜드) 지점이 "로스터리 락온 역삼점"/"로스터리락온 역삼점"처럼 표기가 섞여도
+// 같은 체인 키로 묶이게 한다(기존엔 첫 단어만 써서 "로스터리"↔"로스터리락온"으로 갈려 CHAIN_CAP이 무력화됨).
+const chainKeyOf = (name: string): string => { const parts = (name ?? "").trim().split(/\s+/).filter(Boolean); return parts.length >= 2 ? parts.slice(0, -1).join("") : (name ?? ""); };
 function diversifyChains<T extends { name: string }>(list: T[]): T[] {
   const count = new Map<string, number>();
   const kept: T[] = [];
@@ -298,7 +301,18 @@ export async function GET(req: NextRequest) {
       if (ranked && ranked.length > 0) {
         mode = "ai";
         const sById = new Map(scored.map((s) => [s.id, s]));
-        results = ranked.map((r) => { const s = sById.get(r.id); return s ? { ...s, reasons: r.reason ? [r.reason] : s.reasons } : null; }).filter(Boolean).slice(0, 24) as any[];
+        // Claude 랭킹은 의미적합도만 보고 등급(검증/참고) 신호를 못 받아, "디저트 맛집" 같은 질의에서
+        // 참고 카페가 검증 카페보다 위로 가던 버그(B). LLM 순위(0~100 환산, 결정론)에 등급가산을 더해 재정렬.
+        const withGrade = (ranked
+          .map((r, i) => {
+            const s = sById.get(r.id);
+            if (!s) return null;
+            const rankScore = ((ranked.length - i) / ranked.length) * 100 + gradeBonus(s.grade);
+            return { ...s, reasons: r.reason ? [r.reason] : s.reasons, _rankScore: rankScore };
+          })
+          .filter(Boolean) as any[]);
+        withGrade.sort((a, b) => b._rankScore - a._rankScore);
+        results = withGrade.map(({ _rankScore, ...rest }) => rest).slice(0, 24);
       }
     }
     results = diversifyChains(results);
@@ -330,20 +344,28 @@ export async function GET(req: NextRequest) {
               [likePatterns, effectiveRegion, p1, p2, dqVariants],
             )) as unknown as any[];
         if (nameRows.length > 0) {
-          const have = new Set(results.map((r: any) => r.id));
+          const byId = new Map(results.map((r: any) => [r.id, r]));
           // 정확히 이름이 일치하는 것만 최상단 고정(9999). 부분일치는 등급가점만 받아 일반 랭킹과 경쟁.
           const norm = (s: string) => (s || "").toLowerCase().replace(/\s+/g, "");
           const variantSet = new Set(dqVariants);
-          const nameResults = nameRows.filter((c) => !have.has(c.id)).map((c) => {
+          let boosted = false;
+          const nameResults: any[] = [];
+          for (const c of nameRows) {
             const exactName = variantSet.has(norm(c.name));
-            return {
+            const existing = byId.get(c.id);
+            if (existing) {
+              // 이미 시맨틱/키워드 결과에 낮은 점수로 들어있던 정확매칭 후보 — 스킵하지 말고 9999로 승격(버그 N).
+              if (exactName && existing.score < 9999) { existing.score = 9999; boosted = true; }
+              continue;
+            }
+            nameResults.push({
               id: c.id, name: c.name, area: c.area, grade: c.synth_grade, count: c.synth_count,
               identity: c.synth_identity,
               score: exactName ? 9999 : 200 + gradeBonus(c.synth_grade) + Math.min(50, Number(c.synth_count) || 0),
               reasons: ["카페명 일치"],
-            };
-          });
-          if (nameResults.length > 0) results = [...nameResults, ...results].sort((a: any, b: any) => b.score - a.score).slice(0, 24);
+            });
+          }
+          if (nameResults.length > 0 || boosted) results = [...nameResults, ...results].sort((a: any, b: any) => b.score - a.score).slice(0, 24);
         }
       }
     } catch { /* 상호매칭 실패해도 기존 결과 유지 */ }
