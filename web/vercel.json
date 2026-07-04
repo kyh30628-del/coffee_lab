@@ -22,7 +22,7 @@
     },
     {
       "path": "/api/cron-verify",
-      "schedule": "0 21 * * *"
+      "schedule": "0 9,21 * * *"
     },
     {
       "path": "/api/orchestrator?heal=1",
@@ -38,7 +38,7 @@
     },
     {
       "path": "/api/cron-rulegap",
-      "schedule": "30 16 * * *"
+      "schedule": "30 4,16 * * *"
     },
     {
       "path": "/api/cron-closure",
@@ -54,7 +54,7 @@
     },
     {
       "path": "/api/cron-sentinel",
-      "schedule": "0 15 * * *"
+      "schedule": "0 3,15 * * *"
     },
     {
       "path": "/api/cron-issues",

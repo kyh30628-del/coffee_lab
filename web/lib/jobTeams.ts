@@ -38,7 +38,7 @@ export const teamOf = (job: string) => JOB_TEAM[job] ?? "경영지원본부";
 export const EXPECT_MAX_H: Record<string, number> = {
   // Vercel 크론 (스케줄 + 버퍼)
   "cron-snapshot": 200, "cron-resynth": 200, "cron-newsletter": 200, "cron-discover-categories": 800,
-  "cron-verify": 30, "cron-sentinel": 30, "cron-demand": 30, "cron-rulegap": 30, "cron-closure": 12,
+  "cron-verify": 16, "cron-sentinel": 16, "cron-demand": 30, "cron-rulegap": 16, "cron-closure": 12, // verify·sentinel·rulegap 2×/일(12h)로 촘촘화 → 정지감지도 30→16h로 타이트하게(2026-07-05)
   "cron-grow": 6, "cron-enrich": 8, "cron-embed": 4, "cron-synth": 4, "cron-issues": 2, "cron-coord-consumer": 2,
   "orchestrator-heal": 6,
   // 로컬 launchd 잡
