@@ -7,30 +7,29 @@
 //   실제 소비자 트래픽이 쌓이면 promo_daily 시간대 분포로 재튜닝할 것(빨강 지표로 단정 금지).
 
 const KST_OFFSET_MIN = 9 * 60; // KST = UTC+9 (DST 없음)
-const ROTATE_SLICE_MIN = 20;   // 20분마다 순번 1칸 회전 — '계속 도는' 체감. 고정이라 모든 시간대에 균등.
+const ROTATE_SLICE_MIN = 20;   // 20분마다 순번 1칸 회전 — 피크·비피크 상시 균등하게 '계속 도는' 체감.
+const PEAK_START_MIN = 9 * 60;  // 피크 09:00 KST
+const PEAK_END_MIN = 17 * 60;   // 피크 17:00 KST (CEO 지정 2026-07-04)
 
 export type PeakInfo = { isPeak: boolean; dow: number; minuteOfDay: number };
 
-// now(ms, UTC) → KST 기준 피크 여부·요일·분. 회전은 항상 균등하고, 피크는 '언제 균등이 가장 중요한지'의 정보용
-// (예: 향후 성과 리포트·튜닝). 결정론(주입 가능).
+// now(ms, UTC) → KST 기준 피크(09~17시) 여부·요일·분. 회전은 상시 균등하고, isPeak은 성과 리포트·튜닝 정보용.
 export function peakInfo(now: number = Date.now()): PeakInfo {
   const kstMin = Math.floor(now / 60000) + KST_OFFSET_MIN;
   const minuteOfDay = ((kstMin % 1440) + 1440) % 1440;
   const dayIndex = Math.floor(kstMin / 1440);
   const dow = ((dayIndex % 7) + 7 + 4) % 7; // 1970-01-01=목(4). 0=일 … 6=토
-  const weekend = dow === 0 || dow === 6;
-  // 피크 구간(KST): 평일 점심 11:30–14:00 + 저녁 18:00–22:00 / 주말 12:00–20:00 (합리적 기본값 — 실측 후 튜닝)
-  const inWeekdayPeak = (minuteOfDay >= 690 && minuteOfDay < 840) || (minuteOfDay >= 1080 && minuteOfDay < 1320);
-  const inWeekendPeak = minuteOfDay >= 720 && minuteOfDay < 1200;
-  return { isPeak: weekend ? inWeekendPeak : inWeekdayPeak, dow, minuteOfDay };
+  return { isPeak: minuteOfDay >= PEAK_START_MIN && minuteOfDay < PEAK_END_MIN, dow, minuteOfDay };
 }
 
-// 구독 카페 pool을 균등 순번으로 회전시켜 상위 cap개를 노출.
-//  - 리뷰 수 편향 제거: 중립 기준(id)으로 안정 정렬 후 20분 슬라이스로 오프셋 1칸씩 회전.
-//  - 슬라이스가 고정이라 카운터가 1씩 증가 → 어떤 연속 구간에서도 상단(프리미엄) 자리가 정확히 균등.
-//  - 한 사이클(N 슬라이스=N×20분) 동안 모든 카페가 모든 자리를 똑같이 거친다.
-//  - N ≤ cap이면 전원 상시 노출되지만 '순서(상단 프리미엄)'는 매 슬라이스 공평히 교대.
-//  - 피크엔 트래픽이 많아 20분마다 도는 회전이 그대로 '프라임타임 균등 배분'이 된다.
+// 구독 카페 pool을 균등 순번으로 회전시켜 상위 cap개를 노출. (호출부가 scope=전체 또는 구·군으로 pool을 넘김
+//  → 전체 뷰·구/군 뷰 각각 독립적으로 공정하게 돈다.)
+//  - 리뷰 수 편향 제거: 중립 기준(id) 안정 정렬 후 회전.
+//  - 하루를 20분 슬라이스(0~71)로 나눠 1칸씩 회전 → 피크(09~17시)든 나머지 시간이든 상시 균등.
+//    피크 24슬라이스는 매일 모든 카페에 ~균등(±1)하게 쪼개지고, 비피크에도 계속 돌아 아무도 자리에 박히지 않음.
+//  - + dayIndex 위상 이동: 매일 시작 자리를 1칸씩 밀어 '9시 오픈(프리미엄) 자리'를 특정 카페가 독점하지 못하게
+//    (N일이면 모든 카페가 오픈 자리를 한 번씩 — N과 무관하게 보장).
+//  - N ≤ cap이면 전원 상시 노출되되 '순서(상단 프리미엄)'가 공평히 교대. N > cap이면 노출 자체가 균등 회전.
 export function rotateFeatured<T extends { id: number | string }>(
   pool: T[],
   cap: number,
@@ -39,7 +38,10 @@ export function rotateFeatured<T extends { id: number | string }>(
   const n = pool.length;
   if (n === 0) return [];
   const base = [...pool].sort((a, b) => Number(a.id) - Number(b.id)); // 중립·안정 기준
-  const slice = Math.floor((Math.floor(now / 60000) + KST_OFFSET_MIN) / ROTATE_SLICE_MIN);
-  const off = ((slice % n) + n) % n;
+  const kstMin = Math.floor(now / 60000) + KST_OFFSET_MIN;
+  const minuteOfDay = ((kstMin % 1440) + 1440) % 1440;
+  const dayIndex = Math.floor(kstMin / 1440);
+  const sliceOfDay = Math.floor(minuteOfDay / ROTATE_SLICE_MIN); // 0~71
+  const off = (((sliceOfDay + dayIndex) % n) + n) % n;           // 20분 회전 + 매일 위상 1칸
   return [...base.slice(off), ...base.slice(0, off)].slice(0, cap);
 }
