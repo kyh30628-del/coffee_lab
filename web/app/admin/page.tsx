@@ -123,6 +123,8 @@ export default function AdminPage() {
   useEffect(() => {
     if (!authed || !pw) return;
     refreshNumbers(pw);
+    loadNL(); // 뉴스레터 상태 로드 — 미발송 초안 리마인더용
+    loadSubscribers(pw); // 승인 대기 사장님 리마인더용
     const id = setInterval(() => refreshNumbers(pw), 15000);
     return () => clearInterval(id);
   }, [authed, pw]);
@@ -699,6 +701,18 @@ export default function AdminPage() {
           })()}
           </>}
         </div>
+
+        {/* 🔔 사장님 대응 리마인더 — 승인 대기·미발송 주간레터 */}
+        {(subscribers.some((s: any) => s.status === "pending") || (nlList[0] && nlList[0].status !== "sent")) && (
+          <div className="mb-4 space-y-2">
+            {subscribers.some((s: any) => s.status === "pending") && (
+              <button onClick={() => setShowSubsModal(true)} className="w-full text-left bg-amber-50 border border-amber-300 rounded-xl px-3.5 py-2.5 text-[12.5px] text-amber-800 font-bold">🔔 승인 대기 사장님 {subscribers.filter((s: any) => s.status === "pending").length}명 — 서류 확인 후 승인하세요 →</button>
+            )}
+            {nlList[0] && nlList[0].status !== "sent" && (
+              <button onClick={() => { setShowNL(true); loadNL(); }} className="w-full text-left bg-indigo-50 border border-indigo-300 rounded-xl px-3.5 py-2.5 text-[12.5px] text-indigo-800 font-bold">📰 이번 주 사장님 레터 초안이 발송 대기 중 — 검토·발송하세요 →</button>
+            )}
+          </div>
+        )}
 
         {/* ===== 모달 트리거 (접속·유입 현황 · 구독 카페 현황 · 유튜브 수집 · 내 카페 기록) ===== */}
         <div className="flex gap-2 mb-6 flex-wrap">
