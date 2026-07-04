@@ -568,6 +568,75 @@ export async function markJudged(cafeId: number) {
   await sql`UPDATE cafes SET llm_judged_at=now() WHERE id=${cafeId}`;
 }
 
+// 🔗 카페간 동일원문(link) 교차오염 자동 치유 — 같은 블로그/기사 원문(link)이 2개 이상 공개 카페에 근거로
+//   동시 귀속된 경우(옆가게 오염 또는 같은 브랜드 다른 지점 오귀속) evidence를 정리한다.
+//   판정: quote에 그 카페 고유표기(전체이름 또는 지점 마커)가 없는 쪽 제거. 브랜드가 같아도(형제지점)
+//   지점 마커가 인용문에 없으면 불일치로 간주 — 브랜드명만으론 지점을 못 가리므로(제안26 사례:
+//   '올드페리도넛 수원오목천점' 원문이 무관 지점 '광교갤러리아점'에도 verified로 귀속됨). 전원 불일치면 전체 제거.
+//   여러 곳이 동시에 매칭되면(드묾) score 높은 한 곳만 남긴다.
+function evidenceHitsCafe(quote: string, name: string, areaTerms: string[]): boolean {
+  const norm = (s: string) => (s || "").toLowerCase().replace(/\s+/g, "");
+  const cleaned = cleanCafeName(name);
+  const qN = norm(quote);
+  const fullN = norm(cleaned);
+  if (fullN.length >= 4 && qN.includes(fullN)) return true; // 지점명 포함 전체이름 그대로 일치 — 최우선
+  const words = cleaned.split(/\s+/);
+  const last = words[words.length - 1] || "";
+  if (/^[가-힣0-9]{2,}점$/.test(last)) {
+    // 이름에 지점 표기가 있으면 그 지점 마커가 인용문에 있어야 인정 — 브랜드토큰만 일치는 형제지점 오염이라 불충분.
+    const marker = norm(last.replace(/점$/, ""));
+    return marker.length >= 2 && qN.includes(marker);
+  }
+  return nameCoherence(cleaned, [quote], areaTerms) === 1; // 지점표기 없는 단일매장은 브랜드토큰 일치로 판단
+}
+
+export async function healCrossCafeLinkContamination(): Promise<{ removed: number; groups: number; names: string[] }> {
+  const rows = (await sql`
+    SELECT c.id, c.name, c.area, c.dong, elem->>'link' AS link, elem->>'quote' AS quote, (elem->>'score')::numeric AS score
+    FROM cafes c
+    CROSS JOIN LATERAL jsonb_array_elements(
+      CASE WHEN jsonb_typeof(c.synth_reviews) = 'array' THEN c.synth_reviews ELSE '[]'::jsonb END
+    ) elem
+    WHERE c.published = true AND elem->>'link' IS NOT NULL AND elem->>'link' <> ''`) as any[];
+  const byLink = new Map<string, any[]>();
+  for (const r of rows) { const arr = byLink.get(r.link) || []; arr.push(r); byLink.set(r.link, arr); }
+  const groups = [...byLink.values()].filter((g) => new Set(g.map((r) => r.id)).size >= 2);
+
+  const killMap = new Map<number, Set<string>>();
+  const affectedNames = new Set<string>();
+  let groupsResolved = 0;
+  for (const g of groups) {
+    const scored = g.map((r: any) => ({ ...r, hit: evidenceHitsCafe(r.quote || "", r.name, [r.area, r.dong].filter(Boolean)) }));
+    const hits = scored.filter((s: any) => s.hit);
+    const keepId: number | null = hits.length === 1 ? hits[0].id
+      : hits.length > 1 ? hits.reduce((a: any, b: any) => (Number(b.score) || 0) > (Number(a.score) || 0) ? b : a).id
+      : null; // 0건 히트 = 전원 무관 → 전체 제거
+    let touched = false;
+    for (const s of scored) {
+      if (s.id !== keepId) {
+        if (!killMap.has(s.id)) killMap.set(s.id, new Set());
+        killMap.get(s.id)!.add(s.link);
+        affectedNames.add(s.name);
+        touched = true;
+      }
+    }
+    if (touched) groupsResolved++;
+  }
+
+  let removed = 0;
+  for (const [cafeId, killLinks] of killMap) {
+    const [row] = (await sql`SELECT synth_reviews, synth_reviews_all FROM cafes WHERE id=${cafeId}`) as any[];
+    const parse = (v: any) => { if (typeof v === "string") { try { return JSON.parse(v); } catch { return []; } } return Array.isArray(v) ? v : []; };
+    const sr = parse(row?.synth_reviews);
+    const sra = parse(row?.synth_reviews_all);
+    const newSr = sr.filter((e: any) => !killLinks.has(e?.link));
+    const newSra = sra.filter((e: any) => !killLinks.has(e?.link));
+    removed += sr.length - newSr.length;
+    await sql`UPDATE cafes SET synth_reviews=${safeJson(newSr)}, synth_reviews_all=${safeJson(newSra)} WHERE id=${cafeId}`;
+  }
+  return { removed, groups: groupsResolved, names: [...affectedNames].slice(0, 12) };
+}
+
 // 🛡️ 통합 자가치유: 공개 카페를 커서로 순환하며 '현재의 모든 게이트'로 재검증·교정.
 //   재합성(synthAndStore)은 비카페·프랜차이즈·광고·동명오염·노이즈·등급·좌표 게이트를 전부 다시 적용한다.
 //   → 규칙을 고치면(coreTokens·숫자토큰 등) 기존 공개 데이터도 며칠 안에 자동으로 따라온다(드리프트 치유).

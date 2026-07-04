@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { ensureLearnedTable, loadLearnedTerms, getLearned, applyLearned, rollbackLearned } from "@/lib/learnedTerms";
+import { healCrossCafeLinkContamination } from "@/lib/synthStore";
 import { recordRun } from "@/lib/agentLog";
 
 export const runtime = "nodejs";
@@ -53,6 +54,12 @@ export async function GET(req: NextRequest) {
     const dry = req.nextUrl.searchParams.get("dry") === "1";
     await ensureLearnedTable();
     await loadLearnedTerms(true);
+
+    // ── ⓪ 카페간 동일원문(link) 교차오염 evidence 정리(제안26, 결정론) ──
+    //   매일 재진행 → 새로 유입되는 교차오염도 다음날 자동 감지·정리(재발 감시).
+    const crossContam = dry
+      ? { removed: 0, groups: 0, names: [] as string[] }
+      : await healCrossCafeLinkContamination().catch(() => ({ removed: 0, groups: 0, names: [] as string[] }));
 
     // ── ① 검증·자동롤백 ──────────────────────────────────────────────
     //   직전 자동적용(최근 2시간) 후 공개 카페가 크게 줄었으면 되돌린다(정상 카페 과다 비공개 방지).
@@ -235,10 +242,10 @@ export async function GET(req: NextRequest) {
     // 기록(검증·롤백 기준 + 관제탑 노출용)
     if (!dry) await sql`INSERT INTO rulegap_runs (published_before, learned, pending) VALUES (${pubNow}, ${JSON.stringify(learned)}::jsonb, ${JSON.stringify(pending)}::jsonb)`;
 
-    if (!dry) await recordRun("cron-rulegap", true, `학습 ${learned.length} 승인대기 ${pending.length} 식당자동제외 ${autoExcluded} 롤백 ${rolledBack.length}`, learned.length);
+    if (!dry) await recordRun("cron-rulegap", true, `학습 ${learned.length} 승인대기 ${pending.length} 식당자동제외 ${autoExcluded} 롤백 ${rolledBack.length} 교차오염정리 ${crossContam.removed}건/${crossContam.groups}그룹`, learned.length);
     return NextResponse.json({
       ok: true, dry, ranAt: new Date().toISOString(), scanned,
-      rolledBack, autoExcluded,
+      rolledBack, autoExcluded, crossContam,
       learnedCount: learned.length, learned,
       pendingCount: pending.length, pending: pending.slice(0, 30),
     });
