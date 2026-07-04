@@ -130,16 +130,20 @@ export async function GET(req: NextRequest) {
     const pageviews30d = (await sql`SELECT COUNT(*)::int n FROM traffic_events WHERE ts > now()-interval '30 days'`.catch(() => [{ n: 0 }]))[0]?.n ?? 0;
 
     // 🧑 진짜 사용자 신호 — 봇으로 설명 안 되는 신호(재방문·기능사용·검색유입 재방문율)
+    // r2/r3/r5 = 페이지 열람 2/3/5장+ (visit_count=페이지뷰). trueReturn = 다른 날 다시 온 진짜 재방문.
     const cohort = (await sql.query(
       `SELECT COUNT(*) FILTER (WHERE COALESCE(visit_count,1)>=2)::int r2,
               COUNT(*) FILTER (WHERE COALESCE(visit_count,1)>=3)::int r3,
-              COUNT(*) FILTER (WHERE COALESCE(visit_count,1)>=5)::int r5
+              COUNT(*) FILTER (WHERE COALESCE(visit_count,1)>=5)::int r5,
+              COUNT(*) FILTER (WHERE (last_seen AT TIME ZONE 'Asia/Seoul')::date > (created_at AT TIME ZONE 'Asia/Seoul')::date)::int truereturn
        FROM user_consents WHERE last_seen>now()-interval '30 days' AND ${BOT}`).catch(() => [{}]))[0] as any;
     const consentReal = (await sql`SELECT COUNT(*)::int n FROM user_consents WHERE agreed IS TRUE AND NOT COALESCE(internal,false)`.catch(() => [{ n: 0 }]))[0]?.n ?? 0;
     const tasteN = (await sql`SELECT COUNT(*)::int n FROM taste_logs`.catch(() => [{ n: 0 }]))[0]?.n ?? 0;
     const bookmarkN = (await sql`SELECT COUNT(*)::int n FROM bookmarks`.catch(() => [{ n: 0 }]))[0]?.n ?? 0;
     const realSources = (await sql.query(
-      `SELECT src, COUNT(*)::int visitors, COUNT(*) FILTER (WHERE COALESCE(visit_count,1)>=2)::int returned, ROUND(AVG(COALESCE(visit_count,1))::numeric,1) avg_visits
+      `SELECT src, COUNT(*)::int visitors,
+              COUNT(*) FILTER (WHERE (last_seen AT TIME ZONE 'Asia/Seoul')::date > (created_at AT TIME ZONE 'Asia/Seoul')::date)::int returned,
+              ROUND(AVG(COALESCE(visit_count,1))::numeric,1) avg_pv
        FROM user_consents WHERE src IN('naver','google','instagram','youtube','threads','kakao') AND last_seen>now()-interval '30 days' AND ${BOT}
        GROUP BY 1 ORDER BY visitors DESC`).catch(() => [])) as any[];
 
@@ -159,7 +163,7 @@ export async function GET(req: NextRequest) {
       GROUP BY c.id, c.name, c.area ORDER BY n DESC LIMIT 6`.catch(() => [])) as any[];
 
     return NextResponse.json({
-      realUsers: { r2: cohort?.r2 ?? 0, r3: cohort?.r3 ?? 0, r5: cohort?.r5 ?? 0, consent: consentReal, taste: tasteN, bookmark: bookmarkN }, realSources,
+      realUsers: { r2: cohort?.r2 ?? 0, r3: cohort?.r3 ?? 0, r5: cohort?.r5 ?? 0, trueReturn: cohort?.truereturn ?? 0, consent: consentReal, taste: tasteN, bookmark: bookmarkN }, realSources,
       shares: { total: shares?.total ?? 0, kakao: shares?.kakao ?? 0, web: shares?.web ?? 0, clip: shares?.clip ?? 0, sharers: shares?.sharers ?? 0, today: shares?.today ?? 0 }, topShared,
       ok: true, generatedAt: new Date().toISOString(),
       kpi: {
