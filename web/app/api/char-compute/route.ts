@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
     const limit = Math.min(Math.max(Number(body.limit) || 100, 1), 300);
 
     const rows = await sql`
-      SELECT id, synth_identity, synth_reviews FROM cafes
+      SELECT id, name, synth_identity, synth_reviews FROM cafes
       WHERE published = true AND char_scores IS NULL
       LIMIT ${limit}` as unknown as any[];
 
@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
       const texts: string[] = [];
       if (r.synth_identity) texts.push(r.synth_identity);
       if (Array.isArray(r.synth_reviews)) r.synth_reviews.forEach((x: any) => x.quote && texts.push(x.quote));
-      const scores = computeCharScores(texts);
+      const scores = computeCharScores(texts, r.name);
       await sql`UPDATE cafes SET char_scores=${JSON.stringify(scores)} WHERE id=${r.id}`;
       updated++;
     }

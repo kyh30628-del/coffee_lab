@@ -15,9 +15,22 @@ function countHits(text: string, kws: string[]): number {
   return kws.reduce((s, k) => s + (t.split(k.toLowerCase()).length - 1), 0);
 }
 
-// 여러 텍스트(검증 리뷰 본문들)에서 축별 언급 횟수 합산.
-export function computeCharScores(texts: string[]): Record<string, number> {
-  const blob = texts.filter(Boolean).join(" ");
+// 카페 이름 자체가 축 키워드를 우연히 포함하면(예: "고요재"·"최고요" → quiet 키워드 "고요") 리뷰가
+// 상호를 반복 인용할 때마다 실제 분위기 묘사 없이 축이 허위로 카운트된다 — 카운트 전 상호 언급을 제거해 방지.
+function stripNameMentions(text: string, cafeName?: string): string {
+  if (!cafeName) return text;
+  const variants = [cafeName.trim(), cafeName.trim().replace(/\s+/g, "")].filter((v) => v.length >= 2);
+  let out = text;
+  for (const v of variants) {
+    const re = new RegExp(v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
+    out = out.replace(re, " ");
+  }
+  return out;
+}
+
+// 여러 텍스트(검증 리뷰 본문들)에서 축별 언급 횟수 합산. cafeName을 주면 상호 자기인용을 제외한다.
+export function computeCharScores(texts: string[], cafeName?: string): Record<string, number> {
+  const blob = stripNameMentions(texts.filter(Boolean).join(" "), cafeName);
   const scores: Record<string, number> = {};
   for (const ax of CHAR_AXES) scores[ax.key] = countHits(blob, ax.kws);
   return scores;
