@@ -31,6 +31,11 @@ const CAFE_HINT = /(카페|까페|커피|coffee|로스터|베이커리|제과|�
 const SNACK_STALL = /(꽈배기|찹쌀도너츠|찹쌀도넛|붕어빵|잉어빵|호떡|국화빵|계란빵|델리만쥬|호두과자|풀빵|옥수수빵|타코야키|핫도그|콘도그|떡볶이|김밥|순대|어묵|오뎅|튀김)/;
 export const SNACK_STALL_SQL = "꽈배기|찹쌀 ?도너츠|찹쌀 ?도넛|붕어빵|잉어빵|호떡|국화빵|계란빵|델리만쥬|호두과자|풀빵|옥수수빵|타코야키|핫도그|콘도그|떡볶이|김밥|순대|어묵|오뎅|튀김";
 export const isSnackStall = (name: string) => { const n = (name || "").replace(/\s/g, ""); return SNACK_STALL.test(n) && !CAFE_HINT.test(n); };
+// 🏚️ 유령 상호 — 이름이 '순수 구조물/층 서술어'뿐인 합성 항목(예: "2층 카페", "2층사무실", "지하카페").
+//   네이버 일반검색어를 상호로 착각해 만든 nl_<일반명사> place_id에서 발생. 카테고리는 '카페,디저트'라 통과하므로 이름으로 차단.
+//   ⚠️ 브랜드 토큰이 하나라도 붙으면 제외 안 함('2층라이브러리'·'이층카페 더 로프트'·'반지하40'·'계단집' 보호). CEO 지목 2026-07-04.
+const STRUCT_PHANTOM = /^(지하[0-9]*|반지하|지상[0-9]*|옥상|[0-9]+층|[일이삼사오육칠팔구십]+층)(카페|커피|사무실|공간|점포?|매장)?$/;
+export const isStructuralPhantom = (name: string) => STRUCT_PHANTOM.test((name || "").replace(/\s/g, ""));
 // '카페' 글자가 있어도 커피 카페가 아닌 업종(키즈카페·스터디카페·만화카페·실내놀이터…) — CAFE_HINT보다 우선.
 const NON_CAFE_OVERRIDE = /(키즈카페|실내놀이터|놀이방|스터디카페|스터디룸|독서실|만화카페|룸카페|멀티방|파티룸|방탈출|트램폴린|트램펄린|보드게임|볼링장|당구장|스크린골프|골프연습|pc방|피씨방|찜질방|사우나|클라이밍|코인노래|노래방|애견카페|고양이카페|동물카페|키즈)/i;
 
@@ -175,6 +180,7 @@ export const isNonCafe = (name: string, category: string) => {
   const n = (name || "").replace(/\s/g, ""), cat = category || "";
   if (MANUAL_NONCAFE.some((b) => n.includes(b.replace(/\s/g, "")))) return true; // 직접 지목 비카페(차덕분 등) — 카테고리 무관 확실 차단
   if (isSnackStall(name)) return true; // 🍢 노점 간식(꽈배기·찹쌀도너츠 등) — 네이버 '카페,디저트' 오분류 무시하고 차단
+  if (isStructuralPhantom(name)) return true; // 🏚️ 유령 상호("2층 카페"·"2층사무실" 등) — 카테고리 카페여도 차단
   if (NON_CAFE_OVERRIDE.test(n) || NON_CAFE_OVERRIDE.test(cat)) return true; // 키즈·스터디·만화·실내놀이터 등
   if (cat) {
     // 카테고리 경로를 '구간(segment)'으로 본다. 네이버='카페,디저트>와플', 카카오='음식점 > 카페 > 커피전문점 > {브랜드}'

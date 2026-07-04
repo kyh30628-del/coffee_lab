@@ -7,7 +7,7 @@ import { fetchWebReviews } from "./webSearchCollector";
 import { fetchYouTubeReviews } from "./youtubeCollector";
 import { collectAndSynthesize, type RawSource, type BorderlineItem, type CollectResult } from "./collectOrchestrator";
 import { judgeReviews, hasJudgeKey } from "./reviewJudge";
-import { isNonCafe, isFranchise, isGenericFoodName, isSnackStall } from "./discover";
+import { isNonCafe, isFranchise, isGenericFoodName, isSnackStall, isStructuralPhantom } from "./discover";
 import { nameCoherence, cleanCafeName } from "./reviewQuality";
 import { loadLearnedTerms } from "./learnedTerms";
 
@@ -203,7 +203,7 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   // 🔁 재합성 결과가 이전과 사실상 동일하면 synth_updated 유지 → 그라운딩 무효화·재검 순환 방지.
   const unchanged = !!(cur?.synth_updated && cur.synth_identity === synth.identity && Number(cur.synth_count) === collected && Number(cur.prev_ev) === (evidenceReviews as any[]).length);
   const synthTs = unchanged ? cur.synth_updated : new Date();
-  const excluded = pst === "excluded" || isSnackStall(name); // 콘셉트/업종/오염 '영구 제외'(비카페·식당·이름충돌·노점간식) — 어떤 자동복원도 안 풂. 사람만 해제.
+  const excluded = pst === "excluded" || isSnackStall(name) || isStructuralPhantom(name); // 콘셉트/업종/오염 '영구 제외'(비카페·식당·이름충돌·노점간식·유령상호) — 어떤 자동복원도 안 풂. 사람만 해제.
   const held = pst === "held"; // 그라운딩 '근거0건' 확정 보류 — 재합성해도 비공개 고정
   const stuckNoise = pst === "noise" || noisy; // 노이즈(이름 오염) 한번 걸리면 영구 탈락
   const newPst = excluded ? "excluded" : held ? "held" : stuckNoise ? "noise" : inPipeline ? (ruleOk ? "pending" : "rejected") : pst;
