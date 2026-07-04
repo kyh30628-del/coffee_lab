@@ -142,7 +142,7 @@ export default function OrgDashboard() {
   const [devpipe, setDevpipe] = useState<any>(null);
   const [showDev, setShowDev] = useState(false);
   const [orgAct, setOrgAct] = useState<any>(null); // 본부별 활동 현황
-  const [showRhythm, setShowRhythm] = useState(true); // 조직 운영 리듬(활동+케이던스) — 기본 펼침
+  const [showRhythm, setShowRhythm] = useState(false); // 조직 운영 리듬(활동+케이던스) — 기본 접힘(다른 카드와 통일)
   const load = (password: string, silent = false) => {
     if (!silent) { setLoading(true); setErr(""); }
     Promise.all([
