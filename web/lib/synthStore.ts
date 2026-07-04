@@ -159,7 +159,7 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   //   + 이름이 '일반 음식·메뉴어'(베이글·아메리카노 등)면 음식 리뷰가 전부 매칭돼 식별 불가 → 노이즈로 공개 차단.
   // 🎯 실시간 비카페·오프콘셉 차단 (합성 '그 순간' = 발견 즉시). autoCorrect 폴링·배치 전에 발행 자체를 막아 보드에 안 뜨게.
   //   ① 커피 정체성 0: 노출후기 3건+에 카페 정체성(커피·디저트·베이커리·차/찻집) 단어가 하나도 없으면 비카페(식당·김밥·소매·오염).
-  //   ② 오프콘셉: 활동공간 업종명사(애견·키즈·만화·보드게임·룸·파티룸 등)가 카페 자기이름과 함께 우세(≥0.66) → 활동공간.
+  //   ② 오프콘셉: 활동공간/소매 업종명사(애견·키즈·만화·보드게임·룸·파티룸·소품샵·기프트샵·편집샵 등)가 카페 자기이름과 함께 우세(≥0.66) → 리테일/활동 메인.
   const _belongsHit = qz.filter((q) => CAFE_BELONGS.test(q)).length;
   const noCafeIdentity = collected >= 3 && _belongsHit === 0;
   const _ob = offconceptBrand(name);
@@ -305,7 +305,7 @@ export async function healNonCafeCategory(): Promise<{ held: number; names: stri
 //      self<우세 = 오염/2차 언급 → 손대지 않음(이름정합 healer가 따로 처리). 임계 0.66은 '카페 이스트↔디 이스트'
 //      같은 짧은토큰 충돌 오탐을 배제하려 0.5가 아닌 0.66로 잡음(드라이런 검증).
 // 전 오프콘셉 업종(카테고리 OFF 리스트와 동기화) — 네이버가 일반 '카페'로 분류해도 리뷰내용 self-bound로 잡는다.
-const OFFCONCEPT_VENUE = /애견카페|애견\s*카페|고양이카페|고양이\s*카페|동물카페|반려동물\s*카페|키즈카페|키즈\s*카페|만화카페|만화\s*카페|만화방|보드게임카페|보드게임\s*카페|방탈출|룸익스케이프|멀티방|룸카페|파티룸|스터디카페|스터디\s*룸|독서실|코인노래|노래방|피씨방|pc방|볼링장|당구장|스크린골프|골프연습|찜질방|사우나|클라이밍/i;
+const OFFCONCEPT_VENUE = /애견카페|애견\s*카페|고양이카페|고양이\s*카페|동물카페|반려동물\s*카페|키즈카페|키즈\s*카페|만화카페|만화\s*카페|만화방|보드게임카페|보드게임\s*카페|방탈출|룸익스케이프|멀티방|룸카페|파티룸|스터디카페|스터디\s*룸|독서실|코인노래|노래방|피씨방|pc방|볼링장|당구장|스크린골프|골프연습|찜질방|사우나|클라이밍|소품\s*샵|소품숍|소품가게|기프트\s*샵|기프트숍|편집\s*샵|편집숍|셀렉트\s*샵|셀렉트숍/i;
 function offconceptBrand(name: string): string {
   return (name || "").replace(/^카페\s+/, "").replace(/\s+\S*점$/, "").trim().split(/\s+/)[0] || "";
 }
@@ -313,7 +313,7 @@ export async function healOffConceptByReview(): Promise<{ held: number; names: s
   const cand = (await sql`
     SELECT id, name, synth_reviews FROM cafes
     WHERE published = true AND synth_reviews IS NOT NULL
-      AND synth_reviews::text ~* '애견카페|고양이카페|동물카페|키즈카페|만화카페|만화방|보드게임카페|방탈출|룸익스케이프|멀티방|룸카페|파티룸|스터디카페|스터디룸|독서실|코인노래|노래방|피씨방|pc방|볼링장|당구장|스크린골프|골프연습|찜질방|사우나|클라이밍'`) as any[];
+      AND synth_reviews::text ~* '애견카페|고양이카페|동물카페|키즈카페|만화카페|만화방|보드게임카페|방탈출|룸익스케이프|멀티방|룸카페|파티룸|스터디카페|스터디룸|독서실|코인노래|노래방|피씨방|pc방|볼링장|당구장|스크린골프|골프연습|찜질방|사우나|클라이밍|소품\\s?샵|소품숍|소품가게|기프트\\s?샵|기프트숍|편집\\s?샵|편집숍|셀렉트\\s?샵|셀렉트숍'`) as any[];
   const killIds: number[] = []; const killNames: string[] = [];
   for (const c of cand) {
     let sr: any = c.synth_reviews; try { sr = JSON.parse(sr); } catch { /* already obj */ }
