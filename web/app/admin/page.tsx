@@ -840,7 +840,7 @@ export default function AdminPage() {
             <div className="min-h-full flex items-start justify-center p-2 sm:p-4">
               <div className="bg-stone-50 rounded-2xl w-full max-w-3xl shadow-2xl my-2" onClick={(e) => e.stopPropagation()}>
                 <div className="sticky top-0 z-10 bg-white border-b border-stone-200 px-4 py-3 flex items-center justify-between rounded-t-2xl">
-                  <span className="text-[14px] font-extrabold text-stone-800">📊 접속·유입 현황 <span className="text-[11px] font-normal text-stone-400">· 우리 DB 자체 집계</span></span>
+                  <span className="text-[14px] font-extrabold text-stone-800">📊 접속·유입 현황 <span className="text-[11px] font-normal text-stone-400">· 진짜 외부 사용자만 (대표·팀·봇 제외)</span></span>
                   <div className="flex items-center gap-2">
                     <button onClick={() => loadAnalytics(pw)} className="text-[11px] font-bold text-stone-500 border border-stone-200 rounded-full px-2.5 py-1 hover:bg-stone-100">↻ 새로고침</button>
                     <button onClick={() => setShowAnalytics(false)} className="text-stone-400 hover:text-stone-700 text-lg leading-none px-1">✕</button>
@@ -875,7 +875,7 @@ export default function AdminPage() {
                   ];
                   return (
                     <div className="p-4 space-y-4">
-                      <p className="text-[10.5px] text-stone-500 bg-stone-100/70 rounded-lg px-3 py-2 leading-relaxed">우리 사이트 방문 데이터를 <b className="text-stone-600">외부 도구 없이 직접</b> 모은 현황입니다. 방문자·유입경로·재방문·지역은 지금 정확하고, 페이지 단위(추이·인기카페·시간대)는 최근 도입돼 방문이 쌓이며 채워집니다.</p>
+                      <p className="text-[10.5px] text-stone-500 bg-stone-100/70 rounded-lg px-3 py-2 leading-relaxed">우리 사이트 방문을 <b className="text-stone-600">외부 도구 없이 직접</b> 모은 현황입니다. <b className="text-emerald-700">대표·팀(내부)과 봇은 자동 제외</b>돼 아래 숫자는 모두 <b className="text-stone-600">진짜 외부 방문자</b>입니다. 실시간·방문자·유입경로·재방문은 정확하고, 페이지 단위(추이·인기카페)는 방문이 쌓이며 채워집니다. <span className="text-stone-400">※ 유입경로 '미상'은 추적 도입 전 옛 방문 또는 앱·북마크 유입(카톡·인스타 인앱은 경로가 안 남습니다).</span></p>
                       {/* 🟢 실시간 · 오늘 */}
                       <div className="bg-white rounded-xl border border-stone-200 p-3">
                         <div className="flex items-center justify-between flex-wrap gap-2">

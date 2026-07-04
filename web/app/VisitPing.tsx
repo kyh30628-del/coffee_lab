@@ -17,7 +17,10 @@ export default function VisitPing() {
       const firstThisSession = !sessionStorage.getItem("dcn_pinged");
       sessionStorage.setItem("dcn_pinged", "1");
       const u = new URL(window.location.href);
-      const body: Record<string, string> = { anonId: a, path: pathname || u.pathname };
+      // 내부(대표·팀) 표시: /admin 접속 시 자동 세팅되며, 이후 이 브라우저의 모든 방문은 집계 제외
+      if ((pathname || u.pathname).startsWith("/admin")) localStorage.setItem("dcn_internal", "1");
+      const isInternal = localStorage.getItem("dcn_internal") === "1";
+      const body: Record<string, string | boolean> = { anonId: a, path: pathname || u.pathname, internal: isInternal };
       if (firstThisSession) {
         body.ref = document.referrer || "";
         body.utm_source = u.searchParams.get("utm_source") || "";

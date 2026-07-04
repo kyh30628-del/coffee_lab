@@ -21,6 +21,8 @@ async function ensure() {
   await sql`ALTER TABLE user_consents ADD COLUMN IF NOT EXISTS utm_medium TEXT`;
   await sql`ALTER TABLE user_consents ADD COLUMN IF NOT EXISTS utm_campaign TEXT`;
   await sql`ALTER TABLE user_consents ADD COLUMN IF NOT EXISTS landing TEXT`;
+  // 내부(대표·팀) 트래픽 제외 플래그 — /admin 접속 브라우저 또는 클라 dcn_internal 표시. 한번 켜지면 유지.
+  await sql`ALTER TABLE user_consents ADD COLUMN IF NOT EXISTS internal BOOLEAN DEFAULT false`;
   // 방문핑 행은 동의 '미정'(NULL)이어야 거절(false)과 구분됨
   await sql`ALTER TABLE user_consents ALTER COLUMN agreed DROP NOT NULL`;
   await sql`ALTER TABLE user_consents ALTER COLUMN agreed DROP DEFAULT`;
@@ -63,22 +65,25 @@ export async function POST(req: NextRequest) {
     const utmCampaign = String(b.utm_campaign ?? "").slice(0, 80);
     const landing = String(b.path ?? "").slice(0, 200);
     const src = sourceBucket(ref, utmSource);
+    // 내부(대표·팀) 판정: /admin·/owner 페이지를 봤거나 클라가 내부로 표시 → 이 방문자는 집계 제외 대상
+    const isInternal = b.internal === true || /^\/(admin|owner)/.test(landing);
     // 방문 기록: 첫 방문이면 행 생성(동의 미정=NULL), 재방문이면 카운트·최근시각 갱신.
     // 출처(src/referrer/utm/landing)는 첫터치만 보존 — 이미 있으면 덮어쓰지 않음(COALESCE).
     await sql`
-      INSERT INTO user_consents (anon_id, visit_count, last_seen, user_agent, src, referrer, utm_source, utm_medium, utm_campaign, landing)
-      VALUES (${anonId}, 1, now(), ${ua}, ${src}, ${ref}, ${utmSource}, ${utmMedium}, ${utmCampaign}, ${landing})
+      INSERT INTO user_consents (anon_id, visit_count, last_seen, user_agent, src, referrer, utm_source, utm_medium, utm_campaign, landing, internal)
+      VALUES (${anonId}, 1, now(), ${ua}, ${src}, ${ref}, ${utmSource}, ${utmMedium}, ${utmCampaign}, ${landing}, ${isInternal})
       ON CONFLICT (anon_id) DO UPDATE SET
         visit_count = COALESCE(user_consents.visit_count, 1) + 1,
         last_seen = now(),
+        internal = COALESCE(user_consents.internal, false) OR ${isInternal},
         src = COALESCE(user_consents.src, EXCLUDED.src),
         referrer = COALESCE(NULLIF(user_consents.referrer, ''), NULLIF(EXCLUDED.referrer, '')),
         utm_source = COALESCE(NULLIF(user_consents.utm_source, ''), NULLIF(EXCLUDED.utm_source, '')),
         utm_medium = COALESCE(NULLIF(user_consents.utm_medium, ''), NULLIF(EXCLUDED.utm_medium, '')),
         utm_campaign = COALESCE(NULLIF(user_consents.utm_campaign, ''), NULLIF(EXCLUDED.utm_campaign, '')),
         landing = COALESCE(NULLIF(user_consents.landing, ''), NULLIF(EXCLUDED.landing, ''))`;
-    // 봇 UA·빈 경로는 페이지뷰 이벤트서 제외(분석 정확도). 실제 경로의 사람 방문만 적재.
-    if (landing && !/bot|crawl|spider|slurp|bingpreview|facebookexternalhit|headless|preview/i.test(ua)) {
+    // 봇 UA·빈 경로·내부(대표/팀·/admin·/owner)는 페이지뷰 이벤트서 제외(분석 정확도). 실제 외부 사람 방문만 적재.
+    if (landing && !isInternal && !/^\/(admin|owner)/.test(landing) && !/bot|crawl|spider|slurp|bingpreview|facebookexternalhit|headless|preview/i.test(ua)) {
       await sql`INSERT INTO traffic_events (anon_id, path, src) VALUES (${anonId}, ${landing}, ${src})`.catch(() => {});
     }
     return NextResponse.json({ ok: true });
