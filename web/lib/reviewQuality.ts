@@ -478,11 +478,14 @@ export function verifyReview(input: QualityInput): QualityResult {
   const myBranch = input.name.match(/([가-힣A-Za-z0-9]{2,})점\s*$/)?.[1];
   if (myBranch) {
     const fullT = `${title} ${body}`;
-    // [룰갭23] 지점명이 도로명(○○로·○○길)이면 그 도로 전체를 공유하는 위치어일 뿐 지점 식별력이 없음.
-    //   구·동 수준의 areaPresent만으로 통과시키면 같은 도로 '다른 건물'의 무관업체를 다 흡수한다
-    //   (카페인24 인천은하수로점 ← 같은 도로 다른 건물 '5PM sunset hour' 오염, 실측). 도로명 지점은 지점명 실제 일치만 인정.
-    const branchIsRoadName = /(로|길)$/.test(myBranch);
-    const branchSignal = (myBranch !== "본" && fullT.includes(myBranch)) || (!branchIsRoadName && areaPresent); // 지점명 또는(도로명 지점이 아닐 때만) 대상 지역어
+    // [룰갭23·27] 지점접미사(도로명·쇼핑몰명·랜드마크명 등)는 그 자리를 공유하는 위치어일 뿐 지점 식별력이 없다
+    //   (도로명: 카페인24 인천은하수로점 ← 같은 도로 다른 건물 '5PM sunset hour' 오염 / 몰명: 올드페리도넛
+    //   광교갤러리아점 ← areaPresent(시 단위 '수원')만으로 형제 지점 '수원오목천점' 원문에 오귀속, id10902 실측).
+    //   지점명 자체가 본문에 없다면, 브랜드 고유 토큰(myBranch 제외 나머지)이 대상 지역어와 '함께' 있어야만
+    //   이 지점 신호로 인정한다 — 지역 단독으로는 불인정(도로명 여부와 무관하게 통일).
+    const brandToken = tokens.find((tk) => tk !== myBranch);
+    const branchSignal = (myBranch !== "본" && fullT.includes(myBranch))
+      || (!!brandToken && nameHit(fullT, norm(fullT), brandToken) && areaPresent);
     const otherBranchTok = (fullT.match(/([가-힣]{2,})점/g) ?? [])
       .map((t) => t.replace(/점$/, ""))
       .find((nm) => nm.length >= 2 && nm !== myBranch && nm !== "본" && !isNonBranchWord(nm + "점")
