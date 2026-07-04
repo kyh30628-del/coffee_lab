@@ -69,6 +69,10 @@ export default function AdminPage() {
   const [emailReady, setEmailReady] = useState<boolean | null>(null); // 이 환경에 이메일 발송키 있는지
   const [liveExposure, setLiveExposure] = useState<boolean | null>(null); // 소비자에게 우선노출이 실제 보이는지(SUBSCRIPTION_LIVE)
   const [subMsg, setSubMsg] = useState(""); // 승인 결과(키 발송 성공/실패) 안내
+  const [showOnboard, setShowOnboard] = useState(false); // 온보딩 메일 미리보기 모달
+  const [onboard, setOnboard] = useState<any>(null);     // {trial:{subject,html}, paid:{subject,html}}
+  const [onboardTab, setOnboardTab] = useState<"trial" | "paid">("trial");
+  const openOnboard = () => { setShowOnboard(true); if (!onboard) fetch("/api/onboarding-preview", { headers: { "x-admin-password": pw } }).then((x) => x.json()).then((d) => { if (d.ok) setOnboard(d); }).catch(() => {}); };
   // 📰 뉴스레터
   const [showNL, setShowNL] = useState(false);
   const [nlList, setNlList] = useState<any[]>([]);
@@ -791,7 +795,9 @@ export default function AdminPage() {
           <div className="fixed inset-0 z-[6000]" onClick={() => setShowSubsModal(false)}>
             <div className="absolute inset-0 bg-black/50" />
             <div className="absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto bg-stone-50 rounded-t-2xl p-4 sm:inset-0 sm:m-auto sm:max-w-md sm:h-fit sm:max-h-[85vh] sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-3"><span className="text-sm font-bold text-stone-800">💳 구독 카페 현황 ({subscribers.length})</span><button onClick={() => { setShowSubsModal(false); setSubMsg(""); }} className="text-2xl text-stone-400 leading-none">×</button></div>
+            <div className="flex items-center justify-between mb-2"><span className="text-sm font-bold text-stone-800">💳 구독 카페 현황 ({subscribers.length})</span><button onClick={() => { setShowSubsModal(false); setSubMsg(""); }} className="text-2xl text-stone-400 leading-none">×</button></div>
+            {/* 📧 승인 시 사장님께 자동 발송되는 온보딩 메일(서비스 사용법 + 전용 서비스 안내) 내용 확인 */}
+            <button onClick={openOnboard} className="w-full mb-3 text-left bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-[12px] font-bold text-amber-800">📧 승인 시 발송되는 온보딩 메일 내용 보기 →</button>
             {/* 📧 이메일 발송 준비 상태 — 승인 시 키 자동발송 가능 여부(프로덕션 env) */}
             {emailReady === false && <div className="mb-3 text-[11px] text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-2.5 py-2">🚨 이 환경에 <b>이메일 발송키(RESEND)가 없어요</b>. 승인해도 키가 자동 발송되지 않으니, 승인 후 <b>PIN을 사장님께 직접 전달</b>해야 해요. (Vercel 환경변수 RESEND_API_KEY 설정 필요)</div>}
             {emailReady === true && <div className="mb-3 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-2">📧 이메일 발송 준비됨 — 승인하면 키(PIN)가 사장님 이메일로 <b>자동 발송</b>돼요.</div>}
@@ -1123,6 +1129,29 @@ export default function AdminPage() {
                   );
                 })()}
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* 📧 온보딩 메일 미리보기 모달 — 승인 시 사장님께 실제 발송되는 내용 */}
+        {showOnboard && (
+          <div className="fixed inset-0 z-[6500]" onClick={() => setShowOnboard(false)}>
+            <div className="absolute inset-0 bg-black/50" />
+            <div className="absolute inset-x-0 bottom-0 max-h-[90vh] overflow-y-auto bg-stone-50 rounded-t-2xl p-4 sm:inset-0 sm:m-auto sm:max-w-lg sm:h-fit sm:max-h-[90vh] sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-1"><span className="text-sm font-bold text-stone-800">📧 온보딩 메일 미리보기</span><button onClick={() => setShowOnboard(false)} className="text-2xl text-stone-400 leading-none">×</button></div>
+              <p className="text-[11px] text-stone-500 mb-3">승인 버튼을 누르면 사장님 이메일로 <b>자동 발송</b>되는 내용이에요. 서비스 사용법 + 구독 전용 서비스(리뷰 분석·쇼케이스·우선 노출·뉴스레터) 안내가 담겨 있어요. <b>열쇠(PIN)는 예시</b>이고, 실제로는 그 사장님의 진짜 열쇠가 들어갑니다.</p>
+              {!onboard ? (
+                <div className="py-10 text-center text-stone-400 text-[13px]">불러오는 중…</div>
+              ) : (
+                <>
+                  <div className="flex gap-1.5 mb-2">
+                    <button onClick={() => setOnboardTab("trial")} className={`flex-1 py-2 text-[12px] font-bold rounded-lg border ${onboardTab === "trial" ? "bg-amber-100 border-amber-300 text-amber-800" : "bg-white border-stone-200 text-stone-500"}`}>🎁 7일 체험 승인 시</button>
+                    <button onClick={() => setOnboardTab("paid")} className={`flex-1 py-2 text-[12px] font-bold rounded-lg border ${onboardTab === "paid" ? "bg-amber-100 border-amber-300 text-amber-800" : "bg-white border-stone-200 text-stone-500"}`}>☕ 구독 승인 시</button>
+                  </div>
+                  <div className="text-[11px] text-stone-600 bg-white border border-stone-200 rounded-lg px-2.5 py-2 mb-2"><b>제목:</b> {onboard[onboardTab].subject}</div>
+                  <iframe title="온보딩 메일 미리보기" srcDoc={onboard[onboardTab].html} className="w-full h-[60vh] bg-white rounded-lg border border-stone-200" />
+                </>
+              )}
             </div>
           </div>
         )}
