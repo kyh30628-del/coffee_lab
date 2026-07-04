@@ -1,5 +1,6 @@
 // 쇼케이스 배너 10종 템플릿 — 데모 페이지·카페 상세·사장님 미리보기 공용.
 // 각 스타일은 사진(있으면 배경) 위에 고유한 오버레이·타이포·악센트·애니메이션을 입힌다.
+import type { ReactNode } from "react";
 
 export const SHOWCASE_TEMPLATES = [
   { id: 1, name: "프리미엄 매거진", desc: "줌·골드 샤인 · 고급 정통" },
@@ -150,6 +151,20 @@ export const SHOWCASE_CSS = `
 .sc10 .ct{color:#fff}.sc10 .tg{color:#ffe6f3;font-weight:700}
 .sc10 .hd{font-size:24px;text-shadow:0 2px 12px rgba(120,60,120,.4);animation:scPop .7s .2s both}
 .sc10 .chip{background:rgba(255,255,255,.35);color:#fff;border:1px solid rgba(255,255,255,.6)}
+
+/* 강점 벡터 히어로(사진 없을 때) — 비트맵 이모지 대신 SVG라 어떤 해상도에서도 선명 */
+.scb .scHero{position:absolute;inset:0;z-index:1;pointer-events:none;color:#fff}
+.scb .scHero span{position:absolute;display:block}
+.scb .scHero svg{width:100%;height:100%;display:block}
+.scb .scHeroMain{top:13%;left:50%;transform:translateX(-50%);width:33%;max-width:130px;opacity:.9;filter:drop-shadow(0 8px 22px rgba(0,0,0,.32));animation:scFloat 5.5s ease-in-out infinite}
+.scb .scHeroSub{opacity:.13;filter:drop-shadow(0 3px 8px rgba(0,0,0,.2))}
+.scb .scHeroSub.a{top:15%;left:8%;width:15%;max-width:50px;animation:scFloat 6.5s .6s ease-in-out infinite}
+.scb .scHeroSub.b{top:27%;right:8%;width:12%;max-width:42px;animation:scFloat 7.5s 1.1s ease-in-out infinite}
+.scb .scGrain{position:absolute;inset:0;opacity:.09;background-image:radial-gradient(rgba(255,255,255,.7) 1px,transparent 1.5px);background-size:15px 15px}
+.sc4 .scHero,.sc7 .scHero{color:#2b2018}.sc4 .scGrain,.sc7 .scGrain{opacity:.05;background-image:radial-gradient(rgba(60,40,30,.5) 1px,transparent 1.5px)}
+.sc10 .scHero{color:#9161a8}.sc9 .scHero{color:#d8b978}
+.scb .chip .chIcon{display:inline-block;width:11px;height:11px;vertical-align:-1.5px;margin-right:4px;opacity:.9}
+.scb .chip .chIcon svg{width:100%;height:100%}
 `;
 
 type Props = {
@@ -157,29 +172,53 @@ type Props = {
   photo?: string | null; cta?: string; height?: string; scene?: string;
 };
 
-// 포인트/강점 텍스트 → 대표 이모지(간단한 그림). 사진 없어도 카페 장점이 시각적으로 드러나게.
-const PT_EMOJI: [RegExp, string][] = [
-  [/사진|포토|스냅|인생샷/, "📸"],
-  [/무드|분위기|감성|아늑|힙|예쁜|예쁘/, "✨"],
-  [/넓|공간|홀|좌석|자리|룸|대형|층/, "🪑"],
-  [/디저트|달콤|케이크|빵|베이커|쿠키|타르트|스콘|마카롱/, "🍰"],
-  [/커피|원두|로스팅|에스프레소|라떼|드립|스페셜티/, "☕"],
-  [/조용|고요|혼자|집중|힐링|편안/, "🍃"],
-  [/뷰|전망|풍경|바다|강|호수|리버/, "🌄"],
-  [/루프탑|테라스|정원|야외|가든|마당/, "🌿"],
-  [/아이|키즈|반려|애견|강아지|펫/, "🐾"],
-  [/야경|밤|늦게|심야/, "🌙"],
+// 강점 텍스트 → 프리미엄 벡터 아이콘 키(비트맵 이모지는 확대 시 흐려짐 → SVG로 선명하게).
+const STRENGTH_META: [RegExp, string][] = [
+  [/사진|포토|스냅|인생샷|화보/, "camera"],
+  [/무드|분위기|감성|아늑|힙|예쁜|예쁘|이색/, "sparkle"],
+  [/넓|공간|홀|좌석|자리|룸|대형|층|웅장|규모/, "space"],
+  [/디저트|달콤|케이크|빵|베이커|쿠키|타르트|스콘|마카롱|휘낭|구움/, "cake"],
+  [/커피|원두|로스팅|에스프레소|라떼|드립|스페셜티|핸드드립|바리스타/, "coffee"],
+  [/조용|고요|혼자|집중|힐링|편안|고즈넉|아늑/, "leaf"],
+  [/뷰|전망|풍경|바다|강|호수|리버|오션|산/, "view"],
+  [/루프탑|테라스|정원|야외|가든|마당|자연|플랜트/, "leaf"],
+  [/아이|키즈|반려|애견|강아지|펫/, "paw"],
+  [/야경|밤|늦게|심야|무드등/, "moon"],
 ];
-const ptEmoji = (t: string) => { for (const [re, e] of PT_EMOJI) if (re.test(t || "")) return e; return "☕"; };
+const strengthKey = (t: string) => { for (const [re, k] of STRENGTH_META) if (re.test(t || "")) return k; return "coffee"; };
 
-export default function ShowcaseBanner({ style = 1, headline, tagline, points = [], photo, cta, height = "16rem", scene }: Props) {
+const ICON_PATHS: Record<string, ReactNode> = {
+  camera: (<><path d="M4 8.2h3l1.4-2.3h7.2L17 8.2h3a1 1 0 011 1v8.6a1 1 0 01-1 1H4a1 1 0 01-1-1V9.2a1 1 0 011-1z"/><circle cx="12" cy="13.2" r="3.5"/></>),
+  sparkle: (<><path d="M12 3.4c.45 3.7 1.9 5.15 5.6 5.6-3.7.45-5.15 1.9-5.6 5.6-.45-3.7-1.9-5.15-5.6-5.6 3.7-.45 5.15-1.9 5.6-5.6z"/><path d="M18.4 15c.18 1.5.72 2.02 2.2 2.2-1.48.18-2.02.72-2.2 2.2-.18-1.48-.72-2.02-2.2-2.2 1.48-.18 2.02-.72 2.2-2.2z"/></>),
+  space: (<><path d="M6 12V8.6A2.6 2.6 0 018.6 6h6.8A2.6 2.6 0 0118 8.6V12"/><path d="M4.6 12A1.6 1.6 0 016.2 13.6V16.2h11.6V13.6A1.6 1.6 0 0119.4 12a1.6 1.6 0 011.6 1.6V19.4H3v-5.8A1.6 1.6 0 014.6 12z"/><path d="M7.2 19.4v1.4M16.8 19.4v1.4"/></>),
+  cake: (<><path d="M4.6 20v-5.4a2 2 0 012-2h10.8a2 2 0 012 2V20z"/><path d="M4.6 16.4c1.35 1.35 2.75 1.35 3.8 0s2.45-1.35 3.5 0 2.55 1.35 3.9 0"/><path d="M12 12.6V9.4"/><circle cx="12" cy="7.6" r="1.05"/></>),
+  coffee: (<><path d="M5.4 8.6h10.9V14a4.5 4.5 0 01-4.5 4.5H9.9A4.5 4.5 0 015.4 14z"/><path d="M16.3 9.7H18a2.4 2.4 0 010 4.8h-1.7"/><path d="M8.5 3.4c-.55.9-.55 1.6 0 2.5M11.5 3.4c-.55.9-.55 1.6 0 2.5"/></>),
+  leaf: (<><path d="M5 19C4.2 11.2 10.6 5 20 5.2c.15 9.2-6.1 14.8-15 13.8z"/><path d="M5.2 19c2.7-5.5 6.5-8.6 11.4-10"/></>),
+  view: (<><path d="M3 18.4l5.6-8 3.4 4.4 2.6-3.6L21 18.4z"/><circle cx="7.4" cy="7" r="1.8"/></>),
+  moon: (<path d="M20.5 14.4A8 8 0 019.6 3.5a8 8 0 1010.9 10.9z"/>),
+  paw: (<><ellipse cx="8" cy="9.2" rx="1.3" ry="1.8"/><ellipse cx="12" cy="7.8" rx="1.3" ry="1.9"/><ellipse cx="16" cy="9.2" rx="1.3" ry="1.8"/><path d="M12 12.2c-2.4 0-4.3 1.7-4.3 3.6 0 1.5 1.2 2.3 2.5 1.9.85-.28 2.75-.28 3.6 0 1.3.4 2.5-.4 2.5-1.9 0-1.9-1.9-3.6-4.3-3.6z"/></>),
+};
+function StrengthIcon({ k, stroke = 1.6 }: { k: string; stroke?: number }) {
+  return (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round">{ICON_PATHS[k] ?? ICON_PATHS.coffee}</svg>);
+}
+
+export default function ShowcaseBanner({ style = 1, headline, tagline, points = [], photo, cta, height = "16rem" }: Props) {
   const cls = `sc${Math.min(Math.max(style, 1), 10)}`;
-  // 사진이 없으면 강점 기반 배경 일러스트(이모지) 자동 생성
-  const bgScene = !photo ? (scene || (points.length ? ptEmoji(points[0]) : "☕")) : null;
+  // 사진 없을 때: 강점 기반 프리미엄 벡터 히어로(선명·무한 해상도). 대표 강점 크게 + 보조 강점 은은하게.
+  const keys = (points.length ? points : [headline]).map(strengthKey);
+  const heroKey = keys[0] || "coffee";
+  const subKeys = Array.from(new Set(keys.slice(1))).filter((k) => k !== heroKey).slice(0, 2);
   return (
     <div className={`scb ${cls}`} style={{ height }}>
       {photo ? <img className="scimg" src={photo} alt="" /> : <div className="scbg" />}
-      {bgScene && <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 128, opacity: 0.9, zIndex: 1, filter: "drop-shadow(0 4px 12px rgba(0,0,0,.25))" }}>{bgScene}</div>}
+      {!photo && (
+        <div className="scHero" aria-hidden="true">
+          <i className="scGrain" />
+          <span className="scHeroMain"><StrengthIcon k={heroKey} stroke={1.15} /></span>
+          {subKeys[0] && <span className="scHeroSub a"><StrengthIcon k={subKeys[0]} stroke={1.5} /></span>}
+          {subKeys[1] && <span className="scHeroSub b"><StrengthIcon k={subKeys[1]} stroke={1.5} /></span>}
+        </div>
+      )}
       {style === 2 && <div className="ov2" />}
       <div className="ov" />
       {style === 3 && <div className="vig" />}
@@ -196,7 +235,7 @@ export default function ShowcaseBanner({ style = 1, headline, tagline, points = 
         {style === 2 && <div className="cta">{cta ?? "지금 가보기 →"}</div>}
         {style === 6 && <div className="est">EST · 강동</div>}
         {points.length > 0 && style !== 2 && (
-          <div className="row">{points.map((pt, i) => <span key={i} className="chip">{ptEmoji(pt)} {pt}</span>)}</div>
+          <div className="row">{points.map((pt, i) => <span key={i} className="chip"><i className="chIcon"><StrengthIcon k={strengthKey(pt)} stroke={2.1} /></i>{pt}</span>)}</div>
         )}
       </div>
     </div>
