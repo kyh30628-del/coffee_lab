@@ -157,12 +157,29 @@ type Props = {
   photo?: string | null; cta?: string; height?: string; scene?: string;
 };
 
+// 포인트/강점 텍스트 → 대표 이모지(간단한 그림). 사진 없어도 카페 장점이 시각적으로 드러나게.
+const PT_EMOJI: [RegExp, string][] = [
+  [/사진|포토|스냅|인생샷/, "📸"],
+  [/무드|분위기|감성|아늑|힙|예쁜|예쁘/, "✨"],
+  [/넓|공간|홀|좌석|자리|룸|대형|층/, "🪑"],
+  [/디저트|달콤|케이크|빵|베이커|쿠키|타르트|스콘|마카롱/, "🍰"],
+  [/커피|원두|로스팅|에스프레소|라떼|드립|스페셜티/, "☕"],
+  [/조용|고요|혼자|집중|힐링|편안/, "🍃"],
+  [/뷰|전망|풍경|바다|강|호수|리버/, "🌄"],
+  [/루프탑|테라스|정원|야외|가든|마당/, "🌿"],
+  [/아이|키즈|반려|애견|강아지|펫/, "🐾"],
+  [/야경|밤|늦게|심야/, "🌙"],
+];
+const ptEmoji = (t: string) => { for (const [re, e] of PT_EMOJI) if (re.test(t || "")) return e; return "☕"; };
+
 export default function ShowcaseBanner({ style = 1, headline, tagline, points = [], photo, cta, height = "16rem", scene }: Props) {
   const cls = `sc${Math.min(Math.max(style, 1), 10)}`;
+  // 사진이 없으면 강점 기반 배경 일러스트(이모지) 자동 생성
+  const bgScene = !photo ? (scene || (points.length ? ptEmoji(points[0]) : "☕")) : null;
   return (
     <div className={`scb ${cls}`} style={{ height }}>
       {photo ? <img className="scimg" src={photo} alt="" /> : <div className="scbg" />}
-      {scene && !photo && <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 96, zIndex: 1 }}>{scene}</div>}
+      {bgScene && <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 128, opacity: 0.9, zIndex: 1, filter: "drop-shadow(0 4px 12px rgba(0,0,0,.25))" }}>{bgScene}</div>}
       {style === 2 && <div className="ov2" />}
       <div className="ov" />
       {style === 3 && <div className="vig" />}
@@ -179,7 +196,7 @@ export default function ShowcaseBanner({ style = 1, headline, tagline, points = 
         {style === 2 && <div className="cta">{cta ?? "지금 가보기 →"}</div>}
         {style === 6 && <div className="est">EST · 강동</div>}
         {points.length > 0 && style !== 2 && (
-          <div className="row">{points.map((pt, i) => <span key={i} className="chip">{pt}</span>)}</div>
+          <div className="row">{points.map((pt, i) => <span key={i} className="chip">{ptEmoji(pt)} {pt}</span>)}</div>
         )}
       </div>
     </div>
