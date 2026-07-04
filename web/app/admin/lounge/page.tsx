@@ -142,7 +142,7 @@ export default function Lounge() {
           <div style={{ fontSize: 12.5, color: "#d9c3a0", marginTop: 3 }}>동네 커피 노트 · 자율 조직이 함께 일하고 나누는 공간</div>
           <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
             <Stat label="오늘 실행" value={`${data?.today?.runs ?? 0}`} />
-            <Stat label="성공률" value={okRate == null ? "—" : `${okRate}%`} accent={okRate != null && okRate < 90 ? "#e0a05a" : "#8fd19e"} />
+            <Stat label="오늘 성공률" value={okRate == null ? "—" : `${okRate}%`} accent={okRate != null && okRate < 90 ? "#e0a05a" : "#8fd19e"} />
             <Stat label="본부" value={`${ORG.divisions.length}`} />
             <Stat label="결재 대기" value={`${data?.decisions?.length ?? 0}`} accent={(data?.decisions?.length ?? 0) > 0 ? "#e8b87a" : undefined} />
           </div>
@@ -166,7 +166,7 @@ export default function Lounge() {
         })}
 
         {/* 공유회 피드 */}
-        <Section title="📢 공유회 — 오늘의 회의·자율 협업" open={showFeed} onToggle={() => setShowFeed((v) => !v)} summary={`협업 ${data?.coord?.length ?? 0} · 결재 ${data?.decisions?.length ?? 0}`}>
+        <Section title="📢 공유회 — 오늘의 회의·자율 협업" open={showFeed} onToggle={() => setShowFeed((v) => !v)} summary={`최근 협업 ${data?.coord?.length ?? 0} · 결재 ${data?.decisions?.length ?? 0}`}>
           {data?.brief && (
             <div style={{ background: "#fff", border: "1px solid #e6d8bf", borderRadius: 12, padding: 12, marginBottom: 10 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }} onClick={() => setShowMeeting((v) => !v)}>
@@ -185,7 +185,7 @@ export default function Lounge() {
               ))}
             </div>
           )}
-          <div style={{ fontSize: 11.5, color: "#9c8a6c", margin: "4px 2px 6px", fontWeight: 700 }}>🤝 자율 협업·피드백 스트림</div>
+          <div style={{ fontSize: 11.5, color: "#9c8a6c", margin: "4px 2px 6px", fontWeight: 700 }}>🤝 최근 협업·피드백 스트림 <span style={{ fontWeight: 400, fontSize: 10 }}>(종결 포함 최근 20 · 진행중만 보려면 조직관제)</span></div>
           {(data?.coord || []).length === 0 && <div style={{ fontSize: 12, color: "#9c8a6c", padding: "4px 2px" }}>최근 협업 없음</div>}
           {(data?.coord || []).map((c) => (
             <div key={c.id} style={{ display: "flex", gap: 8, padding: "7px 2px", borderBottom: "1px solid #ece1cc" }}>
