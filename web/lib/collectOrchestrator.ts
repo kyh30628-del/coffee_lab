@@ -212,7 +212,7 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
   const synth = synthesize(name, verifiedReviews);
   synth.grade = grade;
   synth.reviewCount = trustCount;
-  const charScores = computeCharScores(verifiedTexts);
+  const charScores = computeCharScores(verifiedTexts, name);
 
   return { synth, collected: trustCount, grade, charScores, perSource, evidenceReviews: topEvidence, allEvidence, reviewDates, borderline, auditItems, quality: stats };
 }
