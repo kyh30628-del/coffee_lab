@@ -59,12 +59,22 @@ async function getPublicReviews(cafeId: number) {
   } catch { return []; }
 }
 
+// 🔁 리텐션 훅 — 같은 동네(area) 다른 옥석 카페(검증후기 많은 순). 1페이지 이탈↓·2페이지 유도(홍보×경험 #94).
+async function getNearby(area: string, excludeId: number) {
+  try {
+    return (await sql`SELECT id, name, synth_grade, synth_count FROM cafes
+      WHERE published=true AND area=${area} AND id<>${excludeId}
+      ORDER BY COALESCE(synth_count,0) DESC LIMIT 3`) as any[];
+  } catch { return []; }
+}
+
 export default async function CafePage({ params }: Props) {
   const { id } = await params;
   const c = await getCafe(id);
   if (!c) notFound();
   const tags = topTags(c.char_scores);
   const userReviews = await getPublicReviews(c.id);
+  const nearby = await getNearby(c.area, c.id);
   const grade = c.synth_grade || "";
   // 인앱 상세와 동일: 강·약(전체 대비) + 옥석 리뷰 데이터 핵심
   const profile = cafeProfile({ char_scores: c.char_scores, synth_count: c.synth_count }, await getAxisDist());
@@ -176,6 +186,26 @@ export default async function CafePage({ params }: Props) {
             <svg width="12" height="12" viewBox="0 0 24 24" fill="#03c75a"><path d="M16.273 12.845L7.376 0H0v24h7.727V11.155L16.624 24H24V0h-7.727z"/></svg>
             네이버에서 메뉴·가격·영업시간 보기
           </a>
+          {/* 🔁 이 동네 다른 옥석 카페 — 2페이지 유도(리텐션, 홍보×경험 #94) */}
+          {nearby.length > 0 && (
+            <div className="mt-6">
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-[13px] font-bold text-[#5a4632]">☕ {c.area} 다른 옥석 카페</div>
+                <Link href={`/area/${encodeURIComponent(c.area)}`} className="text-[11px] text-[#9c6b3f] whitespace-nowrap">동네 전체 보기 →</Link>
+              </div>
+              <div className="flex flex-col gap-2">
+                {nearby.map((nc: any) => (
+                  <Link key={nc.id} href={`/c/${nc.id}`} className="flex items-center gap-2 bg-white border border-[#e0d3bd] rounded-xl px-3.5 py-2.5">
+                    <span className="flex flex-col text-left min-w-0">
+                      <span className="text-[13.5px] font-bold text-[#3d2f22] truncate">{nc.name}</span>
+                      <span className="text-[10.5px] text-[#9c8a6c] truncate">검증후기 {nc.synth_count ?? 0}건</span>
+                    </span>
+                    {nc.synth_grade && <span className="ml-auto text-[10px] font-bold bg-[#2b2018] text-[#e8b87a] px-2 py-0.5 rounded-full whitespace-nowrap">{nc.synth_grade}</span>}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
           {/* 사장님 CTA — 카페 상세 → owner 인사이트 진입(B2B 퍼널, decisions #15) */}
           <Link href={`/owner?name=${encodeURIComponent(c.name)}`} className="mt-3 flex items-center justify-between gap-2 w-full rounded-xl px-4 py-3 border border-[#e6d2b5]" style={{ background: "linear-gradient(90deg,#fbf3e4,#f4ece0)" }}>
             <span className="flex flex-col text-left">
