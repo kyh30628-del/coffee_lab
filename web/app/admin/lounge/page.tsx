@@ -155,7 +155,7 @@ export default function Lounge() {
         {/* 🧭 진짜 유입 북극성 — 검색 유입 재방문율 (상시 노출) */}
         {data?.acq && (
           <div style={{ background: "linear-gradient(135deg,#0f5132,#157347)", color: "#eafaf0", borderRadius: 12, padding: "12px 14px", marginBottom: 10 }}>
-            <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 6 }}>🧭 진짜 유입 신호 <span style={{ fontWeight: 400, fontSize: 10, opacity: 0.8 }}>· 검색 유입 브라우저 수 + 다른 날 재방문 (봇·내부 제외, 30일)</span></div>
+            <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 6 }}>🧭 진짜 유입 신호 <span style={{ fontWeight: 400, fontSize: 10, opacity: 0.8 }}>· 검색 유입 브라우저 + 재방문(다시 켬=세션 2회+) · 봇·내부 제외 30일</span></div>
             <div style={{ display: "flex", gap: 18, flexWrap: "wrap" }}>
               {[["네이버", "naver"], ["구글", "google"]].map(([label, key]) => {
                 const a = data.acq[key] || { visitors: 0, returned: 0 };

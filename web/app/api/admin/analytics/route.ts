@@ -135,14 +135,14 @@ export async function GET(req: NextRequest) {
       `SELECT COUNT(*) FILTER (WHERE COALESCE(visit_count,1)>=2)::int r2,
               COUNT(*) FILTER (WHERE COALESCE(visit_count,1)>=3)::int r3,
               COUNT(*) FILTER (WHERE COALESCE(visit_count,1)>=5)::int r5,
-              COUNT(*) FILTER (WHERE (last_seen AT TIME ZONE 'Asia/Seoul')::date > (created_at AT TIME ZONE 'Asia/Seoul')::date)::int truereturn
+              COUNT(*) FILTER (WHERE COALESCE(sessions,1) >= 2)::int truereturn
        FROM user_consents WHERE last_seen>now()-interval '30 days' AND ${BOT}`).catch(() => [{}]))[0] as any;
     const consentReal = (await sql`SELECT COUNT(*)::int n FROM user_consents WHERE agreed IS TRUE AND NOT COALESCE(internal,false)`.catch(() => [{ n: 0 }]))[0]?.n ?? 0;
     const tasteN = (await sql`SELECT COUNT(*)::int n FROM taste_logs`.catch(() => [{ n: 0 }]))[0]?.n ?? 0;
     const bookmarkN = (await sql`SELECT COUNT(*)::int n FROM bookmarks`.catch(() => [{ n: 0 }]))[0]?.n ?? 0;
     const realSources = (await sql.query(
       `SELECT src, COUNT(*)::int visitors,
-              COUNT(*) FILTER (WHERE (last_seen AT TIME ZONE 'Asia/Seoul')::date > (created_at AT TIME ZONE 'Asia/Seoul')::date)::int returned,
+              COUNT(*) FILTER (WHERE COALESCE(sessions,1) >= 2)::int returned,
               ROUND(AVG(COALESCE(visit_count,1))::numeric,1) avg_pv
        FROM user_consents WHERE src IN('naver','google','instagram','youtube','threads','kakao') AND last_seen>now()-interval '30 days' AND ${BOT}
        GROUP BY 1 ORDER BY visitors DESC`).catch(() => [])) as any[];

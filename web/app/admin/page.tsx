@@ -906,18 +906,18 @@ export default function AdminPage() {
                         <div className="bg-emerald-50/60 border border-emerald-200 rounded-xl p-3">
                           <div className="text-[12px] font-bold text-emerald-800 mb-1.5">🧑 진짜 사용자 신호 <span className="font-normal text-[10px] text-emerald-600">· 기준=브라우저(localStorage), IP 아님</span></div>
                           <div className="grid grid-cols-3 gap-2 text-center">
-                            <div><div className="text-[19px] font-extrabold text-emerald-700">{a.realUsers.trueReturn ?? 0}</div><div className="text-[9.5px] text-stone-500">다른 날 재방문<br/>(진짜 붙잡은 사람)</div></div>
+                            <div><div className="text-[19px] font-extrabold text-emerald-700">{a.realUsers.trueReturn ?? 0}</div><div className="text-[9.5px] text-stone-500">재방문(다시 켬)<br/>(세션 2회+·같은날 포함)</div></div>
                             <div><div className="text-[19px] font-extrabold text-emerald-700">{a.realUsers.consent}</div><div className="text-[9.5px] text-stone-500">위치동의<br/>(봇은 안 하는 행동)</div></div>
                             <div><div className="text-[19px] font-extrabold text-emerald-700">{(a.realSources || []).reduce((s: number, r: any) => s + r.visitors, 0)}</div><div className="text-[9.5px] text-stone-500">검색·소셜 유입<br/>(브라우저 수)</div></div>
                           </div>
                           {(a.realSources || []).length > 0 && (
                             <div className="mt-2 pt-2 border-t border-emerald-200/70 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-stone-600">
                               {a.realSources.map((r: any) => (
-                                <span key={r.src}><b className="text-emerald-700">{r.src}</b> {r.visitors}명 · 다른날 재방문 {r.returned} · 평균 {r.avg_pv}장</span>
+                                <span key={r.src}><b className="text-emerald-700">{r.src}</b> {r.visitors}명 · 재방문 {r.returned} · 평균 {r.avg_pv}장</span>
                               ))}
                             </div>
                           )}
-                          <p className="text-[9.5px] text-stone-500 mt-1.5 leading-relaxed"><b>참고:</b> 페이지 여러 장 본 사람 {a.realUsers.r2}명(3+장 {a.realUsers.r3}·5+장 {a.realUsers.r5}) — 이건 한 방문에 여러 페이지 본 것(재방문 아님). <b>진짜 성장 신호는 '다른 날 재방문'</b>입니다. 검색으로 와서 다른 날 또 오면 최고 신호.</p>
+                          <p className="text-[9.5px] text-stone-500 mt-1.5 leading-relaxed"><b>참고:</b> 페이지 여러 장 본 사람 {a.realUsers.r2}명(3+장 {a.realUsers.r3}·5+장 {a.realUsers.r5}) — 한 방문에 여러 페이지 본 것(재방문 아님). <b>재방문=브라우저를 다시 켠 것(세션 2회+, 같은날 포함)</b>이 진짜 성장 신호입니다.</p>
                         </div>
                       )}
                       {/* 📣 공유(바이럴) 기록 */}

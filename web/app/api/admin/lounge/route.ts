@@ -48,10 +48,10 @@ export async function GET(req: NextRequest) {
 
   // 🧭 유입 북극성 — 네이버·구글 검색 유입 방문자 + 재방문율(진짜 유입 핵심 증거). 봇·크롤러·내부 제외.
   const NOISE = `COALESCE(user_agent,'') !~* 'bot|crawl|spider|slurp|bingpreview|facebookexternalhit|headless|preview' AND COALESCE(src,'') !~* 'findelio|blinkx|semrush|ahrefs|dataprovider|dotbot|petalbot|yandex|mj12|serpstat' AND NOT COALESCE(internal,false)`;
-  // 진짜 재방문 = '다른 날 다시 온 것'(last_seen 날짜 > 최초 날짜). visit_count는 페이지뷰라 재방문 아님.
+  // 재방문 = '다시 켠 것'(세션 2회+, 같은 날 포함). sessions=브라우저 세션 수(visit_count 페이지뷰와 다름).
   const acqRows = (await sql.query(
     `SELECT src, COUNT(*)::int visitors,
-       COUNT(*) FILTER (WHERE (last_seen AT TIME ZONE 'Asia/Seoul')::date > (created_at AT TIME ZONE 'Asia/Seoul')::date)::int returned
+       COUNT(*) FILTER (WHERE COALESCE(sessions,1) >= 2)::int returned
      FROM user_consents WHERE src IN ('naver','google') AND last_seen > now()-interval '30 days' AND ${NOISE} GROUP BY src`
   ).catch(() => [])) as any[];
   const acq: Record<string, any> = { naver: { visitors: 0, returned: 0 }, google: { visitors: 0, returned: 0 } };

@@ -23,6 +23,8 @@ async function ensure() {
   await sql`ALTER TABLE user_consents ADD COLUMN IF NOT EXISTS landing TEXT`;
   // 내부(대표·팀) 트래픽 제외 플래그 — /admin 접속 브라우저 또는 클라 dcn_internal 표시. 한번 켜지면 유지.
   await sql`ALTER TABLE user_consents ADD COLUMN IF NOT EXISTS internal BOOLEAN DEFAULT false`;
+  // 세션 수 — '다시 켠 것'(같은 날 포함)을 센다. 브라우저 세션(sessionStorage) 새로 시작할 때마다 +1. visit_count(페이지뷰)와 다름.
+  await sql`ALTER TABLE user_consents ADD COLUMN IF NOT EXISTS sessions INT DEFAULT 1`;
   // 방문핑 행은 동의 '미정'(NULL)이어야 거절(false)과 구분됨
   await sql`ALTER TABLE user_consents ALTER COLUMN agreed DROP NOT NULL`;
   await sql`ALTER TABLE user_consents ALTER COLUMN agreed DROP DEFAULT`;
@@ -67,6 +69,7 @@ export async function POST(req: NextRequest) {
     const src = sourceBucket(ref, utmSource);
     // 내부(대표·팀) 판정: /admin·/owner 페이지를 봤거나 클라가 내부로 표시 → 이 방문자는 집계 제외 대상
     const isInternal = b.internal === true || /^\/(admin|owner)/.test(landing);
+    const newSession = b.newSession === true; // 세션 첫 핑(브라우저 새로 켬) → 세션 +1(같은 날 재방문도 잡힘)
     // 방문 기록: 첫 방문이면 행 생성(동의 미정=NULL), 재방문이면 카운트·최근시각 갱신.
     // 출처(src/referrer/utm/landing)는 첫터치만 보존 — 이미 있으면 덮어쓰지 않음(COALESCE).
     await sql`
@@ -74,6 +77,7 @@ export async function POST(req: NextRequest) {
       VALUES (${anonId}, 1, now(), ${ua}, ${src}, ${ref}, ${utmSource}, ${utmMedium}, ${utmCampaign}, ${landing}, ${isInternal})
       ON CONFLICT (anon_id) DO UPDATE SET
         visit_count = COALESCE(user_consents.visit_count, 1) + 1,
+        sessions = COALESCE(user_consents.sessions, 1) + ${newSession ? 1 : 0},
         last_seen = now(),
         internal = COALESCE(user_consents.internal, false) OR ${isInternal},
         src = COALESCE(user_consents.src, EXCLUDED.src),

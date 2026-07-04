@@ -20,7 +20,7 @@ export default function VisitPing() {
       // 내부(대표·팀) 표시: /admin 접속 시 자동 세팅되며, 이후 이 브라우저의 모든 방문은 집계 제외
       if ((pathname || u.pathname).startsWith("/admin")) localStorage.setItem("dcn_internal", "1");
       const isInternal = localStorage.getItem("dcn_internal") === "1";
-      const body: Record<string, string | boolean> = { anonId: a, path: pathname || u.pathname, internal: isInternal };
+      const body: Record<string, string | boolean> = { anonId: a, path: pathname || u.pathname, internal: isInternal, newSession: firstThisSession };
       if (firstThisSession) {
         body.ref = document.referrer || "";
         body.utm_source = u.searchParams.get("utm_source") || "";
