@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { ORG, MEMBER_INFO } from "@/lib/org";
+import { CADENCE } from "@/lib/cadence";
 
 function md2html(md: string) {
   const esc = (s: string) => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -140,6 +141,8 @@ export default function OrgDashboard() {
   const [showJobs, setShowJobs] = useState(false);
   const [devpipe, setDevpipe] = useState<any>(null);
   const [showDev, setShowDev] = useState(false);
+  const [orgAct, setOrgAct] = useState<any>(null); // 본부별 활동 현황
+  const [showRhythm, setShowRhythm] = useState(true); // 조직 운영 리듬(활동+케이던스) — 기본 펼침
   const load = (password: string, silent = false) => {
     if (!silent) { setLoading(true); setErr(""); }
     Promise.all([
@@ -150,7 +153,9 @@ export default function OrgDashboard() {
       fetch("/api/admin/metrics", { headers: { "x-admin-password": password }, cache: "no-store" }).then((r) => r.json()).catch(() => ({ ok: false })),
       fetch("/api/admin/jobs", { headers: { "x-admin-password": password }, cache: "no-store" }).then((r) => r.json()).catch(() => ({ ok: false })),
       fetch("/api/admin/dev-pipeline", { headers: { "x-admin-password": password }, cache: "no-store" }).then((r) => r.json()).catch(() => ({ ok: false })),
-    ]).then(([b, d, co, iss, lv, jb, dp]) => {
+      fetch("/api/admin/org-activity", { headers: { "x-admin-password": password }, cache: "no-store" }).then((r) => r.json()).catch(() => ({ ok: false })),
+    ]).then(([b, d, co, iss, lv, jb, dp, oa]) => {
+      if (oa && oa.ok) setOrgAct(oa);
       if (dp && dp.ok) setDevpipe(dp);
       if (b.ok) { setBrief(b.brief); setBriefs(b.briefs || (b.brief ? [b.brief] : [])); localStorage.setItem("adm_pw", password); } else if (!silent) setErr("비밀번호 확인");
       if (d.ok) setDec({ pending: d.pending || [], delegated: d.delegated || [], recent: d.recent || [], inProgress: d.inProgress || [], deferred: d.deferred || [] });
@@ -254,6 +259,65 @@ export default function OrgDashboard() {
                   </div>
                 );
               })}
+            </div>
+          )}
+        </div>
+
+        {/* 🕐 조직 운영 리듬 — 본부별 활동(live) + 실행 케이던스(설계). 기본 펼침 */}
+        <div style={{ ...card, marginTop: 10 }}>
+          <button onClick={() => setShowRhythm(!showRhythm)} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
+            <span style={{ fontSize: 13.5, fontWeight: 700, color: "#2a7a72" }}>{showRhythm ? "▾" : "▸"} 🕐 조직 운영 리듬</span>
+            {orgAct && <span style={{ fontSize: 10.5, color: "#9c8a6c", fontWeight: 700 }}>24h {orgAct.totalRan24h}회 · 다음 {orgAct.nextCycleHour}시({orgAct.nextCycleToday ? "오늘" : "내일"})</span>}
+          </button>
+          {showRhythm && (
+            <div style={{ marginTop: 10 }}>
+              {/* 본부별 활동(현재) */}
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#9c6b3f", marginBottom: 6 }}>본부별 활동 (현재)</div>
+              {orgAct?.teams ? (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                  {orgAct.teams.map((t: any) => {
+                    const dot = !t.ok ? "🔴" : t.lastH < 24 ? "🟢" : "🟡";
+                    const ago = t.lastH < 1 ? "방금" : `${t.lastH}h 전`;
+                    return (
+                      <div key={t.team} style={{ background: "#fbf6ec", border: "1px solid #e6d8bf", borderRadius: 9, padding: "7px 9px" }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: "#2b2018" }}>{dot} {t.team}</div>
+                        <div style={{ fontSize: 9.5, color: "#9c8a6c", marginTop: 2 }}>{ago} · {t.lastJob} ({t.ran24h}/{t.jobs})</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : <div style={{ fontSize: 11, color: "#9c8a6c" }}>불러오는 중…</div>}
+
+              {/* 실행 케이던스(설계) */}
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#9c6b3f", margin: "12px 0 6px" }}>실행 케이던스 (설계 · 도메인 변화속도에 맞춤)</div>
+              <div style={{ overflowX: "auto", border: "1px solid #ddc9a8", borderRadius: 9 }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11, minWidth: 480 }}>
+                  <thead>
+                    <tr style={{ background: "#f3e9d8", color: "#8a7a5c", textAlign: "left" }}>
+                      <th style={{ padding: "6px 8px", fontWeight: 700 }}>계층</th>
+                      <th style={{ padding: "6px 8px", fontWeight: 700 }}>빈도</th>
+                      <th style={{ padding: "6px 8px", fontWeight: 700 }}>시각</th>
+                      <th style={{ padding: "6px 8px", fontWeight: 700 }}>에이전트 · 근거</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {CADENCE.map((c) => {
+                      const teal = /3×|2×/.test(c.freq); const sky = c.freq === "상시";
+                      const bg = teal ? "#d6efe9" : sky ? "#dceaf5" : "#ece1cc";
+                      const fg = teal ? "#2a7a72" : sky ? "#3a6a92" : "#7a6a4c";
+                      return (
+                        <tr key={c.tier} style={{ borderTop: "1px solid #e6d8bf", verticalAlign: "top" }}>
+                          <td style={{ padding: "7px 8px", fontWeight: 700, color: "#2b2018", whiteSpace: "nowrap" }}>{c.tier}</td>
+                          <td style={{ padding: "7px 8px", whiteSpace: "nowrap" }}><span style={{ background: bg, color: fg, fontWeight: 700, padding: "1px 7px", borderRadius: 20, fontSize: 10 }}>{c.freq}</span></td>
+                          <td style={{ padding: "7px 8px", color: "#6a5a44" }}>{c.when}</td>
+                          <td style={{ padding: "7px 8px", color: "#9c8a6c" }}>{c.items} · {c.why}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{ fontSize: 9.5, color: "#a89574", marginTop: 6 }}>조간회의 폐지 · 12시 점심=오염 가드만 · 결정론 품질크론은 토큰0이라 2×로 촘촘. 변경 출처: run-daily/weekly·vercel.json (lib/cadence.ts)</div>
             </div>
           )}
         </div>

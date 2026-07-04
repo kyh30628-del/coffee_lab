@@ -3,7 +3,6 @@ import { useState, useEffect } from "react";
 import BackLink from "../BackLink";
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis,
   AreaChart, Area, CartesianGrid, Tooltip } from "recharts";
-import { CADENCE } from "@/lib/cadence";
 
 type Cafe = {
   id: number; name: string; area: string; note: string; beans: string;
@@ -78,8 +77,6 @@ export default function AdminPage() {
   const [rotation, setRotation] = useState<any>(null);
   const loadRotation = () => fetch("/api/admin/rotation", { headers: { "x-admin-password": pw }, cache: "no-store" }).then((x) => x.json()).then((d) => { if (d.ok) setRotation(d); }).catch(() => {});
   const openRotation = () => { setShowRotation(true); loadRotation(); };
-  const [orgAct, setOrgAct] = useState<any>(null); // 본부별 활동 현황(상시 노출)
-  const loadOrgActivity = (password: string) => fetch("/api/admin/org-activity", { headers: { "x-admin-password": password }, cache: "no-store" }).then((x) => x.json()).then((d) => { if (d.ok) setOrgAct(d); }).catch(() => {});
   // 📰 뉴스레터
   const [showNL, setShowNL] = useState(false);
   const [nlList, setNlList] = useState<any[]>([]);
@@ -164,7 +161,6 @@ export default function AdminPage() {
     refreshNumbers(password);
     loadReview(password);
     loadSubscribers(password);
-    loadOrgActivity(password);
     fetch("/api/newsletter", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) { setNlList(d.list ?? []); setNlRecipients(d.recipients ?? 0); } }).catch(() => {});
   };
 
@@ -737,69 +733,7 @@ export default function AdminPage() {
           <button onClick={openRotation} className="flex-1 py-2.5 text-[13px] font-bold text-teal-800 bg-teal-50 border border-teal-300 rounded-xl">🔁 노출 로테이션 현황</button>
         </div>
 
-        {/* ===== 🏛️ 본부별 활동 현황 (상시 노출 — 조직이 실제로 일하는지 한눈에) ===== */}
-        {orgAct && (
-          <div className="mb-6 border-t-2 border-stone-300 pt-6 mt-2">
-            <div className="flex items-center justify-between mb-2 flex-wrap gap-1">
-              <span className="text-[13px] font-extrabold text-stone-800">🏛️ 본부별 활동 현황</span>
-              <span className="text-[11px] font-bold text-stone-600">
-                24h {orgAct.totalRan24h}회 실행 · 다음 현업 사이클 <b className="text-teal-700">{orgAct.nextCycleHour}시</b>({orgAct.nextCycleToday ? "오늘" : "내일"} · {Math.floor(orgAct.minsToNext / 60)}h{orgAct.minsToNext % 60}m 후)
-              </span>
-            </div>
-            <div className="text-[10.5px] text-stone-500 mb-2">현업 사이클 {orgAct.cycles.join("·")}시 (하루 3회) · 크론은 상시 자체 주기</div>
-            <div className="grid grid-cols-2 gap-1.5">
-              {orgAct.teams.map((t: any) => {
-                const fresh = t.lastH < 24; const warn = t.lastH >= 48;
-                return (
-                  <div key={t.team} className={`rounded-lg border px-2.5 py-2 ${!t.ok ? "bg-rose-50 border-rose-300" : warn ? "bg-amber-50 border-amber-300" : "bg-white border-stone-300"}`}>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[13px]">{!t.ok ? "🔴" : fresh ? "🟢" : "🟡"}</span>
-                      <span className="text-[12.5px] font-bold text-stone-800 truncate">{t.team}</span>
-                    </div>
-                    <div className="text-[10.5px] text-stone-500 mt-0.5 truncate">
-                      {t.lastH < 1 ? "방금" : `${t.lastH}h 전`} · {t.lastJob} <span className="text-stone-400">({t.ran24h}/{t.jobs})</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            <button onClick={() => loadOrgActivity(pw)} className="mt-2 text-[11px] font-bold text-stone-600">↻ 새로고침</button>
-          </div>
-        )}
-
-        {/* ===== 🕐 실행 케이던스 (조직별 설계 — 도메인 변화속도에 맞춤) ===== */}
-        <div className="mb-6 border-t-2 border-stone-300 pt-6 mt-2">
-          <div className="flex items-center justify-between mb-2 flex-wrap gap-1">
-            <span className="text-[13px] font-extrabold text-stone-800">🕐 실행 케이던스 (조직별 설계)</span>
-            <span className="text-[11px] font-bold text-stone-600">도메인 변화속도에 맞춤 · 품질↑ 토큰↓</span>
-          </div>
-          <div className="overflow-x-auto rounded-lg border border-stone-300">
-            <table className="w-full text-[11.5px]" style={{ minWidth: 520 }}>
-              <thead>
-                <tr className="bg-stone-100 text-stone-600 text-left">
-                  <th className="px-2.5 py-1.5 font-extrabold">계층</th>
-                  <th className="px-2.5 py-1.5 font-extrabold">빈도</th>
-                  <th className="px-2.5 py-1.5 font-extrabold">시각</th>
-                  <th className="px-2.5 py-1.5 font-extrabold">에이전트 · 근거</th>
-                </tr>
-              </thead>
-              <tbody>
-                {CADENCE.map((c) => {
-                  const fc = /3×|2×/.test(c.freq) ? "bg-teal-100 text-teal-800" : c.freq === "상시" ? "bg-sky-100 text-sky-800" : "bg-stone-200 text-stone-700";
-                  return (
-                    <tr key={c.tier} className="border-t border-stone-300 align-top">
-                      <td className="px-2.5 py-2 font-bold text-stone-800 whitespace-nowrap">{c.tier}</td>
-                      <td className="px-2.5 py-2 whitespace-nowrap"><span className={`px-1.5 py-0.5 rounded-full font-bold ${fc}`}>{c.freq}</span></td>
-                      <td className="px-2.5 py-2 text-stone-600">{c.when}</td>
-                      <td className="px-2.5 py-2 text-stone-500">{c.items}<span className="text-stone-400"> · {c.why}</span></td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-          <div className="text-[10.5px] text-stone-500 mt-1.5">조간회의 폐지 · 12시 점심=오염 가드만(경량) · 결정론 품질크론은 토큰0이라 2×로 촘촘. 변경 출처: run-daily/weekly·vercel.json</div>
-        </div>
+        {/* ℹ️ 조직 활동·실행 케이던스는 '조직 관제(/admin/org)'로 이동 — 대시보드는 운영(카페·구독·품질)에 집중 */}
 
         {/* ❤ 내 카페 방문기록 모달 */}
         {showVisits && (
