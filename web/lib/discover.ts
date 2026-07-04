@@ -36,6 +36,10 @@ export const isSnackStall = (name: string) => { const n = (name || "").replace(/
 //   ⚠️ 브랜드 토큰이 하나라도 붙으면 제외 안 함('2층라이브러리'·'이층카페 더 로프트'·'반지하40'·'계단집' 보호). CEO 지목 2026-07-04.
 const STRUCT_PHANTOM = /^(지하[0-9]*|반지하|지상[0-9]*|옥상|[0-9]+층|[일이삼사오육칠팔구십]+층)(카페|커피|사무실|공간|점포?|매장)?$/;
 export const isStructuralPhantom = (name: string) => STRUCT_PHANTOM.test((name || "").replace(/\s/g, ""));
+// 🤖 무인 카페 — 바리스타 없이 자판기·셀프로 운영. '진짜 방문 검증 후기' 큐레이션 본질에 안 맞아 영구 제외. CEO 지목 2026-07-04.
+//   ⚠️ '무인도'(섬)·'무인양품'·'무인등대' 등 무인 오탐은 예외.
+const UNMANNED_FALSE = /무인도|무인양품|무인등대|무인지대|무인기/;
+export const isUnmannedCafe = (name: string) => { const n = name || ""; return /무인/.test(n) && !UNMANNED_FALSE.test(n); };
 // '카페' 글자가 있어도 커피 카페가 아닌 업종(키즈카페·스터디카페·만화카페·실내놀이터…) — CAFE_HINT보다 우선.
 const NON_CAFE_OVERRIDE = /(키즈카페|실내놀이터|놀이방|스터디카페|스터디룸|독서실|만화카페|룸카페|멀티방|파티룸|방탈출|트램폴린|트램펄린|보드게임|볼링장|당구장|스크린골프|골프연습|pc방|피씨방|찜질방|사우나|클라이밍|코인노래|노래방|애견카페|고양이카페|동물카페|키즈)/i;
 
