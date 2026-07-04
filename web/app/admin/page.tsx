@@ -67,6 +67,7 @@ export default function AdminPage() {
   const [subscribers, setSubscribers] = useState<any[]>([]);
   const [showSubsModal, setShowSubsModal] = useState(false);
   const [emailReady, setEmailReady] = useState<boolean | null>(null); // 이 환경에 이메일 발송키 있는지
+  const [liveExposure, setLiveExposure] = useState<boolean | null>(null); // 소비자에게 우선노출이 실제 보이는지(SUBSCRIPTION_LIVE)
   const [subMsg, setSubMsg] = useState(""); // 승인 결과(키 발송 성공/실패) 안내
   // 📰 뉴스레터
   const [showNL, setShowNL] = useState(false);
@@ -78,7 +79,7 @@ export default function AdminPage() {
   const [showYtModal, setShowYtModal] = useState(false);
   const [showVisits, setShowVisits] = useState(false);
   const [visits, setVisits] = useState<any>(null);
-  const loadSubscribers = (password: string) => fetch("/api/subscription?all=1", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) { setSubscribers(d.subs ?? []); setEmailReady(!!d.emailReady); } }).catch(() => {});
+  const loadSubscribers = (password: string) => fetch("/api/subscription?all=1", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) { setSubscribers(d.subs ?? []); setEmailReady(!!d.emailReady); setLiveExposure(!!d.liveExposure); } }).catch(() => {});
   const subAct = async (id: number, action: string, days?: number, reason?: string) => {
     try {
       const d = await (await fetch("/api/subscription", { method: "POST", headers: { "x-admin-password": pw, "Content-Type": "application/json" }, body: JSON.stringify({ id, action, ...(days ? { days } : {}), ...(reason ? { reason } : {}) }) })).json().catch(() => ({}));
@@ -794,6 +795,9 @@ export default function AdminPage() {
             {/* 📧 이메일 발송 준비 상태 — 승인 시 키 자동발송 가능 여부(프로덕션 env) */}
             {emailReady === false && <div className="mb-3 text-[11px] text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-2.5 py-2">🚨 이 환경에 <b>이메일 발송키(RESEND)가 없어요</b>. 승인해도 키가 자동 발송되지 않으니, 승인 후 <b>PIN을 사장님께 직접 전달</b>해야 해요. (Vercel 환경변수 RESEND_API_KEY 설정 필요)</div>}
             {emailReady === true && <div className="mb-3 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-2">📧 이메일 발송 준비됨 — 승인하면 키(PIN)가 사장님 이메일로 <b>자동 발송</b>돼요.</div>}
+            {/* ✨ 소비자 노출(우선노출) 실제 작동 여부 — SUBSCRIPTION_LIVE */}
+            {liveExposure === false && <div className="mb-3 text-[11px] text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-2.5 py-2">🚨 <b>소비자 노출 OFF</b> — 구독 사장님이 featured(우선노출)여도 지도 금색핀·추천카페·쇼케이스가 <b>손님에게 안 보입니다</b>. 유료 사장님이 있으면 Vercel 환경변수 <b>SUBSCRIPTION_LIVE=true</b>로 켜야 노출됩니다.</div>}
+            {liveExposure === true && <div className="mb-3 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-2">✨ 소비자 노출 ON — 구독 사장님 우선노출(금색핀·추천카페·쇼케이스)이 손님에게 정상 노출됩니다.</div>}
             {subMsg && <div className="mb-3 text-[12px] text-stone-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-2 flex items-start gap-2"><span className="flex-1">{subMsg}</span><button onClick={() => setSubMsg("")} className="text-stone-400 shrink-0">×</button></div>}
             {subscribers.length > 0 ? (
             <div className="space-y-2">
