@@ -182,7 +182,7 @@ export const isNonCafe = (name: string, category: string) => {
   if (isSnackStall(name)) return true; // 🍢 노점 간식(꽈배기·찹쌀도너츠 등) — 네이버 '카페,디저트' 오분류 무시하고 차단
   if (isStructuralPhantom(name)) return true; // 🏚️ 유령 상호("2층 카페"·"2층사무실" 등) — 카테고리 카페여도 차단
   if (NON_CAFE_OVERRIDE.test(n) || NON_CAFE_OVERRIDE.test(cat)) return true; // 키즈·스터디·만화·실내놀이터 등
-  if (cat && /브런치/.test(cat)) return true; // 🍳 브런치 전체 제외(식사 위주) — CEO 정책 2026-07-04. '동네 커피 노트'=커피 큐레이션. '브런치카페'가 '카페' 포함해 통과하던 것 차단.
+  if (/브런치/.test(n) || (cat && /브런치/.test(cat))) return true; // 🍳 브런치 전체 제외(식사 위주) — CEO 정책 2026-07-04. '동네 커피 노트'=커피 큐레이션. 카테고리·이름 어느 쪽이든 브런치면 차단('브런치카페'가 '카페' 포함해 통과하던 것 포함).
   if (cat) {
     // 카테고리 경로를 '구간(segment)'으로 본다. 네이버='카페,디저트>와플', 카카오='음식점 > 카페 > 커피전문점 > {브랜드}'
     //  처럼 형식이 다르므로, 리프만 보면 브랜드명이 끝일 때(읍천리382 등) 진짜 카페를 놓친다.
