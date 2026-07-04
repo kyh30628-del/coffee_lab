@@ -1439,12 +1439,17 @@ export default function Home() {
           <div className="absolute inset-0 bg-black/40" onClick={onDecline} />
           <div className="relative bg-[#fdfaf4] w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl p-6 shadow-2xl">
             <div className="text-2xl mb-1">📍</div>
-            <h3 className="text-lg font-bold text-[#2b2018] mb-2">내 동네 카페 먼저 보기</h3>
-            <p className="text-[13px] text-[#52402e] leading-relaxed mb-2">
-              동네 커피 가이드라서, 위치를 알면 <b>가장 가까운 동네(시·군·구)의 검증된 카페</b>를 바로 보여드릴 수 있어요.
+            <h3 className="text-lg font-bold text-[#2b2018] mb-2">내 주변 옥석 카페 바로 찾기</h3>
+            <p className="text-[13px] text-[#52402e] leading-relaxed mb-2.5">
+              위치를 켜면 지금 <b>걸어갈 만한 거리의 검증된 옥석 카페</b>만 골라서 바로 보여드려요. 옆동네까지 헤맬 필요 없이, <b>내 동네부터</b>.
             </p>
-            <p className="text-[12px] text-[#6b5a48] leading-relaxed mb-3">
-              정확한 좌표가 아니라 <b>대략적 지역만</b> 쓰고(저장도 ≈500m로 뭉뚱그려요), 이름·연락처 같은 <b>개인정보는 받지 않아요</b>. 동의는 <b>선택</b>이고 언제든 끌 수 있어요. 동의하시면 브라우저가 위치 권한을 한 번 더 물어봅니다.
+            <div className="flex flex-col gap-1 mb-3 bg-[#f1f5ee] border border-[#d6e3ca] rounded-xl px-3.5 py-2.5">
+              <div className="text-[12.5px] text-[#3f5a37] font-medium">🚶 <b>내 주변 500m</b> 걸어갈 카페만 딱</div>
+              <div className="text-[12.5px] text-[#3f5a37] font-medium">🎯 내 동네 검증 후기 카페 <b>자동 정렬·추천</b></div>
+              <div className="text-[12.5px] text-[#3f5a37] font-medium">☕ 광고·옆가게 없이 <b>진짜 후기로 가린 옥석</b>만</div>
+            </div>
+            <p className="text-[11.5px] text-[#6b5a48] leading-relaxed mb-3">
+              🔒 정확한 좌표가 아니라 <b>대략적 지역(≈500m)만</b> 쓰고, 이름·연락처 같은 <b>개인정보는 일절 안 받아요</b>. 동의는 <b>선택</b>이고 언제든 끌 수 있어요. 동의하시면 브라우저가 위치 권한을 한 번 더 물어봅니다.
             </p>
             <details className="mb-4">
               <summary className="text-[12px] text-[#9c6b3f] cursor-pointer">수집·이용 동의 내용 자세히 보기</summary>
@@ -1459,7 +1464,7 @@ export default function Home() {
               </div>
             </details>
             <div className="flex flex-col gap-2">
-              <button onClick={onAgree} className="w-full bg-[#2b2018] text-[#f4ece0] rounded-xl py-3 font-medium">동의하고 내 동네 보기</button>
+              <button onClick={onAgree} className="w-full bg-[#2b2018] text-[#f4ece0] rounded-xl py-3 font-bold">📍 내 주변 옥석 카페 보기</button>
               <button onClick={onDecline} className="w-full text-[#9c6b3f] rounded-xl py-2 text-sm">아니요, 전체 볼게요</button>
             </div>
           </div>
