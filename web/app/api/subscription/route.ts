@@ -93,6 +93,12 @@ async function ensure() {
   // 만료 자동 반영: 기간 지난 active → expired + featured 해제
   await sql`UPDATE subscriptions SET status='expired', updated_at=now() WHERE status='active' AND expires_at < now()`;
   await sql`UPDATE cafe_promos SET featured=false WHERE cafe_id IN (SELECT cafe_id FROM subscriptions WHERE status='expired') AND featured_until < now()`;
+  // 🔒 self-heal: active 구독은 항상 featured 유지(구독을 단일 출처로). 실수 unfeature/드리프트를 자동 복구.
+  //    노출 제거는 정지(suspend)·취소(cancel)로만 — 그때는 status가 바뀌어 이 대상에서 빠진다.
+  await sql`UPDATE cafe_promos p SET featured=true, featured_until=s.expires_at, updated_at=now()
+            FROM subscriptions s
+            WHERE s.cafe_id = p.cafe_id AND s.status='active' AND s.expires_at > now()
+              AND (p.featured = false OR p.featured_until IS NULL OR p.featured_until < now())`;
 }
 
 export async function GET(req: NextRequest) {
