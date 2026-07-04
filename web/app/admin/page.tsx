@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import BackLink from "../BackLink";
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis,
   AreaChart, Area, CartesianGrid, Tooltip } from "recharts";
+import { CADENCE } from "@/lib/cadence";
 
 type Cafe = {
   id: number; name: string; area: string; note: string; beans: string;
@@ -765,6 +766,40 @@ export default function AdminPage() {
             <button onClick={() => loadOrgActivity(pw)} className="mt-2 text-[11px] font-bold text-stone-600">↻ 새로고침</button>
           </div>
         )}
+
+        {/* ===== 🕐 실행 케이던스 (조직별 설계 — 도메인 변화속도에 맞춤) ===== */}
+        <div className="mb-6 border-t-2 border-stone-300 pt-6 mt-2">
+          <div className="flex items-center justify-between mb-2 flex-wrap gap-1">
+            <span className="text-[13px] font-extrabold text-stone-800">🕐 실행 케이던스 (조직별 설계)</span>
+            <span className="text-[11px] font-bold text-stone-600">도메인 변화속도에 맞춤 · 품질↑ 토큰↓</span>
+          </div>
+          <div className="overflow-x-auto rounded-lg border border-stone-300">
+            <table className="w-full text-[11.5px]" style={{ minWidth: 520 }}>
+              <thead>
+                <tr className="bg-stone-100 text-stone-600 text-left">
+                  <th className="px-2.5 py-1.5 font-extrabold">계층</th>
+                  <th className="px-2.5 py-1.5 font-extrabold">빈도</th>
+                  <th className="px-2.5 py-1.5 font-extrabold">시각</th>
+                  <th className="px-2.5 py-1.5 font-extrabold">에이전트 · 근거</th>
+                </tr>
+              </thead>
+              <tbody>
+                {CADENCE.map((c) => {
+                  const fc = /3×|2×/.test(c.freq) ? "bg-teal-100 text-teal-800" : c.freq === "상시" ? "bg-sky-100 text-sky-800" : "bg-stone-200 text-stone-700";
+                  return (
+                    <tr key={c.tier} className="border-t border-stone-300 align-top">
+                      <td className="px-2.5 py-2 font-bold text-stone-800 whitespace-nowrap">{c.tier}</td>
+                      <td className="px-2.5 py-2 whitespace-nowrap"><span className={`px-1.5 py-0.5 rounded-full font-bold ${fc}`}>{c.freq}</span></td>
+                      <td className="px-2.5 py-2 text-stone-600">{c.when}</td>
+                      <td className="px-2.5 py-2 text-stone-500">{c.items}<span className="text-stone-400"> · {c.why}</span></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <div className="text-[10.5px] text-stone-500 mt-1.5">조간회의 폐지 · 12시 점심=오염 가드만(경량) · 결정론 품질크론은 토큰0이라 2×로 촘촘. 변경 출처: run-daily/weekly·vercel.json</div>
+        </div>
 
         {/* ❤ 내 카페 방문기록 모달 */}
         {showVisits && (
