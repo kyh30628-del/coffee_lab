@@ -15,10 +15,18 @@ let result = "";
 try { result = String(JSON.parse(readFileSync(jf, "utf8")).result || ""); } catch { /* 빈 결과 */ }
 const isEmptyVal = (s) => !s || /^(없(음|다|어|네)|변화\s*없|해당\s*없음|n\/?a|none|생략)/i.test(String(s).trim());
 
-// 성과 한 줄 — 없으면 "완료"
+// 성과 한 줄 — 라벨 우선, 없으면 결과의 마지막 실질 내용을 자동요약 폴백(라벨 누락해도 '완료'로 안 떨어지게)
 let perf = "완료";
 const pm = result.match(/성과\s*[:：]\s*(.+)/);
-if (pm && pm[1].trim()) perf = pm[1].trim().slice(0, 220);
+if (pm && pm[1].trim()) {
+  perf = pm[1].trim().slice(0, 220);
+} else if (result.trim()) {
+  // 깊게 일하고 라벨을 빠뜨린 경우(예: 33턴 후 자기요약으로 종료) — 리포트 경로·빈줄 제외한 마지막 실질 문장을 detail로.
+  const lines = result.split("\n").map((s) => s.trim()).filter(Boolean)
+    .filter((s) => !/^리포트\s*[:：]/.test(s) && !/신규 proposals|\.md`?\)?\.?$/.test(s));
+  const last = (lines[lines.length - 1] || "").replace(/^[-*#>\s]+/, "").replace(/[*`]/g, "").trim();
+  if (last) perf = "(자동요약) " + last.slice(0, 200);
+}
 
 // 주간목표·KPI → team_kpis (팀별·주별). 그 주 최초 실행이 목표를 확정 → 주중 안정(준수 대상 고정).
 await sql`CREATE TABLE IF NOT EXISTS team_kpis (id SERIAL PRIMARY KEY, scope TEXT, week_start DATE, goal TEXT, updated_by TEXT, updated_at TIMESTAMPTZ DEFAULT now(), UNIQUE(scope, week_start))`.catch(() => {});
