@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
+import { generatePromo, hasPromoLLM } from "@/lib/promoAgent";
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 // 홍보 생성 큐 — 사장님 맥의 로컬 배치(promo-batch, Max 구독)가 이용.
 // GET: ai_pending 홍보 목록(카페명·소개글·사진). POST: 생성 결과 저장 + pending 해제.
@@ -44,7 +46,17 @@ export async function POST(req: NextRequest) {
     if (!cafeId) return NextResponse.json({ ok: false, error: "cafeId 필요" }, { status: 400 });
     // 관리자 승인/반려
     if (body.approve) { await sql`UPDATE cafe_promos SET approved=true WHERE cafe_id=${cafeId}`; return NextResponse.json({ ok: true, approved: true }); }
-    if (body.generate) { await sql`UPDATE cafe_promos SET ai_pending=true, updated_at=now() WHERE cafe_id=${cafeId}`; return NextResponse.json({ ok: true, queued: true }); } // 관리자만 AI 생성 트리거 → 로컬 배치가 처리
+    if (body.generate) {
+      // 🤖 콘솔 키로 즉시(인라인) 생성 — 존재하지 않는 로컬 배치 의존 제거(큐에만 쌓여 영구 대기하던 버그 수정).
+      const c = (await sql`SELECT c.name, c.area, p.intro, p.photos FROM cafe_promos p JOIN cafes c ON c.id = p.cafe_id WHERE p.cafe_id=${cafeId}`)[0] as any;
+      if (!c) return NextResponse.json({ ok: false, error: "카페/홍보 정보 없음" }, { status: 404 });
+      if (!hasPromoLLM()) { await sql`UPDATE cafe_promos SET ai_pending=true, updated_at=now() WHERE cafe_id=${cafeId}`; return NextResponse.json({ ok: false, error: "AI 생성 키(ANTHROPIC_API_KEY) 미설정 — 생성 불가" }, { status: 503 }); }
+      const photo = Array.isArray(c.photos) && typeof c.photos[0] === "string" && c.photos[0].startsWith("data:image") ? c.photos[0] : undefined;
+      const ai = await generatePromo(c.name, c.area, c.intro || "", photo);
+      if (!ai) { await sql`UPDATE cafe_promos SET ai_pending=true, updated_at=now() WHERE cafe_id=${cafeId}`; return NextResponse.json({ ok: false, error: "AI 생성 실패 — 잠시 후 다시 시도" }, { status: 502 }); }
+      await sql`UPDATE cafe_promos SET ai_headline=${ai.headline}, ai_tagline=${ai.tagline}, ai_points=${JSON.stringify(ai.points)}, ai_pending=false, approved=false, updated_at=now() WHERE cafe_id=${cafeId}`;
+      return NextResponse.json({ ok: true, generated: true, headline: ai.headline });
+    }
     if (body.feature) { // 우선 노출 ON — 구독 기간만큼(기본 30일). 만료 시 자동 해제.
       const days = Math.min(Math.max(Number(body.days) || 30, 1), 365);
       await sql`UPDATE cafe_promos SET featured=true, featured_until = now() + make_interval(days => ${days}) WHERE cafe_id=${cafeId}`;
