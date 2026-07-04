@@ -5,8 +5,9 @@ export const runtime = "nodejs";
 // 📈 유입 분석 전용 API — 네이버·구글 없이 우리 DB(user_consents·traffic_events)로 상세 집계.
 // 방문자 단위 지표는 user_consents(즉시), 페이지뷰·퍼널·추이는 traffic_events(적재되며 채워짐).
 const authed = (req: NextRequest) => !!req.headers.get("x-admin-password") && req.headers.get("x-admin-password") === process.env.ADMIN_PASSWORD;
-// 노이즈 제외: 봇 UA + 내부(대표·팀) 트래픽. 이 필터를 거치면 '진짜 외부 방문자'만 남는다.
-const BOT = `COALESCE(user_agent,'') !~* 'bot|crawl|spider|slurp|bingpreview|facebookexternalhit|headless|preview' AND NOT COALESCE(internal, false)`;
+// 노이즈 제외: 봇 UA + 크롤러 referrer(UA로 안 잡히는 findelio·blinkx 등) + 내부(대표·팀). 거치면 '진짜 외부 방문자'만.
+const CRAWLER_SRC = "findelio|blinkx|semrush|ahrefs|dataprovider|dotbot|petalbot|yandex|mj12|serpstat";
+const BOT = `COALESCE(user_agent,'') !~* 'bot|crawl|spider|slurp|bingpreview|facebookexternalhit|headless|preview' AND COALESCE(src,'') !~* '${CRAWLER_SRC}' AND NOT COALESCE(internal, false)`;
 
 export async function GET(req: NextRequest) {
   if (!authed(req)) return NextResponse.json({ ok: false }, { status: 401 });

@@ -907,7 +907,7 @@ export default function AdminPage() {
                           <div className="text-[12px] font-bold text-emerald-800 mb-1.5">🧑 진짜 사용자 신호 <span className="font-normal text-[10px] text-emerald-600">· 봇으로 설명 안 되는 것들</span></div>
                           <div className="grid grid-cols-3 gap-2 text-center">
                             <div><div className="text-[19px] font-extrabold text-emerald-700">{a.realUsers.r2}</div><div className="text-[9.5px] text-stone-500">재방문 2회+<br/>(3회+ {a.realUsers.r3}·5회+ {a.realUsers.r5})</div></div>
-                            <div><div className="text-[19px] font-extrabold text-emerald-700">{a.realUsers.consent}</div><div className="text-[9.5px] text-stone-500">위치동의<br/>(취향 {a.realUsers.taste}·북마크 {a.realUsers.bookmark})</div></div>
+                            <div><div className="text-[19px] font-extrabold text-emerald-700">{a.realUsers.consent}</div><div className="text-[9.5px] text-stone-500">위치동의<br/>(봇은 안 하는 행동)</div></div>
                             <div><div className="text-[19px] font-extrabold text-emerald-700">{(a.realSources || []).reduce((s: number, r: any) => s + r.visitors, 0)}</div><div className="text-[9.5px] text-stone-500">검색·소셜 유입<br/>(재방문율로 진짜 확인)</div></div>
                           </div>
                           {(a.realSources || []).length > 0 && (
