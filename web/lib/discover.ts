@@ -25,6 +25,12 @@ const NON_CAFE = ["고로케", "정육", "세탁소", "치킨집", "피자", "�
 const NON_CAFE_END = /(교회|성당|사찰|법당|학교|유치원|어린이집|병원|의원|한의원|치과|약국|도서관|주민센터|행정복지센터|우체국|경찰서|소방서|구청|시청)$/;
 // 카페류 신호(이름·카테고리에 있으면 무조건 통과 — 북카페·○○병원점 같은 정상 카페 보호)
 const CAFE_HINT = /(카페|까페|커피|coffee|로스터|베이커리|제과|제빵|디저트|브런치|에스프레소|라떼|티하우스|찻집|도넛|음료|아이스크림|와플|케이크|빙수|스무디|쥬스|gelato|젤라또|tea)/i;
+// 🍢 노점 간식(꽈배기·찹쌀도너츠·붕어빵 등) — 네이버가 '카페,디저트'로 오분류해도 커피 큐레이션 본질에 안 맞아 제외. CEO 지목 2026-07-04.
+//   ⚠️ '도넛/도너츠' 단독은 막지 않음(런던베이글뮤지엄·랜디스도넛 등 트렌디 디저트 카페 유지). '찹쌀도너츠'만 노점.
+//   이름에 카페 지표(CAFE_HINT) 있으면 예외 — '에스프레소바'의 '소바' 같은 오탐·'○○꽈배기카페' 보호.
+const SNACK_STALL = /(꽈배기|찹쌀도너츠|찹쌀도넛|붕어빵|잉어빵|호떡|국화빵|계란빵|델리만쥬|호두과자|풀빵|옥수수빵|타코야키|핫도그|콘도그|떡볶이|김밥|순대|어묵|오뎅|튀김)/;
+export const SNACK_STALL_SQL = "꽈배기|찹쌀 ?도너츠|찹쌀 ?도넛|붕어빵|잉어빵|호떡|국화빵|계란빵|델리만쥬|호두과자|풀빵|옥수수빵|타코야키|핫도그|콘도그|떡볶이|김밥|순대|어묵|오뎅|튀김";
+export const isSnackStall = (name: string) => { const n = (name || "").replace(/\s/g, ""); return SNACK_STALL.test(n) && !CAFE_HINT.test(n); };
 // '카페' 글자가 있어도 커피 카페가 아닌 업종(키즈카페·스터디카페·만화카페·실내놀이터…) — CAFE_HINT보다 우선.
 const NON_CAFE_OVERRIDE = /(키즈카페|실내놀이터|놀이방|스터디카페|스터디룸|독서실|만화카페|룸카페|멀티방|파티룸|방탈출|트램폴린|트램펄린|보드게임|볼링장|당구장|스크린골프|골프연습|pc방|피씨방|찜질방|사우나|클라이밍|코인노래|노래방|애견카페|고양이카페|동물카페|키즈)/i;
 
@@ -168,6 +174,7 @@ export const isGenericFoodName = (name: string) => { const n = (name || "").repl
 export const isNonCafe = (name: string, category: string) => {
   const n = (name || "").replace(/\s/g, ""), cat = category || "";
   if (MANUAL_NONCAFE.some((b) => n.includes(b.replace(/\s/g, "")))) return true; // 직접 지목 비카페(차덕분 등) — 카테고리 무관 확실 차단
+  if (isSnackStall(name)) return true; // 🍢 노점 간식(꽈배기·찹쌀도너츠 등) — 네이버 '카페,디저트' 오분류 무시하고 차단
   if (NON_CAFE_OVERRIDE.test(n) || NON_CAFE_OVERRIDE.test(cat)) return true; // 키즈·스터디·만화·실내놀이터 등
   if (cat) {
     // 카테고리 경로를 '구간(segment)'으로 본다. 네이버='카페,디저트>와플', 카카오='음식점 > 카페 > 커피전문점 > {브랜드}'
