@@ -35,13 +35,17 @@ function ChatWidget({ pw }: { pw: string }) {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState<"chat" | "region">("chat");
+  const loadHistory = () =>
+    fetch("/api/admin/chat", { headers: { "x-admin-password": pw }, cache: "no-store" }).then((r) => r.json()).then((d) => {
+      if (d.ok && d.history) { const m: any[] = []; for (const h of d.history) { m.push({ role: "user", content: h.question }); if (h.answer) m.push({ role: "assistant", content: h.answer }); } setMsgs(m); }
+    }).catch(() => {});
+  useEffect(() => { if (open && pw) loadHistory(); }, [open, pw]);
+  // 🔄 자율실행 진행보고(dev-report)가 챗에 계속 쌓이므로, 모달 열려있고 입력중 아닐 때 15초마다 새로고침.
   useEffect(() => {
-    if (open && pw) {
-      fetch("/api/admin/chat", { headers: { "x-admin-password": pw }, cache: "no-store" }).then((r) => r.json()).then((d) => {
-        if (d.ok && d.history) { const m: any[] = []; for (const h of d.history) { m.push({ role: "user", content: h.question }); if (h.answer) m.push({ role: "assistant", content: h.answer }); } setMsgs(m); }
-      }).catch(() => {});
-    }
-  }, [open, pw]);
+    if (!open || !pw) return;
+    const t = setInterval(() => { if (!loading) loadHistory(); }, 15000);
+    return () => clearInterval(t);
+  }, [open, pw, loading]);
   const send = async () => {
     const q = input.trim(); if (!q || loading) return;
     setInput(""); setMsgs((m) => [...m, { role: "user", content: q }]); setLoading(true);
@@ -93,7 +97,7 @@ function ChatWidget({ pw }: { pw: string }) {
             </div>
             <div style={{ flex: 1, overflowY: "auto", padding: 12 }}>
               {msgs.length === 0 && (mode === "chat"
-                ? <div style={{ color: "#9c8a6c", fontSize: 13, lineHeight: 1.7 }}>실시간 상태를 물어보세요.<br />예: "발행 몇 개야?" · "결재 대기 뭐 있어?" · "self-audit 언제 돌아?" · "floor 기준 뭐야?"</div>
+                ? <div style={{ color: "#9c8a6c", fontSize: 13, lineHeight: 1.7 }}>상태를 묻거나 <b>작업을 지시</b>하세요.<br />질문: "발행 몇 개야?" · "결재 대기 뭐 있어?"<br />지시: "관제탑 상단에 발행 수 배지 추가해줘" · "지도 팝업 여백 줄여줘"<br /><span style={{ fontSize: 11.5, color: "#b0a081" }}>안전한 코드 변경은 자율로 구현·검증·배포하고, 데이터 변경·모호한 건은 되물어봅니다.</span></div>
                 : <div style={{ color: "#9c8a6c", fontSize: 13, lineHeight: 1.7 }}>동/구 이름을 넣으면 <b>즉시</b> 집계해요(LLM 안 씀·빠름).<br />예: "성수동" · "강남구" · "연남동" · "수원시"</div>)}
               {msgs.map((m, i) => (
                 <div key={i} style={{ display: "flex", justifyContent: m.role === "user" ? "flex-end" : "flex-start", margin: "6px 0" }}>
