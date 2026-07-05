@@ -43,9 +43,9 @@ export const ORG: Org = {
         { k: "🌐", n: "api/momentum·cafeProfile", t: "실시간(매 요청)" }] }] },
     { n: "🟥 영업본부", c: "#b03a3a", teams: [
       { n: "마케팅팀 (B2C)", s: "무료 소비자 유입·바이럴 연구·기획", w: [
-        { k: "🧠", n: "마케팅 에이전트", t: "매일", j: "marketing-agent" }] },
+        { k: "🧠", n: "마케팅 에이전트", t: "격일(17시)", j: "marketing-agent" }] },
       { n: "사장님영업팀 (B2B)", s: "유료 구독 전환 연구·아웃리치", w: [
-        { k: "🧠", n: "B2B영업 에이전트", t: "매일", j: "b2b-sales-agent" }] }] },
+        { k: "🧠", n: "B2B영업 에이전트", t: "격일(17시)", j: "b2b-sales-agent" }] }] },
     { n: "🟫 전략기획본부", c: "#7a5a2a", note: "격일", teams: [
       { n: "전략기획팀", s: "시장조사·벤치마킹·약점보완·예측", w: [
         { k: "🧠", n: "전략 에이전트", t: "격일", j: "strategy-agent" }] }] },

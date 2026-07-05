@@ -20,7 +20,8 @@ export const JOB_TEAM: Record<string, string> = {
   "chat-watch": "경영지원본부",
   // 리프 에이전트(run-daily/weekly 내부, _run.sh 하트비트) — 실패만 감지(staleness는 chief-manager가 대표)
   "integrity-agent": "품질본부", "rulegap-agent": "품질본부", "quality-redteam-agent": "품질본부", "deep-judge-agent": "품질본부",
-  "demand-grow-agent": "성장본부", "marketing-agent": "성장본부",
+  "demand-grow-agent": "성장본부",
+  "marketing-agent": "영업본부", // ⚠️ org.ts(조직도 단일출처)는 마케팅팀=영업본부(B2C). 여기가 성장본부로 drift해 org-activity 롤업에서 영업본부가 b2b-sales만 남아 격일공백 37h→오탐 🟡. 2026-07-06 정합.
   "search-quality-agent": "경험본부", "b2b-sales-agent": "영업본부", "closure-agent": "운영본부",
   "chief-manager-agent": "기획조정실", "chief-secretary-agent": "기획조정실", "self-audit-agent": "기획조정실",
   "dev-agent": "기획조정실",
