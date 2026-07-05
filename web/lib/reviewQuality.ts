@@ -21,6 +21,7 @@ export type QualityInput = {
   name: string;         // 카페명
   areaTerms?: string[]; // 지역어(동명 카페·관련성 검증)
   addr?: string;        // 카페 등록주소(도로명) — 리뷰 주소 불일치 검증용
+  link?: string;        // 출처 URL — 비방문 게시판(중고나라·창업나무 등) 판별용
   source: SourceKind;
 };
 
@@ -86,7 +87,12 @@ const CAFE_WORDS = ["카페", "커피", "로스터리", "베이커리", "디저�
 // 거래·판매·홍보 양식 글(후기 아님) — 중고거래·판매글이 흔한단어 카페명에 우연히 걸림('와이드'↔중고 모니터).
 //   카페 맥락어가 전혀 없을 때만 적용해 진짜 후기('가격·판매대'를 언급한 후기)는 보존.
 //   강력신호(중고거래 플랫폼·판매양식 등)는 진짜 카페 후기엔 절대 안 나오므로 가드 없이 탈락.
-const COMMERCE_STRONG = /(중고나라|당근\s*마켓|번개장터|판매\s*양식|미개봉|택배\s*신청\s*하기|삽니다|팝니다|총판\s*문의)/;
+// 룰갭 제안28(2026-07-05): joonggonara·changupnamu는 '카페(coffee)'가 아니라 '카페(네이버 카페=커뮤니티)'
+//   판매게시판이라 UI 정형문구("타카페", "카페 연동")에 리터럴 "카페"가 박혀 CAFE_WORDS 가드를 우회 —
+//   COMMERCE_JUNK의 !titleHasCafeWord/!bodyHasCafeWord 가드 없이 STRONG으로 승격해 무조건 탈락.
+const COMMERCE_STRONG = /(중고나라|당근\s*마켓|번개장터|판매\s*양식|미개봉|택배\s*신청\s*하기|삽니다|팝니다|총판\s*문의|타\s*카페|카페\s*연동)/;
+// 비방문 판매게시판(네이버 카페=커뮤니티, 회원끼리 물건 거래) — 도메인 성격상 방문 후기가 나올 수 없어 링크만으로 하드 탈락.
+const NONVISIT_BOARD = /cafe\.naver\.com\/(joonggonara|changupnamu)\//i;
 const COMMERCE_JUNK = /(중고\s*거래|직거래|택배\s*(거래|비)|판매\s*(합니다|중입니다|글|가격|처)|구해요|구합니다|분양\s*(합니다|중|가)|새\s*상품|정품\s*인증|택포|계좌\s*(번호|이체)|입금\s*(계좌|확인|자)|견적\s*문의|도매상|인치\s*(모니터|tv|티비))/i;
 // 비카페 업종 선언어 — 제목이 다른 업종(음식점·미용·의료·운동·숙박 등)을 가리킴.
 //   우리 카페 고유명이 제목에 없고 카페맥락어도 없으면 → 같은 자리/무관 다른 업체 글(옆가게 오염).
@@ -285,6 +291,12 @@ export function verifyReview(input: QualityInput): QualityResult {
   // 진짜 광고/협찬(면책 문구 제외)이면 검증 후기에서 제외 — 랜딩 약속('광고·협찬 자동 제외')과 일치.
   const sponsored = AD_STRONG.test(fullL) && !AD_DISCLAIM.test(fullL);
   if (sponsored) return { verdict: "rejected", score: 0, reasons: ["광고·협찬 글 — 자동 제외"], signals: { nameInTitle: false, nameInBody: false, visit: false, substance: 0, listicle: false, sponsored: true, areaMatch: false } };
+
+  // [비방문 게시판] 중고나라·창업나무는 물건 거래·상권 문의 게시판(네이버 카페=커뮤니티)이라 방문 후기가 있을 수 없음.
+  //   내용에 카페 맥락어가 섞여도(리터럴 "카페" 오탐) 링크 도메인만으로 무조건 탈락.
+  if (input.link && NONVISIT_BOARD.test(input.link)) {
+    return { verdict: "rejected", score: 0, reasons: ["비방문 게시판(중고나라·창업나무) — 자동 제외"], signals: { nameInTitle: false, nameInBody: false, visit: false, substance: 0, listicle: false, sponsored: false, areaMatch: false } };
+  }
 
   // ---- 구글 실제 방문 리뷰: 장소에 직접 달린 리뷰이므로 신뢰. 내용량만 본다 ----
   if (input.source === "google") {
