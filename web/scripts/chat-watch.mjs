@@ -41,13 +41,25 @@ async function ground() {
 
 // claude -p 1회 호출. 캐논을 시스템프롬프트로 항상 주입(캐시됨) + 토큰 실측 로깅.
 //   triage/즉답=haiku(저비용·기계적 분류·그라운딩 추출), 심층 DB조사=sonnet. tools=true면 Bash 허용.
-function runClaude(prompt, { tools = false, model = "haiku", job = "chat-triage" } = {}) {
+function runClaude(prompt, { tools = false, model = "haiku", job = "chat-triage", retry = 1 } = {}) {
   return new Promise((res) => {
     const args = ["-p", prompt, "--model", model, "--append-system-prompt-file", CANON, "--dangerously-skip-permissions", "--max-turns", tools ? "6" : "2", "--output-format", "json"];
     if (tools) args.splice(args.indexOf("--max-turns"), 0, "--allowedTools", "Bash");
-    execFile("claude", args,
-      { cwd: "/Users/wangwida/coffee-platform/web", maxBuffer: 16 * 1024 * 1024, timeout: tools ? 75000 : 40000, env: { ...process.env, PATH: "/Users/wangwida/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin" } },
-      (err, stdout) => { try { const j = JSON.parse(stdout); logUsage(job, j); res((j.result || "").trim()); } catch { res(err ? `__ERR__${String(err).slice(0, 80)}` : ""); } });
+    const child = execFile("claude", args,
+      { cwd: "/Users/wangwida/coffee-platform/web", maxBuffer: 16 * 1024 * 1024, timeout: tools ? 75000 : 45000, env: { ...process.env, PATH: "/Users/wangwida/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin" } },
+      async (err, stdout) => {
+        let out = "", reason = "";
+        try {
+          const j = JSON.parse(stdout); logUsage(job, j);
+          if (j.is_error) reason = "api_error:" + (j.subtype || j.api_error_status || "unknown");
+          else out = (j.result || "").trim();
+        } catch { reason = err ? (err.killed ? "timeout" : String(err).slice(0, 70)) : "parse_fail"; }
+        if (out) return res(out);
+        // 🚫 빈칸 금지: 빈/에러는 1회 재시도(트랜션트 대응), 그래도 실패하면 __ERR__로 명확히 표면화.
+        if (retry > 0) { console.error(`[재시도] ${job}/${model}: ${reason || "empty"}`); return res(await runClaude(prompt, { tools, model, job, retry: retry - 1 })); }
+        return res(`__ERR__${reason || "빈 응답"}`);
+      });
+    try { child.stdin && child.stdin.end(); } catch {} // 🔑 stdin 즉시 EOF — claude -p의 3초 stdin 대기 제거(콜드 지연 −3s/콜)
   });
 }
 
@@ -63,6 +75,27 @@ const TRIAGE = `
 \`<CHOICE>대표님께 드리는 짧은 질문 또는 A/B 선택지(왜 확인이 필요한지 한 문장 + 옵션)</CHOICE>\`
 4) 애매하면 3)로. **데이터 변경(UPDATE/DELETE/INSERT)은 절대 <ORDER>로 내지 마라 — 반드시 <CHOICE>.** issues.ts 자동변환·결재/이슈 상호생성 영역은 건드리는 지시가 와도 <CHOICE>로 되물어라.`;
 
+// ⚡ 결정론 즉답 게이트(LLM 0·즉시) — 아주 흔한 상태질문만. 명령/모호하면 null 반환 → LLM 경로.
+//   품질 안전: 명령 동사가 있으면 절대 여기서 처리 안 함(지시는 triage로). 매칭 확실한 것만.
+async function quickAnswer(q) {
+  const s = String(q).trim();
+  if (s.length > 60) return null; // 긴 문장은 LLM(뉘앙스)
+  if (/(추가|바꿔|바꾸|고쳐|고치|만들|수정|삭제|제거|내려|올려|배포|리팩터|해줘|해 줘|해주세요|해주|하라|처리해|적용)/.test(s)) return null; // 지시 → LLM/triage
+  try {
+    if (/(발행|공개|퍼블리시).{0,6}(몇|개수|수|얼마|규모)|(몇|개수).{0,6}(발행|공개)/.test(s)) {
+      const pub = await one(sql`SELECT count(*) c FROM cafes WHERE published`);
+      const v = await one(sql`SELECT count(*) c FROM cafes WHERE published AND synth_grade='검증'`);
+      const r = await one(sql`SELECT count(*) c FROM cafes WHERE published AND synth_grade='참고'`);
+      if (typeof pub === "number") return `현재 발행(공개) 카페는 **${pub.toLocaleString()}곳**입니다 (검증 ${v} · 참고 ${r}).`;
+    }
+    if (/(결재|승인).{0,6}(대기|뭐|있|현황|몇|상태)|대기.{0,4}결재/.test(s)) {
+      const d = await sql`SELECT id,title FROM decisions WHERE status='pending' AND COALESCE(tier,'L3')='L3' ORDER BY id`;
+      return d.length ? `CEO 결재 대기 **${d.length}건**: ${d.map((x) => `#${x.id} ${x.title.slice(0, 30)}`).join(" · ")}` : "CEO 결재 대기는 없습니다 (클린).";
+    }
+  } catch { return null; }
+  return null;
+}
+
 async function askOrAnswer(base) {
   const out = await runClaude(base + TRIAGE, { tools: false, model: "haiku", job: "chat-triage" });
   if (out && !out.startsWith("__ERR__")) {
@@ -75,9 +108,9 @@ async function askOrAnswer(base) {
   // [NEED_DB] 또는 fast 실패 → 읽기전용 심층조회로 질문 답변
   const deep = await runClaude(base + "\n\nBash에서 node+@neondatabase/serverless로 web/.env.local의 DATABASE_URL에 접속해 **읽기전용 SELECT만** 실행해 확인한 뒤 자연스럽게 답하라. 🚫 UPDATE/DELETE/INSERT 절대 금지. 마지막엔 반드시 텍스트로 답을 마무리하라.", { tools: true, model: "sonnet", job: "chat-deep" });
   if (deep && !deep.startsWith("__ERR__")) return { type: "answer", text: deep };
-  if (out && !out.startsWith("__ERR__")) return { type: "answer", text: out.replace("[NEED_DB]", "").trim() || "(확인 필요 — 다시 질문해 주세요)" };
-  const err = out.startsWith("__ERR__") ? out.slice(7) : (deep && deep.startsWith("__ERR__") ? deep.slice(7) : "");
-  return { type: "answer", text: err ? `(LLM 오류: ${err})` : "(빈 응답 — 다시 질문해 주세요)" };
+  if (out && !out.startsWith("__ERR__")) return { type: "answer", text: out.replace("[NEED_DB]", "").trim() || "확인이 필요합니다 — 질문을 조금 더 구체적으로 다시 주시겠어요?" };
+  const err = out.startsWith("__ERR__") ? out.slice(7) : (deep && deep.startsWith("__ERR__") ? deep.slice(7) : "알 수 없음");
+  return { type: "answer", text: `⚠️ 일시적으로 응답을 생성하지 못했어요 (사유: ${err}). 로컬 워커는 정상 가동 중이니 잠시 후 다시 보내 주세요.` };
 }
 
 // 🛠 작업지시 → dev_task(승인·CEO·source=chat) 적재. 실제 구현·검증·배포는 로컬 파이프라인이 수행.
@@ -102,6 +135,10 @@ async function tick() {
     if (rows.length) {
       const { id, question, history } = rows[0];
       await sql`UPDATE chat_queue SET status='processing' WHERE id=${id}`;
+      // ⚡ 결정론 즉답 먼저(LLM 0·즉시) — 흔한 상태질문은 여기서 끝. 히스토리 문맥 없을 때만(맥락질문 오답 방지).
+      const noHist = !Array.isArray(history) || history.length === 0;
+      const quick = noHist ? await quickAnswer(question) : null;
+      if (quick) { await sql`UPDATE chat_queue SET answer=${quick}, status='done', mode='quick', answered_at=now() WHERE id=${id}`; console.log(`[${new Date().toISOString()}] answered #${id} (quick·무LLM)`); busy = false; return; }
       const g = await ground();
       const hist = Array.isArray(history) ? history.map((h) => `${h.role === "user" ? "Q" : "A"}: ${String(h.content).slice(0, 300)}`).join("\n") : "";
       const base = `${KB}\n\n${g}\n\n${hist ? "[직전 대화]\n" + hist + "\n\n" : ""}[대표님 입력] ${question}`;

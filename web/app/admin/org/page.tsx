@@ -52,11 +52,12 @@ function ChatWidget({ pw }: { pw: string }) {
     try {
       const r = await fetch("/api/admin/chat", { method: "POST", headers: { "x-admin-password": pw, "Content-Type": "application/json" }, body: JSON.stringify({ message: q, history: msgs.slice(-8) }) }).then((x) => x.json());
       if (!r.ok) { setMsgs((m) => [...m, { role: "assistant", content: "⚠️ " + (r.error || "오류") }]); setLoading(false); return; }
-      for (let i = 0; i < 45; i++) {
-        await new Promise((res) => setTimeout(res, 2500));
+      await new Promise((res) => setTimeout(res, 1000)); // 결정론 즉답은 ~1초 내 완료
+      for (let i = 0; i < 80; i++) {
         const p = await fetch(`/api/admin/chat?id=${r.id}`, { headers: { "x-admin-password": pw }, cache: "no-store" }).then((x) => x.json());
-        if (p.ok && p.status === "done") { setMsgs((m) => [...m, { role: "assistant", content: p.answer || "(빈 응답)" }]); break; }
-        if (i === 44) setMsgs((m) => [...m, { role: "assistant", content: "⏱ 응답 지연 — 로컬 워커/맥 가동 여부 확인 필요." }]);
+        if (p.ok && p.status === "done") { setMsgs((m) => [...m, { role: "assistant", content: p.answer || "⚠️ 빈 응답 — 잠시 후 다시 시도해 주세요." }]); break; }
+        if (i === 79) setMsgs((m) => [...m, { role: "assistant", content: "⏱ 응답 지연 — 로컬 워커/맥 가동 여부 확인 필요." }]);
+        await new Promise((res) => setTimeout(res, 1500));
       }
     } catch { setMsgs((m) => [...m, { role: "assistant", content: "⚠️ 네트워크 오류" }]); }
     setLoading(false);
@@ -104,7 +105,7 @@ function ChatWidget({ pw }: { pw: string }) {
                   <div className={m.role === "assistant" ? "ex" : ""} style={{ maxWidth: "88%", padding: "9px 12px", borderRadius: 13, fontSize: 14.5, lineHeight: 1.6, whiteSpace: m.role === "user" ? "pre-wrap" : "normal", wordBreak: "break-word", background: m.role === "user" ? "#c98a3c" : "#fff", color: m.role === "user" ? "#fff" : "#2b2018", border: m.role === "user" ? "none" : "1px solid #e6d8bf" }}>{m.role === "assistant" ? <div dangerouslySetInnerHTML={{ __html: md2html(m.content) }} /> : m.content}</div>
                 </div>
               ))}
-              {loading && <div style={{ color: "#9c8a6c", fontSize: 13, margin: "6px 0" }}>{mode === "region" ? "🗺️ 집계 중…" : "💭 claude(구독)가 답변 생성 중… (~20-40초)"}</div>}
+              {loading && <div style={{ color: "#9c8a6c", fontSize: 13, margin: "6px 0" }}>{mode === "region" ? "🗺️ 집계 중…" : "💭 접수됨 · 처리 중… (상태질문은 즉답, 지시는 착수까지 잠깐)"}</div>}
             </div>
             <div style={{ display: "flex", gap: 7, padding: "10px 10px calc(10px + env(safe-area-inset-bottom))", borderTop: "1px solid #e6d8bf" }}>
               <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") (mode === "region" ? sendRegion() : send()); }} placeholder={mode === "region" ? "동/구 이름 (예: 성수동, 강남구)" : "질문…"} disabled={loading} style={{ flex: 1, minWidth: 0, padding: "11px 13px", borderRadius: 10, border: "1px solid #ddc9a8", fontSize: 16 }} />
