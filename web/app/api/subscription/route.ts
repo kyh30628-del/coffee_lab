@@ -109,15 +109,24 @@ export async function POST(req: NextRequest) {
       const days = Math.min(Math.max(Number(b.days) || 30, 1), 365);
       if (b.action === "activate") {
         const pin = s.pin || genPin(); // 재활성화면 기존 PIN 유지
-        // 🕐 시계는 '첫 로그인'에 시작 — 승인 시엔 PIN 발급 + 이용기간만 확정(started/expires는 첫 접속 때 lib/ownerActivity가 세팅).
-        await sql`UPDATE subscriptions SET status='active', started_at=NULL, expires_at=NULL, duration_days=${days}, pin=${pin}, verified=true, updated_at=now() WHERE id=${id}`;
-        // 혜택(골드핀·우선노출·쇼케이스)도 첫 로그인에 켜짐 — 승인 시엔 promo 행만 보장하고 OFF 유지.
-        if (s.cafe_id) await sql`INSERT INTO cafe_promos (cafe_id, featured, featured_until, approved, published, updated_at)
-          VALUES (${s.cafe_id}, false, NULL, false, true, now())
-          ON CONFLICT (cafe_id) DO UPDATE SET featured=false, featured_until=NULL, approved=false, updated_at=now()`;
+        // 체험(≤7일) = 첫 로그인 시점 시작 / 유료 구독 = 결제(=이 승인) 시점 즉시 시작. 온보딩 메일 분기(days<=7)와 동일 기준.
+        const isTrial = days <= 7;
+        if (isTrial) {
+          // 🕐 무료 체험: 시계는 '첫 로그인'에. 승인 시엔 PIN·이용기간만 확정(started/expires·혜택은 첫 접속 때 lib/ownerActivity가 ON).
+          await sql`UPDATE subscriptions SET status='active', started_at=NULL, expires_at=NULL, duration_days=${days}, pin=${pin}, verified=true, updated_at=now() WHERE id=${id}`;
+          if (s.cafe_id) await sql`INSERT INTO cafe_promos (cafe_id, featured, featured_until, approved, published, updated_at)
+            VALUES (${s.cafe_id}, false, NULL, false, true, now())
+            ON CONFLICT (cafe_id) DO UPDATE SET featured=false, featured_until=NULL, approved=false, updated_at=now()`;
+        } else {
+          // 💳 유료 구독: 결제 시점(=이 승인)부터 즉시 시작 + 전 혜택(골드핀·우선노출·쇼케이스) ON.
+          await sql`UPDATE subscriptions SET status='active', started_at=now(), expires_at=now()+make_interval(days=>${days}), duration_days=${days}, pin=${pin}, verified=true, updated_at=now() WHERE id=${id}`;
+          if (s.cafe_id) await sql`INSERT INTO cafe_promos (cafe_id, featured, featured_until, approved, published, updated_at)
+            VALUES (${s.cafe_id}, true, now()+make_interval(days=>${days}), true, true, now())
+            ON CONFLICT (cafe_id) DO UPDATE SET featured=true, featured_until=now()+make_interval(days=>${days}), approved=true, updated_at=now()`;
+        }
         const emailed = await sendPinEmail(decryptPII(s.email ?? ""), pin, s.cafe_name ?? "", days);
         if (emailed) await sql`UPDATE subscriptions SET pin_emailed_at=now() WHERE id=${id}`;
-        return NextResponse.json({ ok: true, status: "active", pin, emailed, started: false, email: decryptPII(s.email ?? "") });
+        return NextResponse.json({ ok: true, status: "active", pin, emailed, started: !isTrial, email: decryptPII(s.email ?? "") });
       }
       if (b.action === "extend") {
         await sql`UPDATE subscriptions SET status='active', expires_at=GREATEST(coalesce(expires_at,now()),now())+make_interval(days=>${days}), updated_at=now() WHERE id=${id}`;

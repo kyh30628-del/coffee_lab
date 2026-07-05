@@ -16,13 +16,19 @@ export function renderOnboardingEmail(opts: { cafeName: string; pin: string; day
   const pin = esc(opts.pin || "");
   const isTrial = days <= 7;
 
-  const kicker = isTrial ? "7일 무료 체험이 준비됐어요" : "우리 가게 이야기가 준비됐어요";
+  const kicker = isTrial ? "7일 무료 체험이 준비됐어요" : "우리 가게 이야기가 시작됐어요";
   const intro = isTrial
     ? `우리 동네 누군가는 오늘도 사장님 가게의 커피 한 잔을 기억합니다. 손님들이 남긴 진심 어린 후기가 모여 만든 <b style="color:#5b4636">‘우리 가게 이야기’</b>를, <b style="color:#5b4636">아래 PIN으로 처음 로그인하는 순간부터 7일 동안</b> 마음껏 들여다보세요. (접속이 늦어져도 기간은 안 깎여요.)`
     : `수많은 손님이 남긴 진심이 모여 사장님 가게만의 색깔이 되었어요. 이제 그 이야기와 함께, 우리 가게를 더 오래 빛나게 해보세요.`;
+  // ⏱ 기간 시작 기준 — 체험=첫 로그인(안 쓰면 안 깎임) / 유료=결제 시점(오늘부터). 이 메일이 알려주는 핵심 안내.
+  const startTitle = isTrial ? "체험 기간 안내 — 언제부터 7일인가요?" : "구독 기간 안내 — 언제부터인가요?";
+  const startBody = isTrial
+    ? `이 <b>7일</b>은 지금이 아니라, 위 <b>PIN으로 처음 로그인하시는 순간</b>부터 시작돼요. 급하게 안 쓰셔도 <b>하루도 손해 없이 온전히 7일</b>을 쓰실 수 있어요. 로그인하는 그 순간 <b>지도 골드핀·우선 노출·쇼케이스</b>도 함께 켜집니다.`
+    : `<b>결제가 확인된 오늘부터</b> 구독 기간이 시작돼요. <b>지도 골드핀·우선 노출·쇼케이스</b>가 지금 바로 켜집니다. 아래 PIN으로 로그인해 우리 가게를 꾸며보세요.`;
+  const exposureWhen = isTrial ? "첫 로그인과 함께 자동 적용" : "결제와 함께 자동 적용(지금 켜짐)";
   const footer = isTrial
     ? `PIN으로 <b>첫 로그인하시는 순간부터 7일</b>이 시작돼요. 기간이 끝나도 구독으로 언제든 이어갈 수 있어요.`
-    : `PIN으로 <b>첫 로그인하시는 순간부터</b> 우리가게 홍보팩 구독이 시작돼요. 함께해 주셔서 고맙습니다.`;
+    : `<b>결제가 확인된 오늘부터</b> 우리가게 홍보팩 구독이 시작됐어요. 함께해 주셔서 고맙습니다.`;
   const subject = isTrial
     ? `☕ ${opts.cafeName} 사장님, 우리 가게 이야기를 열어보세요 (7일 무료 체험 시작)`
     : `☕ ${opts.cafeName} 사장님, 우리 가게 이야기가 시작됐어요`;
@@ -61,6 +67,14 @@ export function renderOnboardingEmail(opts: { cafeName: string; pin: string; day
             <div style="font-size:30px;font-weight:800;letter-spacing:8px;color:#2b2018;font-family:'Courier New',monospace;">${pin}</div>
           </div>
         </td></tr>
+        <tr><td style="padding:12px 28px 4px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fff8ec;border:1px solid #e8d4a8;border-radius:12px;">
+            <tr><td style="padding:14px 16px;">
+              <div style="font-size:12.5px;font-weight:700;color:#9c6b3f;">⏱ ${startTitle}</div>
+              <div style="font-size:12.5px;color:#6b5a48;line-height:1.75;margin-top:5px;">${startBody}</div>
+            </td></tr>
+          </table>
+        </td></tr>
         <tr><td style="padding:10px 28px 22px;" align="center">
           <a href="${site}/owner" style="display:inline-block;background:#2b2018;color:#f4ece0;text-decoration:none;font-size:15px;font-weight:700;padding:14px 30px;border-radius:30px;">내 카페 이야기 보러 가기 →</a>
           <p style="font-size:12px;color:#a8927a;margin:14px 0 0;line-height:1.7;">화면에서 위 열쇠를 입력하면 <b style="color:#7c6a55;">내 카페로 바로</b> 들어가요.</p>
@@ -79,7 +93,7 @@ export function renderOnboardingEmail(opts: { cafeName: string; pin: string; day
         ${feature("#b0733e", "🎀", "쇼케이스 — 카페 상세 상단 홍보 배너",
           "우리 가게 상세페이지 <b>맨 위 배너</b>를 직접 꾸며요. 사진 3장 또는 <b>20초 홍보 영상</b>, <b>AI가 써주는 홍보 카피</b>와 <b>템플릿 10종</b>, <b>방문 혜택 쿠폰</b>까지. 노출·클릭·재생 <b>성과도 숫자</b>로 확인돼요. <span style='color:#9c6b3f'>→ 내 카페 화면 ‘쇼케이스’에서 꾸미기</span>")}
         ${feature("#c99a4e", "⭐", "우선 노출 — 손님 눈에 먼저",
-          "구독 기간 동안 <b>지도 금색 핀</b>, 홈 <b>‘추천 카페’ 상단</b>, 근처에 온 손님에게 <b>가까운 카페로 자동 안내</b>돼요. 쇼케이스를 미리 꾸며두면 노출될 때 바로 빛나요. <span style='color:#9c6b3f'>→ 첫 로그인과 함께 자동 적용</span>")}
+          `구독 기간 동안 <b>지도 금색 핀</b>, 홈 <b>‘추천 카페’ 상단</b>, 근처에 온 손님에게 <b>가까운 카페로 자동 안내</b>돼요. 쇼케이스를 미리 꾸며두면 노출될 때 바로 빛나요. <span style='color:#9c6b3f'>→ ${exposureWhen}</span>`)}
         ${feature("#7c6a55", "📰", "주간 뉴스레터 — 사장님을 위한 트렌드 레터",
           "매주 커피·디저트·동네 카페 <b>트렌드</b>와 바로 써먹는 <b>사장님 액션 플레이북</b>을 이메일로 보내드려요. <span style='color:#9c6b3f'>→ 별도 신청 없이 자동 수신(원하면 언제든 해지)</span>")}
 
