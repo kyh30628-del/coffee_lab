@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 import { sql } from "@/lib/db";
 import { getRegions, TASTES } from "@/lib/seoData";
+import { COLLECTIONS } from "@/lib/collections";
 
 export const runtime = "nodejs";
 export const revalidate = 3600; // 감사수리: 결재 집행(공개/비공개) 반영 지연 축소 — 페이지(3600)와 짝 맞춤
@@ -26,10 +27,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const regionTasteUrls: MetadataRoute.Sitemap = regions.flatMap((r) =>
     TASTES.map((t) => ({ url: `${SITE}/area/${encodeURIComponent(r.area)}/${t.key}`, changeFrequency: "weekly" as const, priority: 0.6 }))
   );
-  // 동네 교차검증 컬렉션(에디토리얼 SEO 랜딩) — 확장 시 이 배열에 slug만 추가.
-  const COLLECTIONS = ["seongsu"];
+  // 동네 교차검증 컬렉션(에디토리얼 SEO 랜딩) — lib/collections.ts 레지스트리 단일출처.
   const collectionUrls: MetadataRoute.Sitemap = COLLECTIONS.map((c) => ({
-    url: `${SITE}/collections/${c}`, changeFrequency: "weekly", priority: 0.85,
+    url: `${SITE}/collections/${c.slug}`, changeFrequency: "weekly", priority: 0.85,
   }));
   return [
     { url: SITE, changeFrequency: "daily", priority: 1 },
