@@ -51,12 +51,16 @@ export async function GET(req: NextRequest) {
     const hourOf = (t: any) => { const k = new Date(new Date(t).getTime() + KST); return { date: k.toISOString().slice(0, 10), h: k.getUTCHours() + k.getUTCMinutes() / 60, hh: String(k.getUTCHours()).padStart(2, "0"), mm: String(k.getUTCMinutes()).padStart(2, "0") }; };
     const cmRuns = recentRuns.map((r) => hourOf(r.ran_at)).filter((k) => k.date === todayKst); // 오늘 KST 실행만
     const CYCLE_DEF = [{ name: "아침", label: "08시", hour: 8, lo: 6, hi: 10.5 }, { name: "점심", label: "12시", hour: 12, lo: 10.5, hi: 14.5 }, { name: "오후", label: "17시", hour: 17, lo: 14.5, hi: 20.5 }];
-    // ⚠️ 사이클은 예약시각에 '시작'하고, 여러 에이전트를 순차 실행한 뒤 chief-manager가 '완료 시' 하트비트를 남긴다(실측 15~40분 소요).
-    //   예약시각 지나자마자 '누락(빨강)'으로 찍으면 진행 중인 걸 오표시 → 유예(GRACE) 안엔 '진행중', 넘어도 없으면 '누락'.
+    // ⚠️⚠️ agent_runs는 PK=job → 잡마다 '최신 1행'만 유지(이력 없음). 나중 사이클이 앞 사이클 시각을 덮어써 사라진다.
+    //   그래서 '각 슬롯 창에 기록 있나'만으론 과거 슬롯이 '누락'으로 오표시됨(08:40·12:14가 17시대 실행에 덮임).
+    //   정직한 판정: ①이 슬롯 창에 최신기록 있으면 '실행(시각)' ②더 나중 슬롯이 실행됐으면 이 슬롯도 '실행됨(추정)'
+    //   — 나중 사이클이 돌 정도면 시스템 가동중이라 앞 슬롯도 돈 것. ③빨강 '누락'은 나중 실행도 없고 유예도 지난 진짜 누락만.
     const GRACE = 1.5; // 예약시각 후 완료·하트비트까지 여유(시간). 이 안엔 running, 넘으면 missing.
+    const latestH = cmRuns.length ? Math.max(...cmRuns.map((k) => k.h)) : -1;
     const cycles = CYCLE_DEF.map((c) => {
       const hit = cmRuns.find((k) => k.h >= c.lo && k.h < c.hi);
       if (hit) return { name: c.name, label: c.label, state: "ran", at: `${hit.hh}:${hit.mm}` };
+      if (latestH >= c.hi) return { name: c.name, label: c.label, state: "ran_inferred", at: null }; // 더 나중 사이클이 돎 → 앞 슬롯도 실행됨
       if (nowHourK < c.hour) return { name: c.name, label: c.label, state: "pending", at: null };
       if (nowHourK < c.hour + GRACE) return { name: c.name, label: c.label, state: "running", at: null };
       return { name: c.name, label: c.label, state: "missing", at: null };
