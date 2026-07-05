@@ -346,7 +346,15 @@ export function verifyReview(input: QualityInput): QualityResult {
   //   오매칭됨. → 전체 이름('102커피') 원문 일치만 인정해 차단.
   const weakWhitelist = onlyTok.length >= 1 && WEAK_IDENTITY_TOKEN.has(onlyTok); // #153 초약체 유일토큰
   const weakSingle = onlyTok.length >= 1 && (onlyTok.length <= 2 || /^[0-9]+$/.test(onlyTok) || weakWhitelist) && nameRawN.length > onlyTok.length;
-  const reqFull = coreEmpty || weakSingle;
+  // 결재#157: 이름이 '카페 801, 인테리어'처럼 개별 약한토큰 여럿으로 쪼개지면(["801,","인테리어"])
+  //   onlyTok(단일토큰)이 비어 weakSingle/weakWhitelist가 무력화 — 이미 등재된 초약체 화이트리스트가
+  //   토큰이 2개 이상이라는 이유만으로 뚫린다. 토큰 전부가 숫자(구두점 부산물 제외)이거나
+  //   WEAK_IDENTITY_TOKEN이면 다중토큰도 동급 '약함'으로 보고 전체이름 원문일치를 요구.
+  const allTokensWeak = tokens.length >= 1 && tokens.every((tk) => {
+    const n = norm(tk).replace(/[,.:;·\-]+$/, "");
+    return /^[0-9]+$/.test(n) || WEAK_IDENTITY_TOKEN.has(n);
+  });
+  const reqFull = coreEmpty || weakSingle || allTokensWeak;
   const distinct = tokens.length ? tokens : (nameN ? [input.name] : []);
   // 흔한구문 이름은 띄어쓰기 보존이 핵심: '좋은커피'(가게)는 원문에 붙어서, '좋은 커피'(맛 표현)는 배제.
   //   짧은 단일토큰은 정규화 전체이름 일치(나무로스터리)로 — 부분문자열 오매칭 차단.
