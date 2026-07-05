@@ -245,6 +245,24 @@ export default function OrgDashboard() {
               {showJobs ? "▾" : "▸"} 🛠 핵심 잡 신선도 (launchd {jobs?.total ?? 8}종){jobs?.bad ? <span style={{ fontSize: 10, fontWeight: 700, color: "#b03a3a" }}> · ⚠️ 정지 {jobs.bad}</span> : <span style={{ fontSize: 10, color: "#3f7a4f" }}> · 전체 정상 ✅</span>}
             </span>
           </button>
+          {/* 🕐 오늘의 핵심 사이클(08·12·17시) 실행여부 — 항상 표시. "12시 배치 돌았나?"를 물어보지 않고 한눈에. */}
+          {jobs?.cycles && (
+            <div style={{ display: "flex", gap: 6, marginTop: 9, flexWrap: "wrap" }}>
+              {jobs.cycles.map((c: any) => {
+                const ran = c.state === "ran", miss = c.state === "missing";
+                const bg = ran ? "#eaf5ec" : miss ? "#fbeaea" : "#f3ede0";
+                const bd = ran ? "#bfe0c6" : miss ? "#e6b3b3" : "#e0d3b8";
+                const fg = ran ? "#2f6b3f" : miss ? "#b03a3a" : "#9c8a6c";
+                const icon = ran ? "✅" : miss ? "🔴" : "⏳";
+                return (
+                  <div key={c.name} style={{ flex: 1, minWidth: 92, background: bg, border: `1px solid ${bd}`, borderRadius: 8, padding: "6px 8px", textAlign: "center" }}>
+                    <div style={{ fontSize: 11.5, fontWeight: 700, color: "#2b2018" }}>{c.name} {c.label}</div>
+                    <div style={{ fontSize: 10.5, fontWeight: 700, color: fg, marginTop: 2 }}>{icon} {ran ? `${c.at} 실행` : miss ? "누락!" : "예정"}</div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
           {showJobs && jobs?.jobs && (
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7, marginTop: 10 }}>
               {jobs.jobs.map((j: any) => {
