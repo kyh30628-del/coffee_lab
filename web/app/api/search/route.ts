@@ -303,12 +303,14 @@ export async function GET(req: NextRequest) {
       aiErr = ranked ? null : lastRerankError(); // await 직후 즉시 캡처 — 동시 요청 간 모듈 전역상태 덮어쓰기 방지
       if (ranked && ranked.length > 0) {
         mode = "ai";
-        const sById = new Map(scored.map((s) => [s.id, s]));
+        // ⚠️ P0(2026-07-05): cafes.id=bigint → neon이 문자열("8744")로 반환하는데 Claude 재정렬은 숫자 id를 준다.
+        //   양쪽을 String으로 정규화하지 않으면 sById.get(숫자)가 문자열키 맵에서 전량 미스 → 재정렬 결과 전부 탈락 → 개념검색 count 0.
+        const sById = new Map(scored.map((s) => [String(s.id), s]));
         // Claude 랭킹은 의미적합도만 보고 등급(검증/참고) 신호를 못 받아, "디저트 맛집" 같은 질의에서
         // 참고 카페가 검증 카페보다 위로 가던 버그(B). LLM 순위(0~100 환산, 결정론)에 등급가산을 더해 재정렬.
         const withGrade = (ranked
           .map((r, i) => {
-            const s = sById.get(r.id);
+            const s = sById.get(String(r.id));
             if (!s) return null;
             const rankScore = ((ranked.length - i) / ranked.length) * 100 + gradeBonus(s.grade);
             return { ...s, reasons: r.reason ? [r.reason] : s.reasons, _rankScore: rankScore };
