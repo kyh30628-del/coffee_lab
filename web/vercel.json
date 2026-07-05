@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron-resynth",
-      "schedule": "0 4 * * 1"
+      "schedule": "0 * * * *"
     },
     {
       "path": "/api/cron-snapshot",

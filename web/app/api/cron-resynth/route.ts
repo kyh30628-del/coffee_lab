@@ -4,7 +4,7 @@ import { synthAndStore } from "@/lib/synthStore";
 import { recordRun } from "@/lib/agentLog";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 // 주간 재수집은 최신성 위해 새로 수집(raw 갱신)
 const synthOne = (c: { id: number; name: string; area: string }) => synthAndStore(c, { refresh: true });
@@ -49,25 +49,46 @@ export async function GET(req: NextRequest) {
       ORDER BY c.synth_updated ASC NULLS FIRST
       LIMIT 3
     ` as unknown as { id: number; name: string; area: string }[];
-    // 일반 순환 — 한 번에 3곳씩(비용·시간 보호), 가장 오래 갱신 안 된 순.
-    const genTargets = await sql`
-      SELECT id, name, area FROM cafes
-      WHERE published = true
+    // 🧹 오염그물 '전수 적용' — 일반 순환은 재수집 없이(refresh:false) 저장된 raw에 현재 규칙만 재적용.
+    //   API·토큰·쿼터 0(순수 결정론)이라 최대치로 돌린다. 동시 10워커 + maxDuration 300s 예산 → 회당 ~400곳.
+    //   ⚠️ no-mass-unpublish 차단기: 100곳 이상 처리 후 비공개율 20% 초과 시 즉시 중단(버그성 대량비공개 방지, 인천사고 교훈).
+    const GEN_CONC = 10, GEN_MAX = 400, GEN_RATE_LIMIT = 0.20;
+    const genRows = (await sql`
+      SELECT id, name, area, synth_count FROM cafes
+      WHERE published = true AND raw_reviews IS NOT NULL
       ORDER BY synth_updated ASC NULLS FIRST
-      LIMIT 3
-    ` as unknown as { id: number; name: string; area: string }[];
-    // 구독 카페 우선 + 일반 순환, 중복 제거, 최대 4곳(구독자 있을 때만 1곳 추가 비용).
-    const seen = new Set<number>();
-    const targets = [...subTargets, ...genTargets].filter((c) => (seen.has(c.id) ? false : (seen.add(c.id), true))).slice(0, 4);
+      LIMIT ${GEN_MAX}
+    `) as unknown as { id: number; name: string; area: string; synth_count: number }[];
+    let gi = 0, gDone = 0, gChanged = 0, gErr = 0; const gUnpub: number[] = []; let gStop = false;
+    const genWorker = async () => {
+      while (!gStop) {
+        const c = genRows[gi++]; if (!c) break;
+        try {
+          await synthAndStore({ id: c.id, name: c.name, area: c.area }, { refresh: false });
+          const [a] = (await sql`SELECT synth_count, published FROM cafes WHERE id=${c.id}`) as unknown as { synth_count: number; published: boolean }[];
+          gDone++;
+          if (a.synth_count !== c.synth_count) gChanged++;
+          if (!a.published) gUnpub.push(c.id);
+          if (gDone >= 100 && gUnpub.length / gDone > GEN_RATE_LIMIT) gStop = true; // 차단기 발동
+        } catch { gErr++; }
+      }
+    };
 
-    const results = [];
-    for (const cafe of targets) {
-      try { results.push(await synthOne(cafe)); }
-      catch (e) { results.push({ name: cafe.name, ok: false, error: String(e) }); }
-      await new Promise((r) => setTimeout(r, 400));
+    // 🎯 구독(유료) 카페는 신선 재수집(refresh:true, 소량·쿼터보호) — 사장님 분석 항상 최신
+    const subResults = [];
+    for (const cafe of subTargets) {
+      try { subResults.push(await synthOne(cafe)); }
+      catch (e) { subResults.push({ name: cafe.name, ok: false, error: String(e) }); }
+      await new Promise((r) => setTimeout(r, 200));
     }
-    await recordRun("cron-resynth", true, `raw정리 ${purged.length} 유튜브 ${ytRefreshed.length} 재합성 ${results.length}(구독우선 ${subTargets.length})`, results.length);
-    return NextResponse.json({ ok: true, ranAt: new Date().toISOString(), rawPurged: purged.length, ytRefreshed: ytRefreshed.length, results });
+    // 일반 순환(무료 대량) 동시 실행
+    await Promise.all(Array.from({ length: GEN_CONC }, () => genWorker()));
+    // 공개상태 바뀐 카페만 전 캐시 레이어 무효화(요청 컨텍스트라 ISR 무효화 정상). 없으면 내용변동분만 검색캐시 갱신.
+    if (gUnpub.length) { const { invalidateCafeCaches } = await import("@/lib/cafeCacheInvalidate"); await invalidateCafeCaches(gUnpub).catch(() => {}); }
+    else if (gChanged) await sql`DELETE FROM search_cache`.catch(() => {});
+
+    await recordRun("cron-resynth", true, `raw정리 ${purged.length} 유튜브 ${ytRefreshed.length} · 구독재수집 ${subResults.length} · 전수적용 ${gDone}(변동 ${gChanged}·비공개 ${gUnpub.length}·오류 ${gErr})${gStop ? " ⚠️차단기발동" : ""}`, gDone);
+    return NextResponse.json({ ok: true, ranAt: new Date().toISOString(), rawPurged: purged.length, ytRefreshed: ytRefreshed.length, subResynth: subResults.length, netApplied: gDone, changed: gChanged, unpublished: gUnpub.length, breaker: gStop });
   } catch (e) {
     await recordRun("cron-resynth", false, String(e).slice(0, 150));
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
