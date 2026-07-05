@@ -287,6 +287,11 @@ export function nameCoherence(name: string, quotes: string[], areaTerms: string[
 // 🚫 명백한 비-카페 스팸 — 카페 방문후기엔 절대 안 나오는 강한 오프토픽(코인·해외선물·거래소·부동산 분양·대출·재개발 등).
 //   블로그가 다른 주제 글에 카페명만 우연히 스쳐 오염되는 케이스(예: 카페클로버에 붙은 '코인 거래소'·'주상복합 분양' 글).
 //   ⚠️ 오탐 방지: 단일 애매어(코인·분양 단독) 금지 — 카페후기엔 안 나오는 '복합 신호'만.
+// coord/결재#153(2026-07-05): coreTokens가 업종어·형용사·지역어를 걷어낸 뒤 아래 초약체 단어만 '유일
+//   식별토큰'으로 남아 전국 무관 콘텐츠와 오매칭(1854·15327·17868·2772·15229·14839 등, 대부분 이미 비공개).
+//   curated 화이트리스트(오탐 확대 방지) — 이게 유일 토큰이면 숫자·2자토큰과 동급 '약함' 처리:
+//   전체이름 원문일치 + 지역어 동반을 요구(둘 중 하나라도 없으면 nameInTitle/Body 불인정).
+const WEAK_IDENTITY_TOKEN = new Set(["공간", "다이아", "블라블라", "충무", "브라더스", "2005", "인테리어"]);
 const OFFTOPIC_SPAM = /(코인\s*해외선물|해외\s*선물\s*(거래|시세|투자|매매)|선물\s*거래소|암호화폐|가상화폐|비트코인|비트겟|바이낸스|재테크\s*(추천|비법|정보|수익)|주식\s*(리딩|종목추천|투자문의|급등주)|대출\s*(상담|한도|이자|갈아타기|추천)|아파트\s*분양|오피스텔\s*분양|분양가|모델하우스|청약\s*(가점|통장|경쟁률)|재개발\s*(구역|조합|호재)|재건축\s*(조합|아파트|호재)|입주\s*예정|주상복합\s*분양|최고\s*\d+\s*층|\d+\s*개동)/;
 
 export function verifyReview(input: QualityInput): QualityResult {
@@ -339,7 +344,8 @@ export function verifyReview(input: QualityInput): QualityResult {
   const onlyTok = tokens.length === 1 ? norm(tokens[0]) : "";
   // 짧은 단일토큰(≤2자)뿐 아니라 '숫자만'인 단일토큰('102커피'→"102")도 약함 — 주소 번지('102호')·다른 업체에
   //   오매칭됨. → 전체 이름('102커피') 원문 일치만 인정해 차단.
-  const weakSingle = onlyTok.length >= 1 && (onlyTok.length <= 2 || /^[0-9]+$/.test(onlyTok)) && nameRawN.length > onlyTok.length;
+  const weakWhitelist = onlyTok.length >= 1 && WEAK_IDENTITY_TOKEN.has(onlyTok); // #153 초약체 유일토큰
+  const weakSingle = onlyTok.length >= 1 && (onlyTok.length <= 2 || /^[0-9]+$/.test(onlyTok) || weakWhitelist) && nameRawN.length > onlyTok.length;
   const reqFull = coreEmpty || weakSingle;
   const distinct = tokens.length ? tokens : (nameN ? [input.name] : []);
   // 흔한구문 이름은 띄어쓰기 보존이 핵심: '좋은커피'(가게)는 원문에 붙어서, '좋은 커피'(맛 표현)는 배제.
@@ -358,8 +364,9 @@ export function verifyReview(input: QualityInput): QualityResult {
   //     '카페 맥락(카페·커피·로스터리…)'이나 지역이 함께 있어야 주제로 인정.
   const titleHasCafeWord = CAFE_WORDS.some((w) => title.includes(w));
   const bodyHasCafeWord = CAFE_WORDS.some((w) => body.includes(w));
-  const nameInTitle = inTitleFull || (distinctInTitle && (titleHasCafeWord || areaPresent));
-  const nameInBody = inBodyFull || (distinctInBody && (bodyHasCafeWord || areaPresent));
+  // #153: 초약체 유일토큰(공간·인테리어·2005…)은 지역어 동반 없으면 전국 오매칭이라 귀속 불인정
+  const nameInTitle = (weakWhitelist && !areaPresent) ? false : (inTitleFull || (distinctInTitle && (titleHasCafeWord || areaPresent)));
+  const nameInBody = (weakWhitelist && !areaPresent) ? false : (inBodyFull || (distinctInBody && (bodyHasCafeWord || areaPresent)));
   const listicle = LISTICLE_TITLE.some((re) => re.test(title)) || (((`${title} ${body}`.match(PLACE_TOKEN) ?? []).length) >= 4);
   const generic = has(fullL, GENERIC_CUES);
   const nameOccurBody = nameN ? countOccur(bodyN, nameN) : 0;
