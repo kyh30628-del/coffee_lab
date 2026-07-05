@@ -35,9 +35,13 @@ export async function GET(req: NextRequest) {
       // ⚠️ 이중 기아 방지: '5일+ 굶은 지역이면 무조건 큐보다 우선'이 상시 참이 되어(64지역 로테이션이라 항상 뭔가는
       //   5일+ 됨) 큐가 3일+ 전혀 안 내려가는 반대 기아가 발생했다(#109). 진짜 위급(10일+)할 때만 큐를 밀어내고,
       //   그 정도는 평소대로 큐 우선 → 큐 비면 굶은 지역으로 폴백.
+      // 🎯 단, PRIORITY_REGIONS(강동·송파·구리)는 사업 우선순위상 10일까지 기다릴 수 없어 3일+ 방치되면
+      //   큐를 밀어낸다 — 대상이 64지역 전체가 아니라 이 3곳뿐이라 #109의 상시-기아 재발은 없다(coord#107).
+      const priorityStarved = (await sql`SELECT region, area_label FROM discovery_state WHERE region = ANY(${PRIORITY_REGIONS}) AND (last_run IS NULL OR last_run < now() - interval '3 days') ORDER BY last_run ASC NULLS FIRST LIMIT 1`)[0] as { region: string; area_label: string } | undefined;
       const starved = (await sql`SELECT region, area_label, (last_run < now() - interval '10 days') AS critical FROM discovery_state WHERE last_run < now() - interval '5 days' ORDER BY last_run ASC NULLS FIRST LIMIT 1`)[0] as { region: string; area_label: string; critical: boolean } | undefined;
-      const at = starved?.critical ? null : (await sql`SELECT id, region, area_label, keywords FROM discovery_targets WHERE status='pending' ORDER BY priority DESC, created_at ASC LIMIT 1`)[0] as any;
-      const target = starved?.critical ? starved : (at ?? starved ?? ((await sql`SELECT region, area_label FROM discovery_state
+      const critical = priorityStarved ?? (starved?.critical ? starved : undefined);
+      const at = critical ? null : (await sql`SELECT id, region, area_label, keywords FROM discovery_targets WHERE status='pending' ORDER BY priority DESC, created_at ASC LIMIT 1`)[0] as any;
+      const target = critical ?? (at ?? starved ?? ((await sql`SELECT region, area_label FROM discovery_state
         ORDER BY (region = ANY(${PRIORITY_REGIONS}) AND (last_run IS NULL OR last_run < now() - interval '6 hours')) DESC, last_run ASC NULLS FIRST LIMIT 1`)[0] as { region: string; area_label: string } | undefined));
       if (!target) break;
       const kw = at && Array.isArray(at.keywords) && at.keywords.length ? (at.keywords as string[]) : undefined;
