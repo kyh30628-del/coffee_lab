@@ -62,8 +62,8 @@ export async function GET(req: NextRequest) {
       MAX(embed_updated) last_embed,
       COUNT(*) FILTER (WHERE raw_reviews IS NOT NULL AND synth_updated IS NULL)::int synth_q,
       COUNT(*) FILTER (WHERE embedding IS NULL AND (published OR pipeline_status='pending') AND synth_identity IS NOT NULL)::int embed_q,
-      COUNT(*) FILTER (WHERE published AND synth_updated >= now() - interval '3 days')::int synth_fresh,
-      COUNT(*) FILTER (WHERE published AND (synth_updated IS NULL OR synth_updated < now() - interval '3 days'))::int synth_stale
+      COUNT(*) FILTER (WHERE published AND raw_reviews IS NOT NULL AND raw_collected_at > synth_updated)::int synth_backlog,
+      COUNT(*) FILTER (WHERE published AND (synth_updated IS NULL OR synth_updated < now() - interval '7 days'))::int synth_stale7
       FROM cafes`)[0] as any;
     // 판정 대기·오늘 지표 = lib/metrics 단일출처(judge-status와 동일 정의 — 화면별 숫자 어긋남 구조적 차단).
     const judgeQ = await judgeQueueCount();
@@ -179,10 +179,10 @@ export async function GET(req: NextRequest) {
     if ((af?.open ?? 0) > 0) notices.push(`오염 플래그 ${af.open}건(검토 대기)`);
     const dgap = (await sql`SELECT COUNT(*)::int n FROM (SELECT area FROM cafes WHERE published GROUP BY area HAVING COUNT(*) >= 10 AND COUNT(*) FILTER (WHERE dong IS NOT NULL)::float / COUNT(*) < 0.9) x`.catch(() => [{ n: 0 }]))[0] as any;
     if (dgap.n > 0) notices.push(`동 채움 미흡 지역 ${dgap.n}곳(<90%)`);
-    // 🧹 재합성 커버리지 = 발행카페 중 최근 3일 내 오염그물 재적용된 비율. 낮으면 강화한 규칙이 카탈로그에 미반영(과거 '주4곳=61년 적체'가 초록불로 숨던 지점 — 이제 경보로 노출).
-    const synthFreshPct = PUB ? Math.round((c.synth_fresh / PUB) * 100) : 100;
-    if (synthFreshPct < 60) risks.push(`재합성 커버리지 ${synthFreshPct}% — 오염그물 미적용 발행카페 ${c.synth_stale}곳(cron-resynth 처리량 점검 필요)`);
-    else if (c.synth_stale > PUB * 0.15) notices.push(`재합성 3일+ 경과 ${c.synth_stale}곳(자동 순환 중, 커버리지 ${synthFreshPct}%)`);
+    // 🧹 재합성 감시(토큰0 결정론). synth_backlog=새 리뷰 수집됐는데 규칙 미재적용(진짜 밀린 것). stale7=7일+ 미갱신(4일 순환이 못 따라감=커버리지 지연).
+    //   과거 '주4곳=61년 적체'가 초록불로 숨던 사각 — 실행이 아니라 '반영 여부'를 잰다.
+    if (c.synth_backlog > PUB * 0.10) risks.push(`재합성 백로그 ${c.synth_backlog}곳 — 새 리뷰가 규칙에 미반영(cron-resynth 처리량 점검)`);
+    if (c.synth_stale7 > PUB * 0.20) risks.push(`재합성 7일+ 지연 ${c.synth_stale7}곳 — 오염그물 커버리지 미달(처리량 점검)`);
     // 임베딩 대기 = 의미검색만 일부 누락(카페는 정상 노출) → 주의. 단, 절반 이상이면 검색 핵심기능 타격 → 위험.
     const noemb = (await sql`SELECT COUNT(*)::int n FROM cafes WHERE published AND embedding IS NULL`.catch(() => [{ n: 0 }]))[0] as any;
     if (noemb.n > 0) { if (noemb.n > PUB * 0.5) risks.push(`의미검색 대량 누락 ${noemb.n}곳 — 검색 기능 타격`); else notices.push(`의미검색 임베딩 대기 ${noemb.n}곳`); }
@@ -453,7 +453,7 @@ export async function GET(req: NextRequest) {
     const health = {
       generatedAt: new Date(now).toISOString(),
       overall, alerts, healed, risks, notices, integrity,
-      coverage: { total: c.total, published: c.published, rawCachedPct: pct(c.raw_cached), judgedPct: pct(c.judged), embeddedPct: c.published ? Math.round((c.pub_embedded / c.published) * 100) : 0, dongPct: pct(td.has_dong), synthFreshPct: c.published ? Math.round((c.synth_fresh / c.published) * 100) : 0, synthStale: c.synth_stale },
+      coverage: { total: c.total, published: c.published, rawCachedPct: pct(c.raw_cached), judgedPct: pct(c.judged), embeddedPct: c.published ? Math.round((c.pub_embedded / c.published) * 100) : 0, dongPct: pct(td.has_dong), synthBacklog: c.synth_backlog, synthStale7: c.synth_stale7 },
       today: { newCafes: daily.newCafes, synthesized: td.synth_today, published: td.published_today, hasDong: td.has_dong, dongPct: pct(td.has_dong), noise: td.noise, newQueue: td.new_q, ytToday: daily.yt, ytTotal: td.yt_total },
       pipeline, agents,
       grounding: { suspectCount: gr?.suspect ?? 0, suspects: grSuspects },

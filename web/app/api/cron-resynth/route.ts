@@ -49,14 +49,16 @@ export async function GET(req: NextRequest) {
       ORDER BY c.synth_updated ASC NULLS FIRST
       LIMIT 3
     ` as unknown as { id: number; name: string; area: string }[];
-    // 🧹 오염그물 '전수 적용' — 일반 순환은 재수집 없이(refresh:false) 저장된 raw에 현재 규칙만 재적용.
-    //   API·토큰·쿼터 0(순수 결정론)이라 최대치로 돌린다. 동시 10워커 + maxDuration 300s 예산 → 회당 ~400곳.
+    // 🧹 오염그물 재적용 — '진짜 필요한 카페만'(낭비 0). refresh:false=재수집X·규칙만 재적용, API·토큰·쿼터 0(순수 결정론).
+    //   대상: ①새 리뷰 수집됨(raw_collected_at > synth_updated → 규칙 재적용 필요) ②4일+ 미갱신(규칙변경 자동커버, 전수 ~4일 순환).
+    //   ⚠️ 신선한(4일 내·새 raw 없는) 카페는 재처리 안 함 → 안 변한 것 반복 재계산 낭비 제거. 필요한 것 우선(새 raw) 먼저.
     //   ⚠️ no-mass-unpublish 차단기: 100곳 이상 처리 후 비공개율 20% 초과 시 즉시 중단(버그성 대량비공개 방지, 인천사고 교훈).
-    const GEN_CONC = 10, GEN_MAX = 400, GEN_RATE_LIMIT = 0.20;
+    const GEN_CONC = 10, GEN_MAX = 150, GEN_RATE_LIMIT = 0.20; // 150/시×24=3,600/일 → 전수 ~4일(12,864/3,600)
     const genRows = (await sql`
       SELECT id, name, area, synth_count FROM cafes
       WHERE published = true AND raw_reviews IS NOT NULL
-      ORDER BY synth_updated ASC NULLS FIRST
+        AND (raw_collected_at > synth_updated OR synth_updated IS NULL OR synth_updated < now() - interval '4 days')
+      ORDER BY (raw_collected_at > synth_updated) DESC, synth_updated ASC NULLS FIRST
       LIMIT ${GEN_MAX}
     `) as unknown as { id: number; name: string; area: string; synth_count: number }[];
     let gi = 0, gDone = 0, gChanged = 0, gErr = 0; const gUnpub: number[] = []; let gStop = false;
