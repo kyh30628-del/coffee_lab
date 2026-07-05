@@ -45,11 +45,14 @@ export async function GET(req: NextRequest) {
     const todayKst = nowKst.toISOString().slice(0, 10);
     const nowHourK = nowKst.getUTCHours() + nowKst.getUTCMinutes() / 60;
     // ⚠️ 사이클 실행 이름이 둘: 아침 풀사이클=chief-manager-agent, 점심/오후=chief-manager. 둘 다 세야 아침이 오탐 '누락' 안 뜸.
-    const cmRuns = (await sql`SELECT ran_at FROM agent_runs WHERE job IN ('chief-manager','chief-manager-agent') AND (ran_at AT TIME ZONE 'Asia/Seoul')::date = ${todayKst}::date ORDER BY ran_at`) as any[];
-    const hourOf = (t: any) => { const k = new Date(new Date(t).getTime() + KST); return { h: k.getUTCHours() + k.getUTCMinutes() / 60, hh: String(k.getUTCHours()).padStart(2, "0"), mm: String(k.getUTCMinutes()).padStart(2, "0") }; };
+    // ⚠️ DB 시간대 캐스트(AT TIME ZONE ::date)가 프로덕션 런타임에서 불안정(로컬은 됨, 프로덕션은 빈값) →
+    //    절대시각 창(20h)만 DB에서 받고 '오늘 KST' 판정·시각은 전부 JS(UTC 연산)로. byJob(날짜필터 없음)은 프로덕션에서 정상 → 이 방식 안전.
+    const recentRuns = (await sql`SELECT ran_at FROM agent_runs WHERE job IN ('chief-manager','chief-manager-agent') AND ran_at > now() - interval '20 hours' ORDER BY ran_at`) as any[];
+    const hourOf = (t: any) => { const k = new Date(new Date(t).getTime() + KST); return { date: k.toISOString().slice(0, 10), h: k.getUTCHours() + k.getUTCMinutes() / 60, hh: String(k.getUTCHours()).padStart(2, "0"), mm: String(k.getUTCMinutes()).padStart(2, "0") }; };
+    const cmRuns = recentRuns.map((r) => hourOf(r.ran_at)).filter((k) => k.date === todayKst); // 오늘 KST 실행만
     const CYCLE_DEF = [{ name: "아침", label: "08시", hour: 8, lo: 6, hi: 10.5 }, { name: "점심", label: "12시", hour: 12, lo: 10.5, hi: 14.5 }, { name: "오후", label: "17시", hour: 17, lo: 14.5, hi: 20.5 }];
     const cycles = CYCLE_DEF.map((c) => {
-      const hit = cmRuns.map(hourOf).find((k) => k.h >= c.lo && k.h < c.hi);
+      const hit = cmRuns.find((k) => k.h >= c.lo && k.h < c.hi);
       if (hit) return { name: c.name, label: c.label, state: "ran", at: `${hit.hh}:${hit.mm}` };
       if (nowHourK < c.hour) return { name: c.name, label: c.label, state: "pending", at: null };
       return { name: c.name, label: c.label, state: "missing", at: null };
