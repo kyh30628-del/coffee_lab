@@ -96,6 +96,10 @@ export default function AdminPage() {
         else if (d.emailed) setSubMsg(`✅ 승인 완료 · 키(PIN ${d.pin})가 ${d.email || "등록 이메일"}로 자동 발송됐어요.`);
         else setSubMsg(`⚠️ 승인은 됐지만 이메일 자동발송 실패 — PIN ${d.pin}을 사장님께 직접 전달하세요 (이메일 미설정/주소 오류).`);
       }
+      if (action === "remind") {
+        if (!d.ok) setSubMsg("❌ 리마인드 발송 실패: " + (d.error || "알 수 없는 오류"));
+        else setSubMsg(`✅ 온보딩 패키지(PIN·사용법)를 ${d.email || "등록 이메일"}로 다시 보냈어요.`);
+      }
       loadSubscribers(pw); fetch("/api/judge-status", { headers: { "x-admin-password": pw } });
     } catch { setSubMsg("❌ 처리 중 오류가 났어요. 다시 시도해 주세요."); }
   };
@@ -856,6 +860,7 @@ export default function AdminPage() {
                     <div className="flex gap-2 mt-2">
                       {s.status !== "active" && <button onClick={() => subAct(s.id, "activate", 7)} disabled={!s.cafe_published} title={s.cafe_published ? "" : "카페가 공개된 뒤 승인할 수 있어요"} className="flex-1 py-1.5 text-[12px] font-bold text-blue-700 bg-blue-50 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed">✓ 체험 승인(7일)</button>}
                       {s.status !== "active" && <button onClick={() => subAct(s.id, "activate", 30)} disabled={!s.cafe_published} title={s.cafe_published ? "" : "카페가 공개된 뒤 승인할 수 있어요"} className="flex-1 py-1.5 text-[12px] font-bold text-emerald-700 bg-emerald-50 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed">✓ 구독 승인(30일)</button>}
+                      {s.status === "active" && s.pin && <button onClick={() => subAct(s.id, "remind")} disabled={!s.email} title={s.email ? "온보딩 패키지(PIN+서비스 사용법)를 사장님 이메일로 다시 보냅니다" : "등록 이메일이 없어요 — 화면의 PIN을 직접 전달하세요"} className="flex-1 py-1.5 text-[12px] font-bold text-amber-700 bg-amber-50 border border-amber-300 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed">📧 온보딩 리마인드</button>}
                       {s.status === "active" && <button onClick={() => subAct(s.id, "extend", 30)} className="flex-1 py-1.5 text-[12px] font-bold text-stone-700 bg-stone-100 rounded-lg">+30일 연장</button>}
                       {s.status === "active" && <button onClick={() => subAct(s.id, "cancel")} className="flex-1 py-1.5 text-[12px] text-rose-600 bg-rose-50 rounded-lg">해지</button>}
                       {s.status !== "suspended" && s.status !== "cancelled" && <button onClick={() => suspendSub(s.id, s.cafe_name)} className="flex-1 py-1.5 text-[12px] font-bold text-white bg-rose-600 rounded-lg">🚫 사칭/위반 즉시정지</button>}

@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
       if (!authed(req)) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
       const id = Number(b.id);
       if (!id) return NextResponse.json({ ok: false, error: "id 필요" }, { status: 400 });
-      const s = (await sql`SELECT cafe_id, cafe_name, email, expires_at, pin FROM subscriptions WHERE id=${id}`)[0] as any;
+      const s = (await sql`SELECT cafe_id, cafe_name, email, expires_at, pin, duration_days, status FROM subscriptions WHERE id=${id}`)[0] as any;
       if (!s) return NextResponse.json({ ok: false, error: "구독 없음" }, { status: 404 });
       const days = Math.min(Math.max(Number(b.days) || 30, 1), 365);
       if (b.action === "activate") {
@@ -147,6 +147,17 @@ export async function POST(req: NextRequest) {
         await sql`UPDATE subscriptions SET status='suspended', suspend_reason=${reason}, suspended_at=now(), updated_at=now() WHERE id=${id}`;
         if (s.cafe_id) await sql`UPDATE cafe_promos SET featured=false, featured_until=NULL WHERE cafe_id=${s.cafe_id}`;
         return NextResponse.json({ ok: true, status: "suspended" });
+      }
+      // 📧 온보딩 패키지 리마인드 재발송 — 이미 승인(PIN 발급)된 사장님께 온보딩 메일(PIN+내카페열쇠+서비스 사용법)을 다시 보낸다.
+      //   메일이 묻혔거나 못 받은 사장님 대상. 상태·혜택은 안 건드리고 '발송'만. 체험/유료 분기는 저장된 duration_days로.
+      if (b.action === "remind") {
+        if (!s.pin) return NextResponse.json({ ok: false, error: "PIN 미발급 — 먼저 승인(activate)하세요" }, { status: 400 });
+        const to = decryptPII(s.email ?? "");
+        if (!to) return NextResponse.json({ ok: false, error: "등록된 이메일이 없어요 — 화면의 PIN을 직접 전달하세요" }, { status: 400 });
+        const remindDays = Math.min(Math.max(Number(s.duration_days) || 30, 1), 365);
+        const emailed = await sendPinEmail(to, s.pin, s.cafe_name ?? "", remindDays);
+        if (emailed) await sql`UPDATE subscriptions SET pin_emailed_at=now() WHERE id=${id}`;
+        return NextResponse.json({ ok: emailed, emailed, email: to, error: emailed ? undefined : "발송 실패 — Resend 키/이메일 주소 확인" });
       }
       return NextResponse.json({ ok: false, error: "알 수 없는 action" }, { status: 400 });
     }
