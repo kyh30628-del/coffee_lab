@@ -85,9 +85,9 @@ export async function GET(req: NextRequest) {
     // 그라운딩 '의심(재검 대기)' = 실제 미처리 = '공개 중'이면서 '현재(재합성 후) 검사 결과'가 의심인 것만 센다.
     //   stale 플래그(재합성으로 무효)·보류(이미 비공개=처리됨)는 미처리가 아니므로 제외 → 화면이 '진짜 남은 일'만 표시.
     const gr = (await sql`SELECT COUNT(*) FILTER (WHERE NOT g.grounded)::int suspect, MAX(g.checked_at) last FROM grounding_checks g JOIN cafes c ON c.id = g.cafe_id WHERE c.published AND g.checked_at >= c.synth_updated AND c.llm_judged_at IS NOT NULL AND c.llm_judged_at >= c.raw_collected_at`)[0] as any;
-    // 그라운딩 백로그(판정완료인데 아직 그라운딩 안 한 공개 카페) + 의심 목록(이름·사유) — 관리자에 명시.
-    // 그라운딩 백로그 = 판정완료·미검(또는 재합성으로 stale)인 공개 카페. (일치율 게이트 금지 — 그 지표는 지역어 오염에 눈멀어 있음)
-    const grBacklog = (await sql`SELECT COUNT(*)::int n FROM cafes c WHERE c.published AND c.raw_reviews IS NOT NULL AND c.synth_identity IS NOT NULL AND c.llm_judged_at IS NOT NULL AND c.llm_judged_at >= c.raw_collected_at AND NOT EXISTS (SELECT 1 FROM grounding_checks g WHERE g.cafe_id = c.id AND g.checked_at >= c.synth_updated)`.catch(() => [{ n: 0 }]))[0] as any;
+    // (제거 2026-07-05) 그라운딩 '백로그'(판정완료·미검 공개카페) 카운터 삭제 — 옛 구독 LLM 그라운딩(grounding_checks 적재)의
+    //   잔재라 워커 정지 상태에선 절대 안 줄어드는 유령값(9,136)이었고, 화면·경보·로직 어디에도 안 쓰였음. 실제 오염검증은
+    //   규칙층(coherence·namepol·offctx·selfaudit 100%)+배치 'about' 판정이 상시 커버. 실신호는 아래 suspectCount(gr).
     // 그라운딩이 문제로 판정해 '비공개 보류'한 카페(소비자 노출 차단됨) — 진짜 처리 필요분.
     const grSuspects = (await sql`SELECT c.name, c.area, g.issue FROM grounding_checks g JOIN cafes c ON c.id = g.cafe_id WHERE NOT g.grounded AND c.llm_judged_at IS NOT NULL AND c.llm_judged_at >= c.raw_collected_at ORDER BY g.checked_at DESC LIMIT 20`.catch(() => [])) as any[];
     // 발굴은 '다양성(전수 아님)' 전략 — 전 지역 3일 신선도는 불필요. 로테이션 현실(64지역·하루 12회=~5일 한바퀴)에 맞춰
@@ -450,7 +450,7 @@ export async function GET(req: NextRequest) {
       coverage: { total: c.total, published: c.published, rawCachedPct: pct(c.raw_cached), judgedPct: pct(c.judged), embeddedPct: c.published ? Math.round((c.pub_embedded / c.published) * 100) : 0, dongPct: pct(td.has_dong) },
       today: { newCafes: daily.newCafes, synthesized: td.synth_today, published: td.published_today, hasDong: td.has_dong, dongPct: pct(td.has_dong), noise: td.noise, newQueue: td.new_q, ytToday: daily.yt, ytTotal: td.yt_total },
       pipeline, agents,
-      grounding: { suspectCount: gr?.suspect ?? 0, backlog: grBacklog.n, suspects: grSuspects },
+      grounding: { suspectCount: gr?.suspect ?? 0, suspects: grSuspects },
       offctx: { count: offctx.n, suspects: offctxSuspects },
       traffic: {
         dau: traffic?.dau ?? 0, wau: traffic?.wau ?? 0, mau: traffic?.mau ?? 0, new7: traffic?.new7 ?? 0,
