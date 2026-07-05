@@ -274,7 +274,8 @@ export async function detectIssues(): Promise<Issue[]> {
 
   // ★ 빠르게 바뀌는 오염 신호는 DB '직접 실시간' 조회(관제탑 캐시는 stale될 수 있음 → 사장님이 본 3건을 RM이 1건만 보던 버그).
   //   품질 오염(audit_flags)·그라운딩 의심·리뷰 맥락(offctx)을 *항상 최신*으로 잡는다.
-  const afn = (await sql`SELECT cafe_name FROM audit_flags WHERE issue!='audit_complete' AND NOT COALESCE(resolved,false) ORDER BY flagged_at DESC LIMIT 10`.catch(() => [])) as any[];
+  // ⚠️ '공개 중'인 카페만 센다 — 이미 비공개(held/excluded)된 카페의 미해결 플래그는 소비자 노출 0이라 '남은 오염'이 아님(stale 알람 방지).
+  const afn = (await sql`SELECT a.cafe_name FROM audit_flags a JOIN cafes c ON c.id=a.cafe_id WHERE a.issue!='audit_complete' AND NOT COALESCE(a.resolved,false) AND c.published ORDER BY a.flagged_at DESC LIMIT 10`.catch(() => [])) as any[];
   if (afn.length > 0) out.push({ ikey: "quality:auditflags", source: "품질감사", severity: "HIGH", type: "품질 오염", title: `품질 오염 감지 ${afn.length}건`, detail: `근거오염·중복 자가감사 플래그: ${afn.slice(0, 5).map((x) => x.cafe_name).join(", ")}`.slice(0, 200), team: "품질본부", state: "처리중", note: "품질레드팀이 매 사이클 트리아지(오탐→정리·오염→비공개)" });
   const grn = await one(sql`SELECT count(*) c FROM grounding_checks g JOIN cafes c ON c.id=g.cafe_id WHERE c.published AND NOT g.grounded AND g.checked_at >= c.synth_updated AND c.llm_judged_at IS NOT NULL`.catch(() => [{ c: 0 }] as any));
   if (grn >= 1) out.push({ ikey: "quality:grounding", source: "그라운딩", severity: "MED", type: "환각 의심", title: `그라운딩 의심 ${grn}곳`, detail: "소개글이 후기 근거 부족(환각 의심)", team: "품질본부", state: "처리중", note: "다음 배치(08·17시) 품질본부 재검·재합성" });
