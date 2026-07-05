@@ -438,6 +438,7 @@ export async function GET(req: NextRequest) {
         { key: "wait_embed", label: "임베딩 대기", count: pl.wait_embed, note: "" },
         { key: "ready", label: "승격 준비", count: pl.ready, note: "곧 공개" },
         { key: "live", label: "공개됨", count: pl.live, note: "전 게이트 통과" },
+        { key: "verified_skip", label: "옥석·AI판정 스킵(후순위)", count: verifiedSkip, note: "검증등급 규칙검증 완료 → AI 재판정 불필요(설계·의도적 후순위·유령 백로그 아님)" },
         { key: "rejected", label: "차단", count: pl.rejected, note: "품질 미달" },
       ],
       promotedThisRun: promoted,
