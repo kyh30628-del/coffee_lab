@@ -51,10 +51,14 @@ export async function GET(req: NextRequest) {
     const hourOf = (t: any) => { const k = new Date(new Date(t).getTime() + KST); return { date: k.toISOString().slice(0, 10), h: k.getUTCHours() + k.getUTCMinutes() / 60, hh: String(k.getUTCHours()).padStart(2, "0"), mm: String(k.getUTCMinutes()).padStart(2, "0") }; };
     const cmRuns = recentRuns.map((r) => hourOf(r.ran_at)).filter((k) => k.date === todayKst); // 오늘 KST 실행만
     const CYCLE_DEF = [{ name: "아침", label: "08시", hour: 8, lo: 6, hi: 10.5 }, { name: "점심", label: "12시", hour: 12, lo: 10.5, hi: 14.5 }, { name: "오후", label: "17시", hour: 17, lo: 14.5, hi: 20.5 }];
+    // ⚠️ 사이클은 예약시각에 '시작'하고, 여러 에이전트를 순차 실행한 뒤 chief-manager가 '완료 시' 하트비트를 남긴다(실측 15~40분 소요).
+    //   예약시각 지나자마자 '누락(빨강)'으로 찍으면 진행 중인 걸 오표시 → 유예(GRACE) 안엔 '진행중', 넘어도 없으면 '누락'.
+    const GRACE = 1.5; // 예약시각 후 완료·하트비트까지 여유(시간). 이 안엔 running, 넘으면 missing.
     const cycles = CYCLE_DEF.map((c) => {
       const hit = cmRuns.find((k) => k.h >= c.lo && k.h < c.hi);
       if (hit) return { name: c.name, label: c.label, state: "ran", at: `${hit.hh}:${hit.mm}` };
       if (nowHourK < c.hour) return { name: c.name, label: c.label, state: "pending", at: null };
+      if (nowHourK < c.hour + GRACE) return { name: c.name, label: c.label, state: "running", at: null };
       return { name: c.name, label: c.label, state: "missing", at: null };
     });
 

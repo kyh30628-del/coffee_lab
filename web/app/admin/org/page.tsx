@@ -249,15 +249,16 @@ export default function OrgDashboard() {
           {jobs?.cycles && (
             <div style={{ display: "flex", gap: 6, marginTop: 9, flexWrap: "wrap" }}>
               {jobs.cycles.map((c: any) => {
-                const ran = c.state === "ran", miss = c.state === "missing";
-                const bg = ran ? "#eaf5ec" : miss ? "#fbeaea" : "#f3ede0";
-                const bd = ran ? "#bfe0c6" : miss ? "#e6b3b3" : "#e0d3b8";
-                const fg = ran ? "#2f6b3f" : miss ? "#b03a3a" : "#9c8a6c";
-                const icon = ran ? "✅" : miss ? "🔴" : "⏳";
+                const st = c.state;
+                const bg = st === "ran" ? "#eaf5ec" : st === "missing" ? "#fbeaea" : st === "running" ? "#e8f0fb" : "#f3ede0";
+                const bd = st === "ran" ? "#bfe0c6" : st === "missing" ? "#e6b3b3" : st === "running" ? "#bcd4ee" : "#e0d3b8";
+                const fg = st === "ran" ? "#2f6b3f" : st === "missing" ? "#b03a3a" : st === "running" ? "#2a5d9c" : "#9c8a6c";
+                const icon = st === "ran" ? "✅" : st === "missing" ? "🔴" : st === "running" ? "🔄" : "⏳";
+                const txt = st === "ran" ? `${c.at} 실행` : st === "missing" ? "누락!" : st === "running" ? "진행중" : "예정";
                 return (
                   <div key={c.name} style={{ flex: 1, minWidth: 92, background: bg, border: `1px solid ${bd}`, borderRadius: 8, padding: "6px 8px", textAlign: "center" }}>
                     <div style={{ fontSize: 11.5, fontWeight: 700, color: "#2b2018" }}>{c.name} {c.label}</div>
-                    <div style={{ fontSize: 10.5, fontWeight: 700, color: fg, marginTop: 2 }}>{icon} {ran ? `${c.at} 실행` : miss ? "누락!" : "예정"}</div>
+                    <div style={{ fontSize: 10.5, fontWeight: 700, color: fg, marginTop: 2 }}>{icon} {txt}</div>
                   </div>
                 );
               })}
