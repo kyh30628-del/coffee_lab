@@ -332,6 +332,21 @@ export async function GET(req: NextRequest) {
           if (heldOrphan > 0) healed.push(`orphan(근거0·복구불가) ${heldOrphan}곳 자동 비공개`);
         }
       } catch {}
+      // (e-1c) 이름오염(coherence<0.3) 자동 홀드 — 노출 후기가 실제 그 카페를 거의 안 말하는 공개 카페(namepol HIGH, 토큰충돌 오염).
+      //   결정론이 '명확 통과'로 분류해 AI판정 대상조차 안 되는 오염은 coherence가 유일한 그물. 지금껏 이슈만 뜨고 자동조치 없어
+      //   '처리중'으로 방치됐음(#1420). raw 있어도 재합성으로 coherence 안 오르면 홀드(되돌림가능·재합성 개선 시 복귀). 대량이면 규칙회귀로 보고 중단·경보.
+      try {
+        const namepol = (await sql`SELECT id, name FROM cafes
+          WHERE published AND synth_coherence IS NOT NULL AND synth_coherence < 0.3
+            AND COALESCE(offctx_ok, false) = false ORDER BY id LIMIT 16`) as any[];
+        if (namepol.length > 15) {
+          integrity.push(`🚨이름오염(coherence<0.3) 급증(${namepol.length}곳+) — 규칙회귀 의심, 자동홀드 중단·즉시 점검`);
+        } else if (namepol.length > 0) {
+          const r = (await sql`UPDATE cafes SET published=false, pipeline_status='held', updated_at=now()
+            WHERE published AND synth_coherence < 0.3 AND COALESCE(offctx_ok, false) = false RETURNING 1`) as any[];
+          if (r.length) { unpubThisRun += r.length; healed.push(`이름오염(coherence<0.3) ${r.length}곳 자동 홀드(${namepol.slice(0, 3).map((x: any) => x.name).join(", ")})`); }
+        }
+      } catch {}
       // (e-2) '절대 카페 아님' 카테고리 자동 비공개 — 그랜드파더 비카페(건설·수목원·병원·미용·캠핑 등)를 카테고리로 자동 솎음(수기 불필요)
       try { const nc = await healNonCafeCategory(); if (nc.held > 0) { unpubThisRun += nc.held; healed.push(`비카페 카테고리 ${nc.held}곳 자동 비공개(${nc.names.slice(0, 3).join(", ")})`); } } catch {}
       // (e-2b) 노출리뷰 기반 오프콘셉 — 네이버가 '카페'로 분류했지만 리뷰는 애견·키즈·만화·보드게임 등 활동공간(자기이름+업종 우세)
