@@ -44,7 +44,8 @@ export async function GET(req: NextRequest) {
     const nowKst = new Date(now + KST);
     const todayKst = nowKst.toISOString().slice(0, 10);
     const nowHourK = nowKst.getUTCHours() + nowKst.getUTCMinutes() / 60;
-    const cmRuns = (await sql`SELECT ran_at FROM agent_runs WHERE job='chief-manager' AND (ran_at AT TIME ZONE 'Asia/Seoul')::date = ${todayKst}::date ORDER BY ran_at`) as any[];
+    // ⚠️ 사이클 실행 이름이 둘: 아침 풀사이클=chief-manager-agent, 점심/오후=chief-manager. 둘 다 세야 아침이 오탐 '누락' 안 뜸.
+    const cmRuns = (await sql`SELECT ran_at FROM agent_runs WHERE job IN ('chief-manager','chief-manager-agent') AND (ran_at AT TIME ZONE 'Asia/Seoul')::date = ${todayKst}::date ORDER BY ran_at`) as any[];
     const hourOf = (t: any) => { const k = new Date(new Date(t).getTime() + KST); return { h: k.getUTCHours() + k.getUTCMinutes() / 60, hh: String(k.getUTCHours()).padStart(2, "0"), mm: String(k.getUTCMinutes()).padStart(2, "0") }; };
     const CYCLE_DEF = [{ name: "아침", label: "08시", hour: 8, lo: 6, hi: 10.5 }, { name: "점심", label: "12시", hour: 12, lo: 10.5, hi: 14.5 }, { name: "오후", label: "17시", hour: 17, lo: 14.5, hi: 20.5 }];
     const cycles = CYCLE_DEF.map((c) => {
