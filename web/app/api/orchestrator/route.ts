@@ -65,6 +65,8 @@ export async function GET(req: NextRequest) {
       FROM cafes`)[0] as any;
     // 판정 대기·오늘 지표 = lib/metrics 단일출처(judge-status와 동일 정의 — 화면별 숫자 어긋남 구조적 차단).
     const judgeQ = await judgeQueueCount();
+    // 옥석(검증) 미판정 = AI판정 '의도적 스킵' 대상(규칙검증 완료·저위험). 대기가 아니라 '완료 처리'임을 화면에 명시(숨김 금지).
+    const verifiedSkip = ((await sql`SELECT COUNT(*)::int n FROM cafes WHERE published AND synth_grade='검증' AND (llm_judged_at IS NULL OR llm_judged_at < raw_collected_at)`.catch(() => [{ n: 0 }]))[0] as any).n;
     const daily = await dailyCounts();
     const vr = (await sql`SELECT ran_at, fails, warns, status FROM verify_reports ORDER BY ran_at DESC LIMIT 1`)[0] as any;
     // open = '실제 카페 오염' 플래그만(cafe_id 있고 'audit_complete' 같은 시스템 로그 제외). last_flag=실행 시각.
@@ -392,7 +394,7 @@ export async function GET(req: NextRequest) {
     }
     // 미판정 내역은 0인 항목은 숨기고 실제 남은 것만 표기(사장님: 헷갈릴 내용 말고 사실만).
     const jbParts = ([["신규", jb.newjudge], ["재수집변경", jb.recollect], ["그라운딩재검", jb.reground]] as [string, number][]).filter(([, n]) => n > 0).map(([k, n]) => `${k} ${n}`);
-    add("judge", "AI 판정 (Haiku·새벽·보조정제)", c.last_judge, 30, judgeQ, `공개카페는 규칙검증돼 노출중 · LLM 보조정제 대기 ${judgeQ}곳(새벽 Batches 자동·소비자 품질무관)${jbParts.length > 1 ? ` [${jbParts.join("+")}]` : ""}`);
+    add("judge", "AI 판정 (Haiku·새벽·보조정제)", c.last_judge, 30, judgeQ, `공개카페는 규칙검증돼 노출중 · LLM 보조정제 대기 ${judgeQ}곳(새벽 Batches 자동·소비자 품질무관)${verifiedSkip ? ` · 옥석(검증) ${verifiedSkip}곳은 규칙검증 완료라 AI판정 스킵(설계·후순위)` : ""}${jbParts.length > 1 ? ` [${jbParts.join("+")}]` : ""}`);
     add("embed", "임베딩", c.last_embed, 30, c.embed_q, c.embed_q ? `미임베딩 ${c.embed_q}` : `완료(공개 ${c.published ? Math.round((c.pub_embedded / c.published) * 100) : 0}%)`);
     add("verify", "검증 레드팀", vr?.ran_at ?? null, 30, (vr?.fails ?? 0) + (vr?.warns ?? 0), vr ? `fail ${vr.fails}·warn ${vr.warns}` : "리포트 없음");
     // 품질감사: 미해결 플래그 기준(가동 시각은 flag 생성 시각으로 근사)
