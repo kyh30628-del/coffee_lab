@@ -5,13 +5,19 @@
 //   ⚠️ ToS-clean: 구독토큰은 백엔드 금지 → 서버는 큐만, 실제 LLM/실행/배포는 전부 여기(로컬 claude -p·로컬 git).
 //   코드 구현·커밋·배포는 이미 검증된 로컬 파이프라인(dev-claim→run-dev-one→dev-deploy, 전역 git락·버전확인)을
 //   재사용한다 — 워커가 직접 free git push 하지 않아 과거 git 레이스 사고를 회피.
-import { readFileSync } from "node:fs";
+import { readFileSync, appendFileSync } from "node:fs";
 import { execFile } from "node:child_process";
 import { neon } from "@neondatabase/serverless";
+import { computeGuard } from "./usageGuard.mjs";
 
 const env = readFileSync("/Users/wangwida/coffee-platform/web/.env.local", "utf8");
 const sql = neon(env.match(/DATABASE_URL="?([^"\n]+)/)[1].trim());
 const one = async (q) => { try { return Number((await q)[0].c); } catch { return "?"; } };
+
+// 📜 CEO 운영원칙 캐논 — triage/실행 프롬프트에 항상 시스템컨텍스트로 주입(캐시됨). 서비스 이해·품질 해자 고정.
+const CANON = "/Users/wangwida/coffee-platform/docs/CEO-OPERATING-PRINCIPLES.md";
+// 📊 토큰 실측 로깅(측정 사각 해소) — _run.sh와 동일 포맷으로 USAGE.tsv에 적재. 캐시read 포함이 소모 프록시.
+function logUsage(job, j) { try { const u = j.usage || {}; const tin = (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0); appendFileSync("/Users/wangwida/coffee-platform/agent-reports/USAGE.tsv", [new Date().toISOString(), job, tin, u.output_tokens || 0, (j.total_cost_usd || 0).toFixed(4), j.num_turns || 0].join("\t") + "\n"); } catch {} }
 
 const KB = `너는 '동네 커피 노트'(dongnecoffeenote.com)의 **기획조정실장** — 대표님(CEO) 직속 2인자이자 관제 상황을 꿰고 있는 참모다. 대표님께 **똑똑하고 자연스럽게, 핵심만** 답하고, 대표님의 **작업지시는 곧 승인**으로 간주해 자율로 처리를 개시한다. 공손하되 직언하고, 도움이 되면 한발 앞서 제안한다.
 [역할 경계 — 중요] ①상태·데이터 **질문**엔 아래 [라이브 상태]로 바로 답한다. ②**안전하고 되돌릴 수 있는 코드/UI/문구/설정 변경 작업지시**는 네가 착수시킨다(격리 워크트리 구현→검증→배포 파이프라인). ③**파괴적·비가역·데이터변경(카페 공개/비공개/등급/대량/삭제)·예산/토큰정책·스케줄/런치d·시크릿·모호하거나 둘 중 택일**인 건은 **절대 자동 실행하지 말고** 대표님께 되묻는다. **너 자신은 DB를 직접 바꾸지 않는다(읽기전용 조회만).**
@@ -33,14 +39,15 @@ async function ground() {
   return L.join("\n");
 }
 
-// claude -p 1회 호출. tools=true면 Bash 허용(추가조회 가능), false면 도구 없이 그라운딩만으로 즉답 강제.
-function runClaude(prompt, tools) {
+// claude -p 1회 호출. 캐논을 시스템프롬프트로 항상 주입(캐시됨) + 토큰 실측 로깅.
+//   triage/즉답=haiku(저비용·기계적 분류·그라운딩 추출), 심층 DB조사=sonnet. tools=true면 Bash 허용.
+function runClaude(prompt, { tools = false, model = "haiku", job = "chat-triage" } = {}) {
   return new Promise((res) => {
-    const args = ["-p", prompt, "--model", "sonnet", "--dangerously-skip-permissions", "--max-turns", tools ? "6" : "2", "--output-format", "json"];
+    const args = ["-p", prompt, "--model", model, "--append-system-prompt-file", CANON, "--dangerously-skip-permissions", "--max-turns", tools ? "6" : "2", "--output-format", "json"];
     if (tools) args.splice(args.indexOf("--max-turns"), 0, "--allowedTools", "Bash");
     execFile("claude", args,
       { cwd: "/Users/wangwida/coffee-platform/web", maxBuffer: 16 * 1024 * 1024, timeout: tools ? 75000 : 40000, env: { ...process.env, PATH: "/Users/wangwida/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin" } },
-      (err, stdout) => { try { res((JSON.parse(stdout).result || "").trim()); } catch { res(err ? `__ERR__${String(err).slice(0, 80)}` : ""); } });
+      (err, stdout) => { try { const j = JSON.parse(stdout); logUsage(job, j); res((j.result || "").trim()); } catch { res(err ? `__ERR__${String(err).slice(0, 80)}` : ""); } });
   });
 }
 
@@ -57,7 +64,7 @@ const TRIAGE = `
 4) 애매하면 3)로. **데이터 변경(UPDATE/DELETE/INSERT)은 절대 <ORDER>로 내지 마라 — 반드시 <CHOICE>.** issues.ts 자동변환·결재/이슈 상호생성 영역은 건드리는 지시가 와도 <CHOICE>로 되물어라.`;
 
 async function askOrAnswer(base) {
-  const out = await runClaude(base + TRIAGE, false);
+  const out = await runClaude(base + TRIAGE, { tools: false, model: "haiku", job: "chat-triage" });
   if (out && !out.startsWith("__ERR__")) {
     const mo = out.match(/<ORDER>([\s\S]*?)<\/ORDER>/);
     if (mo) { try { return { type: "order", spec: JSON.parse(mo[1].trim()) }; } catch { return { type: "answer", text: out.replace(/<\/?ORDER>/g, "").trim() }; } }
@@ -66,7 +73,7 @@ async function askOrAnswer(base) {
     if (!out.includes("[NEED_DB]")) return { type: "answer", text: out };
   }
   // [NEED_DB] 또는 fast 실패 → 읽기전용 심층조회로 질문 답변
-  const deep = await runClaude(base + "\n\nBash에서 node+@neondatabase/serverless로 web/.env.local의 DATABASE_URL에 접속해 **읽기전용 SELECT만** 실행해 확인한 뒤 자연스럽게 답하라. 🚫 UPDATE/DELETE/INSERT 절대 금지. 마지막엔 반드시 텍스트로 답을 마무리하라.", true);
+  const deep = await runClaude(base + "\n\nBash에서 node+@neondatabase/serverless로 web/.env.local의 DATABASE_URL에 접속해 **읽기전용 SELECT만** 실행해 확인한 뒤 자연스럽게 답하라. 🚫 UPDATE/DELETE/INSERT 절대 금지. 마지막엔 반드시 텍스트로 답을 마무리하라.", { tools: true, model: "sonnet", job: "chat-deep" });
   if (deep && !deep.startsWith("__ERR__")) return { type: "answer", text: deep };
   if (out && !out.startsWith("__ERR__")) return { type: "answer", text: out.replace("[NEED_DB]", "").trim() || "(확인 필요 — 다시 질문해 주세요)" };
   const err = out.startsWith("__ERR__") ? out.slice(7) : (deep && deep.startsWith("__ERR__") ? deep.slice(7) : "");
@@ -101,9 +108,15 @@ async function tick() {
       const r = await askOrAnswer(base);
       let answer = "", mode = "claude-p";
       if (r.type === "order") {
-        const o = await createOrder(r.spec, question);
-        mode = "order";
-        answer = `🛠 **착수했습니다 — 개발 #${o.id}**\n\n"${r.spec.title || question}"\n\n격리 워크트리에서 구현 → tsc·빌드 검증 → ${o.autodeploy ? `**자동 배포**(위험도 ${o.risk})` : `**배포대기**(위험도 high — 배포 전 확인 요청드립니다)`}. 진행상황은 여기로 계속 보고드립니다. _(개발 파이프라인 5분 주기 — 곧 시작)_`;
+        const guard = computeGuard(); // 🛡️ 주간한도 근접 시 비핵심 자율개발 보류(핵심 판정·그라운딩 보호)
+        if (guard.level === "pause") {
+          mode = "held";
+          answer = `⏸️ **주간 한도 보호로 자율개발을 잠시 보류합니다** (7일 사용 ${guard.pct}% ≥ 컷).\n\n"${r.spec.title || question}"\n\n핵심 판정·질의응답은 계속 정상 동작합니다. 지금 바로 진행을 원하시면 "강행" 또는 컷 상향을 알려주세요.`;
+        } else {
+          const o = await createOrder(r.spec, question);
+          mode = "order";
+          answer = `🛠 **착수했습니다 — 개발 #${o.id}**\n\n"${r.spec.title || question}"\n\n격리 워크트리에서 구현 → tsc·빌드 검증 → ${o.autodeploy ? `**자동 배포**(위험도 ${o.risk})` : `**배포대기**(위험도 high — 배포 전 확인 요청드립니다)`}. 진행상황은 여기로 계속 보고드립니다. _(개발 파이프라인 5분 주기 — 곧 시작)_${guard.level === "throttle" ? "\n\n_※ 주간 한도 " + guard.pct + "% — 절약 모드로 진행합니다._" : ""}`;
+        }
       } else if (r.type === "choice") {
         mode = "choice";
         answer = `❓ **확인이 필요합니다**\n\n${r.text}\n\n_원하시는 방향을 답해 주시면 그대로 진행하겠습니다._`;
@@ -140,9 +153,11 @@ let maintBusy = false;
 async function maintenance() {
   if (maintBusy) return; maintBusy = true;
   try {
-    await sql`UPDATE decisions SET action_params = action_params || '{"dev_status":"deploy_approved"}'::jsonb, result='챗 자율 — 자동배포 승인(위험도 낮/중)'
-      WHERE action_type='dev_task' AND status='approved' AND action_params->>'source'='chat'
-        AND action_params->>'dev_status'='배포대기' AND (action_params->>'dev_autodeploy')='true'`.catch(() => {});
+    // 🛡️ 주간한도 pause면 자동배포 승격 보류(핵심 판정 보호). throttle/ok면 정상 승격.
+    if (computeGuard().level !== "pause")
+      await sql`UPDATE decisions SET action_params = action_params || '{"dev_status":"deploy_approved"}'::jsonb, result='챗 자율 — 자동배포 승인(위험도 낮/중)'
+        WHERE action_type='dev_task' AND status='approved' AND action_params->>'source'='chat'
+          AND action_params->>'dev_status'='배포대기' AND (action_params->>'dev_autodeploy')='true'`.catch(() => {});
     const rows = await sql`SELECT id, action_params ap, result FROM decisions
       WHERE action_type='dev_task' AND action_params->>'source'='chat'
         AND action_params->>'dev_status' IS NOT NULL
