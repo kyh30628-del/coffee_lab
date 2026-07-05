@@ -1815,8 +1815,8 @@ function CafePanel({ cafe, dist, onClose, onMap, bookmarked = false, onToggleBoo
           )}
 
         </div>
-
-        {/* ===== 전체 리뷰 모달 — aside 안에 두되 fixed로 overlay ===== */}
+      </aside>
+      {/* ===== 전체 리뷰 모달 — aside 밖(z-[3000] 컨테이너 직속)으로 이동. aside는 overflow-y:auto라 스크롤되며, 그 안에 있던 position:fixed 모달이 스크롤량(scrollTop)만큼 화면 밖으로 밀리고 패널 너비로 잘려 아예 안 보였음. 스크롤 안 되는 컨테이너 직속으로 빼서 항상 전체 화면(뷰포트)에 온전히 뜨게 함. ===== */}
         {showAllReviews && (
           <div className="fixed inset-0 z-[3100] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)" }} onClick={() => setShowAllReviews(false)}>
             <div className="w-full max-w-lg bg-[#fdf8f2] rounded-t-2xl max-h-[90dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
@@ -1862,7 +1862,7 @@ function CafePanel({ cafe, dist, onClose, onMap, bookmarked = false, onToggleBoo
                 </div>
               </div>
               {/* 리뷰 목록 */}
-              <div className="overflow-y-auto flex-1 px-4 py-3 space-y-3 pb-[calc(0.75rem_+_env(safe-area-inset-bottom))]">
+              <div className="overflow-y-auto overscroll-contain flex-1 px-4 py-3 space-y-3 pb-[calc(0.75rem_+_env(safe-area-inset-bottom))]">
                 {reviews.filter(rv => {
                   const isYt = /youtu\.?be/i.test(rv.link ?? "");
                   if (reviewFilter === "all") return true;
@@ -1899,7 +1899,6 @@ function CafePanel({ cafe, dist, onClose, onMap, bookmarked = false, onToggleBoo
             </div>
           </div>
         )}
-      </aside>
     </div>
   );
 }
