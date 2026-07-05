@@ -280,6 +280,11 @@ export function nameCoherence(name: string, quotes: string[], areaTerms: string[
   return hit / qs.length;
 }
 
+// 🚫 명백한 비-카페 스팸 — 카페 방문후기엔 절대 안 나오는 강한 오프토픽(코인·해외선물·거래소·부동산 분양·대출·재개발 등).
+//   블로그가 다른 주제 글에 카페명만 우연히 스쳐 오염되는 케이스(예: 카페클로버에 붙은 '코인 거래소'·'주상복합 분양' 글).
+//   ⚠️ 오탐 방지: 단일 애매어(코인·분양 단독) 금지 — 카페후기엔 안 나오는 '복합 신호'만.
+const OFFTOPIC_SPAM = /(코인\s*해외선물|해외\s*선물\s*(거래|시세|투자|매매)|선물\s*거래소|암호화폐|가상화폐|비트코인|비트겟|바이낸스|재테크\s*(추천|비법|정보|수익)|주식\s*(리딩|종목추천|투자문의|급등주)|대출\s*(상담|한도|이자|갈아타기|추천)|아파트\s*분양|오피스텔\s*분양|분양가|모델하우스|청약\s*(가점|통장|경쟁률)|재개발\s*(구역|조합|호재)|재건축\s*(조합|아파트|호재)|입주\s*예정|주상복합\s*분양|최고\s*\d+\s*층|\d+\s*개동)/;
+
 export function verifyReview(input: QualityInput): QualityResult {
   const title = (input.title ?? "").trim();
   const body = (input.body ?? "").trim();
@@ -296,6 +301,11 @@ export function verifyReview(input: QualityInput): QualityResult {
   //   내용에 카페 맥락어가 섞여도(리터럴 "카페" 오탐) 링크 도메인만으로 무조건 탈락.
   if (input.link && NONVISIT_BOARD.test(input.link)) {
     return { verdict: "rejected", score: 0, reasons: ["비방문 게시판(중고나라·창업나무) — 자동 제외"], signals: { nameInTitle: false, nameInBody: false, visit: false, substance: 0, listicle: false, sponsored: false, areaMatch: false } };
+  }
+
+  // [비-카페 스팸] 코인·해외선물·부동산분양·대출 등 카페와 무관한 강한 오프토픽 — 블로그가 카페명만 우연히 스친 오염. 규칙 하드거절.
+  if (OFFTOPIC_SPAM.test(fullL)) {
+    return { verdict: "rejected", score: 0, reasons: ["비-카페 스팸(코인·부동산·대출 등 무관 글) — 자동 제외"], signals: { nameInTitle: false, nameInBody: false, visit: false, substance: 0, listicle: false, sponsored: false, areaMatch: false } };
   }
 
   // ---- 구글 실제 방문 리뷰: 장소에 직접 달린 리뷰이므로 신뢰. 내용량만 본다 ----
