@@ -194,9 +194,19 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   //   신규 카페: 카테고리 필수 + 카테고리 기반 비카페 차단(엄격).
   //   기존 공개(grandfather/live) 카페: 카테고리 재분류로 내리지 않는다 — 검증 후기(일치율·등급)가 곧 카페 증명.
   //     이름 기반 비카페('식당·정육·병원' 등 명백한 것)만 적용. ('쇼핑,유통>차,커피' 소매카페·카테고리 누락 오비공개 방지)
-  const isCafeCat = inPipeline ? (hasCategory && !isNonCafe(name, naverCat)) : !isNonCafe(name, "");
-  // 프랜차이즈 제외 + 카페 카테고리 + 노이즈 아님 — 공개 게이트.
-  const ruleOk = (grade === "검증" || grade === "참고") && isCafeCat && !isFranchise(name) && !noisy;
+  // 🔧 flip-flop 근본수정(2026-07-05): 라이브 카페엔 isNonCafe(name,"")를 '빈 카테고리'로 부르던 게 버그.
+  //   그러면 이름만으로 판정해 '고로케·베이커리·쌀카스테라' 등 정상 디저트카페(네이버 "카페,디저트")를 비카페로 오판
+  //   → published=false(pl은 live 유지) → 힐 b-2가 재공개 → 무한 진동. 실제 카테고리로 판정하면 정상 카페로 나온다.
+  const gradeOk = grade === "검증" || grade === "참고";
+  const nonCafeReal = isNonCafe(name, naverCat); // 실제 카테고리 사용(빈값 name-only 오탐 방지). 카테고리 없으면 grandfather.
+  //   라이브(grandfather): 이름 OR 카테고리 중 '하나라도' 카페면 유지 — 둘 다 비카페일 때만 제거. 오제거 최소화.
+  //   (고로케=카테고리'카페,디저트'로 유지 · 커피로스터=네이버 '제조업/쇼핑' 오분류지만 이름'커피'로 유지 · 식당=둘다 비카페→제거)
+  const isCafeCat = inPipeline ? (hasCategory && !nonCafeReal) : ((hasCategory && !nonCafeReal) || !isNonCafe(name, ""));
+  // 신규(파이프라인): 프랜차이즈 제외 포함 엄격 게이트. 라이브(grandfather): 등급+실제카테고리만 —
+  //   프랜차이즈 등 소프트룰로 기존 공개 카페를 내리지 않는다(힐 b-2 복원조건과 일치 → 진동 원천 제거). 정의적 비카페는 아래 excluded가 처리.
+  const ruleOk = inPipeline
+    ? (gradeOk && isCafeCat && !isFranchise(name) && !noisy)
+    : (gradeOk && isCafeCat && !noisy);
 
   // 🔒 진정한 자동화 게이트: 신규 카페는 규칙 통과해도 즉시 공개 안 함 — AI 판정·임베딩·검증 통과 후 finalizer가 'live'로 승격할 때만.
   //   기존 카페(grandfather/live)는 규칙 게이트로 공개.
