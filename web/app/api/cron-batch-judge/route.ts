@@ -13,11 +13,11 @@ export const maxDuration = 300;
 //   매니페스트(custom_id→cafe·keys)는 DB(judge_batches)에 보관(서버리스 /tmp 비영속 대응).
 const BUILD_LIMIT = Number(process.env.BATCH_JUDGE_LIMIT || 150); // 빌드 시 getAuditCandidates가 카페당 합성 → 300s 내로 제한
 const PER_CAFE = 35;
-// 🎯 위험군 게이트(2026-07-05 CEO): 공개 카페 '재판정'은 오염 위험군만 — 이름이 명확하고 리뷰 충분한
-//   깨끗한 공개 카페(예: 옥석 리뷰 300건)는 재판정 스킵(비용·불필요). 신규(pending)는 공개 게이트라 항상 판정.
-//   위험 신호 = ①부실 리뷰(<5건) ②짧은 이름(≤4자, 토큰충돌 잦음) ③충돌 토큰(신도시·복합시설·지명 — 오염 실적).
-//   ⚠️ 소비자 노출 무영향: 이 게이트는 '무엇을 판정할지' 후보만 좁힘 — 스킵된 카페는 현 상태 그대로 유지(공개·리뷰 불변).
-const RISK_TOKENS = "충무|위례|미사|다산|별내|광교|동탄|운정|송도|청라|영종|마곡|고덕|감일|갈매|스타필드|롯데몰|신세계|현대백화점|아울렛|휴게소|터미널|캠퍼스";
+// 🎯 위험군 게이트(2026-07-05 CEO): 공개 카페 '재판정'은 신뢰도 낮은 등급만 — 파이프라인 자체 등급으로 원리적 선.
+//   '검증'(verified, 평균 85리뷰 = 옥석 코어)은 스킵(재판정 불필요), 그 외('참고' 등, 평균 12리뷰)는 판정.
+//   근거: 오염 4곳(리코·충무·블라블라·블루다이아) 전부 '참고'였음 — 리뷰 개수(<5) 같은 자의적 선보다 등급이 정확.
+//   신규(pending)는 공개 게이트라 항상 판정. ⚠️ 소비자 노출 무영향: 게이트는 후보 SELECT만 좁힘 — 스킵 카페는 현 상태 그대로.
+const TRUSTED_GRADE = "검증"; // 이 등급(옥석 코어)만 재판정 스킵
 
 export async function GET(req: NextRequest) {
   try {
@@ -62,19 +62,17 @@ export async function GET(req: NextRequest) {
     //   ⚠️ 우선순위: 신규(pending) 먼저! pending은 판정이 '공개 필수 게이트'라 미루면 영영 공개 안 됨.
     //   공개카페 재정제(보조)는 그 다음. (이전엔 published DESC라 신규가 영영 차례 안 와 적체됨)
     let submitted = 0, noCand = 0, batchId: string | null = null;
-    //   신규(pending)는 항상 판정(공개 게이트). 공개 재판정은 위험군만(부실<5 · 짧은이름≤4 · 충돌토큰).
-    //   깨끗한 공개 카페(리뷰 충분·명확한 이름)는 후보에서 제외 = 사실상 '제일 뒤로' → 판정 스킵, 노출 무영향.
+    //   신규(pending)는 항상 판정(공개 게이트). 공개 재판정은 '검증' 아닌 등급만(참고 등 = 낮은 신뢰).
+    //   '검증' 등급(옥석 코어, 평균 85리뷰)은 후보에서 제외 → 판정 스킵, 노출 무영향.
     const rows = (await sql`SELECT id, name, area FROM cafes
       WHERE raw_reviews IS NOT NULL
         AND (llm_judged_at IS NULL OR llm_judged_at < raw_collected_at)
         AND (
           pipeline_status = 'pending'
-          OR (published AND (synth_count < 5 OR length(name) <= 4 OR name ~ ${RISK_TOKENS}))
+          OR (published AND synth_grade IS DISTINCT FROM ${TRUSTED_GRADE})
         )
       ORDER BY (pipeline_status = 'pending') DESC,
-               (COALESCE(synth_count, 0) < 5) DESC,   -- 부실 리뷰 우선
-               (length(name) <= 4) DESC,               -- 짧은/충돌 이름 다음
-               COALESCE(synth_count, 0) ASC,           -- 리뷰 적은 순(옥석 많은 곳은 뒤로)
+               COALESCE(synth_count, 0) ASC,           -- 리뷰 적어 취약한 순 우선(옥석 많은 곳은 뒤로)
                id LIMIT ${BUILD_LIMIT}`) as any[];
     const requests: any[] = [];
     const manifestCafes: Record<string, any> = {};
