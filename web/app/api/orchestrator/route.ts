@@ -62,8 +62,8 @@ export async function GET(req: NextRequest) {
       MAX(embed_updated) last_embed,
       COUNT(*) FILTER (WHERE raw_reviews IS NOT NULL AND synth_updated IS NULL)::int synth_q,
       COUNT(*) FILTER (WHERE embedding IS NULL AND (published OR pipeline_status='pending') AND synth_identity IS NOT NULL)::int embed_q,
-      COUNT(*) FILTER (WHERE published AND raw_reviews IS NOT NULL AND raw_collected_at > synth_updated)::int synth_backlog,
-      COUNT(*) FILTER (WHERE published AND (synth_updated IS NULL OR synth_updated < now() - interval '7 days'))::int synth_stale7
+      COUNT(*) FILTER (WHERE published AND raw_reviews IS NOT NULL AND raw_collected_at > synth_checked_at)::int synth_backlog,
+      COUNT(*) FILTER (WHERE published AND (synth_checked_at IS NULL OR synth_checked_at < now() - interval '7 days'))::int synth_stale7
       FROM cafes`)[0] as any;
     // 판정 대기·오늘 지표 = lib/metrics 단일출처(judge-status와 동일 정의 — 화면별 숫자 어긋남 구조적 차단).
     const judgeQ = await judgeQueueCount();

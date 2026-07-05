@@ -24,6 +24,7 @@ export async function GET(req: NextRequest) {
     await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS char_scores JSONB`;
     await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_quality JSONB`;
     await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS review_dates JSONB`;
+    await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_checked_at TIMESTAMPTZ`.catch(() => {}); // 마지막 재점검 시각(커버리지 측정용)
 
     // 🔒 약관 준수: 수집한 외부 글(raw 스니펫)은 영구 보관하지 않고 '한시적 캐시'로만 둔다.
     // 90일 지난 raw는 파기 → warmup(00:10)이 필요 시 새로 수집. (표시용 1줄 인용·링크·파생분석은 유지)
@@ -53,12 +54,14 @@ export async function GET(req: NextRequest) {
     //   대상: ①새 리뷰 수집됨(raw_collected_at > synth_updated → 규칙 재적용 필요) ②4일+ 미갱신(규칙변경 자동커버, 전수 ~4일 순환).
     //   ⚠️ 신선한(4일 내·새 raw 없는) 카페는 재처리 안 함 → 안 변한 것 반복 재계산 낭비 제거. 필요한 것 우선(새 raw) 먼저.
     //   ⚠️ no-mass-unpublish 차단기: 100곳 이상 처리 후 비공개율 20% 초과 시 즉시 중단(버그성 대량비공개 방지, 인천사고 교훈).
+    // synth_checked_at = '마지막 재점검 시각'(변경 여부 무관 매 재합성마다 갱신) → 이걸로 순환해야 실제 커버리지가 전진.
+    //   (synth_updated는 '결과가 바뀐 시각'이라 안 변한 카페는 안 움직여 순환 기준으로 못 씀 — 2026-07-05 정정.)
     const GEN_CONC = 10, GEN_MAX = 150, GEN_RATE_LIMIT = 0.20; // 150/시×24=3,600/일 → 전수 ~4일(12,864/3,600)
     const genRows = (await sql`
       SELECT id, name, area, synth_count FROM cafes
       WHERE published = true AND raw_reviews IS NOT NULL
-        AND (raw_collected_at > synth_updated OR synth_updated IS NULL OR synth_updated < now() - interval '4 days')
-      ORDER BY (raw_collected_at > synth_updated) DESC, synth_updated ASC NULLS FIRST
+        AND (raw_collected_at > synth_checked_at OR synth_checked_at IS NULL OR synth_checked_at < now() - interval '4 days')
+      ORDER BY (raw_collected_at > synth_checked_at) DESC, synth_checked_at ASC NULLS FIRST
       LIMIT ${GEN_MAX}
     `) as unknown as { id: number; name: string; area: string; synth_count: number }[];
     let gi = 0, gDone = 0, gChanged = 0, gErr = 0; const gUnpub: number[] = []; let gStop = false;
