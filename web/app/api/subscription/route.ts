@@ -55,15 +55,21 @@ async function ensure() {
   await sql`ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS suspended_at TIMESTAMPTZ`;
   await sql`ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS newsletter_opt_in BOOLEAN DEFAULT true`; // 주간 뉴스레터 수신동의
   await sql`ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS pin_emailed_at TIMESTAMPTZ`;             // 키 이메일 실제 발송 성공 시각(발송 증빙)
-  // 만료 자동 반영: 기간 지난 active → expired + featured 해제
-  await sql`UPDATE subscriptions SET status='expired', updated_at=now() WHERE status='active' AND expires_at < now()`;
-  await sql`UPDATE cafe_promos SET featured=false WHERE cafe_id IN (SELECT cafe_id FROM subscriptions WHERE status='expired') AND featured_until < now()`;
-  // 🔒 self-heal: active 구독은 항상 featured 유지(구독을 단일 출처로). 실수 unfeature/드리프트를 자동 복구.
-  //    노출 제거는 정지(suspend)·취소(cancel)로만 — 그때는 status가 바뀌어 이 대상에서 빠진다.
-  await sql`UPDATE cafe_promos p SET featured=true, featured_until=s.expires_at, updated_at=now()
+  await sql`ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS duration_days INT`;                     // 승인 시 확정한 이용기간(7일 체험/30일 등). 시계는 '첫 로그인'에 시작되므로 여기에 보관.
+  // 만료 자동 반영: 기간 지난 active → expired + 모든 혜택 해제(골드핀·우선노출·쇼케이스). expires_at IS NULL=미시작(첫 로그인 전)은 만료 아님.
+  await sql`UPDATE subscriptions SET status='expired', updated_at=now() WHERE status='active' AND expires_at IS NOT NULL AND expires_at < now()`;
+  // 혜택 OFF: 구독이 active-시작-미만료가 아닌 모든 카페(만료·취소·정지·미시작). featured=골드핀·우선노출, approved=쇼케이스.
+  await sql`UPDATE cafe_promos p SET featured=false, approved=false, updated_at=now()
             FROM subscriptions s
-            WHERE s.cafe_id = p.cafe_id AND s.status='active' AND s.expires_at > now()
-              AND (p.featured = false OR p.featured_until IS NULL OR p.featured_until < now())`;
+            WHERE s.cafe_id = p.cafe_id
+              AND (s.status <> 'active' OR s.expires_at IS NULL OR s.expires_at <= now())
+              AND (p.featured = true OR p.approved = true)`;
+  // 🔒 self-heal: '시작된(첫 로그인 완료)' active 구독은 항상 전 혜택 유지 — 드리프트 자동복구. 미로그인(expires NULL)은 제외.
+  //    혜택 시작은 첫 로그인(lib/ownerActivity), 제거는 만료·정지·취소로만.
+  await sql`UPDATE cafe_promos p SET featured=true, approved=true, featured_until=s.expires_at, updated_at=now()
+            FROM subscriptions s
+            WHERE s.cafe_id = p.cafe_id AND s.status='active' AND s.expires_at IS NOT NULL AND s.expires_at > now()
+              AND (p.featured = false OR p.approved = false OR p.featured_until IS NULL OR p.featured_until < now())`;
 }
 
 export async function GET(req: NextRequest) {
@@ -72,7 +78,7 @@ export async function GET(req: NextRequest) {
     if (req.nextUrl.searchParams.get("all")) {
       if (!authed(req)) return NextResponse.json({ ok: false }, { status: 401 });
       await ensureOwnerActivity(); // 활동 추적 컬럼·테이블 보장
-      const rows = await sql`SELECT s.id, s.cafe_id, s.cafe_name, s.owner_name, s.contact, s.email, s.plan, s.price, s.status, s.pin, s.pin_emailed_at, s.newsletter_opt_in, s.started_at, s.expires_at, s.created_at, s.biz_reg_url, s.biz_no, s.attested, s.signup_ip, s.signup_ua, s.verified, s.suspend_reason, s.suspended_at, s.last_seen_at, s.first_login_at, COALESCE(s.login_count,0) AS login_count, COALESCE(c.published, false) AS cafe_published,
+      const rows = await sql`SELECT s.id, s.cafe_id, s.cafe_name, s.owner_name, s.contact, s.email, s.plan, s.price, s.status, s.pin, s.pin_emailed_at, s.newsletter_opt_in, s.started_at, s.expires_at, s.duration_days, s.created_at, s.biz_reg_url, s.biz_no, s.attested, s.signup_ip, s.signup_ua, s.verified, s.suspend_reason, s.suspended_at, s.last_seen_at, s.first_login_at, COALESCE(s.login_count,0) AS login_count, COALESCE(c.published, false) AS cafe_published,
         (SELECT COALESCE(json_agg(json_build_object('event', e.event, 'at', e.at) ORDER BY e.at DESC), '[]'::json) FROM (SELECT event, at FROM owner_events WHERE cafe_id = s.cafe_id ORDER BY at DESC LIMIT 8) e) AS recent_events
         FROM subscriptions s LEFT JOIN cafes c ON c.id = s.cafe_id ORDER BY (s.status='pending') DESC, s.created_at DESC LIMIT 200` as unknown as any[];
       // emailReady: 이 환경(프로덕션 포함)에 Resend 키가 있어야 승인 시 키 이메일이 자동 발송됨
@@ -103,13 +109,15 @@ export async function POST(req: NextRequest) {
       const days = Math.min(Math.max(Number(b.days) || 30, 1), 365);
       if (b.action === "activate") {
         const pin = s.pin || genPin(); // 재활성화면 기존 PIN 유지
-        await sql`UPDATE subscriptions SET status='active', started_at=now(), expires_at=now()+make_interval(days=>${days}), pin=${pin}, verified=true, updated_at=now() WHERE id=${id}`;
+        // 🕐 시계는 '첫 로그인'에 시작 — 승인 시엔 PIN 발급 + 이용기간만 확정(started/expires는 첫 접속 때 lib/ownerActivity가 세팅).
+        await sql`UPDATE subscriptions SET status='active', started_at=NULL, expires_at=NULL, duration_days=${days}, pin=${pin}, verified=true, updated_at=now() WHERE id=${id}`;
+        // 혜택(골드핀·우선노출·쇼케이스)도 첫 로그인에 켜짐 — 승인 시엔 promo 행만 보장하고 OFF 유지.
         if (s.cafe_id) await sql`INSERT INTO cafe_promos (cafe_id, featured, featured_until, approved, published, updated_at)
-          VALUES (${s.cafe_id}, true, now()+make_interval(days=>${days}), true, true, now())
-          ON CONFLICT (cafe_id) DO UPDATE SET featured=true, featured_until=now()+make_interval(days=>${days}), approved=true`;
+          VALUES (${s.cafe_id}, false, NULL, false, true, now())
+          ON CONFLICT (cafe_id) DO UPDATE SET featured=false, featured_until=NULL, approved=false, updated_at=now()`;
         const emailed = await sendPinEmail(decryptPII(s.email ?? ""), pin, s.cafe_name ?? "", days);
         if (emailed) await sql`UPDATE subscriptions SET pin_emailed_at=now() WHERE id=${id}`;
-        return NextResponse.json({ ok: true, status: "active", pin, emailed, email: decryptPII(s.email ?? "") });
+        return NextResponse.json({ ok: true, status: "active", pin, emailed, started: false, email: decryptPII(s.email ?? "") });
       }
       if (b.action === "extend") {
         await sql`UPDATE subscriptions SET status='active', expires_at=GREATEST(coalesce(expires_at,now()),now())+make_interval(days=>${days}), updated_at=now() WHERE id=${id}`;

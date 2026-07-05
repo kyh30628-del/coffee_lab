@@ -822,7 +822,7 @@ export default function AdminPage() {
                   <div key={s.id} className="bg-white rounded-xl border border-amber-300 p-3">
                     <div className="min-w-0">
                       <span className="font-bold text-sm">{s.cafe_name}</span>
-                      <span className={`text-[11px] ml-2 font-bold ${stColor}`}>{stLabel}{s.status === "active" && dleft != null ? ` · D-${dleft}` : ""}</span>
+                      <span className={`text-[11px] ml-2 font-bold ${stColor}`}>{stLabel}{s.status === "active" ? (s.expires_at ? ` · D-${dleft}` : ` · ⏳ 로그인 대기(첫 접속 시 ${s.duration_days || 30}일 시작)`) : ""}</span>
                       <div className="text-[12px] text-stone-600 truncate">{s.owner_name} · 📞 {s.contact}{s.email ? ` · ✉️ ${s.email}` : ""} · {s.plan}{s.price ? ` ₩${s.price.toLocaleString()}` : " 무료"}</div>
                       {/* 🔒 사칭 방지 증빙 — 승인 전 대조: 사업자등록증·대표자명·번호·동의·접속기록 */}
                       <div className="mt-1.5 rounded-lg bg-amber-50/70 border border-amber-100 p-2 text-[11px] text-stone-600 space-y-0.5">
@@ -866,7 +866,7 @@ export default function AdminPage() {
               })}
             </div>
             ) : <p className="text-[13px] text-stone-400 py-3 text-center">구독 회원이 아직 없어요.</p>}
-            <p className="text-[10px] text-stone-400 mt-2">활성화 시 우선노출 자동 ON·만료/해지 시 OFF. 연락처는 암호화 저장.</p>
+            <p className="text-[10px] text-stone-400 mt-2">승인 시 PIN 발급 → <b>사장님 첫 로그인 시점부터</b> 기간 카운트 시작 + 골드핀·우선노출·쇼케이스 자동 ON. 만료/해지 시 전부 OFF. 연락처는 암호화 저장.</p>
             </div>
           </div>
         )}

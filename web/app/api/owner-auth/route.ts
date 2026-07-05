@@ -18,7 +18,9 @@ export async function POST(req: NextRequest) {
       await sql`UPDATE subscriptions SET status='expired', updated_at=now() WHERE pin=${pin} AND status='active'`.catch(() => {});
       return NextResponse.json({ ok: false, error: "이용 기간이 만료됐어요. 구독하시면 계속 이용할 수 있어요." }, { status: 401 });
     }
-    await recordOwnerLogin(r.cafe_id); // 📊 접속 모니터링 — 로그인 이력·최근접속·횟수 기록
-    return NextResponse.json({ ok: true, cafeId: r.cafe_id, cafeName: r.cafe_name, expiresAt: r.expires_at });
+    await recordOwnerLogin(r.cafe_id); // 📊 접속 모니터링 + 🕐 첫 로그인이면 여기서 구독 시계 시작·혜택 ON
+    // 첫 로그인 직후엔 위에서 expires_at이 막 세팅되므로, 응답엔 갱신된 값을 다시 읽어 반환(D-day 정확).
+    const fresh = (await sql`SELECT expires_at FROM subscriptions WHERE cafe_id=${r.cafe_id}`)[0] as any;
+    return NextResponse.json({ ok: true, cafeId: r.cafe_id, cafeName: r.cafe_name, expiresAt: fresh?.expires_at ?? r.expires_at });
   } catch (e) { return NextResponse.json({ ok: false, error: String(e) }, { status: 500 }); }
 }
