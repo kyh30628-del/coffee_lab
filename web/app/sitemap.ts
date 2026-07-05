@@ -26,10 +26,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const regionTasteUrls: MetadataRoute.Sitemap = regions.flatMap((r) =>
     TASTES.map((t) => ({ url: `${SITE}/area/${encodeURIComponent(r.area)}/${t.key}`, changeFrequency: "weekly" as const, priority: 0.6 }))
   );
+  // 동네 교차검증 컬렉션(에디토리얼 SEO 랜딩) — 확장 시 이 배열에 slug만 추가.
+  const COLLECTIONS = ["seongsu"];
+  const collectionUrls: MetadataRoute.Sitemap = COLLECTIONS.map((c) => ({
+    url: `${SITE}/collections/${c}`, changeFrequency: "weekly", priority: 0.85,
+  }));
   return [
     { url: SITE, changeFrequency: "daily", priority: 1 },
     { url: `${SITE}/area`, changeFrequency: "daily", priority: 0.9 },
     { url: `${SITE}/pricing`, changeFrequency: "monthly", priority: 0.5 },
+    ...collectionUrls,
     ...tasteUrls,
     ...regionUrls,
     ...regionTasteUrls,

@@ -21,6 +21,16 @@ export default async function AreaIndex() {
         <h1 className="text-[27px] font-bold leading-tight mb-2">동네별 카페 추천</h1>
         <p className="text-[14px] text-[#6b5a48] leading-relaxed mb-6">서울·경기·인천 동네별로 <b>영수증 리뷰·광고 없이 진짜 후기로 검증</b>한 카페를 모았어요. 취향별로도 골라보세요.</p>
 
+        {/* 이번 주 추천 컬렉션 — 교차검증 에디토리얼(SEO·유입 진입점) */}
+        <Link href="/collections/seongsu" className="flex items-center justify-between gap-3 rounded-xl px-4 py-3.5 mb-7 border border-[#e6d2b5]" style={{ background: "linear-gradient(90deg,#fbf3e4,#f4ece0)" }}>
+          <span className="flex flex-col text-left min-w-0">
+            <span className="text-[11px] font-bold text-[#c98a3c] tracking-wide mb-0.5">이번 주 추천 컬렉션</span>
+            <span className="text-[14.5px] font-bold text-[#5a4632] truncate">성수동 카페 — 협찬 없이 교차검증한 곳</span>
+            <span className="text-[11px] text-[#9c8a6c] truncate">광고·협찬·타지점 후기 빼고 실방문 후기로만</span>
+          </span>
+          <span className="text-[#c98a3c] font-bold whitespace-nowrap">→</span>
+        </Link>
+
         <div className="mb-7">
           <div className="text-[12px] font-bold text-[#9c6b3f] mb-2">취향별</div>
           <div className="flex flex-wrap gap-1.5">

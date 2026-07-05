@@ -25,7 +25,7 @@ async function getCafe(id: string) {
   const n = Number(id);
   if (!Number.isFinite(n) || n <= 0) return null;
   try {
-    return (await sql`SELECT id, name, area, synth_grade, synth_identity, synth_count, char_scores, synth_reviews_all, synth_reviews, reputation_note FROM cafes WHERE id=${n} AND published=true LIMIT 1`)[0] as any ?? null;
+    return (await sql`SELECT id, name, area, dong, address, synth_grade, synth_identity, synth_count, char_scores, synth_reviews_all, synth_reviews, reputation_note FROM cafes WHERE id=${n} AND published=true LIMIT 1`)[0] as any ?? null;
   } catch { return null; }
 }
 function topTags(cs: any): string[] {
@@ -205,6 +205,16 @@ export default async function CafePage({ params }: Props) {
                 ))}
               </div>
             </div>
+          )}
+          {/* 성수동 카페 → 교차검증 컬렉션 상호링크(크롤 동선·SEO) */}
+          {(/성수/.test(c.dong || "") || /성수동/.test(c.address || "")) && (
+            <Link href="/collections/seongsu" className="mt-3 flex items-center justify-between gap-2 w-full rounded-xl px-4 py-3 border border-[#d8c8ad] bg-white">
+              <span className="flex flex-col text-left">
+                <span className="text-[12.5px] font-bold text-[#5a4632]">📌 성수동 카페, 협찬 없이 교차검증한 곳</span>
+                <span className="text-[10.5px] text-[#9c8a6c]">광고·협찬·타지점 후기 빼고 실방문 후기로만 모아보기</span>
+              </span>
+              <span className="text-[#9c6b3f] font-bold whitespace-nowrap">→</span>
+            </Link>
           )}
           {/* 사장님 CTA — 카페 상세 → owner 인사이트 진입(B2B 퍼널, decisions #15) */}
           <Link href={`/owner?name=${encodeURIComponent(c.name)}`} className="mt-3 flex items-center justify-between gap-2 w-full rounded-xl px-4 py-3 border border-[#e6d2b5]" style={{ background: "linear-gradient(90deg,#fbf3e4,#f4ece0)" }}>
