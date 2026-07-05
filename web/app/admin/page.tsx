@@ -808,9 +808,9 @@ export default function AdminPage() {
             {/* 📧 이메일 발송 준비 상태 — 승인 시 키 자동발송 가능 여부(프로덕션 env) */}
             {emailReady === false && <div className="mb-3 text-[11px] text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-2.5 py-2">🚨 이 환경에 <b>이메일 발송키(RESEND)가 없어요</b>. 승인해도 키가 자동 발송되지 않으니, 승인 후 <b>PIN을 사장님께 직접 전달</b>해야 해요. (Vercel 환경변수 RESEND_API_KEY 설정 필요)</div>}
             {emailReady === true && <div className="mb-3 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-2">📧 이메일 발송 준비됨 — 승인하면 키(PIN)가 사장님 이메일로 <b>자동 발송</b>돼요.</div>}
-            {/* ✨ 소비자 노출(우선노출) 실제 작동 여부 — SUBSCRIPTION_LIVE */}
-            {liveExposure === false && <div className="mb-3 text-[11px] text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-2.5 py-2">🚨 <b>소비자 노출 OFF</b> — 구독 사장님이 featured(우선노출)여도 지도 금색핀·추천카페·쇼케이스가 <b>손님에게 안 보입니다</b>. 유료 사장님이 있으면 Vercel 환경변수 <b>SUBSCRIPTION_LIVE=true</b>로 켜야 노출됩니다.</div>}
-            {liveExposure === true && <div className="mb-3 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-2">✨ 소비자 노출 ON — 구독 사장님 우선노출(금색핀·추천카페·쇼케이스)이 손님에게 정상 노출됩니다.</div>}
+            {/* ✨ 소비자 노출 — 기본 자동 ON. false 명시(킬스위치)일 때만 경고 */}
+            {liveExposure === false && <div className="mb-3 text-[11px] text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-2.5 py-2">🚨 <b>소비자 노출이 비상 차단(OFF)돼 있어요</b> — 누군가 Vercel 환경변수 <b>SUBSCRIPTION_LIVE=false</b>로 꺼둔 상태입니다. 이 값을 <b>지우면 자동으로 다시 켜집니다</b>(기본 ON).</div>}
+            {liveExposure === true && <div className="mb-3 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-2">✨ 소비자 노출 <b>자동 ON</b> — 구독 사장님이 <b>첫 로그인하면</b> 우선노출(금색핀·추천카페·쇼케이스)이 손님에게 자동으로 노출됩니다. 별도로 켤 필요 없어요.</div>}
             {subMsg && <div className="mb-3 text-[12px] text-stone-800 bg-amber-50 border border-amber-300 rounded-lg px-2.5 py-2 flex items-start gap-2"><span className="flex-1">{subMsg}</span><button onClick={() => setSubMsg("")} className="text-stone-400 shrink-0">×</button></div>}
             {subscribers.length > 0 ? (
             <div className="space-y-2">

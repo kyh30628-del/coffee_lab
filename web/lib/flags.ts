@@ -1,3 +1,4 @@
-// 구독 라이브 스위치. SUBSCRIPTION_LIVE=true 일 때만 소비자에게 featured·쇼케이스·쿠폰·지오프로모 노출.
-// 미설정(기본): 구독 기능은 관리자에서만 관리·확인되고 소비자 사이트엔 안 뜸(실서비스 오픈 전 안전장치).
-export const subscriptionLive = () => process.env.SUBSCRIPTION_LIVE === "true";
+// 구독 라이브 스위치 — 기본 ON(자동). 구독이 활성화(첫 로그인→featured)되면 소비자 노출이 자동으로 살아난다.
+//   노출 대상은 featured=true·approved·featured_until>now 인 카페뿐이라, 활성 구독자가 없으면 자동으로 아무것도 안 보인다(자체 게이팅).
+//   → 별도로 켤 필요 없음. SUBSCRIPTION_LIVE=false 를 명시했을 때만 비상 차단(킬스위치).
+export const subscriptionLive = () => process.env.SUBSCRIPTION_LIVE !== "false";
