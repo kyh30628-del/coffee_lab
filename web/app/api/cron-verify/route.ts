@@ -144,10 +144,15 @@ export async function GET(req: NextRequest) {
       } catch { return null; }
     })();
 
-    // 최신 리포트만 조회(관리자 화면용 — 재실행 안 함)
+    // 관리자 화면 조회(latest=1) — 캐시된 verify_reports 스냅샷이 아니라 매번 실시간 재산출.
+    //   (직전 버그: 하루 2회 크론 사이 데이터가 정상화돼도 화면은 옛 스냅샷의 '오류 N건'을 몇 시간째 표시 — 실측과 어긋남)
+    //   DB에 새 행을 쓰지는 않음(폴링마다 insert하면 이력 테이블만 불어남) — 저장은 크론 실행(비-latest)만.
     if (req.nextUrl.searchParams.get("latest")) {
-      const r = (await sql`SELECT ran_at, status, fails, warns, checks FROM verify_reports ORDER BY ran_at DESC LIMIT 1`)[0] as any;
-      return NextResponse.json({ ok: true, report: r ?? null, grounding });
+      const checks = await runChecks();
+      const fails = checks.filter((c) => c.severity === "fail" && c.count > 0).length;
+      const warns = checks.filter((c) => c.severity === "warn" && c.count > 0).length;
+      const status = fails > 0 ? "fail" : warns > 0 ? "warn" : "pass";
+      return NextResponse.json({ ok: true, report: { ran_at: new Date().toISOString(), status, fails, warns, checks }, grounding });
     }
 
     const checks = await runChecks();
