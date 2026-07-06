@@ -28,6 +28,30 @@ const KB = `너는 '동네 커피 노트'(dongnecoffeenote.com)의 **기획조�
 [지식: 위치컬럼] cafes 위치 3컬럼(100% 채움) — **area=구/시**·**dong=동**·**address=전체주소**·lat/lng. ⚠️'○○동' 질문은 **dong LIKE '%○○%'**로. 구/시 질문만 area.
 [지식: 품질기준] 검증옥석=verifyReview로 가비지 제거 후 옥석만 카운트. 공개floor=검증리뷰 3건+(참고)·30+(검증). 오염게이트=cleanCafeName·offctx·coherence·비카페차단. 수도권만·카카오로컬불가.`;
 
+// 📚 지식소스 — 서비스 전반·조직도·관리자 대시보드·라운지 질문에 **문서 근거로** 답하도록 핵심 문서를 컨텍스트에 연결(지어내기 방지).
+//   정적 프리픽스로 두어(ground 앞) 캐시 이점. 문서 없으면 조용히 건너뜀. 토큰 절약 위해 파일별 상한.
+function loadDocs() {
+  const R = "/Users/wangwida/coffee-platform";
+  const srcs = [
+    ["서비스 단일 사실출처 (CLAUDE.md)", `${R}/CLAUDE.md`, 4000],
+    ["서비스·에이전트 전체 지도 (docs/SERVICE_OVERVIEW.md)", `${R}/docs/SERVICE_OVERVIEW.md`, 9000],
+    ["조직 헌장·DoA (agents/ORG-CHARTER.md)", `${R}/agents/ORG-CHARTER.md`, 6000],
+  ];
+  const parts = [];
+  for (const [label, path, cap] of srcs) {
+    try {
+      let t = readFileSync(path, "utf8").trim();
+      if (!t) continue;
+      if (t.length > cap) t = t.slice(0, cap) + "\n…(이하 생략 — 상세는 원문 참조)";
+      parts.push(`### ${label}\n${t}`);
+    } catch { /* 문서 없으면 건너뜀 */ }
+  }
+  if (!parts.length) return "";
+  return `\n\n[지식소스: 서비스 문서 — 조직/대시보드/라운지/서비스 전반을 물으면 **아래 문서 근거로만** 답하라. 문서에 없으면 지어내지 말고 "문서상 확인 안 됨"이라 하라. 상태·수치는 위 [라이브 상태]가 우선]\n${parts.join("\n\n")}`;
+}
+const DOCS = loadDocs();
+console.log(`지식소스 로드: ${DOCS ? Math.round(DOCS.length / 1024) + "KB" : "없음"}`);
+
 async function ground() {
   const L = ["[라이브 상태] (실측)"];
   L.push(`발행: ${await one(sql`SELECT count(*) c FROM cafes WHERE published`)} (검증 ${await one(sql`SELECT count(*) c FROM cafes WHERE published AND synth_grade='검증'`)}·참고 ${await one(sql`SELECT count(*) c FROM cafes WHERE published AND synth_grade='참고'`)}) · 합성대기 ${await one(sql`SELECT count(*) c FROM cafes WHERE synth_updated IS NULL`)} · 후보보류 ${await one(sql`SELECT count(*) c FROM cafes WHERE NOT published AND synth_grade='후보'`)}`);
@@ -145,7 +169,7 @@ async function tick() {
       if (quick) { await sql`UPDATE chat_queue SET answer=${quick}, status='done', mode='quick', answered_at=now() WHERE id=${id}`; console.log(`[${new Date().toISOString()}] answered #${id} (quick·무LLM)`); busy = false; return; }
       const g = await ground();
       const hist = Array.isArray(history) ? history.map((h) => `${h.role === "user" ? "Q" : "A"}: ${String(h.content).slice(0, 300)}`).join("\n") : "";
-      const base = `${KB}\n\n${g}\n\n${hist ? "[직전 대화]\n" + hist + "\n\n" : ""}[대표님 입력] ${question}`;
+      const base = `${KB}${DOCS}\n\n${g}\n\n${hist ? "[직전 대화]\n" + hist + "\n\n" : ""}[대표님 입력] ${question}`;
       const r = await askOrAnswer(base);
       let answer = "", mode = "claude-p";
       if (r.type === "order") {

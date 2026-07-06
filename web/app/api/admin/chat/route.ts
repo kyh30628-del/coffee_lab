@@ -54,6 +54,12 @@ export async function GET(req: NextRequest) {
         FROM cafes WHERE dong LIKE ${like} OR area LIKE ${like}`)[0] as any;
       const names = ((await sql`SELECT name FROM cafes WHERE published AND (dong LIKE ${like} OR area LIKE ${like})
         ORDER BY (synth_grade='검증') DESC, synth_count DESC NULLS LAST LIMIT 8`) as any[]).map((r) => r.name);
+      // 🔎 카페명 검색 — 지역(동/구)만 매칭하던 버그 수정: 카페 이름 일부로도 검색되게 한다.
+      //   공개floor·오염게이트는 published가 이미 반영(발행된 카페만) → 그대로 유지.
+      const cafes = ((await sql`SELECT id, name, area, dong, synth_grade FROM cafes
+        WHERE published AND name LIKE ${like}
+        ORDER BY (synth_grade='검증') DESC, synth_count DESC NULLS LAST LIMIT 8`) as any[])
+        .map((r) => ({ id: r.id, name: r.name, area: r.area, dong: r.dong, grade: r.synth_grade }));
       // 대표 구/시(지도 링크용) — toGu가 area만 받아, 매칭 카페 중 최다 area로 지도를 건다(동·구·시 모두 안전).
       const gu = ((await sql`SELECT area FROM cafes WHERE published AND (dong LIKE ${like} OR area LIKE ${like})
         GROUP BY area ORDER BY count(*) DESC LIMIT 1`)[0] as any)?.area || q;
@@ -61,7 +67,7 @@ export async function GET(req: NextRequest) {
       const dong = ((await sql`SELECT dong FROM cafes WHERE published AND dong LIKE ${like}
         GROUP BY dong ORDER BY count(*) DESC LIMIT 1`)[0] as any)?.dong || null;
       // 지도 센터링용 중심좌표 + 줌(동 매칭이면 촘촘히 15, 구/시면 13). 필터 안 걸고 이 지점으로만 이동.
-      return NextResponse.json({ ok: true, region: q, pub: a.pub, verified: a.verified, ref: a.ref, unpub: a.unpub, total: a.total, last_pub: a.last_pub, gu, dong, clat: a.clat, clng: a.clng, cz: dong ? 15 : 13, names });
+      return NextResponse.json({ ok: true, region: q, pub: a.pub, verified: a.verified, ref: a.ref, unpub: a.unpub, total: a.total, last_pub: a.last_pub, gu, dong, clat: a.clat, clng: a.clng, cz: dong ? 15 : 13, names, cafes });
     } catch (e) {
       return NextResponse.json({ ok: false, error: String(e).slice(0, 120) }, { status: 500 });
     }
