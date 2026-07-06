@@ -407,14 +407,34 @@ export function verifyReview(input: QualityInput): QualityResult {
     const nm0 = input.name.trim();
     const rawT = `${title} ${body}`;
     const PART = "이가은는을를에의도만로와과랑까부터요입예네죠및한"; // 조사·종결 시작 글자(독립 출현 보호)
+    // 룰갭 제안1 부가: PART 시작 글자가 흔한 명사(가구·과일·로봇·도넛·한강 등)의 첫 글자와 겹쳐, 그 명사가
+    //   이어 붙어도 '조사 시작'으로 오판해 글루드가드를 우회하던 문제(르씨엘→"르씨엘가구점" 실측). 이
+    //   명사들로 시작하면 PART 매치여도 글루드로 판정.
+    const GLUED_NOUN_PREFIX = ["가구", "과일", "로봇", "도넛", "한강"];
     let glued = 0, clean = 0, i = 0;
     while ((i = rawT.indexOf(nm0, i)) >= 0) {
-      const c = rawT[i + nm0.length] || "";
-      if (!c || !/[가-힣]/.test(c) || PART.includes(c)) clean++; else glued++;
+      const after = rawT.slice(i + nm0.length);
+      const c = after[0] || "";
+      if (GLUED_NOUN_PREFIX.some((p) => after.startsWith(p))) glued++;
+      else if (!c || !/[가-힣]/.test(c) || PART.includes(c)) clean++;
+      else glued++;
       i += nm0.length;
     }
     if (glued >= 2 && clean === 0) {
       return { verdict: "rejected", score: 4, reasons: ["글루드 동명 업체(카페명이 다른 상호의 일부)"], signals: sig };
+    }
+  }
+  // [룰갭 제안1] inTitleFull(제목=카페명 완전/짧은토큰 일치) 신뢰 경로엔 CAFE_CONTEXT 게이트가 없어,
+  //   흔한 일반어·브랜드어 카페명(비바체·헌터스·르씨엘 등)이 가구점·전자담배·유소년축구단·넷플릭스
+  //   애니메이션·반려용품 브랜드 등과 겹치면 본문에 카페 맥락이 전무해도 +42점을 받아 검증(verified)까지
+  //   도달했다(rulegap-proposals-20260706.md 제안1, 실측 3곳). 영향범위가 커서 단계 적용: 이름 4자 이하
+  //   또는 WEAK_IDENTITY_TOKEN급(초약체 유일토큰)부터만 게이트 — 이름 3자 이하는 더 엄격한 STRONG 요구.
+  //   하드 탈락 대신 borderline(LLM 재판정)으로 격하 — 표현이 달라 걸리지 않은 진짜 카페 후기를 보호.
+  const nameNoSpace = nameN.replace(/\s/g, "");
+  if (inTitleFull && ((nameNoSpace.length >= 1 && nameNoSpace.length <= 4) || weakWhitelist)) {
+    const ctxGate = nameNoSpace.length <= 3 ? CAFE_CONTEXT_STRONG : CAFE_CONTEXT;
+    if (!ctxGate.test(fullL)) {
+      return { verdict: "rejected", score: 20, reasons: ["제목=카페명 일치하나 카페 맥락 전무(흔한 이름·타업종 혼입 의심) — LLM 재판정"], borderline: true, signals: sig };
     }
   }
   // [인물 직함 블로그] 카페명이 미용·의료 개인 직함(팀장·원장·디자이너 등)+서비스어와 결합 + 카페맥락 전무 → 개인 블로그(테오 팀장).
