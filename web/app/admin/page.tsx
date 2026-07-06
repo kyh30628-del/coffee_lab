@@ -722,7 +722,7 @@ export default function AdminPage() {
                   <div key={c.key} className="flex items-center gap-2 text-[12px]">
                     <span>{c.count === 0 ? "🟢" : c.severity === "fail" ? "🔴" : "🟡"}</span>
                     <span className="flex-1 text-stone-700">{c.label}</span>
-                    {c.count > 0 && c.samples?.length > 0 && <span className="text-[10px] text-stone-400 truncate max-w-[40%]">{c.samples.slice(0, 2).join(", ")}</span>}
+                    {c.count > 0 && c.samples?.length > 0 && <span className="text-[10px] text-stone-400 truncate max-w-[40%]" title={c.samples.join(", ")}>{c.samples.join(", ")}</span>}
                     <span className={c.count > 0 ? (c.severity === "fail" ? "text-rose-600 font-bold" : "text-amber-600 font-bold") : "text-stone-300"}>{c.count}</span>
                   </div>
                 ))}
