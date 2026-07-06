@@ -83,6 +83,8 @@ async function quickAnswer(q) {
   const s = String(q).trim();
   if (s.length > 60) return null; // 긴 문장은 LLM(뉘앙스)
   if (/(추가|바꿔|바꾸|고쳐|고치|만들|수정|삭제|제거|내려|올려|배포|리팩터|해줘|해 줘|해주세요|해주|하라|처리해|적용)/.test(s)) return null; // 지시 → LLM/triage
+  // 🎯 한정(지역·기간·특정대상) 질문은 전역수치로 답하면 오답 → LLM/deep로. (예: "강남구 발행 몇곳"에 전역값 금지)
+  if (/[가-힣]{2,}(구|동|읍|면|시|군)(에|의|에서|에는|엔|\b)|(이번|오늘|어제|이달|올해|지난|최근|주간|기간|월별|요일|별로|각|per)/.test(s)) return null;
   try {
     if (/(발행|공개|퍼블리시).{0,6}(몇|개수|수|얼마|규모)|(몇|개수).{0,6}(발행|공개)/.test(s)) {
       const pub = await one(sql`SELECT count(*) c FROM cafes WHERE published`);
