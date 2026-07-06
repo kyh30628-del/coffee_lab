@@ -101,7 +101,7 @@ async function quickAnswer(q) {
 }
 
 async function askOrAnswer(base) {
-  const out = await runClaude(base + TRIAGE, { tools: false, model: "haiku", job: "chat-triage" });
+  const out = await runClaude(base + TRIAGE, { tools: false, model: "opus", job: "chat-triage" }); // CEO 대화=opus(최고 품질)
   if (out && !out.startsWith("__ERR__")) {
     const mo = out.match(/<ORDER>([\s\S]*?)<\/ORDER>/);
     if (mo) { try { return { type: "order", spec: JSON.parse(mo[1].trim()) }; } catch { return { type: "answer", text: out.replace(/<\/?ORDER>/g, "").trim() }; } }
@@ -110,7 +110,7 @@ async function askOrAnswer(base) {
     if (!out.includes("[NEED_DB]")) return { type: "answer", text: out };
   }
   // [NEED_DB] 또는 fast 실패 → 읽기전용 심층조회로 질문 답변
-  const deep = await runClaude(base + "\n\nBash에서 node+@neondatabase/serverless로 web/.env.local의 DATABASE_URL에 접속해 **읽기전용 SELECT만** 실행해 확인한 뒤 자연스럽게 답하라. 🚫 UPDATE/DELETE/INSERT 절대 금지. 마지막엔 반드시 텍스트로 답을 마무리하라.", { tools: true, model: "sonnet", job: "chat-deep" });
+  const deep = await runClaude(base + "\n\nBash에서 node+@neondatabase/serverless로 web/.env.local의 DATABASE_URL에 접속해 **읽기전용 SELECT만** 실행해 확인한 뒤 자연스럽게 답하라. 🚫 UPDATE/DELETE/INSERT 절대 금지. 마지막엔 반드시 텍스트로 답을 마무리하라.", { tools: true, model: "opus", job: "chat-deep" });
   if (deep && !deep.startsWith("__ERR__")) return { type: "answer", text: deep };
   if (out && !out.startsWith("__ERR__")) return { type: "answer", text: out.replace("[NEED_DB]", "").trim() || "확인이 필요합니다 — 질문을 조금 더 구체적으로 다시 주시겠어요?" };
   const err = out.startsWith("__ERR__") ? out.slice(7) : (deep && deep.startsWith("__ERR__") ? deep.slice(7) : "알 수 없음");

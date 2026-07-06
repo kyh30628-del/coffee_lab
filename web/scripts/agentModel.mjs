@@ -22,6 +22,11 @@ const HAIKU = new Set([
                         //   노출후기·등급·필터·랭킹 어디에도 안 닿음(소비자 영향 0). 회귀게이트+자동복귀 무장.
 ]);
 
+// opus(최고 성능 — CEO 지정 2026-07-06): 코드 구현·검증·배포는 소비자 화면 직결이라 최고 모델.
+const OPUS = new Set([
+  "dev-agent", // 코드 구현·배포(챗 지시·dev-pipeline 공용). 소비자 화면 = 최고 품질.
+]);
+
 export const HAIKU_JOBS = [...HAIKU];
 
 function overrideFor(job) {
@@ -31,6 +36,7 @@ function overrideFor(job) {
 export function modelFor(job) {
   const ov = overrideFor(job);
   if (ov) return ov;              // 자동 회귀복귀(→sonnet)가 최우선
+  if (OPUS.has(job)) return "opus"; // 코드 구현·배포 = opus
   return HAIKU.has(job) ? "haiku" : "sonnet"; // 기본 sonnet(품질 안전)
 }
 
