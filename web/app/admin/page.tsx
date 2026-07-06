@@ -205,7 +205,7 @@ export default function AdminPage() {
 
   const Kpi = ({ label, value, sub, color = "text-stone-900" }: { label: string; value: any; sub?: string; color?: string }) => (
     <div className="bg-white rounded-xl border p-3.5">
-      <div className={`text-2xl font-bold ${color}`}>{value}</div>
+      <div className={`text-2xl font-bold tabular-nums ${color}`}>{value}</div>
       <div className="text-[11px] text-stone-500 mt-0.5">{label}</div>
       {sub && <div className="text-[10px] text-stone-400 mt-0.5">{sub}</div>}
     </div>
@@ -265,27 +265,27 @@ export default function AdminPage() {
         <GroupHeader icon="📊" label="핵심 지표" />
         <div className="admin-kpi-grid mb-6">
           <div className="bg-white rounded-xl border border-stone-300 p-3.5">
-            <div className="text-2xl font-extrabold text-stone-900 leading-tight">{ct?.published?.toLocaleString() ?? "·"}</div>
+            <div className="text-2xl font-extrabold text-stone-900 leading-tight tabular-nums">{ct?.published?.toLocaleString() ?? "·"}</div>
             <div className="text-[11px] text-stone-500 mt-0.5">📦 발행 (공개 카페)</div>
           </div>
           <div className="bg-white rounded-xl border border-stone-300 p-3.5">
-            <div className="text-2xl font-extrabold text-emerald-600 leading-tight">{verifiedRefN.toLocaleString()}</div>
+            <div className="text-2xl font-extrabold text-emerald-600 leading-tight tabular-nums">{verifiedRefN.toLocaleString()}</div>
             <div className="text-[11px] text-stone-500 mt-0.5">✅ 검증 · 참고 등급</div>
           </div>
           <div className={`rounded-xl border p-3.5 ${auditUnresolvedN > 0 ? "bg-red-50 border-red-300" : "bg-white border-stone-300"}`}>
-            <div className={`text-2xl font-extrabold leading-tight ${auditUnresolvedN > 0 ? "text-red-600" : "text-stone-900"}`}>{auditUnresolvedN}</div>
+            <div className={`text-2xl font-extrabold leading-tight tabular-nums ${auditUnresolvedN > 0 ? "text-red-600" : "text-stone-900"}`}>{auditUnresolvedN}</div>
             <div className="text-[11px] text-stone-500 mt-0.5">{auditUnresolvedN > 0 ? "🔴" : "🟢"} 오염 · 품질 이슈</div>
           </div>
           <a href="/admin/org?open=pending" className={`rounded-xl border p-3.5 block ${pendingActionsN > 0 ? "bg-amber-50 border-amber-300" : "bg-white border-stone-300"}`}>
-            <div className={`text-2xl font-extrabold leading-tight ${pendingActionsN > 0 ? "text-amber-600" : "text-stone-900"}`}>{pendingActionsN}</div>
+            <div className={`text-2xl font-extrabold leading-tight tabular-nums ${pendingActionsN > 0 ? "text-amber-600" : "text-stone-900"}`}>{pendingActionsN}</div>
             <div className="text-[11px] text-stone-500 mt-0.5">{pendingActionsN > 0 ? "🟡" : "🟢"} CEO 결재 대기</div>
           </a>
         </div>
 
         {/* 🎩 조직 관제(기획조정실 자율조직 브리핑) — 카페-데이터 관제탑과 별개. 모바일 전용 화면으로. */}
-        <a href="/admin/org" className="flex items-center justify-between mb-6 rounded-2xl border border-amber-300 bg-gradient-to-r from-amber-50 to-stone-50 px-4 py-3 hover:from-amber-100 transition">
+        <a href="/admin/org" className="flex items-center justify-between mb-6 rounded-2xl border border-stone-300 bg-white px-4 py-3 hover:bg-stone-50 transition">
           <span className="flex items-center gap-2"><span className="text-lg">🎩</span><span className="flex flex-col"><span className="font-bold text-stone-800">조직 관제 (기획조정실)</span><span className="text-[11px] text-stone-500">자율 에이전트 일일 브리핑·결재·토큰</span></span></span>
-          <span className="text-amber-600 font-bold">→</span>
+          <span className="text-stone-400 font-bold">→</span>
         </a>
 
         <GroupHeader icon="⚙️" label="크론 · 에이전트 상태" />
@@ -612,9 +612,9 @@ export default function AdminPage() {
 
         {/* ===== 🔄 크론 자동화 현황 (합성·판정 배치 · 10초 갱신) ===== */}
         {jstatus && (
-          <div className="mb-6 rounded-2xl border border-sky-200 bg-sky-50/40 p-4 sm:p-5 space-y-3">
+          <div className="mb-6 rounded-2xl border border-stone-300 bg-white p-4 sm:p-5 space-y-3">
             <button onClick={() => toggleSec("auto")} className="w-full flex items-center justify-between text-left">
-              <span className="admin-section-title font-extrabold text-sky-900">{openSecs.auto ? "▾" : "▸"} 🔄 크론 자동화 현황 <span className="normal-case font-normal text-sky-600">(합성·판정 배치)</span> <span className="normal-case font-normal text-stone-400">· 판정대기 {jstatus.queue?.toLocaleString() ?? 0} · 오늘신규 {jstatus.newToday ?? 0}</span></span>
+              <span className="admin-section-title font-extrabold text-stone-800">{openSecs.auto ? "▾" : "▸"} 🔄 크론 자동화 현황 <span className="normal-case font-normal text-stone-500">(합성·판정 배치)</span> <span className="normal-case font-normal text-stone-400">· 판정대기 {jstatus.queue?.toLocaleString() ?? 0} · 오늘신규 {jstatus.newToday ?? 0}</span></span>
               <span className="text-[10px] text-stone-400 shrink-0">{openSecs.auto ? "접기" : "보기"}</span>
             </button>
             {openSecs.auto && <>
@@ -678,7 +678,7 @@ export default function AdminPage() {
         {auditFlags && (() => {
           const unresolved = auditFlags.flags?.filter((f: any) => !f.resolved) ?? [];
           return (
-            <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50/30 p-4 sm:p-5">
+            <div className="mb-6 rounded-2xl border border-stone-300 bg-white p-4 sm:p-5">
               <button onClick={() => toggleSec("audit")} className="w-full flex items-center justify-between text-left mb-2">
                 <span className={`admin-section-title font-extrabold ${unresolved.length ? "text-red-600" : "text-stone-800"}`}>{openSecs.audit ? "▾" : "▸"} {unresolved.length ? `🚨 실시간 이슈 · 품질 오염 감지 (${unresolved.length}건)` : "✅ 실시간 이슈 · 품질 오염 감지 (0건)"}</span>
                 <span className="text-[11px] text-stone-400 shrink-0">{auditFlags.lastAudit}</span>
@@ -701,7 +701,7 @@ export default function AdminPage() {
         })()}
 
         {/* ===== 🛡️ 검증 에이전트(레드팀) · 정합성 ===== */}
-        <div className="mb-6 rounded-2xl border border-violet-200 bg-violet-50/30 p-4 sm:p-5">
+        <div className="mb-6 rounded-2xl border border-stone-300 bg-white p-4 sm:p-5">
           <div className="flex items-center justify-between mb-2">
             <button onClick={() => toggleSec("verify")} className="admin-section-title font-extrabold text-stone-800 text-left">
               {openSecs.verify ? "▾" : "▸"} 🛡️ 데이터 정합성 검증 <span className="normal-case font-normal text-stone-400">·</span>{" "}
@@ -766,13 +766,13 @@ export default function AdminPage() {
         )}
 
         {/* ===== 모달 트리거 (접속·유입 현황 · 구독 카페 현황 · 유튜브 수집 · 내 카페 기록) ===== */}
-        <div className="flex gap-2 mb-6 flex-wrap">
-          <button onClick={openAnalytics} className="flex-1 py-2.5 text-[13px] font-bold text-sky-700 bg-sky-50 border border-sky-200 rounded-xl">📊 접속·유입 현황{tower?.traffic?.dau != null ? ` (오늘 ${tower.traffic.dau})` : ""}</button>
-          <button onClick={() => setShowSubsModal(true)} className="flex-1 py-2.5 text-[13px] font-bold text-amber-700 bg-amber-50 border border-amber-300 rounded-xl">💳 구독 카페 현황{subscribers.length ? ` (${subscribers.length})` : ""}</button>
-          <button onClick={() => { setShowNL(true); loadNL(); }} className="flex-1 py-2.5 text-[13px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-xl">📰 주간 뉴스레터{nlList.length ? ` (${nlList.length})` : ""}</button>
-          <button onClick={() => setShowYtModal(true)} className="flex-1 py-2.5 text-[13px] font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded-xl">📺 유튜브 수집{yt?.withYt != null ? ` (${yt.withYt})` : ""}</button>
-          <button onClick={() => { setShowVisits(true); fetch("/api/admin/visits", { headers: { "x-admin-password": pw } }).then((x) => x.json()).then((d) => { if (d.ok) setVisits(d); }); }} className="flex-1 py-2.5 text-[13px] font-bold text-pink-700 bg-pink-50 border border-pink-200 rounded-xl">❤ 내 카페 기록{visits?.stat?.total != null ? ` (${visits.stat.total})` : ""}</button>
-          <button onClick={openRotation} className="flex-1 py-2.5 text-[13px] font-bold text-teal-800 bg-teal-50 border border-teal-300 rounded-xl">🔁 노출 로테이션 현황</button>
+        <div className="admin-chip-grid mb-6">
+          <button onClick={openAnalytics} className="py-2.5 text-[13px] font-bold text-stone-700 bg-white border border-stone-300 rounded-xl hover:bg-stone-50">📊 접속·유입 현황{tower?.traffic?.dau != null ? ` (오늘 ${tower.traffic.dau})` : ""}</button>
+          <button onClick={() => setShowSubsModal(true)} className="py-2.5 text-[13px] font-bold text-stone-700 bg-white border border-stone-300 rounded-xl hover:bg-stone-50">💳 구독 카페 현황{subscribers.length ? ` (${subscribers.length})` : ""}</button>
+          <button onClick={() => { setShowNL(true); loadNL(); }} className="py-2.5 text-[13px] font-bold text-stone-700 bg-white border border-stone-300 rounded-xl hover:bg-stone-50">📰 주간 뉴스레터{nlList.length ? ` (${nlList.length})` : ""}</button>
+          <button onClick={() => setShowYtModal(true)} className="py-2.5 text-[13px] font-bold text-stone-700 bg-white border border-stone-300 rounded-xl hover:bg-stone-50">📺 유튜브 수집{yt?.withYt != null ? ` (${yt.withYt})` : ""}</button>
+          <button onClick={() => { setShowVisits(true); fetch("/api/admin/visits", { headers: { "x-admin-password": pw } }).then((x) => x.json()).then((d) => { if (d.ok) setVisits(d); }); }} className="py-2.5 text-[13px] font-bold text-stone-700 bg-white border border-stone-300 rounded-xl hover:bg-stone-50">❤ 내 카페 기록{visits?.stat?.total != null ? ` (${visits.stat.total})` : ""}</button>
+          <button onClick={openRotation} className="py-2.5 text-[13px] font-bold text-stone-700 bg-white border border-stone-300 rounded-xl hover:bg-stone-50">🔁 노출 로테이션 현황</button>
         </div>
 
         {/* ℹ️ 조직 활동·실행 케이던스는 '조직 관제(/admin/org)'로 이동 — 대시보드는 운영(카페·구독·품질)에 집중 */}
@@ -1344,7 +1344,7 @@ export default function AdminPage() {
 
         {/* ===== 💎 구독 신청 ===== */}
         {(subs.length > 0 || purged > 0) && (
-          <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50/30 p-4 sm:p-5">
+          <div className="mb-6 rounded-2xl border border-stone-300 bg-white p-4 sm:p-5">
             <div className="admin-section-title font-extrabold text-stone-800 mb-2">💎 홍보팩 구독 신청 ({subs.length})</div>
             {purged > 0 && <div className="bg-rose-50 border border-rose-200 rounded-lg px-3 py-2 mb-2 text-[11.5px] text-rose-700">🔔 보유기간 만료로 <b>{purged}건의 개인정보가 자동 삭제</b>됐어요. 해당 사장님께 다시 연락하려면 <b>재수집·재동의</b>가 필요합니다.</div>}
             <div className="space-y-2">
@@ -1369,7 +1369,7 @@ export default function AdminPage() {
         <GroupHeader icon="📦" label="콘텐츠 · 발행 관리" />
         {/* ===== 🎀 쇼케이스 승인 · AI 카피 생성 ===== */}
         {(
-          <div className="mb-6 rounded-2xl border border-pink-200 bg-pink-50/30 p-4 sm:p-5">
+          <div className="mb-6 rounded-2xl border border-stone-300 bg-white p-4 sm:p-5">
             <button onClick={() => toggleSec("promo")} className="w-full flex items-center justify-between text-left mb-2">
               <span className="admin-section-title font-extrabold text-stone-800">{openSecs.promo ? "▾" : "▸"} 🎀 쇼케이스 승인 · AI 카피 생성 ({review.length})</span>
               <span className="text-[10px] text-stone-400 shrink-0">{openSecs.promo ? "접기" : "보기"}</span>
@@ -1433,7 +1433,7 @@ export default function AdminPage() {
         )}
 
         {/* ===== 📦 발행 현황 (콘텐츠 · 접이식·기본 접힘) ===== */}
-        <div className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50/30 p-4 sm:p-5">
+        <div className="mb-6 rounded-2xl border border-stone-300 bg-white p-4 sm:p-5">
         <button onClick={() => toggleSec("content")} className="w-full flex items-center justify-between text-left mb-2">
           <span className="admin-section-title font-extrabold text-stone-800">{openSecs.content ? "▾" : "▸"} 📦 발행 현황 <span className="normal-case font-normal text-stone-400">(콘텐츠)</span> <span className="normal-case font-normal">· 공개 {ct?.published?.toLocaleString() ?? "·"} · 전체 {ct?.total?.toLocaleString() ?? "·"}</span></span>
           <span className="text-[10px] text-stone-400 shrink-0">{openSecs.content ? "접기" : "보기"}</span>
@@ -1499,7 +1499,7 @@ export default function AdminPage() {
         </div>
 
         {/* ===== 접속/방문자 (익명 · 접이식·기본 접힘) ===== */}
-        <div className="mb-6 rounded-2xl border border-teal-200 bg-teal-50/30 p-4 sm:p-5">
+        <div className="mb-6 rounded-2xl border border-stone-300 bg-white p-4 sm:p-5">
         <button onClick={() => toggleSec("visitors")} className="w-full flex items-center justify-between text-left mb-2">
           <span className="admin-section-title font-extrabold text-stone-800">{openSecs.visitors ? "▾" : "▸"} 접속 · 방문자 현황 <span className="normal-case font-normal">· 총 {vs?.total?.toLocaleString() ?? "·"} · 7일 활성 {vs?.active7d ?? "·"}</span></span>
           <span className="text-[10px] text-stone-400 shrink-0">{openSecs.visitors ? "접기" : "보기"}</span>
@@ -1545,7 +1545,7 @@ export default function AdminPage() {
         </div>
 
         {/* ===== 🙋 후보 보류 · 검수 관리 (접이식·기본 접힘) ===== */}
-        <div className="mb-6 rounded-2xl border border-blue-200 bg-blue-50/30 p-4 sm:p-5">
+        <div className="mb-6 rounded-2xl border border-stone-300 bg-white p-4 sm:p-5">
         <button onClick={() => toggleSec("inspect")} className="w-full flex items-center justify-between text-left mb-2">
           <span className="admin-section-title font-extrabold text-stone-800">{openSecs.inspect ? "▾" : "▸"} 🙋 후보 보류 <span className="normal-case font-normal text-stone-400">(검수 관리)</span> <span className={`normal-case ${ownerPending.length ? "font-bold text-blue-600" : "font-normal"}`}>· 사장님 대기 {ownerPending.length}</span> <span className="normal-case font-normal">· 자동 비공개 {autoHidden.length}</span></span>
           <span className="text-[10px] text-stone-400 shrink-0">{openSecs.inspect ? "접기" : "보기"}</span>
