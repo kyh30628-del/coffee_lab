@@ -79,6 +79,16 @@ async function loadDecisions(cafeId: number): Promise<Record<string, boolean>> {
   return d && typeof d === "object" ? d : {};
 }
 
+// 🔒 승인된 unpublish 결정 재발 가드(#172): 재합성이 규칙판정만으로 published를 되돌리지 못하게,
+//   이 cafe_id에 대한 가장 최근 CEO/L2 승인 unpublish·restore 결정을 확인. 최신이 unpublish면 잠금(명시적 restore 결정만 해제).
+async function lastUnpublishLocked(cafeId: number): Promise<boolean> {
+  const row = (await sql`SELECT action_type FROM decisions
+    WHERE action_type IN ('unpublish', 'restore') AND status = 'done'
+      AND EXISTS (SELECT 1 FROM jsonb_array_elements_text(COALESCE(action_params->'ids', '[]'::jsonb)) e(v) WHERE v = ${String(cafeId)})
+    ORDER BY decided_at DESC NULLS LAST, id DESC LIMIT 1`.catch(() => []))[0] as any;
+  return row?.action_type === "unpublish";
+}
+
 // 짝 없는 유니코드 서로게이트 제거 → raw JSONB 저장 깨짐 방지(이모지 잘림 등, 모든 소스 공통)
 const stripBad = (s: any) => typeof s === "string" ? s.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "") : s;
 const cleanRaw = (raw: RawItem[]): RawItem[] => raw.map((r) => ({ ...r, text: stripBad(r.text), title: stripBad(r.title), desc: stripBad(r.desc) }));
@@ -216,8 +226,12 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   const excluded = pst === "excluded" || isSnackStall(name) || isStructuralPhantom(name) || isUnmannedCafe(name); // 콘셉트/업종/오염 '영구 제외'(비카페·식당·이름충돌·노점간식·유령상호·무인카페) — 어떤 자동복원도 안 풂. 사람만 해제.
   const held = pst === "held"; // 그라운딩 '근거0건' 확정 보류 — 재합성해도 비공개 고정
   const stuckNoise = pst === "noise" || noisy; // 노이즈(이름 오염) 한번 걸리면 영구 탈락
-  const newPst = excluded ? "excluded" : held ? "held" : stuckNoise ? "noise" : inPipeline ? (ruleOk ? "pending" : "rejected") : pst;
-  const publish = (excluded || held || stuckNoise || inPipeline) ? false : ruleOk; // 제외·held·노이즈·파이프라인은 비공개 고정
+  // 승인된 unpublish 결정 재발 가드: pipeline_status가 'excluded'가 아니어도(드리프트) 결정 이력이 최종 근거 — 명시적 restore 결정 전엔 재공개 안 함.
+  //   다른 사유로 이미 비공개 확정이면(제외·held·노이즈·파이프라인) 조회 자체가 불필요 — ruleOk가 실제로 재공개를 시도할 때만 확인.
+  const otherwiseBlocked = excluded || held || stuckNoise || inPipeline;
+  const unpublishLocked = !otherwiseBlocked && ruleOk && await lastUnpublishLocked(cafeId);
+  const newPst = excluded ? "excluded" : unpublishLocked ? "excluded" : held ? "held" : stuckNoise ? "noise" : inPipeline ? (ruleOk ? "pending" : "rejected") : pst;
+  const publish = (otherwiseBlocked || unpublishLocked) ? false : ruleOk; // 제외·잠금·held·노이즈·파이프라인은 비공개 고정
 
   if (llmJudged) {
     await sql`UPDATE cafes SET synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_coherence=${coherence}, offctx_rate=${offctx}, needs_llm=${needsLLM}, borderline_count=${blCount}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${safeJson(evidenceReviews)}, synth_reviews_all=${allEv}, char_scores=${safeJson(charScores)}, synth_quality=${safeJson(quality)}, review_dates=${safeJson(reviewDates)}, pipeline_status=${newPst}, synth_updated=${synthTs}, synth_checked_at=now(), llm_judged_at=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN 36.8 AND 38.3 AND lng BETWEEN 124.5 AND 127.9) WHERE id=${cafeId}`;
