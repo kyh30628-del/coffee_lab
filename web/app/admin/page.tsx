@@ -262,7 +262,8 @@ export default function AdminPage() {
         </div>
 
         {/* ===== 📊 핵심 지표 (상단 KPI 행) — 발행수·검증/참고·오염·미결재를 한눈에 ===== */}
-        <div className="admin-kpi-grid mb-5">
+        <GroupHeader icon="📊" label="핵심 지표" />
+        <div className="admin-kpi-grid mb-6">
           <div className="bg-white rounded-xl border border-stone-300 p-3.5">
             <div className="text-2xl font-extrabold text-stone-900 leading-tight">{ct?.published?.toLocaleString() ?? "·"}</div>
             <div className="text-[11px] text-stone-500 mt-0.5">📦 발행 (공개 카페)</div>
@@ -282,7 +283,7 @@ export default function AdminPage() {
         </div>
 
         {/* 🎩 조직 관제(기획조정실 자율조직 브리핑) — 카페-데이터 관제탑과 별개. 모바일 전용 화면으로. */}
-        <a href="/admin/org" className="flex items-center justify-between mb-5 rounded-2xl border border-amber-300 bg-gradient-to-r from-amber-50 to-stone-50 px-4 py-3 hover:from-amber-100 transition">
+        <a href="/admin/org" className="flex items-center justify-between mb-6 rounded-2xl border border-amber-300 bg-gradient-to-r from-amber-50 to-stone-50 px-4 py-3 hover:from-amber-100 transition">
           <span className="flex items-center gap-2"><span className="text-lg">🎩</span><span className="flex flex-col"><span className="font-bold text-stone-800">조직 관제 (기획조정실)</span><span className="text-[11px] text-stone-500">자율 에이전트 일일 브리핑·결재·토큰</span></span></span>
           <span className="text-amber-600 font-bold">→</span>
         </a>
@@ -1512,7 +1513,7 @@ export default function AdminPage() {
         </div>
 
         {vs && (
-          <div className="grid sm:grid-cols-2 gap-3 mb-3">
+          <div className="grid sm:grid-cols-2 gap-3 mb-4">
             <Card title="일별 신규 방문 (최근 14일)">
               {vs.daily.length === 0 ? <p className="text-sm text-stone-400 py-8 text-center">아직 방문 데이터가 적어요.</p> : (
                 <ResponsiveContainer width="100%" height={170}>
