@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ORG, MEMBER_INFO } from "@/lib/org";
 import { CADENCE } from "@/lib/cadence";
 
@@ -35,6 +35,8 @@ function ChatWidget({ pw }: { pw: string }) {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState<"chat" | "region">("chat");
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (open && scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; }, [open, msgs, loading]);
   const loadHistory = () =>
     fetch("/api/admin/chat", { headers: { "x-admin-password": pw }, cache: "no-store" }).then((r) => r.json()).then((d) => {
       if (d.ok && d.history) { const m: any[] = []; for (const h of d.history) { m.push({ role: "user", content: h.question }); if (h.answer) m.push({ role: "assistant", content: h.answer }); } setMsgs(m); }
@@ -96,7 +98,7 @@ function ChatWidget({ pw }: { pw: string }) {
                 <button key={mo} onClick={() => setMode(mo)} style={{ flex: 1, padding: "7px 0", borderRadius: 8, fontSize: 12.5, fontWeight: 700, cursor: "pointer", border: "1px solid " + (mode === mo ? "#c98a3c" : "#e0d2b8"), background: mode === mo ? "#2b2018" : "#fff", color: mode === mo ? "#e8b87a" : "#8a7a5c" }}>{mo === "chat" ? "💬 일반" : "🗺️ 지역"}</button>
               ))}
             </div>
-            <div style={{ flex: 1, overflowY: "auto", padding: 12 }}>
+            <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: 12 }}>
               {msgs.length === 0 && (mode === "chat"
                 ? <div style={{ color: "#9c8a6c", fontSize: 13, lineHeight: 1.7 }}>상태를 묻거나 <b>작업을 지시</b>하세요.<br />질문: "발행 몇 개야?" · "결재 대기 뭐 있어?"<br />지시: "관제탑 상단에 발행 수 배지 추가해줘" · "지도 팝업 여백 줄여줘"<br /><span style={{ fontSize: 11.5, color: "#b0a081" }}>안전한 코드 변경은 자율로 구현·검증·배포하고, 데이터 변경·모호한 건은 되물어봅니다.</span></div>
                 : <div style={{ color: "#9c8a6c", fontSize: 13, lineHeight: 1.7 }}>동/구 이름을 넣으면 <b>즉시</b> 집계해요(LLM 안 씀·빠름).<br />예: "성수동" · "강남구" · "연남동" · "수원시"</div>)}
