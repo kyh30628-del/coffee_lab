@@ -43,16 +43,18 @@ async function ground() {
 //   triage/즉답=haiku(저비용·기계적 분류·그라운딩 추출), 심층 DB조사=sonnet. tools=true면 Bash 허용.
 function runClaude(prompt, { tools = false, model = "haiku", job = "chat-triage", retry = 1 } = {}) {
   return new Promise((res) => {
-    const args = ["-p", prompt, "--model", model, "--append-system-prompt-file", CANON, "--dangerously-skip-permissions", "--max-turns", tools ? "6" : "2", "--output-format", "json"];
-    if (tools) args.splice(args.indexOf("--max-turns"), 0, "--allowedTools", "Bash");
+    // triage(tools=false)=툴 미개방 → 순수 텍스트 1턴 완결(과거 툴 시도로 max-turns 2 소진→error_max_turns 근절).
+    //   deep(tools=true)=Bash 개방·턴 24·타임아웃 150s(DB 조회를 매번 새로 작성하다 6턴 초과하던 실패 해소).
+    const args = ["-p", prompt, "--model", model, "--append-system-prompt-file", CANON, "--max-turns", tools ? "24" : "6", "--output-format", "json"];
+    if (tools) args.push("--dangerously-skip-permissions", "--allowedTools", "Bash");
     const child = execFile("claude", args,
-      { cwd: "/Users/wangwida/coffee-platform/web", maxBuffer: 16 * 1024 * 1024, timeout: tools ? 75000 : 45000, env: { ...process.env, PATH: "/Users/wangwida/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin" } },
+      { cwd: "/Users/wangwida/coffee-platform/web", maxBuffer: 16 * 1024 * 1024, timeout: tools ? 150000 : 50000, env: { ...process.env, PATH: "/Users/wangwida/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin" } },
       async (err, stdout) => {
         let out = "", reason = "";
         try {
           const j = JSON.parse(stdout); logUsage(job, j);
-          if (j.is_error) reason = "api_error:" + (j.subtype || j.api_error_status || "unknown");
-          else out = (j.result || "").trim();
+          out = (j.result || "").trim(); // is_error(예: max_turns)여도 부분 결과가 있으면 살려 씀 — 빈칸/에러표시보다 우선.
+          if (!out && j.is_error) reason = "api_error:" + (j.subtype || j.api_error_status || "unknown");
         } catch { reason = err ? (err.killed ? "timeout" : String(err).slice(0, 70)) : "parse_fail"; }
         if (out) return res(out);
         // 🚫 빈칸 금지: 빈/에러는 1회 재시도(트랜션트 대응), 그래도 실패하면 __ERR__로 명확히 표면화.
