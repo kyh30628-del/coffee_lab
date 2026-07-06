@@ -573,11 +573,11 @@ export default function AdminPage() {
           );
         })()}
 
-        {/* ===== 🔄 실시간 자동화 현황 (10초 갱신) ===== */}
+        {/* ===== 🔄 크론 자동화 현황 (합성·판정 배치 · 10초 갱신) ===== */}
         {jstatus && (
-          <div className="mb-6 space-y-3">
-            <button onClick={() => toggleSec("auto")} className="w-full flex items-center justify-between text-left border-t-2 border-stone-300 pt-6 mt-2">
-              <span className="text-[13px] font-extrabold text-stone-800">{openSecs.auto ? "▾" : "▸"} 🔄 자동화 현황 <span className="normal-case font-normal text-stone-400">· 판정대기 {jstatus.queue?.toLocaleString() ?? 0} · 오늘신규 {jstatus.newToday ?? 0}</span></span>
+          <div className="mb-6 rounded-2xl border border-sky-200 bg-sky-50/40 p-4 sm:p-5 space-y-3">
+            <button onClick={() => toggleSec("auto")} className="w-full flex items-center justify-between text-left">
+              <span className="text-[13px] font-extrabold text-sky-900">{openSecs.auto ? "▾" : "▸"} 🔄 크론 자동화 현황 <span className="normal-case font-normal text-sky-600">(합성·판정 배치)</span> <span className="normal-case font-normal text-stone-400">· 판정대기 {jstatus.queue?.toLocaleString() ?? 0} · 오늘신규 {jstatus.newToday ?? 0}</span></span>
               <span className="text-[10px] text-stone-400 shrink-0">{openSecs.auto ? "접기" : "보기"}</span>
             </button>
             {openSecs.auto && <>
@@ -640,9 +640,9 @@ export default function AdminPage() {
         {auditFlags && (() => {
           const unresolved = auditFlags.flags?.filter((f: any) => !f.resolved) ?? [];
           return (
-            <div className="mb-6">
-              <button onClick={() => toggleSec("audit")} className="w-full flex items-center justify-between text-left mb-2 border-t-2 border-stone-300 pt-6 mt-2">
-                <span className={`text-[13px] font-extrabold ${unresolved.length ? "text-red-600" : "text-stone-800"}`}>{openSecs.audit ? "▾" : "▸"} {unresolved.length ? `🚨 품질 오염 감지 (${unresolved.length}건)` : "✅ 품질 오염 감지 (0건)"}</span>
+            <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50/30 p-4 sm:p-5">
+              <button onClick={() => toggleSec("audit")} className="w-full flex items-center justify-between text-left mb-2">
+                <span className={`text-[13px] font-extrabold ${unresolved.length ? "text-red-600" : "text-stone-800"}`}>{openSecs.audit ? "▾" : "▸"} {unresolved.length ? `🚨 실시간 이슈 · 품질 오염 감지 (${unresolved.length}건)` : "✅ 실시간 이슈 · 품질 오염 감지 (0건)"}</span>
                 <span className="text-[11px] text-stone-400 shrink-0">{auditFlags.lastAudit}</span>
               </button>
               {openSecs.audit && (unresolved.length > 0 ? (
@@ -662,11 +662,11 @@ export default function AdminPage() {
           );
         })()}
 
-        {/* ===== 🛡️ 검증 에이전트(레드팀) ===== */}
-        <div className="mb-6 border-t-2 border-stone-300 pt-6 mt-2">
+        {/* ===== 🛡️ 검증 에이전트(레드팀) · 정합성 ===== */}
+        <div className="mb-6 rounded-2xl border border-violet-200 bg-violet-50/30 p-4 sm:p-5">
           <div className="flex items-center justify-between mb-2">
             <button onClick={() => toggleSec("verify")} className="text-[13px] font-extrabold text-stone-800 text-left">
-              {openSecs.verify ? "▾" : "▸"} 🛡️ 데이터 검증 <span className="normal-case font-normal text-stone-400">·</span>{" "}
+              {openSecs.verify ? "▾" : "▸"} 🛡️ 데이터 정합성 검증 <span className="normal-case font-normal text-stone-400">·</span>{" "}
               {verify ? (verify.status === "pass" ? <span className="text-emerald-600 normal-case">정상 ✅</span> : verify.status === "warn" ? <span className="text-amber-600 normal-case">🟡 주의 {verify.warns}</span> : <span className="text-red-600 normal-case">🔴 오류 {verify.fails}</span>) : <span className="normal-case font-normal text-stone-400">리포트 없음</span>}
             </button>
             <button onClick={runVerify} disabled={verifying} className="text-[11px] bg-stone-800 text-white rounded-full px-3 py-1 disabled:opacity-50">{verifying ? "검사 중…" : "지금 검사"}</button>
@@ -1306,7 +1306,7 @@ export default function AdminPage() {
 
         {/* ===== 💎 구독 신청 ===== */}
         {(subs.length > 0 || purged > 0) && (
-          <div className="mb-6">
+          <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50/30 p-4 sm:p-5">
             <div className="text-[13px] font-extrabold text-stone-800 mb-2">💎 홍보팩 구독 신청 ({subs.length})</div>
             {purged > 0 && <div className="bg-rose-50 border border-rose-200 rounded-lg px-3 py-2 mb-2 text-[11.5px] text-rose-700">🔔 보유기간 만료로 <b>{purged}건의 개인정보가 자동 삭제</b>됐어요. 해당 사장님께 다시 연락하려면 <b>재수집·재동의</b>가 필요합니다.</div>}
             <div className="space-y-2">
@@ -1330,8 +1330,8 @@ export default function AdminPage() {
 
         {/* ===== 🎀 쇼케이스 승인 · AI 카피 생성 ===== */}
         {(
-          <div className="mb-6">
-            <button onClick={() => toggleSec("promo")} className="w-full flex items-center justify-between text-left mb-2 border-t-2 border-stone-300 pt-6 mt-2">
+          <div className="mb-6 rounded-2xl border border-pink-200 bg-pink-50/30 p-4 sm:p-5">
+            <button onClick={() => toggleSec("promo")} className="w-full flex items-center justify-between text-left mb-2">
               <span className="text-[13px] font-extrabold text-stone-800">{openSecs.promo ? "▾" : "▸"} 🎀 쇼케이스 승인 · AI 카피 생성 ({review.length})</span>
               <span className="text-[10px] text-stone-400 shrink-0">{openSecs.promo ? "접기" : "보기"}</span>
             </button>
@@ -1393,9 +1393,10 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* ===== 콘텐츠 현황 (접이식·기본 접힘) ===== */}
-        <button onClick={() => toggleSec("content")} className="w-full flex items-center justify-between text-left mb-2 border-t-2 border-stone-300 pt-6 mt-2">
-          <span className="text-[13px] font-extrabold text-stone-800">{openSecs.content ? "▾" : "▸"} 콘텐츠 현황 <span className="normal-case font-normal">· 공개 {ct?.published?.toLocaleString() ?? "·"} · 전체 {ct?.total?.toLocaleString() ?? "·"}</span></span>
+        {/* ===== 📦 발행 현황 (콘텐츠 · 접이식·기본 접힘) ===== */}
+        <div className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50/30 p-4 sm:p-5">
+        <button onClick={() => toggleSec("content")} className="w-full flex items-center justify-between text-left mb-2">
+          <span className="text-[13px] font-extrabold text-stone-800">{openSecs.content ? "▾" : "▸"} 📦 발행 현황 <span className="normal-case font-normal text-stone-400">(콘텐츠)</span> <span className="normal-case font-normal">· 공개 {ct?.published?.toLocaleString() ?? "·"} · 전체 {ct?.total?.toLocaleString() ?? "·"}</span></span>
           <span className="text-[10px] text-stone-400 shrink-0">{openSecs.content ? "접기" : "보기"}</span>
         </button>
         {openSecs.content && <>
@@ -1456,9 +1457,11 @@ export default function AdminPage() {
           </div>
         )}
         </>}
+        </div>
 
         {/* ===== 접속/방문자 (익명 · 접이식·기본 접힘) ===== */}
-        <button onClick={() => toggleSec("visitors")} className="w-full flex items-center justify-between text-left mb-2 border-t-2 border-stone-300 pt-6 mt-2">
+        <div className="mb-6 rounded-2xl border border-teal-200 bg-teal-50/30 p-4 sm:p-5">
+        <button onClick={() => toggleSec("visitors")} className="w-full flex items-center justify-between text-left mb-2">
           <span className="text-[13px] font-extrabold text-stone-800">{openSecs.visitors ? "▾" : "▸"} 접속 · 방문자 현황 <span className="normal-case font-normal">· 총 {vs?.total?.toLocaleString() ?? "·"} · 7일 활성 {vs?.active7d ?? "·"}</span></span>
           <span className="text-[10px] text-stone-400 shrink-0">{openSecs.visitors ? "접기" : "보기"}</span>
         </button>
@@ -1500,10 +1503,12 @@ export default function AdminPage() {
         )}
         <p className="text-[10px] text-stone-400 mb-6">합법·익명 수집만: 브라우저 익명 식별자, (동의 시) 대략 지역(≈500m). 이름·연락처·정밀위치는 수집하지 않습니다.</p>
         </>}
+        </div>
 
-        {/* ===== 검수 관리 (접이식·기본 접힘) ===== */}
-        <button onClick={() => toggleSec("inspect")} className="w-full flex items-center justify-between text-left mb-2 border-t-2 border-stone-300 pt-6 mt-2">
-          <span className="text-[13px] font-extrabold text-stone-800">{openSecs.inspect ? "▾" : "▸"} 검수 관리 <span className={`normal-case ${ownerPending.length ? "font-bold text-blue-600" : "font-normal"}`}>· 사장님 대기 {ownerPending.length}</span> <span className="normal-case font-normal">· 자동 비공개 {autoHidden.length}</span></span>
+        {/* ===== 🙋 후보 보류 · 검수 관리 (접이식·기본 접힘) ===== */}
+        <div className="mb-6 rounded-2xl border border-blue-200 bg-blue-50/30 p-4 sm:p-5">
+        <button onClick={() => toggleSec("inspect")} className="w-full flex items-center justify-between text-left mb-2">
+          <span className="text-[13px] font-extrabold text-stone-800">{openSecs.inspect ? "▾" : "▸"} 🙋 후보 보류 <span className="normal-case font-normal text-stone-400">(검수 관리)</span> <span className={`normal-case ${ownerPending.length ? "font-bold text-blue-600" : "font-normal"}`}>· 사장님 대기 {ownerPending.length}</span> <span className="normal-case font-normal">· 자동 비공개 {autoHidden.length}</span></span>
           <span className="text-[10px] text-stone-400 shrink-0">{openSecs.inspect ? "접기" : "보기"}</span>
         </button>
         {openSecs.inspect && <>
@@ -1524,13 +1529,16 @@ export default function AdminPage() {
           )}
         </section>
         </>}
+        </div>
 
-        {/* ===== 카페 검색 관리 (1000+ 전체 나열 대신 검색) ===== */}
-        <div className="text-[13px] font-extrabold text-stone-800 mb-2">카페 검색 관리</div>
+        {/* ===== 🔎 카페 검색 관리 (1000+ 전체 나열 대신 검색) ===== */}
+        <div className="mb-6 rounded-2xl border border-stone-300 bg-white p-4 sm:p-5">
+        <div className="text-[13px] font-extrabold text-stone-800 mb-2">🔎 카페 검색 관리</div>
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`카페 이름 검색 (전체 ${cafes.length}곳)`} className="w-full border rounded-lg px-4 py-2.5 mb-3 bg-white" />
         {q.trim() === "" ? <p className="text-sm text-stone-400">이름을 검색해 개별 카페를 공개/숨김/삭제 관리하세요. (공개 {live.length} · 비공개 {ownerPending.length + autoHidden.length})</p>
           : searched.length === 0 ? <p className="text-sm text-stone-400">'{q}' 검색 결과 없음</p>
           : <div className="space-y-2">{searched.slice(0, 40).map((c) => <Row key={c.id} c={c} />)}{searched.length > 40 && <p className="text-xs text-stone-400 text-center">상위 40곳만 표시 · 더 좁혀 검색하세요</p>}</div>}
+        </div>
       </div>
     </main>
   );
