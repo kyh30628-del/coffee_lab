@@ -53,6 +53,16 @@ body {
 }
 @media (prefers-reduced-motion: reduce) { .dcn-shimmer, .dcn-shimmer-dark { animation: none; } }
 
+/* 🖥️ 관제탑 대시보드 반응형 — 카드 그리드는 auto-fit/minmax로 폭에 맞춰 채우고, 제목류는 clamp()로 뷰포트 비례 스케일(360~1440px 무깨짐). */
+.admin-kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.625rem; }
+.admin-chip-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(148px, 1fr)); gap: 0.375rem; }
+.admin-today-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(82px, 1fr)); gap: 0.375rem; }
+.admin-stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 0.75rem; text-align: center; }
+.admin-h1 { font-size: clamp(1.25rem, 1.1rem + 0.8vw, 1.625rem); }
+.admin-section-title { font-size: clamp(0.78rem, 0.72rem + 0.28vw, 0.9rem); }
+.admin-group-title { font-size: clamp(0.68rem, 0.64rem + 0.16vw, 0.75rem); }
+.admin-card-title { font-size: clamp(0.8rem, 0.76rem + 0.18vw, 0.9rem); }
+
 /* 관제탑 신호등 — 작동 중 램프가 또렷이 켜졌다 꺼졌다(깜빡) */
 @keyframes accBlink { 0%, 48% { opacity: 1; } 49%, 100% { opacity: 0.16; } }
 .acc-blink { animation: accBlink 1.05s steps(1, end) infinite; }
