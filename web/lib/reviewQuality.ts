@@ -189,7 +189,16 @@ const VENUE_WORDS = [
 ];
 // 신도시·생활권 수식어(시·군·구가 아닌 동네名) — 위치 수식어로만 작동
 const DISTRICT_WORDS = ["위례", "미사", "다산", "별내", "광교", "동탄", "운정", "송도", "청라", "영종", "마곡", "지축", "삼송", "향동", "고덕", "감일", "갈매", "한강신도시", "위례신도시"];
-const isVenueTok = (t: string) => { const n = norm(t); return VENUE_WORDS.some((v) => n.includes(norm(v))) || DISTRICT_WORDS.some((d) => n.includes(norm(d))); };
+// 대학교 축약명(기관명 카테고리, 룰갭 제안3): "OO대학교"·"캠퍼스"는 VENUE_WORDS로 걸리지만 축약명("성신여대")은
+//   안 걸려 identity 토큰으로 남던 것 차단(id15727 더베이크 성신여대 운정그린캠퍼스점 실측 — 지역일치만으로
+//   캠퍼스 주차·행정·동아리 무관글 유입). 브랜드 토큰이 남을 때만 위치수식어로 제거(isVenueTok과 동일 원리).
+const UNIV_ABBR_WORDS = [
+  "서울대", "연세대", "고려대", "이화여대", "성신여대", "한양대", "성균관대", "경희대", "중앙대", "홍익대",
+  "숙명여대", "숭실대", "국민대", "동국대", "건국대", "세종대", "명지대", "광운대", "덕성여대", "동덕여대",
+  "상명대", "가천대", "인하대", "아주대", "단국대", "한국외대", "서강대", "서울여대", "삼육대", "총신대",
+  "한성대", "서경대", "협성대", "루터대", "감신대", "장신대",
+];
+const isVenueTok = (t: string) => { const n = norm(t); return VENUE_WORDS.some((v) => n.includes(norm(v))) || DISTRICT_WORDS.some((d) => n.includes(norm(d))) || UNIV_ABBR_WORDS.some((u) => n.includes(norm(u))); };
 
 // 지역/생활권/신도시 이름 — 카페명 식별 토큰이 '못' 된다.
 //   예: "평촌커피" → 접미 '커피' 제거 후 '평촌'만 남는데, '평촌'은 그 지역 모든 카페 후기에 나옴
@@ -233,7 +242,9 @@ export function cleanCafeName(name: string): string {
 // 몰/신도시어(스타필드·위례 등)는 '다른 브랜드 토큰이 남을 때만' 위치수식어로 제거한다.
 //   - "앤티앤스 스타필드 위례" → ["앤티앤스"] (브랜드 남음 → 몰/신도시 제거)
 //   - "미사강변 북카페" → ["미사강변"] (브랜드 없음 → '미사강변'이 유일 정체성이므로 유지)
-export function coreTokens(name: string, areaTerms: string[]): string[] {
+// venueOnly: 남은 토큰이 전부 다중테넌트 기관/건물명(VENUE_WORDS·대학 축약명 등)일 때 true — 그 건물엔
+//   무관한 여러 시설이 함께 있으므로(제안3 "건물단위 앵커 필수화"), 지역일치만으로 식별 인정하면 안 된다.
+function coreTokensDetail(name: string, areaTerms: string[]): { tokens: string[]; venueOnly: boolean } {
   // 행정 접미사(시·군·구·읍·면·동·리)를 뗀 변형도 비교군에 포함 → 지점명에서 나온 병합 지역어
   //   ('남양주오남점'→'남양주오남')를 areaTerms('남양주시'·'오남읍')와 매칭시켜 식별어에서 제외.
   //   (프랜차이즈 'OO점'이 같은 지역 다른 업종 'OO점' 리뷰를 끌어오던 동명 오염의 근본 차단)
@@ -262,7 +273,11 @@ export function coreTokens(name: string, areaTerms: string[]): string[] {
   const pool = nonBranch.length ? nonBranch : parts; // 지점어만 있는 이름(브랜드 없음)은 그대로 유지
   const base = pool.map((p) => p.core);
   const branded = pool.filter((p) => !isVenueTok(p.raw) && !isVenueTok(p.core)).map((p) => p.core);
-  return branded.length ? branded : base; // 브랜드 토큰이 남으면 venue/신도시 제거, 없으면 원래 유지
+  // 브랜드 토큰이 남으면 venue/신도시 제거, 없으면(=venueOnly) 원래 유지해 정체성 파괴는 막되 신호는 표시.
+  return { tokens: branded.length ? branded : base, venueOnly: branded.length === 0 && base.length > 0 };
+}
+export function coreTokens(name: string, areaTerms: string[]): string[] {
+  return coreTokensDetail(name, areaTerms).tokens;
 }
 
 // 노이즈 게이트: 후기들이 '실제로 그 카페'를 말하는 비율(이름 일관성).
@@ -336,7 +351,7 @@ export function verifyReview(input: QualityInput): QualityResult {
     return { verdict: "rejected", score: 2, reasons: ["카페 모음글·리스트(그 카페가 주제 아님)"], signals: { nameInTitle: false, nameInBody: false, visit: false, substance: 0, listicle: true, sponsored: false, areaMatch: false } };
   }
   // 구별 토큰(지역어·일반어 제거). 토큰이 비면 전체 이름으로만 매칭.
-  const tokens = coreTokens(input.name, areaTerms);
+  const { tokens, venueOnly } = coreTokensDetail(input.name, areaTerms);
   const coreEmpty = tokens.length === 0; // 이름이 흔한구문/일반어뿐(예: '좋은커피') → 원문 '붙임' 일치만 인정
   // 🛡️ 짧은 단일토큰('나무 로스터리'→["나무"])은 다른 업체('나무사이로')의 '부분문자열'로 오매칭됨.
   //   → 토큰 대신 '전체 이름(정규화)' 일치만 인정해 차단. (전체이름이 토큰보다 길 때만 = 한 글자 가게 제외)
@@ -365,8 +380,12 @@ export function verifyReview(input: QualityInput): QualityResult {
   const titleHasCafeWord = CAFE_WORDS.some((w) => title.includes(w));
   const bodyHasCafeWord = CAFE_WORDS.some((w) => body.includes(w));
   // #153: 초약체 유일토큰(공간·인테리어·2005…)은 지역어 동반 없으면 전국 오매칭이라 귀속 불인정
-  const nameInTitle = (weakWhitelist && !areaPresent) ? false : (inTitleFull || (distinctInTitle && (titleHasCafeWord || areaPresent)));
-  const nameInBody = (weakWhitelist && !areaPresent) ? false : (inBodyFull || (distinctInBody && (bodyHasCafeWord || areaPresent)));
+  // 🏢 제안3(건물단위 앵커 필수화): 남은 토큰이 전부 다중테넌트 기관/건물명(VENUE_WORDS·대학 축약명 등)이면
+  //   그 건물엔 무관한 여러 시설(주차·행정·동아리…)이 함께 있으므로, 지역일치만으로는 부족 — 진짜 카페 맥락
+  //   (CAFE_CONTEXT_STRONG)이 함께 있어야 그 건물의 '이 카페' 이야기로 인정한다(전체이름 원문일치는 예외 — 이미 강한 신호).
+  const venueCtxOk = !venueOnly || CAFE_CONTEXT_STRONG.test(fullL);
+  const nameInTitle = (weakWhitelist && !areaPresent) ? false : (inTitleFull || (distinctInTitle && (titleHasCafeWord || areaPresent) && venueCtxOk));
+  const nameInBody = (weakWhitelist && !areaPresent) ? false : (inBodyFull || (distinctInBody && (bodyHasCafeWord || areaPresent) && venueCtxOk));
   const listicle = LISTICLE_TITLE.some((re) => re.test(title)) || (((`${title} ${body}`.match(PLACE_TOKEN) ?? []).length) >= 4);
   const generic = has(fullL, GENERIC_CUES);
   const nameOccurBody = nameN ? countOccur(bodyN, nameN) : 0;
