@@ -30,9 +30,10 @@ function md2html(md: string) {
 
 // 💬 관제 챗봇 — 플로팅 아이콘 → 모달. claude -p(구독) 경유 답을 폴링. 24h 기록.
 // 추천 질문 칩(탭별) — 클릭 시 입력창에 문구만 채운다(자동 전송 X). 첫 사용 진입장벽↓.
-const SUGGEST: Record<"chat" | "region", string[]> = {
-  region: ["성수동", "블루보틀", "서비스가 뭐야?"],
-  chat: ["발행 몇 개야?", "결재 대기 뭐 있어?", "관제탑 상태 어때?"],
+// 일반(region) 탭 전용 추천칩 6개 — 모두 결정론 즉답 가능(지역 집계·카페명 검색·지식).
+//   작업지시(chat) 탭은 칩을 노출하지 않는다(렌더 자체를 제거).
+const SUGGEST: Record<"region", string[]> = {
+  region: ["성수동", "강남구", "블루보틀", "서비스가 뭐야?", "MY PIN이 뭐야?", "구독은 어떻게 해?"],
 };
 
 function ChatWidget({ pw }: { pw: string }) {
@@ -138,11 +139,13 @@ function ChatWidget({ pw }: { pw: string }) {
               ))}
               {loading && <div style={{ color: "#9c8a6c", fontSize: 13, margin: "6px 0" }}>{mode === "region" ? "🗺️ 집계 중…" : "💭 접수됨 · 처리 중… (상태질문은 즉답, 지시는 착수까지 잠깐)"}</div>}
             </div>
-            <div style={{ display: "flex", gap: 6, padding: "8px 10px 0", flexWrap: "wrap", borderTop: "1px solid #e6d8bf" }}>
-              {SUGGEST[mode].map((s) => (
-                <button key={s} onClick={() => setInput(s)} disabled={loading} title="클릭하면 입력창에 채워져요" style={{ padding: "5px 11px", borderRadius: 14, fontSize: 12.5, fontWeight: 600, cursor: loading ? "default" : "pointer", border: "1px solid #ddc9a8", background: "#fff", color: "#8a6b3f", opacity: loading ? 0.5 : 1 }}>{s}</button>
-              ))}
-            </div>
+            {mode === "region" && (
+              <div style={{ display: "flex", gap: 6, padding: "8px 10px 0", flexWrap: "wrap", borderTop: "1px solid #e6d8bf" }}>
+                {SUGGEST.region.map((s) => (
+                  <button key={s} onClick={() => setInput(s)} disabled={loading} title="클릭하면 입력창에 채워져요" style={{ padding: "5px 11px", borderRadius: 14, fontSize: 12.5, fontWeight: 600, cursor: loading ? "default" : "pointer", border: "1px solid #ddc9a8", background: "#fff", color: "#8a6b3f", opacity: loading ? 0.5 : 1 }}>{s}</button>
+                ))}
+              </div>
+            )}
             <div style={{ display: "flex", gap: 7, padding: "8px 10px calc(10px + env(safe-area-inset-bottom))" }}>
               <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") (mode === "region" ? sendRegion() : send()); }} placeholder={mode === "region" ? "동/구 또는 카페 이름 (예: 성수동, 블루보틀)" : "질문…"} disabled={loading} style={{ flex: 1, minWidth: 0, padding: "11px 13px", borderRadius: 10, border: "1px solid #ddc9a8", fontSize: 16 }} />
               <button onClick={() => (mode === "region" ? sendRegion() : send())} disabled={loading} style={{ padding: "0 18px", background: "#2b2018", color: "#e8b87a", border: "none", borderRadius: 10, fontWeight: 700, fontSize: 15, flexShrink: 0, opacity: loading ? 0.5 : 1 }}>전송</button>
