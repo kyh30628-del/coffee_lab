@@ -79,8 +79,17 @@ function ChatWidget({ pw }: { pw: string }) {
     try {
       const r = await fetch(`/api/admin/chat?region=${encodeURIComponent(q)}`, { headers: { "x-admin-password": pw }, cache: "no-store" }).then((x) => x.json());
       if (!r.ok) setRegionMsgs((m) => [...m, { role: "assistant", content: "⚠️ " + (r.error || "오류") }]);
-      else if (r.total === 0) setRegionMsgs((m) => [...m, { role: "assistant", content: `**${q}** — 등록된 카페가 없어요. 동은 '성수동', 구/시는 '강남구'·'수원시' 형식으로 입력해 주세요.` }]);
-      else setRegionMsgs((m) => [...m, { role: "assistant", content: `**${q}** 지역\n\n- 발행(공개): **${r.pub}곳** (검증 ${r.verified} · 참고 ${r.ref})\n- 비공개/후보: ${r.unpub}곳 · 전체 등록 ${r.total}곳${r.last_pub ? `\n- 최종 발행: ${String(r.last_pub).slice(0, 10).replace(/-/g, ".")}` : ""}${r.names?.length ? `\n\n**대표 카페**: ${r.names.join(" · ")}` : ""}\n\n[🗺️ 지도에서 ${r.dong || r.gu || q} 보기](/?region=${encodeURIComponent(r.gu || q)}${r.clat && r.clng ? `&clat=${r.clat}&clng=${r.clng}&cz=${r.cz || 14}` : ""})` }]);
+      else {
+        // 지역(동/구) 집계 + 카페명 검색을 함께 노출. 둘 다 없으면 안내.
+        const parts: string[] = [];
+        if (r.total > 0)
+          parts.push(`**${q}** 지역\n\n- 발행(공개): **${r.pub}곳** (검증 ${r.verified} · 참고 ${r.ref})\n- 비공개/후보: ${r.unpub}곳 · 전체 등록 ${r.total}곳${r.last_pub ? `\n- 최종 발행: ${String(r.last_pub).slice(0, 10).replace(/-/g, ".")}` : ""}${r.names?.length ? `\n\n**대표 카페**: ${r.names.join(" · ")}` : ""}\n\n[🗺️ 지도에서 ${r.dong || r.gu || q} 보기](/?region=${encodeURIComponent(r.gu || q)}${r.clat && r.clng ? `&clat=${r.clat}&clng=${r.clng}&cz=${r.cz || 14}` : ""})`);
+        if (r.cafes?.length)
+          parts.push(`**'${q}' 카페 검색** (${r.cafes.length}곳)\n${r.cafes.map((c: any) => `- [${c.name}](/c/${c.id}) — ${[c.area, c.dong].filter(Boolean).join(" ")}${c.grade ? ` · ${c.grade}` : ""}`).join("\n")}`);
+        if (!parts.length)
+          parts.push(`**${q}** — 매칭되는 발행 카페가 없어요. 동은 '성수동', 구/시는 '강남구'·'수원시', 카페는 이름 일부로 검색해 보세요.`);
+        setRegionMsgs((m) => [...m, { role: "assistant", content: parts.join("\n\n") }]);
+      }
     } catch { setRegionMsgs((m) => [...m, { role: "assistant", content: "⚠️ 네트워크 오류" }]); }
     setRegionLoading(false);
   };
@@ -112,7 +121,7 @@ function ChatWidget({ pw }: { pw: string }) {
             <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: 12 }}>
               {msgs.length === 0 && (mode === "chat"
                 ? <div style={{ color: "#9c8a6c", fontSize: 13, lineHeight: 1.7 }}>상태를 묻거나 <b>작업을 지시</b>하세요.<br />질문: "발행 몇 개야?" · "결재 대기 뭐 있어?"<br />지시: "관제탑 상단에 발행 수 배지 추가해줘" · "지도 팝업 여백 줄여줘"<br /><span style={{ fontSize: 11.5, color: "#b0a081" }}>안전한 코드 변경은 자율로 구현·검증·배포하고, 데이터 변경·모호한 건은 되물어봅니다.</span></div>
-                : <div style={{ color: "#9c8a6c", fontSize: 13, lineHeight: 1.7 }}>동/구 이름을 넣으면 <b>즉시</b> 집계해요(LLM 안 씀·빠름).<br />예: "성수동" · "강남구" · "연남동" · "수원시"</div>)}
+                : <div style={{ color: "#9c8a6c", fontSize: 13, lineHeight: 1.7 }}>동/구 이름 또는 <b>카페 이름</b>을 넣으면 <b>즉시</b> 찾아요(LLM 안 씀·빠름).<br />예: "성수동" · "강남구" · "수원시" · "블루보틀"</div>)}
               {msgs.map((m, i) => (
                 <div key={i} style={{ display: "flex", justifyContent: m.role === "user" ? "flex-end" : "flex-start", margin: "6px 0" }}>
                   <div className={m.role === "assistant" ? "ex" : ""} style={{ maxWidth: "88%", padding: "9px 12px", borderRadius: 13, fontSize: 14.5, lineHeight: 1.6, whiteSpace: m.role === "user" ? "pre-wrap" : "normal", wordBreak: "break-word", background: m.role === "user" ? "#c98a3c" : "#fff", color: m.role === "user" ? "#fff" : "#2b2018", border: m.role === "user" ? "none" : "1px solid #e6d8bf" }}>{m.role === "assistant" ? <div dangerouslySetInnerHTML={{ __html: md2html(m.content) }} /> : m.content}</div>
@@ -121,7 +130,7 @@ function ChatWidget({ pw }: { pw: string }) {
               {loading && <div style={{ color: "#9c8a6c", fontSize: 13, margin: "6px 0" }}>{mode === "region" ? "🗺️ 집계 중…" : "💭 접수됨 · 처리 중… (상태질문은 즉답, 지시는 착수까지 잠깐)"}</div>}
             </div>
             <div style={{ display: "flex", gap: 7, padding: "10px 10px calc(10px + env(safe-area-inset-bottom))", borderTop: "1px solid #e6d8bf" }}>
-              <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") (mode === "region" ? sendRegion() : send()); }} placeholder={mode === "region" ? "동/구 이름 (예: 성수동, 강남구)" : "질문…"} disabled={loading} style={{ flex: 1, minWidth: 0, padding: "11px 13px", borderRadius: 10, border: "1px solid #ddc9a8", fontSize: 16 }} />
+              <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") (mode === "region" ? sendRegion() : send()); }} placeholder={mode === "region" ? "동/구 또는 카페 이름 (예: 성수동, 블루보틀)" : "질문…"} disabled={loading} style={{ flex: 1, minWidth: 0, padding: "11px 13px", borderRadius: 10, border: "1px solid #ddc9a8", fontSize: 16 }} />
               <button onClick={() => (mode === "region" ? sendRegion() : send())} disabled={loading} style={{ padding: "0 18px", background: "#2b2018", color: "#e8b87a", border: "none", borderRadius: 10, fontWeight: 700, fontSize: 15, flexShrink: 0, opacity: loading ? 0.5 : 1 }}>전송</button>
             </div>
           </div>
