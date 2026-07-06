@@ -215,6 +215,13 @@ export default function AdminPage() {
       {note && <p className="text-[10px] text-stone-400 mt-2">{note}</p>}
     </div>
   );
+  // 📐 섹션 그룹 헤더 — 논리 그룹 사이에 라벨+구분선으로 시각 분리(기존 카드 위치·데이터는 그대로, 표기만 추가)
+  const GroupHeader = ({ icon, label }: { icon: string; label: string }) => (
+    <div className="flex items-center gap-2 mt-1 mb-2.5 px-0.5">
+      <span className="text-[11px] font-extrabold tracking-wide text-stone-400 whitespace-nowrap">{icon} {label}</span>
+      <div className="flex-1 h-px bg-stone-300" />
+    </div>
+  );
   const Row = ({ c }: { c: Cafe }) => (
     <div className="bg-white rounded-xl p-4 border flex items-start justify-between gap-4">
       <div className="flex-1 min-w-0">
@@ -236,6 +243,10 @@ export default function AdminPage() {
   const ct = stats?.content, vs = stats?.visitors;
   const agreeRate = vs && vs.total ? Math.round((vs.agreed / vs.total) * 100) : 0;
   const keptPct = ct?.quality?.raw ? Math.round(((ct.quality.raw - ct.quality.rejected) / ct.quality.raw) * 100) : 0;
+  // 📊 상단 KPI 요약 — 이미 로드된 지표를 재사용(신규 fetch 없음). 발행수·검증/참고·오염·미결재를 한눈에.
+  const verifiedRefN = ct?.grades?.filter((g) => g.grade === "검증" || g.grade === "참고").reduce((s, g) => s + g.n, 0) ?? 0;
+  const auditUnresolvedN = auditFlags?.flags?.filter((f: any) => !f.resolved).length ?? 0;
+  const pendingActionsN = ownerPending.length + subscribers.filter((s: any) => s.status === "pending").length + review.length;
 
   return (
     <main className="min-h-screen bg-stone-100 p-4 sm:p-6" style={{ paddingTop: "calc(1rem + env(safe-area-inset-top))" }}>
@@ -246,12 +257,33 @@ export default function AdminPage() {
           <button onClick={() => load(pw)} className="ml-auto text-xs px-3 py-1.5 rounded-lg bg-stone-200 text-stone-700">새로고침</button>
         </div>
 
+        {/* ===== 📊 핵심 지표 (상단 KPI 행) — 발행수·검증/참고·오염·미결재를 한눈에 ===== */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-5">
+          <div className="bg-white rounded-xl border border-stone-300 p-3.5">
+            <div className="text-2xl font-extrabold text-stone-900 leading-tight">{ct?.published?.toLocaleString() ?? "·"}</div>
+            <div className="text-[11px] text-stone-500 mt-0.5">📦 발행 (공개 카페)</div>
+          </div>
+          <div className="bg-white rounded-xl border border-stone-300 p-3.5">
+            <div className="text-2xl font-extrabold text-emerald-600 leading-tight">{verifiedRefN.toLocaleString()}</div>
+            <div className="text-[11px] text-stone-500 mt-0.5">✅ 검증 · 참고 등급</div>
+          </div>
+          <div className={`rounded-xl border p-3.5 ${auditUnresolvedN > 0 ? "bg-red-50 border-red-300" : "bg-white border-stone-300"}`}>
+            <div className={`text-2xl font-extrabold leading-tight ${auditUnresolvedN > 0 ? "text-red-600" : "text-stone-900"}`}>{auditUnresolvedN}</div>
+            <div className="text-[11px] text-stone-500 mt-0.5">{auditUnresolvedN > 0 ? "🔴" : "🟢"} 오염 · 품질 이슈</div>
+          </div>
+          <div className={`rounded-xl border p-3.5 ${pendingActionsN > 0 ? "bg-amber-50 border-amber-300" : "bg-white border-stone-300"}`}>
+            <div className={`text-2xl font-extrabold leading-tight ${pendingActionsN > 0 ? "text-amber-600" : "text-stone-900"}`}>{pendingActionsN}</div>
+            <div className="text-[11px] text-stone-500 mt-0.5">{pendingActionsN > 0 ? "🟡" : "🟢"} 미결재 · 승인 대기</div>
+          </div>
+        </div>
+
         {/* 🎩 조직 관제(기획조정실 자율조직 브리핑) — 카페-데이터 관제탑과 별개. 모바일 전용 화면으로. */}
         <a href="/admin/org" className="flex items-center justify-between mb-5 rounded-2xl border border-amber-300 bg-gradient-to-r from-amber-50 to-stone-50 px-4 py-3 hover:from-amber-100 transition">
           <span className="flex items-center gap-2"><span className="text-lg">🎩</span><span className="flex flex-col"><span className="font-bold text-stone-800">조직 관제 (기획조정실)</span><span className="text-[11px] text-stone-500">자율 에이전트 일일 브리핑·결재·토큰</span></span></span>
           <span className="text-amber-600 font-bold">→</span>
         </a>
 
+        <GroupHeader icon="⚙️" label="크론 · 에이전트 상태" />
         {/* ===== 🛰️ 자율 운영 관제탑 ===== */}
         {tower && (() => {
           const dot: Record<string, string> = { ok: "bg-emerald-500", behind: "bg-amber-500", stalled: "bg-red-500", warn: "bg-amber-500", idle: "bg-stone-300" };
@@ -636,6 +668,7 @@ export default function AdminPage() {
           </div>
         )}
 
+        <GroupHeader icon="🛡️" label="발행 품질 · 정합성 감시" />
         {/* ===== 🚨 품질 감사 플래그 (접이식·기본 접힘 — 헤더에 건수) ===== */}
         {auditFlags && (() => {
           const unresolved = auditFlags.flags?.filter((f: any) => !f.resolved) ?? [];
@@ -1328,6 +1361,7 @@ export default function AdminPage() {
           </div>
         )}
 
+        <GroupHeader icon="📦" label="콘텐츠 · 발행 관리" />
         {/* ===== 🎀 쇼케이스 승인 · AI 카피 생성 ===== */}
         {(
           <div className="mb-6 rounded-2xl border border-pink-200 bg-pink-50/30 p-4 sm:p-5">
