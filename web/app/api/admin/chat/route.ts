@@ -8,6 +8,35 @@ export const runtime = "nodejs";
 //   POST: 질문 적재(pending) → {id}.  GET?id=: 답 폴링.  GET: 24h 대화기록.
 //   콘솔키(ANTHROPIC_API_KEY) 크레딧이 있으면 즉답 폴백도 가능하지만 기본은 claude -p 경로.
 
+// 📚 서비스/조직/대시보드 지식 응답 — 결정론 키워드 매칭($0·LLM 안 씀).
+//   사실 출처: 레포 CLAUDE.md · docs/SERVICE_OVERVIEW.md(추측 없음). '일반' 탭에서 카페·지역이 아닌
+//   서비스/조직/관제/라운지/구독/파이프라인/MY PIN 질문에 바로 답한다.
+type Know = { kw: string[]; a: string };
+const KNOW: Know[] = [
+  { kw: ["서비스", "뭐하는", "뭐야", "소개", "제품", "무슨", "어떤곳", "dongnecoffeenote", "동네커피노트"],
+    a: "**동네 커피 노트** — 서울·수도권 카페를 리뷰 데이터로 검증한 큐레이션 서비스예요.\n\n- 공개 후기(네이버·구글·유튜브)를 모아 규칙으로 옥석을 가리고, AI가 **진짜 방문 검증 후기만** 최종 검증해 지도·추천으로 보여줍니다(별점 나열 X).\n- **B2C**: 지도·검색·카페 상세(형광펜 강조 근거 후기). **B2B**: 사장님 구독(인사이트·노출).\n- **MY PIN**: 사용자가 다녀온 카페 추억을 익명으로 기록·보관(무가입·개인정보 0).\n\n핵심 원칙: 모든 숫자·후기에 출처·근거가 붙는다 — 지어내지 않는다." },
+  { kw: ["검증", "신뢰등급", "등급", "오염", "품질", "옥석", "발굴", "참고"],
+    a: "**신뢰 등급 / 품질 해자**\n\n- **검증**(리뷰 30+) · **참고**(5~30) · **발굴**(5 미만) 3단계.\n- 진짜 방문 검증 후기만 노출하고 **오염 0**(옆가게·광고·동명 오염 금지)이 1순위 원칙.\n- 오염 발견 시 규칙만 바꿔 원본(raw_reviews)에서 재처리하는 자가치유(self-heal) 루프가 돕니다." },
+  { kw: ["조직", "본부", "에이전트", "조직도", "팀", "자율"],
+    a: "**자율 에이전트 조직** — 1인 운영(CEO) + 자율 에이전트 조직(launchd + Claude Code 헤드리스 + Vercel 크론)으로 돌아갑니다.\n\n- 수집(warmup)·판정(judgeloop)·품질감사·재합성·검증 등 에이전트가 정해진 시각에 자동 실행.\n- 조직 운영 현황: [운영 관제 /admin/org](/admin/org) · 전사 공간: [🏛️ 라운지 /admin/lounge](/admin/lounge)" },
+  { kw: ["대시보드", "관제", "관제탑", "orchestrator", "패널", "신호등", "펀넬"],
+    a: "**관제탑(Control Tower)** — 전 에이전트를 자가점검·치유·경보하는 자동화 두뇌예요.\n\n- `GET /api/orchestrator`(현황) · `?heal=1`(인증·자가치유). 관리자 대시보드 🛰️ 관제 패널에 신호등으로 표시.\n- 조립라인 펀넬에서 각 단계 대기 수(어디서 막혔나)를 봅니다.\n- 바로가기: [운영 관제 /admin/org](/admin/org)" },
+  { kw: ["라운지", "lounge"],
+    a: "**🏛️ 전사 라운지** — 자율 조직이 함께 일하고 나누는 공간이에요(오늘 실행·성공률·본부·결재 대기 요약).\n\n바로가기: [/admin/lounge](/admin/lounge)" },
+  { kw: ["구독", "사장님", "b2b", "유료", "요금", "결제"],
+    a: "**B2B 사장님 구독** — 검증된 후기 기반 액션플랜·성격축, 쇼케이스(홍보) 등록을 제공합니다.\n\n현재 구독 게이트는 **관리자 전용**(SUBSCRIPTION_LIVE=off)으로 일반 공개 전 단계예요." },
+  { kw: ["수집", "파이프라인", "warmup", "유튜브", "네이버", "판정", "임베딩", "resynth", "재합성"],
+    a: "**데이터 파이프라인** (원본 → 화면)\n\n- **수집**: warmup(네이버 검색 후기) → `raw_reviews`에 원본 보존(재수집 없이 규칙만 바꿔 재처리·토큰 0).\n- **정제·합성**: synthStore·reviewQuality 규칙 필터.\n- **검증**: AI 판정(Haiku·새벽만) → 레드팀 결정론 검증 → 품질 감사.\n- **서빙**: 지도·추천·카페 상세 API." },
+  { kw: ["추억", "mypin", "마이핀", "개인기록", "핀", "내카페"],
+    a: "**MY PIN(내 카페 추억)** — 다녀온 카페를 ❤로 지도에 기록하는 개인 공간이에요.\n\n- 위치 인증 기반 · 추억 텍스트·사진·즐겨찾기 · **무가입·개인정보 0**.\n- 백업코드 · PDF/JSON 내보내기 · 공용 PC PIN 잠금." },
+];
+function answerKnowledge(q: string): string | null {
+  const n = q.toLowerCase().replace(/\s+/g, "");
+  if (n.length < 2) return null;
+  for (const k of KNOW) if (k.kw.some((w) => n.includes(w))) return k.a;
+  return null;
+}
+
 async function ensure() {
   await sql`CREATE TABLE IF NOT EXISTS chat_queue (
     id SERIAL PRIMARY KEY, question TEXT, history JSONB, status TEXT DEFAULT 'pending',
@@ -41,6 +70,10 @@ export async function GET(req: NextRequest) {
   if (region !== null) {
     const q = region.trim().slice(0, 40);
     if (!q) return NextResponse.json({ ok: false, error: "지역명을 입력하세요" }, { status: 400 });
+    // 📚 서비스/조직/관제/라운지 등 지식 질문이면 결정론 지식으로 즉답(SQL·LLM 안 씀).
+    //   지역/카페명은 이 키워드를 포함하지 않으므로 정상적으로 아래 SQL 경로로 흐른다.
+    const know = answerKnowledge(q);
+    if (know) return NextResponse.json({ ok: true, kind: "knowledge", region: q, answer: know });
     const like = `%${q}%`;
     try {
       const a = (await sql`SELECT
