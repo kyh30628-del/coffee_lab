@@ -36,10 +36,10 @@ async function runChecks(): Promise<Check[]> {
     await n(sql`SELECT count(*)::int n FROM cafes WHERE published AND (synth_grade IS NULL OR synth_grade NOT IN ('검증','참고','후보'))`),
     await samp(sql`SELECT name s FROM cafes WHERE published AND (synth_grade IS NULL OR synth_grade NOT IN ('검증','참고','후보')) LIMIT 6`));
 
-  // 3. 고아 데이터: 공개인데 분석/후기 없음
+  // 3. 고아 데이터: 공개인데 분석/후기 없음 — 대상 식별 가능하도록 샘플에 카페 id 포함(#168: '몇 건'뿐 아니라 '어느 카페'인지 카드에서 바로 확인).
   add("orphan_published", "공개 카페 분석 데이터 누락", "fail",
     await n(sql`SELECT count(*)::int n FROM cafes WHERE published AND (synth_reviews IS NULL OR jsonb_array_length(synth_reviews)=0 OR synth_grade IS NULL)`),
-    await samp(sql`SELECT name s FROM cafes WHERE published AND (synth_reviews IS NULL OR jsonb_array_length(synth_reviews)=0 OR synth_grade IS NULL) LIMIT 6`));
+    await samp(sql`SELECT name || ' (#' || id || ')' s FROM cafes WHERE published AND (synth_reviews IS NULL OR jsonb_array_length(synth_reviews)=0 OR synth_grade IS NULL) ORDER BY id LIMIT 6`));
 
   // 4. 근거 후기 필수필드: quote/link 누락
   add("review_fields", "근거 후기 필수필드(인용·링크) 누락", "fail",
