@@ -280,10 +280,14 @@ export default function OrgDashboard() {
 
       {brief && (<>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 12 }}>
-          <div style={card}><div style={lbl}>🔔 결재 대기</div><div style={big}>{dec.pending.length}건</div></div>
+          {/* 🔔 결재 대기 — 대기 건이 있으면 앰버 배경·진한 빨강 볼드로 한눈에 강조 */}
+          <div style={{ ...card, ...(dec.pending.length ? { background: "#fff5e6", border: "2px solid #e8b046" } : {}) }}>
+            <div style={lbl}>🔔 결재 대기</div>
+            <div style={{ ...big, color: dec.pending.length ? "#b03a1e" : "#7a6a4c" }}>{dec.pending.length}건</div>
+          </div>
           <div style={card}><div style={lbl}>📊 오늘 토큰(in)</div><div style={big}>{fmt(tok.input || 0)}</div><div style={sub}>비용프록시 ${Number(tok.cost || 0).toFixed(2)}</div></div>
-          <div style={card}><div style={lbl}>📈 공개 카페 <span style={{ fontSize: 9, color: "#9c8a6c" }}>실시간</span></div><div style={big}>{live ? live.pub.toLocaleString() : "—"}</div><div style={sub}>검증 {live ? live.v.toLocaleString() : "—"}{live?.backlog ? ` · 대기 ${live.backlog}` : ""}</div></div>
-          <div style={card}><div style={lbl}>🤖 자율 잡 가동 <span style={{ fontSize: 9, color: "#9c8a6c" }}>최신 실행</span></div><div style={big}>{live ? `${live.cronOk}/${live.cronTotal}` : `${crons.filter((c: any) => c.ok).length}/${crons.length}`} {(live ? live.cronFail?.length === 0 : crons.every((c: any) => c.ok)) ? "✅" : "⚠️"}</div><div style={sub}>잡별 최신 실행 성공/전체(크론·에이전트·워커)</div></div>
+          <div style={card}><div style={lbl}>📈 공개 카페 <span style={{ fontSize: 9.5, color: "#9c8a6c", fontWeight: 700 }}>실시간</span></div><div style={big}>{live ? live.pub.toLocaleString() : "—"}</div><div style={sub}>검증 {live ? live.v.toLocaleString() : "—"}{live?.backlog ? ` · 대기 ${live.backlog}` : ""}</div></div>
+          <div style={card}><div style={lbl}>🤖 자율 잡 가동 <span style={{ fontSize: 9.5, color: "#9c8a6c", fontWeight: 700 }}>최신 실행</span></div><div style={{ ...big, color: (live ? live.cronFail?.length === 0 : crons.every((c: any) => c.ok)) ? "#2f7a4a" : "#b06a1e" }}>{live ? `${live.cronOk}/${live.cronTotal}` : `${crons.filter((c: any) => c.ok).length}/${crons.length}`} {(live ? live.cronFail?.length === 0 : crons.every((c: any) => c.ok)) ? "✅" : "⚠️"}</div><div style={sub}>잡별 최신 실행 성공/전체(크론·에이전트·워커)</div></div>
         </div>
 
         {/* 🛠 로컬 잡 상태 — 접이식·기본 접힘(헤더에 정상/정지 요약). 8개 launchd 잡 하트비트 기준 실시간 */}
@@ -729,9 +733,10 @@ export default function OrgDashboard() {
     </main>
   );
 }
-const card: React.CSSProperties = { background: "#fff", border: "1px solid #ddc9a8", borderRadius: 12, padding: "12px 14px" };
-const lbl: React.CSSProperties = { fontSize: 11, color: "#9c6b3f" };
-const big: React.CSSProperties = { fontSize: 22, fontWeight: 700, color: "#c98a3c" };
-const sub: React.CSSProperties = { fontSize: 10, color: "#9c8a6c" };
+const card: React.CSSProperties = { background: "#fff", border: "1px solid #ddc9a8", borderRadius: 12, padding: "12px 14px", minWidth: 0 };
+const lbl: React.CSSProperties = { fontSize: 11.5, fontWeight: 700, color: "#8a5e30" };
+// 핵심 수치 — 폭에 맞춰 잘림 없이(자릿수 정렬 tabular-nums·한 줄 유지·넘치면 축약). 대비 강한 진한 색.
+const big: React.CSSProperties = { fontSize: 23, fontWeight: 800, color: "#b5731f", lineHeight: 1.15, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
+const sub: React.CSSProperties = { fontSize: 10.5, color: "#8a7a5c", fontWeight: 600 };
 const typeC: Record<string, string> = { help: "#3a6ea5", handoff: "#3f7a4f", cowork: "#7a5a2a", dependency: "#b06a2e" };
 const typeLabel: Record<string, string> = { help: "도움요청", handoff: "인계", cowork: "코웍", dependency: "의존" };

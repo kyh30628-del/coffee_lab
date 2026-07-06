@@ -205,8 +205,8 @@ export default function AdminPage() {
 
   const Kpi = ({ label, value, sub, color = "text-stone-900" }: { label: string; value: any; sub?: string; color?: string }) => (
     <div className="bg-white rounded-xl border p-3.5">
-      <div className={`text-2xl font-bold tabular-nums ${color}`}>{value}</div>
-      <div className="text-[11px] text-stone-500 mt-0.5">{label}</div>
+      <div className={`text-2xl font-bold tabular-nums truncate ${color}`}>{value}</div>
+      <div className="text-[11px] text-stone-600 mt-0.5">{label}</div>
       {sub && <div className="text-[10px] text-stone-400 mt-0.5">{sub}</div>}
     </div>
   );
@@ -266,20 +266,20 @@ export default function AdminPage() {
         <GroupHeader icon="📊" label="핵심 지표" />
         <div className="admin-kpi-grid mb-6">
           <div className="bg-white rounded-xl border border-stone-300 p-3.5">
-            <div className="text-2xl font-extrabold text-stone-900 leading-tight tabular-nums">{ct?.published?.toLocaleString() ?? "·"}</div>
-            <div className="text-[11px] text-stone-500 mt-0.5">📦 발행 (공개 카페)</div>
+            <div className="text-2xl font-extrabold text-stone-900 leading-tight tabular-nums truncate">{ct?.published?.toLocaleString() ?? "·"}</div>
+            <div className="text-[11px] font-medium text-stone-600 mt-0.5">📦 발행 (공개 카페)</div>
           </div>
           <div className="bg-white rounded-xl border border-stone-300 p-3.5">
-            <div className="text-2xl font-extrabold text-emerald-600 leading-tight tabular-nums">{verifiedRefN.toLocaleString()}</div>
-            <div className="text-[11px] text-stone-500 mt-0.5">✅ 검증 · 참고 등급</div>
+            <div className="text-2xl font-extrabold text-emerald-600 leading-tight tabular-nums truncate">{verifiedRefN.toLocaleString()}</div>
+            <div className="text-[11px] font-medium text-stone-600 mt-0.5">✅ 검증 · 참고 등급</div>
           </div>
-          <div className={`rounded-xl border p-3.5 ${auditUnresolvedN > 0 ? "bg-red-50 border-red-300" : "bg-white border-stone-300"}`}>
-            <div className={`text-2xl font-extrabold leading-tight tabular-nums ${auditUnresolvedN > 0 ? "text-red-600" : "text-stone-900"}`}>{auditUnresolvedN}</div>
-            <div className="text-[11px] text-stone-500 mt-0.5">{auditUnresolvedN > 0 ? "🔴" : "🟢"} 오염 · 품질 이슈</div>
+          <div className={`rounded-xl border p-3.5 ${auditUnresolvedN > 0 ? "bg-red-50 border-red-400" : "bg-white border-stone-300"}`}>
+            <div className={`text-2xl font-extrabold leading-tight tabular-nums truncate ${auditUnresolvedN > 0 ? "text-red-700" : "text-stone-900"}`}>{auditUnresolvedN}</div>
+            <div className={`text-[11px] font-medium mt-0.5 ${auditUnresolvedN > 0 ? "text-red-700" : "text-stone-600"}`}>{auditUnresolvedN > 0 ? "🔴" : "🟢"} 오염 · 품질 이슈</div>
           </div>
-          <a href="/admin/org?open=pending" className={`rounded-xl border p-3.5 block ${pendingActionsN > 0 ? "bg-amber-50 border-amber-300" : "bg-white border-stone-300"}`}>
-            <div className={`text-2xl font-extrabold leading-tight tabular-nums ${pendingActionsN > 0 ? "text-amber-600" : "text-stone-900"}`}>{pendingActionsN}</div>
-            <div className="text-[11px] text-stone-500 mt-0.5">{pendingActionsN > 0 ? "🟡" : "🟢"} CEO 결재 대기</div>
+          <a href="/admin/org?open=pending" className={`rounded-xl border p-3.5 block ${pendingActionsN > 0 ? "bg-amber-50 border-amber-400" : "bg-white border-stone-300"}`}>
+            <div className={`text-2xl font-extrabold leading-tight tabular-nums truncate ${pendingActionsN > 0 ? "text-amber-700" : "text-stone-900"}`}>{pendingActionsN}</div>
+            <div className={`text-[11px] font-medium mt-0.5 ${pendingActionsN > 0 ? "text-amber-800" : "text-stone-600"}`}>{pendingActionsN > 0 ? "🟡" : "🟢"} CEO 결재 대기</div>
           </a>
         </div>
 

@@ -200,10 +200,10 @@ export default function Lounge() {
             </div>
           )}
           {(data?.decisions?.length ?? 0) > 0 && (
-            <div style={{ background: "#fbf3e6", border: "1px solid #e8cfa6", borderRadius: 12, padding: "10px 12px", marginBottom: 10 }}>
-              <b style={{ fontSize: 12.5, color: "#8a5a1e" }}>⚖️ CEO 결재 대기 {data!.decisions.length}건</b>
+            <div style={{ background: "#fdeecf", border: "2px solid #e0a94a", borderRadius: 12, padding: "10px 12px", marginBottom: 10 }}>
+              <b style={{ fontSize: 13.5, color: "#8a4e12" }}>⚖️ CEO 결재 대기 {data!.decisions.length}건</b>
               {data!.decisions.slice(0, 6).map((d) => (
-                <div key={d.id} style={{ fontSize: 12, color: "#5c4a30", marginTop: 5, lineHeight: 1.45 }}>#{d.id} {d.title}{d.recommendation ? <span style={{ color: "#2f5d3a" }}> · 의견: {d.recommendation.slice(0, 40)}</span> : ""}</div>
+                <div key={d.id} style={{ fontSize: 12, fontWeight: 600, color: "#4a3820", marginTop: 5, lineHeight: 1.45 }}>#{d.id} {d.title}{d.recommendation ? <span style={{ color: "#2f5d3a", fontWeight: 500 }}> · 의견: {d.recommendation.slice(0, 40)}</span> : ""}</div>
               ))}
             </div>
           )}
@@ -375,10 +375,11 @@ export default function Lounge() {
 }
 
 function Stat({ label, value, accent }: { label: string; value: string; accent?: string }) {
+  // 강조색이 지정된 지표(예: 낮은 성공률·결재 대기)는 옅은 배경까지 입혀 한눈에 띄게. 값은 자릿수 정렬·한 줄 유지(넘침 방지).
   return (
-    <div style={{ background: "rgba(255,255,255,0.1)", borderRadius: 10, padding: "7px 12px", minWidth: 62 }}>
-      <div style={{ fontSize: 17, fontWeight: 800, color: accent || "#f4ece0" }}>{value}</div>
-      <div style={{ fontSize: 10.5, color: "#c9b291" }}>{label}</div>
+    <div style={{ background: accent ? "rgba(255,255,255,0.16)" : "rgba(255,255,255,0.1)", borderRadius: 10, padding: "7px 12px", minWidth: 62, boxShadow: accent ? `inset 0 0 0 1px ${accent}55` : undefined }}>
+      <div style={{ fontSize: 18, fontWeight: 800, color: accent || "#f7f0e4", lineHeight: 1.15, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{value}</div>
+      <div style={{ fontSize: 10.5, fontWeight: 600, color: "#d6c1a0" }}>{label}</div>
     </div>
   );
 }
