@@ -176,6 +176,10 @@ export default function OrgDashboard() {
     const id = setInterval(() => { const pw2 = localStorage.getItem("adm_pw"); if (pw2 && document.visibilityState === "visible") load(pw2, true); }, 15000);
     return () => clearInterval(id);
   }, []);
+  // 본체 대시보드 KPI 카드에서 "?open=pending"으로 딥링크 시 결재 대기 섹션을 펼쳐서 바로 보여줌
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("open") === "pending") setShowPending(true);
+  }, []);
 
   const decide = async (id: number, decision: "approve" | "reject") => {
     setBusy(id);
