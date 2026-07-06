@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
-import { ORG, MEMBER_INFO } from "@/lib/org";
+import { ORG, MEMBER_INFO, type Division, type Team, type Worker } from "@/lib/org";
 import { CADENCE } from "@/lib/cadence";
 
 function md2html(md: string) {
@@ -255,6 +255,26 @@ export default function OrgDashboard() {
   const tok = brief?.token_today || {}; const crons = brief?.crons || []; const m = brief?.metrics || {};
   const fmt = (n: number) => (n >= 1000 ? Math.round(n / 1000) + "K" : n || 0);
   const sevC: Record<string, string> = { HIGH: "#b03a3a", MED: "#b06a2e", LOW: "#6a5a48" };
+
+  // 조직도 — 기조실장 직할(스태프)과 라인 본부를 분리 표시. 데이터/로직 변경 없이 표시만 구분.
+  const staffDivs = ORG.divisions.filter((d) => d.note === "기조실장 직속");
+  const lineDivs = ORG.divisions.filter((d) => d.note !== "기조실장 직속");
+  // 팀 렌더 공용(직할·라인 본부가 동일한 팀 표현을 씀)
+  const renderTeams = (d: Division) => d.teams.map((t: Team) => (
+    <div key={t.n} style={{ margin: "6px 0" }}>
+      <div style={{ fontSize: 12.5, color: "#3d2f22", display: "flex", alignItems: "center", gap: 5, fontWeight: 600 }}>
+        <span style={{ color: d.c, fontFamily: "monospace" }}>└</span>{t.n}
+      </div>
+      <div style={{ fontSize: 10.5, color: "#9c8a6c", marginLeft: 16, lineHeight: 1.35 }}>{t.s}</div>
+      {t.w && <div style={{ marginLeft: 16, marginTop: 3, display: "flex", flexWrap: "wrap", gap: 4 }}>
+        {t.w.map((mm: Worker, mi: number) => (
+          <button key={mi} onClick={() => setMember(mm)} style={{ fontSize: 10, background: mm.k === "⚙️" ? "#eef3ee" : mm.k === "🌐" ? "#eef0f6" : "#f6efe2", border: `1px solid ${mm.k === "⚙️" ? "#bcd4bc" : mm.k === "🌐" ? "#c2c8e0" : "#e2cfa8"}`, borderRadius: 6, padding: "2px 6px", color: "#5a4631", cursor: "pointer", fontFamily: "inherit" }}>
+            {mm.k} {mm.n} <span style={{ color: "#9c8a6c" }}>· {mm.t}</span>
+          </button>
+        ))}
+      </div>}
+    </div>
+  ));
 
   return (
     <main style={{ minHeight: "100vh", background: "#efe7d8", color: "#2b2018", fontFamily: "'Gowun Batang',serif", padding: "12px", maxWidth: 640, margin: "0 auto", paddingTop: "calc(12px + env(safe-area-inset-top))" }}>
@@ -675,31 +695,38 @@ export default function OrgDashboard() {
               <span style={{ background: "#c98a3c", color: "#fff", fontWeight: 700, fontSize: 13.5, padding: "7px 16px", borderRadius: 10, textAlign: "center" }}>{ORG.chief}</span>
             </div>
             <div style={{ width: 2, height: 14, background: "#c98a3c", margin: "0 auto" }} />
-            {/* 비서실장 + 본부 트리 */}
+            {/* 직할(스태프) + 라인 본부 트리 — 기조실장 아래 계층 연결선 */}
             <div style={{ borderLeft: "2px solid #d8c4a0", marginLeft: 10, paddingLeft: 14, marginTop: 2 }}>
-              <div style={{ background: "#efe2cf", color: "#6b5640", fontWeight: 600, fontSize: 12.5, padding: "5px 10px", borderRadius: 8, marginBottom: 10, display: "inline-block" }}>{ORG.secretary}</div>
-              {ORG.divisions.map((d) => (
+              {/* 🎯 기조실장 직할 — 라인 본부와 위치(맨 위)·스타일(톤다운 배경·점선 액센트 보더)로 구분되는 스태프 그룹 */}
+              <div style={{ background: "#f0e7d5", border: "1.5px dashed #c9a56a", borderRadius: 10, padding: "9px 11px 5px", marginBottom: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 9 }}>
+                  <span style={{ background: "#8a6d3b", color: "#fff", fontWeight: 700, fontSize: 9.5, letterSpacing: 0.5, padding: "2px 8px", borderRadius: 5 }}>직할</span>
+                  <span style={{ fontSize: 10.5, color: "#8a6d3b", fontWeight: 700 }}>기조실장 직속 · 스태프 유닛</span>
+                </div>
+                {/* 비서실장 — 스태프이므로 점선 보더로 톤다운 */}
+                <div style={{ background: "#fbf6ec", color: "#6b5640", fontWeight: 600, fontSize: 12.5, padding: "5px 10px", borderRadius: 8, border: "1px dashed #d3bd94", marginBottom: 10, display: "inline-block" }}>{ORG.secretary}</div>
+                {staffDivs.map((d) => (
+                  <div key={d.n} style={{ marginBottom: 4 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                      {/* 라인 본부는 solid 채움, 직할은 투명배경·점선 아웃라인으로 스태프 성격 표시 */}
+                      <span style={{ background: "transparent", color: d.c, border: `1.5px dashed ${d.c}`, fontWeight: 700, fontSize: 13, padding: "3px 10px", borderRadius: 8 }}>{d.n}</span>
+                      {d.note && <span style={{ fontSize: 10, color: "#9c8a6c", fontWeight: 700 }}>· {d.note}</span>}
+                    </div>
+                    <div style={{ borderLeft: `2px dashed ${d.c}`, marginLeft: 12, paddingLeft: 12, marginTop: 5, opacity: 0.95 }}>
+                      {renderTeams(d)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {/* 라인 본부 — 기존 solid 카드 스타일 유지 */}
+              {lineDivs.map((d) => (
                 <div key={d.n} style={{ marginBottom: 12 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                     <span style={{ background: d.c, color: "#fff", fontWeight: 700, fontSize: 13, padding: "4px 11px", borderRadius: 8 }}>{d.n}</span>
                     {d.note && <span style={{ fontSize: 10, color: "#9c8a6c", fontWeight: 700 }}>· {d.note}</span>}
                   </div>
                   <div style={{ borderLeft: `2px solid ${d.c}`, marginLeft: 12, paddingLeft: 12, marginTop: 5, opacity: 0.95 }}>
-                    {d.teams.map((t: any) => (
-                      <div key={t.n} style={{ margin: "6px 0" }}>
-                        <div style={{ fontSize: 12.5, color: "#3d2f22", display: "flex", alignItems: "center", gap: 5, fontWeight: 600 }}>
-                          <span style={{ color: d.c, fontFamily: "monospace" }}>└</span>{t.n}
-                        </div>
-                        <div style={{ fontSize: 10.5, color: "#9c8a6c", marginLeft: 16, lineHeight: 1.35 }}>{t.s}</div>
-                        {t.w && <div style={{ marginLeft: 16, marginTop: 3, display: "flex", flexWrap: "wrap", gap: 4 }}>
-                          {t.w.map((m: any, mi: number) => (
-                            <button key={mi} onClick={() => setMember(m)} style={{ fontSize: 10, background: m.k === "⚙️" ? "#eef3ee" : m.k === "🌐" ? "#eef0f6" : "#f6efe2", border: `1px solid ${m.k === "⚙️" ? "#bcd4bc" : m.k === "🌐" ? "#c2c8e0" : "#e2cfa8"}`, borderRadius: 6, padding: "2px 6px", color: "#5a4631", cursor: "pointer", fontFamily: "inherit" }}>
-                              {m.k} {m.n} <span style={{ color: "#9c8a6c" }}>· {m.t}</span>
-                            </button>
-                          ))}
-                        </div>}
-                      </div>
-                    ))}
+                    {renderTeams(d)}
                   </div>
                 </div>
               ))}
