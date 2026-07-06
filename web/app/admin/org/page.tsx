@@ -31,54 +31,65 @@ function md2html(md: string) {
 // 💬 관제 챗봇 — 플로팅 아이콘 → 모달. claude -p(구독) 경유 답을 폴링. 24h 기록.
 function ChatWidget({ pw }: { pw: string }) {
   const [open, setOpen] = useState(false);
-  const [msgs, setMsgs] = useState<{ role: string; content: string }[]>([]);
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState<"chat" | "region">("chat");
+  // 두 탭 완전 독립: 각 탭이 별도의 입력·대화이력·로딩 상태를 가져 서로 섞이지 않음(전환해도 각자 컨텍스트 유지)
+  const [chatMsgs, setChatMsgs] = useState<{ role: string; content: string }[]>([]);
+  const [regionMsgs, setRegionMsgs] = useState<{ role: string; content: string }[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [regionInput, setRegionInput] = useState("");
+  const [chatLoading, setChatLoading] = useState(false);
+  const [regionLoading, setRegionLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  // 현재 활성 탭의 파생 값(렌더·공통 핸들러용)
+  const msgs = mode === "region" ? regionMsgs : chatMsgs;
+  const input = mode === "region" ? regionInput : chatInput;
+  const loading = mode === "region" ? regionLoading : chatLoading;
+  const setInput = mode === "region" ? setRegionInput : setChatInput;
   useEffect(() => { if (open && scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; }, [open, msgs, loading]);
   const loadHistory = () =>
     fetch("/api/admin/chat", { headers: { "x-admin-password": pw }, cache: "no-store" }).then((r) => r.json()).then((d) => {
-      if (d.ok && d.history) { const m: any[] = []; for (const h of d.history) { m.push({ role: "user", content: h.question }); if (h.answer) m.push({ role: "assistant", content: h.answer }); } setMsgs(m); }
+      if (d.ok && d.history) { const m: any[] = []; for (const h of d.history) { m.push({ role: "user", content: h.question }); if (h.answer) m.push({ role: "assistant", content: h.answer }); } setChatMsgs(m); }
     }).catch(() => {});
   useEffect(() => { if (open && pw) loadHistory(); }, [open, pw]);
-  // 🔄 자율실행 진행보고(dev-report)가 챗에 계속 쌓이므로, 모달 열려있고 입력중 아닐 때 15초마다 새로고침.
+  // 🔄 자율실행 진행보고(dev-report)가 챗에 계속 쌓이므로, 모달 열려있고 작업지시 입력중 아닐 때 15초마다 새로고침(작업지시 탭 이력만 갱신).
   useEffect(() => {
     if (!open || !pw) return;
-    const t = setInterval(() => { if (!loading) loadHistory(); }, 15000);
+    const t = setInterval(() => { if (!chatLoading) loadHistory(); }, 15000);
     return () => clearInterval(t);
-  }, [open, pw, loading]);
+  }, [open, pw, chatLoading]);
   const send = async () => {
-    const q = input.trim(); if (!q || loading) return;
-    setInput(""); setMsgs((m) => [...m, { role: "user", content: q }]); setLoading(true);
+    const q = chatInput.trim(); if (!q || chatLoading) return;
+    setChatInput(""); setChatMsgs((m) => [...m, { role: "user", content: q }]); setChatLoading(true);
     try {
-      const r = await fetch("/api/admin/chat", { method: "POST", headers: { "x-admin-password": pw, "Content-Type": "application/json" }, body: JSON.stringify({ message: q, history: msgs.slice(-8) }) }).then((x) => x.json());
-      if (!r.ok) { setMsgs((m) => [...m, { role: "assistant", content: "⚠️ " + (r.error || "오류") }]); setLoading(false); return; }
+      const r = await fetch("/api/admin/chat", { method: "POST", headers: { "x-admin-password": pw, "Content-Type": "application/json" }, body: JSON.stringify({ message: q, history: chatMsgs.slice(-8) }) }).then((x) => x.json());
+      if (!r.ok) { setChatMsgs((m) => [...m, { role: "assistant", content: "⚠️ " + (r.error || "오류") }]); setChatLoading(false); return; }
       await new Promise((res) => setTimeout(res, 1000)); // 결정론 즉답은 ~1초 내 완료
       for (let i = 0; i < 80; i++) {
         const p = await fetch(`/api/admin/chat?id=${r.id}`, { headers: { "x-admin-password": pw }, cache: "no-store" }).then((x) => x.json());
-        if (p.ok && p.status === "done") { setMsgs((m) => [...m, { role: "assistant", content: p.answer || "⚠️ 빈 응답 — 잠시 후 다시 시도해 주세요." }]); break; }
-        if (i === 79) setMsgs((m) => [...m, { role: "assistant", content: "⏱ 응답 지연 — 로컬 워커/맥 가동 여부 확인 필요." }]);
+        if (p.ok && p.status === "done") { setChatMsgs((m) => [...m, { role: "assistant", content: p.answer || "⚠️ 빈 응답 — 잠시 후 다시 시도해 주세요." }]); break; }
+        if (i === 79) setChatMsgs((m) => [...m, { role: "assistant", content: "⏱ 응답 지연 — 로컬 워커/맥 가동 여부 확인 필요." }]);
         await new Promise((res) => setTimeout(res, 1500));
       }
-    } catch { setMsgs((m) => [...m, { role: "assistant", content: "⚠️ 네트워크 오류" }]); }
-    setLoading(false);
+    } catch { setChatMsgs((m) => [...m, { role: "assistant", content: "⚠️ 네트워크 오류" }]); }
+    setChatLoading(false);
   };
   const sendRegion = async () => {
-    const q = input.trim(); if (!q || loading) return;
-    setInput(""); setMsgs((m) => [...m, { role: "user", content: `🗺️ ${q}` }]); setLoading(true);
+    const q = regionInput.trim(); if (!q || regionLoading) return;
+    setRegionInput(""); setRegionMsgs((m) => [...m, { role: "user", content: `🗺️ ${q}` }]); setRegionLoading(true);
     try {
       const r = await fetch(`/api/admin/chat?region=${encodeURIComponent(q)}`, { headers: { "x-admin-password": pw }, cache: "no-store" }).then((x) => x.json());
-      if (!r.ok) setMsgs((m) => [...m, { role: "assistant", content: "⚠️ " + (r.error || "오류") }]);
-      else if (r.total === 0) setMsgs((m) => [...m, { role: "assistant", content: `**${q}** — 등록된 카페가 없어요. 동은 '성수동', 구/시는 '강남구'·'수원시' 형식으로 입력해 주세요.` }]);
-      else setMsgs((m) => [...m, { role: "assistant", content: `**${q}** 지역\n\n- 발행(공개): **${r.pub}곳** (검증 ${r.verified} · 참고 ${r.ref})\n- 비공개/후보: ${r.unpub}곳 · 전체 등록 ${r.total}곳${r.last_pub ? `\n- 최종 발행: ${String(r.last_pub).slice(0, 10).replace(/-/g, ".")}` : ""}${r.names?.length ? `\n\n**대표 카페**: ${r.names.join(" · ")}` : ""}\n\n[🗺️ 지도에서 ${r.dong || r.gu || q} 보기](/?region=${encodeURIComponent(r.gu || q)}${r.clat && r.clng ? `&clat=${r.clat}&clng=${r.clng}&cz=${r.cz || 14}` : ""})` }]);
-    } catch { setMsgs((m) => [...m, { role: "assistant", content: "⚠️ 네트워크 오류" }]); }
-    setLoading(false);
+      if (!r.ok) setRegionMsgs((m) => [...m, { role: "assistant", content: "⚠️ " + (r.error || "오류") }]);
+      else if (r.total === 0) setRegionMsgs((m) => [...m, { role: "assistant", content: `**${q}** — 등록된 카페가 없어요. 동은 '성수동', 구/시는 '강남구'·'수원시' 형식으로 입력해 주세요.` }]);
+      else setRegionMsgs((m) => [...m, { role: "assistant", content: `**${q}** 지역\n\n- 발행(공개): **${r.pub}곳** (검증 ${r.verified} · 참고 ${r.ref})\n- 비공개/후보: ${r.unpub}곳 · 전체 등록 ${r.total}곳${r.last_pub ? `\n- 최종 발행: ${String(r.last_pub).slice(0, 10).replace(/-/g, ".")}` : ""}${r.names?.length ? `\n\n**대표 카페**: ${r.names.join(" · ")}` : ""}\n\n[🗺️ 지도에서 ${r.dong || r.gu || q} 보기](/?region=${encodeURIComponent(r.gu || q)}${r.clat && r.clng ? `&clat=${r.clat}&clng=${r.clng}&cz=${r.cz || 14}` : ""})` }]);
+    } catch { setRegionMsgs((m) => [...m, { role: "assistant", content: "⚠️ 네트워크 오류" }]); }
+    setRegionLoading(false);
   };
   const clearHistory = async () => {
     if (loading || !confirm("24시간 대화기록을 모두 삭제할까요?")) return;
+    // 활성 탭의 이력만 삭제(격리). 작업지시 탭은 서버 24h 이력도 함께 비움, 일반(지역) 탭은 로컬 이력만.
+    if (mode === "region") { setRegionMsgs([]); return; }
     try { await fetch("/api/admin/chat", { method: "DELETE", headers: { "x-admin-password": pw } }); } catch {}
-    setMsgs([]);
+    setChatMsgs([]);
   };
   return (
     <>
@@ -95,7 +106,7 @@ function ChatWidget({ pw }: { pw: string }) {
             </div>
             <div style={{ display: "flex", gap: 6, padding: "8px 12px 0" }}>
               {(["chat", "region"] as const).map((mo) => (
-                <button key={mo} onClick={() => setMode(mo)} style={{ flex: 1, padding: "7px 0", borderRadius: 8, fontSize: 12.5, fontWeight: 700, cursor: "pointer", border: "1px solid " + (mode === mo ? "#c98a3c" : "#e0d2b8"), background: mode === mo ? "#2b2018" : "#fff", color: mode === mo ? "#e8b87a" : "#8a7a5c" }}>{mo === "chat" ? "💬 일반" : "🗺️ 지역"}</button>
+                <button key={mo} onClick={() => setMode(mo)} style={{ flex: 1, padding: "7px 0", borderRadius: 8, fontSize: 12.5, fontWeight: 700, cursor: "pointer", border: "1px solid " + (mode === mo ? "#c98a3c" : "#e0d2b8"), background: mode === mo ? "#2b2018" : "#fff", color: mode === mo ? "#e8b87a" : "#8a7a5c" }}>{mo === "chat" ? "🛠️ 작업지시" : "💬 일반"}</button>
               ))}
             </div>
             <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: 12 }}>
