@@ -212,7 +212,8 @@ export default function AdminPage() {
   );
   const Card = ({ title, children, note }: { title: string; children: React.ReactNode; note?: string }) => (
     <div className="bg-white rounded-xl border p-4">
-      <div className="admin-card-title font-bold text-stone-700 mb-3">{title}</div>
+      {/* 제목: 영역 가로·세로 정중앙 + 글자 높이에 맞춰 콤팩트(고정높이 없음) + 긴 제목은 어절 경계에서 여러 줄로(잘림 방지) */}
+      <div className="admin-card-title font-bold text-stone-700 mb-3 flex items-center justify-center text-center break-keep leading-snug">{title}</div>
       {children}
       {note && <p className="text-[10px] text-stone-400 mt-2">{note}</p>}
     </div>
