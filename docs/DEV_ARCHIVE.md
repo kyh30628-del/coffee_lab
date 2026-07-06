@@ -5,3 +5,4 @@
 
 | 배포일시(UTC) | 이슈 | 제목 | 커밋 | risk | 요청요약 |
 |---|---|---|---|---|---|
+| 2026-07-06 14:09 | #180 | 챗 일반탭 답변 | 61ffd3a7 | med | route.ts: 일반탭 GET?region=에 결정론 지식응답(answerKnowledge: 서비스/조직/관제/라운지/구독/파이프라인/MY PIN→CLAUDE·SERVICE_OV |
