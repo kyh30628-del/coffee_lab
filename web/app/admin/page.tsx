@@ -41,6 +41,7 @@ export default function AdminPage() {
   const [review, setReview] = useState<any[]>([]);
   const [subs, setSubs] = useState<any[]>([]);
   const [purged, setPurged] = useState(0);
+  const [dec, setDec] = useState<{ pending: any[] }>({ pending: [] }); // 실제 CEO L3 결재 대기 큐(단일 소스, /admin/org와 동일)
   const [verify, setVerify] = useState<any>(null);
   const [grounding, setGrounding] = useState<any>(null);
   const [verifying, setVerifying] = useState(false);
@@ -126,6 +127,7 @@ export default function AdminPage() {
     fetch("/api/admin/stats", h).then((x) => x.json()).then((s) => { if (s.ok) setStats(s); }).catch(() => {});
     fetch("/api/orchestrator", { cache: "no-store" }).then((x) => x.json()).then((d) => { if (d.ok) setTower(d); }).catch(() => {});
     fetch("/api/judge-status", h).then((x) => x.json()).then((d) => { if (d.ok) setJstatus(d); }).catch(() => {});
+    fetch("/api/admin/decisions", h).then((x) => x.json()).then((d) => { if (d.ok) setDec({ pending: d.pending ?? [] }); }).catch(() => {});
     fetch("/api/audit-flags", h).then((x) => x.json()).then((d) => { if (d.ok) setAuditFlags(d); }).catch(() => {});
     fetch("/api/sub-request", h).then((x) => x.json()).then((d) => { if (d.ok) { setSubs(d.requests ?? []); setPurged(d.purgedRecently ?? 0); } }).catch(() => {});
     fetch("/api/yt-report", h).then((x) => x.json()).then((d) => { if (d.ok) setYt(d); }).catch(() => {});
@@ -246,7 +248,9 @@ export default function AdminPage() {
   // 📊 상단 KPI 요약 — 이미 로드된 지표를 재사용(신규 fetch 없음). 발행수·검증/참고·오염·미결재를 한눈에.
   const verifiedRefN = ct?.grades?.filter((g) => g.grade === "검증" || g.grade === "참고").reduce((s, g) => s + g.n, 0) ?? 0;
   const auditUnresolvedN = auditFlags?.flags?.filter((f: any) => !f.resolved).length ?? 0;
-  const pendingActionsN = ownerPending.length + subscribers.filter((s: any) => s.status === "pending").length + review.length;
+  // ⚠️ CEO 결재 대기 = /api/admin/decisions의 pending(status='pending' AND tier='L3')과 동일 소스.
+  // 사장님 등록 검수·구독 승인·쇼케이스 승인은 별개의 관리자 액션이라 여기 섞지 않음(각자 전용 섹션에서 표시).
+  const pendingActionsN = dec.pending.length;
 
   return (
     <main className="min-h-screen bg-stone-100 p-4 sm:p-6" style={{ paddingTop: "calc(1rem + env(safe-area-inset-top))" }}>
@@ -271,10 +275,10 @@ export default function AdminPage() {
             <div className={`text-2xl font-extrabold leading-tight ${auditUnresolvedN > 0 ? "text-red-600" : "text-stone-900"}`}>{auditUnresolvedN}</div>
             <div className="text-[11px] text-stone-500 mt-0.5">{auditUnresolvedN > 0 ? "🔴" : "🟢"} 오염 · 품질 이슈</div>
           </div>
-          <div className={`rounded-xl border p-3.5 ${pendingActionsN > 0 ? "bg-amber-50 border-amber-300" : "bg-white border-stone-300"}`}>
+          <a href="/admin/org?open=pending" className={`rounded-xl border p-3.5 block ${pendingActionsN > 0 ? "bg-amber-50 border-amber-300" : "bg-white border-stone-300"}`}>
             <div className={`text-2xl font-extrabold leading-tight ${pendingActionsN > 0 ? "text-amber-600" : "text-stone-900"}`}>{pendingActionsN}</div>
-            <div className="text-[11px] text-stone-500 mt-0.5">{pendingActionsN > 0 ? "🟡" : "🟢"} 미결재 · 승인 대기</div>
-          </div>
+            <div className="text-[11px] text-stone-500 mt-0.5">{pendingActionsN > 0 ? "🟡" : "🟢"} CEO 결재 대기</div>
+          </a>
         </div>
 
         {/* 🎩 조직 관제(기획조정실 자율조직 브리핑) — 카페-데이터 관제탑과 별개. 모바일 전용 화면으로. */}
