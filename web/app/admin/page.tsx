@@ -841,10 +841,10 @@ export default function AdminPage() {
 
         {/* 💳 구독 카페 현황 모달 */}
         {showSubsModal && (
-          <div className="fixed inset-0 z-[6000]" onClick={() => setShowSubsModal(false)}>
-            <div className="absolute inset-0 bg-black/50" />
-            <div className="absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto bg-stone-50 rounded-t-2xl p-4 sm:inset-0 sm:m-auto sm:max-w-md sm:h-fit sm:max-h-[85vh] sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-2"><span className="text-sm font-bold text-stone-800">💳 구독 카페 현황 ({subscribers.length})</span><button onClick={() => { setShowSubsModal(false); setSubMsg(""); }} className="text-2xl text-stone-400 leading-none">×</button></div>
+          <div className="fixed inset-0 z-[6000] flex items-end sm:items-center justify-center bg-black/50" onClick={() => { setShowSubsModal(false); setSubMsg(""); }}>
+            <div className="w-full sm:max-w-lg bg-stone-50 rounded-t-2xl sm:rounded-2xl flex flex-col h-[92dvh] sm:h-auto sm:max-h-[90dvh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-stone-200 bg-white shrink-0"><span className="text-sm font-bold text-stone-800">💳 구독 카페 현황 ({subscribers.length})</span><button onClick={() => { setShowSubsModal(false); setSubMsg(""); }} className="text-2xl text-stone-400 leading-none">×</button></div>
+            <div className="overflow-y-auto flex-1 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
             {/* 📧 승인 시 사장님께 자동 발송되는 온보딩 메일(서비스 사용법 + 전용 서비스 안내) 내용 확인 */}
             <button onClick={openOnboard} className="w-full mb-3 text-left bg-amber-50 border border-amber-300 rounded-lg px-3 py-2 text-[12px] font-bold text-amber-800">📧 승인 시 발송되는 온보딩 메일 내용 보기 →</button>
             {/* 📧 이메일 발송 준비 상태 — 승인 시 키 자동발송 가능 여부(프로덕션 env) */}
@@ -910,6 +910,7 @@ export default function AdminPage() {
             </div>
             ) : <p className="text-[13px] text-stone-400 py-3 text-center">구독 회원이 아직 없어요.</p>}
             <p className="text-[10px] text-stone-400 mt-2">승인 시 PIN 발급 → <b>사장님 첫 로그인 시점부터</b> 기간 카운트 시작 + 골드핀·우선노출·쇼케이스 자동 ON. 만료/해지 시 전부 OFF. 연락처는 암호화 저장.</p>
+            </div>
             </div>
           </div>
         )}
