@@ -16,8 +16,11 @@ const one = async (q) => { try { return Number((await q)[0].c); } catch { return
 
 // 📜 CEO 운영원칙 캐논 — triage/실행 프롬프트에 항상 시스템컨텍스트로 주입(캐시됨). 서비스 이해·품질 해자 고정.
 const CANON = "/Users/wangwida/coffee-platform/docs/CEO-OPERATING-PRINCIPLES.md";
-// 📊 토큰 실측 로깅(측정 사각 해소) — _run.sh와 동일 포맷으로 USAGE.tsv에 적재. 캐시read 포함이 소모 프록시.
-function logUsage(job, j) { try { const u = j.usage || {}; const tin = (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0); appendFileSync("/Users/wangwida/coffee-platform/agent-reports/USAGE.tsv", [new Date().toISOString(), job, tin, u.output_tokens || 0, (j.total_cost_usd || 0).toFixed(4), j.num_turns || 0].join("\t") + "\n"); } catch {} }
+// 📊 토큰 실측 로깅(측정 사각 해소) — USAGE.tsv에 적재. usageGuard와 **동일 원가기준**(이중기준 방지):
+//   [2]입력=정입력(input)+캐시생성(cache_creation)만 온전 계상, [6]캐시읽기(cache_read)는 별도 컬럼에 원값 기록
+//   → 가드가 rowCostTokens로 캐시읽기만 0.1x 가중(실단가 반영). 과거 단순합산(캐시읽기 온전)의 과대계상 교정.
+//   ※ _run.sh(로컬 에이전트 러너)는 아직 구6열 포맷 — 그 행들의 캐시읽기는 별도 분리 전까지 [2]에 섞여 남음(동일 교정 필요, 별건).
+function logUsage(job, j) { try { const u = j.usage || {}; const fullIn = (u.input_tokens || 0) + (u.cache_creation_input_tokens || 0); const cacheRead = u.cache_read_input_tokens || 0; appendFileSync("/Users/wangwida/coffee-platform/agent-reports/USAGE.tsv", [new Date().toISOString(), job, fullIn, u.output_tokens || 0, (j.total_cost_usd || 0).toFixed(4), j.num_turns || 0, cacheRead].join("\t") + "\n"); } catch {} }
 
 const KB = `너는 '동네 커피 노트'(dongnecoffeenote.com)의 **기획조정실장** — 대표님(CEO) 직속 2인자이자 관제 상황을 꿰고 있는 참모다. 대표님께 **똑똑하고 자연스럽게, 핵심만** 답하고, 대표님의 **작업지시는 곧 승인**으로 간주해 자율로 처리를 개시한다. 공손하되 직언하고, 도움이 되면 한발 앞서 제안한다.
 [역할 경계 — 중요] ①상태·데이터 **질문**엔 아래 [라이브 상태]로 바로 답한다. ②**안전하고 되돌릴 수 있는 코드/UI/문구/설정 변경 작업지시**는 네가 착수시킨다(격리 워크트리 구현→검증→배포 파이프라인). ③**파괴적·비가역·데이터변경(카페 공개/비공개/등급/대량/삭제)·예산/토큰정책·스케줄/런치d·시크릿·모호하거나 둘 중 택일**인 건은 **절대 자동 실행하지 말고** 대표님께 되묻는다. **너 자신은 DB를 직접 바꾸지 않는다(읽기전용 조회만).**
@@ -176,11 +179,11 @@ async function tick() {
         const guard = computeGuard(); // 🛡️ 주간한도 근접 시 비핵심 자율개발 보류(핵심 판정·그라운딩 보호)
         if (guard.level === "pause") {
           mode = "held";
-          answer = `⏸️ **주간 한도 보호로 자율개발을 잠시 보류합니다** (7일 사용 ${guard.pct}% ≥ 컷).\n\n"${r.spec.title || question}"\n\n핵심 판정·질의응답은 계속 정상 동작합니다. 지금 바로 진행을 원하시면 "강행" 또는 컷 상향을 알려주세요.`;
+          answer = `⏸️ **구독(claude -p) 주간 한도 보호로 자율개발을 잠시 보류합니다** (7일 사용 ${guard.pct}% ≥ 컷, 캐시읽기 저가중 기준).\n\n"${r.spec.title || question}"\n\n핵심 판정·질의응답은 계속 정상 동작합니다. 지금 바로 진행을 원하시면 "강행" 또는 컷 상향을 알려주세요.`;
         } else {
           const o = await createOrder(r.spec, question);
           mode = "order";
-          answer = `🛠 **착수했습니다 — 개발 #${o.id}**\n\n"${r.spec.title || question}"\n\n격리 워크트리에서 구현 → tsc·빌드 검증 → ${o.autodeploy ? `**자동 배포**(위험도 ${o.risk})` : `**배포대기**(위험도 high — 배포 전 확인 요청드립니다)`}. 진행상황은 여기로 계속 보고드립니다. _(개발 파이프라인 5분 주기 — 곧 시작)_${guard.level === "throttle" ? "\n\n_※ 주간 한도 " + guard.pct + "% — 절약 모드로 진행합니다._" : ""}`;
+          answer = `🛠 **착수했습니다 — 개발 #${o.id}**\n\n"${r.spec.title || question}"\n\n격리 워크트리에서 구현 → tsc·빌드 검증 → ${o.autodeploy ? `**자동 배포**(위험도 ${o.risk})` : `**배포대기**(위험도 high — 배포 전 확인 요청드립니다)`}. 진행상황은 여기로 계속 보고드립니다. _(개발 파이프라인 5분 주기 — 곧 시작)_${guard.level === "throttle" ? "\n\n_※ 구독(claude -p) 주간 한도 " + guard.pct + "% — 절약 모드로 진행합니다._" : ""}`;
         }
       } else if (r.type === "choice") {
         mode = "choice";
