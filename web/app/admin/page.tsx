@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import BackLink from "../BackLink";
+import { isSearchDegradeTrackItem } from "@/lib/searchDegradeTrack";
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis,
   AreaChart, Area, CartesianGrid, Tooltip } from "recharts";
 
@@ -358,15 +359,18 @@ export default function AdminPage() {
           };
           const flow = ["collect", "synth", "judge", "embed"].map((k) => byKey[k]).filter(Boolean);
           const redteam = ["verify", "grounding", "audit"].map((k) => byKey[k]).filter(Boolean);
+          // 🔎 검색 AI 저하(크레딧 소진 계열)는 관제탑 실시간 위험에서 제외 — /admin/org '실행 중' 추적으로 이관(#207).
+          //   표시 필터 전용(orchestrator·DB 불변). 되돌리려면 이 필터만 제거.
+          const towerRisks = ((tower.risks || []) as string[]).filter((r) => !isSearchDegradeTrackItem(r));
           return (
             <>
             <div className="mb-6 rounded-2xl border border-stone-300 bg-white p-4 sm:p-5 shadow-sm">
               <div className="flex items-center justify-between">
                 <button onClick={() => toggleSec("tower")} className="admin-section-title font-extrabold text-stone-800 text-left">
                   {openSecs.tower ? "▾" : "▸"} 🛰️ 자율 운영 관제탑{" "}
-                  {((tower.alerts?.length || 0) + (tower.risks?.length || 0)) > 0 && <span className="text-red-600 normal-case">🔴{(tower.alerts?.length || 0) + (tower.risks?.length || 0)}</span>}{" "}
+                  {((tower.alerts?.length || 0) + towerRisks.length) > 0 && <span className="text-red-600 normal-case">🔴{(tower.alerts?.length || 0) + towerRisks.length}</span>}{" "}
                   {(tower.notices?.length || 0) > 0 && <span className="text-amber-600 normal-case">🟡{tower.notices.length}</span>}
-                  {!((tower.alerts?.length || 0) + (tower.risks?.length || 0)) && !(tower.notices?.length || 0) && <span className="text-emerald-600 normal-case">✅</span>}
+                  {!((tower.alerts?.length || 0) + towerRisks.length) && !(tower.notices?.length || 0) && <span className="text-emerald-600 normal-case">✅</span>}
                 </button>
                 <div className="flex items-center gap-1.5">
                   <button onClick={() => setTowerFull(true)} className="text-[11px] font-bold px-2.5 py-1 rounded-full border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100">⛶ 전체화면</button>
@@ -377,10 +381,10 @@ export default function AdminPage() {
               {tower.alerts?.length > 0 && (
                 <div className="mb-2.5 text-[11px] text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">🚨 경보(즉시조치): {tower.alerts.join(" · ")}</div>
               )}
-              {tower.risks?.length > 0 && (
-                <div className="mb-2.5 text-[11px] text-red-700 bg-red-50 border border-red-300 rounded-lg px-3 py-2">🔴 위험(해자·소비자 타격): {tower.risks.join(" · ")}</div>
+              {towerRisks.length > 0 && (
+                <div className="mb-2.5 text-[11px] text-red-700 bg-red-50 border border-red-300 rounded-lg px-3 py-2">🔴 위험(해자·소비자 타격): {towerRisks.join(" · ")}</div>
               )}
-              {(!tower.alerts?.length && !tower.risks?.length) && (
+              {(!tower.alerts?.length && !towerRisks.length) && (
                 <div className="mb-2.5 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">✅ 위험·해자 검사 통과 — 소비자 노출 손상 없음(숫자 신뢰 가능)</div>
               )}
               {tower.notices?.length > 0 && (

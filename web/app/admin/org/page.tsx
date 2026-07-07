@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import { ORG, MEMBER_INFO, type Division, type Team, type Worker } from "@/lib/org";
 import { CADENCE } from "@/lib/cadence";
+import { isSearchDegradeTrackItem, SEARCH_DEGRADE_TRACK } from "@/lib/searchDegradeTrack";
 
 function md2html(md: string) {
   const esc = (s: string) => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -204,7 +205,9 @@ export default function OrgDashboard() {
       if (b.ok) { setBrief(b.brief); setBriefs(b.briefs || (b.brief ? [b.brief] : [])); localStorage.setItem("adm_pw", password); } else if (!silent) setErr("비밀번호 확인");
       if (d.ok) setDec({ pending: d.pending || [], delegated: d.delegated || [], recent: d.recent || [], inProgress: d.inProgress || [], deferred: d.deferred || [] });
       if (co.ok) setCoord({ open: co.open || [], resolved: co.resolved || [], overdue: co.overdue || 0 }); // overdue 보존 — 접힌 헤더 '⚠️ 지연 N' 배선
-      if (iss.ok) setIssues(iss.open || []);
+      // 검색 AI 저하(크레딧 소진 계열)는 RM 실시간 이슈에서 제외 — 아래 '실행 중'에 상시 추적 항목으로 표기(#207).
+      //   표시 필터 전용(이슈 DB row 불변). 되돌리려면 이 필터만 제거.
+      if (iss.ok) setIssues((iss.open || []).filter((i: any) => !isSearchDegradeTrackItem(i?.title)));
       if (lv && lv.ok) setLive(lv);
       if (jb && jb.ok) setJobs(jb);
       setSynced(new Date().toLocaleTimeString("ko-KR"));
@@ -574,19 +577,25 @@ export default function OrgDashboard() {
         {/* 🔧 실행 중 — 승인됐지만 아직 완료 안 된 실무형(실세계·판단 필요). 끝난 것/진행중 구분. 접이식·기본 접힘. */}
         <div style={{ ...card, marginTop: 10 }}>
           <button onClick={() => setShowInProg(!showInProg)} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: dec.inProgress.length ? "#8a6534" : "#3f7a4f" }}>{showInProg ? "▾" : "▸"} 🔧 실행 중 ({dec.inProgress.length})</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "#8a6534" }}>{showInProg ? "▾" : "▸"} 🔧 실행 중 ({dec.inProgress.length + 1})</span>
             <span style={{ fontSize: 10.5, color: "#9c8a6c" }}>{showInProg ? "접기" : "보기"}</span>
           </button>
           {showInProg && <>
           <div style={{ fontSize: 10.5, color: "#9c8a6c", margin: "6px 0 8px" }}>CEO 승인 후 담당 본부가 실제 실행 중인 실무(방문·정책·룰적용 등). 완료되면 자동으로 여기서 빠짐.</div>
-          {dec.inProgress.length > 0 ? dec.inProgress.map((d) => (
+          {/* 📌 상시 추적 항목 — 검색 AI 저하(콘솔키 크레딧 소진). 관제탑 실시간 이슈에서 제외하고 여기서만 추적(#207). 코드 상수(DB 아님) — 완료 버튼 없음. */}
+          <div style={{ display: "flex", gap: 7, alignItems: "center", padding: "5px 0", borderBottom: "1px solid #f0e8d8", fontSize: 12 }}>
+            <span style={{ background: "#8a6534", color: "#fff", fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 20 }}>추적</span>
+            <span style={{ flex: 1, color: "#5a4631" }}>{SEARCH_DEGRADE_TRACK.title} <span style={{ fontSize: 10, color: "#9c8a6c" }}>· {SEARCH_DEGRADE_TRACK.note}</span></span>
+            <span style={{ fontSize: 10, color: "#9c8a6c" }}>{SEARCH_DEGRADE_TRACK.team}</span>
+          </div>
+          {dec.inProgress.map((d) => (
             <div key={d.id} style={{ display: "flex", gap: 7, alignItems: "center", padding: "5px 0", borderBottom: "1px solid #f0e8d8", fontSize: 12 }}>
               <span style={{ background: "#c08a3e", color: "#fff", fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 20 }}>실행중</span>
               <span style={{ flex: 1, color: "#5a4631" }}>{d.title}</span>
               <span style={{ fontSize: 10, color: d.age_h >= 72 ? "#b03a3a" : "#9c8a6c" }}>{d.team || "-"} · {d.age_h}h</span>
               <button disabled={busy === d.id} onClick={() => completeTask(d.id)} style={{ fontSize: 10, fontWeight: 700, color: "#3f7a4f", background: "#eef5ef", border: "1px solid #cfe3d2", borderRadius: 7, padding: "2px 8px", cursor: "pointer", opacity: busy === d.id ? 0.5 : 1 }}>완료</button>
             </div>
-          )) : <div style={{ fontSize: 12, color: "#3f7a4f" }}>진행 중인 실무 없음 ✅</div>}
+          ))}
           </>}
         </div>
 
