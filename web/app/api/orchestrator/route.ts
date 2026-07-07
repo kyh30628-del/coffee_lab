@@ -3,6 +3,7 @@ import { sql, ensureSchema } from "@/lib/db";
 import { synthAndStore, finalizePipeline, scrubPublishedPII, healGroundingSuspects, holdZeroEvidenceSuspects, healPublishedAudit, healNonCafeCategory, healOutOfBox, healAreaLabel, healOffConceptByReview } from "@/lib/synthStore";
 import { recordRun } from "@/lib/agentLog";
 import { judgeQueueCount, dailyCounts } from "@/lib/metrics";
+import { consoleCreditExhaustedByProbe } from "@/lib/consoleKeyProbe";
 export const runtime = "nodejs";
 export const maxDuration = 120; // 재검증 자가감사(healPublishedAudit) 배치 여유
 
@@ -186,16 +187,23 @@ export async function GET(req: NextRequest) {
     // 임베딩 대기 = 의미검색만 일부 누락(카페는 정상 노출) → 주의. 단, 절반 이상이면 검색 핵심기능 타격 → 위험.
     const noemb = (await sql`SELECT COUNT(*)::int n FROM cafes WHERE published AND embedding IS NULL`.catch(() => [{ n: 0 }]))[0] as any;
     if (noemb.n > 0) { if (noemb.n > PUB * 0.5) risks.push(`의미검색 대량 누락 ${noemb.n}곳 — 검색 기능 타격`); else notices.push(`의미검색 임베딩 대기 ${noemb.n}곳`); }
-    // 🔑 AI 맥락판정(검색 재정렬) 저하 감시 — 콘솔키 크레딧 소진·키오류 시 rerankWithClaude가 조용히 null 폴백(무크래시)해
-    //   검색 품질만 저하된 채 방치되던 P0(협업#133·2026-07-07)를 수면 위로. search_log.ai_err(실사용자 쿼리만 적재)로
-    //   결정론 탐지 — 크론헬스가 못 잡던 사각(크레딧 소진은 자가치유 불가·console.anthropic.com 충전 필요라 red 경보).
+    // 🔑 콘솔키 크레딧 소진 감시 — 소진 시 검색 재정렬(rerankWithClaude)·배치판정이 조용히 규칙폴백(무크래시).
+    //   ⚖️ 심각도 판정(CEO 2026-07-08): 소비자 실제영향 × 폴백없음. 콘솔키 소진은 (a) 검색이 결정론(임베딩·성향축·등급)으로
+    //   우아하게 폴백하고 그 LLM 재정렬은 사실상 미발동 얇은 마무리 층(7일 0회)이며, (b) 리뷰판정 moat는 구독(로컬)으로
+    //   살아있어 콘솔키와 무관 → 소비자 저영향. 그래서 HIGH 아님(알람 노이즈 금지). LOW/정보성(notices)으로만 조용히 표면화.
+    //   두 신호를 합쳐 트래픽과 무관하게 탐지: ① search_log.ai_err(실검색 24h) ② cron-sentinel 프로브 실측(console_key_state).
+    //   신호 사라지면 자동 resolve. ※ '진짜 HIGH'(빈결과·오염 누출)는 아래 noemb·재합성·grounding 등 폴백붕괴 조건이 담당.
     const aiDeg = (await sql`
       SELECT
         COUNT(*) FILTER (WHERE ai_err ~* 'credit|balance|http_40[012]')::int keyerrs,
         COUNT(*) FILTER (WHERE ai_err ~* 'http_429|overloaded|exception|http_5[0-9][0-9]')::int softerrs
       FROM search_log
       WHERE ts > now() - interval '24 hours' AND ai_err IS NOT NULL`.catch(() => [{ keyerrs: 0, softerrs: 0 }]))[0] as any;
-    if ((aiDeg?.keyerrs ?? 0) > 0) risks.push(`검색 AI 맥락판정 저하 — 최근 24h 실사용자 검색 ${aiDeg.keyerrs}건이 콘솔키 크레딧소진·키오류로 규칙폴백(무크래시 조용한 저하). console.anthropic.com 크레딧 충전 필요`);
+    const probeCredit = await consoleCreditExhaustedByProbe(); // 순수 DB 읽기(외부호출 없음) — cron-sentinel 프로브 실측
+    if ((aiDeg?.keyerrs ?? 0) > 0 || probeCredit) {
+      const via = [probeCredit ? "프로브 실측" : null, (aiDeg?.keyerrs ?? 0) > 0 ? `실검색 24h ${aiDeg.keyerrs}건 폴백` : null].filter(Boolean).join("·");
+      notices.push(`콘솔키 크레딧 소진 — 검색AI 재정렬·배치판정 콘솔경로 중단(${via}). 검색은 결정론 폴백 정상·moat는 구독 유지라 소비자 저영향. 충전 시 콘솔경로 복구(console.anthropic.com, 급하지 않음)`);
+    }
     else if ((aiDeg?.softerrs ?? 0) >= 10) notices.push(`검색 AI 재정렬 일시오류 ${aiDeg.softerrs}건(최근 24h — 레이트리밋·과부하 추정, 지속 시 콘솔키 점검)`);
     // 그라운딩은 결정론적 규칙으로 대체됨 — '감사 대기' 백로그는 안 줄어드는 무의미 숫자라 notice에서 제외.
     // 🛡️ 리뷰-카페 불일치(규칙-사각 오염) — 표시 리뷰에 카페 맥락어가 없는 비율↑ = 딴 업종·문구이름 오염 의심.
