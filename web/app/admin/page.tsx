@@ -882,7 +882,9 @@ export default function AdminPage() {
                         const ago = (v: any) => { if (!v) return ""; const ms = Date.now() - new Date(v).getTime(); const d = Math.floor(ms / 86400000), h = Math.floor(ms / 3600000), m = Math.floor(ms / 60000); return d > 0 ? `${d}일 전` : h > 0 ? `${h}시간 전` : m > 0 ? `${m}분 전` : "방금"; };
                         const EV: Record<string, string> = { login: "🔑 로그인", view_analysis: "📊 분석 조회" };
                         const never = !s.login_count;
-                        const issuedAgo = s.pin_emailed_at ? Math.floor((Date.now() - new Date(s.pin_emailed_at).getTime()) / 86400000) : null;
+                        // 발급일 기준 = 승인 시각(updated_at). 승인·PIN발급이 동일 시점이므로 승인일=발급일. 없으면 온보딩 메일 발송시각(pin_emailed_at) fallback.
+                        const issuedAt = s.updated_at || s.pin_emailed_at;
+                        const issuedAgo = issuedAt ? Math.floor((Date.now() - new Date(issuedAt).getTime()) / 86400000) : null;
                         const evs = Array.isArray(s.recent_events) ? s.recent_events : [];
                         return (
                           <div className={`mt-1.5 rounded-lg border p-2 text-[11px] ${never ? "bg-rose-50 border-rose-200" : "bg-sky-50 border-sky-100"}`}>
