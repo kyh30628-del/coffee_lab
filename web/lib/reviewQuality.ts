@@ -221,7 +221,17 @@ const HOTEL_BRANDS = [
 //   남던 것 차단. 시·군·구·동은 areaTerms로 걸러지나 광역명은 안 걸린다. ⚠️ 오탐 방지 위해 '정확 일치'만
 //   (부분일치는 '서울커피'·'인천상회' 같은 진짜 상호를 위치어로 오인 → 정체성 파괴). 단독 토큰일 때만 제거.
 const METRO_NAMES = new Set(["서울", "인천", "경기"]);
-const isVenueTok = (t: string) => { const n = norm(t); return VENUE_WORDS.some((v) => n.includes(norm(v))) || HOTEL_BRANDS.some((v) => n.includes(norm(v))) || DISTRICT_WORDS.some((d) => n.includes(norm(d))) || UNIV_ABBR_WORDS.some((u) => n.includes(norm(u))) || METRO_NAMES.has(n); };
+// 관광 랜드마크명(룰갭 제안9, CEO 승인 #195): 고궁·유적지 인접 상권(안국동·삼청동·서촌 등)에서 랜드마크명이
+//   카페명의 유일 실질토큰이면 그 일대 아무 카페 후기가 딸려온다(id18340 '사랑창덕궁' evidence 6건 중 5건이
+//   텅·회화나무·상국 등 타카페 콘텐츠). 대조군(더바움 경복궁점 등)은 '더바움' 같은 강한 식별어를 별도 보유해 안전.
+//   랜드마크 토큰을 위치수식어로 취급 → 다른 식별어가 남을 때만 제거(VENUE_WORDS/HOTEL_BRANDS와 동일 원리).
+//   ⚠️ 고유명사라 과다적용 위험 낮음(다른 식별어 남을 때만 인정 — 단독일 땐 coreEmpty로 원문일치만 인정).
+const LANDMARK_WORDS = [
+  "경복궁", "창덕궁", "덕수궁", "창경궁", "종묘", "운현궁",
+  "북촌", "서촌", "삼청동", "인사동", "익선동",
+  "남산", "n서울타워", "한강공원", "여의도공원", "올림픽공원", "서울숲",
+];
+const isVenueTok = (t: string) => { const n = norm(t); return VENUE_WORDS.some((v) => n.includes(norm(v))) || HOTEL_BRANDS.some((v) => n.includes(norm(v))) || LANDMARK_WORDS.some((l) => n.includes(norm(l))) || DISTRICT_WORDS.some((d) => n.includes(norm(d))) || UNIV_ABBR_WORDS.some((u) => n.includes(norm(u))) || METRO_NAMES.has(n); };
 
 // 지역/생활권/신도시 이름 — 카페명 식별 토큰이 '못' 된다.
 //   예: "평촌커피" → 접미 '커피' 제거 후 '평촌'만 남는데, '평촌'은 그 지역 모든 카페 후기에 나옴
