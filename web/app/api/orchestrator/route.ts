@@ -186,6 +186,17 @@ export async function GET(req: NextRequest) {
     // 임베딩 대기 = 의미검색만 일부 누락(카페는 정상 노출) → 주의. 단, 절반 이상이면 검색 핵심기능 타격 → 위험.
     const noemb = (await sql`SELECT COUNT(*)::int n FROM cafes WHERE published AND embedding IS NULL`.catch(() => [{ n: 0 }]))[0] as any;
     if (noemb.n > 0) { if (noemb.n > PUB * 0.5) risks.push(`의미검색 대량 누락 ${noemb.n}곳 — 검색 기능 타격`); else notices.push(`의미검색 임베딩 대기 ${noemb.n}곳`); }
+    // 🔑 AI 맥락판정(검색 재정렬) 저하 감시 — 콘솔키 크레딧 소진·키오류 시 rerankWithClaude가 조용히 null 폴백(무크래시)해
+    //   검색 품질만 저하된 채 방치되던 P0(협업#133·2026-07-07)를 수면 위로. search_log.ai_err(실사용자 쿼리만 적재)로
+    //   결정론 탐지 — 크론헬스가 못 잡던 사각(크레딧 소진은 자가치유 불가·console.anthropic.com 충전 필요라 red 경보).
+    const aiDeg = (await sql`
+      SELECT
+        COUNT(*) FILTER (WHERE ai_err ~* 'credit|balance|http_40[012]')::int keyerrs,
+        COUNT(*) FILTER (WHERE ai_err ~* 'http_429|overloaded|exception|http_5[0-9][0-9]')::int softerrs
+      FROM search_log
+      WHERE ts > now() - interval '24 hours' AND ai_err IS NOT NULL`.catch(() => [{ keyerrs: 0, softerrs: 0 }]))[0] as any;
+    if ((aiDeg?.keyerrs ?? 0) > 0) risks.push(`검색 AI 맥락판정 저하 — 최근 24h 실사용자 검색 ${aiDeg.keyerrs}건이 콘솔키 크레딧소진·키오류로 규칙폴백(무크래시 조용한 저하). console.anthropic.com 크레딧 충전 필요`);
+    else if ((aiDeg?.softerrs ?? 0) >= 10) notices.push(`검색 AI 재정렬 일시오류 ${aiDeg.softerrs}건(최근 24h — 레이트리밋·과부하 추정, 지속 시 콘솔키 점검)`);
     // 그라운딩은 결정론적 규칙으로 대체됨 — '감사 대기' 백로그는 안 줄어드는 무의미 숫자라 notice에서 제외.
     // 🛡️ 리뷰-카페 불일치(규칙-사각 오염) — 표시 리뷰에 카페 맥락어가 없는 비율↑ = 딴 업종·문구이름 오염 의심.
     //   그라운딩(LLM)이 못 보던 사각지대를 결정론적으로 상시 감시. 소비자 노출이라 임계 넘으면 위험.
