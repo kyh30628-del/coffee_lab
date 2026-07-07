@@ -173,7 +173,12 @@ const NAME_STOPWORD = new Set(["좋은", "맛있는", "맛있는집", "예쁜", 
   // 레드팀 2026-07-07(coord#125): 흔한 일상어 카페명 — 접미·일반어 제거 후 이 토큰만 남으면 무관 글에 '문장 성분'으로
   //   우연일치. 코너50→[50]·타스 하우스→[타스]·그리고우리→[]로 남겨 전체이름 원문일치를 요구(오매칭 차단).
   //   '루트'(1번국도 루트1)도 동류(등반루트·데이트루트·유통루트 등 오염).
-  "코너", "하우스", "루트", "그리고우리"]);
+  "코너", "하우스", "루트", "그리고우리",
+  // 프랜차이즈 지점앵커 매칭(decisions#196): 브랜드명에 붙는 '메뉴·품질 수식어'는 식별어가 못 된다.
+  //   예: '빙동댕 프리미엄 빙수카페 은평역촌점' → 접미 '카페' 제거 후 [빙동댕,프리미엄,빙수]가 남는데,
+  //   '프리미엄'·'빙수'는 같은 자리 다른 브랜드('백억커피 은평역촌점'의 컵빙수 후기)와도 매칭돼
+  //   지점 브랜드 식별을 흐린다(H43·coord#130 실측). 브랜드 고유어(빙동댕)만 남기려 이들을 식별어에서 제외.
+  "프리미엄", "빙수", "눈꽃빙수", "팥빙수", "무인", "무인카페"]);
 // ⚠️ '가'는 지역접미(종로1가)이자 식별어의 끝음절(타이거슈가·슈가·작가·명가·보테가)로 겹친다. '가'를 지역어로 보고
 //   날리면 식별어가 사라지고 건물명(강남고속터미널)만 남아 같은 건물 딴 업체(솥내음·나인블럭) 후기가 딸려왔다
 //   (id3509, 레드팀 2026-07-07 coord#125). 지역 '가'(동名)는 areaTerms(dong)로 이미 걸러지므로 접미 목록에서
@@ -606,18 +611,33 @@ export function verifyReview(input: QualityInput): QualityResult {
   }
   // 지점(브랜치) 구분: 이 카페가 '○○점'이면, 후기가 '이 지점(지점명·지역)'을 가리켜야 인정.
   //   다른 지점명(예: '마곡점')이 박혀 있고 이 지점 신호가 없으면 다른 지점 후기 → 배제.
-  const myBranch = input.name.match(/([가-힣A-Za-z0-9]{2,})점\s*$/)?.[1];
+  const myBranchRaw = input.name.match(/([가-힣A-Za-z0-9]{2,})점\s*$/)?.[1];
+  // 일반 업태 '○○점'(원두상점·제과점·전문점·백화점 등)은 프랜차이즈 지점이 아니다 — 지점앵커 규칙에서 제외
+  //   (안 그러면 '조상일커피 원두상점' 같은 단일 카페를 '원두상' 지점으로 오인해 정상 후기를 떨군다, decisions#196 실측).
+  const myBranch = myBranchRaw && !isNonBranchWord(myBranchRaw + "점") ? myBranchRaw : undefined;
   if (myBranch) {
     const fullT = `${title} ${body}`;
-    // [룰갭23·27] 지점접미사(도로명·쇼핑몰명·랜드마크명 등)는 그 자리를 공유하는 위치어일 뿐 지점 식별력이 없다
-    //   (도로명: 카페인24 인천은하수로점 ← 같은 도로 다른 건물 '5PM sunset hour' 오염 / 몰명: 올드페리도넛
-    //   광교갤러리아점 ← areaPresent(시 단위 '수원')만으로 형제 지점 '수원오목천점' 원문에 오귀속, id10902 실측).
-    //   지점명 자체가 본문에 없다면, 브랜드 고유 토큰(myBranch 제외 나머지)이 대상 지역어와 '함께' 있어야만
-    //   이 지점 신호로 인정한다 — 지역 단독으로는 불인정(도로명 여부와 무관하게 통일).
-    const brandToken = tokens.find((tk) => tk !== myBranch);
-    const myBranchHere = myBranch !== "본" && norm(fullT).includes(norm(myBranch)); // '이 지점' 랜드마크 직접 언급(공백무시)
-    const branchSignal = myBranchHere
-      || (!!brandToken && nameHit(fullT, norm(fullT), brandToken) && areaPresent);
+    const fullTN = norm(fullT);
+    // [decisions#196 지점앵커 필수화] 지점 랜드마크가 이 카페의 시/구(광역)와 같으면(예: '성남점'의 '성남'=
+    //   성남시, '중랑점'의 '중랑'=중랑구) 형제 지점('미금점'·'분당점'도 다 성남시)이 공유하는 광역어라 지점
+    //   식별력이 없다 → 이땐 '○○점' 원문(성남점)이 본문에 있어야만 '이 지점' 랜드마크로 인정(형제 지점 배제).
+    //   구체 지점명(은평역촌·안성코아루)은 그대로 랜드마크 인정.
+    const branchIsMetroWide = areaTerms.some((a) => norm(a) === norm(myBranch) || norm(guShort(a)) === norm(myBranch));
+    const myBranchHere = myBranch !== "본" && (branchIsMetroWide
+      ? fullTN.includes(norm(myBranch + "점"))
+      : fullTN.includes(norm(myBranch))); // '이 지점' 랜드마크 직접 언급(공백무시)
+    // [decisions#196] 지점앵커 = 구(區)·동(洞)·등록 도로명·'○○점' 원문. 시(市)는 형제 지점이 공유하는 광역어라
+    //   앵커로 불인정(성남점=중원구·미금점=분당구가 다 '성남시'). 서울은 area가 곧 구, 경기는 주소에서 구를 파싱.
+    //   → 플러스82 미금/분당점·카페프리헷 디렉토리 오귀속 차단. 대상 구가 없는 순수 시 언급('성남시'만)은 앵커 불충분.
+    const guFromAddr = input.addr?.match(/([가-힣]{2,4}구)(?:\s|$)/)?.[1];
+    const anchorTerms = areaTerms.filter((a) => !/시$/.test(a)); // 시 제외(구·군·동·읍·면·가·리만)
+    if (guFromAddr && !anchorTerms.includes(guFromAddr)) anchorTerms.push(guFromAddr);
+    const roadHere = (input.addr ? (input.addr.match(/[가-힣A-Za-z0-9]{2,}(?:대로|로|길)/g) ?? []) : [])
+      .some((rd) => rd.length >= 3 && fullT.includes(rd)); // 등록 도로명('광명로'·'남파로') 직접 언급
+    const areaAnchorHere = anchorTerms.some((a) => fullT.includes(a)) || roadHere;
+    // '이 지점' 신호 = 지점 랜드마크(성남점·은평역촌·안성코아루) 또는 구/동/도로 앵커. 브랜드 일치는 이미
+    //   nameInTitle/nameInBody 게이트가 보장하므로(여기 도달 = 식별토큰 존재) 지점앵커만 추가로 요구한다.
+    const branchSignal = myBranchHere || areaAnchorHere;
     // ⚠️ [coord#126 P2] guShort 배제를 '시(市)명 자체'로 한정 — nm.includes(guShort)면 같은 市 다른 洞
     //   지점('포천일동' ← '포천시청점')이 감지에서 빠졌다(id14277: 참고셋 6/6이 형제 지점 '포천일동점').
     const otherBranchTok = (fullT.match(/([가-힣]{2,})점/g) ?? [])
@@ -635,7 +655,7 @@ export function verifyReview(input: QualityInput): QualityResult {
     }
     // 브랜드만 일치하고 '이 지점' 신호가 전혀 없음 → verified 불가, 경계(LLM이 지점 확인)
     if (!branchSignal && (visit || substance >= 1)) {
-      return { verdict: "rejected", score: 20, reasons: ["지점 불명확(브랜드만 일치) — LLM이 지점 확인"], borderline: true, signals: sig };
+      return { verdict: "rejected", score: 20, reasons: ["지점 불명확(브랜드·지점앵커 불충분) — LLM이 지점 확인"], borderline: true, signals: sig };
     }
   }
   // 🍲 같은 상호 '다른 음식점' 분리: 카페명 바로 뒤에 식당 메인메뉴어가 붙으면('장꼬방'→'장꼬방묵은김치찌개전문')
