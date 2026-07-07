@@ -392,8 +392,14 @@ export function verifyReview(input: QualityInput): QualityResult {
   //   그 건물엔 무관한 여러 시설(주차·행정·동아리…)이 함께 있으므로, 지역일치만으로는 부족 — 진짜 카페 맥락
   //   (CAFE_CONTEXT_STRONG)이 함께 있어야 그 건물의 '이 카페' 이야기로 인정한다(전체이름 원문일치는 예외 — 이미 강한 신호).
   const venueCtxOk = !venueOnly || CAFE_CONTEXT_STRONG.test(fullL);
-  const nameInTitle = (weakWhitelist && !areaPresent) ? false : (inTitleFull || (distinctInTitle && (titleHasCafeWord || areaPresent) && venueCtxOk));
-  const nameInBody = (weakWhitelist && !areaPresent) ? false : (inBodyFull || (distinctInBody && (bodyHasCafeWord || areaPresent) && venueCtxOk));
+  // 📮 [주소=상호] 카페명이 '도로명주소'(예: '대산로 511', '중부대로 33-1')면, 그 이름은 같은 자리 이웃
+  //   업체(메밀촌·마라탕…)가 '주소'로 흔히 적는 공유 문자열이라, 이름 일치만으로 귀속하면 옆가게 후기가
+  //   딸려온다(id16359 실측, coord#126 P1). → 진짜 카페 맥락(CAFE_CONTEXT_STRONG)이 함께 있어야만
+  //   이 카페 후기로 인정(주소만 스친 이웃업체 글 차단). 실제 카페 후기는 항상 카페 맥락을 동반하므로 안전.
+  const nameIsRoadAddr = /^[가-힣A-Za-z0-9]{1,12}(로|길)\s*\d+(-\d+)?$/.test(input.name.trim());
+  const roadAddrCtxOk = !nameIsRoadAddr || CAFE_CONTEXT_STRONG.test(fullL);
+  const nameInTitle = (weakWhitelist && !areaPresent) ? false : (roadAddrCtxOk && (inTitleFull || (distinctInTitle && (titleHasCafeWord || areaPresent) && venueCtxOk)));
+  const nameInBody = (weakWhitelist && !areaPresent) ? false : (roadAddrCtxOk && (inBodyFull || (distinctInBody && (bodyHasCafeWord || areaPresent) && venueCtxOk)));
   const listicle = LISTICLE_TITLE.some((re) => re.test(title)) || (((`${title} ${body}`.match(PLACE_TOKEN) ?? []).length) >= 4);
   const generic = has(fullL, GENERIC_CUES);
   const nameOccurBody = nameN ? countOccur(bodyN, nameN) : 0;
@@ -406,6 +412,17 @@ export function verifyReview(input: QualityInput): QualityResult {
     : undefined;
 
   const sig = { nameInTitle, nameInBody, visit, substance, listicle, sponsored, areaMatch: areaPresent };
+
+  // 🌍 [동음이의 지명] 카페 식별토큰이 '해외 지명'과 겹치면(콜롬보=스리랑카 수도, id7272 실측) 여행·현지
+  //   맥락에서 그 토큰만 우연 일치해 해외 여행기가 딸려온다. 우리 지역어도 없고 카페 맥락(CAFE_CONTEXT_STRONG)도
+  //   없이 '해외 지명 맥락'만 있으면 이 카페 후기가 아님. curated 화이트리스트(오탐 확대 방지) — 진짜 카페
+  //   후기는 카페 맥락을 동반하므로 걸리지 않는다. (coord#126 P3)
+  const FOREIGN_HOMONYM = new Set(["콜롬보"]);
+  if (tokens.length && tokens.every((t) => FOREIGN_HOMONYM.has(norm(t))) && !areaPresent
+      && !CAFE_CONTEXT_STRONG.test(fullL)
+      && /(스리랑카|여행기|해외여행|배낭여행|현지인|수도\s|항공권|비행기|공항|배낭|입국|환전)/.test(fullL)) {
+    return { verdict: "rejected", score: 3, reasons: ["동음이의 해외 지명(카페 아님)"], signals: sig };
+  }
 
   // ---- 하드 탈락(명백한 노이즈) ----
   // [거래·판매 글] 후기가 아님. 강력신호(중고나라·판매양식…)는 진짜 후기엔 안 나오므로 가드 없이 탈락.
@@ -565,14 +582,23 @@ export function verifyReview(input: QualityInput): QualityResult {
     //   지점명 자체가 본문에 없다면, 브랜드 고유 토큰(myBranch 제외 나머지)이 대상 지역어와 '함께' 있어야만
     //   이 지점 신호로 인정한다 — 지역 단독으로는 불인정(도로명 여부와 무관하게 통일).
     const brandToken = tokens.find((tk) => tk !== myBranch);
-    const branchSignal = (myBranch !== "본" && fullT.includes(myBranch))
+    const myBranchHere = myBranch !== "본" && norm(fullT).includes(norm(myBranch)); // '이 지점' 랜드마크 직접 언급(공백무시)
+    const branchSignal = myBranchHere
       || (!!brandToken && nameHit(fullT, norm(fullT), brandToken) && areaPresent);
+    // ⚠️ [coord#126 P2] guShort 배제를 '시(市)명 자체'로 한정 — nm.includes(guShort)면 같은 市 다른 洞
+    //   지점('포천일동' ← '포천시청점')이 감지에서 빠졌다(id14277: 참고셋 6/6이 형제 지점 '포천일동점').
     const otherBranchTok = (fullT.match(/([가-힣]{2,})점/g) ?? [])
       .map((t) => t.replace(/점$/, ""))
+      // 공백무시(norm) 양방향 비교: 우리 이름이 nm을 포함('은평 본점'⊇'은평본')하거나, nm이 우리 지점
+      //   랜드마크(myBranch)를 포함('이천날쌘카페하이닉스'⊇'하이닉스', '수원시청역'⊇'수원시청')하면 = 같은 지점의
+      //   축약·장황·도시접두 표기일 뿐 다른 지점 아님. (도시명 접두·역명 변형이 형제로 오판되던 것 차단)
       .find((nm) => nm.length >= 2 && nm !== myBranch && nm !== "본" && !isNonBranchWord(nm + "점")
-        && !input.name.includes(nm) && !areaTerms.some((a) => a.includes(nm) || nm.includes(guShort(a))));
-    if (otherBranchTok && !branchSignal) {
-      return { verdict: "rejected", score: 6, reasons: [`다른 지점 후기('${otherBranchTok}점', 이 지점 신호 없음)`], signals: sig };
+        && !norm(input.name).includes(norm(nm)) && !norm(nm).includes(norm(myBranch))
+        && !areaTerms.some((a) => a.includes(nm) || norm(nm) === norm(guShort(a))));
+    // 다른 지점명이 '명시'됐는데 '이 지점' 랜드마크(myBranch)가 본문에 없으면 = 형제 지점 후기 → 배제.
+    //   (브랜드+市 신호는 형제 지점도 공유하므로 branchSignal만으로는 못 거른다 — 지점 랜드마크 필수화.)
+    if (otherBranchTok && !myBranchHere) {
+      return { verdict: "rejected", score: 6, reasons: [`다른 지점 후기('${otherBranchTok}점', 이 지점 '${myBranch}' 신호 없음)`], signals: sig };
     }
     // 브랜드만 일치하고 '이 지점' 신호가 전혀 없음 → verified 불가, 경계(LLM이 지점 확인)
     if (!branchSignal && (visit || substance >= 1)) {
