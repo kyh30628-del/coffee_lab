@@ -619,6 +619,18 @@ export function verifyReview(input: QualityInput): QualityResult {
   if (!visit && substance === 0) {
     return { verdict: "rejected", score: 10, reasons: ["방문·경험·평가 내용 없음(언급만)"], signals: sig };
   }
+  // [룰갭 제안7] 위 inTitleFull 게이트(제안1·#156)는 '제목=카페명' 신뢰경로에만 CAFE_CONTEXT를 요구해,
+  //   제목엔 이름이 없고(nameInTitle=false) 본문에만 짧은/흔한 이름이 스쳐 참고등급(reference)에 도달하는
+  //   경로는 카페맥락 검증 없이 통과했다. id10592 '타다미'(일본어 다다미 동음이의)에서 펜션·건축사·맛집
+  //   블로그 3건이 서로 다른 출처로 반복 확인. 제안1과 대칭 적용: 이름 4자 이하 또는 WEAK_IDENTITY_TOKEN급인데
+  //   본문에만 등장하면 CAFE_CONTEXT 매칭을 최소 1개 요구(이름 3자 이하는 제안1과 동일하게 STRONG) —
+  //   없으면 하드 탈락 대신 borderline(LLM 재판정)으로 격하해 표현 달라 안 걸린 진짜 카페 후기를 보호.
+  if (!nameInTitle && nameInBody && ((nameNoSpace.length >= 1 && nameNoSpace.length <= 4) || weakWhitelist)) {
+    const bodyCtxGate = nameNoSpace.length <= 3 ? CAFE_CONTEXT_STRONG : CAFE_CONTEXT;
+    if (!bodyCtxGate.test(fullL)) {
+      return { verdict: "rejected", score: 20, reasons: ["본문에만 짧은·흔한 카페명 등장하나 카페 맥락 전무(동음이의·타업종 혼입 의심) — LLM 재판정"], borderline: true, signals: sig };
+    }
+  }
 
   // ---- 점수화(투명) ----
   let score = 0;
