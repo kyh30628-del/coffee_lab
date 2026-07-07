@@ -52,12 +52,16 @@ export async function GET(req: NextRequest) {
           discoveries.push({ region: d.region, error: "naver-quota(보존)" });
           break;
         }
+        // 요청타깃(at)이든 로테이션이든 실제 발굴한 지역의 로테이션 시계(last_run)를 항상 찍는다.
+        //   과거엔 at일 때 discovery_targets만 done하고 discovery_state를 안 찍어, 요청타깃으로 발굴된
+        //   로테이션 지역(예: 포천시)이 옛 날짜로 남아 "N일 굶음" 오표기됐다(관제탑 #555 부풀림).
+        //   target.region이 discovery_state에 없으면 no-op라 안전.
         if (at) await sql`UPDATE discovery_targets SET status='done', consumed_at=now(), found=${d.found}, inserted=${d.inserted} WHERE id=${at.id}`;
-        else await sql`UPDATE discovery_state SET last_run=now(), last_found=${d.found}, last_inserted=${d.inserted} WHERE region=${target.region}`;
+        await sql`UPDATE discovery_state SET last_run=now(), last_found=${d.found}, last_inserted=${d.inserted} WHERE region=${target.region}`;
         discoveries.push({ region: d.region, found: d.found, inserted: d.inserted, stopped: d.stopped, agent: !!at });
       } catch (e) {
         if (at) await sql`UPDATE discovery_targets SET status='done', consumed_at=now() WHERE id=${at.id}`; // 실패해도 큐서 빼 무한루프 방지
-        else await sql`UPDATE discovery_state SET last_run=now() WHERE region=${target.region}`;
+        await sql`UPDATE discovery_state SET last_run=now() WHERE region=${target.region}`; // 발굴 시도된 로테이션 지역 시계도 찍어 일관성(없으면 no-op)
         discoveries.push({ region: target.region, error: String(e).slice(0, 60) });
         break; // 네이버 한도/오류 시 이번 회차 발굴 중단(다음 cron에서 이어감)
       }
