@@ -297,6 +297,10 @@ export async function detectIssues(): Promise<Issue[]> {
     for (const t of (h.notices || []) as string[]) {
       // 오염 플래그·그라운딩·리뷰 맥락은 위에서 'DB 직접 실시간'으로 잡으므로 미러에선 건너뜀(중복·stale 방지).
       if (/오염 플래그|그라운딩|리뷰 맥락|품질 의심/.test(t)) continue;
+      // 콘솔키 크레딧 소진은 CEO가 충전 보류로 '수용'한 상태(검색은 결정론 폴백 정상·moat는 구독 독립) — '처리할 위험'이 아니라 정보성이다.
+      //   관제탑 노티스로만 표출하고 RM 열린 이슈는 만들지 않는다(미러하면 매 크론 재생성=resolved 도돌이표 노이즈). CEO 지시 2026-07-08.
+      //   진짜 HIGH(결정론 폴백까지 붕괴)만 별도 risks 신호로 이슈화. 크레딧 회복 시 노티스 자동 소멸.
+      if (/콘솔키 크레딧 소진/.test(t)) continue;
       // 규칙갭 승인대기는 이제 cron-rulegap이 unpublish '결재'로 상신(actionable). RM보드 '처리중' 미러는 좀비라 제거 — 결재 섹션에서 처리(CEO 지적 2026-07-01).
       if (/규칙갭 승인대기|룰갭 승인대기/.test(t)) continue;
       // 발굴 지연은 cron-grow가 우선처리로 소진 중. 그 외 주의는 다음 배치 사이클(08·17시)에 담당 본부 트리아지.
