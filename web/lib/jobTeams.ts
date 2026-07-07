@@ -54,3 +54,12 @@ export const EXPECT_MAX_H: Record<string, number> = {
   // ⚠️ cron-selfaudit 자신은 여기 못 넣는다(자기 정지를 자기가 감지 불가) — 로컬 run-trigger-watch.sh의
   //   결정론 워치독이 감시(7h+ 미실행 시 ok=false 하트비트로 에스컬레이션).
 };
+
+// 🛑 **의도적으로 은퇴(plist .disabled)한 잡의 명시적 단일 출처.**
+//   과거 lib/issues.ts는 '은퇴'를 "JOB_TEAM엔 있으나 EXPECT_MAX_H엔 없음"으로 *추론*했는데,
+//   그 조건엔 staleness를 chief-manager가 대표 감시하는 **활성** 리프 에이전트 ~20개(self-audit-agent·
+//   quality-redteam-agent·team-legal-agent·dev-agent 등)가 전부 걸린다 → 그들의 investigate 결재가
+//   CEO가 보기도 전에(수십초~2분) '은퇴 확인'으로 오종결돼 L3 에스컬레이션이 무력화됐다(2026-07-07 #200).
+//   → 진짜 은퇴는 여기 **명시적으로만** 표기한다. 은퇴 시 추가, 재활성 시 제거(위 JOB_TEAM 주석과 동기).
+export const RETIRED_JOBS: ReadonlySet<string> = new Set(["dong-backfill", "qualityaudit"]);
+export const isRetired = (job: string) => RETIRED_JOBS.has(job);
