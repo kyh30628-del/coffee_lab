@@ -1,6 +1,13 @@
 import { neon } from "@neondatabase/serverless";
 
-export const sql = neon(process.env.DATABASE_URL!);
+// ⚠️ sql은 서버 전용이지만, 이 모듈이 클라이언트 번들에 딸려 들어갈 수 있다
+//    (예: 'use client' 홈 app/page.tsx → cafeProfile → charScore → criteriaLists → db).
+//    브라우저엔 DATABASE_URL이 없어 neon(undefined!)가 **모듈 로드 시점에** throw →
+//    앱 전체가 "This page couldn't load"로 크래시했다(2026-07 홈 화면 다운 사고).
+//    URL이 없으면(=브라우저) 형식만 갖춘 플레이스홀더로 생성해 로드 크래시를 막는다.
+//    서버는 항상 DATABASE_URL이 있어 실 연결을 쓰므로 동작 무변. 브라우저는 sql을
+//    실제로 호출하지 않는다(동기 getter들은 캐시/BASE 폴백만 읽음).
+export const sql = neon(process.env.DATABASE_URL || "postgresql://unused:unused@localhost/unused");
 
 let ensured = false;
 export async function ensureSchema() {
