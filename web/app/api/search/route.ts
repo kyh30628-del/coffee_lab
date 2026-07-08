@@ -103,9 +103,10 @@ const occ = (text: string, kw: string) => (!text || !kw ? 0 : text.toLowerCase()
 // exact(키워드) + 개념(느낌) 가산 — 두 모드 공통
 function lexicalScore(c: any, tokens: string[], hitConcepts: typeof CONCEPTS) {
   const reviewText = Array.isArray(c.synth_reviews) ? c.synth_reviews.map((r: any) => r?.quote ?? "").join(" ") : "";
+  // 필드가중치는 criteria 단일출처(폴백 4/2.5/2/2/2/1.5/1.5/2/1). GET 진입 시 loadCriteria로 캐시 프라임(동기 읽기).
   const fields: [string, number][] = [
-    [c.name ?? "", 4], [c.synth_identity ?? "", 2.5], [c.signature ?? "", 2], [c.note ?? "", 2],
-    [c.vibe ?? "", 2], [c.uses ?? "", 1.5], [c.beans ?? "", 1.5], [reviewText, 2], [c.area ?? "", 1],
+    [c.name ?? "", getCriterionSync("search.field_weight.name")], [c.synth_identity ?? "", getCriterionSync("search.field_weight.identity")], [c.signature ?? "", getCriterionSync("search.field_weight.signature")], [c.note ?? "", getCriterionSync("search.field_weight.note")],
+    [c.vibe ?? "", getCriterionSync("search.field_weight.vibe")], [c.uses ?? "", getCriterionSync("search.field_weight.uses")], [c.beans ?? "", getCriterionSync("search.field_weight.beans")], [reviewText, getCriterionSync("search.field_weight.review")], [c.area ?? "", getCriterionSync("search.field_weight.area")],
   ];
   let exact = 0;
   const tokenHit = new Set<string>();
@@ -116,8 +117,8 @@ function lexicalScore(c: any, tokens: string[], hitConcepts: typeof CONCEPTS) {
   const reasons: string[] = [];
   for (const cc of hitConcepts) {
     let add = 0;
-    if (cc.axis && (cs[cc.axis] ?? 0) > 0) add += Math.min(cs[cc.axis], 12) * 1.5;
-    if (cc.taste) { const t = c[`synth_${cc.taste}`]; if (t != null) add += t >= 0.6 ? 18 : t >= 0.5 ? 8 : 0; }
+    if (cc.axis && (cs[cc.axis] ?? 0) > 0) add += Math.min(cs[cc.axis], getCriterionSync("search.char_axis.cap")) * getCriterionSync("search.char_axis.scale");
+    if (cc.taste) { const t = c[`synth_${cc.taste}`]; if (t != null) add += t >= getCriterionSync("search.taste.high") ? getCriterionSync("search.taste.high_bonus") : t >= getCriterionSync("search.taste.mid") ? getCriterionSync("search.taste.mid_bonus") : 0; }
     if (cc.uses && c.uses && cc.uses.some((u) => String(c.uses).includes(u))) add += 6;
     if (add > 0) { concept += add; reasons.push(`'${cc.label}' 느낌`); }
   }
@@ -147,19 +148,20 @@ const BRAND_ALIAS: Record<string, string[]> = {
 // 체인·다지점 브랜드 독점 방지 — "로스터리" 같은 카테고리 검색 상위권이 한 브랜드 지점들로만 채워지던 버그(#120).
 //   상호 첫 단어를 브랜드 키로 보고 같은 키는 최대 CHAIN_CAP개까지만 순위를 지키고, 초과분은 뒤로 밀어(제거 아님)
 //   다른 브랜드가 상위에 섞이게 한다. 상호 직접검색(아래 이름매칭 블록)은 이 함수 이후에 추가되므로 영향 없음.
-const CHAIN_CAP = 2;
+// CHAIN_CAP은 criteria 단일출처(폴백 2). GET 진입 시 loadCriteria 프라임 후 diversifyChains에서 동기 읽기.
 // 마지막 단어(지점명: "역삼점" 등)를 뺀 나머지를 공백 없이 합쳐 키로 삼는다 —
 // "로스터리 락온"(2단어 브랜드) 지점이 "로스터리 락온 역삼점"/"로스터리락온 역삼점"처럼 표기가 섞여도
 // 같은 체인 키로 묶이게 한다(기존엔 첫 단어만 써서 "로스터리"↔"로스터리락온"으로 갈려 CHAIN_CAP이 무력화됨).
 const chainKeyOf = (name: string): string => { const parts = (name ?? "").trim().split(/\s+/).filter(Boolean); return parts.length >= 2 ? parts.slice(0, -1).join("") : (name ?? ""); };
 function diversifyChains<T extends { name: string }>(list: T[]): T[] {
+  const chainCap = getCriterionSync("search.chain_cap");
   const count = new Map<string, number>();
   const kept: T[] = [];
   const overflow: T[] = [];
   for (const r of list) {
     const key = chainKeyOf(r.name);
     const n = count.get(key) ?? 0;
-    if (n < CHAIN_CAP) { kept.push(r); count.set(key, n + 1); } else overflow.push(r);
+    if (n < chainCap) { kept.push(r); count.set(key, n + 1); } else overflow.push(r);
   }
   return [...kept, ...overflow];
 }
@@ -182,7 +184,8 @@ async function ensureCache() {
   await sql`CREATE TABLE IF NOT EXISTS search_cache (qkey TEXT PRIMARY KEY, payload JSONB NOT NULL, created_at TIMESTAMPTZ DEFAULT now())`;
   cacheReady = true;
 }
-const CACHE_TTL_HOURS = 3; // 12→3시간: 비공개 카페가 캐시에 남는 시간 단축(heal이 비공개 발생 시 즉시 무효화도 함)
+// 검색 캐시 유효시간은 criteria 단일출처(폴백 3시간). GET 진입 시 loadCriteria 프라임 후 동기 읽기.
+//   12→3시간: 비공개 카페가 캐시에 남는 시간 단축(heal이 비공개 발생 시 즉시 무효화도 함)
 
 // 🔎 검색 수요 로깅(비차단) — 무엇을 찾고 결과가 충분했는지 적재. cron-demand가 수요-공급 갭 분석.
 //   내부 헬스체크 호출(X-Internal-Check 헤더)은 실사용자 수요가 아니므로 제외 — 아니면 수요분석이 봇을 실사용자로 오인(#113).
@@ -219,7 +222,7 @@ export async function GET(req: NextRequest) {
     const qkey = q.toLowerCase().replace(/\s+/g, " ").trim() + "|" + effectiveRegion;
     const nocache = req.nextUrl.searchParams.get("nocache") === "1";
     if (!nocache) {
-      const hit = (await sql`SELECT payload FROM search_cache WHERE qkey=${qkey} AND created_at > now() - (${CACHE_TTL_HOURS} || ' hours')::interval LIMIT 1`)[0];
+      const hit = (await sql`SELECT payload FROM search_cache WHERE qkey=${qkey} AND created_at > now() - (${getCriterionSync("search.cache_ttl_hours")} || ' hours')::interval LIMIT 1`)[0];
       if (hit?.payload && Array.isArray(hit.payload.results) && hit.payload.results.length > 0) {
         logSearch(q, region, Number(hit.payload?.count ?? 0), "cache", isInternalCheck);
         return NextResponse.json({ ...hit.payload, cached: true }, {

@@ -16,7 +16,7 @@ type Preview = { kind: string; wouldUnpublish: number; changed: number; note: st
 
 const card: React.CSSProperties = { background: "#fff", border: "1px solid #ddc9a8", borderRadius: 12, padding: "12px 14px", minWidth: 0 };
 const sub: React.CSSProperties = { fontSize: 10.5, color: "#8a7a5c", fontWeight: 600 };
-const CAT_ICON: Record<string, string> = { 등급: "🏅", 지리: "🗺️", 검색: "🔎", 노출: "✨" };
+const CAT_ICON: Record<string, string> = { 등급: "🏅", 지리: "🗺️", 검색: "🔎", 노출: "✨", 오염: "🛡️" };
 
 export default function CriteriaPage() {
   const [pw, setPw] = useState("");
@@ -47,7 +47,8 @@ export default function CriteriaPage() {
 
   useEffect(() => { const p = localStorage.getItem("adm_pw"); if (p) { setPw(p); load(p); } }, [load]);
 
-  const isRankOnly = (k: string) => k.startsWith("search.") || k.startsWith("exposure.");
+  // 공개상태 블라스트 미리보기가 없는(랭킹/노출/오염 게이트) 기준 — '영향 미리보기' 버튼 숨김. 반영은 합성·재판정 파이프라인.
+  const isRankOnly = (k: string) => k.startsWith("search.") || k.startsWith("exposure.") || k.startsWith("contamination.");
 
   const doPreview = async (it: Item) => {
     const value = Number(draft[it.key]);
@@ -114,7 +115,7 @@ export default function CriteriaPage() {
         <div style={{ ...sub, marginTop: 10, lineHeight: 1.5 }}>
           ⚠️ 이 화면은 <b>기준값만</b> 저장합니다. 실제 카페 공개상태는 바꾸지 않으며, 반영은 합성·재판정 파이프라인이 담당합니다.
           등급·좌표 기준은 저장 전 영향 미리보기가 뜨고, 공개카페 {threshold}곳 초과가 흔들리면 재확인이 필요합니다.
-          <br />⚖️ <b>DoA</b>: <span style={{ color: "#b03a3a", fontWeight: 700 }}>L3 CEO 확인</span>=등급바닥·좌표박스(대량영향) · <span style={{ color: "#3f7a4f", fontWeight: 700 }}>L2 전결</span>=검색가산점·노출상한(소영향·바로 적용). 소유=품질본부, 관장=기획조정실장.
+          <br />⚖️ <b>DoA</b>: <span style={{ color: "#b03a3a", fontWeight: 700 }}>L3 CEO 확인</span>=등급바닥·좌표박스(대량영향) · <span style={{ color: "#3f7a4f", fontWeight: 700 }}>L2 전결</span>=검색가중치·오염임계·노출상한(소영향·바로 적용). 소유=품질본부, 관장=기획조정실장.
         </div>
 
         {categories.map((cat) => (

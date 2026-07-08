@@ -29,6 +29,35 @@ export const META: CriterionMeta[] = [
   { key: "search.grade_bonus.reference", category: "검색", label: "검색 랭킹 등급 가산점(참고)", def: 8, min: 0, max: 100, unit: "점" },
   // 노출 상한
   { key: "exposure.featured_cap", category: "노출", label: "우선노출(featured) 동시 노출 상한", def: 6, min: 1, max: 50, unit: "개" },
+
+  // ── Phase 2 · 오염 게이트 임계 (lib/synthStore.ts 합성 공개 게이트) ──
+  //   ⚠️ 소비처 하드코딩과 100% 동일(서비스 무변). 계수 얽힘(entityPolluted 0.4·offConceptHit 0.66)은 제외.
+  { key: "contamination.noisy.min_collected", category: "오염", label: "노이즈 게이트 최소 수집건수(이상+이름일관성 낮으면 오염보류)", def: 5, min: 1, max: 50, unit: "건" },
+  { key: "contamination.noisy.coherence_max", category: "오염", label: "노이즈 게이트 이름일관성 상한(미만이면 오염보류)", def: 0.4, min: 0, max: 1, unit: "비율" },
+  { key: "contamination.ambiguous.coherence_max", category: "오염", label: "LLM 재판정 트리거: 이름일관성 상한(미만이면 애매)", def: 0.55, min: 0, max: 1, unit: "비율" },
+  { key: "contamination.ambiguous.offctx_min", category: "오염", label: "LLM 재판정 트리거: 맥락없음비율 하한(이상이면 애매)", def: 0.5, min: 0, max: 1, unit: "비율" },
+  { key: "contamination.offctx.min_sample", category: "오염", label: "맥락없음비율 산출 최소 인용문 수(미만이면 0)", def: 8, min: 1, max: 50, unit: "건" },
+  { key: "contamination.nocafe.min_collected", category: "오염", label: "카페정체성0 비카페판정 최소 수집건수", def: 3, min: 1, max: 50, unit: "건" },
+
+  // ── Phase 2 · 검색 랭킹 가중치 (app/api/search/route.ts) ──
+  //   gradeBonus(검증25/참고8)는 Phase1에 이미 있음(search.grade_bonus.*) — 재활용, 재정의 안 함.
+  { key: "search.field_weight.name", category: "검색", label: "검색 필드가중치: 상호명", def: 4, min: 0, max: 20, unit: "가중치" },
+  { key: "search.field_weight.identity", category: "검색", label: "검색 필드가중치: 정체성(synth_identity)", def: 2.5, min: 0, max: 20, unit: "가중치" },
+  { key: "search.field_weight.signature", category: "검색", label: "검색 필드가중치: 시그니처", def: 2, min: 0, max: 20, unit: "가중치" },
+  { key: "search.field_weight.note", category: "검색", label: "검색 필드가중치: 노트", def: 2, min: 0, max: 20, unit: "가중치" },
+  { key: "search.field_weight.vibe", category: "검색", label: "검색 필드가중치: 분위기(vibe)", def: 2, min: 0, max: 20, unit: "가중치" },
+  { key: "search.field_weight.uses", category: "검색", label: "검색 필드가중치: 용도(uses)", def: 1.5, min: 0, max: 20, unit: "가중치" },
+  { key: "search.field_weight.beans", category: "검색", label: "검색 필드가중치: 원두(beans)", def: 1.5, min: 0, max: 20, unit: "가중치" },
+  { key: "search.field_weight.review", category: "검색", label: "검색 필드가중치: 검증리뷰 인용", def: 2, min: 0, max: 20, unit: "가중치" },
+  { key: "search.field_weight.area", category: "검색", label: "검색 필드가중치: 지역(area)", def: 1, min: 0, max: 20, unit: "가중치" },
+  { key: "search.char_axis.scale", category: "검색", label: "검색 특성축(느낌) 점수 배율", def: 1.5, min: 0, max: 10, unit: "배" },
+  { key: "search.char_axis.cap", category: "검색", label: "검색 특성축(느낌) 점수 상한(cap)", def: 12, min: 1, max: 100, unit: "점" },
+  { key: "search.taste.high", category: "검색", label: "검색 맛 강신호 임계(이상)", def: 0.6, min: 0, max: 1, unit: "비율" },
+  { key: "search.taste.high_bonus", category: "검색", label: "검색 맛 강신호 가산점", def: 18, min: 0, max: 100, unit: "점" },
+  { key: "search.taste.mid", category: "검색", label: "검색 맛 중신호 임계(이상)", def: 0.5, min: 0, max: 1, unit: "비율" },
+  { key: "search.taste.mid_bonus", category: "검색", label: "검색 맛 중신호 가산점", def: 8, min: 0, max: 100, unit: "점" },
+  { key: "search.chain_cap", category: "검색", label: "검색 결과 동일체인 상위노출 상한", def: 2, min: 1, max: 20, unit: "개" },
+  { key: "search.cache_ttl_hours", category: "검색", label: "검색 결과 캐시 유효시간", def: 3, min: 1, max: 72, unit: "시간" },
 ];
 
 const BY_KEY: Record<string, CriterionMeta> = Object.fromEntries(META.map((m) => [m.key, m]));

@@ -69,7 +69,8 @@ async function ensureCols() {
 const CAFE_CTX = /(카페|커피|라떼|아메리카노|에스프레소|콜드브루|핸드드립|디저트|케이크|베이커리|메뉴|음료|원두|바리스타|좌석|매장|사장님|주문|브런치|로스팅|카공|빙수|스무디|에이드|방문|다녀|마셨|마시|들렀|시켰|먹었|cafe|coffee|latte|빵집?|빵|꽈배기|도넛|도나쓰|도나스|마카롱|과자|타르트|휘낭시에|쿠키|스콘|크루아상|크로플|베이글|찹쌀|꿀|크림|초코|티라미수|와플|토스트|샌드위치|간식|아인슈페너|플랫화이트|차\b|티\b|푸딩|젤라또|아이스크림|약과|디카페인|음식|맛있|존맛|JMT|먹스타|팥죽|단팥죽|쌍화탕|한방차|대추차|인삼차|유자차|생강차|오미자|다과|전통차|찻집|티하우스|한방|빙떡|경단)/i;
 function offctxRate(quotes: string[]): number {
   const qs = (quotes || []).filter(Boolean);
-  if (qs.length < 8) return 0; // 표본 적으면 신뢰 낮음 → 0
+  // 표본 적으면 신뢰 낮음 → 0. 임계는 criteria 단일출처(폴백 8). 소비 진입점(storeResult)이 loadCriteria로 프라임.
+  if (qs.length < getCriterionSync("contamination.offctx.min_sample")) return 0;
   return qs.filter((q) => !CAFE_CTX.test(q)).length / qs.length;
 }
 
@@ -175,17 +176,17 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   //   ① 커피 정체성 0: 노출후기 3건+에 카페 정체성(커피·디저트·베이커리·차/찻집) 단어가 하나도 없으면 비카페(식당·김밥·소매·오염).
   //   ② 오프콘셉: 활동공간/소매 업종명사(애견·키즈·만화·보드게임·룸·파티룸·소품샵·기프트샵·편집샵 등)가 카페 자기이름과 함께 우세(≥0.66) → 리테일/활동 메인.
   const _belongsHit = qz.filter((q) => CAFE_BELONGS.test(q)).length;
-  const noCafeIdentity = collected >= 3 && _belongsHit === 0;
+  const noCafeIdentity = collected >= getCriterionSync("contamination.nocafe.min_collected") && _belongsHit === 0;
   const _ob = offconceptBrand(name);
   const _offHit = qz.filter((q) => OFFCONCEPT_VENUE.test(q));
   const offConceptHit = _offHit.length >= 3 && _ob.length >= 2 && (_offHit.filter((q) => q.includes(_ob)).length / Math.max(qz.length, 1)) >= 0.66;
-  const noisy = (collected >= 5 && coherence < 0.4) || isGenericFoodName(name) || entityPolluted || noCafeIdentity || offConceptHit;
+  const noisy = (collected >= getCriterionSync("contamination.noisy.min_collected") && coherence < getCriterionSync("contamination.noisy.coherence_max")) || isGenericFoodName(name) || entityPolluted || noCafeIdentity || offConceptHit;
   // 🔀 판정 분기 신호: 진짜 '맥락판단'이 필요한 경우만 LLM으로(규칙 우선 극대화).
   //   ⚠️ 경계후기 존재만으로 LLM 보내지 않음 — 경계후기는 어차피 합성서 제외되어 공개 내용에 안 들어가고,
   //      이미 '깨끗한 후기'로 검증/참고 등급이 난 카페는 규칙으로 공개해도 안전(품질 위험 0).
   //   LLM 필요 = ① 근거 자체가 애매(이름일관성<0.55 OR 맥락오염≥0.5)  또는
   //             ② '후보'등급(깨끗한 후기 부족)인데 경계후기를 살리면 등급이 오를 여지 있음(LLM이 복원).
-  const ambiguousEvidence = coherence < 0.55 || offctx >= 0.5;
+  const ambiguousEvidence = coherence < getCriterionSync("contamination.ambiguous.coherence_max") || offctx >= getCriterionSync("contamination.ambiguous.offctx_min");
   const blCount = borderline?.length ?? 0; // 경계후기 수(노출 제외·LLM 보강 대기) — 관제탑 가시화용
   const recoverableEdge = grade === "후보" && blCount > 0;
   const needsLLM = ambiguousEvidence || recoverableEdge;
@@ -505,7 +506,7 @@ export async function finalizePipeline(): Promise<{ promoted: number; names: str
       AND (
         llm_judged_at IS NOT NULL                                                          -- LLM 판정 완료(애매했던 것도 통과)
         OR needs_llm = false                                                               -- 규칙으로 명확(신규 저장분)
-        OR (needs_llm IS NULL AND COALESCE(synth_coherence,0) >= 0.55 AND COALESCE(offctx_rate,0) < 0.5)  -- 기존분 프록시
+        OR (needs_llm IS NULL AND COALESCE(synth_coherence,0) >= ${getCriterionSync("contamination.ambiguous.coherence_max")} AND COALESCE(offctx_rate,0) < ${getCriterionSync("contamination.ambiguous.offctx_min")})  -- 기존분 프록시(storeResult ambiguous와 동일 기준)
       )
     RETURNING name`) as any[];
   // 남은 pending이 어느 게이트에서 막혔는지 진단(관제용)
@@ -680,6 +681,7 @@ export async function healCrossCafeLinkContamination(): Promise<{ removed: numbe
 //   🚨 안전장치: 한 회차 비공개가 unpubCap 초과 = 규칙 회귀(인천 사태) 의심 → 즉시 중단·경보(대량삭제 차단).
 export async function healPublishedAudit(limit = 600, unpubCap = 120): Promise<{ scanned: number; unpublished: number; flagged: number; regression: boolean; names: string[] }> {
   await ensureCols();
+  await loadCriteria(); // 오염 재플래그 임계(coherence_max) 캐시 프라임 — noisy 게이트와 동일 기준(폴백 0.4)
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS audit_checked_at TIMESTAMPTZ`.catch(() => {});
   const rows = (await sql`SELECT id, name, area FROM cafes
     WHERE published AND raw_reviews IS NOT NULL
@@ -699,7 +701,7 @@ export async function healPublishedAudit(limit = 600, unpubCap = 120): Promise<{
     if (after?.published) {
       const q = (after.synth_reviews || []).map((e: any) => e?.quote || "").filter(Boolean);
       const coh = q.length >= 3 ? nameCoherence(cleanCafeName(r.name), q, [r.area]) : 1; // ★ storeResult와 동일하게 정제이름 사용 — '교동89 카페'·'토팡가 커피 로스터스' 같은 서술어 상호를 오염으로 오탐하던 버그 차단
-      if (coh < 0.4) {
+      if (coh < getCriterionSync("contamination.noisy.coherence_max")) {
         flagged++;
         await sql`INSERT INTO audit_flags (cafe_id, cafe_name, issue, detail, resolved)
           SELECT ${r.id}, ${r.name}, ${"근거오염"}, ${`재합성후에도 카페명 일치율 ${Math.round(coh * 100)}%`}, false
