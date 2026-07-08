@@ -98,6 +98,10 @@ export const LIST_META: ListMeta[] = [
     items: ["고로케", "정육", "세탁소", "치킨집", "피자", "분식", "국밥", "삼겹", "횟집", "노래방", "PC방", "문구"] },
   { key: "discover.manual_noncafe", category: "오염리스트", label: "발굴: 수동 지목 비카페", consumer: "discover.isNonCafe",
     items: ["차덕분"] },
+  // 지역발굴 라우트(app/api/cafe-discover) 전용 추가 비카페 토큰. discover.non_cafe(공용)와 합집합으로 소비 → 기존 하드코딩 16토큰과 동작 동일.
+  //   (세탁·치킨·노래가 공용의 세탁소·치킨집·노래방을 포섭하므로 두 키 합집합 = 종전 유효필터 무변.) 어드민에서 이 키를 편집하면 지역발굴 경로에 반영.
+  { key: "discover.non_cafe_regional", category: "오염리스트", label: "발굴(지역 라우트): 비카페 추가 토큰(부분일치)", consumer: "cafe-discover.isNonCafe",
+    items: ["마트", "편의점", "세탁", "미용", "약국", "치킨", "노래"] },
 
   // ── 초약체 유일토큰 (lib/reviewQuality.ts · WEAK_IDENTITY_TOKEN) — 리뷰 매칭 엄격도 게이트 ──
   { key: "identity.weak_token", category: "정체성", label: "초약체 유일토큰(엄격 매칭 요구)", consumer: "reviewQuality",
