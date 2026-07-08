@@ -3,6 +3,7 @@
 import { sql } from "./db";
 import { getLearned } from "./learnedTerms";
 import { loadCriteria, getCriterionSync } from "./criteria";
+import { getListSync, loadCriteriaLists } from "./criteriaLists"; // 비카페 순수 리스트 단일출처(BASE=폴백). 캐시 프라임은 discover 진입점이 함.
 
 const ID = process.env.NAVER_CLIENT_ID;
 const SECRET = process.env.NAVER_CLIENT_SECRET;
@@ -21,7 +22,8 @@ const FRANCHISE = ["스타벅스", "투썸", "이디야", "메가커피", "메�
   "텐퍼센트커피", "봉명동내커피", "읍천리382", "브런치빈", "나인블럭", "카페인중독", "카페봄봄", "커피인류", "포트캔커피", "프랭크커핀바", "하이테이블", "카페동네",
   "파리크라상", "롤링핀", "안스베이커리", "핫브레드", "좋은아침페스츄리", "노티드", "온더브레드", "홍종흔베이커리", "주재근베이커리", "삼송빵집", "화이트리에", "백금당", "명장시대"];
 // 이름에 들어있으면(지점이어도) 비카페인 '음식·소매' 키워드
-const NON_CAFE = ["고로케", "정육", "세탁소", "치킨집", "피자", "분식", "국밥", "삼겹", "횟집", "노래방", "PC방", "문구"];
+// 비카페 상호 토큰(부분일치) — 사전은 lib/criteriaLists.ts("discover.non_cafe")가 단일출처(무배포 편집). 폴백=현재값.
+const nonCafeList = () => getListSync("discover.non_cafe");
 // 이름이 이 시설명으로 '끝'나면(지점 ○○점 제외) 카페가 아닌 시설 자체
 const NON_CAFE_END = /(교회|성당|사찰|법당|학교|유치원|어린이집|병원|의원|한의원|치과|약국|도서관|주민센터|행정복지센터|우체국|경찰서|소방서|구청|시청)$/;
 // 카페류 신호(이름·카테고리에 있으면 무조건 통과 — 북카페·○○병원점 같은 정상 카페 보호)
@@ -155,7 +157,8 @@ const DONG_KEYWORDS = ["카페", "로스터리", "스페셜티커피", "핸드�
   "도넛", "베이글", "타르트", "마카롱", "스콘", "휘낭시에", "크로플", "카눌레", "젤라또", "푸딩", "티라미수", "약과", "쿠키", "빙수", "수제디저트", "디저트맛집", "빵맛집", "커피맛집"];
 
 // 사장님이 직접 '비카페'로 지목한 곳 — 카테고리가 비어 규칙이 못 잡는 케이스를 이름으로 확실히 차단.
-const MANUAL_NONCAFE = ["차덕분"];
+// 수동 지목 비카페 — 사전은 lib/criteriaLists.ts("discover.manual_noncafe")가 단일출처(무배포 편집). 폴백=현재값.
+const manualNoncafeList = () => getListSync("discover.manual_noncafe");
 const stripTags = (s: string) => (s || "").replace(/<[^>]+>/g, "").replace(/&[a-z]+;/g, "").trim();
 // 지번주소에서 동/읍/면 추출 — '서울특별시 강동구 상일동 502' → '상일동', '경기도 수원시 장안구 정자동' → '정자동'.
 // 구/시/군 뒤에 오는 동·읍·면·가 토큰. 행정동 숫자(여의도동·1가 등) 포함.
@@ -183,7 +186,7 @@ export const isGenericFoodName = (name: string) => { const n = (name || "").repl
 //       반드시 마지막 > 뒤(리프)로 봐야 와플대학·아이스크림·음식점을 제대로 거른다.
 export const isNonCafe = (name: string, category: string) => {
   const n = (name || "").replace(/\s/g, ""), cat = category || "";
-  if (MANUAL_NONCAFE.some((b) => n.includes(b.replace(/\s/g, "")))) return true; // 직접 지목 비카페(차덕분 등) — 카테고리 무관 확실 차단
+  if (manualNoncafeList().some((b) => n.includes(b.replace(/\s/g, "")))) return true; // 직접 지목 비카페(차덕분 등) — 카테고리 무관 확실 차단
   if (isSnackStall(name)) return true; // 🍢 노점 간식(꽈배기·찹쌀도너츠 등) — 네이버 '카페,디저트' 오분류 무시하고 차단
   if (isStructuralPhantom(name)) return true; // 🏚️ 유령 상호("2층 카페"·"2층사무실" 등) — 카테고리 카페여도 차단
   if (NON_CAFE_OVERRIDE.test(n) || NON_CAFE_OVERRIDE.test(cat)) return true; // 키즈·스터디·만화·실내놀이터 등
@@ -205,7 +208,7 @@ export const isNonCafe = (name: string, category: string) => {
   }
   // 카테고리 불명 → 이름 기반 보조
   if (CAFE_HINT.test(n)) return false;
-  if (NON_CAFE.some((k) => n.includes(k))) return true;
+  if (nonCafeList().some((k) => n.includes(k))) return true;
   if (!/점$/.test(n) && NON_CAFE_END.test(n)) return true;
   return false;
 };
@@ -329,6 +332,7 @@ export async function discoverRegion(region: string, areaLabel: string, keywords
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS dong TEXT`.catch(() => {});
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS naver_category TEXT`.catch(() => {});
   await loadCriteria(); // 수도권 좌표박스 기준 캐시 갱신(폴백=36.8~38.3/124.5~127.9)
+  await loadCriteriaLists(); // 비카페 순수 리스트 캐시 프라임(동기 getListSync)
   const latMin = getCriterionSync("geo.box.lat_min"), latMax = getCriterionSync("geo.box.lat_max");
   const lngMin = getCriterionSync("geo.box.lng_min"), lngMax = getCriterionSync("geo.box.lng_max");
   let inserted = 0, skipped = 0, backfilled = 0, oob = 0;

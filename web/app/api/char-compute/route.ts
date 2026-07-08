@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
 import { computeCharScores } from "@/lib/charScore";
+import { loadCriteriaLists } from "@/lib/criteriaLists";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
@@ -8,6 +9,7 @@ export const maxDuration = 60;
 export async function POST(req: NextRequest) {
   try {
     await ensureSchema();
+    await loadCriteriaLists(); // 성향축 키워드 사전 캐시 프라임(computeCharScores가 동기 getListSync로 읽음)
     await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS char_scores JSONB`;
     const body = await req.json().catch(() => ({}));
     const limit = Math.min(Math.max(Number(body.limit) || 100, 1), 300);

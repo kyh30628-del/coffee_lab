@@ -10,6 +10,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { sql } from "./db";
 import { META, DEFAULTS, getCriteria, ensureCriteriaTable, inRange } from "./criteria";
+import { listKeys } from "./criteriaLists";
 
 export type CriteriaCheck = { key: string; label: string; severity: "fail" | "warn"; count: number; samples: string[] };
 export type CriteriaReport = { ranAt: string; status: "pass" | "warn" | "fail"; fails: number; warns: number; checks: CriteriaCheck[]; deadKnobs: string[]; scanned: number };
@@ -17,7 +18,7 @@ export type CriteriaReport = { ranAt: string; status: "pass" | "warn" | "fail"; 
 // ── (a) 정적 dead-knob 스캔 — 순수(fs만, DB·LLM 없음). 소비 코드에서 getCriterion(Sync)("key")로 참조되는지.
 //   런타임(Vercel)에선 next.config outputFileTracingIncludes가 lib/·app/api/ 소스를 함수 번들에 포함시켜 읽는다.
 //   소스를 못 읽으면 false-fail 대신 스캔불가로 리턴(호출부가 warn 처리) — 서비스·감시 신뢰 보호.
-const SKIP_FILE = /(^|\/)(criteria\.ts|criteriaVerify\.ts)$/; // 관제·검증 자신은 소비처가 아님
+const SKIP_FILE = /(^|\/)(criteria\.ts|criteriaVerify\.ts|criteriaLists\.ts)$/; // 관제·검증·리스트정의 자신은 소비처가 아님
 const SKIP_DIR = /(^|\/)(node_modules|\.next|admin\/criteria|api\/admin\/criteria|api\/cron-criteria-verify)(\/|$)/;
 
 function collectSource(roots: string[]): { files: string[]; readable: boolean } {
@@ -53,6 +54,25 @@ export function scanCriteriaUsage(cwdOverride?: string): { usage: Record<string,
   return { usage, readable, scanned: files.length };
 }
 
+/** 리스트 사전 키별 소비 코드 참조 여부(v1 참조확인) — 키 리터럴("char.roast.kws")이 소비 소스에 등장하는지.
+ *  소비처는 getListSync/getListSetSync에 리터럴 키를 넘기거나 구조에 listKey/triggersKey 리터럴로 보유(둘 다 스캔 매칭).
+ *  참조 0 = dead list(무배포 편집해도 서비스 무반응). criteriaLists.ts(정의)·admin 은 SKIP되어 자기참조로 오탐 안 남. */
+export function scanListUsage(cwdOverride?: string): { usage: Record<string, number>; readable: boolean; scanned: number } {
+  const base = cwdOverride ?? process.cwd();
+  const { files, readable } = collectSource([path.join(base, "lib"), path.join(base, "app", "api")]);
+  const keys = listKeys();
+  const usage: Record<string, number> = Object.fromEntries(keys.map((k) => [k, 0]));
+  for (const f of files) {
+    let src: string;
+    try { src = fs.readFileSync(f, "utf8"); } catch { continue; }
+    for (const k of keys) {
+      const re = new RegExp(`["']${k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}["']`);
+      if (re.test(src)) usage[k]++;
+    }
+  }
+  return { usage, readable, scanned: files.length };
+}
+
 // ── 전체 검증 실행 ──────────────────────────────────────────────────────────
 export async function runCriteriaChecks(): Promise<CriteriaReport> {
   const checks: CriteriaCheck[] = [];
@@ -66,6 +86,15 @@ export async function runCriteriaChecks(): Promise<CriteriaReport> {
     add("dead_knob_scan", "정적 dead-knob 스캔 불가(소스 미접근)", "warn", 1, ["번들 트레이싱 확인 필요"]);
   } else {
     add("dead_knob", "코드가 참조하지 않는 기준(dead knob — 무배포 조정해도 서비스 무반응)", "fail", deadKnobs.length, deadKnobs);
+  }
+
+  // (a-2) 리스트 사전 dead-knob — 새 사전 키가 실제 소비 코드에 물렸는지(v1 참조확인).
+  const lu = scanListUsage();
+  const deadLists = lu.readable ? Object.keys(lu.usage).filter((k) => lu.usage[k] === 0) : [];
+  if (!lu.readable) {
+    add("dead_list_scan", "리스트 사전 참조 스캔 불가(소스 미접근)", "warn", 1, ["번들 트레이싱 확인 필요"]);
+  } else {
+    add("dead_list", "코드가 참조하지 않는 리스트 사전(무배포 편집해도 서비스 무반응)", "fail", deadLists.length, deadLists);
   }
 
   // (b) 충실도/드리프트 — criteria 테이블 대조

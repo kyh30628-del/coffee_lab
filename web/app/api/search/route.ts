@@ -3,6 +3,7 @@ import { sql, ensureSchema } from "@/lib/db";
 import { embedQuery, toVectorLiteral, hasEmbedKey } from "@/lib/embed";
 import { hasSearchLLM, rerankWithClaude, lastRerankError, type SearchCand } from "@/lib/searchAgent";
 import { loadCriteria, getCriterionSync } from "@/lib/criteria";
+import { loadCriteriaLists, getListSync } from "@/lib/criteriaLists";
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
@@ -11,21 +12,13 @@ export const maxDuration = 30;
 // - exact/개념: 질의 토큰을 카페 텍스트·검증 리뷰에서 직접 매칭 + 느낌→신호 가산(근거 노출).
 // 키 없으면 키워드 기반으로 자동 폴백. 점수는 DB 실제값만 사용(환각 금지).
 
-// 수도권(서울·경기·인천) 외 지역 키워드 — query 또는 region에 포함 시 미서비스 안내
-const OUT_OF_COVERAGE_KEYWORDS = [
-  // 감사수리: bare "광주"는 서비스 지역인 경기 광주시에 오경보 → 명시형만 유지
-  "부산", "대구", "대전", "광주광역시", "광주 광역시", "울산", "세종",
-  "강원", "충북", "충남", "충청", "전북", "전남", "전라", "경북", "경남", "경상", "제주",
-  "춘천", "원주", "강릉", "속초", "포항", "경주", "안동", "구미",
-  "창원", "진주", "통영", "김해", "거제", "양산", "밀양",
-  "전주", "군산", "익산", "목포", "순천", "여수", "광양",
-  "청주", "충주", "제천", "천안", "아산", "공주", "서산",
-  "제주시", "서귀포",
-];
+// 수도권(서울·경기·인천) 외 지역 키워드 — query 또는 region에 포함 시 미서비스 안내.
+//   사전은 lib/criteriaLists.ts("search.out_of_coverage")가 단일출처(무배포 편집). 폴백=현재값.
+//   감사수리: bare "광주"는 서비스 지역인 경기 광주시에 오경보 → 명시형만 유지.
 
 function detectOutOfCoverage(q: string, region: string): string | null {
   const text = (q + " " + region).toLowerCase();
-  for (const kw of OUT_OF_COVERAGE_KEYWORDS) {
+  for (const kw of getListSync("search.out_of_coverage")) {
     if (text.includes(kw)) {
       return `현재 동네 커피 노트는 수도권(서울·경기·인천)만 서비스합니다. '${kw}' 지역 카페는 아직 포함되어 있지 않아요. 수도권 검색어로 다시 시도해 보세요.`;
     }
@@ -33,17 +26,21 @@ function detectOutOfCoverage(q: string, region: string): string | null {
   return null;
 }
 
-const CONCEPTS: { id: string; triggers: string[]; axis?: string; taste?: string; uses?: string[]; label: string }[] = [
-  { id: "quiet", triggers: ["조용", "혼자", "차분", "사색", "고요", "한적", "혼카", "평온", "힐링", "나홀로", "한가"], axis: "quiet", uses: ["혼자"], label: "조용·혼자" },
-  { id: "work", triggers: ["작업", "공부", "노트북", "콘센트", "스터디", "와이파이", "오래", "독서", "집중", "책"], axis: "work", uses: ["작업"], label: "작업·공부" },
-  { id: "mood", triggers: ["분위기", "감성", "예쁜", "이쁜", "데이트", "사진", "인테리어", "뷰", "루프탑", "아늑", "무드", "빈티지", "힙", "감각", "조명", "이국적"], axis: "mood", uses: ["사진"], label: "분위기·감성" },
-  { id: "dessert", triggers: ["빵", "디저트", "케이크", "베이커리", "달달", "달콤", "스콘", "크로플", "쿠키", "티라미수", "마카롱", "휘낭시에", "과자", "구움"], axis: "dessert", uses: ["빵"], label: "디저트·빵" },
-  { id: "roast", triggers: ["로스팅", "스페셜티", "원두", "핸드드립", "드립", "커피맛", "고급", "로스터리", "싱글", "에스프레소", "진심", "커피가 맛", "커피 맛"], axis: "roast", label: "직접로스팅·스페셜티" },
-  { id: "space", triggers: ["넓", "대형", "테라스", "주차", "규모", "아이", "애견", "반려", "쾌적", "층고", "단체"], axis: "space", label: "넓은공간" },
-  { id: "acidity", triggers: ["산미", "상큼", "과일", "베리", "시트러스", "플로럴", "꽃향", "새콤", "산뜻", "후르츠"], taste: "acidity", label: "산미 또렷" },
-  { id: "body", triggers: ["고소", "묵직", "진한", "다크", "스모키", "견과", "바디", "구수", "진하게"], taste: "body", label: "묵직·고소" },
-  { id: "sweet", triggers: ["단맛", "카라멜", "바닐라", "꿀", "초콜릿", "달콤한"], taste: "sweet", label: "단맛" },
+// 검색 개념 트리거 — 트리거 리스트는 lib/criteriaLists.ts("concept.*.triggers")가 단일출처(무배포 편집).
+//   여기엔 개념 구조(축·용도·라벨)와 리터럴 사전키(triggersKey)만 둔다. c.triggers는 getter로 매 접근시 getListSync(폴백=현재값).
+const CONCEPTS_BASE: { id: string; triggersKey: string; axis?: string; taste?: string; uses?: string[]; label: string }[] = [
+  { id: "quiet", triggersKey: "concept.quiet.triggers", axis: "quiet", uses: ["혼자"], label: "조용·혼자" },
+  { id: "work", triggersKey: "concept.work.triggers", axis: "work", uses: ["작업"], label: "작업·공부" },
+  { id: "mood", triggersKey: "concept.mood.triggers", axis: "mood", uses: ["사진"], label: "분위기·감성" },
+  { id: "dessert", triggersKey: "concept.dessert.triggers", axis: "dessert", uses: ["빵"], label: "디저트·빵" },
+  { id: "roast", triggersKey: "concept.roast.triggers", axis: "roast", label: "직접로스팅·스페셜티" },
+  { id: "space", triggersKey: "concept.space.triggers", axis: "space", label: "넓은공간" },
+  { id: "acidity", triggersKey: "concept.acidity.triggers", taste: "acidity", label: "산미 또렷" },
+  { id: "body", triggersKey: "concept.body.triggers", taste: "body", label: "묵직·고소" },
+  { id: "sweet", triggersKey: "concept.sweet.triggers", taste: "sweet", label: "단맛" },
 ];
+const CONCEPTS: { id: string; triggers: string[]; axis?: string; taste?: string; uses?: string[]; label: string }[] =
+  CONCEPTS_BASE.map((c) => ({ id: c.id, axis: c.axis, taste: c.taste, uses: c.uses, label: c.label, get triggers() { return getListSync(c.triggersKey); } }));
 
 // 서울 25개 구 목록 (cafes.area에는 접두사 없이 "마포구" 형태로 저장)
 const SEOUL_GU = [
@@ -198,6 +195,7 @@ function logSearch(q: string, region: string, results: number, mode: string, int
 
 export async function GET(req: NextRequest) {
   await loadCriteria(); // 등급 가산점 기준 캐시 프라임(동기 gradeBonus가 읽음)
+  await loadCriteriaLists(); // 개념 트리거·미서비스지역 사전 캐시 프라임(동기 getListSync가 읽음)
   try {
     await ensureSchema();
     const q = (req.nextUrl.searchParams.get("q") ?? "").trim();

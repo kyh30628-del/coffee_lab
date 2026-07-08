@@ -1,16 +1,21 @@
 // 성격 축(char) 키워드 점수 — 합성 경로와 char-compute가 공유하는 단일 출처.
 // 검증 통과한 리뷰 텍스트에서만 계산한다(품질 필터 이후). 측정값이 아니라 '언급 빈도'.
+//   ⚠️ 축별 키워드(kws)는 lib/criteriaLists.ts(BASE=폴백 진실원본)가 단일출처 — 무배포 편집 가능.
+//   ax.kws 는 getter로 매 접근시 getListSync(BASE 폴백)를 읽는다(캐시 미프라임이어도 현재값 = 서비스 무변).
+import { getListSync } from "./criteriaLists";
 
-export const CHAR_AXES = [
-  { key: "roast", label: "직접로스팅", emoji: "🔥", kws: ["로스팅", "로스터리", "직접 볶", "자가배전", "스페셜티", "싱글오리진"] },
-  { key: "work", label: "작업·공부", emoji: "💻", kws: ["작업", "노트북", "공부", "콘센트", "집중", "와이파이"] },
+const CHAR_AXES_BASE = [
+  { key: "roast", label: "직접로스팅", emoji: "🔥", listKey: "char.roast.kws" },
+  { key: "work", label: "작업·공부", emoji: "💻", listKey: "char.work.kws" },
   // coord#114(2026-07-05): 바른 "고요" 단독 매칭이 '최고요'(=최고예요)·'아침고요수목원'(관광지명)에 오염 →
   //   quiet 점수 허위 급등(고요재 845·최고요 241). 조용함을 실제 서술하는 형태(고요한/고요함/고요히)만 인정.
-  { key: "quiet", label: "조용·혼자", emoji: "🤍", kws: ["조용", "차분", "혼자", "사색", "한적", "고요한", "고요함", "고요히", "고요하게"] },
-  { key: "dessert", label: "디저트", emoji: "🍰", kws: ["디저트", "케이크", "스콘", "크로플", "티라미수", "베이커리", "쿠키", "빵"] },
-  { key: "mood", label: "분위기", emoji: "📸", kws: ["분위기", "예쁜", "감성", "인테리어", "사진", "뷰", "루프탑", "아늑"] },
-  { key: "space", label: "넓은공간", emoji: "🪑", kws: ["넓", "대형", "규모", "테라스", "주차"] },
+  { key: "quiet", label: "조용·혼자", emoji: "🤍", listKey: "char.quiet.kws" },
+  { key: "dessert", label: "디저트", emoji: "🍰", listKey: "char.dessert.kws" },
+  { key: "mood", label: "분위기", emoji: "📸", listKey: "char.mood.kws" },
+  { key: "space", label: "넓은공간", emoji: "🪑", listKey: "char.space.kws" },
 ];
+export const CHAR_AXES: { key: string; label: string; emoji: string; kws: string[] }[] =
+  CHAR_AXES_BASE.map((a) => ({ key: a.key, label: a.label, emoji: a.emoji, get kws() { return getListSync(a.listKey); } }));
 
 function countHits(text: string, kws: string[]): number {
   const t = text.toLowerCase();

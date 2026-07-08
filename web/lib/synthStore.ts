@@ -11,6 +11,7 @@ import { isNonCafe, isFranchise, isGenericFoodName, isSnackStall, isStructuralPh
 import { nameCoherence, cleanCafeName } from "./reviewQuality";
 import { loadLearnedTerms } from "./learnedTerms";
 import { loadCriteria, getCriterionSync } from "./criteria";
+import { loadCriteriaLists } from "./criteriaLists";
 
 // 카페 지역어(시 + 동洞) — 동까지 넘겨야 reviewQuality가 '분당점=성남시' 같은 市단위 동명 지점 오인을 거른다.
 async function areaTermsFor(id: number, area?: string | null): Promise<string[]> {
@@ -525,6 +526,7 @@ export async function synthAndStore(cafe: { id: number; name: string; area: stri
   await ensureCols();
   await loadLearnedTerms(); // 학습된 규칙 사전 캐시 갱신(TTL 60s — 핫패스 비용 0)
   await loadCriteria(); // 등급 바닥 등 기준 임계값 캐시 갱신(synthesize가 동기로 읽기 전 프라임)
+  await loadCriteriaLists(); // 맛·용도·운영·초약체 사전 캐시 갱신(synthEngine·reviewQuality가 동기로 읽기 전 프라임)
   const { raw, fromCache, apiFailed } = await gatherRaw(cafe, !!opts?.refresh);
   if (apiFailed) return { id: cafe.id, name: cafe.name, ok: false, reason: "수집 API 오류/쿼터 — 보존", skipped: true };
   const sources = rawToSources(raw);

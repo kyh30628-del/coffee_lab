@@ -13,10 +13,13 @@ type Item = {
 };
 type Hist = { id: number; key: string; old_value: number; new_value: number; changed_by: string; changed_at: string; impact_note: string | null };
 type Preview = { kind: string; wouldUnpublish: number; changed: number; note: string; samples: string[] };
+// 📚 리스트 사전
+type ListView = { key: string; category: string; label: string; consumer: string; base: string[]; effective: string[]; added: string[]; removed: string[]; isDefault: boolean };
+type ListHist = { id: number; key: string; item: string | null; action: string; actor: string; note: string | null; at: string };
 
 const card: React.CSSProperties = { background: "#fff", border: "1px solid #ddc9a8", borderRadius: 12, padding: "12px 14px", minWidth: 0 };
 const sub: React.CSSProperties = { fontSize: 10.5, color: "#8a7a5c", fontWeight: 600 };
-const CAT_ICON: Record<string, string> = { 등급: "🏅", 지리: "🗺️", 검색: "🔎", 노출: "✨", 오염: "🛡️" };
+const CAT_ICON: Record<string, string> = { 등급: "🏅", 지리: "🗺️", 검색: "🔎", 노출: "✨", 오염: "🛡️", 성향축: "🎭", 맛축: "☕", 용도: "🪑", 운영신호: "🏷️", 검색개념: "💡", 오염리스트: "🛡️", 정체성: "🔖" };
 
 export default function CriteriaPage() {
   const [pw, setPw] = useState("");
@@ -30,6 +33,18 @@ export default function CriteriaPage() {
   const [busy, setBusy] = useState<string>("");
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
+  // 📚 리스트 사전 상태
+  const [lists, setLists] = useState<ListView[]>([]);
+  const [listCats, setListCats] = useState<string[]>([]);
+  const [listHistory, setListHistory] = useState<ListHist[]>([]);
+  const [newItem, setNewItem] = useState<Record<string, string>>({});
+
+  const loadLists = useCallback(async (p: string) => {
+    try {
+      const d = await fetch("/api/admin/criteria-lists", { headers: { "x-admin-password": p }, cache: "no-store" }).then((r) => r.json());
+      if (d.ok) { setLists(d.lists); setListCats(d.categories); setListHistory(d.history); }
+    } catch { /* 리스트 로드 실패는 숫자기준 화면을 막지 않음 */ }
+  }, []);
 
   const load = useCallback(async (p: string, silent = false) => {
     if (!silent) setLoading(true);
@@ -40,10 +55,22 @@ export default function CriteriaPage() {
         setItems(d.items); setCategories(d.categories); setHistory(d.history); setThreshold(d.blastThreshold ?? 20);
         setAuthed(true); localStorage.setItem("adm_pw", p);
         const dr: Record<string, string> = {}; for (const it of d.items) dr[it.key] = String(it.value); setDraft(dr);
+        await loadLists(p);
       } else if (!silent) setErr("비밀번호 확인");
     } catch { if (!silent) setErr("불러오기 실패"); }
     setLoading(false);
-  }, []);
+  }, [loadLists]);
+
+  const listAction = async (key: string, action: string, item?: string) => {
+    setBusy(key + (item ?? "")); setErr("");
+    try {
+      const d = await fetch("/api/admin/criteria-lists", { method: "POST", headers: { "x-admin-password": pw, "Content-Type": "application/json" },
+        body: JSON.stringify({ action, key, item }) }).then((r) => r.json());
+      if (d.ok) { if (action === "add") setNewItem((s) => ({ ...s, [key]: "" })); await loadLists(pw); }
+      else setErr(d.error || "적용 실패");
+    } catch { setErr("적용 실패"); }
+    setBusy("");
+  };
 
   useEffect(() => { const p = localStorage.getItem("adm_pw"); if (p) { setPw(p); load(p); } }, [load]);
 
@@ -178,8 +205,83 @@ export default function CriteriaPage() {
           </div>
         ))}
 
+        {/* 📚 리스트 사전 — 성향축·맛·용도·검색개념·오염리스트 등 하드코딩 키워드 사전을 무배포 편집 */}
+        <div style={{ marginTop: 22, background: "#2b2018", color: "#e8b87a", borderRadius: 14, padding: "12px 15px" }}>
+          <div style={{ fontSize: 15, fontWeight: 700 }}>📚 리스트 사전</div>
+          <div style={{ fontSize: 11, color: "#cbb38c", lineHeight: 1.5 }}>
+            소비자 출력을 형성하는 키워드 사전(성향점수·맛좌표·검색개념·오염게이트)을 무배포로 편집. 하드코딩=폴백 진실원본, DB=오버라이드.
+            <br />⚖️ <b>DoA</b>: <span style={{ color: "#8fd0a0", fontWeight: 700 }}>L2 전결</span>(기조실장) — 항목 편집이며 카페 공개상태는 직접 바꾸지 않음(반영은 합성/검색 파이프라인). 소유=품질본부.
+          </div>
+        </div>
+
+        {listCats.map((cat) => (
+          <div key={cat} style={{ marginTop: 14 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#9c6b3f", borderBottom: "1px solid #e8b87a", paddingBottom: 4, marginBottom: 8 }}>{CAT_ICON[cat] ?? "•"} {cat}</div>
+            {lists.filter((l) => l.category === cat).map((l) => {
+              const addedSet = new Set(l.added);
+              return (
+                <div key={l.key} style={{ ...card, marginBottom: 8 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 700 }}>{l.label}</div>
+                    <div style={{ display: "flex", gap: 5, alignItems: "baseline", whiteSpace: "nowrap" }}>
+                      {!l.isDefault && <span style={{ fontSize: 10, color: "#b5731f", fontWeight: 700 }}>편집됨</span>}
+                      <span title="소영향 — 기조실장 전결(바로 적용)" style={{ fontSize: 9.5, fontWeight: 700, padding: "1px 6px", borderRadius: 20, color: "#fff", background: "#3f7a4f" }}>L2 전결</span>
+                    </div>
+                  </div>
+                  <div style={{ ...sub, marginTop: 2, fontFamily: "monospace" }}>{l.key} · {l.consumer} · {l.effective.length}개</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 8 }}>
+                    {l.effective.map((it) => {
+                      const isAdded = addedSet.has(it);
+                      return (
+                        <span key={it} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, padding: "3px 4px 3px 9px", borderRadius: 20,
+                          background: isAdded ? "#eaf6ee" : "#f3ead8", border: `1px solid ${isAdded ? "#b6dcc2" : "#e6d8bf"}` }}>
+                          {it}{isAdded && <span style={{ fontSize: 9, color: "#3f7a4f", fontWeight: 700 }}>추가</span>}
+                          <button disabled={busy === l.key + it} onClick={() => listAction(l.key, "remove", it)} title="제거"
+                            style={{ border: "none", background: "transparent", color: "#b03a3a", fontWeight: 700, cursor: "pointer", fontSize: 13, lineHeight: 1, padding: "0 2px" }}>×</button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                  {l.removed.length > 0 && (
+                    <div style={{ ...sub, marginTop: 6 }}>숨김(기본에서 제거): {l.removed.map((it) => (
+                      <button key={it} disabled={busy === l.key + it} onClick={() => listAction(l.key, "revert", it)} title="되돌리기(다시 포함)"
+                        style={{ border: "1px dashed #d8c4a4", background: "#faf4e8", color: "#9c6b3f", borderRadius: 12, fontSize: 11, padding: "1px 7px", margin: "0 3px 3px 0", cursor: "pointer", textDecoration: "line-through" }}>{it} ↩</button>
+                    ))}</div>
+                  )}
+                  <div style={{ display: "flex", gap: 6, marginTop: 9, flexWrap: "wrap", alignItems: "center" }}>
+                    <input value={newItem[l.key] ?? ""} placeholder="새 키워드 추가" maxLength={40}
+                      onChange={(e) => setNewItem((s) => ({ ...s, [l.key]: e.target.value }))}
+                      onKeyDown={(e) => { if (e.key === "Enter" && (newItem[l.key] ?? "").trim()) listAction(l.key, "add", newItem[l.key].trim()); }}
+                      style={{ flex: "1 1 140px", minWidth: 120, padding: "7px 9px", border: "1px solid #d8c4a4", borderRadius: 8, fontSize: 14 }} />
+                    <button disabled={!(newItem[l.key] ?? "").trim() || busy === l.key + (newItem[l.key] ?? "").trim()} onClick={() => listAction(l.key, "add", (newItem[l.key] ?? "").trim())}
+                      style={{ padding: "8px 12px", background: "#2b2018", color: "#f4ece0", border: "none", borderRadius: 8, fontSize: 12.5, fontWeight: 700 }}>추가</button>
+                    {!l.isDefault && (
+                      <button disabled={busy === l.key} onClick={() => { if (window.confirm(`[${l.label}] 사전을 기본값으로 되돌립니다(모든 편집 취소).`)) listAction(l.key, "revert_all"); }}
+                        style={{ padding: "8px 12px", background: "#fff", color: "#9c6b3f", border: "1px solid #d8c4a4", borderRadius: 8, fontSize: 12.5, fontWeight: 700 }}>기본값 복원</button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ))}
+
+        {listHistory.length > 0 && (
+          <div style={{ marginTop: 16 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#9c6b3f", borderBottom: "1px solid #e8b87a", paddingBottom: 4, marginBottom: 8 }}>🕘 리스트 편집 이력</div>
+            <div style={card}>
+              {listHistory.map((h) => (
+                <div key={h.id} style={{ display: "flex", justifyContent: "space-between", gap: 8, padding: "5px 0", borderBottom: "1px solid #f0e6d2", fontSize: 12 }}>
+                  <div><span style={{ fontFamily: "monospace", color: "#8a5e30" }}>{h.key}</span> <b style={{ color: h.action.startsWith("revert") ? "#3f7a4f" : h.action === "remove" ? "#b03a3a" : "#b5731f" }}>{h.action}</b>{h.item ? <> · {h.item}</> : null}</div>
+                  <div style={{ ...sub, whiteSpace: "nowrap" }}>{h.actor} · {new Date(h.at).toLocaleString("ko-KR")}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div style={{ marginTop: 18 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "#9c6b3f", borderBottom: "1px solid #e8b87a", paddingBottom: 4, marginBottom: 8 }}>🕘 최근 변경</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#9c6b3f", borderBottom: "1px solid #e8b87a", paddingBottom: 4, marginBottom: 8 }}>🕘 최근 변경(숫자 기준)</div>
           {history.length === 0 ? <div style={sub}>아직 변경 이력이 없습니다.</div> : (
             <div style={card}>
               {history.map((h) => (

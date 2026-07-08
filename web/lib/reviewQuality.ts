@@ -11,6 +11,7 @@
 // ============================================================================
 
 import { getLearned } from "./learnedTerms";
+import { getListSetSync } from "./criteriaLists"; // 초약체 유일토큰 사전 단일출처(BASE=폴백). 캐시 프라임은 합성 진입점이 함.
 
 export type QualityVerdict = "verified" | "reference" | "rejected";
 export type SourceKind = "google" | "blog" | "cafearticle" | "youtube" | "etc";
@@ -361,7 +362,9 @@ export function nameCoherence(name: string, quotes: string[], areaTerms: string[
 // 룰갭 P9·P10(2026-07-08, rulegap-proposals-20260708-2.md): '청하동길'(id16795, 강화읍 도로명=상호명,
 //   타업체 '강화궁고구마닭강정' 주소혼입 3/6)·'스위치'(id16910, 닌텐도스위치/스위치온다이어트 등 4/6 무관).
 //   초약체 취급(전체이름 원문일치+지역어 동반 요구)으로 오매칭 차단.
-const WEAK_IDENTITY_TOKEN = new Set(["공간", "다이아", "블라블라", "충무", "브라더스", "2005", "인테리어", "조도", "회전목마", "실험실", "청하동길", "스위치"]);
+// 초약체 유일토큰 — 사전은 lib/criteriaLists.ts("identity.weak_token")가 단일출처(무배포 편집). 폴백=현재값.
+//   .has() 소비처(아래 여러 곳)가 그대로 쓰도록 getListSetSync를 위임하는 얇은 래퍼로 노출.
+const WEAK_IDENTITY_TOKEN = { has: (t: string) => getListSetSync("identity.weak_token").has(t) };
 const OFFTOPIC_SPAM = /(코인\s*해외선물|해외\s*선물\s*(거래|시세|투자|매매)|선물\s*거래소|암호화폐|가상화폐|비트코인|비트겟|바이낸스|재테크\s*(추천|비법|정보|수익)|주식\s*(리딩|종목추천|투자문의|급등주)|대출\s*(상담|한도|이자|갈아타기|추천)|아파트\s*분양|오피스텔\s*분양|분양가|모델하우스|청약\s*(가점|통장|경쟁률)|재개발\s*(구역|조합|호재)|재건축\s*(조합|아파트|호재)|입주\s*예정|주상복합\s*분양|최고\s*\d+\s*층|\d+\s*개동)/;
 
 export function verifyReview(input: QualityInput): QualityResult {
