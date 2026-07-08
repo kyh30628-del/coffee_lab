@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { synthesize, type Review } from "@/lib/synthEngine";
 import { collectAndSynthesize, type RawSource } from "@/lib/collectOrchestrator";
+import { loadCriteria } from "@/lib/criteria";
 
 export const runtime = "nodejs";
 
@@ -16,6 +17,7 @@ export async function POST(req: NextRequest) {
 
     // 모드 2: 다중소스 오케스트레이션
     if (Array.isArray(body.sources)) {
+      await loadCriteria(); // 등급 바닥 기준 캐시 프라임(동기 getCriterionSync가 읽음)
       const result = collectAndSynthesize(name, areaTerms, body.sources as RawSource[]);
       return NextResponse.json({ ok: true, mode: "multi", ...result });
     }

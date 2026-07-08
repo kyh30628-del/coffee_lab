@@ -4,6 +4,7 @@ import { synthAndStore, finalizePipeline, scrubPublishedPII, healGroundingSuspec
 import { recordRun } from "@/lib/agentLog";
 import { judgeQueueCount, dailyCounts } from "@/lib/metrics";
 import { consoleCreditExhaustedByProbe } from "@/lib/consoleKeyProbe";
+import { loadCriteria, getCriterionSync } from "@/lib/criteria";
 export const runtime = "nodejs";
 export const maxDuration = 120; // 재검증 자가감사(healPublishedAudit) 배치 여유
 
@@ -105,11 +106,15 @@ export async function GET(req: NextRequest) {
 
     // 🔎 공개 데이터 무결성 실시간 자가검증 — 사장님이 잡은 버그 유형을 관제탑이 매번 스스로 검사.
     //   (동 형식·동=구명 오추출·동-구 불일치·카테고리 누락·좌표 오류) 위반 시 즉시 경보.
+    // 수도권 좌표박스 기준(criteria) 캐시 프라임 — 자동비공개·복원이 synth와 같은 진실을 보게(폴백=36.8~38.3/124.5~127.9).
+    await loadCriteria();
+    const latMin = getCriterionSync("geo.box.lat_min"), latMax = getCriterionSync("geo.box.lat_max");
+    const lngMin = getCriterionSync("geo.box.lng_min"), lngMax = getCriterionSync("geo.box.lng_max");
     const ig = (await sql`SELECT
       COUNT(*) FILTER (WHERE dong IS NOT NULL AND (area=dong||'구' OR area=dong||'시' OR area=dong||'군'))::int dong_isgu,
       COUNT(*) FILTER (WHERE dong IS NOT NULL AND dong !~ '(동|읍|면|가)$')::int dong_badfmt,
       COUNT(*) FILTER (WHERE naver_category IS NULL OR naver_category='')::int pub_nocat,
-      COUNT(*) FILTER (WHERE lat IS NULL OR lat NOT BETWEEN 36.8 AND 38.3 OR lng NOT BETWEEN 124.5 AND 127.9)::int pub_badcoord,
+      COUNT(*) FILTER (WHERE lat IS NULL OR lat NOT BETWEEN ${latMin} AND ${latMax} OR lng NOT BETWEEN ${lngMin} AND ${lngMax})::int pub_badcoord,
       COUNT(*) FILTER (WHERE synth_identity IS NULL OR synth_identity='')::int pub_noidentity,
       -- 도(道) 교차오염: area의 도(인천%→인천, 끝이 구→서울, 끝이 시/군→경기)와 주소의 도가 다름 (예: area=강동구인데 주소=경기 남양주)
       COUNT(*) FILTER (WHERE address IS NOT NULL AND address<>''
@@ -150,7 +155,7 @@ export async function GET(req: NextRequest) {
         // 비공개 조치는 소수일 때만 자동(20건 초과면 대량 의심 → 자동조치 보류하고 경보로 surface)
         if (ig.pub_noidentity > 0 && ig.pub_noidentity <= 20) { const r = await sql`UPDATE cafes SET published=false WHERE published AND (synth_identity IS NULL OR synth_identity='') RETURNING 1`; if (r.length) fixes.push(`정체성없음 ${r.length}곳 비공개`); }
         else if (ig.pub_noidentity > 20) integrity.push(`정체성없음 공개 ${ig.pub_noidentity}곳 — 대량(자동조치 보류, 점검필요)`);
-        if (ig.pub_badcoord > 0 && ig.pub_badcoord <= 20) { const r = await sql`UPDATE cafes SET published=false WHERE published AND (lat IS NULL OR lat NOT BETWEEN 36.8 AND 38.3 OR lng NOT BETWEEN 124.5 AND 127.9) RETURNING 1`; if (r.length) fixes.push(`좌표오류 ${r.length}곳 비공개`); }
+        if (ig.pub_badcoord > 0 && ig.pub_badcoord <= 20) { const r = await sql`UPDATE cafes SET published=false WHERE published AND (lat IS NULL OR lat NOT BETWEEN ${latMin} AND ${latMax} OR lng NOT BETWEEN ${lngMin} AND ${lngMax}) RETURNING 1`; if (r.length) fixes.push(`좌표오류 ${r.length}곳 비공개`); }
         else if (ig.pub_badcoord > 20) integrity.push(`좌표오류 공개 ${ig.pub_badcoord}곳 — 대량(자동조치 보류, 점검필요)`);
       } catch (e) { integrity.push(`무결성 자동교정 실패(즉시 확인): ${String(e).slice(0, 50)}`); }
       if (fixes.length) healed.push(`🔧 무결성 자율교정: ${fixes.join(", ")}`);
@@ -326,7 +331,7 @@ export async function GET(req: NextRequest) {
         const r = await sql`UPDATE cafes SET published=true, updated_at=now()
           WHERE pipeline_status='live' AND NOT published
             AND synth_grade IN ('검증','참고')
-            AND lat BETWEEN 36.8 AND 38.3 AND lng BETWEEN 124.5 AND 127.9
+            AND lat BETWEEN ${latMin} AND ${latMax} AND lng BETWEEN ${lngMin} AND ${lngMax}
           RETURNING 1`;
         if (r.length) healed.push(`좌표백필 미공개 ${r.length}곳 자동 복원(live+박스안+검증/참고)`);
       } catch {}

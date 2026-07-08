@@ -14,6 +14,7 @@ export const runtime = "nodejs";
 // 잡별 감시 계약(정상 최대 경과·담당 본부) = lib/jobTeams.ts **단일 출처**(2026-07-02 수리).
 //   과거: ①3벌 맵 drift ②제거된 잡(dong-backfill·qualityaudit) 잔존 ③주석과 실제 주기 불일치("self-audit 01시").
 import { EXPECT_MAX_H, teamOf } from "@/lib/jobTeams";
+import { loadCriteria, getCriterionSync } from "@/lib/criteria";
 
 export async function GET(req: NextRequest) {
   const secret = process.env.CRON_SECRET;
@@ -37,8 +38,11 @@ export async function GET(req: NextRequest) {
     if (ac.escalated) escalated.push(`오염 비공개 결재상신 ${ac.escalated}건`);
 
     // ── 2) 데이터 정합성 (자동교정 후에도 남으면 = 비결정·조사필요) ──
+    await loadCriteria(); // 수도권 좌표박스 기준 캐시 프라임(폴백=36.8~38.3/124.5~127.9)
+    const latMin = getCriterionSync("geo.box.lat_min"), latMax = getCriterionSync("geo.box.lat_max");
+    const lngMin = getCriterionSync("geo.box.lng_min"), lngMax = getCriterionSync("geo.box.lng_max");
     const integ: [string, number, string, boolean][] = [
-      ["수도권 박스 밖 발행", await one(sql`SELECT count(*) c FROM cafes WHERE published AND (lat<36.8 OR lat>38.3 OR lng<124.5 OR lng>127.9)`), "품질본부", true],
+      ["수도권 박스 밖 발행", await one(sql`SELECT count(*) c FROM cafes WHERE published AND (lat<${latMin} OR lat>${latMax} OR lng<${lngMin} OR lng>${lngMax})`), "품질본부", true],
       ["비수도권 주소 발행", await one(sql`SELECT count(*) c FROM cafes WHERE published AND (address LIKE '충청%' OR address LIKE '강원%' OR address LIKE '전라%' OR address LIKE '경상%' OR address LIKE '대전%' OR address LIKE '부산%' OR address LIKE '대구%' OR address LIKE '울산%' OR address LIKE '광주광역시%' OR address LIKE '세종%' OR address LIKE '제주%')`), "품질본부", true],
       ["근거오염 발행(coherence<0.3)", await one(sql`SELECT count(*) c FROM cafes WHERE published AND synth_coherence<0.3 AND COALESCE(offctx_ok,false)=false`), "품질본부", true],
       ["표시필드 결손(좌표·area·identity·grade·빈이름)", await one(sql`SELECT count(*) c FROM cafes WHERE published AND (length(trim(coalesce(name,'')))<1 OR lat IS NULL OR lng IS NULL OR area IS NULL OR area='' OR synth_identity IS NULL OR synth_identity='' OR synth_grade IS NULL)`), "운영본부", true],

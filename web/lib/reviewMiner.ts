@@ -5,6 +5,7 @@
 import { sql } from "./db";
 import { coreTokens } from "./reviewQuality";
 import { isFranchise, parseDong } from "./discover";
+import { loadCriteria, getCriterionSync } from "./criteria";
 
 const NID = process.env.NAVER_CLIENT_ID, NSEC = process.env.NAVER_CLIENT_SECRET;
 const norm = (s: string) => (s || "").toLowerCase().replace(/\s/g, "");
@@ -34,6 +35,9 @@ export async function mineArea(areaLabel: string, opts?: { maxCalls?: number; ap
   const rawLimit = opts?.rawLimit ?? 100;
   const keyword = areaLabel.split(" ").pop() || areaLabel; // ILIKE·주소매칭용 핵심어(미추홀구 등)
 
+  await loadCriteria(); // 수도권 좌표박스 기준 캐시 프라임(폴백=36.8~38.3/124.5~127.9)
+  const latMin = getCriterionSync("geo.box.lat_min"), latMax = getCriterionSync("geo.box.lat_max");
+  const lngMin = getCriterionSync("geo.box.lng_min"), lngMax = getCriterionSync("geo.box.lng_max");
   const all = (await sql`SELECT name, lat, lng FROM cafes`) as any[];
   const haveN = all.map((c) => norm(c.name));
   const rows = (await sql`SELECT raw_reviews FROM cafes WHERE area ILIKE ${"%" + keyword + "%"} AND raw_reviews IS NOT NULL LIMIT ${rawLimit}`) as any[];
@@ -69,7 +73,7 @@ export async function mineArea(areaLabel: string, opts?: { maxCalls?: number; ap
     const nN = norm(name);
     if (!name || !lat || !lng || isNaN(lat) || isNaN(lng)) continue;
     // 🗺️ 수도권 박스 밖(비수도권 동명업체)은 적재 안 함 — 네이버가 타지역 지점 반환해도 서비스(수도권)와 무관.
-    if (!(lat >= 36.8 && lat <= 38.3 && lng >= 124.5 && lng <= 127.9)) continue;
+    if (!(lat >= latMin && lat <= latMax && lng >= lngMin && lng <= lngMax)) continue;
     // 최종 중복: 이름 또는 좌표 근사 또는 이번 배치 중복
     if (seen.has(nN) || haveN.some((h) => h.includes(nN) || nN.includes(h))
       || all.some((a) => a.lat && Math.abs(a.lat - lat) < 0.0005 && Math.abs(a.lng - lng) < 0.0005)) continue;

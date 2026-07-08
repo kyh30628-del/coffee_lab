@@ -3,6 +3,7 @@
 import { verifyReview, coreTokens, type QualityVerdict, type SourceKind } from "./reviewQuality";
 import { synthesize, type Review, type SynthResult } from "./synthEngine";
 import { computeCharScores } from "./charScore";
+import { getCriterionSync } from "./criteria"; // 등급 바닥 임계값 단일출처(캐시 프라임은 synthAndStore 등 진입점이 함)
 import type { WebSnippet } from "./webSearchCollector";
 
 export type RawSource = {
@@ -161,7 +162,11 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
   // 공개 floor = 검증리뷰 3건 (2026-06-30, CEO "검증된 리뷰 3건 이상"). trustCount는 옥석(verified+reference)만 —
   //   가비지·노이즈(rejected: 동명·무관·광고·SEO·nameAsWord)는 카운트 안 됨. 진짜 검증 리뷰 3건+ 있으면 참고(공개).
   //   얇아도 *진짜* 카페는 살리되 1~2건은 너무 얇아 보류. 오염/비카페는 coherence·카테고리 게이트가 별도로 막음.
-  const grade: "검증" | "참고" | "후보" = trustCount >= 30 ? "검증" : trustCount >= 3 ? "참고" : "후보";
+  //   임계값은 DB 기준(criteria) 단일출처 — 폴백=현재값(검증30/참고3). 동기 조회(캐시 프라임은 synthAndStore 등 진입점).
+  const grade: "검증" | "참고" | "후보" =
+    trustCount >= getCriterionSync("grade.floor.verified") ? "검증"
+    : trustCount >= getCriterionSync("grade.floor.reference") ? "참고"
+    : "후보";
 
   // 근거 리뷰: 복합 랭크(정확도 score + 신뢰등급 + 최신성)로 '가장 정확하고 가장 최신' 순. 최대 6개.
   const nowT = Date.now();

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
 import { collectAndSynthesize, type RawSource } from "@/lib/collectOrchestrator";
+import { loadCriteria } from "@/lib/criteria";
 
 export const runtime = "nodejs";
 
@@ -32,6 +33,7 @@ export async function POST(req: NextRequest) {
     else if (Array.isArray(body.reviews)) sources = [{ source: "google", texts: body.reviews.map((t: string) => ({ text: t })) }];
     else return NextResponse.json({ ok: false, error: "sources 또는 reviews 필요" }, { status: 400 });
 
+    await loadCriteria(); // 등급 바닥 기준 캐시 프라임(동기 getCriterionSync가 읽음)
     const { synth, collected, grade, charScores, evidenceReviews, quality } = collectAndSynthesize(name, areaTerms, sources);
     const c = synth.coords;
     // basis를 읽기 쉬운 한 줄로

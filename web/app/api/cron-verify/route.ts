@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
 import { recordRun } from "@/lib/agentLog";
+import { loadCriteria, getCriterionSync } from "@/lib/criteria";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
@@ -21,6 +22,9 @@ async function samp(q: Promise<any[]>): Promise<string[]> { return (await q).map
 
 async function runChecks(): Promise<Check[]> {
   const checks: Check[] = [];
+  await loadCriteria(); // 수도권 좌표박스 기준 캐시 프라임 — 감시가 synth와 같은 진실을 보게(폴백=36.8~38.3/124.5~127.9)
+  const latMin = getCriterionSync("geo.box.lat_min"), latMax = getCriterionSync("geo.box.lat_max");
+  const lngMin = getCriterionSync("geo.box.lng_min"), lngMax = getCriterionSync("geo.box.lng_max");
   const add = (key: string, label: string, severity: "fail" | "warn", count: number, samples: string[]) =>
     checks.push({ key, label, severity, count, samples });
 
@@ -64,8 +68,8 @@ async function runChecks(): Promise<Check[]> {
 
   // 7. 좌표 범위: 수도권 밖
   add("coord_bounds", "지도 좌표 범위 이탈(수도권 밖)", "fail",
-    await n(sql`SELECT count(*)::int n FROM cafes WHERE published AND (lat IS NULL OR lng IS NULL OR lat < 36.8 OR lat > 38.3 OR lng < 124.5 OR lng > 127.9)`),
-    await samp(sql`SELECT name s FROM cafes WHERE published AND (lat IS NULL OR lng IS NULL OR lat < 36.8 OR lat > 38.3 OR lng < 124.5 OR lng > 127.9) LIMIT 6`));
+    await n(sql`SELECT count(*)::int n FROM cafes WHERE published AND (lat IS NULL OR lng IS NULL OR lat < ${latMin} OR lat > ${latMax} OR lng < ${lngMin} OR lng > ${lngMax})`),
+    await samp(sql`SELECT name s FROM cafes WHERE published AND (lat IS NULL OR lng IS NULL OR lat < ${latMin} OR lat > ${latMax} OR lng < ${lngMin} OR lng > ${lngMax}) LIMIT 6`));
 
   // 8. 중복 근거 후기: 한 카페 내 같은 링크 중복
   add("duplicate_links", "근거 후기 링크 중복", "warn",

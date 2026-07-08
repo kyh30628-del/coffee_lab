@@ -114,7 +114,8 @@ export function synthesize(name: string, reviews: Review[]): SynthResult {
     if (c) ops[o] = c;
   }
 
-  // 등급 바닥 임계값 — DB 기준(criteria) 단일출처, 폴백=현재값(검증30/참고5). 동기 조회(캐시).
+  // 등급 바닥 임계값 — DB 기준(criteria) 단일출처, 폴백=현재값(검증30/참고3). 동기 조회(캐시).
+  //   ⚠️ collectAndSynthesize가 이 grade를 덮어쓰므로(synth.grade=grade) 소비자 실등급은 그 경로가 진실 — 둘 다 같은 criterion을 읽어 일치.
   const grade = n >= getCriterionSync("grade.floor.verified") ? "검증" : n >= getCriterionSync("grade.floor.reference") ? "참고" : "후보";
   const evidence: Record<string, { kind: string; snip: string }[]> = {};
   axes.forEach((a) => (evidence[a] = stat[a].ev.slice(0, 3)));

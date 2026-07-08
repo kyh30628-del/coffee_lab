@@ -18,7 +18,7 @@ export type CriterionMeta = {
 export const META: CriterionMeta[] = [
   // 등급 바닥
   { key: "grade.floor.verified", category: "등급", label: "검증 등급 최소 검증리뷰 수(광고 제외)", def: 30, min: 5, max: 100, unit: "건" },
-  { key: "grade.floor.reference", category: "등급", label: "참고 등급 최소 검증리뷰 수(광고 제외)", def: 5, min: 1, max: 50, unit: "건" },
+  { key: "grade.floor.reference", category: "등급", label: "참고 등급 최소 검증리뷰 수(광고 제외)", def: 3, min: 1, max: 50, unit: "건" },
   // 수도권 좌표 박스 (현재값 ±2)
   { key: "geo.box.lat_min", category: "지리", label: "수도권 좌표 박스 최소 위도(이하 비수도권 제외)", def: 36.8, min: 34.8, max: 38.8, unit: "°" },
   { key: "geo.box.lat_max", category: "지리", label: "수도권 좌표 박스 최대 위도(이상 비수도권 제외)", def: 38.3, min: 36.3, max: 40.3, unit: "°" },

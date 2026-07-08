@@ -402,9 +402,12 @@ export async function healNonCafeByReview(): Promise<{ held: number; names: stri
 // 🗺️ 수도권 박스 밖(비수도권 동명업체) 자동 제외 — 어느 적재 경로(발굴·마이닝·상가·수집)로 들어왔든
 //   2시간마다 일괄 정리. 공개 게이트가 노출은 이미 막지만, DB 청결 + 합성·임베딩 낭비 제거 + 미래 경로까지 커버하는 안전망.
 export async function healOutOfBox(): Promise<{ excluded: number; names: string[] }> {
+  await loadCriteria(); // 수도권 좌표박스 기준 캐시 프라임 — synth 게이트와 같은 진실(폴백=36.8~38.3/124.5~127.9)
+  const latMin = getCriterionSync("geo.box.lat_min"), latMax = getCriterionSync("geo.box.lat_max");
+  const lngMin = getCriterionSync("geo.box.lng_min"), lngMax = getCriterionSync("geo.box.lng_max");
   // ① 좌표 박스 밖
   const rows = (await sql`UPDATE cafes SET published = false, pipeline_status = 'excluded', updated_at = now()
-    WHERE lat IS NOT NULL AND NOT (lat BETWEEN 36.8 AND 38.3 AND lng BETWEEN 124.5 AND 127.9)
+    WHERE lat IS NOT NULL AND NOT (lat BETWEEN ${latMin} AND ${latMax} AND lng BETWEEN ${lngMin} AND ${lngMax})
       AND pipeline_status IS DISTINCT FROM 'excluded'
     RETURNING name`) as any[];
   // ② 주소 시·도가 비수도권 — 좌표가 박스에 걸쳐도(천안·당진·춘천 등 경계지역) 주소가 진짜 근거.
@@ -489,12 +492,15 @@ export async function healGroundingSuspects(): Promise<{ resynthed: number; name
 export async function finalizePipeline(): Promise<{ promoted: number; names: string[]; pending: number; stuck: any }> {
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS pipeline_status TEXT`.catch(() => {});
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS needs_llm BOOLEAN`.catch(() => {});
+  await loadCriteria(); // 수도권 좌표박스 기준 캐시 프라임 — 공개 승격 게이트가 synth와 같은 진실(폴백=36.8~38.3/124.5~127.9)
+  const latMin = getCriterionSync("geo.box.lat_min"), latMax = getCriterionSync("geo.box.lat_max");
+  const lngMin = getCriterionSync("geo.box.lng_min"), lngMax = getCriterionSync("geo.box.lng_max");
   const promoted = (await sql`
     UPDATE cafes SET published = true, pipeline_status = 'live'
     WHERE pipeline_status = 'pending'
       AND embedding IS NOT NULL
       AND synth_grade IN ('검증','참고')
-      AND lat IS NOT NULL AND lat BETWEEN 36.8 AND 38.3 AND lng BETWEEN 124.5 AND 127.9
+      AND lat IS NOT NULL AND lat BETWEEN ${latMin} AND ${latMax} AND lng BETWEEN ${lngMin} AND ${lngMax}
       AND NOT EXISTS (SELECT 1 FROM audit_flags af WHERE af.cafe_id = cafes.id AND NOT af.resolved)
       AND (
         llm_judged_at IS NOT NULL                                                          -- LLM 판정 완료(애매했던 것도 통과)

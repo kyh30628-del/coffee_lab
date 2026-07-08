@@ -3,6 +3,7 @@ import { sql, ensureSchema } from "@/lib/db";
 import { fetchPlacesReviews } from "@/lib/placesCollector";
 import { fetchWebReviews } from "@/lib/webSearchCollector";
 import { collectAndSynthesize, type RawSource } from "@/lib/collectOrchestrator";
+import { loadCriteria } from "@/lib/criteria";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -39,6 +40,7 @@ export async function POST(req: NextRequest) {
 
     if (sources.length === 0) return NextResponse.json({ ok: false, error: "수집된 데이터 없음", collectDebug }, { status: 404 });
 
+    await loadCriteria(); // 등급 바닥 기준 캐시 프라임(동기 getCriterionSync가 읽음)
     const { synth, collected, grade, charScores, perSource, evidenceReviews, reviewDates, quality } = collectAndSynthesize(name, areaTerms, sources);
     const c = synth.coords;
     const basisLine = ["acidity", "body", "sweet"].filter((ax) => c[ax] != null)
