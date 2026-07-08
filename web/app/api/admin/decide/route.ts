@@ -47,6 +47,14 @@ export async function POST(req: NextRequest) {
           const r = await sql`UPDATE cafes SET synth_updated=NULL, updated_at=now() WHERE id=ANY(${ids}) RETURNING id`;
           affected = r.length; result = `재합성 큐 ${affected}곳`; break;
         }
+        case "set_offctx": {
+          // offctx 화이트리스트 토글 — action_params.value(기본 false)로 offctx_ok 설정.
+          //   requeue_resynth가 synth_updated만 바꿔 offctx_ok는 이 결재 경로로 못 바꾸던 갭 보완(협업 #138·decisions#209).
+          //   value=false: 화이트리스트 해제 → offctx watchlist(>=0.55) 재편입(센티넬 재탐지 복구). value=true: 진짜카페 화이트리스트 등재.
+          const val = p.value === true; // 명시적 true만 화이트리스트 등재, 그 외 false(해제)
+          const r = await sql`UPDATE cafes SET offctx_ok=${val}, updated_at=now() WHERE id=ANY(${ids}) RETURNING id`;
+          affected = r.length; result = `offctx_ok=${val} ${affected}곳`; break;
+        }
         case "agent_task": {
           // 코드·에이전트 필요 → 서버 즉시 실행 불가. 승인만 기록, 기조실장이 배분.
           status = "approved"; result = `승인됨 — 기획조정실장이 ${d.team || "담당 본부"}에 배분·실행 예정`; break;

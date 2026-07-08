@@ -6,7 +6,7 @@ export const runtime = "nodejs";
 // 🔔 결재 항목 — 자율 조직이 올린 '구조화된 의사결정'. 위임전결(DoA) 4단계로 라우팅:
 //   L0 실무 자율(decisions 안 거침) · L1 본부 전결 · L2 기조실장 전결 · L3 CEO 결재(치명적·비가역).
 //   CEO 모바일엔 **L3만** 결재 대기로 노출 → 운영결정에 안 시달림. L1/L2는 '전결 처리됨(FYI)'로만 보임.
-//   action_type: unpublish | downgrade | restore | requeue_resynth | agent_task(기조실장 배분)
+//   action_type: unpublish | downgrade | restore | requeue_resynth | set_offctx(offctx_ok 토글) | agent_task(기조실장 배분)
 async function ensure() {
   await sql`CREATE TABLE IF NOT EXISTS decisions (
     id SERIAL PRIMARY KEY, created_at TIMESTAMPTZ DEFAULT now(),
