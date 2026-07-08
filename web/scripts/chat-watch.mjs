@@ -100,9 +100,13 @@ const TRIAGE = `
 2) **안전·가역 코드/UI/문구/설정 변경 작업지시**(예: 문구 수정, 버튼·레이아웃·색·라벨, 카드 추가, 버그 수정, 지표 표기, 정렬/필터 로직 등 — **데이터를 바꾸지 않는** 코드 변경): 다른 말 없이 정확히 한 줄로만 출력하라 →
 \`<ORDER>{"title":"12자내 제목","detail":"구현자가 읽을 요구사항 상세(무엇을 어디에 어떻게, 수용기준)","risk":"low|med|high"}</ORDER>\`
    risk: low=문구/스타일/단일 소규모 UI. high=인증·결제·스키마·마이그레이션·광범위 리팩터·다수 파일·핵심 검색/합성 로직. 그 외 med.
+   ⚠️ **이미 만들어진 특정 개발건을 '배포/배포확정/배포승인' 하라는 지시는 새 코드작업이 아니다 — <ORDER>가 아니라 아래 5)로 보내라.**
 3) **자동 실행 금지·대표님 확인 필요**(파괴적·비가역: 카페 공개/비공개/등급변경/대량/삭제 등 **데이터 변경**, 예산·토큰정책, launchd/스케줄/시크릿 변경, 요구가 모호하거나 선택지가 갈리는 경우): 실행하지 말고 정확히 한 줄로 →
 \`<CHOICE>대표님께 드리는 짧은 질문 또는 A/B 선택지(왜 확인이 필요한지 한 문장 + 옵션)</CHOICE>\`
-4) 애매하면 3)로. **데이터 변경(UPDATE/DELETE/INSERT)은 절대 <ORDER>로 내지 마라 — 반드시 <CHOICE>.** issues.ts 자동변환·결재/이슈 상호생성 영역은 건드리는 지시가 와도 <CHOICE>로 되물어라.`;
+4) 애매하면 3)로. **데이터 변경(UPDATE/DELETE/INSERT)은 절대 <ORDER>로 내지 마라 — 반드시 <CHOICE>.** issues.ts 자동변환·결재/이슈 상호생성 영역은 건드리는 지시가 와도 <CHOICE>로 되물어라.
+5) **기존 개발건 배포확정·배포승인 지시**(예: "#200 배포확정", "200번 배포해 줘", "그 개발건 배포 승인" — 이미 구현된 특정 **dev_task 번호**를 프로덕션에 배포하라는 지시. 새 코드작업이 아님): 신규 구현 큐로 보내지 말고, 지목된 번호를 담아 정확히 한 줄로만 →
+\`<DEPLOY>{"id":<지목된 개발건 번호(정수)>}</DEPLOY>\`
+   ⚠️ **반드시 구체적 번호(#뒤 숫자)가 명시됐을 때만.** 번호가 불명확하거나 여러 건 중 어느 것인지 애매하면 <DEPLOY>가 아니라 <CHOICE>로 "어느 개발건(#번호)인지" 되물어라.`;
 
 // ⚡ 결정론 즉답 게이트(LLM 0·즉시) — 아주 흔한 상태질문만. 명령/모호하면 null 반환 → LLM 경로.
 //   품질 안전: 명령 동사가 있으면 절대 여기서 처리 안 함(지시는 triage로). 매칭 확실한 것만.
@@ -130,6 +134,9 @@ async function quickAnswer(q) {
 async function askOrAnswer(base) {
   const out = await runClaude(base + TRIAGE, { tools: false, model: "opus", job: "chat-triage" }); // CEO 대화=opus(최고 품질)
   if (out && !out.startsWith("__ERR__")) {
+    // 🚀 기존 개발건 배포확정 지시 → 신규 구현 큐로 오라우팅 말고 해당 dev_task를 deploy_approved로 직접 승격.
+    const mdep = out.match(/<DEPLOY>([\s\S]*?)<\/DEPLOY>/);
+    if (mdep) { try { const j = JSON.parse(mdep[1].trim()); const id = Number(j.id); if (Number.isInteger(id) && id > 0) return { type: "deploy", id }; } catch { /* 파싱 실패 → 아래 일반 경로 */ } }
     const mo = out.match(/<ORDER>([\s\S]*?)<\/ORDER>/);
     if (mo) { try { return { type: "order", spec: JSON.parse(mo[1].trim()) }; } catch { return { type: "answer", text: out.replace(/<\/?ORDER>/g, "").trim() }; } }
     const mc = out.match(/<CHOICE>([\s\S]*?)<\/CHOICE>/);
@@ -156,6 +163,25 @@ async function createOrder(spec, question) {
   const id = r[0].id;
   await sql`INSERT INTO work_orders (command, action, tier) VALUES (${question.slice(0, 500)}, ${"dev_task#" + id}, ${risk})`.catch(() => {});
   return { id, autodeploy, risk };
+}
+
+// 🚀 챗 "배포확정"류 지시 → 기존 dev_task의 dev_status를 deploy_approved로 직접 승격(결정론·무LLM).
+//   신규 코드구현 큐로 오라우팅해 "구현불가"로 조용히 무산되던 갭(#211·#212) 차단.
+//   게이트: 실존 dev_task이고 '배포대기'(빌드·검증완료·branch 보유)일 때만 승격 — dev-deploy(무LLM)가 픽업해 실배포.
+//   위험도 무관(대표님의 명시적 배포확정 지시 = CEO 배포 승인). source!=chat(자율진단발 등)도 챗으로 배포확정 가능.
+async function confirmDeploy(id) {
+  const rows = await sql`SELECT id, title, status, action_type, action_params ap FROM decisions WHERE id=${id}`;
+  if (!rows.length) return { ok: false, text: `요청하신 개발 **#${id}**을 찾지 못했어요. 번호를 다시 확인해 주시겠어요?` };
+  const d = rows[0];
+  if (d.action_type !== "dev_task") return { ok: false, text: `**#${id}**은 개발(dev_task) 건이 아니라 배포 대상이 아닙니다 — "${String(d.title).slice(0, 40)}".` };
+  const ds = d.ap?.dev_status;
+  const branch = d.ap?.branch;
+  if (ds === "deployed" || d.status === "done") return { ok: false, text: `개발 **#${id}**은 이미 배포 완료된 상태입니다${d.ap?.sha ? ` (${String(d.ap.sha).slice(0, 8)})` : ""}.` };
+  if (ds === "deploy_approved") return { ok: false, text: `개발 **#${id}**은 이미 배포 승인돼 배포 대기열에 있습니다 — 곧(2분 주기) 반영됩니다.` };
+  if (ds !== "배포대기" || !branch) return { ok: false, text: `개발 **#${id}**은 아직 배포 준비 전입니다(현재 상태: ${ds || "개발대기"}). 구현·검증이 끝나면 배포확정을 다시 지시해 주세요.` };
+  // ✅ 배포대기(빌드·검증·branch 확보) → deploy_approved 승격. chat_deploy_confirm 플래그로 배포완료 보고까지 챗에 연결.
+  await sql`UPDATE decisions SET action_params = action_params || '{"dev_status":"deploy_approved","chat_deploy_confirm":true}'::jsonb, result='챗 배포확정 — CEO 배포 승인' WHERE id=${id}`;
+  return { ok: true, id, text: `🚀 **배포 승인했습니다 — 개발 #${id}**\n\n"${String(d.ap?.summary || d.title).slice(0, 90)}"\n\n배포 워커가 곧 main 병합·푸시합니다(2분 주기, ~3분 내 프로덕션 반영 확인). 완료되면 여기로 보고드립니다.` };
 }
 
 let busy = false;
@@ -185,6 +211,10 @@ async function tick() {
           mode = "order";
           answer = `🛠 **착수했습니다 — 개발 #${o.id}**\n\n"${r.spec.title || question}"\n\n격리 워크트리에서 구현 → tsc·빌드 검증 → ${o.autodeploy ? `**자동 배포**(위험도 ${o.risk})` : `**배포대기**(위험도 high — 배포 전 확인 요청드립니다)`}. 진행상황은 여기로 계속 보고드립니다. _(개발 파이프라인 5분 주기 — 곧 시작)_${guard.level === "throttle" ? "\n\n_※ 구독(claude -p) 주간 한도 " + guard.pct + "% — 절약 모드로 진행합니다._" : ""}`;
         }
+      } else if (r.type === "deploy") {
+        const dep = await confirmDeploy(r.id);
+        mode = dep.ok ? "deploy" : "deploy-info";
+        answer = dep.text;
       } else if (r.type === "choice") {
         mode = "choice";
         answer = `❓ **확인이 필요합니다**\n\n${r.text}\n\n_원하시는 방향을 답해 주시면 그대로 진행하겠습니다._`;
@@ -227,7 +257,8 @@ async function maintenance() {
         WHERE action_type='dev_task' AND status='approved' AND action_params->>'source'='chat'
           AND action_params->>'dev_status'='배포대기' AND (action_params->>'dev_autodeploy')='true'`.catch(() => {});
     const rows = await sql`SELECT id, action_params ap, result FROM decisions
-      WHERE action_type='dev_task' AND action_params->>'source'='chat'
+      WHERE action_type='dev_task'
+        AND (action_params->>'source'='chat' OR (action_params->>'chat_deploy_confirm')='true')
         AND action_params->>'dev_status' IS NOT NULL
         AND COALESCE(action_params->>'chat_reported','') <> COALESCE(action_params->>'dev_status','')`;
     for (const d of rows) {
