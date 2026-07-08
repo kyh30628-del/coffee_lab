@@ -1,6 +1,6 @@
 import { sql } from "./db";
 import { nameCoherence, cleanCafeName } from "./reviewQuality";
-import { healNonCafeCategory, healOffConceptByReview, healRestaurantByReview, healNonCafeByReview, healOutOfBox, healAreaLabel } from "./synthStore";
+import { healNonCafeCategory, healOffConceptByReview, healRestaurantByReview, healNonCafeByReview, healOutOfBox, healAreaLabel, offctxFalsePositive, OFFCTX_FLAG_RATE } from "./synthStore";
 import { pushTrigger } from "./auditTrigger";
 import { teamOf, RETIRED_JOBS } from "./jobTeams";
 import { invalidateCafeCaches } from "./cafeCacheInvalidate";
@@ -59,21 +59,29 @@ export async function autoCorrect(): Promise<{ resolved: number; escalated: numb
         AND COALESCE(decided_by,'') <> 'CEO' RETURNING id`.catch(() => [])) as any[];
     if (rev.length) { if (log.length < 8) log.push(`L3 자가승인 ${rev.length}건 → CEO 결재로 환원(#${rev.map((r) => r.id).join(",")})`); }
   } catch { /* graceful */ }
-  // 대상: 미해결 audit_flags(근거오염) + offctx 높은 공개 카페
+  // 대상: 미해결 audit_flags(근거오염) + offctx 높은 공개 카페. 어느 조건으로 걸렸는지(offctx_flag)를 함께 실어
+  //   offctx 건은 offctx 지표로, audit_flags 건은 이름일관성으로 각각 맞는 기준으로 오탐 재판정한다.
   const targets = (await sql`
-    SELECT DISTINCT c.id, c.name, c.area, c.synth_reviews
+    SELECT DISTINCT c.id, c.name, c.area, c.synth_reviews,
+      (c.offctx_rate >= ${OFFCTX_FLAG_RATE} AND NOT COALESCE(c.offctx_ok,false)) AS offctx_flag
     FROM cafes c
     WHERE c.published AND (
       EXISTS (SELECT 1 FROM audit_flags a WHERE a.cafe_id=c.id AND a.issue!='audit_complete' AND NOT COALESCE(a.resolved,false))
-      OR (c.offctx_rate >= 0.55 AND NOT COALESCE(c.offctx_ok,false))
+      OR (c.offctx_rate >= ${OFFCTX_FLAG_RATE} AND NOT COALESCE(c.offctx_ok,false))
     ) LIMIT 40`.catch(() => [])) as any[];
   for (const c of targets) {
     const q = parseRv(c.synth_reviews); if (q.length < 3) continue;
     const coh = nameCoherence(cleanCafeName(c.name), q, [c.area]);
-    if (coh >= 0.5) {
-      // 진짜 카페(오탐) → 자동 정리: 플래그 해소 + offctx 화이트리스트
+    // 🔑 offctx로 걸린 카페의 '오탐' 판정은 offctx 지표 자체로 재검한다(이름일관성 평균 아님).
+    //   offctx_rate='맥락 없는 리뷰 비율'(소수·다수 오염 포착) vs nameCoherence='이름 언급률'(평균 정합) — 서로
+    //   다른 신호라, 이름은 맞지만 카페 얘기가 아닌 오염(동명 타업종·홍보글)을 coherence 평균이 놓친다. 그 구조적
+    //   상충 탓에 수동교정(offctx_ok=false)이 매 사이클 coherence로 자동 재승인돼 9분 만에 원복됐다(협업#140/결재#209,
+    //   플래그십 확정오염 빙가네숭의본점·"2005" 포함). → offctx 건은 표시 리뷰에 카페맥락이 실제로 충분할 때만 오탐.
+    const offctxFalse = c.offctx_flag ? offctxFalsePositive(q) : true;
+    if (coh >= 0.5 && offctxFalse) {
+      // 진짜 카페(오탐) → 자동 정리: 플래그 해소 + (offctx로 걸린 건만) 화이트리스트
       await sql`UPDATE audit_flags SET resolved=true WHERE cafe_id=${c.id} AND NOT COALESCE(resolved,false)`.catch(() => {});
-      await sql`UPDATE cafes SET offctx_ok=true WHERE id=${c.id}`.catch(() => {});
+      if (c.offctx_flag) await sql`UPDATE cafes SET offctx_ok=true WHERE id=${c.id}`.catch(() => {});
       resolved++; if (log.length < 8) log.push(`오탐정리 ${c.name}(${Math.round(coh * 100)}%)`);
     } else if (coh < 0.35) {
       // 진짜 오염 → 비공개 결재 자동 상신(중복방지). CEO 한 번 승인하면 비공개.
