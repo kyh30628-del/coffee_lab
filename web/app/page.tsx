@@ -1297,7 +1297,7 @@ export default function Home() {
           {/* MapControls(지역/결/목록)는 무겁다(전체 정렬). 지도 탭일 때만 마운트 → 다른 화면 상태변경 시 재조정/정렬 안 함. 지도 div는 위에서 항상 유지. */}
           {tab === "map" && (<>
           <aside className="hidden md:block md:w-[380px] md:h-full bg-[#fdfaf4] border-l border-[#ece0cd] overflow-y-auto p-6 relative z-10">
-            <MapControls {...{ sido, sigungu, dong, onSido, onSigungu, setDong, dongOptions, tasteKey, setTasteKey, filtered, matchSet, setSelected, openLocation, autoGu, geoMsg, clearAuto, closeSheet: () => { setFocusId(null); setSheetOpen(false); } }} />
+            <MapControls {...{ sido, sigungu, dong, onSido, onSigungu, setDong, dongOptions, tasteKey, setTasteKey, filtered, matchSet, setSelected, openLocation, autoGu, geoMsg, clearAuto, setShowFavs, favCount: cafes.filter((c) => bookmarkIds.has(c.id)).length, closeSheet: () => { setFocusId(null); setSheetOpen(false); } }} />
           </aside>
           <div className="md:hidden absolute left-0 right-0 bg-[#fdfaf4] rounded-t-3xl shadow-[0_-4px_24px_rgba(0,0,0,0.18)] z-[1200] flex flex-col transition-transform duration-300 ease-out will-change-transform" style={{ bottom: "3.25rem", height: "72dvh", transform: sheetOpen ? "translateY(0)" : "translateY(calc(72dvh - 2.75rem))" }}>
             {/* 접힘 시 정확히 이 핸들(2.75rem)까지만 보이게 — 아래 목록이 삐져나오지 않음 */}
@@ -1306,7 +1306,7 @@ export default function Home() {
               <span className="text-[11px] font-bold text-[#9c6b3f] leading-none">{sheetOpen ? "지도 보기 ▾" : `지역·필터 펼치기 ▴ (${filtered.length})`}</span>
             </button>
             <div className="flex-1 overflow-y-auto px-5 pb-8" style={{ WebkitOverflowScrolling: "touch" }}>
-              <MapControls {...{ sido, sigungu, dong, onSido, onSigungu, setDong, dongOptions, tasteKey, setTasteKey, filtered, matchSet, setSelected, openLocation, autoGu, geoMsg, clearAuto, closeSheet: () => { setFocusId(null); setSheetOpen(false); } }} />
+              <MapControls {...{ sido, sigungu, dong, onSido, onSigungu, setDong, dongOptions, tasteKey, setTasteKey, filtered, matchSet, setSelected, openLocation, autoGu, geoMsg, clearAuto, setShowFavs, favCount: cafes.filter((c) => bookmarkIds.has(c.id)).length, closeSheet: () => { setFocusId(null); setSheetOpen(false); } }} />
             </div>
           </div>
           </>)}
@@ -1479,7 +1479,7 @@ export default function Home() {
   );
 }
 
-function MapControls({ sido, sigungu, dong, onSido, onSigungu, setDong, dongOptions, tasteKey, setTasteKey, filtered, matchSet, setSelected, openLocation, autoGu, geoMsg, clearAuto, closeSheet }: any) {
+function MapControls({ sido, sigungu, dong, onSido, onSigungu, setDong, dongOptions, tasteKey, setTasteKey, filtered, matchSet, setSelected, openLocation, autoGu, geoMsg, clearAuto, setShowFavs, favCount, closeSheet }: any) {
   // 정렬: 카테고리(결) 선택 시 그 결이 강한 순, 아니면 검증 리뷰 많은 순. 검색범주 안에서도 동일 기준.
   const sortLabel = tasteKey ? `'${TASTE_CHOICES.find((t: any) => t.key === tasteKey)?.label}' 결 강한 순` : "검증 리뷰 많은 순";
   // 전체 정렬은 무거우므로 메모이즈 — 모달 열고닫기 등으로 재렌더돼도 filtered/tasteKey/matchSet가 그대로면 재정렬 안 함.
@@ -1489,6 +1489,13 @@ function MapControls({ sido, sigungu, dong, onSido, onSigungu, setDong, dongOpti
   }), [filtered, tasteKey, matchSet]);
   return (
     <>
+      {/* 즐겨찾기 진입 — 데스크톱 전용(모바일은 하단 네비에 이미 있음). 하단 네비는 md:hidden이라 데스크톱엔 진입로가 없었음 */}
+      {setShowFavs && (
+        <button onClick={() => setShowFavs(true)} className="hidden md:flex items-center justify-center gap-1.5 w-full mb-4 rounded-xl border border-[#e8b4c4] bg-[#fdf0f4] text-[#d6336c] font-bold text-sm py-2.5 active:bg-[#fbe4ec]" aria-label={`즐겨찾기${favCount ? ` ${favCount}곳` : ""}`}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="#d6336c" stroke="#d6336c" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M12 4.5l2.3 4.7 5.2.8-3.75 3.65.9 5.15L12 16.9l-4.65 2.45.9-5.15L4.5 10l5.2-.8z" /></svg>
+          즐겨찾기{favCount ? ` (${favCount})` : ""}
+        </button>
+      )}
       <div className="mb-5">
         <div className="flex items-center justify-between mb-2.5">
           <div className="text-sm font-bold text-[#52402e]">📍 지역</div>
