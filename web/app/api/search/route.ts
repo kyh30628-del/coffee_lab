@@ -264,7 +264,11 @@ export async function GET(req: NextRequest) {
             scored = rows.map((c) => {
               const { exact, concept, reasons } = lexicalScore(c, tokens, hitConcepts);
               const sim = Number(c.sim) || 0;
-              const total = sim * 100 + exact + concept + gradeBonus(c.synth_grade); // 의미 유사도 1차 + 키워드·느낌 + 등급(검증 우대)
+              // #216: 키워드·느낌 완전 불일치(exact+concept===0)면 등급가산 미적용 — 브랜드명(이디야·컴포즈 등)
+              //   DB無매칭 검색 시 의미유사도만 있는 무관 카페가 gradeBonus(+25)로 검증배지·고득점 1위로
+              //   오인 노출되던 왜곡 차단. 키워드 폴백 경로(아래)와 동일한 가드로 두 경로를 일치시킨다.
+              const lexMatched = exact + concept > 0;
+              const total = sim * 100 + exact + concept + (lexMatched ? gradeBonus(c.synth_grade) : 0); // 의미 유사도 1차 + 키워드·느낌 + 등급(검증 우대, 어휘일치 시에만)
               const why = [`의미 유사 ${Math.round(sim * 100)}%`, ...reasons];
               return { id: c.id, name: c.name, area: c.area, grade: c.synth_grade, count: c.synth_count, identity: c.synth_identity, score: Math.round(total * 10) / 10, reasons: why.slice(0, 3) };
             });
