@@ -243,6 +243,9 @@ const LANDMARK_WORDS = [
   "경복궁", "창덕궁", "덕수궁", "창경궁", "종묘", "운현궁",
   "북촌", "서촌", "삼청동", "인사동", "익선동",
   "남산", "n서울타워", "한강공원", "여의도공원", "올림픽공원", "서울숲",
+  // 룰갭 P11(2026-07-08, rulegap-proposals-20260708-2.md): '추억의거리'는 포천 허브아일랜드 테마존명 —
+  //   id16662 6/6 완전오염(테마존 콘텐츠 흡수). 랜드마크 토큰으로 취급해 다른 식별어 남을 때만 인정.
+  "추억의거리",
 ];
 const isVenueTok = (t: string) => { const n = norm(t); return VENUE_WORDS.some((v) => n.includes(norm(v))) || HOTEL_BRANDS.some((v) => n.includes(norm(v))) || LANDMARK_WORDS.some((l) => n.includes(norm(l))) || DISTRICT_WORDS.some((d) => n.includes(norm(d))) || UNIV_ABBR_WORDS.some((u) => n.includes(norm(u))) || METRO_NAMES.has(n); };
 
@@ -355,7 +358,10 @@ export function nameCoherence(name: string, quotes: string[], areaTerms: string[
 // 룰갭 P2(2026-07-08, rulegap-proposals-20260708.md): 동음이의 일반명사·기술용어가 유일 식별토큰으로 남아
 //   무관 콘텐츠와 오매칭 — '조도'(id16979, 4/6 조명용어)·'회전목마'(id10562, 6/6 놀이기구)·'실험실'
 //   (id18021, 5/6 과학실험실). 초약체 취급(전체이름 원문일치+지역어 동반 요구)으로 오매칭 차단.
-const WEAK_IDENTITY_TOKEN = new Set(["공간", "다이아", "블라블라", "충무", "브라더스", "2005", "인테리어", "조도", "회전목마", "실험실"]);
+// 룰갭 P9·P10(2026-07-08, rulegap-proposals-20260708-2.md): '청하동길'(id16795, 강화읍 도로명=상호명,
+//   타업체 '강화궁고구마닭강정' 주소혼입 3/6)·'스위치'(id16910, 닌텐도스위치/스위치온다이어트 등 4/6 무관).
+//   초약체 취급(전체이름 원문일치+지역어 동반 요구)으로 오매칭 차단.
+const WEAK_IDENTITY_TOKEN = new Set(["공간", "다이아", "블라블라", "충무", "브라더스", "2005", "인테리어", "조도", "회전목마", "실험실", "청하동길", "스위치"]);
 const OFFTOPIC_SPAM = /(코인\s*해외선물|해외\s*선물\s*(거래|시세|투자|매매)|선물\s*거래소|암호화폐|가상화폐|비트코인|비트겟|바이낸스|재테크\s*(추천|비법|정보|수익)|주식\s*(리딩|종목추천|투자문의|급등주)|대출\s*(상담|한도|이자|갈아타기|추천)|아파트\s*분양|오피스텔\s*분양|분양가|모델하우스|청약\s*(가점|통장|경쟁률)|재개발\s*(구역|조합|호재)|재건축\s*(조합|아파트|호재)|입주\s*예정|주상복합\s*분양|최고\s*\d+\s*층|\d+\s*개동)/;
 
 export function verifyReview(input: QualityInput): QualityResult {
