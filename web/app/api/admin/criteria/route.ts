@@ -11,6 +11,13 @@ const authed = (req: NextRequest) =>
 
 const BLAST_THRESHOLD = 20; // 재합성 시 공개상태가 바뀔 수 있는 카페 수 상한 — 초과 시 재확인 게이트(인천삭제사고 교훈)
 
+// ⚖️ DoA(위임전결) 티어 — 기준 변경 위험도별 승인규칙(ORG-CHARTER 위임전결 준수).
+//   L3(대량영향): grade.floor·geo.box → 공개상태를 흔들 수 있어 CEO 확인 게이트(대량변동 시 아래 409 차단기와 연결).
+//   L2(소영향): search.grade_bonus·exposure → 랭킹/노출만 영향(공개 무변) → 기조실장 전결·바로 적용.
+//   ⚠️ 티어는 '확인 게이트 + 문서'로만 구현. 기준변경→결재row 자동생성 등 lib/issues.ts 자동경로는 절대 만들지 않는다.
+const tierOf = (key: string): "L3" | "L2" =>
+  key.startsWith("grade.floor.") || key.startsWith("geo.box.") ? "L3" : "L2";
+
 // 제안값 기준 영향 시뮬레이션(읽기전용). key 하나만 바뀐다고 보고, 나머지는 현재 기준값.
 async function previewImpact(key: string, value: number): Promise<{
   kind: string; wouldUnpublish: number; changed: number; note: string; samples: string[];
@@ -66,6 +73,7 @@ export async function GET(req: NextRequest) {
       updated_by: r?.updated_by ?? null,
       updated_at: r?.updated_at ?? null,
       isDefault: (r ? Number(r.value) : m.def) === m.def,
+      tier: tierOf(m.key), // ⚖️ L3(CEO 확인)·L2(기조실장 전결)
     };
   });
   const history = (await sql`SELECT id, key, old_value, new_value, changed_by, changed_at, impact_note FROM criteria_history ORDER BY changed_at DESC LIMIT 30`) as any[];

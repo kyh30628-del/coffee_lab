@@ -16,7 +16,7 @@
 coffee-platform/
 ├─ web/          # 실제 서비스 — Next.js 16 App Router·TS·Neon Postgres·Vercel (web/AGENTS.md 필독)
 │  ├─ app/       # /(지도·홈), /c/[id](공유·SEO), /admin(관제탑), /admin/org(조직 관제), /api/*
-│  ├─ lib/       # issues.ts(RM·결재 — ⚠️동결영역), jobTeams.ts(잡→본부·감시계약 단일출처), synthStore 등
+│  ├─ lib/       # issues.ts(RM·결재 — ⚠️동결영역), jobTeams.ts(잡→본부·감시계약 단일출처), criteria.ts(비즈니스 기준 단일출처)·criteriaVerify.ts(기준 검증 에이전트), synthStore 등
 │  └─ scripts/   # 로컬 워커(dev-claim/deploy·make-digest·heartbeat 등, launchd가 실행)
 ├─ agents/       # 자율 에이전트 헌법(md)+러너(sh) — git 미추적·로컬 전용. ORG-CHARTER.md·SCHEDULE.md 필독
 ├─ agent-reports/# 에이전트 산출물(gitignore)
@@ -39,3 +39,12 @@ coffee-platform/
 ## 3. 배포
 
 `git push origin main` → Vercel 자동배포. 자율 개발 파이프라인(dev_task)은 브랜치 구현→검증→CEO 배포확정→dev-deploy.mjs가 merge+push. 메인 워킹트리에 커밋 안 된 변경이 있으면 dev-deploy가 배포를 중단한다(사람 작업 보호).
+
+## 4. 비즈니스 기준 관제 플레인 (criteria)
+
+흩어진 하드코딩 임계값(등급바닥·수도권 좌표박스·검색 가산점·노출상한 9종)의 **단일출처 = DB `criteria` 테이블**. 코드 `lib/criteria.ts`의 DEFAULTS가 폴백 진실원본(DB 죽어도 서비스 무변). 무배포로 값 조정: 어드민 **`/admin/criteria`**(🎛️ 기준 관제).
+- **소유·거버넌스**: **품질본부(검증심사팀) 소유 + 기획조정실장(L2) 관장.** 상태·검증결과는 `/admin/org` 🎛️ 기준 관제 카드에 표출.
+- **DoA(위임전결)** — *어드민 확인 게이트 + 문서로만* 구현(⚠️ 기준변경→결재row 자동생성 등 lib/issues.ts 자동경로 절대 금지):
+  - **L3 CEO 확인**: `grade.floor.*`·`geo.box.*`(재합성 시 공개상태 흔들림). 저장 전 영향 미리보기 + 대량변동(공개카페 20곳↑) 시 **409 차단기**(재확인 없이 저장 거부).
+  - **L2 기조실장 전결(바로 적용)**: `search.grade_bonus.*`·`exposure.featured_cap`(랭킹/노출만, 공개 무변).
+- **검증 에이전트 v1(결정론·품질본부)**: `cron-criteria-verify`(Vercel cron, 하루 2회)가 ①dead-knob(기준 키가 코드에서 미참조 — 무배포 조정해도 무반응) ②범위·시드 드리프트 ③등급바닥·좌표박스 실효과를 결정론 검사→`criteria_verify_reports` 적재·관제탑 표면화. dead-knob·범위이탈=하드FAIL(recordRun 실패경로로 품질본부 자동배정), 실효과 어긋남=warn(빨강 금지). 정적 스캔은 `next.config` outputFileTracingIncludes로 소스를 함수 번들에 포함해 런타임 대조.

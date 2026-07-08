@@ -9,6 +9,7 @@ type Item = {
   key: string; category: string; label: string; unit: string;
   value: number; default_value: number; min_value: number; max_value: number;
   updated_by: string | null; updated_at: string | null; isDefault: boolean;
+  tier: "L3" | "L2"; // ⚖️ DoA: L3=대량영향(CEO 확인) · L2=소영향(기조실장 전결·바로 적용)
 };
 type Hist = { id: number; key: string; old_value: number; new_value: number; changed_by: string; changed_at: string; impact_note: string | null };
 type Preview = { kind: string; wouldUnpublish: number; changed: number; note: string; samples: string[] };
@@ -63,6 +64,9 @@ export default function CriteriaPage() {
   const save = async (it: Item, confirm = false) => {
     const value = Number(draft[it.key]);
     if (!Number.isFinite(value)) { setErr("숫자를 입력하세요"); return; }
+    // ⚖️ DoA L3 확인 게이트 — 대량영향(등급바닥·좌표박스)은 공개상태를 흔들 수 있어 CEO 확인 하에만 저장.
+    //   (아래 서버 차단기(대량변동 409)와 이중 방어. 소영향 L2는 바로 적용.)
+    if (it.tier === "L3" && !window.confirm(`⚠️ 대량영향(L3) 기준입니다 — 공개상태가 흔들릴 수 있습니다.\n\n[${it.label}] ${it.value} → ${value}\n\nCEO 확인 하에 변경하시겠습니까? (대량변동 시 추가 재확인이 뜹니다)`)) return;
     setBusy(it.key); setErr("");
     try {
       const d = await fetch("/api/admin/criteria", { method: "POST", headers: { "x-admin-password": pw, "Content-Type": "application/json" },
@@ -110,6 +114,7 @@ export default function CriteriaPage() {
         <div style={{ ...sub, marginTop: 10, lineHeight: 1.5 }}>
           ⚠️ 이 화면은 <b>기준값만</b> 저장합니다. 실제 카페 공개상태는 바꾸지 않으며, 반영은 합성·재판정 파이프라인이 담당합니다.
           등급·좌표 기준은 저장 전 영향 미리보기가 뜨고, 공개카페 {threshold}곳 초과가 흔들리면 재확인이 필요합니다.
+          <br />⚖️ <b>DoA</b>: <span style={{ color: "#b03a3a", fontWeight: 700 }}>L3 CEO 확인</span>=등급바닥·좌표박스(대량영향) · <span style={{ color: "#3f7a4f", fontWeight: 700 }}>L2 전결</span>=검색가산점·노출상한(소영향·바로 적용). 소유=품질본부, 관장=기획조정실장.
         </div>
 
         {categories.map((cat) => (
@@ -123,7 +128,13 @@ export default function CriteriaPage() {
                 <div key={it.key} style={{ ...card, marginBottom: 8 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
                     <div style={{ fontSize: 13.5, fontWeight: 700 }}>{it.label}</div>
-                    {!it.isDefault && <span style={{ fontSize: 10, color: "#b5731f", fontWeight: 700, whiteSpace: "nowrap" }}>조정됨</span>}
+                    <div style={{ display: "flex", gap: 5, alignItems: "baseline", whiteSpace: "nowrap" }}>
+                      {!it.isDefault && <span style={{ fontSize: 10, color: "#b5731f", fontWeight: 700 }}>조정됨</span>}
+                      <span title={it.tier === "L3" ? "대량영향 — CEO 확인 게이트(공개상태 흔들림)" : "소영향 — 기조실장 전결(바로 적용)"}
+                        style={{ fontSize: 9.5, fontWeight: 700, padding: "1px 6px", borderRadius: 20, color: "#fff", background: it.tier === "L3" ? "#b03a3a" : "#3f7a4f" }}>
+                        {it.tier === "L3" ? "L3 CEO 확인" : "L2 전결"}
+                      </span>
+                    </div>
                   </div>
                   <div style={{ ...sub, marginTop: 2, fontFamily: "monospace" }}>{it.key}</div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, flexWrap: "wrap" }}>

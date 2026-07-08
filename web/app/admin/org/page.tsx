@@ -189,6 +189,8 @@ export default function OrgDashboard() {
   const [showDev, setShowDev] = useState(false);
   const [orgAct, setOrgAct] = useState<any>(null); // 본부별 활동 현황
   const [showRhythm, setShowRhythm] = useState(false); // 조직 운영 리듬(활동+케이던스) — 기본 접힘(다른 카드와 통일)
+  const [crit, setCrit] = useState<any>(null); // 🎛️ 기준 관제 상태(스냅샷·최근변경·검증에이전트 결과)
+  const [showCrit, setShowCrit] = useState(false);
   const load = (password: string, silent = false) => {
     if (!silent) { setLoading(true); setErr(""); }
     Promise.all([
@@ -200,7 +202,9 @@ export default function OrgDashboard() {
       fetch("/api/admin/jobs", { headers: { "x-admin-password": password }, cache: "no-store" }).then((r) => r.json()).catch(() => ({ ok: false })),
       fetch("/api/admin/dev-pipeline", { headers: { "x-admin-password": password }, cache: "no-store" }).then((r) => r.json()).catch(() => ({ ok: false })),
       fetch("/api/admin/org-activity", { headers: { "x-admin-password": password }, cache: "no-store" }).then((r) => r.json()).catch(() => ({ ok: false })),
-    ]).then(([b, d, co, iss, lv, jb, dp, oa]) => {
+      fetch("/api/admin/criteria-status", { headers: { "x-admin-password": password }, cache: "no-store" }).then((r) => r.json()).catch(() => ({ ok: false })),
+    ]).then(([b, d, co, iss, lv, jb, dp, oa, cr]) => {
+      if (cr && cr.ok) setCrit(cr);
       if (oa && oa.ok) setOrgAct(oa);
       if (dp && dp.ok) setDevpipe(dp);
       if (b.ok) { setBrief(b.brief); setBriefs(b.briefs || (b.brief ? [b.brief] : [])); localStorage.setItem("adm_pw", password); } else if (!silent) setErr("비밀번호 확인");
@@ -317,6 +321,46 @@ export default function OrgDashboard() {
           <div style={card}><div style={lbl}>📈 공개 카페 <span style={{ fontSize: 9.5, color: "#9c8a6c", fontWeight: 700 }}>실시간</span></div><div style={big}>{live ? live.pub.toLocaleString() : "—"}</div><div style={sub}>검증 {live ? live.v.toLocaleString() : "—"}{live?.backlog ? ` · 대기 ${live.backlog}` : ""}</div></div>
           <div style={card}><div style={lbl}>🤖 자율 잡 가동 <span style={{ fontSize: 9.5, color: "#9c8a6c", fontWeight: 700 }}>최신 실행</span></div><div style={{ ...big, color: (live ? live.cronFail?.length === 0 : crons.every((c: any) => c.ok)) ? "#2f7a4a" : "#b06a1e" }}>{live ? `${live.cronOk}/${live.cronTotal}` : `${crons.filter((c: any) => c.ok).length}/${crons.length}`} {(live ? live.cronFail?.length === 0 : crons.every((c: any) => c.ok)) ? "✅" : "⚠️"}</div><div style={sub}>잡별 최신 실행 성공/전체(크론·에이전트·워커)</div></div>
         </div>
+
+        {/* 🎛️ 기준 관제 — 비즈니스 기준(criteria) 스냅샷·최근변경·검증에이전트 결과. 품질본부 소유·기조실장(L2) 관장 */}
+        {crit && (
+          <div style={{ ...card, marginTop: 10, border: crit.verify?.status === "fail" ? "2px solid #b03a3a" : crit.verify?.status === "warn" ? "1px solid #e0b357" : "1px solid #ddc9a8" }}>
+            <button onClick={() => setShowCrit(!showCrit)} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
+              <span style={{ fontSize: 13.5, fontWeight: 700, color: crit.verify?.status === "fail" ? "#b03a3a" : crit.verify?.status === "warn" ? "#a5701e" : "#3f7a4f" }}>
+                {showCrit ? "▾" : "▸"} 🎛️ 기준 관제 <span style={{ fontSize: 10, fontWeight: 700, color: "#9c8a6c" }}>· {crit.adjusted}/{crit.total} 조정</span>
+                {crit.verify?.status === "fail" ? <span style={{ fontSize: 10, fontWeight: 700, color: "#b03a3a" }}> · 🔴 검증실패 {crit.verify.fails}{crit.verify.deadKnobs?.length ? ` (dead-knob ${crit.verify.deadKnobs.length})` : ""}</span>
+                  : crit.verify?.status === "warn" ? <span style={{ fontSize: 10, fontWeight: 700, color: "#a5701e" }}> · 🟡 주의 {crit.verify.warns}</span>
+                  : <span style={{ fontSize: 10, color: "#3f7a4f" }}> · 검증 정상 ✅</span>}
+              </span>
+              <a href="/admin/criteria" onClick={(e) => e.stopPropagation()} style={{ fontSize: 11, fontWeight: 700, color: "#6a468c", textDecoration: "none", whiteSpace: "nowrap" }}>관제 열기 →</a>
+            </button>
+            {showCrit && (
+              <div style={{ marginTop: 9, fontSize: 12, color: "#5a4631" }}>
+                <div style={{ fontSize: 10.5, color: "#9c8a6c" }}>검증 에이전트(criteria-verify · 결정론) — 소스 {crit.verify?.scanned ?? "?"}파일 스캔 · {crit.verify?.ranAt ? new Date(crit.verify.ranAt).toLocaleTimeString("ko-KR") : ""}</div>
+                {crit.verify?.failing?.length > 0 && (
+                  <div style={{ marginTop: 6, padding: "7px 9px", borderRadius: 8, background: "#fbeeee", border: "1px solid #e6b3b3" }}>
+                    {crit.verify.failing.map((f: any, i: number) => (
+                      <div key={i} style={{ fontSize: 11.5, color: "#b03a3a", fontWeight: 600 }}>🔴 {f.label} — {f.count}건{f.samples?.length ? <span style={{ fontWeight: 400, color: "#8a5a5a" }}> ({f.samples.join(", ")})</span> : null}</div>
+                    ))}
+                  </div>
+                )}
+                {crit.verify?.warning?.length > 0 && (
+                  <div style={{ marginTop: 6, fontSize: 11, color: "#a5701e" }}>
+                    {crit.verify.warning.map((w: any, i: number) => <div key={i}>🟡 {w.label} — {w.count}건</div>)}
+                  </div>
+                )}
+                {crit.lastChange ? (
+                  <div style={{ marginTop: 7, fontSize: 11, color: "#7a6a4c" }}>
+                    최근 변경: <span style={{ fontFamily: "monospace", color: "#8a5e30" }}>{crit.lastChange.key}</span> {crit.lastChange.old_value} → <b style={{ color: "#b5731f" }}>{crit.lastChange.new_value}</b> · {crit.lastChange.changed_by} · {new Date(crit.lastChange.changed_at).toLocaleString("ko-KR")}
+                  </div>
+                ) : <div style={{ marginTop: 7, fontSize: 11, color: "#9c8a6c" }}>변경 이력 없음(전부 기본값)</div>}
+                <div style={{ marginTop: 7, fontSize: 10.5, color: "#9c8a6c", lineHeight: 1.5 }}>
+                  DoA: <b>대량영향</b>(등급바닥·좌표박스 → 공개상태 흔들림)=<b style={{ color: "#b03a3a" }}>L3 CEO 확인 게이트</b> · <b>소영향</b>(검색가산점·노출상한)=L2 기조실장 전결(바로 적용). 소유=품질본부.
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* 🛠 로컬 잡 상태 — 접이식·기본 접힘(헤더에 정상/정지 요약). 8개 launchd 잡 하트비트 기준 실시간 */}
         <div style={{ ...card, marginTop: 10, border: jobs?.bad ? "2px solid #b03a3a" : "1px solid #ddc9a8" }}>

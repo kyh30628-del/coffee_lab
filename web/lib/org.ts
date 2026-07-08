@@ -22,8 +22,8 @@ export const ORG: Org = {
         { k: "🧠", n: "정합성 에이전트", t: "매일", j: "integrity-agent" }, { k: "⚙️", n: "cron-sentinel", t: "매일 00시", j: "cron-sentinel" }, { k: "⚙️", n: "orchestrator-heal", t: "2시간마다", j: "orchestrator-heal" }] },
       { n: "리뷰품질팀", s: "옥석 검증규칙(동명비카페·주소·오염) 발굴·적용", w: [
         { k: "🧠", n: "룰갭 에이전트", t: "매일", j: "rulegap-agent" }, { k: "⚙️", n: "cron-rulegap", t: "매일 01:30", j: "cron-rulegap" }, { k: "🌐", n: "reviewQuality(verifyReview)", t: "실시간(합성마다)" }] },
-      { n: "검증심사팀", s: "검증 등급 자격 적대검증·15점검", w: [
-        { k: "🧠", n: "품질레드팀 에이전트", t: "매일", j: "quality-redteam-agent" }, { k: "⚙️", n: "cron-verify", t: "매일 06시", j: "cron-verify" }] },
+      { n: "검증심사팀", s: "검증 등급 자격 적대검증·15점검 + 비즈니스 기준 관제·검증", w: [
+        { k: "🧠", n: "품질레드팀 에이전트", t: "매일", j: "quality-redteam-agent" }, { k: "⚙️", n: "cron-verify", t: "매일 06시", j: "cron-verify" }, { k: "⚙️", n: "기준 검증 에이전트(criteria-verify)", t: "매일 07:50·19:50(결정론)", j: "cron-criteria-verify" }] },
       { n: "심층판정팀", s: "AI판정·그라운딩 — 경계 리뷰 의미판정·환각차단", w: [
         { k: "🧠", n: "심층판정 에이전트(로컬·무료)", t: "격일", j: "deep-judge-agent" }] }] },
     { n: "🟩 성장본부", c: "#3f7a4f", teams: [
@@ -82,6 +82,7 @@ export const MEMBER_INFO: Record<string, string> = {
   "cron-rulegap": "학습된 오염 사전을 매일 자동 반영(로직 변경은 승인 대상).",
   "reviewQuality(verifyReview)": "합성할 때마다 실시간으로 옥석을 거르는 결정론 규칙 엔진(동명비카페·주소·오염·이름정제).",
   "cron-verify": "매일 검증 카페의 15종 무결성을 점검.",
+  "기준 검증 에이전트(criteria-verify)": "비즈니스 기준(criteria) 관제의 파수꾼. 하루 2회 결정론으로 ①각 기준이 코드에 실제 참조되는지(dead-knob 재발 감지) ②DB값의 범위·시드 드리프트 ③등급바닥·좌표박스의 실효과를 검사. dead-knob·범위이탈은 관제탑에 빨강 표면화(품질본부 자동배정), 실효과 어긋남은 노랑 추적. 기준 소유=품질본부, 관장=기획조정실장(L2). LLM·토큰 0.",
   "cron-grow": "2시간마다 발굴 큐를 소비해 신규 카페를 수집.",
   "cron-demand": "매일 검색 로그에서 수요갭·핫지역을 분석.",
   "cron-newsletter": "주간 뉴스레터 발행(현재 보류).",

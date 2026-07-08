@@ -8,7 +8,7 @@ export const JOB_TEAM: Record<string, string> = {
   "cron-synth": "운영본부", "cron-resynth": "운영본부", "cron-embed": "운영본부", "cron-snapshot": "운영본부",
   "cron-closure": "운영본부", "cron-enrich": "운영본부",
   "orchestrator-heal": "품질본부", "cron-sentinel": "품질본부", "cron-verify": "품질본부", "cron-rulegap": "품질본부",
-  "cron-selfaudit": "품질본부", "cron-batch-judge": "품질본부",
+  "cron-selfaudit": "품질본부", "cron-batch-judge": "품질본부", "cron-criteria-verify": "품질본부",
   "cron-grow": "성장본부", "cron-demand": "성장본부", "cron-newsletter": "성장본부", "cron-discover-categories": "성장본부",
   "cafe-collect": "성장본부",
   "cron-issues": "경영지원본부", "cron-coord-consumer": "경영지원본부",
@@ -40,6 +40,7 @@ export const EXPECT_MAX_H: Record<string, number> = {
   // Vercel 크론 (스케줄 + 버퍼)
   "cron-snapshot": 200, "cron-resynth": 3, "cron-newsletter": 200, "cron-discover-categories": 800,
   "cron-verify": 16, "cron-sentinel": 16, "cron-demand": 30, "cron-rulegap": 16, "cron-closure": 12, // verify·sentinel·rulegap 2×/일(12h)로 촘촘화 → 정지감지도 30→16h로 타이트하게(2026-07-05)
+  "cron-criteria-verify": 16, // 기준 검증 에이전트 2×/일(07:50·19:50 KST=12h) + 버퍼 — dead-knob·기준드리프트 결정론 감시(품질본부)
   "cron-grow": 6, "cron-enrich": 8, "cron-embed": 4, "cron-synth": 4, "cron-issues": 2, "cron-coord-consumer": 2,
   "orchestrator-heal": 6,
   // 로컬 launchd 잡
