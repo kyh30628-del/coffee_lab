@@ -1,5 +1,6 @@
 // 리뷰 합성 엔진 (PRINCIPLES.md 1·3·4·7조 준수)
 // - 부정맥락 보정(다국어) + 모호어 처리 + 교차검증 + 최신성 가중 + 근거 보존
+import { getCriterionSync } from "./criteria"; // 등급 바닥 임계값 단일출처(캐시 프라임은 synthAndStore가 함)
 
 export type Review = { text: string; time?: number }; // time: epoch초(최신성용, 옵션)
 
@@ -113,7 +114,8 @@ export function synthesize(name: string, reviews: Review[]): SynthResult {
     if (c) ops[o] = c;
   }
 
-  const grade = n >= 30 ? "검증" : n >= 5 ? "참고" : "후보";
+  // 등급 바닥 임계값 — DB 기준(criteria) 단일출처, 폴백=현재값(검증30/참고5). 동기 조회(캐시).
+  const grade = n >= getCriterionSync("grade.floor.verified") ? "검증" : n >= getCriterionSync("grade.floor.reference") ? "참고" : "후보";
   const evidence: Record<string, { kind: string; snip: string }[]> = {};
   axes.forEach((a) => (evidence[a] = stat[a].ev.slice(0, 3)));
 

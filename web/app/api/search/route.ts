@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
 import { embedQuery, toVectorLiteral, hasEmbedKey } from "@/lib/embed";
 import { hasSearchLLM, rerankWithClaude, lastRerankError, type SearchCand } from "@/lib/searchAgent";
+import { loadCriteria, getCriterionSync } from "@/lib/criteria";
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
@@ -129,7 +130,8 @@ function lexicalScore(c: any, tokens: string[], hitConcepts: typeof CONCEPTS) {
 const FIELDS = `id, name, area, synth_grade, synth_count, synth_identity, signature, note, vibe, uses, beans, char_scores, synth_reviews, synth_acidity, synth_body, synth_sweet`;
 
 // 등급 가중치 — '검증'이 '참고'보다 위 노출(동네 커피 노트의 약속). 절대 우선은 아니고 가산.
-const gradeBonus = (g?: string): number => (g === "검증" ? 25 : g === "참고" ? 8 : 0);
+//   임계값은 DB 기준(criteria) 단일출처, 폴백=검증25/참고8. GET 진입 시 loadCriteria로 캐시 프라임.
+const gradeBonus = (g?: string): number => (g === "검증" ? getCriterionSync("search.grade_bonus.verified") : g === "참고" ? getCriterionSync("search.grade_bonus.reference") : 0);
 // 일반 카테고리·개념 단어 — 이런 검색은 '이름이 그 단어인 카페'가 아니라 '그 부류 옥석'을 원함.
 //   → 이름 직접매칭(9999 최상단 고정)을 건너뛰어 등급순 노출이 살게 한다(참고가 검증 위로 가던 버그 차단).
 const CATEGORY_WORD = new Set(["로스터리", "로스터스", "로스터즈", "로스팅", "핸드드립", "드립", "베이커리", "디저트", "브런치", "스페셜티", "에스프레소", "아메리카노", "라떼", "콜드브루", "원두", "제과", "빵집", "북카페", "카페", "커피", "커피숍", "커피전문점"]);
@@ -192,6 +194,7 @@ function logSearch(q: string, region: string, results: number, mode: string, int
 }
 
 export async function GET(req: NextRequest) {
+  await loadCriteria(); // 등급 가산점 기준 캐시 프라임(동기 gradeBonus가 읽음)
   try {
     await ensureSchema();
     const q = (req.nextUrl.searchParams.get("q") ?? "").trim();

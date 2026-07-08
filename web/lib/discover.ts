@@ -2,6 +2,7 @@
 // 대규모 프랜차이즈·비(非)카페 제외. 중복(이름/좌표 근사) 제외. 비공개로 적재 후 합성 단계에서 검증.
 import { sql } from "./db";
 import { getLearned } from "./learnedTerms";
+import { loadCriteria, getCriterionSync } from "./criteria";
 
 const ID = process.env.NAVER_CLIENT_ID;
 const SECRET = process.env.NAVER_CLIENT_SECRET;
@@ -327,11 +328,14 @@ export async function discoverRegion(region: string, areaLabel: string, keywords
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS pipeline_status TEXT`.catch(() => {});
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS dong TEXT`.catch(() => {});
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS naver_category TEXT`.catch(() => {});
+  await loadCriteria(); // 수도권 좌표박스 기준 캐시 갱신(폴백=36.8~38.3/124.5~127.9)
+  const latMin = getCriterionSync("geo.box.lat_min"), latMax = getCriterionSync("geo.box.lat_max");
+  const lngMin = getCriterionSync("geo.box.lng_min"), lngMax = getCriterionSync("geo.box.lng_max");
   let inserted = 0, skipped = 0, backfilled = 0, oob = 0;
   for (const it of found) {
     // 🗺️ 수도권 박스 밖(비수도권) 좌표는 신규 적재 안 함 — 네이버가 동명 타지역 업체(성심당 본점=대전,
     //   사운즈커피 만촌=대구)를 반환해도 서비스(수도권)와 무관하므로 제외. 공개 게이트도 막지만 적재 단계서 차단=DB 청결.
-    if (it.lat != null && it.lng != null && !(it.lat >= 36.8 && it.lat <= 38.3 && it.lng >= 124.5 && it.lng <= 127.9)) { oob++; continue; }
+    if (it.lat != null && it.lng != null && !(it.lat >= latMin && it.lat <= latMax && it.lng >= lngMin && it.lng <= lngMax)) { oob++; continue; }
     const exists = await sql`SELECT id, dong, naver_category FROM cafes WHERE name = ${it.name} OR (ABS(lat - ${it.lat}) < 0.0005 AND ABS(lng - ${it.lng}) < 0.0005) LIMIT 1`;
     if (exists.length > 0) {
       // 기존 카페: 동·카테고리 정보가 없으면 발굴 중 백필(추가 호출 없이). 카테고리는 비카페 게이트 정확도에 중요.

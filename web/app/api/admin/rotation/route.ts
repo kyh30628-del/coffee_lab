@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
 import { subscriptionLive } from "@/lib/flags";
 import { rotateFeatured, peakInfo } from "@/lib/exposureRotation";
+import { loadCriteria, getCriterionSync } from "@/lib/criteria";
 export const runtime = "nodejs";
 
 // 🔁 노출 로테이션 현황(관리자) — 지금 이 순간 누가 어떤 순서로 노출되는지, 피크 여부·다음 회전까지, 전체+구/군별.
@@ -9,7 +10,6 @@ export const runtime = "nodejs";
 const authed = (req: NextRequest) =>
   !!req.headers.get("x-admin-password") && req.headers.get("x-admin-password") === process.env.ADMIN_PASSWORD;
 
-const FEAT_CAP = 6;
 // 지번/area에서 구·시·군 추출(광역시 infix 주의 — 마지막 구/시/군 토큰). discover guOf와 동일 취지.
 function guOf(area: string): string {
   const a = (area ?? "").trim();
@@ -23,6 +23,8 @@ export async function GET(req: NextRequest) {
   if (!authed(req)) return NextResponse.json({ ok: false }, { status: 401 });
   try {
     await ensureSchema();
+    await loadCriteria(); // 노출상한 기준 캐시 프라임
+    const FEAT_CAP = getCriterionSync("exposure.featured_cap"); // 노출상한 단일출처(폴백 6) — discover와 동일 값
     const now = Date.now();
     const rows = await sql`
       SELECT c.id, c.name, c.area, c.published

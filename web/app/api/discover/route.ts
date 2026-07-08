@@ -3,6 +3,7 @@ import { sql, ensureSchema } from "@/lib/db";
 import { subscriptionLive } from "@/lib/flags";
 import { dessertDominance } from "@/lib/charScore";
 import { rotateFeatured } from "@/lib/exposureRotation";
+import { loadCriteria, getCriterionSync } from "@/lib/criteria";
 export const runtime = "nodejs";
 
 const REGIONS: Record<string, string[]> = {
@@ -60,6 +61,7 @@ function slim(c: any, kind = "") {
 export async function GET(req: NextRequest) {
   try {
     await ensureSchema();
+    await loadCriteria(); // 노출상한 기준 캐시 프라임(동기 getCriterionSync가 읽음)
     const region = req.nextUrl.searchParams.get("region") ?? ""; // 시군구 이름(선택)
     const all = await sql`
       SELECT id, name, area, lat, lng, synth_grade, synth_count, synth_identity, note, char_scores, created_at
@@ -91,7 +93,7 @@ export async function GET(req: NextRequest) {
     // 🔁 공정 노출: 리뷰 수와 무관하게 구독 카페가 균등하게 순번을 나눈다(다 같은 돈 낸 자리).
     //    피크 시간대엔 짧은 슬라이스로 자주 회전 → 프라임타임(상단 자리 포함)을 모두가 균등히.
     //    scope가 지역(동네)으로 필터돼 있어, 지역 쿼리 시 동네 단위로 순번이 돈다. (lib/exposureRotation.ts)
-    const FEAT_CAP = 6;
+    const FEAT_CAP = getCriterionSync("exposure.featured_cap"); // 노출상한 단일출처(폴백 6)
     const featRows = await sql`SELECT cafe_id FROM cafe_promos WHERE featured = true AND approved = true AND (featured_until IS NULL OR featured_until > now())` as unknown as { cafe_id: number }[];
     const featSet = new Set(featRows.map((r) => Number(r.cafe_id)));
     const featPool = scope.filter((c) => featSet.has(Number(c.id))); // 리뷰순 아님 — 회전 함수가 균등 순번 결정

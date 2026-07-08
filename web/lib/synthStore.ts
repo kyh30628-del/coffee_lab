@@ -10,6 +10,7 @@ import { judgeReviews, hasJudgeKey } from "./reviewJudge";
 import { isNonCafe, isFranchise, isGenericFoodName, isSnackStall, isStructuralPhantom, isUnmannedCafe } from "./discover";
 import { nameCoherence, cleanCafeName } from "./reviewQuality";
 import { loadLearnedTerms } from "./learnedTerms";
+import { loadCriteria, getCriterionSync } from "./criteria";
 
 // 카페 지역어(시 + 동洞) — 동까지 넘겨야 reviewQuality가 '분당점=성남시' 같은 市단위 동명 지점 오인을 거른다.
 async function areaTermsFor(id: number, area?: string | null): Promise<string[]> {
@@ -145,6 +146,9 @@ async function gatherRaw(cafe: { id: number; name: string; area: string }, refre
 
 // 합성 결과를 DB에 저장(공용). llmJudged=true면 llm_judged_at도 기록.
 async function storeResult(cafeId: number, name: string, result: CollectResult, llmJudged: boolean) {
+  await loadCriteria(); // 수도권 좌표박스 기준 캐시 갱신(TTL 60s — 핫패스 비용 0). 어떤 진입점(배치판정 포함)이 불러도 안전 프라임.
+  const latMin = getCriterionSync("geo.box.lat_min"), latMax = getCriterionSync("geo.box.lat_max");
+  const lngMin = getCriterionSync("geo.box.lng_min"), lngMax = getCriterionSync("geo.box.lng_max");
   name = cleanCafeName(name); // 매칭·게이트(coherence·generic·nonCafe·franchise)는 SEO 서술어 꼬리 뗀 진짜 상호로 — '구구커피 원두 핸드드립 로스팅' 오염 차단
   const { synth, collected, grade, charScores, evidenceReviews, allEvidence, reviewDates, quality, borderline } = result;
   const c = synth.coords;
@@ -234,9 +238,9 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   const publish = (otherwiseBlocked || unpublishLocked) ? false : ruleOk; // 제외·잠금·held·노이즈·파이프라인은 비공개 고정
 
   if (llmJudged) {
-    await sql`UPDATE cafes SET synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_coherence=${coherence}, offctx_rate=${offctx}, needs_llm=${needsLLM}, borderline_count=${blCount}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${safeJson(evidenceReviews)}, synth_reviews_all=${allEv}, char_scores=${safeJson(charScores)}, synth_quality=${safeJson(quality)}, review_dates=${safeJson(reviewDates)}, pipeline_status=${newPst}, synth_updated=${synthTs}, synth_checked_at=now(), llm_judged_at=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN 36.8 AND 38.3 AND lng BETWEEN 124.5 AND 127.9) WHERE id=${cafeId}`;
+    await sql`UPDATE cafes SET synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_coherence=${coherence}, offctx_rate=${offctx}, needs_llm=${needsLLM}, borderline_count=${blCount}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${safeJson(evidenceReviews)}, synth_reviews_all=${allEv}, char_scores=${safeJson(charScores)}, synth_quality=${safeJson(quality)}, review_dates=${safeJson(reviewDates)}, pipeline_status=${newPst}, synth_updated=${synthTs}, synth_checked_at=now(), llm_judged_at=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN ${latMin} AND ${latMax} AND lng BETWEEN ${lngMin} AND ${lngMax}) WHERE id=${cafeId}`;
   } else {
-    await sql`UPDATE cafes SET synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_coherence=${coherence}, offctx_rate=${offctx}, needs_llm=${needsLLM}, borderline_count=${blCount}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${safeJson(evidenceReviews)}, synth_reviews_all=${allEv}, char_scores=${safeJson(charScores)}, synth_quality=${safeJson(quality)}, review_dates=${safeJson(reviewDates)}, pipeline_status=${newPst}, synth_updated=${synthTs}, synth_checked_at=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN 36.8 AND 38.3 AND lng BETWEEN 124.5 AND 127.9) WHERE id=${cafeId}`;
+    await sql`UPDATE cafes SET synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_coherence=${coherence}, offctx_rate=${offctx}, needs_llm=${needsLLM}, borderline_count=${blCount}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${safeJson(evidenceReviews)}, synth_reviews_all=${allEv}, char_scores=${safeJson(charScores)}, synth_quality=${safeJson(quality)}, review_dates=${safeJson(reviewDates)}, pipeline_status=${newPst}, synth_updated=${synthTs}, synth_checked_at=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN ${latMin} AND ${latMax} AND lng BETWEEN ${lngMin} AND ${lngMax}) WHERE id=${cafeId}`;
   }
   return { grade, collected, published: publish, ruleOk, pipeline: newPst, evidence: evidenceReviews.length, coherence: Math.round(coherence * 100), noisy };
 }
@@ -513,6 +517,7 @@ export async function finalizePipeline(): Promise<{ promoted: number; names: str
 export async function synthAndStore(cafe: { id: number; name: string; area: string }, opts?: { refresh?: boolean }) {
   await ensureCols();
   await loadLearnedTerms(); // 학습된 규칙 사전 캐시 갱신(TTL 60s — 핫패스 비용 0)
+  await loadCriteria(); // 등급 바닥 등 기준 임계값 캐시 갱신(synthesize가 동기로 읽기 전 프라임)
   const { raw, fromCache, apiFailed } = await gatherRaw(cafe, !!opts?.refresh);
   if (apiFailed) return { id: cafe.id, name: cafe.name, ok: false, reason: "수집 API 오류/쿼터 — 보존", skipped: true };
   const sources = rawToSources(raw);
