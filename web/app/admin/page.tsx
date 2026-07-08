@@ -135,6 +135,14 @@ export default function AdminPage() {
     fetch("/api/cron-verify?latest=1", h).then((x) => x.json()).then((d) => { if (d.ok) { setVerify(d.report); setGrounding(d.grounding); } }).catch(() => {});
     loadBorderline(password);
   };
+  // 🔐 세션 복원 — 저장된 관리자 비밀번호(adm_pw)가 있으면 자동 인증(/admin/org와 동일 패턴).
+  //   조직관제에서 '대시보드'로 돌아올 때 비밀번호 화면이 재노출되지 않도록 한다(#213).
+  useEffect(() => {
+    let p: string | null = null;
+    try { p = localStorage.getItem("adm_pw"); } catch {}
+    if (p) { setPw(p); load(p); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // 🧮 전 지표 자동 갱신(15초) — 백그라운드 작업이 실시간 반영(새로고침 불필요)
   useEffect(() => {
     if (!authed || !pw) return;
@@ -163,7 +171,7 @@ export default function AdminPage() {
     const r = await fetch("/api/admin/cafes", { headers: { "x-admin-password": password } });
     if (r.status === 401) { setMsg("비밀번호가 틀렸습니다."); return; }
     const d = await r.json();
-    if (d.ok) { setCafes(d.cafes); setAuthed(true); setMsg(""); }
+    if (d.ok) { setCafes(d.cafes); setAuthed(true); setMsg(""); try { localStorage.setItem("adm_pw", password); } catch {} }
     else { setMsg("오류: " + d.error); return; }
     refreshNumbers(password);
     loadReview(password);
