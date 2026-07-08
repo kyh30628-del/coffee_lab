@@ -74,6 +74,19 @@ function offctxRate(quotes: string[]): number {
   if (qs.length < getCriterionSync("contamination.offctx.min_sample")) return 0;
   return qs.filter((q) => !CAFE_CTX.test(q)).length / qs.length;
 }
+// 🔍 offctx '오탐' 재판정(단일출처) — 표시 리뷰가 *실제로 카페 맥락*을 충분히 담고 있어 offctx 플래그가 오탐인지.
+//   관제탑 autoCorrect가 offctx_ok(사람 화이트리스트)를 자동 해제할 때의 게이트다. 이름일관성(nameCoherence)은
+//   '이름 언급률'이라, 이름은 맞지만 카페 얘기가 아닌 오염(동명 타업종·홍보글)을 놓친다 — 그래서 offctx는
+//   offctx 지표 자체로만 오탐 판정해야 한다(협업#140/결재#209: coherence 평균으로 재승인돼 수동교정이 9분 만에 원복).
+//   보수적: 표본 부족(min_sample 미만)이면 오탐 단정 불가(false) → 자동 화이트리스트 금지. 맥락없음비율이
+//   플래그 임계(offctx_rate>=0.55) 미만으로 떨어졌을 때만 진짜 오탐으로 본다(그 카페는 더는 플래그 대상이 아님).
+export function offctxFalsePositive(quotes: string[]): boolean {
+  const qs = (quotes || []).filter(Boolean);
+  if (qs.length < getCriterionSync("contamination.offctx.min_sample")) return false;
+  return offctxRate(qs) < OFFCTX_FLAG_RATE;
+}
+// offctx 관제탑 플래그 임계(맥락없음비율) — issues.ts 대상쿼리·다이제스트 카운트와 동일 기준(단일 상수).
+export const OFFCTX_FLAG_RATE = 0.55;
 
 // 저장된 판정 결정(영구). 재합성 시에도 동명/무관 제거가 유지되도록 모든 합성에 주입.
 async function loadDecisions(cafeId: number): Promise<Record<string, boolean>> {
