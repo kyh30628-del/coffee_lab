@@ -1,7 +1,10 @@
-// 🚧 컴파일 타임 트립와이어: 이 모듈이 클라이언트 번들에 딸려 들어가면 빌드가 즉시 실패한다.
-//    ('use client' 컴포넌트에서 도달 가능한 임포트 그래프에 이 파일이 있으면 next build가 에러)
-//    아래 런타임 플레이스홀더 가드(벨트)와 함께 이중 방어(멜빵). 서버(라우트·크론·서버컴포넌트)는 무영향.
-import "server-only";
+// ⚠️ 클라이언트 번들 유입 방어는 '모듈 경계 분리'로 구조적으로 달성한다:
+//    lib/criteriaListsBase.ts(클라 안전 코어)만 client 체인이 임포트하고, db는 서버 전용
+//    criteriaLists.ts만 임포트 → 'use client' 그래프가 db.ts에 도달하지 않는다(홈 다운 사고의 실 원인 차단).
+//    과거 `import "server-only"` 컴파일 트립와이어도 걸었으나, db.ts는 로컬 tsx 스크립트
+//    (heartbeat·resynth·embed·youtube-backfill 등 자율 워커)도 공유하는 모듈인데 server-only가
+//    Node/tsx에서 해석 불가('Cannot find package')→로컬 워커를 전멸시켜(e370942 부작용) 제거했다.
+//    미래의 client→db 회귀는 배포 파이프라인의 브라우저 스모크체크로 감지한다. 런타임 가드(아래)는 유지.
 import { neon } from "@neondatabase/serverless";
 
 // ⚠️ sql은 서버 전용이지만, 이 모듈이 클라이언트 번들에 딸려 들어갈 수 있다
