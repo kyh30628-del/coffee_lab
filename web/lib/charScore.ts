@@ -2,7 +2,7 @@
 // 검증 통과한 리뷰 텍스트에서만 계산한다(품질 필터 이후). 측정값이 아니라 '언급 빈도'.
 //   ⚠️ 축별 키워드(kws)는 lib/criteriaLists.ts(BASE=폴백 진실원본)가 단일출처 — 무배포 편집 가능.
 //   ax.kws 는 getter로 매 접근시 getListSync(BASE 폴백)를 읽는다(캐시 미프라임이어도 현재값 = 서비스 무변).
-import { getListSync } from "./criteriaLists";
+import { getListSync } from "./criteriaListsBase"; // ⚠️ base(클라 안전)에서 import — criteriaLists(db 포함)를 거치면 클라 번들에 neon 유입(사고 재발)
 
 const CHAR_AXES_BASE = [
   { key: "roast", label: "직접로스팅", emoji: "🔥", listKey: "char.roast.kws" },
