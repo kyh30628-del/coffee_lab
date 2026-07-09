@@ -27,12 +27,14 @@ export const metadata: Metadata = {
   appleWebApp: { capable: true, title: "커피 노트", statusBarStyle: "black-translucent" },
 };
 
-// 모바일 최적화: 화면 꽉 채우고, 사용자 확대로 깨지지 않게
+// 모바일 최적화: 화면 꽉 채우고 device-width에 정확히 맞춤.
+//   ⚠️ maximumScale:1 / userScalable:false 제거(2026-07-10) — iOS Safari는 user-scalable=no를 무시하지만
+//   인스타·페북 인앱 브라우저(WKWebView)는 이를 '존중'해 페이지를 잘못된 배율로 고정하고, 사용자가
+//   핀치로 되돌릴 수도 없게 만든다(=인스타 링크로 들어오면 화면 배율이 안 맞던 원인). Safari에서만 정상이던 이유.
+//   확대 허용이 Apple 접근성 권장이자 인앱 배율 버그의 표준 해법. 지도는 Leaflet이 자체 제스처를 처리해 무영향.
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
   viewportFit: "cover",
   themeColor: "#2b2018",
 };
