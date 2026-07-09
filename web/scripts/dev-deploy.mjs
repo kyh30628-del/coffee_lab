@@ -44,16 +44,24 @@ for (const d of rows) {
   const coord = d.action_params?.coord;
   console.log(`\n[배포] #${d.id} ${d.title} (${br})`);
   const locked = await glock();
+  // merge를 실제로 시작했는지 추적. 병합 이전(사람작업보호 dirty가드·branch없음·git락·fetch 등)에서
+  // 던진 에러는 워킹트리를 건드리지 않는다 — 아래 checkout -f/reset --hard는 merge 시작 후에만 도달.
+  let mergeStarted = false;
   try {
     if (!locked) throw new Error("git락 타임아웃");
     if (!br) throw new Error("branch 없음");
     // 🛡️ 사람 작업 보호(2026-07-02): 메인 레포에 커밋 안 된 tracked 변경이 있으면 배포 중단.
     //   (아래 checkout -f + reset --hard가 CEO의 로컬 수정을 무경고 삭제하던 구멍. untracked는 reset이 안 지움.)
     const dirty = git("status --porcelain").split("\n").filter((l) => l && !l.startsWith("??"));
-    if (dirty.length) throw new Error(`메인 레포에 커밋 안 된 변경 ${dirty.length}건 — 사람 작업 보호로 배포 중단: ${dirty.slice(0, 3).join(" | ").slice(0, 120)}`);
+    if (dirty.length) {
+      const e = new Error(`메인 레포에 커밋 안 된 변경 ${dirty.length}건 — 사람 작업 보호로 배포 중단: ${dirty.slice(0, 3).join(" | ").slice(0, 120)}`);
+      e.humanWork = true; // 아래 catch가 이 표식을 보고 워킹트리 파괴(checkout -f/reset --hard) 없이 보류 처리
+      throw e;
+    }
     git("fetch origin main -q");
     git("checkout -f main");         // -f: 잔여 미스테이지 변경 폐기(위 dirty 가드 통과 후에만 도달)
     git("reset --hard origin/main"); // 원격 main에 정확히 정렬(rebase 실패 회피)
+    mergeStarted = true; // 이 지점부터의 실패만 아래 catch의 병합/워킹트리 정리(merge --abort·reset) 대상
     git(`merge --no-ff ${br} -m "deploy: #${d.id} ${String(d.title).slice(0, 60)}\n\nCEO 배포 확정. Co-Authored-By: Claude <noreply@anthropic.com>"`);
     let sha = git("rev-parse HEAD");
     // 📜 배포 아카이브 자동 append(커밋 로그 미러). 아카이브 커밋을 얹은 뒤 그 HEAD를 배포 sha로 확정.
@@ -89,6 +97,21 @@ for (const d of rows) {
     }
   } catch (e) {
     const msg = String(e.message || e);
+    // 🛡️ 자기파괴 금지(#221 소실 사고): 병합 이전 단계에서 던진 에러(사람작업보호 dirty가드·branch없음·git락·fetch 등)는
+    //   워킹트리를 절대 건드리지 않는다. 과거엔 이 공용 catch가 무조건 checkout -f/reset --hard를 실행 → dirty가드가
+    //   "보호" 명목으로 던진 에러를 바로 그 catch가 받아 미커밋 변경을 강제 폐기하는 자기모순으로 실제 작업분이 소실됐다.
+    if (!mergeStarted) {
+      if (e?.humanWork) {
+        // 미커밋 변경으로 보류 — deploy_approved 유지(트리 정리되면 다음 주기에 자동 재배포·자가치유). 워킹트리 무손상.
+        await sql`UPDATE decisions SET result=${`배포 보류 — 메인 레포 미커밋 변경 보호(트리 정리 후 자동 재배포): ${msg.slice(0, 90)}`} WHERE id=${d.id}`.catch(() => {});
+        console.log(`  ⏸ #${d.id} 사람 작업 보호로 배포 보류(워킹트리 무손상)`);
+      } else {
+        // 사전조건 실패(branch없음·git락·fetch 등) — 재시도 필요로 정직히 기록. 병합 전이라 정리할 워킹트리 변경 없음.
+        await sql`UPDATE decisions SET result=${`배포 전 오류(재시도 필요, 워킹트리 무손상): ${msg.slice(0, 100)}`}, action_params = action_params || '{"dev_status":"배포오류"}'::jsonb WHERE id=${d.id}`.catch(() => {});
+        console.log(`  ⚠️ #${d.id} 배포 전 오류(무손상): ${msg.slice(0, 100)}`);
+      }
+      continue; // finally에서 락 해제 후 다음 태스크로 — 아래 병합/워킹트리 정리 로직으로 흘러가지 않음
+    }
     // 🔎 결정론적 충돌 감지: 병합 미해결(unmerged) 파일 존재로 판정 — 로케일·출력스트림 무관.
     //   (git 충돌 문구는 stdout·현지어라 e.message 문자열 매칭으론 못 잡음. 반드시 merge --abort 전에 검사.)
     let conflict = false;
