@@ -5,6 +5,8 @@ import { recordRun } from "@/lib/agentLog";
 import { judgeQueueCount, dailyCounts } from "@/lib/metrics";
 import { consoleCreditExhaustedByProbe } from "@/lib/consoleKeyProbe";
 import { loadCriteria, getCriterionSync } from "@/lib/criteria";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 export const runtime = "nodejs";
 export const maxDuration = 120; // 재검증 자가감사(healPublishedAudit) 배치 여유
 
@@ -44,6 +46,10 @@ export async function GET(req: NextRequest) {
     await ensureSchema();
     await sql`CREATE TABLE IF NOT EXISTS orchestrator_state (id INT PRIMARY KEY DEFAULT 1, health JSONB, updated_at TIMESTAMPTZ DEFAULT now())`;
     const now = Date.now();
+    // ⏸️ AI 판정/그라운딩은 CEO가 .ai-paused 플래그로 의도적 정지 가능(구독한도·콘솔비용 보호).
+    //   이 플래그가 있으면 판정 '멈춤'은 장애가 아니라 기승인 상태 → critical 경보 금지(정보성 표시).
+    //   (플래그는 git 추적·배포됨. next.config outputFileTracingIncludes로 이 함수 번들에 포함.)
+    const aiPaused = (() => { try { return existsSync(join(process.cwd(), ".ai-paused")); } catch { return false; } })();
     // 읽기(현황)는 비민감 → 공개. 자가치유(heal)는 비용 발생 가능 → 인증 필수.
     const heal = req.nextUrl.searchParams.get("heal") === "1" && authed(req);
     const healed: string[] = [];
@@ -172,6 +178,7 @@ export async function GET(req: NextRequest) {
     const PUB = c.published || 1;
     const risks: string[] = [];
     const notices: string[] = [];
+    if (aiPaused) notices.push("⏸️ AI 판정·그라운딩 일시정지(CEO 지시 · 구독한도·콘솔비용 보호) — 공개카페는 규칙검증으로 정상 노출, 재개 시 자동 해소");
 
     // 소비자에게 '잘못된 데이터'(그라운딩 업체혼동·환각)가 공개 노출 = 해자(옥석) 직접 훼손.
     //   소수(<0.5% & <30)는 비공개 처리로 정리되는 수준 → 주의. 그 이상이면 해자 타격 → 위험.
@@ -448,8 +455,17 @@ export async function GET(req: NextRequest) {
       agents.push({ key: "selfaudit", label: "재검증 자가감사", lastRun: auditCov?.last_audit ?? null, ageH: aaAge == null ? null : Math.round(aaAge * 10) / 10, cadenceH: 8, status: aaAge != null && aaAge > 12 ? "warn" : "ok", queue: Math.max(0, pub - a7), note: `7일내 재검 ${a7}/${pub}(${covPct}%) · 전 공개카페를 현재 규칙으로 순환 재검증(드리프트 자동치유)` });
     }
 
+    // ⏸️ AI 판정이 CEO 지시로 정지된 상태면 '멈춤(stalled)'이 아니라 의도적 대기 → idle(중립)로 표시.
+    //   경보·전체상태 저하 유발 안 함. 공개카페는 규칙검증으로 노출 유지(판정=보조정제).
+    if (aiPaused) {
+      const j = agents.find((a) => a.key === "judge");
+      if (j) { j.status = "idle"; j.note = `⏸️ 일시정지(CEO 지시·비용 보호) — 재개 시 자동해소 · ${j.note}`; }
+    }
+
     // ── 4) 종합 건강 ──
-    const core = agents.filter((a) => ["collect", "synth", "judge"].includes(a.key));
+    // core = 소비자 조립라인(수집·합성)만. AI 판정은 '보조정제'(공개카페는 규칙검증이 1차 게이트,
+    //   판정 정지해도 소비자 노출 품질 무관)라 단독 정지로 critical 승격 금지 — degraded/notice까지만.
+    const core = agents.filter((a) => ["collect", "synth"].includes(a.key));
     // 위험(risks)·엔진정지·무결성위반·배치크래시 = critical(빨강). 에이전트 멈춤·지연·경고 = degraded(노랑).
     //   주의(notices)는 백그라운드 대기열이라 전체 상태를 떨어뜨리지 않음 — 정보로만 표시(소비자 무관).
     const overall = (core.some((a) => a.status === "stalled") || jobFails.length || integrity.length || risks.length) ? "critical"

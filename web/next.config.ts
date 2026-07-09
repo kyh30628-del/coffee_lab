@@ -11,6 +11,8 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/api/cron-criteria-verify": ["./lib/**/*.ts", "./app/api/**/*.ts"],
     "/api/admin/criteria-status": ["./lib/**/*.ts", "./app/api/**/*.ts"],
+    // 관제탑이 런타임에 .ai-paused 플래그(판정 의도적 정지)를 읽는다 → 함수 번들에 포함.
+    "/api/orchestrator": ["./.ai-paused"],
   },
 };
 
