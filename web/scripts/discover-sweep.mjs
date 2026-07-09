@@ -8,7 +8,9 @@ import { readFileSync } from "node:fs";
 const env = readFileSync(new URL("../.env.local", import.meta.url), "utf8");
 for (const l of env.split("\n")) { const m = l.match(/^([A-Z_0-9]+)=(.*)$/); if (m) process.env[m[1]] = m[2].replace(/^["']|["']$/g, ""); }
 const { discoverRegion } = await import("../lib/discover.ts");
+const { mineArea } = await import("../lib/reviewMiner.ts"); // 리뷰 속 상호 추출→네이버검증 신규적재(키워드검색 못 잡는 롱테일)
 const { sql } = await import("../lib/db.ts");
+const MINE_CALLS = Number(process.env.MINE_CALLS || 30); // 지역당 리뷰마이닝 네이버 검증 콜(0이면 마이닝 생략)
 
 const PER_REGION_MS = Number(process.env.PER_REGION_MS || 120_000); // 지역당 상한(넓게 커버 — cron-grow는 225s)
 const TOTAL_MS = Number(process.env.TOTAL_MS || 6 * 60 * 60_000);   // 총 예산 상한(6h) — 보통 '한 바퀴 완주'로 먼저 종료
@@ -29,7 +31,13 @@ while (Date.now() - t0 < TOTAL_MS && !stop) {
     const res = await discoverRegion(reg.region, reg.area_label ?? reg.region, undefined, { deadlineMs: Date.now() + budget, sorts: ["comment", "random"] });
     await sql`UPDATE discovery_state SET last_run=now(), last_found=${res.found}, last_inserted=${res.inserted} WHERE region=${reg.region}`;
     totalNew += res.inserted; done++;
-    console.log(`[${done}] ${reg.region}: 발견 ${res.found} · 신규 ${res.inserted} · 누적신규 ${totalNew}`);
+    // 🔎 리뷰마이닝 — 이 지역 리뷰에서 상호 추출→네이버검증→롱테일 신규적재(키워드검색 사각). 콜 바운드.
+    let mined = 0;
+    if (MINE_CALLS > 0 && !res.apiError) {
+      try { const mr = await mineArea(reg.area_label ?? reg.region, { maxCalls: MINE_CALLS, apply: true }); mined = mr?.inserted ?? 0; totalNew += mined; }
+      catch { /* 마이닝 실패는 무시(발굴은 이미 완료) */ }
+    }
+    console.log(`[${done}] ${reg.region}: 발견 ${res.found} · 신규 ${res.inserted}${mined ? ` +마이닝 ${mined}` : ""} · 누적신규 ${totalNew}`);
     if (res.apiError) stop = "네이버 한도 추정(429) — 중단(다음 회차 신선도순 재개)";
   } catch (e) {
     const m = String(e).slice(0, 80);
