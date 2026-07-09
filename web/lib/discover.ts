@@ -339,24 +339,48 @@ export async function discoverRegion(region: string, areaLabel: string, keywords
   const latMin = getCriterionSync("geo.box.lat_min"), latMax = getCriterionSync("geo.box.lat_max");
   const lngMin = getCriterionSync("geo.box.lng_min"), lngMax = getCriterionSync("geo.box.lng_max");
   let inserted = 0, skipped = 0, backfilled = 0, oob = 0;
-  for (const it of found) {
-    // 🗺️ 수도권 박스 밖(비수도권) 좌표는 신규 적재 안 함 — 네이버가 동명 타지역 업체(성심당 본점=대전,
-    //   사운즈커피 만촌=대구)를 반환해도 서비스(수도권)와 무관하므로 제외. 공개 게이트도 막지만 적재 단계서 차단=DB 청결.
-    if (it.lat != null && it.lng != null && !(it.lat >= latMin && it.lat <= latMax && it.lng >= lngMin && it.lng <= lngMax)) { oob++; continue; }
-    const exists = await sql`SELECT id, dong, naver_category FROM cafes WHERE name = ${it.name} OR (ABS(lat - ${it.lat}) < 0.0005 AND ABS(lng - ${it.lng}) < 0.0005) LIMIT 1`;
-    if (exists.length > 0) {
-      // 기존 카페: 동·카테고리 정보가 없으면 발굴 중 백필(추가 호출 없이). 카테고리는 비카페 게이트 정확도에 중요.
-      if (it.dong && !exists[0].dong) { await sql`UPDATE cafes SET dong = ${it.dong} WHERE id = ${exists[0].id}`; backfilled++; }
-      if (it.category && !exists[0].naver_category) { await sql`UPDATE cafes SET naver_category = ${it.category} WHERE id = ${exists[0].id}`; }
-      skipped++; continue;
+  // 🗺️ 수도권 박스 밖(좌표 있고 수도권 밖)만 제외 — 네이버가 동명 타지역 업체(성심당=대전 등)를 반환해도 서비스와 무관.
+  //   좌표 null은 원본대로 통과(이름 대조). 공개 게이트도 막지만 적재 단계서 차단=DB 청결.
+  const proc = found.filter((it) => !(it.lat != null && it.lng != null && !(it.lat >= latMin && it.lat <= latMax && it.lng >= lngMin && it.lng <= lngMax)));
+  oob = found.length - proc.length;
+  if (proc.length) {
+    // 🚀 중복검사 배치화(2026-07-09) — 발굴카페마다 개별 SELECT(지역당 수백 왕복)를 '이름 ANY + 좌표박스' 1회 조회로.
+    //   의미 무변(name OR coord-near 동일 판정), 스윕 속도 5~10× → 매 회차 전 지역 커버 가능.
+    const names = [...new Set(proc.map((it) => it.name))];
+    const withCoord = proc.filter((it) => it.lat != null && it.lng != null);
+    let ex: any[];
+    if (withCoord.length) {
+      const minLat = Math.min(...withCoord.map((i) => i.lat as number)) - 0.001, maxLat = Math.max(...withCoord.map((i) => i.lat as number)) + 0.001;
+      const minLng = Math.min(...withCoord.map((i) => i.lng as number)) - 0.001, maxLng = Math.max(...withCoord.map((i) => i.lng as number)) + 0.001;
+      ex = (await sql`SELECT id, name, dong, naver_category, lat, lng FROM cafes
+        WHERE name = ANY(${names}) OR (lat BETWEEN ${minLat} AND ${maxLat} AND lng BETWEEN ${minLng} AND ${maxLng})`) as any[];
+    } else {
+      ex = (await sql`SELECT id, name, dong, naver_category, lat, lng FROM cafes WHERE name = ANY(${names})`) as any[];
     }
-    const pseudoId = `nl_${it.name.replace(/\s/g, "")}_${Math.round(it.lat * 1e5)}`;
-    // 신규 카페는 pipeline_status='new'로 태어남 → 풀 게이트(합성·AI판정·임베딩·검증) 통과 후에만 공개.
-    await sql`
-      INSERT INTO cafes (place_id, name, area, dong, naver_category, address, lat, lng, source, published, roasts_own, pipeline_status)
-      VALUES (${pseudoId}, ${it.name}, ${storeArea}, ${it.dong}, ${it.category}, ${it.address}, ${it.lat}, ${it.lng}, 'discover', false, false, 'new')
-      ON CONFLICT (place_id) DO NOTHING`;
-    inserted++;
+    const byName = new Map<string, any>();
+    for (const c of ex) if (!byName.has(c.name)) byName.set(c.name, c);
+    const pts = ex.filter((c) => c.lat != null).map((c) => ({ lat: Number(c.lat), lng: Number(c.lng), c }));
+    for (const it of proc) {
+      let m = byName.get(it.name);
+      if (!m && it.lat != null) m = pts.find((p) => Math.abs(p.lat - (it.lat as number)) < 0.0005 && Math.abs(p.lng - (it.lng as number)) < 0.0005)?.c;
+      if (m) {
+        // 기존 카페: 동·카테고리 없으면 백필(카테고리는 비카페 게이트 정확도에 중요).
+        if (it.dong && !m.dong) { await sql`UPDATE cafes SET dong = ${it.dong} WHERE id = ${m.id}`; backfilled++; m.dong = it.dong; }
+        if (it.category && !m.naver_category) { await sql`UPDATE cafes SET naver_category = ${it.category} WHERE id = ${m.id}`; m.naver_category = it.category; }
+        skipped++; continue;
+      }
+      const pseudoId = `nl_${it.name.replace(/\s/g, "")}_${Math.round((it.lat as number) * 1e5)}`;
+      // 신규 카페는 pipeline_status='new'로 태어남 → 풀 게이트(합성·AI판정·임베딩·검증) 통과 후에만 공개.
+      await sql`
+        INSERT INTO cafes (place_id, name, area, dong, naver_category, address, lat, lng, source, published, roasts_own, pipeline_status)
+        VALUES (${pseudoId}, ${it.name}, ${storeArea}, ${it.dong}, ${it.category}, ${it.address}, ${it.lat}, ${it.lng}, 'discover', false, false, 'new')
+        ON CONFLICT (place_id) DO NOTHING`;
+      inserted++;
+      // 같은 배치 내 후속 중복 방지(직전에 넣은 것도 대조 대상에 추가)
+      const nc = { id: null, name: it.name, dong: it.dong, naver_category: it.category, lat: it.lat, lng: it.lng };
+      byName.set(it.name, nc);
+      if (it.lat != null) pts.push({ lat: it.lat as number, lng: it.lng as number, c: nc });
+    }
   }
   // apiError: 아무것도 못 건졌는데 API 실패가 있었음 = 쿼터 소진(진짜 빈 지역 아님) → 호출부가 last_run 안 굳히게.
   const apiError = found.length === 0 && apiFails > 0;
