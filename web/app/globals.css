@@ -27,10 +27,21 @@ input::placeholder, textarea::placeholder { color: #a8927a; }
 
 /* iOS PWA: 홈인디케이터 안전영역에 흰 띠가 비치지 않게 앱 메인 배경(크림)으로 고정.
    라이트/다크 모드 무관 — 하단 safe-area가 크림 앱 화면과 자연스럽게 이어짐. */
-html { background: #f4ece0; }
+/* ⚠️ 인앱 브라우저(인스타·페북 등 Android WebView) 자동 글자확대(font-boosting) 차단 —
+   Chrome은 width=device-width가 있으면 폰트부스팅을 끄지만, 인스타 Android WebView는 useWideViewPort=false로
+   device-width를 무시하고 좁은 뷰포트로 렌더해 고정px 텍스트를 전부 부풀린다(=인스타 링크로 들어오면 화면이 너무
+   확대돼 보이던 원인·2026-07-10). text-size-adjust:100%로 어떤 뷰포트에서도 지정한 px를 그대로 쓰게 강제. Chrome은 무영향. */
+html {
+  background: #f4ece0;
+  -webkit-text-size-adjust: 100%;
+  -moz-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
 body {
   background: #f4ece0;
   color: var(--foreground);
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
   /* Gowun Batang 로딩 전 iOS/안드로이드 시스템 명조체로 즉시 표시 → 글자 점진 로딩(빈 글자) 방지 */
   font-family: "Gowun Batang", AppleMyungjo, "Apple SD Gothic Neo", "Noto Serif KR", serif;
 }
