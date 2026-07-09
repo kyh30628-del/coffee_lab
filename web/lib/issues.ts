@@ -2,7 +2,7 @@ import { sql } from "./db";
 import { nameCoherence, cleanCafeName } from "./reviewQuality";
 import { healNonCafeCategory, healOffConceptByReview, healRestaurantByReview, healNonCafeByReview, healOutOfBox, healAreaLabel, offctxFalsePositive, OFFCTX_FLAG_RATE } from "./synthStore";
 import { pushTrigger } from "./auditTrigger";
-import { teamOf, RETIRED_JOBS } from "./jobTeams";
+import { teamOf, RETIRED_JOBS, EXPECT_MAX_H } from "./jobTeams";
 import { invalidateCafeCaches } from "./cafeCacheInvalidate";
 
 const parseRv = (o: any): string[] => {
@@ -208,6 +208,13 @@ export async function coordinationLifecycle(): Promise<{ routed: number; overdue
   // 6) ✅ 조사(investigate) 결재 자동 종결: 자가진단이 '크론 실패/정지'로 올린 investigate는 조사대상 크론이
   //    다시 정상(최신 run ok)이면 조사할 게 사라진 것 → 자동 done. (안 그러면 크론이 잠깐 삐끗할 때마다 안 닫히는 좀비 누적.)
   //    check 예: "크론 실패 cron-closure" → job 'cron-closure' 추출 후 agent_runs 최신 run ok면 종결. 파싱 불가/미정상이면 그대로 둠(안전).
+  //    ⚠️ 근본수리(2026-07-09 #251): 과거엔 "최신 run ok=true"만 봤는데, 크론이 성공 직후 정지하면 최신 기록이
+  //      죽기 직전의 ok=true로 영원히 굳어 → 오래된 성공 기록만으로 '정상화'를 오판, 매 사이클 investigate 결재를
+  //      허위 종결해 ikey pending-dedup을 무력화하고 재상신 폭주(#236→250)를 만들었다(audit-watch·dev-deploy·
+  //      dev-pipeline 정지, 마지막 run이 2h27min 전 ok=true). → 이제 **최신 ok=true인 동시에 그 run이 해당 job의
+  //      기대주기(jobTeams.ts EXPECT_MAX_H, cron-selfaudit의 정지의심 임계값과 동일) 이내로 신선**해야만 '정상화'로
+  //      인정한다. EXPECT_MAX_H 미등록(정지의심 미감시) 잡은 staleness 계약이 없으므로 기존대로 ok=true만 본다.
+  const expectJson = JSON.stringify(EXPECT_MAX_H);
   const closedInv = (await sql`UPDATE decisions d SET status='done', decided_at=now(),
       result = COALESCE(d.result,'') || ' [조사대상 크론 정상화 → 자동 종결]'
     WHERE d.status IN ('approved','pending') AND d.action_type='investigate'
@@ -216,7 +223,11 @@ export async function coordinationLifecycle(): Promise<{ routed: number; overdue
         SELECT 1 FROM agent_runs a
         WHERE a.job = split_part(regexp_replace(d.action_params->>'check', '^.*크론 (정지의심|정지|실패) ', ''), ' ', 1)
           AND a.ran_at = (SELECT MAX(ran_at) FROM agent_runs a2 WHERE a2.job = a.job)
-          AND a.ok = true)
+          AND a.ok = true
+          AND (
+            NOT jsonb_exists(${expectJson}::jsonb, a.job)
+            OR a.ran_at >= now() - ((${expectJson}::jsonb ->> a.job)::numeric * interval '1 hour')
+          ))
     RETURNING id`.catch(() => [])) as any[];
   if (closedInv.length && log.length < 6) log.push(`조사 결재 ${closedInv.length}건 자동 종결(크론 정상화)`);
 
