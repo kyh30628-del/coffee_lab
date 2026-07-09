@@ -294,10 +294,10 @@ export default function OrgDashboard() {
 
       <div style={{ background: "#2b2018", color: "#e8b87a", borderRadius: 14, padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div><div style={{ fontSize: 17, fontWeight: 700 }}>🎩 조직 관제</div><div style={{ fontSize: 11, color: "#cbb38c" }}>기획조정실 · 자율 조직 브리핑</div></div>
-        <div style={{ display: "flex", gap: 7 }}>
-          <a href="/admin/criteria" style={{ background: "#c98a3c", color: "#fff", borderRadius: 9, padding: "8px 11px", fontSize: 12, fontWeight: 700, textDecoration: "none" }}>🎛️ 기준</a>
-          <a href="/admin/lounge" style={{ background: "#6a468c", color: "#fff", borderRadius: 9, padding: "8px 11px", fontSize: 12, fontWeight: 700, textDecoration: "none" }}>🏛️ 라운지</a>
-          <button onClick={() => setShowOrg(true)} style={{ background: "#c98a3c", color: "#fff", border: "none", borderRadius: 9, padding: "8px 11px", fontSize: 12, fontWeight: 700 }}>🏢 조직도</button>
+        <div style={{ display: "flex", gap: 7, flexWrap: "wrap", justifyContent: "flex-end" }}>
+          <a href="/admin/criteria" style={{ background: "#c98a3c", color: "#fff", borderRadius: 9, padding: "8px 16px", fontSize: 12, fontWeight: 700, textDecoration: "none", minWidth: 84, textAlign: "center", whiteSpace: "nowrap" }}>🎛️ 기준</a>
+          <a href="/admin/lounge" style={{ background: "#6a468c", color: "#fff", borderRadius: 9, padding: "8px 16px", fontSize: 12, fontWeight: 700, textDecoration: "none", minWidth: 84, textAlign: "center", whiteSpace: "nowrap" }}>🏛️ 라운지</a>
+          <button onClick={() => setShowOrg(true)} style={{ background: "#c98a3c", color: "#fff", border: "none", borderRadius: 9, padding: "8px 16px", fontSize: 12, fontWeight: 700, minWidth: 84, textAlign: "center", whiteSpace: "nowrap", cursor: "pointer" }}>🏢 조직도</button>
         </div>
       </div>
 
