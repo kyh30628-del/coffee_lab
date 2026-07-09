@@ -79,8 +79,10 @@ export async function GET(req: NextRequest) {
     const verifiedSkip = ((await sql`SELECT COUNT(*)::int n FROM cafes WHERE published AND synth_grade='검증' AND (llm_judged_at IS NULL OR llm_judged_at < raw_collected_at)`.catch(() => [{ n: 0 }]))[0] as any).n;
     const daily = await dailyCounts();
     const vr = (await sql`SELECT ran_at, fails, warns, status FROM verify_reports ORDER BY ran_at DESC LIMIT 1`)[0] as any;
-    // open = '실제 카페 오염' 플래그만(cafe_id 있고 'audit_complete' 같은 시스템 로그 제외). last_flag=실행 시각.
-    const af = (await sql`SELECT COUNT(*) FILTER (WHERE NOT resolved AND cafe_id IS NOT NULL AND issue <> 'audit_complete')::int open, MAX(flagged_at) last_flag FROM audit_flags`)[0] as any;
+    // open = '실제 카페 오염' 플래그만(cafe_id 있고 'audit_complete' 시스템 로그 제외 + '공개 중인 카페'만 — 비공개=이미
+    //   소비자 무노출=처리완료라 검토대기 아님. gr 쿼리와 동일 원칙). last_flag=실행 시각(전체 기준, 감사 가동시각).
+    const af = (await sql`SELECT COUNT(*) FILTER (WHERE NOT resolved AND cafe_id IS NOT NULL AND issue <> 'audit_complete'
+      AND EXISTS (SELECT 1 FROM cafes c WHERE c.id = audit_flags.cafe_id AND c.published))::int open, MAX(flagged_at) last_flag FROM audit_flags`)[0] as any;
     await sql`CREATE TABLE IF NOT EXISTS grounding_checks (cafe_id INT PRIMARY KEY, grounded BOOLEAN, issue TEXT, checked_at TIMESTAMPTZ DEFAULT now())`.catch(() => {});
     // 판정 대기(judge_q) 내역 분해 — 화면이 스스로 설명하게: 신규 미판정 vs 그라운딩이 재검 요청한 것.
     //   (그라운딩 apply가 의심분을 판정 큐로 되먹이면 judge_q가 뛰는데, 이 분해가 그 이유를 숫자로 보여줌)
@@ -170,6 +172,18 @@ export async function GET(req: NextRequest) {
     // 🛑 지역 통째 사라짐 감지 — 카페 30곳+ 지역인데 공개 0 = 대량 비공개 버그(인천 사태). 정상 지역은 항상 일부 공개됨.
     const regionGone = (await sql`SELECT area, COUNT(*)::int tot FROM cafes WHERE area IS NOT NULL GROUP BY area HAVING COUNT(*) >= 30 AND COUNT(*) FILTER (WHERE published) = 0`.catch(() => [])) as any[];
     if (regionGone.length) integrity.push(`⚠️지역 통째 비공개 ${regionGone.length}곳(${regionGone.slice(0, 3).map((r) => r.area).join("·")}) — 대량삭제 의심`);
+
+    // 🔧 치유 루프 폐쇄 — 비공개(excluded 등)된 카페의 오염 플래그는 '소비자 노출 remediated' → 자동 resolve.
+    //   근본원인: 자가치유가 오염카페를 비공개시켜도 audit_flags를 안 닫아 플래그가 영구 적체 → verify evidence_contamination·
+    //   오염카운트가 '이미 고쳐진(비공개) 카페'를 계속 red FAIL로 오경보하던 것. 재공개 시 selfaudit/audit 순환이 잔존
+    //   오염을 다시 플래그하므로 안전. (audit_complete 시스템 마커는 제외 — 감사 로그라 유지)
+    try {
+      const r = await sql`UPDATE audit_flags SET resolved=true
+        WHERE NOT resolved AND cafe_id IS NOT NULL AND issue <> 'audit_complete'
+          AND NOT EXISTS (SELECT 1 FROM cafes c WHERE c.id = audit_flags.cafe_id AND c.published)
+        RETURNING cafe_id`;
+      if (r.length) healed.push(`오염 플래그 ${r.length}건 자동 정리(비공개=처리완료, 소비자 무노출)`);
+    } catch { /* 감사 테이블 없음 등 → 무시(서비스 무영향) */ }
 
     // ⚠️ 위험/의심 선제 탐지 — 하드 위반은 아니지만 '문제 발생 소지' 있는 것을 수면 위로 올림(사장님이 보게).
     // ── 경보 2단계 분리 ──────────────────────────────────────────────

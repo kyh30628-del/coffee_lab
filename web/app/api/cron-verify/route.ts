@@ -102,9 +102,11 @@ async function runChecks(): Promise<Check[]> {
 
   // 13. 🛡️ 근거후기-카페명 불일치(동명·프랜차이즈 지점 오염) — 해자의 핵심. 자가치유가 못 잡은 잔존분.
   //   '바빈스 식당리뷰' 유형: 화면에 뜬 후기가 실제 그 카페 얘기가 아닌 것. 소비자 직접 노출 = 즉시 타격.
+  //   ⚠️ '공개 중인 카페'만 fail — 비공개(excluded)면 소비자 무노출=이미 처리됨(orchestrator 자가치유가 자동 resolve).
+  //   이 필터 없으면 '이미 비공개된 오염카페'를 소비자노출 fail로 영구 오경보(고쳐진 문제를 red로 표시).
   add("evidence_contamination", "근거후기가 카페명과 불일치(동명 오염)", "fail",
-    await n(sql`SELECT count(*)::int n FROM audit_flags WHERE issue='근거오염' AND NOT resolved`),
-    await samp(sql`SELECT cafe_name s FROM audit_flags WHERE issue='근거오염' AND NOT resolved ORDER BY flagged_at DESC LIMIT 6`));
+    await n(sql`SELECT count(*)::int n FROM audit_flags af WHERE af.issue='근거오염' AND NOT af.resolved AND EXISTS (SELECT 1 FROM cafes c WHERE c.id=af.cafe_id AND c.published)`),
+    await samp(sql`SELECT af.cafe_name s FROM audit_flags af WHERE af.issue='근거오염' AND NOT af.resolved AND EXISTS (SELECT 1 FROM cafes c WHERE c.id=af.cafe_id AND c.published) ORDER BY af.flagged_at DESC LIMIT 6`));
 
   // 14. 광고/협찬 글이 '검증 근거'로 노출 — 해자(진짜 후기) 훼손. 재합성 시 AD 게이트가 제외하지만 구데이터 점검.
   //   면책 문구('협찬 없이'·'광고 아님'·내돈내산)는 진짜 후기이므로 제외(오탐 방지) — verifyReview의 AD_STRONG/AD_DISCLAIM과 동일 기준.
