@@ -61,13 +61,19 @@ export async function autoCorrect(): Promise<{ resolved: number; escalated: numb
   } catch { /* graceful */ }
   // 대상: 미해결 audit_flags(근거오염) + offctx 높은 공개 카페. 어느 조건으로 걸렸는지(offctx_flag)를 함께 실어
   //   offctx 건은 offctx 지표로, audit_flags 건은 이름일관성으로 각각 맞는 기준으로 오탐 재판정한다.
+  // ⚠️ offctx 후보는 offctx_ok(화이트리스트) 상태와 무관하게 offctx_rate>=임계 전수를 잡는다(2026-07-09, 협업#149/결정#227).
+  //   과거엔 'AND NOT offctx_ok'로 화이트된 카페를 후보에서 뺐는데 — 재판정 조건에 현재 플래그가 들어가는 구조라, 한 번
+  //   (버그였던 coherence 평균으로) 잘못 offctx_ok=true로 뒤집힌 카페는 판정 로직(dev#219 offctxFalsePositive)을 고쳐도
+  //   대상쿼리에 다시 안 잡혀 새 로직이 영영 안 돌았다(플래그십 15462·14839 등 18곳이 offctx_ok=true로 정체). 이제 화이트도
+  //   재검해 아래 루프가 offctxFalsePositive로 승격/회수를 양방향 수렴시킨다 → SQL 재트리거 없이 자가치유(재발방지).
   const targets = (await sql`
     SELECT DISTINCT c.id, c.name, c.area, c.synth_reviews,
-      (c.offctx_rate >= ${OFFCTX_FLAG_RATE} AND NOT COALESCE(c.offctx_ok,false)) AS offctx_flag
+      COALESCE(c.offctx_ok,false) AS offctx_ok_now,
+      (c.offctx_rate >= ${OFFCTX_FLAG_RATE}) AS offctx_flag
     FROM cafes c
     WHERE c.published AND (
       EXISTS (SELECT 1 FROM audit_flags a WHERE a.cafe_id=c.id AND a.issue!='audit_complete' AND NOT COALESCE(a.resolved,false))
-      OR (c.offctx_rate >= ${OFFCTX_FLAG_RATE} AND NOT COALESCE(c.offctx_ok,false))
+      OR (c.offctx_rate >= ${OFFCTX_FLAG_RATE})
     ) LIMIT 40`.catch(() => [])) as any[];
   for (const c of targets) {
     const q = parseRv(c.synth_reviews); if (q.length < 3) continue;
@@ -78,11 +84,21 @@ export async function autoCorrect(): Promise<{ resolved: number; escalated: numb
     //   상충 탓에 수동교정(offctx_ok=false)이 매 사이클 coherence로 자동 재승인돼 9분 만에 원복됐다(협업#140/결재#209,
     //   플래그십 확정오염 빙가네숭의본점·"2005" 포함). → offctx 건은 표시 리뷰에 카페맥락이 실제로 충분할 때만 오탐.
     const offctxFalse = c.offctx_flag ? offctxFalsePositive(q) : true;
+    // 🔻 화이트리스트 회수(자가치유·재트리거 불필요): offctx로 걸렸는데 오탐이 아니면(진짜 맥락오염) 과거 잘못 부여된
+    //   offctx_ok=true를 코드가 스스로 회수한다. 대상쿼리가 이제 화이트도 재검하므로, 이미 뒤집힌 레코드도 새 로직으로
+    //   재판정돼 다음 사이클에 offctx_ok=false로 강등된다(SQL 재설정 불필요). 강등은 화이트 회수일 뿐 비공개 아님(가역·watchlist 복귀).
+    //   진짜 저코히런스 오염이면 아래 coh<0.35 분기가 별도로 비공개 결재를 상신한다(offctx 강등과 독립).
+    if (c.offctx_flag && !offctxFalse && c.offctx_ok_now) {
+      await sql`UPDATE cafes SET offctx_ok=false WHERE id=${c.id}`.catch(() => {});
+      resolved++; if (log.length < 8) log.push(`맥락오염 화이트회수 ${c.name}(offctx 재판정)`);
+    }
     if (coh >= 0.5 && offctxFalse) {
       // 진짜 카페(오탐) → 자동 정리: 플래그 해소 + (offctx로 걸린 건만) 화이트리스트
-      await sql`UPDATE audit_flags SET resolved=true WHERE cafe_id=${c.id} AND NOT COALESCE(resolved,false)`.catch(() => {});
-      if (c.offctx_flag) await sql`UPDATE cafes SET offctx_ok=true WHERE id=${c.id}`.catch(() => {});
-      resolved++; if (log.length < 8) log.push(`오탐정리 ${c.name}(${Math.round(coh * 100)}%)`);
+      const cleared = (await sql`UPDATE audit_flags SET resolved=true WHERE cafe_id=${c.id} AND NOT COALESCE(resolved,false) RETURNING cafe_id`.catch(() => [])) as any[];
+      // 화이트는 '아직 화이트 아님'일 때만 새로 승인 — 안정 오탐을 매 사이클 재기록·재카운트하지 않게(화이트 전수 재검으로 확장됐으므로 필수).
+      const newWhite = c.offctx_flag && !c.offctx_ok_now;
+      if (newWhite) await sql`UPDATE cafes SET offctx_ok=true WHERE id=${c.id}`.catch(() => {});
+      if (cleared.length || newWhite) { resolved++; if (log.length < 8) log.push(`오탐정리 ${c.name}(${Math.round(coh * 100)}%)`); }
     } else if (coh < 0.35) {
       // 진짜 오염 → 비공개 결재 자동 상신(중복방지). CEO 한 번 승인하면 비공개.
       const ik = `autopollute:${c.id}`;
