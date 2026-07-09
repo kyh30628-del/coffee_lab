@@ -38,3 +38,4 @@
 | 2026-07-09 11:04 | #251 | [자율진단] lib/issues.ts 조사결재 자동종결(6번) 오탐 — 정지된 크론을 최신run=ok tru | 9951ffc4 | - | lib/issues.ts 6번(closedInv) 조사결재 자동종결에 staleness 게이트 추가: 최신 run ok=true인 동시에 그 run이 EXPECT_MAX_H(정지의 |
 | 2026-07-09 11:16 | #256 | 헤더 이모지 제거 | fecd4624 | low | app/admin/org/page.tsx 헤더 3항목(기준/라운지/조직도) 이모지 접두 제거(🎛️🏛️🏢) — 라벨·href·onClick·정렬 스타일 유지. tsc 신규에러  |
 | 2026-07-09 12:40 | #261 | 헤더1줄+프로필이미지 | 2ee921ab | low | ①app/admin/org/page.tsx 헤더 버튼 이모지 복원(🎛️기준·🏛️라운지·🏢조직도)+패딩 8px16px→7px11px·gap7→5·minWidth84 제거·fle |
+| 2026-07-09 14:11 | #262 | 문의메일·챗봇아이콘 | b4b99a9e | med | ①문의메일 kyh30628@gmail.com→dongnecoffeenote@gmail.com 전수교체(8파일 13곳: lib/newsletter·onboardingEmail, ap |
