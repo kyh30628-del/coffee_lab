@@ -174,7 +174,7 @@ export function renderNewsletterEmail(nl: Newsletter, site: string, email: strin
         <!-- 발행 -->
         <tr><td style="padding:18px 26px 22px;border-top:2px solid ${INK};">
           <p style="font-size:11px;color:${MUTED};margin:0;line-height:1.7;">발행 · <b>동네 커피 노트</b> 편집부 | 본 지면은 <b>구독·체험 사장님</b>께 보내는 정보성 뉴스레터입니다. 외부 콘텐츠는 요약·출처 링크로 제공하며 원문 저작권은 각 매체에 있습니다.</p>
-          <p style="font-size:11px;color:#b09a78;margin:7px 0 0;">수신을 원치 않으시면 <a href="${unsub}" style="color:${ACCENT};">수신거부</a> · 문의 kyh30628@gmail.com</p>
+          <p style="font-size:11px;color:#b09a78;margin:7px 0 0;">수신을 원치 않으시면 <a href="${unsub}" style="color:${ACCENT};">수신거부</a> · 문의 dongnecoffeenote@gmail.com</p>
         </td></tr>
       </table>
     </td></tr></table></div>`;

@@ -116,7 +116,7 @@ export function renderOnboardingEmail(opts: { cafeName: string; pin: string; day
 
         <tr><td style="background:#faf4ea;border-top:1px solid #efe2cd;padding:18px 28px;margin-top:8px;">
           <p style="font-size:12px;color:#9c8569;margin:0;line-height:1.7;">${footer}</p>
-          <p style="font-size:11px;color:#bcae98;margin:8px 0 0;">열쇠는 본인만 알 수 있게 보관해 주세요 · 문의 kyh30628@gmail.com</p>
+          <p style="font-size:11px;color:#bcae98;margin:8px 0 0;">열쇠는 본인만 알 수 있게 보관해 주세요 · 문의 dongnecoffeenote@gmail.com</p>
         </td></tr>
       </table>
       <div style="font-size:11px;color:#b3a489;margin-top:14px;font-family:'Apple SD Gothic Neo',serif;">동네 커피 노트 · 진짜 후기로 고른 우리 동네 카페</div>
