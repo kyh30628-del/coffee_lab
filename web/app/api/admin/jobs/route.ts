@@ -1,21 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
+import { LAUNCHD_JOBS, JOB_TEAM, EXPECT_MAX_H } from "@/lib/jobTeams";
 
 export const runtime = "nodejs";
 
 // 🛠 로컬 launchd 잡 상태 — agent_runs(하트비트) 기준 실시간. 관제 화면 잡 상태 카드용.
-//   정지 판정: 마지막 기록이 maxH(주기+버퍼) 초과면 stale. maxH는 lib/jobTeams.ts EXPECT_MAX_H와 일치시킬 것.
-//   ⚠️ 제거된 잡(qualityaudit·dong-backfill .disabled)은 여기 넣지 말 것 — 하트비트 행이 없어 '미기록=오류'로 오표시됨(2026-07-02 수정).
-const JOB_META: Record<string, { label: string; team: string; sched: string; maxH: number }> = {
-  "chief-manager":     { label: "일간 사이클",      team: "기획조정실",   sched: "08·12·17시",        maxH: 20 },
-  "self-audit":        { label: "자율진단",         team: "기획조정실",   sched: "11:30·15:30·21:30", maxH: 16 },
-  "audit-watch":       { label: "이벤트 워처",      team: "기획조정실",   sched: "5분",              maxH: 1 },
-  "dev-pipeline":      { label: "개발 파이프라인",  team: "기획조정실",   sched: "5분",              maxH: 1 },
-  "dev-deploy":        { label: "배포 워커",        team: "기획조정실",   sched: "2분",              maxH: 1 },
-  "youtube-backfill":  { label: "유튜브 수집",      team: "품질본부",     sched: "16:30",            maxH: 30 },
-  "weekly-evaluation": { label: "주간 거버넌스",    team: "전략기획본부", sched: "10:30(격일)",       maxH: 30 },
-  "chat-watch":        { label: "관제 챗봇",        team: "경영지원본부", sched: "상주",             maxH: 1 },
-};
+//   정지 판정: 마지막 기록이 maxH(주기+버퍼) 초과면 stale.
+//   ⚠️ 하드코딩 금지 — lib/jobTeams.ts가 **단일 출처**다. label·sched는 LAUNCHD_JOBS, team은 JOB_TEAM,
+//   maxH는 EXPECT_MAX_H에서 파생한다(과거 여기 3번째 복사가 어긋난 전례 → 2026-07-09 파생으로 전환).
+//   잡 추가는 jobTeams.ts 한 곳(3종 세트)만 고치면 이 카드에 자동 반영. 제거된 잡(.disabled)은 LAUNCHD_JOBS에 없어 자동 제외.
+const JOB_META: Record<string, { label: string; team: string; sched: string; maxH: number }> = Object.fromEntries(
+  Object.entries(LAUNCHD_JOBS).map(([k, m]) => [k, { label: m.label, sched: m.sched, team: JOB_TEAM[k] ?? "경영지원본부", maxH: EXPECT_MAX_H[k] ?? 24 }]),
+);
 
 export async function GET(req: NextRequest) {
   if (req.headers.get("x-admin-password") !== process.env.ADMIN_PASSWORD)

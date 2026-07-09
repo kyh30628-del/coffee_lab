@@ -282,6 +282,16 @@ export default function OrgDashboard() {
                 </div>
               ) : <div style={{ fontSize: 11, color: "#9c8a6c" }}>불러오는 중…</div>}
 
+              {/* 🔎 조직도↔본부맵 드리프트 경보 — 자동감지(정상=숨김). org.ts와 jobTeams.ts가 어긋난 잡. */}
+              {orgAct?.drift?.length > 0 && (
+                <div style={{ marginTop: 10, background: "#fbeaea", border: "1px solid #e0b4b4", borderRadius: 9, padding: "8px 10px" }}>
+                  <div style={{ fontSize: 11.5, fontWeight: 700, color: "#b03a3a" }}>⚠️ 조직도 드리프트 {orgAct.drift.length}건 — org.ts↔jobTeams.ts 본부 불일치</div>
+                  {orgAct.drift.map((d: any) => (
+                    <div key={d.job} style={{ fontSize: 10, color: "#8a4a4a", marginTop: 3 }}>{d.name}({d.job}): 조직도 <b>{d.orgDivision}</b> ↔ 본부맵 <b>{d.jobTeamDivision}</b></div>
+                  ))}
+                </div>
+              )}
+
               {/* 실행 케이던스(설계) */}
               <div style={{ fontSize: 11, fontWeight: 700, color: "#9c6b3f", margin: "12px 0 6px" }}>실행 케이던스 (설계 · 도메인 변화속도에 맞춤)</div>
               <div style={{ overflowX: "auto", border: "1px solid #ddc9a8", borderRadius: 9 }}>

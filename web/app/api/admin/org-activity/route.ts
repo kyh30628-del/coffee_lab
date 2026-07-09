@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { JOB_TEAM } from "@/lib/jobTeams";
+import { orgTeamDrift } from "@/lib/org";
 export const runtime = "nodejs";
 
 // 🏛️ 본부별 활동 현황(관리자) — 각 본부가 마지막으로 언제 일했는지 + 다음 현업 사이클(08·12·17시 KST).
@@ -39,6 +40,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       ok: true,
       teams,
+      drift: orgTeamDrift(), // 🔎 조직도↔본부맵 어긋난 잡(정상=[]). 있으면 관제탑이 스스로 표면화.
       totalRan24h: runs.filter((r) => +r.h < 24).length,
       cycles: CYCLES,
       nextCycleHour: (nextCycleMin % 1440) / 60,

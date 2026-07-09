@@ -1,6 +1,7 @@
 // 🏛️ 조직도 단일 출처 — /admin/org(운영 관제)와 /admin/lounge(전사 라운지)가 함께 쓴다.
 //   ⚠️ 2벌 복사 금지(드리프트 방지 — 잡맵 4번 어긋난 전례). 조직 변경은 여기 한 곳만 고친다.
 //   j = agent_runs의 job 키(성과 조인용). api/deploy 등 자체 실행기록이 없으면 j 생략(null).
+import { JOB_TEAM } from "./jobTeams";
 export type Worker = { k: string; n: string; t: string; j?: string };
 export type Team = { n: string; s?: string; w: Worker[] };
 export type Division = { n: string; c: string; note?: string; teams: Team[] };
@@ -27,8 +28,8 @@ export const ORG: Org = {
       { n: "심층판정팀", s: "AI판정·그라운딩 — 경계 리뷰 의미판정·환각차단", w: [
         { k: "🧠", n: "심층판정 에이전트(로컬·무료)", t: "격일", j: "deep-judge-agent" }] }] },
     { n: "🟩 성장본부", c: "#3f7a4f", teams: [
-      { n: "발굴전략팀", s: "수요·공급갭 추론 → 발굴 타겟 적재", w: [
-        { k: "🧠", n: "발굴 에이전트", t: "매일", j: "demand-grow-agent" }, { k: "⚙️", n: "cron-grow", t: "2시간마다", j: "cron-grow" }, { k: "⚙️", n: "cron-demand", t: "매일 17시", j: "cron-demand" }, { k: "⚙️", n: "cron-discover-categories", t: "월 1회(1일 05시)", j: "cron-discover-categories" }] },
+      { n: "발굴전략팀", s: "수요·공급갭 추론 → 발굴 타겟 적재 + 전지역 신선도순 발굴 스윕", w: [
+        { k: "🧠", n: "발굴 에이전트", t: "매일", j: "demand-grow-agent" }, { k: "⚙️", n: "cron-grow", t: "2시간마다", j: "cron-grow" }, { k: "⚙️", n: "cron-demand", t: "매일 17시", j: "cron-demand" }, { k: "⚙️", n: "cron-discover-categories", t: "월 1회(1일 05시)", j: "cron-discover-categories" }, { k: "⚙️", n: "discover-sweep", t: "매일 02:30·14:30", j: "discover-sweep" }] },
       { n: "콘텐츠·SEO팀", s: "롱테일 SEO 발행 (보류)", w: [
         { k: "⚙️", n: "cron-newsletter", t: "주간(보류)", j: "cron-newsletter" }] }] },
     { n: "🟧 운영본부", c: "#b06a2e", teams: [
@@ -84,6 +85,7 @@ export const MEMBER_INFO: Record<string, string> = {
   "cron-verify": "매일 검증 카페의 15종 무결성을 점검.",
   "기준 검증 에이전트(criteria-verify)": "비즈니스 기준(criteria) 관제의 파수꾼. 하루 2회 결정론으로 ①각 기준이 코드에 실제 참조되는지(dead-knob 재발 감지) ②DB값의 범위·시드 드리프트 ③등급바닥·좌표박스의 실효과를 검사. dead-knob·범위이탈은 관제탑에 빨강 표면화(품질본부 자동배정), 실효과 어긋남은 노랑 추적. 기준 소유=품질본부, 관장=기획조정실장(L2). LLM·토큰 0.",
   "cron-grow": "2시간마다 발굴 큐를 소비해 신규 카페를 수집.",
+  "discover-sweep": "매일 밤·낮 2회(02:30·14:30), 전 수도권 지역을 '가장 오래 안 훑은 곳 먼저' 공정 순환하며 네이버 search/local 한도를 최대로 써 롱테일 독립카페(키워드검색 사각·예: 카페 희와)를 발굴. 지역당 시간상한으로 넓게 커버, 429면 중단 후 익일 재개. 신규는 비공개 적재→cron-grow/synth가 수집·합성·게이트 후에만 공개(안전). cron-grow(2h/1지역=5.5일 주기)의 롱테일 누락을 메우는 스윕.",
   "cron-demand": "매일 검색 로그에서 수요갭·핫지역을 분석.",
   "cron-newsletter": "주간 뉴스레터 발행(현재 보류).",
   "cron-closure": "6시간마다 폐업 의심을 재확인. 보수적 — 자동삭제 안 하고 다중증거·검토대기만.",
@@ -103,3 +105,19 @@ export const JOB_TO_MEMBER: Record<string, JobMeta> = (() => {
   for (const d of ORG.divisions) for (const t of d.teams) for (const w of t.w) if (w.j) m[w.j] = { division: d.n, team: t.n, name: w.n, k: w.k, t: w.t };
   return m;
 })();
+
+// 🔎 드리프트 자동감지 — org.ts(조직도)와 jobTeams.ts(본부맵)가 어긋난 잡을 찾아낸다.
+//   두 모듈 다 "단일 출처"를 자처하지만 job→본부가 겹쳐, 과거 marketing-agent가 성장↔영업으로 어긋나
+//   org-activity 롤업이 오탐(격일공백 37h)을 낸 전례가 있다. 이제 그런 어긋남을 관제탑이 스스로 표면화 →
+//   워커를 추가하면 두 곳이 자동 일치했는지 즉시 검증(수동 대조 불필요). 본부명은 org가 이모지 접두("🟩 성장본부"),
+//   jobTeams는 순수명("성장본부")이라 '포함'으로 정합 확인. 둘 다에 있는 잡만 비교(런처 집계잡 오탐 방지).
+export type OrgDrift = { job: string; name: string; orgDivision: string; jobTeamDivision: string };
+export function orgTeamDrift(): OrgDrift[] {
+  const out: OrgDrift[] = [];
+  for (const [job, meta] of Object.entries(JOB_TO_MEMBER)) {
+    const jt = JOB_TEAM[job];
+    if (!jt) continue; // jobTeams 미등록 리프는 감시대상 아님(런처가 대표) — 여기선 스킵
+    if (!meta.division.includes(jt)) out.push({ job, name: meta.name, orgDivision: meta.division, jobTeamDivision: jt });
+  }
+  return out;
+}

@@ -8,7 +8,7 @@ export const JOB_TEAM: Record<string, string> = {
   "cron-synth": "운영본부", "cron-resynth": "운영본부", "cron-embed": "운영본부", "cron-snapshot": "운영본부",
   "cron-closure": "운영본부", "cron-enrich": "운영본부",
   "orchestrator-heal": "품질본부", "cron-sentinel": "품질본부", "cron-verify": "품질본부", "cron-rulegap": "품질본부",
-  "cron-selfaudit": "품질본부", "cron-batch-judge": "품질본부", "cron-criteria-verify": "품질본부",
+  "cron-batch-judge": "품질본부", "cron-criteria-verify": "품질본부",
   "cron-grow": "성장본부", "cron-demand": "성장본부", "cron-newsletter": "성장본부", "cron-discover-categories": "성장본부",
   "cafe-collect": "성장본부",
   "cron-issues": "경영지원본부", "cron-coord-consumer": "경영지원본부",
@@ -25,8 +25,10 @@ export const JOB_TEAM: Record<string, string> = {
   "marketing-agent": "영업본부", // ⚠️ org.ts(조직도 단일출처)는 마케팅팀=영업본부(B2C). 여기가 성장본부로 drift해 org-activity 롤업에서 영업본부가 b2b-sales만 남아 격일공백 37h→오탐 🟡. 2026-07-06 정합.
   "search-quality-agent": "경험본부", "b2b-sales-agent": "영업본부", "closure-agent": "운영본부",
   "chief-manager-agent": "기획조정실", "chief-secretary-agent": "기획조정실", "self-audit-agent": "기획조정실",
+  "cron-selfaudit": "기획조정실", // ⚠️ org.ts(조직도 단일출처): 자율진단 감사실=기조실장 직할. 여기가 품질본부로 drift(sibling self-audit-agent는 기획조정실인데 혼자 어긋남)해 org-activity 롤업에서 감사실 활동이 품질본부로 잘못 귀속. 2026-07-09 정합(orgTeamDrift 감지).
   "dev-agent": "기획조정실",
-  "evaluation": "전략기획본부", "strategy-agent": "전략기획본부",
+  "strategy-agent": "전략기획본부",
+  "evaluation": "경영지원본부", // ⚠️ org.ts: 평가 에이전트=인사팀(경영지원본부·주간평가·스코어카드·MVP·문화). 여기가 전략기획본부로 drift. 2026-07-09 org.ts에 정합(orgTeamDrift 감지). 방향 바꾸려면 org.ts 평가 에이전트 소속을 옮기면 자동 전파.
   "team-legal-agent": "경영지원본부", "team-finance-agent": "경영지원본부", "team-ops-support-agent": "경영지원본부",
   "risk-mgmt-agent": "경영지원본부", "support-office-director": "경영지원본부",
   // 제거된 잡(plist .disabled) — 재활성 시 팀 배정용으로만 유지. EXPECT_MAX_H엔 절대 넣지 말 것(정지 오탐).
@@ -56,6 +58,23 @@ export const EXPECT_MAX_H: Record<string, number> = {
   "dev-deploy": 1,        // 배포 워처 2분
   // ⚠️ cron-selfaudit 자신은 여기 못 넣는다(자기 정지를 자기가 감지 불가) — 로컬 run-trigger-watch.sh의
   //   결정론 워치독이 감시(7h+ 미실행 시 ok=false 하트비트로 에스컬레이션).
+};
+
+// 🛠 **로컬 launchd 잡의 표시 메타(라벨·스케줄) 단일 출처** — /admin/org '핵심 잡 신선도' 카드용.
+//   과거 app/api/admin/jobs/route.ts가 팀·maxH를 손으로 3번째 복사했다가 어긋난 전례(2026-07-02) →
+//   이제 그 라우트는 이 맵을 순회하며 team=JOB_TEAM[k]·maxH=EXPECT_MAX_H[k]로 파생한다. 여기 잡을 추가하면
+//   (JOB_TEAM·EXPECT_MAX_H와 함께 3종 세트로) 신선도 카드에 **자동 반영**. label=화면명, sched=사람이 읽는 주기.
+//   ⚠️ 여기 넣는 잡은 반드시 EXPECT_MAX_H에도 있어야(정지 감시 계약). 은퇴 잡은 넣지 말 것.
+export const LAUNCHD_JOBS: Record<string, { label: string; sched: string }> = {
+  "chief-manager":     { label: "일간 사이클",     sched: "08·12·17시" },
+  "self-audit":        { label: "자율진단",        sched: "11:30·15:30·21:30" },
+  "audit-watch":       { label: "이벤트 워처",     sched: "5분" },
+  "dev-pipeline":      { label: "개발 파이프라인", sched: "5분" },
+  "dev-deploy":        { label: "배포 워커",       sched: "2분" },
+  "youtube-backfill":  { label: "유튜브 수집",     sched: "16:30" },
+  "weekly-evaluation": { label: "주간 거버넌스",   sched: "10:30(격일)" },
+  "chat-watch":        { label: "관제 챗봇",       sched: "상주" },
+  "discover-sweep":    { label: "발굴 스윕",       sched: "02:30·14:30" },
 };
 
 // 🛑 **의도적으로 은퇴(plist .disabled)한 잡의 명시적 단일 출처.**
