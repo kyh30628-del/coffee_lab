@@ -100,8 +100,10 @@ export const LIST_META: ListMeta[] = [
     items: ["차덕분"] },
 
   // ── 초약체 유일토큰 (lib/reviewQuality.ts · WEAK_IDENTITY_TOKEN) — 리뷰 매칭 엄격도 게이트 ──
+  // 룰갭 P8(#224): '에스엠' id13181(파주 에스엠카페) 5/6 동명 브랜드 혼입(SM엔터·에스엠웍스·에스엠바이크 등).
+  // 룰갭 P14(#224): '우리동네구멍가게' id17927(시흥) 6/6 무관(동명 도서 서평·미니어처 장난감 후기, 카페 언급 0).
   { key: "identity.weak_token", category: "정체성", label: "초약체 유일토큰(엄격 매칭 요구)", consumer: "reviewQuality",
-    items: ["공간", "다이아", "블라블라", "충무", "브라더스", "2005", "인테리어", "조도", "회전목마", "실험실", "청하동길", "스위치"] },
+    items: ["공간", "다이아", "블라블라", "충무", "브라더스", "2005", "인테리어", "조도", "회전목마", "실험실", "청하동길", "스위치", "에스엠", "우리동네구멍가게"] },
 ];
 
 const BY_KEY: Record<string, ListMeta> = Object.fromEntries(LIST_META.map((m) => [m.key, m]));
