@@ -1,29 +1,40 @@
-// 동(洞) 단위 발굴 스윕 — 전 지역(또는 SWEEP_SIDO 지정 시도)을 순회하며 신규 독립카페를 적재.
-// 신규는 pipeline_status='new'(비공개)로 들어가고, warmup/judgeloop이 raw 수집→합성→판정→검증 후 공개.
+// 발굴 스윕(매일) — 신선도 순환(가장 오래 안 훑은 지역 먼저) + 지역당 시간상한 + 총 예산 + 네이버 429 중단.
+//   cron-grow(2h/1지역=각 지역 5.5일에 1회)만으론 롱테일 독립카페(예: 카페 희와)가 며칠씩 누락 → 이 워커가
+//   매일 밤 다수 지역을 '공정 순환'으로 발굴해 네이버 search/local 한도를 최대 활용(CEO 지시 2026-07-09).
+//   ⚠️ 지역당 deadline 필수 — 없으면 한 지역을 완전소진(25분·수천콜)해 뒷 지역이 매일 누락. deadline으로 넓게 커버.
+//   신규는 pipeline_status='new'(비공개)로 적재 → cron-grow/synth가 수집·합성·게이트 후에만 공개(안전).
+//   env: PER_REGION_MS(지역당 상한), TOTAL_MS(총 예산), SWEEP_SIDO(예: '서울'—특정 시도만).
 import { readFileSync } from "node:fs";
 const env = readFileSync(new URL("../.env.local", import.meta.url), "utf8");
 for (const l of env.split("\n")) { const m = l.match(/^([A-Z_0-9]+)=(.*)$/); if (m) process.env[m[1]] = m[2].replace(/^["']|["']$/g, ""); }
-
-const { discoverRegion, METRO_REGIONS } = await import("../lib/discover.ts");
+const { discoverRegion } = await import("../lib/discover.ts");
 const { sql } = await import("../lib/db.ts");
 
-const onlySido = process.env.SWEEP_SIDO || ""; // 예: '서울' 또는 '경기,인천'. 비우면 전체.
-const sidos = onlySido.split(",").map((s) => s.trim()).filter(Boolean);
-const regions = METRO_REGIONS.filter((r) => !sidos.length || sidos.some((s) => r.region.startsWith(s)));
-let totalNew = 0, done = 0;
-console.log(`발굴 스윕 시작 — 대상 ${regions.length}개 지역${onlySido ? ` (${onlySido})` : ""}`);
+const PER_REGION_MS = Number(process.env.PER_REGION_MS || 120_000); // 지역당 상한(넓게 커버 — cron-grow는 225s)
+const TOTAL_MS = Number(process.env.TOTAL_MS || 90 * 60_000);       // 총 예산(네이버 한도 여유 안에서 순환)
+const sido = (process.env.SWEEP_SIDO || "").trim();                 // 특정 시도만(비우면 전체 66지역)
+const t0 = Date.now();
+let totalNew = 0, done = 0, stop = "";
+console.log(`발굴 스윕 — 신선도순 순환 · 지역당 ${PER_REGION_MS / 1000}s · 총 ${Math.round(TOTAL_MS / 60000)}분${sido ? ` · ${sido}` : ""}`);
 
-for (const r of regions) {
+while (Date.now() - t0 < TOTAL_MS && !stop) {
+  const reg = (await sql`SELECT region, area_label FROM discovery_state
+    WHERE (${sido} = '' OR region LIKE ${sido + '%'})
+    ORDER BY last_run ASC NULLS FIRST LIMIT 1`)[0];
+  if (!reg) { stop = "대상 지역 없음"; break; }
+  const budget = Math.min(PER_REGION_MS, TOTAL_MS - (Date.now() - t0));
   try {
-    const res = await discoverRegion(r.region, r.areaLabel);
-    await sql`UPDATE discovery_state SET last_run=now(), last_found=${res.found}, last_inserted=${res.inserted} WHERE region=${r.region}`;
+    const res = await discoverRegion(reg.region, reg.area_label ?? reg.region, undefined, { deadlineMs: Date.now() + budget, sorts: ["comment", "random"] });
+    await sql`UPDATE discovery_state SET last_run=now(), last_found=${res.found}, last_inserted=${res.inserted} WHERE region=${reg.region}`;
     totalNew += res.inserted; done++;
-    console.log(`[${done}/${regions.length}] ${r.region}: 발견 ${res.found} · 신규 ${res.inserted} (누적 신규 ${totalNew})`);
+    console.log(`[${done}] ${reg.region}: 발견 ${res.found} · 신규 ${res.inserted} · 누적신규 ${totalNew}`);
+    if (res.apiError) stop = "네이버 한도 추정(429) — 중단(다음 회차 신선도순 재개)";
   } catch (e) {
-    const msg = String(e).slice(0, 80);
-    console.log(`[${done}/${regions.length}] ${r.region}: 오류 — ${msg}`);
-    if (/quota|한도|429|exceed/i.test(msg)) { console.log("네이버 한도 추정 — 중단(다음 회차 재개)"); break; }
+    const m = String(e).slice(0, 80);
+    console.log(`${reg.region}: 오류 — ${m}`);
+    await sql`UPDATE discovery_state SET last_run=now() WHERE region=${reg.region}`.catch(() => {}); // 무한 재시도 방지(다음 지역으로)
+    if (/quota|429|exceed|한도/i.test(m)) stop = "네이버 한도 — 중단";
   }
 }
-console.log(`스윕 종료 — 처리 ${done}개 지역 · 신규 카페 ${totalNew}곳 적재. 이제 warmup/judgeloop이 자동 합성·판정·검증→공개.`);
+console.log(`스윕 종료(${stop || "예산 소진"}) — 처리 ${done}개 지역 · 신규 ${totalNew}곳 적재. cron-grow/synth가 수집·합성·게이트 후 공개.`);
 process.exit(0);
