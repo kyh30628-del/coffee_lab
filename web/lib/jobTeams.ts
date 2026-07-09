@@ -13,6 +13,7 @@ export const JOB_TEAM: Record<string, string> = {
   "cafe-collect": "성장본부",
   "cron-issues": "경영지원본부", "cron-coord-consumer": "경영지원본부",
   // 로컬 launchd 잡(하트비트 경유)
+  "discover-sweep": "성장본부", // 매일 02:30 KST 전 지역 발굴 스윕(네이버 한도 최대 수집)
   "youtube-backfill": "품질본부",
   "weekly-evaluation": "전략기획본부",
   "chief-manager": "기획조정실", "self-audit": "기획조정실", "audit-watch": "기획조정실",
@@ -44,6 +45,7 @@ export const EXPECT_MAX_H: Record<string, number> = {
   "cron-grow": 6, "cron-enrich": 8, "cron-embed": 4, "cron-synth": 4, "cron-issues": 2, "cron-coord-consumer": 2,
   "orchestrator-heal": 6,
   // 로컬 launchd 잡
+  "discover-sweep": 30,    // 매일 02:30 KST 발굴 스윕 + 버퍼(네이버 한도서 중단해도 익일 재개)
   "youtube-backfill": 30, // 일배치 16:30 KST + 버퍼
   "chief-manager": 20,    // 일간 사이클 08·17시 KST
   "self-audit": 16,       // 매일 11:30·15:30·21:30 KST 3회 + 일간 사이클 내 실행 (최대 공백 밤 14h + 버퍼)
