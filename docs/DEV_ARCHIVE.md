@@ -34,3 +34,4 @@
 | 2026-07-09 01:55 | #221 | [개발] dev-deploy.mjs 사람작업보호 가드가 catch블록에서 자기파괴 — 미커밋 변경 9시간+  | 1e22c943 | - | scripts/dev-deploy.mjs: 사람작업보호 dirty가드가 던진 에러가 공용 catch의 checkout -f/reset --hard로 흘러 미커밋 변경을 자기폐기하던 |
 | 2026-07-09 01:56 | #224 | [룰갭 4차] 신규 오염 규칙 4건(P7 고려궁지·P8 에스엠·P13 푸드몰·P14 우리동네구멍가게) | dce684e0 | - | P7 고려궁지→LANDMARK_WORDS, P13 푸드몰→VENUE_WORDS(reviewQuality.ts); P8 에스엠·P14 우리동네구멍가게→identity.weak_tok |
 | 2026-07-09 02:06 | #226 | 헤더버튼 너비 | 2e3bc9df | low | app/admin/org/page.tsx 헤더 3버튼(기준·라운지·조직도): padding 11→16px·minWidth 84·textAlign center·whiteSpace n |
+| 2026-07-09 06:18 | #227 | [개발] 협업 #149: [후속] dev#219 배포됐으나 플래그십 2곳(15462·14839) 여전히 of | 78fd6f29 | - | lib/issues.ts autoCorrect(): offctx 재판정 대상쿼리를 offctx_ok 무관 전수(offctx_rate>=0.55)로 확장 + 화이트리스트 회수 분기  |
