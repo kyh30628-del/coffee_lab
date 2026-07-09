@@ -11,17 +11,19 @@ const { discoverRegion } = await import("../lib/discover.ts");
 const { sql } = await import("../lib/db.ts");
 
 const PER_REGION_MS = Number(process.env.PER_REGION_MS || 120_000); // 지역당 상한(넓게 커버 — cron-grow는 225s)
-const TOTAL_MS = Number(process.env.TOTAL_MS || 90 * 60_000);       // 총 예산(네이버 한도 여유 안에서 순환)
+const TOTAL_MS = Number(process.env.TOTAL_MS || 6 * 60 * 60_000);   // 총 예산 상한(6h) — 보통 '한 바퀴 완주'로 먼저 종료
 const sido = (process.env.SWEEP_SIDO || "").trim();                 // 특정 시도만(비우면 전체 66지역)
 const t0 = Date.now();
+const runStart = new Date(t0).toISOString();                        // 이번 회차 시작 — 전 지역 한 바퀴 돌면 종료(무한 재순회 방지)
 let totalNew = 0, done = 0, stop = "";
-console.log(`발굴 스윕 — 신선도순 순환 · 지역당 ${PER_REGION_MS / 1000}s · 총 ${Math.round(TOTAL_MS / 60000)}분${sido ? ` · ${sido}` : ""}`);
+console.log(`발굴 스윕 — 신선도순 순환 · 지역당 ${PER_REGION_MS / 1000}s · 상한 ${Math.round(TOTAL_MS / 60000)}분(한 바퀴 완주 시 조기종료)${sido ? ` · ${sido}` : ""}`);
 
 while (Date.now() - t0 < TOTAL_MS && !stop) {
-  const reg = (await sql`SELECT region, area_label FROM discovery_state
+  const reg = (await sql`SELECT region, area_label, last_run FROM discovery_state
     WHERE (${sido} = '' OR region LIKE ${sido + '%'})
     ORDER BY last_run ASC NULLS FIRST LIMIT 1`)[0];
   if (!reg) { stop = "대상 지역 없음"; break; }
+  if (reg.last_run && new Date(reg.last_run).toISOString() >= runStart) { stop = "전 지역 한 바퀴 완주"; break; } // 가장 오래된 지역도 이번 회차에 이미 발굴됨 = 모두 커버
   const budget = Math.min(PER_REGION_MS, TOTAL_MS - (Date.now() - t0));
   try {
     const res = await discoverRegion(reg.region, reg.area_label ?? reg.region, undefined, { deadlineMs: Date.now() + budget, sorts: ["comment", "random"] });
