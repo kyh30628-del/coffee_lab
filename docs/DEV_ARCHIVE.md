@@ -37,3 +37,4 @@
 | 2026-07-09 06:18 | #227 | [개발] 협업 #149: [후속] dev#219 배포됐으나 플래그십 2곳(15462·14839) 여전히 of | 78fd6f29 | - | lib/issues.ts autoCorrect(): offctx 재판정 대상쿼리를 offctx_ok 무관 전수(offctx_rate>=0.55)로 확장 + 화이트리스트 회수 분기  |
 | 2026-07-09 11:04 | #251 | [자율진단] lib/issues.ts 조사결재 자동종결(6번) 오탐 — 정지된 크론을 최신run=ok tru | 9951ffc4 | - | lib/issues.ts 6번(closedInv) 조사결재 자동종결에 staleness 게이트 추가: 최신 run ok=true인 동시에 그 run이 EXPECT_MAX_H(정지의 |
 | 2026-07-09 11:16 | #256 | 헤더 이모지 제거 | fecd4624 | low | app/admin/org/page.tsx 헤더 3항목(기준/라운지/조직도) 이모지 접두 제거(🎛️🏛️🏢) — 라벨·href·onClick·정렬 스타일 유지. tsc 신규에러  |
+| 2026-07-09 12:40 | #261 | 헤더1줄+프로필이미지 | 2ee921ab | low | ①app/admin/org/page.tsx 헤더 버튼 이모지 복원(🎛️기준·🏛️라운지·🏢조직도)+패딩 8px16px→7px11px·gap7→5·minWidth84 제거·fle |
