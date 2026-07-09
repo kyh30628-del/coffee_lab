@@ -31,3 +31,4 @@
 | 2026-07-08 11:03 | #217 | [검색·UX] 즐겨찾기 데스크톱 진입점 부재 (4일 이월) | 329d61d1 | - | app/page.tsx: MapControls 상단에 즐겨찾기(N) 버튼 추가(데스크톱 전용 hidden md:flex, 하단 네비는 md:hidden이라 데스크톱 진입로 없었음) |
 | 2026-07-08 23:47 | #219 | [개발] 협업 #140: 결재#209 offctx_ok 리셋 30곳, autoCorrect() 자동치유 루프 | 2c88040e | - | lib/issues.ts autoCorrect() offctx 오탐 재판정을 이름일관성→offctx 지표 자체로 교정(구조적 상충 해소). lib/synthStore.ts에 off |
 | 2026-07-08 23:48 | #220 | [개발] discovery_state 로테이션에 인천 동구·중구 미등록 | 52eecd85 | - | lib/discover.ts: METRO_REGIONS 인천 배열에 중구·동구 추가(누락 근본원인) → cron-grow 시드루프가 다음 실행에 discovery_state row |
+| 2026-07-09 01:55 | #221 | [개발] dev-deploy.mjs 사람작업보호 가드가 catch블록에서 자기파괴 — 미커밋 변경 9시간+  | 1e22c943 | - | scripts/dev-deploy.mjs: 사람작업보호 dirty가드가 던진 에러가 공용 catch의 checkout -f/reset --hard로 흘러 미커밋 변경을 자기폐기하던 |
