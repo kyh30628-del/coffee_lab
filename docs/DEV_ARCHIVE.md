@@ -45,3 +45,4 @@
 | 2026-07-10 09:26 | #276 | 룰갭 P26 — nameHit/boundedHit 우측경계 미검증 (lib/reviewQuality.ts 코 | 6c76f0bf | - | lib/reviewQuality.ts: boundedHit·nameHit에 우측 경계검사 추가(JOSA_LIST 예외 포함, 르씨엘가구·써니네집·24시간·대나무숲이있는 오매칭 차단 |
 | 2026-07-10 09:27 | #277 | 레드팀 2차 — CAFE_CTX 정규식 보강 (lib/synthStore.ts L70, offctx 자동원복 | b74ec33a | - | lib/synthStore.ts L70 CAFE_CTX 정규식에 맛집·레스토랑·초콜릿·쇼콜라·봉봉 5개 추가. tsc 신규에러 0(기존 next.config eslint 베이스라인 |
 | 2026-07-10 09:43 | #280 | 배포정체 자동감지 | 40ffc022 | med | app/api/admin/dev-pipeline/route.ts: dev_status=배포대기 정체 감지(age_min=dev_claimed 경과, STUCK_MIN=30분, so |
+| 2026-07-10 10:35 | #281 | 일일보고서 기본접힘 | 65e3ee9e | low | app/admin/org/page.tsx: EXECUTIVE 일일보고서 섹션에 showBriefs 접이식 state 추가(기본 false=접힘), showCoord/showWO와  |
