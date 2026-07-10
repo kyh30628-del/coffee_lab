@@ -1057,8 +1057,11 @@ export default function Home() {
 
   // ── 랜딩(초기화면): 소비자 / 사장님 분리 ──
   if (role === null) {
+    // ⚠️ 정상흐름(min-h-screen) 필수 — position:fixed;inset:0로 두면 문서에 흐름 콘텐츠가 0이 돼
+    //   인스타 안드로이드 인앱 WebView가 페이지 폭을 못 구하고 좁은 뷰포트로 폴백→화면 확대(초기화면만 깨지던 원인, 2026-07-10).
+    //   /area 등 min-h-screen 페이지는 정상이던 것과 동일 패턴으로 맞춤. 세로 가운데정렬은 유지.
     return (
-      <div className="flex flex-col items-center justify-center px-6 overflow-y-auto" style={{ position: "fixed", inset: 0, paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)", background: "#2b2018", color: "#f4ece0", fontFamily: "'Gowun Batang', AppleMyungjo, 'Apple SD Gothic Neo', 'Noto Serif KR', serif" }}>
+      <div className="min-h-screen w-full flex flex-col items-center justify-center px-6" style={{ paddingTop: "calc(env(safe-area-inset-top) + 1.5rem)", paddingBottom: "calc(env(safe-area-inset-bottom) + 1.5rem)", background: "#2b2018", color: "#f4ece0", fontFamily: "'Gowun Batang', AppleMyungjo, 'Apple SD Gothic Neo', 'Noto Serif KR', serif" }}>
         <style>{`
           @keyframes dcnRise { from { opacity:0; transform: translateY(22px); } to { opacity:1; transform: translateY(0); } }
           /* 홀로그램: 무지갯빛이 가로로 천천히 흐르며 미세하게 색조가 도는 은은한 효과(평평·베벨 없음) */
