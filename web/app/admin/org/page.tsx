@@ -328,13 +328,26 @@ export default function OrgDashboard() {
 
         {/* 🛠 개발 파이프라인 — 승인된 dev_task 진행(개발대기→배포대기→배포). 배포대기는 CEO 배포/폐기 조치 */}
         {devpipe?.jobs?.length > 0 && (
-          <div style={{ ...card, marginTop: 10, border: devpipe.waiting ? "2px solid #6a468c" : "1px solid #ddc9a8" }}>
+          <div style={{ ...card, marginTop: 10, border: devpipe.stuckNonChatCount ? "2px solid #b03a3a" : devpipe.waiting ? "2px solid #6a468c" : "1px solid #ddc9a8" }}>
             <button onClick={() => setShowDev(!showDev)} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
-              <span style={{ fontSize: 13.5, fontWeight: 700, color: devpipe.waiting ? "#6a468c" : "#9c6b3f" }}>
-                {showDev ? "▾" : "▸"} 🛠 개발 파이프라인 ({devpipe.jobs.length}){devpipe.waiting ? <span style={{ fontSize: 10, fontWeight: 700, color: "#6a468c" }}> · 🚀 배포대기 {devpipe.waiting}</span> : null}
+              <span style={{ fontSize: 13.5, fontWeight: 700, color: devpipe.stuckNonChatCount ? "#b03a3a" : devpipe.waiting ? "#6a468c" : "#9c6b3f" }}>
+                {showDev ? "▾" : "▸"} 🛠 개발 파이프라인 ({devpipe.jobs.length}){devpipe.waiting ? <span style={{ fontSize: 10, fontWeight: 700, color: "#6a468c" }}> · 🚀 배포대기 {devpipe.waiting}</span> : null}{devpipe.stuckCount ? <span style={{ fontSize: 10, fontWeight: 700, color: "#b03a3a" }}> · ⏱ 정체 {devpipe.stuckCount}{devpipe.stuckNonChatCount ? `(자동승격 없음 ${devpipe.stuckNonChatCount})` : ""}</span> : null}
               </span>
               <span style={{ fontSize: 10.5, color: "#9c8a6c" }}>승인→브랜치구현→검증→배포</span>
             </button>
+            {/* ⏱ 배포정체 경보(#280) — 접힘 여부와 무관하게 항상 노출. source≠'chat'은 자동승격 경로 없음(우선 표시) */}
+            {devpipe.stuckCount > 0 && (
+              <div style={{ marginTop: 8, background: devpipe.stuckNonChatCount ? "#fbeaea" : "#fdf3e3", border: `1px solid ${devpipe.stuckNonChatCount ? "#e0b4b4" : "#e6cfa0"}`, borderRadius: 9, padding: "8px 10px" }}>
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: devpipe.stuckNonChatCount ? "#b03a3a" : "#9c6b3f" }}>
+                  ⏱ 배포 정체 {devpipe.stuckCount}건 — 30분+ 배포대기{devpipe.stuckNonChatCount ? ` (그중 자동승격 경로 없음 ${devpipe.stuckNonChatCount}건 — 수동 배포/폐기 필요)` : ""}
+                </div>
+                {devpipe.stuck.map((s: any) => (
+                  <div key={s.id} style={{ fontSize: 10, color: s.source !== "chat" ? "#8a4a4a" : "#8a7458", marginTop: 3 }}>
+                    #{s.id} {s.title.replace(/^\[개발\]\s*/, "")} — {s.age_min}분 경과{s.source !== "chat" ? " · 출처: 비챗(자동승격 없음)" : " · 출처: 챗"}
+                  </div>
+                ))}
+              </div>
+            )}
             {showDev && <div style={{ marginTop: 8 }}>
               {devpipe.jobs.map((j: any) => {
                 // 사실대로 — '실패' 왜곡 금지. 색: 회색=중립, 자주=배포대기, 청록=진행, 주황=조치필요, 빨강=진짜오류
