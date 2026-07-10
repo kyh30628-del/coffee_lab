@@ -72,6 +72,29 @@ export function ChatWidget({ pw }: { pw: string }) {
   const filteredMsgs = search.trim() ? msgs.filter((m) => m.content.toLowerCase().includes(search.trim().toLowerCase())) : msgs;
   useEffect(() => { if (open && scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; }, [open, msgs, loading]);
   useEffect(() => { if (open) setUnread(0); }, [open]);
+  // 🔒 모달 오픈 중 배경 스크롤 락 — iOS Safari는 overflow:hidden만으론 배경이 밀림(rubber-band 전파).
+  //   body를 position:fixed로 고정해 스크롤 자체를 원천 차단, 닫히면 원래 스크롤 위치로 복원.
+  useEffect(() => {
+    if (!open) return;
+    const scrollY = window.scrollY;
+    const body = document.body;
+    const prev = { position: body.style.position, top: body.style.top, left: body.style.left, right: body.style.right, width: body.style.width, overflow: body.style.overflow };
+    body.style.position = "fixed";
+    body.style.top = `-${scrollY}px`;
+    body.style.left = "0";
+    body.style.right = "0";
+    body.style.width = "100%";
+    body.style.overflow = "hidden";
+    return () => {
+      body.style.position = prev.position;
+      body.style.top = prev.top;
+      body.style.left = prev.left;
+      body.style.right = prev.right;
+      body.style.width = prev.width;
+      body.style.overflow = prev.overflow;
+      window.scrollTo(0, scrollY);
+    };
+  }, [open]);
   // ⏱ 응답 생성 경과 시간 — 탭별 시작시각(ref)에서 계산해, 탭 전환 후 돌아와도 경과가 끊기지 않음.
   useEffect(() => {
     if (!loading) { setElapsed(0); return; }
@@ -197,7 +220,7 @@ export function ChatWidget({ pw }: { pw: string }) {
         {unread > 0 && <span style={{ position: "absolute", top: -4, right: -4, background: "#c0392b", color: "#fff", borderRadius: 10, fontSize: 11, fontWeight: 700, minWidth: 18, height: 18, padding: "0 3px", border: "1px solid #f7f1e4", display: "flex", alignItems: "center", justifyContent: "center" }}>{unread > 9 ? "9+" : unread}</span>}
       </div>
       {open && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 100, display: "flex", flexDirection: "column", justifyContent: "flex-end" }} onClick={() => setOpen(false)}>
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 100, display: "flex", flexDirection: "column", justifyContent: "flex-end", overscrollBehavior: "contain" }} onClick={() => setOpen(false)}>
           <div onClick={(e) => e.stopPropagation()} style={{ background: "#f7f1e4", borderRadius: "16px 16px 0 0", maxWidth: 640, width: "100%", margin: "0 auto", height: "86vh", display: "flex", flexDirection: "column" }}>
             <div style={{ background: "#2b2018", color: "#e8b87a", padding: "12px 16px", borderRadius: "16px 16px 0 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <b style={{ fontSize: 15 }}>💬 관제 챗봇</b>
@@ -214,7 +237,7 @@ export function ChatWidget({ pw }: { pw: string }) {
             <div style={{ padding: "8px 12px 0" }}>
               <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 대화 검색…" style={{ width: "100%", padding: "6px 10px", borderRadius: 8, border: "1px solid #e0d2b8", fontSize: 12.5, background: "#fff", boxSizing: "border-box" }} />
             </div>
-            <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: 12 }}>
+            <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", overscrollBehavior: "contain", padding: 12 }}>
               {msgs.length === 0 && (mode === "chat"
                 ? <div style={{ color: "#9c8a6c", fontSize: 13, lineHeight: 1.7 }}>상태를 묻거나 <b>작업을 지시</b>하세요.<br />질문: "발행 몇 개야?" · "결재 대기 뭐 있어?"<br />지시: "관제탑 상단에 발행 수 배지 추가해줘" · "지도 팝업 여백 줄여줘"<br /><span style={{ fontSize: 11.5, color: "#b0a081" }}>안전한 코드 변경은 자율로 구현·검증·배포하고, 데이터 변경·모호한 건은 되물어봅니다.</span></div>
                 : <div style={{ color: "#9c8a6c", fontSize: 13, lineHeight: 1.7 }}>동/구 이름·<b>카페 이름</b>이나 <b>서비스·조직·관제</b> 질문에 <b>즉시</b> 답해요(LLM 안 씀·빠름).<br />예: "성수동" · "강남구" · "블루보틀" · "서비스가 뭐야?" · "관제탑이 뭐야?"</div>)}
