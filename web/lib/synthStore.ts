@@ -284,7 +284,11 @@ export async function scrubPublishedPII(): Promise<{ scrubbed: number; names: st
 }
 
 // 🚷 그라운딩 '근거 0건'(전부 다른 가게) 확정 카페 자동 보류(비공개). 진짜 근거 일부 있는 곳은 제외.
-//   release: 재그라운딩에서 grounded=true로 바뀐 held 카페는 'live'로 복귀(데이터 개선 시 자동 복원).
+//   release 경로(아래)는 재그라운딩에서 grounded=true로 바뀐 held 카페를 'live'로 복귀시키도록 짜여 있으나,
+//   ⚠️ 실측 결과 이 경로는 사실상 발동하지 않는다: 그라운딩 표본은 '공개(published) 검증/참고 카페'만 대상이라
+//   (심층판정 에이전트 그라운딩 스코프) held=비공개 카페는 애초에 재검 대상에서 빠진다(2026-07-10 표본: held
+//   카페의 grounding_checks 중 grounded=true 0건). 재공개하려면 /api/judge-candidates?cafeId=로 해당 카페를
+//   수동 강제 재판정해 새 grounded=true 레코드를 만들어야 한다.
 export async function holdZeroEvidenceSuspects(): Promise<{ held: number; released: number; names: string[] }> {
   await sql`CREATE TABLE IF NOT EXISTS grounding_checks (cafe_id INT PRIMARY KEY, grounded BOOLEAN, issue TEXT, checked_at TIMESTAMPTZ DEFAULT now())`.catch(() => {});
   // 보류: grounded=false + 이슈가 '진짜 근거 0건'임을 명시(전부 다른 가게 / 후기 0건 / 자체 없음).
@@ -298,7 +302,9 @@ export async function holdZeroEvidenceSuspects(): Promise<{ held: number; releas
           g.issue ~ '(후기[^,.]{0,6}0건|커피 후기 0|후기[^,.]{0,4}자체 없|전부 다른 (가게|업체|점포)|전부 카페가 아|건 전부.{0,16}(다른|아님|아닌|카페가 아))'
         ))
     RETURNING name`) as any[];
-  // 복귀: held였는데 재그라운딩에서 grounded=true → 다시 live(다음 재합성이 규칙대로 공개)
+  // 복귀 경로(코드는 살아있으나 실질 미발동 — 위 함수 상단 주석 참조): held였는데 재그라운딩에서
+  //   grounded=true → 다시 live(다음 재합성이 규칙대로 공개). 그라운딩이 공개 카페만 표본으로 삼는 한
+  //   held 카페는 이 UPDATE의 대상(grounded=true row)이 자연 발생하지 않는다.
   const rel = (await sql`
     UPDATE cafes SET pipeline_status = 'live'
     WHERE pipeline_status = 'held'

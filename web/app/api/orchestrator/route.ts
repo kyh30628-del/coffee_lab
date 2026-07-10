@@ -361,7 +361,8 @@ export async function GET(req: NextRequest) {
       let unpubThisRun = 0; // 비공개 발생 시 검색캐시 자동 무효화용(소비자 검색에 비공개 카페가 남는 것 방지)
       // (d) LLM 그라운딩 의심(업체혼동·환각) 자가치유 — 재합성 교정(로컬 그라운딩이 재검사해 플래그 해소)
       try { const gr = await healGroundingSuspects(); if (gr.resynthed > 0) healed.push(`그라운딩 의심 ${gr.resynthed}곳 재합성 교정`); } catch {}
-      // (e) 그라운딩 '근거0건' 확정 카페 자동 보류(비공개) + 개선 시 복귀
+      // (e) 그라운딩 '근거0건' 확정 카페 자동 보류(비공개) + 개선 시 복귀(경로는 있으나 실질 미발동 —
+      //   그라운딩 표본이 공개 카페만 대상이라 held는 재검 대상 밖. 상세: lib/synthStore.ts holdZeroEvidenceSuspects 주석)
       try { const z = await holdZeroEvidenceSuspects(); if (z.held > 0) { unpubThisRun += z.held; healed.push(`근거0건 ${z.held}곳 자동 비공개(${z.names.slice(0, 3).join(", ")})`); } if (z.released > 0) healed.push(`복원 ${z.released}곳`); } catch {}
       // (e-1b) orphan_published 자가치유 — 정체성·등급은 정상인데 근거후기(synth_reviews)만 0인 공개 카페.
       //   정체성없음(pub_noidentity)·그라운딩의심·근거0확정 어느 그물에도 안 걸려 방치되던 사각(검증 fail의 정체).
