@@ -88,9 +88,13 @@ export async function autoCorrect(): Promise<{ resolved: number; escalated: numb
     //   offctx_ok=true를 코드가 스스로 회수한다. 대상쿼리가 이제 화이트도 재검하므로, 이미 뒤집힌 레코드도 새 로직으로
     //   재판정돼 다음 사이클에 offctx_ok=false로 강등된다(SQL 재설정 불필요). 강등은 화이트 회수일 뿐 비공개 아님(가역·watchlist 복귀).
     //   진짜 저코히런스 오염이면 아래 coh<0.35 분기가 별도로 비공개 결재를 상신한다(offctx 강등과 독립).
-    if (c.offctx_flag && !offctxFalse && c.offctx_ok_now) {
+    //   ⚠️ 단, 이름일관성(coh)이 충분히 높으면(≥0.5) 회수하지 않는다 — coh=1.0(후기 전부가 그 카페를 지칭)인
+    //   진짜 카페는 표시후기 일부가 CAFE_CTX 정규식을 안 걸려 offctx가 높게 나올 뿐(리스트형·문구노이즈), 동명오염이
+    //   아니다. 이 가드가 없으면 운영자·검증 화이트리스트가 매 사이클 회수돼 real 카페가 영구 플래그로 남는다
+    //   (2026-07-10 offctx 11건 방치 사고: 진짜카페 화이트가 안 붙던 구조적 원인). 저코히런스(<0.5=동명오염 의심)만 회수.
+    if (c.offctx_flag && !offctxFalse && c.offctx_ok_now && coh < 0.5) {
       await sql`UPDATE cafes SET offctx_ok=false WHERE id=${c.id}`.catch(() => {});
-      resolved++; if (log.length < 8) log.push(`맥락오염 화이트회수 ${c.name}(offctx 재판정)`);
+      resolved++; if (log.length < 8) log.push(`맥락오염 화이트회수 ${c.name}(저코히런스 ${Math.round(coh * 100)}%)`);
     }
     if (coh >= 0.5 && offctxFalse) {
       // 진짜 카페(오탐) → 자동 정리: 플래그 해소 + (offctx로 걸린 건만) 화이트리스트
