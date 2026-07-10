@@ -49,3 +49,4 @@
 | 2026-07-10 10:54 | #282 | 챗봇 기능 강화 | 4d574719 | med | 변경: app/admin/ChatWidget.tsx(경과시간 표시·중지버튼(AbortController)·대화검색·새 응답 알림(배지+Notification API, 백그라운드/닫 |
 | 2026-07-10 11:01 | #283 | 챗봇 모달 스크롤 고정 | 89b7deee | low | app/admin/ChatWidget.tsx: 모달 오픈 시 body를 position:fixed(top=-scrollY)로 고정해 배경 스크롤 원천 차단, 닫히면 원복+스크롤위치 |
 | 2026-07-10 11:09 | #284 | 챗봇 메시지 시각표시 | 70583618 | low | app/admin/ChatWidget.tsx: 메시지에 time(KST HH:MM) 필드 추가, 말풍선 하단에 회색 시각 표시. 신규 전송은 클라이언트 Date로, 작업지시 탭 서 |
+| 2026-07-10 11:59 | #285 | 그라운딩 문서정정 | c1943c26 | low | lib/synthStore.ts(holdZeroEvidenceSuspects 상단·release UPDATE 주석)·app/api/orchestrator/route.ts(e단계 주 |
