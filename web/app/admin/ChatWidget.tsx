@@ -83,7 +83,17 @@ export function ChatWidget({ pw }: { pw: string }) {
   const loading = mode === "region" ? regionLoading : chatLoading;
   const setInput = mode === "region" ? setRegionInput : setChatInput;
   const filteredMsgs = search.trim() ? msgs.filter((m) => m.content.toLowerCase().includes(search.trim().toLowerCase())) : msgs;
-  useEffect(() => { if (open && scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; }, [open, msgs, loading]);
+  // 📜 하단 근접 여부 — 사용자가 위로 스크롤해 읽는 중이면(하단에서 100px 이상 이탈) 새 내용에도 강제 스크롤하지 않음.
+  //   onScroll이 실제 스크롤(사용자 조작 또는 우리가 프로그램적으로 내린 것)만 갱신하고, 메시지 추가 자체는 scrollTop을 안 건드리므로
+  //   "추가 직전 사용자 위치"가 그대로 유지돼 정확히 판단된다.
+  const nearBottomRef = useRef(true);
+  const handleScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    nearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight <= 100;
+  };
+  useEffect(() => { nearBottomRef.current = true; }, [mode]); // 탭 전환 시엔 항상 최신 위치로
+  useEffect(() => { if (open && scrollRef.current && nearBottomRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; }, [open, msgs, loading]);
   useEffect(() => { if (open) setUnread(0); }, [open]);
   // 🔒 모달 오픈 중 배경 스크롤 락 — iOS Safari는 overflow:hidden만으론 배경이 밀림(rubber-band 전파).
   //   body를 position:fixed로 고정해 스크롤 자체를 원천 차단, 닫히면 원래 스크롤 위치로 복원.
@@ -247,6 +257,7 @@ export function ChatWidget({ pw }: { pw: string }) {
   }, [archiveQ, archiveDate]);
   const openChat = () => {
     setOpen(true);
+    nearBottomRef.current = true;
     // 알림 권한은 실제 사용자 제스처(모달 열기) 시점에 요청 — 로드 즉시 요청하는 방해 패턴 지양.
     if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "default") Notification.requestPermission().catch(() => {});
   };
@@ -275,7 +286,7 @@ export function ChatWidget({ pw }: { pw: string }) {
             <div style={{ padding: "8px 12px 0" }}>
               <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 대화 검색…" style={{ width: "100%", padding: "6px 10px", borderRadius: 8, border: "1px solid #e0d2b8", fontSize: 12.5, background: "#fff", boxSizing: "border-box" }} />
             </div>
-            <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", overscrollBehavior: "contain", padding: 12 }}>
+            <div ref={scrollRef} onScroll={handleScroll} style={{ flex: 1, overflowY: "auto", overscrollBehavior: "contain", padding: 12 }}>
               {msgs.length === 0 && (mode === "chat"
                 ? <div style={{ color: "#9c8a6c", fontSize: 13, lineHeight: 1.7 }}>상태를 묻거나 <b>작업을 지시</b>하세요.<br />질문: "발행 몇 개야?" · "결재 대기 뭐 있어?"<br />지시: "관제탑 상단에 발행 수 배지 추가해줘" · "지도 팝업 여백 줄여줘"<br /><span style={{ fontSize: 11.5, color: "#b0a081" }}>안전한 코드 변경은 자율로 구현·검증·배포하고, 데이터 변경·모호한 건은 되물어봅니다.</span></div>
                 : <div style={{ color: "#9c8a6c", fontSize: 13, lineHeight: 1.7 }}>동/구 이름·<b>카페 이름</b>이나 <b>서비스·조직·관제</b> 질문에 <b>즉시</b> 답해요(LLM 안 씀·빠름).<br />예: "성수동" · "강남구" · "블루보틀" · "서비스가 뭐야?" · "관제탑이 뭐야?"</div>)}
