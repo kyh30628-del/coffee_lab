@@ -1,7 +1,11 @@
-// 🛡️ 구독(로컬 claude -p) 주간 사용가드(결정론·무LLM) — USAGE.tsv 최근 7일 **원가가중** 토큰합을 WEEKLY_TOKEN_SOFT_CAP과 비교.
+// 🛡️ 구독(로컬 claude -p) 주간 사용가드(결정론·무LLM) — USAGE.tsv를 이번 주간 리셋 시점 이후로 집계한 **원가가중** 토큰합을 WEEKLY_TOKEN_SOFT_CAP과 비교.
 //   ⚠️ 산정근거: USAGE.tsv는 로컬 자율에이전트·관제챗의 **구독 claude -p 실측**이다(프로덕션 콘솔키 ANTHROPIC_API_KEY 아님).
 //   원가가중식(프록시): 정입력(input)+캐시생성(cache_creation)+출력(output)은 **온전 계상**, 캐시읽기(cache_read)만 실단가≈0.1x 가중.
 //     └ 과거엔 cache_read를 온전 합산해 최근7일이 과대계상됐다(예: 411M/500M=82%). 캐시읽기 제외/저가중으로 교정.
+//   ⚠️ 리셋 시점 교정(#282): 과거엔 "최근 7×24h 롤링 윈도우"로 집계해, 실제 구독 주간한도가 리셋된 뒤에도
+//     리셋 이전 사용량이 며칠간 계속 합산돼 과대표기됐다(실제 11%인데 90%로 표기되는 사고).
+//     구독 주간한도는 **매주 금요일 새벽 2시 KST에 리셋**된다 — 지금부터는 롤링 윈도우가 아니라
+//     "가장 최근 금요일 02:00 KST(=목요일 17:00 UTC) 이후" 사용량만 집계한다.
 //   목적: 한도 근접 시 **비핵심 자율개발(dev 파이프라인·챗 자동배포)을 스로틀/보류**해
 //   핵심 판정(self-audit 등)·그라운딩(챗 질의응답)을 굶기지 않게 한다.
 //   컷 기준은 CEO가 .env.local의 WEEKLY_TOKEN_SOFT_CAP으로 조정(미설정=0=가드 비활성=행동변화 없음).
@@ -23,26 +27,39 @@ export function rowCostTokens(cols) {
   return fullIn + out + CACHE_READ_WEIGHT * cacheRead;
 }
 
+// 주어진 시각(epoch ms) 기준, 가장 최근의 "금요일 02:00 KST" 리셋 시각(epoch ms)을 구한다.
+//   금요일 02:00 KST(UTC+9) = 목요일 17:00 UTC — UTC 요일/시로 계산해 프로세스 로컬 타임존과 무관하게 동작.
+export function lastWeeklyResetUTC(now = Date.now()) {
+  const RESET_DOW_UTC = 4;  // Thursday(UTC 기준) — 금 02:00 KST의 UTC 요일
+  const RESET_HOUR_UTC = 17; // 목요일 17:00 UTC = 금요일 02:00 KST
+  const d = new Date(now);
+  const cur = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), RESET_HOUR_UTC, 0, 0, 0));
+  const diffDays = (cur.getUTCDay() - RESET_DOW_UTC + 7) % 7;
+  cur.setUTCDate(cur.getUTCDate() - diffDays);
+  if (cur.getTime() > now) cur.setUTCDate(cur.getUTCDate() - 7); // 이번 주 리셋 시각이 아직 안 왔으면 지난주 리셋으로
+  return cur.getTime();
+}
+
 export function computeGuard() {
   let cap = 0;
   try { const m = readFileSync(ENV, "utf8").match(/WEEKLY_TOKEN_SOFT_CAP="?([0-9_]+)/); if (m) cap = Number(m[1].replace(/_/g, "")); } catch {}
   let used = 0, n = 0;
-  const now = Date.now(), WEEK = 7 * 864e5;
+  const now = Date.now(), since = lastWeeklyResetUTC(now);
   try {
     for (const l of readFileSync(USAGE, "utf8").trim().split("\n")) {
       const p = l.split("\t"); const t = Date.parse(p[0]);
-      if (!t || now - t > WEEK) continue;
+      if (!t || t < since) continue;
       used += rowCostTokens(p); n++;
     }
   } catch {}
-  if (!cap || cap <= 0) return { level: "ok", used, cap: 0, pct: 0, n, active: false };
+  if (!cap || cap <= 0) return { level: "ok", used, cap: 0, pct: 0, n, active: false, since };
   const pct = used / cap;
   const level = pct >= 1.0 ? "pause" : pct >= 0.8 ? "throttle" : "ok";
-  return { level, used, cap, pct: +(pct * 100).toFixed(1), n, active: true };
+  return { level, used, cap, pct: +(pct * 100).toFixed(1), n, active: true, since };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const g = computeGuard();
-  console.log(`${g.level} (구독 claude -p 7일 ${(g.used / 1e6).toFixed(1)}M tok${g.active ? ` / soft-cap ${(g.cap / 1e6).toFixed(0)}M = ${g.pct}%` : ", cap 미설정=비활성"}, 캐시읽기 ${CACHE_READ_WEIGHT}x 가중)`);
+  console.log(`${g.level} (구독 claude -p 이번 주간(금 2시KST 리셋 이후) ${(g.used / 1e6).toFixed(1)}M tok${g.active ? ` / soft-cap ${(g.cap / 1e6).toFixed(0)}M = ${g.pct}%` : ", cap 미설정=비활성"}, 캐시읽기 ${CACHE_READ_WEIGHT}x 가중, 리셋시각 ${new Date(g.since).toISOString()})`);
   process.exit(g.level === "pause" ? 2 : g.level === "throttle" ? 1 : 0);
 }
