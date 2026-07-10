@@ -62,6 +62,13 @@ export function ChatWidget({ pw }: { pw: string }) {
   const [search, setSearch] = useState("");
   const [elapsed, setElapsed] = useState(0);
   const [unread, setUnread] = useState(0);
+  // 🗂 대화기록(읽기전용) — chat_archive 열람 패널. 세션 목록 → 검색 → 선택 시 해당 날짜 전문.
+  const [archiveOpen, setArchiveOpen] = useState(false);
+  const [archiveQ, setArchiveQ] = useState("");
+  const [archiveSessions, setArchiveSessions] = useState<{ date: string; count: number; title: string }[]>([]);
+  const [archiveDate, setArchiveDate] = useState<string | null>(null);
+  const [archiveMsgs, setArchiveMsgs] = useState<{ question: string; answer: string; t: string }[]>([]);
+  const [archiveLoading, setArchiveLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const chatAbortRef = useRef<AbortController | null>(null);
   const regionAbortRef = useRef<AbortController | null>(null);
@@ -217,6 +224,27 @@ export function ChatWidget({ pw }: { pw: string }) {
     try { await fetch("/api/admin/chat", { method: "DELETE", headers: { "x-admin-password": pw } }); } catch {}
     setChatMsgs([]); chatMsgCountRef.current = 0;
   };
+  // 🗂 대화기록(읽기전용) — 별도 저장소(chat_archive) 조회. 기존 chat_queue 흐름과 완전히 분리.
+  const loadArchiveSessions = (q: string) => {
+    setArchiveLoading(true);
+    fetch(`/api/admin/chat-archive${q.trim() ? `?q=${encodeURIComponent(q.trim())}` : ""}`, { headers: { "x-admin-password": pw }, cache: "no-store" })
+      .then((r) => r.json()).then((d) => { if (d.ok) setArchiveSessions(d.sessions || []); })
+      .catch(() => {}).finally(() => setArchiveLoading(false));
+  };
+  const loadArchiveDetail = (date: string, q: string) => {
+    setArchiveLoading(true);
+    const qs = new URLSearchParams({ date, ...(q.trim() ? { q: q.trim() } : {}) });
+    fetch(`/api/admin/chat-archive?${qs}`, { headers: { "x-admin-password": pw }, cache: "no-store" })
+      .then((r) => r.json()).then((d) => { if (d.ok) setArchiveMsgs(d.messages || []); })
+      .catch(() => {}).finally(() => setArchiveLoading(false));
+  };
+  const openArchive = () => { setArchiveOpen(true); setArchiveDate(null); setArchiveQ(""); setArchiveSessions([]); loadArchiveSessions(""); };
+  useEffect(() => {
+    if (!archiveOpen) return;
+    const t = setTimeout(() => (archiveDate ? loadArchiveDetail(archiveDate, archiveQ) : loadArchiveSessions(archiveQ)), 250); // 검색어 debounce
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [archiveQ, archiveDate]);
   const openChat = () => {
     setOpen(true);
     // 알림 권한은 실제 사용자 제스처(모달 열기) 시점에 요청 — 로드 즉시 요청하는 방해 패턴 지양.
@@ -234,6 +262,7 @@ export function ChatWidget({ pw }: { pw: string }) {
             <div style={{ background: "#2b2018", color: "#e8b87a", padding: "12px 16px", borderRadius: "16px 16px 0 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <b style={{ fontSize: 15 }}>💬 관제 챗봇</b>
               <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+                <span onClick={openArchive} title="대화기록(과거 세션 열람·검색)" style={{ cursor: "pointer", fontSize: 16 }}>🗂</span>
                 <span onClick={clearHistory} title="24h 대화기록 삭제" style={{ cursor: "pointer", fontSize: 17 }}>🗑</span>
                 <span onClick={() => setOpen(false)} style={{ cursor: "pointer", fontSize: 18 }}>✕</span>
               </div>
@@ -274,6 +303,51 @@ export function ChatWidget({ pw }: { pw: string }) {
             <div style={{ display: "flex", gap: 7, padding: "8px 10px calc(10px + env(safe-area-inset-bottom))" }}>
               <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !loading) (mode === "region" ? sendRegion() : send()); }} placeholder={mode === "region" ? "동/구 또는 카페 이름 (예: 성수동, 블루보틀)" : "질문…"} disabled={loading} style={{ flex: 1, minWidth: 0, padding: "11px 13px", borderRadius: 10, border: "1px solid #ddc9a8", fontSize: 16 }} />
               <button onClick={() => (loading ? stop() : (mode === "region" ? sendRegion() : send()))} style={{ padding: "0 18px", background: loading ? "#7a2e22" : "#2b2018", color: loading ? "#f2d9c9" : "#e8b87a", border: "none", borderRadius: 10, fontWeight: 700, fontSize: 15, flexShrink: 0, cursor: "pointer" }}>{loading ? "⏹ 중지" : "전송"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {archiveOpen && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 110, display: "flex", flexDirection: "column", justifyContent: "flex-end", overscrollBehavior: "contain" }} onClick={() => setArchiveOpen(false)}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: "#f7f1e4", borderRadius: "16px 16px 0 0", maxWidth: 640, width: "100%", margin: "0 auto", height: "86vh", display: "flex", flexDirection: "column" }}>
+            <div style={{ background: "#2b2018", color: "#e8b87a", padding: "12px 16px", borderRadius: "16px 16px 0 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                {archiveDate && <span onClick={() => setArchiveDate(null)} title="세션 목록으로" style={{ cursor: "pointer", fontSize: 16 }}>←</span>}
+                <b style={{ fontSize: 15 }}>🗂 대화기록{archiveDate ? ` · ${archiveDate}` : ""}</b>
+              </div>
+              <span onClick={() => setArchiveOpen(false)} style={{ cursor: "pointer", fontSize: 18 }}>✕</span>
+            </div>
+            <div style={{ padding: "8px 12px 0" }}>
+              <input value={archiveQ} onChange={(e) => setArchiveQ(e.target.value)} placeholder="🔍 과거 대화 검색…" style={{ width: "100%", padding: "6px 10px", borderRadius: 8, border: "1px solid #e0d2b8", fontSize: 12.5, background: "#fff", boxSizing: "border-box" }} />
+            </div>
+            <div style={{ flex: 1, overflowY: "auto", overscrollBehavior: "contain", padding: 12 }}>
+              {archiveLoading && <div style={{ color: "#9c8a6c", fontSize: 13 }}>불러오는 중…</div>}
+              {!archiveLoading && !archiveDate && archiveSessions.length === 0 && (
+                <div style={{ color: "#9c8a6c", fontSize: 13, lineHeight: 1.7 }}>{archiveQ.trim() ? "검색 결과 없음" : "24시간이 지난 과거 대화가 여기 자동 보관됩니다(읽기전용)."}</div>
+              )}
+              {!archiveDate && archiveSessions.map((s) => (
+                <div key={s.date} onClick={() => setArchiveDate(s.date)} style={{ padding: "10px 12px", marginBottom: 6, borderRadius: 10, background: "#fff", border: "1px solid #e6d8bf", cursor: "pointer" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <b style={{ fontSize: 13.5, color: "#2b2018" }}>{s.date}</b>
+                    <span style={{ fontSize: 11.5, color: "#a89878" }}>{s.count}건</span>
+                  </div>
+                  {s.title && <div style={{ fontSize: 12.5, color: "#8a7a5c", marginTop: 3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.title}</div>}
+                </div>
+              ))}
+              {archiveDate && !archiveLoading && archiveMsgs.length === 0 && <div style={{ color: "#9c8a6c", fontSize: 13 }}>{archiveQ.trim() ? "검색 결과 없음" : "기록 없음"}</div>}
+              {archiveDate && archiveMsgs.map((m, i) => (
+                <div key={i} style={{ margin: "10px 0" }}>
+                  <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                    <div style={{ maxWidth: "88%", padding: "9px 12px", borderRadius: 13, fontSize: 14, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word", background: "#c98a3c", color: "#fff" }}>{m.question}</div>
+                  </div>
+                  {m.answer && (
+                    <div style={{ display: "flex", justifyContent: "flex-start", marginTop: 4 }}>
+                      <div className="ex" style={{ maxWidth: "88%", padding: "9px 12px", borderRadius: 13, fontSize: 14, lineHeight: 1.6, background: "#fff", color: "#2b2018", border: "1px solid #e6d8bf" }}><div dangerouslySetInnerHTML={{ __html: md2html(m.answer) }} /></div>
+                    </div>
+                  )}
+                  {m.t && <div style={{ fontSize: 10.5, color: "#a89878", textAlign: "right", margin: "2px 4px 0" }}>{m.t}</div>}
+                </div>
+              ))}
             </div>
           </div>
         </div>
