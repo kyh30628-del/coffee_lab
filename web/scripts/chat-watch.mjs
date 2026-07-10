@@ -5,7 +5,8 @@
 //   ⚠️ ToS-clean: 구독토큰은 백엔드 금지 → 서버는 큐만, 실제 LLM/실행/배포는 전부 여기(로컬 claude -p·로컬 git).
 //   코드 구현·커밋·배포는 이미 검증된 로컬 파이프라인(dev-claim→run-dev-one→dev-deploy, 전역 git락·버전확인)을
 //   재사용한다 — 워커가 직접 free git push 하지 않아 과거 git 레이스 사고를 회피.
-import { readFileSync, appendFileSync } from "node:fs";
+import { readFileSync, appendFileSync, statSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { execFile } from "node:child_process";
 import { neon } from "@neondatabase/serverless";
 import { computeGuard } from "./usageGuard.mjs";
@@ -13,6 +14,22 @@ import { computeGuard } from "./usageGuard.mjs";
 const env = readFileSync("/Users/wangwida/coffee-platform/web/.env.local", "utf8");
 const sql = neon(env.match(/DATABASE_URL="?([^"\n]+)/)[1].trim());
 const one = async (q) => { try { return Number((await q)[0].c); } catch { return "?"; } };
+
+// 🔁 자가치유 재기동 — 상주 프로세스라 배포로 이 파일이 바뀌어도 메모리엔 기동 시점 코드가 그대로 남는다
+//   (Node는 핫리로드 안 함). 그 결과 배포된 수정이 재기동 전까지 조용히 무반영된다(#291: 모델배지 미표시 근본원인
+//   — #287 배포는 됐지만 이 프로세스가 재기동 안 돼 llm_model 트래킹 코드가 로드되지 않음).
+//   launchd(com.coffee.chat-watch)가 KeepAlive+RunAtLoad라 process.exit(0)만 하면 ~10초 내 새 코드로 자동 재기동.
+//   진행 중 요청을 끊지 않게 busy가 아닐 때만, 그리고 idle 상태에서만 체크.
+const SELF_PATH = fileURLToPath(import.meta.url);
+let SELF_MTIME = 0;
+try { SELF_MTIME = statSync(SELF_PATH).mtimeMs; } catch {}
+function checkSelfUpdate() {
+  if (busy || maintBusy || !SELF_MTIME) return;
+  try {
+    const m = statSync(SELF_PATH).mtimeMs;
+    if (m !== SELF_MTIME) { console.log(`[${new Date().toISOString()}] 코드 변경 감지 — 재기동해 새 버전 반영`); process.exit(0); }
+  } catch {}
+}
 
 // 📜 CEO 운영원칙 캐논 — triage/실행 프롬프트에 항상 시스템컨텍스트로 주입(캐시됨). 서비스 이해·품질 해자 고정.
 const CANON = "/Users/wangwida/coffee-platform/docs/CEO-OPERATING-PRINCIPLES.md";
@@ -288,6 +305,7 @@ async function maintenance() {
 // 💓 하트비트 — 상주 데몬 생존 기록(경영지원본부, EXPECT_MAX_H 'chat-watch' 1h).
 async function heartbeat() { try { await sql`INSERT INTO agent_runs (job, ran_at, ok, detail, processed) VALUES ('chat-watch', now(), true, '관제 챗봇 상주(지시→자율실행)', 0) ON CONFLICT (job) DO UPDATE SET ran_at=now(), ok=true, detail='관제 챗봇 상주(지시→자율실행)'`; } catch {} }
 setInterval(heartbeat, 60000); heartbeat();
+setInterval(checkSelfUpdate, 30000); // 자가치유 재기동(위 정의) — 배포 후 idle 시 자동 반영
 
 // 🏷️ llm_model 컬럼 방어적 마이그레이션 — API(route.ts ensure())가 먼저 안 돌았어도 이 워커 단독 기동 시 안전.
 await sql`ALTER TABLE chat_queue ADD COLUMN IF NOT EXISTS llm_model TEXT`.catch(() => {});
