@@ -26,7 +26,9 @@ export async function GET(req: NextRequest) {
     ok BOOLEAN, findings JSONB, fixed JSONB, escalated JSONB
   )`.catch(() => {});
 
-  const findings: { check: string; count: number; team: string; critical?: boolean }[] = [];
+  // ikey?: dedup 안정키(경과시간처럼 매 실행 변하는 값을 check에 넣는 finding이 있어, dedup은 이 안정키로 한다).
+  //   미지정 시 check 문자열이 곧 안정키(경과시간 등 가변값이 없는 finding).
+  const findings: { check: string; count: number; team: string; critical?: boolean; ikey?: string }[] = [];
   const fixed: string[] = [];
   const escalated: string[] = [];
   const one = async (q: any): Promise<number> => Number((await q)[0].c);
@@ -69,7 +71,9 @@ export async function GET(req: NextRequest) {
       const expect = EXPECT_MAX_H[c.job];
       if (expect == null) continue; // 감시 계약 없는 잡은 staleness 미적용
       const ageH = (Date.now() - new Date(c.ran_at).getTime()) / 3.6e6;
-      if (ageH > expect) findings.push({ check: `크론 정지의심 ${c.job} (${Math.round(ageH)}h)`, count: 1, team: teamOf(c.job), critical: true });
+      // ⚠️ ikey에서 경과시간(Math.round(ageH))을 분리한다 — 시간은 title/detail(=check 표시)에만, dedup은 잡 이름 안정키로.
+      //   과거: check 전체(경과시간 포함)를 ikey로 써서 매 사이클 ikey가 달라져 dedup 미매치 → 좀비 결재 row 누적(#264/#265).
+      if (ageH > expect) findings.push({ check: `크론 정지의심 ${c.job} (${Math.round(ageH)}h)`, count: 1, team: teamOf(c.job), critical: true, ikey: `selfaudit:크론정지의심:${c.job}` });
     }
 
     // ── 5) 자가검증: CEO 결재가 방치되는지 (실행·피드백 누수 감시) ──
@@ -78,7 +82,7 @@ export async function GET(req: NextRequest) {
 
     // ── 6) 못 푸는 중대건 → CEO 결재(L3) 자동 상신 + 담당 본부 배정 (중복방지) ──
     for (const f of findings.filter((f) => f.critical)) {
-      const ik = `selfaudit:${f.check}`.slice(0, 120);
+      const ik = (f.ikey ?? `selfaudit:${f.check}`).slice(0, 120);
       const dup = (await sql`SELECT 1 FROM decisions WHERE action_params->>'ikey'=${ik} AND status IN('pending','approved') LIMIT 1`.catch(() => [])) as any[];
       if (!dup.length) {
         await sql`INSERT INTO decisions (title, detail, team, severity, tier, action_type, action_params, recommendation)
