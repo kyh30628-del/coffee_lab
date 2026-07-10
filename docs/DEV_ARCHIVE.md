@@ -40,3 +40,4 @@
 | 2026-07-09 12:40 | #261 | 헤더1줄+프로필이미지 | 2ee921ab | low | ①app/admin/org/page.tsx 헤더 버튼 이모지 복원(🎛️기준·🏛️라운지·🏢조직도)+패딩 8px16px→7px11px·gap7→5·minWidth84 제거·fle |
 | 2026-07-09 14:11 | #262 | 문의메일·챗봇아이콘 | b4b99a9e | med | ①문의메일 kyh30628@gmail.com→dongnecoffeenote@gmail.com 전수교체(8파일 13곳: lib/newsletter·onboardingEmail, ap |
 | 2026-07-09 14:45 | #263 | 관리자챗봇노출 | 0bc13021 | med | ChatWidget는 #262에서 /admin에 이미 배선됨(import+<ChatWidget pw={pw}/> line1600, blame 96b03f3)—코드상 런처는 정상 렌 |
+| 2026-07-10 00:52 | #266 | [자율진단] cron-selfaudit 자체 dedup(ikey) 버그 — 경과시간 포함으로 매 사이클 결재 | b9367b8d | - | app/api/cron-selfaudit/route.ts: 크론 정지의심 finding에 안정 ikey(selfaudit:크론정지의심:<job>) 부여, dedup은 f.ikey  |
