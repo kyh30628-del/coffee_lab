@@ -58,3 +58,4 @@
 | 2026-07-10 13:58 | #291 | 모델배지 미표시 수정 | e1745982 | low | 근본원인: #287 배포(21:46) 후 상주 데몬(chat-watch.mjs, launchd KeepAlive)이 재기동 안 돼 구코드로 계속 실행 — llm_model 항상 N |
 | 2026-07-10 14:13 | #292 | 위치동의 상세표기 | c93dfab0 | low | app/api/admin/analytics/route.ts: consentDetail(total/internal/real/located/unlocated) DB실측 쿼리 추가·응답 |
 | 2026-07-10 14:26 | #293 | 챗봇 자동스크롤 수정 | 649b7be2 | low | app/admin/ChatWidget.tsx: 스크롤 위치 추적(nearBottomRef+onScroll)으로 하단 100px 이내일 때만 자동스크롤, 위로 스크롤 중이면 유지.  |
+| 2026-07-10 14:50 | #294 | 대시보드 지표 정리 | 03f6d086 | med | 수정: web/app/admin/page.tsx, web/app/api/cron-verify/route.ts. 중복 제거: /admin의 "접속·방문자 현황" 섹션(총방문자/위치동 |
