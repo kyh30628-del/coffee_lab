@@ -14,6 +14,15 @@ const nextConfig: NextConfig = {
     // 관제탑이 런타임에 .ai-paused 플래그(판정 의도적 정지)를 읽는다 → 함수 번들에 포함.
     "/api/orchestrator": ["./.ai-paused"],
   },
+  // 🧭 홈(랜딩) HTML은 항상 최신으로 — 인스타·페북 등 인앱 브라우저(WebView)가 must-revalidate를 무시하고
+  //   옛 HTML을 디스크캐시로 붙잡아, 코드를 고쳐 배포해도 사용자 화면이 안 바뀌던 문제(2026-07-10 안드로이드
+  //   인스타 초기화면 확대가 고친 뒤에도 계속 보이던 원인=stale 캐시). no-store로 셸 HTML 캐시를 원천 차단.
+  //   해시된 JS/CSS 청크는 그대로 장기캐시(성능 무영향). SEO 무영향(크롤러는 매번 최신 취득).
+  async headers() {
+    return [
+      { source: "/", headers: [{ key: "Cache-Control", value: "no-store, must-revalidate" }] },
+    ];
+  },
 };
 
 export default nextConfig;
