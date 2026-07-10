@@ -20,6 +20,7 @@ export default function OrgDashboard() {
   const [showInProg, setShowInProg] = useState(false);
   const [showDeleg, setShowDeleg] = useState(false);
   const [showCoord, setShowCoord] = useState(false);
+  const [showBriefs, setShowBriefs] = useState(false);
   const [showIssues, setShowIssues] = useState(false);
   const [showTok, setShowTok] = useState(false);
   const [member, setMember] = useState<{ k: string; n: string; t: string } | null>(null);
@@ -579,7 +580,11 @@ export default function OrgDashboard() {
         )}
 
         <div style={{ ...card, marginTop: 10 }} className="ex">
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#9c6b3f", marginBottom: 6 }}>📋 EXECUTIVE 일일보고서 (최근 10일 · 시간별)</div>
+          <button onClick={() => setShowBriefs(!showBriefs)} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "#9c6b3f" }}>{showBriefs ? "▾" : "▸"} 📋 EXECUTIVE 일일보고서 (최근 10일 · 시간별)</span>
+            <span style={{ fontSize: 10.5, color: "#9c8a6c" }}>{showBriefs ? "접기" : "보기"}</span>
+          </button>
+          {showBriefs && <div style={{ marginTop: 6 }}>
           {briefs.length === 0 ? <div style={{ fontSize: 12, color: "#9c8a6c" }}>보고서 없음</div> :
             briefs.map((bf: any, i: number) => {
               const day = bf.day || String(bf.created_at || "").slice(0, 10);
@@ -600,6 +605,7 @@ export default function OrgDashboard() {
                 </div>
               );
             })}
+          </div>}
         </div>
         <div style={{ marginTop: 12, textAlign: "center", fontSize: 11.5, color: "#3f7a4f", fontWeight: 600 }}>🟢 실시간 자동 갱신 중{synced && <span style={{ color: "#9c8a6c", fontWeight: 400 }}> · 마지막 동기 {synced}</span>}</div>
         <div style={{ textAlign: "center", color: "#9c8a6c", fontSize: 11, margin: "10px 0 16px" }}>소비자 경험을 최우선한다 · 기획조정실</div>
