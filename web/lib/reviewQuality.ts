@@ -140,6 +140,23 @@ const guShort = (g: string) => g.replace(/(특별시|광역시|시|군|구)$/, "
 const norm = (s: string) => (s || "").toLowerCase().replace(/\s+/g, "");
 const has = (t: string, kws: string[]) => kws.some((k) => t.includes(k.toLowerCase()));
 const countOccur = (t: string, kw: string) => kw ? t.split(kw).length - 1 : 0;
+// 룰갭 P23(#270/#290): 관용구·일반어 카페명(COMMON_WORD_NAMES)의 nameAsWord 오염 게이트가 카페맥락어를
+//   글 '전역'에서만 찾아, 무관 글이 카페어를 멀리서 우연히 스치기만 해도(예: "하루에 …멀리… 커피") 게이트가
+//   무력화됐다(id9661). 상호명 토큰 출현 위치 ±window자 근접 창 안에서만 맥락 정규식을 인정하는 근접매칭.
+//   normText는 공백제거 정규화 문자열(norm), re는 g플래그 없는 정규식(test 무상태) 전제.
+const ctxNearName = (normText: string, nameNorm: string, re: RegExp, window = 25): boolean => {
+  if (!nameNorm) return false;
+  let from = 0, guard = 0;
+  for (;;) {
+    const i = normText.indexOf(nameNorm, from);
+    if (i < 0 || guard++ > 50) break;
+    const start = Math.max(0, i - window);
+    const end = Math.min(normText.length, i + nameNorm.length + window);
+    if (re.test(normText.slice(start, end))) return true;
+    from = i + nameNorm.length;
+  }
+  return false;
+};
 
 // 룰갭 P26(2026-07-10, rulegap-proposals-20260710-2.md): 매칭 종료 지점의 '오른쪽 경계'가 전혀
 //   검사되지 않아 "르씨엘"이 "르씨엘가구"(가구쇼룸)에, "써니"가 "써니네집"(레스토랑)에, "24"가
@@ -603,11 +620,23 @@ export function verifyReview(input: QualityInput): QualityResult {
   //   무관 글에 '문장 성분(동사/형용사)'으로 우연일치해 통과하던 것 차단. 짧은/일반어 이름 + 카페 맥락(CAFE_CONTEXT·카페어)
   //   전무 → 카페와 무관한 글로 거절. 진짜 후기는 카페 맥락어가 있어 보존(tsx 실측: 이해 43·봄 64·탐 46건 유지). 정상 이름(3+글자)은 영향 없음.
   const nameClean = (nameN || "").replace(/\s/g, "");
-  const nameRisky = (nameClean.length >= 1 && nameClean.length <= 2) || COMMON_WORD_NAMES.has(nameClean);
   //   룰갭 제안22(b): 이 게이트만 CAFE_CONTEXT_STRONG 사용 — CAFE_CONTEXT의 "주문·좌석·매장·사장님·음료"는
   //   비카페 소매/서비스 전반의 범용어라 관용구 카페명(자수성가 등)의 무관 글을 못 걸러냄(전역 적용은 비권장).
-  if (nameRisky && !CAFE_CONTEXT_STRONG.test(fullL) && !titleHasCafeWord && !bodyHasCafeWord) {
-    return { verdict: "rejected", score: 2, reasons: ["초단어·일반어 카페명 우연일치(카페 맥락 전무) — nameAsWord 오염"], signals: sig };
+  //   룰갭 P23(#270/#290): 위험한 카페명(초단어·일반어)을 두 갈래로 분리해 근접매칭 강화.
+  const nameShort = nameClean.length >= 1 && nameClean.length <= 2;
+  const nameCommonPhrase = COMMON_WORD_NAMES.has(nameClean);
+  if (nameShort) {
+    // 1~2글자 이름은 근접 창이 불안정(진짜후기 과다거절 위험) → 기존 '전역' 맥락판정 유지.
+    if (!CAFE_CONTEXT_STRONG.test(fullL) && !titleHasCafeWord && !bodyHasCafeWord) {
+      return { verdict: "rejected", score: 2, reasons: ["초단어 카페명 우연일치(카페 맥락 전무) — nameAsWord 오염"], signals: sig };
+    }
+  } else if (nameCommonPhrase) {
+    // 관용구·일반어 카페명은 상호명 토큰 ±25자 근접 안에 카페맥락어가 있을 때만 진짜후기로 인정(제목 카페어는 강신호로 예외).
+    //   멀리 떨어진 카페어 우연 동시언급은 더 이상 게이트를 무력화하지 못한다(전역 bodyHasCafeWord 예외 제거 — 근접판정 무력화 방지).
+    const fullN = norm(`${title} ${body}`);
+    if (!ctxNearName(fullN, nameClean, CAFE_CONTEXT_STRONG) && !titleHasCafeWord) {
+      return { verdict: "rejected", score: 2, reasons: ["일반어 카페명 우연일치(카페명 근접 맥락 전무) — nameAsWord 오염"], signals: sig };
+    }
   }
   // [지역 SEO 서비스 블로그] 법률·시공·의료·청소 SEO 글이 카페명(일상어)을 제목에 끼움 + 카페맥락 전무 → 무관 홍보글(이해·공유·유지…).
   if (LOCAL_SEO_SERVICES.test(`${title} ${body}`) && !CAFE_CONTEXT.test(fullL) && !bodyHasCafeWord) {
