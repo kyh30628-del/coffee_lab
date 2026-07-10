@@ -1032,7 +1032,26 @@ export default function AdminPage() {
                           <div className="text-[12px] font-bold text-emerald-800 mb-1.5">🧑 진짜 사용자 신호 <span className="font-normal text-[10px] text-emerald-600">· 기준=브라우저(localStorage), IP 아님</span></div>
                           <div className="grid grid-cols-3 gap-2 text-center">
                             <div><div className="text-[19px] font-extrabold text-emerald-700">{a.realUsers.trueReturn ?? 0}</div><div className="text-[9.5px] text-stone-500">재방문(다시 켬)<br/>(세션 2회+·같은날 포함)</div></div>
-                            <div><div className="text-[19px] font-extrabold text-emerald-700">{a.realUsers.consent}</div><div className="text-[9.5px] text-stone-500">위치동의<br/>(봇은 안 하는 행동)</div></div>
+                            <div>
+                              <div className="text-[19px] font-extrabold text-emerald-700">{a.realUsers.consent}</div>
+                              <div className="text-[9.5px] text-stone-500">위치동의<br/>(봇은 안 하는 행동)</div>
+                              {a.realUsers.consentDetail && (
+                                <details className="mt-0.5 text-left">
+                                  <summary className="text-[9px] text-emerald-600 cursor-pointer text-center list-none underline decoration-dotted">상세보기</summary>
+                                  <div className="mt-1 text-[9px] text-stone-500 leading-relaxed bg-white/70 rounded-lg p-1.5 border border-emerald-100">
+                                    <div>전체 동의 {a.realUsers.consentDetail.total}건</div>
+                                    <div>− 테스트기기 {a.realUsers.consentDetail.internal}건 제외</div>
+                                    <div>= 최종 {a.realUsers.consentDetail.real}건</div>
+                                    <div className="mt-0.5 pt-0.5 border-t border-emerald-100">
+                                      지역명 있음 {a.realUsers.consentDetail.located} · 없음 {a.realUsers.consentDetail.unlocated}
+                                      {a.realUsers.consentDetail.unlocated > 0 && (
+                                        <span title="카카오톡 인앱 브라우저 등에서 GPS 권한을 못 받아 좌표는 있어도 지역명을 못 붙인 경우로 추정"> (카톡 인앱 GPS 미획득 추정)</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </details>
+                              )}
+                            </div>
                             <div><div className="text-[19px] font-extrabold text-emerald-700">{(a.realSources || []).reduce((s: number, r: any) => s + r.visitors, 0)}</div><div className="text-[9.5px] text-stone-500">검색·소셜 유입<br/>(브라우저 수)</div></div>
                           </div>
                           {(a.realSources || []).length > 0 && (
