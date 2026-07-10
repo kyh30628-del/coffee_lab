@@ -5,7 +5,7 @@
 //   ⚠️ ToS-clean: 구독토큰은 백엔드 금지 → 서버는 큐만, 실제 LLM/실행/배포는 전부 여기(로컬 claude -p·로컬 git).
 //   코드 구현·커밋·배포는 이미 검증된 로컬 파이프라인(dev-claim→run-dev-one→dev-deploy, 전역 git락·버전확인)을
 //   재사용한다 — 워커가 직접 free git push 하지 않아 과거 git 레이스 사고를 회피.
-import { readFileSync, appendFileSync, statSync } from "node:fs";
+import { readFileSync, appendFileSync, statSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { execFile } from "node:child_process";
 import { neon } from "@neondatabase/serverless";
@@ -72,6 +72,28 @@ function loadDocs() {
 const DOCS = loadDocs();
 console.log(`지식소스 로드: ${DOCS ? Math.round(DOCS.length / 1024) + "KB" : "없음"}`);
 
+// 🧊 프롬프트 캐싱 — 매 턴 통째로 재전송되던 정적 블록(CANON+KB+DOCS)을 system-prompt-file 하나로 합쳐 보낸다.
+//   실측(2026-07-11): -p 인자로 보내는 텍스트는 프로세스가 바뀌면 캐시가 재사용되지 않는다(동일 텍스트 반복 호출해도
+//   cache_creation이 매번 새로 잡힘). 반면 --append-system-prompt-file로 넘긴 내용은 동일 파일이면 프로세스가 달라도
+//   Anthropic 프롬프트캐싱이 프리픽스매칭으로 재사용된다(반복 호출 시 cache_creation→0, cache_read_input_tokens 급증
+//   확인). 그래서 정적 블록(CANON+KB+DOCS)은 이 파일로, 동적 블록([라이브 상태]·대화 히스토리·질문)은 계속 -p 인자로
+//   분리한다. 내용은 한 글자도 축약하지 않고 그대로 옮긴다 — 위치만 바뀐다.
+//   ⚠️ --append-system-prompt-file은 마지막 지정만 적용(중복 지정 시 이전 값을 덮어씀·병합 안 됨) → CANON도 함께 이 파일에 합친다.
+const SYSTEM_STATIC_PATH = "/tmp/chat-watch-system-static.txt";
+let canonMtime = 0;
+function buildStaticSystemPrompt() {
+  let canonText = "";
+  try { canonText = readFileSync(CANON, "utf8"); canonMtime = statSync(CANON).mtimeMs; } catch {}
+  writeFileSync(SYSTEM_STATIC_PATH, `${canonText}\n\n${KB}${DOCS}`);
+}
+buildStaticSystemPrompt();
+// CANON(운영원칙 캐논)은 별도 문서라 언제든 수정될 수 있음 — mtime 변경 감지 시 재생성해 최신 내용을 유지(과거엔 매 호출마다
+//   파일 경로를 직접 넘겨 항상 최신이었던 것과 동등한 신선도를 유지하기 위함).
+function refreshStaticSystemPromptIfChanged() {
+  try { if (statSync(CANON).mtimeMs !== canonMtime) { console.log(`[${new Date().toISOString()}] CANON 변경 감지 — 정적 시스템프롬프트 재생성`); buildStaticSystemPrompt(); } } catch {}
+}
+setInterval(refreshStaticSystemPromptIfChanged, 60000);
+
 async function ground() {
   const L = ["[라이브 상태] (실측)"];
   L.push(`발행: ${await one(sql`SELECT count(*) c FROM cafes WHERE published`)} (검증 ${await one(sql`SELECT count(*) c FROM cafes WHERE published AND synth_grade='검증'`)}·참고 ${await one(sql`SELECT count(*) c FROM cafes WHERE published AND synth_grade='참고'`)}) · 합성대기 ${await one(sql`SELECT count(*) c FROM cafes WHERE synth_updated IS NULL`)} · 후보보류 ${await one(sql`SELECT count(*) c FROM cafes WHERE NOT published AND synth_grade='후보'`)}`);
@@ -92,13 +114,13 @@ async function ground() {
   return L.join("\n");
 }
 
-// claude -p 1회 호출. 캐논을 시스템프롬프트로 항상 주입(캐시됨) + 토큰 실측 로깅.
+// claude -p 1회 호출. 정적 블록(CANON+KB+DOCS)을 시스템프롬프트 파일로 항상 주입(프로세스 간에도 캐시 재사용) + 토큰 실측 로깅.
 //   triage/즉답=haiku(저비용·기계적 분류·그라운딩 추출), 심층 DB조사=sonnet. tools=true면 Bash 허용.
 function runClaude(prompt, { tools = false, model = "haiku", job = "chat-triage", retry = 1 } = {}) {
   return new Promise((res) => {
     // triage(tools=false)=툴 미개방 → 순수 텍스트 1턴 완결(과거 툴 시도로 max-turns 2 소진→error_max_turns 근절).
     //   deep(tools=true)=Bash 개방·턴 24·타임아웃 150s(DB 조회를 매번 새로 작성하다 6턴 초과하던 실패 해소).
-    const args = ["-p", prompt, "--model", model, "--append-system-prompt-file", CANON, "--max-turns", tools ? "24" : "6", "--output-format", "json"];
+    const args = ["-p", prompt, "--model", model, "--append-system-prompt-file", SYSTEM_STATIC_PATH, "--max-turns", tools ? "24" : "6", "--output-format", "json"];
     if (tools) args.push("--dangerously-skip-permissions", "--allowedTools", "Bash");
     const child = execFile("claude", args,
       { cwd: "/Users/wangwida/coffee-platform/web", maxBuffer: 16 * 1024 * 1024, timeout: tools ? 150000 : 50000, env: { ...process.env, PATH: "/Users/wangwida/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin" } },
@@ -228,7 +250,9 @@ async function tick() {
       if (quick) { await sql`UPDATE chat_queue SET answer=${quick}, status='done', mode='quick', answered_at=now() WHERE id=${id}`; console.log(`[${new Date().toISOString()}] answered #${id} (quick·무LLM)`); busy = false; return; }
       const g = await ground();
       const hist = Array.isArray(history) ? history.map((h) => `${h.role === "user" ? "Q" : "A"}: ${String(h.content).slice(0, 300)}`).join("\n") : "";
-      const base = `${KB}${DOCS}\n\n${g}\n\n${hist ? "[직전 대화]\n" + hist + "\n\n" : ""}[대표님 입력] ${question}`;
+      // KB+DOCS(+CANON)는 SYSTEM_STATIC_PATH로 이미 시스템프롬프트에 실려간다(캐시) — 여기 base는 매 턴 실제로 바뀌는
+      //   동적 블록만 담는다: [라이브 상태]·직전 대화·이번 질문.
+      const base = `${g}\n\n${hist ? "[직전 대화]\n" + hist + "\n\n" : ""}[대표님 입력] ${question}`;
       const r = await askOrAnswer(base);
       let answer = "", mode = "claude-p";
       if (r.type === "order") {
