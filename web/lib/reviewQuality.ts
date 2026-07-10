@@ -141,24 +141,63 @@ const norm = (s: string) => (s || "").toLowerCase().replace(/\s+/g, "");
 const has = (t: string, kws: string[]) => kws.some((k) => t.includes(k.toLowerCase()));
 const countOccur = (t: string, kw: string) => kw ? t.split(kw).length - 1 : 0;
 
+// 룰갭 P26(2026-07-10, rulegap-proposals-20260710-2.md): 매칭 종료 지점의 '오른쪽 경계'가 전혀
+//   검사되지 않아 "르씨엘"이 "르씨엘가구"(가구쇼룸)에, "써니"가 "써니네집"(레스토랑)에, "24"가
+//   "24시간"(요양원)에, "숲이있는"이 "대나무숲이있는"(타카페)에 매칭 — 이미 verified로 확정된
+//   근거인용문 자체가 타업소 것인 사례가 실측됨(id12307·8422·15622·16913). 왼쪽과 동일하게 오른쪽도
+//   '경계(공백·구두점·문자열 끝)'거나 '조사(은/는/이/가 등)+경계'일 때만 진짜 매칭으로 인정한다.
+//   단 조사 자체가 더 긴 단어의 일부('가구'의 '가')면 조사로 치지 않는다(그 뒤도 경계여야 함).
+const JOSA_LIST = [
+  "이라고도", "이라고는", "이었지만", "이라고", "이라는", "이라도", "이지만", "지만",
+  "으로서", "으로써", "으로는", "으로도", "으로만", "으로부터", "로부터", "에게서", "한테서",
+  "에서는", "에서도", "한테는", "부터는", "까지는", "까지도", "마저도", "조차도", "밖에는",
+  "에서", "에게", "한테", "에는", "에도", "에만", "보다", "처럼", "만큼", "조차", "마저", "밖에",
+  "이나", "까지", "부터", "으로", "로는", "로도", "로",
+  "은", "는", "이", "가", "을", "를", "도", "만", "의", "와", "과", "랑", "나", "야", "라",
+];
+const isBoundaryChar = (ch: string | undefined) => ch === undefined || !/[가-힣a-zA-Z0-9]/.test(ch);
+function rightBoundaryOk(t: string, endIdx: number): boolean {
+  if (isBoundaryChar(t[endIdx])) return true; // 뒤가 경계(공백·구두점·문자열 끝)면 진짜 매칭
+  const rest = t.slice(endIdx);
+  return JOSA_LIST.some((j) => rest.startsWith(j) && isBoundaryChar(rest[j.length]));
+}
 // 단어 경계 매칭: term이 더 긴 한글/영숫자 단어의 '일부'로 박힌 경우 제외.
-//   예: '바이트'가 '에이바이트키친'·'남산바이트'의 일부면 불인정. (조사는 뒤에 붙으니 '앞 글자'만 검사)
+//   예: '바이트'가 '에이바이트키친'·'남산바이트'의 일부면 불인정. (양쪽 경계 모두 검사, 오른쪽은 조사 예외)
 function boundedHit(rawText: string, term: string): boolean {
   const t = rawText || "", q = (term || "").trim();
   if (!q) return false;
   let i = t.indexOf(q);
   while (i !== -1) {
     const before = i > 0 ? t[i - 1] : " ";
-    if (!/[가-힣a-zA-Z0-9]/.test(before)) return true; // 앞이 경계(공백·구두점·시작)면 진짜 매칭
+    if (!/[가-힣a-zA-Z0-9]/.test(before) && rightBoundaryOk(t, i + q.length)) return true; // 양쪽이 경계면 진짜 매칭
     i = t.indexOf(q, i + 1);
   }
   return false;
 }
-// 짧은 이름(≤4)은 경계 매칭(부분문자열 오매칭 방지), 긴 이름은 일반 정규화 매칭.
+// 긴 이름(>4)용 경계 매칭: 원문(rawText)에서 띄어쓰기 유무 차이(정규화 목적)를 흡수하되
+//   좌우 경계는 boundedHit과 동일하게 검사한다. normText(공백 제거본)로는 경계 문자 자체가
+//   사라져 우측 경계 판정이 불가능하므로, 이름 글자 사이에 선택적 공백만 허용하는 정규식으로
+//   rawText를 직접 검색한다(원본 공백·구두점을 보존해 실제 경계를 검사할 수 있게).
+function boundedFlexHit(rawText: string, term: string): boolean {
+  const chars = (term || "").replace(/\s+/g, "").split("");
+  if (!chars.length) return false;
+  const pattern = chars.map((c) => c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\s*");
+  const re = new RegExp(pattern, "gi");
+  const t = rawText || "";
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(t)) !== null) {
+    const start = m.index, end = start + m[0].length;
+    const before = start > 0 ? t[start - 1] : " ";
+    if (!/[가-힣a-zA-Z0-9]/.test(before) && rightBoundaryOk(t, end)) return true;
+    if (m[0].length === 0) re.lastIndex++;
+  }
+  return false;
+}
+// 짧은 이름(≤4)은 원문 경계 매칭, 긴 이름은 공백 흡수 경계 매칭 — 양쪽 다 동일 좌우 경계검사로 통일.
 function nameHit(rawText: string, normText: string, term: string): boolean {
   const tn = norm(term);
   if (!tn) return false;
-  return tn.length > 4 ? normText.includes(tn) : boundedHit(rawText, term);
+  return tn.length > 4 ? boundedFlexHit(rawText, term) : boundedHit(rawText, term);
 }
 
 const GENERIC_SUFFIX = /(카페|커피|로스터리|로스터스|로스터즈|로스터|로스팅|베이커리|디저트|케이크|케익|케잌|제과점|제과|과자점|베이킹|coffee|cafe|cake|roasters?|roastery|roasteries|점|본점)$/i;
