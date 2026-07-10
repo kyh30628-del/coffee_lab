@@ -4,6 +4,7 @@ import { discoverRegion, METRO_REGIONS, PRIORITY_REGIONS } from "@/lib/discover"
 import { synthAndStore } from "@/lib/synthStore";
 import { mineArea } from "@/lib/reviewMiner";
 import { recordRun } from "@/lib/agentLog";
+import { naverUsedToday, NAVER_DAILY_QUOTA } from "@/lib/naverBudget";
 export const runtime = "nodejs";
 export const maxDuration = 300; // 여러 지역 발굴 + 합성 (플랜 상한까지 사용)
 
@@ -96,7 +97,11 @@ export async function GET(req: NextRequest) {
     const published = synth.filter((s: any) => s.published).length;
 
     const remainingRegions = (await sql`SELECT COUNT(*)::int n FROM discovery_state WHERE last_run IS NULL`)[0].n;
-    await recordRun("cron-grow", true, `발굴 ${discoveries.length}지역 신규 ${totalInserted} 합성 ${synth.length} 공개 ${published}`, totalInserted);
+    // 🧭 네이버 오늘 사용량 — 소진(=자정까지 발굴 불가)이 '버그'가 아니라 '정상 한도'임을 관제탑에 명시.
+    const naverUsed = await naverUsedToday().catch(() => 0);
+    const naverPct = Math.round((naverUsed / NAVER_DAILY_QUOTA) * 100);
+    const quotaNote = naverUsed >= NAVER_DAILY_QUOTA ? " · 네이버 한도소진(자정 리셋·정상)" : ` · 네이버 ${naverPct}%`;
+    await recordRun("cron-grow", true, `발굴 ${discoveries.length}지역 신규 ${totalInserted} 합성 ${synth.length} 공개 ${published}${quotaNote}`, totalInserted);
     return NextResponse.json({
       ok: true, ranAt: new Date().toISOString(),
       regionsSwept: discoveries.length, totalInserted, discoveries, remainingRegions,

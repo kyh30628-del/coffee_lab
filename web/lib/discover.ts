@@ -4,6 +4,7 @@ import { sql } from "./db";
 import { getLearned } from "./learnedTerms";
 import { loadCriteria, getCriterionSync } from "./criteria";
 import { getListSync, loadCriteriaLists } from "./criteriaLists"; // 비카페 순수 리스트 단일출처(BASE=폴백). 캐시 프라임은 discover 진입점이 함.
+import { bumpNaver, markNaverExhausted } from "./naverBudget"; // 네이버 일일 예산 추적(스윕이 70%만 쓰고 cron-grow에 30% 남기게)
 
 const ID = process.env.NAVER_CLIENT_ID;
 const SECRET = process.env.NAVER_CLIENT_SECRET;
@@ -218,7 +219,9 @@ export const isNonCafe = (name: string, category: string) => {
 async function localSearch(query: string, sort: "comment" | "random" = "comment") {
   const url = `https://openapi.naver.com/v1/search/local.json?query=${encodeURIComponent(query)}&display=5&sort=${sort}`;
   const res = await fetch(url, { headers: { "X-Naver-Client-Id": ID!, "X-Naver-Client-Secret": SECRET! } });
-  if (!res.ok) return null; // 쿼터(429)·API 오류 → null로 신호(빈 결과 [] 와 구분: '못 가져옴' vs '진짜 없음')
+  if (res.status === 429) { markNaverExhausted().catch(() => {}); return null; } // 실측 한도초과 → 오늘 소진 마킹(전 잡 우아 정지)
+  if (!res.ok) return null; // 기타 API 오류 → null로 신호(빈 결과 [] 와 구분: '못 가져옴' vs '진짜 없음')
+  bumpNaver(1).catch(() => {}); // 성공 쿼리 1건 계상(일일 예산 추적)
   const data = await res.json();
   return (data.items ?? []).map((it: any) => ({
     name: stripTags(it.title),

@@ -10,6 +10,7 @@ for (const l of env.split("\n")) { const m = l.match(/^([A-Z_0-9]+)=(.*)$/); if 
 const { discoverRegion } = await import("../lib/discover.ts");
 const { mineArea } = await import("../lib/reviewMiner.ts"); // 리뷰 속 상호 추출→네이버검증 신규적재(키워드검색 못 잡는 롱테일)
 const { sql } = await import("../lib/db.ts");
+const { sweepMayContinue, naverUsedToday, NAVER_DAILY_QUOTA, NAVER_SWEEP_RESERVE } = await import("../lib/naverBudget.ts"); // 스윕은 70%까지만·30%는 cron-grow용 예약
 const MINE_CALLS = Number(process.env.MINE_CALLS || 30); // 지역당 리뷰마이닝 네이버 검증 콜(0이면 마이닝 생략)
 
 const PER_REGION_MS = Number(process.env.PER_REGION_MS || 120_000); // 지역당 상한(넓게 커버 — cron-grow는 225s)
@@ -21,6 +22,10 @@ let totalNew = 0, done = 0, stop = "";
 console.log(`발굴 스윕 — 신선도순 순환 · 지역당 ${PER_REGION_MS / 1000}s · 상한 ${Math.round(TOTAL_MS / 60000)}분(한 바퀴 완주 시 조기종료)${sido ? ` · ${sido}` : ""}`);
 
 while (Date.now() - t0 < TOTAL_MS && !stop) {
+  // 🧭 네이버 예산 가드 — 오늘 사용량이 (25k − 예약분)에 닿으면 스윕 정지. 남은 예약분(기본 30%)은
+  //   하루 종일 도는 cron-grow(2h)가 쓴다. "70%만 쓰고 멈춘다"를 실제로 강제(2026-07-10 사기꾼 소리 들은 그 지점).
+  const bud = await sweepMayContinue();
+  if (!bud.ok) { stop = `네이버 예약분 도달 — 스윕 정지(${bud.used.toLocaleString()}/${NAVER_DAILY_QUOTA.toLocaleString()} 사용 · cron-grow용 ${NAVER_SWEEP_RESERVE.toLocaleString()} 예약). 정상.`; break; }
   const reg = (await sql`SELECT region, area_label, last_run FROM discovery_state
     WHERE (${sido} = '' OR region LIKE ${sido + '%'})
     ORDER BY last_run ASC NULLS FIRST LIMIT 1`)[0];
@@ -46,5 +51,6 @@ while (Date.now() - t0 < TOTAL_MS && !stop) {
     if (/quota|429|exceed|한도/i.test(m)) stop = "네이버 한도 — 중단";
   }
 }
-console.log(`스윕 종료(${stop || "예산 소진"}) — 처리 ${done}개 지역 · 신규 ${totalNew}곳 적재. cron-grow/synth가 수집·합성·게이트 후 공개.`);
+const usedFinal = await naverUsedToday().catch(() => 0);
+console.log(`스윕 종료(${stop || "예산 소진"}) — 처리 ${done}개 지역 · 신규 ${totalNew}곳 적재 · 네이버 ${usedFinal.toLocaleString()}/${NAVER_DAILY_QUOTA.toLocaleString()}(${Math.round(usedFinal / NAVER_DAILY_QUOTA * 100)}%) 사용. cron-grow/synth가 수집·합성·게이트 후 공개.`);
 process.exit(0);
