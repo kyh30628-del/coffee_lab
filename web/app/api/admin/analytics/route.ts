@@ -137,7 +137,15 @@ export async function GET(req: NextRequest) {
               COUNT(*) FILTER (WHERE COALESCE(visit_count,1)>=5)::int r5,
               COUNT(*) FILTER (WHERE COALESCE(sessions,1) >= 2)::int truereturn
        FROM user_consents WHERE last_seen>now()-interval '30 days' AND ${BOT}`).catch(() => [{}]))[0] as any;
-    const consentReal = (await sql`SELECT COUNT(*)::int n FROM user_consents WHERE agreed IS TRUE AND NOT COALESCE(internal,false)`.catch(() => [{ n: 0 }]))[0]?.n ?? 0;
+    // 위치동의 상세: 전체동의 → 내부기기 제외 → 최종(실사용자) → 지역명 유/무(카톡 인앱 GPS 미획득 등)
+    const consentDetail = (await sql`SELECT
+        COUNT(*) FILTER (WHERE agreed IS TRUE)::int total,
+        COUNT(*) FILTER (WHERE agreed IS TRUE AND COALESCE(internal,false))::int internal,
+        COUNT(*) FILTER (WHERE agreed IS TRUE AND NOT COALESCE(internal,false))::int real,
+        COUNT(*) FILTER (WHERE agreed IS TRUE AND NOT COALESCE(internal,false) AND region IS NOT NULL)::int located,
+        COUNT(*) FILTER (WHERE agreed IS TRUE AND NOT COALESCE(internal,false) AND region IS NULL)::int unlocated
+      FROM user_consents`.catch(() => [{ total: 0, internal: 0, real: 0, located: 0, unlocated: 0 }]))[0] as any;
+    const consentReal = consentDetail?.real ?? 0;
     const tasteN = (await sql`SELECT COUNT(*)::int n FROM taste_logs`.catch(() => [{ n: 0 }]))[0]?.n ?? 0;
     const bookmarkN = (await sql`SELECT COUNT(*)::int n FROM bookmarks`.catch(() => [{ n: 0 }]))[0]?.n ?? 0;
     const realSources = (await sql.query(
@@ -163,7 +171,14 @@ export async function GET(req: NextRequest) {
       GROUP BY c.id, c.name, c.area ORDER BY n DESC LIMIT 6`.catch(() => [])) as any[];
 
     return NextResponse.json({
-      realUsers: { r2: cohort?.r2 ?? 0, r3: cohort?.r3 ?? 0, r5: cohort?.r5 ?? 0, trueReturn: cohort?.truereturn ?? 0, consent: consentReal, taste: tasteN, bookmark: bookmarkN }, realSources,
+      realUsers: {
+        r2: cohort?.r2 ?? 0, r3: cohort?.r3 ?? 0, r5: cohort?.r5 ?? 0, trueReturn: cohort?.truereturn ?? 0,
+        consent: consentReal, taste: tasteN, bookmark: bookmarkN,
+        consentDetail: {
+          total: consentDetail?.total ?? 0, internal: consentDetail?.internal ?? 0, real: consentDetail?.real ?? 0,
+          located: consentDetail?.located ?? 0, unlocated: consentDetail?.unlocated ?? 0,
+        },
+      }, realSources,
       shares: { total: shares?.total ?? 0, kakao: shares?.kakao ?? 0, web: shares?.web ?? 0, clip: shares?.clip ?? 0, sharers: shares?.sharers ?? 0, today: shares?.today ?? 0 }, topShared,
       ok: true, generatedAt: new Date().toISOString(),
       kpi: {
