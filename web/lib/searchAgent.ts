@@ -37,7 +37,8 @@ export async function rerankWithClaude(query: string, region: string, cands: Sea
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: { "content-type": "application/json", ...authHeaders() },
-      body: JSON.stringify({ model: MODEL, max_tokens: 1400, system: SYSTEM, messages: [{ role: "user", content: user }] }),
+      // 🧊 SYSTEM은 정적 → cache_control로 캐싱(연속 검색 시 재사용·실단가 0.1x). 내용·품질 동일, 위치/마킹만.
+      body: JSON.stringify({ model: MODEL, max_tokens: 1400, system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }], messages: [{ role: "user", content: user }] }),
     });
     if (!res.ok) {
       const body = await res.text().catch(() => "");
