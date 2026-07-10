@@ -37,13 +37,25 @@ function answerKnowledge(q: string): string | null {
   return null;
 }
 
+// 🗂 대화기록(chat_archive) — chat_queue는 24h만 보존(기존 그대로)하므로, purge 직전에 별도 저장소로 미리
+//   복제해 대표님이 새 대화로 맥락을 리셋해도 /admin 대화기록 패널(읽기전용)에서 과거 지시·대화를 계속 열람할 수 있게 한다.
+//   기존 chat_queue 흐름(질문 적재·폴링·삭제)은 전혀 바뀌지 않는다 — 순수 추가(mirror)일 뿐.
+async function archiveThenPurge() {
+  await sql`CREATE TABLE IF NOT EXISTS chat_archive (
+    id SERIAL PRIMARY KEY, question TEXT, answer TEXT, mode TEXT, created_at TIMESTAMPTZ
+  )`.catch(() => {});
+  await sql`INSERT INTO chat_archive (question, answer, mode, created_at)
+    SELECT question, answer, mode, created_at FROM chat_queue WHERE created_at < now()-interval '24 hours'`.catch(() => {});
+  await sql`DELETE FROM chat_queue WHERE created_at < now()-interval '24 hours'`.catch(() => {}); // 24h 보존(기존 동작 그대로)
+}
+
 async function ensure() {
   await sql`CREATE TABLE IF NOT EXISTS chat_queue (
     id SERIAL PRIMARY KEY, question TEXT, history JSONB, status TEXT DEFAULT 'pending',
     answer TEXT, mode TEXT, created_at TIMESTAMPTZ DEFAULT now(), answered_at TIMESTAMPTZ
   )`.catch(() => {});
   await sql`CREATE TABLE IF NOT EXISTS work_orders (id SERIAL PRIMARY KEY, command TEXT, action TEXT, tier TEXT, created_at TIMESTAMPTZ DEFAULT now())`.catch(() => {}); // 챗봇 작업지시 감사
-  await sql`DELETE FROM chat_queue WHERE created_at < now()-interval '24 hours'`.catch(() => {}); // 24h 보존
+  await archiveThenPurge();
 }
 
 export async function POST(req: NextRequest) {
@@ -115,10 +127,15 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ ok: true, history: rows });
 }
 
-// 대화기록 전체 삭제
+// 대화기록 전체 삭제 (위젯 🗑) — 삭제 전 chat_archive로 먼저 복제해 별도 저장소(대화기록 패널)에서는 계속 열람 가능하게 한다.
 export async function DELETE(req: NextRequest) {
   if (req.headers.get("x-admin-password") !== process.env.ADMIN_PASSWORD)
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  await sql`CREATE TABLE IF NOT EXISTS chat_archive (
+    id SERIAL PRIMARY KEY, question TEXT, answer TEXT, mode TEXT, created_at TIMESTAMPTZ
+  )`.catch(() => {});
+  await sql`INSERT INTO chat_archive (question, answer, mode, created_at)
+    SELECT question, answer, mode, created_at FROM chat_queue`.catch(() => {});
   const r = (await sql`DELETE FROM chat_queue RETURNING id`.catch(() => [])) as any[];
   return NextResponse.json({ ok: true, deleted: r.length });
 }
