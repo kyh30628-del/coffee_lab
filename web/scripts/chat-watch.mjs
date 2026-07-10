@@ -214,7 +214,7 @@ async function tick() {
         const guard = computeGuard(); // 🛡️ 주간한도 근접 시 비핵심 자율개발 보류(핵심 판정·그라운딩 보호)
         if (guard.level === "pause") {
           mode = "held";
-          answer = `⏸️ **구독(claude -p) 주간 한도 보호로 자율개발을 잠시 보류합니다** (7일 사용 ${guard.pct}% ≥ 컷, 캐시읽기 저가중 기준).\n\n"${r.spec.title || question}"\n\n핵심 판정·질의응답은 계속 정상 동작합니다. 지금 바로 진행을 원하시면 "강행" 또는 컷 상향을 알려주세요.`;
+          answer = `⏸️ **구독(claude -p) 주간 한도 보호로 자율개발을 잠시 보류합니다** (이번 주간(금 2시KST 리셋 이후) 사용 ${guard.pct}% ≥ 컷, 캐시읽기 저가중 기준).\n\n"${r.spec.title || question}"\n\n핵심 판정·질의응답은 계속 정상 동작합니다. 지금 바로 진행을 원하시면 "강행" 또는 컷 상향을 알려주세요.`;
         } else {
           const o = await createOrder(r.spec, question);
           mode = "order";
