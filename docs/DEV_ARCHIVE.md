@@ -51,3 +51,4 @@
 | 2026-07-10 11:09 | #284 | 챗봇 메시지 시각표시 | 70583618 | low | app/admin/ChatWidget.tsx: 메시지에 time(KST HH:MM) 필드 추가, 말풍선 하단에 회색 시각 표시. 신규 전송은 클라이언트 Date로, 작업지시 탭 서 |
 | 2026-07-10 11:59 | #285 | 그라운딩 문서정정 | c1943c26 | low | lib/synthStore.ts(holdZeroEvidenceSuspects 상단·release UPDATE 주석)·app/api/orchestrator/route.ts(e단계 주 |
 | 2026-07-10 12:10 | #286 | 대화기록 저장·검색 | 7f76a751 | med | app/api/admin/chat-archive/route.ts(신규, GET전용) + app/api/admin/chat/route.ts(purge/clear 직전 chat_arc |
+| 2026-07-10 12:46 | #287 | 답변에 모델 배지 표시 | 27f41cde | low | app/api/admin/chat/route.ts(llm_model 컬럼+GET 노출)·scripts/chat-watch.mjs(실호출 model을 chat_queue.llm_mo |
