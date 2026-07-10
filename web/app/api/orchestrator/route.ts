@@ -253,7 +253,7 @@ export async function GET(req: NextRequest) {
 
     // 📊 유입(트래픽) — 깜깜이 탈출. user_consents(익명 방문핑) 기반 활성자 + 유입경로 첫터치.
     //   봇 UA 제외. src 컬럼은 신규(이전 방문자는 NULL→집계서 '미상') → 앞으로 유입분부터 출처 채워짐.
-    const BOT = `COALESCE(user_agent,'') !~* 'bot|crawl|spider|slurp|bingpreview|facebookexternalhit|headless|preview' AND COALESCE(src,'') !~* 'findelio|blinkx|semrush|ahrefs|dataprovider|dotbot|petalbot|yandex|mj12|serpstat' AND NOT COALESCE(internal, false)`;
+    const BOT = `COALESCE(user_agent,'') !~* 'bot|crawl|spider|slurp|bingpreview|facebookexternalhit|headless|preview' AND COALESCE(src,'') !~* 'findelio|blinkx|semrush|ahrefs|dataprovider|dotbot|petalbot|yandex|mj12|serpstat' AND COALESCE(src,'') NOT IN ('internal','spam') AND NOT COALESCE(internal, false)`;
     const traffic = (await sql.query(
       `SELECT
         COUNT(*) FILTER (WHERE last_seen > now()-interval '7 days')::int wau,

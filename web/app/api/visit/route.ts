@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
+import { sourceBucket } from "@/lib/trafficSource";
 export const runtime = "nodejs";
 
 // 익명 방문 핑 (PRINCIPLES §2: 개인정보 미수집). anon_id만으로 재방문·활성 집계.
@@ -32,24 +33,6 @@ async function ensure() {
   await sql`CREATE TABLE IF NOT EXISTS traffic_events (id BIGSERIAL PRIMARY KEY, anon_id TEXT, path TEXT, src TEXT, ts TIMESTAMPTZ NOT NULL DEFAULT now())`;
   await sql`CREATE INDEX IF NOT EXISTS idx_traffic_events_ts ON traffic_events (ts)`;
   ensured = true;
-}
-
-// referrer/UTM → 출처 버킷. utm_source가 있으면 우선(우리가 붙인 공유링크 식별).
-function sourceBucket(ref: string, utmSource: string): string {
-  const s = (utmSource || "").toLowerCase().trim();
-  if (s) return s.slice(0, 40);
-  const r = (ref || "").toLowerCase();
-  if (!r) return "direct";
-  if (r.includes("naver.")) return "naver";
-  if (r.includes("google.")) return "google";
-  if (r.includes("instagram.")) return "instagram";
-  if (r.includes("threads.")) return "threads";
-  if (r.includes("daum.") || r.includes("kakao")) return "kakao";
-  if (r.includes("youtube.") || r.includes("youtu.be")) return "youtube";
-  if (r.includes("facebook.") || r.includes("fb.")) return "facebook";
-  if (r.includes("bing.")) return "bing";
-  if (r.includes("dongnecoffeenote.com")) return "internal";
-  try { return new URL(ref).hostname.replace(/^www\./, "").slice(0, 40); } catch { return "other"; }
 }
 
 export async function POST(req: NextRequest) {
