@@ -41,3 +41,4 @@
 | 2026-07-09 14:11 | #262 | 문의메일·챗봇아이콘 | b4b99a9e | med | ①문의메일 kyh30628@gmail.com→dongnecoffeenote@gmail.com 전수교체(8파일 13곳: lib/newsletter·onboardingEmail, ap |
 | 2026-07-09 14:45 | #263 | 관리자챗봇노출 | 0bc13021 | med | ChatWidget는 #262에서 /admin에 이미 배선됨(import+<ChatWidget pw={pw}/> line1600, blame 96b03f3)—코드상 런처는 정상 렌 |
 | 2026-07-10 00:52 | #266 | [자율진단] cron-selfaudit 자체 dedup(ikey) 버그 — 경과시간 포함으로 매 사이클 결재 | b9367b8d | - | app/api/cron-selfaudit/route.ts: 크론 정지의심 finding에 안정 ikey(selfaudit:크론정지의심:<job>) 부여, dedup은 f.ikey  |
+| 2026-07-10 00:53 | #271 | 룰갭 P24 — 아파트 브랜드명(자이·래미안 등) VENUE_WORDS 추가 (lib/reviewQualit | d0159bf9 | - | lib/reviewQuality.ts VENUE_WORDS에 아파트 단지 브랜드 카테고리 추가(자이·래미안·푸르지오·힐스테이트·e편한세상·아이파크·롯데캐슬 등 18종). 부분일치로 |
