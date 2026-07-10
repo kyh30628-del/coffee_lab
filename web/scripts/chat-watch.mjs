@@ -63,6 +63,15 @@ async function ground() {
   try { const d = await sql`SELECT id,title,recommendation FROM decisions WHERE status='pending' AND COALESCE(tier,'L3')='L3' ORDER BY id`; L.push(`CEO결재대기(${d.length}): ${d.length ? d.map((x) => `#${x.id} ${x.title.slice(0, 35)}${x.recommendation ? `[의견:${x.recommendation.slice(0, 35)}]` : ""}`).join(" / ") : "없음"}`); } catch {}
   try { const dev = await sql`SELECT id,title,action_params->>'dev_status' ds FROM decisions WHERE action_type='dev_task' AND action_params->>'source'='chat' AND status='approved' AND COALESCE(action_params->>'dev_status','') NOT IN ('deployed') ORDER BY id DESC LIMIT 6`; if (dev.length) L.push(`챗발 개발진행(${dev.length}): ${dev.map((x) => `#${x.id}[${x.ds || "개발대기"}]${x.title.slice(0, 22)}`).join(" / ")}`); } catch {}
   try { const c = await sql`SELECT job,ok FROM (SELECT DISTINCT ON (job) job,ok,ran_at FROM agent_runs ORDER BY job,ran_at DESC) t`; const f = c.filter((x) => !x.ok).map((x) => x.job); L.push(`크론(${c.length}): ${f.length ? "실패=" + f.join(",") : "전체정상"}`); } catch {}
+  // 🌱 발굴 현황(오늘·네이버 예산) — CEO가 가장 자주 묻는 "오늘 몇개·2시간마다 돌았냐"를 즉답(느린 심층조회 회피).
+  try {
+    const grew = await one(sql`SELECT count(*) c FROM cafes WHERE to_char(created_at AT TIME ZONE 'Asia/Seoul','YYYY-MM-DD') = to_char(now() AT TIME ZONE 'Asia/Seoul','YYYY-MM-DD')`);
+    const nb = await sql`SELECT used, exhausted FROM naver_budget WHERE day = to_char(now() AT TIME ZONE 'Asia/Seoul','YYYY-MM-DD')`.catch(() => []);
+    const used = nb[0]?.exhausted ? 25000 : (nb[0]?.used ?? 0);
+    const gr = await sql`SELECT ran_at, detail FROM agent_runs WHERE job='cron-grow' ORDER BY ran_at DESC LIMIT 1`.catch(() => []);
+    const grAt = gr[0]?.ran_at ? new Date(gr[0].ran_at).toISOString().slice(11, 16) + "Z" : "?";
+    L.push(`발굴(오늘 KST): 신규 ${grew}곳 · 네이버 ${used.toLocaleString()}/25,000(${Math.round(used / 25000 * 100)}%)${nb[0]?.exhausted ? " 한도소진→자정 리셋(정상)" : ""} · cron-grow 2h주기(직전 ${grAt}) · 스윕은 70%까지·30%는 cron-grow 예약`);
+  } catch {}
   return L.join("\n");
 }
 
@@ -132,7 +141,7 @@ async function quickAnswer(q) {
 }
 
 async function askOrAnswer(base) {
-  const out = await runClaude(base + TRIAGE, { tools: false, model: "opus", job: "chat-triage" }); // CEO 대화=opus(최고 품질)
+  const out = await runClaude(base + TRIAGE, { tools: false, model: "sonnet", job: "chat-triage" }); // CEO 대화=sonnet(속도·품질 균형 — opus는 3~8분 지연으로 실사용 불가, 2026-07-10)
   if (out && !out.startsWith("__ERR__")) {
     // 🚀 기존 개발건 배포확정 지시 → 신규 구현 큐로 오라우팅 말고 해당 dev_task를 deploy_approved로 직접 승격.
     const mdep = out.match(/<DEPLOY>([\s\S]*?)<\/DEPLOY>/);
@@ -144,7 +153,7 @@ async function askOrAnswer(base) {
     if (!out.includes("[NEED_DB]")) return { type: "answer", text: out };
   }
   // [NEED_DB] 또는 fast 실패 → 읽기전용 심층조회로 질문 답변
-  const deep = await runClaude(base + "\n\nBash에서 node+@neondatabase/serverless로 web/.env.local의 DATABASE_URL에 접속해 **읽기전용 SELECT만** 실행해 확인한 뒤 자연스럽게 답하라. 🚫 UPDATE/DELETE/INSERT 절대 금지. 마지막엔 반드시 텍스트로 답을 마무리하라.", { tools: true, model: "opus", job: "chat-deep" });
+  const deep = await runClaude(base + "\n\nBash에서 node+@neondatabase/serverless로 web/.env.local의 DATABASE_URL에 접속해 **읽기전용 SELECT만** 실행해 확인한 뒤 자연스럽게 답하라. 🚫 UPDATE/DELETE/INSERT 절대 금지. 마지막엔 반드시 텍스트로 답을 마무리하라.", { tools: true, model: "sonnet", job: "chat-deep" });
   if (deep && !deep.startsWith("__ERR__")) return { type: "answer", text: deep };
   if (out && !out.startsWith("__ERR__")) return { type: "answer", text: out.replace("[NEED_DB]", "").trim() || "확인이 필요합니다 — 질문을 조금 더 구체적으로 다시 주시겠어요?" };
   const err = out.startsWith("__ERR__") ? out.slice(7) : (deep && deep.startsWith("__ERR__") ? deep.slice(7) : "알 수 없음");

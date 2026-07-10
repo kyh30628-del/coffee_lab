@@ -68,12 +68,17 @@ export function ChatWidget({ pw }: { pw: string }) {
       const r = await fetch("/api/admin/chat", { method: "POST", headers: { "x-admin-password": pw, "Content-Type": "application/json" }, body: JSON.stringify({ message: q, history: chatMsgs.slice(-8) }) }).then((x) => x.json());
       if (!r.ok) { setChatMsgs((m) => [...m, { role: "assistant", content: "⚠️ " + (r.error || "오류") }]); setChatLoading(false); return; }
       await new Promise((res) => setTimeout(res, 1000)); // 결정론 즉답은 ~1초 내 완료
-      for (let i = 0; i < 80; i++) {
-        const p = await fetch(`/api/admin/chat?id=${r.id}`, { headers: { "x-admin-password": pw }, cache: "no-store" }).then((x) => x.json());
-        if (p.ok && p.status === "done") { setChatMsgs((m) => [...m, { role: "assistant", content: p.answer || "⚠️ 빈 응답 — 잠시 후 다시 시도해 주세요." }]); break; }
-        if (i === 79) setChatMsgs((m) => [...m, { role: "assistant", content: "⏱ 응답 지연 — 로컬 워커/맥 가동 여부 확인 필요." }]);
+      // 폴링 인내: 답변이 늦어도(심층조회 등) 놓치지 않게 넉넉히 대기. 폴 1회 실패는 트랜션트로 무시(네트워크 오류 오표시 방지).
+      //   sonnet 전환으로 보통 ~1분 내, 드물게 심층조회로 2~3분 → 최대 ~4분까지 기다린다.
+      let landed = false;
+      for (let i = 0; i < 160; i++) {
+        try {
+          const p = await fetch(`/api/admin/chat?id=${r.id}`, { headers: { "x-admin-password": pw }, cache: "no-store" }).then((x) => x.json());
+          if (p.ok && p.status === "done") { setChatMsgs((m) => [...m, { role: "assistant", content: p.answer || "⚠️ 빈 응답 — 잠시 후 다시 시도해 주세요." }]); landed = true; break; }
+        } catch { /* 폴 1회 실패는 무시 — 다음 폴에서 재시도(잠깐의 네트워크 흔들림으로 대화가 끊기지 않게) */ }
         await new Promise((res) => setTimeout(res, 1500));
       }
+      if (!landed) setChatMsgs((m) => [...m, { role: "assistant", content: "⏱ 응답이 평소보다 늦네요 — 잠시 후 위 대화 새로고침으로 확인되거나, 다시 보내 주세요. (로컬 워커/맥 가동 여부도 점검)" }]);
     } catch { setChatMsgs((m) => [...m, { role: "assistant", content: "⚠️ 네트워크 오류" }]); }
     setChatLoading(false);
   };
