@@ -22,10 +22,10 @@ const HAIKU = new Set([
                         //   노출후기·등급·필터·랭킹 어디에도 안 닿음(소비자 영향 0). 회귀게이트+자동복귀 무장.
 ]);
 
-// opus(최고 성능 — CEO 지정 2026-07-06): 코드 구현·검증·배포는 소비자 화면 직결이라 최고 모델.
-const OPUS = new Set([
-  "dev-agent", // 코드 구현·배포(챗 지시·dev-pipeline 공용). 소비자 화면 = 최고 품질.
-]);
+// opus(최고 성능) — CEO 방침(2026-07-10): 평상시 코드수정은 **sonnet(5)**, opus는 **중대·대규모·
+//   복잡한** 코드개선/기능추가와 깊이있는 분석기반 계획에만. 즉 dev-agent는 고위험(risk=high)일 때만 opus.
+//   '항상 opus'인 잡은 현재 없음(아래 집합 비움).
+const OPUS = new Set([]);
 
 export const HAIKU_JOBS = [...HAIKU];
 
@@ -33,14 +33,17 @@ function overrideFor(job) {
   try { const o = JSON.parse(readFileSync(OVERRIDES, "utf8")); return o && o[job]; } catch { return null; }
 }
 
-export function modelFor(job) {
+// risk: dev-agent 태스크 위험도(low|med|high). high(중대·대규모·복잡=스키마/마이그레이션/광범위리팩터/핵심로직) → opus, 그 외 sonnet.
+export function modelFor(job, risk) {
   const ov = overrideFor(job);
   if (ov) return ov;              // 자동 회귀복귀(→sonnet)가 최우선
-  if (OPUS.has(job)) return "opus"; // 코드 구현·배포 = opus
+  if (job === "dev-agent") return risk === "high" ? "opus" : "sonnet"; // 코드: 평상시 sonnet5, 중대건만 opus
+  if (OPUS.has(job)) return "opus";
   return HAIKU.has(job) ? "haiku" : "sonnet"; // 기본 sonnet(품질 안전)
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const job = process.argv[2] || "";
-  process.stdout.write(modelFor(job)); // _run.sh가 stdout으로 받음(개행 없이)
+  const risk = process.argv[3] || ""; // 러너가 dev_task 위험도를 함께 넘김(dev-agent 모델 결정용)
+  process.stdout.write(modelFor(job, risk)); // _run.sh가 stdout으로 받음(개행 없이)
 }
