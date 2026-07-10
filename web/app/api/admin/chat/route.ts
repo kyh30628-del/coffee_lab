@@ -54,6 +54,9 @@ async function ensure() {
     id SERIAL PRIMARY KEY, question TEXT, history JSONB, status TEXT DEFAULT 'pending',
     answer TEXT, mode TEXT, created_at TIMESTAMPTZ DEFAULT now(), answered_at TIMESTAMPTZ
   )`.catch(() => {});
+  // 🏷️ 답변 생성에 실제 사용된 모델(sonnet/opus/haiku) — 로컬 워커(chat-watch.mjs)가 실 호출 모델을 그대로 기록.
+  //   결정론(quick)·보고성 메시지는 LLM을 안 써 NULL로 남는다(채팅 UI 배지는 값 있을 때만 표시 — 고정 텍스트 금지).
+  await sql`ALTER TABLE chat_queue ADD COLUMN IF NOT EXISTS llm_model TEXT`.catch(() => {});
   await sql`CREATE TABLE IF NOT EXISTS work_orders (id SERIAL PRIMARY KEY, command TEXT, action TEXT, tier TEXT, created_at TIMESTAMPTZ DEFAULT now())`.catch(() => {}); // 챗봇 작업지시 감사
   await archiveThenPurge();
 }
@@ -119,11 +122,11 @@ export async function GET(req: NextRequest) {
   }
   const id = req.nextUrl.searchParams.get("id");
   if (id) {
-    const r = (await sql`SELECT status, answer, mode FROM chat_queue WHERE id=${Number(id)}`.catch(() => [])) as any[];
+    const r = (await sql`SELECT status, answer, mode, llm_model FROM chat_queue WHERE id=${Number(id)}`.catch(() => [])) as any[];
     if (!r.length) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
-    return NextResponse.json({ ok: true, status: r[0].status, answer: r[0].answer, mode: r[0].mode });
+    return NextResponse.json({ ok: true, status: r[0].status, answer: r[0].answer, mode: r[0].mode, llm_model: r[0].llm_model });
   }
-  const rows = (await sql`SELECT question, answer, status, to_char(created_at AT TIME ZONE 'Asia/Seoul','HH24:MI') t FROM chat_queue WHERE created_at > now()-interval '24 hours' ORDER BY id ASC LIMIT 100`.catch(() => [])) as any[];
+  const rows = (await sql`SELECT question, answer, status, llm_model, to_char(created_at AT TIME ZONE 'Asia/Seoul','HH24:MI') t FROM chat_queue WHERE created_at > now()-interval '24 hours' ORDER BY id ASC LIMIT 100`.catch(() => [])) as any[];
   return NextResponse.json({ ok: true, history: rows });
 }
 

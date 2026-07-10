@@ -140,24 +140,28 @@ async function quickAnswer(q) {
   return null;
 }
 
+// ⚠️ model 필드는 실제로 답을 만든 runClaude 호출에 넘긴 model 그대로를 되돌린다(하드코딩 배지 방지) —
+//   호출부(tick)가 이 값을 그대로 chat_queue.llm_model에 적재해 UI 배지가 실제 호출 모델과 항상 일치하게 한다.
+const TRIAGE_MODEL = "sonnet"; // CEO 대화=sonnet(속도·품질 균형 — opus는 3~8분 지연으로 실사용 불가, 2026-07-10)
+const DEEP_MODEL = "sonnet";
 async function askOrAnswer(base) {
-  const out = await runClaude(base + TRIAGE, { tools: false, model: "sonnet", job: "chat-triage" }); // CEO 대화=sonnet(속도·품질 균형 — opus는 3~8분 지연으로 실사용 불가, 2026-07-10)
+  const out = await runClaude(base + TRIAGE, { tools: false, model: TRIAGE_MODEL, job: "chat-triage" });
   if (out && !out.startsWith("__ERR__")) {
     // 🚀 기존 개발건 배포확정 지시 → 신규 구현 큐로 오라우팅 말고 해당 dev_task를 deploy_approved로 직접 승격.
     const mdep = out.match(/<DEPLOY>([\s\S]*?)<\/DEPLOY>/);
-    if (mdep) { try { const j = JSON.parse(mdep[1].trim()); const id = Number(j.id); if (Number.isInteger(id) && id > 0) return { type: "deploy", id }; } catch { /* 파싱 실패 → 아래 일반 경로 */ } }
+    if (mdep) { try { const j = JSON.parse(mdep[1].trim()); const id = Number(j.id); if (Number.isInteger(id) && id > 0) return { type: "deploy", id, model: TRIAGE_MODEL }; } catch { /* 파싱 실패 → 아래 일반 경로 */ } }
     const mo = out.match(/<ORDER>([\s\S]*?)<\/ORDER>/);
-    if (mo) { try { return { type: "order", spec: JSON.parse(mo[1].trim()) }; } catch { return { type: "answer", text: out.replace(/<\/?ORDER>/g, "").trim() }; } }
+    if (mo) { try { return { type: "order", spec: JSON.parse(mo[1].trim()), model: TRIAGE_MODEL }; } catch { return { type: "answer", text: out.replace(/<\/?ORDER>/g, "").trim(), model: TRIAGE_MODEL }; } }
     const mc = out.match(/<CHOICE>([\s\S]*?)<\/CHOICE>/);
-    if (mc) return { type: "choice", text: mc[1].trim() };
-    if (!out.includes("[NEED_DB]")) return { type: "answer", text: out };
+    if (mc) return { type: "choice", text: mc[1].trim(), model: TRIAGE_MODEL };
+    if (!out.includes("[NEED_DB]")) return { type: "answer", text: out, model: TRIAGE_MODEL };
   }
   // [NEED_DB] 또는 fast 실패 → 읽기전용 심층조회로 질문 답변
-  const deep = await runClaude(base + "\n\nBash에서 node+@neondatabase/serverless로 web/.env.local의 DATABASE_URL에 접속해 **읽기전용 SELECT만** 실행해 확인한 뒤 자연스럽게 답하라. 🚫 UPDATE/DELETE/INSERT 절대 금지. 마지막엔 반드시 텍스트로 답을 마무리하라.", { tools: true, model: "sonnet", job: "chat-deep" });
-  if (deep && !deep.startsWith("__ERR__")) return { type: "answer", text: deep };
-  if (out && !out.startsWith("__ERR__")) return { type: "answer", text: out.replace("[NEED_DB]", "").trim() || "확인이 필요합니다 — 질문을 조금 더 구체적으로 다시 주시겠어요?" };
+  const deep = await runClaude(base + "\n\nBash에서 node+@neondatabase/serverless로 web/.env.local의 DATABASE_URL에 접속해 **읽기전용 SELECT만** 실행해 확인한 뒤 자연스럽게 답하라. 🚫 UPDATE/DELETE/INSERT 절대 금지. 마지막엔 반드시 텍스트로 답을 마무리하라.", { tools: true, model: DEEP_MODEL, job: "chat-deep" });
+  if (deep && !deep.startsWith("__ERR__")) return { type: "answer", text: deep, model: DEEP_MODEL };
+  if (out && !out.startsWith("__ERR__")) return { type: "answer", text: out.replace("[NEED_DB]", "").trim() || "확인이 필요합니다 — 질문을 조금 더 구체적으로 다시 주시겠어요?", model: TRIAGE_MODEL };
   const err = out.startsWith("__ERR__") ? out.slice(7) : (deep && deep.startsWith("__ERR__") ? deep.slice(7) : "알 수 없음");
-  return { type: "answer", text: `⚠️ 일시적으로 응답을 생성하지 못했어요 (사유: ${err}). 로컬 워커는 정상 가동 중이니 잠시 후 다시 보내 주세요.` };
+  return { type: "answer", text: `⚠️ 일시적으로 응답을 생성하지 못했어요 (사유: ${err}). 로컬 워커는 정상 가동 중이니 잠시 후 다시 보내 주세요.`, model: null };
 }
 
 // 🛠 작업지시 → dev_task(승인·CEO·source=chat) 적재. 실제 구현·검증·배포는 로컬 파이프라인이 수행.
@@ -230,8 +234,9 @@ async function tick() {
       } else {
         answer = r.text;
       }
-      await sql`UPDATE chat_queue SET answer=${answer.slice(0, 6000)}, status='done', mode=${mode}, answered_at=now() WHERE id=${id}`;
-      console.log(`[${new Date().toISOString()}] answered #${id} (${mode})`);
+      // 🏷️ llm_model: 이 답을 실제로 만든 LLM 호출의 모델(r.model) 그대로 적재 — UI 배지 단일출처.
+      await sql`UPDATE chat_queue SET answer=${answer.slice(0, 6000)}, status='done', mode=${mode}, llm_model=${r.model || null}, answered_at=now() WHERE id=${id}`;
+      console.log(`[${new Date().toISOString()}] answered #${id} (${mode}${r.model ? "·" + r.model : ""})`);
     }
   } catch (e) { console.error("tick err", String(e).slice(0, 120)); }
   busy = false;
@@ -283,6 +288,9 @@ async function maintenance() {
 // 💓 하트비트 — 상주 데몬 생존 기록(경영지원본부, EXPECT_MAX_H 'chat-watch' 1h).
 async function heartbeat() { try { await sql`INSERT INTO agent_runs (job, ran_at, ok, detail, processed) VALUES ('chat-watch', now(), true, '관제 챗봇 상주(지시→자율실행)', 0) ON CONFLICT (job) DO UPDATE SET ran_at=now(), ok=true, detail='관제 챗봇 상주(지시→자율실행)'`; } catch {} }
 setInterval(heartbeat, 60000); heartbeat();
+
+// 🏷️ llm_model 컬럼 방어적 마이그레이션 — API(route.ts ensure())가 먼저 안 돌았어도 이 워커 단독 기동 시 안전.
+await sql`ALTER TABLE chat_queue ADD COLUMN IF NOT EXISTS llm_model TEXT`.catch(() => {});
 
 console.log("chat-watch 시작 (질문즉답 + 지시→자율실행·배포)");
 setInterval(tick, 1500); tick();

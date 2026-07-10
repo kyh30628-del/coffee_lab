@@ -53,8 +53,8 @@ export function ChatWidget({ pw }: { pw: string }) {
   const [mode, setMode] = useState<"chat" | "region">("chat");
   // 두 탭 완전 독립: 각 탭이 별도의 입력·대화이력·로딩 상태를 가져 서로 섞이지 않음(전환해도 각자 컨텍스트 유지)
   // time: 전송/수신 시각(KST "HH:MM"). 과거 로컬 이력 등 값이 없으면 렌더에서 조용히 생략(에러 없음).
-  const [chatMsgs, setChatMsgs] = useState<{ role: string; content: string; time?: string }[]>([]);
-  const [regionMsgs, setRegionMsgs] = useState<{ role: string; content: string; time?: string }[]>([]);
+  const [chatMsgs, setChatMsgs] = useState<{ role: string; content: string; time?: string; model?: string }[]>([]);
+  const [regionMsgs, setRegionMsgs] = useState<{ role: string; content: string; time?: string; model?: string }[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [regionInput, setRegionInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
@@ -124,14 +124,14 @@ export function ChatWidget({ pw }: { pw: string }) {
       try { new Notification("💬 관제 챗봇 응답 도착", { body: content.replace(/[#*`\[\]]/g, "").slice(0, 140) }); } catch {}
     }
   };
-  const pushChatMsg = (msg: { role: string; content: string }) => {
+  const pushChatMsg = (msg: { role: string; content: string; model?: string }) => {
     setChatMsgs((m) => { const next = [...m, { ...msg, time: fmtTime() }]; chatMsgCountRef.current = next.length; return next; });
   };
   const loadHistory = () =>
     fetch("/api/admin/chat", { headers: { "x-admin-password": pw }, cache: "no-store" }).then((r) => r.json()).then((d) => {
       if (d.ok && d.history) {
         const m: any[] = [];
-        for (const h of d.history) { m.push({ role: "user", content: h.question, time: h.t }); if (h.answer) m.push({ role: "assistant", content: h.answer, time: h.t }); }
+        for (const h of d.history) { m.push({ role: "user", content: h.question, time: h.t }); if (h.answer) m.push({ role: "assistant", content: h.answer, time: h.t, model: h.llm_model || undefined }); }
         const prevCount = chatMsgCountRef.current;
         if (prevCount !== null && m.length > prevCount) {
           const newAnswers = m.slice(prevCount).filter((x) => x.role === "assistant");
@@ -169,7 +169,7 @@ export function ChatWidget({ pw }: { pw: string }) {
           const p = await fetch(`/api/admin/chat?id=${r.id}`, { headers: { "x-admin-password": pw }, cache: "no-store", signal: ac.signal }).then((x) => x.json());
           if (p.ok && p.status === "done") {
             const content = p.answer || "⚠️ 빈 응답 — 잠시 후 다시 시도해 주세요.";
-            pushChatMsg({ role: "assistant", content });
+            pushChatMsg({ role: "assistant", content, model: p.llm_model || undefined });
             if (typeof document !== "undefined" && (document.hidden || !openRef.current)) notifyNewAnswer(content);
             landed = true; break;
           }
@@ -283,7 +283,10 @@ export function ChatWidget({ pw }: { pw: string }) {
               {filteredMsgs.map((m, i) => (
                 <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: m.role === "user" ? "flex-end" : "flex-start", margin: "6px 0" }}>
                   <div className={m.role === "assistant" ? "ex" : ""} style={{ maxWidth: "88%", padding: "9px 12px", borderRadius: 13, fontSize: 14.5, lineHeight: 1.6, whiteSpace: m.role === "user" ? "pre-wrap" : "normal", wordBreak: "break-word", background: m.role === "user" ? "#c98a3c" : "#fff", color: m.role === "user" ? "#fff" : "#2b2018", border: m.role === "user" ? "none" : "1px solid #e6d8bf" }}>{m.role === "assistant" ? <div dangerouslySetInnerHTML={{ __html: md2html(m.content) }} /> : m.content}</div>
-                  {m.time && <span style={{ fontSize: 10.5, color: "#a89878", margin: "2px 4px 0" }}>{m.time}</span>}
+                  <span style={{ display: "flex", alignItems: "center", gap: 5, margin: "2px 4px 0" }}>
+                    {m.role === "assistant" && m.model && <span title="이 답변을 생성한 실제 모델" style={{ fontSize: 9.5, fontWeight: 700, color: "#8a6b3f", background: "#efe1c4", border: "1px solid #ddc9a8", borderRadius: 6, padding: "1px 5px", letterSpacing: 0.2 }}>{m.model.charAt(0).toUpperCase() + m.model.slice(1)}</span>}
+                    {m.time && <span style={{ fontSize: 10.5, color: "#a89878" }}>{m.time}</span>}
+                  </span>
                 </div>
               ))}
               {loading && (
