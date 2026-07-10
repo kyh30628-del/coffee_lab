@@ -54,3 +54,4 @@
 | 2026-07-10 12:46 | #287 | 답변에 모델 배지 표시 | 27f41cde | low | app/api/admin/chat/route.ts(llm_model 컬럼+GET 노출)·scripts/chat-watch.mjs(실호출 model을 chat_queue.llm_mo |
 | 2026-07-10 12:57 | #288 | 유입경로 스팸 필터링 | 34ccb1f8 | med | lib/trafficSource.ts 신설(sourceBucket 단일출처, vercel.app 프리뷰->internal, semalt 등 리퍼러 스팸->spam 분류 추가), v |
 | 2026-07-10 13:27 | #290 | 근접매칭 가드 강화 | 89108617 | high | lib/reviewQuality.ts: nameRisky 가드(룰갭 P23)를 근접매칭으로 강화. ctxNearName() 헬퍼 추가(상호명 토큰 ±25자 창 안에서만 CAFE_C |
+| 2026-07-10 13:57 | #289 | [개발] 협업 #170: [자율진단] coord#163/#165 "해소" 재확인 — offctx_ok=fal | b6a2dab4 | - | scripts/purge-contam-reviews.mjs 신규: coord#170이 특정한 5곳(8422 써니21·11358 나무그늘아래·12307 르씨엘·15622 24 OUR |
