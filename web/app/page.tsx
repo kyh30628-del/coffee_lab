@@ -417,15 +417,6 @@ export default function Home() {
   const anonRef = useRef("");
   // 랜딩/역할 분리 + 사장님 인증 + 뒤로가기 안내
   const [role, setRole] = useState<"consumer" | "owner" | null>(null);
-  // 🔧 임시 진단(2026-07-10) — 인스타 안드로이드 초기화면 확대 원인규명용. 화면 하단에 WebView 실측치 표출.
-  //   원인 확정 후 제거. 사장님이 숫자만 읽어주면 뷰포트/배율 상태를 정확히 판별.
-  const [diag, setDiag] = useState("");
-  useEffect(() => {
-    const upd = () => { try { const vv: any = (window as any).visualViewport; setDiag(`iw${window.innerWidth} vvw${Math.round(vv?.width || 0)} sc${(vv?.scale || 1).toFixed(2)} dpr${(window.devicePixelRatio || 1).toFixed(2)} cw${document.documentElement.clientWidth} sw${document.documentElement.scrollWidth} ua${/Instagram/i.test(navigator.userAgent) ? "IG" : /wv/i.test(navigator.userAgent) ? "WV" : "br"}`); } catch {} };
-    upd(); const vv: any = (window as any).visualViewport; vv?.addEventListener("resize", upd); vv?.addEventListener("scroll", upd); window.addEventListener("resize", upd);
-    const t = setTimeout(upd, 800);
-    return () => { vv?.removeEventListener("resize", upd); vv?.removeEventListener("scroll", upd); window.removeEventListener("resize", upd); clearTimeout(t); };
-  }, []);
   const [ownerPwModal, setOwnerPwModal] = useState(false);
   const [ownerPw, setOwnerPw] = useState("");
   const [ownerErr, setOwnerErr] = useState("");
@@ -1123,8 +1114,6 @@ export default function Home() {
             <div className="text-[12px] text-[#cbb89f] mt-0.5">검증된 후기로 내 카페 경쟁력 진단 · <b className="text-[#e8b87a]">7일 무료 체험</b></div>
           </button>
         </div>
-        {/* 🔧 임시 진단 배너(2026-07-10) — 인스타 안드로이드 초기화면 확대 원인규명. 원인 확정 후 제거. */}
-        {diag && <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 99999, background: "#000", color: "#3f9", fontFamily: "monospace", fontSize: 13, lineHeight: 1.4, padding: "6px 4px", textAlign: "center", wordBreak: "break-all" }}>{diag}</div>}
         <p className="text-[10px] text-[#8a7458] mt-10 text-center leading-relaxed">네이버·구글·유튜브 공개 후기 교차검증 + AI 맥락 판정<br />광고·협찬·무관 글은 자동 제외</p>
         <div className="mt-3 text-[10px] text-[#8a7458] flex gap-3">
           <a href="/area" className="underline">동네별 카페</a>
