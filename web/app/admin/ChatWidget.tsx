@@ -26,6 +26,11 @@ export function md2html(md: string) {
   close(); return html;
 }
 
+// 🕒 말풍선 시각 표시 — 클라이언트 로컬시간을 KST 기준 "HH:MM"으로 포맷. 서버 이력의 t(created_at 기준 HH:MM)도 같은 포맷.
+function fmtTime(d: Date = new Date()) {
+  return d.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Seoul" });
+}
+
 // 중단 가능한 대기 — AbortController.signal이 abort되면 즉시 resolve(폴링 루프가 다음 반복에서 빠져나가게).
 function abortableSleep(ms: number, signal: AbortSignal) {
   return new Promise<void>((resolve) => {
@@ -47,8 +52,9 @@ export function ChatWidget({ pw }: { pw: string }) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"chat" | "region">("chat");
   // 두 탭 완전 독립: 각 탭이 별도의 입력·대화이력·로딩 상태를 가져 서로 섞이지 않음(전환해도 각자 컨텍스트 유지)
-  const [chatMsgs, setChatMsgs] = useState<{ role: string; content: string }[]>([]);
-  const [regionMsgs, setRegionMsgs] = useState<{ role: string; content: string }[]>([]);
+  // time: 전송/수신 시각(KST "HH:MM"). 과거 로컬 이력 등 값이 없으면 렌더에서 조용히 생략(에러 없음).
+  const [chatMsgs, setChatMsgs] = useState<{ role: string; content: string; time?: string }[]>([]);
+  const [regionMsgs, setRegionMsgs] = useState<{ role: string; content: string; time?: string }[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [regionInput, setRegionInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
@@ -112,13 +118,13 @@ export function ChatWidget({ pw }: { pw: string }) {
     }
   };
   const pushChatMsg = (msg: { role: string; content: string }) => {
-    setChatMsgs((m) => { const next = [...m, msg]; chatMsgCountRef.current = next.length; return next; });
+    setChatMsgs((m) => { const next = [...m, { ...msg, time: fmtTime() }]; chatMsgCountRef.current = next.length; return next; });
   };
   const loadHistory = () =>
     fetch("/api/admin/chat", { headers: { "x-admin-password": pw }, cache: "no-store" }).then((r) => r.json()).then((d) => {
       if (d.ok && d.history) {
         const m: any[] = [];
-        for (const h of d.history) { m.push({ role: "user", content: h.question }); if (h.answer) m.push({ role: "assistant", content: h.answer }); }
+        for (const h of d.history) { m.push({ role: "user", content: h.question, time: h.t }); if (h.answer) m.push({ role: "assistant", content: h.answer, time: h.t }); }
         const prevCount = chatMsgCountRef.current;
         if (prevCount !== null && m.length > prevCount) {
           const newAnswers = m.slice(prevCount).filter((x) => x.role === "assistant");
@@ -171,18 +177,21 @@ export function ChatWidget({ pw }: { pw: string }) {
     }
     setChatLoading(false); chatAbortRef.current = null; chatStartRef.current = null;
   };
+  const pushRegionMsg = (msg: { role: string; content: string }) => {
+    setRegionMsgs((m) => [...m, { ...msg, time: fmtTime() }]);
+  };
   const sendRegion = async () => {
     const q = regionInput.trim(); if (!q || regionLoading) return;
     const ac = new AbortController();
     regionAbortRef.current = ac;
     regionStartRef.current = Date.now();
-    setRegionInput(""); setRegionMsgs((m) => [...m, { role: "user", content: `🗺️ ${q}` }]); setRegionLoading(true);
+    setRegionInput(""); pushRegionMsg({ role: "user", content: `🗺️ ${q}` }); setRegionLoading(true);
     try {
       const r = await fetch(`/api/admin/chat?region=${encodeURIComponent(q)}`, { headers: { "x-admin-password": pw }, cache: "no-store", signal: ac.signal }).then((x) => x.json());
-      if (!r.ok) setRegionMsgs((m) => [...m, { role: "assistant", content: "⚠️ " + (r.error || "오류") }]);
+      if (!r.ok) pushRegionMsg({ role: "assistant", content: "⚠️ " + (r.error || "오류") });
       else if (r.kind === "knowledge") {
         // 📚 서비스/조직/관제/라운지 등 지식 질문 — 서버가 결정론으로 답을 돌려줌.
-        setRegionMsgs((m) => [...m, { role: "assistant", content: r.answer }]);
+        pushRegionMsg({ role: "assistant", content: r.answer });
       } else {
         // 지역(동/구) 집계 + 카페명 검색을 함께 노출. 둘 다 없으면 안내.
         const parts: string[] = [];
@@ -192,11 +201,11 @@ export function ChatWidget({ pw }: { pw: string }) {
           parts.push(`**'${q}' 카페 검색** (${r.cafes.length}곳)\n${r.cafes.map((c: any) => `- [${c.name}](/c/${c.id}) — ${[c.area, c.dong].filter(Boolean).join(" ")}${c.grade ? ` · ${c.grade}` : ""}`).join("\n")}`);
         if (!parts.length)
           parts.push(`**${q}** — 매칭되는 발행 카페가 없어요. 동은 '성수동', 구/시는 '강남구'·'수원시', 카페는 이름 일부로 검색해 보세요. 서비스·조직·관제·라운지 같은 질문에도 답해요.`);
-        setRegionMsgs((m) => [...m, { role: "assistant", content: parts.join("\n\n") }]);
+        pushRegionMsg({ role: "assistant", content: parts.join("\n\n") });
       }
     } catch {
-      if (ac.signal.aborted) setRegionMsgs((m) => [...m, { role: "assistant", content: "⏹ 조회를 중단했습니다." }]);
-      else setRegionMsgs((m) => [...m, { role: "assistant", content: "⚠️ 네트워크 오류" }]);
+      if (ac.signal.aborted) pushRegionMsg({ role: "assistant", content: "⏹ 조회를 중단했습니다." });
+      else pushRegionMsg({ role: "assistant", content: "⚠️ 네트워크 오류" });
     }
     setRegionLoading(false); regionAbortRef.current = null; regionStartRef.current = null;
   };
@@ -243,8 +252,9 @@ export function ChatWidget({ pw }: { pw: string }) {
                 : <div style={{ color: "#9c8a6c", fontSize: 13, lineHeight: 1.7 }}>동/구 이름·<b>카페 이름</b>이나 <b>서비스·조직·관제</b> 질문에 <b>즉시</b> 답해요(LLM 안 씀·빠름).<br />예: "성수동" · "강남구" · "블루보틀" · "서비스가 뭐야?" · "관제탑이 뭐야?"</div>)}
               {msgs.length > 0 && search.trim() && filteredMsgs.length === 0 && <div style={{ color: "#9c8a6c", fontSize: 13 }}>검색 결과 없음</div>}
               {filteredMsgs.map((m, i) => (
-                <div key={i} style={{ display: "flex", justifyContent: m.role === "user" ? "flex-end" : "flex-start", margin: "6px 0" }}>
+                <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: m.role === "user" ? "flex-end" : "flex-start", margin: "6px 0" }}>
                   <div className={m.role === "assistant" ? "ex" : ""} style={{ maxWidth: "88%", padding: "9px 12px", borderRadius: 13, fontSize: 14.5, lineHeight: 1.6, whiteSpace: m.role === "user" ? "pre-wrap" : "normal", wordBreak: "break-word", background: m.role === "user" ? "#c98a3c" : "#fff", color: m.role === "user" ? "#fff" : "#2b2018", border: m.role === "user" ? "none" : "1px solid #e6d8bf" }}>{m.role === "assistant" ? <div dangerouslySetInnerHTML={{ __html: md2html(m.content) }} /> : m.content}</div>
+                  {m.time && <span style={{ fontSize: 10.5, color: "#a89878", margin: "2px 4px 0" }}>{m.time}</span>}
                 </div>
               ))}
               {loading && (
