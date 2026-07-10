@@ -3,8 +3,7 @@ import { useState, useEffect } from "react";
 import BackLink from "../BackLink";
 import { isSearchDegradeTrackItem } from "@/lib/searchDegradeTrack";
 import { ChatWidget } from "./ChatWidget";
-import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis,
-  AreaChart, Area, CartesianGrid, Tooltip } from "recharts";
+import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip } from "recharts";
 
 type Cafe = {
   id: number; name: string; area: string; note: string; beans: string;
@@ -45,6 +44,7 @@ export default function AdminPage() {
   const [purged, setPurged] = useState(0);
   const [dec, setDec] = useState<{ pending: any[] }>({ pending: [] }); // 실제 CEO L3 결재 대기 큐(단일 소스, /admin/org와 동일)
   const [verify, setVerify] = useState<any>(null);
+  const [verifyHistory, setVerifyHistory] = useState<any[]>([]); // 📈 검증 이력 추이(최근 20회 · verify_reports 그대로)
   const [grounding, setGrounding] = useState<any>(null);
   const [verifying, setVerifying] = useState(false);
   const [yt, setYt] = useState<any>(null);
@@ -133,7 +133,7 @@ export default function AdminPage() {
     fetch("/api/audit-flags", h).then((x) => x.json()).then((d) => { if (d.ok) setAuditFlags(d); }).catch(() => {});
     fetch("/api/sub-request", h).then((x) => x.json()).then((d) => { if (d.ok) { setSubs(d.requests ?? []); setPurged(d.purgedRecently ?? 0); } }).catch(() => {});
     fetch("/api/yt-report", h).then((x) => x.json()).then((d) => { if (d.ok) setYt(d); }).catch(() => {});
-    fetch("/api/cron-verify?latest=1", h).then((x) => x.json()).then((d) => { if (d.ok) { setVerify(d.report); setGrounding(d.grounding); } }).catch(() => {});
+    fetch("/api/cron-verify?latest=1", h).then((x) => x.json()).then((d) => { if (d.ok) { setVerify(d.report); setGrounding(d.grounding); setVerifyHistory(d.history ?? []); } }).catch(() => {});
     loadBorderline(password);
   };
   // 🔐 세션 복원 — 저장된 관리자 비밀번호(adm_pw)가 있으면 자동 인증(/admin/org와 동일 패턴).
@@ -160,7 +160,7 @@ export default function AdminPage() {
     return () => clearInterval(id);
   }, [showAnalytics, pw]);
 
-  const loadVerify = (password: string) => fetch("/api/cron-verify?latest=1", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) { setVerify(d.report); setGrounding(d.grounding); } }).catch(() => {});
+  const loadVerify = (password: string) => fetch("/api/cron-verify?latest=1", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) { setVerify(d.report); setGrounding(d.grounding); setVerifyHistory(d.history ?? []); } }).catch(() => {});
   const runVerify = async () => {
     setVerifying(true);
     try { const r = await fetch("/api/cron-verify", { headers: { "x-admin-password": pw } }); const d = await r.json(); if (d.ok) { setVerify({ ran_at: d.ranAt, status: d.status, fails: d.fails, warns: d.warns, checks: d.checks }); setGrounding(d.grounding); } } catch {}
@@ -253,8 +253,7 @@ export default function AdminPage() {
     </div>
   );
 
-  const ct = stats?.content, vs = stats?.visitors;
-  const agreeRate = vs && vs.total ? Math.round((vs.agreed / vs.total) * 100) : 0;
+  const ct = stats?.content;
   const keptPct = ct?.quality?.raw ? Math.round(((ct.quality.raw - ct.quality.rejected) / ct.quality.raw) * 100) : 0;
   // 📊 상단 KPI 요약 — 이미 로드된 지표를 재사용(신규 fetch 없음). 발행수·검증/참고·오염·미결재를 한눈에.
   const verifiedRefN = ct?.grades?.filter((g) => g.grade === "검증" || g.grade === "참고").reduce((s, g) => s + g.n, 0) ?? 0;
@@ -743,6 +742,27 @@ export default function AdminPage() {
               </div>
             </div>
           ) : <p className="text-[12px] text-stone-400">검증 리포트 없음 — '지금 검사'를 눌러 실행하세요.</p>}
+
+          {/* 📈 검증 이력 추이 — 크론이 하루 여러 번 자동 실행한 이력(verify_reports)을 그대로 사용, 신규 집계 없음 */}
+          {verifyHistory.length > 1 && (() => {
+            const streak = [...verifyHistory].reverse().findIndex((h: any) => (h.fails ?? 0) + (h.warns ?? 0) > 0);
+            const okStreak = streak === -1 ? verifyHistory.length : streak;
+            return (
+              <div className="mt-2.5 rounded-xl border border-stone-200 bg-stone-50/60 p-2.5">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-[11px] font-bold text-stone-600">📈 검증 이력 추이 <span className="font-normal text-stone-400">· 최근 {verifyHistory.length}회 자동검사</span></span>
+                  <span className="text-[10.5px] font-bold text-emerald-600">{okStreak > 0 ? `연속 정상 ${okStreak}회` : "직전 검사 이상 있음"}</span>
+                </div>
+                <div className="flex items-end gap-0.5 h-8">
+                  {verifyHistory.map((h: any, i: number) => {
+                    const bad = (h.fails ?? 0) + (h.warns ?? 0);
+                    const color = h.fails > 0 ? "bg-rose-400" : h.warns > 0 ? "bg-amber-400" : "bg-emerald-300";
+                    return <div key={i} className={`flex-1 rounded-t ${color}`} style={{ height: bad > 0 ? "100%" : "35%" }} title={`${new Date(h.ran_at).toLocaleString("ko-KR")}: fail ${h.fails}·warn ${h.warns}`} />;
+                  })}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* 🧠 LLM 그라운딩(보조) */}
           {grounding && (() => {
@@ -1531,52 +1551,6 @@ export default function AdminPage() {
             </Card>
           </div>
         )}
-        </>}
-        </div>
-
-        {/* ===== 접속/방문자 (익명 · 접이식·기본 접힘) ===== */}
-        <div className="mb-6 rounded-2xl border border-stone-300 bg-white p-4 sm:p-5">
-        <button onClick={() => toggleSec("visitors")} className="w-full flex items-center justify-between text-left mb-2">
-          <span className="admin-section-title font-extrabold text-stone-800">{openSecs.visitors ? "▾" : "▸"} 접속 · 방문자 현황 <span className="normal-case font-normal">· 총 {vs?.total?.toLocaleString() ?? "·"} · 7일 활성 {vs?.active7d ?? "·"}</span></span>
-          <span className="text-[10px] text-stone-400 shrink-0">{openSecs.visitors ? "접기" : "보기"}</span>
-        </button>
-        {openSecs.visitors && <>
-        <div className="admin-kpi-grid mb-4">
-          <Kpi label="총 방문자" value={vs?.total ?? "·"} sub="익명 식별자 기준" />
-          <Kpi label="위치 동의" value={vs?.agreed ?? "·"} color="text-emerald-600" sub={`동의율 ${agreeRate}%`} />
-          <Kpi label="재방문자" value={vs?.returners ?? "·"} color="text-[#9c6b3f]" sub={`평균 ${vs?.avg_visits ?? 0}회`} />
-          <Kpi label="최근 7일 활성" value={vs?.active7d ?? "·"} color="text-amber-600" sub={`신규 ${vs?.new7d ?? 0}`} />
-        </div>
-
-        {vs && (
-          <div className="grid sm:grid-cols-2 gap-3 mb-4">
-            <Card title="일별 신규 방문 (최근 14일)">
-              {vs.daily.length === 0 ? <p className="text-sm text-stone-400 py-8 text-center">아직 방문 데이터가 적어요.</p> : (
-                <ResponsiveContainer width="100%" height={170}>
-                  <AreaChart data={vs.daily} margin={{ top: 5, right: 8, bottom: 0, left: -20 }}>
-                    <defs><linearGradient id="vis" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#5f7355" stopOpacity={0.5} /><stop offset="100%" stopColor="#5f7355" stopOpacity={0.05} /></linearGradient></defs>
-                    <CartesianGrid stroke="#f1f5f9" vertical={false} />
-                    <XAxis dataKey="d" tick={{ fontSize: 9, fill: "#94a3b8" }} interval={1} axisLine={false} tickLine={false} />
-                    <YAxis allowDecimals={false} tick={{ fontSize: 9, fill: "#94a3b8" }} width={26} axisLine={false} tickLine={false} />
-                    <Tooltip formatter={(v: any) => [`${v}명`, "신규"]} />
-                    <Area type="monotone" dataKey="n" stroke="#5f7355" strokeWidth={2} fill="url(#vis)" />
-                  </AreaChart>
-                </ResponsiveContainer>
-              )}
-            </Card>
-            <Card title="방문자 동네 분포 (위치 동의자)" note="≈500m 익명화 · 개인정보 미수집">
-              {vs.regions.length === 0 ? <p className="text-sm text-stone-400 py-8 text-center">위치 동의 데이터가 아직 적어요.</p> : (
-                <ResponsiveContainer width="100%" height={170}>
-                  <BarChart data={vs.regions} layout="vertical" margin={{ left: 8, right: 12 }}>
-                    <XAxis type="number" hide /><YAxis type="category" dataKey="region" width={80} tick={{ fontSize: 10, fill: "#57534e" }} />
-                    <Tooltip /><Bar dataKey="n" fill="#5f7355" radius={[0, 4, 4, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
-            </Card>
-          </div>
-        )}
-        <p className="text-[10px] text-stone-400 mb-6">합법·익명 수집만: 브라우저 익명 식별자, (동의 시) 대략 지역(≈500m). 이름·연락처·정밀위치는 수집하지 않습니다.</p>
         </>}
         </div>
 

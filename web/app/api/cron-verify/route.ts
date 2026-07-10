@@ -158,7 +158,10 @@ export async function GET(req: NextRequest) {
       const fails = checks.filter((c) => c.severity === "fail" && c.count > 0).length;
       const warns = checks.filter((c) => c.severity === "warn" && c.count > 0).length;
       const status = fails > 0 ? "fail" : warns > 0 ? "warn" : "pass";
-      return NextResponse.json({ ok: true, report: { ran_at: new Date().toISOString(), status, fails, warns, checks }, grounding });
+      // 📈 검사 이력 추이 — 저장된 verify_reports(크론 실행분, 최근 60건 보관)를 그대로 조회만(저비용 단일 SELECT).
+      //   화면에 '지금 이 순간' 뿐 아니라 최근 N회 동안 오류·주의가 얼마나 반복됐는지(추이) 보여줌.
+      const history = (await sql`SELECT ran_at, fails, warns, status FROM verify_reports ORDER BY ran_at DESC LIMIT 20`.catch(() => [])) as any[];
+      return NextResponse.json({ ok: true, report: { ran_at: new Date().toISOString(), status, fails, warns, checks }, grounding, history: history.reverse() });
     }
 
     const checks = await runChecks();
