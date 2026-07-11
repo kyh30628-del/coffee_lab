@@ -72,3 +72,4 @@
 | 2026-07-11 13:07 | #315 | 방문패턴 보고추가 | 68342b20 | med | scripts/make-digest.mjs: DIGEST.md에 위치동의 기기 실사용 패턴 섹션 추가(traffic_events+user_consents 조인, region 보유+ |
 | 2026-07-11 14:12 | #317 | 추억저장 버튼 추가 | 3e97cce7 | med | app/c/[id]/SaveMemoryButton.tsx 신규(추억으로 저장 버튼, 카카오공유 바로아래 우측정렬·동일사이즈·핑크accent #d6336c) + app/MyCafeR |
 | 2026-07-11 14:58 | #320 | 추억버튼 노출 근본수정 | 2c72cb43 | med | app/page.tsx: 근본원인 발견 — #317은 /c/[id](공유용 SEO 페이지)에만 버튼을 추가, 실사용자가 실제로 쓰는 지도 홈(app/page.tsx)의 카페 상세  |
+| 2026-07-11 15:09 | #321 | 추억버튼 위치이동 | 600861f6 | low | app/page.tsx CafePanel: 추억으로 저장 버튼을 즐겨찾기·공유·닫기 행에서 분리해 그 아래 새 행(우측정렬)으로 이동. 버튼 자체·즐겨찾기/공유 순서는 무변경. t |
