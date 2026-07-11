@@ -4,6 +4,7 @@ import Link from "next/link";
 import { cache } from "react";
 import { sql } from "@/lib/db";
 import KakaoShare from "../../KakaoShare";
+import SaveMemoryButton from "./SaveMemoryButton";
 import VisitorReviews from "../../VisitorReviews";
 import { buildAxisDist, cafeProfile, extractHighlights } from "@/lib/cafeProfile";
 import { collectionForCafe } from "@/lib/collections";
@@ -104,6 +105,9 @@ export default async function CafePage({ params }: Props) {
             <svg width="15" height="15" viewBox="0 0 24 24" fill="#3c1e1e"><path d="M12 3C6.5 3 2 6.6 2 11c0 2.8 1.9 5.3 4.7 6.7-.2.7-.7 2.6-.8 3-.1.5.2.5.4.4.2-.1 2.6-1.8 3.7-2.5.6.1 1.3.1 2 .1 5.5 0 10-3.6 10-8S17.5 3 12 3z"/></svg>
             공유
           </KakaoShare>
+        </div>
+        <div className="flex justify-end mt-2">
+          <SaveMemoryButton cafeId={c.id} cafeName={c.name} cafeArea={c.area} />
         </div>
         <div className="mt-5">
           <div className="flex items-center gap-2 mb-1 flex-wrap">
