@@ -26,6 +26,13 @@ const CARDS: { href: string; icon: string; title: string; desc: string; meta: st
     desc: "구/동 단위로 검증된 카페 수·리뷰 수를 소개하는 지역 큐레이션 포스터",
     meta: "1080 × 1080",
   },
+  {
+    href: "/poster/copy",
+    icon: "✍️",
+    title: "홍보카피 포스터",
+    desc: "확정된 홍보카피 4종 중 골라 지역명을 자유 입력하면 실시간 반영되는 카피 포스터",
+    meta: "1080 × 1080 · 카피 4종",
+  },
 ];
 
 export default function PosterHubPage() {
