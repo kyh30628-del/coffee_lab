@@ -382,7 +382,11 @@ function coreTokensDetail(name: string, areaTerms: string[]): { tokens: string[]
   const isBranchWord = (w: string) => /점$/.test(w) && !GENERIC_WORD.has(norm(w)) && w.replace(GENERIC_SUFFIX, "").trim().length >= 1;
   const parts = name.split(/\s+/).flatMap((w) => { const branch = isBranchWord(w);
       return w.split(/(?<=[가-힣])(?=[A-Za-z0-9])|(?<=[A-Za-z0-9])(?=[가-힣])/).map((raw) => ({ raw, branch })); })
-    .map(({ raw, branch }) => ({ raw, core: raw.replace(GENERIC_SUFFIX, "").trim(), branch }))
+    // 룰갭(#307): 쉼표 붙은 업종어('카페,')는 GENERIC_SUFFIX의 $ 앵커가 안 걸려 그대로 살아남아
+    //   '카페, 여유'처럼 콤마로 쪼개진 이름의 진짜 유일토큰('여유')이 weakSingle 보호를 못 받고
+    //   다른 업체명이 섞인 리뷰(예: '노아브런치카페, ... 여유...')에 오매칭됐다. 접미·일반어 판정 전
+    //   후행 구두점만 떼어(원본 raw는 보존) 정상적으로 업종어가 제거되게 한다.
+    .map(({ raw, branch }) => { const rawTrimPunct = raw.replace(/[,.;:·]+$/, ""); return { raw, core: rawTrimPunct.replace(GENERIC_SUFFIX, "").trim(), branch }; })
     .filter(({ core }) => core.length >= 2)
     .filter(({ core }) => !GENERIC_WORD.has(core.toLowerCase()))
     .filter(({ core }) => !NAME_STOPWORD.has(core.toLowerCase()))
@@ -417,6 +421,30 @@ export function nameCoherence(name: string, quotes: string[], areaTerms: string[
     if ((nameN.length >= 4 && qN.includes(nameN)) || terms.some((t) => nameHit(q, qN, t))) hit++;
   }
   return hit / qs.length;
+}
+
+// 리뷰 정렬용 개별 매칭 확신도(#307): nameCoherence는 흔한 단일토큰('여유' 등)도 그대로 히트로 세어
+//   집계 오염게이트로는 충분하지만, 개별 리뷰 하나의 '확신도'로 쓰기엔 느슨하다(다른 업체명이 함께 있어도
+//   흔한 단어 하나만 겹치면 1.0). verifyReview가 이미 쓰는 weakSingle/reqFull(흔한 유일토큰이면 전체이름
+//   원문일치 요구) 판정을 재사용해, 카페 상세 리뷰 정렬이 '동명 불일치' 후기를 상위에 올리지 않게 한다.
+export function quoteMatchConfidence(name: string, quote: string, areaTerms: string[] = []): number {
+  const q = (quote || "").trim();
+  if (!q) return 0;
+  const nameRawN = norm(name);
+  const qN = norm(q);
+  // 전체이름 원문 일치(공백무시) — nameCoherence와 동일한 최우선 신호. 숫자·기호가 붙은 상호
+  // ('오이코스8')는 토큰 분해 시 숫자가 떨어져 나가 경계매칭이 실패하므로, 토큰 검사 전에 먼저 본다.
+  if (nameRawN.length >= 4 && qN.includes(nameRawN)) return 1;
+  const { tokens } = coreTokensDetail(name, areaTerms);
+  const coreEmpty = tokens.length === 0;
+  const onlyTok = tokens.length === 1 ? norm(tokens[0]) : "";
+  const weakWhitelist = onlyTok.length >= 1 && WEAK_IDENTITY_TOKEN.has(onlyTok);
+  const weakSingle = onlyTok.length >= 1 && (onlyTok.length <= 2 || /^[0-9]+$/.test(onlyTok) || weakWhitelist) && nameRawN.length > onlyTok.length;
+  const allTokensWeak = tokens.length >= 1 && tokens.every((tk) => { const n = norm(tk).replace(/[,.:;·-]+$/, ""); return /^[0-9]+$/.test(n) || WEAK_IDENTITY_TOKEN.has(n); });
+  const reqFull = coreEmpty || weakSingle || allTokensWeak;
+  if (reqFull) return 0; // 전체이름 일치도 없고 유일 식별토큰이 흔한 단어/숫자뿐 → 확신도 낮음(동명 불일치 의심)
+  const distinct = tokens.length ? tokens : (nameRawN ? [name] : []);
+  return distinct.some((tk) => nameHit(q, qN, tk)) ? 1 : 0;
 }
 
 // 🚫 명백한 비-카페 스팸 — 카페 방문후기엔 절대 안 나오는 강한 오프토픽(코인·해외선물·거래소·부동산 분양·대출·재개발 등).
