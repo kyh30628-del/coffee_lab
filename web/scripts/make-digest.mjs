@@ -89,6 +89,54 @@ const today = new Date().toISOString().slice(0, 10);
     }
   } catch (e) { /* graceful */ }
 
+  // 6) 위치동의 기기 실사용 패턴 — EXECUTIVE 정기보고서(08:00/17:00) 신규 섹션(#315). 위치동의(region 보유)+내부(대표·팀)
+  //    제외 기기 중 최근7일 페이지뷰 2회+(핑 1회뿐인 기기는 노이즈라 제외)만. traffic_events 조인으로 세션길이·핵심행동 산출.
+  try {
+    const rows = await sql`
+      SELECT uc.anon_id, uc.region,
+             CASE WHEN uc.user_agent ~* 'Mobile|iPhone|Android|iPad' THEN '모바일' ELSE '데스크톱' END AS device,
+             COALESCE(NULLIF(uc.src,''),'미상') AS src,
+             array_agg(json_build_object('p', te.path, 't', te.ts) ORDER BY te.ts) AS events
+      FROM user_consents uc
+      JOIN traffic_events te ON te.anon_id = uc.anon_id
+      WHERE uc.region IS NOT NULL AND NOT COALESCE(uc.internal,false) AND te.ts > now() - interval '7 days'
+      GROUP BY uc.anon_id, uc.region, uc.user_agent, uc.src
+      HAVING COUNT(te.*) >= 2
+      ORDER BY MAX(te.ts) DESC
+      LIMIT 15`;
+    const bucket = (p) => (!p || p === "/") ? "홈" : p.startsWith("/c/") ? "카페상세" : p.startsWith("/area") ? "지역" : p.startsWith("/taste") ? "취향" : (p.startsWith("/owner") || p.startsWith("/cafe")) ? "사장님" : "기타";
+    // 30분 무활동 갭 = 새 세션(표준 웹분석 관례). 7일 통짜 활동폭(수천분)을 '세션'으로 잘못 표기하지 않도록 클러스터링.
+    const SESSION_GAP_MS = 30 * 60 * 1000;
+    const sessionize = (events) => {
+      const sessions = [[events[0]]];
+      for (let i = 1; i < events.length; i++) {
+        const gap = new Date(events[i].t) - new Date(events[i - 1].t);
+        if (gap > SESSION_GAP_MS) sessions.push([events[i]]);
+        else sessions[sessions.length - 1].push(events[i]);
+      }
+      return sessions;
+    };
+    L.push(`## 📍 위치동의 기기 실사용 패턴 (최근7일 · 핑1회뿐 제외 · ${rows.length}대)`);
+    if (!rows.length) {
+      L.push(`- 최근7일 내 조건(위치동의+2PV↑) 만족 기기 없음\n`);
+    } else {
+      L.push(`| 지역 | 기기 | 유입경로 | 세션(분) | PV | 핵심행동 |`);
+      L.push(`|---|---|---|---|---|---|`);
+      let sumSession = 0, sumPv = 0;
+      for (const r of rows) {
+        const counts = {};
+        for (const e of r.events) counts[bucket(e.p)] = (counts[bucket(e.p)] || 0) + 1;
+        const behavior = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([k, v]) => `${k}×${v}`).join(", ");
+        const sessions = sessionize(r.events);
+        const avgSessionMin = sessions.reduce((s, ss) => s + (new Date(ss[ss.length - 1].t) - new Date(ss[0].t)) / 60000, 0) / sessions.length;
+        sumSession += avgSessionMin; sumPv += r.events.length;
+        L.push(`| ${r.region} | ${r.device} | ${r.src} | ${avgSessionMin.toFixed(1)} | ${r.events.length} | ${behavior} |`);
+      }
+      const topRegion = Object.entries(rows.reduce((a, r) => ((a[r.region] = (a[r.region] || 0) + 1), a), {})).sort((a, b) => b[1] - a[1])[0];
+      L.push(`- 한줄 해설: ${topRegion[0]} 지역 기기 최다(${topRegion[1]}대) · 평균세션 ${(sumSession / rows.length).toFixed(1)}분 · 평균PV ${(sumPv / rows.length).toFixed(1)}\n`);
+    }
+  } catch (e) { L.push(`(위치동의 기기 패턴 조회 실패)\n`); }
+
   const out = L.join("\n");
   writeFileSync(`${AR}/DIGEST.md`, out);
   console.log(`✅ DIGEST.md 생성 (${out.length}자, ${(out.length / 1024).toFixed(1)}KB)`);
