@@ -25,7 +25,12 @@ while (Date.now() - t0 < TOTAL_MS && !stop) {
   // 🧭 네이버 예산 가드 — 오늘 사용량이 (25k − 예약분)에 닿으면 스윕 정지. 남은 예약분(기본 30%)은
   //   하루 종일 도는 cron-grow(2h)가 쓴다. "70%만 쓰고 멈춘다"를 실제로 강제(2026-07-10 사기꾼 소리 들은 그 지점).
   const bud = await sweepMayContinue();
-  if (!bud.ok) { stop = `네이버 예약분 도달 — 스윕 정지(${bud.used.toLocaleString()}/${NAVER_DAILY_QUOTA.toLocaleString()} 사용 · cron-grow용 ${NAVER_SWEEP_RESERVE.toLocaleString()} 예약). 정상.`; break; }
+  if (!bud.ok) {
+    stop = bud.blocked
+      ? `네이버 실측 한도(429) — 스윕 정지(${bud.used.toLocaleString()}/${NAVER_DAILY_QUOTA.toLocaleString()} 사용, 쿨다운 후 자동 재개). 정상.`
+      : `네이버 예약분 도달 — 스윕 정지(${bud.used.toLocaleString()}/${NAVER_DAILY_QUOTA.toLocaleString()} 사용 · cron-grow용 ${NAVER_SWEEP_RESERVE.toLocaleString()} 예약). 정상.`;
+    break;
+  }
   const reg = (await sql`SELECT region, area_label, last_run FROM discovery_state
     WHERE (${sido} = '' OR region LIKE ${sido + '%'})
     ORDER BY last_run ASC NULLS FIRST LIMIT 1`)[0];
