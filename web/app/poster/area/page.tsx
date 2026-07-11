@@ -2,14 +2,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import BackLink from "../../BackLink";
 
-// 지역소개 포스터 — 구/동 단위로 검증된 카페 수·검증 리뷰 수를 소개하는 인스타 포스터(1080×1080).
-// 특정 카페 단독홍보가 아니라 "지역 전체 큐레이션" 톤을 유지한다 — 카페명은 작은 예시로만, 통계가 주인공.
-// 카페 수·리뷰 수는 전부 DB 실측(cafes) 기반 — 지어내지 않는다.
+// 지역소개 포스터 — 구/동 단위로 검증등급 상위 카페 3~5곳(이름+한줄 하이라이트)을 소개하는 인스타 포스터(1080×1080).
+// 특정 카페 단독홍보가 아니라 "지역 전체 큐레이션" 톤을 유지한다 — "이 동네엔 이런 검증된 곳들이 있다".
+// 카페 수·리뷰 수 같은 숫자 통계는 하단 작은 배지로 축소. 카페명·하이라이트는 전부 DB 실측(cafes) 기반 — 지어내지 않는다.
 
 const CREAM = "#F7F1E6";
 const ESPRESSO = "#2B2018";
 const BROWN = "#6B4A2E";
-const CARAMEL = "#A9682F";
 const GOLD = "#C98A3F";
 const BROWN_SOFT = "#9C6B3F";
 const SUBTEXT = "#6B5A48";
@@ -18,12 +17,13 @@ const FONT = '"Gowun Batang", AppleMyungjo, "Noto Serif KR", serif';
 const SIZE = 1080;
 
 type Ctx = CanvasRenderingContext2D;
+type TopCafe = { name: string; highlight: string | null };
 type AreaStats = {
   area: string;
   cafeCount: number;
   verifiedCount: number;
   verifiedReviews: number;
-  topNames: string[];
+  topCafes: TopCafe[];
 };
 type AreaHit = { area: string; n: number };
 
@@ -100,74 +100,95 @@ function drawDivider(ctx: Ctx, cx: number, dy: number) {
   ctx.fill();
 }
 
-function drawRadar(ctx: Ctx, cx: number, cy: number, base: number) {
-  ctx.save();
-  ctx.strokeStyle = "rgba(201,165,116,0.28)";
-  ctx.lineWidth = 2;
-  for (let i = 1; i <= 4; i++) {
-    ctx.beginPath();
-    ctx.arc(cx, cy, base * i, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-  ctx.fillStyle = "rgba(169,104,47,0.32)";
-  const dots: [number, number][] = [
-    [cx - base * 2.6, cy - base * 0.6],
-    [cx + base * 2.3, cy + base * 1.1],
-    [cx - base * 1.4, cy + base * 2.4],
-    [cx + base * 1.1, cy - base * 2.2],
-  ];
-  for (const [dx, dy] of dots) {
-    ctx.beginPath();
-    ctx.arc(dx, dy, base * 0.055, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.restore();
+function ellipsize(ctx: Ctx, text: string, maxWidth: number, font: string): string {
+  ctx.font = font;
+  if (ctx.measureText(text).width <= maxWidth) return text;
+  let t = text;
+  while (t.length > 1 && ctx.measureText(`${t}…`).width > maxWidth) t = t.slice(0, -1);
+  return `${t}…`;
 }
 
-function drawBigStat(ctx: Ctx, cx: number, cy: number, value: number, unit: string, label: string) {
-  const valueFont = fitFont(ctx, `${value}${unit}`, 320, 108);
-  txt(ctx, `${value}${unit}`, cx, cy, valueFont, CARAMEL);
-  txt(ctx, label, cx, cy + 44, `400 28px ${FONT}`, SUBTEXT);
+// 카페 하나의 소개 행 — 번호·이름·(있으면) 후기 기반 한줄 하이라이트. rowH에 비례해 배치하므로 3~5곳 모두 자연스럽다.
+function drawCafeRow(ctx: Ctx, cx: number, rowTop: number, rowH: number, index: number, cafe: TopCafe) {
+  const ord = `0${index + 1}`;
+  txt(ctx, ord, cx, rowTop + rowH * 0.22, `700 22px ${FONT}`, GOLD, 5);
+
+  const nameSize = rowH >= 150 ? 50 : rowH >= 115 ? 44 : 38;
+  const nameFont = fitFont(ctx, cafe.name, 820, nameSize);
+  const nameY = cafe.highlight ? rowTop + rowH * 0.52 : rowTop + rowH * 0.58;
+  txt(ctx, cafe.name, cx, nameY, nameFont, ESPRESSO);
+
+  if (cafe.highlight) {
+    const hlSize = rowH >= 150 ? 27 : rowH >= 115 ? 25 : 23;
+    const hlFont = `400 ${hlSize}px ${FONT}`;
+    txt(ctx, ellipsize(ctx, cafe.highlight, 820, hlFont), cx, rowTop + rowH * 0.8, hlFont, SUBTEXT);
+  }
 }
 
-function drawStatDivider(ctx: Ctx, cx: number, y0: number, y1: number) {
-  ctx.strokeStyle = "rgba(201,138,63,0.35)";
-  ctx.lineWidth = 2;
+function drawRowRule(ctx: Ctx, cx: number, y: number) {
+  ctx.strokeStyle = "rgba(201,138,63,0.22)";
+  ctx.lineWidth = 1.5;
   ctx.beginPath();
-  ctx.moveTo(cx, y0);
-  ctx.lineTo(cx, y1);
+  ctx.moveTo(cx - 150, y);
+  ctx.lineTo(cx + 150, y);
   ctx.stroke();
+}
+
+// 숫자 통계는 더 이상 주인공이 아니라 하단의 작은 보조 배지 하나로 축소.
+function drawStatBadge(ctx: Ctx, cx: number, cy: number, stats: AreaStats) {
+  const font = `400 24px ${FONT}`;
+  ctx.font = font;
+  const label = `카페 ${stats.cafeCount}곳 · 검증등급 ${stats.verifiedCount}곳 · 검증 후기 ${stats.verifiedReviews}건`;
+  const tw = ctx.measureText(label).width;
+  const padX = 26;
+  const h = 46;
+  const w = tw + padX * 2;
+  const x = cx - w / 2;
+  const y = cy - h / 2;
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, h / 2);
+  else ctx.rect(x, y, w, h);
+  ctx.fillStyle = "rgba(255,255,255,0.5)";
+  ctx.fill();
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = "rgba(201,138,63,0.45)";
+  ctx.stroke();
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = SUBTEXT;
+  ctx.font = font;
+  ctx.fillText(label, cx, cy + 1);
+  ctx.textBaseline = "alphabetic";
 }
 
 function drawAreaPoster(ctx: Ctx, stats: AreaStats) {
   const W = SIZE, H = SIZE, cx = W / 2;
   drawFrame(ctx, W, H);
 
-  txt(ctx, "지역 큐레이션", cx, H * 0.1, `700 26px ${FONT}`, BROWN_SOFT, 8);
+  txt(ctx, "지역 큐레이션", cx, H * 0.095, `700 26px ${FONT}`, BROWN_SOFT, 8);
 
-  const nameFont = fitFont(ctx, stats.area, 900, 96);
-  txt(ctx, stats.area, cx, H * 0.225, nameFont, ESPRESSO);
-  txt(ctx, "검증된 카페 지도", cx, H * 0.28, `400 32px ${FONT}`, SUBTEXT);
+  const nameFont = fitFont(ctx, stats.area, 900, 90);
+  txt(ctx, stats.area, cx, H * 0.19, nameFont, ESPRESSO);
+  txt(ctx, "이 동네, 검증된 카페들", cx, H * 0.245, `400 32px ${FONT}`, SUBTEXT);
 
-  drawRadar(ctx, cx, H * 0.4, W * 0.045);
+  drawDivider(ctx, cx, H * 0.29);
 
-  drawDivider(ctx, cx, H * 0.475);
+  const cafes = stats.topCafes.slice(0, 5);
+  const listTop = H * 0.335;
+  const listBottom = H * 0.775;
+  const rowH = (listBottom - listTop) / Math.max(1, cafes.length);
+  cafes.forEach((cafe, i) => {
+    const rowTop = listTop + rowH * i;
+    drawCafeRow(ctx, cx, rowTop, rowH, i, cafe);
+    if (i < cafes.length - 1) drawRowRule(ctx, cx, rowTop + rowH);
+  });
 
-  drawBigStat(ctx, cx - W * 0.235, H * 0.6, stats.cafeCount, "곳", "동네 카페");
-  drawStatDivider(ctx, cx, H * 0.545, H * 0.66);
-  drawBigStat(ctx, cx + W * 0.235, H * 0.6, stats.verifiedReviews, "건", "검증 후기");
+  drawStatBadge(ctx, cx, H * 0.815, stats);
 
-  txt(ctx, `그중 검증등급 ${stats.verifiedCount}곳 포함`, cx, H * 0.7, `400 26px ${FONT}`, MUTED);
-
-  if (stats.topNames.length) {
-    const line = `예: ${stats.topNames.join(" · ")} 등`;
-    txt(ctx, line, cx, H * 0.75, `400 24px ${FONT}`, MUTED);
-  }
-
-  txt(ctx, "특정 카페 홍보 아님 · 검증 데이터 기반 지역 큐레이션", cx, H * 0.83, `400 22px ${FONT}`, MUTED);
-  drawDivider(ctx, cx, H * 0.868);
-  txt(ctx, "dongnecoffeenote.com", cx, H * 0.918, `700 42px ${FONT}`, ESPRESSO);
-  txt(ctx, "동네 커피 노트", cx, H * 0.96, `400 26px ${FONT}`, BROWN);
+  txt(ctx, "특정 카페 홍보 아님 · 검증 데이터 기반 지역 큐레이션", cx, H * 0.865, `400 22px ${FONT}`, MUTED);
+  drawDivider(ctx, cx, H * 0.9);
+  txt(ctx, "dongnecoffeenote.com", cx, H * 0.945, `700 42px ${FONT}`, ESPRESSO);
+  txt(ctx, "동네 커피 노트", cx, H * 0.98, `400 24px ${FONT}`, BROWN);
 }
 
 export default function AreaPosterPage() {
@@ -279,8 +300,9 @@ export default function AreaPosterPage() {
         <div className="text-[#9c6b3f] text-xs tracking-[0.3em] uppercase mb-2">Area Spotlight</div>
         <h1 className="text-3xl font-bold mb-1">지역소개 포스터</h1>
         <p className="text-[13px] text-[#8a7458] mb-6 leading-relaxed">
-          구/동 단위로 검증된 카페 수·검증 후기 수를 소개하는 지역 큐레이션 포스터예요. 특정 카페 단독홍보가 아닌
-          지역 전체 톤을 유지해요. 통계는 모두 실제 검증 데이터 기준이에요.
+          구/동 단위로 검증등급 상위 카페 3~5곳을 이름·한줄 하이라이트로 소개하는 지역 큐레이션 포스터예요. 특정
+          카페 단독홍보가 아닌 &ldquo;이 동네엔 이런 검증된 곳들이 있다&rdquo; 톤을 유지해요. 하이라이트는 실제
+          검증 후기에서 뽑은 특징이고, 숫자 통계는 하단 작은 배지로만 표기해요.
         </p>
 
         {/* 지역 선택 */}
@@ -339,8 +361,8 @@ export default function AreaPosterPage() {
         </section>
 
         <p className="text-[11px] text-[#a8927a] leading-relaxed">
-          ※ 카페 수·검증 후기 수는 검증(옥석) 데이터베이스 실측값이에요. 공개 카페가 5곳 이상인 지역만 목록에
-          나타나요.
+          ※ 카페명·하이라이트·카페 수·검증 후기 수는 전부 검증(옥석) 데이터베이스 실측값이에요. 지어낸 카페명·후기는
+          쓰지 않아요. 공개 카페가 5곳 이상인 지역만 목록에 나타나요.
         </p>
       </div>
     </main>
