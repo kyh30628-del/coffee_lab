@@ -106,15 +106,15 @@ export default async function CafePage({ params }: Props) {
             공유
           </KakaoShare>
         </div>
-        <div className="flex justify-end mt-2">
-          <SaveMemoryButton cafeId={c.id} cafeName={c.name} cafeArea={c.area} />
-        </div>
         <div className="mt-5">
           <div className="flex items-center gap-2 mb-1 flex-wrap">
             <h1 className="text-2xl font-bold">{c.name}</h1>
             {grade && <span className="text-[11px] font-bold bg-[#2b2018] text-[#e8b87a] px-2 py-0.5 rounded-full">{grade}</span>}
           </div>
-          <p className="text-[#9c6b3f] text-sm mb-4">{c.area}</p>
+          <div className="flex items-center justify-between gap-2 mb-4">
+            <p className="text-[#9c6b3f] text-sm">{c.area}</p>
+            <SaveMemoryButton cafeId={c.id} cafeName={c.name} cafeArea={c.area} />
+          </div>
           {/* 📊 리뷰 데이터 분석 — 옥석 후기 핵심 */}
           {(highlights.length > 0 || c.synth_identity) && (
             <div className="bg-gradient-to-b from-[#f4eee2] to-[#ece4d4] rounded-xl px-4 py-3.5 mb-3 border border-[#d8c8ad]">
