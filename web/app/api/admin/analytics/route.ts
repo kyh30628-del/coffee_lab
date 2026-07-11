@@ -41,13 +41,16 @@ export async function GET(req: NextRequest) {
     ).catch(() => [{ n: 0 }]))[0]?.n ?? 0;
     const todayPv = (await sql`SELECT COUNT(*)::int n FROM traffic_events
        WHERE (ts AT TIME ZONE 'Asia/Seoul')::date = (now() AT TIME ZONE 'Asia/Seoul')::date`.catch(() => [{ n: 0 }]))[0]?.n ?? 0;
-    // 위치 동의 퍼널 — 방문 → 위치동의 → 위치공유(region 보유)
+    // 위치 동의 퍼널 — 방문 → 위치요청 응답(agreed IS NOT NULL) → 동의(agreed=true) → 위치공유(region 보유)
+    // ⚠️ agreed는 방문 핑에선 NULL(미정)로 남는다(app/api/visit/route.ts) — 모달에 실제로 응답한 사람만 IS NOT NULL.
+    //    과거엔 이 구분 없이 '전체 방문' 대비로 동의율을 계산해 실제보다 훨씬 낮게 보였다(집계 로직 누락).
     const consent = (await sql.query(
       `SELECT COUNT(*)::int pinged,
+              COUNT(*) FILTER (WHERE agreed IS NOT NULL)::int asked,
               COUNT(*) FILTER (WHERE agreed IS TRUE)::int agreed,
               COUNT(*) FILTER (WHERE region IS NOT NULL)::int located
        FROM user_consents WHERE ${BOT}`
-    ).catch(() => [{ pinged: 0, agreed: 0, located: 0 }]))[0] as any;
+    ).catch(() => [{ pinged: 0, asked: 0, agreed: 0, located: 0 }]))[0] as any;
     // 방문자 지역 분포(위치 공유한 방문자)
     const visitorRegions = (await sql.query(
       `SELECT region, COUNT(*)::int n FROM user_consents
@@ -77,11 +80,27 @@ export async function GET(req: NextRequest) {
     ).catch(() => [])) as any[];
 
     // 일별 추이(최근 14일, KST) — 페이지뷰·방문자
+    // ⚠️ 이벤트가 없는 날은 GROUP BY 결과에서 통째로 빠져 그래프가 도중에 끊겨 보였다(x축 배열 누락).
+    //    generate_series로 14일 전체 날짜를 먼저 만들고 LEFT JOIN해 빈 날은 0으로 채운다(끊김 없이 연속 렌더).
     const daily = (await sql`
-      SELECT to_char((ts AT TIME ZONE 'Asia/Seoul')::date, 'MM-DD') AS day,
-             COUNT(*)::int pageviews, COUNT(DISTINCT anon_id)::int visitors
-      FROM traffic_events WHERE ts > now()-interval '14 days'
-      GROUP BY 1 ORDER BY 1`.catch(() => [])) as any[];
+      WITH days AS (
+        SELECT generate_series(
+          (now() AT TIME ZONE 'Asia/Seoul')::date - interval '13 days',
+          (now() AT TIME ZONE 'Asia/Seoul')::date,
+          interval '1 day'
+        )::date AS d
+      )
+      SELECT to_char(days.d, 'MM-DD') AS day,
+             COALESCE(t.pageviews, 0)::int pageviews,
+             COALESCE(t.visitors, 0)::int visitors
+      FROM days
+      LEFT JOIN (
+        SELECT (ts AT TIME ZONE 'Asia/Seoul')::date AS d,
+               COUNT(*)::int pageviews, COUNT(DISTINCT anon_id)::int visitors
+        FROM traffic_events WHERE ts > now()-interval '14 days'
+        GROUP BY 1
+      ) t ON t.d = days.d
+      ORDER BY days.d`.catch(() => [])) as any[];
 
     // 페이지 유형
     const pageBuckets = (await sql`
@@ -148,6 +167,32 @@ export async function GET(req: NextRequest) {
     const consentReal = consentDetail?.real ?? 0;
     const tasteN = (await sql`SELECT COUNT(*)::int n FROM taste_logs`.catch(() => [{ n: 0 }]))[0]?.n ?? 0;
     const bookmarkN = (await sql`SELECT COUNT(*)::int n FROM bookmarks`.catch(() => [{ n: 0 }]))[0]?.n ?? 0;
+
+    // ❤ '내 카페 추억' 즐겨찾기(하트) — user_visits.favorite (위치인증 방문기록 중 하트 표시된 것)
+    const favStat = (await sql`SELECT COUNT(*)::int total,
+        COUNT(*) FILTER (WHERE created_at > now()-interval '7 days')::int last7
+      FROM user_visits WHERE favorite = true AND verified = true`.catch(() => [{ total: 0, last7: 0 }]))[0] as any;
+    const favDaily = (await sql`
+      WITH days AS (
+        SELECT generate_series(
+          (now() AT TIME ZONE 'Asia/Seoul')::date - interval '13 days',
+          (now() AT TIME ZONE 'Asia/Seoul')::date,
+          interval '1 day'
+        )::date AS d
+      )
+      SELECT to_char(days.d, 'MM-DD') AS day, COALESCE(f.n, 0)::int n
+      FROM days
+      LEFT JOIN (
+        SELECT (created_at AT TIME ZONE 'Asia/Seoul')::date AS d, COUNT(*)::int n
+        FROM user_visits WHERE favorite = true AND verified = true AND created_at > now()-interval '14 days'
+        GROUP BY 1
+      ) f ON f.d = days.d
+      ORDER BY days.d`.catch(() => [])) as any[];
+    const topFavCafes = (await sql`
+      SELECT c.name, c.area, COUNT(*)::int n
+      FROM user_visits v JOIN cafes c ON c.id = v.cafe_id
+      WHERE v.favorite = true AND v.verified = true
+      GROUP BY c.id, c.name, c.area ORDER BY n DESC LIMIT 8`.catch(() => [])) as any[];
     const realSources = (await sql.query(
       `SELECT src, COUNT(*)::int visitors,
               COUNT(*) FILTER (WHERE COALESCE(sessions,1) >= 2)::int returned,
@@ -180,6 +225,7 @@ export async function GET(req: NextRequest) {
         },
       }, realSources,
       shares: { total: shares?.total ?? 0, kakao: shares?.kakao ?? 0, web: shares?.web ?? 0, clip: shares?.clip ?? 0, sharers: shares?.sharers ?? 0, today: shares?.today ?? 0 }, topShared,
+      favorites: { total: favStat?.total ?? 0, last7: favStat?.last7 ?? 0, daily: favDaily, topCafes: topFavCafes },
       ok: true, generatedAt: new Date().toISOString(),
       kpi: {
         dau: kpi?.dau ?? 0, wau: kpi?.wau ?? 0, mau: kpi?.mau ?? 0,
@@ -188,7 +234,7 @@ export async function GET(req: NextRequest) {
       },
       realtime: { active5: live?.active5 ?? 0, active30: live?.active30 ?? 0 },
       today: { visitors: todayVisitors, pageviews: todayPv },
-      consent: { pinged: consent?.pinged ?? 0, agreed: consent?.agreed ?? 0, located: consent?.located ?? 0 },
+      consent: { pinged: consent?.pinged ?? 0, asked: consent?.asked ?? 0, agreed: consent?.agreed ?? 0, located: consent?.located ?? 0 },
       visitorRegions,
       sources, retention: { newcomers: retention?.newcomers ?? 0, returning: retention?.ret ?? 0 },
       devices, daily, pageBuckets, topCafes, topRegions, hours,

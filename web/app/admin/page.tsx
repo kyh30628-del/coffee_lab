@@ -1007,7 +1007,9 @@ export default function AdminPage() {
                   const devTotal = dev.mobile + dev.desktop || 1;
                   const noEvents = (a.kpi?.pageviews30d ?? 0) === 0;
                   const maxVReg = Math.max(1, ...(a.visitorRegions || []).map((r: any) => r.n));
+                  const maxFav = Math.max(1, ...(a.favorites?.daily || []).map((d: any) => d.n));
                   const cs = a.consent || {};
+                  const consentRate = cs.asked ? Math.round((cs.agreed ?? 0) / cs.asked * 100) : 0;
                   const newPct = a.kpi?.mau ? Math.round(a.retention?.newcomers / a.kpi.mau * 100) : 0;
                   const retPct = a.kpi?.mau ? Math.round(a.retention?.returning / a.kpi.mau * 100) : 0;
                   const mobPct = Math.round(dev.mobile / devTotal * 100);
@@ -1096,6 +1098,29 @@ export default function AdminPage() {
                           {(a.topShared || []).length > 0 ? (
                             <div className="mt-2 pt-2 border-t border-stone-300 text-[10.5px] text-stone-600"><span className="text-stone-400">많이 공유된 카페: </span>{a.topShared.map((c: any, i: number) => <span key={i} className="mr-1.5"><b>{c.name}</b>({c.n})</span>)}</div>
                           ) : <p className="text-[9.5px] text-stone-400 mt-1.5">아직 공유 기록 없음 — 방금 추적 시작(공유 버튼 클릭 시 채워집니다). 내부(대표·팀) 공유는 제외됩니다.</p>}
+                        </div>
+                      )}
+                      {/* ❤ 내 카페 추억 즐겨찾기(하트) */}
+                      {a.favorites && (
+                        <div className="bg-white rounded-xl border border-stone-300 p-3">
+                          <div className="text-[12px] font-bold text-stone-700 mb-1.5">❤ 내 카페 추억 즐겨찾기 <span className="font-normal text-[10px] text-stone-400">· 위치인증 방문기록 중 하트 표시</span></div>
+                          <div className="flex items-center gap-x-3 gap-y-1 flex-wrap text-[11px] mb-2">
+                            <span>누적 <b className="text-[16px] text-rose-600">{a.favorites.total}</b>건</span>
+                            <span className="text-stone-500">최근 7일 <b>{a.favorites.last7}</b>건</span>
+                          </div>
+                          {(a.favorites.daily || []).length > 0 && (
+                            <div className="flex items-end gap-1 h-14 mb-2">
+                              {a.favorites.daily.map((d: any, i: number) => (
+                                <div key={i} className="flex-1 flex flex-col items-center justify-end gap-0.5">
+                                  <div className="w-full bg-rose-400 rounded-t" style={{ height: `${(d.n / maxFav) * 100}%`, minHeight: "2px" }} title={`${d.day}: ${d.n}건`}></div>
+                                  <span className="text-[7px] text-stone-400">{d.day.slice(3)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {(a.favorites.topCafes || []).length > 0 ? (
+                            <div className="pt-2 border-t border-stone-300 text-[10.5px] text-stone-600"><span className="text-stone-400">즐겨찾기 많은 카페: </span>{a.favorites.topCafes.map((c: any, i: number) => <span key={i} className="mr-1.5"><b>{c.name}</b>({c.n})</span>)}</div>
+                          ) : <p className="text-[9.5px] text-stone-400">아직 즐겨찾기 기록 없음.</p>}
                         </div>
                       )}
                       {noEvents && <div className="bg-amber-50 border border-amber-300 rounded-xl p-2.5 text-[11px] text-amber-800">📊 페이지뷰 단위 지표(추이·인기카페·퍼널·시간대)는 방금 추적 시작 — 방문이 쌓이며 채워집니다. 방문자·유입경로·재방문은 지금부터 정확합니다.</div>}
@@ -1197,17 +1222,23 @@ export default function AdminPage() {
                         </div>
                         <div className="bg-white rounded-xl border border-stone-300 p-3">
                           <div className="text-[12px] font-bold text-stone-700">위치 동의 퍼널</div>
-                          <p className="text-[9.5px] text-stone-400 mb-2">방문 → 위치 안내 동의 → 실제 위치 공유까지 단계별 비율.</p>
+                          <p className="text-[9.5px] text-stone-400 mb-2">방문 → 위치 요청에 실제 응답 → 동의(수락) → 실제 위치 공유까지 단계별 비율.</p>
+                          <div className="flex items-center justify-between bg-rose-50 border border-rose-200 rounded-lg px-2.5 py-1.5 mb-2">
+                            <span className="text-[10.5px] text-stone-600">동의 수락률 <span className="text-stone-400">(요청에 응답한 사람 기준)</span></span>
+                            <span className="text-[15px] font-extrabold text-rose-600">{consentRate}%</span>
+                          </div>
                           {[
-                            { l: "방문(핑)", v: cs.pinged, pct: 100 },
-                            { l: "위치 동의", v: cs.agreed, pct: cs.pinged ? Math.round(cs.agreed / cs.pinged * 100) : 0 },
-                            { l: "위치 공유", v: cs.located, pct: cs.pinged ? Math.round(cs.located / cs.pinged * 100) : 0 },
+                            { l: "전체 방문", v: cs.pinged, pct: 100 },
+                            { l: "위치 요청 응답", v: cs.asked, pct: cs.pinged ? Math.round((cs.asked ?? 0) / cs.pinged * 100) : 0 },
+                            { l: "동의(수락)", v: cs.agreed, pct: cs.asked ? Math.round((cs.agreed ?? 0) / cs.asked * 100) : 0 },
+                            { l: "위치 공유 성공", v: cs.located, pct: cs.agreed ? Math.round((cs.located ?? 0) / cs.agreed * 100) : 0 },
                           ].map((s, i) => (
                             <div key={i} className="mb-1.5">
                               <div className="flex justify-between text-[10.5px] mb-0.5"><span className="text-stone-600">{s.l}</span><span className="font-bold text-stone-700">{(s.v ?? 0).toLocaleString()} <span className="text-stone-400 font-normal">{s.pct}%</span></span></div>
                               <div className="h-2 bg-stone-100 rounded-full overflow-hidden"><div className="h-full bg-rose-400 rounded-full" style={{ width: `${s.pct}%` }}></div></div>
                             </div>
                           ))}
+                          <p className="text-[9.5px] text-stone-400 mt-1">※ '위치 요청 응답'은 실제로 위치 모달에 답한 사람만 기준(대부분의 방문자는 위치를 요청받지 않음) — 이전엔 전체 방문 대비로 계산돼 동의율이 실제보다 낮게 보였습니다.</p>
                         </div>
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
