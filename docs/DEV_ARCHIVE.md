@@ -63,3 +63,4 @@
 | 2026-07-11 00:19 | #297 | [룰갭 P28] 상호가 업종 일반명사(영문 대여어) 자체인 카페 — 이름일치·offctx_rate 방어선 동 | e0fea712 | - | lib/reviewQuality.ts: (1) GENERIC_SUFFIX/GENERIC_WORD에 베이크샵·베이크하우스·브런치카페·베이글샵·도넛 추가 (2) coreEmpty 분기 |
 | 2026-07-11 04:31 | #299 | 카페소개 포스터 | cb9da76d | low | 신규 app/poster/cafe/page.tsx(카페소개 포스터, 검색/오늘의추천/카드형·포토형 2템플릿/PNG저장) + app/api/poster-cafe/route.ts(검증 |
 | 2026-07-11 05:58 | #301 | 지역포스터+모아보기 | e4e044de | med | 신규: app/poster/area/page.tsx(지역소개 포스터, DB실측 카페수/검증후기수) + app/api/poster-area/route.ts(area 목록·통계). a |
+| 2026-07-11 06:29 | #302 | 지역포스터 콘텐츠 개편 | bbabca87 | med | app/api/poster-area/route.ts: topCafes(이름+한줄 하이라이트, extractHighlights/synth_identity 실측 기반) 응답 추가. a |
