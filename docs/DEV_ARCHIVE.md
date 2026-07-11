@@ -67,3 +67,4 @@
 | 2026-07-11 06:57 | #306 | 유입현황 즐겨찾기+그래프 | 5c4f02c2 | med | 변경: app/api/admin/analytics/route.ts, app/admin/page.tsx. ①user_visits.favorite(하트) 일별/누적/상위카페 섹션 추가 |
 | 2026-07-11 07:41 | #307 | 리뷰 정렬 정합성 수정 | 3a2b475f | med | app/api/cafe-detail/route.ts: 정렬을 nameCoherence 매칭확신도(신규 quoteMatchConfidence)→최신순→score/trust 순으로 변 |
 | 2026-07-11 09:05 | #312 | 후기모달 배경고정 | 4921acb0 | low | app/VisitorReviews.tsx: 후기 목록/상세 모달을 createPortal로 document.body에 렌더(인앱 CafePanel aside가 transform 컨 |
+| 2026-07-11 11:42 | #313 | 접속 통계 정의 통일 | 7c856b58 | med | app/api/admin/stats/route.ts: 필터없는 전체누적 visitors 집계 제거(화면에 미사용, 착시 소지 원천 차단·주석으로 단일소스 명시). app/admin |
