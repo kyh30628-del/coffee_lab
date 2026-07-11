@@ -219,7 +219,13 @@ export const isNonCafe = (name: string, category: string) => {
 async function localSearch(query: string, sort: "comment" | "random" = "comment") {
   const url = `https://openapi.naver.com/v1/search/local.json?query=${encodeURIComponent(query)}&display=5&sort=${sort}`;
   const res = await fetch(url, { headers: { "X-Naver-Client-Id": ID!, "X-Naver-Client-Secret": SECRET! } });
-  if (res.status === 429) { markNaverExhausted().catch(() => {}); return null; } // 실측 한도초과 → 오늘 소진 마킹(전 잡 우아 정지)
+  if (res.status === 429) {
+    // ⚠️ 429 두 종류 구분(2026-07-11): ①일일한도(count/quota=…/25000·Query limit·errorCode 010)=진짜 소진→마킹.
+    //   ②초당 rate-limit(버스트)=일시적→마킹 금지(온종일 잠김 방지). 몸통 안 읽고 무조건 마킹하던 게 발굴 온종일 멈춤 근본원인.
+    const body = await res.text().catch(() => "");
+    if (/quota=\d+\/\d+|Query limit|"errorCode"\s*:\s*"010"/i.test(body)) markNaverExhausted().catch(() => {});
+    return null;
+  }
   if (!res.ok) return null; // 기타 API 오류 → null로 신호(빈 결과 [] 와 구분: '못 가져옴' vs '진짜 없음')
   bumpNaver(1).catch(() => {}); // 성공 쿼리 1건 계상(일일 예산 추적)
   const data = await res.json();

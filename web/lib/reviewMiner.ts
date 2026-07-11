@@ -21,7 +21,11 @@ async function naverLocal(q: string): Promise<{ items?: any[]; err?: number }> {
     const r = await fetch(`https://openapi.naver.com/v1/search/local.json?query=${encodeURIComponent(q)}&display=3`,
       { headers: { "X-Naver-Client-Id": NID, "X-Naver-Client-Secret": NSEC } });
     if (r.status === 200) { bumpNaver(1).catch(() => {}); return { items: (await r.json()).items || [] }; } // 성공 쿼리 계상
-    if (r.status === 429) { markNaverExhausted().catch(() => {}); return { err: 429 }; } // 실측 한도초과 → 소진 마킹·즉시 중단(백오프 재시도 폐지: 예산으로 사전 차단)
+    if (r.status === 429) { // 일일한도(count/quota·Query limit·errorCode 010)만 소진 마킹. 초당 rate-limit은 일시적이라 마킹 금지(온종일 잠김 방지).
+      const body = await r.text().catch(() => "");
+      if (/quota=\d+\/\d+|Query limit|"errorCode"\s*:\s*"010"/i.test(body)) markNaverExhausted().catch(() => {});
+      return { err: 429 };
+    }
     return { err: r.status };
   }
   return { err: 429 };
