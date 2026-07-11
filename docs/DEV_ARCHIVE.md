@@ -71,3 +71,4 @@
 | 2026-07-11 12:42 | #314 | 홍보카피 포스터 | 95a6d4e7 | low | 신규 app/poster/copy/page.tsx: 홍보카피 4종(통합 추천안/공감형 강조/취향결 강조/짧고임팩트) 프리셋 드롭다운+지역명 자유입력([지역명] 실시간 치환)+캔버스 |
 | 2026-07-11 13:07 | #315 | 방문패턴 보고추가 | 68342b20 | med | scripts/make-digest.mjs: DIGEST.md에 위치동의 기기 실사용 패턴 섹션 추가(traffic_events+user_consents 조인, region 보유+ |
 | 2026-07-11 14:12 | #317 | 추억저장 버튼 추가 | 3e97cce7 | med | app/c/[id]/SaveMemoryButton.tsx 신규(추억으로 저장 버튼, 카카오공유 바로아래 우측정렬·동일사이즈·핑크accent #d6336c) + app/MyCafeR |
+| 2026-07-11 14:58 | #320 | 추억버튼 노출 근본수정 | 2c72cb43 | med | app/page.tsx: 근본원인 발견 — #317은 /c/[id](공유용 SEO 페이지)에만 버튼을 추가, 실사용자가 실제로 쓰는 지도 홈(app/page.tsx)의 카페 상세  |
