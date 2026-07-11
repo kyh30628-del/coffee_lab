@@ -480,6 +480,11 @@ export default function PosterPage() {
       <div className="max-w-4xl mx-auto px-6 py-10">
         <BackLink to="/" label="홈" className="text-[#9c6b3f] mb-4" />
         <div className="text-[#9c6b3f] text-xs tracking-[0.3em] uppercase mb-2">Instagram Carousel</div>
+        <div className="mb-3">
+          <a href="/poster/cafe" className="text-[12.5px] font-bold text-[#a9682f] underline">
+            → 특정 카페 소개 포스터는 여기(카페소개 포스터)
+          </a>
+        </div>
         <h1 className="text-3xl font-bold mb-1">인스타 홍보 캐러셀 (5장)</h1>
         <p className="text-[13px] text-[#8a7458] mb-6 leading-relaxed">
           아래에서 좌우로 <b>스와이프</b>하며 한 장씩 확인하고, 그 화면을 그대로 스크린샷하거나 <b>PNG 저장</b>으로
