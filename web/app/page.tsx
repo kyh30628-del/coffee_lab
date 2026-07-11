@@ -1676,12 +1676,6 @@ function CafePanel({ cafe, dist, onClose, onMap, bookmarked = false, onToggleBoo
             <div className="flex items-center gap-2 min-w-0"><h3 className="text-xl font-bold text-[#2b2018] truncate">{cafe.name}</h3>{g && <span className="text-[10px] text-white px-2 py-0.5 rounded-full shrink-0" style={{ background: g.bg }}>{g.label}</span>}</div>
             <div className="flex items-center gap-1 shrink-0">
               <button onClick={onToggleBookmark} aria-label="즐겨찾기" className="flex items-center gap-1 border rounded-full px-2.5 py-1 text-[12px] font-medium transition-colors" style={bookmarked ? { color: "#fff", background: "#f0a832", borderColor: "#f0a832" } : { color: "#9c6b3f", borderColor: "#e0d2bd" }}>{bookmarked ? "★ 즐겨찾기" : "☆ 즐겨찾기"}</button>
-              {onSaveMemory && (
-                <button type="button" onClick={onSaveMemory}
-                  className="flex items-center gap-1 bg-[#d6336c] text-white rounded-full pl-2 pr-2.5 py-1 text-[12px] font-bold">
-                  <span className="text-[13px] leading-none">❤</span> 추억으로 저장
-                </button>
-              )}
               <KakaoShare
                 title={`${cafe.name} (${cafe.area})`}
                 description={((cafe as any).identity || cafe.signature || "진짜 후기로 검증한 우리 동네 카페")}
@@ -1695,6 +1689,14 @@ function CafePanel({ cafe, dist, onClose, onMap, bookmarked = false, onToggleBoo
               <button onClick={onClose} className="text-3xl text-[#9c6b3f] leading-none px-1">×</button>
             </div>
           </div>
+          {onSaveMemory && (
+            <div className="flex justify-end mb-2">
+              <button type="button" onClick={onSaveMemory}
+                className="flex items-center gap-1 bg-[#d6336c] text-white rounded-full pl-2 pr-2.5 py-1 text-[12px] font-bold">
+                <span className="text-[13px] leading-none">❤</span> 추억으로 저장
+              </button>
+            </div>
+          )}
           <div className="text-[#9c6b3f] text-sm mb-3">{cafe.area} · {cafe.vibe}</div>
           {cafe.note && <p className="text-[15px] text-[#3d2f22] font-medium leading-relaxed mb-4">"{cafe.note}"</p>}
           {/* ⭐ 한눈에 판단 — 전체 카페 대비 강점/아쉬운점(리뷰 옥석 보기 전 직관 판단의 핵심) */}
