@@ -1347,7 +1347,7 @@ export default function Home() {
         onRemove={(id: number) => toggleBookmark(id)} />}
       {showMyCafeReg && <MyCafeRegModal cafes={cafes} device={deviceId} visits={myVisits} pin={sessionPin} initialCafeId={editCafeId} onClose={() => { setShowMyCafeReg(false); setEditCafeId(null); }} onDone={() => { reloadMyCafes(deviceId, sessionPin); }} />}
 
-      {selected && <CafePanel cafe={selected} dist={axisDist} bookmarked={bookmarkIds.has(selected.id)} onToggleBookmark={() => toggleBookmark(selected.id)} onClose={() => setSelected(null)} onMap={() => {
+      {selected && <CafePanel cafe={selected} dist={axisDist} bookmarked={bookmarkIds.has(selected.id)} onToggleBookmark={() => toggleBookmark(selected.id)} onSaveMemory={() => { setEditCafeId(selected.id); setShowMyCafeReg(true); }} onClose={() => setSelected(null)} onMap={() => {
         if (selected.lat && selected.lng) {
           const g = toGu(selected.area);
           if (g.sido) { setSido(g.sido); setSigungu(g.sigungu); }
@@ -1586,7 +1586,7 @@ function hlQuote(text?: string) {
   );
 }
 
-function CafePanel({ cafe, dist, onClose, onMap, bookmarked = false, onToggleBookmark }: { cafe: Cafe; dist: AxisDist; onClose: () => void; onMap: () => void; bookmarked?: boolean; onToggleBookmark?: () => void }) {
+function CafePanel({ cafe, dist, onClose, onMap, bookmarked = false, onToggleBookmark, onSaveMemory }: { cafe: Cafe; dist: AxisDist; onClose: () => void; onMap: () => void; bookmarked?: boolean; onToggleBookmark?: () => void; onSaveMemory?: () => void }) {
   const g = cafe.synth_grade ? GRADE_STYLE[cafe.synth_grade] : null;
   const [reviews, setReviews] = useState<EvidenceReview[]>([]);
   const [quality, setQuality] = useState<QualityStats | null>(null);
@@ -1676,6 +1676,12 @@ function CafePanel({ cafe, dist, onClose, onMap, bookmarked = false, onToggleBoo
             <div className="flex items-center gap-2 min-w-0"><h3 className="text-xl font-bold text-[#2b2018] truncate">{cafe.name}</h3>{g && <span className="text-[10px] text-white px-2 py-0.5 rounded-full shrink-0" style={{ background: g.bg }}>{g.label}</span>}</div>
             <div className="flex items-center gap-1 shrink-0">
               <button onClick={onToggleBookmark} aria-label="즐겨찾기" className="flex items-center gap-1 border rounded-full px-2.5 py-1 text-[12px] font-medium transition-colors" style={bookmarked ? { color: "#fff", background: "#f0a832", borderColor: "#f0a832" } : { color: "#9c6b3f", borderColor: "#e0d2bd" }}>{bookmarked ? "★ 즐겨찾기" : "☆ 즐겨찾기"}</button>
+              {onSaveMemory && (
+                <button type="button" onClick={onSaveMemory}
+                  className="flex items-center gap-1 bg-[#d6336c] text-white rounded-full pl-2 pr-2.5 py-1 text-[12px] font-bold">
+                  <span className="text-[13px] leading-none">❤</span> 추억으로 저장
+                </button>
+              )}
               <KakaoShare
                 title={`${cafe.name} (${cafe.area})`}
                 description={((cafe as any).identity || cafe.signature || "진짜 후기로 검증한 우리 동네 카페")}
