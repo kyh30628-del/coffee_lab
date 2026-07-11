@@ -69,3 +69,4 @@
 | 2026-07-11 09:05 | #312 | 후기모달 배경고정 | 4921acb0 | low | app/VisitorReviews.tsx: 후기 목록/상세 모달을 createPortal로 document.body에 렌더(인앱 CafePanel aside가 transform 컨 |
 | 2026-07-11 11:42 | #313 | 접속 통계 정의 통일 | 7c856b58 | med | app/api/admin/stats/route.ts: 필터없는 전체누적 visitors 집계 제거(화면에 미사용, 착시 소지 원천 차단·주석으로 단일소스 명시). app/admin |
 | 2026-07-11 12:42 | #314 | 홍보카피 포스터 | 95a6d4e7 | low | 신규 app/poster/copy/page.tsx: 홍보카피 4종(통합 추천안/공감형 강조/취향결 강조/짧고임팩트) 프리셋 드롭다운+지역명 자유입력([지역명] 실시간 치환)+캔버스 |
+| 2026-07-11 13:07 | #315 | 방문패턴 보고추가 | 68342b20 | med | scripts/make-digest.mjs: DIGEST.md에 위치동의 기기 실사용 패턴 섹션 추가(traffic_events+user_consents 조인, region 보유+ |
