@@ -217,8 +217,11 @@ function nameHit(rawText: string, normText: string, term: string): boolean {
   return tn.length > 4 ? boundedFlexHit(rawText, term) : boundedHit(rawText, term);
 }
 
-const GENERIC_SUFFIX = /(카페|커피|로스터리|로스터스|로스터즈|로스터|로스팅|베이커리|디저트|케이크|케익|케잌|제과점|제과|과자점|베이킹|coffee|cafe|cake|roasters?|roastery|roasteries|점|본점)$/i;
-const GENERIC_WORD = new Set(["카페", "커피", "점", "본점", "로스터리", "로스터스", "로스터즈", "로스터", "로스팅", "베이커리", "디저트", "케이크", "케익", "케잌", "제과", "제과점", "과자점", "베이킹", "coffee", "cafe", "cake", "roasters", "roaster", "roastery", "roasteries", "책방", "북카페"]);
+// 룰갭 P28(#297, 2026-07-11): '베이크샵'(=bake shop 영문대여어) 자체가 상호 전체인 카페(id7242)는
+//   접미사전에 없어 이름일치·offctx_rate 둘 다 못 잡는 사각지대 — '구우미 베이크샵'·'아르밀 베이크샵' 등
+//   타업체 후기가 부분일치로 딸려온다(6/6 오염 실측). 카페·베이커리 계열 영문대여어를 접미·일반어로 추가.
+const GENERIC_SUFFIX = /(카페|커피|로스터리|로스터스|로스터즈|로스터|로스팅|베이커리|베이크샵|베이크하우스|브런치카페|베이글샵|도넛|디저트|케이크|케익|케잌|제과점|제과|과자점|베이킹|coffee|cafe|cake|roasters?|roastery|roasteries|점|본점)$/i;
+const GENERIC_WORD = new Set(["카페", "커피", "점", "본점", "로스터리", "로스터스", "로스터즈", "로스터", "로스팅", "베이커리", "베이크샵", "베이크하우스", "브런치카페", "베이글샵", "도넛", "디저트", "케이크", "케익", "케잌", "제과", "제과점", "과자점", "베이킹", "coffee", "cafe", "cake", "roasters", "roaster", "roastery", "roasteries", "책방", "북카페"]);
 // 너무 흔해서 '식별어'가 못 되는 형용사·일반어. 이것만 남으면 전체 이름 일치를 요구(오매칭 방지).
 // 예: "좋은커피" → 접미 '커피' 제거 후 '좋은'만 남는데, '분위기 좋은 카페'처럼 모든 후기에 나옴.
 const NAME_STOPWORD = new Set(["좋은", "맛있는", "맛있는집", "예쁜", "멋진", "행복", "행복한", "우리", "우리집", "작은", "큰", "조용한", "따뜻한", "정직한", "데일리", "오늘", "하루", "그날", "모닝", "감성", "분위기", "힐링", "달콤한", "새로운",
@@ -496,10 +499,15 @@ export function verifyReview(input: QualityInput): QualityResult {
   });
   const reqFull = coreEmpty || weakSingle || allTokensWeak;
   const distinct = tokens.length ? tokens : (nameN ? [input.name] : []);
+  const areaPresent = areaTerms.length ? areaTerms.some((a) => `${title} ${body}`.includes(a)) : false;
   // 흔한구문 이름은 띄어쓰기 보존이 핵심: '좋은커피'(가게)는 원문에 붙어서, '좋은 커피'(맛 표현)는 배제.
   //   짧은 단일토큰은 정규화 전체이름 일치(나무로스터리)로 — 부분문자열 오매칭 차단.
-  const inTitleFull = coreEmpty ? title.includes(input.name) : weakSingle ? titleN.includes(nameRawN) : nameHit(title, titleN, input.name);
-  const inBodyFull = coreEmpty ? body.includes(input.name) : weakSingle ? bodyN.includes(nameRawN) : nameHit(body, bodyN, input.name);
+  // 룰갭 P28(#297): coreEmpty(이름 전체가 흔한구문/일반어, 예: '베이크샵')는 원문 붙임 일치만으로 인정하면
+  //   같은 일반어를 상호 일부로 쓰는 딴 업체 글도 걸린다('구우미 베이크샵'에 '베이크샵'이 그대로 부분일치,
+  //   id7242 6/6 오염 실측). 지역어(동/구) 동반 없이는 인정하지 않는다 — 진짜 후기는 주소·동네 언급을
+  //   동반하는 경우가 대부분이라 정상 매칭은 보존된다.
+  const inTitleFull = coreEmpty ? (title.includes(input.name) && areaPresent) : weakSingle ? titleN.includes(nameRawN) : nameHit(title, titleN, input.name);
+  const inBodyFull = coreEmpty ? (body.includes(input.name) && areaPresent) : weakSingle ? bodyN.includes(nameRawN) : nameHit(body, bodyN, input.name);
   // 지역어 제외한 고유 식별 토큰 — 지역어만 제목에 있는 건 nameInTitle 기여 안 함
   const nonAreaTokens = tokens.filter((tk) => !areaTerms.some((a) => norm(a).includes(norm(tk)) || norm(tk).includes(norm(a))));
   const identTokens = nonAreaTokens.length ? nonAreaTokens : tokens; // 비면 원래대로
@@ -507,7 +515,6 @@ export function verifyReview(input: QualityInput): QualityResult {
   const distinctInBody = reqFull ? inBodyFull : distinct.some((tk) => nameHit(body, bodyN, tk));
   const visit = has(fullL, VISIT_CUES);
   const substance = SUBSTANCE_CUES.filter((k) => fullL.includes(k.toLowerCase())).length;
-  const areaPresent = areaTerms.length ? areaTerms.some((a) => `${title} ${body}`.includes(a)) : false;
   // [#4] 흔한 단어 이름 오매칭 방지: 전체 이름 일치는 강함. 토큰만 일치면
   //     '카페 맥락(카페·커피·로스터리…)'이나 지역이 함께 있어야 주제로 인정.
   const titleHasCafeWord = CAFE_WORDS.some((w) => title.includes(w));
