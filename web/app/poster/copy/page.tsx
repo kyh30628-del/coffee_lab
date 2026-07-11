@@ -2,18 +2,19 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import BackLink from "../../BackLink";
 
-// 홍보카피 포스터 — 최근 확정된 인스타 홍보카피 4종(통합 추천안·공감형 강조·취향/결 강조·짧고임팩트)을
-// 프리셋으로 제공하고, 캡션 속 "[지역명]" 자리를 대표님이 자유 입력(텍스트, DB 지역 목록 제한 없음)으로
-// 치환해 실시간 미리보기에 반영한다. DB 조회 없는 순수 UI/카피 렌더링 — poster/carousel·poster/area와
-// 동일한 브랜드 톤(크림/에스프레소/골드, Gowun Batang, 1080x1080, 더블프레임)을 그대로 재사용한다.
+// 홍보카피 포스터 — "야간 에디토리얼 포스터" 컨셉. 다른 3종(캐러셀·카페·지역)이 전부 크림 배경+더블프레임인 것과
+// 달리 이 타입만 다크(에스프레소) 배경에 골드 코너브래킷 프레임·좌측정렬 타이포로 차별화한다.
+// 카피는 확정 4종에 스토리텔링/후킹 질문/통계 인용형을 더해 6종으로 다양화 — 문장 뼈대 자체가 서로 다르다.
+// "[지역명]" 자리는 대표님이 자유 입력(텍스트, DB 지역 목록 제한 없음)으로 치환해 실시간 반영한다.
+// 특정 카페명은 어떤 프리셋에도 등장하지 않는다 — 지역정보(구/동 단위)만 허용. DB 조회 없는 순수 UI/카피 렌더링.
 
-const CREAM = "#F7F1E6";
-const ESPRESSO = "#2B2018";
-const BROWN = "#6B4A2E";
-const CARAMEL = "#A9682F";
+const INK = "#F7F1E6";
+const NIGHT_TOP = "#2E2116";
+const NIGHT_BOTTOM = "#1B140D";
 const GOLD = "#C98A3F";
-const BROWN_SOFT = "#9C6B3F";
-const SUBTEXT = "#6B5A48";
+const GOLD_SOFT = "#E8B87A";
+const SUB_INK = "rgba(247,241,230,0.72)";
+const FAINT_INK = "rgba(247,241,230,0.55)";
 const FONT = '"Gowun Batang", AppleMyungjo, "Noto Serif KR", serif';
 const SIZE = 1080;
 const REGION_TOKEN = "[지역명]";
@@ -58,6 +59,27 @@ const PRESETS: CopyPreset[] = [
     headline: ["[지역명], 진짜 카페만"],
     sub: ["진짜 방문 후기만 보여드립니다"],
   },
+  {
+    key: "story",
+    label: "스토리텔링",
+    eyebrow: "후기 15개 읽고 갔는데, 사장님이 쓴 거였다면",
+    headline: ["[지역명] 카페, 이제", "가짜 후기에 속지 마세요"],
+    sub: ["한 번 속아본 사람들이", "다음엔 여기서 먼저 확인해요"],
+  },
+  {
+    key: "hook",
+    label: "후킹 질문형",
+    eyebrow: "이 후기, 진짜 가본 사람이 쓴 게 맞을까?",
+    headline: ["[지역명] 카페 후기,", "의심 없이 볼 수 있다면"],
+    sub: ["방문이 확인된 후기만", "가려서 보여드릴게요"],
+  },
+  {
+    key: "stat",
+    label: "통계 인용형",
+    eyebrow: "카페 후기 상당수는 광고·대필이라는 걸 아세요?",
+    headline: ["[지역명]에서 진짜 후기만", "가려낸 카페 목록"],
+    sub: ["옆가게·동명 오염 없는", "방문 검증 데이터로 확인하세요"],
+  },
 ];
 
 function setLS(ctx: Ctx, v: number) {
@@ -94,110 +116,88 @@ function fitFontLines(ctx: Ctx, lines: string[], maxWidth: number, baseSize: num
   }
 }
 
-function drawStain(ctx: Ctx, cx: number, cy: number, r: number) {
-  ctx.save();
-  ctx.strokeStyle = "rgba(201,165,116,0.18)";
-  ctx.lineWidth = r * 0.12;
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.restore();
-}
-
-function drawBackground(ctx: Ctx, W: number, H: number) {
+// 다크 배경 + 상단 웜글로우 — 크림 배경 3종과 정반대 톤으로 이 타입만의 정체성을 만든다.
+function drawNightBackground(ctx: Ctx, W: number, H: number) {
   const cx = W / 2;
   ctx.clearRect(0, 0, W, H);
-  ctx.fillStyle = CREAM;
-  ctx.fillRect(0, 0, W, H);
-  const vg = ctx.createRadialGradient(cx, H * 0.3, 40, cx, H * 0.34, W * 0.95);
-  vg.addColorStop(0, "rgba(255,251,242,0.7)");
-  vg.addColorStop(1, "rgba(206,183,150,0.16)");
-  ctx.fillStyle = vg;
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, NIGHT_TOP);
+  bg.addColorStop(1, NIGHT_BOTTOM);
+  ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
 
-  drawStain(ctx, W * 0.92, H * 0.08, W * 0.14);
-  drawStain(ctx, W * 0.06, H * 0.94, W * 0.11);
+  const glow = ctx.createRadialGradient(cx, H * 0.22, 40, cx, H * 0.22, W * 0.78);
+  glow.addColorStop(0, "rgba(201,138,63,0.24)");
+  glow.addColorStop(1, "rgba(201,138,63,0)");
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, W, H);
 
-  const m = 42;
-  if (typeof ctx.roundRect === "function") {
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = ESPRESSO;
-    ctx.beginPath();
-    ctx.roundRect(m, m, W - m * 2, H - m * 2, 34);
-    ctx.stroke();
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = "rgba(201,138,63,0.6)";
-    ctx.beginPath();
-    ctx.roundRect(m + 12, m + 12, W - (m + 12) * 2, H - (m + 12) * 2, 26);
-    ctx.stroke();
-  }
   ctx.textAlign = "center";
   ctx.textBaseline = "alphabetic";
 }
 
-function drawDivider(ctx: Ctx, cx: number, dy: number) {
+// 더블 라운드 프레임 대신 네 모서리 골드 브래킷 — 사진 프레이밍 마크처럼 가볍게.
+function drawCornerBrackets(ctx: Ctx, W: number, H: number) {
+  const m = 56;
+  const L = 68;
   ctx.strokeStyle = GOLD;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(cx - 130, dy);
-  ctx.lineTo(cx - 18, dy);
-  ctx.moveTo(cx + 18, dy);
-  ctx.lineTo(cx + 130, dy);
-  ctx.stroke();
-  ctx.fillStyle = GOLD;
-  ctx.beginPath();
-  ctx.arc(cx, dy, 5, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.lineWidth = 3;
+  ctx.lineCap = "square";
+  const corners: [number, number, number, number][] = [
+    [m, m, 1, 1],
+    [W - m, m, -1, 1],
+    [m, H - m, 1, -1],
+    [W - m, H - m, -1, -1],
+  ];
+  for (const [x, y, dx, dy] of corners) {
+    ctx.beginPath();
+    ctx.moveTo(x, y + L * dy);
+    ctx.lineTo(x, y);
+    ctx.lineTo(x + L * dx, y);
+    ctx.stroke();
+  }
 }
 
-// 지도 핀(물방울) + 커피콩 — 서비스 핵심 모티프(캐러셀 슬라이드1과 동일 톤).
-function drawPin(ctx: Ctx, cx: number, cy: number, r: number) {
-  const tipY = cy + r * 2.35;
-
+// 헤드라인 뒤편의 커다란 희미한 인용부호 — 에디토리얼 포스터 무드.
+function drawQuoteMark(ctx: Ctx, x: number, y: number, size: number) {
   ctx.save();
-  ctx.globalAlpha = 0.16;
-  ctx.fillStyle = "#4a3421";
-  ctx.beginPath();
-  ctx.ellipse(cx, tipY + r * 0.22, r * 0.62, r * 0.16, 0, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = "rgba(201,138,63,0.16)";
+  ctx.font = `700 ${size}px Georgia, ${FONT}`;
+  ctx.fillText("“", x, y);
   ctx.restore();
+}
 
-  const grad = ctx.createLinearGradient(cx, cy - r, cx, tipY);
-  grad.addColorStop(0, "#4A3320");
-  grad.addColorStop(1, ESPRESSO);
+// 좌측정렬 골드 룰 + 다이아몬드 마커 — 다른 3종의 가운데 덤벨형 디바이더와 다른 모양.
+function drawRule(ctx: Ctx, x: number, y: number, w: number) {
+  ctx.strokeStyle = "rgba(201,138,63,0.55)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(x + w, y);
+  ctx.stroke();
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(Math.PI / 4);
+  ctx.fillStyle = GOLD;
+  ctx.fillRect(-4, -4, 8, 8);
+  ctx.restore();
+}
+
+// 우상단의 작은 단색 핀 스탬프 — 지도 큐레이션 모티프는 유지하되 단순한 실루엣으로 축소.
+function drawStampPin(ctx: Ctx, cx: number, cy: number, r: number) {
+  const tipY = cy + r * 2.1;
   ctx.beginPath();
   ctx.moveTo(cx, tipY);
   ctx.bezierCurveTo(cx - r * 0.55, cy + r * 1.1, cx - r, cy + r * 0.45, cx - r, cy);
   ctx.arc(cx, cy, r, Math.PI, 0, false);
   ctx.bezierCurveTo(cx + r, cy + r * 0.45, cx + r * 0.55, cy + r * 1.1, cx, tipY);
   ctx.closePath();
-  ctx.fillStyle = grad;
+  ctx.fillStyle = GOLD;
+  ctx.globalAlpha = 0.85;
   ctx.fill();
-
-  ctx.lineWidth = Math.max(2, r * 0.03);
-  ctx.strokeStyle = "rgba(201,138,63,0.55)";
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.arc(cx, cy, r * 0.54, 0, Math.PI * 2);
-  ctx.fillStyle = CREAM;
-  ctx.fill();
-
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.rotate(-0.32);
-  ctx.beginPath();
-  ctx.ellipse(0, 0, r * 0.3, r * 0.42, 0, 0, Math.PI * 2);
-  ctx.fillStyle = ESPRESSO;
-  ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(0, -r * 0.38);
-  ctx.bezierCurveTo(r * 0.22, -r * 0.14, -r * 0.22, r * 0.14, 0, r * 0.38);
-  ctx.lineWidth = Math.max(2, r * 0.045);
-  ctx.strokeStyle = CREAM;
-  ctx.lineCap = "round";
-  ctx.stroke();
-  ctx.restore();
+  ctx.globalAlpha = 1;
 }
 
 function resolveLines(lines: string[], region: string): string[] {
@@ -206,37 +206,40 @@ function resolveLines(lines: string[], region: string): string[] {
 }
 
 function drawCopyPoster(ctx: Ctx, preset: CopyPreset, region: string) {
-  const W = SIZE, H = SIZE, cx = W / 2;
-  drawBackground(ctx, W, H);
+  const W = SIZE, H = SIZE;
+  const LEFT = W * 0.12;
+  const MAX_W = W - LEFT * 2;
+
+  drawNightBackground(ctx, W, H);
+  drawCornerBrackets(ctx, W, H);
+  drawStampPin(ctx, W * 0.885, H * 0.115, W * 0.026);
 
   const headline = resolveLines(preset.headline, region);
   const sub = resolveLines(preset.sub, region);
 
-  const pinCy = H * 0.185;
-  drawPin(ctx, cx, pinCy, W * 0.055);
+  drawQuoteMark(ctx, LEFT - 10, H * 0.36, 170);
 
-  txt(ctx, preset.eyebrow, cx, H * 0.29, `700 27px ${FONT}`, BROWN_SOFT, { ls: 5 });
+  txt(ctx, preset.eyebrow, LEFT, H * 0.21, `700 24px ${FONT}`, GOLD_SOFT, { align: "left", ls: 2 });
 
-  const headlineFont = fitFontLines(ctx, headline, W * 0.82, headline.length > 1 ? 68 : 78);
-  const headlineTop = H * 0.42;
+  const headlineFont = fitFontLines(ctx, headline, MAX_W, headline.length > 1 ? 64 : 74);
+  const headlineTop = H * 0.365;
   const headlineGap = H * 0.095;
-  headline.forEach((line, i) => {
-    txt(ctx, line, cx, headlineTop + headlineGap * i, headlineFont, i === headline.length - 1 ? CARAMEL : ESPRESSO);
-  });
+  headline.forEach((line, i) =>
+    txt(ctx, line, LEFT, headlineTop + headlineGap * i, headlineFont, i === headline.length - 1 ? GOLD_SOFT : INK, {
+      align: "left",
+    }),
+  );
 
-  const dividerY = headlineTop + headlineGap * (headline.length - 1) + H * 0.075;
-  drawDivider(ctx, cx, dividerY);
+  const ruleY = headlineTop + headlineGap * (headline.length - 1) + H * 0.075;
+  drawRule(ctx, LEFT, ruleY, W * 0.2);
 
-  const subFont = fitFontLines(ctx, sub, W * 0.78, 34, "400");
-  const subTop = dividerY + H * 0.075;
-  const subGap = H * 0.06;
-  sub.forEach((line, i) => {
-    txt(ctx, line, cx, subTop + subGap * i, subFont, SUBTEXT);
-  });
+  const subFont = fitFontLines(ctx, sub, MAX_W, 31, "400");
+  const subTop = ruleY + H * 0.07;
+  const subGap = H * 0.055;
+  sub.forEach((line, i) => txt(ctx, line, LEFT, subTop + subGap * i, subFont, SUB_INK, { align: "left" }));
 
-  drawDivider(ctx, cx, H * 0.86);
-  txt(ctx, "dongnecoffeenote.com", cx, H * 0.915, `700 44px ${FONT}`, ESPRESSO);
-  txt(ctx, "@dongnecoffeenote", cx, H * 0.955, `400 26px ${FONT}`, BROWN);
+  txt(ctx, "dongnecoffeenote.com", W / 2, H * 0.915, `700 42px ${FONT}`, GOLD_SOFT);
+  txt(ctx, "@dongnecoffeenote", W / 2, H * 0.955, `400 25px ${FONT}`, FAINT_INK);
 }
 
 export default function PosterCopyPage() {
@@ -298,9 +301,10 @@ export default function PosterCopyPage() {
         <div className="text-[#9c6b3f] text-xs tracking-[0.3em] uppercase mb-2">Caption Studio</div>
         <h1 className="text-3xl font-bold mb-1">홍보카피 포스터</h1>
         <p className="text-[13px] text-[#8a7458] mb-6 leading-relaxed">
-          최근 확정된 인스타 홍보카피 4종 중 하나를 골라 &ldquo;{REGION_TOKEN}&rdquo; 자리에 원하는 지역명을
-          자유롭게 입력하면 실시간 미리보기에 바로 반영돼요. DB 지역 목록에 제한되지 않아 어떤 지역명이든 입력할 수
-          있어요.
+          확정된 인스타 홍보카피 {PRESETS.length}종 중 하나를 골라 &ldquo;{REGION_TOKEN}&rdquo; 자리에 원하는
+          지역명을 자유롭게 입력하면 실시간 미리보기에 바로 반영돼요. 통합 추천안·공감형·취향/결·짧고임팩트에
+          스토리텔링·후킹 질문·통계 인용형을 더해 문장 뼈대 자체가 서로 달라요. DB 지역 목록에 제한되지 않아 어떤
+          지역명이든 입력할 수 있어요.
         </p>
 
         <section className="bg-white/60 border border-[#e6dcc8] rounded-xl p-4 mb-5">
@@ -330,7 +334,7 @@ export default function PosterCopyPage() {
 
         <section className="mb-5">
           <div className="text-[13px] font-bold mb-2">3. 미리보기 · 다운로드</div>
-          <div className="rounded-xl overflow-hidden shadow-lg border border-[#e0d3bd] bg-[#F7F1E6] max-w-[440px] mx-auto">
+          <div className="rounded-xl overflow-hidden shadow-lg border border-[#2b2018] max-w-[440px] mx-auto">
             <canvas
               ref={canvasRef}
               width={SIZE}
@@ -348,9 +352,9 @@ export default function PosterCopyPage() {
         </section>
 
         <p className="text-[11px] text-[#a8927a] leading-relaxed">
-          ※ 4종 모두 서비스 브랜드 톤(크림·에스프레소·골드·Gowun Batang·더블프레임)을 그대로 따르고, DB 조회 없이
-          브라우저에서만 렌더링돼요. 지역명은 자유 입력이라 어떤 텍스트를 넣어도 실제 존재 여부와 무관하게
-          렌더링됩니다 — 게시 전 직접 확인해 주세요.
+          ※ 다른 포스터 타입과 달리 다크 배경·골드 코너브래킷의 에디토리얼 톤으로 차별화했어요. DB 조회 없이
+          브라우저에서만 렌더링되고, 어떤 프리셋에도 특정 카페명은 등장하지 않아요(지역명만 자유 입력). 지역명은 자유
+          입력이라 어떤 텍스트를 넣어도 실제 존재 여부와 무관하게 렌더링됩니다 — 게시 전 직접 확인해 주세요.
         </p>
       </div>
     </main>

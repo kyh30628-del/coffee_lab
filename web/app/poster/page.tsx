@@ -30,8 +30,8 @@ const CARDS: { href: string; icon: string; title: string; desc: string; meta: st
     href: "/poster/copy",
     icon: "✍️",
     title: "홍보카피 포스터",
-    desc: "확정된 홍보카피 4종 중 골라 지역명을 자유 입력하면 실시간 반영되는 카피 포스터",
-    meta: "1080 × 1080 · 카피 4종",
+    desc: "스토리텔링·후킹 질문·통계 인용 등 7종 카피 중 골라 지역명을 자유 입력하면 실시간 반영되는 카피 포스터",
+    meta: "1080 × 1080 · 카피 7종",
   },
 ];
 

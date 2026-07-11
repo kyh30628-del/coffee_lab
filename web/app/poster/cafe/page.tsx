@@ -2,19 +2,19 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import BackLink from "../../BackLink";
 
-// 카페소개 포스터 — 특정 검증등급 카페 1곳을 소개하는 인스타 포스터(1080×1080).
-// 이틀에 1회 게시 주기에 맞춰 검증등급 카페를 순환 추천하되, 대표님이 검색으로 직접 골라 바꿀 수 있다.
+// 카페소개 포스터 — "매거진 인터뷰 카드" 컨셉. 다른 3종(캐러셀·지역·카피)의 골드/슬레이트 악센트·중앙정렬 알약형
+// 배지와 달리 이 타입은 러스트(테라코타) 악센트 + 대각선 리본 배지 + 좌측정렬 헤드라인 + 크롭마크 프레임 +
+// 인용구 뒤 대형 워터마크 따옴표로 차별화한다.
+// 특정 검증등급 카페 1곳을 소개하는 인스타 포스터(1080×1080). 이틀에 1회 게시 주기에 맞춰 검증등급 카페를
+// 순환 추천하되, 대표님이 검색으로 직접 골라 바꿀 수 있다.
 // 카페명·태그라인(synth_identity)·하이라이트·후기 발췌는 전부 DB 실측(synth_reviews 등) 기반 — 지어내지 않는다.
 // 사진은 자동 수집하지 않는다 — 대표님이 직접촬영본/무료라이선스 사진을 업로드했을 때만 '포토형'에 쓰인다.
 // 반복 노출 시 협찬 오인을 막기 위해 두 템플릿 모두 "제휴·협찬 아님" 문구를 항상 표기한다.
 
 const CREAM = "#F7F1E6";
 const ESPRESSO = "#2B2018";
-const BROWN = "#6B4A2E";
-const CARAMEL = "#A9682F";
-const GOLD = "#C98A3F";
-const GOLD_TEXT = "#E8B87A";
-const BROWN_SOFT = "#9C6B3F";
+const RUST = "#A64B2A";
+const RUST_SOFT = "#D98B62";
 const SUBTEXT = "#6B5A48";
 const MUTED = "#8A7A68";
 const FONT = '"Gowun Batang", AppleMyungjo, "Noto Serif KR", serif';
@@ -33,12 +33,20 @@ type CafeDetail = {
 };
 type SearchHit = { id: number; name: string; area: string | null };
 
-function txt(ctx: Ctx, str: string, x: number, y: number, font: string, color: string, ls = 0) {
-  ctx.textAlign = "center";
+function txt(
+  ctx: Ctx,
+  str: string,
+  x: number,
+  y: number,
+  font: string,
+  color: string,
+  opts: { align?: CanvasTextAlign; ls?: number } = {},
+) {
+  ctx.textAlign = opts.align ?? "left";
   ctx.textBaseline = "alphabetic";
   ctx.fillStyle = color;
   ctx.font = font;
-  if ("letterSpacing" in ctx) (ctx as Ctx & { letterSpacing: string }).letterSpacing = `${ls}px`;
+  if ("letterSpacing" in ctx) (ctx as Ctx & { letterSpacing: string }).letterSpacing = `${opts.ls ?? 0}px`;
   ctx.fillText(str, x, y);
   if ("letterSpacing" in ctx) (ctx as Ctx & { letterSpacing: string }).letterSpacing = "0px";
 }
@@ -74,7 +82,7 @@ function wrapLines(ctx: Ctx, text: string, maxWidth: number, font: string): stri
 function drawWrappedFixed(
   ctx: Ctx,
   text: string,
-  cx: number,
+  x: number,
   startY: number,
   maxWidth: number,
   font: string,
@@ -90,59 +98,59 @@ function drawWrappedFixed(
     while (last.length > 1 && ctx.measureText(`${last}…`).width > maxWidth) last = last.slice(0, -1);
     lines[maxLines - 1] = `${last}…`;
   }
-  lines.forEach((line, i) => txt(ctx, line, cx, startY + i * lineHeight, font, color));
+  lines.forEach((line, i) => txt(ctx, line, x, startY + i * lineHeight, font, color));
   return lines.length;
 }
 
-function drawStain(ctx: Ctx, cx: number, cy: number, r: number) {
-  ctx.save();
-  ctx.strokeStyle = "rgba(201,165,116,0.18)";
-  ctx.lineWidth = r * 0.12;
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.restore();
+// 크롭마크(카메라 프레이밍 표시) — 다른 3종의 연속 프레임과 달리 모서리에서 살짝 띄운 짧은 표시선.
+function drawCropMarks(ctx: Ctx, W: number, H: number, m: number) {
+  const L = 26, gap = 14;
+  ctx.strokeStyle = RUST;
+  ctx.lineWidth = 3;
+  ctx.lineCap = "square";
+  const corners: [number, number, number, number][] = [
+    [m, m, 1, 1],
+    [W - m, m, -1, 1],
+    [m, H - m, 1, -1],
+    [W - m, H - m, -1, -1],
+  ];
+  for (const [x, y, dx, dy] of corners) {
+    ctx.beginPath();
+    ctx.moveTo(x - gap * dx, y);
+    ctx.lineTo(x - gap * dx - L * dx, y);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x, y - gap * dy);
+    ctx.lineTo(x, y - gap * dy - L * dy);
+    ctx.stroke();
+  }
 }
 
 function drawFrame(ctx: Ctx, W: number, H: number) {
   ctx.fillStyle = CREAM;
   ctx.fillRect(0, 0, W, H);
   const cx = W / 2;
-  const vg = ctx.createRadialGradient(cx, H * 0.3, 40, cx, H * 0.34, W * 0.95);
-  vg.addColorStop(0, "rgba(255,251,242,0.7)");
-  vg.addColorStop(1, "rgba(206,183,150,0.16)");
+  const vg = ctx.createRadialGradient(cx, H * 0.28, 40, cx, H * 0.3, W * 0.9);
+  vg.addColorStop(0, "rgba(255,247,238,0.6)");
+  vg.addColorStop(1, "rgba(196,120,90,0.14)");
   ctx.fillStyle = vg;
   ctx.fillRect(0, 0, W, H);
-  drawStain(ctx, W * 0.92, H * 0.08, W * 0.14);
-  drawStain(ctx, W * 0.06, H * 0.94, W * 0.11);
-  const m = 42;
-  if (typeof ctx.roundRect === "function") {
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = ESPRESSO;
-    ctx.beginPath();
-    ctx.roundRect(m, m, W - m * 2, H - m * 2, 34);
-    ctx.stroke();
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = "rgba(201,138,63,0.6)";
-    ctx.beginPath();
-    ctx.roundRect(m + 12, m + 12, W - (m + 12) * 2, H - (m + 12) * 2, 26);
-    ctx.stroke();
-  }
+
+  const m = 40;
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = ESPRESSO;
+  ctx.strokeRect(m, m, W - m * 2, H - m * 2);
+  drawCropMarks(ctx, W, H, m);
 }
 
-function drawDivider(ctx: Ctx, cx: number, dy: number) {
-  ctx.strokeStyle = GOLD;
-  ctx.lineWidth = 2;
+// 좌측 기준 짧은 러스트 룰 — 다른 3종의 가운데 덤벨형·전체폭형과 다른 형태.
+function drawRule(ctx: Ctx, x: number, y: number, w: number) {
+  ctx.strokeStyle = RUST;
+  ctx.lineWidth = 3;
   ctx.beginPath();
-  ctx.moveTo(cx - 130, dy);
-  ctx.lineTo(cx - 18, dy);
-  ctx.moveTo(cx + 18, dy);
-  ctx.lineTo(cx + 130, dy);
+  ctx.moveTo(x, y);
+  ctx.lineTo(x + w, y);
   ctx.stroke();
-  ctx.fillStyle = GOLD;
-  ctx.beginPath();
-  ctx.arc(cx, dy, 5, 0, Math.PI * 2);
-  ctx.fill();
 }
 
 function drawPin(ctx: Ctx, cx: number, cy: number, r: number) {
@@ -159,7 +167,7 @@ function drawPin(ctx: Ctx, cx: number, cy: number, r: number) {
   ctx.fillStyle = grad;
   ctx.fill();
   ctx.lineWidth = Math.max(2, r * 0.03);
-  ctx.strokeStyle = "rgba(201,138,63,0.55)";
+  ctx.strokeStyle = "rgba(166,75,42,0.55)";
   ctx.stroke();
   ctx.beginPath();
   ctx.arc(cx, cy, r * 0.5, 0, Math.PI * 2);
@@ -167,68 +175,85 @@ function drawPin(ctx: Ctx, cx: number, cy: number, r: number) {
   ctx.fill();
 }
 
-function drawGradePill(ctx: Ctx, cx: number, cy: number, label: string) {
-  const font = `700 26px ${FONT}`;
+// 대각선 리본 배지 — 다른 3종의 중앙정렬 알약형 등급 배지와 다른, 코너를 가로지르는 리본 형태.
+// 캔버스 원점(0,0)이 아니라 코너 안쪽의 피벗점을 기준으로 회전시켜 텍스트가 캔버스 밖으로 밀려나지 않게 한다.
+function drawGradeRibbon(ctx: Ctx, label: string) {
+  const text = `✓ ${label} 등급`;
+  const font = `700 24px ${FONT}`;
   ctx.font = font;
-  const label2 = `✓ ${label} 등급`;
-  const tw = ctx.measureText(label2).width;
-  const padX = 26;
-  const h = 50;
-  const w = tw + padX * 2;
-  const x = cx - w / 2;
-  const y = cy - h / 2;
-  ctx.beginPath();
-  if (ctx.roundRect) ctx.roundRect(x, y, w, h, h / 2);
-  else ctx.rect(x, y, w, h);
-  ctx.fillStyle = ESPRESSO;
-  ctx.fill();
-  txt(ctx, label2, cx, cy + 9, font, GOLD_TEXT);
+  const w = Math.max(230, ctx.measureText(text).width + 60);
+  const h = 48;
+  const pivotX = 100, pivotY = 100;
+  ctx.save();
+  ctx.translate(pivotX, pivotY);
+  ctx.rotate(-Math.PI / 4);
+  ctx.fillStyle = RUST;
+  ctx.fillRect(-w / 2, -h / 2, w, h);
+  ctx.fillStyle = CREAM;
+  ctx.font = font;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, 0, 2);
+  ctx.restore();
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
 }
 
-function drawChipsRow(ctx: Ctx, cx: number, cy: number, chips: { emoji: string; label: string }[]) {
+function drawChipsRow(ctx: Ctx, left: number, cy: number, chips: { emoji: string; label: string }[]) {
   if (!chips.length) return;
   const font = `400 26px ${FONT}`;
   ctx.font = font;
   const padX = 20;
   const gap = 14;
   const h = 44;
-  const labels = chips.map((c) => `${c.emoji} ${c.label}`);
-  const widths = labels.map((l) => ctx.measureText(l).width + padX * 2);
-  const total = widths.reduce((a, b) => a + b, 0) + gap * (chips.length - 1);
-  let x = cx - total / 2;
-  for (let i = 0; i < chips.length; i++) {
-    const w = widths[i];
+  let x = left;
+  for (const c of chips) {
+    const label = `${c.emoji} ${c.label}`;
+    const w = ctx.measureText(label).width + padX * 2;
     const y = cy - h / 2;
     ctx.beginPath();
     if (ctx.roundRect) ctx.roundRect(x, y, w, h, h / 2);
     else ctx.rect(x, y, w, h);
-    ctx.fillStyle = "rgba(201,138,63,0.14)";
+    ctx.fillStyle = "rgba(166,75,42,0.12)";
     ctx.fill();
     ctx.lineWidth = 2;
-    ctx.strokeStyle = "rgba(201,138,63,0.55)";
+    ctx.strokeStyle = "rgba(166,75,42,0.5)";
     ctx.stroke();
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.font = font;
     ctx.fillStyle = ESPRESSO;
-    ctx.fillText(labels[i], x + w / 2, cy + 1);
+    ctx.fillText(label, x + w / 2, cy + 1);
     ctx.textBaseline = "alphabetic";
+    ctx.textAlign = "left";
     x += w + gap;
   }
 }
 
-function drawQuoteCard(ctx: Ctx, cx: number, top: number, w: number, h: number, quote: string) {
-  const x = cx - w / 2;
+// 인용구 카드 — 뒤편에 대형 워터마크 따옴표를 깔아 매거진 풀쿼트 느낌을 낸다.
+function drawQuoteCard(ctx: Ctx, x: number, top: number, w: number, h: number, quote: string) {
   ctx.beginPath();
-  if (ctx.roundRect) ctx.roundRect(x, top, w, h, 20);
+  if (ctx.roundRect) ctx.roundRect(x, top, w, h, 4);
   else ctx.rect(x, top, w, h);
   ctx.fillStyle = "rgba(255,255,255,0.55)";
   ctx.fill();
   ctx.lineWidth = 2;
-  ctx.strokeStyle = "rgba(201,138,63,0.35)";
+  ctx.strokeStyle = "rgba(166,75,42,0.4)";
   ctx.stroke();
-  txt(ctx, "“ 검증 후기 중", cx, top + 42, `700 24px ${FONT}`, BROWN_SOFT, 2);
-  drawWrappedFixed(ctx, quote, cx, top + 86, w - 70, `400 32px ${FONT}`, ESPRESSO, 40, 3);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x, top, w, h);
+  ctx.clip();
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = "rgba(166,75,42,0.15)";
+  ctx.font = `700 150px Georgia, ${FONT}`;
+  ctx.fillText("“", x + 8, top + 110);
+  ctx.restore();
+
+  txt(ctx, "검증 후기 중", x + 32, top + 42, `700 24px ${FONT}`, RUST_SOFT, { ls: 2 });
+  drawWrappedFixed(ctx, quote, x + 32, top + 86, w - 64, `400 32px ${FONT}`, ESPRESSO, 40, 3);
 }
 
 function drawCoverImage(ctx: Ctx, img: HTMLImageElement, x: number, y: number, w: number, h: number) {
@@ -259,80 +284,93 @@ function taglineOf(identity: string | null): string | null {
   return segs.slice(0, IDENTITY_SEGMENTS_SHOWN).join(" · ") || identity;
 }
 
-// ── 카드형(2안) — 사진 없이 텍스트·지도핀 모티프 중심 ──
+// ── 카드형(2안) — 사진 없이 텍스트·좌측정렬 헤드라인 중심 ──
 function drawCardTemplate(ctx: Ctx, cafe: CafeDetail) {
-  const W = SIZE, H = SIZE, cx = W / 2;
+  const W = SIZE, H = SIZE;
+  const left = 40 + 46;
+  const right = W - 40 - 46;
   drawFrame(ctx, W, H);
+  drawGradeRibbon(ctx, cafe.synthGrade || "검증");
 
-  txt(ctx, "오늘의 카페 소개", cx, H * 0.085, `700 26px ${FONT}`, BROWN_SOFT, 6);
-  drawGradePill(ctx, cx, H * 0.145, cafe.synthGrade || "검증");
+  txt(ctx, "오늘의 카페 소개", left, H * 0.195, `700 24px ${FONT}`, RUST_SOFT, { ls: 4 });
 
-  const nameFont = fitFont(ctx, cafe.name, 900, 60);
-  txt(ctx, cafe.name, cx, H * 0.235, nameFont, ESPRESSO);
+  const nameFont = fitFont(ctx, cafe.name, right - left, 64);
+  txt(ctx, cafe.name, left, H * 0.265, nameFont, ESPRESSO);
   const areaLine = [cafe.area, `검증 후기 ${cafe.reviewCount}건`].filter(Boolean).join(" · ");
-  txt(ctx, areaLine, cx, H * 0.285, `400 30px ${FONT}`, SUBTEXT);
+  txt(ctx, areaLine, left, H * 0.31, `400 28px ${FONT}`, SUBTEXT);
 
-  drawDivider(ctx, cx, H * 0.325);
+  drawRule(ctx, left, H * 0.348, W * 0.2);
 
   const tagline = taglineOf(cafe.identity);
-  if (tagline) drawWrappedFixed(ctx, tagline, cx, H * 0.385, 880, `400 34px ${FONT}`, ESPRESSO, 44, 2);
+  let y = H * 0.38;
+  if (tagline) {
+    const lines = drawWrappedFixed(ctx, tagline, left, y, right - left, `400 34px ${FONT}`, ESPRESSO, 44, 2);
+    y += lines * 44 + 20;
+  }
 
-  if (cafe.highlights.length) drawChipsRow(ctx, cx, H * 0.5, cafe.highlights);
+  if (cafe.highlights.length) {
+    drawChipsRow(ctx, left, y, cafe.highlights);
+    y += 60;
+  }
 
-  if (cafe.quote) drawQuoteCard(ctx, cx, H * 0.555, 880, 200, cafe.quote);
+  if (cafe.quote) drawQuoteCard(ctx, left, y, right - left, 190, cafe.quote);
 
-  txt(ctx, "제휴·협찬 아님 · 검증 후기 기반 객관적 소개", cx, H * 0.8, `400 24px ${FONT}`, MUTED);
-  drawDivider(ctx, cx, H * 0.838);
-  txt(ctx, "dongnecoffeenote.com", cx, H * 0.888, `700 40px ${FONT}`, ESPRESSO);
-  txt(ctx, "@dongnecoffeenote", cx, H * 0.93, `400 26px ${FONT}`, BROWN);
+  txt(ctx, "제휴·협찬 아님 · 검증 후기 기반 객관적 소개", left, H * 0.86, `400 22px ${FONT}`, MUTED);
+  drawRule(ctx, left, H * 0.888, right - left);
+  txt(ctx, "dongnecoffeenote.com", left, H * 0.93, `700 38px ${FONT}`, ESPRESSO);
+  txt(ctx, "@dongnecoffeenote", right, H * 0.93, `400 24px ${FONT}`, RUST_SOFT, { align: "right" });
 }
 
-// ── 포토형(3안) — 상단 사진 히어로 + 하단 정보 패널. 사진은 대표님이 직접 업로드했을 때만 사용 ──
+// ── 포토형(3안) — 상단 사진 히어로 + 하단 좌측정렬 정보 패널. 사진은 대표님이 직접 업로드했을 때만 사용 ──
 function drawPhotoTemplate(ctx: Ctx, cafe: CafeDetail, photo: HTMLImageElement | null) {
-  const W = SIZE, H = SIZE, cx = W / 2;
-  const m = 42;
+  const W = SIZE, H = SIZE;
+  const m = 40;
+  const left = m + 46;
+  const right = W - m - 46;
   drawFrame(ctx, W, H);
 
-  const heroTop = m + 12;
-  const heroH = H * 0.52;
+  const heroTop = m + 14;
+  const heroH = H * 0.5;
   if (photo) {
-    drawCoverImage(ctx, photo, m + 12, heroTop, W - (m + 12) * 2, heroH);
+    drawCoverImage(ctx, photo, m + 14, heroTop, W - (m + 14) * 2, heroH);
     const grad = ctx.createLinearGradient(0, heroTop + heroH - 140, 0, heroTop + heroH);
     grad.addColorStop(0, "rgba(43,32,24,0)");
     grad.addColorStop(1, "rgba(43,32,24,0.55)");
     ctx.fillStyle = grad;
-    ctx.fillRect(m + 12, heroTop + heroH - 140, W - (m + 12) * 2, 140);
+    ctx.fillRect(m + 14, heroTop + heroH - 140, W - (m + 14) * 2, 140);
   } else {
     const grad = ctx.createLinearGradient(0, heroTop, 0, heroTop + heroH);
     grad.addColorStop(0, "#4A3320");
     grad.addColorStop(1, ESPRESSO);
     ctx.fillStyle = grad;
-    ctx.fillRect(m + 12, heroTop, W - (m + 12) * 2, heroH);
-    drawPin(ctx, cx, heroTop + heroH * 0.42, 78);
-    txt(ctx, "사진 없이 소개 중", cx, heroTop + heroH * 0.86, `400 26px ${FONT}`, "rgba(247,241,230,0.75)");
+    ctx.fillRect(m + 14, heroTop, W - (m + 14) * 2, heroH);
+    drawPin(ctx, W / 2, heroTop + heroH * 0.42, 78);
+    txt(ctx, "사진 없이 소개 중", W / 2, heroTop + heroH * 0.86, `400 26px ${FONT}`, "rgba(247,241,230,0.75)", {
+      align: "center",
+    });
   }
-  drawGradePill(ctx, cx, heroTop + 46, cafe.synthGrade || "검증");
+  drawGradeRibbon(ctx, cafe.synthGrade || "검증");
 
-  let y = heroTop + heroH + 62;
-  const nameFont = fitFont(ctx, cafe.name, 900, 52);
-  txt(ctx, cafe.name, cx, y, nameFont, ESPRESSO);
-  y += 42;
+  let y = heroTop + heroH + 64;
+  const nameFont = fitFont(ctx, cafe.name, right - left, 52);
+  txt(ctx, cafe.name, left, y, nameFont, ESPRESSO);
+  y += 40;
   const areaLine = [cafe.area, `검증 후기 ${cafe.reviewCount}건`].filter(Boolean).join(" · ");
-  txt(ctx, areaLine, cx, y, `400 27px ${FONT}`, SUBTEXT);
-  y += 46;
+  txt(ctx, areaLine, left, y, `400 26px ${FONT}`, SUBTEXT);
+  y += 44;
 
   const tagline = taglineOf(cafe.identity);
   if (tagline) {
-    const lines = drawWrappedFixed(ctx, tagline, cx, y, 880, `400 29px ${FONT}`, ESPRESSO, 38, 1);
-    y += lines * 38 + 14;
+    const lines = drawWrappedFixed(ctx, tagline, left, y, right - left, `400 28px ${FONT}`, ESPRESSO, 36, 1);
+    y += lines * 36 + 16;
   }
   if (cafe.quote) {
-    drawQuoteCard(ctx, cx, y, 880, 150, cafe.quote);
-    y += 150 + 30;
+    drawQuoteCard(ctx, left, y, right - left, 150, cafe.quote);
+    y += 150 + 28;
   }
 
-  txt(ctx, "제휴·협찬 아님 · 검증 후기 기반 객관적 소개", cx, H * 0.93, `400 22px ${FONT}`, MUTED);
-  txt(ctx, "dongnecoffeenote.com", cx, H * 0.965, `700 30px ${FONT}`, ESPRESSO);
+  txt(ctx, "제휴·협찬 아님 · 검증 후기 기반 객관적 소개", left, H * 0.955, `400 21px ${FONT}`, MUTED);
+  txt(ctx, "dongnecoffeenote.com", right, H * 0.955, `700 28px ${FONT}`, ESPRESSO, { align: "right" });
 }
 
 type Template = "card" | "photo";
@@ -479,7 +517,7 @@ export default function CafePosterPage() {
     >
       <div className="max-w-4xl mx-auto px-6 py-10">
         <BackLink to="/poster" label="포스터" className="text-[#9c6b3f] mb-4" />
-        <div className="text-[#9c6b3f] text-xs tracking-[0.3em] uppercase mb-2">Cafe Spotlight</div>
+        <div className="text-[#a64b2a] text-xs tracking-[0.3em] uppercase mb-2">Cafe Spotlight</div>
         <h1 className="text-3xl font-bold mb-1">카페소개 포스터</h1>
         <p className="text-[13px] text-[#8a7458] mb-6 leading-relaxed">
           검증등급 카페 1곳을 소개하는 인스타 포스터예요. 이틀에 1회 주기로 카페를 자동 추천하지만, 아래 검색으로

@@ -2,17 +2,19 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import BackLink from "../../BackLink";
 
-// 지역소개 포스터 — 구/동 단위로 검증등급 상위 카페 3~5곳(이름+한줄 하이라이트)을 소개하는 인스타 포스터(1080×1080).
+// 지역소개 포스터 — "데이터 리포트 카드" 컨셉. 다른 3종(캐러셀·카페·카피)의 골드/센터정렬/더블프레임과 달리
+// 이 타입은 슬레이트-올리브 악센트 + 좌측정렬 마스트헤드 + 도트그리드 배경 + 단선 사각프레임으로 차별화한다.
+// 구/동 단위로 검증등급 상위 카페 3~5곳(이름+한줄 하이라이트)을 소개하는 인스타 포스터(1080×1080).
 // 특정 카페 단독홍보가 아니라 "지역 전체 큐레이션" 톤을 유지한다 — "이 동네엔 이런 검증된 곳들이 있다".
-// 카페 수·리뷰 수 같은 숫자 통계는 하단 작은 배지로 축소. 카페명·하이라이트는 전부 DB 실측(cafes) 기반 — 지어내지 않는다.
+// 카페 수·리뷰 수 같은 숫자 통계는 하단 3분할 스탯 스트립으로. 카페명·하이라이트는 전부 DB 실측(cafes) 기반 — 지어내지 않는다.
 
 const CREAM = "#F7F1E6";
 const ESPRESSO = "#2B2018";
-const BROWN = "#6B4A2E";
-const GOLD = "#C98A3F";
-const BROWN_SOFT = "#9C6B3F";
+const SLATE = "#5B6B54";
+const SLATE_SOFT = "#7C8A72";
 const SUBTEXT = "#6B5A48";
 const MUTED = "#8A7A68";
+const RULE = "rgba(91,107,84,0.35)";
 const FONT = '"Gowun Batang", AppleMyungjo, "Noto Serif KR", serif';
 const SIZE = 1080;
 
@@ -27,12 +29,20 @@ type AreaStats = {
 };
 type AreaHit = { area: string; n: number };
 
-function txt(ctx: Ctx, str: string, x: number, y: number, font: string, color: string, ls = 0) {
-  ctx.textAlign = "center";
+function txt(
+  ctx: Ctx,
+  str: string,
+  x: number,
+  y: number,
+  font: string,
+  color: string,
+  opts: { align?: CanvasTextAlign; ls?: number } = {},
+) {
+  ctx.textAlign = opts.align ?? "left";
   ctx.textBaseline = "alphabetic";
   ctx.fillStyle = color;
   ctx.font = font;
-  if ("letterSpacing" in ctx) (ctx as Ctx & { letterSpacing: string }).letterSpacing = `${ls}px`;
+  if ("letterSpacing" in ctx) (ctx as Ctx & { letterSpacing: string }).letterSpacing = `${opts.ls ?? 0}px`;
   ctx.fillText(str, x, y);
   if ("letterSpacing" in ctx) (ctx as Ctx & { letterSpacing: string }).letterSpacing = "0px";
 }
@@ -49,55 +59,55 @@ function fitFont(ctx: Ctx, text: string, maxWidth: number, baseSize: number, wei
   return font;
 }
 
-function drawStain(ctx: Ctx, cx: number, cy: number, r: number) {
+// 도트그리드 텍스처 — 다른 3종의 비네트+원두자국 배경과 다른 "리포트/지도" 무드.
+function drawDotGrid(ctx: Ctx, W: number, H: number) {
   ctx.save();
-  ctx.strokeStyle = "rgba(201,165,116,0.18)";
-  ctx.lineWidth = r * 0.12;
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.stroke();
+  ctx.fillStyle = "rgba(91,107,84,0.16)";
+  const gap = 34;
+  for (let y = gap; y < H - gap; y += gap) {
+    for (let x = gap; x < W - gap; x += gap) {
+      ctx.beginPath();
+      ctx.arc(x, y, 1.4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
   ctx.restore();
 }
 
+// 라운드 더블프레임 대신 단선 사각 프레임 + 좌상단 탭.
 function drawFrame(ctx: Ctx, W: number, H: number) {
   ctx.fillStyle = CREAM;
   ctx.fillRect(0, 0, W, H);
-  const cx = W / 2;
-  const vg = ctx.createRadialGradient(cx, H * 0.3, 40, cx, H * 0.34, W * 0.95);
-  vg.addColorStop(0, "rgba(255,251,242,0.7)");
-  vg.addColorStop(1, "rgba(206,183,150,0.16)");
-  ctx.fillStyle = vg;
-  ctx.fillRect(0, 0, W, H);
-  drawStain(ctx, W * 0.92, H * 0.08, W * 0.14);
-  drawStain(ctx, W * 0.06, H * 0.94, W * 0.11);
-  const m = 42;
-  if (typeof ctx.roundRect === "function") {
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = ESPRESSO;
-    ctx.beginPath();
-    ctx.roundRect(m, m, W - m * 2, H - m * 2, 34);
-    ctx.stroke();
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = "rgba(201,138,63,0.6)";
-    ctx.beginPath();
-    ctx.roundRect(m + 12, m + 12, W - (m + 12) * 2, H - (m + 12) * 2, 26);
-    ctx.stroke();
-  }
+  drawDotGrid(ctx, W, H);
+
+  const m = 46;
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = ESPRESSO;
+  ctx.strokeRect(m, m, W - m * 2, H - m * 2);
 }
 
-function drawDivider(ctx: Ctx, cx: number, dy: number) {
-  ctx.strokeStyle = GOLD;
-  ctx.lineWidth = 2;
+// 좌상단 탭 — 라벨 텍스트 폭에 맞춰 배경을 그려 잘림을 방지한다.
+function drawLabelTab(ctx: Ctx, m: number, label: string) {
+  const font = `700 22px ${FONT}`;
+  const ls = 4;
+  ctx.font = font;
+  const textW = ctx.measureText(label).width + ls * label.length;
+  const padX = 22;
+  const h = 56;
+  const w = textW + padX * 2;
+  ctx.fillStyle = ESPRESSO;
+  ctx.fillRect(m, m, w, h);
+  txt(ctx, label, m + padX, m + h * 0.64, font, CREAM, { ls });
+}
+
+// 가운데 덤벨형 대신 좌측 기준 전체폭 룰.
+function drawFullRule(ctx: Ctx, x: number, y: number, w: number) {
+  ctx.strokeStyle = RULE;
+  ctx.lineWidth = 1.5;
   ctx.beginPath();
-  ctx.moveTo(cx - 130, dy);
-  ctx.lineTo(cx - 18, dy);
-  ctx.moveTo(cx + 18, dy);
-  ctx.lineTo(cx + 130, dy);
+  ctx.moveTo(x, y);
+  ctx.lineTo(x + w, y);
   ctx.stroke();
-  ctx.fillStyle = GOLD;
-  ctx.beginPath();
-  ctx.arc(cx, dy, 5, 0, Math.PI * 2);
-  ctx.fill();
 }
 
 function ellipsize(ctx: Ctx, text: string, maxWidth: number, font: string): string {
@@ -108,87 +118,82 @@ function ellipsize(ctx: Ctx, text: string, maxWidth: number, font: string): stri
   return `${t}…`;
 }
 
-// 카페 하나의 소개 행 — 번호·이름·(있으면) 후기 기반 한줄 하이라이트. rowH에 비례해 배치하므로 3~5곳 모두 자연스럽다.
-function drawCafeRow(ctx: Ctx, cx: number, rowTop: number, rowH: number, index: number, cafe: TopCafe) {
-  const ord = `0${index + 1}`;
-  txt(ctx, ord, cx, rowTop + rowH * 0.22, `700 22px ${FONT}`, GOLD, 5);
+// 카페 하나의 소개 행 — 큰 인덱스 번호(좌) + 이름·하이라이트(우), 전부 좌측정렬 리스트업 스타일.
+function drawCafeRow(ctx: Ctx, left: number, right: number, rowTop: number, rowH: number, index: number, cafe: TopCafe) {
+  const ord = `${index + 1}`.padStart(2, "0");
+  txt(ctx, ord, left, rowTop + rowH * 0.62, `700 46px ${FONT}`, SLATE_SOFT);
 
-  const nameSize = rowH >= 150 ? 50 : rowH >= 115 ? 44 : 38;
-  const nameFont = fitFont(ctx, cafe.name, 820, nameSize);
-  const nameY = cafe.highlight ? rowTop + rowH * 0.52 : rowTop + rowH * 0.58;
-  txt(ctx, cafe.name, cx, nameY, nameFont, ESPRESSO);
+  const textX = left + 84;
+  const maxW = right - textX;
+  const nameSize = rowH >= 150 ? 46 : rowH >= 115 ? 40 : 35;
+  const nameFont = fitFont(ctx, cafe.name, maxW, nameSize);
+  const nameY = cafe.highlight ? rowTop + rowH * 0.44 : rowTop + rowH * 0.56;
+  txt(ctx, cafe.name, textX, nameY, nameFont, ESPRESSO);
 
   if (cafe.highlight) {
-    const hlSize = rowH >= 150 ? 27 : rowH >= 115 ? 25 : 23;
+    const hlSize = rowH >= 150 ? 25 : rowH >= 115 ? 23 : 21;
     const hlFont = `400 ${hlSize}px ${FONT}`;
-    txt(ctx, ellipsize(ctx, cafe.highlight, 820, hlFont), cx, rowTop + rowH * 0.8, hlFont, SUBTEXT);
+    txt(ctx, ellipsize(ctx, cafe.highlight, maxW, hlFont), textX, rowTop + rowH * 0.72, hlFont, SUBTEXT);
   }
 }
 
-function drawRowRule(ctx: Ctx, cx: number, y: number) {
-  ctx.strokeStyle = "rgba(201,138,63,0.22)";
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.moveTo(cx - 150, y);
-  ctx.lineTo(cx + 150, y);
-  ctx.stroke();
-}
+// 하단 3분할 스탯 스트립 — 다른 3종의 알약형 배지와 다른 사각 그리드형.
+function drawStatStrip(ctx: Ctx, left: number, right: number, top: number, h: number, stats: AreaStats) {
+  const cells: [string, string][] = [
+    [String(stats.cafeCount), "카페"],
+    [String(stats.verifiedCount), "검증등급"],
+    [String(stats.verifiedReviews), "검증 후기"],
+  ];
+  const w = right - left;
+  const cellW = w / cells.length;
 
-// 숫자 통계는 더 이상 주인공이 아니라 하단의 작은 보조 배지 하나로 축소.
-function drawStatBadge(ctx: Ctx, cx: number, cy: number, stats: AreaStats) {
-  const font = `400 24px ${FONT}`;
-  ctx.font = font;
-  const label = `카페 ${stats.cafeCount}곳 · 검증등급 ${stats.verifiedCount}곳 · 검증 후기 ${stats.verifiedReviews}건`;
-  const tw = ctx.measureText(label).width;
-  const padX = 26;
-  const h = 46;
-  const w = tw + padX * 2;
-  const x = cx - w / 2;
-  const y = cy - h / 2;
-  ctx.beginPath();
-  if (ctx.roundRect) ctx.roundRect(x, y, w, h, h / 2);
-  else ctx.rect(x, y, w, h);
-  ctx.fillStyle = "rgba(255,255,255,0.5)";
-  ctx.fill();
+  ctx.strokeStyle = RULE;
   ctx.lineWidth = 1.5;
-  ctx.strokeStyle = "rgba(201,138,63,0.45)";
-  ctx.stroke();
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillStyle = SUBTEXT;
-  ctx.font = font;
-  ctx.fillText(label, cx, cy + 1);
-  ctx.textBaseline = "alphabetic";
+  ctx.strokeRect(left, top, w, h);
+  for (let i = 1; i < cells.length; i++) {
+    ctx.beginPath();
+    ctx.moveTo(left + cellW * i, top);
+    ctx.lineTo(left + cellW * i, top + h);
+    ctx.stroke();
+  }
+
+  cells.forEach(([value, label], i) => {
+    const cx = left + cellW * i + cellW / 2;
+    txt(ctx, value, cx, top + h * 0.52, `700 44px ${FONT}`, ESPRESSO, { align: "center" });
+    txt(ctx, label, cx, top + h * 0.82, `400 22px ${FONT}`, MUTED, { align: "center" });
+  });
 }
 
 function drawAreaPoster(ctx: Ctx, stats: AreaStats) {
-  const W = SIZE, H = SIZE, cx = W / 2;
+  const W = SIZE, H = SIZE;
+  const m = 46;
+  const left = m + 34;
+  const right = W - m - 34;
   drawFrame(ctx, W, H);
+  drawLabelTab(ctx, m, "AREA REPORT");
 
-  txt(ctx, "지역 큐레이션", cx, H * 0.095, `700 26px ${FONT}`, BROWN_SOFT, 8);
+  const nameFont = fitFont(ctx, stats.area, right - left, 92);
+  txt(ctx, stats.area, left, H * 0.225, nameFont, ESPRESSO);
+  txt(ctx, "이 동네, 검증된 카페들", left, H * 0.27, `400 30px ${FONT}`, SUBTEXT);
 
-  const nameFont = fitFont(ctx, stats.area, 900, 90);
-  txt(ctx, stats.area, cx, H * 0.19, nameFont, ESPRESSO);
-  txt(ctx, "이 동네, 검증된 카페들", cx, H * 0.245, `400 32px ${FONT}`, SUBTEXT);
-
-  drawDivider(ctx, cx, H * 0.29);
+  drawFullRule(ctx, left, H * 0.31, right - left);
 
   const cafes = stats.topCafes.slice(0, 5);
-  const listTop = H * 0.335;
-  const listBottom = H * 0.775;
+  const listTop = H * 0.34;
+  const listBottom = H * 0.735;
   const rowH = (listBottom - listTop) / Math.max(1, cafes.length);
   cafes.forEach((cafe, i) => {
     const rowTop = listTop + rowH * i;
-    drawCafeRow(ctx, cx, rowTop, rowH, i, cafe);
-    if (i < cafes.length - 1) drawRowRule(ctx, cx, rowTop + rowH);
+    drawCafeRow(ctx, left, right, rowTop, rowH, i, cafe);
+    if (i < cafes.length - 1) drawFullRule(ctx, left, rowTop + rowH, right - left);
   });
 
-  drawStatBadge(ctx, cx, H * 0.815, stats);
+  drawStatStrip(ctx, left, right, H * 0.76, 88, stats);
 
-  txt(ctx, "특정 카페 홍보 아님 · 검증 데이터 기반 지역 큐레이션", cx, H * 0.865, `400 22px ${FONT}`, MUTED);
-  drawDivider(ctx, cx, H * 0.9);
-  txt(ctx, "dongnecoffeenote.com", cx, H * 0.945, `700 42px ${FONT}`, ESPRESSO);
-  txt(ctx, "동네 커피 노트", cx, H * 0.98, `400 24px ${FONT}`, BROWN);
+  txt(ctx, "특정 카페 홍보 아님 · 검증 데이터 기반 지역 큐레이션", left, H * 0.882, `400 21px ${FONT}`, MUTED);
+  drawFullRule(ctx, left, H * 0.9, right - left);
+  txt(ctx, "dongnecoffeenote.com", left, H * 0.935, `700 36px ${FONT}`, ESPRESSO);
+  txt(ctx, "동네 커피 노트", right, H * 0.935, `400 24px ${FONT}`, SLATE, { align: "right" });
 }
 
 export default function AreaPosterPage() {
@@ -297,12 +302,12 @@ export default function AreaPosterPage() {
     >
       <div className="max-w-4xl mx-auto px-6 py-10">
         <BackLink to="/poster" label="포스터" className="text-[#9c6b3f] mb-4" />
-        <div className="text-[#9c6b3f] text-xs tracking-[0.3em] uppercase mb-2">Area Spotlight</div>
+        <div className="text-[#5b6b54] text-xs tracking-[0.3em] uppercase mb-2">Area Report</div>
         <h1 className="text-3xl font-bold mb-1">지역소개 포스터</h1>
         <p className="text-[13px] text-[#8a7458] mb-6 leading-relaxed">
           구/동 단위로 검증등급 상위 카페 3~5곳을 이름·한줄 하이라이트로 소개하는 지역 큐레이션 포스터예요. 특정
           카페 단독홍보가 아닌 &ldquo;이 동네엔 이런 검증된 곳들이 있다&rdquo; 톤을 유지해요. 하이라이트는 실제
-          검증 후기에서 뽑은 특징이고, 숫자 통계는 하단 작은 배지로만 표기해요.
+          검증 후기에서 뽑은 특징이고, 숫자 통계는 하단 리포트 스트립으로만 표기해요.
         </p>
 
         {/* 지역 선택 */}
