@@ -1,5 +1,6 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 type R = { memory: string; photos: string[]; favorite: boolean; date?: string };
 const fmt = (d?: string) => (d ? new Date(d).toLocaleDateString("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit" }) : "");
@@ -9,6 +10,28 @@ const SERIF = "'Gowun Batang', AppleMyungjo, 'Apple SD Gothic Neo', 'Noto Serif 
 export default function VisitorReviews({ reviews }: { reviews: R[] }) {
   const [openList, setOpenList] = useState(false);
   const [detail, setDetail] = useState<R | null>(null);
+  const anyOpen = openList || !!detail;
+  // 배경(카페상세) 스크롤 잠금 — 인앱 CafePanel의 aside는 transform 컨테이닝 블록이라
+  // 그 안의 fixed 모달이 aside 스크롤량만큼 함께 밀리는 문제가 있었음(같은 클래스 버그를
+  // 겪은 "전체 리뷰 모달"과 동일 원인). 모달은 아래에서 body로 portal해 분리하고,
+  // 여기서는 배경 스크롤 자체를 잠가 모달이 떠 있는 동안 레이아웃이 안 움직이게 한다.
+  useEffect(() => {
+    if (!anyOpen) return;
+    const scrollY = window.scrollY;
+    const { style } = document.body;
+    const prev = { position: style.position, top: style.top, width: style.width, overflow: style.overflow };
+    style.position = "fixed";
+    style.top = `-${scrollY}px`;
+    style.width = "100%";
+    style.overflow = "hidden";
+    return () => {
+      style.position = prev.position;
+      style.top = prev.top;
+      style.width = prev.width;
+      style.overflow = prev.overflow;
+      window.scrollTo(0, scrollY);
+    };
+  }, [anyOpen]);
   if (!reviews?.length) return null;
   return (
     <>
@@ -21,8 +44,9 @@ export default function VisitorReviews({ reviews }: { reviews: R[] }) {
         <span className="text-[#d6336c] text-[15px] font-bold shrink-0">›</span>
       </button>
 
-      {/* 목록 모달(최신순) */}
-      {openList && (
+      {/* 목록 모달(최신순) — body로 portal해 배경(카페상세)의 transform/overflow 조상과
+          완전히 분리된 별도 스택킹 컨텍스트로 띄운다. 배경 스크롤·리사이즈에 영향받지 않음. */}
+      {openList && createPortal(
         <div className="fixed inset-0 z-[5500] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)", fontFamily: SERIF }} onClick={() => setOpenList(false)}>
           <div className="w-full max-w-lg bg-[#fdfaf4] rounded-t-2xl max-h-[88dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-[#f0e6d4]">
@@ -42,11 +66,12 @@ export default function VisitorReviews({ reviews }: { reviews: R[] }) {
               ))}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* 상세 모달 */}
-      {detail && (
+      {/* 상세 모달 — 동일하게 body로 portal */}
+      {detail && createPortal(
         <div className="fixed inset-0 z-[6000] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.55)", fontFamily: SERIF }} onClick={() => setDetail(null)}>
           <div className="w-full max-w-lg bg-[#fdfaf4] rounded-t-2xl max-h-[90dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-[#f0e6d4]">
@@ -63,7 +88,8 @@ export default function VisitorReviews({ reviews }: { reviews: R[] }) {
               <div className="text-[11px] text-[#a8927a]">위치 인증 방문 · {fmt(detail.date)}</div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
