@@ -16,11 +16,6 @@ type Stats = {
     quality: { avg_noise_pct: number | null; raw: number; rejected: number };
     topRegions: { region: string; n: number }[];
   };
-  visitors: {
-    total: number; agreed: number; declined: number; located: number; returners: number; active7d: number; new7d: number; avg_visits: number | null;
-    daily: { d: string; n: number }[];
-    regions: { region: string; n: number }[];
-  };
 };
 
 const GRADE_COLOR: Record<string, string> = { 검증: "#5f7355", 참고: "#9c6b3f", 후보: "#a8927a", 미합성: "#cbd5e1" };
@@ -473,9 +468,9 @@ export default function AdminPage() {
                     <span className="text-[11px] font-bold text-sky-700">전체 대시보드 →</span>
                   </div>
                   <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10.5px] text-stone-600">
-                    <span>오늘 <b className="text-sky-700">{tower.traffic.dau}</b></span>
-                    <span>주간 <b className="text-sky-700">{tower.traffic.wau}</b></span>
-                    <span>월간 <b className="text-sky-700">{tower.traffic.mau}</b></span>
+                    <span>일간(DAU) <b className="text-sky-700">{tower.traffic.dau}</b></span>
+                    <span>주간(WAU) <b className="text-sky-700">{tower.traffic.wau}</b></span>
+                    <span>월간(MAU) <b className="text-sky-700">{tower.traffic.mau}</b></span>
                     <span>재방문 <b className="text-stone-700">{tower.traffic.retention?.returning ?? 0}</b></span>
                   </div>
                 </button>
@@ -801,7 +796,7 @@ export default function AdminPage() {
 
         {/* ===== 모달 트리거 (접속·유입 현황 · 구독 카페 현황 · 유튜브 수집 · 내 카페 기록) ===== */}
         <div className="admin-chip-grid mb-6">
-          <button onClick={openAnalytics} className="py-2.5 text-[13px] font-bold text-stone-700 bg-white border border-stone-300 rounded-xl hover:bg-stone-50">📊 접속·유입 현황{tower?.traffic?.dau != null ? ` (오늘 ${tower.traffic.dau})` : ""}</button>
+          <button onClick={openAnalytics} className="py-2.5 text-[13px] font-bold text-stone-700 bg-white border border-stone-300 rounded-xl hover:bg-stone-50">📊 접속·유입 현황{tower?.traffic?.dau != null ? ` (DAU ${tower.traffic.dau})` : ""}</button>
           <button onClick={() => setShowSubsModal(true)} className="py-2.5 text-[13px] font-bold text-stone-700 bg-white border border-stone-300 rounded-xl hover:bg-stone-50">💳 구독 카페 현황{subscribers.length ? ` (${subscribers.length})` : ""}</button>
           <button onClick={() => { setShowNL(true); loadNL(); }} className="py-2.5 text-[13px] font-bold text-stone-700 bg-white border border-stone-300 rounded-xl hover:bg-stone-50">📰 주간 뉴스레터{nlList.length ? ` (${nlList.length})` : ""}</button>
           <button onClick={() => setShowYtModal(true)} className="py-2.5 text-[13px] font-bold text-stone-700 bg-white border border-stone-300 rounded-xl hover:bg-stone-50">📺 유튜브 수집{yt?.withYt != null ? ` (${yt.withYt})` : ""}</button>
@@ -1030,13 +1025,13 @@ export default function AdminPage() {
                             <span className="relative flex h-2.5 w-2.5"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span></span>
                             <span className="text-[12px] font-bold text-stone-700">실시간 <span className="text-emerald-600 text-[16px]">{a.realtime?.active5 ?? 0}</span>명 접속 중</span>
                           </div>
-                          <div className="text-[11px] text-stone-500">30분 내 {a.realtime?.active30 ?? 0}명 · 오늘 방문 <b className="text-sky-700">{a.today?.visitors ?? 0}</b> · 페이지뷰 <b className="text-sky-700">{(a.today?.pageviews ?? 0).toLocaleString()}</b></div>
+                          <div className="text-[11px] text-stone-500">30분 내 {a.realtime?.active30 ?? 0}명 · KST 오늘(자정~) 방문 <b className="text-sky-700">{a.today?.visitors ?? 0}</b> · 페이지뷰 <b className="text-sky-700">{(a.today?.pageviews ?? 0).toLocaleString()}</b></div>
                         </div>
-                        <p className="text-[9.5px] text-stone-400 mt-1.5">지금 사이트에 머무는 사람(최근 5분 활동)과 오늘 다녀간 수입니다.</p>
+                        <p className="text-[9.5px] text-stone-400 mt-1.5">지금 사이트에 머무는 사람(최근 5분 활동)과 KST 자정부터 지금까지 다녀간 수입니다. <b>※ 아래 '일간(DAU)'은 집계 기준(자정~ 대신 최근 24시간)이 달라 이 수치와 미묘하게 다를 수 있어요.</b></p>
                       </div>
                       <div className="grid grid-cols-3 gap-2">
                         {[
-                          { ic: "👥", l: "월간 방문자", v: a.kpi?.mau, sub: `주간 ${a.kpi?.wau} · 오늘 ${a.kpi?.dau}`, desc: "30일 순방문자(중복 제외)" },
+                          { ic: "👥", l: "월간 방문자", v: a.kpi?.mau, sub: `주간(WAU) ${a.kpi?.wau} · 일간(DAU) ${a.kpi?.dau}`, desc: "최근 24시간 rolling 순방문자(중복 제외) — 위 'KST 오늘' 카드와 집계 기준 다름" },
                           { ic: "📄", l: "페이지뷰", v: a.kpi?.pageviews30d, sub: `방문당 ${a.kpi?.mau ? (a.kpi.pageviews30d / a.kpi.mau).toFixed(1) : "-"}장`, desc: "열어본 화면 총수(30일)" },
                           { ic: "🔁", l: "재방문율", v: `${retRate}%`, sub: `재방문 ${a.retention?.returning}·신규 ${a.retention?.newcomers}`, desc: "다시 찾은 사람 비율" },
                         ].map((k, i) => (
