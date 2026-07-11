@@ -61,3 +61,4 @@
 | 2026-07-10 14:50 | #294 | 대시보드 지표 정리 | 03f6d086 | med | 수정: web/app/admin/page.tsx, web/app/api/cron-verify/route.ts. 중복 제거: /admin의 "접속·방문자 현황" 섹션(총방문자/위치동 |
 | 2026-07-10 15:34 | #295 | 챗 프롬프트 캐싱 적용 | 3f0ff1e8 | med | scripts/chat-watch.mjs: KB+DOCS(+CANON)를 매턴 -p인자로 재전송하던 걸 단일 --append-system-prompt-file(SYSTEM_STAT |
 | 2026-07-11 00:19 | #297 | [룰갭 P28] 상호가 업종 일반명사(영문 대여어) 자체인 카페 — 이름일치·offctx_rate 방어선 동 | e0fea712 | - | lib/reviewQuality.ts: (1) GENERIC_SUFFIX/GENERIC_WORD에 베이크샵·베이크하우스·브런치카페·베이글샵·도넛 추가 (2) coreEmpty 분기 |
+| 2026-07-11 04:31 | #299 | 카페소개 포스터 | cb9da76d | low | 신규 app/poster/cafe/page.tsx(카페소개 포스터, 검색/오늘의추천/카드형·포토형 2템플릿/PNG저장) + app/api/poster-cafe/route.ts(검증 |
