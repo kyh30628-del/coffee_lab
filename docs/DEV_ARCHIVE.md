@@ -85,3 +85,4 @@
 | 2026-07-12 08:33 | #338 | 카페 상세페이지에 '비슷한 카페 더보기' 추가 | 099bf1e2 | low | app/c/[id]/page.tsx: getNearby→getSimilar로 교체(같은 area 후보 40건 fetch 후 char_scores 결 벡터 코사인유사도 계산), li |
 | 2026-07-12 08:34 | #339 | MY PIN(내 카페 추억) 노출 강화 | 24f6e1cb | low | app/c/[id]/SaveMemoryButton.tsx에 variant="banner" 추가(기존 pill 로직 재사용, 이미 기록시 문구 변경) + app/c/[id]/page |
 | 2026-07-12 08:48 | #341 | [개발] [재발견] instagram_url 컬럼 07-01 완료처리됐지만 11일째 0/13259 채워짐 - | 650ae4e7 | - | scripts/instagram-backfill.mjs 신규: 네이버 지역검색 link 필드가 스마트플레이스 등록 인스타그램을 그대로 반환함을 실측 확인(무크롤·공식API)→카페당 |
+| 2026-07-12 08:59 | #344 | [개발] 등급강등 결정 비영속 구조갭 — downgrade는 재합성 시 조용히 원복(unpublish만 보호 | 748fe973 | - | lib/synthStore.ts: lastDowngradeCap() 가드 추가(lastUnpublishLocked와 동형) — 가장 최근 done downgrade 결정의 목표등급 |
