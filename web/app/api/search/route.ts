@@ -35,6 +35,7 @@ const CONCEPTS_BASE: { id: string; triggersKey: string; axis?: string; taste?: s
   { id: "dessert", triggersKey: "concept.dessert.triggers", axis: "dessert", uses: ["빵"], label: "디저트·빵" },
   { id: "roast", triggersKey: "concept.roast.triggers", axis: "roast", label: "직접로스팅·스페셜티" },
   { id: "space", triggersKey: "concept.space.triggers", axis: "space", label: "넓은공간" },
+  { id: "pet", triggersKey: "concept.pet.triggers", label: "반려동반" },
   { id: "acidity", triggersKey: "concept.acidity.triggers", taste: "acidity", label: "산미 또렷" },
   { id: "body", triggersKey: "concept.body.triggers", taste: "body", label: "묵직·고소" },
   { id: "sweet", triggersKey: "concept.sweet.triggers", taste: "sweet", label: "단맛" },
