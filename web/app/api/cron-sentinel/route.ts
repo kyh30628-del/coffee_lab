@@ -4,6 +4,7 @@ import { healAreaLabel, healOutOfBox } from "@/lib/synthStore";
 import { recordRun } from "@/lib/agentLog";
 import { probeConsoleKey } from "@/lib/consoleKeyProbe";
 import { loadCriteria, getCriterionSync } from "@/lib/criteria";
+import { quoteMatchConfidence, coreTokens } from "@/lib/reviewQuality";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -13,33 +14,43 @@ export const maxDuration = 300;
 //   '까페'·'대구 중구' 같은 일반어/구名 충돌로 1.0 부풀 때 못 잡던 케이스(비비·MY FAVORITE·외할머니)를 잡는다.
 //   ⚠️ 탐지·경보 전용(자동 비공개 안 함) — 붙임/띄어쓰기 변형 오탐이 있으므로 CEO/기조실장 검토 큐로만.
 const FAR_METRO = ["부산", "대구", "대전", "울산", "전주", "창원", "김해", "포항", "목포", "여수", "순천"];
-async function scanNameMismatch(): Promise<{ count: number; samples: string[] }> {
-  // SQL 프리필터: 먼 광역시 토큰이 노출후기에 든 카페만(전수 대신 후보만 → 300s 내 완료). jsonb 페이로드는
-  //   id별 청크로 받아 64MB 회피. 이후 JS로 '제목 주제(앞8자·2회+)+우리지역 아님+이름에 없음' 정밀 확인.
-  const rx = FAR_METRO.map((m) => m).join("|");
-  const cand = (await sql`SELECT id FROM cafes WHERE published AND synth_reviews IS NOT NULL AND synth_reviews::text ~ ${rx}`) as any[];
-  const ids = cand.map((r) => r.id);
-  const flagged: { id: number; name: string; area: string; hits: number; shown: number }[] = [];
-  for (let i = 0; i < ids.length; i += 40) {
-    const batch = ids.slice(i, i + 40);
-    const rows = (await sql`SELECT id, name, area, dong, synth_reviews FROM cafes WHERE id = ANY(${batch})`) as any[];
+// 한 리뷰가 '먼 광역시 주제글'인가(동명 타지역): 그 지역이 제목 주제(앞8자·2회+)+우리지역/이름/시도 아님.
+function farHit(q: string, name: string, areaTerms: string[]): boolean {
+  const fm = FAR_METRO.find((m) => q.includes(m)); if (!fm) return false;
+  if (areaTerms.some((a) => a.includes(fm)) || name.replace(/\s/g, "").includes(fm) || /(서울|경기|인천)/.test(q)) return false;
+  return q.indexOf(fm) <= 7 || q.split(fm).length - 1 >= 2;
+}
+// 🔎 전수 이름-불일치 스캔(모든 오염 클래스): ① 먼광역시 동명 ② 이름 흡수(노출후기 다수가 카페명 실언급 안 함
+//   =quoteMatchConfidence 0, 외할머니·비비·구구커피류). coherence<0.3이 일반어·구名충돌로 못 잡던 전 사각.
+//   결정론·무료(AI 0). 250s 시간컷으로 300s 크론 안전. 탐지·경보만(자동조치 안 함, 붙임/띄어쓰기 오탐은 검토큐).
+async function scanNameMismatch(): Promise<{ count: number; far: number; nameMiss: number; samples: string[] }> {
+  const t0 = Date.now(); let lo = 0; let truncated = false;
+  const flagged: { id: number; name: string; area: string; miss: number; shown: number; far: boolean; rate: number }[] = [];
+  for (let guard = 0; guard < 80; guard++) {
+    if (Date.now() - t0 > 240000) { truncated = true; break; } // 시간 안전장치(다음 실행이 이어감)
+    const rows = (await sql`SELECT id, name, area, dong, synth_reviews FROM cafes
+      WHERE published AND synth_reviews IS NOT NULL AND jsonb_array_length(synth_reviews) >= 3 AND id > ${lo}
+      ORDER BY id LIMIT 500`) as any[];
+    if (!rows.length) break; lo = rows[rows.length - 1].id;
     for (const c of rows) {
       const areaTerms = [c.area, c.dong].filter(Boolean) as string[];
       const revs = c.synth_reviews || [];
-      let hits = 0;
+      const toks = coreTokens(c.name, areaTerms);
+      const hasStrong = toks.some((t: string) => { const n = t.replace(/[^가-힣A-Za-z0-9]/g, ""); return n.length >= 3 && !/^\d+$/.test(n); }); // 고유이름 있어야(1~2자·순수숫자=약한이름 FP 배제)
+      let miss = 0, far = false;
       for (const r of revs) {
         const q = (r.quote || "") as string;
-        const fm = FAR_METRO.find((m) => q.includes(m));
-        if (!fm) continue;
-        if (areaTerms.some((a) => a.includes(fm)) || c.name.replace(/\s/g, "").includes(fm)) continue; // 우리 지역/이름이면 정상
-        if (/(서울|경기|인천)/.test(q)) continue; // 우리 시도 동반=브랜치/출신 언급 보존
-        if (q.indexOf(fm) <= 7 || q.split(fm).length - 1 >= 2) hits++; // 그 지역이 글 주제일 때만
+        if (quoteMatchConfidence(c.name, q, areaTerms) === 0) miss++;
+        if (farHit(q, c.name, areaTerms)) far = true;
       }
-      if (hits > 0) flagged.push({ id: c.id, name: c.name, area: c.area, hits, shown: revs.length });
+      const rate = miss / revs.length;
+      if (far || (hasStrong && rate >= 0.5)) flagged.push({ id: c.id, name: c.name, area: c.area, miss, shown: revs.length, far, rate });
     }
   }
-  flagged.sort((a, b) => b.hits / b.shown - a.hits / a.shown || b.hits - a.hits);
-  return { count: flagged.length, samples: flagged.slice(0, 40).map((f) => `#${f.id} ${f.name}[${f.area}] ${f.hits}/${f.shown} 먼광역시`) };
+  flagged.sort((a, b) => Number(b.far) - Number(a.far) || b.rate - a.rate);
+  const samples = flagged.slice(0, 60).map((f) => `#${f.id} ${f.name}[${f.area}] ${f.miss}/${f.shown}${f.far ? " 먼광역시" : " 이름불일치"}`);
+  if (truncated) samples.push("⚠️(시간컷—다음 실행이 이어서 스캔)");
+  return { count: flagged.length, far: flagged.filter((f) => f.far).length, nameMiss: flagged.filter((f) => !f.far && f.rate >= 0.5).length, samples };
 }
 
 // 🛡️ 데이터 정합성 센티넬 — 신뢰/해자 파수꾼. "사장님이 버그를 발견하기 전에 내가 먼저"(선제 탐지).
@@ -107,7 +118,7 @@ export async function GET(req: NextRequest) {
       name_pollution: await one(sql`SELECT count(*) c FROM cafes WHERE published AND synth_coherence IS NOT NULL AND synth_coherence < 0.3 AND COALESCE(offctx_ok,false)=false`),
     };
     // 🆕 이름-불일치/먼광역시 오염 스캔(coherence 사각 전담) — 탐지·경보만(자동 비공개 안 함).
-    const mismatch = await scanNameMismatch().catch(() => ({ count: 0, samples: [] as string[] }));
+    const mismatch = await scanNameMismatch().catch(() => ({ count: 0, far: 0, nameMiss: 0, samples: [] as string[] }));
     (checks as any).name_mismatch = mismatch.count;
     // name_mismatch는 '정합성 실패'가 아니라 검토 워치리스트 → clean 판정서 제외(경보 폭주 방지, 별도 표면화).
     const residual = Object.entries(checks).reduce((s, [k, n]) => s + (k === "name_mismatch" ? 0 : (n as number)), 0);
@@ -126,7 +137,8 @@ export async function GET(req: NextRequest) {
     await sql`INSERT INTO sentinel_reports (clean, report) VALUES (${clean}, ${JSON.stringify({ checks, nameMismatch: mismatch.samples, healed: { area: area.fixed, box: box.excluded, dup: dup.resolved }, consoleKey: probe })}::jsonb)`.catch(() => {});
 
     const probeNote = probe.signal === "ok" ? "콘솔키 크레딧 정상" : probe.signal === "credit" ? "콘솔키 크레딧 소진(콘솔경로 중단·검색 결정론폴백 정상=저영향)" : `콘솔키 프로브 ${probe.signal}`;
-    const detail = `치유 ${healedTotal}(area${area.fixed}·박스${box.excluded}·중복${dup.resolved}) · ${clean ? "정합성 OK ✅" : "⚠️ 잔여 " + flags.join(" ")} · ${probeNote}`;
+    const mmNote = mismatch.count > 0 ? ` · 🔎오염의심 ${mismatch.count}(먼광역시 ${mismatch.far}·이름불일치 ${mismatch.nameMiss})` : "";
+    const detail = `치유 ${healedTotal}(area${area.fixed}·박스${box.excluded}·중복${dup.resolved}) · ${clean ? "정합성 OK ✅" : "⚠️ 잔여 " + flags.join(" ")}${mmNote} · ${probeNote}`;
     await recordRun("cron-sentinel", true, detail, healedTotal);
     return NextResponse.json({ ok: true, ranAt: new Date().toISOString(), clean, healed: { area: area.fixed, areaNames: area.names, box: box.excluded, dup: dup.resolved, dupPairs: dup.pairs }, checks, flags, nameMismatch: mismatch, consoleKey: probe });
   } catch (e) {
