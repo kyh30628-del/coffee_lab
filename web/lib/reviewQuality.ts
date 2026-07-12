@@ -739,8 +739,38 @@ export function verifyReview(input: QualityInput): QualityResult {
       .find((nm) => nm.length >= 2 && nm !== "본" && !isNonBranchWord(nm + "점")
         && !input.name.includes(nm)
         && !areaTerms.some((a) => a.includes(nm) || nm.includes(guShort(a))));
-    if (otherBranch && !dongHere && (nameInTitle || nameInBody)) {
-      return { verdict: "rejected", score: 6, reasons: [`다른 지점 후기('${otherBranch}점' 명시, 이 동네 '${dongTerm ?? areaTerms[0] ?? ""}' 신호 없음)`], signals: sig };
+    // 룰갭 P30(coordination#178, 결재#328): OR매칭 갭 — 같은 동/구 안에 여러 지점을 운영하는 멀티지점
+    //   브랜드는 dongHere(동 단위) 확인이 무력화된다(형제 지점도 같은 동/구라 dongHere가 우연히 참).
+    //   실측: id1807(YM COFFEE 연신내 ← 구파발점 서사, 둘 다 은평구)·id3681(티에프티커피로스터스 ←
+    //   테라스점 서사, 둘 다 여의도동) 둘 다 브랜드공통토큰 OR매칭만으로 채택됐다. otherBranch('OO점'
+    //   명시)가 이미 확인된 상태에서만, 등록주소(input.addr)의 도로명이 본문에 전혀 없는데 '구/시+도로명
+    //   +번지' 형태의 완전한 다른 주소가 명시되면 dongHere의 '우연한 참'을 무시하고 타지점으로 확정한다.
+    //   ⚠️ otherBranch 없이 도로명 불일치만으로 판단하면 단일지점 카페가 오는 길·인근 도로를 언급한
+    //   정상 후기까지 오탈락한다(전수표본 회귀테스트 실측 — 도로명 단독판단은 폐기, 'OO점' 명시와 결합 필수).
+    let dongOverridden = false;
+    if (otherBranch && dongHere && input.addr) {
+      const addrRoads = (s: string): string[] => {
+        const re = /[가-힣]{2,4}(?:시|군|구)\s*[가-힣]{0,5}?\s*([가-힣A-Za-z0-9]{2,}(?:대로|로|길))\s*\d/g;
+        const out: string[] = [];
+        let m: RegExpExecArray | null;
+        while ((m = re.exec(s)) !== null) {
+          const road = m[1].replace(/\s*\d+(번?길)?$/, "").replace(/\d+$/, "");
+          if (road.length >= 2) out.push(road);
+        }
+        return out;
+      };
+      const cRoad = addrRoads(input.addr);
+      if (cRoad.length) {
+        const ownRoadHere = cRoad.some((r) => fullT.includes(r));
+        if (!ownRoadHere) {
+          const rRoad = addrRoads(fullT);
+          dongOverridden = rRoad.some((r) => !cRoad.some((cr) => cr.includes(r) || r.includes(cr)));
+        }
+      }
+    }
+    if (otherBranch && (!dongHere || dongOverridden) && (nameInTitle || nameInBody)) {
+      const why = dongOverridden ? "등록주소와 다른 도로명" : `이 동네 '${dongTerm ?? areaTerms[0] ?? ""}' 신호 없음`;
+      return { verdict: "rejected", score: 6, reasons: [`다른 지점 후기('${otherBranch}점' 명시, ${why})`], signals: sig };
     }
   }
   // 지점(브랜치) 구분: 이 카페가 '○○점'이면, 후기가 '이 지점(지점명·지역)'을 가리켜야 인정.
