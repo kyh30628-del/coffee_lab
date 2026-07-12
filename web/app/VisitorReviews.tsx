@@ -1,6 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { createPortal } from "react-dom";
+import { useLockBodyScroll } from "@/lib/useLockBodyScroll";
 
 type R = { memory: string; photos: string[]; favorite: boolean; date?: string };
 const fmt = (d?: string) => (d ? new Date(d).toLocaleDateString("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit" }) : "");
@@ -15,23 +16,7 @@ export default function VisitorReviews({ reviews }: { reviews: R[] }) {
   // 그 안의 fixed 모달이 aside 스크롤량만큼 함께 밀리는 문제가 있었음(같은 클래스 버그를
   // 겪은 "전체 리뷰 모달"과 동일 원인). 모달은 아래에서 body로 portal해 분리하고,
   // 여기서는 배경 스크롤 자체를 잠가 모달이 떠 있는 동안 레이아웃이 안 움직이게 한다.
-  useEffect(() => {
-    if (!anyOpen) return;
-    const scrollY = window.scrollY;
-    const { style } = document.body;
-    const prev = { position: style.position, top: style.top, width: style.width, overflow: style.overflow };
-    style.position = "fixed";
-    style.top = `-${scrollY}px`;
-    style.width = "100%";
-    style.overflow = "hidden";
-    return () => {
-      style.position = prev.position;
-      style.top = prev.top;
-      style.width = prev.width;
-      style.overflow = prev.overflow;
-      window.scrollTo(0, scrollY);
-    };
-  }, [anyOpen]);
+  useLockBodyScroll(anyOpen);
   if (!reviews?.length) return null;
   return (
     <>

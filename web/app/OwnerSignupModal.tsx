@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import { useLockBodyScroll } from "@/lib/useLockBodyScroll";
 
 // 사장님 카페 정보 입력 모달(공용) — /pricing(구독)·랜딩(7일 체험)·카페 등록 직후(prefillCafe) 사용.
 //   카페 검색·선택(또는 prefill 고정) → 성함·연락처·이메일·동의 → /api/subscription(pending). 승인 시 이메일로 PIN.
@@ -22,6 +23,7 @@ export default function OwnerSignupModal({ open, onClose, trial = false, prefill
 
   // 등록 직후 진입: 그 카페로 고정(검색 없이)
   useEffect(() => { if (open && prefillCafe) setPicked(prefillCafe); }, [open, prefillCafe]);
+  useLockBodyScroll(open);
   if (!open) return null;
   const reset = () => { setDone(false); setPicked(prefillCafe ?? null); setCafeQ(""); setOwnerName(""); setContact(""); setEmail(""); setBizNo(""); setBizRegBase64(""); setBizRegName(""); setConsent(false); setAttest(false); setSug([]); setErr(""); };
   const close = () => { reset(); onClose(); };

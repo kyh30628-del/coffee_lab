@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { ORG, MEMBER_INFO, JOB_TO_MEMBER, type Team, type Division, type Worker } from "@/lib/org";
+import { useLockBodyScroll } from "@/lib/useLockBodyScroll";
 
 // 경량 마크다운(회의록·조직평가 렌더용) — 제목·목록·굵게·표
 function md2html(md: string) {
@@ -101,6 +102,7 @@ export default function Lounge() {
     const id = setInterval(() => { if (document.visibilityState === "visible") load(pw); }, 30000);
     return () => clearInterval(id);
   }, [authed, pw, load]);
+  useLockBodyScroll(info !== null || composer !== null || kpiEdit !== null);
 
   const doLogin = () => { if (pw) { localStorage.setItem("adm_pw", pw); load(pw); } };
   const perf = data?.perf || {};

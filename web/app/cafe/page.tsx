@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import BackLink from "../BackLink";
+import { useLockBodyScroll } from "@/lib/useLockBodyScroll";
 
 type EvidenceReview = { quote: string; link?: string; source?: string; date?: string };
 type Cafe = {
@@ -155,6 +156,7 @@ function CafeCard({ c, pref, top, onShowEvidence }: { c: Cafe; pref: { acidity: 
 
 // 우측 슬라이드 근거 패널
 function EvidencePanel({ cafe, onClose }: { cafe: Cafe | null; onClose: () => void }) {
+  useLockBodyScroll(!!cafe);
   if (!cafe) return null;
   const reviews = cafe.synth_reviews ?? [];
   return (
