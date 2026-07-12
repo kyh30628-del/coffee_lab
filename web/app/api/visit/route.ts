@@ -32,6 +32,8 @@ async function ensure() {
   // 페이지뷰 이벤트(자체 분석 — 인기페이지·퍼널·체류). 90일 보존(orchestrator가 정리).
   await sql`CREATE TABLE IF NOT EXISTS traffic_events (id BIGSERIAL PRIMARY KEY, anon_id TEXT, path TEXT, src TEXT, ts TIMESTAMPTZ NOT NULL DEFAULT now())`;
   await sql`CREATE INDEX IF NOT EXISTS idx_traffic_events_ts ON traffic_events (ts)`;
+  // 체류시간(ms) — 페이지 이탈 시 /api/visit/duration 비콘이 진입 행에 채운다. 기존 INSERT는 이 컬럼 없이도 무해.
+  await sql`ALTER TABLE traffic_events ADD COLUMN IF NOT EXISTS duration_ms INT`;
   ensured = true;
 }
 

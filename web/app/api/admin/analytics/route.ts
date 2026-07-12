@@ -13,7 +13,8 @@ const WEEKDAY_KO = ["일", "월", "화", "수", "목", "금", "토"];
 // 🧾 일일 분석 요약 — 전일·7일평균 대비 증감(+근거) / 기기 비중 변화 / 요일·시간대 패턴을
 // 실제 수치 없이는 문장을 만들지 않는다(표본 부족 시 '분석 불가' 명시, 숫자 날조 금지).
 function buildDailyInsights(
-  daily: any[], dailySources: any[], dailyDevices: any[], hours: any[], weekdays: any[]
+  daily: any[], dailySources: any[], dailyDevices: any[], hours: any[], weekdays: any[],
+  todayInsight?: { pages: any[]; dwell: { todayMs: number | null; todayN: number; yestMs: number | null; yestN: number }; serious: { visitors: number; serious: number } }
 ): string[] {
   const insights: string[] = [];
 
@@ -117,6 +118,35 @@ function buildDailyInsights(
     }
   }
 
+  // (4) 오늘 페이지 조회 순위 / 체류시간 / 유의미한 사용자 — todayInsight가 있을 때만(표본 없으면 문장 생략)
+  if (todayInsight) {
+    const { pages, dwell, serious } = todayInsight;
+    // 오늘 가장 많이 본 페이지 유형 top (비중 = 오늘 전체 페이지뷰 대비)
+    const totalToday = (pages || []).reduce((s, p) => s + (p.views ?? 0), 0);
+    if (totalToday >= 1 && pages.length) {
+      const top = pages[0];
+      const topPct = Math.round((top.views / totalToday) * 100);
+      insights.push(`오늘 가장 많이 본 화면은 '${top.bucket}'이에요(전체 조회의 ${topPct}%, ${top.views.toLocaleString()}회).`);
+    }
+    // 오늘 평균 체류시간 + 어제 대비 증감
+    if (dwell.todayMs != null && dwell.todayN >= 3) {
+      const secToday = Math.round(dwell.todayMs / 1000);
+      let cmp = "(어제는 표본 부족으로 비교 불가)";
+      if (dwell.yestMs != null && dwell.yestN >= 3) {
+        const secYest = Math.round(dwell.yestMs / 1000);
+        const diff = secToday - secYest;
+        cmp = diff > 0 ? `어제(${secYest}초)보다 ${diff}초 길어졌어요` : diff < 0 ? `어제(${secYest}초)보다 ${Math.abs(diff)}초 짧아졌어요` : `어제(${secYest}초)와 비슷해요`;
+      }
+      insights.push(`오늘 평균 체류시간은 ${secToday}초예요. ${cmp}.`);
+    } else if ((dwell.todayN ?? 0) > 0) {
+      insights.push(`오늘 체류시간은 아직 표본이 적어(${dwell.todayN}건) 평균을 내기엔 일러요.`);
+    }
+    // 유의미한 사용자
+    if (serious.visitors >= 1) {
+      insights.push(`오늘 방문자 ${serious.visitors}명 중 ${serious.serious}명이 진지하게 둘러봤어요(카페 2곳+ 조회·60초+ 체류·재방문 중 하나).`);
+    }
+  }
+
   return insights;
 }
 
@@ -125,6 +155,7 @@ export async function GET(req: NextRequest) {
   try {
     await ensureSchema();
     await sql`CREATE TABLE IF NOT EXISTS traffic_events (id BIGSERIAL PRIMARY KEY, anon_id TEXT, path TEXT, src TEXT, ts TIMESTAMPTZ NOT NULL DEFAULT now())`.catch(() => {});
+    await sql`ALTER TABLE traffic_events ADD COLUMN IF NOT EXISTS duration_ms INT`.catch(() => {});
 
     // 핵심 KPI (방문자 — user_consents)
     const kpi = (await sql.query(
@@ -287,7 +318,60 @@ export async function GET(req: NextRequest) {
 
     const pageviews30d = (await sql`SELECT COUNT(*)::int n FROM traffic_events WHERE ts > now()-interval '30 days'`.catch(() => [{ n: 0 }]))[0]?.n ?? 0;
 
-    const dailyInsights = buildDailyInsights(daily, dailySources, dailyDevices, hours, weekdays);
+    // 📄 (1) 오늘(KST) 페이지 카테고리별 조회 순위 — 카페상세·홈지도·지역·취향·컬렉션·사장님 등으로 묶어 top 순위·비중
+    const todayPages = (await sql`
+      SELECT CASE
+        WHEN path = '/' OR path = '' OR path IS NULL THEN '홈·지도'
+        WHEN path LIKE '/c/%' THEN '카페상세'
+        WHEN path LIKE '/area%' THEN '지역'
+        WHEN path LIKE '/taste%' THEN '취향'
+        WHEN path LIKE '/collections%' THEN '컬렉션'
+        WHEN path LIKE '/share%' THEN '공유'
+        WHEN path LIKE '/owner%' OR path LIKE '/cafe%' OR path LIKE '/business%' OR path LIKE '/pricing%' THEN '사장님'
+        ELSE '기타' END AS bucket,
+        COUNT(*)::int views, COUNT(DISTINCT anon_id)::int uniques
+      FROM traffic_events
+      WHERE (ts AT TIME ZONE 'Asia/Seoul')::date = (now() AT TIME ZONE 'Asia/Seoul')::date
+      GROUP BY 1 ORDER BY views DESC LIMIT 5`.catch(() => [])) as any[];
+
+    // ⏱️ (2) 체류시간 — 오늘·어제(KST) 평균 체류(ms)와 표본수. duration_ms 채워진 페이지뷰만.
+    const dwellRows = (await sql`
+      SELECT (ts AT TIME ZONE 'Asia/Seoul')::date AS d,
+             ROUND(AVG(duration_ms))::int avg_ms, COUNT(*)::int n
+      FROM traffic_events
+      WHERE duration_ms IS NOT NULL AND ts > now()-interval '2 days'
+      GROUP BY 1`.catch(() => [])) as any[];
+    const todayKst = (await sql`SELECT (now() AT TIME ZONE 'Asia/Seoul')::date::text d`.catch(() => [{ d: "" }]))[0]?.d ?? "";
+    const dwellToday = dwellRows.find((r) => String(r.d) === todayKst) ?? null;
+    const dwellYest = dwellRows.find((r) => String(r.d) !== todayKst) ?? null;
+
+    // 🧑 (3) '유의미한 사용자' — 오늘 방문자 중 서로 다른 카페상세 2곳+ OR 체류 60초+ OR 재방문(세션 2회+, make-digest와 동일 기준)
+    const serious = (await sql`
+      WITH today AS (
+        SELECT anon_id,
+               COUNT(DISTINCT path) FILTER (WHERE path LIKE '/c/%') AS cafes,
+               MAX(COALESCE(duration_ms, 0)) AS max_dur
+        FROM traffic_events
+        WHERE (ts AT TIME ZONE 'Asia/Seoul')::date = (now() AT TIME ZONE 'Asia/Seoul')::date
+        GROUP BY anon_id
+      )
+      SELECT COUNT(*)::int visitors,
+             COUNT(*) FILTER (
+               WHERE cafes >= 2 OR max_dur >= 60000
+               OR anon_id IN (SELECT anon_id FROM user_consents WHERE COALESCE(sessions, 1) >= 2)
+             )::int serious
+      FROM today`.catch(() => [{ visitors: 0, serious: 0 }]))[0] as any;
+
+    const todayInsight = {
+      pages: todayPages,
+      dwell: {
+        todayMs: dwellToday?.avg_ms ?? null, todayN: dwellToday?.n ?? 0,
+        yestMs: dwellYest?.avg_ms ?? null, yestN: dwellYest?.n ?? 0,
+      },
+      serious: { visitors: serious?.visitors ?? 0, serious: serious?.serious ?? 0 },
+    };
+
+    const dailyInsights = buildDailyInsights(daily, dailySources, dailyDevices, hours, weekdays, todayInsight);
 
     // 🧑 진짜 사용자 신호 — 봇으로 설명 안 되는 신호(재방문·기능사용·검색유입 재방문율)
     // r2/r3/r5 = 페이지 열람 2/3/5장+ (visit_count=페이지뷰). trueReturn = 다른 날 다시 온 진짜 재방문.
@@ -378,7 +462,7 @@ export async function GET(req: NextRequest) {
       consent: { pinged: consent?.pinged ?? 0, asked: consent?.asked ?? 0, agreed: consent?.agreed ?? 0, located: consent?.located ?? 0 },
       visitorRegions,
       sources, retention: { newcomers: retention?.newcomers ?? 0, returning: retention?.ret ?? 0 },
-      devices, daily, dailyInsights, pageBuckets, topCafes, topRegions, hours,
+      devices, daily, dailyInsights, todayInsight, pageBuckets, topCafes, topRegions, hours,
       funnel: { visitors: funnel?.visitors ?? 0, viewedCafe: funnel?.viewed_cafe ?? 0, browsed: funnel?.browsed ?? 0, engaged },
     });
   } catch (e) {

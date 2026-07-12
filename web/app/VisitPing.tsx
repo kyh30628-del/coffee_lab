@@ -35,5 +35,43 @@ export default function VisitPing() {
       }).catch(() => {});
     } catch {}
   }, [pathname]);
+
+  // ⏱️ 체류시간 계측 — 이 페이지 진입~이탈 경과(ms)를 이탈 시점(탭 숨김·페이지 이동·언로드)에 비콘 전송.
+  //   진입 시 /api/visit이 만든 페이지뷰 행에 duration_ms를 채운다. sendBeacon 우선, 실패 시 fetch keepalive.
+  //   내부(대표·팀)·식별자 없음은 제외(page-view 집계와 동일 기준).
+  useEffect(() => {
+    const path = pathname || window.location.pathname;
+    const enter = Date.now();
+    let sent = false;
+    const send = () => {
+      if (sent) return;
+      const dur = Date.now() - enter;
+      // 스치듯 지나간(0.5초 미만)·비정상(6시간 초과) 체류는 노이즈로 버림
+      if (dur < 500 || dur > 6 * 60 * 60 * 1000) return;
+      let a: string | null = null;
+      try {
+        a = localStorage.getItem("dcn_anon");
+        if (!a || localStorage.getItem("dcn_internal") === "1") return;
+      } catch { return; }
+      sent = true;
+      const payload = JSON.stringify({ anonId: a, path, durationMs: dur });
+      try {
+        if (navigator.sendBeacon) {
+          navigator.sendBeacon("/api/visit/duration", new Blob([payload], { type: "application/json" }));
+        } else {
+          fetch("/api/visit/duration", { method: "POST", headers: { "Content-Type": "application/json" }, body: payload, keepalive: true }).catch(() => {});
+        }
+      } catch {}
+    };
+    const onVisibility = () => { if (document.visibilityState === "hidden") send(); };
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", send);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", send);
+      send(); // SPA 내부 라우트 변경 = 이 페이지 이탈
+    };
+  }, [pathname]);
+
   return null;
 }
