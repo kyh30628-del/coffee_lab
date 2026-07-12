@@ -740,6 +740,29 @@ export function verifyReview(input: QualityInput): QualityResult {
   if (otherDistrictInTitle && !areaPresent) {
     return { verdict: "rejected", score: 7, reasons: [`다른 생활권 동명 카페 추정(제목 '${otherDistrictInTitle}', 대상 지역 언급 없음)`], signals: sig };
   }
+  // 🚏 [먼 광역시 동명] 제목이 다른 광역시(부산·대구·대전…)를 명시하는데 우리 카페가 그 광역시가 아니면,
+  //   '중구' 같은 구名이 우연히 겹쳐 areaPresent=true가 돼도(대구 중구 ↔ 서울 중구) 배제한다.
+  //   서울 중구 '비비'에 '대구 남산동 카페 비비'가, '더달달'에 '부산 남포동 더달달'이 붙던 근본 오염 차단.
+  //   ⚠️ 오탐 방지: ①수도권 접경·브랜치흔한(천안·청주·충주·아산·원주·춘천)·감성컨셉남발(제주) 제외 ②우리 시·도(서울/경기/인천)가
+  //   제목에 함께 있으면(브랜치 소개 '부산 유명 X 서울점') 보존 ③카페 이름/주소에 그 지역어 있으면 정상(부산케키·해운대달맞이빵).
+  //   ⚠️ 일반명사 충돌 지역어(진주=보석·경주=경주마/최씨·통영/거제 등)는 제외 — 명백 광역시/대도시만.
+  const HARD_FAR_METRO = ["부산", "대구", "대전", "울산", "광주광역시", "전주", "창원", "김해", "포항", "목포", "여수", "순천"];
+  const farInTitle = HARD_FAR_METRO.find((m) => title.includes(m));
+  if (farInTitle) {
+    const farBare = farInTitle.replace("광역시", "");
+    const cafeInFar = areaTerms.some((a) => a.includes(farBare)) || nameNoSpace.includes(farBare);
+    // 우리 지역이 제목에 함께 있으면(브랜치 소개·출신언급 '대전서 유명한 X의 부천점') 보존.
+    //   시·도뿐 아니라 우리 카페의 area/dong 토큰이 제목에 있으면 '우리 지역 글'로 본다(강남·공덕·우면동 등).
+    //   ⚠️ 2자 구名(중구·서구…)은 '대구 중구'처럼 먼 광역시에 붙어 우리 지역으로 오인되므로 제외 —
+    //   동(洞, 3자+)·시도(서울/경기/인천)만 '우리 지역 글' 신호로 인정(황학동은 대구 후기에 안 나옴).
+    const ourAreaInTitle = /(서울|경기|인천)/.test(title) || areaTerms.some((a) => a.split(/\s+/).some((tk) => tk.length >= 3 && title.includes(tk)));
+    // '그 먼 지역이 글의 주제'인 강한 신호만: 제목 앞머리(첫 8자) 또는 2회 이상 등장.
+    //   ('대구 남산동 카페 비비'=주제 vs '…이상 대구 아재의 강남 방문기'=스침 구분, FP 차단)
+    const farStrong = title.indexOf(farBare) <= 7 || (title.split(farBare).length - 1) >= 2;
+    if (!cafeInFar && !ourAreaInTitle && farStrong) {
+      return { verdict: "rejected", score: 5, reasons: [`다른 광역시 동명 카페 추정(제목 '${farInTitle}', 우리 지역 아님)`], signals: sig };
+    }
+  }
   // 일반어 '○○점'(지점명이 아님) 제외 — 합성어 오매칭 차단. 예: 음식점·전문점·정기점(검)·관점·시점…
   const NON_BRANCH = /^(장점|단점|시점|관점|초점|약점|강점|정점|요점|중점|종점|만점|채점|별점|평점|빵점|백점|영점|매점|거점|기점|이점|반점|중간점|문제점|차이점|공통점|장단점|단골점|식당점|간점|걸점|음식점|전문점|정기점|가맹점|직영점|대리점|편의점|무인점|할인점|판매점|취약점|허점|접점|교점|꼭짓점|꼭지점|시발점|출발점|도달점|분기점|기준점|소수점|득점|실점|승점|벌점|가점|감점|배점|기본점|가산점)$/;
   // 접미사가 일반 업태인 '○○점'(지점 아님): 롯데백화점·교보문고서점·동네커피전문점… (규칙갭 탐지기가 발굴)
