@@ -4,6 +4,7 @@ import BackLink from "../../BackLink";
 import { ORG, MEMBER_INFO, type Division, type Team, type Worker } from "@/lib/org";
 import { CADENCE } from "@/lib/cadence";
 import { isSearchDegradeTrackItem, SEARCH_DEGRADE_TRACK } from "@/lib/searchDegradeTrack";
+import { useLockBodyScroll } from "@/lib/useLockBodyScroll";
 // 💬 관제 챗봇 + md2html은 /admin·/admin/org 공용 컴포넌트로 분리됨(app/admin/ChatWidget.tsx).
 import { ChatWidget, md2html } from "../ChatWidget";
 
@@ -42,6 +43,7 @@ export default function OrgDashboard() {
   const [showRhythm, setShowRhythm] = useState(false); // 조직 운영 리듬(활동+케이던스) — 기본 접힘(다른 카드와 통일)
   const [crit, setCrit] = useState<any>(null); // 🎛️ 기준 관제 상태(스냅샷·최근변경·검증에이전트 결과)
   const [showCrit, setShowCrit] = useState(false);
+  useLockBodyScroll(showOrg || !!member);
   const load = (password: string, silent = false) => {
     if (!silent) { setLoading(true); setErr(""); }
     Promise.all([

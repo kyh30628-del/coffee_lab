@@ -6,6 +6,7 @@ import { BarChart, Bar, XAxis, YAxis, Cell, ResponsiveContainer,
 import BackLink from "../BackLink";
 import InfoDot from "../InfoDot";
 import Showcase from "../Showcase";
+import { useLockBodyScroll } from "@/lib/useLockBodyScroll";
 
 type RankItem = { rank: number; name: string; count: number; grade: string | null; isMe: boolean };
 type CharItem = { key: string; label: string; emoji: string; me: number; avg: number; diff: number; meRaw?: number; hoodPenetration?: number };
@@ -68,6 +69,7 @@ export default function OwnerPage() {
   const [authReady, setAuthReady] = useState(false);
   const [pinInput, setPinInput] = useState("");
   const [pinErr, setPinErr] = useState("");
+  useLockBodyScroll(showShowcase && !!insight?.me?.id);
   useEffect(() => {
     if (typeof window === "undefined") return;
     const p = sessionStorage.getItem("dcn_owner_pw");

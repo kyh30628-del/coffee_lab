@@ -1,9 +1,11 @@
 "use client";
 import { useState, ReactNode } from "react";
+import { useLockBodyScroll } from "@/lib/useLockBodyScroll";
 
 // 영역별 기능 설명 — 작은 '!' 아이콘, 누르면 모달.
 export default function InfoDot({ title, children, dark }: { title: string; children: ReactNode; dark?: boolean }) {
   const [open, setOpen] = useState(false);
+  useLockBodyScroll(open);
   return (
     <>
       <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); setOpen(true); }}

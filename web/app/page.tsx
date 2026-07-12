@@ -7,6 +7,7 @@ import VisitorReviews from "./VisitorReviews";
 import KakaoShare from "./KakaoShare";
 import MyCafeRegModal from "./MyCafeRegModal";
 import { buildAxisDist, cafeProfile, tasteVector, tasteSimilarity, GRADE_RANK, type AxisDist } from "@/lib/cafeProfile";
+import { useLockBodyScroll } from "@/lib/useLockBodyScroll";
 
 type EvidenceReview = { quote: string; link?: string; source?: string; date?: string; trust?: "verified" | "reference" | "rejected"; score?: number; why?: string[] };
 type QualityStats = { raw: number; verified: number; reference: number; rejected: number; duplicates?: number; rejectReasons?: Record<string, number> };
@@ -413,6 +414,7 @@ export default function Home() {
   // 위치/동의 상태 (세션 캐시 안 함 — '내 위치' 누를 때만 새로 수집)
   const [consent, setConsent] = useState<"unknown" | "agreed" | "declined">("unknown");
   const [showConsent, setShowConsent] = useState(false);
+  useLockBodyScroll(explain !== null || showSearch || showConsent || showFavs || showMyCafeReg || !!selected);
   const [autoGu, setAutoGu] = useState("");   // 위치로 설정된 동네 표시(세션 한정)
   const [geoMsg, setGeoMsg] = useState("");
   const anonRef = useRef("");
@@ -1594,6 +1596,7 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
   const [loadingRev, setLoadingRev] = useState(true);
   const [promo, setPromo] = useState<any>(null);
   const [showAllReviews, setShowAllReviews] = useState(false);
+  useLockBodyScroll(showAllReviews);
   const [reviewFilter, setReviewFilter] = useState<"all" | "verified" | "reference" | "ai" | "youtube">("all");
   const [userReviews, setUserReviews] = useState<{ memory: string; photos: string[]; favorite: boolean; date: string }[]>([]); // 공개 방문자 후기
   const [highlights, setHighlights] = useState<{ label: string; emoji: string; count: number }[]>([]); // 옥석 리뷰 데이터 핵심
@@ -1964,6 +1967,7 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
 function MemoryTab({ device, visits, locked = false, sessionPin = "", onRegister, onEdit, onUnlock, onLock, onRestore }: { device: string; visits: any[]; locked?: boolean; sessionPin?: string; onRegister: () => void; onEdit?: (cafeId: number) => void; onUnlock?: (pin: string) => void; onLock?: () => void; onRestore: (dev: string) => void }) {
   const [showSettings, setShowSettings] = useState(false);
   const [viewVisit, setViewVisit] = useState<any>(null); // 추억 보기 모달(클릭 시 먼저 내용 표시 → 수정 버튼)
+  useLockBodyScroll(showSettings || viewVisit !== null);
   const [hasPin, setHasPin] = useState(false);
   const [unlockPin, setUnlockPin] = useState("");
   const [busy, setBusy] = useState(false);

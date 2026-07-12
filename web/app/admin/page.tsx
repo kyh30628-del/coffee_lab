@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import BackLink from "../BackLink";
 import { isSearchDegradeTrackItem } from "@/lib/searchDegradeTrack";
 import { ChatWidget } from "./ChatWidget";
+import { useLockBodyScroll } from "@/lib/useLockBodyScroll";
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip } from "recharts";
 
 type Cafe = {
@@ -154,6 +155,7 @@ export default function AdminPage() {
     const id = setInterval(() => loadAnalytics(pw, true), 20000);
     return () => clearInterval(id);
   }, [showAnalytics, pw]);
+  useLockBodyScroll(!!selAgent || !!todayDetail || towerFull || showVisits || showYtModal || showSubsModal || showBorderline || showAnalytics || showOnboard || showRotation || showNL);
 
   const loadVerify = (password: string) => fetch("/api/cron-verify?latest=1", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) { setVerify(d.report); setGrounding(d.grounding); setVerifyHistory(d.history ?? []); } }).catch(() => {});
   const runVerify = async () => {

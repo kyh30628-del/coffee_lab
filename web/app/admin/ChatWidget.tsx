@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
+import { useLockBodyScroll } from "@/lib/useLockBodyScroll";
 
 // 💬 관제 챗봇 — 관제탑(/admin/org)·관리자 대시보드(/admin) 공용. 플로팅 아이콘 → 모달.
 //   claude -p(구독) 경유 답을 폴링. 24h 기록. (원래 /admin/org 전용이었으나 공용 컴포넌트로 분리)
@@ -95,29 +96,7 @@ export function ChatWidget({ pw }: { pw: string }) {
   useEffect(() => { nearBottomRef.current = true; }, [mode]); // 탭 전환 시엔 항상 최신 위치로
   useEffect(() => { if (open && scrollRef.current && nearBottomRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; }, [open, msgs, loading]);
   useEffect(() => { if (open) setUnread(0); }, [open]);
-  // 🔒 모달 오픈 중 배경 스크롤 락 — iOS Safari는 overflow:hidden만으론 배경이 밀림(rubber-band 전파).
-  //   body를 position:fixed로 고정해 스크롤 자체를 원천 차단, 닫히면 원래 스크롤 위치로 복원.
-  useEffect(() => {
-    if (!open) return;
-    const scrollY = window.scrollY;
-    const body = document.body;
-    const prev = { position: body.style.position, top: body.style.top, left: body.style.left, right: body.style.right, width: body.style.width, overflow: body.style.overflow };
-    body.style.position = "fixed";
-    body.style.top = `-${scrollY}px`;
-    body.style.left = "0";
-    body.style.right = "0";
-    body.style.width = "100%";
-    body.style.overflow = "hidden";
-    return () => {
-      body.style.position = prev.position;
-      body.style.top = prev.top;
-      body.style.left = prev.left;
-      body.style.right = prev.right;
-      body.style.width = prev.width;
-      body.style.overflow = prev.overflow;
-      window.scrollTo(0, scrollY);
-    };
-  }, [open]);
+  useLockBodyScroll(open || archiveOpen);
   // ⏱ 응답 생성 경과 시간 — 탭별 시작시각(ref)에서 계산해, 탭 전환 후 돌아와도 경과가 끊기지 않음.
   useEffect(() => {
     if (!loading) { setElapsed(0); return; }

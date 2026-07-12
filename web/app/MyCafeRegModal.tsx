@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import { useLockBodyScroll } from "@/lib/useLockBodyScroll";
 
 export type MyCafeRegCafe = { id: number; name: string; area: string };
 
@@ -40,6 +41,9 @@ export default function MyCafeRegModal({ cafes, device, visits, pin = "", initia
     if (c) pick(c);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialCafeId]);
+
+  // 마운트돼있는 동안(부모가 조건부 렌더) 항상 배경 스크롤 잠금
+  useLockBodyScroll(true);
 
   // 사진 선택(여러 장) → 각각 캔버스로 1000px 리사이즈. 갤러리/카메라 모두 허용(capture 미지정). 최대 5장.
   const onPhoto = (e: any) => {
