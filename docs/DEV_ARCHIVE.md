@@ -81,3 +81,4 @@
 | 2026-07-12 07:19 | #334 | [P0] vercel.json ignoreCommand이 dev-deploy 배포를 전부 무음 스킵 — #3 | 02297e8d | - | web/vercel.json ignoreCommand 재작성: VERCEL_GIT_PREVIOUS_SHA(실제 마지막 배포 sha)를 기준으로 diff, 미설정시 HEAD~9 폴백 |
 | 2026-07-12 07:37 | #335 | [자율진단] dev-deploy 반영미확인(dev_status) 영구정체 — 실제론 배포완료인데 결재가 ap | 564c3546 | - | scripts/dev-deploy.mjs: 반영미확인(dev_status) 영구정체 근본원인 수정 — deploy_approved 재쿼리 전에 reconcileUnverified( |
 | 2026-07-12 08:24 | #337 | 네이버 롱테일 SEO — 외곽도시 콘텐츠 밀도 보강 | b5444eed | med | 수원/화성/파주/의정부/김포/양주 x 스페셜티·로스팅 결이 전 도시 공통 최약 조합(DB실측). lib/seoData.ts: getRegionTasteGradeBreakdown 추 |
+| 2026-07-12 08:30 | #336 | [자율진단] #335 반영미확인 재검증 로직이 실제로는 절대 안 불림 — run-dev-deploy.sh C | 6dda4d6a | - | scripts/reconcileUnverified.mjs 신설(반영미확인 재검증 로직 공용모듈화, dev-deploy.mjs에서 추출) + scripts/dev-claim.mjs가 |
