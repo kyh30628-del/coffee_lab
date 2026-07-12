@@ -998,8 +998,8 @@ export default function AdminPage() {
                   const maxBucket = Math.max(1, ...(a.pageBuckets || []).map((b: any) => b.views));
                   const maxHour = Math.max(1, ...(a.hours || []).map((h: any) => h.n));
                   const hourMap: Record<number, number> = {}; (a.hours || []).forEach((h: any) => { hourMap[h.h] = h.n; });
-                  const dev: Record<string, number> = { mobile: 0, desktop: 0 }; (a.devices || []).forEach((d: any) => { dev[d.dev] = d.n; });
-                  const devTotal = dev.mobile + dev.desktop || 1;
+                  const dev: Record<string, number> = { mobile: 0, desktop: 0, tablet: 0 }; (a.devices || []).forEach((d: any) => { dev[d.dev] = d.n; });
+                  const devTotal = dev.mobile + dev.desktop + dev.tablet || 1;
                   const noEvents = (a.kpi?.pageviews30d ?? 0) === 0;
                   const maxVReg = Math.max(1, ...(a.visitorRegions || []).map((r: any) => r.n));
                   const maxFav = Math.max(1, ...(a.favorites?.daily || []).map((d: any) => d.n));
@@ -1008,6 +1008,8 @@ export default function AdminPage() {
                   const newPct = a.kpi?.mau ? Math.round(a.retention?.newcomers / a.kpi.mau * 100) : 0;
                   const retPct = a.kpi?.mau ? Math.round(a.retention?.returning / a.kpi.mau * 100) : 0;
                   const mobPct = Math.round(dev.mobile / devTotal * 100);
+                  const tabPct = Math.round(dev.tablet / devTotal * 100);
+                  const pcPct = Math.max(0, 100 - mobPct - tabPct);
                   const srcTotal = (a.sources || []).reduce((t: number, x: any) => t + x.visitors, 0) || 1;
                   let peakH = -1, peakN = -1; Object.entries(hourMap).forEach(([h, n]) => { if ((n as number) > peakN) { peakN = n as number; peakH = +h; } });
                   const fSteps = [
@@ -1043,6 +1045,27 @@ export default function AdminPage() {
                           </div>
                         ))}
                       </div>
+                      {/* 🧾 일일 분석 요약 — 기존 데이터(일별 추이·유입경로)로 자동 생성한 한두 문장 요약 */}
+                      {(a.daily || []).length >= 2 && (() => {
+                        const dl = a.daily;
+                        const t = dl[dl.length - 1], y = dl[dl.length - 2];
+                        const diff = t.visitors - y.visitors;
+                        const diffPct = y.visitors ? Math.round(Math.abs(diff) / y.visitors * 100) : (t.visitors > 0 ? 100 : 0);
+                        const trendTxt = diff > 0 ? `어제보다 ${diff}명(${diffPct}%) 늘었어요` : diff < 0 ? `어제보다 ${Math.abs(diff)}명(${diffPct}%) 줄었어요` : "어제와 비슷한 수준이에요";
+                        const prev7 = dl.slice(-8, -1);
+                        const avg7 = prev7.length ? prev7.reduce((s: number, d: any) => s + d.visitors, 0) / prev7.length : 0;
+                        let anomaly = "";
+                        if (avg7 >= 3 && t.visitors >= avg7 * 1.5) anomaly = ` 최근 7일 평균(${Math.round(avg7)}명)보다 크게 늘어 급증 신호가 보여요.`;
+                        else if (avg7 >= 3 && t.visitors <= avg7 * 0.5) anomaly = ` 최근 7일 평균(${Math.round(avg7)}명)보다 크게 줄어 급감 신호가 보여요.`;
+                        const topSrc = (a.sources || [])[0];
+                        const srcTxt = topSrc ? ` 주요 유입 경로는 ${topSrc.src === "미상" ? "미상(추적 전 방문)" : topSrc.src}(${topSrc.visitors}명)이에요.` : "";
+                        return (
+                          <div className="bg-sky-50/70 border border-sky-200 rounded-xl p-3">
+                            <div className="text-[11px] font-bold text-sky-800 mb-1">🧾 일일 분석 요약</div>
+                            <p className="text-[11.5px] text-stone-700 leading-relaxed">오늘 방문 <b>{t.visitors}</b>명 · {trendTxt}.{srcTxt}{anomaly}</p>
+                          </div>
+                        );
+                      })()}
                       {/* 🧑 진짜 사용자 신호 — 봇으로 설명 안 되는 것들 */}
                       {a.realUsers && (
                         <div className="bg-emerald-50/60 border border-emerald-200 rounded-xl p-3">
@@ -1106,7 +1129,7 @@ export default function AdminPage() {
                           {(a.favorites.daily || []).length > 0 && (
                             <div className="flex items-end gap-1 h-14 mb-2">
                               {a.favorites.daily.map((d: any, i: number) => (
-                                <div key={i} className="flex-1 flex flex-col items-center justify-end gap-0.5">
+                                <div key={i} className="flex-1 h-full flex flex-col items-center justify-end gap-0.5">
                                   <div className="w-full bg-rose-400 rounded-t" style={{ height: `${(d.n / maxFav) * 100}%`, minHeight: "2px" }} title={`${d.day}: ${d.n}건`}></div>
                                   <span className="text-[7px] text-stone-400">{d.day.slice(3)}</span>
                                 </div>
@@ -1125,7 +1148,7 @@ export default function AdminPage() {
                           <p className="text-[9.5px] text-stone-400 mb-2">날짜별 방문자 수 — 늘고 주는 흐름을 봅니다. (막대에 마우스 올리면 상세)</p>
                           <div className="flex items-end gap-1 h-24">
                             {a.daily.map((d: any, i: number) => (
-                              <div key={i} className="flex-1 flex flex-col items-center justify-end gap-0.5">
+                              <div key={i} className="flex-1 h-full flex flex-col items-center justify-end gap-0.5">
                                 <div className="w-full bg-sky-400 rounded-t" style={{ height: `${(d.visitors / maxDaily) * 100}%`, minHeight: "2px" }} title={`${d.day}: 방문 ${d.visitors}·뷰 ${d.pageviews}`}></div>
                                 <span className="text-[7px] text-stone-400">{d.day.slice(3)}</span>
                               </div>
@@ -1171,13 +1194,15 @@ export default function AdminPage() {
                         </div>
                         <div className="bg-white rounded-xl border border-stone-300 p-3">
                           <div className="text-[12px] font-bold text-stone-700">접속 기기</div>
-                          <p className="text-[9.5px] text-stone-400 mb-2">모바일 vs PC 비율.</p>
+                          <p className="text-[9.5px] text-stone-400 mb-2">모바일 · 태블릿 · PC 비율.</p>
                           <div className="flex h-5 rounded-full overflow-hidden bg-stone-100 text-[9px] font-bold text-white">
                             <div className="bg-teal-400 flex items-center justify-center" style={{ width: `${mobPct}%` }}>{mobPct >= 14 && `${mobPct}%`}</div>
-                            <div className="bg-stone-400 flex items-center justify-center" style={{ width: `${100 - mobPct}%` }}>{(100 - mobPct) >= 14 && `${100 - mobPct}%`}</div>
+                            <div className="bg-violet-400 flex items-center justify-center" style={{ width: `${tabPct}%` }}>{tabPct >= 14 && `${tabPct}%`}</div>
+                            <div className="bg-stone-400 flex items-center justify-center" style={{ width: `${pcPct}%` }}>{pcPct >= 14 && `${pcPct}%`}</div>
                           </div>
-                          <div className="flex gap-3 text-[10px] mt-1.5">
+                          <div className="flex gap-3 text-[10px] mt-1.5 flex-wrap">
                             <span className="flex items-center gap-1 text-stone-500"><span className="w-2 h-2 rounded-full bg-teal-400 inline-block"></span>📱 모바일 <b className="text-stone-700">{dev.mobile}</b></span>
+                            <span className="flex items-center gap-1 text-stone-500"><span className="w-2 h-2 rounded-full bg-violet-400 inline-block"></span>📟 태블릿 <b className="text-stone-700">{dev.tablet}</b></span>
                             <span className="flex items-center gap-1 text-stone-500"><span className="w-2 h-2 rounded-full bg-stone-400 inline-block"></span>💻 PC <b className="text-stone-700">{dev.desktop}</b></span>
                           </div>
                         </div>

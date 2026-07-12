@@ -73,9 +73,12 @@ export async function GET(req: NextRequest) {
        FROM user_consents WHERE last_seen > now()-interval '30 days' AND ${BOT}`
     ).catch(() => [{ newcomers: 0, ret: 0 }]))[0] as any;
 
-    // 기기(모바일/데스크톱) — user_agent 추정
+    // 기기(모바일/태블릿/데스크톱) — user_agent 추정. 태블릿은 iPad·Tablet 토큰 또는 'Mobile' 없는 Android로 판별.
     const devices = (await sql.query(
-      `SELECT CASE WHEN user_agent ~* 'Mobile|iPhone|Android|iPad' THEN 'mobile' ELSE 'desktop' END AS dev, COUNT(*)::int n
+      `SELECT CASE
+         WHEN user_agent ~* 'iPad|Tablet' OR (user_agent ~* 'Android' AND user_agent !~* 'Mobile') THEN 'tablet'
+         WHEN user_agent ~* 'Mobile|iPhone|Android' THEN 'mobile'
+         ELSE 'desktop' END AS dev, COUNT(*)::int n
        FROM user_consents WHERE last_seen > now()-interval '30 days' AND ${BOT} GROUP BY 1`
     ).catch(() => [])) as any[];
 
