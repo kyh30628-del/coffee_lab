@@ -79,6 +79,8 @@ export const LIST_META: ListMeta[] = [
     items: ["분위기", "감성", "예쁜", "이쁜", "데이트", "사진", "인테리어", "뷰", "루프탑", "아늑", "무드", "빈티지", "힙", "감각", "조명", "이국적"] },
   { key: "concept.dessert.triggers", category: "검색개념", label: "개념: 디저트·빵", consumer: "search.route",
     items: ["빵", "디저트", "케이크", "베이커리", "달달", "달콤", "스콘", "크로플", "쿠키", "티라미수", "마카롱", "휘낭시에", "과자", "구움"] },
+  { key: "concept.brunch.triggers", category: "검색개념", label: "개념: 브런치", consumer: "search.route",
+    items: ["브런치", "브런치카페", "브런치맛집", "브런치집", "에그베네딕트", "팬케이크", "와플", "리코타"] },
   { key: "concept.roast.triggers", category: "검색개념", label: "개념: 직접로스팅·스페셜티", consumer: "search.route",
     items: ["로스팅", "스페셜티", "원두", "핸드드립", "드립", "커피맛", "고급", "로스터리", "싱글", "에스프레소", "진심", "커피가 맛", "커피 맛"] },
   { key: "concept.space.triggers", category: "검색개념", label: "개념: 넓은공간", consumer: "search.route",

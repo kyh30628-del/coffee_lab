@@ -33,6 +33,7 @@ const CONCEPTS_BASE: { id: string; triggersKey: string; axis?: string; taste?: s
   { id: "work", triggersKey: "concept.work.triggers", axis: "work", uses: ["작업"], label: "작업·공부" },
   { id: "mood", triggersKey: "concept.mood.triggers", axis: "mood", uses: ["사진"], label: "분위기·감성" },
   { id: "dessert", triggersKey: "concept.dessert.triggers", axis: "dessert", uses: ["빵"], label: "디저트·빵" },
+  { id: "brunch", triggersKey: "concept.brunch.triggers", axis: "dessert", uses: ["빵"], label: "브런치" },
   { id: "roast", triggersKey: "concept.roast.triggers", axis: "roast", label: "직접로스팅·스페셜티" },
   { id: "space", triggersKey: "concept.space.triggers", axis: "space", label: "넓은공간" },
   { id: "acidity", triggersKey: "concept.acidity.triggers", taste: "acidity", label: "산미 또렷" },
