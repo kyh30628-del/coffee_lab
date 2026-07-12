@@ -6,7 +6,7 @@ import OwnerSignupModal from "./OwnerSignupModal";
 import VisitorReviews from "./VisitorReviews";
 import KakaoShare from "./KakaoShare";
 import MyCafeRegModal from "./MyCafeRegModal";
-import { buildAxisDist, cafeProfile, type AxisDist } from "@/lib/cafeProfile";
+import { buildAxisDist, cafeProfile, tasteVector, tasteSimilarity, GRADE_RANK, type AxisDist } from "@/lib/cafeProfile";
 
 type EvidenceReview = { quote: string; link?: string; source?: string; date?: string; trust?: "verified" | "reference" | "rejected"; score?: number; why?: string[] };
 type QualityStats = { raw: number; verified: number; reference: number; rejected: number; duplicates?: number; rejectReasons?: Record<string, number> };
@@ -1347,7 +1347,7 @@ export default function Home() {
         onRemove={(id: number) => toggleBookmark(id)} />}
       {showMyCafeReg && <MyCafeRegModal cafes={cafes} device={deviceId} visits={myVisits} pin={sessionPin} initialCafeId={editCafeId} onClose={() => { setShowMyCafeReg(false); setEditCafeId(null); }} onDone={() => { reloadMyCafes(deviceId, sessionPin); }} />}
 
-      {selected && <CafePanel cafe={selected} dist={axisDist} bookmarked={bookmarkIds.has(selected.id)} onToggleBookmark={() => toggleBookmark(selected.id)} onSaveMemory={() => { setEditCafeId(selected.id); setShowMyCafeReg(true); }} onClose={() => setSelected(null)} onMap={() => {
+      {selected && <CafePanel cafe={selected} dist={axisDist} allCafes={cafes} onOpenCafe={openById} bookmarked={bookmarkIds.has(selected.id)} onToggleBookmark={() => toggleBookmark(selected.id)} onSaveMemory={() => { setEditCafeId(selected.id); setShowMyCafeReg(true); }} onClose={() => setSelected(null)} onMap={() => {
         if (selected.lat && selected.lng) {
           const g = toGu(selected.area);
           if (g.sido) { setSido(g.sido); setSigungu(g.sigungu); }
@@ -1586,7 +1586,7 @@ function hlQuote(text?: string) {
   );
 }
 
-function CafePanel({ cafe, dist, onClose, onMap, bookmarked = false, onToggleBookmark, onSaveMemory }: { cafe: Cafe; dist: AxisDist; onClose: () => void; onMap: () => void; bookmarked?: boolean; onToggleBookmark?: () => void; onSaveMemory?: () => void }) {
+function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarked = false, onToggleBookmark, onSaveMemory }: { cafe: Cafe; dist: AxisDist; allCafes?: Cafe[]; onOpenCafe?: (id: number) => void; onClose: () => void; onMap: () => void; bookmarked?: boolean; onToggleBookmark?: () => void; onSaveMemory?: () => void }) {
   const g = cafe.synth_grade ? GRADE_STYLE[cafe.synth_grade] : null;
   const [reviews, setReviews] = useState<EvidenceReview[]>([]);
   const [quality, setQuality] = useState<QualityStats | null>(null);
@@ -1608,6 +1608,20 @@ function CafePanel({ cafe, dist, onClose, onMap, bookmarked = false, onToggleBoo
   const kept = quality ? quality.verified + quality.reference : 0;
   const chars = topChars(cafe, 4);
   const profile = useMemo(() => cafeProfile(cafe, dist), [cafe, dist]); // 전체 대비 강점/아쉬운점
+  // 🔁 리텐션 훅 — 지도 패널에서도 /c/[id] 상세와 동일 로직으로 '비슷한 카페 더보기'(decisions #338/#347).
+  //   지도가 이미 전체 공개 카페(cafes)를 들고 있어 별도 API 호출 없이 클라이언트에서 바로 계산.
+  const nearby = useMemo(() => {
+    if (!allCafes || allCafes.length === 0) return [];
+    const mine = tasteVector(cafe.char_scores, cafe.synth_count);
+    return allCafes
+      .filter((c) => c.area === cafe.area && c.id !== cafe.id)
+      .map((c) => ({ ...c, sim: tasteSimilarity(mine, tasteVector(c.char_scores, c.synth_count)) }))
+      .sort((a, b) =>
+        (GRADE_RANK[a.synth_grade ?? ""] ?? 3) - (GRADE_RANK[b.synth_grade ?? ""] ?? 3) ||
+        b.sim - a.sim ||
+        (b.synth_count ?? 0) - (a.synth_count ?? 0))
+      .slice(0, 6);
+  }, [allCafes, cafe]);
   const [shared, setShared] = useState(false);
   // 부드러운 슬라이드인 등장 — 마운트 직후 한 프레임 뒤 transition을 트리거(오른쪽에서 미끄러져 들어옴).
   const [shown, setShown] = useState(false);
@@ -1689,13 +1703,19 @@ function CafePanel({ cafe, dist, onClose, onMap, bookmarked = false, onToggleBoo
               <button onClick={onClose} className="text-3xl text-[#9c6b3f] leading-none px-1">×</button>
             </div>
           </div>
+          {/* ❤ MY PIN(내 카페 추억) 노출 배너 — 지도 패널에서도 눈에 띄게(#339/#347, /c/[id] 배너와 동일 톤). 2단계 저장·무가입 원칙 무변, 노출만 강화 */}
           {onSaveMemory && (
-            <div className="flex justify-end mb-2">
-              <button type="button" onClick={onSaveMemory}
-                className="flex items-center gap-1 bg-[#d6336c] text-white rounded-full pl-2 pr-2.5 py-1 text-[12px] font-bold">
-                <span className="text-[13px] leading-none">❤</span> 추억으로 저장
-              </button>
-            </div>
+            <button type="button" onClick={onSaveMemory}
+              className="w-full flex items-center justify-between gap-2 rounded-xl px-4 py-3 border border-[#f0b8cc] text-left mb-3"
+              style={{ background: "linear-gradient(90deg,#fdeaf1,#f4ece0)" }}>
+              <span className="flex flex-col">
+                <span className="text-[12.5px] font-bold text-[#b23a5f] flex items-center gap-1">
+                  <span className="text-[14px] leading-none">❤</span> 이 카페, 다녀가셨나요?
+                </span>
+                <span className="text-[10.5px] text-[#9c8a6c]">위치인증하고 나만의 추억으로 저장 — 무가입·30초</span>
+              </span>
+              <span className="text-[#d6336c] font-bold whitespace-nowrap">→</span>
+            </button>
           )}
           <div className="text-[#9c6b3f] text-sm mb-3">{cafe.area} · {cafe.vibe}</div>
           {cafe.note && <p className="text-[15px] text-[#3d2f22] font-medium leading-relaxed mb-4">"{cafe.note}"</p>}
@@ -1832,7 +1852,24 @@ function CafePanel({ cafe, dist, onClose, onMap, bookmarked = false, onToggleBoo
               )}
             </div>
           )}
-
+          {/* 🔁 비슷한 카페 더보기 — 같은 동네 + 결(taste) 유사도, 검증/참고 등급 우선(리텐션, decisions #338/#347) */}
+          {nearby.length > 0 && (
+            <div className="mt-5">
+              <div className="text-[13px] font-bold text-[#5a4632] mb-2">☕ {cafe.area} 비슷한 카페 더보기</div>
+              <div className="flex flex-col gap-2">
+                {nearby.map((nc) => (
+                  <button key={nc.id} type="button" onClick={() => onOpenCafe?.(nc.id)}
+                    className="flex items-center gap-2 bg-white border border-[#e0d3bd] rounded-xl px-3.5 py-2.5 text-left">
+                    <span className="flex flex-col text-left min-w-0">
+                      <span className="text-[13.5px] font-bold text-[#3d2f22] truncate">{nc.name}</span>
+                      <span className="text-[10.5px] text-[#9c8a6c] truncate">검증후기 {nc.synth_count ?? 0}건</span>
+                    </span>
+                    {nc.synth_grade && <span className="ml-auto text-[10px] font-bold bg-[#2b2018] text-[#e8b87a] px-2 py-0.5 rounded-full whitespace-nowrap shrink-0">{nc.synth_grade}</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </aside>
       {/* ===== 전체 리뷰 모달 — aside 밖(z-[3000] 컨테이너 직속)으로 이동. aside는 overflow-y:auto라 스크롤되며, 그 안에 있던 position:fixed 모달이 스크롤량(scrollTop)만큼 화면 밖으로 밀리고 패널 너비로 잘려 아예 안 보였음. 스크롤 안 되는 컨테이너 직속으로 빼서 항상 전체 화면(뷰포트)에 온전히 뜨게 함. ===== */}

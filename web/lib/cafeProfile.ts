@@ -95,6 +95,8 @@ export function tasteSimilarity(a: number[], b: number[]): number {
   if (na === 0 || nb === 0) return 0;
   return dot / Math.sqrt(na * nb);
 }
+// '비슷한 카페' 정렬 1순위(등급) — /c/[id] 상세와 지도 패널(app/page.tsx) 양쪽에서 공유.
+export const GRADE_RANK: Record<string, number> = { "검증": 0, "참고": 1, "후보": 2 };
 
 // ── 리뷰 핵심 하이라이트 ──────────────────────────────────────────────
 // 옥석(검증) 리뷰들에서 '소비자가 꼭 볼 구체 포인트'를 빈도로 추출. 6개 결보다 구체적·실질적.
