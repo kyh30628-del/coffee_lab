@@ -82,7 +82,12 @@ export const LIST_META: ListMeta[] = [
   { key: "concept.roast.triggers", category: "검색개념", label: "개념: 직접로스팅·스페셜티", consumer: "search.route",
     items: ["로스팅", "스페셜티", "원두", "핸드드립", "드립", "커피맛", "고급", "로스터리", "싱글", "에스프레소", "진심", "커피가 맛", "커피 맛"] },
   { key: "concept.space.triggers", category: "검색개념", label: "개념: 넓은공간", consumer: "search.route",
-    items: ["넓", "대형", "테라스", "주차", "규모", "아이", "애견", "반려", "쾌적", "층고", "단체"] },
+    items: ["넓", "대형", "테라스", "주차", "규모", "아이", "쾌적", "층고", "단체"] },
+  // 검색결함B(#345): "애견동반" 등 반려동반 의도가 "넓은공간" 라벨로 뭉뚱그려짐(07-10 상신, 3일째 재현) —
+  //   "애견"·"반려"를 space triggers에서 분리해 별도 개념으로. 코어 카페 데이터엔 반려 전용 char축/uses가 없어(cafeProfile.ts HIGHLIGHTS만 존재)
+  //   axis/uses 매핑 없이 라벨만 정확히 붙인다(넓은공간 축 가산 오귀속 제거).
+  { key: "concept.pet.triggers", category: "검색개념", label: "개념: 반려동반", consumer: "search.route",
+    items: ["애견", "반려", "강아지", "펫동반"] },
   { key: "concept.acidity.triggers", category: "검색개념", label: "개념: 산미 또렷", consumer: "search.route",
     items: ["산미", "상큼", "과일", "베리", "시트러스", "플로럴", "꽃향", "새콤", "산뜻", "후르츠"] },
   { key: "concept.body.triggers", category: "검색개념", label: "개념: 묵직·고소", consumer: "search.route",
