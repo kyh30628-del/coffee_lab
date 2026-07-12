@@ -88,3 +88,4 @@
 | 2026-07-12 08:59 | #344 | [개발] 등급강등 결정 비영속 구조갭 — downgrade는 재합성 시 조용히 원복(unpublish만 보호 | 748fe973 | - | lib/synthStore.ts: lastDowngradeCap() 가드 추가(lastUnpublishLocked와 동형) — 가장 최근 done downgrade 결정의 목표등급 |
 | 2026-07-12 09:19 | #345 | [검색품질 결함B] "애견동반" 등 편의시설 의도가 "넓은공간" concept에 뭉뚱그려짐 | 643c1638 | - | lib/criteriaListsBase.ts: concept.space.triggers에서 애견/반려 분리, 신규 concept.pet.triggers(애견/반려/강아지/펫동반)  |
 | 2026-07-12 09:20 | #346 | [검색품질 결함C] "브런치" concept 트리거 부재 — 순수 임베딩 유사도만으로 검색 | f77097b7 | - | app/api/search/route.ts CONCEPTS_BASE·lib/criteriaListsBase.ts LIST_META에 브런치 개념 트리거(concept.brunch. |
+| 2026-07-12 09:36 | #347 | 상세페이지기능미노출수정 | eb4ab828 | med | 근본원인: CEO 실사용 경로는 지도(app/page.tsx CafePanel)인데 #338/#339는 공유용 상세페이지(/c/[id])에만 구현돼 지도에서는 안 보였음(SSR c |
