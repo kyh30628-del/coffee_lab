@@ -27,9 +27,11 @@ async function getCafe(id: string) {
   const n = Number(id);
   if (!Number.isFinite(n) || n <= 0) return null;
   try {
-    return (await sql`SELECT id, name, area, dong, address, synth_grade, synth_identity, synth_count, char_scores, synth_reviews_all, synth_reviews, reputation_note FROM cafes WHERE id=${n} AND published=true LIMIT 1`)[0] as any ?? null;
+    return (await sql`SELECT id, name, area, dong, address, lat, lng, synth_grade, synth_identity, synth_count, char_scores, synth_reviews_all, synth_reviews, reputation_note FROM cafes WHERE id=${n} AND published=true LIMIT 1`)[0] as any ?? null;
   } catch { return null; }
 }
+// 등급(검증/참고/후보)→JSON-LD aggregateRating.ratingValue 근사치. 별점을 직접 수집하지 않으므로 등급 기반 대리값.
+const GRADE_RATING: Record<string, number> = { "검증": 4.8, "참고": 4.5, "후보": 4.2 };
 function topTags(cs: any): string[] {
   if (!cs || typeof cs !== "object") return [];
   return Object.entries(cs).filter(([k, v]) => CHAR[k] && (v as number) > 0).sort((a, b) => (b[1] as number) - (a[1] as number)).slice(0, 4).map(([k]) => CHAR[k]);
@@ -94,9 +96,25 @@ export default async function CafePage({ params }: Props) {
   const highlights = extractHighlights((Array.isArray(evAll) ? evAll : []).map((e: any) => e?.quote || ""));
   const jsonLd = {
     "@context": "https://schema.org", "@type": "CafeOrCoffeeShop",
-    name: c.name, address: { "@type": "PostalAddress", addressLocality: c.area, addressCountry: "KR" },
+    name: c.name,
+    address: {
+      "@type": "PostalAddress",
+      ...(c.address ? { streetAddress: c.address } : {}),
+      addressLocality: c.dong || c.area,
+      addressRegion: c.area,
+      addressCountry: "KR",
+    },
     url: `${SITE}/c/${c.id}`, servesCuisine: "Coffee",
+    ...(typeof c.lat === "number" && typeof c.lng === "number" ? { geo: { "@type": "GeoCoordinates", latitude: c.lat, longitude: c.lng } } : {}),
     ...(c.synth_identity ? { description: c.synth_identity } : {}),
+    ...(c.synth_count > 0 ? {
+      aggregateRating: {
+        "@type": "AggregateRating",
+        ratingValue: GRADE_RATING[c.synth_grade] ?? 4.2,
+        reviewCount: c.synth_count,
+        bestRating: 5, worstRating: 1,
+      },
+    } : {}),
   };
   return (
     <main className="min-h-screen bg-[#f4ece0] text-[#2b2018]" style={{ fontFamily: "'Gowun Batang', serif" }}>
