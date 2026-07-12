@@ -94,3 +94,4 @@
 | 2026-07-12 11:13 | #349 | 방문분석요약 고도화 | de13da5b | med | web/app/api/admin/analytics/route.ts: 서버에서 다차원 일일 인사이트(buildDailyInsights) 생성 — ①전일·7일평균 대비 증감+유입경로  |
 | 2026-07-12 11:56 | #350 | 일일요약 심층화 | 6548b018 | high | 일일요약 심층화 완료. (1) 체류시간 계측 신설: traffic_events.duration_ms 컬럼(ALTER IF NOT EXISTS, 기존 INSERT 무해) + Visi |
 | 2026-07-12 12:25 | #351 | 일일요약 5시 자동갱신 | edde2b6f | med | 확인 결과: #350의 오늘 페이지순위/체류시간/유의미사용자 요약(todayInsight)은 /api/admin/analytics(라이브 요청시점 계산)에만 있었고, 17시 일일보 |
+| 2026-07-12 13:09 | #352 | 카페상세 구조화데이터 | ec06d1a7 | low | app/c/[id]/page.tsx: JSON-LD에 geo(lat/lng)·address(streetAddress/dong/area)·aggregateRating(등급기반 rat |
