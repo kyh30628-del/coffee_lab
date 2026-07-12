@@ -92,3 +92,4 @@
 | 2026-07-12 10:37 | #348 | 유입현황 대시보드 개선 | f711385b | med | 수정: app/admin/page.tsx, app/api/admin/analytics/route.ts. (1) 일별 방문 추이·즐겨찾기 일별 차트 렌더링 버그 수정 — 중첩 fle |
 | 2026-07-12 11:05 | #343 | [룰갭 P32] B2B 쇼룸/인테리어 광고가 "카페" 자기묘사로 LOCAL_SEO_SERVICES 가드 무력 | fa210846 | - | lib/reviewQuality.ts:682 LOCAL_SEO_SERVICES 가드에 SELF_BIZ_PROMO(쇼룸/매장주소/방문예약/카톡방문/시공갤러리) 자기업체 정형구 체크  |
 | 2026-07-12 11:13 | #349 | 방문분석요약 고도화 | de13da5b | med | web/app/api/admin/analytics/route.ts: 서버에서 다차원 일일 인사이트(buildDailyInsights) 생성 — ①전일·7일평균 대비 증감+유입경로  |
+| 2026-07-12 11:56 | #350 | 일일요약 심층화 | 6548b018 | high | 일일요약 심층화 완료. (1) 체류시간 계측 신설: traffic_events.duration_ms 컬럼(ALTER IF NOT EXISTS, 기존 INSERT 무해) + Visi |
