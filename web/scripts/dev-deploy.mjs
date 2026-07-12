@@ -35,6 +35,36 @@ function archiveDeploy(d, mergeSha) {
   return git("rev-parse HEAD");
 }
 
+// ♻️ 반영미확인 재검증(#335): L74-96 반영확인 폴링(최대 3.5분) 타임아웃 시 dev_status='반영미확인'로
+//   찍히면, 아래 메인 쿼리는 dev_status='deploy_approved'만 골라 그 행은 영원히 다시 안 걸린다(데드엔드).
+//   실제로는 push가 성공해 나중에 라이브 반영됐을 수 있으므로, 현재 라이브 HEAD(/api/version) 기준
+//   git ancestor 재확인으로 구제한다. 아직 조상이 아니면(정말 미반영) 성급히 done 처리하지 않고 유지.
+async function reconcileUnverified() {
+  const pending = await sql`SELECT id, action_params FROM decisions WHERE action_type='dev_task' AND (action_params->>'dev_status')='반영미확인' AND (action_params->>'sha') IS NOT NULL`;
+  if (!pending.length) return;
+  let liveSha = null;
+  try {
+    const r = await fetch("https://dongnecoffeenote.com/api/version", { cache: "no-store" });
+    const j = await r.json();
+    if (typeof j?.v === "string") liveSha = j.v;
+  } catch {}
+  if (!liveSha) { console.log("  ⏸ 반영미확인 재검증: /api/version 조회 실패 — 다음 주기 재시도"); return; }
+  try { git("fetch origin main -q"); } catch {}
+  for (const d of pending) {
+    const sha = d.action_params?.sha;
+    if (!sha || !/^[0-9a-f]{7,40}$/i.test(sha)) continue; // 형식 이상 sha는 셸 인자로 넘기지 않음
+    const isAncestor = sha === liveSha || (() => { try { git(`merge-base --is-ancestor ${sha} ${liveSha}`); return true; } catch { return false; } })();
+    if (!isAncestor) { console.log(`  ⏸ #${d.id} 반영미확인 재검증: 아직 라이브(${liveSha.slice(0, 8)}) 조상 아님 — 유지`); continue; }
+    const coord = d.action_params?.coord;
+    await sql`UPDATE decisions SET status='done', decided_at=now(), decided_by='CEO',
+      result=${`배포완료·반영 재확인(라이브 HEAD=${liveSha.slice(0, 8)})`},
+      action_params = action_params || ${JSON.stringify({ dev_status: "deployed" })}::jsonb WHERE id=${d.id}`;
+    if (coord) await sql`UPDATE coordination SET status='resolved', resolved_at=now(), stage='완료', resolution=${`개발·배포 완료(#${d.id}, 반영 재확인)`} WHERE id=${Number(coord)}`.catch(() => {});
+    console.log(`  ✅ #${d.id} 반영미확인 → 재확인 완료(sha=${sha.slice(0, 8)}가 라이브 ${liveSha.slice(0, 8)}의 조상)`);
+  }
+}
+try { await reconcileUnverified(); } catch (e) { console.log(`  ⚠️ 반영미확인 재검증 중 오류(무시): ${String(e.message || e).slice(0, 120)}`); }
+
 const rows = await sql`SELECT id, title, detail, action_params FROM decisions WHERE action_type='dev_task' AND (action_params->>'dev_status')='deploy_approved' ORDER BY id`;
 if (!rows.length) { console.log("배포 대상 없음"); process.exit(0); }
 
