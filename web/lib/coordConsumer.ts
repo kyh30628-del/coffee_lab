@@ -28,6 +28,10 @@ export function extractCafeIds(text: string): number[] {
 // 결정론 트리아지 — 순서 있음. 애매하면 human(임의 추정 금지). 재합성 자동'해결' 없음(위 교훈).
 export function classify(topic: string, detail: string, _cafeIds: number[], toTeam: string): { klass: CoordKlass; action: string; resolution: string } {
   const t = `${topic} ${detail}`;
+  // 0) 콘솔키 크레딧 소진/결제 이슈 — lib/ 경로를 '영향범위 설명'으로 언급할 뿐 코드버그가 아니다.
+  //    코드로 고칠 수 없는(결제 조치만 가능) 사안이 아래 lib\/ 등 키워드에 걸려 L3_dev로 오분류되는 걸 방지(협업#182 재발 실측).
+  if (/크레딧\s?(재?소진|잔액|충전)|credit\s?balance|too low|결제\s?조치|plans\s?&?\s?billing/i.test(t))
+    return { klass: "human", action: "기조실장 수동 판단 필요(결제 조치 — 코드 변경 아님)", resolution: "" };
   // 1) 코드 변경 신호(파서·컬럼·헤더 등) 또는 날짜파싱/review_dates 정체(파서 뿌리) → L3 결재 상신(사람 게이트)
   if (/파서|파싱|추출기|코드\s?수정|버그|헤더|컬럼|route\.ts|lib\/|null\s?반환|is_synthetic/i.test(t)
       || /review_dates|1990\.01\.01|날짜/i.test(t))
