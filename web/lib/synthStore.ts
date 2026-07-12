@@ -105,6 +105,24 @@ async function lastUnpublishLocked(cafeId: number): Promise<boolean> {
   return row?.action_type === "unpublish";
 }
 
+// 등급 랭크(강등 상한 비교용): 후보 < 참고 < 검증.
+const GRADE_RANK: Record<string, number> = { "후보": 0, "참고": 1, "검증": 2 };
+
+// 🔒 승인된 downgrade 결정 재발 가드(coordination#186, decisions#344): lastUnpublishLocked와 동형 —
+//   재합성이 규칙판정만으로 강등된 등급을 조용히 원복하지 못하게, 이 cafe_id에 대한 가장 최근
+//   CEO/L2 승인 downgrade 결정의 목표등급을 상한으로 고정한다(명시적 upgrade 결정만 해제).
+//   실증: decisions#8(카페하루에 11913, 검증→참고 강등)이 이후 cron-resynth 재계산에서 synth_count가
+//   다시 검증 임계 이상이 되며 조용히 검증으로 복귀했다.
+async function lastDowngradeCap(cafeId: number): Promise<string | null> {
+  const row = (await sql`SELECT action_type, action_params FROM decisions
+    WHERE action_type IN ('downgrade', 'upgrade') AND status = 'done'
+      AND EXISTS (SELECT 1 FROM jsonb_array_elements_text(COALESCE(action_params->'ids', '[]'::jsonb)) e(v) WHERE v = ${String(cafeId)})
+    ORDER BY decided_at DESC NULLS LAST, id DESC LIMIT 1`.catch(() => []))[0] as any;
+  if (row?.action_type !== "downgrade") return null;
+  const cap = row.action_params?.to ?? row.action_params?.grade; // 결재 기록별 키 표기 차이(#8="to", #55="grade") 모두 수용
+  return typeof cap === "string" && cap in GRADE_RANK ? cap : null;
+}
+
 // 짝 없는 유니코드 서로게이트 제거 → raw JSONB 저장 깨짐 방지(이모지 잘림 등, 모든 소스 공통)
 const stripBad = (s: any) => typeof s === "string" ? s.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "") : s;
 const cleanRaw = (raw: RawItem[]): RawItem[] => raw.map((r) => ({ ...r, text: stripBad(r.text), title: stripBad(r.title), desc: stripBad(r.desc) }));
@@ -165,7 +183,11 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   const latMin = getCriterionSync("geo.box.lat_min"), latMax = getCriterionSync("geo.box.lat_max");
   const lngMin = getCriterionSync("geo.box.lng_min"), lngMax = getCriterionSync("geo.box.lng_max");
   name = cleanCafeName(name); // 매칭·게이트(coherence·generic·nonCafe·franchise)는 SEO 서술어 꼬리 뗀 진짜 상호로 — '구구커피 원두 핸드드립 로스팅' 오염 차단
-  const { synth, collected, grade, charScores, evidenceReviews, allEvidence, reviewDates, quality, borderline } = result;
+  const { synth, collected, charScores, evidenceReviews, allEvidence, reviewDates, quality, borderline } = result;
+  // 🔒 승인된 downgrade 상한(위 lastDowngradeCap) — 재계산 등급이 이를 넘어서면 상한으로 눌러앉힌다.
+  //   내려가는 방향(실제 재계산이 더 낮음)은 막지 않는다 — 이 가드는 바닥이 아니라 천장이다.
+  const downgradeCap = await lastDowngradeCap(cafeId);
+  const grade = downgradeCap && GRADE_RANK[result.grade] > GRADE_RANK[downgradeCap] ? downgradeCap : result.grade;
   const c = synth.coords;
   const basisLine = ["acidity", "body", "sweet"].filter((ax) => c[ax] != null)
     .map((ax) => `${ax === "acidity" ? "산미" : ax === "body" ? "바디" : "단맛"} ${synth.basis[ax]}`).join(" / ");
