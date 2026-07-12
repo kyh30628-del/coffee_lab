@@ -1045,27 +1045,19 @@ export default function AdminPage() {
                           </div>
                         ))}
                       </div>
-                      {/* 🧾 일일 분석 요약 — 기존 데이터(일별 추이·유입경로)로 자동 생성한 한두 문장 요약 */}
-                      {(a.daily || []).length >= 2 && (() => {
-                        const dl = a.daily;
-                        const t = dl[dl.length - 1], y = dl[dl.length - 2];
-                        const diff = t.visitors - y.visitors;
-                        const diffPct = y.visitors ? Math.round(Math.abs(diff) / y.visitors * 100) : (t.visitors > 0 ? 100 : 0);
-                        const trendTxt = diff > 0 ? `어제보다 ${diff}명(${diffPct}%) 늘었어요` : diff < 0 ? `어제보다 ${Math.abs(diff)}명(${diffPct}%) 줄었어요` : "어제와 비슷한 수준이에요";
-                        const prev7 = dl.slice(-8, -1);
-                        const avg7 = prev7.length ? prev7.reduce((s: number, d: any) => s + d.visitors, 0) / prev7.length : 0;
-                        let anomaly = "";
-                        if (avg7 >= 3 && t.visitors >= avg7 * 1.5) anomaly = ` 최근 7일 평균(${Math.round(avg7)}명)보다 크게 늘어 급증 신호가 보여요.`;
-                        else if (avg7 >= 3 && t.visitors <= avg7 * 0.5) anomaly = ` 최근 7일 평균(${Math.round(avg7)}명)보다 크게 줄어 급감 신호가 보여요.`;
-                        const topSrc = (a.sources || [])[0];
-                        const srcTxt = topSrc ? ` 주요 유입 경로는 ${topSrc.src === "미상" ? "미상(추적 전 방문)" : topSrc.src}(${topSrc.visitors}명)이에요.` : "";
-                        return (
-                          <div className="bg-sky-50/70 border border-sky-200 rounded-xl p-3">
-                            <div className="text-[11px] font-bold text-sky-800 mb-1">🧾 일일 분석 요약</div>
-                            <p className="text-[11.5px] text-stone-700 leading-relaxed">오늘 방문 <b>{t.visitors}</b>명 · {trendTxt}.{srcTxt}{anomaly}</p>
-                          </div>
-                        );
-                      })()}
+                      {/* 🧾 일일 분석 요약 — 서버(route.ts)가 다차원 근거로 생성한 2~4개 인사이트 문장 */}
+                      {(a.dailyInsights || []).length > 0 && (
+                        <div className="bg-sky-50/70 border border-sky-200 rounded-xl p-3">
+                          <div className="text-[11px] font-bold text-sky-800 mb-1.5">🧾 일일 분석 요약</div>
+                          <ul className="space-y-1">
+                            {a.dailyInsights.map((line: string, i: number) => (
+                              <li key={i} className="text-[11.5px] text-stone-700 leading-relaxed flex gap-1.5">
+                                <span className="text-sky-400">·</span><span>{line}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
                       {/* 🧑 진짜 사용자 신호 — 봇으로 설명 안 되는 것들 */}
                       {a.realUsers && (
                         <div className="bg-emerald-50/60 border border-emerald-200 rounded-xl p-3">

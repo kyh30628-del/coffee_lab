@@ -8,6 +8,117 @@ const authed = (req: NextRequest) => !!req.headers.get("x-admin-password") && re
 // 노이즈 제외: 봇 UA + 크롤러 referrer(UA로 안 잡히는 findelio·blinkx 등) + 내부(대표·팀). 거치면 '진짜 외부 방문자'만.
 const CRAWLER_SRC = "findelio|blinkx|semrush|ahrefs|dataprovider|dotbot|petalbot|yandex|mj12|serpstat";
 const BOT = `COALESCE(user_agent,'') !~* 'bot|crawl|spider|slurp|bingpreview|facebookexternalhit|headless|preview' AND COALESCE(src,'') !~* '${CRAWLER_SRC}' AND COALESCE(src,'') NOT IN ('internal','spam') AND NOT COALESCE(internal, false)`;
+const WEEKDAY_KO = ["일", "월", "화", "수", "목", "금", "토"];
+
+// 🧾 일일 분석 요약 — 전일·7일평균 대비 증감(+근거) / 기기 비중 변화 / 요일·시간대 패턴을
+// 실제 수치 없이는 문장을 만들지 않는다(표본 부족 시 '분석 불가' 명시, 숫자 날조 금지).
+function buildDailyInsights(
+  daily: any[], dailySources: any[], dailyDevices: any[], hours: any[], weekdays: any[]
+): string[] {
+  const insights: string[] = [];
+
+  // (1) 전일·최근7일 평균 대비 증감 + 유입경로 근거
+  if (daily.length < 2) {
+    insights.push("일별 방문 추이를 분석하기엔 아직 데이터가 부족해요.");
+  } else {
+    const t = daily[daily.length - 1], y = daily[daily.length - 2];
+    if ((t.visitors ?? 0) + (y.visitors ?? 0) < 3) {
+      insights.push(`오늘 방문 ${t.visitors ?? 0}명 · 표본이 적어(어제 ${y.visitors ?? 0}명) 증감 추세는 분석 불가예요.`);
+    } else {
+      const diff = t.visitors - y.visitors;
+      const diffPct = y.visitors ? Math.round(Math.abs(diff) / y.visitors * 100) : (t.visitors > 0 ? 100 : 0);
+      const trendTxt = diff > 0 ? `어제보다 ${diff}명(${diffPct}%) 늘었어요` : diff < 0 ? `어제보다 ${Math.abs(diff)}명(${diffPct}%) 줄었어요` : "어제와 비슷한 수준이에요";
+      const prev7 = daily.slice(-8, -1);
+      const avg7 = prev7.length ? prev7.reduce((s, d) => s + (d.visitors ?? 0), 0) / prev7.length : 0;
+      let vsAvgTxt = "";
+      if (prev7.length >= 3 && avg7 >= 1) {
+        const avgDiffPct = Math.round((t.visitors - avg7) / avg7 * 100);
+        if (Math.abs(avgDiffPct) >= 20) vsAvgTxt = ` 최근 7일 평균(${avg7.toFixed(1)}명)보다 ${avgDiffPct > 0 ? `${avgDiffPct}% 많아요` : `${Math.abs(avgDiffPct)}% 적어요`}.`;
+      }
+      // 근거: 오늘 vs 지난 7일 같은 소스 평균 — 가장 크게 움직인 유입경로 1개
+      let srcTxt = "";
+      const byDay = new Map<string, Map<string, number>>();
+      for (const r of dailySources) {
+        if (!byDay.has(r.day)) byDay.set(r.day, new Map());
+        byDay.get(r.day)!.set(r.src, r.visitors);
+      }
+      const todayMap = byDay.get(t.day);
+      if (todayMap) {
+        let mover: { src: string; today: number; hist: number; pct: number } | null = null;
+        for (const [src, todayN] of todayMap) {
+          if (todayN < 2) continue;
+          let histSum = 0, histDays = 0;
+          for (const [day, m] of byDay) {
+            if (day === t.day) continue;
+            histSum += m.get(src) ?? 0; histDays++;
+          }
+          if (histDays < 3) continue;
+          const histAvg = histSum / histDays;
+          if (histAvg < 1) continue;
+          const pct = Math.round((todayN - histAvg) / histAvg * 100);
+          if (Math.abs(pct) >= 50 && (!mover || Math.abs(pct) > Math.abs(mover.pct))) mover = { src, today: todayN, hist: histAvg, pct };
+        }
+        if (mover) {
+          const label = mover.src === "미상" ? "미상(추적 전 방문)" : mover.src;
+          srcTxt = ` ${label} 유입이 평소(${mover.hist.toFixed(1)}명)보다 ${mover.pct > 0 ? `${mover.pct}% 급증` : `${Math.abs(mover.pct)}% 급감`}했어요(오늘 ${mover.today}명).`;
+        }
+      }
+      insights.push(`오늘 방문 ${t.visitors}명 · ${trendTxt}.${vsAvgTxt}${srcTxt}`);
+    }
+  }
+
+  // (2) 기기별 비중 + 전일 대비 변화
+  if (daily.length >= 1) {
+    const t = daily[daily.length - 1], y = daily.length >= 2 ? daily[daily.length - 2] : null;
+    const sumDev = (rows: any[]) => rows.reduce((s, r) => s + (r.n ?? 0), 0);
+    const pctOf = (rows: any[], dev: string, total: number) => total ? Math.round((rows.find((r) => r.dev === dev)?.n ?? 0) / total * 100) : 0;
+    const todayRows = dailyDevices.filter((r) => r.day === t.day);
+    const todayTotal = sumDev(todayRows);
+    if (todayTotal < 3) {
+      insights.push("오늘은 기기별 비중을 분석하기엔 방문 표본이 부족해요.");
+    } else {
+      const mobPctToday = pctOf(todayRows, "mobile", todayTotal);
+      let cmpTxt = "(전일 비교는 데이터 부족)";
+      if (y) {
+        const yestRows = dailyDevices.filter((r) => r.day === y.day);
+        const yestTotal = sumDev(yestRows);
+        if (yestTotal >= 3) {
+          const mobPctYest = pctOf(yestRows, "mobile", yestTotal);
+          const deltaP = mobPctToday - mobPctYest;
+          cmpTxt = `전일(${mobPctYest}%) 대비 ${deltaP > 0 ? `${deltaP}%p 늘었어요` : deltaP < 0 ? `${Math.abs(deltaP)}%p 줄었어요` : "비슷해요"}`;
+        }
+      }
+      insights.push(`오늘 모바일 방문 비중은 ${mobPctToday}%예요. ${cmpTxt}.`);
+    }
+  }
+
+  // (3) 요일 또는 시간대 중 더 뚜렷한 패턴 1개
+  const hourTotal = hours.reduce((s, h) => s + (h.n ?? 0), 0);
+  const wdTotal = weekdays.reduce((s, w) => s + (w.n ?? 0), 0);
+  if (hourTotal < 10 && wdTotal < 10) {
+    insights.push("요일·시간대별 패턴을 분석하기엔 최근 30일 데이터가 부족해요.");
+  } else {
+    let hourRatio = 0, peakH = -1, peakHN = 0;
+    if (hourTotal >= 10) {
+      for (const h of hours) if ((h.n ?? 0) > peakHN) { peakHN = h.n; peakH = h.h; }
+      hourRatio = (peakHN / hourTotal) / (1 / 24);
+    }
+    let wdRatio = 0, peakW = -1, peakWN = 0;
+    if (wdTotal >= 10) {
+      for (const w of weekdays) if ((w.n ?? 0) > peakWN) { peakWN = w.n; peakW = w.w; }
+      wdRatio = (peakWN / wdTotal) / (1 / 7);
+    }
+    if (hourRatio < 1.3 && wdRatio < 1.3) {
+      insights.push("최근 30일 트래픽은 요일·시간대별로 특별히 몰리지 않고 고르게 분포해요.");
+    } else if (hourRatio >= wdRatio) {
+      insights.push(`최근 30일 방문은 ${peakH}시대에 가장 몰려요(전체의 ${Math.round(peakHN / hourTotal * 100)}%, ${peakHN}건).`);
+    } else {
+      insights.push(`최근 30일 방문은 ${WEEKDAY_KO[peakW]}요일에 가장 많았어요(전체의 ${Math.round(peakWN / wdTotal * 100)}%, ${peakWN}건).`);
+    }
+  }
+
+  return insights;
+}
 
 export async function GET(req: NextRequest) {
   if (!authed(req)) return NextResponse.json({ ok: false }, { status: 401 });
@@ -137,6 +248,31 @@ export async function GET(req: NextRequest) {
       SELECT EXTRACT(hour FROM ts AT TIME ZONE 'Asia/Seoul')::int AS h, COUNT(*)::int n
       FROM traffic_events WHERE ts > now()-interval '30 days' GROUP BY 1 ORDER BY 1`.catch(() => [])) as any[];
 
+    // 요일 분포(KST, 0=일~6=토, 최근 30일) — '일일 분석 요약'의 요일 패턴 문장용
+    const weekdays = (await sql`
+      SELECT EXTRACT(dow FROM ts AT TIME ZONE 'Asia/Seoul')::int AS w, COUNT(*)::int n
+      FROM traffic_events WHERE ts > now()-interval '30 days' GROUP BY 1`.catch(() => [])) as any[];
+
+    // 일별 유입경로별 순방문자(최근 8일, KST, day='MM-DD'로 daily와 동일 포맷) — 오늘 급증/급감 소스 근거용
+    const dailySources = (await sql`
+      SELECT to_char(ts AT TIME ZONE 'Asia/Seoul', 'MM-DD') AS day,
+             COALESCE(NULLIF(src,''),'미상') AS src,
+             COUNT(DISTINCT anon_id)::int visitors
+      FROM traffic_events WHERE ts > now()-interval '8 days'
+      GROUP BY 1, 2`.catch(() => [])) as any[];
+
+    // 일별 기기 비중(최근 2일, KST) — traffic_events × user_consents.user_agent 조인
+    const dailyDevices = (await sql`
+      SELECT to_char(te.ts AT TIME ZONE 'Asia/Seoul', 'MM-DD') AS day,
+        CASE
+          WHEN uc.user_agent ~* 'iPad|Tablet' OR (uc.user_agent ~* 'Android' AND uc.user_agent !~* 'Mobile') THEN 'tablet'
+          WHEN uc.user_agent ~* 'Mobile|iPhone|Android' THEN 'mobile'
+          ELSE 'desktop' END AS dev,
+        COUNT(DISTINCT te.anon_id)::int n
+      FROM traffic_events te JOIN user_consents uc ON uc.anon_id = te.anon_id
+      WHERE te.ts > now()-interval '2 days'
+      GROUP BY 1, 2`.catch(() => [])) as any[];
+
     // 퍼널 — 방문 → 카페상세 조회 → 여러 카페 탐색(몰입)
     const funnel = (await sql`
       SELECT COUNT(DISTINCT anon_id)::int visitors,
@@ -150,6 +286,8 @@ export async function GET(req: NextRequest) {
         GROUP BY anon_id HAVING COUNT(DISTINCT path) >= 2) q`.catch(() => [{ n: 0 }]))[0]?.n ?? 0;
 
     const pageviews30d = (await sql`SELECT COUNT(*)::int n FROM traffic_events WHERE ts > now()-interval '30 days'`.catch(() => [{ n: 0 }]))[0]?.n ?? 0;
+
+    const dailyInsights = buildDailyInsights(daily, dailySources, dailyDevices, hours, weekdays);
 
     // 🧑 진짜 사용자 신호 — 봇으로 설명 안 되는 신호(재방문·기능사용·검색유입 재방문율)
     // r2/r3/r5 = 페이지 열람 2/3/5장+ (visit_count=페이지뷰). trueReturn = 다른 날 다시 온 진짜 재방문.
@@ -240,7 +378,7 @@ export async function GET(req: NextRequest) {
       consent: { pinged: consent?.pinged ?? 0, asked: consent?.asked ?? 0, agreed: consent?.agreed ?? 0, located: consent?.located ?? 0 },
       visitorRegions,
       sources, retention: { newcomers: retention?.newcomers ?? 0, returning: retention?.ret ?? 0 },
-      devices, daily, pageBuckets, topCafes, topRegions, hours,
+      devices, daily, dailyInsights, pageBuckets, topCafes, topRegions, hours,
       funnel: { visitors: funnel?.visitors ?? 0, viewedCafe: funnel?.viewed_cafe ?? 0, browsed: funnel?.browsed ?? 0, engaged },
     });
   } catch (e) {
