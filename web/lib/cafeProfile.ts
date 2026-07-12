@@ -82,6 +82,20 @@ export function cafeProfile(cafe: CafeLite, dist: AxisDist): CafeProfile {
   };
 }
 
+// ── 결(taste) 유사도 ──────────────────────────────────────────────────
+// '비슷한 카페' 추천용 — 후기 1건당 언급률 벡터(카페profile과 같은 정규화 기준)로 코사인 유사도.
+export function tasteVector(cs: Record<string, number> | null | undefined, cnt: number | null | undefined): number[] {
+  const c = cnt ?? 0;
+  const scores = cs ?? {};
+  return CHAR_AXES.map((ax) => (c > 0 ? (scores[ax.key] ?? 0) / c : 0));
+}
+export function tasteSimilarity(a: number[], b: number[]): number {
+  let dot = 0, na = 0, nb = 0;
+  for (let i = 0; i < a.length; i++) { dot += a[i] * b[i]; na += a[i] * a[i]; nb += b[i] * b[i]; }
+  if (na === 0 || nb === 0) return 0;
+  return dot / Math.sqrt(na * nb);
+}
+
 // ── 리뷰 핵심 하이라이트 ──────────────────────────────────────────────
 // 옥석(검증) 리뷰들에서 '소비자가 꼭 볼 구체 포인트'를 빈도로 추출. 6개 결보다 구체적·실질적.
 // 측정값이 아니라 검증 후기에 실제로 자주 나온 것 → '데이터 기반 분석'의 실체.

@@ -6,7 +6,7 @@ import { sql } from "@/lib/db";
 import KakaoShare from "../../KakaoShare";
 import SaveMemoryButton from "./SaveMemoryButton";
 import VisitorReviews from "../../VisitorReviews";
-import { buildAxisDist, cafeProfile, extractHighlights } from "@/lib/cafeProfile";
+import { buildAxisDist, cafeProfile, extractHighlights, tasteVector, tasteSimilarity } from "@/lib/cafeProfile";
 import { collectionForCafe } from "@/lib/collections";
 
 export const runtime = "nodejs";
@@ -61,12 +61,23 @@ async function getPublicReviews(cafeId: number) {
   } catch { return []; }
 }
 
-// 🔁 리텐션 훅 — 같은 동네(area) 다른 옥석 카페(검증후기 많은 순). 1페이지 이탈↓·2페이지 유도(홍보×경험 #94).
-async function getNearby(area: string, excludeId: number) {
+// 🔁 리텐션 훅 — 같은 동네(area) + 결(taste) 유사도 기반 '비슷한 카페 더보기'.
+//   1페이지 이탈↓·2페이지 유도(홍보×경험 #94, decisions #338 — 상세 89% 1페이지 이탈 대응).
+//   검증/참고 등급 우선 노출(등급 낮은 순 정렬) → 동급 안에서는 결 유사도·검증후기 수로 정렬. published=true라 오염 카페는 이미 제외.
+const GRADE_RANK: Record<string, number> = { "검증": 0, "참고": 1, "후보": 2 };
+async function getSimilar(area: string, excludeId: number, char_scores: any, synth_count: number) {
   try {
-    return (await sql`SELECT id, name, synth_grade, synth_count FROM cafes
+    const rows = (await sql`SELECT id, name, synth_grade, synth_count, char_scores FROM cafes
       WHERE published=true AND area=${area} AND id<>${excludeId}
-      ORDER BY COALESCE(synth_count,0) DESC LIMIT 3`) as any[];
+      ORDER BY COALESCE(synth_count,0) DESC LIMIT 40`) as any[];
+    const mine = tasteVector(char_scores, synth_count);
+    return rows
+      .map((r) => ({ ...r, sim: tasteSimilarity(mine, tasteVector(r.char_scores, r.synth_count)) }))
+      .sort((a, b) =>
+        (GRADE_RANK[a.synth_grade] ?? 3) - (GRADE_RANK[b.synth_grade] ?? 3) ||
+        b.sim - a.sim ||
+        (b.synth_count ?? 0) - (a.synth_count ?? 0))
+      .slice(0, 6);
   } catch { return []; }
 }
 
@@ -76,7 +87,7 @@ export default async function CafePage({ params }: Props) {
   if (!c) notFound();
   const tags = topTags(c.char_scores);
   const userReviews = await getPublicReviews(c.id);
-  const nearby = await getNearby(c.area, c.id);
+  const nearby = await getSimilar(c.area, c.id, c.char_scores, c.synth_count);
   const grade = c.synth_grade || "";
   // 인앱 상세와 동일: 강·약(전체 대비) + 옥석 리뷰 데이터 핵심
   const profile = cafeProfile({ char_scores: c.char_scores, synth_count: c.synth_count }, await getAxisDist());
@@ -191,11 +202,11 @@ export default async function CafePage({ params }: Props) {
             <svg width="12" height="12" viewBox="0 0 24 24" fill="#03c75a"><path d="M16.273 12.845L7.376 0H0v24h7.727V11.155L16.624 24H24V0h-7.727z"/></svg>
             네이버에서 메뉴·가격·영업시간 보기
           </a>
-          {/* 🔁 이 동네 다른 옥석 카페 — 2페이지 유도(리텐션, 홍보×경험 #94) */}
+          {/* 🔁 비슷한 카페 더보기 — 같은 동네 + 결(taste) 유사도, 검증/참고 등급 우선(리텐션, 홍보×경험 #94, decisions #338) */}
           {nearby.length > 0 && (
             <div className="mt-6">
               <div className="flex items-center justify-between mb-2">
-                <div className="text-[13px] font-bold text-[#5a4632]">☕ {c.area} 다른 옥석 카페</div>
+                <div className="text-[13px] font-bold text-[#5a4632]">☕ {c.area} 비슷한 카페 더보기</div>
                 <Link href={`/area/${encodeURIComponent(c.area)}`} className="text-[11px] text-[#9c6b3f] whitespace-nowrap">동네 전체 보기 →</Link>
               </div>
               <div className="flex flex-col gap-2">
