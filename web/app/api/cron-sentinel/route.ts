@@ -8,6 +8,40 @@ import { loadCriteria, getCriterionSync } from "@/lib/criteria";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
+// 🆕 이름-불일치 스캔(coherence 부풀림 사각 전담): 노출후기 다수가 '실제 그 카페명'을 안 담거나(quoteMatchConfidence=0)
+//   제목이 먼 광역시(부산·대구…)를 주제로 삼으면 동명 타지역/옆가게 오염 의심. name_pollution(coherence<0.3)이
+//   '까페'·'대구 중구' 같은 일반어/구名 충돌로 1.0 부풀 때 못 잡던 케이스(비비·MY FAVORITE·외할머니)를 잡는다.
+//   ⚠️ 탐지·경보 전용(자동 비공개 안 함) — 붙임/띄어쓰기 변형 오탐이 있으므로 CEO/기조실장 검토 큐로만.
+const FAR_METRO = ["부산", "대구", "대전", "울산", "전주", "창원", "김해", "포항", "목포", "여수", "순천"];
+async function scanNameMismatch(): Promise<{ count: number; samples: string[] }> {
+  // SQL 프리필터: 먼 광역시 토큰이 노출후기에 든 카페만(전수 대신 후보만 → 300s 내 완료). jsonb 페이로드는
+  //   id별 청크로 받아 64MB 회피. 이후 JS로 '제목 주제(앞8자·2회+)+우리지역 아님+이름에 없음' 정밀 확인.
+  const rx = FAR_METRO.map((m) => m).join("|");
+  const cand = (await sql`SELECT id FROM cafes WHERE published AND synth_reviews IS NOT NULL AND synth_reviews::text ~ ${rx}`) as any[];
+  const ids = cand.map((r) => r.id);
+  const flagged: { id: number; name: string; area: string; hits: number; shown: number }[] = [];
+  for (let i = 0; i < ids.length; i += 40) {
+    const batch = ids.slice(i, i + 40);
+    const rows = (await sql`SELECT id, name, area, dong, synth_reviews FROM cafes WHERE id = ANY(${batch})`) as any[];
+    for (const c of rows) {
+      const areaTerms = [c.area, c.dong].filter(Boolean) as string[];
+      const revs = c.synth_reviews || [];
+      let hits = 0;
+      for (const r of revs) {
+        const q = (r.quote || "") as string;
+        const fm = FAR_METRO.find((m) => q.includes(m));
+        if (!fm) continue;
+        if (areaTerms.some((a) => a.includes(fm)) || c.name.replace(/\s/g, "").includes(fm)) continue; // 우리 지역/이름이면 정상
+        if (/(서울|경기|인천)/.test(q)) continue; // 우리 시도 동반=브랜치/출신 언급 보존
+        if (q.indexOf(fm) <= 7 || q.split(fm).length - 1 >= 2) hits++; // 그 지역이 글 주제일 때만
+      }
+      if (hits > 0) flagged.push({ id: c.id, name: c.name, area: c.area, hits, shown: revs.length });
+    }
+  }
+  flagged.sort((a, b) => b.hits / b.shown - a.hits / a.shown || b.hits - a.hits);
+  return { count: flagged.length, samples: flagged.slice(0, 40).map((f) => `#${f.id} ${f.name}[${f.area}] ${f.hits}/${f.shown} 먼광역시`) };
+}
+
 // 🛡️ 데이터 정합성 센티넬 — 신뢰/해자 파수꾼. "사장님이 버그를 발견하기 전에 내가 먼저"(선제 탐지).
 //   백로그를 치우는 게 아니라, 깨끗한 상태를 '유지'하고 새 오염이 들어오면 즉시 경보한다.
 //   ① 모든 정합성 축을 매일 스캔 ② 안전한 것만 자동 치유(area·박스밖·명백 중복) ③ 나머진 리포트(관제탑).
@@ -72,7 +106,11 @@ export async function GET(req: NextRequest) {
       //   (남의 카페 후기도 '카페 맥락어'는 있으니까). cleanCafeName 게이트 배포 후 재합성분은 정확. 경보만(재등급은 결재).
       name_pollution: await one(sql`SELECT count(*) c FROM cafes WHERE published AND synth_coherence IS NOT NULL AND synth_coherence < 0.3 AND COALESCE(offctx_ok,false)=false`),
     };
-    const residual = Object.values(checks).reduce((s, n) => s + n, 0);
+    // 🆕 이름-불일치/먼광역시 오염 스캔(coherence 사각 전담) — 탐지·경보만(자동 비공개 안 함).
+    const mismatch = await scanNameMismatch().catch(() => ({ count: 0, samples: [] as string[] }));
+    (checks as any).name_mismatch = mismatch.count;
+    // name_mismatch는 '정합성 실패'가 아니라 검토 워치리스트 → clean 판정서 제외(경보 폭주 방지, 별도 표면화).
+    const residual = Object.entries(checks).reduce((s, [k, n]) => s + (k === "name_mismatch" ? 0 : (n as number)), 0);
     const healedTotal = area.fixed + box.excluded + dup.resolved;
     const clean = residual === 0;
 
@@ -85,12 +123,12 @@ export async function GET(req: NextRequest) {
 
     // ── ③ 리포트 ──
     const flags = Object.entries(checks).filter(([, n]) => n > 0).map(([k, n]) => `${k}:${n}`);
-    await sql`INSERT INTO sentinel_reports (clean, report) VALUES (${clean}, ${JSON.stringify({ checks, healed: { area: area.fixed, box: box.excluded, dup: dup.resolved }, consoleKey: probe })}::jsonb)`.catch(() => {});
+    await sql`INSERT INTO sentinel_reports (clean, report) VALUES (${clean}, ${JSON.stringify({ checks, nameMismatch: mismatch.samples, healed: { area: area.fixed, box: box.excluded, dup: dup.resolved }, consoleKey: probe })}::jsonb)`.catch(() => {});
 
     const probeNote = probe.signal === "ok" ? "콘솔키 크레딧 정상" : probe.signal === "credit" ? "콘솔키 크레딧 소진(콘솔경로 중단·검색 결정론폴백 정상=저영향)" : `콘솔키 프로브 ${probe.signal}`;
     const detail = `치유 ${healedTotal}(area${area.fixed}·박스${box.excluded}·중복${dup.resolved}) · ${clean ? "정합성 OK ✅" : "⚠️ 잔여 " + flags.join(" ")} · ${probeNote}`;
     await recordRun("cron-sentinel", true, detail, healedTotal);
-    return NextResponse.json({ ok: true, ranAt: new Date().toISOString(), clean, healed: { area: area.fixed, areaNames: area.names, box: box.excluded, dup: dup.resolved, dupPairs: dup.pairs }, checks, flags, consoleKey: probe });
+    return NextResponse.json({ ok: true, ranAt: new Date().toISOString(), clean, healed: { area: area.fixed, areaNames: area.names, box: box.excluded, dup: dup.resolved, dupPairs: dup.pairs }, checks, flags, nameMismatch: mismatch, consoleKey: probe });
   } catch (e) {
     await recordRun("cron-sentinel", false, String(e).slice(0, 150));
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
