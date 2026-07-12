@@ -126,6 +126,10 @@ export default async function CafePage({ params }: Props) {
             <p className="text-[#9c6b3f] text-sm">{c.area}</p>
             <SaveMemoryButton cafeId={c.id} cafeName={c.name} cafeArea={c.area} />
           </div>
+          {/* ❤ MY PIN(내 카페 추억) 노출 배너 — 상세페이지에서 인지도가 낮아 CTA로 강화(#339). 2단계 저장·무가입 원칙 무변, 노출만 강화 */}
+          <div className="mb-3">
+            <SaveMemoryButton cafeId={c.id} cafeName={c.name} cafeArea={c.area} variant="banner" />
+          </div>
           {/* 📊 리뷰 데이터 분석 — 옥석 후기 핵심 */}
           {(highlights.length > 0 || c.synth_identity) && (
             <div className="bg-gradient-to-b from-[#f4eee2] to-[#ece4d4] rounded-xl px-4 py-3.5 mb-3 border border-[#d8c8ad]">
