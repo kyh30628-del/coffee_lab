@@ -90,3 +90,4 @@
 | 2026-07-12 09:20 | #346 | [검색품질 결함C] "브런치" concept 트리거 부재 — 순수 임베딩 유사도만으로 검색 | f77097b7 | - | app/api/search/route.ts CONCEPTS_BASE·lib/criteriaListsBase.ts LIST_META에 브런치 개념 트리거(concept.brunch. |
 | 2026-07-12 09:36 | #347 | 상세페이지기능미노출수정 | eb4ab828 | med | 근본원인: CEO 실사용 경로는 지도(app/page.tsx CafePanel)인데 #338/#339는 공유용 상세페이지(/c/[id])에만 구현돼 지도에서는 안 보였음(SSR c |
 | 2026-07-12 10:37 | #348 | 유입현황 대시보드 개선 | f711385b | med | 수정: app/admin/page.tsx, app/api/admin/analytics/route.ts. (1) 일별 방문 추이·즐겨찾기 일별 차트 렌더링 버그 수정 — 중첩 fle |
+| 2026-07-12 11:05 | #343 | [룰갭 P32] B2B 쇼룸/인테리어 광고가 "카페" 자기묘사로 LOCAL_SEO_SERVICES 가드 무력 | fa210846 | - | lib/reviewQuality.ts:682 LOCAL_SEO_SERVICES 가드에 SELF_BIZ_PROMO(쇼룸/매장주소/방문예약/카톡방문/시공갤러리) 자기업체 정형구 체크  |
