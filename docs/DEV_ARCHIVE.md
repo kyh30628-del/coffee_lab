@@ -84,3 +84,4 @@
 | 2026-07-12 08:30 | #336 | [자율진단] #335 반영미확인 재검증 로직이 실제로는 절대 안 불림 — run-dev-deploy.sh C | 6dda4d6a | - | scripts/reconcileUnverified.mjs 신설(반영미확인 재검증 로직 공용모듈화, dev-deploy.mjs에서 추출) + scripts/dev-claim.mjs가 |
 | 2026-07-12 08:33 | #338 | 카페 상세페이지에 '비슷한 카페 더보기' 추가 | 099bf1e2 | low | app/c/[id]/page.tsx: getNearby→getSimilar로 교체(같은 area 후보 40건 fetch 후 char_scores 결 벡터 코사인유사도 계산), li |
 | 2026-07-12 08:34 | #339 | MY PIN(내 카페 추억) 노출 강화 | 24f6e1cb | low | app/c/[id]/SaveMemoryButton.tsx에 variant="banner" 추가(기존 pill 로직 재사용, 이미 기록시 문구 변경) + app/c/[id]/page |
+| 2026-07-12 08:48 | #341 | [개발] [재발견] instagram_url 컬럼 07-01 완료처리됐지만 11일째 0/13259 채워짐 - | 650ae4e7 | - | scripts/instagram-backfill.mjs 신규: 네이버 지역검색 link 필드가 스마트플레이스 등록 인스타그램을 그대로 반환함을 실측 확인(무크롤·공식API)→카페당 |
