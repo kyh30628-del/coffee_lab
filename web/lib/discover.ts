@@ -65,6 +65,16 @@ export const DISCOVER_KEYWORDS = [
 export const PRIORITY_AREAS = ["송파구", "강동구", "구리시"];
 export const PRIORITY_REGIONS = ["서울 강동구", "서울 송파구", "경기 구리시"];
 
+// 🎯 네이버 롱테일 SEO 채널 우선순위(coordination#337) — 외곽수도권(수원/화성/파주/의정부/김포/양주)×결 조합 중
+//   '스페셜티·로스팅'이 전 지역 공통으로 카페수·검증후기 근거가 가장 약함(다른 결 대비 최소, DB 실측).
+//   discovery_targets 큐에 로스팅 전용 키워드로 우선순위를 실어 그 결 콘텐츠 밀도를 채운다(cron-grow가 소비·시드).
+const ROAST_KEYWORDS = ["로스터리", "스페셜티커피", "직접로스팅", "핸드드립", "싱글오리진", "자가배전", "드립커피전문점", "에스프레소바", "로스터스", "빈투바", "원두판매"];
+export const LONGTAIL_SEED_REASON = "네이버 롱테일 SEO — 외곽도시×로스팅 결 콘텐츠 밀도 보강(coordination#337)";
+export const LONGTAIL_TASTE_TARGETS: { region: string; areaLabel: string; keywords: string[]; reason: string; priority: number }[] =
+  ["수원시", "화성시", "파주시", "의정부시", "김포시", "양주시"].map((gu) => ({
+    region: `경기 ${gu}`, areaLabel: gu, keywords: ROAST_KEYWORDS, reason: LONGTAIL_SEED_REASON, priority: 3,
+  }));
+
 // 수도권 전 지역 (검색용 region, 저장용 areaLabel) — 에이전트가 순회 발굴
 export const METRO_REGIONS: { region: string; areaLabel: string }[] = (() => {
   const R: Record<string, string[]> = {

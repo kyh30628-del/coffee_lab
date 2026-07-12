@@ -1,12 +1,12 @@
 import Link from "next/link";
-import { TASTES, SITE, type SeoCafe } from "@/lib/seoData";
+import { TASTES, SITE, type SeoCafe, type GradeBreakdown } from "@/lib/seoData";
 import KakaoShare from "../KakaoShare";
 
 const GRADE_BG: Record<string, string> = { 검증: "#5f7355", 참고: "#9c6b3f", 후보: "#a8927a" };
 
 // 동네×취향 검증 카페 큐레이션 — SEO 콘텐츠 페이지 공용 렌더(서버 컴포넌트).
-export default function Curated({ area, tasteKey, heading, intro, cafes, regions, canonical }: {
-  area: string; tasteKey?: string; heading: string; intro: string; cafes: SeoCafe[]; regions: { area: string; n: number }[]; canonical: string;
+export default function Curated({ area, tasteKey, heading, intro, cafes, regions, grades, canonical }: {
+  area: string; tasteKey?: string; heading: string; intro: string; cafes: SeoCafe[]; regions: { area: string; n: number }[]; grades?: GradeBreakdown; canonical: string;
 }) {
   const jsonld = {
     "@context": "https://schema.org", "@type": "ItemList", name: heading, numberOfItems: cafes.length,
@@ -21,6 +21,13 @@ export default function Curated({ area, tasteKey, heading, intro, cafes, regions
         <h1 className="text-[26px] font-bold leading-tight mb-2">{heading}</h1>
         <p className="text-[14px] text-[#6b5a48] leading-relaxed mb-3">{intro}</p>
         <p className="text-[12px] text-[#8a7458] bg-white/60 border border-[#e6dcc8] rounded-lg px-3 py-2 mb-6">☕ <b>영수증 리뷰·광고·협찬은 빼고</b>, 네이버·구글·유튜브 공개 후기를 교차검증해 진짜 후기로만 골랐어요.</p>
+
+        {/* 후기 근거 요약 — 등급 분포로 검증 신뢰도를 투명하게 표시(콘텐츠 밀도 보강) */}
+        {tasteKey && grades && (grades.verified + grades.ref + grades.candidate) > 0 && (
+          <p className="text-[11.5px] text-[#a8927a] -mt-4 mb-6">
+            후기 근거: 검증 {grades.verified}곳 · 참고 {grades.ref}곳{grades.candidate ? ` · 후보 ${grades.candidate}곳` : ""}
+          </p>
+        )}
 
         {/* 취향 내비 */}
         <div className="flex flex-wrap gap-1.5 mb-6">

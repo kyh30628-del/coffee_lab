@@ -46,3 +46,15 @@ export async function getRegionTasteCount(area: string, tasteKey: string): Promi
     return Number(((await sql`SELECT count(*)::int n FROM cafes WHERE published AND area=${area} AND COALESCE((char_scores->>${tasteKey})::int, 0) > 0`)[0] as any)?.n ?? 0);
   } catch { return 0; }
 }
+
+// 지역×취향 후기 근거 등급 분포(검증/참고/후보) — 표시 30개가 아닌 전체 모수 기준. 콘텐츠 밀도 보강용 근거 요약.
+export type GradeBreakdown = { verified: number; ref: number; candidate: number };
+export async function getRegionTasteGradeBreakdown(area: string, tasteKey: string): Promise<GradeBreakdown> {
+  try {
+    const rows = (await sql`SELECT synth_grade AS grade, count(*)::int n FROM cafes
+      WHERE published AND area=${area} AND COALESCE((char_scores->>${tasteKey})::int, 0) > 0
+      GROUP BY synth_grade`) as unknown as { grade: string | null; n: number }[];
+    const find = (g: string) => rows.find((r) => r.grade === g)?.n ?? 0;
+    return { verified: find("검증"), ref: find("참고"), candidate: find("후보") };
+  } catch { return { verified: 0, ref: 0, candidate: 0 }; }
+}
