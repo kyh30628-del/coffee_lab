@@ -1,4 +1,5 @@
 {
+  "ignoreCommand": "git diff --quiet HEAD^ HEAD ./",
   "crons": [
     {
       "path": "/api/cron-resynth",
@@ -58,7 +59,7 @@
     },
     {
       "path": "/api/cron-issues",
-      "schedule": "*/10 * * * *"
+      "schedule": "*/30 * * * *"
     },
     {
       "path": "/api/cron-coord-consumer?mode=live",
