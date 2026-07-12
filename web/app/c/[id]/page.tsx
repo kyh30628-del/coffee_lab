@@ -6,7 +6,7 @@ import { sql } from "@/lib/db";
 import KakaoShare from "../../KakaoShare";
 import SaveMemoryButton from "./SaveMemoryButton";
 import VisitorReviews from "../../VisitorReviews";
-import { buildAxisDist, cafeProfile, extractHighlights, tasteVector, tasteSimilarity } from "@/lib/cafeProfile";
+import { buildAxisDist, cafeProfile, extractHighlights, tasteVector, tasteSimilarity, GRADE_RANK } from "@/lib/cafeProfile";
 import { collectionForCafe } from "@/lib/collections";
 
 export const runtime = "nodejs";
@@ -64,7 +64,6 @@ async function getPublicReviews(cafeId: number) {
 // 🔁 리텐션 훅 — 같은 동네(area) + 결(taste) 유사도 기반 '비슷한 카페 더보기'.
 //   1페이지 이탈↓·2페이지 유도(홍보×경험 #94, decisions #338 — 상세 89% 1페이지 이탈 대응).
 //   검증/참고 등급 우선 노출(등급 낮은 순 정렬) → 동급 안에서는 결 유사도·검증후기 수로 정렬. published=true라 오염 카페는 이미 제외.
-const GRADE_RANK: Record<string, number> = { "검증": 0, "참고": 1, "후보": 2 };
 async function getSimilar(area: string, excludeId: number, char_scores: any, synth_count: number) {
   try {
     const rows = (await sql`SELECT id, name, synth_grade, synth_count, char_scores FROM cafes
