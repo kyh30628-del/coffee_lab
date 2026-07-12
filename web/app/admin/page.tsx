@@ -1056,6 +1056,31 @@ export default function AdminPage() {
                               </li>
                             ))}
                           </ul>
+                          {/* 📄 오늘 페이지 조회 순위 top5 — 카테고리별 비중 소목록 */}
+                          {(() => {
+                            const tp = a.todayInsight?.pages || [];
+                            const totalToday = tp.reduce((s: number, p: any) => s + (p.views ?? 0), 0);
+                            if (!tp.length || totalToday < 1) {
+                              return <div className="mt-2 pt-2 border-t border-sky-200/70 text-[10.5px] text-stone-400">오늘 페이지 조회 데이터가 쌓이는 중이에요.</div>;
+                            }
+                            const maxV = Math.max(1, ...tp.map((p: any) => p.views));
+                            return (
+                              <div className="mt-2 pt-2 border-t border-sky-200/70">
+                                <div className="text-[10px] font-bold text-sky-700/80 mb-1">📄 오늘 많이 본 화면 top{tp.length}</div>
+                                <div className="space-y-1">
+                                  {tp.map((p: any, i: number) => (
+                                    <div key={i} className="flex items-center gap-2 text-[11px]">
+                                      <span className="w-16 shrink-0 text-stone-600 font-medium">{p.bucket}</span>
+                                      <div className="flex-1 bg-sky-100 rounded-full h-2 overflow-hidden">
+                                        <div className="bg-sky-400 h-full rounded-full" style={{ width: `${Math.round((p.views / maxV) * 100)}%` }} />
+                                      </div>
+                                      <span className="w-20 shrink-0 text-right text-stone-500">{p.views.toLocaleString()}회 · {Math.round((p.views / totalToday) * 100)}%</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })()}
                         </div>
                       )}
                       {/* 🧑 진짜 사용자 신호 — 봇으로 설명 안 되는 것들 */}
