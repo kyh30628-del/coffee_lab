@@ -137,6 +137,18 @@ const today = new Date().toISOString().slice(0, 10);
     }
   } catch (e) { L.push(`(위치동의 기기 패턴 조회 실패)\n`); }
 
+  // 7) 오늘 일일 분석요약 — 페이지 조회순위·체류시간·유의미 사용자(#350 심층화). EXECUTIVE 17시 일일보고서가
+  //    이 DIGEST를 읽으므로, 여기서 매 사이클 재계산해야 별도 수동 트리거 없이 당일 최신 데이터로 맞물린다(#351).
+  //    쿼리·문장 로직은 lib/dailySummary.ts 단일출처(app/api/admin/analytics/route.ts와 공유).
+  try {
+    const { getTodayInsight, formatTodayInsightLines } = await import("../lib/dailySummary.ts");
+    const todayInsight = await getTodayInsight(sql);
+    const lines = formatTodayInsightLines(todayInsight);
+    L.push(`## 🧾 오늘 일일 분석요약 (페이지 조회순위·체류시간·유의미 사용자)`);
+    L.push(lines.length ? lines.map((l) => `- ${l}`).join("\n") : "- 오늘 표본 부족으로 요약 문장 생략(숫자 날조 금지)");
+    L.push("");
+  } catch (e) { L.push(`(일일 분석요약 조회 실패: ${String(e).slice(0, 100)})\n`); }
+
   const out = L.join("\n");
   writeFileSync(`${AR}/DIGEST.md`, out);
   console.log(`✅ DIGEST.md 생성 (${out.length}자, ${(out.length / 1024).toFixed(1)}KB)`);
