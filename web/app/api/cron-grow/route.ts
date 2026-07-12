@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
-import { discoverRegion, METRO_REGIONS, PRIORITY_REGIONS } from "@/lib/discover";
+import { discoverRegion, METRO_REGIONS, PRIORITY_REGIONS, LONGTAIL_TASTE_TARGETS, LONGTAIL_SEED_REASON } from "@/lib/discover";
 import { synthAndStore } from "@/lib/synthStore";
 import { mineArea } from "@/lib/reviewMiner";
 import { recordRun } from "@/lib/agentLog";
@@ -24,6 +24,16 @@ export async function GET(req: NextRequest) {
     for (const r of METRO_REGIONS) await sql`INSERT INTO discovery_state (region, area_label) VALUES (${r.region}, ${r.areaLabel}) ON CONFLICT (region) DO NOTHING`;
     // 🎯 demand→grow 자율 루프: 에이전트(Claude Code)가 수요·공급갭을 추론해 채우는 타겟 큐. 비면 기존 신선도 순회로 폴백.
     await sql`CREATE TABLE IF NOT EXISTS discovery_targets (id SERIAL PRIMARY KEY, region TEXT, area_label TEXT, keywords JSONB, reason TEXT, priority INT DEFAULT 0, status TEXT DEFAULT 'pending', created_at TIMESTAMPTZ DEFAULT now(), consumed_at TIMESTAMPTZ, found INT, inserted INT)`.catch(() => {});
+    // 🎯 롱테일 SEO 타겟 시드(coordination#337) — pending이거나 최근 7일 내 처리됐으면 재시딩 생략(중복 적재 방지),
+    //   그 외(처음이거나 7일 지나 재보강 필요)면 큐에 다시 올려 로스팅 결 발굴이 계속 우선순위를 받게 한다.
+    for (const t of LONGTAIL_TASTE_TARGETS) {
+      const recent = await sql`SELECT 1 FROM discovery_targets WHERE region=${t.region} AND reason=${LONGTAIL_SEED_REASON}
+        AND (status='pending' OR consumed_at > now() - interval '7 days') LIMIT 1`;
+      if (!recent.length) {
+        await sql`INSERT INTO discovery_targets (region, area_label, keywords, reason, priority)
+          VALUES (${t.region}, ${t.areaLabel}, ${JSON.stringify(t.keywords)}::jsonb, ${t.reason}, ${t.priority})`;
+      }
+    }
 
     // ① 가장 오래된 지역부터 '시간 예산(260초)' 내 공격적 발굴 — sort=comment+random 2패스 + 동/도로
     //    지리 세분화로 검색 창을 최대화(프랜차이즈에 묻힌 리뷰 많은 동네카페 발굴력↑). 호출량이 커서
