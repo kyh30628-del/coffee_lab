@@ -1,22 +1,22 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 
-// 📲 PWA 설치 유도 — 추천안:
-//  · 안드로이드/PC(Chrome·Edge·삼성): beforeinstallprompt를 잡아 버튼 클릭 시 '네이티브 설치창'.
-//  · 아이폰(Safari): 설치창 API 자체가 없음 → '공유 → 홈 화면에 추가' 안내 오버레이.
-//  · 이미 설치(standalone)면 아무것도 안 뜸. 거절하면 14일간 다시 안 조름.
-//  · 첫 화면 즉시 팝업/종료 시 팝업 없음 — 고의도 순간(dcn:install-hint 이벤트)에 배너, 그 외엔 작은 버튼만.
+// 📲 PWA 설치 유도 — 배너만(상시 pill 없음):
+//  · 안드로이드/PC(Chrome·Edge·삼성): beforeinstallprompt를 조용히 잡아두고, 고의도 순간
+//    (dcn:install-hint = 즐겨찾기·내 주변 찾기)에만 하단 배너 → 클릭 시 '네이티브 설치창'.
+//  · 아이폰(Safari): 설치창 API 자체가 없음 → 배너 '방법 보기' → 공유→홈 화면에 추가 안내.
+//  · 이미 설치(standalone)/관리자·사장님 화면/거절 14일 이내면 안 뜸. 첫 화면·종료 시 팝업 없음.
 const DISMISS_KEY = "dcn_pwa_dismiss";
 const DAY = 864e5;
 
 export default function PwaInstall() {
-  const [deferred, setDeferred] = useState<any>(null); // BeforeInstallPromptEvent
   const [isIOS, setIsIOS] = useState(false);
   const [standalone, setStandalone] = useState(true); // 판단 전엔 true(안 뜨게)
-  const [show, setShow] = useState(false);            // 어피던스 노출 여부
-  const [expanded, setExpanded] = useState(false);    // 배너(고의도) vs 작은 버튼
+  const [expanded, setExpanded] = useState(false);    // 배너 노출
   const [iosGuide, setIosGuide] = useState(false);    // iOS 안내 오버레이
+  const deferredRef = useRef<any>(null);              // BeforeInstallPromptEvent(조용히 보관)
+  const iosRef = useRef(false);
   const pathname = usePathname();
 
   const dismissedRecently = useCallback(() => {
@@ -31,43 +31,39 @@ export default function PwaInstall() {
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {}); // 설치 가능 조건
     const ua = navigator.userAgent || "";
     const ios = /iphone|ipad|ipod/i.test(ua); // iOS는 설치창 없음 → 안내만
-    setIsIOS(ios);
-    if (dismissedRecently()) return;
+    iosRef.current = ios; setIsIOS(ios);
 
-    const onBIP = (e: Event) => { e.preventDefault(); setDeferred(e); setShow(true); }; // 안드로이드/PC
-    const onInstalled = () => { setShow(false); setExpanded(false); setDeferred(null); try { localStorage.setItem(DISMISS_KEY, String(Date.now() + 3650 * DAY)); } catch {} };
-    const onHint = () => { if (!dismissedRecently()) { setShow(true); setExpanded(true); } }; // 고의도 순간 → 배너
+    const onBIP = (e: Event) => { e.preventDefault(); deferredRef.current = e; }; // 조용히 보관(배너는 고의도 순간에만)
+    const onInstalled = () => { setExpanded(false); deferredRef.current = null; try { localStorage.setItem(DISMISS_KEY, String(Date.now() + 3650 * DAY)); } catch {} };
+    const onHint = () => { if (!dismissedRecently() && (deferredRef.current || iosRef.current)) setExpanded(true); }; // 실제 설치 가능할 때만 배너
     window.addEventListener("beforeinstallprompt", onBIP);
     window.addEventListener("appinstalled", onInstalled);
     window.addEventListener("dcn:install-hint", onHint as EventListener);
-    // 아이폰은 beforeinstallprompt가 없어 이벤트로 못 뜸 → 첫 화면 즉시 nag 방지 위해 12초 뒤 작은 버튼만.
-    let t: ReturnType<typeof setTimeout> | undefined;
-    if (ios) t = setTimeout(() => { if (!dismissedRecently()) setShow(true); }, 12000);
     return () => {
       window.removeEventListener("beforeinstallprompt", onBIP);
       window.removeEventListener("appinstalled", onInstalled);
       window.removeEventListener("dcn:install-hint", onHint as EventListener);
-      if (t) clearTimeout(t);
     };
   }, [dismissedRecently]);
 
-  const dismiss = () => { setShow(false); setExpanded(false); setIosGuide(false); try { localStorage.setItem(DISMISS_KEY, String(Date.now())); } catch {} };
+  const dismiss = () => { setExpanded(false); setIosGuide(false); try { localStorage.setItem(DISMISS_KEY, String(Date.now())); } catch {} };
 
   const install = async () => {
-    if (isIOS) { setIosGuide(true); setExpanded(false); return; } // iOS는 안내만
-    if (!deferred) return;
+    if (iosRef.current) { setIosGuide(true); setExpanded(false); return; } // iOS는 안내만
+    const d = deferredRef.current;
+    if (!d) return;
     try {
-      deferred.prompt();
-      const res = await deferred.userChoice;
-      if (res?.outcome === "accepted") { setShow(false); setExpanded(false); }
-      setDeferred(null);
+      d.prompt();
+      const res = await d.userChoice;
+      if (res?.outcome === "accepted") setExpanded(false);
+      deferredRef.current = null;
     } catch {}
   };
 
   if (standalone) return null;
   // 관리자·사장님 화면(관제탑 등)에선 소비자용 설치 유도 안 함
   if (pathname && /^\/(admin|owner|business)/.test(pathname)) return null;
-  if (!show && !iosGuide) return null;
+  if (!expanded && !iosGuide) return null;
 
   if (iosGuide) {
     return (
@@ -89,32 +85,18 @@ export default function PwaInstall() {
     );
   }
 
-  if (expanded) {
-    return (
-      <div className="fixed z-[1300] left-0 right-0 px-3" style={{ bottom: "calc(3.25rem + env(safe-area-inset-bottom))" }}>
-        <div className="max-w-lg mx-auto bg-[#2b2018] text-[#f4ece0] rounded-2xl shadow-xl p-3.5 flex items-center gap-3">
-          <div className="text-2xl leading-none">☕</div>
-          <div className="flex-1 min-w-0">
-            <div className="font-bold text-[13px]">홈 화면에 ‘커피 노트’ 추가</div>
-            <div className="text-[11px] text-[#d9c9b3] leading-snug">한 번 누르면 앱처럼 바로 열려요{isIOS ? " · 아이폰은 공유→홈 화면에 추가" : ""}</div>
-          </div>
-          <button onClick={install} className="bg-[#e0a32e] text-[#2b2018] font-bold text-[12px] rounded-full px-3.5 py-2 whitespace-nowrap shrink-0">{isIOS ? "방법 보기" : "설치"}</button>
-          <button onClick={dismiss} aria-label="닫기" className="text-[#b7a58e] px-1 shrink-0 text-sm">✕</button>
-        </div>
-      </div>
-    );
-  }
-
-  // 상시 작은 버튼(고의도 아닐 때) — 우하단, 하단 네비 위. 닫기(✕)로 14일간 숨김.
+  // 배너(고의도 순간) — 하단 네비 위, 닫기(✕) 14일 존중
   return (
-    <div className="fixed z-[1000] right-3 flex items-center gap-1.5" style={{ bottom: "calc(3.75rem + env(safe-area-inset-bottom))" }}>
-      <button onClick={install} aria-label="앱 설치"
-        className="inline-flex items-center gap-1 bg-[#2b2018] text-[#f4ece0] rounded-full shadow-lg px-3.5 py-2 text-[12px] font-bold">
-        <span className="text-[14px] leading-none">📲</span>
-        <span>{isIOS ? "홈 화면에 추가" : "앱 설치"}</span>
-      </button>
-      <button onClick={dismiss} aria-label="설치 안내 닫기"
-        className="w-6 h-6 rounded-full bg-[#2b2018]/85 text-[#e8dcc9] text-[12px] shadow-lg flex items-center justify-center leading-none">✕</button>
+    <div className="fixed z-[1300] left-0 right-0 px-3" style={{ bottom: "calc(3.25rem + env(safe-area-inset-bottom))" }}>
+      <div className="max-w-lg mx-auto bg-[#2b2018] text-[#f4ece0] rounded-2xl shadow-xl p-3.5 flex items-center gap-3">
+        <div className="text-2xl leading-none">☕</div>
+        <div className="flex-1 min-w-0">
+          <div className="font-bold text-[13px]">홈 화면에 ‘커피 노트’ 추가</div>
+          <div className="text-[11px] text-[#d9c9b3] leading-snug">한 번 누르면 앱처럼 바로 열려요{isIOS ? " · 아이폰은 공유→홈 화면에 추가" : ""}</div>
+        </div>
+        <button onClick={install} className="bg-[#e0a32e] text-[#2b2018] font-bold text-[12px] rounded-full px-3.5 py-2 whitespace-nowrap shrink-0">{isIOS ? "방법 보기" : "설치"}</button>
+        <button onClick={dismiss} aria-label="닫기" className="text-[#b7a58e] px-1 shrink-0 text-sm">✕</button>
+      </div>
     </div>
   );
 }
