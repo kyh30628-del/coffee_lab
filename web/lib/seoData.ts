@@ -16,7 +16,7 @@ export const TASTES: Taste[] = [
 ];
 export const tasteByKey = (k: string) => TASTES.find((t) => t.key === k);
 
-export type SeoCafe = { id: number; name: string; dong: string | null; grade: string | null; count: number | null; identity: string | null };
+export type SeoCafe = { id: number; name: string; dong: string | null; grade: string | null; count: number | null; identity: string | null; quote: string | null };
 
 export async function getRegions(): Promise<{ area: string; n: number }[]> {
   try {
@@ -26,7 +26,9 @@ export async function getRegions(): Promise<{ area: string; n: number }[]> {
 
 export async function getRegionCafes(area: string, limit = 30): Promise<SeoCafe[]> {
   try {
-    return (await sql`SELECT id, name, dong, synth_grade AS grade, synth_count AS count, synth_identity AS identity
+    return (await sql`SELECT id, name, dong, synth_grade AS grade, synth_count AS count, synth_identity AS identity,
+      (SELECT left(r->>'quote', 70) FROM jsonb_array_elements(COALESCE(synth_reviews,'[]'::jsonb)) r
+        WHERE COALESCE(r->>'quote','') <> '' ORDER BY COALESCE((r->>'score')::int,0) DESC LIMIT 1) AS quote
       FROM cafes WHERE published AND area=${area}
       ORDER BY (synth_grade='검증') DESC, synth_count DESC NULLS LAST LIMIT ${limit}`) as unknown as SeoCafe[];
   } catch { return []; }
@@ -34,7 +36,9 @@ export async function getRegionCafes(area: string, limit = 30): Promise<SeoCafe[
 
 export async function getRegionTasteCafes(area: string, tasteKey: string, limit = 30): Promise<SeoCafe[]> {
   try {
-    return (await sql`SELECT id, name, dong, synth_grade AS grade, synth_count AS count, synth_identity AS identity
+    return (await sql`SELECT id, name, dong, synth_grade AS grade, synth_count AS count, synth_identity AS identity,
+      (SELECT left(r->>'quote', 70) FROM jsonb_array_elements(COALESCE(synth_reviews,'[]'::jsonb)) r
+        WHERE COALESCE(r->>'quote','') <> '' ORDER BY COALESCE((r->>'score')::int,0) DESC LIMIT 1) AS quote
       FROM cafes WHERE published AND area=${area} AND COALESCE((char_scores->>${tasteKey})::int, 0) > 0
       ORDER BY (char_scores->>${tasteKey})::int DESC, synth_count DESC NULLS LAST LIMIT ${limit}`) as unknown as SeoCafe[];
   } catch { return []; }
