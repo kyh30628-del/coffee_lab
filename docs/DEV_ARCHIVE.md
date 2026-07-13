@@ -102,3 +102,4 @@
 | 2026-07-13 11:51 | #360 | [검색품질 결함D] 모멘텀(요즘뜨는) 피드에 grade 가중치 부재 — 참고등급 저표본 카페 검증등급과 동열 | aa70b6c3 | - | web/app/api/momentum/route.ts: gradeBonus() 추가(search.grade_bonus.verified/reference criteria 재사용) — |
 | 2026-07-13 11:52 | #361 | [전사 재발방지] Anthropic 콘솔키 잔액 임계치 사전경보(Slack/이메일) — 크레딧 소진 4~5차 | dcc2e7c9 | - | lib/consoleKeyProbe.ts: 콘솔키 소진/인증오류(credit·authkey) 감지 시 이메일(Resend·ALERT_EMAIL 폴백 CEO메일) 즉시 발송 + Sl |
 | 2026-07-13 11:58 | #363 | 공유 OG카드 강화 | 70e60b48 | med | lib/ogCard.tsx+charScore.ts(topCharTraits)+c/[id]/opengraph-image.tsx: OG카드에 카페명·등급(✓검증/참고)·대표 결(예:� |
+| 2026-07-13 13:28 | #364 | 지역 SEO 랜딩 확충 | 0745b235 | med | lib/seoData.ts, app/area/Curated.tsx: 지역/취향 랜딩 카페 리스트에 실제 대표후기 스니펫(synth_reviews 중 최고점 quote, correl |
