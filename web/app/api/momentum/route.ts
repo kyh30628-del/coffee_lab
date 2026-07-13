@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
 import { dessertDominance } from "@/lib/charScore";
+import { loadCriteria, getCriterionSync } from "@/lib/criteria";
 export const runtime = "nodejs";
 
 // "📈 요즘 뜨는 카페" — 별점(미제공) 대신 우리 소유 데이터로 모멘텀 산출.
@@ -27,9 +28,14 @@ function inRegion(area: string, region: string): boolean {
   return s.length >= 2 && a.includes(s);
 }
 
+// search API와 동일 기준(criteria.ts search.grade_bonus.*, L2 기조실장 전결) 재사용 —
+// 저표본 참고등급 카페가 버즈만으로 검증등급과 동열노출되는 결함D 보정.
+const gradeBonus = (g?: string | null): number => (g === "검증" ? getCriterionSync("search.grade_bonus.verified") : g === "참고" ? getCriterionSync("search.grade_bonus.reference") : 0);
+
 export async function GET(req: NextRequest) {
   try {
     await ensureSchema();
+    await loadCriteria(); // 등급 가산점 기준 캐시 프라임(동기 gradeBonus가 읽음)
     const region = (req.nextUrl.searchParams.get("region") ?? "").trim();
 
     // 스냅샷 증가분(Δ): 5일 이상 전 스냅샷이 있으면 상승세 계산
@@ -62,6 +68,7 @@ export async function GET(req: NextRequest) {
       const delta = hasDelta && deltaMap.has(c.id) ? total - (deltaMap.get(c.id) ?? total) : null;
       // '요즘 뜨는' = 가장 최근 한 달(30일)을 가장 무겁게(×2) + 3개월(90일) 버즈 + 최근 집중도 보정.
       let score = r30 * 2 + r90 * (0.6 + 0.8 * Math.min(share, 1));
+      score += gradeBonus(c.synth_grade);
       if (delta && delta > 0) score += delta * 3;
       // 커피 카테고리 정체성 보정 — 디저트 우세 카페는 '요즘 뜨는'에서 제외하고, 정체성 유지 카페만 가점.
       // 베이커리류가 리뷰 회전(버즈)만으로 '요즘 뜨는'을 과점하던 편향 완화(결함C, 배포abe8e99가 가점만으로는
