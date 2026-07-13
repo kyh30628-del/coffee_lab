@@ -97,3 +97,4 @@
 | 2026-07-12 13:09 | #352 | 카페상세 구조화데이터 | ec06d1a7 | low | app/c/[id]/page.tsx: JSON-LD에 geo(lat/lng)·address(streetAddress/dong/area)·aggregateRating(등급기반 rat |
 | 2026-07-12 22:06 | #353 | 모달 배경스크롤 고정 | 73feb6e5 | low | lib/useLockBodyScroll.ts(신규, 참조카운트 iOS-safe 훅) 추가 후 admin/ChatWidget·VisitorReviews의 기존 임시구현을 대체, ad |
 | 2026-07-13 01:52 | #354 | [개발] 협업 #190: [레드팀] id16208 표시명 손상 — 정체성붕괴 경계사례(등급 무관) | 2312a439 | - | scripts/fix-name-16208.mjs 신규: id16208 표시명 정정 원클릭 스크립트. 라이브 네이버 재확인 결과 "김포공항플레이보6 트윗젤"은 손상이 아니라 김포공항 |
+| 2026-07-13 09:45 | #358 | [룰갭 P33] 브랜드+숫자 상호 순수숫자토큰 오매칭 — id13384·id10782 재현확정 | a99c1ccb | - | lib/reviewQuality.ts coreTokensDetail: 한글↔숫자 경계분리로 생긴 순수숫자토큰(카페인24→24, 커피깡패254→254)이 다른 비숫자 토큰과 공존할  |
