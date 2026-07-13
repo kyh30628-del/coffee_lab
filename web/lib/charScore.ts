@@ -24,9 +24,13 @@ function countHits(text: string, kws: string[]): number {
 
 // 카페 이름 자체가 축 키워드를 우연히 포함하면(예: "고요재"·"최고요" → quiet 키워드 "고요") 리뷰가
 // 상호를 반복 인용할 때마다 실제 분위기 묘사 없이 축이 허위로 카운트된다 — 카운트 전 상호 언급을 제거해 방지.
+// #359: 지점명이 붙은 상호("앤드테라스 파주점")는 리뷰가 지점명 없이 브랜드만 축약 인용("앤드테라스는...")하는
+//   경우가 흔해 풀네임 매칭을 피해간다 — 마지막 공백토큰(지점명)을 뗀 브랜드 핵심명도 변형으로 함께 제거한다.
 function stripNameMentions(text: string, cafeName?: string): string {
   if (!cafeName) return text;
-  const variants = [cafeName.trim(), cafeName.trim().replace(/\s+/g, "")].filter((v) => v.length >= 2);
+  const trimmed = cafeName.trim();
+  const tokens = trimmed.split(/\s+/);
+  const variants = [trimmed, trimmed.replace(/\s+/g, ""), tokens.slice(0, -1).join(" ")].filter((v) => v.length >= 2);
   let out = text;
   for (const v of variants) {
     const re = new RegExp(v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");

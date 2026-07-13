@@ -25,8 +25,11 @@ export const LIST_META: ListMeta[] = [
     items: ["조용", "차분", "혼자", "사색", "한적", "고요한", "고요함", "고요히", "고요하게"] },
   { key: "char.dessert.kws", category: "성향축", label: "성향축: 디저트 🍰", consumer: "charScore.computeCharScores",
     items: ["디저트", "케이크", "스콘", "크로플", "티라미수", "베이커리", "쿠키", "빵"] },
+  // #359: 바른 "뷰" 단독 매칭이 "리뷰"·"인터뷰"·"벨뷰"·"뷰티"·"트리뷰트"·"랑데자뷰"(카페 상호) 등과
+  //   발음/부분일치 충돌 → mood 언급률 3.2배 허위 급등(coord#114 "고요"→"최고요"와 동일 근본원인).
+  //   view를 실제로 서술하는 복합어 형태만 인정(리뷰 등과 겹치지 않는 접두 결합어).
   { key: "char.mood.kws", category: "성향축", label: "성향축: 분위기 📸", consumer: "charScore.computeCharScores",
-    items: ["분위기", "예쁜", "감성", "인테리어", "사진", "뷰", "루프탑", "아늑"] },
+    items: ["분위기", "예쁜", "감성", "인테리어", "사진", "오션뷰", "시티뷰", "한강뷰", "리버뷰", "루프탑뷰", "야경뷰", "노을뷰", "전망", "루프탑", "아늑"] },
   { key: "char.space.kws", category: "성향축", label: "성향축: 넓은공간 🪑", consumer: "charScore.computeCharScores",
     items: ["넓", "대형", "규모", "테라스", "주차"] },
 
