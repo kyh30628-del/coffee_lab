@@ -86,6 +86,13 @@ body {
 .dcn-region-pin:hover { transform: translate(-50%, -50%) scale(1.09) !important; }
 @media (prefers-reduced-motion: reduce) { .dcn-region-pin { transition: none; } }
 
+/* 홈 CTA(내 주변 옥석 카페) — 커피톤 은은한 글로우 펄스 + 눌림/호버 피드백(대비·클릭영역 무변) */
+@keyframes dcnCtaGlow { 0%, 100% { box-shadow: 0 0 0 0 rgba(124, 82, 48, 0.38); } 50% { box-shadow: 0 0 0 7px rgba(124, 82, 48, 0); } }
+.dcn-cta-glow { animation: dcnCtaGlow 2.6s ease-in-out infinite; transition: transform .15s ease; }
+.dcn-cta-glow:hover { transform: scale(1.015); }
+.dcn-cta-glow:active { transform: scale(0.97); }
+@media (prefers-reduced-motion: reduce) { .dcn-cta-glow { animation: none; } }
+
 /* 홈 테마 가로 스크롤 — 커피·크림 테마 스크롤바 + 부드러운 스냅(전체 배경과 조화) */
 .dcn-hscroll { scrollbar-width: thin; scrollbar-color: #c9a574 transparent; scroll-snap-type: x proximity; scroll-padding-left: 4px; }
 .dcn-hscroll::-webkit-scrollbar { height: 7px; }
