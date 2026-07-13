@@ -131,6 +131,114 @@ async function healAttractionPollution(flagged: AttrFlag[], deadline: number): P
   return { fixed, dropped, unpub, names };
 }
 
+// 🔤 약한이름(1글자) 흡수 오염 스캔·자율조치(CEO 지시 2026-07-14): 이름이 1글자 순한글(쉼·결·휴·봄…)이면
+//   토큰이 너무 흔해 "쉼터"·"커피 마시고 쉼"(동사)·지역매칭만으로 남의 카페 후기를 흡수한다. name_mismatch는
+//   hasStrong(3자+ 고유토큰)을 요구해 이 부류를 '의도적으로' 제외한다(약한토큰=아무데나 매칭→FP폭주). → 전용 탐지기.
+//   ⚠️ 규칙만으론 '용산 카페'·'느좋 카페'(지역·형용사+카페) 서술어를 다른카페 고유명과 못 가른다(2026-07-14 실측:
+//   1글자 20곳 중 18곳이 서술어로 오탐). → 자동삭제는 '지목된 카페명이 우리 DB에 실존하는 다른 공개카페일 때'만(고정밀 대조
+//   게이트: 실측서 서술어 16개 중 15개 배제·진짜오염 4종 전부 포착). 서브토큰(쉼터/동사)·미등록 타카페는 손대지 않음(정상
+//   후기 파괴 위험 → AI 판정 큐로). 오늘 #2557 쉼·#14119 결 수동정리에서 검증된 규칙 그대로. 정밀도>재현율(자동삭제라).
+const WEAK_GEN = /^(근처|이곳|동네|신상|대형|작은|조용한|예쁜|감성|분위기|디저트|브런치|북|애견|강아지|키즈|루프탑|이색|힐링|스터디|무인|프랜차이즈|체인|전문|우리|맛있는|유명|인기|여기|거기|해당|같은|또다른|다른|몇몇|여러|모든|다양한|주변|주위|인근|곳|첫|막|한|두|세|공원|정원|공간|골목|한옥|포토|책|꽃|숲|뜰|마당|오늘|휴식|바다|하늘|강변|호수|숯|국내|서울|경기|인천)$/;
+const WEAK_CAFEWORD = /([가-힣A-Za-z0-9]{2,10})\s*(카페|커피숍|로스터리|베이커리|제과점)/g;
+const PARTICLE_END = /[의이가은는을를에도만과와로]$/; // 조사로 끝나면 카페명 아님("곳의 카페"=여러 카페)
+// 노출후기가 '자기와 다른 특정 카페명'을 지목하는가 → 후보명(pre+접미) 반환(없으면 null). 일반어·조사끝·자기이름 배제.
+function weakOtherCafe(text: string, selfN: string): string | null {
+  WEAK_CAFEWORD.lastIndex = 0; let m: RegExpExecArray | null;
+  while ((m = WEAK_CAFEWORD.exec(text))) {
+    const pre = m[1]; const preN = pre.replace(/\s/g, "").toLowerCase();
+    if (preN === selfN || preN.length < 2 || WEAK_GEN.test(pre) || PARTICLE_END.test(pre)) continue;
+    return pre + m[2];
+  }
+  return null;
+}
+// 정규화·접미(카페/커피…) 제거 = 카페명 대조 표준형. "블룸카페"·"블룸" 모두 "블룸"으로 수렴.
+const canonName = (s: string) => (s || "").replace(/[\s·・.]/g, "").toLowerCase().replace(/(카페|커피숍|커피|로스터리|베이커리|제과점)$/, "");
+// 지목된 후보가 우리 DB에 실존하는 '다른' 카페명인가(고유명 검증). 서술어(용산카페·맛집카페)는 실존 안 해서 걸러짐.
+function xrefKnown(candidate: string, known: Set<string>, selfN: string): boolean {
+  const c = canonName(candidate);
+  return c.length >= 2 && c !== selfN && known.has(c);
+}
+// 강한 자기마커(카페휴·휴카페·커피휴…) — 있으면 진짜 그 카페 후기로 보존. ⚠️ coreTokens는 1글자 토큰을 버리므로
+//   1글자 이름에선 마커가 비어 보호 실패(2026-07-14 #15718 휴='로스팅 카페 휴' 오탐) → 정리한 이름에서 직접 생성.
+function weakSelfMarkers(cleanName: string): string[] {
+  const n = (cleanName || "").replace(/[\s·・.]/g, "").toLowerCase();
+  if (!n) return [];
+  return [n + "카페", "카페" + n, n + "커피", "커피" + n];
+}
+type WeakFlag = { id: number; name: string; area: string; bad: number; shown: number; other: string };
+async function scanWeakNamePollution(): Promise<{ count: number; samples: string[]; flagged: WeakFlag[] }> {
+  const { cleanCafeName } = await import("@/lib/reviewQuality");
+  // DB 실존 카페명 표준형 집합(고유명 대조 게이트). 서술어는 여기 없어서 걸러진다.
+  const known = new Set<string>();
+  for (const r of (await sql`SELECT name FROM cafes WHERE published`) as any[]) { const n = canonName(cleanCafeName(r.name)); if (n.length >= 2) known.add(n); }
+  const t0 = Date.now(); let lo = 0; let truncated = false; const flagged: WeakFlag[] = [];
+  for (let guard = 0; guard < 80; guard++) {
+    if (Date.now() - t0 > 45000) { truncated = true; break; } // 값싼 스캔(대부분 이름체크서 즉시 skip) — 45s컷
+    const rows = (await sql`SELECT id, name, area, dong, synth_reviews FROM cafes
+      WHERE published AND synth_reviews IS NOT NULL AND jsonb_array_length(synth_reviews) >= 3 AND id > ${lo}
+      ORDER BY id LIMIT 500`) as any[];
+    if (!rows.length) break; lo = rows[rows.length - 1].id;
+    for (const c of rows) {
+      const cn = cleanCafeName(c.name); const nn = cn.replace(/[\s·・.]/g, "");
+      if (!/^[가-힣]$/.test(nn)) continue; // 정확히 1글자 순한글 이름만(최고위험·최고정밀)
+      const markers = weakSelfMarkers(cn); const selfN = nn.toLowerCase();
+      let bad = 0; let other = "";
+      for (const r of (c.synth_reviews || [])) {
+        const q = (r.quote || "") as string; const qn = q.replace(/\s/g, "").toLowerCase();
+        const o = weakOtherCafe(q, selfN);
+        if (o && xrefKnown(o, known, selfN) && !markers.some((mk) => qn.includes(mk))) { bad++; if (!other) other = o; }
+      }
+      if (bad >= 1) flagged.push({ id: c.id, name: cn, area: c.area, bad, shown: (c.synth_reviews || []).length, other });
+    }
+  }
+  flagged.sort((a, b) => b.bad - a.bad);
+  const samples = flagged.slice(0, 40).map((f) => `#${f.id} ${f.name}[${f.area}] 타카페 ${f.bad}/${f.shown}(«${f.other}»)`);
+  if (truncated) samples.push("⚠️(시간컷—다음 실행이 이어서 스캔)");
+  return { count: flagged.length, samples, flagged };
+}
+// 🔤 자율 조치: flag된 1글자이름 카페의 '명시적 다른 카페명' 후기를 결정론으로 자동 제거·재합성(durable).
+//   보수: 강한 자기마커 든 후기는 보존(명시적 타카페명 없거나 자기이름 있으면 미제거). 런당 12곳·deadline 시간예산.
+async function healWeakNamePollution(flagged: WeakFlag[], deadline: number): Promise<{ fixed: number; dropped: number; unpub: number; names: string[] }> {
+  const { collectAndSynthesize } = await import("@/lib/collectOrchestrator");
+  const { applyDecisions } = await import("@/lib/synthStore");
+  const { cleanCafeName } = await import("@/lib/reviewQuality");
+  const { invalidateCafeCaches } = await import("@/lib/cafeCacheInvalidate");
+  const known = new Set<string>();
+  for (const r of (await sql`SELECT name FROM cafes WHERE published`) as any[]) { const n = canonName(cleanCafeName(r.name)); if (n.length >= 2) known.add(n); }
+  let fixed = 0, dropped = 0, unpub = 0; const names: string[] = [];
+  for (const f of flagged.slice(0, 12)) {
+    if (Date.now() > deadline) break;
+    try {
+      const c = (await sql`SELECT name, area, dong, address, published, raw_reviews, judge_decisions FROM cafes WHERE id=${f.id}`)[0] as any;
+      if (!c) continue;
+      const at = [c.area, c.dong].filter(Boolean) as string[];
+      const cn = cleanCafeName(c.name); const selfN = cn.replace(/[\s·・.]/g, "").toLowerCase();
+      const markers = weakSelfMarkers(cn);
+      const raw = Array.isArray(c.raw_reviews) ? c.raw_reviews : [];
+      const g = raw.filter((r: any) => r.source === "google").map((r: any) => ({ text: r.text, time: r.time }));
+      const mkS = (s: string) => raw.filter((r: any) => r.source === s).map((r: any) => ({ text: r.text, title: r.title, desc: r.desc, time: r.time, link: r.link, date: r.date, source: r.srcName }));
+      const sources: any[] = []; if (g.length) sources.push({ source: "google", texts: g });
+      const b = mkS("blog"); if (b.length) sources.push({ source: "blog", texts: b });
+      const y = mkS("youtube"); if (y.length) sources.push({ source: "youtube", texts: y });
+      const decs = c.judge_decisions && typeof c.judge_decisions === "object" ? c.judge_decisions : {};
+      const r = collectAndSynthesize(cn, at, sources, { decisions: decs, address: c.address || "" });
+      const dec: Record<string, boolean> = {}; let drop = 0;
+      for (const it of (r.auditItems || [])) {
+        const body = (it.title || "") + " " + (it.body || ""); const bn = body.replace(/\s/g, "").toLowerCase();
+        const o = weakOtherCafe(body, selfN);
+        if (o && xrefKnown(o, known, selfN) && !markers.some((mk) => bn.includes(mk))) { dec[it.key] = false; drop++; }
+      }
+      if (drop === 0) continue;
+      const res = await applyDecisions({ id: f.id, name: c.name, area: c.area }, dec);
+      fixed++; dropped += drop; if (res?.published === false && c.published) unpub++;
+      if (names.length < 8) names.push(`${cn}(-${drop})`);
+      await invalidateCafeCaches([f.id]).catch(() => {});
+    } catch { /* 개별 실패는 건너뜀(다음 런이 이어서 처리) */ }
+  }
+  if (fixed > 0) await sql`DELETE FROM search_cache`.catch(() => {});
+  return { fixed, dropped, unpub, names };
+}
+
 // 🛡️ 데이터 정합성 센티넬 — 신뢰/해자 파수꾼. "사장님이 버그를 발견하기 전에 내가 먼저"(선제 탐지).
 //   백로그를 치우는 게 아니라, 깨끗한 상태를 '유지'하고 새 오염이 들어오면 즉시 경보한다.
 //   ① 모든 정합성 축을 매일 스캔 ② 안전한 것만 자동 치유(area·박스밖·명백 중복) ③ 나머진 리포트(관제탑).
@@ -202,13 +310,17 @@ export async function GET(req: NextRequest) {
     // 🎡 명소·행사 오염(약한토큰 사각) — 탐지·경보만.
     const attr = await scanAttractionPollution().catch(() => ({ count: 0, samples: [] as string[], flagged: [] as AttrFlag[] }));
     // 🎡 자율 조치: flag된 명소·행사 오염을 남은 시간예산 안에서 자동 제거(런당 최대 12곳, deadline 270s). 나머지는 다음 런.
-    const attrHeal = await healAttractionPollution(attr.flagged || [], started + 270000).catch(() => ({ fixed: 0, dropped: 0, unpub: 0, names: [] as string[] }));
+    const attrHeal = await healAttractionPollution(attr.flagged || [], started + 240000).catch(() => ({ fixed: 0, dropped: 0, unpub: 0, names: [] as string[] }));
     (checks as any).attraction_pollution = Math.max(0, attr.count - attrHeal.fixed); // 자동조치 후 잔여
+    // 🔤 약한이름(1글자) 흡수 오염(name_mismatch가 의도적 제외하는 사각) — 명시적 타카페명만 자동 제거.
+    const weak = await scanWeakNamePollution().catch(() => ({ count: 0, samples: [] as string[], flagged: [] as WeakFlag[] }));
+    const weakHeal = await healWeakNamePollution(weak.flagged || [], started + 275000).catch(() => ({ fixed: 0, dropped: 0, unpub: 0, names: [] as string[] }));
+    (checks as any).weak_name_pollution = Math.max(0, weak.count - weakHeal.fixed); // 자동조치 후 잔여
 
-    // name_mismatch·attraction_pollution은 '정합성 실패'가 아니라 검토 워치리스트 → clean 판정서 제외(경보 폭주 방지, 별도 표면화).
-    const WATCH = new Set(["name_mismatch", "attraction_pollution"]);
+    // name_mismatch·attraction_pollution·weak_name_pollution은 '정합성 실패'가 아니라 검토 워치리스트 → clean 판정서 제외.
+    const WATCH = new Set(["name_mismatch", "attraction_pollution", "weak_name_pollution"]);
     const residual = Object.entries(checks).reduce((s, [k, n]) => s + (WATCH.has(k) ? 0 : (n as number)), 0);
-    const healedTotal = area.fixed + box.excluded + dup.resolved + attrHeal.fixed;
+    const healedTotal = area.fixed + box.excluded + dup.resolved + attrHeal.fixed + weakHeal.fixed;
     const clean = residual === 0;
 
     // ── ②-b 콘솔키 크레딧 실측 프로브(트래픽 무관) ──
@@ -220,12 +332,13 @@ export async function GET(req: NextRequest) {
 
     // ── ③ 리포트 ──
     const flags = Object.entries(checks).filter(([k, n]) => n > 0 && !WATCH.has(k)).map(([k, n]) => `${k}:${n}`);
-    await sql`INSERT INTO sentinel_reports (clean, report) VALUES (${clean}, ${JSON.stringify({ checks, nameMismatch: mismatch.samples, attractionPollution: attr.samples, attractionHealed: attrHeal, healed: { area: area.fixed, box: box.excluded, dup: dup.resolved, attr: attrHeal.fixed }, consoleKey: probe })}::jsonb)`.catch(() => {});
+    await sql`INSERT INTO sentinel_reports (clean, report) VALUES (${clean}, ${JSON.stringify({ checks, nameMismatch: mismatch.samples, attractionPollution: attr.samples, attractionHealed: attrHeal, weakNamePollution: weak.samples, weakNameHealed: weakHeal, healed: { area: area.fixed, box: box.excluded, dup: dup.resolved, attr: attrHeal.fixed, weak: weakHeal.fixed }, consoleKey: probe })}::jsonb)`.catch(() => {});
 
     const probeNote = probe.signal === "ok" ? "콘솔키 크레딧 정상" : probe.signal === "credit" ? "콘솔키 크레딧 소진(콘솔경로 중단·검색 결정론폴백 정상=저영향)" : `콘솔키 프로브 ${probe.signal}`;
     const mmNote = mismatch.count > 0 ? ` · 🔎오염의심 ${mismatch.count}(먼광역시 ${mismatch.far}·이름불일치 ${mismatch.nameMiss})` : "";
     const attrNote = (attr.count > 0 || attrHeal.fixed > 0) ? ` · 🎡명소오염 자동정리 ${attrHeal.fixed}곳(-${attrHeal.dropped}건${attrHeal.unpub ? `·비공개 ${attrHeal.unpub}` : ""})${(checks as any).attraction_pollution > 0 ? `·잔여 ${(checks as any).attraction_pollution}(다음런)` : ""}` : "";
-    const detail = `치유 ${healedTotal}(area${area.fixed}·박스${box.excluded}·중복${dup.resolved}) · ${clean ? "정합성 OK ✅" : "⚠️ 잔여 " + flags.join(" ")}${mmNote}${attrNote} · ${probeNote}`;
+    const weakNote = (weak.count > 0 || weakHeal.fixed > 0) ? ` · 🔤약한이름오염 자동정리 ${weakHeal.fixed}곳(-${weakHeal.dropped}건${weakHeal.unpub ? `·비공개 ${weakHeal.unpub}` : ""})${(checks as any).weak_name_pollution > 0 ? `·잔여 ${(checks as any).weak_name_pollution}(다음런)` : ""}` : "";
+    const detail = `치유 ${healedTotal}(area${area.fixed}·박스${box.excluded}·중복${dup.resolved}) · ${clean ? "정합성 OK ✅" : "⚠️ 잔여 " + flags.join(" ")}${mmNote}${attrNote}${weakNote} · ${probeNote}`;
     await recordRun("cron-sentinel", true, detail, healedTotal);
     return NextResponse.json({ ok: true, ranAt: new Date().toISOString(), clean, healed: { area: area.fixed, areaNames: area.names, box: box.excluded, dup: dup.resolved, dupPairs: dup.pairs }, checks, flags, nameMismatch: mismatch, consoleKey: probe });
   } catch (e) {
