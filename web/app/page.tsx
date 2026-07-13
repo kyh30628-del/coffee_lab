@@ -1249,8 +1249,8 @@ export default function Home() {
             </div>
             {/* 📍 내 주변 옥석 카페 바로 찾기 — 위치 하나로 동네(구) 설정 + 반경 500m 옥석(검증·참고) 리스트(위치버튼 통일) */}
             <button onClick={() => (nearHome ? clearNearHome() : openLocation())}
-              className={`w-full rounded-xl py-3 font-bold text-[13px] mt-1 mb-4 shadow-sm transition-colors ${nearHome ? "bg-white text-[#9c6b3f] border border-[#cbb89f] active:scale-[0.98] transition-transform" : "text-[#f4ece0] dcn-cta-glow"}`}
-              style={nearHome ? {} : { background: "linear-gradient(135deg, #7c5230 0%, #9c6b3f 55%, #b8804a 100%)" }}>
+              className={`w-full rounded-xl py-3 font-bold text-[13px] mt-1 mb-4 shadow-sm transition-colors ${nearHome ? "bg-white text-[#9c6b3f] border border-[#cbb89f] active:scale-[0.98] transition-transform" : "text-[#f4ece0] border border-[#e6b260]/40 dcn-cta-glow"}`}
+              style={nearHome ? {} : { background: "linear-gradient(135deg, #2b1a10 0%, #4a2c16 55%, #7a4a22 100%)" }}>
               {nearHome ? "✕ 내 주변 500m 해제" : "📍 내 주변 옥석 카페 바로 찾기"}
             </button>
             {nearHome ? (

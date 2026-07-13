@@ -86,9 +86,12 @@ body {
 .dcn-region-pin:hover { transform: translate(-50%, -50%) scale(1.09) !important; }
 @media (prefers-reduced-motion: reduce) { .dcn-region-pin { transition: none; } }
 
-/* 홈 CTA(내 주변 옥석 카페) — 커피톤 은은한 글로우 펄스 + 눌림/호버 피드백(대비·클릭영역 무변) */
-@keyframes dcnCtaGlow { 0%, 100% { box-shadow: 0 0 0 0 rgba(124, 82, 48, 0.38); } 50% { box-shadow: 0 0 0 7px rgba(124, 82, 48, 0); } }
-.dcn-cta-glow { animation: dcnCtaGlow 2.6s ease-in-out infinite; transition: transform .15s ease; }
+/* 홈 CTA(내 주변 옥석 카페) — 크림 배경 대비 진한 에스프레소톤 + 골드 글로우 펄스로 시선 강탈 + 눌림/호버 피드백(클릭영역 무변) */
+@keyframes dcnCtaGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(230, 178, 96, 0.6), 0 4px 16px rgba(31, 19, 10, 0.4); filter: brightness(1); }
+  50% { box-shadow: 0 0 0 10px rgba(230, 178, 96, 0), 0 4px 16px rgba(31, 19, 10, 0.4); filter: brightness(1.1); }
+}
+.dcn-cta-glow { animation: dcnCtaGlow 2.2s ease-in-out infinite; transition: transform .15s ease; }
 .dcn-cta-glow:hover { transform: scale(1.015); }
 .dcn-cta-glow:active { transform: scale(0.97); }
 @media (prefers-reduced-motion: reduce) { .dcn-cta-glow { animation: none; } }
