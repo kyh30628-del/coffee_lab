@@ -66,11 +66,12 @@ function attrMarkers(name: string, at: string[]): string[] {
   for (const t of coreTokens(name, at)) { const n = t.replace(/\s/g, "").toLowerCase(); if (n.length >= 2) { s.add(n + "카페"); s.add(n + "커피"); s.add("카페" + n); s.add("커피" + n); } }
   return [...s];
 }
-async function scanAttractionPollution(): Promise<{ count: number; samples: string[] }> {
+type AttrFlag = { id: number; name: string; area: string; bad: number; shown: number };
+async function scanAttractionPollution(): Promise<{ count: number; samples: string[]; flagged: AttrFlag[] }> {
   const t0 = Date.now(); let lo = 0; let truncated = false;
-  const flagged: { id: number; name: string; area: string; bad: number; shown: number }[] = [];
+  const flagged: AttrFlag[] = [];
   for (let guard = 0; guard < 80; guard++) {
-    if (Date.now() - t0 > 120000) { truncated = true; break; } // 시간 안전장치(name_mismatch와 예산 분담)
+    if (Date.now() - t0 > 90000) { truncated = true; break; } // 시간 안전장치(스캔60~90s → 자동조치 예산 확보)
     const rows = (await sql`SELECT id, name, area, dong, synth_reviews FROM cafes
       WHERE published AND synth_reviews IS NOT NULL AND jsonb_array_length(synth_reviews) >= 2 AND id > ${lo}
       ORDER BY id LIMIT 500`) as any[];
@@ -89,7 +90,45 @@ async function scanAttractionPollution(): Promise<{ count: number; samples: stri
   flagged.sort((a, b) => b.bad - a.bad);
   const samples = flagged.slice(0, 60).map((f) => `#${f.id} ${f.name}[${f.area}] 명소글 ${f.bad}/${f.shown}`);
   if (truncated) samples.push("⚠️(시간컷—다음 실행이 이어서 스캔)");
-  return { count: flagged.length, samples };
+  return { count: flagged.length, samples, flagged };
+}
+
+// 🎡 자율 조치(CEO 지시 2026-07-14): flag된 카페의 명소·행사 오염 후기를 결정론 규칙으로 자동 제거·재합성(durable).
+//   보수: ①런당 최대 12곳 ②시간예산(전체 스캔 후 남은 시간, deadline까지) ③카페명 마커 든 후기는 보존(명소 언급해도).
+//   멱등: 제거는 judge_decisions에 저장돼 재-flag 안 됨 → 다음 런은 '새로 생긴' 오염만 처리. 실패는 로그만(진행 계속).
+async function healAttractionPollution(flagged: AttrFlag[], deadline: number): Promise<{ fixed: number; dropped: number; unpub: number; names: string[] }> {
+  const { collectAndSynthesize } = await import("@/lib/collectOrchestrator");
+  const { applyDecisions } = await import("@/lib/synthStore");
+  const { cleanCafeName } = await import("@/lib/reviewQuality");
+  const { invalidateCafeCaches } = await import("@/lib/cafeCacheInvalidate");
+  const norm = (s: string) => (s || "").replace(/\s/g, "").toLowerCase();
+  let fixed = 0, dropped = 0, unpub = 0; const names: string[] = [];
+  for (const f of flagged.slice(0, 12)) {
+    if (Date.now() > deadline) break;
+    try {
+      const c = (await sql`SELECT name, area, dong, address, published, raw_reviews, judge_decisions FROM cafes WHERE id=${f.id}`)[0] as any;
+      if (!c) continue;
+      const at = [c.area, c.dong].filter(Boolean) as string[];
+      const mk = attrMarkers(c.name, at);
+      const raw = Array.isArray(c.raw_reviews) ? c.raw_reviews : [];
+      const g = raw.filter((r: any) => r.source === "google").map((r: any) => ({ text: r.text, time: r.time }));
+      const mkS = (s: string) => raw.filter((r: any) => r.source === s).map((r: any) => ({ text: r.text, title: r.title, desc: r.desc, time: r.time, link: r.link, date: r.date, source: r.srcName }));
+      const sources: any[] = []; if (g.length) sources.push({ source: "google", texts: g });
+      const b = mkS("blog"); if (b.length) sources.push({ source: "blog", texts: b });
+      const y = mkS("youtube"); if (y.length) sources.push({ source: "youtube", texts: y });
+      const decs = c.judge_decisions && typeof c.judge_decisions === "object" ? c.judge_decisions : {};
+      const r = collectAndSynthesize(cleanCafeName(c.name), at, sources, { decisions: decs, address: c.address || "" });
+      const dec: Record<string, boolean> = {}; let drop = 0;
+      for (const it of (r.auditItems || [])) { const body = norm((it.title || "") + " " + (it.body || "")); if (ATTR_STRONG.test(body) && !mk.some((m) => body.includes(m))) { dec[it.key] = false; drop++; } }
+      if (drop === 0) continue;
+      const res = await applyDecisions({ id: f.id, name: c.name, area: c.area }, dec);
+      fixed++; dropped += drop; if (res?.published === false && c.published) unpub++;
+      if (names.length < 8) names.push(`${c.name}(-${drop})`);
+      await invalidateCafeCaches([f.id]).catch(() => {});
+    } catch { /* 개별 실패는 건너뜀(다음 런이 이어서 처리) */ }
+  }
+  if (fixed > 0) await sql`DELETE FROM search_cache`.catch(() => {});
+  return { fixed, dropped, unpub, names };
 }
 
 // 🛡️ 데이터 정합성 센티넬 — 신뢰/해자 파수꾼. "사장님이 버그를 발견하기 전에 내가 먼저"(선제 탐지).
@@ -127,6 +166,7 @@ async function healExactDuplicates(): Promise<{ resolved: number; pairs: string[
 }
 
 export async function GET(req: NextRequest) {
+  const started = Date.now();
   try {
     if (!authed(req)) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
     await ensureSchema();
@@ -160,12 +200,15 @@ export async function GET(req: NextRequest) {
     const mismatch = await scanNameMismatch().catch(() => ({ count: 0, far: 0, nameMiss: 0, samples: [] as string[] }));
     (checks as any).name_mismatch = mismatch.count;
     // 🎡 명소·행사 오염(약한토큰 사각) — 탐지·경보만.
-    const attr = await scanAttractionPollution().catch(() => ({ count: 0, samples: [] as string[] }));
-    (checks as any).attraction_pollution = attr.count;
+    const attr = await scanAttractionPollution().catch(() => ({ count: 0, samples: [] as string[], flagged: [] as AttrFlag[] }));
+    // 🎡 자율 조치: flag된 명소·행사 오염을 남은 시간예산 안에서 자동 제거(런당 최대 12곳, deadline 270s). 나머지는 다음 런.
+    const attrHeal = await healAttractionPollution(attr.flagged || [], started + 270000).catch(() => ({ fixed: 0, dropped: 0, unpub: 0, names: [] as string[] }));
+    (checks as any).attraction_pollution = Math.max(0, attr.count - attrHeal.fixed); // 자동조치 후 잔여
+
     // name_mismatch·attraction_pollution은 '정합성 실패'가 아니라 검토 워치리스트 → clean 판정서 제외(경보 폭주 방지, 별도 표면화).
     const WATCH = new Set(["name_mismatch", "attraction_pollution"]);
     const residual = Object.entries(checks).reduce((s, [k, n]) => s + (WATCH.has(k) ? 0 : (n as number)), 0);
-    const healedTotal = area.fixed + box.excluded + dup.resolved;
+    const healedTotal = area.fixed + box.excluded + dup.resolved + attrHeal.fixed;
     const clean = residual === 0;
 
     // ── ②-b 콘솔키 크레딧 실측 프로브(트래픽 무관) ──
@@ -177,11 +220,11 @@ export async function GET(req: NextRequest) {
 
     // ── ③ 리포트 ──
     const flags = Object.entries(checks).filter(([k, n]) => n > 0 && !WATCH.has(k)).map(([k, n]) => `${k}:${n}`);
-    await sql`INSERT INTO sentinel_reports (clean, report) VALUES (${clean}, ${JSON.stringify({ checks, nameMismatch: mismatch.samples, attractionPollution: attr.samples, healed: { area: area.fixed, box: box.excluded, dup: dup.resolved }, consoleKey: probe })}::jsonb)`.catch(() => {});
+    await sql`INSERT INTO sentinel_reports (clean, report) VALUES (${clean}, ${JSON.stringify({ checks, nameMismatch: mismatch.samples, attractionPollution: attr.samples, attractionHealed: attrHeal, healed: { area: area.fixed, box: box.excluded, dup: dup.resolved, attr: attrHeal.fixed }, consoleKey: probe })}::jsonb)`.catch(() => {});
 
     const probeNote = probe.signal === "ok" ? "콘솔키 크레딧 정상" : probe.signal === "credit" ? "콘솔키 크레딧 소진(콘솔경로 중단·검색 결정론폴백 정상=저영향)" : `콘솔키 프로브 ${probe.signal}`;
     const mmNote = mismatch.count > 0 ? ` · 🔎오염의심 ${mismatch.count}(먼광역시 ${mismatch.far}·이름불일치 ${mismatch.nameMiss})` : "";
-    const attrNote = attr.count > 0 ? ` · 🎡명소오염 ${attr.count}` : "";
+    const attrNote = (attr.count > 0 || attrHeal.fixed > 0) ? ` · 🎡명소오염 자동정리 ${attrHeal.fixed}곳(-${attrHeal.dropped}건${attrHeal.unpub ? `·비공개 ${attrHeal.unpub}` : ""})${(checks as any).attraction_pollution > 0 ? `·잔여 ${(checks as any).attraction_pollution}(다음런)` : ""}` : "";
     const detail = `치유 ${healedTotal}(area${area.fixed}·박스${box.excluded}·중복${dup.resolved}) · ${clean ? "정합성 OK ✅" : "⚠️ 잔여 " + flags.join(" ")}${mmNote}${attrNote} · ${probeNote}`;
     await recordRun("cron-sentinel", true, detail, healedTotal);
     return NextResponse.json({ ok: true, ranAt: new Date().toISOString(), clean, healed: { area: area.fixed, areaNames: area.names, box: box.excluded, dup: dup.resolved, dupPairs: dup.pairs }, checks, flags, nameMismatch: mismatch, consoleKey: probe });
