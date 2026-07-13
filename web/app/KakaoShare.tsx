@@ -18,18 +18,18 @@ function loadKakao(): Promise<any> {
   });
 }
 
-export default function KakaoShare({ title, description, imageUrl, link, label = "🟡 카톡 공유", className, children }: {
-  title: string; description: string; imageUrl: string; link: string; label?: string; className?: string; children?: React.ReactNode;
+export default function KakaoShare({ title, description, imageUrl, link, label = "🟡 카톡 공유", className, children, source }: {
+  title: string; description: string; imageUrl: string; link: string; label?: string; className?: string; children?: React.ReactNode; source?: string;
 }) {
   const [msg, setMsg] = useState("");
-  // 공유 클릭 기록(바이럴 신호) — 어떤 채널로 타인에게 공유했는지. anon_id로 내부 구분.
+  // 공유 클릭 기록(바이럴 신호) — 어떤 채널·어떤 화면(카페상세/MYPIN)에서 타인에게 공유했는지. anon_id로 내부 구분.
   const track = useCallback((channel: string) => {
     try {
       const a = typeof window !== "undefined" ? localStorage.getItem("dcn_anon") || "" : "";
       const path = typeof window !== "undefined" ? window.location.pathname : "";
-      fetch("/api/track-share", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ anonId: a, path, channel }), keepalive: true }).catch(() => {});
+      fetch("/api/track-share", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ anonId: a, path, channel, source }), keepalive: true }).catch(() => {});
     } catch {}
-  }, []);
+  }, [source]);
   const onClick = useCallback(async () => {
     const Kakao = await loadKakao();
     if (Kakao?.Share) {

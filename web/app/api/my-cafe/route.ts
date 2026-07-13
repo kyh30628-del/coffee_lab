@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ ok: true, locked: true, hasPin: true, cafes: [] });
   }
   const rows = await sql`
-    SELECT c.id, c.name, c.area, c.lat, c.lng, v.photo_url, v.photos, v.memory, v.favorite, v.is_public, v.created_at
+    SELECT c.id, c.name, c.area, c.lat, c.lng, c.synth_grade, c.synth_identity, v.photo_url, v.photos, v.memory, v.favorite, v.is_public, v.created_at
     FROM user_visits v JOIN cafes c ON c.id = v.cafe_id
     WHERE v.device_id = ${device} AND v.verified = true AND v.finalized = true
     ORDER BY v.favorite DESC, v.created_at DESC`;
