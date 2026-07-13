@@ -3,6 +3,7 @@ import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import VisitPing from "./VisitPing";
 import NaverAnalytics from "./NaverAnalytics";
+import PwaInstall from "./PwaInstall";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://dongnecoffeenote.com"),
@@ -52,6 +53,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-full">
         {children}
+        <PwaInstall />
         <VisitPing />
         <Analytics />
         <NaverAnalytics />

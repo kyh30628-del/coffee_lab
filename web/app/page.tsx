@@ -379,7 +379,6 @@ export default function Home() {
   const [nearMe, setNearMe] = useState<{ lat: number; lng: number } | null>(null); // '내 주변 500m' 현재 위치(누를 때마다 갱신)
   const [nearMsg, setNearMsg] = useState("");
   const [nearHome, setNearHome] = useState<{ lat: number; lng: number } | null>(null); // 홈 '내 주변 옥석 카페' 현재 위치(500m 리스트)
-  const [nearHomeMsg, setNearHomeMsg] = useState("");
   const mlRef = useRef<any>(null); // maplibre 벡터 맵(레이어 토글용)
   const [showStreets, setShowStreets] = useState(false); // '상세'(길이름·건물·잡POI) — 기본 OFF로 깔끔
   const [showBus, setShowBus] = useState(false); // 버스/교통 아이콘 — 기본 OFF
@@ -400,6 +399,7 @@ export default function Home() {
   const toggleBookmark = async (cafeId: number) => {
     const cur = bookmarkIds.has(cafeId);
     setBookmarkIds((prev) => { const n = new Set(prev); if (cur) n.delete(cafeId); else n.add(cafeId); return n; }); // 낙관적 업데이트
+    if (!cur) { try { window.dispatchEvent(new Event("dcn:install-hint")); } catch {} } // 즐겨찾기 추가 = 재방문 의도 → PWA 설치 배너 트리거
     try { await fetch("/api/bookmark", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ device: deviceId, cafeId, action: "toggle" }) }); }
     catch { reloadBookmarks(deviceId); }
   };
@@ -522,6 +522,7 @@ export default function Home() {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const { latitude, longitude } = pos.coords;
+        setNearHome({ lat: latitude, lng: longitude }); // 📍 내 주변 500m 옥석 리스트도 함께 켬(위치버튼 통일)
         const r = nearestRegion(cafes, latitude, longitude);
         if (!r) { setGeoMsg("수도권 밖이거나 가까운 카페가 없어 전체를 보여드려요"); postConsent(true, { lat: latitude, lng: longitude }); return; }
         setHomeSido(r.sido); setHomeGu(r.sigungu);
@@ -572,18 +573,9 @@ export default function Home() {
     );
   };
   const clearNearMe = () => { setNearMe(null); setNearMsg(""); };
-  // 📍 홈 '내 주변 옥석 카페 바로 찾기' — 현재 위치 반경 500m의 옥석(검증·참고) 카페만 홈 리스트로. 서버 전송 없음(클라이언트 전용).
-  const showNearHome = () => {
-    if (!navigator.geolocation) { setNearHomeMsg("이 브라우저는 위치를 지원하지 않아요"); return; }
-    setNearHomeMsg("내 위치 확인 중…");
-    navigator.geolocation.getCurrentPosition(
-      (pos) => { setNearHome({ lat: pos.coords.latitude, lng: pos.coords.longitude }); setNearHomeMsg(""); },
-      (err) => setNearHomeMsg(err.code === 1 ? "위치 권한이 거부됐어요 (브라우저 설정에서 허용 가능)" : "위치를 가져오지 못했어요"),
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }, // 누를 때마다 현재 위치 새로
-    );
-  };
-  const clearNearHome = () => { setNearHome(null); setNearHomeMsg(""); };
-  const clearAuto = () => { setHomeSido(""); setHomeGu(""); setHomeDong(""); setAutoGu(""); setSido(""); setSigungu(""); setDong(""); setGeoMsg(""); };
+  // 📍 홈 '내 주변 옥석 카페 바로 찾기' — detectLocation이 위치 받아 동네(구) + 500m 옥석 리스트를 함께 켬(위치버튼 통일).
+  const clearNearHome = () => { setNearHome(null); };
+  const clearAuto = () => { setHomeSido(""); setHomeGu(""); setHomeDong(""); setAutoGu(""); setSido(""); setSigungu(""); setDong(""); setGeoMsg(""); setNearHome(null); };
   // 인천 동명 구(중구·동구) 구분: 인천이면 "인천 OO"로 넘겨야 백엔드가 서울과 안 헷갈림
   const homeRegion = homeGu ? (homeSido === "인천" ? `인천 ${homeGu}` : homeGu) : "";
   useEffect(() => { const u = homeRegion ? `/api/discover?region=${encodeURIComponent(homeRegion)}` : "/api/discover"; setDiscover(null); fetch(u).then((r) => r.json()).then((d) => { if (d.ok) setDiscover(d); }).catch(() => {}); }, [homeRegion]);
@@ -601,6 +593,8 @@ export default function Home() {
       .filter((x) => x.d <= R)
       .sort((a, b) => a.d - b.d);
   }, [nearHome, cafes]);
+  // 📲 내 주변 옥석 찾기 사용 = 고의도 순간 → PWA 설치 배너 트리거(PwaInstall이 수신, 최근 거절 시 무시)
+  useEffect(() => { if (nearHome) { try { window.dispatchEvent(new Event("dcn:install-hint")); } catch {} } }, [nearHome]);
 
   // 📊 카페 상세 조회 추적 — SPA라 URL이 안 바뀌므로(상태로만 염) 명시적 이벤트로 기록.
   //   인기 카페·전환 퍼널·여러 카페 탐색 패턴 집계의 근거(관제탑 유입 분석). 익명 anon_id만, 개인정보 0.
@@ -637,7 +631,7 @@ export default function Home() {
       if (allowMapBack) { setTab("home"); return true; }                            // 전체(서울/경기/인천) → 홈
       return false;
     }
-    if (u.tab === "home" && u.nearHome) { setNearHome(null); setNearHomeMsg(""); return true; } // 📍 홈 내 주변 500m → 해제(일반 홈)
+    if (u.tab === "home" && u.nearHome) { setNearHome(null); return true; } // 📍 홈 내 주변 500m → 해제(일반 홈)
     if (u.tab === "home" && u.role !== null) { try { sessionStorage.removeItem("dcn_role"); } catch {} setRole(null); return true; } // 홈 → 랜딩
     return false;
   };
@@ -1242,25 +1236,22 @@ export default function Home() {
                 </select>
               </div>
               <div className="mt-2.5 flex flex-col items-center gap-1">
-                {autoGu ? (
+                {autoGu && (
                   <div className="flex items-center gap-2">
                     <span className="text-[11px] text-[#5f7355] bg-[#eef3ea] border border-[#cfe0c2] rounded-full px-2.5 py-1">📍 내 위치 기준 <b>{autoGu}</b></span>
                     <button onClick={clearAuto} className="text-[11px] text-[#9c6b3f] underline">전체보기</button>
                   </div>
-                ) : (
-                  <button onClick={openLocation} className="text-[12px] text-[#fff] bg-[#5f7355] rounded-full px-3.5 py-1.5 font-medium">📍 내 위치로 우리 동네 보기</button>
                 )}
                 {geoMsg && <span className="text-[10px] text-[#a8927a]">{geoMsg}</span>}
                 {homeGu && !autoGu && <button onClick={clearAuto} className="text-[11px] text-[#9c6b3f] underline">수도권 전체 보기</button>}
               </div>
             </div>
-            {/* 📍 내 주변 옥석 카페 바로 찾기 — 현재 위치 반경 500m의 옥석(검증·참고)만 홈 리스트로 */}
-            <button onClick={nearHome ? clearNearHome : showNearHome}
+            {/* 📍 내 주변 옥석 카페 바로 찾기 — 위치 하나로 동네(구) 설정 + 반경 500m 옥석(검증·참고) 리스트(위치버튼 통일) */}
+            <button onClick={() => (nearHome ? clearNearHome() : openLocation())}
               className={`w-full rounded-xl py-3 font-bold text-[13px] mt-1 mb-4 shadow-sm transition-colors ${nearHome ? "bg-white text-[#2f6fb0] border border-[#bcd4ea]" : "text-white"}`}
               style={nearHome ? {} : { background: "#2f6fb0" }}>
               {nearHome ? "✕ 내 주변 500m 해제" : "📍 내 주변 옥석 카페 바로 찾기"}
             </button>
-            {nearHomeMsg && <p className="text-center text-[11px] text-[#a8927a] -mt-2 mb-3">{nearHomeMsg}</p>}
             {nearHome ? (
               <div>
                 <div className="flex items-baseline justify-between mb-2 pb-1 border-b-2 border-[#2b2018]">
