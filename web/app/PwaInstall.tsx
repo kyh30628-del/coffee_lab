@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 
 // 📲 PWA 설치 유도 — 추천안:
 //  · 안드로이드/PC(Chrome·Edge·삼성): beforeinstallprompt를 잡아 버튼 클릭 시 '네이티브 설치창'.
@@ -16,6 +17,7 @@ export default function PwaInstall() {
   const [show, setShow] = useState(false);            // 어피던스 노출 여부
   const [expanded, setExpanded] = useState(false);    // 배너(고의도) vs 작은 버튼
   const [iosGuide, setIosGuide] = useState(false);    // iOS 안내 오버레이
+  const pathname = usePathname();
 
   const dismissedRecently = useCallback(() => {
     try { return Number(localStorage.getItem(DISMISS_KEY) || 0) > Date.now() - 14 * DAY; } catch { return false; }
@@ -63,6 +65,8 @@ export default function PwaInstall() {
   };
 
   if (standalone) return null;
+  // 관리자·사장님 화면(관제탑 등)에선 소비자용 설치 유도 안 함
+  if (pathname && /^\/(admin|owner|business)/.test(pathname)) return null;
   if (!show && !iosGuide) return null;
 
   if (iosGuide) {
@@ -101,13 +105,16 @@ export default function PwaInstall() {
     );
   }
 
-  // 상시 작은 버튼(고의도 아닐 때) — 우하단, 하단 네비 위
+  // 상시 작은 버튼(고의도 아닐 때) — 우하단, 하단 네비 위. 닫기(✕)로 14일간 숨김.
   return (
-    <button onClick={install} aria-label="앱 설치"
-      className="fixed z-[1000] right-3 inline-flex items-center gap-1 bg-[#2b2018] text-[#f4ece0] rounded-full shadow-lg px-3.5 py-2 text-[12px] font-bold"
-      style={{ bottom: "calc(3.75rem + env(safe-area-inset-bottom))" }}>
-      <span className="text-[14px] leading-none">📲</span>
-      <span>{isIOS ? "홈 화면에 추가" : "앱 설치"}</span>
-    </button>
+    <div className="fixed z-[1000] right-3 flex items-center gap-1.5" style={{ bottom: "calc(3.75rem + env(safe-area-inset-bottom))" }}>
+      <button onClick={install} aria-label="앱 설치"
+        className="inline-flex items-center gap-1 bg-[#2b2018] text-[#f4ece0] rounded-full shadow-lg px-3.5 py-2 text-[12px] font-bold">
+        <span className="text-[14px] leading-none">📲</span>
+        <span>{isIOS ? "홈 화면에 추가" : "앱 설치"}</span>
+      </button>
+      <button onClick={dismiss} aria-label="설치 안내 닫기"
+        className="w-6 h-6 rounded-full bg-[#2b2018]/85 text-[#e8dcc9] text-[12px] shadow-lg flex items-center justify-center leading-none">✕</button>
+    </div>
   );
 }
