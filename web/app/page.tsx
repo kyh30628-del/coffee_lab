@@ -378,6 +378,8 @@ export default function Home() {
   const [othersPins, setOthersPins] = useState<{ id: number; name: string; area: string; lat: number; lng: number; cnt: number }[]>([]);
   const [nearMe, setNearMe] = useState<{ lat: number; lng: number } | null>(null); // '내 주변 500m' 현재 위치(누를 때마다 갱신)
   const [nearMsg, setNearMsg] = useState("");
+  const [nearHome, setNearHome] = useState<{ lat: number; lng: number } | null>(null); // 홈 '내 주변 옥석 카페' 현재 위치(500m 리스트)
+  const [nearHomeMsg, setNearHomeMsg] = useState("");
   const mlRef = useRef<any>(null); // maplibre 벡터 맵(레이어 토글용)
   const [showStreets, setShowStreets] = useState(false); // '상세'(길이름·건물·잡POI) — 기본 OFF로 깔끔
   const [showBus, setShowBus] = useState(false); // 버스/교통 아이콘 — 기본 OFF
@@ -570,6 +572,17 @@ export default function Home() {
     );
   };
   const clearNearMe = () => { setNearMe(null); setNearMsg(""); };
+  // 📍 홈 '내 주변 옥석 카페 바로 찾기' — 현재 위치 반경 500m의 옥석(검증·참고) 카페만 홈 리스트로. 서버 전송 없음(클라이언트 전용).
+  const showNearHome = () => {
+    if (!navigator.geolocation) { setNearHomeMsg("이 브라우저는 위치를 지원하지 않아요"); return; }
+    setNearHomeMsg("내 위치 확인 중…");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => { setNearHome({ lat: pos.coords.latitude, lng: pos.coords.longitude }); setNearHomeMsg(""); },
+      (err) => setNearHomeMsg(err.code === 1 ? "위치 권한이 거부됐어요 (브라우저 설정에서 허용 가능)" : "위치를 가져오지 못했어요"),
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }, // 누를 때마다 현재 위치 새로
+    );
+  };
+  const clearNearHome = () => { setNearHome(null); setNearHomeMsg(""); };
   const clearAuto = () => { setHomeSido(""); setHomeGu(""); setHomeDong(""); setAutoGu(""); setSido(""); setSigungu(""); setDong(""); setGeoMsg(""); };
   // 인천 동명 구(중구·동구) 구분: 인천이면 "인천 OO"로 넘겨야 백엔드가 서울과 안 헷갈림
   const homeRegion = homeGu ? (homeSido === "인천" ? `인천 ${homeGu}` : homeGu) : "";
@@ -577,6 +590,17 @@ export default function Home() {
   useEffect(() => { const u = homeRegion ? `/api/momentum?region=${encodeURIComponent(homeRegion)}` : "/api/momentum"; setMomentum(null); fetch(u).then((r) => r.json()).then((d) => { if (d.ok) setMomentum({ rising: d.rising ?? [] }); }).catch(() => {}); }, [homeRegion]);
 
   const openById = useCallback((id: number) => { const c = cafes.find((x) => x.id === id); if (c) setSelected(c); }, [cafes]);
+
+  // 홈 '내 주변 옥석 카페' — 현재 위치 반경 500m의 옥석(검증·참고 등급만, 후보 제외) 카페를 가까운 순으로.
+  const nearHomeCafes = useMemo(() => {
+    if (!nearHome) return [] as { c: Cafe; d: number }[];
+    const R = 500;
+    return cafes
+      .filter((c) => c.lat && c.lng && (c.synth_grade === "검증" || c.synth_grade === "참고"))
+      .map((c) => ({ c, d: distM(nearHome.lat, nearHome.lng, c.lat, c.lng) }))
+      .filter((x) => x.d <= R)
+      .sort((a, b) => a.d - b.d);
+  }, [nearHome, cafes]);
 
   // 📊 카페 상세 조회 추적 — SPA라 URL이 안 바뀌므로(상태로만 염) 명시적 이벤트로 기록.
   //   인기 카페·전환 퍼널·여러 카페 탐색 패턴 집계의 근거(관제탑 유입 분석). 익명 anon_id만, 개인정보 0.
@@ -592,8 +616,8 @@ export default function Home() {
   }, [selected]);
 
   // 뒤로가기 가드: 현재 UI 레이어를 ref로 추적(리스너에서 최신값 참조)
-  const uiRef = useRef<{ selected: boolean; showSearch: boolean; showConsent: boolean; tab: string; role: string | null; ownerPwModal: boolean; showSignup: boolean; sido: string; sigungu: string; dong: string; nearMe: boolean }>({ selected: false, showSearch: false, showConsent: false, tab: "home", role: null, ownerPwModal: false, showSignup: false, sido: "", sigungu: "", dong: "", nearMe: false });
-  uiRef.current = { selected: !!selected, showSearch, showConsent, tab, role, ownerPwModal, showSignup, sido, sigungu, dong, nearMe: !!nearMe };
+  const uiRef = useRef<{ selected: boolean; showSearch: boolean; showConsent: boolean; tab: string; role: string | null; ownerPwModal: boolean; showSignup: boolean; sido: string; sigungu: string; dong: string; nearMe: boolean; nearHome: boolean }>({ selected: false, showSearch: false, showConsent: false, tab: "home", role: null, ownerPwModal: false, showSignup: false, sido: "", sigungu: "", dong: "", nearMe: false, nearHome: false });
+  uiRef.current = { selected: !!selected, showSearch, showConsent, tab, role, ownerPwModal, showSignup, sido, sigungu, dong, nearMe: !!nearMe, nearHome: !!nearHome };
   // 위에서 연 레이어를 우선순위대로 즉시 닫는다(공통). allowMapBack=false면 지도→홈은 건너뜀(지도 패닝과 충돌 방지).
   const closeTopLayer = (allowMapBack = true) => {
     const u = uiRef.current;
@@ -613,6 +637,7 @@ export default function Home() {
       if (allowMapBack) { setTab("home"); return true; }                            // 전체(서울/경기/인천) → 홈
       return false;
     }
+    if (u.tab === "home" && u.nearHome) { setNearHome(null); setNearHomeMsg(""); return true; } // 📍 홈 내 주변 500m → 해제(일반 홈)
     if (u.tab === "home" && u.role !== null) { try { sessionStorage.removeItem("dcn_role"); } catch {} setRole(null); return true; } // 홈 → 랜딩
     return false;
   };
@@ -1229,7 +1254,37 @@ export default function Home() {
                 {homeGu && !autoGu && <button onClick={clearAuto} className="text-[11px] text-[#9c6b3f] underline">수도권 전체 보기</button>}
               </div>
             </div>
-            {!discover ? <p className="text-center text-[#a8927a] py-10">불러오는 중...</p> : (
+            {/* 📍 내 주변 옥석 카페 바로 찾기 — 현재 위치 반경 500m의 옥석(검증·참고)만 홈 리스트로 */}
+            <button onClick={nearHome ? clearNearHome : showNearHome}
+              className={`w-full rounded-xl py-3 font-bold text-[13px] mt-1 mb-4 shadow-sm transition-colors ${nearHome ? "bg-white text-[#2f6fb0] border border-[#bcd4ea]" : "text-white"}`}
+              style={nearHome ? {} : { background: "#2f6fb0" }}>
+              {nearHome ? "✕ 내 주변 500m 해제" : "📍 내 주변 옥석 카페 바로 찾기"}
+            </button>
+            {nearHomeMsg && <p className="text-center text-[11px] text-[#a8927a] -mt-2 mb-3">{nearHomeMsg}</p>}
+            {nearHome ? (
+              <div>
+                <div className="flex items-baseline justify-between mb-2 pb-1 border-b-2 border-[#2b2018]">
+                  <div className="text-base font-bold text-[#2b2018]">📍 내 주변 500m 옥석 카페</div>
+                  <div className="text-[11px] text-[#2f6fb0] shrink-0 font-medium">{nearHomeCafes.length}곳</div>
+                </div>
+                {nearHomeCafes.length === 0 ? (
+                  <div className="text-center text-[#a8927a] text-[13px] py-12 leading-relaxed">500m 내에 추천할 카페가 없습니다</div>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {nearHomeCafes.map(({ c, d }) => (
+                      <button key={c.id} onClick={() => setSelected(c)} className="w-full text-left bg-white rounded-xl p-3.5 border border-[#ece0cd] hover:border-[#9c6b3f] hover:shadow-md transition-all flex flex-col">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <span className="font-bold text-sm text-[#2b2018] truncate">{c.name}</span>
+                          {c.synth_grade && GRADE_STYLE[c.synth_grade] && <span className="text-[8px] text-white px-1.5 py-0.5 rounded-full shrink-0" style={{ background: GRADE_STYLE[c.synth_grade].bg }}>{c.synth_grade}</span>}
+                        </div>
+                        <div className="text-[11px] text-[#a8927a]">{c.area}{c.dong ? ` ${c.dong}` : ""} · {Math.round(d)}m · 리뷰 {c.synth_count ?? 0}</div>
+                        {c.synth_identity && <p className="text-[12px] text-[#5a4a38] leading-relaxed mt-1.5 line-clamp-2">{c.synth_identity}</p>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : !discover ? <p className="text-center text-[#a8927a] py-10">불러오는 중...</p> : (
               <>
                 {discover.headlineA && <HeadlineCard c={discover.headlineA} kicker="이번 주 가장 많이 이야기된 곳" tone={0} onOpen={openById} />}
                 {discover.headlineB && <HeadlineCard c={discover.headlineB} kicker="🔥 커피에 진심인 집 — 스페셜티 스포트라이트" tone={1} onOpen={openById} />}
