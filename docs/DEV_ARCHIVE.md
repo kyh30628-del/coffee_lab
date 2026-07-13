@@ -99,3 +99,4 @@
 | 2026-07-13 01:52 | #354 | [개발] 협업 #190: [레드팀] id16208 표시명 손상 — 정체성붕괴 경계사례(등급 무관) | 2312a439 | - | scripts/fix-name-16208.mjs 신규: id16208 표시명 정정 원클릭 스크립트. 라이브 네이버 재확인 결과 "김포공항플레이보6 트윗젤"은 손상이 아니라 김포공항 |
 | 2026-07-13 09:45 | #358 | [룰갭 P33] 브랜드+숫자 상호 순수숫자토큰 오매칭 — id13384·id10782 재현확정 | a99c1ccb | - | lib/reviewQuality.ts coreTokensDetail: 한글↔숫자 경계분리로 생긴 순수숫자토큰(카페인24→24, 커피깡패254→254)이 다른 비숫자 토큰과 공존할  |
 | 2026-07-13 09:47 | #359 | [정합성] char_scores space/mood 축 브랜드명·발음우연 오염 2건(테라스/뷰) — coor | 89be11ff | - | lib/charScore.ts: stripNameMentions에 '지점명 뗀 브랜드핵심명' 변형 추가(앤드테라스 파주점→앤드테라스 자기인용 커버). lib/criteriaList |
+| 2026-07-13 11:51 | #360 | [검색품질 결함D] 모멘텀(요즘뜨는) 피드에 grade 가중치 부재 — 참고등급 저표본 카페 검증등급과 동열 | aa70b6c3 | - | web/app/api/momentum/route.ts: gradeBonus() 추가(search.grade_bonus.verified/reference criteria 재사용) — |
