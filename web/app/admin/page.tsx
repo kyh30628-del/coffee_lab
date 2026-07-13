@@ -140,6 +140,25 @@ export default function AdminPage() {
     if (p) { setPw(p); load(p); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // 🔄 자동 새 배포 반영 — 소비자 앱과 동일: 서버 배포버전과 비교해 다르면 새로고침(관리자 화면도 항상 최신).
+  //   관리자 탭이 옛 번들을 계속 띄우던 문제 해결(예: 제거한 UI가 관리자에만 남던 것). 같은 버전엔 1회만(루프 방지).
+  useEffect(() => {
+    const mine = process.env.NEXT_PUBLIC_BUILD_ID;
+    if (!mine) return;
+    const check = () => {
+      if (document.visibilityState !== "visible") return;
+      fetch("/api/version", { cache: "no-store" }).then((r) => r.json()).then((d) => {
+        if (d?.v && d.v !== mine) {
+          let last = ""; try { last = sessionStorage.getItem("dcn_rv") || ""; } catch {}
+          if (last !== d.v) { try { sessionStorage.setItem("dcn_rv", d.v); } catch {} location.reload(); }
+        }
+      }).catch(() => {});
+    };
+    document.addEventListener("visibilitychange", check);
+    window.addEventListener("focus", check);
+    check();
+    return () => { document.removeEventListener("visibilitychange", check); window.removeEventListener("focus", check); };
+  }, []);
   // 🧮 전 지표 자동 갱신(15초) — 백그라운드 작업이 실시간 반영(새로고침 불필요)
   useEffect(() => {
     if (!authed || !pw) return;

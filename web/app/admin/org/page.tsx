@@ -76,6 +76,24 @@ export default function OrgDashboard() {
     const id = setInterval(() => { const pw2 = localStorage.getItem("adm_pw"); if (pw2 && document.visibilityState === "visible") load(pw2, true); }, 15000);
     return () => clearInterval(id);
   }, []);
+  // 🔄 자동 새 배포 반영 — 소비자 앱·본체 관리자와 동일: 배포버전 다르면 새로고침(조직 관제도 항상 최신).
+  useEffect(() => {
+    const mine = process.env.NEXT_PUBLIC_BUILD_ID;
+    if (!mine) return;
+    const check = () => {
+      if (document.visibilityState !== "visible") return;
+      fetch("/api/version", { cache: "no-store" }).then((r) => r.json()).then((d) => {
+        if (d?.v && d.v !== mine) {
+          let last = ""; try { last = sessionStorage.getItem("dcn_rv") || ""; } catch {}
+          if (last !== d.v) { try { sessionStorage.setItem("dcn_rv", d.v); } catch {} location.reload(); }
+        }
+      }).catch(() => {});
+    };
+    document.addEventListener("visibilitychange", check);
+    window.addEventListener("focus", check);
+    check();
+    return () => { document.removeEventListener("visibilitychange", check); window.removeEventListener("focus", check); };
+  }, []);
   // 본체 대시보드 KPI 카드에서 "?open=pending"으로 딥링크 시 결재 대기 섹션을 펼쳐서 바로 보여줌
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get("open") === "pending") setShowPending(true);
