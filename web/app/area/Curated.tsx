@@ -52,6 +52,7 @@ export default function Curated({ area, tasteKey, heading, intro, cafes, regions
                     {c.grade && <span className="text-[10px] font-bold text-white px-1.5 py-0.5 rounded ml-auto shrink-0" style={{ background: GRADE_BG[c.grade] || "#a8927a" }}>{c.grade}</span>}
                   </div>
                   {c.identity && <p className="text-[12.5px] text-[#6b5a48] leading-snug mt-1.5 line-clamp-2 pl-7">{c.identity}</p>}
+                  {c.quote && <p className="text-[11.5px] text-[#a8927a] leading-snug mt-1 line-clamp-1 pl-7">“{c.quote}”</p>}
                 </Link>
               </li>
             ))}
