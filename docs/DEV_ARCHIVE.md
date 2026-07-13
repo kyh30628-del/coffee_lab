@@ -96,3 +96,4 @@
 | 2026-07-12 12:25 | #351 | 일일요약 5시 자동갱신 | edde2b6f | med | 확인 결과: #350의 오늘 페이지순위/체류시간/유의미사용자 요약(todayInsight)은 /api/admin/analytics(라이브 요청시점 계산)에만 있었고, 17시 일일보 |
 | 2026-07-12 13:09 | #352 | 카페상세 구조화데이터 | ec06d1a7 | low | app/c/[id]/page.tsx: JSON-LD에 geo(lat/lng)·address(streetAddress/dong/area)·aggregateRating(등급기반 rat |
 | 2026-07-12 22:06 | #353 | 모달 배경스크롤 고정 | 73feb6e5 | low | lib/useLockBodyScroll.ts(신규, 참조카운트 iOS-safe 훅) 추가 후 admin/ChatWidget·VisitorReviews의 기존 임시구현을 대체, ad |
+| 2026-07-13 01:52 | #354 | [개발] 협업 #190: [레드팀] id16208 표시명 손상 — 정체성붕괴 경계사례(등급 무관) | 2312a439 | - | scripts/fix-name-16208.mjs 신규: id16208 표시명 정정 원클릭 스크립트. 라이브 네이버 재확인 결과 "김포공항플레이보6 트윗젤"은 손상이 아니라 김포공항 |
