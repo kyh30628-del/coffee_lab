@@ -1249,8 +1249,8 @@ export default function Home() {
             </div>
             {/* 📍 내 주변 옥석 카페 바로 찾기 — 위치 하나로 동네(구) 설정 + 반경 500m 옥석(검증·참고) 리스트(위치버튼 통일) */}
             <button onClick={() => (nearHome ? clearNearHome() : openLocation())}
-              className={`w-full rounded-xl py-3 font-bold text-[13px] mt-1 mb-4 shadow-sm transition-colors ${nearHome ? "bg-white text-[#2f6fb0] border border-[#bcd4ea]" : "text-white"}`}
-              style={nearHome ? {} : { background: "#2f6fb0" }}>
+              className={`w-full rounded-xl py-3 font-bold text-[13px] mt-1 mb-4 shadow-sm transition-colors ${nearHome ? "bg-white text-[#9c6b3f] border border-[#cbb89f]" : "text-[#f4ece0]"}`}
+              style={nearHome ? {} : { background: "#2b2018" }}>
               {nearHome ? "✕ 내 주변 500m 해제" : "📍 내 주변 옥석 카페 바로 찾기"}
             </button>
             {nearHome ? (
@@ -1375,21 +1375,24 @@ export default function Home() {
       {/* 하단 빠른 액션 바 — 모바일 전용. 뷰포트 바닥에 직접 고정 + 안전영역(홈인디케이터)까지 바 색으로 채움(네이버 방식) */}
       <nav className="md:hidden flex items-stretch" style={{ position: "fixed", left: 0, right: 0, bottom: 0, height: "3.25rem", zIndex: 1300, background: tab === "map" ? "#fdfaf4" : "#f4ece0", boxShadow: "0 -1px 0 rgba(0,0,0,0.06)" }}>
         {[
-          { k: "home", label: "홈", icon: <path d="M3 11.2 12 4l9 7.2M5.5 9.7V20h13V9.7" />, fill: false },
-          { k: "fav", label: "즐겨찾기", icon: <path d="M12 4.5l2.3 4.7 5.2.8-3.75 3.65.9 5.15L12 16.9l-4.65 2.45.9-5.15L4.5 10l5.2-.8z" />, fill: true },
-          { k: "search", label: "검색", icon: <><circle cx="11" cy="11" r="6.5" /><path d="M16 16l4.5 4.5" /></>, fill: false },
-          { k: "loc", label: "내 위치", icon: <><path d="M12 21c4.2-4 7-7.2 7-10.5A7 7 0 0 0 5 10.5C5 13.8 7.8 17 12 21Z" /><circle cx="12" cy="10.5" r="2.4" /></>, fill: false },
-        ].map((a) => (
+          { k: "home", label: "홈", icon: <path d="M3 11.2 12 4l9 7.2M5.5 9.7V20h13V9.7" />, solid: false, active: tab === "home" && !showFavs && !showSearch },
+          { k: "fav", label: "즐겨찾기", icon: <path d="M12 4.5l2.3 4.7 5.2.8-3.75 3.65.9 5.15L12 16.9l-4.65 2.45.9-5.15L4.5 10l5.2-.8z" />, solid: true, active: showFavs },
+          { k: "search", label: "검색", icon: <><circle cx="11" cy="11" r="6.5" /><path d="M16 16l4.5 4.5" /></>, solid: false, active: showSearch },
+          { k: "loc", label: "내 위치", icon: <><path d="M12 21c4.2-4 7-7.2 7-10.5A7 7 0 0 0 5 10.5C5 13.8 7.8 17 12 21Z" /><circle cx="12" cy="10.5" r="2.4" /></>, solid: false, active: !!nearHome },
+        ].map((a) => {
+          const color = a.active ? "#9c6b3f" : "#8a7458";
+          return (
           <button key={a.k} onClick={() => {
             if (a.k === "home") setTab("home");
             else if (a.k === "fav") setShowFavs(true);
             else if (a.k === "search") { setSearchRes(null); setSearchQ(""); setShowSearch(true); }
             else openLocation();
-          }} className="flex-1 flex flex-col items-center justify-center gap-0.5 active:bg-[#f0e6d4]" aria-label={a.label}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill={a.fill ? "#d6336c" : "none"} stroke={a.fill ? "#d6336c" : "#8a7458"} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>{a.icon}</svg>
-            <span className="text-[10px] font-bold leading-none whitespace-nowrap" style={{ color: a.fill ? "#d6336c" : "#8a7458" }}>{a.label}</span>
+          }} className="flex-1 flex flex-col items-center justify-center gap-0.5 active:bg-[#f0e6d4]" aria-label={a.label} aria-current={a.active ? "page" : undefined}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill={a.solid && a.active ? color : "none"} stroke={color} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>{a.icon}</svg>
+            <span className="text-[10px] font-bold leading-none whitespace-nowrap" style={{ color }}>{a.label}</span>
           </button>
-        ))}
+          );
+        })}
       </nav>
       {showFavs && <FavoritesModal items={cafes.filter((c) => bookmarkIds.has(c.id))} onClose={() => setShowFavs(false)}
         onOpen={(c: Cafe) => { setShowFavs(false); setSelected(c); }}
@@ -2015,7 +2018,8 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
 function MemoryTab({ device, visits, locked = false, sessionPin = "", onRegister, onEdit, onUnlock, onLock, onRestore }: { device: string; visits: any[]; locked?: boolean; sessionPin?: string; onRegister: () => void; onEdit?: (cafeId: number) => void; onUnlock?: (pin: string) => void; onLock?: () => void; onRestore: (dev: string) => void }) {
   const [showSettings, setShowSettings] = useState(false);
   const [viewVisit, setViewVisit] = useState<any>(null); // 추억 보기 모달(클릭 시 먼저 내용 표시 → 수정 버튼)
-  useLockBodyScroll(showSettings || viewVisit !== null);
+  const [zoomPhoto, setZoomPhoto] = useState<string | null>(null); // 사진 원본 크기 라이트박스
+  useLockBodyScroll(showSettings || viewVisit !== null || zoomPhoto !== null);
   const [hasPin, setHasPin] = useState(false);
   const [unlockPin, setUnlockPin] = useState("");
   const [busy, setBusy] = useState(false);
@@ -2104,7 +2108,11 @@ function MemoryTab({ device, visits, locked = false, sessionPin = "", onRegister
               <div className="overflow-y-auto flex-1 p-4 space-y-3">
                 {vphotos.length > 0 && (
                   <div className="flex gap-2 overflow-x-auto -mx-1 px-1 pb-1">
-                    {vphotos.map((p, i) => <img key={i} src={p} alt="" className="h-44 rounded-lg border border-[#e6d9c8] object-cover shrink-0" />)}
+                    {vphotos.map((p, i) => (
+                      <button key={i} type="button" onClick={() => setZoomPhoto(p)} className="shrink-0">
+                        <img src={p} alt="" className="h-44 rounded-lg border border-[#e6d9c8] object-cover" />
+                      </button>
+                    ))}
                   </div>
                 )}
                 <div>
@@ -2131,6 +2139,12 @@ function MemoryTab({ device, visits, locked = false, sessionPin = "", onRegister
           </div>
         );
       })()}
+      {zoomPhoto && (
+        <div className="fixed inset-0 z-[6000] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.85)" }} onClick={() => setZoomPhoto(null)}>
+          <button onClick={() => setZoomPhoto(null)} className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/15 text-white text-xl leading-none" aria-label="닫기">×</button>
+          <img src={zoomPhoto} alt="" className="max-w-[94vw] max-h-[90dvh] object-contain rounded-lg" onClick={(e) => e.stopPropagation()} />
+        </div>
+      )}
     </div>
   );
 }
