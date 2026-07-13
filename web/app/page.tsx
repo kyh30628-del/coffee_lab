@@ -1250,7 +1250,7 @@ export default function Home() {
             {/* 📍 내 주변 옥석 카페 바로 찾기 — 위치 하나로 동네(구) 설정 + 반경 500m 옥석(검증·참고) 리스트(위치버튼 통일) */}
             <button onClick={() => (nearHome ? clearNearHome() : openLocation())}
               className={`w-full rounded-xl py-3 font-bold text-[13px] mt-1 mb-4 shadow-sm transition-colors ${nearHome ? "bg-white text-[#9c6b3f] border border-[#cbb89f]" : "text-[#f4ece0]"}`}
-              style={nearHome ? {} : { background: "#2b2018" }}>
+              style={nearHome ? {} : { background: "#9c6b3f" }}>
               {nearHome ? "✕ 내 주변 500m 해제" : "📍 내 주변 옥석 카페 바로 찾기"}
             </button>
             {nearHome ? (
@@ -1387,9 +1387,11 @@ export default function Home() {
             else if (a.k === "fav") setShowFavs(true);
             else if (a.k === "search") { setSearchRes(null); setSearchQ(""); setShowSearch(true); }
             else openLocation();
-          }} className="flex-1 flex flex-col items-center justify-center gap-0.5 active:bg-[#f0e6d4]" aria-label={a.label} aria-current={a.active ? "page" : undefined}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill={a.solid && a.active ? color : "none"} stroke={color} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>{a.icon}</svg>
-            <span className="text-[10px] font-bold leading-none whitespace-nowrap" style={{ color }}>{a.label}</span>
+          }} className="flex-1 flex flex-col items-center justify-center active:bg-[#ece0cd]" aria-label={a.label} aria-current={a.active ? "page" : undefined}>
+            <div className="flex flex-col items-center justify-center gap-0.5 rounded-2xl px-4 py-1 transition-colors" style={{ background: a.active ? "#f0e6d4" : "transparent" }}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill={a.solid && a.active ? color : "none"} stroke={color} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>{a.icon}</svg>
+              <span className="text-[10px] font-bold leading-none whitespace-nowrap" style={{ color }}>{a.label}</span>
+            </div>
           </button>
           );
         })}
