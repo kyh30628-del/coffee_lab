@@ -415,7 +415,14 @@ function coreTokensDetail(name: string, areaTerms: string[]): { tokens: string[]
   const base = pool.map((p) => p.core);
   const branded = pool.filter((p) => !isVenueTok(p.raw) && !isVenueTok(p.core)).map((p) => p.core);
   // 브랜드 토큰이 남으면 venue/신도시 제거, 없으면(=venueOnly) 원래 유지해 정체성 파괴는 막되 신호는 표시.
-  return { tokens: branded.length ? branded : base, venueOnly: branded.length === 0 && base.length > 0 };
+  const finalPool = branded.length ? branded : base;
+  // 룰갭 P33(2026-07-13): 한글↔숫자 경계 분리(위 split)로 '카페인24'→["카페인","24"]처럼 순수 숫자토큰이
+  //   떨어져 나오면, tokens.length>=2라 weakSingle/allTokensWeak(단일·전부-약함 전용) 보호를 못 받고
+  //   "24" 하나가 독립 identity 토큰으로 남아 무관 숫자(주소번지·전화번호끝자리·게시글번호)와 오매칭됐다
+  //   (id13384 6건중5건, id10782 6건중3건 오염 실측). 다른(비숫자) 토큰이 있으면 숫자토큰은 매칭 후보에서
+  //   제외 — 전체이름 원문일치(nameHit 상위 로직)는 이름 전체를 그대로 보므로 진짜 매칭은 안 깨진다.
+  const strongPool = finalPool.filter((t) => !/^[0-9]+$/.test(t));
+  return { tokens: strongPool.length ? strongPool : finalPool, venueOnly: branded.length === 0 && base.length > 0 };
 }
 export function coreTokens(name: string, areaTerms: string[]): string[] {
   return coreTokensDetail(name, areaTerms).tokens;
