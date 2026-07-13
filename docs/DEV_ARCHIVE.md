@@ -104,3 +104,4 @@
 | 2026-07-13 11:58 | #363 | 공유 OG카드 강화 | 70e60b48 | med | lib/ogCard.tsx+charScore.ts(topCharTraits)+c/[id]/opengraph-image.tsx: OG카드에 카페명·등급(✓검증/참고)·대표 결(예:� |
 | 2026-07-13 13:28 | #364 | 지역 SEO 랜딩 확충 | 0745b235 | med | lib/seoData.ts, app/area/Curated.tsx: 지역/취향 랜딩 카페 리스트에 실제 대표후기 스니펫(synth_reviews 중 최고점 quote, correl |
 | 2026-07-13 13:46 | #365 | UI색상·인터랙션 3건 | dcb972e7 | low | app/page.tsx: ①홈 CTA(내 주변 옥석 찾기) 배경색 #2f6fb0(블루)→#2b2018(브랜드 espresso brown), 텍스트 #f4ece0, 토글상태 색도 브 |
+| 2026-07-13 14:04 | #366 | 버튼색·탭하이라이트 | d50596b3 | low | app/page.tsx: 1) 내 주변 옥석 카페 바로 찾기 버튼 배경 #2b2018(다크브라운/거의검정)→#9c6b3f(브랜드 커피브라운)로 변경. 2) 하단 탭바 4개 acti |
