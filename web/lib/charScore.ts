@@ -59,3 +59,12 @@ export function dessertDominance(cs: Record<string, number> | null | undefined):
   const coffeeAxes = roast + (c.work ?? 0) + (c.quiet ?? 0) + (c.mood ?? 0) + (c.space ?? 0);
   return { bonus: dessert <= coffeeAxes, dominant: roast === 0 && dessert > 20 };
 }
+
+// 카페의 대표 결(char) 상위 N개 — OG카드·공유 배지 등 짧은 표시용(원시 언급량 순).
+export function topCharTraits(cs: Record<string, number> | null | undefined, n = 2): string[] {
+  const c = cs ?? {};
+  return CHAR_AXES.filter((ax) => (c[ax.key] ?? 0) > 0)
+    .sort((a, b) => (c[b.key] ?? 0) - (c[a.key] ?? 0))
+    .slice(0, n)
+    .map((ax) => `${ax.emoji} ${ax.label}`);
+}

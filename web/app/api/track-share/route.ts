@@ -9,6 +9,8 @@ async function ensure() {
   if (ensured) return;
   await sql`CREATE TABLE IF NOT EXISTS share_events (id BIGSERIAL PRIMARY KEY, anon_id TEXT, path TEXT, cafe_id INT, channel TEXT, ts TIMESTAMPTZ NOT NULL DEFAULT now())`;
   await sql`CREATE INDEX IF NOT EXISTS idx_share_events_ts ON share_events (ts)`;
+  // source: 공유가 일어난 화면 구분(카페상세/MYPIN) — 전환 분석용(#363).
+  await sql`ALTER TABLE share_events ADD COLUMN IF NOT EXISTS source TEXT`.catch(() => {});
   ensured = true;
 }
 
@@ -19,10 +21,11 @@ export async function POST(req: NextRequest) {
     const anonId = String(b.anonId ?? "").slice(0, 64);
     const path = String(b.path ?? "").slice(0, 200);
     const channel = String(b.channel ?? "").slice(0, 20);
+    const source = String(b.source ?? "").slice(0, 30) || null;
     const m = path.match(/\/c\/(\d+)/);
     const cafeId = m ? Number(m[1]) : null;
     if (!anonId && !path) return NextResponse.json({ ok: false }, { status: 400 });
-    await sql`INSERT INTO share_events (anon_id, path, cafe_id, channel) VALUES (${anonId}, ${path}, ${cafeId}, ${channel})`;
+    await sql`INSERT INTO share_events (anon_id, path, cafe_id, channel, source) VALUES (${anonId}, ${path}, ${cafeId}, ${channel}, ${source})`;
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ ok: false }, { status: 500 });

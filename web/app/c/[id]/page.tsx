@@ -8,6 +8,7 @@ import SaveMemoryButton from "./SaveMemoryButton";
 import VisitorReviews from "../../VisitorReviews";
 import { buildAxisDist, cafeProfile, extractHighlights, tasteVector, tasteSimilarity, GRADE_RANK } from "@/lib/cafeProfile";
 import { collectionForCafe } from "@/lib/collections";
+import { shareHookText } from "@/lib/shareCopy";
 
 export const runtime = "nodejs";
 export const revalidate = 3600; // ISR 1시간
@@ -125,9 +126,10 @@ export default async function CafePage({ params }: Props) {
           <Link href="/" className="text-[#9c6b3f] text-sm">← 동네 커피 노트</Link>
           <KakaoShare
             title={`${c.name} (${c.area})`}
-            description={(c.synth_identity || "진짜 후기로 검증한 동네 카페").slice(0, 80)}
+            description={shareHookText(grade, c.synth_identity)}
             imageUrl={`${SITE}/c/${c.id}/opengraph-image`}
             link={`${SITE}/c/${c.id}`}
+            source="카페상세"
             className="flex items-center gap-1.5 bg-[#FEE500] text-[#3c1e1e] rounded-full pl-2.5 pr-3 py-1.5 text-[12px] font-bold"
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="#3c1e1e"><path d="M12 3C6.5 3 2 6.6 2 11c0 2.8 1.9 5.3 4.7 6.7-.2.7-.7 2.6-.8 3-.1.5.2.5.4.4.2-.1 2.6-1.8 3.7-2.5.6.1 1.3.1 2 .1 5.5 0 10-3.6 10-8S17.5 3 12 3z"/></svg>

@@ -10,9 +10,9 @@ async function getFont(): Promise<ArrayBuffer | null> {
   return fontCache;
 }
 
-export async function ogCard(opts: { kicker?: string; title: string; subtitle?: string; badge?: string; footer?: string }) {
+export async function ogCard(opts: { kicker?: string; title: string; subtitle?: string; badge?: string; traits?: string[]; footer?: string }) {
   const font = await getFont();
-  const { kicker = "☕ 동네 커피 노트", title, subtitle, badge, footer = "진짜 후기로 검증한 우리 동네 카페 · dongnecoffeenote.com" } = opts;
+  const { kicker = "☕ 동네 커피 노트", title, subtitle, badge, traits = [], footer = "진짜 후기로 검증한 우리 동네 카페 · dongnecoffeenote.com" } = opts;
   return new ImageResponse(
     (
       <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", justifyContent: "space-between", background: "linear-gradient(135deg,#3a2a1c 0%,#241a12 60%,#1a120c 100%)", color: "#f4ece0", padding: "64px 72px", fontFamily: "Gowun" }}>
@@ -23,6 +23,13 @@ export async function ogCard(opts: { kicker?: string; title: string; subtitle?: 
         <div style={{ display: "flex", flexDirection: "column" }}>
           <div style={{ fontSize: 78, fontWeight: 700, lineHeight: 1.15, letterSpacing: -1 }}>{title}</div>
           {subtitle ? <div style={{ fontSize: 34, color: "#cbb89f", marginTop: 22, lineHeight: 1.4 }}>{subtitle}</div> : null}
+          {traits.length > 0 && (
+            <div style={{ display: "flex", gap: 12, marginTop: 20 }}>
+              {traits.map((t) => (
+                <div key={t} style={{ display: "flex", fontSize: 26, fontWeight: 700, color: "#f4ece0", background: "rgba(244,236,224,0.12)", border: "2px solid #6b5540", padding: "7px 18px", borderRadius: 999 }}>{t}</div>
+              ))}
+            </div>
+          )}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <div style={{ width: 44, height: 4, background: "#e8b87a" }} />

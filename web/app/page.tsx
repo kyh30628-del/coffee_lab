@@ -8,6 +8,7 @@ import KakaoShare from "./KakaoShare";
 import MyCafeRegModal from "./MyCafeRegModal";
 import { buildAxisDist, cafeProfile, tasteVector, tasteSimilarity, GRADE_RANK, type AxisDist } from "@/lib/cafeProfile";
 import { useLockBodyScroll } from "@/lib/useLockBodyScroll";
+import { shareHookText } from "@/lib/shareCopy";
 
 type EvidenceReview = { quote: string; link?: string; source?: string; date?: string; trust?: "verified" | "reference" | "rejected"; score?: number; why?: string[] };
 type QualityStats = { raw: number; verified: number; reference: number; rejected: number; duplicates?: number; rejectReasons?: Record<string, number> };
@@ -1741,9 +1742,10 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
               <button onClick={onToggleBookmark} aria-label="즐겨찾기" className="flex items-center gap-1 border rounded-full px-2.5 py-1 text-[12px] font-medium transition-colors" style={bookmarked ? { color: "#fff", background: "#f0a832", borderColor: "#f0a832" } : { color: "#9c6b3f", borderColor: "#e0d2bd" }}>{bookmarked ? "★ 즐겨찾기" : "☆ 즐겨찾기"}</button>
               <KakaoShare
                 title={`${cafe.name} (${cafe.area})`}
-                description={((cafe as any).identity || cafe.signature || "진짜 후기로 검증한 우리 동네 카페")}
+                description={shareHookText(cafe.synth_grade, (cafe as any).identity || cafe.signature)}
                 imageUrl={`https://dongnecoffeenote.com/c/${cafe.id}/opengraph-image`}
                 link={`https://dongnecoffeenote.com/c/${cafe.id}`}
+                source="카페상세"
                 className="flex items-center gap-1 bg-[#FEE500] text-[#3c1e1e] rounded-full pl-2 pr-2.5 py-1 text-[12px] font-bold"
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="#3c1e1e"><path d="M12 3C6.5 3 2 6.6 2 11c0 2.8 1.9 5.3 4.7 6.7-.2.7-.7 2.6-.8 3-.1.5.2.5.4.4.2-.1 2.6-1.8 3.7-2.5.6.1 1.3.1 2 .1 5.5 0 10-3.6 10-8S17.5 3 12 3z"/></svg>
@@ -2111,8 +2113,19 @@ function MemoryTab({ device, visits, locked = false, sessionPin = "", onRegister
                 </div>
                 <div className="text-[11px] text-[#a8927a]">{fmtDate(viewVisit.created_at)}{viewVisit.favorite ? " · ★ 즐겨찾기" : ""}</div>
               </div>
-              <div className="p-4 border-t border-[#f0e6d4] pb-[calc(1rem_+_env(safe-area-inset-bottom))]">
-                <button onClick={() => { const id = viewVisit.id; setViewVisit(null); onEdit?.(id); }} className="w-full bg-[#d6336c] text-white rounded-xl py-3 font-bold text-[14px]">✎ 수정하기</button>
+              <div className="p-4 border-t border-[#f0e6d4] pb-[calc(1rem_+_env(safe-area-inset-bottom))] flex gap-2">
+                <KakaoShare
+                  title={`${viewVisit.name} (${viewVisit.area})`}
+                  description={shareHookText(viewVisit.synth_grade, viewVisit.synth_identity)}
+                  imageUrl={`https://dongnecoffeenote.com/c/${viewVisit.id}/opengraph-image`}
+                  link={`https://dongnecoffeenote.com/c/${viewVisit.id}`}
+                  source="MYPIN"
+                  className="flex items-center gap-1 bg-[#FEE500] text-[#3c1e1e] rounded-xl px-4 py-3 text-[14px] font-bold shrink-0"
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="#3c1e1e"><path d="M12 3C6.5 3 2 6.6 2 11c0 2.8 1.9 5.3 4.7 6.7-.2.7-.7 2.6-.8 3-.1.5.2.5.4.4.2-.1 2.6-1.8 3.7-2.5.6.1 1.3.1 2 .1 5.5 0 10-3.6 10-8S17.5 3 12 3z"/></svg>
+                  공유
+                </KakaoShare>
+                <button onClick={() => { const id = viewVisit.id; setViewVisit(null); onEdit?.(id); }} className="flex-1 bg-[#d6336c] text-white rounded-xl py-3 font-bold text-[14px]">✎ 수정하기</button>
               </div>
             </div>
           </div>
