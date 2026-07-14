@@ -6,8 +6,9 @@ export const runtime = "nodejs";
 // 🛠 개발 파이프라인 현황 — 승인된 dev_task의 진행상태(개발대기/배포대기/실패/배포중). 배포대기·실패는 CEO 조치 필요.
 //   pending(미승인)은 일반 결재 섹션에서 승인. 여긴 승인 이후 흐름만.
 // ⏱ 배포정체 감시(#280, 감지·알림 전용 — dev_status 자동전환·결재/이슈 생성 없음, lib/issues.ts 미접촉):
-//   '배포대기'로 STUCK_MIN분 이상 머문 건을 표면화. 특히 source≠'chat'(자율진단·크론발)은
-//   chat-watch.mjs 자동승격 경로가 안 타 영구정체 위험이 높아 별도 우선 집계(memory: dev-status-promotion-gap, #270 사례).
+//   '배포대기'로 STUCK_MIN분 이상 머문 건을 표면화. source≠'chat'(자율진단·크론발) 집계는 별도 유지 —
+//   #370로 chat-watch.mjs 자동승격이 source 무관 처리로 고쳐졌지만(dev_autodeploy='false' 명시일 때만 제외),
+//   주간한도 pause 등으로 여전히 정체될 수 있어 감시는 남겨둔다(memory: dev-status-promotion-gap, #270/#370 사례).
 //   age는 dev_claimed(구현 시작 시각, 없으면 created_at)로부터의 경과 — 정확한 '배포대기 진입 시각' 컬럼이 없어 근사치.
 const STUCK_MIN = 30;
 export async function GET(req: NextRequest) {

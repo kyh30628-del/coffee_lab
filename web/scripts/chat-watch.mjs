@@ -300,17 +300,22 @@ function reportMsg(id, ds, ap, result) {
   }
 }
 
-// 🔁 유지관리(8초): ①자동배포 승격(챗발 배포대기+dev_autodeploy → deploy_approved) ②진행보고를 챗에 적재.
-//   ⚠️ 차단기: high 위험(dev_autodeploy=false)은 절대 자동배포 승격 안 됨 — 대표님이 관제탑에서 직접 배포.
+// 🔁 유지관리(8초): ①자동배포 승격(배포대기+dev_autodeploy≠false → deploy_approved) ②진행보고를 챗에 적재.
+//   ⚠️ 차단기: high 위험(dev_autodeploy=false, 챗 전용 플래그)은 절대 자동배포 승격 안 됨 — 대표님이 직접 배포확정.
+//   🩹 #370: 과거엔 source='chat'만 처리해 자율진단/협업발 dev_task(dev_autodeploy 키 자체가 없음)가
+//   빌드완료 후 '배포대기'에서 영구정체했다(#200/#211/#212/#369, 4회 재발). 그런 건은 애초 CEO가 결재 승인
+//   시점에 "승인하시면 개발 착수(코드→검증→배포)"로 배포까지 이미 승인된 것(lib/issues.ts L172)이므로,
+//   source 무관하게 dev_autodeploy가 명시적으로 'false'가 아니면(=키 없음 포함) 자동승격 대상에 포함한다.
 let maintBusy = false;
 async function maintenance() {
   if (maintBusy) return; maintBusy = true;
   try {
     // 🛡️ 주간한도 pause면 자동배포 승격 보류(핵심 판정 보호). throttle/ok면 정상 승격.
     if (computeGuard().level !== "pause")
-      await sql`UPDATE decisions SET action_params = action_params || '{"dev_status":"deploy_approved"}'::jsonb, result='챗 자율 — 자동배포 승인(위험도 낮/중)'
-        WHERE action_type='dev_task' AND status='approved' AND action_params->>'source'='chat'
-          AND action_params->>'dev_status'='배포대기' AND (action_params->>'dev_autodeploy')='true'`.catch(() => {});
+      await sql`UPDATE decisions SET action_params = action_params || '{"dev_status":"deploy_approved"}'::jsonb, result='자율 배포 승인(빌드·검증 완료 — 결재 승인이 배포까지 포함)'
+        WHERE action_type='dev_task' AND status='approved'
+          AND action_params->>'dev_status'='배포대기'
+          AND COALESCE(action_params->>'dev_autodeploy', 'true') <> 'false'`.catch(() => {});
     const rows = await sql`SELECT id, action_params ap, result FROM decisions
       WHERE action_type='dev_task'
         AND (action_params->>'source'='chat' OR (action_params->>'chat_deploy_confirm')='true')
