@@ -20,7 +20,7 @@ export const ORG: Org = {
         { k: "🧠", n: "개발 실행 에이전트(dev-agent)", t: "5분(승인건 병렬 구현)", j: "dev-agent" }, { k: "🚀", n: "배포 워커(dev-deploy)", t: "2분(CEO 배포확정건)", j: "dev-deploy" }] }] },
     { n: "🟦 품질본부", c: "#3a6ea5", teams: [
       { n: "데이터정합성팀", s: "수도권·area·중복·필드 무결성 스캔·자동치유", w: [
-        { k: "🧠", n: "정합성 에이전트", t: "매일", j: "integrity-agent" }, { k: "⚙️", n: "cron-sentinel", t: "매일 00시", j: "cron-sentinel" }, { k: "⚙️", n: "orchestrator-heal", t: "2시간마다", j: "orchestrator-heal" }] },
+        { k: "🧠", n: "정합성 에이전트", t: "매일", j: "integrity-agent" }, { k: "⚙️", n: "cron-sentinel", t: "매일 12·00시(2회)", j: "cron-sentinel" }, { k: "⚙️", n: "orchestrator-heal", t: "2시간마다", j: "orchestrator-heal" }] },
       { n: "리뷰품질팀", s: "옥석 검증규칙(동명비카페·주소·오염) 발굴·적용", w: [
         { k: "🧠", n: "룰갭 에이전트", t: "매일", j: "rulegap-agent" }, { k: "⚙️", n: "cron-rulegap", t: "매일 01:30", j: "cron-rulegap" }, { k: "🌐", n: "reviewQuality(verifyReview)", t: "실시간(합성마다)" }] },
       { n: "검증심사팀", s: "검증 등급 자격 적대검증·15점검 + 비즈니스 기준 관제·검증", w: [
@@ -78,7 +78,7 @@ export const MEMBER_INFO: Record<string, string> = {
   "재무 에이전트": "과금0 유지·콘솔키 크레딧·네이버/Google 쿼터·토큰 실측 감시.",
   "경영지원 에이전트": "에이전트·크론 가동률 관제 + 본부·팀 간 협업 코디네이션 주관.",
   "리스크 에이전트": "의존성·법·신뢰·사업·기술 리스크를 적극 발굴·등급화하고 해결주체 본부를 지정.",
-  "cron-sentinel": "데이터 정합성 파수꾼. 매일 전 축을 스캔해 안전한 건 자동치유하고 잔여는 경보. 사장님이 발견하기 전에 먼저.",
+  "cron-sentinel": "데이터 정합성·해자 파수꾼. 하루 2회(12·00시) 전 축을 스캔해 ①area·박스밖·중복은 안전 치유 ②명소·행사, 약한이름(1글자), 비카페 업종 오염은 결정론 규칙으로 자동 제거·재합성(멱등, 정밀도>재현율) ③애매한 건 워치리스트 경보. 사장님이 발견하기 전에 먼저.",
   "orchestrator-heal": "2시간마다 파이프라인을 자가치유(area·박스밖·중복 등 가역 교정).",
   "cron-rulegap": "학습된 오염 사전을 매일 자동 반영(로직 변경은 승인 대상).",
   "reviewQuality(verifyReview)": "합성할 때마다 실시간으로 옥석을 거르는 결정론 규칙 엔진(동명비카페·주소·오염·이름정제).",

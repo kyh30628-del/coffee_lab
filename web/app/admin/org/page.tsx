@@ -43,6 +43,8 @@ export default function OrgDashboard() {
   const [showRhythm, setShowRhythm] = useState(false); // 조직 운영 리듬(활동+케이던스) — 기본 접힘(다른 카드와 통일)
   const [crit, setCrit] = useState<any>(null); // 🎛️ 기준 관제 상태(스냅샷·최근변경·검증에이전트 결과)
   const [showCrit, setShowCrit] = useState(false);
+  const [sentinel, setSentinel] = useState<any>(null); // 🛡️ 센티넬 오염 방어 실적
+  const [showSentinel, setShowSentinel] = useState(false);
   useLockBodyScroll(showOrg || !!member);
   const load = (password: string, silent = false) => {
     if (!silent) { setLoading(true); setErr(""); }
@@ -56,7 +58,9 @@ export default function OrgDashboard() {
       fetch("/api/admin/dev-pipeline", { headers: { "x-admin-password": password }, cache: "no-store" }).then((r) => r.json()).catch(() => ({ ok: false })),
       fetch("/api/admin/org-activity", { headers: { "x-admin-password": password }, cache: "no-store" }).then((r) => r.json()).catch(() => ({ ok: false })),
       fetch("/api/admin/criteria-status", { headers: { "x-admin-password": password }, cache: "no-store" }).then((r) => r.json()).catch(() => ({ ok: false })),
-    ]).then(([b, d, co, iss, lv, jb, dp, oa, cr]) => {
+      fetch("/api/admin/sentinel-status", { headers: { "x-admin-password": password }, cache: "no-store" }).then((r) => r.json()).catch(() => ({ ok: false })),
+    ]).then(([b, d, co, iss, lv, jb, dp, oa, cr, se]) => {
+      if (se && se.ok) setSentinel(se);
       if (cr && cr.ok) setCrit(cr);
       if (oa && oa.ok) setOrgAct(oa);
       if (dp && dp.ok) setDevpipe(dp);
@@ -277,6 +281,41 @@ export default function OrgDashboard() {
             </div>
           )}
         </div>
+
+        {/* 🛡️ 센티넬 오염 방어 현황 — 품질본부 파수꾼(cron-sentinel)의 자율 정리 실적. 접이식·기본 접힘(헤더에 요약) */}
+        {sentinel && !sentinel.empty && (
+          <div style={{ ...card, marginTop: 10, border: sentinel.detectors?.some((d: any) => d.residual > 0) ? "1px solid #e0b357" : "1px solid #ddc9a8" }}>
+            <button onClick={() => setShowSentinel(!showSentinel)} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
+              <span style={{ fontSize: 13.5, fontWeight: 700, color: "#3a6ea5" }}>
+                {showSentinel ? "▾" : "▸"} 🛡️ 센티넬 오염 방어 <span style={{ fontSize: 10, fontWeight: 600, color: "#9c8a6c" }}>(품질본부)</span>
+              </span>
+              <span style={{ fontSize: 10.5, fontWeight: 700, color: sentinel.ageH > 16 ? "#b03a3a" : "#3f7a4f" }}>
+                {sentinel.ageH > 16 ? `🔴 ${sentinel.ageH}h 전(정지의심)` : `🟢 ${sentinel.ageH < 1 ? "방금" : sentinel.ageH + "h 전"}`} · 7일 -{sentinel.totalDropped14}건
+              </span>
+            </button>
+            {showSentinel && (
+              <div style={{ marginTop: 10 }}>
+                <div style={{ fontSize: 10.5, color: "#9c8a6c", marginBottom: 8 }}>
+                  하루 2회(12·00시 KST) 전 축 스캔 → 안전한 오염은 결정론 자동 제거·재합성(멱등). 최근 7일 누적 실적:
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 7 }}>
+                  {sentinel.detectors?.map((d: any) => (
+                    <div key={d.key} style={{ background: d.residual > 0 ? "#fdf6e8" : "#fbf6ec", border: `1px solid ${d.residual > 0 ? "#e0cfa0" : "#e6d8bf"}`, borderRadius: 9, padding: "8px 9px" }}>
+                      <div style={{ fontSize: 11.5, fontWeight: 700, color: "#2b2018" }}>{d.label}</div>
+                      <div style={{ fontSize: 10.5, color: "#3f7a4f", fontWeight: 700, marginTop: 3 }}>정리 {d.fixed}곳 · 후기 -{d.dropped}</div>
+                      <div style={{ fontSize: 9.5, color: "#9c8a6c", marginTop: 1 }}>비공개 {d.unpub} · 잔여 {d.residual > 0 ? <b style={{ color: "#a5701e" }}>{d.residual}(다음런)</b> : "0"}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ fontSize: 10, color: "#9c8a6c", marginTop: 8 }}>
+                  안전 치유(최신 런): area {sentinel.safeHeal?.area ?? 0} · 박스밖 {sentinel.safeHeal?.box ?? 0} · 중복 {sentinel.safeHeal?.dup ?? 0}
+                  {sentinel.nameMismatchWatch > 0 && <span> · 🔎 이름불일치 워치 {sentinel.nameMismatchWatch}(경보만)</span>}
+                  {" "}· 마지막 {sentinel.lastRanKst}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* 🕐 조직 운영 리듬 — 본부별 활동(live) + 실행 케이던스(설계). 기본 펼침 */}
         <div style={{ ...card, marginTop: 10 }}>
