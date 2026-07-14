@@ -108,3 +108,4 @@
 | 2026-07-13 22:01 | #367 | 버튼톤+애니메이션 | 2d0a1157 | low | app/page.tsx: 내주변 옥석 카페 버튼 배경을 커피톤 그라디언트(#7c5230→#9c6b3f→#b8804a)로 재조정, globals.css에 .dcn-cta-glow(은 |
 | 2026-07-13 22:17 | #368 | 주변카페버튼 재수정 | e7d17086 | low | app/page.tsx(CTA버튼)·app/globals.css(dcn-cta-glow): 배경을 브라운 그라디언트→다크 에스프레소(#2b1a10→#7a4a22)+골드 보더/글로우 |
 | 2026-07-14 08:09 | #369 | [개발] 협업 #198: [#192 후속] 레거시 비수도권 오염 217건 일괄정리 요청 (코드는 이미 수정됨 | 230669a5 | - | scripts/purge-legacy-nonmetro.mjs 신규(purge-contam-reviews.mjs 관행 따름). WHERE published=false AND area |
+| 2026-07-14 08:10 | #370 | [자율진단] dev_status 배포승격 갭 재발 — #369 CEO승인 15시간+ 미배포(자율진단발 dev | f05e744c | - | scripts/chat-watch.mjs maintenance() 자동승격 WHERE에서 source=chat 조건 제거 — action_type=dev_task AND statu |
