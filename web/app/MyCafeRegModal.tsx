@@ -15,7 +15,9 @@ export default function MyCafeRegModal({ cafes, device, visits, pin = "", initia
   const [isPublic, setIsPublic] = useState(false); // 공개 선택 시 카페 상세에 '방문자 후기'로 노출(기본 비공개)
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
-  const [staged, setStaged] = useState(false); // 1단계: 위치인증 임시저장 완료 → 추억 기록 팝업
+  const [staged, setStaged] = useState(false); // 1단계: 임시저장 완료 → 추억 기록 팝업
+  const [stagedVerified, setStagedVerified] = useState(true); // 이번 임시저장이 GPS 30m 인증됐는지(false=나중에 인증하기)
+  const [unverifiedOffer, setUnverifiedOffer] = useState(false); // 위치인증 실패 → '나중에 인증하기' 노출
   const [done, setDone] = useState<string | null>(null); // 2단계: 최종 기록 성공 멘트(카페명)
 
   const results = useMemo(() => {
@@ -69,8 +71,8 @@ export default function MyCafeRegModal({ cafes, device, visits, pin = "", initia
   // 1단계: 위치 인증 → 임시저장(그 카페에서의 경험임을 보증)
   const stage = () => {
     if (!picked) { setMsg("카페를 선택해주세요"); return; }
-    if (!navigator.geolocation) { setMsg("이 브라우저는 위치를 지원하지 않아요"); return; }
-    setBusy(true); setMsg("현재 위치 확인 중...");
+    if (!navigator.geolocation) { setMsg("이 브라우저는 위치를 지원하지 않아요"); setUnverifiedOffer(true); return; }
+    setBusy(true); setMsg("현재 위치 확인 중..."); setUnverifiedOffer(false);
     navigator.geolocation.getCurrentPosition(async (pos) => {
       try {
         const r = await fetch("/api/my-cafe", {
@@ -78,10 +80,25 @@ export default function MyCafeRegModal({ cafes, device, visits, pin = "", initia
           body: JSON.stringify({ action: "stage", cafeId: picked.id, device, pin, userLat: pos.coords.latitude, userLng: pos.coords.longitude, photosBase64: photos, memory, favorite, isPublic }),
         });
         const d = await r.json();
-        if (d.ok) { setStaged(true); setMsg(""); setBusy(false); } // 위치인증 통과 → 추억 기록 팝업
-        else { setMsg(d.error || "임시저장 실패"); setBusy(false); }
+        if (d.ok) { setStagedVerified(true); setStaged(true); setMsg(""); setBusy(false); } // 위치인증 통과 → 추억 기록 팝업
+        else { setMsg(d.error || "임시저장 실패"); setUnverifiedOffer(true); setBusy(false); } // 30m 밖 등 → 나중에 인증하기 안내
       } catch { setMsg("네트워크 오류"); setBusy(false); }
-    }, () => { setMsg("위치 권한을 허용해주세요 (카페 30m 인증 필요)"); setBusy(false); }, { enableHighAccuracy: true, timeout: 10000 });
+    }, () => { setMsg("위치 권한을 허용해주세요 (카페 30m 인증 필요)"); setUnverifiedOffer(true); setBusy(false); }, { enableHighAccuracy: true, timeout: 10000 });
+  };
+
+  // 위치인증 실패 시 완화 저장 — 미인증(verified=false)으로 임시저장. 나중에 재방문해 '지금 인증하기'로 승격 가능.
+  const stageUnverified = async () => {
+    if (!picked) return;
+    setBusy(true); setMsg("");
+    try {
+      const r = await fetch("/api/my-cafe", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "stage", cafeId: picked.id, device, pin, allowUnverified: true, photosBase64: photos, memory, favorite, isPublic }),
+      });
+      const d = await r.json();
+      if (d.ok) { setStagedVerified(false); setStaged(true); setMsg(""); setBusy(false); }
+      else { setMsg(d.error || "저장 실패"); setBusy(false); }
+    } catch { setMsg("네트워크 오류"); setBusy(false); }
   };
 
   // 2단계: 추억을 기록합니다 — 위치 비교 없이 최종 DB 기록
@@ -106,11 +123,23 @@ export default function MyCafeRegModal({ cafes, device, visits, pin = "", initia
         <div className="bg-[#fdfaf4] rounded-2xl px-7 py-8 text-center max-w-xs shadow-2xl" onClick={(e) => e.stopPropagation()}>
           <div className="text-[34px] mb-2">📖</div>
           <div className="text-[17px] font-bold text-[#2b2018] mb-1.5">추억을 기록합니다</div>
-          <div className="text-[13px] text-[#7a6452] leading-relaxed">
-            <b className="text-[#d6336c]">{picked?.name}</b> 위치 인증이 끝났어요.<br />
-            이 경험을 내 지도에 영구 기록할까요?
-          </div>
-          <div className="text-[11px] text-[#a8927a] mt-2 leading-relaxed">위치 인증으로 <b>진짜 그 카페에서의 경험</b>임이 확인됐어요.</div>
+          {stagedVerified ? (
+            <>
+              <div className="text-[13px] text-[#7a6452] leading-relaxed">
+                <b className="text-[#d6336c]">{picked?.name}</b> 위치 인증이 끝났어요.<br />
+                이 경험을 내 지도에 영구 기록할까요?
+              </div>
+              <div className="text-[11px] text-[#a8927a] mt-2 leading-relaxed">위치 인증으로 <b>진짜 그 카페에서의 경험</b>임이 확인됐어요.</div>
+            </>
+          ) : (
+            <>
+              <div className="text-[13px] text-[#7a6452] leading-relaxed">
+                <b className="text-[#d6336c]">{picked?.name}</b> 추억을<br />
+                <b>미인증</b>으로 기록할까요?
+              </div>
+              <div className="text-[11px] text-[#a8927a] mt-2 leading-relaxed">위치 인증을 못 했어요. 지금은 <b>미인증</b>으로 저장하고,<br />나중에 카페에서 <b>지금 인증하기</b>로 승격할 수 있어요.<br />미인증 추억은 나에게만 보이고 공개 지도엔 안 나와요.</div>
+            </>
+          )}
           {msg && <p className="text-[12px] text-[#c0392b] mt-2">{msg}</p>}
           <button onClick={() => commit(false)} disabled={busy} className="mt-5 w-full bg-[#d6336c] text-white rounded-xl py-3 font-bold text-[14px] disabled:opacity-60">{busy ? "기록 중..." : "추억을 기록합니다"}</button>
           <button onClick={() => setStaged(false)} disabled={busy} className="mt-2 w-full text-[#9c6b3f] text-[13px] py-1">다시 확인할게요</button>
@@ -224,6 +253,11 @@ export default function MyCafeRegModal({ cafes, device, visits, pin = "", initia
                   <button onClick={stage} disabled={busy} className="w-full bg-[#d6336c] text-white rounded-xl py-3 font-bold text-[14px] disabled:opacity-60">
                     {busy ? "위치 확인 중..." : "이 카페에서 위치 인증 (임시저장)"}
                   </button>
+                  {unverifiedOffer && (
+                    <button onClick={stageUnverified} disabled={busy} className="w-full border border-[#cbb89f] text-[#7a6452] bg-white rounded-xl py-2.5 font-bold text-[13px] disabled:opacity-60">
+                      📍 나중에 인증하기 (미인증으로 저장)
+                    </button>
+                  )}
                 </>
               )}
             </>
