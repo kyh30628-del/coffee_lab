@@ -111,3 +111,4 @@
 | 2026-07-14 08:10 | #370 | [자율진단] dev_status 배포승격 갭 재발 — #369 CEO승인 15시간+ 미배포(자율진단발 dev | f05e744c | - | scripts/chat-watch.mjs maintenance() 자동승격 WHERE에서 source=chat 조건 제거 — action_type=dev_task AND statu |
 | 2026-07-14 08:51 | #371 | [개발] 협업 #201: [TIER1 비공개 재상정 요청] id18739 목요일산책 — 재합성 실측 미해결· | 51551ee8 | - | lib/reviewQuality.ts: P31(NONCAFE_BIZ에 사주 타로 철학관 무속 신점 운세상담 손금 추가) + P35(지번주소 구+동+번지 위치불일치 검증, 구 추출  |
 | 2026-07-14 12:45 | #373 | 재방문 인증 허용 | 0d1e86ba | high | 재방문 인증(verified) 구현. app/api/my-cafe/route.ts: verified 컬럼 마이그레이션·GET은 본인기기 인증/미인증 모두 반환(verified 필드 |
+| 2026-07-14 13:15 | #374 | 인증 안내문구 추가 | c00ceca7 | low | app/MyCafeRegModal.tsx(미인증 임시저장 확인팝업 문구 강화·저장완료화면 인증/미인증 분기 신설)·app/page.tsx(추억보관소 목록에 인증/미인증 배지 병기· |
