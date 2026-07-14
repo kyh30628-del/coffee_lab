@@ -2103,7 +2103,11 @@ function MemoryTab({ device, visits, locked = false, sessionPin = "", onReload, 
                     {v.favorite && <span className="text-[#f0a832] text-[13px]">★</span>}
                     <span className="font-bold text-[#2b2018] text-[14px] truncate">{v.name}</span>
                     <span className="text-[10px] text-[#9c6b3f] shrink-0">{v.area}</span>
-                    {v.verified === false && <span className="text-[9px] font-bold text-[#a8927a] bg-[#f3ede1] rounded-full px-1.5 py-0.5 shrink-0">미인증</span>}
+                    {v.verified === false ? (
+                      <span className="text-[9px] font-bold text-[#a8927a] bg-[#f3ede1] rounded-full px-1.5 py-0.5 shrink-0">미인증</span>
+                    ) : (
+                      <span className="text-[9px] font-bold text-[#5f7355] bg-[#eef3ea] rounded-full px-1.5 py-0.5 shrink-0">인증</span>
+                    )}
                     <span className="ml-auto text-[10px] text-[#bcae9b] shrink-0">보기 ›</span>
                   </div>
                   {v.memory ? <p className="text-[12px] text-[#52402e] leading-relaxed mt-0.5 line-clamp-2">{v.memory}</p> : <p className="text-[12px] text-[#bcae9b] mt-0.5">기억 메모 없음</p>}
@@ -2147,7 +2151,7 @@ function MemoryTab({ device, visits, locked = false, sessionPin = "", onReload, 
                 {viewVisit.verified === false && (
                   <div className="rounded-xl border border-[#e6d9c8] bg-[#faf6ee] p-3">
                     <div className="text-[12px] font-bold text-[#7a6452]">미인증 추억</div>
-                    <div className="text-[11px] text-[#a8927a] mt-0.5 leading-relaxed">위치 인증을 아직 안 했어요. 나에게만 보이고 공개 지도엔 안 나와요. 이 카페에 다시 방문해 <b>지금 인증하기</b>를 누르면 인증돼요.</div>
+                    <div className="text-[11px] text-[#a8927a] mt-0.5 leading-relaxed">위치 인증을 아직 안 했어요. <b>미인증 기록은 나만 볼 수 있고</b> 지도에서 다른 사람에게는 안 보여요. <b>인증된 기록만</b> 타인에게 지도로 공개돼요. 이 카페에 다시 방문해 <b>GPS 30m 이내</b>에서 <b>지금 인증하기</b>를 누르면 인증되어 지도에 공개될 수 있어요.</div>
                     {verifyMsg && <p className="text-[11px] text-[#c0392b] mt-1.5">{verifyMsg}</p>}
                     <button onClick={() => verifyNow(viewVisit)} disabled={verifyBusy} className="mt-2 w-full bg-[#5f7355] text-white rounded-lg py-2.5 font-bold text-[13px] disabled:opacity-60">
                       {verifyBusy ? "위치 확인 중..." : "📍 지금 인증하기 (카페 30m)"}
