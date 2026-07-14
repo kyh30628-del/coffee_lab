@@ -107,3 +107,4 @@
 | 2026-07-13 14:04 | #366 | 버튼색·탭하이라이트 | d50596b3 | low | app/page.tsx: 1) 내 주변 옥석 카페 바로 찾기 버튼 배경 #2b2018(다크브라운/거의검정)→#9c6b3f(브랜드 커피브라운)로 변경. 2) 하단 탭바 4개 acti |
 | 2026-07-13 22:01 | #367 | 버튼톤+애니메이션 | 2d0a1157 | low | app/page.tsx: 내주변 옥석 카페 버튼 배경을 커피톤 그라디언트(#7c5230→#9c6b3f→#b8804a)로 재조정, globals.css에 .dcn-cta-glow(은 |
 | 2026-07-13 22:17 | #368 | 주변카페버튼 재수정 | e7d17086 | low | app/page.tsx(CTA버튼)·app/globals.css(dcn-cta-glow): 배경을 브라운 그라디언트→다크 에스프레소(#2b1a10→#7a4a22)+골드 보더/글로우 |
+| 2026-07-14 08:09 | #369 | [개발] 협업 #198: [#192 후속] 레거시 비수도권 오염 217건 일괄정리 요청 (코드는 이미 수정됨 | 230669a5 | - | scripts/purge-legacy-nonmetro.mjs 신규(purge-contam-reviews.mjs 관행 따름). WHERE published=false AND area |
