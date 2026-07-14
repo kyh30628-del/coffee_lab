@@ -109,3 +109,4 @@
 | 2026-07-13 22:17 | #368 | 주변카페버튼 재수정 | e7d17086 | low | app/page.tsx(CTA버튼)·app/globals.css(dcn-cta-glow): 배경을 브라운 그라디언트→다크 에스프레소(#2b1a10→#7a4a22)+골드 보더/글로우 |
 | 2026-07-14 08:09 | #369 | [개발] 협업 #198: [#192 후속] 레거시 비수도권 오염 217건 일괄정리 요청 (코드는 이미 수정됨 | 230669a5 | - | scripts/purge-legacy-nonmetro.mjs 신규(purge-contam-reviews.mjs 관행 따름). WHERE published=false AND area |
 | 2026-07-14 08:10 | #370 | [자율진단] dev_status 배포승격 갭 재발 — #369 CEO승인 15시간+ 미배포(자율진단발 dev | f05e744c | - | scripts/chat-watch.mjs maintenance() 자동승격 WHERE에서 source=chat 조건 제거 — action_type=dev_task AND statu |
+| 2026-07-14 08:51 | #371 | [개발] 협업 #201: [TIER1 비공개 재상정 요청] id18739 목요일산책 — 재합성 실측 미해결· | 51551ee8 | - | lib/reviewQuality.ts: P31(NONCAFE_BIZ에 사주 타로 철학관 무속 신점 운세상담 손금 추가) + P35(지번주소 구+동+번지 위치불일치 검증, 구 추출  |
