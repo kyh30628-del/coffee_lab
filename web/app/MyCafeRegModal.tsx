@@ -19,6 +19,7 @@ export default function MyCafeRegModal({ cafes, device, visits, pin = "", initia
   const [stagedVerified, setStagedVerified] = useState(true); // 이번 임시저장이 GPS 30m 인증됐는지(false=나중에 인증하기)
   const [unverifiedOffer, setUnverifiedOffer] = useState(false); // 위치인증 실패 → '나중에 인증하기' 노출
   const [done, setDone] = useState<string | null>(null); // 2단계: 최종 기록 성공 멘트(카페명)
+  const [doneVerified, setDoneVerified] = useState(true); // 저장 완료 화면에서 인증/미인증 문구 분기
 
   const results = useMemo(() => {
     const k = q.replace(/\s/g, "").toLowerCase();
@@ -111,8 +112,10 @@ export default function MyCafeRegModal({ cafes, device, visits, pin = "", initia
         body: JSON.stringify({ action: "commit", cafeId: picked.id, device, pin, memory, favorite, isPublic, ...(sendPhotos ? { photosBase64: photos } : {}) }),
       });
       const d = await r.json();
-      if (d.ok) { setDone(picked.name); onDone(); }
-      else { setMsg(d.error || "기록 실패"); setBusy(false); setStaged(false); }
+      if (d.ok) {
+        const wasVerified = staged ? stagedVerified : (visits.find((v) => v.id === picked.id)?.verified !== false);
+        setDoneVerified(wasVerified); setDone(picked.name); onDone();
+      } else { setMsg(d.error || "기록 실패"); setBusy(false); setStaged(false); }
     } catch { setMsg("네트워크 오류"); setBusy(false); }
   };
 
@@ -137,7 +140,11 @@ export default function MyCafeRegModal({ cafes, device, visits, pin = "", initia
                 <b className="text-[#d6336c]">{picked?.name}</b> 추억을<br />
                 <b>미인증</b>으로 기록할까요?
               </div>
-              <div className="text-[11px] text-[#a8927a] mt-2 leading-relaxed">위치 인증을 못 했어요. 지금은 <b>미인증</b>으로 저장하고,<br />나중에 카페에서 <b>지금 인증하기</b>로 승격할 수 있어요.<br />미인증 추억은 나에게만 보이고 공개 지도엔 안 나와요.</div>
+              <div className="text-[11px] text-[#a8927a] mt-2 leading-relaxed">
+                위치 인증을 못 했어요. <b>지금은 미인증 상태로 저장</b>돼요.<br />
+                <b>미인증 기록은 나만 볼 수 있고</b> 지도에서 다른 사람에게는 안 보여요. <b>인증된 기록만</b> 타인에게 지도로 공개돼요.<br />
+                나중에 이 카페를 다시 방문해 <b>GPS 30m 이내</b>에서 인증하면 인증 상태로 바뀌어 지도에 공개될 수 있어요.
+              </div>
             </>
           )}
           {msg && <p className="text-[12px] text-[#c0392b] mt-2">{msg}</p>}
@@ -153,9 +160,23 @@ export default function MyCafeRegModal({ cafes, device, visits, pin = "", initia
     return (
       <div className="fixed inset-0 z-[5000] flex items-center justify-center px-6" style={{ background: "rgba(43,32,24,0.6)", fontFamily: "'Gowun Batang', AppleMyungjo, 'Apple SD Gothic Neo', 'Noto Serif KR', serif" }} onClick={onClose}>
         <div className="bg-[#fdfaf4] rounded-2xl px-7 py-8 text-center max-w-xs shadow-2xl" onClick={(e) => e.stopPropagation()}>
-          <div className="text-[40px] mb-2">❤</div>
-          <div className="text-[16px] font-bold text-[#2b2018] mb-1.5">기억이 저장됐어요</div>
-          <div className="text-[13px] text-[#7a6452] leading-relaxed"><b className="text-[#d6336c]">{done}</b>에서의 소중한 기억이<br />지도에 ❤로 노출돼요.</div>
+          {doneVerified ? (
+            <>
+              <div className="text-[40px] mb-2">❤</div>
+              <div className="text-[16px] font-bold text-[#2b2018] mb-1.5">기억이 저장됐어요</div>
+              <div className="text-[13px] text-[#7a6452] leading-relaxed"><b className="text-[#d6336c]">{done}</b>에서의 소중한 기억이<br />지도에 ❤로 노출돼요.</div>
+            </>
+          ) : (
+            <>
+              <div className="text-[40px] mb-2">📍</div>
+              <div className="text-[16px] font-bold text-[#2b2018] mb-1.5">미인증으로 저장됐어요</div>
+              <div className="text-[13px] text-[#7a6452] leading-relaxed">
+                <b className="text-[#d6336c]">{done}</b> 기억이 <b>미인증 상태</b>로 저장됐어요.<br />
+                지금은 나만 볼 수 있고 지도에서 다른 사람에게는 안 보여요.<br />
+                나중에 이 카페를 다시 방문해 <b>GPS 30m 이내</b>에서 인증하면 지도에 공개될 수 있어요.
+              </div>
+            </>
+          )}
           <button onClick={onClose} className="mt-5 w-full bg-[#d6336c] text-white rounded-xl py-2.5 font-bold text-[14px]">확인</button>
         </div>
       </div>
