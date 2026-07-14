@@ -832,7 +832,7 @@ export default function AdminPage() {
           <div className="fixed inset-0 z-[6000] flex items-end justify-center bg-black/40" onClick={() => setShowVisits(false)}>
             <div className="w-full max-w-2xl bg-white rounded-t-2xl max-h-[88dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between px-4 py-3 border-b">
-                <span className="text-sm font-bold text-stone-800">❤ 내 카페 방문기록 {visits?.stat && <span className="text-[11px] text-stone-400 font-normal">총 {visits.stat.total} · 사용자 {visits.stat.users} · 즐겨찾기 {visits.stat.favs}</span>}</span>
+                <span className="text-sm font-bold text-stone-800">❤ 내 카페 방문기록 {visits?.stat && <span className="text-[11px] text-stone-400 font-normal">총 {visits.stat.total} · 사용자 {visits.stat.users} · 즐겨찾기 {visits.stat.favs} · 인증 {visits.stat.verified} · 미인증 {visits.stat.unverified}</span>}</span>
                 <button onClick={() => setShowVisits(false)} className="text-2xl text-stone-400 leading-none">×</button>
               </div>
               <div className="overflow-y-auto flex-1 p-3 space-y-2">
@@ -844,6 +844,7 @@ export default function AdminPage() {
                         {v.favorite && <span className="text-amber-500">★</span>}
                         <b className="text-[13px] text-stone-800">{v.cafe_name}</b>
                         <span className="text-[10px] text-stone-400">{v.area}</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${v.verified ? "bg-emerald-50 text-emerald-600" : "bg-stone-100 text-stone-500"}`}>{v.verified ? "✓ 인증" : "미인증"}</span>
                       </div>
                       {v.memory && <div className="text-[12px] text-stone-600 mt-1 leading-relaxed whitespace-pre-wrap">{v.memory}</div>}
                       <div className="text-[10px] text-stone-400 mt-1">{new Date(v.created_at).toLocaleString("ko-KR")} · 익명 {String(v.device_id).slice(0, 6)}</div>

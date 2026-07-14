@@ -1366,6 +1366,7 @@ export default function Home() {
         </div>
 
       {tab === "memory" && <MemoryTab device={deviceId} visits={myVisits} locked={myLocked} sessionPin={sessionPin}
+        onReload={() => reloadMyCafes(deviceId, sessionPin)}
         onRegister={() => { setEditCafeId(null); setShowMyCafeReg(true); }}
         onEdit={(id: number) => { setEditCafeId(id); setShowMyCafeReg(true); }}
         onUnlock={(p: string) => { try { sessionStorage.setItem("dcn_pin", p); } catch {} setSessionPin(p); setMyLocked(false); reloadMyCafes(deviceId, p); }}
@@ -2017,7 +2018,7 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
 
 // 내 기억 관리 — 백업코드 발급/복원 + PDF·JSON 내보내기 (개인정보 0)
 // 추억 보관소 탭 — 등록 + 내 카페 목록 + 설정버튼. 잠금 시 PIN 입력 화면.
-function MemoryTab({ device, visits, locked = false, sessionPin = "", onRegister, onEdit, onUnlock, onLock, onRestore }: { device: string; visits: any[]; locked?: boolean; sessionPin?: string; onRegister: () => void; onEdit?: (cafeId: number) => void; onUnlock?: (pin: string) => void; onLock?: () => void; onRestore: (dev: string) => void }) {
+function MemoryTab({ device, visits, locked = false, sessionPin = "", onReload, onRegister, onEdit, onUnlock, onLock, onRestore }: { device: string; visits: any[]; locked?: boolean; sessionPin?: string; onReload?: () => void; onRegister: () => void; onEdit?: (cafeId: number) => void; onUnlock?: (pin: string) => void; onLock?: () => void; onRestore: (dev: string) => void }) {
   const [showSettings, setShowSettings] = useState(false);
   const [viewVisit, setViewVisit] = useState<any>(null); // 추억 보기 모달(클릭 시 먼저 내용 표시 → 수정 버튼)
   const [zoomPhoto, setZoomPhoto] = useState<string | null>(null); // 사진 원본 크기 라이트박스
@@ -2026,6 +2027,26 @@ function MemoryTab({ device, visits, locked = false, sessionPin = "", onRegister
   const [unlockPin, setUnlockPin] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
+  const [verifyBusy, setVerifyBusy] = useState(false); // '지금 인증하기' 진행 상태
+  const [verifyMsg, setVerifyMsg] = useState("");
+
+  // 지금 인증하기 — 미인증 추억을 GPS 30m 재확인해 인증으로 승격(위치인증은 그대로 필수)
+  const verifyNow = (v: any) => {
+    if (!navigator.geolocation) { setVerifyMsg("이 브라우저는 위치를 지원하지 않아요"); return; }
+    setVerifyBusy(true); setVerifyMsg("현재 위치 확인 중...");
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      try {
+        const r = await fetch("/api/my-cafe", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "verify", cafeId: v.id, device, pin: sessionPin, userLat: pos.coords.latitude, userLng: pos.coords.longitude }),
+        });
+        const d = await r.json();
+        setVerifyBusy(false);
+        if (d.ok) { setVerifyMsg(""); setViewVisit(null); onReload?.(); }
+        else setVerifyMsg(d.error || "인증 실패");
+      } catch { setVerifyBusy(false); setVerifyMsg("네트워크 오류"); }
+    }, () => { setVerifyBusy(false); setVerifyMsg("위치 권한을 허용해주세요 (카페 30m 인증 필요)"); }, { enableHighAccuracy: true, timeout: 10000 });
+  };
   useEffect(() => { fetch(`/api/my-cafe/pin?device=${device}`).then((r) => r.json()).then((d) => { if (d.ok) setHasPin(!!d.hasPin); }).catch(() => {}); }, [device]);
 
   const doUnlock = async () => {
@@ -2072,7 +2093,7 @@ function MemoryTab({ device, visits, locked = false, sessionPin = "", onRegister
             {visits.map((v) => {
               const photoCount = Array.isArray(v.photos) ? v.photos.length : (v.photo_url ? 1 : 0);
               return (
-              <button key={v.id} type="button" onClick={() => setViewVisit(v)} className="w-full text-left bg-white rounded-2xl border border-[#ece0cd] p-3.5 flex gap-3 hover:border-[#d6b9c4] active:scale-[0.995] transition">
+              <button key={v.id} type="button" onClick={() => { setVerifyMsg(""); setViewVisit(v); }} className="w-full text-left bg-white rounded-2xl border border-[#ece0cd] p-3.5 flex gap-3 hover:border-[#d6b9c4] active:scale-[0.995] transition">
                 <div className="relative w-16 h-16 shrink-0">
                   {v.photo_url ? <img src={v.photo_url} alt="" className="w-16 h-16 rounded-xl object-cover" /> : <div className="w-16 h-16 rounded-xl bg-[#f3ede1] flex items-center justify-center text-[22px]">{v.favorite ? "★" : "☕"}</div>}
                   {photoCount > 1 && <span className="absolute bottom-0.5 right-0.5 bg-black/60 text-white text-[9px] px-1 rounded">📷{photoCount}</span>}
@@ -2082,6 +2103,7 @@ function MemoryTab({ device, visits, locked = false, sessionPin = "", onRegister
                     {v.favorite && <span className="text-[#f0a832] text-[13px]">★</span>}
                     <span className="font-bold text-[#2b2018] text-[14px] truncate">{v.name}</span>
                     <span className="text-[10px] text-[#9c6b3f] shrink-0">{v.area}</span>
+                    {v.verified === false && <span className="text-[9px] font-bold text-[#a8927a] bg-[#f3ede1] rounded-full px-1.5 py-0.5 shrink-0">미인증</span>}
                     <span className="ml-auto text-[10px] text-[#bcae9b] shrink-0">보기 ›</span>
                   </div>
                   {v.memory ? <p className="text-[12px] text-[#52402e] leading-relaxed mt-0.5 line-clamp-2">{v.memory}</p> : <p className="text-[12px] text-[#bcae9b] mt-0.5">기억 메모 없음</p>}
@@ -2122,6 +2144,16 @@ function MemoryTab({ device, visits, locked = false, sessionPin = "", onRegister
                   {viewVisit.memory ? <p className="text-[14px] text-[#2b2018] leading-relaxed whitespace-pre-wrap">{viewVisit.memory}</p> : <p className="text-[13px] text-[#bcae9b]">기억 메모 없음</p>}
                 </div>
                 <div className="text-[11px] text-[#a8927a]">{fmtDate(viewVisit.created_at)}{viewVisit.favorite ? " · ★ 즐겨찾기" : ""}</div>
+                {viewVisit.verified === false && (
+                  <div className="rounded-xl border border-[#e6d9c8] bg-[#faf6ee] p-3">
+                    <div className="text-[12px] font-bold text-[#7a6452]">미인증 추억</div>
+                    <div className="text-[11px] text-[#a8927a] mt-0.5 leading-relaxed">위치 인증을 아직 안 했어요. 나에게만 보이고 공개 지도엔 안 나와요. 이 카페에 다시 방문해 <b>지금 인증하기</b>를 누르면 인증돼요.</div>
+                    {verifyMsg && <p className="text-[11px] text-[#c0392b] mt-1.5">{verifyMsg}</p>}
+                    <button onClick={() => verifyNow(viewVisit)} disabled={verifyBusy} className="mt-2 w-full bg-[#5f7355] text-white rounded-lg py-2.5 font-bold text-[13px] disabled:opacity-60">
+                      {verifyBusy ? "위치 확인 중..." : "📍 지금 인증하기 (카페 30m)"}
+                    </button>
+                  </div>
+                )}
               </div>
               <div className="p-4 border-t border-[#f0e6d4] pb-[calc(1rem_+_env(safe-area-inset-bottom))] flex gap-2">
                 <KakaoShare
@@ -2211,7 +2243,7 @@ function MemorySettingsModal({ device, visits, hasPin, onPinChange, onClose, onR
 
   const exportJSON = () => {
     const data = { service: "동네 커피 노트 — 내 기억", exportedAt: new Date().toISOString(), count: visits.length,
-      records: visits.map((v) => ({ cafe: v.name, area: v.area, favorite: !!v.favorite, memory: v.memory ?? "", photo: v.photo_url ?? null, date: v.created_at })) };
+      records: visits.map((v) => ({ cafe: v.name, area: v.area, favorite: !!v.favorite, verified: v.verified !== false, memory: v.memory ?? "", photo: v.photo_url ?? null, date: v.created_at })) };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `내커피기억_${new Date().toISOString().slice(0, 10)}.json`; a.click();
   };
@@ -2219,7 +2251,7 @@ function MemorySettingsModal({ device, visits, hasPin, onPinChange, onClose, onR
   const exportPDF = () => {
     const rows = visits.map((v) => `
       <div style="border:1px solid #e6d9c8;border-radius:12px;padding:14px;margin-bottom:12px;page-break-inside:avoid;">
-        <div style="font-weight:700;font-size:15px;color:#2b2018;">${v.favorite ? "★ " : ""}${(v.name || "").replace(/</g, "&lt;")} <span style="font-weight:400;font-size:11px;color:#9c6b3f;">${(v.area || "")}</span></div>
+        <div style="font-weight:700;font-size:15px;color:#2b2018;">${v.favorite ? "★ " : ""}${(v.name || "").replace(/</g, "&lt;")} <span style="font-weight:400;font-size:11px;color:#9c6b3f;">${(v.area || "")}</span>${v.verified === false ? ` <span style="font-weight:700;font-size:10px;color:#a8927a;background:#f3ede1;border-radius:8px;padding:1px 6px;">미인증</span>` : ""}</div>
         ${v.photo_url ? `<img src="${v.photo_url}" style="max-width:100%;max-height:240px;border-radius:8px;margin:8px 0;object-fit:cover;" />` : ""}
         ${v.memory ? `<div style="font-size:13px;color:#52402e;line-height:1.7;white-space:pre-wrap;margin-top:6px;">${(v.memory).replace(/</g, "&lt;")}</div>` : ""}
         <div style="font-size:10px;color:#a8927a;margin-top:8px;">${new Date(v.created_at).toLocaleString("ko-KR")}</div>

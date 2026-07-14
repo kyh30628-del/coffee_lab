@@ -15,6 +15,9 @@ async function ensure() {
     created_at TIMESTAMPTZ DEFAULT now(),
     UNIQUE(cafe_id, device_id)
   )`;
+  // verified: GPS 30m 위치인증 여부. true=현장 인증됨, false='나중에 인증하기'로 저장(미인증).
+  // 기존 행은 모두 30m 통과 후 저장돼 verified=true 상태 → 재백필 불필요. 신규 미인증만 false.
+  await sql`ALTER TABLE user_visits ADD COLUMN IF NOT EXISTS verified BOOLEAN DEFAULT false`.catch(() => {});
   await sql`ALTER TABLE user_visits ADD COLUMN IF NOT EXISTS memory TEXT`.catch(() => {});
   await sql`ALTER TABLE user_visits ADD COLUMN IF NOT EXISTS favorite BOOLEAN DEFAULT false`.catch(() => {});
   // finalized: 위치인증(임시저장) 후 "추억을 기록합니다" 확정 단계. 기존 행은 DEFAULT true로 자동 백필(이미 노출 중이던 기록 유지).
@@ -49,11 +52,12 @@ export async function GET(req: NextRequest) {
     if (!pin || pinRow.pin_hash !== hashPin(device, pin))
       return NextResponse.json({ ok: true, locked: true, hasPin: true, cafes: [] });
   }
+  // 본인 기기 조회는 인증/미인증 모두 노출(미인증은 클라이언트에서 배지로 구분). 공개 노출 게이트(verified=true)는 popular·cafe-reviews에서 별도 유지.
   const rows = await sql`
-    SELECT c.id, c.name, c.area, c.lat, c.lng, c.synth_grade, c.synth_identity, v.photo_url, v.photos, v.memory, v.favorite, v.is_public, v.created_at
+    SELECT c.id, c.name, c.area, c.lat, c.lng, c.synth_grade, c.synth_identity, v.photo_url, v.photos, v.memory, v.favorite, v.is_public, v.verified, v.created_at
     FROM user_visits v JOIN cafes c ON c.id = v.cafe_id
-    WHERE v.device_id = ${device} AND v.verified = true AND v.finalized = true
-    ORDER BY v.favorite DESC, v.created_at DESC`;
+    WHERE v.device_id = ${device} AND v.finalized = true
+    ORDER BY v.favorite DESC, v.verified DESC, v.created_at DESC`;
   return NextResponse.json({ ok: true, cafes: rows });
 }
 
@@ -64,7 +68,7 @@ export async function POST(req: NextRequest) {
   try {
     await ensure();
     const body = await req.json();
-    const { action, cafeId, device, userLat, userLng, photoBase64, photosBase64, memory, favorite, isPublic, pin } = body;
+    const { action, cafeId, device, userLat, userLng, photoBase64, photosBase64, memory, favorite, isPublic, pin, allowUnverified } = body;
     const pub = !!isPublic;
     if (!cafeId || !device) return NextResponse.json({ ok: false, error: "필수값 누락" }, { status: 400 });
 
@@ -75,6 +79,21 @@ export async function POST(req: NextRequest) {
 
     const [cafe] = await sql`SELECT id, name, lat, lng FROM cafes WHERE id = ${cafeId} AND published = true LIMIT 1` as any[];
     if (!cafe || cafe.lat == null) return NextResponse.json({ ok: false, error: "카페를 찾을 수 없어요" }, { status: 404 });
+
+    // ── '지금 인증하기' — 미인증(verified=false) 기록을 GPS 30m 재확인 후 인증으로 업그레이드 ──
+    //   위치인증 자체는 그대로 필수(30m). 재방문해 현장에서 누르면 미인증→인증.
+    if (action === "verify") {
+      const [rec] = await sql`SELECT verified FROM user_visits WHERE cafe_id = ${cafeId} AND device_id = ${device} LIMIT 1` as any[];
+      if (!rec) return NextResponse.json({ ok: false, error: "먼저 추억을 저장해주세요." }, { status: 409 });
+      if (rec.verified) return NextResponse.json({ ok: true, verified: true, cafe: { id: cafe.id, name: cafe.name } });
+      if (userLat == null || userLng == null)
+        return NextResponse.json({ ok: false, error: "위치 정보가 필요해요" }, { status: 400 });
+      const dv = distM(Number(userLat), Number(userLng), Number(cafe.lat), Number(cafe.lng));
+      if (dv > RADIUS_M)
+        return NextResponse.json({ ok: false, error: `카페에서 ${Math.round(dv)}m 떨어져 있어요. ${RADIUS_M}m 안에서 인증할 수 있어요.`, dist: Math.round(dv) }, { status: 403 });
+      await sql`UPDATE user_visits SET verified = true WHERE cafe_id = ${cafeId} AND device_id = ${device}`;
+      return NextResponse.json({ ok: true, verified: true, cafe: { id: cafe.id, name: cafe.name }, dist: Math.round(dv) });
+    }
 
     const mem = typeof memory === "string" && memory.trim() ? memory.slice(0, 2000) : null;
     const fav = !!favorite;
@@ -112,24 +131,33 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, cafe: { id: cafe.id, name: cafe.name }, finalized: true });
     }
 
-    // ── 1단계: 임시저장 — 30m 위치 인증 필수 ──
-    if (userLat == null || userLng == null)
-      return NextResponse.json({ ok: false, error: "위치 정보가 필요해요" }, { status: 400 });
-    const d = distM(Number(userLat), Number(userLng), Number(cafe.lat), Number(cafe.lng));
-    if (d > RADIUS_M)
-      return NextResponse.json({ ok: false, error: `카페에서 ${Math.round(d)}m 떨어져 있어요. ${RADIUS_M}m 안에서 임시저장할 수 있어요.`, dist: Math.round(d) }, { status: 403 });
+    // ── 1단계: 임시저장 — 30m 위치 인증(기본). GPS 실패 시 allowUnverified면 미인증(verified=false)으로 완화 저장 ──
+    //   위치인증 경로 자체는 그대로 유지: 30m 이내면 verified=true. 실패했는데 완화 미허용이면 기존처럼 거부(하위호환).
+    const hasLoc = userLat != null && userLng != null;
+    let dist: number | null = null;
+    let verifiedNow = false;
+    if (hasLoc) {
+      dist = Math.round(distM(Number(userLat), Number(userLng), Number(cafe.lat), Number(cafe.lng)));
+      verifiedNow = dist <= RADIUS_M;
+    }
+    if (!verifiedNow && !allowUnverified) {
+      if (!hasLoc) return NextResponse.json({ ok: false, error: "위치 정보가 필요해요" }, { status: 400 });
+      return NextResponse.json({ ok: false, error: `카페에서 ${dist}m 떨어져 있어요. ${RADIUS_M}m 안에서 임시저장할 수 있어요.`, dist }, { status: 403 });
+    }
 
-    // 신규는 finalized=false(임시), 기존 기록 재편집이면 기존 finalized 유지(노출 끊기지 않게)
+    // 신규는 finalized=false(임시), 기존 기록 재편집이면 기존 finalized 유지(노출 끊기지 않게).
+    // verified는 절대 다운그레이드 안 함(기존 인증 유지) + 이번에 30m 통과면 미인증→인증 업그레이드.
     await sql`INSERT INTO user_visits (cafe_id, device_id, photo_url, photos, memory, favorite, is_public, verified, finalized)
-      VALUES (${cafeId}, ${device}, ${photoUrl}, ${photosJson}, ${mem}, ${fav}, ${pub}, true, false)
+      VALUES (${cafeId}, ${device}, ${photoUrl}, ${photosJson}, ${mem}, ${fav}, ${pub}, ${verifiedNow}, false)
       ON CONFLICT (cafe_id, device_id) DO UPDATE SET
         photo_url = COALESCE(EXCLUDED.photo_url, user_visits.photo_url),
         photos = COALESCE(EXCLUDED.photos, user_visits.photos),
         memory = COALESCE(EXCLUDED.memory, user_visits.memory),
-        favorite = EXCLUDED.favorite, is_public = EXCLUDED.is_public, verified = true,
+        favorite = EXCLUDED.favorite, is_public = EXCLUDED.is_public,
+        verified = user_visits.verified OR EXCLUDED.verified,
         finalized = user_visits.finalized, created_at = now()`;
 
-    return NextResponse.json({ ok: true, staged: true, cafe: { id: cafe.id, name: cafe.name }, dist: Math.round(d) });
+    return NextResponse.json({ ok: true, staged: true, verified: verifiedNow, cafe: { id: cafe.id, name: cafe.name }, dist });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
