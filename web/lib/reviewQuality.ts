@@ -465,16 +465,21 @@ export function quoteMatchConfidence(name: string, quote: string, areaTerms: str
   if (!q) return 0;
   const nameRawN = norm(name);
   const qN = norm(q);
+  const { tokens } = coreTokensDetail(name, areaTerms);
+  // 룰갭 P38: 이름 전체가 부가어 없는 흔한단어 단독(=nameIsSoleToken)이면 아래 얼리엑싯이 토큰검사와
+  //   완전히 같은 문자열을 보게 되어 weak-token 판정을 우회한다(톤앤매너류 4자 흔한 합성어 실측). 이 경우는
+  //   얼리엑싯을 건너뛰고 아래 토큰 판정으로 흘려보낸다.
+  const nameIsSoleToken = tokens.length === 1 && norm(tokens[0]) === nameRawN;
   // 전체이름 원문 일치(공백무시) — nameCoherence와 동일한 최우선 신호. 숫자·기호가 붙은 상호
   // ('오이코스8')는 토큰 분해 시 숫자가 떨어져 나가 경계매칭이 실패하므로, 토큰 검사 전에 먼저 본다.
-  if (nameRawN.length >= 4 && qN.includes(nameRawN)) return 1;
-  const { tokens } = coreTokensDetail(name, areaTerms);
+  if (!nameIsSoleToken && nameRawN.length >= 4 && qN.includes(nameRawN)) return 1;
   const coreEmpty = tokens.length === 0;
   const onlyTok = tokens.length === 1 ? norm(tokens[0]) : "";
   const weakWhitelist = onlyTok.length >= 1 && WEAK_IDENTITY_TOKEN.has(onlyTok);
   const weakSingle = onlyTok.length >= 1 && (onlyTok.length <= 2 || /^[0-9]+$/.test(onlyTok) || weakWhitelist) && nameRawN.length > onlyTok.length;
   const allTokensWeak = tokens.length >= 1 && tokens.every((tk) => { const n = norm(tk).replace(/[,.:;·-]+$/, ""); return /^[0-9]+$/.test(n) || WEAK_IDENTITY_TOKEN.has(n); });
-  const reqFull = coreEmpty || weakSingle || allTokensWeak;
+  const bareWeak = nameIsSoleToken && (weakSingle || coreEmpty || allTokensWeak || nameRawN.length <= 4);
+  const reqFull = coreEmpty || weakSingle || allTokensWeak || bareWeak;
   if (reqFull) return 0; // 전체이름 일치도 없고 유일 식별토큰이 흔한 단어/숫자뿐 → 확신도 낮음(동명 불일치 의심)
   const distinct = tokens.length ? tokens : (nameRawN ? [name] : []);
   return distinct.some((tk) => nameHit(q, qN, tk)) ? 1 : 0;
@@ -591,8 +596,21 @@ export function verifyReview(input: QualityInput): QualityResult {
   //   이 카페 후기로 인정(주소만 스친 이웃업체 글 차단). 실제 카페 후기는 항상 카페 맥락을 동반하므로 안전.
   const nameIsRoadAddr = /^[가-힣A-Za-z0-9]{1,12}(로|길)\s*\d+(-\d+)?$/.test(input.name.trim());
   const roadAddrCtxOk = !nameIsRoadAddr || CAFE_CONTEXT_STRONG.test(fullL);
-  const nameInTitle = (weakWhitelist && !areaPresent) ? false : (roadAddrCtxOk && (inTitleFull || (distinctInTitle && (titleHasCafeWord || areaPresent) && venueCtxOk)));
-  const nameInBody = (weakWhitelist && !areaPresent) ? false : (roadAddrCtxOk && (inBodyFull || (distinctInBody && (bodyHasCafeWord || areaPresent) && venueCtxOk)));
+  // 룰갭 P38(coord#202, 2026-07-15): 카페명 전체가 부가어 없는 흔한단어 단독(우주·사이·톤앤매너 등)이면
+  //   식별토큰이 전체이름과 완전히 같은 문자열이 되어 inTitleFull(전체이름 일치)이 distinctInTitle(토큰 일치)과
+  //   동일해진다 — "전체이름 일치 요구"라는 방어가 자기 자신과 같아져 무력화(id13621 "꿈꾸는 오븐" 재오염 근본원인).
+  //   이름=단일토큰이면서 그 토큰이 약함(weakSingle/coreEmpty/allTokensWeak) 또는 짧은 흔한어(4자 이하)면
+  //   inTitleFull 단독 통과를 막고 항상 카페맥락/지역어를 동반 요구한다.
+  const nameIsSoleToken = tokens.length === 1 && norm(tokens[0]) === nameRawN;
+  const bareWeak = nameIsSoleToken && (weakSingle || coreEmpty || allTokensWeak || nameRawN.length <= 4);
+  const nameInTitle = (weakWhitelist && !areaPresent) ? false
+    : bareWeak
+      ? (roadAddrCtxOk && distinctInTitle && (titleHasCafeWord || areaPresent) && venueCtxOk)
+      : (roadAddrCtxOk && (inTitleFull || (distinctInTitle && (titleHasCafeWord || areaPresent) && venueCtxOk)));
+  const nameInBody = (weakWhitelist && !areaPresent) ? false
+    : bareWeak
+      ? (roadAddrCtxOk && distinctInBody && (bodyHasCafeWord || areaPresent) && venueCtxOk)
+      : (roadAddrCtxOk && (inBodyFull || (distinctInBody && (bodyHasCafeWord || areaPresent) && venueCtxOk)));
   const listicle = LISTICLE_TITLE.some((re) => re.test(title)) || (((`${title} ${body}`.match(PLACE_TOKEN) ?? []).length) >= 4);
   const generic = has(fullL, GENERIC_CUES);
   const nameOccurBody = nameN ? countOccur(bodyN, nameN) : 0;
