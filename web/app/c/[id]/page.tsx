@@ -123,7 +123,7 @@ export default async function CafePage({ params }: Props) {
       <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet" />
       <div className="max-w-xl mx-auto px-5 py-8">
         <div className="flex items-center justify-between gap-2">
-          <Link href="/" className="text-[#9c6b3f] text-sm">← 동네 커피 노트</Link>
+          <Link href="/" className="text-[#7a5122] text-sm">← 동네 커피 노트</Link>
           <KakaoShare
             title={`${c.name} (${c.area})`}
             description={shareHookText(grade, c.synth_identity)}
@@ -142,7 +142,7 @@ export default async function CafePage({ params }: Props) {
             {grade && <span className="text-[11px] font-bold bg-[#2b2018] text-[#e8b87a] px-2 py-0.5 rounded-full">{grade}</span>}
           </div>
           <div className="flex items-center justify-between gap-2 mb-4">
-            <p className="text-[#9c6b3f] text-sm">{c.area}</p>
+            <p className="text-[#7a5122] text-sm">{c.area}</p>
             <SaveMemoryButton cafeId={c.id} cafeName={c.name} cafeArea={c.area} />
           </div>
           {/* ❤ MY PIN(내 카페 추억) 노출 배너 — 상세페이지에서 인지도가 낮아 CTA로 강화(#339). 2단계 저장·무가입 원칙 무변, 노출만 강화 */}
@@ -156,12 +156,12 @@ export default async function CafePage({ params }: Props) {
               {c.synth_identity && <div className="text-[14px] font-semibold text-[#3d2f22] leading-relaxed mb-2.5">{c.synth_identity}</div>}
               {highlights.length > 0 && (
                 <>
-                  <div className="text-[10.5px] text-[#9c6b3f] mb-1.5">후기에서 가장 많이 나온 것 · 숫자=언급 후기 수</div>
+                  <div className="text-[10.5px] text-[#7a5122] mb-1.5">후기에서 가장 많이 나온 것 · 숫자=언급 후기 수</div>
                   <div className="flex flex-wrap gap-1.5">
                     {highlights.map((h, i) => (
                       <span key={h.label} className={`text-[12.5px] rounded-full pl-2.5 pr-1.5 py-1 border font-semibold inline-flex items-center gap-1.5 ${i === 0 ? "bg-[#2b2018] text-[#f4ece0] border-[#2b2018]" : "bg-white text-[#52402e] border-[#d8c8ad]"}`}>
                         {h.emoji} {h.label}
-                        <span className={`text-[10px] font-bold rounded-full px-1.5 py-[1px] ${i === 0 ? "bg-[#e8b87a] text-[#2b2018]" : "bg-[#efe9dd] text-[#8a7458]"}`}>{h.count}</span>
+                        <span className={`text-[10px] font-bold rounded-full px-1.5 py-[1px] ${i === 0 ? "bg-[#e8b87a] text-[#2b2018]" : "bg-[#efe9dd] text-[#665036]"}`}>{h.count}</span>
                       </span>
                     ))}
                   </div>
@@ -208,15 +208,15 @@ export default async function CafePage({ params }: Props) {
                   </div>
                 </div>
               )}
-              <p className="text-[10px] text-[#8a7458] mt-2.5 leading-relaxed">기준은 <b>후기 1건당 언급 비율</b>이에요 — 후기 수가 많고 적음을 보정한 공정한 비교입니다. '평균의 N배'·'상위/하위 %'는 전체 카페와 같은 기준으로 비교한 값. 절대 평가가 아닙니다.</p>
+              <p className="text-[10px] text-[#665036] mt-2.5 leading-relaxed">기준은 <b>후기 1건당 언급 비율</b>이에요 — 후기 수가 많고 적음을 보정한 공정한 비교입니다. '평균의 N배'·'상위/하위 %'는 전체 카페와 같은 기준으로 비교한 값. 절대 평가가 아닙니다.</p>
             </div>
           ) : tags.length > 0 && (
             <div className="mb-4">
-              <div className="text-xs font-bold text-[#9c6b3f] mb-1.5">이 카페가 후기에서 자주 언급되는 결</div>
+              <div className="text-xs font-bold text-[#7a5122] mb-1.5">이 카페가 후기에서 자주 언급되는 결</div>
               <div className="flex flex-wrap gap-2">{tags.map((t) => <span key={t} className="text-[13px] bg-[#efe6d6] rounded-full px-3 py-1">{t}</span>)}</div>
             </div>
           )}
-          <p className="text-[12.5px] text-[#8a7458] mb-4 leading-relaxed">네이버 공개 후기 <b>{c.synth_count ?? 0}건</b>을 교차검증한 데이터 기반 소개예요.</p>
+          <p className="text-[12.5px] text-[#665036] mb-4 leading-relaxed">네이버 공개 후기 <b>{c.synth_count ?? 0}건</b>을 교차검증한 데이터 기반 소개예요.</p>
           {/* 방문자 후기 — 하단 버튼 바로 위 */}
           {userReviews.length > 0 && <div className="mb-4"><VisitorReviews reviews={userReviews} /></div>}
           <Link href={`/?cafe=${c.id}`} className="block w-full text-center bg-[#2b2018] text-[#f4ece0] rounded-xl py-3.5 font-bold">지도·근거 후기 보기 →</Link>
@@ -230,14 +230,14 @@ export default async function CafePage({ params }: Props) {
             <div className="mt-6">
               <div className="flex items-center justify-between mb-2">
                 <div className="text-[13px] font-bold text-[#5a4632]">☕ {c.area} 비슷한 카페 더보기</div>
-                <Link href={`/area/${encodeURIComponent(c.area)}`} className="text-[11px] text-[#9c6b3f] whitespace-nowrap">동네 전체 보기 →</Link>
+                <Link href={`/area/${encodeURIComponent(c.area)}`} className="text-[11px] text-[#7a5122] whitespace-nowrap">동네 전체 보기 →</Link>
               </div>
               <div className="flex flex-col gap-2">
                 {nearby.map((nc: any) => (
                   <Link key={nc.id} href={`/c/${nc.id}`} className="flex items-center gap-2 bg-white border border-[#e0d3bd] rounded-xl px-3.5 py-2.5">
                     <span className="flex flex-col text-left min-w-0">
                       <span className="text-[13.5px] font-bold text-[#3d2f22] truncate">{nc.name}</span>
-                      <span className="text-[10.5px] text-[#9c8a6c] truncate">검증후기 {nc.synth_count ?? 0}건</span>
+                      <span className="text-[10.5px] text-[#6f6047] truncate">검증후기 {nc.synth_count ?? 0}건</span>
                     </span>
                     {nc.synth_grade && <span className="ml-auto text-[10px] font-bold bg-[#2b2018] text-[#e8b87a] px-2 py-0.5 rounded-full whitespace-nowrap">{nc.synth_grade}</span>}
                   </Link>
@@ -252,9 +252,9 @@ export default async function CafePage({ params }: Props) {
               <Link href={`/collections/${col.slug}`} className="mt-3 flex items-center justify-between gap-2 w-full rounded-xl px-4 py-3 border border-[#d8c8ad] bg-white">
                 <span className="flex flex-col text-left">
                   <span className="text-[12.5px] font-bold text-[#5a4632]">📌 {col.label} 카페, 협찬 없이 교차검증한 곳</span>
-                  <span className="text-[10.5px] text-[#9c8a6c]">광고·협찬·타지점 후기 빼고 실방문 후기로만 모아보기</span>
+                  <span className="text-[10.5px] text-[#6f6047]">광고·협찬·타지점 후기 빼고 실방문 후기로만 모아보기</span>
                 </span>
-                <span className="text-[#9c6b3f] font-bold whitespace-nowrap">→</span>
+                <span className="text-[#7a5122] font-bold whitespace-nowrap">→</span>
               </Link>
             ) : null;
           })()}
@@ -262,7 +262,7 @@ export default async function CafePage({ params }: Props) {
           <Link href={`/owner?name=${encodeURIComponent(c.name)}`} className="mt-3 flex items-center justify-between gap-2 w-full rounded-xl px-4 py-3 border border-[#e6d2b5]" style={{ background: "linear-gradient(90deg,#fbf3e4,#f4ece0)" }}>
             <span className="flex flex-col text-left">
               <span className="text-[12.5px] font-bold text-[#7a5a2a]">☕ 이 카페 사장님이신가요?</span>
-              <span className="text-[10.5px] text-[#9c8a6c]">후기 데이터로 보는 우리 가게 강점·약점 — 무료 인사이트</span>
+              <span className="text-[10.5px] text-[#6f6047]">후기 데이터로 보는 우리 가게 강점·약점 — 무료 인사이트</span>
             </span>
             <span className="text-[#c98a3c] font-bold whitespace-nowrap">→</span>
           </Link>

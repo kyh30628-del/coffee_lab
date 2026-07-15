@@ -36,7 +36,7 @@ export default function SaveMemoryButton({ cafeId, cafeName, cafeArea, variant =
             <span className="text-[12.5px] font-bold text-[#b23a5f] flex items-center gap-1">
               <span className="text-[14px] leading-none">❤</span> {recorded ? "이미 추억을 기록했어요" : "이 카페, 다녀가셨나요?"}
             </span>
-            <span className="text-[10.5px] text-[#9c8a6c]">{recorded ? "사진·기억을 더하거나 고쳐보세요" : "위치인증하고 나만의 추억으로 저장 — 무가입·30초"}</span>
+            <span className="text-[10.5px] text-[#6f6047]">{recorded ? "사진·기억을 더하거나 고쳐보세요" : "위치인증하고 나만의 추억으로 저장 — 무가입·30초"}</span>
           </span>
           <span className="text-[#d6336c] font-bold whitespace-nowrap">{recorded ? "수정 →" : "→"}</span>
         </button>

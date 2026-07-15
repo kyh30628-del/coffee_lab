@@ -43,7 +43,7 @@ export default async function TastePage({ params }: Props) {
     <main className="min-h-screen flex items-center justify-center px-6 text-[#f4ece0]" style={{ fontFamily: "'Gowun Batang', serif", background: "linear-gradient(135deg,#4a3526,#2b2018 60%,#1f1610)" }}>
       <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet" />
       <div className="w-full max-w-sm text-center">
-        <div className="text-[15px] text-[#cbb89f] mb-1">나의 커피 취향은</div>
+        <div className="text-[15px] text-[#8f7a58] mb-1">나의 커피 취향은</div>
         <div className="text-[80px] leading-none my-2">{t.emoji}</div>
         <h1 className="text-4xl font-bold mb-3" style={{ color: t.accent === "#8a7458" ? "#cbb89f" : t.accent }}>{t.name}</h1>
         <p className="text-[15px] text-[#e6dcc8] leading-relaxed mb-7">{t.line}</p>

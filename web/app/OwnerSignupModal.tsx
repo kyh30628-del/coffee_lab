@@ -74,18 +74,18 @@ export default function OwnerSignupModal({ open, onClose, trial = false, prefill
           <div className="text-center py-6">
             <div className="text-3xl mb-2">🎉</div>
             <div className="font-bold mb-1">{trial ? "7일 체험 신청 완료" : "구독 신청 완료"}</div>
-            <p className="text-[13px] text-[#6b5a48] leading-relaxed">관리자 승인 후 <b>등록하신 이메일로 키(PIN)</b>가 발송돼요. 그 키로 사장님 화면에 로그인하시면 <b>내 카페 분석으로 바로</b> 들어갑니다.{trial ? " 체험은 승인일로부터 7일간이에요." : ""}</p>
+            <p className="text-[13px] text-[#524234] leading-relaxed">관리자 승인 후 <b>등록하신 이메일로 키(PIN)</b>가 발송돼요. 그 키로 사장님 화면에 로그인하시면 <b>내 카페 분석으로 바로</b> 들어갑니다.{trial ? " 체험은 승인일로부터 7일간이에요." : ""}</p>
             <button onClick={close} className="w-full mt-5 bg-[#2b2018] text-[#f4ece0] rounded-lg py-2.5 text-sm font-bold">닫기</button>
           </div>
         ) : (
           <>
             <div className="flex items-start justify-between mb-1">
               <h3 className="font-bold text-lg">{trial ? "✨ 7일 무료 체험 신청" : "홍보팩 구독 신청"}</h3>
-              <button onClick={close} className="text-2xl text-[#bcae98] leading-none -mt-1">×</button>
+              <button onClick={close} className="text-2xl text-[#82714f] leading-none -mt-1">×</button>
             </div>
-            <p className="text-[12px] text-[#6b5a48] mb-3">{prefillCafe ? "방금 등록한 카페로 체험을 신청합니다. 사장님 정보를 남겨주세요." : "내 카페를 선택하고 정보를 남겨주세요."} 승인되면 <b>이메일로 키(PIN)</b>를 보내드려요.{trial ? " 결제 없이 7일간 모든 사장님 기능을 써보실 수 있어요." : ""}</p>
+            <p className="text-[12px] text-[#524234] mb-3">{prefillCafe ? "방금 등록한 카페로 체험을 신청합니다. 사장님 정보를 남겨주세요." : "내 카페를 선택하고 정보를 남겨주세요."} 승인되면 <b>이메일로 키(PIN)</b>를 보내드려요.{trial ? " 결제 없이 7일간 모든 사장님 기능을 써보실 수 있어요." : ""}</p>
             {prefillCafe ? (
-              <div className="mb-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-[14px]"><b>{prefillCafe.name}</b><span className="text-[12px] text-emerald-600 font-bold ml-2">✓ 방금 등록한 내 카페</span><div className="text-[11px] text-[#8a7458] mt-0.5">검증·공개되면 승인 후 키를 보내드려요.</div></div>
+              <div className="mb-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-[14px]"><b>{prefillCafe.name}</b><span className="text-[12px] text-emerald-600 font-bold ml-2">✓ 방금 등록한 내 카페</span><div className="text-[11px] text-[#665036] mt-0.5">검증·공개되면 승인 후 키를 보내드려요.</div></div>
             ) : (
               <>
                 <div className="relative mb-2">
@@ -94,12 +94,12 @@ export default function OwnerSignupModal({ open, onClose, trial = false, prefill
                   {!picked && sug.length > 0 && (
                     <div className="absolute z-10 left-0 right-0 mt-1 bg-white border border-[#d9c9b0] rounded-lg shadow-lg max-h-44 overflow-y-auto">
                       {sug.map((c) => (
-                        <button key={c.id} onClick={() => { setPicked({ id: c.id, name: c.name }); setSug([]); }} className="w-full text-left px-3 py-2 text-[13px] hover:bg-[#f4ece0] border-b border-[#f0e6d4] last:border-0"><b>{c.name}</b> <span className="text-[11px] text-[#8a7458]">{c.area}</span></button>
+                        <button key={c.id} onClick={() => { setPicked({ id: c.id, name: c.name }); setSug([]); }} className="w-full text-left px-3 py-2 text-[13px] hover:bg-[#f4ece0] border-b border-[#f0e6d4] last:border-0"><b>{c.name}</b> <span className="text-[11px] text-[#665036]">{c.area}</span></button>
                       ))}
                     </div>
                   )}
                 </div>
-                <p className="text-[11px] text-[#8a7458] -mt-0.5 mb-2">내 카페가 목록에 없나요? <a href="/cafe/register" className="text-[#9c6b3f] font-bold underline">카페 등록 신청 →</a> <span className="text-[#bcae98]">(검증 후 분석·체험 이용 가능)</span></p>
+                <p className="text-[11px] text-[#665036] -mt-0.5 mb-2">내 카페가 목록에 없나요? <a href="/cafe/register" className="text-[#7a5122] font-bold underline">카페 등록 신청 →</a> <span className="text-[#82714f]">(검증 후 분석·체험 이용 가능)</span></p>
               </>
             )}
             <input value={ownerName} onChange={(e) => setOwnerName(e.target.value)} placeholder="사장님 성함" className="w-full rounded-lg border border-[#d9c9b0] px-3 py-2.5 text-[14px] mb-2 bg-white" />
@@ -111,15 +111,15 @@ export default function OwnerSignupModal({ open, onClose, trial = false, prefill
               <div className="text-[11.5px] font-bold text-[#52402e] mb-1">사업자등록증 사진 <span className="text-[#c0392b]">(필수)</span></div>
               <div className="flex items-center gap-2">
                 <span className="shrink-0 rounded-lg bg-[#2b2018] text-[#f4ece0] text-[12px] font-bold px-3 py-2">{bizRegBase64 ? "다시 선택" : "📷 이미지 선택"}</span>
-                <span className="text-[11px] text-[#8a7458] truncate">{bizRegName || "대표자명·상호가 보이게 촬영/스캔"}</span>
+                <span className="text-[11px] text-[#665036] truncate">{bizRegName || "대표자명·상호가 보이게 촬영/스캔"}</span>
                 <input type="file" accept="image/*" onChange={(e) => onFile(e.target.files?.[0])} className="hidden" />
               </div>
               {bizRegBase64 && <img src={bizRegBase64} alt="사업자등록증 미리보기" className="mt-2 w-full max-h-40 object-contain rounded-lg border border-[#e6dcc8] bg-white" />}
-              <p className="text-[10.5px] text-[#8a7458] mt-1">⚠️ 주민등록번호 등은 <b>가리고</b> 올려주세요(본인확인엔 상호·대표자명만 필요).</p>
+              <p className="text-[10.5px] text-[#665036] mt-1">⚠️ 주민등록번호 등은 <b>가리고</b> 올려주세요(본인확인엔 상호·대표자명만 필요).</p>
             </label>
             <label className="flex items-start gap-2 mb-2 cursor-pointer">
               <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5 shrink-0" />
-              <span className="text-[11.5px] text-[#52402e] leading-snug"><b>(필수)</b> 승인·키(PIN) 발송을 위한 개인정보 수집·이용 동의. 연락처·이메일·서류는 <b>암호화/안전 저장</b>됩니다. <a href="/privacy" target="_blank" className="text-[#9c6b3f] underline">방침</a></span>
+              <span className="text-[11.5px] text-[#52402e] leading-snug"><b>(필수)</b> 승인·키(PIN) 발송을 위한 개인정보 수집·이용 동의. 연락처·이메일·서류는 <b>암호화/안전 저장</b>됩니다. <a href="/privacy" target="_blank" className="text-[#7a5122] underline">방침</a></span>
             </label>
             <label className="flex items-start gap-2 mb-3 cursor-pointer">
               <input type="checkbox" checked={attest} onChange={(e) => setAttest(e.target.checked)} className="mt-0.5 shrink-0" />

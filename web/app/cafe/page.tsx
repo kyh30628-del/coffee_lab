@@ -135,7 +135,7 @@ function CafeCard({ c, pref, top, onShowEvidence }: { c: Cafe; pref: { acidity: 
       )}
 
       {c.acidity != null && (
-        <div className="flex gap-3 mb-3 text-[10px] text-[#8a7458]">
+        <div className="flex gap-3 mb-3 text-[10px] text-[#665036]">
           {([["산미", c.acidity], ["바디", c.body], ["단맛", c.sweet]] as [string, number][]).map(([l, v]) => (
             <div key={l} className="flex-1"><div className="mb-1">{l}</div>
               <div className="h-1 bg-[#e3d6c2] rounded-full overflow-hidden"><div className="h-full bg-[#9c6b3f]" style={{ width: `${(v ?? 0.5) * 100}%` }} /></div></div>
@@ -144,7 +144,7 @@ function CafeCard({ c, pref, top, onShowEvidence }: { c: Cafe; pref: { acidity: 
       )}
 
       <div className="mt-auto">
-        {c.signature && <div className="text-[12px] text-[#6b5a48] mb-2"><span className="text-[#7a4d1c]">추천 </span>{c.signature}</div>}
+        {c.signature && <div className="text-[12px] text-[#524234] mb-2"><span className="text-[#7a4d1c]">추천 </span>{c.signature}</div>}
         <div className="flex gap-2">
           <a href={`https://map.kakao.com/?q=${encodeURIComponent(c.name + " " + c.area)}`} target="_blank" rel="noopener noreferrer" className="flex-1 text-center bg-[#2b2018] text-[#f4ece0] rounded-lg py-2 text-xs font-medium hover:bg-[#3d2f22] transition-colors">지도·길찾기</a>
           {c.phone && <a href={`tel:${c.phone}`} className="px-3 text-center bg-transparent border border-[#cbb89f] text-[#524434] rounded-lg py-2 text-xs font-medium flex items-center">전화</a>}
@@ -220,7 +220,7 @@ export default function CafePage() {
         <BackLink to="/" label="홈" className="text-[#7a4d1c] mb-4" />
         <div className="text-[#7a4d1c] text-xs tracking-[0.4em] uppercase mb-4">강동·구리 동네 커피 노트</div>
         <h1 className="text-4xl font-bold leading-snug mb-3">오늘 커피,<br />뭐 하러 가세요?</h1>
-        <p className="text-[#6b5a48] mb-10 leading-relaxed">목적과 취향을 알려주시면, 거기 딱 맞는 동네 로스터리를 <strong className="text-[#2b2018]">근거와 함께</strong> 추천해드려요.</p>
+        <p className="text-[#524234] mb-10 leading-relaxed">목적과 취향을 알려주시면, 거기 딱 맞는 동네 로스터리를 <strong className="text-[#2b2018]">근거와 함께</strong> 추천해드려요.</p>
         <div className="grid grid-cols-2 gap-3">
           {PURPOSES.map((p) => (
             <button key={p.key} onClick={() => { setPurpose(p.key); setStep("taste"); }}
@@ -239,14 +239,14 @@ export default function CafePage() {
       <Shell wide={false}>
         <button onClick={() => setStep("purpose")} className="text-xs text-[#7a4d1c] underline mb-6">← 목적 다시</button>
         <h1 className="text-3xl font-bold leading-snug mb-2">어떤 커피 좋아해요?</h1>
-        <p className="text-[#6b5a48] mb-8 leading-relaxed">동네 카페 리뷰에서 가장 많이 갈리는 취향이에요. 하나 고르면 맞는 집을 근거와 함께 찾아드려요.</p>
+        <p className="text-[#524234] mb-8 leading-relaxed">동네 카페 리뷰에서 가장 많이 갈리는 취향이에요. 하나 고르면 맞는 집을 근거와 함께 찾아드려요.</p>
         <div className="grid grid-cols-2 gap-3">
           {TASTE_CHOICES.map((t) => (
             <button key={t.key} onClick={() => { setTastePref(t.pref); setStep("result"); }}
               className="bg-[#fdfaf4] border border-[#ece0cd] rounded-2xl p-5 text-left hover:border-[#9c6b3f] hover:-translate-y-0.5 transition-all shadow-sm">
               <div className="text-3xl mb-2">{t.emoji}</div>
               <div className="text-lg font-bold">{t.label}</div>
-              <div className="text-xs text-[#6b5a48] mt-1">{t.desc}</div>
+              <div className="text-xs text-[#524234] mt-1">{t.desc}</div>
             </button>
           ))}
         </div>
@@ -266,8 +266,8 @@ export default function CafePage() {
           <button onClick={() => setStep("purpose")} className="text-xs text-[#7a4d1c] underline">처음부터</button>
         </header>
 
-        {loading ? <p className="text-[#6b5a48]">불러오는 중...</p>
-          : ranked.length === 0 ? <p className="text-[#6b5a48] bg-white/50 rounded-2xl p-8 text-center">맞는 곳을 아직 못 찾았어요.</p>
+        {loading ? <p className="text-[#524234]">불러오는 중...</p>
+          : ranked.length === 0 ? <p className="text-[#524234] bg-white/50 rounded-2xl p-8 text-center">맞는 곳을 아직 못 찾았어요.</p>
           : (
             <div className="grid md:grid-cols-2 gap-5">
               {ranked.map((c, i) => <CafeCard key={c.id} c={c} pref={tastePref} top={!!tastePref && i === 0} onShowEvidence={setEvidenceCafe} />)}

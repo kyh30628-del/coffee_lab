@@ -35,8 +35,8 @@ export default function VisitorReviews({ reviews }: { reviews: R[] }) {
         <div className="fixed inset-0 z-[5500] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)", fontFamily: SERIF }} onClick={() => setOpenList(false)}>
           <div className="w-full max-w-lg bg-[#fdfaf4] rounded-t-2xl max-h-[88dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-[#f0e6d4]">
-              <div className="font-bold text-[#2b2018] text-[15px]">🧡 방문자 후기 <span className="text-[11px] font-normal text-[#9c6b3f]">{reviews.length}건 · 최신순</span></div>
-              <button onClick={() => setOpenList(false)} className="w-8 h-8 rounded-full bg-[#f0e6d4] text-[#7a6452] text-lg">×</button>
+              <div className="font-bold text-[#2b2018] text-[15px]">🧡 방문자 후기 <span className="text-[11px] font-normal text-[#7a5122]">{reviews.length}건 · 최신순</span></div>
+              <button onClick={() => setOpenList(false)} className="w-8 h-8 rounded-full bg-[#f0e6d4] text-[#594839] text-lg">×</button>
             </div>
             <div className="overflow-y-auto flex-1 p-3 space-y-2 pb-[calc(0.75rem_+_env(safe-area-inset-bottom))]">
               {reviews.map((r, i) => (
@@ -44,7 +44,7 @@ export default function VisitorReviews({ reviews }: { reviews: R[] }) {
                   {r.photos[0] ? <img src={r.photos[0]} alt="" className="w-14 h-14 rounded-lg object-cover shrink-0" /> : <div className="w-14 h-14 rounded-lg bg-[#f3ede1] flex items-center justify-center text-[18px] shrink-0">{r.favorite ? "★" : "☕"}</div>}
                   <div className="min-w-0 flex-1">
                     <p className="text-[12.5px] text-[#2b2018] leading-snug line-clamp-2">{r.memory || "사진 후기"}</p>
-                    <div className="text-[10px] text-[#8a7458] mt-1">{r.favorite ? "★ " : ""}방문자 · {fmt(r.date)}{r.photos.length > 1 ? ` · 📷${r.photos.length}` : ""}</div>
+                    <div className="text-[10px] text-[#665036] mt-1">{r.favorite ? "★ " : ""}방문자 · {fmt(r.date)}{r.photos.length > 1 ? ` · 📷${r.photos.length}` : ""}</div>
                   </div>
                   <span className="text-[#bcae9b] text-[12px] self-center">›</span>
                 </button>
@@ -60,8 +60,8 @@ export default function VisitorReviews({ reviews }: { reviews: R[] }) {
         <div className="fixed inset-0 z-[6000] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.55)", fontFamily: SERIF }} onClick={() => setDetail(null)}>
           <div className="w-full max-w-lg bg-[#fdfaf4] rounded-t-2xl max-h-[90dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-[#f0e6d4]">
-              <div className="font-bold text-[#2b2018] text-[14px]">{detail.favorite ? "★ " : ""}방문자 후기 <span className="text-[11px] font-normal text-[#8a7458]">(익명)</span></div>
-              <button onClick={() => setDetail(null)} className="w-8 h-8 rounded-full bg-[#f0e6d4] text-[#7a6452] text-lg">×</button>
+              <div className="font-bold text-[#2b2018] text-[14px]">{detail.favorite ? "★ " : ""}방문자 후기 <span className="text-[11px] font-normal text-[#665036]">(익명)</span></div>
+              <button onClick={() => setDetail(null)} className="w-8 h-8 rounded-full bg-[#f0e6d4] text-[#594839] text-lg">×</button>
             </div>
             <div className="overflow-y-auto flex-1 p-4 space-y-3 pb-[calc(1rem_+_env(safe-area-inset-bottom))]">
               {detail.photos.length > 0 && (
@@ -70,7 +70,7 @@ export default function VisitorReviews({ reviews }: { reviews: R[] }) {
                 </div>
               )}
               {detail.memory && <p className="text-[14px] text-[#2b2018] leading-relaxed whitespace-pre-wrap">{detail.memory}</p>}
-              <div className="text-[11px] text-[#8a7458]">위치 인증 방문 · {fmt(detail.date)}</div>
+              <div className="text-[11px] text-[#665036]">위치 인증 방문 · {fmt(detail.date)}</div>
             </div>
           </div>
         </div>,

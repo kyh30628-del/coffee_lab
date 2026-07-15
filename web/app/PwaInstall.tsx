@@ -71,14 +71,14 @@ export default function PwaInstall() {
         <div className="w-full max-w-lg bg-[#fdfaf4] rounded-t-2xl p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center justify-between mb-3">
             <div className="font-bold text-[#2b2018] text-[15px]">📲 홈 화면에 추가하기</div>
-            <button onClick={dismiss} className="w-8 h-8 rounded-full bg-[#f0e6d4] text-[#7a6452] text-lg">×</button>
+            <button onClick={dismiss} className="w-8 h-8 rounded-full bg-[#f0e6d4] text-[#594839] text-lg">×</button>
           </div>
           <ol className="space-y-2.5 text-[13px] text-[#4a3a2a] leading-relaxed">
             <li>1. 하단(또는 상단)의 <b>공유 버튼 <span style={{ color: "#2f6fb0" }}>⬆︎</span></b>를 누르세요.</li>
             <li>2. 메뉴에서 <b>‘홈 화면에 추가’</b>를 선택하세요.</li>
             <li>3. 오른쪽 위 <b>‘추가’</b>를 누르면 바탕화면에 아이콘이 생겨요.</li>
           </ol>
-          <div className="mt-3 text-[11px] text-[#8a7458]">※ 아이폰은 <b>Safari</b>에서만 홈 화면에 추가할 수 있어요.</div>
+          <div className="mt-3 text-[11px] text-[#665036]">※ 아이폰은 <b>Safari</b>에서만 홈 화면에 추가할 수 있어요.</div>
           <button onClick={dismiss} className="w-full mt-4 bg-[#2b2018] text-[#f4ece0] rounded-xl py-3 font-medium">알겠어요</button>
         </div>
       </div>

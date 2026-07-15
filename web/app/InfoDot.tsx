@@ -17,7 +17,7 @@ export default function InfoDot({ title, children, dark }: { title: string; chil
           <div className="absolute inset-x-0 bottom-0 sm:inset-0 sm:m-auto sm:w-[340px] sm:h-fit bg-[#fdfaf4] rounded-t-2xl sm:rounded-2xl p-5 shadow-2xl" style={{ maxHeight: "82dvh" }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between mb-2">
               <h3 className="font-bold text-[15px] text-[#2b2018]">💡 {title}</h3>
-              <button onClick={() => setOpen(false)} className="text-2xl text-[#9c6b3f] leading-none -mt-1 px-1">×</button>
+              <button onClick={() => setOpen(false)} className="text-2xl text-[#7a5122] leading-none -mt-1 px-1">×</button>
             </div>
             <div className="text-[12.5px] text-[#52402e] leading-relaxed">{children}</div>
             <button onClick={() => setOpen(false)} className="w-full mt-4 bg-[#2b2018] text-[#f4ece0] rounded-lg py-2.5 text-sm">알겠어요</button>

@@ -6,10 +6,10 @@ export default function TermsPage() {
   return (
     <main className="min-h-screen bg-[#f4ece0] text-[#2b2018]" style={{ fontFamily: "'Gowun Batang', serif" }}>
       <div className="max-w-2xl mx-auto px-6 py-12">
-        <BackLink to="/" label="홈" className="text-[#9c6b3f] mb-4" />
-        <div className="text-[#9c6b3f] text-xs tracking-[0.3em] uppercase mb-2">Terms of Service</div>
+        <BackLink to="/" label="홈" className="text-[#7a5122] mb-4" />
+        <div className="text-[#7a5122] text-xs tracking-[0.3em] uppercase mb-2">Terms of Service</div>
         <h1 className="text-3xl font-bold mb-1">이용약관</h1>
-        <p className="text-[13px] text-[#8a7458] mb-8">동네 커피 노트 (Dongne Coffee Note) · 최종 업데이트 {updated}</p>
+        <p className="text-[13px] text-[#665036] mb-8">동네 커피 노트 (Dongne Coffee Note) · 최종 업데이트 {updated}</p>
 
         <div className="space-y-7 text-[14px] leading-relaxed text-[#3d2f22]">
           <section>
@@ -30,7 +30,7 @@ export default function TermsPage() {
             <ul className="list-disc ml-5 space-y-1">
               <li>카페 정보는 <b>네이버·구글·YouTube 등 공개 API</b>로 수집한 후기를 교차검증한 것입니다. 각 출처의 이용약관을 준수하며, <b>원문을 복제·재호스팅하지 않고 한 줄 인용 + 출처 링크 + 날짜</b>만 표시해 항상 원문으로 연결합니다.</li>
               <li>수집한 글은 <b>영구 보관하지 않습니다.</b> 분석을 위해 <b>한시적으로만 캐시</b>하고 주기적으로(약 90일) <b>갱신·파기</b>하며, 이용자에게 보여지는 것은 우리가 산출한 <b>분석 결과 + 최소 인용(1줄)·출처 링크</b>입니다.</li>
-              <li>YouTube 관련 사용에는 <a className="text-[#9c6b3f] underline" href="https://www.youtube.com/t/terms" target="_blank" rel="noopener noreferrer">YouTube 이용약관</a>·<a className="text-[#9c6b3f] underline" href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Google 개인정보처리방침</a>이 적용되며, 영상은 다운로드·재호스팅 없이 원본으로 링크하고 시청에 어떤 제한도 두지 않습니다.</li>
+              <li>YouTube 관련 사용에는 <a className="text-[#7a5122] underline" href="https://www.youtube.com/t/terms" target="_blank" rel="noopener noreferrer">YouTube 이용약관</a>·<a className="text-[#7a5122] underline" href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Google 개인정보처리방침</a>이 적용되며, 영상은 다운로드·재호스팅 없이 원본으로 링크하고 시청에 어떤 제한도 두지 않습니다.</li>
               <li>본인 또는 원저작자가 게시물의 <b>삭제·표시중단을 요청</b>하면 신속히(통상 30일 내) 처리합니다. 문의: dongnecoffeenote@gmail.com</li>
             </ul>
           </section>
@@ -61,7 +61,7 @@ export default function TermsPage() {
               <li><b>우리가게 홍보팩(유료 구독)</b>: 회원이 등록한 결제수단으로 <b>월 단위 요금이 자동 결제·자동 갱신</b>됩니다. 결제 전 금액·주기·갱신 방식을 고지합니다.</li>
               <li><b>요금 증액 또는 무료→유료 전환</b> 시에는 <b>시행 전 사전에 동의</b>를 받으며, 동의하지 않으면 정기결제는 진행되지 않습니다.</li>
               <li><b>해지</b>: 사장님 화면 또는 고객센터(dongnecoffeenote@gmail.com)로 언제든 <b>해지(차기 결제 중지) 또는 즉시 해지</b>할 수 있습니다.</li>
-              <li><b>청약철회·환불</b>은 <a href="/business" className="text-[#9c6b3f] underline">「사업자정보·환불 정책」</a>에 따릅니다. 디지털 서비스 특성상 <b>이미 사용·개시한 기능</b>은 청약철회가 제한될 수 있으나, 본 서비스는 <b>7일 무료 체험(시험 사용)</b>을 제공하여 철회권 행사가 방해되지 않도록 합니다(「전자상거래법」 제17조). 환불은 <b>원결제수단으로 3영업일 이내</b> 처리하며, 정당한 사유 없이 지연 시 법정 지연배상금(연 15%)을 더해 지급합니다.</li>
+              <li><b>청약철회·환불</b>은 <a href="/business" className="text-[#7a5122] underline">「사업자정보·환불 정책」</a>에 따릅니다. 디지털 서비스 특성상 <b>이미 사용·개시한 기능</b>은 청약철회가 제한될 수 있으나, 본 서비스는 <b>7일 무료 체험(시험 사용)</b>을 제공하여 철회권 행사가 방해되지 않도록 합니다(「전자상거래법」 제17조). 환불은 <b>원결제수단으로 3영업일 이내</b> 처리하며, 정당한 사유 없이 지연 시 법정 지연배상금(연 15%)을 더해 지급합니다.</li>
             </ul>
           </section>
 

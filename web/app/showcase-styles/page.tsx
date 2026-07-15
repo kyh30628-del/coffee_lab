@@ -20,9 +20,9 @@ export default function ShowcaseStyles() {
     <main className="min-h-screen bg-[#e7ded0]" style={{ fontFamily: "'Gowun Batang', serif" }}>
       <style dangerouslySetInnerHTML={{ __html: SHOWCASE_CSS }} />
       <div className="max-w-md mx-auto px-5 py-8">
-        <BackLink to="/" label="홈" className="text-[#9c6b3f] mb-3" />
+        <BackLink to="/" label="홈" className="text-[#7a5122] mb-3" />
         <h1 className="text-2xl font-bold text-[#2b2018] mb-1">쇼케이스 스타일 10종</h1>
-        <p className="text-[13px] text-[#6b5a48] mb-6">강동구 카페로 만든 샘플. 새로고침하면 애니메이션이 처음부터 재생됩니다. 사장님은 등록 시 이 중 하나를 고릅니다.</p>
+        <p className="text-[13px] text-[#524234] mb-6">강동구 카페로 만든 샘플. 새로고침하면 애니메이션이 처음부터 재생됩니다. 사장님은 등록 시 이 중 하나를 고릅니다.</p>
         <div className="space-y-8">
           {SHOWCASE_TEMPLATES.map((t, i) => {
             const s = SAMPLES[i];
@@ -31,7 +31,7 @@ export default function ShowcaseStyles() {
                 <div className="mb-2">
                   <span className="inline-block text-[11px] font-bold text-white bg-[#9c6b3f] rounded-full px-2 py-0.5 mr-1.5">{t.id}</span>
                   <span className="text-[#2b2018] font-bold">{t.name}</span>
-                  <span className="text-[12px] text-[#8a7458]"> · {t.desc}</span>
+                  <span className="text-[12px] text-[#665036]"> · {t.desc}</span>
                 </div>
                 <div className="rounded-2xl overflow-hidden shadow-lg bg-[#fdfaf4]">
                   <ShowcaseBanner style={t.id} scene={s.scene} headline={s.headline} tagline={s.tagline} points={s.points} cta={s.cta} height="220px" />
@@ -40,7 +40,7 @@ export default function ShowcaseStyles() {
             );
           })}
         </div>
-        <p className="text-[12px] text-[#8a7458] mt-8 text-center">마음에 드는 번호들을 알려주시면 사장님 등록 화면에 ‘템플릿 선택’으로 적용돼 있어요.</p>
+        <p className="text-[12px] text-[#665036] mt-8 text-center">마음에 드는 번호들을 알려주시면 사장님 등록 화면에 ‘템플릿 선택’으로 적용돼 있어요.</p>
       </div>
       <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet" />
     </main>

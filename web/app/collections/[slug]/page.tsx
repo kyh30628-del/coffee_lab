@@ -76,8 +76,8 @@ export default async function CollectionPage({ params }: { params: Promise<{ slu
     <main className="min-h-screen bg-[#f4ece0] text-[#2b2018]" style={{ fontFamily: "'Gowun Batang', serif" }}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonld) }} />
       <div className="max-w-2xl mx-auto px-5 py-9">
-        <Link href={areaHref} className="text-[#9c6b3f] text-[13px] underline">← {area} 카페 전체</Link>
-        <div className="text-[#9c6b3f] text-[11px] tracking-[0.25em] uppercase mt-4 mb-1">동네 커피 노트 · 검증 큐레이션</div>
+        <Link href={areaHref} className="text-[#7a5122] text-[13px] underline">← {area} 카페 전체</Link>
+        <div className="text-[#7a5122] text-[11px] tracking-[0.25em] uppercase mt-4 mb-1">동네 커피 노트 · 검증 큐레이션</div>
         <h1 className="text-[26px] font-bold leading-tight mb-3">{label} 카페 추천<br />— 협찬 없이 진짜 후기로 교차검증한 곳</h1>
 
         <p className="text-[14.5px] text-[#4a3b2c] leading-relaxed mb-3">
@@ -87,34 +87,34 @@ export default async function CollectionPage({ params }: { params: Promise<{ slu
 
         {agg.cafes > 0 && (
           <div className="bg-white/70 border border-[#e6dcc8] rounded-xl px-4 py-3.5 mb-3">
-            <div className="text-[12px] text-[#9c6b3f] font-bold mb-2 tracking-wide">{label} 교차검증, 숫자로</div>
+            <div className="text-[12px] text-[#7a5122] font-bold mb-2 tracking-wide">{label} 교차검증, 숫자로</div>
             <ul className="text-[13.5px] text-[#4a3b2c] leading-relaxed space-y-1">
               <li>· 검증 카페 <b>{nf(agg.cafes)}곳</b> · 공개 후기 원본 <b>{nf(agg.raw)}건</b>을 한 건씩 검토</li>
               <li>· 광고·협찬 글 <b>{nf(agg.ad)}건</b> 자동 제외</li>
               <li>· 다른 지점·동명 카페 오염 후기 <b>{nf(agg.branch)}건</b> 제외</li>
               <li>· 실제 방문·경험 후기 <b>{nf(agg.verified)}건</b>만 채택</li>
             </ul>
-            <p className="text-[11px] text-[#8a7458] mt-2">※ 수치는 실시간 검증 데이터 기준이라 조금씩 변할 수 있어요.</p>
+            <p className="text-[11px] text-[#665036] mt-2">※ 수치는 실시간 검증 데이터 기준이라 조금씩 변할 수 있어요.</p>
           </div>
         )}
 
-        <p className="text-[12px] text-[#8a7458] bg-white/60 border border-[#e6dcc8] rounded-lg px-3 py-2 mb-6">☕ <b>영수증 리뷰·광고·협찬은 빼고</b>, 네이버·구글·유튜브 공개 후기를 교차검증해 진짜 후기로만 골랐어요.</p>
+        <p className="text-[12px] text-[#665036] bg-white/60 border border-[#e6dcc8] rounded-lg px-3 py-2 mb-6">☕ <b>영수증 리뷰·광고·협찬은 빼고</b>, 네이버·구글·유튜브 공개 후기를 교차검증해 진짜 후기로만 골랐어요.</p>
 
         <h2 className="text-[17px] font-bold mb-3">후기로 검증한 {label} 카페</h2>
         {cafes.length === 0 ? (
-          <p className="text-[13px] text-[#8a7458] py-8 text-center">지금 목록을 불러오지 못했어요. <Link href={areaHref} className="underline text-[#9c6b3f]">{area} 전체 보기</Link></p>
+          <p className="text-[13px] text-[#665036] py-8 text-center">지금 목록을 불러오지 못했어요. <Link href={areaHref} className="underline text-[#7a5122]">{area} 전체 보기</Link></p>
         ) : (
           <ol className="space-y-2.5">
             {cafes.map((cf, i) => (
               <li key={cf.id}>
                 <Link href={`/c/${cf.id}`} className="block bg-white rounded-xl border border-[#e6dcc8] px-4 py-3 hover:shadow-sm transition">
                   <div className="flex items-center gap-2">
-                    <span className="text-[#bcae98] text-[13px] font-bold w-5 shrink-0">{i + 1}</span>
+                    <span className="text-[#82714f] text-[13px] font-bold w-5 shrink-0">{i + 1}</span>
                     <span className="font-bold text-[15px]">{cf.name}</span>
-                    {cf.dong && <span className="text-[12px] text-[#8a7458]">{cf.dong}</span>}
+                    {cf.dong && <span className="text-[12px] text-[#665036]">{cf.dong}</span>}
                     {cf.grade && <span className="text-[10px] font-bold text-white px-1.5 py-0.5 rounded ml-auto shrink-0" style={{ background: GRADE_BG[cf.grade] || "#a8927a" }}>{cf.grade}</span>}
                   </div>
-                  {cf.identity && <p className="text-[12.5px] text-[#6b5a48] leading-snug mt-1.5 line-clamp-2 pl-7">{cf.identity}</p>}
+                  {cf.identity && <p className="text-[12.5px] text-[#524234] leading-snug mt-1.5 line-clamp-2 pl-7">{cf.identity}</p>}
                 </Link>
               </li>
             ))}

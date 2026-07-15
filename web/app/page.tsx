@@ -118,7 +118,7 @@ const Row = memo(function Row({ title, items, sub, info, onOpen }: { title: stri
     <div className="mb-7">
       <div className="flex items-baseline justify-between mb-1 pb-1 border-b-2 border-[#2b2018]">
         <div className="text-base font-bold text-[#2b2018] flex items-center gap-1.5">{title}{info && <InfoDot title={title.replace(/^[^가-힣A-Za-z]+/, "")}>{info}</InfoDot>}</div>
-        {sub && <div className="text-[10px] text-[#9c6b3f] shrink-0">↕ {sub}</div>}
+        {sub && <div className="text-[10px] text-[#7a5122] shrink-0">↕ {sub}</div>}
       </div>
       {/* 바깥은 가로 스크롤, 위쪽 패딩 안에 말풍선이 들어가 잘리지 않음 */}
       <div className="flex gap-3 overflow-x-auto pt-2 pb-2 dcn-hscroll" style={{ WebkitOverflowScrolling: "touch" }}>
@@ -129,7 +129,7 @@ const Row = memo(function Row({ title, items, sub, info, onOpen }: { title: stri
                 <span className="font-bold text-sm text-[#2b2018] truncate">{c.name}</span>
                 {c.grade && GRADE_STYLE[c.grade] && <span className="text-[8px] text-white px-1 py-0.5 rounded-full shrink-0" style={{ background: GRADE_STYLE[c.grade].bg }}>{c.grade}</span>}
               </div>
-              <div className="text-[10px] text-[#8a7458] mb-1.5">{c.area} · 리뷰 {c.count ?? 0}</div>
+              <div className="text-[10px] text-[#665036] mb-1.5">{c.area} · 리뷰 {c.count ?? 0}</div>
               {c.beanNote.length > 0 && <div className="flex flex-wrap gap-1 mb-2">{c.beanNote.map((b) => <span key={b} className="text-[9px] bg-[#f0e6d4] text-[#8a6d3f] px-1.5 py-0.5 rounded-full">{b}</span>)}</div>}
               {c.reason && (
                 <div className="mt-auto pt-2 border-t border-[#f0e6d4]">
@@ -312,12 +312,12 @@ function FavoritesModal({ items, onClose, onOpen, onRemove }: { items: Cafe[]; o
     <div className="fixed inset-0 z-[5000] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)", fontFamily: "'Gowun Batang', AppleMyungjo, 'Apple SD Gothic Neo', 'Noto Serif KR', serif" }} onClick={onClose}>
       <div className="w-full max-w-lg bg-[#fdfaf4] rounded-t-2xl max-h-[80dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-[#f0e6d4]">
-          <div className="font-bold text-[#2b2018] text-[15px]"><span style={{ color: "#f0a832" }}>★</span> 즐겨찾기 <span className="text-[#8a7458] text-[12px] font-normal">{items.length}곳</span></div>
-          <button onClick={onClose} className="w-8 h-8 rounded-full bg-[#f0e6d4] text-[#7a6452] text-lg">×</button>
+          <div className="font-bold text-[#2b2018] text-[15px]"><span style={{ color: "#f0a832" }}>★</span> 즐겨찾기 <span className="text-[#665036] text-[12px] font-normal">{items.length}곳</span></div>
+          <button onClick={onClose} className="w-8 h-8 rounded-full bg-[#f0e6d4] text-[#594839] text-lg">×</button>
         </div>
         <div className="overflow-y-auto flex-1 p-3 space-y-2 pb-[calc(1rem_+_env(safe-area-inset-bottom))]">
           {items.length === 0 ? (
-            <div className="text-center text-[#8a7458] text-[13px] py-12 leading-relaxed">
+            <div className="text-center text-[#665036] text-[13px] py-12 leading-relaxed">
               아직 즐겨찾기한 카페가 없어요.<br />카페 상세에서 <span style={{ color: "#f0a832" }}>★</span>를 누르면 여기에 모여요.
             </div>
           ) : items.map((c) => (
@@ -329,7 +329,7 @@ function FavoritesModal({ items, onClose, onOpen, onRemove }: { items: Cafe[]; o
                     <span className="font-bold text-[#2b2018] text-[14px] truncate">{c.name}</span>
                     {c.synth_grade && GRADE_STYLE[c.synth_grade] && <span className="text-[9px] text-white px-1.5 py-0.5 rounded-full shrink-0" style={{ background: GRADE_STYLE[c.synth_grade].bg }}>{c.synth_grade}</span>}
                   </div>
-                  <div className="text-[11px] text-[#9c6b3f]">{c.area}{c.synth_count ? ` · 리뷰 ${c.synth_count}` : ""}</div>
+                  <div className="text-[11px] text-[#7a5122]">{c.area}{c.synth_count ? ` · 리뷰 ${c.synth_count}` : ""}</div>
                 </div>
               </button>
               <button onClick={() => onRemove(c.id)} aria-label="즐겨찾기 해제" className="shrink-0 text-[#f0a832] text-[20px] px-1.5 active:scale-90">★</button>
@@ -1121,7 +1121,7 @@ export default function Home() {
         </div>
         <p className="dcn-rise text-[17px] text-[#f4ece0] mb-1.5 text-center leading-snug font-bold" style={{ animationDelay: ".05s" }}>별점도 광고도 아닌, <span className="text-[#e8b87a]">진짜 후기</span>.</p>
         <p className="dcn-rise text-[15px] text-[#f4ece0] mb-2 text-center leading-relaxed font-bold" style={{ animationDelay: ".1s" }}>우리 동네 카페, <span className="text-[#e8b87a]">진짜 후기만 가려</span> 골라드려요.</p>
-        <p className="dcn-rise text-[13px] text-[#cbb89f] mb-5 text-center leading-relaxed" style={{ animationDelay: ".14s" }}>마음에 든 곳은 <span style={{ color: "#d6336c" }}>❤</span>로 <b className="text-[#f4ece0]">나만의 동네 지도</b>에.</p>
+        <p className="dcn-rise text-[13px] text-[#8f7a58] mb-5 text-center leading-relaxed" style={{ animationDelay: ".14s" }}>마음에 든 곳은 <span style={{ color: "#d6336c" }}>❤</span>로 <b className="text-[#f4ece0]">나만의 동네 지도</b>에.</p>
         <div className="dcn-rise flex flex-wrap justify-center gap-1.5 mb-8 max-w-xs" style={{ animationDelay: ".16s" }}>
           {["별점, 이제 그만 믿어요", "리뷰 옥석만 남겼어요"].map((t) => (
             <span key={t} className="text-[12px] text-[#e8b87a] border border-[#5b4636] rounded-full px-3 py-1 whitespace-nowrap">{t}</span>
@@ -1134,11 +1134,11 @@ export default function Home() {
           </button>
           <button onClick={() => { setOwnerPw(""); setOwnerErr(""); setOwnerPin(""); setOwnerPinErr(""); setOwnerAdminMode(false); setOwnerPwModal(true); }} className="w-full border border-[#9c6b3f] text-[#f4ece0] rounded-2xl py-5 px-5 text-left active:scale-[0.99] transition">
             <div className="text-lg font-bold">🏪 사장님, 우리 카페 보러가기</div>
-            <div className="text-[12px] text-[#cbb89f] mt-0.5">검증된 후기로 내 카페 경쟁력 진단 · <b className="text-[#e8b87a]">7일 무료 체험</b></div>
+            <div className="text-[12px] text-[#8f7a58] mt-0.5">검증된 후기로 내 카페 경쟁력 진단 · <b className="text-[#e8b87a]">7일 무료 체험</b></div>
           </button>
         </div>
-        <p className="text-[10px] text-[#8a7458] mt-10 text-center leading-relaxed">네이버·구글·유튜브 공개 후기 교차검증 + AI 맥락 판정<br />광고·협찬·무관 글은 자동 제외</p>
-        <div className="mt-3 text-[10px] text-[#8a7458] flex gap-3">
+        <p className="text-[10px] text-[#665036] mt-10 text-center leading-relaxed">네이버·구글·유튜브 공개 후기 교차검증 + AI 맥락 판정<br />광고·협찬·무관 글은 자동 제외</p>
+        <div className="mt-3 text-[10px] text-[#665036] flex gap-3">
           <a href="/area" className="underline">동네별 카페</a>
           <a href="/privacy" className="underline">개인정보처리방침</a>
           <a href="/terms" className="underline">이용약관</a>
@@ -1153,29 +1153,29 @@ export default function Home() {
               {ownerAdminMode ? (
                 <>
                   <h3 className="text-lg font-bold mb-1">🔒 관리자 로그인</h3>
-                  <p className="text-[13px] text-[#6b5a48] mb-3">관리자 비밀번호를 입력하세요.</p>
+                  <p className="text-[13px] text-[#524234] mb-3">관리자 비밀번호를 입력하세요.</p>
                   <input autoFocus type="password" value={ownerPw} onChange={(e) => setOwnerPw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submitOwner()}
                     placeholder="관리자 비밀번호" className="w-full border border-[#cbb89f] rounded-lg px-3 py-2.5 text-base bg-white mb-2" />
                   {ownerErr && <p className="text-[12px] text-[#c0392b] mb-2">{ownerErr}</p>}
                   <div className="flex gap-2">
                     <button onClick={submitOwner} className="flex-1 bg-[#2b2018] text-[#f4ece0] rounded-xl py-2.5 font-medium">확인</button>
-                    <button onClick={() => setOwnerPwModal(false)} className="px-4 text-[#9c6b3f]">취소</button>
+                    <button onClick={() => setOwnerPwModal(false)} className="px-4 text-[#7a5122]">취소</button>
                   </div>
-                  <button onClick={() => { setOwnerAdminMode(false); setOwnerErr(""); }} className="block w-full text-center text-[12px] text-[#9c6b3f] underline mt-3">← 사장님 키 로그인</button>
+                  <button onClick={() => { setOwnerAdminMode(false); setOwnerErr(""); }} className="block w-full text-center text-[12px] text-[#7a5122] underline mt-3">← 사장님 키 로그인</button>
                 </>
               ) : (
                 <>
                   <h3 className="text-lg font-bold mb-1 pr-24">🏪 사장님 로그인</h3>
-                  <p className="text-[13px] text-[#6b5a48] mb-3">이메일로 받은 <b>키(PIN)</b>를 입력하면 내 카페 분석으로 바로 들어갑니다.</p>
+                  <p className="text-[13px] text-[#524234] mb-3">이메일로 받은 <b>키(PIN)</b>를 입력하면 내 카페 분석으로 바로 들어갑니다.</p>
                   <input autoFocus value={ownerPin} onChange={(e) => setOwnerPin(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submitOwnerPin()}
                     placeholder="발급받은 키(PIN)" className="w-full border border-[#cbb89f] rounded-lg px-3 py-2.5 text-base bg-white mb-2 tracking-widest font-mono uppercase" />
                   {ownerPinErr && <p className="text-[12px] text-[#c0392b] mb-2">{ownerPinErr}</p>}
                   <div className="flex gap-2">
                     <button onClick={submitOwnerPin} className="flex-1 bg-[#2b2018] text-[#f4ece0] rounded-xl py-2.5 font-bold">내 카페 들어가기</button>
-                    <button onClick={() => setOwnerPwModal(false)} className="px-4 text-[#9c6b3f]">취소</button>
+                    <button onClick={() => setOwnerPwModal(false)} className="px-4 text-[#7a5122]">취소</button>
                   </div>
-                  <p className="text-[12px] text-[#6b5a48] text-center mt-3">키가 없으세요? <button onClick={() => setShowSignup(true)} className="text-[#9c6b3f] font-bold underline">7일 무료 체험 신청</button></p>
-                  <button onClick={() => { setOwnerAdminMode(true); setOwnerPinErr(""); }} className="block w-full text-center text-[11px] text-[#8a7458] underline mt-2">관리자세요? 관리자 로그인</button>
+                  <p className="text-[12px] text-[#524234] text-center mt-3">키가 없으세요? <button onClick={() => setShowSignup(true)} className="text-[#7a5122] font-bold underline">7일 무료 체험 신청</button></p>
+                  <button onClick={() => { setOwnerAdminMode(true); setOwnerPinErr(""); }} className="block w-full text-center text-[11px] text-[#665036] underline mt-2">관리자세요? 관리자 로그인</button>
                 </>
               )}
             </div>
@@ -1199,7 +1199,7 @@ export default function Home() {
           {/* 홈/지도/추억 토글 */}
           <div className="flex bg-[#3d2f22] rounded-full p-0.5">
             {(["home", "map", "memory"] as const).map((t) => (
-              <button key={t} onClick={() => setTab(t)} className={`px-2.5 sm:px-3 py-1.5 text-xs font-bold rounded-full transition-colors whitespace-nowrap ${tab === t ? "bg-[#f4ece0] text-[#2b2018]" : "text-[#cbb89f]"}`}>
+              <button key={t} onClick={() => setTab(t)} className={`px-2.5 sm:px-3 py-1.5 text-xs font-bold rounded-full transition-colors whitespace-nowrap ${tab === t ? "bg-[#f4ece0] text-[#2b2018]" : "text-[#8f7a58]"}`}>
                 {t === "home" ? "홈" : t === "map" ? "지도" : "추억"}
               </button>
             ))}
@@ -1212,7 +1212,7 @@ export default function Home() {
               <a href="/cafe/register" className="bg-[#3d2f22] rounded-full px-3 py-1.5 text-xs whitespace-nowrap hidden sm:inline-block">사장님 등록</a>
             </>
           ) : (
-            <button onClick={() => { try { sessionStorage.removeItem("dcn_role"); } catch {} setRole(null); }} className="text-[11px] text-[#cbb89f] underline whitespace-nowrap">사장님이세요?</button>
+            <button onClick={() => { try { sessionStorage.removeItem("dcn_role"); } catch {} setRole(null); }} className="text-[11px] text-[#8f7a58] underline whitespace-nowrap">사장님이세요?</button>
           )}
         </div>
       </header>
@@ -1222,7 +1222,7 @@ export default function Home() {
         <div className="flex-1 overflow-y-auto" style={{ paddingBottom: "3.25rem" }}>
           <div className="max-w-2xl mx-auto px-5 py-6">
             <div className="text-center mb-6">
-              <div className="text-[10px] tracking-[0.3em] uppercase text-[#9c6b3f]">데이터로 큐레이션하는</div>
+              <div className="text-[10px] tracking-[0.3em] uppercase text-[#7a5122]">데이터로 큐레이션하는</div>
               <div className="text-xl font-bold border-y-2 border-[#2b2018] py-2 mt-1 dcn-shimmer-dark">{homeGu ? `${homeGu}의 오늘의 커피` : "오늘의 동네 커피"}</div>
               {/* 시·도 → 시·군·구 → 동·면 계층 선택(우리 동네). 검색 돋보기 제거. */}
               <div className="flex gap-1.5 justify-center mt-3 flex-wrap">
@@ -1240,16 +1240,16 @@ export default function Home() {
                 {autoGu && (
                   <div className="flex items-center gap-2">
                     <span className="text-[11px] text-[#5f7355] bg-[#eef3ea] border border-[#cfe0c2] rounded-full px-2.5 py-1">📍 내 위치 기준 <b>{autoGu}</b></span>
-                    <button onClick={clearAuto} className="text-[11px] text-[#9c6b3f] underline">전체보기</button>
+                    <button onClick={clearAuto} className="text-[11px] text-[#7a5122] underline">전체보기</button>
                   </div>
                 )}
-                {geoMsg && <span className="text-[10px] text-[#8a7458]">{geoMsg}</span>}
-                {homeGu && !autoGu && <button onClick={clearAuto} className="text-[11px] text-[#9c6b3f] underline">수도권 전체 보기</button>}
+                {geoMsg && <span className="text-[10px] text-[#665036]">{geoMsg}</span>}
+                {homeGu && !autoGu && <button onClick={clearAuto} className="text-[11px] text-[#7a5122] underline">수도권 전체 보기</button>}
               </div>
             </div>
             {/* 📍 내 주변 옥석 카페 바로 찾기 — 위치 하나로 동네(구) 설정 + 반경 500m 옥석(검증·참고) 리스트(위치버튼 통일) */}
             <button onClick={() => (nearHome ? clearNearHome() : openLocation())}
-              className={`w-full rounded-xl py-3 font-bold text-[13px] mt-1 mb-4 shadow-sm transition-colors ${nearHome ? "bg-white text-[#9c6b3f] border border-[#cbb89f] active:scale-[0.98] transition-transform" : "text-[#f4ece0] border border-[#e6b260]/40 dcn-cta-glow"}`}
+              className={`w-full rounded-xl py-3 font-bold text-[13px] mt-1 mb-4 shadow-sm transition-colors ${nearHome ? "bg-white text-[#7a5122] border border-[#cbb89f] active:scale-[0.98] transition-transform" : "text-[#f4ece0] border border-[#e6b260]/40 dcn-cta-glow"}`}
               style={nearHome ? {} : { background: "linear-gradient(135deg, #2b1a10 0%, #4a2c16 55%, #7a4a22 100%)" }}>
               {nearHome ? "✕ 내 주변 500m 해제" : "📍 내 주변 옥석 카페 바로 찾기"}
             </button>
@@ -1260,7 +1260,7 @@ export default function Home() {
                   <div className="text-[11px] text-[#2f6fb0] shrink-0 font-medium">{nearHomeCafes.length}곳</div>
                 </div>
                 {nearHomeCafes.length === 0 ? (
-                  <div className="text-center text-[#8a7458] text-[13px] py-12 leading-relaxed">500m 내에 추천할 카페가 없습니다</div>
+                  <div className="text-center text-[#665036] text-[13px] py-12 leading-relaxed">500m 내에 추천할 카페가 없습니다</div>
                 ) : (
                   <div className="flex flex-col gap-2">
                     {nearHomeCafes.map(({ c, d }) => (
@@ -1269,14 +1269,14 @@ export default function Home() {
                           <span className="font-bold text-sm text-[#2b2018] truncate">{c.name}</span>
                           {c.synth_grade && GRADE_STYLE[c.synth_grade] && <span className="text-[8px] text-white px-1.5 py-0.5 rounded-full shrink-0" style={{ background: GRADE_STYLE[c.synth_grade].bg }}>{c.synth_grade}</span>}
                         </div>
-                        <div className="text-[11px] text-[#8a7458]">{c.area}{c.dong ? ` ${c.dong}` : ""} · {Math.round(d)}m · 리뷰 {c.synth_count ?? 0}</div>
+                        <div className="text-[11px] text-[#665036]">{c.area}{c.dong ? ` ${c.dong}` : ""} · {Math.round(d)}m · 리뷰 {c.synth_count ?? 0}</div>
                         {c.synth_identity && <p className="text-[12px] text-[#5a4a38] leading-relaxed mt-1.5 line-clamp-2">{c.synth_identity}</p>}
                       </button>
                     ))}
                   </div>
                 )}
               </div>
-            ) : !discover ? <p className="text-center text-[#8a7458] py-10">불러오는 중...</p> : (
+            ) : !discover ? <p className="text-center text-[#665036] py-10">불러오는 중...</p> : (
               <>
                 {discover.headlineA && <HeadlineCard c={discover.headlineA} kicker="이번 주 가장 많이 이야기된 곳" tone={0} onOpen={openById} />}
                 {discover.headlineB && <HeadlineCard c={discover.headlineB} kicker="🔥 커피에 진심인 집 — 스페셜티 스포트라이트" tone={1} onOpen={openById} />}
@@ -1288,7 +1288,7 @@ export default function Home() {
                 <button onClick={() => { setSido(homeSido); setSigungu(homeGu); setDong(homeDong); setFocusId(null); setSheetOpen(false); setTab("map"); }} className="w-full bg-[#2b2018] text-[#f4ece0] rounded-xl py-3.5 font-medium mt-2">🗺 {homeDong ? `${homeDong} 지도로 보기` : homeGu ? `${homeGu} 지도로 보기` : "지도에서 전체 둘러보기"} →</button>
               </>
             )}
-            <p className="text-[10px] text-[#8a7458] mt-6 text-center leading-relaxed">모든 큐레이션은 네이버 공개 후기를 교차검증한 데이터 기반입니다.</p>
+            <p className="text-[10px] text-[#665036] mt-6 text-center leading-relaxed">모든 큐레이션은 네이버 공개 후기를 교차검증한 데이터 기반입니다.</p>
           </div>
 
         </div>
@@ -1323,11 +1323,11 @@ export default function Home() {
             {/* 🗺️ 지도 표시 토글 — 우측(상단 컨트롤과 겹치지 않게 한 줄 아래로) */}
             <div className="absolute top-14 right-3 z-[1100] flex flex-col gap-1.5 items-end">
               <button onClick={() => setShowStreets((v) => !v)}
-                className={`inline-flex items-center gap-1 h-8 px-2.5 rounded-full text-[11px] font-bold shadow-lg whitespace-nowrap transition-colors ${showStreets ? "bg-[#5b4636] text-white" : "bg-white/95 text-[#8a7458] border border-[#e0d3bd]"}`}>
+                className={`inline-flex items-center gap-1 h-8 px-2.5 rounded-full text-[11px] font-bold shadow-lg whitespace-nowrap transition-colors ${showStreets ? "bg-[#5b4636] text-white" : "bg-white/95 text-[#665036] border border-[#e0d3bd]"}`}>
                 <span className="text-[12px] leading-none">🏷️</span><span>상세 {showStreets ? "ON" : "OFF"}</span>
               </button>
               <button onClick={() => setShowBus((v) => !v)}
-                className={`inline-flex items-center gap-1 h-8 px-2.5 rounded-full text-[11px] font-bold shadow-lg whitespace-nowrap transition-colors ${showBus ? "bg-[#235a86] text-white" : "bg-white/95 text-[#8a7458] border border-[#bcd0e0]"}`}>
+                className={`inline-flex items-center gap-1 h-8 px-2.5 rounded-full text-[11px] font-bold shadow-lg whitespace-nowrap transition-colors ${showBus ? "bg-[#235a86] text-white" : "bg-white/95 text-[#665036] border border-[#bcd0e0]"}`}>
                 <span className="text-[12px] leading-none">🚌</span><span>버스 {showBus ? "ON" : "OFF"}</span>
               </button>
             </div>
@@ -1335,7 +1335,7 @@ export default function Home() {
             {(nearMe || nearMsg) && (
               <div className="absolute top-[3.25rem] left-1/2 -translate-x-1/2 z-[1100] bg-white/95 backdrop-blur rounded-full shadow-lg px-3 py-1.5 text-[11px] text-[#23527c] flex items-center gap-2 whitespace-nowrap">
                 <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: "#2f6fb0" }} />
-                {nearMsg ? <span>{nearMsg}</span> : <><span>내 위치 반경 <b>500m</b> 카페</span><button onClick={clearNearMe} className="text-[#8a7458] font-bold ml-0.5">✕ 해제</button></>}
+                {nearMsg ? <span>{nearMsg}</span> : <><span>내 위치 반경 <b>500m</b> 카페</span><button onClick={clearNearMe} className="text-[#665036] font-bold ml-0.5">✕ 해제</button></>}
               </div>
             )}
             {/* 범례 — 두 핀의 의미 안내(켜졌을 때만). 같은 카페면 핀이 하나로 병합됨 */}
@@ -1343,7 +1343,7 @@ export default function Home() {
               <div className="absolute top-3 left-3 z-[1100] bg-white/95 backdrop-blur rounded-xl shadow-lg px-3 py-2 text-[11px] text-[#4a3a2a] leading-snug max-w-[150px]">
                 {myPinMode && <div className="flex items-center gap-1.5 mb-0.5"><span className="inline-block w-3 h-3 rounded-full" style={{ background: "#d6336c" }} />❤ 내가 저장한 카페</div>}
                 {othersMode && <div className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-full" style={{ background: "#5f7355" }} />숫자 = 저장한 사람 수</div>}
-                {myPinMode && othersMode && <div className="mt-1 pt-1 border-t border-[#eee2d2] text-[10px] text-[#8a7458]">같은 카페면 ❤에 인원 배지로 합쳐져요</div>}
+                {myPinMode && othersMode && <div className="mt-1 pt-1 border-t border-[#eee2d2] text-[10px] text-[#665036]">같은 카페면 ❤에 인원 배지로 합쳐져요</div>}
               </div>
             )}
           </div>
@@ -1356,7 +1356,7 @@ export default function Home() {
             {/* 접힘 시 정확히 이 핸들(2.75rem)까지만 보이게 — 아래 목록이 삐져나오지 않음 */}
             <button onClick={() => setSheetOpen((o) => !o)} className="shrink-0 w-full flex flex-col items-center justify-center gap-1" style={{ height: "2.75rem" }} aria-expanded={sheetOpen}>
               <div className="w-9 h-1 bg-[#cbb89f] rounded-full" />
-              <span className="text-[11px] font-bold text-[#9c6b3f] leading-none">{sheetOpen ? "지도 보기 ▾" : `지역·필터 펼치기 ▴ (${filtered.length})`}</span>
+              <span className="text-[11px] font-bold text-[#7a5122] leading-none">{sheetOpen ? "지도 보기 ▾" : `지역·필터 펼치기 ▴ (${filtered.length})`}</span>
             </button>
             <div className="flex-1 overflow-y-auto px-5 pb-8" style={{ WebkitOverflowScrolling: "touch" }}>
               <MapControls {...{ sido, sigungu, dong, onSido, onSigungu, setDong, dongOptions, tasteKey, setTasteKey, filtered, matchSet, setSelected, openLocation, autoGu, geoMsg, clearAuto, setShowFavs, favCount: cafes.filter((c) => bookmarkIds.has(c.id)).length, closeSheet: () => { setFocusId(null); setSheetOpen(false); } }} />
@@ -1420,7 +1420,7 @@ export default function Home() {
             {explain === "mine" ? (
               <>
                 <div className="text-[16px] font-bold text-[#d6336c] mb-2">❤ 내 카페</div>
-                <p className="text-[13.5px] text-[#3d2f22] leading-relaxed">내가 머문 카페, 그날의 커피와 순간을 <b>❤로 기록한 추억</b>들이에요. 지도 위에 하나둘 모아 <b>나만의 추억 지도</b>를 그려가요. <span className="text-[#8a7458]">(이 기기에만 소중히 담겨요.)</span></p>
+                <p className="text-[13.5px] text-[#3d2f22] leading-relaxed">내가 머문 카페, 그날의 커피와 순간을 <b>❤로 기록한 추억</b>들이에요. 지도 위에 하나둘 모아 <b>나만의 추억 지도</b>를 그려가요. <span className="text-[#665036]">(이 기기에만 소중히 담겨요.)</span></p>
               </>
             ) : (
               <>
@@ -1430,7 +1430,7 @@ export default function Home() {
             )}
             <div className="flex gap-2 mt-5">
               <button onClick={() => { const t = explain; setExplain(null); revealMode(t); }} className="flex-1 bg-[#2b2018] text-[#f4ece0] rounded-lg py-2.5 text-sm font-bold">닫기</button>
-              <button onClick={() => { const t = explain; suppressExplain(t); setExplain(null); revealMode(t); }} className="flex-1 bg-white border border-[#cbb89f] text-[#6b5a48] rounded-lg py-2.5 text-[13px]">일주일 동안 보지 않기</button>
+              <button onClick={() => { const t = explain; suppressExplain(t); setExplain(null); revealMode(t); }} className="flex-1 bg-white border border-[#cbb89f] text-[#524234] rounded-lg py-2.5 text-[13px]">일주일 동안 보지 않기</button>
             </div>
           </div>
         </div>
@@ -1446,19 +1446,19 @@ export default function Home() {
                 <input autoFocus value={searchQ} onChange={(e) => setSearchQ(e.target.value)} onKeyDown={(e) => e.key === "Enter" && runSearch(searchQ)}
                   placeholder={`느낌 또는 ☕카페 이름으로 찾기`} className="flex-1 border border-[#cbb89f] rounded-lg px-3 py-2.5 text-base bg-white text-[#2b2018]" />
                 <button onClick={() => runSearch(searchQ)} className="bg-[#2b2018] text-[#f4ece0] rounded-lg px-4 py-2.5 text-sm font-medium shrink-0">검색</button>
-                <button onClick={() => setShowSearch(false)} className="text-2xl text-[#9c6b3f] leading-none px-1 shrink-0">×</button>
+                <button onClick={() => setShowSearch(false)} className="text-2xl text-[#7a5122] leading-none px-1 shrink-0">×</button>
               </div>
               <div className="text-[11px] text-[#5f7355] mt-2 font-medium">💡 “비 오는 날 조용히” 같은 <b>느낌</b>은 물론, <b>카페 이름</b>을 바로 적어도 찾아드려요.</div>
-              <div className="text-[11px] text-[#8a7458] mt-1">{homeGu ? `📍 ${homeGu} 안에서` : "수도권 전체에서"} 검색</div>
+              <div className="text-[11px] text-[#665036] mt-1">{homeGu ? `📍 ${homeGu} 안에서` : "수도권 전체에서"} 검색</div>
               <div className="flex flex-wrap gap-1.5 mt-2">
                 {SEARCH_EXAMPLES.map((ex) => (
-                  <button key={ex} onClick={() => runSearch(ex)} className="text-[11px] text-[#6b5a48] bg-[#f0e6d4] rounded-full px-2.5 py-1">{ex}</button>
+                  <button key={ex} onClick={() => runSearch(ex)} className="text-[11px] text-[#524234] bg-[#f0e6d4] rounded-full px-2.5 py-1">{ex}</button>
                 ))}
               </div>
             </div>
             <div className="flex-1 overflow-y-auto p-4 pb-[calc(1rem_+_env(safe-area-inset-bottom))]">
-              {searchLoading ? <p className="text-center text-[#8a7458] py-10">찾는 중…</p>
-                : !searchRes ? <p className="text-center text-[#8a7458] py-10 text-sm leading-relaxed">"비 오는 날 혼자 조용히", "감성 사진 데이트"처럼<br />구체적이지 않아도 떠오르는 느낌으로 찾아드려요.</p>
+              {searchLoading ? <p className="text-center text-[#665036] py-10">찾는 중…</p>
+                : !searchRes ? <p className="text-center text-[#665036] py-10 text-sm leading-relaxed">"비 오는 날 혼자 조용히", "감성 사진 데이트"처럼<br />구체적이지 않아도 떠오르는 느낌으로 찾아드려요.</p>
                 : (
                   <>
                     {searchRes.coverageNote && (
@@ -1468,18 +1468,18 @@ export default function Home() {
                     )}
                     {searchRes.concepts.length > 0 && <div className="text-[11px] text-[#5f7355] mb-3">감지된 느낌: <b>{searchRes.concepts.join(" · ")}</b></div>}
                     {searchRes.results.length === 0 ? (
-                      <p className="text-center text-[#8a7458] py-10 text-sm">결과가 없어요. 다른 표현이나 더 넓은 동네로 시도해 보세요.</p>
+                      <p className="text-center text-[#665036] py-10 text-sm">결과가 없어요. 다른 표현이나 더 넓은 동네로 시도해 보세요.</p>
                     ) : (
                       <div className="space-y-2">
-                        <div className="text-[11px] text-[#8a7458] mb-1">{searchRes.region} · {searchRes.count}곳 중 가까운 순</div>
+                        <div className="text-[11px] text-[#665036] mb-1">{searchRes.region} · {searchRes.count}곳 중 가까운 순</div>
                         {searchRes.results.map((r) => (
                           <button key={r.id} onClick={() => { openById(r.id); setShowSearch(false); }} className="w-full text-left bg-white rounded-xl p-3.5 border border-[#ece0cd] hover:border-[#9c6b3f]">
                             <div className="flex items-center gap-1.5 mb-0.5">
                               <span className="font-bold text-sm text-[#2b2018]">{r.name}</span>
                               {r.grade && GRADE_STYLE[r.grade] && <span className="text-[8px] text-white px-1 py-0.5 rounded-full" style={{ background: GRADE_STYLE[r.grade].bg }}>{r.grade}</span>}
-                              <span className="text-[10px] text-[#8a7458] ml-auto">{r.area} · 리뷰 {r.count ?? 0}</span>
+                              <span className="text-[10px] text-[#665036] ml-auto">{r.area} · 리뷰 {r.count ?? 0}</span>
                             </div>
-                            {r.identity && <p className="text-[11px] text-[#6b5a48] line-clamp-1 mb-1">{r.identity}</p>}
+                            {r.identity && <p className="text-[11px] text-[#524234] line-clamp-1 mb-1">{r.identity}</p>}
                             {r.reasons.length > 0 && <div className="text-[10px] text-[#b08440]">🔎 {r.reasons.join(" · ")}</div>}
                           </button>
                         ))}
@@ -1507,12 +1507,12 @@ export default function Home() {
               <div className="text-[12.5px] text-[#3f5a37] font-medium">🎯 내 동네 검증 후기 카페 <b>자동 정렬·추천</b></div>
               <div className="text-[12.5px] text-[#3f5a37] font-medium">☕ 광고·옆가게 없이 <b>진짜 후기로 가린 옥석</b>만</div>
             </div>
-            <p className="text-[11.5px] text-[#6b5a48] leading-relaxed mb-3">
+            <p className="text-[11.5px] text-[#524234] leading-relaxed mb-3">
               🔒 정확한 좌표가 아니라 <b>대략적 지역(≈500m)만</b> 쓰고, 이름·연락처 같은 <b>개인정보는 일절 안 받아요</b>. 동의는 <b>선택</b>이고 언제든 끌 수 있어요. 동의하시면 브라우저가 위치 권한을 한 번 더 물어봅니다.
             </p>
             <details className="mb-4">
-              <summary className="text-[12px] text-[#9c6b3f] cursor-pointer">수집·이용 동의 내용 자세히 보기</summary>
-              <div className="text-[11px] text-[#6b5a48] leading-relaxed mt-2 bg-[#f4ece0] rounded-lg p-3 space-y-1">
+              <summary className="text-[12px] text-[#7a5122] cursor-pointer">수집·이용 동의 내용 자세히 보기</summary>
+              <div className="text-[11px] text-[#524234] leading-relaxed mt-2 bg-[#f4ece0] rounded-lg p-3 space-y-1">
                 <div>· <b>수집 항목</b>: 대략적 위치(시·군·구 수준), 브라우저 익명 식별자</div>
                 <div>· <b>이용 목적</b>: 내 동네 카페 자동 추천·필터, 지역별 수요 통계</div>
                 <div>· <b>보관·파기</b>: 동의 철회 또는 브라우저 데이터 삭제 시까지, 이후 파기</div>
@@ -1524,7 +1524,7 @@ export default function Home() {
             </details>
             <div className="flex flex-col gap-2">
               <button onClick={onAgree} className="w-full bg-[#2b2018] text-[#f4ece0] rounded-xl py-3 font-bold">📍 내 주변 옥석 카페 보기</button>
-              <button onClick={onDecline} className="w-full text-[#9c6b3f] rounded-xl py-2 text-sm">아니요, 전체 볼게요</button>
+              <button onClick={onDecline} className="w-full text-[#7a5122] rounded-xl py-2 text-sm">아니요, 전체 볼게요</button>
             </div>
           </div>
         </div>
@@ -1573,8 +1573,8 @@ function MapControls({ sido, sigungu, dong, onSido, onSigungu, setDong, dongOpti
             <option value="">{sigungu && !(dongOptions?.length) ? "우리 동네(수집중)" : "우리 동네"}</option>{(dongOptions ?? []).map((d: string) => <option key={d} value={d}>{d}</option>)}
           </select>
         </div>
-        {geoMsg && <div className="text-[10px] text-[#8a7458] mt-1.5">{geoMsg}</div>}
-        {(sido || sigungu || dong) && <button onClick={() => { if (clearAuto) clearAuto(); else { onSido(""); } }} className="text-xs text-[#9c6b3f] underline mt-2">전체</button>}
+        {geoMsg && <div className="text-[10px] text-[#665036] mt-1.5">{geoMsg}</div>}
+        {(sido || sigungu || dong) && <button onClick={() => { if (clearAuto) clearAuto(); else { onSido(""); } }} className="text-xs text-[#7a5122] underline mt-2">전체</button>}
       </div>
       <div className="mb-5">
         <div className="text-sm font-bold text-[#52402e] mb-2.5 flex items-center gap-1.5">☕ 어떤 카페 찾으세요?<InfoDot title="'결'로 거르기"><b>결</b>은 후기에서 자주 언급되는 카페의 성격이에요(조용·작업·디저트·로스팅 등). 고르면 그 결이 강한 카페만 핀·목록에 뜨고, <b>그 결이 많이 언급된 순</b>으로 정렬돼요. 측정값이 아니라 '리뷰에서 자주 나온 정도'입니다.</InfoDot></div>
@@ -1582,23 +1582,23 @@ function MapControls({ sido, sigungu, dong, onSido, onSigungu, setDong, dongOpti
           {TASTE_CHOICES.map((t) => (
             <button key={t.key} onClick={() => setTasteKey(tasteKey === t.key ? null : t.key)} className={`rounded-xl p-3 text-left border transition-colors ${tasteKey === t.key ? "bg-[#2b2018] text-[#f4ece0] border-[#2b2018]" : "bg-white text-[#2b2018] border-[#cbb89f]"}`}>
               <div className="text-xl mb-0.5">{t.emoji}</div><div className="text-xs font-bold">{t.label}</div>
-              <div className={`text-[10px] mt-0.5 ${tasteKey === t.key ? "text-[#d4a574]" : "text-[#8a7458]"}`}>{t.desc}</div>
+              <div className={`text-[10px] mt-0.5 ${tasteKey === t.key ? "text-[#d4a574]" : "text-[#665036]"}`}>{t.desc}</div>
             </button>
           ))}
         </div>
         {tasteKey && (
           <div className="mt-2 flex items-center justify-between gap-2">
-            <p className="text-xs text-[#9c6b3f]">'{TASTE_CHOICES.find((t) => t.key === tasteKey)?.label}' 결이 자주 언급되는 {matchSet.size}곳만 보는 중</p>
-            <a href={`/taste/${tasteKey}`} className="text-[11px] font-bold text-[#9c6b3f] border border-[#d9c9b0] rounded-full px-2.5 py-1 shrink-0 whitespace-nowrap">🔗 내 취향 공유</a>
+            <p className="text-xs text-[#7a5122]">'{TASTE_CHOICES.find((t) => t.key === tasteKey)?.label}' 결이 자주 언급되는 {matchSet.size}곳만 보는 중</p>
+            <a href={`/taste/${tasteKey}`} className="text-[11px] font-bold text-[#7a5122] border border-[#d9c9b0] rounded-full px-2.5 py-1 shrink-0 whitespace-nowrap">🔗 내 취향 공유</a>
           </div>
         )}
       </div>
       <div>
         <div className="flex items-baseline justify-between mb-2.5">
           <div className="text-sm font-bold text-[#52402e]">목록 ({listCafes.length}{tasteKey ? ` · ${TASTE_CHOICES.find((t: any) => t.key === tasteKey)?.label}` : ""})</div>
-          <div className="text-[10px] text-[#9c6b3f] shrink-0">↕ {sortLabel}</div>
+          <div className="text-[10px] text-[#7a5122] shrink-0">↕ {sortLabel}</div>
         </div>
-        {listCafes.length === 0 ? <p className="text-xs text-[#8a7458] bg-[#f4ece0] rounded-lg p-4">{tasteKey ? "이 카테고리에 해당하는 카페가 이 지역엔 없어요. 다른 결을 골라보세요." : "지역을 선택하면 목록이 나와요."}</p> : (
+        {listCafes.length === 0 ? <p className="text-xs text-[#665036] bg-[#f4ece0] rounded-lg p-4">{tasteKey ? "이 카테고리에 해당하는 카페가 이 지역엔 없어요. 다른 결을 골라보세요." : "지역을 선택하면 목록이 나와요."}</p> : (
           <div className="space-y-2">
             {listCafes.slice(0, 50).map((c: Cafe) => (
               <button key={c.id} onClick={() => setSelected(c)} className="w-full text-left bg-[#f4ece0] rounded-xl p-3">
@@ -1606,9 +1606,9 @@ function MapControls({ sido, sigungu, dong, onSido, onSigungu, setDong, dongOpti
                   <span className="font-bold text-sm text-[#2b2018]">{c.name}</span>
                   {c.synth_grade && GRADE_STYLE[c.synth_grade] && <span className="text-[9px] text-white px-1.5 py-0.5 rounded-full" style={{ background: GRADE_STYLE[c.synth_grade].bg }}>{GRADE_STYLE[c.synth_grade].label}</span>}
                   {tasteKey && matchSet.has(c.id) && <span className="text-[10px] text-[#5f7355]">✓</span>}
-                  <span className="text-[10px] text-[#8a7458] ml-auto">{c.area} · 리뷰 {c.synth_count ?? 0}</span>
+                  <span className="text-[10px] text-[#665036] ml-auto">{c.area} · 리뷰 {c.synth_count ?? 0}</span>
                 </div>
-                <div className="text-[11px] text-[#6b5a48] line-clamp-1">{c.note || c.vibe}</div>
+                <div className="text-[11px] text-[#524234] line-clamp-1">{c.note || c.vibe}</div>
               </button>
             ))}
           </div>
@@ -1705,7 +1705,7 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
                   <video src={promo.video_url} controls playsInline preload="metadata" onPlay={() => trackPromo(cafe.id, "play")} className="w-full block bg-black" style={{ maxHeight: "22rem" }} />
                   <span className="absolute top-2.5 left-2.5 z-10 text-[9px] font-bold text-[#2b2018] bg-[#e8b87a] px-2.5 py-1 rounded-full shadow-md pointer-events-none">🎀 사장님 쇼케이스</span>
                 </div>
-                <div className="text-center text-[10px] text-[#9c6b3f] mt-2 tracking-wide">사장님이 직접 올린 우리 가게 영상</div>
+                <div className="text-center text-[10px] text-[#7a5122] mt-2 tracking-wide">사장님이 직접 올린 우리 가게 영상</div>
               </div>
             ) : (
               <div onClick={() => trackPromo(cafe.id, "click")}>
@@ -1757,7 +1757,7 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="#3c1e1e"><path d="M12 3C6.5 3 2 6.6 2 11c0 2.8 1.9 5.3 4.7 6.7-.2.7-.7 2.6-.8 3-.1.5.2.5.4.4.2-.1 2.6-1.8 3.7-2.5.6.1 1.3.1 2 .1 5.5 0 10-3.6 10-8S17.5 3 12 3z"/></svg>
                 공유
               </KakaoShare>
-              <button onClick={onClose} className="text-3xl text-[#9c6b3f] leading-none px-1">×</button>
+              <button onClick={onClose} className="text-3xl text-[#7a5122] leading-none px-1">×</button>
             </div>
           </div>
           {/* ❤ MY PIN(내 카페 추억) 노출 배너 — 지도 패널에서도 눈에 띄게(#339/#347, /c/[id] 배너와 동일 톤). 2단계 저장·무가입 원칙 무변, 노출만 강화 */}
@@ -1769,27 +1769,27 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
                 <span className="text-[12.5px] font-bold text-[#b23a5f] flex items-center gap-1">
                   <span className="text-[14px] leading-none">❤</span> 이 카페, 다녀가셨나요?
                 </span>
-                <span className="text-[10.5px] text-[#9c8a6c]">위치인증하고 나만의 추억으로 저장 — 무가입·30초</span>
+                <span className="text-[10.5px] text-[#6f6047]">위치인증하고 나만의 추억으로 저장 — 무가입·30초</span>
               </span>
               <span className="text-[#d6336c] font-bold whitespace-nowrap">→</span>
             </button>
           )}
-          <div className="text-[#9c6b3f] text-sm mb-3">{cafe.area} · {cafe.vibe}</div>
+          <div className="text-[#7a5122] text-sm mb-3">{cafe.area} · {cafe.vibe}</div>
           {cafe.note && <p className="text-[15px] text-[#3d2f22] font-medium leading-relaxed mb-4">"{cafe.note}"</p>}
           {/* ⭐ 한눈에 판단 — 전체 카페 대비 강점/아쉬운점(리뷰 옥석 보기 전 직관 판단의 핵심) */}
           {/* 📊 리뷰 데이터 분석 — 옥석 후기 핵심(가장 먼저 눈에 띄게, 구미 당기는 hook) */}
           {(highlights.length > 0 || cafe.synth_identity) && (
             <div className="bg-gradient-to-b from-[#f4eee2] to-[#ece4d4] rounded-xl px-4 py-3.5 mb-3 border border-[#d8c8ad]">
-              <div className="text-[11px] font-bold text-[#7a5f3c] uppercase tracking-wider mb-2">📊 리뷰 데이터 분석 <span className="font-normal lowercase tracking-normal text-[#9c6b3f]">· 검증 후기 {cafe.synth_count}건</span></div>
+              <div className="text-[11px] font-bold text-[#7a5f3c] uppercase tracking-wider mb-2">📊 리뷰 데이터 분석 <span className="font-normal lowercase tracking-normal text-[#7a5122]">· 검증 후기 {cafe.synth_count}건</span></div>
               {cafe.synth_identity && <div className="text-[14px] font-semibold text-[#3d2f22] leading-relaxed mb-2.5">{cafe.synth_identity}</div>}
               {highlights.length > 0 && (
                 <>
-                  <div className="text-[10.5px] text-[#9c6b3f] mb-1.5">후기에서 가장 많이 나온 것 <span className="text-[#b9a78a]">· 숫자=언급 후기 수</span></div>
+                  <div className="text-[10.5px] text-[#7a5122] mb-1.5">후기에서 가장 많이 나온 것 <span className="text-[#b9a78a]">· 숫자=언급 후기 수</span></div>
                   <div className="flex flex-wrap gap-1.5">
                     {highlights.map((h, i) => (
                       <span key={h.label} className={`text-[12.5px] rounded-full pl-2.5 pr-1.5 py-1 border font-semibold inline-flex items-center gap-1.5 ${i === 0 ? "bg-[#2b2018] text-[#f4ece0] border-[#2b2018]" : "bg-white text-[#52402e] border-[#d8c8ad]"}`}>
                         {h.emoji} {h.label}
-                        <span className={`text-[10px] font-bold rounded-full px-1.5 py-[1px] ${i === 0 ? "bg-[#e8b87a] text-[#2b2018]" : "bg-[#efe9dd] text-[#8a7458]"}`}>{h.count}</span>
+                        <span className={`text-[10px] font-bold rounded-full px-1.5 py-[1px] ${i === 0 ? "bg-[#e8b87a] text-[#2b2018]" : "bg-[#efe9dd] text-[#665036]"}`}>{h.count}</span>
                       </span>
                     ))}
                   </div>
@@ -1806,7 +1806,7 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
           {/* 👍 강점 / 🔎 아쉬운점 — 전체 카페 대비 상대 위치 + 언급수/평균 */}
           {profile.ok ? (
             <div className="bg-[#efe9dd] rounded-xl px-4 py-3.5 mb-4 border border-[#ddd0bb]">
-              <div className="text-[11px] font-bold text-[#7a5f3c] uppercase tracking-wider mb-2.5">한눈에 강·약 <span className="font-normal lowercase tracking-normal text-[#9c6b3f]">· 전체 카페 대비</span></div>
+              <div className="text-[11px] font-bold text-[#7a5f3c] uppercase tracking-wider mb-2.5">한눈에 강·약 <span className="font-normal lowercase tracking-normal text-[#7a5122]">· 전체 카페 대비</span></div>
               {profile.strong.length > 0 && (
                 <div className={profile.weak.length > 0 ? "mb-2.5" : ""}>
                   <div className="text-[11px] font-bold text-[#3f7a4f] mb-1.5">👍 이런 점이 강해요</div>
@@ -1836,15 +1836,15 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
                   </div>
                 </div>
               )}
-              <p className="text-[10px] text-[#8a7458] mt-2.5 leading-relaxed">기준은 <b>후기 1건당 언급 비율</b>이에요 — 후기 수가 많고 적음을 보정한 공정한 비교입니다. '평균의 N배'·'상위/하위 %'는 전체 카페와 같은 기준으로 비교한 값. 절대 평가가 아닙니다.</p>
+              <p className="text-[10px] text-[#665036] mt-2.5 leading-relaxed">기준은 <b>후기 1건당 언급 비율</b>이에요 — 후기 수가 많고 적음을 보정한 공정한 비교입니다. '평균의 N배'·'상위/하위 %'는 전체 카페와 같은 기준으로 비교한 값. 절대 평가가 아닙니다.</p>
             </div>
           ) : chars.length > 0 && (
             <div className="bg-[#efe9dd] rounded-lg px-4 py-3 mb-4 border border-[#ddd0bb]">
-              <div className="text-[11px] text-[#8a7458] uppercase tracking-wider mb-2">이 카페가 자주 언급되는 결</div>
+              <div className="text-[11px] text-[#665036] uppercase tracking-wider mb-2">이 카페가 자주 언급되는 결</div>
               <div className="flex flex-wrap gap-1.5">{chars.map((ch) => <span key={ch.label} className="text-[12px] bg-white text-[#52402e] px-2.5 py-1 rounded-full border border-[#e0d4c0]">{ch.emoji} {ch.label}</span>)}</div>
             </div>
           )}
-          {cafe.signature && <div className="text-sm text-[#6b5a48] mb-4"><span className="text-[#9c6b3f]">추천 </span>{cafe.signature}</div>}
+          {cafe.signature && <div className="text-sm text-[#524234] mb-4"><span className="text-[#7a5122]">추천 </span>{cafe.signature}</div>}
           {/* 방문자 후기 — 길찾기 버튼 바로 위에 배치(목록 → 상세 모달). 공개 방문기록 있을 때만. */}
           {userReviews.length > 0 && <div className="mb-4"><VisitorReviews reviews={userReviews} /></div>}
           {/* ===== 버튼 3개 — 리뷰 위에 배치, 눈에 잘 띄게 ===== */}
@@ -1856,7 +1856,7 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
             </a>
           </div>
 
-          {loadingRev && <div className="text-[11px] text-[#8a7458] mb-4">근거 후기 불러오는 중...</div>}
+          {loadingRev && <div className="text-[11px] text-[#665036] mb-4">근거 후기 불러오는 중...</div>}
           {!loadingRev && quality && quality.raw > 0 && (
             <div className="bg-[#eef3ea] border border-[#cfe0c2] rounded-lg px-4 py-2.5 mb-4">
               <div className="text-[11px] text-[#4f6a43] leading-relaxed flex items-start gap-1">
@@ -1873,8 +1873,8 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
           {!loadingRev && reviews.length > 0 && (
             <div className="mb-4">
               <div className="flex items-center justify-between mb-2">
-                <div className="text-[11px] text-[#8a7458]">이 분석의 근거가 된 실제 후기 (네이버 공개 글)</div>
-                <button onClick={() => setShowAllReviews(true)} className="text-[11px] text-[#9c6b3f] font-medium underline">{"전체 "}{reviews.length}{"건 보기 →"}</button>
+                <div className="text-[11px] text-[#665036]">이 분석의 근거가 된 실제 후기 (네이버 공개 글)</div>
+                <button onClick={() => setShowAllReviews(true)} className="text-[11px] text-[#7a5122] font-medium underline">{"전체 "}{reviews.length}{"건 보기 →"}</button>
               </div>
               <div className="space-y-3">
                 {reviews.slice(0, 6).map((rv, i) => (
@@ -1887,23 +1887,23 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
                         : null}
                       {rv.why?.some((w) => w.includes("AI 검증"))
                         ? <span className="text-[9px] text-white px-1.5 py-0.5 rounded-full" style={{ background: "#7c5cbf" }}>✨ AI 검증</span>
-                        : rv.why?.[0] && <span className="text-[10px] text-[#8a7458]">{rv.why[0]}</span>}
+                        : rv.why?.[0] && <span className="text-[10px] text-[#665036]">{rv.why[0]}</span>}
                     </div>
                     {rv.link
-                      ? <a href={rv.link} target="_blank" rel="noopener noreferrer" className="block text-[13.5px] text-[#3d2f22] leading-[1.75] hover:text-[#9c6b3f] transition-colors">"{hlQuote(rv.quote)}"</a>
+                      ? <a href={rv.link} target="_blank" rel="noopener noreferrer" className="block text-[13.5px] text-[#3d2f22] leading-[1.75] hover:text-[#7a5122] transition-colors">"{hlQuote(rv.quote)}"</a>
                       : <div className="text-[13.5px] text-[#3d2f22] leading-[1.75]">"{hlQuote(rv.quote)}"</div>}
-                    <div className="flex items-center gap-2 mt-1.5 text-[10px] text-[#8a7458]">
+                    <div className="flex items-center gap-2 mt-1.5 text-[10px] text-[#665036]">
                       {rv.link && /youtu\.?be/.test(rv.link) && <span className="text-white rounded-[3px] px-1 py-0.5" style={{ background: "#c4302b", fontSize: "8px" }}>▶ YouTube</span>}
                       <span>{rv.source}</span>{rv.date && <span>· {rv.date}</span>}
                       {rv.link && (/youtu\.?be/.test(rv.link)
                         ? <a href={rv.link} target="_blank" rel="noopener noreferrer" className="text-[#c4302b] font-medium ml-auto">영상 보기 →</a>
-                        : <a href={rv.link} target="_blank" rel="noopener noreferrer" className="text-[#9c6b3f] underline ml-auto">원문 →</a>)}
+                        : <a href={rv.link} target="_blank" rel="noopener noreferrer" className="text-[#7a5122] underline ml-auto">원문 →</a>)}
                     </div>
                   </div>
                 ))}
               </div>
               {reviews.length > 6 && (
-                <button onClick={() => setShowAllReviews(true)} className="w-full mt-2 py-2 text-[12px] text-[#9c6b3f] border border-[#e6d9c8] rounded-lg">
+                <button onClick={() => setShowAllReviews(true)} className="w-full mt-2 py-2 text-[12px] text-[#7a5122] border border-[#e6d9c8] rounded-lg">
                   + {reviews.length - 6}건 더 보기
                 </button>
               )}
@@ -1919,7 +1919,7 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
                     className="flex items-center gap-2 bg-white border border-[#e0d3bd] rounded-xl px-3.5 py-2.5 text-left">
                     <span className="flex flex-col text-left min-w-0">
                       <span className="text-[13.5px] font-bold text-[#3d2f22] truncate">{nc.name}</span>
-                      <span className="text-[10.5px] text-[#9c8a6c] truncate">검증후기 {nc.synth_count ?? 0}건</span>
+                      <span className="text-[10.5px] text-[#6f6047] truncate">검증후기 {nc.synth_count ?? 0}건</span>
                     </span>
                     {nc.synth_grade && <span className="ml-auto text-[10px] font-bold bg-[#2b2018] text-[#e8b87a] px-2 py-0.5 rounded-full whitespace-nowrap shrink-0">{nc.synth_grade}</span>}
                   </button>
@@ -1937,14 +1937,14 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
               <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-[#f0e6d4]">
                 <div>
                   <div className="font-bold text-[#2b2018] text-[15px]">{cafe.name}</div>
-                  <div className="flex items-center gap-2 mt-0.5 text-[11px] text-[#8a7458]">
+                  <div className="flex items-center gap-2 mt-0.5 text-[11px] text-[#665036]">
                     <span>검증 <b className="text-[#5f7355]">{reviews.filter(r => r.trust === "verified").length}</b></span>
-                    <span>· 참고 <b className="text-[#9c6b3f]">{reviews.filter(r => r.trust === "reference").length}</b></span>
+                    <span>· 참고 <b className="text-[#7a5122]">{reviews.filter(r => r.trust === "reference").length}</b></span>
                     <span>· 총 <b className="text-[#2b2018]">{reviews.length}</b>건</span>
                     {quality && quality.rejected > 0 && <span className="text-[#c0a08a]">/ 제외 {quality.rejected}</span>}
                   </div>
                 </div>
-                <button onClick={() => setShowAllReviews(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-[#f0e6d4] text-[#7a6452] text-lg leading-none">×</button>
+                <button onClick={() => setShowAllReviews(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-[#f0e6d4] text-[#594839] text-lg leading-none">×</button>
               </div>
               {/* 필터 — wrap으로 잘림 방지 */}
               <div className="px-4 py-2.5 border-b border-[#f0e6d4]">
@@ -1964,7 +1964,7 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
                         className={`px-3 py-1.5 rounded-full text-[11px] font-medium transition-all ${
                           active
                             ? ytColor ? "text-white" : "bg-[#2b2018] text-[#f4ece0]"
-                            : "bg-white border border-[#e6d9c8] text-[#7a6452]"
+                            : "bg-white border border-[#e6d9c8] text-[#594839]"
                         }`}
                         style={active && ytColor ? { background: "#c4302b" } : {}}>
                         {label}
@@ -1994,17 +1994,17 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
                         : null}
                       {rv.why?.some((w) => w.includes("AI 검증"))
                         ? <span className="text-[9px] text-white px-1.5 py-0.5 rounded-full" style={{ background: "#7c5cbf" }}>✨ AI 검증</span>
-                        : rv.why?.[0] && <span className="text-[10px] text-[#8a7458]">{rv.why[0]}</span>}
+                        : rv.why?.[0] && <span className="text-[10px] text-[#665036]">{rv.why[0]}</span>}
                     </div>
                     {rv.link
-                      ? <a href={rv.link} target="_blank" rel="noopener noreferrer" className="block text-[13.5px] text-[#3d2f22] leading-[1.75] hover:text-[#9c6b3f] transition-colors">"{hlQuote(rv.quote)}"</a>
+                      ? <a href={rv.link} target="_blank" rel="noopener noreferrer" className="block text-[13.5px] text-[#3d2f22] leading-[1.75] hover:text-[#7a5122] transition-colors">"{hlQuote(rv.quote)}"</a>
                       : <div className="text-[13.5px] text-[#3d2f22] leading-[1.75]">"{hlQuote(rv.quote)}"</div>}
-                    <div className="flex items-center gap-2 mt-1.5 text-[10px] text-[#8a7458]">
+                    <div className="flex items-center gap-2 mt-1.5 text-[10px] text-[#665036]">
                       {rv.link && /youtu\.?be/.test(rv.link) && <span className="text-white rounded-[3px] px-1 py-0.5" style={{ background: "#c4302b", fontSize: "8px" }}>▶ YouTube</span>}
                       <span>{rv.source}</span>{rv.date && <span>· {rv.date}</span>}
                       {rv.link && (/youtu\.?be/.test(rv.link)
                         ? <a href={rv.link} target="_blank" rel="noopener noreferrer" className="text-[#c4302b] font-medium ml-auto">영상 보기 →</a>
-                        : <a href={rv.link} target="_blank" rel="noopener noreferrer" className="text-[#9c6b3f] underline ml-auto">원문 →</a>)}
+                        : <a href={rv.link} target="_blank" rel="noopener noreferrer" className="text-[#7a5122] underline ml-auto">원문 →</a>)}
                     </div>
                   </div>
                 ))}
@@ -2064,7 +2064,7 @@ function MemoryTab({ device, visits, locked = false, sessionPin = "", onReload, 
         <div className="bg-white rounded-2xl px-7 py-8 text-center max-w-xs w-full shadow-sm border border-[#ece0cd]">
           <div className="text-[34px] mb-2">🔒</div>
           <div className="text-[16px] font-bold text-[#2b2018] mb-1">잠긴 추억 보관소</div>
-          <div className="text-[12px] text-[#7a6452] leading-relaxed mb-4">공용 PC 보호를 위해 PIN으로 잠겨 있어요.<br />내 PIN을 입력하면 내 기록만 보여요.</div>
+          <div className="text-[12px] text-[#594839] leading-relaxed mb-4">공용 PC 보호를 위해 PIN으로 잠겨 있어요.<br />내 PIN을 입력하면 내 기록만 보여요.</div>
           <input value={unlockPin} onChange={(e) => setUnlockPin(e.target.value.replace(/\D/g, ""))} inputMode="numeric" maxLength={8} onKeyDown={(e) => e.key === "Enter" && doUnlock()} autoFocus placeholder="PIN (숫자)" className="w-full border border-[#cbb89f] rounded-lg px-3 py-2.5 text-[18px] text-center tracking-[0.4em] bg-white mb-2" />
           {msg && <p className="text-[12px] text-[#c0392b] mb-2">{msg}</p>}
           <button onClick={doUnlock} disabled={busy} className="w-full bg-[#2b2018] text-[#f4ece0] rounded-xl py-2.5 font-bold text-[14px] disabled:opacity-60">{busy ? "확인 중..." : "잠금 해제"}</button>
@@ -2079,15 +2079,15 @@ function MemoryTab({ device, visits, locked = false, sessionPin = "", onReload, 
         <div className="flex items-center justify-between mb-3">
           <div>
             <div className="text-[17px] font-bold text-[#2b2018]">🗃 추억 보관소</div>
-            <div className="text-[11px] text-[#8a7458]">이 기기의 내 추억 {visits.length}곳 · 다른 사람 기록은 안 보여요</div>
+            <div className="text-[11px] text-[#665036]">이 기기의 내 추억 {visits.length}곳 · 다른 사람 기록은 안 보여요</div>
           </div>
-          <button onClick={() => setShowSettings(true)} className="inline-flex items-center gap-1 h-9 px-3 rounded-full text-[12px] font-bold bg-white text-[#7a6452] border border-[#e6d9c8] shrink-0">⚙ 설정</button>
+          <button onClick={() => setShowSettings(true)} className="inline-flex items-center gap-1 h-9 px-3 rounded-full text-[12px] font-bold bg-white text-[#594839] border border-[#e6d9c8] shrink-0">⚙ 설정</button>
         </div>
         <button onClick={onRegister} className="w-full inline-flex items-center justify-center gap-1.5 bg-[#d6336c] text-white rounded-xl py-3.5 text-[14px] font-bold shadow-sm mb-4">
           <span className="text-[16px] leading-none">➕</span> 새 카페 추억 등록하기
         </button>
         {visits.length === 0 ? (
-          <div className="text-center text-[#8a7458] text-[13px] py-14 bg-white rounded-2xl border border-[#ece0cd] leading-relaxed">아직 등록한 추억이 없어요.<br />카페에서 위치 인증하고 첫 추억을 남겨보세요.</div>
+          <div className="text-center text-[#665036] text-[13px] py-14 bg-white rounded-2xl border border-[#ece0cd] leading-relaxed">아직 등록한 추억이 없어요.<br />카페에서 위치 인증하고 첫 추억을 남겨보세요.</div>
         ) : (
           <div className="space-y-2.5">
             {visits.map((v) => {
@@ -2102,16 +2102,16 @@ function MemoryTab({ device, visits, locked = false, sessionPin = "", onReload, 
                   <div className="flex items-center gap-1.5">
                     {v.favorite && <span className="text-[#f0a832] text-[13px]">★</span>}
                     <span className="font-bold text-[#2b2018] text-[14px] truncate">{v.name}</span>
-                    <span className="text-[10px] text-[#9c6b3f] shrink-0">{v.area}</span>
+                    <span className="text-[10px] text-[#7a5122] shrink-0">{v.area}</span>
                     {v.verified === false ? (
-                      <span className="text-[9px] font-bold text-[#8a7458] bg-[#f3ede1] rounded-full px-1.5 py-0.5 shrink-0">미인증</span>
+                      <span className="text-[9px] font-bold text-[#665036] bg-[#f3ede1] rounded-full px-1.5 py-0.5 shrink-0">미인증</span>
                     ) : (
                       <span className="text-[9px] font-bold text-[#5f7355] bg-[#eef3ea] rounded-full px-1.5 py-0.5 shrink-0">인증</span>
                     )}
-                    <span className="ml-auto text-[10px] text-[#8a7458] shrink-0">보기 ›</span>
+                    <span className="ml-auto text-[10px] text-[#665036] shrink-0">보기 ›</span>
                   </div>
-                  {v.memory ? <p className="text-[12px] text-[#52402e] leading-relaxed mt-0.5 line-clamp-2">{v.memory}</p> : <p className="text-[12px] text-[#8a7458] mt-0.5">기억 메모 없음</p>}
-                  <div className="text-[10px] text-[#8a7458] mt-1">{fmtDate(v.created_at)}</div>
+                  {v.memory ? <p className="text-[12px] text-[#52402e] leading-relaxed mt-0.5 line-clamp-2">{v.memory}</p> : <p className="text-[12px] text-[#665036] mt-0.5">기억 메모 없음</p>}
+                  <div className="text-[10px] text-[#665036] mt-1">{fmtDate(v.created_at)}</div>
                 </div>
               </button>
               );
@@ -2129,9 +2129,9 @@ function MemoryTab({ device, visits, locked = false, sessionPin = "", onReload, 
                 <div className="flex items-center gap-2 min-w-0">
                   {viewVisit.favorite && <span className="text-[#f0a832] text-[18px] leading-none">★</span>}
                   <div className="font-bold text-[#2b2018] text-[15px] truncate">{viewVisit.name}</div>
-                  <span className="text-[11px] text-[#9c6b3f] shrink-0">{viewVisit.area}</span>
+                  <span className="text-[11px] text-[#7a5122] shrink-0">{viewVisit.area}</span>
                 </div>
-                <button onClick={() => setViewVisit(null)} className="w-8 h-8 rounded-full bg-[#f0e6d4] text-[#7a6452] text-lg shrink-0">×</button>
+                <button onClick={() => setViewVisit(null)} className="w-8 h-8 rounded-full bg-[#f0e6d4] text-[#594839] text-lg shrink-0">×</button>
               </div>
               <div className="overflow-y-auto flex-1 p-4 space-y-3">
                 {vphotos.length > 0 && (
@@ -2144,17 +2144,17 @@ function MemoryTab({ device, visits, locked = false, sessionPin = "", onReload, 
                   </div>
                 )}
                 <div>
-                  <div className="text-[12px] text-[#7a6452] mb-1 font-medium">기억</div>
-                  {viewVisit.memory ? <p className="text-[14px] text-[#2b2018] leading-relaxed whitespace-pre-wrap">{viewVisit.memory}</p> : <p className="text-[13px] text-[#8a7458]">기억 메모 없음</p>}
+                  <div className="text-[12px] text-[#594839] mb-1 font-medium">기억</div>
+                  {viewVisit.memory ? <p className="text-[14px] text-[#2b2018] leading-relaxed whitespace-pre-wrap">{viewVisit.memory}</p> : <p className="text-[13px] text-[#665036]">기억 메모 없음</p>}
                 </div>
-                <div className="text-[11px] text-[#8a7458]">{fmtDate(viewVisit.created_at)}{viewVisit.favorite ? " · ★ 즐겨찾기" : ""}</div>
+                <div className="text-[11px] text-[#665036]">{fmtDate(viewVisit.created_at)}{viewVisit.favorite ? " · ★ 즐겨찾기" : ""}</div>
                 {viewVisit.verified === false && (
                   <div className="rounded-xl border border-[#e6d9c8] bg-[#faf6ee] p-3">
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[9px] font-bold text-[#8a7458] bg-[#f3ede1] rounded-full px-1.5 py-0.5">미인증</span>
-                      <div className="text-[12px] font-bold text-[#7a6452]">미인증 추억</div>
+                      <span className="text-[9px] font-bold text-[#665036] bg-[#f3ede1] rounded-full px-1.5 py-0.5">미인증</span>
+                      <div className="text-[12px] font-bold text-[#594839]">미인증 추억</div>
                     </div>
-                    <div className="text-[11px] text-[#8a7458] mt-1 leading-relaxed">위치 인증을 아직 안 했어요. <b>나에게만 보임(비공개)</b> — 지도에서 다른 사람에게는 안 보여요. <b>인증된 기록만</b> 타인에게 지도로 공개돼요. 이 카페에 다시 방문해 <b>GPS 30m 이내</b>에서 <b>지금 인증하기</b>를 누르면 <b>인증 상태로 전환</b>돼 지도에 공개될 수 있어요.</div>
+                    <div className="text-[11px] text-[#665036] mt-1 leading-relaxed">위치 인증을 아직 안 했어요. <b>나에게만 보임(비공개)</b> — 지도에서 다른 사람에게는 안 보여요. <b>인증된 기록만</b> 타인에게 지도로 공개돼요. 이 카페에 다시 방문해 <b>GPS 30m 이내</b>에서 <b>지금 인증하기</b>를 누르면 <b>인증 상태로 전환</b>돼 지도에 공개될 수 있어요.</div>
                     {verifyMsg && <p className="text-[11px] text-[#c0392b] mt-1.5">{verifyMsg}</p>}
                     <button onClick={() => verifyNow(viewVisit)} disabled={verifyBusy} className="mt-2 w-full bg-[#5f7355] text-white rounded-lg py-2.5 font-bold text-[13px] disabled:opacity-60">
                       {verifyBusy ? "위치 확인 중..." : "📍 지금 인증하기 (카페 30m)"}
@@ -2277,12 +2277,12 @@ function MemorySettingsModal({ device, visits, hasPin, onPinChange, onClose, onR
         <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-[#f0e6d4]">
           <div className="font-bold text-[#2b2018] text-[15px]">⚙ 설정</div>
           <div className="flex items-center gap-2">
-            {hasPin && <button onClick={() => { onLock?.(); onClose(); }} className="text-[11px] font-bold text-[#9c6b3f] border border-[#e6d9c8] rounded-full px-2.5 py-1">🔒 지금 잠그기</button>}
-            <button onClick={onClose} className="w-8 h-8 rounded-full bg-[#f0e6d4] text-[#7a6452] text-lg">×</button>
+            {hasPin && <button onClick={() => { onLock?.(); onClose(); }} className="text-[11px] font-bold text-[#7a5122] border border-[#e6d9c8] rounded-full px-2.5 py-1">🔒 지금 잠그기</button>}
+            <button onClick={onClose} className="w-8 h-8 rounded-full bg-[#f0e6d4] text-[#594839] text-lg">×</button>
           </div>
         </div>
         <div className="overflow-y-auto flex-1 p-4 space-y-5 pb-[calc(1rem_+_env(safe-area-inset-bottom))]">
-          <p className="text-[12px] text-[#7a6452] leading-relaxed bg-[#f3ede1] rounded-lg px-3 py-2.5">
+          <p className="text-[12px] text-[#594839] leading-relaxed bg-[#f3ede1] rounded-lg px-3 py-2.5">
             가입·개인정보 없이 — <b>백업 코드</b>로 다른 기기에서 불러오거나 <b>파일로 내려받아</b> 영구 보관, 공용 PC는 <b>PIN</b>으로 잠글 수 있어요.
           </p>
 
@@ -2292,7 +2292,7 @@ function MemorySettingsModal({ device, visits, hasPin, onPinChange, onClose, onR
             {code ? (
               <div className="bg-white border-2 border-[#d6336c] rounded-xl p-3 text-center">
                 <div className="text-[20px] font-bold tracking-widest text-[#d6336c]">{code}</div>
-                <div className="text-[11px] text-[#8a7458] mt-1">이 코드를 메모해두세요. 잃어버리면 복구할 수 없어요(= 우리도 누구 건지 몰라요).</div>
+                <div className="text-[11px] text-[#665036] mt-1">이 코드를 메모해두세요. 잃어버리면 복구할 수 없어요(= 우리도 누구 건지 몰라요).</div>
               </div>
             ) : (
               <button onClick={issueCode} disabled={busy} className="w-full bg-[#2b2018] text-[#f4ece0] rounded-lg py-2.5 text-[13px] font-bold disabled:opacity-60">{busy ? "발급 중..." : "백업 코드 발급"}</button>
@@ -2316,7 +2316,7 @@ function MemorySettingsModal({ device, visits, hasPin, onPinChange, onClose, onR
               <button onClick={exportPDF} disabled={!visits.length} className="flex-1 border-2 border-[#cbb89f] text-[#524434] rounded-lg py-2.5 text-[13px] font-bold bg-white disabled:opacity-50">PDF로 저장</button>
               <button onClick={exportJSON} disabled={!visits.length} className="flex-1 border-2 border-[#cbb89f] text-[#524434] rounded-lg py-2.5 text-[13px] font-bold bg-white disabled:opacity-50">JSON으로 저장</button>
             </div>
-            <p className="text-[10px] text-[#8a7458] mt-1.5">PDF는 보기 좋게, JSON은 백업·재가져오기용. 파일은 본인 기기에만 저장돼요.</p>
+            <p className="text-[10px] text-[#665036] mt-1.5">PDF는 보기 좋게, JSON은 백업·재가져오기용. 파일은 본인 기기에만 저장돼요.</p>
           </div>
 
           {/* ④ 공용 PC 잠금 (PIN) */}
@@ -2329,13 +2329,13 @@ function MemorySettingsModal({ device, visits, hasPin, onPinChange, onClose, onR
                     className="w-full border border-[#cbb89f] rounded-lg px-3 py-2.5 text-[15px] tracking-[0.3em] bg-white" />
                   <div className="flex gap-2">
                     <button onClick={doSetPin} disabled={busy || pinA.length < 4} className="flex-1 bg-[#2b2018] text-[#f4ece0] rounded-lg py-2.5 text-[13px] font-bold disabled:opacity-50">설정</button>
-                    <button onClick={() => { setPinMode(""); setPinA(""); }} className="px-4 text-[#9c6b3f] text-[13px]">취소</button>
+                    <button onClick={() => { setPinMode(""); setPinA(""); }} className="px-4 text-[#7a5122] text-[13px]">취소</button>
                   </div>
                 </div>
               ) : (
                 <>
                   <button onClick={() => { setPinMode("set"); setMsg(""); }} className="w-full border-2 border-[#cbb89f] text-[#524434] rounded-lg py-2.5 text-[13px] font-bold bg-white">PIN 설정하기</button>
-                  <p className="text-[10px] text-[#8a7458] mt-1.5">PIN을 걸면 이 기기에서 <b>PIN을 입력해야만</b> 내 추억이 보여요. 카페·도서관 등 공용 PC에서 추천해요.</p>
+                  <p className="text-[10px] text-[#665036] mt-1.5">PIN을 걸면 이 기기에서 <b>PIN을 입력해야만</b> 내 추억이 보여요. 카페·도서관 등 공용 PC에서 추천해요.</p>
                 </>
               )
             ) : pinMode === "change" ? (
@@ -2346,7 +2346,7 @@ function MemorySettingsModal({ device, visits, hasPin, onPinChange, onClose, onR
                   className="w-full border border-[#cbb89f] rounded-lg px-3 py-2.5 text-[15px] tracking-[0.3em] bg-white" />
                 <div className="flex gap-2">
                   <button onClick={doChangePin} disabled={busy || pinB.length < 4} className="flex-1 bg-[#2b2018] text-[#f4ece0] rounded-lg py-2.5 text-[13px] font-bold disabled:opacity-50">변경</button>
-                  <button onClick={() => { setPinMode(""); setPinA(""); setPinB(""); }} className="px-4 text-[#9c6b3f] text-[13px]">취소</button>
+                  <button onClick={() => { setPinMode(""); setPinA(""); setPinB(""); }} className="px-4 text-[#7a5122] text-[13px]">취소</button>
                 </div>
               </div>
             ) : pinMode === "remove" ? (
@@ -2355,7 +2355,7 @@ function MemorySettingsModal({ device, visits, hasPin, onPinChange, onClose, onR
                   className="w-full border border-[#cbb89f] rounded-lg px-3 py-2.5 text-[15px] tracking-[0.3em] bg-white" />
                 <div className="flex gap-2">
                   <button onClick={doRemovePin} disabled={busy} className="flex-1 bg-[#c0392b] text-white rounded-lg py-2.5 text-[13px] font-bold disabled:opacity-50">PIN 해제</button>
-                  <button onClick={() => { setPinMode(""); setPinA(""); }} className="px-4 text-[#9c6b3f] text-[13px]">취소</button>
+                  <button onClick={() => { setPinMode(""); setPinA(""); }} className="px-4 text-[#7a5122] text-[13px]">취소</button>
                 </div>
               </div>
             ) : (

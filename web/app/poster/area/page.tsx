@@ -301,10 +301,10 @@ export default function AreaPosterPage() {
       }}
     >
       <div className="max-w-4xl mx-auto px-6 py-10">
-        <BackLink to="/poster" label="포스터" className="text-[#9c6b3f] mb-4" />
+        <BackLink to="/poster" label="포스터" className="text-[#7a5122] mb-4" />
         <div className="text-[#5b6b54] text-xs tracking-[0.3em] uppercase mb-2">Area Report</div>
         <h1 className="text-3xl font-bold mb-1">지역소개 포스터</h1>
-        <p className="text-[13px] text-[#8a7458] mb-6 leading-relaxed">
+        <p className="text-[13px] text-[#665036] mb-6 leading-relaxed">
           구/동 단위로 검증등급 상위 카페 3~5곳을 이름·한줄 하이라이트로 소개하는 지역 큐레이션 포스터예요. 특정
           카페 단독홍보가 아닌 &ldquo;이 동네엔 이런 검증된 곳들이 있다&rdquo; 톤을 유지해요. 하이라이트는 실제
           검증 후기에서 뽑은 특징이고, 숫자 통계는 하단 리포트 스트립으로만 표기해요.
@@ -335,7 +335,7 @@ export default function AreaPosterPage() {
               </option>
             ))}
           </select>
-          {loading && <div className="text-[12.5px] text-[#8a7458]">불러오는 중…</div>}
+          {loading && <div className="text-[12.5px] text-[#665036]">불러오는 중…</div>}
           {err && <div className="text-[12.5px] text-[#b5482f]">{err}</div>}
           {stats && !loading && (
             <div className="text-[13px] text-[#5a4632]">
@@ -365,7 +365,7 @@ export default function AreaPosterPage() {
           </button>
         </section>
 
-        <p className="text-[11px] text-[#8a7458] leading-relaxed">
+        <p className="text-[11px] text-[#665036] leading-relaxed">
           ※ 카페명·하이라이트·카페 수·검증 후기 수는 전부 검증(옥석) 데이터베이스 실측값이에요. 지어낸 카페명·후기는
           쓰지 않아요. 공개 카페가 5곳 이상인 지역만 목록에 나타나요.
         </p>

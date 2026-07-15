@@ -47,10 +47,10 @@ export default function PosterHubPage() {
       }}
     >
       <div className="max-w-4xl mx-auto px-6 py-10">
-        <BackLink to="/" label="홈" className="text-[#9c6b3f] mb-4" />
-        <div className="text-[#9c6b3f] text-xs tracking-[0.3em] uppercase mb-2">Poster Studio</div>
+        <BackLink to="/" label="홈" className="text-[#7a5122] mb-4" />
+        <div className="text-[#7a5122] text-xs tracking-[0.3em] uppercase mb-2">Poster Studio</div>
         <h1 className="text-3xl font-bold mb-1">홍보 포스터</h1>
-        <p className="text-[13px] text-[#8a7458] mb-8 leading-relaxed">
+        <p className="text-[13px] text-[#665036] mb-8 leading-relaxed">
           유형을 골라 인스타 홍보용 포스터를 만들고 PNG로 저장하세요. 카페·지역 포스터는 전부 실제 검증 데이터
           기준이에요.
         </p>
@@ -64,8 +64,8 @@ export default function PosterHubPage() {
             >
               <div className="text-3xl mb-3">{c.icon}</div>
               <div className="text-[16px] font-bold mb-1">{c.title}</div>
-              <p className="text-[12.5px] text-[#6b5a48] leading-relaxed mb-3">{c.desc}</p>
-              <div className="text-[11px] text-[#8a7458]">{c.meta}</div>
+              <p className="text-[12.5px] text-[#524234] leading-relaxed mb-3">{c.desc}</p>
+              <div className="text-[11px] text-[#665036]">{c.meta}</div>
             </Link>
           ))}
         </div>

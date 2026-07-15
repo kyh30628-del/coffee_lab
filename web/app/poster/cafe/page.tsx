@@ -516,10 +516,10 @@ export default function CafePosterPage() {
       }}
     >
       <div className="max-w-4xl mx-auto px-6 py-10">
-        <BackLink to="/poster" label="포스터" className="text-[#9c6b3f] mb-4" />
+        <BackLink to="/poster" label="포스터" className="text-[#7a5122] mb-4" />
         <div className="text-[#a64b2a] text-xs tracking-[0.3em] uppercase mb-2">Cafe Spotlight</div>
         <h1 className="text-3xl font-bold mb-1">카페소개 포스터</h1>
-        <p className="text-[13px] text-[#8a7458] mb-6 leading-relaxed">
+        <p className="text-[13px] text-[#665036] mb-6 leading-relaxed">
           검증등급 카페 1곳을 소개하는 인스타 포스터예요. 이틀에 1회 주기로 카페를 자동 추천하지만, 아래 검색으로
           직접 골라 바꿀 수 있어요. 카페명·태그라인·후기 발췌는 모두 실제 검증 데이터 기준이에요.
         </p>
@@ -551,13 +551,13 @@ export default function CafePosterPage() {
                     className="w-full text-left px-3 py-2 text-[13.5px] hover:bg-[#f7f1e6] flex items-baseline gap-2"
                   >
                     <span className="font-bold">{r.name}</span>
-                    <span className="text-[11px] text-[#9c8a6c]">{r.area}</span>
+                    <span className="text-[11px] text-[#6f6047]">{r.area}</span>
                   </button>
                 </li>
               ))}
             </ul>
           )}
-          {loading && <div className="text-[12.5px] text-[#8a7458]">불러오는 중…</div>}
+          {loading && <div className="text-[12.5px] text-[#665036]">불러오는 중…</div>}
           {err && <div className="text-[12.5px] text-[#b5482f]">{err}</div>}
           {cafe && !loading && (
             <div className="text-[13px] text-[#5a4632]">
@@ -598,7 +598,7 @@ export default function CafePosterPage() {
                   사진 제거
                 </button>
               )}
-              <span className="text-[11px] text-[#8a7458] basis-full">
+              <span className="text-[11px] text-[#665036] basis-full">
                 ※ 직접 촬영한 사진 또는 무료 라이선스 사진만 올려주세요. 네이버·타인 인스타 사진은 도용이라 사용
                 금지예요. 사진을 올리지 않으면 지도 핀 모티프로 대체돼요.
               </span>
@@ -627,7 +627,7 @@ export default function CafePosterPage() {
           </button>
         </section>
 
-        <p className="text-[11px] text-[#8a7458] leading-relaxed">
+        <p className="text-[11px] text-[#665036] leading-relaxed">
           ※ 카페명·태그라인·후기 발췌는 검증(옥석) 데이터베이스 실측값이에요. 같은 카페를 반복 소개할 수 있어
           두 템플릿 모두 &ldquo;제휴·협찬 아님&rdquo; 문구를 항상 표기합니다.
         </p>

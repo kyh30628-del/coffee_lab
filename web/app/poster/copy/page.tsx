@@ -297,10 +297,10 @@ export default function PosterCopyPage() {
       }}
     >
       <div className="max-w-4xl mx-auto px-6 py-10">
-        <BackLink to="/poster" label="포스터" className="text-[#9c6b3f] mb-4" />
-        <div className="text-[#9c6b3f] text-xs tracking-[0.3em] uppercase mb-2">Caption Studio</div>
+        <BackLink to="/poster" label="포스터" className="text-[#7a5122] mb-4" />
+        <div className="text-[#7a5122] text-xs tracking-[0.3em] uppercase mb-2">Caption Studio</div>
         <h1 className="text-3xl font-bold mb-1">홍보카피 포스터</h1>
-        <p className="text-[13px] text-[#8a7458] mb-6 leading-relaxed">
+        <p className="text-[13px] text-[#665036] mb-6 leading-relaxed">
           확정된 인스타 홍보카피 {PRESETS.length}종 중 하나를 골라 &ldquo;{REGION_TOKEN}&rdquo; 자리에 원하는
           지역명을 자유롭게 입력하면 실시간 미리보기에 바로 반영돼요. 통합 추천안·공감형·취향/결·짧고임팩트에
           스토리텔링·후킹 질문·통계 인용형을 더해 문장 뼈대 자체가 서로 달라요. DB 지역 목록에 제한되지 않아 어떤
@@ -351,7 +351,7 @@ export default function PosterCopyPage() {
           </button>
         </section>
 
-        <p className="text-[11px] text-[#8a7458] leading-relaxed">
+        <p className="text-[11px] text-[#665036] leading-relaxed">
           ※ 다른 포스터 타입과 달리 다크 배경·골드 코너브래킷의 에디토리얼 톤으로 차별화했어요. DB 조회 없이
           브라우저에서만 렌더링되고, 어떤 프리셋에도 특정 카페명은 등장하지 않아요(지역명만 자유 입력). 지역명은 자유
           입력이라 어떤 텍스트를 넣어도 실제 존재 여부와 무관하게 렌더링됩니다 — 게시 전 직접 확인해 주세요.
