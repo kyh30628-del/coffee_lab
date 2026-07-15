@@ -11,7 +11,7 @@ export const JOB_TEAM: Record<string, string> = {
   "cron-batch-judge": "품질본부", "cron-criteria-verify": "품질본부",
   "cron-grow": "성장본부", "cron-demand": "성장본부", "cron-newsletter": "성장본부", "cron-discover-categories": "성장본부",
   "cafe-collect": "성장본부",
-  "cron-issues": "경영지원본부", "cron-coord-consumer": "경영지원본부",
+  "cron-issues": "경영지원본부", "cron-coord-consumer": "경영지원본부", "cron-billing": "경영지원본부",
   // 로컬 launchd 잡(하트비트 경유)
   "discover-sweep": "성장본부", // 매일 02:30 KST 전 지역 발굴 스윕(네이버 한도 최대 수집)
   "youtube-backfill": "품질본부",
@@ -45,6 +45,7 @@ export const EXPECT_MAX_H: Record<string, number> = {
   "cron-verify": 16, "cron-sentinel": 16, "cron-demand": 30, "cron-rulegap": 16, "cron-closure": 12, // verify·sentinel·rulegap 2×/일(12h)로 촘촘화 → 정지감지도 30→16h로 타이트하게(2026-07-05)
   "cron-criteria-verify": 16, // 기준 검증 에이전트 2×/일(07:50·19:50 KST=12h) + 버퍼 — dead-knob·기준드리프트 결정론 감시(품질본부)
   "cron-grow": 6, "cron-enrich": 8, "cron-embed": 4, "cron-synth": 4, "cron-issues": 2, "cron-coord-consumer": 2,
+  "cron-billing": 30,     // 정기결제 크론 매일 09:00 KST + 버퍼(dunning 재시도 일 1회)
   "orchestrator-heal": 6,
   // 로컬 launchd 잡
   "discover-sweep": 30,    // 매일 02:30 KST 발굴 스윕 + 버퍼(네이버 한도서 중단해도 익일 재개)

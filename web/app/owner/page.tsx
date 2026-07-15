@@ -6,6 +6,7 @@ import { BarChart, Bar, XAxis, YAxis, Cell, ResponsiveContainer,
 import BackLink from "../BackLink";
 import InfoDot from "../InfoDot";
 import Showcase from "../Showcase";
+import BillingManage from "../BillingManage";
 import { useLockBodyScroll } from "@/lib/useLockBodyScroll";
 
 type RankItem = { rank: number; name: string; count: number; grade: string | null; isMe: boolean };
@@ -323,6 +324,9 @@ export default function OwnerPage() {
                 </div>
               ))}
             </div>
+
+            {/* 💳 결제 관리 — PIN 로그인한 구독 사장님에게만 */}
+            {locked && insight.me.id && <BillingManage cafeId={insight.me.id} pin={pin ?? ""} />}
 
             {/* 무료/유료 경계 명확화 */}
             <div className="mt-5 mb-2">

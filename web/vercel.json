@@ -62,6 +62,10 @@
       "schedule": "*/10 * * * *"
     },
     {
+      "path": "/api/cron-billing",
+      "schedule": "0 0 * * *"
+    },
+    {
       "path": "/api/cron-coord-consumer?mode=live",
       "schedule": "15 * * * *"
     },

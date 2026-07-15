@@ -2,22 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
 import { ensureOwnerActivity } from "@/lib/ownerActivity";
 import { encryptPII, decryptPII } from "@/lib/crypto";
-import { subscriptionLive } from "@/lib/flags";
+import { subscriptionLive, paymentsLive } from "@/lib/flags";
 import { renderOnboardingEmail } from "@/lib/onboardingEmail";
+import { ownerScope } from "@/lib/ownerAuth";
+import { PLAN, PRICE, genPin, ensureBilling } from "@/lib/billing"; // 상품 상수·PIN·결제 스키마 단일 출처
 import { put } from "@vercel/blob";
-import crypto from "crypto";
 export const runtime = "nodejs";
 
 // 💳 구독 회원(카페별). 요금제(/pricing)에서 회원가입 → 관리자 활성화 → PIN 발급(이메일)·featured 연동.
-const PLAN = "홍보팩";
-const PRICE = 9900;
 const authed = (req: NextRequest) => !!req.headers.get("x-admin-password") && req.headers.get("x-admin-password") === process.env.ADMIN_PASSWORD;
-
-// 영문+숫자 8자리 PIN(혼동 문자 제외)
-function genPin(): string {
-  const cs = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  return Array.from({ length: 8 }, () => cs[crypto.randomInt(cs.length)]).join("");
-}
 // 등록 이메일로 온보딩 메일(내 카페 열쇠 + 전용 서비스 사용법) 발송(Resend). 키 없으면 미발송(관리자 화면에서 PIN 확인·전달).
 //   본문은 lib/onboardingEmail.ts 단일 출처(리뷰 분석·쇼케이스·노출·뉴스레터 안내 포함). 체험/구독 분기(days<=7).
 async function sendPinEmail(to: string, pin: string, cafeName: string, days = 30): Promise<boolean> {
@@ -56,6 +49,7 @@ async function ensure() {
   await sql`ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS newsletter_opt_in BOOLEAN DEFAULT true`; // 주간 뉴스레터 수신동의
   await sql`ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS pin_emailed_at TIMESTAMPTZ`;             // 키 이메일 실제 발송 성공 시각(발송 증빙)
   await sql`ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS duration_days INT`;                     // 승인 시 확정한 이용기간(7일 체험/30일 등). 시계는 '첫 로그인'에 시작되므로 여기에 보관.
+  await ensureBilling(); // 💳 정기결제 컬럼(billing_key·customer_key·autopay 등) + payments 테이블 — 단일 출처 lib/billing.ts
   // 만료 자동 반영: 기간 지난 active → expired + 모든 혜택 해제(골드핀·우선노출·쇼케이스). expires_at IS NULL=미시작(첫 로그인 전)은 만료 아님.
   await sql`UPDATE subscriptions SET status='expired', updated_at=now() WHERE status='active' AND expires_at IS NOT NULL AND expires_at < now()`;
   // 혜택 OFF: 구독이 active-시작-미만료가 아닌 모든 카페(만료·취소·정지·미시작). featured=골드핀·우선노출, approved=쇼케이스.
@@ -78,19 +72,20 @@ export async function GET(req: NextRequest) {
     if (req.nextUrl.searchParams.get("all")) {
       if (!authed(req)) return NextResponse.json({ ok: false }, { status: 401 });
       await ensureOwnerActivity(); // 활동 추적 컬럼·테이블 보장
-      const rows = await sql`SELECT s.id, s.cafe_id, s.cafe_name, s.owner_name, s.contact, s.email, s.plan, s.price, s.status, s.pin, s.pin_emailed_at, s.updated_at, s.newsletter_opt_in, s.started_at, s.expires_at, s.duration_days, s.created_at, s.biz_reg_url, s.biz_no, s.attested, s.signup_ip, s.signup_ua, s.verified, s.suspend_reason, s.suspended_at, s.last_seen_at, s.first_login_at, COALESCE(s.login_count,0) AS login_count, COALESCE(c.published, false) AS cafe_published,
+      const rows = await sql`SELECT s.id, s.cafe_id, s.cafe_name, s.owner_name, s.contact, s.email, s.plan, s.price, s.status, s.pin, s.pin_emailed_at, s.updated_at, s.newsletter_opt_in, s.started_at, s.expires_at, s.duration_days, s.created_at, s.biz_reg_url, s.biz_no, s.attested, s.signup_ip, s.signup_ua, s.verified, s.suspend_reason, s.suspended_at, s.last_seen_at, s.first_login_at, COALESCE(s.login_count,0) AS login_count, s.card_last4, s.card_company, s.autopay, s.last_payment_status, s.next_billing_at, s.billing_status, COALESCE(c.published, false) AS cafe_published,
         (SELECT COALESCE(json_agg(json_build_object('event', e.event, 'at', e.at) ORDER BY e.at DESC), '[]'::json) FROM (SELECT event, at FROM owner_events WHERE cafe_id = s.cafe_id ORDER BY at DESC LIMIT 8) e) AS recent_events
         FROM subscriptions s LEFT JOIN cafes c ON c.id = s.cafe_id ORDER BY (s.status='pending') DESC, s.created_at DESC LIMIT 200` as unknown as any[];
       // emailReady: 이 환경(프로덕션 포함)에 Resend 키가 있어야 승인 시 키 이메일이 자동 발송됨
       // liveExposure: 소비자에게 실제로 우선노출(금색핀·추천카페·쇼케이스)이 보이는지 — SUBSCRIPTION_LIVE=true 여야 함
       return NextResponse.json({ ok: true, emailReady: !!process.env.RESEND_API_KEY, liveExposure: subscriptionLive(), subs: rows.map((r) => ({ ...r, contact: decryptPII(r.contact), email: decryptPII(r.email) })) });
     }
-    // 사장님: 본인 카페 구독 상태
-    if (!authed(req)) return NextResponse.json({ ok: false }, { status: 401 });
+    // 사장님: 본인 카페 구독 상태(관리자 전체 또는 PIN=본인 카페만)
     const cafeId = Number(req.nextUrl.searchParams.get("cafeId"));
     if (!cafeId) return NextResponse.json({ ok: false, error: "cafeId 필요" }, { status: 400 });
-    const r = (await sql`SELECT id, cafe_id, owner_name, plan, price, status, started_at, expires_at FROM subscriptions WHERE cafe_id=${cafeId}`)[0] ?? null;
-    return NextResponse.json({ ok: true, sub: r });
+    const scope = await ownerScope(req);
+    if (scope !== "admin" && scope !== cafeId) return NextResponse.json({ ok: false }, { status: 401 });
+    const r = (await sql`SELECT id, cafe_id, owner_name, plan, price, status, started_at, expires_at, duration_days, autopay, billing_status, card_last4, card_company, next_billing_at, last_payment_status FROM subscriptions WHERE cafe_id=${cafeId}`)[0] ?? null;
+    return NextResponse.json({ ok: true, sub: r, paymentsLive: paymentsLive() });
   } catch (e) { return NextResponse.json({ ok: false, error: String(e) }, { status: 500 }); }
 }
 
