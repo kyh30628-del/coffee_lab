@@ -29,7 +29,7 @@ export default function TermsPage() {
             <h2 className="text-lg font-bold mb-2">3. 데이터 출처와 인용 원칙</h2>
             <ul className="list-disc ml-5 space-y-1">
               <li>카페 정보는 <b>네이버·구글·YouTube 등 공개 API</b>로 수집한 후기를 교차검증한 것입니다. 각 출처의 이용약관을 준수하며, <b>원문을 복제·재호스팅하지 않고 한 줄 인용 + 출처 링크 + 날짜</b>만 표시해 항상 원문으로 연결합니다.</li>
-              <li>수집한 글은 <b>영구 보관하지 않습니다.</b> 분석을 위해 <b>한시적으로만 캐시</b>하고 주기적으로(약 90일) <b>갱신·파기</b>하며, 이용자에게 보여지는 것은 우리가 산출한 <b>분석 결과 + 최소 인용(1줄)·출처 링크</b>입니다.</li>
+              <li>수집한 글은 <b>분석용 작업 캐시로만</b> 보관하고 <b>재수집 시 주기적으로 갱신</b>하며, 원문을 <b>공개적으로 재호스팅하는 영구 아카이브를 만들지 않습니다.</b> 이용자에게 보여지는 것은 우리가 산출한 <b>분석 결과 + 최소 인용(1줄)·출처 링크</b>뿐이며, 원저작자·원출처의 삭제 요청 시 신속히 처리합니다.</li>
               <li>YouTube 관련 사용에는 <a className="text-[#7a5122] underline" href="https://www.youtube.com/t/terms" target="_blank" rel="noopener noreferrer">YouTube 이용약관</a>·<a className="text-[#7a5122] underline" href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Google 개인정보처리방침</a>이 적용되며, 영상은 다운로드·재호스팅 없이 원본으로 링크하고 시청에 어떤 제한도 두지 않습니다.</li>
               <li>본인 또는 원저작자가 게시물의 <b>삭제·표시중단을 요청</b>하면 신속히(통상 30일 내) 처리합니다. 문의: dongnecoffeenote@gmail.com</li>
             </ul>
