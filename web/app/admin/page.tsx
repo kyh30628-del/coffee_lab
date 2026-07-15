@@ -212,9 +212,9 @@ export default function AdminPage() {
     return (
       <main className="min-h-screen bg-stone-100 flex items-center justify-center p-6">
         <div className="bg-white rounded-2xl p-8 w-full max-w-sm shadow-sm">
-          <BackLink to="/" label="홈" className="text-stone-400 mb-4" />
+          <BackLink to="/" label="홈" className="text-stone-600 mb-4" />
           <h1 className="text-xl font-bold mb-1">관리자 대시보드</h1>
-          <p className="text-sm text-stone-500 mb-4">비밀번호를 입력하세요.</p>
+          <p className="text-sm text-stone-700 mb-4">비밀번호를 입력하세요.</p>
           <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && load(pw)}
             placeholder="비밀번호" className="w-full border rounded-lg px-3 py-2.5 mb-3" />
           <button onClick={() => load(pw)} className="w-full bg-stone-900 text-white rounded-lg py-2.5 font-medium">들어가기</button>
@@ -233,7 +233,7 @@ export default function AdminPage() {
     <div className="bg-white rounded-xl border p-3.5">
       <div className={`text-2xl font-bold tabular-nums truncate ${color}`}>{value}</div>
       <div className="text-[11px] text-stone-600 mt-0.5">{label}</div>
-      {sub && <div className="text-[10px] text-stone-400 mt-0.5">{sub}</div>}
+      {sub && <div className="text-[10px] text-stone-600 mt-0.5">{sub}</div>}
     </div>
   );
   const Card = ({ title, children, note }: { title: string; children: React.ReactNode; note?: string }) => (
@@ -241,13 +241,13 @@ export default function AdminPage() {
       {/* 제목: 영역 가로·세로 정중앙 + 글자 높이에 맞춰 콤팩트(고정높이 없음) + 긴 제목은 어절 경계에서 여러 줄로(잘림 방지) */}
       <div className="admin-card-title font-bold text-stone-700 mb-3 flex items-center justify-center text-center break-keep leading-snug">{title}</div>
       {children}
-      {note && <p className="text-[10px] text-stone-400 mt-2">{note}</p>}
+      {note && <p className="text-[10px] text-stone-600 mt-2">{note}</p>}
     </div>
   );
   // 📐 섹션 그룹 헤더 — 논리 그룹 사이에 라벨+구분선으로 시각 분리(기존 카드 위치·데이터는 그대로, 표기만 추가)
   const GroupHeader = ({ icon, label }: { icon: string; label: string }) => (
     <div className="flex items-center gap-2 mt-1 mb-2.5 px-0.5">
-      <span className="admin-group-title font-extrabold tracking-wide text-stone-400 whitespace-nowrap">{icon} {label}</span>
+      <span className="admin-group-title font-extrabold tracking-wide text-stone-600 whitespace-nowrap">{icon} {label}</span>
       <div className="flex-1 h-px bg-stone-300" />
     </div>
   );
@@ -256,8 +256,8 @@ export default function AdminPage() {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="font-bold">{c.name}</span>
-          <span className="text-xs text-stone-400">{c.area}</span>
-          <span className={`text-[10px] px-1.5 py-0.5 rounded ${c.source === "owner" ? "bg-blue-100 text-blue-700" : c.source === "seed" ? "bg-amber-100 text-amber-700" : "bg-stone-100 text-stone-500"}`}>{c.source}</span>
+          <span className="text-xs text-stone-600">{c.area}</span>
+          <span className={`text-[10px] px-1.5 py-0.5 rounded ${c.source === "owner" ? "bg-blue-100 text-blue-700" : c.source === "seed" ? "bg-amber-100 text-amber-700" : "bg-stone-100 text-stone-700"}`}>{c.source}</span>
           {!c.published && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-50 text-red-500">비공개</span>}
         </div>
         {c.note && <p className="text-sm text-stone-600 mt-1 line-clamp-1">{c.note}</p>}
@@ -282,7 +282,7 @@ export default function AdminPage() {
     <main className="min-h-screen bg-stone-100 p-4 sm:p-6" style={{ paddingTop: "calc(1rem + env(safe-area-inset-top))" }}>
       <div className="max-w-3xl lg:max-w-4xl xl:max-w-5xl mx-auto">
         <div className="flex items-center gap-3 mb-6">
-          <BackLink to="/" label="홈" className="text-stone-500" />
+          <BackLink to="/" label="홈" className="text-stone-700" />
           <h1 className="admin-h1 font-bold">관리자 대시보드</h1>
           <button onClick={() => load(pw)} className="ml-auto text-xs px-3 py-1.5 rounded-lg bg-stone-200 text-stone-700">새로고침</button>
         </div>
@@ -310,8 +310,8 @@ export default function AdminPage() {
 
         {/* 🎩 조직 관제(기획조정실 자율조직 브리핑) — 카페-데이터 관제탑과 별개. 모바일 전용 화면으로. */}
         <a href="/admin/org" className="flex items-center justify-between mb-6 rounded-2xl border border-stone-300 bg-white px-4 py-3 hover:bg-stone-50 transition">
-          <span className="flex items-center gap-2"><span className="text-lg">🎩</span><span className="flex flex-col"><span className="font-bold text-stone-800">조직 관제 (기획조정실)</span><span className="text-[11px] text-stone-500">자율 에이전트 일일 브리핑·결재·토큰</span></span></span>
-          <span className="text-stone-400 font-bold">→</span>
+          <span className="flex items-center gap-2"><span className="text-lg">🎩</span><span className="flex flex-col"><span className="font-bold text-stone-800">조직 관제 (기획조정실)</span><span className="text-[11px] text-stone-700">자율 에이전트 일일 브리핑·결재·토큰</span></span></span>
+          <span className="text-stone-600 font-bold">→</span>
         </a>
 
         <GroupHeader icon="⚙️" label="크론 · 에이전트 상태" />
@@ -355,7 +355,7 @@ export default function AdminPage() {
                 <div className="flex justify-center -mt-[18px] mb-1"><Light status={a.status} /></div>
                 <div className="text-[17px] leading-none">{d?.icon || "•"}</div>
                 <div className="text-[10.5px] font-extrabold text-stone-800 mt-1 leading-tight">{a.label.split(" (")[0]}</div>
-                <div className="text-[9px] mt-0.5 font-bold">{a.queue > 0 ? <span className="text-amber-600">대기 {a.queue.toLocaleString()}</span> : <span className="text-stone-400">{ago(a.ageH)}</span>}</div>
+                <div className="text-[9px] mt-0.5 font-bold">{a.queue > 0 ? <span className="text-amber-600">대기 {a.queue.toLocaleString()}</span> : <span className="text-stone-600">{ago(a.ageH)}</span>}</div>
               </button>
             );
           };
@@ -371,13 +371,13 @@ export default function AdminPage() {
                   <span className="text-2xl leading-none shrink-0">{d?.icon || "•"}</span>
                   <div className="flex-1 min-w-0">
                     <div className="font-extrabold text-stone-800 text-[14px] leading-tight">{a.label}</div>
-                    <div className="text-[11px] text-stone-500 leading-snug mt-0.5 line-clamp-2">{d?.what || a.note}</div>
+                    <div className="text-[11px] text-stone-700 leading-snug mt-0.5 line-clamp-2">{d?.what || a.note}</div>
                   </div>
                   <div className="text-right shrink-0">
-                    {a.queue > 0 ? <div className="text-amber-600 font-extrabold text-[13px]">대기<br />{a.queue.toLocaleString()}</div> : <div className="text-stone-400 text-[11px]">{ago(a.ageH)}</div>}
+                    {a.queue > 0 ? <div className="text-amber-600 font-extrabold text-[13px]">대기<br />{a.queue.toLocaleString()}</div> : <div className="text-stone-600 text-[11px]">{ago(a.ageH)}</div>}
                   </div>
                 </button>
-                {arrow && <div className="flex justify-center py-0.5 text-stone-400 text-xl leading-none select-none">↓</div>}
+                {arrow && <div className="flex justify-center py-0.5 text-stone-600 text-xl leading-none select-none">↓</div>}
               </>
             );
           };
@@ -419,14 +419,14 @@ export default function AdminPage() {
               )}
               {tower.today && (
                 <div className="mb-2.5">
-                  <div className="text-[10px] font-bold text-stone-500 mb-1.5">📅 오늘의 수집 (KST · 자동 갱신)</div>
+                  <div className="text-[10px] font-bold text-stone-700 mb-1.5">📅 오늘의 수집 (KST · 자동 갱신)</div>
                   <div className="admin-today-grid">
                     {[
                       { l: "오늘 신규발굴", v: tower.today.newCafes, c: "text-amber-700 bg-amber-50 border-amber-300", m: "newCafes" },
                       { l: "오늘 합성처리", v: tower.today.synthesized, c: "text-sky-700 bg-sky-50 border-sky-200", m: "synthesized" },
                       { l: "오늘 신규공개", v: tower.today.published, c: "text-emerald-700 bg-emerald-50 border-emerald-200", m: "published" },
                       { l: "동 채움", v: `${tower.today.dongPct}%`, c: "text-stone-700 bg-stone-50 border-stone-300", m: "dongMissing" },
-                      { l: "노이즈탈락(누적)", v: tower.today.noise, c: "text-stone-500 bg-stone-50 border-stone-300", m: "noise" },
+                      { l: "노이즈탈락(누적)", v: tower.today.noise, c: "text-stone-700 bg-stone-50 border-stone-300", m: "noise" },
                       { l: "합성대기", v: tower.today.newQueue, c: "text-amber-600 bg-amber-50 border-amber-300", m: "newQueue" },
                       { l: "유튜브 수집(누적)", v: tower.today.ytTotal ?? 0, c: "text-rose-700 bg-rose-50 border-rose-200", m: "yt" },
                     ].map((t) => (
@@ -462,7 +462,7 @@ export default function AdminPage() {
                   </div>
                   <div className="space-y-1 max-h-44 overflow-y-auto">
                     {tower.grounding.suspects?.map((s: any, i: number) => (
-                      <div key={i} className="text-[10.5px] leading-snug"><b className="text-rose-700">{s.name}</b> <span className="text-stone-400">{s.area}</span><br /><span className="text-stone-600">{s.issue}</span></div>
+                      <div key={i} className="text-[10.5px] leading-snug"><b className="text-rose-700">{s.name}</b> <span className="text-stone-600">{s.area}</span><br /><span className="text-stone-600">{s.issue}</span></div>
                     ))}
                   </div>
                 </div>
@@ -471,14 +471,14 @@ export default function AdminPage() {
               {tower.offctx && tower.offctx.count > 0 && (
                 <div className="mb-2.5 rounded-xl border p-2.5 border-amber-300 bg-amber-50/60">
                   <div className="text-[11px] font-bold mb-1.5 text-stone-700">
-                    🔎 리뷰 맥락 점검 목록 <b className="text-amber-700">{tower.offctx.count}곳</b> <span className="font-normal text-stone-500">· 위험 아님 · 표시 리뷰에 카페 맥락 적음(점검 권장)</span>
+                    🔎 리뷰 맥락 점검 목록 <b className="text-amber-700">{tower.offctx.count}곳</b> <span className="font-normal text-stone-700">· 위험 아님 · 표시 리뷰에 카페 맥락 적음(점검 권장)</span>
                   </div>
                   <div className="space-y-0.5 max-h-44 overflow-y-auto">
                     {tower.offctx.suspects?.map((s: any, i: number) => (
-                      <div key={i} className="text-[10.5px] leading-snug"><b className="text-amber-800">{s.name}</b> <span className="text-stone-400">{s.area}</span> <span className="text-stone-500">맥락없음 {Math.round((s.rate ?? 0) * 100)}%</span></div>
+                      <div key={i} className="text-[10.5px] leading-snug"><b className="text-amber-800">{s.name}</b> <span className="text-stone-600">{s.area}</span> <span className="text-stone-700">맥락없음 {Math.round((s.rate ?? 0) * 100)}%</span></div>
                     ))}
                   </div>
-                  <p className="text-[10px] text-stone-400 mt-1">사각 오염 감시용 watchlist — <b>일부는 진짜 카페(찻집·북카페·시적이름) 오탐</b>. 사람이 확인 후 진짜 오염만 비공개. (헛경보 방지로 위험 아닌 주의)</p>
+                  <p className="text-[10px] text-stone-600 mt-1">사각 오염 감시용 watchlist — <b>일부는 진짜 카페(찻집·북카페·시적이름) 오탐</b>. 사람이 확인 후 진짜 오염만 비공개. (헛경보 방지로 위험 아닌 주의)</p>
                 </div>
               )}
               {/* 📊 접속·유입 — 요약 진입 카드(상세는 전용 대시보드 1곳으로 일원화) */}
@@ -500,25 +500,25 @@ export default function AdminPage() {
               {blData?.summary?.cafes > 0 && (
                 <button onClick={() => setShowBorderline(true)} className="w-full mb-2.5 rounded-xl border border-violet-200 bg-violet-50/60 p-2.5 text-left hover:bg-violet-100/70 transition">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-stone-700">🤖 LLM 보강 대기 <span className="font-normal text-stone-400">· 경계후기는 노출서 제외(신뢰 유지)</span></span>
+                    <span className="text-[11px] font-bold text-stone-700">🤖 LLM 보강 대기 <span className="font-normal text-stone-600">· 경계후기는 노출서 제외(신뢰 유지)</span></span>
                     <span className="text-[11px] font-bold text-violet-700">목록 →</span>
                   </div>
-                  <div className="text-[10.5px] text-stone-600 mt-0.5">카페 <b className="text-violet-700">{blData.summary.cafes.toLocaleString()}</b>곳 · 대기 경계후기 <b className="text-violet-700">{blData.summary.reviews.toLocaleString()}</b>건 <span className="text-stone-400">— 크레딧 복구 시 LLM 평가·확인분만 보강</span></div>
+                  <div className="text-[10.5px] text-stone-600 mt-0.5">카페 <b className="text-violet-700">{blData.summary.cafes.toLocaleString()}</b>곳 · 대기 경계후기 <b className="text-violet-700">{blData.summary.reviews.toLocaleString()}</b>건 <span className="text-stone-600">— 크레딧 복구 시 LLM 평가·확인분만 보강</span></div>
                 </button>
               )}
-              <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-stone-500">
+              <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-stone-700">
                 <span>공개 <b className="text-stone-700">{tower.coverage?.published?.toLocaleString()}</b>/{tower.coverage?.total?.toLocaleString()}</span>
                 <span>raw {tower.coverage?.rawCachedPct}%</span>
                 <span>판정 {tower.coverage?.judgedPct}%</span>
                 <span>임베딩 {tower.coverage?.embeddedPct}%</span>
-                <span className="ml-auto text-stone-400">갱신 {new Date(tower.generatedAt).toLocaleTimeString("ko-KR")}</span>
+                <span className="ml-auto text-stone-600">갱신 {new Date(tower.generatedAt).toLocaleTimeString("ko-KR")}</span>
               </div>
               </div>}
             </div>
             {selAgent && (() => {
               const d = DESC[selAgent.key] || ({} as any);
               const stLabel = sl[selAgent.status] || selAgent.status;
-              const pill = selAgent.status === "ok" ? "bg-emerald-100 text-emerald-700" : selAgent.status === "stalled" ? "bg-red-100 text-red-700" : selAgent.status === "idle" ? "bg-stone-100 text-stone-500" : "bg-amber-100 text-amber-700";
+              const pill = selAgent.status === "ok" ? "bg-emerald-100 text-emerald-700" : selAgent.status === "stalled" ? "bg-red-100 text-red-700" : selAgent.status === "idle" ? "bg-stone-100 text-stone-700" : "bg-amber-100 text-amber-700";
               return (
                 <div onClick={() => setSelAgent(null)} className="fixed inset-0 z-[70] bg-black/40 flex items-end sm:items-center justify-center p-4">
                   <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
@@ -528,15 +528,15 @@ export default function AdminPage() {
                         <div className="text-base font-extrabold text-stone-800 leading-tight">{selAgent.label}</div>
                         <span className={`inline-block mt-1 text-[11px] font-bold px-2 py-0.5 rounded-full ${pill}`}>{stLabel}</span>
                       </div>
-                      <button onClick={() => setSelAgent(null)} className="ml-auto text-stone-400 text-2xl leading-none px-1">×</button>
+                      <button onClick={() => setSelAgent(null)} className="ml-auto text-stone-600 text-2xl leading-none px-1">×</button>
                     </div>
                     <p className="text-[13px] text-stone-700 mt-1.5 leading-relaxed">{d.what || selAgent.note}</p>
                     <div className="mt-3 space-y-1.5 text-[12px] border-t border-stone-300 pt-3">
-                      <div className="flex gap-2"><span className="text-stone-400 w-16 shrink-0">⏰ 주기</span><span className="text-stone-700">{d.sched || "—"}</span></div>
-                      <div className="flex gap-2"><span className="text-stone-400 w-16 shrink-0">➡️ 다음</span><span className="text-stone-700">{d.feeds || "—"}</span></div>
-                      <div className="flex gap-2"><span className="text-stone-400 w-16 shrink-0">🕐 마지막</span><span className="text-stone-700">{ago(selAgent.ageH)}</span></div>
-                      {selAgent.queue > 0 && <div className="flex gap-2"><span className="text-stone-400 w-16 shrink-0">📋 대기</span><span className="text-amber-600 font-bold">{selAgent.queue.toLocaleString()}건</span></div>}
-                      <div className="flex gap-2"><span className="text-stone-400 w-16 shrink-0">📝 현황</span><span className="text-stone-700">{selAgent.note}</span></div>
+                      <div className="flex gap-2"><span className="text-stone-600 w-16 shrink-0">⏰ 주기</span><span className="text-stone-700">{d.sched || "—"}</span></div>
+                      <div className="flex gap-2"><span className="text-stone-600 w-16 shrink-0">➡️ 다음</span><span className="text-stone-700">{d.feeds || "—"}</span></div>
+                      <div className="flex gap-2"><span className="text-stone-600 w-16 shrink-0">🕐 마지막</span><span className="text-stone-700">{ago(selAgent.ageH)}</span></div>
+                      {selAgent.queue > 0 && <div className="flex gap-2"><span className="text-stone-600 w-16 shrink-0">📋 대기</span><span className="text-amber-600 font-bold">{selAgent.queue.toLocaleString()}건</span></div>}
+                      <div className="flex gap-2"><span className="text-stone-600 w-16 shrink-0">📝 현황</span><span className="text-stone-700">{selAgent.note}</span></div>
                     </div>
                     <button onClick={() => setSelAgent(null)} className="mt-4 w-full rounded-xl bg-stone-800 text-white text-[13px] font-bold py-2.5">닫기</button>
                   </div>
@@ -549,16 +549,16 @@ export default function AdminPage() {
                 <div onClick={(e) => e.stopPropagation()} className="w-full max-w-lg max-h-[80vh] flex flex-col rounded-2xl bg-white p-5 shadow-xl">
                   <div className="flex items-center gap-2 mb-3">
                     <span className="text-base font-extrabold text-stone-800">📅 {todayDetail.label}</span>
-                    {!todayDetail.loading && <span className="text-[12px] font-bold text-stone-500">{todayDetail.cafes.length.toLocaleString()}곳{todayDetail.capped ? "+" : ""}</span>}
-                    <button onClick={() => setTodayDetail(null)} className="ml-auto text-stone-400 text-2xl leading-none px-1">×</button>
+                    {!todayDetail.loading && <span className="text-[12px] font-bold text-stone-700">{todayDetail.cafes.length.toLocaleString()}곳{todayDetail.capped ? "+" : ""}</span>}
+                    <button onClick={() => setTodayDetail(null)} className="ml-auto text-stone-600 text-2xl leading-none px-1">×</button>
                   </div>
                   <div className="overflow-y-auto flex-1 -mx-1 px-1">
                     {todayDetail.loading ? (
-                      <div className="text-[13px] text-stone-400 text-center py-8">불러오는 중…</div>
+                      <div className="text-[13px] text-stone-600 text-center py-8">불러오는 중…</div>
                     ) : todayDetail.error ? (
                       <div className="text-[13px] text-red-600 text-center py-8">에러: {todayDetail.error}</div>
                     ) : todayDetail.cafes.length === 0 ? (
-                      <div className="text-[13px] text-stone-400 text-center py-8">해당 카페가 없습니다.</div>
+                      <div className="text-[13px] text-stone-600 text-center py-8">해당 카페가 없습니다.</div>
                     ) : (
                       <div className="divide-y divide-stone-100">
                         {todayDetail.cafes.map((c: any) => {
@@ -566,10 +566,10 @@ export default function AdminPage() {
                             <>
                               <div className="min-w-0 flex-1">
                                 <div className="text-[13px] font-bold text-stone-800 truncate">{c.name}{c.published && <span className="text-[10px] text-indigo-400 font-normal"> ↗</span>}</div>
-                                <div className="text-[11px] text-stone-500 truncate">{c.area}{c.dong ? ` · ${c.dong}` : ""}{c.source ? ` · ${c.source}` : ""}{c.at ? ` · ${c.at}` : ""}</div>
+                                <div className="text-[11px] text-stone-700 truncate">{c.area}{c.dong ? ` · ${c.dong}` : ""}{c.source ? ` · ${c.source}` : ""}{c.at ? ` · ${c.at}` : ""}</div>
                               </div>
-                              {c.grade && <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${c.grade === "검증" ? "bg-emerald-100 text-emerald-700" : c.grade === "참고" ? "bg-sky-100 text-sky-700" : "bg-stone-100 text-stone-500"}`}>{c.grade}{c.cnt != null ? ` ${c.cnt}` : ""}</span>}
-                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${c.published ? "bg-emerald-50 text-emerald-600 border border-emerald-200" : "bg-stone-50 text-stone-400 border border-stone-300"}`}>{c.published ? "공개" : "비공개"}</span>
+                              {c.grade && <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${c.grade === "검증" ? "bg-emerald-100 text-emerald-700" : c.grade === "참고" ? "bg-sky-100 text-sky-700" : "bg-stone-100 text-stone-700"}`}>{c.grade}{c.cnt != null ? ` ${c.cnt}` : ""}</span>}
+                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${c.published ? "bg-emerald-50 text-emerald-600 border border-emerald-200" : "bg-stone-50 text-stone-600 border border-stone-300"}`}>{c.published ? "공개" : "비공개"}</span>
                             </>
                           );
                           return c.published ? (
@@ -581,7 +581,7 @@ export default function AdminPage() {
                       </div>
                     )}
                   </div>
-                  {todayDetail.capped && <div className="text-[10px] text-stone-400 text-center pt-2">최대 500곳까지 표시</div>}
+                  {todayDetail.capped && <div className="text-[10px] text-stone-600 text-center pt-2">최대 500곳까지 표시</div>}
                   <button onClick={() => setTodayDetail(null)} className="mt-3 w-full rounded-xl bg-stone-800 text-white text-[13px] font-bold py-2.5 shrink-0">닫기</button>
                 </div>
               </div>
@@ -643,30 +643,30 @@ export default function AdminPage() {
         {jstatus && (
           <div className="mb-6 rounded-2xl border border-stone-300 bg-white p-4 sm:p-5 space-y-3">
             <button onClick={() => toggleSec("auto")} className="w-full flex items-center justify-between text-left">
-              <span className="admin-section-title font-extrabold text-stone-800">{openSecs.auto ? "▾" : "▸"} 🔄 크론 자동화 현황 <span className="normal-case font-normal text-stone-500">(합성·판정 배치)</span> <span className="normal-case font-normal text-stone-400">· 판정대기 {jstatus.queue?.toLocaleString() ?? 0} · 오늘신규 {jstatus.newToday ?? 0}</span></span>
-              <span className="text-[10px] text-stone-400 shrink-0">{openSecs.auto ? "접기" : "보기"}</span>
+              <span className="admin-section-title font-extrabold text-stone-800">{openSecs.auto ? "▾" : "▸"} 🔄 크론 자동화 현황 <span className="normal-case font-normal text-stone-700">(합성·판정 배치)</span> <span className="normal-case font-normal text-stone-600">· 판정대기 {jstatus.queue?.toLocaleString() ?? 0} · 오늘신규 {jstatus.newToday ?? 0}</span></span>
+              <span className="text-[10px] text-stone-600 shrink-0">{openSecs.auto ? "접기" : "보기"}</span>
             </button>
             {openSecs.auto && <>
 
             {/* AI 판정 */}
             <div className="bg-white rounded-xl border border-stone-300 p-3">
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[12px] font-bold text-stone-700">🧮 AI 맥락 판정 <span className="font-normal text-stone-400">(보조 정제)</span></span>
-                <span className="text-[11px] text-stone-400">{jstatus.last ? `최근 ${new Date(jstatus.last).toLocaleString("ko-KR")}` : "미실행"}</span>
+                <span className="text-[12px] font-bold text-stone-700">🧮 AI 맥락 판정 <span className="font-normal text-stone-600">(보조 정제)</span></span>
+                <span className="text-[11px] text-stone-600">{jstatus.last ? `최근 ${new Date(jstatus.last).toLocaleString("ko-KR")}` : "미실행"}</span>
               </div>
               <div className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2 py-1 mb-1.5">소비자 노출 정상 ✅ <span className="font-normal text-emerald-600">— 공개 카페는 규칙으로 검증돼 노출 중. 아래 '대기'는 그 위 선택적 정제일 뿐 품질·위험과 무관.</span></div>
               <div className="flex items-end justify-between mb-1.5">
                 <span className="text-xl font-bold text-stone-800">{jstatus.pct}%</span>
-                <span className="text-[11px] text-stone-500">{jstatus.done?.toLocaleString()} / {jstatus.total?.toLocaleString()}곳</span>
+                <span className="text-[11px] text-stone-700">{jstatus.done?.toLocaleString()} / {jstatus.total?.toLocaleString()}곳</span>
               </div>
               <div className="w-full h-2 bg-stone-100 rounded-full overflow-hidden mb-1.5">
                 <div className="h-full bg-gradient-to-r from-emerald-400 to-emerald-600 rounded-full transition-all" style={{ width: `${jstatus.pct}%` }} />
               </div>
-              <div className="flex gap-3 text-[11px] text-stone-500">
+              <div className="flex gap-3 text-[11px] text-stone-700">
                 <span>판정 대기 <b className="text-stone-600">{jstatus.queue?.toLocaleString()}</b>곳</span>
                 <span>· 오늘 <b className="text-emerald-600">{jstatus.today}</b>곳 판정</span>
               </div>
-              <p className="text-[10px] text-stone-400 mt-1.5 leading-relaxed">
+              <p className="text-[10px] text-stone-600 mt-1.5 leading-relaxed">
                 ℹ️ '판정 대기' = 같은 이름의 딴 가게·맥락이 <b>애매한 '경계 리뷰'가 있어 LLM 확인이 필요한 곳</b>입니다.
                 새벽 Batches가 크레딧 한도 내에서 자동 처리합니다(경계 리뷰 없는 곳은 무과금 자동완료). <b>공개 카페는 이미
                 규칙으로 검증돼 정상 노출 중</b>이고 판정은 그 위 정제 레이어라, 이 대기 숫자는 <b>소비자 품질·위험과 무관</b>합니다(적체·고장 아님).
@@ -677,9 +677,9 @@ export default function AdminPage() {
             <div className="bg-white rounded-xl border border-stone-300 p-3">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[12px] font-bold text-stone-700">📡 카페 수집·공개</span>
-                <span className="text-[11px] text-stone-400">오늘 신규 <b className="text-blue-600">{jstatus.newToday ?? 0}</b>곳</span>
+                <span className="text-[11px] text-stone-600">오늘 신규 <b className="text-blue-600">{jstatus.newToday ?? 0}</b>곳</span>
               </div>
-              <div className="flex gap-4 text-[11px] text-stone-500">
+              <div className="flex gap-4 text-[11px] text-stone-700">
                 <span>전체 <b className="text-stone-700">{jstatus.cafesTotal?.toLocaleString()}</b>곳</span>
                 <span>공개 <b className="text-emerald-600">{jstatus.cafesPub?.toLocaleString()}</b>곳</span>
                 <span>수집대기 <b className="text-amber-600">{jstatus.collectQueue?.toLocaleString()}</b>곳</span>
@@ -690,9 +690,9 @@ export default function AdminPage() {
             <div className="bg-white rounded-xl border border-stone-300 p-3">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[12px] font-bold text-stone-700">📺 유튜브 수집</span>
-                <span className="text-[11px] text-stone-400">{jstatus.ytLast ? `최근 ${new Date(jstatus.ytLast).toLocaleString("ko-KR")}` : "미실행"}</span>
+                <span className="text-[11px] text-stone-600">{jstatus.ytLast ? `최근 ${new Date(jstatus.ytLast).toLocaleString("ko-KR")}` : "미실행"}</span>
               </div>
-              <div className="flex gap-4 text-[11px] text-stone-500">
+              <div className="flex gap-4 text-[11px] text-stone-700">
                 <span>수집완료 <b className="text-stone-700">{jstatus.ytTotal?.toLocaleString()}</b>곳</span>
                 <span>오늘 <b className="text-emerald-600">{jstatus.ytToday ?? 0}</b>곳</span>
                 <span>대기 <b className="text-amber-600">{jstatus.ytQueue?.toLocaleString()}</b>곳</span>
@@ -710,7 +710,7 @@ export default function AdminPage() {
             <div className="mb-6 rounded-2xl border border-stone-300 bg-white p-4 sm:p-5">
               <button onClick={() => toggleSec("audit")} className="w-full flex items-center justify-between text-left mb-2">
                 <span className={`admin-section-title font-extrabold ${unresolved.length ? "text-red-600" : "text-stone-800"}`}>{openSecs.audit ? "▾" : "▸"} {unresolved.length ? `🚨 실시간 이슈 · 품질 오염 감지 (${unresolved.length}건)` : "✅ 실시간 이슈 · 품질 오염 감지 (0건)"}</span>
-                <span className="text-[11px] text-stone-400 shrink-0">{auditFlags.lastAudit}</span>
+                <span className="text-[11px] text-stone-600 shrink-0">{auditFlags.lastAudit}</span>
               </button>
               {openSecs.audit && (unresolved.length > 0 ? (
                 <div className="bg-red-50 border border-red-200 rounded-xl p-3 space-y-1.5">
@@ -733,8 +733,8 @@ export default function AdminPage() {
         <div className="mb-6 rounded-2xl border border-stone-300 bg-white p-4 sm:p-5">
           <div className="flex items-center justify-between mb-2">
             <button onClick={() => toggleSec("verify")} className="admin-section-title font-extrabold text-stone-800 text-left">
-              {openSecs.verify ? "▾" : "▸"} 🛡️ 데이터 정합성 검증 <span className="normal-case font-normal text-stone-400">·</span>{" "}
-              {verify ? (verify.status === "pass" ? <span className="text-emerald-600 normal-case">정상 ✅</span> : verify.status === "warn" ? <span className="text-amber-600 normal-case">🟡 주의 {verify.warns}</span> : <span className="text-red-600 normal-case">🔴 오류 {verify.fails}</span>) : <span className="normal-case font-normal text-stone-400">리포트 없음</span>}
+              {openSecs.verify ? "▾" : "▸"} 🛡️ 데이터 정합성 검증 <span className="normal-case font-normal text-stone-600">·</span>{" "}
+              {verify ? (verify.status === "pass" ? <span className="text-emerald-600 normal-case">정상 ✅</span> : verify.status === "warn" ? <span className="text-amber-600 normal-case">🟡 주의 {verify.warns}</span> : <span className="text-red-600 normal-case">🔴 오류 {verify.fails}</span>) : <span className="normal-case font-normal text-stone-600">리포트 없음</span>}
             </button>
             <button onClick={runVerify} disabled={verifying} className="text-[11px] bg-stone-800 text-white rounded-full px-3 py-1 disabled:opacity-50">{verifying ? "검사 중…" : "지금 검사"}</button>
           </div>
@@ -744,20 +744,20 @@ export default function AdminPage() {
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-lg">{verify.status === "pass" ? "✅" : verify.status === "warn" ? "🟡" : "🔴"}</span>
                 <span className="font-bold text-sm">{verify.status === "pass" ? "전체 정상 — 한치의 오차 없음" : verify.status === "warn" ? `주의 ${verify.warns}건` : `오류 ${verify.fails}건 — 즉시 확인 필요`}</span>
-                <span className="text-[10px] text-stone-400 ml-auto">{verify.ran_at ? new Date(verify.ran_at).toLocaleString("ko-KR") : ""}</span>
+                <span className="text-[10px] text-stone-600 ml-auto">{verify.ran_at ? new Date(verify.ran_at).toLocaleString("ko-KR") : ""}</span>
               </div>
               <div className="space-y-1">
                 {(verify.checks ?? []).map((c: any) => (
                   <div key={c.key} className="flex items-center gap-2 text-[12px]">
                     <span>{c.count === 0 ? "🟢" : c.severity === "fail" ? "🔴" : "🟡"}</span>
                     <span className="flex-1 text-stone-700">{c.label}</span>
-                    {c.count > 0 && c.samples?.length > 0 && <span className="text-[10px] text-stone-400 truncate max-w-[40%]" title={c.samples.join(", ")}>{c.samples.join(", ")}</span>}
+                    {c.count > 0 && c.samples?.length > 0 && <span className="text-[10px] text-stone-600 truncate max-w-[40%]" title={c.samples.join(", ")}>{c.samples.join(", ")}</span>}
                     <span className={c.count > 0 ? (c.severity === "fail" ? "text-rose-600 font-bold" : "text-amber-600 font-bold") : "text-stone-300"}>{c.count}</span>
                   </div>
                 ))}
               </div>
             </div>
-          ) : <p className="text-[12px] text-stone-400">검증 리포트 없음 — '지금 검사'를 눌러 실행하세요.</p>}
+          ) : <p className="text-[12px] text-stone-600">검증 리포트 없음 — '지금 검사'를 눌러 실행하세요.</p>}
 
           {/* 📈 검증 이력 추이 — 크론이 하루 여러 번 자동 실행한 이력(verify_reports)을 그대로 사용, 신규 집계 없음 */}
           {verifyHistory.length > 1 && (() => {
@@ -766,7 +766,7 @@ export default function AdminPage() {
             return (
               <div className="mt-2.5 rounded-xl border border-stone-200 bg-stone-50/60 p-2.5">
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-[11px] font-bold text-stone-600">📈 검증 이력 추이 <span className="font-normal text-stone-400">· 최근 {verifyHistory.length}회 자동검사</span></span>
+                  <span className="text-[11px] font-bold text-stone-600">📈 검증 이력 추이 <span className="font-normal text-stone-600">· 최근 {verifyHistory.length}회 자동검사</span></span>
                   <span className="text-[10.5px] font-bold text-emerald-600">{okStreak > 0 ? `연속 정상 ${okStreak}회` : "직전 검사 이상 있음"}</span>
                 </div>
                 <div className="flex items-end gap-0.5 h-8">
@@ -794,7 +794,7 @@ export default function AdminPage() {
                   {grounding.samples.map((s: any, i: number) => (
                     <div key={i} className="text-[11px] text-stone-600"><b>{s.s}</b>: {s.issue || "근거 불충분"}</div>
                   ))}
-                  <p className="text-[10px] text-stone-400 mt-1">⚠ 공개 노출 중 — 사람이 확인 후 재합성/비공개 처리하세요.</p>
+                  <p className="text-[10px] text-stone-600 mt-1">⚠ 공개 노출 중 — 사람이 확인 후 재합성/비공개 처리하세요.</p>
                 </div>
               ) : <p className="text-[11px] text-emerald-700">지금 공개 중인 카페 전부 근거 일치 — 소비자에게 보이는 오염 <b>없음</b>.</p>}
             </div>
@@ -832,8 +832,8 @@ export default function AdminPage() {
           <div className="fixed inset-0 z-[6000] flex items-end justify-center bg-black/40" onClick={() => setShowVisits(false)}>
             <div className="w-full max-w-2xl bg-white rounded-t-2xl max-h-[88dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between px-4 py-3 border-b">
-                <span className="text-sm font-bold text-stone-800">❤ 내 카페 방문기록 {visits?.stat && <span className="text-[11px] text-stone-400 font-normal">총 {visits.stat.total} · 사용자 {visits.stat.users} · 즐겨찾기 {visits.stat.favs} · 인증 {visits.stat.verified} · 미인증 {visits.stat.unverified}</span>}</span>
-                <button onClick={() => setShowVisits(false)} className="text-2xl text-stone-400 leading-none">×</button>
+                <span className="text-sm font-bold text-stone-800">❤ 내 카페 방문기록 {visits?.stat && <span className="text-[11px] text-stone-600 font-normal">총 {visits.stat.total} · 사용자 {visits.stat.users} · 즐겨찾기 {visits.stat.favs} · 인증 {visits.stat.verified} · 미인증 {visits.stat.unverified}</span>}</span>
+                <button onClick={() => setShowVisits(false)} className="text-2xl text-stone-600 leading-none">×</button>
               </div>
               <div className="overflow-y-auto flex-1 p-3 space-y-2">
                 {(visits?.visits ?? []).map((v: any) => (
@@ -843,15 +843,15 @@ export default function AdminPage() {
                       <div className="flex items-center gap-1.5">
                         {v.favorite && <span className="text-amber-500">★</span>}
                         <b className="text-[13px] text-stone-800">{v.cafe_name}</b>
-                        <span className="text-[10px] text-stone-400">{v.area}</span>
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${v.verified ? "bg-emerald-50 text-emerald-600" : "bg-stone-100 text-stone-500"}`}>{v.verified ? "✓ 인증" : "미인증"}</span>
+                        <span className="text-[10px] text-stone-600">{v.area}</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${v.verified ? "bg-emerald-50 text-emerald-600" : "bg-stone-100 text-stone-700"}`}>{v.verified ? "✓ 인증" : "미인증"}</span>
                       </div>
                       {v.memory && <div className="text-[12px] text-stone-600 mt-1 leading-relaxed whitespace-pre-wrap">{v.memory}</div>}
-                      <div className="text-[10px] text-stone-400 mt-1">{new Date(v.created_at).toLocaleString("ko-KR")} · 익명 {String(v.device_id).slice(0, 6)}</div>
+                      <div className="text-[10px] text-stone-600 mt-1">{new Date(v.created_at).toLocaleString("ko-KR")} · 익명 {String(v.device_id).slice(0, 6)}</div>
                     </div>
                   </div>
                 ))}
-                {(!visits?.visits || visits.visits.length === 0) && <p className="text-[12px] text-stone-400 text-center py-6">아직 등록된 방문 기록이 없어요.</p>}
+                {(!visits?.visits || visits.visits.length === 0) && <p className="text-[12px] text-stone-600 text-center py-6">아직 등록된 방문 기록이 없어요.</p>}
               </div>
             </div>
           </div>
@@ -863,18 +863,18 @@ export default function AdminPage() {
             <div className="absolute inset-0 bg-black/50" />
             <div className="absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto bg-stone-50 rounded-t-2xl p-4 sm:inset-0 sm:m-auto sm:max-w-md sm:h-fit sm:max-h-[85vh] sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-bold text-stone-800">📺 유튜브 수집 현황 <span className="text-[11px] text-stone-400 font-normal">보유 {yt.withYt}·오늘 {yt.checkedToday}·남은 {yt.remaining}</span></span>
-              <button onClick={() => setShowYtModal(false)} className="text-2xl text-stone-400 leading-none">×</button>
+              <span className="text-sm font-bold text-stone-800">📺 유튜브 수집 현황 <span className="text-[11px] text-stone-600 font-normal">보유 {yt.withYt}·오늘 {yt.checkedToday}·남은 {yt.remaining}</span></span>
+              <button onClick={() => setShowYtModal(false)} className="text-2xl text-stone-600 leading-none">×</button>
             </div>
             {yt.rows?.length > 0 ? (
               <div className="space-y-3">
                 {Object.entries(groupByDate(yt.rows)).map(([date, cafes]: any) => (
                   <div key={date}>
-                    <div className="text-[11px] font-bold text-stone-600 mb-1">📅 {date} <span className="text-stone-400 font-normal">({cafes.length}곳 수집)</span></div>
+                    <div className="text-[11px] font-bold text-stone-600 mb-1">📅 {date} <span className="text-stone-600 font-normal">({cafes.length}곳 수집)</span></div>
                     <div className="space-y-1.5">
                       {cafes.map((c: any) => (
                         <div key={c.id} className="bg-white rounded-lg border border-stone-300 p-2">
-                          <div className="text-[12px] font-bold text-stone-800">{c.name} <span className="text-[10px] text-stone-400 font-normal">{c.area}</span> <span className="text-[10px] text-rose-500">▶{c.videos?.length || 0}</span></div>
+                          <div className="text-[12px] font-bold text-stone-800">{c.name} <span className="text-[10px] text-stone-600 font-normal">{c.area}</span> <span className="text-[10px] text-rose-500">▶{c.videos?.length || 0}</span></div>
                           {(c.videos || []).map((v: any, i: number) => (
                             <a key={i} href={v.l} target="_blank" rel="noopener noreferrer" className="block text-[11px] text-blue-600 truncate hover:underline">▶ {v.q}{v.s ? ` · ${v.s}` : ""}</a>
                           ))}
@@ -884,8 +884,8 @@ export default function AdminPage() {
                   </div>
                 ))}
               </div>
-            ) : <p className="text-[12px] text-stone-400">최근 30일 유튜브 수집 없음.</p>}
-            <p className="text-[10px] text-stone-400 mt-2">유튜브 API 쿼터 한도로 매일 조금씩 수집(04:00 백필). 남은 {yt.remaining}곳 순차 진행.</p>
+            ) : <p className="text-[12px] text-stone-600">최근 30일 유튜브 수집 없음.</p>}
+            <p className="text-[10px] text-stone-600 mt-2">유튜브 API 쿼터 한도로 매일 조금씩 수집(04:00 백필). 남은 {yt.remaining}곳 순차 진행.</p>
             </div>
           </div>
         )}
@@ -894,7 +894,7 @@ export default function AdminPage() {
         {showSubsModal && (
           <div className="fixed inset-0 z-[6000] flex items-end sm:items-center justify-center bg-black/50" onClick={() => { setShowSubsModal(false); setSubMsg(""); }}>
             <div className="w-full sm:max-w-lg bg-stone-50 rounded-t-2xl sm:rounded-2xl flex flex-col h-[92dvh] sm:h-auto sm:max-h-[90dvh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-4 py-3 border-b border-stone-200 bg-white shrink-0"><span className="text-sm font-bold text-stone-800">💳 구독 카페 현황 ({subscribers.length})</span><button onClick={() => { setShowSubsModal(false); setSubMsg(""); }} className="text-2xl text-stone-400 leading-none">×</button></div>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-stone-200 bg-white shrink-0"><span className="text-sm font-bold text-stone-800">💳 구독 카페 현황 ({subscribers.length})</span><button onClick={() => { setShowSubsModal(false); setSubMsg(""); }} className="text-2xl text-stone-600 leading-none">×</button></div>
             <div className="overflow-y-auto flex-1 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
             {/* 📧 승인 시 사장님께 자동 발송되는 온보딩 메일(서비스 사용법 + 전용 서비스 안내) 내용 확인 */}
             <button onClick={openOnboard} className="w-full mb-3 text-left bg-amber-50 border border-amber-300 rounded-lg px-3 py-2 text-[12px] font-bold text-amber-800">📧 승인 시 발송되는 온보딩 메일 내용 보기 →</button>
@@ -904,12 +904,12 @@ export default function AdminPage() {
             {/* ✨ 소비자 노출 — 기본 자동 ON. false 명시(킬스위치)일 때만 경고 */}
             {liveExposure === false && <div className="mb-3 text-[11px] text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-2.5 py-2">🚨 <b>소비자 노출이 비상 차단(OFF)돼 있어요</b> — 누군가 Vercel 환경변수 <b>SUBSCRIPTION_LIVE=false</b>로 꺼둔 상태입니다. 이 값을 <b>지우면 자동으로 다시 켜집니다</b>(기본 ON).</div>}
             {liveExposure === true && <div className="mb-3 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-2">✨ 소비자 노출 <b>자동 ON</b> — 구독 사장님이 <b>첫 로그인하면</b> 우선노출(금색핀·추천카페·쇼케이스)이 손님에게 자동으로 노출됩니다. 별도로 켤 필요 없어요.</div>}
-            {subMsg && <div className="mb-3 text-[12px] text-stone-800 bg-amber-50 border border-amber-300 rounded-lg px-2.5 py-2 flex items-start gap-2"><span className="flex-1">{subMsg}</span><button onClick={() => setSubMsg("")} className="text-stone-400 shrink-0">×</button></div>}
+            {subMsg && <div className="mb-3 text-[12px] text-stone-800 bg-amber-50 border border-amber-300 rounded-lg px-2.5 py-2 flex items-start gap-2"><span className="flex-1">{subMsg}</span><button onClick={() => setSubMsg("")} className="text-stone-600 shrink-0">×</button></div>}
             {subscribers.length > 0 ? (
             <div className="space-y-2">
               {subscribers.map((s) => {
                 const dleft = s.expires_at ? Math.max(0, Math.ceil((new Date(s.expires_at).getTime() - Date.now()) / 86400000)) : null;
-                const stColor = s.status === "active" ? "text-emerald-600" : s.status === "pending" ? "text-amber-600" : s.status === "suspended" ? "text-rose-600" : "text-stone-400";
+                const stColor = s.status === "active" ? "text-emerald-600" : s.status === "pending" ? "text-amber-600" : s.status === "suspended" ? "text-rose-600" : "text-stone-600";
                 const stLabel = s.status === "active" ? "활성" : s.status === "pending" ? "대기" : s.status === "expired" ? "만료" : s.status === "cancelled" ? "해지" : s.status === "suspended" ? "🚫 정지" : s.status;
                 return (
                   <div key={s.id} className="bg-white rounded-xl border border-amber-300 p-3">
@@ -923,10 +923,10 @@ export default function AdminPage() {
                         {s.biz_reg_url ? <a href={s.biz_reg_url} target="_blank" rel="noopener" className="inline-flex items-center gap-1 text-blue-700 underline font-bold">🧾 사업자등록증 보기</a> : <span className="text-rose-600">⚠️ 사업자등록증 없음</span>}
                         <div>대표자명 대조: <b>{s.owner_name}</b>{s.biz_no ? ` · 사업자번호 ${s.biz_no}` : ""}</div>
                         <div>{s.attested ? "✅ 본인확인(사업주) 법적 동의" : "❌ 본인확인 미동의"}{s.signup_ip ? ` · IP ${s.signup_ip}` : ""}</div>
-                        <div className="text-[10px] text-stone-400">대표자명·상호가 이 카페와 일치하는지 확인 후 승인하세요.</div>
+                        <div className="text-[10px] text-stone-600">대표자명·상호가 이 카페와 일치하는지 확인 후 승인하세요.</div>
                       </div>
                       {s.status === "active" && s.pin && <div className="text-[12px] mt-1">🔑 PIN <b className="font-mono tracking-wider text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">{s.pin}</b> {s.pin_emailed_at ? <span className="text-[10px] text-emerald-600">✅ 이메일 발송됨 · 사장님 로그인용</span> : <span className="text-[10px] text-rose-500">⚠️ 이메일 미발송 — 이 PIN을 직접 전달하세요</span>}</div>}
-                      {s.newsletter_opt_in && <div className="text-[10px] text-stone-400 mt-0.5">📰 주간 레터 수신동의 — 매주 트렌드 레터 발송 대상</div>}
+                      {s.newsletter_opt_in && <div className="text-[10px] text-stone-600 mt-0.5">📰 주간 레터 수신동의 — 매주 트렌드 레터 발송 대상</div>}
                       {/* 📈 접속 모니터링 — PIN 발급 사장님이 실제 로그인·사용하는지 */}
                       {s.status === "active" && s.pin && (() => {
                         const ago = (v: any) => { if (!v) return ""; const ms = Date.now() - new Date(v).getTime(); const d = Math.floor(ms / 86400000), h = Math.floor(ms / 3600000), m = Math.floor(ms / 60000); return d > 0 ? `${d}일 전` : h > 0 ? `${h}시간 전` : m > 0 ? `${m}분 전` : "방금"; };
@@ -942,7 +942,7 @@ export default function AdminPage() {
                             {never
                               ? <div className="text-rose-600">🔴 <b>아직 한 번도 로그인 안 함</b>{issuedAgo != null ? ` — PIN 발급 ${issuedAgo}일째 미접속` : ""}. 사용 안내(온보딩)가 필요해요.</div>
                               : <div className="text-stone-600">✅ 로그인 <b className="text-sky-700">{s.login_count}회</b> · 최근 접속 <b>{ago(s.last_seen_at)}</b>{s.first_login_at ? ` · 첫 접속 ${new Date(s.first_login_at).toLocaleDateString("ko-KR")}` : ""}</div>}
-                            {evs.length > 0 && <div className="mt-1 flex flex-wrap gap-1">{evs.slice(0, 6).map((e: any, i: number) => <span key={i} className="text-[10px] bg-white/70 border border-stone-300 rounded px-1.5 py-0.5 text-stone-500">{EV[e.event] || e.event} · {ago(e.at)}</span>)}</div>}
+                            {evs.length > 0 && <div className="mt-1 flex flex-wrap gap-1">{evs.slice(0, 6).map((e: any, i: number) => <span key={i} className="text-[10px] bg-white/70 border border-stone-300 rounded px-1.5 py-0.5 text-stone-700">{EV[e.event] || e.event} · {ago(e.at)}</span>)}</div>}
                           </div>
                         );
                       })()}
@@ -961,8 +961,8 @@ export default function AdminPage() {
                 );
               })}
             </div>
-            ) : <p className="text-[13px] text-stone-400 py-3 text-center">구독 회원이 아직 없어요.</p>}
-            <p className="text-[10px] text-stone-400 mt-2">승인 시 PIN 발급 → <b>사장님 첫 로그인 시점부터</b> 기간 카운트 시작 + 골드핀·우선노출·쇼케이스 자동 ON. 만료/해지 시 전부 OFF. 연락처는 암호화 저장.</p>
+            ) : <p className="text-[13px] text-stone-600 py-3 text-center">구독 회원이 아직 없어요.</p>}
+            <p className="text-[10px] text-stone-600 mt-2">승인 시 PIN 발급 → <b>사장님 첫 로그인 시점부터</b> 기간 카운트 시작 + 골드핀·우선노출·쇼케이스 자동 ON. 만료/해지 시 전부 OFF. 연락처는 암호화 저장.</p>
             </div>
             </div>
           </div>
@@ -974,20 +974,20 @@ export default function AdminPage() {
             <div className="min-h-full flex items-start justify-center p-2 sm:p-4">
               <div className="bg-stone-50 rounded-2xl w-full max-w-2xl shadow-2xl my-2" onClick={(e) => e.stopPropagation()}>
                 <div className="sticky top-0 z-10 bg-white border-b border-stone-300 px-4 py-3 flex items-center justify-between rounded-t-2xl">
-                  <span className="text-[14px] font-extrabold text-stone-800">🤖 LLM 보강 대기 <span className="text-[11px] font-normal text-stone-400">· 노출엔 경계후기 제외됨</span></span>
-                  <button onClick={() => setShowBorderline(false)} className="text-stone-400 hover:text-stone-700 text-lg leading-none px-1">✕</button>
+                  <span className="text-[14px] font-extrabold text-stone-800">🤖 LLM 보강 대기 <span className="text-[11px] font-normal text-stone-600">· 노출엔 경계후기 제외됨</span></span>
+                  <button onClick={() => setShowBorderline(false)} className="text-stone-600 hover:text-stone-700 text-lg leading-none px-1">✕</button>
                 </div>
                 <div className="p-4">
-                  <p className="text-[11px] text-stone-500 bg-stone-100 rounded-lg px-3 py-2 mb-3 leading-relaxed">아래 카페는 <b className="text-stone-600">깨끗한 후기만 노출 중</b>이고(소비자 신뢰 유지), 추가로 발견된 '경계후기'(같은 이름 딴 지점·업종 모호 등)는 <b className="text-stone-600">화면에서 빠진 채</b> LLM 판정을 기다립니다. 크레딧 복구 시 LLM이 평가해 <b className="text-stone-600">진짜로 확인된 것만</b> 노출에 보강됩니다. (숫자: 노출 / 경계대기)</p>
-                  {!blData?.list?.length ? <p className="text-center text-stone-400 py-8 text-[13px]">보강 대기 카페가 없습니다.</p> : (
+                  <p className="text-[11px] text-stone-700 bg-stone-100 rounded-lg px-3 py-2 mb-3 leading-relaxed">아래 카페는 <b className="text-stone-600">깨끗한 후기만 노출 중</b>이고(소비자 신뢰 유지), 추가로 발견된 '경계후기'(같은 이름 딴 지점·업종 모호 등)는 <b className="text-stone-600">화면에서 빠진 채</b> LLM 판정을 기다립니다. 크레딧 복구 시 LLM이 평가해 <b className="text-stone-600">진짜로 확인된 것만</b> 노출에 보강됩니다. (숫자: 노출 / 경계대기)</p>
+                  {!blData?.list?.length ? <p className="text-center text-stone-600 py-8 text-[13px]">보강 대기 카페가 없습니다.</p> : (
                     <div className="space-y-1">
                       {blData.list.map((c: any) => (
                         <div key={c.id} className="flex items-center justify-between bg-white rounded-lg border border-stone-300 px-2.5 py-1.5">
-                          <span className="text-[11px] text-stone-700 truncate mr-2"><b>{c.name}</b> <span className="text-stone-400 font-normal">{c.area}</span> <span className="text-[9px] text-stone-400">{c.synth_grade}</span></span>
+                          <span className="text-[11px] text-stone-700 truncate mr-2"><b>{c.name}</b> <span className="text-stone-600 font-normal">{c.area}</span> <span className="text-[9px] text-stone-600">{c.synth_grade}</span></span>
                           <span className="text-[10.5px] shrink-0 whitespace-nowrap"><b className="text-emerald-600">{c.shown}</b> <span className="text-stone-300">/</span> <b className="text-violet-600">{c.borderline}</b></span>
                         </div>
                       ))}
-                      {blData.list.length >= 200 && <p className="text-[10px] text-stone-400 text-center pt-1">상위 200곳 표시 (경계후기 많은 순)</p>}
+                      {blData.list.length >= 200 && <p className="text-[10px] text-stone-600 text-center pt-1">상위 200곳 표시 (경계후기 많은 순)</p>}
                     </div>
                   )}
                 </div>
@@ -1002,14 +1002,14 @@ export default function AdminPage() {
             <div className="min-h-full flex items-start justify-center p-2 sm:p-4">
               <div className="bg-stone-50 rounded-2xl w-full max-w-3xl shadow-2xl my-2" onClick={(e) => e.stopPropagation()}>
                 <div className="sticky top-0 z-10 bg-white border-b border-stone-300 px-4 py-3 flex items-center justify-between rounded-t-2xl">
-                  <span className="text-[14px] font-extrabold text-stone-800">📊 접속·유입 현황 <span className="text-[11px] font-normal text-stone-400">· 진짜 외부 사용자만 (대표·팀·봇 제외)</span></span>
+                  <span className="text-[14px] font-extrabold text-stone-800">📊 접속·유입 현황 <span className="text-[11px] font-normal text-stone-600">· 진짜 외부 사용자만 (대표·팀·봇 제외)</span></span>
                   <div className="flex items-center gap-2">
-                    <button onClick={() => loadAnalytics(pw)} className="text-[11px] font-bold text-stone-500 border border-stone-300 rounded-full px-2.5 py-1 hover:bg-stone-100">↻ 새로고침</button>
-                    <button onClick={() => setShowAnalytics(false)} className="text-stone-400 hover:text-stone-700 text-lg leading-none px-1">✕</button>
+                    <button onClick={() => loadAnalytics(pw)} className="text-[11px] font-bold text-stone-700 border border-stone-300 rounded-full px-2.5 py-1 hover:bg-stone-100">↻ 새로고침</button>
+                    <button onClick={() => setShowAnalytics(false)} className="text-stone-600 hover:text-stone-700 text-lg leading-none px-1">✕</button>
                   </div>
                 </div>
                 {!analytics ? (
-                  <div className="p-10 text-center text-stone-400 text-[13px]">불러오는 중…</div>
+                  <div className="p-10 text-center text-stone-600 text-[13px]">불러오는 중…</div>
                 ) : (() => {
                   const a = analytics; const f = a.funnel || {};
                   const retRate = a.kpi?.mau ? Math.round((a.retention?.returning / a.kpi.mau) * 100) : 0;
@@ -1041,7 +1041,7 @@ export default function AdminPage() {
                   ];
                   return (
                     <div className="p-4 space-y-4">
-                      <p className="text-[10.5px] text-stone-500 bg-stone-100/70 rounded-lg px-3 py-2 leading-relaxed">우리 사이트 방문을 <b className="text-stone-600">외부 도구 없이 직접</b> 모은 현황입니다. <b className="text-emerald-700">대표·팀(내부)과 봇은 자동 제외</b>돼 아래 숫자는 모두 <b className="text-stone-600">진짜 외부 방문자</b>입니다. 실시간·방문자·유입경로·재방문은 정확하고, 페이지 단위(추이·인기카페)는 방문이 쌓이며 채워집니다. <span className="text-stone-400">※ 유입경로 '미상'은 추적 도입 전 옛 방문 또는 앱·북마크 유입(카톡·인스타 인앱은 경로가 안 남습니다).</span></p>
+                      <p className="text-[10.5px] text-stone-700 bg-stone-100/70 rounded-lg px-3 py-2 leading-relaxed">우리 사이트 방문을 <b className="text-stone-600">외부 도구 없이 직접</b> 모은 현황입니다. <b className="text-emerald-700">대표·팀(내부)과 봇은 자동 제외</b>돼 아래 숫자는 모두 <b className="text-stone-600">진짜 외부 방문자</b>입니다. 실시간·방문자·유입경로·재방문은 정확하고, 페이지 단위(추이·인기카페)는 방문이 쌓이며 채워집니다. <span className="text-stone-600">※ 유입경로 '미상'은 추적 도입 전 옛 방문 또는 앱·북마크 유입(카톡·인스타 인앱은 경로가 안 남습니다).</span></p>
                       {/* 🟢 실시간 · 오늘 */}
                       <div className="bg-white rounded-xl border border-stone-300 p-3">
                         <div className="flex items-center justify-between flex-wrap gap-2">
@@ -1049,9 +1049,9 @@ export default function AdminPage() {
                             <span className="relative flex h-2.5 w-2.5"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span></span>
                             <span className="text-[12px] font-bold text-stone-700">실시간 <span className="text-emerald-600 text-[16px]">{a.realtime?.active5 ?? 0}</span>명 접속 중</span>
                           </div>
-                          <div className="text-[11px] text-stone-500">30분 내 {a.realtime?.active30 ?? 0}명 · KST 오늘(자정~) 방문 <b className="text-sky-700">{a.today?.visitors ?? 0}</b> · 페이지뷰 <b className="text-sky-700">{(a.today?.pageviews ?? 0).toLocaleString()}</b></div>
+                          <div className="text-[11px] text-stone-700">30분 내 {a.realtime?.active30 ?? 0}명 · KST 오늘(자정~) 방문 <b className="text-sky-700">{a.today?.visitors ?? 0}</b> · 페이지뷰 <b className="text-sky-700">{(a.today?.pageviews ?? 0).toLocaleString()}</b></div>
                         </div>
-                        <p className="text-[9.5px] text-stone-400 mt-1.5">지금 사이트에 머무는 사람(최근 5분 활동)과 KST 자정부터 지금까지 다녀간 수입니다. <b>※ 아래 '일간(DAU)'은 집계 기준(자정~ 대신 최근 24시간)이 달라 이 수치와 미묘하게 다를 수 있어요.</b></p>
+                        <p className="text-[9.5px] text-stone-600 mt-1.5">지금 사이트에 머무는 사람(최근 5분 활동)과 KST 자정부터 지금까지 다녀간 수입니다. <b>※ 아래 '일간(DAU)'은 집계 기준(자정~ 대신 최근 24시간)이 달라 이 수치와 미묘하게 다를 수 있어요.</b></p>
                       </div>
                       <div className="grid grid-cols-3 gap-2">
                         {[
@@ -1060,10 +1060,10 @@ export default function AdminPage() {
                           { ic: "🔁", l: "재방문율", v: `${retRate}%`, sub: `재방문 ${a.retention?.returning}·신규 ${a.retention?.newcomers}`, desc: "다시 찾은 사람 비율" },
                         ].map((k, i) => (
                           <div key={i} className="bg-white rounded-xl border border-stone-300 p-2.5">
-                            <div className="text-[10px] text-stone-400 font-bold">{k.ic} {k.l}</div>
+                            <div className="text-[10px] text-stone-600 font-bold">{k.ic} {k.l}</div>
                             <div className="text-[22px] font-extrabold text-stone-800 leading-tight">{typeof k.v === "number" ? k.v?.toLocaleString() : k.v}</div>
-                            <div className="text-[9.5px] text-stone-500">{k.sub}</div>
-                            <div className="text-[9px] text-stone-400 mt-0.5 leading-tight">{k.desc}</div>
+                            <div className="text-[9.5px] text-stone-700">{k.sub}</div>
+                            <div className="text-[9px] text-stone-600 mt-0.5 leading-tight">{k.desc}</div>
                           </div>
                         ))}
                       </div>
@@ -1083,7 +1083,7 @@ export default function AdminPage() {
                             const tp = a.todayInsight?.pages || [];
                             const totalToday = tp.reduce((s: number, p: any) => s + (p.views ?? 0), 0);
                             if (!tp.length || totalToday < 1) {
-                              return <div className="mt-2 pt-2 border-t border-sky-200/70 text-[10.5px] text-stone-400">오늘 페이지 조회 데이터가 쌓이는 중이에요.</div>;
+                              return <div className="mt-2 pt-2 border-t border-sky-200/70 text-[10.5px] text-stone-600">오늘 페이지 조회 데이터가 쌓이는 중이에요.</div>;
                             }
                             const maxV = Math.max(1, ...tp.map((p: any) => p.views));
                             return (
@@ -1096,7 +1096,7 @@ export default function AdminPage() {
                                       <div className="flex-1 bg-sky-100 rounded-full h-2 overflow-hidden">
                                         <div className="bg-sky-400 h-full rounded-full" style={{ width: `${Math.round((p.views / maxV) * 100)}%` }} />
                                       </div>
-                                      <span className="w-20 shrink-0 text-right text-stone-500">{p.views.toLocaleString()}회 · {Math.round((p.views / totalToday) * 100)}%</span>
+                                      <span className="w-20 shrink-0 text-right text-stone-700">{p.views.toLocaleString()}회 · {Math.round((p.views / totalToday) * 100)}%</span>
                                     </div>
                                   ))}
                                 </div>
@@ -1110,14 +1110,14 @@ export default function AdminPage() {
                         <div className="bg-emerald-50/60 border border-emerald-200 rounded-xl p-3">
                           <div className="text-[12px] font-bold text-emerald-800 mb-1.5">🧑 진짜 사용자 신호 <span className="font-normal text-[10px] text-emerald-600">· 기준=브라우저(localStorage), IP 아님</span></div>
                           <div className="grid grid-cols-3 gap-2 text-center">
-                            <div><div className="text-[19px] font-extrabold text-emerald-700">{a.realUsers.trueReturn ?? 0}</div><div className="text-[9.5px] text-stone-500">재방문(다시 켬)<br/>(세션 2회+·같은날 포함)</div></div>
+                            <div><div className="text-[19px] font-extrabold text-emerald-700">{a.realUsers.trueReturn ?? 0}</div><div className="text-[9.5px] text-stone-700">재방문(다시 켬)<br/>(세션 2회+·같은날 포함)</div></div>
                             <div>
                               <div className="text-[19px] font-extrabold text-emerald-700">{a.realUsers.consent}</div>
-                              <div className="text-[9.5px] text-stone-500">위치동의<br/>(봇은 안 하는 행동)</div>
+                              <div className="text-[9.5px] text-stone-700">위치동의<br/>(봇은 안 하는 행동)</div>
                               {a.realUsers.consentDetail && (
                                 <details className="mt-0.5 text-left">
                                   <summary className="text-[9px] text-emerald-600 cursor-pointer text-center list-none underline decoration-dotted">상세보기</summary>
-                                  <div className="mt-1 text-[9px] text-stone-500 leading-relaxed bg-white/70 rounded-lg p-1.5 border border-emerald-100">
+                                  <div className="mt-1 text-[9px] text-stone-700 leading-relaxed bg-white/70 rounded-lg p-1.5 border border-emerald-100">
                                     <div>전체 동의 {a.realUsers.consentDetail.total}건</div>
                                     <div>− 테스트기기 {a.realUsers.consentDetail.internal}건 제외</div>
                                     <div>= 최종 {a.realUsers.consentDetail.real}건</div>
@@ -1131,7 +1131,7 @@ export default function AdminPage() {
                                 </details>
                               )}
                             </div>
-                            <div><div className="text-[19px] font-extrabold text-emerald-700">{(a.realSources || []).reduce((s: number, r: any) => s + r.visitors, 0)}</div><div className="text-[9.5px] text-stone-500">검색·소셜 유입<br/>(브라우저 수)</div></div>
+                            <div><div className="text-[19px] font-extrabold text-emerald-700">{(a.realSources || []).reduce((s: number, r: any) => s + r.visitors, 0)}</div><div className="text-[9.5px] text-stone-700">검색·소셜 유입<br/>(브라우저 수)</div></div>
                           </div>
                           {(a.realSources || []).length > 0 && (
                             <div className="mt-2 pt-2 border-t border-emerald-200/70 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-stone-600">
@@ -1140,56 +1140,56 @@ export default function AdminPage() {
                               ))}
                             </div>
                           )}
-                          <p className="text-[9.5px] text-stone-500 mt-1.5 leading-relaxed"><b>참고:</b> 페이지 여러 장 본 사람 {a.realUsers.r2}명(3+장 {a.realUsers.r3}·5+장 {a.realUsers.r5}) — 한 방문에 여러 페이지 본 것(재방문 아님). <b>재방문=브라우저를 다시 켠 것(세션 2회+, 같은날 포함)</b>이 진짜 성장 신호입니다.</p>
+                          <p className="text-[9.5px] text-stone-700 mt-1.5 leading-relaxed"><b>참고:</b> 페이지 여러 장 본 사람 {a.realUsers.r2}명(3+장 {a.realUsers.r3}·5+장 {a.realUsers.r5}) — 한 방문에 여러 페이지 본 것(재방문 아님). <b>재방문=브라우저를 다시 켠 것(세션 2회+, 같은날 포함)</b>이 진짜 성장 신호입니다.</p>
                         </div>
                       )}
                       {/* 📣 공유(바이럴) 기록 */}
                       {a.shares && (
                         <div className="bg-white rounded-xl border border-stone-300 p-3">
-                          <div className="text-[12px] font-bold text-stone-700 mb-1.5">📣 공유(바이럴) 기록 <span className="font-normal text-[10px] text-stone-400">· 사용자가 카페를 타인에게 공유한 횟수</span></div>
+                          <div className="text-[12px] font-bold text-stone-700 mb-1.5">📣 공유(바이럴) 기록 <span className="font-normal text-[10px] text-stone-600">· 사용자가 카페를 타인에게 공유한 횟수</span></div>
                           <div className="flex items-center gap-x-3 gap-y-1 flex-wrap text-[11px]">
-                            <span>30일 <b className="text-[16px] text-rose-600">{a.shares.total}</b>회 <span className="text-stone-400">(오늘 {a.shares.today})</span></span>
-                            <span className="text-stone-500">공유한 사람 <b>{a.shares.sharers}</b>명</span>
-                            <span className="text-stone-400">카톡 {a.shares.kakao} · 웹공유 {a.shares.web} · 링크복사 {a.shares.clip}</span>
+                            <span>30일 <b className="text-[16px] text-rose-600">{a.shares.total}</b>회 <span className="text-stone-600">(오늘 {a.shares.today})</span></span>
+                            <span className="text-stone-700">공유한 사람 <b>{a.shares.sharers}</b>명</span>
+                            <span className="text-stone-600">카톡 {a.shares.kakao} · 웹공유 {a.shares.web} · 링크복사 {a.shares.clip}</span>
                           </div>
                           {(a.topShared || []).length > 0 ? (
-                            <div className="mt-2 pt-2 border-t border-stone-300 text-[10.5px] text-stone-600"><span className="text-stone-400">많이 공유된 카페: </span>{a.topShared.map((c: any, i: number) => <span key={i} className="mr-1.5"><b>{c.name}</b>({c.n})</span>)}</div>
-                          ) : <p className="text-[9.5px] text-stone-400 mt-1.5">아직 공유 기록 없음 — 방금 추적 시작(공유 버튼 클릭 시 채워집니다). 내부(대표·팀) 공유는 제외됩니다.</p>}
+                            <div className="mt-2 pt-2 border-t border-stone-300 text-[10.5px] text-stone-600"><span className="text-stone-600">많이 공유된 카페: </span>{a.topShared.map((c: any, i: number) => <span key={i} className="mr-1.5"><b>{c.name}</b>({c.n})</span>)}</div>
+                          ) : <p className="text-[9.5px] text-stone-600 mt-1.5">아직 공유 기록 없음 — 방금 추적 시작(공유 버튼 클릭 시 채워집니다). 내부(대표·팀) 공유는 제외됩니다.</p>}
                         </div>
                       )}
                       {/* ❤ 내 카페 추억 즐겨찾기(하트) */}
                       {a.favorites && (
                         <div className="bg-white rounded-xl border border-stone-300 p-3">
-                          <div className="text-[12px] font-bold text-stone-700 mb-1.5">❤ 내 카페 추억 즐겨찾기 <span className="font-normal text-[10px] text-stone-400">· 위치인증 방문기록 중 하트 표시</span></div>
+                          <div className="text-[12px] font-bold text-stone-700 mb-1.5">❤ 내 카페 추억 즐겨찾기 <span className="font-normal text-[10px] text-stone-600">· 위치인증 방문기록 중 하트 표시</span></div>
                           <div className="flex items-center gap-x-3 gap-y-1 flex-wrap text-[11px] mb-2">
                             <span>누적 <b className="text-[16px] text-rose-600">{a.favorites.total}</b>건</span>
-                            <span className="text-stone-500">최근 7일 <b>{a.favorites.last7}</b>건</span>
+                            <span className="text-stone-700">최근 7일 <b>{a.favorites.last7}</b>건</span>
                           </div>
                           {(a.favorites.daily || []).length > 0 && (
                             <div className="flex items-end gap-1 h-14 mb-2">
                               {a.favorites.daily.map((d: any, i: number) => (
                                 <div key={i} className="flex-1 h-full flex flex-col items-center justify-end gap-0.5">
                                   <div className="w-full bg-rose-400 rounded-t" style={{ height: `${(d.n / maxFav) * 100}%`, minHeight: "2px" }} title={`${d.day}: ${d.n}건`}></div>
-                                  <span className="text-[7px] text-stone-400">{d.day.slice(3)}</span>
+                                  <span className="text-[7px] text-stone-600">{d.day.slice(3)}</span>
                                 </div>
                               ))}
                             </div>
                           )}
                           {(a.favorites.topCafes || []).length > 0 ? (
-                            <div className="pt-2 border-t border-stone-300 text-[10.5px] text-stone-600"><span className="text-stone-400">즐겨찾기 많은 카페: </span>{a.favorites.topCafes.map((c: any, i: number) => <span key={i} className="mr-1.5"><b>{c.name}</b>({c.n})</span>)}</div>
-                          ) : <p className="text-[9.5px] text-stone-400">아직 즐겨찾기 기록 없음.</p>}
+                            <div className="pt-2 border-t border-stone-300 text-[10.5px] text-stone-600"><span className="text-stone-600">즐겨찾기 많은 카페: </span>{a.favorites.topCafes.map((c: any, i: number) => <span key={i} className="mr-1.5"><b>{c.name}</b>({c.n})</span>)}</div>
+                          ) : <p className="text-[9.5px] text-stone-600">아직 즐겨찾기 기록 없음.</p>}
                         </div>
                       )}
                       {noEvents && <div className="bg-amber-50 border border-amber-300 rounded-xl p-2.5 text-[11px] text-amber-800">📊 페이지뷰 단위 지표(추이·인기카페·퍼널·시간대)는 방금 추적 시작 — 방문이 쌓이며 채워집니다. 방문자·유입경로·재방문은 지금부터 정확합니다.</div>}
                       {(a.daily || []).length > 0 && (
                         <div className="bg-white rounded-xl border border-stone-300 p-3">
-                          <div className="text-[12px] font-bold text-stone-700">일별 방문 추이 <span className="font-normal text-stone-400 text-[10px]">최근 14일</span></div>
-                          <p className="text-[9.5px] text-stone-400 mb-2">날짜별 방문자 수 — 늘고 주는 흐름을 봅니다. (막대에 마우스 올리면 상세)</p>
+                          <div className="text-[12px] font-bold text-stone-700">일별 방문 추이 <span className="font-normal text-stone-600 text-[10px]">최근 14일</span></div>
+                          <p className="text-[9.5px] text-stone-600 mb-2">날짜별 방문자 수 — 늘고 주는 흐름을 봅니다. (막대에 마우스 올리면 상세)</p>
                           <div className="flex items-end gap-1 h-24">
                             {a.daily.map((d: any, i: number) => (
                               <div key={i} className="flex-1 h-full flex flex-col items-center justify-end gap-0.5">
                                 <div className="w-full bg-sky-400 rounded-t" style={{ height: `${(d.visitors / maxDaily) * 100}%`, minHeight: "2px" }} title={`${d.day}: 방문 ${d.visitors}·뷰 ${d.pageviews}`}></div>
-                                <span className="text-[7px] text-stone-400">{d.day.slice(3)}</span>
+                                <span className="text-[7px] text-stone-600">{d.day.slice(3)}</span>
                               </div>
                             ))}
                           </div>
@@ -1198,7 +1198,7 @@ export default function AdminPage() {
                       {f.visitors > 0 && (
                         <div className="bg-white rounded-xl border border-stone-300 p-3">
                           <div className="text-[12px] font-bold text-stone-700">전환 퍼널</div>
-                          <p className="text-[9.5px] text-stone-400 mb-2">방문 → 카페를 실제로 열어봄 → 여러 곳 비교(몰입). 단계마다 몇 %가 남는지 봅니다.</p>
+                          <p className="text-[9.5px] text-stone-600 mb-2">방문 → 카페를 실제로 열어봄 → 여러 곳 비교(몰입). 단계마다 몇 %가 남는지 봅니다.</p>
                           {fSteps.map((s, i) => (
                             <div key={i}>
                               <div className="flex justify-between text-[10.5px] mb-0.5"><span className="text-stone-600">{s.l}</span><span className="font-bold text-stone-700">{s.v?.toLocaleString()}명 <span className="text-emerald-600">{s.pct}%</span></span></div>
@@ -1210,10 +1210,10 @@ export default function AdminPage() {
                       )}
                       <div className="bg-white rounded-xl border border-stone-300 p-3">
                         <div className="text-[12px] font-bold text-stone-700">유입경로</div>
-                        <p className="text-[9.5px] text-stone-400 mb-2">어디서 들어왔는지(네이버·구글·직접·공유…). '평균'은 그 경로 방문자의 재방문 횟수 — 높을수록 충성도↑.</p>
-                        {(a.sources || []).length === 0 ? <p className="text-[11px] text-stone-400">데이터 없음</p> : a.sources.map((s: any, i: number) => (
+                        <p className="text-[9.5px] text-stone-600 mb-2">어디서 들어왔는지(네이버·구글·직접·공유…). '평균'은 그 경로 방문자의 재방문 횟수 — 높을수록 충성도↑.</p>
+                        {(a.sources || []).length === 0 ? <p className="text-[11px] text-stone-600">데이터 없음</p> : a.sources.map((s: any, i: number) => (
                           <div key={i} className="mb-1.5">
-                            <div className="flex justify-between text-[10.5px] mb-0.5"><span className="text-stone-600 font-medium">{s.src === "미상" ? "미상 (추적 도입 전 방문)" : s.src}</span><span className="text-stone-500">{s.visitors}명 <span className="text-stone-400">({Math.round(s.visitors / srcTotal * 100)}%) · 평균 {s.avg_visits}회</span></span></div>
+                            <div className="flex justify-between text-[10.5px] mb-0.5"><span className="text-stone-600 font-medium">{s.src === "미상" ? "미상 (추적 도입 전 방문)" : s.src}</span><span className="text-stone-700">{s.visitors}명 <span className="text-stone-600">({Math.round(s.visitors / srcTotal * 100)}%) · 평균 {s.avg_visits}회</span></span></div>
                             <div className="h-2 bg-stone-100 rounded-full overflow-hidden"><div className="h-full bg-sky-400 rounded-full" style={{ width: `${(s.visitors / maxSrc) * 100}%` }}></div></div>
                           </div>
                         ))}
@@ -1221,48 +1221,48 @@ export default function AdminPage() {
                       <div className="grid grid-cols-2 gap-2">
                         <div className="bg-white rounded-xl border border-stone-300 p-3">
                           <div className="text-[12px] font-bold text-stone-700">신규 vs 재방문</div>
-                          <p className="text-[9.5px] text-stone-400 mb-2">처음 온 사람 vs 다시 온 사람.</p>
+                          <p className="text-[9.5px] text-stone-600 mb-2">처음 온 사람 vs 다시 온 사람.</p>
                           <div className="flex h-5 rounded-full overflow-hidden bg-stone-100 text-[9px] font-bold text-white">
                             <div className="bg-indigo-400 flex items-center justify-center" style={{ width: `${newPct}%` }}>{newPct >= 14 && `${newPct}%`}</div>
                             <div className="bg-amber-400 flex items-center justify-center" style={{ width: `${retPct}%` }}>{retPct >= 14 && `${retPct}%`}</div>
                           </div>
                           <div className="flex gap-3 text-[10px] mt-1.5">
-                            <span className="flex items-center gap-1 text-stone-500"><span className="w-2 h-2 rounded-full bg-indigo-400 inline-block"></span>신규 <b className="text-stone-700">{a.retention?.newcomers}</b></span>
-                            <span className="flex items-center gap-1 text-stone-500"><span className="w-2 h-2 rounded-full bg-amber-400 inline-block"></span>재방문 <b className="text-stone-700">{a.retention?.returning}</b></span>
+                            <span className="flex items-center gap-1 text-stone-700"><span className="w-2 h-2 rounded-full bg-indigo-400 inline-block"></span>신규 <b className="text-stone-700">{a.retention?.newcomers}</b></span>
+                            <span className="flex items-center gap-1 text-stone-700"><span className="w-2 h-2 rounded-full bg-amber-400 inline-block"></span>재방문 <b className="text-stone-700">{a.retention?.returning}</b></span>
                           </div>
                         </div>
                         <div className="bg-white rounded-xl border border-stone-300 p-3">
                           <div className="text-[12px] font-bold text-stone-700">접속 기기</div>
-                          <p className="text-[9.5px] text-stone-400 mb-2">모바일 · 태블릿 · PC 비율.</p>
+                          <p className="text-[9.5px] text-stone-600 mb-2">모바일 · 태블릿 · PC 비율.</p>
                           <div className="flex h-5 rounded-full overflow-hidden bg-stone-100 text-[9px] font-bold text-white">
                             <div className="bg-teal-400 flex items-center justify-center" style={{ width: `${mobPct}%` }}>{mobPct >= 14 && `${mobPct}%`}</div>
                             <div className="bg-violet-400 flex items-center justify-center" style={{ width: `${tabPct}%` }}>{tabPct >= 14 && `${tabPct}%`}</div>
                             <div className="bg-stone-400 flex items-center justify-center" style={{ width: `${pcPct}%` }}>{pcPct >= 14 && `${pcPct}%`}</div>
                           </div>
                           <div className="flex gap-3 text-[10px] mt-1.5 flex-wrap">
-                            <span className="flex items-center gap-1 text-stone-500"><span className="w-2 h-2 rounded-full bg-teal-400 inline-block"></span>📱 모바일 <b className="text-stone-700">{dev.mobile}</b></span>
-                            <span className="flex items-center gap-1 text-stone-500"><span className="w-2 h-2 rounded-full bg-violet-400 inline-block"></span>📟 태블릿 <b className="text-stone-700">{dev.tablet}</b></span>
-                            <span className="flex items-center gap-1 text-stone-500"><span className="w-2 h-2 rounded-full bg-stone-400 inline-block"></span>💻 PC <b className="text-stone-700">{dev.desktop}</b></span>
+                            <span className="flex items-center gap-1 text-stone-700"><span className="w-2 h-2 rounded-full bg-teal-400 inline-block"></span>📱 모바일 <b className="text-stone-700">{dev.mobile}</b></span>
+                            <span className="flex items-center gap-1 text-stone-700"><span className="w-2 h-2 rounded-full bg-violet-400 inline-block"></span>📟 태블릿 <b className="text-stone-700">{dev.tablet}</b></span>
+                            <span className="flex items-center gap-1 text-stone-700"><span className="w-2 h-2 rounded-full bg-stone-400 inline-block"></span>💻 PC <b className="text-stone-700">{dev.desktop}</b></span>
                           </div>
                         </div>
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         <div className="bg-white rounded-xl border border-stone-300 p-3">
-                          <div className="text-[12px] font-bold text-stone-700">인기 카페 <span className="font-normal text-stone-400 text-[10px]">조회순</span></div>
-                          <p className="text-[9.5px] text-stone-400 mb-2">가장 많이 열어본 카페 — 어떤 곳에 관심이 몰리는지.</p>
-                          {(a.topCafes || []).length === 0 ? <p className="text-[11px] text-stone-400">데이터 쌓이는 중</p> : <div className="space-y-1 max-h-56 overflow-y-auto">{a.topCafes.map((c: any, i: number) => (
+                          <div className="text-[12px] font-bold text-stone-700">인기 카페 <span className="font-normal text-stone-600 text-[10px]">조회순</span></div>
+                          <p className="text-[9.5px] text-stone-600 mb-2">가장 많이 열어본 카페 — 어떤 곳에 관심이 몰리는지.</p>
+                          {(a.topCafes || []).length === 0 ? <p className="text-[11px] text-stone-600">데이터 쌓이는 중</p> : <div className="space-y-1 max-h-56 overflow-y-auto">{a.topCafes.map((c: any, i: number) => (
                             <div key={i} className="text-[10.5px]">
-                              <div className="flex justify-between"><span className="text-stone-700 font-medium truncate">{i + 1}. {c.name} <span className="text-stone-400 font-normal">{c.area}</span></span><span className="text-sky-700 font-bold shrink-0 ml-1">{c.views}</span></div>
+                              <div className="flex justify-between"><span className="text-stone-700 font-medium truncate">{i + 1}. {c.name} <span className="text-stone-600 font-normal">{c.area}</span></span><span className="text-sky-700 font-bold shrink-0 ml-1">{c.views}</span></div>
                               <div className="h-1.5 bg-stone-100 rounded-full overflow-hidden mt-0.5"><div className="h-full bg-sky-300 rounded-full" style={{ width: `${c.views / maxCafe * 100}%` }}></div></div>
                             </div>
                           ))}</div>}
                         </div>
                         <div className="bg-white rounded-xl border border-stone-300 p-3">
-                          <div className="text-[12px] font-bold text-stone-700">인기 지역 <span className="font-normal text-stone-400 text-[10px]">카페 조회 기준</span></div>
-                          <p className="text-[9.5px] text-stone-400 mb-2">조회된 카페가 어느 동네에 몰리는지 — 수요 지도.</p>
-                          {(a.topRegions || []).length === 0 ? <p className="text-[11px] text-stone-400">데이터 쌓이는 중</p> : <div className="space-y-1 max-h-56 overflow-y-auto">{a.topRegions.map((r: any, i: number) => (
+                          <div className="text-[12px] font-bold text-stone-700">인기 지역 <span className="font-normal text-stone-600 text-[10px]">카페 조회 기준</span></div>
+                          <p className="text-[9.5px] text-stone-600 mb-2">조회된 카페가 어느 동네에 몰리는지 — 수요 지도.</p>
+                          {(a.topRegions || []).length === 0 ? <p className="text-[11px] text-stone-600">데이터 쌓이는 중</p> : <div className="space-y-1 max-h-56 overflow-y-auto">{a.topRegions.map((r: any, i: number) => (
                             <div key={i} className="text-[10.5px]">
-                              <div className="flex justify-between"><span className="text-stone-700 font-medium">{r.area}</span><span className="text-stone-500 shrink-0 ml-1">{r.views}</span></div>
+                              <div className="flex justify-between"><span className="text-stone-700 font-medium">{r.area}</span><span className="text-stone-700 shrink-0 ml-1">{r.views}</span></div>
                               <div className="h-1.5 bg-stone-100 rounded-full overflow-hidden mt-0.5"><div className="h-full bg-violet-300 rounded-full" style={{ width: `${r.views / maxRegion * 100}%` }}></div></div>
                             </div>
                           ))}</div>}
@@ -1270,20 +1270,20 @@ export default function AdminPage() {
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         <div className="bg-white rounded-xl border border-stone-300 p-3">
-                          <div className="text-[12px] font-bold text-stone-700">방문자 지역 <span className="font-normal text-stone-400 text-[10px]">위치 공유</span></div>
-                          <p className="text-[9.5px] text-stone-400 mb-2">위치 안내에 동의한 방문자가 어디서 접속하는지.</p>
-                          {(a.visitorRegions || []).length === 0 ? <p className="text-[11px] text-stone-400">위치 공유 데이터 없음</p> : a.visitorRegions.map((r: any, i: number) => (
+                          <div className="text-[12px] font-bold text-stone-700">방문자 지역 <span className="font-normal text-stone-600 text-[10px]">위치 공유</span></div>
+                          <p className="text-[9.5px] text-stone-600 mb-2">위치 안내에 동의한 방문자가 어디서 접속하는지.</p>
+                          {(a.visitorRegions || []).length === 0 ? <p className="text-[11px] text-stone-600">위치 공유 데이터 없음</p> : a.visitorRegions.map((r: any, i: number) => (
                             <div key={i} className="mb-1">
-                              <div className="flex justify-between text-[10.5px]"><span className="text-stone-600">{r.region}</span><span className="text-stone-500">{r.n}</span></div>
+                              <div className="flex justify-between text-[10.5px]"><span className="text-stone-600">{r.region}</span><span className="text-stone-700">{r.n}</span></div>
                               <div className="h-1.5 bg-stone-100 rounded-full overflow-hidden mt-0.5"><div className="h-full bg-rose-300 rounded-full" style={{ width: `${r.n / maxVReg * 100}%` }}></div></div>
                             </div>
                           ))}
                         </div>
                         <div className="bg-white rounded-xl border border-stone-300 p-3">
                           <div className="text-[12px] font-bold text-stone-700">위치 동의 퍼널</div>
-                          <p className="text-[9.5px] text-stone-400 mb-2">방문 → 위치 요청에 실제 응답 → 동의(수락) → 실제 위치 공유까지 단계별 비율.</p>
+                          <p className="text-[9.5px] text-stone-600 mb-2">방문 → 위치 요청에 실제 응답 → 동의(수락) → 실제 위치 공유까지 단계별 비율.</p>
                           <div className="flex items-center justify-between bg-rose-50 border border-rose-200 rounded-lg px-2.5 py-1.5 mb-2">
-                            <span className="text-[10.5px] text-stone-600">동의 수락률 <span className="text-stone-400">(요청에 응답한 사람 기준)</span></span>
+                            <span className="text-[10.5px] text-stone-600">동의 수락률 <span className="text-stone-600">(요청에 응답한 사람 기준)</span></span>
                             <span className="text-[15px] font-extrabold text-rose-600">{consentRate}%</span>
                           </div>
                           {[
@@ -1293,34 +1293,34 @@ export default function AdminPage() {
                             { l: "위치 공유 성공", v: cs.located, pct: cs.agreed ? Math.round((cs.located ?? 0) / cs.agreed * 100) : 0 },
                           ].map((s, i) => (
                             <div key={i} className="mb-1.5">
-                              <div className="flex justify-between text-[10.5px] mb-0.5"><span className="text-stone-600">{s.l}</span><span className="font-bold text-stone-700">{(s.v ?? 0).toLocaleString()} <span className="text-stone-400 font-normal">{s.pct}%</span></span></div>
+                              <div className="flex justify-between text-[10.5px] mb-0.5"><span className="text-stone-600">{s.l}</span><span className="font-bold text-stone-700">{(s.v ?? 0).toLocaleString()} <span className="text-stone-600 font-normal">{s.pct}%</span></span></div>
                               <div className="h-2 bg-stone-100 rounded-full overflow-hidden"><div className="h-full bg-rose-400 rounded-full" style={{ width: `${s.pct}%` }}></div></div>
                             </div>
                           ))}
-                          <p className="text-[9.5px] text-stone-400 mt-1">※ '위치 요청 응답'은 실제로 위치 모달에 답한 사람만 기준(대부분의 방문자는 위치를 요청받지 않음) — 이전엔 전체 방문 대비로 계산돼 동의율이 실제보다 낮게 보였습니다.</p>
+                          <p className="text-[9.5px] text-stone-600 mt-1">※ '위치 요청 응답'은 실제로 위치 모달에 답한 사람만 기준(대부분의 방문자는 위치를 요청받지 않음) — 이전엔 전체 방문 대비로 계산돼 동의율이 실제보다 낮게 보였습니다.</p>
                         </div>
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         <div className="bg-white rounded-xl border border-stone-300 p-3">
                           <div className="text-[12px] font-bold text-stone-700">페이지 유형</div>
-                          <p className="text-[9.5px] text-stone-400 mb-2">어떤 화면(홈·카페상세·지역·취향)을 많이 보는지.</p>
-                          {(a.pageBuckets || []).length === 0 ? <p className="text-[11px] text-stone-400">데이터 쌓이는 중</p> : a.pageBuckets.map((b: any, i: number) => (
+                          <p className="text-[9.5px] text-stone-600 mb-2">어떤 화면(홈·카페상세·지역·취향)을 많이 보는지.</p>
+                          {(a.pageBuckets || []).length === 0 ? <p className="text-[11px] text-stone-600">데이터 쌓이는 중</p> : a.pageBuckets.map((b: any, i: number) => (
                             <div key={i} className="mb-1">
-                              <div className="flex justify-between text-[10.5px]"><span className="text-stone-600">{b.bucket}</span><span className="text-stone-500">{b.views.toLocaleString()}</span></div>
+                              <div className="flex justify-between text-[10.5px]"><span className="text-stone-600">{b.bucket}</span><span className="text-stone-700">{b.views.toLocaleString()}</span></div>
                               <div className="h-1.5 bg-stone-100 rounded-full overflow-hidden mt-0.5"><div className="h-full bg-stone-400 rounded-full" style={{ width: `${b.views / maxBucket * 100}%` }}></div></div>
                             </div>
                           ))}
                         </div>
                         <div className="bg-white rounded-xl border border-stone-300 p-3">
-                          <div className="text-[12px] font-bold text-stone-700">시간대 분포 <span className="font-normal text-stone-400 text-[10px]">KST</span></div>
-                          <p className="text-[9.5px] text-stone-400 mb-2">하루 중 사람이 몰리는 시간{peakH >= 0 ? <> — <b className="text-orange-500">피크 {peakH}시</b></> : ""}. 콘텐츠 발행 타이밍 참고.</p>
-                          {(a.hours || []).length === 0 ? <p className="text-[11px] text-stone-400">데이터 쌓이는 중</p> : <div className="flex items-end gap-px h-16">{Array.from({ length: 24 }).map((_, h) => (
+                          <div className="text-[12px] font-bold text-stone-700">시간대 분포 <span className="font-normal text-stone-600 text-[10px]">KST</span></div>
+                          <p className="text-[9.5px] text-stone-600 mb-2">하루 중 사람이 몰리는 시간{peakH >= 0 ? <> — <b className="text-orange-500">피크 {peakH}시</b></> : ""}. 콘텐츠 발행 타이밍 참고.</p>
+                          {(a.hours || []).length === 0 ? <p className="text-[11px] text-stone-600">데이터 쌓이는 중</p> : <div className="flex items-end gap-px h-16">{Array.from({ length: 24 }).map((_, h) => (
                             <div key={h} className={`flex-1 rounded-t ${h === peakH ? "bg-orange-500" : "bg-orange-300"}`} style={{ height: `${((hourMap[h] || 0) / maxHour) * 100}%`, minHeight: "1px" }} title={`${h}시: ${hourMap[h] || 0}회`}></div>
                           ))}</div>}
                           <div className="flex justify-between text-[8px] text-stone-300 mt-0.5"><span>0시</span><span>6시</span><span>12시</span><span>18시</span><span>23시</span></div>
                         </div>
                       </div>
-                      <p className="text-[9.5px] text-stone-400 text-center pt-1">전부 우리 DB 자체 집계 · 외부(네이버·구글) 의존 0 · 갱신 {new Date(a.generatedAt).toLocaleTimeString("ko-KR")}</p>
+                      <p className="text-[9.5px] text-stone-600 text-center pt-1">전부 우리 DB 자체 집계 · 외부(네이버·구글) 의존 0 · 갱신 {new Date(a.generatedAt).toLocaleTimeString("ko-KR")}</p>
                     </div>
                   );
                 })()}
@@ -1334,15 +1334,15 @@ export default function AdminPage() {
           <div className="fixed inset-0 z-[6500]" onClick={() => setShowOnboard(false)}>
             <div className="absolute inset-0 bg-black/50" />
             <div className="absolute inset-x-0 bottom-0 max-h-[90vh] overflow-y-auto bg-stone-50 rounded-t-2xl p-4 sm:inset-0 sm:m-auto sm:max-w-lg sm:h-fit sm:max-h-[90vh] sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
-              <div className="flex items-center justify-between mb-1"><span className="text-sm font-bold text-stone-800">📧 온보딩 메일 미리보기</span><button onClick={() => setShowOnboard(false)} className="text-2xl text-stone-400 leading-none">×</button></div>
-              <p className="text-[11px] text-stone-500 mb-3">승인 버튼을 누르면 사장님 이메일로 <b>자동 발송</b>되는 내용이에요. 서비스 사용법 + 구독 전용 서비스(리뷰 분석·쇼케이스·우선 노출·뉴스레터) 안내가 담겨 있어요. <b>열쇠(PIN)는 예시</b>이고, 실제로는 그 사장님의 진짜 열쇠가 들어갑니다.</p>
+              <div className="flex items-center justify-between mb-1"><span className="text-sm font-bold text-stone-800">📧 온보딩 메일 미리보기</span><button onClick={() => setShowOnboard(false)} className="text-2xl text-stone-600 leading-none">×</button></div>
+              <p className="text-[11px] text-stone-700 mb-3">승인 버튼을 누르면 사장님 이메일로 <b>자동 발송</b>되는 내용이에요. 서비스 사용법 + 구독 전용 서비스(리뷰 분석·쇼케이스·우선 노출·뉴스레터) 안내가 담겨 있어요. <b>열쇠(PIN)는 예시</b>이고, 실제로는 그 사장님의 진짜 열쇠가 들어갑니다.</p>
               {!onboard ? (
-                <div className="py-10 text-center text-stone-400 text-[13px]">불러오는 중…</div>
+                <div className="py-10 text-center text-stone-600 text-[13px]">불러오는 중…</div>
               ) : (
                 <>
                   <div className="flex gap-1.5 mb-2">
-                    <button onClick={() => setOnboardTab("trial")} className={`flex-1 py-2 text-[12px] font-bold rounded-lg border ${onboardTab === "trial" ? "bg-amber-100 border-amber-300 text-amber-800" : "bg-white border-stone-300 text-stone-500"}`}>🎁 7일 체험 승인 시</button>
-                    <button onClick={() => setOnboardTab("paid")} className={`flex-1 py-2 text-[12px] font-bold rounded-lg border ${onboardTab === "paid" ? "bg-amber-100 border-amber-300 text-amber-800" : "bg-white border-stone-300 text-stone-500"}`}>☕ 구독 승인 시</button>
+                    <button onClick={() => setOnboardTab("trial")} className={`flex-1 py-2 text-[12px] font-bold rounded-lg border ${onboardTab === "trial" ? "bg-amber-100 border-amber-300 text-amber-800" : "bg-white border-stone-300 text-stone-700"}`}>🎁 7일 체험 승인 시</button>
+                    <button onClick={() => setOnboardTab("paid")} className={`flex-1 py-2 text-[12px] font-bold rounded-lg border ${onboardTab === "paid" ? "bg-amber-100 border-amber-300 text-amber-800" : "bg-white border-stone-300 text-stone-700"}`}>☕ 구독 승인 시</button>
                   </div>
                   <div className="text-[11px] text-stone-600 bg-white border border-stone-300 rounded-lg px-2.5 py-2 mb-2"><b>제목:</b> {onboard[onboardTab].subject}</div>
                   <iframe title="온보딩 메일 미리보기" srcDoc={onboard[onboardTab].html} className="w-full h-[60vh] bg-white rounded-lg border border-stone-300" />
@@ -1357,9 +1357,9 @@ export default function AdminPage() {
           <div className="fixed inset-0 z-[6500]" onClick={() => setShowRotation(false)}>
             <div className="absolute inset-0 bg-black/50" />
             <div className="absolute inset-x-0 bottom-0 max-h-[90vh] overflow-y-auto bg-stone-50 rounded-t-2xl p-4 sm:inset-0 sm:m-auto sm:max-w-lg sm:h-fit sm:max-h-[90vh] sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
-              <div className="flex items-center justify-between mb-1"><span className="text-sm font-bold text-stone-900">🔁 노출 로테이션 현황</span><button onClick={() => setShowRotation(false)} className="text-2xl text-stone-500 leading-none">×</button></div>
+              <div className="flex items-center justify-between mb-1"><span className="text-sm font-bold text-stone-900">🔁 노출 로테이션 현황</span><button onClick={() => setShowRotation(false)} className="text-2xl text-stone-700 leading-none">×</button></div>
               {!rotation ? (
-                <div className="py-10 text-center text-stone-500 text-[13px]">불러오는 중…</div>
+                <div className="py-10 text-center text-stone-700 text-[13px]">불러오는 중…</div>
               ) : (
                 <>
                   <div className="flex flex-wrap gap-1.5 mb-2 text-[11px] font-bold">
@@ -1370,7 +1370,7 @@ export default function AdminPage() {
                   </div>
                   <p className="text-[11px] text-stone-600 mb-3">🟢=지금 노출 중(상위 {rotation.cap}), ⚪=대기(다음 차례). 20분마다 순번이 한 칸씩 돌고, 피크(09~17시)를 모든 카페가 똑같이 나눠 가져요.</p>
                   {rotation.total === 0 ? (
-                    <div className="py-6 text-center text-stone-500 text-[13px]">아직 우선노출(featured) 구독 카페가 없어요.</div>
+                    <div className="py-6 text-center text-stone-700 text-[13px]">아직 우선노출(featured) 구독 카페가 없어요.</div>
                   ) : (
                     <>
                       {/* 전체 */}
@@ -1379,10 +1379,10 @@ export default function AdminPage() {
                         <div className="space-y-1">
                           {rotation.global.map((c: any) => (
                             <div key={c.id} className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 border ${c.onair ? "bg-teal-50 border-teal-300" : "bg-white border-stone-300"}`}>
-                              <span className="text-[12px] w-5 text-center font-bold text-stone-500">{c.rank}</span>
+                              <span className="text-[12px] w-5 text-center font-bold text-stone-700">{c.rank}</span>
                               <span className="text-[13px]">{c.onair ? "🟢" : "⚪"}</span>
                               <span className="text-[13px] font-bold text-stone-800 flex-1 truncate">{c.name}</span>
-                              <span className="text-[10px] text-stone-500 truncate max-w-[90px]">{c.area}</span>
+                              <span className="text-[10px] text-stone-700 truncate max-w-[90px]">{c.area}</span>
                             </div>
                           ))}
                         </div>
@@ -1392,11 +1392,11 @@ export default function AdminPage() {
                       <div className="space-y-2.5">
                         {rotation.byGu.map((g: any) => (
                           <div key={g.gu} className="rounded-lg border border-stone-300 bg-white p-2">
-                            <div className="text-[12px] font-bold text-stone-800 mb-1">{g.gu} <span className="font-normal text-stone-500">· {g.count}곳</span></div>
+                            <div className="text-[12px] font-bold text-stone-800 mb-1">{g.gu} <span className="font-normal text-stone-700">· {g.count}곳</span></div>
                             <div className="space-y-1">
                               {g.order.map((c: any) => (
                                 <div key={c.id} className={`flex items-center gap-2 rounded px-2 py-1 ${c.onair ? "bg-teal-50" : ""}`}>
-                                  <span className="text-[11px] w-4 text-center font-bold text-stone-500">{c.rank}</span>
+                                  <span className="text-[11px] w-4 text-center font-bold text-stone-700">{c.rank}</span>
                                   <span className="text-[12px]">{c.onair ? "🟢" : "⚪"}</span>
                                   <span className="text-[12.5px] font-bold text-stone-800 flex-1 truncate">{c.name}</span>
                                 </div>
@@ -1420,14 +1420,14 @@ export default function AdminPage() {
             <div className="absolute inset-0 bg-black/50" />
             <div className="absolute inset-x-0 bottom-0 max-h-[90vh] overflow-y-auto bg-stone-50 rounded-t-2xl p-4 sm:inset-0 sm:m-auto sm:max-w-2xl sm:h-fit sm:max-h-[90vh] sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-bold text-stone-800">📰 주간 뉴스레터 <span className="text-[11px] text-stone-500 font-normal">· 수신대상 {nlRecipients}명(구독+체험)</span></span>
-                <button onClick={() => { setShowNL(false); setNlSel(null); }} className="text-2xl text-stone-400 leading-none">×</button>
+                <span className="text-sm font-bold text-stone-800">📰 주간 뉴스레터 <span className="text-[11px] text-stone-700 font-normal">· 수신대상 {nlRecipients}명(구독+체험)</span></span>
+                <button onClick={() => { setShowNL(false); setNlSel(null); }} className="text-2xl text-stone-600 leading-none">×</button>
               </div>
               <div className="flex gap-2 mb-2">
                 <button onClick={nlGenerate} disabled={!!nlBusy} className="flex-1 py-2 text-[13px] font-bold text-white bg-indigo-600 rounded-lg disabled:opacity-50">{nlBusy === "generate" ? "생성 중…(네이버 수집)" : "✨ 이번 주 뉴스레터 생성 (무료)"}</button>
               </div>
               {nlMsg && <div className="text-[11.5px] text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg px-2.5 py-1.5 mb-2">{nlMsg}</div>}
-              <p className="text-[10.5px] text-stone-400 mb-2">기본 생성은 <b>네이버 검색(무료)</b>으로 최신 기사를 모읍니다(크레딧 0). 출처 없는 사실·과장 표현은 자동 ⚠️ 플래그. 더 풍성한 에디토리얼은 제작자가 별도 생성해 드립니다.</p>
+              <p className="text-[10.5px] text-stone-600 mb-2">기본 생성은 <b>네이버 검색(무료)</b>으로 최신 기사를 모읍니다(크레딧 0). 출처 없는 사실·과장 표현은 자동 ⚠️ 플래그. 더 풍성한 에디토리얼은 제작자가 별도 생성해 드립니다.</p>
 
               {/* 목록 */}
               <div className="space-y-1.5 mb-3">
@@ -1435,13 +1435,13 @@ export default function AdminPage() {
                   <button key={n.id} onClick={() => nlOpen(n.id)} className={`w-full text-left rounded-lg border px-3 py-2 ${nlSel?.id === n.id ? "border-indigo-300 bg-indigo-50" : "border-stone-300 bg-white"}`}>
                     <div className="flex items-center gap-2 text-[12px]">
                       <span className="font-bold">#{n.issue_no} {n.title}</span>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded ${n.status === "sent" ? "bg-emerald-100 text-emerald-700" : n.status === "approved" ? "bg-blue-100 text-blue-700" : "bg-stone-100 text-stone-500"}`}>{n.status}</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded ${n.status === "sent" ? "bg-emerald-100 text-emerald-700" : n.status === "approved" ? "bg-blue-100 text-blue-700" : "bg-stone-100 text-stone-700"}`}>{n.status}</span>
                       {n.flags?.length > 0 && <span className="text-[10px] text-amber-700">⚠️ {n.flags.length}</span>}
-                      {n.sent_count > 0 && <span className="text-[10px] text-stone-400 ml-auto">발송 {n.sent_count}</span>}
+                      {n.sent_count > 0 && <span className="text-[10px] text-stone-600 ml-auto">발송 {n.sent_count}</span>}
                     </div>
                   </button>
                 ))}
-                {nlList.length === 0 && <p className="text-[12px] text-stone-400 text-center py-3">아직 생성된 뉴스레터가 없어요.</p>}
+                {nlList.length === 0 && <p className="text-[12px] text-stone-600 text-center py-3">아직 생성된 뉴스레터가 없어요.</p>}
               </div>
 
               {/* 선택 전문 */}
@@ -1461,7 +1461,7 @@ export default function AdminPage() {
                           {(sec.items || []).map((it: any, ii: number) => (
                             <li key={ii} className="text-[12px] text-stone-700 leading-snug">
                               {it.flag && <span className="text-amber-700 font-bold">⚠️ </span>}{it.text}
-                              {it.why && <span className="text-stone-400"> ↳ {it.why}</span>}
+                              {it.why && <span className="text-stone-600"> ↳ {it.why}</span>}
                               {it.source_url && <a href={it.source_url} target="_blank" className="text-indigo-600 text-[10px] ml-1">[출처]</a>}
                             </li>
                           ))}
@@ -1471,7 +1471,7 @@ export default function AdminPage() {
                   </div>
                   {/* 편집(JSON) */}
                   <details className="mb-2">
-                    <summary className="text-[11px] text-stone-500 cursor-pointer">✏️ 직접 편집(JSON) — 문구·항목 수정</summary>
+                    <summary className="text-[11px] text-stone-700 cursor-pointer">✏️ 직접 편집(JSON) — 문구·항목 수정</summary>
                     <textarea id="nlEdit" defaultValue={JSON.stringify(nlSel.sections, null, 2)} className="w-full h-40 mt-1 text-[11px] font-mono border border-stone-300 rounded-lg p-2 bg-white" />
                     <button onClick={() => { try { const secs = JSON.parse((document.getElementById("nlEdit") as HTMLTextAreaElement).value); nlAct("update", nlSel.id, { title: nlSel.title, sections: secs }); } catch { setNlMsg("JSON 형식 오류"); } }} className="mt-1 px-3 py-1.5 text-[12px] font-bold text-stone-700 bg-stone-100 rounded-lg">저장</button>
                   </details>
@@ -1498,17 +1498,17 @@ export default function AdminPage() {
                 <div key={s.id} className="bg-white rounded-xl border border-amber-300 p-3 flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <span className="font-bold text-sm">{s.cafe_name}</span>
-                    <span className="text-[11px] text-stone-400 ml-2">{s.plan}</span>
+                    <span className="text-[11px] text-stone-600 ml-2">{s.plan}</span>
                     <div className="text-[12px] text-stone-600 truncate">📞 {s.contact}</div>
                   </div>
                   <div className="text-right shrink-0">
-                    <div className="text-[10px] text-stone-400">{new Date(s.created_at).toLocaleDateString("ko-KR")}</div>
+                    <div className="text-[10px] text-stone-600">{new Date(s.created_at).toLocaleDateString("ko-KR")}</div>
                     {s.delete_in != null && <div className="text-[9px] text-rose-400">자동삭제 D-{s.delete_in}</div>}
                   </div>
                 </div>
               ))}
             </div>
-            <p className="text-[10px] text-stone-400 mt-1.5">연락처는 암호화 저장되며 보유기간 만료 시 자동 삭제됩니다. 결제 안내 후 아래 쇼케이스에서 ⭐우선노출을 켜주세요.</p>
+            <p className="text-[10px] text-stone-600 mt-1.5">연락처는 암호화 저장되며 보유기간 만료 시 자동 삭제됩니다. 결제 안내 후 아래 쇼케이스에서 ⭐우선노출을 켜주세요.</p>
           </div>
         )}
 
@@ -1518,27 +1518,27 @@ export default function AdminPage() {
           <div className="mb-6 rounded-2xl border border-stone-300 bg-white p-4 sm:p-5">
             <button onClick={() => toggleSec("promo")} className="w-full flex items-center justify-between text-left mb-2">
               <span className="admin-section-title font-extrabold text-stone-800">{openSecs.promo ? "▾" : "▸"} 🎀 쇼케이스 승인 · AI 카피 생성 ({review.length})</span>
-              <span className="text-[10px] text-stone-400 shrink-0">{openSecs.promo ? "접기" : "보기"}</span>
+              <span className="text-[10px] text-stone-600 shrink-0">{openSecs.promo ? "접기" : "보기"}</span>
             </button>
             {openSecs.promo && <>
-            {review.length === 0 && <p className="text-[12px] text-stone-400 bg-white rounded-xl border p-4">대기 중인 사장님 쇼케이스 요청이 없어요. 사장님이 글(또는 영상)을 저장하면 여기에서 <b className="text-stone-600">🤖 AI 어필 카피 생성</b> → <b className="text-stone-600">✓ 승인</b> 할 수 있어요.</p>}
+            {review.length === 0 && <p className="text-[12px] text-stone-600 bg-white rounded-xl border p-4">대기 중인 사장님 쇼케이스 요청이 없어요. 사장님이 글(또는 영상)을 저장하면 여기에서 <b className="text-stone-600">🤖 AI 어필 카피 생성</b> → <b className="text-stone-600">✓ 승인</b> 할 수 있어요.</p>}
             <div className="space-y-3">
               {review.map((p) => (
                 <div key={p.cafe_id} className="bg-white rounded-xl border border-amber-300 overflow-hidden">
                   <div className="p-3">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="font-bold text-sm">{p.name}</span>
-                      <span className="text-[11px] text-stone-400">{p.area}</span>
+                      <span className="text-[11px] text-stone-600">{p.area}</span>
                       {p.ai_pending && <span className="text-[10px] bg-stone-200 text-stone-600 px-1.5 py-0.5 rounded-full ml-auto">AI 생성 대기</span>}
                     </div>
-                    {p.intro && <p className="text-[12px] text-stone-500 mb-2 line-clamp-2">사장님 글: {p.intro}</p>}
+                    {p.intro && <p className="text-[12px] text-stone-700 mb-2 line-clamp-2">사장님 글: {p.intro}</p>}
                     {p.style === 0 ? (
                       p.video_url ? (
                         <div className="rounded-lg overflow-hidden bg-black">
                           <span className="text-[10px] text-amber-600 px-1">🎬 영상 (소비자 노출 예정)</span>
                           <video src={p.video_url} controls playsInline preload="metadata" className="w-full max-h-48" />
                         </div>
-                      ) : <p className="text-[12px] text-stone-400">영상 업로드 대기 중</p>
+                      ) : <p className="text-[12px] text-stone-600">영상 업로드 대기 중</p>
                     ) : p.ai_headline ? (
                       <div className="rounded-lg overflow-hidden bg-stone-900 text-stone-50">
                         {p.photos?.[0] && <img src={p.photos[0]} alt="" className="w-full h-28 object-cover" />}
@@ -1556,7 +1556,7 @@ export default function AdminPage() {
                     )}
                     {/* 📊 성과(1차 데이터) — 공개 중일 때 */}
                     {p.approved && (
-                      <div className="flex gap-2 mt-2 text-[11px] text-stone-500">
+                      <div className="flex gap-2 mt-2 text-[11px] text-stone-700">
                         <span>👁 노출 <b className="text-stone-700">{p.views ?? 0}</b></span>
                         <span>· 클릭 <b className="text-stone-700">{p.clicks ?? 0}</b></span>
                         <span>· 재생 <b className="text-stone-700">{p.plays ?? 0}</b></span>
@@ -1581,14 +1581,14 @@ export default function AdminPage() {
         {/* ===== 📦 발행 현황 (콘텐츠 · 접이식·기본 접힘) ===== */}
         <div className="mb-6 rounded-2xl border border-stone-300 bg-white p-4 sm:p-5">
         <button onClick={() => toggleSec("content")} className="w-full flex items-center justify-between text-left mb-2">
-          <span className="admin-section-title font-extrabold text-stone-800">{openSecs.content ? "▾" : "▸"} 📦 발행 현황 <span className="normal-case font-normal text-stone-400">(콘텐츠)</span> <span className="normal-case font-normal">· 공개 {ct?.published?.toLocaleString() ?? "·"} · 전체 {ct?.total?.toLocaleString() ?? "·"}</span></span>
-          <span className="text-[10px] text-stone-400 shrink-0">{openSecs.content ? "접기" : "보기"}</span>
+          <span className="admin-section-title font-extrabold text-stone-800">{openSecs.content ? "▾" : "▸"} 📦 발행 현황 <span className="normal-case font-normal text-stone-600">(콘텐츠)</span> <span className="normal-case font-normal">· 공개 {ct?.published?.toLocaleString() ?? "·"} · 전체 {ct?.total?.toLocaleString() ?? "·"}</span></span>
+          <span className="text-[10px] text-stone-600 shrink-0">{openSecs.content ? "접기" : "보기"}</span>
         </button>
         {openSecs.content && <>
         <div className="admin-kpi-grid mb-4">
           <Kpi label="전체 카페" value={ct?.total ?? "·"} />
           <Kpi label="공개 중" value={ct?.published ?? "·"} color="text-emerald-600" />
-          <Kpi label="비공개" value={ct?.hidden ?? "·"} color="text-stone-500" />
+          <Kpi label="비공개" value={ct?.hidden ?? "·"} color="text-stone-700" />
           <Kpi label="사장님 등록대기" value={ct?.owner_pending ?? "·"} color="text-blue-600" sub="사람 검수 필요" />
         </div>
 
@@ -1619,11 +1619,11 @@ export default function AdminPage() {
           <div className="mb-4">
             <Card title="🛡 리뷰 검증 엔진 현황 (해자)" note="규칙으로 노이즈 제거 → Sonnet이 맥락 판정 → 양질 후기만 공개. 매일 자동 갱신.">
               <div className="admin-stat-grid">
-                <div><div className="text-xl font-bold text-stone-900">{ct.total ? Math.round((ct.raw_cached / ct.total) * 100) : 0}%</div><div className="text-[11px] text-stone-500">원본 수집(예열)</div><div className="text-[10px] text-stone-400">{ct.raw_cached}/{ct.total}</div></div>
-                <div><div className="text-xl font-bold text-emerald-600">{ct.total ? Math.round((ct.llm_judged / ct.total) * 100) : 0}%</div><div className="text-[11px] text-stone-500">AI 맥락 판정</div><div className="text-[10px] text-stone-400">{ct.llm_judged}/{ct.total}</div></div>
-                <div><div className="text-xl font-bold text-[#9c6b3f]">{ct.quality.avg_noise_pct ?? 0}%</div><div className="text-[11px] text-stone-500">노이즈 제거율</div><div className="text-[10px] text-stone-400">옥석만</div></div>
+                <div><div className="text-xl font-bold text-stone-900">{ct.total ? Math.round((ct.raw_cached / ct.total) * 100) : 0}%</div><div className="text-[11px] text-stone-700">원본 수집(예열)</div><div className="text-[10px] text-stone-600">{ct.raw_cached}/{ct.total}</div></div>
+                <div><div className="text-xl font-bold text-emerald-600">{ct.total ? Math.round((ct.llm_judged / ct.total) * 100) : 0}%</div><div className="text-[11px] text-stone-700">AI 맥락 판정</div><div className="text-[10px] text-stone-600">{ct.llm_judged}/{ct.total}</div></div>
+                <div><div className="text-xl font-bold text-[#9c6b3f]">{ct.quality.avg_noise_pct ?? 0}%</div><div className="text-[11px] text-stone-700">노이즈 제거율</div><div className="text-[10px] text-stone-600">옥석만</div></div>
               </div>
-              <p className="text-[10px] text-stone-400 mt-2.5">예열(00:10)으로 원본을 한 번 모아두고, Sonnet 판정(04:00)이 매일 정확도를 끌어올립니다.</p>
+              <p className="text-[10px] text-stone-600 mt-2.5">예열(00:10)으로 원본을 한 번 모아두고, Sonnet 판정(04:00)이 매일 정확도를 끌어올립니다.</p>
             </Card>
           </div>
         )}
@@ -1632,12 +1632,12 @@ export default function AdminPage() {
           <div className="mb-6">
             <Card title="데이터 품질" note="모든 화면 데이터는 검증된 옥석 리뷰만 사용">
               <div className="admin-stat-grid">
-                <div><div className="text-xl font-bold text-[#9c6b3f]">{ct.quality.avg_noise_pct ?? 0}%</div><div className="text-[11px] text-stone-500">평균 노이즈 제거</div></div>
-                <div><div className="text-xl font-bold text-emerald-600">{keptPct}%</div><div className="text-[11px] text-stone-500">옥석 채택률</div></div>
-                <div><div className="text-xl font-bold text-stone-900">{ct.published ? Math.round(((ct.pub_embedded ?? 0) / ct.published) * 100) : 0}%</div><div className="text-[11px] text-stone-500">임베딩 커버리지<br/>(공개 기준)</div></div>
-                <div><div className="text-xl font-bold text-stone-900">{ct.published ? Math.round(((ct.pub_has_dates ?? 0) / ct.published) * 100) : 0}%</div><div className="text-[11px] text-stone-500">리뷰주기 데이터<br/>(공개 기준)</div></div>
+                <div><div className="text-xl font-bold text-[#9c6b3f]">{ct.quality.avg_noise_pct ?? 0}%</div><div className="text-[11px] text-stone-700">평균 노이즈 제거</div></div>
+                <div><div className="text-xl font-bold text-emerald-600">{keptPct}%</div><div className="text-[11px] text-stone-700">옥석 채택률</div></div>
+                <div><div className="text-xl font-bold text-stone-900">{ct.published ? Math.round(((ct.pub_embedded ?? 0) / ct.published) * 100) : 0}%</div><div className="text-[11px] text-stone-700">임베딩 커버리지<br/>(공개 기준)</div></div>
+                <div><div className="text-xl font-bold text-stone-900">{ct.published ? Math.round(((ct.pub_has_dates ?? 0) / ct.published) * 100) : 0}%</div><div className="text-[11px] text-stone-700">리뷰주기 데이터<br/>(공개 기준)</div></div>
               </div>
-              <p className="text-[11px] text-stone-400 mt-2.5 text-center">총 수집 {ct.quality.raw?.toLocaleString()}건 중 노이즈 {ct.quality.rejected?.toLocaleString()}건 제거 → 옥석 {(ct.quality.raw - ct.quality.rejected).toLocaleString()}건</p>
+              <p className="text-[11px] text-stone-600 mt-2.5 text-center">총 수집 {ct.quality.raw?.toLocaleString()}건 중 노이즈 {ct.quality.rejected?.toLocaleString()}건 제거 → 옥석 {(ct.quality.raw - ct.quality.rejected).toLocaleString()}건</p>
             </Card>
           </div>
         )}
@@ -1647,20 +1647,20 @@ export default function AdminPage() {
         {/* ===== 🙋 후보 보류 · 검수 관리 (접이식·기본 접힘) ===== */}
         <div className="mb-6 rounded-2xl border border-stone-300 bg-white p-4 sm:p-5">
         <button onClick={() => toggleSec("inspect")} className="w-full flex items-center justify-between text-left mb-2">
-          <span className="admin-section-title font-extrabold text-stone-800">{openSecs.inspect ? "▾" : "▸"} 🙋 후보 보류 <span className="normal-case font-normal text-stone-400">(검수 관리)</span> <span className={`normal-case ${ownerPending.length ? "font-bold text-blue-600" : "font-normal"}`}>· 사장님 대기 {ownerPending.length}</span> <span className="normal-case font-normal">· 자동 비공개 {autoHidden.length}</span></span>
-          <span className="text-[10px] text-stone-400 shrink-0">{openSecs.inspect ? "접기" : "보기"}</span>
+          <span className="admin-section-title font-extrabold text-stone-800">{openSecs.inspect ? "▾" : "▸"} 🙋 후보 보류 <span className="normal-case font-normal text-stone-600">(검수 관리)</span> <span className={`normal-case ${ownerPending.length ? "font-bold text-blue-600" : "font-normal"}`}>· 사장님 대기 {ownerPending.length}</span> <span className="normal-case font-normal">· 자동 비공개 {autoHidden.length}</span></span>
+          <span className="text-[10px] text-stone-600 shrink-0">{openSecs.inspect ? "접기" : "보기"}</span>
         </button>
         {openSecs.inspect && <>
         <section className="mb-4">
           <h2 className="text-sm font-bold text-stone-700 mb-1">🙋 사장님 등록 검수 대기 ({ownerPending.length})</h2>
-          <p className="text-[11px] text-stone-400 mb-2">사장님이 <b>/cafe/register</b>로 직접 등록한 가게. 확인 후 공개/삭제.</p>
-          {ownerPending.length === 0 ? <p className="text-sm text-stone-400 bg-white rounded-xl p-4 border">아직 사장님 직접 등록 신청이 없습니다.</p> :
+          <p className="text-[11px] text-stone-600 mb-2">사장님이 <b>/cafe/register</b>로 직접 등록한 가게. 확인 후 공개/삭제.</p>
+          {ownerPending.length === 0 ? <p className="text-sm text-stone-600 bg-white rounded-xl p-4 border">아직 사장님 직접 등록 신청이 없습니다.</p> :
             <div className="space-y-2">{ownerPending.map((c) => <Row key={c.id} c={c} />)}</div>}
         </section>
         <section className="mb-6">
           <h2 className="text-sm font-bold text-stone-700 mb-1">🔍 자동수집 미공개 · 데이터 부족 ({autoHidden.length})</h2>
-          <p className="text-[11px] text-stone-400 mb-2">검증 리뷰 5건 미만(후보)으로 자동 비공개. 사람 요청 아님 · 리뷰 쌓이면 자동 공개.</p>
-          {autoHidden.length === 0 ? <p className="text-sm text-stone-400">없음</p> : (
+          <p className="text-[11px] text-stone-600 mb-2">검증 리뷰 5건 미만(후보)으로 자동 비공개. 사람 요청 아님 · 리뷰 쌓이면 자동 공개.</p>
+          {autoHidden.length === 0 ? <p className="text-sm text-stone-600">없음</p> : (
             <>
               <button onClick={() => setShowAuto((v) => !v)} className="text-xs px-3 py-1.5 rounded-lg bg-stone-200 text-stone-700 mb-2">{showAuto ? "접기 ▲" : `목록 펼치기 ▼ (${autoHidden.length})`}</button>
               {showAuto && <div className="space-y-2">{autoHidden.map((c) => <Row key={c.id} c={c} />)}</div>}
@@ -1674,9 +1674,9 @@ export default function AdminPage() {
         <div className="mb-6 rounded-2xl border border-stone-300 bg-white p-4 sm:p-5">
         <div className="admin-section-title font-extrabold text-stone-800 mb-2">🔎 카페 검색 관리</div>
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`카페 이름 검색 (전체 ${cafes.length}곳)`} className="w-full border rounded-lg px-4 py-2.5 mb-3 bg-white" />
-        {q.trim() === "" ? <p className="text-sm text-stone-400">이름을 검색해 개별 카페를 공개/숨김/삭제 관리하세요. (공개 {live.length} · 비공개 {ownerPending.length + autoHidden.length})</p>
-          : searched.length === 0 ? <p className="text-sm text-stone-400">'{q}' 검색 결과 없음</p>
-          : <div className="space-y-2">{searched.slice(0, 40).map((c) => <Row key={c.id} c={c} />)}{searched.length > 40 && <p className="text-xs text-stone-400 text-center">상위 40곳만 표시 · 더 좁혀 검색하세요</p>}</div>}
+        {q.trim() === "" ? <p className="text-sm text-stone-600">이름을 검색해 개별 카페를 공개/숨김/삭제 관리하세요. (공개 {live.length} · 비공개 {ownerPending.length + autoHidden.length})</p>
+          : searched.length === 0 ? <p className="text-sm text-stone-600">'{q}' 검색 결과 없음</p>
+          : <div className="space-y-2">{searched.slice(0, 40).map((c) => <Row key={c.id} c={c} />)}{searched.length > 40 && <p className="text-xs text-stone-600 text-center">상위 40곳만 표시 · 더 좁혀 검색하세요</p>}</div>}
         </div>
       </div>
       {/* 💬 관제 챗봇 — 관리자 대시보드에서도 열 수 있게(관제탑과 동일 위젯). 인증된 화면에서만 렌더. */}
