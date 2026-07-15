@@ -156,11 +156,11 @@ export default function OwnerPage() {
               <input value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === "Enter" && search()} placeholder="카페 이름 검색" className="flex-1 min-w-0 border border-[#cbb89f] rounded-lg px-4 py-3 text-base bg-white" />
               <button onClick={search} className="bg-[#2b2018] text-[#f4ece0] rounded-lg px-7 py-3 font-medium shrink-0">검색</button>
             </div>
-            {loading && <p className="text-sm text-[#a8927a]">검색 중...</p>}
+            {loading && <p className="text-sm text-[#8a7458]">검색 중...</p>}
             <div className="space-y-2">
               {results.map((c) => (
                 <button key={c.id} onClick={() => loadInsight(c.name)} className="w-full text-left bg-white rounded-lg p-3 border border-[#ece0cd] hover:border-[#9c6b3f]">
-                  <span className="font-bold text-sm">{c.name}</span><span className="text-xs text-[#a8927a] ml-2">{c.area}</span>
+                  <span className="font-bold text-sm">{c.name}</span><span className="text-xs text-[#8a7458] ml-2">{c.area}</span>
                 </button>
               ))}
             </div>
@@ -214,7 +214,7 @@ export default function OwnerPage() {
             {/* 액션 플랜 — 가장 위에, 핵심 */}
             <div className="mb-4">
               <div className="text-sm font-bold text-[#52402e] mb-1 flex items-center gap-1.5">💡 데이터 기반 액션 플랜<InfoDot title="액션 플랜이 뭐예요?">일반론이 아니라 <b>우리 카페의 검증된 후기 데이터에서만</b> 나오는 구체 제안이에요. 같은 동네 카페와 비교해 <b>차별점·빈 포지션(아무도 안 하는 강점)·매몰점·보완점·순위 전략</b>을 알려드려요.</InfoDot></div>
-              <div className="text-[11px] text-[#a8927a] mb-2.5">제목을 눌러 상세 내용을 펼쳐보세요</div>
+              <div className="text-[11px] text-[#8a7458] mb-2.5">제목을 눌러 상세 내용을 펼쳐보세요</div>
               <div className="space-y-2">
                 {insight.actions.map((a, i) => {
                   const t = TONE[a.tone];
@@ -256,7 +256,7 @@ export default function OwnerPage() {
                     <Bar dataKey="count" radius={[0, 4, 4, 0]}>{rankData.map((e, i) => <Cell key={i} fill={e.isMe ? "#9c6b3f" : "#d8c3a0"} />)}</Bar>
                   </BarChart>
                 </ResponsiveContainer>
-                <div className="text-[10px] text-[#a8927a] mt-1">진한 막대 = 내 카페</div>
+                <div className="text-[10px] text-[#8a7458] mt-1">진한 막대 = 내 카페</div>
               </>)}
               {tab === "radar" && (<>
                 <div className="text-[11px] text-[#8a7458] uppercase tracking-wider mb-3">우리 카페의 결 vs 동네 평균</div>
@@ -270,11 +270,11 @@ export default function OwnerPage() {
                     <Legend wrapperStyle={{ fontSize: 12 }} />
                   </RadarChart>
                 </ResponsiveContainer>
-                <div className="text-[10px] text-[#a8927a] mt-1 leading-relaxed">0~100점 = 같은 동네 카페들 분포 안에서의 상대 위치(50 = 동네 중간, 높을수록 그 특징이 두드러짐). 리뷰 언급 빈도 기반이며 측정값이 아닙니다.</div>
+                <div className="text-[10px] text-[#8a7458] mt-1 leading-relaxed">0~100점 = 같은 동네 카페들 분포 안에서의 상대 위치(50 = 동네 중간, 높을수록 그 특징이 두드러짐). 리뷰 언급 빈도 기반이며 측정값이 아닙니다.</div>
               </>)}
               {tab === "pie" && (<>
                 <div className="text-[11px] text-[#8a7458] uppercase tracking-wider mb-3">우리 카페는 어떤 특징으로 이야기되나</div>
-                {pieData.length === 0 ? <p className="text-sm text-[#a8927a] py-8 text-center">아직 두드러진 특징 언급이 적어요.</p> : (
+                {pieData.length === 0 ? <p className="text-sm text-[#8a7458] py-8 text-center">아직 두드러진 특징 언급이 적어요.</p> : (
                   <ResponsiveContainer width="100%" height={280}>
                     <PieChart>
                       <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={55} outerRadius={95} paddingAngle={2}>
@@ -283,7 +283,7 @@ export default function OwnerPage() {
                     </PieChart>
                   </ResponsiveContainer>
                 )}
-                <div className="text-[10px] text-[#a8927a] mt-1">언급 비중이 클수록 그 특징으로 많이 이야기돼요</div>
+                <div className="text-[10px] text-[#8a7458] mt-1">언급 비중이 클수록 그 특징으로 많이 이야기돼요</div>
               </>)}
             </div>
 
@@ -303,13 +303,13 @@ export default function OwnerPage() {
                       <Area type="monotone" dataKey="count" stroke="#9c6b3f" strokeWidth={2} fill="url(#cad)" />
                     </AreaChart>
                   </ResponsiveContainer>
-                ) : <p className="text-sm text-[#a8927a] py-6 text-center">날짜가 있는 검증 리뷰가 아직 적어요.</p>}
-                <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-[#a8927a] mt-2">
+                ) : <p className="text-sm text-[#8a7458] py-6 text-center">날짜가 있는 검증 리뷰가 아직 적어요.</p>}
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-[#8a7458] mt-2">
                   <span>최근 12개월 <b className="text-[#52402e]">{insight.reviewCadence.last12}건</b></span>
                   {insight.reviewCadence.lastDate && <span>마지막 리뷰 <b className="text-[#52402e]">{insight.reviewCadence.lastDate}</b></span>}
                   {insight.reviewCadence.recentShare > 0 && <span>최근 3개월 비중 <b className="text-[#52402e]">{insight.reviewCadence.recentShare}%</b></span>}
                 </div>
-                <div className="text-[10px] text-[#a8927a] mt-1">검증된 리뷰의 게시일 기준 · 측정값이 아니라 공개 후기 작성 시점</div>
+                <div className="text-[10px] text-[#8a7458] mt-1">검증된 리뷰의 게시일 기준 · 측정값이 아니라 공개 후기 작성 시점</div>
               </div>
             )}
 
@@ -319,7 +319,7 @@ export default function OwnerPage() {
                 <div key={c.name} className="flex items-center gap-2 py-2 border-b border-[#f0e6d4] last:border-0">
                   <span className="font-bold text-sm">{c.name}</span>
                   {c.grade && <span className="text-[9px] text-white px-1.5 py-0.5 rounded-full" style={{ background: GRADE_BG[c.grade] }}>{c.grade}</span>}
-                  <span className="text-xs text-[#a8927a] ml-auto">리뷰 {c.count}건</span>
+                  <span className="text-xs text-[#8a7458] ml-auto">리뷰 {c.count}건</span>
                 </div>
               ))}
             </div>
@@ -333,7 +333,7 @@ export default function OwnerPage() {
               <p className="text-[11px] text-[#8a7458] mt-1.5">위 후기 분석은 <b>무료</b> · 아래는 <b>홍보팩(구독)</b>이에요</p>
             </div>
             <button onClick={() => setShowShowcase(true)} className="w-full bg-gradient-to-r from-[#9c6b3f] to-[#2b2018] text-[#f4ece0] rounded-xl py-3.5 font-medium">🎀 쇼케이스·우선노출·성과 (홍보팩)</button>
-            <p className="text-[10px] text-[#a8927a] mt-3 text-center leading-relaxed">분석은 네이버 공개 후기를 교차검증한 데이터 기반입니다(무료). '결'은 측정값이 아니라 리뷰에서 자주 언급되는 정도입니다.</p>
+            <p className="text-[10px] text-[#8a7458] mt-3 text-center leading-relaxed">분석은 네이버 공개 후기를 교차검증한 데이터 기반입니다(무료). '결'은 측정값이 아니라 리뷰에서 자주 언급되는 정도입니다.</p>
           </div>
         )}
       </div>

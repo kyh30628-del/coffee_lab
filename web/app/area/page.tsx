@@ -40,7 +40,7 @@ export default async function AreaIndex() {
               <span key={t.key} className="text-[12.5px] px-3 py-1.5 rounded-full bg-white border border-[#e6dcc8] text-[#52402e]">{t.emoji} {t.label}</span>
             ))}
           </div>
-          <p className="text-[11px] text-[#a8927a] mt-1.5">동네를 고르면 취향별 추천이 나와요.</p>
+          <p className="text-[11px] text-[#8a7458] mt-1.5">동네를 고르면 취향별 추천이 나와요.</p>
         </div>
 
         <div className="text-[12px] font-bold text-[#9c6b3f] mb-2">동네별 ({regions.length})</div>
@@ -48,11 +48,11 @@ export default async function AreaIndex() {
           {regions.map((r) => (
             <Link key={r.area} href={`/area/${encodeURIComponent(r.area)}`} className="flex items-center justify-between bg-white rounded-lg border border-[#e6dcc8] px-3 py-2 hover:shadow-sm transition">
               <span className="text-[13px] font-bold truncate">{r.area}</span>
-              <span className="text-[11px] text-[#a8927a] shrink-0">{r.n}</span>
+              <span className="text-[11px] text-[#8a7458] shrink-0">{r.n}</span>
             </Link>
           ))}
         </div>
-        <div className="mt-7 text-[11px] text-[#a8927a]"><Link href="/" className="underline">동네 커피 노트 홈</Link> · 진짜 후기로 고른 우리 동네 카페</div>
+        <div className="mt-7 text-[11px] text-[#8a7458]"><Link href="/" className="underline">동네 커피 노트 홈</Link> · 진짜 후기로 고른 우리 동네 카페</div>
       </div>
       <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet" />
     </main>

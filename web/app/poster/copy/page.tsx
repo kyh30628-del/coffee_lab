@@ -351,7 +351,7 @@ export default function PosterCopyPage() {
           </button>
         </section>
 
-        <p className="text-[11px] text-[#a8927a] leading-relaxed">
+        <p className="text-[11px] text-[#8a7458] leading-relaxed">
           ※ 다른 포스터 타입과 달리 다크 배경·골드 코너브래킷의 에디토리얼 톤으로 차별화했어요. DB 조회 없이
           브라우저에서만 렌더링되고, 어떤 프리셋에도 특정 카페명은 등장하지 않아요(지역명만 자유 입력). 지역명은 자유
           입력이라 어떤 텍스트를 넣어도 실제 존재 여부와 무관하게 렌더링됩니다 — 게시 전 직접 확인해 주세요.

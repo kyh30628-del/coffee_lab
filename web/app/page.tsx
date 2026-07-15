@@ -2258,10 +2258,10 @@ function MemorySettingsModal({ device, visits, hasPin, onPinChange, onClose, onR
   const exportPDF = () => {
     const rows = visits.map((v) => `
       <div style="border:1px solid #e6d9c8;border-radius:12px;padding:14px;margin-bottom:12px;page-break-inside:avoid;">
-        <div style="font-weight:700;font-size:15px;color:#2b2018;">${v.favorite ? "★ " : ""}${(v.name || "").replace(/</g, "&lt;")} <span style="font-weight:400;font-size:11px;color:#9c6b3f;">${(v.area || "")}</span>${v.verified === false ? ` <span style="font-weight:700;font-size:10px;color:#a8927a;background:#f3ede1;border-radius:8px;padding:1px 6px;">미인증</span>` : ""}</div>
+        <div style="font-weight:700;font-size:15px;color:#2b2018;">${v.favorite ? "★ " : ""}${(v.name || "").replace(/</g, "&lt;")} <span style="font-weight:400;font-size:11px;color:#9c6b3f;">${(v.area || "")}</span>${v.verified === false ? ` <span style="font-weight:700;font-size:10px;color:#8a7458;background:#f3ede1;border-radius:8px;padding:1px 6px;">미인증</span>` : ""}</div>
         ${v.photo_url ? `<img src="${v.photo_url}" style="max-width:100%;max-height:240px;border-radius:8px;margin:8px 0;object-fit:cover;" />` : ""}
         ${v.memory ? `<div style="font-size:13px;color:#52402e;line-height:1.7;white-space:pre-wrap;margin-top:6px;">${(v.memory).replace(/</g, "&lt;")}</div>` : ""}
-        <div style="font-size:10px;color:#a8927a;margin-top:8px;">${new Date(v.created_at).toLocaleString("ko-KR")}</div>
+        <div style="font-size:10px;color:#8a7458;margin-top:8px;">${new Date(v.created_at).toLocaleString("ko-KR")}</div>
       </div>`).join("");
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>내 커피 기억</title>
       <style>body{font-family:'Gowun Batang',serif;background:#fdfaf4;color:#2b2018;padding:24px;max-width:600px;margin:0 auto;}h1{font-size:22px;}</style></head>

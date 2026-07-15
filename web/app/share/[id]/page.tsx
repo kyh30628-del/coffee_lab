@@ -59,7 +59,7 @@ export default async function SharePage({ params }: Props) {
   return (
     <main className="min-h-screen bg-[#f4ece0] px-4 py-8 flex flex-col items-center">
       <div className="w-full max-w-md">
-        <div className="text-center mb-2 text-[11px] text-[#a8927a] tracking-wider uppercase">☕ 동네 커피 노트 · 검증 리포트</div>
+        <div className="text-center mb-2 text-[11px] text-[#8a7458] tracking-wider uppercase">☕ 동네 커피 노트 · 검증 리포트</div>
 
         {/* 리포트 카드 */}
         <section className="bg-white rounded-3xl border border-[#ece0cd] shadow-sm p-6">
@@ -73,7 +73,7 @@ export default async function SharePage({ params }: Props) {
           <div className="rounded-2xl bg-[#faf4ea] border border-[#ece0cd] py-4 text-center mb-4">
             <div className="text-[12px] text-[#8a7458] mb-1">우리 동네 순위</div>
             <div className="text-xl font-bold text-[#2b2018]">{rankTxt}</div>
-            <div className="text-[12px] text-[#a8927a] mt-1">검증 후기 {rep.count}건 기준</div>
+            <div className="text-[12px] text-[#8a7458] mt-1">검증 후기 {rep.count}건 기준</div>
           </div>
 
           {/* 강점 */}
@@ -94,7 +94,7 @@ export default async function SharePage({ params }: Props) {
         {/* QR — 가게 비치/공유용 */}
         <section className="bg-white rounded-3xl border border-[#ece0cd] mt-4 p-6 text-center">
           <div className="text-sm font-bold text-[#52402e] mb-1">📱 이 리포트 공유 QR</div>
-          <p className="text-[12px] text-[#a8927a] mb-3">가게에 비치하거나 손님·SNS에 공유하세요</p>
+          <p className="text-[12px] text-[#8a7458] mb-3">가게에 비치하거나 손님·SNS에 공유하세요</p>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={qr} alt="공유 QR 코드" width={200} height={200} className="mx-auto rounded-xl border border-[#ece0cd]" />
           <div className="text-[11px] text-[#bcab92] mt-2 break-all">{shareUrl}</div>
@@ -107,7 +107,7 @@ export default async function SharePage({ params }: Props) {
           <a href={`${SITE}/owner`} className="inline-block rounded-xl bg-[#9c6b3f] text-white font-bold px-5 py-2.5 text-sm">무료 분석 받기 →</a>
         </section>
 
-        <p className="text-center text-[11px] text-[#a8927a] mt-5">
+        <p className="text-center text-[11px] text-[#8a7458] mt-5">
           광고·협찬·영수증 없이 공개 후기로만 검증한 큐레이션 · <a href={SITE} className="underline">dongnecoffeenote.com</a>
         </p>
       </div>

@@ -68,7 +68,7 @@ export default function BusinessInfo() {
           <p className="text-[13px] text-[#52402e] leading-relaxed">소비자 분쟁은 <b>공정거래위원회 고시 ‘소비자분쟁해결기준’</b>에 따라 처리하며, 협의가 어려운 경우 <b>한국소비자원·전자거래분쟁조정위원회</b> 등에 조정을 신청할 수 있습니다. 1차 문의: <b>dongnecoffeenote@gmail.com</b>.</p>
         </section>
 
-        <p className="text-[11px] text-[#a8927a] leading-relaxed">본 페이지는 전자상거래법상 표시 의무 이행을 돕기 위한 골격이며, 실제 공개 전 <b>사업자등록·통신판매업 신고 정보 기입</b>과 <b>법률 검토</b>를 권장합니다.</p>
+        <p className="text-[11px] text-[#8a7458] leading-relaxed">본 페이지는 전자상거래법상 표시 의무 이행을 돕기 위한 골격이며, 실제 공개 전 <b>사업자등록·통신판매업 신고 정보 기입</b>과 <b>법률 검토</b>를 권장합니다.</p>
       </div>
       <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet" />
     </main>

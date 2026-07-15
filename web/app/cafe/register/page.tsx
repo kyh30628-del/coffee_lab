@@ -95,10 +95,10 @@ export default function RegisterPage() {
                 {nameSug.map((c) => (
                   <button key={c.id} type="button" onClick={() => { setForm((f) => ({ ...f, name: c.name, area: c.area })); setSupplementId(c.id); setNameSug([]); }}
                     className="w-full text-left px-3.5 py-2.5 hover:bg-[#f4ece0] border-b border-[#f0e6d4] last:border-0">
-                    <span className="font-bold text-sm">{c.name}</span><span className="text-xs text-[#a8927a] ml-2">{c.area} · 내용 보완</span>
+                    <span className="font-bold text-sm">{c.name}</span><span className="text-xs text-[#8a7458] ml-2">{c.area} · 내용 보완</span>
                   </button>
                 ))}
-                <div className="px-3.5 py-2 text-[11px] text-[#a8927a]">목록에 없으면 그대로 두고 새로 등록하세요</div>
+                <div className="px-3.5 py-2 text-[11px] text-[#8a7458]">목록에 없으면 그대로 두고 새로 등록하세요</div>
               </div>
             )}
           </div>
@@ -172,7 +172,7 @@ export default function RegisterPage() {
             className="w-full bg-[#2b2018] text-[#f4ece0] rounded-lg py-3.5 font-medium hover:bg-[#3d2f22] transition-colors disabled:opacity-50">
             {status === "sending" ? "보내는 중..." : wantTrial ? "등록하고 체험 신청하기" : "등록 신청하기"}
           </button>
-          <p className="text-[11px] text-[#a8927a] text-center">신청 후 확인을 거쳐 가이드에 노출됩니다.</p>
+          <p className="text-[11px] text-[#8a7458] text-center">신청 후 확인을 거쳐 가이드에 노출됩니다.</p>
         </div>
 
       </div>

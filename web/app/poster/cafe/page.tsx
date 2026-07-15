@@ -598,7 +598,7 @@ export default function CafePosterPage() {
                   사진 제거
                 </button>
               )}
-              <span className="text-[11px] text-[#a8927a] basis-full">
+              <span className="text-[11px] text-[#8a7458] basis-full">
                 ※ 직접 촬영한 사진 또는 무료 라이선스 사진만 올려주세요. 네이버·타인 인스타 사진은 도용이라 사용
                 금지예요. 사진을 올리지 않으면 지도 핀 모티프로 대체돼요.
               </span>
@@ -627,7 +627,7 @@ export default function CafePosterPage() {
           </button>
         </section>
 
-        <p className="text-[11px] text-[#a8927a] leading-relaxed">
+        <p className="text-[11px] text-[#8a7458] leading-relaxed">
           ※ 카페명·태그라인·후기 발췌는 검증(옥석) 데이터베이스 실측값이에요. 같은 카페를 반복 소개할 수 있어
           두 템플릿 모두 &ldquo;제휴·협찬 아님&rdquo; 문구를 항상 표기합니다.
         </p>
