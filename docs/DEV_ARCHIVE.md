@@ -113,3 +113,4 @@
 | 2026-07-14 12:45 | #373 | 재방문 인증 허용 | 0d1e86ba | high | 재방문 인증(verified) 구현. app/api/my-cafe/route.ts: verified 컬럼 마이그레이션·GET은 본인기기 인증/미인증 모두 반환(verified 필드 |
 | 2026-07-14 13:15 | #374 | 인증 안내문구 추가 | c00ceca7 | low | app/MyCafeRegModal.tsx(미인증 임시저장 확인팝업 문구 강화·저장완료화면 인증/미인증 분기 신설)·app/page.tsx(추억보관소 목록에 인증/미인증 배지 병기· |
 | 2026-07-15 00:13 | #376 | 인증상태 안내+글자진하게 | a4bc940d | med | 변경: app/MyCafeRegModal.tsx(임시저장/완료 팝업에 인증됨·미인증 뱃지 추가+나에게만 보임(비공개)/인증 상태로 전환 문구 명시), app/page.tsx(추억상 |
+| 2026-07-15 01:35 | #378 | 인증안내/글자진하게수정 | 576ce984 | med | 1) MyCafeRegModal 마운트경로(showMyCafeReg) 재확인 — feature flag·조건부렌더 버그 없음, 미인증배지·안내문구·저장직후/목록/상세 3곳 모두 코 |
