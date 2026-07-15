@@ -208,7 +208,7 @@ export default async function CafePage({ params }: Props) {
                   </div>
                 </div>
               )}
-              <p className="text-[10px] text-[#a8927a] mt-2.5 leading-relaxed">기준은 <b>후기 1건당 언급 비율</b>이에요 — 후기 수가 많고 적음을 보정한 공정한 비교입니다. '평균의 N배'·'상위/하위 %'는 전체 카페와 같은 기준으로 비교한 값. 절대 평가가 아닙니다.</p>
+              <p className="text-[10px] text-[#8a7458] mt-2.5 leading-relaxed">기준은 <b>후기 1건당 언급 비율</b>이에요 — 후기 수가 많고 적음을 보정한 공정한 비교입니다. '평균의 N배'·'상위/하위 %'는 전체 카페와 같은 기준으로 비교한 값. 절대 평가가 아닙니다.</p>
             </div>
           ) : tags.length > 0 && (
             <div className="mb-4">
