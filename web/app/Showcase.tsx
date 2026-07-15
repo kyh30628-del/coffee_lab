@@ -68,7 +68,7 @@ export default function Showcase({ cafeId, cafeName, pw, pin }: { cafeId: number
     setBusy(false);
   };
 
-  if (!promo) return <p className="text-[12px] text-[#a8927a]">불러오는 중…</p>;
+  if (!promo) return <p className="text-[12px] text-[#8a7458]">불러오는 중…</p>;
   const status = promo.style === 0
     ? (promo.video_url ? (promo.approved ? "🟢 공개 중 — 카페 상세에 영상이 노출돼요" : "🟡 영상 — 관리자 승인 대기 중") : "🎬 홍보 영상을 올려주세요")
     : promo.ai_pending ? "🕐 관리자가 생성 요청함 — AI 카피 생성 중"

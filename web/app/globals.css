@@ -23,7 +23,7 @@
 }
 /* 폼 입력 글자색 안전망 — 어떤 색 컨텍스트에서도 입력 텍스트가 읽히도록 고정(흰 배경 위 투명글자 방지). */
 input, textarea, select { color: #2b2018; }
-input::placeholder, textarea::placeholder { color: #a8927a; }
+input::placeholder, textarea::placeholder { color: #8a7458; }
 
 /* iOS PWA: 홈인디케이터 안전영역에 흰 띠가 비치지 않게 앱 메인 배경(크림)으로 고정.
    라이트/다크 모드 무관 — 하단 safe-area가 크림 앱 화면과 자연스럽게 이어짐. */

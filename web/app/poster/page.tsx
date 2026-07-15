@@ -65,7 +65,7 @@ export default function PosterHubPage() {
               <div className="text-3xl mb-3">{c.icon}</div>
               <div className="text-[16px] font-bold mb-1">{c.title}</div>
               <p className="text-[12.5px] text-[#6b5a48] leading-relaxed mb-3">{c.desc}</p>
-              <div className="text-[11px] text-[#a8927a]">{c.meta}</div>
+              <div className="text-[11px] text-[#8a7458]">{c.meta}</div>
             </Link>
           ))}
         </div>

@@ -24,7 +24,7 @@ export default function Curated({ area, tasteKey, heading, intro, cafes, regions
 
         {/* 후기 근거 요약 — 등급 분포로 검증 신뢰도를 투명하게 표시(콘텐츠 밀도 보강) */}
         {tasteKey && grades && (grades.verified + grades.ref + grades.candidate) > 0 && (
-          <p className="text-[11.5px] text-[#a8927a] -mt-4 mb-6">
+          <p className="text-[11.5px] text-[#8a7458] -mt-4 mb-6">
             후기 근거: 검증 {grades.verified}곳 · 참고 {grades.ref}곳{grades.candidate ? ` · 후보 ${grades.candidate}곳` : ""}
           </p>
         )}
@@ -39,7 +39,7 @@ export default function Curated({ area, tasteKey, heading, intro, cafes, regions
 
         {/* 목록 */}
         {cafes.length === 0 ? (
-          <p className="text-[13px] text-[#a8927a] py-8 text-center">아직 이 조건에 맞는 검증 카페가 적어요. <Link href={`/area/${encodeURIComponent(area)}`} className="underline text-[#9c6b3f]">{area} 전체 보기</Link></p>
+          <p className="text-[13px] text-[#8a7458] py-8 text-center">아직 이 조건에 맞는 검증 카페가 적어요. <Link href={`/area/${encodeURIComponent(area)}`} className="underline text-[#9c6b3f]">{area} 전체 보기</Link></p>
         ) : (
           <ol className="space-y-2.5">
             {cafes.map((c, i) => (
@@ -48,11 +48,11 @@ export default function Curated({ area, tasteKey, heading, intro, cafes, regions
                   <div className="flex items-center gap-2">
                     <span className="text-[#bcae98] text-[13px] font-bold w-5 shrink-0">{i + 1}</span>
                     <span className="font-bold text-[15px]">{c.name}</span>
-                    {c.dong && <span className="text-[12px] text-[#a8927a]">{c.dong}</span>}
+                    {c.dong && <span className="text-[12px] text-[#8a7458]">{c.dong}</span>}
                     {c.grade && <span className="text-[10px] font-bold text-white px-1.5 py-0.5 rounded ml-auto shrink-0" style={{ background: GRADE_BG[c.grade] || "#a8927a" }}>{c.grade}</span>}
                   </div>
                   {c.identity && <p className="text-[12.5px] text-[#6b5a48] leading-snug mt-1.5 line-clamp-2 pl-7">{c.identity}</p>}
-                  {c.quote && <p className="text-[11.5px] text-[#a8927a] leading-snug mt-1 line-clamp-1 pl-7">“{c.quote}”</p>}
+                  {c.quote && <p className="text-[11.5px] text-[#8a7458] leading-snug mt-1 line-clamp-1 pl-7">“{c.quote}”</p>}
                 </Link>
               </li>
             ))}
@@ -81,7 +81,7 @@ export default function Curated({ area, tasteKey, heading, intro, cafes, regions
             ))}
           </div>
         </div>
-        <div className="mt-6 text-[11px] text-[#a8927a]"><Link href="/" className="underline">동네 커피 노트 홈</Link> · 진짜 후기로 고른 우리 동네 카페</div>
+        <div className="mt-6 text-[11px] text-[#8a7458]"><Link href="/" className="underline">동네 커피 노트 홈</Link> · 진짜 후기로 고른 우리 동네 카페</div>
       </div>
       <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet" />
     </main>

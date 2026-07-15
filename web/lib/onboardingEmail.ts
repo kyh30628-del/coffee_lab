@@ -77,7 +77,7 @@ export function renderOnboardingEmail(opts: { cafeName: string; pin: string; day
         </td></tr>
         <tr><td style="padding:10px 28px 22px;" align="center">
           <a href="${site}/owner" style="display:inline-block;background:#2b2018;color:#f4ece0;text-decoration:none;font-size:15px;font-weight:700;padding:14px 30px;border-radius:30px;">내 카페 이야기 보러 가기 →</a>
-          <p style="font-size:12px;color:#a8927a;margin:14px 0 0;line-height:1.7;">화면에서 위 열쇠를 입력하면 <b style="color:#7c6a55;">내 카페로 바로</b> 들어가요.</p>
+          <p style="font-size:12px;color:#8a7458;margin:14px 0 0;line-height:1.7;">화면에서 위 열쇠를 입력하면 <b style="color:#7c6a55;">내 카페로 바로</b> 들어가요.</p>
         </td></tr>
 
         <!-- 구독 사장님 전용 서비스 -->
@@ -111,7 +111,7 @@ export function renderOnboardingEmail(opts: { cafeName: string; pin: string; day
         </td></tr>
 
         <tr><td style="padding:14px 28px 4px;">
-          <p style="font-size:11.5px;color:#a8927a;line-height:1.8;margin:0;">손님에게 보이는 <b>후기·등급은 모든 카페가 똑같이 검증</b>돼요. 홍보팩은 <b>노출·홍보 도구</b>일 뿐, 후기 평가를 돈으로 바꾸지 않습니다. 그래서 손님이 믿고, 그 신뢰가 사장님 가게에도 힘이 됩니다.</p>
+          <p style="font-size:11.5px;color:#8a7458;line-height:1.8;margin:0;">손님에게 보이는 <b>후기·등급은 모든 카페가 똑같이 검증</b>돼요. 홍보팩은 <b>노출·홍보 도구</b>일 뿐, 후기 평가를 돈으로 바꾸지 않습니다. 그래서 손님이 믿고, 그 신뢰가 사장님 가게에도 힘이 됩니다.</p>
         </td></tr>
 
         <tr><td style="background:#faf4ea;border-top:1px solid #efe2cd;padding:18px 28px;margin-top:8px;">

@@ -78,7 +78,7 @@ export default function PwaInstall() {
             <li>2. 메뉴에서 <b>‘홈 화면에 추가’</b>를 선택하세요.</li>
             <li>3. 오른쪽 위 <b>‘추가’</b>를 누르면 바탕화면에 아이콘이 생겨요.</li>
           </ol>
-          <div className="mt-3 text-[11px] text-[#a8927a]">※ 아이폰은 <b>Safari</b>에서만 홈 화면에 추가할 수 있어요.</div>
+          <div className="mt-3 text-[11px] text-[#8a7458]">※ 아이폰은 <b>Safari</b>에서만 홈 화면에 추가할 수 있어요.</div>
           <button onClick={dismiss} className="w-full mt-4 bg-[#2b2018] text-[#f4ece0] rounded-xl py-3 font-medium">알겠어요</button>
         </div>
       </div>

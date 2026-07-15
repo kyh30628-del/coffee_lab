@@ -102,7 +102,7 @@ export default async function CollectionPage({ params }: { params: Promise<{ slu
 
         <h2 className="text-[17px] font-bold mb-3">후기로 검증한 {label} 카페</h2>
         {cafes.length === 0 ? (
-          <p className="text-[13px] text-[#a8927a] py-8 text-center">지금 목록을 불러오지 못했어요. <Link href={areaHref} className="underline text-[#9c6b3f]">{area} 전체 보기</Link></p>
+          <p className="text-[13px] text-[#8a7458] py-8 text-center">지금 목록을 불러오지 못했어요. <Link href={areaHref} className="underline text-[#9c6b3f]">{area} 전체 보기</Link></p>
         ) : (
           <ol className="space-y-2.5">
             {cafes.map((cf, i) => (
@@ -111,7 +111,7 @@ export default async function CollectionPage({ params }: { params: Promise<{ slu
                   <div className="flex items-center gap-2">
                     <span className="text-[#bcae98] text-[13px] font-bold w-5 shrink-0">{i + 1}</span>
                     <span className="font-bold text-[15px]">{cf.name}</span>
-                    {cf.dong && <span className="text-[12px] text-[#a8927a]">{cf.dong}</span>}
+                    {cf.dong && <span className="text-[12px] text-[#8a7458]">{cf.dong}</span>}
                     {cf.grade && <span className="text-[10px] font-bold text-white px-1.5 py-0.5 rounded ml-auto shrink-0" style={{ background: GRADE_BG[cf.grade] || "#a8927a" }}>{cf.grade}</span>}
                   </div>
                   {cf.identity && <p className="text-[12.5px] text-[#6b5a48] leading-snug mt-1.5 line-clamp-2 pl-7">{cf.identity}</p>}

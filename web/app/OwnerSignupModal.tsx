@@ -94,7 +94,7 @@ export default function OwnerSignupModal({ open, onClose, trial = false, prefill
                   {!picked && sug.length > 0 && (
                     <div className="absolute z-10 left-0 right-0 mt-1 bg-white border border-[#d9c9b0] rounded-lg shadow-lg max-h-44 overflow-y-auto">
                       {sug.map((c) => (
-                        <button key={c.id} onClick={() => { setPicked({ id: c.id, name: c.name }); setSug([]); }} className="w-full text-left px-3 py-2 text-[13px] hover:bg-[#f4ece0] border-b border-[#f0e6d4] last:border-0"><b>{c.name}</b> <span className="text-[11px] text-[#a8927a]">{c.area}</span></button>
+                        <button key={c.id} onClick={() => { setPicked({ id: c.id, name: c.name }); setSug([]); }} className="w-full text-left px-3 py-2 text-[13px] hover:bg-[#f4ece0] border-b border-[#f0e6d4] last:border-0"><b>{c.name}</b> <span className="text-[11px] text-[#8a7458]">{c.area}</span></button>
                       ))}
                     </div>
                   )}
@@ -115,7 +115,7 @@ export default function OwnerSignupModal({ open, onClose, trial = false, prefill
                 <input type="file" accept="image/*" onChange={(e) => onFile(e.target.files?.[0])} className="hidden" />
               </div>
               {bizRegBase64 && <img src={bizRegBase64} alt="사업자등록증 미리보기" className="mt-2 w-full max-h-40 object-contain rounded-lg border border-[#e6dcc8] bg-white" />}
-              <p className="text-[10.5px] text-[#a8927a] mt-1">⚠️ 주민등록번호 등은 <b>가리고</b> 올려주세요(본인확인엔 상호·대표자명만 필요).</p>
+              <p className="text-[10.5px] text-[#8a7458] mt-1">⚠️ 주민등록번호 등은 <b>가리고</b> 올려주세요(본인확인엔 상호·대표자명만 필요).</p>
             </label>
             <label className="flex items-start gap-2 mb-2 cursor-pointer">
               <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5 shrink-0" />

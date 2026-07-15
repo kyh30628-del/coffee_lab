@@ -365,7 +365,7 @@ export default function AreaPosterPage() {
           </button>
         </section>
 
-        <p className="text-[11px] text-[#a8927a] leading-relaxed">
+        <p className="text-[11px] text-[#8a7458] leading-relaxed">
           ※ 카페명·하이라이트·카페 수·검증 후기 수는 전부 검증(옥석) 데이터베이스 실측값이에요. 지어낸 카페명·후기는
           쓰지 않아요. 공개 카페가 5곳 이상인 지역만 목록에 나타나요.
         </p>

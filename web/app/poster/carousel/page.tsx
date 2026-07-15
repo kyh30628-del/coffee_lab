@@ -544,7 +544,7 @@ export default function PosterCarouselPage() {
           ⬇ 5장 모두 저장
         </button>
 
-        <p className="text-[11px] text-[#a8927a] mt-10 leading-relaxed">
+        <p className="text-[11px] text-[#8a7458] mt-10 leading-relaxed">
           ※ 캔버스로 서비스 브랜드 톤(크림·에스프레소·골드·지도 핀·Gowun Batang)에 맞춰 그렸습니다. 글꼴이 로딩된 뒤
           자동으로 다시 렌더됩니다. 모바일에서는 한 화면에 한 장씩 꽉 차게 표시되어 그대로 캡처하기 좋습니다.
         </p>
