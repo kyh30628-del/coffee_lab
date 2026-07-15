@@ -1,5 +1,5 @@
 {
-  "ignoreCommand": "B=\"${VERCEL_GIT_PREVIOUS_SHA:-HEAD~9}\"; if git rev-parse --verify \"$B^{commit}\" >/dev/null 2>&1 && git diff --quiet \"$B\" HEAD ./; then exit 0; else exit 1; fi",
+  "ignoreCommand": "B=\"${VERCEL_GIT_PREVIOUS_SHA:-HEAD~9}\"; if git rev-parse --verify \"$B^{commit}\" >/dev/null 2>&1 && git diff --quiet \"$B\" HEAD ./ && git diff --quiet HEAD~1 HEAD ./; then exit 0; else exit 1; fi",
   "crons": [
     {
       "path": "/api/cron-resynth",
