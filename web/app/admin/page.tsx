@@ -4,7 +4,10 @@ import BackLink from "../BackLink";
 import { isSearchDegradeTrackItem } from "@/lib/searchDegradeTrack";
 import { ChatWidget } from "./ChatWidget";
 import { useLockBodyScroll } from "@/lib/useLockBodyScroll";
-import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip } from "recharts";
+import dynamic from "next/dynamic";
+// ⚡ recharts 지연 로드 — 차트는 ct 데이터 도착 후에만 렌더되므로 출력은 원본과 100% 동일. 높이맞춤 폴백으로 레이아웃 흔들림 방지.
+const GradePie = dynamic(() => import("./AdminCharts").then((m) => m.GradePie), { ssr: false, loading: () => <div style={{ height: 180 }} /> });
+const RegionBar = dynamic(() => import("./AdminCharts").then((m) => m.RegionBar), { ssr: false, loading: () => <div style={{ height: 180 }} /> });
 
 type Cafe = {
   id: number; name: string; area: string; note: string; beans: string;
@@ -19,13 +22,11 @@ type Stats = {
   };
 };
 
-const GRADE_COLOR: Record<string, string> = { 검증: "#5f7355", 참고: "#9c6b3f", 후보: "#a8927a", 미합성: "#cbd5e1" };
 function groupByDate(rows: any[]): Record<string, any[]> {
   const g: Record<string, any[]> = {};
   for (const r of rows) { const d = new Date(r.yt_checked_at).toLocaleDateString("ko-KR"); (g[d] ??= []).push(r); }
   return g;
 }
-const BAR = "#9c6b3f";
 
 export default function AdminPage() {
   const [pw, setPw] = useState("");
@@ -1595,22 +1596,10 @@ export default function AdminPage() {
         {ct && (
           <div className="grid sm:grid-cols-2 gap-3 mb-4">
             <Card title="등급 분포 (공개)" note="검증 30+ · 참고 5~30 · 후보 5미만(자동 비공개)">
-              <ResponsiveContainer width="100%" height={180}>
-                <PieChart>
-                  <Pie data={ct.grades} dataKey="n" nameKey="grade" cx="50%" cy="50%" innerRadius={42} outerRadius={70} paddingAngle={2}
-                    label={(e: any) => `${e.grade} ${e.n}`} labelLine={false} fontSize={11}>
-                    {ct.grades.map((g) => <Cell key={g.grade} fill={GRADE_COLOR[g.grade] ?? "#cbd5e1"} />)}
-                  </Pie><Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
+              <GradePie data={ct.grades} />
             </Card>
             <Card title="지역별 공개 카페 (상위 12)">
-              <ResponsiveContainer width="100%" height={180}>
-                <BarChart data={ct.topRegions} layout="vertical" margin={{ left: 8, right: 12 }}>
-                  <XAxis type="number" hide /><YAxis type="category" dataKey="region" width={70} tick={{ fontSize: 10, fill: "#57534e" }} />
-                  <Tooltip /><Bar dataKey="n" fill={BAR} radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              <RegionBar data={ct.topRegions} />
             </Card>
           </div>
         )}
