@@ -196,10 +196,10 @@ function logSearch(q: string, region: string, results: number, mode: string, int
 }
 
 export async function GET(req: NextRequest) {
-  await loadCriteria(); // 등급 가산점 기준 캐시 프라임(동기 gradeBonus가 읽음)
-  await loadCriteriaLists(); // 개념 트리거·미서비스지역 사전 캐시 프라임(동기 getListSync가 읽음)
+  // ⚡ 두 캐시 프라임 병렬(독립, 동기 getter 사용 전에 완료). 결과 불변.
+  await Promise.all([loadCriteria(), loadCriteriaLists()]);
   try {
-    await ensureSchema();
+    await Promise.all([ensureSchema(), ensureCache()]); // ⚡ 독립 DDL 프라임 병렬(cafes·search_cache)
     const q = (req.nextUrl.searchParams.get("q") ?? "").trim();
     const region = (req.nextUrl.searchParams.get("region") ?? "").trim();
     if (q.length < 1) return NextResponse.json({ ok: false, error: "검색어 필요" }, { status: 400 });
@@ -217,8 +217,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // 캐시 조회: 같은 질문+지역이면 즉시 반환(LLM·임베딩 호출 0)
-    await ensureCache();
+    // 캐시 조회: 같은 질문+지역이면 즉시 반환(LLM·임베딩 호출 0). ensureCache는 위 Promise.all에서 이미 프라임됨.
     const qkey = q.toLowerCase().replace(/\s+/g, " ").trim() + "|" + effectiveRegion;
     const nocache = req.nextUrl.searchParams.get("nocache") === "1";
     if (!nocache) {

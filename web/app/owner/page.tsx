@@ -1,13 +1,18 @@
 "use client";
 import { useState, useEffect } from "react";
-import { BarChart, Bar, XAxis, YAxis, Cell, ResponsiveContainer,
-  RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Legend,
-  PieChart, Pie, Tooltip, AreaChart, Area, CartesianGrid } from "recharts";
+import dynamic from "next/dynamic";
 import BackLink from "../BackLink";
 import InfoDot from "../InfoDot";
 import Showcase from "../Showcase";
 import BillingManage from "../BillingManage";
 import { useLockBodyScroll } from "@/lib/useLockBodyScroll";
+
+// ⚡ recharts 지연 로드 — 차트는 데이터 도착 후에만 렌더되므로 초기 JS에서 제외(출력 동일). 높이맞춤 폴백으로 레이아웃 시프트 없음.
+const ph = (h: number) => function ChartFallback() { return <div style={{ height: h }} />; };
+const RankChart = dynamic(() => import("./OwnerCharts").then((m) => m.RankChart), { ssr: false, loading: ph(200) });
+const RadarChartBox = dynamic(() => import("./OwnerCharts").then((m) => m.RadarChartBox), { ssr: false, loading: ph(250) });
+const CompPie = dynamic(() => import("./OwnerCharts").then((m) => m.CompPie), { ssr: false, loading: ph(280) });
+const CadenceChart = dynamic(() => import("./OwnerCharts").then((m) => m.CadenceChart), { ssr: false, loading: ph(170) });
 
 type RankItem = { rank: number; name: string; count: number; grade: string | null; isMe: boolean };
 type CharItem = { key: string; label: string; emoji: string; me: number; avg: number; diff: number; meRaw?: number; hoodPenetration?: number };
@@ -22,26 +27,12 @@ type Insight = {
   actions: Action[]; reviewCadence?: ReviewCadence;
 };
 const GRADE_BG: Record<string, string> = { 검증: "#5f7355", 참고: "#9c6b3f", 후보: "#a8927a" };
-const PIE_COLORS = ["#9c6b3f", "#5f7355", "#c8893f", "#6f4e37", "#c97a6d", "#a8927a"];
 const TABS = [{ k: "rank", l: "📊 순위" }, { k: "radar", l: "🕸️ 성격" }, { k: "pie", l: "🍩 구성" }];
 const TONE: Record<string, { bg: string; border: string; tag: string }> = {
   good: { bg: "#eef3ea", border: "#bcd4ad", tag: "#5f7355" },
   warn: { bg: "#f7ede4", border: "#e3c9b0", tag: "#b5703c" },
   info: { bg: "#eef0f3", border: "#c3cad4", tag: "#5a6b82" },
 };
-
-// 레이더 축 라벨: 길면 두 줄로 쪼개 잘림 방지
-function RadarTick({ x, y, textAnchor, payload }: any) {
-  const v = String(payload?.value ?? "");
-  let lines = [v];
-  if (v.includes(" ")) lines = v.split(" ");
-  else if (v.length > 4) { const h = Math.ceil(v.length / 2); lines = [v.slice(0, h), v.slice(h)]; }
-  return (
-    <text x={x} y={y} textAnchor={textAnchor} fill="#52402e" fontSize={11} fontWeight={600}>
-      {lines.map((ln, i) => <tspan key={i} x={x} dy={i === 0 ? (lines.length > 1 ? -2 : 4) : 12}>{ln}</tspan>)}
-    </text>
-  );
-}
 
 function renderEmphasis(text: string, tagColor: string) {
   // **...** 를 볼드+색으로
@@ -250,39 +241,18 @@ export default function OwnerPage() {
             <div className="bg-white rounded-2xl p-4 sm:p-5 border border-[#ece0cd] mb-4">
               {tab === "rank" && (<>
                 <div className="text-[11px] text-[#8a7458] uppercase tracking-wider mb-3">동네 카페 리뷰 수 순위</div>
-                <ResponsiveContainer width="100%" height={Math.max(rankData.length * 34, 200)}>
-                  <BarChart data={rankData} layout="vertical" margin={{ left: 10, right: 20 }}>
-                    <XAxis type="number" hide /><YAxis type="category" dataKey="name" width={130} tick={{ fontSize: 11, fill: "#52402e" }} />
-                    <Tooltip cursor={{ fill: "#f4ece0" }} />
-                    <Bar dataKey="count" radius={[0, 4, 4, 0]}>{rankData.map((e, i) => <Cell key={i} fill={e.isMe ? "#9c6b3f" : "#d8c3a0"} />)}</Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+                <RankChart data={rankData} />
                 <div className="text-[10px] text-[#8a7458] mt-1">진한 막대 = 내 카페</div>
               </>)}
               {tab === "radar" && (<>
                 <div className="text-[11px] text-[#8a7458] uppercase tracking-wider mb-3">우리 카페의 결 vs 동네 평균</div>
-                <ResponsiveContainer width="100%" height={250}>
-                  <RadarChart data={radarData} margin={{ top: 16, right: 36, bottom: 16, left: 36 }} outerRadius="66%">
-                    <PolarGrid stroke="#e3d6c2" />
-                    <PolarAngleAxis dataKey="axis" tick={<RadarTick />} />
-                    <PolarRadiusAxis angle={90} domain={[0, 100]} tickCount={3} tick={{ fontSize: 9, fill: "#bcab92" }} axisLine={false} />
-                    <Radar name="동네평균" dataKey="동네평균" stroke="#a8927a" strokeWidth={2} fill="#a8927a" fillOpacity={0.2} dot={{ r: 2.5, fill: "#a8927a" }} />
-                    <Radar name="우리카페" dataKey="우리카페" stroke="#9c6b3f" strokeWidth={2} fill="#9c6b3f" fillOpacity={0.4} dot={{ r: 2.5, fill: "#9c6b3f" }} />
-                    <Legend wrapperStyle={{ fontSize: 12 }} />
-                  </RadarChart>
-                </ResponsiveContainer>
+                <RadarChartBox data={radarData} />
                 <div className="text-[10px] text-[#8a7458] mt-1 leading-relaxed">0~100점 = 같은 동네 카페들 분포 안에서의 상대 위치(50 = 동네 중간, 높을수록 그 특징이 두드러짐). 리뷰 언급 빈도 기반이며 측정값이 아닙니다.</div>
               </>)}
               {tab === "pie" && (<>
                 <div className="text-[11px] text-[#8a7458] uppercase tracking-wider mb-3">우리 카페는 어떤 특징으로 이야기되나</div>
                 {pieData.length === 0 ? <p className="text-sm text-[#8a7458] py-8 text-center">아직 두드러진 특징 언급이 적어요.</p> : (
-                  <ResponsiveContainer width="100%" height={280}>
-                    <PieChart>
-                      <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={55} outerRadius={95} paddingAngle={2}>
-                        {pieData.map((e, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-                      </Pie><Tooltip /><Legend wrapperStyle={{ fontSize: 12 }} />
-                    </PieChart>
-                  </ResponsiveContainer>
+                  <CompPie data={pieData} />
                 )}
                 <div className="text-[10px] text-[#8a7458] mt-1">언급 비중이 클수록 그 특징으로 많이 이야기돼요</div>
               </>)}
@@ -294,16 +264,7 @@ export default function OwnerPage() {
                 <div className="text-[11px] text-[#8a7458] uppercase tracking-wider mb-1">🗓 리뷰 주기 (최근 12개월)</div>
                 <div className="text-[13px] text-[#52402e] leading-relaxed mb-3">{renderEmphasis(insight.reviewCadence.insight, "#b5703c")}</div>
                 {insight.reviewCadence.last12 > 0 ? (
-                  <ResponsiveContainer width="100%" height={170}>
-                    <AreaChart data={insight.reviewCadence.months} margin={{ top: 5, right: 10, bottom: 0, left: -20 }}>
-                      <defs><linearGradient id="cad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#9c6b3f" stopOpacity={0.5} /><stop offset="100%" stopColor="#9c6b3f" stopOpacity={0.05} /></linearGradient></defs>
-                      <CartesianGrid stroke="#f0e6d4" vertical={false} />
-                      <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#8a7458" }} interval={1} axisLine={false} tickLine={false} />
-                      <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: "#a8927a" }} axisLine={false} tickLine={false} width={28} />
-                      <Tooltip cursor={{ stroke: "#cbb89f" }} formatter={(v: any) => [`${v}건`, "리뷰"]} />
-                      <Area type="monotone" dataKey="count" stroke="#9c6b3f" strokeWidth={2} fill="url(#cad)" />
-                    </AreaChart>
-                  </ResponsiveContainer>
+                  <CadenceChart months={insight.reviewCadence.months} />
                 ) : <p className="text-sm text-[#8a7458] py-6 text-center">날짜가 있는 검증 리뷰가 아직 적어요.</p>}
                 <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-[#8a7458] mt-2">
                   <span>최근 12개월 <b className="text-[#52402e]">{insight.reviewCadence.last12}건</b></span>
