@@ -5,7 +5,10 @@ import { hashPin } from "@/lib/pin";
 export const runtime = "nodejs";
 
 // 방문 기록 테이블 (익명 기기기반). 사용자 raw 좌표는 저장 안 함(개인정보 최소화).
+// ⚡ warm 인스턴스 재실행 방지 가드(다른 ensure들과 동일 패턴) — 매 요청 DDL 왕복 제거. 동작 불변(IF NOT EXISTS).
+let ensured = false;
 async function ensure() {
+  if (ensured) return;
   await sql`CREATE TABLE IF NOT EXISTS user_visits (
     id SERIAL PRIMARY KEY,
     cafe_id INT REFERENCES cafes(id) ON DELETE CASCADE,
@@ -28,6 +31,9 @@ async function ensure() {
   await sql`ALTER TABLE user_visits ADD COLUMN IF NOT EXISTS is_public BOOLEAN DEFAULT false`.catch(() => {});
   // 공용 PC 잠금 PIN(기기별). GET에서 잠금 판단에 사용.
   await sql`CREATE TABLE IF NOT EXISTS device_pins (device_id TEXT PRIMARY KEY, pin_hash TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT now())`.catch(() => {});
+  // 🔎 지도 MY PIN 조회는 device_id 단독 필터(WHERE v.device_id=…) — UNIQUE(cafe_id,device_id)는 선두가 cafe_id라 못 씀. 접근경로만 개선(결과·정렬 불변).
+  await sql`CREATE INDEX IF NOT EXISTS idx_user_visits_device ON user_visits(device_id)`.catch(() => {});
+  ensured = true;
 }
 
 // 하버사인 거리(m)

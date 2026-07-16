@@ -34,9 +34,11 @@ const gradeBonus = (g?: string | null): number => (g === "검증" ? getCriterion
 
 export async function GET(req: NextRequest) {
   try {
-    await ensureSchema();
-    await loadCriteria(); // 등급 가산점 기준 캐시 프라임(동기 gradeBonus가 읽음)
+    await Promise.all([ensureSchema(), loadCriteria()]); // ⚡ 독립 프라임 병렬(gradeBonus가 읽는 기준 캐시)
     const region = (req.nextUrl.searchParams.get("region") ?? "").trim();
+    // ⚡ 본쿼리(rows)를 스냅샷 블록과 동시 발사 — 상호 독립(deltaMap은 아래 루프에서만 소비). 결과 불변.
+    const rowsP = sql`SELECT id, name, area, synth_grade, synth_count, synth_identity, review_dates, char_scores
+      FROM cafes WHERE published = true AND review_dates IS NOT NULL`;
 
     // 스냅샷 증가분(Δ): 5일 이상 전 스냅샷이 있으면 상승세 계산
     const deltaMap = new Map<number, number>();
@@ -53,8 +55,7 @@ export async function GET(req: NextRequest) {
       }
     } catch { /* 스냅샷 없음 → 버즈만 사용 */ }
 
-    const rows = (await sql`SELECT id, name, area, synth_grade, synth_count, synth_identity, review_dates, char_scores
-      FROM cafes WHERE published = true AND review_dates IS NOT NULL`) as unknown as
+    const rows = (await rowsP) as unknown as
       { id: number; name: string; area: string; synth_grade: string | null; synth_count: number | null; synth_identity: string | null; review_dates: unknown; char_scores: Record<string, number> | null }[];
 
     const scored: any[] = [];
