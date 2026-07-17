@@ -28,6 +28,34 @@ function groupByDate(rows: any[]): Record<string, any[]> {
   return g;
 }
 
+// 📊 유입경로 그룹핑 — 개별 리퍼러 문자열(naver·direct·coffee-lab-git-...vercel.app 등)은 "딱 봐도" 판단이 안 됨.
+//   의미 있는 채널로 묶어 큰 그림 먼저 보여주고, 원본 개별 값은 아래 상세로 유지(드릴다운 가능).
+//   ⚠️ "내부" 그룹 = 우리 자체 배포 프리뷰 URL 자체클릭(봇/내부테스트 추정) — 실제 마케팅 유입이 아니므로 반드시 분리 표시.
+const SRC_GROUPS: { key: string; label: string; color: string; match: (s: string) => boolean }[] = [
+  { key: "naver", label: "네이버", color: "bg-emerald-400", match: (s) => s === "naver" },
+  { key: "direct", label: "다이렉트(북마크·앱)", color: "bg-sky-400", match: (s) => s === "direct" },
+  { key: "google", label: "구글", color: "bg-blue-400", match: (s) => s === "google" },
+  { key: "ai", label: "AI 어시스턴트", color: "bg-violet-400", match: (s) => /chatgpt|gemini|perplexity|claude|copilot/i.test(s) },
+  { key: "social", label: "소셜미디어", color: "bg-pink-400", match: (s) => ["ig", "instagram", "facebook", "fb", "threads", "twitter", "x.com", "kakaotalk", "kakaostory"].includes(s.toLowerCase()) },
+  { key: "othersearch", label: "기타 검색엔진", color: "bg-amber-400", match: (s) => ["bing", "daum", "yahoo", "duckduckgo"].includes(s.toLowerCase()) },
+  { key: "internal", label: "내부(자체 배포 URL·실유입 아님)", color: "bg-stone-300", match: (s) => /vercel\.app|vercel\.$|coffee-lab-git-|coffee-h2wf/i.test(s) },
+  { key: "unknown", label: "미상", color: "bg-stone-400", match: (s) => s === "미상" },
+];
+function groupSources(sources: { src: string; visitors: number; avg_visits: string | number }[]) {
+  const buckets: Record<string, { label: string; color: string; visitors: number; weightedAvgSum: number; raw: typeof sources }> = {};
+  for (const s of sources || []) {
+    const g = SRC_GROUPS.find((g) => g.match(s.src)) ?? { key: "etc", label: "기타", color: "bg-stone-200", match: () => true };
+    const b = (buckets[g.key] ??= { label: g.label, color: g.color, visitors: 0, weightedAvgSum: 0, raw: [] });
+    b.visitors += s.visitors;
+    b.weightedAvgSum += s.visitors * Number(s.avg_visits || 0);
+    b.raw.push(s);
+  }
+  const total = Object.values(buckets).reduce((t, b) => t + b.visitors, 0) || 1;
+  return Object.entries(buckets)
+    .map(([key, b]) => ({ key, label: b.label, color: b.color, visitors: b.visitors, pct: Math.round((b.visitors / total) * 100), avgVisits: b.visitors ? (b.weightedAvgSum / b.visitors).toFixed(1) : "0", raw: b.raw, isInternal: key === "internal" }))
+    .sort((a, b) => b.visitors - a.visitors);
+}
+
 export default function AdminPage() {
   const [pw, setPw] = useState("");
   const [authed, setAuthed] = useState(false);
@@ -1040,6 +1068,8 @@ export default function AdminPage() {
                   const tabPct = Math.round(dev.tablet / devTotal * 100);
                   const pcPct = Math.max(0, 100 - mobPct - tabPct);
                   const srcTotal = (a.sources || []).reduce((t: number, x: any) => t + x.visitors, 0) || 1;
+                  const srcGroups = groupSources(a.sources || []);
+                  const maxSrcGroup = Math.max(1, ...srcGroups.map((g) => g.visitors));
                   let peakH = -1, peakN = -1; Object.entries(hourMap).forEach(([h, n]) => { if ((n as number) > peakN) { peakN = n as number; peakH = +h; } });
                   const fSteps = [
                     { l: "방문", v: f.visitors, pct: 100 },
@@ -1216,14 +1246,30 @@ export default function AdminPage() {
                         </div>
                       )}
                       <div className="bg-white rounded-xl border border-stone-300 p-3">
-                        <div className="text-[12px] font-bold text-stone-700">유입경로</div>
-                        <p className="text-[9.5px] text-stone-600 mb-2">어디서 들어왔는지(네이버·구글·직접·공유…). '평균'은 그 경로 방문자의 재방문 횟수 — 높을수록 충성도↑.</p>
-                        {(a.sources || []).length === 0 ? <p className="text-[11px] text-stone-600">데이터 없음</p> : a.sources.map((s: any, i: number) => (
-                          <div key={i} className="mb-1.5">
-                            <div className="flex justify-between text-[10.5px] mb-0.5"><span className="text-stone-600 font-medium">{s.src === "미상" ? "미상 (추적 도입 전 방문)" : s.src}</span><span className="text-stone-700">{s.visitors}명 <span className="text-stone-600">({Math.round(s.visitors / srcTotal * 100)}%) · 평균 {s.avg_visits}회</span></span></div>
-                            <div className="h-2 bg-stone-100 rounded-full overflow-hidden"><div className="h-full bg-sky-400 rounded-full" style={{ width: `${(s.visitors / maxSrc) * 100}%` }}></div></div>
+                        <div className="text-[12px] font-bold text-stone-700">유입경로 <span className="font-normal text-stone-600 text-[10px]">채널로 묶음</span></div>
+                        <p className="text-[9.5px] text-stone-600 mb-2">어디서 들어왔는지 의미 있는 채널로 묶었습니다. '평균'은 그 채널 방문자의 재방문 횟수 — 높을수록 충성도↑.</p>
+                        {srcGroups.length === 0 ? <p className="text-[11px] text-stone-600">데이터 없음</p> : srcGroups.map((g) => (
+                          <div key={g.key} className={`mb-1.5 ${g.isInternal ? "opacity-60" : ""}`}>
+                            <div className="flex justify-between text-[10.5px] mb-0.5">
+                              <span className={`font-medium ${g.isInternal ? "text-stone-500" : "text-stone-700"}`}>{g.label}{g.isInternal && <span className="ml-1 text-stone-500 font-normal">(제외하고 판단)</span>}</span>
+                              <span className="text-stone-700">{g.visitors}명 <span className="text-stone-600">({g.pct}%) · 평균 {g.avgVisits}회</span></span>
+                            </div>
+                            <div className="h-2.5 bg-stone-100 rounded-full overflow-hidden"><div className={`h-full ${g.color} rounded-full`} style={{ width: `${(g.visitors / maxSrcGroup) * 100}%` }}></div></div>
                           </div>
                         ))}
+                        {(a.sources || []).length > 0 && (
+                          <details className="mt-2 pt-2 border-t border-stone-200">
+                            <summary className="text-[10px] text-stone-600 cursor-pointer select-none hover:text-stone-700">개별 출처 상세 보기 ({a.sources.length}개)</summary>
+                            <div className="mt-1.5 space-y-1">
+                              {a.sources.map((s: any, i: number) => (
+                                <div key={i} className="flex justify-between text-[9.5px] text-stone-600">
+                                  <span className="truncate mr-2">{s.src === "미상" ? "미상 (추적 도입 전 방문)" : s.src}</span>
+                                  <span className="shrink-0">{s.visitors}명 ({Math.round((s.visitors / srcTotal) * 100)}%) · 평균 {s.avg_visits}회</span>
+                                </div>
+                              ))}
+                            </div>
+                          </details>
+                        )}
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <div className="bg-white rounded-xl border border-stone-300 p-3">
