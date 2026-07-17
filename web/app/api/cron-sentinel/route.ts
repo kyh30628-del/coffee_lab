@@ -310,6 +310,95 @@ async function healNonCafeBizPollution(flagged: NcbFlag[], deadline: number): Pr
   return { fixed, dropped, unpub, names };
 }
 
+// 🏪 프랜차이즈 지점 간 오염 스캔·자율조치(2026-07-17, "프랜차이즈 지점명 전수" 실측 후 상시탐지기화): 같은 브랜드가
+//   우리 DB에 여러 지점으로 등록돼 있을 때(테라커피 구월팬더점·시흥목감점 등), 블로그가 자매 지점 얘기를 섞어써서
+//   노출 후기가 '다른 지점' 얘기로 오염된다(오늘 실측 17곳 확정). xref보다 더 안전 — 대조 대상이 우리 DB에 실존하는
+//   '진짜 다른 지점'이라 오탐 여지가 name_mismatch류보다 훨씬 적다(브랜드명+타지점 접미사 동시등장+자기접미사 부재).
+//   브랜드 추출: "OO ..접미사점" 패턴에서 마지막 어절(본점/지점/N호점/1st 등)을 떼어낸 앞부분 = 브랜드키.
+const GENERIC_BRAND = new Set(["카페", "커피", "디저트", "베이커리", "카페,디저트", "coffee", "cafe"]);
+const BRANCH_SUFFIX_RE = /^(.+?)\s+([가-힣A-Za-z0-9.]{1,14}(?:본점|지점|직영점|가맹점|점|1st|2nd|3rd|호점))$/;
+type FranchiseFlag = { id: number; name: string; area: string; brand: string; ownSuffix: string; otherSuffixes: string[]; bad: number; shown: number; hitSuffix: string };
+async function scanFranchiseBranchPollution(): Promise<{ count: number; samples: string[]; flagged: FranchiseFlag[] }> {
+  // 1단계: 이름만으로 가볍게 브랜드 그룹 구성(전체 카페, id+name만이라 경량)
+  const nameRows = (await sql`SELECT id, name FROM cafes WHERE published`) as { id: number; name: string }[];
+  const groups = new Map<string, { id: number; name: string; suffix: string }[]>();
+  for (const c of nameRows) {
+    const m = c.name.trim().match(BRANCH_SUFFIX_RE);
+    if (!m) continue;
+    const brand = m[1].trim();
+    if (GENERIC_BRAND.has(brand) || brand.length < 2) continue;
+    const suffix = m[2].trim();
+    if (!groups.has(brand)) groups.set(brand, []);
+    groups.get(brand)!.push({ id: c.id, name: c.name, suffix });
+  }
+  // 2단계: 2개 이상 지점 보유 브랜드에 속한 카페만 synth_reviews로 대조(대상만 선별해 경량 유지)
+  const targetIds: number[] = [];
+  const meta = new Map<number, { brand: string; suffix: string; others: string[] }>();
+  for (const [brand, arr] of groups) {
+    if (arr.length < 2) continue;
+    for (const c of arr) {
+      targetIds.push(c.id);
+      meta.set(c.id, { brand, suffix: c.suffix, others: arr.filter((x) => x.id !== c.id).map((x) => x.suffix) });
+    }
+  }
+  const flagged: FranchiseFlag[] = [];
+  for (let i = 0; i < targetIds.length; i += 200) {
+    const chunk = targetIds.slice(i, i + 200);
+    const rows = (await sql`SELECT id, name, area, synth_reviews FROM cafes WHERE id = ANY(${chunk}::int[]) AND synth_reviews IS NOT NULL`) as any[];
+    for (const c of rows) {
+      const info = meta.get(c.id); if (!info) continue;
+      let bad = 0; let hitSuffix = "";
+      for (const r of (c.synth_reviews || [])) {
+        const q = (r.quote || "") as string;
+        const hit = info.others.find((s) => q.includes(s));
+        if (hit && !q.includes(info.suffix)) { bad++; if (!hitSuffix) hitSuffix = hit; }
+      }
+      if (bad >= 1) flagged.push({ id: c.id, name: c.name, area: c.area, brand: info.brand, ownSuffix: info.suffix, otherSuffixes: info.others, bad, shown: (c.synth_reviews || []).length, hitSuffix });
+    }
+  }
+  flagged.sort((a, b) => b.bad - a.bad);
+  const samples = flagged.slice(0, 40).map((f) => `#${f.id} ${f.name}[${f.area}] 타지점"${f.hitSuffix}" ${f.bad}/${f.shown}`);
+  return { count: flagged.length, samples, flagged };
+}
+// 🏪 자율 조치: flag된 카페의 raw에서 '브랜드+다른지점접미사' 언급하되 '자기지점접미사' 없는 항목을 결정론 자동 제거·재합성.
+//   보수: 자기 지점명 함께 언급되면 보존(다른 지점 안내 정보일 뿐). 런당 최대 12곳·deadline 시간예산·멱등.
+async function healFranchiseBranchPollution(flagged: FranchiseFlag[], deadline: number): Promise<{ fixed: number; dropped: number; unpub: number; names: string[] }> {
+  const { collectAndSynthesize } = await import("@/lib/collectOrchestrator");
+  const { applyDecisions } = await import("@/lib/synthStore");
+  const { cleanCafeName } = await import("@/lib/reviewQuality");
+  const { invalidateCafeCaches } = await import("@/lib/cafeCacheInvalidate");
+  let fixed = 0, dropped = 0, unpub = 0; const names: string[] = [];
+  for (const f of flagged.slice(0, 12)) {
+    if (Date.now() > deadline) break;
+    try {
+      const c = (await sql`SELECT name, area, dong, address, published, raw_reviews, judge_decisions FROM cafes WHERE id=${f.id}`)[0] as any;
+      if (!c) continue;
+      const at = [c.area, c.dong].filter(Boolean) as string[];
+      const raw = Array.isArray(c.raw_reviews) ? c.raw_reviews : [];
+      const g = raw.filter((r: any) => r.source === "google").map((r: any) => ({ text: r.text, time: r.time }));
+      const mkS = (s: string) => raw.filter((r: any) => r.source === s).map((r: any) => ({ text: r.text, title: r.title, desc: r.desc, time: r.time, link: r.link, date: r.date, source: r.srcName }));
+      const sources: any[] = []; if (g.length) sources.push({ source: "google", texts: g });
+      const b = mkS("blog"); if (b.length) sources.push({ source: "blog", texts: b });
+      const y = mkS("youtube"); if (y.length) sources.push({ source: "youtube", texts: y });
+      const decs = c.judge_decisions && typeof c.judge_decisions === "object" ? c.judge_decisions : {};
+      const r = collectAndSynthesize(cleanCafeName(c.name), at, sources, { decisions: decs, address: c.address || "" });
+      const dec: Record<string, boolean> = {}; let drop = 0;
+      for (const it of (r.auditItems || [])) {
+        const body = (it.title || "") + " " + (it.body || "");
+        if (body.includes(f.ownSuffix)) continue; // 자기 지점 언급 있으면 보존(다른지점 안내정보일 뿐)
+        if (f.otherSuffixes.some((s) => body.includes(s))) { dec[it.key] = false; drop++; }
+      }
+      if (drop === 0) continue;
+      const res = await applyDecisions({ id: f.id, name: c.name, area: c.area }, dec);
+      fixed++; dropped += drop; if (res?.published === false && c.published) unpub++;
+      if (names.length < 8) names.push(`${cleanCafeName(c.name)}(-${drop})`);
+      await invalidateCafeCaches([f.id]).catch(() => {});
+    } catch { /* 개별 실패는 건너뜀(다음 런이 이어서 처리) */ }
+  }
+  if (fixed > 0) await sql`DELETE FROM search_cache`.catch(() => {});
+  return { fixed, dropped, unpub, names };
+}
+
 // 🛡️ 데이터 정합성 센티넬 — 신뢰/해자 파수꾼. "사장님이 버그를 발견하기 전에 내가 먼저"(선제 탐지).
 //   백로그를 치우는 게 아니라, 깨끗한 상태를 '유지'하고 새 오염이 들어오면 즉시 경보한다.
 //   ① 모든 정합성 축을 매일 스캔 ② 안전한 것만 자동 치유(area·박스밖·명백 중복) ③ 나머진 리포트(관제탑).
@@ -391,11 +480,15 @@ export async function GET(req: NextRequest) {
     const ncb = await scanNonCafeBizPollution().catch(() => ({ count: 0, samples: [] as string[], flagged: [] as NcbFlag[] }));
     const ncbHeal = await healNonCafeBizPollution(ncb.flagged || [], started + 280000).catch(() => ({ fixed: 0, dropped: 0, unpub: 0, names: [] as string[] }));
     (checks as any).noncafe_biz_pollution = Math.max(0, ncb.count - ncbHeal.fixed); // 자동조치 후 잔여
+    // 🏪 프랜차이즈 지점 간 오염(브랜드+타지점 접미사 동시등장, xref보다 안전 — 대조대상이 우리 DB 실존 지점) — 자동 제거.
+    const fr = await scanFranchiseBranchPollution().catch(() => ({ count: 0, samples: [] as string[], flagged: [] as FranchiseFlag[] }));
+    const frHeal = await healFranchiseBranchPollution(fr.flagged || [], started + 290000).catch(() => ({ fixed: 0, dropped: 0, unpub: 0, names: [] as string[] }));
+    (checks as any).franchise_branch_pollution = Math.max(0, fr.count - frHeal.fixed); // 자동조치 후 잔여
 
-    // name_mismatch·attraction·weak_name·noncafe_biz는 '정합성 실패'가 아니라 검토 워치리스트 → clean 판정서 제외.
-    const WATCH = new Set(["name_mismatch", "attraction_pollution", "weak_name_pollution", "noncafe_biz_pollution"]);
+    // name_mismatch·attraction·weak_name·noncafe_biz·franchise_branch는 '정합성 실패'가 아니라 검토 워치리스트 → clean 판정서 제외.
+    const WATCH = new Set(["name_mismatch", "attraction_pollution", "weak_name_pollution", "noncafe_biz_pollution", "franchise_branch_pollution"]);
     const residual = Object.entries(checks).reduce((s, [k, n]) => s + (WATCH.has(k) ? 0 : (n as number)), 0);
-    const healedTotal = area.fixed + box.excluded + dup.resolved + attrHeal.fixed + weakHeal.fixed + ncbHeal.fixed;
+    const healedTotal = area.fixed + box.excluded + dup.resolved + attrHeal.fixed + weakHeal.fixed + ncbHeal.fixed + frHeal.fixed;
     const clean = residual === 0;
 
     // ── ②-b 콘솔키 크레딧 실측 프로브(트래픽 무관) ──
@@ -407,14 +500,15 @@ export async function GET(req: NextRequest) {
 
     // ── ③ 리포트 ──
     const flags = Object.entries(checks).filter(([k, n]) => n > 0 && !WATCH.has(k)).map(([k, n]) => `${k}:${n}`);
-    await sql`INSERT INTO sentinel_reports (clean, report) VALUES (${clean}, ${JSON.stringify({ checks, nameMismatch: mismatch.samples, attractionPollution: attr.samples, attractionHealed: attrHeal, weakNamePollution: weak.samples, weakNameHealed: weakHeal, nonCafeBizPollution: ncb.samples, nonCafeBizHealed: ncbHeal, healed: { area: area.fixed, box: box.excluded, dup: dup.resolved, attr: attrHeal.fixed, weak: weakHeal.fixed, ncb: ncbHeal.fixed }, consoleKey: probe })}::jsonb)`.catch(() => {});
+    await sql`INSERT INTO sentinel_reports (clean, report) VALUES (${clean}, ${JSON.stringify({ checks, nameMismatch: mismatch.samples, attractionPollution: attr.samples, attractionHealed: attrHeal, weakNamePollution: weak.samples, weakNameHealed: weakHeal, nonCafeBizPollution: ncb.samples, nonCafeBizHealed: ncbHeal, franchiseBranchPollution: fr.samples, franchiseBranchHealed: frHeal, healed: { area: area.fixed, box: box.excluded, dup: dup.resolved, attr: attrHeal.fixed, weak: weakHeal.fixed, ncb: ncbHeal.fixed, fr: frHeal.fixed }, consoleKey: probe })}::jsonb)`.catch(() => {});
 
     const probeNote = probe.signal === "ok" ? "콘솔키 크레딧 정상" : probe.signal === "credit" ? "콘솔키 크레딧 소진(콘솔경로 중단·검색 결정론폴백 정상=저영향)" : `콘솔키 프로브 ${probe.signal}`;
     const mmNote = mismatch.count > 0 ? ` · 🔎오염의심 ${mismatch.count}(먼광역시 ${mismatch.far}·이름불일치 ${mismatch.nameMiss})` : "";
     const attrNote = (attr.count > 0 || attrHeal.fixed > 0) ? ` · 🎡명소오염 자동정리 ${attrHeal.fixed}곳(-${attrHeal.dropped}건${attrHeal.unpub ? `·비공개 ${attrHeal.unpub}` : ""})${(checks as any).attraction_pollution > 0 ? `·잔여 ${(checks as any).attraction_pollution}(다음런)` : ""}` : "";
     const weakNote = (weak.count > 0 || weakHeal.fixed > 0) ? ` · 🔤약한이름오염 자동정리 ${weakHeal.fixed}곳(-${weakHeal.dropped}건${weakHeal.unpub ? `·비공개 ${weakHeal.unpub}` : ""})${(checks as any).weak_name_pollution > 0 ? `·잔여 ${(checks as any).weak_name_pollution}(다음런)` : ""}` : "";
     const ncbNote = (ncb.count > 0 || ncbHeal.fixed > 0) ? ` · 🏢비카페업종오염 자동정리 ${ncbHeal.fixed}곳(-${ncbHeal.dropped}건${ncbHeal.unpub ? `·비공개 ${ncbHeal.unpub}` : ""})${(checks as any).noncafe_biz_pollution > 0 ? `·잔여 ${(checks as any).noncafe_biz_pollution}(다음런)` : ""}` : "";
-    const detail = `치유 ${healedTotal}(area${area.fixed}·박스${box.excluded}·중복${dup.resolved}) · ${clean ? "정합성 OK ✅" : "⚠️ 잔여 " + flags.join(" ")}${mmNote}${attrNote}${weakNote}${ncbNote} · ${probeNote}`;
+    const frNote = (fr.count > 0 || frHeal.fixed > 0) ? ` · 🏪지점오염 자동정리 ${frHeal.fixed}곳(-${frHeal.dropped}건${frHeal.unpub ? `·비공개 ${frHeal.unpub}` : ""})${(checks as any).franchise_branch_pollution > 0 ? `·잔여 ${(checks as any).franchise_branch_pollution}(다음런)` : ""}` : "";
+    const detail = `치유 ${healedTotal}(area${area.fixed}·박스${box.excluded}·중복${dup.resolved}) · ${clean ? "정합성 OK ✅" : "⚠️ 잔여 " + flags.join(" ")}${mmNote}${attrNote}${weakNote}${ncbNote}${frNote} · ${probeNote}`;
     await recordRun("cron-sentinel", true, detail, healedTotal);
     return NextResponse.json({ ok: true, ranAt: new Date().toISOString(), clean, healed: { area: area.fixed, areaNames: area.names, box: box.excluded, dup: dup.resolved, dupPairs: dup.pairs }, checks, flags, nameMismatch: mismatch, consoleKey: probe });
   } catch (e) {

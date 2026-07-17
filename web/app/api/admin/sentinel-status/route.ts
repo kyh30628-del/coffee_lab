@@ -27,6 +27,7 @@ export async function GET(req: NextRequest) {
       { key: "attraction", label: "🎡 명소·행사", healKey: "attractionHealed", residKey: "attraction_pollution" },
       { key: "weak", label: "🔤 약한이름(1글자)", healKey: "weakNameHealed", residKey: "weak_name_pollution" },
       { key: "noncafe", label: "🏢 비카페 업종", healKey: "nonCafeBizHealed", residKey: "noncafe_biz_pollution" },
+      { key: "franchise", label: "🏪 프랜차이즈 지점", healKey: "franchiseBranchHealed", residKey: "franchise_branch_pollution" },
     ];
     const detectors = defs.map((d) => {
       let fixed = 0, dropped = 0, unpub = 0;
