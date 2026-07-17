@@ -5,6 +5,7 @@ import { recordRun } from "@/lib/agentLog";
 import { probeConsoleKey } from "@/lib/consoleKeyProbe";
 import { loadCriteria, getCriterionSync } from "@/lib/criteria";
 import { quoteMatchConfidence, coreTokens } from "@/lib/reviewQuality";
+import { loadCriteriaLists, getListSetSync } from "@/lib/criteriaLists";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -399,6 +400,94 @@ async function healFranchiseBranchPollution(flagged: FranchiseFlag[], deadline: 
   return { fixed, dropped, unpub, names };
 }
 
+// 🔠 흔한단어/동음이의어 이름 오염 스캔·자율조치(2026-07-17, "다른 오염도 상시감시" 후속): 카페명이 시계용어(문페이즈)·
+//   골프용품(로시)·음악장르(사이키델릭)·허브/꽃이름(로즈마리·스위트피)·흔한메뉴명(딜라이트)·묘사구문(나무그늘·빨간벽돌)·
+//   극단흔한단어(빛·밤)·커피품종명(코나)·연재물용어(연재) 등과 겹치면, 전혀 무관한 업종·주제 콘텐츠가 대량 흡수된다.
+//   name_mismatch(hasStrong 3자+만 대상)·weak_name(정확히 1글자만)이 의도적으로 비켜가는 사각지대 — 사전은
+//   identity.weak_token(criteria_lists, 무배포 편집 단일출처)을 그대로 재사용해 "이 단어가 위험군"인지 판단한다.
+//   판정: 노출후기가 위험토큰을 담았는데 ①카페 전체이름 원문 또는 ②등록주소 도로명+번지(주소앵커) 둘 다 없으면 오염.
+//   ⚠️ 문맥어(카페/커피) 요구는 오늘 실측상 너무 느슨해 안 씀(무관 콘텐츠도 카페 근처라 카페어를 흔히 동반) — 주소앵커만 신뢰.
+function addressAnchor(addr: string): string {
+  const m = (addr || "").match(/[가-힣0-9]+(?:로|길)\s*\d+(?:-\d+)?/);
+  return m ? m[0].replace(/\s+/g, "") : "";
+}
+function hasStrongAnchor(text: string, nameNoSpace: string, anchor: string): boolean {
+  const t = (text || "").replace(/\s+/g, "");
+  return (nameNoSpace.length >= 2 && t.includes(nameNoSpace)) || (!!anchor && t.includes(anchor));
+}
+type GenericFlag = { id: number; name: string; area: string; token: string; bad: number; shown: number };
+async function scanGenericTermPollution(): Promise<{ count: number; samples: string[]; flagged: GenericFlag[] }> {
+  await loadCriteriaLists();
+  const weakSet = getListSetSync("identity.weak_token");
+  const t0 = Date.now(); let lo = 0; let truncated = false; const flagged: GenericFlag[] = [];
+  for (let guard = 0; guard < 80; guard++) {
+    if (Date.now() - t0 > 30000) { truncated = true; break; } // 값싼 스캔(대부분 토큰체크서 즉시 skip) — 30s컷
+    const rows = (await sql`SELECT id, name, area, dong, address, synth_reviews FROM cafes
+      WHERE published AND synth_reviews IS NOT NULL AND jsonb_array_length(synth_reviews) >= 2 AND id > ${lo}
+      ORDER BY id LIMIT 500`) as any[];
+    if (!rows.length) break; lo = rows[rows.length - 1].id;
+    for (const c of rows) {
+      const at = [c.area, c.dong].filter(Boolean) as string[];
+      const toks = coreTokens(c.name, at);
+      const hitTok = toks.find((tk) => weakSet.has(tk));
+      if (!hitTok) continue;
+      const nameNoSpace = (c.name || "").replace(/\s+/g, "");
+      const anchor = addressAnchor(c.address || "");
+      let bad = 0;
+      for (const r of (c.synth_reviews || [])) {
+        const q = (r.quote || "") as string;
+        if (!q.includes(hitTok)) continue;
+        if (!hasStrongAnchor(q, nameNoSpace, anchor)) bad++;
+      }
+      if (bad >= 1) flagged.push({ id: c.id, name: c.name, area: c.area, token: hitTok, bad, shown: (c.synth_reviews || []).length });
+    }
+  }
+  flagged.sort((a, b) => b.bad - a.bad);
+  const samples = flagged.slice(0, 40).map((f) => `#${f.id} ${f.name}[${f.area}] 흔한단어"${f.token}" ${f.bad}/${f.shown}`);
+  if (truncated) samples.push("⚠️(시간컷—다음 실행이 이어서 스캔)");
+  return { count: flagged.length, samples, flagged };
+}
+// 🔠 자율 조치: flag된 카페의 raw에서 위험토큰을 담되 전체이름/주소앵커 둘 다 없는 항목을 결정론 자동 제거·재합성.
+//   보수: 둘 중 하나라도 있으면 보존. 런당 최대 12곳·deadline 시간예산·멱등.
+async function healGenericTermPollution(flagged: GenericFlag[], deadline: number): Promise<{ fixed: number; dropped: number; unpub: number; names: string[] }> {
+  const { collectAndSynthesize } = await import("@/lib/collectOrchestrator");
+  const { applyDecisions } = await import("@/lib/synthStore");
+  const { cleanCafeName } = await import("@/lib/reviewQuality");
+  const { invalidateCafeCaches } = await import("@/lib/cafeCacheInvalidate");
+  let fixed = 0, dropped = 0, unpub = 0; const names: string[] = [];
+  for (const f of flagged.slice(0, 12)) {
+    if (Date.now() > deadline) break;
+    try {
+      const c = (await sql`SELECT name, area, dong, address, published, raw_reviews, judge_decisions FROM cafes WHERE id=${f.id}`)[0] as any;
+      if (!c) continue;
+      const at = [c.area, c.dong].filter(Boolean) as string[];
+      const nameNoSpace = (c.name || "").replace(/\s+/g, "");
+      const anchor = addressAnchor(c.address || "");
+      const raw = Array.isArray(c.raw_reviews) ? c.raw_reviews : [];
+      const g = raw.filter((r: any) => r.source === "google").map((r: any) => ({ text: r.text, time: r.time }));
+      const mkS = (s: string) => raw.filter((r: any) => r.source === s).map((r: any) => ({ text: r.text, title: r.title, desc: r.desc, time: r.time, link: r.link, date: r.date, source: r.srcName }));
+      const sources: any[] = []; if (g.length) sources.push({ source: "google", texts: g });
+      const b = mkS("blog"); if (b.length) sources.push({ source: "blog", texts: b });
+      const y = mkS("youtube"); if (y.length) sources.push({ source: "youtube", texts: y });
+      const decs = c.judge_decisions && typeof c.judge_decisions === "object" ? c.judge_decisions : {};
+      const r = collectAndSynthesize(cleanCafeName(c.name), at, sources, { decisions: decs, address: c.address || "" });
+      const dec: Record<string, boolean> = {}; let drop = 0;
+      for (const it of (r.auditItems || [])) {
+        const body = (it.title || "") + " " + (it.body || "");
+        if (!body.includes(f.token)) continue;
+        if (!hasStrongAnchor(body, nameNoSpace, anchor)) { dec[it.key] = false; drop++; }
+      }
+      if (drop === 0) continue;
+      const res = await applyDecisions({ id: f.id, name: c.name, area: c.area }, dec);
+      fixed++; dropped += drop; if (res?.published === false && c.published) unpub++;
+      if (names.length < 8) names.push(`${cleanCafeName(c.name)}(-${drop})`);
+      await invalidateCafeCaches([f.id]).catch(() => {});
+    } catch { /* 개별 실패는 건너뜀(다음 런이 이어서 처리) */ }
+  }
+  if (fixed > 0) await sql`DELETE FROM search_cache`.catch(() => {});
+  return { fixed, dropped, unpub, names };
+}
+
 // 🛡️ 데이터 정합성 센티넬 — 신뢰/해자 파수꾼. "사장님이 버그를 발견하기 전에 내가 먼저"(선제 탐지).
 //   백로그를 치우는 게 아니라, 깨끗한 상태를 '유지'하고 새 오염이 들어오면 즉시 경보한다.
 //   ① 모든 정합성 축을 매일 스캔 ② 안전한 것만 자동 치유(area·박스밖·명백 중복) ③ 나머진 리포트(관제탑).
@@ -482,13 +571,17 @@ export async function GET(req: NextRequest) {
     (checks as any).noncafe_biz_pollution = Math.max(0, ncb.count - ncbHeal.fixed); // 자동조치 후 잔여
     // 🏪 프랜차이즈 지점 간 오염(브랜드+타지점 접미사 동시등장, xref보다 안전 — 대조대상이 우리 DB 실존 지점) — 자동 제거.
     const fr = await scanFranchiseBranchPollution().catch(() => ({ count: 0, samples: [] as string[], flagged: [] as FranchiseFlag[] }));
-    const frHeal = await healFranchiseBranchPollution(fr.flagged || [], started + 290000).catch(() => ({ fixed: 0, dropped: 0, unpub: 0, names: [] as string[] }));
+    const frHeal = await healFranchiseBranchPollution(fr.flagged || [], started + 288000).catch(() => ({ fixed: 0, dropped: 0, unpub: 0, names: [] as string[] }));
     (checks as any).franchise_branch_pollution = Math.max(0, fr.count - frHeal.fixed); // 자동조치 후 잔여
+    // 🔠 흔한단어/동음이의어 이름 오염(identity.weak_token 사전 재사용, name_mismatch·weak_name 사각 전담) — 자동 제거.
+    const gen = await scanGenericTermPollution().catch(() => ({ count: 0, samples: [] as string[], flagged: [] as GenericFlag[] }));
+    const genHeal = await healGenericTermPollution(gen.flagged || [], started + 296000).catch(() => ({ fixed: 0, dropped: 0, unpub: 0, names: [] as string[] }));
+    (checks as any).generic_term_pollution = Math.max(0, gen.count - genHeal.fixed); // 자동조치 후 잔여
 
-    // name_mismatch·attraction·weak_name·noncafe_biz·franchise_branch는 '정합성 실패'가 아니라 검토 워치리스트 → clean 판정서 제외.
-    const WATCH = new Set(["name_mismatch", "attraction_pollution", "weak_name_pollution", "noncafe_biz_pollution", "franchise_branch_pollution"]);
+    // name_mismatch·attraction·weak_name·noncafe_biz·franchise_branch·generic_term은 '정합성 실패'가 아니라 검토 워치리스트 → clean 판정서 제외.
+    const WATCH = new Set(["name_mismatch", "attraction_pollution", "weak_name_pollution", "noncafe_biz_pollution", "franchise_branch_pollution", "generic_term_pollution"]);
     const residual = Object.entries(checks).reduce((s, [k, n]) => s + (WATCH.has(k) ? 0 : (n as number)), 0);
-    const healedTotal = area.fixed + box.excluded + dup.resolved + attrHeal.fixed + weakHeal.fixed + ncbHeal.fixed + frHeal.fixed;
+    const healedTotal = area.fixed + box.excluded + dup.resolved + attrHeal.fixed + weakHeal.fixed + ncbHeal.fixed + frHeal.fixed + genHeal.fixed;
     const clean = residual === 0;
 
     // ── ②-b 콘솔키 크레딧 실측 프로브(트래픽 무관) ──
@@ -500,7 +593,7 @@ export async function GET(req: NextRequest) {
 
     // ── ③ 리포트 ──
     const flags = Object.entries(checks).filter(([k, n]) => n > 0 && !WATCH.has(k)).map(([k, n]) => `${k}:${n}`);
-    await sql`INSERT INTO sentinel_reports (clean, report) VALUES (${clean}, ${JSON.stringify({ checks, nameMismatch: mismatch.samples, attractionPollution: attr.samples, attractionHealed: attrHeal, weakNamePollution: weak.samples, weakNameHealed: weakHeal, nonCafeBizPollution: ncb.samples, nonCafeBizHealed: ncbHeal, franchiseBranchPollution: fr.samples, franchiseBranchHealed: frHeal, healed: { area: area.fixed, box: box.excluded, dup: dup.resolved, attr: attrHeal.fixed, weak: weakHeal.fixed, ncb: ncbHeal.fixed, fr: frHeal.fixed }, consoleKey: probe })}::jsonb)`.catch(() => {});
+    await sql`INSERT INTO sentinel_reports (clean, report) VALUES (${clean}, ${JSON.stringify({ checks, nameMismatch: mismatch.samples, attractionPollution: attr.samples, attractionHealed: attrHeal, weakNamePollution: weak.samples, weakNameHealed: weakHeal, nonCafeBizPollution: ncb.samples, nonCafeBizHealed: ncbHeal, franchiseBranchPollution: fr.samples, franchiseBranchHealed: frHeal, genericTermPollution: gen.samples, genericTermHealed: genHeal, healed: { area: area.fixed, box: box.excluded, dup: dup.resolved, attr: attrHeal.fixed, weak: weakHeal.fixed, ncb: ncbHeal.fixed, fr: frHeal.fixed, gen: genHeal.fixed }, consoleKey: probe })}::jsonb)`.catch(() => {});
 
     const probeNote = probe.signal === "ok" ? "콘솔키 크레딧 정상" : probe.signal === "credit" ? "콘솔키 크레딧 소진(콘솔경로 중단·검색 결정론폴백 정상=저영향)" : `콘솔키 프로브 ${probe.signal}`;
     const mmNote = mismatch.count > 0 ? ` · 🔎오염의심 ${mismatch.count}(먼광역시 ${mismatch.far}·이름불일치 ${mismatch.nameMiss})` : "";
@@ -508,7 +601,8 @@ export async function GET(req: NextRequest) {
     const weakNote = (weak.count > 0 || weakHeal.fixed > 0) ? ` · 🔤약한이름오염 자동정리 ${weakHeal.fixed}곳(-${weakHeal.dropped}건${weakHeal.unpub ? `·비공개 ${weakHeal.unpub}` : ""})${(checks as any).weak_name_pollution > 0 ? `·잔여 ${(checks as any).weak_name_pollution}(다음런)` : ""}` : "";
     const ncbNote = (ncb.count > 0 || ncbHeal.fixed > 0) ? ` · 🏢비카페업종오염 자동정리 ${ncbHeal.fixed}곳(-${ncbHeal.dropped}건${ncbHeal.unpub ? `·비공개 ${ncbHeal.unpub}` : ""})${(checks as any).noncafe_biz_pollution > 0 ? `·잔여 ${(checks as any).noncafe_biz_pollution}(다음런)` : ""}` : "";
     const frNote = (fr.count > 0 || frHeal.fixed > 0) ? ` · 🏪지점오염 자동정리 ${frHeal.fixed}곳(-${frHeal.dropped}건${frHeal.unpub ? `·비공개 ${frHeal.unpub}` : ""})${(checks as any).franchise_branch_pollution > 0 ? `·잔여 ${(checks as any).franchise_branch_pollution}(다음런)` : ""}` : "";
-    const detail = `치유 ${healedTotal}(area${area.fixed}·박스${box.excluded}·중복${dup.resolved}) · ${clean ? "정합성 OK ✅" : "⚠️ 잔여 " + flags.join(" ")}${mmNote}${attrNote}${weakNote}${ncbNote}${frNote} · ${probeNote}`;
+    const genNote = (gen.count > 0 || genHeal.fixed > 0) ? ` · 🔠흔한단어오염 자동정리 ${genHeal.fixed}곳(-${genHeal.dropped}건${genHeal.unpub ? `·비공개 ${genHeal.unpub}` : ""})${(checks as any).generic_term_pollution > 0 ? `·잔여 ${(checks as any).generic_term_pollution}(다음런)` : ""}` : "";
+    const detail = `치유 ${healedTotal}(area${area.fixed}·박스${box.excluded}·중복${dup.resolved}) · ${clean ? "정합성 OK ✅" : "⚠️ 잔여 " + flags.join(" ")}${mmNote}${attrNote}${weakNote}${ncbNote}${frNote}${genNote} · ${probeNote}`;
     await recordRun("cron-sentinel", true, detail, healedTotal);
     return NextResponse.json({ ok: true, ranAt: new Date().toISOString(), clean, healed: { area: area.fixed, areaNames: area.names, box: box.excluded, dup: dup.resolved, dupPairs: dup.pairs }, checks, flags, nameMismatch: mismatch, consoleKey: probe });
   } catch (e) {
