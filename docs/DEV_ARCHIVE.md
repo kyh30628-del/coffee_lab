@@ -116,3 +116,4 @@
 | 2026-07-15 01:35 | #378 | 인증안내/글자진하게수정 | 576ce984 | med | 1) MyCafeRegModal 마운트경로(showMyCafeReg) 재확인 — feature flag·조건부렌더 버그 없음, 미인증배지·안내문구·저장직후/목록/상세 3곳 모두 코 |
 | 2026-07-15 10:38 | #386 | [룰갭 P38] 전체이름=흔한 단일단어 카페명 — weak-token 안전장치 자기무력화 | 7b01a960 | - | lib/reviewQuality.ts: verifyReview(nameInTitle/nameInBody)와 quoteMatchConfidence에 nameIsSoleToken/ba |
 | 2026-07-17 04:19 | #393 | [개발] 협업 #205: [호기 D-5] 브라운테일커피 창사 첫 로그인·체험 활성화(07-14) — PAYM | 9ed7b04c | - | 계좌이체 안내 발송 기능 추가(협업#205 대안②) — lib/billingEmail.ts에 bank_transfer 메일 종류(사실문구, 계좌번호는 회신으로만 안내) 추가, ap |
+| 2026-07-17 13:49 | #398 | 계좌이체 안내메일 발송 중단 | 399281f7 | high | lib/flags.ts(bankTransferEmailEnabled, 기본 off)+lib/billingEmail.ts(kind=bank_transfer 최종 차단)+app/api |
