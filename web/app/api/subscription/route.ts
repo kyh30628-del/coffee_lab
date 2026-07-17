@@ -6,6 +6,7 @@ import { subscriptionLive, paymentsLive } from "@/lib/flags";
 import { renderOnboardingEmail } from "@/lib/onboardingEmail";
 import { ownerScope } from "@/lib/ownerAuth";
 import { PLAN, PRICE, genPin, ensureBilling } from "@/lib/billing"; // 상품 상수·PIN·결제 스키마 단일 출처
+import { sendBillingEmail } from "@/lib/billingEmail";
 import { put } from "@vercel/blob";
 export const runtime = "nodejs";
 
@@ -152,6 +153,14 @@ export async function POST(req: NextRequest) {
         const remindDays = Math.min(Math.max(Number(s.duration_days) || 30, 1), 365);
         const emailed = await sendPinEmail(to, s.pin, s.cafe_name ?? "", remindDays);
         if (emailed) await sql`UPDATE subscriptions SET pin_emailed_at=now() WHERE id=${id}`;
+        return NextResponse.json({ ok: emailed, emailed, email: to, error: emailed ? undefined : "발송 실패 — Resend 키/이메일 주소 확인" });
+      }
+      // 🏦 계좌이체 안내 — 카드 정기결제(PAYMENTS_LIVE) 오픈 전, 사장님이 계좌이체로 먼저 전환할 수 있도록
+      //   사실 문구(회신하면 계좌 안내)만 담아 발송. 실제 계좌번호는 개별 회신으로만 안내(코드에 하드코딩 금지).
+      if (b.action === "bank_transfer") {
+        const to = decryptPII(s.email ?? "");
+        if (!to) return NextResponse.json({ ok: false, error: "등록된 이메일이 없어요" }, { status: 400 });
+        const emailed = await sendBillingEmail(to, "bank_transfer", { cafeName: s.cafe_name ?? "" });
         return NextResponse.json({ ok: emailed, emailed, email: to, error: emailed ? undefined : "발송 실패 — Resend 키/이메일 주소 확인" });
       }
       return NextResponse.json({ ok: false, error: "알 수 없는 action" }, { status: 400 });
