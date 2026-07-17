@@ -479,6 +479,15 @@ export function quoteMatchConfidence(name: string, quote: string, areaTerms: str
   const weakSingle = onlyTok.length >= 1 && (onlyTok.length <= 2 || /^[0-9]+$/.test(onlyTok) || weakWhitelist) && nameRawN.length > onlyTok.length;
   const allTokensWeak = tokens.length >= 1 && tokens.every((tk) => { const n = norm(tk).replace(/[,.:;·-]+$/, ""); return /^[0-9]+$/.test(n) || WEAK_IDENTITY_TOKEN.has(n); });
   const bareWeak = nameIsSoleToken && (weakSingle || coreEmpty || allTokensWeak || nameRawN.length <= 4);
+  // 2026-07-17 회귀수정: bareWeak라도 인용문에 '전체이름 원문'이 그대로 있고(강한신호) + 카페맥락/지역어까지
+  //   동반되면 인정한다(verifyReview의 nameInTitle/nameInBody와 동일 원칙 — distinctInTitle && (titleHasCafeWord
+  //   || areaPresent)). db7826c(#386, 2026-07-15)가 bareWeak를 무조건 reqFull=0으로 막아, "카페이유"·"몽브루"
+  //   같은 4자 이하 고유상호(공개 3,264곳=24%)가 자기 후기에서까지 확신도 0을 받는 회귀를 냄(센티넬 name_mismatch
+  //   워치리스트 42→2725 오탐 폭증으로 발견). 단일 흔한단어의 우연 겹침(원 P38 사각)은 전체이름 원문일치 요구가
+  //   여전히 막는다 — 흔한단어 인접 다른내용은 nameRawN 전체가 붙어 나오지 않으므로 그대로 0.
+  const bareWeakOk = bareWeak && !coreEmpty && nameRawN.length >= 2 && qN.includes(nameRawN)
+    && (CAFE_CONTEXT_STRONG.test(q) || areaTerms.some((a) => a && q.includes(a)));
+  if (bareWeakOk) return 1;
   const reqFull = coreEmpty || weakSingle || allTokensWeak || bareWeak;
   if (reqFull) return 0; // 전체이름 일치도 없고 유일 식별토큰이 흔한 단어/숫자뿐 → 확신도 낮음(동명 불일치 의심)
   const distinct = tokens.length ? tokens : (nameRawN ? [name] : []);
