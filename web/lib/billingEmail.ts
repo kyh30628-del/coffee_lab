@@ -3,7 +3,7 @@
 const esc = (s: string) =>
   String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
 
-type BillingKind = "paid" | "failed" | "suspended";
+type BillingKind = "paid" | "failed" | "suspended" | "bank_transfer";
 type BillingOpts = { cafeName: string; amount?: number; nextBillingAt?: string | Date | null };
 
 function fmtDate(d?: string | Date | null): string {
@@ -28,10 +28,14 @@ function render(kind: BillingKind, opts: BillingOpts): { subject: string; html: 
     accent = "#b0733e"; kicker = "결제에 실패했어요"; title = "카드 확인이 필요해요";
     subject = `⚠️ ${opts.cafeName} 사장님 · 홍보팩 결제 실패`;
     body = `이번 정기결제가 처리되지 않았어요. 카드 유효기간·한도를 확인해 주세요. 며칠간 자동으로 다시 시도하며, 계속 실패하면 우선노출이 잠시 중단될 수 있어요.`;
-  } else {
+  } else if (kind === "suspended") {
     accent = "#9c5b3f"; kicker = "구독이 일시 중단됐어요"; title = "결제 실패로 노출이 중단됐어요";
     subject = `⚠️ ${opts.cafeName} 사장님 · 홍보팩 일시 중단`;
     body = `결제가 계속 실패해 우선노출·쇼케이스가 잠시 꺼졌어요. 카드를 다시 등록하시면 바로 복구됩니다. 문의: dongnecoffeenote@gmail.com`;
+  } else {
+    accent = "#8a6d3b"; kicker = "계좌이체 안내"; title = "계좌이체로 먼저 시작하실 수 있어요";
+    subject = `☕ ${opts.cafeName} 사장님 · 홍보팩 계좌이체 안내`;
+    body = `카드 자동결제는 준비 중이라 아직 화면에서 바로 등록하실 수 없어요. 그 전까지는 계좌이체로 먼저 이용을 시작하실 수 있습니다. 이 메일에 회신 주시면 입금 계좌와 절차를 바로 안내해드릴게요. 문의: dongnecoffeenote@gmail.com`;
   }
   const html = `<div style="margin:0;padding:0;background:#efe7d8;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#efe7d8;padding:32px 12px;"><tr><td align="center">
