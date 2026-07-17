@@ -1,5 +1,7 @@
 // 📧 결제 알림 메일 — 성공(영수증)·실패·정지. Resend fetch 패턴은 subscription/route.ts sendPinEmail과 동일.
 //   온보딩 메일(lib/onboardingEmail)과 분리된 결제 전용 문구. 톤: 동네 커피 노트(크림/커피색).
+import { bankTransferEmailEnabled } from "@/lib/flags";
+
 const esc = (s: string) =>
   String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
 
@@ -59,7 +61,12 @@ function render(kind: BillingKind, opts: BillingOpts): { subject: string; html: 
 }
 
 // 결제 알림 발송(Resend). 키 없거나 이메일 무효면 false(우아한 미발송).
+//   🏦 bank_transfer는 플래그(기본 off)로 발송 중단 — 호출부가 어디든 여기서 최종 차단(2중 게이트).
 export async function sendBillingEmail(to: string, kind: BillingKind, opts: BillingOpts): Promise<boolean> {
+  if (kind === "bank_transfer" && !bankTransferEmailEnabled()) {
+    console.log("[billingEmail] bank_transfer 발송 스킵 — BANK_TRANSFER_EMAIL_ENABLED off");
+    return false;
+  }
   const key = process.env.RESEND_API_KEY;
   if (!key || !to || !to.includes("@")) return false;
   const { subject, html } = render(kind, opts);

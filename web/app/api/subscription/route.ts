@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
 import { ensureOwnerActivity } from "@/lib/ownerActivity";
 import { encryptPII, decryptPII } from "@/lib/crypto";
-import { subscriptionLive, paymentsLive } from "@/lib/flags";
+import { subscriptionLive, paymentsLive, bankTransferEmailEnabled } from "@/lib/flags";
 import { renderOnboardingEmail } from "@/lib/onboardingEmail";
 import { ownerScope } from "@/lib/ownerAuth";
 import { PLAN, PRICE, genPin, ensureBilling } from "@/lib/billing"; // 상품 상수·PIN·결제 스키마 단일 출처
@@ -78,7 +78,8 @@ export async function GET(req: NextRequest) {
         FROM subscriptions s LEFT JOIN cafes c ON c.id = s.cafe_id ORDER BY (s.status='pending') DESC, s.created_at DESC LIMIT 200` as unknown as any[];
       // emailReady: 이 환경(프로덕션 포함)에 Resend 키가 있어야 승인 시 키 이메일이 자동 발송됨
       // liveExposure: 소비자에게 실제로 우선노출(금색핀·추천카페·쇼케이스)이 보이는지 — SUBSCRIPTION_LIVE=true 여야 함
-      return NextResponse.json({ ok: true, emailReady: !!process.env.RESEND_API_KEY, liveExposure: subscriptionLive(), subs: rows.map((r) => ({ ...r, contact: decryptPII(r.contact), email: decryptPII(r.email) })) });
+      // bankTransferEmail: 🏦 계좌이체 안내메일 발송이 켜져 있는지(기본 off) — 꺼져 있으면 버튼 비활성
+      return NextResponse.json({ ok: true, emailReady: !!process.env.RESEND_API_KEY, liveExposure: subscriptionLive(), bankTransferEmail: bankTransferEmailEnabled(), subs: rows.map((r) => ({ ...r, contact: decryptPII(r.contact), email: decryptPII(r.email) })) });
     }
     // 사장님: 본인 카페 구독 상태(관리자 전체 또는 PIN=본인 카페만)
     const cafeId = Number(req.nextUrl.searchParams.get("cafeId"));
@@ -157,9 +158,14 @@ export async function POST(req: NextRequest) {
       }
       // 🏦 계좌이체 안내 — 카드 정기결제(PAYMENTS_LIVE) 오픈 전, 사장님이 계좌이체로 먼저 전환할 수 있도록
       //   사실 문구(회신하면 계좌 안내)만 담아 발송. 실제 계좌번호는 개별 회신으로만 안내(코드에 하드코딩 금지).
+      //   ⏸️ 현재 발송 중단(BANK_TRANSFER_EMAIL_ENABLED 기본 off) — 액션은 정상 처리하되 메일만 스킵. on이면 기존대로 발송.
       if (b.action === "bank_transfer") {
         const to = decryptPII(s.email ?? "");
         if (!to) return NextResponse.json({ ok: false, error: "등록된 이메일이 없어요" }, { status: 400 });
+        if (!bankTransferEmailEnabled()) {
+          console.log(`[subscription] bank_transfer 메일 스킵(발송 중단 상태) — sub#${id} ${s.cafe_name ?? ""}`);
+          return NextResponse.json({ ok: true, skipped: true, emailed: false, email: to, reason: "BANK_TRANSFER_EMAIL_ENABLED off" });
+        }
         const emailed = await sendBillingEmail(to, "bank_transfer", { cafeName: s.cafe_name ?? "" });
         return NextResponse.json({ ok: emailed, emailed, email: to, error: emailed ? undefined : "발송 실패 — Resend 키/이메일 주소 확인" });
       }
