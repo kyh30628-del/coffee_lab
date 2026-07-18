@@ -346,6 +346,20 @@ const LANDMARK_WORDS = [
 ];
 const isVenueTok = (t: string) => { const n = norm(t); return VENUE_WORDS.some((v) => n.includes(norm(v))) || HOTEL_BRANDS.some((v) => n.includes(norm(v))) || LANDMARK_WORDS.some((l) => n.includes(norm(l))) || DISTRICT_WORDS.some((d) => n.includes(norm(d))) || UNIV_ABBR_WORDS.some((u) => n.includes(norm(u))) || METRO_NAMES.has(n); };
 
+// 지구 통칭 별명(룰갭 P42, #397·coord#208): "베네치아"는 실제 지명이 아니라 송도 커낼워크 지구를
+//   부르는 관용 별칭이다. DISTRICT_WORDS처럼 전역으로 위치수식어 취급하면 위례·곤지암 등 무관 지역의
+//   동명 카페("베네치아ks커피"·"카페 더 베네치아")까지 식별어를 잃으므로, 카페 자신이 그 지구를
+//   가리킬 때만(상호에 "송도"가 박혀있거나 area/dong이 그 지구를 가리킬 때) 위치수식어로 취급한다.
+//   실측: 이 별명 하나로 무관 업체(미용실·연회장·초밥집 등) 37/44건(84%)이 오통과.
+const DISTRICT_NICKNAME_WORDS: { word: string; district: string }[] = [
+  { word: "베네치아", district: "송도" },
+];
+const isDistrictNicknameTok = (t: string, name: string, areaTerms: string[]) => {
+  const n = norm(t);
+  return DISTRICT_NICKNAME_WORDS.some(({ word, district }) => n === norm(word)
+    && (name.includes(district) || areaTerms.some((a) => a && a.includes(district))));
+};
+
 // 지역/생활권/신도시 이름 — 카페명 식별 토큰이 '못' 된다.
 //   예: "평촌커피" → 접미 '커피' 제거 후 '평촌'만 남는데, '평촌'은 그 지역 모든 카페 후기에 나옴
 //   → 식별어로 쓰면 평촌 지역 아무 카페·심지어 콜밴·샷시수리 글까지 매칭됨(실측 392/632 오통과).
@@ -369,6 +383,11 @@ const AREA_NAME = new Set([
   "구래", "장기", "운양", "풍무", "한강신도시", "마산", "송도", "청라", "영종", "검단", "논현", "서창",
 ]);
 const isAreaTok = (t: string) => { const n = norm(t); return n.length >= 2 && (AREA_NAME.has(t) || [...AREA_NAME].some((a) => norm(a) === n)); };
+// 콜로키얼(구어체) 지명 — AREA_NAME(신도시·생활권 위주)이 놓치는 서울 핫플 동/구 이름·수도권 대표 시명.
+//   룰갭 P43-원인1(#397, coord#208): 이 사전이 기존엔 "제목이 다른 카페를 가리킴" 판정(아래 verifyReview)
+//   에서만 쓰여 coreTokensDetail 코어토큰 분리 단계엔 미반영됐다 — "성수"같은 지명이 걸러지지 않고
+//   독립 식별토큰으로 남아 무관 콘텐츠가 지역어 일치만으로 오통과했다(id9426). coreTokensDetail에도 적용.
+const LOC_LIKE = /^(서울|경기|인천|부산|광화문|홍대|강남|신촌|이태원|합정|연남|성수|건대|혜화|압구정|청담|종로|명동|마포|여의도|잠실|판교|분당|수원|일산|상암|공덕|망원|을지로|동대문|신림|노원|구로|가산|당산|영등포|신도림|용산|왕십리|서초|방배|사당|구리|하남|의정부|부천|안양|평택|송파)$/;
 
 // 카페명 끝에 붙은 'SEO 서술어 꼬리'(원두·핸드드립·로스팅·베이커리·브런치…)를 제거해 진짜 상호만 남긴다.
 //   네이버 상호를 '구구커피 원두 핸드드립 로스팅'처럼 키워드로 등록한 카페가, 그 일반어를 '식별토큰'으로 삼아
@@ -417,12 +436,14 @@ function coreTokensDetail(name: string, areaTerms: string[]): { tokens: string[]
     .filter(({ core }) => !GENERIC_WORD.has(core.toLowerCase()))
     .filter(({ core }) => !NAME_STOPWORD.has(core.toLowerCase()))
     .filter(({ core }) => !isAreaTok(core)) // 지역·생활권명은 식별어 불가(평촌·일산·분당…) → 빠지면 전체이름 일치 요구
+    .filter(({ core }) => !LOC_LIKE.test(core)) // 콜로키얼 지명(성수·홍대·판교 등)도 동일 이유로 식별어 불가(P43-원인1)
     .filter(({ core }) => !an.some((a) => a.includes(norm(core)) || norm(core).includes(a)))
     .filter(({ core }) => !LOC_SUFFIX.test(core));
   const nonBranch = parts.filter((p) => !p.branch);
   const pool = nonBranch.length ? nonBranch : parts; // 지점어만 있는 이름(브랜드 없음)은 그대로 유지
   const base = pool.map((p) => p.core);
-  const branded = pool.filter((p) => !isVenueTok(p.raw) && !isVenueTok(p.core)).map((p) => p.core);
+  const branded = pool.filter((p) => !isVenueTok(p.raw) && !isVenueTok(p.core)
+    && !isDistrictNicknameTok(p.raw, name, areaTerms) && !isDistrictNicknameTok(p.core, name, areaTerms)).map((p) => p.core);
   // 브랜드 토큰이 남으면 venue/신도시 제거, 없으면(=venueOnly) 원래 유지해 정체성 파괴는 막되 신호는 표시.
   const finalPool = branded.length ? branded : base;
   // 룰갭 P33(2026-07-13): 한글↔숫자 경계 분리(위 split)로 '카페인24'→["카페인","24"]처럼 순수 숫자토큰이
@@ -575,6 +596,10 @@ export function verifyReview(input: QualityInput): QualityResult {
   const reqFull = coreEmpty || weakSingle || allTokensWeak;
   const distinct = tokens.length ? tokens : (nameN ? [input.name] : []);
   const areaPresent = areaTerms.length ? areaTerms.some((a) => `${title} ${body}`.includes(a)) : false;
+  // 룰갭 P43-원인2(#397, coord#208): bareWeak(흔한 인명·일반용어 유일토큰, 아래)의 지역 게이트가 areaTerms
+  //   전체(시·구 단위까지 포함)를 인정해, "구" 단위(성동구·마포구 등 핫플 자치구) 일치만으로도 통과했다
+  //   (id9426·id1520 실측 — 같은 구 안 무관 콘텐츠와 흔한 인명 오매칭). 동/읍/면/가/리 단위만 골라 더 좁게 요구.
+  const dongPresent = areaTerms.some((a) => a && /(동|읍|면|가|리)$/.test(a) && `${title} ${body}`.includes(a));
   // 흔한구문 이름은 띄어쓰기 보존이 핵심: '좋은커피'(가게)는 원문에 붙어서, '좋은 커피'(맛 표현)는 배제.
   //   짧은 단일토큰은 정규화 전체이름 일치(나무로스터리)로 — 부분문자열 오매칭 차단.
   // 룰갭 P28(#297): coreEmpty(이름 전체가 흔한구문/일반어, 예: '베이크샵')는 원문 붙임 일치만으로 인정하면
@@ -614,11 +639,11 @@ export function verifyReview(input: QualityInput): QualityResult {
   const bareWeak = nameIsSoleToken && (weakSingle || coreEmpty || allTokensWeak || nameRawN.length <= 4);
   const nameInTitle = (weakWhitelist && !areaPresent) ? false
     : bareWeak
-      ? (roadAddrCtxOk && distinctInTitle && (titleHasCafeWord || areaPresent) && venueCtxOk)
+      ? (roadAddrCtxOk && distinctInTitle && (dongPresent || CAFE_CONTEXT_STRONG.test(fullL) || titleHasCafeWord) && venueCtxOk)
       : (roadAddrCtxOk && (inTitleFull || (distinctInTitle && (titleHasCafeWord || areaPresent) && venueCtxOk)));
   const nameInBody = (weakWhitelist && !areaPresent) ? false
     : bareWeak
-      ? (roadAddrCtxOk && distinctInBody && (bodyHasCafeWord || areaPresent) && venueCtxOk)
+      ? (roadAddrCtxOk && distinctInBody && (dongPresent || CAFE_CONTEXT_STRONG.test(fullL) || bodyHasCafeWord) && venueCtxOk)
       : (roadAddrCtxOk && (inBodyFull || (distinctInBody && (bodyHasCafeWord || areaPresent) && venueCtxOk)));
   const listicle = LISTICLE_TITLE.some((re) => re.test(title)) || (((`${title} ${body}`.match(PLACE_TOKEN) ?? []).length) >= 4);
   const generic = has(fullL, GENERIC_CUES);
@@ -757,8 +782,7 @@ export function verifyReview(input: QualityInput): QualityResult {
   //   카페힌트 있는 긴 제목인데 우리 카페 고유명(비지역 토큰)이 제목에 없으면 → 다른 카페 후기.
   //   예) "오렌지어웨이크에서 라떼" → body에 커피스탑 있어도 reject
   if (!inTitleFull && nameInBody && titleHasCafeWord && title.length > 10) {
-    // 지역어가 아닌 고유 토큰이 제목에 있어야 우리 카페 글로 인정
-    const LOC_LIKE = /^(서울|경기|인천|부산|광화문|홍대|강남|신촌|이태원|합정|연남|성수|건대|혜화|압구정|청담|종로|명동|마포|여의도|잠실|판교|분당|수원|일산|상암|공덕|망원|을지로|동대문|신림|노원|구로|가산|당산|영등포|신도림|용산|왕십리|서초|방배|사당|구리|하남|의정부|부천|안양|평택|송파)$/;
+    // 지역어가 아닌 고유 토큰이 제목에 있어야 우리 카페 글로 인정 (LOC_LIKE = 모듈 상단 정의, coreTokensDetail과 공유)
     // inTitleFull이 false지만 listicle이거나 제목이 단순 탐방형(지역+카페만)이면 통과
     const simpleAreaTitle = /^[가-힣\s]+\s*(카페|커피)\s*(추천|탐방|맛집|top\d*|best|\d+선|필수|명소|핫플)/i.test(title)
       || /^(카페|커피)\s*(추천|탐방|맛집|top\d*|best|\d+선)/i.test(title);
