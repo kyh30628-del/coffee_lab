@@ -468,6 +468,10 @@ async function scanPhraseNamePollution(): Promise<{ count: number; samples: stri
       ORDER BY id LIMIT 500`) as any[];
     if (!rows.length) break; lo = rows[rows.length - 1].id;
     for (const c of rows) {
+      // 지점표식(○○점) 이름은 브랜드가 확립된 프랜차이즈 지점 → 문구오염 대상 아님(지점오염은 franchise_branch 담당).
+      //   실측 FP: '누군가에게 거북섬점'(id4399)은 브랜드 '누군가에게'가 -에게 종결이라 문구로 오인되나 77/77 진짜후기.
+      //   진짜 문구오염(바닷가에서카페·동네까페 수가에서)은 지점표식이 없어 그대로 잡힌다.
+      if (/[가-힣0-9]{2,}점$/.test((c.name || "").trim())) continue;
       const at = [c.area, c.dong].filter(Boolean) as string[];
       const toks = coreTokens(c.name, at);
       // 조사·어미로 끝나는 3자+ 토큰 = 문구형(고유명사 아님). 이미 weak_token 등재분은 generic_term이 담당 → 제외.
