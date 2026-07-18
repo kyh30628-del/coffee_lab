@@ -61,9 +61,19 @@ export type SynthResult = {
   identity: string;
 };
 
+// 완전동일 quote(정규화 후) 중복제거 — SEO 태그블록·경쟁사명 나열 등이 서로 다른 글에서
+// 반복 등장해 검증리뷰로 여러 번 카운트되는 것 방지(협업 정합성조사팀 12:04 사이클).
+const normalizeQuote = (s: string) => s.replace(/\s+/g, "").trim().toLowerCase();
+
 export function synthesize(name: string, reviews: Review[], area: string[] = []): SynthResult {
-  const clean = reviews.filter((r) => r.text && !AD.test(r.text));
-  const n = clean.length;
+  const seenQuotes = new Set<string>();
+  const clean = reviews.filter((r) => r.text && !AD.test(r.text)).filter((r) => {
+    const key = normalizeQuote(r.text);
+    if (seenQuotes.has(key)) return false;
+    seenQuotes.add(key);
+    return true;
+  });
+  const n = clean.length; // distinct quote 기준(등급판정용)
   const axes = TASTE_AXES.map((t) => t.ax);
   const stat: Record<string, { pos: number; neg: number; ev: { kind: string; snip: string }[] }> = {};
   axes.forEach((a) => (stat[a] = { pos: 0, neg: 0, ev: [] }));
