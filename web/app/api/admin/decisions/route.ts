@@ -18,6 +18,28 @@ async function ensure() {
   await sql`ALTER TABLE decisions ADD COLUMN IF NOT EXISTS tier TEXT`.catch(() => {});
   await sql`ALTER TABLE decisions ADD COLUMN IF NOT EXISTS decided_by TEXT`.catch(() => {});
   await sql`ALTER TABLE decisions ADD COLUMN IF NOT EXISTS recommendation TEXT`.catch(() => {}); // 💬 기조실장 의견(결재 참고)
+  // 🚧 action_type 오분류 재발방지 게이트(#400) — 코드수정 상신이 'agent_task'/'investigate'로 등록되면
+  //   scripts/dev-claim.mjs가 영구 미픽업(07-03·07-05·07-08·07-11·07-18 5회+ 재발, 상신 경로마다 텍스트
+  //   지침 재공지로는 전파 안 됨 확인됨). 상신 주체(에이전트 종류)와 무관하게 DB 레이어에서 일괄 정규화.
+  await sql`CREATE OR REPLACE FUNCTION decisions_normalize_action_type() RETURNS trigger AS $fn$
+    DECLARE
+      orig TEXT;
+    BEGIN
+      IF NEW.action_type IN ('agent_task', 'investigate')
+         AND (COALESCE(NEW.title, '') ~* '\\.tsx?\\M|\\.mjs\\M|코드\\s*수정'
+              OR COALESCE(NEW.detail, '') ~* '\\.tsx?\\M|\\.mjs\\M|코드\\s*수정') THEN
+        orig := NEW.action_type;
+        NEW.action_type := 'dev_task';
+        NEW.action_params := COALESCE(NEW.action_params, '{}'::jsonb)
+          || jsonb_build_object('action_type_gate_400', jsonb_build_object('from', orig, 'at', now()));
+      END IF;
+      RETURN NEW;
+    END;
+    $fn$ LANGUAGE plpgsql`.catch(() => {});
+  await sql`DROP TRIGGER IF EXISTS trg_decisions_normalize_action_type ON decisions`.catch(() => {});
+  await sql`CREATE TRIGGER trg_decisions_normalize_action_type
+    BEFORE INSERT ON decisions
+    FOR EACH ROW EXECUTE FUNCTION decisions_normalize_action_type()`.catch(() => {});
 }
 
 export async function GET(req: NextRequest) {
