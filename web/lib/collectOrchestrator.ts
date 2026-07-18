@@ -214,7 +214,7 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
   // 옥석 전체(노이즈 제거 후 verified+reference 전부) — 전체보기용
   const allEvidence = evDedup;
 
-  const synth = synthesize(name, verifiedReviews);
+  const synth = synthesize(name, verifiedReviews, area);
   synth.grade = grade;
   synth.reviewCount = trustCount;
   const charScores = computeCharScores(verifiedTexts, name);

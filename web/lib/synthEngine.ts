@@ -61,7 +61,7 @@ export type SynthResult = {
   identity: string;
 };
 
-export function synthesize(name: string, reviews: Review[]): SynthResult {
+export function synthesize(name: string, reviews: Review[], area: string[] = []): SynthResult {
   const clean = reviews.filter((r) => r.text && !AD.test(r.text));
   const n = clean.length;
   const axes = TASTE_AXES.map((t) => t.ax);
@@ -110,7 +110,7 @@ export function synthesize(name: string, reviews: Review[]): SynthResult {
   const evidence: Record<string, { kind: string; snip: string }[]> = {};
   axes.forEach((a) => (evidence[a] = stat[a].ev.slice(0, 3)));
 
-  return { name, reviewCount: n, grade, coords, basis, uses, ops, evidence, identity: buildIdentity(coords, basis, uses, ops) };
+  return { name, reviewCount: n, grade, coords, basis, uses, ops, evidence, identity: buildIdentity(coords, basis, uses, ops, area) };
 }
 
 // 리뷰 종합 한 줄 — 검증 후기에서 실제로 드러난 신호만(환각 금지) 따뜻하고 와닿게, 절제해서.
@@ -119,7 +119,7 @@ const USE_PHRASE: Record<string, string> = {
   작업: "작업·공부하기 좋은 곳", 혼자: "혼자 조용히 머물기 좋은 곳", 수다: "함께 도란도란 이야기 나누기 좋은 곳",
   사진: "사진 찍기 좋은 분위기", 빵: "빵·디저트가 특히 자주 언급되는 곳",
 };
-function buildIdentity(coords: Record<string, number | null>, basis: Record<string, string>, uses: Record<string, number>, ops: Record<string, number>) {
+function buildIdentity(coords: Record<string, number | null>, basis: Record<string, string>, uses: Record<string, number>, ops: Record<string, number>, area: string[] = []) {
   const p: string[] = [];
   if ((ops["직접로스팅"] ?? 0) >= 2) p.push("직접 로스팅하는 곳"); // 1건은 환각 위험 → 2건+만 주장
   const a = coords.acidity, b = coords.body, s = coords.sweet;
@@ -128,8 +128,15 @@ function buildIdentity(coords: Record<string, number | null>, basis: Record<stri
   if (b != null && b >= 0.65) p.push("묵직하고 고소한 바디");
   else if (b != null && b <= 0.35) p.push("가볍고 부드러운 바디");
   if (s != null && s >= 0.65) p.push("단맛이 좋은 디저트");
+  // 취향·로스팅 근거가 하나도 없어 아래 용도 문구 하나만으로 정체성이 정해지는 카페 — 전국 다수 카페가
+  // 같은 최다-용도 키워드로 수렴해 완전히 동일한 한 줄이 되는 원인(협업 #211). 실제 소재지(동)를 붙여
+  // 카페별로 갈라지게 한다(환각 아님 — area는 이미 검증된 실제 소재지 데이터).
+  const soleSignal = p.length === 0;
   const tu = Object.entries(uses).sort((x, y) => y[1] - x[1])[0];
-  if (tu && USE_PHRASE[tu[0]]) p.push(USE_PHRASE[tu[0]]);
+  if (tu && USE_PHRASE[tu[0]]) {
+    const locality = area.filter(Boolean).slice(-1)[0];
+    p.push(soleSignal && locality ? `${locality}에서 ${USE_PHRASE[tu[0]]}` : USE_PHRASE[tu[0]]);
+  }
   if (ops["원두판매"] && p.length < 4) p.push("원두도 살 수 있는 곳");
   if (ops["권위"]) p.push("매체·평단에 소개된 곳");
   return p.length ? p.join(" · ") : "후기가 더 모이면 분석이 또렷해져요";
