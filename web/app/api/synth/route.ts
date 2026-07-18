@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
       const norm: Review[] = body.reviews.map((r: unknown) =>
         typeof r === "string" ? { text: r } : { text: (r as Review).text ?? "", time: (r as Review).time }
       );
-      const result = synthesize(name, norm);
+      const result = synthesize(name, norm, areaTerms);
       return NextResponse.json({ ok: true, mode: "simple", result });
     }
 
