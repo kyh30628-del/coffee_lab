@@ -119,3 +119,4 @@
 | 2026-07-17 13:49 | #398 | 계좌이체 안내메일 발송 중단 | 399281f7 | high | lib/flags.ts(bankTransferEmailEnabled, 기본 off)+lib/billingEmail.ts(kind=bank_transfer 최종 차단)+app/api |
 | 2026-07-18 03:41 | #399 | [개발] 협업 #211: [레드팀 각도C 정체성 붕괴] synth_identity 균질화 — 검증등급 141 | 66088ad2 | - | lib/synthEngine.ts buildIdentity()에 2차 보조신호(동/지역) 추가 — 취향·로스팅 근거가 전혀 없어 최다-용도 문구 하나로만 정체성이 정해지는 카페(사 |
 | 2026-07-18 08:54 | #397 | [룰갭 신규규칙 2건] P42 지역테마별명(베네치아 송도) + P43 LOC_LIKE/areaPresent  | fd3e4ac0 | - | lib/reviewQuality.ts 3건: (1) DISTRICT_NICKNAME_WORDS 신설(베네치아→송도) — coreTokensDetail의 branded 판정에 연동해 |
+| 2026-07-18 09:55 | #400 | [근본원인] decisions action_type 오분류 코드레벨 검증 게이트 신설 (6차 재발 확정, # | 74043ffc | - | app/api/admin/decisions/route.ts ensure()에 BEFORE INSERT 트리거(decisions_normalize_action_type) 추가 — a |
