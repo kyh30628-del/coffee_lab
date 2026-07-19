@@ -99,6 +99,13 @@ const CAFE_WORDS = ["카페", "커피", "로스터리", "베이커리", "디저�
 // 룰갭 제안28(2026-07-05): joonggonara·changupnamu는 '카페(coffee)'가 아니라 '카페(네이버 카페=커뮤니티)'
 //   판매게시판이라 UI 정형문구("타카페", "카페 연동")에 리터럴 "카페"가 박혀 CAFE_WORDS 가드를 우회 —
 //   COMMERCE_JUNK의 !titleHasCafeWord/!bodyHasCafeWord 가드 없이 STRONG으로 승격해 무조건 탈락.
+// 결재#395(51그룹/69곳 정합성 사고) 근본원인 중 하나: 프랜차이즈 '점포 양도·창업 매물' 게시글(예: 커피
+//   가맹점 매매 카페 게시판)이 브랜드명만 일치해 형제 지점(메가MGC커피 쌍문점 ↔ 하월곡동점처럼 지점끼리
+//   전혀 다른 위치)에 동시 귀속됐다. 이런 글은 방문후기가 원천적으로 아니므로(지점 앵커 판별과 무관하게
+//   항상 오염) COMMERCE_STRONG과 동급으로 무조건 하드 탈락 — borderline이 아니어야 AI 감사(카페별 개별
+//   판정이라 형제지점 교차오염을 못 봄)로 되살아나지 못한다(실측: judge_decisions가 "✨ AI 검증"으로
+//   양쪽 지점 모두에 승인했던 사례).
+const FRANCHISE_TRANSFER_AD = /(양도\s*양수|권리금|가맹\s*(문의|상담|모집)|점포\s*(매매|양도|매도)|매장\s*(매매|양도|매도)|무권리금|초보\s*창업|창업\s*(문의|상담|비용|비교)|프랜차이즈\s*(창업|가맹))/;
 const COMMERCE_STRONG = /(중고나라|당근\s*마켓|번개장터|판매\s*양식|미개봉|택배\s*신청\s*하기|삽니다|팝니다|총판\s*문의|타\s*카페|카페\s*연동)/;
 // 비방문 판매게시판(네이버 카페=커뮤니티, 회원끼리 물건 거래) — 도메인 성격상 방문 후기가 나올 수 없어 링크만으로 하드 탈락.
 const NONVISIT_BOARD = /cafe\.naver\.com\/(joonggonara|changupnamu)\//i;
@@ -682,6 +689,10 @@ export function verifyReview(input: QualityInput): QualityResult {
   //   약한 거래신호는 카페 맥락어가 전혀 없을 때만 탈락(가격·판매대 언급한 진짜 후기 보존).
   if (COMMERCE_STRONG.test(fullL) || (COMMERCE_JUNK.test(fullL) && !titleHasCafeWord && !bodyHasCafeWord)) {
     return { verdict: "rejected", score: 0, reasons: ["거래·판매 글(후기 아님)"], signals: sig };
+  }
+  // [프랜차이즈 점포양도·창업 매물] 방문후기가 아닌 가맹/창업 게시판 글 — 위 COMMERCE_STRONG과 동급 하드 탈락(결재#395).
+  if (FRANCHISE_TRANSFER_AD.test(fullL)) {
+    return { verdict: "rejected", score: 0, reasons: ["프랜차이즈 점포양도·창업 매물 글(후기 아님)"], signals: sig };
   }
   // [비카페 업종] 제목이 다른 업종(스시·칼국수·미용실·병원…)을 선언하고, 우리 카페 고유명도 카페맥락어도
   //   제목에 없음 → 같은 자리/무관 다른 업체 글. 본문에 우리 카페가 언급되면 '같이 간 글'일 수 있어
