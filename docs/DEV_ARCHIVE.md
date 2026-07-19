@@ -121,3 +121,4 @@
 | 2026-07-18 08:54 | #397 | [룰갭 신규규칙 2건] P42 지역테마별명(베네치아 송도) + P43 LOC_LIKE/areaPresent  | fd3e4ac0 | - | lib/reviewQuality.ts 3건: (1) DISTRICT_NICKNAME_WORDS 신설(베네치아→송도) — coreTokensDetail의 branded 판정에 연동해 |
 | 2026-07-18 09:55 | #400 | [근본원인] decisions action_type 오분류 코드레벨 검증 게이트 신설 (6차 재발 확정, # | 74043ffc | - | app/api/admin/decisions/route.ts ensure()에 BEFORE INSERT 트리거(decisions_normalize_action_type) 추가 — a |
 | 2026-07-18 09:57 | #401 | [정합성 신규] synth_reviews_all 완전중복 quote가 검증등급 카운트 부풀림 — synthE | f3e535e9 | - | lib/synthEngine.ts:64-66 — synthesize()의 clean 필터에 quote 정규화(공백제거+소문자) 후 동일 텍스트 uniqBy 추가, n=clean.l |
+| 2026-07-19 00:14 | #408 | [개발] 협업 #213: #407 action_type 정정 필요(investigate→dev_task) — | 412bf4fa | - | web/app/api/orchestrator/route.ts: maxDuration 120→300(플랜상한, 실측102s/여유18s→198s로 확대) + HEAL_DEADLINE( |
