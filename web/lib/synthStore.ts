@@ -722,7 +722,7 @@ export async function healCrossCafeLinkContamination(): Promise<{ removed: numbe
 //   audit_checked_at 커서로 전 공개카페를 ~며칠 주기로 1회씩 재검. 재합성으로 비공개되면 그게 곧 교정.
 //   교정 후에도 근거가 카페명과 안 맞으면 audit_flags(근거오염)로 레드팀에 남긴다.
 //   🚨 안전장치: 한 회차 비공개가 unpubCap 초과 = 규칙 회귀(인천 사태) 의심 → 즉시 중단·경보(대량삭제 차단).
-export async function healPublishedAudit(limit = 600, unpubCap = 120): Promise<{ scanned: number; unpublished: number; flagged: number; regression: boolean; names: string[] }> {
+export async function healPublishedAudit(limit = 600, unpubCap = 120, budgetMs?: number): Promise<{ scanned: number; unpublished: number; flagged: number; regression: boolean; names: string[] }> {
   await ensureCols();
   await loadCriteria(); // 오염 재플래그 임계(coherence_max) 캐시 프라임 — noisy 게이트와 동일 기준(폴백 0.4)
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS audit_checked_at TIMESTAMPTZ`.catch(() => {});
@@ -730,7 +730,9 @@ export async function healPublishedAudit(limit = 600, unpubCap = 120): Promise<{
     WHERE published AND raw_reviews IS NOT NULL
     ORDER BY audit_checked_at ASC NULLS FIRST LIMIT ${limit}`) as unknown as any[];
   let scanned = 0, unpublished = 0, flagged = 0; const names: string[] = []; let regression = false;
+  const deadline = budgetMs != null ? Date.now() + budgetMs : null; // 결재#408: 호출측 시간예산 — 초과 시 스캔 중단(recordRun 도달 보장)
   for (const r of rows) {
+    if (deadline != null && Date.now() > deadline) break;
     const before = (await sql`SELECT published FROM cafes WHERE id=${r.id}`)[0] as any;
     try { await synthAndStore({ id: r.id, name: r.name, area: r.area }, { refresh: false }); } catch { continue; }
     await sql`UPDATE cafes SET audit_checked_at=now() WHERE id=${r.id}`.catch(() => {});

@@ -8,7 +8,7 @@ import { loadCriteria, getCriterionSync } from "@/lib/criteria";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 export const runtime = "nodejs";
-export const maxDuration = 120; // 재검증 자가감사(healPublishedAudit) 배치 여유
+export const maxDuration = 300; // 결재#408: 120s는 실측 102s와 여유 18s뿐이라 백로그 조금만 늘어도 Vercel 강제종료(recordRun 미호출→정지 오판). 다른 heal류 크론과 동일하게 플랜 상한(300s)으로.
 
 // 🛰️ 자율 운영 관제탑(Control Tower)
 // 각 에이전트가 '만든 실제 데이터'로 가동 여부를 추론(거짓 불가) → 건강 판정 → 적체는 자가 치유 → 멈춤은 경보.
@@ -332,13 +332,20 @@ export async function GET(req: NextRequest) {
       FROM cafes`)[0] as any;
 
     // ── 2) 자가 치유 ──
+    // 결재#408: heal 루프(합성 적체·healPublishedAudit)가 백로그 증가로 길어지면 maxDuration에 걸려
+    //   recordRun 호출 전에 플랫폼이 강제종료 → agent_runs 미갱신·무한 정지로 오판되던 근본원인.
+    //   maxDuration 여유 내로 하드 데드라인을 둬 이 두 루프가 아무리 길어져도 recordRun까지는 반드시 도달하게 한다.
+    const HEAL_DEADLINE = now + 260_000; // maxDuration 300s - 40s 안전마진(신호수집·건강판정·기록 구간)
     let promoted = 0;
     if (heal) {
       // (a) 합성 적체(raw 있는데 미합성) 메움 → 신규 'new'가 'pending'으로 진행
       if (c.synth_q > 0) {
         const todo = await sql`SELECT id, name, area FROM cafes WHERE raw_reviews IS NOT NULL AND synth_updated IS NULL LIMIT 50`;
         let done = 0;
-        for (const cf of todo as any[]) { try { await synthAndStore(cf, { refresh: false }); done++; } catch {} }
+        for (const cf of todo as any[]) {
+          if (Date.now() > HEAL_DEADLINE) break;
+          try { await synthAndStore(cf, { refresh: false }); done++; } catch {}
+        }
         if (done) healed.push(`합성 적체 ${done}건 처리`);
       }
       // (b) 풀 게이트 통과한 pending → 자동 공개 승격(finalizer)
@@ -411,7 +418,7 @@ export async function GET(req: NextRequest) {
       // (f) 통합 재검증 자가치유 — 공개 카페를 커서로 순환하며 현재의 모든 게이트(비카페·프랜차이즈·광고·동명오염·등급)로
       //     재합성. 규칙 개선이 기존 공개 데이터에 며칠 안에 자동 반영됨. 대량 비공개는 규칙회귀로 보고 즉시 중단·경보.
       try {
-        const au = await healPublishedAudit();
+        const au = await healPublishedAudit(600, 120, Math.max(0, HEAL_DEADLINE - Date.now()));
         if (au.unpublished > 0) { unpubThisRun += au.unpublished; healed.push(`재검증 자가치유 ${au.unpublished}곳 비공개(규칙 위반: ${au.names.slice(0, 3).join(", ")})`); }
         if (au.flagged > 0) integrity.push(`근거 오염 ${au.flagged}곳(재합성후에도 카페명 불일치) — 점검필요`);
         if (au.regression) integrity.push(`🚨재검증 대량 비공개(${au.unpublished}곳+) — 규칙 회귀 의심, 자가치유 중단됨·즉시 점검`);
