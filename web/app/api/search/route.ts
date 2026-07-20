@@ -266,14 +266,19 @@ export async function GET(req: NextRequest) {
           if (rows.length > 0) {
             mode = "semantic";
             for (const c of rows) byId.set(c.id, c);
-            scored = rows.map((c) => {
-              const { exact, concept, reasons } = lexicalScore(c, tokens, hitConcepts);
+            const lex = rows.map((c) => ({ c, ...lexicalScore(c, tokens, hitConcepts) }));
+            // #219: exact+concept은 필드가중치 누적이라 상한이 없어(다중토큰·다중필드 매치 시 수십점) gradeBonus 격차(17점)를
+            //   쉽게 뭉개고 참고등급이 검증등급 위로 노출되던 버그 — sim*100과 같은 0~100 스케일로 후보군 내 상대값 정규화해
+            //   AI재정렬 경로(아래 rankScore 0~100 정규화+gradeBonus)와 두 경로를 일치시킨다.
+            const maxLex = Math.max(1, ...lex.map((l) => l.exact + l.concept));
+            scored = lex.map(({ c, exact, concept, reasons }) => {
               const sim = Number(c.sim) || 0;
               // #216: 키워드·느낌 완전 불일치(exact+concept===0)면 등급가산 미적용 — 브랜드명(이디야·컴포즈 등)
               //   DB無매칭 검색 시 의미유사도만 있는 무관 카페가 gradeBonus(+25)로 검증배지·고득점 1위로
               //   오인 노출되던 왜곡 차단. 키워드 폴백 경로(아래)와 동일한 가드로 두 경로를 일치시킨다.
               const lexMatched = exact + concept > 0;
-              const total = sim * 100 + exact + concept + (lexMatched ? gradeBonus(c.synth_grade) : 0); // 의미 유사도 1차 + 키워드·느낌 + 등급(검증 우대, 어휘일치 시에만)
+              const lexScore = lexMatched ? ((exact + concept) / maxLex) * 100 : 0;
+              const total = sim * 100 + lexScore + (lexMatched ? gradeBonus(c.synth_grade) : 0); // 의미 유사도 1차 + 키워드·느낌(정규화) + 등급(검증 우대, 어휘일치 시에만)
               const why = [`의미 유사 ${Math.round(sim * 100)}%`, ...reasons];
               return { id: c.id, name: c.name, area: c.area, grade: c.synth_grade, count: c.synth_count, identity: c.synth_identity, score: Math.round(total * 10) / 10, reasons: why.slice(0, 3) };
             });
