@@ -30,6 +30,30 @@ const today = new Date().toISOString().slice(0, 10);
     L.push(runs.map((r) => `${!r.ok ? "❌" : (EXPECT[r.job] != null && +r.h > EXPECT[r.job]) ? "⏸️" : "✅"}${r.job}(${(+r.h).toFixed(0)}h)`).join(" · ") + "\n");
   } catch (e) { L.push(`(크론 조회 실패)\n`); }
 
+  // 1.5) 🚨 제안서 미인입 감시 (협업#187·#219 재발 원인 — 결재 #419) — 팀이 agent-reports/*-proposals-*.md로
+  //    P0 제안을 올려도 coordConsumer(lib/coordConsumer.ts)·coordinationLifecycle(lib/issues.ts) 둘 다 coordination
+  //    DB 테이블만 스캔하고 이 파일 자체는 읽지 않아, 사람이 놓치면 24h+ 방치되는 사각이 2회(coord#187 07-12,
+  //    coord#219 07-19/20) 재발했다. 결정론 감시만(자동 결재/협업 생성 없음, lib/issues.ts 동결 무관) —
+  //    여기 걸리면 다음 self-audit·기조실장 사이클이 이 DIGEST를 읽고 판단한다.
+  //    48h 창(최근분만 — 오래된 이력 143건까지 훑으면 노이즈)·12h+ 미연결만 표시(정상 검토시간엔 안 뜸).
+  try {
+    const files = existsSync(AR) ? readdirSync(AR).filter((f) => /-proposals-\d{8}/.test(f) && f.endsWith(".md")) : [];
+    const stale = [];
+    for (const f of files) {
+      const ageH = (Date.now() - statSync(`${AR}/${f}`).mtimeMs) / 3.6e6;
+      if (ageH < 12 || ageH > 48) continue;
+      const stem = f.replace(/\.md$/, "");
+      const hit = await sql`SELECT 1 FROM decisions WHERE action_params->>'ref' ILIKE ${"%" + stem + "%"} OR title ILIKE ${"%" + stem + "%"} OR detail ILIKE ${"%" + stem + "%"}
+        UNION SELECT 1 FROM coordination WHERE topic ILIKE ${"%" + stem + "%"} OR detail ILIKE ${"%" + stem + "%"} LIMIT 1`.catch(() => []);
+      if (hit.length) continue;
+      let first = ""; try { first = readFileSync(`${AR}/${f}`, "utf8").split("\n").find((l) => l.trim()) || ""; } catch {}
+      stale.push({ f, ageH, first: first.replace(/^#+\s*/, "").slice(0, 70) });
+    }
+    L.push(`## 🚨 제안서 미인입 감시 (12~48h · decisions/coordination 미연결)`);
+    if (!stale.length) L.push(`- ✅ 없음\n`);
+    else L.push(stale.map((s) => `- ⚠️ **${s.f}** (${s.ageH.toFixed(0)}h전, 미인입 의심): ${s.first}`).join("\n") + "\n");
+  } catch (e) { L.push(`(제안서 감시 실패)\n`); }
+
   // 2) 핵심 수치
   try {
     const m = (await sql`SELECT count(*) FILTER(WHERE published) pub, count(*) FILTER(WHERE published AND synth_grade='검증') v, count(*) FILTER(WHERE published AND synth_grade='참고') r, count(*) FILTER(WHERE synth_updated IS NULL) q, count(*) FILTER(WHERE needs_llm) nl FROM cafes`)[0] ?? {};
