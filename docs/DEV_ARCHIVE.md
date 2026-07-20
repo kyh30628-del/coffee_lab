@@ -126,3 +126,4 @@
 | 2026-07-19 23:45 | #412 | [룰갭 신규 2건] P44 흔한 추상명사 카페명(시너지·프렌즈) — identity.weak_token 리스 | 9c1de9b9 | - | lib/criteriaListsBase.ts identity.weak_token에 "시너지","프렌즈" 2항목 추가(주석에 P44 근거 기록). tsc 신규에러 0, npm run |
 | 2026-07-20 03:32 | #413 | [룰갭 신규 2건] P45 흔한 형용사형 카페명(향기로운·온전한) — identity.weak_token 리 | cfda4fa2 | - | lib/criteriaListsBase.ts identity.weak_token 리스트에 향기로운·온전한 2건 추가(P44와 동일 패턴). tsc 신규에러 0, npm run bu |
 | 2026-07-20 08:48 | #414 | [검색P0][coord#219] semantic 폴백 gradeBonus 무력화 — 참고등급이 검증등급 위로 | 09b23faa | - | app/api/search/route.ts:266-285 semantic 폴백 exact+concept(무상한 필드가중치 누적)를 sim*100과 동일한 0~100 스케일로 후보군 |
+| 2026-07-20 08:52 | #415 | [검색P0][coord#219] momentum 강동구 top1 참고등급 승격 — gradeBonus로 억제 | 71b81425 | - | app/api/momentum/route.ts: 참고등급이 검증등급을 버즈점수로 역전하던 결함(gradeBonus 상수가산 무력화)을 구조적으로 해결 — 등급을 점수 가산에서 정렬 |
