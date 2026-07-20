@@ -124,3 +124,4 @@
 | 2026-07-19 00:14 | #408 | [개발] 협업 #213: #407 action_type 정정 필요(investigate→dev_task) — | 412bf4fa | - | web/app/api/orchestrator/route.ts: maxDuration 120→300(플랜상한, 실측102s/여유18s→198s로 확대) + HEAL_DEADLINE( |
 | 2026-07-19 09:06 | #410 | [#395 후속] 51개 그룹 전수분류 스크립트 + 매칭 파이프라인 지점앵커 근본원인 조사 | 99c3698b | - | ① scripts/classify-cross-branch-quotes.mjs 신규(결정론·API0·읽기전용): 동일quote 2곳+귀속 그룹 자동탐지→verifyReview 재적용 |
 | 2026-07-19 23:45 | #412 | [룰갭 신규 2건] P44 흔한 추상명사 카페명(시너지·프렌즈) — identity.weak_token 리스 | 9c1de9b9 | - | lib/criteriaListsBase.ts identity.weak_token에 "시너지","프렌즈" 2항목 추가(주석에 P44 근거 기록). tsc 신규에러 0, npm run |
+| 2026-07-20 03:32 | #413 | [룰갭 신규 2건] P45 흔한 형용사형 카페명(향기로운·온전한) — identity.weak_token 리 | cfda4fa2 | - | lib/criteriaListsBase.ts identity.weak_token 리스트에 향기로운·온전한 2건 추가(P44와 동일 패턴). tsc 신규에러 0, npm run bu |
