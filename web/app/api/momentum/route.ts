@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
 import { dessertDominance } from "@/lib/charScore";
-import { loadCriteria, getCriterionSync } from "@/lib/criteria";
 export const runtime = "nodejs";
 
 // "📈 요즘 뜨는 카페" — 별점(미제공) 대신 우리 소유 데이터로 모멘텀 산출.
@@ -28,13 +27,15 @@ function inRegion(area: string, region: string): boolean {
   return s.length >= 2 && a.includes(s);
 }
 
-// search API와 동일 기준(criteria.ts search.grade_bonus.*, L2 기조실장 전결) 재사용 —
-// 저표본 참고등급 카페가 버즈만으로 검증등급과 동열노출되는 결함D 보정.
-const gradeBonus = (g?: string | null): number => (g === "검증" ? getCriterionSync("search.grade_bonus.verified") : g === "참고" ? getCriterionSync("search.grade_bonus.reference") : 0);
+// 등급 우선순위(결함D: 저표본 참고등급이 순수 버즈 점수로 검증등급을 역전 — 점수 가산(criteria
+// search.grade_bonus.*)은 무한 확장 가능한 버즈 점수 앞에서 상수 가산이라 억제가 불가능했다(#415,
+// coordination#219 24h+ 재발). 등급을 점수에 더하는 대신 정렬의 1차 키로 승격해 어떤 버즈 점수 조합
+// 에서도 참고등급이 검증등급 위로 올라갈 수 없게 구조적으로 보장한다. 동일 등급 내부만 버즈 점수로 정렬.
+const gradeRank = (g?: string | null): number => (g === "검증" ? 2 : g === "참고" ? 1 : 0);
 
 export async function GET(req: NextRequest) {
   try {
-    await Promise.all([ensureSchema(), loadCriteria()]); // ⚡ 독립 프라임 병렬(gradeBonus가 읽는 기준 캐시)
+    await ensureSchema();
     const region = (req.nextUrl.searchParams.get("region") ?? "").trim();
     // ⚡ 본쿼리(rows)를 스냅샷 블록과 동시 발사 — 상호 독립(deltaMap은 아래 루프에서만 소비). 결과 불변.
     const rowsP = sql`SELECT id, name, area, synth_grade, synth_count, synth_identity, review_dates, char_scores
@@ -69,7 +70,6 @@ export async function GET(req: NextRequest) {
       const delta = hasDelta && deltaMap.has(c.id) ? total - (deltaMap.get(c.id) ?? total) : null;
       // '요즘 뜨는' = 가장 최근 한 달(30일)을 가장 무겁게(×2) + 3개월(90일) 버즈 + 최근 집중도 보정.
       let score = r30 * 2 + r90 * (0.6 + 0.8 * Math.min(share, 1));
-      score += gradeBonus(c.synth_grade);
       if (delta && delta > 0) score += delta * 3;
       // 커피 카테고리 정체성 보정 — 디저트 우세 카페는 '요즘 뜨는'에서 제외하고, 정체성 유지 카페만 가점.
       // 베이커리류가 리뷰 회전(버즈)만으로 '요즘 뜨는'을 과점하던 편향 완화(결함C, 배포abe8e99가 가점만으로는
@@ -82,7 +82,7 @@ export async function GET(req: NextRequest) {
         : (r30 >= 2 ? `최근 3개월 ${r90}건 (한 달새 ${r30}건) 입소문` : `최근 3개월 검증후기 ${r90}건 집중`);
       scored.push({ id: c.id, name: c.name, area: c.area, lat: 0, lng: 0, grade: c.synth_grade, count: total, identity: c.synth_identity, note: null, beanNote: [], reason, _s: score });
     }
-    scored.sort((a, b) => b._s - a._s);
+    scored.sort((a, b) => gradeRank(b.grade) - gradeRank(a.grade) || b._s - a._s);
     const rising = scored.slice(0, 12).map(({ _s, ...x }) => x);
     return NextResponse.json({ ok: true, region: region || "수도권 전체", hasDelta, count: rising.length, rising }, {
       headers: { "Cache-Control": "public, max-age=0, must-revalidate" },
