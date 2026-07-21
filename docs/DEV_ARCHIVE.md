@@ -128,3 +128,4 @@
 | 2026-07-20 08:48 | #414 | [검색P0][coord#219] semantic 폴백 gradeBonus 무력화 — 참고등급이 검증등급 위로 | 09b23faa | - | app/api/search/route.ts:266-285 semantic 폴백 exact+concept(무상한 필드가중치 누적)를 sim*100과 동일한 0~100 스케일로 후보군 |
 | 2026-07-20 08:52 | #415 | [검색P0][coord#219] momentum 강동구 top1 참고등급 승격 — gradeBonus로 억제 | 71b81425 | - | app/api/momentum/route.ts: 참고등급이 검증등급을 버즈점수로 역전하던 결함(gradeBonus 상수가산 무력화)을 구조적으로 해결 — 등급을 점수 가산에서 정렬 |
 | 2026-07-20 10:16 | #419 | [개발] 협업 #219: [재발 3회째] 검색랭킹 P0(등급역전) decisions row 미생성 24h+  | b1e6dff5 | - | scripts/make-digest.mjs에 제안서 미인입 감시 섹션 추가 — coord#187/#219 재발 원인(팀이 agent-reports/*-proposals-*.md로  |
+| 2026-07-21 11:12 | #421 | [제안→결재행 미생성 재발] rulegap P46/47/48+레드팀id1032 — coord#221→224  | 81831662 | - | scripts/make-digest.mjs 제안서 미인입 감시 근본수정: (1) coordination 행 존재만으로 인입 완료 오판하던 버그 수정 — 이제 decisions 행  |
