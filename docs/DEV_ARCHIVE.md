@@ -138,3 +138,4 @@
 | 2026-07-22 11:23 | #433 | [개발] 협업 #230: [정합성발견] 근거링크 일반어/부제 혼입형 교차오귀속 — 검증등급 5곳 포함 확정  | 7ae551ae | - | lib/reviewQuality.ts: coord#230 일반어/부제 혼입형 오귀속 근본수정. GENERIC_WORD에 라운지·신상·전통찻집·동네빵집·비치·베이글·샌드위치 추가,  |
 | 2026-07-22 23:02 | #444 | [자율진단] synth_coherence 재기록 누락 — 오탐 근거오염 경보(decisions#443) 구조 | 24147f0c | - | lib/synthStore.ts:794 healPublishedAudit — 재검 시 계산한 coh를 cafes.synth_coherence에 UPDATE로 반영(재기록 누락 수정 |
 | 2026-07-22 23:45 | #448 | [룰갭 P49] '오늘도' 등 조사결합 시간부사 NAME_STOPWORD 누락 — 다중토큰명 OR매칭 오염 | 780b4a3b | - | lib/reviewQuality.ts:285 NAME_STOPWORD Set에 "오늘도" 추가 — 조사결합 시간부사 OR매칭 오염 차단. tsc 신규에러 0, npm run bui |
+| 2026-07-22 23:49 | #449 | [룰갭 P50] 호텔부속 카페 — 웨딩/호캉스/타호텔 객실후기 등 비-F&B 콘텐츠 혼입(NONCAFE_BI | 9b447fb5 | - | lib/reviewQuality.ts: (1)NONCAFE_BIZ에 꽃집/플로리스트/화환 추가(132행) (2)호텔카페(이름에 호텔 또는 HOTEL_BRANDS 포함) + 숙박/호 |
