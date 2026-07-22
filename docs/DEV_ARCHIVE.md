@@ -131,3 +131,4 @@
 | 2026-07-21 11:12 | #421 | [제안→결재행 미생성 재발] rulegap P46/47/48+레드팀id1032 — coord#221→224  | 81831662 | - | scripts/make-digest.mjs 제안서 미인입 감시 근본수정: (1) coordination 행 존재만으로 인입 완료 오판하던 버그 수정 — 이제 decisions 행  |
 | 2026-07-22 00:24 | #424 | [coord#226 재상신] 카페상세 FAQ 구조화 — AI답변엔진(ChatGPT 등) 인용 최적화 | 063abd4d | - | app/c/[id]/page.tsx: buildFaq()로 FAQPage JSON-LD(schema.org) + 동일 내용의 가시 FAQ 아코디언(<details>) 추가. 소개/ |
 | 2026-07-22 00:28 | #425 | 구독상태 구분표시 | 915340a5 | low | app/admin/page.tsx(구독 카페 현황 모달)·app/api/subscription/route.ts(billing_key SELECT 추가): status+duratio |
+| 2026-07-22 01:39 | #427 | [개발] 협업 #227: [재확인] rulegap P46/47/48+id1032 실제 미인입 지속 — dec | 882e9412 | - | scripts/make-digest.mjs 제안서 미인입 감시 근본수정(#421 잔여버그): title/detail ILIKE 매치가 '이 제안서를 실제 처리한 결재행'과 '미인입 |
