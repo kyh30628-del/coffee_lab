@@ -8,7 +8,7 @@ import { fetchYouTubeReviews } from "./youtubeCollector";
 import { collectAndSynthesize, type RawSource, type BorderlineItem, type CollectResult } from "./collectOrchestrator";
 import { judgeReviews, hasJudgeKey } from "./reviewJudge";
 import { isNonCafe, isFranchise, isGenericFoodName, isSnackStall, isStructuralPhantom, isUnmannedCafe } from "./discover";
-import { nameCoherence, cleanCafeName } from "./reviewQuality";
+import { nameCoherence, cleanCafeName, verifyReview, isNonBranchWord } from "./reviewQuality";
 import { loadLearnedTerms } from "./learnedTerms";
 import { loadCriteria, getCriterionSync } from "./criteria";
 import { loadCriteriaLists } from "./criteriaLists";
@@ -183,7 +183,21 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   const latMin = getCriterionSync("geo.box.lat_min"), latMax = getCriterionSync("geo.box.lat_max");
   const lngMin = getCriterionSync("geo.box.lng_min"), lngMax = getCriterionSync("geo.box.lng_max");
   name = cleanCafeName(name); // 매칭·게이트(coherence·generic·nonCafe·franchise)는 SEO 서술어 꼬리 뗀 진짜 상호로 — '구구커피 원두 핸드드립 로스팅' 오염 차단
-  const { synth, collected, charScores, evidenceReviews, allEvidence, reviewDates, quality, borderline } = result;
+  const { synth, collected, charScores, evidenceReviews: evidenceReviewsRaw, allEvidence: allEvidenceRaw, reviewDates, quality, borderline } = result;
+  // [coordination#225 근본수정] healCrossCafeLinkContamination이 형제지점 오귀속으로 판단해 제거한 (카페,link)는
+  //   '영구' 제외해야 한다 — 안 그러면 매 재합성(synthAndStore) 사이클마다 원본 raw_reviews 풀에서 같은 근거가
+  //   그대로 재수집·재판정돼 되살아난다. 이게 07-07(#196)부터 3차례 동일 근거로 재발했던 실제 매커니즘(healer는
+  //   그 순간엔 정리하지만 다음 재합성이 되돌림) — 이 exclusion을 재합성의 유일한 쓰기 지점(storeResult)에서
+  //   직접 걸러 재발을 구조적으로 막는다. (healer와 동일하게 synth_count는 건드리지 않음 — 표시되는 근거 배열만 정리.)
+  await sql`CREATE TABLE IF NOT EXISTS cross_cafe_link_exclusions (
+    cafe_id BIGINT NOT NULL, link TEXT NOT NULL, reason TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (cafe_id, link)
+  )`.catch(() => {});
+  const excludedRows = (await sql`SELECT link FROM cross_cafe_link_exclusions WHERE cafe_id = ${cafeId}`.catch(() => [] as any[])) as any[];
+  const excludedLinks = new Set<string>(excludedRows.map((r: any) => r.link));
+  const dropExcluded = (arr: any[]) => excludedLinks.size ? arr.filter((r) => !excludedLinks.has(r?.link)) : arr;
+  const evidenceReviews = dropExcluded(evidenceReviewsRaw as any[]);
+  const allEvidence = allEvidenceRaw ? dropExcluded(allEvidenceRaw as any[]) : allEvidenceRaw;
   // 🔒 승인된 downgrade 상한(위 lastDowngradeCap) — 재계산 등급이 이를 넘어서면 상한으로 눌러앉힌다.
   //   내려가는 방향(실제 재계산이 더 낮음)은 막지 않는다 — 이 가드는 바닥이 아니라 천장이다.
   const downgradeCap = await lastDowngradeCap(cafeId);
@@ -653,25 +667,46 @@ export async function markJudged(cafeId: number) {
 //   지점 마커가 인용문에 없으면 불일치로 간주 — 브랜드명만으론 지점을 못 가리므로(제안26 사례:
 //   '올드페리도넛 수원오목천점' 원문이 무관 지점 '광교갤러리아점'에도 verified로 귀속됨). 전원 불일치면 전체 제거.
 //   여러 곳이 동시에 매칭되면(드묾) score 높은 한 곳만 남긴다.
-function evidenceHitsCafe(quote: string, name: string, areaTerms: string[]): boolean {
+// [coordination#225 근본수정] 위 간이 로직('전체이름 일치' / '○○점' 접미사 마커) 하나만으론 부족하다 —
+//   구·동·도로명 앵커나 프랜차이즈매물 판별 같은 지점앵커 신호는 안 본다. 그래서 이 함수와 별개로 이미
+//   존재하는 합성 파이프라인의 실제 판정기(reviewQuality.verifyReview — decisions#196부터 누적된 구/동/
+//   도로명 지점앵커 로직 전부 포함)를 '추가 하드 거부권'으로 함께 적용한다. quote는 synth_reviews에 남은
+//   축약문(title 없음)이라 verifyReview의 점수 자체는 못 믿는다(#395 후속 classify-cross-branch-quotes.mjs와
+//   동일 이유) — 그래서 '종합 품질 미달'(점수만의 사유) 거부는 무시하고, 지점/주소 불일치 같은 구조적 거부만
+//   신뢰한다. 근본원인(브랜드명만 보고 지점 토큰/주소를 대조 안 함)을 이 healer가 직접 아는 대신, 이미
+//   검증된 판정기를 재사용해 로직 중복·드리프트를 막는다(같은 개념의 사전이 파일마다 따로 놀며 갱신이 누락되던
+//   패턴 — '제과점'이 GENERIC_WORD엔 있었지만 지점앵커 사전엔 없어 반복 재발한 것과 동일한 구조적 문제).
+const SCORE_ONLY_REJECT_REASON = "종합 품질 미달";
+function evidenceHitsCafe(quote: string, name: string, areaTerms: string[], addr?: string, link?: string): boolean {
   const norm = (s: string) => (s || "").toLowerCase().replace(/\s+/g, "");
   const cleaned = cleanCafeName(name);
   const qN = norm(quote);
   const fullN = norm(cleaned);
-  if (fullN.length >= 4 && qN.includes(fullN)) return true; // 지점명 포함 전체이름 그대로 일치 — 최우선
-  const words = cleaned.split(/\s+/);
-  const last = words[words.length - 1] || "";
-  if (/^[가-힣0-9]{2,}점$/.test(last)) {
-    // 이름에 지점 표기가 있으면 그 지점 마커가 인용문에 있어야 인정 — 브랜드토큰만 일치는 형제지점 오염이라 불충분.
-    const marker = norm(last.replace(/점$/, ""));
-    return marker.length >= 2 && qN.includes(marker);
+  let baseHit: boolean;
+  if (fullN.length >= 4 && qN.includes(fullN)) baseHit = true; // 지점명 포함 전체이름 그대로 일치 — 최우선
+  else {
+    const words = cleaned.split(/\s+/);
+    const last = words[words.length - 1] || "";
+    // '제과점'처럼 지점명이 아니라 일반 업태 접미사인 '○○점'은 지점 마커로 오인하면 안 된다(coordination#225 —
+    //   isNonBranchWord로 verifyReview와 같은 사전을 재사용, 라이언베이커 신사점/제과점 오귀속의 근본원인).
+    if (/^[가-힣0-9]{2,}점$/.test(last) && !isNonBranchWord(last)) {
+      // 이름에 지점 표기가 있으면 그 지점 마커가 인용문에 있어야 인정 — 브랜드토큰만 일치는 형제지점 오염이라 불충분.
+      const marker = norm(last.replace(/점$/, ""));
+      baseHit = marker.length >= 2 && qN.includes(marker);
+    } else {
+      baseHit = nameCoherence(cleaned, [quote], areaTerms) === 1; // 지점표기 없는 단일매장은 브랜드토큰 일치로 판단
+    }
   }
-  return nameCoherence(cleaned, [quote], areaTerms) === 1; // 지점표기 없는 단일매장은 브랜드토큰 일치로 판단
+  if (!baseHit) return false;
+  const verdict = verifyReview({ title: "", body: quote, name: cleaned, areaTerms, addr, link, source: "blog" });
+  const why = verdict.reasons[verdict.reasons.length - 1] || "";
+  if (verdict.verdict === "rejected" && why !== SCORE_ONLY_REJECT_REASON) return false; // 구조적 거부(지점/주소 불일치 등) = 하드 무효
+  return true;
 }
 
 export async function healCrossCafeLinkContamination(): Promise<{ removed: number; groups: number; names: string[] }> {
   const rows = (await sql`
-    SELECT c.id, c.name, c.area, c.dong, elem->>'link' AS link, elem->>'quote' AS quote, (elem->>'score')::numeric AS score
+    SELECT c.id, c.name, c.area, c.dong, c.address AS addr, elem->>'link' AS link, elem->>'quote' AS quote, (elem->>'score')::numeric AS score
     FROM cafes c
     CROSS JOIN LATERAL jsonb_array_elements(
       CASE WHEN jsonb_typeof(c.synth_reviews) = 'array' THEN c.synth_reviews ELSE '[]'::jsonb END
@@ -685,7 +720,7 @@ export async function healCrossCafeLinkContamination(): Promise<{ removed: numbe
   const affectedNames = new Set<string>();
   let groupsResolved = 0;
   for (const g of groups) {
-    const scored = g.map((r: any) => ({ ...r, hit: evidenceHitsCafe(r.quote || "", r.name, [r.area, r.dong].filter(Boolean)) }));
+    const scored = g.map((r: any) => ({ ...r, hit: evidenceHitsCafe(r.quote || "", r.name, [r.area, r.dong].filter(Boolean), r.addr, r.link) }));
     const hits = scored.filter((s: any) => s.hit);
     const keepId: number | null = hits.length === 1 ? hits[0].id
       : hits.length > 1 ? hits.reduce((a: any, b: any) => (Number(b.score) || 0) > (Number(a.score) || 0) ? b : a).id
@@ -703,6 +738,12 @@ export async function healCrossCafeLinkContamination(): Promise<{ removed: numbe
   }
 
   let removed = 0;
+  if (killMap.size) {
+    await sql`CREATE TABLE IF NOT EXISTS cross_cafe_link_exclusions (
+      cafe_id BIGINT NOT NULL, link TEXT NOT NULL, reason TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (cafe_id, link)
+    )`.catch(() => {});
+  }
   for (const [cafeId, killLinks] of killMap) {
     const [row] = (await sql`SELECT synth_reviews, synth_reviews_all FROM cafes WHERE id=${cafeId}`) as any[];
     const parse = (v: any) => { if (typeof v === "string") { try { return JSON.parse(v); } catch { return []; } } return Array.isArray(v) ? v : []; };
@@ -712,6 +753,11 @@ export async function healCrossCafeLinkContamination(): Promise<{ removed: numbe
     const newSra = sra.filter((e: any) => !killLinks.has(e?.link));
     removed += sr.length - newSr.length;
     await sql`UPDATE cafes SET synth_reviews=${safeJson(newSr)}, synth_reviews_all=${safeJson(newSra)} WHERE id=${cafeId}`;
+    // [coordination#225 근본수정] 재합성 때 같은 근거가 되살아나지 않게 (카페,link)를 영구 기록 — storeResult가 참조.
+    for (const link of killLinks) {
+      await sql`INSERT INTO cross_cafe_link_exclusions (cafe_id, link, reason) VALUES (${cafeId}, ${link}, '형제지점/옆가게 근거 교차귀속(healCrossCafeLinkContamination)')
+        ON CONFLICT (cafe_id, link) DO NOTHING`.catch(() => {});
+    }
   }
   return { removed, groups: groupsResolved, names: [...affectedNames].slice(0, 12) };
 }
