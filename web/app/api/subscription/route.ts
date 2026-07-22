@@ -50,6 +50,9 @@ async function ensure() {
   await sql`ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS newsletter_opt_in BOOLEAN DEFAULT true`; // 주간 뉴스레터 수신동의
   await sql`ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS pin_emailed_at TIMESTAMPTZ`;             // 키 이메일 실제 발송 성공 시각(발송 증빙)
   await sql`ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS duration_days INT`;                     // 승인 시 확정한 이용기간(7일 체험/30일 등). 시계는 '첫 로그인'에 시작되므로 여기에 보관.
+  // 🔔 사장님發 구독 전환 요청 시각 — 체험/만료 사장님이 "유료 전환하고 싶다"를 스스로 남긴 신호. 관리자 대시보드
+  //   노출 + CEO 알림메일로 "실제 구독 요청 여부"를 즉시 알 수 있게 한다(카드결제 오픈 전에도 유효). 승인(activate) 시 클리어.
+  await sql`ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS conversion_requested_at TIMESTAMPTZ`;
   await ensureBilling(); // 💳 정기결제 컬럼(billing_key·customer_key·autopay 등) + payments 테이블 — 단일 출처 lib/billing.ts
   // 만료 자동 반영: 기간 지난 active → expired + 모든 혜택 해제(골드핀·우선노출·쇼케이스). expires_at IS NULL=미시작(첫 로그인 전)은 만료 아님.
   await sql`UPDATE subscriptions SET status='expired', updated_at=now() WHERE status='active' AND expires_at IS NOT NULL AND expires_at < now()`;
@@ -73,9 +76,9 @@ export async function GET(req: NextRequest) {
     if (req.nextUrl.searchParams.get("all")) {
       if (!authed(req)) return NextResponse.json({ ok: false }, { status: 401 });
       await ensureOwnerActivity(); // 활동 추적 컬럼·테이블 보장
-      const rows = await sql`SELECT s.id, s.cafe_id, s.cafe_name, s.owner_name, s.contact, s.email, s.plan, s.price, s.status, s.pin, s.pin_emailed_at, s.updated_at, s.newsletter_opt_in, s.started_at, s.expires_at, s.duration_days, s.created_at, s.biz_reg_url, s.biz_no, s.attested, s.signup_ip, s.signup_ua, s.verified, s.suspend_reason, s.suspended_at, s.last_seen_at, s.first_login_at, COALESCE(s.login_count,0) AS login_count, s.billing_key, s.card_last4, s.card_company, s.autopay, s.last_payment_status, s.next_billing_at, s.billing_status, COALESCE(c.published, false) AS cafe_published,
+      const rows = await sql`SELECT s.id, s.cafe_id, s.cafe_name, s.owner_name, s.contact, s.email, s.plan, s.price, s.status, s.pin, s.pin_emailed_at, s.updated_at, s.newsletter_opt_in, s.started_at, s.expires_at, s.duration_days, s.created_at, s.biz_reg_url, s.biz_no, s.attested, s.signup_ip, s.signup_ua, s.verified, s.suspend_reason, s.suspended_at, s.last_seen_at, s.first_login_at, COALESCE(s.login_count,0) AS login_count, s.billing_key, s.card_last4, s.card_company, s.autopay, s.last_payment_status, s.next_billing_at, s.billing_status, s.conversion_requested_at, COALESCE(c.published, false) AS cafe_published,
         (SELECT COALESCE(json_agg(json_build_object('event', e.event, 'at', e.at) ORDER BY e.at DESC), '[]'::json) FROM (SELECT event, at FROM owner_events WHERE cafe_id = s.cafe_id ORDER BY at DESC LIMIT 8) e) AS recent_events
-        FROM subscriptions s LEFT JOIN cafes c ON c.id = s.cafe_id ORDER BY (s.status='pending') DESC, s.created_at DESC LIMIT 200` as unknown as any[];
+        FROM subscriptions s LEFT JOIN cafes c ON c.id = s.cafe_id ORDER BY (s.conversion_requested_at IS NOT NULL AND s.status<>'active') DESC, (s.status='pending') DESC, s.created_at DESC LIMIT 200` as unknown as any[];
       // emailReady: 이 환경(프로덕션 포함)에 Resend 키가 있어야 승인 시 키 이메일이 자동 발송됨
       // liveExposure: 소비자에게 실제로 우선노출(금색핀·추천카페·쇼케이스)이 보이는지 — SUBSCRIPTION_LIVE=true 여야 함
       // bankTransferEmail: 🏦 계좌이체 안내메일 발송이 켜져 있는지(기본 off) — 꺼져 있으면 버튼 비활성
@@ -86,15 +89,51 @@ export async function GET(req: NextRequest) {
     if (!cafeId) return NextResponse.json({ ok: false, error: "cafeId 필요" }, { status: 400 });
     const scope = await ownerScope(req);
     if (scope !== "admin" && scope !== cafeId) return NextResponse.json({ ok: false }, { status: 401 });
-    const r = (await sql`SELECT id, cafe_id, owner_name, plan, price, status, started_at, expires_at, duration_days, autopay, billing_status, card_last4, card_company, next_billing_at, last_payment_status FROM subscriptions WHERE cafe_id=${cafeId}`)[0] ?? null;
+    const r = (await sql`SELECT id, cafe_id, owner_name, plan, price, status, started_at, expires_at, duration_days, autopay, billing_status, card_last4, card_company, next_billing_at, last_payment_status, conversion_requested_at FROM subscriptions WHERE cafe_id=${cafeId}`)[0] ?? null;
     return NextResponse.json({ ok: true, sub: r, paymentsLive: paymentsLive() });
   } catch (e) { return NextResponse.json({ ok: false, error: String(e) }, { status: 500 }); }
+}
+
+// 🔔 CEO 알림 메일(Resend) — 사장님 구독 요청 등 즉시 인지가 필요한 이벤트. 키 없으면 조용히 미발송(무해).
+async function sendCeoAlert(subject: string, html: string): Promise<boolean> {
+  const key = process.env.RESEND_API_KEY;
+  const to = process.env.ALERT_EMAIL || "kyh30628@gmail.com";
+  if (!key) return false;
+  try {
+    const r = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ from: process.env.RESEND_FROM || "동네 커피 노트 <onboarding@resend.dev>", to: [to], subject, html }),
+    });
+    return r.ok;
+  } catch { return false; }
 }
 
 export async function POST(req: NextRequest) {
   try {
     await ensureSchema(); await ensure();
     const b = await req.json().catch(() => ({}));
+
+    // 🔔 사장님發 구독 전환 요청 (PIN 인증 — 관리자 인증 불필요, 본인 카페만). status는 안 건드리고 신호만 남긴다.
+    //   → conversion_requested_at 기록 + owner_events 로그 + CEO 알림메일. 관리자 대시보드에 '구독 전환 요청'으로 노출.
+    if (b.action === "request_conversion") {
+      const cafeId = Number(b.cafeId);
+      if (!cafeId) return NextResponse.json({ ok: false, error: "cafeId 필요" }, { status: 400 });
+      const scope = await ownerScope(req);
+      if (scope !== "admin" && scope !== cafeId) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+      const s = (await sql`SELECT cafe_name, owner_name, contact, email, status, plan FROM subscriptions WHERE cafe_id=${cafeId}`)[0] as any;
+      if (!s) return NextResponse.json({ ok: false, error: "구독 없음" }, { status: 404 });
+      await sql`UPDATE subscriptions SET conversion_requested_at=now(), updated_at=now() WHERE cafe_id=${cafeId}`;
+      await sql`INSERT INTO owner_events (cafe_id, event, at) VALUES (${cafeId}, 'request_conversion', now())`.catch(() => {});
+      const note = String(b.note ?? "").slice(0, 300).replace(/[<>]/g, "");
+      await sendCeoAlert(`🔔 구독 전환 요청 — ${s.cafe_name ?? ""}`,
+        `<div style="font-family:sans-serif;line-height:1.6"><h2>사장님이 유료 구독 전환을 요청했어요</h2>` +
+        `<p><b>카페</b>: ${s.cafe_name ?? ""} (id ${cafeId})<br><b>사장님</b>: ${s.owner_name ?? ""}<br>` +
+        `<b>연락처</b>: ${(decryptPII(s.contact ?? "") || "-")} · ${(decryptPII(s.email ?? "") || "-")}<br>` +
+        `<b>현재 상태</b>: ${s.status ?? "-"} · ${s.plan ?? ""}</p>${note ? `<p><b>메모</b>: ${note}</p>` : ""}` +
+        `<p>→ /admin '💳 구독 카페 현황'에서 승인(activate) 또는 계좌이체 안내로 진행하세요.</p></div>`);
+      return NextResponse.json({ ok: true, requested: true });
+    }
 
     // 관리자 액션: 활성화/해지/연장 (관리자 인증 필요)
     if (b.action) {
@@ -110,13 +149,13 @@ export async function POST(req: NextRequest) {
         const isTrial = days <= 7;
         if (isTrial) {
           // 🕐 무료 체험: 시계는 '첫 로그인'에. 승인 시엔 PIN·이용기간만 확정(started/expires·혜택은 첫 접속 때 lib/ownerActivity가 ON).
-          await sql`UPDATE subscriptions SET status='active', started_at=NULL, expires_at=NULL, duration_days=${days}, pin=${pin}, verified=true, updated_at=now() WHERE id=${id}`;
+          await sql`UPDATE subscriptions SET status='active', started_at=NULL, expires_at=NULL, duration_days=${days}, pin=${pin}, verified=true, conversion_requested_at=NULL, updated_at=now() WHERE id=${id}`;
           if (s.cafe_id) await sql`INSERT INTO cafe_promos (cafe_id, featured, featured_until, approved, published, updated_at)
             VALUES (${s.cafe_id}, false, NULL, false, true, now())
             ON CONFLICT (cafe_id) DO UPDATE SET featured=false, featured_until=NULL, approved=false, updated_at=now()`;
         } else {
           // 💳 유료 구독: 결제 시점(=이 승인)부터 즉시 시작 + 전 혜택(골드핀·우선노출·쇼케이스) ON.
-          await sql`UPDATE subscriptions SET status='active', started_at=now(), expires_at=now()+make_interval(days=>${days}), duration_days=${days}, pin=${pin}, verified=true, updated_at=now() WHERE id=${id}`;
+          await sql`UPDATE subscriptions SET status='active', started_at=now(), expires_at=now()+make_interval(days=>${days}), duration_days=${days}, pin=${pin}, verified=true, conversion_requested_at=NULL, updated_at=now() WHERE id=${id}`;
           if (s.cafe_id) await sql`INSERT INTO cafe_promos (cafe_id, featured, featured_until, approved, published, updated_at)
             VALUES (${s.cafe_id}, true, now()+make_interval(days=>${days}), true, true, now())
             ON CONFLICT (cafe_id) DO UPDATE SET featured=true, featured_until=now()+make_interval(days=>${days}), approved=true, updated_at=now()`;

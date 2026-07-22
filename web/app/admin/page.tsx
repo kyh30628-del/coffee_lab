@@ -839,8 +839,11 @@ export default function AdminPage() {
         </div>
 
         {/* 🔔 사장님 대응 리마인더 — 승인 대기·미발송 주간레터 */}
-        {(subscribers.some((s: any) => s.status === "pending") || (nlList[0] && nlList[0].status !== "sent")) && (
+        {(subscribers.some((s: any) => s.status === "pending") || subscribers.some((s: any) => s.conversion_requested_at && s.status !== "active") || (nlList[0] && nlList[0].status !== "sent")) && (
           <div className="mb-4 space-y-2">
+            {subscribers.some((s: any) => s.conversion_requested_at && s.status !== "active") && (
+              <button onClick={() => setShowSubsModal(true)} className="w-full text-left bg-orange-50 border border-orange-400 rounded-xl px-3.5 py-2.5 text-[12.5px] text-orange-800 font-bold">🔔 구독 전환 요청 {subscribers.filter((s: any) => s.conversion_requested_at && s.status !== "active").length}명 — 사장님이 유료 전환을 원해요. 승인 또는 계좌이체 안내로 진행하세요 →</button>
+            )}
             {subscribers.some((s: any) => s.status === "pending") && (
               <button onClick={() => setShowSubsModal(true)} className="w-full text-left bg-amber-50 border border-amber-300 rounded-xl px-3.5 py-2.5 text-[12.5px] text-amber-800 font-bold">🔔 승인 대기 사장님 {subscribers.filter((s: any) => s.status === "pending").length}명 — 서류 확인 후 승인하세요 →</button>
             )}
@@ -959,6 +962,7 @@ export default function AdminPage() {
                       <span className="font-bold text-sm">{s.cafe_name}</span>
                       <span className={`text-[10px] ml-2 px-2 py-0.5 rounded-full font-bold border ${badge.cls}`}>{badge.label}{s.status === "active" ? (s.expires_at ? ` · D-${dleft}` : ` · ⏳ 로그인 대기(첫 접속 시 ${s.duration_days || 30}일 시작)`) : ""}</span>
                       <span className={`text-[10px] ml-1.5 px-2 py-0.5 rounded-full font-bold border ${s.billing_key ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-stone-100 text-stone-500 border-stone-200"}`}>{s.billing_key ? `💳 카드 등록${s.card_last4 ? ` ${s.card_company ?? ""} ····${s.card_last4}` : ""}${s.autopay ? " · 자동결제 ON" : ""}` : "💳 카드 미등록"}</span>
+                      {s.conversion_requested_at && s.status !== "active" && <span className="text-[10px] ml-1.5 px-2 py-0.5 rounded-full font-bold border bg-orange-100 text-orange-800 border-orange-300" title={`요청일 ${new Date(s.conversion_requested_at).toLocaleDateString("ko-KR")}`}>🔔 구독 전환 요청</span>}
                       <div className="text-[12px] text-stone-600 truncate">{s.owner_name} · 📞 {s.contact}{s.email ? ` · ✉️ ${s.email}` : ""} · {s.plan}{s.price ? ` ₩${s.price.toLocaleString()}` : " 무료"}</div>
                       {/* 🔒 사칭 방지 증빙 — 승인 전 대조: 사업자등록증·대표자명·번호·동의·접속기록 */}
                       <div className="mt-1.5 rounded-lg bg-amber-50/70 border border-amber-100 p-2 text-[11px] text-stone-600 space-y-0.5">

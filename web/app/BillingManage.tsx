@@ -7,6 +7,7 @@ type Sub = {
   status?: string; duration_days?: number | null; expires_at?: string | null;
   autopay?: boolean; billing_status?: string | null; card_last4?: string | null;
   card_company?: string | null; next_billing_at?: string | null;
+  conversion_requested_at?: string | null;
 };
 
 const fmt = (d?: string | null) => {
@@ -70,6 +71,18 @@ export default function BillingManage({ cafeId, pin }: { cafeId: number; pin: st
     } catch (e) { setMsg("결제창을 여는 중 문제가 생겼어요. 잠시 후 다시 시도해 주세요."); setBusy(false); }
   };
 
+  // 🔔 카드 정기결제 오픈 전(또는 카드 미등록) 사장님이 유료 전환 의사를 남긴다 — CEO에게 알림 + 관리자 대시보드 노출.
+  const requestConversion = async () => {
+    setBusy(true); setMsg("");
+    try {
+      const r = await fetch("/api/subscription", { method: "POST", headers: hdr, body: JSON.stringify({ action: "request_conversion", cafeId }) });
+      const d = await r.json();
+      if (d.ok) { setMsg("✅ 구독 요청이 접수됐어요 — 담당자가 곧 연락드릴게요."); await reload(); }
+      else setMsg(d.error || "요청 실패 — 잠시 후 다시 시도해 주세요.");
+    } catch { setMsg("요청 처리 중 문제가 생겼어요."); }
+    setBusy(false);
+  };
+
   const cancel = async () => {
     if (!confirm("정기결제를 해지할까요? 남은 이용기간까지는 그대로 이용하실 수 있어요.")) return;
     setBusy(true); setMsg("");
@@ -119,8 +132,17 @@ export default function BillingManage({ cafeId, pin }: { cafeId: number; pin: st
           </button>
           <p className="text-[10.5px] text-[#8a7458] mt-2 text-center leading-relaxed">카드 정보는 토스페이먼츠가 안전하게 보관하며, 본 서비스는 저장하지 않아요. 언제든 해지할 수 있어요.</p>
         </div>
+      ) : sub.conversion_requested_at ? (
+        <div className="mt-1 bg-[#eef6ec] border border-[#cfe6c9] rounded-xl px-3 py-2.5 text-[12.5px] text-[#3f6b3a] leading-relaxed">
+          ✅ <b>구독 요청이 접수됐어요.</b> 담당자가 곧 연락드릴게요{sub.conversion_requested_at ? ` (요청일 ${fmt(sub.conversion_requested_at)})` : ""}.
+        </div>
       ) : (
-        <p className="text-[12px] text-[#8a7458] mt-1 leading-relaxed">정기결제(카드 자동결제)는 <b>곧 오픈</b>돼요. 그 전까지는 계좌이체로 안내드립니다. 문의: dongnecoffeenote@gmail.com</p>
+        <div className="mt-1">
+          <button onClick={requestConversion} disabled={busy} className="w-full bg-gradient-to-r from-[#9c6b3f] to-[#2b2018] text-[#f4ece0] rounded-xl py-3 text-[13.5px] font-bold disabled:opacity-50">
+            {busy ? "요청 중…" : "구독(홍보팩) 전환 요청하기"}
+          </button>
+          <p className="text-[10.5px] text-[#8a7458] mt-2 text-center leading-relaxed">카드 정기결제는 <b>곧 오픈</b>돼요. 지금 요청하시면 담당자가 계좌이체 등으로 안내드립니다. 문의: dongnecoffeenote@gmail.com</p>
+        </div>
       )}
     </div>
   );
