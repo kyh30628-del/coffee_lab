@@ -37,7 +37,7 @@ const escHtml = (s: string) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp
 async function sendCreditAlertEmail(r: ProbeResult): Promise<boolean> {
   const key = process.env.RESEND_API_KEY;
   if (!key) return false;
-  const to = process.env.ALERT_EMAIL || "kyh30628@gmail.com";
+  const to = process.env.ALERT_EMAIL || "dongnecoffeenote@gmail.com";
   const label = r.signal === "credit" ? "크레딧 소진" : "인증키 오류";
   const subject = `🚨 [동네 커피 노트] Anthropic 콘솔키 ${label} — 결제/키 확인 필요`;
   const html = `<div style="font-family:'Apple SD Gothic Neo',sans-serif;padding:24px;color:#2b2018;">
