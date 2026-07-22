@@ -153,7 +153,12 @@ const CAFE_CONTEXT = /(카페|커피|라떼|아메리카노|에스프레소|콜�
 //   스쳐 딸려오던 신종 — 카페 맥락(CAFE_CONTEXT_STRONG) 없으면 nameAsWord 오염으로 거절(진짜 후기는 카페어 동반).
 //   룰갭 P3(2026-07-08, rulegap-proposals-20260708.md): 관용구·형용사·영화제목이 카페명이라 무관 글에
 //   '문장 성분'으로 우연일치 — '어느멋진날'(id15214)·'나무그늘아래'(id11358)·'버라이어티'(id11444) 각 4-5/6 무관.
-const COMMON_WORD_NAMES = new Set(["일상적", "마찬가지", "그리고", "오래오래", "이러쿵", "어쩌면", "자수성가", "멍하니", "오늘의날씨", "소소한일상", "하루에", "여기서", "인디고", "행복이가득한집", "어느멋진날", "나무그늘아래", "버라이어티"]);
+// 룰갭 P47(2026-07-19, rulegap-proposals-20260719-0813.md + addendum 2건, #428): "시너지"(id14692)·"온기"
+//   (id9294)·"크래프트"(id10527 "카페 크래프트")·"티타임"(id18081 "티타임카페")·"팔레트"(id13808 "카페 팔레트")
+//   — 음식/음료 맛 묘사·감성적 글쓰기·영어 외래어 관용구로 흔히 쓰이는 추상명사 카페명이 무관 글(타 레스토랑
+//   후기·지역 축제 공지·인테리어 컨설팅 글 등)의 우연한 단어 일치로 오염됐다. 부가어(카페 접두/접미)가 붙은
+//   이름은 위 nameCommonPhrase 판정에서 coreTokensDetail의 유일 식별토큰(onlyTok)까지 함께 대조한다.
+const COMMON_WORD_NAMES = new Set(["일상적", "마찬가지", "그리고", "오래오래", "이러쿵", "어쩌면", "자수성가", "멍하니", "오늘의날씨", "소소한일상", "하루에", "여기서", "인디고", "행복이가득한집", "어느멋진날", "나무그늘아래", "버라이어티", "시너지", "온기", "크래프트", "티타임", "팔레트"]);
 // ★ 비카페 업종이 '제목을 지배'할 때의 가드 — 매장·음료·주문·메뉴·좌석은 피부관리/필라테스 등 비카페도 흔히 써서
 //   가드를 뚫는다('피부관리 하이드뷰티…매장 전화번호'→결). 이 경로엔 진짜 커피전문 어휘(카페·커피·디저트·원두…)만 인정(2026-06-28).
 const CAFE_CONTEXT_STRONG = /(카페|커피|라떼|아메리카노|에스프레소|콜드브루|핸드드립|디저트|케이크|베이커리|빵|제과|원두|바리스타|아인슈페너|브런치|로스팅|카공|cafe|coffee|latte)/i;
@@ -762,18 +767,23 @@ export function verifyReview(input: QualityInput): QualityResult {
   //   비카페 소매/서비스 전반의 범용어라 관용구 카페명(자수성가 등)의 무관 글을 못 걸러냄(전역 적용은 비권장).
   //   룰갭 P23(#270/#290): 위험한 카페명(초단어·일반어)을 두 갈래로 분리해 근접매칭 강화.
   const nameShort = nameClean.length >= 1 && nameClean.length <= 2;
-  const nameCommonPhrase = COMMON_WORD_NAMES.has(nameClean);
-  if (nameShort) {
-    // 1~2글자 이름은 근접 창이 불안정(진짜후기 과다거절 위험) → 기존 '전역' 맥락판정 유지.
-    if (!CAFE_CONTEXT_STRONG.test(fullL) && !titleHasCafeWord && !bodyHasCafeWord) {
-      return { verdict: "rejected", score: 2, reasons: ["초단어 카페명 우연일치(카페 맥락 전무) — nameAsWord 오염"], signals: sig };
-    }
-  } else if (nameCommonPhrase) {
+  //   룰갭 P47(#428): "카페 크래프트"·"티타임카페"처럼 부가어(카페 접두/접미)가 붙은 상호는 nameClean(전체이름
+  //   원문)이 COMMON_WORD_NAMES와 일치하지 않는다 — coreTokensDetail이 뽑은 유일 식별토큰(onlyTok)까지 함께 대조.
+  const commonAnchor = COMMON_WORD_NAMES.has(nameClean) ? nameClean : (onlyTok && COMMON_WORD_NAMES.has(onlyTok) ? onlyTok : "");
+  const nameCommonPhrase = !!commonAnchor;
+  if (nameCommonPhrase) {
     // 관용구·일반어 카페명은 상호명 토큰 ±25자 근접 안에 카페맥락어가 있을 때만 진짜후기로 인정(제목 카페어는 강신호로 예외).
     //   멀리 떨어진 카페어 우연 동시언급은 더 이상 게이트를 무력화하지 못한다(전역 bodyHasCafeWord 예외 제거 — 근접판정 무력화 방지).
+    //   룰갭 P47(#428): 근접판정이 nameShort의 전역판정보다 정밀하므로, 화이트리스트에 있으면 2글자 이하("온기")도
+    //   이 경로를 우선한다(id9294 실측 — 전역판정만으론 무관 글 속 우연한 "카페" 언급 하나로도 뚫렸다).
     const fullN = norm(`${title} ${body}`);
-    if (!ctxNearName(fullN, nameClean, CAFE_CONTEXT_STRONG) && !titleHasCafeWord) {
+    if (!ctxNearName(fullN, commonAnchor, CAFE_CONTEXT_STRONG) && !titleHasCafeWord) {
       return { verdict: "rejected", score: 2, reasons: ["일반어 카페명 우연일치(카페명 근접 맥락 전무) — nameAsWord 오염"], signals: sig };
+    }
+  } else if (nameShort) {
+    // 1~2글자 이름(관용구 사전에 없는 것)은 근접 창이 불안정(진짜후기 과다거절 위험) → 기존 '전역' 맥락판정 유지.
+    if (!CAFE_CONTEXT_STRONG.test(fullL) && !titleHasCafeWord && !bodyHasCafeWord) {
+      return { verdict: "rejected", score: 2, reasons: ["초단어 카페명 우연일치(카페 맥락 전무) — nameAsWord 오염"], signals: sig };
     }
   }
   // [지역 SEO 서비스 블로그] 법률·시공·의료·청소 SEO 글이 카페명(일상어)을 제목에 끼움 + 카페맥락 전무 → 무관 홍보글(이해·공유·유지…).
@@ -969,13 +979,28 @@ export function verifyReview(input: QualityInput): QualityResult {
   if (input.addr) {
     const guOf = (s: string) => [...new Set(s.match(/[가-힣]{2,4}(시|군|구)/g) ?? [])];
     const roadOf = (s: string) => (s.match(/[가-힣A-Za-z0-9]{2,}(?:대로|로|길)/g) ?? []).map((r) => r.replace(/\s*\d+(번?길)?$/, "").replace(/\d+$/, "")).filter((r) => r.length >= 2);
+    // 룰갭 P48(#428): '구' 행정구역이 없는 시·군(이천·가평·포천·여주·양평·과천·의왕·안성·동두천·연천·광주·
+    //   하남·오산·구리·양주 등)은 guOf가 자기 자신("이천시") 하나만 매칭한다 — 등록주소도, 완전히 다른 위치의
+    //   리뷰주소도 동일 토큰이 돼 guDiff가 항상 false로 고정, 주소검증 게이트 자체가 무력화된다(id8115 실측,
+    //   노출 6건 중 5건=83%가 등록주소와 다른 읍/면/동 소재 별개 업체). '구' 토큰이 전혀 없으면, 등록주소의
+    //   읍/면/동이 리뷰 전문 어디에도 안 나오는 것 + 도로명 불일치를 배제 조건으로 쓴다(id8115 실측 리뷰는
+    //   읍/면/동을 아예 언급 안 하고 다른 도로명만 쓰므로, '리뷰도 읍면동 토큰을 갖고 그게 다를 때만'으로는
+    //   못 잡는다 — 등록 읍/면/동의 '부재'만으로 판정, 도로명 불일치가 함께 있어야 하므로 과탈락 위험은 낮음).
+    const subOf = (s: string) => [...new Set(s.match(/[가-힣]{2,4}(읍|면|동)/g) ?? [])];
     const cGu = guOf(input.addr), cRoad = roadOf(input.addr);
     const fullT = `${title} ${body}`;
     if (cGu.length && cRoad.length && /[가-힣]{2,4}(시|군|구)\s*[가-힣]{0,5}\s*[가-힣A-Za-z0-9]{2,}(대로|로|길)\s*\d/.test(fullT)) {
       const rGu = guOf(fullT), rRoad = roadOf(fullT);
       const guDiff = rGu.length > 0 && !rGu.some((g) => cGu.includes(g));
       const roadDiff = rRoad.length > 0 && !rRoad.some((rr) => cRoad.some((cc) => cc.includes(rr) || rr.includes(cc)));
-      if (guDiff && roadDiff) {
+      const cHasGu = cGu.some((g) => /구$/.test(g));
+      if (!cHasGu) {
+        const cSub = subOf(input.addr);
+        const subMissing = cSub.length > 0 && !cSub.some((s) => fullT.includes(s));
+        if (subMissing && roadDiff) {
+          return { verdict: "rejected", score: 5, reasons: ["다른 위치 업체 후기(리뷰에 등록 읍면동 언급 없고 도로명도 불일치)"], signals: sig };
+        }
+      } else if (guDiff && roadDiff) {
         return { verdict: "rejected", score: 5, reasons: ["다른 위치 업체 후기(리뷰 주소가 등록 구·도로명과 모두 불일치)"], signals: sig };
       }
     }
