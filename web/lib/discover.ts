@@ -226,6 +226,9 @@ export const isNonCafe = (name: string, category: string) => {
   return false;
 };
 
+// 네이버 지역검색 link 필드가 인스타그램일 때만 채택(스마트플레이스에 SNS를 홈페이지로 등록한 업체) — scripts/instagram-backfill.mjs와 동일 규칙.
+const IG_RE = /^https?:\/\/(www\.)?instagram\.com\//i;
+
 async function localSearch(query: string, sort: "comment" | "random" = "comment") {
   const url = `https://openapi.naver.com/v1/search/local.json?query=${encodeURIComponent(query)}&display=5&sort=${sort}`;
   const res = await fetch(url, { headers: { "X-Naver-Client-Id": ID!, "X-Naver-Client-Secret": SECRET! } });
@@ -246,6 +249,9 @@ async function localSearch(query: string, sort: "comment" | "random" = "comment"
     category: stripTags(it.category || ""),
     lng: it.mapx ? Number(it.mapx) / 1e7 : null,
     lat: it.mapy ? Number(it.mapy) / 1e7 : null,
+    // B2B 아웃리치 타깃 데이터 공백(coordination#232) — 네이버 응답에 이미 들어있는 링크/전화를 발굴 시점에 채움.
+    instagramUrl: IG_RE.test(it.link || "") ? it.link : null,
+    phone: stripTags(it.telephone || "") || null,
   }));
 }
 
@@ -371,10 +377,10 @@ export async function discoverRegion(region: string, areaLabel: string, keywords
     if (withCoord.length) {
       const minLat = Math.min(...withCoord.map((i) => i.lat as number)) - 0.001, maxLat = Math.max(...withCoord.map((i) => i.lat as number)) + 0.001;
       const minLng = Math.min(...withCoord.map((i) => i.lng as number)) - 0.001, maxLng = Math.max(...withCoord.map((i) => i.lng as number)) + 0.001;
-      ex = (await sql`SELECT id, name, dong, naver_category, lat, lng FROM cafes
+      ex = (await sql`SELECT id, name, dong, naver_category, phone, instagram_url, lat, lng FROM cafes
         WHERE name = ANY(${names}) OR (lat BETWEEN ${minLat} AND ${maxLat} AND lng BETWEEN ${minLng} AND ${maxLng})`) as any[];
     } else {
-      ex = (await sql`SELECT id, name, dong, naver_category, lat, lng FROM cafes WHERE name = ANY(${names})`) as any[];
+      ex = (await sql`SELECT id, name, dong, naver_category, phone, instagram_url, lat, lng FROM cafes WHERE name = ANY(${names})`) as any[];
     }
     const byName = new Map<string, any>();
     for (const c of ex) if (!byName.has(c.name)) byName.set(c.name, c);
@@ -383,16 +389,18 @@ export async function discoverRegion(region: string, areaLabel: string, keywords
       let m = byName.get(it.name);
       if (!m && it.lat != null) m = pts.find((p) => Math.abs(p.lat - (it.lat as number)) < 0.0005 && Math.abs(p.lng - (it.lng as number)) < 0.0005)?.c;
       if (m) {
-        // 기존 카페: 동·카테고리 없으면 백필(카테고리는 비카페 게이트 정확도에 중요).
+        // 기존 카페: 동·카테고리·인스타그램·전화 없으면 백필(카테고리는 비카페 게이트 정확도, 인스타/전화는 B2B 아웃리치용 — coordination#232).
         if (it.dong && !m.dong) { await sql`UPDATE cafes SET dong = ${it.dong} WHERE id = ${m.id}`; backfilled++; m.dong = it.dong; }
         if (it.category && !m.naver_category) { await sql`UPDATE cafes SET naver_category = ${it.category} WHERE id = ${m.id}`; m.naver_category = it.category; }
+        if (it.instagramUrl && !m.instagram_url) { await sql`UPDATE cafes SET instagram_url = ${it.instagramUrl} WHERE id = ${m.id}`; m.instagram_url = it.instagramUrl; }
+        if (it.phone && !m.phone) { await sql`UPDATE cafes SET phone = ${it.phone} WHERE id = ${m.id}`; m.phone = it.phone; }
         skipped++; continue;
       }
       const pseudoId = `nl_${it.name.replace(/\s/g, "")}_${Math.round((it.lat as number) * 1e5)}`;
       // 신규 카페는 pipeline_status='new'로 태어남 → 풀 게이트(합성·AI판정·임베딩·검증) 통과 후에만 공개.
       await sql`
-        INSERT INTO cafes (place_id, name, area, dong, naver_category, address, lat, lng, source, published, roasts_own, pipeline_status)
-        VALUES (${pseudoId}, ${it.name}, ${storeArea}, ${it.dong}, ${it.category}, ${it.address}, ${it.lat}, ${it.lng}, 'discover', false, false, 'new')
+        INSERT INTO cafes (place_id, name, area, dong, naver_category, address, lat, lng, phone, instagram_url, source, published, roasts_own, pipeline_status)
+        VALUES (${pseudoId}, ${it.name}, ${storeArea}, ${it.dong}, ${it.category}, ${it.address}, ${it.lat}, ${it.lng}, ${it.phone}, ${it.instagramUrl}, 'discover', false, false, 'new')
         ON CONFLICT (place_id) DO NOTHING`;
       inserted++;
       // 같은 배치 내 후속 중복 방지(직전에 넣은 것도 대조 대상에 추가)
