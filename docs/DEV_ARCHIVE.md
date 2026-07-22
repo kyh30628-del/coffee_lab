@@ -133,3 +133,4 @@
 | 2026-07-22 00:28 | #425 | 구독상태 구분표시 | 915340a5 | low | app/admin/page.tsx(구독 카페 현황 모달)·app/api/subscription/route.ts(billing_key SELECT 추가): status+duratio |
 | 2026-07-22 01:39 | #427 | [개발] 협업 #227: [재확인] rulegap P46/47/48+id1032 실제 미인입 지속 — dec | 882e9412 | - | scripts/make-digest.mjs 제안서 미인입 감시 근본수정(#421 잔여버그): title/detail ILIKE 매치가 '이 제안서를 실제 처리한 결재행'과 '미인입 |
 | 2026-07-22 04:24 | #428 | [개발] 협업 #231: [3차 재상신] P46/P47/P48+레드팀 id11208/id18854 — 결재행 | 79818d8d | - | P46: lib/criteriaListsBase.ts identity.weak_token에 "스토리" 추가(id1338). P47: lib/reviewQuality.ts COMMO |
+| 2026-07-22 04:34 | #429 | [협업#225 SLA위반 에스컬레이션] 프랜차이즈 형제지점 증거 교차공유 — 매칭 파이프라인 지점앵커 근본수 | f3278240 | - | lib/reviewQuality.ts: isNonBranchWord를 모듈스코프로 끌어올려 export(GENERIC_WORD 포함) — 지점앵커 사전에 제과점 등 업태접미사 드리 |
