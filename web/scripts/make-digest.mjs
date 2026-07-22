@@ -41,18 +41,31 @@ const today = new Date().toISOString().slice(0, 10);
   //    사이클이 이 DIGEST를 읽고 판단한다. 12h~168h(7일) 미해결만 표시(정상 검토시간엔 안 뜨고, 몇 주 전 이력까지
   //    훑는 노이즈도 방지). 48h→168h로 확장한 이유: P47/P48(rulegap-proposals-20260719-0813.md)이 생성 후 47h대에
   //    걸려있어 기존 48h 캡이 실제 방치를 창밖으로 밀어내 숨기기 직전이었다 — #421 재발 원인 중 하나.
+  //    ⚠️ #427 근본원인: title/detail ILIKE 매치가 "이 제안서를 실제로 다룬 결재행"과 "이 제안서 미인입 문제를
+  //    논의만 하는 메타 결재행"(#421처럼 "감시 로직을 고쳤다"는 내용에서 대상 파일명을 나열)을 구분 못 해, 메타
+  //    결재행이 나오는 순간 그 안에 언급된 모든 제안서가 "인입완료"로 오판되고 감시망에서 사라졌다(P46/47/48+id1032
+  //    가 #421 배포 후 실제로 그렇게 사라짐 — 재확인 결재 #427이 발견). 같은 창(window) 안에서 서로 다른 제안서
+  //    stem을 2개 이상 동시에 언급하는 결재행은 "제안서 개별 처리"가 아니라 "메타 논의"로 보고 인입 증거에서 제외한다.
   try {
     const files = existsSync(AR) ? readdirSync(AR).filter((f) => /-proposals-\d{8}/.test(f) && f.endsWith(".md")) : [];
-    const stale = [];
+    const candidates = [];
     for (const f of files) {
       const ageH = (Date.now() - statSync(`${AR}/${f}`).mtimeMs) / 3.6e6;
       if (ageH < 12 || ageH > 168) continue;
-      const stem = f.replace(/\.md$/, "");
-      const hitDecision = await sql`SELECT 1 FROM decisions WHERE action_params->>'ref' ILIKE ${"%" + stem + "%"} OR title ILIKE ${"%" + stem + "%"} OR detail ILIKE ${"%" + stem + "%"} LIMIT 1`.catch(() => []);
-      if (hitDecision.length) continue;
-      const hitCoord = await sql`SELECT 1 FROM coordination WHERE topic ILIKE ${"%" + stem + "%"} OR detail ILIKE ${"%" + stem + "%"} LIMIT 1`.catch(() => []);
-      let first = ""; try { first = readFileSync(`${AR}/${f}`, "utf8").split("\n").find((l) => l.trim()) || ""; } catch {}
-      stale.push({ f, ageH, first: first.replace(/^#+\s*/, "").slice(0, 70), coordOnly: hitCoord.length > 0 });
+      candidates.push({ f, ageH, stem: f.replace(/\.md$/, "") });
+    }
+    const stale = [];
+    for (const c of candidates) {
+      const hitDecision = await sql`SELECT title, detail FROM decisions WHERE action_params->>'ref' ILIKE ${"%" + c.stem + "%"} OR title ILIKE ${"%" + c.stem + "%"} OR detail ILIKE ${"%" + c.stem + "%"} LIMIT 5`.catch(() => []);
+      const realHit = hitDecision.some((d) => {
+        const text = `${d.title || ""} ${d.detail || ""}`;
+        const mentionedStems = candidates.filter((o) => text.includes(o.stem)).length;
+        return mentionedStems <= 1;
+      });
+      if (realHit) continue;
+      const hitCoord = await sql`SELECT 1 FROM coordination WHERE topic ILIKE ${"%" + c.stem + "%"} OR detail ILIKE ${"%" + c.stem + "%"} LIMIT 1`.catch(() => []);
+      let first = ""; try { first = readFileSync(`${AR}/${c.f}`, "utf8").split("\n").find((l) => l.trim()) || ""; } catch {}
+      stale.push({ f: c.f, ageH: c.ageH, first: first.replace(/^#+\s*/, "").slice(0, 70), coordOnly: hitCoord.length > 0 });
     }
     L.push(`## 🚨 제안서 미인입 감시 (12h+ · decisions행 미생성)`);
     if (!stale.length) L.push(`- ✅ 없음\n`);
