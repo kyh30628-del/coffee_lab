@@ -1,7 +1,7 @@
 // 🚀 개발 배포 워커(결정론·무LLM) — CEO가 '배포' 확정한 dev_task(dev_status='deploy_approved')를
 //   브랜치를 main에 merge + push(=Vercel 배포) + /api/version 반영 확인 → decision done · coordination resolved.
 //   서버(Vercel)는 배포 못 하므로 로컬에서만. 실패 시 정직히 기록(deploy_failed), main 오염 안 되게 안전 처리.
-import { readFileSync, mkdirSync, rmdirSync, existsSync, writeFileSync, appendFileSync } from "node:fs";
+import { readFileSync, mkdirSync, rmdirSync, existsSync, writeFileSync, appendFileSync, statSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { neon } from "@neondatabase/serverless";
 import { reconcileUnverified } from "./reconcileUnverified.mjs";
@@ -9,7 +9,20 @@ const ROOT = "/Users/wangwida/coffee-platform";
 // 메인 레포 git 조작 전역 락(빌드 워커와 레이스 방지). mkdir 원자성.
 const GLOCK = "/tmp/coffee-gitrepo.lock";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-async function glock() { for (let i = 0; i < 200; i++) { try { mkdirSync(GLOCK); return true; } catch { await sleep(400); } } return false; }
+// 🛡️ 스테일 락 자동회수(2026-07-22, 반복 정체 근본차단): 배포 프로세스가 락을 쥔 채 크래시하면 락 디렉토리가
+//   누수돼 이후 모든 배포가 영구 "git락 타임아웃"으로 실패한다(실측: 11h+ 스테일락이 #421·#422·#424 정체 유발).
+//   실제 배포는 수분 내 끝나므로, 15분+ 오래된 락은 스테일로 간주하고 1회 회수 후 재시도한다(mkdir 원자성이라
+//   오탐 회수 후 재경합해도 안전 — 둘 중 하나만 성공).
+async function glock() {
+  for (let i = 0; i < 200; i++) {
+    try { mkdirSync(GLOCK); return true; }
+    catch {
+      try { if (Date.now() - statSync(GLOCK).mtimeMs > 15 * 60 * 1000) { rmdirSync(GLOCK); continue; } } catch {}
+      await sleep(400);
+    }
+  }
+  return false;
+}
 const gunlock = () => { try { rmdirSync(GLOCK); } catch {} };
 const env = readFileSync(`${ROOT}/web/.env.local`, "utf8");
 for (const l of env.split("\n")) { const m = l.match(/^([A-Z_0-9]+)=(.*)$/); if (m) process.env[m[1]] = m[2].replace(/^["']|["']$/g, ""); }
