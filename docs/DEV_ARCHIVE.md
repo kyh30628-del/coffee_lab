@@ -136,3 +136,4 @@
 | 2026-07-22 04:34 | #429 | [협업#225 SLA위반 에스컬레이션] 프랜차이즈 형제지점 증거 교차공유 — 매칭 파이프라인 지점앵커 근본수 | f3278240 | - | lib/reviewQuality.ts: isNonBranchWord를 모듈스코프로 끌어올려 export(GENERIC_WORD 포함) — 지점앵커 사전에 제과점 등 업태접미사 드리 |
 | 2026-07-22 11:15 | #434 | [개발] 협업 #232: [정보공유] cafes.instagram_url 전량 미입력(0/13483) — B | 2be89c13 | - | lib/discover.ts: 발굴 수집(discoverRegion/localSearch)이 네이버 응답의 link·telephone 필드를 무시하던 것을 근본수정 — instag |
 | 2026-07-22 11:23 | #433 | [개발] 협업 #230: [정합성발견] 근거링크 일반어/부제 혼입형 교차오귀속 — 검증등급 5곳 포함 확정  | 7ae551ae | - | lib/reviewQuality.ts: coord#230 일반어/부제 혼입형 오귀속 근본수정. GENERIC_WORD에 라운지·신상·전통찻집·동네빵집·비치·베이글·샌드위치 추가,  |
+| 2026-07-22 23:02 | #444 | [자율진단] synth_coherence 재기록 누락 — 오탐 근거오염 경보(decisions#443) 구조 | 24147f0c | - | lib/synthStore.ts:794 healPublishedAudit — 재검 시 계산한 coh를 cafes.synth_coherence에 UPDATE로 반영(재기록 누락 수정 |
