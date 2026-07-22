@@ -38,6 +38,36 @@ function topTags(cs: any): string[] {
   return Object.entries(cs).filter(([k, v]) => CHAR[k] && (v as number) > 0).sort((a, b) => (b[1] as number) - (a[1] as number)).slice(0, 4).map(([k]) => CHAR[k]);
 }
 
+// AI답변엔진(ChatGPT 등) 인용 최적화용 FAQ — 실제 페이지 데이터로만 생성, 데이터 없으면 문항 생략(coordination#226/decisions#424)
+function buildFaq(c: any, grade: string, highlights: { emoji: string; label: string; count: number }[], profile: any, tags: string[]): { q: string; a: string }[] {
+  const faqs: { q: string; a: string }[] = [];
+  if (c.synth_identity) {
+    faqs.push({ q: `${c.name}은(는) 어떤 카페인가요?`, a: c.synth_identity });
+  }
+  if (grade && (c.synth_count ?? 0) > 0) {
+    faqs.push({
+      q: `${c.name}의 검증등급은 무엇인가요?`,
+      a: `동네 커피 노트가 네이버 공개 후기 ${c.synth_count}건을 교차검증해 '${grade}' 등급을 부여했어요. 옆가게·동명·광고성 후기는 제외하고 실제 방문 후기만 반영합니다.`,
+    });
+  }
+  if (highlights.length > 0) {
+    faqs.push({ q: `${c.name}의 특징은 무엇인가요?`, a: `후기에서 가장 많이 언급된 특징은 ${highlights.slice(0, 3).map((h) => h.label).join(", ")}이에요.` });
+  } else if (tags.length > 0) {
+    faqs.push({ q: `${c.name}의 특징은 무엇인가요?`, a: `후기에서 자주 언급되는 결은 ${tags.join(", ")}이에요.` });
+  }
+  if (profile.ok && (profile.strong.length > 0 || profile.weak.length > 0)) {
+    const parts: string[] = [];
+    if (profile.strong.length > 0) parts.push(`강점은 ${profile.strong.map((s: any) => s.text).join(", ")}이에요(전체 카페 평균 대비)`);
+    if (profile.weak.length > 0) parts.push(`아쉬운 점은 ${profile.weak.map((w: any) => w.text).join(", ")}이에요`);
+    faqs.push({ q: `${c.name}의 강점과 아쉬운 점은 무엇인가요?`, a: `${parts.join(". ")}.` });
+  }
+  const locParts = [c.area, c.dong].filter(Boolean).join(" ");
+  if (c.address || locParts) {
+    faqs.push({ q: `${c.name}은 어디에 있나요?`, a: c.address ? `${c.address} (${locParts})에 있어요.` : `${locParts}에 있어요.` });
+  }
+  return faqs;
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   const c = await getCafe(id);
@@ -95,6 +125,11 @@ export default async function CafePage({ params }: Props) {
   const profile = cafeProfile({ char_scores: c.char_scores, synth_count: c.synth_count }, await getAxisDist());
   const evAll = (c.synth_reviews_all ?? c.synth_reviews ?? []) as any[];
   const highlights = extractHighlights((Array.isArray(evAll) ? evAll : []).map((e: any) => e?.quote || ""));
+  const faqs = buildFaq(c, grade, highlights, profile, tags);
+  const faqJsonLd = faqs.length > 0 ? {
+    "@context": "https://schema.org", "@type": "FAQPage",
+    mainEntity: faqs.map((f) => ({ "@type": "Question", name: f.q, acceptedAnswer: { "@type": "Answer", text: f.a } })),
+  } : null;
   const jsonLd = {
     "@context": "https://schema.org", "@type": "CafeOrCoffeeShop",
     name: c.name,
@@ -120,6 +155,7 @@ export default async function CafePage({ params }: Props) {
   return (
     <main className="min-h-screen bg-[#f4ece0] text-[#2b2018]" style={{ fontFamily: "'Gowun Batang', serif" }}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      {faqJsonLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />}
       <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet" />
       <div className="max-w-xl mx-auto px-5 py-8">
         <div className="flex items-center justify-between gap-2">
@@ -258,6 +294,20 @@ export default async function CafePage({ params }: Props) {
               </Link>
             ) : null;
           })()}
+          {/* ❓ 자주 묻는 질문 — AI답변엔진(ChatGPT 등) 인용 최적화, 위 FAQPage JSON-LD와 동일 내용(coordination#226) */}
+          {faqs.length > 0 && (
+            <div className="mt-6">
+              <div className="text-[13px] font-bold text-[#5a4632] mb-2">❓ 자주 묻는 질문</div>
+              <div className="flex flex-col gap-2">
+                {faqs.map((f) => (
+                  <details key={f.q} className="bg-white border border-[#e0d3bd] rounded-xl px-3.5 py-2.5">
+                    <summary className="text-[13px] font-bold text-[#3d2f22] cursor-pointer">{f.q}</summary>
+                    <p className="text-[12.5px] text-[#665036] mt-1.5 leading-relaxed">{f.a}</p>
+                  </details>
+                ))}
+              </div>
+            </div>
+          )}
           {/* 사장님 CTA — 카페 상세 → owner 인사이트 진입(B2B 퍼널, decisions #15) */}
           <Link href={`/owner?name=${encodeURIComponent(c.name)}`} className="mt-3 flex items-center justify-between gap-2 w-full rounded-xl px-4 py-3 border border-[#e6d2b5]" style={{ background: "linear-gradient(90deg,#fbf3e4,#f4ece0)" }}>
             <span className="flex flex-col text-left">
