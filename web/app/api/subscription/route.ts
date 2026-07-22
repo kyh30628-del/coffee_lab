@@ -97,7 +97,7 @@ export async function GET(req: NextRequest) {
 // 🔔 CEO 알림 메일(Resend) — 사장님 구독 요청 등 즉시 인지가 필요한 이벤트. 키 없으면 조용히 미발송(무해).
 async function sendCeoAlert(subject: string, html: string): Promise<boolean> {
   const key = process.env.RESEND_API_KEY;
-  const to = process.env.ALERT_EMAIL || "kyh30628@gmail.com";
+  const to = process.env.OWNER_ALERT_EMAIL || "dongnecoffeenote@gmail.com"; // 사장님·구독 알림=관리자 서비스 이메일(개발자 개인메일 아님)
   if (!key) return false;
   try {
     const r = await fetch("https://api.resend.com/emails", {
