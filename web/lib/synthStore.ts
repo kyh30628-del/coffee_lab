@@ -792,6 +792,9 @@ export async function healPublishedAudit(limit = 600, unpubCap = 120, budgetMs?:
     if (after?.published) {
       const q = (after.synth_reviews || []).map((e: any) => e?.quote || "").filter(Boolean);
       const coh = q.length >= 3 ? nameCoherence(cleanCafeName(r.name), q, [r.area]) : 1; // ★ storeResult와 동일하게 정제이름 사용 — '교동89 카페'·'토팡가 커피 로스터스' 같은 서술어 상호를 오염으로 오탐하던 버그 차단
+      // 🩹 결재#444: 이 재검이 계산한 coh를 cafes.synth_coherence에 반드시 반영 — 안 하면 06-30식 stale 값이
+      //   DB에 남아 cron-selfaudit(synth_coherence<0.3 조건)가 매 사이클 같은 카페를 오탐 재상신한다.
+      await sql`UPDATE cafes SET synth_coherence=${coh} WHERE id=${r.id}`.catch(() => {});
       if (coh < getCriterionSync("contamination.noisy.coherence_max")) {
         flagged++;
         await sql`INSERT INTO audit_flags (cafe_id, cafe_name, issue, detail, resolved)
