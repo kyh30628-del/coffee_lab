@@ -944,13 +944,21 @@ export default function AdminPage() {
             <div className="space-y-2">
               {subscribers.map((s) => {
                 const dleft = s.expires_at ? Math.max(0, Math.ceil((new Date(s.expires_at).getTime() - Date.now()) / 86400000)) : null;
-                const stColor = s.status === "active" ? "text-emerald-600" : s.status === "pending" ? "text-amber-600" : s.status === "suspended" ? "text-rose-600" : "text-stone-600";
-                const stLabel = s.status === "active" ? "활성" : s.status === "pending" ? "대기" : s.status === "expired" ? "만료" : s.status === "cancelled" ? "해지" : s.status === "suspended" ? "🚫 정지" : s.status;
+                // 🏷️ 체험(7일 이하)/유료를 status와 결합해 4상태 배지로: 체험중·체험만료·구독요청(결제대기)·구독중. 결제상태(만료/해지/정지)도 색으로 구분.
+                const isTrial = (s.duration_days ?? 30) <= 7;
+                const badge =
+                  s.status === "suspended" ? { label: "🚫 정지", cls: "bg-rose-600 text-white border-rose-600" }
+                  : s.status === "cancelled" ? { label: "해지", cls: "bg-stone-200 text-stone-600 border-stone-300" }
+                  : s.status === "pending" ? { label: "구독요청(결제대기)", cls: "bg-amber-100 text-amber-800 border-amber-300" }
+                  : s.status === "active" ? (isTrial ? { label: "체험중", cls: "bg-sky-100 text-sky-700 border-sky-300" } : { label: "구독중", cls: "bg-emerald-100 text-emerald-700 border-emerald-300" })
+                  : s.status === "expired" ? (isTrial ? { label: "체험만료", cls: "bg-stone-200 text-stone-500 border-stone-300" } : { label: "구독만료", cls: "bg-rose-100 text-rose-600 border-rose-300" })
+                  : { label: s.status, cls: "bg-stone-100 text-stone-600 border-stone-300" };
                 return (
                   <div key={s.id} className="bg-white rounded-xl border border-amber-300 p-3">
                     <div className="min-w-0">
                       <span className="font-bold text-sm">{s.cafe_name}</span>
-                      <span className={`text-[11px] ml-2 font-bold ${stColor}`}>{stLabel}{s.status === "active" ? (s.expires_at ? ` · D-${dleft}` : ` · ⏳ 로그인 대기(첫 접속 시 ${s.duration_days || 30}일 시작)`) : ""}</span>
+                      <span className={`text-[10px] ml-2 px-2 py-0.5 rounded-full font-bold border ${badge.cls}`}>{badge.label}{s.status === "active" ? (s.expires_at ? ` · D-${dleft}` : ` · ⏳ 로그인 대기(첫 접속 시 ${s.duration_days || 30}일 시작)`) : ""}</span>
+                      <span className={`text-[10px] ml-1.5 px-2 py-0.5 rounded-full font-bold border ${s.billing_key ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-stone-100 text-stone-500 border-stone-200"}`}>{s.billing_key ? `💳 카드 등록${s.card_last4 ? ` ${s.card_company ?? ""} ····${s.card_last4}` : ""}${s.autopay ? " · 자동결제 ON" : ""}` : "💳 카드 미등록"}</span>
                       <div className="text-[12px] text-stone-600 truncate">{s.owner_name} · 📞 {s.contact}{s.email ? ` · ✉️ ${s.email}` : ""} · {s.plan}{s.price ? ` ₩${s.price.toLocaleString()}` : " 무료"}</div>
                       {/* 🔒 사칭 방지 증빙 — 승인 전 대조: 사업자등록증·대표자명·번호·동의·접속기록 */}
                       <div className="mt-1.5 rounded-lg bg-amber-50/70 border border-amber-100 p-2 text-[11px] text-stone-600 space-y-0.5">
