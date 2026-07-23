@@ -1072,6 +1072,26 @@ export function verifyReview(input: QualityInput): QualityResult {
         }
       }
     }
+    // 룰갭 P54(결재#466): 형제지점 완전주소 병기 — 동일구·다른도로 슬립. myBranch(961~1009행) 지점앵커는
+    //   리뷰에 'OO점' 원문이 있어야 발동하고(otherBranchTok), 없으면 구/동 앵커(areaAnchorHere)만으로도
+    //   branchSignal이 참이 되는데 그 앵커는 형제지점도 공유해(같은 구) 우연히 참이 돼 완전통과한다. 위
+    //   주소검증(1027~1074행)은 구·도로 '둘 다' 달라야만 발동해 동일구 사례는 설계상 배제한다. 두 사각
+    //   사이로 '지점명 없이 도로주소만 쓰고 + 구는 같은데 도로만 다른' 형제지점 후기가 빠진다(id15294·
+    //   17148·5163·5436 실측, 초기후보 387건 중 4건만 반복성 확인). '점' 지점명 카페에 한해, 등록 도로명이
+    //   리뷰 전문에 전혀 없는데 동일구·다른도로 완전주소가 자기방문 맥락과 함께 나오면 하드 거절 대신
+    //   보수적으로 borderline(LLM 확인) — 주소 불일치 단독판단은 9%FP 이력이라(926~934행 주석) 하드 거절은 피한다.
+    if (myBranch && cGu.length && cRoad.length && !cRoad.some((r) => fullT.includes(r))) {
+      const m = fullT.match(/[가-힣]{2,4}(?:시|군|구)\s*[가-힣]{0,5}?\s*([가-힣A-Za-z0-9]{2,}(?:대로|로|길))\s*\d/);
+      if (m) {
+        const rGu = guOf(fullT);
+        const rRoad = m[1];
+        const sameGu = rGu.length > 0 && rGu.some((g) => cGu.includes(g));
+        const diffRoad = !cRoad.some((cc) => cc.includes(rRoad) || rRoad.includes(cc));
+        if (sameGu && diffRoad && /(위치|주소|오늘|다녀|들렀|방문|갔|왔)/.test(fullT)) {
+          return { verdict: "rejected", score: 20, reasons: [`형제 지점 의심(동일구 다른도로 완전주소 병기, 등록도로 미언급) — LLM이 지점 확인`], borderline: true, signals: sig };
+        }
+      }
+    }
   }
   if (generic && !nameInTitle) {
     return { verdict: "rejected", score: 5, reasons: ["일반 교양/정보글(그 카페 후기 아님)"], signals: sig };
