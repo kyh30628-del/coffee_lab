@@ -46,6 +46,14 @@ const today = new Date().toISOString().slice(0, 10);
   //    결재행이 나오는 순간 그 안에 언급된 모든 제안서가 "인입완료"로 오판되고 감시망에서 사라졌다(P46/47/48+id1032
   //    가 #421 배포 후 실제로 그렇게 사라짐 — 재확인 결재 #427이 발견). 같은 창(window) 안에서 서로 다른 제안서
   //    stem을 2개 이상 동시에 언급하는 결재행은 "제안서 개별 처리"가 아니라 "메타 논의"로 보고 인입 증거에서 제외한다.
+  //    ⚠️ #450 근본원인(#427 수정의 잔여 오탐): 위 "stem 2개+ = 메타" 휴리스틱이 #428처럼 "여러 제안서를 한 결재행에
+  //    묶어 실제로 다 구현한" 정상 배치 처리까지 메타로 오판했다(P46 파일 stem + P47/P48 파일 stem 동시 언급 → 즉시
+  //    제외). 실측: #421·#427(진짜 메타 — 이 감시 로직 자체 make-digest.mjs를 고친 결재행이 예시로 대상 파일명을
+  //    나열)과 #428(진짜 구현 — lib/criteriaListsBase.ts·lib/reviewQuality.ts에 실제 코드 반영)을 "몇 개 stem을
+  //    언급했나"로는 구분 불가 — 둘 다 2개+ 언급. 대신 "그 결재행 자신의 action_params가 make-digest.mjs(이 감시
+  //    스크립트 자신)를 고쳤는가"로 판별한다: 감시 로직 자기수정 결재행은 대상 제안서를 실제로 구현한 게 아니므로
+  //    항상 메타 제외. 그 외(감시 스크립트를 안 건드린) 결재행은 stem 여러 개 동시 언급 + 코드 배포 완료(dev_status
+  //    deployed/built) 조합이면 배치 구현으로 인정한다(#428류 재발 방지).
   try {
     const files = existsSync(AR) ? readdirSync(AR).filter((f) => /-proposals-\d{8}/.test(f) && f.endsWith(".md")) : [];
     const candidates = [];
@@ -56,11 +64,15 @@ const today = new Date().toISOString().slice(0, 10);
     }
     const stale = [];
     for (const c of candidates) {
-      const hitDecision = await sql`SELECT title, detail FROM decisions WHERE action_params->>'ref' ILIKE ${"%" + c.stem + "%"} OR title ILIKE ${"%" + c.stem + "%"} OR detail ILIKE ${"%" + c.stem + "%"} LIMIT 5`.catch(() => []);
+      const hitDecision = await sql`SELECT title, detail, action_params FROM decisions WHERE action_params->>'ref' ILIKE ${"%" + c.stem + "%"} OR title ILIKE ${"%" + c.stem + "%"} OR detail ILIKE ${"%" + c.stem + "%"} LIMIT 5`.catch(() => []);
       const realHit = hitDecision.some((d) => {
+        const ap = d.action_params || {};
+        const selfChange = `${ap.summary || ""} ${ap.branch || ""} ${ap.file || ""}`;
+        if (/make-digest\.mjs/i.test(selfChange)) return false; // 감시 로직 자기수정 — 대상 제안서 미구현
         const text = `${d.title || ""} ${d.detail || ""}`;
         const mentionedStems = candidates.filter((o) => text.includes(o.stem)).length;
-        return mentionedStems <= 1;
+        if (mentionedStems <= 1) return true;
+        return (ap.dev_status === "deployed" || ap.dev_status === "built") && !!ap.summary; // 배치 구현 인정
       });
       if (realHit) continue;
       const hitCoord = await sql`SELECT 1 FROM coordination WHERE topic ILIKE ${"%" + c.stem + "%"} OR detail ILIKE ${"%" + c.stem + "%"} LIMIT 1`.catch(() => []);
