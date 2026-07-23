@@ -141,3 +141,4 @@
 | 2026-07-22 23:49 | #449 | [룰갭 P50] 호텔부속 카페 — 웨딩/호캉스/타호텔 객실후기 등 비-F&B 콘텐츠 혼입(NONCAFE_BI | 9b447fb5 | - | lib/reviewQuality.ts: (1)NONCAFE_BIZ에 꽃집/플로리스트/화환 추가(132행) (2)호텔카페(이름에 호텔 또는 HOTEL_BRANDS 포함) + 숙박/호 |
 | 2026-07-23 01:39 | #450 | [개발] 협업 #234: [정정] P46/P47/P48 미인입 감시는 오탐 확정 — 코드 직접확인 배포완료, | 24bc0bde | - | scripts/make-digest.mjs 제안서 미인입 감시 근본수정(#427 잔여 오탐): '결재행이 서로 다른 제안서 stem 2개+ 동시 언급하면 메타 논의로 제외' 휴리스 |
 | 2026-07-23 01:43 | #451 | [개발] 협업 #235: [coord#225 후속] 코드수정(#429, 07-22 13:34 배포) 이후에도 | 1a13dd36 | - | lib/reviewQuality.ts(isAreaLikeWord export)+lib/synthStore.ts(evidenceHitsCafe): #429가 '○○점' 접미 지점표기 |
+| 2026-07-23 09:35 | #452 | [검색품질] 미보유 프랜차이즈명 검색 시 리뷰 속 타사비교 언급만으로 무관카페 1위 노출 | 9b70984a | - | app/api/search/route.ts lexicalScore(): 리뷰텍스트만 매칭(다른 필드 0)인 경우 exact=0으로 제외해 lexScore/gradeBonus 대상에 |
