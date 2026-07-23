@@ -8,7 +8,7 @@ import { fetchYouTubeReviews } from "./youtubeCollector";
 import { collectAndSynthesize, type RawSource, type BorderlineItem, type CollectResult } from "./collectOrchestrator";
 import { judgeReviews, hasJudgeKey } from "./reviewJudge";
 import { isNonCafe, isFranchise, isGenericFoodName, isSnackStall, isStructuralPhantom, isUnmannedCafe } from "./discover";
-import { nameCoherence, cleanCafeName, verifyReview, isNonBranchWord } from "./reviewQuality";
+import { nameCoherence, cleanCafeName, verifyReview, isNonBranchWord, isAreaLikeWord } from "./reviewQuality";
 import { loadLearnedTerms } from "./learnedTerms";
 import { loadCriteria, getCriterionSync } from "./criteria";
 import { loadCriteriaLists } from "./criteriaLists";
@@ -689,10 +689,19 @@ function evidenceHitsCafe(quote: string, name: string, areaTerms: string[], addr
     const last = words[words.length - 1] || "";
     // '제과점'처럼 지점명이 아니라 일반 업태 접미사인 '○○점'은 지점 마커로 오인하면 안 된다(coordination#225 —
     //   isNonBranchWord로 verifyReview와 같은 사전을 재사용, 라이언베이커 신사점/제과점 오귀속의 근본원인).
+    // [decisions#451] '점' 접미 없이 이 카페 자신의 동(洞)이나 생활권 지명을 그대로 붙인 지점표기
+    //   (예: '베이커리차차 정자동' — 형제 '베이커리차차'와 브랜드만 공유). areaTerms의 동이 이름 끝단어와
+    //   그대로 같거나(isAreaLikeWord) 하면 '점' 마커와 동급으로 취급 — pyblog/224266096968이 두 카페 양쪽에
+    //   교차귀속된 재발(#429는 '점' 접미 패턴만 다뤄 이 유형을 놓쳤다)의 근본 차단.
+    const dongTerm = areaTerms.find((a) => /(동|읍|면|가|리)$/.test(a));
+    const ownDongTail = words.length > 1 && !!dongTerm
+      && (norm(last) === norm(dongTerm) || norm(last) === norm(dongTerm.replace(/(동|읍|면|가|리)$/, "")));
     if (/^[가-힣0-9]{2,}점$/.test(last) && !isNonBranchWord(last)) {
       // 이름에 지점 표기가 있으면 그 지점 마커가 인용문에 있어야 인정 — 브랜드토큰만 일치는 형제지점 오염이라 불충분.
       const marker = norm(last.replace(/점$/, ""));
       baseHit = marker.length >= 2 && qN.includes(marker);
+    } else if (words.length > 1 && (ownDongTail || isAreaLikeWord(last))) {
+      baseHit = qN.includes(norm(last)); // 동네이름 지점표기도 그 지역어가 인용문에 있어야 인정
     } else {
       baseHit = nameCoherence(cleaned, [quote], areaTerms) === 1; // 지점표기 없는 단일매장은 브랜드토큰 일치로 판단
     }
