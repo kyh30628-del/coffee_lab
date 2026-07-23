@@ -83,7 +83,10 @@ for (const d of rows) {
     git("checkout -f main");         // -f: 잔여 미스테이지 변경 폐기(위 dirty 가드 통과 후에만 도달)
     git("reset --hard origin/main"); // 원격 main에 정확히 정렬(rebase 실패 회피)
     mergeStarted = true; // 이 지점부터의 실패만 아래 catch의 병합/워킹트리 정리(merge --abort·reset) 대상
-    git(`merge --no-ff ${br} -m "deploy: #${d.id} ${String(d.title).slice(0, 60)}\n\nCEO 배포 확정. Co-Authored-By: Claude <noreply@anthropic.com>"`);
+    // 🛡️ 커밋 메시지는 execSync 셸문자열이라 제목의 큰따옴표·백틱·$·\ 가 -m "..." 을 깨 배포 전면실패시킴
+    //   (2026-07-23 #456 근본원인: 제목 '…"플래그십(스토어)"…' 의 따옴표로 git merge Command failed). 셸 위험문자 제거.
+    const safeTitle = String(d.title).slice(0, 60).replace(/["`$\\]/g, "");
+    git(`merge --no-ff ${br} -m "deploy: #${d.id} ${safeTitle}\n\nCEO 배포 확정. Co-Authored-By: Claude <noreply@anthropic.com>"`);
     let sha = git("rev-parse HEAD");
     // 📜 배포 아카이브 자동 append(커밋 로그 미러). 아카이브 커밋을 얹은 뒤 그 HEAD를 배포 sha로 확정.
     //   실패해도 배포는 계속 — 워킹트리 오염만 정리(다음 배포 dirty가드 보호).
