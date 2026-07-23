@@ -144,3 +144,4 @@
 | 2026-07-23 09:35 | #452 | [검색품질] 미보유 프랜차이즈명 검색 시 리뷰 속 타사비교 언급만으로 무관카페 1위 노출 | 9b70984a | - | app/api/search/route.ts lexicalScore(): 리뷰텍스트만 매칭(다른 필드 0)인 경우 exact=0으로 제외해 lexScore/gradeBonus 대상에 |
 | 2026-07-23 11:50 | #456 | [룰갭 P52] GENERIC_SUFFIX에 "플래그십(스토어)" 추가 — 타 브랜드 매장타입 서술어 교차매 | 46a65fd9 | - | lib/reviewQuality.ts:259 GENERIC_SUFFIX에 플래그십 스토어 접미사(공백유무 모두) 추가. tsc 신규에러 0, build 성공. |
 | 2026-07-23 23:24 | #465 | [룰갭 P53] "퍼스널" 흔한 서비스업 수식어 identity-core 오귀속 → COMMON_WORD_N | 6028d86d | - | lib/reviewQuality.ts:163 COMMON_WORD_NAMES에 "퍼스널" 추가. tsc 신규에러 0(베이스라인 next.config eslint 1건 제외), np |
+| 2026-07-23 23:46 | #466 | [룰갭 P54] 다지점 프랜차이즈 형제지점 완전주소 병기 — 동일구·다른도로 슬립(신규 로직, 승인 필요) | ea527f88 | - | lib/reviewQuality.ts: myBranch('점'지점) 카페의 주소검증 블록(input.addr 섹션) 끝에 신규 체크 추가 — 등록 도로명이 리뷰 전문에 전혀 없는데 |
