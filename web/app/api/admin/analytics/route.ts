@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
 import { getTodayInsight, formatTodayInsightLines, type TodayInsight } from "@/lib/dailySummary";
+import { BEHAVIOR_BOT_ANON_IDS_SQL } from "@/lib/behaviorBot";
 export const runtime = "nodejs";
 
 // 📈 유입 분석 전용 API — 네이버·구글 없이 우리 DB(user_consents·traffic_events)로 상세 집계.
 // 방문자 단위 지표는 user_consents(즉시), 페이지뷰·퍼널·추이는 traffic_events(적재되며 채워짐).
 const authed = (req: NextRequest) => !!req.headers.get("x-admin-password") && req.headers.get("x-admin-password") === process.env.ADMIN_PASSWORD;
-// 노이즈 제외: 봇 UA + 크롤러 referrer(UA로 안 잡히는 findelio·blinkx 등) + 내부(대표·팀). 거치면 '진짜 외부 방문자'만.
+// 노이즈 제외: 봇 UA + 크롤러 referrer(UA로 안 잡히는 findelio·blinkx 등) + 내부(대표·팀) + 행동기반 봇(#472,
+// 데스크톱 UA로 위장해 위 키워드 필터를 통과하는 헤드리스 — lib/behaviorBot.ts 참고). 거치면 '진짜 외부 방문자'만.
 const CRAWLER_SRC = "findelio|blinkx|semrush|ahrefs|dataprovider|dotbot|petalbot|yandex|mj12|serpstat";
-const BOT = `COALESCE(user_agent,'') !~* 'bot|crawl|spider|slurp|bingpreview|facebookexternalhit|headless|preview' AND COALESCE(src,'') !~* '${CRAWLER_SRC}' AND COALESCE(src,'') NOT IN ('internal','spam') AND NOT COALESCE(internal, false)`;
+const BOT = `COALESCE(user_agent,'') !~* 'bot|crawl|spider|slurp|bingpreview|facebookexternalhit|headless|preview' AND COALESCE(src,'') !~* '${CRAWLER_SRC}' AND COALESCE(src,'') NOT IN ('internal','spam') AND NOT COALESCE(internal, false) AND anon_id NOT IN (${BEHAVIOR_BOT_ANON_IDS_SQL})`;
 const WEEKDAY_KO = ["일", "월", "화", "수", "목", "금", "토"];
 
 // 🧾 일일 분석 요약 — 전일·7일평균 대비 증감(+근거) / 기기 비중 변화 / 요일·시간대 패턴을
@@ -158,7 +160,8 @@ export async function GET(req: NextRequest) {
        WHERE (last_seen AT TIME ZONE 'Asia/Seoul')::date = (now() AT TIME ZONE 'Asia/Seoul')::date AND ${BOT}`
     ).catch(() => [{ n: 0 }]))[0]?.n ?? 0;
     const todayPv = (await sql`SELECT COUNT(*)::int n FROM traffic_events
-       WHERE (ts AT TIME ZONE 'Asia/Seoul')::date = (now() AT TIME ZONE 'Asia/Seoul')::date`.catch(() => [{ n: 0 }]))[0]?.n ?? 0;
+       WHERE (ts AT TIME ZONE 'Asia/Seoul')::date = (now() AT TIME ZONE 'Asia/Seoul')::date
+         AND anon_id NOT IN (${sql.unsafe(BEHAVIOR_BOT_ANON_IDS_SQL)})`.catch(() => [{ n: 0 }]))[0]?.n ?? 0;
     // 위치 동의 퍼널 — 방문 → 위치요청 응답(agreed IS NOT NULL) → 동의(agreed=true) → 위치공유(region 보유)
     // ⚠️ agreed는 방문 핑에선 NULL(미정)로 남는다(app/api/visit/route.ts) — 모달에 실제로 응답한 사람만 IS NOT NULL.
     //    과거엔 이 구분 없이 '전체 방문' 대비로 동의율을 계산해 실제보다 훨씬 낮게 보였다(집계 로직 누락).
@@ -219,6 +222,7 @@ export async function GET(req: NextRequest) {
         SELECT (ts AT TIME ZONE 'Asia/Seoul')::date AS d,
                COUNT(*)::int pageviews, COUNT(DISTINCT anon_id)::int visitors
         FROM traffic_events WHERE ts > now()-interval '14 days'
+          AND anon_id NOT IN (${sql.unsafe(BEHAVIOR_BOT_ANON_IDS_SQL)})
         GROUP BY 1
       ) t ON t.d = days.d
       ORDER BY days.d`.catch(() => [])) as any[];
@@ -234,6 +238,7 @@ export async function GET(req: NextRequest) {
         ELSE '기타' END AS bucket,
         COUNT(*)::int views, COUNT(DISTINCT anon_id)::int uniques
       FROM traffic_events WHERE ts > now()-interval '30 days'
+        AND anon_id NOT IN (${sql.unsafe(BEHAVIOR_BOT_ANON_IDS_SQL)})
       GROUP BY 1 ORDER BY views DESC`.catch(() => [])) as any[];
 
     // 인기 카페(조회순)
@@ -241,6 +246,7 @@ export async function GET(req: NextRequest) {
       SELECT c.id, c.name, c.area, COUNT(*)::int views, COUNT(DISTINCT te.anon_id)::int uniques
       FROM traffic_events te JOIN cafes c ON te.path = '/c/' || c.id
       WHERE te.ts > now()-interval '30 days'
+        AND te.anon_id NOT IN (${sql.unsafe(BEHAVIOR_BOT_ANON_IDS_SQL)})
       GROUP BY c.id, c.name, c.area ORDER BY views DESC LIMIT 15`.catch(() => [])) as any[];
 
     // 인기 지역(조회된 카페의 area 집계)
@@ -248,17 +254,20 @@ export async function GET(req: NextRequest) {
       SELECT c.area, COUNT(*)::int views, COUNT(DISTINCT te.anon_id)::int uniques
       FROM traffic_events te JOIN cafes c ON te.path = '/c/' || c.id
       WHERE te.ts > now()-interval '30 days'
+        AND te.anon_id NOT IN (${sql.unsafe(BEHAVIOR_BOT_ANON_IDS_SQL)})
       GROUP BY c.area ORDER BY views DESC LIMIT 12`.catch(() => [])) as any[];
 
     // 시간대 분포(KST 0~23)
     const hours = (await sql`
       SELECT EXTRACT(hour FROM ts AT TIME ZONE 'Asia/Seoul')::int AS h, COUNT(*)::int n
-      FROM traffic_events WHERE ts > now()-interval '30 days' GROUP BY 1 ORDER BY 1`.catch(() => [])) as any[];
+      FROM traffic_events WHERE ts > now()-interval '30 days'
+        AND anon_id NOT IN (${sql.unsafe(BEHAVIOR_BOT_ANON_IDS_SQL)}) GROUP BY 1 ORDER BY 1`.catch(() => [])) as any[];
 
     // 요일 분포(KST, 0=일~6=토, 최근 30일) — '일일 분석 요약'의 요일 패턴 문장용
     const weekdays = (await sql`
       SELECT EXTRACT(dow FROM ts AT TIME ZONE 'Asia/Seoul')::int AS w, COUNT(*)::int n
-      FROM traffic_events WHERE ts > now()-interval '30 days' GROUP BY 1`.catch(() => [])) as any[];
+      FROM traffic_events WHERE ts > now()-interval '30 days'
+        AND anon_id NOT IN (${sql.unsafe(BEHAVIOR_BOT_ANON_IDS_SQL)}) GROUP BY 1`.catch(() => [])) as any[];
 
     // 일별 유입경로별 순방문자(최근 8일, KST, day='MM-DD'로 daily와 동일 포맷) — 오늘 급증/급감 소스 근거용
     const dailySources = (await sql`
@@ -266,6 +275,7 @@ export async function GET(req: NextRequest) {
              COALESCE(NULLIF(src,''),'미상') AS src,
              COUNT(DISTINCT anon_id)::int visitors
       FROM traffic_events WHERE ts > now()-interval '8 days'
+        AND anon_id NOT IN (${sql.unsafe(BEHAVIOR_BOT_ANON_IDS_SQL)})
       GROUP BY 1, 2`.catch(() => [])) as any[];
 
     // 일별 기기 비중(최근 2일, KST) — traffic_events × user_consents.user_agent 조인
@@ -278,6 +288,7 @@ export async function GET(req: NextRequest) {
         COUNT(DISTINCT te.anon_id)::int n
       FROM traffic_events te JOIN user_consents uc ON uc.anon_id = te.anon_id
       WHERE te.ts > now()-interval '2 days'
+        AND te.anon_id NOT IN (${sql.unsafe(BEHAVIOR_BOT_ANON_IDS_SQL)})
       GROUP BY 1, 2`.catch(() => [])) as any[];
 
     // 퍼널 — 방문 → 카페상세 조회 → 여러 카페 탐색(몰입)
@@ -285,14 +296,17 @@ export async function GET(req: NextRequest) {
       SELECT COUNT(DISTINCT anon_id)::int visitors,
              COUNT(DISTINCT anon_id) FILTER (WHERE path LIKE '/c/%')::int viewed_cafe,
              COUNT(DISTINCT anon_id) FILTER (WHERE path LIKE '/area%' OR path LIKE '/taste%')::int browsed
-      FROM traffic_events WHERE ts > now()-interval '30 days'`.catch(() => [{ visitors: 0, viewed_cafe: 0, browsed: 0 }]))[0] as any;
+      FROM traffic_events WHERE ts > now()-interval '30 days'
+        AND anon_id NOT IN (${sql.unsafe(BEHAVIOR_BOT_ANON_IDS_SQL)})`.catch(() => [{ visitors: 0, viewed_cafe: 0, browsed: 0 }]))[0] as any;
     // 여러 카페(2곳+) 본 몰입 방문자
     const engaged = (await sql`
       SELECT COUNT(*)::int n FROM (
         SELECT anon_id FROM traffic_events WHERE ts > now()-interval '30 days' AND path LIKE '/c/%'
+          AND anon_id NOT IN (${sql.unsafe(BEHAVIOR_BOT_ANON_IDS_SQL)})
         GROUP BY anon_id HAVING COUNT(DISTINCT path) >= 2) q`.catch(() => [{ n: 0 }]))[0]?.n ?? 0;
 
-    const pageviews30d = (await sql`SELECT COUNT(*)::int n FROM traffic_events WHERE ts > now()-interval '30 days'`.catch(() => [{ n: 0 }]))[0]?.n ?? 0;
+    const pageviews30d = (await sql`SELECT COUNT(*)::int n FROM traffic_events WHERE ts > now()-interval '30 days'
+      AND anon_id NOT IN (${sql.unsafe(BEHAVIOR_BOT_ANON_IDS_SQL)})`.catch(() => [{ n: 0 }]))[0]?.n ?? 0;
 
     // 📄⏱️🧑 오늘(KST) 페이지 조회 순위·체류시간·유의미 사용자 — lib/dailySummary.ts 단일출처
     //   (scripts/make-digest.mjs의 일일보고서 파이프라인과 동일 쿼리를 공유, #351)
