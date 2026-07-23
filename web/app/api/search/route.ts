@@ -103,13 +103,25 @@ const occ = (text: string, kw: string) => (!text || !kw ? 0 : text.toLowerCase()
 function lexicalScore(c: any, tokens: string[], hitConcepts: typeof CONCEPTS) {
   const reviewText = Array.isArray(c.synth_reviews) ? c.synth_reviews.map((r: any) => r?.quote ?? "").join(" ") : "";
   // 필드가중치는 criteria 단일출처(폴백 4/2.5/2/2/2/1.5/1.5/2/1). GET 진입 시 loadCriteria로 캐시 프라임(동기 읽기).
+  //   ⚠️ reviewText(검증리뷰 인용)는 아래에서 별도 집계한다(#452) — occ()가 "이디야보다 낫다" 같은
+  //   타사비교 문장도 그냥 매칭 카운트로 세어, 리뷰 단독 언급 1건만으로 exact 최댓값을 차지하고
+  //   maxLex 정규화 분모가 돼 lexScore=100·gradeBonus까지 받아 실제 무관 카페가 진짜 의미매칭 카페를
+  //   역전하던 버그(테라커피 174.4점 1위 vs 이디알베이커리카페 70.8점, "이디야" 검색 재현).
   const fields: [string, number][] = [
     [c.name ?? "", getCriterionSync("search.field_weight.name")], [c.synth_identity ?? "", getCriterionSync("search.field_weight.identity")], [c.signature ?? "", getCriterionSync("search.field_weight.signature")], [c.note ?? "", getCriterionSync("search.field_weight.note")],
-    [c.vibe ?? "", getCriterionSync("search.field_weight.vibe")], [c.uses ?? "", getCriterionSync("search.field_weight.uses")], [c.beans ?? "", getCriterionSync("search.field_weight.beans")], [reviewText, getCriterionSync("search.field_weight.review")], [c.area ?? "", getCriterionSync("search.field_weight.area")],
+    [c.vibe ?? "", getCriterionSync("search.field_weight.vibe")], [c.uses ?? "", getCriterionSync("search.field_weight.uses")], [c.beans ?? "", getCriterionSync("search.field_weight.beans")], [c.area ?? "", getCriterionSync("search.field_weight.area")],
   ];
-  let exact = 0;
+  let coreExact = 0;
   const tokenHit = new Set<string>();
-  for (const tok of tokens) for (const [text, w] of fields) { const n = occ(text, tok); if (n > 0) { exact += n * w; tokenHit.add(tok); } }
+  for (const tok of tokens) for (const [text, w] of fields) { const n = occ(text, tok); if (n > 0) { coreExact += n * w; tokenHit.add(tok); } }
+
+  let reviewExact = 0;
+  const reviewWeight = getCriterionSync("search.field_weight.review");
+  for (const tok of tokens) { const n = occ(reviewText, tok); if (n > 0) { reviewExact += n * reviewWeight; tokenHit.add(tok); } }
+  // 리뷰 인용문 매칭이 유일한 근거(다른 필드는 전혀 안 맞음)면 랭킹 점수에서 제외 — 카페명/정체성 등
+  // 실제 필드가 이미 맞은 경우엔 기존처럼 리뷰 가중치도 그대로 합산(회귀 없음).
+  const reviewOnly = coreExact === 0 && reviewExact > 0;
+  const exact = reviewOnly ? 0 : coreExact + reviewExact;
 
   let concept = 0;
   const cs = c.char_scores ?? {};
