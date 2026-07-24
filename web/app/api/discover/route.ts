@@ -77,6 +77,25 @@ function slim(c: any, kind = "", theme?: Theme) {
     isNew: isNewCafe(c), beanNote: beanNote(c), reason: reasonFor(c, kind, theme) };
 }
 
+// 🌏 구(區) 라운드로빈 인터리브 — 구별로 묶어 한 곳씩 번갈아 뽑아 재배열.
+//   결과 배열은 인접 원소가 서로 다른 구 → 이 순서로 하루 1칸씩 회전하면 '연속일'이 다른 지역이 된다.
+//   (전체 뷰의 id-순 회전이 같은 지역을 며칠씩 이어 노출하던 문제 해소. 지역 필터 뷰는 단일 구라 무영향.)
+function interleaveByRegion<T extends { id: number | string; area?: string }>(pool: T[]): T[] {
+  const groups = new Map<string, T[]>();
+  for (const c of [...pool].sort((a, b) => Number(a.id) - Number(b.id))) { // 그룹 내부는 id 안정
+    const g = guOf(c.area ?? "");
+    if (!groups.has(g)) groups.set(g, []);
+    groups.get(g)!.push(c);
+  }
+  const buckets = [...groups.values()];
+  const out: T[] = [];
+  for (let i = 0, more = true; more; i++) {
+    more = false;
+    for (const b of buckets) if (i < b.length) { out.push(b[i]); more = true; }
+  }
+  return out;
+}
+
 export async function GET(req: NextRequest) {
   try {
     // ⚡ 독립 프라임 병렬 + featRows를 본쿼리(all)와 동시 발사(둘 다 네트워크라 왕복 겹침). 결과·정렬 불변.
@@ -103,7 +122,8 @@ export async function GET(req: NextRequest) {
       && recentN(c.review_dates, 90) >= 1
       && !dessertDominance(c.char_scores).dominant
       && beanNote(c).length > 0);
-    const gemPick = rotateByPeriod(gemPool)[0];
+    // 구 라운드로빈 인터리브 순서로 회전(preordered) → 전체 뷰 연속일이 다른 지역
+    const gemPick = rotateByPeriod(interleaveByRegion(gemPool), Date.now(), 1, 1, true)[0];
     // 폴백(지역 pool 비면): 기존 headlineA 로직 = 검증 로스터리 리뷰 1위
     const headlineA = gemPick ? slim(gemPick, "gem") : (() => {
       const vs = scope.filter((c: any) => c.synth_grade === "검증");

@@ -54,15 +54,17 @@ export function dayIndexKST(now: number = Date.now()): number {
 // 🔁 기간 회전 — rotateFeatured(20분)와 달리 periodDays(일=1/주=7) 단위로 1칸씩 천천히 회전.
 //   '오늘의 숨은 보석'·'오늘의 테마' 처럼 하루 동안은 고정(플리커 방지)되되, 매일(또는 매주) 새 얼굴로 교대.
 //   중립·안정 기준(id)으로 정렬 후 dayIndex/periodDays 위상만큼 회전 → 결정론(시계만). 상위 cap개 반환(기본 1).
+//   preordered=true면 호출부가 이미 정한 순서를 그대로 회전(예: 지역 라운드로빈 인터리브) — id 재정렬 안 함.
 export function rotateByPeriod<T extends { id: number | string }>(
   pool: T[],
   now: number = Date.now(),
   periodDays: number = 1,
   cap: number = 1,
+  preordered: boolean = false,
 ): T[] {
   const n = pool.length;
   if (n === 0) return [];
-  const base = [...pool].sort((a, b) => Number(a.id) - Number(b.id));
+  const base = preordered ? [...pool] : [...pool].sort((a, b) => Number(a.id) - Number(b.id));
   const period = Math.max(1, Math.floor(periodDays));
   const off = (((Math.floor(dayIndexKST(now) / period) % n) + n) % n);
   return [...base.slice(off), ...base.slice(0, off)].slice(0, cap);
