@@ -785,8 +785,11 @@ export function verifyReview(input: QualityInput): QualityResult {
   //   (좁은 도메인) 객실/부대시설 이용후기 시그널이 있고 카페 맥락어가 전무하면 offctx 후보로 강등 —
   //   대조군(id1316 그랜드 워커힐, 실제 F&B 후기)은 CAFE_CONTEXT가 있어 안전. 표본 3곳뿐인 소규모 파일럿이라
   //   하드 탈락 대신 LLM 재판정(borderline)으로 격하해 오탐 위험을 낮춘다.
+  // [룰갭 P58] id17012 재실측(offctx_rate=0.38 잔존, 07-24): 웨딩/예식/객실(bare)/1박/수영장(bare) 미등재로
+  //   raw 352건 중 159건(45%)이 사전을 우회. bare form 추가하되 CAFE_CONTEXT 가드는 그대로 유지(카페 실질
+  //   후기의 드문 "객실"·"수영장" 단독 언급은 통과 보호).
   const HOTEL_NAMED = input.name.includes("호텔") || HOTEL_BRANDS.some((b) => input.name.includes(b));
-  const HOTEL_LODGING_SIGNAL = /(숙박|투숙|킹룸|스탠다드룸|디럭스룸|조식뷔페|호캉스|풀빌라|수영장\s*이용권|연회장|컨벤션\s*후기)/;
+  const HOTEL_LODGING_SIGNAL = /(숙박|투숙|킹룸|스탠다드룸|디럭스룸|조식뷔페|호캉스|풀빌라|수영장|연회장|컨벤션\s*후기|웨딩|예식장?|객실|1박)/;
   if (HOTEL_NAMED && HOTEL_LODGING_SIGNAL.test(fullL) && !CAFE_CONTEXT.test(fullL)) {
     return { verdict: "rejected", score: 15, reasons: ["호텔 객실/부대시설 이용후기(카페 맥락 전무) — LLM 재판정"], borderline: true, signals: sig };
   }
