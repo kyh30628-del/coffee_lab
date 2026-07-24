@@ -22,8 +22,8 @@ type Cafe = {
   char_scores?: Record<string, number> | null;
   featured?: boolean;
 };
-type DCafe = { id: number; name: string; area: string; lat: number; lng: number; grade: string | null; count: number | null; identity: string | null; note: string | null; beanNote: string[]; reason?: string };
-type Discover = { headlineA: DCafe | null; headlineB: DCafe | null; top3: DCafe[]; fresh: DCafe[]; specialty: DCafe[]; featured?: DCafe[]; scopeCount: number };
+type DCafe = { id: number; name: string; area: string; lat: number; lng: number; grade: string | null; count: number | null; identity: string | null; note: string | null; beanNote: string[]; reason?: string; isNew?: boolean };
+type Discover = { headlineA: DCafe | null; headlineB: DCafe | null; themeB?: { emoji: string; label: string } | null; top3: DCafe[]; fresh: DCafe[]; specialty: DCafe[]; featured?: DCafe[]; scopeCount: number };
 type SearchResult = { id: number; name: string; area: string; grade: string | null; count: number | null; identity: string | null; score: number; reasons: string[] };
 type SearchRes = { ok: boolean; region: string; q: string; concepts: string[]; count: number; results: SearchResult[]; coverageNote?: string };
 const SEARCH_EXAMPLES = ["비 오는 날 혼자 조용히", "감성 사진 데이트", "노트북 작업하기 좋은", "산미 또렷한 커피", "빵 맛있는 집"];
@@ -104,6 +104,7 @@ const HeadlineCard = memo(function HeadlineCard({ c, kicker, tone, onOpen }: { c
         <div className="flex items-center gap-2 mb-1">
           <h2 className="text-2xl font-bold leading-tight">{c.name}</h2>
           {c.grade && <span className="text-[10px] bg-[#f4ece0]/20 px-2 py-0.5 rounded-full">{c.grade}</span>}
+          {c.isNew && <span className="text-[10px] bg-[#ffd9a0]/90 text-[#3a2a12] font-bold px-2 py-0.5 rounded-full">NEW</span>}
         </div>
         <div className="text-[12px] text-[#e8d4b0] mb-2">{c.area} · 리뷰 {c.count ?? 0}건</div>
         {c.identity && <p className="text-[13px] text-[#f0e6d4] leading-relaxed mb-3 line-clamp-2">{c.identity}</p>}
@@ -1278,8 +1279,8 @@ export default function Home() {
               </div>
             ) : !discover ? <p className="text-center text-[#665036] py-10">불러오는 중...</p> : (
               <>
-                {discover.headlineA && <HeadlineCard c={discover.headlineA} kicker="이번 주 가장 많이 이야기된 곳" tone={0} onOpen={openById} />}
-                {discover.headlineB && <HeadlineCard c={discover.headlineB} kicker="🔥 커피에 진심인 집 — 스페셜티 스포트라이트" tone={1} onOpen={openById} />}
+                {discover.headlineA && <HeadlineCard c={discover.headlineA} kicker="💎 오늘의 숨은 보석 — 검증됐지만 아직 덜 알려진 곳" tone={0} onOpen={openById} />}
+                {discover.headlineB && <HeadlineCard c={discover.headlineB} kicker={discover.themeB ? `${discover.themeB.emoji} 오늘의 테마 · ${discover.themeB.label}` : "🔥 커피에 진심인 집 — 스페셜티 스포트라이트"} tone={1} onOpen={openById} />}
                 {discover.featured && discover.featured.length > 0 && <Row title="✨ 추천 카페" items={discover.featured} onOpen={openById} sub="쇼케이스" info={<>사장님이 직접 <b>홍보 중인 쇼케이스 카페</b>예요(우선 노출). 후기·등급은 다른 카페와 똑같이 검증된 값이에요.</>} />}
                 {momentum && momentum.rising.length > 0 && <Row title="📈 요즘 뜨는 카페" items={momentum.rising.slice(0, 5)} onOpen={openById} sub="최근 입소문 순" info={<>별점 대신 <b>검증된 진짜 후기가 요즘 얼마나 빨리 느는지</b>로 뽑은 '뜨는 카페'예요. 최근 3개월 검증 후기가 많을수록 상위로 올라가요.</>} />}
                 <Row title="🏆 리뷰 많은 Top 3" items={discover.top3} onOpen={openById} sub="검증 리뷰 많은 순" info={<>이 동네에서 <b>검증·참고 후기(옥석)가 가장 많은</b> 카페 순서예요. 광고·가짜·무관 글은 제외한 '진짜 후기 수' 기준입니다.</>} />

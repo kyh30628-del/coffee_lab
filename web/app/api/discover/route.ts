@@ -2,9 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
 import { subscriptionLive } from "@/lib/flags";
 import { dessertDominance } from "@/lib/charScore";
-import { rotateFeatured } from "@/lib/exposureRotation";
+import { rotateFeatured, rotateByPeriod, dayIndexKST } from "@/lib/exposureRotation";
+import { recentN } from "@/lib/reviewDates";
 import { loadCriteria, getCriterionSync } from "@/lib/criteria";
 export const runtime = "nodejs";
+
+// 🎯 '오늘의 테마' — char_scores 6축과 1:1. dayIndexKST % 길이로 매일 축이 순환한다.
+type Theme = { key: string; label: string; emoji: string };
+const THEMES: Theme[] = [
+  { key: "roast", label: "직접 로스팅에 진심", emoji: "🔥" },
+  { key: "work", label: "작업하기 좋은", emoji: "💻" },
+  { key: "quiet", label: "조용히 몰입하는", emoji: "🤍" },
+  { key: "dessert", label: "디저트까지 완벽한", emoji: "🍰" },
+  { key: "mood", label: "분위기 좋은", emoji: "📸" },
+  { key: "space", label: "넓고 여유로운", emoji: "🪑" },
+];
 
 const REGIONS: Record<string, string[]> = {
   서울: ["강남구","강동구","강북구","강서구","관악구","광진구","구로구","금천구","노원구","도봉구","동대문구","동작구","마포구","서대문구","서초구","성동구","성북구","송파구","양천구","영등포구","용산구","은평구","종로구","중구","중랑구"],
@@ -40,7 +52,12 @@ function beanNote(c: any): string[] {
     .map(([k]: any) => CHAR_LABELS[k]?.label ?? k);
   return tags;
 }
-function reasonFor(c: any, kind: string): string {
+// created_at ~45일 이내면 '막 발견된' 신규 카페(NEW 배지·숨은 보석 신호)
+function isNewCafe(c: any): boolean {
+  const t = Date.parse(String(c.created_at ?? ""));
+  return !isNaN(t) && Date.now() - t < 45 * 86400000;
+}
+function reasonFor(c: any, kind: string, theme?: Theme): string {
   const cs = c.char_scores ?? {};
   const cnt = c.synth_count ?? 0;
   const beans = beanNote(c);
@@ -49,13 +66,15 @@ function reasonFor(c: any, kind: string): string {
     const r = cs.roast ?? 0;
     return `직접 로스팅 언급이 ${r}회로 또렷한, 커피에 진심인 집. 검증 등급(리뷰 ${cnt}건)으로 신뢰도도 높아요.`;
   }
+  if (kind === "gem") return `검증 등급인데 아직 리뷰 ${cnt}건 — 아직 덜 알려진 숨은 곳이에요.${beans.length ? " " + beans.join("·") + " 결이 잡혀요." : ""}`;
+  if (kind === "theme" && theme) return `${theme.label} 신호가 ${cs[theme.key] ?? 0}회로 또렷한 검증 카페(리뷰 ${cnt}건).`;
   if (kind === "fresh") return `최근 우리 지도에 새로 발견된 곳. ${beans.length ? beans.join("·") + " 신호가 잡혔어요." : "리뷰가 쌓이는 중이에요."}`;
   return c.identity ?? "";
 }
-function slim(c: any, kind = "") {
+function slim(c: any, kind = "", theme?: Theme) {
   return { id: c.id, name: c.name, area: c.area, lat: c.lat, lng: c.lng,
     grade: c.synth_grade, count: c.synth_count, identity: c.synth_identity, note: c.note,
-    beanNote: beanNote(c), reason: reasonFor(c, kind) };
+    isNew: isNewCafe(c), beanNote: beanNote(c), reason: reasonFor(c, kind, theme) };
 }
 
 export async function GET(req: NextRequest) {
@@ -65,7 +84,7 @@ export async function GET(req: NextRequest) {
     const region = req.nextUrl.searchParams.get("region") ?? ""; // 시군구 이름(선택)
     const featRowsP = sql`SELECT cafe_id FROM cafe_promos WHERE featured = true AND approved = true AND (featured_until IS NULL OR featured_until > now())` as unknown as Promise<{ cafe_id: number }[]>;
     const all = await sql`
-      SELECT id, name, area, lat, lng, synth_grade, synth_count, synth_identity, note, char_scores, created_at
+      SELECT id, name, area, lat, lng, synth_grade, synth_count, synth_identity, note, char_scores, created_at, review_dates
       FROM cafes WHERE published = true` as unknown as any[];
     const scope = region ? all.filter((c) => matchRegion(c.area, region)) : all;
 
@@ -75,19 +94,38 @@ export async function GET(req: NextRequest) {
     const bySpecialty = scope.filter((c) => c.synth_grade === "검증" && ((c.char_scores ?? {}).roast ?? 0) >= 2)
       .sort((a, b) => ((b.char_scores ?? {}).roast ?? 0) - ((a.char_scores ?? {}).roast ?? 0));
 
-    // 헤드라인 b: 스페셜티 중 직접로스팅 점수 최고 (주목할 로스터리)
-    const headlineB = bySpecialty[0] ? slim(bySpecialty[0], "specialty") : null;
+    // 💎 슬롯A — 오늘의 숨은 보석: 검증·저노출(리뷰 거인 제외)·최근 살아있음·커피정체성·결있음, 매일 회전.
+    //   프라임 자리를 늘 1등에게 주지 않고 '아직 덜 알려진 검증 카페'에 공정히 돌린다(롱테일).
+    const GEM_CEILING = getCriterionSync("exposure.gem_ceiling"); // 저노출 기준(폴백 80)
+    const gemPool = scope.filter((c: any) =>
+      c.synth_grade === "검증"
+      && (c.synth_count ?? 0) < GEM_CEILING
+      && recentN(c.review_dates, 90) >= 1
+      && !dessertDominance(c.char_scores).dominant
+      && beanNote(c).length > 0);
+    const gemPick = rotateByPeriod(gemPool)[0];
+    // 폴백(지역 pool 비면): 기존 headlineA 로직 = 검증 로스터리 리뷰 1위
+    const headlineA = gemPick ? slim(gemPick, "gem") : (() => {
+      const vs = scope.filter((c: any) => c.synth_grade === "검증");
+      const sr = vs.filter((c: any) => ((c.char_scores ?? {}).roast ?? 0) >= 5).sort((a: any, b: any) => (b.synth_count ?? 0) - (a.synth_count ?? 0));
+      const vr = [...vs].sort((a: any, b: any) => (b.synth_count ?? 0) - (a.synth_count ?? 0));
+      const pick = sr[0] ?? vr[0] ?? byReview[0];
+      return pick ? slim(pick, "top") : null;
+    })();
 
-    // headlineA = 검증 스페셜티 대표 (검증 + 로스팅 확실(roast>=5) 중 리뷰 1위, headlineB와 중복 회피)
-    const verifiedScope = scope.filter((c: any) => c.synth_grade === "검증");
-    const strongRoast = verifiedScope
-      .filter((c: any) => ((c.char_scores ?? {}).roast ?? 0) >= 5 && c.id !== headlineB?.id)
-      .sort((a: any, b: any) => (b.synth_count ?? 0) - (a.synth_count ?? 0));
-    const verifiedByReview = verifiedScope
-      .filter((c: any) => c.id !== headlineB?.id)
-      .sort((a: any, b: any) => (b.synth_count ?? 0) - (a.synth_count ?? 0));
-    const headlineA = strongRoast.length > 0 ? slim(strongRoast[0], "top")
-      : (verifiedByReview[0] ? slim(verifiedByReview[0], "top") : (byReview[0] ? slim(byReview[0], "top") : null));
+    // 🎯 슬롯B — 오늘의 테마: char_scores 축이 매일 순환, 축 상위 8 중 회전(강신호 유지 + 교대).
+    const theme = THEMES[((dayIndexKST() % THEMES.length) + THEMES.length) % THEMES.length];
+    const scOf = (c: any) => (c.char_scores ?? {})[theme.key] ?? 0;
+    const themePool = scope.filter((c: any) =>
+      c.synth_grade === "검증" && scOf(c) >= 2 && c.id !== headlineA?.id
+      && !dessertDominance(c.char_scores).dominant)  // 커피 브랜드 유지 — 디저트 테마도 '커피 카페 중 디저트 좋은 곳'만(순수 베이커리 제외)
+      .sort((a: any, b: any) => scOf(b) - scOf(a)).slice(0, 8);
+    const themePick = rotateByPeriod(themePool)[0];
+    // 폴백(테마 pool 비면): 기존 headlineB = 스페셜티(로스팅) 1위, themeB=null이면 클라가 기존 문구로.
+    const headlineB = themePick ? slim(themePick, "theme", theme)
+      : (() => { const f = bySpecialty.find((c: any) => c.id !== headlineA?.id); return f ? slim(f, "specialty") : null; })();
+    const themeB = themePick ? { emoji: theme.emoji, label: theme.label } : null;
+
     const usedIds = new Set([headlineA?.id, headlineB?.id].filter(Boolean));
 
     // ✨ 우선 노출(featured) — 유료 상품. 기간(featured_until) 만료 시 자동 제외.
@@ -104,7 +142,7 @@ export async function GET(req: NextRequest) {
       ok: true, region: region || "전체", scopeCount: scope.length,
       featured: subscriptionLive() ? featured : [], // 구독 라이브 전엔 소비자에 '추천 카페' 숨김
 
-      headlineA, headlineB,
+      headlineA, headlineB, themeB,
       // 헤드라인 제외 후 잘라서 항상 꽉 채움(공개 카페가 충분하면 Top3=3개)
       top3: byReview.filter((c) => !usedIds.has(c.id)).slice(0, 3).map((c: any) => slim(c, "top")),
       fresh: (() => {

@@ -29,6 +29,7 @@ export const META: CriterionMeta[] = [
   { key: "search.grade_bonus.reference", category: "검색", label: "검색 랭킹 등급 가산점(참고)", def: 8, min: 0, max: 100, unit: "점" },
   // 노출 상한
   { key: "exposure.featured_cap", category: "노출", label: "우선노출(featured) 동시 노출 상한", def: 6, min: 1, max: 50, unit: "개" },
+  { key: "exposure.gem_ceiling", category: "노출", label: "홈 '숨은 보석' 저노출 기준(검증 리뷰 이 수 미만만 후보)", def: 80, min: 40, max: 200, unit: "건" },
 
   // ── Phase 2 · 오염 게이트 임계 (lib/synthStore.ts 합성 공개 게이트) ──
   //   ⚠️ 소비처 하드코딩과 100% 동일(서비스 무변). 계수 얽힘(entityPolluted 0.4·offConceptHit 0.66)은 제외.

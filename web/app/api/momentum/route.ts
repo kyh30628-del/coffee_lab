@@ -1,18 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
 import { dessertDominance } from "@/lib/charScore";
+import { recentN } from "@/lib/reviewDates";
 export const runtime = "nodejs";
 
 // "📈 요즘 뜨는 카페" — 별점(미제공) 대신 우리 소유 데이터로 모멘텀 산출.
-// 1차 신호(지금 작동): 최근 90/30일 검증 후기 게시 수 = 입소문 버즈(review_dates 기반).
+// 1차 신호(지금 작동): 최근 90/30일 검증 후기 게시 수 = 입소문 버즈(review_dates 기반, recentN=lib/reviewDates).
 // 2차 신호(스냅샷 누적 시): 주간 검증 리뷰 수 증가분(Δ) = 상승세. 둘 다 환각 없이 실데이터.
-const recentN = (dates: unknown, days: number): number => {
-  if (!Array.isArray(dates)) return 0;
-  const cut = Date.now() - days * 86400000;
-  let n = 0;
-  for (const d of dates) { const t = Date.parse(String(d).replace(/\./g, "-")); if (!isNaN(t) && t >= cut) n++; }
-  return n;
-};
 function inRegion(area: string, region: string): boolean {
   if (!region) return true;
   const a = area ?? "";
