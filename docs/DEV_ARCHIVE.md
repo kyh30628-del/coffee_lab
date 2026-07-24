@@ -148,3 +148,4 @@
 | 2026-07-23 23:59 | #472 | [개발] 관제탑 트래픽 패널 — 행동기반 봇 제외(스푸핑 UA 헤드리스 대응) | dbcb87f0 | - | 신규 lib/behaviorBot.ts(BEHAVIOR_BOT_ANON_IDS_SQL, 재사용 predicate) + app/api/admin/analytics/route.ts에  |
 | 2026-07-24 04:09 | #477 | [룰갭 P55] 흔한 관용구/명사형 카페명 — '우상향'·'향초' weak_token 갭(사전추가) | e0790d1e | - | lib/criteriaListsBase.ts identity.weak_token에 '우상향'·'향초' 2건 추가(P44/46과 동일 메커니즘, 코멘트 블록에 P55 근거 명시).  |
 | 2026-07-24 04:19 | #478 | [룰갭 P56] 동명이업종 브랜드 오귀속 — nameInTitle 자기소개 예외 무력화(레드문 뷰티 vs 레 | 97b0a527 | - | lib/reviewQuality.ts: NONCAFE_BIZ의 nameInTitle 자기소개 예외를 무력화하는 신규 게이트 추가(747/755 뒤). nameInTitle=true |
+| 2026-07-24 04:27 | #479 | [룰갭 P57] LOCAL_SEO_SERVICES 사전 갭 — 리모델링/종합설비 배관시공 SEO스팸 미등재( | a85a6b49 | - | lib/reviewQuality.ts LOCAL_SEO_SERVICES에 리모델링·종합설비 추가(142행). 기존 865행 CAFE_CONTEXT/SELF_BIZ_PROMO 가드  |
