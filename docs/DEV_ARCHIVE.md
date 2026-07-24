@@ -149,3 +149,4 @@
 | 2026-07-24 04:09 | #477 | [룰갭 P55] 흔한 관용구/명사형 카페명 — '우상향'·'향초' weak_token 갭(사전추가) | e0790d1e | - | lib/criteriaListsBase.ts identity.weak_token에 '우상향'·'향초' 2건 추가(P44/46과 동일 메커니즘, 코멘트 블록에 P55 근거 명시).  |
 | 2026-07-24 04:19 | #478 | [룰갭 P56] 동명이업종 브랜드 오귀속 — nameInTitle 자기소개 예외 무력화(레드문 뷰티 vs 레 | 97b0a527 | - | lib/reviewQuality.ts: NONCAFE_BIZ의 nameInTitle 자기소개 예외를 무력화하는 신규 게이트 추가(747/755 뒤). nameInTitle=true |
 | 2026-07-24 04:27 | #479 | [룰갭 P57] LOCAL_SEO_SERVICES 사전 갭 — 리모델링/종합설비 배관시공 SEO스팸 미등재( | a85a6b49 | - | lib/reviewQuality.ts LOCAL_SEO_SERVICES에 리모델링·종합설비 추가(142행). 기존 865행 CAFE_CONTEXT/SELF_BIZ_PROMO 가드  |
+| 2026-07-24 14:07 | #483 | [룰갭 P58] P50 HOTEL_LODGING_SIGNAL 사전 협소 — 웨딩/예식/객실/1박/수영장(ba | 6d8b6a6e | - | lib/reviewQuality.ts:789 HOTEL_LODGING_SIGNAL에 웨딩 예식장? 객실 1박 수영장(bare) 추가, 수영장 이용권 조건 제거. CAFE_CONTE |
