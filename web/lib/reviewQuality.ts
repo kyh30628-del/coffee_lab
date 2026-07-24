@@ -164,6 +164,9 @@ const COMMON_WORD_NAMES = new Set(["일상적", "마찬가지", "그리고", "�
 // ★ 비카페 업종이 '제목을 지배'할 때의 가드 — 매장·음료·주문·메뉴·좌석은 피부관리/필라테스 등 비카페도 흔히 써서
 //   가드를 뚫는다('피부관리 하이드뷰티…매장 전화번호'→결). 이 경로엔 진짜 커피전문 어휘(카페·커피·디저트·원두…)만 인정(2026-06-28).
 const CAFE_CONTEXT_STRONG = /(카페|커피|라떼|아메리카노|에스프레소|콜드브루|핸드드립|디저트|케이크|베이커리|빵|제과|원두|바리스타|아인슈페너|브런치|로스팅|카공|cafe|coffee|latte)/i;
+// ★ 룰갭 P56 전용 — CAFE_CONTEXT_STRONG에서 카테고리어("카페"/cafe/coffee/카공)를 뺀 '실질' 음료·디저트
+//   어휘만. "카페"는 겸업 업체 설명문에도 흔해(카페+에스테틱 겸업) 자기소개 신뢰 신호로 약하다.
+const CAFE_CONTEXT_SUBSTANCE = /(커피|라떼|아메리카노|에스프레소|콜드브루|핸드드립|디저트|케이크|베이커리|빵|제과|원두|바리스타|아인슈페너|브런치|로스팅)/i;
 
 // 수도권 시·군·구 — 같은 상호의 '다른 지점'을 지역으로 구분하기 위함
 const ALL_GU = [
@@ -754,6 +757,23 @@ export function verifyReview(input: QualityInput): QualityResult {
   //   가드: CAFE_CONTEXT가 하나라도 있으면 진짜 카페 후기로 보고 통과(혼재 업체·실제 후기 보호 → 오탐 차단).
   if (NONCAFE_BIZ.test(title) && !CAFE_CONTEXT_STRONG.test(fullL)) {
     return { verdict: "rejected", score: 4, reasons: ["동명 비카페 업체(업종어 지배·카페맥락 전무)"], signals: sig };
+  }
+  // [룰갭 P56, decisions#478] nameInTitle 자기소개 예외 무력화 — 카페 상호 자체에 업종어가 포함돼
+  //   (정당한 상호, 예: '레드문 뷰티') nameInTitle이 항상 발동하면 위 747 게이트가 통째로 빠져나간다.
+  //   완전히 다른 회사가 동일/유사 브랜드명을 쓰는 무관 업종 콘텐츠도 '자기소개'로 오인해 통과한다
+  //   (id15796 "레드문글로벌" 에스테틱 실측). 위 755 가드(CAFE_CONTEXT_STRONG 완전 부재 요구)는
+  //   이런 글이 흔히 같은 자리 겸업(카페+에스테틱)을 설명하며 카페 카테고리어("카페")만 지나가듯
+  //   섞어 써도 뚫린다(실측: id15796 오염 리뷰 전부 CAFE_CONTEXT_STRONG 히트 1개 이상 — "루프탑카페+
+  //   에스테틱뷰티샵을 다녀왔어요" 식). 카테고리어("카페"/cafe/coffee/카공) 자체는 자기소개에도
+  //   겸업 서술에도 똑같이 쓰이는 약한 신호라, 실제 음료·디저트 어휘(커피·라떼·아메리카노·디저트·
+  //   케이크·원두·바리스타…)가 전무한 채 NONCAFE_BIZ 시술어가 2회 이상 반복되면(제목 자기소개
+  //   신뢰가 무색해질 만큼 비카페 내용이 압도) nameInTitle 예외를 취소하고 거절한다(실측: id15796
+  //   오염 8건 전부 이 신호 0개, 정상 리뷰는 이 신호를 동반해 안전).
+  if (nameInTitle && NONCAFE_BIZ.test(title)) {
+    const nonCafeBizHits = (fullL.match(new RegExp(NONCAFE_BIZ.source, "g")) ?? []).length;
+    if (nonCafeBizHits >= 2 && !CAFE_CONTEXT_SUBSTANCE.test(fullL)) {
+      return { verdict: "rejected", score: 4, reasons: ["동명 비카페 업체(제목 자기소개 예외 무력화 — 시술어 반복·카페 실질신호 전무)"], signals: sig };
+    }
   }
   // [룰갭 P50] 호텔 부속 카페 — HOTEL_BRANDS(coord#125)는 '동브랜드 산하 딴 F&B 서브업장' 혼입만 방어했으나,
   //   호텔 자체의 비-F&B 콘텐츠(객실·수영장·연회장·웨딩)가 그대로 verified까지 도달했다(id10125·id17012 실측,
