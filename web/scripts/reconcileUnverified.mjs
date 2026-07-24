@@ -18,18 +18,18 @@ export async function reconcileUnverified(sql) {
     const j = await r.json();
     if (typeof j?.v === "string") liveSha = j.v;
   } catch {}
-  if (!liveSha) { console.log("  ⏸ 반영미확인 재검증: /api/version 조회 실패 — 다음 주기 재시도"); return; }
+  if (!liveSha) { console.error("  ⏸ 반영미확인 재검증: /api/version 조회 실패 — 다음 주기 재시도"); return; }
   try { git("fetch origin main -q"); } catch {}
   for (const d of pending) {
     const sha = d.action_params?.sha;
     if (!sha || !/^[0-9a-f]{7,40}$/i.test(sha)) continue; // 형식 이상 sha는 셸 인자로 넘기지 않음
     const isAncestor = sha === liveSha || (() => { try { git(`merge-base --is-ancestor ${sha} ${liveSha}`); return true; } catch { return false; } })();
-    if (!isAncestor) { console.log(`  ⏸ #${d.id} 반영미확인 재검증: 아직 라이브(${liveSha.slice(0, 8)}) 조상 아님 — 유지`); continue; }
+    if (!isAncestor) { console.error(`  ⏸ #${d.id} 반영미확인 재검증: 아직 라이브(${liveSha.slice(0, 8)}) 조상 아님 — 유지`); continue; }
     const coord = d.action_params?.coord;
     await sql`UPDATE decisions SET status='done', decided_at=now(), decided_by='CEO',
       result=${`배포완료·반영 재확인(라이브 HEAD=${liveSha.slice(0, 8)})`},
       action_params = action_params || ${JSON.stringify({ dev_status: "deployed" })}::jsonb WHERE id=${d.id}`;
     if (coord) await sql`UPDATE coordination SET status='resolved', resolved_at=now(), stage='완료', resolution=${`개발·배포 완료(#${d.id}, 반영 재확인)`} WHERE id=${Number(coord)}`.catch(() => {});
-    console.log(`  ✅ #${d.id} 반영미확인 → 재확인 완료(sha=${sha.slice(0, 8)}가 라이브 ${liveSha.slice(0, 8)}의 조상)`);
+    console.error(`  ✅ #${d.id} 반영미확인 → 재확인 완료(sha=${sha.slice(0, 8)}가 라이브 ${liveSha.slice(0, 8)}의 조상)`);
   }
 }

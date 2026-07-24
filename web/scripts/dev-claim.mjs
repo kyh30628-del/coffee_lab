@@ -10,7 +10,7 @@ const K = Math.max(1, Math.min(6, Number(process.argv[2] || 3)));
 // ♻️ 반영미확인 재검증(#336): dev-deploy.mjs는 run-dev-deploy.sh의 deploy_approved CNT 가드가
 //   0일 때 아예 호출 안 돼 재검증이 죽은 코드가 되는 blind spot이 있었다(#311/#327/#328 영구 미표시).
 //   dev-claim.mjs는 그 가드와 무관하게 매 클레임 주기 무조건 실행되므로 여기서도 재검증한다.
-try { await reconcileUnverified(sql); } catch (e) { console.log(`  ⚠️ 반영미확인 재검증 중 오류(무시): ${String(e.message || e).slice(0, 120)}`); }
+try { await reconcileUnverified(sql); } catch (e) { console.error(`  ⚠️ 반영미확인 재검증 중 오류(무시): ${String(e.message || e).slice(0, 120)}`); }
 
 // 1) stale 'building'(120분+ 미완) → 미빌드로 리셋(재시도 가능)
 //    (2026-07-02: 30분→120분 — 긴 빌드가 30분을 넘기면 동일 태스크가 재클레임돼 두 워커가 같은
