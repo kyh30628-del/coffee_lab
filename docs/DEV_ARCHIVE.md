@@ -146,3 +146,4 @@
 | 2026-07-23 23:24 | #465 | [룰갭 P53] "퍼스널" 흔한 서비스업 수식어 identity-core 오귀속 → COMMON_WORD_N | 6028d86d | - | lib/reviewQuality.ts:163 COMMON_WORD_NAMES에 "퍼스널" 추가. tsc 신규에러 0(베이스라인 next.config eslint 1건 제외), np |
 | 2026-07-23 23:46 | #466 | [룰갭 P54] 다지점 프랜차이즈 형제지점 완전주소 병기 — 동일구·다른도로 슬립(신규 로직, 승인 필요) | ea527f88 | - | lib/reviewQuality.ts: myBranch('점'지점) 카페의 주소검증 블록(input.addr 섹션) 끝에 신규 체크 추가 — 등록 도로명이 리뷰 전문에 전혀 없는데 |
 | 2026-07-23 23:59 | #472 | [개발] 관제탑 트래픽 패널 — 행동기반 봇 제외(스푸핑 UA 헤드리스 대응) | dbcb87f0 | - | 신규 lib/behaviorBot.ts(BEHAVIOR_BOT_ANON_IDS_SQL, 재사용 predicate) + app/api/admin/analytics/route.ts에  |
+| 2026-07-24 04:09 | #477 | [룰갭 P55] 흔한 관용구/명사형 카페명 — '우상향'·'향초' weak_token 갭(사전추가) | e0790d1e | - | lib/criteriaListsBase.ts identity.weak_token에 '우상향'·'향초' 2건 추가(P44/46과 동일 메커니즘, 코멘트 블록에 P55 근거 명시).  |
