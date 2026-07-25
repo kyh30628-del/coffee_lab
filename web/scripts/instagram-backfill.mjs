@@ -14,7 +14,7 @@ for (const l of env.split("\n")) { const m = l.match(/^([A-Z_0-9]+)=(.*)$/); if 
 const { sql } = await import("../lib/db.ts");
 const { recordRun, guardJob } = await import("../lib/heartbeat.ts");
 const { bumpNaver, markNaverExhausted, naverBlocked } = await import("../lib/naverBudget.ts");
-const { coreTokens } = await import("../lib/reviewQuality.ts");
+const { coreTokensDetail } = await import("../lib/reviewQuality.ts");
 guardJob("instagram-backfill"); // 잡히지 않은 크래시도 관제탑이 보게 기록
 
 const ID = process.env.NAVER_CLIENT_ID, SECRET = process.env.NAVER_CLIENT_SECRET;
@@ -23,14 +23,30 @@ const strip = (s) => (s || "").replace(/<[^>]+>/g, "").trim();
 const IG_RE = /^https?:\/\/(www\.)?instagram\.com\//i;
 const normName = (s) => (s || "").toLowerCase().replace(/\s+/g, "");
 // coord#244 후속(#486): 좌표 165m 근접만으론 상가밀집지역에서 옆가게를 채택하는 근본버그였다.
-// 대상 카페의 식별토큰(coreTokens, lib/reviewQuality.ts — 오염검증 단일출처와 동일 로직)이 네이버
+// 대상 카페의 식별토큰(coreTokensDetail, lib/reviewQuality.ts — 오염검증 단일출처와 동일 로직)이 네이버
 // 검색결과 상호명에 실제로 포함될 때만 채택 — 좌표+상호명 이중 게이트.
+// coord#245 후속(#493, H15): #486 배포 이후에도 스타필드·터미널 등 다중테넌트 몰에서 오귀속이 재발했다
+// (id3517 "포비 강남점"↔creamlabel_, id4226 "도넛킬러 남양주점"↔milky_kr). 몰은 Naver가 입점 매장 전부에
+// 사실상 동일 좌표를 부여해 좌표 게이트가 무력화되고, 기존 게이트가 우리 토큰이 후보 원문에 '부분 포함'되는지만
+// 봐 무관 후보의 이름 어딘가에 우리 토큰이 우연히 등장하기만 해도 통과했다. 후보명도 같은 coreTokensDetail
+// 엔진으로 식별토큰을 뽑아 '겹치는 식별토큰이 실제로 있는지'까지 요구 + venueOnly(건물명뿐인 식별)나 2자 이하
+// 초약체 토큰만 남은 경우엔 전체이름 일치까지 요구해 우연한 부분일치를 근본 차단한다.
 function nameMatches(cafeName, areaTerms, candidateName) {
-  const toks = coreTokens(cafeName, areaTerms);
+  const { tokens: toks, venueOnly } = coreTokensDetail(cafeName, areaTerms);
   const cand = normName(candidateName);
-  if (toks.length) return toks.some((t) => cand.includes(normName(t)));
-  // 식별토큰이 하나도 없는(전부 일반어) 이름은 토큰매칭이 불가하므로 원본 이름 전체 포함으로 대체 판정.
   const full = normName(cafeName);
+  if (toks.length) {
+    const candToks = coreTokensDetail(candidateName, areaTerms).tokens;
+    const overlap = candToks.length
+      ? toks.some((t) => candToks.some((ct) => normName(ct) === normName(t)))
+      : toks.some((t) => cand.includes(normName(t)));
+    if (!overlap) return false;
+    // 몰/밀집매장 다중테넌트 식별(venueOnly)이거나 2자 이하 초약체 토큰뿐이면 겹침만으론 불충분 — 전체이름까지 요구.
+    const weak = venueOnly || toks.every((t) => normName(t).length <= 2);
+    if (!weak) return true;
+    return full.length >= 2 && (cand.includes(full) || full.includes(cand));
+  }
+  // 식별토큰이 하나도 없는(전부 일반어) 이름은 토큰매칭이 불가하므로 원본 이름 전체 포함으로 대체 판정.
   return full.length >= 2 && (cand.includes(full) || full.includes(cand));
 }
 
