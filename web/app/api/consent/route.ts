@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
+import { BOT_ANON_IDS_SQL } from "@/lib/behaviorBot";
 export const runtime = "nodejs";
 
 // 위치이용 동의·기록 (PRINCIPLES §2: 개인정보 최소수집)
@@ -55,7 +56,8 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// 동의 현황 집계(관리용)
+// 동의 현황 집계(관리용) — 봇/내부 제외 = lib/behaviorBot.ts BOT_ANON_IDS_SQL 단일출처(#503 후속,
+//   CEO "모든 기준을 그걸로" — 방문자 수를 다루는 모든 화면이 예외 없이 같은 기준을 쓰게 통일).
 export async function GET() {
   try {
     await ensureSchema();
@@ -65,10 +67,11 @@ export async function GET() {
              COUNT(*) FILTER (WHERE agreed)::int AS agreed,
              COUNT(*) FILTER (WHERE region IS NOT NULL)::int AS located,
              COUNT(*) FILTER (WHERE created_at > now() - interval '7 days')::int AS last7d
-      FROM user_consents`)[0];
+      FROM user_consents WHERE anon_id NOT IN (${sql.unsafe(BOT_ANON_IDS_SQL)})`)[0];
     const topRegions = await sql`
       SELECT region, COUNT(*)::int AS n
       FROM user_consents WHERE region IS NOT NULL
+        AND anon_id NOT IN (${sql.unsafe(BOT_ANON_IDS_SQL)})
       GROUP BY region ORDER BY n DESC LIMIT 10`;
     return NextResponse.json({ ok: true, ...row, topRegions });
   } catch (e) {

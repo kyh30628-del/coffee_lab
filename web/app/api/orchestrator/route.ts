@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
 import { synthAndStore, finalizePipeline, scrubPublishedPII, healGroundingSuspects, holdZeroEvidenceSuspects, healPublishedAudit, healNonCafeCategory, healOutOfBox, healAreaLabel, healOffConceptByReview } from "@/lib/synthStore";
 import { recordRun } from "@/lib/agentLog";
+import { BOT_ANON_IDS_SQL } from "@/lib/behaviorBot";
 import { judgeQueueCount, dailyCounts } from "@/lib/metrics";
 import { consoleCreditExhaustedByProbe } from "@/lib/consoleKeyProbe";
 import { loadCriteria, getCriterionSync } from "@/lib/criteria";
@@ -252,20 +253,21 @@ export async function GET(req: NextRequest) {
     } catch {}
 
     // 📊 유입(트래픽) — 깜깜이 탈출. user_consents(익명 방문핑) 기반 활성자 + 유입경로 첫터치.
-    //   봇 UA 제외. src 컬럼은 신규(이전 방문자는 NULL→집계서 '미상') → 앞으로 유입분부터 출처 채워짐.
-    const BOT = `COALESCE(user_agent,'') !~* 'bot|crawl|spider|slurp|bingpreview|facebookexternalhit|headless|preview' AND COALESCE(src,'') !~* 'findelio|blinkx|semrush|ahrefs|dataprovider|dotbot|petalbot|yandex|mj12|serpstat' AND COALESCE(src,'') NOT IN ('internal','spam') AND NOT COALESCE(internal, false)`;
+    //   봇/크롤러/내부/스크래퍼 제외 = lib/behaviorBot.ts BOT_ANON_IDS_SQL 단일출처(#503 후속,
+    //   CEO "모든 기준을 그걸로" — 화면마다 다른 필터로 숫자가 갈리는 사고 재발 방지. 이전엔 이 파일 자체
+    //   local BOT 상수가 'internal' 오분류 버그를 그대로 갖고 있었음).
     const traffic = (await sql.query(
       `SELECT
         COUNT(*) FILTER (WHERE last_seen > now()-interval '7 days')::int wau,
         COUNT(*) FILTER (WHERE last_seen > now()-interval '30 days')::int mau,
         COUNT(*) FILTER (WHERE last_seen > now()-interval '1 day')::int dau,
         COUNT(*) FILTER (WHERE created_at > now()-interval '7 days')::int new7
-      FROM user_consents WHERE ${BOT}`
+      FROM user_consents WHERE anon_id NOT IN (${BOT_ANON_IDS_SQL})`
     ).catch(() => [{ wau: 0, mau: 0, dau: 0, new7: 0 }]))[0] as any;
     const trafficSources = (await sql.query(
       `SELECT COALESCE(NULLIF(src,''),'미상') AS s, COUNT(*)::int n
        FROM user_consents
-       WHERE last_seen > now()-interval '30 days' AND ${BOT}
+       WHERE last_seen > now()-interval '30 days' AND anon_id NOT IN (${BOT_ANON_IDS_SQL})
        GROUP BY 1 ORDER BY n DESC LIMIT 12`
     ).catch(() => [])) as any[];
     if ((traffic?.mau ?? 0) > 0 && trafficSources.every((r) => r.s === "미상")) {
@@ -274,17 +276,18 @@ export async function GET(req: NextRequest) {
     // 출처별 참여도(평균 재방문수) — 어디서 온 사람이 더 들러붙나.
     const sourceEngage = (await sql.query(
       `SELECT COALESCE(NULLIF(src,''),'미상') AS s, COUNT(*)::int n, ROUND(AVG(COALESCE(visit_count,1))::numeric,1) AS avg_visits
-       FROM user_consents WHERE last_seen > now()-interval '30 days' AND ${BOT}
+       FROM user_consents WHERE last_seen > now()-interval '30 days' AND anon_id NOT IN (${BOT_ANON_IDS_SQL})
        GROUP BY 1 ORDER BY n DESC LIMIT 8`
     ).catch(() => [])) as any[];
     // 신규 vs 재방문(최근 30일 활성)
     const retention = (await sql.query(
       `SELECT COUNT(*) FILTER (WHERE COALESCE(visit_count,1) <= 1)::int newcomers,
               COUNT(*) FILTER (WHERE COALESCE(visit_count,1) > 1)::int ret
-       FROM user_consents WHERE last_seen > now()-interval '30 days' AND ${BOT}`
+       FROM user_consents WHERE last_seen > now()-interval '30 days' AND anon_id NOT IN (${BOT_ANON_IDS_SQL})`
     ).catch(() => [{ newcomers: 0, ret: 0 }]))[0] as any;
 
     // 📈 페이지뷰 분석(traffic_events) — 자체 집계. 90일 보존(여기서 정리).
+    //   ⚠️ 이전엔 이 4개 쿼리에 봇필터가 전혀 없었다(원시 카운트) — 관제탑이 노출봇을 그대로 보여주던 사각.
     await sql`DELETE FROM traffic_events WHERE ts < now() - interval '90 days'`.catch(() => {});
     const pageBuckets = (await sql`
       SELECT CASE
@@ -296,18 +299,22 @@ export async function GET(req: NextRequest) {
         ELSE '기타' END AS bucket,
         COUNT(*)::int views, COUNT(DISTINCT anon_id)::int uniques
       FROM traffic_events WHERE ts > now()-interval '30 days'
+        AND anon_id NOT IN (${sql.unsafe(BOT_ANON_IDS_SQL)})
       GROUP BY 1 ORDER BY views DESC`.catch(() => [])) as any[];
     const topCafes = (await sql`
       SELECT c.name, c.area, COUNT(*)::int views, COUNT(DISTINCT te.anon_id)::int uniques
       FROM traffic_events te JOIN cafes c ON te.path = '/c/' || c.id
       WHERE te.ts > now()-interval '30 days'
+        AND te.anon_id NOT IN (${sql.unsafe(BOT_ANON_IDS_SQL)})
       GROUP BY c.id, c.name, c.area ORDER BY views DESC LIMIT 10`.catch(() => [])) as any[];
     // 퍼널: 방문자 중 카페상세까지 본 비율(둘러보기→몰입 전환)
     const funnel = (await sql`
       SELECT COUNT(DISTINCT anon_id)::int visitors,
              COUNT(DISTINCT anon_id) FILTER (WHERE path LIKE '/c/%')::int viewed_cafe
-      FROM traffic_events WHERE ts > now()-interval '30 days'`.catch(() => [{ visitors: 0, viewed_cafe: 0 }]))[0] as any;
-    const pageviews30d = (await sql`SELECT COUNT(*)::int n FROM traffic_events WHERE ts > now()-interval '30 days'`.catch(() => [{ n: 0 }]))[0]?.n ?? 0;
+      FROM traffic_events WHERE ts > now()-interval '30 days'
+        AND anon_id NOT IN (${sql.unsafe(BOT_ANON_IDS_SQL)})`.catch(() => [{ visitors: 0, viewed_cafe: 0 }]))[0] as any;
+    const pageviews30d = (await sql`SELECT COUNT(*)::int n FROM traffic_events WHERE ts > now()-interval '30 days'
+      AND anon_id NOT IN (${sql.unsafe(BOT_ANON_IDS_SQL)})`.catch(() => [{ n: 0 }]))[0]?.n ?? 0;
 
     // 파이프라인 진행 상황(신규 카페 조립라인)
     const pl = (await sql`SELECT

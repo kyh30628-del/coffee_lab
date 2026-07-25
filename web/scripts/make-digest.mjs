@@ -2,6 +2,7 @@
 //   1회 미리 계산해 agent-reports/DIGEST.md 한 장으로. 에이전트는 이걸 한 번 Read → 턴·캐시재독 급감(품질 무영향, 데이터 동일).
 import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from "node:fs";
 import { neon } from "@neondatabase/serverless";
+import { BOT_ANON_IDS_SQL } from "../lib/behaviorBot.ts"; // 트래픽/유입 단일출처(#503 후속, CEO "모든 기준을 그걸로") — 모든 러너가 --import tsx로 실행돼 .ts import 안전
 const AR = "/Users/wangwida/coffee-platform/agent-reports";
 const env = readFileSync("/Users/wangwida/coffee-platform/web/.env.local", "utf8");
 const url = env.match(/DATABASE_URL="?([^"\n]+)/)[1].trim();
@@ -203,6 +204,7 @@ const today = new Date().toISOString().slice(0, 10);
       FROM user_consents uc
       JOIN traffic_events te ON te.anon_id = uc.anon_id
       WHERE uc.region IS NOT NULL AND NOT COALESCE(uc.internal,false) AND te.ts > now() - interval '7 days'
+        AND uc.anon_id NOT IN (${sql.unsafe(BOT_ANON_IDS_SQL)})
       GROUP BY uc.anon_id, uc.region, uc.user_agent, uc.src
       HAVING COUNT(te.*) >= 2
       ORDER BY MAX(te.ts) DESC
