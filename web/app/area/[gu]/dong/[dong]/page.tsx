@@ -1,15 +1,15 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Curated from "../../../Curated";
-import { getDongs, getDongsInArea, getDongCafes, getDongPublishedCount, SITE } from "@/lib/seoData";
+import { getDongsInArea, getDongCafes, getDongPublishedCount, SITE } from "@/lib/seoData";
 
 export const revalidate = 1800; // 30분 — 비공개/신규 반영 빠르게(구·취향 페이지와 동일 정책)
 
+// 빌드 비용 제로화(2026-07-26, CEO 지시) — 빌드타임 프리렌더 0곳. 전부 온디맨드 ISR.
+// sitemap엔 631곳 전부 실려 있어 크롤러 첫 요청 시 그 1건만 생성·캐시(revalidate 30분)되고,
+// 배포마다 반복되던 "150곳 미리 빌드" 비용(+18.7초/+35% 빌드시간, 실측)이 완전히 사라진다.
 export async function generateStaticParams() {
-  const dongs = await getDongs();
-  // 빌드 비용 제어 — 상위 150곳만 미리 빌드, 나머지는 온디맨드 ISR(구·취향 페이지의 "top 30" 정책과 동일 원칙).
-  // sitemap엔 631곳 전부 실려 크롤러가 요청하는 즉시 생성·캐시되므로 "전체 확장"은 그대로 유지된다.
-  return dongs.slice(0, 150).map((d) => ({ gu: d.area, dong: d.dong }));
+  return [];
 }
 
 type Props = { params: Promise<{ gu: string; dong: string }> };
