@@ -54,16 +54,65 @@ const today = new Date().toISOString().slice(0, 10);
   //    스크립트 자신)를 고쳤는가"로 판별한다: 감시 로직 자기수정 결재행은 대상 제안서를 실제로 구현한 게 아니므로
   //    항상 메타 제외. 그 외(감시 스크립트를 안 건드린) 결재행은 stem 여러 개 동시 언급 + 코드 배포 완료(dev_status
   //    deployed/built) 조합이면 배치 구현으로 인정한다(#428류 재발 방지).
+  //    ⚠️ #502 근본재설계(#450 수정에도 3주+ 재발): 위 stem ILIKE 매치 계열 전부가 같은 잘못된 전제 위에 있었다 —
+  //    "이 제안서를 처리한 결재행은 파일명 문자열을 그대로 담고 있을 것"이라는 가정. 실측(risk-proposals-20260720/
+  //    23·b2b-sales-proposals-20260718 등 25건 표본)해보니 사실이 아니었다: (a) risk-proposals류는 신규 제안이
+  //    아니라 **기존 결재#356/#398처럼 번호로 이미 콕 집어 촉구**하는 재확인 리포트라 파일명이 결재문에 실릴 이유가
+  //    없고(집행대기는 이미 백로그 섹션에 별도 표출 중 — 중복 신호), (b) selfaudit-proposals·rulegap-proposals류는
+  //    아예 처음부터 "## decisions#421 —"·"(사전추가, decisions#477)"처럼 **자기가 상신한 결재 번호를 헤딩/본문에
+  //    스스로 명시**하는 관행인데 stem 매칭은 이걸 못 읽고, (c) selfaudit-proposals-20260722-0800.md처럼 "결재
+  //    상신: 없음"(참고만, 애초에 신규 인입 대상 아님)인 파일까지 후보에 넣고 있었다. 세 경우 다 stem 문자열 매칭을
+  //    아무리 정교화해도(#421→#427→#450) 원리상 못 잡는다 — 근본원인은 "파일명 재인용 여부"를 신호로 쓴 것 자체.
+  //    재설계: 매칭 신호를 **팀이 스스로 남긴 결재 번호 인용**(1차, 결정론)으로 바꾸고, stem ILIKE는 번호 인용이
+  //    없는 순수 신규 제안만 잡는 2차 폴백으로 유지한다(id1032류처럼 인용 없이 신규 제안됐다가 나중에 메타 결재행에
+  //    언급만 되는 케이스는 여전히 #427/#450 폴백이 필요). 1차: 파일 텍스트에서 `결재#N`/`decisions#N`(체인 표기
+  //    `decisions#477/#478/#479` 포함) 인용을 (i) 헤딩 앞부분(40자 이내) 또는 (ii) "완료·등재·승인·기존·이미" 인접
+  //    어휘로만 한정 추출(단순 배경설명 인용은 제외 — b2b-sales-proposals-20260722/24가 결재#416·#398을 "이 결정은
+  //    막은 적 없다"는 배경으로만 언급한 건 안 걸려야 함, 실측 확인됨) → 그 번호가 decisions 테이블에 실존하면
+  //    "이미 스스로 추적 중"으로 보고 제외. 파일 전체가 "상신: 없음"(승인 필요 문구도 없음)이면 애초에 인입 대상이
+  //    아니므로 통째로 제외. 실DB 재현검증(07-25): 기존 22건 stale → 신규 10건(전부 인용 없는 순수 신규 제안,
+  //    redteam-proposals-20260719~23·b2b-sales-proposals-20260722/24·rulegap-proposals-20260723-0820) 확인, 제거된
+  //    12건은 전부 결재#356/#465~479/#421/#422/#429/#444 등 자기인용 확인 또는 "상신 없음" 순수참고 파일.
   try {
+    const CITE = /(?:결재|decisions?)\s*#\s*\d+(?:\s*[/·,]\s*#\s*\d+)*/gi;
+    const CITE_INDICATOR = /완료|등재|승인|기존|이미/;
+    const extractSelfCitedIds = (text) => {
+      const ids = new Set();
+      for (const line of text.split("\n")) {
+        const isHeadingLine = /^#{1,6}\s/.test(line);
+        let m;
+        CITE.lastIndex = 0;
+        while ((m = CITE.exec(line))) {
+          const chain = m[0];
+          let qualifies = isHeadingLine && m.index < 40;
+          if (!qualifies) {
+            const before = line.slice(Math.max(0, m.index - 15), m.index);
+            const after = line.slice(m.index + chain.length, m.index + chain.length + 15);
+            qualifies = CITE_INDICATOR.test(before) || CITE_INDICATOR.test(after);
+          }
+          if (qualifies) (chain.match(/\d+/g) || []).forEach((n) => ids.add(n));
+        }
+      }
+      return ids;
+    };
+    const isExplicitNoProposal = (text) => /상신\s*[:\s]*(?:없음|0건)/.test(text) && !/승인\s*필요/.test(text);
+
     const files = existsSync(AR) ? readdirSync(AR).filter((f) => /-proposals-\d{8}/.test(f) && f.endsWith(".md")) : [];
     const candidates = [];
     for (const f of files) {
       const ageH = (Date.now() - statSync(`${AR}/${f}`).mtimeMs) / 3.6e6;
       if (ageH < 12 || ageH > 168) continue;
-      candidates.push({ f, ageH, stem: f.replace(/\.md$/, "") });
+      let text = ""; try { text = readFileSync(`${AR}/${f}`, "utf8"); } catch {}
+      candidates.push({ f, ageH, stem: f.replace(/\.md$/, ""), text, cited: extractSelfCitedIds(text), noProposal: isExplicitNoProposal(text) });
     }
+    const allCitedIds = [...new Set(candidates.flatMap((c) => [...c.cited]))].map(Number);
+    const existingCited = allCitedIds.length ? await sql`SELECT id FROM decisions WHERE id = ANY(${allCitedIds})`.catch(() => []) : [];
+    const existingCitedIds = new Set(existingCited.map((r) => String(r.id)));
+
     const stale = [];
     for (const c of candidates) {
+      const selfCovered = c.noProposal || [...c.cited].some((id) => existingCitedIds.has(id));
+      if (selfCovered) continue;
       const hitDecision = await sql`SELECT title, detail, action_params FROM decisions WHERE action_params->>'ref' ILIKE ${"%" + c.stem + "%"} OR title ILIKE ${"%" + c.stem + "%"} OR detail ILIKE ${"%" + c.stem + "%"} LIMIT 5`.catch(() => []);
       const realHit = hitDecision.some((d) => {
         const ap = d.action_params || {};
@@ -76,7 +125,7 @@ const today = new Date().toISOString().slice(0, 10);
       });
       if (realHit) continue;
       const hitCoord = await sql`SELECT 1 FROM coordination WHERE topic ILIKE ${"%" + c.stem + "%"} OR detail ILIKE ${"%" + c.stem + "%"} LIMIT 1`.catch(() => []);
-      let first = ""; try { first = readFileSync(`${AR}/${c.f}`, "utf8").split("\n").find((l) => l.trim()) || ""; } catch {}
+      const first = c.text.split("\n").find((l) => l.trim()) || "";
       stale.push({ f: c.f, ageH: c.ageH, first: first.replace(/^#+\s*/, "").slice(0, 70), coordOnly: hitCoord.length > 0 });
     }
     L.push(`## 🚨 제안서 미인입 감시 (12h+ · decisions행 미생성)`);
