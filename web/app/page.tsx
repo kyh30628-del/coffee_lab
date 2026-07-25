@@ -113,10 +113,11 @@ const HeadlineCard = memo(function HeadlineCard({ c, kicker, tone, onOpen }: { c
     </button>
   );
 });
-// 🎬 자동 스포트라이트(넷플릭스식) — 가로 스크롤 나열 대신, 큰 카드 1개가 몇 초마다 자동 전환 + 점(dot)으로 위치 표시.
+// 🎬 자동 스포트라이트(넷플릭스식) 본체 — 큰 카드 1개가 몇 초마다 자동 전환 + 점(dot)으로 위치 표시.
 //   HeadlineCard를 그대로 재사용해 상단 💎숨은보석·🎯오늘의테마와 톤·배지·태그가 통일된다(추가 코드 최소화).
 //   터치/클릭하면 5초간 멈췄다가 재개(읽는 도중 안 넘어감). 좌우 스와이프로 수동 이동도 가능.
-const Spotlight = memo(function Spotlight({ title, items, sub, info, onOpen, toneOffset = 0, intervalMs = 4000 }: { title: string; items: DCafe[]; sub?: string; info?: React.ReactNode; onOpen: (id: number) => void; toneOffset?: number; intervalMs?: number }) {
+//   제목 표시줄이 없는 '코어'만 — Spotlight(단일기준)·RankSpotlight(탭전환)가 공유해서 쓴다.
+const SpotlightCore = memo(function SpotlightCore({ items, onOpen, toneOffset = 0, intervalMs = 4000 }: { items: DCafe[]; onOpen: (id: number) => void; toneOffset?: number; intervalMs?: number }) {
   const [idx, setIdx] = useState(0);
   const [prevIdx, setPrevIdx] = useState<number | null>(null); // 진짜 크로스페이드용 — 이전 카드가 사라지는 동안만 유지
   const [paused, setPaused] = useState(false);
@@ -158,11 +159,7 @@ const Spotlight = memo(function Spotlight({ title, items, sub, info, onOpen, ton
   if (!items?.length) return null;
   const c = items[idx];
   return (
-    <div className="mb-7">
-      <div className="flex items-baseline justify-between mb-1 pb-1 border-b-2 border-[#2b2018]">
-        <div className="text-base font-bold text-[#2b2018] flex items-center gap-1.5">{title}{info && <InfoDot title={title.replace(/^[^가-힣A-Za-z]+/, "")}>{info}</InfoDot>}</div>
-        {sub && <div className="text-[10px] text-[#7a5122] shrink-0">↕ {sub}</div>}
-      </div>
+    <>
       <div
         className="relative"
         onPointerDown={pauseThenResume}
@@ -191,6 +188,58 @@ const Spotlight = memo(function Spotlight({ title, items, sub, info, onOpen, ton
           ))}
         </div>
       )}
+    </>
+  );
+});
+
+// 제목표시줄+SpotlightCore — 단일 기준 섹션(추천·신규발견)용 얇은 래퍼.
+const Spotlight = memo(function Spotlight({ title, items, sub, info, onOpen, toneOffset = 0, intervalMs = 4000 }: { title: string; items: DCafe[]; sub?: string; info?: React.ReactNode; onOpen: (id: number) => void; toneOffset?: number; intervalMs?: number }) {
+  if (!items?.length) return null;
+  return (
+    <div className="mb-7">
+      <div className="flex items-baseline justify-between mb-1 pb-1 border-b-2 border-[#2b2018]">
+        <div className="text-base font-bold text-[#2b2018] flex items-center gap-1.5">{title}{info && <InfoDot title={title.replace(/^[^가-힣A-Za-z]+/, "")}>{info}</InfoDot>}</div>
+        {sub && <div className="text-[10px] text-[#7a5122] shrink-0">↕ {sub}</div>}
+      </div>
+      <SpotlightCore items={items} onOpen={onOpen} toneOffset={toneOffset} intervalMs={intervalMs} />
+    </div>
+  );
+});
+
+// 🏆 인기 카페 — 리뷰순·입소문순·로스팅순 3가지 순위기준을 탭으로 전환하는 통합 섹션.
+//   기존 '📈요즘뜨는·🏆Top3·🔥스페셜티' 3개 섹션을 하나로 합쳐 홈 섹션 수를 줄임(CEO "카페가 너무 많아 조잡하다").
+const RANK_TABS: { key: "top3" | "momentum" | "specialty"; label: string }[] = [
+  { key: "top3", label: "리뷰순" },
+  { key: "momentum", label: "입소문순" },
+  { key: "specialty", label: "로스팅순" },
+];
+const RankSpotlight = memo(function RankSpotlight({ top3, momentum, specialty, onOpen }: { top3: DCafe[]; momentum: DCafe[]; specialty: DCafe[]; onOpen: (id: number) => void }) {
+  const [tabIdx, setTabIdx] = useState(0);
+  const dataByKey: Record<string, DCafe[]> = { top3, momentum, specialty };
+  const infoByKey: Record<string, React.ReactNode> = {
+    top3: <>이 동네에서 <b>검증·참고 후기(옥석)가 가장 많은</b> 카페 순서예요. 광고·가짜·무관 글은 제외한 '진짜 후기 수' 기준입니다.</>,
+    momentum: <>별점 대신 <b>검증된 진짜 후기가 요즘 얼마나 빨리 느는지</b>로 뽑은 '뜨는 카페'예요. 최근 3개월 검증 후기가 많을수록 상위로 올라가요.</>,
+    specialty: <>검증된 카페 중 <b>직접 로스팅·스페셜티가 후기에 자주 언급된</b> 곳이에요. 커피에 진심인 집 위주로 보여줘요.</>,
+  };
+  const availableTabs = RANK_TABS.filter((t) => (dataByKey[t.key] || []).length > 0);
+  if (availableTabs.length === 0) return null;
+  // 선택 탭에 데이터가 없으면(지역필터 등 엣지케이스) 첫 available 탭으로 안전 폴백.
+  const safeIdx = (dataByKey[RANK_TABS[tabIdx].key]?.length ?? 0) > 0 ? tabIdx : RANK_TABS.findIndex((t) => t.key === availableTabs[0].key);
+  const safeKey = RANK_TABS[safeIdx].key;
+  return (
+    <div className="mb-7">
+      <div className="flex items-baseline justify-between mb-1 pb-1 border-b-2 border-[#2b2018]">
+        <div className="text-base font-bold text-[#2b2018] flex items-center gap-1.5">🏆 인기 카페<InfoDot title="인기 카페">{infoByKey[safeKey]}</InfoDot></div>
+      </div>
+      <div className="flex gap-1.5 mb-2 mt-1.5">
+        {RANK_TABS.map((t, i) => (dataByKey[t.key] || []).length > 0 && (
+          <button key={t.key} onClick={() => setTabIdx(i)}
+            className={`text-[11px] font-medium px-2.5 py-1 rounded-full border transition-colors ${i === safeIdx ? "bg-[#2b2018] text-[#f4ece0] border-[#2b2018]" : "bg-white text-[#7a5122] border-[#e3d3b8] hover:border-[#9c6b3f]"}`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+      <SpotlightCore items={dataByKey[safeKey]} onOpen={onOpen} toneOffset={safeIdx} />
     </div>
   );
 });
@@ -1331,9 +1380,7 @@ export default function Home() {
                 {discover.headlineA && <HeadlineCard c={discover.headlineA} kicker="💎 오늘의 숨은 보석 — 검증됐지만 아직 덜 알려진 곳" tone={0} onOpen={openById} />}
                 {discover.headlineB && <HeadlineCard c={discover.headlineB} kicker={discover.themeB ? `${discover.themeB.emoji} 오늘의 테마 · ${discover.themeB.label}` : "🔥 커피에 진심인 집 — 스페셜티 스포트라이트"} tone={1} onOpen={openById} />}
                 {discover.featured && discover.featured.length > 0 && <Spotlight title="✨ 추천 카페" items={discover.featured} onOpen={openById} sub="쇼케이스" toneOffset={2} info={<>사장님이 직접 <b>홍보 중인 쇼케이스 카페</b>예요(우선 노출). 후기·등급은 다른 카페와 똑같이 검증된 값이에요.</>} />}
-                {momentum && momentum.rising.length > 0 && <Spotlight title="📈 요즘 뜨는 카페" items={momentum.rising.slice(0, 5)} onOpen={openById} sub="최근 입소문 순" toneOffset={4} info={<>별점 대신 <b>검증된 진짜 후기가 요즘 얼마나 빨리 느는지</b>로 뽑은 '뜨는 카페'예요. 최근 3개월 검증 후기가 많을수록 상위로 올라가요.</>} />}
-                <Spotlight title="🏆 리뷰 많은 Top 3" items={discover.top3} onOpen={openById} sub="검증 리뷰 많은 순" toneOffset={0} info={<>이 동네에서 <b>검증·참고 후기(옥석)가 가장 많은</b> 카페 순서예요. 광고·가짜·무관 글은 제외한 '진짜 후기 수' 기준입니다.</>} />
-                <Spotlight title="🔥 스페셜티 픽" items={discover.specialty} onOpen={openById} sub="로스팅 언급 순" toneOffset={1} info={<>검증된 카페 중 <b>직접 로스팅·스페셜티가 후기에 자주 언급된</b> 곳이에요. 커피에 진심인 집 위주로 보여줘요.</>} />
+                <RankSpotlight top3={discover.top3} momentum={momentum?.rising.slice(0, 5) ?? []} specialty={discover.specialty} onOpen={openById} />
                 {discover.fresh.length > 0 && <Spotlight title="🆕 새로 발견된 카페" items={discover.fresh} onOpen={openById} sub="최신 등록순" toneOffset={3} info={<>우리 지도에 <b>새로 등록·검증된 카페</b>예요. 신선한 발견, 이미 검증된 곳만 올라와요.</>} />}
                 <button onClick={() => { setSido(homeSido); setSigungu(homeGu); setDong(homeDong); setFocusId(null); setSheetOpen(false); setTab("map"); }} className="w-full bg-[#2b2018] text-[#f4ece0] rounded-xl py-3.5 font-medium mt-2">🗺 {homeDong ? `${homeDong} 지도로 보기` : homeGu ? `${homeGu} 지도로 보기` : "지도에서 전체 둘러보기"} →</button>
               </>
