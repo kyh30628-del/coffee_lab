@@ -121,26 +121,28 @@ const Row = memo(function Row({ title, items, sub, info, onOpen }: { title: stri
         <div className="text-base font-bold text-[#2b2018] flex items-center gap-1.5">{title}{info && <InfoDot title={title.replace(/^[^가-힣A-Za-z]+/, "")}>{info}</InfoDot>}</div>
         {sub && <div className="text-[10px] text-[#7a5122] shrink-0">↕ {sub}</div>}
       </div>
-      {/* 바깥은 가로 스크롤, 위쪽 패딩 안에 말풍선이 들어가 잘리지 않음 */}
-      <div className="flex gap-3 overflow-x-auto pt-2 pb-2 dcn-hscroll" style={{ WebkitOverflowScrolling: "touch" }}>
-        {items.map((c) => (
-          <div key={c.id} className="shrink-0 w-48">
-            <button onClick={() => onOpen(c.id)} className="w-full text-left bg-white rounded-xl p-3.5 border border-[#ece0cd] hover:border-[#9c6b3f] hover:shadow-md transition-all h-full flex flex-col">
-              <div className="flex items-center gap-1 mb-1">
-                <span className="font-bold text-sm text-[#2b2018] truncate">{c.name}</span>
-                {c.grade && GRADE_STYLE[c.grade] && <span className="text-[8px] text-white px-1 py-0.5 rounded-full shrink-0" style={{ background: GRADE_STYLE[c.grade].bg }}>{c.grade}</span>}
-              </div>
-              <div className="text-[10px] text-[#665036] mb-1.5">{c.area} · 리뷰 {c.count ?? 0}</div>
-              {c.beanNote.length > 0 && <div className="flex flex-wrap gap-1 mb-2">{c.beanNote.map((b) => <span key={b} className="text-[9px] bg-[#f0e6d4] text-[#8a6d3f] px-1.5 py-0.5 rounded-full">{b}</span>)}</div>}
-              {c.reason && (
-                <div className="mt-auto pt-2 border-t border-[#f0e6d4]">
-                  <div className="text-[8px] tracking-wider uppercase text-[#b08440] mb-0.5">📰 선정 이유</div>
-                  <p className="text-[10.5px] text-[#5a4a38] leading-relaxed">{c.reason}</p>
+      {/* 바깥은 가로 스크롤, 위쪽 패딩 안에 말풍선이 들어가 잘리지 않음. wrap의 ::after가 우측 페이드로 "더 있음" 신호. */}
+      <div className="dcn-hscroll-wrap">
+        <div className="flex gap-3 overflow-x-auto pt-2 pb-2 dcn-hscroll" style={{ WebkitOverflowScrolling: "touch" }}>
+          {items.map((c) => (
+            <div key={c.id} className="shrink-0 w-48">
+              <button onClick={() => onOpen(c.id)} className="w-full text-left bg-white rounded-xl p-3.5 border border-[#ece0cd] hover:border-[#9c6b3f] hover:shadow-md transition-all h-full flex flex-col">
+                <div className="flex items-center gap-1 mb-1">
+                  <span className="font-bold text-sm text-[#2b2018] truncate">{c.name}</span>
+                  {c.grade && GRADE_STYLE[c.grade] && <span className="text-[8px] text-white px-1 py-0.5 rounded-full shrink-0" style={{ background: GRADE_STYLE[c.grade].bg }}>{c.grade}</span>}
                 </div>
-              )}
-            </button>
-          </div>
-        ))}
+                <div className="text-[10px] text-[#665036] mb-1.5">{c.area} · 리뷰 {c.count ?? 0}</div>
+                {c.beanNote.length > 0 && <div className="flex flex-wrap gap-1 mb-2">{c.beanNote.map((b) => <span key={b} className="text-[9px] bg-[#f0e6d4] text-[#8a6d3f] px-1.5 py-0.5 rounded-full">{b}</span>)}</div>}
+                {c.reason && (
+                  <div className="mt-auto pt-2 border-t border-[#f0e6d4]">
+                    <div className="text-[8px] tracking-wider uppercase text-[#b08440] mb-0.5">📰 선정 이유</div>
+                    <p className="text-[10.5px] text-[#5a4a38] leading-relaxed">{c.reason}</p>
+                  </div>
+                )}
+              </button>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
