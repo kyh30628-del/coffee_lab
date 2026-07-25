@@ -318,11 +318,17 @@ async function healNonCafeBizPollution(flagged: NcbFlag[], deadline: number): Pr
 //   브랜드 추출: "OO ..접미사점" 패턴에서 마지막 어절(본점/지점/N호점/1st 등)을 떼어낸 앞부분 = 브랜드키.
 const GENERIC_BRAND = new Set(["카페", "커피", "디저트", "베이커리", "카페,디저트", "coffee", "cafe"]);
 const BRANCH_SUFFIX_RE = /^(.+?)\s+([가-힣A-Za-z0-9.]{1,14}(?:본점|지점|직영점|가맹점|점|1st|2nd|3rd|호점))$/;
-type FranchiseFlag = { id: number; name: string; area: string; brand: string; ownSuffix: string; otherSuffixes: string[]; bad: number; shown: number; hitSuffix: string };
+// 접미사(예:"서창점")에서 마커를 떼면 지점 토큰(예:"서창") — 후기 원문은 "서창점"보다 "서창동/서창" 식으로 더 흔히 등장해
+// 접미사 완전일치만으로는 놓친다(#499 실증: id16680 용현점에 id15520 서창점 인용문 복제, "서창점" 문자열은 없었음).
+const BRANCH_MARKER_RE = /(본점|지점|직영점|가맹점|점|1st|2nd|3rd|호점)$/;
+function branchToken(suffix: string): string {
+  return suffix.replace(BRANCH_MARKER_RE, "").trim();
+}
+type FranchiseFlag = { id: number; name: string; area: string; brand: string; ownSuffix: string; ownToken: string; otherSuffixes: string[]; otherTokens: string[]; bad: number; shown: number; hitSuffix: string };
 async function scanFranchiseBranchPollution(): Promise<{ count: number; samples: string[]; flagged: FranchiseFlag[] }> {
   // 1단계: 이름만으로 가볍게 브랜드 그룹 구성(전체 카페, id+name만이라 경량)
   const nameRows = (await sql`SELECT id, name FROM cafes WHERE published`) as { id: number; name: string }[];
-  const groups = new Map<string, { id: number; name: string; suffix: string }[]>();
+  const groups = new Map<string, { id: number; name: string; suffix: string; token: string }[]>();
   for (const c of nameRows) {
     const m = c.name.trim().match(BRANCH_SUFFIX_RE);
     if (!m) continue;
@@ -330,16 +336,21 @@ async function scanFranchiseBranchPollution(): Promise<{ count: number; samples:
     if (GENERIC_BRAND.has(brand) || brand.length < 2) continue;
     const suffix = m[2].trim();
     if (!groups.has(brand)) groups.set(brand, []);
-    groups.get(brand)!.push({ id: c.id, name: c.name, suffix });
+    groups.get(brand)!.push({ id: c.id, name: c.name, suffix, token: branchToken(suffix) });
   }
   // 2단계: 2개 이상 지점 보유 브랜드에 속한 카페만 synth_reviews로 대조(대상만 선별해 경량 유지)
   const targetIds: number[] = [];
-  const meta = new Map<number, { brand: string; suffix: string; others: string[] }>();
+  const meta = new Map<number, { brand: string; suffix: string; token: string; others: string[]; otherTokens: string[] }>();
   for (const [brand, arr] of groups) {
     if (arr.length < 2) continue;
     for (const c of arr) {
       targetIds.push(c.id);
-      meta.set(c.id, { brand, suffix: c.suffix, others: arr.filter((x) => x.id !== c.id).map((x) => x.suffix) });
+      meta.set(c.id, {
+        brand, suffix: c.suffix, token: c.token,
+        others: arr.filter((x) => x.id !== c.id).map((x) => x.suffix),
+        // 지점 토큰은 2자 미만(본점 등 마커만 떼면 빈 문자열)이면 변별력 없어 제외.
+        otherTokens: arr.filter((x) => x.id !== c.id && x.token.length >= 2).map((x) => x.token),
+      });
     }
   }
   const flagged: FranchiseFlag[] = [];
@@ -349,12 +360,13 @@ async function scanFranchiseBranchPollution(): Promise<{ count: number; samples:
     for (const c of rows) {
       const info = meta.get(c.id); if (!info) continue;
       let bad = 0; let hitSuffix = "";
+      const ownHit = (q: string) => q.includes(info.suffix) || (info.token.length >= 2 && q.includes(info.token));
       for (const r of (c.synth_reviews || [])) {
         const q = (r.quote || "") as string;
-        const hit = info.others.find((s) => q.includes(s));
-        if (hit && !q.includes(info.suffix)) { bad++; if (!hitSuffix) hitSuffix = hit; }
+        const hit = info.others.find((s) => q.includes(s)) || info.otherTokens.find((t) => q.includes(t));
+        if (hit && !ownHit(q)) { bad++; if (!hitSuffix) hitSuffix = hit; }
       }
-      if (bad >= 1) flagged.push({ id: c.id, name: c.name, area: c.area, brand: info.brand, ownSuffix: info.suffix, otherSuffixes: info.others, bad, shown: (c.synth_reviews || []).length, hitSuffix });
+      if (bad >= 1) flagged.push({ id: c.id, name: c.name, area: c.area, brand: info.brand, ownSuffix: info.suffix, ownToken: info.token, otherSuffixes: info.others, otherTokens: info.otherTokens, bad, shown: (c.synth_reviews || []).length, hitSuffix });
     }
   }
   flagged.sort((a, b) => b.bad - a.bad);
@@ -386,8 +398,8 @@ async function healFranchiseBranchPollution(flagged: FranchiseFlag[], deadline: 
       const dec: Record<string, boolean> = {}; let drop = 0;
       for (const it of (r.auditItems || [])) {
         const body = (it.title || "") + " " + (it.body || "");
-        if (body.includes(f.ownSuffix)) continue; // 자기 지점 언급 있으면 보존(다른지점 안내정보일 뿐)
-        if (f.otherSuffixes.some((s) => body.includes(s))) { dec[it.key] = false; drop++; }
+        if (body.includes(f.ownSuffix) || (f.ownToken.length >= 2 && body.includes(f.ownToken))) continue; // 자기 지점(접미사·토큰) 언급 있으면 보존(다른지점 안내정보일 뿐)
+        if (f.otherSuffixes.some((s) => body.includes(s)) || f.otherTokens.some((t) => body.includes(t))) { dec[it.key] = false; drop++; }
       }
       if (drop === 0) continue;
       const res = await applyDecisions({ id: f.id, name: c.name, area: c.area }, dec);
