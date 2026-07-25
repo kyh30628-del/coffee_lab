@@ -23,7 +23,7 @@ type Cafe = {
   featured?: boolean;
 };
 type DCafe = { id: number; name: string; area: string; lat: number; lng: number; grade: string | null; count: number | null; identity: string | null; note: string | null; beanNote: string[]; reason?: string; isNew?: boolean };
-type Discover = { headlineA: DCafe | null; headlineB: DCafe | null; themeB?: { emoji: string; label: string } | null; top3: DCafe[]; fresh: DCafe[]; specialty: DCafe[]; featured?: DCafe[]; scopeCount: number };
+type Discover = { headlineA: DCafe | null; headlineB: DCafe | null; headlineAList?: DCafe[]; headlineBList?: DCafe[]; themeB?: { emoji: string; label: string } | null; top3: DCafe[]; fresh: DCafe[]; specialty: DCafe[]; featured?: DCafe[]; scopeCount: number };
 type SearchResult = { id: number; name: string; area: string; grade: string | null; count: number | null; identity: string | null; score: number; reasons: string[] };
 type SearchRes = { ok: boolean; region: string; q: string; concepts: string[]; count: number; results: SearchResult[]; coverageNote?: string };
 const SEARCH_EXAMPLES = ["비 오는 날 혼자 조용히", "감성 사진 데이트", "노트북 작업하기 좋은", "산미 또렷한 커피", "빵 맛있는 집"];
@@ -206,20 +206,23 @@ const Spotlight = memo(function Spotlight({ title, items, sub, info, onOpen, ton
   );
 });
 
-// 🏆 인기 카페 — 리뷰순·입소문순·로스팅순 3가지 순위기준을 탭으로 전환하는 통합 섹션.
-//   기존 '📈요즘뜨는·🏆Top3·🔥스페셜티' 3개 섹션을 하나로 합쳐 홈 섹션 수를 줄임(CEO "카페가 너무 많아 조잡하다").
-const RANK_TABS: { key: "top3" | "momentum" | "specialty"; label: string }[] = [
+// 🔍 카페 둘러보기 — 리뷰순·입소문순·로스팅순·신규순 4가지 기준을 탭으로 전환하는 통합 섹션.
+//   기존 '📈요즘뜨는·🏆Top3·🔥스페셜티·🆕신규발견' 4개 섹션을 하나로 합쳐 홈 섹션 수를 줄임
+//   (CEO "카페가 너무 많아 조잡하다" → "🏆인기 카페"에 신규발견도 탭으로 편입 + 이름 변경).
+const RANK_TABS: { key: "top3" | "momentum" | "specialty" | "fresh"; label: string }[] = [
   { key: "top3", label: "리뷰순" },
   { key: "momentum", label: "입소문순" },
   { key: "specialty", label: "로스팅순" },
+  { key: "fresh", label: "신규순" },
 ];
-const RankSpotlight = memo(function RankSpotlight({ top3, momentum, specialty, onOpen }: { top3: DCafe[]; momentum: DCafe[]; specialty: DCafe[]; onOpen: (id: number) => void }) {
+const RankSpotlight = memo(function RankSpotlight({ top3, momentum, specialty, fresh, onOpen }: { top3: DCafe[]; momentum: DCafe[]; specialty: DCafe[]; fresh: DCafe[]; onOpen: (id: number) => void }) {
   const [tabIdx, setTabIdx] = useState(0);
-  const dataByKey: Record<string, DCafe[]> = { top3, momentum, specialty };
+  const dataByKey: Record<string, DCafe[]> = { top3, momentum, specialty, fresh };
   const infoByKey: Record<string, React.ReactNode> = {
     top3: <>이 동네에서 <b>검증·참고 후기(옥석)가 가장 많은</b> 카페 순서예요. 광고·가짜·무관 글은 제외한 '진짜 후기 수' 기준입니다.</>,
     momentum: <>별점 대신 <b>검증된 진짜 후기가 요즘 얼마나 빨리 느는지</b>로 뽑은 '뜨는 카페'예요. 최근 3개월 검증 후기가 많을수록 상위로 올라가요.</>,
     specialty: <>검증된 카페 중 <b>직접 로스팅·스페셜티가 후기에 자주 언급된</b> 곳이에요. 커피에 진심인 집 위주로 보여줘요.</>,
+    fresh: <>우리 지도에 <b>새로 등록·검증된 카페</b>예요. 신선한 발견, 이미 검증된 곳만 올라와요.</>,
   };
   const availableTabs = RANK_TABS.filter((t) => (dataByKey[t.key] || []).length > 0);
   if (availableTabs.length === 0) return null;
@@ -229,9 +232,9 @@ const RankSpotlight = memo(function RankSpotlight({ top3, momentum, specialty, o
   return (
     <div className="mb-7">
       <div className="flex items-baseline justify-between mb-1 pb-1 border-b-2 border-[#2b2018]">
-        <div className="text-base font-bold text-[#2b2018] flex items-center gap-1.5">🏆 인기 카페<InfoDot title="인기 카페">{infoByKey[safeKey]}</InfoDot></div>
+        <div className="text-base font-bold text-[#2b2018] flex items-center gap-1.5">🔍 카페 둘러보기<InfoDot title="카페 둘러보기">{infoByKey[safeKey]}</InfoDot></div>
       </div>
-      <div className="flex gap-1.5 mb-2 mt-1.5">
+      <div className="flex gap-1.5 mb-2 mt-1.5 flex-wrap">
         {RANK_TABS.map((t, i) => (dataByKey[t.key] || []).length > 0 && (
           <button key={t.key} onClick={() => setTabIdx(i)}
             className={`text-[11px] font-medium px-2.5 py-1 rounded-full border transition-colors ${i === safeIdx ? "bg-[#2b2018] text-[#f4ece0] border-[#2b2018]" : "bg-white text-[#7a5122] border-[#e3d3b8] hover:border-[#9c6b3f]"}`}>
@@ -1377,11 +1380,16 @@ export default function Home() {
               </div>
             ) : !discover ? <p className="text-center text-[#665036] py-10">불러오는 중...</p> : (
               <>
-                {discover.headlineA && <HeadlineCard c={discover.headlineA} kicker="💎 오늘의 숨은 보석 — 검증됐지만 아직 덜 알려진 곳" tone={0} onOpen={openById} />}
-                {discover.headlineB && <HeadlineCard c={discover.headlineB} kicker={discover.themeB ? `${discover.themeB.emoji} 오늘의 테마 · ${discover.themeB.label}` : "🔥 커피에 진심인 집 — 스페셜티 스포트라이트"} tone={1} onOpen={openById} />}
+                {discover.headlineAList && discover.headlineAList.length > 0 && (
+                  <Spotlight title="💎 오늘의 숨은 보석" items={discover.headlineAList} onOpen={openById} sub="검증됐지만 덜 알려진" toneOffset={0}
+                    info={<>검증 등급인데 아직 <b>리뷰가 적어 덜 알려진</b> 카페예요. 매일 다른 곳이 스포트라이트에 올라와요.</>} />
+                )}
+                {discover.headlineBList && discover.headlineBList.length > 0 && (
+                  <Spotlight title={discover.themeB ? `${discover.themeB.emoji} 오늘의 테마 · ${discover.themeB.label}` : "🔥 커피에 진심인 집"} items={discover.headlineBList} onOpen={openById} sub="테마 매칭 순" toneOffset={1}
+                    info={<>커피 성격(로스팅·작업·조용함·디저트·분위기·공간) 중 하나를 <b>매일 돌아가며</b> 소개해요.</>} />
+                )}
                 {discover.featured && discover.featured.length > 0 && <Spotlight title="✨ 추천 카페" items={discover.featured} onOpen={openById} sub="쇼케이스" toneOffset={2} info={<>사장님이 직접 <b>홍보 중인 쇼케이스 카페</b>예요(우선 노출). 후기·등급은 다른 카페와 똑같이 검증된 값이에요.</>} />}
-                <RankSpotlight top3={discover.top3} momentum={momentum?.rising.slice(0, 5) ?? []} specialty={discover.specialty} onOpen={openById} />
-                {discover.fresh.length > 0 && <Spotlight title="🆕 새로 발견된 카페" items={discover.fresh} onOpen={openById} sub="최신 등록순" toneOffset={3} info={<>우리 지도에 <b>새로 등록·검증된 카페</b>예요. 신선한 발견, 이미 검증된 곳만 올라와요.</>} />}
+                <RankSpotlight top3={discover.top3} momentum={momentum?.rising.slice(0, 5) ?? []} specialty={discover.specialty} fresh={discover.fresh} onOpen={openById} />
                 <button onClick={() => { setSido(homeSido); setSigungu(homeGu); setDong(homeDong); setFocusId(null); setSheetOpen(false); setTab("map"); }} className="w-full bg-[#2b2018] text-[#f4ece0] rounded-xl py-3.5 font-medium mt-2">🗺 {homeDong ? `${homeDong} 지도로 보기` : homeGu ? `${homeGu} 지도로 보기` : "지도에서 전체 둘러보기"} →</button>
               </>
             )}

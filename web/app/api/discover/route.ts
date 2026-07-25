@@ -122,8 +122,10 @@ export async function GET(req: NextRequest) {
       && recentN(c.review_dates, 90) >= 1
       && !dessertDominance(c.char_scores).dominant
       && beanNote(c).length > 0);
-    // 구 라운드로빈 인터리브 순서로 회전(preordered) → 전체 뷰 연속일이 다른 지역
-    const gemPick = rotateByPeriod(interleaveByRegion(gemPool), Date.now(), 1, 1, true)[0];
+    // 구 라운드로빈 인터리브 순서로 회전(preordered) → 전체 뷰 연속일이 다른 지역. cap=5 → 오늘의 1픽(첫자리) +
+    //   스와이프로 볼 수 있는 다음 순번 후보 몇 개(홈 '숨은 보석' 섹션을 스와이프 가능하게, CEO 2026-07-25).
+    const gemPicks = rotateByPeriod(interleaveByRegion(gemPool), Date.now(), 1, 5, true);
+    const gemPick = gemPicks[0];
     // 폴백(지역 pool 비면): 기존 headlineA 로직 = 검증 로스터리 리뷰 1위
     const headlineA = gemPick ? slim(gemPick, "gem") : (() => {
       const vs = scope.filter((c: any) => c.synth_grade === "검증");
@@ -132,6 +134,8 @@ export async function GET(req: NextRequest) {
       const pick = sr[0] ?? vr[0] ?? byReview[0];
       return pick ? slim(pick, "top") : null;
     })();
+    // 스와이프용 후보 목록(최대 5, 첫 자리=오늘의 1픽). 폴백 시엔 headlineA 하나만.
+    const headlineAList = gemPicks.length ? gemPicks.map((c: any) => slim(c, "gem")) : (headlineA ? [headlineA] : []);
 
     // 🎯 슬롯B — 오늘의 테마: char_scores 축이 매일 순환, 축 상위 8 중 회전(강신호 유지 + 교대).
     const theme = THEMES[((dayIndexKST() % THEMES.length) + THEMES.length) % THEMES.length];
@@ -140,11 +144,14 @@ export async function GET(req: NextRequest) {
       c.synth_grade === "검증" && scOf(c) >= 2 && c.id !== headlineA?.id
       && !dessertDominance(c.char_scores).dominant)  // 커피 브랜드 유지 — 디저트 테마도 '커피 카페 중 디저트 좋은 곳'만(순수 베이커리 제외)
       .sort((a: any, b: any) => scOf(b) - scOf(a)).slice(0, 8);
-    const themePick = rotateByPeriod(themePool)[0];
+    // cap=5 → '오늘의 테마'도 스와이프 가능하게(첫자리=오늘의 1픽 + 같은 테마 다음 순번 후보).
+    const themePicks = rotateByPeriod(themePool, Date.now(), 1, 5);
+    const themePick = themePicks[0];
     // 폴백(테마 pool 비면): 기존 headlineB = 스페셜티(로스팅) 1위, themeB=null이면 클라가 기존 문구로.
     const headlineB = themePick ? slim(themePick, "theme", theme)
       : (() => { const f = bySpecialty.find((c: any) => c.id !== headlineA?.id); return f ? slim(f, "specialty") : null; })();
     const themeB = themePick ? { emoji: theme.emoji, label: theme.label } : null;
+    const headlineBList = themePicks.length ? themePicks.map((c: any) => slim(c, "theme", theme)) : (headlineB ? [headlineB] : []);
 
     const usedIds = new Set([headlineA?.id, headlineB?.id].filter(Boolean));
 
@@ -162,7 +169,7 @@ export async function GET(req: NextRequest) {
       ok: true, region: region || "전체", scopeCount: scope.length,
       featured: subscriptionLive() ? featured : [], // 구독 라이브 전엔 소비자에 '추천 카페' 숨김
 
-      headlineA, headlineB, themeB,
+      headlineA, headlineB, themeB, headlineAList, headlineBList,
       // 헤드라인 제외 후 잘라서 항상 꽉 채움(공개 카페가 충분하면 Top3=3개)
       top3: byReview.filter((c) => !usedIds.has(c.id)).slice(0, 3).map((c: any) => slim(c, "top")),
       fresh: (() => {
