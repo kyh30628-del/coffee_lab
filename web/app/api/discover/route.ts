@@ -110,7 +110,7 @@ export async function GET(req: NextRequest) {
     // 정렬된 후보 — 헤드라인 제외 '후' 잘라야 개수가 안 줄어든다(예: Top3가 2개로 줄던 버그)
     const byReview = [...scope].sort((a, b) => (b.synth_count ?? 0) - (a.synth_count ?? 0));
     const byNew = [...scope].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-    const bySpecialty = scope.filter((c) => c.synth_grade === "검증" && ((c.char_scores ?? {}).roast ?? 0) >= 2)
+    const bySpecialty = scope.filter((c) => c.synth_grade === "검증" && ((c.char_scores ?? {}).roast ?? 0) >= 2 && !dessertDominance(c.char_scores).dominant)
       .sort((a, b) => ((b.char_scores ?? {}).roast ?? 0) - ((a.char_scores ?? {}).roast ?? 0));
 
     // 💎 슬롯A — 오늘의 숨은 보석: 검증·저노출(리뷰 거인 제외)·최근 살아있음·커피정체성·결있음, 매일 회전.

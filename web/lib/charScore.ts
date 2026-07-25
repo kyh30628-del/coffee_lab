@@ -57,7 +57,11 @@ export function dessertDominance(cs: Record<string, number> | null | undefined):
   const dessert = c.dessert ?? 0;
   const roast = c.roast ?? 0;
   const coffeeAxes = roast + (c.work ?? 0) + (c.quiet ?? 0) + (c.mood ?? 0) + (c.space ?? 0);
-  return { bonus: dessert <= coffeeAxes, dominant: roast === 0 && dessert > 20 };
+  // dominant: 디저트 언급이 유의미(>20)하고 ①로스팅 절대량이 약하며(<5, 빵 리뷰 속 노이즈 수준) ②디저트가 로스팅을 압도(≥8배)하면 = 사실상 베이커리.
+  //   ⚠️ 2026-07-25: 기존 roast===0 조건은 빵 리뷰 속 로스팅 노이즈 1~3회만 껴도 빠져나가, '삼남매 빵집'(디저트333·로스팅3)
+  //   같은 순수 빵집이 커피 스페셜티로 노출됨(coherence 1.0=오염 아님, 순수 분류 오류). 비율만으로는 진짜 로스터리(레귤러리 로스팅53 등)까지
+  //   오배제되어, 로스팅 절대량 하한(<5)을 함께 걸어 '로스팅 강한 진짜 커피집'은 디저트가 많아도 보호한다.
+  return { bonus: dessert <= coffeeAxes, dominant: dessert > 20 && roast < 5 && dessert >= roast * 8 };
 }
 
 // 카페의 대표 결(char) 상위 N개 — OG카드·공유 배지 등 짧은 표시용(원시 언급량 순).
