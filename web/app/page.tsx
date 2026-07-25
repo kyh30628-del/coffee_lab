@@ -1340,6 +1340,12 @@ export default function Home() {
                 <select value={homeDong} onChange={(e) => { const d = e.target.value; setHomeDong(d); if (d) { setSido(homeSido); setSigungu(homeGu); setDong(d); setFocusId(null); setSheetOpen(false); setTab("map"); } }} disabled={!homeGu || !homeDongOptions.length} className="border border-[#cbb89f] rounded-lg px-2.5 py-2 text-sm bg-white text-[#2b2018] disabled:opacity-40">
                   <option value="">{homeGu && !homeDongOptions.length ? "우리 동네 (수집중)" : "우리 동네"}</option>{homeDongOptions.map((d) => <option key={d} value={d}>{d}</option>)}
                 </select>
+                {/* 📍 내 주변 옥석 카페 바로 찾기 — 아이콘만, 배경 없이 테두리·색으로만 강조(우리 동네 선택 옆) */}
+                <button onClick={() => (nearHome ? clearNearHome() : openLocation())}
+                  aria-label={nearHome ? "내 주변 500m 해제" : "내 주변 옥석 카페 바로 찾기"}
+                  className={`shrink-0 w-9 h-9 flex items-center justify-center rounded-lg border text-base transition-colors ${nearHome ? "border-[#7a5122] text-[#7a5122]" : "border-[#e6b260] text-[#a85f1c] dcn-cta-glow"}`}>
+                  📍
+                </button>
               </div>
               <div className="mt-2.5 flex flex-col items-center gap-1">
                 {autoGu && (
@@ -1352,12 +1358,6 @@ export default function Home() {
                 {homeGu && !autoGu && <button onClick={clearAuto} className="text-[11px] text-[#7a5122] underline">수도권 전체 보기</button>}
               </div>
             </div>
-            {/* 📍 내 주변 옥석 카페 바로 찾기 — 위치 하나로 동네(구) 설정 + 반경 500m 옥석(검증·참고) 리스트(위치버튼 통일) */}
-            <button onClick={() => (nearHome ? clearNearHome() : openLocation())}
-              className={`w-full rounded-xl py-3 font-bold text-[13px] mt-1 mb-4 shadow-sm transition-colors ${nearHome ? "bg-white text-[#7a5122] border border-[#cbb89f] active:scale-[0.98] transition-transform" : "text-[#f4ece0] border border-[#e6b260]/40 dcn-cta-glow"}`}
-              style={nearHome ? {} : { background: "linear-gradient(135deg, #2b1a10 0%, #4a2c16 55%, #7a4a22 100%)" }}>
-              {nearHome ? "✕ 내 주변 500m 해제" : "📍 내 주변 옥석 카페 바로 찾기"}
-            </button>
             {nearHome ? (
               <div>
                 <div className="flex items-baseline justify-between mb-2 pb-1 border-b-2 border-[#2b2018]">
