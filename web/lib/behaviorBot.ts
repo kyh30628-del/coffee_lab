@@ -58,6 +58,28 @@ const AREA_ENUM_BOT_ANON_IDS_SQL = `
   HAVING COUNT(DISTINCT path) >= 10
 `;
 
+// 🎯 단일 카페 반복 프로버(2026-07-26, 전수감사 중 발견) — 서로 다른 anon_id 27개가 전부 정확히 동일한
+//   UA 문자열("X11; Linux x86_64 ... Chrome/149.0.0.0", 실제 KR 소비자에 드문 리눅스 데스크톱)로 6일간
+//   /c/5424 딱 한 곳만 반복 방문(24건, 매번 새 anon_id·단일페이지 이탈), 전부 src=google 자칭 — 네이버
+//   위장 스크래퍼(위 AREA_ENUM)와 같은 계열(검색유입 신호 위조로 행동필터 회피)이나 지역×취향 대신
+//   카페 1곳을 표적. 실제 사람은 독립된 브라우저 인스턴스가 며칠에 걸쳐 완전히 동일한 UA 문자열을
+//   유지하지 않는다(브라우저 버전·기기가 자연히 갈림). 전수 스캔 결과 이 신호는 이 1건 외엔 안 걸림
+//   (임계값 5는 24라는 관측치에서 넉넉한 여유).
+const SINGLE_CAFE_UA_REPEAT_BOT_ANON_IDS_SQL = `
+  SELECT t.anon_id FROM traffic_events t
+  LEFT JOIN user_consents u ON u.anon_id = t.anon_id
+  WHERE t.path LIKE '/c/%'
+    AND t.anon_id IN (SELECT anon_id FROM traffic_events GROUP BY anon_id HAVING COUNT(DISTINCT path) = 1)
+    AND (u.user_agent, t.path) IN (
+      SELECT u2.user_agent, t2.path
+      FROM traffic_events t2 LEFT JOIN user_consents u2 ON u2.anon_id = t2.anon_id
+      WHERE t2.path LIKE '/c/%'
+        AND t2.anon_id IN (SELECT anon_id FROM traffic_events GROUP BY anon_id HAVING COUNT(DISTINCT path) = 1)
+      GROUP BY u2.user_agent, t2.path
+      HAVING COUNT(DISTINCT t2.anon_id) >= 5
+    )
+`;
+
 // 명시적 봇(UA·크롤러 referrer·internal·필터전수순회) anon_id — 위 BEHAVIOR_BOT_ANON_IDS_SQL은 이 조건을
 // 만족하는 이벤트를 WHERE에서 먼저 걷어내고 나머지로만 행동신호를 판정하므로(노이즈가 '다중페이지'로
 // 오분류되는 버그 방지), 모든 이벤트가 명시적 봇 조건인 anon_id는 GROUP BY 결과 자체에 나타나지 않는다 →
@@ -71,6 +93,7 @@ export const EXPLICIT_BOT_ANON_IDS_SQL = `
      OR COALESCE(t.src, '') IN ('spam')
      OR COALESCE(u.internal, false)
      OR t.anon_id IN (${AREA_ENUM_BOT_ANON_IDS_SQL})
+     OR t.anon_id IN (${SINGLE_CAFE_UA_REPEAT_BOT_ANON_IDS_SQL})
 `;
 
 // 봇/노이즈 anon_id 단일 소스(#503) — 명시적 봇 UNION 행동기반 봇. traffic_events 기반이든
