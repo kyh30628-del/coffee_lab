@@ -113,37 +113,61 @@ const HeadlineCard = memo(function HeadlineCard({ c, kicker, tone, onOpen }: { c
     </button>
   );
 });
-const Row = memo(function Row({ title, items, sub, info, onOpen }: { title: string; items: DCafe[]; sub?: string; info?: React.ReactNode; onOpen: (id: number) => void }) {
+// 🎬 자동 스포트라이트(넷플릭스식) — 가로 스크롤 나열 대신, 큰 카드 1개가 몇 초마다 자동 전환 + 점(dot)으로 위치 표시.
+//   HeadlineCard를 그대로 재사용해 상단 💎숨은보석·🎯오늘의테마와 톤·배지·태그가 통일된다(추가 코드 최소화).
+//   터치/클릭하면 5초간 멈췄다가 재개(읽는 도중 안 넘어감). 좌우 스와이프로 수동 이동도 가능.
+const Spotlight = memo(function Spotlight({ title, items, sub, info, onOpen, toneOffset = 0, intervalMs = 4000 }: { title: string; items: DCafe[]; sub?: string; info?: React.ReactNode; onOpen: (id: number) => void; toneOffset?: number; intervalMs?: number }) {
+  const [idx, setIdx] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const resumeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const touchX = useRef<number | null>(null);
+  useEffect(() => { setIdx(0); }, [items]);
+  useEffect(() => {
+    if (paused || items.length <= 1) return;
+    // 행마다 시작을 살짝 어긋나게(스태거) — 안 그러면 모든 행 타이머가 페이지 로드 시 거의 동시에 시작돼
+    // 화면 전체가 4초마다 한꺼번에 깜빡이는 느낌이 남(각 행은 여전히 4초 주기, 위상만 다름).
+    let interval: ReturnType<typeof setInterval> | undefined;
+    const stagger = setTimeout(() => {
+      interval = setInterval(() => setIdx((i) => (i + 1) % items.length), intervalMs);
+    }, (toneOffset % 5) * 650);
+    return () => { clearTimeout(stagger); if (interval) clearInterval(interval); };
+  }, [paused, items.length, intervalMs, toneOffset]);
+  const pauseThenResume = () => {
+    setPaused(true);
+    if (resumeTimer.current) clearTimeout(resumeTimer.current);
+    resumeTimer.current = setTimeout(() => setPaused(false), 5000);
+  };
+  useEffect(() => () => { if (resumeTimer.current) clearTimeout(resumeTimer.current); }, []);
   if (!items?.length) return null;
+  const c = items[idx];
   return (
     <div className="mb-7">
       <div className="flex items-baseline justify-between mb-1 pb-1 border-b-2 border-[#2b2018]">
         <div className="text-base font-bold text-[#2b2018] flex items-center gap-1.5">{title}{info && <InfoDot title={title.replace(/^[^가-힣A-Za-z]+/, "")}>{info}</InfoDot>}</div>
         {sub && <div className="text-[10px] text-[#7a5122] shrink-0">↕ {sub}</div>}
       </div>
-      {/* 바깥은 가로 스크롤, 위쪽 패딩 안에 말풍선이 들어가 잘리지 않음. wrap의 ::after가 우측 페이드로 "더 있음" 신호. */}
-      <div className="dcn-hscroll-wrap">
-        <div className="flex gap-3 overflow-x-auto pt-2 pb-2 dcn-hscroll" style={{ WebkitOverflowScrolling: "touch" }}>
-          {items.map((c) => (
-            <div key={c.id} className="shrink-0 w-48">
-              <button onClick={() => onOpen(c.id)} className="w-full text-left bg-white rounded-xl p-3.5 border border-[#ece0cd] hover:border-[#9c6b3f] hover:shadow-md transition-all h-full flex flex-col">
-                <div className="flex items-center gap-1 mb-1">
-                  <span className="font-bold text-sm text-[#2b2018] truncate">{c.name}</span>
-                  {c.grade && GRADE_STYLE[c.grade] && <span className="text-[8px] text-white px-1 py-0.5 rounded-full shrink-0" style={{ background: GRADE_STYLE[c.grade].bg }}>{c.grade}</span>}
-                </div>
-                <div className="text-[10px] text-[#665036] mb-1.5">{c.area} · 리뷰 {c.count ?? 0}</div>
-                {c.beanNote.length > 0 && <div className="flex flex-wrap gap-1 mb-2">{c.beanNote.map((b) => <span key={b} className="text-[9px] bg-[#f0e6d4] text-[#8a6d3f] px-1.5 py-0.5 rounded-full">{b}</span>)}</div>}
-                {c.reason && (
-                  <div className="mt-auto pt-2 border-t border-[#f0e6d4]">
-                    <div className="text-[8px] tracking-wider uppercase text-[#b08440] mb-0.5">📰 선정 이유</div>
-                    <p className="text-[10.5px] text-[#5a4a38] leading-relaxed">{c.reason}</p>
-                  </div>
-                )}
-              </button>
-            </div>
-          ))}
+      <div
+        onPointerDown={pauseThenResume}
+        onTouchStart={(e) => { touchX.current = e.touches[0].clientX; pauseThenResume(); }}
+        onTouchEnd={(e) => {
+          if (touchX.current == null) return;
+          const dx = e.changedTouches[0].clientX - touchX.current;
+          if (Math.abs(dx) > 40) setIdx((i) => (dx < 0 ? (i + 1) % items.length : (i - 1 + items.length) % items.length));
+          touchX.current = null;
+        }}
+      >
+        <div key={c.id} className="dcn-spotlight-fade">
+          <HeadlineCard c={c} kicker={`${idx + 1} / ${items.length}`} tone={(toneOffset + idx) % TONES.length} onOpen={onOpen} />
         </div>
       </div>
+      {items.length > 1 && (
+        <div className="flex justify-center gap-1.5 mt-1">
+          {items.map((_, i) => (
+            <button key={i} onClick={() => { setIdx(i); pauseThenResume(); }} aria-label={`${i + 1}번째`}
+              className={`h-1.5 rounded-full transition-all duration-300 ${i === idx ? "w-5 bg-[#9c6b3f]" : "w-1.5 bg-[#d9c6a5]"}`} />
+          ))}
+        </div>
+      )}
     </div>
   );
 });
@@ -1283,11 +1307,11 @@ export default function Home() {
               <>
                 {discover.headlineA && <HeadlineCard c={discover.headlineA} kicker="💎 오늘의 숨은 보석 — 검증됐지만 아직 덜 알려진 곳" tone={0} onOpen={openById} />}
                 {discover.headlineB && <HeadlineCard c={discover.headlineB} kicker={discover.themeB ? `${discover.themeB.emoji} 오늘의 테마 · ${discover.themeB.label}` : "🔥 커피에 진심인 집 — 스페셜티 스포트라이트"} tone={1} onOpen={openById} />}
-                {discover.featured && discover.featured.length > 0 && <Row title="✨ 추천 카페" items={discover.featured} onOpen={openById} sub="쇼케이스" info={<>사장님이 직접 <b>홍보 중인 쇼케이스 카페</b>예요(우선 노출). 후기·등급은 다른 카페와 똑같이 검증된 값이에요.</>} />}
-                {momentum && momentum.rising.length > 0 && <Row title="📈 요즘 뜨는 카페" items={momentum.rising.slice(0, 5)} onOpen={openById} sub="최근 입소문 순" info={<>별점 대신 <b>검증된 진짜 후기가 요즘 얼마나 빨리 느는지</b>로 뽑은 '뜨는 카페'예요. 최근 3개월 검증 후기가 많을수록 상위로 올라가요.</>} />}
-                <Row title="🏆 리뷰 많은 Top 3" items={discover.top3} onOpen={openById} sub="검증 리뷰 많은 순" info={<>이 동네에서 <b>검증·참고 후기(옥석)가 가장 많은</b> 카페 순서예요. 광고·가짜·무관 글은 제외한 '진짜 후기 수' 기준입니다.</>} />
-                <Row title="🔥 스페셜티 픽" items={discover.specialty} onOpen={openById} sub="로스팅 언급 순" info={<>검증된 카페 중 <b>직접 로스팅·스페셜티가 후기에 자주 언급된</b> 곳이에요. 커피에 진심인 집 위주로 보여줘요.</>} />
-                {discover.fresh.length > 0 && <Row title="🆕 새로 발견된 카페" items={discover.fresh} onOpen={openById} sub="최신 등록순" info={<>우리 지도에 <b>새로 등록·검증된 카페</b>예요. 신선한 발견, 이미 검증된 곳만 올라와요.</>} />}
+                {discover.featured && discover.featured.length > 0 && <Spotlight title="✨ 추천 카페" items={discover.featured} onOpen={openById} sub="쇼케이스" toneOffset={2} info={<>사장님이 직접 <b>홍보 중인 쇼케이스 카페</b>예요(우선 노출). 후기·등급은 다른 카페와 똑같이 검증된 값이에요.</>} />}
+                {momentum && momentum.rising.length > 0 && <Spotlight title="📈 요즘 뜨는 카페" items={momentum.rising.slice(0, 5)} onOpen={openById} sub="최근 입소문 순" toneOffset={4} info={<>별점 대신 <b>검증된 진짜 후기가 요즘 얼마나 빨리 느는지</b>로 뽑은 '뜨는 카페'예요. 최근 3개월 검증 후기가 많을수록 상위로 올라가요.</>} />}
+                <Spotlight title="🏆 리뷰 많은 Top 3" items={discover.top3} onOpen={openById} sub="검증 리뷰 많은 순" toneOffset={0} info={<>이 동네에서 <b>검증·참고 후기(옥석)가 가장 많은</b> 카페 순서예요. 광고·가짜·무관 글은 제외한 '진짜 후기 수' 기준입니다.</>} />
+                <Spotlight title="🔥 스페셜티 픽" items={discover.specialty} onOpen={openById} sub="로스팅 언급 순" toneOffset={1} info={<>검증된 카페 중 <b>직접 로스팅·스페셜티가 후기에 자주 언급된</b> 곳이에요. 커피에 진심인 집 위주로 보여줘요.</>} />
+                {discover.fresh.length > 0 && <Spotlight title="🆕 새로 발견된 카페" items={discover.fresh} onOpen={openById} sub="최신 등록순" toneOffset={3} info={<>우리 지도에 <b>새로 등록·검증된 카페</b>예요. 신선한 발견, 이미 검증된 곳만 올라와요.</>} />}
                 <button onClick={() => { setSido(homeSido); setSigungu(homeGu); setDong(homeDong); setFocusId(null); setSheetOpen(false); setTab("map"); }} className="w-full bg-[#2b2018] text-[#f4ece0] rounded-xl py-3.5 font-medium mt-2">🗺 {homeDong ? `${homeDong} 지도로 보기` : homeGu ? `${homeGu} 지도로 보기` : "지도에서 전체 둘러보기"} →</button>
               </>
             )}

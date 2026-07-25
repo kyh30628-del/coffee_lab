@@ -96,20 +96,8 @@ body {
 .dcn-cta-glow:active { transform: scale(0.97); }
 @media (prefers-reduced-motion: reduce) { .dcn-cta-glow { animation: none; } }
 
-/* 홈 테마 가로 스크롤 — 커피·크림 테마 스크롤바 + 확실한 스냅(카드가 딱딱 붙는 캐러셀 느낌).
-   2026-07-25: proximity(느슨함, 애매하게 걸치는 카드 생김)→mandatory로 강화 — 스와이프하면 항상 카드 시작점에 착 정렬. */
-.dcn-hscroll { scrollbar-width: thin; scrollbar-color: #c9a574 transparent; scroll-snap-type: x mandatory; scroll-padding-left: 4px; }
-.dcn-hscroll::-webkit-scrollbar { height: 7px; }
-.dcn-hscroll::-webkit-scrollbar-track { background: transparent; }
-.dcn-hscroll::-webkit-scrollbar-thumb { background: linear-gradient(90deg, #caa472, #a87f4f); border-radius: 99px; border: 2px solid transparent; background-clip: padding-box; }
-.dcn-hscroll::-webkit-scrollbar-thumb:hover { background: #946338; }
-.dcn-hscroll > * { scroll-snap-align: start; }
-
-/* 우측 페이드 힌트 — "더 있음"을 직관적으로. 스크롤 컨테이너를 감싸는 relative wrapper의 ::after로,
-   콘텐츠 위에 고정 오버레이(스크롤과 함께 안 움직임). 배경색(#f4ece0)으로 자연스럽게 블렌드. */
-.dcn-hscroll-wrap { position: relative; }
-.dcn-hscroll-wrap::after {
-  content: ""; position: absolute; top: 0; right: 0; bottom: 7px; width: 36px;
-  background: linear-gradient(to right, rgba(244,236,224,0) 0%, #f4ece0 78%);
-  pointer-events: none;
-}
+/* 🎬 홈 자동 스포트라이트(넷플릭스식) — 가로 스크롤 나열 대신 카드 1개가 자동 전환.
+   2026-07-25: 스크롤+스냅 방식(dcn-hscroll)을 대체 — 카드 바뀔 때 살짝 떠오르며 페이드인. */
+.dcn-spotlight-fade { animation: dcnSpotlightIn 0.4s ease; }
+@keyframes dcnSpotlightIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .dcn-spotlight-fade { animation: none; } }
