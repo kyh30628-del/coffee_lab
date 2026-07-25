@@ -58,6 +58,17 @@ const AREA_ENUM_BOT_ANON_IDS_SQL = `
   HAVING COUNT(DISTINCT path) >= 10
 `;
 
+// 🧪 자사 프리뷰 배포 자가방문(2026-07-26, CEO "더 오래된 것까지 전수로" 지시로 전체기간 재감사 중 발견) —
+//   자율 개발 파이프라인이 dev_task 브랜치를 배포검증할 때 프리뷰 URL(`coffee-*-product-builder.vercel.app`
+//   또는 `coffee-lab-git-{브랜치명}-product-builder.vercel.app`)을 여는 것(HeadlessChrome 자동화 또는
+//   실브라우저 수동확인)이 같은 프로덕션 Neon DB에 `/api/visit`을 그대로 남겨 방문자로 잡혔다. UA에
+//   이미 'headless' 있는 건 기존 정규식이 걸렀지만, 실브라우저(Chrome/Android 등)로 연 건 안 걸렸음.
+//   `referrer`가 우리 커스텀도메인(dongnecoffeenote.com)이 아니라 `*.vercel.app` 프리뷰 URL 자체인
+//   게 결정적 증거(실 소비자는 절대 이 주소로 안 들어옴). 전체기간(06-06~) 스캔: anon_id 26개 중
+//   traffic_events에 실제로 남은 건 9개, 그중 3개(4a1749c0·6208b151·dd830cee)가 기존 필터를 통과해
+//   사람으로 집계되고 있었음(수량은 작지만 방치 금지). 아래 EXPLICIT_BOT_ANON_IDS_SQL의
+//   `u.referrer ~* '\.vercel\.app'` 조건으로 제외.
+
 // 🎯 단일 카페 반복 프로버(2026-07-26, 전수감사 중 발견) — 서로 다른 anon_id 27개가 전부 정확히 동일한
 //   UA 문자열("X11; Linux x86_64 ... Chrome/149.0.0.0", 실제 KR 소비자에 드문 리눅스 데스크톱)로 6일간
 //   /c/5424 딱 한 곳만 반복 방문(24건, 매번 새 anon_id·단일페이지 이탈), 전부 src=google 자칭 — 네이버
@@ -92,6 +103,7 @@ export const EXPLICIT_BOT_ANON_IDS_SQL = `
      OR COALESCE(t.src, '') ~* 'findelio|blinkx|semrush|ahrefs|dataprovider|dotbot|petalbot|yandex|mj12|serpstat'
      OR COALESCE(t.src, '') IN ('spam')
      OR COALESCE(u.internal, false)
+     OR COALESCE(u.referrer, '') ~* '\\.vercel\\.app'
      OR t.anon_id IN (${AREA_ENUM_BOT_ANON_IDS_SQL})
      OR t.anon_id IN (${SINGLE_CAFE_UA_REPEAT_BOT_ANON_IDS_SQL})
 `;
