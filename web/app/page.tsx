@@ -118,26 +118,43 @@ const HeadlineCard = memo(function HeadlineCard({ c, kicker, tone, onOpen }: { c
 //   터치/클릭하면 5초간 멈췄다가 재개(읽는 도중 안 넘어감). 좌우 스와이프로 수동 이동도 가능.
 const Spotlight = memo(function Spotlight({ title, items, sub, info, onOpen, toneOffset = 0, intervalMs = 4000 }: { title: string; items: DCafe[]; sub?: string; info?: React.ReactNode; onOpen: (id: number) => void; toneOffset?: number; intervalMs?: number }) {
   const [idx, setIdx] = useState(0);
+  const [prevIdx, setPrevIdx] = useState<number | null>(null); // 진짜 크로스페이드용 — 이전 카드가 사라지는 동안만 유지
   const [paused, setPaused] = useState(false);
   const resumeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prevClearTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const touchX = useRef<number | null>(null);
-  useEffect(() => { setIdx(0); }, [items]);
+  // 인덱스 전환 단일 진입점 — 이전 카드를 잠깐 남겨 CSS가 겹쳐서 페이드아웃, 새 카드는 동시에 페이드인(진짜 크로스페이드).
+  //   기존엔 key교체로 이전 카드가 순간 사라지고 새 카드만 나타나는 '컷 전환'이라 뚝뚝 끊겨 보였음.
+  const goTo = useCallback((updater: number | ((cur: number) => number)) => {
+    setIdx((cur) => {
+      const next = typeof updater === "function" ? (updater as (c: number) => number)(cur) : updater;
+      if (next === cur) return cur;
+      setPrevIdx(cur);
+      if (prevClearTimer.current) clearTimeout(prevClearTimer.current);
+      prevClearTimer.current = setTimeout(() => setPrevIdx(null), 650); // CSS 애니메이션(0.6s)보다 살짝 길게
+      return next;
+    });
+  }, []);
+  useEffect(() => { setIdx(0); setPrevIdx(null); }, [items]);
   useEffect(() => {
     if (paused || items.length <= 1) return;
     // 행마다 시작을 살짝 어긋나게(스태거) — 안 그러면 모든 행 타이머가 페이지 로드 시 거의 동시에 시작돼
     // 화면 전체가 4초마다 한꺼번에 깜빡이는 느낌이 남(각 행은 여전히 4초 주기, 위상만 다름).
     let interval: ReturnType<typeof setInterval> | undefined;
     const stagger = setTimeout(() => {
-      interval = setInterval(() => setIdx((i) => (i + 1) % items.length), intervalMs);
+      interval = setInterval(() => goTo((i) => (i + 1) % items.length), intervalMs);
     }, (toneOffset % 5) * 650);
     return () => { clearTimeout(stagger); if (interval) clearInterval(interval); };
-  }, [paused, items.length, intervalMs, toneOffset]);
+  }, [paused, items.length, intervalMs, toneOffset, goTo]);
   const pauseThenResume = () => {
     setPaused(true);
     if (resumeTimer.current) clearTimeout(resumeTimer.current);
     resumeTimer.current = setTimeout(() => setPaused(false), 5000);
   };
-  useEffect(() => () => { if (resumeTimer.current) clearTimeout(resumeTimer.current); }, []);
+  useEffect(() => () => {
+    if (resumeTimer.current) clearTimeout(resumeTimer.current);
+    if (prevClearTimer.current) clearTimeout(prevClearTimer.current);
+  }, []);
   if (!items?.length) return null;
   const c = items[idx];
   return (
@@ -147,23 +164,29 @@ const Spotlight = memo(function Spotlight({ title, items, sub, info, onOpen, ton
         {sub && <div className="text-[10px] text-[#7a5122] shrink-0">↕ {sub}</div>}
       </div>
       <div
+        className="relative"
         onPointerDown={pauseThenResume}
         onTouchStart={(e) => { touchX.current = e.touches[0].clientX; pauseThenResume(); }}
         onTouchEnd={(e) => {
           if (touchX.current == null) return;
           const dx = e.changedTouches[0].clientX - touchX.current;
-          if (Math.abs(dx) > 40) setIdx((i) => (dx < 0 ? (i + 1) % items.length : (i - 1 + items.length) % items.length));
+          if (Math.abs(dx) > 40) goTo((i) => (dx < 0 ? (i + 1) % items.length : (i - 1 + items.length) % items.length));
           touchX.current = null;
         }}
       >
-        <div key={c.id} className="dcn-spotlight-fade">
+        <div key={`cur-${c.id}`} className={prevIdx !== null ? "dcn-spotlight-in" : undefined}>
           <HeadlineCard c={c} kicker={`${idx + 1} / ${items.length}`} tone={(toneOffset + idx) % TONES.length} onOpen={onOpen} />
         </div>
+        {prevIdx !== null && items[prevIdx] && (
+          <div key={`prev-${items[prevIdx].id}`} className="absolute inset-0 dcn-spotlight-out">
+            <HeadlineCard c={items[prevIdx]} kicker={`${prevIdx + 1} / ${items.length}`} tone={(toneOffset + prevIdx) % TONES.length} onOpen={onOpen} />
+          </div>
+        )}
       </div>
       {items.length > 1 && (
         <div className="flex justify-center gap-1.5 mt-1">
           {items.map((_, i) => (
-            <button key={i} onClick={() => { setIdx(i); pauseThenResume(); }} aria-label={`${i + 1}번째`}
+            <button key={i} onClick={() => { goTo(i); pauseThenResume(); }} aria-label={`${i + 1}번째`}
               className={`h-1.5 rounded-full transition-all duration-300 ${i === idx ? "w-5 bg-[#9c6b3f]" : "w-1.5 bg-[#d9c6a5]"}`} />
           ))}
         </div>

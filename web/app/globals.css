@@ -97,7 +97,15 @@ body {
 @media (prefers-reduced-motion: reduce) { .dcn-cta-glow { animation: none; } }
 
 /* 🎬 홈 자동 스포트라이트(넷플릭스식) — 가로 스크롤 나열 대신 카드 1개가 자동 전환.
-   2026-07-25: 스크롤+스냅 방식(dcn-hscroll)을 대체 — 카드 바뀔 때 살짝 떠오르며 페이드인. */
-.dcn-spotlight-fade { animation: dcnSpotlightIn 0.4s ease; }
-@keyframes dcnSpotlightIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-@media (prefers-reduced-motion: reduce) { .dcn-spotlight-fade { animation: none; } }
+   2026-07-25: 스크롤+스냅 방식(dcn-hscroll)을 대체.
+   ⚠️ 진짜 크로스페이드로 개선(같은 날 추가 지시 "애니메이션 부드럽게") — 이전엔 key교체로 이전 카드가
+   순간 사라지고 새 카드만 페이드인 되는 '컷 전환'이라 뚝뚝 끊겨 보였음. 이제 이전 카드(절대위치, 위)가
+   서서히 사라지는 동시에 새 카드(아래, 정상흐름)가 서서히 나타나 실제로 겹쳐 넘어간다. */
+.dcn-spotlight-in { animation: dcnSpotlightIn 0.6s cubic-bezier(0.22, 1, 0.36, 1); }
+.dcn-spotlight-out { animation: dcnSpotlightOut 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+@keyframes dcnSpotlightIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes dcnSpotlightOut { from { opacity: 1; } to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .dcn-spotlight-in { animation: none; }
+  .dcn-spotlight-out { animation: none; opacity: 0; }
+}
