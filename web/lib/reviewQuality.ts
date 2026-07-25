@@ -79,6 +79,11 @@ const AD_DISCLAIM = /(협찬|광고|제공|대가|유료|체험단|서포터즈?
 //     ⚠️ 오탐 방지: 홍보단/기자단은 '기관 접두어 붙음'(1자+) 또는 활동/모집/위촉 역할어 동반 시에만. '앰배서더' 단독은
 //        호텔·브랜드명(노보텔 앰배서더)이라 절대 넣지 않음.
 const SUPPORTER_PR = /(서포터[즈스]|시민\s*기자단|블로그\s*기자단|대학생\s*기자단|SNS\s*서포터|온라인\s*서포터|홍보\s*서포터|우수\s*서포터|홍보\s*대사|[가-힣A-Za-z]{1,12}홍보단|[가-힣]{1,8}기자단|서포터[즈스]?로?\s*(선정|위촉|활동|참여|뽑|발대)|기자단\s*(활동|으로|에\s*선정|모집|위촉|입니|현장)|홍보단\s*(활동|모집|위촉|입니|발대)|위촉장)/;
+// 룰갭 P60(2026-07-25, decisions#500): 기관 보도자료·업무협약/후원 소식이 3인칭 발표문체라 AD_STRONG(협찬·체험단 등
+//   상업광고 신호)과 언어적으로 다른 별개 클래스라 매칭 안 되고 통과, 카페 방문후기로 오분류돼 참고등급 노출(6곳 확인:
+//   업무협약·보도자료·후원 문구가 방문 서술 없이 3인칭으로 카페명만 언급). 리뷰(quote) 단위 판정이라 같은 카페의
+//   실제 방문 후기는 이 패턴이 없어 영향 없음.
+const INSTITUTIONAL_PR = /(업무협약|협약\s*체결|협약을?\s*맺|보도자료|후원받아|후원\s*소식|전달식|기념식|사회보장협의체|상생\s*모델|구청장|군수는|시장은|지역공동체일자리)/;
 // 식당 메인 메뉴어(카페 아닌 '음식점' 시그널). 같은 상호 다른 음식점('장꼬방'+'묵은김치찌개') 후기 분리용.
 //   카페가 흔히 파는 것(토스트·샌드위치·파스타·브런치)은 제외 — 명백한 한식·중식 '식당 본메뉴'만.
 const RESTAURANT_MAIN_SRC = "(묵은김치|김치찌개|된장찌개|부대찌개|동태찌개|순두부찌개|순두부|찌개|찌게|백반|국밥|순대국|해장국|감자탕|짜장면|짜장|짬뽕|탕수육|보쌈|족발|곱창|막창|삼겹살|갈비탕|갈비찜|불고기|제육|돈가스|돈까스|냉면|칼국수|쌈밥|한정식|매운탕|추어탕|설렁탕|곰탕|닭갈비|찜닭|아구찜|해물찜|쌀국수|분식)";
@@ -613,7 +618,8 @@ export function verifyReview(input: QualityInput): QualityResult {
   // 진짜 광고/협찬(면책 문구 제외)이면 검증 후기에서 제외 — 랜딩 약속('광고·협찬 자동 제외')과 일치.
   const sponsored = AD_STRONG.test(fullL) && !AD_DISCLAIM.test(fullL);
   const supporterPR = SUPPORTER_PR.test(fullL) && !AD_DISCLAIM.test(fullL); // coord#112: 서포터즈·기자단 위촉 홍보글
-  if (sponsored || supporterPR) return { verdict: "rejected", score: 0, reasons: [supporterPR && !sponsored ? "서포터즈·기자단 위촉 홍보글 — 자동 제외" : "광고·협찬 글 — 자동 제외"], signals: { nameInTitle: false, nameInBody: false, visit: false, substance: 0, listicle: false, sponsored: true, areaMatch: false } };
+  const institutionalPR = INSTITUTIONAL_PR.test(fullL) && !AD_DISCLAIM.test(fullL); // decisions#500: 기관 보도자료·업무협약/후원 소식
+  if (sponsored || supporterPR || institutionalPR) return { verdict: "rejected", score: 0, reasons: [institutionalPR && !sponsored && !supporterPR ? "기관 보도자료·업무협약/후원 소식 — 자동 제외" : supporterPR && !sponsored ? "서포터즈·기자단 위촉 홍보글 — 자동 제외" : "광고·협찬 글 — 자동 제외"], signals: { nameInTitle: false, nameInBody: false, visit: false, substance: 0, listicle: false, sponsored: true, areaMatch: false } };
 
   // [비방문 게시판] 중고나라·창업나무는 물건 거래·상권 문의 게시판(네이버 카페=커뮤니티)이라 방문 후기가 있을 수 없음.
   //   내용에 카페 맥락어가 섞여도(리터럴 "카페" 오탐) 링크 도메인만으로 무조건 탈락.
