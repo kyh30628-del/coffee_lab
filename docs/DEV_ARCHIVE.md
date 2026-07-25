@@ -154,3 +154,4 @@
 | 2026-07-25 01:10 | #493 | [개발] 협업 #245: #486 instagram_url enrich 재검토 요청 — 배포 후에도 잔존 오 | 9b137e1d | - | lib/reviewQuality.ts: coreTokensDetail export(venueOnly 노출) + scripts/instagram-backfill.mjs nameMat |
 | 2026-07-25 03:22 | #499 | [레드팀 신규] cron-sentinel 교차오염 탐지 사각 — 동일브랜드 타지점 인용문 복제 | f59e9b23 | - | app/api/cron-sentinel/route.ts scanFranchiseBranchPollution: 브랜드 접미사(예 서창점) 완전일치뿐 아니라 마커를 뗀 지점토큰(서창) |
 | 2026-07-25 03:28 | #497 | [룰갭 P59] 체험공방(도자기 원데이클래스)이 "테마카페"로 오분류 — 카페맥락 0인 체험후기가 참고/검증 | 35576532 | - | lib/reviewQuality.ts: CRAFT_WORKSHOP_ACTIVITY 하드게이트 신규(원데이클래스·물레체험·핸드빌딩·찰흙놀이·도자(기)?체험/만들기/굽기/페인팅/공방· |
+| 2026-07-25 09:30 | #500 | [룰갭 P60] 기관 보도자료·업무협약/후원 소식이 카페 방문후기로 오분류 — 참고등급 노출(6곳 확인) | a6fa42de | - | lib/reviewQuality.ts: INSTITUTIONAL_PR 정규식 추가(업무협약/협약체결/보도자료/후원받아/전달식/기념식/사회보장협의체/구청장 등) + verifyRev |
