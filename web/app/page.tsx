@@ -1340,11 +1340,13 @@ export default function Home() {
                 <select value={homeDong} onChange={(e) => { const d = e.target.value; setHomeDong(d); if (d) { setSido(homeSido); setSigungu(homeGu); setDong(d); setFocusId(null); setSheetOpen(false); setTab("map"); } }} disabled={!homeGu || !homeDongOptions.length} className="border border-[#cbb89f] rounded-lg px-2.5 py-2 text-sm bg-white text-[#2b2018] disabled:opacity-40">
                   <option value="">{homeGu && !homeDongOptions.length ? "우리 동네 (수집중)" : "우리 동네"}</option>{homeDongOptions.map((d) => <option key={d} value={d}>{d}</option>)}
                 </select>
-                {/* 📍 내 주변 옥석 카페 바로 찾기 — 아이콘만, 배경 없이 테두리·색으로만 강조(우리 동네 선택 옆) */}
+                {/* 📍 내 주변 옥석 카페 바로 찾기 — 아이콘만, 하단 내비 '내 위치' 핀과 같은 외곽선 아이콘으로 통일(발광 없음, 주변 select와 같은 톤) */}
                 <button onClick={() => (nearHome ? clearNearHome() : openLocation())}
                   aria-label={nearHome ? "내 주변 500m 해제" : "내 주변 옥석 카페 바로 찾기"}
-                  className={`shrink-0 w-9 h-9 flex items-center justify-center rounded-lg border text-base transition-colors ${nearHome ? "border-[#7a5122] text-[#7a5122]" : "border-[#e6b260] text-[#a85f1c] dcn-cta-glow"}`}>
-                  📍
+                  className={`shrink-0 w-9 h-9 flex items-center justify-center rounded-lg border transition-colors ${nearHome ? "border-[#7a5122] bg-[#f0e6d4]" : "border-[#cbb89f] bg-white"}`}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={nearHome ? "#7a5122" : "#8a7458"} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 21c4.2-4 7-7.2 7-10.5A7 7 0 0 0 5 10.5C5 13.8 7.8 17 12 21Z" /><circle cx="12" cy="10.5" r="2.4" />
+                  </svg>
                 </button>
               </div>
               <div className="mt-2.5 flex flex-col items-center gap-1">
