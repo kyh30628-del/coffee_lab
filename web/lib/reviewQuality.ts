@@ -457,7 +457,7 @@ export function cleanCafeName(name: string): string {
 //   - "미사강변 북카페" → ["미사강변"] (브랜드 없음 → '미사강변'이 유일 정체성이므로 유지)
 // venueOnly: 남은 토큰이 전부 다중테넌트 기관/건물명(VENUE_WORDS·대학 축약명 등)일 때 true — 그 건물엔
 //   무관한 여러 시설이 함께 있으므로(제안3 "건물단위 앵커 필수화"), 지역일치만으로 식별 인정하면 안 된다.
-function coreTokensDetail(name: string, areaTerms: string[]): { tokens: string[]; venueOnly: boolean } {
+export function coreTokensDetail(name: string, areaTerms: string[]): { tokens: string[]; venueOnly: boolean } {
   // 행정 접미사(시·군·구·읍·면·동·리)를 뗀 변형도 비교군에 포함 → 지점명에서 나온 병합 지역어
   //   ('남양주오남점'→'남양주오남')를 areaTerms('남양주시'·'오남읍')와 매칭시켜 식별어에서 제외.
   //   (프랜차이즈 'OO점'이 같은 지역 다른 업종 'OO점' 리뷰를 끌어오던 동명 오염의 근본 차단)
