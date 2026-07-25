@@ -36,10 +36,24 @@ export const BEHAVIOR_BOT_ANON_IDS_SQL = `
      AND bool_or(COALESCE(u.user_agent, '') ~* 'Mobile|iPhone|Android') = false
 `;
 
-// 명시적 봇(UA·크롤러 referrer·internal) anon_id — 위 BEHAVIOR_BOT_ANON_IDS_SQL은 이 조건을 만족하는
-// 이벤트를 WHERE에서 먼저 걷어내고 나머지로만 행동신호를 판정하므로(노이즈가 '다중페이지'로 오분류되는
-// 버그 방지), 모든 이벤트가 명시적 봇 조건인 anon_id는 GROUP BY 결과 자체에 나타나지 않는다 → 아래
-// BOT_ANON_IDS_SQL의 UNION으로 따로 합쳐야 새지 않는다(#503, traffic_events 집계에서 새던 버그).
+// 🕵️ 필터조합 전수순회 스크래퍼(2026-07-25 발견) — naver referrer로 위 3개 신호를 전부 통과하는 스크래퍼가
+//   실제로 있었다(#503 사고 조사 중 실측 발견): 검증 리퍼러(naver)+데스크톱 UA로 위장하고, 짧은 시간에
+//   서로 다른 /area/{구}/{취향필터} 조합을 기계적으로 대량 순회(예: 7분간 19종 조합·49건, 초단위 간격).
+//   진짜 사람은 이렇게 많은 지역×필터 조합을 한 세션에 훑지 않는다(실측: 오늘 방문자 중 2위가 6종/7건뿐 —
+//   19 vs 6로 확연히 분리). '속도(초당 이벤트)'는 네이버 인앱브라우저로 카페 카드 여러 개를 빠르게 비교하는
+//   진짜 사람과 구분이 안 돼(오탐 위험 실측 확인) 신호로 안 쓴다 — '서로 다른 지역+필터 조합 개수'만 본다.
+//   임계값 10(관측치 19 vs 6에서 넉넉한 여유)은 보수적 — 애매하면 사람으로 남긴다(과거 '55% 오탐' 재발 방지).
+const AREA_ENUM_BOT_ANON_IDS_SQL = `
+  SELECT anon_id FROM traffic_events
+  WHERE path LIKE '/area/%'
+  GROUP BY anon_id
+  HAVING COUNT(DISTINCT path) >= 10
+`;
+
+// 명시적 봇(UA·크롤러 referrer·internal·필터전수순회) anon_id — 위 BEHAVIOR_BOT_ANON_IDS_SQL은 이 조건을
+// 만족하는 이벤트를 WHERE에서 먼저 걷어내고 나머지로만 행동신호를 판정하므로(노이즈가 '다중페이지'로
+// 오분류되는 버그 방지), 모든 이벤트가 명시적 봇 조건인 anon_id는 GROUP BY 결과 자체에 나타나지 않는다 →
+// 아래 BOT_ANON_IDS_SQL의 UNION으로 따로 합쳐야 새지 않는다(#503, traffic_events 집계에서 새던 버그).
 export const EXPLICIT_BOT_ANON_IDS_SQL = `
   SELECT DISTINCT t.anon_id
   FROM traffic_events t
@@ -48,6 +62,7 @@ export const EXPLICIT_BOT_ANON_IDS_SQL = `
      OR COALESCE(t.src, '') ~* 'findelio|blinkx|semrush|ahrefs|dataprovider|dotbot|petalbot|yandex|mj12|serpstat'
      OR COALESCE(t.src, '') IN ('spam')
      OR COALESCE(u.internal, false)
+     OR t.anon_id IN (${AREA_ENUM_BOT_ANON_IDS_SQL})
 `;
 
 // 봇/노이즈 anon_id 단일 소스(#503) — 명시적 봇 UNION 행동기반 봇. traffic_events 기반이든
