@@ -5,8 +5,10 @@ import KakaoShare from "../KakaoShare";
 const GRADE_BG: Record<string, string> = { 검증: "#5f7355", 참고: "#9c6b3f", 후보: "#a8927a" };
 
 // 동네×취향 검증 카페 큐레이션 — SEO 콘텐츠 페이지 공용 렌더(서버 컴포넌트).
-export default function Curated({ area, tasteKey, heading, intro, cafes, regions, grades, canonical }: {
-  area: string; tasteKey?: string; heading: string; intro: string; cafes: SeoCafe[]; regions: { area: string; n: number }[]; grades?: GradeBreakdown; canonical: string;
+// 동(洞) 단위 페이지(app/area/[gu]/dong/[dong])도 이 컴포넌트를 재사용 — backHref/showTasteNav/crossLinks로 분기.
+export default function Curated({ area, tasteKey, heading, intro, cafes, regions = [], grades, canonical, backHref = "/area", backLabel = "지역별 카페", showTasteNav = true, crossLinks, crossLinksLabel = "다른 동네도 둘러보기", extra }: {
+  area: string; tasteKey?: string; heading: string; intro: string; cafes: SeoCafe[]; regions?: { area: string; n: number }[]; grades?: GradeBreakdown; canonical: string;
+  backHref?: string; backLabel?: string; showTasteNav?: boolean; crossLinks?: { label: string; href: string }[]; crossLinksLabel?: string; extra?: React.ReactNode;
 }) {
   const jsonld = {
     "@context": "https://schema.org", "@type": "ItemList", name: heading, numberOfItems: cafes.length,
@@ -16,7 +18,7 @@ export default function Curated({ area, tasteKey, heading, intro, cafes, regions
     <main className="min-h-screen bg-[#f4ece0] text-[#2b2018]" style={{ fontFamily: "'Gowun Batang', serif" }}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonld) }} />
       <div className="max-w-2xl mx-auto px-5 py-9">
-        <Link href="/area" className="text-[#7a5122] text-[13px] underline">← 지역별 카페</Link>
+        <Link href={backHref} className="text-[#7a5122] text-[13px] underline">← {backLabel}</Link>
         <div className="text-[#7a5122] text-[11px] tracking-[0.25em] uppercase mt-4 mb-1">동네 커피 노트 · 검증 큐레이션</div>
         <h1 className="text-[26px] font-bold leading-tight mb-2">{heading}</h1>
         <p className="text-[14px] text-[#524234] leading-relaxed mb-3">{intro}</p>
@@ -30,12 +32,14 @@ export default function Curated({ area, tasteKey, heading, intro, cafes, regions
         )}
 
         {/* 취향 내비 */}
-        <div className="flex flex-wrap gap-1.5 mb-6">
-          <Link href={`/area/${encodeURIComponent(area)}`} className={`text-[12px] px-2.5 py-1 rounded-full border ${!tasteKey ? "bg-[#2b2018] text-[#f4ece0] border-[#2b2018]" : "bg-white text-[#524234] border-[#d9c9b0]"}`}>전체</Link>
-          {TASTES.map((t) => (
-            <Link key={t.key} href={`/area/${encodeURIComponent(area)}/${t.key}`} className={`text-[12px] px-2.5 py-1 rounded-full border ${tasteKey === t.key ? "bg-[#2b2018] text-[#f4ece0] border-[#2b2018]" : "bg-white text-[#524234] border-[#d9c9b0]"}`}>{t.emoji} {t.short}</Link>
-          ))}
-        </div>
+        {showTasteNav && (
+          <div className="flex flex-wrap gap-1.5 mb-6">
+            <Link href={`/area/${encodeURIComponent(area)}`} className={`text-[12px] px-2.5 py-1 rounded-full border ${!tasteKey ? "bg-[#2b2018] text-[#f4ece0] border-[#2b2018]" : "bg-white text-[#524234] border-[#d9c9b0]"}`}>전체</Link>
+            {TASTES.map((t) => (
+              <Link key={t.key} href={`/area/${encodeURIComponent(area)}/${t.key}`} className={`text-[12px] px-2.5 py-1 rounded-full border ${tasteKey === t.key ? "bg-[#2b2018] text-[#f4ece0] border-[#2b2018]" : "bg-white text-[#524234] border-[#d9c9b0]"}`}>{t.emoji} {t.short}</Link>
+            ))}
+          </div>
+        )}
 
         {/* 목록 */}
         {cafes.length === 0 ? (
@@ -72,12 +76,14 @@ export default function Curated({ area, tasteKey, heading, intro, cafes, regions
           <link rel="preconnect" href="https://t1.kakaocdn.net" />
         </div>
 
-        {/* 다른 지역 크로스링크 */}
+        {extra}
+
+        {/* 다른 지역/동 크로스링크 — 내부링크로 신규 페이지 크롤 확산 */}
         <div className="mt-8 pt-5 border-t border-[#e6dcc8]">
-          <div className="text-[12px] font-bold text-[#7a5122] mb-2">다른 동네도 둘러보기</div>
+          <div className="text-[12px] font-bold text-[#7a5122] mb-2">{crossLinksLabel}</div>
           <div className="flex flex-wrap gap-1.5">
-            {regions.filter((r) => r.area !== area).slice(0, 24).map((r) => (
-              <Link key={r.area} href={`/area/${encodeURIComponent(r.area)}`} className="text-[12px] px-2.5 py-1 rounded-full bg-white text-[#524234] border border-[#d9c9b0]">{r.area}</Link>
+            {(crossLinks ?? regions.filter((r) => r.area !== area).slice(0, 24).map((r) => ({ label: r.area, href: `/area/${encodeURIComponent(r.area)}` }))).map((c) => (
+              <Link key={c.href} href={c.href} className="text-[12px] px-2.5 py-1 rounded-full bg-white text-[#524234] border border-[#d9c9b0]">{c.label}</Link>
             ))}
           </div>
         </div>

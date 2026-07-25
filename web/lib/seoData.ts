@@ -62,3 +62,38 @@ export async function getRegionTasteGradeBreakdown(area: string, tasteKey: strin
     return { verified: find("검증"), ref: find("참고"), candidate: find("후보") };
   } catch { return { verified: 0, ref: 0, candidate: 0 }; }
 }
+
+// 동(洞) 단위 프로그래매틱 SEO — "정자동 카페"처럼 실제 검색행태와 가장 가까운 단위(서비스명 "동네" 그 자체).
+// 콘텐츠 얇음(thin content) 방지용 최소 카페수 기준은 구 단위(getRegions)와 동일한 5곳.
+export async function getDongs(minCount = 5): Promise<{ area: string; dong: string; n: number }[]> {
+  try {
+    return (await sql`SELECT area, dong, count(*)::int n FROM cafes
+      WHERE published AND area IS NOT NULL AND area <> '' AND dong IS NOT NULL AND dong <> ''
+      GROUP BY area, dong HAVING count(*) >= ${minCount} ORDER BY n DESC`) as unknown as { area: string; dong: string; n: number }[];
+  } catch { return []; }
+}
+
+// 같은 구 안의 다른 동 목록 — 동 페이지 하단 크로스링크(내부링크로 크롤 확산)용.
+export async function getDongsInArea(area: string, minCount = 5): Promise<{ dong: string; n: number }[]> {
+  try {
+    return (await sql`SELECT dong, count(*)::int n FROM cafes
+      WHERE published AND area=${area} AND dong IS NOT NULL AND dong <> ''
+      GROUP BY dong HAVING count(*) >= ${minCount} ORDER BY n DESC`) as unknown as { dong: string; n: number }[];
+  } catch { return []; }
+}
+
+export async function getDongCafes(area: string, dong: string, limit = 30): Promise<SeoCafe[]> {
+  try {
+    return (await sql`SELECT id, name, dong, synth_grade AS grade, synth_count AS count, synth_identity AS identity,
+      (SELECT left(r->>'quote', 70) FROM jsonb_array_elements(COALESCE(synth_reviews,'[]'::jsonb)) r
+        WHERE COALESCE(r->>'quote','') <> '' ORDER BY COALESCE((r->>'score')::int,0) DESC LIMIT 1) AS quote
+      FROM cafes WHERE published AND area=${area} AND dong=${dong}
+      ORDER BY (synth_grade='검증') DESC, synth_count DESC NULLS LAST LIMIT ${limit}`) as unknown as SeoCafe[];
+  } catch { return []; }
+}
+
+// 동 공개 카페 곳수 — "N곳" 카피의 실제 값(표시 30개를 곳수로 오용 금지, lib/region.ts regionPublishedCount와 동일 원칙).
+export async function getDongPublishedCount(area: string, dong: string): Promise<number> {
+  try { return Number(((await sql`SELECT count(*)::int n FROM cafes WHERE published AND area=${area} AND dong=${dong}`)[0] as any)?.n ?? 0); }
+  catch { return 0; }
+}

@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 import { sql } from "@/lib/db";
-import { getRegions, TASTES } from "@/lib/seoData";
+import { getRegions, getDongs, TASTES } from "@/lib/seoData";
 import { COLLECTIONS } from "@/lib/collections";
 
 export const runtime = "nodejs";
@@ -27,6 +27,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const regionTasteUrls: MetadataRoute.Sitemap = regions.flatMap((r) =>
     TASTES.map((t) => ({ url: `${SITE}/area/${encodeURIComponent(r.area)}/${t.key}`, changeFrequency: "weekly" as const, priority: 0.6 }))
   );
+  // 동(洞) 단위 — "정자동 카페"처럼 실검색행태에 가장 가까운 단위(카페 5곳↑ 동만, 얇은 콘텐츠 방지)
+  const dongs = await getDongs();
+  const dongUrls: MetadataRoute.Sitemap = dongs.map((d) => ({
+    url: `${SITE}/area/${encodeURIComponent(d.area)}/dong/${encodeURIComponent(d.dong)}`, changeFrequency: "weekly", priority: 0.65,
+  }));
   // 동네 교차검증 컬렉션(에디토리얼 SEO 랜딩) — lib/collections.ts 레지스트리 단일출처.
   const collectionUrls: MetadataRoute.Sitemap = COLLECTIONS.map((c) => ({
     url: `${SITE}/collections/${c.slug}`, changeFrequency: "weekly", priority: 0.85,
@@ -39,6 +44,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...tasteUrls,
     ...regionUrls,
     ...regionTasteUrls,
+    ...dongUrls,
     ...cafeUrls,
   ];
 }
