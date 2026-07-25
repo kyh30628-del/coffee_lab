@@ -91,6 +91,28 @@ const SINGLE_CAFE_UA_REPEAT_BOT_ANON_IDS_SQL = `
     )
 `;
 
+// 💥 카페 순회 부하테스트/스크래퍼 버스트(2026-07-26, 카페별 반복 프로버 전수 스캔 중 추가 발견) —
+//   07-07 21:35과 07-08 17:29, 단 두 개의 1분 구간에 각각 서로 다른 anon_id 14개·13개가 몰려서
+//   완전히 무작위인 카페 13~14곳(두 날 거의 동일한 카페ID 목록 재사용)을 한 곳씩 나눠 방문(각자
+//   단일페이지 이탈), UA는 매번 다른 Chrome 버전(139~147 사이를 인위적으로 순환)을 썼다. 진짜
+//   사람이라면 서로 무관한 15명 남짓이 정확히 같은 60초 안에 우연히 접속해 하필 다른 카페들로
+//   흩어질 확률이 사실상 0 — 스크립트가 매 요청마다 새 anon_id·가짜 UA를 돌려쓰며 카페 목록을
+//   순회한 부하테스트/스크래퍼 흔적. 전수 스캔(1분 단위 서로 다른 anon_id 수 집계) 결과 이
+//   두 구간 외엔 최대 5명(2026-07-25 13:12, 정상적인 동시접속 범위)뿐이라 임계값 8은 안전.
+const CAFE_BURST_BOT_ANON_IDS_SQL = `
+  SELECT anon_id FROM traffic_events
+  WHERE path LIKE '/c/%'
+    AND date_trunc('minute', ts) IN (
+      SELECT date_trunc('minute', ts) FROM traffic_events
+      WHERE path LIKE '/c/%'
+      GROUP BY date_trunc('minute', ts)
+      HAVING COUNT(DISTINCT anon_id) >= 8
+    )
+`;
+
+// 🔊 Google-Read-Aloud(2026-07-26, 카페 롤링 스캔 중 발견) — UA에 자체 명시된 구글 접근성 크롤러
+//   (+https://support.google.com/webmasters/answer/1061943, "페이지 읽어주기" 기능). 확정 봇 시그니처.
+
 // 명시적 봇(UA·크롤러 referrer·internal·필터전수순회) anon_id — 위 BEHAVIOR_BOT_ANON_IDS_SQL은 이 조건을
 // 만족하는 이벤트를 WHERE에서 먼저 걷어내고 나머지로만 행동신호를 판정하므로(노이즈가 '다중페이지'로
 // 오분류되는 버그 방지), 모든 이벤트가 명시적 봇 조건인 anon_id는 GROUP BY 결과 자체에 나타나지 않는다 →
@@ -99,13 +121,14 @@ export const EXPLICIT_BOT_ANON_IDS_SQL = `
   SELECT DISTINCT t.anon_id
   FROM traffic_events t
   LEFT JOIN user_consents u ON u.anon_id = t.anon_id
-  WHERE COALESCE(u.user_agent, '') ~* 'bot|crawl|spider|slurp|bingpreview|facebookexternalhit|headless|preview|meta-externalagent'
+  WHERE COALESCE(u.user_agent, '') ~* 'bot|crawl|spider|slurp|bingpreview|facebookexternalhit|headless|preview|meta-externalagent|Google-Read-Aloud'
      OR COALESCE(t.src, '') ~* 'findelio|blinkx|semrush|ahrefs|dataprovider|dotbot|petalbot|yandex|mj12|serpstat'
      OR COALESCE(t.src, '') IN ('spam')
      OR COALESCE(u.internal, false)
      OR COALESCE(u.referrer, '') ~* '\\.vercel\\.app'
      OR t.anon_id IN (${AREA_ENUM_BOT_ANON_IDS_SQL})
      OR t.anon_id IN (${SINGLE_CAFE_UA_REPEAT_BOT_ANON_IDS_SQL})
+     OR t.anon_id IN (${CAFE_BURST_BOT_ANON_IDS_SQL})
 `;
 
 // 봇/노이즈 anon_id 단일 소스(#503) — 명시적 봇 UNION 행동기반 봇. traffic_events 기반이든
