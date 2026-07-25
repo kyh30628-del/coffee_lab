@@ -151,3 +151,4 @@
 | 2026-07-24 04:27 | #479 | [룰갭 P57] LOCAL_SEO_SERVICES 사전 갭 — 리모델링/종합설비 배관시공 SEO스팸 미등재( | a85a6b49 | - | lib/reviewQuality.ts LOCAL_SEO_SERVICES에 리모델링·종합설비 추가(142행). 기존 865행 CAFE_CONTEXT/SELF_BIZ_PROMO 가드  |
 | 2026-07-24 14:07 | #483 | [룰갭 P58] P50 HOTEL_LODGING_SIGNAL 사전 협소 — 웨딩/예식/객실/1박/수영장(ba | 6d8b6a6e | - | lib/reviewQuality.ts:789 HOTEL_LODGING_SIGNAL에 웨딩 예식장? 객실 1박 수영장(bare) 추가, 수영장 이용권 조건 제거. CAFE_CONTE |
 | 2026-07-24 14:08 | #486 | [개발] instagram_url enrich 좌표전용매칭 근본버그 — 상호명 검사 없음(coord#244  | 8ea3e609 | - | scripts/instagram-backfill.mjs: 좌표(165m)만+link형식 매칭에 상호명 코어토큰 일치(lib/reviewQuality.ts coreTokens 재사용 |
+| 2026-07-25 01:10 | #493 | [개발] 협업 #245: #486 instagram_url enrich 재검토 요청 — 배포 후에도 잔존 오 | 9b137e1d | - | lib/reviewQuality.ts: coreTokensDetail export(venueOnly 노출) + scripts/instagram-backfill.mjs nameMat |
