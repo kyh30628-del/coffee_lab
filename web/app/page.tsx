@@ -93,21 +93,24 @@ const CHAR_LABELS: Record<string, { label: string; emoji: string }> = {
   mood: { label: "분위기", emoji: "📸" }, space: { label: "넓은공간", emoji: "🪑" },
 };
 const GRADE_STYLE: Record<string, { bg: string; label: string }> = { 검증: { bg: "#5f7355", label: "검증" }, 참고: { bg: "#9c6b3f", label: "참고" }, 후보: { bg: "#a8927a", label: "후보" } };
-const TONES = ["#6f4e37", "#5f7355", "#9c6b3f", "#3a2e28", "#8a5a24"];
+// 🎨 2026-07-25: 초록(#5f7355)이 섞여 브라운 카드들과 안 어울려 "조잡하다"는 피드백 → 전부 사이트 브랜드
+//   톤(에스프레소·로스팅 브라운·카라멜, 명도만 다르게)으로 통일. 진한→연한 순.
+const TONES = ["#2b2018", "#4a3220", "#6f4e37", "#8a5a24", "#9c6b3f"];
 
 // 홈 잡지 카드 — 모듈 스코프(컴포넌트 내부 정의 금지). 내부에 두면 렌더마다 재마운트되어 뒤로가기/탭전환이 느려짐.
+// 2026-07-25: 높이 압축 피드백 — 패딩·폰트·여백 축소, identity 2줄→1줄.
 const HeadlineCard = memo(function HeadlineCard({ c, kicker, tone, onOpen }: { c: DCafe; kicker: string; tone: number; onOpen: (id: number) => void }) {
   return (
     <button onClick={() => onOpen(c.id)} className="w-full text-left rounded-2xl overflow-hidden shadow-md mb-4" style={{ background: TONES[tone] }}>
-      <div className="p-5 text-[#f4ece0]">
-        <div className="text-[10px] tracking-[0.25em] uppercase text-[#e8d4b0] mb-2">{kicker}</div>
+      <div className="p-3.5 text-[#f4ece0]">
+        <div className="text-[9px] tracking-[0.2em] uppercase text-[#e8d4b0] mb-1.5">{kicker}</div>
         <div className="flex items-center gap-2 mb-1">
-          <h2 className="text-2xl font-bold leading-tight">{c.name}</h2>
+          <h2 className="text-lg font-bold leading-tight">{c.name}</h2>
           {c.grade && <span className="text-[10px] bg-[#f4ece0]/20 px-2 py-0.5 rounded-full">{c.grade}</span>}
           {c.isNew && <span className="text-[10px] bg-[#ffd9a0]/90 text-[#3a2a12] font-bold px-2 py-0.5 rounded-full">NEW</span>}
         </div>
-        <div className="text-[12px] text-[#e8d4b0] mb-2">{c.area} · 리뷰 {c.count ?? 0}건</div>
-        {c.identity && <p className="text-[13px] text-[#f0e6d4] leading-relaxed mb-3 line-clamp-2">{c.identity}</p>}
+        <div className="text-[11px] text-[#e8d4b0] mb-1.5">{c.area} · 리뷰 {c.count ?? 0}건</div>
+        {c.identity && <p className="text-[12px] text-[#f0e6d4] leading-snug mb-2 line-clamp-1">{c.identity}</p>}
         {c.beanNote.length > 0 && <div className="flex flex-wrap gap-1.5">{c.beanNote.map((b) => <span key={b} className="text-[10px] bg-[#f4ece0]/15 px-2 py-0.5 rounded-full">{b}</span>)}</div>}
       </div>
     </button>
