@@ -25,7 +25,7 @@ export const BEHAVIOR_BOT_ANON_IDS_SQL = `
   SELECT t.anon_id
   FROM traffic_events t
   LEFT JOIN user_consents u ON u.anon_id = t.anon_id
-  WHERE COALESCE(u.user_agent, '') !~* 'bot|crawl|spider|slurp|bingpreview|facebookexternalhit|headless|preview'
+  WHERE COALESCE(u.user_agent, '') !~* 'bot|crawl|spider|slurp|bingpreview|facebookexternalhit|headless|preview|meta-externalagent'
     AND COALESCE(t.src, '') !~* 'findelio|blinkx|semrush|ahrefs|dataprovider|dotbot|petalbot|yandex|mj12|serpstat'
     AND COALESCE(t.src, '') NOT IN ('spam')
     AND NOT COALESCE(u.internal, false)
@@ -36,6 +36,14 @@ export const BEHAVIOR_BOT_ANON_IDS_SQL = `
      AND bool_or(COALESCE(u.user_agent, '') ~* 'Mobile|iPhone|Android') = false
 `;
 
+// 🤖 Meta 링크미리보기 크롤러(2026-07-26 발견) — 카페 공유링크(?cafe=ID)가 페이스북/인스타/왓츠앱/
+//   메신저/스레드 어디든 붙여넣어지는 순간, 사람이 클릭 안 해도 Meta가 자동으로 그 URL을 가져가
+//   미리보기 카드를 생성한다(UA에 박힌 공식 문서 URL로 확정: developers.facebook.com/docs/sharing/
+//   webmasters/crawler). 예전 시그니처 facebookexternalhit는 이미 걸렀지만 Meta가 새 UA
+//   'meta-externalagent'로 갈아탄 뒤로는 안 걸리고 있었다. 데스크톱 UA+direct/internal 출처+
+//   페이지 2개(본문+오리지 og-image 등 후속요청)라 기존 행동기반 필터(경로<2)도 통과했음
+//   — 실측: anon_id 577개(2026-07-18~), 하루 최대 247건(07-23). "오늘 9명 중 실사람 몇?" CEO
+//   질문으로 발견. 확정 봇 시그니처라 오탐 위험 없음(실브라우저 UA엔 이 문자열이 나올 수 없음).
 // 🕵️ 필터조합 전수순회 스크래퍼(2026-07-25 발견) — naver referrer로 위 3개 신호를 전부 통과하는 스크래퍼가
 //   실제로 있었다(#503 사고 조사 중 실측 발견): 검증 리퍼러(naver)+데스크톱 UA로 위장하고, 짧은 시간에
 //   서로 다른 /area/{구}/{취향필터} 조합을 기계적으로 대량 순회(예: 7분간 19종 조합·49건, 초단위 간격).
@@ -58,7 +66,7 @@ export const EXPLICIT_BOT_ANON_IDS_SQL = `
   SELECT DISTINCT t.anon_id
   FROM traffic_events t
   LEFT JOIN user_consents u ON u.anon_id = t.anon_id
-  WHERE COALESCE(u.user_agent, '') ~* 'bot|crawl|spider|slurp|bingpreview|facebookexternalhit|headless|preview'
+  WHERE COALESCE(u.user_agent, '') ~* 'bot|crawl|spider|slurp|bingpreview|facebookexternalhit|headless|preview|meta-externalagent'
      OR COALESCE(t.src, '') ~* 'findelio|blinkx|semrush|ahrefs|dataprovider|dotbot|petalbot|yandex|mj12|serpstat'
      OR COALESCE(t.src, '') IN ('spam')
      OR COALESCE(u.internal, false)
