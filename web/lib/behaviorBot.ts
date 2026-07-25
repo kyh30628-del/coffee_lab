@@ -26,3 +26,27 @@ export const BEHAVIOR_BOT_ANON_IDS_SQL = `
      AND COUNT(DISTINCT date_trunc('day', t.ts AT TIME ZONE 'Asia/Seoul')) < 2
      AND bool_or(COALESCE(u.user_agent, '') ~* 'Mobile|iPhone|Android') = false
 `;
+
+// 명시적 봇(UA·크롤러 referrer·internal) anon_id — 위 BEHAVIOR_BOT_ANON_IDS_SQL은 이 조건을 만족하는
+// 이벤트를 WHERE에서 먼저 걷어내고 나머지로만 행동신호를 판정하므로(노이즈가 '다중페이지'로 오분류되는
+// 버그 방지), 모든 이벤트가 명시적 봇 조건인 anon_id는 GROUP BY 결과 자체에 나타나지 않는다 → 아래
+// BOT_ANON_IDS_SQL의 UNION으로 따로 합쳐야 새지 않는다(#503, traffic_events 집계에서 새던 버그).
+export const EXPLICIT_BOT_ANON_IDS_SQL = `
+  SELECT DISTINCT t.anon_id
+  FROM traffic_events t
+  LEFT JOIN user_consents u ON u.anon_id = t.anon_id
+  WHERE COALESCE(u.user_agent, '') ~* 'bot|crawl|spider|slurp|bingpreview|facebookexternalhit|headless|preview'
+     OR COALESCE(t.src, '') ~* 'findelio|blinkx|semrush|ahrefs|dataprovider|dotbot|petalbot|yandex|mj12|serpstat'
+     OR COALESCE(t.src, '') IN ('internal', 'spam')
+     OR COALESCE(u.internal, false)
+`;
+
+// 봇/노이즈 anon_id 단일 소스(#503) — 명시적 봇 UNION 행동기반 봇. traffic_events 기반이든
+// user_consents 기반이든, "봇 제외"가 필요한 모든 집계(헤드라인 카드·14일 추이 그래프·기타 트래픽
+// 통계)는 이 상수 하나만 참조한다. 필터 기준이 갈라지면 같은 날짜의 방문자·페이지뷰 수치가
+// 화면마다 달라진다(예: 469 vs 467) — 그 재발을 막는 게 이 상수의 존재 이유다.
+export const BOT_ANON_IDS_SQL = `
+  SELECT anon_id FROM (${EXPLICIT_BOT_ANON_IDS_SQL}) e
+  UNION
+  SELECT anon_id FROM (${BEHAVIOR_BOT_ANON_IDS_SQL}) b
+`;
