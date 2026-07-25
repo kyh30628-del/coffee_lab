@@ -153,3 +153,4 @@
 | 2026-07-24 14:08 | #486 | [개발] instagram_url enrich 좌표전용매칭 근본버그 — 상호명 검사 없음(coord#244  | 8ea3e609 | - | scripts/instagram-backfill.mjs: 좌표(165m)만+link형식 매칭에 상호명 코어토큰 일치(lib/reviewQuality.ts coreTokens 재사용 |
 | 2026-07-25 01:10 | #493 | [개발] 협업 #245: #486 instagram_url enrich 재검토 요청 — 배포 후에도 잔존 오 | 9b137e1d | - | lib/reviewQuality.ts: coreTokensDetail export(venueOnly 노출) + scripts/instagram-backfill.mjs nameMat |
 | 2026-07-25 03:22 | #499 | [레드팀 신규] cron-sentinel 교차오염 탐지 사각 — 동일브랜드 타지점 인용문 복제 | f59e9b23 | - | app/api/cron-sentinel/route.ts scanFranchiseBranchPollution: 브랜드 접미사(예 서창점) 완전일치뿐 아니라 마커를 뗀 지점토큰(서창) |
+| 2026-07-25 03:28 | #497 | [룰갭 P59] 체험공방(도자기 원데이클래스)이 "테마카페"로 오분류 — 카페맥락 0인 체험후기가 참고/검증 | 35576532 | - | lib/reviewQuality.ts: CRAFT_WORKSHOP_ACTIVITY 하드게이트 신규(원데이클래스·물레체험·핸드빌딩·찰흙놀이·도자(기)?체험/만들기/굽기/페인팅/공방· |
