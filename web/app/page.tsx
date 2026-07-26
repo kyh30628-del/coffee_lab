@@ -30,6 +30,22 @@ const SEARCH_EXAMPLES = ["비 오는 날 혼자 조용히", "감성 사진 데�
 // 쇼케이스 1차 성과 집계(노출·클릭·재생)
 const trackPromo = (cafeId: number, type: "view" | "click" | "play") => { fetch("/api/promo-event", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cafeId, type }) }).catch(() => {}); };
 
+// 📓 스프링노트 제본 — 금속 코일 링(펀치홀 + 브론즈 링 + 인접 링 사이 와이어)을 SVG로 그려 타일링.
+//    점만 찍은 v4가 "점만 있으면 뭐냐"는 피드백을 받아, 실제 코일이 종이를 관통하는 모양으로 재작업(2026-07-26).
+const SPRING_RING_SVG =
+  "<svg xmlns='http://www.w3.org/2000/svg' width='28' height='22'>" +
+  "<defs><linearGradient id='g2' x1='0' y1='0' x2='1' y2='1'>" +
+  "<stop offset='0' stop-color='#f6e2b6'/><stop offset='0.45' stop-color='#b8823f'/><stop offset='1' stop-color='#5c3a1e'/>" +
+  "</linearGradient></defs>" +
+  "<path d='M-3 15 L9 6' stroke='url(%23g2)' stroke-width='2' opacity='0.8' stroke-linecap='round'/>" +
+  "<path d='M19 6 L31 15' stroke='url(%23g2)' stroke-width='2' opacity='0.8' stroke-linecap='round'/>" +
+  "<ellipse cx='14' cy='17' rx='3.4' ry='2.8' fill='rgba(43,32,24,0.5)'/>" +
+  "<ellipse cx='14' cy='17' rx='2.1' ry='1.7' fill='rgba(43,32,24,0.82)'/>" +
+  "<ellipse cx='14' cy='9.5' rx='6.6' ry='8.4' fill='none' stroke='url(%23g2)' stroke-width='2.4' transform='rotate(-9 14 9.5)'/>" +
+  "<path d='M9 5 A6.6 8.4 -9 0 1 15 1.4' fill='none' stroke='%23fdf1d6' stroke-width='1' opacity='0.6' stroke-linecap='round'/>" +
+  "</svg>";
+const SPRING_RING_BG = `url("data:image/svg+xml,${SPRING_RING_SVG}")`;
+
 const REGIONS: Record<string, string[]> = {
   서울: ["강남구","강동구","강북구","강서구","관악구","광진구","구로구","금천구","노원구","도봉구","동대문구","동작구","마포구","서대문구","서초구","성동구","성북구","송파구","양천구","영등포구","용산구","은평구","종로구","중구","중랑구"],
   경기: ["수원시","성남시","고양시","용인시","부천시","안산시","안양시","남양주시","화성시","평택시","의정부시","시흥시","파주시","김포시","광명시","광주시","군포시","하남시","오산시","양주시","구리시","안성시","포천시","의왕시","여주시","동두천시","과천시","이천시","양평군","가평군","연천군"],
@@ -1345,13 +1361,15 @@ export default function Home() {
       {/* 홈 = 잡지 1면 */}
       {tab === "home" && (
         <div className="flex-1 overflow-y-auto" style={{ paddingBottom: "3.25rem" }}>
-          {/* 📓 스프링노트 제본 — 홈 진입 즉시 "노트"임을 알리는 한 번의 확실한 신호(반복 안 해도 됨).
-              실제 카드폭(max-w-2xl+px-5)에 맞춰 좌우 인셋 동일하게. */}
+          {/* 📓 스프링노트 제본(2026-07-26, C안 확정 배포) — 펀치홀 + 브론즈 금속 링 + 링 사이
+              연결 와이어까지 그려 실제 스프링 코일이 종이를 관통하는 모양으로 표현. */}
           <div aria-hidden className="max-w-2xl mx-auto px-5 pt-3">
             <div style={{
-              height: 14,
-              backgroundImage: "radial-gradient(circle, rgba(43,32,24,0.3) 0 2.6px, transparent 2.6px)",
-              backgroundSize: "26px 100%", backgroundRepeat: "repeat-x", backgroundPosition: "13px center",
+              height: 22,
+              backgroundImage: SPRING_RING_BG,
+              backgroundSize: "28px 22px",
+              backgroundRepeat: "repeat-x",
+              backgroundPosition: "0 center",
             }} />
           </div>
           <div className="max-w-2xl mx-auto px-5 pt-4 pb-6" style={{
