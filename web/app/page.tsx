@@ -30,17 +30,15 @@ const SEARCH_EXAMPLES = ["비 오는 날 혼자 조용히", "감성 사진 데�
 // 쇼케이스 1차 성과 집계(노출·클릭·재생)
 const trackPromo = (cafeId: number, type: "view" | "click" | "play") => { fetch("/api/promo-event", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cafeId, type }) }).catch(() => {}); };
 
-// 📓 스프링노트 제본 — 개별 링을 넓은 간격으로 분리해 진짜 스프링처럼 보이게(2026-07-26 v7 확정).
-//    이전(v4~v6)은 링 사이 와이어가 서로 이어져 하나의 물결/꼬임띠처럼 보이는 문제가 있었음 —
-//    실제 크롬 브라우저로 렌더링 확인 후, 와이어를 없애고 링 간격을 넓혀 "분리된 링들"로 재작업.
+// 📓 스프링노트 제본 — "분리된 링"이 아니라 실제 스프링을 옆에서 편 모양의 연속 지그재그 와이어로
+//    표현(2026-07-26 v8 확정, 실브라우저 스크린샷으로 직접 확인 후 반영). "링만 있으면 뭐냐, 쇠
+//    와이어를 표현하라"는 피드백 반영 — 뾰족하게 꺾이는 금속 코일 라인 하나가 계속 이어짐.
 const SPRING_RING_SVG =
-  "<svg xmlns='http://www.w3.org/2000/svg' width='36' height='26'>" +
-  "<defs><linearGradient id='g2' x1='0' y1='0' x2='1' y2='1'>" +
+  "<svg xmlns='http://www.w3.org/2000/svg' width='22' height='26'>" +
+  "<defs><linearGradient id='g2' x1='0' y1='0' x2='0' y2='1'>" +
   "<stop offset='0' stop-color='%23f6e2b6'/><stop offset='0.5' stop-color='%23b8823f'/><stop offset='1' stop-color='%235c3a1e'/>" +
   "</linearGradient></defs>" +
-  "<ellipse cx='18' cy='13' rx='5.5' ry='8' fill='none' stroke='url(%23g2)' stroke-width='2.2'/>" +
-  "<ellipse cx='18' cy='13' rx='2.4' ry='4' fill='rgba(43,32,24,0.4)'/>" +
-  "<path d='M15 6 A5.5 8 0 0 1 19 4.5' fill='none' stroke='%23fdf1d6' stroke-width='1' opacity='0.6' stroke-linecap='round'/>" +
+  "<path d='M-2 21 L9 6 L20 21 L31 6' fill='none' stroke='url(%23g2)' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/>" +
   "</svg>";
 const SPRING_RING_BG = `url("data:image/svg+xml,${SPRING_RING_SVG}")`;
 
@@ -1359,12 +1357,12 @@ export default function Home() {
       {/* 홈 = 잡지 1면 */}
       {tab === "home" && (
         <div className="flex-1 overflow-y-auto" style={{ paddingBottom: "3.25rem" }}>
-          {/* 📓 스프링노트 제본(2026-07-26, v7 확정) — 넓은 간격의 분리된 브론즈 링(실브라우저 확인 완료). */}
+          {/* 📓 스프링노트 제본(2026-07-26, v8 확정) — 연속 지그재그 와이어(실브라우저 확인 완료). */}
           <div aria-hidden className="max-w-2xl mx-auto px-5 pt-3">
             <div style={{
               height: 26,
               backgroundImage: SPRING_RING_BG,
-              backgroundSize: "36px 26px",
+              backgroundSize: "22px 26px",
               backgroundRepeat: "repeat-x",
               backgroundPosition: "0 center",
             }} />
