@@ -23,6 +23,10 @@ async function areaTermsFor(id: number, area?: string | null): Promise<string[]>
 async function addrFor(id: number): Promise<string> {
   try { const r = (await sql`SELECT address FROM cafes WHERE id=${id}`) as any[]; return r[0]?.address || ""; } catch { return ""; }
 }
+// 카페 네이버 업종 카테고리 — 룰갭 P61(naver_category 비F&B 조합신호) 판별용
+async function naverCategoryFor(id: number): Promise<string> {
+  try { const r = (await sql`SELECT naver_category FROM cafes WHERE id=${id}`) as any[]; return r[0]?.naver_category || ""; } catch { return ""; }
+}
 
 type RawItem = { source: "google" | "blog" | "youtube"; text: string; title?: string; desc?: string; time?: number; link?: string; date?: string; srcName?: string };
 
@@ -592,8 +596,9 @@ export async function synthAndStore(cafe: { id: number; name: string; area: stri
 
   const area = await areaTermsFor(cafe.id, cafe.area);
   const addr = await addrFor(cafe.id);
+  const naverCategory = await naverCategoryFor(cafe.id);
   const decisions = await loadDecisions(cafe.id); // 과거 판정 AI 결정 유지(동명/무관 제거 영구)
-  let result = collectAndSynthesize(cleanCafeName(cafe.name), area, sources, { decisions, address: addr });
+  let result = collectAndSynthesize(cleanCafeName(cafe.name), area, sources, { decisions, address: addr, naverCategory });
 
   // 서버측 보조 LLM 재판정. ⚠️ 기본 OFF — 실시간 API($1/$5)는 비싸므로 안 씀(INLINE_JUDGE=1일 때만).
   //   판정은 cron-batch-judge(Batches 50%할인) + 로컬 구독 드레인이 담당. 여기선 규칙+과거결정만 적용,
@@ -605,7 +610,7 @@ export async function synthAndStore(cafe: { id: number; name: string; area: stri
     if (verdicts) {
       const whitelist = new Set<string>();
       for (const it of items) { const v = verdicts.get(it.i); if (v?.about && v.helpful) whitelist.add(result.borderline[it.i].key); }
-      if (whitelist.size > 0) { result = collectAndSynthesize(cleanCafeName(cafe.name), area, sources, { whitelist, address: addr }); rescued = whitelist.size; }
+      if (whitelist.size > 0) { result = collectAndSynthesize(cleanCafeName(cafe.name), area, sources, { whitelist, address: addr, naverCategory }); rescued = whitelist.size; }
     }
   }
   const stored = await storeResult(cafe.id, cafe.name, result, false);
@@ -619,7 +624,7 @@ export async function getAuditCandidates(cafe: { id: number; name: string; area:
   await ensureCols();
   const raw = await loadRaw(cafe.id);
   if (!raw.length) return { candidates: [], hasRaw: false };
-  const result = collectAndSynthesize(cleanCafeName(cafe.name), await areaTermsFor(cafe.id, cafe.area), rawToSources(raw), { address: await addrFor(cafe.id) });
+  const result = collectAndSynthesize(cleanCafeName(cafe.name), await areaTermsFor(cafe.id, cafe.area), rawToSources(raw), { address: await addrFor(cafe.id), naverCategory: await naverCategoryFor(cafe.id) });
   // 토큰 최적화: AI에는 '경계(규칙이 애매)'만 보냄(70~90% 절감). 명확한 검증·참고는 규칙 신뢰.
   return { candidates: result.borderline, hasRaw: true };
 }
@@ -631,7 +636,7 @@ export async function applyDecisions(cafe: { id: number; name: string; area: str
   if (!raw.length) { await sql`UPDATE cafes SET llm_judged_at=now() WHERE id=${cafe.id}`; return { id: cafe.id, approved: 0, grade: null, published: false, reason: "raw 없음" }; }
   // 기존 결정과 병합 → 영구 저장(재합성해도 유지). 새 판정이 우선.
   const merged = { ...(await loadDecisions(cafe.id)), ...decisions };
-  const result = collectAndSynthesize(cleanCafeName(cafe.name), await areaTermsFor(cafe.id, cafe.area), rawToSources(raw), { decisions: merged, address: await addrFor(cafe.id) });
+  const result = collectAndSynthesize(cleanCafeName(cafe.name), await areaTermsFor(cafe.id, cafe.area), rawToSources(raw), { decisions: merged, address: await addrFor(cafe.id), naverCategory: await naverCategoryFor(cafe.id) });
   await sql`UPDATE cafes SET judge_decisions=${safeJson(merged)} WHERE id=${cafe.id}`;
   const stored = await storeResult(cafe.id, cafe.name, result, true);
   const approved = Object.values(merged).filter(Boolean).length;
@@ -650,7 +655,7 @@ export async function backfillYouTube(cafe: { id: number; name: string; area: st
   if (!yt.snippets.length) return "none";
   for (const s of yt.snippets) raw.push({ source: "youtube", text: s.text, title: s.title, desc: s.desc, time: s.time, link: s.link, date: s.date, srcName: s.source });
   await sql`UPDATE cafes SET raw_reviews=${safeJson(cleanRaw(raw))}, raw_collected_at=now() WHERE id=${cafe.id}`;
-  const result = collectAndSynthesize(cleanCafeName(cafe.name), await areaTermsFor(cafe.id, cafe.area), rawToSources(raw), { address: await addrFor(cafe.id) });
+  const result = collectAndSynthesize(cleanCafeName(cafe.name), await areaTermsFor(cafe.id, cafe.area), rawToSources(raw), { address: await addrFor(cafe.id), naverCategory: await naverCategoryFor(cafe.id) });
   await storeResult(cafe.id, cafe.name, result, false);
   return "added";
 }

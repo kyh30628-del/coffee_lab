@@ -78,7 +78,7 @@ function toQuote(text: string, name = "", maxLen = 90): string {
 }
 const dedupeKey = (s: string) => s.toLowerCase().replace(/\s+/g, "").slice(0, 60);
 
-export function collectAndSynthesize(name: string, area: string[], sources: RawSource[], opts?: { whitelist?: Set<string>; decisions?: Record<string, boolean>; address?: string }): CollectResult {
+export function collectAndSynthesize(name: string, area: string[], sources: RawSource[], opts?: { whitelist?: Set<string>; decisions?: Record<string, boolean>; address?: string; naverCategory?: string }): CollectResult {
   const whitelist = opts?.whitelist;
   const verifiedReviews: Review[] = [];   // 합성 입력(검증, 출처가중 반영)
   const perSource: { source: string; raw: number; kept: number }[] = [];
@@ -108,7 +108,7 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
       seen.add(key);
       stats.raw++;   // 고유 글만 '전체'로 집계 → 전체 = 노이즈 + 옥석 (정확히 맞음)
 
-      const rule = verifyReview({ title: t.title, body: t.desc ?? t.text, name, areaTerms: area, addr: opts?.address, link: t.link, source: kind });
+      const rule = verifyReview({ title: t.title, body: t.desc ?? t.text, name, areaTerms: area, addr: opts?.address, link: t.link, naverCategory: opts?.naverCategory, source: kind });
 
       // 규칙상 on-topic(검증·참고 또는 경계)은 Sonnet 최종 심사 후보로 노출
       if (rule.verdict !== "rejected" || rule.borderline) auditItems.push({ key, title: t.title, body: t.desc ?? t.text });

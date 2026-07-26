@@ -23,6 +23,7 @@ export type QualityInput = {
   areaTerms?: string[]; // 지역어(동명 카페·관련성 검증)
   addr?: string;        // 카페 등록주소(도로명) — 리뷰 주소 불일치 검증용
   link?: string;        // 출처 URL — 비방문 게시판(중고나라·창업나무 등) 판별용
+  naverCategory?: string; // 네이버 업종 카테고리 — 비F&B 조합신호(룰갭 P61) 판별용
   source: SourceKind;
 };
 
@@ -169,7 +170,10 @@ const CAFE_CONTEXT = /(카페|커피|라떼|아메리카노|에스프레소|콜�
 //   — 음식/음료 맛 묘사·감성적 글쓰기·영어 외래어 관용구로 흔히 쓰이는 추상명사 카페명이 무관 글(타 레스토랑
 //   후기·지역 축제 공지·인테리어 컨설팅 글 등)의 우연한 단어 일치로 오염됐다. 부가어(카페 접두/접미)가 붙은
 //   이름은 위 nameCommonPhrase 판정에서 coreTokensDetail의 유일 식별토큰(onlyTok)까지 함께 대조한다.
-const COMMON_WORD_NAMES = new Set(["일상적", "마찬가지", "그리고", "오래오래", "이러쿵", "어쩌면", "자수성가", "멍하니", "오늘의날씨", "소소한일상", "하루에", "여기서", "인디고", "행복이가득한집", "어느멋진날", "나무그늘아래", "버라이어티", "시너지", "온기", "크래프트", "티타임", "팔레트", "퍼스널"]);
+// 룰갭 P61(2026-07-26, coord#249, decisions#507): "동네방네"는 "이 동네" 관용구로 흔히 오귀속되는 2~3음절
+//   일반명사 카페명 — 표시리뷰 전량이 무관 업체(김밥집/베이커리/개인블로그) 후기였다(id1819 실측, naver_category
+//   서비스,산업>통신). 로직 변경 없이 사전 등재만으로 근접 맥락판정(ctxNearName)이 적용된다.
+const COMMON_WORD_NAMES = new Set(["일상적", "마찬가지", "그리고", "오래오래", "이러쿵", "어쩌면", "자수성가", "멍하니", "오늘의날씨", "소소한일상", "하루에", "여기서", "인디고", "행복이가득한집", "어느멋진날", "나무그늘아래", "버라이어티", "시너지", "온기", "크래프트", "티타임", "팔레트", "퍼스널", "동네방네"]);
 // ★ 비카페 업종이 '제목을 지배'할 때의 가드 — 매장·음료·주문·메뉴·좌석은 피부관리/필라테스 등 비카페도 흔히 써서
 //   가드를 뚫는다('피부관리 하이드뷰티…매장 전화번호'→결). 이 경로엔 진짜 커피전문 어휘(카페·커피·디저트·원두…)만 인정(2026-06-28).
 const CAFE_CONTEXT_STRONG = /(카페|커피|라떼|아메리카노|에스프레소|콜드브루|핸드드립|디저트|케이크|베이커리|빵|제과|원두|바리스타|아인슈페너|브런치|로스팅|카공|cafe|coffee|latte)/i;
@@ -607,6 +611,22 @@ export function quoteMatchConfidence(name: string, quote: string, areaTerms: str
 const WEAK_IDENTITY_TOKEN = { has: (t: string) => getListSetSync("identity.weak_token").has(t) };
 const OFFTOPIC_SPAM = /(코인\s*해외선물|해외\s*선물\s*(거래|시세|투자|매매)|선물\s*거래소|암호화폐|가상화폐|비트코인|비트겟|바이낸스|재테크\s*(추천|비법|정보|수익)|주식\s*(리딩|종목추천|투자문의|급등주)|대출\s*(상담|한도|이자|갈아타기|추천)|아파트\s*분양|오피스텔\s*분양|분양가|모델하우스|청약\s*(가점|통장|경쟁률)|재개발\s*(구역|조합|호재)|재건축\s*(조합|아파트|호재)|입주\s*예정|주상복합\s*분양|최고\s*\d+\s*층|\d+\s*개동|전원주택\s*(급매|매매|분양|답사)|급매물|철근콘크리트\s*주택|주택\s*답사기|토지\s*(매매|급매|투자))/;
 
+// 🏭 [룰갭 P61] naver_category 비F&B 조합신호(coordination#249, decisions#507) — naver_category가 카페/디저트/
+//   커피/베이커리 등 F&B 대분류가 아닌데(제조업>떡류제조·직업기술교육>바리스타·서비스산업>통신 등) 상호가 카페
+//   맥락어(커피·로스팅·원두 등)와 우연히 겹치면(예: "○○로스터스"=바리스타 교육업체) 기존 CAFE_CONTEXT 가드가
+//   무력화된다(id2286·id4335·id1819 3건 확인 — n=3 corroborate). 대조군(퀸스타운·뿌뜨리 앤틱빈티지 등 6건)은
+//   F&B 대분류거나 카테고리 없음/제조업>커피가공(정상 로스터리 겸영)이라 이 신호가 꺼져 오탐 없음(표본검증 확정).
+const FNB_MAJOR_CATEGORY = /(카페|디저트|커피|베이커리|제과|빵|양식|한식|중식|일식|분식|브런치|찻집|티룸|티하우스|레스토랑|음식점)/;
+export function isNonFnbCategory(naverCategory?: string): boolean {
+  const c = (naverCategory || "").trim();
+  if (!c) return false; // 카테고리 없음 — grandfather 카페 오제거 방지(인천 사태 교훈), 신호 OFF
+  if (c.includes("제조업>커피가공")) return false; // 정상 로스터리 겸영
+  return !FNB_MAJOR_CATEGORY.test(c);
+}
+// 리뷰 안의 '다른 상호명' 후보 — 고유명사(2~8자)에 카페류 접미사가 바로 붙은 표기. 자기 상호와 일치하면
+//   (아래 verifyReview 호출부에서 nameHit/coreTokens 대조) 제외 — 진짜 후기의 자기소개는 그대로 보존.
+const OTHER_BIZ_NAME = /[가-힣]{2,8}(로스터스|로스터즈|로스터리|베이커리|카페|까페|커피|디저트|찻집|티룸|티하우스)/g;
+
 export function verifyReview(input: QualityInput): QualityResult {
   const title = (input.title ?? "").trim();
   const body = (input.body ?? "").trim();
@@ -742,6 +762,30 @@ export function verifyReview(input: QualityInput): QualityResult {
       && !CAFE_CONTEXT_STRONG.test(fullL)
       && /(스리랑카|여행기|해외여행|배낭여행|현지인|수도\s|항공권|비행기|공항|배낭|입국|환전)/.test(fullL)) {
     return { verdict: "rejected", score: 3, reasons: ["동음이의 해외 지명(카페 아님)"], signals: sig };
+  }
+
+  // 🏭 [룰갭 P61] naver_category 비F&B 조합신호 적용(coordination#249, decisions#507): isNonFnbCategory가
+  //   ON일 때만(비어있음·제조업>커피가공·F&B 대분류는 위 헬퍼가 이미 걸러 신호 자체가 꺼짐) — 리뷰 안에
+  //   자기 상호와 불일치하는 '다른 상호명'(고유명사+로스터스/베이커리 등 접미사)이 있거나, 우리 카페 지역어는
+  //   전무한데 다른 지역(콜로키얼 핫플동·생활권·구)이 등장하면 그 리뷰를 거절한다(id2286·id4335·id1819 실측).
+  if (isNonFnbCategory(input.naverCategory)) {
+    const fullT = `${title} ${body}`;
+    const otherBizName = (fullT.match(OTHER_BIZ_NAME) ?? [])
+      .find((hit) => { const hn = norm(hit); return !nameHit(hit, hn, input.name) && !distinct.some((tk) => hn.includes(norm(tk))); });
+    // 다른 지역 혼입: 알려진 지명(콜로키얼 핫플동·신도시/생활권·자치구)이 우리 카페 지역어와 불일치할 때만
+    //   (조사 결합 대비 짧은 조사 접미 제거 후 사전 정확매칭 — 흔한 동사어 '운동'·'감동' 오탐 방지).
+    const JOSA_STRIP = /(에서|에게|에는|에도|에만|으로|로는|로도|이라|이나|은|는|이|가|을|를|도|만|의|와|과|랑|나|야|로)$/;
+    const otherAreaWord = fullT.split(/[\s,.·|/\\()]+/).filter(Boolean).find((wRaw) => {
+      const stripped = wRaw.replace(JOSA_STRIP, "");
+      const w = stripped.length >= 2 ? stripped : wRaw;
+      const bare = w.replace(/(동|읍|면|가|리|구|시)$/, "");
+      const isKnownArea = LOC_LIKE.test(w) || (bare.length >= 2 && (LOC_LIKE.test(bare) || AREA_NAME.has(bare) || ALL_GU.some((g) => norm(guShort(g)) === norm(bare))));
+      if (!isKnownArea) return false;
+      return !areaTerms.some((a) => { const an = norm(a).replace(/(동|읍|면|가|리|구|시)$/, ""); return norm(a) === norm(w) || (an.length >= 2 && an === norm(bare)); });
+    });
+    if ((otherBizName || otherAreaWord) && !areaPresent) {
+      return { verdict: "rejected", score: 6, reasons: [otherBizName ? `naver_category 비F&B 조합 — 다른 상호명 혼입('${otherBizName}')` : `naver_category 비F&B 조합 — 다른 지역 혼입('${otherAreaWord}')`], signals: sig };
+    }
   }
 
   // ---- 하드 탈락(명백한 노이즈) ----
