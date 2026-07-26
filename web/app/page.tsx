@@ -106,6 +106,35 @@ const GRADE_STYLE: Record<string, { bg: string; label: string }> = { 검증: { b
 //   톤(에스프레소·로스팅 브라운·카라멜, 명도만 다르게)으로 통일. 진한→연한 순.
 const TONES = ["#2b2018", "#4a3220", "#6f4e37", "#8a5a24", "#9c6b3f"];
 
+// 📓 노트에 단어를 하나씩 써내려가는 효과(2026-07-26) — "글자 단위 아니라 단어 단위" 피드백.
+//   ⚠️ CSS animation/transition을 dcn-shimmer-dark(background-clip:text)의 자식에 걸면 그
+//   자식이 별도 GPU 레이어로 승격되면서 부모의 클립된 그라데이션이 아예 안 보이는(글자 통째로
+//   실종) 브라우저 렌더링 버그를 실브라우저에서 발견 — 그래서 CSS 애니메이션이 아니라 React
+//   상태(setTimeout)로 opacity를 "그냥 값"으로만 바꾼다(애니메이션/트랜지션 속성 자체가 없어
+//   레이어 승격이 안 됨 → 셰이더 효과가 있는 타이틀에도 안전).
+const WordReveal = memo(function WordReveal({ words, startDelay = 0, step = 0.16 }: { words: string[]; startDelay?: number; step?: number }) {
+  const [count, setCount] = useState(0);
+  const key = words.join(" ");
+  useEffect(() => {
+    // 접근성: 애니메이션 최소화 선호 시 전부 즉시 표시
+    if (typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+      setCount(words.length);
+      return;
+    }
+    setCount(0);
+    const timers = words.map((_, i) => setTimeout(() => setCount((c) => Math.max(c, i + 1)), Math.round((startDelay + i * step) * 1000)));
+    return () => timers.forEach(clearTimeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key, startDelay, step]);
+  return (
+    <>
+      {words.map((w, i) => (
+        <span key={i} style={{ opacity: i < count ? 1 : 0 }}>{w}{i < words.length - 1 ? " " : ""}</span>
+      ))}
+    </>
+  );
+});
+
 // 홈 잡지 카드 — 모듈 스코프(컴포넌트 내부 정의 금지). 내부에 두면 렌더마다 재마운트되어 뒤로가기/탭전환이 느려짐.
 // 2026-07-25: 높이 압축 피드백 — 패딩·폰트·여백 축소, identity 2줄→1줄.
 const HeadlineCard = memo(function HeadlineCard({ c, kicker, tone, onOpen, swipeable }: { c: DCafe; kicker: string; tone: number; onOpen: (id: number) => void; swipeable?: boolean }) {
@@ -1369,29 +1398,19 @@ export default function Home() {
             backgroundPosition: "0 6px",
           }}>
             <div className="text-center mb-6">
-              {/* 📓 노트에 단어를 하나씩 써내려가는 듯한 효과(2026-07-26) — 글자 단위(clip-path)가
-                  아니라 단어 단위로 각 span에 페이드+살짝 떠오르는 애니메이션을 순차 지연 적용. */}
+              {/* 📓 노트에 단어를 하나씩 써내려가는 효과(2026-07-26). WordReveal 참고. */}
               {(() => {
                 const kickerWords = "데이터로 큐레이션하는".split(" ");
                 const titleWords = (homeGu ? `${homeGu}의 오늘의 커피` : "오늘의 동네 커피").split(" ");
-                const kStep = 0.16, kDur = 0.32;
-                const kTotal = (kickerWords.length - 1) * kStep + kDur + 0.08;
-                const tStep = 0.18;
+                const kStep = 0.18;
+                const kTotal = kickerWords.length * kStep + 0.15;
                 return (
                   <>
-                    <div className="text-[10px] tracking-[0.3em] uppercase text-[#7a5122] dcn-anim">
-                      {kickerWords.map((w, i) => (
-                        <span key={i} style={{ display: "inline-block", animation: `dcnWordIn ${kDur}s ease-out ${i * kStep}s both` }}>
-                          {w}{i < kickerWords.length - 1 ? " " : ""}
-                        </span>
-                      ))}
+                    <div className="text-[10px] tracking-[0.3em] uppercase text-[#7a5122]">
+                      <WordReveal words={kickerWords} step={kStep} />
                     </div>
-                    <div className="text-xl font-bold border-y-2 border-[#2b2018] py-2 mt-1 dcn-shimmer-dark dcn-anim">
-                      {titleWords.map((w, i) => (
-                        <span key={i} style={{ display: "inline-block", animation: `dcnWordIn 0.36s ease-out ${kTotal + i * tStep}s both` }}>
-                          {w}{i < titleWords.length - 1 ? " " : ""}
-                        </span>
-                      ))}
+                    <div className="text-xl font-bold border-y-2 border-[#2b2018] py-2 mt-1 dcn-shimmer-dark">
+                      <WordReveal words={titleWords} startDelay={kTotal} step={0.2} />
                     </div>
                   </>
                 );

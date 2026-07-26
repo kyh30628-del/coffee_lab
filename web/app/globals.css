@@ -117,7 +117,7 @@ body {
   .dcn-spotlight-out { animation: none; opacity: 0; }
 }
 
-/* 📓 노트에 단어를 하나씩 써내려가는 효과 — 단어별 span에 순차 지연된 페이드+살짝 떠오름.
-   (글자 단위 clip-path는 "단어가 하나씩"이 아니라는 피드백으로 폐기, 2026-07-26) */
-@keyframes dcnWordIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
-@media (prefers-reduced-motion: reduce) { .dcn-anim, .dcn-anim * { animation: none !important; opacity: 1 !important; transform: none !important; } }
+/* 📓 노트에 단어를 하나씩 써내려가는 효과는 page.tsx의 WordReveal 컴포넌트가 담당(CSS 애니메이션이
+   아니라 React state+setTimeout으로 opacity를 바꿈) — dcn-shimmer-dark(background-clip:text) 자식에
+   animation/transition을 걸면 그 자식이 별도 GPU 레이어로 승격되며 부모의 클립된 그라데이션이 통째로
+   안 보이는 브라우저 렌더링 버그를 실브라우저에서 발견해 CSS 키프레임 대신 이 방식을 채택(2026-07-26). */
