@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
             to_char(created_at AT TIME ZONE 'Asia/Seoul', 'MM-DD') AS at
           FROM cafes WHERE published AND dong IS NULL ORDER BY area, name LIMIT ${LIMIT}`;
         break;
-      case "yt": // 유튜브 수집(누적): yt_checked_at 있는 카페(최근순)
+      case "yt": // 유튜브 확인(누적): yt_checked_at 있는 카페(최근순, 영상 발견 여부 무관 — 실제 확보수는 withYt/유튜브 확보 참조)
         cafes = await sql`SELECT id, name, area, dong, synth_grade AS grade, synth_count AS cnt, published, source,
             to_char(yt_checked_at AT TIME ZONE 'Asia/Seoul', 'MM-DD') AS at
           FROM cafes WHERE yt_checked_at IS NOT NULL ORDER BY yt_checked_at DESC LIMIT ${LIMIT}`;

@@ -463,7 +463,7 @@ export default function AdminPage() {
                       { l: "동 채움", v: `${tower.today.dongPct}%`, c: "text-stone-700 bg-stone-50 border-stone-300", m: "dongMissing" },
                       { l: "노이즈탈락(누적)", v: tower.today.noise, c: "text-stone-700 bg-stone-50 border-stone-300", m: "noise" },
                       { l: "합성대기", v: tower.today.newQueue, c: "text-amber-600 bg-amber-50 border-amber-300", m: "newQueue" },
-                      { l: "유튜브 수집(누적)", v: tower.today.ytTotal ?? 0, c: "text-rose-700 bg-rose-50 border-rose-200", m: "yt" },
+                      { l: "유튜브 확인(누적)", v: tower.today.ytTotal ?? 0, c: "text-rose-700 bg-rose-50 border-rose-200", m: "yt" },
                     ].map((t) => (
                       <button key={t.l} onClick={() => openToday(t.m, t.l)} title="클릭하면 상세 목록"
                         className={`rounded-xl border px-2 py-2 text-center transition hover:brightness-95 hover:shadow-sm cursor-pointer ${t.c}`}>
@@ -728,7 +728,7 @@ export default function AdminPage() {
                 <span className="text-[11px] text-stone-600">{jstatus.ytLast ? `최근 ${new Date(jstatus.ytLast).toLocaleString("ko-KR")}` : "미실행"}</span>
               </div>
               <div className="flex gap-4 text-[11px] text-stone-700">
-                <span>수집완료 <b className="text-stone-700">{jstatus.ytTotal?.toLocaleString()}</b>곳</span>
+                <span>확인완료 <b className="text-stone-700">{jstatus.ytTotal?.toLocaleString()}</b>곳</span>
                 <span>오늘 <b className="text-emerald-600">{jstatus.ytToday ?? 0}</b>곳</span>
                 <span>대기 <b className="text-amber-600">{jstatus.ytQueue?.toLocaleString()}</b>곳</span>
               </div>
@@ -858,7 +858,7 @@ export default function AdminPage() {
           <button onClick={openAnalytics} className="py-2.5 text-[13px] font-bold text-stone-700 bg-white border border-stone-300 rounded-xl hover:bg-stone-50">📊 접속·유입 현황{tower?.traffic?.dau != null ? ` (DAU ${tower.traffic.dau})` : ""}</button>
           <button onClick={() => setShowSubsModal(true)} className="py-2.5 text-[13px] font-bold text-stone-700 bg-white border border-stone-300 rounded-xl hover:bg-stone-50">💳 구독 카페 현황{subscribers.length ? ` (${subscribers.length})` : ""}</button>
           <button onClick={() => { setShowNL(true); loadNL(); }} className="py-2.5 text-[13px] font-bold text-stone-700 bg-white border border-stone-300 rounded-xl hover:bg-stone-50">📰 주간 뉴스레터{nlList.length ? ` (${nlList.length})` : ""}</button>
-          <button onClick={() => setShowYtModal(true)} className="py-2.5 text-[13px] font-bold text-stone-700 bg-white border border-stone-300 rounded-xl hover:bg-stone-50">📺 유튜브 수집{yt?.withYt != null ? ` (${yt.withYt})` : ""}</button>
+          <button onClick={() => setShowYtModal(true)} className="py-2.5 text-[13px] font-bold text-stone-700 bg-white border border-stone-300 rounded-xl hover:bg-stone-50">📺 유튜브 확보{yt?.withYt != null ? ` (${yt.withYt})` : ""}</button>
           <button onClick={() => { setShowVisits(true); fetch("/api/admin/visits", { headers: { "x-admin-password": pw } }).then((x) => x.json()).then((d) => { if (d.ok) setVisits(d); }); }} className="py-2.5 text-[13px] font-bold text-stone-700 bg-white border border-stone-300 rounded-xl hover:bg-stone-50">❤ 내 카페 기록{visits?.stat?.total != null ? ` (${visits.stat.total})` : ""}</button>
           <button onClick={openRotation} className="py-2.5 text-[13px] font-bold text-stone-700 bg-white border border-stone-300 rounded-xl hover:bg-stone-50">🔁 노출 로테이션 현황</button>
         </div>
@@ -901,7 +901,7 @@ export default function AdminPage() {
             <div className="absolute inset-0 bg-black/50" />
             <div className="absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto bg-stone-50 rounded-t-2xl p-4 sm:inset-0 sm:m-auto sm:max-w-md sm:h-fit sm:max-h-[85vh] sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-bold text-stone-800">📺 유튜브 수집 현황 <span className="text-[11px] text-stone-600 font-normal">보유 {yt.withYt}·오늘 {yt.checkedToday}·남은 {yt.remaining}</span></span>
+              <span className="text-sm font-bold text-stone-800">📺 유튜브 확보 현황 <span className="text-[11px] text-stone-600 font-normal">보유 {yt.withYt}·오늘 확인 {yt.checkedToday}·미확인 {yt.remaining}</span></span>
               <button onClick={() => setShowYtModal(false)} className="text-2xl text-stone-600 leading-none">×</button>
             </div>
             {yt.rows?.length > 0 ? (
@@ -922,8 +922,8 @@ export default function AdminPage() {
                   </div>
                 ))}
               </div>
-            ) : <p className="text-[12px] text-stone-600">최근 30일 유튜브 수집 없음.</p>}
-            <p className="text-[10px] text-stone-600 mt-2">유튜브 API 쿼터 한도로 매일 조금씩 수집(04:00 백필). 남은 {yt.remaining}곳 순차 진행.</p>
+            ) : <p className="text-[12px] text-stone-600">최근 30일 유튜브 확보 없음.</p>}
+            <p className="text-[10px] text-stone-600 mt-2">유튜브 API 쿼터 한도로 매일 조금씩 확인(04:00 백필). 남은 {yt.remaining}곳 순차 진행. ※ 이 "보유" 수치는 실제 영상을 찾은 카페 수 — 위 "유튜브 확인(누적)" 타일(체크만 하고 영상 못 찾은 곳 포함)과는 다른 값입니다.</p>
             </div>
           </div>
         )}
