@@ -1358,8 +1358,17 @@ export default function Home() {
             backgroundImage: "repeating-linear-gradient(to bottom, transparent 0, transparent 27px, rgba(43,32,24,0.06) 27px, rgba(43,32,24,0.06) 28px)",
             backgroundPosition: "0 6px",
           }}>
-            <div className="text-center mb-6">
-              <div className="text-[10px] tracking-[0.3em] uppercase text-[#7a5122]">데이터로 큐레이션하는</div>
+            <div className="text-center mb-6" style={{ position: "relative" }}>
+              {/* ☕ 은은한 카페 느낌(2026-07-26) — 커피잔 링 자국 + 따뜻한 원두빛 비네트, 코너에만 부드럽게. */}
+              <div aria-hidden style={{
+                position: "absolute", inset: "-20px -8px -12px", pointerEvents: "none", zIndex: 0,
+                backgroundImage:
+                  "radial-gradient(ellipse at 100% 0%, rgba(155,105,50,0.14) 0%, transparent 55%), " +
+                  "radial-gradient(ellipse at 0% 100%, rgba(120,80,40,0.08) 0%, transparent 50%), " +
+                  "radial-gradient(circle at 92% 6%, transparent 34px, rgba(120,80,40,0.10) 36px, rgba(120,80,40,0.10) 39px, transparent 41px), " +
+                  "radial-gradient(circle at 92% 6%, transparent 20px, rgba(120,80,40,0.07) 22px, rgba(120,80,40,0.07) 24px, transparent 26px)",
+              }} />
+              <div className="text-[10px] tracking-[0.3em] uppercase text-[#7a5122]" style={{ position: "relative", zIndex: 1 }}>데이터로 큐레이션하는</div>
               <div className="text-xl font-bold border-y-2 border-[#2b2018] py-2 mt-1 dcn-shimmer-dark">{homeGu ? `${homeGu}의 오늘의 커피` : "오늘의 동네 커피"}</div>
               {/* 시·도 → 시·군·구 → 동·면 계층 선택(우리 동네). 검색 돋보기 제거. */}
               <div className="flex gap-1.5 justify-center mt-3 flex-wrap">
