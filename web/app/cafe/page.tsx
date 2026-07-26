@@ -7,28 +7,25 @@ type EvidenceReview = { quote: string; link?: string; source?: string; date?: st
 type Cafe = {
   id: number; name: string; area: string; address: string;
   hours: string; phone: string; rating: number; rating_count: number;
-  roasts_own: boolean; beans: string; signature: string; uses: string;
+  signature: string;
   vibe: string; note: string; price_hint: string; source: string;
-  acidity: number; body: number; sweet: number; taste_pick: string; tone: string;
+  tone: string;
   photo_url: string | null;
+  char_scores: Record<string, number> | null;
   synth_grade: string | null; synth_identity: string | null;
   synth_basis: string | null; synth_count: number | null;
   synth_reviews: EvidenceReview[] | null;
 };
 
+// 🚨 재발방지(2026-07-26): 예전엔 uses/acidity/body/sweet 등 별도 필드로 목적·취향을 매칭했는데,
+//   그 필드들은 극초기 카페 11곳에만 값이 있고 나머지 13,380곳(전체의 99.9%)은 전부 비어있어
+//   목적을 아무거나 골라도 항상 0곳이 나오는 상태로 방치돼 있었다(스키마가 char_scores 체계로
+//   넘어간 뒤 이 페이지만 안 옮겨탐). 실제 전 카페에 값이 있는 char_scores(6축)로 교체.
 const PURPOSES = [
-  { key: "작업", label: "작업·집중", emoji: "💻" },
-  { key: "혼자", label: "혼자 조용히", emoji: "🤍" },
-  { key: "수다", label: "수다 떨기", emoji: "💬" },
-  { key: "빵", label: "빵·디저트", emoji: "🥐" },
-];
-
-// 맛 질문 — 데이터로 검증된 "갈리는 축" 4갈래 단일선택. 각각을 좌표로 변환.
-const TASTE_CHOICES = [
-  { key: "acidity", label: "산미·상큼", emoji: "🍋", pref: { acidity: 0.85, body: 0.4, sweet: 0.5 }, desc: "밝고 또렷한 과일향" },
-  { key: "dark", label: "묵직·다크", emoji: "🍫", pref: { acidity: 0.25, body: 0.85, sweet: 0.5 }, desc: "진하고 묵직한 바디" },
-  { key: "nutty", label: "고소·부드러움", emoji: "🌰", pref: { acidity: 0.2, body: 0.6, sweet: 0.5 }, desc: "견과류처럼 구수하게" },
-  { key: "sweet", label: "달콤·디저트", emoji: "🍰", pref: { acidity: 0.4, body: 0.5, sweet: 0.85 }, desc: "단맛과 디저트 위주" },
+  { key: "작업", label: "작업·집중", emoji: "💻", axis: "work" },
+  { key: "혼자", label: "혼자 조용히", emoji: "🤍", axis: "quiet" },
+  { key: "수다", label: "수다 떨기", emoji: "💬", axis: "mood" },
+  { key: "빵", label: "빵·디저트", emoji: "🥐", axis: "dessert" },
 ];
 
 const TONES: Record<string, { from: string; to: string; ink: string }> = {
@@ -41,15 +38,15 @@ const GRADE_STYLE: Record<string, { bg: string; label: string }> = {
   검증: { bg: "#5f7355", label: "검증" }, 참고: { bg: "#9c6b3f", label: "참고" }, 후보: { bg: "#a8927a", label: "후보" },
 };
 
-// 특징 태그 — '대부분 카페가 가진' 특징을 데이터로 뽑아 표시 (질문 아닌 정보)
+// 특징 태그 — '대부분 카페가 가진' 특징을 데이터(char_scores)로 뽑아 표시 (질문 아닌 정보)
 function featureTags(c: Cafe): string[] {
   const tags: string[] = [];
-  if (c.roasts_own) tags.push("🔥 직접 로스팅");
-  const id = c.synth_identity ?? "";
-  if (id.includes("디저트") || (c.uses ?? "").includes("빵")) tags.push("🍰 디저트");
-  if (id.includes("외부 평판") || (c.synth_count ?? 0) >= 30) tags.push("⭐ 평판 많음");
-  if ((c.uses ?? "").includes("사진")) tags.push("📸 분위기");
-  if ((c.uses ?? "").includes("작업")) tags.push("💻 작업");
+  const cs = c.char_scores ?? {};
+  if ((cs.roast ?? 0) >= 2) tags.push("🔥 직접 로스팅");
+  if ((cs.dessert ?? 0) >= 2) tags.push("🍰 디저트");
+  if ((c.synth_count ?? 0) >= 30) tags.push("⭐ 평판 많음");
+  if ((cs.mood ?? 0) >= 2) tags.push("📸 분위기");
+  if ((cs.work ?? 0) >= 2) tags.push("💻 작업");
   return tags.slice(0, 3);
 }
 
@@ -74,29 +71,14 @@ function Visual({ c }: { c: Cafe }) {
   );
 }
 
-function matchReason(c: Cafe, pref: { acidity: number; body: number; sweet: number } | null): string | null {
-  if (!pref || c.acidity == null) return null;
-  const diffs = [
-    { k: "산미", cafe: c.acidity, want: pref.acidity, high: "산미가 또렷한", low: "산미가 부드러운" },
-    { k: "바디", cafe: c.body, want: pref.body, high: "묵직한", low: "가벼운" },
-    { k: "단맛", cafe: c.sweet, want: pref.sweet, high: "단맛이 좋은", low: "깔끔한" },
-  ];
-  for (const d of diffs) {
-    if (d.want >= 0.7 && d.cafe >= 0.65) return `${d.k} 좋아하는 당신께 — 여긴 ${d.high} 편이에요`;
-    if (d.want <= 0.3 && d.cafe <= 0.35) return `${d.k} 부담스러운 당신께 — 여긴 ${d.low} 편이에요`;
-  }
-  return null;
-}
-
-function CafeCard({ c, pref, top, onShowEvidence }: { c: Cafe; pref: { acidity: number; body: number; sweet: number } | null; top: boolean; onShowEvidence: (c: Cafe) => void }) {
+function CafeCard({ c, top, onShowEvidence }: { c: Cafe; top: boolean; onShowEvidence: (c: Cafe) => void }) {
   const g = c.synth_grade ? GRADE_STYLE[c.synth_grade] : null;
-  const reason = matchReason(c, pref);
   const tags = featureTags(c);
   const hasReviews = (c.synth_reviews?.length ?? 0) > 0;
 
   return (
     <article className="bg-[#fdfaf4] rounded-2xl p-4 shadow-[0_4px_24px_rgba(80,50,20,0.08)] border border-[#ece0cd] flex flex-col">
-      {top && <div className="text-[10px] font-bold text-[#7a4d1c] uppercase tracking-wider mb-2">★ 당신께 가장 가까운 곳</div>}
+      {top && <div className="text-[10px] font-bold text-[#7a4d1c] uppercase tracking-wider mb-2">★ 이 목적에 가장 잘 맞는 곳</div>}
       <Visual c={c} />
       <div className="flex items-center gap-1.5 flex-wrap mb-1">
         <h2 className="text-xl font-bold leading-tight">{c.name}</h2>
@@ -113,13 +95,6 @@ function CafeCard({ c, pref, top, onShowEvidence }: { c: Cafe; pref: { acidity: 
 
       {c.note && <p className="text-[15px] leading-relaxed text-[#3d2f22] font-medium mb-3">“{c.note}”</p>}
 
-      {reason && (
-        <div className="bg-[#e8f0e3] border border-[#bcd4ad] rounded-lg px-3 py-2 mb-2">
-          <div className="text-[10px] text-[#5f7355] uppercase tracking-wider mb-0.5">추천 근거</div>
-          <div className="text-[13px] text-[#3f4f32]">{reason}</div>
-        </div>
-      )}
-
       {c.synth_identity && (
         <div className="bg-[#efe9dd] rounded-lg px-3 py-2 mb-2 border border-[#ddd0bb]">
           <div className="text-[13px] text-[#52402e] leading-snug">{c.synth_identity}</div>
@@ -132,15 +107,6 @@ function CafeCard({ c, pref, top, onShowEvidence }: { c: Cafe; pref: { acidity: 
           <span className="text-[12px] text-[#8a6d3f]">📋 리뷰 {c.synth_count}건 종합 {hasReviews && "· 근거 보기"}</span>
           {hasReviews && <span className="text-[#7a4d1c] text-xs">→</span>}
         </button>
-      )}
-
-      {c.acidity != null && (
-        <div className="flex gap-3 mb-3 text-[10px] text-[#665036]">
-          {([["산미", c.acidity], ["바디", c.body], ["단맛", c.sweet]] as [string, number][]).map(([l, v]) => (
-            <div key={l} className="flex-1"><div className="mb-1">{l}</div>
-              <div className="h-1 bg-[#e3d6c2] rounded-full overflow-hidden"><div className="h-full bg-[#9c6b3f]" style={{ width: `${(v ?? 0.5) * 100}%` }} /></div></div>
-          ))}
-        </div>
       )}
 
       <div className="mt-auto">
@@ -192,27 +158,22 @@ function EvidencePanel({ cafe, onClose }: { cafe: Cafe | null; onClose: () => vo
 export default function CafePage() {
   const [cafes, setCafes] = useState<Cafe[]>([]);
   const [loading, setLoading] = useState(true);
-  const [step, setStep] = useState<"purpose" | "taste" | "result">("purpose");
+  const [step, setStep] = useState<"purpose" | "result">("purpose");
   const [purpose, setPurpose] = useState<string>("");
-  const [tastePref, setTastePref] = useState<{ acidity: number; body: number; sweet: number } | null>(null);
   const [evidenceCafe, setEvidenceCafe] = useState<Cafe | null>(null);
 
   useEffect(() => {
     fetch("/api/cafes").then((r) => r.json()).then((d) => { setCafes(d.cafes ?? []); setLoading(false); }).catch(() => setLoading(false));
   }, []);
 
+  // 목적 축(char_scores) 점수 높은 순 정렬 — 실제 전 카페에 값이 있는 데이터로 순위 매김.
   const ranked = useMemo(() => {
-    let list = purpose ? cafes.filter((c) => (c.uses ?? "").split(",").includes(purpose)) : cafes;
-    if (tastePref) {
-      const p = tastePref;
-      list = [...list].sort((a, b) => {
-        const da = Math.hypot((a.acidity ?? 0.5) - p.acidity, (a.body ?? 0.5) - p.body, (a.sweet ?? 0.5) - p.sweet);
-        const db = Math.hypot((b.acidity ?? 0.5) - p.acidity, (b.body ?? 0.5) - p.body, (b.sweet ?? 0.5) - p.sweet);
-        return da - db;
-      });
-    }
-    return list;
-  }, [cafes, purpose, tastePref]);
+    if (!purpose) return cafes;
+    const axis = PURPOSES.find((p) => p.key === purpose)?.axis ?? "";
+    return cafes
+      .filter((c) => ((c.char_scores ?? {})[axis] ?? 0) > 0)
+      .sort((a, b) => ((b.char_scores ?? {})[axis] ?? 0) - ((a.char_scores ?? {})[axis] ?? 0));
+  }, [cafes, purpose]);
 
   if (step === "purpose") {
     return (
@@ -220,37 +181,16 @@ export default function CafePage() {
         <BackLink to="/" label="홈" className="text-[#7a4d1c] mb-4" />
         <div className="text-[#7a4d1c] text-xs tracking-[0.4em] uppercase mb-4">강동·구리 동네 커피 노트</div>
         <h1 className="text-4xl font-bold leading-snug mb-3">오늘 커피,<br />뭐 하러 가세요?</h1>
-        <p className="text-[#524234] mb-10 leading-relaxed">목적과 취향을 알려주시면, 거기 딱 맞는 동네 로스터리를 <strong className="text-[#2b2018]">근거와 함께</strong> 추천해드려요.</p>
+        <p className="text-[#524234] mb-10 leading-relaxed">목적을 알려주시면, 거기 딱 맞는 동네 로스터리를 <strong className="text-[#2b2018]">근거와 함께</strong> 추천해드려요.</p>
         <div className="grid grid-cols-2 gap-3">
           {PURPOSES.map((p) => (
-            <button key={p.key} onClick={() => { setPurpose(p.key); setStep("taste"); }}
+            <button key={p.key} onClick={() => { setPurpose(p.key); setStep("result"); }}
               className="bg-[#fdfaf4] border border-[#ece0cd] rounded-2xl p-6 text-left hover:border-[#9c6b3f] hover:-translate-y-0.5 transition-all shadow-sm">
               <div className="text-3xl mb-2">{p.emoji}</div><div className="text-lg font-bold">{p.label}</div>
             </button>
           ))}
         </div>
-        <button onClick={() => { setPurpose(""); setStep("taste"); }} className="mt-6 text-sm text-[#7a4d1c] underline">목적 상관없이 취향만으로 →</button>
-      </Shell>
-    );
-  }
-
-  if (step === "taste") {
-    return (
-      <Shell wide={false}>
-        <button onClick={() => setStep("purpose")} className="text-xs text-[#7a4d1c] underline mb-6">← 목적 다시</button>
-        <h1 className="text-3xl font-bold leading-snug mb-2">어떤 커피 좋아해요?</h1>
-        <p className="text-[#524234] mb-8 leading-relaxed">동네 카페 리뷰에서 가장 많이 갈리는 취향이에요. 하나 고르면 맞는 집을 근거와 함께 찾아드려요.</p>
-        <div className="grid grid-cols-2 gap-3">
-          {TASTE_CHOICES.map((t) => (
-            <button key={t.key} onClick={() => { setTastePref(t.pref); setStep("result"); }}
-              className="bg-[#fdfaf4] border border-[#ece0cd] rounded-2xl p-5 text-left hover:border-[#9c6b3f] hover:-translate-y-0.5 transition-all shadow-sm">
-              <div className="text-3xl mb-2">{t.emoji}</div>
-              <div className="text-lg font-bold">{t.label}</div>
-              <div className="text-xs text-[#524234] mt-1">{t.desc}</div>
-            </button>
-          ))}
-        </div>
-        <button onClick={() => { setTastePref(null); setStep("result"); }} className="mt-6 text-sm text-[#7a4d1c] underline">취향 상관없이 전체 보기 →</button>
+        <button onClick={() => { setPurpose(""); setStep("result"); }} className="mt-6 text-sm text-[#7a4d1c] underline">목적 상관없이 전체 보기 →</button>
       </Shell>
     );
   }
@@ -261,7 +201,7 @@ export default function CafePage() {
         <header className="mb-6 flex items-center justify-between">
           <div>
             <div className="text-[#7a4d1c] text-[11px] tracking-[0.3em] uppercase">강동·구리 동네 커피 노트</div>
-            <h1 className="text-2xl font-bold mt-1">{purpose ? `${PURPOSES.find((p) => p.key === purpose)?.label}` : "전체"}{tastePref ? " · 취향 맞춤" : ""}</h1>
+            <h1 className="text-2xl font-bold mt-1">{purpose ? `${PURPOSES.find((p) => p.key === purpose)?.label}` : "전체"}</h1>
           </div>
           <button onClick={() => setStep("purpose")} className="text-xs text-[#7a4d1c] underline">처음부터</button>
         </header>
@@ -270,7 +210,7 @@ export default function CafePage() {
           : ranked.length === 0 ? <p className="text-[#524234] bg-white/50 rounded-2xl p-8 text-center">맞는 곳을 아직 못 찾았어요.</p>
           : (
             <div className="grid md:grid-cols-2 gap-5">
-              {ranked.map((c, i) => <CafeCard key={c.id} c={c} pref={tastePref} top={!!tastePref && i === 0} onShowEvidence={setEvidenceCafe} />)}
+              {ranked.map((c, i) => <CafeCard key={c.id} c={c} top={!!purpose && i === 0} onShowEvidence={setEvidenceCafe} />)}
             </div>
           )}
 

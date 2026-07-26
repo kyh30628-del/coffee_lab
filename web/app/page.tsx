@@ -1333,12 +1333,14 @@ export default function Home() {
 
       {/* 홈 = 잡지 1면 */}
       {tab === "home" && (
-        <div className="flex-1 overflow-y-auto" style={{
-          paddingBottom: "3.25rem",
-          // 📓 "커피 노트" 정체성 — 홈 배경에 공책 줄노트 텍스처. 톤은 유지, 배경만 살짝.
-          backgroundImage: "repeating-linear-gradient(to bottom, transparent 0, transparent 31px, rgba(43,32,24,0.07) 31px, rgba(43,32,24,0.07) 32px), linear-gradient(to right, transparent 0, transparent 38px, rgba(180,92,58,0.22) 38px, rgba(180,92,58,0.22) 39px, transparent 39px)",
-        }}>
-          <div className="max-w-2xl mx-auto px-5 py-6">
+        <div className="flex-1 overflow-y-auto" style={{ paddingBottom: "3.25rem" }}>
+          <div className="max-w-2xl mx-auto px-5 py-6" style={{
+            // 📓 "커피 노트" 정체성 — 콘텐츠 폭에만 딱 맞춘 옅은 줄노트 텍스처(전체 화면폭이 아니라
+            // 실제 카드가 놓이는 영역에만 스코프해 넓은 화면에서 배경이 따로 노는 것 방지). 세로 여백선은
+            // 카드·헤더와 어긋나 오히려 어수선해 보여 뺌 — 가로줄만 아주 옅게, 텍스트 줄간격에 가깝게.
+            backgroundImage: "repeating-linear-gradient(to bottom, transparent 0, transparent 27px, rgba(43,32,24,0.045) 27px, rgba(43,32,24,0.045) 28px)",
+            backgroundPosition: "0 6px",
+          }}>
             <div className="text-center mb-6">
               <div className="text-[10px] tracking-[0.3em] uppercase text-[#7a5122]">데이터로 큐레이션하는</div>
               <div className="text-xl font-bold border-y-2 border-[#2b2018] py-2 mt-1 dcn-shimmer-dark">{homeGu ? `${homeGu}의 오늘의 커피` : "오늘의 동네 커피"}</div>

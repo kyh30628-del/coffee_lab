@@ -209,7 +209,7 @@ export async function GET(req: NextRequest) {
         WHEN path LIKE '/c/%' THEN '카페상세'
         WHEN path LIKE '/area%' THEN '지역'
         WHEN path LIKE '/taste%' THEN '취향'
-        WHEN path LIKE '/owner%' OR path LIKE '/cafe%' THEN '사장님'
+        WHEN path LIKE '/owner%' OR path LIKE '/cafe/register%' THEN '사장님'
         ELSE '기타' END AS bucket,
         COUNT(*)::int views, COUNT(DISTINCT anon_id)::int uniques
       FROM traffic_events WHERE ts > now()-interval '30 days'

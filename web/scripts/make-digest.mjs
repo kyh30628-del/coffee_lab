@@ -209,7 +209,8 @@ const today = new Date().toISOString().slice(0, 10);
       HAVING COUNT(te.*) >= 2
       ORDER BY MAX(te.ts) DESC
       LIMIT 15`;
-    const bucket = (p) => (!p || p === "/") ? "홈" : p.startsWith("/c/") ? "카페상세" : p.startsWith("/area") ? "지역" : p.startsWith("/taste") ? "취향" : (p.startsWith("/owner") || p.startsWith("/cafe")) ? "사장님" : "기타";
+    // ⚠️ "/cafe" 단독(강동·구리 소비자용 취향퀴즈 페이지)까지 잡히지 않게 "/cafe/register"만 사장님 버킷으로.
+    const bucket = (p) => (!p || p === "/") ? "홈" : p.startsWith("/c/") ? "카페상세" : p.startsWith("/area") ? "지역" : p.startsWith("/taste") ? "취향" : (p.startsWith("/owner") || p.startsWith("/cafe/register")) ? "사장님" : "기타";
     // 30분 무활동 갭 = 새 세션(표준 웹분석 관례). 7일 통짜 활동폭(수천분)을 '세션'으로 잘못 표기하지 않도록 클러스터링.
     const SESSION_GAP_MS = 30 * 60 * 1000;
     const sessionize = (events) => {

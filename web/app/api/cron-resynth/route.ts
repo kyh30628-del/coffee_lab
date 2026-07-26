@@ -64,7 +64,7 @@ export async function GET(req: NextRequest) {
       ORDER BY (raw_collected_at > synth_checked_at) DESC, synth_checked_at ASC NULLS FIRST
       LIMIT ${GEN_MAX}
     `) as unknown as { id: number; name: string; area: string; synth_count: number }[];
-    let gi = 0, gDone = 0, gChanged = 0, gErr = 0; const gUnpub: number[] = []; let gStop = false;
+    let gi = 0, gDone = 0, gErr = 0; const gUnpub: number[] = []; const gChangedIds: number[] = []; let gStop = false;
     const genWorker = async () => {
       while (!gStop) {
         const c = genRows[gi++]; if (!c) break;
@@ -72,7 +72,7 @@ export async function GET(req: NextRequest) {
           await synthAndStore({ id: c.id, name: c.name, area: c.area }, { refresh: false });
           const [a] = (await sql`SELECT synth_count, published FROM cafes WHERE id=${c.id}`) as unknown as { synth_count: number; published: boolean }[];
           gDone++;
-          if (a.synth_count !== c.synth_count) gChanged++;
+          if (a.synth_count !== c.synth_count) gChangedIds.push(c.id);
           if (!a.published) gUnpub.push(c.id);
           if (gDone >= 100 && gUnpub.length / gDone > GEN_RATE_LIMIT) gStop = true; // 차단기 발동
         } catch { gErr++; }
@@ -88,12 +88,15 @@ export async function GET(req: NextRequest) {
     }
     // 일반 순환(무료 대량) 동시 실행
     await Promise.all(Array.from({ length: GEN_CONC }, () => genWorker()));
-    // 공개상태 바뀐 카페만 전 캐시 레이어 무효화(요청 컨텍스트라 ISR 무효화 정상). 없으면 내용변동분만 검색캐시 갱신.
-    if (gUnpub.length) { const { invalidateCafeCaches } = await import("@/lib/cafeCacheInvalidate"); await invalidateCafeCaches(gUnpub).catch(() => {}); }
-    else if (gChanged) await sql`DELETE FROM search_cache`.catch(() => {});
+    // 🚨 재발방지(2026-07-26): 예전엔 "공개상태 바뀐 카페만" ISR(/c/[id]·/share/[id]) 무효화하고,
+    //   내용만 바뀐(비공개 전환 없이 리뷰수·등급 변동) 카페는 search_cache만 지웠다 — 그래서 지도·검색은
+    //   바로 반영되는데 카페 상세·사장님 공유 리포트는 다음 revalidate(최대 1시간) 전까지 옛 숫자를 보여주는
+    //   '목록 vs 상세' 불일치가 매시간 반복됐다. 내용 변동분도 동일하게 전 레이어 무효화한다.
+    const toInvalidate = [...new Set([...gUnpub, ...gChangedIds])];
+    if (toInvalidate.length) { const { invalidateCafeCaches } = await import("@/lib/cafeCacheInvalidate"); await invalidateCafeCaches(toInvalidate).catch(() => {}); }
 
-    await recordRun("cron-resynth", true, `raw정리 ${purged.length} 유튜브 ${ytRefreshed.length} · 구독재수집 ${subResults.length} · 전수적용 ${gDone}(변동 ${gChanged}·비공개 ${gUnpub.length}·오류 ${gErr})${gStop ? " ⚠️차단기발동" : ""}`, gDone);
-    return NextResponse.json({ ok: true, ranAt: new Date().toISOString(), rawPurged: purged.length, ytRefreshed: ytRefreshed.length, subResynth: subResults.length, netApplied: gDone, changed: gChanged, unpublished: gUnpub.length, breaker: gStop });
+    await recordRun("cron-resynth", true, `raw정리 ${purged.length} 유튜브 ${ytRefreshed.length} · 구독재수집 ${subResults.length} · 전수적용 ${gDone}(변동 ${gChangedIds.length}·비공개 ${gUnpub.length}·오류 ${gErr})${gStop ? " ⚠️차단기발동" : ""}`, gDone);
+    return NextResponse.json({ ok: true, ranAt: new Date().toISOString(), rawPurged: purged.length, ytRefreshed: ytRefreshed.length, subResynth: subResults.length, netApplied: gDone, changed: gChangedIds.length, unpublished: gUnpub.length, breaker: gStop });
   } catch (e) {
     await recordRun("cron-resynth", false, String(e).slice(0, 150));
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
