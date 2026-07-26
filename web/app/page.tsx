@@ -1352,18 +1352,30 @@ export default function Home() {
       {/* 홈 = 잡지 1면 */}
       {tab === "home" && (
         <div className="flex-1 overflow-y-auto" style={{ paddingBottom: "3.25rem", position: "relative" }}>
-          {/* ☕ 은은한 카페 느낌(2026-07-26 v2) — "너무 티가 안난다" 피드백으로 코너 한 곳이 아니라
-              화면 전체에 걸친 은은한 원두빛 비네트(양쪽 코너) + 커피잔 링 자국 2개로 확장.
-              position:fixed로 스크롤해도 느낌이 계속 유지되도록(전반적인 분위기). */}
+          {/* ☕ 은은한 카페 느낌(2026-07-26 v3) — "더 진하게 + 원두 형상화" 피드백으로 비네트 진하게,
+              커피콩 실루엣 3개 산개 배치(카드 위가 아니라 여백에만, 저채도로 은은하게). */}
           <div aria-hidden style={{
             position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0,
             backgroundImage:
-              "radial-gradient(ellipse at 100% 0%, rgba(155,105,50,0.22) 0%, transparent 60%), " +
-              "radial-gradient(ellipse at 0% 100%, rgba(120,80,40,0.18) 0%, transparent 55%), " +
-              "radial-gradient(circle at 90% 5%, transparent 34px, rgba(120,80,40,0.14) 36px, rgba(120,80,40,0.14) 39px, transparent 41px), " +
-              "radial-gradient(circle at 90% 5%, transparent 20px, rgba(120,80,40,0.1) 22px, rgba(120,80,40,0.1) 24px, transparent 26px), " +
-              "radial-gradient(circle at 8% 96%, transparent 26px, rgba(120,80,40,0.11) 28px, rgba(120,80,40,0.11) 30px, transparent 32px)",
-          }} />
+              "radial-gradient(ellipse at 100% 0%, rgba(155,105,50,0.32) 0%, transparent 62%), " +
+              "radial-gradient(ellipse at 0% 100%, rgba(120,80,40,0.26) 0%, transparent 58%), " +
+              "radial-gradient(circle at 90% 5%, transparent 34px, rgba(120,80,40,0.18) 36px, rgba(120,80,40,0.18) 39px, transparent 41px), " +
+              "radial-gradient(circle at 90% 5%, transparent 20px, rgba(120,80,40,0.13) 22px, rgba(120,80,40,0.13) 24px, transparent 26px), " +
+              "radial-gradient(circle at 8% 96%, transparent 26px, rgba(120,80,40,0.15) 28px, rgba(120,80,40,0.15) 30px, transparent 32px)",
+          }}>
+            <svg aria-hidden style={{ position: "absolute", top: "12%", left: "6%", transform: "rotate(-25deg)" }} width="30" height="44" viewBox="0 0 32 48">
+              <path d="M16 2C7 2 2 14 2 24C2 36 8 46 16 46C24 46 30 36 30 24C30 14 25 2 16 2Z" fill="rgba(90,60,30,0.16)" />
+              <path d="M16 8C12 18 12 30 16 40" stroke="rgba(60,40,20,0.22)" strokeWidth="2" fill="none" strokeLinecap="round" />
+            </svg>
+            <svg aria-hidden style={{ position: "absolute", top: "38%", right: "5%", transform: "rotate(18deg)" }} width="24" height="35" viewBox="0 0 32 48">
+              <path d="M16 2C7 2 2 14 2 24C2 36 8 46 16 46C24 46 30 36 30 24C30 14 25 2 16 2Z" fill="rgba(90,60,30,0.14)" />
+              <path d="M16 8C12 18 12 30 16 40" stroke="rgba(60,40,20,0.2)" strokeWidth="2" fill="none" strokeLinecap="round" />
+            </svg>
+            <svg aria-hidden style={{ position: "absolute", bottom: "10%", left: "10%", transform: "rotate(40deg)" }} width="26" height="38" viewBox="0 0 32 48">
+              <path d="M16 2C7 2 2 14 2 24C2 36 8 46 16 46C24 46 30 36 30 24C30 14 25 2 16 2Z" fill="rgba(90,60,30,0.15)" />
+              <path d="M16 8C12 18 12 30 16 40" stroke="rgba(60,40,20,0.21)" strokeWidth="2" fill="none" strokeLinecap="round" />
+            </svg>
+          </div>
           <div className="max-w-2xl mx-auto px-5 pt-4 pb-6" style={{
             // 📓 "커피 노트" 정체성 — 콘텐츠 폭에만 딱 맞춘 줄노트 텍스처(전체 화면폭이 아니라 실제
             // 카드가 놓이는 영역에만 스코프해 넓은 화면에서 배경이 따로 노는 것 방지).
