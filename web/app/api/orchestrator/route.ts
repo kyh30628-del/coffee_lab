@@ -69,6 +69,7 @@ export async function GET(req: NextRequest) {
       MAX(synth_updated) last_synth,
       MAX(llm_judged_at) last_judge,
       MAX(embed_updated) last_embed,
+      COUNT(*) FILTER (WHERE raw_reviews IS NULL)::int collect_q,
       COUNT(*) FILTER (WHERE raw_reviews IS NOT NULL AND synth_updated IS NULL)::int synth_q,
       COUNT(*) FILTER (WHERE embedding IS NULL AND (published OR pipeline_status='pending') AND synth_identity IS NOT NULL)::int embed_q,
       COUNT(*) FILTER (WHERE published AND raw_reviews IS NOT NULL AND raw_collected_at > synth_checked_at)::int synth_backlog,
@@ -445,16 +446,17 @@ export async function GET(req: NextRequest) {
     //   raw_collected_at으로 신선도를 보면 멀쩡히 도는데도 stale로 오인됨(들쭉날쭉 수정의 부작용 차단).
     const lastCheck = c.last_check ?? c.last_collect;
     add("discover", "발굴 (grow·지역수색)", lastCheck, 24, ds.behind, ds.behind ? `${ds.behind}/${ds.n} 지역 7일+ 미발굴(굶음)` : `${ds.n}개 지역 순환중`);
-    add("collect", "수집 (warmup·raw)", lastCheck, 16, c.synth_q, `raw 수집·재수집`);
+    add("collect", "수집 (warmup·raw)", lastCheck, 16, c.collect_q, c.collect_q ? `${c.collect_q}곳 미수집` : `raw 수집·재수집`);
     add("synth", "합성 (옥석·등급)", c.last_synth, 24, c.synth_q, c.synth_q ? "미합성 적체" : "적체 없음");
     // 카테고리·동 채움 단계도 개별 모니터(발굴~수집 세분화)
+    // pubND(공개 카페 중 동 없음)는 아래 dongPct 계산에도 재사용 — 블록 밖으로 선언(스코프 버그 방지).
+    const pubND = (await sql`SELECT COUNT(*)::int n FROM cafes WHERE published AND dong IS NULL`.catch(() => [{ n: 0 }]))[0] as any;
     {
       const catRun = jobRuns.find((j: any) => j.job === "dong-backfill");
       const pubNoCat = (await sql`SELECT COUNT(*)::int n FROM cafes WHERE published AND (naver_category IS NULL OR naver_category='')`.catch(() => [{ n: 0 }]))[0] as any;
       const cAge = ageHours(catRun?.ran_at ?? null, now);
       // 카테고리 미보유는 소비자 지장 없음(검증된 카페) → 평소엔 정보성. 대량(>1000)일 때만 백필 정체로 보고 warn.
       agents.push({ key: "category", label: "카테고리 검증", lastRun: catRun?.ran_at ?? null, ageH: cAge == null ? null : Math.round(cAge * 10) / 10, cadenceH: 26, status: pubNoCat.n > 1000 ? "warn" : "ok", queue: pubNoCat.n, note: pubNoCat.n ? `미보유 ${pubNoCat.n}(검증카페·지장없음)` : "전수 완료" });
-      const pubND = (await sql`SELECT COUNT(*)::int n FROM cafes WHERE published AND dong IS NULL`.catch(() => [{ n: 0 }]))[0] as any;
       const dAge = ageHours(catRun?.ran_at ?? null, now);
       agents.push({ key: "dongfill", label: "동 채움 (백필)", lastRun: catRun?.ran_at ?? null, ageH: dAge == null ? null : Math.round(dAge * 10) / 10, cadenceH: 26, status: pubND.n > 50 ? "warn" : "ok", queue: pubND.n, note: pubND.n ? `공개 동없음 ${pubND.n}` : "공개 동 100%" });
     }
@@ -519,11 +521,17 @@ export async function GET(req: NextRequest) {
       promotedThisRun: promoted,
     };
 
+    // 🔧 동 채움 %(2026-07-26 정정): 이전엔 전체 카페(공개+비공개) 기준이라 신규 미공개 카페가
+    //   유입될 때마다 "동 채움" 타일이 100% 밑으로 계속 흔들렸는데, 정작 동 채움 담당(dongfill)
+    //   에이전트 자신은 "공개 카페 동 100%"라고 공개 카페 기준으로만 주장 — 같은 화면에서 서로
+    //   다른 모집단을 "동 채움"이라는 같은 이름으로 보여주던 불일치. 타일도 공개 카페 기준(pubND)
+    //   으로 통일해 에이전트의 주장과 항상 일치하게 만든다.
+    const dongPct = c.published ? Math.round(((c.published - pubND.n) / c.published) * 100) : 0;
     const health = {
       generatedAt: new Date(now).toISOString(),
       overall, alerts, healed, risks, notices, integrity,
-      coverage: { total: c.total, published: c.published, rawCachedPct: pct(c.raw_cached), judgedPct: pct(c.judged), embeddedPct: c.published ? Math.round((c.pub_embedded / c.published) * 100) : 0, dongPct: pct(td.has_dong), synthBacklog: c.synth_backlog, synthStale7: c.synth_stale7 },
-      today: { newCafes: daily.newCafes, synthesized: td.synth_today, published: td.published_today, hasDong: td.has_dong, dongPct: pct(td.has_dong), noise: td.noise, newQueue: td.new_q, ytToday: daily.yt, ytTotal: td.yt_total },
+      coverage: { total: c.total, published: c.published, rawCachedPct: pct(c.raw_cached), judgedPct: pct(c.judged), embeddedPct: c.published ? Math.round((c.pub_embedded / c.published) * 100) : 0, dongPct, synthBacklog: c.synth_backlog, synthStale7: c.synth_stale7 },
+      today: { newCafes: daily.newCafes, synthesized: td.synth_today, published: td.published_today, hasDong: td.has_dong, dongPct, noise: td.noise, newQueue: td.new_q, ytToday: daily.yt, ytTotal: td.yt_total },
       pipeline, agents,
       grounding: { suspectCount: gr?.suspect ?? 0, suspects: grSuspects },
       offctx: { count: offctx.n, suspects: offctxSuspects },
