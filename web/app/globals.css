@@ -102,22 +102,10 @@ body {
    순간 사라지고 새 카드만 페이드인 되는 '컷 전환'이라 뚝뚝 끊겨 보였음. 이제 이전 카드(절대위치, 위)가
    서서히 사라지는 동시에 새 카드(아래, 정상흐름)가 서서히 나타나 실제로 겹쳐 넘어간다. */
 .dcn-spotlight-in { animation: dcnSpotlightIn 0.6s cubic-bezier(0.22, 1, 0.36, 1); }
-/* 📓 2026-07-26: "책장 넘기듯" + "우측 상단 접힌 표시" 피드백 — 카드 우측 상단 접힌 모서리(dog-ear)
-   힌트와 짝을 맞춰, 오른쪽 모서리를 축으로 페이지가 넘어가는 3D 회전(perspective는 SpotlightCore
-   컨테이너에 지정)으로 교체. */
-.dcn-spotlight-out { animation: dcnSpotlightOut 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards; transform-origin: right center; backface-visibility: hidden; }
+.dcn-spotlight-out { animation: dcnSpotlightOut 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
 @keyframes dcnSpotlightIn { from { opacity: 0; } to { opacity: 1; } }
-@keyframes dcnSpotlightOut {
-  0% { transform: rotateY(0deg); opacity: 1; filter: brightness(1); }
-  65% { opacity: 1; filter: brightness(0.75); }
-  100% { transform: rotateY(100deg); opacity: 0; filter: brightness(0.55); }
-}
+@keyframes dcnSpotlightOut { from { opacity: 1; } to { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
   .dcn-spotlight-in { animation: none; }
   .dcn-spotlight-out { animation: none; opacity: 0; }
 }
-
-/* 📓 노트에 단어를 하나씩 써내려가는 효과는 page.tsx의 WordReveal 컴포넌트가 담당(CSS 애니메이션이
-   아니라 React state+setTimeout으로 opacity를 바꿈) — dcn-shimmer-dark(background-clip:text) 자식에
-   animation/transition을 걸면 그 자식이 별도 GPU 레이어로 승격되며 부모의 클립된 그라데이션이 통째로
-   안 보이는 브라우저 렌더링 버그를 실브라우저에서 발견해 CSS 키프레임 대신 이 방식을 채택(2026-07-26). */
