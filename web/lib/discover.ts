@@ -343,16 +343,26 @@ export async function discoverRegion(region: string, areaLabel: string, keywords
     for (const kw of keywords) tasks.push({ q: `${region} ${kw}`, sort });
   }
   // ③ 지리 세분화 — 이미 보유한 카페 주소에서 도로명 추출 → 도로 단위로 더 잘게(상위5 창 증가).
+  // ⚡ 2026-07-26 쿼리 전략 최적화(DB 실측 근거) — discovery_state 로그 대조 결과 강남구·강동구·송파구처럼
+  //   이미 밀집한(500+곳) 지역은 스윕당 raw hit 300~550건에도 신규 삽입이 0~1곳뿐인데, 인천 검단구처럼
+  //   덜 훑인(~100곳) 지역은 같은 방식으로 5곳이 나왔다. 도로명 목록 자체가 '이미 보유한 카페 주소'에서
+  //   뽑는 구조라 밀집 지역일수록 이미 아는 카페만 되돌려주는 최고-중복 구간 — SATURATED_THRESHOLD 이상
+  //   지역은 이 구간을 생략해 그만큼(최대 12로×6키워드×sorts) 예산을 아끼고, 다른 회차가 덜 훑인 지역·
+  //   신설 지역에 더 많이 배정되게 한다(전체 발굴량 늘리는 게 목적, 이 지역 자체를 덜 보진 않음 — 동/구
+  //   단위 발굴은 그대로 유지).
+  const SATURATED_THRESHOLD = 250;
   try {
     const addrRows = (await sql`SELECT address FROM cafes WHERE area = ${storeArea} AND address IS NOT NULL`) as unknown as { address: string }[];
-    const roadFreq = new Map<string, number>();
-    for (const r of addrRows) {
-      const m = (r.address || "").match(/([가-힣A-Za-z0-9]+(?:대로|로|길))\s*\d/);
-      if (m) roadFreq.set(m[1], (roadFreq.get(m[1]) ?? 0) + 1);
+    if (addrRows.length < SATURATED_THRESHOLD) {
+      const roadFreq = new Map<string, number>();
+      for (const r of addrRows) {
+        const m = (r.address || "").match(/([가-힣A-Za-z0-9]+(?:대로|로|길))\s*\d/);
+        if (m) roadFreq.set(m[1], (roadFreq.get(m[1]) ?? 0) + 1);
+      }
+      const roads = [...roadFreq.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12).map(([r]) => r);
+      const CORE = ["카페", "로스터리", "디저트", "베이커리", "브런치", "도넛"];
+      for (const sort of sorts) for (const road of roads) for (const kw of CORE) tasks.push({ q: `${road} ${kw}`, sort });
     }
-    const roads = [...roadFreq.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12).map(([r]) => r);
-    const CORE = ["카페", "로스터리", "디저트", "베이커리", "브런치", "도넛"];
-    for (const sort of sorts) for (const road of roads) for (const kw of CORE) tasks.push({ q: `${road} ${kw}`, sort });
   } catch { /* 주소 없으면 도로 세분화 생략 */ }
 
   // 셔플(Fisher–Yates) — 부분 실행 시 특정 동·키워드에 편중되지 않게.

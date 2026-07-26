@@ -1361,32 +1361,32 @@ export default function Home() {
       {/* 홈 = 잡지 1면 */}
       {tab === "home" && (
         <div className="flex-1 overflow-y-auto" style={{ paddingBottom: "3.25rem", position: "relative" }}>
-          {/* ☕ 은은한 카페 느낌 — 원두 실루엣만 유지(2026-07-26 v5). 배경 비네트·링자국 그라데이션은
-              "코너가 어두워서 잘 안 보인다" 피드백으로 삭제. */}
+          {/* ☕ 은은한 카페 느낌 — 원두 실루엣(2026-07-26 v7, "가장자리 말고 자유롭게 배치" 재요청).
+              화면 곳곳에 흩어지도록 x/y를 다양화(작고 옅게 유지해 카드와 겹쳐도 거슬리지 않음). */}
           <div aria-hidden style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0 }}>
-            <svg aria-hidden style={{ position: "absolute", top: 90, left: 4, transform: "rotate(-25deg)" }} width="26" height="38" viewBox="0 0 32 48">
-              <path d="M16 2C7 2 2 14 2 24C2 36 8 46 16 46C24 46 30 36 30 24C30 14 25 2 16 2Z" fill="rgba(112,70,26,0.34)" />
-              <path d="M16 8C12 18 12 30 16 40" stroke="rgba(78,46,18,0.4)" strokeWidth="2" fill="none" strokeLinecap="round" />
-            </svg>
-            <svg aria-hidden style={{ position: "absolute", top: 4, right: 4, transform: "rotate(12deg)" }} width="22" height="32" viewBox="0 0 32 48">
-              <path d="M16 2C7 2 2 14 2 24C2 36 8 46 16 46C24 46 30 36 30 24C30 14 25 2 16 2Z" fill="rgba(112,70,26,0.3)" />
-              <path d="M16 8C12 18 12 30 16 40" stroke="rgba(78,46,18,0.36)" strokeWidth="2" fill="none" strokeLinecap="round" />
-            </svg>
-            <svg aria-hidden style={{ position: "absolute", top: "40%", right: 2, transform: "rotate(18deg)" }} width="24" height="35" viewBox="0 0 32 48">
-              <path d="M16 2C7 2 2 14 2 24C2 36 8 46 16 46C24 46 30 36 30 24C30 14 25 2 16 2Z" fill="rgba(112,70,26,0.32)" />
-              <path d="M16 8C12 18 12 30 16 40" stroke="rgba(78,46,18,0.38)" strokeWidth="2" fill="none" strokeLinecap="round" />
-            </svg>
-            <svg aria-hidden style={{ position: "absolute", top: "62%", left: 2, transform: "rotate(-8deg)" }} width="20" height="30" viewBox="0 0 32 48">
+            <svg aria-hidden style={{ position: "absolute", top: "9%", left: "18%", transform: "rotate(-25deg)" }} width="22" height="32" viewBox="0 0 32 48">
               <path d="M16 2C7 2 2 14 2 24C2 36 8 46 16 46C24 46 30 36 30 24C30 14 25 2 16 2Z" fill="rgba(112,70,26,0.28)" />
               <path d="M16 8C12 18 12 30 16 40" stroke="rgba(78,46,18,0.34)" strokeWidth="2" fill="none" strokeLinecap="round" />
             </svg>
-            <svg aria-hidden style={{ position: "absolute", bottom: 70, left: 4, transform: "rotate(40deg)" }} width="26" height="38" viewBox="0 0 32 48">
-              <path d="M16 2C7 2 2 14 2 24C2 36 8 46 16 46C24 46 30 36 30 24C30 14 25 2 16 2Z" fill="rgba(112,70,26,0.33)" />
-              <path d="M16 8C12 18 12 30 16 40" stroke="rgba(78,46,18,0.39)" strokeWidth="2" fill="none" strokeLinecap="round" />
+            <svg aria-hidden style={{ position: "absolute", top: "22%", left: "68%", transform: "rotate(12deg)" }} width="20" height="29" viewBox="0 0 32 48">
+              <path d="M16 2C7 2 2 14 2 24C2 36 8 46 16 46C24 46 30 36 30 24C30 14 25 2 16 2Z" fill="rgba(112,70,26,0.25)" />
+              <path d="M16 8C12 18 12 30 16 40" stroke="rgba(78,46,18,0.31)" strokeWidth="2" fill="none" strokeLinecap="round" />
             </svg>
-            <svg aria-hidden style={{ position: "absolute", bottom: 4, right: 4, transform: "rotate(-45deg)" }} width="22" height="32" viewBox="0 0 32 48">
-              <path d="M16 2C7 2 2 14 2 24C2 36 8 46 16 46C24 46 30 36 30 24C30 14 25 2 16 2Z" fill="rgba(112,70,26,0.31)" />
-              <path d="M16 8C12 18 12 30 16 40" stroke="rgba(78,46,18,0.37)" strokeWidth="2" fill="none" strokeLinecap="round" />
+            <svg aria-hidden style={{ position: "absolute", top: "38%", left: "8%", transform: "rotate(18deg)" }} width="24" height="35" viewBox="0 0 32 48">
+              <path d="M16 2C7 2 2 14 2 24C2 36 8 46 16 46C24 46 30 36 30 24C30 14 25 2 16 2Z" fill="rgba(112,70,26,0.27)" />
+              <path d="M16 8C12 18 12 30 16 40" stroke="rgba(78,46,18,0.33)" strokeWidth="2" fill="none" strokeLinecap="round" />
+            </svg>
+            <svg aria-hidden style={{ position: "absolute", top: "51%", left: "82%", transform: "rotate(-8deg)" }} width="18" height="26" viewBox="0 0 32 48">
+              <path d="M16 2C7 2 2 14 2 24C2 36 8 46 16 46C24 46 30 36 30 24C30 14 25 2 16 2Z" fill="rgba(112,70,26,0.24)" />
+              <path d="M16 8C12 18 12 30 16 40" stroke="rgba(78,46,18,0.3)" strokeWidth="2" fill="none" strokeLinecap="round" />
+            </svg>
+            <svg aria-hidden style={{ position: "absolute", top: "68%", left: "35%", transform: "rotate(40deg)" }} width="24" height="35" viewBox="0 0 32 48">
+              <path d="M16 2C7 2 2 14 2 24C2 36 8 46 16 46C24 46 30 36 30 24C30 14 25 2 16 2Z" fill="rgba(112,70,26,0.29)" />
+              <path d="M16 8C12 18 12 30 16 40" stroke="rgba(78,46,18,0.35)" strokeWidth="2" fill="none" strokeLinecap="round" />
+            </svg>
+            <svg aria-hidden style={{ position: "absolute", top: "83%", left: "60%", transform: "rotate(-45deg)" }} width="20" height="29" viewBox="0 0 32 48">
+              <path d="M16 2C7 2 2 14 2 24C2 36 8 46 16 46C24 46 30 36 30 24C30 14 25 2 16 2Z" fill="rgba(112,70,26,0.26)" />
+              <path d="M16 8C12 18 12 30 16 40" stroke="rgba(78,46,18,0.32)" strokeWidth="2" fill="none" strokeLinecap="round" />
             </svg>
           </div>
           <div className="max-w-2xl mx-auto px-5 pt-4 pb-6" style={{
