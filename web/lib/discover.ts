@@ -335,12 +335,28 @@ export async function discoverRegion(region: string, areaLabel: string, keywords
   // full-region 키(예: "인천 중구") 우선 — 서울과 이름이 겹치는 구를 정확히 구분. 없으면 bare 구 키로 폴백.
   const dongs = DONGS[region] ?? DONGS[gu] ?? [];
 
+  // ⚡ 2026-07-27 쿼리 전략 추가 최적화(실측 근거) — 강남구(포화, 564곳)에서 "카페"·"커피전문점"·
+  //   "동네카페" 3개를 검색해보니 겹치는 상위 결과가 대부분(64%가 이미 DB에 있는 곳)이었던 반면,
+  //   "카눌레"·"휘낭시에" 같은 니치 키워드는 서로 다른 업체를 반환(겹침 1/11)하고 DB 중복률도 더
+  //   낮았다(45%). '카페'류 동의어 묶음은 포화 지역에서 서로 거의 같은 결과만 되돌려주는 중복 구간
+  //   — 도로명 세분화와 같은 SATURATED_THRESHOLD로 걸러 포화 지역에서만 생략(니치·로스팅·분위기·
+  //   디저트 키워드는 전부 유지 — 실제 차별화 신호가 있는 것들은 안 건드림).
+  const GENERIC_CAFE_SYNONYMS = new Set([
+    "카페", "커피", "커피전문점", "동네카페", "작은카페", "신상카페", "대형카페",
+    "카페추천", "예쁜카페", "분위기카페", "조용한카페", "카페거리", "테이크아웃커피",
+  ]);
+  const SATURATED_THRESHOLD = 250;
+  const addrRows = (await sql`SELECT address FROM cafes WHERE area = ${storeArea} AND address IS NOT NULL`) as unknown as { address: string }[];
+  const saturated = addrRows.length >= SATURATED_THRESHOLD;
+  const dongKeywords = saturated ? DONG_KEYWORDS.filter((k) => !GENERIC_CAFE_SYNONYMS.has(k)) : DONG_KEYWORDS;
+  const regionKeywords = saturated ? keywords.filter((k) => !GENERIC_CAFE_SYNONYMS.has(k)) : keywords;
+
   // ── 검색 작업 풀: (지리단위 × 키워드 × sort). 셔플 후 deadline까지 처리.
   const tasks: { q: string; sort: "comment" | "random" }[] = [];
   for (const sort of sorts) {
     // ① 동(洞) 단위 정밀 발굴(서울만 동 목록 보유) ② 구 단위 광역(경기·인천 + 서울 보완)
-    for (const dong of dongs) for (const kw of DONG_KEYWORDS) tasks.push({ q: `${gu} ${dong} ${kw}`, sort });
-    for (const kw of keywords) tasks.push({ q: `${region} ${kw}`, sort });
+    for (const dong of dongs) for (const kw of dongKeywords) tasks.push({ q: `${gu} ${dong} ${kw}`, sort });
+    for (const kw of regionKeywords) tasks.push({ q: `${region} ${kw}`, sort });
   }
   // ③ 지리 세분화 — 이미 보유한 카페 주소에서 도로명 추출 → 도로 단위로 더 잘게(상위5 창 증가).
   // ⚡ 2026-07-26 쿼리 전략 최적화(DB 실측 근거) — discovery_state 로그 대조 결과 강남구·강동구·송파구처럼
@@ -350,10 +366,8 @@ export async function discoverRegion(region: string, areaLabel: string, keywords
   //   지역은 이 구간을 생략해 그만큼(최대 12로×6키워드×sorts) 예산을 아끼고, 다른 회차가 덜 훑인 지역·
   //   신설 지역에 더 많이 배정되게 한다(전체 발굴량 늘리는 게 목적, 이 지역 자체를 덜 보진 않음 — 동/구
   //   단위 발굴은 그대로 유지).
-  const SATURATED_THRESHOLD = 250;
-  try {
-    const addrRows = (await sql`SELECT address FROM cafes WHERE area = ${storeArea} AND address IS NOT NULL`) as unknown as { address: string }[];
-    if (addrRows.length < SATURATED_THRESHOLD) {
+  if (!saturated) {
+    try {
       const roadFreq = new Map<string, number>();
       for (const r of addrRows) {
         const m = (r.address || "").match(/([가-힣A-Za-z0-9]+(?:대로|로|길))\s*\d/);
@@ -362,8 +376,8 @@ export async function discoverRegion(region: string, areaLabel: string, keywords
       const roads = [...roadFreq.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12).map(([r]) => r);
       const CORE = ["카페", "로스터리", "디저트", "베이커리", "브런치", "도넛"];
       for (const sort of sorts) for (const road of roads) for (const kw of CORE) tasks.push({ q: `${road} ${kw}`, sort });
-    }
-  } catch { /* 주소 없으면 도로 세분화 생략 */ }
+    } catch { /* 주소 없으면 도로 세분화 생략 */ }
+  }
 
   // 셔플(Fisher–Yates) — 부분 실행 시 특정 동·키워드에 편중되지 않게.
   for (let i = tasks.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [tasks[i], tasks[j]] = [tasks[j], tasks[i]]; }
