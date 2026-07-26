@@ -35,10 +35,10 @@ const trackPromo = (cafeId: number, type: "view" | "click" | "play") => { fetch(
 const SPRING_RING_SVG =
   "<svg xmlns='http://www.w3.org/2000/svg' width='28' height='22'>" +
   "<defs><linearGradient id='g2' x1='0' y1='0' x2='1' y2='1'>" +
-  "<stop offset='0' stop-color='#f6e2b6'/><stop offset='0.45' stop-color='#b8823f'/><stop offset='1' stop-color='#5c3a1e'/>" +
+  "<stop offset='0' stop-color='%23f6e2b6'/><stop offset='0.45' stop-color='%23b8823f'/><stop offset='1' stop-color='%235c3a1e'/>" +
   "</linearGradient></defs>" +
-  "<path d='M-3 15 L9 6' stroke='url(%23g2)' stroke-width='2' opacity='0.8' stroke-linecap='round'/>" +
-  "<path d='M19 6 L31 15' stroke='url(%23g2)' stroke-width='2' opacity='0.8' stroke-linecap='round'/>" +
+  "<path d='M-3 15 L9 6' stroke='%237a4f26' stroke-width='2.4' opacity='0.9' stroke-linecap='round'/>" +
+  "<path d='M19 6 L31 15' stroke='%237a4f26' stroke-width='2.4' opacity='0.9' stroke-linecap='round'/>" +
   "<ellipse cx='14' cy='17' rx='3.4' ry='2.8' fill='rgba(43,32,24,0.5)'/>" +
   "<ellipse cx='14' cy='17' rx='2.1' ry='1.7' fill='rgba(43,32,24,0.82)'/>" +
   "<ellipse cx='14' cy='9.5' rx='6.6' ry='8.4' fill='none' stroke='url(%23g2)' stroke-width='2.4' transform='rotate(-9 14 9.5)'/>" +
