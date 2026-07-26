@@ -162,7 +162,17 @@ const BRAND_ALIAS: Record<string, string[]> = {
 // 마지막 단어(지점명: "역삼점" 등)를 뺀 나머지를 공백 없이 합쳐 키로 삼는다 —
 // "로스터리 락온"(2단어 브랜드) 지점이 "로스터리 락온 역삼점"/"로스터리락온 역삼점"처럼 표기가 섞여도
 // 같은 체인 키로 묶이게 한다(기존엔 첫 단어만 써서 "로스터리"↔"로스터리락온"으로 갈려 CHAIN_CAP이 무력화됨).
-const chainKeyOf = (name: string): string => { const parts = (name ?? "").trim().split(/\s+/).filter(Boolean); return parts.length >= 2 ? parts.slice(0, -1).join("") : (name ?? ""); };
+// 단, 마지막 단어가 "점"으로 끝나는 지점 접미(점/지점/역점/호점 등) 패턴일 때만 체인으로 간주한다 —
+// 그렇지 않으면 "카페 물루"처럼 "카페/더/베이커리" 같은 일반명사를 상호 앞단어로 쓰는 독립카페까지
+// 같은 체인 키로 묶여 diversifyChains에서 부당하게 하위로 밀리는 오탐이 발생한다(#512, 검증카페 261곳 영향).
+const BRANCH_SUFFIX_RE = /점$/;
+const chainKeyOf = (name: string): string => {
+  const parts = (name ?? "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length < 2) return name ?? "";
+  const last = parts[parts.length - 1];
+  if (!BRANCH_SUFFIX_RE.test(last)) return name ?? "";
+  return parts.slice(0, -1).join("");
+};
 function diversifyChains<T extends { name: string }>(list: T[]): T[] {
   const chainCap = getCriterionSync("search.chain_cap");
   const count = new Map<string, number>();
