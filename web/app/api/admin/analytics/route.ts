@@ -296,13 +296,15 @@ export async function GET(req: NextRequest) {
 
     const dailyInsights = buildDailyInsights(daily, dailySources, dailyDevices, hours, weekdays, todayInsight);
 
-    // 🧑 진짜 사용자 신호 — 봇으로 설명 안 되는 신호(재방문·기능사용·검색유입 재방문율)
-    // r2/r3/r5 = 페이지 열람 2/3/5장+ (visit_count=페이지뷰). trueReturn = 다른 날 다시 온 진짜 재방문.
+    // 🧑 진짜 사용자 신호 — 봇으로 설명 안 되는 신호(기능사용). r2/r3/r5 = 페이지 열람 2/3/5장+(참고용 관여도, 재방문 아님).
+    // 🐛 재발방지(2026-07-26, CEO "여기저기 헷갈리게 표현하지 말고 명쾌하게 한 번만") — 이 자리에 별도로
+    //   'truereturn'(sessions>=2, 같은날 포함)을 "재방문"이라 표시해 위 retention(진짜 날짜기준 재방문)과
+    //   다른 숫자가 같은 화면에 함께 떠 사람을 헷갈리게 했다. "재방문"은 화면 전체에서 retention.ret
+    //   딱 하나만 쓴다 — 아래서 그 값을 그대로 재사용(별도 쿼리·별도 정의 금지).
     const cohort = (await sql.query(
       `SELECT COUNT(*) FILTER (WHERE COALESCE(visit_count,1)>=2)::int r2,
               COUNT(*) FILTER (WHERE COALESCE(visit_count,1)>=3)::int r3,
-              COUNT(*) FILTER (WHERE COALESCE(visit_count,1)>=5)::int r5,
-              COUNT(*) FILTER (WHERE COALESCE(sessions,1) >= 2)::int truereturn
+              COUNT(*) FILTER (WHERE COALESCE(visit_count,1)>=5)::int r5
        FROM user_consents WHERE last_seen>now()-interval '30 days' AND ${BOT}`).catch(() => [{}]))[0] as any;
     // 위치동의 상세: 전체동의 → 내부기기 제외 → 최종(실사용자) → 지역명 유/무(카톡 인앱 GPS 미획득 등)
     const consentDetail = (await sql`SELECT
@@ -341,12 +343,20 @@ export async function GET(req: NextRequest) {
       FROM user_visits v JOIN cafes c ON c.id = v.cafe_id
       WHERE v.favorite = true AND v.verified = true
       GROUP BY c.id, c.name, c.area ORDER BY n DESC LIMIT 8`.catch(() => [])) as any[];
+    // 🐛 재발방지(2026-07-26) — 여기도 sessions>=2(같은날 포함)를 '재방문'이라 표시해 위 retention(날짜기준)과
+    //   다른 숫자를 같은 화면에 냈다. traffic_events 날짜(KST) distinct count로 통일(retention과 동일 정의).
+    //   d 서브쿼리 컬럼을 a_id로 별칭(anon_id 그대로 두면 바깥 ${BOT}의 무수식 anon_id가 모호해짐).
     const realSources = (await sql.query(
-      `SELECT src, COUNT(*)::int visitors,
-              COUNT(*) FILTER (WHERE COALESCE(sessions,1) >= 2)::int returned,
-              ROUND(AVG(COALESCE(visit_count,1))::numeric,1) avg_pv
-       FROM user_consents WHERE src IN('naver','google','instagram','youtube','threads','kakao') AND last_seen>now()-interval '30 days' AND ${BOT}
-       GROUP BY 1 ORDER BY visitors DESC`).catch(() => [])) as any[];
+      `SELECT uc.src, COUNT(*)::int visitors,
+              COUNT(*) FILTER (WHERE d.days > 1)::int returned,
+              ROUND(AVG(COALESCE(uc.visit_count,1))::numeric,1) avg_pv
+       FROM user_consents uc
+       LEFT JOIN (
+         SELECT anon_id AS a_id, COUNT(DISTINCT date_trunc('day', ts AT TIME ZONE 'Asia/Seoul'))::int days
+         FROM traffic_events GROUP BY anon_id
+       ) d ON d.a_id = uc.anon_id
+       WHERE uc.src IN('naver','google','instagram','youtube','threads','kakao') AND uc.last_seen>now()-interval '30 days' AND ${BOT}
+       GROUP BY uc.src ORDER BY visitors DESC`).catch(() => [])) as any[];
 
     // 📣 공유 기록 — 사용자가 카페를 타인에게 공유한 이벤트(바이럴). 내부(대표·팀) 제외.
     await sql`CREATE TABLE IF NOT EXISTS share_events (id BIGSERIAL PRIMARY KEY, anon_id TEXT, path TEXT, cafe_id INT, channel TEXT, ts TIMESTAMPTZ NOT NULL DEFAULT now())`.catch(() => {});
@@ -365,7 +375,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       realUsers: {
-        r2: cohort?.r2 ?? 0, r3: cohort?.r3 ?? 0, r5: cohort?.r5 ?? 0, trueReturn: cohort?.truereturn ?? 0,
+        r2: cohort?.r2 ?? 0, r3: cohort?.r3 ?? 0, r5: cohort?.r5 ?? 0, trueReturn: retention?.ret ?? 0,
         consent: consentReal, taste: tasteN, bookmark: bookmarkN,
         consentDetail: {
           total: consentDetail?.total ?? 0, internal: consentDetail?.internal ?? 0, real: consentDetail?.real ?? 0,

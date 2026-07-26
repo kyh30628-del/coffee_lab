@@ -1095,15 +1095,23 @@ export default function AdminPage() {
                     <div className="p-4 space-y-4">
                       <p className="text-[10.5px] text-stone-700 bg-stone-100/70 rounded-lg px-3 py-2 leading-relaxed">우리 사이트 방문을 <b className="text-stone-600">외부 도구 없이 직접</b> 모은 현황입니다. <b className="text-emerald-700">대표·팀(내부)과 봇은 자동 제외</b>돼 아래 숫자는 모두 <b className="text-stone-600">진짜 외부 방문자</b>입니다. 실시간·방문자·유입경로·재방문은 정확하고, 페이지 단위(추이·인기카페)는 방문이 쌓이며 채워집니다. <span className="text-stone-600">※ 유입경로 '미상'은 추적 도입 전 옛 방문 또는 앱·북마크 유입(카톡·인스타 인앱은 경로가 안 남습니다).</span></p>
                       {/* 🟢 실시간 · 오늘 */}
-                      <div className="bg-white rounded-xl border border-stone-300 p-3">
-                        <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="bg-white rounded-xl border-2 border-emerald-300 p-3">
+                        <div className="text-center py-1">
+                          <div className="text-[11px] text-stone-600 font-bold mb-0.5">✅ 실제 사람 접속 · 재방문 (봇·내부 전부 제외, 명쾌 요약)</div>
+                          <div className="text-[26px] font-extrabold text-stone-800 leading-none">
+                            오늘 <span className="text-emerald-700">{a.today?.visitors ?? 0}</span>명
+                            <span className="mx-2 text-stone-300">|</span>
+                            재방문 <span className="text-amber-700">{a.retention?.returning ?? 0}</span>명<span className="text-[13px] text-stone-500 font-normal">(최근 30일)</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between flex-wrap gap-2 mt-2 pt-2 border-t border-stone-200">
                           <div className="flex items-center gap-1.5">
                             <span className="relative flex h-2.5 w-2.5"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span></span>
                             <span className="text-[12px] font-bold text-stone-700">실시간 <span className="text-emerald-600 text-[16px]">{a.realtime?.active5 ?? 0}</span>명 접속 중</span>
                           </div>
-                          <div className="text-[11px] text-stone-700">30분 내 {a.realtime?.active30 ?? 0}명 · KST 오늘(자정~) 방문 <b className="text-sky-700">{a.today?.visitors ?? 0}</b> · 페이지뷰 <b className="text-sky-700">{(a.today?.pageviews ?? 0).toLocaleString()}</b></div>
+                          <div className="text-[11px] text-stone-700">30분 내 {a.realtime?.active30 ?? 0}명 · 페이지뷰 <b className="text-sky-700">{(a.today?.pageviews ?? 0).toLocaleString()}</b></div>
                         </div>
-                        <p className="text-[9.5px] text-stone-600 mt-1.5">지금 사이트에 머무는 사람(최근 5분 활동)과 KST 자정부터 지금까지 다녀간 수입니다. <b>※ 아래 '일간(DAU)'은 집계 기준(자정~ 대신 최근 24시간)이 달라 이 수치와 미묘하게 다를 수 있어요.</b></p>
+                        <p className="text-[9.5px] text-stone-600 mt-1.5">위 굵은 숫자 2개가 이 화면의 유일한 기준입니다 — 아래 다른 카드들의 같은 이름 숫자도 전부 이것과 일치합니다. <b>※ 아래 '일간(DAU)'은 집계 기준(자정~ 대신 최근 24시간)이 달라 '오늘' 숫자와 미묘하게 다를 수 있어요.</b></p>
                       </div>
                       <div className="grid grid-cols-3 gap-2">
                         {[
@@ -1161,8 +1169,7 @@ export default function AdminPage() {
                       {a.realUsers && (
                         <div className="bg-emerald-50/60 border border-emerald-200 rounded-xl p-3">
                           <div className="text-[12px] font-bold text-emerald-800 mb-1.5">🧑 진짜 사용자 신호 <span className="font-normal text-[10px] text-emerald-600">· 기준=브라우저(localStorage), IP 아님</span></div>
-                          <div className="grid grid-cols-3 gap-2 text-center">
-                            <div><div className="text-[19px] font-extrabold text-emerald-700">{a.realUsers.trueReturn ?? 0}</div><div className="text-[9.5px] text-stone-700">재방문(다시 켬)<br/>(세션 2회+·같은날 포함)</div></div>
+                          <div className="grid grid-cols-2 gap-2 text-center">
                             <div>
                               <div className="text-[19px] font-extrabold text-emerald-700">{a.realUsers.consent}</div>
                               <div className="text-[9.5px] text-stone-700">위치동의<br/>(봇은 안 하는 행동)</div>
@@ -1192,7 +1199,7 @@ export default function AdminPage() {
                               ))}
                             </div>
                           )}
-                          <p className="text-[9.5px] text-stone-700 mt-1.5 leading-relaxed"><b>참고:</b> 페이지 여러 장 본 사람 {a.realUsers.r2}명(3+장 {a.realUsers.r3}·5+장 {a.realUsers.r5}) — 한 방문에 여러 페이지 본 것(재방문 아님). <b>재방문=브라우저를 다시 켠 것(세션 2회+, 같은날 포함)</b>이 진짜 성장 신호입니다.</p>
+                          <p className="text-[9.5px] text-stone-700 mt-1.5 leading-relaxed"><b>참고:</b> 페이지 여러 장 본 사람 {a.realUsers.r2}명(3+장 {a.realUsers.r3}·5+장 {a.realUsers.r5}) — 한 방문에 여러 페이지 본 것일 뿐 재방문이 아닙니다. <b>"재방문"이라 표시된 숫자는 화면 전체에서 전부 하나(위 '재방문율' 카드)와 같은 정의</b> — 다른 날짜에 다시 온 사람만 셉니다.</p>
                         </div>
                       )}
                       {/* 📣 공유(바이럴) 기록 */}
