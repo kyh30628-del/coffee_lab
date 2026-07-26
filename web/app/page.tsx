@@ -1331,7 +1331,7 @@ export default function Home() {
           {/* 홈/지도/추억 토글 */}
           <div className="flex bg-[#3d2f22] rounded-full p-0.5">
             {(["home", "map", "memory"] as const).map((t) => (
-              <button key={t} onClick={() => setTab(t)} className={`px-2.5 sm:px-3 py-1.5 text-xs font-bold rounded-full transition-colors whitespace-nowrap ${tab === t ? "bg-[#f4ece0] text-[#2b2018]" : "text-[#8f7a58]"}`}>
+              <button key={t} onClick={() => setTab(t)} className={`px-2.5 sm:px-3 py-1.5 text-[13px] font-bold rounded-full transition-colors whitespace-nowrap ${tab === t ? "bg-[#f4ece0] text-[#2b2018]" : "text-[#e8d4b0]"}`}>
                 {t === "home" ? "홈" : t === "map" ? "지도" : "추억"}
               </button>
             ))}
