@@ -85,10 +85,9 @@ function inRegion(area: string, region: string): boolean {
   const a = area ?? "";
   // 🗺️ 인천 동명 구(중구·동구) 구분: 인천 area는 "인천 OO"로 저장, 서울/경기는 접두사 없음.
   //   region이 "인천 OO"면 인천만, 아니면 인천 카페는 제외(서울 중구 ≠ 인천 중구).
-  if (region.startsWith("인천")) {
-    const gu = region.replace(/^인천\s*/, "");
-    return a.startsWith("인천") && (a.includes(gu) || a.includes(region));
-  }
+  // 🚨 재발방지(2026-07-26): area는 이미 정제된 정확한 키(lib/region.ts)라 부분일치(.includes)는
+  //   "동구"⊂"남동구" 같은 충돌을 부른다(discover.ts에서 실측 확인된 전례). 정확히 같은지만 비교한다.
+  if (region.startsWith("인천")) return a === region;
   if (a.startsWith("인천")) return false;
   // 서울·경기 광역명 → 하위 구/시 목록으로 확장 매칭
   const metroList = metroAreaList(region);

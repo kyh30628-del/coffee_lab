@@ -3,7 +3,8 @@ import { NextResponse } from "next/server";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-const INCHEON = ["중구","동구","미추홀구","연수구","남동구","부평구","계양구","서구","강화군","옹진군"];
+// 2026-07-01 인천 2군9구 개편 반영(중구·동구→제물포구/영종구, 서구→검단구/서해구, 공식 확인).
+const INCHEON = ["미추홀구","연수구","남동구","부평구","계양구","강화군","옹진군","검단구","서해구","영종구","제물포구"];
 
 export async function POST(req: Request) {
   try {
