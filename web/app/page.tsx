@@ -1351,24 +1351,28 @@ export default function Home() {
 
       {/* 홈 = 잡지 1면 */}
       {tab === "home" && (
-        <div className="flex-1 overflow-y-auto" style={{ paddingBottom: "3.25rem" }}>
+        <div className="flex-1 overflow-y-auto" style={{ paddingBottom: "3.25rem", position: "relative" }}>
+          {/* ☕ 은은한 카페 느낌(2026-07-26 v2) — "너무 티가 안난다" 피드백으로 코너 한 곳이 아니라
+              화면 전체에 걸친 은은한 원두빛 비네트(양쪽 코너) + 커피잔 링 자국 2개로 확장.
+              position:fixed로 스크롤해도 느낌이 계속 유지되도록(전반적인 분위기). */}
+          <div aria-hidden style={{
+            position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0,
+            backgroundImage:
+              "radial-gradient(ellipse at 100% 0%, rgba(155,105,50,0.22) 0%, transparent 60%), " +
+              "radial-gradient(ellipse at 0% 100%, rgba(120,80,40,0.18) 0%, transparent 55%), " +
+              "radial-gradient(circle at 90% 5%, transparent 34px, rgba(120,80,40,0.14) 36px, rgba(120,80,40,0.14) 39px, transparent 41px), " +
+              "radial-gradient(circle at 90% 5%, transparent 20px, rgba(120,80,40,0.1) 22px, rgba(120,80,40,0.1) 24px, transparent 26px), " +
+              "radial-gradient(circle at 8% 96%, transparent 26px, rgba(120,80,40,0.11) 28px, rgba(120,80,40,0.11) 30px, transparent 32px)",
+          }} />
           <div className="max-w-2xl mx-auto px-5 pt-4 pb-6" style={{
             // 📓 "커피 노트" 정체성 — 콘텐츠 폭에만 딱 맞춘 줄노트 텍스처(전체 화면폭이 아니라 실제
             // 카드가 놓이는 영역에만 스코프해 넓은 화면에서 배경이 따로 노는 것 방지).
             backgroundImage: "repeating-linear-gradient(to bottom, transparent 0, transparent 27px, rgba(43,32,24,0.06) 27px, rgba(43,32,24,0.06) 28px)",
             backgroundPosition: "0 6px",
+            position: "relative", zIndex: 1,
           }}>
-            <div className="text-center mb-6" style={{ position: "relative" }}>
-              {/* ☕ 은은한 카페 느낌(2026-07-26) — 커피잔 링 자국 + 따뜻한 원두빛 비네트, 코너에만 부드럽게. */}
-              <div aria-hidden style={{
-                position: "absolute", inset: "-20px -8px -12px", pointerEvents: "none", zIndex: 0,
-                backgroundImage:
-                  "radial-gradient(ellipse at 100% 0%, rgba(155,105,50,0.14) 0%, transparent 55%), " +
-                  "radial-gradient(ellipse at 0% 100%, rgba(120,80,40,0.08) 0%, transparent 50%), " +
-                  "radial-gradient(circle at 92% 6%, transparent 34px, rgba(120,80,40,0.10) 36px, rgba(120,80,40,0.10) 39px, transparent 41px), " +
-                  "radial-gradient(circle at 92% 6%, transparent 20px, rgba(120,80,40,0.07) 22px, rgba(120,80,40,0.07) 24px, transparent 26px)",
-              }} />
-              <div className="text-[10px] tracking-[0.3em] uppercase text-[#7a5122]" style={{ position: "relative", zIndex: 1 }}>데이터로 큐레이션하는</div>
+            <div className="text-center mb-6">
+              <div className="text-[10px] tracking-[0.3em] uppercase text-[#7a5122]">데이터로 큐레이션하는</div>
               <div className="text-xl font-bold border-y-2 border-[#2b2018] py-2 mt-1 dcn-shimmer-dark">{homeGu ? `${homeGu}의 오늘의 커피` : "오늘의 동네 커피"}</div>
               {/* 시·도 → 시·군·구 → 동·면 계층 선택(우리 동네). 검색 돋보기 제거. */}
               <div className="flex gap-1.5 justify-center mt-3 flex-wrap">
