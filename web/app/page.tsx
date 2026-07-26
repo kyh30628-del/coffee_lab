@@ -1333,7 +1333,11 @@ export default function Home() {
 
       {/* 홈 = 잡지 1면 */}
       {tab === "home" && (
-        <div className="flex-1 overflow-y-auto" style={{ paddingBottom: "3.25rem" }}>
+        <div className="flex-1 overflow-y-auto" style={{
+          paddingBottom: "3.25rem",
+          // 📓 "커피 노트" 정체성 — 홈 배경에 공책 줄노트 텍스처. 톤은 유지, 배경만 살짝.
+          backgroundImage: "repeating-linear-gradient(to bottom, transparent 0, transparent 31px, rgba(43,32,24,0.07) 31px, rgba(43,32,24,0.07) 32px), linear-gradient(to right, transparent 0, transparent 38px, rgba(180,92,58,0.22) 38px, rgba(180,92,58,0.22) 39px, transparent 39px)",
+        }}>
           <div className="max-w-2xl mx-auto px-5 py-6">
             <div className="text-center mb-6">
               <div className="text-[10px] tracking-[0.3em] uppercase text-[#7a5122]">데이터로 큐레이션하는</div>
