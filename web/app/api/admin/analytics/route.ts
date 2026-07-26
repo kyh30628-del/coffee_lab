@@ -181,11 +181,18 @@ export async function GET(req: NextRequest) {
        GROUP BY 1 ORDER BY visitors DESC LIMIT 15`
     ).catch(() => [])) as any[];
 
-    // 신규 vs 재방문
+    // 🐛 재발방지(2026-07-26, CEO "재방문 카운팅도 정확하게") — visit_count는 페이지뷰 누적치라 한
+    //   세션에서 2페이지만 봐도 '재방문'으로 잡혔다(실측: 이 기준 478명 vs 실제 날짜 기준 28명, ~17배
+    //   과대). '재방문'은 서로 다른 날짜에 다시 온 것만 쳐야 하므로 traffic_events의 날짜(KST) distinct
+    //   count로 재계산.
     const retention = (await sql.query(
-      `SELECT COUNT(*) FILTER (WHERE COALESCE(visit_count,1) <= 1)::int newcomers,
-              COUNT(*) FILTER (WHERE COALESCE(visit_count,1) > 1)::int ret
-       FROM user_consents WHERE last_seen > now()-interval '30 days' AND ${BOT}`
+      `WITH days AS (
+         SELECT anon_id, COUNT(DISTINCT date_trunc('day', ts AT TIME ZONE 'Asia/Seoul'))::int d
+         FROM traffic_events WHERE ts > now() - interval '30 days' GROUP BY anon_id
+       )
+       SELECT COUNT(*) FILTER (WHERE d <= 1)::int newcomers,
+              COUNT(*) FILTER (WHERE d > 1)::int ret
+       FROM days WHERE ${BOT}`
     ).catch(() => [{ newcomers: 0, ret: 0 }]))[0] as any;
 
     // 기기(모바일/태블릿/데스크톱) — user_agent 추정. 태블릿은 iPad·Tablet 토큰 또는 'Mobile' 없는 Android로 판별.

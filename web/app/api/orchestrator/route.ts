@@ -281,10 +281,17 @@ export async function GET(req: NextRequest) {
        GROUP BY 1 ORDER BY n DESC LIMIT 8`
     ).catch(() => [])) as any[];
     // 신규 vs 재방문(최근 30일 활성)
+    // 🐛 재발방지(2026-07-26, admin/analytics와 동일 버그 여기도 복제돼 있었음) — visit_count는
+    //   페이지뷰 누적치라 한 세션 2페이지만 봐도 '재방문'으로 잡혔다(실측 478명 vs 실제 날짜기준 28명,
+    //   ~17배 과대). traffic_events의 날짜(KST) distinct count로 재계산.
     const retention = (await sql.query(
-      `SELECT COUNT(*) FILTER (WHERE COALESCE(visit_count,1) <= 1)::int newcomers,
-              COUNT(*) FILTER (WHERE COALESCE(visit_count,1) > 1)::int ret
-       FROM user_consents WHERE last_seen > now()-interval '30 days' AND anon_id NOT IN (${BOT_ANON_IDS_SQL})`
+      `WITH days AS (
+         SELECT anon_id, COUNT(DISTINCT date_trunc('day', ts AT TIME ZONE 'Asia/Seoul'))::int d
+         FROM traffic_events WHERE ts > now() - interval '30 days' GROUP BY anon_id
+       )
+       SELECT COUNT(*) FILTER (WHERE d <= 1)::int newcomers,
+              COUNT(*) FILTER (WHERE d > 1)::int ret
+       FROM days WHERE anon_id NOT IN (${BOT_ANON_IDS_SQL})`
     ).catch(() => [{ newcomers: 0, ret: 0 }]))[0] as any;
 
     // 📈 페이지뷰 분석(traffic_events) — 자체 집계. 90일 보존(여기서 정리).
