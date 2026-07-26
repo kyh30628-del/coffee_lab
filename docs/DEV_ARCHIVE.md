@@ -158,3 +158,4 @@
 | 2026-07-25 09:37 | #502 | [dev_task 재상신] make-digest.mjs 제안서 미인입 감시 오탐 근본재설계 — #450 수정 | 6a6c1071 | - | scripts/make-digest.mjs 제안서 미인입 감시 근본재설계(#450 수정 후에도 3주+ 재발): 기존 stem ILIKE 문자열매칭 계열(#421/#427/#450) |
 | 2026-07-25 11:12 | #503 | 트래픽 지표 통일 | 6d689dbe | med | 단일소스 lib/trafficMetrics.ts(getDailyTraffic/getTodayTraffic) 신설 + lib/behaviorBot.ts BOT_ANON_IDS_SQL |
 | 2026-07-26 05:01 | #507 | [룰갭 P61] naver_category 비-F&B 업종 + 리뷰 내 타업체/타지역 혼입 조합 신호 — 신 | 383af22c | - | lib/reviewQuality.ts: naver_category 비F&B 조합신호 신규 게이트 추가(QualityInput.naverCategory, isNonFnbCategor |
+| 2026-07-26 08:49 | #512 | [검색품질] 체인상한(chain_cap) 오탐 — "카페 OOO" 등 일반명사 접두 개인상호를 프랜차이즈로  | c85a14a6 | - | app/api/search/route.ts:165 chainKeyOf() 수정 — 마지막 단어가 "점"으로 끝나는 지점접미 패턴일 때만 체인키로 묶도록 제한(그 외엔 이름 전체를  |
