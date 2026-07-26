@@ -49,7 +49,11 @@ export async function GET(req: NextRequest) {
       // 🎯 단, PRIORITY_REGIONS(강동·송파·구리)는 사업 우선순위상 10일까지 기다릴 수 없어 3일+ 방치되면
       //   큐를 밀어낸다 — 대상이 64지역 전체가 아니라 이 3곳뿐이라 #109의 상시-기아 재발은 없다(coord#107).
       const priorityStarved = (await sql`SELECT region, area_label FROM discovery_state WHERE region = ANY(${PRIORITY_REGIONS}) AND (last_run IS NULL OR last_run < now() - interval '3 days') ORDER BY last_run ASC NULLS FIRST LIMIT 1`)[0] as { region: string; area_label: string } | undefined;
-      const starved = (await sql`SELECT region, area_label, (last_run < now() - interval '10 days') AS critical FROM discovery_state WHERE last_run < now() - interval '5 days' ORDER BY last_run ASC NULLS FIRST LIMIT 1`)[0] as { region: string; area_label: string; critical: boolean } | undefined;
+      // 🐛 재발방지(2026-07-26): priorityStarved(위 줄)는 NULL(한 번도 미발굴)을 안전 처리하는데 이 쿼리는
+      //   WHERE last_run < ... 만 있어 NULL은 SQL에서 '비교 결과 unknown'이라 결과에서 아예 빠졌다 — 즉
+      //   한 번도 발굴 안 된 신설 지역(예: 인천 행정구역 개편 신설구)이 '5일+ 굶음'보다도 우선순위가
+      //   낮게 취급돼 큐가 안 비는 한 영영 못 뽑혔다. NULL을 최우선(critical)으로 명시 처리.
+      const starved = (await sql`SELECT region, area_label, (last_run IS NULL OR last_run < now() - interval '10 days') AS critical FROM discovery_state WHERE last_run IS NULL OR last_run < now() - interval '5 days' ORDER BY last_run ASC NULLS FIRST LIMIT 1`)[0] as { region: string; area_label: string; critical: boolean } | undefined;
       const critical = priorityStarved ?? (starved?.critical ? starved : undefined);
       const at = critical ? null : (await sql`SELECT id, region, area_label, keywords FROM discovery_targets WHERE status='pending' ORDER BY priority DESC, created_at ASC LIMIT 1`)[0] as any;
       const target = critical ?? (at ?? starved ?? ((await sql`SELECT region, area_label FROM discovery_state
