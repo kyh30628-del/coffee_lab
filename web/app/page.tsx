@@ -174,6 +174,7 @@ const SpotlightCore = memo(function SpotlightCore({ items, onOpen, toneOffset = 
     <>
       <div
         className="relative"
+        style={{ perspective: 1000 }}
         onPointerDown={pauseThenResume}
         onTouchStart={(e) => { touchX.current = e.touches[0].clientX; pauseThenResume(); }}
         onTouchEnd={(e) => {
@@ -1352,8 +1353,20 @@ export default function Home() {
             backgroundPosition: "0 6px",
           }}>
             <div className="text-center mb-6">
-              <div className="text-[10px] tracking-[0.3em] uppercase text-[#7a5122]">데이터로 큐레이션하는</div>
-              <div className="text-xl font-bold border-y-2 border-[#2b2018] py-2 mt-1 dcn-shimmer-dark">{homeGu ? `${homeGu}의 오늘의 커피` : "오늘의 동네 커피"}</div>
+              {/* 📓 노트에 손글씨를 써내려가는 듯한 타자기 효과(2026-07-26) — clip-path만 애니메이션해
+                  text-center 정렬이 프레임마다 흔들리지 않게(width 애니메이션 대신 사용). */}
+              {(() => {
+                const kickerText = "데이터로 큐레이션하는";
+                const titleText = homeGu ? `${homeGu}의 오늘의 커피` : "오늘의 동네 커피";
+                const kDur = Math.max(0.4, kickerText.length * 0.05);
+                const tDur = Math.max(0.4, titleText.length * 0.06);
+                return (
+                  <>
+                    <div className="text-[10px] tracking-[0.3em] uppercase text-[#7a5122] dcn-anim" style={{ animation: `dcnType ${kDur}s steps(${kickerText.length}, end) both` }}>{kickerText}</div>
+                    <div className="text-xl font-bold border-y-2 border-[#2b2018] py-2 mt-1 dcn-shimmer-dark dcn-anim" style={{ animation: `dcnShimmer 2s ease-out infinite, dcnType ${tDur}s steps(${titleText.length}, end) ${kDur}s both` }}>{titleText}</div>
+                  </>
+                );
+              })()}
               {/* 시·도 → 시·군·구 → 동·면 계층 선택(우리 동네). 검색 돋보기 제거. */}
               <div className="flex gap-1.5 justify-center mt-3 flex-wrap">
                 <select value={homeSido} onChange={(e) => { setHomeSido(e.target.value); setHomeGu(""); setHomeDong(""); }} className="border border-[#cbb89f] rounded-lg px-2.5 py-2 text-sm bg-white text-[#2b2018]">
