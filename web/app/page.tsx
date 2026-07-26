@@ -108,9 +108,18 @@ const TONES = ["#2b2018", "#4a3220", "#6f4e37", "#8a5a24", "#9c6b3f"];
 
 // 홈 잡지 카드 — 모듈 스코프(컴포넌트 내부 정의 금지). 내부에 두면 렌더마다 재마운트되어 뒤로가기/탭전환이 느려짐.
 // 2026-07-25: 높이 압축 피드백 — 패딩·폰트·여백 축소, identity 2줄→1줄.
-const HeadlineCard = memo(function HeadlineCard({ c, kicker, tone, onOpen }: { c: DCafe; kicker: string; tone: number; onOpen: (id: number) => void }) {
+const HeadlineCard = memo(function HeadlineCard({ c, kicker, tone, onOpen, swipeable }: { c: DCafe; kicker: string; tone: number; onOpen: (id: number) => void; swipeable?: boolean }) {
   return (
-    <button onClick={() => onOpen(c.id)} className="w-full text-left rounded-2xl overflow-hidden shadow-md mb-4" style={{ background: TONES[tone] }}>
+    <button onClick={() => onOpen(c.id)} className="relative w-full text-left rounded-2xl overflow-hidden shadow-md mb-4" style={{ background: TONES[tone] }}>
+      {/* 📓 우측 상단 접힌 페이지 표시(2026-07-26) — "다음 페이지 있음, 스와이프하세요" 힌트. */}
+      {swipeable && (
+        <div aria-hidden style={{
+          position: "absolute", top: 0, right: 0, width: 0, height: 0,
+          borderStyle: "solid", borderWidth: "0 22px 22px 0",
+          borderColor: "transparent rgba(244,236,224,0.85) transparent transparent",
+          filter: "drop-shadow(-1.5px 1.5px 2px rgba(0,0,0,0.35))",
+        }} />
+      )}
       <div className="p-3.5 text-[#f4ece0]">
         <div className="text-[9px] tracking-[0.2em] uppercase text-[#e8d4b0] mb-1.5">{kicker}</div>
         <div className="flex items-center gap-2 mb-1">
@@ -185,11 +194,11 @@ const SpotlightCore = memo(function SpotlightCore({ items, onOpen, toneOffset = 
         }}
       >
         <div key={`cur-${c.id}`} className={prevIdx !== null ? "dcn-spotlight-in" : undefined}>
-          <HeadlineCard c={c} kicker={`${idx + 1} / ${items.length}`} tone={(toneOffset + idx) % TONES.length} onOpen={onOpen} />
+          <HeadlineCard c={c} kicker={`${idx + 1} / ${items.length}`} tone={(toneOffset + idx) % TONES.length} onOpen={onOpen} swipeable={items.length > 1} />
         </div>
         {prevIdx !== null && items[prevIdx] && (
           <div key={`prev-${items[prevIdx].id}`} className="absolute inset-0 dcn-spotlight-out">
-            <HeadlineCard c={items[prevIdx]} kicker={`${prevIdx + 1} / ${items.length}`} tone={(toneOffset + prevIdx) % TONES.length} onOpen={onOpen} />
+            <HeadlineCard c={items[prevIdx]} kicker={`${prevIdx + 1} / ${items.length}`} tone={(toneOffset + prevIdx) % TONES.length} onOpen={onOpen} swipeable={items.length > 1} />
           </div>
         )}
       </div>
@@ -1360,17 +1369,30 @@ export default function Home() {
             backgroundPosition: "0 6px",
           }}>
             <div className="text-center mb-6">
-              {/* 📓 노트에 손글씨를 써내려가는 듯한 타자기 효과(2026-07-26) — clip-path만 애니메이션해
-                  text-center 정렬이 프레임마다 흔들리지 않게(width 애니메이션 대신 사용). */}
+              {/* 📓 노트에 단어를 하나씩 써내려가는 듯한 효과(2026-07-26) — 글자 단위(clip-path)가
+                  아니라 단어 단위로 각 span에 페이드+살짝 떠오르는 애니메이션을 순차 지연 적용. */}
               {(() => {
-                const kickerText = "데이터로 큐레이션하는";
-                const titleText = homeGu ? `${homeGu}의 오늘의 커피` : "오늘의 동네 커피";
-                const kDur = Math.max(0.4, kickerText.length * 0.05);
-                const tDur = Math.max(0.4, titleText.length * 0.06);
+                const kickerWords = "데이터로 큐레이션하는".split(" ");
+                const titleWords = (homeGu ? `${homeGu}의 오늘의 커피` : "오늘의 동네 커피").split(" ");
+                const kStep = 0.16, kDur = 0.32;
+                const kTotal = (kickerWords.length - 1) * kStep + kDur + 0.08;
+                const tStep = 0.18;
                 return (
                   <>
-                    <div className="text-[10px] tracking-[0.3em] uppercase text-[#7a5122] dcn-anim" style={{ animation: `dcnType ${kDur}s steps(${kickerText.length}, end) both` }}>{kickerText}</div>
-                    <div className="text-xl font-bold border-y-2 border-[#2b2018] py-2 mt-1 dcn-shimmer-dark dcn-anim" style={{ animation: `dcnShimmer 2s ease-out infinite, dcnType ${tDur}s steps(${titleText.length}, end) ${kDur}s both` }}>{titleText}</div>
+                    <div className="text-[10px] tracking-[0.3em] uppercase text-[#7a5122] dcn-anim">
+                      {kickerWords.map((w, i) => (
+                        <span key={i} style={{ display: "inline-block", animation: `dcnWordIn ${kDur}s ease-out ${i * kStep}s both` }}>
+                          {w}{i < kickerWords.length - 1 ? " " : ""}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="text-xl font-bold border-y-2 border-[#2b2018] py-2 mt-1 dcn-shimmer-dark dcn-anim">
+                      {titleWords.map((w, i) => (
+                        <span key={i} style={{ display: "inline-block", animation: `dcnWordIn 0.36s ease-out ${kTotal + i * tStep}s both` }}>
+                          {w}{i < titleWords.length - 1 ? " " : ""}
+                        </span>
+                      ))}
+                    </div>
                   </>
                 );
               })()}

@@ -102,21 +102,22 @@ body {
    순간 사라지고 새 카드만 페이드인 되는 '컷 전환'이라 뚝뚝 끊겨 보였음. 이제 이전 카드(절대위치, 위)가
    서서히 사라지는 동시에 새 카드(아래, 정상흐름)가 서서히 나타나 실제로 겹쳐 넘어간다. */
 .dcn-spotlight-in { animation: dcnSpotlightIn 0.6s cubic-bezier(0.22, 1, 0.36, 1); }
-/* 📓 2026-07-26: "책장 넘기듯" 피드백 — 단순 페이드 대신 왼쪽 모서리를 축으로 실제 책장이
-   넘어가는 3D 회전(perspective 필요, SpotlightCore 컨테이너에 지정)으로 교체. */
-.dcn-spotlight-out { animation: dcnSpotlightOut 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards; transform-origin: left center; backface-visibility: hidden; }
+/* 📓 2026-07-26: "책장 넘기듯" + "우측 상단 접힌 표시" 피드백 — 카드 우측 상단 접힌 모서리(dog-ear)
+   힌트와 짝을 맞춰, 오른쪽 모서리를 축으로 페이지가 넘어가는 3D 회전(perspective는 SpotlightCore
+   컨테이너에 지정)으로 교체. */
+.dcn-spotlight-out { animation: dcnSpotlightOut 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards; transform-origin: right center; backface-visibility: hidden; }
 @keyframes dcnSpotlightIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes dcnSpotlightOut {
   0% { transform: rotateY(0deg); opacity: 1; filter: brightness(1); }
   65% { opacity: 1; filter: brightness(0.75); }
-  100% { transform: rotateY(-100deg); opacity: 0; filter: brightness(0.55); }
+  100% { transform: rotateY(100deg); opacity: 0; filter: brightness(0.55); }
 }
 @media (prefers-reduced-motion: reduce) {
   .dcn-spotlight-in { animation: none; }
   .dcn-spotlight-out { animation: none; opacity: 0; }
 }
 
-/* 📓 노트에 손글씨를 써내려가는 듯한 타자기 효과 — clip-path만 애니메이션(레이아웃 무변,
-   text-center 부모에서도 가운데 정렬이 프레임마다 흔들리지 않음). 글자수는 JS에서 steps(N)로 주입. */
-@keyframes dcnType { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
-@media (prefers-reduced-motion: reduce) { .dcn-anim { animation: none !important; } }
+/* 📓 노트에 단어를 하나씩 써내려가는 효과 — 단어별 span에 순차 지연된 페이드+살짝 떠오름.
+   (글자 단위 clip-path는 "단어가 하나씩"이 아니라는 피드백으로 폐기, 2026-07-26) */
+@keyframes dcnWordIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .dcn-anim, .dcn-anim * { animation: none !important; opacity: 1 !important; transform: none !important; } }
