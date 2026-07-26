@@ -67,7 +67,7 @@ export default function RegisterPage() {
           )}
           <a href="/cafe" className="inline-block mt-5 text-[#7a5122] underline text-sm">가이드 둘러보기 →</a>
         </div>
-        <OwnerSignupModal open={showTrial} onClose={() => setShowTrial(false)} trial prefillCafe={newCafe} />
+        <OwnerSignupModal open={showTrial} onClose={() => setShowTrial(false)} trial prefillCafe={newCafe} source="cafe_register" />
         <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet" />
       </main>
     );
@@ -176,7 +176,7 @@ export default function RegisterPage() {
         </div>
 
       </div>
-      <OwnerSignupModal open={showTrial} onClose={() => setShowTrial(false)} trial prefillCafe={newCafe} />
+      <OwnerSignupModal open={showTrial} onClose={() => setShowTrial(false)} trial prefillCafe={newCafe} source="cafe_register" />
       <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet" />
     </main>
   );

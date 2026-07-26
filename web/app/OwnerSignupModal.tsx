@@ -4,7 +4,16 @@ import { useLockBodyScroll } from "@/lib/useLockBodyScroll";
 
 // 사장님 카페 정보 입력 모달(공용) — /pricing(구독)·랜딩(7일 체험)·카페 등록 직후(prefillCafe) 사용.
 //   카페 검색·선택(또는 prefill 고정) → 성함·연락처·이메일·동의 → /api/subscription(pending). 승인 시 이메일로 PIN.
-export default function OwnerSignupModal({ open, onClose, trial = false, prefillCafe }: { open: boolean; onClose: () => void; trial?: boolean; prefillCafe?: { id: number; name: string } | null }) {
+// 📊 #513 신청 퍼널 계측 — 모달 오픈·제출 성공/실패를 /api/owner-funnel에 얕게 기록(개인정보 0, 실패해도 신청 흐름엔 무해).
+function trackFunnel(event: string, extra?: Record<string, unknown>) {
+  try {
+    const anonId = typeof window !== "undefined" ? localStorage.getItem("dcn_anon") || "" : "";
+    const path = typeof window !== "undefined" ? window.location.pathname : "";
+    fetch("/api/owner-funnel", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ anonId, event, path, ...extra }), keepalive: true }).catch(() => {});
+  } catch {}
+}
+
+export default function OwnerSignupModal({ open, onClose, trial = false, prefillCafe, source }: { open: boolean; onClose: () => void; trial?: boolean; prefillCafe?: { id: number; name: string } | null; source?: string }) {
   const [cafeQ, setCafeQ] = useState("");
   const [sug, setSug] = useState<{ id: number; name: string; area: string }[]>([]);
   const [picked, setPicked] = useState<{ id: number; name: string } | null>(null);
@@ -23,6 +32,7 @@ export default function OwnerSignupModal({ open, onClose, trial = false, prefill
 
   // 등록 직후 진입: 그 카페로 고정(검색 없이)
   useEffect(() => { if (open && prefillCafe) setPicked(prefillCafe); }, [open, prefillCafe]);
+  useEffect(() => { if (open) trackFunnel("modal_open", { source, meta: { trial, prefill: !!prefillCafe } }); }, [open, source, trial, prefillCafe]);
   useLockBodyScroll(open);
   if (!open) return null;
   const reset = () => { setDone(false); setPicked(prefillCafe ?? null); setCafeQ(""); setOwnerName(""); setContact(""); setEmail(""); setBizNo(""); setBizRegBase64(""); setBizRegName(""); setConsent(false); setAttest(false); setSug([]); setErr(""); };
@@ -60,9 +70,9 @@ export default function OwnerSignupModal({ open, onClose, trial = false, prefill
     try {
       const r = await fetch("/api/subscription", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cafeId: picked!.id, cafeName: picked!.name, ownerName, contact, email, bizNo, bizRegBase64, consent: true, attest: true, newsletter: news, trial }) });
       const d = await r.json();
-      if (d.ok) setDone(true);
-      else setErr(d.error || "신청에 실패했어요");
-    } catch { setErr("네트워크 오류 — 다시 시도해 주세요"); }
+      if (d.ok) { setDone(true); trackFunnel("submit_success", { source, cafeId: picked!.id, meta: { trial } }); }
+      else { setErr(d.error || "신청에 실패했어요"); trackFunnel("submit_fail", { source, cafeId: picked!.id, meta: { trial, error: d.error || "unknown" } }); }
+    } catch { setErr("네트워크 오류 — 다시 시도해 주세요"); trackFunnel("submit_fail", { source, cafeId: picked?.id, meta: { trial, error: "network" } }); }
     setBusy(false);
   };
 
