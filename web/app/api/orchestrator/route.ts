@@ -512,7 +512,7 @@ export async function GET(req: NextRequest) {
         { key: "wait_judge", label: "AI판정 대기", count: pl.wait_judge, note: "새벽 판정" },
         { key: "wait_embed", label: "임베딩 대기", count: pl.wait_embed, note: "" },
         { key: "ready", label: "승격 준비", count: pl.ready, note: "곧 공개" },
-        { key: "live", label: "공개됨", count: pl.live, note: "전 게이트 통과" },
+        { key: "live", label: "파이프라인 통과", count: pl.live, note: "전 게이트 통과(pipeline_status='live') — 이후 수동 비공개 처리된 곳 포함, 지금 실제 공개수는 아래 '공개 N/M' 참조" },
         { key: "verified_skip", label: "옥석·AI판정 스킵(후순위)", count: verifiedSkip, note: "검증등급 규칙검증 완료 → AI 재판정 불필요(설계·의도적 후순위·유령 백로그 아님)" },
         { key: "rejected", label: "차단", count: pl.rejected, note: "품질 미달" },
       ],

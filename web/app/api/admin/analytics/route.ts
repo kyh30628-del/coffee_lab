@@ -8,10 +8,11 @@ export const runtime = "nodejs";
 // 📈 유입 분석 전용 API — 네이버·구글 없이 우리 DB(user_consents·traffic_events)로 상세 집계.
 // 방문자 단위 지표는 user_consents(즉시), 페이지뷰·퍼널·추이는 traffic_events(적재되며 채워짐).
 const authed = (req: NextRequest) => !!req.headers.get("x-admin-password") && req.headers.get("x-admin-password") === process.env.ADMIN_PASSWORD;
-// 노이즈 제외: 봇 UA + 크롤러 referrer(UA로 안 잡히는 findelio·blinkx 등) + 내부(대표·팀) + 행동기반 봇(#472,
-// 데스크톱 UA로 위장해 위 키워드 필터를 통과하는 헤드리스 — lib/behaviorBot.ts 참고). 거치면 '진짜 외부 방문자'만.
-const CRAWLER_SRC = "findelio|blinkx|semrush|ahrefs|dataprovider|dotbot|petalbot|yandex|mj12|serpstat";
-const BOT = `COALESCE(user_agent,'') !~* 'bot|crawl|spider|slurp|bingpreview|facebookexternalhit|headless|preview' AND COALESCE(src,'') !~* '${CRAWLER_SRC}' AND COALESCE(src,'') NOT IN ('internal','spam') AND NOT COALESCE(internal, false) AND anon_id NOT IN (${BOT_ANON_IDS_SQL})`;
+// 🚨 재발방지(2026-07-26): 여기 로컬로 봇 정규식을 다시 만들지 말 것 — 예전에 이 자리에 있던 로컬
+//   BOT 상수가 `src NOT IN ('internal','spam')`을 독자적으로 재도입해 #503과 똑같은 방식으로 진짜
+//   방문자를 오탐(DAU 165→94, -43% 실측)하고 있었다. 노이즈 제외 기준은 lib/behaviorBot.ts의
+//   `BOT_ANON_IDS_SQL` 단일출처만 쓴다(CEO 절대원칙, [[reference_traffic_analysis]]).
+const BOT = `anon_id NOT IN (${BOT_ANON_IDS_SQL})`;
 const WEEKDAY_KO = ["일", "월", "화", "수", "목", "금", "토"];
 
 // 🧾 일일 분석 요약 — 전일·7일평균 대비 증감(+근거) / 기기 비중 변화 / 요일·시간대 패턴을
