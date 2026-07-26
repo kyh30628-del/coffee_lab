@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
-import { dessertDominance } from "@/lib/charScore";
-import { recentN } from "@/lib/reviewDates";
 export const runtime = "nodejs";
 
 // "📈 요즘 뜨는 카페" — 별점(미제공) 대신 우리 소유 데이터로 모멘텀 산출.
@@ -33,9 +31,34 @@ export async function GET(req: NextRequest) {
     // 매 콜드스타트마다 순차 DDL 4회 왕복(무의미)을 냈다. 스키마는 다른 쓰기 경로에서 계속 보장되므로
     // 이 GET에서는 생략(2026-07-26, 동작 무변·순수 성능).
     const region = (req.nextUrl.searchParams.get("region") ?? "").trim();
-    // ⚡ 본쿼리(rows)를 스냅샷 블록과 동시 발사 — 상호 독립(deltaMap은 아래 루프에서만 소비). 결과 불변.
-    const rowsP = sql`SELECT id, name, area, synth_grade, synth_count, synth_identity, review_dates, char_scores
-      FROM cafes WHERE published = true AND review_dates IS NOT NULL`;
+    // ⚡ 2026-07-26 쿼리 구조 재작업 — 예전엔 발행 카페 13,388곳 전체(review_dates·char_scores
+    // JSONB 포함)를 통째로 받아와 JS에서 recentN·dessertDominance를 매 요청마다 순회 계산했다
+    // (최대 비용 구간, 홈 로딩 지연의 실질 원인). r90/r30(최근성)·dominant(디저트우세) 판정을 SQL로
+    // 이전해 DB 안에서 필터링 — 네트워크로는 "최근 버즈 있고 디저트우세 아닌" 훨씬 적은 후보만 전송.
+    // ⚠️ recentN은 Date.now() 기준 정확한 시각 컷오프라 SQL도 CURRENT_DATE(자정)가 아니라
+    // now()의 정밀 timestamp로 맞춰야 결과가 일치한다(DB 500/800건 표본 전수 대조로 검증, 불일치 0).
+    const rowsP = sql`
+      SELECT c.id, c.name, c.area, c.synth_grade, c.synth_count, c.synth_identity,
+        r.r90, r.r30,
+        (COALESCE((c.char_scores->>'dessert')::numeric,0) <= (
+          COALESCE((c.char_scores->>'roast')::numeric,0) + COALESCE((c.char_scores->>'work')::numeric,0) +
+          COALESCE((c.char_scores->>'quiet')::numeric,0) + COALESCE((c.char_scores->>'mood')::numeric,0) +
+          COALESCE((c.char_scores->>'space')::numeric,0)
+        )) AS bonus
+      FROM cafes c
+      CROSS JOIN LATERAL (
+        SELECT
+          (SELECT COUNT(*) FROM jsonb_array_elements_text(c.review_dates) d
+           WHERE (to_date(replace(d,'.','-'),'YYYY-MM-DD')::timestamptz AT TIME ZONE 'UTC') >= (now() - interval '90 days')) AS r90,
+          (SELECT COUNT(*) FROM jsonb_array_elements_text(c.review_dates) d
+           WHERE (to_date(replace(d,'.','-'),'YYYY-MM-DD')::timestamptz AT TIME ZONE 'UTC') >= (now() - interval '30 days')) AS r30
+      ) r
+      WHERE c.published = true AND c.review_dates IS NOT NULL
+        AND r.r90 >= 3
+        AND NOT (COALESCE((c.char_scores->>'dessert')::numeric,0) > 20
+          AND COALESCE((c.char_scores->>'roast')::numeric,0) < 5
+          AND COALESCE((c.char_scores->>'dessert')::numeric,0) >= COALESCE((c.char_scores->>'roast')::numeric,0) * 8)
+    `;
 
     // 스냅샷 증가분(Δ): 5일 이상 전 스냅샷이 있으면 상승세 계산
     // ⚡ 홈 로딩 속도 — 원래 "날짜 범위 확인 → (조건부) base 조회" 순차 2왕복이었다. cafe_snapshots는
@@ -65,15 +88,13 @@ export async function GET(req: NextRequest) {
     } catch { /* 스냅샷 없음 → 버즈만 사용 */ }
 
     const rows = (await rowsP) as unknown as
-      { id: number; name: string; area: string; synth_grade: string | null; synth_count: number | null; synth_identity: string | null; review_dates: unknown; char_scores: Record<string, number> | null }[];
+      { id: number; name: string; area: string; synth_grade: string | null; synth_count: number | null; synth_identity: string | null; r90: number; r30: number; bonus: boolean }[];
 
     const scored: any[] = [];
     for (const c of rows) {
       if (!inRegion(c.area ?? "", region)) continue;
       const total = c.synth_count ?? 0;
-      const r90 = recentN(c.review_dates, 90);
-      const r30 = recentN(c.review_dates, 30);
-      if (r90 < 3) continue; // 최근 버즈가 의미 있는 곳만
+      const r90 = Number(c.r90), r30 = Number(c.r30); // ⚡ SQL에서 이미 계산·필터링(r90>=3·NOT dominant)됨
       const share = total > 0 ? r90 / total : 0;
       const delta = hasDelta && deltaMap.has(c.id) ? total - (deltaMap.get(c.id) ?? total) : null;
       // '요즘 뜨는' = 가장 최근 한 달(30일)을 가장 무겁게(×2) + 3개월(90일) 버즈 + 최근 집중도 보정.
@@ -81,9 +102,8 @@ export async function GET(req: NextRequest) {
       if (delta && delta > 0) score += delta * 3;
       // 커피 카테고리 정체성 보정 — 디저트 우세 카페는 '요즘 뜨는'에서 제외하고, 정체성 유지 카페만 가점.
       // 베이커리류가 리뷰 회전(버즈)만으로 '요즘 뜨는'을 과점하던 편향 완화(결함C, 배포abe8e99가 가점만으로는
-      // 미달성 — 디저트 우세 카페 자체를 걸러야 함. coordination#88).
-      const { bonus, dominant } = dessertDominance(c.char_scores);
-      if (dominant) continue;
+      // 미달성 — 디저트 우세 카페 자체를 걸러야 함. coordination#88). dominant 카페는 이미 SQL WHERE에서 제외됨.
+      const bonus = c.bonus;
       if (bonus) score *= 1.25;
       const reason = (delta && delta > 0)
         ? `최근 검증후기 +${delta}건 늘며 상승세 · 3개월 ${r90}건`

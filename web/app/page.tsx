@@ -105,12 +105,22 @@ const GRADE_STYLE: Record<string, { bg: string; label: string }> = { 검증: { b
 // 🎨 2026-07-25: 초록(#5f7355)이 섞여 브라운 카드들과 안 어울려 "조잡하다"는 피드백 → 전부 사이트 브랜드
 //   톤(에스프레소·로스팅 브라운·카라멜, 명도만 다르게)으로 통일. 진한→연한 순.
 const TONES = ["#2b2018", "#4a3220", "#6f4e37", "#8a5a24", "#9c6b3f"];
+// 🎨 2026-07-26: "카드 색을 주변 톤과 어울리게 + 그라데이션 은은하게" 피드백 — 각 톤을 단색 대신
+// 같은 계열(에스프레소·로스팅 브라운·카라멜) 안에서만 밝기 변화를 주는 대각선 그라데이션으로.
+// 배경(크림 #f4ece0)·헤더(#2b2018)와 같은 색가족이라 튀지 않으면서 카드에 입체감만 더함.
+const TONE_GRADIENTS = [
+  "linear-gradient(135deg, #3d2f22 0%, #2b2018 55%, #1c140d 100%)",
+  "linear-gradient(135deg, #5c4230 0%, #4a3220 55%, #37230f 100%)",
+  "linear-gradient(135deg, #83604a 0%, #6f4e37 55%, #573d29 100%)",
+  "linear-gradient(135deg, #a06f3a 0%, #8a5a24 55%, #6c4419 100%)",
+  "linear-gradient(135deg, #b3814f 0%, #9c6b3f 55%, #7a5230 100%)",
+];
 
 // 홈 잡지 카드 — 모듈 스코프(컴포넌트 내부 정의 금지). 내부에 두면 렌더마다 재마운트되어 뒤로가기/탭전환이 느려짐.
 // 2026-07-25: 높이 압축 피드백 — 패딩·폰트·여백 축소, identity 2줄→1줄.
 const HeadlineCard = memo(function HeadlineCard({ c, kicker, tone, onOpen }: { c: DCafe; kicker: string; tone: number; onOpen: (id: number) => void }) {
   return (
-    <button onClick={() => onOpen(c.id)} className="w-full text-left rounded-2xl overflow-hidden shadow-md mb-4" style={{ background: TONES[tone] }}>
+    <button onClick={() => onOpen(c.id)} className="w-full text-left rounded-2xl overflow-hidden shadow-md mb-4" style={{ backgroundImage: TONE_GRADIENTS[tone] }}>
       <div className="p-3.5 text-[#f4ece0]">
         <div className="text-[9px] tracking-[0.2em] uppercase text-[#e8d4b0] mb-1.5">{kicker}</div>
         <div className="flex items-center gap-2 mb-1">
@@ -1352,18 +1362,9 @@ export default function Home() {
       {/* 홈 = 잡지 1면 */}
       {tab === "home" && (
         <div className="flex-1 overflow-y-auto" style={{ paddingBottom: "3.25rem", position: "relative" }}>
-          {/* ☕ 은은한 카페 느낌(2026-07-26 v4) — "더 진하게 + 원두 개수 늘려" 재요청으로 비네트·원두
-              불투명도 상향, 6개로 확대. 화면 진짜 가장자리(px 단위)에 붙여 좁은 모바일 폭에서도
-              카드 텍스트와 안 겹치게(퍼센트 좌표는 모바일에서 콘텐츠 위에 얹히는 문제가 있어 변경). */}
-          <div aria-hidden style={{
-            position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0,
-            backgroundImage:
-              "radial-gradient(ellipse at 100% 0%, rgba(155,105,50,0.4) 0%, transparent 62%), " +
-              "radial-gradient(ellipse at 0% 100%, rgba(120,80,40,0.32) 0%, transparent 58%), " +
-              "radial-gradient(circle at 90% 5%, transparent 34px, rgba(120,80,40,0.22) 36px, rgba(120,80,40,0.22) 39px, transparent 41px), " +
-              "radial-gradient(circle at 90% 5%, transparent 20px, rgba(120,80,40,0.16) 22px, rgba(120,80,40,0.16) 24px, transparent 26px), " +
-              "radial-gradient(circle at 8% 96%, transparent 26px, rgba(120,80,40,0.19) 28px, rgba(120,80,40,0.19) 30px, transparent 32px)",
-          }}>
+          {/* ☕ 은은한 카페 느낌 — 원두 실루엣만 유지(2026-07-26 v5). 배경 비네트·링자국 그라데이션은
+              "코너가 어두워서 잘 안 보인다" 피드백으로 삭제. */}
+          <div aria-hidden style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0 }}>
             <svg aria-hidden style={{ position: "absolute", top: 90, left: 4, transform: "rotate(-25deg)" }} width="26" height="38" viewBox="0 0 32 48">
               <path d="M16 2C7 2 2 14 2 24C2 36 8 46 16 46C24 46 30 36 30 24C30 14 25 2 16 2Z" fill="rgba(90,60,30,0.26)" />
               <path d="M16 8C12 18 12 30 16 40" stroke="rgba(60,40,20,0.32)" strokeWidth="2" fill="none" strokeLinecap="round" />
