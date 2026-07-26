@@ -556,7 +556,18 @@ export default function Home() {
   const LRef = useRef<any>(null);
   const [mapReady, setMapReady] = useState(false); // 지도 초기화 완료 신호(마커 재렌더용)
 
-  useEffect(() => { fetch("/api/cafes").then((r) => r.json()).then((d) => setCafes(d.cafes ?? [])).catch(() => {}); }, []);
+  // ⚡ 속도 개선(2026-07-26): /api/cafes는 전 공개카페(13,391곳·char_scores 등 포함, 실측 5.1MB·1.8s)라
+  //   지도·지역선택·상세패널에만 필요한데 예전엔 홈 첫 렌더와 동시에(마운트 즉시) 무조건 받아왔다 — 홈
+  //   화면이 실제로 필요한 /api/discover(10KB)와 네트워크·메인스레드(JSON.parse+buildAxisDist)를 두고
+  //   경쟁해 홈이 뜨는 그 순간을 오히려 늦추고 있었다. 첫 페인트가 끝난 유휴 시간으로 미뤄도 사용자가
+  //   카드를 탭하거나 지역을 고르기 전에 이미 도착해 있어 기능은 그대로다.
+  useEffect(() => {
+    const load = () => fetch("/api/cafes").then((r) => r.json()).then((d) => setCafes(d.cafes ?? [])).catch(() => {});
+    const ric = (window as any).requestIdleCallback as ((cb: () => void, opts?: { timeout: number }) => number) | undefined;
+    if (ric) { const id = ric(load, { timeout: 2000 }); return () => (window as any).cancelIdleCallback?.(id); }
+    const t = setTimeout(load, 300);
+    return () => clearTimeout(t);
+  }, []);
   // 자동 업데이트: 앱 복귀/포커스/로드 시 서버 배포버전과 비교 → 다르면 새로고침(PWA·PC·모바일 항상 최신). 같은 버전엔 1회만 시도(루프 방지).
   useEffect(() => {
     const mine = process.env.NEXT_PUBLIC_BUILD_ID;
@@ -1334,11 +1345,19 @@ export default function Home() {
       {/* 홈 = 잡지 1면 */}
       {tab === "home" && (
         <div className="flex-1 overflow-y-auto" style={{ paddingBottom: "3.25rem" }}>
-          <div className="max-w-2xl mx-auto px-5 py-6" style={{
-            // 📓 "커피 노트" 정체성 — 콘텐츠 폭에만 딱 맞춘 옅은 줄노트 텍스처(전체 화면폭이 아니라
-            // 실제 카드가 놓이는 영역에만 스코프해 넓은 화면에서 배경이 따로 노는 것 방지). 세로 여백선은
-            // 카드·헤더와 어긋나 오히려 어수선해 보여 뺌 — 가로줄만 아주 옅게, 텍스트 줄간격에 가깝게.
-            backgroundImage: "repeating-linear-gradient(to bottom, transparent 0, transparent 27px, rgba(43,32,24,0.045) 27px, rgba(43,32,24,0.045) 28px)",
+          {/* 📓 스프링노트 제본 — 홈 진입 즉시 "노트"임을 알리는 한 번의 확실한 신호(반복 안 해도 됨).
+              실제 카드폭(max-w-2xl+px-5)에 맞춰 좌우 인셋 동일하게. */}
+          <div aria-hidden className="max-w-2xl mx-auto px-5 pt-3">
+            <div style={{
+              height: 14,
+              backgroundImage: "radial-gradient(circle, rgba(43,32,24,0.3) 0 2.6px, transparent 2.6px)",
+              backgroundSize: "26px 100%", backgroundRepeat: "repeat-x", backgroundPosition: "13px center",
+            }} />
+          </div>
+          <div className="max-w-2xl mx-auto px-5 pt-4 pb-6" style={{
+            // 📓 "커피 노트" 정체성 — 콘텐츠 폭에만 딱 맞춘 줄노트 텍스처(전체 화면폭이 아니라 실제
+            // 카드가 놓이는 영역에만 스코프해 넓은 화면에서 배경이 따로 노는 것 방지).
+            backgroundImage: "repeating-linear-gradient(to bottom, transparent 0, transparent 27px, rgba(43,32,24,0.06) 27px, rgba(43,32,24,0.06) 28px)",
             backgroundPosition: "0 6px",
           }}>
             <div className="text-center mb-6">
