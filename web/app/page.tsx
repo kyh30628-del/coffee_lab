@@ -30,16 +30,6 @@ const SEARCH_EXAMPLES = ["비 오는 날 혼자 조용히", "감성 사진 데�
 // 쇼케이스 1차 성과 집계(노출·클릭·재생)
 const trackPromo = (cafeId: number, type: "view" | "click" | "play") => { fetch("/api/promo-event", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cafeId, type }) }).catch(() => {}); };
 
-// 📓 스프링노트 제본 — 은은하고 입체적인 기울어진 스프링(2026-07-26 v13 확정, 실브라우저 확인).
-//    단색 원이 "색을 강조한다"는 피드백 — 옅은 반투명 톤으로 낮추고, 타원을 살짝 기울여
-//    비스듬히 보는 코일처럼 입체감을 줌. 겹치는 링 체인 구조는 유지.
-const SPRING_RING_SVG =
-  "<svg xmlns='http://www.w3.org/2000/svg' width='16' height='26'>" +
-  "<ellipse cx='0' cy='13' rx='9' ry='7' fill='none' stroke='rgba(61,47,34,0.55)' stroke-width='1.8' transform='rotate(-22 0 13)'/>" +
-  "<ellipse cx='16' cy='13' rx='9' ry='7' fill='none' stroke='rgba(61,47,34,0.55)' stroke-width='1.8' transform='rotate(-22 16 13)'/>" +
-  "</svg>";
-const SPRING_RING_BG = `url("data:image/svg+xml,${SPRING_RING_SVG}")`;
-
 const REGIONS: Record<string, string[]> = {
   서울: ["강남구","강동구","강북구","강서구","관악구","광진구","구로구","금천구","노원구","도봉구","동대문구","동작구","마포구","서대문구","서초구","성동구","성북구","송파구","양천구","영등포구","용산구","은평구","종로구","중구","중랑구"],
   경기: ["수원시","성남시","고양시","용인시","부천시","안산시","안양시","남양주시","화성시","평택시","의정부시","시흥시","파주시","김포시","광명시","광주시","군포시","하남시","오산시","양주시","구리시","안성시","포천시","의왕시","여주시","동두천시","과천시","이천시","양평군","가평군","연천군"],
@@ -1355,16 +1345,6 @@ export default function Home() {
       {/* 홈 = 잡지 1면 */}
       {tab === "home" && (
         <div className="flex-1 overflow-y-auto" style={{ paddingBottom: "3.25rem" }}>
-          {/* 📓 스프링노트 제본(2026-07-26, v13 확정) — 은은한 기울어진 링(실브라우저 확인 완료). */}
-          <div aria-hidden className="max-w-2xl mx-auto px-5 pt-3">
-            <div style={{
-              height: 26,
-              backgroundImage: SPRING_RING_BG,
-              backgroundSize: "16px 26px",
-              backgroundRepeat: "repeat-x",
-              backgroundPosition: "0 center",
-            }} />
-          </div>
           <div className="max-w-2xl mx-auto px-5 pt-4 pb-6" style={{
             // 📓 "커피 노트" 정체성 — 콘텐츠 폭에만 딱 맞춘 줄노트 텍스처(전체 화면폭이 아니라 실제
             // 카드가 놓이는 영역에만 스코프해 넓은 화면에서 배경이 따로 노는 것 방지).
