@@ -105,15 +105,15 @@ const GRADE_STYLE: Record<string, { bg: string; label: string }> = { 검증: { b
 // 🎨 2026-07-25: 초록(#5f7355)이 섞여 브라운 카드들과 안 어울려 "조잡하다"는 피드백 → 전부 사이트 브랜드
 //   톤(에스프레소·로스팅 브라운·카라멜, 명도만 다르게)으로 통일. 진한→연한 순.
 const TONES = ["#2b2018", "#4a3220", "#6f4e37", "#8a5a24", "#9c6b3f"];
-// 🎨 2026-07-26: "카드 색을 주변 톤과 어울리게 + 그라데이션 은은하게" 피드백 — 각 톤을 단색 대신
-// 같은 계열(에스프레소·로스팅 브라운·카라멜) 안에서만 밝기 변화를 주는 대각선 그라데이션으로.
-// 배경(크림 #f4ece0)·헤더(#2b2018)와 같은 색가족이라 튀지 않으면서 카드에 입체감만 더함.
+// 🎨 2026-07-26 v2: "그라데이션 더 + 색을 주변이랑 어울리게" 재요청 — 밝은 쪽 끝을 크림 배경·헤더
+// 악센트와 같은 계열의 따뜻한 카라멜 하이라이트(#e8c98a 근처)로 통일해 카드마다 "빛이 스치는" 지점이
+// 배경과 이어지는 느낌을 주고, 어두운 쪽은 더 진하게 내려 대비(그라데이션 폭)를 키웠다.
 const TONE_GRADIENTS = [
-  "linear-gradient(135deg, #3d2f22 0%, #2b2018 55%, #1c140d 100%)",
-  "linear-gradient(135deg, #5c4230 0%, #4a3220 55%, #37230f 100%)",
-  "linear-gradient(135deg, #83604a 0%, #6f4e37 55%, #573d29 100%)",
-  "linear-gradient(135deg, #a06f3a 0%, #8a5a24 55%, #6c4419 100%)",
-  "linear-gradient(135deg, #b3814f 0%, #9c6b3f 55%, #7a5230 100%)",
+  "linear-gradient(135deg, #caa06a 0%, #6b4a30 32%, #2b2018 62%, #140d07 100%)",
+  "linear-gradient(135deg, #d2ab74 0%, #7d5a3a 32%, #4a3220 62%, #241708 100%)",
+  "linear-gradient(135deg, #dab784 0%, #96714c 32%, #6f4e37 62%, #3c2a1c 100%)",
+  "linear-gradient(135deg, #e2c48f 0%, #b3874f 32%, #8a5a24 62%, #4f320f 100%)",
+  "linear-gradient(135deg, #e8c98a 0%, #c99a5c 32%, #9c6b3f 62%, #5c3c1f 100%)",
 ];
 
 // 홈 잡지 카드 — 모듈 스코프(컴포넌트 내부 정의 금지). 내부에 두면 렌더마다 재마운트되어 뒤로가기/탭전환이 느려짐.
@@ -1397,8 +1397,17 @@ export default function Home() {
             backgroundPosition: "0 6px",
             position: "relative", zIndex: 1,
           }}>
-            <div className="text-center mb-6">
-              <div className="text-[10px] tracking-[0.3em] uppercase text-[#7a5122]">데이터로 큐레이션하는</div>
+            <div className="text-center mb-6" style={{ position: "relative" }}>
+              {/* ☕ 커피잔 링 자국 재추가(2026-07-26 v6) — 비네트(어두운 배경 그라데이션)는 "코너가
+                  안 보인다"는 피드백으로 뺐지만, 은은한 링 자국만 다시 — 어둡게 깔지 않고 옅은
+                  링 두 겹만 그려 텍스트 가독성에 영향 없음. */}
+              <div aria-hidden style={{
+                position: "absolute", top: -8, right: -4, width: 70, height: 70, pointerEvents: "none", zIndex: 0,
+                backgroundImage:
+                  "radial-gradient(circle at 80% 25%, transparent 22px, rgba(120,80,40,0.16) 24px, rgba(120,80,40,0.16) 27px, transparent 29px), " +
+                  "radial-gradient(circle at 80% 25%, transparent 12px, rgba(120,80,40,0.11) 14px, rgba(120,80,40,0.11) 16px, transparent 18px)",
+              }} />
+              <div className="text-[10px] tracking-[0.3em] uppercase text-[#7a5122]" style={{ position: "relative" }}>데이터로 큐레이션하는</div>
               <div className="text-xl font-bold border-y-2 border-[#2b2018] py-2 mt-1 dcn-shimmer-dark">{homeGu ? `${homeGu}의 오늘의 커피` : "오늘의 동네 커피"}</div>
               {/* 시·도 → 시·군·구 → 동·면 계층 선택(우리 동네). 검색 돋보기 제거. */}
               <div className="flex gap-1.5 justify-center mt-3 flex-wrap">

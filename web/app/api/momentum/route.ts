@@ -31,33 +31,35 @@ export async function GET(req: NextRequest) {
     // 매 콜드스타트마다 순차 DDL 4회 왕복(무의미)을 냈다. 스키마는 다른 쓰기 경로에서 계속 보장되므로
     // 이 GET에서는 생략(2026-07-26, 동작 무변·순수 성능).
     const region = (req.nextUrl.searchParams.get("region") ?? "").trim();
-    // ⚡ 2026-07-26 쿼리 구조 재작업 — 예전엔 발행 카페 13,388곳 전체(review_dates·char_scores
-    // JSONB 포함)를 통째로 받아와 JS에서 recentN·dessertDominance를 매 요청마다 순회 계산했다
-    // (최대 비용 구간, 홈 로딩 지연의 실질 원인). r90/r30(최근성)·dominant(디저트우세) 판정을 SQL로
-    // 이전해 DB 안에서 필터링 — 네트워크로는 "최근 버즈 있고 디저트우세 아닌" 훨씬 적은 후보만 전송.
-    // ⚠️ recentN은 Date.now() 기준 정확한 시각 컷오프라 SQL도 CURRENT_DATE(자정)가 아니라
-    // now()의 정밀 timestamp로 맞춰야 결과가 일치한다(DB 500/800건 표본 전수 대조로 검증, 불일치 0).
+    // ⚡ 2026-07-26 쿼리 구조 재작업 v2 — v1은 r90·r30을 각각 별도 서브쿼리로 배열을 두 번 unnest했다.
+    // 배열을 한 번만 풀어(jsonb_array_elements_text 1회) FILTER(WHERE)로 r90/r30을 동시 집계하도록
+    // 재작업(로컬 표본 600건 전수 대조 불일치 0, DB 직접 타이밍 비교로 단축 확인). dessert/roast 등
+    // char_scores 파생값도 LATERAL 체인으로 한 번만 추출해 재사용(중복 JSONB 키 조회 제거).
     const rowsP = sql`
       SELECT c.id, c.name, c.area, c.synth_grade, c.synth_count, c.synth_identity,
-        r.r90, r.r30,
-        (COALESCE((c.char_scores->>'dessert')::numeric,0) <= (
-          COALESCE((c.char_scores->>'roast')::numeric,0) + COALESCE((c.char_scores->>'work')::numeric,0) +
-          COALESCE((c.char_scores->>'quiet')::numeric,0) + COALESCE((c.char_scores->>'mood')::numeric,0) +
-          COALESCE((c.char_scores->>'space')::numeric,0)
-        )) AS bonus
+        r.r90, r.r30, x.bonus
       FROM cafes c
       CROSS JOIN LATERAL (
         SELECT
-          (SELECT COUNT(*) FROM jsonb_array_elements_text(c.review_dates) d
-           WHERE (to_date(replace(d,'.','-'),'YYYY-MM-DD')::timestamptz AT TIME ZONE 'UTC') >= (now() - interval '90 days')) AS r90,
-          (SELECT COUNT(*) FROM jsonb_array_elements_text(c.review_dates) d
-           WHERE (to_date(replace(d,'.','-'),'YYYY-MM-DD')::timestamptz AT TIME ZONE 'UTC') >= (now() - interval '30 days')) AS r30
+          COUNT(*) FILTER (WHERE parsed >= now() - interval '90 days') AS r90,
+          COUNT(*) FILTER (WHERE parsed >= now() - interval '30 days') AS r30
+        FROM (
+          SELECT (to_date(replace(d,'.','-'),'YYYY-MM-DD')::timestamptz AT TIME ZONE 'UTC') AS parsed
+          FROM jsonb_array_elements_text(c.review_dates) d
+        ) p
       ) r
-      WHERE c.published = true AND c.review_dates IS NOT NULL
-        AND r.r90 >= 3
-        AND NOT (COALESCE((c.char_scores->>'dessert')::numeric,0) > 20
-          AND COALESCE((c.char_scores->>'roast')::numeric,0) < 5
-          AND COALESCE((c.char_scores->>'dessert')::numeric,0) >= COALESCE((c.char_scores->>'roast')::numeric,0) * 8)
+      CROSS JOIN LATERAL (
+        SELECT
+          COALESCE((c.char_scores->>'dessert')::numeric,0) AS dessert,
+          COALESCE((c.char_scores->>'roast')::numeric,0) AS roast,
+          COALESCE((c.char_scores->>'work')::numeric,0) + COALESCE((c.char_scores->>'quiet')::numeric,0) +
+          COALESCE((c.char_scores->>'mood')::numeric,0) + COALESCE((c.char_scores->>'space')::numeric,0) AS otheraxes
+      ) cs
+      CROSS JOIN LATERAL (
+        SELECT (cs.dessert <= cs.roast + cs.otheraxes) AS bonus,
+               (cs.dessert > 20 AND cs.roast < 5 AND cs.dessert >= cs.roast * 8) AS dominant
+      ) x
+      WHERE c.published = true AND c.review_dates IS NOT NULL AND r.r90 >= 3 AND NOT x.dominant
     `;
 
     // 스냅샷 증가분(Δ): 5일 이상 전 스냅샷이 있으면 상승세 계산
