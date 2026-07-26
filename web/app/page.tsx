@@ -30,15 +30,13 @@ const SEARCH_EXAMPLES = ["비 오는 날 혼자 조용히", "감성 사진 데�
 // 쇼케이스 1차 성과 집계(노출·클릭·재생)
 const trackPromo = (cafeId: number, type: "view" | "click" | "play") => { fetch("/api/promo-event", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cafeId, type }) }).catch(() => {}); };
 
-// 📓 스프링노트 제본 — 둥글면서도 촘촘한 코일(2026-07-26 v11 확정, 실브라우저 확인).
-//    v10(주기44)은 둥글긴 했지만 간격이 넓어 "뚝뚝 끊긴다"는 피드백 — 진폭을 낮추고(9) 주기를
-//    좁혀(24) 곡률은 완만하게 유지한 채로 촘촘히 이어지도록 재조정.
+// 📓 스프링노트 제본 — "공책 동그라미 스프링"(2026-07-26 v12 확정, 실브라우저 확인).
+//    파형(wave) 라인은 "연결되는 느낌도 아니다"는 피드백 — 실제 스프링 링 모양인 원을 서로
+//    겹치게 반복해 진짜 겹쳐 이어지는 링 체인처럼. 그라데이션 없이 단색(사이트 다크브라운).
 const SPRING_RING_SVG =
-  "<svg xmlns='http://www.w3.org/2000/svg' width='24' height='26'>" +
-  "<defs><linearGradient id='g2' x1='0' y1='0' x2='0' y2='1'>" +
-  "<stop offset='0' stop-color='%23a8907a'/><stop offset='0.5' stop-color='%236b4f38'/><stop offset='1' stop-color='%232b2018'/>" +
-  "</linearGradient></defs>" +
-  "<path d='M-6 17.5 C 0 17.5, 0 8.5, 6 8.5 S 18 17.5, 24 17.5 S 30 8.5, 36 8.5' fill='none' stroke='url(%23g2)' stroke-width='2.3' stroke-linecap='round'/>" +
+  "<svg xmlns='http://www.w3.org/2000/svg' width='14' height='26'>" +
+  "<circle cx='0' cy='13' r='9' fill='none' stroke='%233d2f22' stroke-width='2.2'/>" +
+  "<circle cx='14' cy='13' r='9' fill='none' stroke='%233d2f22' stroke-width='2.2'/>" +
   "</svg>";
 const SPRING_RING_BG = `url("data:image/svg+xml,${SPRING_RING_SVG}")`;
 
@@ -1357,12 +1355,12 @@ export default function Home() {
       {/* 홈 = 잡지 1면 */}
       {tab === "home" && (
         <div className="flex-1 overflow-y-auto" style={{ paddingBottom: "3.25rem" }}>
-          {/* 📓 스프링노트 제본(2026-07-26, v11 확정) — 둥글고 촘촘한 코일(실브라우저 확인 완료). */}
+          {/* 📓 스프링노트 제본(2026-07-26, v12 확정) — 겹치는 원 체인, 단색(실브라우저 확인 완료). */}
           <div aria-hidden className="max-w-2xl mx-auto px-5 pt-3">
             <div style={{
               height: 26,
               backgroundImage: SPRING_RING_BG,
-              backgroundSize: "24px 26px",
+              backgroundSize: "14px 26px",
               backgroundRepeat: "repeat-x",
               backgroundPosition: "0 center",
             }} />
