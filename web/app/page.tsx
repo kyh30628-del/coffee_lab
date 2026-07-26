@@ -30,15 +30,14 @@ const SEARCH_EXAMPLES = ["비 오는 날 혼자 조용히", "감성 사진 데�
 // 쇼케이스 1차 성과 집계(노출·클릭·재생)
 const trackPromo = (cafeId: number, type: "view" | "click" | "play") => { fetch("/api/promo-event", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cafeId, type }) }).catch(() => {}); };
 
-// 📓 스프링노트 제본 — 연속 지그재그 금속 와이어(2026-07-26 v9 확정, 실브라우저 확인).
-//    v8의 금색 브론즈가 "안 어울린다"는 피드백 받아, 사이트 다크브라운 톤(#2b2018)에 맞춘
-//    그라데이션(밝은 탄색→다크브라운)으로 교체 — 금속 하이라이트는 유지하되 팔레트에 통일.
+// 📓 스프링노트 제본 — 뾰족한 지그재그가 아니라 진짜 "둥근" 스프링 코일 곡선으로(2026-07-26 v10 확정,
+//    실브라우저 스크린샷 확인). 곡률을 완만하게(넓은 주기) 잡아야 각지지 않고 둥글게 보임.
 const SPRING_RING_SVG =
-  "<svg xmlns='http://www.w3.org/2000/svg' width='22' height='26'>" +
+  "<svg xmlns='http://www.w3.org/2000/svg' width='44' height='26'>" +
   "<defs><linearGradient id='g2' x1='0' y1='0' x2='0' y2='1'>" +
   "<stop offset='0' stop-color='%23a8907a'/><stop offset='0.5' stop-color='%236b4f38'/><stop offset='1' stop-color='%232b2018'/>" +
   "</linearGradient></defs>" +
-  "<path d='M-2 21 L9 6 L20 21 L31 6' fill='none' stroke='url(%23g2)' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/>" +
+  "<path d='M-11 24 C 0 24, 0 6, 11 6 S 33 24, 44 24 S 66 6, 77 6' fill='none' stroke='url(%23g2)' stroke-width='2.4' stroke-linecap='round'/>" +
   "</svg>";
 const SPRING_RING_BG = `url("data:image/svg+xml,${SPRING_RING_SVG}")`;
 
@@ -1357,12 +1356,12 @@ export default function Home() {
       {/* 홈 = 잡지 1면 */}
       {tab === "home" && (
         <div className="flex-1 overflow-y-auto" style={{ paddingBottom: "3.25rem" }}>
-          {/* 📓 스프링노트 제본(2026-07-26, v8 확정) — 연속 지그재그 와이어(실브라우저 확인 완료). */}
+          {/* 📓 스프링노트 제본(2026-07-26, v10 확정) — 둥근 코일 곡선(실브라우저 확인 완료). */}
           <div aria-hidden className="max-w-2xl mx-auto px-5 pt-3">
             <div style={{
               height: 26,
               backgroundImage: SPRING_RING_BG,
-              backgroundSize: "22px 26px",
+              backgroundSize: "44px 26px",
               backgroundRepeat: "repeat-x",
               backgroundPosition: "0 center",
             }} />
