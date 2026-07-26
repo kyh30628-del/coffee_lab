@@ -63,7 +63,7 @@ export default function Pricing() {
         </div>
       </div>
 
-      <OwnerSignupModal open={open} onClose={() => setOpen(false)} trial={trial} />
+      <OwnerSignupModal open={open} onClose={() => setOpen(false)} trial={trial} source="pricing" />
       <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet" />
     </main>
   );
