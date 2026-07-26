@@ -30,13 +30,13 @@ const SEARCH_EXAMPLES = ["비 오는 날 혼자 조용히", "감성 사진 데�
 // 쇼케이스 1차 성과 집계(노출·클릭·재생)
 const trackPromo = (cafeId: number, type: "view" | "click" | "play") => { fetch("/api/promo-event", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cafeId, type }) }).catch(() => {}); };
 
-// 📓 스프링노트 제본 — "분리된 링"이 아니라 실제 스프링을 옆에서 편 모양의 연속 지그재그 와이어로
-//    표현(2026-07-26 v8 확정, 실브라우저 스크린샷으로 직접 확인 후 반영). "링만 있으면 뭐냐, 쇠
-//    와이어를 표현하라"는 피드백 반영 — 뾰족하게 꺾이는 금속 코일 라인 하나가 계속 이어짐.
+// 📓 스프링노트 제본 — 연속 지그재그 금속 와이어(2026-07-26 v9 확정, 실브라우저 확인).
+//    v8의 금색 브론즈가 "안 어울린다"는 피드백 받아, 사이트 다크브라운 톤(#2b2018)에 맞춘
+//    그라데이션(밝은 탄색→다크브라운)으로 교체 — 금속 하이라이트는 유지하되 팔레트에 통일.
 const SPRING_RING_SVG =
   "<svg xmlns='http://www.w3.org/2000/svg' width='22' height='26'>" +
   "<defs><linearGradient id='g2' x1='0' y1='0' x2='0' y2='1'>" +
-  "<stop offset='0' stop-color='%23f6e2b6'/><stop offset='0.5' stop-color='%23b8823f'/><stop offset='1' stop-color='%235c3a1e'/>" +
+  "<stop offset='0' stop-color='%23a8907a'/><stop offset='0.5' stop-color='%236b4f38'/><stop offset='1' stop-color='%232b2018'/>" +
   "</linearGradient></defs>" +
   "<path d='M-2 21 L9 6 L20 21 L31 6' fill='none' stroke='url(%23g2)' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/>" +
   "</svg>";
