@@ -38,15 +38,27 @@ export async function GET(req: NextRequest) {
       FROM cafes WHERE published = true AND review_dates IS NOT NULL`;
 
     // 스냅샷 증가분(Δ): 5일 이상 전 스냅샷이 있으면 상승세 계산
+    // ⚡ 홈 로딩 속도 — 원래 "날짜 범위 확인 → (조건부) base 조회" 순차 2왕복이었다. cafe_snapshots는
+    // 이미 오래 축적돼(2026-06-05~) span>=5가 실질적으로 항상 참이라, bounds+base를 한 쿼리로 합쳐
+    // 1왕복으로 줄임(결과 동일 — span<5인 신생 상태에서만 base를 미리 계산하는 손해, 현재 무해).
     const deltaMap = new Map<number, number>();
     let hasDelta = false;
     try {
-      const snapDates = (await sql`SELECT DISTINCT snap_date FROM cafe_snapshots ORDER BY snap_date`) as unknown as { snap_date: string }[];
-      if (snapDates.length >= 2) {
-        const span = (Date.parse(String(snapDates[snapDates.length - 1].snap_date)) - Date.parse(String(snapDates[0].snap_date))) / 86400000;
+      const snapRows = (await sql`
+        WITH bounds AS (SELECT MIN(snap_date) min_d, MAX(snap_date) max_d, COUNT(DISTINCT snap_date) n_dates FROM cafe_snapshots)
+        SELECT b.min_d, b.max_d, b.n_dates, s.cafe_id, s.rating_count
+        FROM bounds b
+        LEFT JOIN LATERAL (
+          SELECT DISTINCT ON (cafe_id) cafe_id, rating_count FROM cafe_snapshots
+          WHERE snap_date <= CURRENT_DATE - 5 ORDER BY cafe_id, snap_date DESC
+        ) s ON true
+      `) as unknown as { min_d: string | null; max_d: string | null; n_dates: string; cafe_id: number | null; rating_count: number | null }[];
+      const n = Number(snapRows[0]?.n_dates ?? 0);
+      if (n >= 2) {
+        const span = (Date.parse(String(snapRows[0].max_d)) - Date.parse(String(snapRows[0].min_d))) / 86400000;
         if (span >= 5) {
           hasDelta = true;
-          const base = (await sql`SELECT DISTINCT ON (cafe_id) cafe_id, rating_count FROM cafe_snapshots WHERE snap_date <= CURRENT_DATE - 5 ORDER BY cafe_id, snap_date DESC`) as unknown as { cafe_id: number; rating_count: number | null }[];
+          const base = snapRows.filter((r) => r.cafe_id != null) as { cafe_id: number; rating_count: number | null }[];
           for (const b of base) if (b.rating_count != null) deltaMap.set(b.cafe_id, b.rating_count);
         }
       }
