@@ -21,12 +21,17 @@ const THEMES: Theme[] = [
 const REGIONS: Record<string, string[]> = {
   서울: ["강남구","강동구","강북구","강서구","관악구","광진구","구로구","금천구","노원구","도봉구","동대문구","동작구","마포구","서대문구","서초구","성동구","성북구","송파구","양천구","영등포구","용산구","은평구","종로구","중구","중랑구"],
   경기: ["수원시","성남시","고양시","용인시","부천시","안산시","안양시","남양주시","화성시","평택시","의정부시","시흥시","파주시","김포시","광명시","광주시","군포시","하남시","오산시","양주시","구리시","안성시","포천시","의왕시","여주시","동두천시","과천시","이천시","양평군","가평군","연천군"],
-  인천: ["중구","동구","미추홀구","연수구","남동구","부평구","계양구","서구","강화군","옹진군"],
+  인천: ["중구","동구","미추홀구","연수구","남동구","부평구","계양구","서구","강화군","옹진군","검단구","서해구","영종구","제물포구"],
 };
+// 🚨 재발방지(2026-07-26): 인천 신설 구(검단·서해·영종·제물포) 누락으로 134곳이 "인천"으로만 뭉쳐지고
+//   있었고, "동구"⊂"남동구" 부분문자열 충돌로 region="인천 동구" 필터가 "인천 남동구" 161곳까지 같이
+//   끌어왔음(실측 확인: matchRegion의 `a.includes(gu)`가 원인). area 컬럼은 이미 정제된 정확한 키라서
+//   (lib/region.ts 참고) 부분일치 대신 정확히 같은지만 비교하면 되고, guOf도 긴 이름부터 검사한다.
+const _longestFirst = (list: string[]) => [...list].sort((a, b) => b.length - a.length);
 function guOf(area: string): string {
   const a = (area ?? "").trim();
-  if (a.includes("인천")) { for (const g of REGIONS["인천"]) if (a.includes(g)) return "인천 " + g; return "인천"; }
-  for (const list of Object.values(REGIONS)) for (const g of list) if (a.includes(g)) return g;
+  if (a.includes("인천")) { for (const g of _longestFirst(REGIONS["인천"])) if (a.includes(g)) return "인천 " + g; return "인천"; }
+  for (const list of Object.values(REGIONS)) for (const g of _longestFirst(list)) if (a.includes(g)) return g;
   if (a.includes("구리")) return "구리시";
   return a;
 }
@@ -36,7 +41,9 @@ function matchRegion(area: string, region: string): boolean {
   const a = area ?? "";
   // 🗺️ 인천 동명 구(중구·동구) 구분: region="인천 OO"면 인천만, bare면 인천 제외(서울 중구≠인천 중구)
   if (region === "인천") return a.startsWith("인천");
-  if (region.startsWith("인천")) { const gu = region.replace(/^인천\s*/, ""); return a.startsWith("인천") && a.includes(gu); }
+  // area는 이미 정제된 정확한 키(예: "인천 남동구")라 부분일치가 아니라 정확히 같은지만 봐야
+  // "동구" 선택 시 "남동구"까지 같이 잡히는 일이 없다(실측: 34곳 vs 195곳 혼입, 07-26 수정).
+  if (region.startsWith("인천")) return a === region;
   if (a.startsWith("인천")) return false;
   return guOf(area) === region;
 }

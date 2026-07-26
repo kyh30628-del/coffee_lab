@@ -33,17 +33,23 @@ const trackPromo = (cafeId: number, type: "view" | "click" | "play") => { fetch(
 const REGIONS: Record<string, string[]> = {
   서울: ["강남구","강동구","강북구","강서구","관악구","광진구","구로구","금천구","노원구","도봉구","동대문구","동작구","마포구","서대문구","서초구","성동구","성북구","송파구","양천구","영등포구","용산구","은평구","종로구","중구","중랑구"],
   경기: ["수원시","성남시","고양시","용인시","부천시","안산시","안양시","남양주시","화성시","평택시","의정부시","시흥시","파주시","김포시","광명시","광주시","군포시","하남시","오산시","양주시","구리시","안성시","포천시","의왕시","여주시","동두천시","과천시","이천시","양평군","가평군","연천군"],
-  인천: ["중구","동구","미추홀구","연수구","남동구","부평구","계양구","서구","강화군","옹진군"],
+  인천: ["중구","동구","미추홀구","연수구","남동구","부평구","계양구","서구","강화군","옹진군","검단구","서해구","영종구","제물포구"],
 };
+// 🚨 재발방지(2026-07-26): 인천 신설 구(검단·서해·영종·제물포)가 목록에 없어 3.5년치 134곳이 지역 드롭다운
+//   자체에서 선택 불가였고, 짧은 이름이 긴 이름의 부분문자열이면(예: "동구"⊂"남동구") 배열 순서에 우연히
+//   기대는 매칭이 오분류를 냈다("인천 동구" 선택 시 "인천 남동구" 161곳까지 같이 잡힘, 실측 확인). 아래처럼
+//   구 이름을 **긴 것부터** 검사해 어떤 신설/개편에도 이 충돌이 재발하지 않게 한다(배열 순서에 안 기댐).
 const SIDO_CENTER: Record<string, [number, number, number]> = { 서울: [37.5665, 126.978, 11], 경기: [37.37, 127.105, 9], 인천: [37.4563, 126.7052, 11] };
 // area별 결과 캐시 — area 종류는 ~64개뿐이라, 1만건을 매번 64개 순회(64만 연산)하던 걸 O(1)로.
 const _guCache = new Map<string, { sido: string; sigungu: string }>();
+const _longestFirst = (list: string[]) => [...list].sort((a, b) => b.length - a.length);
+const REGIONS_LONGEST: Record<string, string[]> = Object.fromEntries(Object.entries(REGIONS).map(([sido, list]) => [sido, _longestFirst(list)]));
 function toGu(area: string): { sido: string; sigungu: string } {
   const a = (area ?? "").trim();
   const hit = _guCache.get(a); if (hit) return hit;
   let res: { sido: string; sigungu: string } = { sido: "", sigungu: "" };
-  if (a.includes("인천")) { res = { sido: "인천", sigungu: "" }; for (const gu of REGIONS["인천"]) { if (a.includes(gu)) { res = { sido: "인천", sigungu: gu }; break; } } }
-  else { outer: for (const [sido, list] of Object.entries(REGIONS)) { for (const gu of list) { if (a.includes(gu)) { res = { sido, sigungu: gu }; break outer; } } }
+  if (a.includes("인천")) { res = { sido: "인천", sigungu: "" }; for (const gu of REGIONS_LONGEST["인천"]) { if (a.includes(gu)) { res = { sido: "인천", sigungu: gu }; break; } } }
+  else { outer: for (const [sido, list] of Object.entries(REGIONS_LONGEST)) { for (const gu of list) { if (a.includes(gu)) { res = { sido, sigungu: gu }; break outer; } } }
     if (!res.sigungu) { if (a.includes("구리")) res = { sido: "경기", sigungu: "구리시" }; else if (a.includes("하남")) res = { sido: "경기", sigungu: "하남시" }; } }
   _guCache.set(a, res);
   return res;
