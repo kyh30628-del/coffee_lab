@@ -30,13 +30,13 @@ const SEARCH_EXAMPLES = ["비 오는 날 혼자 조용히", "감성 사진 데�
 // 쇼케이스 1차 성과 집계(노출·클릭·재생)
 const trackPromo = (cafeId: number, type: "view" | "click" | "play") => { fetch("/api/promo-event", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cafeId, type }) }).catch(() => {}); };
 
-// 📓 스프링노트 제본 — "공책 동그라미 스프링"(2026-07-26 v12 확정, 실브라우저 확인).
-//    파형(wave) 라인은 "연결되는 느낌도 아니다"는 피드백 — 실제 스프링 링 모양인 원을 서로
-//    겹치게 반복해 진짜 겹쳐 이어지는 링 체인처럼. 그라데이션 없이 단색(사이트 다크브라운).
+// 📓 스프링노트 제본 — 은은하고 입체적인 기울어진 스프링(2026-07-26 v13 확정, 실브라우저 확인).
+//    단색 원이 "색을 강조한다"는 피드백 — 옅은 반투명 톤으로 낮추고, 타원을 살짝 기울여
+//    비스듬히 보는 코일처럼 입체감을 줌. 겹치는 링 체인 구조는 유지.
 const SPRING_RING_SVG =
-  "<svg xmlns='http://www.w3.org/2000/svg' width='14' height='26'>" +
-  "<circle cx='0' cy='13' r='9' fill='none' stroke='%233d2f22' stroke-width='2.2'/>" +
-  "<circle cx='14' cy='13' r='9' fill='none' stroke='%233d2f22' stroke-width='2.2'/>" +
+  "<svg xmlns='http://www.w3.org/2000/svg' width='16' height='26'>" +
+  "<ellipse cx='0' cy='13' rx='9' ry='7' fill='none' stroke='rgba(61,47,34,0.55)' stroke-width='1.8' transform='rotate(-22 0 13)'/>" +
+  "<ellipse cx='16' cy='13' rx='9' ry='7' fill='none' stroke='rgba(61,47,34,0.55)' stroke-width='1.8' transform='rotate(-22 16 13)'/>" +
   "</svg>";
 const SPRING_RING_BG = `url("data:image/svg+xml,${SPRING_RING_SVG}")`;
 
@@ -1355,12 +1355,12 @@ export default function Home() {
       {/* 홈 = 잡지 1면 */}
       {tab === "home" && (
         <div className="flex-1 overflow-y-auto" style={{ paddingBottom: "3.25rem" }}>
-          {/* 📓 스프링노트 제본(2026-07-26, v12 확정) — 겹치는 원 체인, 단색(실브라우저 확인 완료). */}
+          {/* 📓 스프링노트 제본(2026-07-26, v13 확정) — 은은한 기울어진 링(실브라우저 확인 완료). */}
           <div aria-hidden className="max-w-2xl mx-auto px-5 pt-3">
             <div style={{
               height: 26,
               backgroundImage: SPRING_RING_BG,
-              backgroundSize: "14px 26px",
+              backgroundSize: "16px 26px",
               backgroundRepeat: "repeat-x",
               backgroundPosition: "0 center",
             }} />
