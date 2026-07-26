@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sql, ensureSchema } from "@/lib/db";
+import { sql } from "@/lib/db";
 import { dessertDominance } from "@/lib/charScore";
 import { recentN } from "@/lib/reviewDates";
 export const runtime = "nodejs";
@@ -29,7 +29,9 @@ const gradeRank = (g?: string | null): number => (g === "검증" ? 2 : g === "�
 
 export async function GET(req: NextRequest) {
   try {
-    await ensureSchema();
+    // ⚡ 홈 로딩 속도 — ensureSchema()는 cafes 스키마가 이미 오래 안정된 이 읽기전용 핫패스에서
+    // 매 콜드스타트마다 순차 DDL 4회 왕복(무의미)을 냈다. 스키마는 다른 쓰기 경로에서 계속 보장되므로
+    // 이 GET에서는 생략(2026-07-26, 동작 무변·순수 성능).
     const region = (req.nextUrl.searchParams.get("region") ?? "").trim();
     // ⚡ 본쿼리(rows)를 스냅샷 블록과 동시 발사 — 상호 독립(deltaMap은 아래 루프에서만 소비). 결과 불변.
     const rowsP = sql`SELECT id, name, area, synth_grade, synth_count, synth_identity, review_dates, char_scores

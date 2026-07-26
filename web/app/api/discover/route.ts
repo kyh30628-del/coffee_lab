@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sql, ensureSchema } from "@/lib/db";
+import { sql } from "@/lib/db";
 import { subscriptionLive } from "@/lib/flags";
 import { dessertDominance } from "@/lib/charScore";
 import { rotateFeatured, rotateByPeriod, dayIndexKST } from "@/lib/exposureRotation";
@@ -108,8 +108,10 @@ function interleaveByRegion<T extends { id: number | string; area?: string }>(po
 
 export async function GET(req: NextRequest) {
   try {
-    // ⚡ 독립 프라임 병렬 + featRows를 본쿼리(all)와 동시 발사(둘 다 네트워크라 왕복 겹침). 결과·정렬 불변.
-    await Promise.all([ensureSchema(), loadCriteria()]); // loadCriteria: 노출상한 기준 캐시 프라임(동기 getCriterionSync가 읽음)
+    // ⚡ 홈 로딩 속도 — ensureSchema()는 이미 오래 안정된 스키마를 매 콜드스타트마다 순차 DDL 4회
+    // 왕복으로 재확인했다(무의미). 다른 쓰기 경로에서 계속 보장되므로 이 읽기전용 핫패스는 생략,
+    // loadCriteria(노출상한 기준 캐시 프라임)만 유지(2026-07-26, 동작 무변·순수 성능).
+    await loadCriteria();
     const region = req.nextUrl.searchParams.get("region") ?? ""; // 시군구 이름(선택)
     const featRowsP = sql`SELECT cafe_id FROM cafe_promos WHERE featured = true AND approved = true AND (featured_until IS NULL OR featured_until > now())` as unknown as Promise<{ cafe_id: number }[]>;
     const all = await sql`
