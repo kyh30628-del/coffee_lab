@@ -40,8 +40,10 @@ export async function GET(req: NextRequest) {
     const all = await sql`SELECT id, name, area, synth_grade, synth_count, synth_identity, char_scores FROM cafes WHERE published = true` as unknown as any[];
     const hood = all.filter((c) => guOf(c.area) === myGu);
 
-    // 순위 — 본인 식별은 id 기준(동명 카페가 있어도 정확)
-    const sorted = [...hood].sort((a, b) => (b.synth_count ?? 0) - (a.synth_count ?? 0));
+    // 순위 — 본인 식별은 id 기준(동명 카페가 있어도 정확). 동점 시 id로 타이브레이크(2026-07-26) —
+    // ORDER BY 없는 SELECT라 정렬 전 배열 순서가 보장 안 돼, 리뷰수 같은 카페끼리는 순위가 재조회
+    // 때마다 흔들릴 수 있었다(badge/[cafeId] 라우트와 동일 원칙 통일).
+    const sorted = [...hood].sort((a, b) => (b.synth_count ?? 0) - (a.synth_count ?? 0) || Number(a.id) - Number(b.id));
     const rank = sorted.findIndex((c) => Number(c.id) === Number(me.id)) + 1;
     const rankList = sorted.map((c, i) => ({ rank: i + 1, name: c.name, count: c.synth_count ?? 0, grade: c.synth_grade, isMe: Number(c.id) === Number(me.id) }));
 

@@ -20,7 +20,9 @@ export async function GET(req: NextRequest) {
     const myGu = guOf(me.area);
     const hood = (await sql`SELECT id, name, area, synth_count, char_scores FROM cafes WHERE published = true`) as any[];
     const inHood = hood.filter((c) => guOf(c.area) === myGu);
-    const sorted = [...inHood].sort((a, b) => (b.synth_count ?? 0) - (a.synth_count ?? 0));
+    // 순위 동점 시 id로 타이브레이크(2026-07-26) — ORDER BY 없는 SELECT라 정렬 전 배열 순서가 보장 안 돼,
+    // 리뷰수 같은 카페끼리는 순위가 재조회 때마다 흔들릴 수 있었다(badge/[cafeId] 라우트와 동일 원칙 통일).
+    const sorted = [...inHood].sort((a, b) => (b.synth_count ?? 0) - (a.synth_count ?? 0) || Number(a.id) - Number(b.id));
     const rank = sorted.findIndex((c) => Number(c.id) === Number(me.id)) + 1; // 동명 카페 순위 오식별 방지(2026-07-02)
 
     // 대표 강점: 내 점수 높고 동네에서 흔치 않은 축(차별점)
