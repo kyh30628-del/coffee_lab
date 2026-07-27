@@ -21,11 +21,18 @@
 //   팀/관리자 방문 제외는 `user_consents.internal`(아래 `u.internal`) 하나로 충분 — 완전히 다른 컬럼·다른
 //   의미다. **`t.src`(traffic_events)에 'internal'을 봇/제외 조건으로 다시 넣지 말 것** — spam(리퍼러
 //   스팸봇 도메인, lib/trafficSource.ts SPAM_REFERRER_PATTERN)만 진짜 봇 신호다.
+// 확정 봇 UA 시그니처 단일출처(#523, coord#262 후속) — 표출필터(아래 SQL 2곳)와 수집단계
+// 원천차단(app/api/visit/route.ts)이 이 문자열 하나만 참조한다. 과거엔 이 정규식이 route.ts에
+// 따로 박제되어 있다가(facebookexternalhit까지만) 여기서 'meta-externalagent'를 추가한 뒤로도
+// 갱신이 안 돼(#472→#503 사이 드리프트) 수집(INSERT) 자체는 계속 야간마다 오염 누적되고
+// 표출 화면에서만 걸러지고 있었다 — 드리프트 재발 방지가 이 상수의 존재 이유.
+export const KNOWN_BOT_UA_PATTERN = "bot|crawl|spider|slurp|bingpreview|facebookexternalhit|headless|preview|meta-externalagent|Google-Read-Aloud";
+
 export const BEHAVIOR_BOT_ANON_IDS_SQL = `
   SELECT t.anon_id
   FROM traffic_events t
   LEFT JOIN user_consents u ON u.anon_id = t.anon_id
-  WHERE COALESCE(u.user_agent, '') !~* 'bot|crawl|spider|slurp|bingpreview|facebookexternalhit|headless|preview|meta-externalagent'
+  WHERE COALESCE(u.user_agent, '') !~* '${KNOWN_BOT_UA_PATTERN}'
     AND COALESCE(t.src, '') !~* 'findelio|blinkx|semrush|ahrefs|dataprovider|dotbot|petalbot|yandex|mj12|serpstat'
     AND COALESCE(t.src, '') NOT IN ('spam')
     AND NOT COALESCE(u.internal, false)
@@ -121,7 +128,7 @@ export const EXPLICIT_BOT_ANON_IDS_SQL = `
   SELECT DISTINCT t.anon_id
   FROM traffic_events t
   LEFT JOIN user_consents u ON u.anon_id = t.anon_id
-  WHERE COALESCE(u.user_agent, '') ~* 'bot|crawl|spider|slurp|bingpreview|facebookexternalhit|headless|preview|meta-externalagent|Google-Read-Aloud'
+  WHERE COALESCE(u.user_agent, '') ~* '${KNOWN_BOT_UA_PATTERN}'
      OR COALESCE(t.src, '') ~* 'findelio|blinkx|semrush|ahrefs|dataprovider|dotbot|petalbot|yandex|mj12|serpstat'
      OR COALESCE(t.src, '') IN ('spam')
      OR COALESCE(u.internal, false)
