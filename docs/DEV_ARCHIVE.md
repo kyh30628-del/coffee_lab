@@ -160,3 +160,4 @@
 | 2026-07-26 05:01 | #507 | [룰갭 P61] naver_category 비-F&B 업종 + 리뷰 내 타업체/타지역 혼입 조합 신호 — 신 | 383af22c | - | lib/reviewQuality.ts: naver_category 비F&B 조합신호 신규 게이트 추가(QualityInput.naverCategory, isNonFnbCategor |
 | 2026-07-26 08:49 | #512 | [검색품질] 체인상한(chain_cap) 오탐 — "카페 OOO" 등 일반명사 접두 개인상호를 프랜차이즈로  | c85a14a6 | - | app/api/search/route.ts:165 chainKeyOf() 수정 — 마지막 단어가 "점"으로 끝나는 지점접미 패턴일 때만 체인키로 묶도록 제한(그 외엔 이름 전체를  |
 | 2026-07-26 08:54 | #513 | [사장님영업] 사장님 신청 퍼널 이벤트 계측 3종 — 홈 CTA→모달→제출 이탈지점 트래킹 | be9ae6b3 | - | 신규 app/api/owner-funnel/route.ts(owner_funnel_events 테이블: anon_id/event/source/cafe_id/path/meta) +  |
+| 2026-07-27 02:22 | #518 | [개발] 제안서 미인입 감시 5차+ 재발오탐 확정 — 오늘 8건 전부 결재행 기존확인, 실배치 아님 | 0e0361b2 | - | scripts/make-digest.mjs 1.5절(제안서 미인입 감시) 근본전환(coord#255): 폴백 매칭 신호를 파일명 stem ILIKE에서 제안서 헤딩(##+)의 카페 |
