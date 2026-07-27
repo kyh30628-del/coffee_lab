@@ -162,3 +162,4 @@
 | 2026-07-26 08:54 | #513 | [사장님영업] 사장님 신청 퍼널 이벤트 계측 3종 — 홈 CTA→모달→제출 이탈지점 트래킹 | be9ae6b3 | - | 신규 app/api/owner-funnel/route.ts(owner_funnel_events 테이블: anon_id/event/source/cafe_id/path/meta) +  |
 | 2026-07-27 02:22 | #518 | [개발] 제안서 미인입 감시 5차+ 재발오탐 확정 — 오늘 8건 전부 결재행 기존확인, 실배치 아님 | 0e0361b2 | - | scripts/make-digest.mjs 1.5절(제안서 미인입 감시) 근본전환(coord#255): 폴백 매칭 신호를 파일명 stem ILIKE에서 제안서 헤딩(##+)의 카페 |
 | 2026-07-27 02:41 | #519 | [개발] 협업 #254: PII 유출: id2588 카페세그루 공개후기에 전화번호 노출(scrubPublis | 4d247098 | - | lib/collectOrchestrator.ts maskPII()에 050[0-9](안심/가상번호) 대역 정규식 추가(마지막 그룹 3~4자리 가변 대응) + lib/synthSto |
+| 2026-07-27 03:17 | #520 | [룰갭 P62] '워크샵' 일반활동명사 — identity.weak_token 갭(사전추가) | bd5aeeaa | - | lib/criteriaListsBase.ts:125 identity.weak_token 배열에 "워크샵" 추가(P38/P44/P55 동일 패턴). tsc 신규에러 0(베이스라인 n |
