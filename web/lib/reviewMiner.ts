@@ -34,10 +34,11 @@ async function naverLocal(q: string): Promise<{ items?: any[]; err?: number }> {
 export type MineResult = { area: string; sampled: number; candidates: number; verified: number; inserted: number; calls: number; names: string[]; stopped?: string };
 
 // areaLabel 예: "강동구" / "안양시" / "인천 미추홀구". apply=false면 적재 안 함(dry-run).
-export async function mineArea(areaLabel: string, opts?: { maxCalls?: number; apply?: boolean; rawLimit?: number }): Promise<MineResult> {
+export async function mineArea(areaLabel: string, opts?: { maxCalls?: number; apply?: boolean; rawLimit?: number; deadlineMs?: number }): Promise<MineResult> {
   const maxCalls = opts?.maxCalls ?? 25;
   const apply = !!opts?.apply;
   const rawLimit = opts?.rawLimit ?? 100;
+  const deadlineMs = opts?.deadlineMs; // 호출측 함수시간 예산 안전판(discoverRegion과 동일 패턴) — 없으면 무제한(기존 동작 유지)
   const keyword = areaLabel.split(" ").pop() || areaLabel; // ILIKE·주소매칭용 핵심어(미추홀구 등)
 
   await loadCriteria(); // 수도권 좌표박스 기준 캐시 프라임(폴백=36.8~38.3/124.5~127.9)
@@ -64,6 +65,8 @@ export async function mineArea(areaLabel: string, opts?: { maxCalls?: number; ap
   const seen = new Set<string>();
   for (const c of pool) {
     if (calls >= maxCalls) { stopped = "maxCalls"; break; }
+    if (deadlineMs && Date.now() > deadlineMs) { stopped = "deadline"; break; }
+    if (calls > 0) await new Promise((r) => setTimeout(r, 220)); // discoverRegion과 동일 간격 — 없으면 초당 rate-limit(429)에 조기 컷(실측: 무지연 100콜 시도→16콜서 429)
     const res = await naverLocal(keyword + " " + c.name); calls++;
     if (res.err) { stopped = `naver ${res.err}`; break; }
     const tok = coreTokens(c.name, [keyword]);

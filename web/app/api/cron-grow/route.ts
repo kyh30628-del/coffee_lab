@@ -85,13 +85,16 @@ export async function GET(req: NextRequest) {
     const totalInserted = discoveries.reduce((s, d) => s + (d.inserted ?? 0), 0);
 
     // ①-B 리뷰 속 숨은 카페 발굴 — 이미 수집한 raw_reviews에서 상호 추출→네이버 검증→신규 적재(토큰 0).
-    //     가장 오래 채굴 안 된 지역 1곳만 바운드(maxCalls)로 처리 → 매일 조금씩 수도권 순회(네이버 한도·함수시간 안전).
+    //     가장 오래 채굴 안 된 지역 1곳만 처리. 이 채널은 호출당 적중률이 지역발굴(①)보다 ~10배 높다
+    //     (실측: 354곳/38일 ≈ 최대 32콜/신규카페 vs ①의 ~260콜/신규카페) — maxCalls=25는 지역당 후보풀
+    //     96~114개 중 70~90개를 매번 그냥 버리는 임의 상한이었다(coord 네이버쿼터 딥다이브). 100으로 상향하되
+    //     deadlineMs로 ①이 예산을 많이 써버린 회차에도 합성(②) 시간을 절대 침범하지 않게 안전판을 둔다.
     await sql`ALTER TABLE discovery_state ADD COLUMN IF NOT EXISTS last_mined TIMESTAMPTZ`.catch(() => {});
     let mining: any = null;
     try {
       const mt = (await sql`SELECT region, area_label FROM discovery_state ORDER BY last_mined ASC NULLS FIRST LIMIT 1`)[0] as { region: string; area_label: string } | undefined;
       if (mt) {
-        mining = await mineArea(mt.area_label ?? mt.region, { maxCalls: 25, apply: true });
+        mining = await mineArea(mt.area_label ?? mt.region, { maxCalls: 100, apply: true, deadlineMs: t0 + 270_000 });
         await sql`UPDATE discovery_state SET last_mined=now() WHERE region=${mt.region}`;
       }
     } catch (e) { mining = { error: String(e).slice(0, 80) }; }
