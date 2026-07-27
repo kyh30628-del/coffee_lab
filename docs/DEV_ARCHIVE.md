@@ -164,3 +164,4 @@
 | 2026-07-27 02:41 | #519 | [개발] 협업 #254: PII 유출: id2588 카페세그루 공개후기에 전화번호 노출(scrubPublis | 4d247098 | - | lib/collectOrchestrator.ts maskPII()에 050[0-9](안심/가상번호) 대역 정규식 추가(마지막 그룹 3~4자리 가변 대응) + lib/synthSto |
 | 2026-07-27 03:17 | #520 | [룰갭 P62] '워크샵' 일반활동명사 — identity.weak_token 갭(사전추가) | bd5aeeaa | - | lib/criteriaListsBase.ts:125 identity.weak_token 배열에 "워크샵" 추가(P38/P44/P55 동일 패턴). tsc 신규에러 0(베이스라인 n |
 | 2026-07-27 03:55 | #522 | [개발] 협업 #259: [신규] PII 유출 재발 위험: scrubPublishedPII가 synth_re | 61730345 | - | lib/synthStore.ts scrubPublishedPII() 후보선별 쿼리 수정: synth_reviews(top6)만 스캔하던 것을 synth_reviews_all까지 U |
+| 2026-07-27 09:02 | #523 | [개발] [coord#248 후속정정] direct 봇오염(meta-externalagent) 야간 주기 재 | 52b1e054 | - | lib/behaviorBot.ts: KNOWN_BOT_UA_PATTERN 단일출처 신설(표출필터 2곳도 이걸로 통일). app/api/visit/route.ts: /api/visi |
