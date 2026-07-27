@@ -98,13 +98,51 @@ const today = new Date().toISOString().slice(0, 10);
     };
     const isExplicitNoProposal = (text) => /상신\s*[:\s]*(?:없음|0건)/.test(text) && !/승인\s*필요/.test(text);
 
+    // ⚠️ #518 근본전환(coord#255, #421→#427→#450→#502 5차 재발): #502가 "번호 인용"으로 1차 신호를
+    //    고쳤지만, 인용 없는 순수 신규 제안의 2차 폴백은 여전히 "파일명 stem이 결재문에 그대로 실린다"는
+    //    틀린 전제(#502가 이미 폐기했어야 할 가정)에 머물러 있었다 — 실측(coord#255) 결과 결재행은 파일명이
+    //    아니라 팀이 다루는 대상 자체(카페id·룰갭 P번호·브랜드명)로 타이틀링된다(예: "id1032 블루보틀 인천롯데
+    //    팝업", "[룰갭 P52] ..."). 폴백 신호를 "파일명 문자열"에서 "제안서 본문(헤딩)이 실제로 다루는 대상
+    //    토큰"으로 교체한다: (a) 카페id(id\d+), (b) 룰갭 번호(P\d{2,} — "P0/P1" 같은 우선순위 라벨과 겹치지
+    //    않게 2자리+만), (c) 헤딩에 등장하는 한글 고유명사류 단어(2자+, 불용어 제외 = 브랜드명·주제어). id·P는
+    //    단 1개만 겹쳐도 확정 매치(고유 식별자), 브랜드명류 단어는 우연 일치 방지를 위해 2개 이상 동시 겹쳐야
+    //    매치로 인정한다.
+    const TOKEN_STOPWORDS = new Set([
+      "신규", "제안", "배경", "현황", "결함", "유형", "근거", "권장", "요청", "승인", "필요", "예상", "영향",
+      "범위", "확인", "실제", "예시", "실측", "기존", "오늘", "현재", "분류", "대상", "방식", "리스크", "위치",
+      "등급", "검토", "진행", "완료", "실패", "참고", "조치", "결론", "정리", "요약", "제안서", "사이클",
+      // 도메인 보일러플레이트 — 거의 모든 결재행·제안서에 등장해 브랜드 식별력이 없다(카페 리뷰 플랫폼 특성상
+      // "카페"·"리뷰"·"방문" 등은 사실상 불용어다). #518 1차수정에서 이 단어들이 무관 결재행 대량 오탐매치를
+      // 일으켜(예: 저번호 decisions가 "인천"·"카페" 우연 일치로 걸림) 발견, 추가.
+      "카페", "리뷰", "방문", "브랜드", "매장", "지점", "점포", "레드팀", "룰갭", "결재", "협업", "감시",
+      "재상신", "연속", "폐업", "종료", "재합성", "합성", "재요청", "후보", "사례", "조사", "오염", "교차",
+      "매칭", "형제", "동명",
+    ]);
+    const extractContentTokens = (text) => {
+      const ids = new Set();
+      const brands = new Set();
+      for (const line of text.split("\n")) {
+        if (!/^#{2,6}\s/.test(line)) continue; // ## 이상만 — 파일 H1 제목은 전 파일 공통 보일러플레이트라 제외
+        const heading = line.replace(/^#{2,6}\s*/, "");
+        (heading.match(/\bid\d+\b/gi) || []).forEach((t) => ids.add(t.toLowerCase()));
+        (heading.match(/\bP\d{2,}\b/g) || []).forEach((t) => ids.add(t));
+        (heading.match(/[가-힣]{2,}/g) || []).forEach((w) => { if (!TOKEN_STOPWORDS.has(w)) brands.add(w); });
+      }
+      return { ids, brands };
+    };
+    const decisionMatchesTokens = (d, tok) => {
+      const text = `${d.title || ""} ${d.detail || ""} ${d.action_params?.ref || ""}`;
+      if ([...tok.ids].some((id) => text.includes(id))) return true; // 고유 식별자는 1개만 겹쳐도 확정
+      return [...tok.brands].filter((b) => text.includes(b)).length >= 2; // 일반 단어는 2개+ 동시 일치만 인정
+    };
+
     const files = existsSync(AR) ? readdirSync(AR).filter((f) => /-proposals-\d{8}/.test(f) && f.endsWith(".md")) : [];
     const candidates = [];
     for (const f of files) {
       const ageH = (Date.now() - statSync(`${AR}/${f}`).mtimeMs) / 3.6e6;
       if (ageH < 12 || ageH > 168) continue;
       let text = ""; try { text = readFileSync(`${AR}/${f}`, "utf8"); } catch {}
-      candidates.push({ f, ageH, stem: f.replace(/\.md$/, ""), text, cited: extractSelfCitedIds(text), noProposal: isExplicitNoProposal(text) });
+      candidates.push({ f, ageH, stem: f.replace(/\.md$/, ""), text, cited: extractSelfCitedIds(text), noProposal: isExplicitNoProposal(text), tokens: extractContentTokens(text) });
     }
     const allCitedIds = [...new Set(candidates.flatMap((c) => [...c.cited]))].map(Number);
     const existingCited = allCitedIds.length ? await sql`SELECT id FROM decisions WHERE id = ANY(${allCitedIds})`.catch(() => []) : [];
@@ -114,14 +152,34 @@ const today = new Date().toISOString().slice(0, 10);
     for (const c of candidates) {
       const selfCovered = c.noProposal || [...c.cited].some((id) => existingCitedIds.has(id));
       if (selfCovered) continue;
-      const hitDecision = await sql`SELECT title, detail, action_params FROM decisions WHERE action_params->>'ref' ILIKE ${"%" + c.stem + "%"} OR title ILIKE ${"%" + c.stem + "%"} OR detail ILIKE ${"%" + c.stem + "%"} LIMIT 5`.catch(() => []);
+      const tokenList = [...c.tokens.ids, ...c.tokens.brands];
+      // ⚠️ LIMIT을 걸면 흔한 단어(과거엔 "카페"·"인천" 등) 우연일치 행이 먼저 채워져 진짜 대상 결재행이
+      // 잘려나갈 수 있다(#518 1차수정 실측 재현). decisions 전체가 500행 남짓이라 LIMIT 없이 전부 받아
+      // JS에서 정확히 판별하는 편이 더 싸고 안전하다.
+      const hitDecision = tokenList.length
+        ? await sql`
+            SELECT title, detail, action_params FROM decisions d
+            WHERE EXISTS (
+              SELECT 1 FROM unnest(${tokenList}::text[]) t
+              WHERE d.title ILIKE '%' || t || '%' OR d.detail ILIKE '%' || t || '%' OR d.action_params->>'ref' ILIKE '%' || t || '%'
+            )
+            ORDER BY d.id DESC`.catch(() => [])
+        : [];
       const realHit = hitDecision.some((d) => {
         const ap = d.action_params || {};
         const selfChange = `${ap.summary || ""} ${ap.branch || ""} ${ap.file || ""}`;
         if (/make-digest\.mjs/i.test(selfChange)) return false; // 감시 로직 자기수정 — 대상 제안서 미구현
-        const text = `${d.title || ""} ${d.detail || ""}`;
-        const mentionedStems = candidates.filter((o) => text.includes(o.stem)).length;
-        if (mentionedStems <= 1) return true;
+        if (!decisionMatchesTokens(d, c.tokens)) return false;
+        // 배치 처리(#428류) 판정은 오직 고유 식별자(id\d+/P\d{2,})로만, 그것도 **title에 실제로 명시된
+        // 대상**만 센다 — detail 본문은 "id11208/18854와 동일 구조적 갭" 처럼 다른 건을 배경비교로만 지나가듯
+        // 언급하는 경우가 흔해(#494 실측), 본문까지 포함하면 무관한 후보가 무더기로 "같은 배치"로 오판된다
+        // (#518 1차수정 실측: id1032 단일건이 무관 후보 4개와 "겹침" 오판). title은 결재행이 실제로 "이 건에
+        // 대한" 결정임을 선언하는 자리라 훨씬 신뢰도 높은 신호.
+        const decisionTitle = d.title || "";
+        const idMatchedCandidates = c.tokens.ids.size
+          ? candidates.filter((o) => o.tokens.ids.size && [...o.tokens.ids].some((id) => decisionTitle.includes(id))).length
+          : 1; // 이 후보 자체가 식별자 없이 브랜드 단어만으로 히트한 경우(예: 코드제안류) — 배치판정 대상 아님, 단일 취급
+        if (idMatchedCandidates <= 1) return true;
         return (ap.dev_status === "deployed" || ap.dev_status === "built") && !!ap.summary; // 배치 구현 인정
       });
       if (realHit) continue;
@@ -130,8 +188,11 @@ const today = new Date().toISOString().slice(0, 10);
       stale.push({ f: c.f, ageH: c.ageH, first: first.replace(/^#+\s*/, "").slice(0, 70), coordOnly: hitCoord.length > 0 });
     }
     L.push(`## 🚨 제안서 미인입 감시 (12h+ · decisions행 미생성)`);
+    // ⚠️ coord#255 톤다운 권고: 토큰 매칭도 완벽하진 않다(브랜드명 추출 실패 등) — 확정 단정("미인입 의심")
+    //    대신 대사 후 판단을 요구하는 어조로 유지해 오탐이 남더라도 closure-agent 등이 성급히 "파이프라인
+    //    점검 시급"으로 오판하지 않게 한다.
     if (!stale.length) L.push(`- ✅ 없음\n`);
-    else L.push(stale.map((s) => `- ⚠️ **${s.f}** (${s.ageH.toFixed(0)}h전${s.coordOnly ? ", 협업 핸드오프 중이나 결재행 미생성 — 루프 의심" : ", 미인입 의심"}): ${s.first}`).join("\n") + "\n");
+    else L.push(stale.map((s) => `- ⚠️ **${s.f}** (${s.ageH.toFixed(0)}h전${s.coordOnly ? ", 협업 핸드오프 중이나 결재행 미생성 — 루프 의심" : ", 미인입 가능성(오탐 가능성 있음 — decisions 직접 대사 후 판단)"}): ${s.first}`).join("\n") + "\n");
   } catch (e) { L.push(`(제안서 감시 실패)\n`); }
 
   // 2) 핵심 수치
