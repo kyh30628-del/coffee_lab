@@ -305,13 +305,22 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
 export async function scrubPublishedPII(): Promise<{ scrubbed: number; names: string[] }> {
   const { maskPII } = await import("./collectOrchestrator");
   // 레드팀과 동일 규칙으로 위반 카페만 선별(대용량 fetch 회피)
+  // ⚠️ synth_reviews(top6)만으로는 부족 — 공개페이지는 synth_reviews_all을 우선 렌더링하므로 둘 다 스캔(#259)
   const bad = (await sql`
-    SELECT DISTINCT c.id, c.name FROM cafes c, jsonb_array_elements(c.synth_reviews) r
-    WHERE c.published AND (r->>'quote' ~ '01[0-9][- ]?[0-9]{3,4}[- ]?[0-9]{4}'
-      OR r->>'quote' ~ '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
-      OR r->>'quote' ~ '\\m0(2|[3-6][0-9])[-. ]?[0-9]{3,4}[-. ]?[0-9]{4}\\M'
-      OR r->>'quote' ~ '\\m050[0-9][-. ]?[0-9]{3,4}[-. ]?[0-9]{3,4}\\M')
-    LIMIT 200`) as any[];
+    WITH cand AS (
+      SELECT c.id, c.name FROM cafes c, jsonb_array_elements(c.synth_reviews) r
+      WHERE c.published AND (r->>'quote' ~ '01[0-9][- ]?[0-9]{3,4}[- ]?[0-9]{4}'
+        OR r->>'quote' ~ '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
+        OR r->>'quote' ~ '\\m0(2|[3-6][0-9])[-. ]?[0-9]{3,4}[-. ]?[0-9]{4}\\M'
+        OR r->>'quote' ~ '\\m050[0-9][-. ]?[0-9]{3,4}[-. ]?[0-9]{3,4}\\M')
+      UNION
+      SELECT c.id, c.name FROM cafes c, jsonb_array_elements(c.synth_reviews_all) r
+      WHERE c.published AND (r->>'quote' ~ '01[0-9][- ]?[0-9]{3,4}[- ]?[0-9]{4}'
+        OR r->>'quote' ~ '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
+        OR r->>'quote' ~ '\\m0(2|[3-6][0-9])[-. ]?[0-9]{3,4}[-. ]?[0-9]{4}\\M'
+        OR r->>'quote' ~ '\\m050[0-9][-. ]?[0-9]{3,4}[-. ]?[0-9]{3,4}\\M')
+    )
+    SELECT DISTINCT id, name FROM cand LIMIT 200`) as any[];
   const names: string[] = [];
   for (const c of bad) {
     const [row] = await sql`SELECT synth_reviews, synth_reviews_all FROM cafes WHERE id=${c.id}` as any[];
