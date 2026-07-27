@@ -68,9 +68,19 @@ export async function GET(req: NextRequest) {
     //   신규(pending)는 항상 판정(공개 게이트). 공개 재판정은 '검증' 아닌 등급만(참고 등 = 낮은 신뢰).
     //   '검증' 등급(옥석 코어, 평균 85리뷰)은 후보에서 제외 → 판정 스킵, 노출 무영향.
     //   후보구제: excluded·held·noise는 등급이 올라도 storeResult가 무조건 publish=false로 고정(영구차단) → 대상에서 제외해 낭비 방지.
+    // ⚠️ 중복제출 방지(2026-07-27 실측사고): llm_judged_at은 결과가 '적용'될 때만 찍힌다 — 제출 시점엔 안 찍혀서,
+    //   배치가 끝나기 전에 이 엔드포인트를 다시 호출하면 SELECT가 매번 같은 상위 N개를 또 뽑아 같은 카페가
+    //   여러 배치에 중복 제출된다(수동청산 중 29개 중복배치 발생·취소로 복구). 아직 안 끝난(NOT applied) 배치의
+    //   매니페스트에 이미 들어있는 카페는 여기서 명시적으로 제외 — 짧은 간격으로 반복 호출해도 안전(멱등)하게 만든다.
+    const inFlight = (await sql`
+      SELECT DISTINCT (v->>'id')::int AS id
+      FROM judge_batches, jsonb_each(manifest->'cafes') AS kv(k, v)
+      WHERE NOT applied`) as any[];
+    const inFlightIds = inFlight.map((r) => r.id).filter((n) => Number.isInteger(n));
     const rows = (await sql`SELECT id, name, area FROM cafes
       WHERE raw_reviews IS NOT NULL
         AND (llm_judged_at IS NULL OR llm_judged_at < raw_collected_at)
+        AND NOT (id = ANY(${inFlightIds}))
         AND (
           pipeline_status = 'pending'
           OR (published AND synth_grade IS DISTINCT FROM ${TRUSTED_GRADE})
