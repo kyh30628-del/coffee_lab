@@ -309,7 +309,8 @@ export async function scrubPublishedPII(): Promise<{ scrubbed: number; names: st
     SELECT DISTINCT c.id, c.name FROM cafes c, jsonb_array_elements(c.synth_reviews) r
     WHERE c.published AND (r->>'quote' ~ '01[0-9][- ]?[0-9]{3,4}[- ]?[0-9]{4}'
       OR r->>'quote' ~ '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
-      OR r->>'quote' ~ '\\m0(2|[3-6][0-9])[-. ]?[0-9]{3,4}[-. ]?[0-9]{4}\\M')
+      OR r->>'quote' ~ '\\m0(2|[3-6][0-9])[-. ]?[0-9]{3,4}[-. ]?[0-9]{4}\\M'
+      OR r->>'quote' ~ '\\m050[0-9][-. ]?[0-9]{3,4}[-. ]?[0-9]{3,4}\\M')
     LIMIT 200`) as any[];
   const names: string[] = [];
   for (const c of bad) {

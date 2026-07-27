@@ -55,9 +55,9 @@ async function runChecks(): Promise<Check[]> {
   // 5. PII 누출: 표시 인용문에 전화/이메일
   add("pii_leak", "근거 후기에 개인정보(전화·이메일) 노출", "fail",
     await n(sql`SELECT count(DISTINCT c.id)::int n FROM cafes c, jsonb_array_elements(c.synth_reviews) r
-      WHERE c.published AND (r->>'quote' ~ '01[0-9][- ]?[0-9]{3,4}[- ]?[0-9]{4}' OR r->>'quote' ~ '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}')`),
+      WHERE c.published AND (r->>'quote' ~ '01[0-9][- ]?[0-9]{3,4}[- ]?[0-9]{4}' OR r->>'quote' ~ '\\m050[0-9][-. ]?[0-9]{3,4}[-. ]?[0-9]{3,4}\\M' OR r->>'quote' ~ '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}')`),
     await samp(sql`SELECT DISTINCT c.name s FROM cafes c, jsonb_array_elements(c.synth_reviews) r
-      WHERE c.published AND (r->>'quote' ~ '01[0-9][- ]?[0-9]{3,4}[- ]?[0-9]{4}' OR r->>'quote' ~ '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}') LIMIT 6`));
+      WHERE c.published AND (r->>'quote' ~ '01[0-9][- ]?[0-9]{3,4}[- ]?[0-9]{4}' OR r->>'quote' ~ '\\m050[0-9][-. ]?[0-9]{3,4}[-. ]?[0-9]{3,4}\\M' OR r->>'quote' ~ '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}') LIMIT 6`));
 
   // 6. 링크 형식: http로 시작하지 않는 출처 링크
   add("link_format", "출처 링크 형식 오류(http 아님)", "fail",
