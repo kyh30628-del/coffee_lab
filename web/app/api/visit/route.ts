@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
 import { sourceBucket } from "@/lib/trafficSource";
+import { KNOWN_BOT_UA_PATTERN } from "@/lib/behaviorBot";
 export const runtime = "nodejs";
+
+// 확정 봇 UA(meta-externalagent 등, #523·coord#262) 원천 차단 — lib/behaviorBot.ts 단일출처.
+// 표출 화면에서만 걸러내면 user_consents/traffic_events 원본은 야간마다 계속 오염 누적된다(실측:
+// 07-25~07-27 direct 신규 100건 중 86건 봇). 여기서 걸리면 INSERT 자체를 하지 않는다.
+const KNOWN_BOT_UA = new RegExp(KNOWN_BOT_UA_PATTERN, "i");
 
 // 익명 방문 핑 (PRINCIPLES §2: 개인정보 미수집). anon_id만으로 재방문·활성 집계.
 // 정밀 위치·이름·연락처는 일절 받지 않음. 위치는 동의 플로우(/api/consent)에서만.
@@ -45,6 +51,7 @@ export async function POST(req: NextRequest) {
     const anonId = String(b.anonId ?? "").slice(0, 64);
     if (!anonId) return NextResponse.json({ ok: false }, { status: 400 });
     const ua = (req.headers.get("user-agent") ?? "").slice(0, 200);
+    if (KNOWN_BOT_UA.test(ua)) return NextResponse.json({ ok: true });
     // 유입경로: 클라가 보낸 referrer/UTM(세션 첫 핑만) + 헤더 referer 폴백
     const ref = String(b.ref ?? req.headers.get("referer") ?? "").slice(0, 300);
     const utmSource = String(b.utm_source ?? "").slice(0, 60);
@@ -71,8 +78,8 @@ export async function POST(req: NextRequest) {
         utm_medium = COALESCE(NULLIF(user_consents.utm_medium, ''), NULLIF(EXCLUDED.utm_medium, '')),
         utm_campaign = COALESCE(NULLIF(user_consents.utm_campaign, ''), NULLIF(EXCLUDED.utm_campaign, '')),
         landing = COALESCE(NULLIF(user_consents.landing, ''), NULLIF(EXCLUDED.landing, ''))`;
-    // 봇 UA·빈 경로·내부(대표/팀·/admin·/owner)는 페이지뷰 이벤트서 제외(분석 정확도). 실제 외부 사람 방문만 적재.
-    if (landing && !isInternal && !/^\/(admin|owner)/.test(landing) && !/bot|crawl|spider|slurp|bingpreview|facebookexternalhit|headless|preview/i.test(ua)) {
+    // 빈 경로·내부(대표/팀·/admin·/owner)는 페이지뷰 이벤트서 제외(분석 정확도). 봇은 위에서 이미 원천 차단됨.
+    if (landing && !isInternal && !/^\/(admin|owner)/.test(landing)) {
       await sql`INSERT INTO traffic_events (anon_id, path, src) VALUES (${anonId}, ${landing}, ${src})`.catch(() => {});
     }
     return NextResponse.json({ ok: true });
