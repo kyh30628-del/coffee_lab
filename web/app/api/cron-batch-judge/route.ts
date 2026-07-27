@@ -60,18 +60,29 @@ export async function GET(req: NextRequest) {
 
     // ── ② 판정 대기 카페로 새 배치 제출 ──
     //   ⚠️ 우선순위: 신규(pending) 먼저! pending은 판정이 '공개 필수 게이트'라 미루면 영영 공개 안 됨.
-    //   공개카페 재정제(보조)는 그 다음. (이전엔 published DESC라 신규가 영영 차례 안 와 적체됨)
+    //   그다음 '후보구제'(한 번도 공개 안 된 카페인데 경계리뷰가 있어 AI가 구제하면 등급 문턱을 넘을 수 있는 것) —
+    //   실측(2026-07-27): 후보등급 미공개 카페 2,763곳이 평균 74개 경계리뷰를 갖고도 이 쿼리 조건에
+    //   한 번도 안 걸려(published=false·pending도 아님) AI판정 자체를 받아본 적이 없었다(구조적 누락, 로직버그 아님).
+    //   공개카페 재정제(보조)는 맨 마지막. (이전엔 published DESC라 신규가 영영 차례 안 와 적체됨)
     let submitted = 0, noCand = 0, batchId: string | null = null;
     //   신규(pending)는 항상 판정(공개 게이트). 공개 재판정은 '검증' 아닌 등급만(참고 등 = 낮은 신뢰).
     //   '검증' 등급(옥석 코어, 평균 85리뷰)은 후보에서 제외 → 판정 스킵, 노출 무영향.
+    //   후보구제: excluded·held·noise는 등급이 올라도 storeResult가 무조건 publish=false로 고정(영구차단) → 대상에서 제외해 낭비 방지.
     const rows = (await sql`SELECT id, name, area FROM cafes
       WHERE raw_reviews IS NOT NULL
         AND (llm_judged_at IS NULL OR llm_judged_at < raw_collected_at)
         AND (
           pipeline_status = 'pending'
           OR (published AND synth_grade IS DISTINCT FROM ${TRUSTED_GRADE})
+          OR (
+            synth_grade = '후보' AND NOT published AND COALESCE(borderline_count, 0) > 0
+            AND (pipeline_status IS NULL OR pipeline_status NOT IN ('excluded', 'held', 'noise'))
+          )
         )
-      ORDER BY (pipeline_status = 'pending') DESC,
+      ORDER BY (COALESCE(pipeline_status, '') = 'pending') DESC,
+               -- ⚠️ pipeline_status IS NULL(grandfather)인 행은 위 비교가 SQL NULL이 되고, Postgres는
+               --   DESC에서 NULL을 '가장 큼'으로 취급해 맨 앞으로 보낸다 — COALESCE로 NULL을 없애 방지(실측으로 발견).
+               (synth_grade = '후보' AND NOT COALESCE(published, false)) DESC,  -- 후보구제(신규 공개 가능성) > 공개카페 재정제
                COALESCE(synth_count, 0) ASC,           -- 리뷰 적어 취약한 순 우선(옥석 많은 곳은 뒤로)
                id LIMIT ${BUILD_LIMIT}`) as any[];
     const requests: any[] = [];
