@@ -163,3 +163,4 @@
 | 2026-07-27 02:22 | #518 | [개발] 제안서 미인입 감시 5차+ 재발오탐 확정 — 오늘 8건 전부 결재행 기존확인, 실배치 아님 | 0e0361b2 | - | scripts/make-digest.mjs 1.5절(제안서 미인입 감시) 근본전환(coord#255): 폴백 매칭 신호를 파일명 stem ILIKE에서 제안서 헤딩(##+)의 카페 |
 | 2026-07-27 02:41 | #519 | [개발] 협업 #254: PII 유출: id2588 카페세그루 공개후기에 전화번호 노출(scrubPublis | 4d247098 | - | lib/collectOrchestrator.ts maskPII()에 050[0-9](안심/가상번호) 대역 정규식 추가(마지막 그룹 3~4자리 가변 대응) + lib/synthSto |
 | 2026-07-27 03:17 | #520 | [룰갭 P62] '워크샵' 일반활동명사 — identity.weak_token 갭(사전추가) | bd5aeeaa | - | lib/criteriaListsBase.ts:125 identity.weak_token 배열에 "워크샵" 추가(P38/P44/P55 동일 패턴). tsc 신규에러 0(베이스라인 n |
+| 2026-07-27 03:55 | #522 | [개발] 협업 #259: [신규] PII 유출 재발 위험: scrubPublishedPII가 synth_re | 61730345 | - | lib/synthStore.ts scrubPublishedPII() 후보선별 쿼리 수정: synth_reviews(top6)만 스캔하던 것을 synth_reviews_all까지 U |
