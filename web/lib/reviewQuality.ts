@@ -42,6 +42,15 @@ export type QualityResult = {
 const VISIT_CUES = ["갔", "방문", "다녀", "마셨", "마시", "주문", "시켰", "들렀", "가봤", "재방문", "다시 가", "다녀왔",
   "앉아", "웨이팅", "줄 서", "예약하고", "visited", "ordered", "tried", "went", "stopped by", "i had", "we had"];
 
+// 룰갭 P63(2026-07-28, decisions#530): 택배/스마트스토어 배송 후기가 VISIT_CUES의 "주문"에 걸려 매장 방문
+//   신호로 오판되고, SUBSTANCE_CUES(빵·맛·가격 등)도 배송리뷰에 흔해 구체 후기 신호까지 중복 가산 — 매장
+//   방문 없이 verified(score 63~100)까지 산입되던 사고(10곳 확정, proposals-20260728-1210.md). 배송-전용
+//   강신호가 있고 매장 실물방문 신호가 전무하면 이 리뷰의 VISIT_CUES 매칭을 무효화하고 borderline(LLM
+//   재판정)으로 격하한다. 방문+구매 혼합 리뷰(매장에서 마시고 원두는 스마트스토어로 재구매 등)는 아래
+//   INSTORE_VISIT_CUES가 함께 잡히므로 과탈락하지 않는다(실측: 나머지 18곳은 매장방문 언급이 공존해 제외).
+const DELIVERY_ONLY_CUES = /(택배\s*후기|택배로\s*받|택배\s*수령|스마트스토어(에서)?\s*구매|주문서\s*캡쳐|집에서\s*받아)/;
+const INSTORE_VISIT_CUES = /(매장에서|카페에\s*앉|좌석에?\s*앉|자리에?\s*앉|직접\s*가서|웨이팅|매장\s*방문|가게에\s*가|테이블에\s*앉)/;
+
 // 실제 경험·평가가 담겼는지 (감각/메뉴/서비스/공간 등 구체 신호)
 const SUBSTANCE_CUES = [
   "맛", "원두", "라떼", "아메리카노", "에스프레소", "핸드드립", "드립", "디저트", "케이크", "빵", "스콘", "크로플",
@@ -708,7 +717,10 @@ export function verifyReview(input: QualityInput): QualityResult {
   const identTokens = nonAreaTokens.length ? nonAreaTokens : tokens; // 비면 원래대로
   const distinctInTitle = reqFull ? inTitleFull : identTokens.some((tk) => nameHit(title, titleN, tk));
   const distinctInBody = reqFull ? inBodyFull : distinct.some((tk) => nameHit(body, bodyN, tk));
-  const visit = has(fullL, VISIT_CUES);
+  // 룰갭 P63: 배송-전용 강신호가 있고 매장 실물방문 신호가 없으면 비방문 구매후기 — VISIT_CUES의
+  //   "주문" 오탐(택배 주문)을 무효화하고 아래에서 borderline(LLM 재판정)으로 격하한다.
+  const deliveryOnly = DELIVERY_ONLY_CUES.test(fullL) && !INSTORE_VISIT_CUES.test(fullL);
+  const visit = has(fullL, VISIT_CUES) && !deliveryOnly;
   const substance = SUBSTANCE_CUES.filter((k) => fullL.includes(k.toLowerCase())).length;
   // [#4] 흔한 단어 이름 오매칭 방지: 전체 이름 일치는 강함. 토큰만 일치면
   //     '카페 맥락(카페·커피·로스터리…)'이나 지역이 함께 있어야 주제로 인정.
@@ -1195,6 +1207,13 @@ export function verifyReview(input: QualityInput): QualityResult {
   }
   if (listicle && !nameInTitle) {
     return { verdict: "rejected", score: 10, reasons: ["나열식 모음글에 언급만 됨(주제 아님)"], signals: sig };
+  }
+  // 룰갭 P63(2026-07-28, decisions#530): 배송-전용 강신호(택배·스마트스토어 구매 등)만 있고 매장 실물방문
+  //   신호가 전무하면 하드 탈락 대신 borderline(LLM 재판정)으로 격하 — SUBSTANCE_CUES(빵·맛 등)는 배송
+  //   후기에도 흔해 score만으론 방문후기와 구분 안 되므로, 하드 verified 산입을 막고 LLM이 확인하게 한다.
+  //   !visit && substance===0 하드거절보다 먼저 검사해 배송후기도 항상 borderline 경로로 보낸다.
+  if (deliveryOnly && (nameInTitle || nameInBody)) {
+    return { verdict: "rejected", score: 30, reasons: ["택배/스마트스토어 배송 후기(매장 방문 단서 없음) — LLM 재판정"], borderline: true, signals: sig };
   }
   if (!visit && substance === 0) {
     return { verdict: "rejected", score: 10, reasons: ["방문·경험·평가 내용 없음(언급만)"], signals: sig };
