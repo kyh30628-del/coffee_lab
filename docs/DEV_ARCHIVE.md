@@ -169,3 +169,4 @@
 | 2026-07-28 09:29 | #531 | [룰갭 P64] 배달앱(배민·쿠팡이츠·요기요) 주문 후기가 VISIT_CUES 오탐 — P63 배송후기 수정 | 538f82aa | - | lib/reviewQuality.ts:51 DELIVERY_ONLY_CUES 정규식에 배달앱 어휘(배달 시켜/시켰/앱/어플/주문/해서, 배달 후기, 쿠팡이츠, 배달의 민족, 배민) |
 | 2026-07-28 09:30 | #532 | [검색품질] 무관련 질의에도 관련성 하한선 없이 24건 확정노출 — 프랜차이즈명·오타·무의미 문자열 검색 시 | 057856e6 | - | app/api/search/route.ts 시맨틱 경로(lexMatched===false)에 sim<criteria(search.semantic_floor.min_sim, 기본 0 |
 | 2026-07-28 09:37 | #533 | [사장님영업] 홈 사장님 CTA 시각 강조 개선 — 배포 후 2일간 클릭 0건(방문 92명) | d2ecc315 | - | app/page.tsx:1276-1278 사장님 CTA 버튼을 소비자 버튼과 동등한 시각강조로 변경 — border 아웃라인→bg-[#e8b87a] 채움+shadow-lg(소비자는 |
+| 2026-07-28 09:40 | #534 | [기조실장 발견] L2 자동승인 코드가 requeue_resynth·investigate 미커버 — 29~8 | 541295c5 | - | web/lib/issues.ts autoCorrect(): L2 자동승인·자동집행 대상을 unpublish 단독에서 unpublish+requeue_resynth로 확대(둘 다 / |
