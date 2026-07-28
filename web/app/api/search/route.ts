@@ -292,17 +292,24 @@ export async function GET(req: NextRequest) {
             //   쉽게 뭉개고 참고등급이 검증등급 위로 노출되던 버그 — sim*100과 같은 0~100 스케일로 후보군 내 상대값 정규화해
             //   AI재정렬 경로(아래 rankScore 0~100 정규화+gradeBonus)와 두 경로를 일치시킨다.
             const maxLex = Math.max(1, ...lex.map((l) => l.exact + l.concept));
-            scored = lex.map(({ c, exact, concept, reasons }) => {
-              const sim = Number(c.sim) || 0;
-              // #216: 키워드·느낌 완전 불일치(exact+concept===0)면 등급가산 미적용 — 브랜드명(이디야·컴포즈 등)
-              //   DB無매칭 검색 시 의미유사도만 있는 무관 카페가 gradeBonus(+25)로 검증배지·고득점 1위로
-              //   오인 노출되던 왜곡 차단. 키워드 폴백 경로(아래)와 동일한 가드로 두 경로를 일치시킨다.
-              const lexMatched = exact + concept > 0;
-              const lexScore = lexMatched ? ((exact + concept) / maxLex) * 100 : 0;
-              const total = sim * 100 + lexScore + (lexMatched ? gradeBonus(c.synth_grade) : 0); // 의미 유사도 1차 + 키워드·느낌(정규화) + 등급(검증 우대, 어휘일치 시에만)
-              const why = [`의미 유사 ${Math.round(sim * 100)}%`, ...reasons];
-              return { id: c.id, name: c.name, area: c.area, grade: c.synth_grade, count: c.synth_count, identity: c.synth_identity, score: Math.round(total * 10) / 10, reasons: why.slice(0, 3) };
-            });
+            // #532: 어휘일치가 전혀 없는(lexMatched===false) 후보는 의미유사도(sim) 단독값만으로 순위가 매겨져
+            //   무관 질의(오타·무의미 문자열·미보유 프랜차이즈명)에도 하한 없이 24건이 검증배지와 함께 확정노출되던 버그.
+            //   sim이 이 하한 미만이면 후보에서 제외 — 어휘일치가 있는 후보(브랜드 상호 부분일치 등)는 그대로 둔다.
+            const semanticFloor = getCriterionSync("search.semantic_floor.min_sim");
+            scored = lex
+              .map(({ c, exact, concept, reasons }) => {
+                const sim = Number(c.sim) || 0;
+                // #216: 키워드·느낌 완전 불일치(exact+concept===0)면 등급가산 미적용 — 브랜드명(이디야·컴포즈 등)
+                //   DB無매칭 검색 시 의미유사도만 있는 무관 카페가 gradeBonus(+25)로 검증배지·고득점 1위로
+                //   오인 노출되던 왜곡 차단. 키워드 폴백 경로(아래)와 동일한 가드로 두 경로를 일치시킨다.
+                const lexMatched = exact + concept > 0;
+                const lexScore = lexMatched ? ((exact + concept) / maxLex) * 100 : 0;
+                const total = sim * 100 + lexScore + (lexMatched ? gradeBonus(c.synth_grade) : 0); // 의미 유사도 1차 + 키워드·느낌(정규화) + 등급(검증 우대, 어휘일치 시에만)
+                const why = [`의미 유사 ${Math.round(sim * 100)}%`, ...reasons];
+                return { sim, lexMatched, item: { id: c.id, name: c.name, area: c.area, grade: c.synth_grade, count: c.synth_count, identity: c.synth_identity, score: Math.round(total * 10) / 10, reasons: why.slice(0, 3) } };
+              })
+              .filter((x) => x.lexMatched || x.sim >= semanticFloor)
+              .map((x) => x.item);
           }
         }
       } catch {
