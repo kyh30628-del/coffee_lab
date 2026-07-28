@@ -166,3 +166,4 @@
 | 2026-07-27 03:55 | #522 | [개발] 협업 #259: [신규] PII 유출 재발 위험: scrubPublishedPII가 synth_re | 61730345 | - | lib/synthStore.ts scrubPublishedPII() 후보선별 쿼리 수정: synth_reviews(top6)만 스캔하던 것을 synth_reviews_all까지 U |
 | 2026-07-27 09:02 | #523 | [개발] [coord#248 후속정정] direct 봇오염(meta-externalagent) 야간 주기 재 | 52b1e054 | - | lib/behaviorBot.ts: KNOWN_BOT_UA_PATTERN 단일출처 신설(표출필터 2곳도 이걸로 통일). app/api/visit/route.ts: /api/visi |
 | 2026-07-28 04:03 | #530 | [룰갭 P63] 택배/스마트스토어 배송 후기가 VISIT_CUES 오탐 — 비방문 구매글이 검증등급에 산입 | 2d422bd3 | - | lib/reviewQuality.ts: 택배/스마트스토어 배송 후기 오탐 수정 — DELIVERY_ONLY_CUES(택배 후기/택배로 받/스마트스토어 구매/주문서 캡쳐 등) + I |
+| 2026-07-28 09:29 | #531 | [룰갭 P64] 배달앱(배민·쿠팡이츠·요기요) 주문 후기가 VISIT_CUES 오탐 — P63 배송후기 수정 | 538f82aa | - | lib/reviewQuality.ts:51 DELIVERY_ONLY_CUES 정규식에 배달앱 어휘(배달 시켜/시켰/앱/어플/주문/해서, 배달 후기, 쿠팡이츠, 배달의 민족, 배민) |
