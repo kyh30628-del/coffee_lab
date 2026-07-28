@@ -8,8 +8,9 @@ import { sql } from "./db";
 //      정상일 때도 haiku 입력 몇 토큰+출력 1토큰(≈$0)이라 비용 무시. cron-sentinel(2×/일)에서만 호출.
 //   🆕 [결재#361] 능동 사전경보: #133→#182→#185→#189→#193까지 같은 소진 장애가 4~5회 재발한 근본원인은
 //      "탐지는 됐지만 관제탑을 봐야만 안다"는 수동성 — 아무도 안 보면 24h+ 방치. Anthropic엔 잔액 조회 API가
-//      없어 '바닥나기 전' 사전경보는 불가하므로, 대신 소진 탐지 즉시(사후 발견 기다리지 않고) 이메일/Slack으로
+//      없어 '바닥나기 전' 사전경보는 불가하므로, 대신 소진 탐지 즉시(사후 발견 기다리지 않고) Slack으로
 //      능동 푸시한다. 6h 스로틀로 크론 2×/일 주기와 맞춰 미해결 시 재알림, 중복발송은 방지.
+//      (2026-07-28 CEO 지시: 이메일 경보는 폐지 — Slack만 유지, 관제탑 console_key_state는 계속 실측 기록)
 
 const CONSOLE_KEY = process.env.ANTHROPIC_API_KEY;
 // 프로브 모델 = 배치판정과 동일 haiku(가장 싸고, 이 경로가 곧 배치판정 건강을 대변). 소진은 모델 무관.
@@ -31,32 +32,7 @@ async function ensureConsoleKeyState(): Promise<void> {
   await sql`ALTER TABLE console_key_state ADD COLUMN IF NOT EXISTS alerted_at TIMESTAMPTZ`.catch(() => {});
 }
 
-const escHtml = (s: string) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
-
-// 이메일(Resend) — RESEND_API_KEY 없으면 조용히 스킵(재무·개발환경 무해).
-async function sendCreditAlertEmail(r: ProbeResult): Promise<boolean> {
-  const key = process.env.RESEND_API_KEY;
-  if (!key) return false;
-  const to = "dongnecoffeenote@gmail.com"; // 관리자 알림 고정(env 우회 없음)
-  const label = r.signal === "credit" ? "크레딧 소진" : "인증키 오류";
-  const subject = `🚨 [동네 커피 노트] Anthropic 콘솔키 ${label} — 결제/키 확인 필요`;
-  const html = `<div style="font-family:'Apple SD Gothic Neo',sans-serif;padding:24px;color:#2b2018;">
-    <h2 style="margin:0 0 12px;">Anthropic 콘솔키(ANTHROPIC_API_KEY) ${label} 감지</h2>
-    <p style="margin:0 0 8px;">신호: <b>${escHtml(r.signal)}</b> · ${escHtml(r.detail)}</p>
-    <p style="margin:0 0 8px;">영향: 검색 AI 재정렬·리뷰 경계판정이 결정론 폴백으로 조용히 저하됩니다(크래시 없음).</p>
-    <p style="margin:0;">조치: <a href="https://console.anthropic.com/settings/billing">console.anthropic.com Plans &amp; Billing</a>에서 크레딧 충전 또는 키 상태 확인.</p>
-  </div>`;
-  try {
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from: process.env.RESEND_FROM || "동네 커피 노트 <onboarding@resend.dev>", to: [to], subject, html }),
-    });
-    return res.ok;
-  } catch { return false; }
-}
-
-// Slack — SLACK_WEBHOOK_URL 미설정 시 무시(신규 시크릿 없이도 이메일 경보는 동작).
+// Slack — SLACK_WEBHOOK_URL 미설정 시 무시. (2026-07-28 CEO 지시: 이메일 경보 폐지, Slack만 유지)
 async function sendCreditAlertSlack(r: ProbeResult): Promise<boolean> {
   const url = process.env.SLACK_WEBHOOK_URL;
   if (!url) return false;
@@ -78,8 +54,8 @@ async function maybeAlertCreditExhausted(r: ProbeResult): Promise<void> {
     const rows = (await sql`SELECT EXTRACT(EPOCH FROM (now() - alerted_at)) / 3600 AS age_h FROM console_key_state WHERE id = 1`.catch(() => [])) as any[];
     const ageH = rows[0]?.age_h == null ? Infinity : Number(rows[0].age_h);
     if (ageH < ALERT_THROTTLE_H) return;
-    const [emailOk, slackOk] = await Promise.all([sendCreditAlertEmail(r), sendCreditAlertSlack(r)]);
-    if (emailOk || slackOk) {
+    const slackOk = await sendCreditAlertSlack(r);
+    if (slackOk) {
       await sql`UPDATE console_key_state SET alerted_at = now() WHERE id = 1`.catch(() => {});
     }
   } catch { /* 알림 실패가 프로브 자체를 막지 않음 */ }
