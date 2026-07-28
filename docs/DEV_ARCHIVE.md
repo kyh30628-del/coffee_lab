@@ -165,3 +165,4 @@
 | 2026-07-27 03:17 | #520 | [룰갭 P62] '워크샵' 일반활동명사 — identity.weak_token 갭(사전추가) | bd5aeeaa | - | lib/criteriaListsBase.ts:125 identity.weak_token 배열에 "워크샵" 추가(P38/P44/P55 동일 패턴). tsc 신규에러 0(베이스라인 n |
 | 2026-07-27 03:55 | #522 | [개발] 협업 #259: [신규] PII 유출 재발 위험: scrubPublishedPII가 synth_re | 61730345 | - | lib/synthStore.ts scrubPublishedPII() 후보선별 쿼리 수정: synth_reviews(top6)만 스캔하던 것을 synth_reviews_all까지 U |
 | 2026-07-27 09:02 | #523 | [개발] [coord#248 후속정정] direct 봇오염(meta-externalagent) 야간 주기 재 | 52b1e054 | - | lib/behaviorBot.ts: KNOWN_BOT_UA_PATTERN 단일출처 신설(표출필터 2곳도 이걸로 통일). app/api/visit/route.ts: /api/visi |
+| 2026-07-28 04:03 | #530 | [룰갭 P63] 택배/스마트스토어 배송 후기가 VISIT_CUES 오탐 — 비방문 구매글이 검증등급에 산입 | 2d422bd3 | - | lib/reviewQuality.ts: 택배/스마트스토어 배송 후기 오탐 수정 — DELIVERY_ONLY_CUES(택배 후기/택배로 받/스마트스토어 구매/주문서 캡쳐 등) + I |
