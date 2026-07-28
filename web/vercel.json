@@ -11,7 +11,7 @@
     },
     {
       "path": "/api/cron-embed",
-      "schedule": "5 * * * *"
+      "schedule": "1 * * * *"
     },
     {
       "path": "/api/cron-grow",
@@ -19,7 +19,7 @@
     },
     {
       "path": "/api/cron-synth",
-      "schedule": "45 * * * *"
+      "schedule": "2 * * * *"
     },
     {
       "path": "/api/cron-verify",
@@ -59,7 +59,7 @@
     },
     {
       "path": "/api/cron-issues",
-      "schedule": "*/10 * * * *"
+      "schedule": "0 * * * *"
     },
     {
       "path": "/api/cron-billing",
@@ -67,7 +67,7 @@
     },
     {
       "path": "/api/cron-coord-consumer?mode=live",
-      "schedule": "15 * * * *"
+      "schedule": "3 * * * *"
     },
     {
       "path": "/api/cron-selfaudit",
