@@ -1273,9 +1273,9 @@ export default function Home() {
             <div className="text-lg font-bold">☕ 우리 동네 카페 보러가기</div>
             <div className="text-[12px] text-[#7c6a55] mt-0.5">진짜 후기로 검증 · 내 취향에 딱 맞게</div>
           </button>
-          <button onClick={() => { setOwnerPw(""); setOwnerErr(""); setOwnerPin(""); setOwnerPinErr(""); setOwnerAdminMode(false); setOwnerPwModal(true); trackOwnerCta(); }} className="w-full border border-[#9c6b3f] text-[#f4ece0] rounded-2xl py-5 px-5 text-left active:scale-[0.99] transition">
+          <button onClick={() => { setOwnerPw(""); setOwnerErr(""); setOwnerPin(""); setOwnerPinErr(""); setOwnerAdminMode(false); setOwnerPwModal(true); trackOwnerCta(); }} className="w-full bg-[#e8b87a] text-[#2b2018] rounded-2xl py-5 px-5 text-left shadow-lg active:scale-[0.99] transition">
             <div className="text-lg font-bold">🏪 사장님, 우리 카페 보러가기</div>
-            <div className="text-[12px] text-[#8f7a58] mt-0.5">검증된 후기로 내 카페 경쟁력 진단 · <b className="text-[#e8b87a]">7일 무료 체험</b></div>
+            <div className="text-[12px] text-[#5c4326] mt-0.5">검증된 후기로 내 카페 경쟁력 진단 · <b className="text-[#2b2018]">7일 무료 체험</b></div>
           </button>
         </div>
         <p className="text-[10px] text-[#665036] mt-10 text-center leading-relaxed">네이버·구글·유튜브 공개 후기 교차검증 + AI 맥락 판정<br />광고·협찬·무관 글은 자동 제외</p>
