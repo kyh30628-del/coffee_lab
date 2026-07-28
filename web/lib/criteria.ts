@@ -59,6 +59,9 @@ export const META: CriterionMeta[] = [
   { key: "search.taste.mid_bonus", category: "검색", label: "검색 맛 중신호 가산점", def: 8, min: 0, max: 100, unit: "점" },
   { key: "search.chain_cap", category: "검색", label: "검색 결과 동일체인 상위노출 상한", def: 2, min: 1, max: 20, unit: "개" },
   { key: "search.cache_ttl_hours", category: "검색", label: "검색 결과 캐시 유효시간", def: 3, min: 1, max: 72, unit: "시간" },
+  // #532: 어휘일치(exact+concept)가 0인 시맨틱 전용 결과는 이 유사도 미만이면 배제(무관 질의 확정노출 차단).
+  //   관찰치(2026-07-28): 무관 질의(오타·무의미문자열·미보유 프랜차이즈) sim 0.595~0.702, 정상 매칭은 어휘일치 동반이라 이 경로 미해당.
+  { key: "search.semantic_floor.min_sim", category: "검색", label: "시맨틱 전용(어휘 불일치) 결과 최소 유사도 하한", def: 0.75, min: 0.5, max: 0.95, unit: "비율" },
 ];
 
 const BY_KEY: Record<string, CriterionMeta> = Object.fromEntries(META.map((m) => [m.key, m]));
