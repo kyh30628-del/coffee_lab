@@ -28,26 +28,38 @@ export async function autoCorrect(): Promise<{ resolved: number; escalated: numb
   try { const al = await healAreaLabel(); if (al.fixed) { resolved += al.fixed; if (log.length < 8) log.push(`area라벨 ${al.fixed}곳 즉시 교정`); } } catch { /* graceful */ }
   // 🟢 L2 전결(기획조정실장 권한) — 결정론 액션은 다음 사이클(≤10분)에 자동 승인. CEO 트리거 불필요(오탐·오염 수정=L2 전결).
   //   L3(CEO 전용)는 절대 자동승인 안 함(아래 환원 가드가 지킴). 실무형(agent_task·investigate)도 제외 — 진짜 작업 필요.
+  //   ⚠️ 대상 = /api/admin/decide가 이미 '안전·결정론'으로 분류해 즉시 실행하는 action_type만(unpublish·requeue_resynth).
+  //   과거엔 unpublish만 커버해 requeue_resynth L2가 make-digest.mjs "자동승인 예정" 표시와 달리 실제론 영원히 pending으로
+  //   남아 29~81h 방치됐다(#534). investigate는 진짜 조사가 필요해 여전히 제외 — make-digest.mjs가 별도로 정직 표시.
+  const L2_AUTO_TYPES = ["unpublish", "requeue_resynth"];
   try {
     const l2 = (await sql`UPDATE decisions SET status='approved', decided_at=now(), decided_by='기조실장(전결)', result='L2 전결 자동승인'
-      WHERE status='pending' AND tier='L2' AND action_type='unpublish' RETURNING id`.catch(() => [])) as any[];
+      WHERE status='pending' AND tier='L2' AND action_type = ANY(${L2_AUTO_TYPES}) RETURNING id`.catch(() => [])) as any[];
     if (l2.length) { if (log.length < 8) log.push(`L2 전결 자동승인 ${l2.length}건(#${l2.map((r) => r.id).join(",")})`); }
   } catch { /* graceful */ }
   // 🔧 승인된 '결정론 집행' 결정을 그 자리에서 실집행+done — 집행 루프 닫기(더는 '처리중'으로 안 쌓임).
-  //   action_type='unpublish'(ids 명시)만 자동집행. agent_task·investigate(구현·판단 필요)는 자동집행 안 하고 OUTSTANDING으로 정직 표시.
+  //   action_type IN(unpublish, requeue_resynth)(ids 명시)만 자동집행. agent_task·investigate(구현·판단 필요)는
+  //   자동집행 안 하고 OUTSTANDING으로 정직 표시.
   //   🛡️ 집행 자격 검증(2026-07-02 감사): L2(기조실장 전결) 또는 decided_by='CEO'인 승인만 집행.
   //   과거엔 approved+unpublish면 tier·승인자 무검증 집행 → 에이전트 자가승인 L3도 실집행되던 구멍.
   try {
-    const dec = (await sql`SELECT id, action_params FROM decisions WHERE status='approved' AND action_type='unpublish'
+    const dec = (await sql`SELECT id, action_type, action_params FROM decisions WHERE status='approved' AND action_type = ANY(${L2_AUTO_TYPES})
       AND (COALESCE(tier,'L3')='L2' OR decided_by='CEO')`.catch(() => [])) as any[];
     for (const d of dec) {
       const ids = Array.isArray(d.action_params?.ids) ? d.action_params.ids : [];
+      let msg = "";
       if (ids.length) {
-        await sql`UPDATE cafes SET published=false, pipeline_status='excluded' WHERE id = ANY(${ids})`.catch(() => {});
+        if (d.action_type === "unpublish") {
+          await sql`UPDATE cafes SET published=false, pipeline_status='excluded' WHERE id = ANY(${ids})`.catch(() => {});
+          msg = `${ids.length}곳 비공개`;
+        } else if (d.action_type === "requeue_resynth") {
+          await sql`UPDATE cafes SET synth_updated=NULL WHERE id = ANY(${ids})`.catch(() => {});
+          msg = `${ids.length}곳 재합성 큐`;
+        }
         await invalidateCafeCaches(ids.map(Number)).catch(() => {}); // DB+CDN+ISR 전 레이어 즉시 반영
       }
       await sql`UPDATE decisions SET status='done', result='auto-executed', decided_at=now() WHERE id=${d.id}`.catch(() => {});
-      resolved++; if (log.length < 8) log.push(`승인결정 즉시집행 #${d.id}(${ids.length}곳 비공개)`);
+      resolved++; if (log.length < 8) log.push(`승인결정 즉시집행 #${d.id}(${msg})`);
     }
   } catch { /* graceful */ }
   // 🛑 L3 자가승인 환원(2026-06-30, 재발방지 / 2026-07-02 전 action_type 확대): L3는 *오직 CEO*(모바일=decided_by 'CEO')만 승인.
