@@ -209,7 +209,12 @@ const today = new Date().toISOString().slice(0, 10);
   try {
     // 관제탑과 같은 기준(L3만 CEO 결재)으로 — 화면 간 수치 갈림 방지(2026-07-02). L2 pending은 별도 표기.
     const pend = await sql`SELECT id,title,team,severity FROM decisions WHERE status='pending' AND COALESCE(tier,'L3')='L3' ORDER BY id`;
-    const pendL2 = await sql`SELECT id,title FROM decisions WHERE status='pending' AND tier='L2' ORDER BY id`.catch(() => []);
+    const pendL2 = await sql`SELECT id,title,action_type FROM decisions WHERE status='pending' AND tier='L2' ORDER BY id`.catch(() => []);
+    // ⚠️ autoCorrect()의 L2 자동승인은 unpublish·requeue_resynth만 대상(lib/issues.ts). investigate 등 나머지는
+    //   자동승인이 절대 안 되는데도 예전엔 여기서 전부 "자동승인 예정"으로 뭉뚱그려 29~81h 방치를 낳았다(#534).
+    const L2_AUTO_TYPES = new Set(["unpublish", "requeue_resynth"]);
+    const pendL2Auto = pendL2.filter((p) => L2_AUTO_TYPES.has(p.action_type));
+    const pendL2Manual = pendL2.filter((p) => !L2_AUTO_TYPES.has(p.action_type));
     const appr = await sql`SELECT id,title,team FROM decisions WHERE status='approved' ORDER BY id`;
     const defr = await sql`SELECT id,title,team FROM decisions WHERE status IN ('deferred','resolved') ORDER BY id`.catch(() => []);
     const coord = await sql`SELECT id,from_team,to_team,topic, round(EXTRACT(EPOCH FROM (now()-created_at))/86400,1) d FROM coordination WHERE status IN ('open','in_progress') ORDER BY created_at`.catch(() => []);
@@ -219,7 +224,8 @@ const today = new Date().toISOString().slice(0, 10);
     const clo = await one(sql`SELECT count(*) c FROM cafes WHERE published AND closure_misses>=3`.catch(() => [{ c: 0 }]));
     const supp = await one(sql`SELECT count(*) c FROM cafe_supplements WHERE status='new'`.catch(() => [{ c: 0 }]));
     L.push(`- **CEO 결재 대기(L3) ${pend.length}**: ${pend.map((p) => `#${p.id} ${p.title.slice(0, 30)}(${p.team})`).join(" / ") || "없음"}`);
-    if (pendL2.length) L.push(`- L2 전결 대기(자동승인 예정) ${pendL2.length}: ${pendL2.map((p) => `#${p.id}`).join(",")}`);
+    if (pendL2Auto.length) L.push(`- L2 전결 대기(자동승인 예정) ${pendL2Auto.length}: ${pendL2Auto.map((p) => `#${p.id}`).join(",")}`);
+    if (pendL2Manual.length) L.push(`- L2 전결 대기(자동승인 미대상 — 기조실장 수동 조치 필요) ${pendL2Manual.length}: ${pendL2Manual.map((p) => `#${p.id}(${p.action_type})`).join(",")}`);
     L.push(`- **집행 대기(approved) ${appr.length}**: ${appr.map((a) => `#${a.id} ${a.title.slice(0, 30)}(${a.team})`).join(" / ") || "없음"}`);
     if (defr.length) L.push(`- **⏸️ 보류(deferred/resolved) ${defr.length} — 생애주기 확인 필요**: ${defr.map((a) => `#${a.id} ${a.title.slice(0, 30)}(${a.team})`).join(" / ")}`);
     L.push(`- **미해결 협업 ${coord.length}**: ${coord.map((c) => `#${c.id} ${c.topic}(${c.from_team}→${c.to_team}·${c.d}일)`).join(" / ") || "없음"}`);
