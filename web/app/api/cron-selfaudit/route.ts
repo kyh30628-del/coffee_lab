@@ -49,6 +49,14 @@ export async function GET(req: NextRequest) {
       ["근거오염 발행(coherence<0.3)", await one(sql`SELECT count(*) c FROM cafes WHERE published AND synth_coherence<0.3 AND COALESCE(offctx_ok,false)=false`), "품질본부", true],
       ["표시필드 결손(좌표·area·identity·grade·빈이름)", await one(sql`SELECT count(*) c FROM cafes WHERE published AND (length(trim(coalesce(name,'')))<1 OR lat IS NULL OR lng IS NULL OR area IS NULL OR area='' OR synth_identity IS NULL OR synth_identity='' OR synth_grade IS NULL)`), "운영본부", true],
       ["폐업의심 지속(closure_misses>=3)", await one(sql`SELECT count(*) c FROM cafes WHERE published AND COALESCE(closure_misses,0)>=3`), "운영본부", false],
+      // coord#266: closure_misses=0(네이버 존재는 확인됨)이라도 검증등급 근거 최신후기가 18개월+ 노후 — 폐업조사 사각지대 보조지표.
+      //   증거부재≠폐업 원칙상 non-critical(자동 결재상신 없음) — 운영본부 관측·판단용.
+      ["검증등급 최신증거 18개월+노후(closure_misses=0 사각)", await one(sql`
+        WITH x AS (
+          SELECT id, (SELECT max(to_date(d, 'YYYY.MM.DD')) FROM jsonb_array_elements_text(review_dates) d) AS latest
+          FROM cafes WHERE published AND synth_grade='검증' AND COALESCE(closure_misses,0)=0
+        )
+        SELECT count(*) c FROM x WHERE latest < now() - interval '18 months'`), "운영본부", false],
     ];
     for (const [name, n, team, crit] of integ) if (n > 0) findings.push({ check: name, count: n, team, critical: crit });
 

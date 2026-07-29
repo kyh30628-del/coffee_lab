@@ -14,6 +14,9 @@ export const maxDuration = 300;
 
 const STALE_MONTHS = 15;   // 최신 리뷰가 이만큼 지난 카페만 재확인 대상(활발한 카페는 명백히 영업중 → 스킵)
 const PER_RUN = 35;        // 회당 네이버 재확인 수(쿼터 절약)
+// coord#266: 네이버 존재확인(misses)만으로는 "리스팅은 살아있지만 방문후기가 오래 끊긴" 사각지대를 못 잡음.
+//   misses는 그대로 두고(의미 다름: 네이버 미발견 횟수), 증거노후는 보조지표로만 집계 — 자동 비공개·misses 반영 없음.
+const STALE_EVIDENCE_MONTHS = 18;
 
 // review_dates(캐시)는 raw_reviews보다 낡을 수 있어 폐업 오탐 유발 → raw_reviews(원본)의 날짜만 계산.
 //   ⚠️ raw_reviews 전체를 JS로 끌어오면 64MB 초과(Neon 507)라, SQL에서 date 배열만 추출해 넘김(아래 쿼리).
@@ -72,9 +75,19 @@ export async function GET(req: NextRequest) {
     // 검토 대기 = 3회+ 지속 미발견 카페(여전히 공개 중). 사람이 정밀확인·승인 후에만 처리.
     const reviewQueue = (await sql`SELECT id, name, area, closure_misses FROM cafes WHERE published AND closure_misses >= 3 ORDER BY closure_misses DESC, closure_checked_at ASC LIMIT 30`) as any[];
 
-    const detail = `재확인 ${checked} 영업중 ${alive} 의심+${newSuspect} 검토대기 ${reviewQueue.length} 활발스킵 ${skippedFresh}${quotaStop ? " 쿼터중단" : ""}`;
+    // coord#266 보조지표: misses=0(네이버는 여전히 발견됨)이라도 검증등급 근거의 최신 후기가 STALE_EVIDENCE_MONTHS+ 지난 카페.
+    //   자동 비공개·misses 변경 없음(증거부재≠폐업) — 집계만 해서 selfaudit 정합성체크로 넘김(비중대·운영본부 관측용).
+    const staleEvidenceCount = await sql`
+      WITH x AS (
+        SELECT id, (SELECT max(to_date(d, 'YYYY.MM.DD')) FROM jsonb_array_elements_text(review_dates) d) AS latest
+        FROM cafes WHERE published AND synth_grade='검증' AND COALESCE(closure_misses,0)=0
+      )
+      SELECT count(*) c FROM x WHERE latest < now() - (${STALE_EVIDENCE_MONTHS}||' months')::interval
+    `.then((r: any[]) => Number(r[0].c)).catch(() => 0);
+
+    const detail = `재확인 ${checked} 영업중 ${alive} 의심+${newSuspect} 검토대기 ${reviewQueue.length} 활발스킵 ${skippedFresh} 증거노후${STALE_EVIDENCE_MONTHS}mo+ ${staleEvidenceCount}${quotaStop ? " 쿼터중단" : ""}`;
     await recordRun("cron-closure", true, detail, newSuspect);
-    return NextResponse.json({ ok: true, ranAt: new Date().toISOString(), checked, alive, newSuspect, suspectNames, skippedFresh, quotaStop, reviewQueue: reviewQueue.map((r) => ({ id: r.id, name: r.name, area: r.area, misses: r.closure_misses })) });
+    return NextResponse.json({ ok: true, ranAt: new Date().toISOString(), checked, alive, newSuspect, suspectNames, skippedFresh, quotaStop, staleEvidenceCount, reviewQueue: reviewQueue.map((r) => ({ id: r.id, name: r.name, area: r.area, misses: r.closure_misses })) });
   } catch (e) {
     await recordRun("cron-closure", false, String(e).slice(0, 150));
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
