@@ -743,11 +743,23 @@ export async function healCrossCafeLinkContamination(): Promise<{ removed: numbe
   const killMap = new Map<number, Set<string>>();
   const affectedNames = new Set<string>();
   let groupsResolved = 0;
+  const normLink = (s: string) => (s || "").toLowerCase().replace(/\s+/g, "");
   for (const g of groups) {
     const scored = g.map((r: any) => ({ ...r, hit: evidenceHitsCafe(r.quote || "", r.name, [r.area, r.dong].filter(Boolean), r.addr, r.link) }));
     const hits = scored.filter((s: any) => s.hit);
-    const keepId: number | null = hits.length === 1 ? hits[0].id
-      : hits.length > 1 ? hits.reduce((a: any, b: any) => (Number(b.score) || 0) > (Number(a.score) || 0) ? b : a).id
+    // [#538 근본수정] 동석/체인접미(예: '커인스'/'커인스 커피')는 cleanCafeName·coreTokens가 같은 식별토큰으로
+    //   수렴시켜 양쪽 다 hit=true가 된다 — 이 경우 score(카페별 독립 합성점수, 소속과 무관)로 승자를 고르면
+    //   짧은 이름이 우연히 더 높은 score를 받아 틀린 쪽이 남을 수 있다(요행에 의존). 인용문에 '원본(정제 전)
+    //   이름'이 그대로 나오는 후보만 추리고, 그중 이름이 가장 긴(=가장 구체적인) 쪽을 승자로 — '커인스 커피'
+    //   원문이 인용문에 있으면 그 카페가 이긴다(짧은 '커인스'는 '커인스 커피'의 접두어일 뿐).
+    const rawNameHits = hits.filter((s: any) => normLink(s.quote || "").includes(normLink(s.name)));
+    const pool = rawNameHits.length ? rawNameHits : hits;
+    const keepId: number | null = pool.length === 1 ? pool[0].id
+      : pool.length > 1 ? pool.reduce((a: any, b: any) => {
+          const an = normLink(a.name).length, bn = normLink(b.name).length;
+          if (bn !== an) return bn > an ? b : a;
+          return (Number(b.score) || 0) > (Number(a.score) || 0) ? b : a;
+        }).id
       : null; // 0건 히트 = 전원 무관 → 전체 제거
     let touched = false;
     for (const s of scored) {
