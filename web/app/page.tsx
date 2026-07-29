@@ -1225,7 +1225,7 @@ export default function Home() {
     //   인스타 안드로이드 인앱 WebView가 페이지 폭을 못 구하고 좁은 뷰포트로 폴백→화면 확대(초기화면만 깨지던 원인, 2026-07-10).
     //   /area 등 min-h-screen 페이지는 정상이던 것과 동일 패턴으로 맞춤. 세로 가운데정렬은 유지.
     return (
-      <div className="min-h-screen w-full flex flex-col items-center justify-center px-6" style={{ paddingTop: "calc(env(safe-area-inset-top) + 1.5rem)", paddingBottom: "calc(env(safe-area-inset-bottom) + 1.5rem)", background: "#2b2018", color: "#f4ece0", fontFamily: "'Gowun Batang', AppleMyungjo, 'Apple SD Gothic Neo', 'Noto Serif KR', serif" }}>
+      <div className="min-h-screen w-full flex flex-col items-center justify-center px-6" style={{ paddingTop: "calc(env(safe-area-inset-top) + 1.5rem)", paddingBottom: "calc(env(safe-area-inset-bottom) + 1.5rem)", background: "radial-gradient(125% 85% at 50% -5%, #4a3526 0%, #3a2a1d 30%, #2b2018 60%, #241510 100%)", color: "#f4ece0", fontFamily: "'Gowun Batang', AppleMyungjo, 'Apple SD Gothic Neo', 'Noto Serif KR', serif" }}>
         <style>{`
           @keyframes dcnRise { from { opacity:0; transform: translateY(22px); } to { opacity:1; transform: translateY(0); } }
           /* 홀로그램: 무지갯빛이 가로로 천천히 흐르며 미세하게 색조가 도는 은은한 효과(평평·베벨 없음) */
@@ -1262,7 +1262,8 @@ export default function Home() {
         </div>
         <p className="dcn-rise text-[17px] text-[#f4ece0] mb-1.5 text-center leading-snug font-bold" style={{ animationDelay: ".05s" }}>별점도 광고도 아닌, <span className="text-[#e8b87a]">진짜 후기</span>.</p>
         <p className="dcn-rise text-[15px] text-[#f4ece0] mb-2 text-center leading-relaxed font-bold" style={{ animationDelay: ".1s" }}>우리 동네 카페, <span className="text-[#e8b87a]">진짜 후기만 가려</span> 골라드려요.</p>
-        <p className="dcn-rise text-[13px] text-[#8f7a58] mb-5 text-center leading-relaxed" style={{ animationDelay: ".14s" }}>마음에 든 곳은 <span style={{ color: "#d6336c" }}>❤</span>로 <b className="text-[#f4ece0]">나만의 동네 지도</b>에.</p>
+        <p className="dcn-rise text-[13px] text-[#8f7a58] mb-3 text-center leading-relaxed" style={{ animationDelay: ".14s" }}>마음에 든 곳은 <span style={{ color: "#d6336c" }}>❤</span>로 <b className="text-[#f4ece0]">나만의 동네 지도</b>에.</p>
+        <p className="dcn-rise text-[11.5px] mb-6 text-center" style={{ animationDelay: ".15s", color: "#c79a5f", letterSpacing: "0.22em", fontStyle: "italic" }}>에스프레소 · 라떼 · 디저트</p>
         <div className="dcn-rise flex flex-wrap justify-center gap-1.5 mb-8 max-w-xs" style={{ animationDelay: ".16s" }}>
           {["별점, 이제 그만 믿어요", "리뷰 옥석만 남겼어요"].map((t) => (
             <span key={t} className="text-[12px] text-[#e8b87a] border border-[#5b4636] rounded-full px-3 py-1 whitespace-nowrap">{t}</span>
@@ -1273,9 +1274,9 @@ export default function Home() {
             <div className="text-lg font-bold">☕ 우리 동네 카페 보러가기</div>
             <div className="text-[12px] text-[#7c6a55] mt-0.5">진짜 후기로 검증 · 내 취향에 딱 맞게</div>
           </button>
-          <button onClick={() => { setOwnerPw(""); setOwnerErr(""); setOwnerPin(""); setOwnerPinErr(""); setOwnerAdminMode(false); setOwnerPwModal(true); trackOwnerCta(); }} className="w-full bg-[#d9a45e] text-[#2b2018] rounded-2xl py-5 px-5 text-left shadow-lg active:scale-[0.99] transition">
+          <button onClick={() => { setOwnerPw(""); setOwnerErr(""); setOwnerPin(""); setOwnerPinErr(""); setOwnerAdminMode(false); setOwnerPwModal(true); trackOwnerCta(); }} className="w-full text-[#2b2018] rounded-2xl py-5 px-5 text-left shadow-lg active:scale-[0.99] transition" style={{ background: "linear-gradient(135deg, #c68a4c 0%, #b0763c 100%)" }}>
             <div className="text-lg font-bold">🏪 사장님, 우리 카페 보러가기</div>
-            <div className="text-[12px] text-[#5c4326] mt-0.5">검증된 후기로 내 카페 경쟁력 진단 · <b className="text-[#2b2018]">7일 무료 체험</b></div>
+            <div className="text-[12px] text-[#3a2712] mt-0.5">검증된 후기로 내 카페 경쟁력 진단 · <b className="text-[#2b2018]">7일 무료 체험</b></div>
           </button>
         </div>
         <p className="text-[10px] text-[#665036] mt-10 text-center leading-relaxed">네이버·구글·유튜브 공개 후기 교차검증 + AI 맥락 판정<br />광고·협찬·무관 글은 자동 제외</p>
