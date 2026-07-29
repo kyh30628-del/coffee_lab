@@ -303,7 +303,12 @@ const GENERIC_SUFFIX = /(카페|까페|캬페|커피숍|커피샵|커피|로스�
 //   '전통찻집 수수'→'전통찻집'이 걸러지지 않아 무관 찻집과, '동네빵집'·'비치카페'가 그 자체로 흔한
 //   서술구라 무관 베이커리/카페와 혼입). '베이글'·'샌드위치'는 메뉴 일반어로 다른 베이글전문점끼리
 //   OR매칭됨(룩앳베이글 샌드위치 ↔ 사랑해베이글). 표본검증 확정 6+5건(proposals-20260722-1201/1700) 반영.
-const GENERIC_WORD = new Set(["카페", "까페", "캬페", "카패", "까패", "커피", "커피숍", "커피샵", "coffeeshop", "점", "본점", "로스터리", "로스터스", "로스터즈", "로스터", "로스팅", "베이커리", "베이크샵", "베이크하우스", "브런치카페", "베이글샵", "도넛", "디저트", "케이크", "케익", "케잌", "케이크샵", "케익샵", "케잌샵", "제과", "제과점", "과자점", "베이킹", "coffee", "cafe", "cake", "roasters", "roaster", "roastery", "roasteries", "책방", "북카페", "라운지", "신상", "전통찻집", "동네빵집", "비치", "베이글", "샌드위치"]);
+// decisions#545(2026-07-29): '동네빵집'처럼 접미가 붙은 형태만 있었고 '동네' 단독은 없어 '동네카페'(상호 자체가
+//   일반명사구, id1152)에서 GENERIC_SUFFIX가 '카페'를 떼어낸 뒤 '동네'(2자)가 유일 식별토큰으로 남았다.
+//   블로그 제목의 관용구 "[강동구 동네 카페 탐방기]"(다른 실재 업체 소개 글)가 그 유일토큰과 일치해
+//   완전 무관 타업체 후기 6/6이 오귀속(포르마레·카페자욱·요거트글로우·구교리 등, coord 실측). '동네' 자체를
+//   일반어로 등재해 coreEmpty 처리 → 전체이름 원문일치(공백 붙임 오탐 차단)를 요구하게 한다.
+const GENERIC_WORD = new Set(["카페", "까페", "캬페", "카패", "까패", "커피", "커피숍", "커피샵", "coffeeshop", "점", "본점", "로스터리", "로스터스", "로스터즈", "로스터", "로스팅", "베이커리", "베이크샵", "베이크하우스", "브런치카페", "베이글샵", "도넛", "디저트", "케이크", "케익", "케잌", "케이크샵", "케익샵", "케잌샵", "제과", "제과점", "과자점", "베이킹", "coffee", "cafe", "cake", "roasters", "roaster", "roastery", "roasteries", "책방", "북카페", "라운지", "신상", "전통찻집", "동네빵집", "동네", "비치", "베이글", "샌드위치"]);
 
 // 일반어 '○○점'(지점명이 아님) 제외 — 합성어 오매칭 차단. 예: 음식점·전문점·정기점(검)·관점·시점…
 const NON_BRANCH_POINT_WORD = /^(장점|단점|시점|관점|초점|약점|강점|정점|요점|중점|종점|만점|채점|별점|평점|빵점|백점|영점|매점|거점|기점|이점|반점|중간점|문제점|차이점|공통점|장단점|단골점|식당점|간점|걸점|음식점|전문점|정기점|가맹점|직영점|대리점|편의점|무인점|할인점|판매점|취약점|허점|접점|교점|꼭짓점|꼭지점|시발점|출발점|도달점|분기점|기준점|소수점|득점|실점|승점|벌점|가점|감점|배점|기본점|가산점)$/;
@@ -731,8 +736,14 @@ export function verifyReview(input: QualityInput): QualityResult {
   //   같은 일반어를 상호 일부로 쓰는 딴 업체 글도 걸린다('구우미 베이크샵'에 '베이크샵'이 그대로 부분일치,
   //   id7242 6/6 오염 실측). 지역어(동/구) 동반 없이는 인정하지 않는다 — 진짜 후기는 주소·동네 언급을
   //   동반하는 경우가 대부분이라 정상 매칭은 보존된다.
-  const inTitleFull = coreEmpty ? (title.includes(input.name) && areaPresent) : weakSingle ? titleN.includes(nameRawN) : nameHit(title, titleN, input.name);
-  const inBodyFull = coreEmpty ? (body.includes(input.name) && areaPresent) : weakSingle ? bodyN.includes(nameRawN) : nameHit(body, bodyN, input.name);
+  // decisions#545: coreEmpty의 지역어 동반이 areaPresent(구 단위 포함)만 보면 P43-원인2와 동일하게 '구'
+  //   단위 우연일치를 통과시킨다(예: '동네카페'(강동구 상일동)가 다른 동 소개 글의 '강동구청'(성내동) 언급
+  //   만으로 지역 게이트를 통과 — 포르마레 실측). areaTerms에 동/읍/면/가/리 단위 정보가 있으면 그걸로
+  //   좁혀 요구하고, 없을 때만(동 정보 미보유 카페) 기존 구 단위 areaPresent로 완화한다.
+  const hasDongTerm = areaTerms.some((a) => a && /(동|읍|면|가|리)$/.test(a));
+  const coreEmptyAreaOk = hasDongTerm ? dongPresent : areaPresent;
+  const inTitleFull = coreEmpty ? (title.includes(input.name) && coreEmptyAreaOk) : weakSingle ? titleN.includes(nameRawN) : nameHit(title, titleN, input.name);
+  const inBodyFull = coreEmpty ? (body.includes(input.name) && coreEmptyAreaOk) : weakSingle ? bodyN.includes(nameRawN) : nameHit(body, bodyN, input.name);
   // 지역어 제외한 고유 식별 토큰 — 지역어만 제목에 있는 건 nameInTitle 기여 안 함
   const nonAreaTokens = tokens.filter((tk) => !areaTerms.some((a) => norm(a).includes(norm(tk)) || norm(tk).includes(norm(a))));
   const identTokens = nonAreaTokens.length ? nonAreaTokens : tokens; // 비면 원래대로
