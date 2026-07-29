@@ -200,6 +200,14 @@ const CAFE_CONTEXT_SUBSTANCE = /(커피|라떼|아메리카노|에스프레소|�
 //   체험기를 방문후기로 오판했다(4/6건 오염 실측). 대조군(카페더함186 도자기체험공방·도자기카페 이클림 등)은
 //   리뷰에 실제 음료 소비가 함께 언급돼 CAFE_CONTEXT_SUBSTANCE로 보존되므로 오탐 없음.
 const CRAFT_WORKSHOP_ACTIVITY = /(원데이\s*클래스|물레\s*(체험|그릇\s*만들기|만들기)|핸드\s*빌딩|손\s*성형|찰흙\s*놀이|도자\s*기?\s*(체험|만들기|굽기|페인팅|공방)|도예\s*(체험|수업|클래스|공방))/;
+// ★ 룰갭 P67(2026-07-29, decisions#543): 반려식물/수족관 소매업 — naver_category="카페,디저트"로
+//   자기등록해 P61(비F&B신호)·P66(F&B비카페신호)를 모두 우회하는 새 유형. 실제 업종은 수초/어항(아쿠아스케이프)
+//   소매·전시업이며 리뷰 원문에 "카페" 리터럴(#이색카페 #도봉구카페, "카페 겸 어항 수초 판매")이 반복돼
+//   CAFE_CONTEXT_STRONG은 통과하지만 실질 음료·디저트(CAFE_CONTEXT_SUBSTANCE)는 전무하다(id3313 실측:
+//   노출 evidence 6건 전량 수초/어항/물생활 판매 후기, 커피·디저트 실질언급 0/6). P59와 동일하게 처리 —
+//   대조군(이름에 플랜트/식물/화원/다육/반려/애견 포함 published 카페 19곳)은 실제 음료 언급이 함께 있어
+//   CAFE_CONTEXT_SUBSTANCE로 보존되므로 오탐 없음.
+const AQUASCAPE_PET_RETAIL = /(수초\s*(전문|분양|판매|갤러리)|어항\s*(꾸미기|분양|판매)|아쿠아스케이프|물생활|베타\s*어항|수족관\s*(용품|판매)|반려식물\s*(판매|분양)|다육이?\s*(분양|판매))/;
 
 // 수도권 시·군·구 — 같은 상호의 '다른 지점'을 지역으로 구분하기 위함
 const ALL_GU = [
@@ -833,6 +841,11 @@ export function verifyReview(input: QualityInput): QualityResult {
   //   도자기카페 이클림 등)은 리뷰에 실제 음료 소비가 함께 언급돼 CAFE_CONTEXT_SUBSTANCE로 보존되므로 오탐 없음.
   if (CRAFT_WORKSHOP_ACTIVITY.test(fullL) && !CAFE_CONTEXT_SUBSTANCE.test(fullL)) {
     return { verdict: "rejected", score: 4, reasons: ["체험공방 활동기(도자기·도예 원데이클래스 등 — 카페 실질맥락 전무)"], signals: sig };
+  }
+  // [룰갭 P67, decisions#543] 반려식물/수족관 소매업 — "카페" 리터럴이 있어도 실질 음료·디저트 맥락이
+  //   전무하면 P59와 동일하게 참고등급 진입 없이 곧장 하드 거절한다(id3313 실측).
+  if (AQUASCAPE_PET_RETAIL.test(fullL) && !CAFE_CONTEXT_SUBSTANCE.test(fullL)) {
+    return { verdict: "rejected", score: 4, reasons: ["반려식물·수족관 소매업 글(수초/어항/물생활 — 카페 실질맥락 전무)"], signals: sig };
   }
   // [룰갭 P32] 자기 업체 정형구("쇼룸"·"매장 주소"·"오프라인 매장"·"방문 예약"·"카톡 방문"·"시공 갤러리")가
   //   2개 이상 동시출현하면 LOCAL_SEO_SERVICES 업종어와 무관하게 벤더의 1인칭 홍보 안내문으로 확정 거절한다.
