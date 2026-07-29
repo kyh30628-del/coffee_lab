@@ -138,15 +138,14 @@ function buildIdentity(coords: Record<string, number | null>, basis: Record<stri
   if (b != null && b >= 0.65) p.push("묵직하고 고소한 바디");
   else if (b != null && b <= 0.35) p.push("가볍고 부드러운 바디");
   if (s != null && s >= 0.65) p.push("단맛이 좋은 디저트");
-  // 취향·로스팅 근거가 하나도 없어 아래 용도 문구 하나만으로 정체성이 정해지는 카페 — 전국 다수 카페가
-  // 같은 최다-용도 키워드로 수렴해 완전히 동일한 한 줄이 되는 원인(협업 #211). 실제 소재지(동)를 붙여
-  // 카페별로 갈라지게 한다(환각 아님 — area는 이미 검증된 실제 소재지 데이터).
-  const soleSignal = p.length === 0;
+  // 취향 3축은 각각 강/약/모호 소수 상태뿐이라 조합해도 전국 카페가 몇 안 되는 문구로 쉽게 수렴한다
+  // (예: '단맛 좋음 + 빵 최다용도' 조합만 724곳 완전동일, 협업 #211/정합성조사 #536). 용도 문구가 붙는
+  // 경우든 아니든 실제 소재지(동)를 상시 포함해 카페별로 갈라지게 한다(환각 아님 — area는 이미 검증된
+  // 실제 소재지 데이터).
+  const locality = area.filter(Boolean).slice(-1)[0];
   const tu = Object.entries(uses).sort((x, y) => y[1] - x[1])[0];
-  if (tu && USE_PHRASE[tu[0]]) {
-    const locality = area.filter(Boolean).slice(-1)[0];
-    p.push(soleSignal && locality ? `${locality}에서 ${USE_PHRASE[tu[0]]}` : USE_PHRASE[tu[0]]);
-  }
+  if (tu && USE_PHRASE[tu[0]]) p.push(locality ? `${locality}에서 ${USE_PHRASE[tu[0]]}` : USE_PHRASE[tu[0]]);
+  else if (locality) p.push(`${locality}의 카페`);
   if (ops["원두판매"] && p.length < 4) p.push("원두도 살 수 있는 곳");
   if (ops["권위"]) p.push("매체·평단에 소개된 곳");
   return p.length ? p.join(" · ") : "후기가 더 모이면 분석이 또렷해져요";
