@@ -14,27 +14,29 @@ await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS yt_checked_at TIMESTAMPTZ`;
 const MAX = Number(process.env.YT_MAX || 90); // 유튜브 일일 쿼터 안전선
 let added = 0, none = 0, processed = 0, quota = false;
 
-while (processed < MAX && !quota) {
-  // 공개 우선 타깃팅(CEO 결정): 사용자가 실제 보는 카페부터 — 공개 > 비공개, 검증 > 참고 > 후보, 그 안에서 리뷰 많은 순.
-  const rows = await sql`
-    SELECT id, name, area FROM cafes
-    WHERE raw_reviews IS NOT NULL AND yt_checked_at IS NULL
-      AND NOT (raw_reviews @> '[{"source":"youtube"}]')
-    ORDER BY published DESC NULLS LAST,
-             (synth_grade='검증') DESC,
-             (synth_grade='참고') DESC,
-             synth_count DESC NULLS LAST
-    LIMIT 5`;
-  if (!rows.length) { console.log("유튜브 백필 대상 없음 — 전체 완료"); break; }
-  for (const c of rows) {
-    const r = await backfillYouTube(c);
-    processed++;
-    if (r === "added") { added++; console.log(`  ✓ ${c.name}: 유튜브 추가·재합성`); }
-    else if (r === "none") { none++; }
-    else if (r === "quota") { quota = true; console.log("유튜브 쿼터 소진 — 중단(내일 이어서)"); break; }
-    if (processed >= MAX) break;
-    await new Promise((x) => setTimeout(x, 400));
-  }
+// ⚠️ 2026-07-29 수정: 예전엔 이 무거운 쿼리(raw_reviews 큰 컬럼을 훑는 필터)를 LIMIT 5로 18번(90/5) 반복 호출해
+//   Neon 데이터전송비 폭증의 주범이었다(실측: 508콜·~660GB, 청구서 663GB와 거의 일치). MAX(90)를 한 번에 가져오는
+//   걸로 바꿔 이 쿼리 호출을 18분의 1로 줄인다 — 이미 처리한 카페는 아래 루프에서 yt_checked_at이 찍히므로
+//   재조회 없이도 중복처리 걱정 없음(한 번의 스냅샷을 그대로 순회).
+const rows = await sql`
+  SELECT id, name, area FROM cafes
+  WHERE raw_reviews IS NOT NULL AND yt_checked_at IS NULL
+    AND NOT (raw_reviews @> '[{"source":"youtube"}]')
+  ORDER BY published DESC NULLS LAST,
+           (synth_grade='검증') DESC,
+           (synth_grade='참고') DESC,
+           synth_count DESC NULLS LAST
+  LIMIT ${MAX}`;
+if (!rows.length) console.log("유튜브 백필 대상 없음 — 전체 완료");
+for (const c of rows) {
+  if (quota) break;
+  const r = await backfillYouTube(c);
+  processed++;
+  if (r === "added") { added++; console.log(`  ✓ ${c.name}: 유튜브 추가·재합성`); }
+  else if (r === "none") { none++; }
+  else if (r === "quota") { quota = true; console.log("유튜브 쿼터 소진 — 중단(내일 이어서)"); break; }
+  if (processed >= MAX) break;
+  await new Promise((x) => setTimeout(x, 400));
 }
 const remain = (await sql`SELECT COUNT(*)::int n FROM cafes WHERE raw_reviews IS NOT NULL AND yt_checked_at IS NULL AND NOT (raw_reviews @> '[{"source":"youtube"}]')`)[0].n;
 console.log(`\n유튜브 백필 종료: 추가 ${added} · 영상없음 ${none} · 처리 ${processed} · 남은 대상 ${remain}`);
