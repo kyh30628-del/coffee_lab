@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
-import { synthAndStore, finalizePipeline, scrubPublishedPII, healGroundingSuspects, holdZeroEvidenceSuspects, healPublishedAudit, healNonCafeCategory, healOutOfBox, healAreaLabel, healOffConceptByReview } from "@/lib/synthStore";
+import { synthAndStore, finalizePipeline, scrubPublishedPII, healVendorTemplateQuotes, healGroundingSuspects, holdZeroEvidenceSuspects, healPublishedAudit, healNonCafeCategory, healOutOfBox, healAreaLabel, healOffConceptByReview } from "@/lib/synthStore";
 import { recordRun } from "@/lib/agentLog";
 import { BOT_ANON_IDS_SQL } from "@/lib/behaviorBot";
 import { judgeQueueCount, dailyCounts } from "@/lib/metrics";
@@ -380,6 +380,8 @@ export async function GET(req: NextRequest) {
       } catch {}
       // (c) 레드팀 PII 누출 자가치유 — 공개 인용문 전화·이메일·핸들 제거
       try { const pii = await scrubPublishedPII(); if (pii.scrubbed > 0) healed.push(`PII 세척 ${pii.scrubbed}곳(${pii.names.slice(0, 3).join(", ")})`); } catch {}
+      // (c-1) 위탁판매 게시판 등록양식(네임택 첨부 안내) 인용문 제거 — [정합성조사 #542]
+      try { const vt = await healVendorTemplateQuotes(); if (vt.scrubbed > 0) healed.push(`벤더양식 인용문 ${vt.removed}건 제거 ${vt.scrubbed}곳(${vt.names.slice(0, 3).join(", ")})`); } catch {}
       let unpubThisRun = 0; // 비공개 발생 시 검색캐시 자동 무효화용(소비자 검색에 비공개 카페가 남는 것 방지)
       // (d) LLM 그라운딩 의심(업체혼동·환각) 자가치유 — 재합성 교정(로컬 그라운딩이 재검사해 플래그 해소)
       try { const gr = await healGroundingSuspects(); if (gr.resynthed > 0) healed.push(`그라운딩 의심 ${gr.resynthed}곳 재합성 교정`); } catch {}
