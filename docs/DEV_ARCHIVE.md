@@ -171,3 +171,4 @@
 | 2026-07-28 09:37 | #533 | [사장님영업] 홈 사장님 CTA 시각 강조 개선 — 배포 후 2일간 클릭 0건(방문 92명) | d2ecc315 | - | app/page.tsx:1276-1278 사장님 CTA 버튼을 소비자 버튼과 동등한 시각강조로 변경 — border 아웃라인→bg-[#e8b87a] 채움+shadow-lg(소비자는 |
 | 2026-07-28 09:40 | #534 | [기조실장 발견] L2 자동승인 코드가 requeue_resynth·investigate 미커버 — 29~8 | 541295c5 | - | web/lib/issues.ts autoCorrect(): L2 자동승인·자동집행 대상을 unpublish 단독에서 unpublish+requeue_resynth로 확대(둘 다 / |
 | 2026-07-29 08:29 | #536 | [정합성조사 발견] synth_identity 태그라인 조합폭발형 대량중복(90.2%) — 다양성 신뢰 리스 | 46180482 | - | lib/synthEngine.ts:buildIdentity — soleSignal(취향신호 전무) 조건으로만 지역명(동)을 붙이던 걸 상시 부착으로 변경(용도문구 있으면 '~동에서 |
+| 2026-07-29 08:30 | #537 | [룰갭 P65 · coord#263] YouTube 댓글이 quote에 혼입돼 verified 리뷰로 집계( | aab328d6 | - | lib/youtubeCollector.ts: YouTube 댓글 수집·병합 로직 완전 제거(commentThreads API 호출 삭제, text/desc는 title+desc만) |
