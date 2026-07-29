@@ -1262,8 +1262,7 @@ export default function Home() {
         </div>
         <p className="dcn-rise text-[17px] text-[#f4ece0] mb-1.5 text-center leading-snug font-bold" style={{ animationDelay: ".05s" }}>별점도 광고도 아닌, <span className="text-[#e8b87a]">진짜 후기</span>.</p>
         <p className="dcn-rise text-[15px] text-[#f4ece0] mb-2 text-center leading-relaxed font-bold" style={{ animationDelay: ".1s" }}>우리 동네 카페, <span className="text-[#e8b87a]">진짜 후기만 가려</span> 골라드려요.</p>
-        <p className="dcn-rise text-[13px] text-[#8f7a58] mb-3 text-center leading-relaxed" style={{ animationDelay: ".14s" }}>마음에 든 곳은 <span style={{ color: "#d6336c" }}>❤</span>로 <b className="text-[#f4ece0]">나만의 동네 지도</b>에.</p>
-        <p className="dcn-rise text-[11.5px] mb-6 text-center" style={{ animationDelay: ".15s", color: "#c79a5f", letterSpacing: "0.22em", fontStyle: "italic" }}>에스프레소 · 라떼 · 디저트</p>
+        <p className="dcn-rise text-[13px] text-[#8f7a58] mb-5 text-center leading-relaxed" style={{ animationDelay: ".14s" }}>마음에 든 곳은 <span style={{ color: "#d6336c" }}>❤</span>로 <b className="text-[#f4ece0]">나만의 동네 지도</b>에.</p>
         <div className="dcn-rise flex flex-wrap justify-center gap-1.5 mb-8 max-w-xs" style={{ animationDelay: ".16s" }}>
           {["별점, 이제 그만 믿어요", "리뷰 옥석만 남겼어요"].map((t) => (
             <span key={t} className="text-[12px] text-[#e8b87a] border border-[#5b4636] rounded-full px-3 py-1 whitespace-nowrap">{t}</span>
@@ -1274,9 +1273,9 @@ export default function Home() {
             <div className="text-lg font-bold">☕ 우리 동네 카페 보러가기</div>
             <div className="text-[12px] text-[#7c6a55] mt-0.5">진짜 후기로 검증 · 내 취향에 딱 맞게</div>
           </button>
-          <button onClick={() => { setOwnerPw(""); setOwnerErr(""); setOwnerPin(""); setOwnerPinErr(""); setOwnerAdminMode(false); setOwnerPwModal(true); trackOwnerCta(); }} className="w-full text-[#2b2018] rounded-2xl py-5 px-5 text-left shadow-lg active:scale-[0.99] transition" style={{ background: "linear-gradient(135deg, #c68a4c 0%, #b0763c 100%)" }}>
-            <div className="text-lg font-bold">🏪 사장님, 우리 카페 보러가기</div>
-            <div className="text-[12px] text-[#3a2712] mt-0.5">검증된 후기로 내 카페 경쟁력 진단 · <b className="text-[#2b2018]">7일 무료 체험</b></div>
+          <button onClick={() => { setOwnerPw(""); setOwnerErr(""); setOwnerPin(""); setOwnerPinErr(""); setOwnerAdminMode(false); setOwnerPwModal(true); trackOwnerCta(); }} className="w-full rounded-2xl py-5 px-5 text-left shadow-lg active:scale-[0.99] transition" style={{ background: "linear-gradient(135deg, #241609 0%, #150d05 100%)", border: "1px solid #a97f45" }}>
+            <div className="text-lg font-bold text-[#f4ece0]">🏪 사장님, 우리 카페 보러가기</div>
+            <div className="text-[12px] text-[#c7ab82] mt-0.5">검증된 후기로 내 카페 경쟁력 진단 · <b className="text-[#e8b87a]">7일 무료 체험</b></div>
           </button>
         </div>
         <p className="text-[10px] text-[#665036] mt-10 text-center leading-relaxed">네이버·구글·유튜브 공개 후기 교차검증 + AI 맥락 판정<br />광고·협찬·무관 글은 자동 제외</p>
