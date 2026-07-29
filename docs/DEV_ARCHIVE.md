@@ -173,3 +173,4 @@
 | 2026-07-29 08:29 | #536 | [정합성조사 발견] synth_identity 태그라인 조합폭발형 대량중복(90.2%) — 다양성 신뢰 리스 | 46180482 | - | lib/synthEngine.ts:buildIdentity — soleSignal(취향신호 전무) 조건으로만 지역명(동)을 붙이던 걸 상시 부착으로 변경(용도문구 있으면 '~동에서 |
 | 2026-07-29 08:30 | #537 | [룰갭 P65 · coord#263] YouTube 댓글이 quote에 혼입돼 verified 리뷰로 집계( | aab328d6 | - | lib/youtubeCollector.ts: YouTube 댓글 수집·병합 로직 완전 제거(commentThreads API 호출 삭제, text/desc는 title+desc만) |
 | 2026-07-29 08:31 | #538 | [정합성조사 발견] 유사상호 카페 간 동일 블로그리뷰 링크 교차귀속(2쌍) | 8d7fd374 | - | lib/synthStore.ts healCrossCafeLinkContamination() 승자선정 근본수정: 종전엔 hit=true 후보가 2곳 이상이면 카페별 독립 score로 |
+| 2026-07-29 08:32 | #539 | [룰갭 P66 · coord#265] naver_category F&B이나 비카페(양식/파스타 등)인데 검증 | ba36b0eb | - | lib/reviewQuality.ts: isNonCafeFnbCategory()+COFFEE_SUBSTANCE 신규(F&B대분류·비카페 업종=레스토랑/양식/한식/중식/일식/분식/이 |
