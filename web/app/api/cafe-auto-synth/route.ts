@@ -10,6 +10,10 @@ export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
   try {
+    // 🔒 내부 도구 라우트 — 합성 덮어쓰기 + 유료 API(Places/CSE) 호출이라 무인증 노출 금지(2026-07-29 보안감사).
+    const secret = process.env.CRON_SECRET;
+    if (secret && req.headers.get("authorization") !== `Bearer ${secret}`)
+      return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
     await ensureSchema();
     await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_grade TEXT`;
     await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_identity TEXT`;

@@ -8,6 +8,10 @@ export const maxDuration = 60;
 // POST { limit?: 100 } — 아직 char_scores 없는 카페부터 limit개씩 처리
 export async function POST(req: NextRequest) {
   try {
+    // 🔒 내부 배치 라우트 — 대량 char_scores 재연산이라 무인증 노출 금지(2026-07-29 보안감사).
+    const secret = process.env.CRON_SECRET;
+    if (secret && req.headers.get("authorization") !== `Bearer ${secret}`)
+      return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
     await ensureSchema();
     await loadCriteriaLists(); // 성향축 키워드 사전 캐시 프라임(computeCharScores가 동기 getListSync로 읽음)
     await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS char_scores JSONB`;

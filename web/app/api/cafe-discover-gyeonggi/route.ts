@@ -7,6 +7,10 @@ const GYEONGGI = ["수원시","성남시","고양시","용인시","부천시","�
 
 export async function POST(req: Request) {
   try {
+    // 🔒 네이버 유료검색 유발 라우트 — 무인증 노출 금지(2026-07-29 보안감사).
+    const secret = process.env.CRON_SECRET;
+    if (secret && req.headers.get("authorization") !== `Bearer ${secret}`)
+      return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
     const body = await req.json().catch(() => ({}));
     const start = Number(body.start) || 0;
     const count = Math.min(Number(body.count) || 5, 8);
@@ -19,7 +23,8 @@ export async function POST(req: Request) {
     for (const city of targets) {
       try {
         const r = await fetch(`${base}/api/cafe-discover`, {
-          method: "POST", headers: { "Content-Type": "application/json" },
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...(secret ? { authorization: `Bearer ${secret}` } : {}) },
           body: JSON.stringify({ region: city }),
         });
         const d = await r.json();

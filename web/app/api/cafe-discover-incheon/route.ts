@@ -8,6 +8,10 @@ const INCHEON = ["미추홀구","연수구","남동구","부평구","계양구",
 
 export async function POST(req: Request) {
   try {
+    // 🔒 네이버 유료검색 유발 라우트 — 무인증 노출 금지(2026-07-29 보안감사).
+    const secret = process.env.CRON_SECRET;
+    if (secret && req.headers.get("authorization") !== `Bearer ${secret}`)
+      return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
     const body = await req.json().catch(() => ({}));
     const start = Number(body.start) || 0;
     const count = Math.min(Number(body.count) || 5, 10);
@@ -19,7 +23,8 @@ export async function POST(req: Request) {
       try {
         // 인천은 "인천 중구"처럼 시 이름을 붙여 검색(다른 지역 중구와 혼동 방지)
         const r = await fetch(`${base}/api/cafe-discover`, {
-          method: "POST", headers: { "Content-Type": "application/json" },
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...(secret ? { authorization: `Bearer ${secret}` } : {}) },
           body: JSON.stringify({ region: `인천 ${gu}` }),
         });
         const d = await r.json();

@@ -200,7 +200,9 @@ export async function GET(req: NextRequest) {
       specialty: bySpecialty.filter((c) => !usedIds.has(c.id)).slice(0, 5).map((c: any) => slim(c, "specialty")),
     }, {
       // 엣지 캐시(지역별로 따로 캐시됨). 추천·featured는 5분 신선도면 충분.
-      headers: { "Cache-Control": "public, max-age=0, must-revalidate" },
+      //   ⚠️ 2026-07-29: 기존엔 s-maxage가 없어 CDN 캐시가 안 걸리고 홈 진입마다 공개카페 전량을 DB에서 재조회했다(주석 의도와 불일치).
+      //   s-maxage=300(CDN 5분 캐시)+SWR로 실제 엣지 캐시 활성화 — 브라우저는 재검증(max-age=0), CDN이 5분 흡수해 DB 부하 급감.
+      headers: { "Cache-Control": "public, max-age=0, s-maxage=300, stale-while-revalidate=600" },
     });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });

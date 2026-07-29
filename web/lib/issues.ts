@@ -20,9 +20,9 @@ export async function autoCorrect(): Promise<{ resolved: number; escalated: numb
   //   즉시 종결한다. 대표님: "개별 이슈는 즉시 실행. 왜 배치주기를 기다리냐." → 결정론 해결을 탐지 시점에 합침.
   //   배치 크론은 전체 리프레시 백스톱으로 유지(이중 안전망). 결정론·무료·멱등이라 자주 돌려도 안전.
   try { const nc = await healNonCafeCategory(); if (nc.held) { resolved += nc.held; if (log.length < 8) log.push(`비카페 카테고리 ${nc.held}곳 즉시 비공개`); } } catch { /* graceful */ }
-  try { const oc = await healOffConceptByReview(); if (oc.held) { resolved += oc.held; if (log.length < 8) log.push(`오프콘셉(활동공간) ${oc.held}곳 즉시 비공개`); } } catch { /* graceful */ }
-  try { const rs = await healRestaurantByReview(); if (rs.held) { resolved += rs.held; if (log.length < 8) log.push(`식당 ${rs.held}곳 즉시 비공개`); } } catch { /* graceful */ }
-  try { const nx = await healNonCafeByReview(); if (nx.held) { resolved += nx.held; if (log.length < 8) log.push(`비카페(커피정체성0) ${nx.held}곳 즉시 비공개: ${nx.names.slice(0, 3).join(", ")}`); } } catch { /* graceful */ }
+  try { const oc = await healOffConceptByReview(); if (oc.held) { resolved += oc.held; if (log.length < 8) log.push(`오프콘셉(활동공간) ${oc.held}곳 즉시 비공개`); } if (oc.capped && log.length < 8) log.push(`🛑 오프콘셉 대량비공개 차단 ${oc.capped}곳(회귀 의심 — 집행 보류, CEO 검토)`); } catch { /* graceful */ }
+  try { const rs = await healRestaurantByReview(); if (rs.held) { resolved += rs.held; if (log.length < 8) log.push(`식당 ${rs.held}곳 즉시 비공개`); } if (rs.capped && log.length < 8) log.push(`🛑 식당 대량비공개 차단 ${rs.capped}곳(회귀 의심 — 집행 보류, CEO 검토)`); } catch { /* graceful */ }
+  try { const nx = await healNonCafeByReview(); if (nx.held) { resolved += nx.held; if (log.length < 8) log.push(`비카페(커피정체성0) ${nx.held}곳 즉시 비공개: ${nx.names.slice(0, 3).join(", ")}`); } if (nx.capped && log.length < 8) log.push(`🛑 비카페 대량비공개 차단 ${nx.capped}곳(회귀 의심 — 집행 보류, CEO 검토)`); } catch { /* graceful */ }
   // 정합성도 같은 실시간 경로로 — 박스밖(비수도권)·area라벨 오류를 2시간 배치 대신 여기서 즉시 교정.
   try { const ob = await healOutOfBox(); if (ob.excluded) { resolved += ob.excluded; if (log.length < 8) log.push(`수도권밖 ${ob.excluded}곳 즉시 제외`); } } catch { /* graceful */ }
   try { const al = await healAreaLabel(); if (al.fixed) { resolved += al.fixed; if (log.length < 8) log.push(`area라벨 ${al.fixed}곳 즉시 교정`); } } catch { /* graceful */ }
@@ -48,16 +48,25 @@ export async function autoCorrect(): Promise<{ resolved: number; escalated: numb
     for (const d of dec) {
       const ids = Array.isArray(d.action_params?.ids) ? d.action_params.ids : [];
       let msg = "";
+      // ⚠️ 2026-07-29: 예전엔 UPDATE를 .catch(()=>{})로 삼키고 성공여부와 무관하게 결재를 done으로 닫아,
+      //   DB오류로 비공개가 실패해도 "집행됨"으로 위장되고 재시도도 없었다(오염카페 공개 잔존·안전조치 무력화 은폐).
+      //   이제 집행 실패 시 결재를 approved로 유지(다음 사이클 재시도)하고 done 마킹을 건너뛴다.
+      let ok = true;
       if (ids.length) {
-        if (d.action_type === "unpublish") {
-          await sql`UPDATE cafes SET published=false, pipeline_status='excluded' WHERE id = ANY(${ids})`.catch(() => {});
-          msg = `${ids.length}곳 비공개`;
-        } else if (d.action_type === "requeue_resynth") {
-          await sql`UPDATE cafes SET synth_updated=NULL WHERE id = ANY(${ids})`.catch(() => {});
-          msg = `${ids.length}곳 재합성 큐`;
+        try {
+          if (d.action_type === "unpublish") {
+            await sql`UPDATE cafes SET published=false, pipeline_status='excluded' WHERE id = ANY(${ids})`;
+            msg = `${ids.length}곳 비공개`;
+          } else if (d.action_type === "requeue_resynth") {
+            await sql`UPDATE cafes SET synth_updated=NULL WHERE id = ANY(${ids})`;
+            msg = `${ids.length}곳 재합성 큐`;
+          }
+          await invalidateCafeCaches(ids.map(Number)); // DB+CDN+ISR 전 레이어 즉시 반영
+        } catch {
+          ok = false; // 집행 실패 — done으로 닫지 않고 다음 사이클 재시도
         }
-        await invalidateCafeCaches(ids.map(Number)).catch(() => {}); // DB+CDN+ISR 전 레이어 즉시 반영
       }
+      if (!ok) { if (log.length < 8) log.push(`승인결정 집행실패 #${d.id} — 다음 사이클 재시도(결재 유지)`); continue; }
       await sql`UPDATE decisions SET status='done', result='auto-executed', decided_at=now() WHERE id=${d.id}`.catch(() => {});
       resolved++; if (log.length < 8) log.push(`승인결정 즉시집행 #${d.id}(${msg})`);
     }

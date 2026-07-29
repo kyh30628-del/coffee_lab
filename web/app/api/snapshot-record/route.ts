@@ -35,6 +35,10 @@ const recentN = (dates: unknown, days = 90): number => {
 // POST { limit?: 200 } — 오늘 아직 스냅샷 안 찍은 공개 카페부터 limit개 (우리 데이터만, 빠름)
 export async function POST(req: NextRequest) {
   try {
+    // 🔒 내부 배치 라우트 — cron-snapshot만 호출. 무인증 반복호출로 DB write 증폭 방지(2026-07-29 보안감사).
+    const secret = process.env.CRON_SECRET;
+    if (secret && req.headers.get("authorization") !== `Bearer ${secret}`)
+      return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
     await ensureSchema();
     await ensureSnapTable();
     const body = await req.json().catch(() => ({}));

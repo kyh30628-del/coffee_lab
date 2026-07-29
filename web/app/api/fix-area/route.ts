@@ -1,9 +1,13 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
 export const runtime = "nodejs";
 
-export async function POST() {
+export async function POST(req: NextRequest) {
   try {
+    // 🔒 일회성 수리 라우트(파괴적 DELETE 포함) — 무인증 노출 금지(2026-07-29 보안감사).
+    const secret = process.env.CRON_SECRET;
+    if (secret && req.headers.get("authorization") !== `Bearer ${secret}`)
+      return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
     await ensureSchema();
     // 1) 쓰레기 데이터 삭제 (__count__ 테스트로 잘못 적재된 것)
     const del = await sql`DELETE FROM cafes WHERE area = '__count__' RETURNING name`;

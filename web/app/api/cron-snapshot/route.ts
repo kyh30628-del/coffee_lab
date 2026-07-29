@@ -14,7 +14,8 @@ export async function GET(req: NextRequest) {
     let totalRecorded = 0, rounds = 0;
     while (rounds < 30) {
       const r = await fetch(`${base}/api/snapshot-record`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(secret ? { authorization: `Bearer ${secret}` } : {}) },
         body: JSON.stringify({ limit: 50 }),
       });
       const d = await r.json();

@@ -33,6 +33,10 @@ async function localSearch(query: string) {
 
 // POST { region: "강동구", keywords?: [...] }
 export async function POST(req: NextRequest) {
+  // 🔒 네이버 유료 지역검색 호출 + 미검증 카페 INSERT라 무인증 노출 금지(2026-07-29 보안감사). discover-seoul/incheon/gyeonggi가 시크릿 담아 호출.
+  const secret = process.env.CRON_SECRET;
+  if (secret && req.headers.get("authorization") !== `Bearer ${secret}`)
+    return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   if (!ID || !SECRET) return NextResponse.json({ ok: false, error: "네이버 키 미설정" }, { status: 500 });
   try {
     await ensureSchema();

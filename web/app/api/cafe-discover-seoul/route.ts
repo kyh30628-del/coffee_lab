@@ -8,6 +8,10 @@ const SEOUL_GU = ["강남구","강동구","강북구","강서구","관악구","�
 // POST { start?: 0, count?: 5 } — 구를 start부터 count개씩 (폭주 방지, 나눠 실행)
 export async function POST(req: Request) {
   try {
+    // 🔒 네이버 유료검색 유발 라우트 — 무인증 노출 금지(2026-07-29 보안감사).
+    const secret = process.env.CRON_SECRET;
+    if (secret && req.headers.get("authorization") !== `Bearer ${secret}`)
+      return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
     const body = await req.json().catch(() => ({}));
     const start = Number(body.start) || 0;
     const count = Math.min(Number(body.count) || 5, 8);
@@ -18,7 +22,8 @@ export async function POST(req: Request) {
     for (const gu of targets) {
       try {
         const r = await fetch(`${base}/api/cafe-discover`, {
-          method: "POST", headers: { "Content-Type": "application/json" },
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...(secret ? { authorization: `Bearer ${secret}` } : {}) },
           body: JSON.stringify({ region: gu }),
         });
         const d = await r.json();

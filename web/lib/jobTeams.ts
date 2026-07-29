@@ -71,9 +71,9 @@ export const EXPECT_MAX_H: Record<string, number> = {
 export const LAUNCHD_JOBS: Record<string, { label: string; sched: string }> = {
   "chief-manager":     { label: "일간 사이클",     sched: "08·12·17시" },
   "self-audit":        { label: "자율진단",        sched: "11:30·15:30·21:30" },
-  "audit-watch":       { label: "이벤트 워처",     sched: "5분" },
-  "dev-pipeline":      { label: "개발 파이프라인", sched: "5분" },
-  "dev-deploy":        { label: "배포 워커",       sched: "2분" },
+  "audit-watch":       { label: "이벤트 워처",     sched: "60분" },
+  "dev-pipeline":      { label: "개발 파이프라인", sched: "60분" },
+  "dev-deploy":        { label: "배포 워커",       sched: "60분" },
   "youtube-backfill":  { label: "유튜브 수집",     sched: "16:30" },
   "weekly-evaluation": { label: "주간 거버넌스",   sched: "10:30(격일)" },
   "chat-watch":        { label: "관제 챗봇",       sched: "상주" },

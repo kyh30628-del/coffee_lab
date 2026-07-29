@@ -12,6 +12,7 @@ import { nameCoherence, cleanCafeName, verifyReview, isNonBranchWord, isAreaLike
 import { loadLearnedTerms } from "./learnedTerms";
 import { loadCriteria, getCriterionSync } from "./criteria";
 import { loadCriteriaLists } from "./criteriaLists";
+import { invalidateCafeCaches } from "./cafeCacheInvalidate"; // 비공개 후 캐시 무효화(2026-07-29: heal* 경로가 ISR/search_cache 미반영이던 틈 수리)
 
 // 카페 지역어(시 + 동洞) — 동까지 넘겨야 reviewQuality가 '분당점=성남시' 같은 市단위 동명 지점 오인을 거른다.
 async function areaTermsFor(id: number, area?: string | null): Promise<string[]> {
@@ -378,7 +379,7 @@ export async function healNonCafeCategory(): Promise<{ held: number; names: stri
       )
       AND naver_category !~ '(카페|커피|로스터|디저트|베이커리|제과|브런치|찻집|티룸|티하우스)'
       AND name !~ '(카페|까페|커피|로스터|디저트|베이커리|제과|찻집|티하우스|북카페|coffee|cafe)'
-    RETURNING name`) as any[];
+    RETURNING id, name`) as any[];
   // 🐶 오프콘셉 '○○카페' — 업종에 '카페'가 들어가도, 커피·디저트 취향 큐레이션과 안 맞는 '활동 목적' 공간은 제외.
   //   애견·고양이·키즈·스터디·만화·룸·보드게임·방탈출·노래·찜질방 + 서점(소매). 이 서비스는 커피/디저트 카페만 다룬다.
   //   📚 북카페·도서관 — 책/독서가 메인, 커피는 부차 → CEO 지시(2026-06)로 제외. 갤러리·플라워카페는 커피가 메인이라 보존.
@@ -387,13 +388,15 @@ export async function healNonCafeCategory(): Promise<{ held: number; names: stri
     UPDATE cafes SET published = false, pipeline_status = 'excluded'
     WHERE published = true AND naver_category IS NOT NULL
       AND naver_category ~ '(애견|애완|반려동물|펫카페|고양이카페|동물카페|키즈|실내놀이터|놀이방|스터디카페|독서실|만화방|만화카페|룸카페|멀티방|파티룸|방탈출|보드게임|보드카페|볼링|당구|스크린골프|골프연습|코인노래|노래방|찜질방|사우나|클라이밍|트램폴린|트램펄린|서점|북카페|도서관)'
-    RETURNING name`) as any[];
+    RETURNING id, name`) as any[];
   // 📚 북카페 — 카테고리가 일반(카페,디저트>카페)으로 붙어도 이름에 '북카페'면 책 메인 → 제외.
   const bookByName = (await sql`
     UPDATE cafes SET published = false, pipeline_status = 'excluded'
     WHERE published = true AND name ~ '북카페|북 ?카페'
-    RETURNING name`) as any[];
+    RETURNING id, name`) as any[];
   off.push(...bookByName);
+  const killedIds = [...rows, ...off].map((r) => r.id).filter((x) => x != null);
+  if (killedIds.length) await invalidateCafeCaches(killedIds).catch(() => {}); // 비공개 → 모든 캐시 레이어 무효화
   return { held: rows.length + off.length, names: [...rows.map((r) => r.name), ...off.map((r) => r.name)].slice(0, 12) };
 }
 
@@ -408,7 +411,13 @@ const OFFCONCEPT_VENUE = /애견카페|애견\s*카페|고양이카페|고양이
 function offconceptBrand(name: string): string {
   return (name || "").replace(/^카페\s+/, "").replace(/\s+\S*점$/, "").trim().split(/\s+/)[0] || "";
 }
-export async function healOffConceptByReview(): Promise<{ held: number; names: string[] }> {
+// 🛑 대량 오비공개 차단기(2026-07-29 보안감사) — heal* 리뷰기반 비공개가 정규식/JSON파싱 회귀로 한 회차에 비정상적으로
+//   많은 공개 카페를 내리려 하면(과거 '인천 사태' 클래스: 멀쩡한 카페 12% 오비공개) 집행을 중단하고 신호만 남긴다.
+//   정상 회차는 보통 0~수곳(이미 내린 건 published=false라 재대상 아님). 초과 시 UPDATE 스킵 → held:0, capped:N.
+//   진짜 대량정리가 필요하면 CEO가 HEAL_UNPUB_CAP env를 올리거나 결재로 집행(healPublishedAudit의 unpubCap과 동일 사상).
+const HEAL_UNPUB_CAP = Number(process.env.HEAL_UNPUB_CAP || 50);
+
+export async function healOffConceptByReview(): Promise<{ held: number; names: string[]; capped?: number }> {
   const cand = (await sql`
     SELECT id, name, synth_reviews FROM cafes
     WHERE published = true AND synth_reviews IS NOT NULL
@@ -425,8 +434,10 @@ export async function healOffConceptByReview(): Promise<{ held: number; names: s
     const self = hard.filter((t) => t.includes(b) || t.includes(c.name));
     if (self.length / texts.length >= 0.66) { killIds.push(c.id); killNames.push(c.name); }
   }
+  if (killIds.length > HEAL_UNPUB_CAP) return { held: 0, names: killNames.slice(0, 12), capped: killIds.length }; // 🛑 대량 차단
   if (killIds.length) {
     await sql`UPDATE cafes SET published = false, pipeline_status = 'excluded' WHERE id = ANY(${killIds})`;
+    await invalidateCafeCaches(killIds).catch(() => {}); // 비공개 → 모든 캐시 레이어 무효화
   }
   return { held: killIds.length, names: killNames.slice(0, 12) };
 }
@@ -435,7 +446,7 @@ export async function healOffConceptByReview(): Promise<{ held: number; names: s
 //   중, 이름도 카페형이 아니고 노출리뷰에 커피 정체성(커피·라떼·원두·디저트·베이커리·브런치 등)이 전무하면 = 명백한 식당
 //   (빌라드코스테스=빠에야 레스토랑 류) → 결정론적 비공개. 커피 정체성 하나라도 있으면(양식 브런치카페 37.5·노멀브런치) 보존.
 //   ⚠️ '음식점>카페,디저트'(몬스터커피 등)는 카테고리에 '카페' 있어 제외. 리뷰 없으면 안 건드림(미검증 보호).
-export async function healRestaurantByReview(): Promise<{ held: number; names: string[] }> {
+export async function healRestaurantByReview(): Promise<{ held: number; names: string[]; capped?: number }> {
   const cand = (await sql`
     SELECT id, name, COALESCE(synth_reviews::text, '') t FROM cafes
     WHERE published = true AND naver_category IS NOT NULL
@@ -445,7 +456,8 @@ export async function healRestaurantByReview(): Promise<{ held: number; names: s
   const COFFEE_ID = /커피|라떼|아메리카노|원두|에스프레소|핸드드립|콜드브루|드립|카페|까페|디저트|베이커리|빵|브런치|케이크|스콘|크로플|마카롱|음료|티룸|찻집|로스터/;
   const kill: number[] = []; const names: string[] = [];
   for (const c of cand) { if (c.t && !COFFEE_ID.test(c.t)) { kill.push(c.id); names.push(c.name); } }
-  if (kill.length) await sql`UPDATE cafes SET published = false, pipeline_status = 'excluded' WHERE id = ANY(${kill})`;
+  if (kill.length > HEAL_UNPUB_CAP) return { held: 0, names: names.slice(0, 12), capped: kill.length }; // 🛑 대량 차단
+  if (kill.length) { await sql`UPDATE cafes SET published = false, pipeline_status = 'excluded' WHERE id = ANY(${kill})`; await invalidateCafeCaches(kill).catch(() => {}); }
   return { held: kill.length, names: names.slice(0, 12) };
 }
 
@@ -455,8 +467,18 @@ export async function healRestaurantByReview(): Promise<{ held: number; names: s
 //   ⚠️ FP 차단: BELONGS 그물을 매우 넓게(차/찻집 포함 — 한글 \b 안 먹혀 구체어 나열). '카페' 단어만 있어도 통과.
 //      찻집(대추차·오미자차)이 안 죽게 차 계열 필수. 3건 미만(미검증)은 안 건드림.
 const CAFE_BELONGS = /커피|라떼|라테|아메리카노|원두|에스프레소|핸드드립|콜드브루|드립|카페|까페|coffee|cafe|음료|스무디|에이드|찻집|차한잔|전통차|대추차|오미자|쌍화|유자차|생강차|한방차|꽃차|허브|녹차|말차|홍차|보이차|국화차|캐모마일|페퍼민트|루이보스|얼그레이|밀크티|버블티|아이스티|디저트|베이커리|제과|빵|식빵|소금빵|베이글|꽈배기|고로케|크로켓|핫도그|도넛|도너츠|케이크|케익|타르트|쿠키|마카롱|스콘|크로플|와플|파이|휘낭시에|마들렌|젤라또|아이스크림|빙수|푸딩|초콜릿|쇼콜라|아포가토|크림|우유|밀크|과자|전병|약과|한과|구움과자|샌드위치|브런치|토스트|크로와상|크루아상|프레첼/;
-export async function healNonCafeByReview(): Promise<{ held: number; names: string[] }> {
-  const cand = (await sql`SELECT id, name, synth_reviews FROM cafes WHERE published = true AND synth_reviews IS NOT NULL`) as any[];
+// SQL 사전필터용(healNonCafeByReview 성능 최적화). ⚠️ CAFE_BELONGS와 동일 패턴·동일 대소문자성(둘 다 case-sensitive:
+//   JS엔 i플래그 없음 → SQL도 `!~`(대소문자 구분) 사용). 소스 문자열을 재사용해 두 사전이 드리프트하지 않게 한다.
+const CAFE_BELONGS_SQL = CAFE_BELONGS.source;
+export async function healNonCafeByReview(): Promise<{ held: number; names: string[]; capped?: number }> {
+  // ⚡ 2026-07-29 성능(보안감사 C): 예전엔 공개카페 전량(synth_reviews 포함, ~13.5천행)을 매 호출 전송했다(autoCorrect가
+  //   매시 호출 → 누적 46GB 실측). 카페 정체성 토큰이 리뷰 어디에도 없는 행만 후보이므로, 그 사전필터(synth_reviews::text
+  //   !~* CAFE_BELONGS)를 WHERE로 내려 압도적 다수(정체성 있는 정상 카페)를 SQL에서 걸러 전송량을 급감시킨다.
+  //   ⚠️ 아래 JS의 texts.some(CAFE_BELONGS) 보존조건과 동일 사전(CAFE_BELONGS_SQL은 CAFE_BELONGS와 같은 패턴)이라
+  //      죽는 집합 불변(SQL에서 거른 행은 JS도 반드시 보존했을 행) — 배포 전 실측으로 kill-set 동일함을 검증함.
+  const cand = (await sql`SELECT id, name, synth_reviews FROM cafes
+    WHERE published = true AND synth_reviews IS NOT NULL
+      AND synth_reviews::text !~ ${CAFE_BELONGS_SQL}`) as any[];
   const kill: number[] = []; const names: string[] = [];
   for (const c of cand) {
     let sr: any = c.synth_reviews; try { sr = JSON.parse(sr); } catch { /* obj */ }
@@ -466,7 +488,8 @@ export async function healNonCafeByReview(): Promise<{ held: number; names: stri
     if (texts.some((t) => CAFE_BELONGS.test(t))) continue; // 카페 정체성 1건이라도 있으면 보존
     kill.push(c.id); names.push(c.name);
   }
-  if (kill.length) await sql`UPDATE cafes SET published = false, pipeline_status = 'excluded' WHERE id = ANY(${kill})`;
+  if (kill.length > HEAL_UNPUB_CAP) return { held: 0, names: names.slice(0, 12), capped: kill.length }; // 🛑 대량 차단
+  if (kill.length) { await sql`UPDATE cafes SET published = false, pipeline_status = 'excluded' WHERE id = ANY(${kill})`; await invalidateCafeCaches(kill).catch(() => {}); }
   return { held: kill.length, names: names.slice(0, 12) };
 }
 
