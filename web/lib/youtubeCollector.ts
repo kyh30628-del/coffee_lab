@@ -1,6 +1,8 @@
 // 유튜브 수집 (PRINCIPLES §1·§2·§3·§4): YouTube Data API v3(공식·합법)로 카페 영상의
-// 제목·설명·게시일·채널 + 상위 댓글을 수집한다. 영상 1개 = 스니펫 1개(출처 링크=영상 URL).
-// 원문(영상 속 말/자막)은 합법적으로 못 가져오므로 제목·설명·댓글까지만 보존.
+// 제목·설명·게시일·채널을 수집한다. 영상 1개 = 스니펫 1개(출처 링크=영상 URL).
+// 원문(영상 속 말/자막)은 합법적으로 못 가져오므로 제목·설명까지만 보존.
+// 댓글은 수집하지 않는다 — 작성자가 영상 업로더(카페 방문자)가 아닌 제3자라 방문검증 근거가 될 수 없고,
+// 다른 업체를 언급한 댓글이 그대로 quote·verified 신뢰로 채택되는 오염이 있었다(coord#263, decisions#537).
 // 수집된 스니펫은 다른 소스와 동일하게 '리뷰 품질 검증 엔진'을 통과해야 채택된다.
 import type { WebSnippet } from "./webSearchCollector";
 
@@ -13,7 +15,7 @@ const stripBadUnicode = (s: string) => s.replace(/[\uD800-\uDBFF](?![\uDC00-\uDF
 const fmtDate = (iso?: string) => (iso && iso.length >= 10 ? iso.slice(0, 10).replace(/-/g, ".") : "");
 const toTime = (iso?: string) => { if (!iso) return undefined; const t = Date.parse(iso); return isNaN(t) ? undefined : Math.floor(t / 1000); };
 
-// 카페 영상 검색 → 상세 → 상위 댓글. 쿼터 절약: 검색 1회(100유닛)+영상상세 1유닛+댓글 상위 4개 영상만.
+// 카페 영상 검색 → 상세. 쿼터 절약: 검색 1회(100유닛)+영상상세 1유닛.
 export async function fetchYouTubeReviews(name: string, area: string): Promise<{ snippets: WebSnippet[]; apiError?: boolean }> {
   if (!KEY) return { snippets: [] };
   try {
@@ -35,28 +37,11 @@ export async function fetchYouTubeReviews(name: string, area: string): Promise<{
       const sn = v.snippet ?? {};
       const title = (sn.title ?? "").trim();
       const desc = (sn.description ?? "").replace(/\s+/g, " ").trim().slice(0, 350);
-      // 상위 4개 영상만 댓글 수집(쿼터 절약). 댓글=실제 방문 반응 신호.
-      let comments = "";
-      if (i < 4) {
-        try {
-          const cres = await fetch(`${API}/commentThreads?key=${KEY}&part=snippet&videoId=${v.id}&maxResults=3&order=relevance&textFormat=plainText`);
-          if (cres.ok) {
-            const cd = await cres.json();
-            // 개인정보 보호(YouTube 정책): 댓글 '텍스트'만 — 작성자 아이디·채널·프로필은 수집/저장 안 함.
-            // 텍스트 안의 @아이디 멘션도 제거해 식별정보를 남기지 않는다.
-            comments = (cd.items ?? [])
-              .map((c: any) => c?.snippet?.topLevelComment?.snippet?.textDisplay ?? "")
-              .filter(Boolean)
-              .map((t: string) => stripBadUnicode(t.replace(/@[\w.\-가-힣]+/g, "").replace(/\s+/g, " ").trim().slice(0, 110)))
-              .filter(Boolean).join(" · ");
-          }
-        } catch { /* 댓글 비활성/오류 무시 */ }
-      }
-      const text = `${title} ${desc}${comments ? ` 댓글: ${comments}` : ""}`.replace(/\s+/g, " ").trim();
+      const text = `${title} ${desc}`.replace(/\s+/g, " ").trim();
       if (text.length < 15) continue;
       snippets.push({
         text: stripBadUnicode(text), title: stripBadUnicode(title),
-        desc: stripBadUnicode(`${desc}${comments ? ` · 댓글: ${comments}` : ""}`.slice(0, 320)),
+        desc: stripBadUnicode(desc.slice(0, 320)),
         time: toTime(sn.publishedAt),
         link: `https://www.youtube.com/watch?v=${v.id}`,
         source: sn.channelTitle || "YouTube",
