@@ -8,7 +8,7 @@ import { fetchYouTubeReviews } from "./youtubeCollector";
 import { collectAndSynthesize, type RawSource, type BorderlineItem, type CollectResult } from "./collectOrchestrator";
 import { judgeReviews, hasJudgeKey } from "./reviewJudge";
 import { isNonCafe, isFranchise, isGenericFoodName, isSnackStall, isStructuralPhantom, isUnmannedCafe } from "./discover";
-import { nameCoherence, cleanCafeName, verifyReview, isNonBranchWord, isAreaLikeWord } from "./reviewQuality";
+import { nameCoherence, cleanCafeName, verifyReview, isNonBranchWord, isAreaLikeWord, VENDOR_LISTING_TEMPLATE } from "./reviewQuality";
 import { loadLearnedTerms } from "./learnedTerms";
 import { loadCriteria, getCriterionSync } from "./criteria";
 import { loadCriteriaLists } from "./criteriaLists";
@@ -332,6 +332,39 @@ export async function scrubPublishedPII(): Promise<{ scrubbed: number; names: st
     names.push(c.name);
   }
   return { scrubbed: bad.length, names: names.slice(0, 10) };
+}
+
+// 🧼 위탁판매/납품 신청 양식(벤더 템플릿) 인용문 제거 — [정합성조사 #542] 네이버 카페(커뮤니티) 물품 등록
+//   게시판의 "제품 이미지(네임택 첨부 필수-카페명...)" 정형 안내문이 방문후기로 오분류돼 인용문에 섞여
+//   들어간 사례(카페 리버스 id5679·카페 범고래 id5891). 방문 서술이 아니므로 마스킹이 아니라 항목째 제거—
+//   PII 세척(scrubPublishedPII)과 달리 이 문구는 남길 부분이 없다. reviewQuality.ts의 신규 분류 게이트
+//   (VENDOR_LISTING_TEMPLATE)가 향후 재유입은 막고, 이 healer가 이미 적재된 항목을 정리한다.
+export async function healVendorTemplateQuotes(): Promise<{ scrubbed: number; removed: number; names: string[] }> {
+  const bad = (await sql`
+    WITH cand AS (
+      SELECT c.id, c.name FROM cafes c, jsonb_array_elements(c.synth_reviews) r
+      WHERE c.published AND r->>'quote' ~ '네임택\\s*첨부\\s*필수|제품\\s*이미지\\s*\\(?\\s*네임택'
+      UNION
+      SELECT c.id, c.name FROM cafes c, jsonb_array_elements(c.synth_reviews_all) r
+      WHERE c.published AND r->>'quote' ~ '네임택\\s*첨부\\s*필수|제품\\s*이미지\\s*\\(?\\s*네임택'
+    )
+    SELECT DISTINCT id, name FROM cand LIMIT 200`) as any[];
+  const names: string[] = [];
+  let removed = 0;
+  for (const c of bad) {
+    const [row] = await sql`SELECT synth_reviews, synth_reviews_all FROM cafes WHERE id=${c.id}` as any[];
+    const drop = (arr: any[]) => {
+      if (!Array.isArray(arr)) return arr;
+      const kept = arr.filter((r) => !VENDOR_LISTING_TEMPLATE.test(r?.quote || ""));
+      removed += arr.length - kept.length;
+      return kept;
+    };
+    const sr = drop(row?.synth_reviews);
+    const sra = drop(row?.synth_reviews_all);
+    await sql`UPDATE cafes SET synth_reviews=${safeJson(sr)}, synth_reviews_all=${safeJson(sra)} WHERE id=${c.id}`;
+    names.push(c.name);
+  }
+  return { scrubbed: bad.length, removed, names: names.slice(0, 10) };
 }
 
 // 🚷 그라운딩 '근거 0건'(전부 다른 가게) 확정 카페 자동 보류(비공개). 진짜 근거 일부 있는 곳은 제외.

@@ -125,6 +125,12 @@ const CAFE_WORDS = ["카페", "커피", "로스터리", "베이커리", "디저�
 //   양쪽 지점 모두에 승인했던 사례).
 const FRANCHISE_TRANSFER_AD = /(양도\s*양수|권리금|가맹\s*(문의|상담|모집)|점포\s*(매매|양도|매도)|매장\s*(매매|양도|매도)|무권리금|초보\s*창업|창업\s*(문의|상담|비용|비교)|프랜차이즈\s*(창업|가맹))/;
 const COMMERCE_STRONG = /(중고나라|당근\s*마켓|번개장터|판매\s*양식|미개봉|택배\s*신청\s*하기|삽니다|팝니다|총판\s*문의|타\s*카페|카페\s*연동)/;
+// [정합성조사 #542] 위탁판매/납품 신청 양식(벤더 템플릿) — 네이버 카페(커뮤니티)의 물품 등록 게시판에서
+//   "제품 이미지(네임택 첨부 필수-카페명+닉네임...)" 같은 정형 안내문이 등장한다. 여기서 "카페명"은 실제
+//   업로드해야 할 판매글 작성 규칙(중고물품에 네이버카페 이름표를 붙이라는 지시)일 뿐 방문 서술이 아닌데,
+//   카페명·지역어가 우연히 함께 걸려 방문후기로 오분류됐다(카페 리버스 id5679·카페 범고래 id5891 실측,
+//   전수스캔 결과 이 정형구는 항상 위 용도로만 등장 — 진짜 방문후기엔 절대 안 나와 가드 없이 하드 탈락).
+export const VENDOR_LISTING_TEMPLATE = /네임택\s*첨부\s*필수|제품\s*이미지\s*\(?\s*네임택/;
 // 비방문 판매게시판(네이버 카페=커뮤니티, 회원끼리 물건 거래) — 도메인 성격상 방문 후기가 나올 수 없어 링크만으로 하드 탈락.
 const NONVISIT_BOARD = /cafe\.naver\.com\/(joonggonara|changupnamu)\//i;
 // 룰갭 P5(2026-07-08, rulegap-proposals-20260708.md): 중고거래 마켓 정형양식 필드(희망가격·거래지역·판매자
@@ -846,6 +852,10 @@ export function verifyReview(input: QualityInput): QualityResult {
   //   약한 거래신호는 카페 맥락어가 전혀 없을 때만 탈락(가격·판매대 언급한 진짜 후기 보존).
   if (COMMERCE_STRONG.test(fullL) || (COMMERCE_JUNK.test(fullL) && !titleHasCafeWord && !bodyHasCafeWord)) {
     return { verdict: "rejected", score: 0, reasons: ["거래·판매 글(후기 아님)"], signals: sig };
+  }
+  // [위탁판매 게시판 등록양식] #542 — 네임택 첨부 안내 정형구는 항상 벤더 템플릿이지 방문후기가 아님.
+  if (VENDOR_LISTING_TEMPLATE.test(fullL)) {
+    return { verdict: "rejected", score: 0, reasons: ["위탁판매 게시판 등록양식(네임택 첨부 안내 — 후기 아님)"], signals: sig };
   }
   // [프랜차이즈 점포양도·창업 매물] 방문후기가 아닌 가맹/창업 게시판 글 — 위 COMMERCE_STRONG과 동급 하드 탈락(결재#395).
   if (FRANCHISE_TRANSFER_AD.test(fullL)) {
