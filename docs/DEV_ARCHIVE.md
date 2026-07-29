@@ -175,3 +175,4 @@
 | 2026-07-29 08:31 | #538 | [정합성조사 발견] 유사상호 카페 간 동일 블로그리뷰 링크 교차귀속(2쌍) | 8d7fd374 | - | lib/synthStore.ts healCrossCafeLinkContamination() 승자선정 근본수정: 종전엔 hit=true 후보가 2곳 이상이면 카페별 독립 score로 |
 | 2026-07-29 08:32 | #539 | [룰갭 P66 · coord#265] naver_category F&B이나 비카페(양식/파스타 등)인데 검증 | ba36b0eb | - | lib/reviewQuality.ts: isNonCafeFnbCategory()+COFFEE_SUBSTANCE 신규(F&B대분류·비카페 업종=레스토랑/양식/한식/중식/일식/분식/이 |
 | 2026-07-29 11:34 | #542 | [정합성조사 발견] 리뷰 아닌 양식성 문구가 리뷰 인용문으로 오혼입 | aac7b94a | - | lib/reviewQuality.ts: VENDOR_LISTING_TEMPLATE 패턴(네임택 첨부 필수 등 위탁판매 게시판 등록양식) 신규 분류 게이트로 하드 탈락 추가(향후 재 |
+| 2026-07-29 11:35 | #543 | [룰갭 P67] 반려식물/수족관 소매업이 '카페 겸업' 자기서술로 검증노출 — 커피실질언급 0건(id3313 | b017fd3a | - | lib/reviewQuality.ts: NONCAFE_BIZ와 별개로 AQUASCAPE_PET_RETAIL(수초/어항/아쿠아스케이프/반려식물/다육 판매) 신설, CRAFT_WORK |
