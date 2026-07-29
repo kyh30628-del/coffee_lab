@@ -177,3 +177,4 @@
 | 2026-07-29 11:34 | #542 | [정합성조사 발견] 리뷰 아닌 양식성 문구가 리뷰 인용문으로 오혼입 | aac7b94a | - | lib/reviewQuality.ts: VENDOR_LISTING_TEMPLATE 패턴(네임택 첨부 필수 등 위탁판매 게시판 등록양식) 신규 분류 게이트로 하드 탈락 추가(향후 재 |
 | 2026-07-29 11:35 | #543 | [룰갭 P67] 반려식물/수족관 소매업이 '카페 겸업' 자기서술로 검증노출 — 커피실질언급 0건(id3313 | b017fd3a | - | lib/reviewQuality.ts: NONCAFE_BIZ와 별개로 AQUASCAPE_PET_RETAIL(수초/어항/아쿠아스케이프/반려식물/다육 판매) 신설, CRAFT_WORK |
 | 2026-07-29 11:36 | #545 | [검색품질] 취향추천(char_scores) 오염 — 일반명사형 카페명("동네카페")이 무관 타업체 후기로  | e7289f72 | - | lib/reviewQuality.ts: GENERIC_WORD에 "동네" 추가(동네카페 등 상호 자체가 일반구문인 경우 coreEmpty 처리) + verifyReview core |
+| 2026-07-29 11:37 | #546 | [개발] 협업 #266: 검증등급 카페 80곳 최신리뷰증거 18개월+ 노후(closure_misses=0 사 | ecdeb8be | - | app/api/cron-closure/route.ts: STALE_EVIDENCE_MONTHS(18) 보조지표 추가 — misses=0(네이버는 발견됨)이라도 검증등급 최신후기 1 |
