@@ -1,6 +1,6 @@
 // 수집 오케스트레이터 (PRINCIPLES §1·§2·§3·§4·§7)
 // 모든 수집 글을 '리뷰 품질 검증 엔진'에 통과시켜 옥석을 가린 뒤에만 합성·집계·노출한다.
-import { verifyReview, coreTokens, type QualityVerdict, type SourceKind } from "./reviewQuality";
+import { verifyReview, coreTokens, isNonCafeFnbCategory, COFFEE_SUBSTANCE, type QualityVerdict, type SourceKind } from "./reviewQuality";
 import { synthesize, type Review, type SynthResult } from "./synthEngine";
 import { computeCharScores } from "./charScore";
 import { getCriterionSync } from "./criteria"; // 등급 바닥 임계값 단일출처(캐시 프라임은 synthAndStore 등 진입점이 함)
@@ -165,10 +165,17 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
   //   가비지·노이즈(rejected: 동명·무관·광고·SEO·nameAsWord)는 카운트 안 됨. 진짜 검증 리뷰 3건+ 있으면 참고(공개).
   //   얇아도 *진짜* 카페는 살리되 1~2건은 너무 얇아 보류. 오염/비카페는 coherence·카테고리 게이트가 별도로 막음.
   //   임계값은 DB 기준(criteria) 단일출처 — 폴백=현재값(검증30/참고3). 동기 조회(캐시 프라임은 synthAndStore 등 진입점).
-  const grade: "검증" | "참고" | "후보" =
+  let grade: "검증" | "참고" | "후보" =
     trustCount >= getCriterionSync("grade.floor.verified") ? "검증"
     : trustCount >= getCriterionSync("grade.floor.reference") ? "참고"
     : "후보";
+
+  // 🍽️ [룰갭 P66, coord#265/decisions#539] F&B 대분류이나 카페 아닌 업종(레스토랑·양식·일식 등)인데 수집된
+  //   옥석 리뷰 전량에 커피 실질언급이 0건이면 검증등급을 참고등급으로 하향(비공개 아님 — 그대로 노출, CEO 승인#539).
+  if (grade === "검증" && isNonCafeFnbCategory(opts?.naverCategory) && verifiedTexts.length > 0
+      && !verifiedTexts.some((t) => COFFEE_SUBSTANCE.test(t))) {
+    grade = "참고";
+  }
 
   // 근거 리뷰: 복합 랭크(정확도 score + 신뢰등급 + 최신성)로 '가장 정확하고 가장 최신' 순. 최대 6개.
   const nowT = Date.now();

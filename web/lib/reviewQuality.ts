@@ -635,6 +635,24 @@ export function isNonFnbCategory(naverCategory?: string): boolean {
   if (c.includes("제조업>커피가공")) return false; // 정상 로스터리 겸영
   return !FNB_MAJOR_CATEGORY.test(c);
 }
+// 🍽️ [룰갭 P66, coord#265/decisions#539] naver_category F&B 대분류이나 카페 아닌 업종(레스토랑·양식·한식·
+//   중식·일식·분식·이탈리아음식·파스타 등) — 레드팀 handoff 독립재검증(n=10/16, 원표본 5곳보다 2배 규모로
+//   재확인)에서 isNonFnbCategory는 카테고리가 F&B 대분류 자체가 아닐 때만(제조업·교육 등) 발동해 이 패턴
+//   (F&B는 맞지만 카페가 아닌 식당)은 그대로 통과시킨다는 갭이 드러났다(id1794 루비스한남점·id2239 퀸스타운·
+//   37.5 체인 3개 지점·id1256 파스타인카페·id1529 카페나하본점 등). 카테고리에 카페 하위 키워드(카페/디저트/
+//   커피/베이커리/제과/빵/찻집/티룸/티하우스)가 전혀 없으면 순수 식당 업종으로 본다. 상호명에 '카페'가
+//   들어가도(카페나하본점·나츠카페·마롱카페) 카테고리가 순수 식당이면 대상 — 이름만으론 카페 아님(반례 다수 확인).
+const CAFE_SUBCATEGORY = /(카페|디저트|커피|베이커리|제과|빵|찻집|티룸|티하우스)/;
+const NONCAFE_FNB_CATEGORY = /(레스토랑|음식점|양식|한식|중식|일식|분식|이탈리아음식|파스타|스파게티)/;
+export function isNonCafeFnbCategory(naverCategory?: string): boolean {
+  const c = (naverCategory || "").trim();
+  if (!c) return false; // 카테고리 없음 — grandfather 방지, 신호 OFF
+  if (CAFE_SUBCATEGORY.test(c)) return false; // 카페 하위 키워드 있으면 정상 카페(겸업 포함)
+  return NONCAFE_FNB_CATEGORY.test(c);
+}
+// 노출 리뷰에서 '진짜 커피 실질언급'만 — "카페"·"디저트"·"브런치" 등은 상호명 리터럴(예: '카페나하본점')이나
+//   식당의 부수 메뉴로도 흔해 오탐하므로 제외. isNonCafeFnbCategory와 짝으로만 쓴다(일반 판정엔 과도하게 좁음).
+export const COFFEE_SUBSTANCE = /커피|라떼|아메리카노|에스프레소|드립|원두|로스팅|콜드브루|카푸치노|마키아토|핸드드립/;
 // 리뷰 안의 '다른 상호명' 후보 — 고유명사(2~8자)에 카페류 접미사가 바로 붙은 표기. 자기 상호와 일치하면
 //   (아래 verifyReview 호출부에서 nameHit/coreTokens 대조) 제외 — 진짜 후기의 자기소개는 그대로 보존.
 const OTHER_BIZ_NAME = /[가-힣]{2,8}(로스터스|로스터즈|로스터리|베이커리|카페|까페|커피|디저트|찻집|티룸|티하우스)/g;
