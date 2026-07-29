@@ -76,6 +76,10 @@
     {
       "path": "/api/cron-criteria-verify",
       "schedule": "50 10,22 * * *"
+    },
+    {
+      "path": "/api/cron-costwatch",
+      "schedule": "20 9 * * *"
     }
   ]
 }

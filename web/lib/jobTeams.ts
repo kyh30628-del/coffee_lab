@@ -12,6 +12,7 @@ export const JOB_TEAM: Record<string, string> = {
   "cron-grow": "성장본부", "cron-demand": "성장본부", "cron-newsletter": "성장본부", "cron-discover-categories": "성장본부",
   "cafe-collect": "성장본부",
   "cron-issues": "경영지원본부", "cron-coord-consumer": "경영지원본부", "cron-billing": "경영지원본부",
+  "cron-costwatch": "경영지원본부", // Neon 데이터전송비 이상탐지 워치독(2026-07-29, CEO 지시 — youtube-backfill 663GB 사고 재발방지)
   // 로컬 launchd 잡(하트비트 경유)
   "discover-sweep": "성장본부", // 매일 02:30 KST 전 지역 발굴 스윕(네이버 한도 최대 수집)
   "youtube-backfill": "품질본부",
@@ -53,10 +54,11 @@ export const EXPECT_MAX_H: Record<string, number> = {
   "chief-manager": 20,    // 일간 사이클 08·17시 KST
   "self-audit": 16,       // 매일 11:30·15:30·21:30 KST 3회 + 일간 사이클 내 실행 (최대 공백 밤 14h + 버퍼)
   "weekly-evaluation": 30, // 매일 10:30 KST(격일 게이트지만 스킵도 하트비트)
-  "audit-watch": 1,       // 이벤트 워처 5분
+  "audit-watch": 2,       // 이벤트 워처 60분(2026-07-28 CEO 지시: Neon 폴링비용 절감, 5분→60분)
   "chat-watch": 1,        // 관제 챗봇 상주(60초 하트비트)
-  "dev-pipeline": 1,      // 개발 파이프라인 5분
-  "dev-deploy": 1,        // 배포 워처 2분
+  "dev-pipeline": 2,      // 개발 파이프라인 60분(2026-07-28 CEO 지시: Neon 폴링비용 절감, 5분→60분)
+  "dev-deploy": 2,        // 배포 워처 60분(2026-07-28 CEO 지시: Neon 폴링비용 절감, 2분→60분)
+  "cron-costwatch": 30,   // Neon 비용 이상탐지, 매일 09:20 UTC(18:20 KST) + 버퍼(2026-07-29 CEO 지시)
   // ⚠️ cron-selfaudit 자신은 여기 못 넣는다(자기 정지를 자기가 감지 불가) — 로컬 run-trigger-watch.sh의
   //   결정론 워치독이 감시(7h+ 미실행 시 ok=false 하트비트로 에스컬레이션).
 };
