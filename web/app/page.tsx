@@ -578,6 +578,7 @@ export default function Home() {
   const layerRef = useRef<any>(null);
   const LRef = useRef<any>(null);
   const [mapReady, setMapReady] = useState(false); // 지도 초기화 완료 신호(마커 재렌더용)
+  const [inViewCount, setInViewCount] = useState<number | null>(null); // 🗺️ 현재 화면(viewport) 안 공개 카페 수(전문성 인디케이터)
 
   // ⚡ 속도 개선(2026-07-26): /api/cafes는 전 공개카페(13,391곳·char_scores 등 포함, 실측 5.1MB·1.8s)라
   //   지도·지역선택·상세패널에만 필요한데 예전엔 홈 첫 렌더와 동시에(마운트 즉시) 무조건 받아왔다 — 홈
@@ -865,6 +866,8 @@ export default function Home() {
       LRef.current = L;
       mapObj.current = L.map(mapRef.current, { zoomControl: true, attributionControl: true }).setView([37.5, 127.05], 10);
       mapObj.current.attributionControl.setPrefix("");
+      // 📏 축척(전문성) — 미터법만, 좌하단. 스타일은 전역 CSS(.leaflet-control-scale-line)에서 커피 톤으로.
+      try { L.control.scale({ imperial: false, position: "bottomleft", maxWidth: 116 }).addTo(mapObj.current); } catch {}
       // ⚠️ 래스터 OSM은 항상 깔면 안 됨 — Leaflet z-index 상 벡터 캔버스를 덮어 녹지가 그대로 보였음(검증 완료).
       //    그래서 벡터 '초기화 실패 시에만' 폴백으로 깐다.
       // 🗺️ 벡터 OSM(OSM Liberty) — 녹지·토지구획·산·지형래스터를 꺼 도로·시설·역·카페가 또렷. 한글 라벨 유지.
@@ -1045,6 +1048,8 @@ export default function Home() {
     // ===== 줌 기반 계층(자유 줌·이동도 자연스럽게). 화면이 곧 상태: 시도→구→동 집계, z≥15/동선택=개별 카페 실시간 =====
     const z = map.getZoom();
     const b = map.getBounds().pad(0.2);
+    // 🗺️ 현재 화면(실제 viewport, 패딩 없음) 안 공개 카페 수 — 이동/줌마다 실시간 갱신(전문성 인디케이터)
+    try { const vb = map.getBounds(); setInViewCount(cafes.reduce((n, c) => (c.lat && c.lng && vb.contains([c.lat, c.lng] as [number, number]) ? n + 1 : n), 0)); } catch {}
     // z≥13(구·동네 줌)부터 카페 — 단, 개별 핀이 아니라 '클러스터'로 묶어 깔끔하게(아래). 광역만 행정 집계.
     const level = (dong || focusId || z >= 13) ? "cafe"
       : sigungu ? "dong"
@@ -1379,6 +1384,16 @@ export default function Home() {
           .dcn-enter, .dcn-pin-feat::after, .dcn-pin-focus::after, .dcn-cload .cup::before, .dcn-cload .drip, .dcn-cload .stm, .dcn-pop, .dcn-fly { animation: none !important; }
           .dcn-enter { opacity:1 !important; transform:none !important; }
         }
+        /* 🗺️ 지도 기본 컨트롤을 커피 톤으로(전문성) — 톤은 유지, 밋밋한 라이브러리 기본값만 다듬음 */
+        .leaflet-control-zoom { border:none !important; border-radius:12px !important; overflow:hidden; box-shadow:0 3px 12px rgba(50,33,20,.22) !important; }
+        .leaflet-control-zoom a { background:#fffdf9 !important; color:#6b4f35 !important; border:none !important; width:34px !important; height:34px !important; line-height:34px !important; font-size:19px !important; font-weight:700 !important; transition:background .15s, color .15s; }
+        .leaflet-control-zoom a:hover { background:#f4ece0 !important; color:#2b2018 !important; }
+        .leaflet-control-zoom a.leaflet-control-zoom-in { border-bottom:1px solid #ece0cc !important; }
+        .leaflet-control-zoom a.leaflet-disabled { background:#f6f0e6 !important; color:#cbbca4 !important; }
+        .leaflet-control-scale { margin-bottom:88px !important; margin-left:12px !important; } /* 하단 시트 핸들 바 위로 띄움(가림 방지) */
+        .leaflet-control-scale-line { background:rgba(255,253,249,.86) !important; border:1.5px solid #b79a6f !important; border-top:none !important; color:#6b4f35 !important; font:600 10px/1.4 'Gowun Batang',serif !important; padding:1px 6px !important; border-radius:0 0 5px 5px !important; box-shadow:0 1px 5px rgba(50,33,20,.14); }
+        .leaflet-control-attribution { background:rgba(255,253,249,.72) !important; color:#9c8569 !important; font-size:9px !important; padding:1px 6px !important; border-radius:6px 0 0 0 !important; }
+        .leaflet-control-attribution a { color:#8a6d3b !important; }
       `}</style>
       <header className="shrink-0 bg-[#2b2018] text-[#f4ece0] z-[1500] flex items-center justify-between px-4 gap-3" style={{ height: "calc(3.5rem + env(safe-area-inset-top))", paddingTop: "env(safe-area-inset-top)" }}>
         <div className="flex items-center gap-3 min-w-0">
@@ -1538,6 +1553,15 @@ export default function Home() {
       <div className="flex-1 relative md:flex overflow-hidden" style={{ display: tab === "map" ? undefined : "none" }}>
           <div className="absolute inset-0 md:relative md:flex-1 md:p-5">
             <div ref={mapRef} className="w-full h-full md:rounded-2xl overflow-hidden bg-[#e8e0d3] z-0" />
+            {/* 🗺️ 현재 화면 카페 수 — 좌상단 줌버튼 아래(전문성). 커버리지를 숫자로. 이동/줌마다 실시간 갱신 */}
+            {inViewCount != null && (
+              <div className="absolute top-[5.5rem] left-3 z-[1100] pointer-events-none">
+                <div className="inline-flex items-center gap-1.5 rounded-full pl-2.5 pr-3 py-1.5 text-[11px] font-bold shadow-lg" style={{ background: "rgba(43,32,24,0.86)", color: "#f4ece0", backdropFilter: "blur(3px)" }}>
+                  <span className="text-[#e8b87a] text-[12px] leading-none">☕</span>
+                  <span>이 화면 <b className="text-[#e8b87a]">{inViewCount.toLocaleString()}</b>곳</span>
+                </div>
+              </div>
+            )}
             {/* 내 카페(MY PIN) / 다른 사람은 — 지도 상단 */}
             <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[1100] flex gap-2 max-w-[calc(100vw-1.5rem)]">
               <button onClick={showNearMe} aria-label="내 주변 500m"
