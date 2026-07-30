@@ -393,11 +393,25 @@ function makePinHtml(c: Cafe, isMatch: boolean, isFocus = false, isMine = false)
     : feat ? "background:#e0a32e;color:#2b2018;font-weight:700;" : "background:rgba(253,250,244,0.96);color:#2b2018;font-weight:600;";
   const glyph = isMine ? "❤" : isFocus ? "📍" : feat ? "⭐" : "☕";
   return `<div style="transform:translate(-50%,-100%);text-align:center;">
-    <div style="width:${size}px;height:${size}px;background:${color};background-image:radial-gradient(circle at 34% 28%, rgba(255,255,255,0.42), rgba(255,255,255,0) 58%);border:2px solid #fdfaf4;border-radius:50% 50% 50% 0;transform:rotate(-45deg);${ring}display:flex;align-items:center;justify-content:center;margin:0 auto;">
+    <div${feat ? ' class="dcn-pin-feat"' : ""} style="width:${size}px;height:${size}px;background:${color};background-image:radial-gradient(circle at 34% 28%, rgba(255,255,255,0.42), rgba(255,255,255,0) 58%);border:2px solid #fdfaf4;border-radius:50% 50% 50% 0;transform:rotate(-45deg);${ring}display:flex;align-items:center;justify-content:center;margin:0 auto;">
       <span style="transform:rotate(45deg);font-size:${isFocus ? 20 : isMatch || feat ? 16 : 14}px;filter:drop-shadow(0 1px 1px rgba(0,0,0,0.25));">${glyph}</span></div>
     <div style="margin-top:3px;${labelStyle}padding:2px 7px;border-radius:8px;font-size:${isFocus || isMine ? 11 : 10}px;white-space:nowrap;display:inline-block;box-shadow:0 2px 6px rgba(0,0,0,0.28);">${c.name}${isMine ? " ❤" : isFocus ? "" : feat ? " ⭐" : isMatch ? " ✓" : ""}</div>
   </div>`;
 }
+// ☕ 커피 드립 로딩 — 스피너 대신 우리 정체성(잔에 방울·김). label은 로딩 문구.
+function CoffeeLoader({ label }: { label?: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-9 gap-2.5">
+      <div className="dcn-cload" aria-hidden="true">
+        <span className="stm s1" /><span className="stm s2" />
+        <span className="drip" />
+        <div className="cup"><span className="ear" /></div>
+      </div>
+      {label && <div className="text-[12px] text-[#8a7150]">{label}</div>}
+    </div>
+  );
+}
+
 // 다른 사람들의 집계 핀 — 등록 인원수 표시, 인기 많을수록 크게(원형, 카페핀과 구분).
 function makeCountPinHtml(p: { name: string; cnt: number }, maxCnt: number): string {
   const t = Math.min(1, p.cnt / Math.max(1, maxCnt));
@@ -1334,6 +1348,38 @@ export default function Home() {
 
   return (
     <div className="flex flex-col bg-[#f4ece0]" style={{ position: "fixed", inset: 0, fontFamily: "'Gowun Batang', AppleMyungjo, 'Apple SD Gothic Neo', 'Noto Serif KR', serif" }}>
+      {/* ✨ 동적 연출(2026-07-30) — CSS 전용·가볍게·reduced-motion 존중. 우리 정체성을 '느끼게': ①골드핀 맥동 ②커피드립 로딩 ③저장 손맛 ④옥석 가리기 */}
+      <style>{`
+        /* ① 골드(우선노출) 핀 — 은은히 퍼지는 크레마 링(시선 유도 + B2B 가치 강조) */
+        @keyframes dcnHalo { 0% { box-shadow:0 0 0 0 rgba(224,163,46,0.55); opacity:.9; } 100% { box-shadow:0 0 0 11px rgba(224,163,46,0); opacity:0; } }
+        .dcn-pin-feat { position:relative; }
+        .dcn-pin-feat::after { content:""; position:absolute; inset:-4px; border-radius:50%; pointer-events:none; animation: dcnHalo 1.9s ease-out infinite; }
+        /* ② 커피 드립 로딩 — 스피너 대신 잔에 방울이 떨어지고 김이 오르는 연출 */
+        @keyframes dcnDrip { 0% { transform:translate(-50%,-2px) scaleY(.6); opacity:0; } 25% { opacity:1; } 70% { transform:translate(-50%,15px) scaleY(1); opacity:1; } 100% { transform:translate(-50%,15px) scaleY(.2); opacity:0; } }
+        @keyframes dcnFill { 0%,100% { transform:scaleY(.72); } 50% { transform:scaleY(.9); } }
+        @keyframes dcnSteamRise { 0% { transform:translateY(3px) scaleX(.8); opacity:0; } 30% { opacity:.5; } 100% { transform:translateY(-9px) scaleX(1.3); opacity:0; } }
+        .dcn-cload { position:relative; width:34px; height:34px; margin:0 auto; }
+        .dcn-cload .cup { position:absolute; bottom:0; left:50%; transform:translateX(-50%); width:24px; height:18px; border:2px solid #6b4f35; border-top:none; border-radius:0 0 9px 9px; background:#fff; overflow:hidden; }
+        .dcn-cload .cup::before { content:""; position:absolute; left:0; right:0; bottom:0; height:100%; background:linear-gradient(#a9743e,#7c4f27); transform-origin:bottom; transform:scaleY(.72); animation: dcnFill 1.6s ease-in-out infinite; }
+        .dcn-cload .ear { position:absolute; bottom:3px; right:2px; width:7px; height:8px; border:2px solid #6b4f35; border-left:none; border-radius:0 6px 6px 0; }
+        .dcn-cload .drip { position:absolute; top:2px; left:50%; width:4px; height:7px; border-radius:0 0 50% 50%; background:#7c4f27; animation: dcnDrip 1.15s ease-in infinite; }
+        .dcn-cload .stm { position:absolute; top:-5px; width:3px; height:8px; border-radius:50%; background:linear-gradient(to top, rgba(160,120,70,0), rgba(160,120,70,.5)); filter:blur(1px); }
+        .dcn-cload .s1 { left:11px; animation: dcnSteamRise 2.1s ease-in-out infinite; } .dcn-cload .s2 { left:20px; animation: dcnSteamRise 2.4s ease-in-out .7s infinite; }
+        /* ③ 저장 손맛 — 별 버튼 팝 + 날아오르는 하트 */
+        @keyframes dcnPop { 0% { transform:scale(1); } 35% { transform:scale(1.32); } 60% { transform:scale(.92); } 100% { transform:scale(1); } }
+        .dcn-pop { animation: dcnPop .42s cubic-bezier(.3,1.4,.5,1) 1; }
+        @keyframes dcnFly { 0% { transform:translate(-50%,0) scale(.7); opacity:0; } 20% { opacity:1; } 100% { transform:translate(-50%,-38px) scale(1.25); opacity:0; } }
+        .dcn-fly { position:absolute; left:50%; top:-2px; font-size:16px; pointer-events:none; animation: dcnFly .75s ease-out 1; }
+        /* ④ 옥석 가리기 — 노이즈는 떨어져 사라지고, 옥석은 떠올라 빛난다 */
+        @keyframes dcnFallOut { 0% { transform:translateY(0); opacity:1; } 100% { transform:translateY(9px); opacity:.32; } }
+        @keyframes dcnRiseGem { 0% { transform:translateY(7px); opacity:0; } 60% { opacity:1; } 100% { transform:translateY(0); opacity:1; } }
+        .dcn-sift-out { display:inline-block; animation: dcnFallOut .9s ease-in .25s both; }
+        .dcn-sift-gem { display:inline-block; animation: dcnRiseGem .7s cubic-bezier(.2,.8,.2,1) .5s both; }
+        @media (prefers-reduced-motion: reduce) {
+          .dcn-pin-feat::after, .dcn-cload .cup::before, .dcn-cload .drip, .dcn-cload .stm, .dcn-pop, .dcn-fly, .dcn-sift-out, .dcn-sift-gem { animation: none !important; }
+          .dcn-sift-out, .dcn-sift-gem { opacity:1 !important; transform:none !important; }
+        }
+      `}</style>
       <header className="shrink-0 bg-[#2b2018] text-[#f4ece0] z-[1500] flex items-center justify-between px-4 gap-3" style={{ height: "calc(3.5rem + env(safe-area-inset-top))", paddingTop: "env(safe-area-inset-top)" }}>
         <div className="flex items-center gap-3 min-w-0">
           <button onClick={() => { try { sessionStorage.removeItem("dcn_role"); } catch {} setRole(null); }} className="text-lg font-bold shrink-0 dcn-shimmer" aria-label="랜딩으로">동네 커피 노트</button>
@@ -1462,7 +1508,7 @@ export default function Home() {
                   </div>
                 )}
               </div>
-            ) : !discover ? <p className="text-center text-[#665036] py-10">불러오는 중...</p> : (
+            ) : !discover ? <CoffeeLoader label="우리 동네 카페 내리는 중…" /> : (
               <>
                 {discover.headlineAList && discover.headlineAList.length > 0 && (
                   <Spotlight title="💎 오늘의 숨은 보석" items={discover.headlineAList} onOpen={openById} sub="검증됐지만 덜 알려진" toneOffset={0}
@@ -1646,7 +1692,7 @@ export default function Home() {
               </div>
             </div>
             <div className="flex-1 overflow-y-auto p-4 pb-[calc(1rem_+_env(safe-area-inset-bottom))]">
-              {searchLoading ? <p className="text-center text-[#665036] py-10">찾는 중…</p>
+              {searchLoading ? <CoffeeLoader label="취향 맞는 카페 찾는 중…" />
                 : !searchRes ? <p className="text-center text-[#665036] py-10 text-sm leading-relaxed">"비 오는 날 혼자 조용히", "감성 사진 데이트"처럼<br />구체적이지 않아도 떠오르는 느낌으로 찾아드려요.</p>
                 : (
                   <>
@@ -1832,6 +1878,8 @@ function hlQuote(text?: string) {
 
 function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarked = false, onToggleBookmark, onSaveMemory }: { cafe: Cafe; dist: AxisDist; allCafes?: Cafe[]; onOpenCafe?: (id: number) => void; onClose: () => void; onMap: () => void; bookmarked?: boolean; onToggleBookmark?: () => void; onSaveMemory?: () => void }) {
   const g = cafe.synth_grade ? GRADE_STYLE[cafe.synth_grade] : null;
+  const [saveFx, setSaveFx] = useState(false); // ③ 저장 손맛 — 담는 순간에만 팝+하트 연출
+  const onBookmark = () => { const willSave = !bookmarked; onToggleBookmark?.(); if (willSave) { setSaveFx(true); setTimeout(() => setSaveFx(false), 800); } };
   const [reviews, setReviews] = useState<EvidenceReview[]>([]);
   const [quality, setQuality] = useState<QualityStats | null>(null);
   const [llmJudged, setLlmJudged] = useState(false);
@@ -1934,7 +1982,10 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-2 min-w-0"><h3 className="text-xl font-bold text-[#2b2018] truncate">{cafe.name}</h3>{g && <span className="text-[10px] text-white px-2 py-0.5 rounded-full shrink-0" style={{ background: g.bg }}>{g.label}</span>}</div>
             <div className="flex items-center gap-1 shrink-0">
-              <button onClick={onToggleBookmark} aria-label="즐겨찾기" className="flex items-center gap-1 border rounded-full px-2.5 py-1 text-[12px] font-medium transition-colors" style={bookmarked ? { color: "#fff", background: "#f0a832", borderColor: "#f0a832" } : { color: "#9c6b3f", borderColor: "#e0d2bd" }}>{bookmarked ? "★ 즐겨찾기" : "☆ 즐겨찾기"}</button>
+              <span className="relative inline-flex">
+                {saveFx && <span className="dcn-fly" aria-hidden="true">★</span>}
+                <button onClick={onBookmark} aria-label="즐겨찾기" className={`flex items-center gap-1 border rounded-full px-2.5 py-1 text-[12px] font-medium transition-colors ${saveFx ? "dcn-pop" : ""}`} style={bookmarked ? { color: "#fff", background: "#f0a832", borderColor: "#f0a832" } : { color: "#9c6b3f", borderColor: "#e0d2bd" }}>{bookmarked ? "★ 즐겨찾기" : "☆ 즐겨찾기"}</button>
+              </span>
               <KakaoShare
                 title={`${cafe.name} (${cafe.area})`}
                 description={shareHookText(cafe.synth_grade, (cafe as any).identity || cafe.signature)}
@@ -2045,11 +2096,11 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
             </a>
           </div>
 
-          {loadingRev && <div className="text-[11px] text-[#665036] mb-4">근거 후기 불러오는 중...</div>}
+          {loadingRev && <CoffeeLoader label="근거 후기 우려내는 중…" />}
           {!loadingRev && quality && quality.raw > 0 && (
             <div className="bg-[#eef3ea] border border-[#cfe0c2] rounded-lg px-4 py-2.5 mb-4">
               <div className="text-[11px] text-[#4f6a43] leading-relaxed flex items-start gap-1">
-                <span className="flex-1">🔍 네이버·유튜브 공개 글 <b>{quality.raw}건</b>{quality.duplicates ? <>(중복 {quality.duplicates}건 별도 제거)</> : null}을 검증해, 다른 가게·모음글·동명 카페 등 <b>노이즈 {quality.rejected}건</b>을 걸러내고<b> 옥석 {kept}건</b>만 분석에 썼어요.</span>
+                <span className="flex-1">🔍 네이버·유튜브 공개 글 <b>{quality.raw}건</b>{quality.duplicates ? <>(중복 {quality.duplicates}건 별도 제거)</> : null}을 검증해, 다른 가게·모음글·동명 카페 등 <b className="dcn-sift-out">노이즈 {quality.rejected}건</b>을 걸러내고<b className="dcn-sift-gem" style={{ color: "#8a6d1e" }}> 옥석 {kept}건</b>만 분석에 썼어요.</span>
                 <InfoDot title="옥석 검증이 뭐예요?"><b>이 서비스의 핵심</b>이에요. 수천 개 공개 후기에서 ① 광고·협찬, ② 카페명만 스친 글, ③ '맛집 N곳' 나열식, ④ 다른 지역·다른 지점의 <b>동명(同名)</b> 카페 글을 규칙으로 걸러내고, <b>Claude AI</b>가 내용·맥락까지 읽어 <b>진짜 방문 후기만</b> 남겨요. 모든 판정엔 근거가 붙습니다.</InfoDot>
               </div>
               {llmJudged && (
