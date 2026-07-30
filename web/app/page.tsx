@@ -393,7 +393,7 @@ function makePinHtml(c: Cafe, isMatch: boolean, isFocus = false, isMine = false)
     : feat ? "background:#e0a32e;color:#2b2018;font-weight:700;" : "background:rgba(253,250,244,0.96);color:#2b2018;font-weight:600;";
   const glyph = isMine ? "❤" : isFocus ? "📍" : feat ? "⭐" : "☕";
   return `<div style="transform:translate(-50%,-100%);text-align:center;">
-    <div${feat ? ' class="dcn-pin-feat"' : ""} style="width:${size}px;height:${size}px;background:${color};background-image:radial-gradient(circle at 34% 28%, rgba(255,255,255,0.42), rgba(255,255,255,0) 58%);border:2px solid #fdfaf4;border-radius:50% 50% 50% 0;transform:rotate(-45deg);${ring}display:flex;align-items:center;justify-content:center;margin:0 auto;">
+    <div${feat ? ' class="dcn-pin-feat"' : isFocus ? ' class="dcn-pin-focus"' : ""} style="width:${size}px;height:${size}px;background:${color};background-image:radial-gradient(circle at 34% 28%, rgba(255,255,255,0.42), rgba(255,255,255,0) 58%);border:2px solid #fdfaf4;border-radius:50% 50% 50% 0;transform:rotate(-45deg);${ring}display:flex;align-items:center;justify-content:center;margin:0 auto;">
       <span style="transform:rotate(45deg);font-size:${isFocus ? 20 : isMatch || feat ? 16 : 14}px;filter:drop-shadow(0 1px 1px rgba(0,0,0,0.25));">${glyph}</span></div>
     <div style="margin-top:3px;${labelStyle}padding:2px 7px;border-radius:8px;font-size:${isFocus || isMine ? 11 : 10}px;white-space:nowrap;display:inline-block;box-shadow:0 2px 6px rgba(0,0,0,0.28);">${c.name}${isMine ? " ❤" : isFocus ? "" : feat ? " ⭐" : isMatch ? " ✓" : ""}</div>
   </div>`;
@@ -1350,10 +1350,15 @@ export default function Home() {
     <div className="flex flex-col bg-[#f4ece0]" style={{ position: "fixed", inset: 0, fontFamily: "'Gowun Batang', AppleMyungjo, 'Apple SD Gothic Neo', 'Noto Serif KR', serif" }}>
       {/* ✨ 동적 연출(2026-07-30) — CSS 전용·가볍게·reduced-motion 존중. 우리 정체성을 '느끼게': ①골드핀 맥동 ②커피드립 로딩 ③저장 손맛 ④옥석 가리기 */}
       <style>{`
-        /* ① 골드(우선노출) 핀 — 은은히 퍼지는 크레마 링(시선 유도 + B2B 가치 강조) */
-        @keyframes dcnHalo { 0% { box-shadow:0 0 0 0 rgba(224,163,46,0.55); opacity:.9; } 100% { box-shadow:0 0 0 11px rgba(224,163,46,0); opacity:0; } }
-        .dcn-pin-feat { position:relative; }
-        .dcn-pin-feat::after { content:""; position:absolute; inset:-4px; border-radius:50%; pointer-events:none; animation: dcnHalo 1.9s ease-out infinite; }
+        /* 📥 홈 피드 등장 — 진입하는 순간 카드들이 차례로 떠오름(항상 보이는 화면이라 확실히 느껴짐) */
+        @keyframes dcnEnter { 0% { opacity:0; transform:translateY(18px); } 100% { opacity:1; transform:translateY(0); } }
+        .dcn-enter { animation: dcnEnter .55s cubic-bezier(.2,.75,.25,1) both; }
+        /* ① 골드(우선노출) 핀 — 퍼지는 크레마 링 2겹(시선 유도 + B2B 가치 강조) */
+        @keyframes dcnHalo { 0% { box-shadow:0 0 0 0 rgba(224,163,46,0.7); opacity:1; } 100% { box-shadow:0 0 0 16px rgba(224,163,46,0); opacity:0; } }
+        .dcn-pin-feat, .dcn-pin-focus { position:relative; }
+        .dcn-pin-feat::after, .dcn-pin-focus::after { content:""; position:absolute; inset:-5px; border-radius:50%; pointer-events:none; animation: dcnHalo 1.5s ease-out infinite; }
+        .dcn-pin-focus::after { animation-name: dcnHaloF; }
+        @keyframes dcnHaloF { 0% { box-shadow:0 0 0 0 rgba(181,112,60,0.7); opacity:1; } 100% { box-shadow:0 0 0 16px rgba(181,112,60,0); opacity:0; } }
         /* ② 커피 드립 로딩 — 스피너 대신 잔에 방울이 떨어지고 김이 오르는 연출 */
         @keyframes dcnDrip { 0% { transform:translate(-50%,-2px) scaleY(.6); opacity:0; } 25% { opacity:1; } 70% { transform:translate(-50%,15px) scaleY(1); opacity:1; } 100% { transform:translate(-50%,15px) scaleY(.2); opacity:0; } }
         @keyframes dcnFill { 0%,100% { transform:scaleY(.72); } 50% { transform:scaleY(.9); } }
@@ -1370,14 +1375,15 @@ export default function Home() {
         .dcn-pop { animation: dcnPop .42s cubic-bezier(.3,1.4,.5,1) 1; }
         @keyframes dcnFly { 0% { transform:translate(-50%,0) scale(.7); opacity:0; } 20% { opacity:1; } 100% { transform:translate(-50%,-38px) scale(1.25); opacity:0; } }
         .dcn-fly { position:absolute; left:50%; top:-2px; font-size:16px; pointer-events:none; animation: dcnFly .75s ease-out 1; }
-        /* ④ 옥석 가리기 — 노이즈는 떨어져 사라지고, 옥석은 떠올라 빛난다 */
-        @keyframes dcnFallOut { 0% { transform:translateY(0); opacity:1; } 100% { transform:translateY(9px); opacity:.32; } }
-        @keyframes dcnRiseGem { 0% { transform:translateY(7px); opacity:0; } 60% { opacity:1; } 100% { transform:translateY(0); opacity:1; } }
-        .dcn-sift-out { display:inline-block; animation: dcnFallOut .9s ease-in .25s both; }
-        .dcn-sift-gem { display:inline-block; animation: dcnRiseGem .7s cubic-bezier(.2,.8,.2,1) .5s both; }
+        /* ④ 옥석 가리기 — 노이즈는 아래로 떨어져 흐려지고, 옥석은 떠올라 금색으로 빛난다(더 크게·또렷하게) */
+        @keyframes dcnFallOut { 0% { transform:translateY(-6px); opacity:0; } 30% { transform:translateY(0); opacity:1; } 100% { transform:translateY(14px); opacity:.28; filter:blur(.4px); } }
+        @keyframes dcnRiseGem { 0% { transform:translateY(12px) scale(.9); opacity:0; } 55% { opacity:1; } 100% { transform:translateY(0) scale(1); opacity:1; } }
+        @keyframes dcnGemGlow { 0%,100% { text-shadow:0 0 0 rgba(224,163,46,0); } 50% { text-shadow:0 0 9px rgba(224,163,46,.75); } }
+        .dcn-sift-out { display:inline-block; animation: dcnFallOut 1.15s ease-in .2s both; }
+        .dcn-sift-gem { display:inline-block; animation: dcnRiseGem .8s cubic-bezier(.2,.85,.2,1) .7s both, dcnGemGlow 2.2s ease-in-out 1.5s 2; }
         @media (prefers-reduced-motion: reduce) {
-          .dcn-pin-feat::after, .dcn-cload .cup::before, .dcn-cload .drip, .dcn-cload .stm, .dcn-pop, .dcn-fly, .dcn-sift-out, .dcn-sift-gem { animation: none !important; }
-          .dcn-sift-out, .dcn-sift-gem { opacity:1 !important; transform:none !important; }
+          .dcn-enter, .dcn-pin-feat::after, .dcn-pin-focus::after, .dcn-cload .cup::before, .dcn-cload .drip, .dcn-cload .stm, .dcn-pop, .dcn-fly, .dcn-sift-out, .dcn-sift-gem { animation: none !important; }
+          .dcn-enter, .dcn-sift-out, .dcn-sift-gem { opacity:1 !important; transform:none !important; filter:none !important; }
         }
       `}</style>
       <header className="shrink-0 bg-[#2b2018] text-[#f4ece0] z-[1500] flex items-center justify-between px-4 gap-3" style={{ height: "calc(3.5rem + env(safe-area-inset-top))", paddingTop: "env(safe-area-inset-top)" }}>
@@ -1511,15 +1517,19 @@ export default function Home() {
             ) : !discover ? <CoffeeLoader label="우리 동네 카페 내리는 중…" /> : (
               <>
                 {discover.headlineAList && discover.headlineAList.length > 0 && (
-                  <Spotlight title="💎 오늘의 숨은 보석" items={discover.headlineAList} onOpen={openById} sub="검증됐지만 덜 알려진" toneOffset={0}
-                    info={<>검증 등급인데 아직 <b>리뷰가 적어 덜 알려진</b> 카페예요. 매일 다른 곳이 스포트라이트에 올라와요.</>} />
+                  <div className="dcn-enter" style={{ animationDelay: "0s" }}>
+                    <Spotlight title="💎 오늘의 숨은 보석" items={discover.headlineAList} onOpen={openById} sub="검증됐지만 덜 알려진" toneOffset={0}
+                      info={<>검증 등급인데 아직 <b>리뷰가 적어 덜 알려진</b> 카페예요. 매일 다른 곳이 스포트라이트에 올라와요.</>} />
+                  </div>
                 )}
                 {discover.headlineBList && discover.headlineBList.length > 0 && (
-                  <Spotlight title={discover.themeB ? `${discover.themeB.emoji} 오늘의 테마 · ${discover.themeB.label}` : "🔥 커피에 진심인 집"} items={discover.headlineBList} onOpen={openById} sub="테마 매칭 순" toneOffset={1}
-                    info={<>커피 성격(로스팅·작업·조용함·디저트·분위기·공간) 중 하나를 <b>매일 돌아가며</b> 소개해요.</>} />
+                  <div className="dcn-enter" style={{ animationDelay: ".1s" }}>
+                    <Spotlight title={discover.themeB ? `${discover.themeB.emoji} 오늘의 테마 · ${discover.themeB.label}` : "🔥 커피에 진심인 집"} items={discover.headlineBList} onOpen={openById} sub="테마 매칭 순" toneOffset={1}
+                      info={<>커피 성격(로스팅·작업·조용함·디저트·분위기·공간) 중 하나를 <b>매일 돌아가며</b> 소개해요.</>} />
+                  </div>
                 )}
-                {discover.featured && discover.featured.length > 0 && <Spotlight title="✨ 추천 카페" items={discover.featured} onOpen={openById} sub="쇼케이스" toneOffset={2} info={<>사장님이 직접 <b>홍보 중인 쇼케이스 카페</b>예요(우선 노출). 후기·등급은 다른 카페와 똑같이 검증된 값이에요.</>} />}
-                <RankSpotlight top3={discover.top3} momentum={momentum?.rising.slice(0, 5) ?? []} specialty={discover.specialty} fresh={discover.fresh} onOpen={openById} />
+                {discover.featured && discover.featured.length > 0 && <div className="dcn-enter" style={{ animationDelay: ".2s" }}><Spotlight title="✨ 추천 카페" items={discover.featured} onOpen={openById} sub="쇼케이스" toneOffset={2} info={<>사장님이 직접 <b>홍보 중인 쇼케이스 카페</b>예요(우선 노출). 후기·등급은 다른 카페와 똑같이 검증된 값이에요.</>} /></div>}
+                <div className="dcn-enter" style={{ animationDelay: ".3s" }}><RankSpotlight top3={discover.top3} momentum={momentum?.rising.slice(0, 5) ?? []} specialty={discover.specialty} fresh={discover.fresh} onOpen={openById} /></div>
                 <button onClick={() => { setSido(homeSido); setSigungu(homeGu); setDong(homeDong); setFocusId(null); setSheetOpen(false); setTab("map"); }} className="w-full bg-[#2b2018] text-[#f4ece0] rounded-xl py-3.5 font-medium mt-2">🗺 {homeDong ? `${homeDong} 지도로 보기` : homeGu ? `${homeGu} 지도로 보기` : "지도에서 전체 둘러보기"} →</button>
               </>
             )}
