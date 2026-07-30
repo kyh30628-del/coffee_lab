@@ -80,9 +80,11 @@ export async function GET(req: NextRequest) {
         (SELECT COALESCE(json_agg(json_build_object('event', e.event, 'at', e.at) ORDER BY e.at DESC), '[]'::json) FROM (SELECT event, at FROM owner_events WHERE cafe_id = s.cafe_id ORDER BY at DESC LIMIT 8) e) AS recent_events
         FROM subscriptions s LEFT JOIN cafes c ON c.id = s.cafe_id ORDER BY (s.conversion_requested_at IS NOT NULL AND s.status<>'active') DESC, (s.status='pending') DESC, s.created_at DESC LIMIT 200` as unknown as any[];
       // emailReady: 이 환경(프로덕션 포함)에 Resend 키가 있어야 승인 시 키 이메일이 자동 발송됨
+      // senderReady: 발신주소(RESEND_FROM)가 설정돼야 브랜드 도메인(noreply@dongnecoffeenote.com)으로 나감.
+      //   ⚠️ 미설정 시 코드가 onboarding@resend.dev(공용 테스트 도메인) 폴백 → 스팸행·비전문 발신. 키만 보면 이 사각을 놓침(2026-07-30 강화).
       // liveExposure: 소비자에게 실제로 우선노출(금색핀·추천카페·쇼케이스)이 보이는지 — SUBSCRIPTION_LIVE=true 여야 함
       // bankTransferEmail: 🏦 계좌이체 안내메일 발송이 켜져 있는지(기본 off) — 꺼져 있으면 버튼 비활성
-      return NextResponse.json({ ok: true, emailReady: !!process.env.RESEND_API_KEY, liveExposure: subscriptionLive(), bankTransferEmail: bankTransferEmailEnabled(), subs: rows.map((r) => ({ ...r, contact: decryptPII(r.contact), email: decryptPII(r.email) })) });
+      return NextResponse.json({ ok: true, emailReady: !!process.env.RESEND_API_KEY, senderReady: !!process.env.RESEND_FROM, liveExposure: subscriptionLive(), bankTransferEmail: bankTransferEmailEnabled(), subs: rows.map((r) => ({ ...r, contact: decryptPII(r.contact), email: decryptPII(r.email) })) });
     }
     // 사장님: 본인 카페 구독 상태(관리자 전체 또는 PIN=본인 카페만)
     const cafeId = Number(req.nextUrl.searchParams.get("cafeId"));

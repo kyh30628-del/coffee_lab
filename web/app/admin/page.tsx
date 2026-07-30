@@ -95,6 +95,7 @@ export default function AdminPage() {
   const [subscribers, setSubscribers] = useState<any[]>([]);
   const [showSubsModal, setShowSubsModal] = useState(false);
   const [emailReady, setEmailReady] = useState<boolean | null>(null); // 이 환경에 이메일 발송키 있는지
+  const [senderReady, setSenderReady] = useState<boolean | null>(null); // 발신주소(RESEND_FROM) 설정 여부 — 없으면 공용 테스트 도메인 폴백(스팸행)
   const [liveExposure, setLiveExposure] = useState<boolean | null>(null); // 소비자에게 우선노출이 실제 보이는지(SUBSCRIPTION_LIVE)
   const [bankTransferEmail, setBankTransferEmail] = useState<boolean | null>(null); // 🏦 계좌이체 안내메일 발송 켜짐 여부(BANK_TRANSFER_EMAIL_ENABLED, 기본 off)
   const [subMsg, setSubMsg] = useState(""); // 승인 결과(키 발송 성공/실패) 안내
@@ -116,7 +117,7 @@ export default function AdminPage() {
   const [showYtModal, setShowYtModal] = useState(false);
   const [showVisits, setShowVisits] = useState(false);
   const [visits, setVisits] = useState<any>(null);
-  const loadSubscribers = (password: string) => fetch("/api/subscription?all=1", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) { setSubscribers(d.subs ?? []); setEmailReady(!!d.emailReady); setLiveExposure(!!d.liveExposure); setBankTransferEmail(!!d.bankTransferEmail); } }).catch(() => {});
+  const loadSubscribers = (password: string) => fetch("/api/subscription?all=1", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) { setSubscribers(d.subs ?? []); setEmailReady(!!d.emailReady); setSenderReady(!!d.senderReady); setLiveExposure(!!d.liveExposure); setBankTransferEmail(!!d.bankTransferEmail); } }).catch(() => {});
   const subAct = async (id: number, action: string, days?: number, reason?: string) => {
     try {
       const d = await (await fetch("/api/subscription", { method: "POST", headers: { "x-admin-password": pw, "Content-Type": "application/json" }, body: JSON.stringify({ id, action, ...(days ? { days } : {}), ...(reason ? { reason } : {}) }) })).json().catch(() => ({}));
@@ -938,7 +939,8 @@ export default function AdminPage() {
             <button onClick={openOnboard} className="w-full mb-3 text-left bg-amber-50 border border-amber-300 rounded-lg px-3 py-2 text-[12px] font-bold text-amber-800">📧 승인 시 발송되는 온보딩 메일 내용 보기 →</button>
             {/* 📧 이메일 발송 준비 상태 — 승인 시 키 자동발송 가능 여부(프로덕션 env) */}
             {emailReady === false && <div className="mb-3 text-[11px] text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-2.5 py-2">🚨 이 환경에 <b>이메일 발송키(RESEND)가 없어요</b>. 승인해도 키가 자동 발송되지 않으니, 승인 후 <b>PIN을 사장님께 직접 전달</b>해야 해요. (Vercel 환경변수 RESEND_API_KEY 설정 필요)</div>}
-            {emailReady === true && <div className="mb-3 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-2">📧 이메일 발송 준비됨 — 승인하면 키(PIN)가 사장님 이메일로 <b>자동 발송</b>돼요.</div>}
+            {emailReady === true && senderReady === false && <div className="mb-3 text-[11px] text-amber-800 bg-amber-50 border border-amber-300 rounded-lg px-2.5 py-2">⚠️ 발송키는 있는데 <b>발신주소(RESEND_FROM)가 없어요</b>. 이대로 승인하면 메일이 공용 테스트 도메인(onboarding@resend.dev)으로 나가 <b>스팸함에 갈 위험</b>이 있어요. Vercel 환경변수 <b>RESEND_FROM</b>을 브랜드 도메인(예: 동네 커피 노트 &lt;noreply@dongnecoffeenote.com&gt;)으로 설정 후 발송을 권장해요.</div>}
+            {emailReady === true && senderReady === true && <div className="mb-3 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-2">📧 이메일 발송 준비됨 — 승인하면 키(PIN)가 브랜드 발신주소로 사장님 이메일에 <b>자동 발송</b>돼요.</div>}
             {/* ✨ 소비자 노출 — 기본 자동 ON. false 명시(킬스위치)일 때만 경고 */}
             {liveExposure === false && <div className="mb-3 text-[11px] text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-2.5 py-2">🚨 <b>소비자 노출이 비상 차단(OFF)돼 있어요</b> — 누군가 Vercel 환경변수 <b>SUBSCRIPTION_LIVE=false</b>로 꺼둔 상태입니다. 이 값을 <b>지우면 자동으로 다시 켜집니다</b>(기본 ON).</div>}
             {liveExposure === true && <div className="mb-3 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-2">✨ 소비자 노출 <b>자동 ON</b> — 구독 사장님이 <b>첫 로그인하면</b> 우선노출(금색핀·추천카페·쇼케이스)이 손님에게 자동으로 노출됩니다. 별도로 켤 필요 없어요.</div>}
