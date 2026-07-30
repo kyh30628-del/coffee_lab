@@ -412,39 +412,6 @@ function CoffeeLoader({ label }: { label?: string }) {
   );
 }
 
-// 🔍 옥석 가리기 연출 — 우리 정체성의 핵심. 공개 후기 조각이 뜨고, 노이즈(광고·모음글·동명)는
-//   우르르 떨어져 나가고, 진짜 후기만 금색으로 남는다. CSS 전용·재생 가능. reduced-motion에선 결과만 표시.
-function SiftReveal({ raw, kept }: { raw: number; kept: number }) {
-  const [k, setK] = useState(0); // 다시 보기 리플레이 키
-  const TOTAL = 9;
-  const gemN = Math.min(6, Math.max(2, Math.round((TOTAL * kept) / Math.max(1, raw))));
-  const gemSet = new Set<number>();
-  for (let g = 0; g < gemN; g++) gemSet.add(Math.round((g * (TOTAL - 1)) / Math.max(1, gemN - 1)));
-  const NOISE = ["광고", "모음글", "동명", "무관", "협찬", "나열글", "옆가게"];
-  let ni = 0;
-  return (
-    <div className="mb-2 pb-2 border-b border-[#d7e6cb]">
-      <div className="flex items-center justify-between mb-0.5">
-        <div className="text-[11px] text-[#4f6a43] font-bold">🔍 공개 후기 {raw.toLocaleString()}건, 이렇게 가려냈어요</div>
-        <button onClick={() => setK((x) => x + 1)} className="text-[10px] text-[#6f8a5c] border border-[#cfe0c2] rounded-full px-2 py-0.5">다시 보기 ↻</button>
-      </div>
-      <div key={k} className="dcn-sift-stage">
-        {Array.from({ length: TOTAL }, (_, i) => {
-          const gem = gemSet.has(i);
-          const label = gem ? "✓ 진짜" : (NOISE[ni++ % NOISE.length]);
-          return (
-            <span key={i} className={`dcn-chip ${gem ? "dcn-chip-gem" : "dcn-chip-noise"}`}
-              style={gem ? { animationDelay: `${i * 45}ms, 1.35s` } : { animationDelay: `${i * 45}ms, ${1.0 + (i % 5) * 0.09}s` }}>
-              {label}
-            </span>
-          );
-        })}
-        <span className="dcn-sift-badge">✨ 옥석 {kept.toLocaleString()}건만 분석</span>
-      </div>
-    </div>
-  );
-}
-
 // 다른 사람들의 집계 핀 — 등록 인원수 표시, 인기 많을수록 크게(원형, 카페핀과 구분).
 function makeCountPinHtml(p: { name: string; cnt: number }, maxCnt: number): string {
   const t = Math.min(1, p.cnt / Math.max(1, maxCnt));
@@ -1408,22 +1375,9 @@ export default function Home() {
         .dcn-pop { animation: dcnPop .42s cubic-bezier(.3,1.4,.5,1) 1; }
         @keyframes dcnFly { 0% { transform:translate(-50%,0) scale(.7); opacity:0; } 20% { opacity:1; } 100% { transform:translate(-50%,-38px) scale(1.25); opacity:0; } }
         .dcn-fly { position:absolute; left:50%; top:-2px; font-size:16px; pointer-events:none; animation: dcnFly .75s ease-out 1; }
-        /* ④ 옥석 가리기(메인 연출) — 주변 톤(크림·검증녹색)에 맞춤. 노이즈(크림)는 떨어져 나가고 진짜(검증녹색)만 남는다 */
-        .dcn-sift-stage { display:flex; flex-wrap:wrap; justify-content:center; align-items:flex-start; gap:5px; position:relative; min-height:84px; padding:2px 2px 28px; }
-        .dcn-chip { display:inline-block; font-size:11px; font-weight:700; padding:3px 8px; border-radius:8px; white-space:nowrap; }
-        .dcn-chip-noise { background:#efe4cf; color:#a68f6d; border:1px solid #e0cfae; animation: dcnDropIn .4s cubic-bezier(.2,.8,.2,1) both, dcnFallOut2 .8s ease-in both; }
-        .dcn-chip-gem { background:#5f7355; color:#fff; box-shadow:0 1px 3px rgba(60,75,50,.3); animation: dcnDropIn .4s cubic-bezier(.2,.8,.2,1) both, dcnGemGlow2 1.2s ease-in-out both; }
-        .dcn-sift-badge { position:absolute; bottom:2px; left:50%; font-size:12.5px; font-weight:800; color:#fff; background:#5f7355; padding:5px 15px; border-radius:20px; box-shadow:0 2px 8px rgba(95,115,85,.4); animation: dcnBadgeIn .6s cubic-bezier(.2,1.5,.5,1) 2s both; }
-        @keyframes dcnDropIn { from { transform:translateY(-24px); opacity:0; } to { transform:translateY(0); opacity:1; } }
-        @keyframes dcnFallOut2 { 0%,60% { transform:translateY(0) rotate(0); opacity:1; } 100% { transform:translateY(60px) rotate(14deg); opacity:0; } }
-        @keyframes dcnGemGlow2 { 0%,50% { box-shadow:0 1px 3px rgba(60,75,50,.3); } 72% { box-shadow:0 0 12px 2px rgba(95,115,85,.85); } 100% { box-shadow:0 0 6px 1px rgba(95,115,85,.5); } }
-        @keyframes dcnBadgeIn { from { transform:translateX(-50%) translateY(9px) scale(.8); opacity:0; } to { transform:translateX(-50%) translateY(0) scale(1); opacity:1; } }
         @media (prefers-reduced-motion: reduce) {
-          .dcn-enter, .dcn-pin-feat::after, .dcn-pin-focus::after, .dcn-cload .cup::before, .dcn-cload .drip, .dcn-cload .stm, .dcn-pop, .dcn-fly, .dcn-chip, .dcn-sift-badge { animation: none !important; }
+          .dcn-enter, .dcn-pin-feat::after, .dcn-pin-focus::after, .dcn-cload .cup::before, .dcn-cload .drip, .dcn-cload .stm, .dcn-pop, .dcn-fly { animation: none !important; }
           .dcn-enter { opacity:1 !important; transform:none !important; }
-          .dcn-chip-noise { display:none !important; }
-          .dcn-sift-stage { min-height:auto; padding-bottom:2px; }
-          .dcn-sift-badge { position:static; transform:none; margin:6px auto 0; }
         }
       `}</style>
       <header className="shrink-0 bg-[#2b2018] text-[#f4ece0] z-[1500] flex items-center justify-between px-4 gap-3" style={{ height: "calc(3.5rem + env(safe-area-inset-top))", paddingTop: "env(safe-area-inset-top)" }}>
@@ -2149,9 +2103,8 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
           {loadingRev && <CoffeeLoader label="근거 후기 우려내는 중…" />}
           {!loadingRev && quality && quality.raw > 0 && (
             <div className="bg-[#eef3ea] border border-[#cfe0c2] rounded-lg px-4 py-2.5 mb-4">
-              <SiftReveal raw={quality.raw} kept={kept} />
               <div className="text-[11px] text-[#4f6a43] leading-relaxed flex items-start gap-1">
-                <span className="flex-1">🔍 네이버·유튜브 공개 글 <b>{quality.raw}건</b>{quality.duplicates ? <>(중복 {quality.duplicates}건 별도 제거)</> : null}을 검증해, 다른 가게·모음글·동명 카페 등 <b className="line-through text-[#a2967f]">노이즈 {quality.rejected}건</b>을 걸러내고 <b className="text-[#8a6d1e]">옥석 {kept}건</b>만 분석에 썼어요.</span>
+                <span className="flex-1">🔍 네이버·유튜브 공개 글 <b>{quality.raw}건</b>{quality.duplicates ? <>(중복 {quality.duplicates}건 별도 제거)</> : null}을 검증해, 다른 가게·모음글·동명 카페 등 <b>노이즈 {quality.rejected}건</b>을 걸러내고<b> 옥석 {kept}건</b>만 분석에 썼어요.</span>
                 <InfoDot title="옥석 검증이 뭐예요?"><b>이 서비스의 핵심</b>이에요. 수천 개 공개 후기에서 ① 광고·협찬, ② 카페명만 스친 글, ③ '맛집 N곳' 나열식, ④ 다른 지역·다른 지점의 <b>동명(同名)</b> 카페 글을 규칙으로 걸러내고, <b>Claude AI</b>가 내용·맥락까지 읽어 <b>진짜 방문 후기만</b> 남겨요. 모든 판정엔 근거가 붙습니다.</InfoDot>
               </div>
               {llmJudged && (
