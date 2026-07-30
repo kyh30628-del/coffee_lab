@@ -412,6 +412,39 @@ function CoffeeLoader({ label }: { label?: string }) {
   );
 }
 
+// 🔍 옥석 가리기 연출 — 우리 정체성의 핵심. 공개 후기 조각이 뜨고, 노이즈(광고·모음글·동명)는
+//   우르르 떨어져 나가고, 진짜 후기만 금색으로 남는다. CSS 전용·재생 가능. reduced-motion에선 결과만 표시.
+function SiftReveal({ raw, kept }: { raw: number; kept: number }) {
+  const [k, setK] = useState(0); // 다시 보기 리플레이 키
+  const TOTAL = 9;
+  const gemN = Math.min(6, Math.max(2, Math.round((TOTAL * kept) / Math.max(1, raw))));
+  const gemSet = new Set<number>();
+  for (let g = 0; g < gemN; g++) gemSet.add(Math.round((g * (TOTAL - 1)) / Math.max(1, gemN - 1)));
+  const NOISE = ["광고", "모음글", "동명", "무관", "협찬", "나열글", "옆가게"];
+  let ni = 0;
+  return (
+    <div className="bg-[#211913] rounded-xl px-3 pt-3 pb-2.5 mb-4 overflow-hidden">
+      <div className="flex items-center justify-between mb-1">
+        <div className="text-[11.5px] text-[#e8b87a] font-bold">🔍 공개 후기 {raw.toLocaleString()}건, 이렇게 옥석을 가려요</div>
+        <button onClick={() => setK((x) => x + 1)} className="text-[10px] text-[#b79a6f] border border-[#5b4636] rounded-full px-2 py-0.5">다시 보기 ↻</button>
+      </div>
+      <div key={k} className="dcn-sift-stage">
+        {Array.from({ length: TOTAL }, (_, i) => {
+          const gem = gemSet.has(i);
+          const label = gem ? "☕ 진짜" : (NOISE[ni++ % NOISE.length]);
+          return (
+            <span key={i} className={`dcn-chip ${gem ? "dcn-chip-gem" : "dcn-chip-noise"}`}
+              style={gem ? { animationDelay: `${i * 45}ms, 1.35s` } : { animationDelay: `${i * 45}ms, ${1.0 + (i % 5) * 0.09}s` }}>
+              {label}
+            </span>
+          );
+        })}
+        <span className="dcn-sift-badge">✨ 옥석 {kept.toLocaleString()}건만 분석</span>
+      </div>
+    </div>
+  );
+}
+
 // 다른 사람들의 집계 핀 — 등록 인원수 표시, 인기 많을수록 크게(원형, 카페핀과 구분).
 function makeCountPinHtml(p: { name: string; cnt: number }, maxCnt: number): string {
   const t = Math.min(1, p.cnt / Math.max(1, maxCnt));
@@ -1375,15 +1408,22 @@ export default function Home() {
         .dcn-pop { animation: dcnPop .42s cubic-bezier(.3,1.4,.5,1) 1; }
         @keyframes dcnFly { 0% { transform:translate(-50%,0) scale(.7); opacity:0; } 20% { opacity:1; } 100% { transform:translate(-50%,-38px) scale(1.25); opacity:0; } }
         .dcn-fly { position:absolute; left:50%; top:-2px; font-size:16px; pointer-events:none; animation: dcnFly .75s ease-out 1; }
-        /* ④ 옥석 가리기 — 노이즈는 아래로 떨어져 흐려지고, 옥석은 떠올라 금색으로 빛난다(더 크게·또렷하게) */
-        @keyframes dcnFallOut { 0% { transform:translateY(-6px); opacity:0; } 30% { transform:translateY(0); opacity:1; } 100% { transform:translateY(14px); opacity:.28; filter:blur(.4px); } }
-        @keyframes dcnRiseGem { 0% { transform:translateY(12px) scale(.9); opacity:0; } 55% { opacity:1; } 100% { transform:translateY(0) scale(1); opacity:1; } }
-        @keyframes dcnGemGlow { 0%,100% { text-shadow:0 0 0 rgba(224,163,46,0); } 50% { text-shadow:0 0 9px rgba(224,163,46,.75); } }
-        .dcn-sift-out { display:inline-block; animation: dcnFallOut 1.15s ease-in .2s both; }
-        .dcn-sift-gem { display:inline-block; animation: dcnRiseGem .8s cubic-bezier(.2,.85,.2,1) .7s both, dcnGemGlow 2.2s ease-in-out 1.5s 2; }
+        /* ④ 옥석 가리기(메인 연출) — 후기 조각이 뜨고, 노이즈는 우르르 떨어져 나가고, 진짜만 금색으로 남는다 */
+        .dcn-sift-stage { display:flex; flex-wrap:wrap; justify-content:center; align-items:flex-start; gap:5px; position:relative; min-height:88px; padding:2px 2px 28px; }
+        .dcn-chip { display:inline-block; font-size:11px; font-weight:700; padding:3px 8px; border-radius:8px; white-space:nowrap; }
+        .dcn-chip-noise { background:#33291f; color:#a08a72; border:1px solid #47392c; animation: dcnDropIn .4s cubic-bezier(.2,.8,.2,1) both, dcnFallOut2 .8s ease-in both; }
+        .dcn-chip-gem { background:linear-gradient(#eabf85,#dca35a); color:#2b2018; box-shadow:0 1px 4px rgba(0,0,0,.35); animation: dcnDropIn .4s cubic-bezier(.2,.8,.2,1) both, dcnGemGlow2 1.2s ease-in-out both; }
+        .dcn-sift-badge { position:absolute; bottom:2px; left:50%; font-size:12.5px; font-weight:800; color:#2b2018; background:linear-gradient(#f2cd8e,#e2ac60); padding:5px 15px; border-radius:20px; box-shadow:0 2px 9px rgba(224,163,46,.5); animation: dcnBadgeIn .6s cubic-bezier(.2,1.5,.5,1) 2s both; }
+        @keyframes dcnDropIn { from { transform:translateY(-24px); opacity:0; } to { transform:translateY(0); opacity:1; } }
+        @keyframes dcnFallOut2 { 0%,60% { transform:translateY(0) rotate(0); opacity:1; } 100% { transform:translateY(62px) rotate(16deg); opacity:0; } }
+        @keyframes dcnGemGlow2 { 0%,50% { box-shadow:0 1px 4px rgba(0,0,0,.35); } 72% { box-shadow:0 0 14px 3px rgba(224,163,46,.95); } 100% { box-shadow:0 0 8px 1px rgba(224,163,46,.6); } }
+        @keyframes dcnBadgeIn { from { transform:translateX(-50%) translateY(9px) scale(.8); opacity:0; } to { transform:translateX(-50%) translateY(0) scale(1); opacity:1; } }
         @media (prefers-reduced-motion: reduce) {
-          .dcn-enter, .dcn-pin-feat::after, .dcn-pin-focus::after, .dcn-cload .cup::before, .dcn-cload .drip, .dcn-cload .stm, .dcn-pop, .dcn-fly, .dcn-sift-out, .dcn-sift-gem { animation: none !important; }
-          .dcn-enter, .dcn-sift-out, .dcn-sift-gem { opacity:1 !important; transform:none !important; filter:none !important; }
+          .dcn-enter, .dcn-pin-feat::after, .dcn-pin-focus::after, .dcn-cload .cup::before, .dcn-cload .drip, .dcn-cload .stm, .dcn-pop, .dcn-fly, .dcn-chip, .dcn-sift-badge { animation: none !important; }
+          .dcn-enter { opacity:1 !important; transform:none !important; }
+          .dcn-chip-noise { display:none !important; }
+          .dcn-sift-stage { min-height:auto; padding-bottom:2px; }
+          .dcn-sift-badge { position:static; transform:none; margin:6px auto 0; }
         }
       `}</style>
       <header className="shrink-0 bg-[#2b2018] text-[#f4ece0] z-[1500] flex items-center justify-between px-4 gap-3" style={{ height: "calc(3.5rem + env(safe-area-inset-top))", paddingTop: "env(safe-area-inset-top)" }}>
@@ -2107,6 +2147,7 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
           </div>
 
           {loadingRev && <CoffeeLoader label="근거 후기 우려내는 중…" />}
+          {!loadingRev && quality && quality.raw > 0 && <SiftReveal raw={quality.raw} kept={kept} />}
           {!loadingRev && quality && quality.raw > 0 && (
             <div className="bg-[#eef3ea] border border-[#cfe0c2] rounded-lg px-4 py-2.5 mb-4">
               <div className="text-[11px] text-[#4f6a43] leading-relaxed flex items-start gap-1">
