@@ -2110,7 +2110,7 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
           {!loadingRev && quality && quality.raw > 0 && (
             <div className="bg-[#eef3ea] border border-[#cfe0c2] rounded-lg px-4 py-2.5 mb-4">
               <div className="text-[11px] text-[#4f6a43] leading-relaxed flex items-start gap-1">
-                <span className="flex-1">🔍 네이버·유튜브 공개 글 <b>{quality.raw}건</b>{quality.duplicates ? <>(중복 {quality.duplicates}건 별도 제거)</> : null}을 검증해, 다른 가게·모음글·동명 카페 등 <b className="dcn-sift-out">노이즈 {quality.rejected}건</b>을 걸러내고<b className="dcn-sift-gem" style={{ color: "#8a6d1e" }}> 옥석 {kept}건</b>만 분석에 썼어요.</span>
+                <span className="flex-1">🔍 네이버·유튜브 공개 글 <b>{quality.raw}건</b>{quality.duplicates ? <>(중복 {quality.duplicates}건 별도 제거)</> : null}을 검증해, 다른 가게·모음글·동명 카페 등 <b className="line-through text-[#a2967f]">노이즈 {quality.rejected}건</b>을 걸러내고 <b className="text-[#8a6d1e]">옥석 {kept}건</b>만 분석에 썼어요.</span>
                 <InfoDot title="옥석 검증이 뭐예요?"><b>이 서비스의 핵심</b>이에요. 수천 개 공개 후기에서 ① 광고·협찬, ② 카페명만 스친 글, ③ '맛집 N곳' 나열식, ④ 다른 지역·다른 지점의 <b>동명(同名)</b> 카페 글을 규칙으로 걸러내고, <b>Claude AI</b>가 내용·맥락까지 읽어 <b>진짜 방문 후기만</b> 남겨요. 모든 판정엔 근거가 붙습니다.</InfoDot>
               </div>
               {llmJudged && (
