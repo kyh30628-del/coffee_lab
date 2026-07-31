@@ -560,6 +560,15 @@ export default function Home() {
   const anonRef = useRef("");
   // 랜딩/역할 분리 + 사장님 인증 + 뒤로가기 안내
   const [role, setRole] = useState<"consumer" | "owner" | null>(null);
+  // ☕ 첫 진입 인트로 스플래시 — 세션당 1번만(재진입 시 skip). SSR·클라 첫 렌더는 항상 '노출'로 일치시켜 하이드레이션 불일치 방지.
+  const [introSkip] = useState(() => {
+    if (typeof window === "undefined") return false; // SSR: 노출
+    try {
+      if (sessionStorage.getItem("dcn_intro_seen")) return true; // 이미 봤음 → skip
+      sessionStorage.setItem("dcn_intro_seen", "1");
+      return false; // 첫 진입 → 노출
+    } catch { return false; }
+  });
   const [ownerPwModal, setOwnerPwModal] = useState(false);
   const [ownerPw, setOwnerPw] = useState("");
   const [ownerErr, setOwnerErr] = useState("");
@@ -1276,6 +1285,75 @@ export default function Home() {
           .dcn-symbol { display:block; margin:0 auto 12px; animation: dcnFade .9s ease both, dcnFloat 6s ease-in-out .9s infinite, dcnSymHolo 9s ease-in-out infinite; }
           @media (prefers-reduced-motion: reduce) { .dcn-rise,.dcn-title { animation: dcnRise .01s both; } .dcn-title{ -webkit-text-fill-color:#f4ece0; color:#f4ece0; } .dcn-steam{ display:none; } .dcn-symbol{ animation: dcnFade .01s both; } }
         `}</style>
+        {/* ☕ 첫 진입 인트로 스플래시 — 랜딩과 같은 에스프레소 톤에서 커피잔+김이 피어오르고 워드마크가 떠오른 뒤 위로 자연스럽게 사라지며 랜딩으로 이어짐. 세션당 1회. */}
+        <div aria-hidden className={"dcn-intro" + (introSkip ? " dcn-intro-skip" : "")}>
+          <style>{`
+            @keyframes dcnIntroOut { 0%,68% { opacity:1; visibility:visible; } 100% { opacity:0; visibility:hidden; transform: translateY(-10px); } }
+            @keyframes dcnCupIn { 0% { opacity:0; transform: translateY(14px) scale(.86); } 60% { opacity:1; } 100% { opacity:1; transform: translateY(0) scale(1); } }
+            @keyframes dcnHaloPulse { 0%,100% { opacity:.35; transform: scale(1); } 50% { opacity:.7; transform: scale(1.12); } }
+            @keyframes dcnWordIn { 0% { opacity:0; transform: translateY(12px); } 100% { opacity:1; transform: translateY(0); } }
+            @keyframes dcnIntroSteam {
+              0%   { opacity:0; transform: translateY(4px) scaleX(.7); }
+              25%  { opacity:.55; }
+              60%  { transform: translateY(-20px) translateX(4px) scaleX(1.25); }
+              100% { opacity:0; transform: translateY(-42px) translateX(-3px) scaleX(1.5); }
+            }
+            .dcn-intro {
+              position:fixed; inset:0; z-index:9000; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:26px;
+              background: radial-gradient(125% 85% at 50% -5%, #4a3526 0%, #3a2a1d 30%, #2b2018 60%, #241510 100%);
+              animation: dcnIntroOut 2.15s cubic-bezier(.4,0,.2,1) forwards;
+            }
+            .dcn-intro-skip { display:none; }
+            .dcn-intro-cup { position:relative; animation: dcnCupIn .8s cubic-bezier(.2,.7,.2,1) both; }
+            .dcn-intro-halo { position:absolute; left:50%; top:52%; width:200px; height:200px; transform:translate(-50%,-50%);
+              background: radial-gradient(circle, rgba(232,184,122,.5) 0%, rgba(232,184,122,0) 62%); filter:blur(2px);
+              animation: dcnHaloPulse 3s ease-in-out infinite; pointer-events:none; }
+            .dcn-intro-steam { position:absolute; top:6px; width:10px; height:30px; border-radius:50%;
+              background: linear-gradient(to top, rgba(244,236,224,0), rgba(244,236,224,.6)); filter: blur(5px); opacity:0; }
+            .dcn-is1 { left:38%; animation: dcnIntroSteam 3.2s ease-in-out .5s infinite; }
+            .dcn-is2 { left:50%; animation: dcnIntroSteam 3.6s ease-in-out .9s infinite; }
+            .dcn-is3 { left:62%; animation: dcnIntroSteam 3.4s ease-in-out 1.3s infinite; }
+            .dcn-intro-word { animation: dcnWordIn .7s cubic-bezier(.2,.7,.2,1) .45s both; text-align:center; }
+            @media (prefers-reduced-motion: reduce) {
+              .dcn-intro { animation: dcnIntroOut 1.4s linear forwards; }
+              .dcn-intro-cup,.dcn-intro-word { animation: none; } .dcn-intro-steam { display:none; }
+            }
+          `}</style>
+          <div className="dcn-intro-cup">
+            <div className="dcn-intro-halo" />
+            <span className="dcn-intro-steam dcn-is1" />
+            <span className="dcn-intro-steam dcn-is2" />
+            <span className="dcn-intro-steam dcn-is3" />
+            <svg width="128" height="120" viewBox="0 0 160 150" fill="none" style={{ position: "relative", display: "block" }}>
+              <defs>
+                <linearGradient id="dcnPorcelain" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stopColor="#fbf4e8" /><stop offset="1" stopColor="#e6d3b2" />
+                </linearGradient>
+                <linearGradient id="dcnCrema" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stopColor="#d8a468" /><stop offset="1" stopColor="#a9713c" />
+                </linearGradient>
+              </defs>
+              {/* 받침 */}
+              <ellipse cx="80" cy="123" rx="56" ry="11" fill="#3a2a1d" opacity="0.55" />
+              <ellipse cx="80" cy="120" rx="54" ry="10" fill="url(#dcnPorcelain)" />
+              {/* 손잡이 */}
+              <path d="M120 66c20-4 28 8 24 22-3 11-15 16-26 13" stroke="url(#dcnPorcelain)" strokeWidth="8" fill="none" strokeLinecap="round" />
+              {/* 잔 몸통 */}
+              <path d="M42 62c0 0 3 44 10 51 5 5 20 8 28 8s23-3 28-8c7-7 10-51 10-51z" fill="url(#dcnPorcelain)" />
+              {/* 잔 테두리 + 커피 표면 */}
+              <ellipse cx="80" cy="62" rx="40" ry="11" fill="#f6ecd9" />
+              <ellipse cx="80" cy="62" rx="34" ry="8.5" fill="url(#dcnCrema)" />
+              <ellipse cx="80" cy="60.5" rx="34" ry="8.5" fill="none" stroke="#e8b87a" strokeWidth="1.4" opacity="0.65" />
+              {/* 크레마 하이라이트 */}
+              <ellipse cx="72" cy="59" rx="11" ry="2.6" fill="#e9c48f" opacity="0.6" />
+            </svg>
+          </div>
+          <div className="dcn-intro-word">
+            <div className="dcn-title" style={{ fontSize: "2rem", fontWeight: 700, letterSpacing: "-0.01em" }}>동네 커피 노트</div>
+            <div style={{ color: "#a98a5f", fontSize: "12.5px", marginTop: "8px", letterSpacing: "0.02em" }}>진짜 후기만 가려 골라드려요</div>
+          </div>
+        </div>
+
         <div className="dcn-cup mb-5">
           <h1 className="dcn-title text-[2.9rem] sm:text-[3.3rem] leading-[1.12] font-bold tracking-tight">동네 커피 노트</h1>
         </div>
@@ -1422,34 +1500,7 @@ export default function Home() {
       {/* 홈 = 잡지 1면 */}
       {tab === "home" && (
         <div className="flex-1 overflow-y-auto" style={{ paddingBottom: "3.25rem", position: "relative" }}>
-          {/* ☕ 은은한 카페 느낌 — 원두 실루엣(2026-07-26 v7, "가장자리 말고 자유롭게 배치" 재요청).
-              화면 곳곳에 흩어지도록 x/y를 다양화(작고 옅게 유지해 카드와 겹쳐도 거슬리지 않음). */}
-          <div aria-hidden style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0 }}>
-            <svg aria-hidden style={{ position: "absolute", top: "9%", left: "18%", transform: "rotate(-25deg)" }} width="22" height="32" viewBox="0 0 32 48">
-              <path d="M16 2C7 2 2 14 2 24C2 36 8 46 16 46C24 46 30 36 30 24C30 14 25 2 16 2Z" fill="rgba(112,70,26,0.28)" />
-              <path d="M16 8C12 18 12 30 16 40" stroke="rgba(78,46,18,0.34)" strokeWidth="2" fill="none" strokeLinecap="round" />
-            </svg>
-            <svg aria-hidden style={{ position: "absolute", top: "22%", left: "68%", transform: "rotate(12deg)" }} width="20" height="29" viewBox="0 0 32 48">
-              <path d="M16 2C7 2 2 14 2 24C2 36 8 46 16 46C24 46 30 36 30 24C30 14 25 2 16 2Z" fill="rgba(112,70,26,0.25)" />
-              <path d="M16 8C12 18 12 30 16 40" stroke="rgba(78,46,18,0.31)" strokeWidth="2" fill="none" strokeLinecap="round" />
-            </svg>
-            <svg aria-hidden style={{ position: "absolute", top: "38%", left: "8%", transform: "rotate(18deg)" }} width="24" height="35" viewBox="0 0 32 48">
-              <path d="M16 2C7 2 2 14 2 24C2 36 8 46 16 46C24 46 30 36 30 24C30 14 25 2 16 2Z" fill="rgba(112,70,26,0.27)" />
-              <path d="M16 8C12 18 12 30 16 40" stroke="rgba(78,46,18,0.33)" strokeWidth="2" fill="none" strokeLinecap="round" />
-            </svg>
-            <svg aria-hidden style={{ position: "absolute", top: "51%", left: "82%", transform: "rotate(-8deg)" }} width="18" height="26" viewBox="0 0 32 48">
-              <path d="M16 2C7 2 2 14 2 24C2 36 8 46 16 46C24 46 30 36 30 24C30 14 25 2 16 2Z" fill="rgba(112,70,26,0.24)" />
-              <path d="M16 8C12 18 12 30 16 40" stroke="rgba(78,46,18,0.3)" strokeWidth="2" fill="none" strokeLinecap="round" />
-            </svg>
-            <svg aria-hidden style={{ position: "absolute", top: "68%", left: "35%", transform: "rotate(40deg)" }} width="24" height="35" viewBox="0 0 32 48">
-              <path d="M16 2C7 2 2 14 2 24C2 36 8 46 16 46C24 46 30 36 30 24C30 14 25 2 16 2Z" fill="rgba(112,70,26,0.29)" />
-              <path d="M16 8C12 18 12 30 16 40" stroke="rgba(78,46,18,0.35)" strokeWidth="2" fill="none" strokeLinecap="round" />
-            </svg>
-            <svg aria-hidden style={{ position: "absolute", top: "83%", left: "60%", transform: "rotate(-45deg)" }} width="20" height="29" viewBox="0 0 32 48">
-              <path d="M16 2C7 2 2 14 2 24C2 36 8 46 16 46C24 46 30 36 30 24C30 14 25 2 16 2Z" fill="rgba(112,70,26,0.26)" />
-              <path d="M16 8C12 18 12 30 16 40" stroke="rgba(78,46,18,0.32)" strokeWidth="2" fill="none" strokeLinecap="round" />
-            </svg>
-          </div>
+          {/* 원두 실루엣 장식 제거(2026-07-31 CEO 지시) */}
           <div className="max-w-2xl mx-auto px-5 pt-4 pb-6" style={{
             // 📓 "커피 노트" 정체성 — 콘텐츠 폭에만 딱 맞춘 줄노트 텍스처(전체 화면폭이 아니라 실제
             // 카드가 놓이는 영역에만 스코프해 넓은 화면에서 배경이 따로 노는 것 방지).
