@@ -25,8 +25,32 @@ async function naver(kind: "news" | "blog", query: string, sort = "date"): Promi
 const CAT = [
   { key: "coffee", title: "☕ 커피 인사이트", q: ["스페셜티 커피 트렌드", "디카페인 원두 카페", "커피 프랜차이즈 신메뉴"], n: 3, tip: "원두·로스팅·디카페인 기준을 메뉴판에 한 줄로 명시 → 신뢰 포인트." },
   { key: "dessert", title: "🍰 디저트 스포트라이트", q: ["카페 디저트 신메뉴", "베이커리 신상 메뉴", "빙수 카페 신메뉴"], n: 3, tip: "사진 잘 받는 시그니처 1종을 주말 한정으로 테스트." },
-  { key: "cafes", title: "🔥 뜨는 카페 동향", q: ["성수 신상 카페", "감성 카페 신상 오픈", "카페 창업 트렌드"], n: 3, tip: "큰 인테리어 대신 우리만의 '한 장면'(사진 포인트)을 만들기." },
 ];
+// 🔥 뜨는 카페 동향 — 네이버 뉴스(빈약·중복) 대신 우리 고유 데이터로. 최근 리뷰가 활발한(recent_ratio) 검증·참고 카페를
+//   지역 다양성으로 골라, 카페명·지역·등급·리뷰수·한줄소개·상세링크까지 담는다(항상 3+ 보장, 사장님 경쟁 인사이트).
+async function risingCafeItems(): Promise<NLItem[]> {
+  const site = (process.env.NEXT_PUBLIC_SITE_URL || "https://dongnecoffeenote.com").replace(/\/$/, "");
+  const rows = (await sql`
+    SELECT id, name, area, synth_grade, synth_count, synth_identity, COALESCE(recent_ratio, 0) AS rr
+    FROM cafes
+    WHERE published = true AND synth_grade IN ('검증','참고') AND synth_count >= 6 AND synth_identity IS NOT NULL
+    ORDER BY COALESCE(recent_ratio, 0) DESC, synth_count DESC
+    LIMIT 40`.catch(() => [])) as any[];
+  const out: NLItem[] = [], seenArea = new Set<string>();
+  for (const c of rows) { // 지역 편중 방지 — 한 동네에서 하나씩(다양성)
+    if (seenArea.has(c.area)) continue; seenArea.add(c.area);
+    const id = (c.synth_identity as string || "").replace(/\s+/g, " ").trim().slice(0, 64);
+    out.push({ text: `${c.name} (${c.area}) · ${c.synth_grade} · 리뷰 ${c.synth_count}건`, note: id || undefined, source_url: `${site}/c/${c.id}` });
+    if (out.length >= 5) break;
+  }
+  if (out.length < 3) for (const c of rows) { // 다양성으로 3개 미달 시 동네 중복 허용해 채움
+    if (out.some((o) => o.source_url?.endsWith(`/c/${c.id}`))) continue;
+    const id = (c.synth_identity as string || "").replace(/\s+/g, " ").trim().slice(0, 64);
+    out.push({ text: `${c.name} (${c.area}) · ${c.synth_grade} · 리뷰 ${c.synth_count}건`, note: id || undefined, source_url: `${site}/c/${c.id}` });
+    if (out.length >= 4) break;
+  }
+  return out;
+}
 
 export async function generateNewsletterFree(): Promise<{ ok: boolean; newsletter?: Newsletter; id?: number; cost?: number; error?: string }> {
   if (!NID || !NSEC) return { ok: false, error: "NAVER_CLIENT_ID/SECRET 미설정" };
@@ -67,10 +91,14 @@ export async function generateNewsletterFree(): Promise<{ ok: boolean; newslette
   let newsPool: { title: string; desc: string; link: string }[] = [];
   for (const q of ["카페 신메뉴", "카페 베이커리 트렌드", "프랜차이즈 커피 신메뉴"]) newsPool = newsPool.concat(await naver("news", q));
   const news = pick(newsPool, 4).map((i) => ({ text: i.text, source_url: i.source_url }));
+  // 🔥 뜨는 카페 동향 — 우리 고유 데이터(항상 3+). 실패해도 나머지 뉴스레터는 생성.
+  const risingItems = await risingCafeItems().catch(() => [] as NLItem[]);
+  const cafesSection = risingItems.length ? [{ key: "cafes", title: "🔥 뜨는 카페 동향", intro: "우리 가게엔: 이번 주 리뷰가 활발한 동네 카페예요. 어떤 '결'로 주목받는지 보고 우리 강점 한 가지를 더 뾰족하게.", items: risingItems }] : [];
+  if (risingItems[0]) leads.push(risingItems[0].text);
   const tldr = { key: "tldr", title: "📌 이번 주 한눈에", items: leads.slice(0, 3).map((t) => ({ text: t })) };
-  const action = { key: "action", title: "💡 이번 주 사장님 액션", items: CAT.map((c) => ({ text: c.tip })) };
+  const action = { key: "action", title: "💡 이번 주 사장님 액션", items: [...CAT.map((c) => ({ text: c.tip })), { text: "우리 가게 검증 후기가 늘면 '뜨는 카페'에 오를 수 있어요 — 방문 손님께 네이버 후기 한 줄을 부탁해보세요." }] };
   // 순서·제목은 applyGuards(NL_SPEC)가 최종 강제하므로 조립 순서는 무관 — 필수 섹션을 모두 넣기만 하면 됨.
-  const allSections = [tldr, ...radar, ...sections, action, ...(news.length ? [{ key: "news", title: "📰 짧은 업계 뉴스", items: news }] : [])];
+  const allSections = [tldr, ...radar, ...sections, ...cafesSection, action, ...(news.length ? [{ key: "news", title: "📰 짧은 업계 뉴스", items: news }] : [])];
 
   const d = new Date();
   const title = `이번 주 커피·디저트 트렌드 (${d.getMonth() + 1}월 ${d.getDate()}일)`;
