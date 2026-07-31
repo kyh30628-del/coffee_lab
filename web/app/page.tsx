@@ -560,15 +560,6 @@ export default function Home() {
   const anonRef = useRef("");
   // 랜딩/역할 분리 + 사장님 인증 + 뒤로가기 안내
   const [role, setRole] = useState<"consumer" | "owner" | null>(null);
-  // ☕ 첫 진입 인트로 스플래시 — 세션당 1번만(재진입 시 skip). SSR·클라 첫 렌더는 항상 '노출'로 일치시켜 하이드레이션 불일치 방지.
-  const [introSkip] = useState(() => {
-    if (typeof window === "undefined") return false; // SSR: 노출
-    try {
-      if (sessionStorage.getItem("dcn_intro_seen")) return true; // 이미 봤음 → skip
-      sessionStorage.setItem("dcn_intro_seen", "1");
-      return false; // 첫 진입 → 노출
-    } catch { return false; }
-  });
   const [ownerPwModal, setOwnerPwModal] = useState(false);
   const [ownerPw, setOwnerPw] = useState("");
   const [ownerErr, setOwnerErr] = useState("");
@@ -1285,79 +1276,6 @@ export default function Home() {
           .dcn-symbol { display:block; margin:0 auto 12px; animation: dcnFade .9s ease both, dcnFloat 6s ease-in-out .9s infinite, dcnSymHolo 9s ease-in-out infinite; }
           @media (prefers-reduced-motion: reduce) { .dcn-rise,.dcn-title { animation: dcnRise .01s both; } .dcn-title{ -webkit-text-fill-color:#f4ece0; color:#f4ece0; } .dcn-steam{ display:none; } .dcn-symbol{ animation: dcnFade .01s both; } }
         `}</style>
-        {/* ☕ 첫 진입 인트로 스플래시 — 랜딩과 같은 에스프레소 톤에서 커피잔+김이 피어오르고 워드마크가 떠오른 뒤 위로 자연스럽게 사라지며 랜딩으로 이어짐. 세션당 1회. */}
-        <div aria-hidden className={"dcn-intro" + (introSkip ? " dcn-intro-skip" : "")}>
-          <style>{`
-            @keyframes dcnIntroOut { 0%,68% { opacity:1; visibility:visible; } 100% { opacity:0; visibility:hidden; transform: translateY(-10px); } }
-            @keyframes dcnCupIn { 0% { opacity:0; transform: translateY(14px) scale(.86); } 60% { opacity:1; } 100% { opacity:1; transform: translateY(0) scale(1); } }
-            @keyframes dcnHaloPulse { 0%,100% { opacity:.35; transform: translate(-50%,-50%) scale(1); } 50% { opacity:.7; transform: translate(-50%,-50%) scale(1.12); } }
-            @keyframes dcnWordIn { 0% { opacity:0; transform: translateY(12px); } 100% { opacity:1; transform: translateY(0); } }
-            @keyframes dcnIntroSteam {
-              0%   { opacity:0; transform: translateY(4px) scaleX(.7); }
-              25%  { opacity:.55; }
-              60%  { transform: translateY(-20px) translateX(4px) scaleX(1.25); }
-              100% { opacity:0; transform: translateY(-42px) translateX(-3px) scaleX(1.5); }
-            }
-            .dcn-intro {
-              position:fixed; inset:0; z-index:9000; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:26px;
-              background: radial-gradient(125% 85% at 50% -5%, #4a3526 0%, #3a2a1d 30%, #2b2018 60%, #241510 100%);
-              animation: dcnIntroOut 2.15s cubic-bezier(.4,0,.2,1) forwards;
-            }
-            .dcn-intro-skip { display:none; }
-            .dcn-intro-cup { position:relative; animation: dcnCupIn .8s cubic-bezier(.2,.7,.2,1) both; }
-            .dcn-intro-halo { position:absolute; left:50%; top:46%; width:260px; height:260px; transform:translate(-50%,-50%);
-              background: radial-gradient(circle, rgba(232,184,122,.5) 0%, rgba(232,184,122,0) 62%); filter:blur(2px);
-              animation: dcnHaloPulse 3s ease-in-out infinite; pointer-events:none; }
-            .dcn-intro-steam { position:absolute; top:6px; width:10px; height:30px; border-radius:50%;
-              background: linear-gradient(to top, rgba(244,236,224,0), rgba(244,236,224,.6)); filter: blur(5px); opacity:0; }
-            .dcn-is1 { left:38%; animation: dcnIntroSteam 3.2s ease-in-out .5s infinite; }
-            .dcn-is2 { left:50%; animation: dcnIntroSteam 3.6s ease-in-out .9s infinite; }
-            .dcn-is3 { left:62%; animation: dcnIntroSteam 3.4s ease-in-out 1.3s infinite; }
-            .dcn-intro-word { animation: dcnWordIn .7s cubic-bezier(.2,.7,.2,1) .45s both; text-align:center; }
-            @media (prefers-reduced-motion: reduce) {
-              .dcn-intro { animation: dcnIntroOut 1.4s linear forwards; }
-              .dcn-intro-cup,.dcn-intro-word { animation: none; } .dcn-intro-steam { display:none; }
-            }
-          `}</style>
-          <div className="dcn-intro-cup">
-            <div className="dcn-intro-halo" />
-            <span className="dcn-intro-steam dcn-is1" />
-            <span className="dcn-intro-steam dcn-is2" />
-            <span className="dcn-intro-steam dcn-is3" />
-            {/* ☕ 글자 없이 커피잔만 — 잔 속 '커피'를 히어로로 크게·진하게 강조 */}
-            <svg width="188" height="176" viewBox="0 0 160 150" fill="none" style={{ position: "relative", display: "block" }}>
-              <defs>
-                <linearGradient id="dcnPorcelain" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0" stopColor="#fbf4e8" /><stop offset="1" stopColor="#e0cba6" />
-                </linearGradient>
-                {/* 커피(크레마): 가장자리 밝은 크레마 → 중심 깊은 에스프레소, 리치한 톤 */}
-                <radialGradient id="dcnCoffee" cx="0.42" cy="0.36" r="0.75">
-                  <stop offset="0" stopColor="#c68a4e" />
-                  <stop offset="0.45" stopColor="#8a542a" />
-                  <stop offset="0.8" stopColor="#4e2f18" />
-                  <stop offset="1" stopColor="#3a2010" />
-                </radialGradient>
-              </defs>
-              {/* 받침 */}
-              <ellipse cx="80" cy="124" rx="58" ry="11.5" fill="#3a2a1d" opacity="0.5" />
-              <ellipse cx="80" cy="121" rx="56" ry="10.5" fill="url(#dcnPorcelain)" />
-              {/* 손잡이 */}
-              <path d="M120 64c21-4 30 9 25 23-3 12-16 17-27 14" stroke="url(#dcnPorcelain)" strokeWidth="9" fill="none" strokeLinecap="round" />
-              {/* 잔 몸통 */}
-              <path d="M40 60c0 0 3 46 10.5 53 5 5 21 8.5 29.5 8.5s24.5-3.5 29.5-8.5c7.5-7 10.5-53 10.5-53z" fill="url(#dcnPorcelain)" />
-              {/* 잔 테두리(도자기 림) */}
-              <ellipse cx="80" cy="60" rx="42" ry="12" fill="#f6ecd9" />
-              {/* ★ 커피 표면 — 크게·진하게(히어로) */}
-              <ellipse cx="80" cy="60" rx="37" ry="9.6" fill="url(#dcnCoffee)" />
-              {/* 크레마 림(가장자리 밝은 거품 테) */}
-              <ellipse cx="80" cy="59.4" rx="37" ry="9.6" fill="none" stroke="#e6b077" strokeWidth="1.8" opacity="0.8" />
-              {/* 크레마 하이라이트(윤기) */}
-              <ellipse cx="70" cy="56.5" rx="13" ry="3.1" fill="#e8bd86" opacity="0.55" />
-              <ellipse cx="88" cy="62" rx="7" ry="1.6" fill="#7a4a26" opacity="0.5" />
-            </svg>
-          </div>
-        </div>
-
         <div className="dcn-cup mb-5">
           <h1 className="dcn-title text-[2.9rem] sm:text-[3.3rem] leading-[1.12] font-bold tracking-tight">동네 커피 노트</h1>
         </div>
