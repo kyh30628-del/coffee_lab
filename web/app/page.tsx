@@ -1290,7 +1290,7 @@ export default function Home() {
           <style>{`
             @keyframes dcnIntroOut { 0%,68% { opacity:1; visibility:visible; } 100% { opacity:0; visibility:hidden; transform: translateY(-10px); } }
             @keyframes dcnCupIn { 0% { opacity:0; transform: translateY(14px) scale(.86); } 60% { opacity:1; } 100% { opacity:1; transform: translateY(0) scale(1); } }
-            @keyframes dcnHaloPulse { 0%,100% { opacity:.35; transform: scale(1); } 50% { opacity:.7; transform: scale(1.12); } }
+            @keyframes dcnHaloPulse { 0%,100% { opacity:.35; transform: translate(-50%,-50%) scale(1); } 50% { opacity:.7; transform: translate(-50%,-50%) scale(1.12); } }
             @keyframes dcnWordIn { 0% { opacity:0; transform: translateY(12px); } 100% { opacity:1; transform: translateY(0); } }
             @keyframes dcnIntroSteam {
               0%   { opacity:0; transform: translateY(4px) scaleX(.7); }
@@ -1305,7 +1305,7 @@ export default function Home() {
             }
             .dcn-intro-skip { display:none; }
             .dcn-intro-cup { position:relative; animation: dcnCupIn .8s cubic-bezier(.2,.7,.2,1) both; }
-            .dcn-intro-halo { position:absolute; left:50%; top:52%; width:200px; height:200px; transform:translate(-50%,-50%);
+            .dcn-intro-halo { position:absolute; left:50%; top:46%; width:260px; height:260px; transform:translate(-50%,-50%);
               background: radial-gradient(circle, rgba(232,184,122,.5) 0%, rgba(232,184,122,0) 62%); filter:blur(2px);
               animation: dcnHaloPulse 3s ease-in-out infinite; pointer-events:none; }
             .dcn-intro-steam { position:absolute; top:6px; width:10px; height:30px; border-radius:50%;
@@ -1324,33 +1324,37 @@ export default function Home() {
             <span className="dcn-intro-steam dcn-is1" />
             <span className="dcn-intro-steam dcn-is2" />
             <span className="dcn-intro-steam dcn-is3" />
-            <svg width="128" height="120" viewBox="0 0 160 150" fill="none" style={{ position: "relative", display: "block" }}>
+            {/* ☕ 글자 없이 커피잔만 — 잔 속 '커피'를 히어로로 크게·진하게 강조 */}
+            <svg width="188" height="176" viewBox="0 0 160 150" fill="none" style={{ position: "relative", display: "block" }}>
               <defs>
                 <linearGradient id="dcnPorcelain" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0" stopColor="#fbf4e8" /><stop offset="1" stopColor="#e6d3b2" />
+                  <stop offset="0" stopColor="#fbf4e8" /><stop offset="1" stopColor="#e0cba6" />
                 </linearGradient>
-                <linearGradient id="dcnCrema" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0" stopColor="#d8a468" /><stop offset="1" stopColor="#a9713c" />
-                </linearGradient>
+                {/* 커피(크레마): 가장자리 밝은 크레마 → 중심 깊은 에스프레소, 리치한 톤 */}
+                <radialGradient id="dcnCoffee" cx="0.42" cy="0.36" r="0.75">
+                  <stop offset="0" stopColor="#c68a4e" />
+                  <stop offset="0.45" stopColor="#8a542a" />
+                  <stop offset="0.8" stopColor="#4e2f18" />
+                  <stop offset="1" stopColor="#3a2010" />
+                </radialGradient>
               </defs>
               {/* 받침 */}
-              <ellipse cx="80" cy="123" rx="56" ry="11" fill="#3a2a1d" opacity="0.55" />
-              <ellipse cx="80" cy="120" rx="54" ry="10" fill="url(#dcnPorcelain)" />
+              <ellipse cx="80" cy="124" rx="58" ry="11.5" fill="#3a2a1d" opacity="0.5" />
+              <ellipse cx="80" cy="121" rx="56" ry="10.5" fill="url(#dcnPorcelain)" />
               {/* 손잡이 */}
-              <path d="M120 66c20-4 28 8 24 22-3 11-15 16-26 13" stroke="url(#dcnPorcelain)" strokeWidth="8" fill="none" strokeLinecap="round" />
+              <path d="M120 64c21-4 30 9 25 23-3 12-16 17-27 14" stroke="url(#dcnPorcelain)" strokeWidth="9" fill="none" strokeLinecap="round" />
               {/* 잔 몸통 */}
-              <path d="M42 62c0 0 3 44 10 51 5 5 20 8 28 8s23-3 28-8c7-7 10-51 10-51z" fill="url(#dcnPorcelain)" />
-              {/* 잔 테두리 + 커피 표면 */}
-              <ellipse cx="80" cy="62" rx="40" ry="11" fill="#f6ecd9" />
-              <ellipse cx="80" cy="62" rx="34" ry="8.5" fill="url(#dcnCrema)" />
-              <ellipse cx="80" cy="60.5" rx="34" ry="8.5" fill="none" stroke="#e8b87a" strokeWidth="1.4" opacity="0.65" />
-              {/* 크레마 하이라이트 */}
-              <ellipse cx="72" cy="59" rx="11" ry="2.6" fill="#e9c48f" opacity="0.6" />
+              <path d="M40 60c0 0 3 46 10.5 53 5 5 21 8.5 29.5 8.5s24.5-3.5 29.5-8.5c7.5-7 10.5-53 10.5-53z" fill="url(#dcnPorcelain)" />
+              {/* 잔 테두리(도자기 림) */}
+              <ellipse cx="80" cy="60" rx="42" ry="12" fill="#f6ecd9" />
+              {/* ★ 커피 표면 — 크게·진하게(히어로) */}
+              <ellipse cx="80" cy="60" rx="37" ry="9.6" fill="url(#dcnCoffee)" />
+              {/* 크레마 림(가장자리 밝은 거품 테) */}
+              <ellipse cx="80" cy="59.4" rx="37" ry="9.6" fill="none" stroke="#e6b077" strokeWidth="1.8" opacity="0.8" />
+              {/* 크레마 하이라이트(윤기) */}
+              <ellipse cx="70" cy="56.5" rx="13" ry="3.1" fill="#e8bd86" opacity="0.55" />
+              <ellipse cx="88" cy="62" rx="7" ry="1.6" fill="#7a4a26" opacity="0.5" />
             </svg>
-          </div>
-          <div className="dcn-intro-word">
-            <div className="dcn-title" style={{ fontSize: "2rem", fontWeight: 700, letterSpacing: "-0.01em" }}>동네 커피 노트</div>
-            <div style={{ color: "#a98a5f", fontSize: "12.5px", marginTop: "8px", letterSpacing: "0.02em" }}>진짜 후기만 가려 골라드려요</div>
           </div>
         </div>
 
