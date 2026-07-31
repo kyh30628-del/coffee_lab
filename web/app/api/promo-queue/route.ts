@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
-import { generatePromo, hasPromoLLM } from "@/lib/promoAgent";
+import { generatePromo, generatePromoFree, hasPromoLLM } from "@/lib/promoAgent";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
@@ -50,12 +50,14 @@ export async function POST(req: NextRequest) {
       // 🤖 콘솔 키로 즉시(인라인) 생성 — 존재하지 않는 로컬 배치 의존 제거(큐에만 쌓여 영구 대기하던 버그 수정).
       const c = (await sql`SELECT c.name, c.area, p.intro, p.photos FROM cafe_promos p JOIN cafes c ON c.id = p.cafe_id WHERE p.cafe_id=${cafeId}`)[0] as any;
       if (!c) return NextResponse.json({ ok: false, error: "카페/홍보 정보 없음" }, { status: 404 });
-      if (!hasPromoLLM()) { await sql`UPDATE cafe_promos SET ai_pending=true, updated_at=now() WHERE cafe_id=${cafeId}`; return NextResponse.json({ ok: false, error: "AI 생성 키(ANTHROPIC_API_KEY) 미설정 — 생성 불가" }, { status: 503 }); }
       const photo = Array.isArray(c.photos) && typeof c.photos[0] === "string" && c.photos[0].startsWith("data:image") ? c.photos[0] : undefined;
-      const ai = await generatePromo(c.name, c.area, c.intro || "", photo);
-      if (!ai) { await sql`UPDATE cafe_promos SET ai_pending=true, updated_at=now() WHERE cafe_id=${cafeId}`; return NextResponse.json({ ok: false, error: "AI 생성 실패 — 잠시 후 다시 시도" }, { status: 502 }); }
+      // 🤖 LLM(콘솔키) 우선 — 사진까지 읽어 더 매끄러운 카피. 🆓 실패(크레딧 소진·키 없음) 시 우리 데이터 기반 무료 폴백으로 항상 생성.
+      let ai = hasPromoLLM() ? await generatePromo(c.name, c.area, c.intro || "", photo) : null;
+      const source = ai ? "ai" : "free";
+      if (!ai) ai = await generatePromoFree(cafeId);
+      if (!ai) { await sql`UPDATE cafe_promos SET ai_pending=true, updated_at=now() WHERE cafe_id=${cafeId}`; return NextResponse.json({ ok: false, error: "생성 실패 — 카페 데이터 부족(검증 후기 필요)" }, { status: 502 }); }
       await sql`UPDATE cafe_promos SET ai_headline=${ai.headline}, ai_tagline=${ai.tagline}, ai_points=${JSON.stringify(ai.points)}, ai_pending=false, approved=false, updated_at=now() WHERE cafe_id=${cafeId}`;
-      return NextResponse.json({ ok: true, generated: true, headline: ai.headline });
+      return NextResponse.json({ ok: true, generated: true, source, headline: ai.headline });
     }
     if (body.feature) { // 우선 노출 ON — 구독 기간만큼(기본 30일). 만료 시 자동 해제.
       const days = Math.min(Math.max(Number(body.days) || 30, 1), 365);
