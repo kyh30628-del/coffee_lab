@@ -121,7 +121,23 @@ const today = new Date().toISOString().slice(0, 10);
     const extractContentTokens = (text) => {
       const ids = new Set();
       const brands = new Set();
+      // ⚠️ #558 근본원인: 헤딩전용 추출은 카페id를 헤딩이 아니라 마크다운 **표**(| id | 이름 | ... |)로
+      // 나열하는 레드팀 제안서(예: redteam-proposals-20260729-0815.md)에서 tokens.ids가 완전히 비어
+      // 영구 "루프 의심" 오탐을 낳았다(decisions#540이 이미 정확히 처리했는데도). 표 데이터행도 스캔하되,
+      // 표 헤더의 첫 컬럼명이 정확히 "id"인 표만 대상으로 한정한다(순번·순위 등 무관한 숫자 컬럼을 카페id로
+      // 오매핑하는 새 오탐을 막기 위함 — 헤더 확인 없이 "첫 컬럼이 숫자면 id"로만 판별하면 표마다 의미가
+      // 달라 위험).
+      let tableHasIdColumn = false;
       for (const line of text.split("\n")) {
+        const row = line.match(/^\s*\|(.+)\|\s*$/);
+        if (row) {
+          const firstCell = row[1].split("|")[0].trim();
+          if (/^-+$/.test(firstCell)) continue; // 헤더 구분행(|---|---|)은 상태 유지
+          if (/^id$/i.test(firstCell)) { tableHasIdColumn = true; continue; } // 표 헤더행 확인
+          if (tableHasIdColumn && /^\d+$/.test(firstCell)) ids.add(`id${firstCell}`);
+        } else {
+          tableHasIdColumn = false; // 표 블록 종료 — 다음 표를 위해 리셋
+        }
         if (!/^#{2,6}\s/.test(line)) continue; // ## 이상만 — 파일 H1 제목은 전 파일 공통 보일러플레이트라 제외
         const heading = line.replace(/^#{2,6}\s*/, "");
         (heading.match(/\bid\d+\b/gi) || []).forEach((t) => ids.add(t.toLowerCase()));
