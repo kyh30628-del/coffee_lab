@@ -61,6 +61,8 @@ export default function OwnerPage() {
   const [authReady, setAuthReady] = useState(false);
   const [pinInput, setPinInput] = useState("");
   const [pinErr, setPinErr] = useState("");
+  const [nlOptIn, setNlOptIn] = useState<boolean | null>(null); // 📰 주간 레터 수신 on/off(본인 설정)
+  const [nlSaving, setNlSaving] = useState(false);
   useLockBodyScroll(showShowcase && !!insight?.me?.id);
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -101,6 +103,17 @@ export default function OwnerPage() {
   };
   // PIN 모드: 본인 카페 자동 로드(검색 없이 바로 진입)
   useEffect(() => { if (locked) loadInsight(locked.name); }, [locked]); // eslint-disable-line react-hooks/exhaustive-deps
+  // 📰 로그인 시 현재 뉴스레터 수신 상태 로드
+  useEffect(() => {
+    if (!locked || !pin) { setNlOptIn(null); return; }
+    fetch("/api/owner-newsletter", { headers: hdr }).then((r) => r.json()).then((d) => { if (d.ok) setNlOptIn(!!d.optIn); }).catch(() => {});
+  }, [locked, pin]); // eslint-disable-line react-hooks/exhaustive-deps
+  const toggleNewsletter = async (next: boolean) => {
+    setNlSaving(true); const prev = nlOptIn; setNlOptIn(next); // 낙관적 반영
+    try { const r = await fetch("/api/owner-newsletter", { method: "POST", headers: { ...hdr, "Content-Type": "application/json" }, body: JSON.stringify({ optIn: next }) }); const d = await r.json(); if (!d.ok) setNlOptIn(prev); }
+    catch { setNlOptIn(prev); }
+    setNlSaving(false);
+  };
 
   if (!authReady) return <div className="min-h-screen bg-[#f4ece0] text-[#9c6b3f] flex items-center justify-center" style={{ fontFamily: "'Gowun Batang', serif" }}>확인 중…</div>;
   // 미인증 → 구독 PIN 로그인(관리자/등록은 홈에서)
@@ -198,9 +211,20 @@ export default function OwnerPage() {
               <div className="text-sm font-bold text-[#3f5a37] mb-1">📰 {locked ? "매주 트렌드 레터를 보내드려요" : "구독 사장님께 드리는 주간 레터"}</div>
               <p className="text-[12px] text-[#5a6f52] leading-relaxed">
                 {locked
-                  ? <>가입하신 이메일로 <b>매주 커피·디저트 트렌드와 사장님 액션 팁</b>을 담은 주간 레터가 자동으로 도착해요. 우리 동네·업계 흐름을 놓치지 않게요. 원치 않으시면 레터 맨 아래 수신거부로 언제든 끌 수 있어요.</>
+                  ? <>가입하신 이메일로 <b>매주 커피·디저트 트렌드와 사장님 액션 팁</b>을 담은 주간 레터를 보내드려요. 우리 동네·업계 흐름을 놓치지 않게요.</>
                   : <>구독하시면 가입하신 이메일로 <b>매주 커피·디저트 트렌드와 사장님 액션 팁</b>을 담은 주간 레터를 보내드려요. 우리 동네·업계 흐름을 놓치지 않게요.</>}
               </p>
+              {/* 📰 본인 수신 on/off 토글(로그인 사장님만) — 신청 때 껐어도 여기서 직접 켤 수 있어요 */}
+              {locked && nlOptIn !== null && (
+                <div className="mt-3 pt-3 border-t border-[#d6e3ca] flex items-center justify-between gap-3">
+                  <span className="text-[12px] font-bold text-[#3f5a37]">{nlOptIn ? "주간 레터 받는 중이에요 ✓" : "지금은 안 받고 있어요"}</span>
+                  <button onClick={() => toggleNewsletter(!nlOptIn)} disabled={nlSaving} aria-label="주간 레터 수신 토글"
+                    className="relative inline-flex items-center h-6 w-11 rounded-full transition-colors disabled:opacity-50 shrink-0"
+                    style={{ background: nlOptIn ? "#5f7355" : "#cabfa8" }}>
+                    <span className="inline-block h-5 w-5 rounded-full bg-white shadow transform transition-transform" style={{ transform: nlOptIn ? "translateX(22px)" : "translateX(2px)" }} />
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* 액션 플랜 — 가장 위에, 핵심 */}
