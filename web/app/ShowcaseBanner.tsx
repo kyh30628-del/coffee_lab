@@ -204,19 +204,14 @@ function StrengthIcon({ k, stroke = 1.6 }: { k: string; stroke?: number }) {
 
 export default function ShowcaseBanner({ style = 1, headline, tagline, points = [], photo, cta, height = "16rem" }: Props) {
   const cls = `sc${Math.min(Math.max(style, 1), 10)}`;
-  // 사진 없을 때: 강점 기반 프리미엄 벡터 히어로(선명·무한 해상도). 대표 강점 크게 + 보조 강점 은은하게.
-  const keys = (points.length ? points : [headline]).map(strengthKey);
-  const heroKey = keys[0] || "coffee";
-  const subKeys = Array.from(new Set(keys.slice(1))).filter((k) => k !== heroKey).slice(0, 2);
   return (
-    <div className={`scb ${cls}`} style={{ height }}>
+    // 사진 없을 때: 큰 중앙 강점 아이콘(커피잔 등) 제거 + 배너 높이 축소(2026-07-31 CEO 지시 — 의미 없이 상하 공간만 차지).
+    //   그라디언트+미세 그레인 텍스처 위에 문구·강점칩만 콤팩트하게.
+    <div className={`scb ${cls}`} style={{ height: photo ? height : "9rem" }}>
       {photo ? <img className="scimg" src={photo} alt="" /> : <div className="scbg" />}
       {!photo && (
         <div className="scHero" aria-hidden="true">
           <i className="scGrain" />
-          <span className="scHeroMain"><StrengthIcon k={heroKey} stroke={1.15} /></span>
-          {subKeys[0] && <span className="scHeroSub a"><StrengthIcon k={subKeys[0]} stroke={1.5} /></span>}
-          {subKeys[1] && <span className="scHeroSub b"><StrengthIcon k={subKeys[1]} stroke={1.5} /></span>}
         </div>
       )}
       {style === 2 && <div className="ov2" />}
