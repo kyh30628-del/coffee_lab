@@ -1301,7 +1301,10 @@ export function verifyReview(input: QualityInput): QualityResult {
   //   블로그 3건이 서로 다른 출처로 반복 확인. 제안1과 대칭 적용: 이름 4자 이하 또는 WEAK_IDENTITY_TOKEN급인데
   //   본문에만 등장하면 CAFE_CONTEXT 매칭을 최소 1개 요구(이름 3자 이하는 제안1과 동일하게 STRONG) —
   //   없으면 하드 탈락 대신 borderline(LLM 재판정)으로 격하해 표현 달라 안 걸린 진짜 카페 후기를 보호.
-  if (!nameInTitle && nameInBody && ((nameNoSpace.length >= 1 && nameNoSpace.length <= 4) || weakWhitelist)) {
+  // [룰갭 20260801-1200] 길이 문턱(4자)이 5자+ 일상 관용구성 상호(예: "화목한가정"=5자)를 미보호 —
+  //   id19491 실증(반려동물 분양·심리상담 후기가 관용구 "화목한 가정"으로 혼입, 카페 맥락 전무).
+  //   파일럿(decisions#567): 문턱을 4자→5자로 확장(가장 단순한 승인안). STRONG 요구 경계(3자 이하)는 그대로 유지.
+  if (!nameInTitle && nameInBody && ((nameNoSpace.length >= 1 && nameNoSpace.length <= 5) || weakWhitelist)) {
     const bodyCtxGate = nameNoSpace.length <= 3 ? CAFE_CONTEXT_STRONG : CAFE_CONTEXT;
     if (!bodyCtxGate.test(fullL)) {
       return { verdict: "rejected", score: 20, reasons: ["본문에만 짧은·흔한 카페명 등장하나 카페 맥락 전무(동음이의·타업종 혼입 의심) — LLM 재판정"], borderline: true, signals: sig };
