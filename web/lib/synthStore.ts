@@ -252,16 +252,16 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   const allEv = safeJson(allEvidence ?? evidenceReviews);
   // 현재 상태(파이프라인 단계·카테고리·이전 합성값) 먼저 — 카테고리 게이트 분기에 pst 필요.
   const cur = (await sql`SELECT pipeline_status, naver_category, synth_identity, synth_count, synth_updated, jsonb_array_length(COALESCE(synth_reviews,'[]'::jsonb)) prev_ev,
-    (COALESCE(raw_reviews::text,'') ~* '아메리카노|에스프레소|카푸치노|아인슈페너|콜드브루|플랫화이트|핸드드립|카페라|디카페인') AS raw_coffee
+    (COALESCE(raw_reviews::text,'') ~* '커피|디저트|음료|아메리카노|에스프레소|카푸치노|콜드브루|플랫화이트|핸드드립|카페라') AS raw_coffee
     FROM cafes WHERE id=${cafeId} LIMIT 1`)[0] as any;
   const pst: string | null = cur?.pipeline_status ?? null;
   const inPipeline = pst === "new" || pst === "pending" || pst === "rejected"; // 신규 카페(공개 전 게이트)
-  // ☕ 커피 플랫폼 일관성 게이트(CEO 2026-08-01): 먹거리 상호(빵·떡·꽈배기·주전부리·과자·부각… — 이름에 카페/커피 없음)인데
-  //   노출·원본 리뷰에 커피 메뉴(아메리카노·에스프레소·라떼·드립…) 신호가 전무하면 = 순수 먹거리점 → 영구 비공개(재합성해도 안 풂).
-  //   커피 파는 베이커리카페는 메뉴어가 잡혀 통과(오제거 방지). '카페/커피' 든 상호는 애초 대상 아님.
-  const isFoodOnlyName = /빵|베이커리|베이크|제과|제빵|블랑제|파티세리|파티스리|떡|설기|꽈배기|주전부리|부각|찐빵|한과|인삼빵|과자|명과/.test(name) && !/카페|커피/.test(name);
-  const coffeeMenuHit = ((allEvidence ?? evidenceReviews) as any[]).some((r) => /아메리카노|에스프레소|카푸치노|아인슈페너|콜드브루|카페라떼|카페라테|라떼|라테|플랫화이트|아포가토|카페모카|핸드드립|드립|디카페인|룽고|원두|카푸치/.test(String(r?.quote || ""))) || !!cur?.raw_coffee;
-  const foodNoCoffee = isFoodOnlyName && !coffeeMenuHit;
+  // ☕ 커피 플랫폼 일관성 게이트(CEO 2026-08-01, 08-01 완화): 순수 먹거리점(떡·과자·꽈배기·주전부리·부각·한과·명과 —
+  //   빵/베이커리/제과 등 제빵소류·카페/커피 상호는 제외=항상 유지)인데, 노출·원본 리뷰에 커피/디저트/카페 신호가
+  //   전무하면 → 영구 비공개(재합성해도 안 풂). 커피·디저트 언급만 있어도 살린다(오제거 방지, CEO 지시).
+  const isFoodOnlyName = /떡|설기|꽈배기|주전부리|부각|한과|과자|명과/.test(name) && !/빵|베이커리|베이크|제과|제빵|블랑제|파티세리|파티스리|브레드|스콘|케이크|카페|커피/.test(name);
+  const cafeSignalHit = ((allEvidence ?? evidenceReviews) as any[]).some((r) => /커피|디저트|카페|아메리카노|에스프레소|카푸치노|콜드브루|라떼|라테|플랫화이트|아포가토|카페모카|핸드드립|드립|원두|음료|케이크|베이글|스콘|브런치|빙수|마카롱|와플|크로플|푸딩|타르트/.test(String(r?.quote || ""))) || !!cur?.raw_coffee;
+  const foodNoCoffee = isFoodOnlyName && !cafeSignalHit;
 
   // 🔒 카테고리·비카페 게이트.
   //   신규(파이프라인) 카페: 카테고리 필수 — 카테고리 없이는 카페/비카페 구분 불가 → 공개 금지.
