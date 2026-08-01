@@ -14,8 +14,18 @@ export async function GET(req: NextRequest) {
     if (secret && req.headers.get("authorization") !== `Bearer ${secret}` && req.headers.get("x-admin-password") !== process.env.ADMIN_PASSWORD) {
       return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
     }
-    if (!process.env.ANTHROPIC_API_KEY) { await recordRun("cron-discover-categories", false, "ANTHROPIC_API_KEY 미설정 — 발굴 비활성").catch(() => {}); return NextResponse.json({ ok: false, error: "ANTHROPIC_API_KEY 미설정 — 발굴 비활성" }); }
     await ensureSchema();
+    // 🆓 LLM 비활성(콘솔키 없음/크레딧 소진/인증문제)은 '실패'가 아니라 '스킵'으로 기록 — 월1회·제안전용 비핵심 잡이
+    //   크레딧 소진(CEO 충전 사안)만으로 관제탑에 빨간 HIGH(크론 실패)를 계속 띄우던 false-red 제거.
+    //   판단: consoleKeyProbe 단일소스(console_key_state.signal). 진짜 코드오류는 아래 catch로 그대로 실패(빨강) 유지.
+    const noKey = !process.env.ANTHROPIC_API_KEY;
+    const st = noKey ? null : (await sql`SELECT signal FROM console_key_state WHERE id = 1`.catch(() => []))[0] as any;
+    const llmDown = noKey || (st && ["credit", "authkey", "nokey"].includes(st.signal));
+    if (llmDown) {
+      const why = noKey ? "ANTHROPIC_API_KEY 미설정" : `콘솔키 ${st.signal}`;
+      await recordRun("cron-discover-categories", true, `LLM 비활성(${why}) — 이번 회차 스킵(제안 전용·비핵심, 충전 시 재개)`, 0).catch(() => {});
+      return NextResponse.json({ ok: true, skipped: true, reason: why });
+    }
     await sql`CREATE TABLE IF NOT EXISTS category_candidates (id SERIAL PRIMARY KEY, found_at TIMESTAMPTZ DEFAULT now(), candidates JSONB, applied BOOLEAN DEFAULT false)`;
 
     // 여러 카페에서 인용문 샘플 수집(편향 줄이려 무작위 120곳 × 상위 4건)
