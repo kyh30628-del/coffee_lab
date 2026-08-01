@@ -180,3 +180,4 @@
 | 2026-07-29 11:37 | #546 | [개발] 협업 #266: 검증등급 카페 80곳 최신리뷰증거 18개월+ 노후(closure_misses=0 사 | ecdeb8be | - | app/api/cron-closure/route.ts: STALE_EVIDENCE_MONTHS(18) 보조지표 추가 — misses=0(네이버는 발견됨)이라도 검증등급 최신후기 1 |
 | 2026-08-01 04:41 | #565 | [룰갭] 프랜차이즈 필터 영문/로마자 브랜드 미등재 — 체인필터 우회 (rulegap-proposals-20 | 16ba1e4b | - | lib/discover.ts·lib/sangga.ts·app/api/cafe-discover/route.ts: FRANCHISE 배열에 영문/로마자 브랜드명(STARBUCKS/TW |
 | 2026-08-01 04:42 | #566 | [룰갭] "제목이 다른 업체를 가리킴" 방어 게이트가 카페/커피 키워드 전제 — 비카페 업종어(라이브카페·재 | 27ee5dec | - | lib/reviewQuality.ts: naver_category 기반 non-coffee 카페 업종어(라이브카페/재즈바/재즈클럽/라이브클럽/공연카페/북카페/와인바/펍카페) 세트  |
+| 2026-08-01 05:43 | #567 | [룰갭] 짧은/흔한 이름 카페맥락 게이트가 5자+ 관용구성 상호명은 미보호 — 무관 업종 글 혼입 (rule | 43e6404d | - | lib/reviewQuality.ts:1304 제안7 게이트 길이문턱 4자→5자 확장(파일럿 승인안). id19491 화목한가정 등 5자 관용구성 상호가 본문언급만으로 CAFE_C |
