@@ -178,3 +178,4 @@
 | 2026-07-29 11:35 | #543 | [룰갭 P67] 반려식물/수족관 소매업이 '카페 겸업' 자기서술로 검증노출 — 커피실질언급 0건(id3313 | b017fd3a | - | lib/reviewQuality.ts: NONCAFE_BIZ와 별개로 AQUASCAPE_PET_RETAIL(수초/어항/아쿠아스케이프/반려식물/다육 판매) 신설, CRAFT_WORK |
 | 2026-07-29 11:36 | #545 | [검색품질] 취향추천(char_scores) 오염 — 일반명사형 카페명("동네카페")이 무관 타업체 후기로  | e7289f72 | - | lib/reviewQuality.ts: GENERIC_WORD에 "동네" 추가(동네카페 등 상호 자체가 일반구문인 경우 coreEmpty 처리) + verifyReview core |
 | 2026-07-29 11:37 | #546 | [개발] 협업 #266: 검증등급 카페 80곳 최신리뷰증거 18개월+ 노후(closure_misses=0 사 | ecdeb8be | - | app/api/cron-closure/route.ts: STALE_EVIDENCE_MONTHS(18) 보조지표 추가 — misses=0(네이버는 발견됨)이라도 검증등급 최신후기 1 |
+| 2026-08-01 04:41 | #565 | [룰갭] 프랜차이즈 필터 영문/로마자 브랜드 미등재 — 체인필터 우회 (rulegap-proposals-20 | 16ba1e4b | - | lib/discover.ts·lib/sangga.ts·app/api/cafe-discover/route.ts: FRANCHISE 배열에 영문/로마자 브랜드명(STARBUCKS/TW |
