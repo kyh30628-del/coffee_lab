@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { ensureLearnedTable, loadLearnedTerms, getLearned, applyLearned, rollbackLearned } from "@/lib/learnedTerms";
 import { healCrossCafeLinkContamination } from "@/lib/synthStore";
+import { isFranchise } from "@/lib/discover";
 import { recordRun } from "@/lib/agentLog";
 
 export const runtime = "nodejs";
@@ -83,6 +84,11 @@ export async function GET(req: NextRequest) {
     const add = (m: Record<string, Set<number>>, t: string, id: number) => { (m[t] = m[t] || new Set()).add(id); };
     const learnedDist = getLearned("district");
     const pollutedCafes: { id: number; name: string; nc: number; cf: number }[] = []; // 노출리뷰가 비카페 업체어에 지배(이름충돌/오염)
+    // decisions#572 근본원인 개선: FRANCHISE 블록리스트(lib/discover.ts) 확장은 신규 발굴에만 걸리고,
+    //   이미 발행된 카페엔 소급 재검사가 없었다(decisions#570: 41곳 4일+ 노출). synthAndStore의 grandfather 경로는
+    //   진동방지 위해 프랜차이즈를 소프트룰로 취급해 기존 공개엔 적용 안 함(synthStore.ts storeResult 주석 참조) —
+    //   그 격차를 이 상시 스캔(2×/일)으로 메운다. isFranchise()가 정적 배열+학습된 브랜드 모두 커버.
+    const franchiseCaught: { id: number; name: string }[] = [];
     let scanned = 0;
 
     for (let lo = 0; lo <= 15000; lo += 1000) {
@@ -98,6 +104,7 @@ export async function GET(req: NextRequest) {
         const allTxt = revs.map((r: any) => (typeof r === "string" ? r : (r.quote || r.title || "")) || "").join(" ");
         const ncN = (allTxt.match(NONCAFE_ENTITY) || []).length, cfN = (allTxt.match(CAFE_TERM) || []).length;
         if (ncN >= 3 && ncN > cfN * 2 && !GOOD_NAME.test(c.name)) pollutedCafes.push({ id: c.id, name: c.name, nc: ncN, cf: cfN });
+        if (isFranchise(c.name)) franchiseCaught.push({ id: c.id, name: c.name });
         for (const r of revs) {
           const txt: string = (typeof r === "string" ? r : (r.quote || r.title || "")) || "";
           const dongHere = !!dong && (txt.includes(dong) || (dongCore.length >= 2 && txt.includes(dongCore)));
@@ -239,10 +246,52 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // ── 프랜차이즈 블록리스트 소급 스윕(decisions#572) ──────────────────
+    //   결정론 매칭이라 자동비공개는 안 함(오탐 리스크) — 승인대기 레일로만 상신.
+    //   이미 이 스윕이 만든 결정(대기중이든 CEO가 반려했든)에 포함된 id는 재상신하지 않음(무한 재플래그 방지).
+    const franchisePriorRows = franchiseCaught.length
+      ? ((await sql`SELECT action_params FROM decisions WHERE action_type='unpublish' AND action_params->>'ikey' LIKE 'franchise-retro%'`.catch(() => [])) as any[])
+      : [];
+    const franchisePriorCovered = new Set<number>();
+    for (const r of franchisePriorRows) for (const v of (r.action_params?.ids || [])) franchisePriorCovered.add(Number(v));
+    const franchiseFresh = franchiseCaught.filter((c) => !franchisePriorCovered.has(c.id));
+    const FRANCHISE_BULK_THRESHOLD = 20; // geo.box·grade.floor 대량변동 기준(20곳)과 동일 — no-mass-unpublish 차단기
+    if (franchiseFresh.length) {
+      pending.push({
+        kind: "franchise_retro",
+        term: franchiseFresh.length > FRANCHISE_BULK_THRESHOLD ? `대량 ${franchiseFresh.length}곳` : franchiseFresh.map((c) => c.name).slice(0, 8).join(", "),
+        cafes: franchiseFresh.length,
+        samples: franchiseFresh.slice(0, 8).map((c) => c.id),
+        reason: "블록리스트 등재 브랜드가 소급 미적용 상태로 계속 공개 — 검토 후 비공개(승인)",
+      });
+    }
+    if (!dry && franchiseFresh.length) {
+      if (franchiseFresh.length > FRANCHISE_BULK_THRESHOLD) {
+        // 대량(20곳+): 개별 L2 대신 인천사고 교훈(no-mass-unpublish)대로 단일 CEO 확인 결정으로 묶는다(decisions#570과 동일 형태).
+        const ids = franchiseFresh.map((c) => c.id);
+        await sql`INSERT INTO decisions (title,detail,team,severity,tier,action_type,action_params,recommendation)
+          VALUES (${`[룰갭] 프랜차이즈 블록리스트 소급 미적용 ${ids.length}곳(대량) — CEO 확인`.slice(0, 110)},
+                  ${`규칙갭 자가진단(decisions#572 소급스윕): 블록리스트 등재 브랜드명 매칭 ${ids.length}곳이 계속 공개 중. 샘플: ${franchiseFresh.slice(0, 6).map((c) => c.name).join(", ")}${ids.length > 6 ? " 외" : ""}. 대량이라 no-mass-unpublish 차단기로 개별 L2 대신 단일 CEO 결정으로 상신.`.slice(0, 200)},
+                  '품질본부', 'HIGH', 'L3', 'unpublish', ${JSON.stringify({ ids, ikey: `franchise-retro-bulk:${ids[0]}-${ids.length}` })}::jsonb,
+                  ${"블록리스트 등재 확인됨 — 대량(20곳+)이라 CEO 확인 후 비공개."})`.catch(() => {});
+      } else {
+        for (const c of franchiseFresh) {
+          const ik = `franchise-retro:${c.id}`;
+          const dup = (await sql`SELECT 1 FROM decisions WHERE action_params->>'ikey'=${ik} LIMIT 1`.catch(() => [])) as any[];
+          if (dup.length) continue;
+          await sql`INSERT INTO decisions (title,detail,team,severity,tier,action_type,action_params,recommendation)
+            VALUES (${`[룰갭] 프랜차이즈 블록리스트 소급 미적용 — ${c.name}`.slice(0, 110)},
+                    ${`규칙갭 자가진단(decisions#572 소급스윕): 블록리스트 등재 브랜드명이 카페#${c.id}(${c.name})에 매칭되나 계속 공개 중 — 등재 시점 이전 발행이라 소급 재검사 누락 추정.`.slice(0, 200)},
+                    '품질본부', 'HIGH', 'L2', 'unpublish', ${JSON.stringify({ ids: [c.id], ikey: ik })}::jsonb,
+                    ${"블록리스트 등재 확인됨 — 기조실장 전결로 다음 사이클 자동 비공개."})`.catch(() => {});
+        }
+      }
+    }
+
     // 기록(검증·롤백 기준 + 관제탑 노출용)
     if (!dry) await sql`INSERT INTO rulegap_runs (published_before, learned, pending) VALUES (${pubNow}, ${JSON.stringify(learned)}::jsonb, ${JSON.stringify(pending)}::jsonb)`;
 
-    if (!dry) await recordRun("cron-rulegap", true, `학습 ${learned.length} 승인대기 ${pending.length} 식당자동제외 ${autoExcluded} 롤백 ${rolledBack.length} 교차오염정리 ${crossContam.removed}건/${crossContam.groups}그룹`, learned.length);
+    if (!dry) await recordRun("cron-rulegap", true, `학습 ${learned.length} 승인대기 ${pending.length} 식당자동제외 ${autoExcluded} 롤백 ${rolledBack.length} 교차오염정리 ${crossContam.removed}건/${crossContam.groups}그룹 프랜차이즈소급 ${franchiseFresh.length}`, learned.length);
     return NextResponse.json({
       ok: true, dry, ranAt: new Date().toISOString(), scanned,
       rolledBack, autoExcluded, crossContam,
