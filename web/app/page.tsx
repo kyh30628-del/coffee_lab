@@ -5,6 +5,7 @@ import ShowcaseBanner, { SHOWCASE_CSS } from "./ShowcaseBanner";
 import OwnerSignupModal from "./OwnerSignupModal";
 import VisitorReviews from "./VisitorReviews";
 import KakaoShare from "./KakaoShare";
+import { trackShare } from "./trackShareClient";
 import MyCafeRegModal from "./MyCafeRegModal";
 import { buildAxisDist, cafeProfile, tasteVector, tasteSimilarity, GRADE_RANK, type AxisDist } from "@/lib/cafeProfile";
 import { useLockBodyScroll } from "@/lib/useLockBodyScroll";
@@ -1924,8 +1925,8 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
     const url = `${typeof window !== "undefined" ? window.location.origin : "https://dongnecoffeenote.com"}/c/${cafe.id}`;
     const title = `${cafe.name} (${cafe.area}) — 동네 커피 노트`;
     try {
-      if (typeof navigator !== "undefined" && (navigator as any).share) await (navigator as any).share({ title, text: title, url });
-      else { await navigator.clipboard.writeText(url); setShared(true); setTimeout(() => setShared(false), 1800); }
+      if (typeof navigator !== "undefined" && (navigator as any).share) { await (navigator as any).share({ title, text: title, url }); trackShare({ channel: "web", source: "카페상세", cafeId: cafe.id }); }
+      else { await navigator.clipboard.writeText(url); trackShare({ channel: "clipboard", source: "카페상세", cafeId: cafe.id }); setShared(true); setTimeout(() => setShared(false), 1800); }
     } catch { /* 사용자 취소 */ }
   };
   return (

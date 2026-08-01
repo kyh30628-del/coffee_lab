@@ -70,6 +70,7 @@ export default function Curated({ area, tasteKey, heading, intro, cafes, regions
             description="영수증 리뷰·광고 빼고 진짜 후기로 검증한 우리 동네 카페"
             imageUrl={`${canonical}/opengraph-image`}
             link={canonical}
+            source="동네목록"
             label="🟡 카카오톡으로 공유"
             className="block w-full text-center mt-2 bg-[#FEE500] text-[#3c1e1e] rounded-xl py-2.5 font-bold"
           />

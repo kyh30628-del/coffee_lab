@@ -129,6 +129,7 @@ export default async function CollectionPage({ params }: { params: Promise<{ slu
               description={`광고·협찬·타지점 후기 빼고 진짜 방문 후기로 검증한 ${label} 카페`}
               imageUrl={`${canon}/opengraph-image`}
               link={canon}
+              source="컬렉션"
             />
           </div>
         </div>

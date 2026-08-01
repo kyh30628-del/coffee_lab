@@ -11,6 +11,9 @@ async function ensure() {
   await sql`CREATE INDEX IF NOT EXISTS idx_share_events_ts ON share_events (ts)`;
   // source: 공유가 일어난 화면 구분(카페상세/MYPIN) — 전환 분석용(#363).
   await sql`ALTER TABLE share_events ADD COLUMN IF NOT EXISTS source TEXT`.catch(() => {});
+  // kakao_failed/note: 카톡 공유 실작동 검증 — 카톡 버튼인데 폴백되면 true+원인 기록(폴백을 진짜 카톡과 구분).
+  await sql`ALTER TABLE share_events ADD COLUMN IF NOT EXISTS kakao_failed BOOLEAN`.catch(() => {});
+  await sql`ALTER TABLE share_events ADD COLUMN IF NOT EXISTS note TEXT`.catch(() => {});
   ensured = true;
 }
 
@@ -22,10 +25,14 @@ export async function POST(req: NextRequest) {
     const path = String(b.path ?? "").slice(0, 200);
     const channel = String(b.channel ?? "").slice(0, 20);
     const source = String(b.source ?? "").slice(0, 30) || null;
+    // cafeId: 명시값 우선(홈 슬라이드 패널은 pathname이 "/"라 파싱 불가) → 없으면 path에서 /c/ID 파싱.
+    const explicit = Number(b.cafeId);
     const m = path.match(/\/c\/(\d+)/);
-    const cafeId = m ? Number(m[1]) : null;
+    const cafeId = Number.isFinite(explicit) && explicit > 0 ? explicit : (m ? Number(m[1]) : null);
+    const kakaoFailed = b.kakaoFailed === true ? true : null;
+    const note = b.note ? String(b.note).slice(0, 120) : null;
     if (!anonId && !path) return NextResponse.json({ ok: false }, { status: 400 });
-    await sql`INSERT INTO share_events (anon_id, path, cafe_id, channel, source) VALUES (${anonId}, ${path}, ${cafeId}, ${channel}, ${source})`;
+    await sql`INSERT INTO share_events (anon_id, path, cafe_id, channel, source, kakao_failed, note) VALUES (${anonId}, ${path}, ${cafeId}, ${channel}, ${source}, ${kakaoFailed}, ${note})`;
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ ok: false }, { status: 500 });
