@@ -251,9 +251,17 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS borderline_count INT`.catch(() => {});
   const allEv = safeJson(allEvidence ?? evidenceReviews);
   // 현재 상태(파이프라인 단계·카테고리·이전 합성값) 먼저 — 카테고리 게이트 분기에 pst 필요.
-  const cur = (await sql`SELECT pipeline_status, naver_category, synth_identity, synth_count, synth_updated, jsonb_array_length(COALESCE(synth_reviews,'[]'::jsonb)) prev_ev FROM cafes WHERE id=${cafeId} LIMIT 1`)[0] as any;
+  const cur = (await sql`SELECT pipeline_status, naver_category, synth_identity, synth_count, synth_updated, jsonb_array_length(COALESCE(synth_reviews,'[]'::jsonb)) prev_ev,
+    (COALESCE(raw_reviews::text,'') ~* '아메리카노|에스프레소|카푸치노|아인슈페너|콜드브루|플랫화이트|핸드드립|카페라|디카페인') AS raw_coffee
+    FROM cafes WHERE id=${cafeId} LIMIT 1`)[0] as any;
   const pst: string | null = cur?.pipeline_status ?? null;
   const inPipeline = pst === "new" || pst === "pending" || pst === "rejected"; // 신규 카페(공개 전 게이트)
+  // ☕ 커피 플랫폼 일관성 게이트(CEO 2026-08-01): 먹거리 상호(빵·떡·꽈배기·주전부리·과자·부각… — 이름에 카페/커피 없음)인데
+  //   노출·원본 리뷰에 커피 메뉴(아메리카노·에스프레소·라떼·드립…) 신호가 전무하면 = 순수 먹거리점 → 영구 비공개(재합성해도 안 풂).
+  //   커피 파는 베이커리카페는 메뉴어가 잡혀 통과(오제거 방지). '카페/커피' 든 상호는 애초 대상 아님.
+  const isFoodOnlyName = /빵|베이커리|베이크|제과|제빵|블랑제|파티세리|파티스리|떡|설기|꽈배기|주전부리|부각|찐빵|한과|인삼빵|과자|명과/.test(name) && !/카페|커피/.test(name);
+  const coffeeMenuHit = ((allEvidence ?? evidenceReviews) as any[]).some((r) => /아메리카노|에스프레소|카푸치노|아인슈페너|콜드브루|카페라떼|카페라테|라떼|라테|플랫화이트|아포가토|카페모카|핸드드립|드립|디카페인|룽고|원두|카푸치/.test(String(r?.quote || ""))) || !!cur?.raw_coffee;
+  const foodNoCoffee = isFoodOnlyName && !coffeeMenuHit;
 
   // 🔒 카테고리·비카페 게이트.
   //   신규(파이프라인) 카페: 카테고리 필수 — 카테고리 없이는 카페/비카페 구분 불가 → 공개 금지.
@@ -283,7 +291,7 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   // 🔁 재합성 결과가 이전과 사실상 동일하면 synth_updated 유지 → 그라운딩 무효화·재검 순환 방지.
   const unchanged = !!(cur?.synth_updated && cur.synth_identity === synth.identity && Number(cur.synth_count) === collected && Number(cur.prev_ev) === (evidenceReviews as any[]).length);
   const synthTs = unchanged ? cur.synth_updated : new Date();
-  const excluded = pst === "excluded" || isSnackStall(name) || isStructuralPhantom(name) || isUnmannedCafe(name); // 콘셉트/업종/오염 '영구 제외'(비카페·식당·이름충돌·노점간식·유령상호·무인카페) — 어떤 자동복원도 안 풂. 사람만 해제.
+  const excluded = pst === "excluded" || isSnackStall(name) || isStructuralPhantom(name) || isUnmannedCafe(name) || foodNoCoffee; // 콘셉트/업종/오염 '영구 제외'(비카페·식당·이름충돌·노점간식·유령상호·무인카페·먹거리無커피) — 어떤 자동복원도 안 풂. 사람만 해제.
   const held = pst === "held"; // 그라운딩 '근거0건' 확정 보류 — 재합성해도 비공개 고정
   const stuckNoise = pst === "noise" || noisy; // 노이즈(이름 오염) 한번 걸리면 영구 탈락
   // 승인된 unpublish 결정 재발 가드: pipeline_status가 'excluded'가 아니어도(드리프트) 결정 이력이 최종 근거 — 명시적 restore 결정 전엔 재공개 안 함.
