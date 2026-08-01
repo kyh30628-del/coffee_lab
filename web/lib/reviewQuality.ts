@@ -640,6 +640,18 @@ export function quoteMatchConfidence(name: string, quote: string, areaTerms: str
 // 초약체 유일토큰 — 사전은 lib/criteriaLists.ts("identity.weak_token")가 단일출처(무배포 편집). 폴백=현재값.
 //   .has() 소비처(아래 여러 곳)가 그대로 쓰도록 getListSetSync를 위임하는 얇은 래퍼로 노출.
 const WEAK_IDENTITY_TOKEN = { has: (t: string) => getListSetSync("identity.weak_token").has(t) };
+// 룰갭 20260801-1704(decisions#569): 영문/로마자 카페명(예: "Everything on a waffle")이 실존 외부
+//   고유명사(도서명·해외지명)와 우연일치하면 그 고유명사를 다루는 무관 콘텐츠(완독기·여행기)가 이름일치만으로
+//   verified/reference까지 채택됐다(id10271·15308 실측). 아래 길이 문턱 게이트(제안1 985행·제안7 1307행)는
+//   한글 상호 길이 기준이라 "Everythingonawaffle"처럼 긴 영문구는 통과 못 시켰다 — 이름의 글자 구성이 라틴
+//   알파벳 위주면 길이와 무관하게 CAFE_CONTEXT 매칭을 요구하도록 확장. 카페/커피/라떼 등 CAFE_CONTEXT가
+//   관대해 실제 영문상호 카페 후기는 대부분 통과하고 무관 콘텐츠만 걸릴 것으로 예상.
+function isLatinHeavyName(nameNoSpace: string): boolean {
+  const letters = nameNoSpace.match(/[A-Za-z가-힣]/g);
+  if (!letters || letters.length < 4) return false;
+  const latin = letters.filter((c) => /[A-Za-z]/.test(c)).length;
+  return latin / letters.length >= 0.6;
+}
 const OFFTOPIC_SPAM = /(코인\s*해외선물|해외\s*선물\s*(거래|시세|투자|매매)|선물\s*거래소|암호화폐|가상화폐|비트코인|비트겟|바이낸스|재테크\s*(추천|비법|정보|수익)|주식\s*(리딩|종목추천|투자문의|급등주)|대출\s*(상담|한도|이자|갈아타기|추천)|아파트\s*분양|오피스텔\s*분양|분양가|모델하우스|청약\s*(가점|통장|경쟁률)|재개발\s*(구역|조합|호재)|재건축\s*(조합|아파트|호재)|입주\s*예정|주상복합\s*분양|최고\s*\d+\s*층|\d+\s*개동|전원주택\s*(급매|매매|분양|답사)|급매물|철근콘크리트\s*주택|주택\s*답사기|토지\s*(매매|급매|투자))/;
 
 // 🏭 [룰갭 P61] naver_category 비F&B 조합신호(coordination#249, decisions#507) — naver_category가 카페/디저트/
@@ -982,7 +994,8 @@ export function verifyReview(input: QualityInput): QualityResult {
   //   또는 WEAK_IDENTITY_TOKEN급(초약체 유일토큰)부터만 게이트 — 이름 3자 이하는 더 엄격한 STRONG 요구.
   //   하드 탈락 대신 borderline(LLM 재판정)으로 격하 — 표현이 달라 걸리지 않은 진짜 카페 후기를 보호.
   const nameNoSpace = nameN.replace(/\s/g, "");
-  if (inTitleFull && ((nameNoSpace.length >= 1 && nameNoSpace.length <= 4) || weakWhitelist)) {
+  const nameLatinHeavy = isLatinHeavyName(nameNoSpace); // #569: 영문/로마자 상호 — 길이 문턱 대신 라틴 비중으로 게이트
+  if (inTitleFull && ((nameNoSpace.length >= 1 && nameNoSpace.length <= 4) || weakWhitelist || nameLatinHeavy)) {
     const ctxGate = nameNoSpace.length <= 3 ? CAFE_CONTEXT_STRONG : CAFE_CONTEXT;
     if (!ctxGate.test(fullL)) {
       return { verdict: "rejected", score: 20, reasons: ["제목=카페명 일치하나 카페 맥락 전무(흔한 이름·타업종 혼입 의심) — LLM 재판정"], borderline: true, signals: sig };
@@ -1304,7 +1317,7 @@ export function verifyReview(input: QualityInput): QualityResult {
   // [룰갭 20260801-1200] 길이 문턱(4자)이 5자+ 일상 관용구성 상호(예: "화목한가정"=5자)를 미보호 —
   //   id19491 실증(반려동물 분양·심리상담 후기가 관용구 "화목한 가정"으로 혼입, 카페 맥락 전무).
   //   파일럿(decisions#567): 문턱을 4자→5자로 확장(가장 단순한 승인안). STRONG 요구 경계(3자 이하)는 그대로 유지.
-  if (!nameInTitle && nameInBody && ((nameNoSpace.length >= 1 && nameNoSpace.length <= 5) || weakWhitelist)) {
+  if (!nameInTitle && nameInBody && ((nameNoSpace.length >= 1 && nameNoSpace.length <= 5) || weakWhitelist || nameLatinHeavy)) {
     const bodyCtxGate = nameNoSpace.length <= 3 ? CAFE_CONTEXT_STRONG : CAFE_CONTEXT;
     if (!bodyCtxGate.test(fullL)) {
       return { verdict: "rejected", score: 20, reasons: ["본문에만 짧은·흔한 카페명 등장하나 카페 맥락 전무(동음이의·타업종 혼입 의심) — LLM 재판정"], borderline: true, signals: sig };
