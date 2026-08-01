@@ -21,7 +21,10 @@ const FRANCHISE = ["스타벅스", "투썸", "이디야", "메가커피", "메�
   "팔공티", "오가다", "고디바", "김보람초콜릿",
   // 누락 보강분(저가·디저트·베이커리 다지점 체인 — 스페셜티 로스터리는 유지)
   "텐퍼센트커피", "봉명동내커피", "읍천리382", "브런치빈", "나인블럭", "카페인중독", "카페봄봄", "커피인류", "포트캔커피", "프랭크커핀바", "하이테이블", "카페동네",
-  "파리크라상", "롤링핀", "안스베이커리", "핫브레드", "좋은아침페스츄리", "노티드", "온더브레드", "홍종흔베이커리", "주재근베이커리", "삼송빵집", "화이트리에", "백금당", "명장시대"];
+  "파리크라상", "롤링핀", "안스베이커리", "핫브레드", "좋은아침페스츄리", "노티드", "온더브레드", "홍종흔베이커리", "주재근베이커리", "삼송빵집", "화이트리에", "백금당", "명장시대",
+  // 영문/로마자 표기(네이버가 영문 상호로 등재하는 지점 우회 방지 — decisions#565)
+  "STARBUCKS", "TWOSOME", "EDIYA", "MEGACOFFEE", "MEGAMGC", "PAIKSCOFFEE", "PAIKDABANG", "COMPOSECOFFEE", "VANNAPRESSO", "COFFEEBEAN", "HOLLYS", "ANGELINUS", "PASCUCCI", "TOMNTOMS", "PAULBASSETT", "DROPTOP", "YOGERPRESSO", "THEVENTI", "MAMMOTHCOFFEE", "GONGCHA", "SMOOTHIEKING", "CAFEBENE", "CAFFEBENE", "MANLAB", "TOPRESSO", "SELECTO", "DALKOMMCOFFEE", "COFFEESMITH", "JUICY",
+  "DUNKIN", "PARISBAGUETTE", "TOUSLESJOURS", "BASKINROBBINS", "KRISPYKREME", "SULBING", "NATUUR", "COFFEEBAY", "COLDSTONE", "HAAGENDAZS", "GODIVA"];
 // 이름에 들어있으면(지점이어도) 비카페인 '음식·소매' 키워드
 // 비카페 상호 토큰(부분일치) — 사전은 lib/criteriaLists.ts("discover.non_cafe")가 단일출처(무배포 편집). 폴백=현재값.
 const nonCafeList = () => getListSync("discover.non_cafe");
@@ -189,7 +192,7 @@ export function parseDong(jibun: string): string | null {
   const m = jibun.match(/(?:구|시|군)\s+([가-힣]+[0-9]?(?:동|읍|면|가))(?![가-힣])/);
   return m ? m[1] : null;
 }
-export const isFranchise = (name: string) => { const n = name.replace(/\s/g, ""); return FRANCHISE.some((f) => n.includes(f)) || [...getLearned("franchise")].some((f) => n.includes(f)); };
+export const isFranchise = (name: string) => { const n = name.replace(/\s/g, "").toUpperCase(); return FRANCHISE.some((f) => n.includes(f.toUpperCase())) || [...getLearned("franchise")].some((f) => n.includes(f)); };
 
 // 🚫 이름 자체가 '일반 음식·메뉴어'인 카페 → 이름으로 식별 불가(그 음식 리뷰가 전부 매칭돼 coherence=1.0 오인).
 //   예: '베이글'·'아메리카노'·'빵' 카페는 빵·음료 리뷰를 긁어옴 → 공개 금지. (정확히 그 단어 하나일 때만)

@@ -8,8 +8,10 @@ export const hasSanggaKey = () => !!KEY;
 // storeListInDong: 시군구코드(signguCd)로 그 구의 상가 조회
 const ENDPOINT = "https://apis.data.go.kr/B553077/api/open/sdsc2/storeListInDong";
 
-const FRANCHISE = ["스타벅스", "투썸", "이디야", "메가커피", "메가엠지씨", "빽다방", "컴포즈", "커피빈", "할리스", "엔제리너스", "파스쿠찌", "탐앤탐스", "폴바셋", "드롭탑", "요거프레소", "더벤티", "매머드", "공차", "스무디킹", "투썸플레이스", "카페베네", "만랩", "토프레소", "셀렉토", "더리터", "달콤커피", "커피스미스", "주커피", "백억커피", "쥬씨", "더치앤빈"];
-const isFranchise = (n: string) => { const x = (n || "").replace(/\s/g, ""); return FRANCHISE.some((f) => x.includes(f)); };
+const FRANCHISE = ["스타벅스", "투썸", "이디야", "메가커피", "메가엠지씨", "빽다방", "컴포즈", "커피빈", "할리스", "엔제리너스", "파스쿠찌", "탐앤탐스", "폴바셋", "드롭탑", "요거프레소", "더벤티", "매머드", "공차", "스무디킹", "투썸플레이스", "카페베네", "만랩", "토프레소", "셀렉토", "더리터", "달콤커피", "커피스미스", "주커피", "백억커피", "쥬씨", "더치앤빈",
+  // 영문/로마자 표기(네이버가 영문 상호로 등재하는 지점 우회 방지 — decisions#565)
+  "STARBUCKS", "TWOSOME", "EDIYA", "MEGACOFFEE", "MEGAMGC", "PAIKSCOFFEE", "PAIKDABANG", "COMPOSECOFFEE", "COFFEEBEAN", "HOLLYS", "ANGELINUS", "PASCUCCI", "TOMNTOMS", "PAULBASSETT", "DROPTOP", "YOGERPRESSO", "THEVENTI", "MAMMOTHCOFFEE", "GONGCHA", "SMOOTHIEKING", "CAFEBENE", "CAFFEBENE", "MANLAB", "TOPRESSO", "SELECTO", "DALKOMMCOFFEE", "COFFEESMITH", "JUICY"];
+const isFranchise = (n: string) => { const x = (n || "").replace(/\s/g, "").toUpperCase(); return FRANCHISE.some((f) => x.includes(f.toUpperCase())); };
 // 카페 업종: 소분류명이 커피/카페/다방 (코드 필터가 빗나가도 안전망)
 const isCafe = (indsSclsNm: string, indsMclsNm: string) => /커피|카페|다방/.test(indsSclsNm || "") || /비알콜/.test(indsMclsNm || "");
 
