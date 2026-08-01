@@ -34,7 +34,17 @@ function shareRun(a: string, b: string): boolean {
 // 인용문에 이 상호를 언급하면 '자기 후기'로 보는 마커.
 export function selfMarkers(cleanName: string): string[] {
   const x = (cleanName || "").replace(/[\s·・.]/g, "").toLowerCase();
-  return x ? [x + "카페", "카페" + x, x + "커피", "커피" + x, x] : [];
+  const m = x ? [x + "카페", "카페" + x, x + "커피", "커피" + x, x] : [];
+  // 🛡️ 브랜드 토큰(지점명 앞 상호) — '로제누아르 일산 마두점'→'로제누아르', '어노인트 교동도점'→'어노인트'.
+  //   지점명 붙은 상호는 인용문에 짧은 브랜드로만 나오므로, 전체명 마커론 자기후기를 못 알아봐 교차오염 오탐이 났다.
+  //   자기후기 보호를 넓히는 '보수적' 추가(=제거를 줄일 뿐 늘리지 않음) — 한글 3자+ 변별 토큰만.
+  const first = (cleanName || "").trim().split(/\s+/)[0]?.replace(/[·・.]/g, "").toLowerCase();
+  if (first && first !== x && (first.match(/[가-힣]/g) || []).length >= 3 && !m.includes(first)) m.push(first);
+  // 🛡️ 업종어 뗀 코어 — '앤아더커피'→'앤아더', '스윗포터리카페'→'스윗포터리'. 띄어쓰기 없는 '브랜드+업종어'
+  //   상호는 리뷰가 짧은 브랜드로만 불러 위 마커론 자기후기를 못 알아봤다(오탐). 보수적 추가(제거만 줄임).
+  const core = cafeCore(cleanName);
+  if (core && core !== x && (core.match(/[가-힣]/g) || []).length >= 2 && !m.includes(core)) m.push(core);
+  return m;
 }
 
 export type CompetitorIndex = Map<string, number[]>; // 코어/브랜드루트 → 카페id[]

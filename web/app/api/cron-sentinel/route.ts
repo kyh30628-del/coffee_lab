@@ -590,8 +590,8 @@ async function scanCompetitorQuotePollution(): Promise<{ count: number; samples:
   const t0 = Date.now(); let lo = 0; let truncated = false; const flagged: CompFlag[] = [];
   for (let guard = 0; guard < 80; guard++) {
     if (Date.now() - t0 > 60000) { truncated = true; break; }
-    const rows = (await sql`SELECT id, name, area, synth_reviews FROM cafes
-      WHERE published AND synth_reviews IS NOT NULL AND jsonb_array_length(synth_reviews) >= 3 AND id > ${lo}
+    const rows = (await sql`SELECT id, name, area, COALESCE(synth_reviews_all, synth_reviews) AS synth_reviews FROM cafes
+      WHERE published AND synth_reviews_all IS NOT NULL AND jsonb_array_length(synth_reviews_all) >= 3 AND id > ${lo}
       ORDER BY id LIMIT 600`) as any[];
     if (!rows.length) break; lo = rows[rows.length - 1].id;
     for (const c of rows) {
@@ -622,19 +622,21 @@ async function healCompetitorQuotePollution(flagged: CompFlag[], deadline: numbe
   for (const f of flagged) {
     if (Date.now() > deadline) break;
     try {
-      const c = (await sql`SELECT name, synth_reviews FROM cafes WHERE id=${f.id}`)[0] as any;
+      // 🩹 표시되는 배열(synth_reviews_all)까지 정리 — 과거엔 synth_reviews만 고쳐 정작 상세페이지가 쓰는
+      //   synth_reviews_all은 오염이 남던 버그(2026-08-01 발견). 둘 다 같은 기준으로 정리.
+      const c = (await sql`SELECT name, synth_reviews, synth_reviews_all FROM cafes WHERE id=${f.id}`)[0] as any;
       if (!c) continue;
       const cn = cleanCafeName(c.name); const sc = cafeCore(cn); const mk = selfMarkers(cn);
+      const foreign = (r: any) => { const q = (r.quote || "") as string; const qn = q.replace(/\s/g, "").toLowerCase(); if (mk.some((x: string) => qn.includes(x))) return false; return !!competitorInText(q, sc, f.id, idx); };
       const qs = (c.synth_reviews || []) as any[];
-      const keep = qs.filter((r: any) => {
-        const q = (r.quote || "") as string; const qn = q.replace(/\s/g, "").toLowerCase();
-        if (mk.some((x: string) => qn.includes(x))) return true;
-        return !competitorInText(q, sc, f.id, idx);
-      });
-      if (keep.length === qs.length) continue;
-      await sql`UPDATE cafes SET synth_reviews=${JSON.stringify(keep)}::jsonb, updated_at=now() WHERE id=${f.id}`;
+      const qa = (c.synth_reviews_all || []) as any[];
+      const keep = qs.filter((r: any) => !foreign(r));
+      const keepAll = qa.filter((r: any) => !foreign(r));
+      if (keep.length === qs.length && keepAll.length === qa.length) continue;
+      await sql`UPDATE cafes SET synth_reviews=${JSON.stringify(keep)}::jsonb, synth_reviews_all=${JSON.stringify(keepAll)}::jsonb, updated_at=now() WHERE id=${f.id}`;
       await invalidateCafeCaches([f.id]).catch(() => {});
-      fixed++; dropped += qs.length - keep.length; if (names.length < 8) names.push(`${cn}(-${qs.length - keep.length})`);
+      const rm = (qs.length - keep.length) + (qa.length - keepAll.length);
+      fixed++; dropped += rm; if (names.length < 8) names.push(`${cn}(-${qa.length - keepAll.length})`);
     } catch { /* 개별 실패는 다음 런이 이어서 */ }
   }
   if (fixed > 0) await sql`DELETE FROM search_cache`.catch(() => {});
