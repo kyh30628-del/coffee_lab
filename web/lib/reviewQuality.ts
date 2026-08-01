@@ -669,6 +669,27 @@ export function isNonCafeFnbCategory(naverCategory?: string): boolean {
   if (CAFE_SUBCATEGORY.test(c)) return false; // 카페 하위 키워드 있으면 정상 카페(겸업 포함)
   return NONCAFE_FNB_CATEGORY.test(c);
 }
+// 🎷 [룰갭 제안2, decisions#566] naver_category가 카페/디저트 F&B이지만 카페·커피 대신 업종어(라이브카페·
+//   재즈바·와인바·북카페·펍카페 등)를 쓰는 카페 — titleHasCafeWord(카페/커피 어휘 존재 전제)가 무력화돼
+//   "제목이 다른 카페를 가리킴" 방어 게이트(아래 verifyReview)가 발동하지 않는다(id18647 재즈클럽 야누스
+//   실증 — 6건 중 2건이 실질 딴 업체 '재즈클럽 디바야누스'·'재즈바 버텀라인' 리뷰인데도 이름 부분중첩만으로 채택).
+//   전역 CAFE_WORDS 확장은 무관 콘텐츠 과다포함 위험이 있어, 그 카페 자신의 naver_category가 해당
+//   업종에 속할 때만 그 업종어를 titleHasCafeWord/bodyHasCafeWord 판정에 포함한다(naver_category 기반 스코프).
+const NON_COFFEE_CAFE_CATEGORY_WORDS: Array<{ category: RegExp; words: string[] }> = [
+  { category: /라이브카페|라이브클럽/, words: ["라이브카페", "재즈바", "재즈클럽", "라이브클럽", "공연카페"] },
+  { category: /북카페/, words: ["북카페"] },
+  { category: /와인바/, words: ["와인바"] },
+  { category: /펍카페/, words: ["펍카페"] },
+];
+export function nonCoffeeCafeCategoryWords(naverCategory?: string): string[] {
+  const c = (naverCategory || "").trim();
+  if (!c) return [];
+  const out: string[] = [];
+  for (const { category, words } of NON_COFFEE_CAFE_CATEGORY_WORDS) {
+    if (category.test(c)) out.push(...words);
+  }
+  return out;
+}
 // 노출 리뷰에서 '진짜 커피 실질언급'만 — "카페"·"디저트"·"브런치" 등은 상호명 리터럴(예: '카페나하본점')이나
 //   식당의 부수 메뉴로도 흔해 오탐하므로 제외. isNonCafeFnbCategory와 짝으로만 쓴다(일반 판정엔 과도하게 좁음).
 export const COFFEE_SUBSTANCE = /커피|라떼|아메리카노|에스프레소|드립|원두|로스팅|콜드브루|카푸치노|마키아토|핸드드립/;
@@ -770,8 +791,9 @@ export function verifyReview(input: QualityInput): QualityResult {
   const substance = SUBSTANCE_CUES.filter((k) => fullL.includes(k.toLowerCase())).length;
   // [#4] 흔한 단어 이름 오매칭 방지: 전체 이름 일치는 강함. 토큰만 일치면
   //     '카페 맥락(카페·커피·로스터리…)'이나 지역이 함께 있어야 주제로 인정.
-  const titleHasCafeWord = CAFE_WORDS.some((w) => title.includes(w));
-  const bodyHasCafeWord = CAFE_WORDS.some((w) => body.includes(w));
+  const nonCoffeeCafeWords = nonCoffeeCafeCategoryWords(input.naverCategory);
+  const titleHasCafeWord = CAFE_WORDS.some((w) => title.includes(w)) || nonCoffeeCafeWords.some((w) => title.includes(w));
+  const bodyHasCafeWord = CAFE_WORDS.some((w) => body.includes(w)) || nonCoffeeCafeWords.some((w) => body.includes(w));
   // #153: 초약체 유일토큰(공간·인테리어·2005…)은 지역어 동반 없으면 전국 오매칭이라 귀속 불인정
   // 🏢 제안3(건물단위 앵커 필수화): 남은 토큰이 전부 다중테넌트 기관/건물명(VENUE_WORDS·대학 축약명 등)이면
   //   그 건물엔 무관한 여러 시설(주차·행정·동아리…)이 함께 있으므로, 지역일치만으로는 부족 — 진짜 카페 맥락
