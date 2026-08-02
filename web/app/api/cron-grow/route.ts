@@ -102,10 +102,16 @@ export async function GET(req: NextRequest) {
     // ② 합성/재판정 — 미합성(신규) 우선, 그다음 가장 오래된 순으로 순회.
     //    각 카페가 synthAndStore(규칙+LLM 맥락 재판정)를 거쳐 정확도가 지속적으로 올라간다.
     //    Gemini 쿼터 소진 시 LLM은 자동 폴백(규칙 결과 유지) → 한도 회복되면 다음 회차부터 재판정.
+    // 🐛 재발방지(coord#276): 이 루프에 시간 예산이 없어 mining(최대 t0+270s)이 늘어지면 5곳 합성이
+    //    maxDuration(300s)을 넘겨 플랫폼에 강제종료됐다 — recordRun(하트비트)이 함수 맨 끝에만 있어서
+    //    같이 증발, agent_runs만 끊기고 discovery_state(위 ①, 225s 예산 내)는 계속 갱신되는 오탐성 정지처럼
+    //    보였다(하트비트-실작업 괴리). SYNTH_DEADLINE으로 항상 recordRun까지 도달하도록 보장.
+    const SYNTH_DEADLINE = t0 + 285_000;
     const targets = (await sql`SELECT id, name, area FROM cafes ORDER BY synth_updated ASC NULLS FIRST LIMIT 5`) as unknown as { id: number; name: string; area: string }[];
     const synth = [];
     let rescued = 0;
     for (const cafe of targets) {
+      if (Date.now() > SYNTH_DEADLINE) break;
       try { const r: any = await synthAndStore(cafe); synth.push(r); rescued += r.rescued ?? 0; }
       catch (e) { synth.push({ id: cafe.id, name: cafe.name, ok: false, reason: String(e).slice(0, 80) }); }
       await new Promise((r) => setTimeout(r, 300));
