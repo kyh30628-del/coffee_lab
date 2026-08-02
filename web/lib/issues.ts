@@ -51,8 +51,10 @@ export async function autoCorrect(): Promise<{ resolved: number; escalated: numb
       // ⚠️ 2026-07-29: 예전엔 UPDATE를 .catch(()=>{})로 삼키고 성공여부와 무관하게 결재를 done으로 닫아,
       //   DB오류로 비공개가 실패해도 "집행됨"으로 위장되고 재시도도 없었다(오염카페 공개 잔존·안전조치 무력화 은폐).
       //   이제 집행 실패 시 결재를 approved로 유지(다음 사이클 재시도)하고 done 마킹을 건너뛴다.
-      let ok = true;
-      if (ids.length) {
+      // ⚠️ 2026-08-02(레드팀 #586): ids가 빈 배열(action_params 누락)이면 UPDATE 블록이 통째로 스킵되는데
+      //   ok가 기본 true라 무실행을 성공으로 오표시하고 done 마킹됐다(#550·#559 재합성 미집행 은폐). ids 없으면 실패로 잡는다.
+      let ok = ids.length > 0;
+      if (ok) {
         try {
           if (d.action_type === "unpublish") {
             await sql`UPDATE cafes SET published=false, pipeline_status='excluded' WHERE id = ANY(${ids})`;
@@ -66,7 +68,7 @@ export async function autoCorrect(): Promise<{ resolved: number; escalated: numb
           ok = false; // 집행 실패 — done으로 닫지 않고 다음 사이클 재시도
         }
       }
-      if (!ok) { if (log.length < 8) log.push(`승인결정 집행실패 #${d.id} — 다음 사이클 재시도(결재 유지)`); continue; }
+      if (!ok) { if (log.length < 8) log.push(ids.length ? `승인결정 집행실패 #${d.id} — 다음 사이클 재시도(결재 유지)` : `승인결정 집행실패 #${d.id}(action_params 누락) — 다음 사이클 재시도(결재 유지)`); continue; }
       await sql`UPDATE decisions SET status='done', result='auto-executed', decided_at=now() WHERE id=${d.id}`.catch(() => {});
       resolved++; if (log.length < 8) log.push(`승인결정 즉시집행 #${d.id}(${msg})`);
     }
