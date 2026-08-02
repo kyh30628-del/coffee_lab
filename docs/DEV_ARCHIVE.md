@@ -184,3 +184,4 @@
 | 2026-08-01 09:44 | #569 | [룰갭] 영문/외래어 카페명이 실존 고유명사(도서명·해외지명)와 우연일치 — 무관 콘텐츠 verified 채 | 47d4adeb | - | lib/reviewQuality.ts: isLatinHeavyName() 헬퍼 추가(라틴글자비중>=60%, 글자수>=4) — 제안1 게이트(985행 inTitleFull)·제안7  |
 | 2026-08-01 10:45 | #572 | [개발] 협업 #274: 프랜차이즈 블록리스트 소급미적용 41곳(decisions#570) — 근본원인 프로 | 796549ed | - | app/api/cron-rulegap/route.ts: 스캔 루프에 isFranchise(lib/discover.ts) 체크 추가, 신규 소급미적용 카페를 decisions에 자동 |
 | 2026-08-02 00:47 | #580 | [자율진단] 새벽 크론 통잠창(47ffe86) — 정지감시 임계값(EXPECT_MAX_H) 미조정으로 매일  | 4d2c39ed | - | web/lib/jobTeams.ts EXPECT_MAX_H 재계산(#580): cron-grow 6→14h, cron-resynth 3→9h, cron-embed/synth/iss |
+| 2026-08-02 00:48 | #583 | [정합성조사 발견] synth_identity '빵·디저트' 잔여 균질화(40.3%) — #536 후속 미해 | 0eadeed4 | - | lib/synthEngine.ts buildIdentity()에 3차 disambiguator 추가: 동+빵 최다용도 충돌 시 naver_category 세부값(베이커리/케이크전문 |
