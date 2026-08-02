@@ -246,6 +246,15 @@ async function healWeakNamePollution(flagged: WeakFlag[], deadline: number): Pro
 //   판정: 노출후기가 ①강한 비카페 업종어 담고 ②카페명 마커(attrMarkers) 없으면 오염. ⚠️보수적 마커만(자동차검사·브런치
 //   정식 등 정상 카페가 근처 업종어 쓰는 케이스 배제 — YELLOW75=자동차검사소 안 카페라 '자동차검사'는 넣지 않음).
 const NONCAFE_STRONG = /(상가\s*매매|매매\s*합니다|매매합니다|탑층\s*상가|상업지역\s*탑층|추천\s*매물|오피스텔\s*분양|아파트\s*분양|분양\s*문의|전신\s*관리|전신관리|피부\s*관리|피부관리|마사지\s*(?:샵|숍|관리|예약|전문|테라피)|태국\s*마사지|스웨디시|플라즈마토닝|왁싱\s*(?:샵|숍|전문|예약)?|반영구\s*(?:화장|메이크업|눈썹|아이라인|시술|샵)|눈썹\s*문신|예물\s*시계|무브먼트\s*시착|시착\s*후기|담당\s*업무|지원\s*자격|아르바이트\s*모집|직원\s*모집|채용\s*공고|시급\s*[0-9])/;
+// 🍽️ 식당/음식점 딸림(2026-08-02, 강화 감사): 카페 리뷰에 다른 '식사 전문점'(짬뽕·비빔밥·횟집·국밥·보쌈…) 후기가 섞인 경우.
+//   메뉴어는 카페 리뷰에도 부수 등장하므로 '카페 신호(커피·디저트·베이커리…)가 전혀 없는' 문장만 오염으로 판정(정상 카페후기 오제거 방지).
+const RESTAURANT_MEAL = /짬뽕|순두부|젓국|밴댕이|칼국수|백반|한정식|산채비빔밥|비빔밥|국밥|짜장면|탕수육|분식|소세지|소시지|떡볶이|순대국|족발|보쌈|곱창|막창|삼겹살|장어구이|횟집|회덮밥|물회|매운탕|감자탕|아구찜|해물탕|닭갈비|추어탕|설렁탕/;
+const CAFE_SIGNAL_Q = /커피|카페|디저트|라떼|라테|아메리카노|에스프레소|음료|케이크|스콘|브런치|베이글|빙수|마카롱|와플|찻집|티룸|말차|녹차|에이드|스무디|아인슈페너|드립|원두|베이커리|빵/;
+function bizPollutionHit(text: string): string | null {
+  const m = NONCAFE_STRONG.exec(text); if (m) return m[0];
+  if (RESTAURANT_MEAL.test(text) && !CAFE_SIGNAL_Q.test(text)) { const mm = text.match(RESTAURANT_MEAL); return mm ? mm[0] : "식당"; }
+  return null;
+}
 type NcbFlag = { id: number; name: string; area: string; bad: number; shown: number; hit: string };
 async function scanNonCafeBizPollution(): Promise<{ count: number; samples: string[]; flagged: NcbFlag[] }> {
   const t0 = Date.now(); let lo = 0; let truncated = false; const flagged: NcbFlag[] = [];
@@ -261,8 +270,8 @@ async function scanNonCafeBizPollution(): Promise<{ count: number; samples: stri
       let bad = 0; let hit = "";
       for (const r of (c.synth_reviews || [])) {
         const q = (r.quote || "") as string; const qn = q.replace(/\s/g, "").toLowerCase();
-        const m = NONCAFE_STRONG.exec(q);
-        if (m && !mk.some((x) => qn.includes(x))) { bad++; if (!hit) hit = m[0]; }
+        const h = bizPollutionHit(q);
+        if (h && !mk.some((x) => qn.includes(x))) { bad++; if (!hit) hit = h; }
       }
       if (bad >= 2) flagged.push({ id: c.id, name: c.name, area: c.area, bad, shown: (c.synth_reviews || []).length, hit });
     }
@@ -298,7 +307,7 @@ async function healNonCafeBizPollution(flagged: NcbFlag[], deadline: number): Pr
       const dec: Record<string, boolean> = {}; let drop = 0;
       for (const it of (r.auditItems || [])) {
         const body = (it.title || "") + " " + (it.body || ""); const bn = body.replace(/\s/g, "").toLowerCase();
-        if (NONCAFE_STRONG.test(body) && !mk.some((x) => bn.includes(x))) { dec[it.key] = false; drop++; }
+        if (bizPollutionHit(body) && !mk.some((x) => bn.includes(x))) { dec[it.key] = false; drop++; }
       }
       if (drop === 0) continue;
       const res = await applyDecisions({ id: f.id, name: c.name, area: c.area }, dec);
