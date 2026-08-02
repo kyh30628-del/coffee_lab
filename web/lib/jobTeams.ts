@@ -42,10 +42,12 @@ export const teamOf = (job: string) => JOB_TEAM[job] ?? "경영지원본부";
 //   잔류 기록이 영구 오탐을 만들던 것(dormantIdle 우회 포함)의 구조적 차단.
 export const EXPECT_MAX_H: Record<string, number> = {
   // Vercel 크론 (스케줄 + 버퍼)
-  "cron-snapshot": 200, "cron-resynth": 3, "cron-newsletter": 200, "cron-discover-categories": 800,
+  "cron-snapshot": 200, "cron-resynth": 9, "cron-newsletter": 200, "cron-discover-categories": 800,
   "cron-verify": 16, "cron-sentinel": 16, "cron-demand": 30, "cron-rulegap": 16, "cron-closure": 12, // verify·sentinel·rulegap 2×/일(12h)로 촘촘화 → 정지감지도 30→16h로 타이트하게(2026-07-05)
   "cron-criteria-verify": 16, // 기준 검증 에이전트 2×/일(07:50·19:50 KST=12h) + 버퍼 — dead-knob·기준드리프트 결정론 감시(품질본부)
-  "cron-grow": 6, "cron-enrich": 8, "cron-embed": 4, "cron-synth": 4, "cron-issues": 2, "cron-coord-consumer": 2,
+  // 2026-08-01 47ffe86 통잠창(KST 01-07=UTC16-22 제외) 재배치로 최대 공백이 커져 재계산(2026-08-02, decisions#580):
+  //   cron-grow(0-11시): 11→익일0시 13h 공백 + 버퍼=14. cron-resynth/embed/synth/issues/coord-consumer(0-15,23시): 15→23시 8h 공백 + 버퍼=9.
+  "cron-grow": 14, "cron-enrich": 8, "cron-embed": 9, "cron-synth": 9, "cron-issues": 9, "cron-coord-consumer": 9,
   "cron-billing": 30,     // 정기결제 크론 매일 09:00 KST + 버퍼(dunning 재시도 일 1회)
   "orchestrator-heal": 6,
   // 로컬 launchd 잡
