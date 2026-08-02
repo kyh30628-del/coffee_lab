@@ -187,3 +187,4 @@
 | 2026-08-02 00:48 | #583 | [정합성조사 발견] synth_identity '빵·디저트' 잔여 균질화(40.3%) — #536 후속 미해 | 0eadeed4 | - | lib/synthEngine.ts buildIdentity()에 3차 disambiguator 추가: 동+빵 최다용도 충돌 시 naver_category 세부값(베이커리/케이크전문 |
 | 2026-08-02 01:49 | #584 | [룰갭] 랜드마크+업종접미사 복합상호 — 전체상호 미일치로 방어게이트 우회, verified까지 침투 (ru | 89ad1f75 | - | lib/reviewQuality.ts: coreTokensDetail에 landmarkStripped 신호 추가(랜드마크 토큰 제거 후 다른 식별어만 남는 경우 감지, venueO |
 | 2026-08-02 01:50 | #586 | [레드팀 코드결함] autoCorrect() 승인집행 done 오표시 — action_params 없으면 무 | 3d9c4c48 | - | web/lib/issues.ts autoCorrect() L46-72: ids.length===0(action_params 누락)일 때 ok 기본값을 true→ids.length> |
+| 2026-08-02 02:51 | #589 | [개발] 협업 #276: decision#575 cron-grow 정지의심 — 부분 오탐 가능성(하트비트만  | 74df9ba1 | - | app/api/cron-grow/route.ts: 합성루프(②)에 시간예산(SYNTH_DEADLINE=t0+285s) 추가. 근본원인: recordRun(하트비트)이 함수 맨 끝에 |
