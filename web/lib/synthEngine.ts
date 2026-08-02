@@ -65,7 +65,7 @@ export type SynthResult = {
 // 반복 등장해 검증리뷰로 여러 번 카운트되는 것 방지(협업 정합성조사팀 12:04 사이클).
 const normalizeQuote = (s: string) => s.replace(/\s+/g, "").trim().toLowerCase();
 
-export function synthesize(name: string, reviews: Review[], area: string[] = []): SynthResult {
+export function synthesize(name: string, reviews: Review[], area: string[] = [], naverCategory?: string): SynthResult {
   const seenQuotes = new Set<string>();
   const clean = reviews.filter((r) => r.text && !AD.test(r.text)).filter((r) => {
     const key = normalizeQuote(r.text);
@@ -120,7 +120,8 @@ export function synthesize(name: string, reviews: Review[], area: string[] = [])
   const evidence: Record<string, { kind: string; snip: string }[]> = {};
   axes.forEach((a) => (evidence[a] = stat[a].ev.slice(0, 3)));
 
-  return { name, reviewCount: n, grade, coords, basis, uses, ops, evidence, identity: buildIdentity(coords, basis, uses, ops, area) };
+  const breadTerm = uses["빵"] ? categoryBreadTerm(naverCategory) ?? reviewBreadKeyword(clean) : null;
+  return { name, reviewCount: n, grade, coords, basis, uses, ops, evidence, identity: buildIdentity(coords, basis, uses, ops, area, breadTerm) };
 }
 
 // 리뷰 종합 한 줄 — 검증 후기에서 실제로 드러난 신호만(환각 금지) 따뜻하고 와닿게, 절제해서.
@@ -129,7 +130,32 @@ const USE_PHRASE: Record<string, string> = {
   작업: "작업·공부하기 좋은 곳", 혼자: "혼자 조용히 머물기 좋은 곳", 수다: "함께 도란도란 이야기 나누기 좋은 곳",
   사진: "사진 찍기 좋은 분위기", 빵: "빵·디저트가 특히 자주 언급되는 곳",
 };
-function buildIdentity(coords: Record<string, number | null>, basis: Record<string, string>, uses: Record<string, number>, ops: Record<string, number>, area: string[] = []) {
+// '빵' 용도는 '동+빵' 조합만으로도 인구밀집 동네에서 수십 곳이 완전동일 문구로 수렴(정합성조사 #536 후속 #583).
+//   동 부착 이후에도 남는 충돌을 가를 3차 disambiguator: naver_category 세부값(이미 검증된 실데이터, 환각 아님) 우선,
+//   없으면 실제 리뷰 텍스트에 등장한 구체 디저트 키워드(스콘/크루아상/케이크/티라미수 등) 1개로 대체.
+const CATEGORY_BREAD_TERM: Record<string, string> = {
+  베이커리: "베이커리 빵", 케이크전문: "케이크", 도넛: "도넛", 아이스크림: "아이스크림",
+  빙수: "빙수", 와플: "와플", 베이글: "베이글", 초콜릿전문점: "초콜릿",
+};
+function categoryBreadTerm(naverCategory?: string): string | null {
+  if (!naverCategory) return null;
+  const last = naverCategory.split(">").pop()?.trim() ?? "";
+  return CATEGORY_BREAD_TERM[last] ?? null;
+}
+const SPECIFIC_BREAD_KEYWORD: Record<string, string> = {
+  스콘: "스콘", scone: "스콘", 크루아상: "크루아상", croissant: "크루아상",
+  케이크: "케이크", cake: "케이크", 티라미수: "티라미수", tiramisu: "티라미수",
+};
+function reviewBreadKeyword(clean: Review[]): string | null {
+  const counts = new Map<string, number>();
+  for (const [kw, label] of Object.entries(SPECIFIC_BREAD_KEYWORD)) {
+    const c = clean.filter((r) => r.text.toLowerCase().includes(kw.toLowerCase())).length;
+    if (c) counts.set(label, (counts.get(label) ?? 0) + c);
+  }
+  if (!counts.size) return null;
+  return [...counts.entries()].sort((x, y) => y[1] - x[1])[0][0];
+}
+function buildIdentity(coords: Record<string, number | null>, basis: Record<string, string>, uses: Record<string, number>, ops: Record<string, number>, area: string[] = [], breadTerm: string | null = null) {
   const p: string[] = [];
   if ((ops["직접로스팅"] ?? 0) >= 2) p.push("직접 로스팅하는 곳"); // 1건은 환각 위험 → 2건+만 주장
   const a = coords.acidity, b = coords.body, s = coords.sweet;
@@ -144,7 +170,10 @@ function buildIdentity(coords: Record<string, number | null>, basis: Record<stri
   // 실제 소재지 데이터).
   const locality = area.filter(Boolean).slice(-1)[0];
   const tu = Object.entries(uses).sort((x, y) => y[1] - x[1])[0];
-  if (tu && USE_PHRASE[tu[0]]) p.push(locality ? `${locality}에서 ${USE_PHRASE[tu[0]]}` : USE_PHRASE[tu[0]]);
+  if (tu && tu[0] === "빵" && breadTerm) {
+    const phrase = `${breadTerm}·디저트가 특히 자주 언급되는 곳`;
+    p.push(locality ? `${locality}에서 ${phrase}` : phrase);
+  } else if (tu && USE_PHRASE[tu[0]]) p.push(locality ? `${locality}에서 ${USE_PHRASE[tu[0]]}` : USE_PHRASE[tu[0]]);
   else if (locality) p.push(`${locality}의 카페`);
   if (ops["원두판매"] && p.length < 4) p.push("원두도 살 수 있는 곳");
   if (ops["권위"]) p.push("매체·평단에 소개된 곳");
