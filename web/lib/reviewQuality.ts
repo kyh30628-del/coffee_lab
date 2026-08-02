@@ -432,8 +432,14 @@ const LANDMARK_WORDS = [
   // 룰갭 P7(#224, 2026-07-09): '고려궁지'는 강화군 사적 유적지 — id16818(고려궁지카페) synth_reviews 5/6이
   //   유적지 여행기(벚꽃로드·전등사 연계·주차/입장료). #195(사랑창덕궁)와 동일 메커니즘, 서울 도심 밖 확장.
   "고려궁지",
+  // 룰갭 20260802(decisions#584): '수봉별마루'는 인천 수봉공원의 전망대·야경명소(별빛축제로 유명) —
+  //   id15358 '수봉별마루도너츠' synth_reviews_all 12/30건이 이 명소 방문기(도너츠·카페 무관)를 흡수했다.
+  "수봉별마루",
 ];
 const isVenueTok = (t: string) => { const n = norm(t); return VENUE_WORDS.some((v) => n.includes(norm(v))) || HOTEL_BRANDS.some((v) => n.includes(norm(v))) || LANDMARK_WORDS.some((l) => n.includes(norm(l))) || DISTRICT_WORDS.some((d) => n.includes(norm(d))) || UNIV_ABBR_WORDS.some((u) => n.includes(norm(u))) || METRO_NAMES.has(n); };
+// 랜드마크 전용 판정(isVenueTok의 부분집합) — 몰/호텔/대학 등 다른 venue 범주와 분리해, '랜드마크가
+//   제거되어 다른 식별어가 남는' 경우만 좁게 표시한다(coreTokensDetail의 landmarkStripped 신호, 아래).
+const isLandmarkTok = (t: string) => { const n = norm(t); return LANDMARK_WORDS.some((l) => n.includes(norm(l))); };
 
 // 지구 통칭 별명(룰갭 P42, #397·coord#208): "베네치아"는 실제 지명이 아니라 송도 커낼워크 지구를
 //   부르는 관용 별칭이다. DISTRICT_WORDS처럼 전역으로 위치수식어 취급하면 위례·곤지암 등 무관 지역의
@@ -505,7 +511,7 @@ export function cleanCafeName(name: string): string {
 //   - "미사강변 북카페" → ["미사강변"] (브랜드 없음 → '미사강변'이 유일 정체성이므로 유지)
 // venueOnly: 남은 토큰이 전부 다중테넌트 기관/건물명(VENUE_WORDS·대학 축약명 등)일 때 true — 그 건물엔
 //   무관한 여러 시설이 함께 있으므로(제안3 "건물단위 앵커 필수화"), 지역일치만으로 식별 인정하면 안 된다.
-export function coreTokensDetail(name: string, areaTerms: string[]): { tokens: string[]; venueOnly: boolean } {
+export function coreTokensDetail(name: string, areaTerms: string[]): { tokens: string[]; venueOnly: boolean; landmarkStripped: boolean } {
   // 행정 접미사(시·군·구·읍·면·동·리)를 뗀 변형도 비교군에 포함 → 지점명에서 나온 병합 지역어
   //   ('남양주오남점'→'남양주오남')를 areaTerms('남양주시'·'오남읍')와 매칭시켜 식별어에서 제외.
   //   (프랜차이즈 'OO점'이 같은 지역 다른 업종 'OO점' 리뷰를 끌어오던 동명 오염의 근본 차단)
@@ -521,6 +527,10 @@ export function coreTokensDetail(name: string, areaTerms: string[]): { tokens: s
   //   ⚠️ 지점 검출은 '공백 단어' 단위로 — '상암DMC점'은 한글↔영문 분리로 [상암,DMC,점]이 돼 점 표식을 잃으므로,
   //   분리 전에 단어가 '점'으로 끝나는지를 먼저 판정해 하위 토큰 전체에 branch 플래그를 내린다.
   const isBranchWord = (w: string) => /점$/.test(w) && !GENERIC_WORD.has(norm(w)) && w.replace(GENERIC_SUFFIX, "").trim().length >= 1;
+  // [룰갭 20260802, decisions#584] 랜드마크 원단어가 이름에 있었는지 — 아래 filter 체인(지역어·LOC_LIKE·an
+  //   중첩 등)이 랜드마크 단어를 걸러내는 이유는 제각각이라, filter 전 원본 분리단어에서 먼저 확인해둔다.
+  const rawWordsForLandmark = name.split(/\s+/).flatMap((w) => w.split(/(?<=[가-힣])(?=[A-Za-z0-9])|(?<=[A-Za-z0-9])(?=[가-힣])/));
+  const hasLandmarkRawWord = rawWordsForLandmark.some((w) => isLandmarkTok(w));
   const parts = name.split(/\s+/).flatMap((w) => { const branch = isBranchWord(w);
       return w.split(/(?<=[가-힣])(?=[A-Za-z0-9])|(?<=[A-Za-z0-9])(?=[가-힣])/).map((raw) => ({ raw, branch })); })
     // 룰갭(#307): 쉼표 붙은 업종어('카페,')는 GENERIC_SUFFIX의 $ 앵커가 안 걸려 그대로 살아남아
@@ -548,7 +558,14 @@ export function coreTokensDetail(name: string, areaTerms: string[]): { tokens: s
   //   (id13384 6건중5건, id10782 6건중3건 오염 실측). 다른(비숫자) 토큰이 있으면 숫자토큰은 매칭 후보에서
   //   제외 — 전체이름 원문일치(nameHit 상위 로직)는 이름 전체를 그대로 보므로 진짜 매칭은 안 깨진다.
   const strongPool = finalPool.filter((t) => !/^[0-9]+$/.test(t));
-  return { tokens: strongPool.length ? strongPool : finalPool, venueOnly: branded.length === 0 && base.length > 0 };
+  // [룰갭 20260802, decisions#584] 랜드마크 토큰이 제거되고 '다른 식별어'가 남는 경우(venueOnly=false와
+  //   반대 케이스) — 그 랜드마크를 다루는 무관 글이 남은 식별어의 우연일치만으로 채택되던 사각(id3537
+  //   '포레스트 서울숲' ← 서울숲 팝업행사·동명타업체 6건 verified 오염 실측). venueOnly와 짝을 이루는
+  //   신호로 노출해, verifyReview가 이 경우도 카페맥락/전체이름 일치를 요구하게 한다(아래 landmarkCtxOk).
+  //   ⚠️ 최종 finalPool에 랜드마크 원단어가 그대로 남아있으면(글루드 이름이 통째로 살아남는 케이스,
+  //   예: '수봉별마루도너츠') venueOnly 가드가 이미 담당하므로 이 신호는 끈다(중복 방지, 과다적용 방지).
+  const landmarkStripped = hasLandmarkRawWord && finalPool.length > 0 && !finalPool.some((t) => isLandmarkTok(t));
+  return { tokens: strongPool.length ? strongPool : finalPool, venueOnly: branded.length === 0 && base.length > 0, landmarkStripped };
 }
 export function coreTokens(name: string, areaTerms: string[]): string[] {
   return coreTokensDetail(name, areaTerms).tokens;
@@ -752,7 +769,7 @@ export function verifyReview(input: QualityInput): QualityResult {
     return { verdict: "rejected", score: 2, reasons: ["카페 모음글·리스트(그 카페가 주제 아님)"], signals: { nameInTitle: false, nameInBody: false, visit: false, substance: 0, listicle: true, sponsored: false, areaMatch: false } };
   }
   // 구별 토큰(지역어·일반어 제거). 토큰이 비면 전체 이름으로만 매칭.
-  const { tokens, venueOnly } = coreTokensDetail(input.name, areaTerms);
+  const { tokens, venueOnly, landmarkStripped } = coreTokensDetail(input.name, areaTerms);
   const coreEmpty = tokens.length === 0; // 이름이 흔한구문/일반어뿐(예: '좋은커피') → 원문 '붙임' 일치만 인정
   // 🛡️ 짧은 단일토큰('나무 로스터리'→["나무"])은 다른 업체('나무사이로')의 '부분문자열'로 오매칭됨.
   //   → 토큰 대신 '전체 이름(정규화)' 일치만 인정해 차단. (전체이름이 토큰보다 길 때만 = 한 글자 가게 제외)
@@ -817,6 +834,11 @@ export function verifyReview(input: QualityInput): QualityResult {
   //   이 카페 후기로 인정(주소만 스친 이웃업체 글 차단). 실제 카페 후기는 항상 카페 맥락을 동반하므로 안전.
   const nameIsRoadAddr = /^[가-힣A-Za-z0-9]{1,12}(로|길)\s*\d+(-\d+)?$/.test(input.name.trim());
   const roadAddrCtxOk = !nameIsRoadAddr || CAFE_CONTEXT_STRONG.test(fullL);
+  // [룰갭 20260802, decisions#584] 카페명이 [랜드마크]+[다른 식별어]로 구성돼 코어토큰 분해 시 랜드마크
+  //   부분이 위치수식어로 제거되고 남은 식별어만으로 매칭되면(landmarkStripped), venueOnly와 동일 원리로
+  //   카페 맥락(CAFE_CONTEXT_STRONG) 또는 전체이름 원문 일치를 요구 — 그 랜드마크를 다루는 무관 글이
+  //   남은 식별어의 우연일치만으로 채택되던 사각 차단(진짜 후기는 맥락어를 동반해 보존).
+  const landmarkCtxOk = !landmarkStripped || CAFE_CONTEXT_STRONG.test(fullL) || inTitleFull || inBodyFull;
   // 룰갭 P38(coord#202, 2026-07-15): 카페명 전체가 부가어 없는 흔한단어 단독(우주·사이·톤앤매너 등)이면
   //   식별토큰이 전체이름과 완전히 같은 문자열이 되어 inTitleFull(전체이름 일치)이 distinctInTitle(토큰 일치)과
   //   동일해진다 — "전체이름 일치 요구"라는 방어가 자기 자신과 같아져 무력화(id13621 "꿈꾸는 오븐" 재오염 근본원인).
@@ -826,12 +848,12 @@ export function verifyReview(input: QualityInput): QualityResult {
   const bareWeak = nameIsSoleToken && (weakSingle || coreEmpty || allTokensWeak || nameRawN.length <= 4);
   const nameInTitle = (weakWhitelist && !areaPresent) ? false
     : bareWeak
-      ? (roadAddrCtxOk && distinctInTitle && (dongPresent || CAFE_CONTEXT_STRONG.test(fullL) || titleHasCafeWord) && venueCtxOk)
-      : (roadAddrCtxOk && (inTitleFull || (distinctInTitle && (titleHasCafeWord || areaPresent) && venueCtxOk)));
+      ? (roadAddrCtxOk && distinctInTitle && (dongPresent || CAFE_CONTEXT_STRONG.test(fullL) || titleHasCafeWord) && venueCtxOk && landmarkCtxOk)
+      : (roadAddrCtxOk && (inTitleFull || (distinctInTitle && (titleHasCafeWord || areaPresent) && venueCtxOk && landmarkCtxOk)));
   const nameInBody = (weakWhitelist && !areaPresent) ? false
     : bareWeak
-      ? (roadAddrCtxOk && distinctInBody && (dongPresent || CAFE_CONTEXT_STRONG.test(fullL) || bodyHasCafeWord) && venueCtxOk)
-      : (roadAddrCtxOk && (inBodyFull || (distinctInBody && (bodyHasCafeWord || areaPresent) && venueCtxOk)));
+      ? (roadAddrCtxOk && distinctInBody && (dongPresent || CAFE_CONTEXT_STRONG.test(fullL) || bodyHasCafeWord) && venueCtxOk && landmarkCtxOk)
+      : (roadAddrCtxOk && (inBodyFull || (distinctInBody && (bodyHasCafeWord || areaPresent) && venueCtxOk && landmarkCtxOk)));
   const listicle = LISTICLE_TITLE.some((re) => re.test(title)) || (((`${title} ${body}`.match(PLACE_TOKEN) ?? []).length) >= 4);
   const generic = has(fullL, GENERIC_CUES);
   const nameOccurBody = nameN ? countOccur(bodyN, nameN) : 0;
