@@ -3,7 +3,7 @@
   "crons": [
     {
       "path": "/api/cron-resynth",
-      "schedule": "0 0-15,23 * * *"
+      "schedule": "0 0-15/3,23 * * *"
     },
     {
       "path": "/api/cron-snapshot",
@@ -11,15 +11,15 @@
     },
     {
       "path": "/api/cron-embed",
-      "schedule": "1 0-15,23 * * *"
+      "schedule": "1 0-15/3,23 * * *"
     },
     {
       "path": "/api/cron-grow",
-      "schedule": "10 0-11 * * *"
+      "schedule": "10 0-15/3 * * *"
     },
     {
       "path": "/api/cron-synth",
-      "schedule": "2 0-15,23 * * *"
+      "schedule": "2 0-15/3,23 * * *"
     },
     {
       "path": "/api/cron-verify",
@@ -27,7 +27,7 @@
     },
     {
       "path": "/api/orchestrator?heal=1",
-      "schedule": "25 0-14/2 * * *"
+      "schedule": "25 0,6,12 * * *"
     },
     {
       "path": "/api/cron-newsletter",
@@ -39,19 +39,19 @@
     },
     {
       "path": "/api/cron-rulegap",
-      "schedule": "30 4,23 * * *"
+      "schedule": "30 6,23 * * *"
     },
     {
       "path": "/api/cron-closure",
-      "schedule": "0 1,7,13,23 * * *"
+      "schedule": "0 0,6,12,23 * * *"
     },
     {
       "path": "/api/cron-demand",
-      "schedule": "0 8 * * *"
+      "schedule": "0 9 * * *"
     },
     {
       "path": "/api/cron-enrich",
-      "schedule": "40 0-15/3,23 * * *"
+      "schedule": "40 0,6,12,23 * * *"
     },
     {
       "path": "/api/cron-sentinel",
@@ -59,7 +59,7 @@
     },
     {
       "path": "/api/cron-issues",
-      "schedule": "0 0-15,23 * * *"
+      "schedule": "0 0-15/3,23 * * *"
     },
     {
       "path": "/api/cron-billing",
@@ -67,7 +67,7 @@
     },
     {
       "path": "/api/cron-coord-consumer?mode=live",
-      "schedule": "3 0-15,23 * * *"
+      "schedule": "3 0-15/3,23 * * *"
     },
     {
       "path": "/api/cron-selfaudit",
@@ -75,7 +75,7 @@
     },
     {
       "path": "/api/cron-criteria-verify",
-      "schedule": "50 10,23 * * *"
+      "schedule": "50 9,23 * * *"
     },
     {
       "path": "/api/cron-costwatch",
