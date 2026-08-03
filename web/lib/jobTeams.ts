@@ -43,13 +43,13 @@ export const teamOf = (job: string) => JOB_TEAM[job] ?? "경영지원본부";
 export const EXPECT_MAX_H: Record<string, number> = {
   // Vercel 크론 (스케줄 + 버퍼)
   "cron-snapshot": 200, "cron-resynth": 9, "cron-newsletter": 200, "cron-discover-categories": 800,
-  "cron-verify": 16, "cron-sentinel": 16, "cron-demand": 30, "cron-rulegap": 16, "cron-closure": 12, // verify·sentinel·rulegap 2×/일(12h)로 촘촘화 → 정지감지도 30→16h로 타이트하게(2026-07-05)
+  "cron-verify": 16, "cron-sentinel": 16, "cron-demand": 30, "cron-rulegap": 20, "cron-closure": 12, // verify·sentinel 2×/일(12h)로 촘촘화 → 30→16h(2026-07-05). rulegap은 스케줄 "30 4,23*UTC"(04:30·23:30) 최대공백 19h라 20으로 재계산(2026-08-03, decisions#596) — 16은 비대칭 스케줄 미반영 오탐이었음
   "cron-criteria-verify": 16, // 기준 검증 에이전트 2×/일(07:50·19:50 KST=12h) + 버퍼 — dead-knob·기준드리프트 결정론 감시(품질본부)
   // 2026-08-01 47ffe86 통잠창(KST 01-07=UTC16-22 제외) 재배치로 최대 공백이 커져 재계산(2026-08-02, decisions#580):
   //   cron-grow(0-11시): 11→익일0시 13h 공백 + 버퍼=14. cron-resynth/embed/synth/issues/coord-consumer(0-15,23시): 15→23시 8h 공백 + 버퍼=9.
   "cron-grow": 14, "cron-enrich": 8, "cron-embed": 9, "cron-synth": 9, "cron-issues": 9, "cron-coord-consumer": 9,
   "cron-billing": 30,     // 정기결제 크론 매일 09:00 KST + 버퍼(dunning 재시도 일 1회)
-  "orchestrator-heal": 6,
+  "orchestrator-heal": 11, // 2026-08-01 47ffe86 통잠창 재배치(decisions#580)로 14:25→익일00:25 최대공백 10h + 버퍼=11로 재계산(2026-08-03, decisions#596) — 6은 재배치 전 값이라 매일 저녁 오탐이었음
   // 로컬 launchd 잡
   "discover-sweep": 30,    // 매일 02:30 KST 발굴 스윕 + 버퍼(네이버 한도서 중단해도 익일 재개)
   "youtube-backfill": 30, // 일배치 16:30 KST + 버퍼
