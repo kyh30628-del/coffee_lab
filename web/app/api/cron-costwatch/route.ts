@@ -13,43 +13,54 @@ const PER_QUERY_GB_ALERT = Number(process.env.COST_WATCH_PER_QUERY_GB || 10); //
 const TOTAL_GB_ALERT = Number(process.env.COST_WATCH_TOTAL_GB || 25); // 전체 합산 하루 이 이상이면 경보(정상 베이스라인 ~14GB/일의 ~1.8배)
 const XFER_RATE = 0.032; // Neon 공용 네트워크 전송(발신) 공개단가 $/GB
 
-// 📧 매일 아침 비용 점검 메일(CEO 지시 2026-08-03). 전송량 추이는 기존 실행이력(agent_runs)에서 파싱 — 새 테이블/무거운 조회 없음.
+// 📧 매일 아침 비용 점검 메일(CEO 지시 2026-08-03). 지난달(cost_baseline) vs 이번달(실행이력) 정면 비교. 새 무거운 조회 없음.
 async function sendCostReport(todayGb: number, top: { q: string; deltaGb: number } | null, anomaly: boolean) {
   const key = process.env.RESEND_API_KEY; if (!key) return;
   const to = process.env.COST_REPORT_EMAIL || "kyh30628@gmail.com"; // 이미 공개 git 커밋에 있는 주소(신규 노출 아님)
-  // 최근 30일 costwatch 실행이력에서 '총 X GB' 파싱 → 추이
-  const hist = (await sql`SELECT detail, to_char(ran_at AT TIME ZONE 'Asia/Seoul','MM-DD') d FROM agent_runs WHERE job='cron-costwatch' AND ran_at >= now() - interval '31 days' ORDER BY ran_at DESC`.catch(() => [])) as { detail: string; d: string }[];
-  const days = hist.map((h) => ({ d: h.d, gb: Number((String(h.detail).match(/총\s*([\d.]+)\s*GB/) || [])[1] || NaN) })).filter((x) => Number.isFinite(x.gb));
-  const avg = (a: number[]) => a.length ? a.reduce((s, n) => s + n, 0) / a.length : 0;
-  const last7 = avg(days.slice(0, 7).map((x) => x.gb));
-  const prev = avg(days.slice(7, 21).map((x) => x.gb)); // 그 이전 2주
-  const trend = last7 > prev * 1.15 ? "↑ 상승" : last7 < prev * 0.85 ? "↓ 하락" : "≈ 유지";
-  const spark = days.slice(0, 10).reverse().map((x) => `${x.d} ${x.gb.toFixed(1)}GB`).join(" · ");
-  const estDay = todayGb * XFER_RATE, estMo = last7 * XFER_RATE * 30;
+  // 지난달 기준선(인보이스 실측, DB에 저장 — 공개 소스에 금액 하드코딩 안 함)
+  const base = (await sql`SELECT period, transfer_gb::float gb, days, transfer_usd::float tusd, total_usd::float total FROM cost_baseline ORDER BY period DESC LIMIT 1`.catch(() => []))[0] as any;
+  const julAvg = base ? base.gb / base.days : 23.8;
+  // 이번 KST월 costwatch 일일 전송 이력 → 일별 dedup 후 합산(이번달 누적·경과일)
+  const rows = (await sql`SELECT to_char(ran_at AT TIME ZONE 'Asia/Seoul','MM-DD') d, detail
+    FROM agent_runs WHERE job='cron-costwatch'
+      AND (ran_at AT TIME ZONE 'Asia/Seoul') >= date_trunc('month', now() AT TIME ZONE 'Asia/Seoul')
+    ORDER BY ran_at DESC`.catch(() => [])) as { d: string; detail: string }[];
+  const byDay = new Map<string, number>();
+  for (const r of rows) { if (byDay.has(r.d)) continue; const gb = Number((String(r.detail).match(/총\s*([\d.]+)\s*GB/) || [])[1]); if (Number.isFinite(gb)) byDay.set(r.d, gb); }
+  const augDays = byDay.size || 1;
+  const augCum = [...byDay.values()].reduce((s, n) => s + n, 0);
+  const augAvg = augCum / augDays;
+  const pct = julAvg > 0 ? Math.round((augAvg - julAvg) / julAvg * 100) : 0;
+  const up = augAvg > julAvg * 1.05, down = augAvg < julAvg * 0.95;
+  const cmp = up ? `↑ ${pct}% 높음` : down ? `↓ ${Math.abs(pct)}% 낮음` : "≈ 비슷";
+  const cmpColor = up ? "#c0392b" : down ? "#2b7a4b" : "#8a7256";
+  const augProjUsd = augAvg * 31 * XFER_RATE; // 이대로면 이번달 전송비 추정
+  const estDay = todayGb * XFER_RATE;
   const c = anomaly ? "#c0392b" : "#2b7a4b";
   const html = `<div style="font-family:system-ui,'Apple SD Gothic Neo',sans-serif;max-width:560px;color:#2b2018">
     <h2 style="margin:0 0 4px">☕ 일일 비용 점검</h2>
     <p style="color:#8a7256;margin:0 0 16px;font-size:13px">Neon 데이터전송 기준 · 총 청구액은 월 인보이스가 기준</p>
-    <div style="border:1px solid #e5d8c2;border-radius:12px;padding:16px">
+    <div style="border:1px solid #e5d8c2;border-radius:12px;padding:16px;margin-bottom:14px">
       <div style="font-size:13px;color:#8a7256">어제 데이터전송</div>
       <div style="font-size:26px;font-weight:700;color:${c}">${todayGb.toFixed(1)} GB <span style="font-size:13px;color:#8a7256;font-weight:400">/ 임계 ${TOTAL_GB_ALERT}GB · 추정 $${estDay.toFixed(2)}</span></div>
       ${anomaly ? '<div style="color:#c0392b;font-weight:700;margin-top:6px">🚨 임계 초과 — 확인 필요</div>' : ''}
-      <hr style="border:none;border-top:1px solid #eee;margin:14px 0">
-      <table style="font-size:14px;width:100%;border-collapse:collapse">
-        <tr><td style="color:#8a7256;padding:3px 0">최근 7일 일평균</td><td style="text-align:right;font-weight:600">${last7.toFixed(1)} GB/일</td></tr>
-        <tr><td style="color:#8a7256;padding:3px 0">직전 2주 일평균</td><td style="text-align:right">${prev.toFixed(1)} GB/일</td></tr>
-        <tr><td style="color:#8a7256;padding:3px 0">추세</td><td style="text-align:right;font-weight:700">${trend}</td></tr>
-        <tr><td style="color:#8a7256;padding:3px 0">월 환산(전송비 추정)</td><td style="text-align:right">~$${estMo.toFixed(0)}</td></tr>
-      </table>
-      ${top ? `<div style="font-size:12px;color:#8a7256;margin-top:10px">최다 전송 쿼리: ${String(top.q).replace(/\s+/g, " ").slice(0, 90)} (${top.deltaGb.toFixed(1)}GB)</div>` : ''}
-      <div style="font-size:12px;color:#a99;margin-top:10px">추이: ${spark || "누적 중"}</div>
     </div>
-    <p style="color:#a99;font-size:11px;margin-top:12px">참고: 이 수치는 데이터전송(발신)만. 컴퓨트·저장·총 $는 Vercel/Neon 월 인보이스 기준.</p>
+    <div style="border:2px solid ${cmpColor};border-radius:12px;padding:16px;margin-bottom:14px">
+      <div style="font-size:14px;font-weight:700;margin-bottom:10px">📊 지난달(7월) 대비 — 전송량 기준</div>
+      <table style="font-size:14px;width:100%;border-collapse:collapse">
+        <tr><td style="color:#8a7256;padding:4px 0">7월</td><td style="text-align:right">일평균 <b>${julAvg.toFixed(1)}GB</b> · 총 ${base ? base.gb.toFixed(0) : "-"}GB · 청구 $${base ? base.total.toFixed(2) : "-"}</td></tr>
+        <tr><td style="color:#8a7256;padding:4px 0">8월(현재 ${augDays}일)</td><td style="text-align:right">일평균 <b>${augAvg.toFixed(1)}GB</b> · 누적 ${augCum.toFixed(0)}GB</td></tr>
+        <tr><td style="padding:8px 0 0;font-weight:700">→ 지난달 대비</td><td style="text-align:right;padding-top:8px;font-weight:800;font-size:16px;color:${cmpColor}">${cmp}</td></tr>
+        <tr><td style="color:#8a7256;padding:4px 0">이대로면 8월 전송비</td><td style="text-align:right">~$${augProjUsd.toFixed(1)} <span style="color:#8a7256">(7월 전송 $${base ? base.tusd.toFixed(2) : "-"})</span></td></tr>
+      </table>
+    </div>
+    ${top ? `<div style="font-size:12px;color:#8a7256">최다 전송 쿼리: ${String(top.q).replace(/\s+/g, " ").slice(0, 90)} (${top.deltaGb.toFixed(1)}GB)</div>` : ''}
+    <p style="color:#a99;font-size:11px;margin-top:12px">전송량(발신)만 매일 측정 가능. 컴퓨트·총 $는 월 인보이스가 기준(7월 총 $${base ? base.total.toFixed(2) : "-"}).</p>
   </div>`;
   await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from: process.env.RESEND_FROM || "동네 커피 노트 <onboarding@resend.dev>", to: [to], subject: `${anomaly ? "🚨" : "☕"} 일일 비용 점검 — 어제 ${todayGb.toFixed(1)}GB (${trend})`, html }),
+    body: JSON.stringify({ from: process.env.RESEND_FROM || "동네 커피 노트 <onboarding@resend.dev>", to: [to], subject: `${anomaly ? "🚨" : "☕"} 일일 비용 — 8월 일평균 ${augAvg.toFixed(1)}GB (지난달 대비 ${cmp})`, html }),
   }).catch(() => {});
 }
 
