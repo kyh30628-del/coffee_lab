@@ -189,3 +189,4 @@
 | 2026-08-02 01:50 | #586 | [레드팀 코드결함] autoCorrect() 승인집행 done 오표시 — action_params 없으면 무 | 3d9c4c48 | - | web/lib/issues.ts autoCorrect() L46-72: ids.length===0(action_params 누락)일 때 ok 기본값을 true→ids.length> |
 | 2026-08-02 02:51 | #589 | [개발] 협업 #276: decision#575 cron-grow 정지의심 — 부분 오탐 가능성(하트비트만  | 74df9ba1 | - | app/api/cron-grow/route.ts: 합성루프(②)에 시간예산(SYNTH_DEADLINE=t0+285s) 추가. 근본원인: recordRun(하트비트)이 함수 맨 끝에 |
 | 2026-08-03 01:53 | #596 | [개발] 협업 #277: 결재#594·#595 크론 정지의심 — 임계값(EXPECT_MAX_H) 미스매치로  | 9f699155 | - | lib/jobTeams.ts EXPECT_MAX_H 재계산: cron-rulegap 16→20(스케줄 04:30·23:30UTC 최대공백19h+버퍼), orchestrator-he |
+| 2026-08-03 01:54 | #597 | [룰갭] 예약제·무인픽업 주문제작 케이크공방 — walk-in 카페와 동일경로로 검증(최고신뢰) 등급 도달  | 988d0aa6 | - | lib/reviewQuality.ts: DELIVERY_ONLY_CUES와 대칭인 PICKUP_ONLY_CUES 신설(100%예약제·무인픽업·픽업시간·카톡ID/문의·주문제작·원데이 |
