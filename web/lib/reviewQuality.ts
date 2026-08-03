@@ -227,6 +227,16 @@ const CRAFT_WORKSHOP_ACTIVITY = /(원데이\s*클래스|물레\s*(체험|그릇\
 //   대조군(이름에 플랜트/식물/화원/다육/반려/애견 포함 published 카페 19곳)은 실제 음료 언급이 함께 있어
 //   CAFE_CONTEXT_SUBSTANCE로 보존되므로 오탐 없음.
 const AQUASCAPE_PET_RETAIL = /(수초\s*(전문|분양|판매|갤러리)|어항\s*(꾸미기|분양|판매)|아쿠아스케이프|물생활|베타\s*어항|수족관\s*(용품|판매)|반려식물\s*(판매|분양)|다육이?\s*(분양|판매))/;
+// ★ 룰갭 rulegap-20260803(decisions#600): 브랜드 체험관(자동차·가구쇼룸) 부속 카페 — 완성차·가구/매트리스
+//   등 비식음료 브랜드가 운영하는 대형 브랜드 체험관(전시·시승·쇼룸)에 부속된 카페가, 체험관 전체 방문기
+//   (카페 소비와 무관한 전시·시승·포토존 콘텐츠)를 카페 리뷰로 흡수한다(id18421 "현대 모터스튜디오 고양
+//   카페"·id4922 "시몬스 그로서리 스토어 이천 테라스" 실측, 서로 다른 지역·업종 독립 재현). P59/P67과
+//   달리 카페 자체는 진짜 카페(체험관 부속시설)이고 nameInTitle/coreTokens도 정상 매칭돼 하드 거절 대신
+//   개별 리뷰 단위로 P50(호텔 부속 카페)과 동일하게 — 체험관 방문 활동 신호가 있고 카페 실질맥락
+//   (CAFE_CONTEXT_SUBSTANCE)이 전무한 리뷰만 borderline(LLM 재판정)으로 격하한다. 대조군(일광전구
+//   라이트하우스 id14892, 전구공장 개조 카페)은 "아메리카노 주문" 등 실제 카페 이용 서술이 있어
+//   CAFE_CONTEXT_SUBSTANCE로 보존되므로 오탐 없음.
+const BRAND_EXPERIENCE_ACTIVITY = /(전시\s*(후기|관람)|시승\s*(후기|체험)|포토존|쇼룸\s*(투어|구경)|캐릭터\s*전시)/;
 
 // 수도권 시·군·구 — 같은 상호의 '다른 지점'을 지역으로 구분하기 위함
 const ALL_GU = [
@@ -1001,6 +1011,11 @@ export function verifyReview(input: QualityInput): QualityResult {
   const HOTEL_LODGING_SIGNAL = /(숙박|투숙|킹룸|스탠다드룸|디럭스룸|조식뷔페|호캉스|풀빌라|수영장|연회장|컨벤션\s*후기|웨딩|예식장?|객실|1박)/;
   if (HOTEL_NAMED && HOTEL_LODGING_SIGNAL.test(fullL) && !CAFE_CONTEXT.test(fullL)) {
     return { verdict: "rejected", score: 15, reasons: ["호텔 객실/부대시설 이용후기(카페 맥락 전무) — LLM 재판정"], borderline: true, signals: sig };
+  }
+  // [룰갭 rulegap-20260803, decisions#600] 브랜드 체험관(자동차 모터스튜디오·가구/매트리스 쇼룸 등) 부속
+  //   카페 — 전시/시승/포토존 방문기가 카페 실질맥락 없이 섞이면 borderline으로 격하(위 BRAND_EXPERIENCE_ACTIVITY 참조).
+  if (BRAND_EXPERIENCE_ACTIVITY.test(fullL) && !CAFE_CONTEXT_SUBSTANCE.test(fullL)) {
+    return { verdict: "rejected", score: 15, reasons: ["브랜드 체험관 방문기(전시·시승·포토존 — 카페 실질맥락 전무) — LLM 재판정"], borderline: true, signals: sig };
   }
   // [글루드 동명 업체] 카페명이 '다른 상호의 일부'로만 등장(다올→다올커텐) + 카페맥락 전무 → 다른 업체.
   //   카페명 바로 뒤 글자가 '조사'가 아닌 한글이면 글루드(다른 단어). 독립 출현(조사·경계) 0 + 글루드 2+ 일 때만(보수).
