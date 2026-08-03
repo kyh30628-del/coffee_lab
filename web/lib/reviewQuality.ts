@@ -53,6 +53,14 @@ const VISIT_CUES = ["갔", "방문", "다녀", "마셨", "마시", "주문", "�
 //   커버 어휘만 확장.
 const DELIVERY_ONLY_CUES = /(택배\s*후기|택배로\s*받|택배\s*수령|스마트스토어(에서)?\s*구매|주문서\s*캡쳐|집에서\s*받아|배달\s*후기|배달\s*(시켜|시켰|앱|어플|주문|해서)|쿠팡이츠|배달의\s*민족|배민)/;
 const INSTORE_VISIT_CUES = /(매장에서|카페에\s*앉|좌석에?\s*앉|자리에?\s*앉|직접\s*가서|웨이팅|매장\s*방문|가게에\s*가|테이블에\s*앉)/;
+// 룰갭 rulegap-20260803(decisions#597): DELIVERY_ONLY_CUES와 대칭 — 예약제·무인픽업 주문제작 케이크/플라워
+//   케이크 공방(완전 무점포)은 "택배·배달"이 아니라 "카톡문의→제작→무인픽업"으로 거래해 DELIVERY_ONLY_CUES에
+//   안 걸리면서도 VISIT_CUES의 "주문/갔/방문"에 정상 매칭돼 매장 취식 신호로 오판된다(id19936·19739·18813·
+//   16322 실측: 매장 방문 언급 0건인데 검증(최고신뢰) 도달). 예약제/무인픽업/공방 운영 강신호가 있고 매장
+//   실물방문 신호가 전무하면 VISIT_CUES 매칭을 무효화하고 P63과 동일하게 borderline(LLM 재판정)으로 격하한다.
+//   대조군(id83·9121·9704 — 실제 walk-in 베이커리카페)은 "매장/좌석/테이블에 앉" 등 INSTORE_VISIT_CUES가
+//   공존해 제외되므로 오탐 없음.
+const PICKUP_ONLY_CUES = /(100%\s*(주문제작\s*)?예약제|완전\s*예약제|전\s*예약제\s*운영|무인\s*픽업|픽업\s*(시간|전용|만\s*가능)|카톡\s*(ID|아이디|문의|상담)|카카오톡\s*(ID|아이디|문의|상담)|주문\s*제작\s*(케이크|전문|만)|공방\s*운영|원\s*데이\s*클래스|원데이클래스)/i;
 
 // 실제 경험·평가가 담겼는지 (감각/메뉴/서비스/공간 등 구체 신호)
 const SUBSTANCE_CUES = [
@@ -816,7 +824,10 @@ export function verifyReview(input: QualityInput): QualityResult {
   // 룰갭 P63: 배송-전용 강신호가 있고 매장 실물방문 신호가 없으면 비방문 구매후기 — VISIT_CUES의
   //   "주문" 오탐(택배 주문)을 무효화하고 아래에서 borderline(LLM 재판정)으로 격하한다.
   const deliveryOnly = DELIVERY_ONLY_CUES.test(fullL) && !INSTORE_VISIT_CUES.test(fullL);
-  const visit = has(fullL, VISIT_CUES) && !deliveryOnly;
+  // 룰갭 rulegap-20260803(decisions#597): 위와 대칭 — 예약제/무인픽업 주문제작 공방 강신호가 있고 매장
+  //   실물방문 신호가 없으면 VISIT_CUES의 "주문/갔/방문" 오탐(제작 문의·픽업 안내)을 무효화한다.
+  const pickupOnly = PICKUP_ONLY_CUES.test(fullL) && !INSTORE_VISIT_CUES.test(fullL);
+  const visit = has(fullL, VISIT_CUES) && !deliveryOnly && !pickupOnly;
   const substance = SUBSTANCE_CUES.filter((k) => fullL.includes(k.toLowerCase())).length;
   // [#4] 흔한 단어 이름 오매칭 방지: 전체 이름 일치는 강함. 토큰만 일치면
   //     '카페 맥락(카페·커피·로스터리…)'이나 지역이 함께 있어야 주제로 인정.
@@ -1326,6 +1337,11 @@ export function verifyReview(input: QualityInput): QualityResult {
   //   !visit && substance===0 하드거절보다 먼저 검사해 배송후기도 항상 borderline 경로로 보낸다.
   if (deliveryOnly && (nameInTitle || nameInBody)) {
     return { verdict: "rejected", score: 30, reasons: ["택배/스마트스토어 배송 후기(매장 방문 단서 없음) — LLM 재판정"], borderline: true, signals: sig };
+  }
+  // 룰갭 rulegap-20260803(decisions#597): P63과 대칭 — 예약제/무인픽업 주문제작 공방 후기는 매장 취식이
+  //   구조적으로 없는데도 하드 verified 산입되던 것을 borderline(LLM 재판정)으로 격하한다.
+  if (pickupOnly && (nameInTitle || nameInBody)) {
+    return { verdict: "rejected", score: 30, reasons: ["예약제/무인픽업 주문제작 후기(매장 취식 단서 없음) — LLM 재판정"], borderline: true, signals: sig };
   }
   if (!visit && substance === 0) {
     return { verdict: "rejected", score: 10, reasons: ["방문·경험·평가 내용 없음(언급만)"], signals: sig };
