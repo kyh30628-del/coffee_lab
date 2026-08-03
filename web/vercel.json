@@ -79,7 +79,7 @@
     },
     {
       "path": "/api/cron-costwatch",
-      "schedule": "20 9 * * *"
+      "schedule": "0 23 * * *"
     }
   ]
 }
