@@ -5,6 +5,7 @@ import { synthAndStore } from "@/lib/synthStore";
 import { mineArea } from "@/lib/reviewMiner";
 import { recordRun } from "@/lib/agentLog";
 import { naverUsedToday, NAVER_DAILY_QUOTA } from "@/lib/naverBudget";
+import { isCostHalted } from "@/lib/costGuard";
 export const runtime = "nodejs";
 export const maxDuration = 300; // 여러 지역 발굴 + 합성 (플랜 상한까지 사용)
 
@@ -19,6 +20,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
     }
     await ensureSchema();
+    if (await isCostHalted()) { await recordRun("cron-grow", true, "🛑 비용 자동정지 중 — 스킵", 0).catch(() => {}); return NextResponse.json({ ok: true, skipped: "cost-halt" }); }
     await sql`CREATE TABLE IF NOT EXISTS discovery_state (region TEXT PRIMARY KEY, area_label TEXT, last_run TIMESTAMPTZ, last_found INT, last_inserted INT)`;
     // 지역 시드(최초 1회)
     for (const r of METRO_REGIONS) await sql`INSERT INTO discovery_state (region, area_label) VALUES (${r.region}, ${r.areaLabel}) ON CONFLICT (region) DO NOTHING`;

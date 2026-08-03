@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { recordRun } from "@/lib/agentLog";
+import { setCostHalt } from "@/lib/costGuard";
 
 export const runtime = "nodejs";
 
@@ -14,11 +15,11 @@ const TOTAL_GB_ALERT = Number(process.env.COST_WATCH_TOTAL_GB || 25); // 전체 
 const XFER_RATE = 0.032; // Neon 공용 네트워크 전송(발신) 공개단가 $/GB
 
 // 📧 매일 아침 비용 점검 메일(CEO 지시 2026-08-03). 지난달(cost_baseline) vs 이번달(실행이력) 정면 비교. 새 무거운 조회 없음.
-async function sendCostReport(todayGb: number, top: { q: string; deltaGb: number } | null, anomaly: boolean) {
+async function sendCostReport(todayGb: number, top: { q: string; deltaGb: number } | null, anomaly: boolean, execMin: number) {
   const key = process.env.RESEND_API_KEY; if (!key) return;
   const to = process.env.COST_REPORT_EMAIL || "kyh30628@gmail.com"; // 이미 공개 git 커밋에 있는 주소(신규 노출 아님)
   // 지난달 기준선(인보이스 실측, DB에 저장 — 공개 소스에 금액 하드코딩 안 함)
-  const base = (await sql`SELECT period, transfer_gb::float gb, days, transfer_usd::float tusd, total_usd::float total FROM cost_baseline ORDER BY period DESC LIMIT 1`.catch(() => []))[0] as any;
+  const base = (await sql`SELECT period, transfer_gb::float gb, days, transfer_usd::float tusd, compute_usd::float cusd, total_usd::float total FROM cost_baseline ORDER BY period DESC LIMIT 1`.catch(() => []))[0] as any;
   const julAvg = base ? base.gb / base.days : 23.8;
   // 이번 KST월 costwatch 일일 전송 이력 → 일별 dedup 후 합산(이번달 누적·경과일)
   const rows = (await sql`SELECT to_char(ran_at AT TIME ZONE 'Asia/Seoul','MM-DD') d, detail
@@ -54,6 +55,14 @@ async function sendCostReport(todayGb: number, top: { q: string; deltaGb: number
         <tr><td style="color:#8a7256;padding:4px 0">이대로면 8월 전송비</td><td style="text-align:right">~$${augProjUsd.toFixed(1)} <span style="color:#8a7256">(7월 전송 $${base ? base.tusd.toFixed(2) : "-"})</span></td></tr>
       </table>
     </div>
+    <div style="border:1px solid #e5d8c2;border-radius:12px;padding:16px;margin-bottom:14px">
+      <div style="font-size:14px;font-weight:700;margin-bottom:10px">🖥️ 컴퓨트</div>
+      <table style="font-size:14px;width:100%;border-collapse:collapse">
+        <tr><td style="color:#8a7256;padding:4px 0">어제 DB 처리시간(부하 프록시)</td><td style="text-align:right;font-weight:600">${execMin.toFixed(0)}분</td></tr>
+        <tr><td style="color:#8a7256;padding:4px 0">7월 컴퓨트</td><td style="text-align:right">$${base ? base.cusd.toFixed(2) : "-"} <span style="color:#8a7256">(일 $${base ? (base.cusd / base.days).toFixed(2) : "-"})</span></td></tr>
+      </table>
+      <div style="font-size:11px;color:#a99;margin-top:8px">컴퓨트 실제 CU-h·$는 Neon 인보이스가 기준(DB 조회로 정확 산출 불가). 처리시간은 상대 추세 파악용.</div>
+    </div>
     ${top ? `<div style="font-size:12px;color:#8a7256">최다 전송 쿼리: ${String(top.q).replace(/\s+/g, " ").slice(0, 90)} (${top.deltaGb.toFixed(1)}GB)</div>` : ''}
     <p style="color:#a99;font-size:11px;margin-top:12px">전송량(발신)만 매일 측정 가능. 컴퓨트·총 $는 월 인보이스가 기준(7월 총 $${base ? base.total.toFixed(2) : "-"}).</p>
   </div>`;
@@ -76,6 +85,7 @@ export async function GET(req: NextRequest) {
       calls BIGINT NOT NULL,
       snapshot_at TIMESTAMPTZ DEFAULT now()
     )`;
+    await sql`ALTER TABLE cost_watch_snapshot ADD COLUMN IF NOT EXISTS exec_ms DOUBLE PRECISION DEFAULT 0`.catch(() => {}); // 컴퓨트 부하 프록시(누적 실행시간)
 
     const hasExt = (await sql`SELECT 1 FROM pg_extension WHERE extname='pg_stat_statements'`.catch(() => [])) as any[];
     if (!hasExt.length) {
@@ -85,12 +95,14 @@ export async function GET(req: NextRequest) {
 
     // GROUP BY 필수: pg_stat_statements는 (userid,dbid,queryid)별 행이라 같은 queryid가 여러 행일 수 있음
     //   (2026-07-29 로컬테스트에서 실제로 "ON CONFLICT DO UPDATE cannot affect row a second time" 오류로 발견) — 합산해 유일화.
-    const cur = (await sql`SELECT queryid, MAX(LEFT(query, 200)) q, SUM(calls)::bigint calls, SUM(shared_blks_read)::bigint blks_read
-      FROM pg_stat_statements WHERE queryid IS NOT NULL GROUP BY queryid`) as { queryid: string; q: string; calls: string; blks_read: string }[];
-    const prev = (await sql`SELECT queryid, blks_read FROM cost_watch_snapshot`) as { queryid: string; blks_read: string }[];
+    const cur = (await sql`SELECT queryid, MAX(LEFT(query, 200)) q, SUM(calls)::bigint calls, SUM(shared_blks_read)::bigint blks_read, SUM(total_exec_time)::float exec_ms
+      FROM pg_stat_statements WHERE queryid IS NOT NULL GROUP BY queryid`) as { queryid: string; q: string; calls: string; blks_read: string; exec_ms: number }[];
+    const prev = (await sql`SELECT queryid, blks_read, exec_ms FROM cost_watch_snapshot`) as { queryid: string; blks_read: string; exec_ms: number }[];
     const prevMap = new Map(prev.map((p) => [p.queryid, BigInt(p.blks_read)]));
+    const prevExec = new Map(prev.map((p) => [p.queryid, Number(p.exec_ms || 0)]));
 
     let totalDeltaBlocks = BigInt(0);
+    let totalDeltaExecMs = 0; // 컴퓨트 부하 프록시(어제 DB 처리시간)
     let top: { q: string; deltaGb: number } | null = null;
     for (const r of cur) {
       const curBlocks = BigInt(r.blks_read);
@@ -98,27 +110,31 @@ export async function GET(req: NextRequest) {
       // prev 없음(신규 쿼리) 또는 curBlocks < prevBlocks(evict·리셋)면 현재값을 그대로 델타로 취급(과소평가 방지, 오탐 방지 둘 다 안전한 쪽).
       const delta = prevBlocks == null || curBlocks < prevBlocks ? curBlocks : curBlocks - prevBlocks;
       totalDeltaBlocks += delta;
+      const curExec = Number(r.exec_ms || 0), pe = prevExec.get(r.queryid);
+      totalDeltaExecMs += pe == null || curExec < pe ? curExec : curExec - pe;
       const deltaGb = Number(delta) * 8 / 1024 / 1024;
       if (!top || deltaGb > top.deltaGb) top = { q: r.q, deltaGb };
     }
     const totalGb = Number(totalDeltaBlocks) * 8 / 1024 / 1024;
+    const execMin = totalDeltaExecMs / 1000 / 60; // 어제 DB 처리시간(분) — 컴퓨트 부하 프록시
 
     // 스냅샷 갱신(다음날 비교용) — pg_stat_statements가 최대 5천 행까지 잡혀 행별 왕복 쿼리는 그 자체로 느리고 낭비
     //   (2026-07-29 로컬테스트: 4,915건 개별 UPSERT가 120초+ 걸림 — 비용감시 도구가 비용을 만드는 아이러니 방지).
     //   unnest로 배열 파라미터 하나만 보내 단일 왕복으로 처리.
     if (cur.length) {
       await sql`
-        INSERT INTO cost_watch_snapshot (queryid, query_sample, blks_read, calls, snapshot_at)
-        SELECT queryid, query_sample, blks_read, calls, now()
+        INSERT INTO cost_watch_snapshot (queryid, query_sample, blks_read, calls, exec_ms, snapshot_at)
+        SELECT queryid, query_sample, blks_read, calls, exec_ms, now()
         FROM unnest(
           ${cur.map((r) => r.queryid)}::bigint[],
           ${cur.map((r) => r.q)}::text[],
           ${cur.map((r) => r.blks_read)}::bigint[],
-          ${cur.map((r) => r.calls)}::bigint[]
-        ) AS t(queryid, query_sample, blks_read, calls)
+          ${cur.map((r) => r.calls)}::bigint[],
+          ${cur.map((r) => r.exec_ms)}::float8[]
+        ) AS t(queryid, query_sample, blks_read, calls, exec_ms)
         ON CONFLICT (queryid) DO UPDATE SET
           query_sample = EXCLUDED.query_sample, blks_read = EXCLUDED.blks_read,
-          calls = EXCLUDED.calls, snapshot_at = now()
+          calls = EXCLUDED.calls, exec_ms = EXCLUDED.exec_ms, snapshot_at = now()
       `.catch(() => {});
     }
     // 더 이상 안 보이는(evict된) 옛 스냅샷 정리 — 무한 누적 방지.
@@ -131,8 +147,10 @@ export async function GET(req: NextRequest) {
       : `정상 — 오늘 총 ${totalGb.toFixed(1)}GB(임계 ${TOTAL_GB_ALERT}GB), 최다쿼리 ${top ? top.deltaGb.toFixed(1) : 0}GB`;
 
     await recordRun("cron-costwatch", !anomaly, detail, cur.length);
-    await sendCostReport(totalGb, top, anomaly).catch(() => {}); // 📧 매일 아침 CEO 비용 점검 메일(발송 실패는 점검 자체를 막지 않음)
-    return NextResponse.json({ ok: true, anomaly, totalGb: +totalGb.toFixed(2), top, checked: cur.length });
+    // 🛑 과다 시 자동 정지(무거운 자율 크론이 스킵) / 정상 복귀 시 자동 해제 — CEO "과다면 멈춰"
+    await setCostHalt(anomaly, anomaly ? `자동정지: ${detail.slice(0, 150)}` : "정상").catch(() => {});
+    await sendCostReport(totalGb, top, anomaly, execMin).catch(() => {}); // 📧 매일 아침 CEO 비용 점검 메일(발송 실패는 점검 자체를 막지 않음)
+    return NextResponse.json({ ok: true, anomaly, halted: anomaly, totalGb: +totalGb.toFixed(2), execMin: +execMin.toFixed(1), top, checked: cur.length });
   } catch (e) {
     await recordRun("cron-costwatch", false, String(e).slice(0, 150));
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });

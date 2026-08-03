@@ -11,6 +11,9 @@ const { sql } = await import("../lib/db.ts");
 const { recordRun } = await import("../lib/agentLog.ts");
 
 await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS yt_checked_at TIMESTAMPTZ`;
+// 🛑 비용 자동정지(CEO 2026-08-03): cron-costwatch가 이상 감지 시 halted=true → 전송 1위 주범인 이 배치를 멈춘다.
+const halted = (await sql`SELECT halted FROM cost_guard WHERE id=1`.catch(() => []))[0]?.halted;
+if (halted) { await recordRun("youtube-backfill", true, "🛑 비용 자동정지 중 — 스킵", 0).catch(() => {}); console.log("비용 자동정지 중 — youtube-backfill 스킵"); process.exit(0); }
 const MAX = Number(process.env.YT_MAX || 90); // 유튜브 일일 쿼터 안전선
 let added = 0, none = 0, processed = 0, quota = false;
 

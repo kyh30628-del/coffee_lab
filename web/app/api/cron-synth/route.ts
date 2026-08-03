@@ -4,6 +4,7 @@ import { synthAndStore } from "@/lib/synthStore";
 import { PRIORITY_AREAS } from "@/lib/discover";
 import { recordRun } from "@/lib/agentLog";
 import { autoCorrect } from "@/lib/issues";
+import { isCostHalted } from "@/lib/costGuard";
 export const runtime = "nodejs";
 export const maxDuration = 300; // 신규 큐를 시간예산껏 비움
 
@@ -18,6 +19,7 @@ export async function GET(req: NextRequest) {
   }
   try {
     await ensureSchema();
+    if (await isCostHalted()) { await recordRun("cron-synth", true, "🛑 비용 자동정지 중 — 스킵", 0).catch(() => {}); return NextResponse.json({ ok: true, skipped: "cost-halt" }); }
     const BUDGET_MS = 280_000; // maxDuration 300초 내 안전 여유
     const t0 = Date.now();
     let processed = 0, published = 0, skipped = 0, failed = 0;

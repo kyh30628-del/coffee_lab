@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
 import { healAreaLabel, healOutOfBox } from "@/lib/synthStore";
 import { recordRun } from "@/lib/agentLog";
+import { isCostHalted } from "@/lib/costGuard";
 import { probeConsoleKey } from "@/lib/consoleKeyProbe";
 import { loadCriteria, getCriterionSync } from "@/lib/criteria";
 import { quoteMatchConfidence, coreTokens } from "@/lib/reviewQuality";
@@ -657,6 +658,7 @@ export async function GET(req: NextRequest) {
   try {
     if (!authed(req)) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
     await ensureSchema();
+    if (await isCostHalted()) { await recordRun("cron-sentinel", true, "🛑 비용 자동정지 중 — 스킵", 0).catch(() => {}); return NextResponse.json({ ok: true, skipped: "cost-halt" }); }
     await sql`CREATE TABLE IF NOT EXISTS sentinel_reports (id SERIAL PRIMARY KEY, ran_at TIMESTAMPTZ DEFAULT now(), clean BOOLEAN, report JSONB)`.catch(() => {});
 
     // ── ① 자동 치유(안전·결정론·멱등) ──
