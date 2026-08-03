@@ -120,8 +120,7 @@ export function synthesize(name: string, reviews: Review[], area: string[] = [],
   const evidence: Record<string, { kind: string; snip: string }[]> = {};
   axes.forEach((a) => (evidence[a] = stat[a].ev.slice(0, 3)));
 
-  const breadTerm = uses["빵"] ? categoryBreadTerm(naverCategory) ?? reviewBreadKeyword(clean) : null;
-  return { name, reviewCount: n, grade, coords, basis, uses, ops, evidence, identity: buildIdentity(coords, basis, uses, ops, area, breadTerm) };
+  return { name, reviewCount: n, grade, coords, basis, uses, ops, evidence, identity: buildIdentity(coords, basis, uses, ops, area, clean, naverCategory) };
 }
 
 // 리뷰 종합 한 줄 — 검증 후기에서 실제로 드러난 신호만(환각 금지) 따뜻하고 와닿게, 절제해서.
@@ -130,9 +129,11 @@ const USE_PHRASE: Record<string, string> = {
   작업: "작업·공부하기 좋은 곳", 혼자: "혼자 조용히 머물기 좋은 곳", 수다: "함께 도란도란 이야기 나누기 좋은 곳",
   사진: "사진 찍기 좋은 분위기", 빵: "빵·디저트가 특히 자주 언급되는 곳",
 };
-// '빵' 용도는 '동+빵' 조합만으로도 인구밀집 동네에서 수십 곳이 완전동일 문구로 수렴(정합성조사 #536 후속 #583).
-//   동 부착 이후에도 남는 충돌을 가를 3차 disambiguator: naver_category 세부값(이미 검증된 실데이터, 환각 아님) 우선,
-//   없으면 실제 리뷰 텍스트에 등장한 구체 디저트 키워드(스콘/크루아상/케이크/티라미수 등) 1개로 대체.
+// 동일 동네에 같은 최다용도 카테고리가 겹치면 '동+용도' 조합만으로 수십~수백 곳이 완전동일 문구로
+//   수렴한다(정합성조사 #536 '동+빵' 724곳 → #583 breadTerm 완화 → #605 잔여 135그룹/1,772곳: 사진/작업/
+//   혼자/수다는 disambiguator가 없어 그대로 판박이). 5개 용도 전부에 4차 disambiguator를 둔다: '빵'만
+//   naver_category 세부값(이미 검증된 실데이터, 환각 아님)을 1순위로 쓰고(카테고리가 곧 용도와 직결),
+//   나머지 4개+빵의 폴백은 실제 리뷰 텍스트에 등장한 구체 키워드 1개(SPECIFIC_TERM_KEYWORDS)로 대체한다.
 const CATEGORY_BREAD_TERM: Record<string, string> = {
   베이커리: "베이커리 빵", 케이크전문: "케이크", 도넛: "도넛", 아이스크림: "아이스크림",
   빙수: "빙수", 와플: "와플", 베이글: "베이글", 초콜릿전문점: "초콜릿",
@@ -142,20 +143,35 @@ function categoryBreadTerm(naverCategory?: string): string | null {
   const last = naverCategory.split(">").pop()?.trim() ?? "";
   return CATEGORY_BREAD_TERM[last] ?? null;
 }
-const SPECIFIC_BREAD_KEYWORD: Record<string, string> = {
-  스콘: "스콘", scone: "스콘", 크루아상: "크루아상", croissant: "크루아상",
-  케이크: "케이크", cake: "케이크", 티라미수: "티라미수", tiramisu: "티라미수",
+// 용도별 구체 키워드 사전 — USE_KEYS(포괄 신호어)보다 좁고 구체적인 단어만 골라 같은 용도 안에서도 갈라지게 한다.
+const SPECIFIC_TERM_KEYWORDS: Record<string, Record<string, string>> = {
+  빵: { 스콘: "스콘", scone: "스콘", 크루아상: "크루아상", croissant: "크루아상",
+    케이크: "케이크", cake: "케이크", 티라미수: "티라미수", tiramisu: "티라미수" },
+  작업: { 콘센트: "콘센트", outlet: "콘센트", 와이파이: "와이파이", wifi: "와이파이", "1인석": "1인석 좌석" },
+  혼자: { 창가: "창가 자리", "window seat": "창가 자리", 구석자리: "구석 자리", 테라스: "테라스 자리", 정원: "정원" },
+  수다: { 룸: "프라이빗 룸", "private room": "프라이빗 룸", 단체석: "단체석", 야외석: "야외석", 테라스: "테라스" },
+  사진: { 루프탑: "루프탑", rooftop: "루프탑", 오션뷰: "오션뷰", 한강뷰: "한강뷰", 통유리: "통유리 창", 식물: "식물 가득한 공간" },
 };
-function reviewBreadKeyword(clean: Review[]): string | null {
+function reviewSpecificTerm(category: string, clean: Review[]): string | null {
+  const dict = SPECIFIC_TERM_KEYWORDS[category];
+  if (!dict) return null;
   const counts = new Map<string, number>();
-  for (const [kw, label] of Object.entries(SPECIFIC_BREAD_KEYWORD)) {
+  for (const [kw, label] of Object.entries(dict)) {
     const c = clean.filter((r) => r.text.toLowerCase().includes(kw.toLowerCase())).length;
     if (c) counts.set(label, (counts.get(label) ?? 0) + c);
   }
   if (!counts.size) return null;
   return [...counts.entries()].sort((x, y) => y[1] - x[1])[0][0];
 }
-function buildIdentity(coords: Record<string, number | null>, basis: Record<string, string>, uses: Record<string, number>, ops: Record<string, number>, area: string[] = [], breadTerm: string | null = null) {
+// 최다용도 카테고리별 구체 문구 템플릿 — USE_PHRASE(포괄형)를 대체할 때만 쓴다.
+const SPECIFIC_PHRASE: Record<string, (term: string) => string> = {
+  빵: (term) => `${term}·디저트가 특히 자주 언급되는 곳`,
+  작업: (term) => `${term} 갖춘 작업·공부하기 좋은 곳`,
+  혼자: (term) => `${term}에서 혼자 조용히 머물기 좋은 곳`,
+  수다: (term) => `${term}에서 함께 도란도란 이야기 나누기 좋은 곳`,
+  사진: (term) => `${term}이 있어 사진 찍기 좋은 분위기`,
+};
+function buildIdentity(coords: Record<string, number | null>, basis: Record<string, string>, uses: Record<string, number>, ops: Record<string, number>, area: string[] = [], clean: Review[] = [], naverCategory?: string) {
   const p: string[] = [];
   if ((ops["직접로스팅"] ?? 0) >= 2) p.push("직접 로스팅하는 곳"); // 1건은 환각 위험 → 2건+만 주장
   const a = coords.acidity, b = coords.body, s = coords.sweet;
@@ -169,12 +185,16 @@ function buildIdentity(coords: Record<string, number | null>, basis: Record<stri
   // 경우든 아니든 실제 소재지(동)를 상시 포함해 카페별로 갈라지게 한다(환각 아님 — area는 이미 검증된
   // 실제 소재지 데이터).
   const locality = area.filter(Boolean).slice(-1)[0];
+  // 동+phrase가 이미 '동에서' 구조인 경우 phrase 안에 '에서'가 또 나오면 어색해지므로(예: '창가 자리에서'),
+  // phrase 자체에 '에서'가 있으면 조사 없이 붙인다.
+  const wrapLocality = (phrase: string) => (!locality ? phrase : phrase.includes("에서") ? `${locality} ${phrase}` : `${locality}에서 ${phrase}`);
   const tu = Object.entries(uses).sort((x, y) => y[1] - x[1])[0];
-  if (tu && tu[0] === "빵" && breadTerm) {
-    const phrase = `${breadTerm}·디저트가 특히 자주 언급되는 곳`;
-    p.push(locality ? `${locality}에서 ${phrase}` : phrase);
-  } else if (tu && USE_PHRASE[tu[0]]) p.push(locality ? `${locality}에서 ${USE_PHRASE[tu[0]]}` : USE_PHRASE[tu[0]]);
-  else if (locality) p.push(`${locality}의 카페`);
+  if (tu) {
+    const cat = tu[0];
+    const term = cat === "빵" ? categoryBreadTerm(naverCategory) ?? reviewSpecificTerm(cat, clean) : reviewSpecificTerm(cat, clean);
+    if (term && SPECIFIC_PHRASE[cat]) p.push(wrapLocality(SPECIFIC_PHRASE[cat](term)));
+    else if (USE_PHRASE[cat]) p.push(wrapLocality(USE_PHRASE[cat]));
+  } else if (locality) p.push(`${locality}의 카페`);
   if (ops["원두판매"] && p.length < 4) p.push("원두도 살 수 있는 곳");
   if (ops["권위"]) p.push("매체·평단에 소개된 곳");
   return p.length ? p.join(" · ") : "후기가 더 모이면 분석이 또렷해져요";
