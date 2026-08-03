@@ -188,3 +188,4 @@
 | 2026-08-02 01:49 | #584 | [룰갭] 랜드마크+업종접미사 복합상호 — 전체상호 미일치로 방어게이트 우회, verified까지 침투 (ru | 89ad1f75 | - | lib/reviewQuality.ts: coreTokensDetail에 landmarkStripped 신호 추가(랜드마크 토큰 제거 후 다른 식별어만 남는 경우 감지, venueO |
 | 2026-08-02 01:50 | #586 | [레드팀 코드결함] autoCorrect() 승인집행 done 오표시 — action_params 없으면 무 | 3d9c4c48 | - | web/lib/issues.ts autoCorrect() L46-72: ids.length===0(action_params 누락)일 때 ok 기본값을 true→ids.length> |
 | 2026-08-02 02:51 | #589 | [개발] 협업 #276: decision#575 cron-grow 정지의심 — 부분 오탐 가능성(하트비트만  | 74df9ba1 | - | app/api/cron-grow/route.ts: 합성루프(②)에 시간예산(SYNTH_DEADLINE=t0+285s) 추가. 근본원인: recordRun(하트비트)이 함수 맨 끝에 |
+| 2026-08-03 01:53 | #596 | [개발] 협업 #277: 결재#594·#595 크론 정지의심 — 임계값(EXPECT_MAX_H) 미스매치로  | 9f699155 | - | lib/jobTeams.ts EXPECT_MAX_H 재계산: cron-rulegap 16→20(스케줄 04:30·23:30UTC 최대공백19h+버퍼), orchestrator-he |
