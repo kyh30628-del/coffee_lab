@@ -192,3 +192,4 @@
 | 2026-08-03 01:54 | #597 | [룰갭] 예약제·무인픽업 주문제작 케이크공방 — walk-in 카페와 동일경로로 검증(최고신뢰) 등급 도달  | 988d0aa6 | - | lib/reviewQuality.ts: DELIVERY_ONLY_CUES와 대칭인 PICKUP_ONLY_CUES 신설(100%예약제·무인픽업·픽업시간·카톡ID/문의·주문제작·원데이 |
 | 2026-08-03 03:55 | #599 | [개발] 협업 #278: CAFE_CTX/CAFE_CONTEXT 사전 협소로 offctx_rate 과대측정  | 0d23a3f5 | - | lib/synthStore.ts CAFE_CTX·lib/reviewQuality.ts CAFE_CONTEXT/CAFE_CONTEXT_STRONG/CAFE_CONTEXT_SUBSTA |
 | 2026-08-04 08:54 | #600 | [룰갭] 브랜드 체험관(자동차·가구쇼룸) 부속 카페 — 전시/시승 방문기가 카페 리뷰로 혼입 (rulegap | a000fd7a | - | lib/reviewQuality.ts: BRAND_EXPERIENCE_ACTIVITY regex 신설(전시/시승 후기·포토존·쇼룸 투어·캐릭터 전시) + P50(호텔 부속 카페)과 |
+| 2026-08-04 08:55 | #605 | [정합성조사] synth_identity 태그라인 잔여 수렴 — 동일동 내 10곳+ 완전동일 문구 135그룹 | 0155bfa6 | - | lib/synthEngine.ts buildIdentity: 4개 잔여 용도(작업/혼자/수다/사진)에 리뷰텍스트 기반 구체 키워드 disambiguator(SPECIFIC_TERM |
