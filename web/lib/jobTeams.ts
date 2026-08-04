@@ -14,7 +14,7 @@ export const JOB_TEAM: Record<string, string> = {
   "cron-issues": "경영지원본부", "cron-coord-consumer": "경영지원본부", "cron-billing": "경영지원본부",
   "cron-costwatch": "경영지원본부", // Neon 데이터전송비 이상탐지 워치독(2026-07-29, CEO 지시 — youtube-backfill 663GB 사고 재발방지)
   // 로컬 launchd 잡(하트비트 경유)
-  "discover-sweep": "성장본부", // 매일 02:30 KST 전 지역 발굴 스윕(네이버 한도 최대 수집)
+  "discover-sweep": "성장본부", // 🔄2026-08-04 KST 12·20시 전 지역 발굴 스윕(새벽 02:30 → 낮으로 이동, DB통잠)
   "youtube-backfill": "품질본부",
   "weekly-evaluation": "전략기획본부",
   "chief-manager": "기획조정실", "self-audit": "기획조정실", "audit-watch": "기획조정실",
@@ -42,24 +42,24 @@ export const teamOf = (job: string) => JOB_TEAM[job] ?? "경영지원본부";
 //   잔류 기록이 영구 오탐을 만들던 것(dormantIdle 우회 포함)의 구조적 차단.
 export const EXPECT_MAX_H: Record<string, number> = {
   // Vercel 크론 (스케줄 + 버퍼)
-  "cron-snapshot": 200, "cron-resynth": 9, "cron-newsletter": 200, "cron-discover-categories": 800,
-  "cron-verify": 16, "cron-sentinel": 16, "cron-demand": 30, "cron-rulegap": 20, "cron-closure": 12, // verify·sentinel 2×/일(12h)로 촘촘화 → 30→16h(2026-07-05). rulegap은 스케줄 "30 4,23*UTC"(04:30·23:30) 최대공백 19h라 20으로 재계산(2026-08-03, decisions#596) — 16은 비대칭 스케줄 미반영 오탐이었음
-  "cron-criteria-verify": 16, // 기준 검증 에이전트 2×/일(07:50·19:50 KST=12h) + 버퍼 — dead-knob·기준드리프트 결정론 감시(품질본부)
-  // 2026-08-01 47ffe86 통잠창(KST 01-07=UTC16-22 제외) 재배치로 최대 공백이 커져 재계산(2026-08-02, decisions#580):
-  //   cron-grow(0-11시): 11→익일0시 13h 공백 + 버퍼=14. cron-resynth/embed/synth/issues/coord-consumer(0-15,23시): 15→23시 8h 공백 + 버퍼=9.
-  "cron-grow": 14, "cron-enrich": 8, "cron-embed": 9, "cron-synth": 9, "cron-issues": 9, "cron-coord-consumer": 9,
-  "cron-billing": 30,     // 정기결제 크론 매일 09:00 KST + 버퍼(dunning 재시도 일 1회)
-  "orchestrator-heal": 11, // 2026-08-01 47ffe86 통잠창 재배치(decisions#580)로 14:25→익일00:25 최대공백 10h + 버퍼=11로 재계산(2026-08-03, decisions#596) — 6은 재배치 전 값이라 매일 저녁 오탐이었음
+  "cron-snapshot": 200, "cron-resynth": 14, "cron-newsletter": 200, "cron-discover-categories": 800,
+  "cron-verify": 16, "cron-sentinel": 18, "cron-demand": 30, "cron-rulegap": 20, "cron-closure": 14,
+  "cron-criteria-verify": 16, // 기준 검증 에이전트 2×/일 + 버퍼
+  // 🔄 2026-08-04 4창 클러스터링(커밋 8da8c31, KST 08·12·16·20=UTC 3,7,11,23) 재계산: 4창 잡 최대공백 20→08시=12h(+버퍼14),
+  //   2창 잡(enrich·orchestrator·sentinel UTC3,11) 최대공백 11→익일3시=16h(+버퍼18). EXPECT_MAX_H 미갱신이 정지 오탐 원인이었음(자율진단 #604).
+  "cron-grow": 14, "cron-enrich": 18, "cron-embed": 14, "cron-synth": 14, "cron-issues": 14, "cron-coord-consumer": 14,
+  "cron-billing": 30,     // 정기결제 크론 매일 1회 + 버퍼
+  "orchestrator-heal": 18, // 2창(UTC 3,11) 최대공백 16h + 버퍼
   // 로컬 launchd 잡
-  "discover-sweep": 30,    // 매일 02:30 KST 발굴 스윕 + 버퍼(네이버 한도서 중단해도 익일 재개)
+  "discover-sweep": 30,    // 🔄2026-08-04 KST 12·20시 발굴 스윕 + 버퍼
   "youtube-backfill": 30, // 일배치 16:30 KST + 버퍼
-  "chief-manager": 20,    // 일간 사이클 08·17시 KST
-  "self-audit": 16,       // 매일 11:30·15:30·21:30 KST 3회 + 일간 사이클 내 실행 (최대 공백 밤 14h + 버퍼)
+  "chief-manager": 20,    // 일간 사이클 KST 08·12·16시
+  "self-audit": 18,       // 🔄KST 12·16·20시 (최대공백 20→익일12시=16h + 버퍼)
   "weekly-evaluation": 30, // 매일 10:30 KST(격일 게이트지만 스킵도 하트비트)
-  "audit-watch": 2,       // 이벤트 워처 60분(2026-07-28 CEO 지시: Neon 폴링비용 절감, 5분→60분)
-  "chat-watch": 1,        // 관제 챗봇 상주(60초 하트비트)
-  "dev-pipeline": 2,      // 개발 파이프라인 60분(2026-07-28 CEO 지시: Neon 폴링비용 절감, 5분→60분)
-  "dev-deploy": 2,        // 배포 워처 60분(2026-07-28 CEO 지시: Neon 폴링비용 절감, 2분→60분)
+  // 🔄 2026-08-04: chat-watch 폴링(1.5초) 정지로 DB 24h깨우기 제거(컴퓨트 절감) → 로컬 폴러 3개도 60분→KST 08·12·16·20시(최대공백 12h+버퍼14).
+  "audit-watch": 14,      // 이벤트 워처 KST 08·12·16·20시
+  "dev-pipeline": 14,     // 개발 파이프라인 KST 08·12·16·20시
+  "dev-deploy": 14,       // 배포 워처 KST 08·12·16·20시
   "cron-costwatch": 30,   // Neon 비용 이상탐지, 매일 09:20 UTC(18:20 KST) + 버퍼(2026-07-29 CEO 지시)
   // ⚠️ cron-selfaudit 자신은 여기 못 넣는다(자기 정지를 자기가 감지 불가) — 로컬 run-trigger-watch.sh의
   //   결정론 워치독이 감시(7h+ 미실행 시 ok=false 하트비트로 에스컬레이션).
@@ -71,15 +71,14 @@ export const EXPECT_MAX_H: Record<string, number> = {
 //   (JOB_TEAM·EXPECT_MAX_H와 함께 3종 세트로) 신선도 카드에 **자동 반영**. label=화면명, sched=사람이 읽는 주기.
 //   ⚠️ 여기 넣는 잡은 반드시 EXPECT_MAX_H에도 있어야(정지 감시 계약). 은퇴 잡은 넣지 말 것.
 export const LAUNCHD_JOBS: Record<string, { label: string; sched: string }> = {
-  "chief-manager":     { label: "일간 사이클",     sched: "08·12·17시" },
-  "self-audit":        { label: "자율진단",        sched: "11:30·15:30·21:30" },
-  "audit-watch":       { label: "이벤트 워처",     sched: "60분" },
-  "dev-pipeline":      { label: "개발 파이프라인", sched: "60분" },
-  "dev-deploy":        { label: "배포 워커",       sched: "60분" },
+  "chief-manager":     { label: "일간 사이클",     sched: "08·12·16시" },
+  "self-audit":        { label: "자율진단",        sched: "12·16·20시" },
+  "audit-watch":       { label: "이벤트 워처",     sched: "08·12·16·20시" },
+  "dev-pipeline":      { label: "개발 파이프라인", sched: "08·12·16·20시" },
+  "dev-deploy":        { label: "배포 워커",       sched: "08·12·16·20시" },
   "youtube-backfill":  { label: "유튜브 수집",     sched: "16:30" },
   "weekly-evaluation": { label: "주간 거버넌스",   sched: "10:30(격일)" },
-  "chat-watch":        { label: "관제 챗봇",       sched: "상주" },
-  "discover-sweep":    { label: "발굴 스윕",       sched: "02:30·14:30" },
+  "discover-sweep":    { label: "발굴 스윕",       sched: "12·20시" },
 };
 
 // 🛑 **의도적으로 은퇴(plist .disabled)한 잡의 명시적 단일 출처.**
@@ -88,5 +87,5 @@ export const LAUNCHD_JOBS: Record<string, { label: string; sched: string }> = {
 //   quality-redteam-agent·team-legal-agent·dev-agent 등)가 전부 걸린다 → 그들의 investigate 결재가
 //   CEO가 보기도 전에(수십초~2분) '은퇴 확인'으로 오종결돼 L3 에스컬레이션이 무력화됐다(2026-07-07 #200).
 //   → 진짜 은퇴는 여기 **명시적으로만** 표기한다. 은퇴 시 추가, 재활성 시 제거(위 JOB_TEAM 주석과 동기).
-export const RETIRED_JOBS: ReadonlySet<string> = new Set(["dong-backfill", "qualityaudit"]);
+export const RETIRED_JOBS: ReadonlySet<string> = new Set(["dong-backfill", "qualityaudit", "chat-watch"]); // chat-watch: 2026-08-04 컴퓨트 절감 위해 정지(관제 챗봇, 필요시 수동 재기동)
 export const isRetired = (job: string) => RETIRED_JOBS.has(job);

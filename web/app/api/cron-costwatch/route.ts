@@ -51,10 +51,23 @@ async function sendCostReport(todayGb: number, top: { q: string; deltaGb: number
   const cUp = compDay > julCompDay * 1.05, cDown = compDay < julCompDay * 0.95;
   const compCmp = cUp ? `↑ ${Math.round((compDay / julCompDay - 1) * 100)}% 높음` : cDown ? `↓ ${Math.round((1 - compDay / julCompDay) * 100)}% 낮음` : "≈ 비슷";
   const compColor = cUp ? "#c0392b" : cDown ? "#2b7a4b" : "#8a7256";
+  // 💵 전송+컴퓨트+저장 합산 월 추정 (7월 인보이스 총액과 동일 기준: VAT 10% 포함)
+  const storUsd = base ? Math.max(0.5, base.total / 1.1 - base.tusd - base.cusd) : 0.7; // 저장 ≈ 소계 - 전송 - 컴퓨트
+  const projSub = augProjUsd + compMonth + storUsd;
+  const projTotal = projSub * 1.1;
+  const tUp = base && projTotal > base.total * 1.05, tDown = base && projTotal < base.total * 0.95;
+  const totCmp = tUp ? `↑ ${base ? Math.round((projTotal / base.total - 1) * 100) : 0}% 높음` : tDown ? `↓ ${base ? Math.round((1 - projTotal / base.total) * 100) : 0}% 낮음` : "≈ 비슷";
+  const totColor = tUp ? "#c0392b" : tDown ? "#2b7a4b" : "#8a7256";
   const c = anomaly ? "#c0392b" : "#2b7a4b";
   const html = `<div style="font-family:system-ui,'Apple SD Gothic Neo',sans-serif;max-width:560px;color:#2b2018">
     <h2 style="margin:0 0 4px">☕ 일일 비용 점검</h2>
-    <p style="color:#8a7256;margin:0 0 16px;font-size:13px">Neon 데이터전송 기준 · 총 청구액은 월 인보이스가 기준</p>
+    <p style="color:#8a7256;margin:0 0 16px;font-size:13px">Neon 기준 추정 · 정확한 청구는 월 인보이스</p>
+    <div style="border:2px solid ${totColor};border-radius:14px;padding:18px;margin-bottom:16px">
+      <div style="font-size:13px;color:#8a7256">📊 이대로면 8월 총 (전송+컴퓨트+저장, VAT 포함)</div>
+      <div style="font-size:30px;font-weight:800;color:${totColor};margin:4px 0">~$${projTotal.toFixed(0)} <span style="font-size:14px;font-weight:400;color:#8a7256">vs 7월 $${base ? base.total.toFixed(2) : "-"}</span></div>
+      <div style="font-size:15px;font-weight:700;color:${totColor}">${totCmp}</div>
+      <div style="font-size:12px;color:#8a7256;margin-top:6px">전송 ~$${augProjUsd.toFixed(0)} + 컴퓨트 ~$${compMonth.toFixed(0)} + 저장 ~$${storUsd.toFixed(1)} → 소계 ~$${projSub.toFixed(0)} +VAT</div>
+    </div>
     <div style="border:1px solid #e5d8c2;border-radius:12px;padding:16px;margin-bottom:14px">
       <div style="font-size:13px;color:#8a7256">어제 데이터전송</div>
       <div style="font-size:26px;font-weight:700;color:${c}">${todayGb.toFixed(1)} GB <span style="font-size:13px;color:#8a7256;font-weight:400">/ 임계 ${TOTAL_GB_ALERT}GB · 추정 $${estDay.toFixed(2)}</span></div>
