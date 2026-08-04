@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
+import { pingDevTrigger } from "@/lib/devTrigger";
 
 export const runtime = "nodejs";
 
@@ -17,6 +18,7 @@ export async function POST(req: NextRequest) {
     if (action === "deploy") {
       if (ds !== "배포대기") return NextResponse.json({ ok: false, error: `배포대기 상태가 아님(현재: ${ds || "미빌드"})` }, { status: 400 });
       await sql`UPDATE decisions SET action_params = action_params || '{"dev_status":"deploy_approved"}'::jsonb, result='CEO 배포 확정 — 배포 진행' WHERE id=${id}`;
+      await pingDevTrigger("deploy"); // 로컬 dev-deploy 즉시 발화(브라우저 승인도 대기 없이)
       return NextResponse.json({ ok: true, status: "deploy_approved" });
     }
     if (action === "discard") {

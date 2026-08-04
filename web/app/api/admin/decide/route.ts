@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
+import { pingDevTrigger } from "@/lib/devTrigger";
 
 export const runtime = "nodejs";
 
@@ -83,6 +84,8 @@ export async function POST(req: NextRequest) {
       status = "failed"; result = "실행 오류: " + String(e).slice(0, 80);
     }
     await sql`UPDATE decisions SET status=${status}, decided_at=now(), result=${result}, decided_by='CEO' WHERE id=${id}`;
+    // dev_task 승인 → 로컬 dev-pipeline 즉시 발화(브라우저 승인도 대기 없이 빌드 착수)
+    if (d.action_type === "dev_task" && status === "approved") await pingDevTrigger("build");
     return NextResponse.json({ ok: true, status, result, affected });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
