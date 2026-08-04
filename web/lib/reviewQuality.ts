@@ -732,6 +732,15 @@ export function nonCoffeeCafeCategoryWords(naverCategory?: string): string[] {
   }
   return out;
 }
+// 🎷🍸 [룰갭 rulegap-20260803-16시대, decisions#606] naver_category="라이브카페" 자기소유 리뷰가 실제
+//   재즈바/공연 위주 주류업소인 경우 — #566(decisions#566)은 "제목이 다른 업체를 가리킴" 크로스체크만
+//   고쳐, 그 카페 '자기 자신'의 리뷰인데 실질 업종이 커피가 아니라 주류/공연이면 nameHit·naver_category
+//   매칭이 정상 통과해 verified까지 도달한다(coordination#281 재검증 실증: id18647 재즈클럽 야누스 6/6
+//   리뷰 전부 재즈바/공연/주류 서술뿐인데 verified 다수 채택, id1214 하늘아래작은마을 BBQ장 방문기 위주
+//   인데도 커피 실질언급 0/6으로 최고등급 도달). naver_category가 라이브카페/라이브클럽 범위일 때만
+//   (전역 아님 — #566과 동일하게 naver_category 기반 스코프로 오탐 최소화) 아래에서 적용한다.
+const ALCOHOL_LIVE_VENUE_ACTIVITY = /재즈바|재즈클럽|생맥주|하이볼|칵테일|위스키|공연\s*(입장료|무대)|커버차지|야외바베큐|바베큐(장|이자)/;
+const LIVE_VENUE_CATEGORY = /라이브카페|라이브클럽/;
 // 노출 리뷰에서 '진짜 커피 실질언급'만 — "카페"·"디저트"·"브런치" 등은 상호명 리터럴(예: '카페나하본점')이나
 //   식당의 부수 메뉴로도 흔해 오탐하므로 제외. isNonCafeFnbCategory와 짝으로만 쓴다(일반 판정엔 과도하게 좁음).
 export const COFFEE_SUBSTANCE = /커피|라떼|아메리카노|에스프레소|드립|원두|로스팅|콜드브루|카푸치노|마키아토|핸드드립/;
@@ -1397,6 +1406,17 @@ export function verifyReview(input: QualityInput): QualityResult {
   if (score >= 60 && nameInTitle && (visit || substance >= 1)) verdict = "verified";
   else if (score >= 38 && (nameInTitle || nameInBody)) verdict = "reference";
   else { verdict = "rejected"; reasons.push("종합 품질 미달"); }
+
+  // [룰갭 rulegap-20260803-16시대, decisions#606] 라이브카페 자기소유 리뷰가 주류/공연 활동기(재즈바·
+  //   생맥주·하이볼·야외바베큐 등)뿐이고 카페 실질맥락(CAFE_CONTEXT_SUBSTANCE — 커피·라떼·디저트 등)이
+  //   그 리뷰에 전무하면 verified 승격을 막고 reference 상한으로 캡한다 — 카페 전체 하드탈락이 아니라
+  //   리뷰 단위 페어드 네거티브 조건(P59 CRAFT_WORKSHOP_ACTIVITY와 동일 구조)이라, 카페 겸업 자기서술이
+  //   섞여 등급을 못 채운 리뷰도 삭제되지 않고 reference로 보존된다.
+  if (verdict === "verified" && LIVE_VENUE_CATEGORY.test(input.naverCategory ?? "") && ALCOHOL_LIVE_VENUE_ACTIVITY.test(fullL) && !CAFE_CONTEXT_SUBSTANCE.test(fullL)) {
+    verdict = "reference";
+    score = Math.min(score, 59);
+    reasons.push("라이브카페 주류/공연 활동기(카페 실질맥락 전무) — 참고등급 캡");
+  }
 
   return { verdict, score: Math.round(score), reasons, signals: sig };
 }
