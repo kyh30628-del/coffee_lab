@@ -61,6 +61,19 @@ const INSTORE_VISIT_CUES = /(매장에서|카페에\s*앉|좌석에?\s*앉|자�
 //   대조군(id83·9121·9704 — 실제 walk-in 베이커리카페)은 "매장/좌석/테이블에 앉" 등 INSTORE_VISIT_CUES가
 //   공존해 제외되므로 오탐 없음.
 const PICKUP_ONLY_CUES = /(100%\s*(주문제작\s*)?예약제|완전\s*예약제|전\s*예약제\s*운영|무인\s*픽업|픽업\s*(시간|전용|만\s*가능)|카톡\s*(ID|아이디|문의|상담)|카카오톡\s*(ID|아이디|문의|상담)|주문\s*제작\s*(케이크|전문|만)|공방\s*운영|원\s*데이\s*클래스|원데이클래스)/i;
+// 룰갭 rulegap-20260804(decisions#618): 원두 도매/로스팅공장 + 소매아울렛 — 사업자 대상 대량구매·창고형
+//   소매점 구매후기가 DELIVERY_ONLY_CUES/PICKUP_ONLY_CUES 사각으로 남는다(택배·예약픽업 어휘가 없고 실제
+//   오프라인 매장 방문 자체는 있는 유형이라 "매장에서/앉아" 류 INSTORE_VISIT_CUES조차 없어 두 게이트 모두
+//   무력화). "카페"·"커피"·"원두" 어휘가 풍부해 CAFE_CONTEXT는 통과하지만 실제로는 음료를 마시러 간 게 아니라
+//   사업자 원두 대량구매·홈카페 용품 구매 후기다(id7124 브리즈빈 로스터리·id4799 베라커피아울렛 실측, 표시
+//   리뷰 전량 도매/구매 후기 — 시음·착석 서술 0건). 도매/소매 강신호가 있고 실제 음료 시음/착석 서술
+//   (마셨다·시켜서·앉아서 등)이 없으면 P63과 동일하게 VISIT_CUES 매칭을 무효화 후 borderline(LLM 재판정)
+//   격하한다.
+const WHOLESALE_RETAIL_CUES = /(대량주문|사업자\s*(원두|샘플)|도매가|창고형|홈카페\s*(용품|구매)|카페\s*창업|원두\s*(구매|판매)\s*후기|B2B|거래처|납품)/i;
+// 위 borderline만으론 부족 — naver_category가 F&B 대분류 밖(제조업·쇼핑,유통 등, isNonFnbCategory)이면
+//   "카페" 자기등록조차 없는 업종이라 도매 마케팅/창고형 매장일 확률이 더 높다(id7124=서비스,산업>제조업,
+//   id4799=쇼핑,유통>쇼핑센터,할인매장 — 둘 다 비F&B 카테고리 실측, P61과 결합해 가중치 상향).
+const DRINK_TASTING_CUES = /(마셨|마시고|시켜서\s*마|시켰|한\s*잔\s*하고|앉아서)/;
 
 // 실제 경험·평가가 담겼는지 (감각/메뉴/서비스/공간 등 구체 신호)
 const SUBSTANCE_CUES = [
@@ -832,7 +845,10 @@ export function verifyReview(input: QualityInput): QualityResult {
   // 룰갭 rulegap-20260803(decisions#597): 위와 대칭 — 예약제/무인픽업 주문제작 공방 강신호가 있고 매장
   //   실물방문 신호가 없으면 VISIT_CUES의 "주문/갔/방문" 오탐(제작 문의·픽업 안내)을 무효화한다.
   const pickupOnly = PICKUP_ONLY_CUES.test(fullL) && !INSTORE_VISIT_CUES.test(fullL);
-  const visit = has(fullL, VISIT_CUES) && !deliveryOnly && !pickupOnly;
+  // 룰갭 rulegap-20260804(decisions#618): 도매/소매 강신호가 있고 매장 실물방문·시음 신호가 전무하면
+  //   P63/rulegap-20260803과 동일하게 VISIT_CUES 매칭을 무효화한다.
+  const wholesaleOnly = WHOLESALE_RETAIL_CUES.test(fullL) && !INSTORE_VISIT_CUES.test(fullL) && !DRINK_TASTING_CUES.test(fullL);
+  const visit = has(fullL, VISIT_CUES) && !deliveryOnly && !pickupOnly && !wholesaleOnly;
   const substance = SUBSTANCE_CUES.filter((k) => fullL.includes(k.toLowerCase())).length;
   // [#4] 흔한 단어 이름 오매칭 방지: 전체 이름 일치는 강함. 토큰만 일치면
   //     '카페 맥락(카페·커피·로스터리…)'이나 지역이 함께 있어야 주제로 인정.
@@ -1347,6 +1363,16 @@ export function verifyReview(input: QualityInput): QualityResult {
   //   구조적으로 없는데도 하드 verified 산입되던 것을 borderline(LLM 재판정)으로 격하한다.
   if (pickupOnly && (nameInTitle || nameInBody)) {
     return { verdict: "rejected", score: 30, reasons: ["예약제/무인픽업 주문제작 후기(매장 취식 단서 없음) — LLM 재판정"], borderline: true, signals: sig };
+  }
+  // 룰갭 rulegap-20260804(decisions#618): 원두 도매/로스팅공장·소매아울렛 — 사업자 대량구매·창고형 소매점
+  //   구매후기가 P63/rulegap-20260803의 사각(택배·예약픽업 어휘 없이 실제 오프라인 방문은 있는 유형)에
+  //   남는다. naver_category가 F&B 대분류 밖(isNonFnbCategory, P61)이면 도매 마케팅/창고형 매장일 확률이
+  //   더 높아 하드 거절, 그 외(정상 카페가 원두도 함께 파는 겸업 등)는 P63과 동일하게 borderline(LLM 재판정).
+  if (wholesaleOnly && (nameInTitle || nameInBody)) {
+    if (isNonFnbCategory(input.naverCategory)) {
+      return { verdict: "rejected", score: 6, reasons: ["원두 도매/소매 사업자용 후기(비F&B 카테고리 + 매장 시음·착석 단서 없음)"], signals: sig };
+    }
+    return { verdict: "rejected", score: 30, reasons: ["원두 도매/소매 구매후기(매장 시음·착석 단서 없음) — LLM 재판정"], borderline: true, signals: sig };
   }
   if (!visit && substance === 0) {
     return { verdict: "rejected", score: 10, reasons: ["방문·경험·평가 내용 없음(언급만)"], signals: sig };
