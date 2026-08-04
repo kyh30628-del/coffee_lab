@@ -21,7 +21,8 @@ await sql`UPDATE decisions SET action_params = action_params - 'dev_status' - 'd
 // 2) 최대 K건 원자적 클레임 — 🛡️ CEO가 직접 승인(decided_by='CEO')한 dev_task만(자가승인 착수 차단, 2026-07-02)
 const rows = await sql`UPDATE decisions SET action_params = action_params || jsonb_build_object('dev_status','building','dev_claimed', now()::text)
   WHERE id IN (
-    SELECT id FROM decisions WHERE action_type='dev_task' AND status='approved' AND decided_by='CEO' AND (action_params->>'dev_status') IS NULL
+    SELECT id FROM decisions WHERE action_type='dev_task' AND status='approved' AND decided_by='CEO'
+      AND COALESCE(action_params->>'dev_status','개발대기') = '개발대기'   -- null(정상) + 생성경로가 라벨 문자열을 실제로 저장한 경우(#618) 모두 클레임. IS NULL만 보면 후자가 영구 미빌드 고아가 됨.
     ORDER BY id LIMIT ${K} FOR UPDATE SKIP LOCKED
   ) RETURNING id`.catch(() => []);
 console.log(rows.map((r) => r.id).join(" "));
