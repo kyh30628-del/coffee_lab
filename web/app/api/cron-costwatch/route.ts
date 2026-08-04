@@ -19,7 +19,7 @@ async function sendCostReport(todayGb: number, top: { q: string; deltaGb: number
   const key = process.env.RESEND_API_KEY; if (!key) return;
   const to = process.env.COST_REPORT_EMAIL || "kyh30628@gmail.com"; // 이미 공개 git 커밋에 있는 주소(신규 노출 아님)
   // 지난달 기준선(인보이스 실측, DB에 저장 — 공개 소스에 금액 하드코딩 안 함)
-  const base = (await sql`SELECT period, transfer_gb::float gb, days, transfer_usd::float tusd, compute_usd::float cusd, total_usd::float total FROM cost_baseline ORDER BY period DESC LIMIT 1`.catch(() => []))[0] as any;
+  const base = (await sql`SELECT period, transfer_gb::float gb, days, transfer_usd::float tusd, compute_usd::float cusd, compute_cuh::float ccuh, total_usd::float total FROM cost_baseline ORDER BY period DESC LIMIT 1`.catch(() => []))[0] as any;
   const julAvg = base ? base.gb / base.days : 23.8;
   // 이번 KST월 costwatch 일일 전송 이력 → 일별 dedup 후 합산(이번달 누적·경과일)
   const rows = (await sql`SELECT to_char(ran_at AT TIME ZONE 'Asia/Seoul','MM-DD') d, detail
@@ -37,6 +37,20 @@ async function sendCostReport(todayGb: number, top: { q: string; deltaGb: number
   const cmpColor = up ? "#c0392b" : down ? "#2b7a4b" : "#8a7256";
   const augProjUsd = augAvg * 31 * XFER_RATE; // 이대로면 이번달 전송비 추정
   const estDay = todayGb * XFER_RATE;
+  // 🖥️ 컴퓨트(DB) 추정: 어제 DB가 '깨어있던 시간'(활동 타임스탬프 5분 버킷) × CU_size × $0.106.
+  //   CU_size는 7월 인보이스에서 역산(7월은 chat-watch로 24h 깨어있었으니 CU-h/(days*24)).
+  const abk = (await sql`SELECT count(DISTINCT floor(extract(epoch from t)/300))::int b FROM (
+      SELECT ts t FROM traffic_events WHERE ts >= now() - interval '24 hours'
+      UNION ALL SELECT ran_at FROM agent_runs WHERE ran_at >= now() - interval '24 hours'
+    ) u`.catch(() => [{ b: 0 }]))[0] as any;
+  const activeH = Math.min(24, (Number(abk?.b || 0) * 5) / 60); // 어제 DB 활성 시간(추정)
+  const cuSize = base && base.ccuh ? base.ccuh / (base.days * 24) : 0.6;
+  const compDay = activeH * cuSize * 0.106; // Neon CU-시간 공개단가 $0.106
+  const compMonth = compDay * 30;
+  const julCompDay = base ? base.cusd / base.days : 1.52;
+  const cUp = compDay > julCompDay * 1.05, cDown = compDay < julCompDay * 0.95;
+  const compCmp = cUp ? `↑ ${Math.round((compDay / julCompDay - 1) * 100)}% 높음` : cDown ? `↓ ${Math.round((1 - compDay / julCompDay) * 100)}% 낮음` : "≈ 비슷";
+  const compColor = cUp ? "#c0392b" : cDown ? "#2b7a4b" : "#8a7256";
   const c = anomaly ? "#c0392b" : "#2b7a4b";
   const html = `<div style="font-family:system-ui,'Apple SD Gothic Neo',sans-serif;max-width:560px;color:#2b2018">
     <h2 style="margin:0 0 4px">☕ 일일 비용 점검</h2>
@@ -55,13 +69,16 @@ async function sendCostReport(todayGb: number, top: { q: string; deltaGb: number
         <tr><td style="color:#8a7256;padding:4px 0">이대로면 8월 전송비</td><td style="text-align:right">~$${augProjUsd.toFixed(1)} <span style="color:#8a7256">(7월 전송 $${base ? base.tusd.toFixed(2) : "-"})</span></td></tr>
       </table>
     </div>
-    <div style="border:1px solid #e5d8c2;border-radius:12px;padding:16px;margin-bottom:14px">
-      <div style="font-size:14px;font-weight:700;margin-bottom:10px">🖥️ 컴퓨트</div>
+    <div style="border:2px solid ${compColor};border-radius:12px;padding:16px;margin-bottom:14px">
+      <div style="font-size:14px;font-weight:700;margin-bottom:10px">🖥️ 컴퓨트(DB) — 지난달 대비</div>
       <table style="font-size:14px;width:100%;border-collapse:collapse">
-        <tr><td style="color:#8a7256;padding:4px 0">어제 DB 처리시간(부하 프록시)</td><td style="text-align:right;font-weight:600">${execMin.toFixed(0)}분</td></tr>
-        <tr><td style="color:#8a7256;padding:4px 0">7월 컴퓨트</td><td style="text-align:right">$${base ? base.cusd.toFixed(2) : "-"} <span style="color:#8a7256">(일 $${base ? (base.cusd / base.days).toFixed(2) : "-"})</span></td></tr>
+        <tr><td style="color:#8a7256;padding:4px 0">어제 DB 깨어있던 시간(추정)</td><td style="text-align:right;font-weight:600">${activeH.toFixed(1)}시간 / 24 <span style="color:#8a7256;font-weight:400">(${(24 - activeH).toFixed(1)}시간 잠)</span></td></tr>
+        <tr><td style="color:#8a7256;padding:4px 0">추정 컴퓨트비</td><td style="text-align:right;font-weight:600">~$${compDay.toFixed(2)}/일 · 월 ~$${compMonth.toFixed(0)}</td></tr>
+        <tr><td style="color:#8a7256;padding:4px 0">7월</td><td style="text-align:right">일 $${julCompDay.toFixed(2)} · 월 $${base ? base.cusd.toFixed(2) : "-"} <span style="color:#8a7256">(24h 깨어있었음)</span></td></tr>
+        <tr><td style="padding:8px 0 0;font-weight:700">→ 지난달 대비</td><td style="text-align:right;padding-top:8px;font-weight:800;font-size:16px;color:${compColor}">${compCmp}</td></tr>
+        <tr><td style="color:#8a7256;padding:4px 0">어제 DB 처리시간</td><td style="text-align:right;color:#8a7256">${execMin.toFixed(0)}분</td></tr>
       </table>
-      <div style="font-size:11px;color:#a99;margin-top:8px">컴퓨트 실제 CU-h·$는 Neon 인보이스가 기준(DB 조회로 정확 산출 불가). 처리시간은 상대 추세 파악용.</div>
+      <div style="font-size:11px;color:#a99;margin-top:8px">추정식: DB 활성시간 × CU_size(${cuSize.toFixed(2)}, 7월 인보이스서 역산) × $0.106/CU-h. 정확한 청구는 Neon 인보이스 기준.</div>
     </div>
     ${top ? `<div style="font-size:12px;color:#8a7256">최다 전송 쿼리: ${String(top.q).replace(/\s+/g, " ").slice(0, 90)} (${top.deltaGb.toFixed(1)}GB)</div>` : ''}
     <p style="color:#a99;font-size:11px;margin-top:12px">전송량(발신)만 매일 측정 가능. 컴퓨트·총 $는 월 인보이스가 기준(7월 총 $${base ? base.total.toFixed(2) : "-"}).</p>
