@@ -191,3 +191,4 @@
 | 2026-08-03 01:53 | #596 | [개발] 협업 #277: 결재#594·#595 크론 정지의심 — 임계값(EXPECT_MAX_H) 미스매치로  | 9f699155 | - | lib/jobTeams.ts EXPECT_MAX_H 재계산: cron-rulegap 16→20(스케줄 04:30·23:30UTC 최대공백19h+버퍼), orchestrator-he |
 | 2026-08-03 01:54 | #597 | [룰갭] 예약제·무인픽업 주문제작 케이크공방 — walk-in 카페와 동일경로로 검증(최고신뢰) 등급 도달  | 988d0aa6 | - | lib/reviewQuality.ts: DELIVERY_ONLY_CUES와 대칭인 PICKUP_ONLY_CUES 신설(100%예약제·무인픽업·픽업시간·카톡ID/문의·주문제작·원데이 |
 | 2026-08-03 03:55 | #599 | [개발] 협업 #278: CAFE_CTX/CAFE_CONTEXT 사전 협소로 offctx_rate 과대측정  | 0d23a3f5 | - | lib/synthStore.ts CAFE_CTX·lib/reviewQuality.ts CAFE_CONTEXT/CAFE_CONTEXT_STRONG/CAFE_CONTEXT_SUBSTA |
+| 2026-08-04 08:54 | #600 | [룰갭] 브랜드 체험관(자동차·가구쇼룸) 부속 카페 — 전시/시승 방문기가 카페 리뷰로 혼입 (rulegap | a000fd7a | - | lib/reviewQuality.ts: BRAND_EXPERIENCE_ACTIVITY regex 신설(전시/시승 후기·포토존·쇼룸 투어·캐릭터 전시) + P50(호텔 부속 카페)과 |
