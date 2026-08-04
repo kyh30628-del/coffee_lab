@@ -194,3 +194,4 @@
 | 2026-08-04 08:54 | #600 | [룰갭] 브랜드 체험관(자동차·가구쇼룸) 부속 카페 — 전시/시승 방문기가 카페 리뷰로 혼입 (rulegap | a000fd7a | - | lib/reviewQuality.ts: BRAND_EXPERIENCE_ACTIVITY regex 신설(전시/시승 후기·포토존·쇼룸 투어·캐릭터 전시) + P50(호텔 부속 카페)과 |
 | 2026-08-04 08:55 | #605 | [정합성조사] synth_identity 태그라인 잔여 수렴 — 동일동 내 10곳+ 완전동일 문구 135그룹 | 0155bfa6 | - | lib/synthEngine.ts buildIdentity: 4개 잔여 용도(작업/혼자/수다/사진)에 리뷰텍스트 기반 구체 키워드 disambiguator(SPECIFIC_TERM |
 | 2026-08-04 08:56 | #606 | [룰갭] naver_category="라이브카페" 자기소유 리뷰가 실제 주류/공연 업소인데 카페실질 0으로도 | 8b0a5854 | - | lib/reviewQuality.ts: ALCOHOL_LIVE_VENUE_ACTIVITY(재즈바/생맥주/하이볼/칵테일/위스키/공연입장료·무대/커버차지/야외바베큐/바베큐장·이자) 신 |
+| 2026-08-04 08:57 | #618 | [룰갭] 원두 도매/로스팅공장 + 소매아울렛 — 사업자 대량구매·제품구매 후기가 카페 방문후기로 혼입 (ru | 4d549ed4 | - | lib/reviewQuality.ts: WHOLESALE_RETAIL_CUES 정규식 신설(대량주문·사업자 원두/샘플·도매가·창고형·홈카페 용품/구매·카페창업·원두 구매/판매 후기 |
