@@ -193,3 +193,4 @@
 | 2026-08-03 03:55 | #599 | [개발] 협업 #278: CAFE_CTX/CAFE_CONTEXT 사전 협소로 offctx_rate 과대측정  | 0d23a3f5 | - | lib/synthStore.ts CAFE_CTX·lib/reviewQuality.ts CAFE_CONTEXT/CAFE_CONTEXT_STRONG/CAFE_CONTEXT_SUBSTA |
 | 2026-08-04 08:54 | #600 | [룰갭] 브랜드 체험관(자동차·가구쇼룸) 부속 카페 — 전시/시승 방문기가 카페 리뷰로 혼입 (rulegap | a000fd7a | - | lib/reviewQuality.ts: BRAND_EXPERIENCE_ACTIVITY regex 신설(전시/시승 후기·포토존·쇼룸 투어·캐릭터 전시) + P50(호텔 부속 카페)과 |
 | 2026-08-04 08:55 | #605 | [정합성조사] synth_identity 태그라인 잔여 수렴 — 동일동 내 10곳+ 완전동일 문구 135그룹 | 0155bfa6 | - | lib/synthEngine.ts buildIdentity: 4개 잔여 용도(작업/혼자/수다/사진)에 리뷰텍스트 기반 구체 키워드 disambiguator(SPECIFIC_TERM |
+| 2026-08-04 08:56 | #606 | [룰갭] naver_category="라이브카페" 자기소유 리뷰가 실제 주류/공연 업소인데 카페실질 0으로도 | 8b0a5854 | - | lib/reviewQuality.ts: ALCOHOL_LIVE_VENUE_ACTIVITY(재즈바/생맥주/하이볼/칵테일/위스키/공연입장료·무대/커버차지/야외바베큐/바베큐장·이자) 신 |
