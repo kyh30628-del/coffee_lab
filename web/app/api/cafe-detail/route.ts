@@ -20,26 +20,24 @@ function recencyBonus(d: string | undefined, nowT: number): number {
   if (months <= 1) return 45;
   return Math.max(0, 45 - months * 2);
 }
-// 정확도(score) + 신뢰등급 복합 — 동일 확신도·동일 최신성 내 안정적 타이브레이크용(3순위).
-function rankScore(e: any, nowT: number): number {
-  const score = typeof e?.score === "number" ? e.score : 50;
-  const trust = e?.trust === "verified" ? 25 : e?.trust === "reference" ? 0 : -40;
-  return score + trust + recencyBonus(e?.date, nowT);
+// 정확도(score) — 후기 한 건의 판정 정확도 수치(0~100). 등급 다음가는 정렬 기준(CEO 2026-08-05).
+function accuracy(e: any): number {
+  return typeof e?.score === "number" ? e.score : 50;
 }
-// 신뢰등급 티어 — 상위 노출(대표 6건) 우선순위의 1차 기준. verified(검증)=그 카페가 글의 주제인 진짜 방문기,
+// 신뢰등급 티어 — 노출 우선순위의 최상위 기준. verified(검증)=그 카페가 글의 주제인 진짜 방문기,
 //   reference(참고)=본문에 이름만 스친 약한 근거(옆가게·다른 맛집 글에 "맞은편 카페 ○○도" 식 언급).
 function trustTier(e: any): number {
   return e?.trust === "verified" ? 2 : e?.trust === "reference" ? 1 : 0;
 }
-// #307: 정렬 = ①카페명 매칭 확신도(nameCoherence 기반, 동명 불일치·오염의심 리뷰를 하단으로) 내림차순
-//   → ②신뢰등급(검증 > 참고) → ③동일 등급 내 최신순 → ④동률 안정화용 정확도+신뢰등급.
-//   저장 시점 score/trust만으로는 '카페 여유'에 붙은 '노아브런치카페' 언급 리뷰처럼 흔한 단어(여유) 하나로
-//   겹친 오염이 최신성 덕에 최상단을 차지했다 — 읽기 시점에 매칭 확신도를 다시 계산해 즉시 적용한다.
-// 2026-08-05(CEO "피기스터하우스에 돈제당 리뷰가 6건 안에"): 확신도는 이름만 맞으면 전부 1이라
-//   사실상 '최신순'만 남았고, 그 결과 **참고 등급(약한 근거)이 검증 후기를 밀어내고 대표 6건을 차지**했다.
-//   (14075 피기스터하우스: 검증 17건이 있는데도 상위 6칸 중 4칸이 참고 — 돈제당 식당 글·피자집 글·샤브샤브 글.)
-//   → 신뢰등급을 최신성보다 **위** 순위로 올려, 검증 후기가 있는 한 참고는 대표 6건에 못 들어오게 한다.
-//   전수 실측: 공개 13,460곳 중 9,927곳이 대표 6건에 참고를 노출, 그중 8,339곳은 아래에 검증 후기가 대기 중.
+// 노출 정렬(CEO 확정 2026-08-05) — **①신뢰등급(검증 > 참고 > 그 외) ②같은 등급 안에서 정확도(score) 높은 순**
+//   ③동점이면 최신순 ④그래도 동점이면 안정 타이브레이크. 검증 등급은 무조건 최우선으로 노출된다.
+// ⚠️ 단 하나의 선행 관문 = 카페명 매칭 확신도(quoteMatchConfidence, 0/1). conf=0 = 인용문에 이 카페 이름조차
+//   안 맞는 '다른 카페 의심' 건이라 등급과 무관하게 맨 뒤로 내린다(#307 '카페 여유'에 붙은 '노아브런치카페'
+//   오염이 최상단을 차지한 사고의 방어선 — 저장 시점 등급만 믿으면 재발한다). 실제 데이터의 절대다수는
+//   conf=1이라 이 관문은 오염 의심분만 걸러내고, 나머지 전부에 위 ①②③이 그대로 적용된다.
+// 배경(CEO "피기스터하우스에 돈제당 리뷰가 6건 안에"): 예전 정렬은 conf→최신순이었는데 conf가 사실상 전건 1이라
+//   '최신순'만 남아, 참고 등급(약한 근거)이 검증 후기를 밀어내고 대표 6칸을 차지했다(14075: 6칸 중 4칸).
+//   전수 실측: 공개 13,460곳 중 9,927곳이 대표 6건에 참고를 노출, 그중 8,339곳은 아래에 검증 후기가 대기 중이었다.
 function sortReviews(raw: any[], name: string, areaTerms: string[], nowT: number): any[] {
   return [...raw]
     .map((e) => ({ e, conf: quoteMatchConfidence(name, e?.quote || "", areaTerms) }))
@@ -47,9 +45,9 @@ function sortReviews(raw: any[], name: string, areaTerms: string[], nowT: number
       if (b.conf !== a.conf) return b.conf - a.conf;
       const tier = trustTier(b.e) - trustTier(a.e);
       if (tier !== 0) return tier;
-      const rb = recencyBonus(b.e?.date, nowT) - recencyBonus(a.e?.date, nowT);
-      if (rb !== 0) return rb;
-      return rankScore(b.e, nowT) - rankScore(a.e, nowT);
+      const acc = accuracy(b.e) - accuracy(a.e);
+      if (acc !== 0) return acc;
+      return recencyBonus(b.e?.date, nowT) - recencyBonus(a.e?.date, nowT);
     })
     .map(({ e }) => e);
 }
