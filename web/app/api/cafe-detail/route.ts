@@ -26,15 +26,27 @@ function rankScore(e: any, nowT: number): number {
   const trust = e?.trust === "verified" ? 25 : e?.trust === "reference" ? 0 : -40;
   return score + trust + recencyBonus(e?.date, nowT);
 }
+// 신뢰등급 티어 — 상위 노출(대표 6건) 우선순위의 1차 기준. verified(검증)=그 카페가 글의 주제인 진짜 방문기,
+//   reference(참고)=본문에 이름만 스친 약한 근거(옆가게·다른 맛집 글에 "맞은편 카페 ○○도" 식 언급).
+function trustTier(e: any): number {
+  return e?.trust === "verified" ? 2 : e?.trust === "reference" ? 1 : 0;
+}
 // #307: 정렬 = ①카페명 매칭 확신도(nameCoherence 기반, 동명 불일치·오염의심 리뷰를 하단으로) 내림차순
-//   → ②동일 확신도 내 최신순 → ③동률 안정화용 정확도+신뢰등급. 저장 시점 score/trust만으로는
-//   '카페 여유'에 붙은 '노아브런치카페' 언급 리뷰처럼 흔한 단어(여유) 하나로 겹친 오염이 최신성 덕에
-//   최상단을 차지했다 — 읽기 시점에 매칭 확신도를 다시 계산해 이미 저장된 전체 카페에 즉시 적용한다.
+//   → ②신뢰등급(검증 > 참고) → ③동일 등급 내 최신순 → ④동률 안정화용 정확도+신뢰등급.
+//   저장 시점 score/trust만으로는 '카페 여유'에 붙은 '노아브런치카페' 언급 리뷰처럼 흔한 단어(여유) 하나로
+//   겹친 오염이 최신성 덕에 최상단을 차지했다 — 읽기 시점에 매칭 확신도를 다시 계산해 즉시 적용한다.
+// 2026-08-05(CEO "피기스터하우스에 돈제당 리뷰가 6건 안에"): 확신도는 이름만 맞으면 전부 1이라
+//   사실상 '최신순'만 남았고, 그 결과 **참고 등급(약한 근거)이 검증 후기를 밀어내고 대표 6건을 차지**했다.
+//   (14075 피기스터하우스: 검증 17건이 있는데도 상위 6칸 중 4칸이 참고 — 돈제당 식당 글·피자집 글·샤브샤브 글.)
+//   → 신뢰등급을 최신성보다 **위** 순위로 올려, 검증 후기가 있는 한 참고는 대표 6건에 못 들어오게 한다.
+//   전수 실측: 공개 13,460곳 중 9,927곳이 대표 6건에 참고를 노출, 그중 8,339곳은 아래에 검증 후기가 대기 중.
 function sortReviews(raw: any[], name: string, areaTerms: string[], nowT: number): any[] {
   return [...raw]
     .map((e) => ({ e, conf: quoteMatchConfidence(name, e?.quote || "", areaTerms) }))
     .sort((a, b) => {
       if (b.conf !== a.conf) return b.conf - a.conf;
+      const tier = trustTier(b.e) - trustTier(a.e);
+      if (tier !== 0) return tier;
       const rb = recencyBonus(b.e?.date, nowT) - recencyBonus(a.e?.date, nowT);
       if (rb !== 0) return rb;
       return rankScore(b.e, nowT) - rankScore(a.e, nowT);
