@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import BackLink from "../BackLink";
 import { useLockBodyScroll } from "@/lib/useLockBodyScroll";
+import { decodeCafeScores } from "@/lib/mapCafes";
 
 type EvidenceReview = { quote: string; link?: string; source?: string; date?: string };
 type Cafe = {
@@ -163,7 +164,7 @@ export default function CafePage() {
   const [evidenceCafe, setEvidenceCafe] = useState<Cafe | null>(null);
 
   useEffect(() => {
-    fetch("/api/cafes").then((r) => r.json()).then((d) => { setCafes(d.cafes ?? []); setLoading(false); }).catch(() => setLoading(false));
+    fetch("/api/cafes").then((r) => r.json()).then((d) => { setCafes(decodeCafeScores(d.cafes ?? [])); setLoading(false); }).catch(() => setLoading(false));
   }, []);
 
   // 목적 축(char_scores) 점수 높은 순 정렬 — 실제 전 카페에 값이 있는 데이터로 순위 매김.

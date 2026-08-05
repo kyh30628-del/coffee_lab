@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Curated from "../../Curated";
-import { getRegions, getRegionTasteCafes, getRegionTasteCount, getRegionTasteGradeBreakdown, TASTES, tasteByKey, SITE } from "@/lib/seoData";
+import { getRegions, getRegionTasteCafes, getRegionTasteCount, getRegionTasteGradeBreakdown, TASTES, tasteByKey, SITE, TASTE_MIN_HITS, TASTE_MIN_RATE_PCT } from "@/lib/seoData";
 
 export const revalidate = 1800; // 30분 — 비공개/신규 반영 빠르게(이전 1일)
 
@@ -38,6 +38,7 @@ export default async function RegionTastePage({ params }: Props) {
   if (!t) notFound();
   const [cafes, regions, total, grades] = await Promise.all([getRegionTasteCafes(area, taste, 30), getRegions(), getRegionTasteCount(area, taste), getRegionTasteGradeBreakdown(area, taste)]);
   const heading = `${area} ${t.label} 카페`;
-  const intro = `${area}에서 ${t.desc} 카페 ${total || cafes.length}곳을 진짜 후기로 검증해 골랐어요.`;
-  return <Curated area={area} tasteKey={taste} heading={heading} intro={intro} cafes={cafes} regions={regions} grades={grades} canonical={`${SITE}/area/${encodeURIComponent(area)}/${taste}`} />;
+  // 카피는 실제 채택 기준과 정확히 일치해야 한다(예전엔 '언급 1회'도 포함해 놓고 "N곳 검증"이라 적었다).
+  const intro = `${area}에서 ${t.desc} 카페 ${total || cafes.length}곳. 후기에 ${t.short} 이야기가 ${TASTE_MIN_HITS}건 이상, 그 카페 전체 후기의 ${TASTE_MIN_RATE_PCT}% 이상 나온 곳만 골랐어요.`;
+  return <Curated area={area} tasteKey={taste} tasteLabel={t.short} tasteEmoji={t.emoji} heading={heading} intro={intro} cafes={cafes} regions={regions} grades={grades} canonical={`${SITE}/area/${encodeURIComponent(area)}/${taste}`} />;
 }

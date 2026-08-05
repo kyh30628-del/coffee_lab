@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 import { sql } from "@/lib/db";
-import { getRegions, getDongs, TASTES } from "@/lib/seoData";
+import { getRegions, getDongs, getRegionTasteCounts, TASTES } from "@/lib/seoData";
 import { COLLECTIONS } from "@/lib/collections";
 
 export const runtime = "nodejs";
@@ -11,7 +11,9 @@ const SITE = "https://dongnecoffeenote.com";
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   let cafes: { id: number }[] = [];
   try {
-    cafes = (await sql`SELECT id FROM cafes WHERE published = true ORDER BY synth_count DESC NULLS LAST LIMIT 5000`) as unknown as { id: number }[];
+    // 전량 제출(2026-08-06). 예전 LIMIT 5000은 공개 13,460곳 중 8,460곳(63%)을 검색엔진에 제출조차
+    //   못 하게 막고 있었다 — 사이트맵 한도는 URL 50,000개·50MB라 전량을 넣어도 여유가 크다.
+    cafes = (await sql`SELECT id FROM cafes WHERE published = true ORDER BY synth_count DESC NULLS LAST`) as unknown as { id: number }[];
   } catch { /* DB 불가 시 기본 페이지만 */ }
   const cafeUrls: MetadataRoute.Sitemap = cafes.map((c) => ({
     url: `${SITE}/c/${c.id}`, changeFrequency: "weekly", priority: 0.7,
@@ -24,8 +26,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const regionUrls: MetadataRoute.Sitemap = regions.map((r) => ({
     url: `${SITE}/area/${encodeURIComponent(r.area)}`, changeFrequency: "weekly", priority: 0.8,
   }));
+  // 지역×취향은 **채택 기준(TASTE_MIN_*)을 통과한 카페가 5곳 이상**인 조합만 제출 —
+  //   기준 상향 후 몇 곳 안 남는 조합까지 넣으면 얇은 콘텐츠(thin content)를 스스로 제출하는 꼴이 된다.
+  //   곳수는 쿼리 1회로 한꺼번에 받는다(지역×취향 408회 개별조회 금지).
+  const tasteCounts = await getRegionTasteCounts();
   const regionTasteUrls: MetadataRoute.Sitemap = regions.flatMap((r) =>
-    TASTES.map((t) => ({ url: `${SITE}/area/${encodeURIComponent(r.area)}/${t.key}`, changeFrequency: "weekly" as const, priority: 0.6 }))
+    TASTES.filter((t) => (tasteCounts[`${r.area}|${t.key}`] ?? 0) >= 5)
+      .map((t) => ({ url: `${SITE}/area/${encodeURIComponent(r.area)}/${t.key}`, changeFrequency: "weekly" as const, priority: 0.6 }))
   );
   // 동(洞) 단위 — "정자동 카페"처럼 실검색행태에 가장 가까운 단위(카페 5곳↑ 동만, 얇은 콘텐츠 방지)
   const dongs = await getDongs();

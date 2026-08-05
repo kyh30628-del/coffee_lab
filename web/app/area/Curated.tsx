@@ -6,8 +6,8 @@ const GRADE_BG: Record<string, string> = { 검증: "#5f7355", 참고: "#9c6b3f",
 
 // 동네×취향 검증 카페 큐레이션 — SEO 콘텐츠 페이지 공용 렌더(서버 컴포넌트).
 // 동(洞) 단위 페이지(app/area/[gu]/dong/[dong])도 이 컴포넌트를 재사용 — backHref/showTasteNav/crossLinks로 분기.
-export default function Curated({ area, tasteKey, heading, intro, cafes, regions = [], grades, canonical, backHref = "/area", backLabel = "지역별 카페", showTasteNav = true, crossLinks, crossLinksLabel = "다른 동네도 둘러보기", extra }: {
-  area: string; tasteKey?: string; heading: string; intro: string; cafes: SeoCafe[]; regions?: { area: string; n: number }[]; grades?: GradeBreakdown; canonical: string;
+export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, heading, intro, cafes, regions = [], grades, canonical, backHref = "/area", backLabel = "지역별 카페", showTasteNav = true, crossLinks, crossLinksLabel = "다른 동네도 둘러보기", extra }: {
+  area: string; tasteKey?: string; tasteLabel?: string; tasteEmoji?: string; heading: string; intro: string; cafes: SeoCafe[]; regions?: { area: string; n: number }[]; grades?: GradeBreakdown; canonical: string;
   backHref?: string; backLabel?: string; showTasteNav?: boolean; crossLinks?: { label: string; href: string }[]; crossLinksLabel?: string; extra?: React.ReactNode;
 }) {
   const jsonld = {
@@ -55,6 +55,14 @@ export default function Curated({ area, tasteKey, heading, intro, cafes, regions
                     {c.dong && <span className="text-[12px] text-[#665036]">{c.dong}</span>}
                     {c.grade && <span className="text-[10px] font-bold text-white px-1.5 py-0.5 rounded ml-auto shrink-0" style={{ background: GRADE_BG[c.grade] || "#a8927a" }}>{c.grade}</span>}
                   </div>
+                  {/* 🎯 이 페이지의 취향이 '이 카페 후기에서 실제로 몇 번 나왔는지' — 목록 전체가 같은 한줄소개로
+                      보이던 문제(공개 13,460곳 중 고유 한줄 7,654개)를 이 카페만의 숫자로 갈라준다. */}
+                  {tasteKey && typeof c.tasteHits === "number" && c.tasteHits > 0 && (
+                    <p className="text-[11.5px] font-bold text-[#5f7355] mt-1.5 pl-7">
+                      {tasteEmoji} {tasteLabel} 후기 {c.tasteHits}건
+                      {c.count ? <span className="font-normal text-[#665036]"> · 전체 후기 {c.count}건 중 {Math.round((c.tasteHits / c.count) * 100)}%</span> : null}
+                    </p>
+                  )}
                   {c.identity && <p className="text-[12.5px] text-[#524234] leading-snug mt-1.5 line-clamp-2 pl-7">{c.identity}</p>}
                   {c.quote && <p className="text-[11.5px] text-[#665036] leading-snug mt-1 line-clamp-1 pl-7">“{c.quote}”</p>}
                 </Link>

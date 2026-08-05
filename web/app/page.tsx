@@ -10,6 +10,7 @@ import MyCafeRegModal from "./MyCafeRegModal";
 import { buildAxisDist, cafeProfile, tasteVector, tasteSimilarity, GRADE_RANK, type AxisDist } from "@/lib/cafeProfile";
 import { useLockBodyScroll } from "@/lib/useLockBodyScroll";
 import { shareHookText } from "@/lib/shareCopy";
+import { decodeCafeScores } from "@/lib/mapCafes";
 
 type EvidenceReview = { quote: string; link?: string; source?: string; date?: string; trust?: "verified" | "reference" | "rejected"; score?: number; why?: string[] };
 type QualityStats = { raw: number; verified: number; reference: number; rejected: number; duplicates?: number; rejectReasons?: Record<string, number> };
@@ -587,7 +588,9 @@ export default function Home() {
   //   경쟁해 홈이 뜨는 그 순간을 오히려 늦추고 있었다. 첫 페인트가 끝난 유휴 시간으로 미뤄도 사용자가
   //   카드를 탭하거나 지역을 고르기 전에 이미 도착해 있어 기능은 그대로다.
   useEffect(() => {
-    const load = () => fetch("/api/cafes").then((r) => r.json()).then((d) => setCafes(d.cafes ?? [])).catch(() => {});
+    // 📉 2026-08-06: /api/cafes가 char_scores 6축을 고정순서 배열 `cs`로 보낸다(전송량 절감).
+    //   받는 즉시 원래 모양으로 되돌리므로 아래 소비 코드(취향 필터·정렬·유사도)는 전부 그대로다.
+    const load = () => fetch("/api/cafes").then((r) => r.json()).then((d) => setCafes(decodeCafeScores(d.cafes ?? []))).catch(() => {});
     const ric = (window as any).requestIdleCallback as ((cb: () => void, opts?: { timeout: number }) => number) | undefined;
     if (ric) { const id = ric(load, { timeout: 2000 }); return () => (window as any).cancelIdleCallback?.(id); }
     const t = setTimeout(load, 300);

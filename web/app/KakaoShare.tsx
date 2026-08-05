@@ -40,7 +40,15 @@ export default function KakaoShare({ title, description, imageUrl, link, label =
         return;
       } catch (e: any) { fail = "sendDefault: " + (e?.message || e); }
     } else {
-      fail = Kakao ? "Kakao.Share 없음" : "SDK 미로드(키 없음?)";
+      // 원인을 정확히 남긴다 — 2026-08-02·04 실사용자 폴백 2건의 note가 "Kakao.Share 없음"뿐이라
+      //   ①키 미주입 ②init 실패 ③SDK 미로드를 구분하지 못해 원인 추적에 시간이 걸렸다.
+      //   (실제 원인은 ① — 카카오 SDK v2는 init 성공 후에야 Share 모듈이 붙는데, 그 배포엔
+      //    NEXT_PUBLIC_KAKAO_MAP_KEY가 빌드에 안 박혀 있어 init 자체를 건너뛰었다.)
+      let inited = false;
+      try { inited = !!(Kakao as any)?.isInitialized?.(); } catch {}
+      fail = Kakao
+        ? `Kakao.Share 없음(key=${KEY ? "있음" : "없음"}, init=${inited})`
+        : `SDK 미로드(key=${KEY ? "있음" : "없음"})`;
     }
     // 폴백 — 카톡이 안 떠서 web/clipboard로 대체됨(kakaoFailed=true + 원인 기록).
     const nav = navigator as any;
