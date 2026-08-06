@@ -185,6 +185,18 @@ async function gatherRaw(cafe: { id: number; name: string; area: string }, refre
   return { raw, fromCache: false, apiFailed: false };
 }
 
+// 다른 카페로 이미 확정 귀속된 근거 링크(healCrossCafeLinkContamination이 형제지점/리스티클 교차오염으로
+//   판단해 영구 제외한 (카페,link)) 조회 — 재합성 호출부가 collectAndSynthesize에 넘겨 등급판정 카운트에서도
+//   빼고(decisions#628, coordination#291), storeResult가 표시 근거 배열에서도 뺀다(이중 방어, 단일 조회 함수).
+async function loadLinkExclusions(cafeId: number): Promise<Set<string>> {
+  await sql`CREATE TABLE IF NOT EXISTS cross_cafe_link_exclusions (
+    cafe_id BIGINT NOT NULL, link TEXT NOT NULL, reason TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (cafe_id, link)
+  )`.catch(() => {});
+  const excludedRows = (await sql`SELECT link FROM cross_cafe_link_exclusions WHERE cafe_id = ${cafeId}`.catch(() => [] as any[])) as any[];
+  return new Set<string>(excludedRows.map((r: any) => r.link));
+}
+
 // 합성 결과를 DB에 저장(공용). llmJudged=true면 llm_judged_at도 기록.
 async function storeResult(cafeId: number, name: string, result: CollectResult, llmJudged: boolean) {
   await loadCriteria(); // 수도권 좌표박스 기준 캐시 갱신(TTL 60s — 핫패스 비용 0). 어떤 진입점(배치판정 포함)이 불러도 안전 프라임.
@@ -192,17 +204,11 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   const lngMin = getCriterionSync("geo.box.lng_min"), lngMax = getCriterionSync("geo.box.lng_max");
   name = cleanCafeName(name); // 매칭·게이트(coherence·generic·nonCafe·franchise)는 SEO 서술어 꼬리 뗀 진짜 상호로 — '구구커피 원두 핸드드립 로스팅' 오염 차단
   const { synth, collected, charScores, evidenceReviews: evidenceReviewsRaw, allEvidence: allEvidenceRaw, reviewDates, quality, borderline } = result;
-  // [coordination#225 근본수정] healCrossCafeLinkContamination이 형제지점 오귀속으로 판단해 제거한 (카페,link)는
-  //   '영구' 제외해야 한다 — 안 그러면 매 재합성(synthAndStore) 사이클마다 원본 raw_reviews 풀에서 같은 근거가
-  //   그대로 재수집·재판정돼 되살아난다. 이게 07-07(#196)부터 3차례 동일 근거로 재발했던 실제 매커니즘(healer는
-  //   그 순간엔 정리하지만 다음 재합성이 되돌림) — 이 exclusion을 재합성의 유일한 쓰기 지점(storeResult)에서
-  //   직접 걸러 재발을 구조적으로 막는다. (healer와 동일하게 synth_count는 건드리지 않음 — 표시되는 근거 배열만 정리.)
-  await sql`CREATE TABLE IF NOT EXISTS cross_cafe_link_exclusions (
-    cafe_id BIGINT NOT NULL, link TEXT NOT NULL, reason TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    PRIMARY KEY (cafe_id, link)
-  )`.catch(() => {});
-  const excludedRows = (await sql`SELECT link FROM cross_cafe_link_exclusions WHERE cafe_id = ${cafeId}`.catch(() => [] as any[])) as any[];
-  const excludedLinks = new Set<string>(excludedRows.map((r: any) => r.link));
+  // [coordination#225 근본수정] 위 loadLinkExclusions는 이제 호출부(synthAndStore 등)가 collectAndSynthesize
+  //   호출 *전에* 먼저 불러 opts.excludeLinks로 넘긴다 — 그래야 원본 raw_reviews 풀에서 같은 근거가 재판정
+  //   자체에서 빠져 등급판정 카운트에도 반영된다(07-07(#196)부터 3차례 재발했던 "healer가 정리해도 다음
+  //   재합성이 되돌림" 매커니즘 차단). 여기 storeResult에서도 한 번 더 걸러 표시 근거 배열을 정리(이중 방어).
+  const excludedLinks = await loadLinkExclusions(cafeId);
   const dropExcluded = (arr: any[]) => excludedLinks.size ? arr.filter((r) => !excludedLinks.has(r?.link)) : arr;
   const evidenceReviews = dropExcluded(evidenceReviewsRaw as any[]);
   const allEvidence = allEvidenceRaw ? dropExcluded(allEvidenceRaw as any[]) : allEvidenceRaw;
@@ -675,7 +681,8 @@ export async function synthAndStore(cafe: { id: number; name: string; area: stri
   const addr = await addrFor(cafe.id);
   const naverCategory = await naverCategoryFor(cafe.id);
   const decisions = await loadDecisions(cafe.id); // 과거 판정 AI 결정 유지(동명/무관 제거 영구)
-  let result = collectAndSynthesize(cleanCafeName(cafe.name), area, sources, { decisions, address: addr, naverCategory });
+  const excludeLinks = await loadLinkExclusions(cafe.id); // 다른 카페로 확정귀속된 근거는 재판정 자체에서 제외(등급판정 카운트도 반영)
+  let result = collectAndSynthesize(cleanCafeName(cafe.name), area, sources, { decisions, address: addr, naverCategory, excludeLinks });
 
   // 서버측 보조 LLM 재판정. ⚠️ 기본 OFF — 실시간 API($1/$5)는 비싸므로 안 씀(INLINE_JUDGE=1일 때만).
   //   판정은 cron-batch-judge(Batches 50%할인) + 로컬 구독 드레인이 담당. 여기선 규칙+과거결정만 적용,
@@ -687,7 +694,7 @@ export async function synthAndStore(cafe: { id: number; name: string; area: stri
     if (verdicts) {
       const whitelist = new Set<string>();
       for (const it of items) { const v = verdicts.get(it.i); if (v?.about && v.helpful) whitelist.add(result.borderline[it.i].key); }
-      if (whitelist.size > 0) { result = collectAndSynthesize(cleanCafeName(cafe.name), area, sources, { whitelist, address: addr, naverCategory }); rescued = whitelist.size; }
+      if (whitelist.size > 0) { result = collectAndSynthesize(cleanCafeName(cafe.name), area, sources, { whitelist, address: addr, naverCategory, excludeLinks }); rescued = whitelist.size; }
     }
   }
   const stored = await storeResult(cafe.id, cafe.name, result, false);
@@ -713,7 +720,8 @@ export async function applyDecisions(cafe: { id: number; name: string; area: str
   if (!raw.length) { await sql`UPDATE cafes SET llm_judged_at=now() WHERE id=${cafe.id}`; return { id: cafe.id, approved: 0, grade: null, published: false, reason: "raw 없음" }; }
   // 기존 결정과 병합 → 영구 저장(재합성해도 유지). 새 판정이 우선.
   const merged = { ...(await loadDecisions(cafe.id)), ...decisions };
-  const result = collectAndSynthesize(cleanCafeName(cafe.name), await areaTermsFor(cafe.id, cafe.area), rawToSources(raw), { decisions: merged, address: await addrFor(cafe.id), naverCategory: await naverCategoryFor(cafe.id) });
+  const excludeLinks = await loadLinkExclusions(cafe.id);
+  const result = collectAndSynthesize(cleanCafeName(cafe.name), await areaTermsFor(cafe.id, cafe.area), rawToSources(raw), { decisions: merged, address: await addrFor(cafe.id), naverCategory: await naverCategoryFor(cafe.id), excludeLinks });
   await sql`UPDATE cafes SET judge_decisions=${safeJson(merged)} WHERE id=${cafe.id}`;
   const stored = await storeResult(cafe.id, cafe.name, result, true);
   const approved = Object.values(merged).filter(Boolean).length;
@@ -732,7 +740,8 @@ export async function backfillYouTube(cafe: { id: number; name: string; area: st
   if (!yt.snippets.length) return "none";
   for (const s of yt.snippets) raw.push({ source: "youtube", text: s.text, title: s.title, desc: s.desc, time: s.time, link: s.link, date: s.date, srcName: s.source });
   await sql`UPDATE cafes SET raw_reviews=${safeJson(cleanRaw(raw))}, raw_collected_at=now() WHERE id=${cafe.id}`;
-  const result = collectAndSynthesize(cleanCafeName(cafe.name), await areaTermsFor(cafe.id, cafe.area), rawToSources(raw), { address: await addrFor(cafe.id), naverCategory: await naverCategoryFor(cafe.id) });
+  const excludeLinks = await loadLinkExclusions(cafe.id);
+  const result = collectAndSynthesize(cleanCafeName(cafe.name), await areaTermsFor(cafe.id, cafe.area), rawToSources(raw), { address: await addrFor(cafe.id), naverCategory: await naverCategoryFor(cafe.id), excludeLinks });
   await storeResult(cafe.id, cafe.name, result, false);
   return "added";
 }

@@ -80,7 +80,7 @@ function toQuote(text: string, name = "", maxLen = 90): string {
 }
 const dedupeKey = (s: string) => s.toLowerCase().replace(/\s+/g, "").slice(0, 60);
 
-export function collectAndSynthesize(name: string, area: string[], sources: RawSource[], opts?: { whitelist?: Set<string>; decisions?: Record<string, boolean>; address?: string; naverCategory?: string }): CollectResult {
+export function collectAndSynthesize(name: string, area: string[], sources: RawSource[], opts?: { whitelist?: Set<string>; decisions?: Record<string, boolean>; address?: string; naverCategory?: string; excludeLinks?: Set<string> }): CollectResult {
   const whitelist = opts?.whitelist;
   const verifiedReviews: Review[] = [];   // 합성 입력(검증, 출처가중 반영)
   const perSource: { source: string; raw: number; kept: number }[] = [];
@@ -103,6 +103,10 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
     for (const t of src.texts) {
       // 같은 글이 다른 검색어로 여러 번 수집되는 것 제거(같은 URL = 같은 후기 1건)
       const lk = linkKeyOf(t.link);
+      // 다른 카페로 이미 확정 귀속된 근거(리스티클/형제지점 교차오염, cross_cafe_link_exclusions) — 표시뿐
+      // 아니라 등급판정 카운트에서도 제외(coordination#291, decisions#628: 카운트 로직이 매칭 품질을 안 보던 결함).
+      // ⚠️ 원본(비정규화) link로 저장돼있음(storeResult의 dropExcluded와 동일 비교 기준) — lk가 아닌 t.link로 대조.
+      if (t.link && opts?.excludeLinks?.has(t.link)) continue;
       if (lk && seenLinks.has(lk)) { stats.duplicates++; continue; }
       if (lk) seenLinks.add(lk);
       const key = dedupeKey(t.text);
@@ -159,14 +163,25 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
   }
 
   // 신뢰 헤드라인 숫자 = 노이즈 제거 후 '주제가 맞는 진짜 리뷰' 수(검증+참고).
-  // rejected(동명·모음언급·무관·내용없음)만 버린 뒤 남은 옥석. 등급도 이 기준.
+  // rejected(동명·모음언급·무관·내용없음)만 버린 뒤 남은 옥석. 표시 카운트는 이 기준(검증+참고 동등).
   const trustCount = stats.verified + stats.reference;
+  // 🎯 등급판정 전용 가중 카운트(decisions#628) — verified(제목=이 카페 주제)와 reference(본문에만 스친
+  //   약한 매칭)는 '이 카페가 맞다'는 확신이 다른데, 여태 grade.floor.verified(30) 비교엔 trustCount를
+  //   동등 가중으로 썼다. 이름이 랜드마크·일반명사와 겹치는 카페(id16913 '숲이 있는' ↔ 북서울꿈의숲)는
+  //   reference가 raw 볼륨만으로 30건을 채워 진짜 관련 리뷰가 3건뿐인데도 '검증' 등급을 받았다(레드팀 08-06
+  //   확인: verified=3/reference=26, reference 26건 전부 카페와 무관한 공원·전시·맛집 스침). reference는
+  //   '참고' floor 도달까진 그대로 인정하되(원래 참고=본문언급이라도 살리자는 취지), '검증' floor는 절반
+  //   가중만 인정해 약한매칭 대량으로 못 채우게 한다 — SRC_WEIGHT(위)와 같은 급의 알고리즘 상수라 criteria
+  //   DB로 안 빼고 코드 상수로 둔다(grade.floor.*처럼 공개상태 대량변동을 부르는 값이 아니라 그 값의 산정
+  //   방식 보정이며, 조정 시 재합성이 필요해 무배포 즉시효과 대상이 아님).
+  const REFERENCE_GRADE_WEIGHT = 0.5;
+  const gradeCount = stats.verified + stats.reference * REFERENCE_GRADE_WEIGHT;
   // 공개 floor = 검증리뷰 3건 (2026-06-30, CEO "검증된 리뷰 3건 이상"). trustCount는 옥석(verified+reference)만 —
   //   가비지·노이즈(rejected: 동명·무관·광고·SEO·nameAsWord)는 카운트 안 됨. 진짜 검증 리뷰 3건+ 있으면 참고(공개).
   //   얇아도 *진짜* 카페는 살리되 1~2건은 너무 얇아 보류. 오염/비카페는 coherence·카테고리 게이트가 별도로 막음.
   //   임계값은 DB 기준(criteria) 단일출처 — 폴백=현재값(검증30/참고3). 동기 조회(캐시 프라임은 synthAndStore 등 진입점).
   let grade: "검증" | "참고" | "후보" =
-    trustCount >= getCriterionSync("grade.floor.verified") ? "검증"
+    gradeCount >= getCriterionSync("grade.floor.verified") ? "검증"
     : trustCount >= getCriterionSync("grade.floor.reference") ? "참고"
     : "후보";
 
