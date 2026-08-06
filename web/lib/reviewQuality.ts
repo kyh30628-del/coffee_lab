@@ -743,6 +743,19 @@ export function isNonCafeFnbCategory(naverCategory?: string): boolean {
   if (CAFE_SUBCATEGORY.test(c)) return false; // 카페 하위 키워드 있으면 정상 카페(겸업 포함)
   return NONCAFE_FNB_CATEGORY.test(c);
 }
+// 🔎 [룰갭 H17, rulegap-proposals-20260806-1213.md / decisions#626] naver_category가 카페 계열 밖(P61·P66이
+//   전제하는 F&B 대분류·식당 업종 블록리스트에도 안 걸리는 임의 업종 — 통신·구제의류·아이스크림제조 등)이고
+//   상호명에도 카페/커피/로스터리 토큰이 없는 카페. 전수 10건 검토에서 4건 실오염 확정(한정식집·모음글 시리즈명
+//   오추출·구제의류점·젤라또전문점)했지만 6건은 정상 카페(핸드크라프트·로우키 로스터리 등)라 naver_category
+//   단독 자동거부는 오탐 위험 — 자동비공개가 아니라 judge-candidates LLM 그라운딩 큐의 우선순위 신호로만 쓴다.
+const CAFE_FAMILY_CATEGORY = /카페|디저트|베이커리|제과|커피|다방|찻집|티룸|브런치|로스터리/;
+const CAFE_NAME_TOKEN = /카페|커피|coffee|로스터리|로스터스/i;
+export function isNonCafeFamilySignal(naverCategory?: string, name?: string): boolean {
+  const c = (naverCategory || "").trim();
+  if (!c) return false; // 카테고리 없음 — grandfather 방지, 신호 OFF
+  if (CAFE_FAMILY_CATEGORY.test(c)) return false;
+  return !CAFE_NAME_TOKEN.test(name || "");
+}
 // 🎷 [룰갭 제안2, decisions#566] naver_category가 카페/디저트 F&B이지만 카페·커피 대신 업종어(라이브카페·
 //   재즈바·와인바·북카페·펍카페 등)를 쓰는 카페 — titleHasCafeWord(카페/커피 어휘 존재 전제)가 무력화돼
 //   "제목이 다른 카페를 가리킴" 방어 게이트(아래 verifyReview)가 발동하지 않는다(id18647 재즈클럽 야누스
