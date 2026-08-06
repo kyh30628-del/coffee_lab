@@ -34,12 +34,17 @@ export async function GET(req: NextRequest) {
       // 기본 큐(자율 판정 순서 고정): 기존 공개 → 기존 비공개 → 신규 공개 → 신규 비공개.
       //   기존/신규 경계 = 2026-06-14(동단위 신규 발굴 배치 시작일). 그 전 = 기존, 그 이후 = 신규.
       //   raw 있는 카페 전부 대상(비공개 포함) — 기존 비공개도 맥락 재판정해 옥석 가림. 그룹 내 그라운딩 의심·오래된 것 우선.
+      //   [룰갭 H17, decisions#626] naver_category가 카페 계열 밖 + 상호명도 카페/커피/로스터리 토큰 無인 카페를
+      //   그룹 내 최우선으로 올린다(자동비공개 아님 — lib/reviewQuality.ts isNonCafeFamilySignal과 동일 정의, SQL 복제).
       targets = (await sql`
         SELECT c.id, c.name, c.area FROM cafes c
         LEFT JOIN grounding_checks g ON g.cafe_id = c.id
         WHERE c.raw_reviews IS NOT NULL
           AND (c.llm_judged_at IS NULL OR c.llm_judged_at < c.raw_collected_at)
-        ORDER BY COALESCE(c.created_at < '2026-06-14', true) DESC, c.published DESC, (g.grounded = false) DESC NULLS LAST, c.llm_judged_at ASC NULLS FIRST
+        ORDER BY COALESCE(c.created_at < '2026-06-14', true) DESC, c.published DESC,
+          (c.naver_category IS NOT NULL AND c.naver_category !~ '카페|디저트|베이커리|제과|커피|다방|찻집|티룸|브런치|로스터리'
+            AND c.name !~* '카페|커피|coffee|로스터리|로스터스') DESC,
+          (g.grounded = false) DESC NULLS LAST, c.llm_judged_at ASC NULLS FIRST
         LIMIT ${limit}`) as unknown as typeof targets;
     }
 
