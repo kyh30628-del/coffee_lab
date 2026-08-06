@@ -401,11 +401,23 @@ export default function OrgDashboard() {
                 <div style={{ fontSize: 11.5, fontWeight: 700, color: devpipe.stuckNonChatCount ? "#b03a3a" : "#9c6b3f" }}>
                   ⏱ 배포 정체 {devpipe.stuckCount}건 — 30분+ 배포대기{devpipe.stuckNonChatCount ? ` (그중 자동승격 경로 없음 ${devpipe.stuckNonChatCount}건 — 수동 배포/폐기 필요)` : ""}
                 </div>
-                {devpipe.stuck.map((s: any) => (
-                  <div key={s.id} style={{ fontSize: 10, color: s.source !== "chat" ? "#8a4a4a" : "#8a7458", marginTop: 3 }}>
-                    #{s.id} {s.title.replace(/^\[개발\]\s*/, "")} — {s.age_min}분 경과{s.source !== "chat" ? " · 출처: 비챗(자동승격 없음)" : " · 출처: 챗"}
-                  </div>
-                ))}
+                {/* ⚠️ 2026-08-06 CEO "배포 버튼이 없잖아" — 정체 경고는 **접힌 상태에서도** 보이는데
+                    조치 버튼(🚀배포·폐기)은 아래 펼침 블록(showDev)에만 있었다. 즉 "수동 배포 필요"라고
+                    띄워놓고 정작 누를 곳을 안 준 화면이었음. 정체 줄 자체에 버튼을 붙여 바로 조치 가능하게. */}
+                {devpipe.stuck.map((s: any) => {
+                  const job = devpipe.jobs.find((j: any) => j.id === s.id);
+                  return (
+                    <div key={s.id} style={{ fontSize: 10, color: s.source !== "chat" ? "#8a4a4a" : "#8a7458", marginTop: 3 }}>
+                      <div>#{s.id} {s.title.replace(/^\[개발\]\s*/, "")} — {s.age_min}분 경과{s.source !== "chat" ? " · 출처: 비챗(자동승격 없음)" : " · 출처: 챗"}</div>
+                      {job?.dev_status === "배포대기" && (
+                        <div style={{ display: "flex", gap: 6, margin: "5px 0 7px" }}>
+                          <button disabled={busy === s.id} onClick={() => devAction(s.id, "deploy")} style={{ flex: 1, padding: "7px 0", background: "#6a468c", color: "#fff", border: "none", borderRadius: 8, fontWeight: 700, fontSize: 12.5 }}>🚀 배포</button>
+                          <button disabled={busy === s.id} onClick={() => devAction(s.id, "discard")} style={{ flex: 1, padding: "7px 0", background: "#efe7d8", color: "#8a5a5a", border: "1px solid #d8c4a4", borderRadius: 8, fontWeight: 700, fontSize: 12.5 }}>폐기</button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
             {showDev && <div style={{ marginTop: 8 }}>

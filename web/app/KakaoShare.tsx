@@ -26,6 +26,25 @@ export default function KakaoShare({ title, description, imageUrl, link, label =
   // 공유 대상 카페 id(link의 /c/ID) — 홈 슬라이드 패널 등 pathname이 "/"여도 정확히 귀속.
   const cafeId = (() => { const m = String(link).match(/\/c\/(\d+)/); return m ? Number(m[1]) : undefined; })();
   const onClick = useCallback(async () => {
+    // 📱 모바일은 **시스템 공유 시트 우선**(CEO 지시 2026-08-06).
+    //   카카오 웹 공유(sharer.kakao.com)는 앱키·플랫폼 설정에 걸려 폰에서 "요청 실패(4011 — 잘못된 앱키)"가 떴고,
+    //   sendDefault는 예외를 안 던져 우리 기록엔 '성공'으로 남는 바람에 원인 추적이 늦었다.
+    //   시스템 공유 시트는 카카오 콘솔 설정과 **무관하게** 동작하고, 시트에서 카카오톡을 고르면 카톡 앱이 바로 열린다.
+    //   (공유 카드는 링크 미리보기로 우리 OG 이미지가 그대로 붙는다.)
+    //   ⚠️ 반드시 클릭 핸들러 진입 즉시 호출 — 앞에 await를 두면 사용자 제스처가 만료돼 시트가 안 뜬다.
+    const nav = navigator as any;
+    const isMobile = typeof navigator !== "undefined"
+      && (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.maxTouchPoints ?? 0) > 1);
+    if (isMobile && nav.share) {
+      try {
+        await nav.share({ title, text: description, url: link });
+        trackShare({ channel: "web", source, cafeId });
+        return;
+      } catch (e: any) {
+        // 사용자가 시트를 닫은 것(AbortError)은 실패가 아니다 — 카카오로 되돌아가면 오히려 이상하다.
+        if (e?.name === "AbortError") return;
+      }
+    }
     // 카톡 공유 시도 → 실패(SDK 미로드/미초기화/도메인 미등록 등) 시 원인(fail)을 담아 폴백. 폴백은 kakaoFailed=true로 구분.
     let fail = "";
     const Kakao = await loadKakao();
@@ -51,7 +70,6 @@ export default function KakaoShare({ title, description, imageUrl, link, label =
         : `SDK 미로드(key=${KEY ? "있음" : "없음"})`;
     }
     // 폴백 — 카톡이 안 떠서 web/clipboard로 대체됨(kakaoFailed=true + 원인 기록).
-    const nav = navigator as any;
     if (nav.share) { try { await nav.share({ title, text: description, url: link }); trackShare({ channel: "web", source, cafeId, kakaoFailed: true, note: fail }); return; } catch {} }
     try { await navigator.clipboard.writeText(link); trackShare({ channel: "clipboard", source, cafeId, kakaoFailed: true, note: fail }); setMsg("링크 복사됨"); setTimeout(() => setMsg(""), 1500); } catch {}
   }, [title, description, imageUrl, link, source, cafeId]);
