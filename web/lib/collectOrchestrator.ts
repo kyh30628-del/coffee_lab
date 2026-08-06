@@ -219,7 +219,24 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
   const isYt = (e: EvidenceReview) => /youtu\.?be/.test(e.link ?? "");
   const bestYt = evDedup.find(isYt);
   const nonYt = evDedup.filter((e) => !isYt(e));
-  let topEvidence = bestYt ? [...nonYt.slice(0, 5), bestYt] : nonYt.slice(0, 6);
+  // [rulegap #625] 표시 근거는 같은 블로거(source=bloggername) 최대 2건 — 단일 블로거(사업자 자체 계정 추정)가
+  //   top-6를 지배하는 것 방지. 같은 링크 dedup과 동일 사상: 삭제 아님, 밀린 포스팅은 allEvidence(전체보기)엔 그대로 유지.
+  const blogCap = new Map<string, number>();
+  const pickDiverse = (list: EvidenceReview[], limit: number): EvidenceReview[] => {
+    const out: EvidenceReview[] = [];
+    for (const e of list) {
+      if (out.length >= limit) break;
+      const src = (e.source ?? "").trim();
+      if (src) {
+        const n = blogCap.get(src) ?? 0;
+        if (n >= 2) continue;
+        blogCap.set(src, n + 1);
+      }
+      out.push(e);
+    }
+    return out;
+  };
+  let topEvidence = bestYt ? [...pickDiverse(nonYt, 5), bestYt] : pickDiverse(nonYt, 6);
   // 옥석 전체(노이즈 제거 후 verified+reference 전부) — 전체보기용
   const allEvidence = evDedup;
 
