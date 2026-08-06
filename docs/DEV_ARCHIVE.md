@@ -198,3 +198,4 @@
 | 2026-08-06 23:05 | #623 | [룰갭] 인테리어/가구업계 콘텐츠(리바트·한샘·인테리어시공 등) 동명 오채택 — 카페리뷰 혼입 (rulega | 15ff50a9 | - | lib/reviewQuality.ts: NONCAFE_INTERIOR_CUES 신규 게이트 추가(P59/P67과 동일 구조, verifyReview 하드탈락 섹션) — 가구 재설치 |
 | 2026-08-06 23:06 | #625 | [룰갭] 검증등급 표시 근거리뷰가 단일 블로거(사업자 자체 계정 추정)로 지배 — 노출 다양성 캡 필요 (c | 8f3616c3 | - | lib/collectOrchestrator.ts L217-233: top-6 근거리뷰 선정에 같은 블로거(source=bloggername) 최대 2건 캡(pickDiverse)  |
 | 2026-08-06 23:07 | #626 | [룰갭] naver_category 비카페 신호 미사용 — 리뷰큐 반영 + 확정오염 4건(1996·1819· | 380f29ef | - | lib/reviewQuality.ts: isNonCafeFamilySignal(naverCategory,name) 신규 export(H17 게이트, 카페계열 카테고리 밖+상호명도  |
+| 2026-08-06 23:08 | #628 | [개발] 협업 #290: 등급판정 n(reviewCount)이 relevance/trust 미반영 — 랜드마 | f13fdf5f | - | lib/collectOrchestrator.ts: 등급판정 gradeCount = verified + reference*0.5 (참고 floor는 trustCount 그대로) —  |
