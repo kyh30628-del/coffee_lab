@@ -37,7 +37,11 @@ export default function KakaoShare({ title, description, imageUrl, link, label =
       && (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.maxTouchPoints ?? 0) > 1);
     if (isMobile && nav.share) {
       try {
-        await nav.share({ title, text: description, url: link });
+        // ⚠️ **text를 같이 넘기지 않는다**(2026-08-06 CEO "카톡에 너무 밋밋하게 공유돼").
+        //   안드로이드 공유 시트는 text를 카톡 메시지 본문으로 넣고 url을 뒤에 붙여 보내는데,
+        //   그러면 카톡이 '긴 텍스트 메시지'로 취급해 링크 미리보기(OG 큰 카드)가 안 붙거나 초라해진다.
+        //   **URL만 단독**으로 보내면 카톡이 그 링크를 스크랩해 1200x630 카드(카페명·한줄·태그)를 크게 띄운다.
+        await nav.share({ title, url: link });
         trackShare({ channel: "web", source, cafeId });
         return;
       } catch (e: any) {
