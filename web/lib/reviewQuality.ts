@@ -249,6 +249,20 @@ const AQUASCAPE_PET_RETAIL = /(수초\s*(전문|분양|판매|갤러리)|어항\
 //   인테리어 시공사례 등)가 있고 실질 음료·디저트 소비(CAFE_CONTEXT_SUBSTANCE)가 전무하면 이름 길이·매칭
 //   경로와 무관하게 곧장 하드 거절한다. 실제 카페 후기는 커피·디저트 소비 서술을 동반해 오탐 없음.
 const NONCAFE_INTERIOR_CUES = /(가구\s*(재설치|재배치|배치|매입|판매|거래|처분|이전\s*설치|배송\s*후기)|맘카페\s*(가구|중고)|중고\s*가구\s*(거래|판매|나눔)|리바트|한샘|인테리어\s*(시공|공사|업체|견적|상담|사례)|시공\s*사례|붙박이\s*장|시스템\s*가구)/i;
+// ★ 룰갭 H18(2026-08-07, decisions#631): 바리스타/커피 교육원(naver_category="직업,기술교육>바리스타") —
+//   P61(isNonFnbCategory)은 naver_category가 F&B 대분류 밖일 때 "다른 상호명/다른 지역 혼입"이 있을 때만
+//   거절하는 교차오염 전용 게이트라, 자기 자신에 대한 자기완결적 수강후기(정규 수강생 후기 — SCA 커리큘럼·
+//   자격증 시험·1:1 교육 등, 자기 상호·자기 지역 서술뿐이라 "다른" 상호/지역 혼입이 없음)는 애초에 발동
+//   대상이 아니다. 커피 어휘 밀도가 높아 CAFE_CONTEXT 가드도 오히려 통과한다(id4335 실측: published·
+//   참고등급 라이브 노출 중, 전수 9곳 중 7곳 offctx_rate=0). 제안서는 P59와 동일하게 CAFE_CONTEXT_SUBSTANCE를
+//   보존조건으로 제시했지만, 실측 검증 결과 이 업종은 "커피·로스팅·바리스타" 자체가 교육 콘텐츠의 본질 어휘라
+//   CAFE_CONTEXT_SUBSTANCE가 거의 항상 참이 되어 게이트가 무력화됨을 확인(id4335 실제 evidence 3건 모두
+//   CAFE_CONTEXT_SUBSTANCE 통과, 게이트 미발동). 대신 DRINK_TASTING_CUES(마셨·시켜서 마·앉아서 등 실제
+//   음료 시음 행위 어휘 — WHOLESALE_RETAIL_CUES 게이트에서 이미 검증된 패턴)를 보존조건으로 써야 "교육
+//   콘텐츠 서술"과 "실제 카페 방문 소비"를 구분한다(대조군 id7486 스페셜티 커피 에듀케이션은 실제 방문
+//   서술이 섞인 리뷰가 함께 노출돼 보존 필요 — 합성 재현으로 DRINK_TASTING_CUES 존재 시 보존 확인).
+const BARISTA_EDU_CATEGORY = /직업,?\s*기술교육/;
+const BARISTA_EDU_ACTIVITY = /(SCA\s*커리큘럼|바리스타\s*자격증|자격증\s*(발급|취득|시험)|수강생|1\s*(대|:)\s*1\s*교육|이론\s*(수업|공부)|시험\s*일정|커피\s*교육|창업\s*컨설팅)/;
 // ★ 룰갭 rulegap-20260803(decisions#600): 브랜드 체험관(자동차·가구쇼룸) 부속 카페 — 완성차·가구/매트리스
 //   등 비식음료 브랜드가 운영하는 대형 브랜드 체험관(전시·시승·쇼룸)에 부속된 카페가, 체험관 전체 방문기
 //   (카페 소비와 무관한 전시·시승·포토존 콘텐츠)를 카페 리뷰로 흡수한다(id18421 "현대 모터스튜디오 고양
@@ -997,6 +1011,15 @@ export function verifyReview(input: QualityInput): QualityResult {
   //   이름-길이 예외로 맥락검사가 생략돼도, 실질 음료·디저트 맥락 전무 시 곧장 하드 거절한다.
   if (NONCAFE_INTERIOR_CUES.test(fullL) && !CAFE_CONTEXT_SUBSTANCE.test(fullL)) {
     return { verdict: "rejected", score: 4, reasons: ["인테리어·가구업계 콘텐츠(가구 재설치·거래·시공사례 등 — 카페 실질맥락 전무)"], signals: sig };
+  }
+  // [룰갭 H18, decisions#631] 바리스타/커피 교육원 자기완결형 수강 후기 — naver_category가 직업,기술교육
+  //   범위이고 수강생 대상 콘텐츠(SCA 커리큘럼·자격증 시험·1:1 교육 등)이며 실제 음료 시음 행위 서술
+  //   (DRINK_TASTING_CUES — 마셨·시켜서 마·앉아서 등)이 전무하면 P59와 동일하게 참고등급 진입 없이 곧장
+  //   하드 거절한다(id4335 실측). CAFE_CONTEXT_SUBSTANCE가 아니라 DRINK_TASTING_CUES를 쓰는 이유는 위 상수
+  //   선언부 주석 참조 — 이 업종은 커피/로스팅 어휘 자체가 교육 콘텐츠 본질이라 CAFE_CONTEXT_SUBSTANCE로는
+  //   교육 서술과 실제 소비를 구분 못 한다.
+  if (BARISTA_EDU_CATEGORY.test(input.naverCategory ?? "") && BARISTA_EDU_ACTIVITY.test(fullL) && !DRINK_TASTING_CUES.test(fullL)) {
+    return { verdict: "rejected", score: 4, reasons: ["바리스타/커피 교육원 수강 후기(자기완결형 — 실제 음료 시음 서술 전무)"], signals: sig };
   }
   // [룰갭 P32] 자기 업체 정형구("쇼룸"·"매장 주소"·"오프라인 매장"·"방문 예약"·"카톡 방문"·"시공 갤러리")가
   //   2개 이상 동시출현하면 LOCAL_SEO_SERVICES 업종어와 무관하게 벤더의 1인칭 홍보 안내문으로 확정 거절한다.
