@@ -382,6 +382,18 @@ const GENERIC_BRANCH_SUFFIX = /(백화점|면세점|서점|문고점|전문점|�
 export function isNonBranchWord(full: string): boolean {
   return NON_BRANCH_POINT_WORD.test(full) || GENERIC_BRANCH_SUFFIX.test(full) || GENERIC_WORD.has(full) || getLearned("nonbranch").has(full);
 }
+// decisions#634(rulegap-20260807-1211): '○○점'(붙임, 관용 접미) 외에 '○○ 지점'(공백 있는 격식체 명사구)도
+//   같은 '다른 지점' 표기다 — id7112 "송파 지점에 기계가 있는 건 아니고 남양주에 로스팅센터가..."가 붙임표기
+//   정규식(/[가-힣]{2,}점/)을 벗어나 형제 소매지점 후기가 로스팅시설 카페에 그대로 통과했다. '지점' 앞의
+//   흔한 수식어(다른/타/인근/형제…)는 지점명이 아니므로 제외한다.
+const GENERIC_BRANCH_MODIFIER = new Set(["다른", "타", "인근", "형제", "자매", "여러", "각", "해당", "이", "그", "저", "총", "전", "일부", "몇몇", "모든", "별도", "직영", "가맹", "프랜차이즈", "매장", "본사", "본점"]);
+function branchNameMatches(text: string): string[] {
+  const attached = (text.match(/([가-힣]{2,})점/g) ?? []).map((t) => t.replace(/점$/, ""));
+  const spaced = (text.match(/([가-힣]{2,})\s+지점/g) ?? [])
+    .map((t) => t.replace(/\s+지점$/, ""))
+    .filter((nm) => !GENERIC_BRANCH_MODIFIER.has(nm));
+  return [...attached, ...spaced];
+}
 // 너무 흔해서 '식별어'가 못 되는 형용사·일반어. 이것만 남으면 전체 이름 일치를 요구(오매칭 방지).
 // 예: "좋은커피" → 접미 '커피' 제거 후 '좋은'만 남는데, '분위기 좋은 카페'처럼 모든 후기에 나옴.
 const NAME_STOPWORD = new Set(["좋은", "맛있는", "맛있는집", "예쁜", "멋진", "행복", "행복한", "우리", "우리집", "작은", "큰", "조용한", "따뜻한", "정직한", "데일리", "오늘", "오늘도", "하루", "그날", "모닝", "감성", "분위기", "힐링", "달콤한", "새로운",
@@ -1223,8 +1235,7 @@ export function verifyReview(input: QualityInput): QualityResult {
     const nameEqualsDong = dongCore.length >= 2 && nameN === norm(dongCore);
     let dongHere = dongTerm ? (fullT.includes(dongTerm) || (dongCore.length >= 2 && fullT.includes(dongCore))) : areaPresent;
     if (nameEqualsDong) dongHere = dongHere && CAFE_CONTEXT.test(fullL);
-    const otherBranch = (fullT.match(/([가-힣]{2,})점/g) ?? [])
-      .map((t) => t.replace(/점$/, ""))
+    const otherBranch = branchNameMatches(fullT)
       .find((nm) => nm.length >= 2 && nm !== "본" && !isNonBranchWord(nm + "점")
         && !input.name.includes(nm)
         && !areaTerms.some((a) => a.includes(nm) || nm.includes(guShort(a))));
@@ -1293,8 +1304,7 @@ export function verifyReview(input: QualityInput): QualityResult {
     const branchSignal = myBranchHere || areaAnchorHere;
     // ⚠️ [coord#126 P2] guShort 배제를 '시(市)명 자체'로 한정 — nm.includes(guShort)면 같은 市 다른 洞
     //   지점('포천일동' ← '포천시청점')이 감지에서 빠졌다(id14277: 참고셋 6/6이 형제 지점 '포천일동점').
-    const otherBranchTok = (fullT.match(/([가-힣]{2,})점/g) ?? [])
-      .map((t) => t.replace(/점$/, ""))
+    const otherBranchTok = branchNameMatches(fullT)
       // 공백무시(norm) 양방향 비교: 우리 이름이 nm을 포함('은평 본점'⊇'은평본')하거나, nm이 우리 지점
       //   랜드마크(myBranch)를 포함('이천날쌘카페하이닉스'⊇'하이닉스', '수원시청역'⊇'수원시청')하면 = 같은 지점의
       //   축약·장황·도시접두 표기일 뿐 다른 지점 아님. (도시명 접두·역명 변형이 형제로 오판되던 것 차단)
