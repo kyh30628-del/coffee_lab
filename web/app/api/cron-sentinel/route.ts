@@ -906,12 +906,23 @@ export async function GET(req: NextRequest) {
     //   반복 중(2026-08-08 지점오염 힐러가 정확히 그 모습이었다). ⚠️ 지문엔 시각·난수·시도내역을 넣지 말 것 —
     //   '치유 이름/제거건수'를 넣었더니 런마다 미세하게 달라져 정체를 못 잡았다(설계 교정 실측).
     const _fpIds = (arr: unknown): string[] => (Array.isArray(arr) ? arr : []).map((x) => String(x).match(/#(\d+)/)?.[1] ?? String(x).slice(0, 12));
+    // ⚠️ 지문은 **사람이 판독을 끝낸 건(동결)을 뺀** 문제 집합이어야 한다. 안 그러면 사람이 다 처리한 뒤에도
+    //   "같은 결과 N회 연속"으로 영원히 정체 경보가 뜬다(2026-08-08 실측으로 발견).
+    const _frozenAll = new Set<number>();
+    for (const j of ["sentinel.attraction", "sentinel.weak-name", "sentinel.noncafe-biz",
+                     "sentinel.franchise-branch", "sentinel.generic-term", "sentinel.competitor-quote"]) {
+      for (const id of await frozenTargets(j)) _frozenAll.add(id);
+    }
+    const _live = (arr: string[]) => arr.filter((x) => !_frozenAll.has(Number(x)));
     const fingerprint = fingerprintOf({
-      attr: attr.count, weak: weak.count, ncb: ncb.count, fr: fr.count, gen: gen.count, comp: comp.count, mm: mismatch.count,
-      targets: [
+      attr: (checks as any).attraction_pollution, weak: (checks as any).weak_name_pollution,
+      ncb: (checks as any).noncafe_biz_pollution, fr: (checks as any).franchise_branch_pollution,
+      gen: (checks as any).generic_term_pollution, comp: (checks as any).competitor_quote_pollution,
+      mm: mismatch.count,
+      targets: _live([
         ..._fpIds(attr.samples), ..._fpIds(weak.samples), ..._fpIds(ncb.samples),
         ..._fpIds(fr.samples), ..._fpIds(gen.samples), ..._fpIds(comp.samples),
-      ],
+      ]),
     });
     if (DRY) {
       // 🧪 드라이런 — DB에 아무것도 남기지 않는다(원장·리포트 오염 방지). "무엇이 바뀔 것인가"만 돌려준다.
