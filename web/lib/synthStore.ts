@@ -9,6 +9,7 @@ import { collectAndSynthesize, type RawSource, type BorderlineItem, type Collect
 import { judgeReviews, hasJudgeKey } from "./reviewJudge";
 import { isNonCafe, isFranchise, isGenericFoodName, isSnackStall, isStructuralPhantom, isUnmannedCafe } from "./discover";
 import { tickBlob } from "./blobBudget";
+import { acquireLease, releaseLease } from "./healLease";
 import { nameCoherence, cleanCafeName, verifyReview, isNonBranchWord, isAreaLikeWord, VENDOR_LISTING_TEMPLATE, detectCampaignCluster } from "./reviewQuality";
 import { loadLearnedTerms } from "./learnedTerms";
 import { loadCriteria, getCriterionSync } from "./criteria";
@@ -492,11 +493,15 @@ export async function healOffConceptByReview(): Promise<{ held: number; names: s
     if (self.length / texts.length >= 0.66) { killIds.push(c.id); killNames.push(c.name); }
   }
   if (killIds.length > HEAL_UNPUB_CAP) return { held: 0, names: killNames.slice(0, 12), capped: killIds.length }; // 🛑 대량 차단
-  if (killIds.length) {
-    await sql`UPDATE cafes SET published = false, pipeline_status = 'excluded' WHERE id = ANY(${killIds})`;
-    await invalidateCafeCaches(killIds).catch(() => {}); // 비공개 → 모든 캐시 레이어 무효화
+  // 🎫 하네스 L2 — 다른 잡이 같은 카페를 재합성 중이면 비켜간다(위 healNonCafeByReview와 동일 규약).
+  const leasedIds: number[] = [];
+  for (const id of killIds) { if (await acquireLease("autoCorrect", Number(id), 60)) leasedIds.push(id); }
+  if (leasedIds.length) {
+    await sql`UPDATE cafes SET published = false, pipeline_status = 'excluded' WHERE id = ANY(${leasedIds})`;
+    await invalidateCafeCaches(leasedIds).catch(() => {}); // 비공개 → 모든 캐시 레이어 무효화
+    for (const id of leasedIds) await releaseLease("autoCorrect", Number(id)).catch(() => {});
   }
-  return { held: killIds.length, names: killNames.slice(0, 12) };
+  return { held: leasedIds.length, names: killNames.slice(0, 12) }; // 실제 집행분만(리스 양보분 제외)
 }
 
 // 🍽️ 식당 자동 비공개 — 카페와 겹쳐 카테고리 게이트가 안 거른 '음식점>' 계열(양식·이탈리·다이닝·바·아시안·퓨전 등)
@@ -514,8 +519,13 @@ export async function healRestaurantByReview(): Promise<{ held: number; names: s
   const kill: number[] = []; const names: string[] = [];
   for (const c of cand) { if (c.t && !COFFEE_ID.test(c.t)) { kill.push(c.id); names.push(c.name); } }
   if (kill.length > HEAL_UNPUB_CAP) return { held: 0, names: names.slice(0, 12), capped: kill.length }; // 🛑 대량 차단
-  if (kill.length) { await sql`UPDATE cafes SET published = false, pipeline_status = 'excluded' WHERE id = ANY(${kill})`; await invalidateCafeCaches(kill).catch(() => {}); }
-  return { held: kill.length, names: names.slice(0, 12) };
+  // 🎫 하네스 L2 — 센티넬 힐러가 같은 카페를 재합성 중이면 비켜간다(read-modify-write 구간 충돌 방지).
+  //   집합 UPDATE라 자체 원자성은 있지만, 상대가 방금 읽어둔 스냅샷으로 덮어쓰면 이 비공개가 되살아난다.
+  const leased: number[] = [];
+  for (const id of kill) { if (await acquireLease("autoCorrect", Number(id), 60)) leased.push(id); }
+  if (leased.length) { await sql`UPDATE cafes SET published = false, pipeline_status = 'excluded' WHERE id = ANY(${leased})`; await invalidateCafeCaches(leased).catch(() => {}); }
+  for (const id of leased) await releaseLease("autoCorrect", Number(id)).catch(() => {});
+  return { held: leased.length, names: names.slice(0, 12) }; // 하네스 원칙: 실제 집행분만 센다(리스 양보분 제외)
 }
 
 // 🎯 일반 비카페 자동 비공개 (유형 불문 단일 신호) — 카페면 노출리뷰에 '카페 정체성'(커피·디저트·베이커리·차)이
@@ -546,8 +556,13 @@ export async function healNonCafeByReview(): Promise<{ held: number; names: stri
     kill.push(c.id); names.push(c.name);
   }
   if (kill.length > HEAL_UNPUB_CAP) return { held: 0, names: names.slice(0, 12), capped: kill.length }; // 🛑 대량 차단
-  if (kill.length) { await sql`UPDATE cafes SET published = false, pipeline_status = 'excluded' WHERE id = ANY(${kill})`; await invalidateCafeCaches(kill).catch(() => {}); }
-  return { held: kill.length, names: names.slice(0, 12) };
+  // 🎫 하네스 L2 — 센티넬 힐러가 같은 카페를 재합성 중이면 비켜간다(read-modify-write 구간 충돌 방지).
+  //   집합 UPDATE라 자체 원자성은 있지만, 상대가 방금 읽어둔 스냅샷으로 덮어쓰면 이 비공개가 되살아난다.
+  const leased: number[] = [];
+  for (const id of kill) { if (await acquireLease("autoCorrect", Number(id), 60)) leased.push(id); }
+  if (leased.length) { await sql`UPDATE cafes SET published = false, pipeline_status = 'excluded' WHERE id = ANY(${leased})`; await invalidateCafeCaches(leased).catch(() => {}); }
+  for (const id of leased) await releaseLease("autoCorrect", Number(id)).catch(() => {});
+  return { held: leased.length, names: names.slice(0, 12) }; // 하네스 원칙: 실제 집행분만 센다(리스 양보분 제외)
 }
 
 // 🗺️ 수도권 박스 밖(비수도권 동명업체) 자동 제외 — 어느 적재 경로(발굴·마이닝·상가·수집)로 들어왔든
