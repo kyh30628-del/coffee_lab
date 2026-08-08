@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
 import { reputationSignals } from "@/lib/enrich";
 import { recordRun } from "@/lib/agentLog";
+import { startJobRun } from "@/lib/blobBudget";
+import { openScope } from "@/lib/writeScope";
+import { fingerprintOf } from "@/lib/runLedger";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -16,6 +19,7 @@ const authed = (req: NextRequest) => {
 };
 
 export async function GET(req: NextRequest) {
+  startJobRun("cron-enrich"); openScope("cron-enrich"); // 💰🔐 하네스 L1·L3 — 큰 컬럼 계량 + 쓰기 스코프
   try {
     if (!authed(req)) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
     await ensureSchema();
@@ -48,7 +52,9 @@ export async function GET(req: NextRequest) {
     }
 
     const detail = `평판점검 ${processed} 평하락 ${declining}`;
-    await recordRun("cron-enrich", true, detail, processed);
+    // 📒 하네스 L5 — 지문은 **남은 일(백로그)** 기준. 할 일이 없으면(0) 지문을 안 남긴다 —
+    //   "일이 없어 조용한 것"과 "일이 있는데 못 끝내는 것"을 구분해야 정체 탐지가 소음이 안 된다.
+    await recordRun("cron-enrich", true, detail, processed, { fingerprint: (processed) > 0 ? fingerprintOf({ processed }) : undefined, metrics: { processed } });
     return NextResponse.json({ ok: true, ranAt: new Date().toISOString(), processed, declining, declineNames, remaining: rows.length === limit });
   } catch (e) {
     await recordRun("cron-enrich", false, String(e).slice(0, 150));

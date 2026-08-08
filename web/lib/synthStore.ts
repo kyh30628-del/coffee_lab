@@ -10,6 +10,7 @@ import { judgeReviews, hasJudgeKey } from "./reviewJudge";
 import { isNonCafe, isFranchise, isGenericFoodName, isSnackStall, isStructuralPhantom, isUnmannedCafe } from "./discover";
 import { tickBlob } from "./blobBudget";
 import { acquireLease, releaseLease } from "./healLease";
+import { noteWrite } from "./writeScope";
 import { nameCoherence, cleanCafeName, verifyReview, isNonBranchWord, isAreaLikeWord, VENDOR_LISTING_TEMPLATE, detectCampaignCluster } from "./reviewQuality";
 import { loadLearnedTerms } from "./learnedTerms";
 import { loadCriteria, getCriterionSync } from "./criteria";
@@ -318,6 +319,9 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   const newPst = excluded ? "excluded" : unpublishLocked ? "excluded" : held ? "held" : stuckNoise ? "noise" : inPipeline ? (ruleOk ? "pending" : "rejected") : pst;
   const publish = (otherwiseBlocked || unpublishLocked) ? false : ruleOk; // 제외·잠금·held·노이즈·파이프라인은 비공개 고정
 
+  // 🔐 하네스 L3 — 합성 결과 쓰기의 **단일 지점**에서 신고한다. 스코프를 연 잡(openScope)은
+  //   여기 한 곳만으로 자동 적용되고, 계약에 이 대상이 없으면 드리프트로 잡힌다.
+  noteWrite("cafes.synth_reviews"); noteWrite("cafes.synth_reviews_all"); noteWrite("cafes.published");
   if (llmJudged) {
     await sql`UPDATE cafes SET synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_coherence=${coherence}, offctx_rate=${offctx}, needs_llm=${needsLLM}, needs_llm_priority=${needsLlmPriority}, borderline_count=${blCount}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${safeJson(evidenceReviews)}, synth_reviews_all=${allEv}, char_scores=${safeJson(charScores)}, synth_quality=${safeJson(quality)}, review_dates=${safeJson(reviewDates)}, pipeline_status=${newPst}, synth_updated=${synthTs}, synth_checked_at=now(), llm_judged_at=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN ${latMin} AND ${latMax} AND lng BETWEEN ${lngMin} AND ${lngMax}) WHERE id=${cafeId}`;
   } else {

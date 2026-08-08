@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
 import { naverExistsRobust } from "@/lib/discover";
 import { recordRun } from "@/lib/agentLog";
+import { startJobRun } from "@/lib/blobBudget";
+import { openScope } from "@/lib/writeScope";
+import { fingerprintOf } from "@/lib/runLedger";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -33,6 +36,7 @@ const authed = (req: NextRequest) => {
 };
 
 export async function GET(req: NextRequest) {
+  startJobRun("cron-closure"); openScope("cron-closure"); // 💰🔐 하네스 L1·L3 — 큰 컬럼 계량 + 쓰기 스코프
   try {
     if (!authed(req)) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
     await ensureSchema();
@@ -86,7 +90,9 @@ export async function GET(req: NextRequest) {
     `.then((r: any[]) => Number(r[0].c)).catch(() => 0);
 
     const detail = `재확인 ${checked} 영업중 ${alive} 의심+${newSuspect} 검토대기 ${reviewQueue.length} 활발스킵 ${skippedFresh} 증거노후${STALE_EVIDENCE_MONTHS}mo+ ${staleEvidenceCount}${quotaStop ? " 쿼터중단" : ""}`;
-    await recordRun("cron-closure", true, detail, newSuspect);
+    // 📒 하네스 L5 — 지문은 **남은 일(백로그)** 기준. 할 일이 없으면(0) 지문을 안 남긴다 —
+    //   "일이 없어 조용한 것"과 "일이 있는데 못 끝내는 것"을 구분해야 정체 탐지가 소음이 안 된다.
+    await recordRun("cron-closure", true, detail, newSuspect, { fingerprint: (newSuspect) > 0 ? fingerprintOf({ suspect: newSuspect }) : undefined, metrics: { suspect: newSuspect } });
     return NextResponse.json({ ok: true, ranAt: new Date().toISOString(), checked, alive, newSuspect, suspectNames, skippedFresh, quotaStop, staleEvidenceCount, reviewQueue: reviewQueue.map((r) => ({ id: r.id, name: r.name, area: r.area, misses: r.closure_misses })) });
   } catch (e) {
     await recordRun("cron-closure", false, String(e).slice(0, 150));

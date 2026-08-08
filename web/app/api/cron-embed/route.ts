@@ -3,12 +3,16 @@ import { sql, ensureSchema } from "@/lib/db";
 import { embedBatch, toVectorLiteral, EMBED_DIM, hasEmbedKey, buildCafeEmbedText } from "@/lib/embed";
 import { PRIORITY_AREAS } from "@/lib/discover";
 import { recordRun } from "@/lib/agentLog";
+import { startJobRun } from "@/lib/blobBudget";
+import { openScope } from "@/lib/writeScope";
+import { fingerprintOf } from "@/lib/runLedger";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
 // 매일(Vercel cron) 임베딩 안 된 카페를 채운다. 무료 일일 쿼터 내에서 점진 완성 + 신규 유지.
 // Vercel cron은 CRON_SECRET을 Authorization 헤더로 자동 전송.
 export async function GET(req: NextRequest) {
+  startJobRun("cron-embed"); openScope("cron-embed"); // 💰🔐 하네스 L1·L3 — 큰 컬럼 계량 + 쓰기 스코프
   try {
     const secret = process.env.CRON_SECRET;
     if (secret && req.headers.get("authorization") !== `Bearer ${secret}`) {
@@ -43,7 +47,9 @@ export async function GET(req: NextRequest) {
       }
     }
     const remain = (await sql`SELECT COUNT(*)::int n FROM cafes WHERE published = true AND embedding IS NULL`)[0].n;
-    await recordRun("cron-embed", true, `임베딩 ${updated} 남음 ${remain}`, updated);
+    // 📒 하네스 L5 — 지문은 **남은 일(백로그)** 기준. 할 일이 없으면(0) 지문을 안 남긴다 —
+    //   "일이 없어 조용한 것"과 "일이 있는데 못 끝내는 것"을 구분해야 정체 탐지가 소음이 안 된다.
+    await recordRun("cron-embed", true, `임베딩 ${updated} 남음 ${remain}`, updated, { fingerprint: (remain) > 0 ? fingerprintOf({ remain, updated }) : undefined, metrics: { remain, updated } });
     return NextResponse.json({ ok: true, ranAt: new Date().toISOString(), embedded: updated, remaining: remain });
   } catch (e) {
     await recordRun("cron-embed", false, String(e).slice(0, 150));

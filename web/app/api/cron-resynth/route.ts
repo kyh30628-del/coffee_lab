@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
 import { synthAndStore } from "@/lib/synthStore";
+import { acquireLease, releaseLease } from "@/lib/healLease";
 import { recordRun } from "@/lib/agentLog";
-import { startJobRun, runUsage, clearOverBudget } from "@/lib/blobBudget";
+import { startJobRun, runUsage, clearOverBudget, windowBudgetExceeded } from "@/lib/blobBudget";
 import { isCostHalted } from "@/lib/costGuard";
 
 export const runtime = "nodejs";
@@ -14,6 +15,12 @@ const synthOne = (c: { id: number; name: string; area: string }) => synthAndStor
 // 자동 실행 진입점: 가장 오래 갱신 안 된 카페 몇 곳을 재수집
 export async function GET(req: NextRequest) {
   startJobRun("cron-resynth"); // 💰 하네스 L1 — 큰 컬럼 소비 계량 시작
+  // 🪟 하네스 L1 — 창 총량 예산: 최근 24h 누적 blob 로드가 상한을 넘으면 이번 런은 재합성을 건너뛴다.
+  //   런당 예산만으론 "조금씩 자주"를 못 막는다(2026-07 유튜브 백필 663GB가 그 형태였다).
+  if (await windowBudgetExceeded("cron-resynth", 24, 600)) {
+    await recordRun("cron-resynth", true, "🪟 창 예산 초과 — 이번 런 스킵(다음 창에서 재개)", 0).catch(() => {});
+    return NextResponse.json({ ok: true, skipped: "window-budget" });
+  }
   try {
     // 보안: 아무나 이 주소를 호출해 비용을 쓰지 못하게 비밀키 확인
     const secret = process.env.CRON_SECRET;
@@ -73,7 +80,10 @@ export async function GET(req: NextRequest) {
       while (!gStop) {
         const c = genRows[gi++]; if (!c) break;
         try {
-          await synthAndStore({ id: c.id, name: c.name, area: c.area }, { refresh: false });
+          // 🎫 하네스 L2 — 센티넬 힐러·autoCorrect가 같은 카페를 만지는 중이면 양보(다음 런이 처리).
+          if (!(await acquireLease("cron-resynth", Number(c.id), 120))) continue;
+          try { await synthAndStore({ id: c.id, name: c.name, area: c.area }, { refresh: false }); }
+          finally { await releaseLease("cron-resynth", Number(c.id)).catch(() => {}); }
           const [a] = (await sql`SELECT synth_count, published FROM cafes WHERE id=${c.id}`) as unknown as { synth_count: number; published: boolean }[];
           gDone++;
           if (a.synth_count !== c.synth_count) gChangedIds.push(c.id);

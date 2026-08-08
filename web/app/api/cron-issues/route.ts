@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { syncIssues, autoCorrect } from "@/lib/issues";
 import { recordRun } from "@/lib/agentLog";
+import { startJobRun } from "@/lib/blobBudget";
+import { openScope } from "@/lib/writeScope";
 import { fingerprintOf } from "@/lib/runLedger";
 
 export const runtime = "nodejs";
@@ -8,6 +10,7 @@ export const runtime = "nodejs";
 // 🚨 실시간 이슈 파수꾼 — 아무도 안 봐도 주기적으로 탐지·라우팅해 issues를 최신화(개통/해소 추적).
 //   대시보드 로드(=/api/admin/issues)와 같은 엔진. 결정론·토큰0.
 export async function GET(req: NextRequest) {
+  startJobRun("cron-issues"); openScope("cron-issues"); // 💰🔐 하네스 L1·L3 — 큰 컬럼 계량 + 쓰기 스코프
   const secret = process.env.CRON_SECRET;
   if (secret && req.headers.get("authorization") !== `Bearer ${secret}`)
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });

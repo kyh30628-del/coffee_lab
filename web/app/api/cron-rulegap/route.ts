@@ -4,6 +4,9 @@ import { ensureLearnedTable, loadLearnedTerms, getLearned, applyLearned, rollbac
 import { healCrossCafeLinkContamination } from "@/lib/synthStore";
 import { isFranchise } from "@/lib/discover";
 import { recordRun } from "@/lib/agentLog";
+import { startJobRun } from "@/lib/blobBudget";
+import { openScope } from "@/lib/writeScope";
+import { fingerprintOf } from "@/lib/runLedger";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -50,6 +53,7 @@ const authed = (req: NextRequest) => {
 };
 
 export async function GET(req: NextRequest) {
+  startJobRun("cron-rulegap"); openScope("cron-rulegap"); // 💰🔐 하네스 L1·L3 — 큰 컬럼 계량 + 쓰기 스코프
   try {
     if (!authed(req)) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
     const dry = req.nextUrl.searchParams.get("dry") === "1";
@@ -291,7 +295,7 @@ export async function GET(req: NextRequest) {
     // 기록(검증·롤백 기준 + 관제탑 노출용)
     if (!dry) await sql`INSERT INTO rulegap_runs (published_before, learned, pending) VALUES (${pubNow}, ${JSON.stringify(learned)}::jsonb, ${JSON.stringify(pending)}::jsonb)`;
 
-    if (!dry) await recordRun("cron-rulegap", true, `학습 ${learned.length} 승인대기 ${pending.length} 식당자동제외 ${autoExcluded} 롤백 ${rolledBack.length} 교차오염정리 ${crossContam.removed}건/${crossContam.groups}그룹 프랜차이즈소급 ${franchiseFresh.length}`, learned.length);
+    if (!dry) await recordRun("cron-rulegap", true, `학습 ${learned.length} 승인대기 ${pending.length} 식당자동제외 ${autoExcluded} 롤백 ${rolledBack.length} 교차오염정리 ${crossContam.removed}건/${crossContam.groups}그룹 프랜차이즈소급 ${franchiseFresh.length}`, learned.length, { fingerprint: (pending.length) > 0 ? fingerprintOf({ pending: pending.length, learned: learned.length }) : undefined, metrics: { pending: pending.length, learned: learned.length } });
     return NextResponse.json({
       ok: true, dry, ranAt: new Date().toISOString(), scanned,
       rolledBack, autoExcluded, crossContam,

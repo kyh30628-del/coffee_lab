@@ -63,3 +63,19 @@ async function reportOverBudget(job: string, used: number, limit: number): Promi
 export async function clearOverBudget(job: string): Promise<void> {
   try { await sql`UPDATE issues SET status='resolved', resolved_at=now() WHERE ikey=${`budget:${job}`} AND status='open'`; } catch { /* graceful */ }
 }
+
+/**
+ * 🪟 창(window) 총량 예산 — 하네스 L1 보완.
+ *   런당 예산만으론 "조금씩 자주"를 못 막는다(2026-07 유튜브 백필이 정확히 그 형태로 전송 663GB를 냈다).
+ *   최근 N시간 누적 blob 로드가 상한을 넘으면 이번 런은 무거운 작업을 **스스로 건너뛴다**.
+ *   ⚠️ 조회는 원장 집계 1회(작은 숫자만). 실패 시 막지 않는다(가용성 우선).
+ */
+export async function windowBudgetExceeded(job: string, hours = 24, limit = 400): Promise<boolean> {
+  try {
+    const r = (await sql`SELECT COALESCE(SUM((metrics->>'blobReads')::int), 0)::int AS n
+      FROM run_ledger WHERE job = ${job} AND started_at > now() - (${hours} * interval '1 hour')`)[0] as any;
+    const used = Number(r?.n ?? 0);
+    if (used > limit) { console.warn(`[blobBudget] ${job}: 최근 ${hours}h 누적 ${used} > 창 예산 ${limit} — 이번 런 스킵`); return true; }
+    return false;
+  } catch { return false; }
+}

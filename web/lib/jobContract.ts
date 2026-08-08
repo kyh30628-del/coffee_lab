@@ -58,6 +58,15 @@ const CONTRACTS: Record<string, Partial<JobContract>> = {
   "discover-sweep": { tier: "L0", budget: { blobReads: 0, rows: 20000, wallMs: 900_000 } },
   // 유튜브 백필 — 2026-07 전송 663GB 사고의 주범이었던 경로(LIMIT 5 반복쿼리)
   "youtube-backfill": { tier: "L0", budget: { blobReads: 120, rows: 20000, wallMs: 1_800_000 } },
+  // 합성·발굴·수집 — 쓰기 대상을 선언해야 L3 스코프가 드리프트를 잡는다(미선언이면 통과)
+  "cron-embed": { tier: "L2", budget: { blobReads: 0, rows: 20000, wallMs: 300_000 }, writes: ["cafes.embedding", "cafes.embed_updated"] },
+  "cron-enrich": { tier: "L2", budget: { blobReads: 0, rows: 20000, wallMs: 300_000 }, writes: ["cafes.reputation_note", "cafes.enriched_at", "cafes.rating", "cafes.rating_count"] },
+  "cron-closure": { tier: "L2", budget: { blobReads: 0, rows: 20000, wallMs: 300_000 }, writes: ["cafes.closure_misses", "cafes.closure_checked_at"] },
+  "cron-verify": { tier: "L0", budget: { blobReads: 0, rows: 20000, wallMs: 300_000 } },
+  "cron-rulegap": { tier: "L2", budget: { blobReads: 12, rows: 20000, wallMs: 300_000 }, writes: ["cafes.synth_*", "cafes.published", "learned_terms.*"] },
+  "cron-issues": { tier: "L2", budget: { blobReads: 0, rows: 20000, wallMs: 300_000 }, writes: ["cafes.published", "cafes.pipeline_status", "issues.*", "decisions.*"] },
+  "cron-coord-consumer": { tier: "L2", budget: { blobReads: 0, rows: 10000, wallMs: 300_000 } },
+  "cron-demand": { tier: "L0", budget: { blobReads: 0, rows: 10000, wallMs: 300_000 } },
   // 읽기 전용 감시류
   "cron-costwatch": { tier: "L0", budget: { blobReads: 0, rows: 5000, wallMs: 120_000 } },
   "cron-selfaudit": { tier: "L0", budget: { blobReads: 0, rows: 20000, wallMs: 300_000 } },

@@ -4,6 +4,9 @@ import { discoverRegion, METRO_REGIONS, PRIORITY_REGIONS, LONGTAIL_TASTE_TARGETS
 import { synthAndStore } from "@/lib/synthStore";
 import { mineArea } from "@/lib/reviewMiner";
 import { recordRun } from "@/lib/agentLog";
+import { startJobRun } from "@/lib/blobBudget";
+import { openScope } from "@/lib/writeScope";
+import { fingerprintOf } from "@/lib/runLedger";
 import { naverUsedToday, NAVER_DAILY_QUOTA } from "@/lib/naverBudget";
 import { isCostHalted } from "@/lib/costGuard";
 export const runtime = "nodejs";
@@ -14,6 +17,7 @@ export const maxDuration = 300; // 여러 지역 발굴 + 합성 (플랜 상한�
 //       ② 미합성 카페를 동일 품질엔진으로 합성 → 노이즈 제거 후 검증/참고만 자동 공개.
 // 환각·동명·다른지점은 reviewQuality가 차단하므로, 자동 성장해도 정확도가 유지된다.
 export async function GET(req: NextRequest) {
+  startJobRun("cron-grow"); openScope("cron-grow"); // 💰🔐 하네스 L1·L3 — 큰 컬럼 계량 + 쓰기 스코프
   try {
     const secret = process.env.CRON_SECRET;
     if (secret && req.headers.get("authorization") !== `Bearer ${secret}`) {
@@ -126,7 +130,7 @@ export async function GET(req: NextRequest) {
     const naverUsed = await naverUsedToday().catch(() => 0);
     const naverPct = Math.round((naverUsed / NAVER_DAILY_QUOTA) * 100);
     const quotaNote = naverUsed >= NAVER_DAILY_QUOTA ? " · 네이버 한도소진(자정 리셋·정상)" : ` · 네이버 ${naverPct}%`;
-    await recordRun("cron-grow", true, `발굴 ${discoveries.length}지역 신규 ${totalInserted} 합성 ${synth.length} 공개 ${published}${quotaNote}`, totalInserted);
+    await recordRun("cron-grow", true, `발굴 ${discoveries.length}지역 신규 ${totalInserted} 합성 ${synth.length} 공개 ${published}${quotaNote}`, totalInserted, { fingerprint: (1) > 0 ? fingerprintOf({ inserted: totalInserted, published }) : undefined, metrics: { inserted: totalInserted, published } });
     return NextResponse.json({
       ok: true, ranAt: new Date().toISOString(),
       regionsSwept: discoveries.length, totalInserted, discoveries, remainingRegions,

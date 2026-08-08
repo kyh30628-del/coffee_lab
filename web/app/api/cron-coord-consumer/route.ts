@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { recordRun } from "@/lib/agentLog";
+import { fingerprintOf } from "@/lib/runLedger";
 import { consumeCoordination } from "@/lib/coordConsumer";
 
 export const runtime = "nodejs";
@@ -15,7 +16,7 @@ export async function GET(req: NextRequest) {
   const dryRun = new URL(req.url).searchParams.get("mode") !== "live";
   try {
     const { handled, skippedHuman, total, report } = await consumeCoordination({ dryRun });
-    await recordRun("cron-coord-consumer", true, report.split("\n")[0].slice(0, 180), handled.length);
+    await recordRun("cron-coord-consumer", true, report.split("\n")[0].slice(0, 180), handled.length, { fingerprint: (handled.length) > 0 ? fingerprintOf({ handled: handled.length }) : undefined, metrics: { handled: handled.length } });
     return NextResponse.json({ ok: true, dryRun, total, handled, skippedHuman, report }, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
     await recordRun("cron-coord-consumer", false, String(e).slice(0, 180), 0).catch(() => {});
