@@ -1002,7 +1002,14 @@ export function verifyReview(input: QualityInput): QualityResult {
   // #153: 초약체 유일토큰(공간·인테리어·2005…)은 지역어 동반 없으면 전국 오매칭이라 귀속 불인정
   // 🏢 제안3(건물단위 앵커 필수화): 남은 토큰이 전부 다중테넌트 기관/건물명(VENUE_WORDS·대학 축약명 등)이면
   //   그 건물엔 무관한 여러 시설(주차·행정·동아리…)이 함께 있으므로, 지역일치만으로는 부족 — 진짜 카페 맥락
-  //   (CAFE_CONTEXT_STRONG)이 함께 있어야 그 건물의 '이 카페' 이야기로 인정한다(전체이름 원문일치는 예외 — 이미 강한 신호).
+  //   (CAFE_CONTEXT_STRONG)이 함께 있어야 그 건물의 '이 카페' 이야기로 인정한다.
+  //   [룰갭 rulegap-20260808-1615, decisions#639] 예전엔 "전체이름 원문일치는 예외(이미 강한 신호)"였으나,
+  //   다중테넌트 건물(백화점·아울렛·몰)은 완전히 다른 두 사업자가 도로명주소까지 바이트단위로 동일한 경우가
+  //   구조적으로 흔하다(id4934 롯데아울렛·id361 더현대서울 등 주소완전동일+상호상이 17그룹 실측) — venueOnly
+  //   이름(브랜드 토큰 없이 건물명뿐, 예: '세종문화회관꿈의숲 카페테라스')은 전체이름이 그대로 원문에 있어도
+  //   그게 '우리 지점' 이야기라는 보장이 없다(같은 건물 다른 시설·다른 테넌트일 수 있음). 아래 nameInTitle/
+  //   nameInBody에서 inTitleFull/inBodyFull도 이 게이트를 통과해야만 인정하도록 예외를 없앤다(venueOnly=false인
+  //   보통 카페는 venueCtxOk가 항상 true라 기존 동작 그대로 보존).
   const venueCtxOk = !venueOnly || CAFE_CONTEXT_STRONG.test(fullL);
   // 📮 [주소=상호] 카페명이 '도로명주소'(예: '대산로 511', '중부대로 33-1')면, 그 이름은 같은 자리 이웃
   //   업체(메밀촌·마라탕…)가 '주소'로 흔히 적는 공유 문자열이라, 이름 일치만으로 귀속하면 옆가게 후기가
@@ -1025,11 +1032,11 @@ export function verifyReview(input: QualityInput): QualityResult {
   const nameInTitle = (weakWhitelist && !areaPresent) ? false
     : bareWeak
       ? (roadAddrCtxOk && distinctInTitle && (dongPresent || CAFE_CONTEXT_STRONG.test(fullL) || titleHasCafeWord) && venueCtxOk && landmarkCtxOk)
-      : (roadAddrCtxOk && (inTitleFull || (distinctInTitle && (titleHasCafeWord || areaPresent) && venueCtxOk && landmarkCtxOk)));
+      : (roadAddrCtxOk && venueCtxOk && (inTitleFull || (distinctInTitle && (titleHasCafeWord || areaPresent) && landmarkCtxOk)));
   const nameInBody = (weakWhitelist && !areaPresent) ? false
     : bareWeak
       ? (roadAddrCtxOk && distinctInBody && (dongPresent || CAFE_CONTEXT_STRONG.test(fullL) || bodyHasCafeWord) && venueCtxOk && landmarkCtxOk)
-      : (roadAddrCtxOk && (inBodyFull || (distinctInBody && (bodyHasCafeWord || areaPresent) && venueCtxOk && landmarkCtxOk)));
+      : (roadAddrCtxOk && venueCtxOk && (inBodyFull || (distinctInBody && (bodyHasCafeWord || areaPresent) && landmarkCtxOk)));
   const listicle = LISTICLE_TITLE.some((re) => re.test(title)) || (((`${title} ${body}`.match(PLACE_TOKEN) ?? []).length) >= 4);
   const generic = has(fullL, GENERIC_CUES);
   const nameOccurBody = nameN ? countOccur(bodyN, nameN) : 0;
