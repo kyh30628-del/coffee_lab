@@ -121,7 +121,12 @@ async function healAttractionPollution(flagged: AttrFlag[], deadline: number): P
       const decs = c.judge_decisions && typeof c.judge_decisions === "object" ? c.judge_decisions : {};
       const r = collectAndSynthesize(cleanCafeName(c.name), at, sources, { decisions: decs, address: c.address || "" });
       const dec: Record<string, boolean> = {}; let drop = 0;
-      for (const it of (r.auditItems || [])) { const body = norm((it.title || "") + " " + (it.body || "")); if (ATTR_STRONG.test(body) && !mk.some((m) => body.includes(m))) { dec[it.key] = false; drop++; } }
+      for (const it of (r.auditItems || [])) {
+        // ♻️ 무한 반복 차단(2026-08-08, CEO "왜 자꾸 헛도는 루프를 도냐"): auditItems는 **규칙 기준**으로
+        //   채워져서 이미 decisions=false로 제거 결정된 항목도 계속 들어온다. 가드가 없으면 힐러가 매 런마다
+        //   같은 항목을 또 dec에 담아 applyDecisions를 호출 → raw_reviews(큰 blob) 재로드 + 재합성 +
+        //   `DELETE FROM search_cache`까지 하루 4회씩 헛돌았다(실측: 6회 연속 "치유 10/감지 22" 동일).
+        if (decs[it.key] === false) continue; const body = norm((it.title || "") + " " + (it.body || "")); if (ATTR_STRONG.test(body) && !mk.some((m) => body.includes(m))) { dec[it.key] = false; drop++; } }
       if (drop === 0) continue;
       const res = await applyDecisions({ id: f.id, name: c.name, area: c.area }, dec);
       fixed++; dropped += drop; if (res?.published === false && c.published) unpub++;
@@ -226,6 +231,11 @@ async function healWeakNamePollution(flagged: WeakFlag[], deadline: number): Pro
       const r = collectAndSynthesize(cn, at, sources, { decisions: decs, address: c.address || "" });
       const dec: Record<string, boolean> = {}; let drop = 0;
       for (const it of (r.auditItems || [])) {
+        // ♻️ 무한 반복 차단(2026-08-08, CEO "왜 자꾸 헛도는 루프를 도냐"): auditItems는 **규칙 기준**으로
+        //   채워져서 이미 decisions=false로 제거 결정된 항목도 계속 들어온다. 가드가 없으면 힐러가 매 런마다
+        //   같은 항목을 또 dec에 담아 applyDecisions를 호출 → raw_reviews(큰 blob) 재로드 + 재합성 +
+        //   `DELETE FROM search_cache`까지 하루 4회씩 헛돌았다(실측: 6회 연속 "치유 10/감지 22" 동일).
+        if (decs[it.key] === false) continue;
         const body = (it.title || "") + " " + (it.body || ""); const bn = body.replace(/\s/g, "").toLowerCase();
         const o = weakOtherCafe(body, selfN);
         if (o && xrefKnown(o, known, selfN) && !markers.some((mk) => bn.includes(mk))) { dec[it.key] = false; drop++; }
@@ -307,6 +317,11 @@ async function healNonCafeBizPollution(flagged: NcbFlag[], deadline: number): Pr
       const r = collectAndSynthesize(cleanCafeName(c.name), at, sources, { decisions: decs, address: c.address || "" });
       const dec: Record<string, boolean> = {}; let drop = 0;
       for (const it of (r.auditItems || [])) {
+        // ♻️ 무한 반복 차단(2026-08-08, CEO "왜 자꾸 헛도는 루프를 도냐"): auditItems는 **규칙 기준**으로
+        //   채워져서 이미 decisions=false로 제거 결정된 항목도 계속 들어온다. 가드가 없으면 힐러가 매 런마다
+        //   같은 항목을 또 dec에 담아 applyDecisions를 호출 → raw_reviews(큰 blob) 재로드 + 재합성 +
+        //   `DELETE FROM search_cache`까지 하루 4회씩 헛돌았다(실측: 6회 연속 "치유 10/감지 22" 동일).
+        if (decs[it.key] === false) continue;
         const body = (it.title || "") + " " + (it.body || ""); const bn = body.replace(/\s/g, "").toLowerCase();
         if (bizPollutionHit(body) && !mk.some((x) => bn.includes(x))) { dec[it.key] = false; drop++; }
       }
@@ -407,6 +422,11 @@ async function healFranchiseBranchPollution(flagged: FranchiseFlag[], deadline: 
       const r = collectAndSynthesize(cleanCafeName(c.name), at, sources, { decisions: decs, address: c.address || "" });
       const dec: Record<string, boolean> = {}; let drop = 0;
       for (const it of (r.auditItems || [])) {
+        // ♻️ 무한 반복 차단(2026-08-08, CEO "왜 자꾸 헛도는 루프를 도냐"): auditItems는 **규칙 기준**으로
+        //   채워져서 이미 decisions=false로 제거 결정된 항목도 계속 들어온다. 가드가 없으면 힐러가 매 런마다
+        //   같은 항목을 또 dec에 담아 applyDecisions를 호출 → raw_reviews(큰 blob) 재로드 + 재합성 +
+        //   `DELETE FROM search_cache`까지 하루 4회씩 헛돌았다(실측: 6회 연속 "치유 10/감지 22" 동일).
+        if (decs[it.key] === false) continue;
         const body = (it.title || "") + " " + (it.body || "");
         if (body.includes(f.ownSuffix) || (f.ownToken.length >= 2 && body.includes(f.ownToken))) continue; // 자기 지점(접미사·토큰) 언급 있으면 보존(다른지점 안내정보일 뿐)
         if (f.otherSuffixes.some((s) => body.includes(s)) || f.otherTokens.some((t) => body.includes(t))) { dec[it.key] = false; drop++; }
@@ -541,6 +561,11 @@ async function healGenericTermPollution(flagged: GenericFlag[], deadline: number
       const r = collectAndSynthesize(cleanCafeName(c.name), at, sources, { decisions: decs, address: c.address || "" });
       const dec: Record<string, boolean> = {}; let drop = 0;
       for (const it of (r.auditItems || [])) {
+        // ♻️ 무한 반복 차단(2026-08-08, CEO "왜 자꾸 헛도는 루프를 도냐"): auditItems는 **규칙 기준**으로
+        //   채워져서 이미 decisions=false로 제거 결정된 항목도 계속 들어온다. 가드가 없으면 힐러가 매 런마다
+        //   같은 항목을 또 dec에 담아 applyDecisions를 호출 → raw_reviews(큰 blob) 재로드 + 재합성 +
+        //   `DELETE FROM search_cache`까지 하루 4회씩 헛돌았다(실측: 6회 연속 "치유 10/감지 22" 동일).
+        if (decs[it.key] === false) continue;
         const body = (it.title || "") + " " + (it.body || "");
         if (!body.includes(f.token)) continue;
         if (!hasStrongAnchor(body, nameNoSpace, anchor)) { dec[it.key] = false; drop++; }
