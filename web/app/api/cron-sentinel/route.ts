@@ -5,6 +5,7 @@ import { recordRun } from "@/lib/agentLog";
 import { fingerprintOf } from "@/lib/runLedger";
 import { frozenTargets, noteAttempt, shownHash, frozenSummary } from "@/lib/healHarness";
 import { startJobRun, tickBlob, runUsage, clearOverBudget } from "@/lib/blobBudget";
+import { acquireLease, releaseLease, pruneLeases, activeLeases } from "@/lib/healLease";
 import { isCostHalted } from "@/lib/costGuard";
 import { probeConsoleKey } from "@/lib/consoleKeyProbe";
 import { loadCriteria, getCriterionSync } from "@/lib/criteria";
@@ -115,6 +116,8 @@ async function healAttractionPollution(flagged: AttrFlag[], deadline: number): P
   for (const f of flagged.slice(0, 12)) {
     if (Date.now() > deadline) break;
     if (frozenSet.has(f.id)) { skipped++; continue; }
+    // 🎫 하네스 L2 — 다른 잡(autoCorrect·resynth·다른 힐러)이 같은 카페를 만지는 중이면 양보한다.
+    if (!(await acquireLease(HJOB, f.id, 180))) { skipped++; continue; }
     try {
       tickBlob(); const c = (await sql`SELECT name, area, dong, address, published, raw_reviews, judge_decisions FROM cafes WHERE id=${f.id}`)[0] as any;
       if (!c) continue;
@@ -135,7 +138,11 @@ async function healAttractionPollution(flagged: AttrFlag[], deadline: number): P
         //   같은 항목을 또 dec에 담아 applyDecisions를 호출 → raw_reviews(큰 blob) 재로드 + 재합성 +
         //   `DELETE FROM search_cache`까지 하루 4회씩 헛돌았다(실측: 6회 연속 "치유 10/감지 22" 동일).
         if (decs[it.key] === false) continue; const body = norm((it.title || "") + " " + (it.body || "")); if (ATTR_STRONG.test(body) && !mk.some((m) => body.includes(m))) { dec[it.key] = false; drop++; } }
-      if (drop === 0) continue;
+      // 🩺 하네스 L4 완성(2026-08-08 실전검증서 발견): 가드가 앞단에서 다 걸러 `drop=0`이 되면
+      //   applyDecisions도 noteAttempt도 호출되지 않아 **수렴 계약이 발동하지 못한다** → 감지 22건이
+      //   영원히 남고 아무도 사람에게 안 넘긴다. "제거할 게 없다"도 **무효(효과 없음)** 로 기록해야
+      //   2회 후 동결되고 워치리스트로 승격된다.
+      if (drop === 0) { noEffect++; if ((await noteAttempt(HJOB, f.id, false, { note: "제거 대상 없음(이미 결정 완료 — 자동으로는 더 못 고침)" })).frozen) frozenNew++; continue; }
       // 🩺 하네스 L4 — 집행 전후 '탐지기가 보는 소스'(synth_reviews)의 해시를 비교해 **효과를 실측**한다.
       //   md5는 SQL 안에서 계산돼 32자만 오간다(큰 컬럼 전송 없음). 효과 없으면 fixed로 세지 않는다.
       const _h0 = await shownHash(f.id);
@@ -147,6 +154,7 @@ async function healAttractionPollution(flagged: AttrFlag[], deadline: number): P
       if (names.length < 8) names.push(`${c.name}(-${drop})`);
       await invalidateCafeCaches([f.id]).catch(() => {});
     } catch { /* 개별 실패는 건너뜀(다음 런이 이어서 처리) */ }
+    finally { await releaseLease(HJOB, f.id).catch(() => {}); }
   }
   if (fixed > 0) await sql`DELETE FROM search_cache`.catch(() => {});
   return { fixed, dropped, unpub, names, skipped, noEffect, frozen: frozenNew };
@@ -234,6 +242,8 @@ async function healWeakNamePollution(flagged: WeakFlag[], deadline: number): Pro
   for (const f of flagged.slice(0, 12)) {
     if (Date.now() > deadline) break;
     if (frozenSet.has(f.id)) { skipped++; continue; }
+    // 🎫 하네스 L2 — 다른 잡(autoCorrect·resynth·다른 힐러)이 같은 카페를 만지는 중이면 양보한다.
+    if (!(await acquireLease(HJOB, f.id, 180))) { skipped++; continue; }
     try {
       tickBlob(); const c = (await sql`SELECT name, area, dong, address, published, raw_reviews, judge_decisions FROM cafes WHERE id=${f.id}`)[0] as any;
       if (!c) continue;
@@ -259,7 +269,11 @@ async function healWeakNamePollution(flagged: WeakFlag[], deadline: number): Pro
         const o = weakOtherCafe(body, selfN);
         if (o && xrefKnown(o, known, selfN) && !markers.some((mk) => bn.includes(mk))) { dec[it.key] = false; drop++; }
       }
-      if (drop === 0) continue;
+      // 🩺 하네스 L4 완성(2026-08-08 실전검증서 발견): 가드가 앞단에서 다 걸러 `drop=0`이 되면
+      //   applyDecisions도 noteAttempt도 호출되지 않아 **수렴 계약이 발동하지 못한다** → 감지 22건이
+      //   영원히 남고 아무도 사람에게 안 넘긴다. "제거할 게 없다"도 **무효(효과 없음)** 로 기록해야
+      //   2회 후 동결되고 워치리스트로 승격된다.
+      if (drop === 0) { noEffect++; if ((await noteAttempt(HJOB, f.id, false, { note: "제거 대상 없음(이미 결정 완료 — 자동으로는 더 못 고침)" })).frozen) frozenNew++; continue; }
       // 🩺 하네스 L4 — 집행 전후 '탐지기가 보는 소스'(synth_reviews)의 해시를 비교해 **효과를 실측**한다.
       //   md5는 SQL 안에서 계산돼 32자만 오간다(큰 컬럼 전송 없음). 효과 없으면 fixed로 세지 않는다.
       const _h0 = await shownHash(f.id);
@@ -271,6 +285,7 @@ async function healWeakNamePollution(flagged: WeakFlag[], deadline: number): Pro
       if (names.length < 8) names.push(`${cn}(-${drop})`);
       await invalidateCafeCaches([f.id]).catch(() => {});
     } catch { /* 개별 실패는 건너뜀(다음 런이 이어서 처리) */ }
+    finally { await releaseLease(HJOB, f.id).catch(() => {}); }
   }
   if (fixed > 0) await sql`DELETE FROM search_cache`.catch(() => {});
   return { fixed, dropped, unpub, names, skipped, noEffect, frozen: frozenNew };
@@ -332,6 +347,8 @@ async function healNonCafeBizPollution(flagged: NcbFlag[], deadline: number): Pr
   for (const f of flagged.slice(0, 12)) {
     if (Date.now() > deadline) break;
     if (frozenSet.has(f.id)) { skipped++; continue; }
+    // 🎫 하네스 L2 — 다른 잡(autoCorrect·resynth·다른 힐러)이 같은 카페를 만지는 중이면 양보한다.
+    if (!(await acquireLease(HJOB, f.id, 180))) { skipped++; continue; }
     try {
       tickBlob(); const c = (await sql`SELECT name, area, dong, address, published, raw_reviews, judge_decisions FROM cafes WHERE id=${f.id}`)[0] as any;
       if (!c) continue;
@@ -355,7 +372,11 @@ async function healNonCafeBizPollution(flagged: NcbFlag[], deadline: number): Pr
         const body = (it.title || "") + " " + (it.body || ""); const bn = body.replace(/\s/g, "").toLowerCase();
         if (bizPollutionHit(body) && !mk.some((x) => bn.includes(x))) { dec[it.key] = false; drop++; }
       }
-      if (drop === 0) continue;
+      // 🩺 하네스 L4 완성(2026-08-08 실전검증서 발견): 가드가 앞단에서 다 걸러 `drop=0`이 되면
+      //   applyDecisions도 noteAttempt도 호출되지 않아 **수렴 계약이 발동하지 못한다** → 감지 22건이
+      //   영원히 남고 아무도 사람에게 안 넘긴다. "제거할 게 없다"도 **무효(효과 없음)** 로 기록해야
+      //   2회 후 동결되고 워치리스트로 승격된다.
+      if (drop === 0) { noEffect++; if ((await noteAttempt(HJOB, f.id, false, { note: "제거 대상 없음(이미 결정 완료 — 자동으로는 더 못 고침)" })).frozen) frozenNew++; continue; }
       // 🩺 하네스 L4 — 집행 전후 '탐지기가 보는 소스'(synth_reviews)의 해시를 비교해 **효과를 실측**한다.
       //   md5는 SQL 안에서 계산돼 32자만 오간다(큰 컬럼 전송 없음). 효과 없으면 fixed로 세지 않는다.
       const _h0 = await shownHash(f.id);
@@ -367,6 +388,7 @@ async function healNonCafeBizPollution(flagged: NcbFlag[], deadline: number): Pr
       if (names.length < 8) names.push(`${cleanCafeName(c.name)}(-${drop})`);
       await invalidateCafeCaches([f.id]).catch(() => {});
     } catch { /* 개별 실패는 건너뜀(다음 런이 이어서 처리) */ }
+    finally { await releaseLease(HJOB, f.id).catch(() => {}); }
   }
   if (fixed > 0) await sql`DELETE FROM search_cache`.catch(() => {});
   return { fixed, dropped, unpub, names, skipped, noEffect, frozen: frozenNew };
@@ -449,6 +471,8 @@ async function healFranchiseBranchPollution(flagged: FranchiseFlag[], deadline: 
   for (const f of flagged.slice(0, 12)) {
     if (Date.now() > deadline) break;
     if (frozenSet.has(f.id)) { skipped++; continue; }
+    // 🎫 하네스 L2 — 다른 잡(autoCorrect·resynth·다른 힐러)이 같은 카페를 만지는 중이면 양보한다.
+    if (!(await acquireLease(HJOB, f.id, 180))) { skipped++; continue; }
     try {
       tickBlob(); const c = (await sql`SELECT name, area, dong, address, published, raw_reviews, judge_decisions FROM cafes WHERE id=${f.id}`)[0] as any;
       if (!c) continue;
@@ -472,7 +496,11 @@ async function healFranchiseBranchPollution(flagged: FranchiseFlag[], deadline: 
         if (body.includes(f.ownSuffix) || (f.ownToken.length >= 2 && body.includes(f.ownToken))) continue; // 자기 지점(접미사·토큰) 언급 있으면 보존(다른지점 안내정보일 뿐)
         if (f.otherSuffixes.some((s) => body.includes(s)) || f.otherTokens.some((t) => body.includes(t))) { dec[it.key] = false; drop++; }
       }
-      if (drop === 0) continue;
+      // 🩺 하네스 L4 완성(2026-08-08 실전검증서 발견): 가드가 앞단에서 다 걸러 `drop=0`이 되면
+      //   applyDecisions도 noteAttempt도 호출되지 않아 **수렴 계약이 발동하지 못한다** → 감지 22건이
+      //   영원히 남고 아무도 사람에게 안 넘긴다. "제거할 게 없다"도 **무효(효과 없음)** 로 기록해야
+      //   2회 후 동결되고 워치리스트로 승격된다.
+      if (drop === 0) { noEffect++; if ((await noteAttempt(HJOB, f.id, false, { note: "제거 대상 없음(이미 결정 완료 — 자동으로는 더 못 고침)" })).frozen) frozenNew++; continue; }
       // 🩺 하네스 L4 — 집행 전후 '탐지기가 보는 소스'(synth_reviews)의 해시를 비교해 **효과를 실측**한다.
       //   md5는 SQL 안에서 계산돼 32자만 오간다(큰 컬럼 전송 없음). 효과 없으면 fixed로 세지 않는다.
       const _h0 = await shownHash(f.id);
@@ -484,6 +512,7 @@ async function healFranchiseBranchPollution(flagged: FranchiseFlag[], deadline: 
       if (names.length < 8) names.push(`${cleanCafeName(c.name)}(-${drop})`);
       await invalidateCafeCaches([f.id]).catch(() => {});
     } catch { /* 개별 실패는 건너뜀(다음 런이 이어서 처리) */ }
+    finally { await releaseLease(HJOB, f.id).catch(() => {}); }
   }
   if (fixed > 0) await sql`DELETE FROM search_cache`.catch(() => {});
   return { fixed, dropped, unpub, names, skipped, noEffect, frozen: frozenNew };
@@ -597,6 +626,8 @@ async function healGenericTermPollution(flagged: GenericFlag[], deadline: number
   for (const f of flagged.slice(0, 12)) {
     if (Date.now() > deadline) break;
     if (frozenSet.has(f.id)) { skipped++; continue; }
+    // 🎫 하네스 L2 — 다른 잡(autoCorrect·resynth·다른 힐러)이 같은 카페를 만지는 중이면 양보한다.
+    if (!(await acquireLease(HJOB, f.id, 180))) { skipped++; continue; }
     try {
       tickBlob(); const c = (await sql`SELECT name, area, dong, address, published, raw_reviews, judge_decisions FROM cafes WHERE id=${f.id}`)[0] as any;
       if (!c) continue;
@@ -622,7 +653,11 @@ async function healGenericTermPollution(flagged: GenericFlag[], deadline: number
         if (!body.includes(f.token)) continue;
         if (!hasStrongAnchor(body, nameNoSpace, anchor)) { dec[it.key] = false; drop++; }
       }
-      if (drop === 0) continue;
+      // 🩺 하네스 L4 완성(2026-08-08 실전검증서 발견): 가드가 앞단에서 다 걸러 `drop=0`이 되면
+      //   applyDecisions도 noteAttempt도 호출되지 않아 **수렴 계약이 발동하지 못한다** → 감지 22건이
+      //   영원히 남고 아무도 사람에게 안 넘긴다. "제거할 게 없다"도 **무효(효과 없음)** 로 기록해야
+      //   2회 후 동결되고 워치리스트로 승격된다.
+      if (drop === 0) { noEffect++; if ((await noteAttempt(HJOB, f.id, false, { note: "제거 대상 없음(이미 결정 완료 — 자동으로는 더 못 고침)" })).frozen) frozenNew++; continue; }
       // 🩺 하네스 L4 — 집행 전후 '탐지기가 보는 소스'(synth_reviews)의 해시를 비교해 **효과를 실측**한다.
       //   md5는 SQL 안에서 계산돼 32자만 오간다(큰 컬럼 전송 없음). 효과 없으면 fixed로 세지 않는다.
       const _h0 = await shownHash(f.id);
@@ -634,6 +669,7 @@ async function healGenericTermPollution(flagged: GenericFlag[], deadline: number
       if (names.length < 8) names.push(`${cleanCafeName(c.name)}(-${drop})`);
       await invalidateCafeCaches([f.id]).catch(() => {});
     } catch { /* 개별 실패는 건너뜀(다음 런이 이어서 처리) */ }
+    finally { await releaseLease(HJOB, f.id).catch(() => {}); }
   }
   if (fixed > 0) await sql`DELETE FROM search_cache`.catch(() => {});
   return { fixed, dropped, unpub, names, skipped, noEffect, frozen: frozenNew };
@@ -720,6 +756,8 @@ async function healCompetitorQuotePollution(flagged: CompFlag[], deadline: numbe
   for (const f of flagged) {
     if (Date.now() > deadline) break;
     if (frozenSet.has(f.id)) { skipped++; continue; }
+    // 🎫 하네스 L2 — 다른 잡(autoCorrect·resynth·다른 힐러)이 같은 카페를 만지는 중이면 양보한다.
+    if (!(await acquireLease(HJOB, f.id, 180))) { skipped++; continue; }
     try {
       // 🩹 표시되는 배열(synth_reviews_all)까지 정리 — 과거엔 synth_reviews만 고쳐 정작 상세페이지가 쓰는
       //   synth_reviews_all은 오염이 남던 버그(2026-08-01 발견). 둘 다 같은 기준으로 정리.
@@ -738,6 +776,7 @@ async function healCompetitorQuotePollution(flagged: CompFlag[], deadline: numbe
       fixed++; dropped += rm; if (names.length < 8) names.push(`${cn}(-${qa.length - keepAll.length})`);
       await noteAttempt(HJOB, f.id, true).catch(() => ({ frozen: false }));
     } catch { /* 개별 실패는 다음 런이 이어서 */ }
+    finally { await releaseLease(HJOB, f.id).catch(() => {}); }
   }
   if (fixed > 0) await sql`DELETE FROM search_cache`.catch(() => {});
   return { fixed, dropped, unpub: 0, names, skipped, noEffect, frozen: frozenNew };
@@ -749,6 +788,10 @@ export async function GET(req: NextRequest) {
     if (!authed(req)) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
     await ensureSchema();
     startJobRun("cron-sentinel"); // 💰 하네스 L1 — 큰 컬럼 소비 계량 시작(웜 인스턴스 누적 방지)
+    // 🧪 하네스 L3 — 드라이런 표준화(`?dry=1`). 탐지는 그대로 돌리되 **치유기를 전혀 호출하지 않는다.**
+    //   지금까지 "무엇이 바뀔 것인가"를 보려면 매번 손으로 임시 스크립트를 짜야 했다(2026-08-08에도 그랬다).
+    //   드라이런을 계약의 일부로 두면 조치 전 확인이 표준 절차가 된다. DB 변경 0 · 큰 컬럼 로드 0.
+    const DRY = req.nextUrl.searchParams.get("dry") === "1";
     if (await isCostHalted()) { await recordRun("cron-sentinel", true, "🛑 비용 자동정지 중 — 스킵", 0).catch(() => {}); return NextResponse.json({ ok: true, skipped: "cost-halt" }); }
     await sql`CREATE TABLE IF NOT EXISTS sentinel_reports (id SERIAL PRIMARY KEY, ran_at TIMESTAMPTZ DEFAULT now(), clean BOOLEAN, report JSONB)`.catch(() => {});
 
@@ -782,23 +825,23 @@ export async function GET(req: NextRequest) {
     // 🎡 명소·행사 오염(약한토큰 사각) — 탐지·경보만.
     const attr = await scanAttractionPollution().catch(() => ({ count: 0, samples: [] as string[], flagged: [] as AttrFlag[] }));
     // 🎡 자율 조치: flag된 명소·행사 오염을 남은 시간예산 안에서 자동 제거(런당 최대 12곳, deadline 270s). 나머지는 다음 런.
-    const attrHeal = await healAttractionPollution(attr.flagged || [], started + 240000).catch(() => ({ fixed: 0, dropped: 0, unpub: 0, names: [] as string[], skipped: 0, noEffect: 0, frozen: 0 }));
+    const attrHeal = DRY ? { fixed: 0, dropped: 0, unpub: 0, names: [] as string[], skipped: 0, noEffect: 0, frozen: 0 } : await healAttractionPollution(attr.flagged || [], started + 240000).catch(() => ({ fixed: 0, dropped: 0, unpub: 0, names: [] as string[], skipped: 0, noEffect: 0, frozen: 0 }));
     (checks as any).attraction_pollution = Math.max(0, attr.count - attrHeal.fixed); // 자동조치 후 잔여
     // 🔤 약한이름(1글자) 흡수 오염(name_mismatch가 의도적 제외하는 사각) — 명시적 타카페명만 자동 제거.
     const weak = await scanWeakNamePollution().catch(() => ({ count: 0, samples: [] as string[], flagged: [] as WeakFlag[] }));
-    const weakHeal = await healWeakNamePollution(weak.flagged || [], started + 250000).catch(() => ({ fixed: 0, dropped: 0, unpub: 0, names: [] as string[], skipped: 0, noEffect: 0, frozen: 0 }));
+    const weakHeal = DRY ? { fixed: 0, dropped: 0, unpub: 0, names: [] as string[], skipped: 0, noEffect: 0, frozen: 0 } : await healWeakNamePollution(weak.flagged || [], started + 250000).catch(() => ({ fixed: 0, dropped: 0, unpub: 0, names: [] as string[], skipped: 0, noEffect: 0, frozen: 0 }));
     (checks as any).weak_name_pollution = Math.max(0, weak.count - weakHeal.fixed); // 자동조치 후 잔여
     // 🏢 비카페 업종 오염(부동산·마사지·시계·구인 등, xref 사각) — 강한 업종어 + 카페명마커 부재만 자동 제거.
     const ncb = await scanNonCafeBizPollution().catch(() => ({ count: 0, samples: [] as string[], flagged: [] as NcbFlag[] }));
-    const ncbHeal = await healNonCafeBizPollution(ncb.flagged || [], started + 280000).catch(() => ({ fixed: 0, dropped: 0, unpub: 0, names: [] as string[], skipped: 0, noEffect: 0, frozen: 0 }));
+    const ncbHeal = DRY ? { fixed: 0, dropped: 0, unpub: 0, names: [] as string[], skipped: 0, noEffect: 0, frozen: 0 } : await healNonCafeBizPollution(ncb.flagged || [], started + 280000).catch(() => ({ fixed: 0, dropped: 0, unpub: 0, names: [] as string[], skipped: 0, noEffect: 0, frozen: 0 }));
     (checks as any).noncafe_biz_pollution = Math.max(0, ncb.count - ncbHeal.fixed); // 자동조치 후 잔여
     // 🏪 프랜차이즈 지점 간 오염(브랜드+타지점 접미사 동시등장, xref보다 안전 — 대조대상이 우리 DB 실존 지점) — 자동 제거.
     const fr = await scanFranchiseBranchPollution().catch(() => ({ count: 0, samples: [] as string[], flagged: [] as FranchiseFlag[] }));
-    const frHeal = await healFranchiseBranchPollution(fr.flagged || [], started + 288000).catch(() => ({ fixed: 0, dropped: 0, unpub: 0, names: [] as string[], skipped: 0, noEffect: 0, frozen: 0 }));
+    const frHeal = DRY ? { fixed: 0, dropped: 0, unpub: 0, names: [] as string[], skipped: 0, noEffect: 0, frozen: 0 } : await healFranchiseBranchPollution(fr.flagged || [], started + 288000).catch(() => ({ fixed: 0, dropped: 0, unpub: 0, names: [] as string[], skipped: 0, noEffect: 0, frozen: 0 }));
     (checks as any).franchise_branch_pollution = Math.max(0, fr.count - frHeal.fixed); // 자동조치 후 잔여
     // 🔠 흔한단어/동음이의어 이름 오염(identity.weak_token 사전 재사용, name_mismatch·weak_name 사각 전담) — 자동 제거.
     const gen = await scanGenericTermPollution().catch(() => ({ count: 0, samples: [] as string[], flagged: [] as GenericFlag[] }));
-    const genHeal = await healGenericTermPollution(gen.flagged || [], started + 296000).catch(() => ({ fixed: 0, dropped: 0, unpub: 0, names: [] as string[], skipped: 0, noEffect: 0, frozen: 0 }));
+    const genHeal = DRY ? { fixed: 0, dropped: 0, unpub: 0, names: [] as string[], skipped: 0, noEffect: 0, frozen: 0 } : await healGenericTermPollution(gen.flagged || [], started + 296000).catch(() => ({ fixed: 0, dropped: 0, unpub: 0, names: [] as string[], skipped: 0, noEffect: 0, frozen: 0 }));
     (checks as any).generic_term_pollution = Math.max(0, gen.count - genHeal.fixed); // 자동조치 후 잔여
     // 🗣️ 문구형 이름 오염(신규 재발 조기경보 — 조사·어미 종결 토큰, 아직 사전 미등재분) — 탐지·워치리스트 전용(자동조치 없음).
     const phrase = await scanPhraseNamePollution().catch(() => ({ count: 0, samples: [] as string[], flagged: [] as PhraseFlag[] }));
@@ -806,7 +849,7 @@ export async function GET(req: NextRequest) {
 
     // 🕵️ 인용문 교차오염(다른 카페 상호 섞임) — 탐지+자율조치(경쟁 상호 인용문만 제거, 비공개 안 함)
     const comp = await scanCompetitorQuotePollution().catch(() => ({ count: 0, samples: [] as string[], flagged: [] as CompFlag[] }));
-    const compHeal = await healCompetitorQuotePollution(comp.flagged || [], started + 288000).catch(() => ({ fixed: 0, dropped: 0, unpub: 0, names: [] as string[], skipped: 0, noEffect: 0, frozen: 0 }));
+    const compHeal = DRY ? { fixed: 0, dropped: 0, unpub: 0, names: [] as string[], skipped: 0, noEffect: 0, frozen: 0 } : await healCompetitorQuotePollution(comp.flagged || [], started + 288000).catch(() => ({ fixed: 0, dropped: 0, unpub: 0, names: [] as string[], skipped: 0, noEffect: 0, frozen: 0 }));
     (checks as any).competitor_quote_pollution = Math.max(0, comp.count - compHeal.fixed);
 
     // name_mismatch·attraction·weak_name·noncafe_biz·franchise_branch·generic_term·phrase_name은 '정합성 실패'가 아니라 검토 워치리스트 → clean 판정서 제외.
@@ -824,12 +867,15 @@ export async function GET(req: NextRequest) {
 
     // ── ③ 리포트 ──
     const flags = Object.entries(checks).filter(([k, n]) => n > 0 && !WATCH.has(k)).map(([k, n]) => `${k}:${n}`);
+    // 🎫 하네스 L2 — 만료 리스 청소 + 현재 점유 현황(겹침이 실제로 있었는지 보이게)
+    const leasePruned = await pruneLeases().catch(() => 0);
+    const leaseNow = await activeLeases().catch(() => 0);
     // 🩺 하네스 L4 — 자동으로 못 고쳐 '동결'된 대상은 사람이 볼 수 있어야 한다(조용히 사라지면 안 됨).
     const frozenNow = await frozenSummary().catch(() => [] as { job: string; n: number }[]);
     const healSkipped = (attrHeal.skipped ?? 0) + (weakHeal.skipped ?? 0) + (ncbHeal.skipped ?? 0) + (frHeal.skipped ?? 0) + (genHeal.skipped ?? 0) + (compHeal.skipped ?? 0);
     const healNoEffect = (attrHeal.noEffect ?? 0) + (weakHeal.noEffect ?? 0) + (ncbHeal.noEffect ?? 0) + (frHeal.noEffect ?? 0) + (genHeal.noEffect ?? 0) + (compHeal.noEffect ?? 0);
     const harnessNote = (healSkipped || healNoEffect || frozenNow.length)
-      ? ` · 🩺하네스: 무효 ${healNoEffect}·동결스킵 ${healSkipped}${frozenNow.length ? `·동결누적 ${frozenNow.reduce((a, b) => a + b.n, 0)}(사람확인 대기)` : ""}`
+      ? ` · 🩺하네스: 무효 ${healNoEffect}·동결스킵 ${healSkipped}${frozenNow.length ? `·동결누적 ${frozenNow.reduce((a, b) => a + b.n, 0)}(사람확인 대기)` : ""}${leaseNow ? `·리스점유 ${leaseNow}` : ""}${leasePruned ? `·만료리스정리 ${leasePruned}` : ""}`
       : "";
     await sql`INSERT INTO sentinel_reports (clean, report) VALUES (${clean}, ${JSON.stringify({ checks, nameMismatch: mismatch.samples, attractionPollution: attr.samples, attractionHealed: attrHeal, weakNamePollution: weak.samples, weakNameHealed: weakHeal, nonCafeBizPollution: ncb.samples, nonCafeBizHealed: ncbHeal, franchiseBranchPollution: fr.samples, franchiseBranchHealed: frHeal, genericTermPollution: gen.samples, genericTermHealed: genHeal, phraseNamePollution: phrase.samples, competitorQuotePollution: comp.samples, competitorQuoteHealed: compHeal, healed: { area: area.fixed, box: box.excluded, dup: dup.resolved, attr: attrHeal.fixed, weak: weakHeal.fixed, ncb: ncbHeal.fixed, fr: frHeal.fixed, gen: genHeal.fixed, comp: compHeal.fixed }, consoleKey: probe, harness: { noEffect: healNoEffect, skipped: healSkipped, frozen: frozenNow } })}::jsonb)`.catch(() => {});
 
@@ -854,6 +900,13 @@ export async function GET(req: NextRequest) {
         ..._fpIds(fr.samples), ..._fpIds(gen.samples), ..._fpIds(comp.samples),
       ],
     });
+    if (DRY) {
+      // 🧪 드라이런 — DB에 아무것도 남기지 않는다(원장·리포트 오염 방지). "무엇이 바뀔 것인가"만 돌려준다.
+      return NextResponse.json({ ok: true, dryRun: true, wouldDetect: checks, samples: {
+        attraction: attr.samples, weakName: weak.samples, nonCafeBiz: ncb.samples,
+        franchise: fr.samples, generic: gen.samples, competitor: comp.samples,
+      } });
+    }
     const _usage = runUsage(); if (!_usage?.overBudget) void clearOverBudget("cron-sentinel");
     await recordRun("cron-sentinel", true, detail, healedTotal, {
       fingerprint,
