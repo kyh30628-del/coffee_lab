@@ -648,6 +648,83 @@ export function nameCoherence(name: string, quotes: string[], areaTerms: string[
   return hit / qs.length;
 }
 
+// 룰갭(rulegap-20260808-0815, coordination#293, decisions#636): 동일날짜 SEO 템플릿반복 — 미표기 체험단
+//   캠페인 신호. 정합성조사팀이 발행카페 56곳에서 후기 30%↑가 단일날짜에 몰리는 패턴을 발견했으나(id17879
+//   카유·id19989 모노베이크 실측), 날짜밀집 단독 신호는 "생활의달인" TV방영 진짜버즈(id14844, 43.2%밀집)를
+//   오탐한다 — 방영회차·개인서사·#내돈내산으로 조직캠페인과 구분됨. 그래서 날짜밀집 + 어절(2-gram) 템플릿
+//   반복 + 개인서사 마커 부재가 함께 있을 때만 신호로 본다. ⚠️ 자동비공개 아님(criteria.ts 4번 원칙: 결정론=
+//   신호, 의미판단=LLM) — needs_llm 재판정 큐 우선순위 태그만 부여(호출부 synthStore.storeResult).
+const PERSONAL_NARRATIVE_MARKER = /(친구|가족|혼자|직접\s*(가|다녀|방문)|\d+\s*(회|화)(?=[^\p{L}]|$)|내돈내산|불만|아쉬|별로|\d[,\d]{2,}\s*원|\d+\s*(천|만)\s*원)/u;
+const CAMPAIGN_MIN_CLUSTER = 4;       // 표본 너무 적으면 판단 불가(실 사례는 6건 밀집)
+const CAMPAIGN_CLUSTER_RATE = 0.30;   // 정합성조사팀 원 쿼리 임계(동일날짜 30%↑) 재사용
+const CAMPAIGN_TEMPLATE_SCORE = 0.35; // 그룹 내 quote 쌍 2-gram 평균 중복률 — 어절조합 반복 강신호 임계
+const CAMPAIGN_PERSONAL_RATE = 0.34;  // 그룹 1/3 이상이 개인서사 마커를 가지면 진짜버즈로 봄(반증사례 보호)
+
+function bigramSet(text: string): Set<string> {
+  const words = (text || "").replace(/[^\p{L}\p{N}\s]/gu, " ").split(/\s+/).filter(Boolean);
+  const out = new Set<string>();
+  for (let i = 0; i < words.length - 1; i++) out.add(words[i] + " " + words[i + 1]);
+  return out;
+}
+// 두 인용문의 어절(2-gram) 중복률(겹침계수, min-size 기준) — 문장 길이차에 안정적.
+function bigramOverlap(a: Set<string>, b: Set<string>): number {
+  if (!a.size || !b.size) return 0;
+  let hit = 0;
+  for (const g of a) if (b.has(g)) hit++;
+  return hit / Math.min(a.size, b.size);
+}
+// "YYYY.MM.DD" → epoch day. 파싱 불가면 null(reviewDates/EvidenceReview.date와 동일 포맷 전제).
+function toEpochDay(d?: string): number | null {
+  const m = String(d || "").match(/^(\d{4})\.(\d{2})\.(\d{2})$/);
+  if (!m) return null;
+  return Math.floor(Date.UTC(+m[1], +m[2] - 1, +m[3]) / 86400000);
+}
+
+export type CampaignSignal = {
+  suspect: boolean;
+  clusterDate: string | null;   // 밀집 중심일(YYYY-MM-DD), 신호 없으면 null
+  clusterRate: number;          // 날짜있는 표시 리뷰 중 밀집그룹(±1일) 비율
+  templateScore: number;        // 밀집그룹 내 2-gram 평균 중복률
+  personalMarkerRate: number;   // 밀집그룹 내 개인서사 마커 보유 비율
+};
+
+// 카페 표시 근거(옥석) 전체 중 동일날짜(±1일) 밀집 + 템플릿 반복 + 개인서사 부재 결합 신호 탐지.
+export function detectCampaignCluster(evidence: { quote: string; date?: string }[]): CampaignSignal {
+  const none: CampaignSignal = { suspect: false, clusterDate: null, clusterRate: 0, templateScore: 0, personalMarkerRate: 0 };
+  const dated = evidence.filter((e) => toEpochDay(e.date) != null);
+  if (dated.length < CAMPAIGN_MIN_CLUSTER) return none;
+  const byDay = new Map<number, { quote: string; date?: string }[]>();
+  for (const e of dated) {
+    const day = toEpochDay(e.date) as number;
+    if (!byDay.has(day)) byDay.set(day, []);
+    byDay.get(day)!.push(e);
+  }
+  // ±1일 병합 — 가장 큰 밀집그룹을 대표로 본다.
+  const days = [...byDay.keys()].sort((a, b) => a - b);
+  let best: { quote: string; date?: string }[] = [];
+  let bestDay = days[0] ?? 0;
+  for (const center of days) {
+    const group = days.filter((d) => Math.abs(d - center) <= 1).flatMap((d) => byDay.get(d)!);
+    if (group.length > best.length) { best = group; bestDay = center; }
+  }
+  const clusterRate = best.length / dated.length;
+  if (best.length < CAMPAIGN_MIN_CLUSTER || clusterRate < CAMPAIGN_CLUSTER_RATE) return none;
+
+  const grams = best.map((e) => bigramSet(e.quote));
+  let sum = 0, pairs = 0;
+  for (let i = 0; i < grams.length; i++) {
+    for (let j = i + 1; j < grams.length; j++) { sum += bigramOverlap(grams[i], grams[j]); pairs++; }
+  }
+  const templateScore = pairs ? sum / pairs : 0;
+  const personalMarkerRate = best.filter((e) => PERSONAL_NARRATIVE_MARKER.test(e.quote)).length / best.length;
+  const suspect = templateScore >= CAMPAIGN_TEMPLATE_SCORE && personalMarkerRate < CAMPAIGN_PERSONAL_RATE;
+  return {
+    suspect,
+    clusterDate: suspect ? new Date(bestDay * 86400000).toISOString().slice(0, 10) : null,
+    clusterRate, templateScore, personalMarkerRate,
+  };
+}
+
 // 리뷰 정렬용 개별 매칭 확신도(#307): nameCoherence는 흔한 단일토큰('여유' 등)도 그대로 히트로 세어
 //   집계 오염게이트로는 충분하지만, 개별 리뷰 하나의 '확신도'로 쓰기엔 느슨하다(다른 업체명이 함께 있어도
 //   흔한 단어 하나만 겹치면 1.0). verifyReview가 이미 쓰는 weakSingle/reqFull(흔한 유일토큰이면 전체이름
