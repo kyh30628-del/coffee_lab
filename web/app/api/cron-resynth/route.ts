@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
 import { synthAndStore } from "@/lib/synthStore";
 import { recordRun } from "@/lib/agentLog";
+import { startJobRun, runUsage } from "@/lib/blobBudget";
 import { isCostHalted } from "@/lib/costGuard";
 
 export const runtime = "nodejs";
@@ -12,6 +13,7 @@ const synthOne = (c: { id: number; name: string; area: string }) => synthAndStor
 
 // 자동 실행 진입점: 가장 오래 갱신 안 된 카페 몇 곳을 재수집
 export async function GET(req: NextRequest) {
+  startJobRun("cron-resynth"); // 💰 하네스 L1 — 큰 컬럼 소비 계량 시작
   try {
     // 보안: 아무나 이 주소를 호출해 비용을 쓰지 못하게 비밀키 확인
     const secret = process.env.CRON_SECRET;
@@ -97,7 +99,8 @@ export async function GET(req: NextRequest) {
     const toInvalidate = [...new Set([...gUnpub, ...gChangedIds])];
     if (toInvalidate.length) { const { invalidateCafeCaches } = await import("@/lib/cafeCacheInvalidate"); await invalidateCafeCaches(toInvalidate).catch(() => {}); }
 
-    await recordRun("cron-resynth", true, `raw정리 ${purged.length} 유튜브 ${ytRefreshed.length} · 구독재수집 ${subResults.length} · 전수적용 ${gDone}(변동 ${gChangedIds.length}·비공개 ${gUnpub.length}·오류 ${gErr})${gStop ? " ⚠️차단기발동" : ""}`, gDone);
+    const _u = runUsage(); // 💰 하네스 L1 — 이번 런의 큰 컬럼 소비량을 원장에 남긴다
+    await recordRun("cron-resynth", true, `raw정리 ${purged.length} 유튜브 ${ytRefreshed.length} · 구독재수집 ${subResults.length} · 전수적용 ${gDone}(변동 ${gChangedIds.length}·비공개 ${gUnpub.length}·오류 ${gErr})${gStop ? " ⚠️차단기발동" : ""}`, gDone, { metrics: { blobReads: _u?.blobReads ?? 0, wallMs: _u?.wallMs ?? 0 } });
     return NextResponse.json({ ok: true, ranAt: new Date().toISOString(), rawPurged: purged.length, ytRefreshed: ytRefreshed.length, subResynth: subResults.length, netApplied: gDone, changed: gChangedIds.length, unpublished: gUnpub.length, breaker: gStop });
   } catch (e) {
     await recordRun("cron-resynth", false, String(e).slice(0, 150));

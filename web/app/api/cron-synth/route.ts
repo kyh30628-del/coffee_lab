@@ -3,6 +3,7 @@ import { sql, ensureSchema } from "@/lib/db";
 import { synthAndStore } from "@/lib/synthStore";
 import { PRIORITY_AREAS } from "@/lib/discover";
 import { recordRun } from "@/lib/agentLog";
+import { startJobRun, runUsage } from "@/lib/blobBudget";
 import { autoCorrect } from "@/lib/issues";
 import { isCostHalted } from "@/lib/costGuard";
 export const runtime = "nodejs";
@@ -13,6 +14,7 @@ export const maxDuration = 300; // 신규 큐를 시간예산껏 비움
 //   워크플로우 불변: synthAndStore가 raw 수집 → 옥석 합성(규칙) → 품질 게이트 통과 시에만 공개.
 //   토큰 미사용(네이버 수집 + 규칙 합성). LLM 보조판정은 별도 cron-batch-judge(Batches).
 export async function GET(req: NextRequest) {
+  startJobRun("cron-synth"); // 💰 하네스 L1 — 큰 컬럼 소비 계량 시작
   const secret = process.env.CRON_SECRET;
   if (secret && req.headers.get("authorization") !== `Bearer ${secret}`) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
@@ -41,7 +43,8 @@ export async function GET(req: NextRequest) {
     const pendingNew = (await sql`SELECT COUNT(*)::int n FROM cafes WHERE synth_updated IS NULL`)[0].n;
     // 🔄 합성 직후 즉시 정리 — 새로 공개된 데이터에 비카페·오염·정합성 문제가 있으면 그 자리에서 해결(10분 폴링 안 기다림).
     const ac = await autoCorrect().catch(() => ({ resolved: 0, escalated: 0, log: [] as string[] }));
-    await recordRun("cron-synth", true, `합성 ${processed} 공개 ${published} 실패 ${failed} 신규대기 ${pendingNew}${ac.resolved ? ` · 즉시정리 ${ac.resolved}` : ""}`, processed);
+    const _u = runUsage(); // 💰 하네스 L1 — 이번 런의 큰 컬럼 소비량을 원장에 남긴다
+    await recordRun("cron-synth", true, `합성 ${processed} 공개 ${published} 실패 ${failed} 신규대기 ${pendingNew}${ac.resolved ? ` · 즉시정리 ${ac.resolved}` : ""}`, processed, { metrics: { blobReads: _u?.blobReads ?? 0, wallMs: _u?.wallMs ?? 0 } });
     return NextResponse.json({ ok: true, ranAt: new Date().toISOString(), processed, published, skipped, failed, pendingNew, autoCorrect: ac });
   } catch (e) {
     await recordRun("cron-synth", false, String(e).slice(0, 150));

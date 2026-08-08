@@ -4,6 +4,7 @@
 //   ⚠️ 잡 추가/제거 시 여기 **한 곳만** 갱신한다. (이 모듈은 아무것도 import하지 않아 순환참조 불가.)
 
 export const JOB_TEAM: Record<string, string> = {
+  "cron-exposure": "경험본부",   // 👁️ 노출 감시자(2026-08-08 신설) — 사용자가 실제로 보는 상위 6건 품질
   // Vercel 크론
   "cron-synth": "운영본부", "cron-resynth": "운영본부", "cron-embed": "운영본부", "cron-snapshot": "운영본부",
   "cron-closure": "운영본부", "cron-enrich": "운영본부",
@@ -41,6 +42,7 @@ export const teamOf = (job: string) => JOB_TEAM[job] ?? "경영지원본부";
 //   미등록 잡은 실패(ok=false)만 감지하고 staleness는 안 본다 — 일회성 스크립트·제거된 잡의
 //   잔류 기록이 영구 오탐을 만들던 것(dormantIdle 우회 포함)의 구조적 차단.
 export const EXPECT_MAX_H: Record<string, number> = {
+  "cron-exposure": 30,   // 하루 1회 + 버퍼
   // Vercel 크론 (스케줄 + 버퍼)
   "cron-snapshot": 200, "cron-resynth": 14, "cron-newsletter": 200, "cron-discover-categories": 800,
   "cron-verify": 16, "cron-sentinel": 18, "cron-demand": 30, "cron-rulegap": 20, "cron-closure": 14,

@@ -4,6 +4,7 @@ import { healAreaLabel, healOutOfBox } from "@/lib/synthStore";
 import { recordRun } from "@/lib/agentLog";
 import { fingerprintOf } from "@/lib/runLedger";
 import { frozenTargets, noteAttempt, shownHash, frozenSummary } from "@/lib/healHarness";
+import { startJobRun, tickBlob, runUsage } from "@/lib/blobBudget";
 import { isCostHalted } from "@/lib/costGuard";
 import { probeConsoleKey } from "@/lib/consoleKeyProbe";
 import { loadCriteria, getCriterionSync } from "@/lib/criteria";
@@ -115,7 +116,7 @@ async function healAttractionPollution(flagged: AttrFlag[], deadline: number): P
     if (Date.now() > deadline) break;
     if (frozenSet.has(f.id)) { skipped++; continue; }
     try {
-      const c = (await sql`SELECT name, area, dong, address, published, raw_reviews, judge_decisions FROM cafes WHERE id=${f.id}`)[0] as any;
+      tickBlob(); const c = (await sql`SELECT name, area, dong, address, published, raw_reviews, judge_decisions FROM cafes WHERE id=${f.id}`)[0] as any;
       if (!c) continue;
       const at = [c.area, c.dong].filter(Boolean) as string[];
       const mk = attrMarkers(c.name, at);
@@ -234,7 +235,7 @@ async function healWeakNamePollution(flagged: WeakFlag[], deadline: number): Pro
     if (Date.now() > deadline) break;
     if (frozenSet.has(f.id)) { skipped++; continue; }
     try {
-      const c = (await sql`SELECT name, area, dong, address, published, raw_reviews, judge_decisions FROM cafes WHERE id=${f.id}`)[0] as any;
+      tickBlob(); const c = (await sql`SELECT name, area, dong, address, published, raw_reviews, judge_decisions FROM cafes WHERE id=${f.id}`)[0] as any;
       if (!c) continue;
       const at = [c.area, c.dong].filter(Boolean) as string[];
       const cn = cleanCafeName(c.name); const selfN = cn.replace(/[\s·・.]/g, "").toLowerCase();
@@ -332,7 +333,7 @@ async function healNonCafeBizPollution(flagged: NcbFlag[], deadline: number): Pr
     if (Date.now() > deadline) break;
     if (frozenSet.has(f.id)) { skipped++; continue; }
     try {
-      const c = (await sql`SELECT name, area, dong, address, published, raw_reviews, judge_decisions FROM cafes WHERE id=${f.id}`)[0] as any;
+      tickBlob(); const c = (await sql`SELECT name, area, dong, address, published, raw_reviews, judge_decisions FROM cafes WHERE id=${f.id}`)[0] as any;
       if (!c) continue;
       const at = [c.area, c.dong].filter(Boolean) as string[];
       const mk = attrMarkers(c.name, at);
@@ -449,7 +450,7 @@ async function healFranchiseBranchPollution(flagged: FranchiseFlag[], deadline: 
     if (Date.now() > deadline) break;
     if (frozenSet.has(f.id)) { skipped++; continue; }
     try {
-      const c = (await sql`SELECT name, area, dong, address, published, raw_reviews, judge_decisions FROM cafes WHERE id=${f.id}`)[0] as any;
+      tickBlob(); const c = (await sql`SELECT name, area, dong, address, published, raw_reviews, judge_decisions FROM cafes WHERE id=${f.id}`)[0] as any;
       if (!c) continue;
       const at = [c.area, c.dong].filter(Boolean) as string[];
       const raw = Array.isArray(c.raw_reviews) ? c.raw_reviews : [];
@@ -597,7 +598,7 @@ async function healGenericTermPollution(flagged: GenericFlag[], deadline: number
     if (Date.now() > deadline) break;
     if (frozenSet.has(f.id)) { skipped++; continue; }
     try {
-      const c = (await sql`SELECT name, area, dong, address, published, raw_reviews, judge_decisions FROM cafes WHERE id=${f.id}`)[0] as any;
+      tickBlob(); const c = (await sql`SELECT name, area, dong, address, published, raw_reviews, judge_decisions FROM cafes WHERE id=${f.id}`)[0] as any;
       if (!c) continue;
       const at = [c.area, c.dong].filter(Boolean) as string[];
       const nameNoSpace = (c.name || "").replace(/\s+/g, "");
@@ -747,6 +748,7 @@ export async function GET(req: NextRequest) {
   try {
     if (!authed(req)) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
     await ensureSchema();
+    startJobRun("cron-sentinel"); // 💰 하네스 L1 — 큰 컬럼 소비 계량 시작(웜 인스턴스 누적 방지)
     if (await isCostHalted()) { await recordRun("cron-sentinel", true, "🛑 비용 자동정지 중 — 스킵", 0).catch(() => {}); return NextResponse.json({ ok: true, skipped: "cost-halt" }); }
     await sql`CREATE TABLE IF NOT EXISTS sentinel_reports (id SERIAL PRIMARY KEY, ran_at TIMESTAMPTZ DEFAULT now(), clean BOOLEAN, report JSONB)`.catch(() => {});
 
@@ -852,9 +854,14 @@ export async function GET(req: NextRequest) {
         ..._fpIds(fr.samples), ..._fpIds(gen.samples), ..._fpIds(comp.samples),
       ],
     });
+    const _usage = runUsage();
     await recordRun("cron-sentinel", true, detail, healedTotal, {
       fingerprint,
-      metrics: { detected: attr.count + weak.count + ncb.count + fr.count + gen.count + comp.count, healed: healedTotal },
+      metrics: {
+        detected: attr.count + weak.count + ncb.count + fr.count + gen.count + comp.count, healed: healedTotal,
+        noEffect: healNoEffect, skipped: healSkipped,
+        blobReads: _usage?.blobReads ?? 0, wallMs: _usage?.wallMs ?? 0,
+      },
     });
     return NextResponse.json({ ok: true, ranAt: new Date().toISOString(), clean, healed: { area: area.fixed, areaNames: area.names, box: box.excluded, dup: dup.resolved, dupPairs: dup.pairs }, checks, flags, nameMismatch: mismatch, consoleKey: probe });
   } catch (e) {

@@ -8,6 +8,7 @@ import { fetchYouTubeReviews } from "./youtubeCollector";
 import { collectAndSynthesize, type RawSource, type BorderlineItem, type CollectResult } from "./collectOrchestrator";
 import { judgeReviews, hasJudgeKey } from "./reviewJudge";
 import { isNonCafe, isFranchise, isGenericFoodName, isSnackStall, isStructuralPhantom, isUnmannedCafe } from "./discover";
+import { tickBlob } from "./blobBudget";
 import { nameCoherence, cleanCafeName, verifyReview, isNonBranchWord, isAreaLikeWord, VENDOR_LISTING_TEMPLATE, detectCampaignCluster } from "./reviewQuality";
 import { loadLearnedTerms } from "./learnedTerms";
 import { loadCriteria, getCriterionSync } from "./criteria";
@@ -147,6 +148,7 @@ function rawToSources(raw: RawItem[]): RawSource[] {
 }
 
 async function loadRaw(cafeId: number): Promise<RawItem[]> {
+  tickBlob(); // 💰 하네스 L1 — 큰 컬럼(raw_reviews) 로드의 단일 통로. 여기서만 계량한다(관측 모드).
   const row = (await sql`SELECT raw_reviews FROM cafes WHERE id=${cafeId}`)[0];
   const r = row?.raw_reviews;
   return Array.isArray(r) ? (r as RawItem[]) : [];

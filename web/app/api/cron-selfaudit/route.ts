@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { recordRun } from "@/lib/agentLog";
 import { detectStuck } from "@/lib/runLedger";
+import { verifyContracts } from "@/lib/jobContract";
+import { pendingGates } from "@/lib/gateQueue";
+import { openRecheckCount } from "@/lib/recheckQueue";
 import { autoCorrect } from "@/lib/issues";
 import { pushTrigger } from "@/lib/auditTrigger";
 
@@ -104,6 +107,31 @@ export async function GET(req: NextRequest) {
         await pushTrigger("selfaudit_critical", f.check, `${f.check} (${f.count}건·${f.team})`, "HIGH");
       }
     }
+
+    // ── 🚦 인간 게이트 SLA — 하네스 L6(2026-08-08) ──
+    //   🔴 자동승인 절대 없음. 사람이 눌러야 하는 일이 **조용히 갇히지 않게** 드러내기만 한다.
+    //   (2026-08-08: 배포대기 4건이 27시간 정체 — 경고는 접힌 화면에, 버튼은 펼친 화면에 있었다.)
+    try {
+      const gates = await pendingGates();
+      for (const g of gates.filter((x) => x.sla === "지연" || x.sla === "심각")) {
+        findings.push({
+          check: `사람 대기 ${g.sla} #${g.id} ${g.dev_status ?? g.status} (${g.ageH}h) — ${g.title}`,
+          count: 1, team: "경영지원본부", critical: g.sla === "심각",
+        });
+      }
+      const rq = await openRecheckCount();
+      if (rq > 0) findings.push({ check: `정책 소급 재판정 대기 ${rq}건(사람 확인 필요 — 자동 재공개 없음)`, count: rq, team: "품질본부", critical: false });
+    } catch { /* 게이트 조회 실패가 자가감사를 깨지 않게 */ }
+
+    // ── 📜 계약 검증 — 하네스 L1(2026-08-08) ──
+    //   `cron-criteria-verify`의 dead-knob 검사와 같은 취지: 계약과 현실이 갈라지는 걸 결정론으로 잡는다.
+    //   ⚠️ 추가 DB 조회 없음 — 위에서 이미 읽은 크론 상태 목록(crons)을 그대로 재사용한다.
+    try {
+      const running = (crons as any[]).map((c: any) => String(c.job));
+      for (const v of verifyContracts(running)) {
+        findings.push({ check: `계약 ${v.kind}: ${v.job} — ${v.note}`, count: 1, team: teamOf(v.job), critical: false });
+      }
+    } catch { /* 검증 실패가 자가감사를 깨지 않게 */ }
 
     // ── 🔁 정체(헛돎) 감시 — 하네스 L5(2026-08-08) ──
     //   같은 '문제 집합'이 3회 연속 반복되면 그 잡은 아무것도 못 바꾸고 도는 중이다. 실행이 성공(ok=true)이라
