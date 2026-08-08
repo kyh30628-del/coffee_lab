@@ -8,7 +8,7 @@ import { fetchYouTubeReviews } from "./youtubeCollector";
 import { collectAndSynthesize, type RawSource, type BorderlineItem, type CollectResult } from "./collectOrchestrator";
 import { judgeReviews, hasJudgeKey } from "./reviewJudge";
 import { isNonCafe, isFranchise, isGenericFoodName, isSnackStall, isStructuralPhantom, isUnmannedCafe } from "./discover";
-import { nameCoherence, cleanCafeName, verifyReview, isNonBranchWord, isAreaLikeWord, VENDOR_LISTING_TEMPLATE } from "./reviewQuality";
+import { nameCoherence, cleanCafeName, verifyReview, isNonBranchWord, isAreaLikeWord, VENDOR_LISTING_TEMPLATE, detectCampaignCluster } from "./reviewQuality";
 import { loadLearnedTerms } from "./learnedTerms";
 import { loadCriteria, getCriterionSync } from "./criteria";
 import { loadCriteriaLists } from "./criteriaLists";
@@ -253,11 +253,16 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   const ambiguousEvidence = coherence < getCriterionSync("contamination.ambiguous.coherence_max") || offctx >= getCriterionSync("contamination.ambiguous.offctx_min");
   const blCount = borderline?.length ?? 0; // 경계후기 수(노출 제외·LLM 보강 대기) — 관제탑 가시화용
   const recoverableEdge = grade === "후보" && blCount > 0;
-  const needsLLM = ambiguousEvidence || recoverableEdge;
+  // rulegap-20260808-0815(coordination#293, decisions#636): 동일날짜 SEO 템플릿반복(미표기 체험단) 의심 —
+  //   자동비공개 아님, needs_llm 재판정 큐 우선순위 태그만 부여(반증사례 id14844 TV방영 진짜버즈 보호 확인됨).
+  const campaignSignal = detectCampaignCluster(((allEvidence ?? evidenceReviews) as any[]).map((r) => ({ quote: String(r?.quote || ""), date: r?.date })));
+  const needsLLM = ambiguousEvidence || recoverableEdge || campaignSignal.suspect;
+  const needsLlmPriority = campaignSignal.suspect ? "동일날짜 SEO반복 캠페인 의심" : null;
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_reviews_all JSONB`.catch(() => {});
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS pipeline_status TEXT`.catch(() => {});
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS needs_llm BOOLEAN`.catch(() => {});
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS borderline_count INT`.catch(() => {});
+  await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS needs_llm_priority TEXT`.catch(() => {}); // needs_llm 재판정 큐 우선순위 태그(rulegap-20260808-0815)
   const allEv = safeJson(allEvidence ?? evidenceReviews);
   // 현재 상태(파이프라인 단계·카테고리·이전 합성값) 먼저 — 카테고리 게이트 분기에 pst 필요.
   const cur = (await sql`SELECT pipeline_status, naver_category, synth_identity, synth_count, synth_updated, jsonb_array_length(COALESCE(synth_reviews,'[]'::jsonb)) prev_ev,
@@ -311,9 +316,9 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   const publish = (otherwiseBlocked || unpublishLocked) ? false : ruleOk; // 제외·잠금·held·노이즈·파이프라인은 비공개 고정
 
   if (llmJudged) {
-    await sql`UPDATE cafes SET synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_coherence=${coherence}, offctx_rate=${offctx}, needs_llm=${needsLLM}, borderline_count=${blCount}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${safeJson(evidenceReviews)}, synth_reviews_all=${allEv}, char_scores=${safeJson(charScores)}, synth_quality=${safeJson(quality)}, review_dates=${safeJson(reviewDates)}, pipeline_status=${newPst}, synth_updated=${synthTs}, synth_checked_at=now(), llm_judged_at=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN ${latMin} AND ${latMax} AND lng BETWEEN ${lngMin} AND ${lngMax}) WHERE id=${cafeId}`;
+    await sql`UPDATE cafes SET synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_coherence=${coherence}, offctx_rate=${offctx}, needs_llm=${needsLLM}, needs_llm_priority=${needsLlmPriority}, borderline_count=${blCount}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${safeJson(evidenceReviews)}, synth_reviews_all=${allEv}, char_scores=${safeJson(charScores)}, synth_quality=${safeJson(quality)}, review_dates=${safeJson(reviewDates)}, pipeline_status=${newPst}, synth_updated=${synthTs}, synth_checked_at=now(), llm_judged_at=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN ${latMin} AND ${latMax} AND lng BETWEEN ${lngMin} AND ${lngMax}) WHERE id=${cafeId}`;
   } else {
-    await sql`UPDATE cafes SET synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_coherence=${coherence}, offctx_rate=${offctx}, needs_llm=${needsLLM}, borderline_count=${blCount}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${safeJson(evidenceReviews)}, synth_reviews_all=${allEv}, char_scores=${safeJson(charScores)}, synth_quality=${safeJson(quality)}, review_dates=${safeJson(reviewDates)}, pipeline_status=${newPst}, synth_updated=${synthTs}, synth_checked_at=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN ${latMin} AND ${latMax} AND lng BETWEEN ${lngMin} AND ${lngMax}) WHERE id=${cafeId}`;
+    await sql`UPDATE cafes SET synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_coherence=${coherence}, offctx_rate=${offctx}, needs_llm=${needsLLM}, needs_llm_priority=${needsLlmPriority}, borderline_count=${blCount}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${safeJson(evidenceReviews)}, synth_reviews_all=${allEv}, char_scores=${safeJson(charScores)}, synth_quality=${safeJson(quality)}, review_dates=${safeJson(reviewDates)}, pipeline_status=${newPst}, synth_updated=${synthTs}, synth_checked_at=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN ${latMin} AND ${latMax} AND lng BETWEEN ${lngMin} AND ${lngMax}) WHERE id=${cafeId}`;
   }
   return { grade, collected, published: publish, ruleOk, pipeline: newPst, evidence: evidenceReviews.length, coherence: Math.round(coherence * 100), noisy };
 }
