@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
 import { extractHighlights } from "@/lib/cafeProfile";
 import { quoteMatchConfidence } from "@/lib/reviewQuality";
+import { ownBranch, isOtherBranchQuote } from "@/lib/branchQuote";
 export const runtime = "nodejs";
 
 // 리뷰 게시일 파싱(YYYY.MM.DD / YYYY-MM / YYYY년 MM월 등) → ms
@@ -38,11 +39,21 @@ function trustTier(e: any): number {
 // 배경(CEO "피기스터하우스에 돈제당 리뷰가 6건 안에"): 예전 정렬은 conf→최신순이었는데 conf가 사실상 전건 1이라
 //   '최신순'만 남아, 참고 등급(약한 근거)이 검증 후기를 밀어내고 대표 6칸을 차지했다(14075: 6칸 중 4칸).
 //   전수 실측: 공개 13,460곳 중 9,927곳이 대표 6건에 참고를 노출, 그중 8,339곳은 아래에 검증 후기가 대기 중이었다.
-function sortReviews(raw: any[], name: string, areaTerms: string[], nowT: number): any[] {
+// 🏪 두 번째 선행 관문(2026-08-08, CEO 선택안 C) — **다른 지점 후기**도 conf와 같은 급으로 뒤로 민다.
+//   '쉐프부랑제 사우점' 상세에 '운양동 …쉐프부랑제 방문기'가 대표 6건에 뜨던 문제(센티넬 지점오염 22곳).
+//   삭제하지 않는 이유: 한 글이 두 지점을 함께 다루는 경우가 흔해 지우면 정상 후기가 죽는다. 순서만 바꾼다.
+//   ⚠️ 형제 지점 목록 조회 없음 — 카페 이름 하나로만 판정해 **추가 DB 비용 0**.
+function sortReviews(raw: any[], name: string, areaTerms: string[], nowT: number, dong?: string | null): any[] {
+  const own = ownBranch(name, dong);
   return [...raw]
-    .map((e) => ({ e, conf: quoteMatchConfidence(name, e?.quote || "", areaTerms) }))
+    .map((e) => ({
+      e,
+      conf: quoteMatchConfidence(name, e?.quote || "", areaTerms),
+      mine: own && isOtherBranchQuote(e?.quote || "", own) ? 0 : 1, // 0 = 다른 지점 글 → 맨 뒤
+    }))
     .sort((a, b) => {
       if (b.conf !== a.conf) return b.conf - a.conf;
+      if (b.mine !== a.mine) return b.mine - a.mine;
       const tier = trustTier(b.e) - trustTier(a.e);
       if (tier !== 0) return tier;
       const acc = accuracy(b.e) - accuracy(a.e);
@@ -68,7 +79,7 @@ export async function GET(req: NextRequest) {
     // 매칭 확신도 우선 + 동일 확신도 내 최신순 정렬 → 상위 6건(대표)·전체보기 모두 동일 순서로 노출
     const nowT = Date.now();
     const areaTerms = [rows[0]?.area, rows[0]?.dong].filter(Boolean) as string[];
-    const reviews = Array.isArray(raw) ? sortReviews(raw, rows[0]?.name ?? "", areaTerms, nowT) : raw;
+    const reviews = Array.isArray(raw) ? sortReviews(raw, rows[0]?.name ?? "", areaTerms, nowT, rows[0]?.dong) : raw;
     const quality = rows[0]?.synth_quality ?? null;
     const llmJudged = !!rows[0]?.llm_judged_at;
     // 옥석 리뷰에서 소비자가 꼭 볼 구체 포인트를 빈도로 추출(데이터 기반 핵심)
