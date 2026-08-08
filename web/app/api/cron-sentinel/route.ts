@@ -115,9 +115,9 @@ async function healAttractionPollution(flagged: AttrFlag[], deadline: number): P
   const frozenSet = await frozenTargets(HJOB);
   for (const f of flagged.slice(0, 12)) {
     if (Date.now() > deadline) break;
-    if (frozenSet.has(f.id)) { skipped++; continue; }
+    if (frozenSet.has(Number(f.id))) { skipped++; continue; }
     // 🎫 하네스 L2 — 다른 잡(autoCorrect·resynth·다른 힐러)이 같은 카페를 만지는 중이면 양보한다.
-    if (!(await acquireLease(HJOB, f.id, 180))) { skipped++; continue; }
+    if (!(await acquireLease(HJOB, Number(f.id), 180))) { skipped++; continue; }
     try {
       tickBlob(); const c = (await sql`SELECT name, area, dong, address, published, raw_reviews, judge_decisions FROM cafes WHERE id=${f.id}`)[0] as any;
       if (!c) continue;
@@ -142,19 +142,19 @@ async function healAttractionPollution(flagged: AttrFlag[], deadline: number): P
       //   applyDecisions도 noteAttempt도 호출되지 않아 **수렴 계약이 발동하지 못한다** → 감지 22건이
       //   영원히 남고 아무도 사람에게 안 넘긴다. "제거할 게 없다"도 **무효(효과 없음)** 로 기록해야
       //   2회 후 동결되고 워치리스트로 승격된다.
-      if (drop === 0) { noEffect++; if ((await noteAttempt(HJOB, f.id, false, { note: "제거 대상 없음(이미 결정 완료 — 자동으로는 더 못 고침)" })).frozen) frozenNew++; continue; }
+      if (drop === 0) { noEffect++; if ((await noteAttempt(HJOB, Number(f.id), false, { note: "제거 대상 없음(이미 결정 완료 — 자동으로는 더 못 고침)" })).frozen) frozenNew++; continue; }
       // 🩺 하네스 L4 — 집행 전후 '탐지기가 보는 소스'(synth_reviews)의 해시를 비교해 **효과를 실측**한다.
       //   md5는 SQL 안에서 계산돼 32자만 오간다(큰 컬럼 전송 없음). 효과 없으면 fixed로 세지 않는다.
-      const _h0 = await shownHash(f.id);
+      const _h0 = await shownHash(Number(f.id));
       const res = await applyDecisions({ id: f.id, name: c.name, area: c.area }, dec);
-      const _eff = (await shownHash(f.id)) !== _h0;
-      if ((await noteAttempt(HJOB, f.id, _eff, { note: `drop=${drop}` })).frozen) frozenNew++;
+      const _eff = (await shownHash(Number(f.id))) !== _h0;
+      if ((await noteAttempt(HJOB, Number(f.id), _eff, { note: `drop=${drop}` })).frozen) frozenNew++;
       if (!_eff) { noEffect++; continue; }   // 허위 '고쳤다' 차단 — 다음 런은 위 frozenSet이 막는다
       fixed++; dropped += drop; if (res?.published === false && c.published) unpub++;
       if (names.length < 8) names.push(`${c.name}(-${drop})`);
       await invalidateCafeCaches([f.id]).catch(() => {});
     } catch { /* 개별 실패는 건너뜀(다음 런이 이어서 처리) */ }
-    finally { await releaseLease(HJOB, f.id).catch(() => {}); }
+    finally { await releaseLease(HJOB, Number(f.id)).catch(() => {}); }
   }
   if (fixed > 0) await sql`DELETE FROM search_cache`.catch(() => {});
   return { fixed, dropped, unpub, names, skipped, noEffect, frozen: frozenNew };
@@ -241,9 +241,9 @@ async function healWeakNamePollution(flagged: WeakFlag[], deadline: number): Pro
   const frozenSet = await frozenTargets(HJOB);
   for (const f of flagged.slice(0, 12)) {
     if (Date.now() > deadline) break;
-    if (frozenSet.has(f.id)) { skipped++; continue; }
+    if (frozenSet.has(Number(f.id))) { skipped++; continue; }
     // 🎫 하네스 L2 — 다른 잡(autoCorrect·resynth·다른 힐러)이 같은 카페를 만지는 중이면 양보한다.
-    if (!(await acquireLease(HJOB, f.id, 180))) { skipped++; continue; }
+    if (!(await acquireLease(HJOB, Number(f.id), 180))) { skipped++; continue; }
     try {
       tickBlob(); const c = (await sql`SELECT name, area, dong, address, published, raw_reviews, judge_decisions FROM cafes WHERE id=${f.id}`)[0] as any;
       if (!c) continue;
@@ -273,19 +273,19 @@ async function healWeakNamePollution(flagged: WeakFlag[], deadline: number): Pro
       //   applyDecisions도 noteAttempt도 호출되지 않아 **수렴 계약이 발동하지 못한다** → 감지 22건이
       //   영원히 남고 아무도 사람에게 안 넘긴다. "제거할 게 없다"도 **무효(효과 없음)** 로 기록해야
       //   2회 후 동결되고 워치리스트로 승격된다.
-      if (drop === 0) { noEffect++; if ((await noteAttempt(HJOB, f.id, false, { note: "제거 대상 없음(이미 결정 완료 — 자동으로는 더 못 고침)" })).frozen) frozenNew++; continue; }
+      if (drop === 0) { noEffect++; if ((await noteAttempt(HJOB, Number(f.id), false, { note: "제거 대상 없음(이미 결정 완료 — 자동으로는 더 못 고침)" })).frozen) frozenNew++; continue; }
       // 🩺 하네스 L4 — 집행 전후 '탐지기가 보는 소스'(synth_reviews)의 해시를 비교해 **효과를 실측**한다.
       //   md5는 SQL 안에서 계산돼 32자만 오간다(큰 컬럼 전송 없음). 효과 없으면 fixed로 세지 않는다.
-      const _h0 = await shownHash(f.id);
+      const _h0 = await shownHash(Number(f.id));
       const res = await applyDecisions({ id: f.id, name: c.name, area: c.area }, dec);
-      const _eff = (await shownHash(f.id)) !== _h0;
-      if ((await noteAttempt(HJOB, f.id, _eff, { note: `drop=${drop}` })).frozen) frozenNew++;
+      const _eff = (await shownHash(Number(f.id))) !== _h0;
+      if ((await noteAttempt(HJOB, Number(f.id), _eff, { note: `drop=${drop}` })).frozen) frozenNew++;
       if (!_eff) { noEffect++; continue; }   // 허위 '고쳤다' 차단 — 다음 런은 위 frozenSet이 막는다
       fixed++; dropped += drop; if (res?.published === false && c.published) unpub++;
       if (names.length < 8) names.push(`${cn}(-${drop})`);
       await invalidateCafeCaches([f.id]).catch(() => {});
     } catch { /* 개별 실패는 건너뜀(다음 런이 이어서 처리) */ }
-    finally { await releaseLease(HJOB, f.id).catch(() => {}); }
+    finally { await releaseLease(HJOB, Number(f.id)).catch(() => {}); }
   }
   if (fixed > 0) await sql`DELETE FROM search_cache`.catch(() => {});
   return { fixed, dropped, unpub, names, skipped, noEffect, frozen: frozenNew };
@@ -346,9 +346,9 @@ async function healNonCafeBizPollution(flagged: NcbFlag[], deadline: number): Pr
   const frozenSet = await frozenTargets(HJOB);
   for (const f of flagged.slice(0, 12)) {
     if (Date.now() > deadline) break;
-    if (frozenSet.has(f.id)) { skipped++; continue; }
+    if (frozenSet.has(Number(f.id))) { skipped++; continue; }
     // 🎫 하네스 L2 — 다른 잡(autoCorrect·resynth·다른 힐러)이 같은 카페를 만지는 중이면 양보한다.
-    if (!(await acquireLease(HJOB, f.id, 180))) { skipped++; continue; }
+    if (!(await acquireLease(HJOB, Number(f.id), 180))) { skipped++; continue; }
     try {
       tickBlob(); const c = (await sql`SELECT name, area, dong, address, published, raw_reviews, judge_decisions FROM cafes WHERE id=${f.id}`)[0] as any;
       if (!c) continue;
@@ -376,19 +376,19 @@ async function healNonCafeBizPollution(flagged: NcbFlag[], deadline: number): Pr
       //   applyDecisions도 noteAttempt도 호출되지 않아 **수렴 계약이 발동하지 못한다** → 감지 22건이
       //   영원히 남고 아무도 사람에게 안 넘긴다. "제거할 게 없다"도 **무효(효과 없음)** 로 기록해야
       //   2회 후 동결되고 워치리스트로 승격된다.
-      if (drop === 0) { noEffect++; if ((await noteAttempt(HJOB, f.id, false, { note: "제거 대상 없음(이미 결정 완료 — 자동으로는 더 못 고침)" })).frozen) frozenNew++; continue; }
+      if (drop === 0) { noEffect++; if ((await noteAttempt(HJOB, Number(f.id), false, { note: "제거 대상 없음(이미 결정 완료 — 자동으로는 더 못 고침)" })).frozen) frozenNew++; continue; }
       // 🩺 하네스 L4 — 집행 전후 '탐지기가 보는 소스'(synth_reviews)의 해시를 비교해 **효과를 실측**한다.
       //   md5는 SQL 안에서 계산돼 32자만 오간다(큰 컬럼 전송 없음). 효과 없으면 fixed로 세지 않는다.
-      const _h0 = await shownHash(f.id);
+      const _h0 = await shownHash(Number(f.id));
       const res = await applyDecisions({ id: f.id, name: c.name, area: c.area }, dec);
-      const _eff = (await shownHash(f.id)) !== _h0;
-      if ((await noteAttempt(HJOB, f.id, _eff, { note: `drop=${drop}` })).frozen) frozenNew++;
+      const _eff = (await shownHash(Number(f.id))) !== _h0;
+      if ((await noteAttempt(HJOB, Number(f.id), _eff, { note: `drop=${drop}` })).frozen) frozenNew++;
       if (!_eff) { noEffect++; continue; }   // 허위 '고쳤다' 차단 — 다음 런은 위 frozenSet이 막는다
       fixed++; dropped += drop; if (res?.published === false && c.published) unpub++;
       if (names.length < 8) names.push(`${cleanCafeName(c.name)}(-${drop})`);
       await invalidateCafeCaches([f.id]).catch(() => {});
     } catch { /* 개별 실패는 건너뜀(다음 런이 이어서 처리) */ }
-    finally { await releaseLease(HJOB, f.id).catch(() => {}); }
+    finally { await releaseLease(HJOB, Number(f.id)).catch(() => {}); }
   }
   if (fixed > 0) await sql`DELETE FROM search_cache`.catch(() => {});
   return { fixed, dropped, unpub, names, skipped, noEffect, frozen: frozenNew };
@@ -470,9 +470,9 @@ async function healFranchiseBranchPollution(flagged: FranchiseFlag[], deadline: 
   const frozenSet = await frozenTargets(HJOB);
   for (const f of flagged.slice(0, 12)) {
     if (Date.now() > deadline) break;
-    if (frozenSet.has(f.id)) { skipped++; continue; }
+    if (frozenSet.has(Number(f.id))) { skipped++; continue; }
     // 🎫 하네스 L2 — 다른 잡(autoCorrect·resynth·다른 힐러)이 같은 카페를 만지는 중이면 양보한다.
-    if (!(await acquireLease(HJOB, f.id, 180))) { skipped++; continue; }
+    if (!(await acquireLease(HJOB, Number(f.id), 180))) { skipped++; continue; }
     try {
       tickBlob(); const c = (await sql`SELECT name, area, dong, address, published, raw_reviews, judge_decisions FROM cafes WHERE id=${f.id}`)[0] as any;
       if (!c) continue;
@@ -500,19 +500,19 @@ async function healFranchiseBranchPollution(flagged: FranchiseFlag[], deadline: 
       //   applyDecisions도 noteAttempt도 호출되지 않아 **수렴 계약이 발동하지 못한다** → 감지 22건이
       //   영원히 남고 아무도 사람에게 안 넘긴다. "제거할 게 없다"도 **무효(효과 없음)** 로 기록해야
       //   2회 후 동결되고 워치리스트로 승격된다.
-      if (drop === 0) { noEffect++; if ((await noteAttempt(HJOB, f.id, false, { note: "제거 대상 없음(이미 결정 완료 — 자동으로는 더 못 고침)" })).frozen) frozenNew++; continue; }
+      if (drop === 0) { noEffect++; if ((await noteAttempt(HJOB, Number(f.id), false, { note: "제거 대상 없음(이미 결정 완료 — 자동으로는 더 못 고침)" })).frozen) frozenNew++; continue; }
       // 🩺 하네스 L4 — 집행 전후 '탐지기가 보는 소스'(synth_reviews)의 해시를 비교해 **효과를 실측**한다.
       //   md5는 SQL 안에서 계산돼 32자만 오간다(큰 컬럼 전송 없음). 효과 없으면 fixed로 세지 않는다.
-      const _h0 = await shownHash(f.id);
+      const _h0 = await shownHash(Number(f.id));
       const res = await applyDecisions({ id: f.id, name: c.name, area: c.area }, dec);
-      const _eff = (await shownHash(f.id)) !== _h0;
-      if ((await noteAttempt(HJOB, f.id, _eff, { note: `drop=${drop}` })).frozen) frozenNew++;
+      const _eff = (await shownHash(Number(f.id))) !== _h0;
+      if ((await noteAttempt(HJOB, Number(f.id), _eff, { note: `drop=${drop}` })).frozen) frozenNew++;
       if (!_eff) { noEffect++; continue; }   // 허위 '고쳤다' 차단 — 다음 런은 위 frozenSet이 막는다
       fixed++; dropped += drop; if (res?.published === false && c.published) unpub++;
       if (names.length < 8) names.push(`${cleanCafeName(c.name)}(-${drop})`);
       await invalidateCafeCaches([f.id]).catch(() => {});
     } catch { /* 개별 실패는 건너뜀(다음 런이 이어서 처리) */ }
-    finally { await releaseLease(HJOB, f.id).catch(() => {}); }
+    finally { await releaseLease(HJOB, Number(f.id)).catch(() => {}); }
   }
   if (fixed > 0) await sql`DELETE FROM search_cache`.catch(() => {});
   return { fixed, dropped, unpub, names, skipped, noEffect, frozen: frozenNew };
@@ -625,9 +625,9 @@ async function healGenericTermPollution(flagged: GenericFlag[], deadline: number
   const frozenSet = await frozenTargets(HJOB);
   for (const f of flagged.slice(0, 12)) {
     if (Date.now() > deadline) break;
-    if (frozenSet.has(f.id)) { skipped++; continue; }
+    if (frozenSet.has(Number(f.id))) { skipped++; continue; }
     // 🎫 하네스 L2 — 다른 잡(autoCorrect·resynth·다른 힐러)이 같은 카페를 만지는 중이면 양보한다.
-    if (!(await acquireLease(HJOB, f.id, 180))) { skipped++; continue; }
+    if (!(await acquireLease(HJOB, Number(f.id), 180))) { skipped++; continue; }
     try {
       tickBlob(); const c = (await sql`SELECT name, area, dong, address, published, raw_reviews, judge_decisions FROM cafes WHERE id=${f.id}`)[0] as any;
       if (!c) continue;
@@ -657,19 +657,19 @@ async function healGenericTermPollution(flagged: GenericFlag[], deadline: number
       //   applyDecisions도 noteAttempt도 호출되지 않아 **수렴 계약이 발동하지 못한다** → 감지 22건이
       //   영원히 남고 아무도 사람에게 안 넘긴다. "제거할 게 없다"도 **무효(효과 없음)** 로 기록해야
       //   2회 후 동결되고 워치리스트로 승격된다.
-      if (drop === 0) { noEffect++; if ((await noteAttempt(HJOB, f.id, false, { note: "제거 대상 없음(이미 결정 완료 — 자동으로는 더 못 고침)" })).frozen) frozenNew++; continue; }
+      if (drop === 0) { noEffect++; if ((await noteAttempt(HJOB, Number(f.id), false, { note: "제거 대상 없음(이미 결정 완료 — 자동으로는 더 못 고침)" })).frozen) frozenNew++; continue; }
       // 🩺 하네스 L4 — 집행 전후 '탐지기가 보는 소스'(synth_reviews)의 해시를 비교해 **효과를 실측**한다.
       //   md5는 SQL 안에서 계산돼 32자만 오간다(큰 컬럼 전송 없음). 효과 없으면 fixed로 세지 않는다.
-      const _h0 = await shownHash(f.id);
+      const _h0 = await shownHash(Number(f.id));
       const res = await applyDecisions({ id: f.id, name: c.name, area: c.area }, dec);
-      const _eff = (await shownHash(f.id)) !== _h0;
-      if ((await noteAttempt(HJOB, f.id, _eff, { note: `drop=${drop}` })).frozen) frozenNew++;
+      const _eff = (await shownHash(Number(f.id))) !== _h0;
+      if ((await noteAttempt(HJOB, Number(f.id), _eff, { note: `drop=${drop}` })).frozen) frozenNew++;
       if (!_eff) { noEffect++; continue; }   // 허위 '고쳤다' 차단 — 다음 런은 위 frozenSet이 막는다
       fixed++; dropped += drop; if (res?.published === false && c.published) unpub++;
       if (names.length < 8) names.push(`${cleanCafeName(c.name)}(-${drop})`);
       await invalidateCafeCaches([f.id]).catch(() => {});
     } catch { /* 개별 실패는 건너뜀(다음 런이 이어서 처리) */ }
-    finally { await releaseLease(HJOB, f.id).catch(() => {}); }
+    finally { await releaseLease(HJOB, Number(f.id)).catch(() => {}); }
   }
   if (fixed > 0) await sql`DELETE FROM search_cache`.catch(() => {});
   return { fixed, dropped, unpub, names, skipped, noEffect, frozen: frozenNew };
@@ -755,9 +755,9 @@ async function healCompetitorQuotePollution(flagged: CompFlag[], deadline: numbe
   const frozenSet = await frozenTargets(HJOB);
   for (const f of flagged) {
     if (Date.now() > deadline) break;
-    if (frozenSet.has(f.id)) { skipped++; continue; }
+    if (frozenSet.has(Number(f.id))) { skipped++; continue; }
     // 🎫 하네스 L2 — 다른 잡(autoCorrect·resynth·다른 힐러)이 같은 카페를 만지는 중이면 양보한다.
-    if (!(await acquireLease(HJOB, f.id, 180))) { skipped++; continue; }
+    if (!(await acquireLease(HJOB, Number(f.id), 180))) { skipped++; continue; }
     try {
       // 🩹 표시되는 배열(synth_reviews_all)까지 정리 — 과거엔 synth_reviews만 고쳐 정작 상세페이지가 쓰는
       //   synth_reviews_all은 오염이 남던 버그(2026-08-01 발견). 둘 다 같은 기준으로 정리.
@@ -769,14 +769,14 @@ async function healCompetitorQuotePollution(flagged: CompFlag[], deadline: numbe
       const qa = (c.synth_reviews_all || []) as any[];
       const keep = qs.filter((r: any) => !foreign(r));
       const keepAll = qa.filter((r: any) => !foreign(r));
-      if (keep.length === qs.length && keepAll.length === qa.length) { noEffect++; if ((await noteAttempt(HJOB, f.id, false, { note: "제거 대상 없음(보수 판정)" })).frozen) frozenNew++; continue; }
+      if (keep.length === qs.length && keepAll.length === qa.length) { noEffect++; if ((await noteAttempt(HJOB, Number(f.id), false, { note: "제거 대상 없음(보수 판정)" })).frozen) frozenNew++; continue; }
       await sql`UPDATE cafes SET synth_reviews=${JSON.stringify(keep)}::jsonb, synth_reviews_all=${JSON.stringify(keepAll)}::jsonb, updated_at=now() WHERE id=${f.id}`;
       await invalidateCafeCaches([f.id]).catch(() => {});
       const rm = (qs.length - keep.length) + (qa.length - keepAll.length);
       fixed++; dropped += rm; if (names.length < 8) names.push(`${cn}(-${qa.length - keepAll.length})`);
-      await noteAttempt(HJOB, f.id, true).catch(() => ({ frozen: false }));
+      await noteAttempt(HJOB, Number(f.id), true).catch(() => ({ frozen: false }));
     } catch { /* 개별 실패는 다음 런이 이어서 */ }
-    finally { await releaseLease(HJOB, f.id).catch(() => {}); }
+    finally { await releaseLease(HJOB, Number(f.id)).catch(() => {}); }
   }
   if (fixed > 0) await sql`DELETE FROM search_cache`.catch(() => {});
   return { fixed, dropped, unpub: 0, names, skipped, noEffect, frozen: frozenNew };

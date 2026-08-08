@@ -47,7 +47,7 @@ export async function frozenTargets(job: string): Promise<Set<number>> {
     await ensure();
     const rows = (await sql`SELECT target_id FROM heal_attempts
       WHERE job=${job} AND frozen_until IS NOT NULL AND frozen_until > now()`) as any[];
-    return new Set(rows.map((r) => Number(r.target_id)));
+    return new Set(rows.map((r) => Number(r.target_id))); // Set<number> — 호출부도 Number()로 비교할 것
   } catch { return new Set(); }
 }
 
@@ -58,6 +58,8 @@ export async function frozenTargets(job: string): Promise<Set<number>> {
  * @returns 이번 호출로 동결됐는지
  */
 export async function noteAttempt(
+  // ⚠️ targetId는 반드시 number로 — cafes.id는 SQL에서 문자열로 오므로 호출부가 Number()를 씌워야 한다.
+  //   2026-08-08 실전검증에서 Set<number>.has("7628")이 false가 되어 동결이 무력화된 적이 있다.
   job: string, targetId: number, effective: boolean,
   opts?: { maxNoEffect?: number; freezeDays?: number; note?: string },
 ): Promise<{ frozen: boolean }> {
