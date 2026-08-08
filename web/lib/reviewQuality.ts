@@ -1261,6 +1261,24 @@ export function verifyReview(input: QualityInput): QualityResult {
   if (LOCAL_SEO_SERVICES.test(`${title} ${body}`) && (SELF_BIZ_PROMO.test(fullL) || (!CAFE_CONTEXT.test(fullL) && !bodyHasCafeWord))) {
     return { verdict: "rejected", score: 3, reasons: [SELF_BIZ_PROMO.test(fullL) ? "지역 SEO 서비스 자기업체 홍보(쇼룸·매장 정형구 — 카페 자기묘사 우회 차단)" : "지역 SEO 서비스 홍보 블로그(카페 무관)"], signals: sig };
   }
+  // 🧭 [룰갭 rulegap-20260808-1211, decisions#637] 부분문자열 상호명 근접성 게이트: 우리 이름이 원문에 '경계매칭'은
+  //   실패했지만(nameInTitle/nameInBody=false) '붙임 부분문자열'로는 있는 경우 — 예: '커피마을' ⊂ '두레커피마을',
+  //   'H.ORM' ⊂ '고도 H.ORM'. 이런 경우 바로 아래 폴백('카페 맥락 있으면 LLM 재판정')이 무조건 borderline으로만
+  //   보내 근접성(행정동)을 전혀 안 봤다 — 원거리 별개업체(다른 사업자, 다른 동)의 후기가 우리 카페 후기로
+  //   교차귀속됐다(id11853·id2947·id5466 라이브 검증등급 실측). 우리 동(洞)을 알고 있는데 원문 어디에도 없고,
+  //   대신 '다른' 동이 명시돼 있으면 = 원거리 별개업체로 보고 즉시 하드 배제(과거 judge_decisions 오판정도
+  //   무력화 — collectAndSynthesize의 hardReject는 규칙 절대 우선). 같은 동(형제매장 가능성)이면 배제하지 않고
+  //   기존 폴백대로 LLM 재판정(needs_llm) 대상으로 남긴다 — 정상 부속매장(카페+베이커리 등)을 과잉차단하지 않기 위함.
+  const fullTNoSpace = norm(`${title} ${body}`);
+  const rawSubstringHit = !coreEmpty && !nameInTitle && !nameInBody
+    && nameRawN.length >= 3 && fullTNoSpace.includes(nameRawN);
+  if (rawSubstringHit && hasDongTerm && !dongPresent) {
+    const otherDong = (`${title} ${body}`.match(/[가-힣]{2,6}(동|읍|면)(?![가-힣])/g) || [])
+      .find((d) => !areaTerms.some((a) => a && (a.includes(d) || d.includes(a))));
+    if (otherDong) {
+      return { verdict: "rejected", score: 4, reasons: [`부분문자열 상호명 다른업체 추정('${otherDong}', 이 지점 행정동 불일치)`], signals: sig };
+    }
+  }
   if (!nameInTitle && !nameInBody) {
     // 이름은 안 잡혀도 '카페 방문 후기 맥락'이 뚜렷하면 버리지 않고 LLM 재판정 대상으로(경계).
     const ctx = (visit || substance >= 2) && (areaPresent || titleHasCafeWord || bodyHasCafeWord) && !listicle;
