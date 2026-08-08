@@ -201,3 +201,4 @@
 | 2026-08-06 23:08 | #628 | [개발] 협업 #290: 등급판정 n(reviewCount)이 relevance/trust 미반영 — 랜드마 | f13fdf5f | - | lib/collectOrchestrator.ts: 등급판정 gradeCount = verified + reference*0.5 (참고 floor는 trustCount 그대로) —  |
 | 2026-08-08 03:05 | #631 | [룰갭] 바리스타/커피 교육원(직업,기술교육) 자기완결형 후기가 P61 교차오염 게이트 우회 — id4335 | 66ad853f | - | lib/reviewQuality.ts: BARISTA_EDU_CATEGORY/BARISTA_EDU_ACTIVITY 신규 하드거절 게이트 추가(P59 위치, naver_categor |
 | 2026-08-08 03:06 | #634 | [룰갭] 로스팅시설(로스팅랩/센터) 네이버 리스팅에 형제 소매지점 후기 혼입 — id7112 라이브 노출 4 | c25a2fd3 | - | lib/reviewQuality.ts: otherBranch/otherBranchTok 다른지점 게이트가 "OO점"(붙임) 정규식만 매칭해 "송파 지점"처럼 공백 있는 격식체를 놓 |
+| 2026-08-08 07:05 | #636 | [룰갭] 동일날짜 SEO템플릿반복 — 미표기 체험단 캠페인(coordination#293 후속) — need | 899f4999 | - | lib/reviewQuality.ts: detectCampaignCluster() 추가(±1일 날짜밀집≥30% + 2-gram 템플릿중복≥0.35 + 개인서사마커<34% 결합신호, |
