@@ -202,3 +202,4 @@
 | 2026-08-08 03:05 | #631 | [룰갭] 바리스타/커피 교육원(직업,기술교육) 자기완결형 후기가 P61 교차오염 게이트 우회 — id4335 | 66ad853f | - | lib/reviewQuality.ts: BARISTA_EDU_CATEGORY/BARISTA_EDU_ACTIVITY 신규 하드거절 게이트 추가(P59 위치, naver_categor |
 | 2026-08-08 03:06 | #634 | [룰갭] 로스팅시설(로스팅랩/센터) 네이버 리스팅에 형제 소매지점 후기 혼입 — id7112 라이브 노출 4 | c25a2fd3 | - | lib/reviewQuality.ts: otherBranch/otherBranchTok 다른지점 게이트가 "OO점"(붙임) 정규식만 매칭해 "송파 지점"처럼 공백 있는 격식체를 놓 |
 | 2026-08-08 07:05 | #636 | [룰갭] 동일날짜 SEO템플릿반복 — 미표기 체험단 캠페인(coordination#293 후속) — need | 899f4999 | - | lib/reviewQuality.ts: detectCampaignCluster() 추가(±1일 날짜밀집≥30% + 2-gram 템플릿중복≥0.35 + 개인서사마커<34% 결합신호, |
+| 2026-08-08 23:05 | #637 | [룰갭] 부분문자열 상호명 매칭 시 근접성 게이트 부재 — 원거리 이종업체 리뷰 교차귀속, 라이브 검증등급  | b57b02cf | - | lib/reviewQuality.ts verifyReview()에 부분문자열 상호명 근접성 게이트 추가(1187행 앞): 우리 상호가 원문에 경계매칭은 실패했지만(nameInTit |
