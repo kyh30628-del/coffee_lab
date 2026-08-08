@@ -15,6 +15,29 @@ const today = new Date().toISOString().slice(0, 10);
   L.push(`# 🗜️ 관제 다이제스트 (결정론 사전계산 · 에이전트 공용)`);
   L.push(`> 생성 ${new Date().toISOString()} · **이 파일을 먼저 읽어라. 관제·수치·백로그가 다 있다. DB 재쿼리는 여기 없는 것만 묶어서 최소 턴으로.**\n`);
 
+  // 0.5) 🚦 사람 대기(인간 게이트 SLA) — 하네스 L6(2026-08-08).
+  //    CEO가 눌러야 진행되는 일이 **조용히 갇히는 것**을 막는다. 2026-08-08 배포대기 4건이 27h 정체했는데
+  //    원인은 "경고는 접힌 화면·버튼은 펼친 화면"이었다. 큐를 진실의 원천으로 삼아 여기 **최상단**에 띄운다.
+  //    🔴 자동승인 절대 없음 — 표시만 한다(L3는 CEO 전용).
+  try {
+    const gates = await sql`
+      SELECT id, LEFT(title,70) title, status, action_params->>'dev_status' ds,
+             ROUND(EXTRACT(EPOCH FROM (now() - COALESCE(decided_at, created_at)))/3600) h
+      FROM decisions
+      WHERE (status='pending' AND COALESCE(tier,'L3')='L3')
+         OR (status='approved' AND action_type='dev_task' AND action_params->>'dev_status'='배포대기')
+      ORDER BY h DESC LIMIT 12`;
+    if (gates.length) {
+      const late = gates.filter((g) => Number(g.h) >= 24);
+      L.push(`## 🚦 사람 대기 ${gates.length}건${late.length ? ` — ⚠️ 24h+ 지연 ${late.length}건` : ""}`);
+      for (const g of gates.slice(0, 8)) {
+        const sla = Number(g.h) >= 72 ? "🔴심각" : Number(g.h) >= 24 ? "🟠지연" : Number(g.h) >= 6 ? "🟡주의" : "🟢";
+        L.push(`- ${sla} #${g.id} ${g.ds ?? g.status} · ${g.h}h · ${g.title}`);
+      }
+      L.push(`> 조치 위치: /admin/org → 🛠 개발 파이프라인(배포대기는 정체 목록에 🚀배포·폐기 버튼이 함께 있음)\n`);
+    }
+  } catch { /* graceful */ }
+
   // 1) 크론 건강 — 실패(ok=false) + 정지의심(EXPECT_MAX_H 초과) 둘 다 본다(2026-07-02 수리:
   //    과거 실패만 봐서 "전 크론 정상"이 정지를 가림). 감시 계약은 lib/jobTeams.ts 단일 출처.
   //    (tsx 없이 plain node로 돌면 staleness 생략 — 러너는 --import tsx 사용)

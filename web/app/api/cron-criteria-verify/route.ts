@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { recordRun } from "@/lib/agentLog";
+import { runRecheckTrigger } from "@/lib/recheckTrigger";
 import { runCriteriaChecks, ensureCriteriaVerifyTable } from "@/lib/criteriaVerify";
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -37,7 +38,12 @@ export async function GET(req: NextRequest) {
     const detail = hardFail
       ? `dead-knob/드리프트 ${report.fails}건${report.deadKnobs.length ? ` [${report.deadKnobs.join(",")}]` : ""}`
       : `pass(warn ${report.warns})`;
-    await recordRun("cron-criteria-verify", !hardFail, detail, report.fails + report.warns);
+    // ♻️ 하네스 L6 — 기준(criteria)이 바뀌었으면 **그 소유 크론이** 소급 재판정 큐를 채운다.
+    //   기준 관제의 주인이 품질본부/검증심사팀이므로 여기가 제자리다. 정책 변경이 없으면 쿼리 0회로 끝난다.
+    //   🔴 자동 재공개 없음 — '사람이 볼 목록'까지만 만든다.
+    const rq = await runRecheckTrigger(26).catch(() => ({ policyChanged: false, scanned: 0, queued: 0, ref: "" }));
+    const rqNote = rq.policyChanged ? ` · ♻️소급재판정 대상 ${rq.queued}곳 적재(스캔 ${rq.scanned})` : "";
+    await recordRun("cron-criteria-verify", !hardFail, detail + rqNote, report.fails + report.warns);
 
     return NextResponse.json({ ok: true, report });
   } catch (e) {

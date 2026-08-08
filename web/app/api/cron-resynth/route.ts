@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
 import { synthAndStore } from "@/lib/synthStore";
 import { recordRun } from "@/lib/agentLog";
-import { startJobRun, runUsage } from "@/lib/blobBudget";
+import { startJobRun, runUsage, clearOverBudget } from "@/lib/blobBudget";
 import { isCostHalted } from "@/lib/costGuard";
 
 export const runtime = "nodejs";
@@ -99,7 +99,7 @@ export async function GET(req: NextRequest) {
     const toInvalidate = [...new Set([...gUnpub, ...gChangedIds])];
     if (toInvalidate.length) { const { invalidateCafeCaches } = await import("@/lib/cafeCacheInvalidate"); await invalidateCafeCaches(toInvalidate).catch(() => {}); }
 
-    const _u = runUsage(); // 💰 하네스 L1 — 이번 런의 큰 컬럼 소비량을 원장에 남긴다
+    const _u = runUsage(); if (!_u?.overBudget) void clearOverBudget("cron-resynth"); // 💰 하네스 L1 — 이번 런의 큰 컬럼 소비량을 원장에 남긴다
     await recordRun("cron-resynth", true, `raw정리 ${purged.length} 유튜브 ${ytRefreshed.length} · 구독재수집 ${subResults.length} · 전수적용 ${gDone}(변동 ${gChangedIds.length}·비공개 ${gUnpub.length}·오류 ${gErr})${gStop ? " ⚠️차단기발동" : ""}`, gDone, { metrics: { blobReads: _u?.blobReads ?? 0, wallMs: _u?.wallMs ?? 0 } });
     return NextResponse.json({ ok: true, ranAt: new Date().toISOString(), rawPurged: purged.length, ytRefreshed: ytRefreshed.length, subResynth: subResults.length, netApplied: gDone, changed: gChangedIds.length, unpublished: gUnpub.length, breaker: gStop });
   } catch (e) {

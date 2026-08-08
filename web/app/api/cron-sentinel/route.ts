@@ -4,7 +4,7 @@ import { healAreaLabel, healOutOfBox } from "@/lib/synthStore";
 import { recordRun } from "@/lib/agentLog";
 import { fingerprintOf } from "@/lib/runLedger";
 import { frozenTargets, noteAttempt, shownHash, frozenSummary } from "@/lib/healHarness";
-import { startJobRun, tickBlob, runUsage } from "@/lib/blobBudget";
+import { startJobRun, tickBlob, runUsage, clearOverBudget } from "@/lib/blobBudget";
 import { isCostHalted } from "@/lib/costGuard";
 import { probeConsoleKey } from "@/lib/consoleKeyProbe";
 import { loadCriteria, getCriterionSync } from "@/lib/criteria";
@@ -854,7 +854,7 @@ export async function GET(req: NextRequest) {
         ..._fpIds(fr.samples), ..._fpIds(gen.samples), ..._fpIds(comp.samples),
       ],
     });
-    const _usage = runUsage();
+    const _usage = runUsage(); if (!_usage?.overBudget) void clearOverBudget("cron-sentinel");
     await recordRun("cron-sentinel", true, detail, healedTotal, {
       fingerprint,
       metrics: {
