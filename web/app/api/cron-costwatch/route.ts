@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { recordRun } from "@/lib/agentLog";
+import { pruneLedger } from "@/lib/runLedger";
 import { setCostHalt } from "@/lib/costGuard";
 
 export const runtime = "nodejs";
@@ -176,7 +177,9 @@ export async function GET(req: NextRequest) {
         (top && top.deltaGb >= PER_QUERY_GB_ALERT ? ` · 최다쿼리 ${top.deltaGb.toFixed(1)}GB: ${top.q.replace(/\s+/g, " ").slice(0, 100)}` : "")
       : `정상 — 오늘 총 ${totalGb.toFixed(1)}GB(임계 ${TOTAL_GB_ALERT}GB), 최다쿼리 ${top ? top.deltaGb.toFixed(1) : 0}GB`;
 
-    await recordRun("cron-costwatch", !anomaly, detail, cur.length);
+    // 📒 하네스 L5 — 실행 원장 보존정리(90일). 하루 1회·행 수천 개 수준이라 부하 무시 가능.
+    const pruned = await pruneLedger(90).catch(() => 0);
+    await recordRun("cron-costwatch", !anomaly, detail + (pruned ? ` · 원장정리 ${pruned}행` : ""), cur.length);
     // 🛑 과다 시 자동 정지(무거운 자율 크론이 스킵) / 정상 복귀 시 자동 해제 — CEO "과다면 멈춰"
     await setCostHalt(anomaly, anomaly ? `자동정지: ${detail.slice(0, 150)}` : "정상").catch(() => {});
     await sendCostReport(totalGb, top, anomaly, execMin).catch(() => {}); // 📧 매일 아침 CEO 비용 점검 메일(발송 실패는 점검 자체를 막지 않음)

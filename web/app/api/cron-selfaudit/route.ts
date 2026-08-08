@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { recordRun } from "@/lib/agentLog";
+import { detectStuck } from "@/lib/runLedger";
 import { autoCorrect } from "@/lib/issues";
 import { pushTrigger } from "@/lib/auditTrigger";
 
@@ -103,6 +104,19 @@ export async function GET(req: NextRequest) {
         await pushTrigger("selfaudit_critical", f.check, `${f.check} (${f.count}건·${f.team})`, "HIGH");
       }
     }
+
+    // ── 🔁 정체(헛돎) 감시 — 하네스 L5(2026-08-08) ──
+    //   같은 '문제 집합'이 3회 연속 반복되면 그 잡은 아무것도 못 바꾸고 도는 중이다. 실행이 성공(ok=true)이라
+    //   기존 감시망은 전부 통과했다 — 실제로 지점오염 힐러가 6일간 그 상태였고, 매 런 raw_reviews(큰 컬럼)를
+    //   헛되이 재로드하며 검색 캐시까지 날리고 있었다. 이력이 없으면 구조적으로 볼 수 없는 유형.
+    try {
+      const stuck = await detectStuck(48, 3);
+      for (const s of stuck) {
+        findings.push({ check: `자율조치 정체 ${s.job} (같은 결과 ${s.repeats}회 연속)`, count: s.repeats, team: teamOf(s.job.split(".")[0]), critical: false });
+        // 판단이 필요한 이산 이벤트 → self-audit LLM이 근본원인을 조사하도록 신호만 남긴다(디바운스 내장).
+        await pushTrigger("heal_stuck", s.job, `같은 문제집합 ${s.repeats}회 연속(${String(s.first_at).slice(5, 16)}~) — 자동조치가 효과 없음`, "HIGH").catch(() => {});
+      }
+    } catch { /* 감시 실패가 자가감사를 깨지 않게 */ }
 
     const ok = findings.filter((f) => f.critical).length === 0;
     await sql`INSERT INTO selfaudit_runs (ok, findings, fixed, escalated)

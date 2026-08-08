@@ -1,10 +1,18 @@
 import { sql } from "./db";
 import { pushTrigger } from "./auditTrigger";
 import { teamOf } from "./jobTeams"; // 단일 사실 출처(2026-07-02 — 3벌 맵 drift 수리)
+import { recordLedger, type RunMetrics } from "./runLedger"; // 📒 하네스 L5 실행 원장
 
 // 에이전트(cron) 실행 로그 — agent_runs에 job별 최신 1행(upsert). 관제탑 모니터링 사각지대 제거.
 //   side-effect 타임스탬프(synth_updated 등)에 의존하던 것을 명시 로그로 보완: 잡이 일을 하기 전에 죽어도 ok=false로 잡힘.
-export async function recordRun(job: string, ok: boolean, detail = "", processed = 0): Promise<void> {
+export async function recordRun(
+  job: string, ok: boolean, detail = "", processed = 0,
+  // 📒 하네스 L5(2026-08-08): 실행 '이력'을 남기는 선택 인자. 기존 호출부 28곳은 손대지 않아도 되고,
+  //   지문을 넘기는 잡만 정체(헛돎) 탐지 대상이 된다. agent_runs upsert(현재상태)는 그대로 유지.
+  extra?: { fingerprint?: string; metrics?: RunMetrics; effectOk?: boolean | null; startedAt?: Date },
+): Promise<void> {
+  // 원장은 본 작업과 독립 — 실패해도 아래 흐름에 영향 없음(recordLedger 내부 graceful).
+  void recordLedger(job, { ok, detail, effectOk: extra?.effectOk ?? null, fingerprint: extra?.fingerprint, metrics: { ...(extra?.metrics ?? {}), processed }, startedAt: extra?.startedAt });
   try {
     await sql`CREATE TABLE IF NOT EXISTS agent_runs (job TEXT PRIMARY KEY, ran_at TIMESTAMPTZ DEFAULT now(), ok BOOLEAN DEFAULT true, detail TEXT, processed INT DEFAULT 0)`;
     await sql`INSERT INTO agent_runs (job, ran_at, ok, detail, processed) VALUES (${job}, now(), ${ok}, ${String(detail).slice(0, 200)}, ${processed})
