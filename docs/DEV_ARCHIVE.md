@@ -205,3 +205,4 @@
 | 2026-08-08 23:05 | #637 | [룰갭] 부분문자열 상호명 매칭 시 근접성 게이트 부재 — 원거리 이종업체 리뷰 교차귀속, 라이브 검증등급  | b57b02cf | - | lib/reviewQuality.ts verifyReview()에 부분문자열 상호명 근접성 게이트 추가(1187행 앞): 우리 상호가 원문에 경계매칭은 실패했지만(nameInTit |
 | 2026-08-09 03:05 | #639 | [개발] 협업 #294: [증거보강] decision#637 구현 전 반영 요망 — 다중테넌트(몰/아울렛)  | 0610c5fe | - | lib/reviewQuality.ts venueCtxOk 적용범위 확대(998-1032행): 다중테넌트 시설(백화점·아울렛·몰) venueOnly 이름(브랜드핵심토큰 없이 건물명뿐 |
 | 2026-08-09 07:05 | #640 | [룰갭] 비방문 거래게시판 NONVISIT_BOARD 미등록 — cafe.naver.com/ettrainer | fd8cc9f9 | - | web/lib/reviewQuality.ts:156 NONVISIT_BOARD 정규식에 ettrainer 추가(카페직거래광장, joonggonara/changupnamu와 동일 성 |
+| 2026-08-09 08:06 | #642 | [레드팀 재발] synth_identity 태그라인 수렴 재악화 — #605 disambiguator 배포  | f8fca721 | - | lib/synthEngine.ts+lib/criteriaListsBase.ts: 용도문구(사진/작업/혼자/수다/빵) disambiguator에 2차 폴백 추가 — 코드고정 SPEC |
