@@ -153,7 +153,10 @@ const COMMERCE_STRONG = /(중고나라|당근\s*마켓|번개장터|판매\s*양
 //   전수스캔 결과 이 정형구는 항상 위 용도로만 등장 — 진짜 방문후기엔 절대 안 나와 가드 없이 하드 탈락).
 export const VENDOR_LISTING_TEMPLATE = /네임택\s*첨부\s*필수|제품\s*이미지\s*\(?\s*네임택/;
 // 비방문 판매게시판(네이버 카페=커뮤니티, 회원끼리 물건 거래) — 도메인 성격상 방문 후기가 나올 수 없어 링크만으로 하드 탈락.
-const NONVISIT_BOARD = /cafe\.naver\.com\/(joonggonara|changupnamu)\//i;
+// 룰갭(2026-08-09, rulegap-proposals-20260809-0818.md): ettrainer(카페직거래광장)도 동일 성격 —
+//   공개카페 전수스캔 6곳 100% 순수 거래공고(양도/매매/구합니다), 리뷰 원문 자체가 "카페직거래광장 사이트에
+//   자동등록"이라 자기증언(id8319·16285·15043·20200·18081·17082).
+const NONVISIT_BOARD = /cafe\.naver\.com\/(joonggonara|changupnamu|ettrainer)\//i;
 // 룰갭 P5(2026-07-08, rulegap-proposals-20260708.md): 중고거래 마켓 정형양식 필드(희망가격·거래지역·판매자
 //   신뢰·상품설명)가 흔한단어 카페명에 걸림 — id13680(시즈더데이) 4/6 무관 의류 중고거래글. 카페맥락어
 //   가드(!titleHasCafeWord && !bodyHasCafeWord) 하에만 탈락하므로 진짜 후기는 보존.
