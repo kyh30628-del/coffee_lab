@@ -31,6 +31,10 @@ export async function GET(req: NextRequest) {
       ok: true, jobs: rows, waiting,
       stuckCount: stuck.length, stuckNonChatCount: stuckNonChat.length,
       stuck: stuck.map((r) => ({ id: r.id, title: r.title, age_min: r.age_min, source: r.source || null })),
+      // 🔔 즉시발화 설정 여부(불리언만 — 토픽값은 절대 노출 안 함). 미설정이면 승인해도 다음 창(08/12/16/20시)까지 대기한다.
+      //   2026-08-09: 이 값이 프로덕션에서 false인 걸 아무도 모른 채 4일 지나 배포가 매번 최대 4h 밀렸다.
+      //   설정 절차가 사람 손이면 반드시 **시스템이 스스로 설정 상태를 보고**해야 한다(조용한 실패 금지).
+      triggerConfigured: !!process.env.TRIGGER_NTFY_TOPIC,
     }, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e).slice(0, 120) }, { headers: { "Cache-Control": "no-store" } });

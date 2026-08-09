@@ -52,3 +52,18 @@ const gates = await sql`SELECT COUNT(*)::int n, MAX(ROUND(EXTRACT(EPOCH FROM (no
   FROM decisions WHERE (status='pending' AND COALESCE(tier,'L3')='L3')
      OR (status='approved' AND action_type='dev_task' AND action_params->>'dev_status'='배포대기')`;
 console.log(`\n⑤ 사람 대기(게이트): ${gates[0].n}건 · 최장 ${gates[0].h ?? 0}h ${(gates[0].h ?? 0) >= 24 ? "⚠️ 24h+ 지연" : ""}`);
+
+// ⑥ 배포 즉시발화 경로 — 승인해도 안 나가던 4일 사고(2026-08-09)의 재발 감시.
+//   사람이 Vercel에 env를 심는 절차라 조용히 죽을 수 있다 → 승인 때가 아니라 **평상시 점검에서** 잡는다.
+//   프로덕션 불리언 1회 + 로컬 리스너 프로세스 확인. DB 조회 0.
+try {
+  const r = await fetch("https://dongnecoffeenote.com/api/admin/dev-pipeline", {
+    headers: { "x-admin-password": process.env.ADMIN_PASSWORD || "" },
+  }).then((x) => x.json());
+  const listener = (await import("node:child_process")).execSync("pgrep -f run-trigger-listener.sh | head -1").toString().trim();
+  const ok = r?.triggerConfigured && listener;
+  console.log(`\n⑥ 배포 즉시발화: ${ok ? "정상 ✅" : "⚠️ 끊김"} (프로덕션 TRIGGER_NTFY_TOPIC ${r?.triggerConfigured ? "설정됨" : "❌ 미설정"} · 맥 리스너 ${listener ? "가동" : "❌ 중지"})`);
+  if (!ok) console.log("   → 승인해도 즉시 안 나가고 다음 창(08/12/16/20시)까지 최대 4h 대기합니다.");
+} catch (e) {
+  console.log(`\n⑥ 배포 즉시발화: 점검 실패(${String(e).slice(0, 60)})`);
+}
