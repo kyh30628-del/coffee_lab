@@ -118,6 +118,12 @@ const SUPPORTER_PR = /(서포터[즈스]|시민\s*기자단|블로그\s*기자�
 //   업무협약·보도자료·후원 문구가 방문 서술 없이 3인칭으로 카페명만 언급). 리뷰(quote) 단위 판정이라 같은 카페의
 //   실제 방문 후기는 이 패턴이 없어 영향 없음.
 const INSTITUTIONAL_PR = /(업무협약|협약\s*체결|협약을?\s*맺|보도자료|후원받아|후원\s*소식|전달식|기념식|사회보장협의체|상생\s*모델|구청장|군수는|시장은|지역공동체일자리)/;
+// 룰갭 rulegap-20260809-1614(decisions#644): 갤러리 병설 카페(디크레센도·아트스페이스엑스카페)에서 작가/기획사가
+//   배포하는 3인칭 전시 공지문("김광례 개인전/많은 관심 부탁드립니다", "전시소개/전시명:/작가:/기간:" 필드나열형)이
+//   CAFE_CONTEXT의 "전시" 어휘를 우연히 통과해 방문 서술 없이 방문후기로 노출(2곳 4건 확인). INSTITUTIONAL_PR과
+//   동일 메커니즘(3인칭 발표문+방문신호 부재)이라 VISIT_CUES가 전무할 때만 하드거절 — 전시를 언급하며 실제
+//   방문 서술이 있는 진짜 후기(대조군 id8138)는 VISIT_CUES가 있어 그대로 보존된다.
+const EXHIBITION_PR = /(개인전|전시\s*소개|전시명\s*[:：]|작가\s*[:：]|전시\s*기간\s*[:：]|많은\s*관심\s*부탁드립니다)/;
 // 식당 메인 메뉴어(카페 아닌 '음식점' 시그널). 같은 상호 다른 음식점('장꼬방'+'묵은김치찌개') 후기 분리용.
 //   카페가 흔히 파는 것(토스트·샌드위치·파스타·브런치)은 제외 — 명백한 한식·중식 '식당 본메뉴'만.
 const RESTAURANT_MAIN_SRC = "(묵은김치|김치찌개|된장찌개|부대찌개|동태찌개|순두부찌개|순두부|찌개|찌게|백반|국밥|순대국|해장국|감자탕|짜장면|짜장|짬뽕|탕수육|보쌈|족발|곱창|막창|삼겹살|갈비탕|갈비찜|불고기|제육|돈가스|돈까스|냉면|칼국수|쌈밥|한정식|매운탕|추어탕|설렁탕|곰탕|닭갈비|찜닭|아구찜|해물찜|쌀국수|분식)";
@@ -911,7 +917,8 @@ export function verifyReview(input: QualityInput): QualityResult {
   const sponsored = AD_STRONG.test(fullL) && !AD_DISCLAIM.test(fullL);
   const supporterPR = SUPPORTER_PR.test(fullL) && !AD_DISCLAIM.test(fullL); // coord#112: 서포터즈·기자단 위촉 홍보글
   const institutionalPR = INSTITUTIONAL_PR.test(fullL) && !AD_DISCLAIM.test(fullL); // decisions#500: 기관 보도자료·업무협약/후원 소식
-  if (sponsored || supporterPR || institutionalPR) return { verdict: "rejected", score: 0, reasons: [institutionalPR && !sponsored && !supporterPR ? "기관 보도자료·업무협약/후원 소식 — 자동 제외" : supporterPR && !sponsored ? "서포터즈·기자단 위촉 홍보글 — 자동 제외" : "광고·협찬 글 — 자동 제외"], signals: { nameInTitle: false, nameInBody: false, visit: false, substance: 0, listicle: false, sponsored: true, areaMatch: false } };
+  const exhibitionPR = EXHIBITION_PR.test(fullL) && !has(fullL, VISIT_CUES) && !AD_DISCLAIM.test(fullL); // decisions#644: 갤러리 전시 공지문(3인칭 초대장)
+  if (sponsored || supporterPR || institutionalPR || exhibitionPR) return { verdict: "rejected", score: 0, reasons: [institutionalPR && !sponsored && !supporterPR ? "기관 보도자료·업무협약/후원 소식 — 자동 제외" : exhibitionPR && !sponsored && !supporterPR ? "갤러리 전시 공지문(3인칭 초대장) — 자동 제외" : supporterPR && !sponsored ? "서포터즈·기자단 위촉 홍보글 — 자동 제외" : "광고·협찬 글 — 자동 제외"], signals: { nameInTitle: false, nameInBody: false, visit: false, substance: 0, listicle: false, sponsored: true, areaMatch: false } };
 
   // [비방문 게시판] 중고나라·창업나무는 물건 거래·상권 문의 게시판(네이버 카페=커뮤니티)이라 방문 후기가 있을 수 없음.
   //   내용에 카페 맥락어가 섞여도(리터럴 "카페" 오탐) 링크 도메인만으로 무조건 탈락.
