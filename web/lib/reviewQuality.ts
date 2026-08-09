@@ -156,7 +156,7 @@ export const VENDOR_LISTING_TEMPLATE = /네임택\s*첨부\s*필수|제품\s*이
 // 룰갭(2026-08-09, rulegap-proposals-20260809-0818.md): ettrainer(카페직거래광장)도 동일 성격 —
 //   공개카페 전수스캔 6곳 100% 순수 거래공고(양도/매매/구합니다), 리뷰 원문 자체가 "카페직거래광장 사이트에
 //   자동등록"이라 자기증언(id8319·16285·15043·20200·18081·17082).
-const NONVISIT_BOARD = /cafe\.naver\.com\/(joonggonara|changupnamu|ettrainer)\//i;
+const NONVISIT_BOARD = /cafe\.naver\.com\/(joonggonara|changupnamu|ettrainer|jihosoccer123)\//i;
 // 룰갭 P5(2026-07-08, rulegap-proposals-20260708.md): 중고거래 마켓 정형양식 필드(희망가격·거래지역·판매자
 //   신뢰·상품설명)가 흔한단어 카페명에 걸림 — id13680(시즈더데이) 4/6 무관 의류 중고거래글. 카페맥락어
 //   가드(!titleHasCafeWord && !bodyHasCafeWord) 하에만 탈락하므로 진짜 후기는 보존.
