@@ -12,7 +12,11 @@ export async function recordRun(
   extra?: { fingerprint?: string; metrics?: RunMetrics; effectOk?: boolean | null; startedAt?: Date },
 ): Promise<void> {
   // 원장은 본 작업과 독립 — 실패해도 아래 흐름에 영향 없음(recordLedger 내부 graceful).
-  void recordLedger(job, { ok, detail, effectOk: extra?.effectOk ?? null, fingerprint: extra?.fingerprint, metrics: { ...(extra?.metrics ?? {}), processed }, startedAt: extra?.startedAt });
+  // ⚠️ 반드시 await — 예전엔 `void`(fire-and-forget)였는데, 로컬 launchd 잡은 heartbeat.mjs가
+  //   `await recordRun(...)` 직후 `process.exit(0)`으로 즉사해 **원장 INSERT가 완료 전에 잘려나갔다.**
+  //   증상: agent_runs엔 dev-deploy 16:06이 있는데 run_ledger엔 없음 → 로컬 잡 14종이 원장에서 통째 누락.
+  //   recordLedger는 내부가 전부 try/catch라 await해도 본 흐름을 깨지 않는다.
+  await recordLedger(job, { ok, detail, effectOk: extra?.effectOk ?? null, fingerprint: extra?.fingerprint, metrics: { ...(extra?.metrics ?? {}), processed }, startedAt: extra?.startedAt });
   try {
     await sql`CREATE TABLE IF NOT EXISTS agent_runs (job TEXT PRIMARY KEY, ran_at TIMESTAMPTZ DEFAULT now(), ok BOOLEAN DEFAULT true, detail TEXT, processed INT DEFAULT 0)`;
     await sql`INSERT INTO agent_runs (job, ran_at, ok, detail, processed) VALUES (${job}, now(), ${ok}, ${String(detail).slice(0, 200)}, ${processed})
