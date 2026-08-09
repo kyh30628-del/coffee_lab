@@ -207,3 +207,4 @@
 | 2026-08-09 07:05 | #640 | [룰갭] 비방문 거래게시판 NONVISIT_BOARD 미등록 — cafe.naver.com/ettrainer | fd8cc9f9 | - | web/lib/reviewQuality.ts:156 NONVISIT_BOARD 정규식에 ettrainer 추가(카페직거래광장, joonggonara/changupnamu와 동일 성 |
 | 2026-08-09 08:06 | #642 | [레드팀 재발] synth_identity 태그라인 수렴 재악화 — #605 disambiguator 배포  | f8fca721 | - | lib/synthEngine.ts+lib/criteriaListsBase.ts: 용도문구(사진/작업/혼자/수다/빵) disambiguator에 2차 폴백 추가 — 코드고정 SPEC |
 | 2026-08-09 11:05 | #643 | [룰갭] 비방문 거래게시판 NONVISIT_BOARD 미등록 — cafe.naver.com/jihosocce | 6abb9e87 | - | lib/reviewQuality.ts:159 NONVISIT_BOARD 정규식에 jihosoccer123 게시판 추가(joonggonara changupnamu ettrainer  |
+| 2026-08-09 11:06 | #644 | [룰갭] 갤러리 병설 카페 전시 공지문(3인칭 초대장) — VISIT_CUES 없는 방문후기 노출, 2곳 4 | 2bc9976d | - | lib/reviewQuality.ts: EXHIBITION_PR 정규식 추가(개인전/전시소개/전시명:/작가:/전시 기간:/많은 관심 부탁드립니다) + VISIT_CUES 부재 조건 |
