@@ -282,7 +282,24 @@ export async function coordinationLifecycle(): Promise<{ routed: number; overdue
 // 관제탑 어디서든 문제가 발견되는 즉시 issues 테이블에 적재하고, RM 분류 규칙으로 담당 본부에 자동 배정한다.
 // "기획조정실장 명의로 RM팀이 분류 → 각 본부 실시간 조치"의 결정론 백본. LLM(RM 에이전트)은 배치로 정제·심화.
 
-export type Issue = { ikey: string; source: string; severity: "HIGH" | "MED" | "LOW"; type: string; title: string; detail: string; team: string; state?: "처리중" | "결재대기" | "OUTSTANDING"; note?: string };
+// 🔴 빨강(HIGH)의 유일한 자격 = **소비자 화면이 실제로 망가졌는가.**
+//   CEO 지시(2026-08-09): "AI 판정이 필수 조건도 아닌데, 소비자 화면 멀쩡하면 위험으로 표시하면 안 된다."
+//   반복 사고 패턴: 내부 적체·백로그·처리량을 빨강으로 띄워 보드가 상시 빨갛고, 그래서 **진짜 오염이 묻힌다.**
+//   → 문서로 두면 또 어긋난다. `consumer`를 **필수 필드**로 만들어 새 이슈를 추가할 때 반드시 선언하게 하고,
+//     아래 clampSeverity가 `consumer:false`의 HIGH를 **구조적으로 불가능**하게 만든다(선언 실수도 막힘).
+//   consumer:true 판단 기준 — 지금 이 순간 소비자가 보는 화면에 ①없어야 할 것이 보이거나 ②있어야 할 것이 없다.
+//   느려짐·대기·미판정·내부 프로세스 지연은 전부 consumer:false다(품질이 나빠질 '가능성'은 손상이 아니다).
+export type Issue = {
+  ikey: string; source: string; severity: "HIGH" | "MED" | "LOW"; type: string; title: string; detail: string; team: string;
+  consumer: boolean;
+  state?: "처리중" | "결재대기" | "OUTSTANDING"; note?: string;
+};
+
+/** 소비자 무영향은 절대 빨강이 될 수 없다 — 등급을 한 단계 내린다(선언 실수·미래 추가 모두 여기서 걸린다). */
+function clampSeverity(list: Issue[]): Issue[] {
+  for (const i of list) if (!i.consumer && i.severity === "HIGH") i.severity = "MED";
+  return list;
+}
 
 // 크론 → 소속 본부: lib/jobTeams.ts 단일 출처 사용(2026-07-02 — 3벌 drift로 cron-issues가 팀을 덮어쓰던 사고 수리)
 
@@ -304,19 +321,19 @@ export async function detectIssues(): Promise<Issue[]> {
   const out: Issue[] = [];
   // 1) 크론·에이전트 실패 (job별 최신이 실패)
   const crons = (await sql`SELECT DISTINCT ON (job) job, ok, detail FROM agent_runs ORDER BY job, ran_at DESC`) as any[];
-  for (const c of crons) if (!c.ok) out.push({ ikey: `cronfail:${c.job}`, source: "크론", severity: "HIGH", type: "크론 실패", title: `${c.job} 실패`, detail: String(c.detail || "").slice(0, 200), team: teamOf(c.job) });
+  for (const c of crons) if (!c.ok) out.push({ ikey: `cronfail:${c.job}`, source: "크론", severity: "HIGH", type: "크론 실패", title: `${c.job} 실패`, detail: String(c.detail || "").slice(0, 200), team: teamOf(c.job), consumer: false });
 
   // 2) 데이터 정합성 위반 (sentinel 축)
   const outBox = await one(sql`SELECT count(*) c FROM cafes WHERE published AND (lat<36.8 OR lat>38.3 OR lng<124.5 OR lng>127.9)`);
-  if (outBox > 0) out.push({ ikey: "integ:outbox", source: "정합성", severity: "HIGH", type: "정합성", title: `수도권 박스 밖 공개 ${outBox}곳`, detail: "좌표가 수도권(36.8~38.3/124.5~127.9) 밖인데 공개 중", team: "품질본부" });
+  if (outBox > 0) out.push({ ikey: "integ:outbox", source: "정합성", severity: "HIGH", type: "정합성", title: `수도권 박스 밖 공개 ${outBox}곳`, detail: "좌표가 수도권(36.8~38.3/124.5~127.9) 밖인데 공개 중", team: "품질본부", consumer: true });
   const nonCap = await one(sql`SELECT count(*) c FROM cafes WHERE published AND (address LIKE '충청%' OR address LIKE '강원%' OR address LIKE '전라%' OR address LIKE '경상%' OR address LIKE '대전%' OR address LIKE '부산%' OR address LIKE '대구%' OR address LIKE '울산%' OR address LIKE '광주광역시%' OR address LIKE '세종%' OR address LIKE '제주%')`);
-  if (nonCap > 0) out.push({ ikey: "integ:noncap", source: "정합성", severity: "HIGH", type: "정합성", title: `비수도권 주소 공개 ${nonCap}곳`, detail: "주소 시·도가 비수도권인데 공개 중", team: "품질본부" });
+  if (nonCap > 0) out.push({ ikey: "integ:noncap", source: "정합성", severity: "HIGH", type: "정합성", title: `비수도권 주소 공개 ${nonCap}곳`, detail: "주소 시·도가 비수도권인데 공개 중", team: "품질본부", consumer: true });
   const namePol = await one(sql`SELECT count(*) c FROM cafes WHERE published AND synth_coherence IS NOT NULL AND synth_coherence < 0.3 AND COALESCE(offctx_ok,false)=false`);
-  if (namePol > 0) out.push({ ikey: "integ:namepol", source: "정합성", severity: "HIGH", type: "오염", title: `이름 오염 의심 공개 ${namePol}곳`, detail: "노출 후기가 실제 그 카페를 거의 안 말함(coherence<0.3) — 구구커피류", team: "품질본부" });
+  if (namePol > 0) out.push({ ikey: "integ:namepol", source: "정합성", severity: "HIGH", type: "오염", title: `이름 오염 의심 공개 ${namePol}곳`, detail: "노출 후기가 실제 그 카페를 거의 안 말함(coherence<0.3) — 구구커피류", team: "품질본부", consumer: true });
   const areaMis = await one(sql`SELECT count(*) c FROM cafes WHERE published AND area LIKE '%구' AND area NOT LIKE '인천%' AND address LIKE '서울%' AND position(area in address)=0`);
-  if (areaMis > 0) out.push({ ikey: "integ:areamis", source: "정합성", severity: "MED", type: "정합성", title: `area-주소 불일치 ${areaMis}곳`, detail: "area 라벨이 실제 주소 구와 어긋남", team: "품질본부" });
+  if (areaMis > 0) out.push({ ikey: "integ:areamis", source: "정합성", severity: "MED", type: "정합성", title: `area-주소 불일치 ${areaMis}곳`, detail: "area 라벨이 실제 주소 구와 어긋남", team: "품질본부", consumer: true });
   const missCoord = await one(sql`SELECT count(*) c FROM cafes WHERE published AND (lat IS NULL OR lng IS NULL OR lat=0 OR lng=0)`);
-  if (missCoord > 0) out.push({ ikey: "integ:misscoord", source: "정합성", severity: "MED", type: "필드누락", title: `좌표 없는 공개 ${missCoord}곳`, detail: "지도·박스검증 불가", team: "품질본부" });
+  if (missCoord > 0) out.push({ ikey: "integ:misscoord", source: "정합성", severity: "MED", type: "필드누락", title: `좌표 없는 공개 ${missCoord}곳`, detail: "지도·박스검증 불가", team: "품질본부", consumer: true });
 
   // 3) ⛔ 결재(decisions) 미러링 제거 — 구조적 분리(2026-06-30, CEO "몇 번을 말하냐").
   //   결재·승인·집행은 *결재 워크플로우*이고, 이미 전용 '🔔 CEO 결재 대기' 섹션(승인버튼·기조실장 의견 포함)에서 본다.
@@ -328,22 +345,25 @@ export async function detectIssues(): Promise<Issue[]> {
   const jdDecided = await one(sql`SELECT count(*) c FROM decisions WHERE (title ILIKE '%judgeloop%' OR title ILIKE '%판정%재개%') AND status IN ('rejected','done')`.catch(() => [{ c: 0 }] as any));
   if (jdDecided === 0) {
     const needsLlm = await one(sql`SELECT count(*) c FROM cafes WHERE needs_llm=true`);
-    if (needsLlm >= 300) out.push({ ikey: "ops:needsllm", source: "품질", severity: (needsLlm >= 1000 ? "HIGH" : "MED"), type: "판정 적체", title: `AI 판정 대기 ${needsLlm.toLocaleString()}건`, detail: "경계 리뷰 판정 적체 — judgeloop 재개 결정 필요(CEO)", team: "품질본부" });
+    // ⚠️ CEO 지시(2026-08-09): **AI 판정은 노출의 필수 조건이 아니다.** 미판정 카페도 결정론 규칙(등급·오염게이트)으로
+    //   정상 노출되므로 소비자 화면에 손상이 없다 → 빨강·경고 아님. 건수만 알리는 정보성(LOW)으로 고정한다.
+    //   (과거 1,000건 넘으면 HIGH로 띄워, 크레딧 미충전 기간 내내 보드가 상시 빨갛고 진짜 오염이 묻혔다.)
+    if (needsLlm >= 300) out.push({ ikey: "ops:needsllm", source: "품질", severity: "LOW", type: "선택 보강 대기", title: `AI 판정 대기 ${needsLlm.toLocaleString()}건`, detail: "경계 리뷰의 선택적 AI 재판정 대기 — 규칙 판정으로 이미 정상 노출 중(소비자 영향 없음)", team: "품질본부", consumer: false, state: "처리중", note: "콘솔 크레딧 충전 시 자동 소진. 노출 품질은 결정론 규칙이 담당" });
   }
 
   // 4) 협업 지연 — 생애주기에서 '지연'(과기한)으로 재상신된 건. 담당 팀 에이전트가 조치해야 해소(자동교정 대상 아님).
   const lateCoord = (await sql`SELECT count(*) c FROM coordination WHERE status IN ('open','in_progress') AND stage='지연'`.catch(() => [{ c: 0 }])) as any[];
-  if (Number(lateCoord[0].c) > 0) out.push({ ikey: "coord:late", source: "협업", severity: "MED", type: "협업 지연", title: `협업 지연 ${lateCoord[0].c}건(기한초과·재촉됨)`, detail: "받은 팀이 기한 내 확인·조치 안 함 — 담당 에이전트 이벤트 기동으로 재촉 중", team: "경영지원본부", state: "OUTSTANDING", note: "담당 팀 에이전트가 수신확인·조치해야 해소(coord_overdue 트리거로 재촉)" });
+  if (Number(lateCoord[0].c) > 0) out.push({ ikey: "coord:late", source: "협업", severity: "MED", type: "협업 지연", title: `협업 지연 ${lateCoord[0].c}건(기한초과·재촉됨)`, detail: "받은 팀이 기한 내 확인·조치 안 함 — 담당 에이전트 이벤트 기동으로 재촉 중", team: "경영지원본부", consumer: false, state: "OUTSTANDING", note: "담당 팀 에이전트가 수신확인·조치해야 해소(coord_overdue 트리거로 재촉)" });
 
   // ★ 빠르게 바뀌는 오염 신호는 DB '직접 실시간' 조회(관제탑 캐시는 stale될 수 있음 → 사장님이 본 3건을 RM이 1건만 보던 버그).
   //   품질 오염(audit_flags)·그라운딩 의심·리뷰 맥락(offctx)을 *항상 최신*으로 잡는다.
   // ⚠️ '공개 중'인 카페만 센다 — 이미 비공개(held/excluded)된 카페의 미해결 플래그는 소비자 노출 0이라 '남은 오염'이 아님(stale 알람 방지).
   const afn = (await sql`SELECT a.cafe_name FROM audit_flags a JOIN cafes c ON c.id=a.cafe_id WHERE a.issue!='audit_complete' AND NOT COALESCE(a.resolved,false) AND c.published ORDER BY a.flagged_at DESC LIMIT 10`.catch(() => [])) as any[];
-  if (afn.length > 0) out.push({ ikey: "quality:auditflags", source: "품질감사", severity: "HIGH", type: "품질 오염", title: `품질 오염 감지 ${afn.length}건`, detail: `근거오염·중복 자가감사 플래그: ${afn.slice(0, 5).map((x) => x.cafe_name).join(", ")}`.slice(0, 200), team: "품질본부", state: "처리중", note: "품질레드팀이 매 사이클 트리아지(오탐→정리·오염→비공개)" });
+  if (afn.length > 0) out.push({ ikey: "quality:auditflags", source: "품질감사", severity: "HIGH", type: "품질 오염", title: `품질 오염 감지 ${afn.length}건`, detail: `근거오염·중복 자가감사 플래그: ${afn.slice(0, 5).map((x) => x.cafe_name).join(", ")}`.slice(0, 200), team: "품질본부", consumer: true, state: "처리중", note: "품질레드팀이 매 사이클 트리아지(오탐→정리·오염→비공개)" });
   const grn = await one(sql`SELECT count(*) c FROM grounding_checks g JOIN cafes c ON c.id=g.cafe_id WHERE c.published AND NOT g.grounded AND g.checked_at >= c.synth_updated AND c.llm_judged_at IS NOT NULL`.catch(() => [{ c: 0 }] as any));
-  if (grn >= 1) out.push({ ikey: "quality:grounding", source: "그라운딩", severity: "MED", type: "환각 의심", title: `그라운딩 의심 ${grn}곳`, detail: "소개글이 후기 근거 부족(환각 의심)", team: "품질본부", state: "처리중", note: "다음 배치(08·17시) 품질본부 재검·재합성" });
+  if (grn >= 1) out.push({ ikey: "quality:grounding", source: "그라운딩", severity: "MED", type: "환각 의심", title: `그라운딩 의심 ${grn}곳`, detail: "소개글이 후기 근거 부족(환각 의심)", team: "품질본부", consumer: true, state: "처리중", note: "다음 배치(08·17시) 품질본부 재검·재합성" });
   const offcn = await one(sql`SELECT count(*) c FROM cafes WHERE published AND offctx_rate>=0.55 AND NOT COALESCE(offctx_ok,false)`.catch(() => [{ c: 0 }] as any));
-  if (offcn >= 1) out.push({ ikey: "quality:offctx", source: "맥락점검", severity: "LOW", type: "맥락 watchlist", title: `리뷰 맥락 점검 ${offcn}곳`, detail: "표시 리뷰에 카페 맥락 적음(일부 오탐) — 트리아지 대상", team: "품질본부", state: "처리중", note: "품질레드팀이 매 사이클 정리(진짜카페→offctx_ok·오염→비공개)" });
+  if (offcn >= 1) out.push({ ikey: "quality:offctx", source: "맥락점검", severity: "LOW", type: "맥락 watchlist", title: `리뷰 맥락 점검 ${offcn}곳`, detail: "표시 리뷰에 카페 맥락 적음(일부 오탐) — 트리아지 대상", team: "품질본부", consumer: true, state: "처리중", note: "품질레드팀이 매 사이클 정리(진짜카페→offctx_ok·오염→비공개)" });
 
   // ★★ 메인 관제탑(/admin) 전체 미러 — orchestrator가 계산해 둔 risks(위험)·notices(주의)·integrity(정합성)를
   //   '통째로' RM 이슈로 변환한다. 대시보드에 뜨는 *모든* 주의·오염·위험이 자동 전달되고, 앞으로 새 신호가
@@ -355,8 +375,8 @@ export async function detectIssues(): Promise<Issue[]> {
     const route = (t: string) => /규칙갭|룰갭/.test(t) ? "품질본부/룰갭팀" : /폐업|closure/.test(t) ? "운영본부" : /검색|추천|momentum/.test(t) ? "경험본부" : /임베딩|합성|동\b|backfill/.test(t) ? "운영본부" : /발굴|grow/.test(t) ? "성장본부" : "품질본부";
     const slug = (p: string, t: string) => p + ":" + t.replace(/[0-9,]/g, "").replace(/\s+/g, "").slice(0, 48); // 숫자 제거 → 카운트 바뀌어도 같은 ikey
     // state는 사실대로(2026-07-02): 자동 결재상신은 06-30에 제거됐으므로 '결재대기' 표기는 화면≠사실이었음.
-    for (const t of (h.risks || []) as string[]) out.push({ ikey: slug("tower-risk", t), source: "관제탑·위험", severity: "HIGH", type: "위험", title: String(t).slice(0, 95), detail: "메인 관제탑 위험(빨강) — 소비자 타격/해자 훼손, 즉시 조치", team: route(String(t)), state: "OUTSTANDING", note: "담당 본부 즉시 조치 대상 — CEO 판단 필요 시 에이전트가 직접 결재 상신" });
-    for (const t of (h.integrity || []) as string[]) out.push({ ikey: slug("tower-integ", t), source: "관제탑·정합성", severity: "MED", type: "정합성", title: String(t).slice(0, 95), detail: "메인 관제탑 정합성 경보", team: "품질본부", state: "처리중", note: "orchestrator-heal이 2시간마다 자동치유" });
+    for (const t of (h.risks || []) as string[]) out.push({ ikey: slug("tower-risk", t), source: "관제탑·위험", severity: "HIGH", type: "위험", title: String(t).slice(0, 95), detail: "메인 관제탑 위험(빨강) — 소비자 타격/해자 훼손, 즉시 조치", team: route(String(t)), consumer: true, state: "OUTSTANDING", note: "담당 본부 즉시 조치 대상 — CEO 판단 필요 시 에이전트가 직접 결재 상신" });
+    for (const t of (h.integrity || []) as string[]) out.push({ ikey: slug("tower-integ", t), source: "관제탑·정합성", severity: "MED", type: "정합성", title: String(t).slice(0, 95), detail: "메인 관제탑 정합성 경보", team: "품질본부", consumer: true, state: "처리중", note: "orchestrator-heal이 2시간마다 자동치유" });
     for (const t of (h.notices || []) as string[]) {
       // 오염 플래그·그라운딩·리뷰 맥락은 위에서 'DB 직접 실시간'으로 잡으므로 미러에선 건너뜀(중복·stale 방지).
       if (/오염 플래그|그라운딩|리뷰 맥락|품질 의심/.test(t)) continue;
@@ -370,18 +390,19 @@ export async function detectIssues(): Promise<Issue[]> {
       const isGrow = /발굴.*(지연|미발굴)/.test(t);
       const isRule = /규칙갭|룰갭/.test(t);
       const when = isGrow ? "cron-grow가 2시간마다 굶은 지역 우선 발굴 (자동 소진)" : isRule ? "다음 룰갭 사이클(매일 01:30) + 기조실장 검토" : "다음 배치 사이클(08·17시) 담당 본부 처리";
-      out.push({ ikey: slug("tower-notice", t), source: "관제탑·주의", severity: "LOW", type: "주의", title: String(t).slice(0, 95), detail: "메인 관제탑 주의(점검 권장)", team: route(String(t)), state: "처리중", note: when });
+      out.push({ ikey: slug("tower-notice", t), source: "관제탑·주의", severity: "LOW", type: "주의", title: String(t).slice(0, 95), detail: "메인 관제탑 주의(점검 권장)", team: route(String(t)), consumer: false, state: "처리중", note: when });
     }
   } catch { /* orchestrator_state 없으면 아래 직접 체크가 안전망 */ }
 
   // 5) 폐업 검토대기 — 3회+ 미발견은 비공개 결재가 필요한 '진짜 처리 대상'(자동삭제 안 함). 유지.
   const closureBack = await one(sql`SELECT count(*) c FROM cafes WHERE published AND closure_misses>=3`);
-  if (closureBack > 0) out.push({ ikey: "ops:closureback", source: "운영", severity: "MED", type: "폐업 검토대기", title: `폐업 검토대기 ${closureBack}곳`, detail: "3회+ 미발견 — 정밀확인 후 결재(자동삭제 안 함)", state: "처리중", note: "cron-closure 6시간마다 재확인 + 운영본부 정밀확인 후 결재", team: "운영본부" });
+  if (closureBack > 0) out.push({ ikey: "ops:closureback", source: "운영", severity: "MED", type: "폐업 검토대기", title: `폐업 검토대기 ${closureBack}곳`, detail: "3회+ 미발견 — 정밀확인 후 결재(자동삭제 안 함)", consumer: false, state: "처리중", note: "cron-closure 6시간마다 재확인 + 운영본부 정밀확인 후 결재", team: "운영본부" });
   // ⚠️ 합성 대기·임베딩 대기 등 '정상 파이프라인 백로그'는 이슈로 안 띄운다 — cron이 자동 처리하는 평상 상태일 뿐
   //   문제가 아니다(CEO: 정상 운영상태를 이슈로 띄워 보드가 항상 차보이게 하지 마라). cron-synth가 *고장*나면
   //   '크론 실패'(위 1번)로 잡힌다 → 그게 진짜 문제.
 
-  return out;
+  // 🔴 최종 관문 — 소비자 무영향 항목은 여기서 빨강이 벗겨진다. 위에서 실수로 HIGH를 달아도 통과 못 한다.
+  return clampSeverity(out);
 }
 
 // 탐지 → upsert(신규 적재·기존 갱신) → 사라진 이슈 자동 해소. 반환 = 현재 열린 이슈.
