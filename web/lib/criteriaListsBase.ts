@@ -65,6 +65,23 @@ export const LIST_META: ListMeta[] = [
   { key: "use.빵", category: "용도", label: "용도: 빵", consumer: "synthEngine.synthesize",
     items: ["빵", "베이커리", "스콘", "크루아상", "디저트", "케이크", "티라미수", "bread", "bakery", "scone", "croissant", "dessert", "cake", "tiramisu", "pastry"] },
 
+  // ── 용도구체어 확장사전 (lib/synthEngine.ts · reviewSpecificTermExt) — 정합성조사 #536→#583→#605→#642(4회
+  //   재발) 원인: 용도문구 분기용 구체어가 코드 고정 SPECIFIC_TERM_KEYWORDS뿐이라 협소해 절대다수가 generic
+  //   USE_PHRASE로 폴백·동일문구 수렴. #642 조사에서 리뷰텍스트 형태소분석 없는 단순 빈도추출은 SEO 잡음
+  //   (전화번호·운영시간·가능한 등)이 상위를 차지해 신뢰 불가로 기각(실측, 명사추출 오채택 시 환각·비문 위험) —
+  //   대신 이 사전(코드 고정 SPECIFIC_TERM_KEYWORDS의 2차 폴백)을 무배포 편집 가능하게 분리해, 다음 재발부터는
+  //   dev_task 없이 기획조정실장(L2)이 /admin/criteria에서 항목만 추가하면 되도록 구조 전환.
+  { key: "specific_term.빵", category: "용도구체어", label: "구체어 확장: 빵", consumer: "synthEngine.reviewSpecificTermExt",
+    items: ["휘낭시에", "마카롱", "크로플", "파운드케이크", "롤케이크", "단팥빵", "소금빵"] },
+  { key: "specific_term.작업", category: "용도구체어", label: "구체어 확장: 작업", consumer: "synthEngine.reviewSpecificTermExt",
+    items: ["스터디룸", "전용좌석"] },
+  { key: "specific_term.혼자", category: "용도구체어", label: "구체어 확장: 혼자", consumer: "synthEngine.reviewSpecificTermExt",
+    items: ["다락", "바자리", "소파자리"] },
+  { key: "specific_term.수다", category: "용도구체어", label: "구체어 확장: 수다", consumer: "synthEngine.reviewSpecificTermExt",
+    items: ["회의실", "넓은테이블"] },
+  { key: "specific_term.사진", category: "용도구체어", label: "구체어 확장: 사진", consumer: "synthEngine.reviewSpecificTermExt",
+    items: ["정원", "포토존", "대형창", "중정", "마당", "다락방", "통창"] },
+
   // ── 운영 정체성 신호어 (lib/synthEngine.ts · OP_SIGNALS) — 직접로스팅·원두판매·권위 주장 탐지 ──
   { key: "op.직접로스팅", category: "운영신호", label: "운영: 직접로스팅 주장", consumer: "synthEngine.synthesize",
     items: ["직접 로스팅", "직접로스팅", "자가배전", "직접 볶", "직접볶", "로스터리", "빈투바", "bean to bar", "in-house roast", "in house roast", "house roasted", "roast in-house", "직접 볶은", "직접 볶아", "로스팅합니다", "로스팅 합니다"] },
