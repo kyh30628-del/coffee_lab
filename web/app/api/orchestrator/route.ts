@@ -73,7 +73,10 @@ export async function GET(req: NextRequest) {
       COUNT(*) FILTER (WHERE raw_reviews IS NOT NULL AND synth_updated IS NULL)::int synth_q,
       COUNT(*) FILTER (WHERE embedding IS NULL AND (published OR pipeline_status='pending') AND synth_identity IS NOT NULL)::int embed_q,
       COUNT(*) FILTER (WHERE published AND raw_reviews IS NOT NULL AND raw_collected_at > synth_checked_at)::int synth_backlog,
-      COUNT(*) FILTER (WHERE published AND (synth_checked_at IS NULL OR synth_checked_at < now() - interval '7 days'))::int synth_stale7
+      COUNT(*) FILTER (WHERE published AND (synth_checked_at IS NULL OR synth_checked_at < now() - interval '7 days'))::int synth_stale7,
+      -- 순환 천장 = '가장 오래 안 훑은 카페의 나이'. 고정창(stale7) 대신 이걸로 그물이 실제로 멈췄는지를 잰다(아래 주석).
+      COALESCE(MAX(CASE WHEN published THEN ROUND(EXTRACT(EPOCH FROM (now() - synth_checked_at))/86400)::int END), 0) synth_oldest_d,
+      COUNT(*) FILTER (WHERE published AND synth_checked_at IS NULL)::int synth_never
       FROM cafes`)[0] as any;
     // 판정 대기·오늘 지표 = lib/metrics 단일출처(judge-status와 동일 정의 — 화면별 숫자 어긋남 구조적 차단).
     const judgeQ = await judgeQueueCount();
@@ -208,10 +211,17 @@ export async function GET(req: NextRequest) {
     if ((af?.open ?? 0) > 0) notices.push(`오염 플래그 ${af.open}건(검토 대기)`);
     const dgap = (await sql`SELECT COUNT(*)::int n FROM (SELECT area FROM cafes WHERE published GROUP BY area HAVING COUNT(*) >= 10 AND COUNT(*) FILTER (WHERE dong IS NOT NULL)::float / COUNT(*) < 0.9) x`.catch(() => [{ n: 0 }]))[0] as any;
     if (dgap.n > 0) notices.push(`동 채움 미흡 지역 ${dgap.n}곳(<90%)`);
-    // 🧹 재합성 감시(토큰0 결정론). synth_backlog=새 리뷰 수집됐는데 규칙 미재적용(진짜 밀린 것). stale7=7일+ 미갱신(4일 순환이 못 따라감=커버리지 지연).
+    // 🧹 재합성 감시(토큰0 결정론). synth_backlog=새 리뷰 수집됐는데 규칙 미재적용(진짜 밀린 것). stale7=7일+ 미점검(순환 지연 — 실측 주기 8~9일).
     //   과거 '주4곳=61년 적체'가 초록불로 숨던 사각 — 실행이 아니라 '반영 여부'를 잰다.
     if (c.synth_backlog > PUB * 0.10) risks.push(`재합성 백로그 ${c.synth_backlog}곳 — 새 리뷰가 규칙에 미반영(cron-resynth 처리량 점검)`);
-    if (c.synth_stale7 > PUB * 0.20) risks.push(`재합성 7일+ 지연 ${c.synth_stale7}곳 — 오염그물 커버리지 미달(처리량 점검)`);
+    // ⚠️ 2026-08-09 재교정: stale7 고정창은 **순환 주기가 7일보다 길면 수학적으로 항상 빨강**이다.
+    //   주기 C일의 정상 순환에서 stale7 = PUB×(C−7)/C → 20% 임계는 C<8.75일에서만 조용하다.
+    //   실측 C≈8~9일이라 임계선 위에서 깜빡이며 07-05부터 35일간 HIGH로 눌러앉았다(#2526). 그물은 멀쩡했다.
+    //   → 재는 대상을 바꾼다: **'가장 오래 안 훑은 카페의 나이'(순환 천장)**. 그물이 진짜 멈추면 이 값만 치솟는다.
+    //   과거 '주4곳=61년 적체'도 이 지표면 즉시 빨강(천장 수천일) — 감도는 잃지 않고 상시 오경보만 제거.
+    if (c.synth_never > 0) risks.push(`재합성 미착수 ${c.synth_never}곳 — 오염그물 사각(한 번도 안 훑음)`);
+    else if (c.synth_oldest_d > 21) risks.push(`재합성 순환 정체 — 최장 ${c.synth_oldest_d}일 미점검(오염그물 멈춤, 처리량 점검)`);
+    else if (c.synth_stale7 > PUB * 0.20) notices.push(`재합성 7일+ ${c.synth_stale7}곳(순환 주기 ${c.synth_oldest_d}일 — 정상 로테이션 지연)`);
     // 임베딩 대기 = 의미검색만 일부 누락(카페는 정상 노출) → 주의. 단, 절반 이상이면 검색 핵심기능 타격 → 위험.
     const noemb = (await sql`SELECT COUNT(*)::int n FROM cafes WHERE published AND embedding IS NULL`.catch(() => [{ n: 0 }]))[0] as any;
     if (noemb.n > 0) { if (noemb.n > PUB * 0.5) risks.push(`의미검색 대량 누락 ${noemb.n}곳 — 검색 기능 타격`); else notices.push(`의미검색 임베딩 대기 ${noemb.n}곳`); }
@@ -539,7 +549,7 @@ export async function GET(req: NextRequest) {
     const health = {
       generatedAt: new Date(now).toISOString(),
       overall, alerts, healed, risks, notices, integrity,
-      coverage: { total: c.total, published: c.published, rawCachedPct: pct(c.raw_cached), judgedPct: pct(c.judged), embeddedPct: c.published ? Math.round((c.pub_embedded / c.published) * 100) : 0, dongPct, synthBacklog: c.synth_backlog, synthStale7: c.synth_stale7 },
+      coverage: { total: c.total, published: c.published, rawCachedPct: pct(c.raw_cached), judgedPct: pct(c.judged), embeddedPct: c.published ? Math.round((c.pub_embedded / c.published) * 100) : 0, dongPct, synthBacklog: c.synth_backlog, synthStale7: c.synth_stale7, synthOldestD: c.synth_oldest_d, synthNever: c.synth_never },
       today: { newCafes: daily.newCafes, synthesized: td.synth_today, published: td.published_today, hasDong: td.has_dong, dongPct, noise: td.noise, newQueue: td.new_q, ytToday: daily.yt, ytTotal: td.yt_total },
       pipeline, agents,
       grounding: { suspectCount: gr?.suspect ?? 0, suspects: grSuspects },

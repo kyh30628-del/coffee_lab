@@ -826,6 +826,13 @@ function isLatinHeavyName(nameNoSpace: string): boolean {
   const latin = letters.filter((c) => /[A-Za-z]/.test(c)).length;
   return latin / letters.length >= 0.6;
 }
+// 🚫 [decisions#617 / coordination#295] 개인정보 DB 판매 SEO 스팸 — "전국 개인사업자 디비 N건" 계열.
+//   raw 크롤링 풀에 1,455/19,666곳 혼입(표시단 synth_reviews 매칭 0건 = 라이브 노출은 없었음).
+//   방치 비용: 판정 큐에 실려 불필요 LLM 호출을 유발한다 → 수집 단계에서 규칙으로 끊는 게 정답(비용 0).
+//   ⚠️ 오탐 방지 원칙(위 OFFTOPIC_SPAM과 동일): '디비/DB' 단독 금지 — 판매·업종 수식어가 붙은 **복합 신호만**.
+//      카페 후기에 "개인사업자 디비"·"업종별 DB 추출" 같은 조합이 나올 일은 없다.
+const DB_SALES_SPAM = /((개인\s*사업자|자영업자|법인|업체|업종별|전국)\s*(디비|db)|(디비|db)\s*(판매|삽니다|팝니다|구매|추출|업체|리스트|대량)|텔레마케팅\s*(디비|db)|(디비|db)\s*\d+\s*만\s*건|\d+\s*만\s*건\s*(디비|db))/i;
+
 const OFFTOPIC_SPAM = /(코인\s*해외선물|해외\s*선물\s*(거래|시세|투자|매매)|선물\s*거래소|암호화폐|가상화폐|비트코인|비트겟|바이낸스|재테크\s*(추천|비법|정보|수익)|주식\s*(리딩|종목추천|투자문의|급등주)|대출\s*(상담|한도|이자|갈아타기|추천)|아파트\s*분양|오피스텔\s*분양|분양가|모델하우스|청약\s*(가점|통장|경쟁률)|재개발\s*(구역|조합|호재)|재건축\s*(조합|아파트|호재)|입주\s*예정|주상복합\s*분양|최고\s*\d+\s*층|\d+\s*개동|전원주택\s*(급매|매매|분양|답사)|급매물|철근콘크리트\s*주택|주택\s*답사기|토지\s*(매매|급매|투자))/;
 
 // 🏭 [룰갭 P61] naver_category 비F&B 조합신호(coordination#249, decisions#507) — naver_category가 카페/디저트/
@@ -924,6 +931,11 @@ export function verifyReview(input: QualityInput): QualityResult {
   //   내용에 카페 맥락어가 섞여도(리터럴 "카페" 오탐) 링크 도메인만으로 무조건 탈락.
   if (input.link && NONVISIT_BOARD.test(input.link)) {
     return { verdict: "rejected", score: 0, reasons: ["비방문 게시판(중고나라·창업나무) — 자동 제외"], signals: { nameInTitle: false, nameInBody: false, visit: false, substance: 0, listicle: false, sponsored: false, areaMatch: false } };
+  }
+
+  // [DB판매 스팸] 개인정보 디비 판매 SEO 블로그 — 카페명만 스친 오염. 규칙 하드거절(#617).
+  if (DB_SALES_SPAM.test(fullL)) {
+    return { verdict: "rejected", score: 0, reasons: ["개인정보 DB 판매 스팸 블로그 — 자동 제외"], signals: { nameInTitle: false, nameInBody: false, visit: false, substance: 0, listicle: false, sponsored: false, areaMatch: false } };
   }
 
   // [비-카페 스팸] 코인·해외선물·부동산분양·대출 등 카페와 무관한 강한 오프토픽 — 블로그가 카페명만 우연히 스친 오염. 규칙 하드거절.
