@@ -118,7 +118,12 @@ export default function OrgDashboard() {
     setBusy(id);
     try {
       const r = await fetch("/api/admin/dev-action", { method: "POST", headers: { "x-admin-password": pw, "Content-Type": "application/json" }, body: JSON.stringify({ id, action }) }).then((x) => x.json());
-      setToast(r.ok ? `✅ ${action === "deploy" ? "배포 확정 — 진행 중" : "폐기"}` : `⚠️ ${r.error}`);
+      // fired: 즉시발화 중계 결과. 'sent'가 아니면 다음 배포창(08/12/16/20시)까지 대기하므로 반드시 보이게 한다.
+      setToast(r.ok
+        ? action === "deploy"
+          ? r.fired === "sent" ? "✅ 배포 확정 — 즉시 실행 중" : `✅ 배포 확정 — ⚠️ 즉시발화 ${r.fired === "unconfigured" ? "미설정" : "실패"}(다음 창까지 대기)`
+          : "✅ 폐기"
+        : `⚠️ ${r.error}`);
       load(pw);
     } catch { setToast("⚠️ 처리 실패"); }
     setBusy(null); setTimeout(() => setToast(""), 4000);

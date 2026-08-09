@@ -18,8 +18,8 @@ export async function POST(req: NextRequest) {
     if (action === "deploy") {
       if (ds !== "배포대기") return NextResponse.json({ ok: false, error: `배포대기 상태가 아님(현재: ${ds || "미빌드"})` }, { status: 400 });
       await sql`UPDATE decisions SET action_params = action_params || '{"dev_status":"deploy_approved"}'::jsonb, result='CEO 배포 확정 — 배포 진행' WHERE id=${id}`;
-      await pingDevTrigger("deploy"); // 로컬 dev-deploy 즉시 발화(브라우저 승인도 대기 없이)
-      return NextResponse.json({ ok: true, status: "deploy_approved" });
+      const fired = await pingDevTrigger("deploy"); // 로컬 dev-deploy 즉시 발화(브라우저 승인도 대기 없이)
+      return NextResponse.json({ ok: true, status: "deploy_approved", fired });
     }
     if (action === "discard") {
       await sql`UPDATE decisions SET status='rejected', decided_at=now(), decided_by='CEO', result='CEO 폐기', action_params = action_params || '{"dev_status":"discarded"}'::jsonb WHERE id=${id}`;
