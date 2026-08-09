@@ -163,13 +163,41 @@ function reviewSpecificTerm(category: string, clean: Review[]): string | null {
   if (!counts.size) return null;
   return [...counts.entries()].sort((x, y) => y[1] - x[1])[0][0];
 }
+// SPECIFIC_TERM_KEYWORDS(위, 코드 고정)의 2차 폴백 — criteriaLists(admin) 단일출처라 무배포 편집 가능.
+//   재발(#27→#399→#605→#642, 4회)마다 dev_task로 사전을 넓혀온 구조를 끊는다: 다음부턴 기획조정실장(L2)이
+//   /admin/criteria에서 항목만 추가하면 되고, 코드 재배포가 필요없다(decisions#642 구조 전환).
+const SPECIFIC_TERM_EXT_KEYS: Record<string, string> = {
+  빵: "specific_term.빵", 작업: "specific_term.작업", 혼자: "specific_term.혼자",
+  수다: "specific_term.수다", 사진: "specific_term.사진",
+};
+function reviewSpecificTermExt(category: string, clean: Review[]): string | null {
+  const key = SPECIFIC_TERM_EXT_KEYS[category];
+  if (!key) return null;
+  const items = getListSync(key);
+  if (!items.length) return null;
+  const counts = new Map<string, number>();
+  for (const term of items) {
+    const c = clean.filter((r) => r.text.toLowerCase().includes(term.toLowerCase())).length;
+    if (c) counts.set(term, c);
+  }
+  if (!counts.size) return null;
+  return [...counts.entries()].sort((x, y) => y[1] - x[1])[0][0];
+}
+// 받침 유무로 이/가 선택 — 기존 코드는 "이"만 고정이라 오션뷰/한강뷰(받침 없음)에 붙으면 비문("오션뷰이 있어")이었다.
+//   확장사전이 받침 없는 term도 다수 추가하므로 이 기회에 정확히 교정.
+function iGa(term: string): "이" | "가" {
+  const last = term[term.length - 1] ?? "";
+  const code = last.charCodeAt(0) - 0xac00;
+  const hasBatchim = code < 0 || code > 11171 ? true : code % 28 !== 0; // 한글 완성형 밖(영문 등)은 안전폴백
+  return hasBatchim ? "이" : "가";
+}
 // 최다용도 카테고리별 구체 문구 템플릿 — USE_PHRASE(포괄형)를 대체할 때만 쓴다.
 const SPECIFIC_PHRASE: Record<string, (term: string) => string> = {
   빵: (term) => `${term}·디저트가 특히 자주 언급되는 곳`,
   작업: (term) => `${term} 갖춘 작업·공부하기 좋은 곳`,
   혼자: (term) => `${term}에서 혼자 조용히 머물기 좋은 곳`,
   수다: (term) => `${term}에서 함께 도란도란 이야기 나누기 좋은 곳`,
-  사진: (term) => `${term}이 있어 사진 찍기 좋은 분위기`,
+  사진: (term) => `${term}${iGa(term)} 있어 사진 찍기 좋은 분위기`,
 };
 function buildIdentity(coords: Record<string, number | null>, basis: Record<string, string>, uses: Record<string, number>, ops: Record<string, number>, area: string[] = [], clean: Review[] = [], naverCategory?: string) {
   const p: string[] = [];
@@ -191,7 +219,9 @@ function buildIdentity(coords: Record<string, number | null>, basis: Record<stri
   const tu = Object.entries(uses).sort((x, y) => y[1] - x[1])[0];
   if (tu) {
     const cat = tu[0];
-    const term = cat === "빵" ? categoryBreadTerm(naverCategory) ?? reviewSpecificTerm(cat, clean) : reviewSpecificTerm(cat, clean);
+    const term = cat === "빵"
+      ? categoryBreadTerm(naverCategory) ?? reviewSpecificTerm(cat, clean) ?? reviewSpecificTermExt(cat, clean)
+      : reviewSpecificTerm(cat, clean) ?? reviewSpecificTermExt(cat, clean);
     if (term && SPECIFIC_PHRASE[cat]) p.push(wrapLocality(SPECIFIC_PHRASE[cat](term)));
     else if (USE_PHRASE[cat]) p.push(wrapLocality(USE_PHRASE[cat]));
   } else if (locality) p.push(`${locality}의 카페`);
