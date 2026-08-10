@@ -4,6 +4,7 @@ import { embedQuery, toVectorLiteral, hasEmbedKey } from "@/lib/embed";
 import { hasSearchLLM, rerankWithClaude, lastRerankError, type SearchCand } from "@/lib/searchAgent";
 import { loadCriteria, getCriterionSync } from "@/lib/criteria";
 import { loadCriteriaLists, getListSync } from "@/lib/criteriaLists";
+import { parseQuery, loadGeoIndex, detectRegion, isCoreArea } from "@/lib/searchQuery";
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
@@ -99,8 +100,13 @@ function inRegion(area: string, region: string): boolean {
 const occ = (text: string, kw: string) => (!text || !kw ? 0 : text.toLowerCase().split(kw.toLowerCase()).length - 1);
 
 // exact(키워드) + 개념(느낌) 가산 — 두 모드 공통
+// 리뷰 인용 배열은 두 모양으로 온다 — 객체 배열(원본 synth_reviews) 또는 문자열 배열(SQL에서 quote만 잘라온 것).
+//   💰 후자가 기본 경로다(큰 컬럼 통째 전송 금지). 두 모양을 한 곳에서 흡수해 호출부가 신경 쓰지 않게 한다.
+const quoteList = (rv: any): string[] =>
+  Array.isArray(rv) ? rv.map((r: any) => (typeof r === "string" ? r : (r?.quote ?? ""))).filter(Boolean) : [];
+
 function lexicalScore(c: any, tokens: string[], hitConcepts: typeof CONCEPTS) {
-  const reviewText = Array.isArray(c.synth_reviews) ? c.synth_reviews.map((r: any) => r?.quote ?? "").join(" ") : "";
+  const reviewText = quoteList(c.synth_reviews).join(" ");
   // 필드가중치는 criteria 단일출처(폴백 4/2.5/2/2/2/1.5/1.5/2/1). GET 진입 시 loadCriteria로 캐시 프라임(동기 읽기).
   //   ⚠️ reviewText(검증리뷰 인용)는 아래에서 별도 집계한다(#452) — occ()가 "이디야보다 낫다" 같은
   //   타사비교 문장도 그냥 매칭 카운트로 세어, 리뷰 단독 언급 1건만으로 exact 최댓값을 차지하고
@@ -138,7 +144,9 @@ function lexicalScore(c: any, tokens: string[], hitConcepts: typeof CONCEPTS) {
   return { exact, concept, reasons };
 }
 
-const FIELDS = `id, name, area, synth_grade, synth_count, synth_identity, signature, note, vibe, uses, beans, char_scores, synth_reviews, synth_acidity, synth_body, synth_sweet`;
+// 💰 synth_reviews는 통째로 싣지 않고 **SQL 안에서 quote만 잘라** 받는다(TOAST 1.9GB 컬럼 → 인용문 몇 줄).
+//   후보 80건 × 리뷰 전체를 앱으로 옮기던 것이 검색 응답 지연·전송비의 주범이었다.
+const FIELDS = `id, name, area, synth_grade, synth_count, synth_identity, signature, note, vibe, uses, beans, char_scores, jsonb_path_query_array(synth_reviews, '$[*].quote') AS synth_reviews, synth_acidity, synth_body, synth_sweet`;
 
 // 등급 가중치 — '검증'이 '참고'보다 위 노출(동네 커피 노트의 약속). 절대 우선은 아니고 가산.
 //   임계값은 DB 기준(criteria) 단일출처, 폴백=검증25/참고8. GET 진입 시 loadCriteria로 캐시 프라임.
@@ -193,8 +201,7 @@ function charTags(cs: any): string {
   return Object.entries(cs).filter(([, v]) => Number(v) > 0).sort((a, b) => Number(b[1]) - Number(a[1])).slice(0, 4).map(([k]) => AXIS_LABEL[k] ?? k).join(", ");
 }
 function quotesOf(reviews: any): string {
-  if (!Array.isArray(reviews)) return "";
-  return reviews.slice(0, 3).map((r: any) => r?.quote ?? "").filter(Boolean).join(" / ");
+  return quoteList(reviews).slice(0, 3).join(" / ");
 }
 
 // 검색 캐시: (질문+지역)별 결과를 저장해 같은/비슷한 질문은 LLM·임베딩 재계산 없이 즉시 응답.
@@ -227,15 +234,26 @@ export async function GET(req: NextRequest) {
     const isInternalCheck = !!req.headers.get("x-internal-check"); // 헬스체크 대표질의 — search_log 수요 집계에서 제외
 
     const ql = q.toLowerCase();
-    const tokens = Array.from(new Set(ql.split(/[\s,./?!~"'()]+/).filter((t) => t.length >= 2)));
+    // 🔤 불용어 제거·조사 절단(lib/searchQuery) — '카페·맛집·좋은'이 전 카페에 매칭돼 랭킹을 지배하던 문제 해결.
+    const parsed = parseQuery(q);
+    const tokens = parsed.tokens;
     const hitConcepts = CONCEPTS.filter((c) => c.triggers.some((t) => ql.includes(t)));
     let effectiveRegion = region;
+    let regionExplicit = !!region;
     if (!effectiveRegion) {
+      // ① 기존 하드코딩 사전(빠른 경로·상권 별칭: 홍대·경리단 등 행정동에 없는 이름을 커버)
       for (const tok of tokens) {
         if (DONG_TO_GU[tok]) { effectiveRegion = DONG_TO_GU[tok]; break; }
         if (SEOUL_GU.includes(tok)) { effectiveRegion = tok; break; }
         if (GYEONGGI_SI.includes(tok)) { effectiveRegion = tok; break; }
       }
+      // ② DB 실데이터(dong/area) 전수 인덱스 — '우면동·자양동'처럼 사전에 없던 동을 커버(정확도 실패의 주원인).
+      if (!effectiveRegion) {
+        const geo = await loadGeoIndex();
+        const hit = detectRegion(tokens, geo);
+        if (hit) effectiveRegion = hit.area;
+      }
+      regionExplicit = !!effectiveRegion;
     }
 
     // 캐시 조회: 같은 질문+지역이면 즉시 반환(LLM·임베딩 호출 0). ensureCache는 위 Promise.all에서 이미 프라임됨.
@@ -296,6 +314,17 @@ export async function GET(req: NextRequest) {
             //   무관 질의(오타·무의미 문자열·미보유 프랜차이즈명)에도 하한 없이 24건이 검증배지와 함께 확정노출되던 버그.
             //   sim이 이 하한 미만이면 후보에서 제외 — 어휘일치가 있는 후보(브랜드 상호 부분일치 등)는 그대로 둔다.
             const semanticFloor = getCriterionSync("search.semantic_floor.min_sim");
+            // 🔀 순위 융합(RRF) — 실측 문제: sim이 전 후보 66~81%에 뭉쳐 변별력이 없는데(스케일 0~100),
+            //   어휘점수는 정규화 후 0~100 + 등급가산 25라 **어휘가 의미를 항상 압도**했다. 그래서 리뷰 문장으로
+            //   검색해도 그 카페가 42%만 1위였다. 점수를 더하는 대신 **각 랭킹의 등수**를 섞으면 스케일 문제가 사라진다.
+            //   RRF: score = Σ 1/(k + rank). k=20(후보 80개 기준 상위권을 완만하게 우대).
+            const RRF_K = 20;
+            const simRank = new Map<string, number>();
+            [...lex].sort((a, b) => (Number(b.c.sim) || 0) - (Number(a.c.sim) || 0))
+              .forEach((l, i) => simRank.set(String(l.c.id), i));
+            const lexRank = new Map<string, number>();
+            [...lex].sort((a, b) => (b.exact + b.concept) - (a.exact + a.concept))
+              .forEach((l, i) => lexRank.set(String(l.c.id), i));
             scored = lex
               .map(({ c, exact, concept, reasons }) => {
                 const sim = Number(c.sim) || 0;
@@ -303,8 +332,14 @@ export async function GET(req: NextRequest) {
                 //   DB無매칭 검색 시 의미유사도만 있는 무관 카페가 gradeBonus(+25)로 검증배지·고득점 1위로
                 //   오인 노출되던 왜곡 차단. 키워드 폴백 경로(아래)와 동일한 가드로 두 경로를 일치시킨다.
                 const lexMatched = exact + concept > 0;
-                const lexScore = lexMatched ? ((exact + concept) / maxLex) * 100 : 0;
-                const total = sim * 100 + lexScore + (lexMatched ? gradeBonus(c.synth_grade) : 0); // 의미 유사도 1차 + 키워드·느낌(정규화) + 등급(검증 우대, 어휘일치 시에만)
+                // RRF 융합값을 0~100 스케일로 환산(두 랭킹 모두 1위면 100). 어휘 미매칭은 의미 랭킹만 반영.
+                const rSim = simRank.get(String(c.id)) ?? lex.length;
+                const rLex = lexMatched ? (lexRank.get(String(c.id)) ?? lex.length) : lex.length * 2;
+                const rrf = (1 / (RRF_K + rSim) + 1 / (RRF_K + rLex)) / (2 / (RRF_K + 0)) * 100;
+                // 🗺️ 지역 미지정 질의의 외곽 상위노출 방지 — 지역을 *명시한* 질의엔 적용하지 않는다.
+                //   (실측: "크루아상 맛집" 1위가 이천시, "고양이 있는 카페" 1위가 강화군이었다.)
+                const corePrior = !regionExplicit && isCoreArea(c.area) ? 6 : 0;
+                const total = rrf + (lexMatched ? gradeBonus(c.synth_grade) : 0) + corePrior;
                 const why = [`의미 유사 ${Math.round(sim * 100)}%`, ...reasons];
                 return { sim, lexMatched, item: { id: c.id, name: c.name, area: c.area, grade: c.synth_grade, count: c.synth_count, identity: c.synth_identity, score: Math.round(total * 10) / 10, reasons: why.slice(0, 3) } };
               })
@@ -319,7 +354,24 @@ export async function GET(req: NextRequest) {
 
     // ===== 키워드/개념 폴백 =====
     if (scored.length === 0) {
-      const rows = (await sql.query(`SELECT ${FIELDS} FROM cafes WHERE published = true`)) as unknown as any[];
+      // 💰 2026-08-10 비용 수리: 예전엔 `SELECT <synth_reviews 포함 전 필드> FROM cafes WHERE published`로
+      //   공개 13,484곳의 **큰 컬럼(TOAST 1.9GB)을 통째로 끌어왔다** — 임베딩이 실패할 때마다 발생하는
+      //   전수 blob 전송으로, 사장님이 금지한 패턴이 검색 경로 한복판에 있었다.
+      //   → 어휘 후보를 **SQL에서 먼저 좁히고**(작은 컬럼 ILIKE, 상한 400) 그 안에서만 점수를 낸다.
+      //   리뷰 인용은 SQL 안에서 잘라 받는다(통째 전송 금지).
+      const likes = tokens.slice(0, 6).map((t) => `%${t}%`);
+      const rows = likes.length === 0 ? [] : ((await sql.query(
+        `SELECT id, name, area, synth_grade, synth_count, synth_identity, signature, note, vibe, uses, beans,
+                char_scores, synth_acidity, synth_body, synth_sweet,
+                jsonb_path_query_array(synth_reviews, '$[*].quote') AS synth_reviews
+         FROM cafes
+         WHERE published = true
+           AND (name ILIKE ANY($1::text[]) OR synth_identity ILIKE ANY($1::text[]) OR signature ILIKE ANY($1::text[])
+                OR note ILIKE ANY($1::text[]) OR vibe ILIKE ANY($1::text[]) OR uses ILIKE ANY($1::text[])
+                OR beans ILIKE ANY($1::text[]) OR area ILIKE ANY($1::text[]))
+         LIMIT 400`,
+        [likes],
+      )) as unknown as any[]);
       for (const c of rows) {
         if (!inRegion(c.area ?? "", effectiveRegion)) continue;
         const { exact, concept, reasons } = lexicalScore(c, tokens, hitConcepts);
