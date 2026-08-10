@@ -53,7 +53,19 @@ const gates = await sql`SELECT COUNT(*)::int n, MAX(ROUND(EXTRACT(EPOCH FROM (no
      OR (status='approved' AND action_type='dev_task' AND action_params->>'dev_status'='배포대기')`;
 console.log(`\n⑤ 사람 대기(게이트): ${gates[0].n}건 · 최장 ${gates[0].h ?? 0}h ${(gates[0].h ?? 0) >= 24 ? "⚠️ 24h+ 지연" : ""}`);
 
-// ⑥ 배포 즉시발화 경로 — 승인해도 안 나가던 4일 사고(2026-08-09)의 재발 감시.
+// ⑦ 검색 품질 — 하네스 원칙 "효과가 성공"의 소비자 화면판. 골든셋 결정론 채점(LLM 0원).
+//   회귀를 실제로 잡아낸 이력: 조사 절단이 '고양이'를 '고양시'로 만들어 정확도 100%→20%로 떨어진 것을 여기서 검출.
+try {
+  const { runEval } = await import("./search-eval.mjs");
+  const ev = await runEval(sql);
+  const pct = (x) => `${Math.round(x * 100)}%`;
+  console.log(`\n⑥ 검색 품질(골든셋 26질의): 종합 ${pct(ev.total)} · 지역 ${pct(ev.byType.area ?? 0)} · 사실 ${pct(ev.byType.fact ?? 0)} · 상호 ${pct(ev.byType.name ?? 0)} · 수도권핵심 ${pct(ev.coreRate)}`);
+  const bad = ev.rows.filter((r) => r.score < 0.6);
+  bad.forEach((r) => console.log(`   🔴 ${pct(r.score)} ${r.q} — ${r.note}`));
+  if (!bad.length) console.log("   저조 질의 없음 ✅");
+} catch (e) { console.log(`\n⑥ 검색 품질: 점검 실패(${String(e).slice(0, 70)})`); }
+
+// ⑦ 배포 즉시발화 경로 — 승인해도 안 나가던 4일 사고(2026-08-09)의 재발 감시.
 //   사람이 Vercel에 env를 심는 절차라 조용히 죽을 수 있다 → 승인 때가 아니라 **평상시 점검에서** 잡는다.
 //   프로덕션 불리언 1회 + 로컬 리스너 프로세스 확인. DB 조회 0.
 try {
@@ -62,8 +74,8 @@ try {
   }).then((x) => x.json());
   const listener = (await import("node:child_process")).execSync("pgrep -f run-trigger-listener.sh | head -1").toString().trim();
   const ok = r?.triggerConfigured && listener;
-  console.log(`\n⑥ 배포 즉시발화: ${ok ? "정상 ✅" : "⚠️ 끊김"} (프로덕션 TRIGGER_NTFY_TOPIC ${r?.triggerConfigured ? "설정됨" : "❌ 미설정"} · 맥 리스너 ${listener ? "가동" : "❌ 중지"})`);
+  console.log(`\n⑦ 배포 즉시발화: ${ok ? "정상 ✅" : "⚠️ 끊김"} (프로덕션 TRIGGER_NTFY_TOPIC ${r?.triggerConfigured ? "설정됨" : "❌ 미설정"} · 맥 리스너 ${listener ? "가동" : "❌ 중지"})`);
   if (!ok) console.log("   → 승인해도 즉시 안 나가고 다음 창(08/12/16/20시)까지 최대 4h 대기합니다.");
 } catch (e) {
-  console.log(`\n⑥ 배포 즉시발화: 점검 실패(${String(e).slice(0, 60)})`);
+  console.log(`\n⑦ 배포 즉시발화: 점검 실패(${String(e).slice(0, 60)})`);
 }
