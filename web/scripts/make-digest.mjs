@@ -150,6 +150,13 @@ const today = new Date().toISOString().slice(0, 10);
       // 표 헤더의 첫 컬럼명이 정확히 "id"인 표만 대상으로 한정한다(순번·순위 등 무관한 숫자 컬럼을 카페id로
       // 오매핑하는 새 오탐을 막기 위함 — 헤더 확인 없이 "첫 컬럼이 숫자면 id"로만 판별하면 표마다 의미가
       // 달라 위험).
+      // ⚠️ #646 근본원인(self-audit 08-10): #558은 "표 형식"에만 특화 패치를 얹었을 뿐, id\d+/P\d{2,}
+      // 추출 자체는 여전히 "## " 헤딩 줄에만 갇혀 있었다 — 불릿·중첩목록·코드블록 등 새 마크다운 구조로
+      // id를 적는 제안서가 나오면 6번째 재발이 예정돼 있었다(#421→#427→#450→#502→#518→#558). id\d+·
+      // P\d{2,}는 고유 식별자라 우연일치 위험이 낮다(아래 decisionMatchesTokens가 1개만 겹쳐도 확정
+      // 처리하는 이유가 바로 이거다) — 헤딩 제한을 풀고 문서 전체 어느 줄에서든 추출한다. 표의 "순수
+      // 숫자" id 컬럼(셀 자체엔 "id" 접두가 없고 헤더로만 의미가 정해지는 경우)만은 구조 정보 없인
+      // 일반 정규식으로 복원 불가능해 그 갈래(표 헤더 인식)는 그대로 남긴다.
       let tableHasIdColumn = false;
       for (const line of text.split("\n")) {
         const row = line.match(/^\s*\|(.+)\|\s*$/);
@@ -161,10 +168,12 @@ const today = new Date().toISOString().slice(0, 10);
         } else {
           tableHasIdColumn = false; // 표 블록 종료 — 다음 표를 위해 리셋
         }
-        if (!/^#{2,6}\s/.test(line)) continue; // ## 이상만 — 파일 H1 제목은 전 파일 공통 보일러플레이트라 제외
+        // id\d+·P\d{2,}는 헤딩 여부와 무관하게 줄 전체에서 추출(일반화) — 불릿·중첩목록·표 셀 인라인
+        // 표기("| id1032 | ... |")·코드블록까지 커버.
+        (line.match(/\bid\d+\b/gi) || []).forEach((t) => ids.add(t.toLowerCase()));
+        (line.match(/\bP\d{2,}\b/g) || []).forEach((t) => ids.add(t));
+        if (!/^#{2,6}\s/.test(line)) continue; // ## 이상만 — 브랜드 단어류는 우연일치 위험이 높아 헤딩으로 한정 유지(#518 교훈), 파일 H1은 전 파일 공통 보일러플레이트라 제외
         const heading = line.replace(/^#{2,6}\s*/, "");
-        (heading.match(/\bid\d+\b/gi) || []).forEach((t) => ids.add(t.toLowerCase()));
-        (heading.match(/\bP\d{2,}\b/g) || []).forEach((t) => ids.add(t));
         (heading.match(/[가-힣]{2,}/g) || []).forEach((w) => { if (!TOKEN_STOPWORDS.has(w)) brands.add(w); });
       }
       return { ids, brands };
