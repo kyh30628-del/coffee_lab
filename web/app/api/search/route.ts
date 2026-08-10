@@ -125,8 +125,13 @@ function lexicalScore(c: any, tokens: string[], hitConcepts: typeof CONCEPTS) {
   for (const tok of tokens) { const n = occ(reviewText, tok); if (n > 0) { reviewExact += n * reviewWeight; tokenHit.add(tok); } }
   // 리뷰 인용문 매칭이 유일한 근거(다른 필드는 전혀 안 맞음)면 랭킹 점수에서 제외 — 카페명/정체성 등
   // 실제 필드가 이미 맞은 경우엔 기존처럼 리뷰 가중치도 그대로 합산(회귀 없음).
+  // ⚠️ 2026-08-10 재교정: 예전엔 리뷰에만 걸리면 exact를 **0으로 지웠다**(#452 대응).
+  //   그 조치의 원인은 "리뷰 언급 1건이 maxLex 정규화 분모를 차지해 점수가 폭주"하는 **스케일 문제**였는데,
+  //   랭킹을 RRF(순위 융합)로 바꾸면서 그 원인 자체가 사라졌다. 그런데 0으로 지우는 규칙만 남아
+  //   **리뷰 본문 검색을 구조적으로 막고 있었다** — '경의선숲길'이 리뷰에만 있는 카페가 아예 탈락했다.
+  //   → 지우지 않고 **감쇠**한다. 이름·정체성 매칭보다는 약하게, 그러나 검색은 되게.
   const reviewOnly = coreExact === 0 && reviewExact > 0;
-  const exact = reviewOnly ? 0 : coreExact + reviewExact;
+  const exact = reviewOnly ? reviewExact * 0.5 : coreExact + reviewExact;
 
   let concept = 0;
   const cs = c.char_scores ?? {};
@@ -138,10 +143,20 @@ function lexicalScore(c: any, tokens: string[], hitConcepts: typeof CONCEPTS) {
     if (cc.uses && c.uses && cc.uses.some((u) => String(c.uses).includes(u))) add += 6;
     if (add > 0) { concept += add; reasons.push(`'${cc.label}' 느낌`); }
   }
+  // 📌 근거는 '단어 이름'이 아니라 **실제 리뷰 문장**으로 보여준다(CEO 요구: 리뷰를 쉽게 찾을 수 있게).
+  //   예전엔 "리뷰에 '카페' 언급"처럼 아무 정보도 없는 근거만 떠서, 왜 이 카페가 나왔는지 알 수 없었다.
+  const quotes = quoteList(c.synth_reviews);
   const reviewTok = tokens.find((t) => occ(reviewText, t) > 0);
-  if (reviewTok) reasons.push(`리뷰에 '${reviewTok}' 언급`);
-  else if (tokenHit.size > 0) reasons.push(`'${Array.from(tokenHit)[0]}' 일치`);
-  return { exact, concept, reasons };
+  let snippet: string | null = null;
+  if (reviewTok) {
+    const hitQuote = quotes.find((qt) => occ(qt, reviewTok) > 0) ?? "";
+    // 매칭어 주변만 잘라 보여준다(문장 전체는 길어 화면을 잡아먹는다)
+    const at = hitQuote.toLowerCase().indexOf(reviewTok.toLowerCase());
+    const from = Math.max(0, at - 22);
+    snippet = (from > 0 ? "…" : "") + hitQuote.slice(from, from + 74).trim() + (hitQuote.length > from + 74 ? "…" : "");
+    reasons.push(`리뷰: ${snippet}`);
+  } else if (tokenHit.size > 0) reasons.push(`'${Array.from(tokenHit)[0]}' 일치`);
+  return { exact, concept, reasons, snippet, matchedTerm: reviewTok ?? null };
 }
 
 // 💰 synth_reviews는 통째로 싣지 않고 **SQL 안에서 quote만 잘라** 받는다(TOAST 1.9GB 컬럼 → 인용문 몇 줄).
@@ -326,7 +341,7 @@ export async function GET(req: NextRequest) {
             [...lex].sort((a, b) => (b.exact + b.concept) - (a.exact + a.concept))
               .forEach((l, i) => lexRank.set(String(l.c.id), i));
             scored = lex
-              .map(({ c, exact, concept, reasons }) => {
+              .map(({ c, exact, concept, reasons, snippet }) => {
                 const sim = Number(c.sim) || 0;
                 // #216: 키워드·느낌 완전 불일치(exact+concept===0)면 등급가산 미적용 — 브랜드명(이디야·컴포즈 등)
                 //   DB無매칭 검색 시 의미유사도만 있는 무관 카페가 gradeBonus(+25)로 검증배지·고득점 1위로
@@ -341,7 +356,7 @@ export async function GET(req: NextRequest) {
                 const corePrior = !regionExplicit && isCoreArea(c.area) ? 6 : 0;
                 const total = rrf + (lexMatched ? gradeBonus(c.synth_grade) : 0) + corePrior;
                 const why = [`의미 유사 ${Math.round(sim * 100)}%`, ...reasons];
-                return { sim, lexMatched, item: { id: c.id, name: c.name, area: c.area, grade: c.synth_grade, count: c.synth_count, identity: c.synth_identity, score: Math.round(total * 10) / 10, reasons: why.slice(0, 3) } };
+                return { sim, lexMatched, item: { id: c.id, name: c.name, area: c.area, grade: c.synth_grade, count: c.synth_count, identity: c.synth_identity, score: Math.round(total * 10) / 10, reasons: why.slice(0, 3), snippet } };
               })
               .filter((x) => x.lexMatched || x.sim >= semanticFloor)
               .map((x) => x.item);
@@ -374,11 +389,11 @@ export async function GET(req: NextRequest) {
       )) as unknown as any[]);
       for (const c of rows) {
         if (!inRegion(c.area ?? "", effectiveRegion)) continue;
-        const { exact, concept, reasons } = lexicalScore(c, tokens, hitConcepts);
+        const { exact, concept, reasons, snippet } = lexicalScore(c, tokens, hitConcepts);
         const total = exact + concept + (exact + concept > 0 ? gradeBonus(c.synth_grade) : 0);
         if (exact + concept <= 0) continue;
         byId.set(c.id, c);
-        scored.push({ id: c.id, name: c.name, area: c.area, grade: c.synth_grade, count: c.synth_count, identity: c.synth_identity, score: Math.round(total * 10) / 10, reasons: reasons.slice(0, 3) });
+        scored.push({ id: c.id, name: c.name, area: c.area, grade: c.synth_grade, count: c.synth_count, identity: c.synth_identity, score: Math.round(total * 10) / 10, reasons: reasons.slice(0, 3), snippet });
       }
     }
 
