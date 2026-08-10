@@ -31,6 +31,16 @@ export default function OrgDashboard() {
   const [err, setErr] = useState(""); const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState<number | null>(null);
   const [showOrg, setShowOrg] = useState(false);
+  // 🩺 하네스 관제 — 설계한 6계층이 지금 실제로 물려 있는지 보는 모달. 열 때만 조회(상시 폴링 없음 = DB 비용 0).
+  const [showHarness, setShowHarness] = useState(false);
+  const [harness, setHarness] = useState<any>(null);
+  const openHarness = async () => {
+    setShowHarness(true); setHarness(null);
+    try {
+      const r = await fetch("/api/admin/harness", { headers: { "x-admin-password": pw } }).then((x) => x.json());
+      setHarness(r);
+    } catch { setHarness({ ok: false, error: "조회 실패" }); }
+  };
   const [toast, setToast] = useState("");
 
   const [synced, setSynced] = useState("");
@@ -177,6 +187,7 @@ export default function OrgDashboard() {
         <div style={{ display: "flex", gap: 5, flexWrap: "nowrap", justifyContent: "flex-end" }}>
           <a href="/admin/criteria" style={{ background: "#c98a3c", color: "#fff", borderRadius: 9, padding: "7px 11px", fontSize: 12, fontWeight: 700, textDecoration: "none", textAlign: "center", whiteSpace: "nowrap" }}>🎛️ 기준</a>
           <a href="/admin/lounge" style={{ background: "#6a468c", color: "#fff", borderRadius: 9, padding: "7px 11px", fontSize: 12, fontWeight: 700, textDecoration: "none", textAlign: "center", whiteSpace: "nowrap" }}>🏛️ 라운지</a>
+          <button onClick={openHarness} style={{ background: "#3f6a7a", color: "#fff", border: "none", borderRadius: 9, padding: "7px 11px", fontSize: 12, fontWeight: 700, textAlign: "center", whiteSpace: "nowrap", cursor: "pointer" }}>🩺 하네스</button>
           <button onClick={() => setShowOrg(true)} style={{ background: "#c98a3c", color: "#fff", border: "none", borderRadius: 9, padding: "7px 11px", fontSize: 12, fontWeight: 700, textAlign: "center", whiteSpace: "nowrap", cursor: "pointer" }}>🏢 조직도</button>
         </div>
       </div>
@@ -686,6 +697,94 @@ export default function OrgDashboard() {
         <div style={{ marginTop: 12, textAlign: "center", fontSize: 11.5, color: "#3f7a4f", fontWeight: 600 }}>🟢 실시간 자동 갱신 중{synced && <span style={{ color: "#9c8a6c", fontWeight: 400 }}> · 마지막 동기 {synced}</span>}</div>
         <div style={{ textAlign: "center", color: "#9c8a6c", fontSize: 11, margin: "10px 0 16px" }}>소비자 경험을 최우선한다 · 기획조정실</div>
       </>)}
+
+      {/* 🩺 하네스 엔지니어링 관제 모달 — 자율 실행을 감싸는 6계층이 "지금" 물려 있는지 */}
+      {showHarness && (
+        <div onClick={() => setShowHarness(false)} style={{ position: "fixed", inset: 0, background: "rgba(20,14,10,.6)", zIndex: 55, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: "#f4ece0", borderRadius: "18px 18px 0 0", padding: 18, width: "100%", maxWidth: 680, maxHeight: "88vh", overflowY: "auto" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <div style={{ fontSize: 16, fontWeight: 700, color: "#2b2018" }}>🩺 하네스 엔지니어링</div>
+              <button onClick={() => setShowHarness(false)} style={{ background: "none", border: "none", fontSize: 20, color: "#9c8a6c", cursor: "pointer" }}>✕</button>
+            </div>
+            {!harness && <div style={{ padding: 24, textAlign: "center", color: "#9c8a6c", fontSize: 12 }}>불러오는 중…</div>}
+            {harness && !harness.ok && <div style={{ padding: 20, color: "#b03a3a", fontSize: 12 }}>⚠️ {harness.error}</div>}
+            {harness?.ok && (<>
+              <div style={{ fontSize: 10.5, color: "#6b5640", marginBottom: 12, lineHeight: 1.6, background: "#efe2cf", borderRadius: 8, padding: "8px 10px" }}>
+                자율 실행(크론·에이전트·치유기)을 감싸는 <b>안전·검증 계층</b>입니다. 도입 계기: 치유기가 6일간 헛돌며 큰 데이터를 하루 40회 헛 로드했는데 기존 감시망이 전부 &quot;정상&quot;으로 통과시켰습니다 — <b>실행 여부만 보고 효과를 안 봤기 때문</b>입니다.
+                {(harness.principles || []).map((p: string, i: number) => <div key={i} style={{ marginTop: 4 }}>· {p}</div>)}
+              </div>
+
+              {/* 6계층 상태 */}
+              <div style={{ display: "grid", gap: 7 }}>
+                {(harness.layers || []).map((L: any) => (
+                  <div key={L.id} style={{ background: "#fff", borderRadius: 10, padding: "9px 11px", border: `1.5px solid ${L.ok ? "#cfe0cf" : "#e8c4a0"}` }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                      <span style={{ background: L.ok ? "#3f7a4f" : "#c0762a", color: "#fff", fontSize: 10, fontWeight: 700, borderRadius: 5, padding: "2px 6px" }}>{L.id}</span>
+                      <span style={{ fontSize: 12.5, fontWeight: 700, color: "#2b2018" }}>{L.name}</span>
+                      <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 700, color: L.ok ? "#3f7a4f" : "#c0762a" }}>{L.ok ? "정상" : "확인 필요"}</span>
+                    </div>
+                    <div style={{ fontSize: 11, color: "#4a3a2a", marginTop: 4, fontWeight: 600 }}>{L.stat}</div>
+                    <div style={{ fontSize: 10, color: "#8a7355", marginTop: 3, lineHeight: 1.5 }}>{L.note}</div>
+                    <div style={{ fontSize: 9.5, color: "#b09b78", marginTop: 2, fontFamily: "monospace" }}>{L.file}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* 예산 실측 — 계약 대비 큰컬럼 로드 */}
+              <div style={{ marginTop: 14, fontSize: 12.5, fontWeight: 700, color: "#2b2018" }}>💰 24시간 큰 데이터 로드 (계약 대비)</div>
+              <div style={{ fontSize: 10, color: "#8a7355", margin: "3px 0 6px" }}>리뷰 원문 같은 큰 컬럼을 몇 번 읽었는지. 계약 상한을 넘으면 원장에 기록됩니다(현재 관측 모드 — 막지는 않음).</div>
+              <div style={{ display: "grid", gap: 4 }}>
+                {(harness.budgets || []).length === 0 && <div style={{ fontSize: 11, color: "#9c8a6c" }}>기록 없음</div>}
+                {(harness.budgets || []).map((b: any) => (
+                  <div key={b.job} style={{ display: "flex", alignItems: "center", gap: 8, background: "#fff", borderRadius: 8, padding: "6px 9px", fontSize: 11 }}>
+                    <span style={{ fontFamily: "monospace", color: "#4a3a2a", flex: 1 }}>{b.job}</span>
+                    <span style={{ color: "#8a7355" }}>{b.runs}회</span>
+                    <span style={{ fontWeight: 700, color: b.over ? "#b03a3a" : "#3f7a4f" }}>{b.used ?? 0} / {b.limit}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* 정체·동결 */}
+              {(harness.stuck || []).length > 0 && (<>
+                <div style={{ marginTop: 14, fontSize: 12.5, fontWeight: 700, color: "#b03a3a" }}>🔁 정체(같은 문제집합 3회+ 연속)</div>
+                {(harness.stuck || []).map((sk: any, i: number) => (
+                  <div key={i} style={{ fontSize: 11, color: "#4a3a2a", background: "#fff", borderRadius: 8, padding: "6px 9px", marginTop: 4 }}>{sk.job} — {sk.repeats}회</div>
+                ))}
+              </>)}
+              {(harness.frozen || []).length > 0 && (<>
+                <div style={{ marginTop: 14, fontSize: 12.5, fontWeight: 700, color: "#2b2018" }}>🧊 동결 — 자동으로 못 고쳐 사람에게 넘긴 것</div>
+                <div style={{ fontSize: 10, color: "#8a7355", margin: "3px 0 6px" }}>2회 시도해도 효과가 없으면 계속 재시도하지 않고 멈춥니다(무한루프 차단).</div>
+                {(harness.frozen || []).map((f: any) => (
+                  <div key={f.job} style={{ display: "flex", gap: 8, fontSize: 11, background: "#fff", borderRadius: 8, padding: "6px 9px", marginTop: 4 }}>
+                    <span style={{ fontFamily: "monospace", color: "#4a3a2a", flex: 1 }}>{f.job}</span>
+                    <span style={{ color: "#8a7355" }}>{f.n}건 · 판독 {f.read} · 오탐 {f.fp}</span>
+                  </div>
+                ))}
+              </>)}
+
+              {/* 원장 최근 실행 */}
+              <div style={{ marginTop: 14, fontSize: 12.5, fontWeight: 700, color: "#2b2018" }}>📒 원장 — 최근 24시간 실행</div>
+              <div style={{ fontSize: 10, color: "#8a7355", margin: "3px 0 6px" }}>지문=같은 문제집합 반복(헛돎) 검출용 · blob=큰 데이터 로드 횟수 · 동결스킵=시도조차 안 한 건</div>
+              <div style={{ display: "grid", gap: 3 }}>
+                {(harness.runs || []).map((r: any, i: number) => (
+                  <div key={i} style={{ display: "flex", gap: 7, alignItems: "center", background: "#fff", borderRadius: 7, padding: "5px 8px", fontSize: 10.5 }}>
+                    <span style={{ color: "#9c8a6c", fontFamily: "monospace" }}>{String(r.kst).slice(5, 16)}</span>
+                    <span>{r.ok ? "✅" : "❌"}</span>
+                    <span style={{ fontFamily: "monospace", color: "#4a3a2a", minWidth: 120 }}>{r.job}</span>
+                    <span style={{ color: "#8a7355", flex: 1 }}>
+                      {r.fp ? "지문 " : ""}{r.blob != null ? `blob${r.blob} ` : ""}{r.skipped ? `동결스킵${r.skipped} ` : ""}{r.scope_viol ? `🔐위반${r.scope_viol}` : ""}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ marginTop: 14, fontSize: 10, color: "#8a7355", lineHeight: 1.6, background: "#efe2cf", borderRadius: 8, padding: "8px 10px" }}>
+                <b>하네스도 못 넘는 제약</b> — L3(코드·배포) 자동승인 없음 · 자동 재공개 없음 · 이슈↔결재 자동변환 금지 · 감시자에게 집행 권한 없음.
+              </div>
+            </>)}
+          </div>
+        </div>
+      )}
 
       {/* 조직도 모달 */}
       {showOrg && (

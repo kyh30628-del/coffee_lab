@@ -100,10 +100,15 @@ export function detectRegion(tokens: string[], geo: GeoIndex): { area: string; t
     const hit = geo.dong.get(t);
     if (hit) return { area: hit, token: t };
   }
-  // '성수동카페'처럼 붙여 쓴 경우 — 토큰 앞부분이 동명과 일치하는지
+  // '성수동카페'처럼 붙여 쓴 경우 — 토큰 앞부분이 동명과 일치하는지.
+  //   ⚠️ 접두 일치만으로 지역을 단정하면 **'고양이'가 '고양'시로 잡힌다**(골든셋이 이 회귀를 잡아냈다:
+  //   "고양이 있는 카페" 정확도 100%→20%). 그래서 **남은 꼬리가 장소를 뜻하는 말일 때만** 인정한다.
+  const PLACE_TAIL = new Set(["카페", "커피", "맛집", "거리", "근처", "동네", "쪽", "역", "점", "길"]);
   for (const t of tokens) {
-    for (let len = Math.min(5, t.length); len >= 2; len--) {
+    for (let len = Math.min(5, t.length - 1); len >= 2; len--) {
       const head = t.slice(0, len);
+      const tail = t.slice(len);
+      if (!PLACE_TAIL.has(tail)) continue;
       const hit = geo.dong.get(head);
       if (hit) return { area: hit, token: head };
     }
