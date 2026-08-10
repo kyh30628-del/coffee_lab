@@ -158,7 +158,9 @@ async function healAttractionPollution(flagged: AttrFlag[], deadline: number): P
     } catch { /* 개별 실패는 건너뜀(다음 런이 이어서 처리) */ }
     finally { await releaseLease(HJOB, Number(f.id)).catch(() => {}); }
   }
-  if (fixed > 0) await sql`DELETE FROM search_cache`.catch(() => {});
+  if (fixed > 0) // ⚠️ 지역 인덱스 행(__geo_index_v1__)은 남긴다 — 카페 한 곳 비공개는 동네→구 지도와 무관한데,
+  //   같이 지우면 다음 검색이 전수 스캔(6,565페이지)으로 지도를 다시 만든다(불필요한 비용).
+  await sql`DELETE FROM search_cache WHERE qkey <> '__geo_index_v1__'`.catch(() => {});
   return { fixed, dropped, unpub, names, skipped, noEffect, frozen: frozenNew };
 }
 
@@ -290,7 +292,9 @@ async function healWeakNamePollution(flagged: WeakFlag[], deadline: number): Pro
     } catch { /* 개별 실패는 건너뜀(다음 런이 이어서 처리) */ }
     finally { await releaseLease(HJOB, Number(f.id)).catch(() => {}); }
   }
-  if (fixed > 0) await sql`DELETE FROM search_cache`.catch(() => {});
+  if (fixed > 0) // ⚠️ 지역 인덱스 행(__geo_index_v1__)은 남긴다 — 카페 한 곳 비공개는 동네→구 지도와 무관한데,
+  //   같이 지우면 다음 검색이 전수 스캔(6,565페이지)으로 지도를 다시 만든다(불필요한 비용).
+  await sql`DELETE FROM search_cache WHERE qkey <> '__geo_index_v1__'`.catch(() => {});
   return { fixed, dropped, unpub, names, skipped, noEffect, frozen: frozenNew };
 }
 
@@ -394,7 +398,9 @@ async function healNonCafeBizPollution(flagged: NcbFlag[], deadline: number): Pr
     } catch { /* 개별 실패는 건너뜀(다음 런이 이어서 처리) */ }
     finally { await releaseLease(HJOB, Number(f.id)).catch(() => {}); }
   }
-  if (fixed > 0) await sql`DELETE FROM search_cache`.catch(() => {});
+  if (fixed > 0) // ⚠️ 지역 인덱스 행(__geo_index_v1__)은 남긴다 — 카페 한 곳 비공개는 동네→구 지도와 무관한데,
+  //   같이 지우면 다음 검색이 전수 스캔(6,565페이지)으로 지도를 다시 만든다(불필요한 비용).
+  await sql`DELETE FROM search_cache WHERE qkey <> '__geo_index_v1__'`.catch(() => {});
   return { fixed, dropped, unpub, names, skipped, noEffect, frozen: frozenNew };
 }
 
@@ -519,7 +525,9 @@ async function healFranchiseBranchPollution(flagged: FranchiseFlag[], deadline: 
     } catch { /* 개별 실패는 건너뜀(다음 런이 이어서 처리) */ }
     finally { await releaseLease(HJOB, Number(f.id)).catch(() => {}); }
   }
-  if (fixed > 0) await sql`DELETE FROM search_cache`.catch(() => {});
+  if (fixed > 0) // ⚠️ 지역 인덱스 행(__geo_index_v1__)은 남긴다 — 카페 한 곳 비공개는 동네→구 지도와 무관한데,
+  //   같이 지우면 다음 검색이 전수 스캔(6,565페이지)으로 지도를 다시 만든다(불필요한 비용).
+  await sql`DELETE FROM search_cache WHERE qkey <> '__geo_index_v1__'`.catch(() => {});
   return { fixed, dropped, unpub, names, skipped, noEffect, frozen: frozenNew };
 }
 
@@ -677,7 +685,9 @@ async function healGenericTermPollution(flagged: GenericFlag[], deadline: number
     } catch { /* 개별 실패는 건너뜀(다음 런이 이어서 처리) */ }
     finally { await releaseLease(HJOB, Number(f.id)).catch(() => {}); }
   }
-  if (fixed > 0) await sql`DELETE FROM search_cache`.catch(() => {});
+  if (fixed > 0) // ⚠️ 지역 인덱스 행(__geo_index_v1__)은 남긴다 — 카페 한 곳 비공개는 동네→구 지도와 무관한데,
+  //   같이 지우면 다음 검색이 전수 스캔(6,565페이지)으로 지도를 다시 만든다(불필요한 비용).
+  await sql`DELETE FROM search_cache WHERE qkey <> '__geo_index_v1__'`.catch(() => {});
   return { fixed, dropped, unpub, names, skipped, noEffect, frozen: frozenNew };
 }
 
@@ -785,7 +795,9 @@ async function healCompetitorQuotePollution(flagged: CompFlag[], deadline: numbe
     } catch { /* 개별 실패는 다음 런이 이어서 */ }
     finally { await releaseLease(HJOB, Number(f.id)).catch(() => {}); }
   }
-  if (fixed > 0) await sql`DELETE FROM search_cache`.catch(() => {});
+  if (fixed > 0) // ⚠️ 지역 인덱스 행(__geo_index_v1__)은 남긴다 — 카페 한 곳 비공개는 동네→구 지도와 무관한데,
+  //   같이 지우면 다음 검색이 전수 스캔(6,565페이지)으로 지도를 다시 만든다(불필요한 비용).
+  await sql`DELETE FROM search_cache WHERE qkey <> '__geo_index_v1__'`.catch(() => {});
   return { fixed, dropped, unpub: 0, names, skipped, noEffect, frozen: frozenNew };
 }
 

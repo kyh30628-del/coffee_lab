@@ -78,8 +78,23 @@ type GeoIndex = { dong: Map<string, string>; area: Set<string> };
 let geoCache: { at: number; idx: GeoIndex } | null = null;
 const GEO_TTL_MS = 6 * 60 * 60 * 1000;
 
+// 💰 비용 규율: 이 GROUP BY는 **전체 스캔(6,565 페이지·16ms)**이다. 서버리스는 인스턴스가 새로 뜰 때마다
+//   프로세스 메모리 캐시가 비어 있으므로, 그대로 두면 **콜드 스타트마다 전수 스캔**이 돈다(검색 트래픽이 적을수록
+//   콜드 비율이 높아 더 나쁘다). 그래서 결과를 `search_cache` 한 행에 말아 넣고, 콜드 스타트는
+//   **기본키 조회 1건**(1페이지)만 하게 한다. 전수 스캔은 하루 1회로 수렴한다.
+const GEO_CACHE_KEY = "__geo_index_v1__";
+
 export async function loadGeoIndex(): Promise<GeoIndex> {
   if (geoCache && Date.now() - geoCache.at < GEO_TTL_MS) return geoCache.idx;
+  // ① DB 한 행 캐시(콜드 스타트 경로) — PK 조회라 사실상 공짜
+  try {
+    const hit = (await sql`SELECT payload FROM search_cache WHERE qkey=${GEO_CACHE_KEY} AND created_at > now() - interval '24 hours' LIMIT 1`)[0] as any;
+    if (hit?.payload?.dong) {
+      const idx = { dong: new Map<string, string>(Object.entries(hit.payload.dong as Record<string, string>)), area: new Set<string>(hit.payload.area as string[]) };
+      geoCache = { at: Date.now(), idx };
+      return idx;
+    }
+  } catch { /* 캐시 실패 시 아래에서 직접 만든다 */ }
   const dong = new Map<string, string>();
   const area = new Set<string>();
   try {
@@ -96,6 +111,11 @@ export async function loadGeoIndex(): Promise<GeoIndex> {
       if (bare.length >= 2 && !dong.has(bare)) dong.set(bare, String(r.area));
     }
   } catch { /* DB 실패 시 빈 인덱스 — 기존 하드코딩 폴백이 살아 있다 */ }
+  // ② 만든 지도를 한 행에 적재 — 다음 콜드 스타트부터는 전수 스캔 없이 이 행만 읽는다(비차단).
+  if (dong.size > 0) {
+    sql`INSERT INTO search_cache (qkey, payload, created_at) VALUES (${GEO_CACHE_KEY}, ${JSON.stringify({ dong: Object.fromEntries(dong), area: [...area] })}, now())
+        ON CONFLICT (qkey) DO UPDATE SET payload=EXCLUDED.payload, created_at=now()`.catch(() => {});
+  }
   geoCache = { at: Date.now(), idx: { dong, area } };
   return geoCache.idx;
 }

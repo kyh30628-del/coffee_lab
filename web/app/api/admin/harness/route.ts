@@ -37,8 +37,11 @@ export async function GET(req: NextRequest) {
       sql`SELECT ikey, LEFT(COALESCE(detail,''),100) detail FROM issues WHERE ikey LIKE 'budget:%' AND status='open'`,
     ]) as any[];
 
-    // L1 계약 검증 — 최근 24h 실행 목록을 근거로 고아/유령/미선언을 판정(추가 조회 없음)
-    const runningJobs = Array.from(new Set((runs as any[]).map((r) => r.job)));
+    // L1 계약 검증 — ⚠️ 표시용 목록(LIMIT 40)으로 판정하면 **하루 1회 도는 잡이 '유령 계약'으로 오탐**된다.
+    //   (실제로 cron-costwatch·cron-exposure가 정상 실행 중인데 유령으로 찍혔다.)
+    //   판정은 잘리지 않은 DISTINCT 목록으로 한다 — 작은 컬럼 1개 집계라 비용은 무시할 수준.
+    const jobRows = (await sql`SELECT DISTINCT job FROM run_ledger WHERE started_at > now() - interval '48 hours'`) as any[];
+    const runningJobs = jobRows.map((r) => r.job);
     const contractIssues = verifyContracts(runningJobs);
     const budgets = (budget as any[]).map((b) => {
       const c = getContract(b.job);

@@ -97,7 +97,13 @@ export async function detectStuck(hours = 48, minRepeats = 3): Promise<StuckJob[
       GROUP BY job, fp
       HAVING COUNT(*) >= ${minRepeats}
       ORDER BY COUNT(*) DESC`) as unknown as StuckJob[];
-    return rows;
+    // ⚠️ 2026-08-10 오탐 수리: '같은 지문 반복'은 **수렴을 약속한 잡**에서만 정체다.
+    //   감시·수집형 잡(enrich·demand·closure·issues·grow·rulegap)은 "볼 게 없다/상태 그대로"가 정상인데,
+    //   그 정상 상태가 매번 같은 지문이라 전부 정체로 찍혔다(실측 3~7건 전부 오탐).
+    //   → 계약에 monotone-decrease(줄어들어야 함)를 선언한 잡만 정체 판정 대상으로 둔다.
+    //   같은 실수의 재발 방지: "정상 상태를 문제로 표시하지 않는다"(CEO 지시 2026-08-09)의 하네스판.
+    const { getContract } = await import("./jobContract");
+    return rows.filter((r) => getContract(r.job).effect?.kind === "monotone-decrease");
   } catch { return []; }
 }
 

@@ -5,7 +5,9 @@ import { sql } from "./db";
 //   API는 always-fresh(max-age=0)로 이미 해결 — 남은 레이어 = ①search_cache(DB) ②ISR 페이지(/c/[id]·share·area·sitemap).
 //   revalidatePath는 route handler 컨텍스트에서만 유효하므로 동적 import + graceful.
 export async function invalidateCafeCaches(ids: number[]): Promise<void> {
-  await sql`DELETE FROM search_cache`.catch(() => {});
+  // ⚠️ 지역 인덱스 행(__geo_index_v1__)은 남긴다 — 카페 한 곳 비공개는 동네→구 지도와 무관한데,
+  //   같이 지우면 다음 검색이 전수 스캔(6,565페이지)으로 지도를 다시 만든다(불필요한 비용).
+  await sql`DELETE FROM search_cache WHERE qkey <> '__geo_index_v1__'`.catch(() => {});
   try {
     const { revalidatePath } = await import("next/cache");
     for (const id of ids.slice(0, 50)) {
