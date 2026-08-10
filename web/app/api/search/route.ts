@@ -265,7 +265,8 @@ export async function GET(req: NextRequest) {
       // ② DB 실데이터(dong/area) 전수 인덱스 — '우면동·자양동'처럼 사전에 없던 동을 커버(정확도 실패의 주원인).
       if (!effectiveRegion) {
         const geo = await loadGeoIndex();
-        const hit = detectRegion(tokens, geo);
+        // 지역 판정은 **원형 토큰**으로 — 절단본을 쓰면 '고양이'가 '고양'이 돼 고양시로 잡힌다(실측 사고).
+        const hit = detectRegion(parsed.rawTokens, geo);
         if (hit) effectiveRegion = hit.area;
       }
       regionExplicit = !!effectiveRegion;

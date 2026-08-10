@@ -32,10 +32,16 @@ const PARTICLES = [
   "은", "는", "이", "가", "을", "를", "의", "에", "와", "과", "도", "만", "로", "랑",
 ];
 
-/** 조사 절단 — 어간이 2자 미만이 되면 원본을 유지(과절단 방지). */
+/**
+ * 조사 절단 — 어간이 2자 미만이 되면 원본을 유지(과절단 방지).
+ * ⚠️ 1자 조사(이/가/은/는…)는 **명사의 마지막 글자를 잡아먹기 쉽다**: '고양이'→'고양'으로 잘려
+ *   '고양시'로 인식되는 실제 사고가 났다(골든셋 정확도 100%→20%). 그래서 1자 조사는 4자 이상
+ *   토큰에서만 뗀다('붕어빵이'→'붕어빵'은 살리고, '고양이·아메리카노'는 건드리지 않는다).
+ */
 export function stripParticle(tok: string): string {
   for (const p of PARTICLES) {
-    if (tok.length > p.length + 1 && tok.endsWith(p)) {
+    const minLen = p.length === 1 ? 4 : p.length + 2;
+    if (tok.length >= minLen && tok.endsWith(p)) {
       const stem = tok.slice(0, -p.length);
       if (stem.length >= 2) return stem;
     }
@@ -46,6 +52,7 @@ export function stripParticle(tok: string): string {
 export type ParsedQuery = {
   raw: string;
   tokens: string[];      // 랭킹에 쓰는 의미 토큰(불용어 제거·조사 절단 완료)
+  rawTokens: string[];   // 절단 전 원형 — 지역 판정은 반드시 이걸 쓴다(절단본으로 판정하면 '고양이'→'고양시')
   stopped: string[];     // 제거된 일반어(설명·디버깅용)
 };
 
@@ -60,8 +67,8 @@ export function parseQuery(q: string): ParsedQuery {
     if (stem.length >= 2 && !tokens.includes(stem)) tokens.push(stem);
   }
   // 전부 불용어였다면(예: "좋은 카페 추천") 원본 토큰을 살려 결과 0을 막는다 — 정밀도보다 재현율 우선인 경계.
-  if (tokens.length === 0) return { raw: q, tokens: rawTokens, stopped: [] };
-  return { raw: q, tokens, stopped };
+  if (tokens.length === 0) return { raw: q, tokens: rawTokens, rawTokens, stopped: [] };
+  return { raw: q, tokens, rawTokens, stopped };
 }
 
 // ── 지역 인식: DB의 실제 dong/area가 단일 출처 ────────────────────────────────
