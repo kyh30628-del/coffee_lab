@@ -1083,11 +1083,21 @@ export function verifyReview(input: QualityInput): QualityResult {
   //   맥락에서 그 토큰만 우연 일치해 해외 여행기가 딸려온다. 우리 지역어도 없고 카페 맥락(CAFE_CONTEXT_STRONG)도
   //   없이 '해외 지명 맥락'만 있으면 이 카페 후기가 아님. curated 화이트리스트(오탐 확대 방지) — 진짜 카페
   //   후기는 카페 맥락을 동반하므로 걸리지 않는다. (coord#126 P3)
-  const FOREIGN_HOMONYM = new Set(["콜롬보"]);
+  //   [룰갭 rulegap-20260811-0305, decisions#656] 공용 정규식(스리랑카|여행기|…)이 일반 여행어휘만 커버해
+  //   '오타와'·'캐나다'·'Byward' 같은 지명 자체는 안 걸린다(id15308 '바이워드마켓' 실측 — 캐나다 오타와의
+  //   실제 관광지 Byward Market과 동명). Set→Map<식별토큰, 전용 문맥 정규식>으로 확장해 용어별 전용
+  //   트리거를 추가할 수 있게 한다. 기존 '콜롬보'는 공용 정규식을 그대로 매핑해 하위호환 유지.
+  const FOREIGN_HOMONYM_GENERIC = /(스리랑카|여행기|해외여행|배낭여행|현지인|수도\s|항공권|비행기|공항|배낭|입국|환전)/;
+  const FOREIGN_HOMONYM = new Map([
+    ["콜롬보", FOREIGN_HOMONYM_GENERIC],
+    ["바이워드마켓", /오타와|캐나다|Ottawa|Byward/i],
+  ]);
   if (tokens.length && tokens.every((t) => FOREIGN_HOMONYM.has(norm(t))) && !areaPresent
-      && !CAFE_CONTEXT_STRONG.test(fullL)
-      && /(스리랑카|여행기|해외여행|배낭여행|현지인|수도\s|항공권|비행기|공항|배낭|입국|환전)/.test(fullL)) {
-    return { verdict: "rejected", score: 3, reasons: ["동음이의 해외 지명(카페 아님)"], signals: sig };
+      && !CAFE_CONTEXT_STRONG.test(fullL)) {
+    const homonymCtxRe = tokens.map((t) => FOREIGN_HOMONYM.get(norm(t))).find(Boolean) ?? FOREIGN_HOMONYM_GENERIC;
+    if (homonymCtxRe.test(fullL)) {
+      return { verdict: "rejected", score: 3, reasons: ["동음이의 해외 지명(카페 아님)"], signals: sig };
+    }
   }
 
   // 🏭 [룰갭 P61] naver_category 비F&B 조합신호 적용(coordination#249, decisions#507): isNonFnbCategory가
