@@ -133,12 +133,24 @@ export function ChatWidget({ pw }: { pw: string }) {
     }).catch(() => {});
   useEffect(() => { if (pw) loadHistory(); }, [pw]);
   useEffect(() => { if (open && pw) loadHistory(); }, [open, pw]);
-  // 🔄 자율실행 진행보고(dev-report)가 챗에 계속 쌓이므로, pw 인증된 동안은 모달이 닫혀있어도(다른 탭/백그라운드)
-  //   15초마다 새로고침해 새 응답을 감지·알림한다(작업지시 탭 이력만 갱신).
+  // 🔄 자율실행 진행보고(dev-report)가 챗에 계속 쌓이므로 주기적으로 새 응답을 감지·알림한다.
+  // 💰 2026-08-12 수정: 예전엔 **백그라운드 탭에서도 15초마다** 돌았다(주석에 그게 의도라고 적혀 있었다).
+  //    그 의도가 정확히 chat-watch를 죽인 이유였다 — 하루 5,760회 조회로 Neon이 절전에 못 든다.
+  //    보이는 동안 15초 / 안 보이는 동안 2분으로 낮추고, 다시 보는 순간 즉시 최신화한다.
+  //    (완전히 끄지 않는 이유: 다른 탭에서 작업 중일 때 자율실행 완료 알림을 놓치지 않기 위함.)
   useEffect(() => {
     if (!pw) return;
-    const t = setInterval(() => { if (!chatLoading) loadHistory(); }, 15000);
-    return () => clearInterval(t);
+    let last = 0;
+    const t = setInterval(() => {
+      if (chatLoading) return;
+      const gap = document.visibilityState === "visible" ? 15000 : 120000;
+      if (Date.now() - last < gap) return;
+      last = Date.now();
+      loadHistory();
+    }, 15000);
+    const onVis = () => { if (document.visibilityState === "visible" && !chatLoading) { last = Date.now(); loadHistory(); } };
+    document.addEventListener("visibilitychange", onVis);
+    return () => { clearInterval(t); document.removeEventListener("visibilitychange", onVis); };
   }, [pw, chatLoading]);
   const send = async () => {
     const q = chatInput.trim(); if (!q || chatLoading) return;

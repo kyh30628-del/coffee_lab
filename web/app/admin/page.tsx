@@ -196,18 +196,24 @@ export default function AdminPage() {
     return () => { document.removeEventListener("visibilitychange", check); window.removeEventListener("focus", check); };
   }, []);
   // 🧮 전 지표 자동 갱신(15초) — 백그라운드 작업이 실시간 반영(새로고침 불필요)
+  // 💰 2026-08-12: **보이지 않는 탭에서는 돌지 않는다.** 예전엔 가드가 없어 관제탑 탭을 켜두기만 해도
+  //    15초마다 영원히 조회했다 → 하루 5,760회 함수 실행 + 그동안 Neon이 **한숨도 못 잔다**.
+  //    (같은 실패로 chat-watch를 2026-08-03에 껐다. 그건 서버측, 이건 브라우저측 쌍둥이였다.)
+  //    화면을 보고 있을 때만 갱신하고, 다시 보는 순간 즉시 최신화 → 사장님이 보는 수치는 항상 정확하다.
   useEffect(() => {
     if (!authed || !pw) return;
     refreshNumbers(pw);
     loadNL(); // 뉴스레터 상태 로드 — 미발송 초안 리마인더용
     loadSubscribers(pw); // 승인 대기 사장님 리마인더용
-    const id = setInterval(() => refreshNumbers(pw), 15000);
-    return () => clearInterval(id);
+    const id = setInterval(() => { if (document.visibilityState === "visible") refreshNumbers(pw); }, 15000);
+    const onVis = () => { if (document.visibilityState === "visible") refreshNumbers(pw); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => { clearInterval(id); document.removeEventListener("visibilitychange", onVis); };
   }, [authed, pw]);
   // 📈 접속·유입 대시보드가 열려있는 동안 20초마다 자동 갱신(실시간) — 조용히(silent) 갱신해 깜빡임 없음
   useEffect(() => {
     if (!showAnalytics || !pw) return;
-    const id = setInterval(() => loadAnalytics(pw, true), 20000);
+    const id = setInterval(() => { if (document.visibilityState === "visible") loadAnalytics(pw, true); }, 20000);
     return () => clearInterval(id);
   }, [showAnalytics, pw]);
   useLockBodyScroll(!!selAgent || !!todayDetail || towerFull || showVisits || showYtModal || showSubsModal || showBorderline || showAnalytics || showOnboard || showRotation || showNL);
