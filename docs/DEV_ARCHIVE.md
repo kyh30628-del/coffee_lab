@@ -210,3 +210,4 @@
 | 2026-08-09 11:06 | #644 | [룰갭] 갤러리 병설 카페 전시 공지문(3인칭 초대장) — VISIT_CUES 없는 방문후기 노출, 2곳 4 | 2bc9976d | - | lib/reviewQuality.ts: EXHIBITION_PR 정규식 추가(개인전/전시소개/전시명:/작가:/전시 기간:/많은 관심 부탁드립니다) + VISIT_CUES 부재 조건 |
 | 2026-08-10 11:05 | #646 | [개발] 협업 #297: [경영지원 코디네이션] 제안서 미인입 감시 로직 — "표 형식" 특화 패턴에 국한, | 4385e974 | - | scripts/make-digest.mjs extractContentTokens(): id\d+/P\d{2,} 추출을 헤딩(## ) 전용에서 문서 전체 줄로 일반화 — 불릿·중첩목 |
 | 2026-08-10 23:05 | #650 | [룰갭] 언론 보도기사 바이라인 방문후기 오분류 — NEWS_BYLINE 미등록, 5곳 5건 (rulegap | 8d4ac0f7 | - | lib/reviewQuality.ts: NEWS_BYLINE 정규식 신설(EXHIBITION_PR 아래) + verifyReview()에서 institutionalPR/exhibi |
+| 2026-08-11 07:05 | #651 | [룰갭] 업체 자체 SNS 공지문 방문후기 오분류 — SELF_ANNOUNCE 미등록, 5곳 6건 (rule | ac8e3682 | - | lib/reviewQuality.ts: SELF_ANNOUNCE 정규식(오픈/신메뉴 출시/이벤트/영업 시작 안내, 소식을 전해드립니다류) 신설, verifyReview() inst |
