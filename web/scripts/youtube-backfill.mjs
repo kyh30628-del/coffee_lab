@@ -21,15 +21,26 @@ let added = 0, none = 0, processed = 0, quota = false;
 //   Neon 데이터전송비 폭증의 주범이었다(실측: 508콜·~660GB, 청구서 663GB와 거의 일치). MAX(90)를 한 번에 가져오는
 //   걸로 바꿔 이 쿼리 호출을 18분의 1로 줄인다 — 이미 처리한 카페는 아래 루프에서 yt_checked_at이 찍히므로
 //   재조회 없이도 중복처리 걱정 없음(한 번의 스냅샷을 그대로 순회).
-const rows = await sql`
+// 💰 2026-08-12 수리(CEO 지적): `NOT (raw_reviews @> ...)`를 WHERE에 두면 **13,495행 전부의 raw_reviews(1.27GB)를
+//   디토스트**해야 한다 — 실측 한 번 실행에 2.67GB 판독. 2026-07-29에 호출 횟수는 줄였지만 이 조건 자체가
+//   남아 있어 매 실행 전수 판독은 그대로였다(같은 병의 다른 쿼리).
+//   → 후보는 **작은 컬럼만으로** 뽑고, 무거운 JSON 포함검사는 **뽑힌 90건에만** 건다. 판독량 GB → MB.
+const cand = await sql`
   SELECT id, name, area FROM cafes
   WHERE raw_reviews IS NOT NULL AND yt_checked_at IS NULL
-    AND NOT (raw_reviews @> '[{"source":"youtube"}]')
   ORDER BY published DESC NULLS LAST,
            (synth_grade='검증') DESC,
            (synth_grade='참고') DESC,
            synth_count DESC NULLS LAST
   LIMIT ${MAX}`;
+// 이미 유튜브가 들어간 카페 걸러내기 — 후보 90건에만 디토스트되므로 저렴하다.
+const candIds = cand.map((c) => c.id);
+const already = candIds.length
+  ? new Set((await sql`SELECT id FROM cafes WHERE id = ANY(${candIds}) AND raw_reviews @> '[{"source":"youtube"}]'`).map((r) => String(r.id)))
+  : new Set();
+// 이미 보유한 건 다시 안 잡히도록 확인시각만 찍고 제외(다음 실행에서 후보에서 빠진다).
+if (already.size) await sql`UPDATE cafes SET yt_checked_at = now() WHERE id = ANY(${[...already]})`.catch(() => {});
+const rows = cand.filter((c) => !already.has(String(c.id)));
 if (!rows.length) console.log("유튜브 백필 대상 없음 — 전체 완료");
 for (const c of rows) {
   if (quota) break;
@@ -41,7 +52,8 @@ for (const c of rows) {
   if (processed >= MAX) break;
   await new Promise((x) => setTimeout(x, 400));
 }
-const remain = (await sql`SELECT COUNT(*)::int n FROM cafes WHERE raw_reviews IS NOT NULL AND yt_checked_at IS NULL AND NOT (raw_reviews @> '[{"source":"youtube"}]')`)[0].n;
+// 남은 대상 수 — 로그용 상한치. 여기서도 `@>`를 쓰면 또 전수 디토스트라 작은 컬럼만으로 센다(실제보다 약간 많게 나옴).
+const remain = (await sql`SELECT COUNT(*)::int n FROM cafes WHERE raw_reviews IS NOT NULL AND yt_checked_at IS NULL`)[0].n;
 console.log(`\n유튜브 백필 종료: 추가 ${added} · 영상없음 ${none} · 처리 ${processed} · 남은 대상 ${remain}`);
 // 자율진단이 정지를 감지하도록 agent_runs에 기록(재발방지). 쿼터소진도 정상 종료로 기록.
 await recordRun("youtube-backfill", true, `추가 ${added}·영상없음 ${none}·처리 ${processed}·남은 ${remain}${quota ? "·쿼터소진" : ""}`, processed).catch(() => {});

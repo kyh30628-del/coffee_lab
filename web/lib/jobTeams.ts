@@ -89,5 +89,6 @@ export const LAUNCHD_JOBS: Record<string, { label: string; sched: string }> = {
 //   quality-redteam-agent·team-legal-agent·dev-agent 등)가 전부 걸린다 → 그들의 investigate 결재가
 //   CEO가 보기도 전에(수십초~2분) '은퇴 확인'으로 오종결돼 L3 에스컬레이션이 무력화됐다(2026-07-07 #200).
 //   → 진짜 은퇴는 여기 **명시적으로만** 표기한다. 은퇴 시 추가, 재활성 시 제거(위 JOB_TEAM 주석과 동기).
-export const RETIRED_JOBS: ReadonlySet<string> = new Set(["dong-backfill", "qualityaudit", "chat-watch"]); // chat-watch: 2026-08-04 컴퓨트 절감 위해 정지(관제 챗봇, 필요시 수동 재기동)
+export const RETIRED_JOBS: ReadonlySet<string> = new Set(["dong-backfill", "qualityaudit", "chat-watch", "youtube-backfill"]); // chat-watch: 2026-08-04 컴퓨트 절감 위해 정지(관제 챗봇, 필요시 수동 재기동)
+// youtube-backfill: 2026-08-12 CEO 지시로 정지 — 몇 달간 커버리지 24%(3,302/13,495)에 남은 분량 107일 소요 대비 매 실행 GB급 판독. 재기동 = plist에서 .disabled 제거 후 launchctl load.
 export const isRetired = (job: string) => RETIRED_JOBS.has(job);
