@@ -469,7 +469,7 @@ async function scanFranchiseBranchPollution(): Promise<{ count: number; samples:
 // 🏪 자율 조치: flag된 카페의 raw에서 '브랜드+다른지점접미사' 언급하되 '자기지점접미사' 없는 항목을 결정론 자동 제거·재합성.
 //   보수: 자기 지점명 함께 언급되면 보존(다른 지점 안내 정보일 뿐). 런당 최대 12곳·deadline 시간예산·멱등.
 async function healFranchiseBranchPollution(flagged: FranchiseFlag[], deadline: number): Promise<{ fixed: number; dropped: number; unpub: number; names: string[]; skipped?: number; noEffect?: number; frozen?: number }> {
-  const { collectAndSynthesize } = await import("@/lib/collectOrchestrator");
+  const { collectAndSynthesize, toQuote } = await import("@/lib/collectOrchestrator");
   const { applyDecisions } = await import("@/lib/synthStore");
   const { cleanCafeName } = await import("@/lib/reviewQuality");
   const { invalidateCafeCaches } = await import("@/lib/cafeCacheInvalidate");
@@ -494,7 +494,8 @@ async function healFranchiseBranchPollution(flagged: FranchiseFlag[], deadline: 
       const b = mkS("blog"); if (b.length) sources.push({ source: "blog", texts: b });
       const y = mkS("youtube"); if (y.length) sources.push({ source: "youtube", texts: y });
       const decs = c.judge_decisions && typeof c.judge_decisions === "object" ? c.judge_decisions : {};
-      const r = collectAndSynthesize(cleanCafeName(c.name), at, sources, { decisions: decs, address: c.address || "" });
+      const cleanName = cleanCafeName(c.name);
+      const r = collectAndSynthesize(cleanName, at, sources, { decisions: decs, address: c.address || "" });
       const dec: Record<string, boolean> = {}; let drop = 0;
       for (const it of (r.auditItems || [])) {
         // ♻️ 무한 반복 차단(2026-08-08, CEO "왜 자꾸 헛도는 루프를 도냐"): auditItems는 **규칙 기준**으로
@@ -503,7 +504,14 @@ async function healFranchiseBranchPollution(flagged: FranchiseFlag[], deadline: 
         //   `DELETE FROM search_cache`까지 하루 4회씩 헛돌았다(실측: 6회 연속 "치유 10/감지 22" 동일).
         if (decs[it.key] === false) continue;
         const body = (it.title || "") + " " + (it.body || "");
-        if (body.includes(f.ownSuffix) || (f.ownToken.length >= 2 && body.includes(f.ownToken))) continue; // 자기 지점(접미사·토큰) 언급 있으면 보존(다른지점 안내정보일 뿐)
+        // 🩺 granularity 갭 수정(decisions#659, 08-11): 보존 여부는 **raw 항목 전체**가 아니라 실제로
+        //   화면에 노출될 합성 quote(toQuote — 표시 로직과 완전히 동일 함수)를 기준으로 판정한다. 여러
+        //   지점을 나열하는 라운드업 포스트는 본문 어딘가에 자기 지점 접미사가 있어도, 실제 대표 인용문은
+        //   다른 지점 얘기만 뽑힐 수 있다(id3782·11906 실측) — scanFranchiseBranchPollution의 탐지 granularity
+        //   (synth_reviews.quote 대조)와 맞춘다.
+        const quote = toQuote(it.body || it.title || "", cleanName);
+        const ownInQuote = quote.includes(f.ownSuffix) || (f.ownToken.length >= 2 && quote.includes(f.ownToken));
+        if (ownInQuote) continue; // 표시될 인용문 자체가 자기 지점 얘기 → 보존
         if (f.otherSuffixes.some((s) => body.includes(s)) || f.otherTokens.some((t) => body.includes(t))) { dec[it.key] = false; drop++; }
       }
       // 🩺 하네스 L4 완성(2026-08-08 실전검증서 발견): 가드가 앞단에서 다 걸러 `drop=0`이 되면

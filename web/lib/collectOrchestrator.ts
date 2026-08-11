@@ -65,7 +65,7 @@ export function maskPII(s: string): string {
 const COFFEE_TERMS = /커피|카페|라떼|아메리카노|원두|로스팅|에스프레소|디저트|케이크|베이커리|빵|브런치|분위기|인테리어|메뉴|음료|핸드드립|드립|콜드브루|바리스타|좌석|자리|맛있|고소|산미|크림|디카페인|플랫화이트|감성|예쁘|아늑|향/;
 // 표시 인용문: '이 카페·커피' 관련 문장을 우선 골라 1줄로. 다른 가게(점심·디저트 등)를 함께 적은
 // 글이어도 카페 내용이 담긴 문장이 보이게 → 멀티 언급 글도 의미 있게 활용.
-function toQuote(text: string, name = "", maxLen = 90): string {
+export function toQuote(text: string, name = "", maxLen = 90): string {
   const masked = maskPII(text.trim());
   const sentences = masked.split(/(?<=[.!?。…])\s+|\n+|\s{2,}/).map((s) => s.trim()).filter((s) => s.length >= 5);
   if (sentences.length <= 1) return masked.length <= maxLen ? masked : masked.slice(0, maxLen) + "…";
