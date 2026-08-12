@@ -214,3 +214,4 @@
 | 2026-08-11 07:05 | #656 | [룰갭] FOREIGN_HOMONYM 화이트리스트 누락 — 바이워드마켓(오타와) 해외지명 오염, 1곳 6건 | 292ad8ec | - | lib/reviewQuality.ts:1086 FOREIGN_HOMONYM Set→Map<식별토큰,전용정규식> 확장. 콜롬보=기존 공용정규식 유지, 바이워드마켓→/오타와 캐나다 O |
 | 2026-08-12 23:05 | #658 | [개발] [관측] 인천 중구·서구 area태깅 이상 — 대량 발굴에도 실published 0~3건 | 7a6ef6cd | - | app/api/cron-grow/route.ts: METRO_REGIONS 시딩 뒤 discovery_state에서 METRO_REGIONS에 없는 폐지지역 행 DELETE 추가( |
 | 2026-08-12 23:05 | #659 | [룰갭] 프랜차이즈 지점오염 힐러 가드 과보존 — id3782·11906 노출후기가 타지점 얘기, 자동조치  | f0bdf066 | - | app/api/cron-sentinel/route.ts healFranchiseBranchPollution: 보존 판정을 raw 항목 전체가 아니라 실제 표시 quote(lib/c |
+| 2026-08-12 23:06 | #661 | [룰갭] VENUE_WORDS 누락 — 지식산업센터 건물코드(SKV1), 디저트문정 SKV1점 9/51건 이 | 7932e1c4 | - | lib/reviewQuality.ts VENUE_WORDS 배열에 "SKV1" 추가(지식산업센터 건물브랜드, #661). tsc 신규에러 0(기존 next.config.ts esl |
