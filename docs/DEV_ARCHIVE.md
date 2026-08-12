@@ -213,3 +213,4 @@
 | 2026-08-11 07:05 | #651 | [룰갭] 업체 자체 SNS 공지문 방문후기 오분류 — SELF_ANNOUNCE 미등록, 5곳 6건 (rule | ac8e3682 | - | lib/reviewQuality.ts: SELF_ANNOUNCE 정규식(오픈/신메뉴 출시/이벤트/영업 시작 안내, 소식을 전해드립니다류) 신설, verifyReview() inst |
 | 2026-08-11 07:05 | #656 | [룰갭] FOREIGN_HOMONYM 화이트리스트 누락 — 바이워드마켓(오타와) 해외지명 오염, 1곳 6건 | 292ad8ec | - | lib/reviewQuality.ts:1086 FOREIGN_HOMONYM Set→Map<식별토큰,전용정규식> 확장. 콜롬보=기존 공용정규식 유지, 바이워드마켓→/오타와 캐나다 O |
 | 2026-08-12 23:05 | #658 | [개발] [관측] 인천 중구·서구 area태깅 이상 — 대량 발굴에도 실published 0~3건 | 7a6ef6cd | - | app/api/cron-grow/route.ts: METRO_REGIONS 시딩 뒤 discovery_state에서 METRO_REGIONS에 없는 폐지지역 행 DELETE 추가( |
+| 2026-08-12 23:05 | #659 | [룰갭] 프랜차이즈 지점오염 힐러 가드 과보존 — id3782·11906 노출후기가 타지점 얘기, 자동조치  | f0bdf066 | - | app/api/cron-sentinel/route.ts healFranchiseBranchPollution: 보존 판정을 raw 항목 전체가 아니라 실제 표시 quote(lib/c |
