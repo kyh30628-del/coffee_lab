@@ -28,6 +28,13 @@ export async function GET(req: NextRequest) {
     await sql`CREATE TABLE IF NOT EXISTS discovery_state (region TEXT PRIMARY KEY, area_label TEXT, last_run TIMESTAMPTZ, last_found INT, last_inserted INT)`;
     // 지역 시드(최초 1회)
     for (const r of METRO_REGIONS) await sql`INSERT INTO discovery_state (region, area_label) VALUES (${r.region}, ${r.areaLabel}) ON CONFLICT (region) DO NOTHING`;
+    // 🚨 재발방지(coordination#302): ON CONFLICT DO NOTHING 시딩은 새 지역만 더할 뿐 폐지된 지역을 절대
+    //   못 지운다 — 인천 2026-07-01 구제편(중구·동구·서구 폐지)으로 METRO_REGIONS에서 이미 빠졌는데도
+    //   discovery_state엔 예전 행이 그대로 남아 매일 스윕 대상이 됐다(중구 519건·서구 113건 검색해도
+    //   실제 cafes.area 반영은 각 1·3건뿐 — 네이버 예산만 태우고 성과가 안 남는 죽은 지역). 매 회차
+    //   METRO_REGIONS에 없는 행을 정리해 폐지 지역이 재발해도 다음 cron-grow에서 자동 치유되게 한다.
+    const validRegions = METRO_REGIONS.map((r) => r.region);
+    await sql`DELETE FROM discovery_state WHERE region <> ALL(${validRegions})`.catch(() => {});
     // 🎯 demand→grow 자율 루프: 에이전트(Claude Code)가 수요·공급갭을 추론해 채우는 타겟 큐. 비면 기존 신선도 순회로 폴백.
     await sql`CREATE TABLE IF NOT EXISTS discovery_targets (id SERIAL PRIMARY KEY, region TEXT, area_label TEXT, keywords JSONB, reason TEXT, priority INT DEFAULT 0, status TEXT DEFAULT 'pending', created_at TIMESTAMPTZ DEFAULT now(), consumed_at TIMESTAMPTZ, found INT, inserted INT)`.catch(() => {});
     // 🎯 롱테일 SEO 타겟 시드(coordination#337) — pending이거나 최근 7일 내 처리됐으면 재시딩 생략(중복 적재 방지),
