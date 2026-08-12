@@ -29,6 +29,11 @@ export default function OrgDashboard() {
   const [coord, setCoord] = useState<{ open: any[]; resolved: any[]; overdue: number }>({ open: [], resolved: [], overdue: 0 });
   const [issues, setIssues] = useState<any[]>([]);
   const [err, setErr] = useState(""); const [loading, setLoading] = useState(false);
+  // 🔐 인증 상태는 **데이터와 분리**한다. 예전엔 브리핑(brief) 유무로 로그인 화면을 띄워서,
+  //    브리핑이 하나도 없으면 비밀번호가 맞아도 영원히 로그인 화면으로 되돌아왔다.
+  //    2026-08-12 실제 사고: 마지막 브리핑(08-02)이 API의 10일 창 밖으로 밀려나는 순간 관제탑이 통째로 잠겼다.
+  //    "데이터가 없다"와 "권한이 없다"는 완전히 다른 상태다 — 절대 같은 조건으로 묶지 않는다.
+  const [authed, setAuthed] = useState(false);
   const [busy, setBusy] = useState<number | null>(null);
   const [showOrg, setShowOrg] = useState(false);
   // 🩺 하네스 관제 — 설계한 6계층이 지금 실제로 물려 있는지 보는 모달. 열 때만 조회(상시 폴링 없음 = DB 비용 0).
@@ -74,7 +79,7 @@ export default function OrgDashboard() {
       if (cr && cr.ok) setCrit(cr);
       if (oa && oa.ok) setOrgAct(oa);
       if (dp && dp.ok) setDevpipe(dp);
-      if (b.ok) { setBrief(b.brief); setBriefs(b.briefs || (b.brief ? [b.brief] : [])); localStorage.setItem("adm_pw", password); } else if (!silent) setErr("비밀번호 확인");
+      if (b.ok) { setAuthed(true); setBrief(b.brief); setBriefs(b.briefs || (b.brief ? [b.brief] : [])); localStorage.setItem("adm_pw", password); } else if (!silent) { setAuthed(false); setErr("비밀번호 확인"); }
       if (d.ok) setDec({ pending: d.pending || [], delegated: d.delegated || [], recent: d.recent || [], inProgress: d.inProgress || [], deferred: d.deferred || [] });
       if (co.ok) setCoord({ open: co.open || [], resolved: co.resolved || [], overdue: co.overdue || 0 }); // overdue 보존 — 접힌 헤더 '⚠️ 지연 N' 배선
       // 검색 AI 저하(크레딧 소진 계열)는 RM 실시간 이슈에서 제외 — 아래 '실행 중'에 상시 추적 항목으로 표기(#207).
@@ -192,7 +197,7 @@ export default function OrgDashboard() {
         </div>
       </div>
 
-      {!brief && (
+      {!authed && (
         <div style={{ ...card, marginTop: 12 }}>
           <div style={{ fontSize: 13, marginBottom: 8 }}>관리자 비밀번호</div>
           <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && load(pw)} style={{ width: "100%", padding: 10, border: "1px solid #d8c4a4", borderRadius: 9, fontSize: 16 }} placeholder="비밀번호" />
@@ -201,7 +206,16 @@ export default function OrgDashboard() {
         </div>
       )}
 
-      {brief && (<>
+      {authed && (<>
+      {/* 브리핑이 없을 때 화면이 조용히 비어 보이지 않게 사실대로 알린다(이번 사고의 재발 방지) */}
+      {!brief && (
+        <div style={{ ...card, marginTop: 12, borderLeft: "4px solid #c0762a" }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#c0762a", marginBottom: 4 }}>⚠️ 조직 브리핑 없음</div>
+          <div style={{ fontSize: 11.5, color: "#6b5640", lineHeight: 1.6 }}>
+            최근 10일간 생성된 브리핑이 없습니다. 아래 결재·협업·이슈·잡 현황은 정상 표시됩니다.
+          </div>
+        </div>
+      )}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 12 }}>
           {/* 🔔 결재 대기 — 대기 건이 있으면 앰버 배경·진한 빨강 볼드로 한눈에 강조 */}
           <div style={{ ...card, ...(dec.pending.length ? { background: "#fff5e6", border: "2px solid #e8b046" } : {}) }}>
@@ -662,7 +676,7 @@ export default function OrgDashboard() {
               <span style={{ fontSize: 13, fontWeight: 700, color: "#6a468c" }}>{showWO ? "▾" : "▸"} 🗂️ 기획조정실장 업무지시 (다음 사이클)</span>
               <span style={{ fontSize: 10.5, color: "#9c8a6c" }}>{showWO ? "접기" : "본부별 지시 보기"}</span>
             </button>
-            {showWO && <div style={{ marginTop: 8 }} dangerouslySetInnerHTML={{ __html: md2html(brief.work_order) }} />}
+            {showWO && <div style={{ marginTop: 8 }} dangerouslySetInnerHTML={{ __html: md2html(brief?.work_order || "") }} />}
           </div>
         )}
 
