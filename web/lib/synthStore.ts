@@ -6,6 +6,7 @@ import { fetchPlacesReviews } from "./placesCollector";
 import { fetchWebReviews } from "./webSearchCollector";
 import { fetchYouTubeReviews } from "./youtubeCollector";
 import { collectAndSynthesize, type RawSource, type BorderlineItem, type CollectResult } from "./collectOrchestrator";
+import { upsertReviewerStats } from "./reviewerProfiles";
 import { judgeReviews, hasJudgeKey } from "./reviewJudge";
 import { isNonCafe, isFranchise, isGenericFoodName, isSnackStall, isStructuralPhantom, isUnmannedCafe } from "./discover";
 import { tickBlob } from "./blobBudget";
@@ -203,6 +204,9 @@ async function loadLinkExclusions(cafeId: number): Promise<Set<string>> {
 
 // 합성 결과를 DB에 저장(공용). llmJudged=true면 llm_judged_at도 기록.
 async function storeResult(cafeId: number, name: string, result: CollectResult, llmJudged: boolean) {
+  // 👤 리뷰어 프로필 적재(#699 1단계) — 판정·등급·노출 무영향. 실패해도 합성 본류를 막지 않는다(비치명).
+  try { await upsertReviewerStats(cafeId, result.reviewerStats); }
+  catch (e) { console.warn(`[reviewerProfiles] 적재 실패(비치명) cafe=${cafeId}: ${String(e).slice(0, 80)}`); }
   await loadCriteria(); // 수도권 좌표박스 기준 캐시 갱신(TTL 60s — 핫패스 비용 0). 어떤 진입점(배치판정 포함)이 불러도 안전 프라임.
   const latMin = getCriterionSync("geo.box.lat_min"), latMax = getCriterionSync("geo.box.lat_max");
   const lngMin = getCriterionSync("geo.box.lng_min"), lngMax = getCriterionSync("geo.box.lng_max");

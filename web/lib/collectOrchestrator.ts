@@ -1,6 +1,7 @@
 // 수집 오케스트레이터 (PRINCIPLES §1·§2·§3·§4·§7)
 // 모든 수집 글을 '리뷰 품질 검증 엔진'에 통과시켜 옥석을 가린 뒤에만 합성·집계·노출한다.
 import { verifyReview, coreTokens, isNonCafeFnbCategory, COFFEE_SUBSTANCE, type QualityVerdict, type SourceKind } from "./reviewQuality";
+import { extractRid, looseDate, type ReviewerCafeStat } from "./reviewerProfiles";
 import { synthesize, type Review, type SynthResult } from "./synthEngine";
 import { computeCharScores } from "./charScore";
 import { getCriterionSync } from "./criteria"; // 등급 바닥 임계값 단일출처(캐시 프라임은 synthAndStore 등 진입점이 함)
@@ -34,6 +35,7 @@ export type BorderlineItem = { key: string; title?: string; body: string };
 
 export type CollectResult = {
   synth: SynthResult;
+  reviewerStats: Map<string, ReviewerCafeStat>; // 👤 계정별 통계(1단계 수집, #699) — 판정 무영향
   collected: number;          // = 검증 통과 고유 리뷰 수 (신뢰 헤드라인 숫자)
   grade: "검증" | "참고" | "후보";
   charScores: Record<string, number>;
@@ -90,6 +92,7 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
   const borderline: BorderlineItem[] = []; // LLM 재판정 대상(경계)
   const auditItems: BorderlineItem[] = []; // Sonnet 최종 심사 대상(규칙상 on-topic 전체)
   const seen = new Set<string>();
+  const reviewerStats = new Map<string, ReviewerCafeStat>(); // 👤 #699 1단계 — 판정 무영향, 적재용
   const seenLinks = new Set<string>();     // 같은 글(URL) 중복 수집 제거용
   const stats: QualityStats = { raw: 0, verified: 0, reference: 0, rejected: 0, duplicates: 0, rejectReasons: {} };
   // 블로그 URL 정규화(프로토콜·m.·쿼리·해시·끝슬래시 무시) → 같은 글 1회만
@@ -124,6 +127,18 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
       //   ⚠️ 하드 구조거절(동명 비카페·필라테스·글루드·OFFTOPIC·SEO·인물직함 등 borderline 아닌 reject)은 광고처럼 *규칙 절대 우선*.
       //   (스테일 "유지" 결정이 구조적 오염을 덮어 검증 카페가 정화 안 되던 버그 차단 — 2026-06-28)
       const isAd = !!rule.signals?.sponsored;
+      // 👤 리뷰어 프로필 수집(#699 1단계) — 판정에 영향 없음. 네이버 블로그 링크(97%)만 계정 추출.
+      {
+        const rid = extractRid(t.link);
+        if (rid) {
+          const cur = reviewerStats.get(rid) ?? { accepted: 0, rejectedAd: 0, firstDt: null, lastDt: null };
+          if (isAd) cur.rejectedAd++;
+          const dt = looseDate((t as any).date);
+          if (dt && (!cur.firstDt || dt < cur.firstDt)) cur.firstDt = dt;
+          if (dt && (!cur.lastDt || dt > cur.lastDt)) cur.lastDt = dt;
+          reviewerStats.set(rid, cur);
+        }
+      }
       const hardReject = rule.verdict === "rejected" && !rule.borderline; // 경계 아닌 구조적 하드 거절
       let verdict = rule.verdict;
       let reasons = rule.reasons;
@@ -142,6 +157,7 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
         continue;
       }
       if (verdict === "verified") stats.verified++; else stats.reference++;
+      { const rid = extractRid(t.link); if (rid) { const cur = reviewerStats.get(rid)!; if (cur) cur.accepted++; } } // 👤 #699
       kept++;
 
       // 합성 입력: verified 정가중, reference 절반가중. 출처가중도 반영.
@@ -260,5 +276,5 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
   synth.reviewCount = trustCount;
   const charScores = computeCharScores(verifiedTexts, name);
 
-  return { synth, collected: trustCount, grade, charScores, perSource, evidenceReviews: topEvidence, allEvidence, reviewDates, borderline, auditItems, quality: stats };
+  return { synth, collected: trustCount, grade, charScores, perSource, evidenceReviews: topEvidence, allEvidence, reviewDates, borderline, auditItems, quality: stats, reviewerStats };
 }

@@ -48,11 +48,11 @@ const CONTRACTS: Record<string, Partial<JobContract>> = {
   "cron-sentinel": {
     tier: "L2", budget: { blobReads: 24, rows: 40000, wallMs: 300_000 },
     effect: { kind: "monotone-decrease", maxNoEffectRuns: 2 },
-    writes: ["cafes.synth_reviews", "cafes.synth_reviews_all", "cafes.judge_decisions", "cafes.published"],
+    writes: ["cafes.synth_reviews", "cafes.synth_reviews_all", "cafes.judge_decisions", "cafes.published", "reviewer_cafes.*"],
   },
   // 재합성 — 전수 적용 배치. raw를 카페당 1회 로드하므로 상한이 곧 처리 곳수
-  "cron-resynth": { tier: "L2", budget: { blobReads: 200, rows: 40000, wallMs: 300_000 }, writes: ["cafes.synth_*"] },
-  "cron-synth": { tier: "L2", budget: { blobReads: 60, rows: 40000, wallMs: 300_000 }, writes: ["cafes.synth_*", "cafes.published"] },
+  "cron-resynth": { tier: "L2", budget: { blobReads: 200, rows: 40000, wallMs: 300_000 }, writes: ["cafes.synth_*", "reviewer_cafes.*"] },
+  "cron-synth": { tier: "L2", budget: { blobReads: 60, rows: 40000, wallMs: 300_000 }, writes: ["cafes.synth_*", "cafes.published", "reviewer_cafes.*"] },
   // 발굴·수집 — 네이버 쿼터가 진짜 제약(일 25,000). 신규 발굴 카페를 합성할 때 raw를 곳당 1회 로드한다
   //   (5일 실측: 런당 1~6회, 합성 상한 5곳+검증여유). 08-08의 blobReads:0 선언은 이 정당 경로를 몰랐던 오기 —
   //   실측 관찰 후 확정하기로 한 CEO 결정(08-09 "후자로")의 이행이 이 값이다.
