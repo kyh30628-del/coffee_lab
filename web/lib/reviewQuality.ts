@@ -1298,9 +1298,14 @@ export function verifyReview(input: QualityInput): QualityResult {
   //   무관 글에 '문장 성분(동사/형용사)'으로 우연일치해 통과하던 것 차단. 짧은/일반어 이름 + 카페 맥락(CAFE_CONTEXT·카페어)
   //   전무 → 카페와 무관한 글로 거절. 진짜 후기는 카페 맥락어가 있어 보존(tsx 실측: 이해 43·봄 64·탐 46건 유지). 정상 이름(3+글자)은 영향 없음.
   const nameClean = (nameN || "").replace(/\s/g, "");
-  //   룰갭 제안22(b): 이 게이트만 CAFE_CONTEXT_STRONG 사용 — CAFE_CONTEXT의 "주문·좌석·매장·사장님·음료"는
-  //   비카페 소매/서비스 전반의 범용어라 관용구 카페명(자수성가 등)의 무관 글을 못 걸러냄(전역 적용은 비권장).
+  //   룰갭 제안22(b): 이 게이트만 CAFE_CONTEXT(범용 매장어) 대신 강한 카페맥락어 사용 — CAFE_CONTEXT의
+  //   "주문·좌석·매장·사장님·음료"는 비카페 소매/서비스 전반의 범용어라 관용구 카페명(자수성가 등)의
+  //   무관 글을 못 걸러냄(전역 적용은 비권장).
   //   룰갭 P23(#270/#290): 위험한 카페명(초단어·일반어)을 두 갈래로 분리해 근접매칭 강화.
+  //   룰갭 P68(2026-08-13, decisions#668): CAFE_CONTEXT_STRONG엔 협업#278(#599)에서 추가된 "공연|전시|재즈"가
+  //   포함돼, 엔터테인먼트 계열 COMMON_WORD_NAMES("버라이어티" 등)가 무관 글 속 "○○ 콘서트…공연을 가질" 같은
+  //   문구와 우연히 근접해 근접판정을 무력화했다(id11444 실측, P47 등재 후 회귀). 카테고리·업종어가 아니라
+  //   실질 음료·디저트 소비어만 남긴 CAFE_CONTEXT_SUBSTANCE(P56 도입)로 좁혀 우회를 차단한다.
   const nameShort = nameClean.length >= 1 && nameClean.length <= 2;
   //   룰갭 P47(#428): "카페 크래프트"·"티타임카페"처럼 부가어(카페 접두/접미)가 붙은 상호는 nameClean(전체이름
   //   원문)이 COMMON_WORD_NAMES와 일치하지 않는다 — coreTokensDetail이 뽑은 유일 식별토큰(onlyTok)까지 함께 대조.
@@ -1312,7 +1317,7 @@ export function verifyReview(input: QualityInput): QualityResult {
     //   룰갭 P47(#428): 근접판정이 nameShort의 전역판정보다 정밀하므로, 화이트리스트에 있으면 2글자 이하("온기")도
     //   이 경로를 우선한다(id9294 실측 — 전역판정만으론 무관 글 속 우연한 "카페" 언급 하나로도 뚫렸다).
     const fullN = norm(`${title} ${body}`);
-    if (!ctxNearName(fullN, commonAnchor, CAFE_CONTEXT_STRONG) && !titleHasCafeWord) {
+    if (!ctxNearName(fullN, commonAnchor, CAFE_CONTEXT_SUBSTANCE) && !titleHasCafeWord) {
       return { verdict: "rejected", score: 2, reasons: ["일반어 카페명 우연일치(카페명 근접 맥락 전무) — nameAsWord 오염"], signals: sig };
     }
   } else if (nameShort) {
