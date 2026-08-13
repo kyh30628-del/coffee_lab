@@ -10,6 +10,17 @@ export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, headin
   area: string; tasteKey?: string; tasteLabel?: string; tasteEmoji?: string; heading: string; intro: string; cafes: SeoCafe[]; regions?: { area: string; n: number }[]; grades?: GradeBreakdown; canonical: string;
   backHref?: string; backLabel?: string; showTasteNav?: boolean; crossLinks?: { label: string; href: string }[]; crossLinksLabel?: string; extra?: React.ReactNode;
 }) {
+  // 🧭 BreadcrumbList(2026-08-13, 구글 채널 강화) — 구글이 검색결과에 계층 경로를 표시하고
+  //   사이트 구조를 이해하는 근거. 테마 페이지는 홈>지역>테마, 동/지역 페이지는 홈>지역 2단.
+  const crumbs = [
+    { name: "동네 커피 노트", url: SITE },
+    { name: `${area} 카페`, url: `${SITE}/area/${encodeURIComponent(area)}` },
+    ...(tasteKey && tasteLabel ? [{ name: `${area} ${tasteLabel} 카페`, url: canonical }] : []),
+  ];
+  const breadcrumbLd = {
+    "@context": "https://schema.org", "@type": "BreadcrumbList",
+    itemListElement: crumbs.map((b, i) => ({ "@type": "ListItem", position: i + 1, name: b.name, item: b.url })),
+  };
   const jsonld = {
     "@context": "https://schema.org", "@type": "ItemList", name: heading, numberOfItems: cafes.length,
     itemListElement: cafes.slice(0, 20).map((c, i) => ({ "@type": "ListItem", position: i + 1, url: `${SITE}/c/${c.id}`, name: c.name })),
@@ -17,6 +28,7 @@ export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, headin
   return (
     <main className="min-h-screen bg-[#f4ece0] text-[#2b2018]" style={{ fontFamily: "'Gowun Batang', serif" }}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonld) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }} />
       <div className="max-w-2xl mx-auto px-5 py-9">
         <Link href={backHref} className="text-[#7a5122] text-[13px] underline">← {backLabel}</Link>
         <div className="text-[#7a5122] text-[11px] tracking-[0.25em] uppercase mt-4 mb-1">동네 커피 노트 · 검증 큐레이션</div>

@@ -141,6 +141,15 @@ export default async function CafePage({ params }: Props) {
     "@context": "https://schema.org", "@type": "FAQPage",
     mainEntity: faqs.map((f) => ({ "@type": "Question", name: f.q, acceptedAnswer: { "@type": "Answer", text: f.a } })),
   } : null;
+  // 🧭 BreadcrumbList(2026-08-13, 구글 채널 강화) — 홈 > 지역 > 카페. 검색결과 계층 표시 + 구조 이해.
+  const breadcrumbLd = {
+    "@context": "https://schema.org", "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "동네 커피 노트", item: SITE },
+      { "@type": "ListItem", position: 2, name: `${c.area} 카페`, item: `${SITE}/area/${encodeURIComponent(c.area)}` },
+      { "@type": "ListItem", position: 3, name: c.name, item: `${SITE}/c/${c.id}` },
+    ],
+  };
   const jsonLd = {
     "@context": "https://schema.org", "@type": "CafeOrCoffeeShop",
     name: c.name,
@@ -166,6 +175,7 @@ export default async function CafePage({ params }: Props) {
   return (
     <main className="min-h-screen bg-[#f4ece0] text-[#2b2018]" style={{ fontFamily: "'Gowun Batang', serif" }}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }} />
       {faqJsonLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />}
       <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet" />
       <div className="max-w-xl mx-auto px-5 py-8">

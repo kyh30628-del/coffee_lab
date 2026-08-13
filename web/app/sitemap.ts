@@ -9,14 +9,17 @@ export const revalidate = 3600; // 감사수리: 결재 집행(공개/비공개)
 const SITE = "https://dongnecoffeenote.com";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  let cafes: { id: number }[] = [];
+  let cafes: { id: number; synth_updated?: string }[] = [];
   try {
     // 전량 제출(2026-08-06). 예전 LIMIT 5000은 공개 13,460곳 중 8,460곳(63%)을 검색엔진에 제출조차
     //   못 하게 막고 있었다 — 사이트맵 한도는 URL 50,000개·50MB라 전량을 넣어도 여유가 크다.
-    cafes = (await sql`SELECT id FROM cafes WHERE published = true ORDER BY synth_count DESC NULLS LAST`) as unknown as { id: number }[];
+    // lastmod 추가(2026-08-13, 구글 채널 강화): 구글은 changefreq·priority를 무시하고 **lastmod로 재크롤
+    //   우선순위를 정한다**. synth_updated(리뷰 재합성 시각)가 곧 콘텐츠 변경 시각 — 작은 컬럼 1개 추가라 비용 무시 수준.
+    cafes = (await sql`SELECT id, synth_updated FROM cafes WHERE published = true ORDER BY synth_count DESC NULLS LAST`) as unknown as { id: number; synth_updated?: string }[];
   } catch { /* DB 불가 시 기본 페이지만 */ }
   const cafeUrls: MetadataRoute.Sitemap = cafes.map((c) => ({
     url: `${SITE}/c/${c.id}`, changeFrequency: "weekly", priority: 0.7,
+    ...(c.synth_updated ? { lastModified: new Date(c.synth_updated) } : {}),
   }));
   const tasteUrls: MetadataRoute.Sitemap = ["roast", "work", "quiet", "dessert"].map((t) => ({
     url: `${SITE}/taste/${t}`, changeFrequency: "monthly", priority: 0.6,
