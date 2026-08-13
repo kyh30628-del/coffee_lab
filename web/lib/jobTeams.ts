@@ -54,7 +54,6 @@ export const EXPECT_MAX_H: Record<string, number> = {
   "orchestrator-heal": 18, // 2창(UTC 3,11) 최대공백 16h + 버퍼
   // 로컬 launchd 잡
   "discover-sweep": 30,    // 🔄2026-08-04 KST 12·20시 발굴 스윕 + 버퍼
-  "youtube-backfill": 30, // 일배치 16:30 KST + 버퍼
   "chief-manager": 20,    // 일간 사이클 KST 08·12·16시
   "self-audit": 18,       // 🔄KST 12·16·20시 (최대공백 20→익일12시=16h + 버퍼)
   "weekly-evaluation": 30, // 매일 10:30 KST(격일 게이트지만 스킵도 하트비트)
@@ -78,7 +77,6 @@ export const LAUNCHD_JOBS: Record<string, { label: string; sched: string }> = {
   "audit-watch":       { label: "이벤트 워처",     sched: "08·12·16·20시" },
   "dev-pipeline":      { label: "개발 파이프라인", sched: "승인 즉시+08·12·16·20시" },
   "dev-deploy":        { label: "배포 워커",       sched: "승인 즉시+08·12·16·20시" },
-  "youtube-backfill":  { label: "유튜브 수집",     sched: "16:30" },
   "weekly-evaluation": { label: "주간 거버넌스",   sched: "10:30(격일)" },
   "discover-sweep":    { label: "발굴 스윕",       sched: "12·20시" },
 };
