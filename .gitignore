@@ -30,3 +30,7 @@ data-engine/data/clean/fx_usd_krw.csv
 /_tri.mts
 /web/agents/
 /web/redteam-query.ts
+
+# 분석·검증용 임시 스크립트(세션 산출물) — 커밋 금지
+web/.tmp-*
+web/scripts/.tmp-*

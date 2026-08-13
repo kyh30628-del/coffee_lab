@@ -9,6 +9,16 @@ const sql = neon(process.env.DATABASE_URL);
 const kst = (s) => String(s ?? "").slice(5, 16);
 
 console.log("═".repeat(72));
+// ⓪ 순수함수 회귀 셀프테스트 — DB·네트워크 0. 실사고 함수들('고양이'→고양시, 뷰⊂리뷰 등)의 재발 방지선.
+try {
+  const { execSync } = await import("node:child_process");
+  const out = execSync("node --import tsx scripts/selftest.mjs", { encoding: "utf8", cwd: new URL("..", import.meta.url).pathname }).trim();
+  console.log("⓪ " + out.split("\n").pop());
+} catch (e) {
+  console.log("⓪ 🧪 셀프테스트 ❌ 실패 — 아래 상세:");
+  console.log(String(e.stdout || e).slice(0, 600));
+}
+
 console.log("🩺 하네스 점검 —", new Date().toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }));
 console.log("═".repeat(72));
 
