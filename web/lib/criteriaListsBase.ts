@@ -32,6 +32,15 @@ export const LIST_META: ListMeta[] = [
     items: ["분위기", "예쁜", "감성", "인테리어", "사진", "오션뷰", "시티뷰", "한강뷰", "리버뷰", "루프탑뷰", "야경뷰", "노을뷰", "전망", "루프탑", "아늑"] },
   { key: "char.space.kws", category: "성향축", label: "성향축: 넓은공간 🪑", consumer: "charScore.computeCharScores",
     items: ["넓", "대형", "규모", "테라스", "주차"] },
+  // 🐶🥐🌄 2026-08-13 신설 3축(CEO 승인 P1) — 근거: 네이버 데이터랩 수요 1·2위(애견동반·브런치)가 미커버였고
+  //   노출 리뷰 신호 보유 카페가 각 1,100곳+(공급 확보). 오탐 방지: 단독 애매어 금지 원칙 준수 —
+  //   pet은 '강아지' 단독 금지(동반 서술형만), view는 '뷰' 단독 금지("리뷰" 부분일치, #359 학습사항).
+  { key: "char.pet.kws", category: "성향축", label: "성향축: 애견동반 🐶", consumer: "charScore.computeCharScores",
+    items: ["애견동반", "애견 동반", "반려견", "반려동물", "펫프렌들리", "펫 프렌들리", "강아지 동반", "강아지랑", "강아지와 함께", "강아지 데리고", "댕댕이랑", "댕댕이 동반"] },
+  { key: "char.brunch.kws", category: "성향축", label: "성향축: 브런치 🥐", consumer: "charScore.computeCharScores",
+    items: ["브런치", "에그베네딕트", "프렌치토스트", "샌드위치 맛집", "샐러드 카페"] },
+  { key: "char.view.kws", category: "성향축", label: "성향축: 뷰 🌄", consumer: "charScore.computeCharScores",
+    items: ["오션뷰", "시티뷰", "한강뷰", "리버뷰", "산뷰", "논뷰", "숲뷰", "바다뷰", "호수뷰", "노을뷰", "야경뷰", "뷰맛집", "뷰 맛집", "뷰가 좋", "뷰가 예쁘", "뷰가 이쁘", "전망이 좋", "창밖 풍경", "탁 트인"] },
 
   // ── 맛 3축 신호어 (lib/synthEngine.ts · SIGNALS/AMBIGUOUS) — 맛 좌표(산미·바디·단맛) 직접형성 ──
   { key: "taste.acidity.strong", category: "맛축", label: "맛: 산미 강신호", consumer: "synthEngine.synthesize",
@@ -110,6 +119,8 @@ export const LIST_META: ListMeta[] = [
   //   axis/uses 매핑 없이 라벨만 정확히 붙인다(넓은공간 축 가산 오귀속 제거).
   { key: "concept.pet.triggers", category: "검색개념", label: "개념: 반려동반", consumer: "search.route",
     items: ["애견", "반려", "강아지", "펫동반"] },
+  { key: "concept.view.triggers", category: "검색개념", label: "개념: 뷰 좋은", consumer: "search.route",
+    items: ["뷰맛집", "뷰 좋은", "뷰좋은", "한강뷰", "리버뷰", "오션뷰", "시티뷰", "전망 좋은", "창밖", "노을", "야경"] },
   { key: "concept.acidity.triggers", category: "검색개념", label: "개념: 산미 또렷", consumer: "search.route",
     items: ["산미", "상큼", "과일", "베리", "시트러스", "플로럴", "꽃향", "새콤", "산뜻", "후르츠"] },
   { key: "concept.body.triggers", category: "검색개념", label: "개념: 묵직·고소", consumer: "search.route",

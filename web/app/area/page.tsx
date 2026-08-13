@@ -20,6 +20,11 @@ export default async function AreaIndex() {
         <Link href="/" className="text-[#7a5122] text-[13px] underline">← 홈</Link>
         <div className="text-[#7a5122] text-[11px] tracking-[0.25em] uppercase mt-4 mb-1">동네 커피 노트</div>
         <h1 className="text-[27px] font-bold leading-tight mb-2">동네별 카페 추천</h1>
+        {/* 🆕 새 발굴 진입(P2) — 독점 데이터(월 500곳+ 자동 발굴)로 재방문 유인 */}
+        <Link href="/new" className="flex items-center justify-between gap-2 rounded-xl px-4 py-3 border border-[#d8c8ad] bg-white mb-4">
+          <span className="text-[13px] font-semibold text-[#5a4632]">🆕 이번 달 새로 발굴한 카페 보기</span>
+          <span className="text-[#7a5122] text-[12px]">→</span>
+        </Link>
         <p className="text-[14px] text-[#524234] leading-relaxed mb-6">서울·경기·인천 동네별로 <b>영수증 리뷰·광고 없이 진짜 후기로 검증</b>한 카페를 모았어요. 취향별로도 골라보세요.</p>
 
         {/* 동네 교차검증 컬렉션 — 에디토리얼 SEO 랜딩(레지스트리 구동, 유입 진입점) */}

@@ -1,7 +1,7 @@
 // 지도·목록 응답(/api/cafes)의 char_scores 압축 규약 — **서버와 클라이언트의 단일 출처**.
 // 6축을 키 이름 없이 고정 순서 배열 `cs`로 실어 보내 전송량을 줄인다(이 항목 하나가 응답의 26%였다).
 // 순서를 바꾸면 취향 필터·정렬·유사도가 통째로 뒤섞이므로, 반드시 여기서만 고칠 것.
-export const CAFE_AXES = ["roast", "work", "quiet", "dessert", "mood", "space"] as const;
+export const CAFE_AXES = ["roast", "work", "quiet", "dessert", "mood", "space", "pet", "brunch", "view"] as const;
 
 export function encodeCharScores(cs: Record<string, number> | null | undefined): number[] | undefined {
   if (!cs) return undefined;

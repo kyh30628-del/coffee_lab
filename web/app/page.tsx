@@ -27,7 +27,7 @@ type Cafe = {
 type DCafe = { id: number; name: string; area: string; lat: number; lng: number; grade: string | null; count: number | null; identity: string | null; note: string | null; beanNote: string[]; reason?: string; isNew?: boolean };
 type Discover = { headlineA: DCafe | null; headlineB: DCafe | null; headlineAList?: DCafe[]; headlineBList?: DCafe[]; themeB?: { emoji: string; label: string } | null; top3: DCafe[]; fresh: DCafe[]; specialty: DCafe[]; featured?: DCafe[]; scopeCount: number };
 type SearchResult = { id: number; name: string; area: string; grade: string | null; count: number | null; identity: string | null; score: number; reasons: string[] };
-type SearchRes = { ok: boolean; region: string; q: string; concepts: string[]; count: number; results: SearchResult[]; coverageNote?: string };
+type SearchRes = { ok: boolean; region: string; q: string; concepts: string[]; count: number; results: SearchResult[]; coverageNote?: string; franchiseNote?: string };
 const SEARCH_EXAMPLES = ["비 오는 날 혼자 조용히", "감성 사진 데이트", "노트북 작업하기 좋은", "산미 또렷한 커피", "빵 맛있는 집"];
 // 쇼케이스 1차 성과 집계(노출·클릭·재생)
 const trackPromo = (cafeId: number, type: "view" | "click" | "play") => { fetch("/api/promo-event", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cafeId, type }) }).catch(() => {}); };
@@ -1704,6 +1704,11 @@ export default function Home() {
                     {searchRes.coverageNote && (
                       <div className="mb-3 rounded-xl border border-[#e3c79a] bg-[#fff8ec] px-3.5 py-3 text-[12px] text-[#7a5a1e] leading-relaxed">
                         ⚠️ {searchRes.coverageNote}
+                      </div>
+                    )}
+                    {searchRes.franchiseNote && (
+                      <div className="mb-3 rounded-xl border border-[#d8c8ad] bg-[#faf5ea] px-3.5 py-3 text-[12px] text-[#6b5640] leading-relaxed">
+                        ☕ {searchRes.franchiseNote}
                       </div>
                     )}
                     {searchRes.concepts.length > 0 && <div className="text-[11px] text-[#5f7355] mb-3">감지된 느낌: <b>{searchRes.concepts.join(" · ")}</b></div>}

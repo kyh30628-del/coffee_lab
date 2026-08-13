@@ -5,6 +5,7 @@ import { hasSearchLLM, rerankWithClaude, lastRerankError, type SearchCand } from
 import { loadCriteria, getCriterionSync } from "@/lib/criteria";
 import { loadCriteriaLists, getListSync } from "@/lib/criteriaLists";
 import { parseQuery, loadGeoIndex, detectRegion, isCoreArea } from "@/lib/searchQuery";
+import { isFranchise } from "@/lib/discover";
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
@@ -34,10 +35,11 @@ const CONCEPTS_BASE: { id: string; triggersKey: string; axis?: string; taste?: s
   { id: "work", triggersKey: "concept.work.triggers", axis: "work", uses: ["작업"], label: "작업·공부" },
   { id: "mood", triggersKey: "concept.mood.triggers", axis: "mood", uses: ["사진"], label: "분위기·감성" },
   { id: "dessert", triggersKey: "concept.dessert.triggers", axis: "dessert", uses: ["빵"], label: "디저트·빵" },
-  { id: "brunch", triggersKey: "concept.brunch.triggers", axis: "dessert", uses: ["빵"], label: "브런치" },
+  { id: "brunch", triggersKey: "concept.brunch.triggers", axis: "brunch", uses: ["빵"], label: "브런치" }, // 2026-08-13: 전용 축 신설로 dessert 차용 해제
   { id: "roast", triggersKey: "concept.roast.triggers", axis: "roast", label: "직접로스팅·스페셜티" },
   { id: "space", triggersKey: "concept.space.triggers", axis: "space", label: "넓은공간" },
-  { id: "pet", triggersKey: "concept.pet.triggers", label: "반려동반" },
+  { id: "pet", triggersKey: "concept.pet.triggers", axis: "pet", label: "반려동반" }, // 2026-08-13: 축 연결(전엔 트리거만 있고 점수 미반영)
+  { id: "view", triggersKey: "concept.view.triggers", axis: "view", label: "뷰 좋은" },
   { id: "acidity", triggersKey: "concept.acidity.triggers", taste: "acidity", label: "산미 또렷" },
   { id: "body", triggersKey: "concept.body.triggers", taste: "body", label: "묵직·고소" },
   { id: "sweet", triggersKey: "concept.sweet.triggers", taste: "sweet", label: "단맛" },
@@ -486,12 +488,19 @@ export async function GET(req: NextRequest) {
     } catch { /* 상호매칭 실패해도 기존 결과 유지 */ }
 
     const coverageNote = detectOutOfCoverage(q, region);
+    // 🏪 프랜차이즈 질의 안내(2026-08-13 P3) — 실측: "스타벅스" 검색이 30일 3회 들어와 빈약결과로 조용히 이탈.
+    //   미등록은 큐레이션 정책(옥석 컨셉)이라 맞지만, 이유를 안 알려주면 "검색이 고장났다"로 보인다.
+    //   isFranchise는 동기·메모리 캐시(learnedTerms)라 추가 조회 0.
+    const franchiseNote = isFranchise(q.replace(/\s+/g, ""))
+      ? "동네 커피 노트는 프랜차이즈 대신 동네의 검증된 개인 카페만 큐레이션해요. 아래에서 근처의 검증 카페를 만나보세요."
+      : null;
     const payload: Record<string, unknown> = {
       ok: true, mode, region: effectiveRegion || "수도권 전체", q,
       concepts: hitConcepts.map((c) => c.label),
       count: results.length, results,
     };
     if (coverageNote) payload.coverageNote = coverageNote;
+    if (franchiseNote) payload.franchiseNote = franchiseNote;
     // 결과가 있으면 캐시에 저장(다음 동일 질문은 재계산 0)
     if (results.length > 0) {
       sql`INSERT INTO search_cache (qkey, payload, created_at) VALUES (${qkey}, ${JSON.stringify(payload)}, now())

@@ -13,6 +13,10 @@ const CHAR_AXES_BASE = [
   { key: "dessert", label: "디저트", emoji: "🍰", listKey: "char.dessert.kws" },
   { key: "mood", label: "분위기", emoji: "📸", listKey: "char.mood.kws" },
   { key: "space", label: "넓은공간", emoji: "🪑", listKey: "char.space.kws" },
+  // 2026-08-13 신설 3축(P1) — 수요 데이터랩 1·2위 커버. 사전은 위 criteriaListsBase 단일출처.
+  { key: "pet", label: "애견동반", emoji: "🐶", listKey: "char.pet.kws" },
+  { key: "brunch", label: "브런치", emoji: "🥐", listKey: "char.brunch.kws" },
+  { key: "view", label: "뷰 좋은", emoji: "🌄", listKey: "char.view.kws" },
 ];
 export const CHAR_AXES: { key: string; label: string; emoji: string; kws: string[] }[] =
   CHAR_AXES_BASE.map((a) => ({ key: a.key, label: a.label, emoji: a.emoji, get kws() { return getListSync(a.listKey); } }));

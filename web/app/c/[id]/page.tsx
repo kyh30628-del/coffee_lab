@@ -31,7 +31,7 @@ const getAxisDist = cache(async () => {
 });
 
 const SITE = "https://dongnecoffeenote.com";
-const CHAR: Record<string, string> = { roast: "🔥 직접로스팅", work: "💻 작업하기 좋은", quiet: "🤍 조용한", dessert: "🍰 디저트", mood: "📸 분위기", space: "🪑 넓은공간" };
+const CHAR: Record<string, string> = { roast: "🔥 직접로스팅", work: "💻 작업하기 좋은", quiet: "🤍 조용한", dessert: "🍰 디저트", mood: "📸 분위기", space: "🪑 넓은공간", pet: "🐶 애견동반", brunch: "🥐 브런치", view: "🌄 뷰 좋은" };
 
 type Props = { params: Promise<{ id: string }> };
 
