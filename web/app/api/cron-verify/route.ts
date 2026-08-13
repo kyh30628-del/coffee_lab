@@ -126,6 +126,22 @@ async function runChecks(): Promise<Check[]> {
     await n(sql`SELECT COALESCE(SUM(cnt-1),0)::int n FROM (SELECT count(*) cnt FROM cafes WHERE published GROUP BY name, area HAVING count(*) > 1) x`),
     await samp(sql`SELECT name || ' (' || area || ')' s FROM cafes WHERE published GROUP BY name, area HAVING count(*) > 1 LIMIT 6`));
 
+  // 16. 🕵️ CROSS_CAFE_QUOTE_DUP(decisions#674) — 서로 다른 공개카페 2곳 이상에 완전동일 quote가 노출되면
+  //   블로그·리뷰 글이 여러 카페에 걸쳐 잘못 매핑된 교차오염(브랜드명 동일·지점 다른 카페간 크로스오염 유형).
+  //   저비용 1쿼리(GROUP BY quote HAVING count(DISTINCT id)>1) — 정합성조사팀 3/3 실측 적중(글로리·비바보사·오페라빈,
+  //   coordination#306). 개별 오염건은 각각 별도 결재로 처리하므로 여기선 warn(상시 조기경보)만.
+  add("cross_cafe_quote_dup", "카페간 인용문(quote) 완전동일(교차오염 의심)", "warn",
+    await n(sql`WITH q AS (
+        SELECT c.id cid, r->>'quote' AS quote FROM cafes c, jsonb_array_elements(c.synth_reviews) r
+        WHERE c.published AND coalesce(r->>'quote','') <> ''
+      )
+      SELECT count(DISTINCT cid)::int n FROM q WHERE quote IN (SELECT quote FROM q GROUP BY quote HAVING count(DISTINCT cid) > 1)`),
+    await samp(sql`WITH q AS (
+        SELECT c.id cid, c.name cname, r->>'quote' AS quote FROM cafes c, jsonb_array_elements(c.synth_reviews) r
+        WHERE c.published AND coalesce(r->>'quote','') <> ''
+      )
+      SELECT DISTINCT cname s FROM q WHERE quote IN (SELECT quote FROM q GROUP BY quote HAVING count(DISTINCT cid) > 1) LIMIT 6`));
+
   return checks;
 }
 
