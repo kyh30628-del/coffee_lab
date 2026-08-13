@@ -17,6 +17,11 @@ export const maxDuration = 300;
 
 const STALE_MONTHS = 15;   // 최신 리뷰가 이만큼 지난 카페만 재확인 대상(활발한 카페는 명백히 영업중 → 스킵)
 const PER_RUN = 35;        // 회당 네이버 재확인 수(쿼터 절약)
+
+// coord#304: 저장된 synth_reviews(노출 근거) 텍스트 자체의 명시적 폐업 신호 — 활발(최근 리뷰)해도
+//   STALE_MONTHS 게이트를 우회해 네이버 재확인을 최우선 배정한다. 자동 비공개는 여전히 안 함(신호는
+//   우선순위 부여일 뿐 — 최종 판정은 기존과 동일하게 naverExistsRobust 다중쿼리 미발견 누적으로만).
+const CLOSURE_TEXT_SIGNAL = "폐업|폐점|문\\s*닫(았|음|는다고|았다고|았대|았나요|았어요)|영업\\s*(안\\s*해|종료)|없어졌";
 // coord#266: 네이버 존재확인(misses)만으로는 "리스팅은 살아있지만 방문후기가 오래 끊긴" 사각지대를 못 잡음.
 //   misses는 그대로 두고(의미 다름: 네이버 미발견 횟수), 증거노후는 보조지표로만 집계 — 자동 비공개·misses 반영 없음.
 const STALE_EVIDENCE_MONTHS = 18;
@@ -49,19 +54,27 @@ export async function GET(req: NextRequest) {
         CASE WHEN jsonb_typeof(raw_reviews)='array'
              THEN (SELECT array_agg(r->>'date') FROM jsonb_array_elements(raw_reviews) r)
              ELSE NULL END AS raw_dates,
-        COALESCE(closure_misses,0) misses
+        COALESCE(closure_misses,0) misses,
+        EXISTS (
+          SELECT 1 FROM jsonb_array_elements(
+            CASE WHEN jsonb_typeof(COALESCE(synth_reviews_all, synth_reviews, '[]'::jsonb)) = 'array'
+                 THEN COALESCE(synth_reviews_all, synth_reviews, '[]'::jsonb)
+                 ELSE '[]'::jsonb END
+          ) r WHERE r->>'quote' ~ ${CLOSURE_TEXT_SIGNAL}
+        ) AS closure_signal
       FROM cafes WHERE published AND raw_reviews IS NOT NULL
-      ORDER BY closure_checked_at ASC NULLS FIRST LIMIT 400`) as any[];
+      ORDER BY closure_signal DESC, closure_checked_at ASC NULLS FIRST LIMIT 400`) as any[];
 
-    let checked = 0, alive = 0, quotaStop = false, skippedFresh = 0, newSuspect = 0;
+    let checked = 0, alive = 0, quotaStop = false, skippedFresh = 0, newSuspect = 0, signalBypass = 0;
     const suspectNames: string[] = [];
     for (const c of rows) {
       const mo = latestReviewMonths(c.raw_dates);
-      if (mo != null && mo < STALE_MONTHS) { // 활발 → 영업중 명백, 네이버 호출 없이 통과
+      if (!c.closure_signal && mo != null && mo < STALE_MONTHS) { // 활발 → 영업중 명백, 네이버 호출 없이 통과
         await sql`UPDATE cafes SET closure_checked_at = now(), closure_misses = 0 WHERE id = ${c.id}`.catch(() => {});
         skippedFresh++; continue;
       }
       if (checked >= PER_RUN) break; // 쿼터 절약: 회당 재확인 상한
+      if (c.closure_signal && mo != null && mo < STALE_MONTHS) signalBypass++; // 활발해도 텍스트 신호로 우선 재확인
       const exists = await naverExistsRobust(c.name, c.area ?? "", c.dong ?? "", c.lat, c.lng);
       if (exists === null) { quotaStop = true; break; } // 전 쿼리 쿼터/오류 → 이번 회차 중단(판단 보류)
       checked++;
@@ -89,11 +102,11 @@ export async function GET(req: NextRequest) {
       SELECT count(*) c FROM x WHERE latest < now() - (${STALE_EVIDENCE_MONTHS}||' months')::interval
     `.then((r: any[]) => Number(r[0].c)).catch(() => 0);
 
-    const detail = `재확인 ${checked} 영업중 ${alive} 의심+${newSuspect} 검토대기 ${reviewQueue.length} 활발스킵 ${skippedFresh} 증거노후${STALE_EVIDENCE_MONTHS}mo+ ${staleEvidenceCount}${quotaStop ? " 쿼터중단" : ""}`;
+    const detail = `재확인 ${checked} 영업중 ${alive} 의심+${newSuspect} 검토대기 ${reviewQueue.length} 활발스킵 ${skippedFresh} 텍스트신호우선${signalBypass} 증거노후${STALE_EVIDENCE_MONTHS}mo+ ${staleEvidenceCount}${quotaStop ? " 쿼터중단" : ""}`;
     // 📒 하네스 L5 — 지문은 **남은 일(백로그)** 기준. 할 일이 없으면(0) 지문을 안 남긴다 —
     //   "일이 없어 조용한 것"과 "일이 있는데 못 끝내는 것"을 구분해야 정체 탐지가 소음이 안 된다.
     await recordRun("cron-closure", true, detail, newSuspect, { fingerprint: (newSuspect) > 0 ? fingerprintOf({ suspect: newSuspect }) : undefined, metrics: { suspect: newSuspect } });
-    return NextResponse.json({ ok: true, ranAt: new Date().toISOString(), checked, alive, newSuspect, suspectNames, skippedFresh, quotaStop, staleEvidenceCount, reviewQueue: reviewQueue.map((r) => ({ id: r.id, name: r.name, area: r.area, misses: r.closure_misses })) });
+    return NextResponse.json({ ok: true, ranAt: new Date().toISOString(), checked, alive, newSuspect, suspectNames, skippedFresh, signalBypass, quotaStop, staleEvidenceCount, reviewQueue: reviewQueue.map((r) => ({ id: r.id, name: r.name, area: r.area, misses: r.closure_misses })) });
   } catch (e) {
     await recordRun("cron-closure", false, String(e).slice(0, 150));
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
