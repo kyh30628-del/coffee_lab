@@ -31,7 +31,7 @@ export type QualityStats = {
   rejectReasons: Record<string, number>; // 탈락 사유별 건수 (투명성)
 };
 
-export type BorderlineItem = { key: string; title?: string; body: string };
+export type BorderlineItem = { key: string; title?: string; body: string; text?: string };
 
 export type CollectResult = {
   synth: SynthResult;
@@ -120,8 +120,11 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
       const rule = verifyReview({ title: t.title, body: t.desc ?? t.text, name, areaTerms: area, addr: opts?.address, link: t.link, naverCategory: opts?.naverCategory, source: kind });
 
       // 규칙상 on-topic(검증·참고 또는 경계)은 Sonnet 최종 심사 후보로 노출
-      if (rule.verdict !== "rejected" || rule.borderline) auditItems.push({ key, title: t.title, body: t.desc ?? t.text });
-      if (rule.borderline) borderline.push({ key, title: t.title, body: t.desc ?? t.text });
+      // ⚠️ text도 함께 보존(#683): 표시 대표문(evidence.quote)은 toQuote(t.text, …)로 뽑히는데
+      //   힐러들이 재감사 시 toQuote(desc)를 쓰면 desc가 text와 달라(제목 프리픽스 등) 다른 문장을
+      //   고를 수 있다 — "화면에 보이는 오염 문장"과 "힐러가 재심사하는 문장"이 어긋나 제거가 안 걸림(id7840 실증).
+      if (rule.verdict !== "rejected" || rule.borderline) auditItems.push({ key, title: t.title, body: t.desc ?? t.text, text: t.text });
+      if (rule.borderline) borderline.push({ key, title: t.title, body: t.desc ?? t.text, text: t.text });
 
       // 효과 판정 우선순위: 광고·하드 구조거절 = 절대(판정·whitelist로 못 살림) > decisions(과거 AI 심사) > whitelist > 규칙.
       //   ⚠️ 하드 구조거절(동명 비카페·필라테스·글루드·OFFTOPIC·SEO·인물직함 등 borderline 아닌 reject)은 광고처럼 *규칙 절대 우선*.
