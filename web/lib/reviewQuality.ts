@@ -74,6 +74,12 @@ const WHOLESALE_RETAIL_CUES = /(대량주문|사업자\s*(원두|샘플)|도매�
 //   "카페" 자기등록조차 없는 업종이라 도매 마케팅/창고형 매장일 확률이 더 높다(id7124=서비스,산업>제조업,
 //   id4799=쇼핑,유통>쇼핑센터,할인매장 — 둘 다 비F&B 카테고리 실측, P61과 결합해 가중치 상향).
 const DRINK_TASTING_CUES = /(마셨|마시고|시켜서\s*마|시켰|한\s*잔\s*하고|앉아서)/;
+// 룰갭 P67(2026-08-12, decisions#667): 커피머신/에스프레소머신 정비업체의 B2B 영업일지("OO카페 커피머신
+//   수리 방문 드렸습니다")가 커피 어휘가 풍부해 CAFE_CONTEXT류를 전부 통과, "검증" 방문후기로 노출된다
+//   (8곳 10건 실측: 네오·카페와바·블루하라·찻집소·데이카페·플로우카페·만옥제과). "수리 방문 드렸습니다"의
+//   "방문"이 VISIT_CUES에 걸려 정비기사의 작업방문을 고객의 매장방문으로 오판 — WHOLESALE_RETAIL_CUES와
+//   동일 메커니즘.
+const EQUIPMENT_SERVICE_BLOG = /(커피머신\s*(수리|누수|점검|설치|AS)|반자동\s*커피머신\s*수리|에스프레소\s*머신\s*(수리|설치|점검)|그라인더\s*(수리|점검|AS)|소모품\s*교체.{0,15}(핫워터디스펜서|커피머신|디스펜서)|AS\s*(요청|후기).{0,20}방문\s*드렸|정비\s*(방문|후기|일지)|(씨메|CIME|라심발리|LA\s*CIMBALI|훼마|페마|세코)\s*[A-Za-z0-9]*\s*(수리|정비|AS))/i;
 
 // 실제 경험·평가가 담겼는지 (감각/메뉴/서비스/공간 등 구체 신호)
 const SUBSTANCE_CUES = [
@@ -1032,7 +1038,10 @@ export function verifyReview(input: QualityInput): QualityResult {
   // 룰갭 rulegap-20260804(decisions#618): 도매/소매 강신호가 있고 매장 실물방문·시음 신호가 전무하면
   //   P63/rulegap-20260803과 동일하게 VISIT_CUES 매칭을 무효화한다.
   const wholesaleOnly = WHOLESALE_RETAIL_CUES.test(fullL) && !INSTORE_VISIT_CUES.test(fullL) && !DRINK_TASTING_CUES.test(fullL);
-  const visit = has(fullL, VISIT_CUES) && !deliveryOnly && !pickupOnly && !wholesaleOnly;
+  // 룰갭 P67(decisions#667): 정비업체 영업일지 강신호가 있고 매장 실물방문·시음 신호가 전무하면 위 세
+  //   패턴과 동일하게 VISIT_CUES 매칭(정비기사의 "방문 드렸습니다")을 무효화한다.
+  const equipmentServiceOnly = EQUIPMENT_SERVICE_BLOG.test(fullL) && !INSTORE_VISIT_CUES.test(fullL) && !DRINK_TASTING_CUES.test(fullL);
+  const visit = has(fullL, VISIT_CUES) && !deliveryOnly && !pickupOnly && !wholesaleOnly && !equipmentServiceOnly;
   const substance = SUBSTANCE_CUES.filter((k) => fullL.includes(k.toLowerCase())).length;
   // [#4] 흔한 단어 이름 오매칭 방지: 전체 이름 일치는 강함. 토큰만 일치면
   //     '카페 맥락(카페·커피·로스터리…)'이나 지역이 함께 있어야 주제로 인정.
@@ -1609,6 +1618,12 @@ export function verifyReview(input: QualityInput): QualityResult {
       return { verdict: "rejected", score: 6, reasons: ["원두 도매/소매 사업자용 후기(비F&B 카테고리 + 매장 시음·착석 단서 없음)"], signals: sig };
     }
     return { verdict: "rejected", score: 30, reasons: ["원두 도매/소매 구매후기(매장 시음·착석 단서 없음) — LLM 재판정"], borderline: true, signals: sig };
+  }
+  // 룰갭 P67(decisions#667): 커피머신/에스프레소머신 정비업체 영업일지는 구조적으로 고객의 방문경험이
+  //   아니므로(정비기사 작업일지), VISIT_CUES/SUBSTANCE_CUES가 실제로 동반되지 않으면 하드 거절 —
+  //   WHOLESALE_RETAIL_CUES와 달리 정상 카페 겸업 가능성이 없어 borderline 없이 바로 탈락.
+  if (equipmentServiceOnly && !visit && substance === 0 && (nameInTitle || nameInBody)) {
+    return { verdict: "rejected", score: 5, reasons: ["커피머신/에스프레소머신 정비업체 영업일지(고객 방문경험 서술 없음) — 자동 제외"], signals: sig };
   }
   if (!visit && substance === 0) {
     return { verdict: "rejected", score: 10, reasons: ["방문·경험·평가 내용 없음(언급만)"], signals: sig };
