@@ -8,15 +8,26 @@ import SaveMemoryButton from "./SaveMemoryButton";
 import VisitorReviews from "../../VisitorReviews";
 import { buildAxisDist, cafeProfile, extractHighlights, tasteVector, tasteSimilarity, GRADE_RANK } from "@/lib/cafeProfile";
 import { collectionForCafe } from "@/lib/collections";
+import { tasteByKey } from "@/lib/seoData";
 import { shareHookText } from "@/lib/shareCopy";
 
 export const runtime = "nodejs";
 export const revalidate = 3600; // ISR 1시간
 
-// 전체 카페 결 분포(강·약 판단용) — 요청 내 1회만(ISR 캐시와 함께 부하 최소화)
+// 전체 카페 결 분포(강·약 판단용).
+// 💰 2026-08-13 수리: react cache()는 **요청 내** 메모라, ISR 재생성마다 공개 13,495행을 통째로 읽었다.
+//   지난달 ISR 쓰기 45만건(크롤러가 sitemap 14,635 URL 순회) = 그만큼 이 전수 스캔이 반복됐다는 뜻.
+//   분포는 전 카페 통계라 몇 시간 묵어도 강·약 판정이 안 바뀐다 → 인스턴스 메모리 6시간 캐시로 전환.
+//   웜 인스턴스에서 크롤 폭주가 와도 스캔은 6시간에 1회. (요청 내 중복 방지용 cache()는 유지)
+let axisDistMem: { at: number; v: ReturnType<typeof buildAxisDist> } | null = null;
+const AXIS_TTL_MS = 6 * 60 * 60 * 1000;
 const getAxisDist = cache(async () => {
-  try { return buildAxisDist((await sql`SELECT char_scores, synth_count FROM cafes WHERE published AND char_scores IS NOT NULL`) as any[]); }
-  catch { return buildAxisDist([]); }
+  if (axisDistMem && Date.now() - axisDistMem.at < AXIS_TTL_MS) return axisDistMem.v;
+  try {
+    const v = buildAxisDist((await sql`SELECT char_scores, synth_count FROM cafes WHERE published AND char_scores IS NOT NULL`) as any[]);
+    axisDistMem = { at: Date.now(), v };
+    return v;
+  } catch { return axisDistMem?.v ?? buildAxisDist([]); }
 });
 
 const SITE = "https://dongnecoffeenote.com";
@@ -281,6 +292,28 @@ export default async function CafePage({ params }: Props) {
               </div>
             </div>
           )}
+          {/* 🧭 테마 페이지 역링크(2026-08-13 신설) — 유입 실측: 성장 엔진이 /area/{지역}/{테마}(성북구/work 41회 등,
+              네이버 유입 95%)인데 상세 13,484페이지에서 거기로 가는 링크가 0이었다. 이 카페가 강한 결 상위 2개를
+              앵커텍스트("{지역} {테마} 카페")로 연결 → 크롤 동선·테마 페이지 랭킹 강화 + 사용자 다음 행동 제공.
+              char_scores 키 = TASTES 키(동일 축)라 별도 매핑·추가 조회 0. */}
+          {(() => {
+            const themed = Object.entries((c.char_scores ?? {}) as Record<string, number>)
+              .filter(([k, v]) => Number(v) > 0 && tasteByKey(k))
+              .sort((a, b) => Number(b[1]) - Number(a[1]))
+              .slice(0, 2)
+              .map(([k]) => tasteByKey(k)!);
+            return themed.length > 0 ? (
+              <div className="mt-4 flex flex-col gap-2">
+                {themed.map((t) => (
+                  <Link key={t.key} href={`/area/${encodeURIComponent(c.area)}/${t.key}`}
+                    className="flex items-center justify-between gap-2 rounded-xl px-4 py-3 border border-[#d8c8ad] bg-white">
+                    <span className="text-[12.5px] font-semibold text-[#5a4632]">{t.emoji} {c.area} {t.label} 카페 더 찾기</span>
+                    <span className="text-[#7a5122] text-[12px]">→</span>
+                  </Link>
+                ))}
+              </div>
+            ) : null;
+          })()}
           {/* 동네 교차검증 컬렉션 상호링크(크롤 동선·SEO) — 레지스트리 게이팅 */}
           {(() => {
             const col = collectionForCafe(c.dong, c.area);

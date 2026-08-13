@@ -53,8 +53,10 @@ const CONTRACTS: Record<string, Partial<JobContract>> = {
   // 재합성 — 전수 적용 배치. raw를 카페당 1회 로드하므로 상한이 곧 처리 곳수
   "cron-resynth": { tier: "L2", budget: { blobReads: 200, rows: 40000, wallMs: 300_000 }, writes: ["cafes.synth_*"] },
   "cron-synth": { tier: "L2", budget: { blobReads: 60, rows: 40000, wallMs: 300_000 }, writes: ["cafes.synth_*", "cafes.published"] },
-  // 발굴·수집 — 네이버 쿼터가 진짜 제약(일 25,000). blob은 안 읽음
-  "cron-grow": { tier: "L0", budget: { blobReads: 0, rows: 20000, wallMs: 300_000 } },
+  // 발굴·수집 — 네이버 쿼터가 진짜 제약(일 25,000). 신규 발굴 카페를 합성할 때 raw를 곳당 1회 로드한다
+  //   (5일 실측: 런당 1~6회, 합성 상한 5곳+검증여유). 08-08의 blobReads:0 선언은 이 정당 경로를 몰랐던 오기 —
+  //   실측 관찰 후 확정하기로 한 CEO 결정(08-09 "후자로")의 이행이 이 값이다.
+  "cron-grow": { tier: "L0", budget: { blobReads: 12, rows: 20000, wallMs: 300_000 } },
   "discover-sweep": { tier: "L0", budget: { blobReads: 0, rows: 20000, wallMs: 900_000 } },
   // 유튜브 백필 — 2026-07 전송 663GB 사고의 주범이었던 경로(LIMIT 5 반복쿼리)
   "youtube-backfill": { tier: "L0", budget: { blobReads: 120, rows: 20000, wallMs: 1_800_000 } },

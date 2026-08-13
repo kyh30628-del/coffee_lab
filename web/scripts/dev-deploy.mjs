@@ -68,6 +68,7 @@ for (const d of rows) {
   // merge를 실제로 시작했는지 추적. 병합 이전(사람작업보호 dirty가드·branch없음·git락·fetch 등)에서
   // 던진 에러는 워킹트리를 건드리지 않는다 — 아래 checkout -f/reset --hard는 merge 시작 후에만 도달.
   let mergeStarted = false;
+  let preMergeHead = ""; // 병합 실패 정리의 복원 지점(로컬 묶음 커밋 보존)
   try {
     if (!locked) throw new Error("git락 타임아웃");
     if (!br) throw new Error("branch 없음");
@@ -81,7 +82,27 @@ for (const d of rows) {
     }
     git("fetch origin main -q");
     git("checkout -f main");         // -f: 잔여 미스테이지 변경 폐기(위 dirty 가드 통과 후에만 도달)
-    git("reset --hard origin/main"); // 원격 main에 정확히 정렬(rebase 실패 회피)
+    // 🛡️ 묶음배포 보호(2026-08-13 실사고): 위 dirty 가드는 '커밋 안 된' 변경만 지킨다.
+    //   '커밋됐지만 미푸시'인 로컬 커밋(=CEO 지시로 다음 배포에 묶어둔 작업)은 아래 reset --hard가
+    //   무경고 파괴했다 — 하네스 점검 커밋(5a546b3)이 아침 자동배포에 실제로 소실됨(reflog로 복구).
+    //   ahead 커밋은 폐기 대상이 아니라 **이번 배포에 함께 태울 화물**이다.
+    const aheadN = Number(git("rev-list --count origin/main..main").trim() || 0);
+    const behindN = Number(git("rev-list --count main..origin/main").trim() || 0);
+    if (aheadN === 0) {
+      git("reset --hard origin/main"); // 로컬 묶음 없음 — 원격에 정확히 정렬(기존 동작)
+    } else if (behindN === 0) {
+      // 로컬이 원격의 자손 — 정렬 불필요. 묶음 커밋이 아래 merge~push에 자연히 실려 나간다.
+    } else {
+      // 갈라짐: 원격도 전진(다른 배포)·로컬도 묶음 보유. 묶음을 원격 위로 재배치 시도, 충돌 시 사람에게.
+      try { git("rebase origin/main"); }
+      catch {
+        try { git("rebase --abort"); } catch { /* abort 실패해도 아래서 보류 */ }
+        const e = new Error(`로컬 묶음 커밋 ${aheadN}개가 원격과 충돌 — 사람 확인 필요(배포 보류·커밋 보존)`);
+        e.humanWork = true;
+        throw e;
+      }
+    }
+    preMergeHead = git("rev-parse HEAD").trim(); // 병합 실패 시 복원 지점 — origin/main이 아니라 '로컬 묶음 포함' 현재 HEAD
     mergeStarted = true; // 이 지점부터의 실패만 아래 catch의 병합/워킹트리 정리(merge --abort·reset) 대상
     // 🛡️ 커밋 메시지는 execSync 셸문자열이라 제목의 큰따옴표·백틱·$·\ 가 -m "..." 을 깨 배포 전면실패시킴
     //   (2026-07-23 #456 근본원인: 제목 '…"플래그십(스토어)"…' 의 따옴표로 git merge Command failed). 셸 위험문자 제거.
@@ -142,7 +163,9 @@ for (const d of rows) {
     try { conflict = git("ls-files -u").length > 0; } catch {}
     if (!conflict) conflict = /conflict|충돌|merge failed|병합.*실패|not something we can merge|Automatic merge|자동 병합/i.test(msg);
     try { git("merge --abort"); } catch {}
-    try { git("checkout -f main"); git("reset --hard origin/main"); } catch {}
+    // 🛡️ 복원은 origin/main이 아니라 병합 직전 HEAD로 — origin/main으로 되돌리면 묶음배포용
+    //   로컬 미푸시 커밋이 병합 실패 청소에 휩쓸려 또 소실된다(위 08-13 사고와 같은 계열).
+    try { git("checkout -f main"); git(`reset --hard ${preMergeHead || "origin/main"}`); } catch {}
     // ♻️ 병합 충돌 = 오래된 브랜치가 그새 배포된 다른 변경과 겹침 → 실패가 아니라 '최신 기반 자동 재빌드'로 자가치유.
     //   (병렬 브랜치가 같은 파일을 건드릴 때 필연. 재빌드하면 이미 배포된 코드 위에서 다시 구현 → 충돌 소멸.)
     if (conflict && br) {
