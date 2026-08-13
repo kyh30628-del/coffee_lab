@@ -273,7 +273,7 @@ export default async function CafePage({ params }: Props) {
               <div className="flex flex-wrap gap-2">{tags.map((t) => <span key={t} className="text-[13px] bg-[#efe6d6] rounded-full px-3 py-1">{t}</span>)}</div>
             </div>
           )}
-          <p className="text-[12.5px] text-[#665036] mb-4 leading-relaxed">네이버 공개 후기 <b>{c.synth_count ?? 0}건</b>을 교차검증한 데이터 기반 소개예요.</p>
+          <p className="text-[12.5px] text-[#665036] mb-4 leading-relaxed">네이버 공개 후기 <b>{c.synth_count ?? 0}건</b>을 교차검증한 데이터 기반 소개예요. <Link href="/trust" className="underline text-[#7a5122]">검증 방법 보기</Link></p>
           {/* 방문자 후기 — 하단 버튼 바로 위 */}
           {userReviews.length > 0 && <div className="mb-4"><VisitorReviews reviews={userReviews} /></div>}
           <Link href={`/?cafe=${c.id}`} className="block w-full text-center bg-[#2b2018] text-[#f4ece0] rounded-xl py-3.5 font-bold">지도·근거 후기 보기 →</Link>

@@ -21,7 +21,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!t) return { title: "동네 커피 노트" };
   const cafes = await getRegionTasteCafes(area, taste, 5);
   const names = cafes.map((c) => c.name).slice(0, 3).join(", ");
-  const title = `${area} ${t.label} 카페 — 검증된 추천 | 동네 커피 노트`;
+  // BEST N 프레이밍(2026-08-13 벤치마킹 B — 다이닝코드 Top100 상품화 차용). ⚠️ 기존 네이버 랭킹 보호:
+  //   검색어 머리("{지역} {테마} 카페")는 그대로 두고 BEST N을 덧붙이기만 한다(제목 전면 교체 금지).
+  //   ⚠️ 위 cafes는 미리보기 5건 조회라 length를 쓰면 항상 "BEST 5"가 된다 — 본문과 같은 기준(표시 상한 30)으로 계산.
+  const totalForTitle = await getRegionTasteCount(area, taste);
+  const shownN = Math.min(totalForTitle || cafes.length, 30);
+  const bestN = shownN >= 5 ? ` BEST ${shownN}` : "";
+  const title = `${area} ${t.label} 카페${bestN} — 검증된 추천 | 동네 커피 노트`;
   const desc = `${area}에서 ${t.desc} 카페를 영수증 리뷰·광고 없이 진짜 후기로 검증해 골랐어요.${names ? ` ${names} 등.` : ""}`;
   const url = `${SITE}/area/${encodeURIComponent(area)}/${taste}`;
   return {
@@ -37,7 +43,8 @@ export default async function RegionTastePage({ params }: Props) {
   const t = tasteByKey(taste);
   if (!t) notFound();
   const [cafes, regions, total, grades] = await Promise.all([getRegionTasteCafes(area, taste, 30), getRegions(), getRegionTasteCount(area, taste), getRegionTasteGradeBreakdown(area, taste)]);
-  const heading = `${area} ${t.label} 카페`;
+  const shownN2 = Math.min(total || cafes.length, 30);
+  const heading = `${area} ${t.label} 카페${shownN2 >= 5 ? ` BEST ${shownN2}` : ""}`;
   // 카피는 실제 채택 기준과 정확히 일치해야 한다(예전엔 '언급 1회'도 포함해 놓고 "N곳 검증"이라 적었다).
   const intro = `${area}에서 ${t.desc} 카페 ${total || cafes.length}곳. 후기에 ${t.short} 이야기가 ${TASTE_MIN_HITS}건 이상, 그 카페 전체 후기의 ${TASTE_MIN_RATE_PCT}% 이상 나온 곳만 골랐어요.`;
   return <Curated area={area} tasteKey={taste} tasteLabel={t.short} tasteEmoji={t.emoji} heading={heading} intro={intro} cafes={cafes} regions={regions} grades={grades} canonical={`${SITE}/area/${encodeURIComponent(area)}/${taste}`} />;
