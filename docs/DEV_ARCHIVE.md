@@ -217,3 +217,4 @@
 | 2026-08-12 23:06 | #661 | [룰갭] VENUE_WORDS 누락 — 지식산업센터 건물코드(SKV1), 디저트문정 SKV1점 9/51건 이 | 7932e1c4 | - | lib/reviewQuality.ts VENUE_WORDS 배열에 "SKV1" 추가(지식산업센터 건물브랜드, #661). tsc 신규에러 0(기존 next.config.ts esl |
 | 2026-08-13 03:05 | #667 | [룰갭] EQUIPMENT_SERVICE_BLOG 미등재 — 커피머신 정비업체 영업일지 8곳 10건 고객후기 | 62fe6765 | - | lib/reviewQuality.ts: EQUIPMENT_SERVICE_BLOG 정규식 신설(L72 근방, decisions#667) + equipmentServiceOnly 게이 |
 | 2026-08-13 07:05 | #668 | [룰갭] COMMON_WORD_NAMES 근접판정 구조적 회귀 — CAFE_CONTEXT_STRONG의 공연 | f4bdd43f | - | lib/reviewQuality.ts:1320 ctxNearName(fullN, commonAnchor, CAFE_CONTEXT_STRONG)→CAFE_CONTEXT_SUBSTAN |
+| 2026-08-13 07:05 | #669 | [룰갭] COMMON_WORD_NAMES 사전 미등재 — "무렵"(시간관용구,5/6건 무관) · "네오"(제 | 4f0a9817 | - | lib/reviewQuality.ts:239 COMMON_WORD_NAMES에 "무렵"·"네오" 추가. tsc 신규에러 0(기존 next.config.ts eslint 베이스라인  |
