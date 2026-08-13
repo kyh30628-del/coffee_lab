@@ -218,3 +218,4 @@
 | 2026-08-13 03:05 | #667 | [룰갭] EQUIPMENT_SERVICE_BLOG 미등재 — 커피머신 정비업체 영업일지 8곳 10건 고객후기 | 62fe6765 | - | lib/reviewQuality.ts: EQUIPMENT_SERVICE_BLOG 정규식 신설(L72 근방, decisions#667) + equipmentServiceOnly 게이 |
 | 2026-08-13 07:05 | #668 | [룰갭] COMMON_WORD_NAMES 근접판정 구조적 회귀 — CAFE_CONTEXT_STRONG의 공연 | f4bdd43f | - | lib/reviewQuality.ts:1320 ctxNearName(fullN, commonAnchor, CAFE_CONTEXT_STRONG)→CAFE_CONTEXT_SUBSTAN |
 | 2026-08-13 07:05 | #669 | [룰갭] COMMON_WORD_NAMES 사전 미등재 — "무렵"(시간관용구,5/6건 무관) · "네오"(제 | 4f0a9817 | - | lib/reviewQuality.ts:239 COMMON_WORD_NAMES에 "무렵"·"네오" 추가. tsc 신규에러 0(기존 next.config.ts eslint 베이스라인  |
+| 2026-08-13 23:05 | #671 | [개발] 협업 #304: [정합성] 폐업 감지 사각 — 리뷰 텍스트 내 명시적 폐업신호 미활용(cron-cl | fe5256c5 | - | app/api/cron-closure/route.ts: synth_reviews(_all) quote 텍스트에서 폐업/폐점/문닫았/영업안해/없어졌 명시신호 감지 시 STALE_MO |
