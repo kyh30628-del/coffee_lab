@@ -67,6 +67,7 @@ export default function AdminPage() {
   const [review, setReview] = useState<any[]>([]);
   const [subs, setSubs] = useState<any[]>([]);
   const [purged, setPurged] = useState(0);
+  const [portfolioData, setPortfolioData] = useState<any>(null); // 🏛️ 형제 서비스(부동산) 이슈·결재 읽기전용
   const [dec, setDec] = useState<{ pending: any[] }>({ pending: [] }); // 실제 CEO L3 결재 대기 큐(단일 소스, /admin/org와 동일)
   const [verify, setVerify] = useState<any>(null);
   const [verifyHistory, setVerifyHistory] = useState<any[]>([]); // 📈 검증 이력 추이(최근 20회 · verify_reports 그대로)
@@ -105,6 +106,7 @@ export default function AdminPage() {
   const openOnboard = () => { setShowOnboard(true); if (!onboard) fetch("/api/onboarding-preview", { headers: { "x-admin-password": pw } }).then((x) => x.json()).then((d) => { if (d.ok) setOnboard(d); }).catch(() => {}); };
   const [showRotation, setShowRotation] = useState(false); // 노출 로테이션 현황 모달
   const [rotation, setRotation] = useState<any>(null);
+  const loadPortfolio = (password: string) => fetch("/api/admin/portfolio", { headers: { "x-admin-password": password }, cache: "no-store" }).then((x) => x.json()).then((d) => { if (d.ok) setPortfolioData(d); }).catch(() => {});
   const loadRotation = () => fetch("/api/admin/rotation", { headers: { "x-admin-password": pw }, cache: "no-store" }).then((x) => x.json()).then((d) => { if (d.ok) setRotation(d); }).catch(() => {});
   const openRotation = () => { setShowRotation(true); loadRotation(); };
   // 📰 뉴스레터
@@ -235,6 +237,7 @@ export default function AdminPage() {
     refreshNumbers(password);
     loadReview(password);
     loadSubscribers(password);
+    loadPortfolio(password);
     fetch("/api/newsletter", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) { setNlList(d.list ?? []); setNlRecipients(d.recipients ?? 0); } }).catch(() => {});
   };
 
@@ -349,6 +352,67 @@ export default function AdminPage() {
             <div className={`text-[11px] font-medium mt-0.5 ${pendingActionsN > 0 ? "text-amber-800" : "text-stone-600"}`}>{pendingActionsN > 0 ? "🟡" : "🟢"} CEO 결재 대기</div>
           </a>
         </div>
+
+        {/* 🏛️ 회사 포트폴리오 — 형제 서비스 이슈·결재 읽기전용(조치는 해당 서비스 관제탑에서). 기본 접힘. */}
+        {portfolioData?.services?.length > 0 && (
+          <details className="mb-6 rounded-2xl border border-stone-300 bg-white overflow-hidden">
+            <summary className="px-4 py-3 cursor-pointer select-none flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <span className="text-lg">🏛️</span>
+                <span className="flex flex-col">
+                  <span className="font-bold text-stone-800">회사 포트폴리오 (다른 서비스)</span>
+                  <span className="text-[11px] text-stone-700">
+                    {portfolioData.services.map((x: any) => `${x.name} ${x.ok ? `이슈 ${(x.issues?.high ?? 0) + (x.issues?.med ?? 0)}·결재 ${x.decisions?.pending ?? 0}` : "연결 실패"}`).join(" · ")}
+                  </span>
+                </span>
+              </span>
+              <span className="text-stone-600 font-bold">▾</span>
+            </summary>
+            <div className="px-4 pb-4 border-t border-stone-200">
+              {portfolioData.services.map((x: any) => (
+                <div key={x.key} className="pt-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-stone-800 text-sm">{x.emoji} {x.name}</span>
+                    <a href={x.admin} target="_blank" rel="noopener" className="text-[11px] font-bold text-emerald-700 underline">관제탑 열기 ↗</a>
+                  </div>
+                  {!x.ok ? (
+                    <div className="text-[11px] text-red-700 mt-1">연결 실패 — {x.error || "상태를 가져오지 못했습니다"}</div>
+                  ) : (
+                    <>
+                      <div className="text-[11px] text-stone-700 mt-1">
+                        물건 {Number(x.items ?? 0).toLocaleString()}건 · 수집 {x.freshHours ?? "-"}시간 전 · 오늘 방문자 {x.visitorsToday ?? 0}명
+                      </div>
+                      <div className="flex gap-2 mt-2 flex-wrap">
+                        <span className={`text-[11px] font-bold rounded-full px-2.5 py-1 border ${(x.issues?.high ?? 0) > 0 ? "bg-red-50 border-red-400 text-red-700" : "bg-white border-stone-300 text-stone-700"}`}>긴급 {x.issues?.high ?? 0}</span>
+                        <span className="text-[11px] font-bold rounded-full px-2.5 py-1 border bg-white border-stone-300 text-stone-700">주의 {x.issues?.med ?? 0}</span>
+                        <span className={`text-[11px] font-bold rounded-full px-2.5 py-1 border ${(x.decisions?.pending ?? 0) > 0 ? "bg-amber-50 border-amber-400 text-amber-800" : "bg-white border-stone-300 text-stone-700"}`}>결재 대기 {x.decisions?.pending ?? 0}</span>
+                        {(x.decisions?.approved ?? 0) > 0 && <span className="text-[11px] font-bold rounded-full px-2.5 py-1 border bg-white border-stone-300 text-stone-700">집행 대기 {x.decisions.approved}</span>}
+                      </div>
+                      {(x.issues?.top ?? []).length > 0 && (
+                        <ul className="mt-2 space-y-1">
+                          {x.issues.top.map((i: any, n: number) => (
+                            <li key={n} className="text-[11px] text-stone-700 flex gap-1.5">
+                              <span className={i.severity === "HIGH" ? "text-red-600 font-bold" : "text-amber-700"}>{i.severity === "HIGH" ? "●" : "○"}</span>
+                              <span className="flex-1">{i.title}{i.consumer ? "" : " (내부)"}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      {(x.decisions?.top ?? []).length > 0 && (
+                        <ul className="mt-2 space-y-1 border-t border-stone-200 pt-2">
+                          {x.decisions.top.map((d: any) => (
+                            <li key={d.id} className="text-[11px] text-stone-700">📋 {d.title} <span className="text-stone-500">[{d.tier} · {d.status === "pending" ? "결재 대기" : "집행 대기"}]</span></li>
+                          ))}
+                        </ul>
+                      )}
+                    </>
+                  )}
+                </div>
+              ))}
+              <p className="text-[10px] text-stone-500 mt-3">읽기 전용입니다 — 승인·조치는 해당 서비스 관제탑에서 하세요. 서비스 간 DB는 분리돼 있습니다(60초 캐시).</p>
+            </div>
+          </details>
+        )}
 
         {/* 🎩 조직 관제(기획조정실 자율조직 브리핑) — 카페-데이터 관제탑과 별개. 모바일 전용 화면으로. */}
         <a href="/admin/org" className="flex items-center justify-between mb-6 rounded-2xl border border-stone-300 bg-white px-4 py-3 hover:bg-stone-50 transition">
