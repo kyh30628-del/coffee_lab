@@ -223,3 +223,4 @@
 | 2026-08-14 03:05 | #676 | [자율진단] youtube-backfill 은퇴 후 EXPECT_MAX_H 잔류 → 매 사이클 허위 크론정지 | 04bce37d | - | web/lib/jobTeams.ts: EXPECT_MAX_H·LAUNCHD_JOBS에서 youtube-backfill 제거(RETIRED_JOBS와 정합, 57·81행 삭제). t |
 | 2026-08-14 03:06 | #677 | [룰갭] VENUE_WORDS 누락 — 연세대 백양누리(학생회관 복합시설) 타업체(샐러디) 오염 | be787c63 | - | web/lib/reviewQuality.ts VENUE_WORDS에 백양누리 추가(대학 복합건물 그룹). tsc 신규에러 0, npm run build 성공. |
 | 2026-08-14 23:05 | #683 | [자율진단] franchise-branch 힐러 2회연속 무효→30일동결 — id7840 보구슬라바 오산시청 | 79419258 | - | lib/collectOrchestrator.ts(BorderlineItem에 text 필드 추가·auditItems/borderline push에 t.text 보존)·app/api |
+| 2026-08-14 23:05 | #684 | [룰갭·저신뢰] COMMERCE_JUNK 가드 "카페" 부분문자열 우회 — 헬스장비 판매글 verified  | c64df313 | - | web/lib/reviewQuality.ts NONVISIT_BOARD 정규식에 gymmaster(헬스장비 중고거래 게시판) 추가. 판매 정형고지문(카페 특성과는 다른…)이 tit |
