@@ -28,7 +28,13 @@ export async function POST(req: NextRequest) {
 
     // 승인 → action_type별 실행
     const p = d.action_params || {};
-    const ids: number[] = Array.isArray(p.ids) ? p.ids.map(Number) : [];
+    // ids 정규화: 일부 상신 경로가 action_params.cafe_id(단수)로 올려 ids가 비어 WHERE id=ANY([])가
+    //   0건 매치해도 catch에 안 걸리고 done으로 오기록되던 문제(#638/#688/#689/#690) — cafe_id 폴백 추가.
+    const ids: number[] = Array.isArray(p.ids)
+      ? p.ids.map(Number)
+      : p.cafe_id != null
+        ? [Number(p.cafe_id)]
+        : [];
     let result = "", status = "done", affected = 0;
     try {
       switch (d.action_type) {
@@ -74,6 +80,10 @@ export async function POST(req: NextRequest) {
         }
         default:
           status = "approved"; result = "승인 기록(수동 실행 필요)";
+      }
+      // ids가 있는데 실제 매치 0건 = 상신측 키 불일치 등으로 실행이 안 된 것 — done으로 은폐하지 않고 failed로 표시.
+      if (status === "done" && ids.length > 0 && affected === 0) {
+        status = "failed"; result += " — 0건 매치(미실행 의심, ids 확인 필요)";
       }
       // 공개상태·등급 변경 = 전 캐시 레이어 무효화(search_cache + ISR /c/[id]·share·area·sitemap) — 2026-07-02
       if (["unpublish", "downgrade", "restore", "requeue_resynth"].includes(d.action_type)) {
