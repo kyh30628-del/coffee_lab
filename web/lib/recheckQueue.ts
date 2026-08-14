@@ -26,6 +26,7 @@ async function ensure(): Promise<void> {
     note TEXT
   )`.catch(() => {});
   await sql`CREATE UNIQUE INDEX IF NOT EXISTS recheck_queue_open ON recheck_queue (cafe_id) WHERE reviewed_at IS NULL`.catch(() => {});
+  await sql`ALTER TABLE recheck_queue ADD COLUMN IF NOT EXISTS reviewed_by TEXT`.catch(() => {});
   ensured = true;
 }
 
@@ -45,24 +46,41 @@ export async function enqueueRecheck(items: { cafeId: number; reason: string; po
   } catch { return 0; }
 }
 
-export type RecheckItem = { id: number; cafe_id: number; name: string; area: string; grade: string; count: number; reason: string; queued_at: string };
+export type RecheckItem = {
+  id: number; cafe_id: number; name: string; area: string; address: string; grade: string; count: number;
+  reason: string; policy_ref: string | null; queued_at: string;
+};
+export type RecheckReviewed = {
+  id: number; cafe_id: number; name: string; verdict: string; note: string | null; reviewed_by: string | null; reviewed_at: string;
+};
 
 /** 미검토 목록 — 관제 화면·보고서용(작은 컬럼만). */
 export async function openRechecks(limit = 50): Promise<RecheckItem[]> {
   try {
     await ensure();
-    return (await sql`SELECT q.id, q.cafe_id, c.name, c.area, c.synth_grade grade, c.synth_count count,
-        q.reason, (q.queued_at AT TIME ZONE 'Asia/Seoul')::text queued_at
+    return (await sql`SELECT q.id, q.cafe_id, c.name, c.area, c.address, c.synth_grade grade, c.synth_count count,
+        q.reason, q.policy_ref, (q.queued_at AT TIME ZONE 'Asia/Seoul')::text queued_at
       FROM recheck_queue q JOIN cafes c ON c.id = q.cafe_id
       WHERE q.reviewed_at IS NULL ORDER BY q.id DESC LIMIT ${limit}`) as any[];
   } catch { return []; }
 }
 
-/** 사람이 판단한 결과 기록 — 이 함수는 공개 상태를 바꾸지 않는다(집행은 기존 결재 경로로). */
-export async function resolveRecheck(id: number, verdict: "keep_excluded" | "republish" | "needs_look", note = ""): Promise<void> {
+/** 최근 검토완료 목록 — 리뷰 화면 이력표시용. */
+export async function reviewedRechecks(limit = 50): Promise<RecheckReviewed[]> {
   try {
     await ensure();
-    await sql`UPDATE recheck_queue SET reviewed_at = now(), verdict = ${verdict}, note = ${note.slice(0, 300)} WHERE id = ${id}`;
+    return (await sql`SELECT q.id, q.cafe_id, c.name, q.verdict, q.note, q.reviewed_by,
+        (q.reviewed_at AT TIME ZONE 'Asia/Seoul')::text reviewed_at
+      FROM recheck_queue q JOIN cafes c ON c.id = q.cafe_id
+      WHERE q.reviewed_at IS NOT NULL ORDER BY q.reviewed_at DESC LIMIT ${limit}`) as any[];
+  } catch { return []; }
+}
+
+/** 사람이 판단한 결과 기록 — 이 함수는 공개 상태를 바꾸지 않는다(집행은 기존 결재 경로로). */
+export async function resolveRecheck(id: number, verdict: "keep_excluded" | "republish" | "needs_look", note = "", reviewedBy = ""): Promise<void> {
+  try {
+    await ensure();
+    await sql`UPDATE recheck_queue SET reviewed_at = now(), verdict = ${verdict}, note = ${note.slice(0, 300)}, reviewed_by = ${reviewedBy.slice(0, 60) || null} WHERE id = ${id}`;
   } catch { /* graceful */ }
 }
 
