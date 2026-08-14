@@ -220,3 +220,4 @@
 | 2026-08-13 07:05 | #669 | [룰갭] COMMON_WORD_NAMES 사전 미등재 — "무렵"(시간관용구,5/6건 무관) · "네오"(제 | 4f0a9817 | - | lib/reviewQuality.ts:239 COMMON_WORD_NAMES에 "무렵"·"네오" 추가. tsc 신규에러 0(기존 next.config.ts eslint 베이스라인  |
 | 2026-08-13 23:05 | #671 | [개발] 협업 #304: [정합성] 폐업 감지 사각 — 리뷰 텍스트 내 명시적 폐업신호 미활용(cron-cl | fe5256c5 | - | app/api/cron-closure/route.ts: synth_reviews(_all) quote 텍스트에서 폐업/폐점/문닫았/영업안해/없어졌 명시신호 감지 시 STALE_MO |
 | 2026-08-13 23:06 | #674 | [탐지엔진] 카페간 인용문(quote) 완전동일 상시탐지 — cron-sentinel/cron-verify  | 4987b37d | - | app/api/cron-verify/route.ts: runChecks()에 check #16 cross_cafe_quote_dup 추가 — 공개카페 synth_reviews[]. |
+| 2026-08-14 03:05 | #676 | [자율진단] youtube-backfill 은퇴 후 EXPECT_MAX_H 잔류 → 매 사이클 허위 크론정지 | 04bce37d | - | web/lib/jobTeams.ts: EXPECT_MAX_H·LAUNCHD_JOBS에서 youtube-backfill 제거(RETIRED_JOBS와 정합, 57·81행 삭제). t |
