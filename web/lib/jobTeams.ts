@@ -58,6 +58,8 @@ export const EXPECT_MAX_H: Record<string, number> = {
   "chief-manager": 20,    // 일간 사이클 KST 08·12·16시
   "self-audit": 18,       // 🔄KST 12·16·20시 (최대공백 20→익일12시=16h + 버퍼)
   "weekly-evaluation": 30, // 매일 10:30 KST(격일 게이트지만 스킵도 하트비트)
+  "search-quality-agent": 30, // 저녁블록 일 1회 + 버퍼 (coordination#296/#300, decisions#663·664)
+  "b2b-sales-agent": 54,      // 격일(짝수/홀수 DOY 로테이션) + 버퍼 (coordination#296/#300, decisions#663·664)
   // 🔄 2026-08-04: chat-watch 폴링(1.5초) 정지로 DB 24h깨우기 제거(컴퓨트 절감) → 로컬 폴러 3개도 60분→KST 08·12·16·20시(최대공백 12h+버퍼14).
   "audit-watch": 14,      // 이벤트 워처 KST 08·12·16·20시
   "dev-pipeline": 14,     // 개발 파이프라인 KST 08·12·16·20시
