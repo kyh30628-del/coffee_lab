@@ -509,7 +509,13 @@ async function healFranchiseBranchPollution(flagged: FranchiseFlag[], deadline: 
         //   지점을 나열하는 라운드업 포스트는 본문 어딘가에 자기 지점 접미사가 있어도, 실제 대표 인용문은
         //   다른 지점 얘기만 뽑힐 수 있다(id3782·11906 실측) — scanFranchiseBranchPollution의 탐지 granularity
         //   (synth_reviews.quote 대조)와 맞춘다.
-        const quote = toQuote(it.body || it.title || "", cleanName);
+        // 🩺 2차 granularity 갭 수정(#683, 08-14): 표시 quote는 storeResult의 evidence.push가
+        //   toQuote(t.**text**, name)으로 뽑는데(collectOrchestrator.ts), 위 줄은 desc 기반인 it.body를
+        //   써서 다른 문장을 골랐다 — text에 제목이 붙어있으면 문장 분리·점수가 달라져(동점 tie-break로
+        //   먼저 오는 문장이 이김) desc판 quote엔 자기지점이 있어도 text판(=실제 화면) quote엔 없는 경우가
+        //   생긴다(id7840 실증: desc quote="…오산시청점에 본점이…"(보존) vs 실제 표시 quote="…한국병원점…"(오염
+        //   그대로)). it.text(원문)를 최우선으로 써서 재감사 quote를 표시 quote와 완전히 일치시킨다.
+        const quote = toQuote(it.text || it.body || it.title || "", cleanName);
         const ownInQuote = quote.includes(f.ownSuffix) || (f.ownToken.length >= 2 && quote.includes(f.ownToken));
         if (ownInQuote) continue; // 표시될 인용문 자체가 자기 지점 얘기 → 보존
         if (f.otherSuffixes.some((s) => body.includes(s)) || f.otherTokens.some((t) => body.includes(t))) { dec[it.key] = false; drop++; }
