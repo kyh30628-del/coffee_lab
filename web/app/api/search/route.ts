@@ -158,7 +158,7 @@ function lexicalScore(c: any, tokens: string[], hitConcepts: typeof CONCEPTS) {
     snippet = (from > 0 ? "…" : "") + hitQuote.slice(from, from + 74).trim() + (hitQuote.length > from + 74 ? "…" : "");
     reasons.push(`리뷰: ${snippet}`);
   } else if (tokenHit.size > 0) reasons.push(`'${Array.from(tokenHit)[0]}' 일치`);
-  return { exact, concept, reasons, snippet, matchedTerm: reviewTok ?? null };
+  return { exact, concept, reasons, snippet, matchedTerm: reviewTok ?? null, reviewOnly };
 }
 
 // 💰 synth_reviews는 통째로 싣지 않고 **SQL 안에서 quote만 잘라** 받는다(TOAST 1.9GB 컬럼 → 인용문 몇 줄).
@@ -344,12 +344,16 @@ export async function GET(req: NextRequest) {
             [...lex].sort((a, b) => (b.exact + b.concept) - (a.exact + a.concept))
               .forEach((l, i) => lexRank.set(String(l.c.id), i));
             scored = lex
-              .map(({ c, exact, concept, reasons, snippet }) => {
+              .map(({ c, exact, concept, reasons, snippet, reviewOnly }) => {
                 const sim = Number(c.sim) || 0;
                 // #216: 키워드·느낌 완전 불일치(exact+concept===0)면 등급가산 미적용 — 브랜드명(이디야·컴포즈 등)
                 //   DB無매칭 검색 시 의미유사도만 있는 무관 카페가 gradeBonus(+25)로 검증배지·고득점 1위로
                 //   오인 노출되던 왜곡 차단. 키워드 폴백 경로(아래)와 동일한 가드로 두 경로를 일치시킨다.
                 const lexMatched = exact + concept > 0;
+                // #727: reviewOnly(다른 필드는 전혀 안 맞고 리뷰 인용문의 비교언급 1건뿐)는 lexMatched지만
+                //   "진짜 매칭"이 아니다 — semantic_floor 면제·gradeBonus 지급 대상에서는 제외한다(qualifies).
+                //   RRF 랭킹(rLex)에는 그대로 반영해 리뷰 본문 검색 자체는 계속 되게 한다(2026-08-10 재교정 유지).
+                const qualifies = (exact > 0 && !reviewOnly) || concept > 0;
                 // RRF 융합값을 0~100 스케일로 환산(두 랭킹 모두 1위면 100). 어휘 미매칭은 의미 랭킹만 반영.
                 const rSim = simRank.get(String(c.id)) ?? lex.length;
                 const rLex = lexMatched ? (lexRank.get(String(c.id)) ?? lex.length) : lex.length * 2;
@@ -357,11 +361,11 @@ export async function GET(req: NextRequest) {
                 // 🗺️ 지역 미지정 질의의 외곽 상위노출 방지 — 지역을 *명시한* 질의엔 적용하지 않는다.
                 //   (실측: "크루아상 맛집" 1위가 이천시, "고양이 있는 카페" 1위가 강화군이었다.)
                 const corePrior = !regionExplicit && isCoreArea(c.area) ? 6 : 0;
-                const total = rrf + (lexMatched ? gradeBonus(c.synth_grade) : 0) + corePrior;
+                const total = rrf + (qualifies ? gradeBonus(c.synth_grade) : 0) + corePrior;
                 const why = [`의미 유사 ${Math.round(sim * 100)}%`, ...reasons];
-                return { sim, lexMatched, item: { id: c.id, name: c.name, area: c.area, grade: c.synth_grade, count: c.synth_count, identity: c.synth_identity, score: Math.round(total * 10) / 10, reasons: why.slice(0, 3), snippet } };
+                return { sim, qualifies, item: { id: c.id, name: c.name, area: c.area, grade: c.synth_grade, count: c.synth_count, identity: c.synth_identity, score: Math.round(total * 10) / 10, reasons: why.slice(0, 3), snippet } };
               })
-              .filter((x) => x.lexMatched || x.sim >= semanticFloor)
+              .filter((x) => x.qualifies || x.sim >= semanticFloor)
               .map((x) => x.item);
           }
         }
@@ -392,8 +396,10 @@ export async function GET(req: NextRequest) {
       )) as unknown as any[]);
       for (const c of rows) {
         if (!inRegion(c.area ?? "", effectiveRegion)) continue;
-        const { exact, concept, reasons, snippet } = lexicalScore(c, tokens, hitConcepts);
-        const total = exact + concept + (exact + concept > 0 ? gradeBonus(c.synth_grade) : 0);
+        const { exact, concept, reasons, snippet, reviewOnly } = lexicalScore(c, tokens, hitConcepts);
+        // #727: reviewOnly 단독 매칭(리뷰 인용문의 타사 비교언급뿐)은 등급가산 대상에서 제외(semantic 경로와 일치).
+        const qualifies = (exact > 0 && !reviewOnly) || concept > 0;
+        const total = exact + concept + (qualifies ? gradeBonus(c.synth_grade) : 0);
         if (exact + concept <= 0) continue;
         byId.set(c.id, c);
         scored.push({ id: c.id, name: c.name, area: c.area, grade: c.synth_grade, count: c.synth_count, identity: c.synth_identity, score: Math.round(total * 10) / 10, reasons: reasons.slice(0, 3), snippet });
