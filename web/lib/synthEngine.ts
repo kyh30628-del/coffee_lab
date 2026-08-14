@@ -216,14 +216,24 @@ function buildIdentity(coords: Record<string, number | null>, basis: Record<stri
   // 동+phrase가 이미 '동에서' 구조인 경우 phrase 안에 '에서'가 또 나오면 어색해지므로(예: '창가 자리에서'),
   // phrase 자체에 '에서'가 있으면 조사 없이 붙인다.
   const wrapLocality = (phrase: string) => (!locality ? phrase : phrase.includes("에서") ? `${locality} ${phrase}` : `${locality}에서 ${phrase}`);
-  const tu = Object.entries(uses).sort((x, y) => y[1] - x[1])[0];
-  if (tu) {
-    const cat = tu[0];
-    const term = cat === "빵"
-      ? categoryBreadTerm(naverCategory) ?? reviewSpecificTerm(cat, clean) ?? reviewSpecificTermExt(cat, clean)
-      : reviewSpecificTerm(cat, clean) ?? reviewSpecificTermExt(cat, clean);
-    if (term && SPECIFIC_PHRASE[cat]) p.push(wrapLocality(SPECIFIC_PHRASE[cat](term)));
-    else if (USE_PHRASE[cat]) p.push(wrapLocality(USE_PHRASE[cat]));
+  const useEntries = Object.entries(uses).sort((x, y) => y[1] - x[1]);
+  if (useEntries.length) {
+    // 레드팀#665: 897곳이 "{동}에서 사진 찍기 좋은 분위기" 고정 템플릿으로 수렴 — 원인은 1위 용도만 구체어를
+    // 시도하는 이 폴백조건이었다. use.사진 신호어(분위기/인테리어/예쁜/감성)가 다른 용도보다 훨씬 포괄적이라
+    // 거의 항상 1위를 차지하는데, 정작 사진의 구체어 사전(루프탑·오션뷰 등)은 좁아 매칭 실패율이 높다. 그 결과
+    // 리뷰에 자동차카페·케이크·프라이빗룸 등 구체 신호가 실제로 있어도(2·3위 용도) 버려지고 포괄 문구로
+    // 폴백했다. 1위부터 순서대로 구체어를 시도해 어느 용도든 구체어가 잡히면 그걸 쓰고, 전부 없을 때만
+    // 1위 용도의 포괄 문구로 폴백한다(완전 실패 시의 최종 폴백은 그대로 유지 — 서비스 무변).
+    let picked: { cat: string; term: string } | null = null;
+    for (const [cat] of useEntries) {
+      const term = cat === "빵"
+        ? categoryBreadTerm(naverCategory) ?? reviewSpecificTerm(cat, clean) ?? reviewSpecificTermExt(cat, clean)
+        : reviewSpecificTerm(cat, clean) ?? reviewSpecificTermExt(cat, clean);
+      if (term) { picked = { cat, term }; break; }
+    }
+    const topCat = useEntries[0][0];
+    if (picked && SPECIFIC_PHRASE[picked.cat]) p.push(wrapLocality(SPECIFIC_PHRASE[picked.cat](picked.term)));
+    else if (USE_PHRASE[topCat]) p.push(wrapLocality(USE_PHRASE[topCat]));
   } else if (locality) p.push(`${locality}의 카페`);
   if (ops["원두판매"] && p.length < 4) p.push("원두도 살 수 있는 곳");
   if (ops["권위"]) p.push("매체·평단에 소개된 곳");
