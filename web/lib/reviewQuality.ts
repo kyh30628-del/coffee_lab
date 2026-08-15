@@ -1357,11 +1357,19 @@ export function verifyReview(input: QualityInput): QualityResult {
     }
   }
   if (!nameInTitle && !nameInBody) {
+    // [룰갭 rulegap-20260814-1234, decisions#716] venueOnly/landmarkStripped 가드(venueCtxOk·landmarkCtxOk)로
+    //   이미 이 자리에서 nameInTitle/nameInBody가 false가 된 후보가, 아래 areaPresent만으로 borderline(LLM
+    //   재판정) 큐에 들어가면 AI가 venue/landmark 판단 근거를 모른 채 독자적으로 "실제 후기 여부"만 보고
+    //   재유입시킨다(id15358 수봉별마루도너츠=인천 수봉공원 전망대 "수봉별마루"와 동명 랜드마크, 표시 6건 중
+    //   3건이 랜드마크 후기로 재오염 실측). CAFE_CONTEXT_STRONG·CAFE_WORDS(titleHasCafeWord/bodyHasCafeWord)가
+    //   원문에 전무하면 = 카페 맥락 자체가 없다는 뜻이므로, needs_llm 후보풀에 넣기 전 결정론으로 하드 스킵한다
+    //   (AI 판정 로직 자체는 불변 — borderline 큐에 아예 안 들어가게만 한다).
+    const venueOrLandmarkNoCtx = (venueOnly || landmarkStripped) && !CAFE_CONTEXT_STRONG.test(fullL) && !titleHasCafeWord && !bodyHasCafeWord;
     // 이름은 안 잡혀도 '카페 방문 후기 맥락'이 뚜렷하면 버리지 않고 LLM 재판정 대상으로(경계).
-    const ctx = (visit || substance >= 2) && (areaPresent || titleHasCafeWord || bodyHasCafeWord) && !listicle;
+    const ctx = !venueOrLandmarkNoCtx && (visit || substance >= 2) && (areaPresent || titleHasCafeWord || bodyHasCafeWord) && !listicle;
     return ctx
       ? { verdict: "rejected", score: 22, reasons: ["카페명 불명확하나 후기 맥락 있음(LLM 재판정 대상)"], borderline: true, signals: sig }
-      : { verdict: "rejected", score: 0, reasons: ["카페명이 제목·본문에 없음(무관/동명)"], signals: sig };
+      : { verdict: "rejected", score: 0, reasons: [venueOrLandmarkNoCtx ? "건물/랜드마크 동명(카페 맥락 전무) — 결정론 하드스킵" : "카페명이 제목·본문에 없음(무관/동명)"], signals: sig };
   }
   // ★ 핵심 규칙: 제목이 '다른 카페'를 선언 — 우리 카페는 본문에 잠깐 언급된 것.
   //   카페힌트 있는 긴 제목인데 우리 카페 고유명(비지역 토큰)이 제목에 없으면 → 다른 카페 후기.
