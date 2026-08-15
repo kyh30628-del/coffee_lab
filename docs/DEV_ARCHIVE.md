@@ -231,3 +231,4 @@
 | 2026-08-15 03:06 | #727 | [검색품질 재발] 리뷰 비교문 언급 오탐 — #452 스코어인플레는 픽스, 후보노출(candidate lea | 578c7eb5 | - | app/api/search/route.ts: reviewOnly(리뷰 인용문 타사비교 언급 단독 매칭)이 lexMatched=true로 잡혀 semantic_floor(min_si |
 | 2026-08-15 07:05 | #716 | [룰갭] LANDMARK_WORDS 가드가 AI판정(needs_llm) 경로에서 우회 — 수봉별마루도너츠 표 | 6b3e3e9a | - | web/lib/reviewQuality.ts classify()의 nameInTitle/nameInBody 둘 다 false인 폴백 분기(라인 1359 부근)에 venueOnly/ |
 | 2026-08-15 11:05 | #730 | [룰갭] "카페" 브랜딩 비카페 요식업(파스타·순댓국·죽·떡집) — NONCAFE_BIZ titleHasCa | 755d5ef5 | - | web/lib/reviewQuality.ts:1176 부근 — naver_category dish-specific 화이트리스트(한식>순대,순댓국 한식>죽 이탈리아음식>스파게티,파스 |
+| 2026-08-15 23:05 | #732 | [룰갭] 멀티플레이스 리스트/투어 콘텐츠 — nameInTitle만으로 listicle 하드거절 우회 | 4ccd5892 | - | web/lib/reviewQuality.ts:1616 listicle 하드거절 조건을 (listicle && !nameInTitle) -> (listicle && !nameInBo |
