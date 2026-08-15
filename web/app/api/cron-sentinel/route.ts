@@ -114,9 +114,14 @@ async function healAttractionPollution(flagged: AttrFlag[], deadline: number): P
   let skipped = 0, noEffect = 0, frozenNew = 0;
   const HJOB = "sentinel.attraction";
   const frozenSet = await frozenTargets(HJOB);
-  for (const f of flagged.slice(0, 12)) {
+  // 🩺 2026-08-15 수렴 버그 수리: 예전엔 `flagged.slice(0,12)`로 **먼저 자르고** 그 안에서 동결분을 걸렀다.
+  //   동결 대상이 목록 앞쪽에 몰리면 12개 슬롯을 전부 스킵으로 소진해, 처리 가능한 항목이 **영원히 차례가 안 왔다**
+  //   (실측: 지점오염 '잔여 5(다음런)'이 여러 런 동안 그대로 · 자동정리 0 · 하네스가 정체 3회로 검출).
+  //   → 동결분을 **자르기 전에** 제외해 배치 12칸이 전부 실제 처리 대상으로 채워지게 한다.
+  const actionable = flagged.filter((x: any) => !frozenSet.has(Number(x.id)));
+  skipped += flagged.length - actionable.length;
+  for (const f of actionable.slice(0, 12)) {
     if (Date.now() > deadline) break;
-    if (frozenSet.has(Number(f.id))) { skipped++; continue; }
     // 🎫 하네스 L2 — 다른 잡(autoCorrect·resynth·다른 힐러)이 같은 카페를 만지는 중이면 양보한다.
     if (!(await acquireLease(HJOB, Number(f.id), 180))) { skipped++; continue; }
     try {
@@ -243,9 +248,14 @@ async function healWeakNamePollution(flagged: WeakFlag[], deadline: number): Pro
   let skipped = 0, noEffect = 0, frozenNew = 0;
   const HJOB = "sentinel.weak-name";
   const frozenSet = await frozenTargets(HJOB);
-  for (const f of flagged.slice(0, 12)) {
+  // 🩺 2026-08-15 수렴 버그 수리: 예전엔 `flagged.slice(0,12)`로 **먼저 자르고** 그 안에서 동결분을 걸렀다.
+  //   동결 대상이 목록 앞쪽에 몰리면 12개 슬롯을 전부 스킵으로 소진해, 처리 가능한 항목이 **영원히 차례가 안 왔다**
+  //   (실측: 지점오염 '잔여 5(다음런)'이 여러 런 동안 그대로 · 자동정리 0 · 하네스가 정체 3회로 검출).
+  //   → 동결분을 **자르기 전에** 제외해 배치 12칸이 전부 실제 처리 대상으로 채워지게 한다.
+  const actionable = flagged.filter((x: any) => !frozenSet.has(Number(x.id)));
+  skipped += flagged.length - actionable.length;
+  for (const f of actionable.slice(0, 12)) {
     if (Date.now() > deadline) break;
-    if (frozenSet.has(Number(f.id))) { skipped++; continue; }
     // 🎫 하네스 L2 — 다른 잡(autoCorrect·resynth·다른 힐러)이 같은 카페를 만지는 중이면 양보한다.
     if (!(await acquireLease(HJOB, Number(f.id), 180))) { skipped++; continue; }
     try {
@@ -351,9 +361,14 @@ async function healNonCafeBizPollution(flagged: NcbFlag[], deadline: number): Pr
   let skipped = 0, noEffect = 0, frozenNew = 0;
   const HJOB = "sentinel.noncafe-biz";
   const frozenSet = await frozenTargets(HJOB);
-  for (const f of flagged.slice(0, 12)) {
+  // 🩺 2026-08-15 수렴 버그 수리: 예전엔 `flagged.slice(0,12)`로 **먼저 자르고** 그 안에서 동결분을 걸렀다.
+  //   동결 대상이 목록 앞쪽에 몰리면 12개 슬롯을 전부 스킵으로 소진해, 처리 가능한 항목이 **영원히 차례가 안 왔다**
+  //   (실측: 지점오염 '잔여 5(다음런)'이 여러 런 동안 그대로 · 자동정리 0 · 하네스가 정체 3회로 검출).
+  //   → 동결분을 **자르기 전에** 제외해 배치 12칸이 전부 실제 처리 대상으로 채워지게 한다.
+  const actionable = flagged.filter((x: any) => !frozenSet.has(Number(x.id)));
+  skipped += flagged.length - actionable.length;
+  for (const f of actionable.slice(0, 12)) {
     if (Date.now() > deadline) break;
-    if (frozenSet.has(Number(f.id))) { skipped++; continue; }
     // 🎫 하네스 L2 — 다른 잡(autoCorrect·resynth·다른 힐러)이 같은 카페를 만지는 중이면 양보한다.
     if (!(await acquireLease(HJOB, Number(f.id), 180))) { skipped++; continue; }
     try {
@@ -478,9 +493,14 @@ async function healFranchiseBranchPollution(flagged: FranchiseFlag[], deadline: 
   let skipped = 0, noEffect = 0, frozenNew = 0;
   const HJOB = "sentinel.franchise-branch";
   const frozenSet = await frozenTargets(HJOB);
-  for (const f of flagged.slice(0, 12)) {
+  // 🩺 2026-08-15 수렴 버그 수리: 예전엔 `flagged.slice(0,12)`로 **먼저 자르고** 그 안에서 동결분을 걸렀다.
+  //   동결 대상이 목록 앞쪽에 몰리면 12개 슬롯을 전부 스킵으로 소진해, 처리 가능한 항목이 **영원히 차례가 안 왔다**
+  //   (실측: 지점오염 '잔여 5(다음런)'이 여러 런 동안 그대로 · 자동정리 0 · 하네스가 정체 3회로 검출).
+  //   → 동결분을 **자르기 전에** 제외해 배치 12칸이 전부 실제 처리 대상으로 채워지게 한다.
+  const actionable = flagged.filter((x: any) => !frozenSet.has(Number(x.id)));
+  skipped += flagged.length - actionable.length;
+  for (const f of actionable.slice(0, 12)) {
     if (Date.now() > deadline) break;
-    if (frozenSet.has(Number(f.id))) { skipped++; continue; }
     // 🎫 하네스 L2 — 다른 잡(autoCorrect·resynth·다른 힐러)이 같은 카페를 만지는 중이면 양보한다.
     if (!(await acquireLease(HJOB, Number(f.id), 180))) { skipped++; continue; }
     try {
@@ -650,9 +670,14 @@ async function healGenericTermPollution(flagged: GenericFlag[], deadline: number
   let skipped = 0, noEffect = 0, frozenNew = 0;
   const HJOB = "sentinel.generic-term";
   const frozenSet = await frozenTargets(HJOB);
-  for (const f of flagged.slice(0, 12)) {
+  // 🩺 2026-08-15 수렴 버그 수리: 예전엔 `flagged.slice(0,12)`로 **먼저 자르고** 그 안에서 동결분을 걸렀다.
+  //   동결 대상이 목록 앞쪽에 몰리면 12개 슬롯을 전부 스킵으로 소진해, 처리 가능한 항목이 **영원히 차례가 안 왔다**
+  //   (실측: 지점오염 '잔여 5(다음런)'이 여러 런 동안 그대로 · 자동정리 0 · 하네스가 정체 3회로 검출).
+  //   → 동결분을 **자르기 전에** 제외해 배치 12칸이 전부 실제 처리 대상으로 채워지게 한다.
+  const actionable = flagged.filter((x: any) => !frozenSet.has(Number(x.id)));
+  skipped += flagged.length - actionable.length;
+  for (const f of actionable.slice(0, 12)) {
     if (Date.now() > deadline) break;
-    if (frozenSet.has(Number(f.id))) { skipped++; continue; }
     // 🎫 하네스 L2 — 다른 잡(autoCorrect·resynth·다른 힐러)이 같은 카페를 만지는 중이면 양보한다.
     if (!(await acquireLease(HJOB, Number(f.id), 180))) { skipped++; continue; }
     try {
