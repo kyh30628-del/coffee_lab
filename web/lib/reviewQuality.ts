@@ -1624,7 +1624,11 @@ export function verifyReview(input: QualityInput): QualityResult {
   if (generic && !nameInTitle) {
     return { verdict: "rejected", score: 5, reasons: ["일반 교양/정보글(그 카페 후기 아님)"], signals: sig };
   }
-  if (listicle && !nameInTitle) {
+  // 룰갭(decisions#732): 멀티플레이스 투어/베스트N 콘텐츠는 방문한 여러 장소를 제목에 나열해 타겟 카페명도
+  //   우연히 title에 포함되면(nameInTitle=true) 이 하드거절을 우회한다. 실제로 그 카페 얘기인지는 본문에서만
+  //   판별 가능하므로(id4678·16787·3132 실측, desc가 전량 타 장소/타 지역 내용이거나 실질 내용 0) title
+  //   대신 nameInBody로 판별한다 — nameInBody는 이미 위(1091행)에서 계산됨.
+  if (listicle && !nameInBody) {
     return { verdict: "rejected", score: 10, reasons: ["나열식 모음글에 언급만 됨(주제 아님)"], signals: sig };
   }
   // 룰갭 P63(2026-07-28, decisions#530): 배송-전용 강신호(택배·스마트스토어 구매 등)만 있고 매장 실물방문
