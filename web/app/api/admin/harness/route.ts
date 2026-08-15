@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { detectStuck } from "@/lib/runLedger";
 import { ALL_CONTRACT_IDS, getContract, verifyContracts } from "@/lib/jobContract";
+import { openRecheckCount } from "@/lib/recheckQueue";
 export const runtime = "nodejs";
 
 // 🩺 하네스 관제 — 설계한 6계층이 **지금 실제로 물려 있는지**를 한 화면에 모은다.
@@ -13,7 +14,7 @@ export async function GET(req: NextRequest) {
   if (req.headers.get("x-admin-password") !== process.env.ADMIN_PASSWORD)
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   try {
-    const [runs, stuck, frozen, budget, leases, overIssues] = await Promise.all([
+    const [runs, stuck, frozen, budget, leases, overIssues, recheckOpen] = await Promise.all([
       // L5 원장 — 최근 실행과 계층별 신호(지문·예산·동결스킵·스코프위반)
       sql`SELECT job, (started_at AT TIME ZONE 'Asia/Seoul')::text kst, ok,
             fingerprint IS NOT NULL AS fp,
@@ -35,6 +36,7 @@ export async function GET(req: NextRequest) {
       // L2 배차 — 현재 잡혀 있는 리스(치유기 동시집행 방지)
       sql`SELECT COUNT(*)::int n FROM heal_leases WHERE lease_until > now()`.catch(() => [{ n: 0 }]),
       sql`SELECT ikey, LEFT(COALESCE(detail,''),100) detail FROM issues WHERE ikey LIKE 'budget:%' AND status='open'`,
+      openRecheckCount(),
     ]) as any[];
 
     // L1 계약 검증 — ⚠️ 표시용 목록(LIMIT 40)으로 판정하면 **하루 1회 도는 잡이 '유령 계약'으로 오탐**된다.
@@ -70,8 +72,8 @@ export async function GET(req: NextRequest) {
         stat: `24h 실행 ${(runs as any[]).length}건 · 정체 ${(stuck as any[]).length}건`,
         note: "모든 실행을 추가전용으로 남기고, 같은 문제집합이 반복되면 '헛돎'으로 검출한다." },
       { id: "L6", name: "게이트·재판정", file: "lib/gateQueue · lib/recheckQueue",
-        ok: true, stat: "SLA 6/24/72h",
-        note: "사람 결재가 묵히지 않게 눈에 띄게 한다. L3 자동승인·자동 재공개는 하네스도 못 넘는다." },
+        ok: true, stat: `SLA 6/24/72h · 재판정 미검토 ${recheckOpen}건`,
+        note: "사람 결재가 묵히지 않게 눈에 띄게 한다. L3 자동승인·자동 재공개는 하네스도 못 넘는다.", link: "/admin/recheck" },
     ];
 
     return NextResponse.json({

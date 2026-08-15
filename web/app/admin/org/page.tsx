@@ -740,6 +740,7 @@ export default function OrgDashboard() {
                     <div style={{ fontSize: 11, color: "#4a3a2a", marginTop: 4, fontWeight: 600 }}>{L.stat}</div>
                     <div style={{ fontSize: 10, color: "#8a7355", marginTop: 3, lineHeight: 1.5 }}>{L.note}</div>
                     <div style={{ fontSize: 9.5, color: "#b09b78", marginTop: 2, fontFamily: "monospace" }}>{L.file}</div>
+                    {L.link && <a href={L.link} style={{ display: "inline-block", marginTop: 5, fontSize: 11, fontWeight: 700, color: "#6a468c", textDecoration: "none" }}>리뷰 화면 열기 →</a>}
                   </div>
                 ))}
               </div>
