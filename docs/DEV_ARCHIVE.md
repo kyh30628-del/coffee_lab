@@ -228,3 +228,4 @@
 | 2026-08-14 23:07 | #694 | [개발] synth_identity 정체성 붕괴 템플릿 897건 — 생성 로직 폴백조건 조사·수정 | f5220bc8 | - | lib/synthEngine.ts buildIdentity 수정. 근본원인 분해: 897건 중 대다수(약 2,774건)는 #642(08-09 07:17 UTC 배포) 이전에 합성된 |
 | 2026-08-14 23:08 | #695 | [개발] decide API action_params 키 불일치로 미실행건 허위 done 처리 — ids 정 | d364e425 | - | app/api/admin/decide/route.ts: ids 파싱에 cafe_id 단수 폴백 추가(정규화) + status===done && ids.length>0 && affe |
 | 2026-08-15 03:05 | #702 | [자율진단] 정책 소급 재판정 큐(L6) 리뷰 UI 부재 — 0/200 방치 | 2624e598 | - | 신규: app/admin/recheck/page.tsx(리뷰 화면)+app/api/admin/recheck/route.ts(GET목록/POST verdict). lib/rechec |
+| 2026-08-15 03:06 | #727 | [검색품질 재발] 리뷰 비교문 언급 오탐 — #452 스코어인플레는 픽스, 후보노출(candidate lea | 578c7eb5 | - | app/api/search/route.ts: reviewOnly(리뷰 인용문 타사비교 언급 단독 매칭)이 lexMatched=true로 잡혀 semantic_floor(min_si |
