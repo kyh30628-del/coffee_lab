@@ -4,19 +4,24 @@ import { sql } from "@/lib/db";
 export const SITE = "https://dongnecoffeenote.com";
 export const OG_HINT = "영수증 리뷰·광고 빼고 진짜 후기로 검증 · dongnecoffeenote.com";
 
-export type Taste = { key: string; label: string; short: string; emoji: string; desc: string };
+export type Taste = { key: string; label: string; short: string; emoji: string; desc: string;
+  /** 🔍 사람들이 실제로 검색하는 표현(네이버 데이터랩 실측 기반, 2026-08-15).
+   *  우리 label은 '우리 말'이라 검색어와 어긋난다 — 실측: "안산시 작업하기 좋은 카페 검증"은 10위 안 10개가
+   *  전부 우리 페이지인데, 정작 사람들이 치는 "안산 카공 카페 추천"에는 **한 개도 안 잡혔다**.
+   *  제목 머리는 보존한 채 이 별칭을 뒤에 병기해 같은 자산이 더 큰 검색량 풀에서 싸우게 한다. */
+  aliases: string[] };
 // char_scores 키와 1:1 (mood/work/quiet/roast/space/dessert)
 export const TASTES: Taste[] = [
-  { key: "work", label: "작업하기 좋은", short: "카공", emoji: "💻", desc: "노트북·콘센트·집중하기 좋은" },
-  { key: "quiet", label: "조용한", short: "혼자", emoji: "🤍", desc: "혼자 차분히 머물기 좋은" },
-  { key: "dessert", label: "디저트 맛집", short: "디저트", emoji: "🍰", desc: "달콤한 디저트가 맛있는" },
-  { key: "roast", label: "스페셜티·로스팅", short: "스페셜티", emoji: "🔥", desc: "직접 로스팅·원두에 진심인" },
-  { key: "mood", label: "분위기 좋은", short: "감성", emoji: "📸", desc: "분위기·사진이 예쁜" },
-  { key: "space", label: "넓은 대형", short: "대형", emoji: "🪑", desc: "넓고 좌석이 많은" },
+  { key: "work", label: "작업하기 좋은", short: "카공", emoji: "💻", desc: "노트북·콘센트·집중하기 좋은", aliases: ["카공 카페", "노트북 카페", "공부하기 좋은 카페"] },
+  { key: "quiet", label: "조용한", short: "혼자", emoji: "🤍", desc: "혼자 차분히 머물기 좋은", aliases: ["조용한 카페", "혼자 가기 좋은 카페"] },
+  { key: "dessert", label: "디저트 맛집", short: "디저트", emoji: "🍰", desc: "달콤한 디저트가 맛있는", aliases: ["디저트 카페", "디저트 맛집", "베이커리 카페"] },
+  { key: "roast", label: "스페셜티·로스팅", short: "스페셜티", emoji: "🔥", desc: "직접 로스팅·원두에 진심인", aliases: ["로스터리 카페", "핸드드립 카페", "스페셜티 커피"] },
+  { key: "mood", label: "분위기 좋은", short: "감성", emoji: "📸", desc: "분위기·사진이 예쁜", aliases: ["분위기 좋은 카페", "감성 카페", "예쁜 카페"] },
+  { key: "space", label: "넓은 대형", short: "대형", emoji: "🪑", desc: "넓고 좌석이 많은", aliases: ["대형카페", "넓은 카페", "주차 되는 카페"] },
   // 2026-08-13 신설(P1 — CEO 승인): 데이터랩 수요 1·2위 테마. char 축과 키 동일(파이프라인 자동 연동).
-  { key: "pet", label: "애견동반", short: "반려동반", emoji: "🐶", desc: "반려견과 함께 갈 수 있는" },
-  { key: "brunch", label: "브런치 맛집", short: "브런치", emoji: "🥐", desc: "브런치 메뉴가 맛있는" },
-  { key: "view", label: "뷰 좋은", short: "뷰맛집", emoji: "🌄", desc: "창밖 풍경·전망이 좋은" },
+  { key: "pet", label: "애견동반", short: "반려동반", emoji: "🐶", desc: "반려견과 함께 갈 수 있는", aliases: ["애견카페", "강아지 카페", "반려견 동반 카페"] },
+  { key: "brunch", label: "브런치 맛집", short: "브런치", emoji: "🥐", desc: "브런치 메뉴가 맛있는", aliases: ["브런치 카페", "브런치 맛집"] },
+  { key: "view", label: "뷰 좋은", short: "뷰맛집", emoji: "🌄", desc: "창밖 풍경·전망이 좋은", aliases: ["뷰맛집 카페", "전망 좋은 카페"] },
 ];
 export const tasteByKey = (k: string) => TASTES.find((t) => t.key === k);
 
@@ -143,4 +148,23 @@ export async function getDongCafes(area: string, dong: string, limit = 30): Prom
 export async function getDongPublishedCount(area: string, dong: string): Promise<number> {
   try { return Number(((await sql`SELECT count(*)::int n FROM cafes WHERE published AND area=${area} AND dong=${dong}`)[0] as any)?.n ?? 0); }
   catch { return 0; }
+}
+
+/**
+ * 🗺️ 지역 축약형 — 제목·설명에 병기해 검색어 정합을 넓힌다(2026-08-15).
+ *   실측: 사람들은 "안산 카페"로 치는데 우리 제목은 "안산시"만 있었다.
+ *   "인천 연수구"처럼 광역 접두가 붙은 경우 구 이름 단독형도 함께 노출한다.
+ */
+export function areaAliases(area: string): string[] {
+  const out: string[] = [];
+  const push = (v: string) => { if (v.length >= 2 && v !== area && !out.includes(v)) out.push(v); };
+  const parts = area.split(/\s+/);
+  if (parts.length > 1) {
+    // 광역 접두형("인천 연수구")은 **구 이름 단독**이 자연스럽다 — "인천 연수 대형카페"는 어색하고
+    //   실제로 아무도 그렇게 검색하지 않는다. 자치구명 → 축약 → 광역제거형 순으로 우선한다.
+    push(parts[parts.length - 1]);                                    // 인천 연수구 → 연수구
+    push(parts[parts.length - 1].replace(/(시|군|구)$/, ""));          // → 연수
+  }
+  push(area.replace(/(특별시|광역시|시|군|구)$/, ""));                  // 안산시 → 안산
+  return out;
 }
