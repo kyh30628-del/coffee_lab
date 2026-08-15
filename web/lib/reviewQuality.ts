@@ -1173,6 +1173,17 @@ export function verifyReview(input: QualityInput): QualityResult {
   if (NONCAFE_INTERIOR_CUES.test(fullL) && !CAFE_CONTEXT_SUBSTANCE.test(fullL)) {
     return { verdict: "rejected", score: 4, reasons: ["인테리어·가구업계 콘텐츠(가구 재설치·거래·시공사례 등 — 카페 실질맥락 전무)"], signals: sig };
   }
+  // [룰갭 rulegap-20260815-1214, decisions#730] 확정 비카페 dish-specific naver_category(한식>순대,순댓국·
+  //   한식>죽·이탈리아음식>스파게티,파스타전문·전통식품>떡,한과)인데 상호에 "카페"를 브랜딩으로 넣으면(예:
+  //   이리카페파스타, 메고지고 작은공간카페) titleHasCafeWord가 항상 true라 아래 [비카페 업종]/[동명 비카페
+  //   업체] 게이트(1209·1217행 부근)가 전부 무력화된다 — "카페" 리터럴 자체가 CAFE_CONTEXT_STRONG에도
+  //   걸려 둘 다 우회(offctx_rate=0으로 완전 통과, 전수 스캔 7건). naver_category가 이 dish 전용 좁은
+  //   화이트리스트일 때만 실질 음료·디저트 맥락(CAFE_CONTEXT_SUBSTANCE) 부재 시 titleHasCafeWord와 무관하게
+  //   곧장 하드 거절한다(P59/P67과 동일 처리방식 — 겸업 실제 카페 후기는 CAFE_CONTEXT_SUBSTANCE로 보존).
+  const DISH_SPECIFIC_NONCAFE_CATEGORY = /한식>순대,순댓국|한식>죽|이탈리아음식>스파게티,파스타전문|전통식품>떡,한과/;
+  if (DISH_SPECIFIC_NONCAFE_CATEGORY.test(input.naverCategory ?? "") && !CAFE_CONTEXT_SUBSTANCE.test(fullL)) {
+    return { verdict: "rejected", score: 4, reasons: ["확정 비카페 dish 전용업종(순대국·죽·파스타전문·떡한과 — 카페 실질맥락 전무)"], signals: sig };
+  }
   // [룰갭 H18, decisions#631] 바리스타/커피 교육원 자기완결형 수강 후기 — naver_category가 직업,기술교육
   //   범위이고 수강생 대상 콘텐츠(SCA 커리큘럼·자격증 시험·1:1 교육 등)이며 실제 음료 시음 행위 서술
   //   (DRINK_TASTING_CUES — 마셨·시켜서 마·앉아서 등)이 전무하면 P59와 동일하게 참고등급 진입 없이 곧장
