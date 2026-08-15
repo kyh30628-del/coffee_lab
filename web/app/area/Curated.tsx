@@ -6,9 +6,13 @@ const GRADE_BG: Record<string, string> = { 검증: "#5f7355", 참고: "#9c6b3f",
 
 // 동네×취향 검증 카페 큐레이션 — SEO 콘텐츠 페이지 공용 렌더(서버 컴포넌트).
 // 동(洞) 단위 페이지(app/area/[gu]/dong/[dong])도 이 컴포넌트를 재사용 — backHref/showTasteNav/crossLinks로 분기.
-export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, heading, intro, cafes, regions = [], grades, canonical, backHref = "/area", backLabel = "지역별 카페", showTasteNav = true, crossLinks, crossLinksLabel = "다른 동네도 둘러보기", extra }: {
+export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, heading, intro, cafes, regions = [], grades, canonical, backHref = "/area", backLabel = "지역별 카페", showTasteNav = true, crossLinks, crossLinksLabel = "다른 동네도 둘러보기", extra, tasteCounts, sameTasteNearby = [] }: {
   area: string; tasteKey?: string; tasteLabel?: string; tasteEmoji?: string; heading: string; intro: string; cafes: SeoCafe[]; regions?: { area: string; n: number }[]; grades?: GradeBreakdown; canonical: string;
   backHref?: string; backLabel?: string; showTasteNav?: boolean; crossLinks?: { label: string; href: string }[]; crossLinksLabel?: string; extra?: React.ReactNode;
+  /** 이 지역의 테마별 카페 수 — 빈 테마 칩을 숨겨 '눌렀더니 빈 페이지' 이탈을 막는다(2026-08-15). */
+  tasteCounts?: Record<string, number>;
+  /** 같은 테마를 유지한 인근 지역 링크 — 기존 크로스링크는 테마를 잃어버려 맥락이 끊겼다. */
+  sameTasteNearby?: { area: string; n: number }[];
 }) {
   // 🧭 BreadcrumbList(2026-08-13, 구글 채널 강화) — 구글이 검색결과에 계층 경로를 표시하고
   //   사이트 구조를 이해하는 근거. 테마 페이지는 홈>지역>테마, 동/지역 페이지는 홈>지역 2단.
@@ -47,8 +51,10 @@ export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, headin
         {showTasteNav && (
           <div className="flex flex-wrap gap-1.5 mb-6">
             <Link href={`/area/${encodeURIComponent(area)}`} className={`text-[12px] px-2.5 py-1 rounded-full border ${!tasteKey ? "bg-[#2b2018] text-[#f4ece0] border-[#2b2018]" : "bg-white text-[#524234] border-[#d9c9b0]"}`}>전체</Link>
-            {TASTES.map((t) => (
-              <Link key={t.key} href={`/area/${encodeURIComponent(area)}/${t.key}`} className={`text-[12px] px-2.5 py-1 rounded-full border ${tasteKey === t.key ? "bg-[#2b2018] text-[#f4ece0] border-[#2b2018]" : "bg-white text-[#524234] border-[#d9c9b0]"}`}>{t.emoji} {t.short}</Link>
+            {TASTES.filter((t) => !tasteCounts || t.key === tasteKey || (tasteCounts[t.key] ?? 0) > 0).map((t) => (
+              <Link key={t.key} href={`/area/${encodeURIComponent(area)}/${t.key}`} className={`text-[12px] px-2.5 py-1 rounded-full border ${tasteKey === t.key ? "bg-[#2b2018] text-[#f4ece0] border-[#2b2018]" : "bg-white text-[#524234] border-[#d9c9b0]"}`}>
+                {t.emoji} {t.short}{tasteCounts && (tasteCounts[t.key] ?? 0) > 0 && <span className="ml-1 opacity-60">{tasteCounts[t.key]}</span>}
+              </Link>
             ))}
           </div>
         )}
@@ -96,6 +102,23 @@ export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, headin
           />
           <link rel="preconnect" href="https://t1.kakaocdn.net" />
         </div>
+
+        {/* 🧭 같은 테마·다른 동네(2026-08-15) — 실측: 테마 페이지 착지 신규방문자의 49%가 1페이지만 보고 이탈.
+            기존 크로스링크는 `/area/{다른지역}`으로만 보내 **테마 맥락을 잃었다**("안산 카공" 보던 사람이 파주 전체 목록으로).
+            같은 테마를 유지한 채 옆 동네로 넘어가게 해 다음 행동을 만든다. 추가 조회 없음(부모가 이미 가진 카운트 재사용). */}
+        {tasteKey && tasteLabel && sameTasteNearby.length > 0 && (
+          <div className="mt-7">
+            <div className="text-[13px] font-bold text-[#5a4632] mb-2">🧭 다른 동네 {tasteLabel} 카페</div>
+            <div className="flex flex-wrap gap-1.5">
+              {sameTasteNearby.map((r) => (
+                <Link key={r.area} href={`/area/${encodeURIComponent(r.area)}/${tasteKey}`}
+                  className="text-[12px] px-2.5 py-1 rounded-full bg-white text-[#524234] border border-[#d9c9b0]">
+                  {r.area} <span className="opacity-60">{r.n}</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
 
         {extra}
 

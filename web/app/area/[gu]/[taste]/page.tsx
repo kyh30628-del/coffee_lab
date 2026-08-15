@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Curated from "../../Curated";
-import { getRegions, getRegionTasteCafes, getRegionTasteCount, getRegionTasteGradeBreakdown, TASTES, tasteByKey, SITE, TASTE_MIN_HITS, TASTE_MIN_RATE_PCT } from "@/lib/seoData";
+import { getRegions, getRegionTasteCafes, getRegionTasteCount, getRegionTasteCounts, getRegionTasteGradeBreakdown, TASTES, tasteByKey, SITE, TASTE_MIN_HITS, TASTE_MIN_RATE_PCT } from "@/lib/seoData";
 
 export const revalidate = 1800; // 30분 — 비공개/신규 반영 빠르게(이전 1일)
 
@@ -42,10 +42,23 @@ export default async function RegionTastePage({ params }: Props) {
   const area = decodeURIComponent(gu);
   const t = tasteByKey(taste);
   if (!t) notFound();
-  const [cafes, regions, total, grades] = await Promise.all([getRegionTasteCafes(area, taste, 30), getRegions(), getRegionTasteCount(area, taste), getRegionTasteGradeBreakdown(area, taste)]);
+  // 🧭 동선 데이터(2026-08-15): 전 지역×테마 카운트 1회 조회로 ①이 지역의 테마별 개수(빈 칩 숨김)
+  //   ②같은 테마 다른 동네 링크를 동시에 만든다. 집계 1회·작은 컬럼뿐, ISR 30분 캐시라 부하 무시 수준.
+  const [cafes, regions, total, grades, allCounts] = await Promise.all([
+    getRegionTasteCafes(area, taste, 30), getRegions(), getRegionTasteCount(area, taste),
+    getRegionTasteGradeBreakdown(area, taste), getRegionTasteCounts(),
+  ]);
+  const tasteCounts: Record<string, number> = {};
+  for (const t of TASTES) tasteCounts[t.key] = allCounts[`${area}|${t.key}`] ?? 0;
+  // 같은 테마 보유량이 많은 다른 동네 순 — 빈 페이지로 보내지 않도록 5곳 이상만(sitemap 기준과 동일).
+  const sameTasteNearby = Object.entries(allCounts)
+    .filter(([k, v]) => k.endsWith(`|${taste}`) && v >= 5 && !k.startsWith(`${area}|`))
+    .map(([k, v]) => ({ area: k.split("|")[0], n: v }))
+    .sort((a, b) => b.n - a.n)
+    .slice(0, 12);
   const shownN2 = Math.min(total || cafes.length, 30);
   const heading = `${area} ${t.label} 카페${shownN2 >= 5 ? ` BEST ${shownN2}` : ""}`;
   // 카피는 실제 채택 기준과 정확히 일치해야 한다(예전엔 '언급 1회'도 포함해 놓고 "N곳 검증"이라 적었다).
   const intro = `${area}에서 ${t.desc} 카페 ${total || cafes.length}곳. 후기에 ${t.short} 이야기가 ${TASTE_MIN_HITS}건 이상, 그 카페 전체 후기의 ${TASTE_MIN_RATE_PCT}% 이상 나온 곳만 골랐어요.`;
-  return <Curated area={area} tasteKey={taste} tasteLabel={t.short} tasteEmoji={t.emoji} heading={heading} intro={intro} cafes={cafes} regions={regions} grades={grades} canonical={`${SITE}/area/${encodeURIComponent(area)}/${taste}`} />;
+  return <Curated area={area} tasteKey={taste} tasteLabel={t.short} tasteEmoji={t.emoji} heading={heading} intro={intro} cafes={cafes} regions={regions} grades={grades} tasteCounts={tasteCounts} sameTasteNearby={sameTasteNearby} canonical={`${SITE}/area/${encodeURIComponent(area)}/${taste}`} />;
 }

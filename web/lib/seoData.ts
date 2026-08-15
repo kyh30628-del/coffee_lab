@@ -78,14 +78,18 @@ export async function getRegionTasteCount(area: string, tasteKey: string): Promi
 //   지역 68 × 취향 6 = 408번 개별 조회는 비용상 금지([[feedback_cost_discipline_hard]]).
 export async function getRegionTasteCounts(): Promise<Record<string, number>> {
   try {
-    const rows = (await sql`SELECT area,
-      COUNT(*) FILTER (WHERE COALESCE((char_scores->>'work')::int,0) >= 3 AND COALESCE((char_scores->>'work')::int,0) * 100 >= COALESCE(synth_count,0) * 5)::int work,
-      COUNT(*) FILTER (WHERE COALESCE((char_scores->>'quiet')::int,0) >= 3 AND COALESCE((char_scores->>'quiet')::int,0) * 100 >= COALESCE(synth_count,0) * 5)::int quiet,
-      COUNT(*) FILTER (WHERE COALESCE((char_scores->>'dessert')::int,0) >= 3 AND COALESCE((char_scores->>'dessert')::int,0) * 100 >= COALESCE(synth_count,0) * 5)::int dessert,
-      COUNT(*) FILTER (WHERE COALESCE((char_scores->>'roast')::int,0) >= 3 AND COALESCE((char_scores->>'roast')::int,0) * 100 >= COALESCE(synth_count,0) * 5)::int roast,
-      COUNT(*) FILTER (WHERE COALESCE((char_scores->>'mood')::int,0) >= 3 AND COALESCE((char_scores->>'mood')::int,0) * 100 >= COALESCE(synth_count,0) * 5)::int mood,
-      COUNT(*) FILTER (WHERE COALESCE((char_scores->>'space')::int,0) >= 3 AND COALESCE((char_scores->>'space')::int,0) * 100 >= COALESCE(synth_count,0) * 5)::int space
-      FROM cafes WHERE published AND area IS NOT NULL AND area <> '' GROUP BY area`) as unknown as Record<string, any>[];
+    // ⚠️ 2026-08-15 수리: 예전엔 6개 축(work/quiet/dessert/roast/mood/space)을 **SQL에 하드코딩**했다.
+    //   08-13에 TASTES로 pet·brunch·view를 추가했을 때 이 쿼리가 안 따라와, 신설 축은 항상 0으로 집계됐고
+    //   그 결과 **sitemap의 `>= 5` 필터에서 전부 탈락 → 신설 테마 171페이지가 검색엔진에 제출조차 안 됐다**
+    //   (실측: 사이트맵 내 pet/brunch/view = 0개, 기존 6축 = 391개). "색인 대기"가 아니라 "미제출"이었다.
+    //   → TASTES를 단일 출처로 삼아 동적 생성한다. 앞으로 축을 추가해도 여기가 자동으로 따라간다.
+    const cols = TASTES.map((t) =>
+      `COUNT(*) FILTER (WHERE COALESCE((char_scores->>'${t.key}')::int,0) >= ${TASTE_MIN_HITS}
+        AND COALESCE((char_scores->>'${t.key}')::int,0) * 100 >= COALESCE(synth_count,0) * ${TASTE_MIN_RATE_PCT})::int "${t.key}"`
+    ).join(",\n      ");
+    const rows = (await sql.query(`SELECT area,
+      ${cols}
+      FROM cafes WHERE published AND area IS NOT NULL AND area <> '' GROUP BY area`)) as unknown as Record<string, any>[];
     const out: Record<string, number> = {};
     for (const r of rows) for (const t of TASTES) out[`${r.area}|${t.key}`] = Number(r[t.key] ?? 0);
     return out;
