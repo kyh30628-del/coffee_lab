@@ -229,3 +229,4 @@
 | 2026-08-14 23:08 | #695 | [개발] decide API action_params 키 불일치로 미실행건 허위 done 처리 — ids 정 | d364e425 | - | app/api/admin/decide/route.ts: ids 파싱에 cafe_id 단수 폴백 추가(정규화) + status===done && ids.length>0 && affe |
 | 2026-08-15 03:05 | #702 | [자율진단] 정책 소급 재판정 큐(L6) 리뷰 UI 부재 — 0/200 방치 | 2624e598 | - | 신규: app/admin/recheck/page.tsx(리뷰 화면)+app/api/admin/recheck/route.ts(GET목록/POST verdict). lib/rechec |
 | 2026-08-15 03:06 | #727 | [검색품질 재발] 리뷰 비교문 언급 오탐 — #452 스코어인플레는 픽스, 후보노출(candidate lea | 578c7eb5 | - | app/api/search/route.ts: reviewOnly(리뷰 인용문 타사비교 언급 단독 매칭)이 lexMatched=true로 잡혀 semantic_floor(min_si |
+| 2026-08-15 07:05 | #716 | [룰갭] LANDMARK_WORDS 가드가 AI판정(needs_llm) 경로에서 우회 — 수봉별마루도너츠 표 | 6b3e3e9a | - | web/lib/reviewQuality.ts classify()의 nameInTitle/nameInBody 둘 다 false인 폴백 분기(라인 1359 부근)에 venueOnly/ |
