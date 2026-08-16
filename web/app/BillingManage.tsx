@@ -138,10 +138,11 @@ export default function BillingManage({ cafeId, pin }: { cafeId: number; pin: st
         </div>
       ) : (
         <div className="mt-1">
+          <p className="text-[11px] text-[#8a7458] mb-2 leading-relaxed">체험 중에도 지도 <b>골드핀</b>·홈 <b>추천 카페 상단</b>·<b>쇼케이스</b> 배너가 그대로 켜져 있어요. 버튼을 눌러도 <b>바로 결제되지 않아요</b> — 담당자 확인 요청만 접수돼요.</p>
           <button onClick={requestConversion} disabled={busy} className="w-full bg-gradient-to-r from-[#9c6b3f] to-[#2b2018] text-[#f4ece0] rounded-xl py-3 text-[13.5px] font-bold disabled:opacity-50">
             {busy ? "요청 중…" : "구독(홍보팩) 전환 요청하기"}
           </button>
-          <p className="text-[10.5px] text-[#8a7458] mt-2 text-center leading-relaxed">카드 정기결제는 <b>곧 오픈</b>돼요. 지금 요청하시면 담당자가 계좌이체 등으로 안내드립니다. 문의: dongnecoffeenote@gmail.com</p>
+          <p className="text-[10.5px] text-[#8a7458] mt-2 text-center leading-relaxed">카드 정기결제는 <b>곧 오픈</b>돼요. 요청하시면 담당자가 계좌이체 등으로 안내드립니다. 문의: dongnecoffeenote@gmail.com</p>
         </div>
       )}
     </div>
