@@ -44,5 +44,13 @@ T("'리뷰/인터뷰'가 view로 안 셈(#359)", (cs2.view ?? 0) === 0);
 const cs3 = computeCharScores(["강아지 동반 가능해서 좋아요 한강뷰도 멋져요"], "아무카페");
 T("애견동반·뷰 정탐", (cs3.pet ?? 0) > 0 && (cs3.view ?? 0) > 0);
 
+// ── adTemplate: 광고 대행 템플릿 강등 (사고: 협찬 공시가 스니펫 밖이라 공시어 규칙에 사각)
+const { isAdTemplateQuote } = await import("../lib/adTemplate.ts");
+T("정보카드형(영업시간+주차+전화) 강등", isAdTemplateQuote("영업시간 매일 10:00-21:00 전화 0507-1111-2222 주차 가능") === true);
+T("해시태그 폭탄+영업시간 강등", isAdTemplateQuote("#평택카페 #평택맛집 #평택꼬메 영업시간 8:30~19:00 주차불가") === true);
+T("개인 감상 있으면 유지(오탐 방지)", isAdTemplateQuote("주차 가능해서 좋았어요. 디저트도 맛있고 분위기가 아늑합니다") === false);
+T("단독 신호는 강등 안 함", isAdTemplateQuote("영업시간 확인하고 방문했습니다 조용한 공간이네요") === false);
+T("짧은 문구는 판단 보류", isAdTemplateQuote("주차 가능") === false);
+
 console.log(`\n🧪 셀프테스트: ${pass} 통과 · ${fail} 실패 ${fail ? "❌" : "✅"}`);
 process.exit(fail ? 1 : 0);

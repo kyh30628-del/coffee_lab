@@ -1,5 +1,6 @@
 import { quoteMatchConfidence } from "./reviewQuality";
 import { ownBranch, isOtherBranchQuote } from "./branchQuote";
+import { isAdTemplateQuote } from "./adTemplate";
 
 // 👁️ 노출 정렬 단일 출처 — 하네스 L5(노출 감시).
 //
@@ -53,10 +54,16 @@ export function sortReviews(raw: any[], name: string, areaTerms: string[], nowT:
       e,
       conf: quoteMatchConfidence(name, e?.quote || "", areaTerms),
       mine: own && isOtherBranchQuote(e?.quote || "", own) ? 0 : 1, // 0 = 다른 지점 글 → 맨 뒤
+      // 🏷️ 세 번째 선행 관문(2026-08-16, CEO 지시 A) — 광고 대행 템플릿(업체 정보 카드)을 뒤로 민다.
+      //   협찬 공시는 글 끝에 붙는데 우리가 받는 건 앞부분 스니펫뿐이라 공시어 규칙엔 사각이 있다.
+      //   → 공시 대신 '지문'(영업시간·주차·전화번호 나열 + 개인 감상 전무)으로 판정한다.
+      //   삭제가 아니라 순서만 바꾸므로 오탐이 나도 후기는 사라지지 않는다. 추가 DB 조회 0.
+      real: isAdTemplateQuote(e?.quote) ? 0 : 1, // 0 = 정보 카드형 → 진짜 후기 뒤로
     }))
     .sort((a, b) => {
       if (b.conf !== a.conf) return b.conf - a.conf;
       if (b.mine !== a.mine) return b.mine - a.mine;
+      if (b.real !== a.real) return b.real - a.real;
       const tier = trustTier(b.e) - trustTier(a.e);
       if (tier !== 0) return tier;
       const acc = accuracy(b.e) - accuracy(a.e);

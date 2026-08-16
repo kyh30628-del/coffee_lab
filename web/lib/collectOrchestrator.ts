@@ -2,6 +2,7 @@
 // 모든 수집 글을 '리뷰 품질 검증 엔진'에 통과시켜 옥석을 가린 뒤에만 합성·집계·노출한다.
 import { verifyReview, coreTokens, isNonCafeFnbCategory, COFFEE_SUBSTANCE, type QualityVerdict, type SourceKind } from "./reviewQuality";
 import { extractRid, looseDate, type ReviewerCafeStat } from "./reviewerProfiles";
+import { isAdTemplateQuote } from "./adTemplate";
 import { synthesize, type Review, type SynthResult } from "./synthEngine";
 import { computeCharScores } from "./charScore";
 import { getCriterionSync } from "./criteria"; // 등급 바닥 임계값 단일출처(캐시 프라임은 synthAndStore 등 진입점이 함)
@@ -270,7 +271,16 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
     }
     return out;
   };
-  let topEvidence = bestYt ? [...pickDiverse(nonYt, 5), bestYt] : pickDiverse(nonYt, 6);
+  // 🏷️ 저장 top6 선정에서도 광고 대행 템플릿을 뒤로 민다(2026-08-16, CEO 지시 A).
+  //   소비자 상세는 전체 풀을 exposureOrder로 재정렬해 이미 막히지만, **SEO 페이지·목록 카드는
+  //   저장된 top6(synth_reviews)의 quote를 그대로 쓴다** — 거기까지 막으려면 선정 시점에도 걸러야 한다.
+  //   ⚠️ 제거가 아니라 후순위: 정보카드밖에 없는 카페는 여전히 그것으로 6칸을 채운다(빈 화면 방지).
+  const deprioritizeAd = (list: EvidenceReview[]): EvidenceReview[] => {
+    const real = list.filter((e) => !isAdTemplateQuote(e.quote));
+    const ad = list.filter((e) => isAdTemplateQuote(e.quote));
+    return [...real, ...ad];
+  };
+  let topEvidence = bestYt ? [...pickDiverse(deprioritizeAd(nonYt), 5), bestYt] : pickDiverse(deprioritizeAd(nonYt), 6);
   // 옥석 전체(노이즈 제거 후 verified+reference 전부) — 전체보기용
   const allEvidence = evDedup;
 
