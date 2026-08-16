@@ -46,7 +46,14 @@ export async function autoCorrect(): Promise<{ resolved: number; escalated: numb
     const dec = (await sql`SELECT id, action_type, action_params FROM decisions WHERE status='approved' AND action_type = ANY(${L2_AUTO_TYPES})
       AND (COALESCE(tier,'L3')='L2' OR decided_by='CEO')`.catch(() => [])) as any[];
     for (const d of dec) {
-      const ids = Array.isArray(d.action_params?.ids) ? d.action_params.ids : [];
+      // ⚠️ 2026-08-16(#743): 일부 상신 경로(closure-agent·룰갭발굴팀)가 action_params.cafe_id(단수)만 실어
+      //   ids가 매번 빈 배열 → 아래 ok=false로 영구 재시도만 반복하며 approved 상태로 무한대기했다(#737/#739/#740).
+      //   app/api/admin/decide/route.ts:33-37과 동일한 cafe_id 단수 폴백을 이식.
+      const ids: number[] = Array.isArray(d.action_params?.ids)
+        ? d.action_params.ids.map(Number)
+        : d.action_params?.cafe_id != null
+          ? [Number(d.action_params.cafe_id)]
+          : [];
       let msg = "";
       // ⚠️ 2026-07-29: 예전엔 UPDATE를 .catch(()=>{})로 삼키고 성공여부와 무관하게 결재를 done으로 닫아,
       //   DB오류로 비공개가 실패해도 "집행됨"으로 위장되고 재시도도 없었다(오염카페 공개 잔존·안전조치 무력화 은폐).
