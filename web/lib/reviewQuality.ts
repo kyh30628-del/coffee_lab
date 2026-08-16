@@ -718,9 +718,17 @@ export function nameCoherence(name: string, quotes: string[], areaTerms: string[
 //   반복 + 개인서사 마커 부재가 함께 있을 때만 신호로 본다. ⚠️ 자동비공개 아님(criteria.ts 4번 원칙: 결정론=
 //   신호, 의미판단=LLM) — needs_llm 재판정 큐 우선순위 태그만 부여(호출부 synthStore.storeResult).
 const PERSONAL_NARRATIVE_MARKER = /(친구|가족|혼자|직접\s*(가|다녀|방문)|\d+\s*(회|화)(?=[^\p{L}]|$)|내돈내산|불만|아쉬|별로|\d[,\d]{2,}\s*원|\d+\s*(천|만)\s*원)/u;
-const CAMPAIGN_MIN_CLUSTER = 4;       // 표본 너무 적으면 판단 불가(실 사례는 6건 밀집)
-const CAMPAIGN_CLUSTER_RATE = 0.30;   // 정합성조사팀 원 쿼리 임계(동일날짜 30%↑) 재사용
-const CAMPAIGN_TEMPLATE_SCORE = 0.35; // 그룹 내 quote 쌍 2-gram 평균 중복률 — 어절조합 반복 강신호 임계
+// ⚠️ 2026-08-16 재교정(CEO 지시 B) — 기존 임계가 실측상 700곳 중 **0곳**만 잡았다. 단계별 진단 결과
+//   94%가 '동일날짜 밀집 비율 30%'에서 탈락했다. 캠페인은 **절대 건수의 폭발**인데 비율로만 재서,
+//   후기가 많은 카페일수록 같은 규모의 캠페인이 희석돼 영영 안 걸리는 구조였다.
+//   → 절대 밀집(≥5건) 하한을 추가하고 비율 임계를 25%로 낮춘다. 비율은 그대로 유지하는 이유:
+//     유명 빵집의 자연 인기(8/150=5%)와 캠페인(8/13=62%)을 가르는 유일한 신호가 비율이다.
+//   재교정 후 실측: 표본 700곳 중 7곳(1%) — 전부 개인서사 0%·템플릿 반복 뚜렷한 명백 사례
+//   (젤라잇 8/13·카페샤누아 24/44·스카이라운지 13/24·마이요거트립 5/11 등).
+const CAMPAIGN_MIN_CLUSTER = 4;       // 표본 너무 적으면 판단 불가
+const CAMPAIGN_MIN_BURST = 5;         // ±1일 절대 밀집 하한 — 우연으로는 잘 안 생기는 규모
+const CAMPAIGN_CLUSTER_RATE = 0.25;   // 그 카페 전체 근거 중 밀집분 비율(자연 인기와 캠페인을 가르는 축)
+const CAMPAIGN_TEMPLATE_SCORE = 0.25; // 그룹 내 quote 쌍 2-gram 평균 중복률(0.35→0.25, 실측 분포 반영)
 const CAMPAIGN_PERSONAL_RATE = 0.34;  // 그룹 1/3 이상이 개인서사 마커를 가지면 진짜버즈로 봄(반증사례 보호)
 
 function bigramSet(text: string): Set<string> {
@@ -771,7 +779,7 @@ export function detectCampaignCluster(evidence: { quote: string; date?: string }
     if (group.length > best.length) { best = group; bestDay = center; }
   }
   const clusterRate = best.length / dated.length;
-  if (best.length < CAMPAIGN_MIN_CLUSTER || clusterRate < CAMPAIGN_CLUSTER_RATE) return none;
+  if (best.length < Math.max(CAMPAIGN_MIN_CLUSTER, CAMPAIGN_MIN_BURST) || clusterRate < CAMPAIGN_CLUSTER_RATE) return none;
 
   const grams = best.map((e) => bigramSet(e.quote));
   let sum = 0, pairs = 0;

@@ -52,5 +52,22 @@ T("개인 감상 있으면 유지(오탐 방지)", isAdTemplateQuote("주차 가
 T("단독 신호는 강등 안 함", isAdTemplateQuote("영업시간 확인하고 방문했습니다 조용한 공간이네요") === false);
 T("짧은 문구는 판단 보류", isAdTemplateQuote("주차 가능") === false);
 
+// ── detectCampaignCluster: 미표기 체험단 캠페인 (사고: 비율 임계만 있어 700곳 중 0곳만 잡던 구조)
+const { detectCampaignCluster } = await import("../lib/reviewQuality.ts");
+{
+  const dt = (y, m, dd) => `${y}.${String(m).padStart(2, "0")}.${String(dd).padStart(2, "0")}`;
+  const campaign = [
+    ...Array.from({ length: 8 }, (_, i) => ({ quote: `디저트 맛집 방문 영업시간 10:00-21:00 주차 가능 ${i}`, date: dt(2026, 5, 1) })),
+    ...Array.from({ length: 5 }, (_, i) => ({ quote: `커피 마시고 왔어요 ${i}`, date: dt(2025, 3, i + 1) })),
+  ];
+  const organic = [
+    ...Array.from({ length: 8 }, (_, i) => ({ quote: `친구랑 갔는데 케이크가 정말 맛있었어요 ${i}`, date: dt(2026, 5, 1) })),
+    ...Array.from({ length: 60 }, (_, i) => ({ quote: `혼자 조용히 책 읽기 좋았습니다 ${i}`, date: dt(2025, 1 + (i % 12), 1 + (i % 28)) })),
+  ];
+  T("캠페인(동일날짜 8건·템플릿·개인서사0) 검출", detectCampaignCluster(campaign).suspect === true);
+  T("자연인기(분산된 68건·개인서사) 보호", detectCampaignCluster(organic).suspect === false);
+  T("표본 부족 시 판단보류", detectCampaignCluster([{ quote: "좋아요", date: dt(2026, 5, 1) }]).suspect === false);
+}
+
 console.log(`\n🧪 셀프테스트: ${pass} 통과 · ${fail} 실패 ${fail ? "❌" : "✅"}`);
 process.exit(fail ? 1 : 0);

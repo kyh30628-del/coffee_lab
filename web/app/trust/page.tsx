@@ -92,10 +92,26 @@ export default async function TrustPage() {
           자동으로 처리하지 않고 사람이 직접 확인합니다. 프랜차이즈는 다루지 않습니다 — 동네의 개인 카페만 큐레이션합니다.
         </p>
 
-        <h2 className="text-[18px] font-bold mb-3">4. 솔직한 한계</h2>
+        <h2 className="text-[18px] font-bold mb-3">4. 솔직한 한계 — 저희가 못 하는 것</h2>
+        <div className="bg-white rounded-xl border border-[#e6dcc8] px-4 py-3.5 mb-3">
+          <div className="text-[13.5px] font-bold mb-1">🔍 협찬을 100% 걸러내지는 못합니다</div>
+          <div className="text-[12.5px] text-[#524234] leading-relaxed">
+            저희가 볼 수 있는 건 블로그 <b>원문 전체가 아니라 검색 결과 발췌</b>입니다(네이버가 제공하는 범위).
+            글 안에서 <b>카페가 언급된 부분</b>은 잘 보이지만, 협찬 고지 문구는 대개 글 끝에 따로 적혀 있어
+            그 발췌에 들어오지 않습니다. 그래서 <b>고지가 발췌에 잡힌 협찬 글은 자동 제외</b>하고,
+            고지가 안 보이는 글은 <b>&lsquo;업체 정보 나열형&rsquo; 문체·동일 시기 반복 패턴</b> 같은 간접 신호로 걸러
+            <b>노출 순위를 뒤로 미룹니다</b>(지우지는 않습니다 — 진짜 후기가 함께 죽으면 안 되니까요).
+          </div>
+        </div>
+        <div className="bg-white rounded-xl border border-[#e6dcc8] px-4 py-3.5 mb-3">
+          <div className="text-[13.5px] font-bold mb-1">🤖 자동 검증은 완벽하지 않습니다</div>
+          <div className="text-[12.5px] text-[#524234] leading-relaxed">
+            드물게 잘못 걸러지거나 놓치는 후기가 있습니다. 발견되는 대로 고치고, 애매한 건은 자동으로 처리하지 않고
+            사람이 직접 확인합니다.
+          </div>
+        </div>
         <p className="text-[13px] text-[#524234] leading-relaxed mb-8">
-          자동 검증은 완벽하지 않습니다. 드물게 잘못 걸러지거나 놓치는 후기가 있을 수 있고, 발견되는 대로 고칩니다.
-          맛과 분위기의 판단은 결국 취향의 영역이라, 저희는 &lsquo;진짜 후기인가&rsquo;까지만 책임집니다.
+          맛과 분위기의 판단은 결국 취향의 영역이라, 저희는 &lsquo;<b>이 글이 이 카페를 실제로 다녀와서 쓴 글인가</b>&rsquo;까지를 책임집니다.
         </p>
 
         <Link href="/area" className="block w-full text-center bg-[#2b2018] text-[#f4ece0] rounded-xl py-3.5 font-bold">검증된 동네 카페 보러 가기 →</Link>
