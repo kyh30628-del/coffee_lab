@@ -6,6 +6,7 @@ import { sql } from "@/lib/db";
 import KakaoShare from "../../KakaoShare";
 import SaveMemoryButton from "./SaveMemoryButton";
 import VisitorReviews from "../../VisitorReviews";
+import RecentCafes from "../../RecentCafes";
 import { buildAxisDist, cafeProfile, extractHighlights, tasteVector, tasteSimilarity, GRADE_RANK } from "@/lib/cafeProfile";
 import { collectionForCafe } from "@/lib/collections";
 import { tasteByKey } from "@/lib/seoData";
@@ -337,6 +338,10 @@ export default async function CafePage({ params }: Props) {
               </div>
             ) : null;
           })()}
+          {/* 🕘 최근 본 카페(2026-08-16 리텐션) — 이 카페를 기록하고, 이전에 본 카페들을 이어보게 한다.
+              저장 행동을 요구하지 않는 자동 축적 방식(기존 북마크는 4건뿐이었다). localStorage·서버 조회 0. */}
+          <RecentCafes current={{ id: Number(c.id), name: c.name, area: c.area, grade: grade || undefined }} />
+
           {/* 동네 교차검증 컬렉션 상호링크(크롤 동선·SEO) — 레지스트리 게이팅 */}
           {(() => {
             const col = collectionForCafe(c.dong, c.area);

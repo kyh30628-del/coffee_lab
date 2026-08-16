@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { TASTES, SITE, type SeoCafe, type GradeBreakdown } from "@/lib/seoData";
 import KakaoShare from "../KakaoShare";
+import RecentCafes from "../RecentCafes";
 
 const GRADE_BG: Record<string, string> = { 검증: "#5f7355", 참고: "#9c6b3f", 후보: "#a8927a" };
 
@@ -134,6 +135,10 @@ export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, headin
         )}
 
         {extra}
+
+        {/* 🕘 최근 본 카페(2026-08-16 리텐션) — 표시만(기록은 상세에서). 재방문자가 테마 페이지에 다시 착지해도
+            "내가 보던 것"으로 바로 이어갈 수 있게. 첫 방문자에겐 렌더되지 않는다. */}
+        <RecentCafes />
 
         {/* 다른 지역/동 크로스링크 — 내부링크로 신규 페이지 크롤 확산 */}
         <div className="mt-8 pt-5 border-t border-[#e6dcc8]">
