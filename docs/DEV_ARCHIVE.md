@@ -233,3 +233,4 @@
 | 2026-08-15 11:05 | #730 | [룰갭] "카페" 브랜딩 비카페 요식업(파스타·순댓국·죽·떡집) — NONCAFE_BIZ titleHasCa | 755d5ef5 | - | web/lib/reviewQuality.ts:1176 부근 — naver_category dish-specific 화이트리스트(한식>순대,순댓국 한식>죽 이탈리아음식>스파게티,파스 |
 | 2026-08-15 23:05 | #732 | [룰갭] 멀티플레이스 리스트/투어 콘텐츠 — nameInTitle만으로 listicle 하드거절 우회 | 4ccd5892 | - | web/lib/reviewQuality.ts:1616 listicle 하드거절 조건을 (listicle && !nameInTitle) -> (listicle && !nameInBo |
 | 2026-08-15 23:06 | #733 | [사장님영업] 홈 사장님 CTA→체험신청 모달 미스매치 — 전환 8%대 붕괴(cta_click 12건 중 m | f1d0bf79 | - | app/page.tsx: 랜딩 사장님 CTA(1299행)를 A안대로 role 분리 — 1차 버튼이 ownerPwModal(PIN 로그인벽) 대신 OwnerSignupModal(체험 |
+| 2026-08-16 07:35 | #734 | [사장님영업] 트라이얼 전환 버튼(BillingManage.tsx) day-1 카피 개선 — 방향 승인 요청 | d6516f30 | - | app/BillingManage.tsx: 트라이얼 전환 버튼 카피 개선(문자열/레이아웃만). 버튼 위에 체험 중 실제 켜져있는 기능(골드핀·추천카페 상단·쇼케이스) 1줄 고지 +  |
