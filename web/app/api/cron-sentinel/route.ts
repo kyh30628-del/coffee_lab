@@ -965,15 +965,26 @@ export async function GET(req: NextRequest) {
       for (const id of await frozenTargets(j)) _frozenAll.add(id);
     }
     const _live = (arr: string[]) => arr.filter((x) => !_frozenAll.has(Number(x)));
-    const fingerprint = fingerprintOf({
+    // 🩺 지문 = **이 잡이 고쳐야 할 문제집합**의 식별자. 두 가지를 지킨다(2026-08-16 수리).
+    //   ① `mm`(이름불일치)는 **이 잡이 치유하지 않는** 관찰 전용 신호다(표시 품질은 cron-exposure 담당,
+    //      과거 전수감사서 RED의 ~90%가 오탐으로 판명). 지문에 넣으면 영원히 안 변하는 상수가 섞여
+    //      **어떤 런이든 같은 지문 → 영구 '정체'** 오탐이 난다. 실측: 08-15 수렴 완료 후에도 4회 연속 정체 검출.
+    //   ② 고칠 게 하나도 없으면(전 축 0 + 대상 0) **지문을 남기지 않는다**(null). 빈 문제집합의 반복은
+    //      '헛돎'이 아니라 '깨끗함'이다. detectStuck은 fingerprint IS NOT NULL만 보므로 이걸로 오탐이 끝난다.
+    const _fpTargets = _live([
+      ..._fpIds(attr.samples), ..._fpIds(weak.samples), ..._fpIds(ncb.samples),
+      ..._fpIds(fr.samples), ..._fpIds(gen.samples), ..._fpIds(comp.samples),
+    ]);
+    const _healable = [
+      (checks as any).attraction_pollution, (checks as any).weak_name_pollution,
+      (checks as any).noncafe_biz_pollution, (checks as any).franchise_branch_pollution,
+      (checks as any).generic_term_pollution, (checks as any).competitor_quote_pollution,
+    ].reduce((a: number, b: any) => a + (Number(b) || 0), 0);
+    const fingerprint = (_healable === 0 && _fpTargets.length === 0) ? undefined : fingerprintOf({
       attr: (checks as any).attraction_pollution, weak: (checks as any).weak_name_pollution,
       ncb: (checks as any).noncafe_biz_pollution, fr: (checks as any).franchise_branch_pollution,
       gen: (checks as any).generic_term_pollution, comp: (checks as any).competitor_quote_pollution,
-      mm: mismatch.count,
-      targets: _live([
-        ..._fpIds(attr.samples), ..._fpIds(weak.samples), ..._fpIds(ncb.samples),
-        ..._fpIds(fr.samples), ..._fpIds(gen.samples), ..._fpIds(comp.samples),
-      ]),
+      targets: _fpTargets,
     });
     if (DRY) {
       // 🧪 드라이런 — DB에 아무것도 남기지 않는다(원장·리포트 오염 방지). "무엇이 바뀔 것인가"만 돌려준다.
