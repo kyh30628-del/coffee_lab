@@ -59,6 +59,19 @@ export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, headin
           </div>
         )}
 
+        {/* 🗺️ 지도 CTA를 목록 **위**로(2026-08-16) — 실측: 테마 페이지 착지 377명 중 193명(51%)이 1페이지 이탈인데,
+            기존 CTA는 카드 30개 아래에 있어 사실상 안 보였다. 반면 지도(홈)에 도달한 사람의 이탈률은 **3%**
+            (78명 중 2명) — 우리 서비스의 체류는 지도에서 만들어진다. 그 입구를 첫 화면으로 올린다.
+            ⚠️ taste를 딥링크에 실어 맥락 보존 — 예전 `?region=`만 넘기면 "마포 카공" 보던 사람이 마포 전체로 떨어졌다. */}
+        <Link href={`/?region=${encodeURIComponent(area)}${tasteKey ? `&taste=${tasteKey}` : ""}`}
+          className="flex items-center justify-between gap-2 w-full rounded-xl px-4 py-3 mb-5 border border-[#d8c8ad] bg-white">
+          <span className="text-[13px] font-semibold text-[#3d2f22]">
+            🗺️ {area} {tasteLabel ? `${tasteLabel} ` : ""}카페 지도에서 보기
+            <span className="block text-[11px] text-[#8a7355] font-normal mt-0.5">위치·거리 확인하고 취향으로 골라보기</span>
+          </span>
+          <span className="text-[#7a5122] text-[13px]">→</span>
+        </Link>
+
         {/* 목록 */}
         {cafes.length === 0 ? (
           <p className="text-[13px] text-[#665036] py-8 text-center">아직 이 조건에 맞는 검증 카페가 적어요. <Link href={`/area/${encodeURIComponent(area)}`} className="underline text-[#7a5122]">{area} 전체 보기</Link></p>
@@ -90,7 +103,7 @@ export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, headin
         )}
 
         <div className="mt-7">
-          <Link href={`/?region=${encodeURIComponent(area)}`} className="block w-full bg-[#2b2018] text-[#f4ece0] rounded-xl py-3 text-center font-bold">{area} 카페 앱에서 더 보기 →</Link>
+          <Link href={`/?region=${encodeURIComponent(area)}${tasteKey ? `&taste=${tasteKey}` : ""}`} className="block w-full bg-[#2b2018] text-[#f4ece0] rounded-xl py-3 text-center font-bold">🗺️ {area} 카페 지도에서 보기 →</Link>
           <KakaoShare
             title={heading}
             description="영수증 리뷰·광고 빼고 진짜 후기로 검증한 우리 동네 카페"

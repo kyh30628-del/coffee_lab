@@ -206,6 +206,19 @@ export default async function CafePage({ params }: Props) {
           <div className="mb-3">
             <SaveMemoryButton cafeId={c.id} cafeName={c.name} cafeArea={c.area} variant="banner" />
           </div>
+          {/* 🗺️ 지도 CTA를 첫 화면으로(2026-08-16) — 실측: 카페 상세에 **바로 착지한** 방문자의 이탈률이 87%(79명 중 69명)로
+              전 페이지 유형 중 최악이다. 기존 CTA는 후기·분석 전부 아래(279행)에 있어 사실상 안 보였다.
+              반면 지도(홈)에 도달하면 이탈률 3% — 체류는 지도에서 만들어진다. 그 입구를 위로 올린다.
+              ⚠️ 하단 CTA는 그대로 둔다(끝까지 읽은 사람의 자연스러운 다음 행동). 여기 것은 '근처 카페'를 강조해 중복 아님. */}
+          <Link href={`/?region=${encodeURIComponent(c.area)}`}
+            className="flex items-center justify-between gap-2 w-full rounded-xl px-4 py-3 mb-3 border border-[#d8c8ad] bg-white">
+            <span className="text-[13px] font-semibold text-[#3d2f22]">
+              🗺️ {c.area} 카페 지도에서 둘러보기
+              <span className="block text-[11px] text-[#8a7355] font-normal mt-0.5">근처 검증 카페를 위치·취향으로 한눈에</span>
+            </span>
+            <span className="text-[#7a5122] text-[13px]">→</span>
+          </Link>
+
           {/* 📊 리뷰 데이터 분석 — 옥석 후기 핵심 */}
           {(highlights.length > 0 || c.synth_identity) && (
             <div className="bg-gradient-to-b from-[#f4eee2] to-[#ece4d4] rounded-xl px-4 py-3.5 mb-3 border border-[#d8c8ad]">
