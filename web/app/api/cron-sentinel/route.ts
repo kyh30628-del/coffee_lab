@@ -980,7 +980,11 @@ export async function GET(req: NextRequest) {
       (checks as any).noncafe_biz_pollution, (checks as any).franchise_branch_pollution,
       (checks as any).generic_term_pollution, (checks as any).competitor_quote_pollution,
     ].reduce((a: number, b: any) => a + (Number(b) || 0), 0);
-    const fingerprint = (_healable === 0 && _fpTargets.length === 0) ? undefined : fingerprintOf({
+    //   ⚠️ 판정 기준은 **치유 카운트(_healable)만** 본다. 샘플 목록(_fpTargets)까지 조건에 넣었더니,
+    //   카운트는 0인데 동결 안 된 잔여 샘플이 1건 남아 지문이 계속 기록되고 → 같은 지문 3연속으로
+    //   정체 오탐이 되살아났다(실측 08-16: 치유대상 0건인데 competitor 샘플 1건 잔존).
+    //   카운트가 "이 잡이 지금 고쳐야 할 것"의 유일한 권위다 — 0이면 수렴한 것이고, 지문을 남기지 않는다.
+    const fingerprint = (_healable === 0) ? undefined : fingerprintOf({
       attr: (checks as any).attraction_pollution, weak: (checks as any).weak_name_pollution,
       ncb: (checks as any).noncafe_biz_pollution, fr: (checks as any).franchise_branch_pollution,
       gen: (checks as any).generic_term_pollution, comp: (checks as any).competitor_quote_pollution,
