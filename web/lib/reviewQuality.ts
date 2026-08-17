@@ -705,6 +705,10 @@ export function nameCoherence(name: string, quotes: string[], areaTerms: string[
   //   quoteMatchConfidence.bareWeakOk와 동일 기준(전체이름 원문일치 + 카페맥락/지역어 동반)을 요구해 정렬한다.
   const coreEmpty = toks.length === 0;
   const terms = toks.length ? toks : [name];
+  // coord#312 근본원인: terms에 살아남은 흔한 지명(성내천·소사벌 등)이 리뷰 텍스트에 '주변 랜드마크/주소'로만
+  //   언급돼도 단일 hit로 coherence=1.0을 받던 버그 — 지명형 term은 카페맥락 동반을 요구해 걸러낸다.
+  const strongTerms = terms.filter((t) => !isAreaLikeWord(t));
+  const locTerms = terms.filter(isAreaLikeWord);
   const nameN = norm(name); // 전체 이름(붙여쓰기) — '성북동빵공장'처럼 토큰 경계검사가 놓치는 경우 보완
   let hit = 0;
   for (const q of qs) {
@@ -717,7 +721,11 @@ export function nameCoherence(name: string, quotes: string[], areaTerms: string[
       if (fullMatch && contextOk) hit++;
       continue;
     }
-    if ((nameN.length >= 4 && qN.includes(nameN)) || terms.some((t) => nameHit(q, qN, t))) hit++;
+    if (
+      (nameN.length >= 4 && qN.includes(nameN)) ||
+      strongTerms.some((t) => nameHit(q, qN, t)) ||
+      (locTerms.some((t) => nameHit(q, qN, t)) && CAFE_CONTEXT_STRONG.test(q))
+    ) hit++;
   }
   return hit / qs.length;
 }
