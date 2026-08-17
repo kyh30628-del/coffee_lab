@@ -850,6 +850,15 @@ export function quoteMatchConfidence(name: string, quote: string, areaTerms: str
 // 초약체 유일토큰 — 사전은 lib/criteriaLists.ts("identity.weak_token")가 단일출처(무배포 편집). 폴백=현재값.
 //   .has() 소비처(아래 여러 곳)가 그대로 쓰도록 getListSetSync를 위임하는 얇은 래퍼로 노출.
 const WEAK_IDENTITY_TOKEN = { has: (t: string) => getListSetSync("identity.weak_token").has(t) };
+// 룰갭 rulegap-20260817(decisions#745): 관용구/일반명사형 상호명("동네방네"·"우리동네"·"골목") — bareWeak
+//   게이트의 (dongPresent || CAFE_CONTEXT_STRONG || titleHasCafeWord) OR조건은 titleHasCafeWord/CAFE_CONTEXT_STRONG가
+//   카페 관련 글이면 거의 항상 참이라 무관 콘텐츠까지 통과시킨다(id1819 "동네방네 소문났어요" 같은 관용구 표현,
+//   id2778 "우리동네 소금빵" 같은 딴 상호 부분일치). 이 화이트리스트 대상은 dongPresent를 OR가 아닌 필수 AND로 격상.
+const IDIOM_DONG_TOKEN = { has: (t: string) => getListSetSync("identity.idiom_dong_token").has(t) };
+// 룰갭 rulegap-20260817(decisions#745): "마실"은 상호명이자 동사 '마시다'의 관형사형(잠재형 "~마실 수 있는")과
+//   동음이의라, 다른 카페를 다루는 글의 "커피를 마실 수 있는" 구문만으로도 리터럴 일치돼 오매칭됐다(id11801
+//   "새벽에도 커피를 마실 수 있는 대형 카페, 코홀트커피"). 잠재형 패턴만 있고 그 외 진짜 언급이 없으면 무효화.
+const VERB_HOMONYM_TOKEN = { has: (t: string) => getListSetSync("identity.verb_homonym_token").has(t) };
 // 룰갭 20260801-1704(decisions#569): 영문/로마자 카페명(예: "Everything on a waffle")이 실존 외부
 //   고유명사(도서명·해외지명)와 우연일치하면 그 고유명사를 다루는 무관 콘텐츠(완독기·여행기)가 이름일치만으로
 //   verified/reference까지 채택됐다(id10271·15308 실측). 아래 길이 문턱 게이트(제안1 985행·제안7 1307행)는
@@ -1092,13 +1101,26 @@ export function verifyReview(input: QualityInput): QualityResult {
   //   inTitleFull 단독 통과를 막고 항상 카페맥락/지역어를 동반 요구한다.
   const nameIsSoleToken = tokens.length === 1 && norm(tokens[0]) === nameRawN;
   const bareWeak = nameIsSoleToken && (weakSingle || coreEmpty || allTokensWeak || nameRawN.length <= 4);
+  // decisions#745: bareWeak 대상 이름이 관용구 화이트리스트("동네방네"·"우리동네"·"골목" 등)면 titleHasCafeWord/
+  //   CAFE_CONTEXT_STRONG의 OR 우회를 없애고 dongPresent를 필수 AND로 요구(동 단위 지역어 없이는 절대 인정 안 함).
+  const idiomDongRequired = bareWeak && IDIOM_DONG_TOKEN.has(nameRawN);
+  // decisions#745: 동사 활용형과 동음이의인 이름("마실")은 "TOKEN 수 있/없"(잠재형) 패턴만 있고 그 외의 진짜
+  //   언급이 없으면 이름 일치로 인정하지 않는다 — 잠재형 패턴을 지운 뒤에도 이름이 남아 있어야 진짜 언급.
+  const isVerbHomonym = bareWeak && VERB_HOMONYM_TOKEN.has(nameRawN);
+  const stripPotentialForm = (s: string) => s.replace(new RegExp(`${nameRawN}수(있|없)`, "g"), "");
+  const verbHomonymTitleOk = !isVerbHomonym || stripPotentialForm(titleN).includes(nameRawN);
+  const verbHomonymBodyOk = !isVerbHomonym || stripPotentialForm(bodyN).includes(nameRawN);
   const nameInTitle = (weakWhitelist && !areaPresent) ? false
     : bareWeak
-      ? (roadAddrCtxOk && distinctInTitle && (dongPresent || CAFE_CONTEXT_STRONG.test(fullL) || titleHasCafeWord) && venueCtxOk && landmarkCtxOk)
+      ? (roadAddrCtxOk && distinctInTitle && verbHomonymTitleOk
+          && (idiomDongRequired ? dongPresent : (dongPresent || CAFE_CONTEXT_STRONG.test(fullL) || titleHasCafeWord))
+          && venueCtxOk && landmarkCtxOk)
       : (roadAddrCtxOk && venueCtxOk && (inTitleFull || (distinctInTitle && (titleHasCafeWord || areaPresent) && landmarkCtxOk)));
   const nameInBody = (weakWhitelist && !areaPresent) ? false
     : bareWeak
-      ? (roadAddrCtxOk && distinctInBody && (dongPresent || CAFE_CONTEXT_STRONG.test(fullL) || bodyHasCafeWord) && venueCtxOk && landmarkCtxOk)
+      ? (roadAddrCtxOk && distinctInBody && verbHomonymBodyOk
+          && (idiomDongRequired ? dongPresent : (dongPresent || CAFE_CONTEXT_STRONG.test(fullL) || bodyHasCafeWord))
+          && venueCtxOk && landmarkCtxOk)
       : (roadAddrCtxOk && venueCtxOk && (inBodyFull || (distinctInBody && (bodyHasCafeWord || areaPresent) && landmarkCtxOk)));
   const listicle = LISTICLE_TITLE.some((re) => re.test(title)) || (((`${title} ${body}`.match(PLACE_TOKEN) ?? []).length) >= 4);
   const generic = has(fullL, GENERIC_CUES);

@@ -151,6 +151,15 @@ export const LIST_META: ListMeta[] = [
   //   향초 판매업체 블로그 등 무관 콘텐츠 매칭(offctx_rate=0.5).
   { key: "identity.weak_token", category: "정체성", label: "초약체 유일토큰(엄격 매칭 요구)", consumer: "reviewQuality",
     items: ["공간", "다이아", "블라블라", "충무", "브라더스", "2005", "인테리어", "조도", "회전목마", "실험실", "청하동길", "스위치", "에스엠", "우리동네구멍가게", "오븐", "꿈꾸는", "우주", "사이", "톤앤매너", "좋은친구들", "시너지", "프렌즈", "향기로운", "온전한", "스토리", "우상향", "향초", "워크샵"] },
+  // 룰갭(rulegap-20260817, decisions#745): 관용구/일반명사형 상호명 — "동네방네"(id1819)·"우리동네"(id2778)는
+  // titleHasCafeWord/CAFE_CONTEXT_STRONG OR우회로 무관 콘텐츠(입소문 관용구·딴 상호 부분일치)까지 통과했다.
+  // "골목"은 동일 유형의 선제 등재(관용구 상호명 카테고리, 실측 오염 사례는 아직 없음).
+  { key: "identity.idiom_dong_token", category: "정체성", label: "관용구 상호명(동 단위 지역어 필수 AND)", consumer: "reviewQuality",
+    items: ["동네방네", "우리동네", "골목"] },
+  // 룰갭(rulegap-20260817, decisions#745): "마실"(id11801)은 동사 '마시다'의 관형사형(잠재형 "~마실 수 있는")과
+  // 동음이의라, 딴 카페를 다루는 글의 "커피를 마실 수 있는" 구문만으로 오매칭됐다(id11801 6건중1건).
+  { key: "identity.verb_homonym_token", category: "정체성", label: "동사 활용형 동음이의 상호명(잠재형 패턴 무효화)", consumer: "reviewQuality",
+    items: ["마실"] },
 ];
 
 const BY_KEY: Record<string, ListMeta> = Object.fromEntries(LIST_META.map((m) => [m.key, m]));
