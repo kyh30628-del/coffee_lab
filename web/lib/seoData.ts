@@ -81,7 +81,17 @@ export async function getRegionTasteCount(area: string, tasteKey: string): Promi
 
 // 전 지역×전 취향 곳수를 **쿼리 1회**로 — 사이트맵이 얇은 페이지(기준 미달)를 제출하지 않게 거르는 용도.
 //   지역 68 × 취향 6 = 408번 개별 조회는 비용상 금지([[feedback_cost_discipline_hard]]).
+// 💰 2026-08-17 비용 사고 수리 — 이 함수는 **전 카페 GROUP BY 전수 스캔**(평균 171ms·디스크판독 6,187)이다.
+//   08-15에 테마 페이지 본문(칩 개수·다른 동네 링크)에 붙였는데, 테마 페이지는 ISR 30분이라
+//   488개 페이지가 재생성될 때마다 이 스캔이 돈다 → **실측 825회·누적 141초**, DB 활성시간이
+//   7.3h/일 → 13.2h/일로 뛰었다(월 $14 → $25 환산). 사장님이 가장 경계하시는 유형의 사고다.
+//   → 결과는 전 지역 통계라 몇 시간 묵어도 칩 개수·링크가 안 바뀐다. 인스턴스 메모리 6시간 캐시.
+//     (getAxisDist에 이미 같은 처방을 했고 34회·1.1초로 안정적이다 — 같은 패턴을 적용한다.)
+let tasteCountsMem: { at: number; v: Record<string, number> } | null = null;
+const TASTE_COUNTS_TTL_MS = 6 * 60 * 60 * 1000;
+
 export async function getRegionTasteCounts(): Promise<Record<string, number>> {
+  if (tasteCountsMem && Date.now() - tasteCountsMem.at < TASTE_COUNTS_TTL_MS) return tasteCountsMem.v;
   try {
     // ⚠️ 2026-08-15 수리: 예전엔 6개 축(work/quiet/dessert/roast/mood/space)을 **SQL에 하드코딩**했다.
     //   08-13에 TASTES로 pet·brunch·view를 추가했을 때 이 쿼리가 안 따라와, 신설 축은 항상 0으로 집계됐고
@@ -97,8 +107,9 @@ export async function getRegionTasteCounts(): Promise<Record<string, number>> {
       FROM cafes WHERE published AND area IS NOT NULL AND area <> '' GROUP BY area`)) as unknown as Record<string, any>[];
     const out: Record<string, number> = {};
     for (const r of rows) for (const t of TASTES) out[`${r.area}|${t.key}`] = Number(r[t.key] ?? 0);
+    tasteCountsMem = { at: Date.now(), v: out };
     return out;
-  } catch { return {}; }
+  } catch { return tasteCountsMem?.v ?? {}; }
 }
 
 // 지역×취향 후기 근거 등급 분포(검증/참고/후보) — 표시 30개가 아닌 전체 모수 기준. 콘텐츠 밀도 보강용 근거 요약.
