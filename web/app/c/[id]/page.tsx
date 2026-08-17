@@ -11,6 +11,7 @@ import { buildAxisDist, cafeProfile, extractHighlights, tasteVector, tasteSimila
 import { collectionForCafe } from "@/lib/collections";
 import { tasteByKey } from "@/lib/seoData";
 import { shareHookText } from "@/lib/shareCopy";
+import { sortReviews } from "@/lib/exposureOrder";
 
 export const runtime = "nodejs";
 export const revalidate = 3600; // ISR 1시간
@@ -135,8 +136,15 @@ export default async function CafePage({ params }: Props) {
   const grade = c.synth_grade || "";
   // 인앱 상세와 동일: 강·약(전체 대비) + 옥석 리뷰 데이터 핵심
   const profile = cafeProfile({ char_scores: c.char_scores, synth_count: c.synth_count }, await getAxisDist());
-  const evAll = (c.synth_reviews_all ?? c.synth_reviews ?? []) as any[];
-  const highlights = extractHighlights((Array.isArray(evAll) ? evAll : []).map((e: any) => e?.quote || ""));
+  // 🔴 2026-08-17: 이 SEO 상세는 리뷰 배열을 **정렬 없이 원본 순서로** 하이라이트에 넣고 있었다.
+  //   앱 상세(/api/cafe-detail)는 sortReviews(확신도·타지점·광고템플릿 3관문)를 타는데 여기만 안 탔다.
+  //   구글에 색인되는 면이 정작 방어를 안 받던 셈이라, 같은 함수를 태워 두 경로를 일치시킨다.
+  //   비용 0 — 이미 읽어온 배열에 대한 순수함수 정렬이라 추가 조회가 없다.
+  const evRaw = (c.synth_reviews_all ?? c.synth_reviews ?? []) as any[];
+  const evAll = Array.isArray(evRaw)
+    ? sortReviews(evRaw, c.name ?? "", [c.area, c.dong].filter(Boolean) as string[], Date.now(), c.dong)
+    : [];
+  const highlights = extractHighlights(evAll.map((e: any) => e?.quote || ""));
   const faqs = buildFaq(c, grade, highlights, profile, tags);
   const faqJsonLd = faqs.length > 0 ? {
     "@context": "https://schema.org", "@type": "FAQPage",
