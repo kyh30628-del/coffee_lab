@@ -12,6 +12,7 @@ import { collectionForCafe } from "@/lib/collections";
 import { tasteByKey } from "@/lib/seoData";
 import { shareHookText } from "@/lib/shareCopy";
 import { sortReviews } from "@/lib/exposureOrder";
+import { extractWorkSignals } from "@/lib/workDetail";
 import OutboundLink from "../../OutboundLink";
 
 export const runtime = "nodejs";
@@ -42,7 +43,7 @@ async function getCafe(id: string) {
   const n = Number(id);
   if (!Number.isFinite(n) || n <= 0) return null;
   try {
-    return (await sql`SELECT id, name, area, dong, address, lat, lng, synth_grade, synth_identity, synth_count, char_scores, synth_reviews_all, synth_reviews, reputation_note FROM cafes WHERE id=${n} AND published=true LIMIT 1`)[0] as any ?? null;
+    return (await sql`SELECT id, name, area, dong, address, lat, lng, synth_grade, synth_identity, synth_count, char_scores, synth_reviews_all, synth_reviews, reputation_note, synth_quality FROM cafes WHERE id=${n} AND published=true LIMIT 1`)[0] as any ?? null;
   } catch { return null; }
 }
 // 등급(검증/참고/후보)→JSON-LD aggregateRating.ratingValue 근사치. 별점을 직접 수집하지 않으므로 등급 기반 대리값.
@@ -145,7 +146,20 @@ export default async function CafePage({ params }: Props) {
   const evAll = Array.isArray(evRaw)
     ? sortReviews(evRaw, c.name ?? "", [c.area, c.dong].filter(Boolean) as string[], Date.now(), c.dong)
     : [];
-  const highlights = extractHighlights(evAll.map((e: any) => e?.quote || ""));
+  const quotesAll = evAll.map((e: any) => e?.quote || "");
+  const highlights = extractHighlights(quotesAll);
+  // 💻 카공 세부 신호(2026-08-17) — "작업하기 좋음" 한 축으로 뭉뚱그리던 것을 콘센트·와이파이·자리로 쪼갠다.
+  //   실측: 테마 수요 상위 8개 중 7개가 카공인데 정작 카공족이 묻는 건 이 시설 정보였다.
+  //   ⚠️ 추가 조회 0(이미 읽은 인용문 재사용) · LLM 0(규칙) · 근거 없으면 아무것도 안 그린다.
+  const work = extractWorkSignals(quotesAll);
+  // 🛡️ 검증 근거 공개(2026-08-17) — 우리 해자의 증거가 synth_quality에 다 있는데 화면엔 한 글자도 안 나갔다.
+  //   /trust 페이지로 따로 빼뒀더니 30일 방문 **1명**이었다. 설명을 별도 페이지에 가두면 아무도 안 읽는다.
+  //   → 이 카페의 실제 숫자로, 결정하는 화면 안에서 보여준다. 추가 조회 없이 같은 행에서 읽는다.
+  const sq = (c.synth_quality ?? null) as any;
+  const sqRaw = Number(sq?.raw ?? 0);
+  const sqReasons: [string, number][] = sq?.rejectReasons && typeof sq.rejectReasons === "object"
+    ? (Object.entries(sq.rejectReasons) as [string, number][]).filter(([, n]) => Number(n) > 0).sort((a, b) => Number(b[1]) - Number(a[1])).slice(0, 3)
+    : [];
   const faqs = buildFaq(c, grade, highlights, profile, tags);
   const faqJsonLd = faqs.length > 0 ? {
     "@context": "https://schema.org", "@type": "FAQPage",
@@ -249,6 +263,57 @@ export default async function CafePage({ params }: Props) {
               )}
             </div>
           )}
+          {/* 🛡️ 이 카페를 어떻게 골랐나 — 추상적 설명이 아니라 **이 카페의 실제 숫자**로.
+              ⚠️ duplicates는 여기 넣지 말 것 — 실측(500곳) 결과 raw = verified+reference+rejected가
+                 정확히 성립하고 rejectReasons 합계도 rejected와 같다(498/500). 즉 중복은 raw 이전 단계에서
+                 빠져 있어, 제외 목록에 함께 적으면 이중계산처럼 읽힌다. */}
+          {sqRaw > 0 && (
+            <div className="bg-[#f7f3ea] rounded-xl px-4 py-3 mb-3 border border-[#ddd0b6]">
+              <div className="text-[13px] text-[#3d2f22] leading-relaxed">
+                🛡️ 이 카페가 나온 글 <b>{sqRaw.toLocaleString()}건</b>을 확인해
+                <b> {(sqRaw - Number(sq?.verified ?? 0) - Number(sq?.reference ?? 0)).toLocaleString()}건을 걸러내고</b>{" "}
+                <b>{Number(sq?.verified ?? 0).toLocaleString()}건</b>의 진짜 방문 후기로 판단했어요.
+              </div>
+              {sqReasons.length > 0 && (
+                <ul className="mt-2 space-y-0.5">
+                  {sqReasons.map(([why, n]) => (
+                    <li key={why} className="text-[11.5px] text-[#6b5740] flex gap-1.5">
+                      <span className="text-[#a8927a]">·</span>
+                      <span>{why} <b className="text-[#7a5122]">{Number(n).toLocaleString()}건</b> 제외</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <Link href="/trust" className="inline-block text-[11.5px] text-[#7a5122] underline mt-2">검증 방법 자세히 →</Link>
+            </div>
+          )}
+
+          {/* 💻 카공 시설 — 콘센트·와이파이·자리. **근거 건수를 반드시 함께** 적어 단정하지 않는다.
+              "없다"는 언급도 숨기지 않는다 — 헛걸음을 막아주는 것도 우리가 파는 값이다. */}
+          {(work.signals.length > 0 || work.timeLimit > 0) && (
+            <div className="bg-white rounded-xl px-4 py-3 mb-3 border border-[#d8c8ad]">
+              <div className="text-[11px] font-bold text-[#7a5f3c] uppercase tracking-wider mb-2">💻 작업하기 전에 확인</div>
+              <div className="flex flex-wrap gap-1.5">
+                {work.signals.map((sg) => {
+                  const pos = sg.yes >= sg.no;
+                  return (
+                    <span key={sg.key} className={`text-[12.5px] rounded-full pl-2.5 pr-1.5 py-1 border font-semibold inline-flex items-center gap-1.5 ${pos ? "bg-[#eef4ea] text-[#3f5537] border-[#c4d6bb]" : "bg-[#fbeeee] text-[#8a4040] border-[#e3c3c3]"}`}>
+                      {sg.emoji} {pos ? sg.label : sg.negLabel}
+                      <span className={`text-[10px] font-bold rounded-full px-1.5 py-[1px] ${pos ? "bg-[#d6e6cd] text-[#3f5537]" : "bg-[#f0d6d6] text-[#8a4040]"}`}>후기 {Math.max(sg.yes, sg.no)}건</span>
+                    </span>
+                  );
+                })}
+                {work.timeLimit > 0 && (
+                  <span className="text-[12.5px] rounded-full pl-2.5 pr-1.5 py-1 border font-semibold inline-flex items-center gap-1.5 bg-[#fdf4e3] text-[#8a6a3a] border-[#e7d3b3]">
+                    ⏱ 이용 시간 제한 언급
+                    <span className="text-[10px] font-bold rounded-full px-1.5 py-[1px] bg-[#f2e2c4] text-[#8a6a3a]">후기 {work.timeLimit}건</span>
+                  </span>
+                )}
+              </div>
+              <div className="text-[10.5px] text-[#8a7355] mt-2">후기에 실제로 적힌 말만 셌어요. 언급이 없으면 표시하지 않습니다.</div>
+            </div>
+          )}
+
           {/* ⚖️ 평판 신선도 — 최근 평이 갈리거나 노후하면 투명하게 안내 */}
           {c.reputation_note && (
             <div className="bg-[#fbf3ea] rounded-xl px-4 py-2.5 mb-3 border border-[#e7d3b3]">

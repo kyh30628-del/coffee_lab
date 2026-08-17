@@ -26,6 +26,9 @@ export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, headin
     "@context": "https://schema.org", "@type": "BreadcrumbList",
     itemListElement: crumbs.map((b, i) => ({ "@type": "ListItem", position: i + 1, name: b.name, item: b.url })),
   };
+  // 히어로 = 목록 1위. 3곳 미만이면 "1위"라는 표현 자체가 과장이라 쓰지 않는다(근거 없는 단정 금지).
+  const hero = cafes.length >= 3 ? cafes[0] : null;
+  const rest = hero ? cafes.slice(1) : cafes;
   const jsonld = {
     "@context": "https://schema.org", "@type": "ItemList", name: heading, numberOfItems: cafes.length,
     itemListElement: cafes.slice(0, 20).map((c, i) => ({ "@type": "ListItem", position: i + 1, url: `${SITE}/c/${c.id}`, name: c.name })),
@@ -60,6 +63,40 @@ export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, headin
           </div>
         )}
 
+        {/* 🥇 "답 먼저" 히어로(2026-08-17) — 목록이 아니라 **결론 하나**를 먼저 준다.
+            실측 근거: 테마 페이지가 유입의 87%인데 체류 **중앙값 6.9초**다. 카드 30개를 내려놓으면
+            사용자는 고르지 못하고 떠난다. 그리고 우리가 가진 근거(78.5%가 검증후기 10건 이상)는
+            카드 안 70자 인용문으로만 새어나가고 있었다 — 해자가 화면에 안 보였다는 뜻이다.
+            → 1위 한 곳을 크게, **왜 1위인지 숫자로** 먼저 보여준다. 순위 기준은 목록과 동일
+              (테마 페이지=그 결의 언급 건수, 지역 페이지=검증 등급·후기량)이라 목록과 어긋나지 않는다.
+            ⚠️ 추가 DB 조회 0 — 이미 받아온 cafes[0]을 다르게 그릴 뿐이다. */}
+        {hero && (
+          <Link href={`/c/${hero.id}`} className="block bg-white rounded-2xl border-2 border-[#c9b48c] px-5 py-4 mb-4 hover:shadow-md transition">
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="text-[10px] font-bold text-white bg-[#7a5122] px-2 py-0.5 rounded-full">
+                {tasteLabel ? `${tasteEmoji ?? ""} ${tasteLabel} 1위` : "가장 검증이 두꺼운 곳"}
+              </span>
+              {hero.grade && <span className="text-[10px] font-bold text-white px-1.5 py-0.5 rounded" style={{ background: GRADE_BG[hero.grade] || "#a8927a" }}>{hero.grade}</span>}
+            </div>
+            <div className="flex items-baseline gap-2 flex-wrap">
+              <span className="font-bold text-[21px] leading-tight">{hero.name}</span>
+              {hero.dong && <span className="text-[12.5px] text-[#665036]">{hero.dong}</span>}
+            </div>
+            {/* 근거를 문장이 아니라 **숫자**로 — 이게 우리가 다른 서비스와 다른 지점이다. */}
+            <p className="text-[13px] font-bold text-[#5f7355] mt-2">
+              {tasteKey && typeof hero.tasteHits === "number" && hero.tasteHits > 0 ? (
+                <>후기 {hero.count ?? 0}건 중 <span className="text-[15px]">{hero.tasteHits}건</span>이 {tasteLabel} 이야기
+                  {hero.count ? <span className="font-normal text-[#665036]"> ({Math.round((hero.tasteHits / hero.count) * 100)}%)</span> : null}</>
+              ) : (
+                <>교차검증한 진짜 후기 <span className="text-[15px]">{hero.count ?? 0}건</span></>
+              )}
+            </p>
+            {hero.identity && <p className="text-[13px] text-[#3d2f22] leading-relaxed mt-1.5">{hero.identity}</p>}
+            {hero.quote && <p className="text-[12.5px] text-[#665036] leading-relaxed mt-2 pl-2.5 border-l-2 border-[#e0d3b8]">“{hero.quote}”</p>}
+            <span className="inline-block text-[12.5px] font-semibold text-[#7a5122] mt-2.5">근거 후기 전부 보기 →</span>
+          </Link>
+        )}
+
         {/* 🗺️ 지도 CTA를 목록 **위**로(2026-08-16) — 실측: 테마 페이지 착지 377명 중 193명(51%)이 1페이지 이탈인데,
             기존 CTA는 카드 30개 아래에 있어 사실상 안 보였다. 반면 지도(홈)에 도달한 사람의 이탈률은 **3%**
             (78명 중 2명) — 우리 서비스의 체류는 지도에서 만들어진다. 그 입구를 첫 화면으로 올린다.
@@ -78,11 +115,11 @@ export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, headin
           <p className="text-[13px] text-[#665036] py-8 text-center">아직 이 조건에 맞는 검증 카페가 적어요. <Link href={`/area/${encodeURIComponent(area)}`} className="underline text-[#7a5122]">{area} 전체 보기</Link></p>
         ) : (
           <ol className="space-y-2.5">
-            {cafes.map((c, i) => (
+            {rest.map((c, i) => (
               <li key={c.id}>
                 <Link href={`/c/${c.id}`} className="block bg-white rounded-xl border border-[#e6dcc8] px-4 py-3 hover:shadow-sm transition">
                   <div className="flex items-center gap-2">
-                    <span className="text-[#82714f] text-[13px] font-bold w-5 shrink-0">{i + 1}</span>
+                    <span className="text-[#82714f] text-[13px] font-bold w-5 shrink-0">{i + (hero ? 2 : 1)}</span>
                     <span className="font-bold text-[15px]">{c.name}</span>
                     {c.dong && <span className="text-[12px] text-[#665036]">{c.dong}</span>}
                     {c.grade && <span className="text-[10px] font-bold text-white px-1.5 py-0.5 rounded ml-auto shrink-0" style={{ background: GRADE_BG[c.grade] || "#a8927a" }}>{c.grade}</span>}

@@ -69,6 +69,20 @@ T("'광고x체험단o'는 협찬으로 거절", vr("베이커리 맛집 크로�
 T("'협찬x 내돈내산'은 그대로 통과(오탐 방지)", vr("크로엔젤 안산사동점 방문 후기", "협찬x 내돈내산으로 다녀왔어요. 소금빵이 맛있고 분위기가 좋았습니다 안산시") !== "rejected");
 T("'체험단ok'처럼 글자 이어지면 긍정표기 아님", vr("크로엔젤 안산사동점 후기", "광고 아님. 소금빵 먹었어요 맛있었고 재방문 의사 있습니다 안산시") !== "rejected");
 
+// ── workDetail: 카공 시설 신호 — 부정을 못 읽으면 **사실과 정반대**를 말한다(가장 위험한 실패)
+const { extractWorkSignals } = await import("../lib/workDetail.ts");
+{
+  const g = (qs, key) => extractWorkSignals(qs).signals.find((s) => s.key === key);
+  T("콘센트 있음 정탐", g(["콘센트도 많고 자리도 좋아요"], "outlet")?.yes === 1);
+  T("'콘센트없음'(붙여쓰기) 부정 인식", g(["콘센트없음 테이블 모양은 예쁨"], "outlet")?.no === 1);
+  T("'콘센트가 하나도 없어서' 부정 인식", g(["매장에 콘센트가 하나도 없어서 오래 있을 곳은 아니에요"], "outlet")?.no === 1);
+  // 구현 중 실제로 밟은 버그: '눈치'를 키워드 앞에서만 찾아 "노트북 눈치 보여서"가 긍정으로 잡혔다.
+  T("'와이파이 느리다' 부정 인식", g(["와이파이 느려서 작업은 좀"], "wifi")?.no === 1);
+  T("'부족함 없이'는 부정 아님(오탐 방지)", g(["콘센트 부족함 없이 넉넉해요"], "outlet")?.yes === 1);
+  T("언급 없으면 아무것도 만들지 않음", extractWorkSignals(["커피가 맛있어요"]).signals.length === 0);
+  T("시간제한은 따로 센다", extractWorkSignals(["2시간 이용 제한 있어요"]).timeLimit === 1);
+}
+
 // ── detectCampaignCluster: 미표기 체험단 캠페인 (사고: 비율 임계만 있어 700곳 중 0곳만 잡던 구조)
 const { detectCampaignCluster } = await import("../lib/reviewQuality.ts");
 {
