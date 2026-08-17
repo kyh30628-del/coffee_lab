@@ -116,9 +116,13 @@ for (const d of rows) {
       console.log(`  ⚠️ 아카이브 append 실패(배포 계속): ${String(ae?.message || ae).slice(0, 90)}`);
     }
     git("push origin main");
-    // 배포 반영 확인(최대 ~3.5분)
+    // 배포 반영 확인 — ⚠️ 2026-08-17 재교정: 창이 3.5분(14×15초)이었는데 **우리 실제 빌드는 평균 10.5분**
+    //   (인보이스 실측: 6,528분 / 619빌드)이고 20분 넘게 걸린 날도 있다. 정상 배포가 매번 '반영미확인'으로
+    //   기록되고 exit 1 → cronfail 이슈까지 자동 생성됐다(실측 08-17 #743: 20분 뒤 정상 반영됐는데 실패로 표기).
+    //   창을 25분으로 넓힌다. 폴링은 15초 간격 fetch 1회씩이라 비용은 무시할 수준이고,
+    //   진짜 빌드 실패는 25분이 지나도 안 올라오므로 여전히 잡힌다(감도 손실 없음).
     let live = false;
-    for (let i = 0; i < 14; i++) {
+    for (let i = 0; i < 100; i++) {
       try {
         const r = await fetch("https://dongnecoffeenote.com/api/version", { cache: "no-store" });
         const j = await r.json(); if (j.v === sha) { live = true; break; }
