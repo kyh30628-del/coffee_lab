@@ -111,6 +111,12 @@ const AD_STRONG = /(협찬|체험단|제공\s*받|원고료|소정의|대가성|
 //   ⚠️ '내돈내산'은 면책 아님 — '체험단으로 갔지만 (이전엔)내돈내산' 같이 실제 협찬받은 글에도 붙으므로,
 //      능동적 협찬신호(체험단·협찬받음·제공받음)가 있으면 제외(엄격 — 진짜 후기 해자).
 const AD_DISCLAIM = /(협찬|광고|제공|대가|유료|체험단|서포터즈?|기자단)\s*([xX✕✖]|아닌|아니|아님|없이|없는|없습니다|없음|받지\s*않)|비협찬/;
+// ⚠️ 2026-08-17 실측 사고: 면책이 **항목별이 아니라 문장 단위**로 적용돼, 한 항목만 부인해도 나머지가 통째로 면제됐다.
+//   실례 #11900 크로엔젤 안산사동점 — "광고x체험단o"(광고 아님·체험단 **맞음**)가 '광고x' 하나로 면책 처리돼
+//   체험단 협찬글이 verified/95로 노출 중이었다. 표시 인용문 전수 조회 결과 이 형태는 이 1건.
+//   → 긍정 표기(체험단o·협찬O)는 어떤 면책 문구로도 상쇄되지 않는 하드 신호로 둔다.
+//   오탐 방지: 마커 바로 뒤에 글자가 이어지면(체험단ok, 협찬only) 제외 — 표기형 'o'만 인정.
+const AD_AFFIRM = /(협찬|체험단|제공|대가성|원고료)\s?[oO0ㅇ○◯](?![a-zA-Z가-힣0-9])/;
 // coord#112(2026-07-05): 지자체 서포터즈·시민/블로그 기자단 등 '위촉형 대가성 홍보글'이 방문후기(verified)로 혼입.
 //   협찬/체험단 문구는 걸러지나 서포터즈·기자단 위촉 문구는 통과 → 22곳(검증 8곳) 오염 확인. 위촉 역할어를 협찬과 동급 처리.
 //   ⚠️ '서포터즈 모임을 했어요' 같은 손님 후기 오탐 방지: 필자 역할(활동·위촉·선정·모집)·기관위촉 신호가 붙을 때만.
@@ -957,7 +963,8 @@ export function verifyReview(input: QualityInput): QualityResult {
   const nameN = norm(input.name);
   const areaTerms = input.areaTerms ?? [];
   // 진짜 광고/협찬(면책 문구 제외)이면 검증 후기에서 제외 — 랜딩 약속('광고·협찬 자동 제외')과 일치.
-  const sponsored = AD_STRONG.test(fullL) && !AD_DISCLAIM.test(fullL);
+  const disclaimed = AD_DISCLAIM.test(fullL) && !AD_AFFIRM.test(fullL); // 긍정 표기가 있으면 면책 무효(2026-08-17)
+  const sponsored = AD_STRONG.test(fullL) && !disclaimed;
   const supporterPR = SUPPORTER_PR.test(fullL) && !AD_DISCLAIM.test(fullL); // coord#112: 서포터즈·기자단 위촉 홍보글
   const institutionalPR = INSTITUTIONAL_PR.test(fullL) && !AD_DISCLAIM.test(fullL); // decisions#500: 기관 보도자료·업무협약/후원 소식
   const exhibitionPR = EXHIBITION_PR.test(fullL) && !has(fullL, VISIT_CUES) && !AD_DISCLAIM.test(fullL); // decisions#644: 갤러리 전시 공지문(3인칭 초대장)
