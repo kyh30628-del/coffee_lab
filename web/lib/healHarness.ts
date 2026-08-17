@@ -101,13 +101,20 @@ export async function frozenSummary(): Promise<{ job: string; n: number }[]> {
 }
 
 /**
- * 치유 효과 판정용 지문 — **탐지기가 보는 바로 그 소스**(`synth_reviews` = 노출 top6)의 해시.
+ * 치유 효과 판정용 지문 — **탐지기가 보는 바로 그 소스**의 해시.
  *   ⚠️ 비용: md5를 **SQL 안에서** 계산해 32자만 전송한다(큰 컬럼을 앱으로 실어오지 않는다).
  *   집행 전후 이 값이 같으면 = 노출이 하나도 안 바뀜 = 효과 없음(2026-08-08 사고의 정확한 모습).
+ *
+ * 🔴 2026-08-17: 예전엔 `synth_reviews`(top6)만 해싱했다. 그런데 같은 날 센티넬 탐지 범위를
+ *   `synth_reviews_all`(실제 렌더되는 전체 배열)까지 넓히면서, **전체 배열에만 있던 오염을 치유하면
+ *   top6 해시는 그대로 → '효과 없음'으로 찍히고 → 반복되면 그 대상이 동결**되는 구조가 됐다.
+ *   즉 치유기가 제 일을 했다는 이유로 벌을 받는다(같은 날 아침 고친 정체 오탐과 같은 계열의 버그).
+ *   → 지문은 **탐지 범위와 반드시 같은 것을 덮어야 한다.** 두 배열을 함께 해싱한다.
  */
 export async function shownHash(cafeId: number): Promise<string> {
   try {
-    const r = (await sql`SELECT md5(COALESCE(synth_reviews::text,'')) h FROM cafes WHERE id=${cafeId}`)[0] as any;
+    const r = (await sql`SELECT md5(COALESCE(synth_reviews::text,'') || '|' || COALESCE(synth_reviews_all::text,'')) h
+      FROM cafes WHERE id=${cafeId}`)[0] as any;
     return String(r?.h ?? "");
   } catch { return ""; }
 }

@@ -35,8 +35,8 @@ async function scanNameMismatch(): Promise<{ count: number; far: number; nameMis
   const flagged: { id: number; name: string; area: string; miss: number; shown: number; far: boolean; rate: number }[] = [];
   for (let guard = 0; guard < 80; guard++) {
     if (Date.now() - t0 > 240000) { truncated = true; break; } // 시간 안전장치(다음 실행이 이어감)
-    const rows = (await sql`SELECT id, name, area, dong, synth_reviews FROM cafes
-      WHERE published AND synth_reviews IS NOT NULL AND jsonb_array_length(synth_reviews) >= 3 AND id > ${lo}
+    const rows = (await sql`SELECT id, name, area, dong, COALESCE(synth_reviews_all, synth_reviews) AS synth_reviews FROM cafes
+      WHERE published AND COALESCE(synth_reviews_all, synth_reviews) IS NOT NULL AND jsonb_array_length(COALESCE(synth_reviews_all, synth_reviews)) >= 3 AND id > ${lo}
       ORDER BY id LIMIT 500`) as any[];
     if (!rows.length) break; lo = rows[rows.length - 1].id;
     for (const c of rows) {
@@ -79,8 +79,8 @@ async function scanAttractionPollution(): Promise<{ count: number; samples: stri
   const flagged: AttrFlag[] = [];
   for (let guard = 0; guard < 80; guard++) {
     if (Date.now() - t0 > 90000) { truncated = true; break; } // 시간 안전장치(스캔60~90s → 자동조치 예산 확보)
-    const rows = (await sql`SELECT id, name, area, dong, synth_reviews FROM cafes
-      WHERE published AND synth_reviews IS NOT NULL AND jsonb_array_length(synth_reviews) >= 2 AND id > ${lo}
+    const rows = (await sql`SELECT id, name, area, dong, COALESCE(synth_reviews_all, synth_reviews) AS synth_reviews FROM cafes
+      WHERE published AND COALESCE(synth_reviews_all, synth_reviews) IS NOT NULL AND jsonb_array_length(COALESCE(synth_reviews_all, synth_reviews)) >= 2 AND id > ${lo}
       ORDER BY id LIMIT 500`) as any[];
     if (!rows.length) break; lo = rows[rows.length - 1].id;
     for (const c of rows) {
@@ -212,8 +212,8 @@ async function scanWeakNamePollution(): Promise<{ count: number; samples: string
   const t0 = Date.now(); let lo = 0; let truncated = false; const flagged: WeakFlag[] = [];
   for (let guard = 0; guard < 80; guard++) {
     if (Date.now() - t0 > 45000) { truncated = true; break; } // 값싼 스캔(대부분 이름체크서 즉시 skip) — 45s컷
-    const rows = (await sql`SELECT id, name, area, dong, synth_reviews FROM cafes
-      WHERE published AND synth_reviews IS NOT NULL AND jsonb_array_length(synth_reviews) >= 3 AND id > ${lo}
+    const rows = (await sql`SELECT id, name, area, dong, COALESCE(synth_reviews_all, synth_reviews) AS synth_reviews FROM cafes
+      WHERE published AND COALESCE(synth_reviews_all, synth_reviews) IS NOT NULL AND jsonb_array_length(COALESCE(synth_reviews_all, synth_reviews)) >= 3 AND id > ${lo}
       ORDER BY id LIMIT 500`) as any[];
     if (!rows.length) break; lo = rows[rows.length - 1].id;
     for (const c of rows) {
@@ -328,8 +328,8 @@ async function scanNonCafeBizPollution(): Promise<{ count: number; samples: stri
   const t0 = Date.now(); let lo = 0; let truncated = false; const flagged: NcbFlag[] = [];
   for (let guard = 0; guard < 80; guard++) {
     if (Date.now() - t0 > 60000) { truncated = true; break; } // 60s컷(자동조치 예산 확보)
-    const rows = (await sql`SELECT id, name, area, dong, synth_reviews FROM cafes
-      WHERE published AND synth_reviews IS NOT NULL AND jsonb_array_length(synth_reviews) >= 2 AND id > ${lo}
+    const rows = (await sql`SELECT id, name, area, dong, COALESCE(synth_reviews_all, synth_reviews) AS synth_reviews FROM cafes
+      WHERE published AND COALESCE(synth_reviews_all, synth_reviews) IS NOT NULL AND jsonb_array_length(COALESCE(synth_reviews_all, synth_reviews)) >= 2 AND id > ${lo}
       ORDER BY id LIMIT 500`) as any[];
     if (!rows.length) break; lo = rows[rows.length - 1].id;
     for (const c of rows) {
@@ -464,7 +464,7 @@ async function scanFranchiseBranchPollution(): Promise<{ count: number; samples:
   const flagged: FranchiseFlag[] = [];
   for (let i = 0; i < targetIds.length; i += 200) {
     const chunk = targetIds.slice(i, i + 200);
-    const rows = (await sql`SELECT id, name, area, synth_reviews FROM cafes WHERE id = ANY(${chunk}::int[]) AND synth_reviews IS NOT NULL`) as any[];
+    const rows = (await sql`SELECT id, name, area, COALESCE(synth_reviews_all, synth_reviews) AS synth_reviews FROM cafes WHERE id = ANY(${chunk}::int[]) AND COALESCE(synth_reviews_all, synth_reviews) IS NOT NULL`) as any[];
     for (const c of rows) {
       const info = meta.get(c.id); if (!info) continue;
       let bad = 0; let hitSuffix = "";
@@ -587,8 +587,8 @@ async function scanGenericTermPollution(): Promise<{ count: number; samples: str
   const t0 = Date.now(); let lo = 0; let truncated = false; const flagged: GenericFlag[] = [];
   for (let guard = 0; guard < 80; guard++) {
     if (Date.now() - t0 > 30000) { truncated = true; break; } // 값싼 스캔(대부분 토큰체크서 즉시 skip) — 30s컷
-    const rows = (await sql`SELECT id, name, area, dong, address, synth_reviews FROM cafes
-      WHERE published AND synth_reviews IS NOT NULL AND jsonb_array_length(synth_reviews) >= 2 AND id > ${lo}
+    const rows = (await sql`SELECT id, name, area, dong, address, COALESCE(synth_reviews_all, synth_reviews) AS synth_reviews FROM cafes
+      WHERE published AND COALESCE(synth_reviews_all, synth_reviews) IS NOT NULL AND jsonb_array_length(COALESCE(synth_reviews_all, synth_reviews)) >= 2 AND id > ${lo}
       ORDER BY id LIMIT 500`) as any[];
     if (!rows.length) break; lo = rows[rows.length - 1].id;
     for (const c of rows) {
@@ -628,8 +628,8 @@ async function scanPhraseNamePollution(): Promise<{ count: number; samples: stri
   const t0 = Date.now(); let lo = 0; let truncated = false; const flagged: PhraseFlag[] = [];
   for (let guard = 0; guard < 80; guard++) {
     if (Date.now() - t0 > 30000) { truncated = true; break; } // 값싼 스캔 — 30s컷
-    const rows = (await sql`SELECT id, name, area, dong, address, synth_reviews FROM cafes
-      WHERE published AND synth_reviews IS NOT NULL AND jsonb_array_length(synth_reviews) >= 4 AND id > ${lo}
+    const rows = (await sql`SELECT id, name, area, dong, address, COALESCE(synth_reviews_all, synth_reviews) AS synth_reviews FROM cafes
+      WHERE published AND COALESCE(synth_reviews_all, synth_reviews) IS NOT NULL AND jsonb_array_length(COALESCE(synth_reviews_all, synth_reviews)) >= 4 AND id > ${lo}
       ORDER BY id LIMIT 500`) as any[];
     if (!rows.length) break; lo = rows[rows.length - 1].id;
     for (const c of rows) {
