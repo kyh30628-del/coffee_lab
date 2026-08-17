@@ -96,6 +96,17 @@ const { detectCampaignCluster } = await import("../lib/reviewQuality.ts");
     ...Array.from({ length: 60 }, (_, i) => ({ quote: `혼자 조용히 책 읽기 좋았습니다 ${i}`, date: dt(2025, 1 + (i % 12), 1 + (i % 28)) })),
   ];
   T("캠페인(동일날짜 8건·템플릿·개인서사0) 검출", detectCampaignCluster(campaign).suspect === true);
+  // 2026-08-17 갭: 요즘 대행 글은 **문구를 패러프레이즈**해 2-gram 유사도가 낮다.
+  //   '카페 여백'(#304) — 32건 중 21건이 이틀에 몰리고 개인서사 0%인데 템플릿 0.22로 빠져나갔다.
+  //   → 유사도가 낮아도 절반 이상이 하루에 몰리고 개인서사가 없으면 이상신호로 본다.
+  const paraphrased = [
+    ...Array.from({ length: 12 }, (_, i) => ({ quote: `성북구 숨은 힐링 스팟 로스터리 카페 소개 ${i} 조용한 골목 분위기 한 잔`, date: dt(2026, 5, 1) })),
+    ...Array.from({ length: 6 }, (_, i) => ({ quote: `핸드드립 원두 향 좋은 공간 ${i}`, date: dt(2025, 2, i + 1) })),
+  ];
+  T("패러프레이즈 캠페인(밀집률만 높음) 검출", detectCampaignCluster(paraphrased).suspect === true);
+  // 인기 폭발로 한날 몰렸어도 **개인서사가 있으면** 보호한다(오탐 방지의 핵심 조건).
+  const burstButReal = Array.from({ length: 14 }, (_, i) => ({ quote: `친구랑 다녀왔어요 케이크가 정말 맛있었어요 재방문 의사 있어요 ${i}`, date: dt(2026, 5, 1) }));
+  T("한날 몰려도 개인서사 있으면 보호", detectCampaignCluster(burstButReal).suspect === false);
   T("자연인기(분산된 68건·개인서사) 보호", detectCampaignCluster(organic).suspect === false);
   T("표본 부족 시 판단보류", detectCampaignCluster([{ quote: "좋아요", date: dt(2026, 5, 1) }]).suspect === false);
 }

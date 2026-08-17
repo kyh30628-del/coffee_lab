@@ -1,4 +1,4 @@
-import { quoteMatchConfidence } from "./reviewQuality";
+import { quoteMatchConfidence, detectCampaignCluster } from "./reviewQuality";
 import { ownBranch, isOtherBranchQuote } from "./branchQuote";
 import { isAdTemplateQuote } from "./adTemplate";
 
@@ -49,6 +49,19 @@ function trustTier(e: any): number {
 //   ⚠️ 형제 지점 목록 조회 없음 — 카페 이름 하나로만 판정해 **추가 DB 비용 0**.
 export function sortReviews(raw: any[], name: string, areaTerms: string[], nowT: number, dong?: string | null): any[] {
   const own = ownBranch(name, dong);
+  // 🚩 네 번째 선행 관문(2026-08-17) — **미표기 체험단 캠페인**을 뒤로 민다.
+  //   지금까지 detectCampaignCluster는 탐지만 하고 needs_llm_priority 텍스트만 남겼다(집행 없음).
+  //   LLM 크레딧이 없어도 캠페인 판정 자체는 결정론이라, 노출 순서로는 지금 바로 집행할 수 있다.
+  //   실제 사례 '카페 여백'(#304): 후기 32건 중 21건이 이틀에 몰리고 개인서사 0%, 자동생성 블로그 계정.
+  //   ⚠️ 삭제·비공개가 아니라 순서만 바꾼다 — 오탐이 나도 후기는 사라지지 않는다(광고템플릿 관문과 같은 원칙).
+  //   비용: 실측 카페당 0.12ms(후기 120건 기준)·추가 DB 조회 0.
+  const camp = detectCampaignCluster(raw.map((e) => ({ quote: e?.quote || "", date: e?.date })));
+  const campDay = camp.suspect && camp.clusterDate ? new Date(camp.clusterDate + "T00:00:00").getTime() : null;
+  const inCampaign = (e: any): boolean => {
+    if (campDay == null) return false;
+    const t = parseYmd(e?.date);
+    return t != null && Math.abs(t - campDay) <= 36 * 3600 * 1000; // ±1일(밀집 병합 기준과 동일)
+  };
   return [...raw]
     .map((e) => ({
       e,
@@ -59,11 +72,13 @@ export function sortReviews(raw: any[], name: string, areaTerms: string[], nowT:
       //   → 공시 대신 '지문'(영업시간·주차·전화번호 나열 + 개인 감상 전무)으로 판정한다.
       //   삭제가 아니라 순서만 바꾸므로 오탐이 나도 후기는 사라지지 않는다. 추가 DB 조회 0.
       real: isAdTemplateQuote(e?.quote) ? 0 : 1, // 0 = 정보 카드형 → 진짜 후기 뒤로
+      solo: inCampaign(e) ? 0 : 1,               // 0 = 캠페인 묶음 글 → 뒤로
     }))
     .sort((a, b) => {
       if (b.conf !== a.conf) return b.conf - a.conf;
       if (b.mine !== a.mine) return b.mine - a.mine;
       if (b.real !== a.real) return b.real - a.real;
+      if (b.solo !== a.solo) return b.solo - a.solo;
       const tier = trustTier(b.e) - trustTier(a.e);
       if (tier !== 0) return tier;
       const acc = accuracy(b.e) - accuracy(a.e);

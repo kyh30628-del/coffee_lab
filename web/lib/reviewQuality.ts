@@ -794,7 +794,16 @@ export function detectCampaignCluster(evidence: { quote: string; date?: string }
   }
   const templateScore = pairs ? sum / pairs : 0;
   const personalMarkerRate = best.filter((e) => PERSONAL_NARRATIVE_MARKER.test(e.quote)).length / best.length;
-  const suspect = templateScore >= CAMPAIGN_TEMPLATE_SCORE && personalMarkerRate < CAMPAIGN_PERSONAL_RATE;
+  // ⚠️ 2026-08-17 실측 갭: 템플릿 유사도를 **필수 조건**으로 두니 3,200곳 중 2곳만 걸렸다.
+  //   실제로 놓친 예 — '카페 여백'(#304): 후기 32건 중 21건이 2025.09.25~26 이틀에 몰렸고
+  //   개인서사 0%, 블로그명은 qpalzm6109·thxlov 식 자동생성 계정, 문구는 전부 홍보 카피였다.
+  //   그런데 요즘 대행 글은 **문구를 패러프레이즈**해서 2-gram 유사도가 0.22로 낮게 나온다.
+  //   → 유사도가 낮아도 **후기 절반 이상이 하루(±1일)에 몰리고 개인서사가 거의 없으면** 그 자체로 이상신호다.
+  //     (자연 발생 후기가 이렇게 몰릴 수는 없다). 밀집률을 대체 경로로 인정하되, 개인서사 조건은 유지해
+  //     "인기 폭발로 한날 몰린 진짜 후기"는 계속 보호한다.
+  const CAMPAIGN_BURST_ONLY_RATE = 0.5;
+  const suspect = personalMarkerRate < CAMPAIGN_PERSONAL_RATE
+    && (templateScore >= CAMPAIGN_TEMPLATE_SCORE || clusterRate >= CAMPAIGN_BURST_ONLY_RATE);
   return {
     suspect,
     clusterDate: suspect ? new Date(bestDay * 86400000).toISOString().slice(0, 10) : null,
