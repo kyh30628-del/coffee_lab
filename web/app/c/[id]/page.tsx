@@ -12,6 +12,7 @@ import { collectionForCafe } from "@/lib/collections";
 import { tasteByKey } from "@/lib/seoData";
 import { shareHookText } from "@/lib/shareCopy";
 import { sortReviews } from "@/lib/exposureOrder";
+import OutboundLink from "../../OutboundLink";
 
 export const runtime = "nodejs";
 export const revalidate = 3600; // ISR 1시간
@@ -300,10 +301,10 @@ export default async function CafePage({ params }: Props) {
           {userReviews.length > 0 && <div className="mb-4"><VisitorReviews reviews={userReviews} /></div>}
           <Link href={`/?cafe=${c.id}`} className="block w-full text-center bg-[#2b2018] text-[#f4ece0] rounded-xl py-3.5 font-bold">지도·근거 후기 보기 →</Link>
           {/* 메뉴·가격·영업시간은 권위 원천(네이버 플레이스)으로 연결 — 항상 정확·최신 */}
-          <a href={`/api/naver-place-redirect?id=${c.id}`} target="_blank" rel="noopener noreferrer" className="mt-2.5 flex items-center justify-center gap-1.5 w-full text-center border-2 rounded-xl py-3 text-[13px] font-semibold bg-white" style={{ borderColor: "#03c75a", color: "#03c75a" }}>
+          <OutboundLink href={`/api/naver-place-redirect?id=${c.id}`} target="naver_place" cafeId={c.id} source="카페상세" className="mt-2.5 flex items-center justify-center gap-1.5 w-full text-center border-2 rounded-xl py-3 text-[13px] font-semibold bg-white" style={{ borderColor: "#03c75a", color: "#03c75a" }}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="#03c75a"><path d="M16.273 12.845L7.376 0H0v24h7.727V11.155L16.624 24H24V0h-7.727z"/></svg>
             네이버에서 메뉴·가격·영업시간 보기
-          </a>
+          </OutboundLink>
           {/* 🔁 비슷한 카페 더보기 — 같은 동네 + 결(taste) 유사도, 검증/참고 등급 우선(리텐션, 홍보×경험 #94, decisions #338) */}
           {nearby.length > 0 && (
             <div className="mt-6">

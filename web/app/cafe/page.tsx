@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import BackLink from "../BackLink";
+import { trackOutbound } from "../trackOutboundClient";
 import { useLockBodyScroll } from "@/lib/useLockBodyScroll";
 import { decodeCafeScores } from "@/lib/mapCafes";
 
@@ -113,7 +114,7 @@ function CafeCard({ c, top, onShowEvidence }: { c: Cafe; top: boolean; onShowEvi
       <div className="mt-auto">
         {c.signature && <div className="text-[12px] text-[#524234] mb-2"><span className="text-[#7a4d1c]">추천 </span>{c.signature}</div>}
         <div className="flex gap-2">
-          <a href={`https://map.kakao.com/?q=${encodeURIComponent(c.name + " " + c.area)}`} target="_blank" rel="noopener noreferrer" className="flex-1 text-center bg-[#2b2018] text-[#f4ece0] rounded-lg py-2 text-xs font-medium hover:bg-[#3d2f22] transition-colors">지도·길찾기</a>
+          <a href={`https://map.kakao.com/?q=${encodeURIComponent(c.name + " " + c.area)}`} target="_blank" rel="noopener noreferrer" onClick={() => trackOutbound({ target: "kakao_map", cafeId: c.id, source: "동네목록" })} className="flex-1 text-center bg-[#2b2018] text-[#f4ece0] rounded-lg py-2 text-xs font-medium hover:bg-[#3d2f22] transition-colors">지도·길찾기</a>
           {c.phone && <a href={`tel:${c.phone}`} className="px-3 text-center bg-transparent border border-[#cbb89f] text-[#524434] rounded-lg py-2 text-xs font-medium flex items-center">전화</a>}
         </div>
       </div>
