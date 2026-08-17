@@ -73,6 +73,13 @@ export type StuckJob = { job: string; fingerprint: string; repeats: number; firs
  * 🔁 정체(헛돎) 탐지 — **같은 지문이 N회 연속**이면 그 잡은 아무것도 바꾸지 못하고 반복 중이다.
  *   2026-08-08 지점오염 치유기가 정확히 이 모습이었다(6회 연속 감지22/치유10, DB는 무변).
  *   ⚠️ '연속'이어야 한다 — 단순 COUNT는 사이에 다른 결과가 끼어도 잡아 오탐이 난다.
+ *
+ * ⚠️ 2026-08-17 오탐 수리(2차): **지문 NULL = "치유할 게 없다"는 정상·성공 상태**인데,
+ *   예전 쿼리는 `fingerprint IS NOT NULL`로 그 행을 아예 걸러냈다. 그래서 NULL 행이
+ *   연속을 끊지도, 최신 상태로 인정되지도 못했다.
+ *   실제 피해: cron-sentinel이 08-17 12:02(KST)에 치유대상 0으로 정상화됐는데도, 그 직전
+ *   같은 지문 3회가 그대로 남아 **일을 끝냈다는 이유로 48시간 동안 '정체'로 찍혔다.**
+ *   → NULL도 지문의 한 값으로 취급한다: 중간에 끼면 연속을 끊고, 최신이 NULL이면 판정 제외.
  */
 export async function detectStuck(hours = 48, minRepeats = 3): Promise<StuckJob[]> {
   try {
@@ -82,12 +89,13 @@ export async function detectStuck(hours = 48, minRepeats = 3): Promise<StuckJob[
         SELECT job, fingerprint, started_at,
                ROW_NUMBER() OVER (PARTITION BY job ORDER BY started_at DESC) AS rn
         FROM run_ledger
-        WHERE started_at > now() - (${hours} * interval '1 hour') AND fingerprint IS NOT NULL
+        WHERE started_at > now() - (${hours} * interval '1 hour')
       ), latest AS (
-        SELECT job, fingerprint AS fp FROM recent WHERE rn = 1
+        -- 최신 런이 NULL(=치유대상 없음)이면 그 잡은 지금 건강하다 → 아예 후보에서 뺀다.
+        SELECT job, fingerprint AS fp FROM recent WHERE rn = 1 AND fingerprint IS NOT NULL
       ), streak AS (
         SELECT r.job, r.fingerprint, r.started_at, l.fp,
-               SUM(CASE WHEN r.fingerprint = l.fp THEN 0 ELSE 1 END)
+               SUM(CASE WHEN r.fingerprint IS NOT DISTINCT FROM l.fp THEN 0 ELSE 1 END)
                  OVER (PARTITION BY r.job ORDER BY r.rn) AS broke
         FROM recent r JOIN latest l ON l.job = r.job
       )
