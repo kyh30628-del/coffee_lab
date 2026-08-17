@@ -119,7 +119,7 @@ const today = new Date().toISOString().slice(0, 10);
       }
       return ids;
     };
-    const isExplicitNoProposal = (text) => /상신\s*[:\s]*(?:없음|0건)/.test(text) && !/승인\s*필요/.test(text);
+    const isExplicitNoProposal = (text) => /(?:상신|제안)\s*[:\s]*(?:없음|0건)/.test(text) && !/승인\s*필요/.test(text);
 
     // ⚠️ #518 근본전환(coord#255, #421→#427→#450→#502 5차 재발): #502가 "번호 인용"으로 1차 신호를
     //    고쳤지만, 인용 없는 순수 신규 제안의 2차 폴백은 여전히 "파일명 stem이 결재문에 그대로 실린다"는
