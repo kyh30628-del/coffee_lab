@@ -236,3 +236,4 @@
 | 2026-08-16 07:35 | #734 | [사장님영업] 트라이얼 전환 버튼(BillingManage.tsx) day-1 카피 개선 — 방향 승인 요청 | d6516f30 | - | app/BillingManage.tsx: 트라이얼 전환 버튼 카피 개선(문자열/레이아웃만). 버튼 위에 체험 중 실제 켜져있는 기능(골드핀·추천카페 상단·쇼케이스) 1줄 고지 +  |
 | 2026-08-16 23:05 | #743 | [버그수정] lib/issues.ts:49 L2 자동집행 ids폴백 누락 — cafe_id단수 결정 영구미집 | 3c582bf7 | - | lib/issues.ts:49 ids 파싱에 action_params.cafe_id 단수 폴백 추가(app/api/admin/decide/route.ts:33-37과 동일 패턴). |
 | 2026-08-17 11:05 | #745 | [룰갭 신규] 관용구/일반명사형 상호명(동네·우리동네·골목·마실) — titleHasCafeWord만으론 " | 660bc2fa | - | lib/reviewQuality.ts bareWeak 게이트에 관용구/동사동음이의 화이트리스트 2종 추가(identity.idiom_dong_token: 동네방네·우리동네·골목=d |
+| 2026-08-17 11:06 | #746 | [룰갭 캐치업] 45차 발견 미등록 — 호텔 예약 제휴 어필리에이트 "할인정보" 템플릿 AD_STRONG 우 | ac2583a1 | - | lib/reviewQuality.ts:109 AD_STRONG에 호텔 예약제휴 할인정보 템플릿(할인정보(후기 가격 평점 교통 조식 세일 리뷰) 및 역순 (할인정보, — id418  |
