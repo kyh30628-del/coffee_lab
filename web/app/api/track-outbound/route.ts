@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sql } from "@/lib/db";
+import { sql, ensureOnce } from "@/lib/db";
 export const runtime = "nodejs";
 
 // 🚪 외부 이탈 클릭 기록 — "이 카페로 가기로 했다"에 가장 가까운 신호(2026-08-17, CEO 지시).
@@ -15,6 +15,8 @@ export const runtime = "nodejs";
 let ensured = false;
 async function ensure() {
   if (ensured) return;
+  // 💰 사용자 클릭 경로에 DDL을 두지 않는다 — 배포 단위 1회로(2026-08-18).
+  await ensureOnce("api.trackOutbound.schema", async () => {
   await sql`CREATE TABLE IF NOT EXISTS outbound_clicks (
     id BIGSERIAL PRIMARY KEY,
     anon_id TEXT,
@@ -26,6 +28,7 @@ async function ensure() {
   )`;
   await sql`CREATE INDEX IF NOT EXISTS idx_outbound_clicks_ts ON outbound_clicks (ts)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_outbound_clicks_cafe ON outbound_clicks (cafe_id)`;
+  });
   ensured = true;
 }
 

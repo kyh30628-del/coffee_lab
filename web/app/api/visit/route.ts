@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sql, ensureSchema } from "@/lib/db";
+import { sql, ensureSchema, ensureOnce } from "@/lib/db";
 import { sourceBucket } from "@/lib/trafficSource";
 import { KNOWN_BOT_UA_PATTERN } from "@/lib/behaviorBot";
 export const runtime = "nodejs";
@@ -13,6 +13,8 @@ const KNOWN_BOT_UA = new RegExp(KNOWN_BOT_UA_PATTERN, "i");
 // 정밀 위치·이름·연락처는 일절 받지 않음. 위치는 동의 플로우(/api/consent)에서만.
 let ensured = false;
 async function ensure() {
+  // 💰 이 경로는 **모든 페이지뷰**가 지난다 — 콜드스타트마다 ALTER 13개를 다시 돌던 낭비 차단(2026-08-18).
+  return ensureOnce("api.visit.schema", async () => {
   if (ensured) return;
   await sql`
     CREATE TABLE IF NOT EXISTS user_consents (
@@ -41,6 +43,7 @@ async function ensure() {
   // 체류시간(ms) — 페이지 이탈 시 /api/visit/duration 비콘이 진입 행에 채운다. 기존 INSERT는 이 컬럼 없이도 무해.
   await sql`ALTER TABLE traffic_events ADD COLUMN IF NOT EXISTS duration_ms INT`;
   ensured = true;
+  });
 }
 
 export async function POST(req: NextRequest) {

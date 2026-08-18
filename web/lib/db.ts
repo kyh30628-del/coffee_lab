@@ -19,6 +19,8 @@ export const sql = neon(process.env.DATABASE_URL || "postgresql://unused:unused@
 let ensured = false;
 export async function ensureSchema() {
   if (ensured) return;
+  // 💰 2026-08-18: 여기도 콜드스타트마다 다시 돌았다 — 배포 단위 1회로.
+  await ensureOnce("db.baseSchema", async () => {
   // 기존 취향 로그 (유지)
   await sql`
     CREATE TABLE IF NOT EXISTS taste_logs (
@@ -58,5 +60,42 @@ export async function ensureSchema() {
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS dong TEXT`.catch(() => {});
   // B2B 아웃리치 DM 타깃용 인스타그램 URL
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS instagram_url TEXT`.catch(() => {});
+  });
   ensured = true;
+}
+
+/**
+ * 🧊 스키마 보장 "1회 통과" 게이트 (2026-08-18, CEO 지시: 불필요한 DB 작업 근절)
+ *
+ * 실측 근거(pg_stat_statements 스냅샷): 전체 DB 실행시간 **4,739초 중 535초(11.3%)·24,961회**가
+ *   "이미 있는 컬럼을 또 만드는" DDL이었다. 예: `ALTER TABLE cafes ADD COLUMN IF NOT EXISTS raw_reviews`
+ *   단독으로 166회·121초. `IF NOT EXISTS`라 결과는 no-op이지만, 2GB 테이블에서 수백 ms가 걸리고
+ *   그동안 락도 잡는다. 서버리스는 인스턴스가 자주 새로 뜨므로 **콜드스타트마다 30개씩** 다시 돌았다.
+ *
+ * 해결: 배포(커밋 SHA) 단위로 "이미 보장됨" 표시를 DB에 남기고, 다음 콜드스타트는 **가벼운 조회 1회**로 건너뛴다.
+ *   - 배포가 바뀌면 태그가 달라져 새 컬럼이 있어도 정확히 한 번은 실행된다(안전).
+ *   - 표시 조회·기록이 실패해도 원래 DDL을 그대로 실행한다(실패 시 기존 동작 유지 — 절대 스키마를 건너뛰지 않는다).
+ */
+const SCHEMA_TAG = process.env.VERCEL_GIT_COMMIT_SHA || process.env.NODE_ENV || "local";
+const schemaDone = new Map<string, boolean>();
+export async function ensureOnce(key: string, run: () => Promise<void>): Promise<void> {
+  if (schemaDone.get(key)) return;
+  let skip = false;
+  try {
+    const r = (await sql`SELECT 1 FROM schema_state WHERE key=${key} AND tag=${SCHEMA_TAG} LIMIT 1`) as unknown[];
+    skip = r.length > 0;
+  } catch {
+    // 표시 테이블이 아직 없음 → 아래에서 만든다(최초 1회뿐).
+    try {
+      await sql`CREATE TABLE IF NOT EXISTS schema_state (key TEXT PRIMARY KEY, tag TEXT NOT NULL, at TIMESTAMPTZ NOT NULL DEFAULT now())`;
+    } catch { /* 만들지 못해도 아래 DDL은 그대로 돈다 */ }
+  }
+  if (!skip) {
+    await run();
+    try {
+      await sql`INSERT INTO schema_state (key, tag) VALUES (${key}, ${SCHEMA_TAG})
+        ON CONFLICT (key) DO UPDATE SET tag=EXCLUDED.tag, at=now()`;
+    } catch { /* 기록 실패는 무해 — 다음에 다시 실행될 뿐 */ }
+  }
+  schemaDone.set(key, true);
 }

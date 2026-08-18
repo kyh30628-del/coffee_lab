@@ -1,4 +1,5 @@
 "use client";
+import { shouldPoll } from "./idleGuard";
 import { useState, useEffect } from "react";
 import BackLink from "../BackLink";
 import { isSearchDegradeTrackItem } from "@/lib/searchDegradeTrack";
@@ -207,7 +208,7 @@ export default function AdminPage() {
     refreshNumbers(pw);
     loadNL(); // 뉴스레터 상태 로드 — 미발송 초안 리마인더용
     loadSubscribers(pw); // 승인 대기 사장님 리마인더용
-    const id = setInterval(() => { if (document.visibilityState === "visible") refreshNumbers(pw); }, 15000);
+    const id = setInterval(() => { if (shouldPoll()) refreshNumbers(pw); }, 15000);
     const onVis = () => { if (document.visibilityState === "visible") refreshNumbers(pw); };
     document.addEventListener("visibilitychange", onVis);
     return () => { clearInterval(id); document.removeEventListener("visibilitychange", onVis); };
@@ -215,7 +216,7 @@ export default function AdminPage() {
   // 📈 접속·유입 대시보드가 열려있는 동안 20초마다 자동 갱신(실시간) — 조용히(silent) 갱신해 깜빡임 없음
   useEffect(() => {
     if (!showAnalytics || !pw) return;
-    const id = setInterval(() => { if (document.visibilityState === "visible") loadAnalytics(pw, true); }, 20000);
+    const id = setInterval(() => { if (shouldPoll()) loadAnalytics(pw, true); }, 20000);
     return () => clearInterval(id);
   }, [showAnalytics, pw]);
   useLockBodyScroll(!!selAgent || !!todayDetail || towerFull || showVisits || showYtModal || showSubsModal || showBorderline || showAnalytics || showOnboard || showRotation || showNL);

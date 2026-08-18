@@ -1,4 +1,5 @@
 "use client";
+import { shouldPoll } from "../idleGuard";
 import { useState, useEffect, useCallback } from "react";
 import { ORG, MEMBER_INFO, JOB_TO_MEMBER, type Team, type Division, type Worker } from "@/lib/org";
 import { useLockBodyScroll } from "@/lib/useLockBodyScroll";
@@ -99,7 +100,7 @@ export default function Lounge() {
   }, [load]);
   useEffect(() => {
     if (!authed) return;
-    const id = setInterval(() => { if (document.visibilityState === "visible") load(pw); }, 30000);
+    const id = setInterval(() => { if (shouldPoll()) load(pw); }, 30000);
     return () => clearInterval(id);
   }, [authed, pw, load]);
   useLockBodyScroll(info !== null || composer !== null || kpiEdit !== null);

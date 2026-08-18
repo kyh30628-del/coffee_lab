@@ -1,4 +1,5 @@
 "use client";
+import { shouldPoll } from "../idleGuard";
 import { useState, useEffect } from "react";
 import BackLink from "../../BackLink";
 import { ORG, MEMBER_INFO, type Division, type Team, type Worker } from "@/lib/org";
@@ -92,7 +93,7 @@ export default function OrgDashboard() {
   };
   useEffect(() => {
     const p = localStorage.getItem("adm_pw"); if (p) { setPw(p); load(p); }
-    const id = setInterval(() => { const pw2 = localStorage.getItem("adm_pw"); if (pw2 && document.visibilityState === "visible") load(pw2, true); }, 15000);
+    const id = setInterval(() => { const pw2 = localStorage.getItem("adm_pw"); if (pw2 && shouldPoll()) load(pw2, true); }, 15000);
     return () => clearInterval(id);
   }, []);
   // 🔄 자동 새 배포 반영 — 소비자 앱·본체 관리자와 동일: 배포버전 다르면 새로고침(조직 관제도 항상 최신).
