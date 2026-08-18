@@ -16,6 +16,34 @@ const TOTAL_GB_ALERT = Number(process.env.COST_WATCH_TOTAL_GB || 25); // 전체 
 const XFER_RATE = 0.032; // Neon 공용 네트워크 전송(발신) 공개단가 $/GB
 
 // 📧 매일 아침 비용 점검 메일(CEO 지시 2026-08-03). 지난달(cost_baseline) vs 이번달(실행이력) 정면 비교. 새 무거운 조회 없음.
+
+// ⏰ 가동시간 워치독(2026-08-18, CEO 지적 — "DB 자는 걸로 했잖아").
+//   왜 필요했나: 이 워치독은 **데이터 전송량(GB)**만 봤다. 그런데 Neon 과금의 절반 이상은
+//   **깨어 있는 시간(compute)**이다. 그래서 크롤러발 ISR 재생성이 DB를 하루 10.4시간 붙잡고 있어도
+//   전송량은 정상이라 조용히 지나갔다 — 사장님이 물어봐서야 발견됐다. 그 구멍을 막는다.
+//   비용: 이미 있는 타임스탬프 3종을 하루 1회 집계(작은 컬럼·인덱스 사용). 새 테이블·새 크론 없음.
+async function awakeStats(): Promise<{ wakes: number; awakeMin: number; nightMin: number }> {
+  try {
+    const r = (await sql`
+      WITH ev AS (
+        SELECT ts FROM traffic_events WHERE ts > now()-interval '24 hours'
+        UNION ALL SELECT started_at FROM run_ledger WHERE started_at > now()-interval '24 hours'
+        UNION ALL SELECT ran_at FROM agent_runs WHERE ran_at > now()-interval '24 hours'
+      ), o AS (SELECT ts, lag(ts) OVER (ORDER BY ts) prev FROM ev),
+      k AS (SELECT ts, CASE WHEN prev IS NULL OR ts-prev > interval '5 minutes' THEN 1 ELSE 0 END nw FROM o),
+      g AS (SELECT ts, sum(nw) OVER (ORDER BY ts) grp FROM k),
+      w AS (SELECT grp, min(ts) st, max(ts) en FROM g GROUP BY grp)
+      SELECT count(*)::int wakes,
+             round(sum(EXTRACT(epoch FROM (en-st))/60 + 5)::numeric)::int awake_min,
+             round(sum(CASE WHEN extract(hour from st AT TIME ZONE 'Asia/Seoul') BETWEEN 0 AND 7
+                   THEN EXTRACT(epoch FROM (en-st))/60 + 5 ELSE 0 END)::numeric)::int night_min
+      FROM w`)[0] as any;
+    return { wakes: Number(r?.wakes ?? 0), awakeMin: Number(r?.awake_min ?? 0), nightMin: Number(r?.night_min ?? 0) };
+  } catch { return { wakes: 0, awakeMin: 0, nightMin: 0 }; }
+}
+// 하루 가동 이 시간을 넘으면 경보 — 2026-08-18 실측 기준선 10.4시간(624분)보다 위로 잡아 '개선 후 재악화'를 잡는다.
+const AWAKE_MIN_ALERT = Number(process.env.COST_WATCH_AWAKE_MIN || 660);
+
 async function sendCostReport(todayGb: number, top: { q: string; deltaGb: number } | null, anomaly: boolean, execMin: number) {
   const key = process.env.RESEND_API_KEY; if (!key) return;
   const to = process.env.COST_REPORT_EMAIL || "kyh30628@gmail.com"; // 이미 공개 git 커밋에 있는 주소(신규 노출 아님)
@@ -171,11 +199,18 @@ export async function GET(req: NextRequest) {
     // 더 이상 안 보이는(evict된) 옛 스냅샷 정리 — 무한 누적 방지.
     await sql`DELETE FROM cost_watch_snapshot WHERE snapshot_at < now() - interval '14 days'`.catch(() => {});
 
-    const anomaly = (top && top.deltaGb >= PER_QUERY_GB_ALERT) || totalGb >= TOTAL_GB_ALERT;
+    // ⏰ 가동시간 점검 — 전송량이 정상이어도 DB가 종일 깨어 있으면 그게 컴퓨트 청구서다(2026-08-18).
+    const aw = await awakeStats();
+    const awakeBad = aw.awakeMin >= AWAKE_MIN_ALERT;
+    const anomaly = (top && top.deltaGb >= PER_QUERY_GB_ALERT) || totalGb >= TOTAL_GB_ALERT || awakeBad;
+    const awakeTxt = `가동 ${(aw.awakeMin / 60).toFixed(1)}h/일(깨어남 ${aw.wakes}회, 새벽 ${aw.nightMin}분)`;
     const detail = anomaly
-      ? `🚨 데이터전송 이상: 오늘 총 ${totalGb.toFixed(1)}GB(임계 ${TOTAL_GB_ALERT}GB)` +
-        (top && top.deltaGb >= PER_QUERY_GB_ALERT ? ` · 최다쿼리 ${top.deltaGb.toFixed(1)}GB: ${top.q.replace(/\s+/g, " ").slice(0, 100)}` : "")
-      : `정상 — 오늘 총 ${totalGb.toFixed(1)}GB(임계 ${TOTAL_GB_ALERT}GB), 최다쿼리 ${top ? top.deltaGb.toFixed(1) : 0}GB`;
+      ? (awakeBad ? `🚨 가동시간 초과: ${awakeTxt} — 임계 ${(AWAKE_MIN_ALERT / 60).toFixed(1)}h. ` : "") +
+        ((top && top.deltaGb >= PER_QUERY_GB_ALERT) || totalGb >= TOTAL_GB_ALERT
+          ? `🚨 데이터전송 이상: 오늘 총 ${totalGb.toFixed(1)}GB(임계 ${TOTAL_GB_ALERT}GB)` +
+            (top && top.deltaGb >= PER_QUERY_GB_ALERT ? ` · 최다쿼리 ${top.deltaGb.toFixed(1)}GB: ${top.q.replace(/\s+/g, " ").slice(0, 100)}` : "")
+          : "")
+      : `정상 — 총 ${totalGb.toFixed(1)}GB(임계 ${TOTAL_GB_ALERT}GB), ${awakeTxt}`;
 
     // 📒 하네스 L5 — 실행 원장 보존정리(90일). 하루 1회·행 수천 개 수준이라 부하 무시 가능.
     const pruned = await pruneLedger(90).catch(() => 0);
@@ -183,7 +218,7 @@ export async function GET(req: NextRequest) {
     // 🛑 과다 시 자동 정지(무거운 자율 크론이 스킵) / 정상 복귀 시 자동 해제 — CEO "과다면 멈춰"
     await setCostHalt(anomaly, anomaly ? `자동정지: ${detail.slice(0, 150)}` : "정상").catch(() => {});
     await sendCostReport(totalGb, top, anomaly, execMin).catch(() => {}); // 📧 매일 아침 CEO 비용 점검 메일(발송 실패는 점검 자체를 막지 않음)
-    return NextResponse.json({ ok: true, anomaly, halted: anomaly, totalGb: +totalGb.toFixed(2), execMin: +execMin.toFixed(1), top, checked: cur.length });
+    return NextResponse.json({ ok: true, anomaly, halted: anomaly, totalGb: +totalGb.toFixed(2), execMin: +execMin.toFixed(1), awakeHours: +(aw.awakeMin / 60).toFixed(1), wakes: aw.wakes, nightMin: aw.nightMin, top, checked: cur.length });
   } catch (e) {
     await recordRun("cron-costwatch", false, String(e).slice(0, 150));
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
