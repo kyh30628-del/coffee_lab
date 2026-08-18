@@ -238,3 +238,4 @@
 | 2026-08-17 11:05 | #745 | [룰갭 신규] 관용구/일반명사형 상호명(동네·우리동네·골목·마실) — titleHasCafeWord만으론 " | 660bc2fa | - | lib/reviewQuality.ts bareWeak 게이트에 관용구/동사동음이의 화이트리스트 2종 추가(identity.idiom_dong_token: 동네방네·우리동네·골목=d |
 | 2026-08-17 11:06 | #746 | [룰갭 캐치업] 45차 발견 미등록 — 호텔 예약 제휴 어필리에이트 "할인정보" 템플릿 AD_STRONG 우 | ac2583a1 | - | lib/reviewQuality.ts:109 AD_STRONG에 호텔 예약제휴 할인정보 템플릿(할인정보(후기 가격 평점 교통 조식 세일 리뷰) 및 역순 (할인정보, — id418  |
 | 2026-08-17 23:05 | #750 | [정합성조사→핸드오프후속] coord#312 근본원인 진단 — nameCoherence 위치어 단독매칭 가드 | 27fe71e4 | - | lib/reviewQuality.ts nameCoherence(): non-empty coreTokens 경로에 지명형(locTerms=isAreaLikeWord) 가드 추가 —  |
+| 2026-08-18 07:05 | #759 | [개발] make-digest.mjs 제안서 미인입 감시 — '상신 없음'만 매칭, '제안 없음' 문구 누락 | ba42f731 | - | web/scripts/make-digest.mjs:122 isExplicitNoProposal 정규식을 /상신.../에서 /(?:상신 제안).../로 확장 — 제안 없음 문구도 매 |
