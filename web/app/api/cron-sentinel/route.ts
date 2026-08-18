@@ -314,6 +314,12 @@ async function healWeakNamePollution(flagged: WeakFlag[], deadline: number): Pro
 //   판정: 노출후기가 ①강한 비카페 업종어 담고 ②카페명 마커(attrMarkers) 없으면 오염. ⚠️보수적 마커만(자동차검사·브런치
 //   정식 등 정상 카페가 근처 업종어 쓰는 케이스 배제 — YELLOW75=자동차검사소 안 카페라 '자동차검사'는 넣지 않음).
 const NONCAFE_STRONG = /(상가\s*매매|매매\s*합니다|매매합니다|탑층\s*상가|상업지역\s*탑층|추천\s*매물|오피스텔\s*분양|아파트\s*분양|분양\s*문의|전신\s*관리|전신관리|피부\s*관리|피부관리|마사지\s*(?:샵|숍|관리|예약|전문|테라피)|태국\s*마사지|스웨디시|플라즈마토닝|왁싱\s*(?:샵|숍|전문|예약)?|반영구\s*(?:화장|메이크업|눈썹|아이라인|시술|샵)|눈썹\s*문신|예물\s*시계|무브먼트\s*시착|시착\s*후기|담당\s*업무|지원\s*자격|아르바이트\s*모집|직원\s*모집|채용\s*공고|시급\s*[0-9])/;
+// 🩺 결재#762(협업#320 후속): 채용공고류(구인 스팸)는 카페명 마커 보존예외를 절대 적용하지 않는다.
+//   마커 보존은 "명소·프랜차이즈 자매지점 이름이 우연히 겹쳐 정상후기가 오탐되는 것"을 막기 위한 장치인데,
+//   자영업자 본인이 올린 채용공고는 관례상 자기 상호를 함께 적으므로("[어썸블리스] 마카롱,케이크 주문제작
+//   아르바이트 모집") 마커 보존이 오히려 광고를 "정상 인용"으로 오판·영구 보존시킨다(id18295 레드팀 실증,
+//   자동치유 2회 연속 drop=0→30일 동결). 채용공고 신호는 그 자체로 절대 오염 판정(광고·협찬과 동급 우선순위).
+const JOB_AD_ABSOLUTE = /(담당\s*업무|지원\s*자격|아르바이트\s*모집|직원\s*모집|채용\s*공고|시급\s*[0-9])/;
 // 🍽️ 식당/음식점 딸림(2026-08-02, 강화 감사): 카페 리뷰에 다른 '식사 전문점'(짬뽕·비빔밥·횟집·국밥·보쌈…) 후기가 섞인 경우.
 //   메뉴어는 카페 리뷰에도 부수 등장하므로 '카페 신호(커피·디저트·베이커리…)가 전혀 없는' 문장만 오염으로 판정(정상 카페후기 오제거 방지).
 const RESTAURANT_MEAL = /짬뽕|순두부|젓국|밴댕이|칼국수|백반|한정식|산채비빔밥|비빔밥|국밥|짜장면|탕수육|분식|소세지|소시지|떡볶이|순대국|족발|보쌈|곱창|막창|삼겹살|장어구이|횟집|회덮밥|물회|매운탕|감자탕|아구찜|해물탕|닭갈비|추어탕|설렁탕/;
@@ -339,7 +345,7 @@ async function scanNonCafeBizPollution(): Promise<{ count: number; samples: stri
       for (const r of (c.synth_reviews || [])) {
         const q = (r.quote || "") as string; const qn = q.replace(/\s/g, "").toLowerCase();
         const h = bizPollutionHit(q);
-        if (h && !mk.some((x) => qn.includes(x))) { bad++; if (!hit) hit = h; }
+        if (h && (JOB_AD_ABSOLUTE.test(q) || !mk.some((x) => qn.includes(x)))) { bad++; if (!hit) hit = h; }
       }
       if (bad >= 2) flagged.push({ id: c.id, name: c.name, area: c.area, bad, shown: (c.synth_reviews || []).length, hit });
     }
@@ -392,7 +398,7 @@ async function healNonCafeBizPollution(flagged: NcbFlag[], deadline: number): Pr
         //   `DELETE FROM search_cache`까지 하루 4회씩 헛돌았다(실측: 6회 연속 "치유 10/감지 22" 동일).
         if (decs[it.key] === false) continue;
         const body = (it.title || "") + " " + (it.body || ""); const bn = body.replace(/\s/g, "").toLowerCase();
-        if (bizPollutionHit(body) && !mk.some((x) => bn.includes(x))) { dec[it.key] = false; drop++; }
+        if (bizPollutionHit(body) && (JOB_AD_ABSOLUTE.test(body) || !mk.some((x) => bn.includes(x)))) { dec[it.key] = false; drop++; }
       }
       // 🩺 하네스 L4 완성(2026-08-08 실전검증서 발견): 가드가 앞단에서 다 걸러 `drop=0`이 되면
       //   applyDecisions도 noteAttempt도 호출되지 않아 **수렴 계약이 발동하지 못한다** → 감지 22건이
