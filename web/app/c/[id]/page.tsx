@@ -16,7 +16,7 @@ import { extractWorkSignals } from "@/lib/workDetail";
 import OutboundLink from "../../OutboundLink";
 
 export const runtime = "nodejs";
-export const revalidate = 3600; // ISR 1시간
+export const revalidate = 21600; // ISR 1시간
 
 // 전체 카페 결 분포(강·약 판단용).
 // 💰 2026-08-13 수리: react cache()는 **요청 내** 메모라, ISR 재생성마다 공개 13,495행을 통째로 읽었다.

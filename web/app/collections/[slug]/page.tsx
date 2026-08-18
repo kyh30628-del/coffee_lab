@@ -8,7 +8,7 @@ import KakaoShare from "../../KakaoShare";
 
 // 동네 교차검증 컬렉션 — 동적 템플릿(레지스트리 lib/collections.ts 구동).
 // 데이터 100% 라이브(cafes), 하드코딩 카페명 0. 성수 최초 발행 구조를 재사용.
-export const revalidate = 1800; // 30분 — 비공개/신규 반영
+export const revalidate = 21600; // 30분 — 비공개/신규 반영
 export const dynamicParams = false;
 
 const GRADE_BG: Record<string, string> = { 검증: "#5f7355", 참고: "#9c6b3f", 후보: "#a8927a" };

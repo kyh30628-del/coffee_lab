@@ -3,7 +3,7 @@ import Link from "next/link";
 import { getRegions, TASTES, SITE } from "@/lib/seoData";
 import { COLLECTIONS } from "@/lib/collections";
 
-export const revalidate = 1800; // 30분 — 비공개/신규 반영 빠르게(이전 1일)
+export const revalidate = 10800; // 30분 — 비공개/신규 반영 빠르게(이전 1일)
 
 export const metadata: Metadata = {
   title: "동네별 카페 추천 — 수도권 검증 카페 | 동네 커피 노트",

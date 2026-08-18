@@ -16,5 +16,9 @@ export async function invalidateCafeCaches(ids: number[]): Promise<void> {
     }
     revalidatePath("/sitemap.xml");
     revalidatePath("/area/[gu]", "page");
+    // 🔧 2026-08-18: 테마·동 페이지가 무효화 목록에서 빠져 있었다. ISR 주기를 늘리기 전에 먼저 채운다
+    //   (순서가 반대면 비공개 처리한 카페가 그 화면에 더 오래 남는다).
+    revalidatePath("/area/[gu]/[taste]", "page");
+    revalidatePath("/area/[gu]/dong/[dong]", "page");
   } catch { /* 빌드/비-요청 컨텍스트에선 ISR 무효화 불가 — search_cache 삭제만으로도 검색은 즉시 반영 */ }
 }

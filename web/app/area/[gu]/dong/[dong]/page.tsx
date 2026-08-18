@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import Curated from "../../../Curated";
 import { getDongsInArea, getDongCafes, getDongPublishedCount, SITE } from "@/lib/seoData";
 
-export const revalidate = 1800; // 30분 — 비공개/신규 반영 빠르게(구·취향 페이지와 동일 정책)
+export const revalidate = 10800; // 30분 — 비공개/신규 반영 빠르게(구·취향 페이지와 동일 정책)
 
 // 빌드 비용 제로화(2026-07-26, CEO 지시) — 빌드타임 프리렌더 0곳. 전부 온디맨드 ISR.
 // sitemap엔 631곳 전부 실려 있어 크롤러 첫 요청 시 그 1건만 생성·캐시(revalidate 30분)되고,
