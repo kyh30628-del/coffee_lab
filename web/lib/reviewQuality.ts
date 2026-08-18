@@ -1323,6 +1323,16 @@ export function verifyReview(input: QualityInput): QualityResult {
   if (BRAND_EXPERIENCE_ACTIVITY.test(fullL) && !CAFE_CONTEXT_SUBSTANCE.test(fullL)) {
     return { verdict: "rejected", score: 15, reasons: ["브랜드 체험관 방문기(전시·시승·포토존 — 카페 실질맥락 전무) — LLM 재판정"], borderline: true, signals: sig };
   }
+  // [룰갭 rulegap-proposals-20260818-1217 제안2] 유명 비카페 플랫폼명 충돌 — 카페명에 네이버 "해피빈" 기부
+  //   플랫폼명이 포함되면(id7368 해피빈 행복한카페 실측) 그 플랫폼 전용어(콩 기부·저금통·기프티콘 당첨·자출사)로
+  //   검색된 무관 기부 콘텐츠가 매칭된다(표시 6건 중 4건 오염). HOTEL_LODGING_SIGNAL과 동일하게 좁은 도메인
+  //   (카페명에 "해피빈" 포함 시에만) + 카페 실질맥락 전무를 조건으로 borderline(LLM 재판정) 격하 — 표본 1곳뿐인
+  //   소규모 파일럿이라 하드 탈락 대신 재판정으로 오탐 위험을 낮춘다.
+  const HAPPYBEAN_NAMED = input.name.includes("해피빈");
+  const HAPPYBEAN_PLATFORM_SIGNAL = /(기부|콩\s*기부|저금통|기프티콘\s*당첨|자출사)/;
+  if (HAPPYBEAN_NAMED && HAPPYBEAN_PLATFORM_SIGNAL.test(fullL) && !CAFE_CONTEXT_SUBSTANCE.test(fullL)) {
+    return { verdict: "rejected", score: 15, reasons: ["네이버 해피빈 기부 플랫폼 콘텐츠(카페 실질맥락 전무) — LLM 재판정"], borderline: true, signals: sig };
+  }
   // [글루드 동명 업체] 카페명이 '다른 상호의 일부'로만 등장(다올→다올커텐) + 카페맥락 전무 → 다른 업체.
   //   카페명 바로 뒤 글자가 '조사'가 아닌 한글이면 글루드(다른 단어). 독립 출현(조사·경계) 0 + 글루드 2+ 일 때만(보수).
   if (!/\s/.test(input.name.trim()) && input.name.trim().length >= 2 && !CAFE_CONTEXT.test(fullL)) {
