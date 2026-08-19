@@ -690,6 +690,30 @@ export function coreTokens(name: string, areaTerms: string[]): string[] {
   return coreTokensDetail(name, areaTerms).tokens;
 }
 
+// 상호명↔후보명(인스타 계정 등 외부 소스) 브랜드 토큰 겹침 검증 — 단일출처.
+//   좌표·검색순위만으론 몰/밀집매장에서 무관 업체(옆가게·다른 프랜차이즈)가 그대로 채택되는 근본버그를 막는다
+//   (decisions#486/#493 instagram-backfill.mjs 최초 도입 → decisions#780로 lib/discover.ts 좌표전용 백필 경로에도 적용,
+//   coord-only 매칭이 name 검증 없이 인스타 계정을 옮겨붙인 게 #655 리셋 4~6일 뒤 재오염의 실제 원인이었다).
+export function brandTokenOverlap(baseName: string, candidateName: string, areaTerms: string[] = []): boolean {
+  const norm = (s: string) => (s || "").toLowerCase().replace(/\s+/g, "");
+  const { tokens: toks, venueOnly } = coreTokensDetail(baseName, areaTerms);
+  const cand = norm(candidateName);
+  const full = norm(baseName);
+  if (toks.length) {
+    const candToks = coreTokensDetail(candidateName, areaTerms).tokens;
+    const overlap = candToks.length
+      ? toks.some((t) => candToks.some((ct) => norm(ct) === norm(t)))
+      : toks.some((t) => cand.includes(norm(t)));
+    if (!overlap) return false;
+    // 몰/밀집매장 다중테넌트 식별(venueOnly)이거나 2자 이하 초약체 토큰뿐이면 겹침만으론 불충분 — 전체이름까지 요구.
+    const weak = venueOnly || toks.every((t) => norm(t).length <= 2);
+    if (!weak) return true;
+    return full.length >= 2 && (cand.includes(full) || full.includes(cand));
+  }
+  // 식별토큰이 하나도 없는(전부 일반어) 이름은 토큰매칭이 불가하므로 원본 이름 전체 포함으로 대체 판정.
+  return full.length >= 2 && (cand.includes(full) || full.includes(cand));
+}
+
 // 노이즈 게이트: 후기들이 '실제로 그 카페'를 말하는 비율(이름 일관성).
 //   개별 verifyReview를 통과해도, 묶어 보면 카페명이 거의 안 나오면 오염 의심.
 //   유형별 규칙으로 못 잡은 오염(부분문자열·구문·신종)을 공개 전에 잡는 안전망.
