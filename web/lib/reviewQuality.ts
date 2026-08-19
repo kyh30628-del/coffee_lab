@@ -558,6 +558,11 @@ const LANDMARK_WORDS = [
   // 룰갭 20260802(decisions#584): '수봉별마루'는 인천 수봉공원의 전망대·야경명소(별빛축제로 유명) —
   //   id15358 '수봉별마루도너츠' synth_reviews_all 12/30건이 이 명소 방문기(도너츠·카페 무관)를 흡수했다.
   "수봉별마루",
+  // 룰갭 20260818(decisions#766): '꿈의숲'은 북서울꿈의숲(강북구·노원구 대형 공원) — id16913
+  //   '숲이 있는'(강북구) offctx_rate=0.34, 표시 6건 중 5건이 꿈의숲 아트센터·맛집·벚꽃길 등 무관 콘텐츠
+  //   흡수(카페 언급 0). 대조군(더숲 초소책방·숲속의 밤)은 6/6 정상 — '숲' 자체가 아니라 '꿈의숲' 랜드마크
+  //   미등재가 원인.
+  "꿈의숲",
 ];
 const isVenueTok = (t: string) => { const n = norm(t); return VENUE_WORDS.some((v) => n.includes(norm(v))) || HOTEL_BRANDS.some((v) => n.includes(norm(v))) || LANDMARK_WORDS.some((l) => n.includes(norm(l))) || DISTRICT_WORDS.some((d) => n.includes(norm(d))) || UNIV_ABBR_WORDS.some((u) => n.includes(norm(u))) || METRO_NAMES.has(n); };
 // 랜드마크 전용 판정(isVenueTok의 부분집합) — 몰/호텔/대학 등 다른 venue 범주와 분리해, '랜드마크가
