@@ -119,7 +119,17 @@ const today = new Date().toISOString().slice(0, 10);
       }
       return ids;
     };
-    const isExplicitNoProposal = (text) => /(?:상신|제안)\s*[:\s]*(?:없음|0건)/.test(text) && !/승인\s*필요/.test(text);
+    // ⚠️ #763 근본원인(9차 재발 계열): (a) "오늘 신규 승인 요청 없음"처럼 "요청"이 "없음" 바로 앞에 오는
+    //   phrasing을 "상신"/"제안"만 잡던 alt가 놓쳤다 — "요청"을 alt에 추가. (b) 더 근본적으로, b2b-sales
+    //   팀 리포트의 고정 템플릿 제목(H1) 자체가 항상 "승인 필요 제안 — DATE"라서, 부정조건 !/승인\s*필요/를
+    //   전체 텍스트에 걸면 본문에 어떤 no-proposal 문구를 써도 제목의 "승인 필요" 때문에 매번 걸려 b2b-sales
+    //   팀은 영구적으로 isExplicitNoProposal=false로 고정되는 구조였다. 부정조건만 H1 제목 줄(고정 보일러
+    //   플레이트)을 뺀 본문으로 스코프를 축소한다 — 긍정조건은 그대로 전체 텍스트(제목 자체가 "제안 없음"인
+    //   rulegap류 파일이 있어 축소하면 역회귀).
+    const isExplicitNoProposal = (text) => {
+      const bodyNoH1 = text.split("\n").filter((l) => !/^#\s/.test(l)).join("\n");
+      return /(?:상신|제안|요청)\s*[:\s]*(?:없음|0건)/.test(text) && !/승인\s*필요/.test(bodyNoH1);
+    };
 
     // ⚠️ #518 근본전환(coord#255, #421→#427→#450→#502 5차 재발): #502가 "번호 인용"으로 1차 신호를
     //    고쳤지만, 인용 없는 순수 신규 제안의 2차 폴백은 여전히 "파일명 stem이 결재문에 그대로 실린다"는
