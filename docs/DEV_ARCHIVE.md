@@ -243,3 +243,4 @@
 | 2026-08-18 23:05 | #762 | [개발] 협업 #320: [전사자율진단] sentinel.noncafe-biz 자동치유 실패 3건 — 채용공 | 75c20f10 | - | app/api/cron-sentinel/route.ts: JOB_AD_ABSOLUTE 정규식(채용공고/직원모집/시급숫자 등) 신설 — scanNonCafeBizPollution·h |
 | 2026-08-19 07:05 | #763 | [개발] make-digest.mjs 제안서 미인입 감시 — b2b-sales 팀 제목 구조상 no-prop | 83cb2931 | - | scripts/make-digest.mjs isExplicitNoProposal 2건 수정: (a) 긍정패턴에 요청 alt 추가(승인 요청 없음 미매칭 해소), (b) 부정조건(! |
 | 2026-08-19 11:05 | #760 | [룰갭 회귀의심] 일반명사 단독상호 앵커게이트(P47/#428)가 재합성 후에도 무관콘텐츠 통과 — id92 | d79483f5 | - | lib/reviewQuality.ts 수정. (1) id9294(온기) 재현: 현재 코드는 이미 정상 거절함(score2, nameAsWord 오염 사유) — 회귀 아님, synt |
+| 2026-08-19 11:06 | #765 | [룰갭 신규] 다중토큰 상호명 부분토큰 OR-매칭 — id9683·id19744 무관 콘텐츠 매칭 | 6df7ad95 | - | lib/reviewQuality.ts: distinctInTitle/Body가 identTokens.some()으로 다중토큰 중 하나만 히트해도 매칭 인정하던 것을, 히트 토큰이  |
