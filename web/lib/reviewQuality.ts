@@ -1079,8 +1079,20 @@ export function verifyReview(input: QualityInput): QualityResult {
   // 지역어 제외한 고유 식별 토큰 — 지역어만 제목에 있는 건 nameInTitle 기여 안 함
   const nonAreaTokens = tokens.filter((tk) => !areaTerms.some((a) => norm(a).includes(norm(tk)) || norm(tk).includes(norm(a))));
   const identTokens = nonAreaTokens.length ? nonAreaTokens : tokens; // 비면 원래대로
-  const distinctInTitle = reqFull ? inTitleFull : identTokens.some((tk) => nameHit(title, titleN, tk));
-  const distinctInBody = reqFull ? inBodyFull : distinct.some((tk) => nameHit(body, bodyN, tk));
+  // 룰갭 rulegap-20260818-1614(decisions#765): 다중토큰(공백 포함) 상호명은 identTokens.some()이 토큰
+  //   '하나만' 히트해도 매칭 인정돼, 흔한 부가어(작업실·하우스·포레스트류 — GENERIC_WORD엔 카페 업태어만
+  //   있어 미등재)의 단독 일치로 무관 콘텐츠가 딸려왔다(id9683 '카야씨의 작업실' 6/6 무관 — "작업실"만 일치,
+  //   id19744 '포레스트 하우스' 1/6 무관 — "포레스트"만 일치). weakSingle이 쓰는 '약한 토큰' 판정(짧거나
+  //   WEAK_IDENTITY_TOKEN 학습사전)을 유일토큰뿐 아니라 다중토큰의 매칭 기여 토큰 각각에도 적용 — 히트한
+  //   토큰이 전부 약함이면 동 단위 지역어(dongPresent)를 추가로 요구한다(전체이름 원문일치는 위 inTitleFull/
+  //   inBodyFull이 호출부 OR에서 이미 커버하므로 여기서 중복 요구 안 함).
+  const isWeakIdentTok = (tk: string) => { const n = norm(tk).replace(/[,.:;·\-]+$/, ""); return n.length <= 2 || /^[0-9]+$/.test(n) || WEAK_IDENTITY_TOKEN.has(n); };
+  const titleHitTokens = identTokens.filter((tk) => nameHit(title, titleN, tk));
+  const bodyHitTokens = distinct.filter((tk) => nameHit(body, bodyN, tk));
+  const distinctInTitle = reqFull ? inTitleFull
+    : titleHitTokens.length > 0 && (titleHitTokens.some((tk) => !isWeakIdentTok(tk)) || dongPresent);
+  const distinctInBody = reqFull ? inBodyFull
+    : bodyHitTokens.length > 0 && (bodyHitTokens.some((tk) => !isWeakIdentTok(tk)) || dongPresent);
   // 룰갭 P63: 배송-전용 강신호가 있고 매장 실물방문 신호가 없으면 비방문 구매후기 — VISIT_CUES의
   //   "주문" 오탐(택배 주문)을 무효화하고 아래에서 borderline(LLM 재판정)으로 격하한다.
   const deliveryOnly = DELIVERY_ONLY_CUES.test(fullL) && !INSTORE_VISIT_CUES.test(fullL);
