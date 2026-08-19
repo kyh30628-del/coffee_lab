@@ -257,7 +257,11 @@ const CAFE_CONTEXT = /(카페|커피|라떼|아메리카노|에스프레소|콜�
 // 룰갭 P61(2026-07-26, coord#249, decisions#507): "동네방네"는 "이 동네" 관용구로 흔히 오귀속되는 2~3음절
 //   일반명사 카페명 — 표시리뷰 전량이 무관 업체(김밥집/베이커리/개인블로그) 후기였다(id1819 실측, naver_category
 //   서비스,산업>통신). 로직 변경 없이 사전 등재만으로 근접 맥락판정(ctxNearName)이 적용된다.
-const COMMON_WORD_NAMES = new Set(["일상적", "마찬가지", "그리고", "오래오래", "이러쿵", "어쩌면", "자수성가", "멍하니", "오늘의날씨", "소소한일상", "하루에", "여기서", "인디고", "행복이가득한집", "어느멋진날", "나무그늘아래", "버라이어티", "시너지", "온기", "크래프트", "티타임", "팔레트", "퍼스널", "동네방네", "무렵", "네오"]);
+// 룰갭 P47 재확인(#760, rulegap-proposals-20260818-1217.md 제안1): id9294("온기") 재현 결과 현재 코드는
+//   근접게이트가 정상 발동해 무관 리뷰를 거절한다(회귀 아님 — synth_updated 08-10 이후 배포된 규칙들이 아직
+//   재합성에 반영 안 된 데이터 staleness 문제, 코드 결함 아님). "재미"는 사전 미등재라 id19681(cafe JM재미)이
+//   전혀 근접판정을 못 받고 있었다 — 등재.
+const COMMON_WORD_NAMES = new Set(["일상적", "마찬가지", "그리고", "오래오래", "이러쿵", "어쩌면", "자수성가", "멍하니", "오늘의날씨", "소소한일상", "하루에", "여기서", "인디고", "행복이가득한집", "어느멋진날", "나무그늘아래", "버라이어티", "시너지", "온기", "크래프트", "티타임", "팔레트", "퍼스널", "동네방네", "무렵", "네오", "재미"]);
 // ★ 비카페 업종이 '제목을 지배'할 때의 가드 — 매장·음료·주문·메뉴·좌석은 피부관리/필라테스 등 비카페도 흔히 써서
 //   가드를 뚫는다('피부관리 하이드뷰티…매장 전화번호'→결). 이 경로엔 진짜 커피전문 어휘(카페·커피·디저트·원두…)만 인정(2026-06-28).
 const CAFE_CONTEXT_STRONG = /(카페|커피|라떼|아메리카노|에스프레소|콜드브루|핸드드립|디저트|케이크|베이커리|빵|제과|원두|바리스타|아인슈페너|브런치|로스팅|카공|cafe|coffee|latte|목장|치즈|요거트|답례품|파충류|재즈|공연|전시|밀크티|버블티|망고사고)/i;
@@ -1395,7 +1399,14 @@ export function verifyReview(input: QualityInput): QualityResult {
   const nameShort = nameClean.length >= 1 && nameClean.length <= 2;
   //   룰갭 P47(#428): "카페 크래프트"·"티타임카페"처럼 부가어(카페 접두/접미)가 붙은 상호는 nameClean(전체이름
   //   원문)이 COMMON_WORD_NAMES와 일치하지 않는다 — coreTokensDetail이 뽑은 유일 식별토큰(onlyTok)까지 함께 대조.
-  const commonAnchor = COMMON_WORD_NAMES.has(nameClean) ? nameClean : (onlyTok && COMMON_WORD_NAMES.has(onlyTok) ? onlyTok : "");
+  //   룰갭 #760(id19681 "cafe JM재미" 실측): 부가어가 GENERIC_WORD가 아닌 라틴 이니셜/필러("JM")면 토큰이
+  //   2개 이상 남아 onlyTok(단일토큰 전용)이 항상 비어 위 대조 자체가 발동하지 않았다. 짧은 라틴 필러(1~3자)를
+  //   뺀 나머지가 정확히 1개면 그것도 onlyTok과 동급으로 대조한다.
+  const nonFillerToks = tokens.filter((t) => !/^[A-Za-z]{1,3}$/.test(t));
+  const soleSubstTok = nonFillerToks.length === 1 ? norm(nonFillerToks[0]) : "";
+  const commonAnchor = COMMON_WORD_NAMES.has(nameClean) ? nameClean
+    : onlyTok && COMMON_WORD_NAMES.has(onlyTok) ? onlyTok
+    : soleSubstTok && COMMON_WORD_NAMES.has(soleSubstTok) ? soleSubstTok : "";
   const nameCommonPhrase = !!commonAnchor;
   if (nameCommonPhrase) {
     // 관용구·일반어 카페명은 상호명 토큰 ±25자 근접 안에 카페맥락어가 있을 때만 진짜후기로 인정(제목 카페어는 강신호로 예외).
