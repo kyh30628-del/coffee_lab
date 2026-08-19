@@ -245,3 +245,4 @@
 | 2026-08-19 11:05 | #760 | [룰갭 회귀의심] 일반명사 단독상호 앵커게이트(P47/#428)가 재합성 후에도 무관콘텐츠 통과 — id92 | d79483f5 | - | lib/reviewQuality.ts 수정. (1) id9294(온기) 재현: 현재 코드는 이미 정상 거절함(score2, nameAsWord 오염 사유) — 회귀 아님, synt |
 | 2026-08-19 11:06 | #765 | [룰갭 신규] 다중토큰 상호명 부분토큰 OR-매칭 — id9683·id19744 무관 콘텐츠 매칭 | 6df7ad95 | - | lib/reviewQuality.ts: distinctInTitle/Body가 identTokens.some()으로 다중토큰 중 하나만 히트해도 매칭 인정하던 것을, 히트 토큰이  |
 | 2026-08-19 11:07 | #766 | [룰갭 신규 — 저위험] LANDMARK_WORDS "꿈의숲" 미등재 — id16913 5/6 무관 콘텐츠  | 3d92bd6d | - | lib/reviewQuality.ts LANDMARK_WORDS 배열에 꿈의숲 1건 추가(기존 메커니즘 재사용). tsc 신규에러 0(기존 next.config eslint 베이스 |
+| 2026-08-19 23:05 | #780 | [개발] instagram-backfill 매칭 검증 스텝 부재 — 데이터리셋 반복 실효 없음(08-13 재 | 9b5a9283 | - | lib/discover.ts: 좌표전용 매칭(byName 실패 시 좌표 근접 55m만으로 채택, 424행)으로 백필되던 instagram_url(429행)에 상호명 브랜드토큰 겹침 |
