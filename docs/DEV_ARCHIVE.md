@@ -244,3 +244,4 @@
 | 2026-08-19 07:05 | #763 | [개발] make-digest.mjs 제안서 미인입 감시 — b2b-sales 팀 제목 구조상 no-prop | 83cb2931 | - | scripts/make-digest.mjs isExplicitNoProposal 2건 수정: (a) 긍정패턴에 요청 alt 추가(승인 요청 없음 미매칭 해소), (b) 부정조건(! |
 | 2026-08-19 11:05 | #760 | [룰갭 회귀의심] 일반명사 단독상호 앵커게이트(P47/#428)가 재합성 후에도 무관콘텐츠 통과 — id92 | d79483f5 | - | lib/reviewQuality.ts 수정. (1) id9294(온기) 재현: 현재 코드는 이미 정상 거절함(score2, nameAsWord 오염 사유) — 회귀 아님, synt |
 | 2026-08-19 11:06 | #765 | [룰갭 신규] 다중토큰 상호명 부분토큰 OR-매칭 — id9683·id19744 무관 콘텐츠 매칭 | 6df7ad95 | - | lib/reviewQuality.ts: distinctInTitle/Body가 identTokens.some()으로 다중토큰 중 하나만 히트해도 매칭 인정하던 것을, 히트 토큰이  |
+| 2026-08-19 11:07 | #766 | [룰갭 신규 — 저위험] LANDMARK_WORDS "꿈의숲" 미등재 — id16913 5/6 무관 콘텐츠  | 3d92bd6d | - | lib/reviewQuality.ts LANDMARK_WORDS 배열에 꿈의숲 1건 추가(기존 메커니즘 재사용). tsc 신규에러 0(기존 next.config eslint 베이스 |
