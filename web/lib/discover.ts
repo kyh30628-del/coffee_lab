@@ -5,6 +5,7 @@ import { getLearned } from "./learnedTerms";
 import { loadCriteria, getCriterionSync } from "./criteria";
 import { getListSync, loadCriteriaLists } from "./criteriaLists"; // 비카페 순수 리스트 단일출처(BASE=폴백). 캐시 프라임은 discover 진입점이 함.
 import { bumpNaver, markNaverExhausted } from "./naverBudget"; // 네이버 일일 예산 추적(스윕이 70%만 쓰고 cron-grow에 30% 남기게)
+import { brandTokenOverlap } from "./reviewQuality"; // 상호명↔후보명 브랜드토큰 겹침 검증 단일출처(decisions#780)
 
 const ID = process.env.NAVER_CLIENT_ID;
 const SECRET = process.env.NAVER_CLIENT_SECRET;
@@ -426,7 +427,10 @@ export async function discoverRegion(region: string, areaLabel: string, keywords
         // 기존 카페: 동·카테고리·인스타그램·전화 없으면 백필(카테고리는 비카페 게이트 정확도, 인스타/전화는 B2B 아웃리치용 — coordination#232).
         if (it.dong && !m.dong) { await sql`UPDATE cafes SET dong = ${it.dong} WHERE id = ${m.id}`; backfilled++; m.dong = it.dong; }
         if (it.category && !m.naver_category) { await sql`UPDATE cafes SET naver_category = ${it.category} WHERE id = ${m.id}`; m.naver_category = it.category; }
-        if (it.instagramUrl && !m.instagram_url) { await sql`UPDATE cafes SET instagram_url = ${it.instagramUrl} WHERE id = ${m.id}`; m.instagram_url = it.instagramUrl; }
+        // ★ it은 name === m.name(byName) 아니면 좌표 근접만으로 매칭된 별개 검색결과다(위 424행) — 몰/밀집매장에서
+        //   무관 업체(옆가게·프랜차이즈)의 인스타 링크가 좌표만으로 그대로 채택되던 근본버그(decisions#780,
+        //   #655 리셋 4~6일 뒤 동일계정 재오염의 실제 원인). 상호명 브랜드토큰 겹침 검증 없이는 채택하지 않는다.
+        if (it.instagramUrl && !m.instagram_url && brandTokenOverlap(m.name, it.name, [storeArea, m.dong].filter(Boolean))) { await sql`UPDATE cafes SET instagram_url = ${it.instagramUrl} WHERE id = ${m.id}`; m.instagram_url = it.instagramUrl; }
         if (it.phone && !m.phone) { await sql`UPDATE cafes SET phone = ${it.phone} WHERE id = ${m.id}`; m.phone = it.phone; }
         skipped++; continue;
       }
