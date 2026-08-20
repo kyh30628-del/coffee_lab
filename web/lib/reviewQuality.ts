@@ -408,6 +408,33 @@ function nameHit(rawText: string, normText: string, term: string): boolean {
   return tn.length > 4 ? boundedFlexHit(rawText, term) : boundedHit(rawText, term);
 }
 
+// 룰갭 rulegap-20260819-0818(decisions#777): '접두 결합 합성상호' — 카페명 직전에 공백 없이 결합된
+//   한글 접두어가 있으면 전혀 다른 업체(두레커피마을 ⊃ 커피마을)일 수 있다. 접두어가 카페 자신의
+//   지역수식어(area/dong)거나 흔한 형용사류 수식어면 정상 매칭이므로 제외(id4835 카페온뜰·id4069
+//   카페 정원처럼 "신상카페온뜰"·"핫한카페정원" 식 자연스러운 붙여쓰기 보호).
+const NAME_PREFIX_WHITELIST = new Set(["신상", "대형", "감성", "인생", "핫한", "유명한", "합리적", "가성비", "레트로", "빈티지", "모던", "아늑한", "조용한", "넓은", "작은", "새로운", "오래된", "숨은", "동네", "우리", "그", "이", "저"]);
+function attachedNamePrefix(text: string, name: string, areaTerms: string[]): string | null {
+  const t = text || "";
+  const q = (name || "").trim();
+  if (q.length < 2) return null;
+  let i = t.indexOf(q);
+  while (i !== -1) {
+    const before = i > 0 ? t[i - 1] : "";
+    if (/[가-힣]/.test(before)) {
+      let start = i;
+      while (start > 0 && /[가-힣]/.test(t[start - 1])) start--;
+      const prefix = t.slice(start, i);
+      if (prefix.length >= 1 && prefix.length <= 4 && !NAME_PREFIX_WHITELIST.has(prefix)) {
+        const pn = norm(prefix);
+        const isOwnArea = areaTerms.some((a) => { const an = norm(a).replace(/(특별시|광역시|시|군|구|읍|면|동|리)$/, ""); return an.length >= 1 && (an === pn || pn.includes(an)); });
+        if (!isOwnArea) return prefix;
+      }
+    }
+    i = t.indexOf(q, i + 1);
+  }
+  return null;
+}
+
 // 룰갭 P28(#297, 2026-07-11): '베이크샵'(=bake shop 영문대여어) 자체가 상호 전체인 카페(id7242)는
 //   접미사전에 없어 이름일치·offctx_rate 둘 다 못 잡는 사각지대 — '구우미 베이크샵'·'아르밀 베이크샵' 등
 //   타업체 후기가 부분일치로 딸려온다(6/6 오염 실측). 카페·베이커리 계열 영문대여어를 접미·일반어로 추가.
@@ -1482,10 +1509,20 @@ export function verifyReview(input: QualityInput): QualityResult {
   const rawSubstringHit = !coreEmpty && !nameInTitle && !nameInBody
     && nameRawN.length >= 3 && fullTNoSpace.includes(nameRawN);
   if (rawSubstringHit && hasDongTerm && !dongPresent) {
-    const otherDong = (`${title} ${body}`.match(/[가-힣]{2,6}(동|읍|면)(?![가-힣])/g) || [])
+    const fullT = `${title} ${body}`;
+    const otherDong = (fullT.match(/[가-힣]{2,6}(동|읍|면)(?![가-힣])/g) || [])
       .find((d) => !areaTerms.some((a) => a && (a.includes(d) || d.includes(a))));
     if (otherDong) {
       return { verdict: "rejected", score: 4, reasons: [`부분문자열 상호명 다른업체 추정('${otherDong}', 이 지점 행정동 불일치)`], signals: sig };
+    }
+    // 룰갭 rulegap-20260819-0818(decisions#777): 위 otherDong 정규식은 '동/읍/면' 바로 뒤에 공백 없이
+    //   다른 한글이 붙으면(예: '월피동커피맛집을') 오탐방지용 우측경계 검사에 걸려 실제 지명을 놓친다
+    //   (id11853 '((두레커피마을))월피동커피맛집을 소개합니다' 실측 — otherDong 미검출로 LLM 재판정
+    //   큐에 흘러들어가 오귀속). 다른 동을 못 뽑아내도 '접두 결합'(카페명 직전에 결합된, 자기 지역수식어·
+    //   범용수식어 아닌 한글 접두어) 자체가 이미 별도 상호 의심 신호이고 자기 동도 전무하므로 하드 배제한다.
+    const prefix = attachedNamePrefix(fullT, input.name, areaTerms);
+    if (prefix) {
+      return { verdict: "rejected", score: 4, reasons: [`접두 결합 합성상호 의심('${prefix}${input.name}', 이 지점 행정동 신호 없음)`], signals: sig };
     }
   }
   if (!nameInTitle && !nameInBody) {
