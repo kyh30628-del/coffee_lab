@@ -247,3 +247,4 @@
 | 2026-08-19 11:07 | #766 | [룰갭 신규 — 저위험] LANDMARK_WORDS "꿈의숲" 미등재 — id16913 5/6 무관 콘텐츠  | 3d92bd6d | - | lib/reviewQuality.ts LANDMARK_WORDS 배열에 꿈의숲 1건 추가(기존 메커니즘 재사용). tsc 신규에러 0(기존 next.config eslint 베이스 |
 | 2026-08-19 23:05 | #780 | [개발] instagram-backfill 매칭 검증 스텝 부재 — 데이터리셋 반복 실효 없음(08-13 재 | 9b5a9283 | - | lib/discover.ts: 좌표전용 매칭(byName 실패 시 좌표 근접 55m만으로 채택, 424행)으로 백필되던 instagram_url(429행)에 상호명 브랜드토큰 겹침 |
 | 2026-08-20 07:05 | #777 | [룰갭 신규] 접두 결합 합성상호 dong 불일치 게이트 — id11853 커피마을/두레커피마을 오매칭 | aadaf180 | - | lib/reviewQuality.ts: 접두 결합 합성상호 dong 불일치 게이트 추가(attachedNamePrefix). id11853 커피마을/두레커피마을 케이스2건 실측검증 |
+| 2026-08-20 07:06 | #782 | [사장님영업] 카페 상세페이지 사장님 CTA 계측 공백 — 14일 826명 최대접점이 무측정 | ef6179cc | - | app/c/[id]/OwnerCtaLink.tsx 신설(SaveMemoryButton/OutboundLink와 동일 클라 래퍼 패턴) + app/c/[id]/page.tsx의 사장 |
