@@ -56,6 +56,9 @@ async function ensure() {
   //   노출 + CEO 알림메일로 "실제 구독 요청 여부"를 즉시 알 수 있게 한다(카드결제 오픈 전에도 유효). 승인(activate) 시 클리어.
   await sql`ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS conversion_requested_at TIMESTAMPTZ`;
   await ensureBilling(); // 💳 정기결제 컬럼(billing_key·customer_key·autopay 등) + payments 테이블 — 단일 출처 lib/billing.ts
+  });
+  // ⚠️ 2026-08-20 래핑 사고 수리: 아래 3개 UPDATE는 스키마가 아니라 **주기 업무로직**(만료 반영·혜택 동기화)이다.
+  //   ensureOnce에 묶으면 배포 사이에 만료가 멈춘다 — 래퍼 밖(매 요청, 원래 동작)으로 복원. 테이블 2행이라 비용 무시 수준.
   // 만료 자동 반영: 기간 지난 active → expired + 모든 혜택 해제(골드핀·우선노출·쇼케이스). expires_at IS NULL=미시작(첫 로그인 전)은 만료 아님.
   await sql`UPDATE subscriptions SET status='expired', updated_at=now() WHERE status='active' AND expires_at IS NOT NULL AND expires_at < now()`;
   // 혜택 OFF: 구독이 active-시작-미만료가 아닌 모든 카페(만료·취소·정지·미시작). featured=골드핀·우선노출, approved=쇼케이스.
@@ -70,7 +73,6 @@ async function ensure() {
             FROM subscriptions s
             WHERE s.cafe_id = p.cafe_id AND s.status='active' AND s.expires_at IS NOT NULL AND s.expires_at > now()
               AND (p.featured = false OR p.approved = false OR p.featured_until IS NULL OR p.featured_until < now())`;
-  });
 }
 
 export async function GET(req: NextRequest) {

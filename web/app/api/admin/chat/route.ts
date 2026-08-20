@@ -40,6 +40,7 @@ function answerKnowledge(q: string): string | null {
 // 🗂 대화기록(chat_archive) — chat_queue는 24h만 보존(기존 그대로)하므로, purge 직전에 별도 저장소로 미리
 //   복제해 대표님이 새 대화로 맥락을 리셋해도 /admin 대화기록 패널(읽기전용)에서 과거 지시·대화를 계속 열람할 수 있게 한다.
 //   기존 chat_queue 흐름(질문 적재·폴링·삭제)은 전혀 바뀌지 않는다 — 순수 추가(mirror)일 뿐.
+let lastPurgeAt = 0;
 async function archiveThenPurge() {
   await sql`CREATE TABLE IF NOT EXISTS chat_archive (
     id SERIAL PRIMARY KEY, question TEXT, answer TEXT, mode TEXT, created_at TIMESTAMPTZ
@@ -60,8 +61,10 @@ async function ensure() {
   //   결정론(quick)·보고성 메시지는 LLM을 안 써 NULL로 남는다(채팅 UI 배지는 값 있을 때만 표시 — 고정 텍스트 금지).
   await sql`ALTER TABLE chat_queue ADD COLUMN IF NOT EXISTS llm_model TEXT`.catch(() => {});
   await sql`CREATE TABLE IF NOT EXISTS work_orders (id SERIAL PRIMARY KEY, command TEXT, action TEXT, tier TEXT, created_at TIMESTAMPTZ DEFAULT now())`.catch(() => {}); // 챗봇 작업지시 감사
-  await archiveThenPurge();
   });
+  // ⚠️ 래핑 사고 수리: 아카이브는 스키마가 아니라 주기 업무로직 — 배포당 1회면 24h 보존이 멈춘다.
+  //   반대로 예전(매 폴링 15초)은 과잉이었다 → 인스턴스당 1시간 게이트.
+  if (Date.now() - lastPurgeAt > 60 * 60 * 1000) { lastPurgeAt = Date.now(); await archiveThenPurge(); }
 }
 
 export async function POST(req: NextRequest) {
