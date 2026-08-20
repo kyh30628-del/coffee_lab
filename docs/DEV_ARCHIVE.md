@@ -250,3 +250,4 @@
 | 2026-08-20 07:06 | #782 | [사장님영업] 카페 상세페이지 사장님 CTA 계측 공백 — 14일 826명 최대접점이 무측정 | ef6179cc | - | app/c/[id]/OwnerCtaLink.tsx 신설(SaveMemoryButton/OutboundLink와 동일 클라 래퍼 패턴) + app/c/[id]/page.tsx의 사장 |
 | 2026-08-20 23:05 | #783 | [개발] healGroundingSuspects 재합성 후 grounding 재검증 루프 부재 — 환각 미교 | abaaf33f | - | lib/synthStore.ts healGroundingSuspects(): 재합성 후 llm_judged_at=NULL로 초기화해 judge-candidates 기본 큐(로컬 g |
 | 2026-08-20 23:06 | #784 | [결재 재구성] needs_llm 임계선 대응 — 우선순위 재조정(#490 26일 미집행 근본수정) | 8e9c9e3a | - | app/api/cron-batch-judge/route.ts ORDER BY(line92-97)에 재정제 우선순위 추가: (published AND synth_grade!=검증)  |
+| 2026-08-20 23:07 | #787 | [개발] 협업 #323: [리스크 MED] issues#5548 cron-sentinel 예산초과 HIGH  | 0509b77c | - | lib/jobContract.ts: cron-sentinel budget.blobReads 24→200(9일 실측 avg18/max151 반영, decision#499/#674 교 |
