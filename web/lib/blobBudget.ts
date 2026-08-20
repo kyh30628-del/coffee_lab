@@ -60,11 +60,15 @@ export function runUsage(): { job: string; blobReads: number; wallMs: number; ov
 /** 예산 초과를 RM 보드에 기록(경고 모드). 실행은 막지 않는다. 기록 실패는 조용히 무시. */
 async function reportOverBudget(job: string, used: number, limit: number): Promise<void> {
   try {
+    // ⚠️ severity는 항상 MED다 — HIGH로 하드인서트하지 않는다. lib/issues.ts의 clampSeverity와 같은 원칙
+    //   (CEO 2026-08-09: 소비자 화면이 실제로 망가진 게 아니면 빨강 금지)을 여기서도 지킨다. 예산초과는
+    //   경고 모드(실행 계속·서비스 무영향) 신호라 정의상 consumer:false — HIGH로 매 런 뜨면 issues#5548처럼
+    //   알람피로+결재상신 압력만 쌓이고 진짜 소비자 손상(HIGH)이 묻힌다.
     await sql`INSERT INTO issues (ikey, source, severity, type, title, detail, team, status, state, note, first_seen, last_seen)
-      VALUES (${`budget:${job}`}, '하네스', 'HIGH', '예산 초과', ${`${job} 큰 컬럼 예산 초과`},
-              ${`큰 컬럼 로드 ${used}회 > 계약 예산 ${limit}회 — 실행은 계속됨(경고 모드)`},
+      VALUES (${`budget:${job}`}, '하네스', 'MED', '예산 초과', ${`${job} 큰 컬럼 예산 초과`},
+              ${`큰 컬럼 로드 ${used}회 > 계약 예산 ${limit}회 — 실행은 계속됨(경고 모드, 소비자 영향 없음)`},
               ${teamOf(job)}, 'open', '처리중', '하네스 L1 예산 계량', now(), now())
-      ON CONFLICT (ikey) DO UPDATE SET status='open', severity='HIGH', detail=EXCLUDED.detail, last_seen=now(), state='처리중', resolved_at=NULL`;
+      ON CONFLICT (ikey) DO UPDATE SET status='open', severity='MED', detail=EXCLUDED.detail, last_seen=now(), state='처리중', resolved_at=NULL`;
   } catch { /* issues 테이블 미존재 등 — 원장 metrics가 백스톱 */ }
 }
 

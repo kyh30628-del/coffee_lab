@@ -44,9 +44,14 @@ const DEFAULT_CONTRACT: Omit<JobContract, "id" | "owner"> = {
 // 명시 계약 — 무거운 잡·데이터 변경 잡만 선언한다(나머지는 기본 계약).
 //   ⚠️ 값의 근거를 주석에 남길 것. 근거 없는 숫자는 다음 사람이 못 고친다.
 const CONTRACTS: Record<string, Partial<JobContract>> = {
-  // 오염 감시·치유 — 런당 12곳 × (힐러 SELECT + applyDecisions loadRaw) = 24 blob이 상한
+  // 오염 감시·치유 — 2026-08-08 산정치(12곳×2=24)는 이후 issues#5548로 낡음이 드러났다: decision#499/#674로
+  //   교차오염(경쟁상호·동일브랜드 지점) 탐지·힐러가 편입되면서 카테고리가 5→7종으로 늘었고, 그중 인용문 교차오염
+  //   힐러(healCompetitorQuotePollution)는 개수 상한 없이 시간예산(270s)까지 flag된 카페 전량을 힐한다 —
+  //   나머지 5종처럼 slice(0,12)로 고정 상한을 걸 수 없는 성격(오염 재발이 몰리는 주기엔 정상적으로 급증).
+  //   9일 실측(run_ledger, 08-11~08-20, n=43): 평균 18·최댓값 151. 정상 변동폭을 예산으로 오탐하지 않으면서
+  //   2026-08-03류 진짜 폭주(13,000곳×8스캔)는 여전히 잡도록, cron-resynth와 같은 상한 200으로 올린다.
   "cron-sentinel": {
-    tier: "L2", budget: { blobReads: 24, rows: 40000, wallMs: 300_000 },
+    tier: "L2", budget: { blobReads: 200, rows: 40000, wallMs: 300_000 },
     effect: { kind: "monotone-decrease", maxNoEffectRuns: 2 },
     writes: ["cafes.synth_reviews", "cafes.synth_reviews_all", "cafes.judge_decisions", "cafes.published", "reviewer_cafes.*"],
   },
