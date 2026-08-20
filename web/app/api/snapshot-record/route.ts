@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sql, ensureSchema } from "@/lib/db";
+import { sql, ensureSchema , ensureOnce } from "@/lib/db";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
@@ -9,6 +9,8 @@ export const maxDuration = 60;
 //  - recent_count  : 최근 90일 검증 리뷰 게시 수(버즈/모멘텀)
 // 주차별 추이 = '뜨는 곳/지는 곳'. 과금·스크래핑 없음.
 async function ensureSnapTable() {
+  // 💰 2026-08-20 전수 적용: 이 함수 일부는 메모 플래그조차 없어 **매 요청** DDL이 돌았다 — 배포 단위 1회로.
+  await ensureOnce("snapshot-record.ensureSnapTable", async () => {
   await sql`CREATE TABLE IF NOT EXISTS cafe_snapshots (
     id SERIAL PRIMARY KEY,
     cafe_id INT NOT NULL,
@@ -19,6 +21,7 @@ async function ensureSnapTable() {
   )`;
   await sql`ALTER TABLE cafe_snapshots ADD COLUMN IF NOT EXISTS recent_count INT`;
   await sql`CREATE INDEX IF NOT EXISTS idx_snap_cafe ON cafe_snapshots(cafe_id, snap_date)`;
+  });
 }
 
 const recentN = (dates: unknown, days = 90): number => {

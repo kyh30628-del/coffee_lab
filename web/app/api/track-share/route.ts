@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sql } from "@/lib/db";
+import { sql , ensureOnce } from "@/lib/db";
 export const runtime = "nodejs";
 
 // 📣 공유 클릭 기록 — 사용자가 카페 상세 등에서 공유 버튼을 눌러 '타인에게 공유'한 이벤트(바이럴 신호).
 //   channel=kakao|web|clipboard. anon_id로 내부(대표·팀) 구분 가능. 개인정보 없음(anon만).
 let ensured = false;
 async function ensure() {
+  // 💰 2026-08-20 전수 적용: 이 함수 일부는 메모 플래그조차 없어 **매 요청** DDL이 돌았다 — 배포 단위 1회로.
+  await ensureOnce("track-share.ensure", async () => {
   if (ensured) return;
   await sql`CREATE TABLE IF NOT EXISTS share_events (id BIGSERIAL PRIMARY KEY, anon_id TEXT, path TEXT, cafe_id INT, channel TEXT, ts TIMESTAMPTZ NOT NULL DEFAULT now())`;
   await sql`CREATE INDEX IF NOT EXISTS idx_share_events_ts ON share_events (ts)`;
@@ -15,6 +17,7 @@ async function ensure() {
   await sql`ALTER TABLE share_events ADD COLUMN IF NOT EXISTS kakao_failed BOOLEAN`.catch(() => {});
   await sql`ALTER TABLE share_events ADD COLUMN IF NOT EXISTS note TEXT`.catch(() => {});
   ensured = true;
+  });
 }
 
 export async function POST(req: NextRequest) {

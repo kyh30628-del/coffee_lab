@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sql, ensureSchema } from "@/lib/db";
+import { sql, ensureSchema, ensureOnce } from "@/lib/db";
 import { embedQuery, toVectorLiteral, hasEmbedKey } from "@/lib/embed";
 import { hasSearchLLM, rerankWithClaude, lastRerankError, type SearchCand } from "@/lib/searchAgent";
 import { loadCriteria, getCriterionSync } from "@/lib/criteria";
@@ -225,7 +225,10 @@ function quotesOf(reviews: any): string {
 let cacheReady = false;
 async function ensureCache() {
   if (cacheReady) return;
+  // 💰 콜드스타트마다 DDL 반복 금지(2026-08-20 전수 적용) — 배포 단위 1회.
+  await ensureOnce("search.ensureCache", async () => {
   await sql`CREATE TABLE IF NOT EXISTS search_cache (qkey TEXT PRIMARY KEY, payload JSONB NOT NULL, created_at TIMESTAMPTZ DEFAULT now())`;
+  });
   cacheReady = true;
 }
 // 검색 캐시 유효시간은 criteria 단일출처(폴백 3시간). GET 진입 시 loadCriteria 프라임 후 동기 읽기.

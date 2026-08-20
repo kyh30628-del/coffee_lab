@@ -1,16 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sql } from "@/lib/db";
+import { sql , ensureOnce } from "@/lib/db";
 export const runtime = "nodejs";
 
 // 카페 북마크(즐겨찾기) — 내 카페 등록과 별개. 익명 기기기반, 개인정보 0. 위치인증·메모 불필요.
 async function ensure() {
-  await sql`CREATE TABLE IF NOT EXISTS bookmarks (
-    id SERIAL PRIMARY KEY,
-    device_id TEXT NOT NULL,
-    cafe_id INT REFERENCES cafes(id) ON DELETE CASCADE,
-    created_at TIMESTAMPTZ DEFAULT now(),
-    UNIQUE(device_id, cafe_id)
-  )`;
+  await ensureOnce("bookmark.ddl", async () => {
+    await sql`CREATE TABLE IF NOT EXISTS bookmarks (
+      id SERIAL PRIMARY KEY,
+      device_id TEXT NOT NULL,
+      cafe_id INT REFERENCES cafes(id) ON DELETE CASCADE,
+      created_at TIMESTAMPTZ DEFAULT now(),
+      UNIQUE(device_id, cafe_id)
+    )`;
+  });
 }
 
 // GET ?device= : 내 북마크 카페 목록(상세 표시용)

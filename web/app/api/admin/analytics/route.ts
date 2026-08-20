@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sql, ensureSchema } from "@/lib/db";
+import { sql, ensureSchema , ensureOnce } from "@/lib/db";
 import { getTodayInsight, formatTodayInsightLines, type TodayInsight } from "@/lib/dailySummary";
 import { BOT_ANON_IDS_SQL } from "@/lib/behaviorBot";
 import { getDailyTraffic } from "@/lib/trafficMetrics";
@@ -134,8 +134,10 @@ export async function GET(req: NextRequest) {
   if (!authed(req)) return NextResponse.json({ ok: false }, { status: 401 });
   try {
     await ensureSchema();
-    await sql`CREATE TABLE IF NOT EXISTS traffic_events (id BIGSERIAL PRIMARY KEY, anon_id TEXT, path TEXT, src TEXT, ts TIMESTAMPTZ NOT NULL DEFAULT now())`.catch(() => {});
-    await sql`ALTER TABLE traffic_events ADD COLUMN IF NOT EXISTS duration_ms INT`.catch(() => {});
+    await ensureOnce("admin-analytics.ddl", async () => {
+      await sql`CREATE TABLE IF NOT EXISTS traffic_events (id BIGSERIAL PRIMARY KEY, anon_id TEXT, path TEXT, src TEXT, ts TIMESTAMPTZ NOT NULL DEFAULT now())`.catch(() => {});
+      await sql`ALTER TABLE traffic_events ADD COLUMN IF NOT EXISTS duration_ms INT`.catch(() => {});
+    });
 
     // 핵심 KPI (방문자 — user_consents)
     const kpi = (await sql.query(

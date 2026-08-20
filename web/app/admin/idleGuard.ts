@@ -28,3 +28,9 @@ export function shouldPoll(): boolean {
   if (document.visibilityState !== "visible") return false;
   return Date.now() - lastAct < IDLE_MS;
 }
+
+/** 가시성 무관, 최근 idleMs 안에 사람이 이 탭을 만졌는가 — 백그라운드 알림 폴링(ChatWidget)용. */
+export function recentlyActive(idleMs: number): boolean {
+  bind();
+  return Date.now() - lastAct < idleMs;
+}

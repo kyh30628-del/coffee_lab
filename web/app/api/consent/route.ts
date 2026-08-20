@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sql, ensureSchema } from "@/lib/db";
+import { sql, ensureSchema , ensureOnce } from "@/lib/db";
 import { BOT_ANON_IDS_SQL } from "@/lib/behaviorBot";
 export const runtime = "nodejs";
 
@@ -7,6 +7,8 @@ export const runtime = "nodejs";
 // - 익명 식별자(클라이언트 생성 UUID)만 사용. 이름·연락처 등 식별정보 없음.
 // - 좌표는 약 500m 격자로 스냅해 대략적 지역만 저장. 정밀 위치는 보관하지 않음.
 async function ensure() {
+  // 💰 2026-08-20: 플래그 없이 **매 동의 요청마다** CREATE TABLE이 돌았다 — 배포 단위 1회로.
+  await ensureOnce("consent.schema", async () => {
   await sql`
     CREATE TABLE IF NOT EXISTS user_consents (
       id              BIGSERIAL PRIMARY KEY,
@@ -20,6 +22,7 @@ async function ensure() {
       created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
       updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
     )`;
+  });
 }
 
 export async function POST(req: NextRequest) {

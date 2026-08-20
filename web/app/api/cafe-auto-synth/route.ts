@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sql, ensureSchema } from "@/lib/db";
+import { sql, ensureSchema , ensureOnce } from "@/lib/db";
 import { fetchPlacesReviews } from "@/lib/placesCollector";
 import { fetchWebReviews } from "@/lib/webSearchCollector";
 import { collectAndSynthesize, type RawSource } from "@/lib/collectOrchestrator";
@@ -15,18 +15,20 @@ export async function POST(req: NextRequest) {
     if (secret && req.headers.get("authorization") !== `Bearer ${secret}`)
       return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
     await ensureSchema();
-    await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_grade TEXT`;
-    await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_identity TEXT`;
-    await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_basis TEXT`;
-    await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_count INT`;
-    await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_acidity REAL`;
-    await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_body REAL`;
-    await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_sweet REAL`;
-    await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_updated TIMESTAMPTZ`;
-    await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_reviews JSONB`;
-    await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS char_scores JSONB`;
-    await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_quality JSONB`;
-    await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS review_dates JSONB`;
+    await ensureOnce("cafe-auto-synth.ddl", async () => {
+      await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_grade TEXT`;
+      await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_identity TEXT`;
+      await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_basis TEXT`;
+      await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_count INT`;
+      await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_acidity REAL`;
+      await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_body REAL`;
+      await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_sweet REAL`;
+      await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_updated TIMESTAMPTZ`;
+      await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_reviews JSONB`;
+      await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS char_scores JSONB`;
+      await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_quality JSONB`;
+      await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS review_dates JSONB`;
+    });
 
     const { name, area } = await req.json();
     if (!name) return NextResponse.json({ ok: false, error: "name 필요" }, { status: 400 });

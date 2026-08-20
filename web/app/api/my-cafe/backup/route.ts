@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sql } from "@/lib/db";
+import { sql , ensureOnce } from "@/lib/db";
 export const runtime = "nodejs";
 
 // 익명 복구코드 ↔ 기기 매핑 (개인정보 0, 코드는 난수)
 async function ensure() {
-  await sql`CREATE TABLE IF NOT EXISTS recovery_codes (
-    code TEXT PRIMARY KEY,
-    device_id TEXT NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT now()
-  )`;
+  await ensureOnce("my-cafe-backup.ddl", async () => {
+    await sql`CREATE TABLE IF NOT EXISTS recovery_codes (
+      code TEXT PRIMARY KEY,
+      device_id TEXT NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT now()
+    )`;
+  });
 }
 // 헷갈리는 글자 제외(O,0,I,1,L 등)
 const ALPH = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";

@@ -1,4 +1,4 @@
-import { sql } from "./db";
+import { sql , ensureOnce } from "./db";
 import { nameCoherence, cleanCafeName } from "./reviewQuality";
 import { healNonCafeCategory, healOffConceptByReview, healRestaurantByReview, healNonCafeByReview, healOutOfBox, healAreaLabel, offctxFalsePositive, OFFCTX_FLAG_RATE } from "./synthStore";
 import { pushTrigger } from "./auditTrigger";
@@ -311,6 +311,8 @@ function clampSeverity(list: Issue[]): Issue[] {
 // 크론 → 소속 본부: lib/jobTeams.ts 단일 출처 사용(2026-07-02 — 3벌 drift로 cron-issues가 팀을 덮어쓰던 사고 수리)
 
 export async function ensureIssues() {
+  // 💰 2026-08-20 전수 적용: 이 함수 일부는 메모 플래그조차 없어 **매 요청** DDL이 돌았다 — 배포 단위 1회로.
+  await ensureOnce("lib_issues.ensureIssues", async () => {
   await sql`CREATE TABLE IF NOT EXISTS issues (
     id SERIAL PRIMARY KEY, ikey TEXT UNIQUE,
     source TEXT, severity TEXT, type TEXT, title TEXT, detail TEXT, team TEXT,
@@ -319,6 +321,7 @@ export async function ensureIssues() {
   )`.catch(() => {});
   await sql`ALTER TABLE issues ADD COLUMN IF NOT EXISTS state TEXT`.catch(() => {});
   await sql`ALTER TABLE issues ADD COLUMN IF NOT EXISTS note TEXT`.catch(() => {});
+  });
 }
 
 const one = async (q: any): Promise<number> => Number((await q)[0].c);

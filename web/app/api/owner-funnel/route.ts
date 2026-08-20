@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sql } from "@/lib/db";
+import { sql , ensureOnce } from "@/lib/db";
 export const runtime = "nodejs";
 
 // 📊 사장님 신청 퍼널 계측(읽기전용) — CTA 클릭→체험/구독 모달 오픈→제출 성공/실패.
@@ -9,10 +9,12 @@ const EVENTS = new Set(["cta_click", "modal_open", "submit_success", "submit_fai
 let ensured = false;
 async function ensure() {
   if (ensured) return;
-  await sql`CREATE TABLE IF NOT EXISTS owner_funnel_events (
-    id BIGSERIAL PRIMARY KEY, anon_id TEXT, event TEXT, source TEXT, cafe_id INT, path TEXT, meta JSONB,
-    ts TIMESTAMPTZ NOT NULL DEFAULT now())`;
-  await sql`CREATE INDEX IF NOT EXISTS idx_owner_funnel_events_ts ON owner_funnel_events (ts)`;
+  await ensureOnce("owner-funnel.ddl", async () => {
+    await sql`CREATE TABLE IF NOT EXISTS owner_funnel_events (
+      id BIGSERIAL PRIMARY KEY, anon_id TEXT, event TEXT, source TEXT, cafe_id INT, path TEXT, meta JSONB,
+      ts TIMESTAMPTZ NOT NULL DEFAULT now())`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_owner_funnel_events_ts ON owner_funnel_events (ts)`;
+  });
   ensured = true;
 }
 

@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sql, ensureSchema } from "@/lib/db";
+import { sql, ensureSchema , ensureOnce } from "@/lib/db";
 import { encryptPII, decryptPII } from "@/lib/crypto";
 export const runtime = "nodejs";
 
 // 사장님 구독(홍보팩) 신청 — 연락처(개인정보)는 암호화 저장·동의 기록·보유기간 자동 폐기.
 async function ensure() {
+  // 💰 2026-08-20 전수 적용: 이 함수 일부는 메모 플래그조차 없어 **매 요청** DDL이 돌았다 — 배포 단위 1회로.
+  await ensureOnce("sub-request.ensure", async () => {
   await sql`CREATE TABLE IF NOT EXISTS sub_requests (
     id SERIAL PRIMARY KEY, cafe_name TEXT, contact TEXT, plan TEXT,
     status TEXT DEFAULT 'new', consent BOOLEAN DEFAULT false, consent_at TIMESTAMPTZ,
@@ -13,6 +15,7 @@ async function ensure() {
   await sql`ALTER TABLE sub_requests ADD COLUMN IF NOT EXISTS consent BOOLEAN DEFAULT false`;
   await sql`ALTER TABLE sub_requests ADD COLUMN IF NOT EXISTS consent_at TIMESTAMPTZ`;
   await sql`CREATE TABLE IF NOT EXISTS purge_log (id SERIAL PRIMARY KEY, n INT, deleted_at TIMESTAMPTZ DEFAULT now())`;
+  });
 }
 // 보유기간 자동 폐기 + 삭제 알림 로그. 반환: 이번에 삭제된 건수.
 async function purgeExpired(): Promise<number> {

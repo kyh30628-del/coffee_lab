@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sql, ensureSchema } from "@/lib/db";
+import { sql, ensureSchema , ensureOnce } from "@/lib/db";
 import { generatePromo } from "@/lib/promoAgent";
 import { ownerScope } from "@/lib/ownerAuth";
 import { subscriptionLive } from "@/lib/flags";
@@ -9,6 +9,8 @@ export const maxDuration = 30;
 // 사장님 쇼케이스: 사장님이 글·사진 저장 → Claude가 홍보 카피 생성 → 카페 상세 상단 배너.
 let ready = false;
 async function ensurePromo() {
+  // 💰 2026-08-20 전수 적용: 이 함수 일부는 메모 플래그조차 없어 **매 요청** DDL이 돌았다 — 배포 단위 1회로.
+  await ensureOnce("owner-promo.ensurePromo", async () => {
   if (ready) return;
   await sql`CREATE TABLE IF NOT EXISTS cafe_promos (
     cafe_id INT PRIMARY KEY,
@@ -29,6 +31,7 @@ async function ensurePromo() {
   await sql`ALTER TABLE cafe_promos ADD COLUMN IF NOT EXISTS clicks INT DEFAULT 0`;  // 클릭
   await sql`ALTER TABLE cafe_promos ADD COLUMN IF NOT EXISTS plays INT DEFAULT 0`;   // 영상 재생
   ready = true;
+  });
 }
 const authed = (req: NextRequest) => !!req.headers.get("x-admin-password") && req.headers.get("x-admin-password") === process.env.ADMIN_PASSWORD;
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sql } from "@/lib/db";
+import { sql , ensureOnce } from "@/lib/db";
 export const runtime = "nodejs";
 
 // ⏱️ 체류시간 비콘 — 페이지 이탈(visibilitychange/pagehide) 시 클라가 진입~이탈 경과(ms)를 보낸다.
@@ -8,8 +8,10 @@ export const runtime = "nodejs";
 let ensured = false;
 async function ensure() {
   if (ensured) return;
-  await sql`CREATE TABLE IF NOT EXISTS traffic_events (id BIGSERIAL PRIMARY KEY, anon_id TEXT, path TEXT, src TEXT, ts TIMESTAMPTZ NOT NULL DEFAULT now())`;
-  await sql`ALTER TABLE traffic_events ADD COLUMN IF NOT EXISTS duration_ms INT`;
+  await ensureOnce("visit-duration.ddl", async () => {
+    await sql`CREATE TABLE IF NOT EXISTS traffic_events (id BIGSERIAL PRIMARY KEY, anon_id TEXT, path TEXT, src TEXT, ts TIMESTAMPTZ NOT NULL DEFAULT now())`;
+    await sql`ALTER TABLE traffic_events ADD COLUMN IF NOT EXISTS duration_ms INT`;
+  });
   ensured = true;
 }
 

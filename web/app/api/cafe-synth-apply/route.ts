@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sql, ensureSchema } from "@/lib/db";
+import { sql, ensureSchema , ensureOnce } from "@/lib/db";
 import { collectAndSynthesize, type RawSource } from "@/lib/collectOrchestrator";
 import { loadCriteria } from "@/lib/criteria";
 
@@ -15,17 +15,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
     await ensureSchema();
     // 합성 결과 컬럼 보장
-    await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_grade TEXT`;
-    await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_identity TEXT`;
-    await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_basis TEXT`;
-    await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_count INT`;
-    await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_acidity REAL`;
-    await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_body REAL`;
-    await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_sweet REAL`;
-    await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_updated TIMESTAMPTZ`;
-    await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_reviews JSONB`;
-    await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS char_scores JSONB`;
-    await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_quality JSONB`;
+    // 💰 2026-08-20: 이 DDL 묶음은 핸들러 인라인이라 **호출마다** 2GB 테이블에 ALTER를 날렸다 — 배포 단위 1회로.
+    await ensureOnce("cafe-synth-apply.ddl", async () => {
+      await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_grade TEXT`;
+      await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_identity TEXT`;
+      await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_basis TEXT`;
+      await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_count INT`;
+      await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_acidity REAL`;
+      await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_body REAL`;
+      await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_sweet REAL`;
+      await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_updated TIMESTAMPTZ`;
+      await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_reviews JSONB`;
+      await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS char_scores JSONB`;
+      await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_quality JSONB`;
+    });
 
     const body = await req.json();
     const { name, area } = body;

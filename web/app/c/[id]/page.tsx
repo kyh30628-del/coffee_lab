@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { cache } from "react";
-import { sql } from "@/lib/db";
+import { sql, ensureOnce } from "@/lib/db";
 import KakaoShare from "../../KakaoShare";
 import SaveMemoryButton from "./SaveMemoryButton";
 import OwnerCtaLink from "./OwnerCtaLink";
@@ -102,7 +102,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 async function getPublicReviews(cafeId: number) {
   try {
-    await sql`ALTER TABLE user_visits ADD COLUMN IF NOT EXISTS is_public BOOLEAN DEFAULT false`.catch(() => {});
+    // 💰 2026-08-20: 이 ALTER가 **ISR 재생성마다**(공개 13,517페이지) 돌고 있었다 — 배포 단위 1회로.
+    await ensureOnce("c-id.user_visits.is_public", async () => {
+      await sql`ALTER TABLE user_visits ADD COLUMN IF NOT EXISTS is_public BOOLEAN DEFAULT false`;
+    }).catch(() => {});
     const rows = await sql`SELECT memory, photos, photo_url, favorite, created_at FROM user_visits
       WHERE cafe_id=${cafeId} AND is_public=true AND finalized=true AND verified=true AND (COALESCE(memory,'')<>'' OR photo_url IS NOT NULL)
       ORDER BY created_at DESC LIMIT 20`;

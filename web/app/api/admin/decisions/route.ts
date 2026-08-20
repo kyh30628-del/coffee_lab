@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sql } from "@/lib/db";
+import { sql , ensureOnce } from "@/lib/db";
 
 export const runtime = "nodejs";
 
@@ -8,6 +8,8 @@ export const runtime = "nodejs";
 //   CEO 모바일엔 **L3만** 결재 대기로 노출 → 운영결정에 안 시달림. L1/L2는 '전결 처리됨(FYI)'로만 보임.
 //   action_type: unpublish | downgrade | restore | requeue_resynth | set_offctx(offctx_ok 토글) | agent_task(기조실장 배분)
 async function ensure() {
+  // 💰 2026-08-20 전수 적용: 이 함수 일부는 메모 플래그조차 없어 **매 요청** DDL이 돌았다 — 배포 단위 1회로.
+  await ensureOnce("admin_decisions.ensure", async () => {
   await sql`CREATE TABLE IF NOT EXISTS decisions (
     id SERIAL PRIMARY KEY, created_at TIMESTAMPTZ DEFAULT now(),
     title TEXT, detail TEXT, team TEXT, severity TEXT,
@@ -40,6 +42,7 @@ async function ensure() {
   await sql`CREATE TRIGGER trg_decisions_normalize_action_type
     BEFORE INSERT ON decisions
     FOR EACH ROW EXECUTE FUNCTION decisions_normalize_action_type()`.catch(() => {});
+  });
 }
 
 export async function GET(req: NextRequest) {

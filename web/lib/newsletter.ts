@@ -1,4 +1,4 @@
-import { sql } from "@/lib/db";
+import { sql , ensureOnce } from "@/lib/db";
 import { decryptPII } from "@/lib/crypto";
 import crypto from "crypto";
 
@@ -10,6 +10,8 @@ export type NLSection = { key: string; title: string; intro?: string; items: NLI
 export type Newsletter = { id?: number; issue_no?: number; week_of?: string; title: string; sections: NLSection[]; flags?: string[]; status?: string };
 
 export async function ensureNewsletterSchema() {
+  // 💰 2026-08-20 전수 적용: 이 함수 일부는 메모 플래그조차 없어 **매 요청** DDL이 돌았다 — 배포 단위 1회로.
+  await ensureOnce("lib_newsletter.ensureNewsletterSchema", async () => {
   await sql`CREATE TABLE IF NOT EXISTS newsletters (
     id SERIAL PRIMARY KEY, issue_no INT, week_of DATE,
     status TEXT DEFAULT 'draft', title TEXT, sections JSONB, flags JSONB,
@@ -22,6 +24,7 @@ export async function ensureNewsletterSchema() {
   )`;
   await sql`CREATE TABLE IF NOT EXISTS newsletter_optout (email TEXT PRIMARY KEY, sub_id INT, opted_out_at TIMESTAMPTZ DEFAULT now())`;
   await sql`ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS newsletter_opt_in BOOLEAN DEFAULT true`.catch(() => {});
+  });
 }
 
 // 수신 대상: 활성 구독+체험 ∧ 이메일 有 ∧ 수신동의 ∧ 수신거부 아님. 이메일은 복호화.

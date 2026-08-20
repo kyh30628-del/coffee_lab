@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sql, ensureSchema } from "@/lib/db";
+import { sql, ensureSchema , ensureOnce } from "@/lib/db";
 export const runtime = "nodejs";
 
 // 쇼케이스 1차 성과 집계 — 노출(view)·클릭(click)·영상재생(play). 익명·공개. 승인된 홍보만 카운트.
@@ -11,7 +11,9 @@ export async function POST(req: NextRequest) {
     const cafeId = Number(body.cafeId);
     const type = String(body.type ?? "");
     if (!cafeId || !["view", "click", "play"].includes(type)) return NextResponse.json({ ok: false }, { status: 400 });
-    await sql`CREATE TABLE IF NOT EXISTS promo_daily (cafe_id INT, day DATE, views INT DEFAULT 0, clicks INT DEFAULT 0, plays INT DEFAULT 0, PRIMARY KEY (cafe_id, day))`;
+    await ensureOnce("promo-event.ddl", async () => {
+      await sql`CREATE TABLE IF NOT EXISTS promo_daily (cafe_id INT, day DATE, views INT DEFAULT 0, clicks INT DEFAULT 0, plays INT DEFAULT 0, PRIMARY KEY (cafe_id, day))`;
+    });
     // 승인된 프로모만 집계 — cafe_promos(누적)는 approved=true만 올리는데 promo_daily(월)는 무조건 올려 월>누적 불일치·고아행이 생겼음.
     const appr = (await sql`SELECT 1 FROM cafe_promos WHERE cafe_id=${cafeId} AND approved=true LIMIT 1`) as any[];
     if (!appr.length) return NextResponse.json({ ok: true, skipped: "not-approved" });

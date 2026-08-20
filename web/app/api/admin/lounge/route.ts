@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sql } from "@/lib/db";
+import { sql , ensureOnce } from "@/lib/db";
 import { BOT_ANON_IDS_SQL } from "@/lib/behaviorBot";
 
 export const runtime = "nodejs";
@@ -9,6 +9,8 @@ export const runtime = "nodejs";
 const auth = (req: NextRequest) => req.headers.get("x-admin-password") === process.env.ADMIN_PASSWORD;
 
 async function ensure() {
+  // 💰 2026-08-20 전수 적용: 이 함수 일부는 메모 플래그조차 없어 **매 요청** DDL이 돌았다 — 배포 단위 1회로.
+  await ensureOnce("admin_lounge.ensure", async () => {
   await sql`CREATE TABLE IF NOT EXISTS lounge_comments (
     id SERIAL PRIMARY KEY, target TEXT NOT NULL, author TEXT DEFAULT 'CEO',
     body TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT now()
@@ -16,6 +18,7 @@ async function ensure() {
   await sql`CREATE TABLE IF NOT EXISTS peer_reviews (id SERIAL PRIMARY KEY, reviewer TEXT, target TEXT, note TEXT, created_at TIMESTAMPTZ DEFAULT now())`.catch(() => {});
   await sql`CREATE TABLE IF NOT EXISTS org_reports (kind TEXT PRIMARY KEY, title TEXT, md TEXT, updated_at TIMESTAMPTZ DEFAULT now())`.catch(() => {});
   await sql`CREATE TABLE IF NOT EXISTS team_kpis (id SERIAL PRIMARY KEY, scope TEXT, week_start DATE, goal TEXT, updated_by TEXT, updated_at TIMESTAMPTZ DEFAULT now(), UNIQUE(scope, week_start))`.catch(() => {});
+  });
 }
 
 export async function GET(req: NextRequest) {

@@ -3,7 +3,7 @@
 //   결제 성공은 기존 구독 수명주기(subscription/route.ts activate/extend, ownerActivity)의
 //   '기간 세팅 + 혜택 ON'에 결선한다(markPaidAndActivate). 혜택 최종정합은 ensure() self-heal이 보장.
 import crypto from "crypto";
-import { sql } from "./db";
+import { sql , ensureOnce } from "./db";
 import { decryptPII } from "./crypto";
 import { sendBillingEmail } from "./billingEmail";
 
@@ -69,6 +69,8 @@ export function cardDisplay(data: any): { last4: string | null; company: string 
 let billingEnsured = false;
 export async function ensureBilling() {
   if (billingEnsured) return;
+  // 💰 콜드스타트마다 DDL 반복 금지(2026-08-20 전수 적용) — 배포 단위 1회.
+  await ensureOnce("lib.billing.ensureBilling", async () => {
   await sql`CREATE TABLE IF NOT EXISTS subscriptions (id SERIAL PRIMARY KEY, cafe_id INT UNIQUE)`; // 방어: 없으면 최소 생성(정식 스키마는 subscription/route.ts)
   await sql`ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS billing_key TEXT`;
   await sql`ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS billing_customer_key TEXT`;
@@ -82,6 +84,7 @@ export async function ensureBilling() {
   await sql`ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS dunning_count INT DEFAULT 0`;
   await sql`ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS autopay BOOLEAN DEFAULT false`;
   await ensurePayments();
+  });
   billingEnsured = true;
 }
 
@@ -89,6 +92,8 @@ export async function ensureBilling() {
 let paymentsEnsured = false;
 export async function ensurePayments() {
   if (paymentsEnsured) return;
+  // 💰 콜드스타트마다 DDL 반복 금지(2026-08-20 전수 적용) — 배포 단위 1회.
+  await ensureOnce("lib.billing.ensurePayments", async () => {
   await sql`CREATE TABLE IF NOT EXISTS payments (
     id SERIAL PRIMARY KEY,
     order_id TEXT UNIQUE,
@@ -108,6 +113,7 @@ export async function ensurePayments() {
   )`;
   await sql`ALTER TABLE payments ADD COLUMN IF NOT EXISTS applied_at TIMESTAMPTZ`; // 이 결제로 이미 기간 연장했는지(중복 연장 차단)
   await sql`CREATE INDEX IF NOT EXISTS idx_payments_cafe ON payments(cafe_id, created_at DESC)`;
+  });
   paymentsEnsured = true;
 }
 

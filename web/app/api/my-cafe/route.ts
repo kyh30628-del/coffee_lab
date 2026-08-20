@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sql } from "@/lib/db";
+import { sql , ensureOnce } from "@/lib/db";
 import { put } from "@vercel/blob";
 import { hashPin } from "@/lib/pin";
 export const runtime = "nodejs";
@@ -8,6 +8,8 @@ export const runtime = "nodejs";
 // ⚡ warm 인스턴스 재실행 방지 가드(다른 ensure들과 동일 패턴) — 매 요청 DDL 왕복 제거. 동작 불변(IF NOT EXISTS).
 let ensured = false;
 async function ensure() {
+  // 💰 2026-08-20 전수 적용: 이 함수 일부는 메모 플래그조차 없어 **매 요청** DDL이 돌았다 — 배포 단위 1회로.
+  await ensureOnce("my-cafe.ensure", async () => {
   if (ensured) return;
   await sql`CREATE TABLE IF NOT EXISTS user_visits (
     id SERIAL PRIMARY KEY,
@@ -34,6 +36,7 @@ async function ensure() {
   // 🔎 지도 MY PIN 조회는 device_id 단독 필터(WHERE v.device_id=…) — UNIQUE(cafe_id,device_id)는 선두가 cafe_id라 못 씀. 접근경로만 개선(결과·정렬 불변).
   await sql`CREATE INDEX IF NOT EXISTS idx_user_visits_device ON user_visits(device_id)`.catch(() => {});
   ensured = true;
+  });
 }
 
 // 하버사인 거리(m)

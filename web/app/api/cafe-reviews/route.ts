@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sql } from "@/lib/db";
+import { sql , ensureOnce } from "@/lib/db";
 export const runtime = "nodejs";
 
 // 공개 방문 후기 — 사용자가 '공개'로 등록한 위치인증 방문기록을 카페 상세에 노출(재활용).
@@ -8,7 +8,9 @@ export async function GET(req: NextRequest) {
   try {
     const cafeId = Number(req.nextUrl.searchParams.get("cafeId"));
     if (!cafeId) return NextResponse.json({ ok: false, error: "cafeId 필요" }, { status: 400 });
-    await sql`ALTER TABLE user_visits ADD COLUMN IF NOT EXISTS is_public BOOLEAN DEFAULT false`.catch(() => {});
+    await ensureOnce("cafe-reviews.user_visits.is_public", async () => {
+      await sql`ALTER TABLE user_visits ADD COLUMN IF NOT EXISTS is_public BOOLEAN DEFAULT false`;
+    }).catch(() => {});
     const rows = await sql`
       SELECT memory, photos, photo_url, favorite, created_at
       FROM user_visits

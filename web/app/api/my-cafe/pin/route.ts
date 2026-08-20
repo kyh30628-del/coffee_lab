@@ -1,15 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sql } from "@/lib/db";
+import { sql , ensureOnce } from "@/lib/db";
 import { hashPin } from "@/lib/pin";
 export const runtime = "nodejs";
 
 // 공용 PC 잠금 — 기기별 PIN(개인정보 아님, 익명 기기 식별자에 종속)
 async function ensure() {
-  await sql`CREATE TABLE IF NOT EXISTS device_pins (
-    device_id TEXT PRIMARY KEY,
-    pin_hash TEXT NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT now()
-  )`;
+  await ensureOnce("my-cafe-pin.ddl", async () => {
+    await sql`CREATE TABLE IF NOT EXISTS device_pins (
+      device_id TEXT PRIMARY KEY,
+      pin_hash TEXT NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT now()
+    )`;
+  });
 }
 const isPin = (p: any) => typeof p === "string" && /^\d{4,8}$/.test(p);
 

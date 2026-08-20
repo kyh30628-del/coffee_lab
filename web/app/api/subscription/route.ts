@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sql, ensureSchema } from "@/lib/db";
+import { sql, ensureSchema , ensureOnce } from "@/lib/db";
 import { ensureOwnerActivity } from "@/lib/ownerActivity";
 import { encryptPII, decryptPII } from "@/lib/crypto";
 import { subscriptionLive, paymentsLive, bankTransferEmailEnabled } from "@/lib/flags";
@@ -30,6 +30,8 @@ async function sendPinEmail(to: string, pin: string, cafeName: string, days = 30
 }
 
 async function ensure() {
+  // 💰 2026-08-20 전수 적용: 이 함수 일부는 메모 플래그조차 없어 **매 요청** DDL이 돌았다 — 배포 단위 1회로.
+  await ensureOnce("subscription.ensure", async () => {
   await sql`CREATE TABLE IF NOT EXISTS subscriptions (
     id SERIAL PRIMARY KEY, cafe_id INT UNIQUE, cafe_name TEXT, owner_name TEXT,
     contact TEXT, email TEXT, plan TEXT DEFAULT '홍보팩', price INT DEFAULT 9900,
@@ -68,6 +70,7 @@ async function ensure() {
             FROM subscriptions s
             WHERE s.cafe_id = p.cafe_id AND s.status='active' AND s.expires_at IS NOT NULL AND s.expires_at > now()
               AND (p.featured = false OR p.approved = false OR p.featured_until IS NULL OR p.featured_until < now())`;
+  });
 }
 
 export async function GET(req: NextRequest) {

@@ -1,9 +1,11 @@
-import { sql } from "@/lib/db";
+import { sql , ensureOnce } from "@/lib/db";
 
 // 사장님(구독 PIN) 활동 추적 — 접속·사용 모니터링. "제대로 접속하고 쓰는지" 본부가 알 수 있게.
 // owner_events: 상세 이력(로그인·분석조회 등). subscriptions: 빠른 요약(최근접속·횟수·첫로그인).
 let ensured = false;
 export async function ensureOwnerActivity() {
+  // 💰 2026-08-20 전수 적용: 이 함수 일부는 메모 플래그조차 없어 **매 요청** DDL이 돌았다 — 배포 단위 1회로.
+  await ensureOnce("lib_ownerActivity.ensureOwnerActivity", async () => {
   if (ensured) return;
   await sql`CREATE TABLE IF NOT EXISTS owner_events (id SERIAL PRIMARY KEY, cafe_id INT, event TEXT, at TIMESTAMPTZ DEFAULT now(), meta JSONB)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_owner_events_cafe ON owner_events(cafe_id, at DESC)`;
@@ -12,6 +14,7 @@ export async function ensureOwnerActivity() {
   await sql`ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS login_count INT DEFAULT 0`;
   await sql`ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS duration_days INT`; // 첫 로그인 시 시계 시작에 쓰는 이용기간 — 로그인 경로가 이 컬럼을 참조하므로 여기서도 보장
   ensured = true;
+  });
 }
 
 // PIN 로그인 성공 시 — 항상 기록(첫 접속·재접속 모두 의미).

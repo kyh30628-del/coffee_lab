@@ -1,4 +1,5 @@
 "use client";
+import { recentlyActive } from "./idleGuard";
 import { useState, useEffect, useRef } from "react";
 import { useLockBodyScroll } from "@/lib/useLockBodyScroll";
 
@@ -143,6 +144,9 @@ export function ChatWidget({ pw }: { pw: string }) {
     let last = 0;
     const t = setInterval(() => {
       if (chatLoading) return;
+      // 💰 2026-08-20: 탭을 열어둔 채 자리를 비우면 백그라운드 2분 주기가 **밤새** DB를 깨웠다.
+      //   마지막 조작 후 10분이 지나면 정지(알림 목적상 idleGuard 3분보다 길게) — 복귀 시 visibilitychange가 즉시 재개.
+      if (!recentlyActive(10 * 60 * 1000)) return;
       const gap = document.visibilityState === "visible" ? 15000 : 120000;
       if (Date.now() - last < gap) return;
       last = Date.now();

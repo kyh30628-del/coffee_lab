@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sql } from "@/lib/db";
+import { sql , ensureOnce } from "@/lib/db";
 
 export const runtime = "nodejs";
 
@@ -50,6 +50,8 @@ async function archiveThenPurge() {
 }
 
 async function ensure() {
+  // 💰 2026-08-20 전수 적용: 이 함수 일부는 메모 플래그조차 없어 **매 요청** DDL이 돌았다 — 배포 단위 1회로.
+  await ensureOnce("admin_chat.ensure", async () => {
   await sql`CREATE TABLE IF NOT EXISTS chat_queue (
     id SERIAL PRIMARY KEY, question TEXT, history JSONB, status TEXT DEFAULT 'pending',
     answer TEXT, mode TEXT, created_at TIMESTAMPTZ DEFAULT now(), answered_at TIMESTAMPTZ
@@ -59,6 +61,7 @@ async function ensure() {
   await sql`ALTER TABLE chat_queue ADD COLUMN IF NOT EXISTS llm_model TEXT`.catch(() => {});
   await sql`CREATE TABLE IF NOT EXISTS work_orders (id SERIAL PRIMARY KEY, command TEXT, action TEXT, tier TEXT, created_at TIMESTAMPTZ DEFAULT now())`.catch(() => {}); // 챗봇 작업지시 감사
   await archiveThenPurge();
+  });
 }
 
 export async function POST(req: NextRequest) {
