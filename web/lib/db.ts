@@ -77,9 +77,18 @@ export async function ensureSchema() {
  *   - 표시 조회·기록이 실패해도 원래 DDL을 그대로 실행한다(실패 시 기존 동작 유지 — 절대 스키마를 건너뛰지 않는다).
  */
 const SCHEMA_TAG = process.env.VERCEL_GIT_COMMIT_SHA || process.env.NODE_ENV || "local";
-const schemaDone = new Map<string, boolean>();
+const schemaDone = new Map<string, Promise<void>>();
 export async function ensureOnce(key: string, run: () => Promise<void>): Promise<void> {
-  if (schemaDone.get(key)) return;
+  // 동시성: 콜드스타트 직후 요청이 몰리면(방문 핑 burst) 같은 키의 DDL이 병렬로 중복 실행됐다.
+  //   promise를 메모해 첫 호출만 실행하고 나머지는 그 결과를 기다린다. 실패 시 메모를 지워 다음 요청이 재시도.
+  const inflight = schemaDone.get(key);
+  if (inflight) return inflight;
+  const p = ensureOnceInner(key, run);
+  schemaDone.set(key, p);
+  p.catch(() => schemaDone.delete(key));
+  return p;
+}
+async function ensureOnceInner(key: string, run: () => Promise<void>): Promise<void> {
   let skip = false;
   try {
     const r = (await sql`SELECT 1 FROM schema_state WHERE key=${key} AND tag=${SCHEMA_TAG} LIMIT 1`) as unknown[];
@@ -97,5 +106,4 @@ export async function ensureOnce(key: string, run: () => Promise<void>): Promise
         ON CONFLICT (key) DO UPDATE SET tag=EXCLUDED.tag, at=now()`;
     } catch { /* 기록 실패는 무해 — 다음에 다시 실행될 뿐 */ }
   }
-  schemaDone.set(key, true);
 }

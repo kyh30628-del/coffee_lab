@@ -3,7 +3,7 @@ import { ogCard, OG_SIZE } from "@/lib/ogCard";
 import { topCharTraits } from "@/lib/charScore";
 
 export const runtime = "nodejs";
-export const revalidate = 3600; // 감사수리: 결재 집행(공개/비공개) 반영 지연 축소 — 페이지(3600)와 짝 맞춤
+export const revalidate = 21600; // 💰 2026-08-20: 페이지(21600)와 짝 맞춤 — 13.5k 이미지가 1시간마다 재생성 대상이던 것을 6시간으로
 export const size = OG_SIZE;
 export const contentType = "image/png";
 export const alt = "동네 커피 노트 — 검증한 동네 카페";

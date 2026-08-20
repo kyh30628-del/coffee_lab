@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { SITE } from "@/lib/seoData";
 
-export const revalidate = 3600;
+export const revalidate = 21600; // 💰 2026-08-20: 공유 스냅샷도 6시간이면 충분(데이터는 재합성 ~5일 주기)
 
 type Props = { params: Promise<{ id: string }> };
 type Report = {

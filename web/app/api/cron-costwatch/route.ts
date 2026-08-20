@@ -214,6 +214,13 @@ export async function GET(req: NextRequest) {
 
     // 📒 하네스 L5 — 실행 원장 보존정리(90일). 하루 1회·행 수천 개 수준이라 부하 무시 가능.
     const pruned = await pruneLedger(90).catch(() => 0);
+    // 🧹 이벤트 테이블 보존정리(2026-08-20 전수검사) — 아래 4개는 정리 경로가 아예 없어 **무한 누적**이었다.
+    //   저장은 $0.35/GB-월 종량이라 작아도 방치하면 청구서가 되는 구조. 분석 지평(계절성 비교)만큼만 남긴다.
+    //   traffic_events(90일)는 orchestrator가 이미 정리 — 여기 추가 금지(이중 삭제 방지).
+    await sql`DELETE FROM search_log WHERE ts < now() - interval '90 days'`.catch(() => {});
+    await sql`DELETE FROM share_events WHERE ts < now() - interval '365 days'`.catch(() => {});
+    await sql`DELETE FROM outbound_clicks WHERE ts < now() - interval '365 days'`.catch(() => {});
+    await sql`DELETE FROM owner_funnel_events WHERE ts < now() - interval '365 days'`.catch(() => {});
     await recordRun("cron-costwatch", !anomaly, detail + (pruned ? ` · 원장정리 ${pruned}행` : ""), cur.length);
     // 🛑 과다 시 자동 정지(무거운 자율 크론이 스킵) / 정상 복귀 시 자동 해제 — CEO "과다면 멈춰"
     await setCostHalt(anomaly, anomaly ? `자동정지: ${detail.slice(0, 150)}` : "정상").catch(() => {});
