@@ -92,7 +92,12 @@ export async function GET(req: NextRequest) {
       ORDER BY (COALESCE(pipeline_status, '') = 'pending') DESC,
                -- ⚠️ pipeline_status IS NULL(grandfather)인 행은 위 비교가 SQL NULL이 되고, Postgres는
                --   DESC에서 NULL을 '가장 큼'으로 취급해 맨 앞으로 보낸다 — COALESCE로 NULL을 없애 방지(실측으로 발견).
-               (synth_grade = '후보' AND NOT COALESCE(published, false)) DESC,  -- 후보구제(신규 공개 가능성) > 공개카페 재정제
+               -- 🎯 결재#784(#490 옵션2, 08-20): 크레딧 희소 상황 — 이미 신뢰확보(공개)된 카페 재정제를
+               --   후보구제보다 먼저 처리해 늦추지 않되, 그 안에서는 최근합성(synth_updated 최신)순으로
+               --   신선한 데이터부터 판정해 무작위 순환보다 효율화.
+               (published AND synth_grade IS DISTINCT FROM ${TRUSTED_GRADE}) DESC,  -- 신뢰확보 카페 재정제 우선
+               synth_updated DESC NULLS LAST,          -- 최근합성 우선
+               (synth_grade = '후보' AND NOT COALESCE(published, false)) DESC,  -- 후보구제(신규 공개 가능성)
                COALESCE(synth_count, 0) ASC,           -- 리뷰 적어 취약한 순 우선(옥석 많은 곳은 뒤로)
                id LIMIT ${BUILD_LIMIT}`) as any[];
     const requests: any[] = [];
