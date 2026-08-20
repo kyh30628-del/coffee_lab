@@ -646,6 +646,12 @@ export async function healExactDuplicates(): Promise<{ resolved: number; pairs: 
 
 // 🩺 LLM 그라운딩 의심(업체혼동·환각) 자가치유 — 재합성으로 교정(개선엔진: 오염제거·로스팅환각 차단).
 //   아직 교정 안 된 것(synth_updated <= 그라운딩 검사시각)만 재합성 → 로컬 그라운딩이 재검사해 플래그 해소.
+//   ⚠️ [decisions#783] 재합성만으로는 grounding_checks.grounded가 갱신되지 않는다(그라운딩 판정은 별도 로컬
+//   LLM 배치 소관 — 여기서 직접 재검사하지 않음, .ai-paused 시엔 정지됨). 재합성 직후 synth_updated가
+//   checked_at을 앞지르면 이 함수의 WHERE 조건에서 영구 제외되는데, llm_judged_at을 그대로 두면 그 배치의
+//   판정 큐(judge-candidates 기본 큐, WHERE llm_judged_at IS NULL OR < raw_collected_at)에도 안 걸려
+//   재검증이 아예 발동하지 않는다 — grounded=false 플래그만 남긴 채 조용히 방치. llm_judged_at을 초기화해
+//   판정 큐에 강제 재편입시켜야 실제 재검 루프가 닫힌다.
 export async function healGroundingSuspects(): Promise<{ resynthed: number; names: string[]; suspects: number }> {
   await sql`CREATE TABLE IF NOT EXISTS grounding_checks (cafe_id INT PRIMARY KEY, grounded BOOLEAN, issue TEXT, checked_at TIMESTAMPTZ DEFAULT now())`.catch(() => {});
   const bad = (await sql`
@@ -654,7 +660,13 @@ export async function healGroundingSuspects(): Promise<{ resynthed: number; name
       AND (c.synth_updated IS NULL OR c.synth_updated <= g.checked_at)
     ORDER BY g.checked_at ASC LIMIT 15`) as any[];
   const names: string[] = [];
-  for (const c of bad) { try { await synthAndStore({ id: c.id, name: c.name, area: c.area }, { refresh: false }); names.push(c.name); } catch {} }
+  for (const c of bad) {
+    try {
+      await synthAndStore({ id: c.id, name: c.name, area: c.area }, { refresh: false });
+      await sql`UPDATE cafes SET llm_judged_at = NULL WHERE id = ${c.id}`;
+      names.push(c.name);
+    } catch {}
+  }
   const [s] = await sql`SELECT COUNT(*)::int n FROM grounding_checks WHERE grounded = false` as any[];
   return { resynthed: bad.length, names: names.slice(0, 8), suspects: s.n };
 }
