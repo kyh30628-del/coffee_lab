@@ -5,6 +5,7 @@ import { cache } from "react";
 import { sql } from "@/lib/db";
 import KakaoShare from "../../KakaoShare";
 import SaveMemoryButton from "./SaveMemoryButton";
+import OwnerCtaLink from "./OwnerCtaLink";
 import VisitorReviews from "../../VisitorReviews";
 import RecentCafes from "../../RecentCafes";
 import { buildAxisDist, cafeProfile, extractHighlights, tasteVector, tasteSimilarity, GRADE_RANK } from "@/lib/cafeProfile";
@@ -443,14 +444,14 @@ export default async function CafePage({ params }: Props) {
               </div>
             </div>
           )}
-          {/* 사장님 CTA — 카페 상세 → owner 인사이트 진입(B2B 퍼널, decisions #15) */}
-          <Link href={`/owner?name=${encodeURIComponent(c.name)}`} className="mt-3 flex items-center justify-between gap-2 w-full rounded-xl px-4 py-3 border border-[#e6d2b5]" style={{ background: "linear-gradient(90deg,#fbf3e4,#f4ece0)" }}>
+          {/* 사장님 CTA — 카페 상세 → owner 인사이트 진입(B2B 퍼널, decisions #15). 클릭 계측: decisions #782 */}
+          <OwnerCtaLink cafeId={c.id} cafeName={c.name} className="mt-3 flex items-center justify-between gap-2 w-full rounded-xl px-4 py-3 border border-[#e6d2b5]" style={{ background: "linear-gradient(90deg,#fbf3e4,#f4ece0)" }}>
             <span className="flex flex-col text-left">
               <span className="text-[12.5px] font-bold text-[#7a5a2a]">☕ 이 카페 사장님이신가요?</span>
               <span className="text-[10.5px] text-[#6f6047]">후기 데이터로 보는 우리 가게 강점·약점 — 무료 인사이트</span>
             </span>
             <span className="text-[#c98a3c] font-bold whitespace-nowrap">→</span>
-          </Link>
+          </OwnerCtaLink>
         </div>
       </div>
     </main>
