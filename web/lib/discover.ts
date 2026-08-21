@@ -166,7 +166,8 @@ const DONGS: Record<string, string[]> = {
   부평구: ["부평동", "산곡동", "청천동", "갈산동", "삼산동", "십정동", "부개동", "일신동"],
   계양구: ["계산동", "작전동", "효성동", "임학동", "병방동", "서운동"],
   검단구: ["검단", "원당동", "당하동", "불로동", "마전동", "왕길동"],
-  서해구: ["청라", "가정동", "석남동", "연희동", "루원시티"],
+  // 가좌동·원창동 추가(decisions#788): #487 재발분(id19827·19828·19845·20087·20116)이 이 두 동 권역(건지로·정서진1로·여우재로)에 몰려 있었음 — 기존 목록이 청라·루원시티 신도심 위주라 이 아라뱃길 남단 권역을 검색어로 아예 안 훑었다.
+  서해구: ["청라", "가정동", "석남동", "연희동", "루원시티", "가좌동", "원창동"],
   강화군: ["강화읍", "길상면", "화도면", "불은면", "선원면", "교동면"],
   옹진군: ["북도면", "백령면", "연평면", "덕적면", "영흥면", "자월면"],
 };
@@ -192,6 +193,18 @@ export function parseDong(jibun: string): string | null {
   //   동 뒤에 한글이 더 오면(강동'구', 강동'대로') 그건 동이 아니므로 거부 → 진짜 동(천호동 등)을 찾는다.
   const m = jibun.match(/(?:구|시|군)\s+([가-힣]+[0-9]?(?:동|읍|면|가))(?![가-힣])/);
   return m ? m[1] : null;
+}
+
+// 🚨 재발방지(decisions#788): discoverRegion이 검색 쿼리의 area(예: '인천 제물포구')를 검색결과 주소와
+//   무관하게 무조건 찍어 저장하던 근본버그 — 인천 신설구(검단구/서해구/영종구/제물포구 등, 2026-07-01 개편)는
+//   경계가 인접해 있어 'OO구 카페'로 검색해도 실제로는 옆 신설구 소재 카페가 상위5에 섞여 나온다.
+//   실주소에 명시된 구/시/군 토큰이 METRO_REGIONS(현재 유효 92개 구·시·군) 중 하나와 일치하면 그걸 area로 채택.
+const GU_TO_AREA = new Map<string, string>(METRO_REGIONS.map(({ region, areaLabel }) => [region.split(" ").pop()!, areaLabel]));
+export function parseGuArea(address: string): string | null {
+  if (!address) return null;
+  const matches = address.match(/[가-힣]+(?:구|시|군)(?![가-힣])/g) ?? [];
+  for (const token of matches) { const area = GU_TO_AREA.get(token); if (area) return area; }
+  return null;
 }
 export const isFranchise = (name: string) => { const n = name.replace(/\s/g, "").toUpperCase(); return FRANCHISE.some((f) => n.includes(f.toUpperCase())) || [...getLearned("franchise")].some((f) => n.includes(f)); };
 
@@ -435,10 +448,12 @@ export async function discoverRegion(region: string, areaLabel: string, keywords
         skipped++; continue;
       }
       const pseudoId = `nl_${it.name.replace(/\s/g, "")}_${Math.round((it.lat as number) * 1e5)}`;
+      // ★ 검색쿼리 라벨(storeArea)보다 실주소에 명시된 구·시·군을 우선(위 parseGuArea) — 경계 인접 신설구 교차유입 방지.
+      const itArea = parseGuArea(it.address) ?? storeArea;
       // 신규 카페는 pipeline_status='new'로 태어남 → 풀 게이트(합성·AI판정·임베딩·검증) 통과 후에만 공개.
       await sql`
         INSERT INTO cafes (place_id, name, area, dong, naver_category, address, lat, lng, phone, instagram_url, source, published, roasts_own, pipeline_status)
-        VALUES (${pseudoId}, ${it.name}, ${storeArea}, ${it.dong}, ${it.category}, ${it.address}, ${it.lat}, ${it.lng}, ${it.phone}, ${it.instagramUrl}, 'discover', false, false, 'new')
+        VALUES (${pseudoId}, ${it.name}, ${itArea}, ${it.dong}, ${it.category}, ${it.address}, ${it.lat}, ${it.lng}, ${it.phone}, ${it.instagramUrl}, 'discover', false, false, 'new')
         ON CONFLICT (place_id) DO NOTHING`;
       inserted++;
       // 같은 배치 내 후속 중복 방지(직전에 넣은 것도 대조 대상에 추가)
