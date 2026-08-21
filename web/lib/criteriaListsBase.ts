@@ -158,8 +158,12 @@ export const LIST_META: ListMeta[] = [
   // 룰갭(rulegap-20260817, decisions#745): 관용구/일반명사형 상호명 — "동네방네"(id1819)·"우리동네"(id2778)는
   // titleHasCafeWord/CAFE_CONTEXT_STRONG OR우회로 무관 콘텐츠(입소문 관용구·딴 상호 부분일치)까지 통과했다.
   // "골목"은 동일 유형의 선제 등재(관용구 상호명 카테고리, 실측 오염 사례는 아직 없음).
+  // 룰갭(rulegap-20260821, decisions#795): "카페투어"(id7265, 화성시 병점구)는 방문후기 작성자들이 카페와
+  // 무관하게 보편적으로 쓰는 행위 관용구/해시태그와 상호명이 완전일치해, titleHasCafeWord/CAFE_CONTEXT_STRONG
+  // OR우회로 표시리뷰 6/6건이 전부 다른 업체(카페 더포레·한옥버치 등) 후기였다(전수확인). "카페산책"·
+  // "카페콩투어"·"커피여행" 등 수식어 결합형 5곳은 대사 결과 정상이라 등재 안 함(순수 관용구 완전일치만).
   { key: "identity.idiom_dong_token", category: "정체성", label: "관용구 상호명(동 단위 지역어 필수 AND)", consumer: "reviewQuality",
-    items: ["동네방네", "우리동네", "골목"] },
+    items: ["동네방네", "우리동네", "골목", "카페투어"] },
   // 룰갭(rulegap-20260817, decisions#745): "마실"(id11801)은 동사 '마시다'의 관형사형(잠재형 "~마실 수 있는")과
   // 동음이의라, 딴 카페를 다루는 글의 "커피를 마실 수 있는" 구문만으로 오매칭됐다(id11801 6건중1건).
   { key: "identity.verb_homonym_token", category: "정체성", label: "동사 활용형 동음이의 상호명(잠재형 패턴 무효화)", consumer: "reviewQuality",
