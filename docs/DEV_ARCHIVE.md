@@ -254,3 +254,4 @@
 | 2026-08-21 03:05 | #788 | [정합성] 인천 신규구 동 매핑표 커버리지 누락 — decision#487 재발(5건) | 43c2b987 | - | lib/discover.ts: discoverRegion INSERT가 검색쿼리 라벨(storeArea)을 무조건 area로 찍던 근본버그 수정 — parseGuArea()로 실주 |
 | 2026-08-21 11:05 | #790 | [룰갭 신규] 카페+펜션/글램핑 겸업 — 숙박류 게이트가 '호텔' 명칭에만 한정돼 우회 (id18246 그라 | 2475b224 | - | lib/reviewQuality.ts:1388 부근에 LODGING_NAMED/LODGING_SIGNAL 게이트 추가(P50/P58 패턴 재사용). 카페명에 펜션/글램핑/리조트/연 |
 | 2026-08-21 11:06 | #794 | [개발] decisions_normalize_action_type 정규화 게이트 오탐 — .mjs 언급만으로 | 857bcdb8 | - | app/api/admin/decisions/route.ts의 decisions_normalize_action_type() 트리거 수정: 파일확장자(.mjs/.tsx?) 매칭은 ti |
+| 2026-08-21 11:07 | #795 | [룰갭 신규] 행위 관용구형 상호명("카페투어") — bareWeakOk 전체이름일치 안전장치 무력화, 10 | cc906280 | - | lib/criteriaListsBase.ts: identity.idiom_dong_token 화이트리스트에 "카페투어" 추가(id7265 실측 오염). reviewQuality.t |
