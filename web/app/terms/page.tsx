@@ -1,5 +1,6 @@
 import BackLink from "../BackLink";
-export const metadata = { title: "이용약관 · 동네 커피 노트" };
+export const metadata = {
+  alternates: { canonical: "/terms" }, title: "이용약관 · 동네 커피 노트" };
 
 export default function TermsPage() {
   const updated = "2026-06-21";

@@ -1,6 +1,7 @@
 import BackLink from "../BackLink";
 
-export const metadata = { title: "사업자 정보·환불 정책 · 동네 커피 노트" };
+export const metadata = {
+  alternates: { canonical: "/business" }, title: "사업자 정보·환불 정책 · 동네 커피 노트" };
 
 // 전자상거래법 사업자정보 표시 + 환불·청약철회 정책 (유료 결제 도입용 골격).
 // ⚠️ [입력 필요] 부분은 실제 사업자등록·통신판매업 신고 정보로 채운 뒤 공개하세요.

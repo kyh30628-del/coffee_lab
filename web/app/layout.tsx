@@ -7,6 +7,13 @@ import PwaInstall from "./PwaInstall";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://dongnecoffeenote.com"),
+  // 🔗 2026-08-21 실측 수리: 서치콘솔 "사용자가 선택한 표준이 없는 중복 페이지" **1,164개**의 정체가
+  //   `/?cafe=7020` 형태 지도앱 딥링크였다. 카페 상세 13,517개가 각각 `/?cafe={id}`를 링크하는데
+  //   홈에 canonical이 **아예 없어** 구글이 전부 별개 URL로 보고 중복 판정했다.
+  //   지금 12,069개가 "발견됐지만 크롤 대기" 상태라 크롤 예산이 귀한데, 그 예산을 중복이 먹고 있었다.
+  //   → 홈을 기준 URL로 고정. 하위 페이지는 각자 canonical을 선언하므로 덮어써지지 않는다
+  //     (SEO 대상 페이지 10종 전수 확인 완료 — 선언 없는 곳은 아래 ②에서 개별 부여).
+  alternates: { canonical: "/" },
   title: "동네 커피 노트 — 취향으로 찾는 동네 카페",
   description: "수도권 동네 로스터리·카페를 취향과 근거로 안내합니다. 네이버 공개 후기를 교차검증해 산미·바디·단맛까지.",
   manifest: "/manifest.json",

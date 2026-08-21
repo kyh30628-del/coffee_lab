@@ -1,5 +1,6 @@
 import BackLink from "../BackLink";
-export const metadata = { title: "개인정보처리방침 · 동네 커피 노트" };
+export const metadata = {
+  alternates: { canonical: "/privacy" }, title: "개인정보처리방침 · 동네 커피 노트" };
 
 export default function PrivacyPage() {
   const updated = "2026-06-13";
