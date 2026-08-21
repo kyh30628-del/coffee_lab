@@ -22,7 +22,7 @@ const XFER_RATE = 0.032; // Neon 공용 네트워크 전송(발신) 공개단가
 //   **깨어 있는 시간(compute)**이다. 그래서 크롤러발 ISR 재생성이 DB를 하루 10.4시간 붙잡고 있어도
 //   전송량은 정상이라 조용히 지나갔다 — 사장님이 물어봐서야 발견됐다. 그 구멍을 막는다.
 //   비용: 이미 있는 타임스탬프 3종을 하루 1회 집계(작은 컬럼·인덱스 사용). 새 테이블·새 크론 없음.
-async function awakeStats(): Promise<{ wakes: number; awakeMin: number; nightMin: number }> {
+async function awakeStats(): Promise<{ wakes: number; awakeMin: number; nightMin: number; medianMin: number }> {
   try {
     const r = (await sql`
       WITH ev AS (
@@ -38,11 +38,31 @@ async function awakeStats(): Promise<{ wakes: number; awakeMin: number; nightMin
              round(sum(CASE WHEN extract(hour from st AT TIME ZONE 'Asia/Seoul') BETWEEN 0 AND 7
                    THEN EXTRACT(epoch FROM (en-st))/60 + 5 ELSE 0 END)::numeric)::int night_min
       FROM w`)[0] as any;
-    return { wakes: Number(r?.wakes ?? 0), awakeMin: Number(r?.awake_min ?? 0), nightMin: Number(r?.night_min ?? 0) };
-  } catch { return { wakes: 0, awakeMin: 0, nightMin: 0 }; }
+    // 비교 기준선 = 최근 7일 '일별 가동시간'의 중앙값(평균 아님 — 주말 피크 한 번에 끌려가지 않게).
+    const m = (await sql`
+      WITH ev AS (
+        SELECT ts FROM traffic_events WHERE ts > now()-interval '8 days'
+        UNION ALL SELECT started_at FROM run_ledger WHERE started_at > now()-interval '8 days'
+        UNION ALL SELECT ran_at FROM agent_runs WHERE ran_at > now()-interval '8 days'
+      ), o AS (SELECT ts, lag(ts) OVER (ORDER BY ts) prev FROM ev),
+      k AS (SELECT ts, CASE WHEN prev IS NULL OR ts-prev > interval '5 minutes' THEN 1 ELSE 0 END nw FROM o),
+      g AS (SELECT ts, sum(nw) OVER (ORDER BY ts) grp FROM k),
+      w AS (SELECT grp, min(ts) st, max(ts) en FROM g GROUP BY grp),
+      d AS (SELECT (st AT TIME ZONE 'Asia/Seoul')::date dd,
+                   sum(EXTRACT(epoch FROM (en-st))/60 + 5) mins FROM w GROUP BY 1)
+      SELECT round(percentile_cont(0.5) WITHIN GROUP (ORDER BY mins)::numeric)::int med
+      FROM d WHERE dd < (now() AT TIME ZONE 'Asia/Seoul')::date`)[0] as any;
+    return { wakes: Number(r?.wakes ?? 0), awakeMin: Number(r?.awake_min ?? 0), nightMin: Number(r?.night_min ?? 0), medianMin: Number(m?.med ?? 0) };
+  } catch { return { wakes: 0, awakeMin: 0, nightMin: 0, medianMin: 0 }; }
 }
-// 하루 가동 이 시간을 넘으면 경보 — 2026-08-18 실측 기준선 10.4시간(624분)보다 위로 잡아 '개선 후 재악화'를 잡는다.
-const AWAKE_MIN_ALERT = Number(process.env.COST_WATCH_AWAKE_MIN || 660);
+// 🔴 2026-08-22 설계 수리 — 절대 임계(660분)는 **서비스가 성장하면 스스로를 멈추는 장치**였다.
+//   실측: 가동시간은 방문자 수에 정비례한다(45명→6.2h · 130명→11.9h · 258명→13.6h).
+//   기준선을 잡은 08-18은 방문자 100명이었는데, 130명인 08-21에 11.9h가 나와 임계를 넘었고
+//   08-22 08:01 자동정지가 걸려 **cron-grow·sentinel·synth가 통째로 스킵**됐다(실제 피해).
+//   → 절대값 대신 **최근 7일 중앙값 대비 배수**로 본다. 트래픽이 늘면 중앙값이 따라 올라
+//     정상 성장은 통과하고, 폴링 폭주 같은 진짜 이상(중앙값의 몇 배)만 걸린다.
+const AWAKE_MEDIAN_MULT = Number(process.env.COST_WATCH_AWAKE_MULT || 1.6);
+const AWAKE_MIN_FLOOR = Number(process.env.COST_WATCH_AWAKE_FLOOR || 900); // 15h — 중앙값이 작을 때 과민반응 방지
 
 async function sendCostReport(todayGb: number, top: { q: string; deltaGb: number } | null, anomaly: boolean, execMin: number) {
   const key = process.env.RESEND_API_KEY; if (!key) return;
@@ -201,16 +221,20 @@ export async function GET(req: NextRequest) {
 
     // ⏰ 가동시간 점검 — 전송량이 정상이어도 DB가 종일 깨어 있으면 그게 컴퓨트 청구서다(2026-08-18).
     const aw = await awakeStats();
-    const awakeBad = aw.awakeMin >= AWAKE_MIN_ALERT;
-    const anomaly = (top && top.deltaGb >= PER_QUERY_GB_ALERT) || totalGb >= TOTAL_GB_ALERT || awakeBad;
-    const awakeTxt = `가동 ${(aw.awakeMin / 60).toFixed(1)}h/일(깨어남 ${aw.wakes}회, 새벽 ${aw.nightMin}분)`;
+    const awakeLimit = Math.max(AWAKE_MIN_FLOOR, Math.round(aw.medianMin * AWAKE_MEDIAN_MULT));
+    const awakeBad = aw.medianMin > 0 && aw.awakeMin >= awakeLimit;
+    // 🔴 가동시간은 **경보만** 한다 — 자동정지에 넣지 않는다.
+    //   전송량 폭주(7월 $58 사고의 지문)는 명백한 버그 신호라 멈추는 게 맞지만,
+    //   가동시간은 트래픽이 늘어도 오른다. 여기서 멈추면 **잘 되는 날 서비스를 끄는 셈**이다.
+    //   (CEO 원칙 "빨강은 소비자 손상일 때만"과도 같은 결. 가동시간 증가는 소비자 손상이 아니다.)
+    const transferBad = (top && top.deltaGb >= PER_QUERY_GB_ALERT) || totalGb >= TOTAL_GB_ALERT;
+    const anomaly = transferBad;
+    const awakeTxt = `가동 ${(aw.awakeMin / 60).toFixed(1)}h/일(깨어남 ${aw.wakes}회, 새벽 ${aw.nightMin}분, 7일중앙값 ${(aw.medianMin / 60).toFixed(1)}h)`;
+    const awakeNote = awakeBad ? `⚠️ 가동시간 주의: ${awakeTxt} — 중앙값의 ${AWAKE_MEDIAN_MULT}배(${(awakeLimit / 60).toFixed(1)}h) 초과. ` : "";
     const detail = anomaly
-      ? (awakeBad ? `🚨 가동시간 초과: ${awakeTxt} — 임계 ${(AWAKE_MIN_ALERT / 60).toFixed(1)}h. ` : "") +
-        ((top && top.deltaGb >= PER_QUERY_GB_ALERT) || totalGb >= TOTAL_GB_ALERT
-          ? `🚨 데이터전송 이상: 오늘 총 ${totalGb.toFixed(1)}GB(임계 ${TOTAL_GB_ALERT}GB)` +
-            (top && top.deltaGb >= PER_QUERY_GB_ALERT ? ` · 최다쿼리 ${top.deltaGb.toFixed(1)}GB: ${top.q.replace(/\s+/g, " ").slice(0, 100)}` : "")
-          : "")
-      : `정상 — 총 ${totalGb.toFixed(1)}GB(임계 ${TOTAL_GB_ALERT}GB), ${awakeTxt}`;
+      ? awakeNote + `🚨 데이터전송 이상: 오늘 총 ${totalGb.toFixed(1)}GB(임계 ${TOTAL_GB_ALERT}GB)` +
+        (top && top.deltaGb >= PER_QUERY_GB_ALERT ? ` · 최다쿼리 ${top.deltaGb.toFixed(1)}GB: ${top.q.replace(/\s+/g, " ").slice(0, 100)}` : "")
+      : awakeNote + `정상 — 총 ${totalGb.toFixed(1)}GB(임계 ${TOTAL_GB_ALERT}GB), ${awakeTxt}`;
 
     // 📒 하네스 L5 — 실행 원장 보존정리(90일). 하루 1회·행 수천 개 수준이라 부하 무시 가능.
     const pruned = await pruneLedger(90).catch(() => 0);
@@ -225,7 +249,7 @@ export async function GET(req: NextRequest) {
     // 🛑 과다 시 자동 정지(무거운 자율 크론이 스킵) / 정상 복귀 시 자동 해제 — CEO "과다면 멈춰"
     await setCostHalt(anomaly, anomaly ? `자동정지: ${detail.slice(0, 150)}` : "정상").catch(() => {});
     await sendCostReport(totalGb, top, anomaly, execMin).catch(() => {}); // 📧 매일 아침 CEO 비용 점검 메일(발송 실패는 점검 자체를 막지 않음)
-    return NextResponse.json({ ok: true, anomaly, halted: anomaly, totalGb: +totalGb.toFixed(2), execMin: +execMin.toFixed(1), awakeHours: +(aw.awakeMin / 60).toFixed(1), wakes: aw.wakes, nightMin: aw.nightMin, top, checked: cur.length });
+    return NextResponse.json({ ok: true, anomaly, halted: anomaly, totalGb: +totalGb.toFixed(2), execMin: +execMin.toFixed(1), awakeHours: +(aw.awakeMin / 60).toFixed(1), wakes: aw.wakes, nightMin: aw.nightMin, awakeMedianH: +(aw.medianMin / 60).toFixed(1), awakeWarn: awakeBad, top, checked: cur.length });
   } catch (e) {
     await recordRun("cron-costwatch", false, String(e).slice(0, 150));
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
