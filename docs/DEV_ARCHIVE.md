@@ -252,3 +252,4 @@
 | 2026-08-20 23:06 | #784 | [결재 재구성] needs_llm 임계선 대응 — 우선순위 재조정(#490 26일 미집행 근본수정) | 8e9c9e3a | - | app/api/cron-batch-judge/route.ts ORDER BY(line92-97)에 재정제 우선순위 추가: (published AND synth_grade!=검증)  |
 | 2026-08-20 23:07 | #787 | [개발] 협업 #323: [리스크 MED] issues#5548 cron-sentinel 예산초과 HIGH  | 0509b77c | - | lib/jobContract.ts: cron-sentinel budget.blobReads 24→200(9일 실측 avg18/max151 반영, decision#499/#674 교 |
 | 2026-08-21 03:05 | #788 | [정합성] 인천 신규구 동 매핑표 커버리지 누락 — decision#487 재발(5건) | 43c2b987 | - | lib/discover.ts: discoverRegion INSERT가 검색쿼리 라벨(storeArea)을 무조건 area로 찍던 근본버그 수정 — parseGuArea()로 실주 |
+| 2026-08-21 11:05 | #790 | [룰갭 신규] 카페+펜션/글램핑 겸업 — 숙박류 게이트가 '호텔' 명칭에만 한정돼 우회 (id18246 그라 | 2475b224 | - | lib/reviewQuality.ts:1388 부근에 LODGING_NAMED/LODGING_SIGNAL 게이트 추가(P50/P58 패턴 재사용). 카페명에 펜션/글램핑/리조트/연 |
