@@ -251,3 +251,4 @@
 | 2026-08-20 23:05 | #783 | [개발] healGroundingSuspects 재합성 후 grounding 재검증 루프 부재 — 환각 미교 | abaaf33f | - | lib/synthStore.ts healGroundingSuspects(): 재합성 후 llm_judged_at=NULL로 초기화해 judge-candidates 기본 큐(로컬 g |
 | 2026-08-20 23:06 | #784 | [결재 재구성] needs_llm 임계선 대응 — 우선순위 재조정(#490 26일 미집행 근본수정) | 8e9c9e3a | - | app/api/cron-batch-judge/route.ts ORDER BY(line92-97)에 재정제 우선순위 추가: (published AND synth_grade!=검증)  |
 | 2026-08-20 23:07 | #787 | [개발] 협업 #323: [리스크 MED] issues#5548 cron-sentinel 예산초과 HIGH  | 0509b77c | - | lib/jobContract.ts: cron-sentinel budget.blobReads 24→200(9일 실측 avg18/max151 반영, decision#499/#674 교 |
+| 2026-08-21 03:05 | #788 | [정합성] 인천 신규구 동 매핑표 커버리지 누락 — decision#487 재발(5건) | 43c2b987 | - | lib/discover.ts: discoverRegion INSERT가 검색쿼리 라벨(storeArea)을 무조건 area로 찍던 근본버그 수정 — parseGuArea()로 실주 |
