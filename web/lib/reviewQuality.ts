@@ -1390,6 +1390,20 @@ export function verifyReview(input: QualityInput): QualityResult {
   if (HOTEL_NAMED && HOTEL_LODGING_SIGNAL.test(fullL) && !CAFE_CONTEXT.test(fullL)) {
     return { verdict: "rejected", score: 15, reasons: ["호텔 객실/부대시설 이용후기(카페 맥락 전무) — LLM 재판정"], borderline: true, signals: sig };
   }
+  // [룰갭 rulegap-proposals-20260820-1214 제안1] 카페+펜션/글램핑/연수원 겸업 — 위 HOTEL_NAMED는 카페명에
+  //   "호텔"류만 인정해, 시골·근교 감성카페 상권에 흔한 "카페+펜션/글램핑/연수원" 겸업 업체는 완전히
+  //   우회한다(id3069 카페_백란_펜션 실측: 47건 중 5건 펜션 겸업 맥락, 카페 실질맥락 부재). 카페 상호
+  //   자체에 숙박류 단어가 없어도 방문기 제목이 그 카페를(nameInTitle) "○○숙소/리조트/연수원"으로 소개하는
+  //   사례도 동일 위험군이라 함께 게이트한다(id18246 그라운드휴 실측: 상호엔 숙박어가 없으나 표시 6건 전부
+  //   제목이 "가평 4인 숙소 그라운드휴", "가평리조트 그라운드휴" 등으로 소개, 커피·디저트 등 카페 실질맥락
+  //   단어 0건). !CAFE_CONTEXT 가드는 위 HOTEL 게이트와 동일하게 유지 — 실제 F&B 후기(카페 맥락어 동반)는
+  //   보호한다.
+  const LODGING_DESC = /펜션|글램핑|리조트|연수원|풀빌라|콘도|숙소/;
+  const LODGING_NAMED = HOTEL_NAMED || LODGING_DESC.test(input.name) || (nameInTitle && LODGING_DESC.test(title));
+  const LODGING_SIGNAL = /(숙박|투숙|킹룸|스탠다드룸|디럭스룸|조식뷔페|호캉스|풀빌라|수영장|연회장|컨벤션\s*후기|웨딩|예식장?|객실|1박|바베큐\s*무한리필|단체\s*워크숍|트리하우스|계곡\s*물놀이)/;
+  if (LODGING_NAMED && LODGING_SIGNAL.test(fullL) && !CAFE_CONTEXT.test(fullL)) {
+    return { verdict: "rejected", score: 15, reasons: ["펜션/글램핑 겸업 숙박 후기(카페 맥락 전무) — LLM 재판정"], borderline: true, signals: sig };
+  }
   // [룰갭 rulegap-20260803, decisions#600] 브랜드 체험관(자동차 모터스튜디오·가구/매트리스 쇼룸 등) 부속
   //   카페 — 전시/시승/포토존 방문기가 카페 실질맥락 없이 섞이면 borderline으로 격하(위 BRAND_EXPERIENCE_ACTIVITY 참조).
   if (BRAND_EXPERIENCE_ACTIVITY.test(fullL) && !CAFE_CONTEXT_SUBSTANCE.test(fullL)) {
