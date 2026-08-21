@@ -23,13 +23,17 @@ async function ensure() {
   // 🚧 action_type 오분류 재발방지 게이트(#400) — 코드수정 상신이 'agent_task'/'investigate'로 등록되면
   //   scripts/dev-claim.mjs가 영구 미픽업(07-03·07-05·07-08·07-11·07-18 5회+ 재발, 상신 경로마다 텍스트
   //   지침 재공지로는 전파 안 됨 확인됨). 상신 주체(에이전트 종류)와 무관하게 DB 레이어에서 일괄 정규화.
+  // 🩹 #794: 파일확장자(.mjs/.tsx?) 매칭은 title에서만 — detail 안 참조성 언급(예: #742 "원인추정(instagram-
+  //   backfill.mjs 오매칭)"은 데이터정정 작업이 근거로 코드파일을 언급한 것뿐, 그 파일을 고치라는 게 아님)이
+  //   데이터작업을 dev_task로 오분류(#742→4일 스톨). "코드 수정" 문구는 명시적 의도 표현이라 title/detail
+  //   어디든 매칭 유지(#780류: detail에만 "정식 코드수정 결재로 상신" 있어도 정탐 필요).
   await sql`CREATE OR REPLACE FUNCTION decisions_normalize_action_type() RETURNS trigger AS $fn$
     DECLARE
       orig TEXT;
     BEGIN
       IF NEW.action_type IN ('agent_task', 'investigate')
          AND (COALESCE(NEW.title, '') ~* '\\.tsx?\\M|\\.mjs\\M|코드\\s*수정'
-              OR COALESCE(NEW.detail, '') ~* '\\.tsx?\\M|\\.mjs\\M|코드\\s*수정') THEN
+              OR COALESCE(NEW.detail, '') ~* '코드\\s*수정') THEN
         orig := NEW.action_type;
         NEW.action_type := 'dev_task';
         NEW.action_params := COALESCE(NEW.action_params, '{}'::jsonb)
