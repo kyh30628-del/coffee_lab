@@ -21,7 +21,7 @@ async function ensure() {
     id BIGSERIAL PRIMARY KEY,
     anon_id TEXT,
     cafe_id INT,
-    target TEXT,            -- naver_place | kakao_map
+    target TEXT,            -- naver_place | kakao_map | wish(찜, 2026-08-21)
     source TEXT,            -- 어느 화면에서 눌렀나(카페상세/지도앱/동네목록)
     path TEXT,
     ts TIMESTAMPTZ NOT NULL DEFAULT now()

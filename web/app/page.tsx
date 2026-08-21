@@ -629,6 +629,10 @@ export default function Home() {
     const sp = new URLSearchParams(window.location.search);
     const t = sp.get("taste");
     if (t && TASTE_CHOICES.some((x) => x.key === t)) setTasteKey(t);
+    // ❤ 2026-08-21: /?favs=1 로 도착하면 '찜한 곳' 모달을 바로 연다.
+    //   찜 기능은 있었는데 **찜한 뒤 돌아올 길이 없어** 리텐션 고리가 끊겨 있었다
+    //   (상세에서 찜 → 그다음 아무 동선 없음). 저장은 다시 꺼내볼 수 있어야 저장이다.
+    if (sp.get("favs") === "1") setShowFavs(true);
     // SEO 동네 페이지(/area/…)에서 '카페 더 보기'로 진입 → 랜딩 건너뛰고 소비자 화면 + 해당 지역 추천
     const region = sp.get("region");
     if (region) {

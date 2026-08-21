@@ -4,7 +4,7 @@
 // ⚠️ keepalive가 핵심: 이 클릭은 곧바로 새 탭/외부 사이트로 넘어가는 순간이라
 //   일반 fetch는 페이지 전환에 잘려 유실된다(과소집계). 공유 계측이 겪은 것과 같은 함정.
 export function trackOutbound(opts: {
-  target: "naver_place" | "kakao_map"; // 어디로 나갔나
+  target: "naver_place" | "kakao_map" | "wish"; // 어디로 나갔나(wish=찜, 이탈은 아니지만 같은 잣대 비교용)
   cafeId?: number | null;              // 지도앱은 pathname이 "/"라 path 파싱이 안 되므로 명시 필요
   source?: string;                     // 화면 구분(카페상세/지도앱/동네목록)
   path?: string;

@@ -5,6 +5,7 @@ import { cache } from "react";
 import { sql, ensureOnce } from "@/lib/db";
 import KakaoShare from "../../KakaoShare";
 import SaveMemoryButton from "./SaveMemoryButton";
+import WishButton from "../../WishButton";
 import OwnerCtaLink from "./OwnerCtaLink";
 import VisitorReviews from "../../VisitorReviews";
 import RecentCafes from "../../RecentCafes";
@@ -228,12 +229,26 @@ export default async function CafePage({ params }: Props) {
           </div>
           <div className="flex items-center justify-between gap-2 mb-4">
             <p className="text-[#7a5122] text-sm">{c.area}</p>
-            <SaveMemoryButton cafeId={c.id} cafeName={c.name} cafeArea={c.area} />
+            {/* ❤ 2026-08-21: 이 자리는 **고르는 사람**의 자리다 — 위치인증 저장(다녀온 사람용) 대신 무마찰 찜.
+                실측 근거: 상세 도달 64%인데 위치인증 저장은 누적 6건·발급 PIN 0개(아무도 통과 못 함).
+                같은 화면 외부클릭은 15.7% → 의지는 있으나 요구조건이 불가능했다. */}
+            <WishButton cafeId={c.id} />
           </div>
-          {/* ❤ MY PIN(내 카페 추억) 노출 배너 — 상세페이지에서 인지도가 낮아 CTA로 강화(#339). 2단계 저장·무가입 원칙 무변, 노출만 강화 */}
-          <div className="mb-3">
-            <SaveMemoryButton cafeId={c.id} cafeName={c.name} cafeArea={c.area} variant="banner" />
+          {/* ❤ 찜 배너 — 마찰 0(탭 1번). 우리 사용자는 "어디 갈까" 고르는 중이므로 미래형 저장이 맞다. */}
+          <div className="mb-2">
+            <WishButton cafeId={c.id} variant="banner" />
           </div>
+          {/* 🧭 위치인증 방문기록은 **없애지 않고 2순위로** 내린다.
+              GPS 30m로 검증된 방문기는 우리만 가진 자산(해자)이라 실제 방문자에게는 계속 열어둔다.
+              다만 첫 자리는 위 찜에 내준다 — 고르는 사람에게 "다녀가셨나요?"는 해당되지 않는 질문이었다. */}
+          <details className="mb-3 group">
+            <summary className="cursor-pointer list-none text-[11.5px] text-[#7a5122] underline underline-offset-2">
+              이미 다녀오셨나요? 위치인증하고 추억으로 남기기 →
+            </summary>
+            <div className="mt-2">
+              <SaveMemoryButton cafeId={c.id} cafeName={c.name} cafeArea={c.area} variant="banner" />
+            </div>
+          </details>
           {/* 🗺️ 지도 CTA를 첫 화면으로(2026-08-16) — 실측: 카페 상세에 **바로 착지한** 방문자의 이탈률이 87%(79명 중 69명)로
               전 페이지 유형 중 최악이다. 기존 CTA는 후기·분석 전부 아래(279행)에 있어 사실상 안 보였다.
               반면 지도(홈)에 도달하면 이탈률 3% — 체류는 지도에서 만들어진다. 그 입구를 위로 올린다.

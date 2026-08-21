@@ -1,0 +1,11 @@
+import { neon } from '@neondatabase/serverless';
+import fs from 'fs';
+const env = fs.readFileSync('.env.local','utf8');
+const dbUrl = env.match(/DATABASE_URL=(.+)/)[1].trim();
+const sql = neon(dbUrl);
+const r = await sql`SELECT id,name,synth_identity,synth_grade,synth_count,offctx_rate,offctx_ok FROM cafes WHERE id='4064'`;
+console.log(JSON.stringify(r,null,1));
+const revs = await sql`SELECT jsonb_array_length(synth_reviews) n, synth_reviews FROM cafes WHERE id='4064'`;
+const sample = revs[0].synth_reviews.slice(0,6).map(x=>({link:x.link, quote:x.quote.slice(0,50), trust:x.trust}));
+console.log('n=',revs[0].n);
+console.log(JSON.stringify(sample,null,1));
