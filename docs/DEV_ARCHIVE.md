@@ -255,3 +255,4 @@
 | 2026-08-21 11:05 | #790 | [룰갭 신규] 카페+펜션/글램핑 겸업 — 숙박류 게이트가 '호텔' 명칭에만 한정돼 우회 (id18246 그라 | 2475b224 | - | lib/reviewQuality.ts:1388 부근에 LODGING_NAMED/LODGING_SIGNAL 게이트 추가(P50/P58 패턴 재사용). 카페명에 펜션/글램핑/리조트/연 |
 | 2026-08-21 11:06 | #794 | [개발] decisions_normalize_action_type 정규화 게이트 오탐 — .mjs 언급만으로 | 857bcdb8 | - | app/api/admin/decisions/route.ts의 decisions_normalize_action_type() 트리거 수정: 파일확장자(.mjs/.tsx?) 매칭은 ti |
 | 2026-08-21 11:07 | #795 | [룰갭 신규] 행위 관용구형 상호명("카페투어") — bareWeakOk 전체이름일치 안전장치 무력화, 10 | cc906280 | - | lib/criteriaListsBase.ts: identity.idiom_dong_token 화이트리스트에 "카페투어" 추가(id7265 실측 오염). reviewQuality.t |
+| 2026-08-22 03:05 | #798 | [룰갭 신규] 네이버 카페(커뮤니티) 소스 — "카페" 동음이의로 본문언급 게이트 우회 (id11444·18 | 1f0f34e1 | - | lib/reviewQuality.ts:1832 짧은/흔한 카페명 본문언급 게이트 수정 — source==='cafearticle'(네이버 카페 커뮤니티)일 때만 bodyCtxGat |
