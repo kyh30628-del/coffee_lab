@@ -29,6 +29,8 @@ export default function OrgDashboard() {
   const [dec, setDec] = useState<{ pending: any[]; delegated: any[]; recent: any[]; inProgress: any[]; deferred: any[] }>({ pending: [], delegated: [], recent: [], inProgress: [], deferred: [] });
   const [coord, setCoord] = useState<{ open: any[]; resolved: any[]; overdue: number }>({ open: [], resolved: [], overdue: 0 });
   const [issues, setIssues] = useState<any[]>([]);
+  // HIGH 건수 — 빨강 판정의 유일한 근거(건수가 아니라 심각도로 색을 정한다).
+  const highN = issues.filter((i) => i.severity === "HIGH").length;
   const [err, setErr] = useState(""); const [loading, setLoading] = useState(false);
   // 🔐 인증 상태는 **데이터와 분리**한다. 예전엔 브리핑(brief) 유무로 로그인 화면을 띄워서,
   //    브리핑이 하나도 없으면 비밀번호가 맞아도 영원히 로그인 화면으로 되돌아왔다.
@@ -480,11 +482,15 @@ export default function OrgDashboard() {
           </div>
         )}
 
-        {/* 🚨 RM 실시간 이슈 — 접이식·기본 접힘(헤더에 건수·HIGH 표시) */}
-        <div style={{ ...card, marginTop: 10, border: issues.length ? "2px solid #b03a3a" : "1px solid #bcd4bc" }}>
+        {/* RM 실시간 이슈 — 접이식·기본 접힘(헤더에 건수·HIGH 표시)
+            ⚠️ 2026-08-22 수리: 예전엔 **건수만 있으면 빨강**이라 HIGH 0건인데도 🚨+빨간 테두리가 떴다.
+            실제 내용은 MED "폐업 검토대기"·LOW "정상 로테이션 지연"으로 소비자 손상이 아니었다.
+            CEO 원칙("빨강은 소비자 손상일 때만") 위반이자, 상시 빨강은 진짜 빨강을 못 알아보게 만든다.
+            → 빨강은 HIGH가 있을 때만. 그 외엔 '주의'(호박)·'정상'(초록)으로 구분한다. */}
+        <div style={{ ...card, marginTop: 10, border: highN ? "2px solid #b03a3a" : issues.length ? "1px solid #d8c8ad" : "1px solid #bcd4bc" }}>
           <button onClick={() => setShowIssues(!showIssues)} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
-            <span style={{ fontSize: 13.5, fontWeight: 700, color: issues.length ? "#b03a3a" : "#3f7a4f" }}>
-              {showIssues ? "▾" : "▸"} 🚨 RM 실시간 이슈 ({issues.length}) {issues.length > 0 && <span style={{ fontSize: 10, fontWeight: 700, color: "#b03a3a" }}>· HIGH {issues.filter((i) => i.severity === "HIGH").length}</span>}
+            <span style={{ fontSize: 13.5, fontWeight: 700, color: highN ? "#b03a3a" : issues.length ? "#8a6a3a" : "#3f7a4f" }}>
+              {showIssues ? "▾" : "▸"} {highN ? "🚨" : issues.length ? "⚠️" : "✅"} RM 실시간 이슈 ({issues.length}) {issues.length > 0 && <span style={{ fontSize: 10, fontWeight: 700, color: highN ? "#b03a3a" : "#8a6a3a" }}>· HIGH {highN}</span>}
             </span>
             <span style={{ fontSize: 10.5, color: "#9c8a6c" }}>{showIssues ? "접기" : issues.length ? "조치 보기" : "보기"}</span>
           </button>

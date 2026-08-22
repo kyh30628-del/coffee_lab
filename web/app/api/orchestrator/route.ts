@@ -227,7 +227,11 @@ export async function GET(req: NextRequest) {
     //   과거 '주4곳=61년 적체'도 이 지표면 즉시 빨강(천장 수천일) — 감도는 잃지 않고 상시 오경보만 제거.
     if (c.synth_never > 0) risks.push(`재합성 미착수 ${c.synth_never}곳 — 오염그물 사각(한 번도 안 훑음)`);
     else if (c.synth_oldest_d > 21) risks.push(`재합성 순환 정체 — 최장 ${c.synth_oldest_d}일 미점검(오염그물 멈춤, 처리량 점검)`);
-    else if (c.synth_stale7 > PUB * 0.20) notices.push(`재합성 7일+ ${c.synth_stale7}곳(순환 주기 ${c.synth_oldest_d}일 — 정상 로테이션 지연)`);
+    // ⚠️ 2026-08-22 최종 제거: stale7은 **주의로 낮춰도 여전히 상시 발동**이었다.
+    //   위 주석대로 정상 순환에서 stale7 = PUB×(C−7)/C이고 현재 C≈16일이라 항상 임계(20%)를 넘는다
+    //   → 실측 9,316곳이 "정상 로테이션 지연"이라는 문구를 달고 매일 이슈 목록에 올라왔다.
+    //   **정상인 상태를 알림으로 만들면 목록 전체의 신뢰가 깎인다.** 진짜 정체는 바로 위 순환 천장
+    //   (synth_oldest_d > 21)이 이미 잡으므로 이 줄은 감도 손실 없이 삭제한다.
     // 임베딩 대기 = 의미검색만 일부 누락(카페는 정상 노출) → 주의. 단, 절반 이상이면 검색 핵심기능 타격 → 위험.
     const noemb = (await sql`SELECT COUNT(*)::int n FROM cafes WHERE published AND embedding IS NULL`.catch(() => [{ n: 0 }]))[0] as any;
     if (noemb.n > 0) { if (noemb.n > PUB * 0.5) risks.push(`의미검색 대량 누락 ${noemb.n}곳 — 검색 기능 타격`); else notices.push(`의미검색 임베딩 대기 ${noemb.n}곳`); }
