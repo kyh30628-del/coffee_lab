@@ -1843,8 +1843,14 @@ export function verifyReview(input: QualityInput): QualityResult {
   // [룰갭 20260801-1200] 길이 문턱(4자)이 5자+ 일상 관용구성 상호(예: "화목한가정"=5자)를 미보호 —
   //   id19491 실증(반려동물 분양·심리상담 후기가 관용구 "화목한 가정"으로 혼입, 카페 맥락 전무).
   //   파일럿(decisions#567): 문턱을 4자→5자로 확장(가장 단순한 승인안). STRONG 요구 경계(3자 이하)는 그대로 유지.
+  // 룰갭 P73(2026-08-21, decisions#798, rulegap-proposals-20260821-1620.md 제안1): source='네이버 카페'
+  //   (온라인 커뮤니티 게시판) 원문은 "카페"가 커피숍/온라인커뮤니티 동음이의라 CAFE_CONTEXT(약함, "카페"
+  //   단독 토큰도 인정)가 플랫폼 자기지칭만으로 우연 통과한다(id11444 버라이어티·id18112 플러스82 안산점·
+  //   id10314 리본 각 2건씩 무관 콘텐츠 실측, 228개 카페·268건 코호트). source가 네이버 카페류 커뮤니티일
+  //   때만 요구 수준을 CAFE_CONTEXT_SUBSTANCE(실질 음료·디저트 어휘, "카페" 단독 제외)로 격상 — 일반
+  //   블로그 소스는 오탐 확대 방지를 위해 기존 CAFE_CONTEXT 그대로 유지.
   if (!nameInTitle && nameInBody && ((nameNoSpace.length >= 1 && nameNoSpace.length <= 5) || weakWhitelist || nameLatinHeavy)) {
-    const bodyCtxGate = nameNoSpace.length <= 3 ? CAFE_CONTEXT_STRONG : CAFE_CONTEXT;
+    const bodyCtxGate = nameNoSpace.length <= 3 ? CAFE_CONTEXT_STRONG : input.source === "cafearticle" ? CAFE_CONTEXT_SUBSTANCE : CAFE_CONTEXT;
     if (!bodyCtxGate.test(fullL)) {
       return { verdict: "rejected", score: 20, reasons: ["본문에만 짧은·흔한 카페명 등장하나 카페 맥락 전무(동음이의·타업종 혼입 의심) — LLM 재판정"], borderline: true, signals: sig };
     }
