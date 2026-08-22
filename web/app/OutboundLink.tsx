@@ -8,18 +8,20 @@ export default function OutboundLink({
   href, target: dest, cafeId, source, className, style, children,
 }: {
   href: string;
-  target: "naver_place" | "kakao_map";
+  target: "naver_place" | "kakao_map" | "map_cta" | "nearby" | "record";
   cafeId?: number | null;
   source?: string;
   className?: string;
   style?: React.CSSProperties;
   children: React.ReactNode;
 }) {
+  // 내부 이동(지도·다음 카페)은 같은 탭이 자연스럽다 — 새 탭은 외부로 나갈 때만.
+  const external = /^https?:\/\//.test(href) || href.startsWith("/api/");
   return (
     <a
       href={href}
-      target="_blank"
-      rel="noopener noreferrer"
+      target={external ? "_blank" : undefined}
+      rel={external ? "noopener noreferrer" : undefined}
       className={className}
       style={style}
       onClick={() => trackOutbound({ target: dest, cafeId, source })}

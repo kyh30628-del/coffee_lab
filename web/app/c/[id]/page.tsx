@@ -282,6 +282,35 @@ export default async function CafePage({ params }: Props) {
               )}
             </div>
           )}
+          {/* 🧭 "다음 행동" 묶음(2026-08-22) — 지도·다음 카페를 **위로** 올린다.
+              실측: 카페상세에 바로 착지한 방문자는 **평균 2.0페이지·이탈 71.5%**(14일 221명).
+              그런데 지도 CTA와 '비슷한 카페'는 386·392행(맨 아래)에 있어 **구조적으로 못 본다**.
+              지도는 도달 시 이탈 35.7%·평균 4.1PV로 전 화면 중 가장 좋은데 도달률이 17.2%뿐인 이유가 여기 있었다.
+              ⚠️ 하단 블록은 그대로 둔다 — 끝까지 읽은 사람의 자연스러운 다음 행동이라 성격이 다르다.
+              비용 0: nearby는 이미 위에서 조회해둔 값을 재사용(추가 쿼리 없음). */}
+          <div className="rounded-xl border border-[#d8c8ad] bg-white px-4 py-3 mb-3">
+            <OutboundLink href={`/?cafe=${c.id}`} target="map_cta" cafeId={c.id} source="카페상세" className="flex items-center justify-between gap-2">
+              <span className="text-[13px] font-semibold text-[#3d2f22]">
+                🗺️ 지도에서 위치·주변 함께 보기
+                <span className="block text-[10.5px] text-[#8a7355] font-normal mt-0.5">근처 다른 카페까지 한눈에</span>
+              </span>
+              <span className="text-[#7a5122] text-[13px]">→</span>
+            </OutboundLink>
+            {nearby.length > 0 && (
+              <div className="mt-2.5 pt-2.5 border-t border-[#efe6d4]">
+                <div className="text-[10.5px] text-[#8a7355] mb-1.5">이 동네 비슷한 곳</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {nearby.slice(0, 3).map((nc: any) => (
+                    <OutboundLink key={nc.id} href={`/c/${nc.id}`} target="nearby" cafeId={c.id} source="카페상세"
+                      className="text-[12px] rounded-full border border-[#e0d3b8] bg-[#faf6ee] px-2.5 py-1 text-[#52402e] hover:bg-white">
+                      {nc.name}
+                      {nc.synth_grade === "검증" && <span className="ml-1 text-[9.5px] font-bold text-[#5f7355]">검증</span>}
+                    </OutboundLink>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
           {/* 🛡️ 이 카페를 어떻게 골랐나 — 추상적 설명이 아니라 **이 카페의 실제 숫자**로.
               ⚠️ duplicates는 여기 넣지 말 것 — 실측(500곳) 결과 raw = verified+reference+rejected가
                  정확히 성립하고 rejectReasons 합계도 rejected와 같다(498/500). 즉 중복은 raw 이전 단계에서

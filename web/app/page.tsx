@@ -447,7 +447,11 @@ function topChars(c: Cafe, n = 4) {
 }
 
 // 즐겨찾기(★ 북마크) 모달 — 카페 상세에서 북마크한 카페 목록(내 카페 등록과 별개). 탭하면 상세로.
-function FavoritesModal({ items, onClose, onOpen, onRemove }: { items: Cafe[]; onClose: () => void; onOpen: (c: Cafe) => void; onRemove: (id: number) => void }) {
+// 🧭 2026-08-22: 찜 목록은 "가려고 마음먹은 곳"이다 → 여기가 '내 카페 기록'의 가장 자연스러운 입구다.
+//   실측 배경: 내 카페 기록은 누적 6건·발급 PIN 0건으로 사실상 미사용인데, 원인은 GPS 30m 인증을
+//   요구하면서 정작 진입점이 어디에도 안 붙어 있었기 때문이다. 찜한 곳에 "다녀왔어요"를 달아
+//   기억이 살아있는 순간에 기록으로 잇는다(강요 아님 — 작은 보조 버튼).
+function FavoritesModal({ items, onClose, onOpen, onRemove, onRecord }: { items: Cafe[]; onClose: () => void; onOpen: (c: Cafe) => void; onRemove: (id: number) => void; onRecord: (c: Cafe) => void }) {
   return (
     <div className="fixed inset-0 z-[5000] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)", fontFamily: "'Gowun Batang', AppleMyungjo, 'Apple SD Gothic Neo', 'Noto Serif KR', serif" }} onClick={onClose}>
       <div className="w-full max-w-lg bg-[#fdfaf4] rounded-t-2xl max-h-[80dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
@@ -458,7 +462,8 @@ function FavoritesModal({ items, onClose, onOpen, onRemove }: { items: Cafe[]; o
         <div className="overflow-y-auto flex-1 p-3 space-y-2 pb-[calc(1rem_+_env(safe-area-inset-bottom))]">
           {items.length === 0 ? (
             <div className="text-center text-[#665036] text-[13px] py-12 leading-relaxed">
-              아직 즐겨찾기한 카페가 없어요.<br />카페 상세에서 <span style={{ color: "#f0a832" }}>★</span>를 누르면 여기에 모여요.
+              아직 찜한 카페가 없어요.<br />카페 상세에서 <span style={{ color: "#d6336c" }}>❤</span> <b>찜하기</b>를 누르면 여기에 모여요.<br />
+              <span className="text-[11.5px] text-[#8a7355]">가입도 위치확인도 필요 없어요 · 탭 한 번</span>
             </div>
           ) : items.map((c) => (
             <div key={c.id} className="bg-white rounded-xl border border-[#ece0cd] p-3 flex gap-2 items-center">
@@ -472,7 +477,8 @@ function FavoritesModal({ items, onClose, onOpen, onRemove }: { items: Cafe[]; o
                   <div className="text-[11px] text-[#7a5122]">{c.area}{c.synth_count ? ` · 리뷰 ${c.synth_count}` : ""}</div>
                 </div>
               </button>
-              <button onClick={() => onRemove(c.id)} aria-label="즐겨찾기 해제" className="shrink-0 text-[#f0a832] text-[20px] px-1.5 active:scale-90">★</button>
+              <button onClick={() => onRecord(c)} className="shrink-0 text-[11px] font-bold text-[#b23a5f] border border-[#f0b8cc] rounded-full px-2 py-1 active:scale-95">다녀왔어요</button>
+              <button onClick={() => onRemove(c.id)} aria-label="찜 해제" className="shrink-0 text-[#d6336c] text-[18px] px-1 active:scale-90">❤</button>
             </div>
           ))}
         </div>
@@ -1647,7 +1653,9 @@ export default function Home() {
       </nav>
       {showFavs && <FavoritesModal items={cafes.filter((c) => bookmarkIds.has(c.id))} onClose={() => setShowFavs(false)}
         onOpen={(c: Cafe) => { setShowFavs(false); setSelected(c); }}
-        onRemove={(id: number) => toggleBookmark(id)} />}
+        onRemove={(id: number) => toggleBookmark(id)}
+        // 찜 목록 → 그 카페가 선택된 채로 기록 모달을 연다(기억이 살아있는 순간에 잇기).
+        onRecord={(c: Cafe) => { setShowFavs(false); setEditCafeId(c.id); setShowMyCafeReg(true); }} />}
       {showMyCafeReg && <MyCafeRegModal cafes={cafes} device={deviceId} visits={myVisits} pin={sessionPin} initialCafeId={editCafeId} onClose={() => { setShowMyCafeReg(false); setEditCafeId(null); }} onDone={() => { reloadMyCafes(deviceId, sessionPin); }} />}
 
       {selected && <CafePanel cafe={selected} dist={axisDist} allCafes={cafes} onOpenCafe={openById} bookmarked={bookmarkIds.has(selected.id)} onToggleBookmark={() => toggleBookmark(selected.id)} onSaveMemory={() => { setEditCafeId(selected.id); setShowMyCafeReg(true); }} onClose={() => setSelected(null)} onMap={() => {

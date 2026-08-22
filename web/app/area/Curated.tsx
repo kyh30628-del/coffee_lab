@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { TASTES, SITE, type SeoCafe, type GradeBreakdown } from "@/lib/seoData";
+import { standoutBadges } from "@/lib/standoutBadge";
 import KakaoShare from "../KakaoShare";
 import RecentCafes from "../RecentCafes";
 
@@ -27,6 +28,11 @@ export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, headin
     itemListElement: crumbs.map((b, i) => ({ "@type": "ListItem", position: i + 1, name: b.name, item: b.url })),
   };
   // 히어로 = 목록 1위. 3곳 미만이면 "1위"라는 표현 자체가 과장이라 쓰지 않는다(근거 없는 단정 금지).
+  // 🏅 "이 집만의 한 가지"(2026-08-22) — 카드 30개가 전부 `등급+후기수+한줄소개`로 똑같아 보여
+  //   고를 근거가 없다는 게 이탈 45.4%의 원인이었다. 같은 동네·같은 테마 안에서
+  //   **평균보다 두드러진 축**을 하나씩 붙여 카드를 갈라준다(절대 임계는 96%가 걸려 무용지물이었다).
+  //   비용 0 — 이미 받은 char_scores로 계산하는 순수함수.
+  const badges = standoutBadges(cafes as any[], tasteKey);
   const hero = cafes.length >= 3 ? cafes[0] : null;
   const rest = hero ? cafes.slice(1) : cafes;
   const jsonld = {
@@ -77,6 +83,7 @@ export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, headin
                 {tasteLabel ? `${tasteEmoji ?? ""} ${tasteLabel} 1위` : "가장 검증이 두꺼운 곳"}
               </span>
               {hero.grade && <span className="text-[10px] font-bold text-white px-1.5 py-0.5 rounded" style={{ background: GRADE_BG[hero.grade] || "#a8927a" }}>{hero.grade}</span>}
+              {badges[0] && <span className="text-[10px] font-bold text-[#5a4a2e] bg-[#f0e6d2] border border-[#ddd0b6] px-1.5 py-0.5 rounded-full">{badges[0].emoji} 이 동네에서 유독 {badges[0].label}</span>}
             </div>
             <div className="flex items-baseline gap-2 flex-wrap">
               <span className="font-bold text-[21px] leading-tight">{hero.name}</span>
@@ -122,6 +129,11 @@ export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, headin
                     <span className="text-[#82714f] text-[13px] font-bold w-5 shrink-0">{i + (hero ? 2 : 1)}</span>
                     <span className="font-bold text-[15px]">{c.name}</span>
                     {c.dong && <span className="text-[12px] text-[#665036]">{c.dong}</span>}
+                    {badges[i + (hero ? 1 : 0)] && (
+                      <span className="text-[10px] font-bold text-[#5a4a2e] bg-[#f0e6d2] border border-[#ddd0b6] px-1.5 py-0.5 rounded-full shrink-0">
+                        {badges[i + (hero ? 1 : 0)]!.emoji} {badges[i + (hero ? 1 : 0)]!.label}
+                      </span>
+                    )}
                     {c.grade && <span className="text-[10px] font-bold text-white px-1.5 py-0.5 rounded ml-auto shrink-0" style={{ background: GRADE_BG[c.grade] || "#a8927a" }}>{c.grade}</span>}
                   </div>
                   {/* 🎯 이 페이지의 취향이 '이 카페 후기에서 실제로 몇 번 나왔는지' — 목록 전체가 같은 한줄소개로
