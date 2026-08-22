@@ -256,3 +256,4 @@
 | 2026-08-21 11:06 | #794 | [개발] decisions_normalize_action_type 정규화 게이트 오탐 — .mjs 언급만으로 | 857bcdb8 | - | app/api/admin/decisions/route.ts의 decisions_normalize_action_type() 트리거 수정: 파일확장자(.mjs/.tsx?) 매칭은 ti |
 | 2026-08-21 11:07 | #795 | [룰갭 신규] 행위 관용구형 상호명("카페투어") — bareWeakOk 전체이름일치 안전장치 무력화, 10 | cc906280 | - | lib/criteriaListsBase.ts: identity.idiom_dong_token 화이트리스트에 "카페투어" 추가(id7265 실측 오염). reviewQuality.t |
 | 2026-08-22 03:05 | #798 | [룰갭 신규] 네이버 카페(커뮤니티) 소스 — "카페" 동음이의로 본문언급 게이트 우회 (id11444·18 | 1f0f34e1 | - | lib/reviewQuality.ts:1832 짧은/흔한 카페명 본문언급 게이트 수정 — source==='cafearticle'(네이버 카페 커뮤니티)일 때만 bodyCtxGat |
+| 2026-08-22 11:05 | #802 | [룰갭 신규] identity.weak_token 미등재 3건 — 크리스탈·허니브라운·소문난 (id6435· | d89c9aff | - | lib/criteriaListsBase.ts identity.weak_token 배열에 크리스탈·허니브라운·소문난 3건 추가(기존 사전과 동일 메커니즘 확장). tsc 신규에러 0 |
