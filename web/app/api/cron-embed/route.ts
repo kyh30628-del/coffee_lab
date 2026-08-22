@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sql, ensureSchema } from "@/lib/db";
+import { sql, ensureSchema , ensureOnce } from "@/lib/db";
 import { embedBatch, toVectorLiteral, EMBED_DIM, hasEmbedKey, buildCafeEmbedText } from "@/lib/embed";
 import { PRIORITY_AREAS } from "@/lib/discover";
 import { recordRun } from "@/lib/agentLog";
@@ -21,11 +21,14 @@ export async function GET(req: NextRequest) {
     if (!hasEmbedKey()) return NextResponse.json({ ok: false, error: "embed key 미설정" }, { status: 400 });
     await ensureSchema();
     await sql`CREATE EXTENSION IF NOT EXISTS vector`;
-    await sql.query(`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS embedding vector(${EMBED_DIM})`);
-    await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS embed_updated TIMESTAMPTZ`;
-
-    // NULL(미임베딩) 먼저, 그다음 재합성으로 오래된(embed_updated < synth_updated) 것 갱신.
-    await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS pipeline_status TEXT`.catch(() => {});
+    // 💰 2026-08-22 잔여 수리: 이 DDL도 매 실행마다 돌고 있었다 — 배포 단위 1회로.
+    await ensureOnce("cron-embed.ddl", async () => {
+      await sql.query(`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS embedding vector(${EMBED_DIM})`);
+      await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS embed_updated TIMESTAMPTZ`;
+  
+      // NULL(미임베딩) 먼저, 그다음 재합성으로 오래된(embed_updated < synth_updated) 것 갱신.
+      await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS pipeline_status TEXT`.catch(() => {});
+    });
     // 신규 pending도 임베딩(공개 게이트 통과에 필요) — pending 최우선, 그다음 공개 카페.
     const rows = (await sql`
       SELECT id, name, area, synth_identity, signature, note, vibe, uses, beans, char_scores, synth_reviews

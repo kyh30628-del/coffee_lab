@@ -1,6 +1,6 @@
 // 카페 발굴 (PRINCIPLES §0·§2): 합법 소스(네이버 지역검색)로 동네·스페셜티 카페 수집.
 // 대규모 프랜차이즈·비(非)카페 제외. 중복(이름/좌표 근사) 제외. 비공개로 적재 후 합성 단계에서 검증.
-import { sql } from "./db";
+import { sql , ensureOnce } from "./db";
 import { getLearned } from "./learnedTerms";
 import { loadCriteria, getCriterionSync } from "./criteria";
 import { getListSync, loadCriteriaLists } from "./criteriaLists"; // 비카페 순수 리스트 단일출처(BASE=폴백). 캐시 프라임은 discover 진입점이 함.
@@ -404,9 +404,12 @@ export async function discoverRegion(region: string, areaLabel: string, keywords
     await collect(t.q, t.sort);
   }
 
-  await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS pipeline_status TEXT`.catch(() => {});
-  await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS dong TEXT`.catch(() => {});
-  await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS naver_category TEXT`.catch(() => {});
+  // 💰 2026-08-22 잔여 수리: 이 DDL도 매 실행마다 돌고 있었다 — 배포 단위 1회로.
+  await ensureOnce("lib_discover.ddl", async () => {
+    await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS pipeline_status TEXT`.catch(() => {});
+    await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS dong TEXT`.catch(() => {});
+    await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS naver_category TEXT`.catch(() => {});
+  });
   await loadCriteria(); // 수도권 좌표박스 기준 캐시 갱신(폴백=36.8~38.3/124.5~127.9)
   await loadCriteriaLists(); // 비카페 순수 리스트 캐시 프라임(동기 getListSync)
   const latMin = getCriterionSync("geo.box.lat_min"), latMax = getCriterionSync("geo.box.lat_max");

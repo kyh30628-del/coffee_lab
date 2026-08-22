@@ -13,10 +13,12 @@ export async function GET(req: NextRequest) {
     const idNum = Number(id);
     if (!Number.isInteger(idNum)) return NextResponse.json({ ok: false, error: "잘못된 id" }, { status: 400 });
     // 감사수리: published 조건 없이 비공개 카페 리뷰가 새던 누수 차단
-    const rows = await sql`SELECT name, area, dong, synth_reviews, synth_reviews_all, synth_quality, llm_judged_at, reputation_note FROM cafes WHERE id=${idNum} AND published=true LIMIT 1`;
+    // 💰 2026-08-22: 두 배열을 **둘 다** 받아놓고 실제로는 `all ?? top6` 하나만 썼다(카페당 1,290B 낭비).
+    //   COALESCE로 하나만 받는다 — 결과 동일, 전송 7,470B → 6,180B(-17%).
+    const rows = await sql`SELECT name, area, dong, COALESCE(synth_reviews_all, synth_reviews) AS synth_reviews_all, synth_quality, llm_judged_at, reputation_note FROM cafes WHERE id=${idNum} AND published=true LIMIT 1`;
     if (!rows[0]) return NextResponse.json({ ok: false, error: "카페를 찾을 수 없어요" }, { status: 404 });
     // 전체보기용: synth_reviews_all(옥석 전체) 우선, 없으면 기존 top6
-    const raw = (rows[0]?.synth_reviews_all ?? rows[0]?.synth_reviews ?? []) as any[];
+    const raw = (rows[0]?.synth_reviews_all ?? []) as any[];
     // 매칭 확신도 우선 + 동일 확신도 내 최신순 정렬 → 상위 6건(대표)·전체보기 모두 동일 순서로 노출
     const nowT = Date.now();
     const areaTerms = [rows[0]?.area, rows[0]?.dong].filter(Boolean) as string[];

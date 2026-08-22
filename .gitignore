@@ -39,3 +39,10 @@ web/scripts/.tmp-*
 web/_*.mjs
 web/__*.mjs
 web/scripts/_*.mjs
+web/scripts/tmp-*.mjs
+
+# 🧹 2026-08-22: 에이전트 임시 스크립트가 이름을 계속 바꿔가며 쌓인다(_*, __*, tmp-*, rt_query*, dec_check…).
+#   패턴을 쫓지 말고 **web 루트의 .mjs 자체를 차단**한다 — 정식 스크립트는 전부 web/scripts/ 아래에 둔다.
+web/*.mjs
+# ⚠️ 빌드 설정은 예외 — 한 번 실수로 같이 치웠다(2026-08-22)
+!web/*.config.mjs
