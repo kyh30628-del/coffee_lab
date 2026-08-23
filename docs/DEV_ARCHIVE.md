@@ -258,3 +258,4 @@
 | 2026-08-22 03:05 | #798 | [룰갭 신규] 네이버 카페(커뮤니티) 소스 — "카페" 동음이의로 본문언급 게이트 우회 (id11444·18 | 1f0f34e1 | - | lib/reviewQuality.ts:1832 짧은/흔한 카페명 본문언급 게이트 수정 — source==='cafearticle'(네이버 카페 커뮤니티)일 때만 bodyCtxGat |
 | 2026-08-22 11:05 | #802 | [룰갭 신규] identity.weak_token 미등재 3건 — 크리스탈·허니브라운·소문난 (id6435· | d89c9aff | - | lib/criteriaListsBase.ts identity.weak_token 배열에 크리스탈·허니브라운·소문난 3건 추가(기존 사전과 동일 메커니즘 확장). tsc 신규에러 0 |
 | 2026-08-23 07:05 | #805 | [룰갭 신규] 부동산 분양 홍보글 정형구 — OFFTOPIC_SPAM 우회 + CAFE_CONTEXT_STR | 190f88c5 | - | lib/reviewQuality.ts: OFFTOPIC_SPAM에 부동산 시황 정형구(미분양/집값·땅값 우상향/부동산 시황/전용면적) 추가 + REAL_ESTATE_LISTING_ |
+| 2026-08-23 11:05 | #804 | [룰갭 신규] identity.weak_token 미등재 — "플랫폼" (id9605 237플랫폼 카페) | 2a891af7 | - | lib/criteriaListsBase.ts: identity.weak_token 배열에 플랫폼 추가(id9605 237플랫폼 오혼입 대응) + 근거 주석. tsc 신규에러 0(기 |
