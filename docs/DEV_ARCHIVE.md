@@ -259,3 +259,4 @@
 | 2026-08-22 11:05 | #802 | [룰갭 신규] identity.weak_token 미등재 3건 — 크리스탈·허니브라운·소문난 (id6435· | d89c9aff | - | lib/criteriaListsBase.ts identity.weak_token 배열에 크리스탈·허니브라운·소문난 3건 추가(기존 사전과 동일 메커니즘 확장). tsc 신규에러 0 |
 | 2026-08-23 07:05 | #805 | [룰갭 신규] 부동산 분양 홍보글 정형구 — OFFTOPIC_SPAM 우회 + CAFE_CONTEXT_STR | 190f88c5 | - | lib/reviewQuality.ts: OFFTOPIC_SPAM에 부동산 시황 정형구(미분양/집값·땅값 우상향/부동산 시황/전용면적) 추가 + REAL_ESTATE_LISTING_ |
 | 2026-08-23 11:05 | #804 | [룰갭 신규] identity.weak_token 미등재 — "플랫폼" (id9605 237플랫폼 카페) | 2a891af7 | - | lib/criteriaListsBase.ts: identity.weak_token 배열에 플랫폼 추가(id9605 237플랫폼 오혼입 대응) + 근거 주석. tsc 신규에러 0(기 |
+| 2026-08-23 11:06 | #806 | [룰갭 신규] "OO호텔+범용시설어" 코어토큰 붕괴 — 스카이라운지 단어일치로 무관 건물 콘텐츠 유입 (id | 69bc3938 | - | lib/reviewQuality.ts GENERIC_WORD(line457)에 스카이라운지 정확일치 추가 — VENUE_WORDS 호텔 부분일치 스트립 후 남는 유일 식별토큰이 범 |
