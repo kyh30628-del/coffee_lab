@@ -484,3 +484,33 @@ export async function discoverRegion(region: string, areaLabel: string, keywords
   const apiError = found.length === 0 && apiFails > 0;
   return { region, found: found.length, inserted, skipped, backfilled, oob, stopped, apiError, apiFails, tasks: tasks.length, names: found.map((f) => f.name) };
 }
+
+// 🔧 인스타그램 오귀속 자가치유(decisions#811, coordination#335) — 위 464행의 brandTokenOverlap 게이트(#780)는
+//   '신규' 백필만 막는다. 그 게이트가 생기기 전 좌표근접만으로 잘못 채택된 레거시 instagram_url은 그대로
+//   남아있었다(예: id11506 소베베이커리 ↔ id6853 소수수, 46m 거리에 동일 계정 — 협업#335 실측 40쌍/80곳).
+//   같은 instagram_url을 공유하는 카페 그룹에서 '그룹 내 어느 누구와도' 브랜드토큰이 안 겹치는 멤버만
+//   오귀속으로 보고 NULL 처리(그룹 전체가 서로 겹치면 동일브랜드 다지점 정상공유이므로 그대로 둠).
+//   어느 쪽이 진짜 주인인지 확정할 근거가 없으므로(coordination#335: "잘못 지우면 정상 링크 삭제 위험") 승자를
+//   추측하지 않고 지운다 — instagram_url은 B2B 아웃리치 보조 데이터일 뿐 공개 UI에 노출되지 않아 리스크가
+//   낮고, 지워도 다음 발굴/백필이 새 게이트로 재검증해 채운다(healCrossCafeLinkContamination과 같은 자가치유 급).
+export async function healInstagramMisattribution(): Promise<{ cleared: number; groups: number; names: string[] }> {
+  const rows = (await sql`SELECT id, name, area, dong, instagram_url FROM cafes WHERE instagram_url IS NOT NULL`) as any[];
+  const byUrl = new Map<string, any[]>();
+  for (const r of rows) { const arr = byUrl.get(r.instagram_url) || []; arr.push(r); byUrl.set(r.instagram_url, arr); }
+  const groups = [...byUrl.values()].filter((g) => g.length >= 2);
+  const overlaps = (a: any, b: any) => brandTokenOverlap(a.name, b.name, [a.area, a.dong, b.area, b.dong].filter(Boolean));
+
+  let cleared = 0, groupsAffected = 0;
+  const names: string[] = [];
+  for (const g of groups) {
+    const outliers = g.filter((m) => !g.some((o) => o.id !== m.id && overlaps(m, o)));
+    if (!outliers.length) continue;
+    groupsAffected++;
+    for (const m of outliers) {
+      await sql`UPDATE cafes SET instagram_url = NULL WHERE id = ${m.id} AND instagram_url = ${m.instagram_url}`;
+      cleared++;
+      if (names.length < 20) names.push(m.name);
+    }
+  }
+  return { cleared, groups: groupsAffected, names };
+}

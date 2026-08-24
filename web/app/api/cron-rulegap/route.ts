@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { ensureLearnedTable, loadLearnedTerms, getLearned, applyLearned, rollbackLearned } from "@/lib/learnedTerms";
 import { healCrossCafeLinkContamination } from "@/lib/synthStore";
-import { isFranchise } from "@/lib/discover";
+import { isFranchise, healInstagramMisattribution } from "@/lib/discover";
 import { recordRun } from "@/lib/agentLog";
 import { startJobRun } from "@/lib/blobBudget";
 import { openScope } from "@/lib/writeScope";
@@ -65,6 +65,12 @@ export async function GET(req: NextRequest) {
     const crossContam = dry
       ? { removed: 0, groups: 0, names: [] as string[] }
       : await healCrossCafeLinkContamination().catch(() => ({ removed: 0, groups: 0, names: [] as string[] }));
+
+    // ── ⓪-2 인스타그램 오귀속 자가치유(decisions#811, coordination#335) ──
+    //   위와 같은 이유로 매일 재진행(레거시 잔존분 소거 + 새로 유입되는 재발도 다음날 자동 감지).
+    const igHeal = dry
+      ? { cleared: 0, groups: 0, names: [] as string[] }
+      : await healInstagramMisattribution().catch(() => ({ cleared: 0, groups: 0, names: [] as string[] }));
 
     // ── ① 검증·자동롤백 ──────────────────────────────────────────────
     //   직전 자동적용(최근 2시간) 후 공개 카페가 크게 줄었으면 되돌린다(정상 카페 과다 비공개 방지).
@@ -295,10 +301,10 @@ export async function GET(req: NextRequest) {
     // 기록(검증·롤백 기준 + 관제탑 노출용)
     if (!dry) await sql`INSERT INTO rulegap_runs (published_before, learned, pending) VALUES (${pubNow}, ${JSON.stringify(learned)}::jsonb, ${JSON.stringify(pending)}::jsonb)`;
 
-    if (!dry) await recordRun("cron-rulegap", true, `학습 ${learned.length} 승인대기 ${pending.length} 식당자동제외 ${autoExcluded} 롤백 ${rolledBack.length} 교차오염정리 ${crossContam.removed}건/${crossContam.groups}그룹 프랜차이즈소급 ${franchiseFresh.length}`, learned.length, { fingerprint: (pending.length) > 0 ? fingerprintOf({ pending: pending.length, learned: learned.length }) : undefined, metrics: { pending: pending.length, learned: learned.length } });
+    if (!dry) await recordRun("cron-rulegap", true, `학습 ${learned.length} 승인대기 ${pending.length} 식당자동제외 ${autoExcluded} 롤백 ${rolledBack.length} 교차오염정리 ${crossContam.removed}건/${crossContam.groups}그룹 인스타오귀속정리 ${igHeal.cleared}건/${igHeal.groups}그룹 프랜차이즈소급 ${franchiseFresh.length}`, learned.length, { fingerprint: (pending.length) > 0 ? fingerprintOf({ pending: pending.length, learned: learned.length }) : undefined, metrics: { pending: pending.length, learned: learned.length } });
     return NextResponse.json({
       ok: true, dry, ranAt: new Date().toISOString(), scanned,
-      rolledBack, autoExcluded, crossContam,
+      rolledBack, autoExcluded, crossContam, igHeal,
       learnedCount: learned.length, learned,
       pendingCount: pending.length, pending: pending.slice(0, 30),
     });

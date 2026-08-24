@@ -70,7 +70,7 @@ const CONTRACTS: Record<string, Partial<JobContract>> = {
   "cron-enrich": { tier: "L2", budget: { blobReads: 0, rows: 20000, wallMs: 300_000 }, writes: ["cafes.reputation_note", "cafes.enriched_at", "cafes.rating", "cafes.rating_count"] },
   "cron-closure": { tier: "L2", budget: { blobReads: 0, rows: 20000, wallMs: 300_000 }, writes: ["cafes.closure_misses", "cafes.closure_checked_at"] },
   "cron-verify": { tier: "L0", budget: { blobReads: 0, rows: 20000, wallMs: 300_000 } },
-  "cron-rulegap": { tier: "L2", budget: { blobReads: 12, rows: 20000, wallMs: 300_000 }, writes: ["cafes.synth_*", "cafes.published", "learned_terms.*"] },
+  "cron-rulegap": { tier: "L2", budget: { blobReads: 12, rows: 20000, wallMs: 300_000 }, writes: ["cafes.synth_*", "cafes.published", "cafes.instagram_url", "learned_terms.*"] },
   "cron-issues": { tier: "L2", budget: { blobReads: 0, rows: 20000, wallMs: 300_000 }, writes: ["cafes.published", "cafes.pipeline_status", "issues.*", "decisions.*"] },
   "cron-coord-consumer": { tier: "L2", budget: { blobReads: 0, rows: 10000, wallMs: 300_000 } },
   "cron-demand": { tier: "L0", budget: { blobReads: 0, rows: 10000, wallMs: 300_000 } },
