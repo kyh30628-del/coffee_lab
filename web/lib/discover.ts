@@ -453,14 +453,23 @@ export async function discoverRegion(region: string, areaLabel: string, keywords
     const pts = ex.filter((c) => c.lat != null).map((c) => ({ lat: Number(c.lat), lng: Number(c.lng), c }));
     for (const it of proc) {
       let m = byName.get(it.name);
-      if (!m && it.lat != null) m = pts.find((p) => Math.abs(p.lat - (it.lat as number)) < 0.0005 && Math.abs(p.lng - (it.lng as number)) < 0.0005)?.c;
+      // 🐛 재발방지(decisions#814): 좌표 근접(44~55m 박스)만으로 이름검증 없이 동일카페 판정→신규 skip하던
+      //   과잉차단 — 기존DB 카페 최근접거리 실측 중앙값 75~94m·하위10%도 52~61m로 이 박스 안에 서로 다른
+      //   카페가 공존하는 게 정상인데(밀집구 상권 특성), 좌표만 겹치면 이름 무관하게 같은 카페로 오판해
+      //   6개 지역 표본 전수에서 전환율 0~0.4%까지 떨어뜨렸다. brandTokenOverlap(위 464행과 동일 함수,
+      //   decisions#780 도입)으로 이름이 실제로 연관된 경우에만 좌표매칭을 동일카페로 채택한다.
+      if (!m && it.lat != null) {
+        const near = pts.find((p) => Math.abs(p.lat - (it.lat as number)) < 0.0005 && Math.abs(p.lng - (it.lng as number)) < 0.0005)?.c;
+        if (near && brandTokenOverlap(near.name, it.name, [storeArea, near.dong, it.dong].filter(Boolean))) m = near;
+      }
       if (m) {
         // 기존 카페: 동·카테고리·인스타그램·전화 없으면 백필(카테고리는 비카페 게이트 정확도, 인스타/전화는 B2B 아웃리치용 — coordination#232).
         if (it.dong && !m.dong) { await sql`UPDATE cafes SET dong = ${it.dong} WHERE id = ${m.id}`; backfilled++; m.dong = it.dong; }
         if (it.category && !m.naver_category) { await sql`UPDATE cafes SET naver_category = ${it.category} WHERE id = ${m.id}`; m.naver_category = it.category; }
-        // ★ it은 name === m.name(byName) 아니면 좌표 근접만으로 매칭된 별개 검색결과다(위 424행) — 몰/밀집매장에서
-        //   무관 업체(옆가게·프랜차이즈)의 인스타 링크가 좌표만으로 그대로 채택되던 근본버그(decisions#780,
-        //   #655 리셋 4~6일 뒤 동일계정 재오염의 실제 원인). 상호명 브랜드토큰 겹침 검증 없이는 채택하지 않는다.
+        // ★ it은 name === m.name(byName) 아니면 좌표 근접+brandTokenOverlap로 매칭된 결과다(위 461행,
+        //   decisions#814). 그래도 인스타그램 링크는 별도로 한 번 더 겹침 검증 — 몰/밀집매장에서 무관
+        //   업체(옆가게·프랜차이즈)의 인스타 링크가 좌표만으로 그대로 채택되던 근본버그(decisions#780,
+        //   #655 리셋 4~6일 뒤 동일계정 재오염의 실제 원인) 재발방지 이중 안전판.
         if (it.instagramUrl && !m.instagram_url && brandTokenOverlap(m.name, it.name, [storeArea, m.dong].filter(Boolean))) { await sql`UPDATE cafes SET instagram_url = ${it.instagramUrl} WHERE id = ${m.id}`; m.instagram_url = it.instagramUrl; }
         if (it.phone && !m.phone) { await sql`UPDATE cafes SET phone = ${it.phone} WHERE id = ${m.id}`; m.phone = it.phone; }
         skipped++; continue;
