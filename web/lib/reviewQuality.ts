@@ -1482,8 +1482,12 @@ export function verifyReview(input: QualityInput): QualityResult {
   //   하드 탈락 대신 borderline(LLM 재판정)으로 격하 — 표현이 달라 걸리지 않은 진짜 카페 후기를 보호.
   const nameNoSpace = nameN.replace(/\s/g, "");
   const nameLatinHeavy = isLatinHeavyName(nameNoSpace); // #569: 영문/로마자 상호 — 길이 문턱 대신 라틴 비중으로 게이트
+  // 룰갭 P73 반쪽수정(2026-08-24, decisions#810, rulegap-proposals-20260824.md 제안1): #798이 body-only
+  //   경로(bodyCtxGate, :1877)만 source='cafearticle'(네이버 카페 커뮤니티)일 때 CAFE_CONTEXT_SUBSTANCE로
+  //   격상했고, 이 title-match 경로는 그대로 CAFE_CONTEXT(약함, "카페" 단독 토큰도 인정)를 써 동일 사각이
+  //   남아있었다 — 네이버 카페 자기홍보 정형구("카페 가입/카페 성장")만으로 통과(id3063 실측). 대칭 적용.
   if (inTitleFull && ((nameNoSpace.length >= 1 && nameNoSpace.length <= 4) || weakWhitelist || nameLatinHeavy)) {
-    const ctxGate = nameNoSpace.length <= 3 ? CAFE_CONTEXT_STRONG : CAFE_CONTEXT;
+    const ctxGate = nameNoSpace.length <= 3 ? CAFE_CONTEXT_STRONG : input.source === "cafearticle" ? CAFE_CONTEXT_SUBSTANCE : CAFE_CONTEXT;
     if (!ctxGate.test(fullL)) {
       return { verdict: "rejected", score: 20, reasons: ["제목=카페명 일치하나 카페 맥락 전무(흔한 이름·타업종 혼입 의심) — LLM 재판정"], borderline: true, signals: sig };
     }
