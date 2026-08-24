@@ -1075,6 +1075,10 @@ export default function Home() {
       : (sido || z >= 11) ? "gu"
       : "sido";
     if (level !== "cafe") {
+      // 🔴 2026-08-24: 줌아웃(지역 뭉치) 상태에서도 **내 추억 ❤ 핀은 항상 그린다.**
+      //   예전엔 z<13이면 카페 핀 자체를 안 그려서, 지도를 조금만 줌아웃해도 내 기록이 사라졌다.
+      //   내 것은 개수가 적고(수~수십) 지도가 어지러워지지 않는다 — 못 찾는 게 훨씬 큰 손해다.
+      const myPins = cafes.filter((c) => myCafeIds.has(c.id) && c.lat && c.lng);
       const keyFn = level === "sido" ? (c: Cafe) => toGu(c.area).sido
         : level === "gu" ? (c: Cafe) => toGu(c.area).sigungu
         : (c: Cafe) => c.dong || "기타";
@@ -1098,6 +1102,13 @@ export default function Home() {
           else if (level === "gu") { setSigungu(g.key); setDong(""); }
           else setDong(g.key);
         }));
+      // 내 추억 ❤는 지역 뭉치 위에 항상 얹는다(줌아웃해도 안 사라지게).
+      for (const c of myPins) {
+        markers.push(L.marker([c.lat, c.lng], {
+          icon: L.divIcon({ className: "", html: makePinHtml(c, false, false, true), iconSize: [0, 0] }),
+          zIndexOffset: 5000,
+        }).on("click", () => setSelected(c)));
+      }
       layerRef.current.addLayer(L.layerGroup(markers));
       return;
     }
@@ -1127,6 +1138,15 @@ export default function Home() {
       const fIdx = focusId ? items.findIndex((c) => c.id === focusId) : -1; // 포커스 카페는 뭉치지 말고 단독 핀
       let pts = items;
       if (fIdx >= 0) { addPin(items[fIdx], true); pts = items.filter((_, i) => i !== fIdx); }
+      // 🔴 2026-08-24 버그 수리: **내 카페(❤)가 클러스터에 먹혀 사라졌다.**
+      //   포커스 핀만 뭉치기에서 빼주고 내 카페는 빠져 있어, 주변에 카페가 한 곳만 더 있어도
+      //   ●N 숫자 뭉치로 흡수돼 화면에서 없어졌다(성북구처럼 밀집 지역은 거의 항상).
+      //   내 추억은 '이 지도에서 가장 중요한 핀'이므로 절대 뭉치지 않는다.
+      const mineInCell = pts.filter((c) => myCafeIds.has(c.id));
+      if (mineInCell.length) {
+        for (const mc of mineInCell) addPin(mc);
+        pts = pts.filter((c) => !myCafeIds.has(c.id));
+      }
       if (pts.length === 0) continue;
       if (pts.length === 1) { addPin(pts[0]); continue; }
       const cx = pts.reduce((s, c) => s + c.lat, 0) / pts.length; // 2개+ → 클러스터 뱃지(centroid), 클릭 시 줌인
