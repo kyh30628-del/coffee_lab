@@ -948,7 +948,15 @@ export default function AdminPage() {
               <div className="overflow-y-auto flex-1 p-3 space-y-2">
                 {(visits?.visits ?? []).map((v: any) => (
                   <div key={v.id} className="flex gap-3 border border-stone-300 rounded-xl p-3">
-                    {v.photo_url && <img src={v.photo_url} alt="" className="w-16 h-16 rounded-lg object-cover shrink-0" />}
+                    {(() => {
+                      // 여러 장 저장된 기록(최대 5장)을 전부 보여준다 — 예전엔 photo_url 1장만 떴다.
+                      const ph = (Array.isArray(v.photos) && v.photos.length ? v.photos : (v.photo_url ? [v.photo_url] : [])) as string[];
+                      return ph.length ? (
+                        <div className="flex gap-1 shrink-0">
+                          {ph.slice(0, 5).map((u, i) => <img key={i} src={u} alt="" className="w-16 h-16 rounded-lg object-cover" />)}
+                        </div>
+                      ) : null;
+                    })()}
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
                         {v.favorite && <span className="text-amber-500">★</span>}

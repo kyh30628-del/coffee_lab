@@ -46,3 +46,4 @@ web/scripts/tmp-*.mjs
 web/*.mjs
 # ⚠️ 빌드 설정은 예외 — 한 번 실수로 같이 치웠다(2026-08-22)
 !web/*.config.mjs
+.vercel
