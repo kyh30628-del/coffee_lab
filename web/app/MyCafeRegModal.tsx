@@ -265,8 +265,24 @@ export default function MyCafeRegModal({ cafes, device, visits, pin = "", initia
               </div>
               {visits.some((v) => v.id === picked.id) ? (
                 <>
-                  <p className="text-[11px] text-[#665036] leading-relaxed">※ 이미 기록한 추억이에요. 사진(갤러리에서 추가 가능)·기억을 고치고 저장하세요. <b>이미 인증된 방문</b>이라 위치 확인은 다시 안 해도 돼요.</p>
+                  {/* 🔴 2026-08-24 수리: 예전엔 기록이 있으면 무조건 "이미 인증된 방문"이라 안내했다.
+                      그런데 **미인증(verified=false)** 기록도 여기로 들어오는데 승격 경로가 없어,
+                      작성자가 사진까지 올리고도 영영 공개로 못 바꾸는 막다른 길이었다(실사례 1건).
+                      → 미인증이면 상태를 알리고 '지금 인증하기'(GPS 30m 재확인)를 그 자리에서 제공한다. */}
+                  {visits.find((v) => v.id === picked.id)?.verified === false ? (
+                    <div className="text-[12px] text-[#3d2f22] leading-relaxed bg-[#fdf4e3] border border-[#e7d3b3] rounded-xl p-2.5">
+                      <div className="font-bold text-[#8a6a3a] mb-1 text-[12.5px]">📍 이 기록은 <b>미인증</b>이라 나에게만 보여요</div>
+                      <div>지도에서 다른 사람에게는 안 보입니다. <b>지금 이 카페 안(GPS 30m 이내)</b>에 계시면 아래로 인증해 공개로 바꿀 수 있어요.</div>
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-[#665036] leading-relaxed">※ 이미 기록한 추억이에요. 사진(갤러리에서 추가 가능)·기억을 고치고 저장하세요. <b>이미 인증된 방문</b>이라 위치 확인은 다시 안 해도 돼요.</p>
+                  )}
                   {msg && <p className="text-[12px] text-[#c0392b]">{msg}</p>}
+                  {visits.find((v) => v.id === picked.id)?.verified === false && (
+                    <button onClick={stage} disabled={busy} className="w-full bg-[#8a6a3a] text-white rounded-xl py-3 font-bold text-[14px] disabled:opacity-60">
+                      {busy ? "위치 확인 중..." : "📍 지금 인증하기 (카페 30m)"}
+                    </button>
+                  )}
                   <button onClick={() => commit(true)} disabled={busy} className="w-full bg-[#d6336c] text-white rounded-xl py-3 font-bold text-[14px] disabled:opacity-60">
                     {busy ? "저장 중..." : "수정 저장"}
                   </button>

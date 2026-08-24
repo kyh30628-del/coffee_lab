@@ -1045,7 +1045,11 @@ export default function Home() {
       const op = othersMode ? othersPins.filter(inScope) : [];
       const othersCntById = new Map(op.map((p) => [p.id, p.cnt] as [number, number]));
       const maxCnt = op.reduce((m, p) => Math.max(m, p.cnt), 1);
-      const base = myPinMode ? filtered.filter((c) => myCafeIds.has(c.id)) : [];
+      // 🔴 2026-08-24 버그 수리: 예전엔 `filtered`(현재 지역·동·취향 필터가 걸린 목록)에서 골랐다.
+      //   그래서 **지도가 다른 구를 보고 있으면 내 추억 핀이 통째로 사라졌다** —
+      //   성북구에 저장한 기록이 강동구를 보는 동안 안 보이는 식(실사례: 바이모베이글).
+      //   '내 카페'는 내가 어디를 보든 **항상 내 것 전부**가 보여야 한다 → 지역 필터를 태우지 않는다.
+      const base = myPinMode ? cafes.filter((c) => myCafeIds.has(c.id) && c.lat && c.lng) : [];
       const markers = base.map((c) => {
         const isMine = myCafeIds.has(c.id);
         const cnt = othersCntById.get(c.id) ?? 0;
@@ -1167,7 +1171,7 @@ export default function Home() {
     if (focusId) {
       /* focus effect가 setView 처리 */
     } else if (myPinMode || othersMode) {
-      const src = myPinMode ? filtered.filter((c) => myCafeIds.has(c.id)) : othersPins;
+      const src = myPinMode ? cafes.filter((c) => myCafeIds.has(c.id) && c.lat && c.lng) : othersPins; // 위와 같은 이유로 지역 필터 제외(2026-08-24)
       const pts = src.map((c: any) => [c.lat, c.lng] as [number, number]).filter((p) => p[0] && p[1]);
       if (pts.length) map.flyToBounds(L.latLngBounds(pts), { padding: [60, 60], maxZoom: pts.length === 1 ? 14 : 15, duration: 0.45 });
       else if (sido && SIDO_CENTER[sido]) { const [la, ln, z] = SIDO_CENTER[sido]; map.flyTo([la, ln], z, { duration: 0.45 }); }
