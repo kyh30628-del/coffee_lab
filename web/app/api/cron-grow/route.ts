@@ -26,6 +26,10 @@ export async function GET(req: NextRequest) {
     await ensureSchema();
     if (await isCostHalted()) { await recordRun("cron-grow", true, "🛑 비용 자동정지 중 — 스킵", 0).catch(() => {}); return NextResponse.json({ ok: true, skipped: "cost-halt" }); }
     await sql`CREATE TABLE IF NOT EXISTS discovery_state (region TEXT PRIMARY KEY, area_label TEXT, last_run TIMESTAMPTZ, last_found INT, last_inserted INT)`;
+    // 재현가능한 진단(decisions#814 권장조치②) — skip/oob도 last_found/last_inserted처럼 영구 보존해
+    //   좌표전용 dedup 과잉차단 같은 회귀를 회차별 diff로 잡을 수 있게 한다.
+    await sql`ALTER TABLE discovery_state ADD COLUMN IF NOT EXISTS last_skipped INT`.catch(() => {});
+    await sql`ALTER TABLE discovery_state ADD COLUMN IF NOT EXISTS last_oob INT`.catch(() => {});
     // 지역 시드(최초 1회)
     for (const r of METRO_REGIONS) await sql`INSERT INTO discovery_state (region, area_label) VALUES (${r.region}, ${r.areaLabel}) ON CONFLICT (region) DO NOTHING`;
     // 🚨 재발방지(coordination#302): ON CONFLICT DO NOTHING 시딩은 새 지역만 더할 뿐 폐지된 지역을 절대
@@ -85,7 +89,7 @@ export async function GET(req: NextRequest) {
         //   로테이션 지역(예: 포천시)이 옛 날짜로 남아 "N일 굶음" 오표기됐다(관제탑 #555 부풀림).
         //   target.region이 discovery_state에 없으면 no-op라 안전.
         if (at) await sql`UPDATE discovery_targets SET status='done', consumed_at=now(), found=${d.found}, inserted=${d.inserted} WHERE id=${at.id}`;
-        await sql`UPDATE discovery_state SET last_run=now(), last_found=${d.found}, last_inserted=${d.inserted} WHERE region=${target.region}`;
+        await sql`UPDATE discovery_state SET last_run=now(), last_found=${d.found}, last_inserted=${d.inserted}, last_skipped=${d.skipped}, last_oob=${d.oob} WHERE region=${target.region}`;
         discoveries.push({ region: d.region, found: d.found, inserted: d.inserted, stopped: d.stopped, agent: !!at });
       } catch (e) {
         if (at) await sql`UPDATE discovery_targets SET status='done', consumed_at=now() WHERE id=${at.id}`; // 실패해도 큐서 빼 무한루프 방지
