@@ -262,3 +262,4 @@
 | 2026-08-23 11:06 | #806 | [룰갭 신규] "OO호텔+범용시설어" 코어토큰 붕괴 — 스카이라운지 단어일치로 무관 건물 콘텐츠 유입 (id | 69bc3938 | - | lib/reviewQuality.ts GENERIC_WORD(line457)에 스카이라운지 정확일치 추가 — VENUE_WORDS 호텔 부분일치 스트립 후 남는 유일 식별토큰이 범 |
 | 2026-08-24 03:05 | #807 | [룰갭 신규] "OO아트홀" 부속 카페 코어토큰 붕괴 — 지자체 문화시설명 부분일치로 무관 전시·인근식당 콘 | 1cead8f0 | - | lib/reviewQuality.ts: VENUE_WORDS 배열에 "아트홀" 추가(코멘트 포함). id18064 반월아트홀 쉼카페처럼 지자체 문화시설명이 카페명에 붙어쓰인 복합명 |
 | 2026-08-24 07:05 | #810 | [룰갭 신규] P73(네이버카페 자기홍보 정형구) 미수정 반쪽 — inTitleFull 경로 CAFE_CON | 4d192611 | - | lib/reviewQuality.ts:1478 inTitleFull(제목=카페명) 게이트를 body-only 경로(:1877, P73/#798)와 대칭으로 수정 — source== |
+| 2026-08-24 11:05 | #811 | [개발] [정합성 발견] instagram_url 근접 오귀속 의심 40쌍(80곳) — enrichment  | 18ceea7d | - | lib/discover.ts: healInstagramMisattribution() 추가 — 조사결과 brandTokenOverlap 게이트(#780)는 이미 정상 작동 중(재현  |
