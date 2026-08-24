@@ -41,7 +41,8 @@ export default function WishButton({ cafeId, variant = "pill" }: { cafeId: numbe
     try {
       const r = await fetch("/api/bookmark", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ device, cafeId, action: next ? "add" : "remove" }),
+        // 🔗 유입 경로와 잇기 위해 anon_id를 함께 보낸다(2026-08-24). 개인정보 아님 — 기존 익명 식별자.
+        body: JSON.stringify({ device, cafeId, action: next ? "add" : "remove", anonId: (() => { try { return localStorage.getItem("dcn_anon") || null; } catch { return null; } })() }),
       }).then((x) => x.json());
       if (!r?.ok) setOn(!next);              // 실패 시 되돌림
       // 📊 계측: 찜을 '했을 때만' 기록한다. 기존 outbound_clicks 테이블 재사용 —
@@ -80,7 +81,8 @@ export default function WishButton({ cafeId, variant = "pill" }: { cafeId: numbe
       </button>
       {/* 저장은 **다시 꺼내볼 수 있어야** 저장이다 — 찜한 직후에만 회수 동선을 연다(평소엔 화면을 어지럽히지 않게). */}
       {on && (
-        <a href="/?favs=1" className="mt-1.5 block text-center text-[11.5px] font-semibold text-[#b23a5f] underline underline-offset-2">
+        <a href="/?favs=1" onClick={() => { try { const a = localStorage.getItem("dcn_anon")||""; if (localStorage.getItem("dcn_internal")!=="1") fetch("/api/track-outbound",{method:"POST",headers:{"Content-Type":"application/json"},keepalive:true,body:JSON.stringify({anonId:a,cafeId,target:"favs_link",source:"카페상세",path:window.location.pathname})}).catch(()=>{}); } catch {} }}
+          className="mt-1.5 block text-center text-[11.5px] font-semibold text-[#b23a5f] underline underline-offset-2">
           찜한 곳 모아보기 →
         </a>
       )}

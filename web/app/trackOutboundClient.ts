@@ -4,7 +4,8 @@
 // ⚠️ keepalive가 핵심: 이 클릭은 곧바로 새 탭/외부 사이트로 넘어가는 순간이라
 //   일반 fetch는 페이지 전환에 잘려 유실된다(과소집계). 공유 계측이 겪은 것과 같은 함정.
 export function trackOutbound(opts: {
-  target: "naver_place" | "kakao_map" | "wish" | "map_cta" | "nearby" | "record"; // 무엇을 했나
+  target: "naver_place" | "kakao_map" | "wish" | "map_cta" | "nearby" | "record"
+    | "fav_open" | "mypin_open" | "fav_toggle" | "favs_link"; // 무엇을 했나
   //   naver_place·kakao_map = 외부로 나감(가기로 결정) / wish = 찜 / map_cta = 지도 진입
   //   nearby = 다음 카페로 / record = 내 카페 기록 시작. 전부 같은 테이블에 담아 **같은 잣대로** 비교한다.
   cafeId?: number | null;              // 지도앱은 pathname이 "/"라 path 파싱이 안 되므로 명시 필요

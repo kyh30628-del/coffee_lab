@@ -5,7 +5,10 @@ export const runtime = "nodejs";
 // 카페 북마크(즐겨찾기) — 내 카페 등록과 별개. 익명 기기기반, 개인정보 0. 위치인증·메모 불필요.
 async function ensure() {
   await ensureOnce("bookmark.ddl", async () => {
-    await sql`CREATE TABLE IF NOT EXISTS bookmarks (
+    // 🔗 2026-08-24: 저장은 device_id, 유입은 anon_id라 **서로 다른 키**여서
+  //   "찜한 사람이 어디서 들어왔나"를 원천적으로 알 수 없었다. anon_id를 함께 남겨 연결한다.
+  await sql`ALTER TABLE bookmarks ADD COLUMN IF NOT EXISTS anon_id TEXT`.catch(() => {});
+  await sql`CREATE TABLE IF NOT EXISTS bookmarks (
       id SERIAL PRIMARY KEY,
       device_id TEXT NOT NULL,
       cafe_id INT REFERENCES cafes(id) ON DELETE CASCADE,
@@ -37,12 +40,12 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     await ensure();
-    const { device, cafeId, action = "toggle" } = await req.json();
+    const { device, cafeId, action = "toggle", anonId = null } = await req.json();
     if (!device || !cafeId) return NextResponse.json({ ok: false, error: "필수값 누락" }, { status: 400 });
     const [ex] = await sql`SELECT 1 FROM bookmarks WHERE device_id=${device} AND cafe_id=${cafeId} LIMIT 1` as any[];
     let bookmarked: boolean;
     if (action === "add" || (action === "toggle" && !ex)) {
-      await sql`INSERT INTO bookmarks (device_id, cafe_id) VALUES (${device}, ${cafeId}) ON CONFLICT DO NOTHING`;
+      await sql`INSERT INTO bookmarks (device_id, cafe_id, anon_id) VALUES (${device}, ${cafeId}, ${anonId}) ON CONFLICT DO NOTHING`;
       bookmarked = true;
     } else {
       await sql`DELETE FROM bookmarks WHERE device_id=${device} AND cafe_id=${cafeId}`;

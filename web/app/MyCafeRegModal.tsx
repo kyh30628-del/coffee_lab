@@ -78,7 +78,7 @@ export default function MyCafeRegModal({ cafes, device, visits, pin = "", initia
       try {
         const r = await fetch("/api/my-cafe", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "stage", cafeId: picked.id, device, pin, userLat: pos.coords.latitude, userLng: pos.coords.longitude, photosBase64: photos, memory, favorite, isPublic }),
+          body: JSON.stringify({ action: "stage", cafeId: picked.id, device, pin, anonId: (() => { try { return localStorage.getItem("dcn_anon") || null; } catch { return null; } })(), userLat: pos.coords.latitude, userLng: pos.coords.longitude, photosBase64: photos, memory, favorite, isPublic }),
         });
         const d = await r.json();
         if (d.ok) { setStagedVerified(true); setStaged(true); setMsg(""); setBusy(false); } // 위치인증 통과 → 추억 기록 팝업
@@ -94,7 +94,7 @@ export default function MyCafeRegModal({ cafes, device, visits, pin = "", initia
     try {
       const r = await fetch("/api/my-cafe", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "stage", cafeId: picked.id, device, pin, allowUnverified: true, photosBase64: photos, memory, favorite, isPublic }),
+        body: JSON.stringify({ action: "stage", cafeId: picked.id, device, pin, anonId: (() => { try { return localStorage.getItem("dcn_anon") || null; } catch { return null; } })(), allowUnverified: true, photosBase64: photos, memory, favorite, isPublic }),
       });
       const d = await r.json();
       if (d.ok) { setStagedVerified(false); setStaged(true); setMsg(""); setBusy(false); }
@@ -109,7 +109,7 @@ export default function MyCafeRegModal({ cafes, device, visits, pin = "", initia
     try {
       const r = await fetch("/api/my-cafe", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "commit", cafeId: picked.id, device, pin, memory, favorite, isPublic, ...(sendPhotos ? { photosBase64: photos } : {}) }),
+        body: JSON.stringify({ action: "commit", cafeId: picked.id, device, pin, anonId: (() => { try { return localStorage.getItem("dcn_anon") || null; } catch { return null; } })(), memory, favorite, isPublic, ...(sendPhotos ? { photosBase64: photos } : {}) }),
       });
       const d = await r.json();
       if (d.ok) {

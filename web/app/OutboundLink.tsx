@@ -8,7 +8,7 @@ export default function OutboundLink({
   href, target: dest, cafeId, source, className, style, children,
 }: {
   href: string;
-  target: "naver_place" | "kakao_map" | "map_cta" | "nearby" | "record";
+  target: "naver_place" | "kakao_map" | "map_cta" | "nearby" | "record" | "favs_link";
   cafeId?: number | null;
   source?: string;
   className?: string;

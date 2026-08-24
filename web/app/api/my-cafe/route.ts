@@ -23,6 +23,8 @@ async function ensure() {
   // verified: GPS 30m 위치인증 여부. true=현장 인증됨, false='나중에 인증하기'로 저장(미인증).
   // 기존 행은 모두 30m 통과 후 저장돼 verified=true 상태 → 재백필 불필요. 신규 미인증만 false.
   await sql`ALTER TABLE user_visits ADD COLUMN IF NOT EXISTS verified BOOLEAN DEFAULT false`.catch(() => {});
+  // 🔗 2026-08-24: 유입(anon_id)과 저장(device_id)이 갈라져 있어 경로 추적이 불가능했다 — 함께 남긴다.
+  await sql`ALTER TABLE user_visits ADD COLUMN IF NOT EXISTS anon_id TEXT`.catch(() => {});
   await sql`ALTER TABLE user_visits ADD COLUMN IF NOT EXISTS memory TEXT`.catch(() => {});
   await sql`ALTER TABLE user_visits ADD COLUMN IF NOT EXISTS favorite BOOLEAN DEFAULT false`.catch(() => {});
   // finalized: 위치인증(임시저장) 후 "추억을 기록합니다" 확정 단계. 기존 행은 DEFAULT true로 자동 백필(이미 노출 중이던 기록 유지).
@@ -77,7 +79,7 @@ export async function POST(req: NextRequest) {
   try {
     await ensure();
     const body = await req.json();
-    const { action, cafeId, device, userLat, userLng, photoBase64, photosBase64, memory, favorite, isPublic, pin, allowUnverified } = body;
+    const { action, cafeId, device, userLat, userLng, photoBase64, photosBase64, memory, favorite, isPublic, pin, allowUnverified, anonId = null } = body;
     const pub = !!isPublic;
     if (!cafeId || !device) return NextResponse.json({ ok: false, error: "필수값 누락" }, { status: 400 });
 
@@ -156,8 +158,8 @@ export async function POST(req: NextRequest) {
 
     // 신규는 finalized=false(임시), 기존 기록 재편집이면 기존 finalized 유지(노출 끊기지 않게).
     // verified는 절대 다운그레이드 안 함(기존 인증 유지) + 이번에 30m 통과면 미인증→인증 업그레이드.
-    await sql`INSERT INTO user_visits (cafe_id, device_id, photo_url, photos, memory, favorite, is_public, verified, finalized)
-      VALUES (${cafeId}, ${device}, ${photoUrl}, ${photosJson}, ${mem}, ${fav}, ${pub}, ${verifiedNow}, false)
+    await sql`INSERT INTO user_visits (cafe_id, device_id, anon_id, photo_url, photos, memory, favorite, is_public, verified, finalized)
+      VALUES (${cafeId}, ${device}, ${anonId}, ${photoUrl}, ${photosJson}, ${mem}, ${fav}, ${pub}, ${verifiedNow}, false)
       ON CONFLICT (cafe_id, device_id) DO UPDATE SET
         photo_url = COALESCE(EXCLUDED.photo_url, user_visits.photo_url),
         photos = COALESCE(EXCLUDED.photos, user_visits.photos),

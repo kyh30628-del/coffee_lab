@@ -547,7 +547,7 @@ export default function Home() {
     const cur = bookmarkIds.has(cafeId);
     setBookmarkIds((prev) => { const n = new Set(prev); if (cur) n.delete(cafeId); else n.add(cafeId); return n; }); // 낙관적 업데이트
     if (!cur) { try { window.dispatchEvent(new Event("dcn:install-hint")); } catch {} } // 즐겨찾기 추가 = 재방문 의도 → PWA 설치 배너 트리거
-    try { await fetch("/api/bookmark", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ device: deviceId, cafeId, action: "toggle" }) }); }
+    try { await fetch("/api/bookmark", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ device: deviceId, cafeId, action: "toggle", anonId: (() => { try { return localStorage.getItem("dcn_anon") || null; } catch { return null; } })() }) }); }
     catch { reloadBookmarks(deviceId); }
   };
   useEffect(() => {
@@ -1638,6 +1638,9 @@ export default function Home() {
           const color = a.active ? "#9c6b3f" : "#8a7458";
           return (
           <button key={a.k} onClick={() => {
+            // 📊 2026-08-24: 지도앱 내부 행동은 계측이 없어 "즐겨찾기를 본 사람이 있나"조차 답할 수 없었다.
+            //   기존 outbound_clicks에 함께 담아 유입~저장~재방문을 한 잣대로 본다(새 테이블·API 0).
+            trackOutbound({ target: a.k === "fav" ? "fav_open" : a.k === "search" ? "map_cta" : "map_cta", source: `지도앱탭:${a.k}` });
             if (a.k === "home") setTab("home");
             else if (a.k === "fav") setShowFavs(true);
             else if (a.k === "search") { setSearchRes(null); setSearchQ(""); setShowSearch(true); }
@@ -1655,7 +1658,7 @@ export default function Home() {
         onOpen={(c: Cafe) => { setShowFavs(false); setSelected(c); }}
         onRemove={(id: number) => toggleBookmark(id)}
         // 찜 목록 → 그 카페가 선택된 채로 기록 모달을 연다(기억이 살아있는 순간에 잇기).
-        onRecord={(c: Cafe) => { setShowFavs(false); setEditCafeId(c.id); setShowMyCafeReg(true); }} />}
+        onRecord={(c: Cafe) => { trackOutbound({ target: "record", cafeId: c.id, source: "찜목록" }); setShowFavs(false); setEditCafeId(c.id); setShowMyCafeReg(true); }} />}
       {showMyCafeReg && <MyCafeRegModal cafes={cafes} device={deviceId} visits={myVisits} pin={sessionPin} initialCafeId={editCafeId} onClose={() => { setShowMyCafeReg(false); setEditCafeId(null); }} onDone={() => { reloadMyCafes(deviceId, sessionPin); }} />}
 
       {selected && <CafePanel cafe={selected} dist={axisDist} allCafes={cafes} onOpenCafe={openById} bookmarked={bookmarkIds.has(selected.id)} onToggleBookmark={() => toggleBookmark(selected.id)} onSaveMemory={() => { setEditCafeId(selected.id); setShowMyCafeReg(true); }} onClose={() => setSelected(null)} onMap={() => {
@@ -1811,7 +1814,7 @@ function MapControls({ sido, sigungu, dong, onSido, onSigungu, setDong, dongOpti
     <>
       {/* 즐겨찾기 진입 — 데스크톱 전용(모바일은 하단 네비에 이미 있음). 하단 네비는 md:hidden이라 데스크톱엔 진입로가 없었음 */}
       {setShowFavs && (
-        <button onClick={() => setShowFavs(true)} className="hidden md:flex items-center justify-center gap-1.5 w-full mb-4 rounded-xl border border-[#e8b4c4] bg-[#fdf0f4] text-[#d6336c] font-bold text-sm py-2.5 active:bg-[#fbe4ec]" aria-label={`즐겨찾기${favCount ? ` ${favCount}곳` : ""}`}>
+        <button onClick={() => { trackOutbound({ target: "fav_open", source: "지도앱" }); setShowFavs(true); }} className="hidden md:flex items-center justify-center gap-1.5 w-full mb-4 rounded-xl border border-[#e8b4c4] bg-[#fdf0f4] text-[#d6336c] font-bold text-sm py-2.5 active:bg-[#fbe4ec]" aria-label={`즐겨찾기${favCount ? ` ${favCount}곳` : ""}`}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="#d6336c" stroke="#d6336c" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M12 4.5l2.3 4.7 5.2.8-3.75 3.65.9 5.15L12 16.9l-4.65 2.45.9-5.15L4.5 10l5.2-.8z" /></svg>
           즐겨찾기{favCount ? ` (${favCount})` : ""}
         </button>
@@ -2010,7 +2013,7 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
             <div className="flex items-center gap-1 shrink-0">
               <span className="relative inline-flex">
                 {saveFx && <span className="dcn-fly" aria-hidden="true">★</span>}
-                <button onClick={onBookmark} aria-label="즐겨찾기" className={`flex items-center gap-1 border rounded-full px-2.5 py-1 text-[12px] font-medium transition-colors ${saveFx ? "dcn-pop" : ""}`} style={bookmarked ? { color: "#fff", background: "#f0a832", borderColor: "#f0a832" } : { color: "#9c6b3f", borderColor: "#e0d2bd" }}>{bookmarked ? "★ 즐겨찾기" : "☆ 즐겨찾기"}</button>
+                <button onClick={() => { trackOutbound({ target: "fav_toggle", source: "지도앱" }); onBookmark?.(); }} aria-label="즐겨찾기" className={`flex items-center gap-1 border rounded-full px-2.5 py-1 text-[12px] font-medium transition-colors ${saveFx ? "dcn-pop" : ""}`} style={bookmarked ? { color: "#fff", background: "#f0a832", borderColor: "#f0a832" } : { color: "#9c6b3f", borderColor: "#e0d2bd" }}>{bookmarked ? "★ 즐겨찾기" : "☆ 즐겨찾기"}</button>
               </span>
               <KakaoShare
                 title={`${cafe.name} (${cafe.area})`}
