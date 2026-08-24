@@ -80,6 +80,24 @@ const DRINK_TASTING_CUES = /(마셨|마시고|시켜서\s*마|시켰|한\s*잔\s
 //   "방문"이 VISIT_CUES에 걸려 정비기사의 작업방문을 고객의 매장방문으로 오판 — WHOLESALE_RETAIL_CUES와
 //   동일 메커니즘.
 const EQUIPMENT_SERVICE_BLOG = /(커피머신\s*(수리|누수|점검|설치|AS)|반자동\s*커피머신\s*수리|에스프레소\s*머신\s*(수리|설치|점검)|그라인더\s*(수리|점검|AS)|소모품\s*교체.{0,15}(핫워터디스펜서|커피머신|디스펜서)|AS\s*(요청|후기).{0,20}방문\s*드렸|정비\s*(방문|후기|일지)|(씨메|CIME|라심발리|LA\s*CIMBALI|훼마|페마|세코)\s*[A-Za-z0-9]*\s*(수리|정비|AS))/i;
+// 룰갭 CLUB_MEETUP_LOGISTICS_LEAK(2026-08-24, decisions#813, rulegap-proposals-20260824-1617.md 제안1):
+//   네이버 카페(cafe.naver.com — 동호회 커뮤니티 게시판) 정기모임·번개모임 공지문이 "일시:/장소:" 로지스틱스
+//   정형구만 담고 카페 실질맥락(맛·메뉴·분위기)이 전무한데도, 카페명 정확언급+시간/장소 정보를 구체 후기
+//   신호로 오판정해 통과했다(id1198 카페소소=자동차 동호회, id11232 차너른=등산 동호회, id6844 허니브라운=
+//   악기 동호회 3건 실측, raw_reviews DB 원문 대조 완료). 실측 확인: 이 소스는 SourceKind가 항상 'blog'로
+//   저장돼(collectOrchestrator.ts SRC_KIND엔 'cafearticle' 매핑 자체가 없음 — QualityInput.source로는 절대
+//   구분 불가) link 도메인(cafe.naver.com)만이 유일한 구분 신호다. 또한 id1198 원문("커피번개")처럼 모임
+//   이름 자체에 "커피" 같은 카테고리어가 섞여 CAFE_CONTEXT_SUBSTANCE(커피·라떼·디저트 등)가 우연히 참이
+//   되므로, 그 상수 대신 실제 음료 소비 서술 전용인 DRINK_TASTING_CUES(마셨·시켜서 마·앉아서 등 — 위 H18
+//   바리스타 교육원 게이트와 동일 이유, 76행 주석 참조)로 "진짜 마셨는지"만 확인한다. 대조군(id8972 콜로라도
+//   프로젝트=카페 자체 주최 공연초대, id8040 유재학빨간풍차과자점=개인블로거 실제 방문후기)은 링크가
+//   cafe.naver.com이 아니라 이 게이트에 걸리지 않는다.
+const CLUB_NAVER_LINK = /cafe\.naver\.com\//i;
+const CLUB_MEETUP_LOGISTICS_CUES = /(모임\s*일시|모임\s*장소|번개|정(모|기\s*모임)\s*안내|찍턴)/;
+// "내려가지 마시고"·"오르지 마시고" 같은 부정 명령형 관용구("-지 말다")의 "마시고"가 DRINK_TASTING_CUES의
+//   "마시고"(마시다=drink)와 문자열이 같아 등산·나들이 모임 공지문(id11232 실측: "내려가지 마시고 자전거
+//   거치대...")에서 실제 음료 시음으로 오매칭된다. 이 게이트 전용으로만 그 관용구를 지우고 판정한다.
+const NEGATIVE_IMPERATIVE_IDIOM = /[가-힣]지\s*마시고/g;
 
 // 실제 경험·평가가 담겼는지 (감각/메뉴/서비스/공간 등 구체 신호)
 const SUBSTANCE_CUES = [
@@ -1206,7 +1224,12 @@ export function verifyReview(input: QualityInput): QualityResult {
   // 룰갭 P67(decisions#667): 정비업체 영업일지 강신호가 있고 매장 실물방문·시음 신호가 전무하면 위 세
   //   패턴과 동일하게 VISIT_CUES 매칭(정비기사의 "방문 드렸습니다")을 무효화한다.
   const equipmentServiceOnly = EQUIPMENT_SERVICE_BLOG.test(fullL) && !INSTORE_VISIT_CUES.test(fullL) && !DRINK_TASTING_CUES.test(fullL);
-  const visit = has(fullL, VISIT_CUES) && !deliveryOnly && !pickupOnly && !wholesaleOnly && !equipmentServiceOnly;
+  // 룰갭 CLUB_MEETUP_LOGISTICS_LEAK(decisions#813): 네이버 카페(cafe.naver.com) 동호회 모임 공지문(모임
+  //   로지스틱스 정형구) + 실제 음료 소비 서술 전무 시 VISIT_CUES 매칭을 무효화한다 — "실제 방문 단서"
+  //   판정이 모임 공지문의 로지스틱스 서술에 우연 매칭되던 것(id11232 실측)을 차단.
+  const clubMeetupLogisticsLeak = CLUB_NAVER_LINK.test(input.link ?? "") && CLUB_MEETUP_LOGISTICS_CUES.test(fullL)
+    && !DRINK_TASTING_CUES.test(fullL.replace(NEGATIVE_IMPERATIVE_IDIOM, ""));
+  const visit = has(fullL, VISIT_CUES) && !deliveryOnly && !pickupOnly && !wholesaleOnly && !equipmentServiceOnly && !clubMeetupLogisticsLeak;
   const substance = SUBSTANCE_CUES.filter((k) => fullL.includes(k.toLowerCase())).length;
   // [#4] 흔한 단어 이름 오매칭 방지: 전체 이름 일치는 강함. 토큰만 일치면
   //     '카페 맥락(카페·커피·로스터리…)'이나 지역이 함께 있어야 주제로 인정.
@@ -1886,6 +1909,12 @@ export function verifyReview(input: QualityInput): QualityResult {
   //   WHOLESALE_RETAIL_CUES와 달리 정상 카페 겸업 가능성이 없어 borderline 없이 바로 탈락.
   if (equipmentServiceOnly && !visit && substance === 0 && (nameInTitle || nameInBody)) {
     return { verdict: "rejected", score: 5, reasons: ["커피머신/에스프레소머신 정비업체 영업일지(고객 방문경험 서술 없음) — 자동 제외"], signals: sig };
+  }
+  // 룰갭 CLUB_MEETUP_LOGISTICS_LEAK(decisions#813): 네이버 카페 동호회 모임 공지문(모임일시/모임장소/번개/
+  //   정모 안내/찍턴 정형구 + 카페 실질맥락 전무)은 표본 소수(n=3)라 하드탈락 대신 borderline(LLM 재판정)으로
+  //   격하한다(action_params 권고 그대로 반영).
+  if (clubMeetupLogisticsLeak && (nameInTitle || nameInBody)) {
+    return { verdict: "rejected", score: 30, reasons: ["네이버 카페 동호회 모임 공지문(로지스틱스 정형구 — 카페 실질맥락 없음) — LLM 재판정"], borderline: true, signals: sig };
   }
   if (!visit && substance === 0) {
     return { verdict: "rejected", score: 10, reasons: ["방문·경험·평가 내용 없음(언급만)"], signals: sig };
