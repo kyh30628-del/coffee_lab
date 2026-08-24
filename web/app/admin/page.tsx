@@ -42,6 +42,8 @@ const SRC_GROUPS: { key: string; label: string; color: string; match: (s: string
   { key: "internal", label: "내부(자체 배포 URL·실유입 아님)", color: "bg-stone-300", match: (s) => /vercel\.app|vercel\.$|coffee-lab-git-|coffee-h2wf/i.test(s) },
   { key: "unknown", label: "미상", color: "bg-stone-400", match: (s) => s === "미상" },
 ];
+// 🐛 정의정정(협업#337, 08-24) — avg_visits는 user_consents.visit_count 평균이고 이건 페이지뷰 누적치다
+//   (앱/api/visit/route.ts에서 페이지 이동마다 +1). "재방문"이 아니므로 avgVisits 표시는 반드시 "장"(페이지) 단위로.
 function groupSources(sources: { src: string; visitors: number; avg_visits: string | number }[]) {
   const buckets: Record<string, { label: string; color: string; visitors: number; weightedAvgSum: number; raw: typeof sources }> = {};
   for (const s of sources || []) {
@@ -1342,12 +1344,12 @@ export default function AdminPage() {
                       )}
                       <div className="bg-white rounded-xl border border-stone-300 p-3">
                         <div className="text-[12px] font-bold text-stone-700">유입경로 <span className="font-normal text-stone-600 text-[10px]">채널로 묶음</span></div>
-                        <p className="text-[9.5px] text-stone-600 mb-2">어디서 들어왔는지 의미 있는 채널로 묶었습니다. '평균'은 그 채널 방문자의 재방문 횟수 — 높을수록 충성도↑.</p>
+                        <p className="text-[9.5px] text-stone-600 mb-2">어디서 들어왔는지 의미 있는 채널로 묶었습니다. '평균'은 그 채널 방문자가 한 번 올 때 둘러본 페이지 수(참고용 관여도) — 재방문 횟수 아님.</p>
                         {srcGroups.length === 0 ? <p className="text-[11px] text-stone-600">데이터 없음</p> : srcGroups.map((g) => (
                           <div key={g.key} className={`mb-1.5 ${g.isInternal ? "opacity-60" : ""}`}>
                             <div className="flex justify-between text-[10.5px] mb-0.5">
                               <span className={`font-medium ${g.isInternal ? "text-stone-500" : "text-stone-700"}`}>{g.label}{g.isInternal && <span className="ml-1 text-stone-500 font-normal">(제외하고 판단)</span>}</span>
-                              <span className="text-stone-700">{g.visitors}명 <span className="text-stone-600">({g.pct}%) · 평균 {g.avgVisits}회</span></span>
+                              <span className="text-stone-700">{g.visitors}명 <span className="text-stone-600">({g.pct}%) · 평균 {g.avgVisits}장</span></span>
                             </div>
                             <div className="h-2.5 bg-stone-100 rounded-full overflow-hidden"><div className={`h-full ${g.color} rounded-full`} style={{ width: `${(g.visitors / maxSrcGroup) * 100}%` }}></div></div>
                           </div>
@@ -1359,7 +1361,7 @@ export default function AdminPage() {
                               {a.sources.map((s: any, i: number) => (
                                 <div key={i} className="flex justify-between text-[9.5px] text-stone-600">
                                   <span className="truncate mr-2">{s.src === "미상" ? "미상 (추적 도입 전 방문)" : s.src}</span>
-                                  <span className="shrink-0">{s.visitors}명 ({Math.round((s.visitors / srcTotal) * 100)}%) · 평균 {s.avg_visits}회</span>
+                                  <span className="shrink-0">{s.visitors}명 ({Math.round((s.visitors / srcTotal) * 100)}%) · 평균 {s.avg_visits}장</span>
                                 </div>
                               ))}
                             </div>

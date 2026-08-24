@@ -294,7 +294,8 @@ export async function GET(req: NextRequest) {
     if ((traffic?.mau ?? 0) > 0 && trafficSources.every((r) => r.s === "미상")) {
       notices.push(`유입경로 데이터 수집 시작 — 출처는 다음 방문분부터 채워집니다(현재 방문자 출처 '미상')`);
     }
-    // 출처별 참여도(평균 재방문수) — 어디서 온 사람이 더 들러붙나.
+    // 출처별 참여도(평균 페이지뷰) — 어디서 온 사람이 더 들러붙나.
+    // 🐛 정의정정(협업#337, 08-24) — avg_visits = AVG(visit_count)는 페이지뷰 누적치, "재방문수" 아님(admin/analytics.ts와 동일 정의 사용).
     const sourceEngage = (await sql.query(
       `SELECT COALESCE(NULLIF(src,''),'미상') AS s, COUNT(*)::int n, ROUND(AVG(COALESCE(visit_count,1))::numeric,1) AS avg_visits
        FROM user_consents WHERE last_seen > now()-interval '30 days' AND anon_id NOT IN (${BOT_ANON_IDS_SQL})
