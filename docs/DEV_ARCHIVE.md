@@ -264,3 +264,4 @@
 | 2026-08-24 07:05 | #810 | [룰갭 신규] P73(네이버카페 자기홍보 정형구) 미수정 반쪽 — inTitleFull 경로 CAFE_CON | 4d192611 | - | lib/reviewQuality.ts:1478 inTitleFull(제목=카페명) 게이트를 body-only 경로(:1877, P73/#798)와 대칭으로 수정 — source== |
 | 2026-08-24 11:05 | #811 | [개발] [정합성 발견] instagram_url 근접 오귀속 의심 40쌍(80곳) — enrichment  | 18ceea7d | - | lib/discover.ts: healInstagramMisattribution() 추가 — 조사결과 brandTokenOverlap 게이트(#780)는 이미 정상 작동 중(재현  |
 | 2026-08-24 11:05 | #812 | [룰갭 신규] 동명 상품/식물명 판매 콘텐츠(리테일 브랜드 자사글) — 정확 동명일치로 CAFE_CONTEX | 4d8d7fda | - | lib/reviewQuality.ts: CAFE_CONTEXT_SUBSTANCE에 커피(?!테이블 나무) 부정형lookahead 추가(커피테이블·커피나무 복합어 오탐 차단) + B |
+| 2026-08-24 23:05 | #813 | [룰갭 신규] 동호회 커뮤니티 모임 공지문이 실제 후기로 오판정 (id1198 카페소소·id11232 차너른 | deb5ce64 | - | lib/reviewQuality.ts: CLUB_MEETUP_LOGISTICS_LEAK 게이트 신규(CLUB_NAVER_LINK+CLUB_MEETUP_LOGISTICS_CUES 동 |
