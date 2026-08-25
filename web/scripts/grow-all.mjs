@@ -17,13 +17,23 @@ import { readFileSync } from "fs";
 for (const l of readFileSync(".env.local", "utf8").split("\n")) { const m = l.match(/^([A-Z_0-9]+)=(.*)$/); if (m) process.env[m[1]] = m[2].replace(/^["']|["']$/g, ""); }
 const { discoverRegion, METRO_REGIONS } = await import("../lib/discover.ts");
 const { naverUsedToday, naverBlocked } = await import("../lib/naverBudget.ts");
+const { neon } = await import("@neondatabase/serverless");
+const sql = neon(process.env.DATABASE_URL);
 
 const arg = (k, d) => { const a = process.argv.find((x) => x.startsWith(`--${k}=`)); return a ? a.split("=")[1] : d; };
 const FILTER = arg("filter", "");
 // 쿼터 상한: 하루 25,000 중 크론 몫을 남겨둔다. 기본 5,000 = 현재 여유(6,300)보다 보수적.
 const BUDGET = Number(arg("budget", 5000));
 
-const targets = METRO_REGIONS.filter((r) => !FILTER || r.region.includes(FILTER));
+// ⚠️ 순서는 METRO_REGIONS 배열 순이 아니라 **가장 오래 안 훑은 지역 먼저**(cron-grow와 같은 원칙).
+//   그냥 배열 순으로 돌면 중단 후 재실행할 때마다 앞쪽 지역만 반복해 예산을 태운다(2026-08-25 실제로 밟음).
+const pool = METRO_REGIONS.filter((r) => !FILTER || r.region.includes(FILTER));
+let order = new Map();
+try {
+  const st = await sql`SELECT region, last_run FROM discovery_state`;
+  for (const x of st) order.set(x.region, x.last_run ? new Date(x.last_run).getTime() : 0);
+} catch {}
+const targets = pool.sort((a, b) => (order.get(a.region) ?? 0) - (order.get(b.region) ?? 0));
 const startUsed = await naverUsedToday();
 console.log(`대상 ${targets.length}개 지역${FILTER ? ` (필터: ${FILTER})` : ""} · 시작 시점 쿼터 사용 ${startUsed}/25000 · 이번 실행 예산 ${BUDGET}콜\n`);
 
@@ -37,6 +47,9 @@ for (const r of targets) {
   try {
     const res = await discoverRegion(r.region, r.areaLabel);
     totalNew += res.inserted; totalFound += res.found ?? 0; done++;
+    // 발굴 이력 기록 — 이게 없으면 cron-grow가 방금 훑은 지역을 또 훑고, 이 스크립트도 재실행 때 앞부터 반복한다.
+    await sql`INSERT INTO discovery_state (region, area_label, last_run) VALUES (${r.region}, ${r.areaLabel}, now())
+      ON CONFLICT (region) DO UPDATE SET last_run = now()`.catch(() => {});
     console.log(`  ${String(r.areaLabel).padEnd(12)} 발견 ${String(res.found ?? 0).padStart(4)} · 신규 ${String(res.inserted).padStart(4)} · 누적신규 ${totalNew}`);
   } catch (e) {
     console.log(`  ${String(r.areaLabel).padEnd(12)} 오류 ${String(e).slice(0, 60)}`);

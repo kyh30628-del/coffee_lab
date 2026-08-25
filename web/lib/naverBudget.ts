@@ -9,6 +9,11 @@
 //   않고 시각만 찍어 **쿨다운(기본 20분) 뒤 자동 만료**(일시·초기 429가 하루를 잠그지 않게).
 import { sql } from "./db";
 
+// 🚨 **이 카운터는 search/local(발굴) 전용이다 — 네이버 전체 사용량이 아니다.**
+//   bumpNaver는 lib/discover.ts 한 곳에서만 호출된다. 후기 수집(lib/webSearchCollector.ts의
+//   blog·cafearticle)은 여기 안 잡힌다 — 네이버는 **API별로 한도가 따로**라 그게 맞다.
+//   ⚠️ 2026-08-25 사고: 이 값(21,906)을 '네이버 전체 잔여'로 오해해 후기 수집을 스스로 멈췄다.
+//      실제로는 local·blog·webkr 모두 200 정상이었다. 이 숫자로 수집 경로를 막지 말 것.
 export const NAVER_DAILY_QUOTA = 25000;
 // 발굴 스윕이 남겨둘 예약분(cron-grow 2h용). 기본 30%(7,500) — 하루 12회 cron-grow가 지역당 ~600콜.
 export const NAVER_SWEEP_RESERVE = Number(process.env.NAVER_SWEEP_RESERVE || 7500);
