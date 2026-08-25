@@ -2,6 +2,7 @@
 // 등록 상가 중 '커피전문점/카페/다방'만 → 위경도(WGS84) 직접 제공(좌표변환 불필요).
 // 프랜차이즈·중복 제외, 비공개로 적재 후 합성 단계에서 검증. 키 없거나 검증 전엔 dry-run.
 import { sql } from "./db";
+import { brandTokenOverlap } from "./reviewQuality";
 
 const KEY = process.env.DATA_GO_KR_KEY;
 export const hasSanggaKey = () => !!KEY;
@@ -62,7 +63,14 @@ export async function discoverSangga(signguCd: string, areaLabel: string, opts?:
   let inserted = 0, skipped = 0;
   if (apply) {
     for (const it of cands) {
-      const exists = await sql`SELECT id FROM cafes WHERE name = ${it.name} OR (ABS(lat - ${it.lat}) < 0.0005 AND ABS(lng - ${it.lng}) < 0.0005) LIMIT 1`;
+      // 🐛 2026-08-25 전수점검: 좌표 근접(약 55m)만으로 이름검증 없이 '이미 있음' 처리하던 과잉차단 교정
+      //   (lib/discover.ts decisions#814와 같은 버그). 좌표는 후보만 뽑고 동일 판정은 이름으로 한다.
+      //   ⚠️ 밀도 의존 — DB가 커질수록 55m 안에 뭔가 있을 확률이 올라가 같은 코드가 점점 더 많이 버린다.
+      const nameHit = await sql`SELECT id FROM cafes WHERE name = ${it.name} LIMIT 1`;
+      const nearRows = nameHit.length ? [] : (await sql`SELECT id, name FROM cafes
+        WHERE ABS(lat - ${it.lat}) < 0.0005 AND ABS(lng - ${it.lng}) < 0.0005 LIMIT 5`) as any[];
+      const exists = nameHit.length ? nameHit
+        : (nearRows.some((r: any) => brandTokenOverlap(r.name, it.name)) ? nearRows : []);
       if (exists.length > 0) { skipped++; continue; }
       const pseudoId = `dg_${it.name.replace(/\s/g, "")}_${Math.round(it.lat * 1e5)}`;
       await sql`

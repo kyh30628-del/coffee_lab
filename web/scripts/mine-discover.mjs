@@ -6,6 +6,7 @@ import { readFileSync } from "node:fs";
 const env = readFileSync(new URL("../.env.local", import.meta.url), "utf8");
 for (const l of env.split("\n")) { const m = l.match(/^([A-Z_0-9]+)=(.*)$/); if (m) process.env[m[1]] = m[2].replace(/^["']|["']$/g, ""); }
 const { coreTokens } = await import("../lib/reviewQuality.ts");
+const { brandTokenOverlap } = await import("../lib/reviewQuality.ts");
 import { neon } from "@neondatabase/serverless";
 const sql = neon(process.env.DATABASE_URL);
 const ID = process.env.NAVER_CLIENT_ID, SEC = process.env.NAVER_CLIENT_SECRET;
@@ -61,7 +62,9 @@ for (const c of pool) {
   const lat = Number(hit.mapy)/1e7, lng = Number(hit.mapx)/1e7;
   const nN = norm(name);
   // 최종 중복: 이름 또는 좌표 근사
-  if (haveN.some(h=>h.includes(nN)||nN.includes(h)) || all.some(a=>a.lat&&Math.abs(a.lat-lat)<0.0005&&Math.abs(a.lng-lng)<0.0005) || found.some(f=>norm(f.name)===nN)) { skip++; await new Promise(r=>setTimeout(r,110)); continue; }
+  // 🐛 2026-08-25 전수점검: 좌표만으로 이름검증 없이 버리던 과잉차단 교정(decisions#814와 같은 버그·밀도 의존)
+  const nearDup = all.find(a=>a.lat&&Math.abs(a.lat-lat)<0.0005&&Math.abs(a.lng-lng)<0.0005);
+  if (haveN.some(h=>h.includes(nN)||nN.includes(h)) || (nearDup && brandTokenOverlap(nearDup.name, name)) || found.some(f=>norm(f.name)===nN)) { skip++; await new Promise(r=>setTimeout(r,110)); continue; }
   const dong = dongOf(hit.address);
   found.push({ name, addr:hit.address, dong, lat, lng, cat:hit.category, count:c.count });
   if (APPLY) {

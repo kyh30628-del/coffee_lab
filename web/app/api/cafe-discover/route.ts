@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { brandTokenOverlap } from "@/lib/reviewQuality";
 import { sql, ensureSchema } from "@/lib/db";
 
 export const runtime = "nodejs";
@@ -68,8 +69,13 @@ export async function POST(req: NextRequest) {
     // DB 적재 (중복은 이름+좌표 근사로 스킵, published=false)
     let inserted = 0, skipped = 0;
     for (const it of found) {
-      const exists = await sql`
-        SELECT id FROM cafes WHERE name = ${it.name} OR (ABS(lat - ${it.lat}) < 0.0005 AND ABS(lng - ${it.lng}) < 0.0005) LIMIT 1`;
+      // 🐛 2026-08-25 전수점검: 좌표 근접(55m)만으로 이름검증 없이 중복 처리하던 과잉차단 교정
+      //   (decisions#814와 같은 버그·밀도 의존). 좌표는 후보만, 동일 판정은 이름으로.
+      const nameHit = await sql`SELECT id FROM cafes WHERE name = ${it.name} LIMIT 1`;
+      const nearRows = nameHit.length ? [] : (await sql`SELECT id, name FROM cafes
+        WHERE ABS(lat - ${it.lat}) < 0.0005 AND ABS(lng - ${it.lng}) < 0.0005 LIMIT 5`) as any[];
+      const exists = nameHit.length ? nameHit
+        : (nearRows.some((r: any) => brandTokenOverlap(r.name, it.name)) ? nearRows : []);
       if (exists.length > 0) { skipped++; continue; }
       const pseudoId = `nl_${it.name.replace(/\s/g, "")}_${Math.round(it.lat * 1e5)}`;
       await sql`
