@@ -19,11 +19,12 @@ export const META: CriterionMeta[] = [
   // 등급 바닥
   { key: "grade.floor.verified", category: "등급", label: "검증 등급 최소 검증리뷰 수(광고 제외)", def: 30, min: 5, max: 100, unit: "건" },
   { key: "grade.floor.reference", category: "등급", label: "참고 등급 최소 검증리뷰 수(광고 제외)", def: 3, min: 1, max: 50, unit: "건" },
-  // 수도권 좌표 박스 (현재값 ±2)
-  { key: "geo.box.lat_min", category: "지리", label: "수도권 좌표 박스 최소 위도(이하 비수도권 제외)", def: 36.8, min: 34.8, max: 38.8, unit: "°" },
-  { key: "geo.box.lat_max", category: "지리", label: "수도권 좌표 박스 최대 위도(이상 비수도권 제외)", def: 38.3, min: 36.3, max: 40.3, unit: "°" },
-  { key: "geo.box.lng_min", category: "지리", label: "수도권 좌표 박스 최소 경도(이하 비수도권 제외)", def: 124.5, min: 122.5, max: 126.5, unit: "°" },
-  { key: "geo.box.lng_max", category: "지리", label: "수도권 좌표 박스 최대 경도(이상 비수도권 제외)", def: 127.9, min: 125.9, max: 129.9, unit: "°" },
+  // 서비스 범위 좌표 박스 — 2026-08-25 강원 편입으로 위 38.3→38.7(고성), 경 127.9→129.4(삼척) 확대.
+  //   ⚠️ DB criteria 행과 반드시 같아야 한다(DB 장애 시 이 값이 진실 → 어긋나면 강원이 통째로 배제된다).
+  { key: "geo.box.lat_min", category: "지리", label: "서비스범위 좌표 박스 최소 위도(이하 범위밖 제외)", def: 36.8, min: 34.8, max: 38.8, unit: "°" },
+  { key: "geo.box.lat_max", category: "지리", label: "서비스범위 좌표 박스 최대 위도(이상 범위밖 제외)", def: 38.7, min: 36.3, max: 40.3, unit: "°" },
+  { key: "geo.box.lng_min", category: "지리", label: "서비스범위 좌표 박스 최소 경도(이하 범위밖 제외)", def: 124.5, min: 122.5, max: 126.5, unit: "°" },
+  { key: "geo.box.lng_max", category: "지리", label: "서비스범위 좌표 박스 최대 경도(이상 범위밖 제외)", def: 129.4, min: 125.9, max: 129.9, unit: "°" },
   // 검색 등급 가산점
   { key: "search.grade_bonus.verified", category: "검색", label: "검색 랭킹 등급 가산점(검증)", def: 25, min: 0, max: 100, unit: "점" },
   { key: "search.grade_bonus.reference", category: "검색", label: "검색 랭킹 등급 가산점(참고)", def: 8, min: 0, max: 100, unit: "점" },
@@ -38,6 +39,12 @@ export const META: CriterionMeta[] = [
   { key: "contamination.ambiguous.coherence_max", category: "오염", label: "LLM 재판정 트리거: 이름일관성 상한(미만이면 애매)", def: 0.55, min: 0, max: 1, unit: "비율" },
   { key: "contamination.ambiguous.offctx_min", category: "오염", label: "LLM 재판정 트리거: 맥락없음비율 하한(이상이면 애매)", def: 0.5, min: 0, max: 1, unit: "비율" },
   { key: "contamination.offctx.min_sample", category: "오염", label: "맥락없음비율 산출 최소 인용문 수(미만이면 0)", def: 8, min: 1, max: 50, unit: "건" },
+  // 방문객 성격(🧳여행/🏠동네) — lib/visitorMix.ts 소비. 관광 배지는 오탐(동네 카페에 관광지 낙인)이
+  //   손상이 크므로 보수적으로 잡았다: 표본15건+20%면 수도권 공개의 0.7%만 해당하고 오탐후보 0곳(실측).
+  { key: "visitor.trip.min_sample", category: "방문객", label: "🧳여행 배지 최소 인용문 수", def: 15, min: 5, max: 60, unit: "건" },
+  { key: "visitor.trip.rate", category: "방문객", label: "🧳여행 배지 최소 여행신호 비율", def: 0.20, min: 0.05, max: 0.6, unit: "비율" },
+  { key: "visitor.local.min_sample", category: "방문객", label: "🏠동네 배지 최소 인용문 수", def: 10, min: 5, max: 60, unit: "건" },
+  { key: "visitor.local.rate", category: "방문객", label: "🏠동네 배지 최소 동네신호 비율", def: 0.08, min: 0.02, max: 0.5, unit: "비율" },
   { key: "contamination.nocafe.min_collected", category: "오염", label: "카페정체성0 비카페판정 최소 수집건수", def: 3, min: 1, max: 50, unit: "건" },
 
   // ── Phase 2 · 검색 랭킹 가중치 (app/api/search/route.ts) ──

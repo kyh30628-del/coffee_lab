@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { cache } from "react";
 import { sql, ensureOnce } from "@/lib/db";
+import { visitorBadges } from "@/lib/visitorMix";
 import KakaoShare from "../../KakaoShare";
 import SaveMemoryButton from "./SaveMemoryButton";
 import WishButton from "../../WishButton";
@@ -45,7 +46,7 @@ async function getCafe(id: string) {
   const n = Number(id);
   if (!Number.isFinite(n) || n <= 0) return null;
   try {
-    return (await sql`SELECT id, name, area, dong, address, lat, lng, synth_grade, synth_identity, synth_count, char_scores, synth_reviews_all, synth_reviews, reputation_note, synth_quality FROM cafes WHERE id=${n} AND published=true LIMIT 1`)[0] as any ?? null;
+    return (await sql`SELECT id, name, area, dong, address, lat, lng, synth_grade, synth_identity, synth_count, char_scores, synth_reviews_all, synth_reviews, reputation_note, synth_quality, visitor_n, visitor_trip, visitor_local FROM cafes WHERE id=${n} AND published=true LIMIT 1`)[0] as any ?? null;
   } catch { return null; }
 }
 // 등급(검증/참고/후보)→JSON-LD aggregateRating.ratingValue 근사치. 별점을 직접 수집하지 않으므로 등급 기반 대리값.
@@ -227,6 +228,17 @@ export default async function CafePage({ params }: Props) {
             <h1 className="text-2xl font-bold">{c.name}</h1>
             {grade && <span className="text-[11px] font-bold bg-[#2b2018] text-[#e8b87a] px-2 py-0.5 rounded-full">{grade}</span>}
           </div>
+          {/* 🧳🏠 방문객 성격 — "이 후기를 누가 썼나". 카페를 단정하지 않고(관광지다X) 근거만 말한다.
+              누군가에겐 관광지여도 거기 사는 사람에겐 동네다 — 그래서 두 배지는 배타적이지 않다(둘 다 붙을 수 있음). */}
+          {visitorBadges({ n: c.visitor_n ?? 0, trip: c.visitor_trip ?? 0, local: c.visitor_local ?? 0 }).length > 0 && (
+            <div className="flex items-center gap-1.5 flex-wrap mb-2">
+              {visitorBadges({ n: c.visitor_n ?? 0, trip: c.visitor_trip ?? 0, local: c.visitor_local ?? 0 }).map((b) => (
+                <span key={b.key} className="text-[11px] font-bold text-[#4a5a4e] bg-[#e6efe8] border border-[#c9dbcf] px-2 py-0.5 rounded-full">
+                  {b.emoji} {b.label} <span className="font-normal text-[#6b7d71]">({b.note})</span>
+                </span>
+              ))}
+            </div>
+          )}
           <div className="flex items-center justify-between gap-2 mb-4">
             <p className="text-[#7a5122] text-sm">{c.area}</p>
             {/* ❤ 2026-08-21: 이 자리는 **고르는 사람**의 자리다 — 위치인증 저장(다녀온 사람용) 대신 무마찰 찜.

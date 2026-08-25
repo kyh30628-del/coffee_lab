@@ -6,6 +6,7 @@ import { fetchPlacesReviews } from "./placesCollector";
 import { fetchWebReviews } from "./webSearchCollector";
 import { fetchYouTubeReviews } from "./youtubeCollector";
 import { collectAndSynthesize, type RawSource, type BorderlineItem, type CollectResult } from "./collectOrchestrator";
+import { visitorMix } from "./visitorMix";
 import { upsertReviewerStats } from "./reviewerProfiles";
 import { judgeReviews, hasJudgeKey } from "./reviewJudge";
 import { isNonCafe, isFranchise, isGenericFoodName, isSnackStall, isStructuralPhantom, isUnmannedCafe } from "./discover";
@@ -73,7 +74,12 @@ async function ensureCols() {
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS yt_checked_at TIMESTAMPTZ`;
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS judge_decisions JSONB`; // 판정 AI 결정(key→keep/drop) 영구 보존 → 재합성해도 유지
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_coherence REAL`; // 근거후기 이름일관성(0~1) — 그라운딩을 '애매한 곳'에만 돌리는 효율 게이트용
-  await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS offctx_rate REAL`; // 표시 리뷰 중 '카페 맥락어 없는 비율'(0~1) — 규칙-사각 오염(딴업종·문구이름) 관제탑 감시 지표
+  await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS offctx_rate REAL`;
+  // 🧳🏠 방문객 성격(lib/visitorMix.ts) — 인용문 중 여행신호·동네신호 비율. 배지 표시용.
+  //   비율만 저장하고 판정(임계)은 표시 시점에 한다 — 임계를 criteria로 무배포 조정해도 재합성이 필요 없게.
+  await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS visitor_n INT`;
+  await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS visitor_trip REAL`;
+  await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS visitor_local REAL`; // 표시 리뷰 중 '카페 맥락어 없는 비율'(0~1) — 규칙-사각 오염(딴업종·문구이름) 관제탑 감시 지표
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS offctx_ok BOOLEAN DEFAULT false`; // 사람이 '진짜 카페'로 확인한 화이트리스트 → offctx 점검목록서 제외(프록시 오탐 반복 방지)
   });
   ensured = true;
@@ -236,6 +242,8 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   const loc = (await sql`SELECT area, dong FROM cafes WHERE id=${cafeId}`)[0] as any; // 지역어(시+동) — coherence가 지역어를 식별토큰서 빼게
   const coherence = nameCoherence(name, (evidenceReviews as any[]).map((r) => r?.quote || ""), [loc?.area, loc?.dong].filter(Boolean));
   const offctx = offctxRate(((allEvidence ?? evidenceReviews) as any[]).map((r) => r?.quote || "")); // 맥락없음 비율(관제탑 감시)
+  // 🧳🏠 방문객 성격 — offctx와 같은 인용문 풀에서 뽑는다(같은 근거 = 같은 잣대). 추가 조회 0.
+  const vmix = visitorMix(((allEvidence ?? evidenceReviews) as any[]).map((r) => r?.quote || ""));
   // 🚨 비카페 업체 지배: 노출 리뷰가 '다른 업종 업체어'(킥복싱·냉삼·만두·미용실·펜션…)에 지배되면
   //   이름이 겹쳐 coherence가 속아도(라온=라온킥복싱, PLMM사가정=사가정 만두집) 오염 → 공개 차단.
   //   카페어보다 비카페어가 많고 다수 후기에 퍼져 있을 때만(근처 헬스장 한번 언급한 정상카페는 통과).
@@ -330,9 +338,9 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   //   여기 한 곳만으로 자동 적용되고, 계약에 이 대상이 없으면 드리프트로 잡힌다.
   noteWrite("cafes.synth_reviews"); noteWrite("cafes.synth_reviews_all"); noteWrite("cafes.published");
   if (llmJudged) {
-    await sql`UPDATE cafes SET synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_coherence=${coherence}, offctx_rate=${offctx}, needs_llm=${needsLLM}, needs_llm_priority=${needsLlmPriority}, borderline_count=${blCount}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${safeJson(evidenceReviews)}, synth_reviews_all=${allEv}, char_scores=${safeJson(charScores)}, synth_quality=${safeJson(quality)}, review_dates=${safeJson(reviewDates)}, pipeline_status=${newPst}, synth_updated=${synthTs}, synth_checked_at=now(), llm_judged_at=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN ${latMin} AND ${latMax} AND lng BETWEEN ${lngMin} AND ${lngMax}) WHERE id=${cafeId}`;
+    await sql`UPDATE cafes SET synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_coherence=${coherence}, offctx_rate=${offctx}, visitor_n=${vmix.n}, visitor_trip=${vmix.trip}, visitor_local=${vmix.local}, needs_llm=${needsLLM}, needs_llm_priority=${needsLlmPriority}, borderline_count=${blCount}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${safeJson(evidenceReviews)}, synth_reviews_all=${allEv}, char_scores=${safeJson(charScores)}, synth_quality=${safeJson(quality)}, review_dates=${safeJson(reviewDates)}, pipeline_status=${newPst}, synth_updated=${synthTs}, synth_checked_at=now(), llm_judged_at=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN ${latMin} AND ${latMax} AND lng BETWEEN ${lngMin} AND ${lngMax}) WHERE id=${cafeId}`;
   } else {
-    await sql`UPDATE cafes SET synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_coherence=${coherence}, offctx_rate=${offctx}, needs_llm=${needsLLM}, needs_llm_priority=${needsLlmPriority}, borderline_count=${blCount}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${safeJson(evidenceReviews)}, synth_reviews_all=${allEv}, char_scores=${safeJson(charScores)}, synth_quality=${safeJson(quality)}, review_dates=${safeJson(reviewDates)}, pipeline_status=${newPst}, synth_updated=${synthTs}, synth_checked_at=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN ${latMin} AND ${latMax} AND lng BETWEEN ${lngMin} AND ${lngMax}) WHERE id=${cafeId}`;
+    await sql`UPDATE cafes SET synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_coherence=${coherence}, offctx_rate=${offctx}, visitor_n=${vmix.n}, visitor_trip=${vmix.trip}, visitor_local=${vmix.local}, needs_llm=${needsLLM}, needs_llm_priority=${needsLlmPriority}, borderline_count=${blCount}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${safeJson(evidenceReviews)}, synth_reviews_all=${allEv}, char_scores=${safeJson(charScores)}, synth_quality=${safeJson(quality)}, review_dates=${safeJson(reviewDates)}, pipeline_status=${newPst}, synth_updated=${synthTs}, synth_checked_at=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN ${latMin} AND ${latMax} AND lng BETWEEN ${lngMin} AND ${lngMax}) WHERE id=${cafeId}`;
   }
   return { grade, collected, published: publish, ruleOk, pipeline: newPst, evidence: evidenceReviews.length, coherence: Math.round(coherence * 100), noisy };
 }
@@ -576,7 +584,7 @@ export async function healNonCafeByReview(): Promise<{ held: number; names: stri
   return { held: leased.length, names: names.slice(0, 12) }; // 하네스 원칙: 실제 집행분만 센다(리스 양보분 제외)
 }
 
-// 🗺️ 수도권 박스 밖(비수도권 동명업체) 자동 제외 — 어느 적재 경로(발굴·마이닝·상가·수집)로 들어왔든
+// 🗺️ 서비스 범위 박스 밖(범위 밖 동명업체) 자동 제외 — 2026-08-25 강원 편입으로 '수도권'이 아니라 '서비스 범위'다 — 어느 적재 경로(발굴·마이닝·상가·수집)로 들어왔든
 //   2시간마다 일괄 정리. 공개 게이트가 노출은 이미 막지만, DB 청결 + 합성·임베딩 낭비 제거 + 미래 경로까지 커버하는 안전망.
 export async function healOutOfBox(): Promise<{ excluded: number; names: string[] }> {
   await loadCriteria(); // 수도권 좌표박스 기준 캐시 프라임 — synth 게이트와 같은 진실(폴백=36.8~38.3/124.5~127.9)
@@ -592,7 +600,9 @@ export async function healOutOfBox(): Promise<{ excluded: number; names: string[
   const adr = (await sql`UPDATE cafes SET published = false, pipeline_status = 'excluded', updated_at = now()
     WHERE address IS NOT NULL
       AND (address LIKE '충청%' OR address LIKE '충북%' OR address LIKE '충남%'
-        OR address LIKE '강원%' OR address LIKE '전라%' OR address LIKE '전북%' OR address LIKE '전남%'
+        -- 🏔️ 강원은 2026-08-25 서비스 범위에 편입(CEO 승인) — 여기서 제외했다.
+        --    관광지 성격은 배제가 아니라 🧳 배지로 구분한다(lib/visitorMix.ts).
+        OR address LIKE '전라%' OR address LIKE '전북%' OR address LIKE '전남%'
         OR address LIKE '경상%' OR address LIKE '경북%' OR address LIKE '경남%'
         OR address LIKE '대전%' OR address LIKE '대구%' OR address LIKE '부산%' OR address LIKE '울산%'
         OR address LIKE '광주광역시%' OR address LIKE '세종%' OR address LIKE '제주%')
@@ -617,8 +627,16 @@ export async function healAreaLabel(): Promise<{ fixed: number; names: string[] 
       AND substring(address from '경기[^ ]* ([가-힣]+[시군])') IS NOT NULL
       AND substring(address from '경기[^ ]* ([가-힣]+[시군])') <> area
     RETURNING name`) as any[];
-  const names = [...seoul, ...gg].map((r) => r.name).slice(0, 8);
-  return { fixed: seoul.length + gg.length, names };
+  // 강원: 주소 시/군 ≠ area. (2026-08-25 확장) 서울·경기와 달리 area 접미사 조건을 걸지 않는다 —
+  //   강원 카페들은 발굴 당시 검색지역이 그대로 붙어 '남양주시'·'김포시'·'종로구'처럼 **다른 시도의 라벨**을
+  //   달고 있었다(주소는 춘천인데 area는 남양주시). '%시|%군'만 고치면 '구'로 잘못 붙은 건들이 남는다.
+  const gw = (await sql`UPDATE cafes SET area = substring(address from '강원[^ ]* ([가-힣]+[시군])'), closure_misses = 0, updated_at = now()
+    WHERE address LIKE '강원%'
+      AND substring(address from '강원[^ ]* ([가-힣]+[시군])') IS NOT NULL
+      AND substring(address from '강원[^ ]* ([가-힣]+[시군])') IS DISTINCT FROM area
+    RETURNING name`) as any[];
+  const names = [...seoul, ...gg, ...gw].map((r) => r.name).slice(0, 8);
+  return { fixed: seoul.length + gg.length + gw.length, names };
 }
 
 // 🔁 명백 중복 자동 해소 — 정규화 이름 동일 + 좌표 ~55m(같은 자리 같은 이름=같은 카페). 후기 많은 쪽만 남김(보수).
