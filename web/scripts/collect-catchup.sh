@@ -15,10 +15,14 @@
 cd "$(dirname "$0")/.." || exit 1
 export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 LOG="/tmp/coffee-collect-catchup.log"
-DEADLINE=$(( $(date +%s) + 90*60 ))   # 90분 상한 — 20시 시작이어도 21:30 종료(새벽 미침범)
+# 창 120분: 4창×120분×(2샤드 ~7곳/분) = 하루 3,360곳으로 **쿼터(2,875곳)가 병목**이 되게 맞춘다.
+#   샤드를 늘리는 대신 창을 늘렸다 — 동시성을 키우면 Neon이 오토스케일로 더 큰 컴퓨트를 잡아
+#   CU-시간 단가가 오를 수 있다. 창 연장은 단가를 안 건드린다.
+#   최대 종료 22:15 — 실측상 23시까지 7/7일 상시 가동이라 새벽 미침범.
+DEADLINE=$(( $(date +%s) + 120*60 ))
 
 {
-  echo "=== $(date '+%F %T') 수집 따라잡기 시작(창 90분) ==="
+  echo "=== $(date '+%F %T') 수집 따라잡기 시작(창 120분) ==="
   round=0
   while [ "$(date +%s)" -lt "$DEADLINE" ]; do
     round=$((round+1))
@@ -29,7 +33,7 @@ DEADLINE=$(( $(date +%s) + 90*60 ))   # 90분 상한 — 20시 시작이어도 2
     if tail -4 "$LOG" | grep -q "큐 소진"; then echo "큐 소진 — 라운드 ${round}에서 종료"; break; fi
     if tail -4 "$LOG" | grep -q "쿼터 소진 추정"; then echo "쿼터 소진 — 라운드 ${round}에서 종료"; break; fi
   done
-  [ "$(date +%s)" -ge "$DEADLINE" ] && echo "90분 창 종료 — 다음 창(4시간 뒤)에 이어감"
+  [ "$(date +%s)" -ge "$DEADLINE" ] && echo "120분 창 종료 — 다음 창(4시간 뒤)에 이어감"
   echo "=== $(date '+%F %T') 종료 ==="
 } >> "$LOG" 2>&1
 node --import tsx scripts/heartbeat.mjs collect-catchup 0 "신규 후기 수집 따라잡기" >> "$LOG" 2>&1 || true
