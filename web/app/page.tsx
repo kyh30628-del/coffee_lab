@@ -706,7 +706,7 @@ export default function Home() {
         const { latitude, longitude } = pos.coords;
         setNearHome({ lat: latitude, lng: longitude }); // 📍 내 주변 500m 옥석 리스트도 함께 켬(위치버튼 통일)
         const r = nearestRegion(cafes, latitude, longitude);
-        if (!r) { setGeoMsg("수도권 밖이거나 가까운 카페가 없어 전체를 보여드려요"); postConsent(true, { lat: latitude, lng: longitude }); return; }
+        if (!r) { setGeoMsg("서비스 지역 밖이거나 가까운 카페가 없어 전체를 보여드려요"); postConsent(true, { lat: latitude, lng: longitude }); return; }
         setHomeSido(r.sido); setHomeGu(r.sigungu);
         setSido(r.sido); setSigungu(r.sigungu);
         setAutoGu(r.sigungu); setGeoMsg("");
@@ -1221,7 +1221,7 @@ export default function Home() {
       const bounds = L.latLngBounds([[q(la, 0.02), q(ln, 0.02)], [q(la, 0.98), q(ln, 0.98)]]);
       map.flyToBounds(bounds, { padding: [50, 50], maxZoom: 15, duration: 0.45 });
     } else if (sido && SIDO_CENTER[sido]) { const [la, ln, z] = SIDO_CENTER[sido]; map.flyTo([la, ln], z, { duration: 0.45 }); }
-    else { map.flyTo([37.5, 127.05], 9, { duration: 0.45 }); } // 전체(시도 미선택) → 수도권 전역으로 부드럽게 줌아웃해 시도 집계 원형 표시
+    else { map.flyTo([37.55, 127.55], 8, { duration: 0.45 }); } // 전체(시도 미선택) → 서울~강원 동해안이 한 화면에 들어오게(2026-08-25 강원 편입). 줌9·경도127.05면 강원 집계 원형이 화면 밖으로 밀렸다.
     drawMarkers();
     // 주의: 의존성에 tab을 넣지 말 것(탭 전환마다 재렌더되어 느려짐). 데이터/필터 변경 시에만.
   }, [filtered, matchSet, sido, sigungu, focusId, mapReady, myPinMode, myCafeIds, othersMode, othersPins, drawMarkers, nearMe]);
@@ -1529,7 +1529,7 @@ export default function Home() {
                   </div>
                 )}
                 {geoMsg && <span className="text-[10px] text-[#665036]">{geoMsg}</span>}
-                {homeGu && !autoGu && <button onClick={clearAuto} className="text-[11px] text-[#7a5122] underline">수도권 전체 보기</button>}
+                {homeGu && !autoGu && <button onClick={clearAuto} className="text-[11px] text-[#7a5122] underline">전체 지역 보기</button>}
               </div>
             </div>
             {nearHome ? (
@@ -1547,6 +1547,7 @@ export default function Home() {
                         <div className="flex items-center gap-1.5 mb-1">
                           <span className="font-bold text-sm text-[#2b2018] truncate">{c.name}</span>
                           {c.synth_grade && GRADE_STYLE[c.synth_grade] && <span className="text-[8px] text-white px-1.5 py-0.5 rounded-full shrink-0" style={{ background: GRADE_STYLE[c.synth_grade].bg }}>{c.synth_grade}</span>}
+                            <VisitorBadges vb={(c as any).vb} />
                         </div>
                         <div className="text-[11px] text-[#665036]">{c.area}{c.dong ? ` ${c.dong}` : ""} · {Math.round(d)}m · 리뷰 {c.synth_count ?? 0}</div>
                         {c.synth_identity && <p className="text-[12px] text-[#5a4a38] leading-relaxed mt-1.5 line-clamp-2">{c.synth_identity}</p>}
@@ -1749,7 +1750,7 @@ export default function Home() {
                 <button onClick={() => setShowSearch(false)} className="text-2xl text-[#7a5122] leading-none px-1 shrink-0">×</button>
               </div>
               <div className="text-[11px] text-[#5f7355] mt-2 font-medium">💡 “비 오는 날 조용히” 같은 <b>느낌</b>은 물론, <b>카페 이름</b>을 바로 적어도 찾아드려요.</div>
-              <div className="text-[11px] text-[#665036] mt-1">{homeGu ? `📍 ${homeGu} 안에서` : "수도권 전체에서"} 검색</div>
+              <div className="text-[11px] text-[#665036] mt-1">{homeGu ? `📍 ${homeGu} 안에서` : "전체 지역에서"} 검색</div>
               <div className="flex flex-wrap gap-1.5 mt-2">
                 {SEARCH_EXAMPLES.map((ex) => (
                   <button key={ex} onClick={() => runSearch(ex)} className="text-[11px] text-[#524234] bg-[#f0e6d4] rounded-full px-2.5 py-1">{ex}</button>
@@ -1782,6 +1783,7 @@ export default function Home() {
                             <div className="flex items-center gap-1.5 mb-0.5">
                               <span className="font-bold text-sm text-[#2b2018]">{r.name}</span>
                               {r.grade && GRADE_STYLE[r.grade] && <span className="text-[8px] text-white px-1 py-0.5 rounded-full" style={{ background: GRADE_STYLE[r.grade].bg }}>{r.grade}</span>}
+                                <VisitorBadges vb={(r as any).vb} />
                               <span className="text-[10px] text-[#665036] ml-auto">{r.area} · 리뷰 {r.count ?? 0}</span>
                             </div>
                             {r.identity && <p className="text-[11px] text-[#524234] line-clamp-1 mb-1">{r.identity}</p>}
@@ -1910,6 +1912,7 @@ function MapControls({ sido, sigungu, dong, onSido, onSigungu, setDong, dongOpti
                 <div className="flex items-center gap-1.5">
                   <span className="font-bold text-sm text-[#2b2018]">{c.name}</span>
                   {c.synth_grade && GRADE_STYLE[c.synth_grade] && <span className="text-[9px] text-white px-1.5 py-0.5 rounded-full" style={{ background: GRADE_STYLE[c.synth_grade].bg }}>{GRADE_STYLE[c.synth_grade].label}</span>}
+                    <VisitorBadges vb={(c as any).vb} />
                   {tasteKey && matchSet.has(c.id) && <span className="text-[10px] text-[#5f7355]">✓</span>}
                   <span className="text-[10px] text-[#665036] ml-auto">{c.area} · 리뷰 {c.synth_count ?? 0}</span>
                 </div>
@@ -2232,6 +2235,7 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
                       <span className="text-[10.5px] text-[#6f6047] truncate">검증후기 {nc.synth_count ?? 0}건</span>
                     </span>
                     {nc.synth_grade && <span className="ml-auto text-[10px] font-bold bg-[#2b2018] text-[#e8b87a] px-2 py-0.5 rounded-full whitespace-nowrap shrink-0">{nc.synth_grade}</span>}
+                      <VisitorBadges vb={(nc as any).vb} />
                   </button>
                 ))}
               </div>

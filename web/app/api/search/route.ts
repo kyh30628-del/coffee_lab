@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { visitorBadges } from "@/lib/visitorMix";
 import { sql, ensureSchema, ensureOnce } from "@/lib/db";
 import { embedQuery, toVectorLiteral, hasEmbedKey } from "@/lib/embed";
 import { hasSearchLLM, rerankWithClaude, lastRerankError, type SearchCand } from "@/lib/searchAgent";
@@ -163,7 +164,14 @@ function lexicalScore(c: any, tokens: string[], hitConcepts: typeof CONCEPTS) {
 
 // 💰 synth_reviews는 통째로 싣지 않고 **SQL 안에서 quote만 잘라** 받는다(TOAST 1.9GB 컬럼 → 인용문 몇 줄).
 //   후보 80건 × 리뷰 전체를 앱으로 옮기던 것이 검색 응답 지연·전송비의 주범이었다.
-const FIELDS = `id, name, area, synth_grade, synth_count, synth_identity, signature, note, vibe, uses, beans, char_scores, jsonb_path_query_array(synth_reviews, '$[*].quote') AS synth_reviews, synth_acidity, synth_body, synth_sweet`;
+const FIELDS = `id, name, area, synth_grade, synth_count, visitor_n, visitor_trip, visitor_local, synth_identity, signature, note, vibe, uses, beans, char_scores, jsonb_path_query_array(synth_reviews, '$[*].quote') AS synth_reviews, synth_acidity, synth_body, synth_sweet`;
+
+// 🧳🏠 방문객 성격 배지 — /api/cafes와 **같은 규약**(붙는 곳만 "T"/"L"/"TL"). 지도앱이 한 컴포넌트로 렌더한다.
+const vbOf = (c: any): string | undefined => {
+  const v = visitorBadges({ n: c.visitor_n ?? 0, trip: c.visitor_trip ?? 0, local: c.visitor_local ?? 0 })
+    .map((b) => (b.key === "trip" ? "T" : "L")).join("");
+  return v || undefined;
+};
 
 // 등급 가중치 — '검증'이 '참고'보다 위 노출(동네 커피 노트의 약속). 절대 우선은 아니고 가산.
 //   임계값은 DB 기준(criteria) 단일출처, 폴백=검증25/참고8. GET 진입 시 loadCriteria로 캐시 프라임.
@@ -366,7 +374,7 @@ export async function GET(req: NextRequest) {
                 const corePrior = !regionExplicit && isCoreArea(c.area) ? 6 : 0;
                 const total = rrf + (qualifies ? gradeBonus(c.synth_grade) : 0) + corePrior;
                 const why = [`의미 유사 ${Math.round(sim * 100)}%`, ...reasons];
-                return { sim, qualifies, item: { id: c.id, name: c.name, area: c.area, grade: c.synth_grade, count: c.synth_count, identity: c.synth_identity, score: Math.round(total * 10) / 10, reasons: why.slice(0, 3), snippet } };
+                return { sim, qualifies, item: { id: c.id, name: c.name, area: c.area, grade: c.synth_grade, count: c.synth_count, identity: c.synth_identity, vb: vbOf(c), score: Math.round(total * 10) / 10, reasons: why.slice(0, 3), snippet } };
               })
               .filter((x) => x.qualifies || x.sim >= semanticFloor)
               .map((x) => x.item);
@@ -405,7 +413,7 @@ export async function GET(req: NextRequest) {
         const total = exact + concept + (qualifies ? gradeBonus(c.synth_grade) : 0);
         if (exact + concept <= 0) continue;
         byId.set(c.id, c);
-        scored.push({ id: c.id, name: c.name, area: c.area, grade: c.synth_grade, count: c.synth_count, identity: c.synth_identity, score: Math.round(total * 10) / 10, reasons: reasons.slice(0, 3), snippet });
+        scored.push({ id: c.id, name: c.name, area: c.area, grade: c.synth_grade, count: c.synth_count, identity: c.synth_identity, vb: vbOf(c), score: Math.round(total * 10) / 10, reasons: reasons.slice(0, 3), snippet });
       }
     }
 
@@ -485,7 +493,7 @@ export async function GET(req: NextRequest) {
               continue;
             }
             nameResults.push({
-              id: c.id, name: c.name, area: c.area, grade: c.synth_grade, count: c.synth_count,
+              id: c.id, name: c.name, area: c.area, grade: c.synth_grade, count: c.synth_count, vb: vbOf(c),
               identity: c.synth_identity,
               score: exactName ? 9999 : 200 + gradeBonus(c.synth_grade) + Math.min(50, Number(c.synth_count) || 0),
               reasons: ["카페명 일치"],
@@ -504,7 +512,7 @@ export async function GET(req: NextRequest) {
       ? "동네 커피 노트는 프랜차이즈 대신 동네의 검증된 개인 카페만 큐레이션해요. 아래에서 근처의 검증 카페를 만나보세요."
       : null;
     const payload: Record<string, unknown> = {
-      ok: true, mode, region: effectiveRegion || "수도권 전체", q,
+      ok: true, mode, region: effectiveRegion || "전체 지역", q,
       concepts: hitConcepts.map((c) => c.label),
       count: results.length, results,
     };
