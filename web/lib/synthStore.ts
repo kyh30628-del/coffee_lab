@@ -2,6 +2,7 @@
 // PRINCIPLES §1·§3·§5·§7: raw 보존 → 재합성 시 API 재호출 없이 재현(쿼터 절약).
 // 규칙 1차 + LLM 맥락 재판정(스마트). 검증/참고면 자동 공개, 부족하면 비공개(정직).
 import { sql , ensureOnce } from "./db";
+import { OUT_OF_SCOPE_SQL } from "./serviceScope";
 import { fetchPlacesReviews } from "./placesCollector";
 import { fetchWebReviews } from "./webSearchCollector";
 import { fetchYouTubeReviews } from "./youtubeCollector";
@@ -605,17 +606,12 @@ export async function healOutOfBox(): Promise<{ excluded: number; names: string[
     RETURNING name`) as any[];
   // ② 주소 시·도가 비수도권 — 좌표가 박스에 걸쳐도(천안·당진·춘천 등 경계지역) 주소가 진짜 근거.
   //    area가 수도권 시로 잘못 붙는 경계 카페 방어. 주소 '접두'로만 판단(경기 광주시 오인 방지 위해 '광주광역시'만).
-  const adr = (await sql`UPDATE cafes SET published = false, pipeline_status = 'excluded', updated_at = now()
-    WHERE address IS NOT NULL
-      AND (address LIKE '충청%' OR address LIKE '충북%' OR address LIKE '충남%'
-        -- 🏔️ 강원은 2026-08-25 서비스 범위에 편입(CEO 승인) — 여기서 제외했다.
-        --    관광지 성격은 배제가 아니라 🧳 배지로 구분한다(lib/visitorMix.ts).
-        OR address LIKE '전라%' OR address LIKE '전북%' OR address LIKE '전남%'
-        OR address LIKE '경상%' OR address LIKE '경북%' OR address LIKE '경남%'
-        OR address LIKE '대전%' OR address LIKE '대구%' OR address LIKE '부산%' OR address LIKE '울산%'
-        OR address LIKE '광주광역시%' OR address LIKE '세종%' OR address LIKE '제주%')
+  // 🗺️ 서비스 범위 밖 시·도 = lib/serviceScope.ts **단일출처**. 여기 목록을 따로 적어 두면
+  //   범위가 바뀔 때 이 파일만 뒤처져 정상 카페를 배제하거나(여기) 오경보를 낸다(issues.ts에서 실제로 났다).
+  const adr = (await sql.query(`UPDATE cafes SET published = false, pipeline_status = 'excluded', updated_at = now()
+    WHERE address IS NOT NULL AND (${OUT_OF_SCOPE_SQL})
       AND pipeline_status IS DISTINCT FROM 'excluded'
-    RETURNING name`) as any[];
+    RETURNING name`)) as any[];
   const names = [...rows, ...adr].map((r) => r.name).slice(0, 8);
   return { excluded: rows.length + adr.length, names };
 }

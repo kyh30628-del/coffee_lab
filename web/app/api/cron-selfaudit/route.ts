@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { OUT_OF_SCOPE_SQL } from "@/lib/serviceScope";
 import { sql } from "@/lib/db";
 import { recordRun } from "@/lib/agentLog";
 import { detectStuck } from "@/lib/runLedger";
@@ -49,7 +50,8 @@ export async function GET(req: NextRequest) {
     const lngMin = getCriterionSync("geo.box.lng_min"), lngMax = getCriterionSync("geo.box.lng_max");
     const integ: [string, number, string, boolean][] = [
       ["수도권 박스 밖 발행", await one(sql`SELECT count(*) c FROM cafes WHERE published AND (lat<${latMin} OR lat>${latMax} OR lng<${lngMin} OR lng>${lngMax})`), "품질본부", true],
-      ["비수도권 주소 발행", await one(sql`SELECT count(*) c FROM cafes WHERE published AND (address LIKE '충청%' OR address LIKE '강원%' OR address LIKE '전라%' OR address LIKE '경상%' OR address LIKE '대전%' OR address LIKE '부산%' OR address LIKE '대구%' OR address LIKE '울산%' OR address LIKE '광주광역시%' OR address LIKE '세종%' OR address LIKE '제주%')`), "품질본부", true],
+      // 🗺️ 서비스 범위 밖 시·도 = lib/serviceScope.ts 단일출처. 강원 편입 후 이 목록만 뒤처져 오경보났던 자리.
+      ["서비스 범위 밖 주소 발행", await one(sql.query(`SELECT count(*) c FROM cafes WHERE published AND (${OUT_OF_SCOPE_SQL})`) as any), "품질본부", true],
       ["근거오염 발행(coherence<0.3)", await one(sql`SELECT count(*) c FROM cafes WHERE published AND synth_coherence<0.3 AND COALESCE(offctx_ok,false)=false`), "품질본부", true],
       ["표시필드 결손(좌표·area·identity·grade·빈이름)", await one(sql`SELECT count(*) c FROM cafes WHERE published AND (length(trim(coalesce(name,'')))<1 OR lat IS NULL OR lng IS NULL OR area IS NULL OR area='' OR synth_identity IS NULL OR synth_identity='' OR synth_grade IS NULL)`), "운영본부", true],
       ["폐업의심 지속(closure_misses>=3)", await one(sql`SELECT count(*) c FROM cafes WHERE published AND COALESCE(closure_misses,0)>=3`), "운영본부", false],

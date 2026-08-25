@@ -1,4 +1,6 @@
 import { sql , ensureOnce } from "./db";
+import { getCriterionSync } from "./criteria";
+import { OUT_OF_SCOPE_SQL } from "./serviceScope";
 import { nameCoherence, cleanCafeName } from "./reviewQuality";
 import { healNonCafeCategory, healOffConceptByReview, healRestaurantByReview, healNonCafeByReview, healOutOfBox, healAreaLabel, offctxFalsePositive, OFFCTX_FLAG_RATE } from "./synthStore";
 import { pushTrigger } from "./auditTrigger";
@@ -335,9 +337,10 @@ export async function detectIssues(): Promise<Issue[]> {
 
   // 2) 데이터 정합성 위반 (sentinel 축)
   const outBox = await one(sql`SELECT count(*) c FROM cafes WHERE published AND (lat<36.8 OR lat>38.3 OR lng<124.5 OR lng>127.9)`);
-  if (outBox > 0) out.push({ ikey: "integ:outbox", source: "정합성", severity: "HIGH", type: "정합성", title: `수도권 박스 밖 공개 ${outBox}곳`, detail: "좌표가 수도권(36.8~38.3/124.5~127.9) 밖인데 공개 중", team: "품질본부", consumer: true });
-  const nonCap = await one(sql`SELECT count(*) c FROM cafes WHERE published AND (address LIKE '충청%' OR address LIKE '강원%' OR address LIKE '전라%' OR address LIKE '경상%' OR address LIKE '대전%' OR address LIKE '부산%' OR address LIKE '대구%' OR address LIKE '울산%' OR address LIKE '광주광역시%' OR address LIKE '세종%' OR address LIKE '제주%')`);
-  if (nonCap > 0) out.push({ ikey: "integ:noncap", source: "정합성", severity: "HIGH", type: "정합성", title: `비수도권 주소 공개 ${nonCap}곳`, detail: "주소 시·도가 비수도권인데 공개 중", team: "품질본부", consumer: true });
+  if (outBox > 0) out.push({ ikey: "integ:outbox", source: "정합성", severity: "HIGH", type: "정합성", title: `좌표 박스 밖 공개 ${outBox}곳`, detail: `좌표가 서비스 범위(${getCriterionSync("geo.box.lat_min")}~${getCriterionSync("geo.box.lat_max")}/${getCriterionSync("geo.box.lng_min")}~${getCriterionSync("geo.box.lng_max")}) 밖인데 공개 중`, team: "품질본부", consumer: true });
+  // 🗺️ 서비스 범위 밖 시·도는 lib/serviceScope.ts 단일출처(강원 편입 후 여기만 뒤처져 139곳 오경보난 자리).
+  const nonCap = await one(sql.query(`SELECT count(*) c FROM cafes WHERE published AND (${OUT_OF_SCOPE_SQL})`) as any);
+  if (nonCap > 0) out.push({ ikey: "integ:noncap", source: "정합성", severity: "HIGH", type: "정합성", title: `서비스 범위 밖 주소 공개 ${nonCap}곳`, detail: "주소 시·도가 서비스 범위 밖인데 공개 중", team: "품질본부", consumer: true });
   const namePol = await one(sql`SELECT count(*) c FROM cafes WHERE published AND synth_coherence IS NOT NULL AND synth_coherence < 0.3 AND COALESCE(offctx_ok,false)=false`);
   if (namePol > 0) out.push({ ikey: "integ:namepol", source: "정합성", severity: "HIGH", type: "오염", title: `이름 오염 의심 공개 ${namePol}곳`, detail: "노출 후기가 실제 그 카페를 거의 안 말함(coherence<0.3) — 구구커피류", team: "품질본부", consumer: true });
   const areaMis = await one(sql`SELECT count(*) c FROM cafes WHERE published AND area LIKE '%구' AND area NOT LIKE '인천%' AND address LIKE '서울%' AND position(area in address)=0`);
