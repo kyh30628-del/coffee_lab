@@ -10,7 +10,7 @@ export const JOB_TEAM: Record<string, string> = {
   "cron-closure": "운영본부", "cron-enrich": "운영본부",
   "orchestrator-heal": "품질본부", "cron-sentinel": "품질본부", "cron-verify": "품질본부", "cron-rulegap": "품질본부",
   "cron-batch-judge": "품질본부", "cron-criteria-verify": "품질본부",
-  "cron-grow": "성장본부", "cron-demand": "성장본부", "cron-newsletter": "성장본부", "cron-discover-categories": "성장본부",
+  "cron-grow": "성장본부", "collect-catchup": "성장본부", "cron-demand": "성장본부", "cron-newsletter": "성장본부", "cron-discover-categories": "성장본부",
   "cafe-collect": "성장본부",
   "cron-issues": "경영지원본부", "cron-coord-consumer": "경영지원본부", "cron-billing": "경영지원본부",
   "cron-costwatch": "경영지원본부", // Neon 데이터전송비 이상탐지 워치독(2026-07-29, CEO 지시 — youtube-backfill 663GB 사고 재발방지)
@@ -49,7 +49,8 @@ export const EXPECT_MAX_H: Record<string, number> = {
   "cron-criteria-verify": 16, // 기준 검증 에이전트 2×/일 + 버퍼
   // 🔄 2026-08-04 4창 클러스터링(커밋 8da8c31, KST 08·12·16·20=UTC 3,7,11,23) 재계산: 4창 잡 최대공백 20→08시=12h(+버퍼14),
   //   2창 잡(enrich·orchestrator·sentinel UTC3,11) 최대공백 11→익일3시=16h(+버퍼18). EXPECT_MAX_H 미갱신이 정지 오탐 원인이었음(자율진단 #604).
-  "cron-grow": 14, "cron-enrich": 18, "cron-embed": 14, "cron-synth": 14, "cron-issues": 14, "cron-coord-consumer": 14,
+  "cron-grow": 14, "collect-catchup": 30, // 하루 1회(KST 01:10) → 24h 주기 + 버퍼6h
+  "cron-enrich": 18, "cron-embed": 14, "cron-synth": 14, "cron-issues": 14, "cron-coord-consumer": 14,
   "cron-billing": 30,     // 정기결제 크론 매일 1회 + 버퍼
   "orchestrator-heal": 18, // 2창(UTC 3,11) 최대공백 16h + 버퍼
   // 로컬 launchd 잡
