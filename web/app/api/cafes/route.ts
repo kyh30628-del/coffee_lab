@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { visitorBadges } from "@/lib/visitorMix";
+import { loadCriteria } from "@/lib/criteria";
 import { sql, ensureSchema } from "@/lib/db";
 import { subscriptionLive } from "@/lib/flags";
 import { encodeCharScores } from "@/lib/mapCafes";
@@ -29,9 +31,11 @@ export async function GET() {
         headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=0, must-revalidate", "X-Cafes-Cache": "HIT" },
       });
     }
+    await loadCriteria(); // 배지 임계(criteria) 프라임 — 없으면 폴백 DEFAULTS로 동작
     const cafes = await sql`
       SELECT c.id, c.name, c.area, c.dong, c.lat, c.lng, c.vibe, c.note, c.signature,
              c.synth_grade, c.synth_count, c.synth_identity, c.char_scores,
+             c.visitor_n, c.visitor_trip, c.visitor_local,
              COALESCE(p.featured AND p.approved AND (p.featured_until IS NULL OR p.featured_until > now()), false) AS featured
       FROM cafes c
       LEFT JOIN cafe_promos p ON p.cafe_id = c.id
@@ -56,6 +60,11 @@ export async function GET() {
       if (live && c.featured) o.featured = true;
       const cs = encodeCharScores(c.char_scores);
       if (cs) o.cs = cs;
+      // 🧳🏠 방문객 성격 배지 — 판정은 서버에서 하고 **붙는 곳만** 2글자로 보낸다("T"/"L"/"TL").
+      //   13,634곳 전체에 숫자 3개를 실으면 페이로드가 커진다(위 ①~③ 축소 원칙과 같은 결).
+      const vb = visitorBadges({ n: c.visitor_n ?? 0, trip: c.visitor_trip ?? 0, local: c.visitor_local ?? 0 })
+        .map((b) => (b.key === "trip" ? "T" : "L")).join("");
+      if (vb) o.vb = vb;
       return o;
     });
     const body = JSON.stringify({ ok: true, cafes: out });

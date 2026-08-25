@@ -39,6 +39,28 @@ const trackPromo = (cafeId: number, type: "view" | "click" | "play") => { fetch(
 //   ⚠️ 짧은 이름이 긴 이름의 부분문자열인 경우(예: "동구"⊂"남동구") 배열 순서에 기대는 매칭이
 //   오분류를 냈던 전례가 있어, 아래 REGIONS_LONGEST로 **긴 이름부터** 검사한다.
 const REGIONS = SIDO_GU;
+
+// 🧳🏠 방문객 성격 배지 — /api/cafes가 붙는 곳만 vb("T"/"L"/"TL")로 보낸다(페이로드 최소).
+//   "관광지 카페"가 아니라 **근거**를 말한다: 누군가에겐 관광지여도 사는 사람에겐 동네라서.
+const VB_LABEL: Record<string, { emoji: string; label: string }> = {
+  T: { emoji: "🧳", label: "여행 후기 많음" },
+  L: { emoji: "🏠", label: "동네 단골 후기" },
+};
+function VisitorBadges({ vb, dark }: { vb?: string; dark?: boolean }) {
+  if (!vb) return null;
+  return (
+    <>
+      {vb.split("").map((k) => VB_LABEL[k] && (
+        <span key={k} title={VB_LABEL[k].label}
+          className={dark ? "text-[10px] bg-[#f4ece0]/20 px-1.5 py-0.5 rounded-full shrink-0"
+                          : "text-[9px] text-[#4a5a4e] bg-[#e6efe8] border border-[#c9dbcf] px-1.5 py-0.5 rounded-full shrink-0"}>
+          {VB_LABEL[k].emoji}
+        </span>
+      ))}
+    </>
+  );
+}
+
 // area별 결과 캐시 — area 종류는 ~64개뿐이라, 1만건을 매번 64개 순회(64만 연산)하던 걸 O(1)로.
 const _guCache = new Map<string, { sido: string; sigungu: string }>();
 const _longestFirst = (list: string[]) => [...list].sort((a, b) => b.length - a.length);
@@ -122,6 +144,7 @@ const HeadlineCard = memo(function HeadlineCard({ c, kicker, tone, onOpen }: { c
           <h2 className="text-lg font-bold leading-tight">{c.name}</h2>
           {c.grade && <span className="text-[10px] bg-[#f4ece0]/20 px-2 py-0.5 rounded-full">{c.grade}</span>}
           {c.isNew && <span className="text-[10px] bg-[#ffd9a0]/90 text-[#3a2a12] font-bold px-2 py-0.5 rounded-full">NEW</span>}
+          <VisitorBadges vb={(c as any).vb} dark />
         </div>
         <div className="text-[11px] text-[#e8d4b0] mb-1.5">{c.area} · 리뷰 {c.count ?? 0}건</div>
         {c.identity && <p className="text-[12px] text-[#f0e6d4] leading-snug mb-2 line-clamp-1">{c.identity}</p>}
@@ -466,6 +489,7 @@ function FavoritesModal({ items, onClose, onOpen, onRemove, onRecord }: { items:
                   <div className="flex items-center gap-1.5">
                     <span className="font-bold text-[#2b2018] text-[14px] truncate">{c.name}</span>
                     {c.synth_grade && GRADE_STYLE[c.synth_grade] && <span className="text-[9px] text-white px-1.5 py-0.5 rounded-full shrink-0" style={{ background: GRADE_STYLE[c.synth_grade].bg }}>{c.synth_grade}</span>}
+                    <VisitorBadges vb={(c as any).vb} />
                   </div>
                   <div className="text-[11px] text-[#7a5122]">{c.area}{c.synth_count ? ` · 리뷰 ${c.synth_count}` : ""}</div>
                 </div>

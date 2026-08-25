@@ -26,11 +26,16 @@ const label = `[${SHARD}/${OF}]`;
 let done = 0, err = 0, consecErr = 0, stale = 0;
 for (;;) {
   // 샤드끼리 같은 행을 집지 않게 id % OF로 나눈다(락 없이 충돌 회피).
+  // 🥇 처리 순서 = 강원 먼저, 수도권 적체는 그다음(CEO 지시 2026-08-25).
+  //   강원은 지금 공개가 140곳뿐이라 한 곳이 늘 때 사용자 체감이 크고, 수도권은 이미 13,494곳이 공개돼 있어
+  //   적체가 며칠 늦어져도 화면이 비지 않는다. ORDER BY로만 우선순위를 주고 큐는 하나로 유지한다
+  //   (큐를 나누면 강원이 끝난 뒤 워커가 놀거나, 필터를 지우는 걸 잊어 수도권이 영영 안 도는 사고가 난다).
   const rows = FILTER
     ? await sql`SELECT id, name, area FROM cafes WHERE raw_reviews IS NULL AND pipeline_status='new'
         AND address LIKE ${FILTER + "%"} AND (id % ${OF}) = ${SHARD} ORDER BY id LIMIT 20`
     : await sql`SELECT id, name, area FROM cafes WHERE raw_reviews IS NULL AND pipeline_status='new'
-        AND (id % ${OF}) = ${SHARD} ORDER BY id LIMIT 20`;
+        AND (id % ${OF}) = ${SHARD}
+        ORDER BY (address LIKE '강원%') DESC, id LIMIT 20`;
   if (!rows.length) { console.log(`${label} 큐 소진 — 완료 ${done}곳`); break; }
   for (const c of rows) {
     try { await synthAndStore(c, { refresh: false }); done++; consecErr = 0; }
