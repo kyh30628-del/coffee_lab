@@ -1,6 +1,7 @@
 // 카페 발굴 (PRINCIPLES §0·§2): 합법 소스(네이버 지역검색)로 동네·스페셜티 카페 수집.
 // 대규모 프랜차이즈·비(非)카페 제외. 중복(이름/좌표 근사) 제외. 비공개로 적재 후 합성 단계에서 검증.
 import { sql , ensureOnce } from "./db";
+import { SIDO_GU } from "./regionList";
 import { getLearned } from "./learnedTerms";
 import { loadCriteria, getCriterionSync } from "./criteria";
 import { getListSync, loadCriteriaLists } from "./criteriaLists"; // 비카페 순수 리스트 단일출처(BASE=폴백). 캐시 프라임은 discover 진입점이 함.
@@ -86,19 +87,8 @@ export const LONGTAIL_TASTE_TARGETS: { region: string; areaLabel: string; keywor
 //   계속 네이버를 검색하고 있었다(표시단 버그보다 심각 — 새 카페 발굴 자체가 안 됐음). 곳수(1396곳 중
 //   신설구 273곳)가 이미 재분류된 만큼 발굴 목록도 같은 9개 구로 맞춘다.
 export const METRO_REGIONS: { region: string; areaLabel: string }[] = (() => {
-  const R: Record<string, string[]> = {
-    서울: ["강남구", "강동구", "강북구", "강서구", "관악구", "광진구", "구로구", "금천구", "노원구", "도봉구", "동대문구", "동작구", "마포구", "서대문구", "서초구", "성동구", "성북구", "송파구", "양천구", "영등포구", "용산구", "은평구", "종로구", "중구", "중랑구"],
-    경기: ["수원시", "성남시", "고양시", "용인시", "부천시", "안산시", "안양시", "남양주시", "화성시", "평택시", "의정부시", "시흥시", "파주시", "김포시", "광명시", "광주시", "군포시", "하남시", "오산시", "양주시", "구리시", "안성시", "포천시", "의왕시", "여주시", "동두천시", "과천시", "이천시", "양평군", "가평군", "연천군"],
-    인천: ["미추홀구", "연수구", "남동구", "부평구", "계양구", "강화군", "옹진군", "검단구", "서해구", "영종구", "제물포구"],
-    // 🏔️ 강원 전면 확장(2026-08-25, CEO 승인 "끝까지"). 관광지 카페는 배제가 아니라 **🧳 배지로 구분**한다
-    //   (lib/visitorMix.ts) — 정체성은 지역이 아니라 근거로 지킨다는 결론.
-    // ⚠️ 여기 등재 = cron-grow가 discovery_state에 자동 편입 = **신규 발굴 시작**(route.ts:34).
-    //   area 라벨만 고치고 싶을 땐 절대 여기 넣지 말 것(발굴이 딸려 켜진다).
-    // ⚠️ '고성군'은 강원·경남 동명이다. 경남 주소는 healOutOfBox ②(경상%)가 계속 막으므로 공개되진 않지만,
-    //   경남 고성 카페가 유입되면 area가 강원 고성군으로 잘못 붙을 수 있다(공개 무영향, 배제 처리됨).
-    강원: ["춘천시", "원주시", "강릉시", "동해시", "태백시", "속초시", "삼척시", "홍천군", "횡성군",
-          "영월군", "평창군", "정선군", "철원군", "화천군", "양구군", "인제군", "고성군", "양양군"],
-  };
+  const R: Record<string, string[]> = SIDO_GU; // 단일 출처(lib/regionList.ts)
+
   const out: { region: string; areaLabel: string }[] = [];
   for (const [sido, gus] of Object.entries(R)) for (const gu of gus) out.push({ region: `${sido} ${gu}`, areaLabel: sido === "인천" ? `인천 ${gu}` : gu });
   return out;

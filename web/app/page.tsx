@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
+import { SIDO_GU, SIDO_CENTER } from "@/lib/regionList";
 import InfoDot from "./InfoDot";
 import { trackOutbound } from "./trackOutboundClient";
 import ShowcaseBanner, { SHOWCASE_CSS } from "./ShowcaseBanner";
@@ -33,19 +34,11 @@ const SEARCH_EXAMPLES = ["비 오는 날 혼자 조용히", "감성 사진 데�
 // 쇼케이스 1차 성과 집계(노출·클릭·재생)
 const trackPromo = (cafeId: number, type: "view" | "click" | "play") => { fetch("/api/promo-event", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cafeId, type }) }).catch(() => {}); };
 
-const REGIONS: Record<string, string[]> = {
-  서울: ["강남구","강동구","강북구","강서구","관악구","광진구","구로구","금천구","노원구","도봉구","동대문구","동작구","마포구","서대문구","서초구","성동구","성북구","송파구","양천구","영등포구","용산구","은평구","종로구","중구","중랑구"],
-  경기: ["수원시","성남시","고양시","용인시","부천시","안산시","안양시","남양주시","화성시","평택시","의정부시","시흥시","파주시","김포시","광명시","광주시","군포시","하남시","오산시","양주시","구리시","안성시","포천시","의왕시","여주시","동두천시","과천시","이천시","양평군","가평군","연천군"],
-  인천: ["미추홀구","연수구","남동구","부평구","계양구","강화군","옹진군","검단구","서해구","영종구","제물포구"],
-};
-// 🚨 재발방지(2026-07-26): 인천이 2026-07-01부로 2군9구로 개편(중구·동구 폐지→제물포구·영종구로 통합,
-//   서구 폐지→검단구·서해구로 분리, 공식 인천시청 자료 확인)됐는데 목록엔 옛 10개 구만 있어 신설구
-//   소속 카페 134곳이 지역 드롭다운에서 선택 자체가 불가였다. 옛 중구·동구·서구 소속 카페 263곳도 법정동
-//   기준(영종·무의도 8개동→영종구, 나머지 중구/동구→제물포구, 검단 옛 김포편입분 10개동→검단구, 나머지
-//   서구→서해구)으로 실제 재분류 완료 — 이제 옛 구 이름을 쓰는 카페가 하나도 없어 목록에서도 제거.
-//   짧은 이름이 긴 이름의 부분문자열이면(예: "동구"⊂"남동구") 배열 순서에 우연히 기대는 매칭이 오분류를
-//   냈던 전례가 있어(실측 확인) 아래처럼 구 이름을 **긴 것부터** 검사해 향후 개편에도 안전하게 한다.
-const SIDO_CENTER: Record<string, [number, number, number]> = { 서울: [37.5665, 126.978, 11], 경기: [37.37, 127.105, 9], 인천: [37.4563, 126.7052, 11] };
+// 🗺️ 지역 목록은 lib/regionList.ts 단일 출처를 쓴다 — 여기 복제해 두면 한쪽만 갱신되어
+//   "DB엔 있는데 화면에서 못 고른다"가 반복된다(인천 개편 134곳·강원 확장, 둘 다 실제로 겪음).
+//   ⚠️ 짧은 이름이 긴 이름의 부분문자열인 경우(예: "동구"⊂"남동구") 배열 순서에 기대는 매칭이
+//   오분류를 냈던 전례가 있어, 아래 REGIONS_LONGEST로 **긴 이름부터** 검사한다.
+const REGIONS = SIDO_GU;
 // area별 결과 캐시 — area 종류는 ~64개뿐이라, 1만건을 매번 64개 순회(64만 연산)하던 걸 O(1)로.
 const _guCache = new Map<string, { sido: string; sigungu: string }>();
 const _longestFirst = (list: string[]) => [...list].sort((a, b) => b.length - a.length);
