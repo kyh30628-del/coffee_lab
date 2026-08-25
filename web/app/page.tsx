@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
+import NoticeModal from "./NoticeModal";
 import { SIDO_GU, SIDO_CENTER } from "@/lib/regionList";
 import InfoDot from "./InfoDot";
 import { trackOutbound } from "./trackOutboundClient";
@@ -259,7 +260,7 @@ const RankSpotlight = memo(function RankSpotlight({ top3, momentum, specialty, f
   const [tabIdx, setTabIdx] = useState(0);
   const dataByKey: Record<string, DCafe[]> = { top3, momentum, specialty, fresh };
   const infoByKey: Record<string, React.ReactNode> = {
-    top3: <>이 동네에서 <b>검증·참고 후기(옥석)가 가장 많은</b> 카페 순서예요. 광고·가짜·무관 글은 제외한 '진짜 후기 수' 기준입니다.</>,
+    top3: <>이 동네에서 <b>검증·참고 후기(옥석)가 가장 많은</b> 카페 순서예요. 광고·가짜·무관 글은 제외한 '진짜 후기 수' 기준입니다. <b>서울·경기·인천·강원을 번갈아</b> 보여드려요 — 후기 수만으로 줄 세우면 늦게 합류한 지역이 영영 안 보이거든요.</>,
     momentum: <>별점 대신 <b>검증된 진짜 후기가 요즘 얼마나 빨리 느는지</b>로 뽑은 '뜨는 카페'예요. 최근 3개월 검증 후기가 많을수록 상위로 올라가요.</>,
     specialty: <>검증된 카페 중 <b>직접 로스팅·스페셜티가 후기에 자주 언급된</b> 곳이에요. 커피에 진심인 집 위주로 보여줘요.</>,
     fresh: <>우리 지도에 <b>새로 등록·검증된 카페</b>예요. 신선한 발견, 이미 검증된 곳만 올라와요.</>,
@@ -1412,6 +1413,8 @@ export default function Home() {
 
   return (
     <div className="flex flex-col bg-[#f4ece0]" style={{ position: "fixed", inset: 0, fontFamily: "'Gowun Batang', AppleMyungjo, 'Apple SD Gothic Neo', 'Noto Serif KR', serif" }}>
+      {/* 📣 접속 시 1회 안내(강원 확장) — 공지 ID·만료일 내장이라 지나면 스스로 사라진다 */}
+      <NoticeModal />
       {/* ✨ 동적 연출(2026-07-30) — CSS 전용·가볍게·reduced-motion 존중. 우리 정체성을 '느끼게': ①골드핀 맥동 ②커피드립 로딩 ③저장 손맛 ④옥석 가리기 */}
       <style>{`
         /* 📥 홈 피드 등장 — 진입하는 순간 카드들이 차례로 떠오름(항상 보이는 화면이라 확실히 느껴짐) */

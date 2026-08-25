@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { rotateBySido } from "@/lib/sidoRotation";
 import { sql } from "@/lib/db";
 export const runtime = "nodejs";
 
@@ -113,8 +114,9 @@ export async function GET(req: NextRequest) {
       scored.push({ id: c.id, name: c.name, area: c.area, lat: 0, lng: 0, grade: c.synth_grade, count: total, identity: c.synth_identity, note: null, beanNote: [], reason, _s: score });
     }
     scored.sort((a, b) => gradeRank(b.grade) - gradeRank(a.grade) || b._s - a._s);
-    const rising = scored.slice(0, 12).map(({ _s, ...x }) => x);
-    return NextResponse.json({ ok: true, region: region || "수도권 전체", hasDelta, count: rising.length, rising }, {
+    // ⚖️ 시·도 순환(lib/sidoRotation.ts) — '입소문순'도 순수 정렬이면 수도권 독식이라 강원이 못 오른다.
+    const rising = rotateBySido(scored, 12).map(({ _s, ...x }: any) => x);
+    return NextResponse.json({ ok: true, region: region || "전체 지역", hasDelta, count: rising.length, rising }, {
       headers: { "Cache-Control": "public, max-age=0, must-revalidate" },
     });
   } catch (e) {

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { rotateBySido } from "@/lib/sidoRotation";
 import { sql } from "@/lib/db";
 import { subscriptionLive } from "@/lib/flags";
 import { dessertDominance } from "@/lib/charScore";
@@ -183,7 +184,9 @@ export async function GET(req: NextRequest) {
 
       headlineA, headlineB, themeB, headlineAList, headlineBList,
       // 헤드라인 제외 후 잘라서 항상 꽉 채움(공개 카페가 충분하면 Top3=3개)
-      top3: byReview.filter((c) => !usedIds.has(c.id)).slice(0, 3).map((c: any) => slim(c, "top")),
+      // ⚖️ 시·도 순환(lib/sidoRotation.ts) — 순수 정렬이면 후기 많은 수도권이 독식해 강원이 영영 못 오른다.
+      //   시·도별 라운드로빈 + 날짜별 시작점 회전으로 4일에 한 번은 각 시·도가 첫 자리에 온다.
+      top3: rotateBySido(byReview.filter((c) => !usedIds.has(c.id)), 3).map((c: any) => slim(c, "top")),
       fresh: (() => {
         // 검증 등급이라도 리뷰가 적으면(예: count=6) 신뢰도 낮음 → 최소 리뷰수 기준 추가(제안F)
         // + 디저트 우세 카페는 momentum과 동일 기준으로 제외(결함C, coordination#88 — fresh엔 이 편향완화가 누락돼 있었음)
@@ -195,9 +198,9 @@ export async function GET(req: NextRequest) {
           const n = areaCnt.get(gu) ?? 0;
           if (n < 1) { deduped.push(c); areaCnt.set(gu, n + 1); }
         }
-        return deduped.slice(0, 5).map((c: any) => slim(c, "fresh"));
+        return rotateBySido(deduped, 5).map((c: any) => slim(c, "fresh")); // 구 중복제거 후 시·도 순환
       })(),
-      specialty: bySpecialty.filter((c) => !usedIds.has(c.id)).slice(0, 5).map((c: any) => slim(c, "specialty")),
+      specialty: rotateBySido(bySpecialty.filter((c) => !usedIds.has(c.id)), 5).map((c: any) => slim(c, "specialty")),
     }, {
       // 엣지 캐시(지역별로 따로 캐시됨). 추천·featured는 5분 신선도면 충분.
       //   ⚠️ 2026-07-29: 기존엔 s-maxage가 없어 CDN 캐시가 안 걸리고 홈 진입마다 공개카페 전량을 DB에서 재조회했다(주석 의도와 불일치).
