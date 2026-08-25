@@ -37,11 +37,24 @@ async function naverSearch(kind: "blog" | "cafearticle", query: string): Promise
   const url = `https://openapi.naver.com/v1/search/${kind}.json?query=${encodeURIComponent(query)}&display=${NAVER_DISPLAY}&sort=sim`;
   // 🔑 키가 여러 개면 소진된 키를 건너뛰며 재시도한다(lib/naverKeys.ts). 키 1개면 기존과 동일 동작.
   let res: Response | null = null;
-  for (let attempt = 0; attempt < Math.max(1, NAVER_KEY_COUNT); attempt++) {
+  // ⚠️ 429는 **두 종류**다(discover.ts가 2026-07-11에 이미 겪은 함정 — 수집 경로엔 빠져 있었다):
+  //   ① 일일한도(count/quota=…/25000·Query limit·errorCode 010) = 진짜 소진 → 키 교체/중단
+  //   ② 초당 버스트 제한 = 일시적 → **짧게 쉬고 재시도**. 이걸 소진으로 처리하면 키가 통째로 죽고,
+  //      콜은 썼는데 수확이 0이라 순수 낭비가 된다(실제로 샤드 하나가 '확보 0/20'으로 멈췄다).
+  const BURST_WAIT = [300, 900, 2000];
+  let burst = 0;
+  for (let attempt = 0; attempt < Math.max(1, NAVER_KEY_COUNT) + BURST_WAIT.length; attempt++) {
     const k = naverHeaders();
     if (!k) return { items: [], ok: false }; // 전 키 소진 — 조용히 중단
     res = await fetch(url, { headers: k.headers });
     if (res.status !== 429) break;
+    const body = await res.text().catch(() => "");
+    const daily = /quota=\d+\/\d+|Query limit|"errorCode"\s*:\s*"010"/i.test(body);
+    if (!daily) {
+      if (burst >= BURST_WAIT.length) return { items: [], ok: false }; // 계속 버스트면 이번 질의만 포기
+      await new Promise((r) => setTimeout(r, BURST_WAIT[burst++]));
+      continue; // 같은 키로 재시도 — 키를 죽이지 않는다
+    }
     markNaverExhausted().catch(() => {});
     if (!markKeyExhausted(k.label)) return { items: [], ok: false }; // 남은 키 없음
   }
@@ -91,6 +104,7 @@ export async function fetchWebReviews(name: string, area: string): Promise<{ sni
           seen.add(key);
           snippets.push(it);
         }
+        await new Promise((r) => setTimeout(r, 120)); // 질의 간 최소 간격 — 샤드 2개가 동시에 때려 버스트 429 나던 걸 완화
         // 첫 질의가 비포화면 이 종류(blog/cafearticle)의 나머지 질의는 건너뛴다.
         //   ⚠️ ok=false(쿼터/오류)일 땐 items가 0이라 '비포화'로 오인할 수 있으므로 ok일 때만 판단한다.
         if (qi === 0 && ok && items.length < NAVER_DISPLAY) break;
