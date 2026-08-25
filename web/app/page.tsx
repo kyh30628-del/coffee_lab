@@ -1413,8 +1413,8 @@ export default function Home() {
 
   return (
     <div className="flex flex-col bg-[#f4ece0]" style={{ position: "fixed", inset: 0, fontFamily: "'Gowun Batang', AppleMyungjo, 'Apple SD Gothic Neo', 'Noto Serif KR', serif" }}>
-      {/* 📣 접속 시 1회 안내(강원 확장) — 공지 ID·만료일 내장이라 지나면 스스로 사라진다 */}
-      <NoticeModal />
+      {/* 📣 접속 시 안내 공지 — 데이터는 /api/discover 응답에 얹혀 온다(전용 요청 0, 비용 증가 0) */}
+      <NoticeModal source={(discover as any)?.notice ?? null} />
       {/* ✨ 동적 연출(2026-07-30) — CSS 전용·가볍게·reduced-motion 존중. 우리 정체성을 '느끼게': ①골드핀 맥동 ②커피드립 로딩 ③저장 손맛 ④옥석 가리기 */}
       <style>{`
         /* 📥 홈 피드 등장 — 진입하는 순간 카드들이 차례로 떠오름(항상 보이는 화면이라 확실히 느껴짐) */

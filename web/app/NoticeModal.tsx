@@ -1,39 +1,55 @@
 "use client";
 import { useEffect, useState } from "react";
-import { activeNotice, isPast, type Notice } from "@/lib/notices";
+import { isPast, type Notice } from "@/lib/notices";
 
-// 📣 서비스 공지 모달 — 내용·날짜는 lib/notices.ts가 정한다(지역 추가 시 그 파일만 수정).
+// 📣 서비스 공지 모달 — 내용·날짜는 **관리자 화면(/admin)에서 DB로 관리**한다(무배포).
+//   💰 공지 데이터는 **부모가 넘겨준다**(/api/discover 응답에 얹혀 온다). 전용 fetch를 두면
+//   접속마다 요청이 하나 늘어난다 — 비용을 늘리지 않는 게 절대 규칙이다.
 //
-// ⚠️ 표시 규칙(2026-08-25 CEO 지시 개정):
-//   · 공지 기간 동안 **접속할 때마다 뜬다**(전엔 최초 1회였는데, 못 보고 지나치는 사람이 생긴다).
-//   · 사용자가 **'다시 보지 않기'를 누르면 영영 안 뜬다**. 그냥 닫으면(둘러보기·배경 탭) 다음에 또 뜬다.
-//     → 끄는 선택권을 사용자에게 주되, 명시적으로 끄기 전엔 확실히 알린다.
-//   · 기간이 끝나면(until) 아무것도 안 뜬다. 사람이 지우는 걸 잊어도 스스로 정리된다.
+// ⚠️ 표시 규칙(2026-08-25 CEO 지시, 2차 개정):
+//   · **브라우저 세션당 1회**만 뜬다(sessionStorage). 매 새로고침마다 뜨면 성가시다.
+//   · 새 세션(탭을 새로 열거나 브라우저를 다시 켜면)에는 다시 뜬다 — 못 보고 지나친 사람을 위해.
+//   · **'다시 보지 않기'를 누르면 영영 안 뜬다**(localStorage). 그냥 닫으면 다음 세션에 또 뜬다.
+//   · 기간이 끝나면(until) 아무것도 안 뜬다.
 //
 // ⚠️ localStorage 키에 **공지 ID를 박는다**(dcn_notice_<id>). 공용 플래그 하나면 다음 공지를 띄울 때
 //   예전에 끈 사람에게 영영 안 뜬다. id는 절대 재사용하지 않는다(lib/notices.ts 주석 참조).
 // ⚠️ 배경 스크롤 잠금은 하지 않는다 — 정보 고지일 뿐이고, 실제 스크롤러가 html이라 body만 잠그면
 //   안 먹는 함정이 있다. 탭 한 번으로 닫힌다.
 
-export default function NoticeModal() {
+export default function NoticeModal({ source }: { source?: Notice | null }) {
   const [notice, setNotice] = useState<Notice | null>(null);
   const [past, setPast] = useState(false);
 
   useEffect(() => {
-    const n = activeNotice();
-    if (!n) return;
-    try {
-      if (localStorage.getItem(`dcn_notice_${n.id}`)) return; // '다시 보지 않기'를 누른 사람
-    } catch { return; } // 프라이빗 모드 등 localStorage 불가 → 끌 방법이 없으니 아예 안 띄운다
-    // 첫 화면이 그려진 뒤에 띄운다 — 즉시 띄우면 로딩 중 화면 위에 맥락 없이 떠 보인다.
-    const t = setTimeout(() => { setPast(isPast(n)); setNotice(n); }, 600);
-    return () => clearTimeout(t);
-  }, []);
+    let alive = true;
+    (() => {
+      const n = source ?? null;
+      if (!n) return;
+      try {
+        if (localStorage.getItem(`dcn_notice_${n.id}`)) return;        // 영구 해제한 사람
+        if (sessionStorage.getItem(`dcn_notice_seen_${n.id}`)) return; // 이번 세션에 이미 봄
+      } catch { return; } // 프라이빗 모드 등 저장 불가 → 끌 방법이 없으니 아예 안 띄운다
+      // 첫 화면이 그려진 뒤에 띄운다 — 즉시 띄우면 로딩 중 화면 위에 맥락 없이 떠 보인다.
+      setTimeout(() => {
+        if (!alive) return;
+        try { sessionStorage.setItem(`dcn_notice_seen_${n.id}`, "1"); } catch {}
+        setPast(isPast(n)); setNotice(n);
+      }, 600);
+    })();
+    return () => { alive = false; };
+  }, [source]);
 
   if (!notice) return null;
-  const close = () => setNotice(null);                                  // 이번만 닫기 — 다음 접속에 또 뜬다
+  const close = () => setNotice(null);                                  // 이번만 닫기 — 다음 '세션'에 또 뜬다
   const never = () => {                                                 // 영구 해제
     try { localStorage.setItem(`dcn_notice_${notice.id}`, String(Date.now())); } catch {}
+    // 관리자 화면에서 공지 효과를 보기 위한 기록(해제만 — '노출'까지 남기면 접속마다 DB를 깨운다).
+    try {
+      const anonId = localStorage.getItem("dcn_anon") || "";
+      fetch("/api/notice", { method: "POST", headers: { "Content-Type": "application/json" }, keepalive: true,
+        body: JSON.stringify({ id: notice.id, anonId }) }).catch(() => {});
+    } catch {}
     setNotice(null);
   };
 

@@ -100,6 +100,17 @@ export default function AdminPage() {
   //   ⚠️ 아래 loadRotation(/api/admin/rotation)은 **유료 노출 로테이션**으로 이름만 비슷한 다른 기능이다.
   const [rot, setRot] = useState<any>(null);
   const loadSidoRotation = (password: string) => fetch("/api/admin/sido-rotation", { headers: { "x-admin-password": password }, cache: "no-store" }).then((x) => x.json()).then((d) => { if (d.ok) setRot(d); }).catch(() => {});
+  // 📣 공지 관리 — 무배포로 만들고 고친다(DB 진실원본, lib/notices.ts는 폴백).
+  const [notices, setNotices] = useState<any[] | null>(null);
+  const [ntMsg, setNtMsg] = useState("");
+  const [ntEdit, setNtEdit] = useState<any>(null);
+  const loadNotices = (password: string) => fetch("/api/admin/notices", { headers: { "x-admin-password": password }, cache: "no-store" }).then((x) => x.json()).then((d) => { if (d.ok) setNotices(d.items); }).catch(() => {});
+  const ntAct = async (body: any) => {
+    setNtMsg("");
+    const r = await fetch("/api/admin/notices", { method: "POST", headers: { "Content-Type": "application/json", "x-admin-password": pw }, body: JSON.stringify(body) }).then((x) => x.json()).catch(() => ({ ok: false, error: "요청 실패" }));
+    if (r.ok) { setNtEdit(null); loadNotices(pw); setNtMsg("저장했습니다 — 사용자 화면은 CDN 캐시로 최대 10분 뒤 반영됩니다."); }
+    else setNtMsg(r.error || "실패");
+  };
   const [subscribers, setSubscribers] = useState<any[]>([]);
   const [showSubsModal, setShowSubsModal] = useState(false);
   const [emailReady, setEmailReady] = useState<boolean | null>(null); // 이 환경에 이메일 발송키 있는지
@@ -240,6 +251,7 @@ export default function AdminPage() {
 
   const load = async (password: string) => {
     loadSidoRotation(password);
+    loadNotices(password);
     setMsg("불러오는 중...");
     const r = await fetch("/api/admin/cafes", { headers: { "x-admin-password": password } });
     if (r.status === 401) { setMsg("비밀번호가 틀렸습니다."); return; }
@@ -846,6 +858,84 @@ export default function AdminPage() {
             </div>
           );
         })()}
+
+        {/* ===== 📣 공지 관리 ===== */}
+        <div className="mb-6 rounded-2xl border border-stone-300 bg-white p-4 sm:p-5">
+          <div className="flex items-center justify-between mb-2">
+            <button onClick={() => toggleSec("notice")} className="admin-section-title font-extrabold text-stone-800 text-left">
+              {openSecs.notice ? "▾" : "▸"} 📣 공지 관리{" "}
+              <span className="normal-case font-normal text-stone-600">
+                {notices ? `· 전체 ${notices.length}건 · 진행중 ${notices.filter((n: any) => n.status.startsWith("진행")).length}건` : "· 불러오는 중…"}
+              </span>
+            </button>
+            <button onClick={() => setNtEdit({ id: "", emoji: "📣", title: "", titlePast: "", highlight: "", body: "", bodyPast: "", sub: "", subPast: "", cta: "확인", ctaPast: "확인", from: "", pastFrom: "", until: "" })}
+              className="text-[11px] bg-stone-800 text-white rounded-full px-3 py-1">+ 새 공지</button>
+          </div>
+          {openSecs.notice && <>
+            <p className="text-[11.5px] text-stone-600 leading-relaxed mb-3">
+              사용자에게 접속 시 뜨는 안내 모달입니다. <b>세션당 1회</b> 뜨고, 사용자가 <b>&apos;다시 보지 않기&apos;</b>를 누르면 영구 해제됩니다.
+              날짜가 <b>완료형 전환</b>을 지나면 문구가 자동으로 과거형이 되고, <b>종료</b>가 지나면 아무것도 안 뜹니다.
+              <span className="text-stone-500"> 저장 후 사용자 화면 반영은 CDN 캐시로 최대 10분.</span>
+            </p>
+            {ntMsg && <div className="mb-2 text-[11.5px] rounded-lg px-3 py-2 bg-stone-100 text-stone-700">{ntMsg}</div>}
+            <div className="space-y-2">
+              {(notices ?? []).map((n: any) => (
+                <div key={n.id} className="rounded-xl border border-stone-200 bg-stone-50 p-3">
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <span className="text-[15px]">{n.emoji}</span>
+                    <span className="font-bold text-[13px] text-stone-800">{n.title}</span>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${n.status.startsWith("진행") ? "bg-emerald-100 text-emerald-700" : n.status === "예정" ? "bg-amber-100 text-amber-700" : "bg-stone-200 text-stone-600"}`}>{n.status}</span>
+                    <span className="text-[10.5px] text-stone-500 ml-auto font-mono">{n.id}</span>
+                  </div>
+                  <div className="text-[11px] text-stone-600 mb-1.5">
+                    {new Date(n.from).toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit" })} 시작
+                    {" · "}{new Date(n.pastFrom).toLocaleString("ko-KR", { month: "2-digit", day: "2-digit" })} 완료형
+                    {" · "}{new Date(n.until).toLocaleString("ko-KR", { month: "2-digit", day: "2-digit" })} 종료
+                  </div>
+                  <div className="flex items-center gap-3 text-[11px] text-stone-600">
+                    <span>기간 방문자 <b className="text-stone-800">{n.reach == null ? "—" : n.reach.toLocaleString()}</b></span>
+                    <span>다시보지않기 <b className="text-stone-800">{(n.dismissals ?? 0).toLocaleString()}</b></span>
+                    <div className="ml-auto flex gap-1.5">
+                      <button onClick={() => setNtEdit({ ...n, from: new Date(n.from).toISOString().slice(0, 16), pastFrom: new Date(n.pastFrom).toISOString().slice(0, 16), until: new Date(n.until).toISOString().slice(0, 16), titlePast: n.title_past, bodyPast: n.body_past, subPast: n.sub_past, ctaPast: n.cta_past })}
+                        className="text-[11px] px-2 py-1 rounded-lg bg-white border border-stone-300 text-stone-700">수정</button>
+                      <button onClick={() => ntAct({ action: "toggle", id: n.id })}
+                        className={`text-[11px] px-2 py-1 rounded-lg border ${n.enabled ? "bg-white border-stone-300 text-stone-700" : "bg-emerald-600 border-emerald-600 text-white"}`}>{n.enabled ? "중지" : "재개"}</button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {notices && notices.length === 0 && <p className="text-[12px] text-stone-500 py-3 text-center">공지가 없습니다.</p>}
+            </div>
+
+            {ntEdit && (
+              <div className="mt-3 rounded-xl border-2 border-stone-800 bg-white p-3">
+                <div className="text-[12px] font-bold text-stone-800 mb-2">{ntEdit.created_at ? "공지 수정" : "새 공지"}</div>
+                <div className="grid grid-cols-2 gap-2">
+                  {([
+                    ["id", "ID(영문·재사용 금지)", "text"], ["emoji", "이모지", "text"],
+                    ["title", "제목(예고)", "text"], ["titlePast", "제목(완료)", "text"],
+                    ["highlight", "강조 문구(선택)", "text"], ["body", "본문(예고)", "text"],
+                    ["bodyPast", "본문(완료)", "text"], ["sub", "보조설명(예고)", "text"],
+                    ["subPast", "보조설명(완료)", "text"], ["cta", "버튼(예고)", "text"],
+                    ["ctaPast", "버튼(완료)", "text"],
+                    ["from", "시작", "datetime-local"], ["pastFrom", "완료형 전환", "datetime-local"], ["until", "종료", "datetime-local"],
+                  ] as [string, string, string][]).map(([k, label, type]) => (
+                    <label key={k} className="text-[10.5px] text-stone-600">
+                      {label}
+                      <input type={type} value={ntEdit[k] ?? ""} disabled={k === "id" && !!ntEdit.created_at}
+                        onChange={(e) => setNtEdit({ ...ntEdit, [k]: e.target.value })}
+                        className="w-full mt-0.5 border border-stone-300 rounded-lg px-2 py-1.5 text-[12px] bg-white disabled:bg-stone-100" />
+                    </label>
+                  ))}
+                </div>
+                <div className="flex gap-2 mt-3">
+                  <button onClick={() => ntAct({ action: "save", fields: ntEdit })} className="flex-1 bg-stone-800 text-white rounded-lg py-2 text-[12px] font-bold">저장</button>
+                  <button onClick={() => { setNtEdit(null); setNtMsg(""); }} className="px-4 text-[12px] text-stone-600">취소</button>
+                </div>
+              </div>
+            )}
+          </>}
+        </div>
 
         {/* ===== ⚖️ 카페 둘러보기 시·도 순환 ===== */}
         <div className="mb-6 rounded-2xl border border-stone-300 bg-white p-4 sm:p-5">

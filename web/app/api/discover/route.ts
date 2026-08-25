@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { currentNotice } from "@/lib/noticeStore";
 import { rotateBySido } from "@/lib/sidoRotation";
 import { sql } from "@/lib/db";
 import { subscriptionLive } from "@/lib/flags";
@@ -180,6 +181,9 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       ok: true, region: region || "전체", scopeCount: scope.length,
+      // 📣 공지를 여기 얹는다 — 별도 엔드포인트를 만들면 접속마다 요청이 하나 늘어난다.
+      //   이 응답은 이미 CDN 5분 캐시라 추가 DB 깨움도 사실상 없다(캐시 미스 때 작은 쿼리 1건).
+      notice: await currentNotice().catch(() => null),
       featured: subscriptionLive() ? featured : [], // 구독 라이브 전엔 소비자에 '추천 카페' 숨김
 
       headlineA, headlineB, themeB, headlineAList, headlineBList,

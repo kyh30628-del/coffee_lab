@@ -26,6 +26,9 @@ export type Notice = {
 
 const KST = (y: number, m: number, d: number) => Date.UTC(y, m - 1, d, -9, 0, 0); // KST 자정
 
+// ⚠️ 이 배열은 이제 **폴백**이다(2026-08-25). 진실 원본은 DB `notices` 테이블이고
+//   관리자 화면(/admin)에서 무배포로 만들고 고친다. DB가 죽어도 서비스 공지가 사라지지 않게
+//   여기 값을 남겨 둔다 — criteria의 DEFAULTS와 같은 원칙이다.
 export const NOTICES: Notice[] = [
   {
     id: "gangwon-2026-08",
