@@ -320,10 +320,14 @@ export async function GET(req: NextRequest) {
     const tasteN = (await sql`SELECT COUNT(*)::int n FROM taste_logs`.catch(() => [{ n: 0 }]))[0]?.n ?? 0;
     const bookmarkN = (await sql`SELECT COUNT(*)::int n FROM bookmarks`.catch(() => [{ n: 0 }]))[0]?.n ?? 0;
 
-    // ❤ '내 카페 추억' 즐겨찾기(하트) — user_visits.favorite (위치인증 방문기록 중 하트 표시된 것)
+    // ⭐ 찜(즐겨찾기) — **bookmarks 테이블**이 진짜 출처다.
+    //   🔴 2026-08-25 수리(CEO 지적 "유입현황 즐겨찾기 누적이 0"):
+    //     예전엔 `user_visits.favorite`(추억 기록 안의 하트)를 세고 있었다. 그건 실사용 **0건**이라
+    //     화면이 늘 0으로 나왔다. 정작 카페상세·지도에서 누른 진짜 찜 9건은 어디에도 반영되지 않았다.
+    //     두 기능은 이름만 비슷할 뿐 별개다 — 찜=bookmarks, 하트=user_visits.favorite.
     const favStat = (await sql`SELECT COUNT(*)::int total,
         COUNT(*) FILTER (WHERE created_at > now()-interval '7 days')::int last7
-      FROM user_visits WHERE favorite = true AND verified = true`.catch(() => [{ total: 0, last7: 0 }]))[0] as any;
+      FROM bookmarks`.catch(() => [{ total: 0, last7: 0 }]))[0] as any;
     const favDaily = (await sql`
       WITH days AS (
         SELECT generate_series(
@@ -336,14 +340,13 @@ export async function GET(req: NextRequest) {
       FROM days
       LEFT JOIN (
         SELECT (created_at AT TIME ZONE 'Asia/Seoul')::date AS d, COUNT(*)::int n
-        FROM user_visits WHERE favorite = true AND verified = true AND created_at > now()-interval '14 days'
+        FROM bookmarks WHERE created_at > now()-interval '14 days'
         GROUP BY 1
       ) f ON f.d = days.d
       ORDER BY days.d`.catch(() => [])) as any[];
     const topFavCafes = (await sql`
       SELECT c.name, c.area, COUNT(*)::int n
-      FROM user_visits v JOIN cafes c ON c.id = v.cafe_id
-      WHERE v.favorite = true AND v.verified = true
+      FROM bookmarks b JOIN cafes c ON c.id = b.cafe_id
       GROUP BY c.id, c.name, c.area ORDER BY n DESC LIMIT 8`.catch(() => [])) as any[];
     // 🐛 재발방지(2026-07-26) — 여기도 sessions>=2(같은날 포함)를 '재방문'이라 표시해 위 retention(날짜기준)과
     //   다른 숫자를 같은 화면에 냈다. traffic_events 날짜(KST) distinct count로 통일(retention과 동일 정의).

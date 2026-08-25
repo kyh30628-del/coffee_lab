@@ -119,6 +119,10 @@ export default function AdminPage() {
   const [nlMsg, setNlMsg] = useState("");
   const [showYtModal, setShowYtModal] = useState(false);
   const [showVisits, setShowVisits] = useState(false);
+  // 📑 2026-08-25(CEO 지시): 추억/찜을 **탭으로 분리**하고 항목 클릭 시 상세를 연다.
+  //   예전엔 한 목록에 뒤섞여 있고 클릭해도 아무 일이 없어 내용을 제대로 볼 수 없었다.
+  const [visitTab, setVisitTab] = useState<"memory" | "mark">("memory");
+  const [visitDetail, setVisitDetail] = useState<any>(null);
   const [visits, setVisits] = useState<any>(null);
   const loadSubscribers = (password: string) => fetch("/api/subscription?all=1", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) { setSubscribers(d.subs ?? []); setEmailReady(!!d.emailReady); setSenderReady(!!d.senderReady); setLiveExposure(!!d.liveExposure); setBankTransferEmail(!!d.bankTransferEmail); } }).catch(() => {});
   const subAct = async (id: number, action: string, days?: number, reason?: string) => {
@@ -947,53 +951,105 @@ export default function AdminPage() {
                   {visits?.mstat && <span className="text-[11px] text-amber-700 font-normal"> · 찜 {visits.mstat.total}건 / 기기 {visits.mstat.users}대 (7일 +{visits.mstat.last7})</span>}</span>
                 <button onClick={() => setShowVisits(false)} className="text-2xl text-stone-600 leading-none">×</button>
               </div>
+              {/* 📑 탭 — 추억/찜을 분리한다(2026-08-25 CEO 지시). 한 목록에 섞여 있으면 구분이 안 된다. */}
+              <div className="flex gap-1 px-3 pt-2 border-b border-stone-200">
+                {([["memory", `❤ 추억 ${visits?.stat?.total ?? 0}`], ["mark", `⭐ 찜 ${visits?.mstat?.total ?? 0}`]] as const).map(([k, label]) => (
+                  <button key={k} onClick={() => { setVisitTab(k as any); setVisitDetail(null); }}
+                    className={`px-3 py-2 text-[12.5px] font-bold rounded-t-lg ${visitTab === k ? "bg-stone-800 text-white" : "text-stone-600 hover:bg-stone-100"}`}>
+                    {label}
+                  </button>
+                ))}
+              </div>
               <div className="overflow-y-auto flex-1 p-3 space-y-2">
-                {/* ⭐ 찜(bookmarks) — 2026-08-25 신설. 그동안 관리자 화면에 이 데이터가 아예 없었다.
-                    화면의 '즐겨찾기'는 전부 user_visits.favorite(추억 속 하트)였고 실사용은 0건,
-                    정작 카페상세·지도에서 누른 진짜 찜은 어디에서도 못 봤다. */}
-                {(visits?.marks ?? []).length > 0 && (
-                  <div className="border border-amber-300 bg-amber-50/60 rounded-xl p-3 mb-1">
-                    <div className="text-[12px] font-bold text-amber-800 mb-2">⭐ 찜(즐겨찾기) {visits.marks.length}건</div>
-                    <div className="space-y-1">
-                      {visits.marks.map((m: any) => (
-                        <div key={m.id} className="flex items-center gap-2 text-[12px]">
-                          <span className="text-amber-500">★</span>
-                          <b className="text-stone-800">{m.cafe_name ?? "(카페삭제)"}</b>
-                          <span className="text-[10px] text-stone-600">{m.area}</span>
-                          {m.synth_grade && <span className="text-[9.5px] px-1.5 py-0.5 rounded-full bg-white border border-stone-300 text-stone-700">{m.synth_grade}</span>}
-                          {m.published === false && <span className="text-[9.5px] text-rose-700">비공개</span>}
-                          <span className="ml-auto text-[10px] text-stone-600 whitespace-nowrap">
-                            {new Date(m.created_at).toLocaleDateString("ko-KR")} · 익명 {String(m.device_id).slice(0, 6)}
-                          </span>
+                {/* ❤ 추억 목록 — 클릭하면 상세(사진 원본·전문) */}
+                {visitTab === "memory" && (visits?.visits ?? []).map((v: any) => {
+                  const ph = (Array.isArray(v.photos) && v.photos.length ? v.photos : (v.photo_url ? [v.photo_url] : [])) as string[];
+                  return (
+                    <button key={v.id} onClick={() => setVisitDetail({ kind: "memory", ...v, ph })}
+                      className="w-full text-left flex gap-3 border border-stone-300 rounded-xl p-3 hover:bg-stone-50">
+                      {ph.length > 0 && <img src={ph[0]} alt="" className="w-16 h-16 rounded-lg object-cover shrink-0" />}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <b className="text-[13px] text-stone-800">{v.cafe_name}</b>
+                          <span className="text-[10px] text-stone-600">{v.area}</span>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${v.verified ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-700"}`}>{v.verified ? "✓ 인증" : "📍 미인증(나만)"}</span>
+                          {ph.length > 1 && <span className="text-[10px] text-stone-600">사진 {ph.length}장</span>}
                         </div>
-                      ))}
-                    </div>
+                        {v.memory && <div className="text-[12px] text-stone-600 mt-1 line-clamp-2">{v.memory}</div>}
+                        <div className="text-[10px] text-stone-500 mt-1">{new Date(v.created_at).toLocaleString("ko-KR")} · 익명 {String(v.device_id).slice(0, 6)} · 눌러서 상세</div>
+                      </div>
+                    </button>
+                  );
+                })}
+                {/* ⭐ 찜 목록 — 클릭하면 상세 */}
+                {visitTab === "mark" && (visits?.marks ?? []).map((m: any) => (
+                  <button key={m.id} onClick={() => setVisitDetail({ kind: "mark", ...m })}
+                    className="w-full text-left flex items-center gap-2 border border-amber-200 bg-amber-50/40 rounded-xl px-3 py-2.5 hover:bg-amber-50">
+                    <span className="text-amber-500">★</span>
+                    <b className="text-[13px] text-stone-800">{m.cafe_name ?? "(카페삭제)"}</b>
+                    <span className="text-[10px] text-stone-600">{m.area}</span>
+                    {m.synth_grade && <span className="text-[9.5px] px-1.5 py-0.5 rounded-full bg-white border border-stone-300 text-stone-700">{m.synth_grade}</span>}
+                    {m.published === false && <span className="text-[9.5px] text-rose-700">비공개</span>}
+                    <span className="ml-auto text-[10px] text-stone-600 whitespace-nowrap">{new Date(m.created_at).toLocaleDateString("ko-KR")}</span>
+                  </button>
+                ))}
+                {visitTab === "memory" && (!visits?.visits || visits.visits.length === 0) && <p className="text-[12px] text-stone-600 text-center py-6">아직 등록된 추억이 없어요.</p>}
+                {visitTab === "mark" && (!visits?.marks || visits.marks.length === 0) && <p className="text-[12px] text-stone-600 text-center py-6">아직 찜 기록이 없어요.</p>}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 🔍 추억·찜 상세 — 목록에서 클릭하면 열린다(2026-08-25). 사진 원본·본문 전문·메타 전부. */}
+        {visitDetail && (
+          <div className="fixed inset-0 z-[6100] flex items-center justify-center bg-black/60 p-3" onClick={() => setVisitDetail(null)}>
+            <div className="w-full max-w-lg bg-white rounded-2xl max-h-[90dvh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between px-4 py-3 border-b sticky top-0 bg-white">
+                <span className="text-sm font-bold text-stone-800">
+                  {visitDetail.kind === "memory" ? "❤ 추억 상세" : "⭐ 찜 상세"}
+                </span>
+                <button onClick={() => setVisitDetail(null)} className="text-2xl text-stone-600 leading-none">×</button>
+              </div>
+              <div className="p-4 space-y-3">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <b className="text-[15px] text-stone-900">{visitDetail.cafe_name ?? "(카페삭제)"}</b>
+                  <span className="text-[11px] text-stone-600">{visitDetail.area}</span>
+                  {visitDetail.synth_grade && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-stone-100 text-stone-700">{visitDetail.synth_grade}</span>}
+                  {visitDetail.kind === "memory" && (
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${visitDetail.verified ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-700"}`}>
+                      {visitDetail.verified ? "✓ 위치인증됨(공개)" : "📍 미인증 — 본인·관리자만"}
+                    </span>
+                  )}
+                  {visitDetail.published === false && <span className="text-[10px] text-rose-700">카페 비공개</span>}
+                </div>
+
+                {visitDetail.kind === "memory" && (visitDetail.ph ?? []).length > 0 && (
+                  <div className="grid grid-cols-2 gap-2">
+                    {(visitDetail.ph as string[]).map((u, i) => (
+                      <a key={i} href={u} target="_blank" rel="noopener noreferrer">
+                        <img src={u} alt="" className="w-full h-40 object-cover rounded-lg border border-stone-200" />
+                      </a>
+                    ))}
                   </div>
                 )}
-                {(visits?.visits ?? []).map((v: any) => (
-                  <div key={v.id} className="flex gap-3 border border-stone-300 rounded-xl p-3">
-                    {(() => {
-                      // 여러 장 저장된 기록(최대 5장)을 전부 보여준다 — 예전엔 photo_url 1장만 떴다.
-                      const ph = (Array.isArray(v.photos) && v.photos.length ? v.photos : (v.photo_url ? [v.photo_url] : [])) as string[];
-                      return ph.length ? (
-                        <div className="flex gap-1 shrink-0">
-                          {ph.slice(0, 5).map((u, i) => <img key={i} src={u} alt="" className="w-16 h-16 rounded-lg object-cover" />)}
-                        </div>
-                      ) : null;
-                    })()}
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5">
-                        {v.favorite && <span className="text-amber-500">★</span>}
-                        <b className="text-[13px] text-stone-800">{v.cafe_name}</b>
-                        <span className="text-[10px] text-stone-600">{v.area}</span>
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${v.verified ? "bg-emerald-50 text-emerald-600" : "bg-stone-100 text-stone-700"}`}>{v.verified ? "✓ 인증" : "미인증"}</span>
-                      </div>
-                      {v.memory && <div className="text-[12px] text-stone-600 mt-1 leading-relaxed whitespace-pre-wrap">{v.memory}</div>}
-                      <div className="text-[10px] text-stone-600 mt-1">{new Date(v.created_at).toLocaleString("ko-KR")} · 익명 {String(v.device_id).slice(0, 6)}</div>
-                    </div>
-                  </div>
-                ))}
-                {(!visits?.visits || visits.visits.length === 0) && <p className="text-[12px] text-stone-600 text-center py-6">아직 등록된 방문 기록이 없어요.</p>}
+
+                {visitDetail.kind === "memory" && visitDetail.memory && (
+                  <div className="text-[13px] text-stone-700 leading-relaxed whitespace-pre-wrap bg-stone-50 rounded-lg p-3">{visitDetail.memory}</div>
+                )}
+
+                <div className="text-[11px] text-stone-600 space-y-0.5 border-t pt-2">
+                  <div>등록: {new Date(visitDetail.created_at).toLocaleString("ko-KR")}</div>
+                  <div>익명 기기: {String(visitDetail.device_id).slice(0, 10)}…</div>
+                  <div>유입 연결: {visitDetail.anon_id ? `연결됨 (${String(visitDetail.anon_id).slice(0, 8)}…)` : "미연결 — 08-24 이전 저장분"}</div>
+                  {visitDetail.kind === "memory" && <div>확정={visitDetail.finalized ? "O" : "X"} · 공개설정={visitDetail.is_public ? "O" : "X"} · 하트={visitDetail.favorite ? "O" : "X"}</div>}
+                </div>
+
+                {visitDetail.cafe_id && (
+                  <a href={`/c/${visitDetail.cafe_id}`} target="_blank" rel="noopener noreferrer"
+                    className="block text-center text-[12.5px] font-bold text-stone-700 border border-stone-300 rounded-xl py-2.5 hover:bg-stone-50">
+                    카페 페이지 열기 →
+                  </a>
+                )}
               </div>
             </div>
           </div>
@@ -1324,7 +1380,7 @@ export default function AdminPage() {
                       {/* ❤ 내 카페 추억 즐겨찾기(하트) */}
                       {a.favorites && (
                         <div className="bg-white rounded-xl border border-stone-300 p-3">
-                          <div className="text-[12px] font-bold text-stone-700 mb-1.5">❤ 내 카페 추억 즐겨찾기 <span className="font-normal text-[10px] text-stone-600">· 위치인증 방문기록 중 하트 표시</span></div>
+                          <div className="text-[12px] font-bold text-stone-700 mb-1.5">⭐ 찜(즐겨찾기) <span className="font-normal text-[10px] text-stone-600">· 카페상세·지도에서 누른 찜(bookmarks)</span></div>
                           <div className="flex items-center gap-x-3 gap-y-1 flex-wrap text-[11px] mb-2">
                             <span>누적 <b className="text-[16px] text-rose-600">{a.favorites.total}</b>건</span>
                             <span className="text-stone-700">최근 7일 <b>{a.favorites.last7}</b>건</span>
@@ -1341,7 +1397,7 @@ export default function AdminPage() {
                           )}
                           {(a.favorites.topCafes || []).length > 0 ? (
                             <div className="pt-2 border-t border-stone-300 text-[10.5px] text-stone-600"><span className="text-stone-600">즐겨찾기 많은 카페: </span>{a.favorites.topCafes.map((c: any, i: number) => <span key={i} className="mr-1.5"><b>{c.name}</b>({c.n})</span>)}</div>
-                          ) : <p className="text-[9.5px] text-stone-600">아직 즐겨찾기 기록 없음.</p>}
+                          ) : <p className="text-[9.5px] text-stone-600">아직 찜 기록 없음.</p>}
                         </div>
                       )}
                       {noEvents && <div className="bg-amber-50 border border-amber-300 rounded-xl p-2.5 text-[11px] text-amber-800">📊 페이지뷰 단위 지표(추이·인기카페·퍼널·시간대)는 방금 추적 시작 — 방문이 쌓이며 채워집니다. 방문자·유입경로·재방문은 지금부터 정확합니다.</div>}
