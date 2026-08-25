@@ -267,3 +267,4 @@
 | 2026-08-24 23:05 | #813 | [룰갭 신규] 동호회 커뮤니티 모임 공지문이 실제 후기로 오판정 (id1198 카페소소·id11232 차너른 | deb5ce64 | - | lib/reviewQuality.ts: CLUB_MEETUP_LOGISTICS_LEAK 게이트 신규(CLUB_NAVER_LINK+CLUB_MEETUP_LOGISTICS_CUES 동 |
 | 2026-08-24 23:06 | #814 | [개발] 발굴 좌표전용 dedup 과잉차단 — lib/discover.ts:456 이름검증 없이 44~55m | a653d54e | - | web/lib/discover.ts:456 좌표전용 dedup에 brandTokenOverlap 이름검증 추가(decisions#780 함수 재사용) — 좌표 근접만으론 skip  |
 | 2026-08-25 03:05 | #815 | [개발] 협업 #337: [정의정정] user_consents.visit_count는 "재방문"이 아니라 페 | 97c611ae | - | app/admin/page.tsx(유입경로 카드)·app/api/orchestrator/route.ts(sourceEngage)에서 visit_count 평균을 '재방문 횟수'로  |
+| 2026-08-25 11:05 | #816 | [개발] [정합성 발견] raw_reviews에 스팸 블로그원문("금호김영집" 등) 981곳 중복 오염 —  | f0c88535 | - | 근본원인: lib/webSearchCollector.ts fetchWebReviews가 네이버 sort=sim 유사도만 믿고 카페명 무관 콘텐츠까지 반환(예: 링크나열형 스팸 블로 |
