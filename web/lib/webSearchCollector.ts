@@ -1,4 +1,5 @@
 // 네이버 검색 API로 카페 리뷰성 문서 수집 (PRINCIPLES.md 2조: 공식 API, 합법)
+import { bumpNaver, markNaverExhausted } from "./naverBudget";
 // (A)방식: 원문 복제 금지. 인용 한 줄(요약) + 출처 링크 + 날짜만 보존.
 export type WebSnippet = { text: string; title?: string; desc?: string; kind?: "blog" | "cafearticle"; time?: number; link?: string; source?: string; date?: string };
 
@@ -23,11 +24,19 @@ function fmtDate(d?: string): string {
 }
 
 // display=100: 호출 수는 동일(쿼터 동일)하나 카페당 후기 텍스트 ~5배 확보(검증 정확도↑).
+// 🚨 2026-08-25 교정: 네이버 검색 API 일일 한도(25,000)는 **애플리케이션 전체 공유**다.
+//   local/blog/cafearticle이 각각 25,000인 줄 알고 수집을 병렬로 올렸다가 하루치를 태웠다
+//   (실측 응답: 세 API 모두 `{count/quota=25000/25000}`). 그래서 여기서도 예산에 계상해야
+//   naver_budget이 진실이 된다 — 예전엔 lib/discover.ts(발굴)만 계상해 절반만 보였다.
 async function naverSearch(kind: "blog" | "cafearticle", query: string): Promise<{ items: WebSnippet[]; ok: boolean }> {
   if (!ID || !SECRET) return { items: [], ok: false };
   const url = `https://openapi.naver.com/v1/search/${kind}.json?query=${encodeURIComponent(query)}&display=100&sort=sim`;
   const res = await fetch(url, { headers: { "X-Naver-Client-Id": ID, "X-Naver-Client-Secret": SECRET } });
-  if (!res.ok) return { items: [], ok: false }; // 429(쿼터)·기타 → ok:false
+  if (!res.ok) {
+    if (res.status === 429) markNaverExhausted().catch(() => {}); // 쿨다운 뒤 자동 만료(자가치유) — 발굴과 같은 취급
+    return { items: [], ok: false }; // 429(쿼터)·기타 → ok:false
+  }
+  bumpNaver(1).catch(() => {}); // 성공 호출 계상 — 발굴과 **같은 카운터**를 쓴다(한도가 공유이므로)
   const data = await res.json();
   const items = (data.items ?? []).map((it: { title?: string; description?: string; postdate?: string; link?: string; bloggername?: string }) => {
     const title = stripTags(it.title ?? "");
