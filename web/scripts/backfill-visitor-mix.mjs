@@ -37,7 +37,7 @@ for (;;) {
 
   for (const c of rows) {
     seen++;
-    const mix = visitorMix((c.s || []).map((r) => r?.quote || ""));
+    const mix = visitorMix((c.s || []).map((r) => r?.quote || ""), c.name || ""); // 상호 오탐 차단(단골커피·우리동네식빵 등)
     const b = visitorBadges(mix);
     if (b.some((x) => x.key === "trip")) { trip++; if (samples.length < 20) samples.push(`🧳 ${c.name} (${c.area}) 후기 ${mix.n}건 중 ${Math.round(mix.trip * 100)}%`); }
     if (b.some((x) => x.key === "local")) local++;

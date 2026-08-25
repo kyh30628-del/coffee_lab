@@ -28,15 +28,24 @@ const TRIP = /(여행|놀러|나들이|드라이브|여행객|관광객|당일�
 // 동네 신호: 반복 방문·생활권 관계. 이게 우리 서비스의 정체성 그 자체다.
 const LOCAL = /(단골|자주\s?가|자주\s?들르|또\s?왔|또\s?가|재방문|동네|집\s?앞|집\s?근처|퇴근|출근|근처\s?살)/;
 
+// 🚨 상호 오탐 차단(2026-08-25, 배포 전 실측으로 발견):
+//   후기에는 카페 이름이 자주 등장한다. 그래서 **상호에 신호어가 들어간 카페**는 신호가 100%로 튄다 —
+//   '단골커피' 19건 중 동네 100% · '우리동네식빵' 22건 중 100% · '걸리버여행기' 43건 중 여행 79%.
+//   실측 규모: 상호에 동네어 98곳(그중 배지 오탐 21곳) · 여행어 7곳(오탐 1곳).
+//   교정 원리 = **그 카페에 한해 해당 축을 판정하지 않는다**(0으로 두어 배지가 안 붙게).
+//   억지로 이름만 지워서 재는 것보다 안전하다 — '동네커피'의 후기에서 '동네'가 상호를 가리키는지
+//   진짜 동네를 가리키는지 규칙으로는 가를 수 없기 때문(모르면 붙이지 않는다).
 export type VisitorMix = { n: number; trip: number; local: number };
 export type VisitorBadge = { key: "trip" | "local"; emoji: string; label: string; note: string };
 
 // 인용문 배열 → 비율. 표본이 적으면 비율이 요동치므로 판정(badges)에서 표본 하한을 건다.
-export function visitorMix(quotes: string[]): VisitorMix {
+export function visitorMix(quotes: string[], cafeName = ""): VisitorMix {
   const qs = (quotes || []).filter(Boolean);
   if (!qs.length) return { n: 0, trip: 0, local: 0 };
-  const trip = qs.filter((q) => TRIP.test(q)).length / qs.length;
-  const local = qs.filter((q) => LOCAL.test(q)).length / qs.length;
+  // 상호가 그 축의 신호어를 품고 있으면 그 축은 판정하지 않는다(위 주석 참조).
+  const nameHasTrip = TRIP.test(cafeName), nameHasLocal = LOCAL.test(cafeName);
+  const trip = nameHasTrip ? 0 : qs.filter((q) => TRIP.test(q)).length / qs.length;
+  const local = nameHasLocal ? 0 : qs.filter((q) => LOCAL.test(q)).length / qs.length;
   return { n: qs.length, trip, local };
 }
 

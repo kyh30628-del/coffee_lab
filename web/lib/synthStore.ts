@@ -243,7 +243,7 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   const coherence = nameCoherence(name, (evidenceReviews as any[]).map((r) => r?.quote || ""), [loc?.area, loc?.dong].filter(Boolean));
   const offctx = offctxRate(((allEvidence ?? evidenceReviews) as any[]).map((r) => r?.quote || "")); // 맥락없음 비율(관제탑 감시)
   // 🧳🏠 방문객 성격 — offctx와 같은 인용문 풀에서 뽑는다(같은 근거 = 같은 잣대). 추가 조회 0.
-  const vmix = visitorMix(((allEvidence ?? evidenceReviews) as any[]).map((r) => r?.quote || ""));
+  const vmix = visitorMix(((allEvidence ?? evidenceReviews) as any[]).map((r) => r?.quote || ""), name); // name = cleanCafeName 적용된 진짜 상호
   // 🚨 비카페 업체 지배: 노출 리뷰가 '다른 업종 업체어'(킥복싱·냉삼·만두·미용실·펜션…)에 지배되면
   //   이름이 겹쳐 coherence가 속아도(라온=라온킥복싱, PLMM사가정=사가정 만두집) 오염 → 공개 차단.
   //   카페어보다 비카페어가 많고 다수 후기에 퍼져 있을 때만(근처 헬스장 한번 언급한 정상카페는 통과).
