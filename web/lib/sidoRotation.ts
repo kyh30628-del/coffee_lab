@@ -7,9 +7,10 @@
 //   ① **인터리브** — 시·도별로 묶어 서울→경기→인천→강원 순으로 한 곳씩 번갈아 뽑는다.
 //      각 시·도 '안에서는' 원래 정렬(리뷰순 등)이 그대로라 라벨이 거짓이 되지 않는다.
 //   ② **시작점 회전** — 목록이 3~5칸뿐이라 인터리브만으론 강원이 늘 꼴찌다.
-//      날짜에 따라 시작 시·도를 돌려(day % N) 4일에 한 번은 강원이 첫 자리에 온다.
-//      날(day) 단위인 이유: 엔드포인트가 CDN 5분 캐시라 더 잦게 바꾸면 캐시가 무의미해지고,
-//      하루 안에서는 결과가 안정적이라 "새로고침할 때마다 뒤바뀐다"는 혼란도 없다.
+//      12시간마다 시작 시·도를 돌려(slot % N) **하루 2회** 바뀐다(2026-08-25 CEO 지시).
+//      12시간인 이유: 엔드포인트가 CDN 5분 캐시라 그보다 잦으면 캐시가 무의미해지고,
+//      반나절 안에서는 결과가 안정적이라 "새로고침할 때마다 뒤바뀐다"는 혼란도 없다.
+//      4개 시·도 기준 이틀이면 한 바퀴를 돈다(하루 1회였을 땐 나흘).
 import { SIDO_GU } from "./regionList";
 
 export const SIDO_ORDER = Object.keys(SIDO_GU); // 서울, 경기, 인천, 강원
@@ -27,16 +28,25 @@ export function sidoOf(area: string): string {
   return hit ? GU_TO_SIDO.get(hit)! : "";
 }
 
-/** KST 기준 '오늘'의 일련번호 — 시작 시·도를 돌리는 데 쓴다(하루 안에서는 고정). */
-export function kstDayIndex(now = Date.now()): number {
-  return Math.floor((now + 9 * 3600 * 1000) / 86400000);
+/** 회전 슬롯 길이(ms) — 12시간. KST 00:00·12:00에 경계가 떨어진다. */
+export const ROTATION_SLOT_MS = 12 * 3600 * 1000;
+
+/** KST 기준 회전 슬롯 번호 — 시작 시·도를 돌리는 데 쓴다(슬롯 안에서는 고정). */
+export function kstSlotIndex(now = Date.now()): number {
+  return Math.floor((now + 9 * 3600 * 1000) / ROTATION_SLOT_MS);
+}
+
+/** 지금 슬롯이 언제 끝나나(ms 타임스탬프) — 관제 화면의 '다음 전환' 표시용. */
+export function slotEndsAt(now = Date.now()): number {
+  return (kstSlotIndex(now) + 1) * ROTATION_SLOT_MS - 9 * 3600 * 1000;
 }
 
 /**
  * 정렬된 목록을 시·도 라운드로빈으로 재배치. 각 시·도 내부 순서는 보존한다.
  * @param cap 최종 개수. 시·도가 모자라면 남은 곳에서 순서대로 채운다(빈칸 없이).
+ * @param slotIdx 회전 슬롯(12시간). 관제 화면이 미래 슬롯을 미리 보여줄 때 직접 넘긴다.
  */
-export function rotateBySido<T extends { area?: string | null }>(sorted: T[], cap: number, dayIdx = kstDayIndex()): T[] {
+export function rotateBySido<T extends { area?: string | null }>(sorted: T[], cap: number, slotIdx = kstSlotIndex()): T[] {
   if (!sorted?.length) return [];
   const groups = new Map<string, T[]>();
   for (const c of sorted) {
@@ -45,7 +55,7 @@ export function rotateBySido<T extends { area?: string | null }>(sorted: T[], ca
   }
   // 오늘의 시작 시·도부터 도는 순서. '기타'(미분류)는 항상 맨 뒤로 둔다.
   const present = SIDO_ORDER.filter((s) => groups.has(s));
-  const start = present.length ? dayIdx % present.length : 0;
+  const start = present.length ? slotIdx % present.length : 0;
   const order = [...present.slice(start), ...present.slice(0, start), ...(groups.has("기타") ? ["기타"] : [])];
 
   const out: T[] = [];

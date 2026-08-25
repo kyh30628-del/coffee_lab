@@ -96,6 +96,10 @@ export default function AdminPage() {
   const [showBorderline, setShowBorderline] = useState(false);
   const [blData, setBlData] = useState<any>(null);
   const loadBorderline = (password: string) => fetch("/api/admin/borderline", { headers: { "x-admin-password": password }, cache: "no-store" }).then((x) => x.json()).then((d) => { if (d.ok) setBlData(d); }).catch(() => {});
+  // ⚖️ 카페 둘러보기 시·도 순환 — 순환이 실제로 공평하게 도는지 확인(CEO 지시 2026-08-25).
+  //   ⚠️ 아래 loadRotation(/api/admin/rotation)은 **유료 노출 로테이션**으로 이름만 비슷한 다른 기능이다.
+  const [rot, setRot] = useState<any>(null);
+  const loadSidoRotation = (password: string) => fetch("/api/admin/sido-rotation", { headers: { "x-admin-password": password }, cache: "no-store" }).then((x) => x.json()).then((d) => { if (d.ok) setRot(d); }).catch(() => {});
   const [subscribers, setSubscribers] = useState<any[]>([]);
   const [showSubsModal, setShowSubsModal] = useState(false);
   const [emailReady, setEmailReady] = useState<boolean | null>(null); // 이 환경에 이메일 발송키 있는지
@@ -235,6 +239,7 @@ export default function AdminPage() {
   };
 
   const load = async (password: string) => {
+    loadSidoRotation(password);
     setMsg("불러오는 중...");
     const r = await fetch("/api/admin/cafes", { headers: { "x-admin-password": password } });
     if (r.status === 401) { setMsg("비밀번호가 틀렸습니다."); return; }
@@ -841,6 +846,48 @@ export default function AdminPage() {
             </div>
           );
         })()}
+
+        {/* ===== ⚖️ 카페 둘러보기 시·도 순환 ===== */}
+        <div className="mb-6 rounded-2xl border border-stone-300 bg-white p-4 sm:p-5">
+          <div className="flex items-center justify-between mb-2">
+            <button onClick={() => toggleSec("rot")} className="admin-section-title font-extrabold text-stone-800 text-left">
+              {openSecs.rot ? "▾" : "▸"} ⚖️ 카페 둘러보기 시·도 순환{" "}
+              {rot ? <span className="normal-case font-normal text-stone-600">· 현재 선두 <b className="text-stone-800">{rot.leadNow}</b> · {rot.minutesLeft}분 뒤 교대 · {rot.slotHours}시간마다(하루 2회)</span>
+                   : <span className="normal-case font-normal text-stone-600">불러오는 중…</span>}
+            </button>
+            <button onClick={() => loadSidoRotation(pw)} className="text-[11px] bg-stone-800 text-white rounded-full px-3 py-1">새로고침</button>
+          </div>
+          {openSecs.rot && rot && <>
+            <p className="text-[11.5px] text-stone-600 leading-relaxed mb-3">
+              후기 수로만 줄 세우면 서울·경기가 독식해 늦게 합류한 지역이 영영 안 보입니다. 시·도별로 한 곳씩 번갈아 뽑고,
+              선두 시·도를 <b>{rot.slotHours}시간마다</b> 돌려 <b>{rot.cycleHours}시간({rot.cycleSlots}슬롯)</b>이면 한 바퀴가 됩니다.
+              각 시·도 <b>안에서는</b> 원래 정렬(리뷰순 등)이 그대로라 라벨이 거짓이 되지 않습니다.
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+              {(rot.pool ?? []).map((p: any) => (
+                <div key={p.sido} className={`rounded-xl border p-2.5 text-center ${p.sido === rot.leadNow ? "bg-amber-50 border-amber-300" : "bg-stone-50 border-stone-200"}`}>
+                  <div className="text-[12px] font-bold text-stone-800">{p.sido}{p.sido === rot.leadNow ? " 👑" : ""}</div>
+                  <div className="text-[11px] text-stone-600">공개 {p.cafes.toLocaleString()}곳</div>
+                </div>
+              ))}
+            </div>
+            {rot.unclassified > 0 && (
+              <div className="rounded-lg bg-rose-50 border border-rose-200 px-3 py-2 text-[11.5px] text-rose-700 mb-3">
+                🔴 시·도 판정 실패 {rot.unclassified.toLocaleString()}곳 — area 라벨이 목록(lib/regionList.ts)에 없습니다. 순환에서 항상 뒤로 밀립니다.
+              </div>
+            )}
+            <div className="text-[11px] font-bold text-stone-700 mb-1">교대 예정</div>
+            <div className="space-y-1">
+              {(rot.upcoming ?? []).map((u: any, i: number) => (
+                <div key={u.slot} className={`flex items-center gap-2 text-[11.5px] rounded-lg px-2.5 py-1.5 ${i === 0 ? "bg-amber-50" : "bg-stone-50"}`}>
+                  <span className="text-stone-500 w-[110px] shrink-0">{new Date(u.at).toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
+                  <span className="text-stone-800">{u.order.join(" → ")}</span>
+                  {i === 0 && <span className="ml-auto text-[10px] font-bold text-amber-700">지금</span>}
+                </div>
+              ))}
+            </div>
+          </>}
+        </div>
 
         {/* ===== 🛡️ 검증 에이전트(레드팀) · 정합성 ===== */}
         <div className="mb-6 rounded-2xl border border-stone-300 bg-white p-4 sm:p-5">
