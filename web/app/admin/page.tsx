@@ -931,7 +931,7 @@ export default function AdminPage() {
           <button onClick={() => setShowSubsModal(true)} className="py-2.5 text-[13px] font-bold text-stone-700 bg-white border border-stone-300 rounded-xl hover:bg-stone-50">💳 구독 카페 현황{subscribers.length ? ` (${subscribers.length})` : ""}</button>
           <button onClick={() => { setShowNL(true); loadNL(); }} className="py-2.5 text-[13px] font-bold text-stone-700 bg-white border border-stone-300 rounded-xl hover:bg-stone-50">📰 주간 뉴스레터{nlList.length ? ` (${nlList.length})` : ""}</button>
           <button onClick={() => setShowYtModal(true)} className="py-2.5 text-[13px] font-bold text-stone-700 bg-white border border-stone-300 rounded-xl hover:bg-stone-50">📺 유튜브 확보{yt?.withYt != null ? ` (${yt.withYt})` : ""}</button>
-          <button onClick={() => { setShowVisits(true); fetch("/api/admin/visits", { headers: { "x-admin-password": pw } }).then((x) => x.json()).then((d) => { if (d.ok) setVisits(d); }); }} className="py-2.5 text-[13px] font-bold text-stone-700 bg-white border border-stone-300 rounded-xl hover:bg-stone-50">❤ 내 카페 기록{visits?.stat?.total != null ? ` (${visits.stat.total})` : ""}</button>
+          <button onClick={() => { setShowVisits(true); fetch("/api/admin/visits", { headers: { "x-admin-password": pw } }).then((x) => x.json()).then((d) => { if (d.ok) setVisits(d); }); }} className="py-2.5 text-[13px] font-bold text-stone-700 bg-white border border-stone-300 rounded-xl hover:bg-stone-50">❤ 추억·찜{visits?.stat?.total != null ? ` (${visits.stat.total}·${visits?.mstat?.total ?? 0})` : ""}</button>
           <button onClick={openRotation} className="py-2.5 text-[13px] font-bold text-stone-700 bg-white border border-stone-300 rounded-xl hover:bg-stone-50">🔁 노출 로테이션 현황</button>
         </div>
 
@@ -942,10 +942,34 @@ export default function AdminPage() {
           <div className="fixed inset-0 z-[6000] flex items-end justify-center bg-black/40" onClick={() => setShowVisits(false)}>
             <div className="w-full max-w-2xl bg-white rounded-t-2xl max-h-[88dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between px-4 py-3 border-b">
-                <span className="text-sm font-bold text-stone-800">❤ 내 카페 방문기록 {visits?.stat && <span className="text-[11px] text-stone-600 font-normal">총 {visits.stat.total} · 사용자 {visits.stat.users} · 즐겨찾기 {visits.stat.favs} · 인증 {visits.stat.verified} · 미인증 {visits.stat.unverified}</span>}</span>
+                <span className="text-sm font-bold text-stone-800">❤ 내 카페 추억 · ⭐ 찜
+                  {visits?.stat && <span className="text-[11px] text-stone-600 font-normal"> 추억 {visits.stat.total}(인증 {visits.stat.verified}·미인증 {visits.stat.unverified})</span>}
+                  {visits?.mstat && <span className="text-[11px] text-amber-700 font-normal"> · 찜 {visits.mstat.total}건 / 기기 {visits.mstat.users}대 (7일 +{visits.mstat.last7})</span>}</span>
                 <button onClick={() => setShowVisits(false)} className="text-2xl text-stone-600 leading-none">×</button>
               </div>
               <div className="overflow-y-auto flex-1 p-3 space-y-2">
+                {/* ⭐ 찜(bookmarks) — 2026-08-25 신설. 그동안 관리자 화면에 이 데이터가 아예 없었다.
+                    화면의 '즐겨찾기'는 전부 user_visits.favorite(추억 속 하트)였고 실사용은 0건,
+                    정작 카페상세·지도에서 누른 진짜 찜은 어디에서도 못 봤다. */}
+                {(visits?.marks ?? []).length > 0 && (
+                  <div className="border border-amber-300 bg-amber-50/60 rounded-xl p-3 mb-1">
+                    <div className="text-[12px] font-bold text-amber-800 mb-2">⭐ 찜(즐겨찾기) {visits.marks.length}건</div>
+                    <div className="space-y-1">
+                      {visits.marks.map((m: any) => (
+                        <div key={m.id} className="flex items-center gap-2 text-[12px]">
+                          <span className="text-amber-500">★</span>
+                          <b className="text-stone-800">{m.cafe_name ?? "(카페삭제)"}</b>
+                          <span className="text-[10px] text-stone-600">{m.area}</span>
+                          {m.synth_grade && <span className="text-[9.5px] px-1.5 py-0.5 rounded-full bg-white border border-stone-300 text-stone-700">{m.synth_grade}</span>}
+                          {m.published === false && <span className="text-[9.5px] text-rose-700">비공개</span>}
+                          <span className="ml-auto text-[10px] text-stone-600 whitespace-nowrap">
+                            {new Date(m.created_at).toLocaleDateString("ko-KR")} · 익명 {String(m.device_id).slice(0, 6)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {(visits?.visits ?? []).map((v: any) => (
                   <div key={v.id} className="flex gap-3 border border-stone-300 rounded-xl p-3">
                     {(() => {

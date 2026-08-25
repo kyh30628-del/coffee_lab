@@ -15,6 +15,19 @@ export async function GET(req: NextRequest) {
       ORDER BY v.created_at DESC LIMIT 200`;
     const [stat] = await sql`SELECT count(*)::int total, count(DISTINCT device_id)::int users, count(*) FILTER(WHERE favorite)::int favs,
       count(*) FILTER(WHERE verified)::int verified, count(*) FILTER(WHERE NOT verified)::int unverified FROM user_visits` as any[];
-    return NextResponse.json({ ok: true, visits: rows, stat });
+
+    // ⭐ 2026-08-25(CEO 지적): 관리자 화면에 **찜(bookmarks)이 아예 없었다.**
+    //   기존 '즐겨찾기' 표시는 전부 user_visits.favorite(추억 속 하트, 실사용 0건)였고,
+    //   카페 상세·지도에서 누른 진짜 찜 9건은 관리자 어디에서도 볼 수 없었다.
+    //   새 API를 만들지 않고 이 응답에 함께 실어 보낸다(요청 1회 유지).
+    const marks = await sql`
+      SELECT b.id, b.cafe_id, c.name AS cafe_name, c.area, c.synth_grade, c.published,
+             b.device_id, b.anon_id, b.created_at
+      FROM bookmarks b LEFT JOIN cafes c ON c.id = b.cafe_id
+      ORDER BY b.created_at DESC LIMIT 200`;
+    const [mstat] = await sql`SELECT count(*)::int total, count(DISTINCT device_id)::int users,
+      count(*) FILTER (WHERE created_at > now()-interval '7 days')::int last7 FROM bookmarks` as any[];
+
+    return NextResponse.json({ ok: true, visits: rows, stat, marks, mstat });
   } catch (e) { return NextResponse.json({ ok: true, visits: [], stat: null }); }
 }
