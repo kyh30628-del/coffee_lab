@@ -1,5 +1,6 @@
 // 네이버 검색 API로 카페 리뷰성 문서 수집 (PRINCIPLES.md 2조: 공식 API, 합법)
 import { bumpNaver, markNaverExhausted } from "./naverBudget";
+import { naverHeaders, markKeyExhausted, NAVER_KEY_COUNT } from "./naverKeys";
 // (A)방식: 원문 복제 금지. 인용 한 줄(요약) + 출처 링크 + 날짜만 보존.
 export type WebSnippet = { text: string; title?: string; desc?: string; kind?: "blog" | "cafearticle"; time?: number; link?: string; source?: string; date?: string };
 
@@ -31,11 +32,17 @@ function fmtDate(d?: string): string {
 async function naverSearch(kind: "blog" | "cafearticle", query: string): Promise<{ items: WebSnippet[]; ok: boolean }> {
   if (!ID || !SECRET) return { items: [], ok: false };
   const url = `https://openapi.naver.com/v1/search/${kind}.json?query=${encodeURIComponent(query)}&display=100&sort=sim`;
-  const res = await fetch(url, { headers: { "X-Naver-Client-Id": ID, "X-Naver-Client-Secret": SECRET } });
-  if (!res.ok) {
-    if (res.status === 429) markNaverExhausted().catch(() => {}); // 쿨다운 뒤 자동 만료(자가치유) — 발굴과 같은 취급
-    return { items: [], ok: false }; // 429(쿼터)·기타 → ok:false
+  // 🔑 키가 여러 개면 소진된 키를 건너뛰며 재시도한다(lib/naverKeys.ts). 키 1개면 기존과 동일 동작.
+  let res: Response | null = null;
+  for (let attempt = 0; attempt < Math.max(1, NAVER_KEY_COUNT); attempt++) {
+    const k = naverHeaders();
+    if (!k) return { items: [], ok: false }; // 전 키 소진 — 조용히 중단
+    res = await fetch(url, { headers: k.headers });
+    if (res.status !== 429) break;
+    markNaverExhausted().catch(() => {});
+    if (!markKeyExhausted(k.label)) return { items: [], ok: false }; // 남은 키 없음
   }
+  if (!res || !res.ok) return { items: [], ok: false };
   bumpNaver(1).catch(() => {}); // 성공 호출 계상 — 발굴과 **같은 카운터**를 쓴다(한도가 공유이므로)
   const data = await res.json();
   const items = (data.items ?? []).map((it: { title?: string; description?: string; postdate?: string; link?: string; bloggername?: string }) => {

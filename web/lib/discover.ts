@@ -5,7 +5,8 @@ import { SIDO_GU } from "./regionList";
 import { getLearned } from "./learnedTerms";
 import { loadCriteria, getCriterionSync } from "./criteria";
 import { getListSync, loadCriteriaLists } from "./criteriaLists"; // 비카페 순수 리스트 단일출처(BASE=폴백). 캐시 프라임은 discover 진입점이 함.
-import { bumpNaver, markNaverExhausted } from "./naverBudget"; // 네이버 일일 예산 추적(스윕이 70%만 쓰고 cron-grow에 30% 남기게)
+import { bumpNaver, markNaverExhausted } from "./naverBudget";
+import { naverHeaders, markKeyExhausted, NAVER_KEY_COUNT } from "./naverKeys"; // 네이버 일일 예산 추적(스윕이 70%만 쓰고 cron-grow에 30% 남기게)
 import { brandTokenOverlap } from "./reviewQuality"; // 상호명↔후보명 브랜드토큰 겹침 검증 단일출처(decisions#780)
 
 const ID = process.env.NAVER_CLIENT_ID;
@@ -303,14 +304,22 @@ const IG_RE = /^https?:\/\/(www\.)?instagram\.com\//i;
 
 async function localSearch(query: string, sort: "comment" | "random" = "comment") {
   const url = `https://openapi.naver.com/v1/search/local.json?query=${encodeURIComponent(query)}&display=5&sort=${sort}`;
-  const res = await fetch(url, { headers: { "X-Naver-Client-Id": ID!, "X-Naver-Client-Secret": SECRET! } });
-  if (res.status === 429) {
+  // 🔑 키가 여러 개면 소진된 키를 건너뛰며 재시도(lib/naverKeys.ts). 키 1개면 기존과 동일 동작.
+  let res: Response | null = null;
+  for (let attempt = 0; attempt < Math.max(1, NAVER_KEY_COUNT); attempt++) {
+    const k = naverHeaders();
+    if (!k) return null; // 전 키 소진
+    res = await fetch(url, { headers: k.headers });
+    if (res.status !== 429) break;
     // ⚠️ 429 두 종류 구분(2026-07-11): ①일일한도(count/quota=…/25000·Query limit·errorCode 010)=진짜 소진→마킹.
     //   ②초당 rate-limit(버스트)=일시적→마킹 금지(온종일 잠김 방지). 몸통 안 읽고 무조건 마킹하던 게 발굴 온종일 멈춤 근본원인.
     const body = await res.text().catch(() => "");
-    if (/quota=\d+\/\d+|Query limit|"errorCode"\s*:\s*"010"/i.test(body)) markNaverExhausted().catch(() => {});
-    return null;
+    const daily = /quota=\d+\/\d+|Query limit|"errorCode"\s*:\s*"010"/i.test(body);
+    if (!daily) return null; // 버스트 429 — 이 쿼리만 건너뛴다(키 교체 대상 아님)
+    markNaverExhausted().catch(() => {});
+    if (!markKeyExhausted(k.label)) return null; // 남은 키 없음
   }
+  if (!res) return null;
   if (!res.ok) return null; // 기타 API 오류 → null로 신호(빈 결과 [] 와 구분: '못 가져옴' vs '진짜 없음')
   bumpNaver(1).catch(() => {}); // 성공 쿼리 1건 계상(일일 예산 추적)
   const data = await res.json();
