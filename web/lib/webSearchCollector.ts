@@ -1,6 +1,9 @@
 // 네이버 검색 API로 카페 리뷰성 문서 수집 (PRINCIPLES.md 2조: 공식 API, 합법)
 import { bumpNaver, markNaverExhausted } from "./naverBudget";
 import { naverHeaders, markKeyExhausted, NAVER_KEY_COUNT } from "./naverKeys";
+
+// 한 번에 받아오는 최대 건수. 포화 판정("이만큼 왔으면 더 있다")의 기준이기도 하다.
+const NAVER_DISPLAY = 100;
 // (A)방식: 원문 복제 금지. 인용 한 줄(요약) + 출처 링크 + 날짜만 보존.
 export type WebSnippet = { text: string; title?: string; desc?: string; kind?: "blog" | "cafearticle"; time?: number; link?: string; source?: string; date?: string };
 
@@ -31,7 +34,7 @@ function fmtDate(d?: string): string {
 //   naver_budget이 진실이 된다 — 예전엔 lib/discover.ts(발굴)만 계상해 절반만 보였다.
 async function naverSearch(kind: "blog" | "cafearticle", query: string): Promise<{ items: WebSnippet[]; ok: boolean }> {
   if (!ID || !SECRET) return { items: [], ok: false };
-  const url = `https://openapi.naver.com/v1/search/${kind}.json?query=${encodeURIComponent(query)}&display=100&sort=sim`;
+  const url = `https://openapi.naver.com/v1/search/${kind}.json?query=${encodeURIComponent(query)}&display=${NAVER_DISPLAY}&sort=sim`;
   // 🔑 키가 여러 개면 소진된 키를 건너뛰며 재시도한다(lib/naverKeys.ts). 키 1개면 기존과 동일 동작.
   let res: Response | null = null;
   for (let attempt = 0; attempt < Math.max(1, NAVER_KEY_COUNT); attempt++) {
@@ -71,8 +74,14 @@ export async function fetchWebReviews(name: string, area: string): Promise<{ sni
     const snippets: WebSnippet[] = [];
     const debug: unknown[] = [];
     let anyOk = false, anyFail = false;
-    for (const q of queries) {
-      for (const kind of ["blog", "cafearticle"] as const) {
+    // ⚡ 포화 조기중단(2026-08-26, CEO "낭비하지 말고 효율적으로") — 실측으로 검증한 규칙:
+    //   첫 질의 `{이름} {지역}`이 display 상한(100건) **미만**을 반환하면 그 검색어의 결과가 소진된 것이라,
+    //   더 좁은 질의(+카페/+후기/+리뷰)는 그 부분집합만 돌려준다 → 호출해도 **신규 0건**.
+    //   검증: 비포화 6곳 전수에서 q2~q4 추가 신규 0건(위반 0). 포화(=100)일 때만 나머지를 돈다.
+    //   효과: 표본상 절반이 비포화 → 곳당 8콜 → 평균 5콜(약 47% 절감), **손실 0**.
+    for (const kind of ["blog", "cafearticle"] as const) {
+      for (let qi = 0; qi < queries.length; qi++) {
+        const q = queries[qi];
         const { items, ok } = await naverSearch(kind, q);
         if (ok) anyOk = true; else anyFail = true;
         debug.push({ q, kind, got: items.length, ok });
@@ -82,6 +91,9 @@ export async function fetchWebReviews(name: string, area: string): Promise<{ sni
           seen.add(key);
           snippets.push(it);
         }
+        // 첫 질의가 비포화면 이 종류(blog/cafearticle)의 나머지 질의는 건너뛴다.
+        //   ⚠️ ok=false(쿼터/오류)일 땐 items가 0이라 '비포화'로 오인할 수 있으므로 ok일 때만 판단한다.
+        if (qi === 0 && ok && items.length < NAVER_DISPLAY) break;
       }
     }
     // 수집 0인데 호출이 한 번도 성공 못 함 → API 오류/쿼터(진짜 0건과 구분)
