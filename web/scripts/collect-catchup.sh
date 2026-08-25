@@ -34,6 +34,17 @@ DEADLINE=$(( $(date +%s) + 120*60 ))
     if tail -4 "$LOG" | grep -q "쿼터 소진 추정"; then echo "쿼터 소진 — 라운드 ${round}에서 종료"; break; fi
   done
   [ "$(date +%s)" -ge "$DEADLINE" ] && echo "120분 창 종료 — 다음 창(4시간 뒤)에 이어감"
+
+  # 📰 수집 큐가 **완전히 비었을 때만** 관광지 캘리브레이션 표본을 뜬다(40콜).
+  #   쿼터 소진으로 멈춘 경우엔 돌리지 않는다 — 수집이 우선이고, 뉴스도 같은 25,000을 공유한다.
+  #   여기 얹는 이유: 새 잡을 만들면 스케줄·비용 판단이 또 필요하고, 이미 깨어 있는 창을 쓰는 게 공짜다.
+  if tail -6 "$LOG" | grep -q "큐 소진"; then
+    if [ ! -f /tmp/coffee-tourism-calibrated ]; then
+      echo "--- 수집 완료 → 관광지 캘리브레이션 표본 40개(40콜) ---"
+      node --import tsx scripts/classify-tourism.mjs --calibrate --limit=40
+      touch /tmp/coffee-tourism-calibrated   # 1회만 — 임계 확정 후 사람이 지우고 전체 판정한다
+    fi
+  fi
   echo "=== $(date '+%F %T') 종료 ==="
 } >> "$LOG" 2>&1
 node --import tsx scripts/heartbeat.mjs collect-catchup 0 "신규 후기 수집 따라잡기" >> "$LOG" 2>&1 || true
