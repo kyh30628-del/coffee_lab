@@ -266,3 +266,4 @@
 | 2026-08-24 11:05 | #812 | [룰갭 신규] 동명 상품/식물명 판매 콘텐츠(리테일 브랜드 자사글) — 정확 동명일치로 CAFE_CONTEX | 4d8d7fda | - | lib/reviewQuality.ts: CAFE_CONTEXT_SUBSTANCE에 커피(?!테이블 나무) 부정형lookahead 추가(커피테이블·커피나무 복합어 오탐 차단) + B |
 | 2026-08-24 23:05 | #813 | [룰갭 신규] 동호회 커뮤니티 모임 공지문이 실제 후기로 오판정 (id1198 카페소소·id11232 차너른 | deb5ce64 | - | lib/reviewQuality.ts: CLUB_MEETUP_LOGISTICS_LEAK 게이트 신규(CLUB_NAVER_LINK+CLUB_MEETUP_LOGISTICS_CUES 동 |
 | 2026-08-24 23:06 | #814 | [개발] 발굴 좌표전용 dedup 과잉차단 — lib/discover.ts:456 이름검증 없이 44~55m | a653d54e | - | web/lib/discover.ts:456 좌표전용 dedup에 brandTokenOverlap 이름검증 추가(decisions#780 함수 재사용) — 좌표 근접만으론 skip  |
+| 2026-08-25 03:05 | #815 | [개발] 협업 #337: [정의정정] user_consents.visit_count는 "재방문"이 아니라 페 | 97c611ae | - | app/admin/page.tsx(유입경로 카드)·app/api/orchestrator/route.ts(sourceEngage)에서 visit_count 평균을 '재방문 횟수'로  |
