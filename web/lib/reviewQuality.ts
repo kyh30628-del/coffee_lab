@@ -499,7 +499,23 @@ const GENERIC_SUFFIX = /(카페|까페|캬페|커피숍|커피샵|커피|로스�
 //   불일치) 그대로 살아남았다. VENUE_WORDS의 '호텔' 범용 스트립(브랜드 무관 부분일치)이 '공군호텔' 고유명을
 //   벗겨내고 나면 이 단어만 유일 식별토큰으로 남아, 동명이지만 무관한 아파트 커뮤니티시설 소개 기사가
 //   식별토큰 일치만으로 딸려왔다(id10125 공군호텔 스카이라운지 6건 중 1건 오염 실측).
-const GENERIC_WORD = new Set(["카페", "까페", "캬페", "카패", "까패", "커피", "커피숍", "커피샵", "coffeeshop", "점", "본점", "로스터리", "로스터스", "로스터즈", "로스터", "로스팅", "베이커리", "베이크샵", "베이크하우스", "브런치카페", "베이글샵", "도넛", "디저트", "케이크", "케익", "케잌", "케이크샵", "케익샵", "케잌샵", "제과", "제과점", "과자점", "베이킹", "coffee", "cafe", "cake", "roasters", "roaster", "roastery", "roasteries", "책방", "북카페", "라운지", "스카이라운지", "신상", "전통찻집", "동네빵집", "동네", "비치", "베이글", "샌드위치"]);
+// 룰갭 MALL_POPUP_ROTATING_VENUE_LEAK(decisions#817): 백화점/몰 팝업스토어는 같은 자리에 시기별로
+//   다른 브랜드가 순환 입점한다 — 카페명에 붙는 "팝업"·"팝업스토어"는 그 자체가 식별토큰이 되면 같은
+//   백화점 코너에서 열린 '다른 시기 다른 브랜드' 팝업 후기가 이 단어 하나의 우연일치로 딸려온다
+//   (id16327 앨리스사라다 팝업스토어 — "팝업스토어"만 일치한 아기공룡둘리/Connect/청주미친만두/모찌방앗간
+//   등 무관 브랜드 후기 5/6건이 verified·reference로 채택; id1032 블루보틀 인천롯데 팝업카페 — "팝업"만
+//   일치한 왓어브레드/롱브르378 무관 팝업 후기 2/6건 채택). "카페"·"베이커리"처럼 업태를 가리키는
+//   일반어일 뿐 식별어가 아니므로 여기 등재해 coreTokens에서 제외한다 — 남은 진짜 브랜드 토큰(앨리스사라다·
+//   블루보틀)만 있어야 그 카페 후기로 인정된다(주소·백화점명 일치만으로는 통과 못 함).
+const GENERIC_WORD = new Set(["카페", "까페", "캬페", "카패", "까패", "커피", "커피숍", "커피샵", "coffeeshop", "점", "본점", "로스터리", "로스터스", "로스터즈", "로스터", "로스팅", "베이커리", "베이크샵", "베이크하우스", "브런치카페", "베이글샵", "도넛", "디저트", "케이크", "케익", "케잌", "케이크샵", "케익샵", "케잌샵", "제과", "제과점", "과자점", "베이킹", "coffee", "cafe", "cake", "roasters", "roaster", "roastery", "roasteries", "책방", "북카페", "라운지", "스카이라운지", "신상", "전통찻집", "동네빵집", "동네", "비치", "베이글", "샌드위치", "팝업", "팝업스토어"]);
+// naver_category가 팝업(스토어) 업종이거나 카페명에 "팝업스토어"/"팝업 카페"가 붙어있으면 — 위 GENERIC_WORD로
+//   coreTokens는 이미 정화되지만, 이름 전체가 팝업 수식어뿐이라 브랜드 토큰이 하나도 안 남는 극단적 경우까지
+//   대비해 판별 함수로 노출한다(coreEmpty 경로가 이미 지역어 동반 원문일치를 요구하므로 안전망 성격).
+const POPUP_CATEGORY = /팝업/;
+const POPUP_NAME = /팝업스토어|팝업\s*카페/;
+export function isPopupRotatingVenue(naverCategory?: string, name?: string): boolean {
+  return POPUP_CATEGORY.test(naverCategory ?? "") || POPUP_NAME.test(name ?? "");
+}
 
 // 일반어 '○○점'(지점명이 아님) 제외 — 합성어 오매칭 차단. 예: 음식점·전문점·정기점(검)·관점·시점…
 const NON_BRANCH_POINT_WORD = /^(장점|단점|시점|관점|초점|약점|강점|정점|요점|중점|종점|만점|채점|별점|평점|빵점|백점|영점|매점|거점|기점|이점|반점|중간점|문제점|차이점|공통점|장단점|단골점|식당점|간점|걸점|음식점|전문점|정기점|가맹점|직영점|대리점|편의점|무인점|할인점|판매점|취약점|허점|접점|교점|꼭짓점|꼭지점|시발점|출발점|도달점|분기점|기준점|소수점|득점|실점|승점|벌점|가점|감점|배점|기본점|가산점)$/;
@@ -1343,6 +1359,17 @@ export function verifyReview(input: QualityInput): QualityResult {
     if ((otherBizName || otherAreaWord) && !areaPresent) {
       return { verdict: "rejected", score: 6, reasons: [otherBizName ? `naver_category 비F&B 조합 — 다른 상호명 혼입('${otherBizName}')` : `naver_category 비F&B 조합 — 다른 지역 혼입('${otherAreaWord}')`], signals: sig };
     }
+  }
+
+  // 🎪 [룰갭 MALL_POPUP_ROTATING_VENUE_LEAK, decisions#817] naver_category가 팝업(스토어)이거나 카페명에
+  //   "팝업스토어"/"팝업 카페"가 붙은 백화점/몰 팝업 벤뉴 — 같은 주소(백화점 코너)에 시기별로 다른 브랜드가
+  //   순환 입점해, 주소·백화점명 일치만으로 채택하면 다른 시기 타브랜드 팝업 후기가 오염된다(id16327
+  //   앨리스사라다 팝업스토어 6건 중 5건, id1032 블루보틀 인천롯데 팝업카페 6건 중 2건이 무관 타브랜드
+  //   팝업 후기 실측). GENERIC_WORD가 "팝업"/"팝업스토어"를 coreTokens에서 이미 걷어내지만, 안전망으로
+  //   명시 게이트도 둔다 — 진짜 브랜드 토큰(또는 전체이름)이 제목/본문 어디에도 없으면 하드 거절.
+  //   카페 자신의 진짜 후기는 항상 브랜드명을 동반하므로 정상 매칭은 보존된다.
+  if (isPopupRotatingVenue(input.naverCategory, input.name) && !inTitleFull && !inBodyFull && !distinctInTitle && !distinctInBody) {
+    return { verdict: "rejected", score: 5, reasons: ["팝업 벤뉴 — 카페 고유 브랜드 토큰 불일치(주소/백화점명·'팝업' 단어만 일치)"], signals: sig };
   }
 
   // ---- 하드 탈락(명백한 노이즈) ----
