@@ -17,6 +17,27 @@ import { sql } from "./db";
 export const NAVER_DAILY_QUOTA = 25000;
 // 발굴 스윕이 남겨둘 예약분(cron-grow 2h용). 기본 30%(7,500) — 하루 12회 cron-grow가 지역당 ~600콜.
 export const NAVER_SWEEP_RESERVE = Number(process.env.NAVER_SWEEP_RESERVE || 7500);
+
+// 🚦 적체 가드(2026-08-25) — **발굴이 쿼터를 독식해 수집이 굶던 구조를 끊는다.**
+//   기존 설계는 25,000을 전부 발굴에 배정했다(스윕 17,500 + cron-grow 예약 7,500).
+//   후기 수집 몫은 예약이 없어 '남으면 하는' 신세였다. 그동안 문제가 안 된 건 밀도 버그(decisions#814)로
+//   발굴 수확이 하루 15~35곳뿐이라 수집할 게 없었기 때문이다. 그 버그가 풀리자 하루 2,000~4,500곳이
+//   들어오는데 수집 몫이 없어 **적체만 쌓였다**(실측: 발굴 22,981콜 소모 후 수집엔 2,019콜만 남아 205곳).
+//   발굴만 해봐야 후기가 없으면 공개가 안 되니 사용자에겐 0이다 — 그래서 적체가 크면 발굴을 멈춘다.
+const COLLECT_BACKLOG_STOP = Number(process.env.COLLECT_BACKLOG_STOP || 800);
+
+/** 후기 수집 대기(적재만 되고 후기 없는 카페) 수. */
+export async function collectBacklog(): Promise<number> {
+  const r = (await sql`SELECT count(*)::int n FROM cafes WHERE pipeline_status='new' AND raw_reviews IS NULL`
+    .catch(() => [])) as any[];
+  return Number(r[0]?.n ?? 0);
+}
+
+/** 발굴을 더 해도 되나 — 적체가 임계 미만일 때만. 임계 초과면 남은 쿼터는 수집이 쓴다. */
+export async function discoveryMayRun(): Promise<{ ok: boolean; backlog: number; limit: number }> {
+  const backlog = await collectBacklog();
+  return { ok: backlog < COLLECT_BACKLOG_STOP, backlog, limit: COLLECT_BACKLOG_STOP };
+}
 // 실측 429 후 '차단'으로 볼 시간(분). 이 시간이 지나면 자동으로 재시도 허용(자가치유). 진짜 소진이면 다음 콜이 또 429→재마킹.
 const EXHAUST_COOLDOWN_MIN = Number(process.env.NAVER_EXHAUST_COOLDOWN_MIN || 20);
 

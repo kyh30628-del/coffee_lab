@@ -8,6 +8,7 @@ import { readFileSync } from "node:fs";
 const env = readFileSync(new URL("../.env.local", import.meta.url), "utf8");
 for (const l of env.split("\n")) { const m = l.match(/^([A-Z_0-9]+)=(.*)$/); if (m) process.env[m[1]] = m[2].replace(/^["']|["']$/g, ""); }
 const { discoverRegion } = await import("../lib/discover.ts");
+const { discoveryMayRun } = await import("../lib/naverBudget.ts");
 const { mineArea } = await import("../lib/reviewMiner.ts"); // 리뷰 속 상호 추출→네이버검증 신규적재(키워드검색 못 잡는 롱테일)
 const { sql } = await import("../lib/db.ts");
 const { sweepMayContinue, naverUsedToday, NAVER_DAILY_QUOTA, NAVER_SWEEP_RESERVE } = await import("../lib/naverBudget.ts"); // 스윕은 70%까지만·30%는 cron-grow용 예약
@@ -20,6 +21,14 @@ const t0 = Date.now();
 const runStart = new Date(t0).toISOString();                        // 이번 회차 시작 — 전 지역 한 바퀴 돌면 종료(무한 재순회 방지)
 let totalNew = 0, done = 0, stop = "";
 console.log(`발굴 스윕 — 신선도순 순환 · 지역당 ${PER_REGION_MS / 1000}s · 상한 ${Math.round(TOTAL_MS / 60000)}분(한 바퀴 완주 시 조기종료)${sido ? ` · ${sido}` : ""}`);
+
+// 🚦 적체 가드 — 발굴만 하고 후기를 못 모으면 사용자에겐 0이다. 수집 대기가 임계를 넘으면
+//   오늘 발굴은 건너뛰고 쿼터를 통째로 수집(collect-catchup·cron)에 넘긴다(2026-08-25).
+const dg = await discoveryMayRun();
+if (!dg.ok) {
+  console.log(`발굴 건너뜀 — 후기 수집 대기 ${dg.backlog.toLocaleString()}곳(임계 ${dg.limit.toLocaleString()}). 오늘 쿼터는 수집이 쓴다.`);
+  stop = `적체 우선(수집 대기 ${dg.backlog.toLocaleString()}곳)`;
+}
 
 while (Date.now() - t0 < TOTAL_MS && !stop) {
   // 🧭 네이버 예산 가드 — 오늘 사용량이 (25k − 예약분)에 닿으면 스윕 정지. 남은 예약분(기본 30%)은

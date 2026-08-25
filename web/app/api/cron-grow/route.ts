@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { discoveryMayRun } from "@/lib/naverBudget";
 import { sql, ensureSchema } from "@/lib/db";
 import { discoverRegion, METRO_REGIONS, PRIORITY_REGIONS, LONGTAIL_TASTE_TARGETS, LONGTAIL_SEED_REASON } from "@/lib/discover";
 import { synthAndStore } from "@/lib/synthStore";
@@ -59,7 +60,13 @@ export async function GET(req: NextRequest) {
     const GROW_BUDGET_MS = 225_000; // 발굴 225s + 마이닝·합성 여유 → maxDuration 300s 안전마진(실측 290s→타임아웃 위험 해소)
     const t0 = Date.now();
     const discoveries: { region: string; found?: number; inserted?: number; stopped?: boolean; error?: string; agent?: boolean }[] = [];
-    while (Date.now() - t0 < GROW_BUDGET_MS) {
+    // 🚦 적체 가드(2026-08-25) — 수집 대기가 임계를 넘으면 발굴을 건너뛰고 쿼터를 수집에 넘긴다.
+    //   발굴만 하고 후기를 못 모으면 공개가 안 돼 사용자에겐 0이다(실측: 발굴이 쿼터 92%를 먹어 수집 205곳).
+    const dgrow = await discoveryMayRun();
+    if (!dgrow.ok) {
+      discoveries.push({ region: `(발굴 건너뜀) 후기 수집 대기 ${dgrow.backlog}곳 ≥ 임계 ${dgrow.limit} — 오늘 쿼터는 수집이 쓴다`, stopped: true });
+    }
+    while (dgrow.ok && Date.now() - t0 < GROW_BUDGET_MS) {
       // ⚠️ 이중 기아 방지: '5일+ 굶은 지역이면 무조건 큐보다 우선'이 상시 참이 되어(64지역 로테이션이라 항상 뭔가는
       //   5일+ 됨) 큐가 3일+ 전혀 안 내려가는 반대 기아가 발생했다(#109). 진짜 위급(10일+)할 때만 큐를 밀어내고,
       //   그 정도는 평소대로 큐 우선 → 큐 비면 굶은 지역으로 폴백.
