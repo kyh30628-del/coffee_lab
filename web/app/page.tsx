@@ -2094,7 +2094,10 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
         )}
         <div className="p-5">
           <div className="flex items-center justify-between mb-1">
-            <div className="flex items-center gap-2 min-w-0"><h3 className="text-xl font-bold text-[#2b2018] truncate">{cafe.name}</h3>{g && <span className="text-[10px] text-white px-2 py-0.5 rounded-full shrink-0" style={{ background: g.bg }}>{g.label}</span>}</div>
+            <div className="flex items-center gap-2 min-w-0"><h3 className="text-xl font-bold text-[#2b2018] truncate">{cafe.name}</h3>{g && <span className="text-[10px] text-white px-2 py-0.5 rounded-full shrink-0" style={{ background: g.bg }}>{g.label}</span>}
+              {/* 🧳🏠 방문객 성격 — 지도에서 카페를 누르면 뜨는 이 패널이 실제 소비 지점이다.
+                  여기 표시가 없으면 "지도에서는 구분이 안 된다"는 말이 맞다(CEO 지적). */}
+              <VisitorBadges vb={(cafe as any).vb} /></div>
             <div className="flex items-center gap-1 shrink-0">
               <span className="relative inline-flex">
                 {saveFx && <span className="dcn-fly" aria-hidden="true">★</span>}
