@@ -224,10 +224,15 @@ function buildIdentity(coords: Record<string, number | null>, basis: Record<stri
     // 리뷰에 자동차카페·케이크·프라이빗룸 등 구체 신호가 실제로 있어도(2·3위 용도) 버려지고 포괄 문구로
     // 폴백했다. 1위부터 순서대로 구체어를 시도해 어느 용도든 구체어가 잡히면 그걸 쓰고, 전부 없을 때만
     // 1위 용도의 포괄 문구로 폴백한다(완전 실패 시의 최종 폴백은 그대로 유지 — 서비스 무변).
+    // 정합성조사 #341(협업)/결재 #823·#829: '빵'은 naver_category만으로 만든 categoryBreadTerm을
+    // 1순위로 썼다 — 카테고리는 동네+우세용도가 같은 카페끼리 전부 동일해서(리뷰 내용과 무관) 848그룹/
+    // 3838곳이 "{동}에서 케이크·디저트가 특히 자주 언급되는 곳"류로 완전히 겹쳤다(카페 고유 신호 미반영).
+    // 다른 4개 용도처럼 실제 리뷰에 등장한 구체어(카페마다 다름)를 먼저 시도하고, categoryBreadTerm은
+    // 리뷰에서 아무 구체어도 못 찾았을 때만 쓰는 최종 폴백으로 내린다.
     let picked: { cat: string; term: string } | null = null;
     for (const [cat] of useEntries) {
       const term = cat === "빵"
-        ? categoryBreadTerm(naverCategory) ?? reviewSpecificTerm(cat, clean) ?? reviewSpecificTermExt(cat, clean)
+        ? reviewSpecificTerm(cat, clean) ?? reviewSpecificTermExt(cat, clean) ?? categoryBreadTerm(naverCategory)
         : reviewSpecificTerm(cat, clean) ?? reviewSpecificTermExt(cat, clean);
       if (term) { picked = { cat, term }; break; }
     }
