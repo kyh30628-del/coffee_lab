@@ -93,7 +93,14 @@ export async function POST(req: NextRequest) {
     } catch (e) {
       status = "failed"; result = "실행 오류: " + String(e).slice(0, 80);
     }
-    await sql`UPDATE decisions SET status=${status}, decided_at=now(), result=${result}, decided_by='CEO' WHERE id=${id}`;
+    // 정규화된 ids·목표등급을 DB에도 되쓴다(#827) — lastDowngradeCap/lastUnpublishLocked(synthStore.ts)는
+    //   action_params에서 'ids'(배열)와 'to' 키만 읽는데, 위 ids 정규화(cafe_id 단수 폴백)는 로컬 변수에만
+    //   적용되고 DB엔 상신 시점 원본 포맷(cafe_id 단수·grade 등)이 그대로 남아 재발가드가 인식 못 했다.
+    //   downgrade 실행은 항상 검증→'참고'로 귀결되므로(위 case) to도 그 실제값으로 고정.
+    const normalizedParams = ids.length > 0
+      ? { ...p, ids, ...(d.action_type === "downgrade" && status === "done" ? { to: "참고" } : {}) }
+      : p;
+    await sql`UPDATE decisions SET status=${status}, decided_at=now(), result=${result}, decided_by='CEO', action_params=${JSON.stringify(normalizedParams)}::jsonb WHERE id=${id}`;
     // dev_task 승인 → 로컬 dev-pipeline 즉시 발화(브라우저 승인도 대기 없이 빌드 착수)
     const fired = d.action_type === "dev_task" && status === "approved" ? await pingDevTrigger("build") : undefined;
     return NextResponse.json({ ok: true, status, result, affected, fired });
