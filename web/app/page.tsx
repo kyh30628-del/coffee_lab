@@ -43,9 +43,10 @@ const REGIONS = SIDO_GU;
 
 // 🧳🏠 방문객 성격 배지 — /api/cafes가 붙는 곳만 vb("T"/"L"/"TL")로 보낸다(페이로드 최소).
 //   "관광지 카페"가 아니라 **근거**를 말한다: 누군가에겐 관광지여도 사는 사람에겐 동네라서.
-const VB_LABEL: Record<string, { emoji: string; label: string }> = {
-  T: { emoji: "🧳", label: "여행 후기 많음" },
-  L: { emoji: "🏠", label: "동네 단골 후기" },
+const VB_LABEL: Record<string, { emoji: string; label: string; short: string }> = {
+  //  short = 카드에 붙는 짧은 말. 이모지만 두면 10px짜리 회색 점으로 보여 아무도 못 알아본다(CEO 지적).
+  T: { emoji: "🧳", label: "여행 와서 들른 후기가 많아요", short: "여행지" },
+  L: { emoji: "🏠", label: "동네 단골 후기가 있어요", short: "동네 단골" },
 };
 function VisitorBadges({ vb, dark }: { vb?: string; dark?: boolean }) {
   if (!vb) return null;
@@ -53,9 +54,9 @@ function VisitorBadges({ vb, dark }: { vb?: string; dark?: boolean }) {
     <>
       {vb.split("").map((k) => VB_LABEL[k] && (
         <span key={k} title={VB_LABEL[k].label}
-          className={dark ? "text-[11px] bg-[#f4ece0]/20 px-1.5 py-0.5 rounded-full shrink-0"
-                          : "text-[11px] leading-none text-[#4a5a4e] bg-[#e6efe8] border border-[#c9dbcf] px-1.5 py-1 rounded-full shrink-0"}>
-          {VB_LABEL[k].emoji}
+          className={dark ? "text-[10.5px] font-bold bg-[#f4ece0]/20 px-2 py-0.5 rounded-full shrink-0"
+                          : "text-[10px] font-bold leading-none text-[#4a5a4e] bg-[#e6efe8] border border-[#c9dbcf] px-2 py-1 rounded-full shrink-0"}>
+          {VB_LABEL[k].emoji} {VB_LABEL[k].short}
         </span>
       ))}
     </>
@@ -399,6 +400,10 @@ function makeMyLocHtml(): string {
   // 내 현재 위치 — 파란 점(펄스 느낌의 후광)
   return `<div style="transform:translate(-50%,-50%);"><span style="display:block;width:18px;height:18px;border-radius:50%;background:#2f6fb0;border:3px solid #fff;box-shadow:0 0 0 5px rgba(47,111,176,0.28),0 1px 5px rgba(0,0,0,0.45);"></span></div>`;
 }
+// 🧳🏠 핀 라벨에 붙일 방문객 성격 표시. 지도는 메인 화면이라 여기 표시가 없으면 사실상 안 보인다(CEO 지적).
+//   핀은 HTML 문자열로 그려서 React 컴포넌트를 못 쓰므로 별도 헬퍼로 둔다.
+const vbGlyph = (vb?: string) => (vb ? ` ${vb.includes("T") ? "🧳" : ""}${vb.includes("L") ? "🏠" : ""}` : "");
+
 function makePinHtml(c: Cafe, isMatch: boolean, isFocus = false, isMine = false): string {
   const grade = c.synth_grade ?? "후보";
   const feat = !!c.featured && !isFocus; // ✨ 우선 노출 — 골드 핀 강조(포커스 핀이 우선)
@@ -415,7 +420,7 @@ function makePinHtml(c: Cafe, isMatch: boolean, isFocus = false, isMine = false)
   return `<div style="transform:translate(-50%,-100%);text-align:center;">
     <div${feat ? ' class="dcn-pin-feat"' : isFocus ? ' class="dcn-pin-focus"' : ""} style="width:${size}px;height:${size}px;background:${color};background-image:radial-gradient(circle at 34% 28%, rgba(255,255,255,0.42), rgba(255,255,255,0) 58%);border:2px solid #fdfaf4;border-radius:50% 50% 50% 0;transform:rotate(-45deg);${ring}display:flex;align-items:center;justify-content:center;margin:0 auto;">
       <span style="transform:rotate(45deg);font-size:${isFocus ? 20 : isMatch || feat ? 16 : 14}px;filter:drop-shadow(0 1px 1px rgba(0,0,0,0.25));">${glyph}</span></div>
-    <div style="margin-top:3px;${labelStyle}padding:2px 7px;border-radius:8px;font-size:${isFocus || isMine ? 11 : 10}px;white-space:nowrap;display:inline-block;box-shadow:0 2px 6px rgba(0,0,0,0.28);">${c.name}${isMine ? " ❤" : isFocus ? "" : feat ? " ⭐" : isMatch ? " ✓" : ""}</div>
+    <div style="margin-top:3px;${labelStyle}padding:2px 7px;border-radius:8px;font-size:${isFocus || isMine ? 11 : 10}px;white-space:nowrap;display:inline-block;box-shadow:0 2px 6px rgba(0,0,0,0.28);">${c.name}${vbGlyph((c as any).vb)}${isMine ? " ❤" : isFocus ? "" : feat ? " ⭐" : isMatch ? " ✓" : ""}</div>
   </div>`;
 }
 // ☕ 커피 드립 로딩 — 스피너 대신 우리 정체성(잔에 방울·김). label은 로딩 문구.
