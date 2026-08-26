@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { syncIssues, autoCorrect } from "@/lib/issues";
+import { loadCriteria } from "@/lib/criteria";
 
 export const runtime = "nodejs";
 
@@ -9,6 +10,7 @@ export async function GET(req: NextRequest) {
   if (req.headers.get("x-admin-password") !== process.env.ADMIN_PASSWORD)
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   try {
+    await loadCriteria(); // 좌표박스 기준(geo.box.*) 캐시 프라임 — integ:outbox가 현재 criteria값을 보게(폴백=DEFAULTS)
     const ac = await autoCorrect().catch(() => ({ resolved: 0, escalated: 0, log: [] as string[] }));
     const open = await syncIssues();
     return NextResponse.json({ ok: true, open, autoCorrect: ac }, { headers: { "Cache-Control": "no-store" } });

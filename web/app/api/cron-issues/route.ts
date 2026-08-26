@@ -4,6 +4,7 @@ import { recordRun } from "@/lib/agentLog";
 import { startJobRun } from "@/lib/blobBudget";
 import { openScope } from "@/lib/writeScope";
 import { fingerprintOf } from "@/lib/runLedger";
+import { loadCriteria } from "@/lib/criteria";
 
 export const runtime = "nodejs";
 
@@ -18,6 +19,7 @@ export async function GET(req: NextRequest) {
     // 관제탑(orchestrator_state)을 먼저 갱신 → RM 미러가 stale 신호(이미 끝난 '규칙갭 승인대기' 등)를 안 보게.
     //   읽기전용 GET이라 토큰0·비파괴. 실패해도 마지막 상태로 graceful.
     try { await fetch(new URL("/api/orchestrator", req.url).toString(), { cache: "no-store" }); } catch { /* graceful */ }
+    await loadCriteria(); // 좌표박스 기준(geo.box.*) 캐시 프라임 — integ:outbox가 현재 criteria값을 보게(폴백=DEFAULTS)
     // 🔧 자동 교정 먼저 — 오탐 정리·진짜 오염 결재 상신(무인). 그 다음 남은 것만 이슈로 띄움.
     const ac = await autoCorrect().catch(() => ({ resolved: 0, escalated: 0, log: [] as string[] }));
     const open = await syncIssues();
