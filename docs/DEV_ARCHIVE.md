@@ -271,3 +271,4 @@
 | 2026-08-25 11:05 | #817 | [룰갭 신규] 백화점/몰 팝업스토어 순환벤뉴 — 다른 시기 타브랜드 팝업 후기 오귀속 (id16327 앨리스 | db8dad99 | - | lib/reviewQuality.ts: GENERIC_WORD에 팝업/팝업스토어 추가(coreTokens 오염 제거) + isPopupRotatingVenue 신규 하드게이트(na |
 | 2026-08-26 07:05 | #822 | [룰갭 신규] DISTRICT_WORDS 누락어 "루원시티" — 인천 서구 신도시 상권 딴 브랜드 오귀속 ( | f03294c4 | - | lib/reviewQuality.ts DISTRICT_WORDS에 루원시티 추가(1줄). isVenueTok·AREA_NAME·otherDistrictInTitle 판정에 자동 반 |
 | 2026-08-26 11:05 | #823 | [개발] [정합성 발견] synth_identity 템플릿 중복 848그룹/3838곳(공개28%) — 카페  | 963a230a | - | lib/synthEngine.ts buildIdentity() 빵 카테고리 구체어 우선순위 역전: categoryBreadTerm(naver_category만 반영, 동+카테고리  |
+| 2026-08-26 11:05 | #827 | [레드팀 발견][코드수정] 강등/비공개 결재 action_params 포맷 불일치가 재발가드(lastDown | eb754d3b | - | app/api/admin/decide/route.ts: 실행 후 최종 UPDATE decisions에서 action_params를 정규화된 ids(jsonb 배열)와 downgra |
