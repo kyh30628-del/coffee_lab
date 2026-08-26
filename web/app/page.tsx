@@ -657,6 +657,15 @@ export default function Home() {
     //   찜 기능은 있었는데 **찜한 뒤 돌아올 길이 없어** 리텐션 고리가 끊겨 있었다
     //   (상세에서 찜 → 그다음 아무 동선 없음). 저장은 다시 꺼내볼 수 있어야 저장이다.
     if (sp.get("favs") === "1") setShowFavs(true);
+    // 📣 공지 모달 '둘러보기' 등에서 시·도 단위로 바로 진입(/?sido=강원&tab=map).
+    //   지역이 새로 열렸다고 알려놓고 랜딩으로 떨구면 사용자가 직접 찾아가야 한다 — 알린 곳으로 데려간다.
+    const psido = sp.get("sido");
+    if (psido && REGIONS[psido]) {
+      try { sessionStorage.setItem("dcn_role", "consumer"); } catch {}
+      setRole("consumer");
+      setHomeSido(psido); setSido(psido);
+      if (sp.get("tab") === "map") setTab("map");
+    }
     // SEO 동네 페이지(/area/…)에서 '카페 더 보기'로 진입 → 랜딩 건너뛰고 소비자 화면 + 해당 지역 추천
     const region = sp.get("region");
     if (region) {

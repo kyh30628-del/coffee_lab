@@ -42,6 +42,12 @@ export default function NoticeModal({ source }: { source?: Notice | null }) {
 
   if (!notice) return null;
   const close = () => setNotice(null);                                  // 이번만 닫기 — 다음 '세션'에 또 뜬다
+  // 주 버튼 = 알린 곳으로 데려간다(공지마다 ctaHref로 지정). 목적지가 없으면 그냥 닫힌다.
+  const go = () => {
+    const href = notice.ctaHref;
+    setNotice(null);
+    if (href) { try { window.location.assign(href); } catch {} }
+  };
   const never = () => {                                                 // 영구 해제
     try { localStorage.setItem(`dcn_notice_${notice.id}`, String(Date.now())); } catch {}
     // 관리자 화면에서 공지 효과를 보기 위한 기록(해제만 — '노출'까지 남기면 접속마다 DB를 깨운다).
@@ -68,7 +74,7 @@ export default function NoticeModal({ source }: { source?: Notice | null }) {
           {past ? notice.bodyPast : notice.body}
         </p>
         <p className="text-[12px] text-[#7a6a55] leading-relaxed mb-5">{past ? notice.subPast : notice.sub}</p>
-        <button onClick={close}
+        <button onClick={go}
           className="w-full bg-[#2b2018] text-[#f4ece0] rounded-xl py-3 text-[14px] font-bold active:scale-[0.98] transition-transform">
           {past ? notice.ctaPast : notice.cta}
         </button>

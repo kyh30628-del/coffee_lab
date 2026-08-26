@@ -13,6 +13,7 @@ export async function ensureNoticeSchema(): Promise<void> {
       body TEXT NOT NULL, body_past TEXT NOT NULL,
       sub TEXT NOT NULL DEFAULT '', sub_past TEXT NOT NULL DEFAULT '',
       cta TEXT NOT NULL DEFAULT '확인', cta_past TEXT NOT NULL DEFAULT '확인',
+      cta_href TEXT,                             -- 버튼 목적지(예: /?sido=강원&tab=map). 지역 공지는 필수
       from_at TIMESTAMPTZ NOT NULL,              -- 이때부터 표시
       past_from_at TIMESTAMPTZ NOT NULL,         -- 이때부터 완료형 문구
       until_at TIMESTAMPTZ NOT NULL,             -- 이때부터 미표시
@@ -27,11 +28,12 @@ export async function ensureNoticeSchema(): Promise<void> {
       ts TIMESTAMPTZ NOT NULL DEFAULT now()
     )`;
     await sql`CREATE INDEX IF NOT EXISTS idx_notice_dismissals_nid ON notice_dismissals (notice_id)`;
+    await sql`ALTER TABLE notices ADD COLUMN IF NOT EXISTS cta_href TEXT`.catch(() => {}); // 기존 테이블 보강
     // 최초 1회 코드 폴백을 씨앗으로 넣는다(이미 있으면 건드리지 않음).
     for (const n of NOTICES) {
-      await sql`INSERT INTO notices (id, emoji, title, title_past, highlight, body, body_past, sub, sub_past, cta, cta_past, from_at, past_from_at, until_at)
+      await sql`INSERT INTO notices (id, emoji, title, title_past, highlight, body, body_past, sub, sub_past, cta, cta_past, cta_href, from_at, past_from_at, until_at)
         VALUES (${n.id}, ${n.emoji}, ${n.title}, ${n.titlePast}, ${n.highlight ?? null}, ${n.body}, ${n.bodyPast},
-                ${n.sub}, ${n.subPast}, ${n.cta}, ${n.ctaPast},
+                ${n.sub}, ${n.subPast}, ${n.cta}, ${n.ctaPast}, ${n.ctaHref ?? null},
                 to_timestamp(${n.from / 1000}), to_timestamp(${n.pastFrom / 1000}), to_timestamp(${n.until / 1000}))
         ON CONFLICT (id) DO NOTHING`;
     }
@@ -42,7 +44,7 @@ const toNotice = (r: any): Notice => ({
   id: r.id, emoji: r.emoji,
   title: r.title, titlePast: r.title_past, highlight: r.highlight ?? undefined,
   body: r.body, bodyPast: r.body_past, sub: r.sub, subPast: r.sub_past,
-  cta: r.cta, ctaPast: r.cta_past,
+  cta: r.cta, ctaPast: r.cta_past, ctaHref: r.cta_href ?? undefined,
   from: new Date(r.from_at).getTime(), pastFrom: new Date(r.past_from_at).getTime(), until: new Date(r.until_at).getTime(),
 });
 

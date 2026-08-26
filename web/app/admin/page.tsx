@@ -868,7 +868,7 @@ export default function AdminPage() {
                 {notices ? `· 전체 ${notices.length}건 · 진행중 ${notices.filter((n: any) => n.status.startsWith("진행")).length}건` : "· 불러오는 중…"}
               </span>
             </button>
-            <button onClick={() => setNtEdit({ id: "", emoji: "📣", title: "", titlePast: "", highlight: "", body: "", bodyPast: "", sub: "", subPast: "", cta: "확인", ctaPast: "확인", from: "", pastFrom: "", until: "" })}
+            <button onClick={() => setNtEdit({ id: "", emoji: "📣", title: "", titlePast: "", highlight: "", body: "", bodyPast: "", sub: "", subPast: "", cta: "확인", ctaPast: "확인", ctaHref: "", from: "", pastFrom: "", until: "" })}
               className="text-[11px] bg-stone-800 text-white rounded-full px-3 py-1">+ 새 공지</button>
           </div>
           {openSecs.notice && <>
@@ -896,7 +896,7 @@ export default function AdminPage() {
                     <span>기간 방문자 <b className="text-stone-800">{n.reach == null ? "—" : n.reach.toLocaleString()}</b></span>
                     <span>다시보지않기 <b className="text-stone-800">{(n.dismissals ?? 0).toLocaleString()}</b></span>
                     <div className="ml-auto flex gap-1.5">
-                      <button onClick={() => setNtEdit({ ...n, from: new Date(n.from).toISOString().slice(0, 16), pastFrom: new Date(n.pastFrom).toISOString().slice(0, 16), until: new Date(n.until).toISOString().slice(0, 16), titlePast: n.title_past, bodyPast: n.body_past, subPast: n.sub_past, ctaPast: n.cta_past })}
+                      <button onClick={() => setNtEdit({ ...n, from: new Date(n.from).toISOString().slice(0, 16), pastFrom: new Date(n.pastFrom).toISOString().slice(0, 16), until: new Date(n.until).toISOString().slice(0, 16), titlePast: n.title_past, bodyPast: n.body_past, subPast: n.sub_past, ctaPast: n.cta_past, ctaHref: n.cta_href ?? "" })}
                         className="text-[11px] px-2 py-1 rounded-lg bg-white border border-stone-300 text-stone-700">수정</button>
                       <button onClick={() => ntAct({ action: "toggle", id: n.id })}
                         className={`text-[11px] px-2 py-1 rounded-lg border ${n.enabled ? "bg-white border-stone-300 text-stone-700" : "bg-emerald-600 border-emerald-600 text-white"}`}>{n.enabled ? "중지" : "재개"}</button>
@@ -918,6 +918,7 @@ export default function AdminPage() {
                     ["bodyPast", "본문(완료)", "text"], ["sub", "보조설명(예고)", "text"],
                     ["subPast", "보조설명(완료)", "text"], ["cta", "버튼(예고)", "text"],
                     ["ctaPast", "버튼(완료)", "text"],
+                    ["ctaHref", "버튼 목적지(예: /?sido=강원&tab=map)", "text"],
                     ["from", "시작", "datetime-local"], ["pastFrom", "완료형 전환", "datetime-local"], ["until", "종료", "datetime-local"],
                   ] as [string, string, string][]).map(([k, label, type]) => (
                     <label key={k} className="text-[10.5px] text-stone-600">

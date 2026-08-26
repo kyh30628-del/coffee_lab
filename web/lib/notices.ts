@@ -22,6 +22,9 @@ export type Notice = {
   highlight?: string;                  // 본문 앞에 붙는 강조 문구(예: "8월 31일까지")
   sub: string; subPast: string;
   cta: string; ctaPast: string;
+  /** 버튼을 누르면 갈 곳. 비우면 그냥 닫힌다.
+   *  ⚠️ 지역 공지는 반드시 채운다 — "새로 열렸다"고 알려놓고 랜딩으로 떨구면 사용자가 직접 찾아가야 한다. */
+  ctaHref?: string;
 };
 
 const KST = (y: number, m: number, d: number) => Date.UTC(y, m - 1, d, -9, 0, 0); // KST 자정
@@ -43,6 +46,7 @@ export const NOTICES: Notice[] = [
     subPast: "춘천·원주를 시작으로 강원 전역이 올라왔어요. 후기 검증을 마친 곳만 담았습니다.",
     cta: "둘러보기",
     ctaPast: "강원 카페 보러가기",
+    ctaHref: "/?sido=강원&tab=map", // 알린 지역의 지도로 바로 데려간다
   },
 ];
 
