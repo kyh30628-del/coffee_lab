@@ -356,10 +356,15 @@ export async function naverExists(name: string, area: string, lat: number | null
 //   그래서 '못 찾음'을 폐업으로 단정 못 함. 여러 쿼리(이름+구·이름+동·이름만)로 recall을 올려
 //   하나라도 좌표 근처 매칭되면 '영업중 확정'(false 오탐 최소화). 그래도 false는 '의심'일 뿐 폐업확정 아님.
 //   반환: true=존재(어느 쿼리든 매칭), false=모든 쿼리서 미발견, null=모든 쿼리가 쿼터/오류(판단보류).
-export async function naverExistsRobust(name: string, area: string, dong: string, lat: number | null, lng: number | null): Promise<boolean | null> {
+// altNames(coord#342): DB 표시명과 네이버 실제 등재명이 드리프트된 카페(예: "둔촌성내점" DB vs
+//   "둔촌본점" 네이버)는 이름불일치로 매 사이클 미발견→misses 누적. DB의 표시명은 그대로 두고,
+//   재확인 쿼리에서만 별칭도 함께 시도해 오탐을 잡는다.
+export async function naverExistsRobust(name: string, area: string, dong: string, lat: number | null, lng: number | null, altNames: string[] = []): Promise<boolean | null> {
   const nm = (s: string) => (s || "").replace(/\s/g, "").toLowerCase();
-  const nN = nm(name);
-  const queries = [`${area ?? ""} ${name}`.trim(), dong ? `${dong} ${name}`.trim() : "", name.trim()]
+  const names = [name, ...altNames].filter(Boolean);
+  const nNs = names.map(nm);
+  const queries = names
+    .flatMap((n) => [`${area ?? ""} ${n}`.trim(), dong ? `${dong} ${n}`.trim() : "", n.trim()])
     .filter((q, i, a) => q && a.indexOf(q) === i);
   let anyOk = false;
   for (const q of queries) {
@@ -368,7 +373,7 @@ export async function naverExistsRobust(name: string, area: string, dong: string
     anyOk = true;
     const hit = items.some((it: any) => {
       const iN = nm(it.name);
-      const nameMatch = iN.length >= 2 && (iN.includes(nN) || nN.includes(iN));
+      const nameMatch = iN.length >= 2 && nNs.some((nN) => iN.includes(nN) || nN.includes(iN));
       const near = lat != null && it.lat != null && Math.abs(it.lat - lat) < 0.005 && Math.abs(it.lng - lng!) < 0.005;
       return nameMatch && (near || lat == null);
     });

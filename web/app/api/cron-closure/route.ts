@@ -21,10 +21,18 @@ const PER_RUN = 35;        // 회당 네이버 재확인 수(쿼터 절약)
 // coord#304: 저장된 synth_reviews(노출 근거) 텍스트 자체의 명시적 폐업 신호 — 활발(최근 리뷰)해도
 //   STALE_MONTHS 게이트를 우회해 네이버 재확인을 최우선 배정한다. 자동 비공개는 여전히 안 함(신호는
 //   우선순위 부여일 뿐 — 최종 판정은 기존과 동일하게 naverExistsRobust 다중쿼리 미발견 누적으로만).
-const CLOSURE_TEXT_SIGNAL = "폐업|폐점|문\\s*닫(았|음|는다고|았다고|았대|았나요|았어요)|영업\\s*(안\\s*해|종료)|없어졌";
+// coord#342: "품절/재료소진 시 (조기)영업종료" 같은 일일 영업시간 안내문이 오매칭돼 활발스킵을 우회하고
+//   매회 불필요한 네이버 재확인을 강제하던 문제 — 부정 후방탐색으로 조건부 영업종료 문구만 예외 처리.
+const CLOSURE_TEXT_SIGNAL = "폐업|폐점|문\\s*닫(았|음|는다고|았다고|았대|았나요|았어요)|(?<!(?:품절|소진)\\s*시\\s*(?:조기\\s*)?)영업\\s*(안\\s*해|종료)|없어졌";
 // coord#266: 네이버 존재확인(misses)만으로는 "리스팅은 살아있지만 방문후기가 오래 끊긴" 사각지대를 못 잡음.
 //   misses는 그대로 두고(의미 다름: 네이버 미발견 횟수), 증거노후는 보조지표로만 집계 — 자동 비공개·misses 반영 없음.
 const STALE_EVIDENCE_MONTHS = 18;
+
+// coord#342: DB 표시명(cafes.name)과 네이버 실제 등재명이 드리프트된 카페 — 상호는 그대로 두고
+//   재확인 쿼리에서만 별칭도 함께 시도해 misses 오적립을 막는다(id → 네이버 등재명 목록).
+const NAVER_NAME_ALIASES: Record<number, string[]> = {
+  14402: ["러셀 도넛 둔촌본점"], // 러셀 도넛 둔촌성내점 — 네이버 실제 등재명은 "둔촌본점"(동일 주소)
+};
 
 // review_dates(캐시)는 raw_reviews보다 낡을 수 있어 폐업 오탐 유발 → raw_reviews(원본)의 날짜만 계산.
 //   ⚠️ raw_reviews 전체를 JS로 끌어오면 64MB 초과(Neon 507)라, SQL에서 date 배열만 추출해 넘김(아래 쿼리).
@@ -75,7 +83,7 @@ export async function GET(req: NextRequest) {
       }
       if (checked >= PER_RUN) break; // 쿼터 절약: 회당 재확인 상한
       if (c.closure_signal && mo != null && mo < STALE_MONTHS) signalBypass++; // 활발해도 텍스트 신호로 우선 재확인
-      const exists = await naverExistsRobust(c.name, c.area ?? "", c.dong ?? "", c.lat, c.lng);
+      const exists = await naverExistsRobust(c.name, c.area ?? "", c.dong ?? "", c.lat, c.lng, NAVER_NAME_ALIASES[Number(c.id)]);
       if (exists === null) { quotaStop = true; break; } // 전 쿼리 쿼터/오류 → 이번 회차 중단(판단 보류)
       checked++;
       await sql`UPDATE cafes SET closure_checked_at = now() WHERE id = ${c.id}`.catch(() => {});
