@@ -1,0 +1,52 @@
+// 📋 아침 보고 — 수집 결과 + 유입을 한 번에. (CEO 요청 2026-08-26)
+//   💰 밤새 감시 폴링을 두지 않는다 — 03~05시 절전 구간을 깨우기 때문. 아침에 이 한 번만 조회한다.
+import { readFileSync } from "node:fs";
+const env = readFileSync("./.env.local", "utf8");
+for (const l of env.split("\n")) { const m = l.match(/^([A-Z_0-9]+)=(.*)$/); if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^["']|["']$/g, ""); }
+const { neon } = await import("@neondatabase/serverless");
+const sql = neon(process.env.DATABASE_URL);
+const GW = ["춘천","원주","강릉","속초","동해","삼척","태백","홍천","횡성","영월","평창","정선","철원","화천","양구","인제","고성","양양"];
+
+console.log("═══ ① 수집 결과 ═══");
+const g = (await sql`SELECT count(*) n, count(*) FILTER (WHERE raw_reviews IS NOT NULL) raw,
+  count(*) FILTER (WHERE published) pub, count(*) FILTER (WHERE pipeline_status='new' AND raw_reviews IS NULL) wait,
+  count(*) FILTER (WHERE pipeline_status='pending') pend
+  FROM cafes WHERE address LIKE '강원%'`)[0];
+console.log(`  강원 ${g.n}곳 · 후기확보 ${g.raw} · 공개 ${g.pub} · 대기 ${g.wait} · 승격대기 ${g.pend}`);
+const all = (await sql`SELECT count(*) FILTER (WHERE published) pub, count(*) FILTER (WHERE pipeline_status='new' AND raw_reviews IS NULL) wait FROM cafes`)[0];
+console.log(`  전체 공개 ${all.pub} · 남은 적체 ${all.wait}`);
+const q = (await sql`SELECT used FROM naver_budget WHERE day = to_char(now() AT TIME ZONE 'Asia/Seoul','YYYY-MM-DD')`)[0];
+console.log(`  오늘 쿼터 ${q?.used ?? 0}/25000`);
+
+console.log("\n═══ ② 시군별 공개 ═══");
+for (const r of await sql`SELECT area, count(*) n, count(*) FILTER (WHERE synth_grade='검증') v,
+  count(*) FILTER (WHERE visitor_n>=10 AND visitor_local>=0.08) h, count(*) FILTER (WHERE visitor_n>=15 AND visitor_trip>=0.20) t
+  FROM cafes WHERE published AND address LIKE '강원%' GROUP BY 1 ORDER BY 2 DESC`)
+  console.log(`  ${String(r.area).padEnd(9)}${String(r.n).padStart(4)}곳  검증${String(r.v).padStart(4)}  🏠${String(r.h).padStart(3)}  🧳${String(r.t).padStart(3)}`);
+
+console.log("\n═══ ③ 강원 유입(어제 대비) ═══");
+const ids = new Set((await sql`SELECT id FROM cafes WHERE address LIKE '강원%'`).map(r => String(r.id)));
+const isGw = (p) => { const d = decodeURIComponent(p || ""); if (GW.some(x => d.includes(`/area/${x}`))) return true; const m = d.match(/^\/c\/(\d+)/); return !!(m && ids.has(m[1])); };
+for (const [label, since, until] of [["오늘", "0 days", null], ["어제", "1 day", "0 days"]]) {
+  const rows = await sql.query(`SELECT t.anon_id, t.path, t.src, COALESCE(u.internal,false) internal, u.user_agent
+    FROM traffic_events t LEFT JOIN user_consents u ON u.anon_id=t.anon_id
+    WHERE t.ts >= (now() AT TIME ZONE 'Asia/Seoul')::date::timestamptz - interval '${since}'
+      ${until ? `AND t.ts < (now() AT TIME ZONE 'Asia/Seoul')::date::timestamptz - interval '${until}'` : ""}`);
+  const gw = rows.filter(r => isGw(r.path));
+  const ext = gw.filter(r => !r.internal);          // 내부(대표·팀) 제외 = 진짜 사용자
+  const users = new Set(ext.map(r => r.anon_id));
+  const srcs = {}; for (const r of ext) srcs[r.src || "직접"] = (srcs[r.src || "직접"] ?? 0) + 1;
+  console.log(`  ${label}: 강원 조회 ${gw.length}건 (내부 제외 ${ext.length}건 · 방문자 ${users.size}명)`);
+  if (ext.length) console.log(`     유입경로: ${Object.entries(srcs).map(([k, v]) => `${k} ${v}`).join(" · ")}`);
+}
+
+console.log("\n═══ ④ 공지 모달 효과 ═══");
+const d = (await sql`SELECT count(*) n FROM notice_dismissals WHERE notice_id='gangwon-2026-08'`.catch(() => [{ n: 0 }]))[0];
+console.log(`  '다시 보지 않기' 클릭 ${d.n}건`);
+const map = await sql`SELECT count(*) n FROM outbound_clicks WHERE target='map_cta' AND ts >= (now() AT TIME ZONE 'Asia/Seoul')::date::timestamptz`.catch(() => [{ n: 0 }]);
+console.log(`  오늘 지도 진입 클릭 ${map[0].n}건`);
+
+console.log("\n═══ ⑤ 관광지 캘리브레이션 ═══");
+const t = await sql`SELECT count(*) n, count(*) FILTER (WHERE is_tourist) yes FROM dong_tourism`.catch(() => null);
+if (t && Number(t[0].n) > 0) console.log(`  판정 완료 ${t[0].n}개 동 · 관광지 판정 ${t[0].yes}개`);
+else console.log("  아직 미실행 — 수집 큐가 완전히 비면 자동으로 40개 표본을 뜬다");
