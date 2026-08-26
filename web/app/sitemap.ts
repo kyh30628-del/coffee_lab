@@ -49,6 +49,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   return [
     { url: SITE, changeFrequency: "daily", priority: 1 },
     { url: `${SITE}/area`, changeFrequency: "daily", priority: 0.9 },
+    { url: `${SITE}/insights`, changeFrequency: "daily", priority: 0.7 }, // 📊 데이터 리포트(인용 유도 — 백링크 전략)
     { url: `${SITE}/new`, changeFrequency: "daily", priority: 0.8 }, // 🆕 새 발굴(P2, 2026-08-13)
     { url: `${SITE}/trust`, changeFrequency: "monthly", priority: 0.7 }, // 🛡️ 검증 방법론(벤치마킹 A, 2026-08-13)
     { url: `${SITE}/pricing`, changeFrequency: "monthly", priority: 0.5 },
