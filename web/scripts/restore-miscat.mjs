@@ -9,7 +9,7 @@ const { sql } = await import("../lib/db.ts");
 const rows = await sql`SELECT id, name, naver_category, synth_grade FROM cafes
   WHERE NOT published AND pipeline_status='rejected' AND synth_grade IN ('검증','참고')
     AND naver_category IS NOT NULL AND naver_category <> ''
-    AND lat BETWEEN 36.8 AND 38.3 AND lng BETWEEN 124.5 AND 127.9`;
+    AND lat BETWEEN 36.8 AND 38.7 AND lng BETWEEN 124.5 AND 129.4`;
 
 let restored = 0, kept = 0;
 const restoredNames = [];

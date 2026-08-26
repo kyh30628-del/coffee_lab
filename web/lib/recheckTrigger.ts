@@ -1,4 +1,6 @@
 import { sql } from "./db";
+import { OUT_OF_SCOPE_SQL, geoBoxSql } from "./serviceScope";
+import { loadCriteria, getCriterionSync } from "./criteria";
 import { enqueueRecheck } from "./recheckQueue";
 import { isNonCafe, isFranchise, isSnackStall, isStructuralPhantom, isUnmannedCafe } from "./discover";
 
@@ -46,15 +48,18 @@ export async function runRecheckTrigger(sinceHours = 26): Promise<{ policyChange
   // ⚠️ 주소 시·도 필터 필수(2026-08-08 육안검증 교훈): 좌표 박스만으로는 경계지역을 못 거른다.
   //    재공개 후보 7곳 중 3곳이 **area는 수도권인데 실제 주소가 비수도권**이었다(로드1950=충남 당진,
   //    한탄강빵명장=강원 철원, 월송유로=강원 춘천). 이걸 안 거르면 큐가 소음으로 채워진다.
-  const rows = (await sql`SELECT id, name, naver_category cat, synth_grade g
+  // 🚨 2026-08-26: 좌표 박스와 시·도 목록이 둘 다 하드코딩이라 **강원이 재공개 후보에서 영영 빠졌다**.
+  //   범위가 바뀌면 여기만 뒤처져 정상 카페가 복구되지 않는다 → criteria·serviceScope 단일출처로 교정.
+  await loadCriteria();
+  const rows = (await sql.query(`SELECT id, name, naver_category cat, synth_grade g
     FROM cafes
     WHERE NOT published AND pipeline_status = 'excluded'
       AND synth_grade IN ('검증','참고')
-      AND lat BETWEEN 36.8 AND 38.3 AND lng BETWEEN 124.5 AND 127.9
-      AND (address LIKE '서울%' OR address LIKE '경기%' OR address LIKE '인천%')
-      AND COALESCE(offctx_rate, 0) < 0.2            -- 오염 의심분은 사람 목록에 넣지 않는다(정밀도 우선)
+      AND lat IS NOT NULL AND ${geoBoxSql(getCriterionSync)}
+      AND NOT (${OUT_OF_SCOPE_SQL})
+      AND COALESCE(offctx_rate, 0) < 0.2
       AND id NOT IN (SELECT cafe_id FROM recheck_queue WHERE reviewed_at IS NULL)
-    LIMIT 2000`.catch(() => [])) as any[];
+    LIMIT 2000`).catch(() => [])) as any[];
 
   const cand: { cafeId: number; reason: string; policyRef: string }[] = [];
   for (const c of rows) {

@@ -9,6 +9,11 @@ const { parseDong } = await import("../lib/discover.ts");
 const { sql } = await import("../lib/db.ts");
 const { isFranchise, isNonCafe } = await import("../lib/discover.ts");
 const { recordRun, guardJob } = await import("../lib/heartbeat.ts");
+// 🚨 좌표 박스는 criteria 단일출처(2026-08-26) — 하드코딩하면 범위 확대 후 이 스크립트가
+//   정상 카페를 다시 비공개로 되돌린다(공개 상태를 직접 쓰는 경로라 특히 위험).
+const { loadCriteria: _lc, getCriterionSync: _gc } = await import("../lib/criteria.ts");
+await _lc();
+const BOX = { aMin: _gc("geo.box.lat_min"), aMax: _gc("geo.box.lat_max"), oMin: _gc("geo.box.lng_min"), oMax: _gc("geo.box.lng_max") };
 guardJob("dong-backfill"); // 잡히지 않은 크래시(ReferenceError 등)도 관제탑이 보게 기록
 const ID = process.env.NAVER_CLIENT_ID, SECRET = process.env.NAVER_CLIENT_SECRET;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

@@ -1,6 +1,6 @@
 import { sql , ensureOnce } from "./db";
 import { getCriterionSync } from "./criteria";
-import { OUT_OF_SCOPE_SQL } from "./serviceScope";
+import { OUT_OF_SCOPE_SQL, geoBoxSql } from "./serviceScope";
 import { nameCoherence, cleanCafeName } from "./reviewQuality";
 import { healNonCafeCategory, healOffConceptByReview, healRestaurantByReview, healNonCafeByReview, healOutOfBox, healAreaLabel, offctxFalsePositive, OFFCTX_FLAG_RATE } from "./synthStore";
 import { pushTrigger } from "./auditTrigger";
@@ -336,7 +336,10 @@ export async function detectIssues(): Promise<Issue[]> {
   for (const c of crons) if (!c.ok) out.push({ ikey: `cronfail:${c.job}`, source: "크론", severity: "HIGH", type: "크론 실패", title: `${c.job} 실패`, detail: String(c.detail || "").slice(0, 200), team: teamOf(c.job), consumer: false });
 
   // 2) 데이터 정합성 위반 (sentinel 축)
-  const outBox = await one(sql`SELECT count(*) c FROM cafes WHERE published AND (lat<36.8 OR lat>38.3 OR lng<124.5 OR lng>127.9)`);
+  // 🚨 2026-08-26: 여기 좌표가 하드코딩(36.8~38.3/124.5~127.9)돼 있어, criteria로 박스를 넓힌 뒤에도
+  //   정상 공개된 강원 카페 764곳을 "박스 밖 공개" HIGH로 잘못 경보했다. 앞서 메시지만 고치고
+  //   **정작 쿼리를 안 고친** 게 원인 — 라벨과 판정이 따로 노는 전형적 사고다. 단일출처로 교정.
+  const outBox = await one(sql.query(`SELECT count(*) c FROM cafes WHERE published AND lat IS NOT NULL AND NOT (${geoBoxSql(getCriterionSync)})`) as any);
   if (outBox > 0) out.push({ ikey: "integ:outbox", source: "정합성", severity: "HIGH", type: "정합성", title: `좌표 박스 밖 공개 ${outBox}곳`, detail: `좌표가 서비스 범위(${getCriterionSync("geo.box.lat_min")}~${getCriterionSync("geo.box.lat_max")}/${getCriterionSync("geo.box.lng_min")}~${getCriterionSync("geo.box.lng_max")}) 밖인데 공개 중`, team: "품질본부", consumer: true });
   // 🗺️ 서비스 범위 밖 시·도는 lib/serviceScope.ts 단일출처(강원 편입 후 여기만 뒤처져 139곳 오경보난 자리).
   const nonCap = await one(sql.query(`SELECT count(*) c FROM cafes WHERE published AND (${OUT_OF_SCOPE_SQL})`) as any);

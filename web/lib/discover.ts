@@ -467,7 +467,7 @@ export async function discoverRegion(region: string, areaLabel: string, keywords
     await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS dong TEXT`.catch(() => {});
     await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS naver_category TEXT`.catch(() => {});
   });
-  await loadCriteria(); // 수도권 좌표박스 기준 캐시 갱신(폴백=36.8~38.3/124.5~127.9)
+  await loadCriteria(); // 수도권 좌표박스 기준 캐시 갱신(폴백=criteria DEFAULTS(현재 36.8~38.7/124.5~129.4))
   await loadCriteriaLists(); // 비카페 순수 리스트 캐시 프라임(동기 getListSync)
   const latMin = getCriterionSync("geo.box.lat_min"), latMax = getCriterionSync("geo.box.lat_max");
   const lngMin = getCriterionSync("geo.box.lng_min"), lngMax = getCriterionSync("geo.box.lng_max");

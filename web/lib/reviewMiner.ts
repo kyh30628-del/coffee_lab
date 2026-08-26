@@ -41,7 +41,7 @@ export async function mineArea(areaLabel: string, opts?: { maxCalls?: number; ap
   const deadlineMs = opts?.deadlineMs; // 호출측 함수시간 예산 안전판(discoverRegion과 동일 패턴) — 없으면 무제한(기존 동작 유지)
   const keyword = areaLabel.split(" ").pop() || areaLabel; // ILIKE·주소매칭용 핵심어(미추홀구 등)
 
-  await loadCriteria(); // 수도권 좌표박스 기준 캐시 프라임(폴백=36.8~38.3/124.5~127.9)
+  await loadCriteria(); // 수도권 좌표박스 기준 캐시 프라임(폴백=criteria DEFAULTS(현재 36.8~38.7/124.5~129.4))
   const latMin = getCriterionSync("geo.box.lat_min"), latMax = getCriterionSync("geo.box.lat_max");
   const lngMin = getCriterionSync("geo.box.lng_min"), lngMax = getCriterionSync("geo.box.lng_max");
   const all = (await sql`SELECT name, lat, lng FROM cafes`) as any[];
@@ -80,7 +80,7 @@ export async function mineArea(areaLabel: string, opts?: { maxCalls?: number; ap
     const lat = Number(hit.mapy) / 1e7, lng = Number(hit.mapx) / 1e7;
     const nN = norm(name);
     if (!name || !lat || !lng || isNaN(lat) || isNaN(lng)) continue;
-    // 🗺️ 수도권 박스 밖(비수도권 동명업체)은 적재 안 함 — 네이버가 타지역 지점 반환해도 서비스(수도권)와 무관.
+    // 🗺️ 서비스 범위 박스 밖(비수도권 동명업체)은 적재 안 함 — 네이버가 타지역 지점 반환해도 서비스(수도권)와 무관.
     if (!(lat >= latMin && lat <= latMax && lng >= lngMin && lng <= lngMax)) continue;
     // 최종 중복: 이름 또는 좌표 근사 또는 이번 배치 중복
     // 🐛 재발방지(2026-08-25 전수점검): 좌표 근접(약 55m×44m)만으로 이름검증 없이 동일카페 판정해

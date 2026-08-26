@@ -23,3 +23,10 @@ export const OUT_OF_SCOPE_PREFIXES = [
 
 /** `address LIKE ...` OR 절 — SQL 조각으로 그대로 끼워 쓴다(태그드 템플릿은 조각 합성이 안 되므로 문자열). */
 export const OUT_OF_SCOPE_SQL = OUT_OF_SCOPE_PREFIXES.map((p) => `address LIKE '${p}%'`).join(" OR ");
+
+/** 좌표 박스 SQL 조각 — criteria(DB) 단일출처를 읽어 만든다. 하드코딩 금지.
+ *  ⚠️ 태그드 템플릿(sql`…`)은 조각 합성이 안 되므로 sql.query(문자열)와 함께 쓴다.
+ *  호출 전 loadCriteria()로 캐시를 프라임할 것(안 하면 DEFAULTS 폴백값이 쓰인다). */
+export function geoBoxSql(g: (k: string) => number, col = { lat: "lat", lng: "lng" }): string {
+  return `${col.lat} BETWEEN ${g("geo.box.lat_min")} AND ${g("geo.box.lat_max")} AND ${col.lng} BETWEEN ${g("geo.box.lng_min")} AND ${g("geo.box.lng_max")}`;
+}

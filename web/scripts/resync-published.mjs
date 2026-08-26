@@ -10,7 +10,7 @@ const { sql } = await import("../lib/db.ts");
 const cafes = await sql`SELECT id, name, naver_category FROM cafes
   WHERE synth_grade IN ('검증','참고')
     AND pipeline_status IN ('live','rejected')
-    AND lat IS NOT NULL AND lat BETWEEN 36.8 AND 38.3 AND lng BETWEEN 124.5 AND 127.9`;
+    AND lat IS NOT NULL AND lat BETWEEN 36.8 AND 38.7 AND lng BETWEEN 124.5 AND 129.4`;
 let pub = 0, rej = 0;
 const rejNames = [];
 for (const c of cafes) {

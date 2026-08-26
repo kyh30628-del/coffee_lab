@@ -601,7 +601,7 @@ export async function healNonCafeByReview(): Promise<{ held: number; names: stri
 // 🗺️ 서비스 범위 박스 밖(범위 밖 동명업체) 자동 제외 — 2026-08-25 강원 편입으로 '수도권'이 아니라 '서비스 범위'다 — 어느 적재 경로(발굴·마이닝·상가·수집)로 들어왔든
 //   2시간마다 일괄 정리. 공개 게이트가 노출은 이미 막지만, DB 청결 + 합성·임베딩 낭비 제거 + 미래 경로까지 커버하는 안전망.
 export async function healOutOfBox(): Promise<{ excluded: number; names: string[] }> {
-  await loadCriteria(); // 수도권 좌표박스 기준 캐시 프라임 — synth 게이트와 같은 진실(폴백=36.8~38.3/124.5~127.9)
+  await loadCriteria(); // 수도권 좌표박스 기준 캐시 프라임 — synth 게이트와 같은 진실(폴백=criteria DEFAULTS(현재 36.8~38.7/124.5~129.4))
   const latMin = getCriterionSync("geo.box.lat_min"), latMax = getCriterionSync("geo.box.lat_max");
   const lngMin = getCriterionSync("geo.box.lng_min"), lngMax = getCriterionSync("geo.box.lng_max");
   // ① 좌표 박스 밖
@@ -708,7 +708,7 @@ export async function healGroundingSuspects(): Promise<{ resynthed: number; name
 export async function finalizePipeline(): Promise<{ promoted: number; names: string[]; pending: number; stuck: any }> {
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS pipeline_status TEXT`.catch(() => {});
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS needs_llm BOOLEAN`.catch(() => {});
-  await loadCriteria(); // 수도권 좌표박스 기준 캐시 프라임 — 공개 승격 게이트가 synth와 같은 진실(폴백=36.8~38.3/124.5~127.9)
+  await loadCriteria(); // 수도권 좌표박스 기준 캐시 프라임 — 공개 승격 게이트가 synth와 같은 진실(폴백=criteria DEFAULTS(현재 36.8~38.7/124.5~129.4))
   const latMin = getCriterionSync("geo.box.lat_min"), latMax = getCriterionSync("geo.box.lat_max");
   const lngMin = getCriterionSync("geo.box.lng_min"), lngMax = getCriterionSync("geo.box.lng_max");
   const promoted = (await sql`
