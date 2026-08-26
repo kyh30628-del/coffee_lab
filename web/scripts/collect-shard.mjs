@@ -15,7 +15,7 @@ const env = readFileSync("./.env.local", "utf8");
 for (const l of env.split("\n")) { const m = l.match(/^([A-Z_0-9]+)=(.*)$/); if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^["']|["']$/g, ""); }
 const { neon } = await import("@neondatabase/serverless");
 const { synthAndStore } = await import("../lib/synthStore.ts");
-const { naverBlocked } = await import("../lib/naverBudget.ts");
+const { naverBlocked, naverUsedToday } = await import("../lib/naverBudget.ts");
 const sql = neon(process.env.DATABASE_URL);
 
 const arg = (k, d) => { const a = process.argv.find((x) => x.startsWith(`--${k}=`)); return a ? a.split("=")[1] : d; };
@@ -23,7 +23,8 @@ const SHARD = Number(arg("shard", 0)), OF = Number(arg("of", 1));
 const FILTER = arg("filter", "");
 const label = `[${SHARD}/${OF}]`;
 
-let done = 0, err = 0, consecErr = 0, stale = 0;
+let done = 0, err = 0, consecErr = 0, stale = 0, batches = 0, baselineUsed = 0;
+const CALL_PER_CAFE_STOP = Number(process.env.CALL_PER_CAFE_STOP || 15); // 정상 ~5콜의 3배
 for (;;) {
   // 샤드끼리 같은 행을 집지 않게 id % OF로 나눈다(락 없이 충돌 회피).
   // 🥇 처리 순서 = 강원 먼저, 수도권 적체는 그다음(CEO 지시 2026-08-25).
@@ -46,6 +47,19 @@ for (;;) {
     catch (e) { err++; consecErr++; if (err <= 3) console.log(`${label} ✗ ${c.name}: ${String(e).slice(0, 50)}`); }
     if (consecErr >= 10) { console.log(`${label} 연속 오류 10회 — 중단(재실행시 재개)`); process.exit(0); }
   }
+  // 🚨 효율 자동 차단(2026-08-26) — **낭비를 사람이 발견하기 전에 워커가 스스로 멈춘다.**
+  //   오늘 두 번 태웠다: ①중복 샤드 4개(곳당 43콜) ②수집 0건 카페 무한 재선택(곳당 133콜).
+  //   둘 다 "돌긴 도는데 수확이 없는" 형태라 겉으론 정상으로 보이고, 쿼터를 다 태운 뒤에야 드러난다.
+  //   정상은 곳당 5콜 안팎이므로 그 3배(15콜)를 넘으면 무조건 이상이다 — 즉시 멈추고 사람이 본다.
+  const used = await naverUsedToday().catch(() => 0);
+  if (batches === 0) baselineUsed = used;
+  batches++;
+  const spent = used - baselineUsed;
+  if (done >= 20 && spent / Math.max(1, done) > CALL_PER_CAFE_STOP) {
+    console.log(`${label} 🚨 효율 이상 — 곳당 ${(spent / done).toFixed(1)}콜(정상 ~5, 한계 ${CALL_PER_CAFE_STOP}). 낭비 방지로 중단.`);
+    break;
+  }
+
   // 🚨 헛돌기 차단(2026-08-25 실제로 밟음): 쿼터가 소진되면 gatherRaw가 빈 결과를 반환하고
   //   raw_reviews를 쓰지 않는다 → 상태가 'new'로 남아 **같은 20행이 영원히 다시 뽑힌다**.
   //   샤드가 "1,900곳 처리"를 찍는데 실제 확보는 205곳이었던 게 이것. 진척으로 판정한다.
