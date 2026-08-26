@@ -200,7 +200,12 @@ async function gatherRaw(cafe: { id: number; name: string; area: string }, refre
   const sig = (a: RawItem[]) => a.map((r) => `${r.source}${r.text || ""}${r.title || ""}${r.desc || ""}`).sort().join("");
   let changed = true;
   try { const prev = await loadRaw(cafe.id); if (prev.length === cleaned.length && sig(prev) === sig(cleaned)) changed = false; } catch { /* 비교 실패 시 안전하게 변경으로 간주 */ }
-  if (changed) {
+  // 🐛 무한 재수집 차단(2026-08-26): 수집 결과가 0건이면 prev([])와 cleaned([])가 같아 changed=false가 되고
+  //   raw_reviews가 **NULL로 남는다**. 그러면 'raw_reviews IS NULL'로 대상을 고르는 배치가 같은 카페를
+  //   영원히 다시 집어 매번 8콜씩 태운다(실측: 한 샤드가 같은 19곳에 갇혀 배치당 152콜 낭비).
+  //   → 아직 한 번도 저장된 적이 없으면(NULL) 결과가 비어도 빈 배열을 써서 '시도했음'을 남긴다.
+  const neverStored = !(await sql`SELECT 1 FROM cafes WHERE id=${cafe.id} AND raw_reviews IS NOT NULL`).length;
+  if (changed || neverStored) {
     await sql`UPDATE cafes SET raw_reviews=${safeJson(cleaned)}, raw_collected_at=now(), raw_checked_at=now() WHERE id=${cafe.id}`;
   } else {
     await sql`UPDATE cafes SET raw_checked_at=now() WHERE id=${cafe.id}`;

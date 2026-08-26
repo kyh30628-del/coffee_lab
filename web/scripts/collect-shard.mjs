@@ -31,9 +31,13 @@ for (;;) {
   //   적체가 며칠 늦어져도 화면이 비지 않는다. ORDER BY로만 우선순위를 주고 큐는 하나로 유지한다
   //   (큐를 나누면 강원이 끝난 뒤 워커가 놀거나, 필터를 지우는 걸 잊어 수도권이 영영 안 도는 사고가 난다).
   const rows = FILTER
+    // 🔒 이중 안전판(2026-08-26): 방금 확인한 카페는 다시 집지 않는다. raw_reviews가 NULL로 남는
+    //   경로가 하나라도 생기면 같은 카페를 무한 재수집하며 쿼터를 태운다(실제로 그랬다).
     ? await sql`SELECT id, name, area FROM cafes WHERE raw_reviews IS NULL AND pipeline_status='new'
+        AND (raw_checked_at IS NULL OR raw_checked_at < now() - interval '12 hours')
         AND address LIKE ${FILTER + "%"} AND (id % ${OF}) = ${SHARD} ORDER BY id LIMIT 20`
     : await sql`SELECT id, name, area FROM cafes WHERE raw_reviews IS NULL AND pipeline_status='new'
+        AND (raw_checked_at IS NULL OR raw_checked_at < now() - interval '12 hours')
         AND (id % ${OF}) = ${SHARD}
         ORDER BY (address LIKE '강원%') DESC, id LIMIT 20`;
   if (!rows.length) { console.log(`${label} 큐 소진 — 완료 ${done}곳`); break; }
