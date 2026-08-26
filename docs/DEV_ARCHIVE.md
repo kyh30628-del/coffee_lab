@@ -270,3 +270,4 @@
 | 2026-08-25 11:05 | #816 | [개발] [정합성 발견] raw_reviews에 스팸 블로그원문("금호김영집" 등) 981곳 중복 오염 —  | f0c88535 | - | 근본원인: lib/webSearchCollector.ts fetchWebReviews가 네이버 sort=sim 유사도만 믿고 카페명 무관 콘텐츠까지 반환(예: 링크나열형 스팸 블로 |
 | 2026-08-25 11:05 | #817 | [룰갭 신규] 백화점/몰 팝업스토어 순환벤뉴 — 다른 시기 타브랜드 팝업 후기 오귀속 (id16327 앨리스 | db8dad99 | - | lib/reviewQuality.ts: GENERIC_WORD에 팝업/팝업스토어 추가(coreTokens 오염 제거) + isPopupRotatingVenue 신규 하드게이트(na |
 | 2026-08-26 07:05 | #822 | [룰갭 신규] DISTRICT_WORDS 누락어 "루원시티" — 인천 서구 신도시 상권 딴 브랜드 오귀속 ( | f03294c4 | - | lib/reviewQuality.ts DISTRICT_WORDS에 루원시티 추가(1줄). isVenueTok·AREA_NAME·otherDistrictInTitle 판정에 자동 반 |
+| 2026-08-26 11:05 | #823 | [개발] [정합성 발견] synth_identity 템플릿 중복 848그룹/3838곳(공개28%) — 카페  | 963a230a | - | lib/synthEngine.ts buildIdentity() 빵 카테고리 구체어 우선순위 역전: categoryBreadTerm(naver_category만 반영, 동+카테고리  |
