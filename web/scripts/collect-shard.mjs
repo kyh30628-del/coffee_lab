@@ -15,7 +15,7 @@ const env = readFileSync("./.env.local", "utf8");
 for (const l of env.split("\n")) { const m = l.match(/^([A-Z_0-9]+)=(.*)$/); if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^["']|["']$/g, ""); }
 const { neon } = await import("@neondatabase/serverless");
 const { synthAndStore } = await import("../lib/synthStore.ts");
-const { naverBlocked, naverUsedToday } = await import("../lib/naverBudget.ts");
+const { naverBlocked, naverUsedToday, NAVER_DAILY_QUOTA } = await import("../lib/naverBudget.ts");
 const sql = neon(process.env.DATABASE_URL);
 
 const arg = (k, d) => { const a = process.argv.find((x) => x.startsWith(`--${k}=`)); return a ? a.split("=")[1] : d; };
@@ -25,6 +25,7 @@ const label = `[${SHARD}/${OF}]`;
 
 let done = 0, err = 0, consecErr = 0, stale = 0, batches = 0, baselineUsed = 0;
 const CALL_PER_CAFE_STOP = Number(process.env.CALL_PER_CAFE_STOP || 15); // 정상 ~5콜의 3배
+const CRON_RESERVE = Number(process.env.COLLECT_CRON_RESERVE || 2000); // 평판점검·폐업확인 크론 몫
 for (;;) {
   // 샤드끼리 같은 행을 집지 않게 id % OF로 나눈다(락 없이 충돌 회피).
   // 🥇 처리 순서 = 강원 먼저, 수도권 적체는 그다음(CEO 지시 2026-08-25).
@@ -54,6 +55,15 @@ for (;;) {
   const used = await naverUsedToday().catch(() => 0);
   if (batches === 0) baselineUsed = used;
   batches++;
+
+  // 🚦 크론 몫 예약(2026-08-26 CEO 지시) — 수집이 하루 25,000을 통째로 먹으면
+  //   cron-enrich(평판 점검)·cron-closure(폐업 확인)가 쿼터 없이 헛돈다.
+  //   폐업 확인이 밀리면 **이미 닫은 카페가 지도에 남아 소비자가 헛걸음한다** — 수집보다 우선순위가 높다.
+  //   실제로 오늘 25,000을 다 태워 20시 크론 두 개를 굶겼다.
+  if (used >= NAVER_DAILY_QUOTA - CRON_RESERVE) {
+    console.log(`${label} 🚦 크론 예약분 도달 — 수집 중단(${used}/${NAVER_DAILY_QUOTA}, 크론용 ${CRON_RESERVE} 보존)`);
+    break;
+  }
   const spent = used - baselineUsed;
   if (done >= 20 && spent / Math.max(1, done) > CALL_PER_CAFE_STOP) {
     console.log(`${label} 🚨 효율 이상 — 곳당 ${(spent / done).toFixed(1)}콜(정상 ~5, 한계 ${CALL_PER_CAFE_STOP}). 낭비 방지로 중단.`);

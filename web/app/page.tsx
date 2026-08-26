@@ -53,8 +53,8 @@ function VisitorBadges({ vb, dark }: { vb?: string; dark?: boolean }) {
     <>
       {vb.split("").map((k) => VB_LABEL[k] && (
         <span key={k} title={VB_LABEL[k].label}
-          className={dark ? "text-[10px] bg-[#f4ece0]/20 px-1.5 py-0.5 rounded-full shrink-0"
-                          : "text-[9px] text-[#4a5a4e] bg-[#e6efe8] border border-[#c9dbcf] px-1.5 py-0.5 rounded-full shrink-0"}>
+          className={dark ? "text-[11px] bg-[#f4ece0]/20 px-1.5 py-0.5 rounded-full shrink-0"
+                          : "text-[11px] leading-none text-[#4a5a4e] bg-[#e6efe8] border border-[#c9dbcf] px-1.5 py-1 rounded-full shrink-0"}>
           {VB_LABEL[k].emoji}
         </span>
       ))}
@@ -1858,13 +1858,25 @@ export default function Home() {
 }
 
 function MapControls({ sido, sigungu, dong, onSido, onSigungu, setDong, dongOptions, tasteKey, setTasteKey, filtered, matchSet, setSelected, openLocation, autoGu, geoMsg, clearAuto, setShowFavs, favCount, closeSheet }: any) {
+  // 🧳🏠 방문객 성격 필터 — 배지가 전체의 7%뿐이라 목록을 훑어서는 못 찾는다(CEO 지적).
+  //   "동네 단골 후기 있는 곳만 보기"는 우리 정체성 그 자체라 필터로서도 값이 크다.
+  const [vbFilter, setVbFilter] = useState<"" | "L" | "T">("");
   // 정렬: 카테고리(결) 선택 시 그 결이 강한 순, 아니면 검증 리뷰 많은 순. 검색범주 안에서도 동일 기준.
   const sortLabel = tasteKey ? `'${TASTE_CHOICES.find((t: any) => t.key === tasteKey)?.label}' 결 강한 순` : "검증 리뷰 많은 순";
   // 전체 정렬은 무거우므로 메모이즈 — 모달 열고닫기 등으로 재렌더돼도 filtered/tasteKey/matchSet가 그대로면 재정렬 안 함.
-  const listCafes: Cafe[] = useMemo(() => [...(tasteKey ? filtered.filter((c: Cafe) => matchSet.has(c.id)) : filtered)].sort((a: Cafe, b: Cafe) => {
-    if (tasteKey) { const d = ((b.char_scores ?? {})[tasteKey] ?? 0) - ((a.char_scores ?? {})[tasteKey] ?? 0); if (d) return d; }
-    return (b.synth_count ?? 0) - (a.synth_count ?? 0);
-  }), [filtered, tasteKey, matchSet]);
+  const listCafes: Cafe[] = useMemo(() => {
+    let base = tasteKey ? filtered.filter((c: Cafe) => matchSet.has(c.id)) : filtered;
+    if (vbFilter) base = base.filter((c: Cafe) => ((c as any).vb ?? "").includes(vbFilter));
+    return [...base].sort((a: Cafe, b: Cafe) => {
+      if (tasteKey) { const d = ((b.char_scores ?? {})[tasteKey] ?? 0) - ((a.char_scores ?? {})[tasteKey] ?? 0); if (d) return d; }
+      return (b.synth_count ?? 0) - (a.synth_count ?? 0);
+    });
+  }, [filtered, tasteKey, matchSet, vbFilter]);
+  // 필터 칩에 곳수를 미리 보여준다 — 눌러봤더니 0곳이면 기능이 고장난 걸로 오해한다.
+  const vbCounts = useMemo(() => {
+    const base = tasteKey ? filtered.filter((c: Cafe) => matchSet.has(c.id)) : filtered;
+    return { L: base.filter((c: any) => (c.vb ?? "").includes("L")).length, T: base.filter((c: any) => (c.vb ?? "").includes("T")).length };
+  }, [filtered, tasteKey, matchSet]);
   return (
     <>
       {/* 즐겨찾기 진입 — 데스크톱 전용(모바일은 하단 네비에 이미 있음). 하단 네비는 md:hidden이라 데스크톱엔 진입로가 없었음 */}
@@ -1913,10 +1925,22 @@ function MapControls({ sido, sigungu, dong, onSido, onSigungu, setDong, dongOpti
         )}
       </div>
       <div>
-        <div className="flex items-baseline justify-between mb-2.5">
+        <div className="flex items-baseline justify-between mb-2">
           <div className="text-sm font-bold text-[#52402e]">목록 ({listCafes.length}{tasteKey ? ` · ${TASTE_CHOICES.find((t: any) => t.key === tasteKey)?.label}` : ""})</div>
           <div className="text-[10px] text-[#7a5122] shrink-0">↕ {sortLabel}</div>
         </div>
+        {/* 🧳🏠 방문객 성격 필터 — 배지가 소수라 목록을 훑어선 못 찾는다. 곳수를 함께 보여줘 헛클릭을 막는다. */}
+        {(vbCounts.L > 0 || vbCounts.T > 0) && (
+          <div className="flex gap-1.5 mb-2.5 flex-wrap">
+            {([["L", "🏠", "동네 단골 후기", vbCounts.L], ["T", "🧳", "여행 후기 많음", vbCounts.T]] as const).map(([k, emoji, label, n]) => n > 0 && (
+              <button key={k} onClick={() => setVbFilter(vbFilter === k ? "" : (k as "L" | "T"))}
+                className={`text-[11px] font-medium px-2.5 py-1 rounded-full border transition-colors ${vbFilter === k ? "bg-[#4a5a4e] text-white border-[#4a5a4e]" : "bg-white text-[#4a5a4e] border-[#c9dbcf]"}`}>
+                {emoji} {label} {n}
+              </button>
+            ))}
+            {vbFilter && <button onClick={() => setVbFilter("")} className="text-[11px] text-[#7a5122] underline px-1">전체</button>}
+          </div>
+        )}
         {listCafes.length === 0 ? <p className="text-xs text-[#665036] bg-[#f4ece0] rounded-lg p-4">{tasteKey ? "이 카테고리에 해당하는 카페가 이 지역엔 없어요. 다른 결을 골라보세요." : "지역을 선택하면 목록이 나와요."}</p> : (
           <div className="space-y-2">
             {listCafes.slice(0, 50).map((c: Cafe) => (
