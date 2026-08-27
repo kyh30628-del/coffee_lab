@@ -46,7 +46,10 @@ async function getCafe(id: string) {
   const n = Number(id);
   if (!Number.isFinite(n) || n <= 0) return null;
   try {
-    return (await sql`SELECT id, name, area, dong, address, lat, lng, synth_grade, synth_identity, synth_count, char_scores, synth_reviews_all, synth_reviews, reputation_note, synth_quality, visitor_n, visitor_trip, visitor_local FROM cafes WHERE id=${n} AND published=true LIMIT 1`)[0] as any ?? null;
+    return (await sql`SELECT c.id, c.name, c.area, c.dong, c.address, c.lat, c.lng, c.synth_grade, c.synth_identity, c.synth_count, c.char_scores, c.synth_reviews_all, c.synth_reviews, c.reputation_note, c.synth_quality, c.visitor_n, c.visitor_trip, c.visitor_local,
+      COALESCE(dt.is_tourist, false) AS dong_tourist
+      FROM cafes c LEFT JOIN dong_tourism dt ON dt.area = c.area AND dt.dong = c.dong
+      WHERE c.id=${n} AND c.published=true LIMIT 1`)[0] as any ?? null;
   } catch { return null; }
 }
 // 등급(검증/참고/후보)→JSON-LD aggregateRating.ratingValue 근사치. 별점을 직접 수집하지 않으므로 등급 기반 대리값.
@@ -230,13 +233,19 @@ export default async function CafePage({ params }: Props) {
           </div>
           {/* 🧳🏠 방문객 성격 — "이 후기를 누가 썼나". 카페를 단정하지 않고(관광지다X) 근거만 말한다.
               누군가에겐 관광지여도 거기 사는 사람에겐 동네다 — 그래서 두 배지는 배타적이지 않다(둘 다 붙을 수 있음). */}
-          {visitorBadges({ n: c.visitor_n ?? 0, trip: c.visitor_trip ?? 0, local: c.visitor_local ?? 0 }).length > 0 && (
+          {(visitorBadges({ n: c.visitor_n ?? 0, trip: c.visitor_trip ?? 0, local: c.visitor_local ?? 0 }).length > 0 || c.dong_tourist) && (
             <div className="flex items-center gap-1.5 flex-wrap mb-2">
               {visitorBadges({ n: c.visitor_n ?? 0, trip: c.visitor_trip ?? 0, local: c.visitor_local ?? 0 }).map((b) => (
                 <span key={b.key} className="text-[11px] font-bold text-[#4a5a4e] bg-[#e6efe8] border border-[#c9dbcf] px-2 py-0.5 rounded-full">
                   {b.emoji} {b.label} <span className="font-normal text-[#6b7d71]">({b.note})</span>
                 </span>
               ))}
+              {/* 📰 동 단위 뉴스 판정(2026-08-27) — 후기 말투(위)와 별개의 '위치 속성'. 근거를 문구로 밝힌다. */}
+              {c.dong_tourist && (
+                <span className="text-[11px] font-bold text-[#4a5a6e] bg-[#e6ebf2] border border-[#c9d3e0] px-2 py-0.5 rounded-full">
+                  🗺️ 관광지로 알려진 동네 <span className="font-normal text-[#6b7a91]">(언론 보도 기준)</span>
+                </span>
+              )}
             </div>
           )}
           <div className="flex items-center justify-between gap-2 mb-4">

@@ -16,7 +16,9 @@
 // ⚠️ 동음이의 방어: '교동'·'중앙동'처럼 흔한 동명은 지역명과 함께 질의하고, 기사 본문에 지역명이
 //   실제로 등장하는 기사만 센다. 이게 없으면 다른 지역 기사로 오판한다.
 
-export const TOURISM_TERMS = /(관광객|관광지|관광명소|명소|여행객|나들이객|나들이|핫플레이스|핫플|유원지|해수욕장|관광단지|드라이브\s?코스|포토존|축제|유명\s?관광|여행\s?코스|관광\s?수요)/;
+// 2026-08-27 확장: 1차 사전은 속초카페거리(토성면) 3%·봉평면 0%로 변별 실패 — 뉴스가 실제로 쓰는
+//   관광 어휘(피서객·휴가철·카페거리·해변·리조트 등)를 보강. ⚠️단독 애매어(방문객 등)는 넣지 않는다.
+export const TOURISM_TERMS = /(관광객|관광지|관광명소|명소|여행객|나들이객|나들이|핫플레이스|핫플|유원지|해수욕장|관광단지|드라이브\s?코스|포토존|축제|유명\s?관광|여행\s?코스|관광\s?수요|피서객|휴가철|성수기|여행지|가볼\s?만한|카페\s?거리|해변|바닷가|서핑|스키장|리조트|글램핑|캠핑장|출렁다리|케이블카|둘레길)/;
 // 생활권 신호 — 관광 어휘가 섞여도 이쪽이 강하면 관광지로 보지 않는다(주민 대상 기사).
 export const LOCAL_NEWS_TERMS = /(주민센터|아파트|재개발|재건축|학군|통학|출퇴근|주민\s?설명회|생활권|택지|입주민|민원)/;
 
@@ -42,7 +44,10 @@ export function tourismSignal(articles: Article[], areaHint: string, dong: strin
     if (!t.trim()) continue;
     // 동음이의 방어 — 지역명(또는 그 핵심어)이 기사에 실제로 나와야 이 동네 기사로 인정.
     if (areaCore && !t.includes(areaCore) && !t.includes(areaHint)) continue;
-    if (dong && !t.includes(dong)) continue;
+    // 기사는 행정 접미사를 떼고 쓴다("평창 봉평", "속초 조양") — 정확일치만 요구하면 관광 기사가
+    // 표본에서 빠지고 공문서형 기사만 남아 비율이 왜곡된다(2026-08-27 실측). areaCore 동시 요구가 동음이의 방어.
+    const dongCore = (dong || "").replace(/(동|면|읍|가)$/, "");
+    if (dong && !t.includes(dong) && !(dongCore.length >= 2 && t.includes(dongCore))) continue;
     sampled++;
     if (TOURISM_TERMS.test(t)) touristic++;
     if (LOCAL_NEWS_TERMS.test(t)) residential++;

@@ -48,6 +48,8 @@ const VB_LABEL: Record<string, { emoji: string; label: string; short: string }> 
   //  short = 카드에 붙는 짧은 말. 이모지만 두면 10px짜리 회색 점으로 보여 아무도 못 알아본다(CEO 지적).
   T: { emoji: "🧳", label: "여행 와서 들른 후기가 많아요", short: "여행지" },
   L: { emoji: "🏠", label: "동네 단골 후기가 있어요", short: "동네 단골" },
+  // D = 동 단위 뉴스 판정(언론이 관광 맥락으로 다루는 동네) — 후기 말투(T)와 별개의 '위치 속성'.
+  D: { emoji: "🗺️", label: "관광지로 알려진 동네예요 (언론 보도 기준)", short: "관광지 동네" },
 };
 function VisitorBadges({ vb, dark }: { vb?: string; dark?: boolean }) {
   if (!vb) return null;
@@ -403,7 +405,7 @@ function makeMyLocHtml(): string {
 }
 // 🧳🏠 핀 라벨에 붙일 방문객 성격 표시. 지도는 메인 화면이라 여기 표시가 없으면 사실상 안 보인다(CEO 지적).
 //   핀은 HTML 문자열로 그려서 React 컴포넌트를 못 쓰므로 별도 헬퍼로 둔다.
-const vbGlyph = (vb?: string) => (vb ? ` ${vb.includes("T") ? "🧳" : ""}${vb.includes("L") ? "🏠" : ""}` : "");
+const vbGlyph = (vb?: string) => (vb ? ` ${vb.includes("T") ? "🧳" : ""}${vb.includes("L") ? "🏠" : ""}${vb.includes("D") ? "🗺️" : ""}` : "");
 
 function makePinHtml(c: Cafe, isMatch: boolean, isFocus = false, isMine = false): string {
   const grade = c.synth_grade ?? "후보";
@@ -1885,7 +1887,7 @@ function MapControls({ sido, sigungu, dong, onSido, onSigungu, setDong, dongOpti
   // 필터 칩에 곳수를 미리 보여준다 — 눌러봤더니 0곳이면 기능이 고장난 걸로 오해한다.
   const vbCounts = useMemo(() => {
     const base = tasteKey ? filtered.filter((c: Cafe) => matchSet.has(c.id)) : filtered;
-    return { L: base.filter((c: any) => (c.vb ?? "").includes("L")).length, T: base.filter((c: any) => (c.vb ?? "").includes("T")).length };
+    return { L: base.filter((c: any) => (c.vb ?? "").includes("L")).length, T: base.filter((c: any) => (c.vb ?? "").includes("T")).length, D: base.filter((c: any) => (c.vb ?? "").includes("D")).length };
   }, [filtered, tasteKey, matchSet]);
   return (
     <>
@@ -1940,9 +1942,9 @@ function MapControls({ sido, sigungu, dong, onSido, onSigungu, setDong, dongOpti
           <div className="text-[10px] text-[#7a5122] shrink-0">↕ {sortLabel}</div>
         </div>
         {/* 🧳🏠 방문객 성격 필터 — 배지가 소수라 목록을 훑어선 못 찾는다. 곳수를 함께 보여줘 헛클릭을 막는다. */}
-        {(vbCounts.L > 0 || vbCounts.T > 0) && (
+        {(vbCounts.L > 0 || vbCounts.T > 0 || vbCounts.D > 0) && (
           <div className="flex gap-1.5 mb-2.5 flex-wrap">
-            {([["L", "🏠", "동네 단골 후기", vbCounts.L], ["T", "🧳", "여행 후기 많음", vbCounts.T]] as const).map(([k, emoji, label, n]) => n > 0 && (
+            {([["L", "🏠", "동네 단골 후기", vbCounts.L], ["T", "🧳", "여행 후기 많음", vbCounts.T], ["D", "🗺️", "관광지 동네", vbCounts.D]] as const).map(([k, emoji, label, n]) => n > 0 && (
               <button key={k} onClick={() => setVbFilter(vbFilter === k ? "" : (k as "L" | "T"))}
                 className={`text-[11px] font-medium px-2.5 py-1 rounded-full border transition-colors ${vbFilter === k ? "bg-[#4a5a4e] text-white border-[#4a5a4e]" : "bg-white text-[#4a5a4e] border-[#c9dbcf]"}`}>
                 {emoji} {label} {n}

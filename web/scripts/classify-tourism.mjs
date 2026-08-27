@@ -59,7 +59,10 @@ async function news(query) {
 
 const out = [];
 for (const r of targets) {
-  const items = await news(`${r.area} ${r.dong}`);
+  // 질의도 일상 표기("평창 봉평")로 — 공식 행정명 질의는 보도자료·공문서형 기사로 쏠린다(2026-08-27).
+  const qArea = r.area.replace(/(특별자치도|광역시|특별시)$/, "").replace(/(시|군|구)$/, "");
+  const qDong = r.dong.replace(/(동|면|읍|가)$/, "");
+  const items = await news(`${qArea} ${qDong.length >= 2 ? qDong : r.dong}`);
   if (items === null) { console.log("  ⚠️ 쿼터 소진 — 중단(재실행 시 이어감)"); break; }
   const sig = tourismSignal(items.map((i) => ({ title: i.title, description: i.description })), r.area, r.dong);
   const verdict = isTouristDong(sig);

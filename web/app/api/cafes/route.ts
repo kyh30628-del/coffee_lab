@@ -36,9 +36,12 @@ export async function GET() {
       SELECT c.id, c.name, c.area, c.dong, c.lat, c.lng, c.vibe, c.note, c.signature,
              c.synth_grade, c.synth_count, c.synth_identity, c.char_scores,
              c.visitor_n, c.visitor_trip, c.visitor_local,
-             COALESCE(p.featured AND p.approved AND (p.featured_until IS NULL OR p.featured_until > now()), false) AS featured
+             COALESCE(p.featured AND p.approved AND (p.featured_until IS NULL OR p.featured_until > now()), false) AS featured,
+             COALESCE(dt.is_tourist, false) AS dong_tourist
       FROM cafes c
       LEFT JOIN cafe_promos p ON p.cafe_id = c.id
+      -- 📰 관광지 동네(뉴스 기반, 2026-08-27) — dong_tourism은 ~1천 행이라 조인 비용 무시 수준.
+      LEFT JOIN dong_tourism dt ON dt.area = c.area AND dt.dong = c.dong
       WHERE c.published = true
       ORDER BY (c.note IS NOT NULL AND c.note <> '') DESC, c.synth_count DESC NULLS LAST
     `;
@@ -62,8 +65,10 @@ export async function GET() {
       if (cs) o.cs = cs;
       // 🧳🏠 방문객 성격 배지 — 판정은 서버에서 하고 **붙는 곳만** 2글자로 보낸다("T"/"L"/"TL").
       //   13,634곳 전체에 숫자 3개를 실으면 페이로드가 커진다(위 ①~③ 축소 원칙과 같은 결).
-      const vb = visitorBadges({ n: c.visitor_n ?? 0, trip: c.visitor_trip ?? 0, local: c.visitor_local ?? 0 })
+      let vb = visitorBadges({ n: c.visitor_n ?? 0, trip: c.visitor_trip ?? 0, local: c.visitor_local ?? 0 })
         .map((b) => (b.key === "trip" ? "T" : "L")).join("");
+      // "D" = 관광지로 알려진 동네(언론 보도 기준·동 단위 판정 — CEO 08-25 "후기 말투가 아니라 공개된 사실로").
+      if (c.dong_tourist) vb += "D";
       if (vb) o.vb = vb;
       return o;
     });
