@@ -71,6 +71,7 @@ export default function AdminPage() {
   const [subs, setSubs] = useState<any[]>([]);
   const [purged, setPurged] = useState(0);
   const [portfolioData, setPortfolioData] = useState<any>(null); // 🏛️ 형제 서비스(부동산) 이슈·결재 읽기전용
+  const [ownerFunnel, setOwnerFunnel] = useState<any>(null); // 🏪 사장님 퍼널(무료 리포트 도달률·전환)
   const [dec, setDec] = useState<{ pending: any[] }>({ pending: [] }); // 실제 CEO L3 결재 대기 큐(단일 소스, /admin/org와 동일)
   const [verify, setVerify] = useState<any>(null);
   const [verifyHistory, setVerifyHistory] = useState<any[]>([]); // 📈 검증 이력 추이(최근 20회 · verify_reports 그대로)
@@ -124,6 +125,7 @@ export default function AdminPage() {
   const openOnboard = () => { setShowOnboard(true); if (!onboard) fetch("/api/onboarding-preview", { headers: { "x-admin-password": pw } }).then((x) => x.json()).then((d) => { if (d.ok) setOnboard(d); }).catch(() => {}); };
   const [showRotation, setShowRotation] = useState(false); // 노출 로테이션 현황 모달
   const [rotation, setRotation] = useState<any>(null);
+  const loadOwnerFunnel = (password: string) => fetch("/api/admin/owner-funnel", { headers: { "x-admin-password": password }, cache: "no-store" }).then((x) => x.json()).then((d) => { if (d.ok) setOwnerFunnel(d); }).catch(() => {});
   const loadPortfolio = (password: string) => fetch("/api/admin/portfolio", { headers: { "x-admin-password": password }, cache: "no-store" }).then((x) => x.json()).then((d) => { if (d.ok) setPortfolioData(d); }).catch(() => {});
   const loadRotation = () => fetch("/api/admin/rotation", { headers: { "x-admin-password": pw }, cache: "no-store" }).then((x) => x.json()).then((d) => { if (d.ok) setRotation(d); }).catch(() => {});
   const openRotation = () => { setShowRotation(true); loadRotation(); };
@@ -262,6 +264,7 @@ export default function AdminPage() {
     loadReview(password);
     loadSubscribers(password);
     loadPortfolio(password);
+    loadOwnerFunnel(password);
     fetch("/api/newsletter", { headers: { "x-admin-password": password } }).then((x) => x.json()).then((d) => { if (d.ok) { setNlList(d.list ?? []); setNlRecipients(d.recipients ?? 0); } }).catch(() => {});
   };
 
@@ -378,6 +381,63 @@ export default function AdminPage() {
         </div>
 
         {/* 🏛️ 회사 포트폴리오 — 형제 서비스 이슈·결재 읽기전용(조치는 해당 서비스 관제탑에서). 기본 접힘. */}
+        {ownerFunnel && (
+          <details className="mb-6 rounded-2xl border border-stone-300 bg-white overflow-hidden">
+            <summary className="px-4 py-3 cursor-pointer select-none flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <span className="text-lg">🏪</span>
+                <span className="flex flex-col">
+                  <span className="font-bold text-stone-800">사장님 퍼널 (우리 가게 리포트)</span>
+                  <span className="text-[11px] text-stone-700">
+                    7일 — 진입 {ownerFunnel.d7.cta.total} · 리포트 {ownerFunnel.d7.reportView}
+                    {ownerFunnel.d7.reachRate !== null ? ` (도달 ${ownerFunnel.d7.reachRate}%)` : ""}
+                    {" · 신청 "}{ownerFunnel.d7.submit} · 유료 {ownerFunnel.subs.paid}
+                  </span>
+                </span>
+              </span>
+              <span className="text-stone-400 text-xs">펼치기</span>
+            </summary>
+            <div className="px-4 pb-4">
+              <p className="text-[11px] text-stone-600 mb-3 leading-relaxed">
+                진입(CTA 클릭) → 무료 리포트 도달 → 체험 신청 → 유료. <b>도달률</b>이 2026-08-27 수리의 성적표입니다
+                (그전엔 리포트 대신 PIN 로그인 벽이 떠서 사실상 0%였습니다).
+              </p>
+              <table className="w-full text-[12px]">
+                <thead>
+                  <tr className="text-stone-500 border-b border-stone-200">
+                    <th className="text-left py-1.5 font-medium">단계</th>
+                    <th className="text-right py-1.5 font-medium">7일</th>
+                    <th className="text-right py-1.5 font-medium">30일</th>
+                  </tr>
+                </thead>
+                <tbody className="text-stone-800">
+                  {[
+                    ["진입 — 홈", (w: any) => w.cta.home],
+                    ["진입 — 카페 상세", (w: any) => w.cta.cafe_detail],
+                    ["무료 리포트 조회", (w: any) => w.reportView],
+                    ["리포트 → 요금 안내", (w: any) => w.cta.free_report],
+                    ["체험 신청 완료", (w: any) => w.submit],
+                  ].map(([label, get]: any) => (
+                    <tr key={label} className="border-b border-stone-100">
+                      <td className="py-1.5">{label}</td>
+                      <td className="py-1.5 text-right tabular-nums">{get(ownerFunnel.d7)}</td>
+                      <td className="py-1.5 text-right tabular-nums text-stone-500">{get(ownerFunnel.d30)}</td>
+                    </tr>
+                  ))}
+                  <tr className="font-bold">
+                    <td className="py-1.5">리포트 도달률</td>
+                    <td className="py-1.5 text-right tabular-nums">{ownerFunnel.d7.reachRate ?? "—"}{ownerFunnel.d7.reachRate !== null ? "%" : ""}</td>
+                    <td className="py-1.5 text-right tabular-nums text-stone-500">{ownerFunnel.d30.reachRate ?? "—"}{ownerFunnel.d30.reachRate !== null ? "%" : ""}</td>
+                  </tr>
+                </tbody>
+              </table>
+              <div className="mt-3 text-[11px] text-stone-600">
+                구독 {ownerFunnel.subs.total}건 · 활성 {ownerFunnel.subs.active} · <b className={ownerFunnel.subs.paid > 0 ? "text-emerald-700" : "text-stone-800"}>유료 {ownerFunnel.subs.paid}건</b>
+              </div>
+            </div>
+          </details>
+        )}
+
         {portfolioData?.services?.length > 0 && (
           <details className="mb-6 rounded-2xl border border-stone-300 bg-white overflow-hidden">
             <summary className="px-4 py-3 cursor-pointer select-none flex items-center justify-between">

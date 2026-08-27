@@ -6,6 +6,7 @@ import InfoDot from "./InfoDot";
 import { trackOutbound } from "./trackOutboundClient";
 import ShowcaseBanner, { SHOWCASE_CSS } from "./ShowcaseBanner";
 import OwnerSignupModal from "./OwnerSignupModal";
+import OwnerFindModal from "./OwnerFindModal";
 import VisitorReviews from "./VisitorReviews";
 import KakaoShare from "./KakaoShare";
 import { trackShare } from "./trackShareClient";
@@ -598,7 +599,9 @@ export default function Home() {
   const [ownerPin, setOwnerPin] = useState("");        // 사장님 키(PIN) 로그인
   const [ownerPinErr, setOwnerPinErr] = useState("");
   const [ownerAdminMode, setOwnerAdminMode] = useState(false); // 모달 내 '관리자 로그인' 토글
-  const [showSignup, setShowSignup] = useState(false); // 7일 체험 신청 모달
+  const [showSignup, setShowSignup] = useState(false);
+  // 🏪 사장님 홈 진입: 가입 모달이 아니라 **가게 찾기 → 무료 리포트**가 먼저다(2026-08-27).
+  const [showFind, setShowFind] = useState(false); // 7일 체험 신청 모달
   const [backToast, setBackToast] = useState(false);
   // 지도용 상태
   const [tasteKey, setTasteKey] = useState<string | null>(null);
@@ -1363,9 +1366,9 @@ export default function Home() {
             <div className="text-lg font-bold">☕ 우리 동네 카페 보러가기</div>
             <div className="text-[12px] text-[#7c6a55] mt-0.5">진짜 후기로 검증 · 내 취향에 딱 맞게</div>
           </button>
-          <button onClick={() => { trackOwnerCta(); setShowSignup(true); }} className="w-full rounded-2xl py-5 px-5 text-left shadow-lg active:scale-[0.99] transition" style={{ background: "#2b2018", border: "1px solid #6b5334" }}>
+          <button onClick={() => { trackOwnerCta(); setShowFind(true); }} className="w-full rounded-2xl py-5 px-5 text-left shadow-lg active:scale-[0.99] transition" style={{ background: "#2b2018", border: "1px solid #6b5334" }}>
             <div className="text-lg font-bold text-[#f4ece0]">🏪 사장님, 우리 카페 보러가기</div>
-            <div className="text-[12px] text-[#c7ab82] mt-0.5">검증된 후기로 내 카페 경쟁력 진단 · <b className="text-[#e8b87a]">7일 무료 체험 신청</b></div>
+            <div className="text-[12px] text-[#c7ab82] mt-0.5">검증된 후기로 내 카페 경쟁력 진단 · <b className="text-[#e8b87a]">가입 없이 바로 확인</b></div>
           </button>
           <button onClick={() => { setOwnerPw(""); setOwnerErr(""); setOwnerPin(""); setOwnerPinErr(""); setOwnerAdminMode(false); setOwnerPwModal(true); }} className="block w-full text-center text-[12px] text-[#8f7a58] underline">
             이미 키가 있어요 · 로그인
@@ -1415,6 +1418,8 @@ export default function Home() {
             </div>
           </div>
         )}
+        <OwnerFindModal open={showFind} onClose={() => setShowFind(false)}
+          onNoMatch={() => { setShowFind(false); setShowSignup(true); }} />
         <OwnerSignupModal open={showSignup} onClose={() => setShowSignup(false)} trial source="home" />
         {backToast && (
           <div className="fixed left-1/2 -translate-x-1/2 bottom-8 z-[6000] bg-[#f4ece0] text-[#2b2018] text-sm px-5 py-3 rounded-full shadow-xl">
