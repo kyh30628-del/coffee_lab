@@ -1037,9 +1037,12 @@ export default function Home() {
   const axisDist = useMemo<AxisDist>(() => buildAxisDist(cafes), [cafes]);
 
   // 현재 지도 화면(bounds)+줌에 맞춰 마커를 그린다 — 줌인하면 그 영역 핀이 동적으로 드러나고, 줌아웃이면 화면 안 인기순 상위만.
+  // ⚡ 마지막으로 그린 (줌, 패딩 경계) — 이 범위 안에서의 팬은 재그리기 불필요(카페 레벨 한정).
+  const lastDrawRef = useRef<{ z: number; s: number; n: number; w: number; e: number } | null>(null);
   const drawMarkers = useCallback(() => {
     const L = LRef.current; const map = mapObj.current;
     if (!L || !map || !layerRef.current) return;
+    lastDrawRef.current = null; // 그리기 시작 = 기존 기억 무효(카페 레벨만 끝에서 재설정)
     layerRef.current.clearLayers();
 
     // 🚇 호선 노선 라인 — 가장 아래 깔아 '역들이 호선으로 연결된' 느낌. z≥11부터.
@@ -1154,8 +1157,17 @@ export default function Home() {
     //   마커 수가 화면 셀 수(~수십개)로 한정 → 카페가 몇천이든 항상 깔끔. 이동/줌 시 뷰포트 재클러스터.
     // ★ 항상 전체 카페에서 '현재 화면(viewport)'만 거른다. 지역 선택(시/구/동)은 지도를 그쪽으로 옮길 뿐,
     //   카페 집합을 고정하지 않는다 → 이동하면 그 화면 카페로 계속 바뀜(선택 지역에 고정 안 됨).
-    const src = cafes.filter((c) => c.lat && c.lng);
-    const inView = src.filter((c) => b.contains([c.lat, c.lng] as [number, number]));
+    // ⚡ 2026-08-27 성능: b.contains는 호출마다 LatLng 객체를 만들어 17,000곳 전수에서 비싸다 →
+    //   경계를 숫자 4개로 풀어 단일 패스 비교(할당 0). 아울러 **화면보다 50% 넓게(pad)** 걸러 그려 두면
+    //   그 여유 안에서 팬(드래그)하는 동안은 재그리기를 통째로 건너뛸 수 있다(아래 lastDrawRef).
+    //   클러스터 셀은 절대 픽셀 좌표 기준이라 팬으로는 소속이 안 바뀐다 — 여유분만 있으면 화면이 정확하다.
+    const pb = b.pad(0.5);
+    const pS = pb.getSouth(), pN = pb.getNorth(), pW = pb.getWest(), pE = pb.getEast();
+    const inView: Cafe[] = [];
+    for (const c of cafes) {
+      if (!c.lat || !c.lng) continue;
+      if (c.lat >= pS && c.lat <= pN && c.lng >= pW && c.lng <= pE) inView.push(c);
+    }
     const CELL = 64; // 화면상 셀 크기(px) — 이 안의 카페끼리 한 뭉치. 줌인하면 px 간격 벌어져 쪼개짐.
     const cells = new Map<string, Cafe[]>();
     for (const c of inView) {
@@ -1196,26 +1208,28 @@ export default function Home() {
       if (landmarks.length) {
         // 큰 랜드마크(우선순위≥3: 몰·백화점·대학·경기장·타워·공항·궁·테마파크)만, 화면당 최대 8개 — 군더더기 제거
         const lms = landmarks
-          .filter(([, la, lo, , pr]) => pr >= 3 && b.contains([la, lo] as [number, number]))
+          .filter(([, la, lo, , pr]) => pr >= 3 && la >= pS && la <= pN && lo >= pW && lo <= pE)
           .sort((a, c) => c[4] - a[4])
           .slice(0, 8);
         const lmLayer = lms.map(([nm, la, lo, ic]) => L.marker([la, lo], { icon: L.divIcon({ className: "", html: makeLandmarkHtml(nm, ic), iconSize: [0, 0] }), interactive: false, zIndexOffset: -800 }));
         if (lmLayer.length) layerRef.current.addLayer(L.layerGroup(lmLayer));
       }
       if (stations.length) {
-        const stns = stations.filter((s) => b.contains([s.lat, s.lng] as [number, number])).slice(0, 20);
+        const stns = stations.filter((s) => s.lat >= pS && s.lat <= pN && s.lng >= pW && s.lng <= pE).slice(0, 20);
         const stnLayer = stns.map((s) => L.marker([s.lat, s.lng], { icon: L.divIcon({ className: "", html: makeStationHtml(s.n, s.c, s.r), iconSize: [0, 0] }), interactive: false, zIndexOffset: -300 }));
         if (stnLayer.length) layerRef.current.addLayer(L.layerGroup(stnLayer));
       }
       // 지하철 출구 — z≥15에서, 화면 안 최대 26개. 연결선 없이 출구 마커만 도드라지게(역 근처에 모여 보임).
       if (z >= 15 && exits.length) {
-        const exs = exits.filter((e) => b.contains([e.lat, e.lng] as [number, number])).slice(0, 26);
+        const exs = exits.filter((e) => e.lat >= pS && e.lat <= pN && e.lng >= pW && e.lng <= pE).slice(0, 26);
         const exLayer = exs.map((e) => L.marker([e.lat, e.lng], { icon: L.divIcon({ className: "", html: makeExitHtml(e.n), iconSize: [0, 0] }), interactive: false, zIndexOffset: 200 }));
         if (exLayer.length) layerRef.current.addLayer(L.layerGroup(exLayer));
       }
     }
     layerRef.current.addLayer(L.layerGroup(markers));
     if (focusM) (focusM as any).openPopup();
+    // ⚡ 방금 그린 범위(패딩 포함)와 줌을 기억 — live/final이 "다시 그릴 필요가 있나"를 판단하는 근거.
+    lastDrawRef.current = { z, s: pS, n: pN, w: pW, e: pE };
   }, [filtered, matchSet, sido, sigungu, dong, focusId, myPinMode, myCafeIds, othersMode, othersPins, cafes, stations, exits, lines, landmarks, nearMe]);
 
   // 데이터/지역/모드 변경 시: 화면을 맞춘 뒤 마커를 그린다(맞춘 화면 기준으로 그려짐).
@@ -1251,8 +1265,17 @@ export default function Home() {
     const map = mapObj.current;
     if (!map || !mapReady) return;
     let timer: ReturnType<typeof setTimeout> | null = null;
-    const live = () => { if (timer) return; timer = setTimeout(() => { timer = null; drawMarkers(); }, 120); }; // 유저 드래그 중 ~120ms마다 재클러스터(반응)
-    const final = () => { if (timer) { clearTimeout(timer); timer = null; } drawMarkers(); }; // 멈춤·줌끝·날아가기 끝 → 최종 1회
+    // ⚡ 이미 그려 둔 패딩 범위 안에서 같은 줌으로 움직이는 중이면 재그리기 생략 —
+    //   클러스터 소속은 절대 픽셀 그리드라 팬으로 안 변하고, 마커도 이미 그 범위까지 그려져 있다.
+    //   (강남 밀집 실측: 그리기 1회 최대 84ms = 프레임 5개 — 이 스킵이 드래그 버벅임의 본체를 없앤다.)
+    const needRedraw = () => {
+      const last = lastDrawRef.current; if (!last) return true;
+      if (map.getZoom() !== last.z) return true;
+      const vb2 = map.getBounds();
+      return vb2.getSouth() < last.s || vb2.getNorth() > last.n || vb2.getWest() < last.w || vb2.getEast() > last.e;
+    };
+    const live = () => { if (timer) return; timer = setTimeout(() => { timer = null; if (needRedraw()) drawMarkers(); }, 120); }; // 유저 드래그 중 ~120ms마다(필요할 때만) 재클러스터
+    const final = () => { if (timer) { clearTimeout(timer); timer = null; } if (needRedraw()) drawMarkers(); }; // 멈춤·줌끝 → 필요 시 1회
     map.on("drag", live);   // ★ 유저 손가락 팬에만 라이브 → flyTo(뒤로가기 줌아웃)·줌 중엔 안 걸려 전환이 매끄러움(끝나서 한 번만 재그림)
     map.on("moveend", final);
     return () => { map.off("drag", live); map.off("moveend", final); if (timer) clearTimeout(timer); };
