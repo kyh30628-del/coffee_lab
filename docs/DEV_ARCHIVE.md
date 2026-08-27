@@ -275,3 +275,4 @@
 | 2026-08-26 23:05 | #819 | [개발] 정합성 감시(lib/issues.ts) 하드코딩 좌표박스·주소필터가 강원 확장(criteria.ge | 4e6e2d4d | - | web/lib/issues.ts integ:outbox는 이미 geoBoxSql(getCriterionSync)로 교정돼 있었음(선행 커밋). integ:noncap도 OUT_OF |
 | 2026-08-26 23:06 | #828 | [개발] [폐업검토] cron-closure 신호 오탐 2건 — closure_signal 정규식 + 상호  | e5ed6b8c | - | app/api/cron-closure/route.ts: CLOSURE_TEXT_SIGNAL 정규식에 부정후방탐색 추가(품절/소진 시 조기영업종료 조건부문구 예외, 실제 폐업신호는  |
 | 2026-08-27 07:05 | #833 | [룰갭 신규] VENUE_WORDS 누락어 "비발디파크" — 리조트 복합단지 딴 입점업체 오귀속 (id242 | 4c84b841 | - | lib/reviewQuality.ts VENUE_WORDS에 비발디파크 추가(리조트 복합단지 클래스, 아파트단지#271/SKV1#661/백양누리#677와 동일 메커니즘). tsc  |
+| 2026-08-27 11:05 | #835 | [개발] id1152 동네카페 — 3회 상신에도 근본 코드수정 미집행, 오염 원문 그대로 라이브 9일+ 방치 | 7335e2ac | - | lib/reviewQuality.ts verifyReview() borderline(LLM 재판정) 라우팅 게이트 수정(~1656-1663행). 근본원인: coreEmpty(완전  |
