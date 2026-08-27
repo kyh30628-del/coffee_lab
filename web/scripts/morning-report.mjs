@@ -24,6 +24,23 @@ for (const r of await sql`SELECT area, count(*) n, count(*) FILTER (WHERE synth_
   FROM cafes WHERE published AND address LIKE '강원%' GROUP BY 1 ORDER BY 2 DESC`)
   console.log(`  ${String(r.area).padEnd(9)}${String(r.n).padStart(4)}곳  검증${String(r.v).padStart(4)}  🏠${String(r.h).padStart(3)}  🧳${String(r.t).padStart(3)}`);
 
+// ⑥ 월 PV 진척률(애드센스 재검토 트리거 = 10만) + 신설 테마 색인→유입 곡선 — CEO 요청 2026-08-27.
+//   💰 봇 제외 집계 2회 추가일 뿐(아침 1회). BOT_ANON_IDS_SQL은 무겁게 임포트하지 않고 동일 정의를 재사용해야 하나
+//   이 스크립트는 .ts 임포트가 가능하므로 단일출처를 그대로 쓴다.
+const { BOT_ANON_IDS_SQL } = await import("../lib/behaviorBot.ts");
+console.log("\n═══ ⑥ 월 PV 진척률 (애드센스 트리거 10만) ═══");
+const pv = (await sql.query(`SELECT count(*)::int pv, count(DISTINCT anon_id)::int uv FROM traffic_events
+  WHERE ts > now()-interval '30 days' AND anon_id NOT IN (${BOT_ANON_IDS_SQL})`))[0];
+console.log(`  최근 30일: ${Number(pv.pv).toLocaleString()} PV · ${Number(pv.uv).toLocaleString()}명 → 10만 PV의 ${(pv.pv/1000).toFixed(1)}%`);
+
+console.log("\n═══ ⑦ 신설 테마(베이커리·테라스) 색인→유입 곡선 ═══");
+const th = await sql.query(`SELECT split_part(path,'/',4) axis, (ts AT TIME ZONE 'Asia/Seoul')::date d, count(*)::int pv
+  FROM traffic_events WHERE (path LIKE '%/bakery%' OR path LIKE '%/terrace%')
+    AND ts > now()-interval '14 days' AND anon_id NOT IN (${BOT_ANON_IDS_SQL})
+  GROUP BY 1,2 ORDER BY 2,1`);
+if (!th.length) console.log("  아직 유입 0 — 색인 대기(08-27 제출·전례상 ~열흘 소요). 곡선이 시작되면 CEO 보고할 것.");
+else th.forEach((x) => console.log(`  ${x.d} ${x.axis}: ${x.pv} PV`));
+
 console.log("\n═══ ③ 강원 유입(어제 대비) ═══");
 const ids = new Set((await sql`SELECT id FROM cafes WHERE address LIKE '강원%'`).map(r => String(r.id)));
 const isGw = (p) => { const d = decodeURIComponent(p || ""); if (GW.some(x => d.includes(`/area/${x}`))) return true; const m = d.match(/^\/c\/(\d+)/); return !!(m && ids.has(m[1])); };
