@@ -40,7 +40,10 @@ DEADLINE=$(( $(date +%s) + 120*60 ))
   while [ "$(date +%s)" -lt "$DEADLINE" ]; do
     round=$((round+1))
     for k in 0 1; do
-      node --import tsx scripts/collect-shard.mjs --shard=$k --of=2 &
+      # ⏰ 창 종료 시각을 샤드에 넘긴다(2026-08-27). 예전엔 여기서만 시각을 봐서, 한 라운드가
+      #   큐를 다 비울 때까지 4시간+ 돌아 '120분 창'이 무의미했다(적체 2,346곳 유입 때 드러남).
+      #   샤드는 배치마다·카페마다 이 시각을 확인해 즉시 멈춘다. 중단해도 손실 0(다음 창이 이어감).
+      COLLECT_DEADLINE=$DEADLINE node --import tsx scripts/collect-shard.mjs --shard=$k --of=2 &
     done
     wait
     if tail -4 "$LOG" | grep -q "큐 소진"; then echo "큐 소진 — 라운드 ${round}에서 종료"; break; fi

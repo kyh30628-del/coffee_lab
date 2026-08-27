@@ -26,7 +26,19 @@ const label = `[${SHARD}/${OF}]`;
 let done = 0, err = 0, consecErr = 0, stale = 0, batches = 0, baselineUsed = 0;
 const CALL_PER_CAFE_STOP = Number(process.env.CALL_PER_CAFE_STOP || 15); // 정상 ~5콜의 3배
 const CRON_RESERVE = Number(process.env.COLLECT_CRON_RESERVE || 2000); // 평판점검·폐업확인 크론 몫
+// ⏰ 창(window) 데드라인 — 정지 조건에 '시간'이 없어 120분 창이 지켜지지 않던 것을 막는다(2026-08-27).
+//   원인: catchup.sh는 라운드와 라운드 *사이*에서만 시각을 보는데, 샤드가 큐를 다 비울 때까지 자체적으로
+//   돌아 한 라운드가 4시간을 넘겼다. 큐가 작을 땐 안 드러나다가 적체 2,346곳이 들어오며 터졌다.
+//   ⚠️ env가 없어도 스스로 상한을 갖는다 — catchup.sh를 안 거치고 직접 실행해도 무한히 돌지 않게.
+//   창을 넘겨 중단해도 손실 0: 큐 조건이 raw_reviews IS NULL이라 다음 창이 그 자리에서 이어간다.
+const DEADLINE_MS = Number(process.env.COLLECT_DEADLINE) > 0
+  ? Number(process.env.COLLECT_DEADLINE) * 1000          // catchup.sh가 넘긴 epoch초(창 종료 시각)
+  : Date.now() + Number(process.env.COLLECT_MAX_MIN || 120) * 60 * 1000; // 폴백: 시작 +120분
+const overDeadline = () => Date.now() >= DEADLINE_MS;
+const deadlineLabel = () => new Date(DEADLINE_MS).toLocaleTimeString("ko-KR", { hour12: false });
 for (;;) {
+  // 창 종료면 새 배치를 아예 집지 않는다(DB 조회 1회도 아낀다).
+  if (overDeadline()) { console.log(`${label} ⏰ 창 종료(${deadlineLabel()}) — 중단. 확보 ${done}곳 · 다음 창에서 이어감`); break; }
   // 샤드끼리 같은 행을 집지 않게 id % OF로 나눈다(락 없이 충돌 회피).
   // 🥇 처리 순서 = 강원 먼저, 수도권 적체는 그다음(CEO 지시 2026-08-25).
   //   강원은 지금 공개가 140곳뿐이라 한 곳이 늘 때 사용자 체감이 크고, 수도권은 이미 13,494곳이 공개돼 있어
@@ -44,6 +56,8 @@ for (;;) {
         ORDER BY (address LIKE '강원%') DESC, id LIMIT 20`;
   if (!rows.length) { console.log(`${label} 큐 소진 — 완료 ${done}곳`); break; }
   for (const c of rows) {
+    // 배치(20곳)가 도는 중에도 창을 넘기면 즉시 멈춘다 — 배치 단위로만 보면 최대 2분을 초과한다.
+    if (overDeadline()) { console.log(`${label} ⏰ 창 종료(${deadlineLabel()}) — 배치 중단. 확보 ${done}곳`); break; }
     try { await synthAndStore(c, { refresh: false }); done++; consecErr = 0; }
     catch (e) { err++; consecErr++; if (err <= 3) console.log(`${label} ✗ ${c.name}: ${String(e).slice(0, 50)}`); }
     if (consecErr >= 10) { console.log(`${label} 연속 오류 10회 — 중단(재실행시 재개)`); process.exit(0); }
