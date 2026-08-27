@@ -11,7 +11,7 @@ export const revalidate = 86400;
 
 export const metadata: Metadata = {
   title: "카페 데이터 리포트 — 동네 커피 노트",
-  description: "광고·협찬을 걸러낸 검증 후기 데이터로 본 서울·수도권·강원 카페 지형. 동네 단골 카페와 여행객 카페의 분포를 공개합니다.",
+  description: "광고·협찬을 걸러낸 검증 후기 데이터로 본 서울·수도권·강원 카페 지형. 동네 단골 vs 여행객 카페 분포, 뉴스 기반 관광지 카페 동네 랭킹을 공개합니다.",
   alternates: { canonical: "/insights" },
 };
 
@@ -32,7 +32,13 @@ async function getStats() {
     const grow = (await sql`SELECT area, count(*)::int n FROM cafes
       WHERE published AND created_at > now() - interval '30 days' AND area IS NOT NULL
       GROUP BY area ORDER BY 2 DESC LIMIT 10`) as any[];
-    return { tot, vb, localTop, tripTop, grow };
+    // 🗺️ 뉴스 기반 관광지 동네 랭킹(2026-08-27 신설) — 전국 1,391개 동의 최근 뉴스 표본에서
+    //   관광 맥락 기사 비율로 판정한 71곳 중 상위. 우리만 만들 수 있는 랭킹이라 인용 가치가 크다.
+    const touristDong = (await sql`SELECT t.area, t.dong, round(t.rate*100)::int pct,
+        (SELECT count(*)::int FROM cafes c WHERE c.published AND c.area=t.area AND c.dong=t.dong) cafes
+      FROM dong_tourism t WHERE t.is_tourist ORDER BY t.rate DESC LIMIT 10`) as any[];
+    const [tCnt] = (await sql`SELECT count(*)::int total, count(*) FILTER (WHERE is_tourist)::int tourist FROM dong_tourism`) as any[];
+    return { tot, vb, localTop, tripTop, grow, touristDong, tCnt };
   } catch { return null; }
 }
 
@@ -87,9 +93,33 @@ export default async function InsightsPage() {
           <div className="bg-white rounded-2xl border border-[#e6dcc8] p-4 mt-3"><Row items={s.grow} /></div>
         </section>
 
+        <section className="mb-8">
+          <h2 className="text-[17px] font-bold mb-1">🗺️ 뉴스가 &lsquo;관광지&rsquo;로 다루는 카페 동네 TOP 10</h2>
+          <p className="text-[12.5px] text-[#665036] mb-3">
+            전국 {Number(s.tCnt?.total ?? 0).toLocaleString()}개 동의 최근 언론 보도를 표본 조사해, 관광 맥락 기사 비율이
+            높은 동네를 가려냈습니다(판정 {s.tCnt?.tourist ?? 0}곳). 후기 말투가 아니라 <b>공개된 보도</b>로 판정한 수치입니다.
+          </p>
+          <div className="bg-white rounded-2xl border border-[#e6dcc8] p-4">
+            <ol className="space-y-1.5">{(s.touristDong ?? []).map((x: any, i: number) => (
+              <li key={`${x.area}${x.dong}`} className="flex items-center gap-2 text-[13.5px]">
+                <span className="w-5 text-right font-bold text-[#82714f]">{i + 1}</span>
+                <span className="text-[#2b2018]">{x.area} <b>{x.dong}</b></span>
+                <span className="text-[11px] text-[#8a7458]">검증 카페 {x.cafes}곳</span>
+                <span className="ml-auto text-[#7a5122] font-bold">관광기사 {x.pct}%</span>
+              </li>))}
+            </ol>
+          </div>
+        </section>
+
         <p className="text-[11.5px] text-[#665036] bg-white/60 border border-[#e6dcc8] rounded-lg px-3 py-2.5 leading-relaxed">
           집계 방법: 네이버·구글·유튜브 공개 후기를 교차 수집한 뒤 광고·협찬 표기, 서포터즈·기자단, 동명·옆가게 오염,
           템플릿 도배를 규칙 기반으로 제외했습니다. <Link href="/trust" className="underline text-[#7a5122]">검증 방법 자세히</Link>
+        </p>
+        {/* 📎 인용 안내 — 이 페이지의 존재 이유(백링크). 조건을 낮추고 명확하게. */}
+        <p className="mt-3 text-[11.5px] text-[#665036] bg-[#fdf6e9] border border-[#ecd9b0] rounded-lg px-3 py-2.5 leading-relaxed">
+          📎 <b>이 리포트의 수치·순위는 출처 표기 시 자유롭게 인용하실 수 있습니다.</b>{" "}
+          &ldquo;동네 커피 노트(dongnecoffeenote.com)&rdquo;와 링크를 함께 적어주세요. 기사·영상용 상세 데이터가
+          필요하면 언제든 요청 주세요.
         </p>
       </div>
     </main>
