@@ -5,7 +5,9 @@ export const runtime = "nodejs";
 // 📊 사장님 신청 퍼널 계측(읽기전용) — CTA 클릭→체험/구독 모달 오픈→제출 성공/실패.
 //   #513: 랜딩 296명 유입에도 신청 퍼널 진입이 월 1명뿐인 원인(이탈 지점)을 보려는 것. UI·결제·발송·공개상태 로직과 무관.
 //   anon_id만 사용(개인정보 0), share_events/traffic_events와 동일한 얕은 기록 패턴.
-const EVENTS = new Set(["cta_click", "modal_open", "submit_success", "submit_fail"]);
+// free_report_view = 무료 리포트(/owner/r/[id]) 계측(2026-08-27).
+//   화이트리스트가 아니면 400이라 조용히 안 쌓인다 — 새 이벤트를 만들면 반드시 여기 추가.
+const EVENTS = new Set(["cta_click", "modal_open", "submit_success", "submit_fail", "free_report_view"]);
 let ensured = false;
 async function ensure() {
   if (ensured) return;
