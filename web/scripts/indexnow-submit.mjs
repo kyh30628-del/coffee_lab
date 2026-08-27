@@ -35,15 +35,13 @@ await sql`CREATE TABLE IF NOT EXISTS indexnow_log (
   url TEXT PRIMARY KEY, submitted_at TIMESTAMPTZ NOT NULL DEFAULT now(), engine TEXT
 )`;
 
-// 제출 대상: 공개 카페 상세 + 지역/취향 페이지(사이트맵과 같은 기준).
-const cafes = await sql`SELECT id FROM cafes WHERE published ORDER BY id`;
-const regions = await sql`SELECT area, count(*)::int n FROM cafes WHERE published AND area IS NOT NULL AND area <> ''
-  GROUP BY area HAVING count(*) >= 5`;
-const urls = [
-  SITE, `${SITE}/area`,
-  ...regions.map((r) => `${SITE}/area/${encodeURIComponent(r.area)}`),
-  ...cafes.map((c) => `${SITE}/c/${c.id}`),
-];
+// 제출 대상 = **라이브 사이트맵**(단일출처) — 2026-08-27 개선.
+//   예전엔 카페·지역만 직접 조립해서 지역×취향 페이지(유기 유입의 78%!)가 제출 목록에서 빠졌다.
+//   사이트맵을 읽으면 축이 늘어도 이 스크립트는 손댈 필요가 없다.
+const smRes = await fetch(`${SITE}/sitemap.xml`);
+if (!smRes.ok) { console.log(`🔴 sitemap.xml ${smRes.status} — 중단`); process.exit(1); }
+const smXml = await smRes.text();
+const urls = [...smXml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
 
 let targets = urls;
 if (!ALL) {
