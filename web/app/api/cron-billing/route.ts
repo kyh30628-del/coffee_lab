@@ -49,9 +49,17 @@ export async function GET(req: NextRequest) {
         await sendBillingEmail(to, "failed", { cafeName: row.cafe_name ?? "" }).catch(() => {});
       }
     }
-    const detail = `due=${due.length} paid=${paid} failed=${failed} suspended=${suspended} skipped=${skipped}`;
+    // 🔔 사장님 감시 알림 — **새 크론을 만들지 않고** 이미 매일 도는 이 잡에 얹는다(둘 다 구독자 대상).
+    //   구독자 카페만 갱신·비교하고, 변화가 없으면 메일을 보내지 않는다. 실패해도 과금 결과는 그대로 보고한다.
+    let watch = { subs: 0, refreshed: 0, changed: 0, sent: 0, baseline: 0, skipped: null as string | null };
+    try { const { runOwnerWatch } = await import("@/lib/ownerWatch"); watch = await runOwnerWatch(); }
+    catch (e) { console.error("ownerWatch 실패:", String(e).slice(0, 120)); }
+
+    const detail = `due=${due.length} paid=${paid} failed=${failed} suspended=${suspended} skipped=${skipped}`
+      + ` | watch subs=${watch.subs} 갱신=${watch.refreshed} 변화=${watch.changed} 발송=${watch.sent}`
+      + (watch.baseline ? ` 기준선=${watch.baseline}` : "") + (watch.skipped ? ` (${watch.skipped})` : "");
     await recordRun("cron-billing", true, detail, paid);
-    return NextResponse.json({ ok: true, detail });
+    return NextResponse.json({ ok: true, detail, watch });
   } catch (e) {
     await recordRun("cron-billing", false, String(e), 0);
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
