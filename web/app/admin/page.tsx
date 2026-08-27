@@ -391,7 +391,7 @@ export default function AdminPage() {
                   <span className="text-[11px] text-stone-700">
                     7일 — 진입 {ownerFunnel.d7.cta.total} · 리포트 {ownerFunnel.d7.reportView}
                     {ownerFunnel.d7.reachRate !== null ? ` (도달 ${ownerFunnel.d7.reachRate}%)` : ""}
-                    {" · 신청 "}{ownerFunnel.d7.submit} · 유료 {ownerFunnel.subs.paid}
+                    {" · 신청 "}{ownerFunnel.d7.submit} · 리드 {ownerFunnel.leads ?? 0} · 유료 {ownerFunnel.subs.paid}
                   </span>
                 </span>
               </span>
@@ -417,6 +417,7 @@ export default function AdminPage() {
                     ["무료 리포트 조회", (w: any) => w.reportView],
                     ["리포트 → 요금 안내", (w: any) => w.cta.free_report],
                     ["체험 신청 완료", (w: any) => w.submit],
+                    ["📧 월간요약 리드(누적)", () => ownerFunnel.leads ?? 0],
                   ].map(([label, get]: any) => (
                     <tr key={label} className="border-b border-stone-100">
                       <td className="py-1.5">{label}</td>

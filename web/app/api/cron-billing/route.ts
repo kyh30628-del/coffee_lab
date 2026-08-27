@@ -54,10 +54,15 @@ export async function GET(req: NextRequest) {
     let watch = { subs: 0, refreshed: 0, changed: 0, sent: 0, baseline: 0, skipped: null as string | null };
     try { const { runOwnerWatch } = await import("@/lib/ownerWatch"); watch = await runOwnerWatch(); }
     catch (e) { console.error("ownerWatch 실패:", String(e).slice(0, 120)); }
+    // 📧 무료 리드 월간 요약 — 매월 1일에만 실제 동작(그 외엔 즉시 반환). 실패해도 과금 보고는 그대로.
+    let digest = { leads: 0, sent: 0, skipped: null as string | null };
+    try { const { runOwnerLeadDigest } = await import("@/lib/ownerWatch"); digest = await runOwnerLeadDigest(); }
+    catch (e) { console.error("leadDigest 실패:", String(e).slice(0, 120)); }
 
     const detail = `due=${due.length} paid=${paid} failed=${failed} suspended=${suspended} skipped=${skipped}`
       + ` | watch subs=${watch.subs} 갱신=${watch.refreshed} 변화=${watch.changed} 발송=${watch.sent}`
-      + (watch.baseline ? ` 기준선=${watch.baseline}` : "") + (watch.skipped ? ` (${watch.skipped})` : "");
+      + (watch.baseline ? ` 기준선=${watch.baseline}` : "") + (watch.skipped ? ` (${watch.skipped})` : "")
+      + (digest.sent ? ` | 월간요약 발송=${digest.sent}` : "");
     await recordRun("cron-billing", true, detail, paid);
     return NextResponse.json({ ok: true, detail, watch });
   } catch (e) {

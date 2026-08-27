@@ -47,13 +47,15 @@ export async function GET(req: NextRequest) {
       };
     };
 
+    // 📧 리드(월간 요약 구독) — 결제 전 자산. 테이블 없으면 0(첫 리드 때 생성).
+    const leads = ((await sql`SELECT count(*)::int n FROM owner_leads`.catch(() => [{ n: 0 }])) as any[])[0].n;
     const subs = (await sql`
       SELECT count(*)::int total,
              count(*) FILTER (WHERE status = 'active')::int active,
              count(*) FILTER (WHERE COALESCE(price, 0) > 0)::int paid
       FROM subscriptions`)[0] as any;
 
-    return NextResponse.json({ ok: true, d7: build(7), d30: build(30), subs });
+    return NextResponse.json({ ok: true, d7: build(7), d30: build(30), subs, leads });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e).slice(0, 120) }, { status: 500 });
   }

@@ -4,6 +4,7 @@ import { sql } from "@/lib/db";
 import { CHAR_AXES } from "@/lib/charScore";
 import Track from "./Track";
 import PricingCta from "./PricingCta";
+import LeadForm from "./LeadForm";
 
 // ☕ 「우리 가게 리포트」 무료 진단 — 사장님이 PIN 없이 자기 가게를 바로 볼 수 있는 화면.
 //
@@ -243,6 +244,9 @@ export default async function FreeReportPage({ params }: Props) {
         </ul>
         <PricingCta cafeId={r.id} />
       </div>
+
+      {/* 📧 유료가 부담스러운 사장님을 위한 낮은 계단 — 월 1회 무료 요약(리드 수집) */}
+      <LeadForm cafeId={r.id} />
 
       <p className="text-[11px] text-[#8a7458] leading-relaxed text-center">
         네이버·구글·유튜브 공개 후기를 교차검증한 데이터입니다.{" "}

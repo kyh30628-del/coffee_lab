@@ -176,3 +176,52 @@ export async function runOwnerWatch(opts?: { dry?: boolean }): Promise<{
   }
   return { subs: subs.length, refreshed, changed, sent, baseline, skipped: canSend ? null : "발송 시간대 아님(21~08 KST)" };
 }
+
+// ── 📧 무료 리드 월간 요약(2026-08-27, 수익화 4순위) ─────────────────────────────
+//   owner_leads(무료·월 1회)는 유료 감시(매일·즉시)와 급을 나눈다. 리포트의 약속
+//   "매월 1일에 동네 순위·검증 후기 수 변화를 한 통으로"를 이 함수가 이행한다.
+//   💰 새 크론 0 — cron-billing이 매일 도는 김에 KST 1일에만 실행. 발송량 = 리드 수(작음).
+//   ⚠️ last_sent_at 가드로 같은 달 중복 발송 차단(크론 재시도에도 안전).
+export async function runOwnerLeadDigest(): Promise<{ leads: number; sent: number; skipped: string | null }> {
+  const kstDay = Number(new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Seoul", day: "numeric" }).format(new Date()));
+  if (kstDay !== 1) return { leads: 0, sent: 0, skipped: "매월 1일 아님" };
+  if (!sendableNow()) return { leads: 0, sent: 0, skipped: "발송 시간대 아님" };
+
+  const leads = (await sql`
+    SELECT l.id, l.cafe_id, l.email
+    FROM owner_leads l
+    WHERE l.last_sent_at IS NULL OR l.last_sent_at < date_trunc('month', now())
+    LIMIT 500`) as unknown as any[]; // Resend 무료 한도 보호 — 넘치면 다음 실행(내일)엔 1일이 아니라 스킵되므로
+                                     // 500을 넘기 전에 발송 인프라를 재검토해야 한다(현재 리드 0에서 시작).
+  if (!leads.length) return { leads: 0, sent: 0, skipped: "리드 없음" };
+
+  let sent = 0;
+  for (const l of leads) {
+    const email = (decryptPII(l.email) || "").trim().toLowerCase();
+    if (!email.includes("@")) continue;
+    if ((await sql`SELECT 1 FROM newsletter_optout WHERE email=${email} LIMIT 1`).length) continue;
+    const now = await (async () => {
+      const me = (await sql`SELECT id, name, area, synth_count FROM cafes WHERE id=${l.cafe_id} AND published=true LIMIT 1`)[0] as any;
+      if (!me) return null;
+      const hood = (await sql`SELECT id, synth_count FROM cafes WHERE published=true AND area=${me.area}`) as unknown as any[];
+      const sorted = [...hood].sort((a, b) => (b.synth_count ?? 0) - (a.synth_count ?? 0) || Number(a.id) - Number(b.id));
+      return { name: me.name, area: me.area, count: me.synth_count ?? 0,
+        rank: sorted.findIndex((c) => Number(c.id) === Number(me.id)) + 1, hoodN: hood.length };
+    })();
+    if (!now) continue;
+    const site = "https://dongnecoffeenote.com";
+    const html = `<div style="font-family:-apple-system,'Apple SD Gothic Neo',sans-serif;max-width:520px;margin:0 auto;background:#f4ece0;padding:28px 24px;color:#2b2018">
+      <div style="font-size:11px;letter-spacing:.2em;color:#9c6b3f;margin-bottom:6px">월간 가게 요약 · 무료</div>
+      <h1 style="font-size:19px;margin:0 0 14px">${now.name} — 이번 달 요약</h1>
+      <ul style="background:#fff;border:1px solid #e6dcc8;border-radius:14px;padding:16px 18px 16px 34px;font-size:13.5px;margin:0 0 18px;line-height:1.9">
+        <li>${now.area} 카페 ${now.hoodN}곳 중 <b>${now.rank}위</b> (검증 후기 수 기준)</li>
+        <li>검증을 통과한 후기 <b>${now.count}건</b></li>
+      </ul>
+      <a href="${site}/owner/r/${l.cafe_id}" style="display:block;text-align:center;background:#2b2018;color:#f4ece0;text-decoration:none;border-radius:12px;padding:13px;font-size:14px;font-weight:700">전체 리포트 보기</a>
+      <p style="font-size:10.5px;color:#8a7458;margin:14px 0 0;line-height:1.7">새 후기가 올라온 즉시 알림·약점 처방은 <a href="${site}/pricing" style="color:#9c6b3f">우리 가게 리포트 구독</a>에서.<br>
+      <a href="${site}/api/newsletter-optout?e=${encodeURIComponent(email)}&t=${optoutToken(email)}" style="color:#9c6b3f">더 이상 받지 않기</a></p></div>`;
+    const ok = await send(email, `${now.name} — ${new Intl.DateTimeFormat("ko-KR",{timeZone:"Asia/Seoul",month:"long"}).format(new Date())} 가게 요약`, html);
+    if (ok) { sent++; await sql`UPDATE owner_leads SET last_sent_at=now() WHERE id=${l.id}`; }
+  }
+  return { leads: leads.length, sent, skipped: null };
+}

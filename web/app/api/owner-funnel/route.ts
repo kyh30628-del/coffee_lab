@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 //   anon_id만 사용(개인정보 0), share_events/traffic_events와 동일한 얕은 기록 패턴.
 // free_report_view = 무료 리포트(/owner/r/[id]) 계측(2026-08-27).
 //   화이트리스트가 아니면 400이라 조용히 안 쌓인다 — 새 이벤트를 만들면 반드시 여기 추가.
-const EVENTS = new Set(["cta_click", "modal_open", "submit_success", "submit_fail", "free_report_view"]);
+const EVENTS = new Set(["cta_click", "modal_open", "submit_success", "submit_fail", "free_report_view", "lead_submit"]);
 let ensured = false;
 async function ensure() {
   if (ensured) return;
