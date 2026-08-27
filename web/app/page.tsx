@@ -520,10 +520,16 @@ export default function Home() {
   const [exits, setExits] = useState<{ lat: number; lng: number; n: string }[]>([]); // 지하철 출구(좌표, 번호)
   const [lines, setLines] = useState<{ ref: string; color: string; segs: [number, number][][] }[]>([]); // 호선 노선(역 순서 폴리라인, 끊긴 구간 분리)
   useEffect(() => {
-    fetch("/data/stations.json").then((r) => r.json()).then((d) => Array.isArray(d) && setStations(d)).catch(() => {});
-    fetch("/data/exits.json").then((r) => r.json()).then((d) => Array.isArray(d) && setExits(d)).catch(() => {});
-    fetch("/data/lines.json").then((r) => r.json()).then((d) => Array.isArray(d) && setLines(d)).catch(() => {});
-    fetch("/data/landmarks.json").then((r) => r.json()).then((d) => Array.isArray(d) && setLandmarks(d)).catch(() => {});
+    // ⚡ 2026-08-27: 장식 4종(합 265KB)은 z≥11에서만 쓰인다 — 첫 페인트·/api/cafes(834KB)와
+    //   네트워크·파싱 경쟁하지 않게 유휴시간으로 미룬다. 지도를 열기 전에 이미 도착해 있는 건 동일.
+    const loadDecor = () => {
+      fetch("/data/stations.json").then((r) => r.json()).then((d) => Array.isArray(d) && setStations(d)).catch(() => {});
+      fetch("/data/exits.json").then((r) => r.json()).then((d) => Array.isArray(d) && setExits(d)).catch(() => {});
+      fetch("/data/lines.json").then((r) => r.json()).then((d) => Array.isArray(d) && setLines(d)).catch(() => {});
+      fetch("/data/landmarks.json").then((r) => r.json()).then((d) => Array.isArray(d) && setLandmarks(d)).catch(() => {});
+    };
+    const ric2 = (window as any).requestIdleCallback as ((cb: () => void, opts?: { timeout: number }) => number) | undefined;
+    if (ric2) ric2(loadDecor, { timeout: 4000 }); else setTimeout(loadDecor, 1200);
   }, []);
   const [selected, setSelected] = useState<Cafe | null>(null);
   const [tab, setTab] = useState<"home" | "map" | "memory">("home");
@@ -625,7 +631,31 @@ export default function Home() {
   useEffect(() => {
     // 📉 2026-08-06: /api/cafes가 char_scores 6축을 고정순서 배열 `cs`로 보낸다(전송량 절감).
     //   받는 즉시 원래 모양으로 되돌리므로 아래 소비 코드(취향 필터·정렬·유사도)는 전부 그대로다.
-    const load = () => fetch("/api/cafes").then((r) => r.json()).then((d) => setCafes(decodeCafeScores(d.cafes ?? []))).catch(() => {});
+    // ⚡ 2026-08-27 SWR: 재방문이면 Cache API 사본(≤30분)을 **즉시** 그리고, 네트워크 신선본이
+    //   도착하는 순간 교체한다(도착 후엔 사본이 절대 못 덮음 — fresh 플래그). 모바일에서 압축 834KB
+    //   전송+파싱이 지도 첫 페인트를 수 초 붙잡던 것의 해법. 서버는 여전히 always-fresh(원칙 유지) —
+    //   사본 노출은 신선본 도착까지의 몇 초 + 최대 30분 이내 사본만이라, /c/[id] ISR(6h)보다 훨씬 짧다.
+    const load = async () => {
+      let fresh = false;
+      try {
+        const at = Number(localStorage.getItem("dcn_cafes_at") || 0);
+        if (Date.now() - at < 30 * 60 * 1000) {
+          const hit = await (await caches.open("dcn-cafes-v1")).match("/api/cafes");
+          if (hit && !fresh) {
+            const d = await hit.json();
+            if (!fresh) setCafes(decodeCafeScores(d.cafes ?? []));
+          }
+        }
+      } catch {}
+      try {
+        const r = await fetch("/api/cafes");
+        const r2 = r.clone(); // 본문 재직렬화 없이 스트림째 캐시에 저장
+        const d = await r.json();
+        fresh = true;
+        setCafes(decodeCafeScores(d.cafes ?? []));
+        try { await (await caches.open("dcn-cafes-v1")).put("/api/cafes", r2); localStorage.setItem("dcn_cafes_at", String(Date.now())); } catch {}
+      } catch {}
+    };
     const ric = (window as any).requestIdleCallback as ((cb: () => void, opts?: { timeout: number }) => number) | undefined;
     if (ric) { const id = ric(load, { timeout: 2000 }); return () => (window as any).cancelIdleCallback?.(id); }
     const t = setTimeout(load, 300);
@@ -997,6 +1027,9 @@ export default function Home() {
         L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: '&copy; OpenStreetMap' }).addTo(mapObj.current);
       }
       layerRef.current = L.layerGroup().addTo(mapObj.current);
+      // ⚡ 비클릭 벡터(노선·반경원)는 캔버스 렌더러로 — SVG는 요소 수만큼 DOM·페인트 비용이 드는데
+      //   캔버스는 한 장이다. 시각 결과 동일(안티앨리어싱 미세 차이뿐).
+      canvasRef2.current = L.canvas({ padding: 0.5 });
       // 🇰🇷 독도·울릉도 — 항상 표시(영토 표현). layerRef가 아니라 맵에 직접 붙여 drawMarkers 갱신에도 유지.
       L.marker([37.2429, 131.8665], { icon: L.divIcon({ className: "", html: makeIslandHtml("독도"), iconSize: [0, 0] }), interactive: false, zIndexOffset: 500 }).addTo(mapObj.current);
       L.marker([37.4845, 130.9057], { icon: L.divIcon({ className: "", html: makeIslandHtml("울릉도"), iconSize: [0, 0] }), interactive: false, zIndexOffset: 500 }).addTo(mapObj.current);
@@ -1039,6 +1072,7 @@ export default function Home() {
   // 현재 지도 화면(bounds)+줌에 맞춰 마커를 그린다 — 줌인하면 그 영역 핀이 동적으로 드러나고, 줌아웃이면 화면 안 인기순 상위만.
   // ⚡ 마지막으로 그린 (줌, 패딩 경계) — 이 범위 안에서의 팬은 재그리기 불필요(카페 레벨 한정).
   const lastDrawRef = useRef<{ z: number; s: number; n: number; w: number; e: number } | null>(null);
+  const canvasRef2 = useRef<any>(null); // 비클릭 벡터용 캔버스 렌더러(맵 초기화 때 1회 생성)
   const drawMarkers = useCallback(() => {
     const L = LRef.current; const map = mapObj.current;
     if (!L || !map || !layerRef.current) return;
@@ -1055,8 +1089,8 @@ export default function Home() {
         const cas: any[] = [], col: any[] = []; // 케이싱 전부 먼저(아래) → 색선(위): 교차역 흰테 안 겹침
         for (const ln of lines) for (const seg of ln.segs) {
           if (!seg.some(([la, lo]) => lb.contains([la, lo] as [number, number]))) continue;
-          cas.push(L.polyline(seg, { color: "#ffffff", weight: w + 2.5, opacity: 0.7, interactive: false, lineJoin: "round", lineCap: "round" }));
-          col.push(L.polyline(seg, { color: ln.color, weight: w, opacity: lz >= 13 ? 0.9 : 0.7, interactive: false, lineJoin: "round", lineCap: "round" }));
+          cas.push(L.polyline(seg, { color: "#ffffff", weight: w + 2.5, opacity: 0.7, interactive: false, lineJoin: "round", lineCap: "round", renderer: canvasRef2.current ?? undefined }));
+          col.push(L.polyline(seg, { color: ln.color, weight: w, opacity: lz >= 13 ? 0.9 : 0.7, interactive: false, lineJoin: "round", lineCap: "round", renderer: canvasRef2.current ?? undefined }));
         }
         if (cas.length) layerRef.current.addLayer(L.layerGroup([...cas, ...col]));
       }
@@ -1065,7 +1099,7 @@ export default function Home() {
     // ===== 📍 내 주변 500m: 현재 위치 + 반경 원 + 500m 이내 카페만 =====
     if (nearMe) {
       const R = 500;
-      layerRef.current.addLayer(L.circle([nearMe.lat, nearMe.lng], { radius: R, color: "#2f6fb0", weight: 1.5, fillColor: "#2f6fb0", fillOpacity: 0.08, interactive: false }));
+      layerRef.current.addLayer(L.circle([nearMe.lat, nearMe.lng], { radius: R, color: "#2f6fb0", weight: 1.5, fillColor: "#2f6fb0", fillOpacity: 0.08, interactive: false, renderer: canvasRef2.current ?? undefined }));
       layerRef.current.addLayer(L.marker([nearMe.lat, nearMe.lng], { icon: L.divIcon({ className: "", html: makeMyLocHtml(), iconSize: [0, 0] }), zIndexOffset: 6000, interactive: false }));
       const near = cafes.filter((c) => c.lat && c.lng && distM(nearMe.lat, nearMe.lng, c.lat, c.lng) <= R);
       const markers = near.map((c) => L.marker([c.lat, c.lng], { icon: L.divIcon({ className: "", html: makePinHtml(c, matchSet.has(c.id), c.id === focusId, myCafeIds.has(c.id)), iconSize: [0, 0] }), zIndexOffset: c.id === focusId ? 3000 : c.featured ? 2000 : 100 }).on("click", () => setSelected(c)));
