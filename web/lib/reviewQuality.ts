@@ -1660,10 +1660,18 @@ export function verifyReview(input: QualityInput): QualityResult {
     //   (AI 판정 로직 자체는 불변 — borderline 큐에 아예 안 들어가게만 한다).
     const venueOrLandmarkNoCtx = (venueOnly || landmarkStripped) && !CAFE_CONTEXT_STRONG.test(fullL) && !titleHasCafeWord && !bodyHasCafeWord;
     // 이름은 안 잡혀도 '카페 방문 후기 맥락'이 뚜렷하면 버리지 않고 LLM 재판정 대상으로(경계).
-    const ctx = !venueOrLandmarkNoCtx && (visit || substance >= 2) && (areaPresent || titleHasCafeWord || bodyHasCafeWord) && !listicle;
+    // decisions#835(coord#343): coreEmpty(완전 일반어 상호, 예: '동네카페')는 titleHasCafeWord/bodyHasCafeWord가
+    //   이름 자체에 포함된 업태어("카페")라 항상 참에 가까워 무변별 — 아래 OR가 사실상 무조건 통과된다.
+    //   그 결과 다른 특정 카페(코블유·포르마레·프라란·요거트글로우 등)를 지칭하는 글이 '동네카페'+구 단위
+    //   우연일치(강동구)만으로 LLM 재판정 큐에 들어갔고, 근거 부족한 LLM이 "실제 후기"로 오판정해 재오염됐다
+    //   (id1152 6건 중 5건 재확인, 47% 그라운딩 탈락 = 절반 이상은 여전히 통과). coreEmpty는 이미 위(1211)에서
+    //   행정동 단위 게이트(coreEmptyAreaOk)를 정한 카페이므로, 구 단위뿐인 areaPresent/카페단어 OR로 그 게이트를
+    //   우회시키지 않고 동일하게 coreEmptyAreaOk를 요구한다(다른 이름 있는 카페는 areaPresent OR 그대로 유효).
+    const ctxAreaOk = coreEmpty ? coreEmptyAreaOk : (areaPresent || titleHasCafeWord || bodyHasCafeWord);
+    const ctx = !venueOrLandmarkNoCtx && (visit || substance >= 2) && ctxAreaOk && !listicle;
     return ctx
       ? { verdict: "rejected", score: 22, reasons: ["카페명 불명확하나 후기 맥락 있음(LLM 재판정 대상)"], borderline: true, signals: sig }
-      : { verdict: "rejected", score: 0, reasons: [venueOrLandmarkNoCtx ? "건물/랜드마크 동명(카페 맥락 전무) — 결정론 하드스킵" : "카페명이 제목·본문에 없음(무관/동명)"], signals: sig };
+      : { verdict: "rejected", score: 0, reasons: [venueOrLandmarkNoCtx ? "건물/랜드마크 동명(카페 맥락 전무) — 결정론 하드스킵" : (coreEmpty && !ctxAreaOk ? "일반어 상호명(행정동 불일치 — 다른 업체 지칭 추정) — 결정론 하드스킵" : "카페명이 제목·본문에 없음(무관/동명)")], signals: sig };
   }
   // ★ 핵심 규칙: 제목이 '다른 카페'를 선언 — 우리 카페는 본문에 잠깐 언급된 것.
   //   카페힌트 있는 긴 제목인데 우리 카페 고유명(비지역 토큰)이 제목에 없으면 → 다른 카페 후기.
