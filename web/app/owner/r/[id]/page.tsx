@@ -39,16 +39,18 @@ function overGuard(): boolean {
   return guard.n > GUARD_MAX;
 }
 
-type Axis = { key: string; label: string; emoji: string; me: number; avg: number; diff: number; pen: number };
+type Axis = { key: string; label: string; emoji: string; me: number; avg: number; diff: number; pen: number; meRaw: number; hoodHas: number };
 type Report = {
   id: number; name: string; area: string; dong: string | null;
   grade: string | null; count: number; rank: number; hoodN: number;
   strong: Axis | null; top: Axis | null; weak: Axis | null; lockedCount: number;
+  /** 우리가 대신 걸러낸 양 — '분석'보다 '노동'이 사장님에겐 더 구체적이다(2026-08-27). */
+  filtered: { raw: number; ads: number; kept: number } | null;
 };
 
 async function getReport(id: number): Promise<Report | null> {
   const me = (await sql`
-    SELECT id, name, area, dong, synth_grade, synth_count, char_scores
+    SELECT id, name, area, dong, synth_grade, synth_count, char_scores, synth_quality
     FROM cafes WHERE id = ${id} AND published = true LIMIT 1`)[0] as any;
   if (!me) return null;
 
@@ -87,7 +89,8 @@ async function getReport(id: number): Promise<Report | null> {
     const avg = hoodScores.length ? Math.round(hoodScores.reduce((s, x) => s + x, 0) / hoodScores.length) : 0;
     const has = hood.filter((c) => ((c.char_scores ?? {})[ax.key] ?? 0) > 0).length;
     return { key: ax.key, label: ax.label, emoji: ax.emoji, me: meScore, avg,
-      diff: meScore - avg, pen: hood.length ? Math.round((has / hood.length) * 100) : 0 };
+      diff: meScore - avg, pen: hood.length ? Math.round((has / hood.length) * 100) : 0,
+      meRaw: (me.char_scores ?? {})[ax.key] ?? 0, hoodHas: has };
   });
 
   // 강점 = 동네 평균을 가장 크게 앞선 축(절대 수준도 있어야 함).
@@ -102,6 +105,16 @@ async function getReport(id: number): Promise<Report | null> {
     id: Number(me.id), name: me.name, area: me.area, dong: me.dong,
     grade: me.synth_grade, count: me.synth_count ?? 0, rank, hoodN: hood.length,
     strong, top, weak, lockedCount: axes.filter((a) => a.me > 0).length,
+    filtered: (() => {
+      const q = me.synth_quality ?? null;
+      const raw = Number(q?.raw ?? 0);
+      if (!raw) return null;
+      // 광고·협찬으로 걸러낸 건수 — rejectReasons 키가 문구라 '광고'로 시작하는 항목을 합친다.
+      const ads = Object.entries(q?.rejectReasons ?? {})
+        .filter(([k]) => k.startsWith("광고"))
+        .reduce((s2, [, v]) => s2 + Number(v || 0), 0);
+      return { raw, ads, kept: me.synth_count ?? 0 };
+    })(),
   };
 }
 
@@ -179,22 +192,45 @@ export default async function FreeReportPage({ params }: Props) {
         )}
       </div>
 
-      {/* 🔒 유료 경계 — 약점은 '있다는 사실'과 제목만 보여주고 내용은 잠근다 */}
-      <div className={`${CARD} mb-3 relative overflow-hidden`}>
-        <div className="text-[11px] text-[#8a7458] mb-1.5">우리 가게의 약점</div>
+      {/* 🔒 유료 경계 — 사실(무엇이 없는지)은 공짜로 보여주고, 처방(어떻게 바꾸나)을 잠근다.
+          흐린 더미 텍스트를 가려두던 걸 걷어냈다(2026-08-27): 후크가 가짜면 전환되지 않는다.
+          우리 데이터에 '부정 후기'는 사실상 없지만(1,745건 중 0.6%·대부분 오탐) **'부재'는 명확히 있다.
+          동네는 다 듣는 말인데 우리만 안 나오는 것 — 심리적 효과는 같고, 이건 실제로 존재한다. */}
+      <div className={`${CARD} mb-3`}>
+        <div className="text-[11px] text-[#8a7458] mb-1.5">우리 가게에 없는 말</div>
         {r.weak ? (
-          <div className="text-[16px] font-bold text-[#2b2018] mb-2">{r.weak.emoji} {r.weak.label}</div>
+          <>
+            <div className="text-[16px] font-bold text-[#2b2018] mb-1.5">{r.weak.emoji} {r.weak.label}</div>
+            <p className="text-[12.5px] text-[#524234] leading-relaxed">
+              {r.area} 카페 <b>{r.hoodN}곳 중 {r.weak.hoodHas}곳({r.weak.pen}%)</b>이 이 얘기를 들어요.
+              {r.weak.meRaw > 0
+                ? <> 사장님 가게는 <b className="text-[#a4553f]">{r.weak.meRaw}번</b>뿐이라 동네에서 뒤처져 있어요.</>
+                : <> 그런데 사장님 가게는 <b className="text-[#a4553f]">아직 한 번도 안 나왔어요.</b></>}
+            </p>
+          </>
         ) : (
-          <div className="text-[16px] font-bold text-[#2b2018] mb-2">🔍 개선 포인트</div>
+          <>
+            <div className="text-[16px] font-bold text-[#2b2018] mb-1.5">🔍 아직 뚜렷한 약점은 없어요</div>
+            <p className="text-[12.5px] text-[#524234] leading-relaxed">동네 카페들이 공통으로 듣는 말 중 크게 뒤처진 항목이 없습니다.</p>
+          </>
         )}
-        <div className="select-none" aria-hidden="true" style={{ filter: "blur(5px)" }}>
-          <p className="text-[12.5px] text-[#524234] leading-relaxed">
-            동네 카페 대부분이 이 점을 언급받는데 우리 가게는 뒤처져 있습니다. 무엇을 어떻게 바꿔야
-            하는지, 어떤 손님이 이 부분을 말했는지 구체적인 문장과 함께 알려드려요.
-          </p>
+        <div className="mt-3 pt-3 border-t border-[#f0e6d4] text-[12px] text-[#7a6a55] leading-relaxed">
+          🔒 <b>무엇을 어떻게 바꿔야 하는지</b>와 <b>어떤 손님이 이 말을 했는지</b>는 구독하면 보실 수 있어요.
         </div>
-        <div className="mt-3 text-[11.5px] text-[#9c6b3f] font-medium">🔒 구독하면 내용을 볼 수 있어요</div>
       </div>
+
+      {/* 노동 절약 — '분석'보다 '우리가 대신 한 일'이 훨씬 구체적이다 */}
+      {r.filtered && (
+        <div className={`${CARD} mb-3`}>
+          <div className="text-[11px] text-[#8a7458] mb-2">사장님 대신 해둔 일</div>
+          <p className="text-[12.5px] text-[#524234] leading-relaxed">
+            블로그·유튜브 글 <b>{r.filtered.raw.toLocaleString()}건</b>을 모아
+            {r.filtered.ads > 0 ? <> 광고·협찬 <b>{r.filtered.ads}건</b>과</> : null} 다른 가게·무관한 글을 걸러내고,
+            진짜 방문 후기 <b>{r.filtered.kept}건</b>만 남겼어요.
+          </p>
+          <p className="text-[11px] text-[#8a7458] mt-1.5">직접 하면 {r.filtered.raw.toLocaleString()}건을 하나씩 열어봐야 해요.</p>
+        </div>
+      )}
 
       {/* 유료 안내 — '노출'이 아니라 '감시'를 판다 */}
       <div className="bg-[#2b2018] text-[#f4ece0] rounded-2xl px-5 py-5 mb-4">
