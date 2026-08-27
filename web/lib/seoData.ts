@@ -22,6 +22,10 @@ export const TASTES: Taste[] = [
   { key: "pet", label: "애견동반", short: "반려동반", emoji: "🐶", desc: "반려견과 함께 갈 수 있는", aliases: ["애견카페", "강아지 카페", "반려견 동반 카페"] },
   { key: "brunch", label: "브런치 맛집", short: "브런치", emoji: "🥐", desc: "브런치 메뉴가 맛있는", aliases: ["브런치 카페", "브런치 맛집"] },
   { key: "view", label: "뷰 좋은", short: "뷰맛집", emoji: "🌄", desc: "창밖 풍경·전망이 좋은", aliases: ["뷰맛집 카페", "전망 좋은 카페"] },
+  // 2026-08-27 신설(데이터랩 실측 — 베이커리: 브런치의 59%로 미커버 최대 수요 · 테라스: 카공급 수요, 4~5월 2배 피크).
+  //   ⚠️ dessert의 alias "베이커리 카페"는 그대로 둔다 — 제목 머리·꼬리 불변 원칙(기존 네이버 랭킹 보호).
+  { key: "bakery", label: "베이커리", short: "베이커리", emoji: "🥖", desc: "갓 구운 빵이 맛있는", aliases: ["베이커리카페", "빵집 카페", "빵맛집"] },
+  { key: "terrace", label: "테라스·야외", short: "테라스", emoji: "🌿", desc: "테라스·야외 좌석이 있는", aliases: ["테라스카페", "야외 카페", "루프탑 카페"] },
 ];
 export const tasteByKey = (k: string) => TASTES.find((t) => t.key === k);
 

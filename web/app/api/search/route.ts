@@ -41,6 +41,8 @@ const CONCEPTS_BASE: { id: string; triggersKey: string; axis?: string; taste?: s
   { id: "space", triggersKey: "concept.space.triggers", axis: "space", label: "넓은공간" },
   { id: "pet", triggersKey: "concept.pet.triggers", axis: "pet", label: "반려동반" }, // 2026-08-13: 축 연결(전엔 트리거만 있고 점수 미반영)
   { id: "view", triggersKey: "concept.view.triggers", axis: "view", label: "뷰 좋은" },
+  { id: "bakery", triggersKey: "concept.bakery.triggers", axis: "bakery", uses: ["빵"], label: "베이커리" }, // 2026-08-27 신설
+  { id: "terrace", triggersKey: "concept.terrace.triggers", axis: "terrace", label: "테라스·야외" }, // 2026-08-27 신설
   { id: "acidity", triggersKey: "concept.acidity.triggers", taste: "acidity", label: "산미 또렷" },
   { id: "body", triggersKey: "concept.body.triggers", taste: "body", label: "묵직·고소" },
   { id: "sweet", triggersKey: "concept.sweet.triggers", taste: "sweet", label: "단맛" },

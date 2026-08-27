@@ -39,6 +39,13 @@ export const LIST_META: ListMeta[] = [
     items: ["애견동반", "애견 동반", "반려견", "반려동물", "펫프렌들리", "펫 프렌들리", "강아지 동반", "강아지랑", "강아지와 함께", "강아지 데리고", "댕댕이랑", "댕댕이 동반"] },
   { key: "char.brunch.kws", category: "성향축", label: "성향축: 브런치 🥐", consumer: "charScore.computeCharScores",
     items: ["브런치", "에그베네딕트", "프렌치토스트", "샌드위치 맛집", "샐러드 카페"] },
+  // 2026-08-27 신설 2축(데이터랩 실측: 베이커리=브런치의 59%로 미커버 수요 1위 · 테라스=카공급 수요+봄 피크 2배).
+  //   ⚠️ #359 교훈: 단독 애매어 금지 — "빵" 단독은 붕어빵·호빵 오탐(dessert에 이미 있어 여기선 제외),
+  //   "야외" 단독은 "야외 주차장" 오탐 → 좌석 맥락이 있는 표현만.
+  { key: "char.bakery.kws", category: "성향축", label: "성향축: 베이커리 🥖", consumer: "charScore.computeCharScores",
+    items: ["베이커리", "빵집", "빵맛집", "소금빵", "크루아상", "크로플", "휘낭시에", "스콘", "바게트", "식빵", "베이글", "마들렌", "까눌레", "갓 구운 빵", "갓구운 빵", "빵이 맛있"] },
+  { key: "char.terrace.kws", category: "성향축", label: "성향축: 테라스·야외 🌿", consumer: "charScore.computeCharScores",
+    items: ["테라스", "루프탑", "야외 좌석", "야외좌석", "야외 테이블", "야외석", "노천", "야장"] },
   { key: "char.view.kws", category: "성향축", label: "성향축: 뷰 🌄", consumer: "charScore.computeCharScores",
     items: ["오션뷰", "시티뷰", "한강뷰", "리버뷰", "산뷰", "논뷰", "숲뷰", "바다뷰", "호수뷰", "노을뷰", "야경뷰", "뷰맛집", "뷰 맛집", "뷰가 좋", "뷰가 예쁘", "뷰가 이쁘", "전망이 좋", "창밖 풍경", "탁 트인"] },
 
@@ -119,6 +126,10 @@ export const LIST_META: ListMeta[] = [
   //   axis/uses 매핑 없이 라벨만 정확히 붙인다(넓은공간 축 가산 오귀속 제거).
   { key: "concept.pet.triggers", category: "검색개념", label: "개념: 반려동반", consumer: "search.route",
     items: ["애견", "반려", "강아지", "펫동반"] },
+  { key: "concept.bakery.triggers", category: "검색개념", label: "개념: 베이커리", consumer: "search.route",
+    items: ["베이커리", "빵집", "빵맛집", "소금빵", "크루아상", "베이글", "식빵", "빵 맛있는"] },
+  { key: "concept.terrace.triggers", category: "검색개념", label: "개념: 테라스·야외", consumer: "search.route",
+    items: ["테라스", "루프탑", "야외", "노천", "야장"] },
   { key: "concept.view.triggers", category: "검색개념", label: "개념: 뷰 좋은", consumer: "search.route",
     items: ["뷰맛집", "뷰 좋은", "뷰좋은", "한강뷰", "리버뷰", "오션뷰", "시티뷰", "전망 좋은", "창밖", "노을", "야경"] },
   { key: "concept.acidity.triggers", category: "검색개념", label: "개념: 산미 또렷", consumer: "search.route",

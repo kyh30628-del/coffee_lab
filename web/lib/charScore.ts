@@ -17,6 +17,9 @@ const CHAR_AXES_BASE = [
   { key: "pet", label: "애견동반", emoji: "🐶", listKey: "char.pet.kws" },
   { key: "brunch", label: "브런치", emoji: "🥐", listKey: "char.brunch.kws" },
   { key: "view", label: "뷰 좋은", emoji: "🌄", listKey: "char.view.kws" },
+  // 2026-08-27 신설 2축 — 데이터랩 수요 실측(베이커리 59%·테라스 6%/봄13.6%, 브런치=100 기준) + 공급(후기신호 34%·6%).
+  { key: "bakery", label: "베이커리", emoji: "🥖", listKey: "char.bakery.kws" },
+  { key: "terrace", label: "테라스·야외", emoji: "🌿", listKey: "char.terrace.kws" },
 ];
 export const CHAR_AXES: { key: string; label: string; emoji: string; kws: string[] }[] =
   CHAR_AXES_BASE.map((a) => ({ key: a.key, label: a.label, emoji: a.emoji, get kws() { return getListSync(a.listKey); } }));

@@ -23,6 +23,8 @@ const AXES: { key: string; label: string; emoji: string }[] = [
   { key: "view", label: "뷰", emoji: "🌄" },
   { key: "pet", label: "애견동반", emoji: "🐶" },
   { key: "brunch", label: "브런치", emoji: "🥐" },
+  { key: "bakery", label: "베이커리", emoji: "🥖" },
+  { key: "terrace", label: "테라스", emoji: "🌿" },
 ];
 
 type Row = { char_scores?: any; count?: number | null; tasteHits?: number | null };
