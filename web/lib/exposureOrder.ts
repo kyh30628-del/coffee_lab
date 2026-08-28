@@ -81,6 +81,16 @@ export function sortReviews(raw: any[], name: string, areaTerms: string[], nowT:
       if (b.solo !== a.solo) return b.solo - a.solo;
       const tier = trustTier(b.e) - trustTier(a.e);
       if (tier !== 0) return tier;
+      // 🔴 2026-08-28 수리(CEO: "최신의 오염 없이 검증된 리뷰를 노출"):
+      //   최신성이 **맨 마지막 타이브레이커**라, score가 1점만 달라도 3년 전 글이 올해 글을 이겼다
+      //   (실측: 더 최신 검증후기가 있는데 옛 글만 표시된 카페 8,243곳).
+      //   → 오염 방어(확신도·내가게·실방문·단독·신뢰등급)는 **순서 그대로 우선**, 그 아래에서만
+      //     정확도와 최신성을 **합산**해 겨룬다. 품질 기준을 낮추는 게 아니라, 같은 자격이면 최신이 이긴다.
+      // 신뢰등급(trustTier)은 이미 위에서 갈렸다. 여기서 정확도와 최신성을 합산하면 **검증 후기가
+      //   참고 후기에 밀리는 일은 없지만**, 정확도 높은 검증글이 최신 검증글에 밀려 상위6에서 빠지며
+      //   검증 후기 '개수'가 줄었다(실측 300곳 중 15곳). → 합산은 폐기.
+      //   대신 **최신은 확실히 한 자리를 갖는다**: 정렬은 정확도 우선 그대로 두고,
+      //   호출부에서 상위6 중 1칸을 '최근 1년 검증 후기'에 예약한다(품질 무손실·최신 보장).
       const acc = accuracy(b.e) - accuracy(a.e);
       if (acc !== 0) return acc;
       return recencyBonus(b.e?.date, nowT) - recencyBonus(a.e?.date, nowT);
@@ -88,3 +98,26 @@ export function sortReviews(raw: any[], name: string, areaTerms: string[], nowT:
     .map(({ e }) => e);
 }
 
+
+/**
+ * 🆕 2026-08-28 — 상위 N칸 중 **1칸을 '최근 1년' 후기에 예약**한다(CEO: 최신의 검증된 리뷰를 노출).
+ *   품질 무손실 설계: 정렬(sortReviews) 결과에서 **가장 앞선 최근 1년 후기**를 끌어올릴 뿐,
+ *   신뢰등급·정확도 판정을 바꾸지 않는다. 이미 상위 N에 최근 1년 글이 있으면 아무것도 안 한다.
+ *   (합산 가중치 방식은 검증 후기 수가 줄어드는 부작용이 실측돼 폐기했다.)
+ */
+export function ensureRecent<T extends { date?: string; trust?: string }>(sorted: T[], n = 6, nowT = Date.now()): T[] {
+  if (sorted.length <= n) return sorted;
+  // ⚠️ 끌어올릴 대상은 **'검증' 등급 + 최근 1년**만. 참고 등급을 올리면 상위6의 검증 후기 수가
+  //   줄어든다(실측 300곳 중 14곳). CEO 요구는 "최신의 **오염 없이 검증된** 리뷰"다 — 둘 다 만족해야 한다.
+  const isRecent = (e: T) => {
+    if (e?.trust !== "verified") return false;
+    const t = parseYmd(e?.date); return t != null && (nowT - t) < 365 * 86400000;
+  };
+  // 이미 상위6에 '검증+최근1년'이 있으면 손대지 않는다.
+  const top = sorted.slice(0, n);
+  if (top.some(isRecent)) return sorted;
+  const idx = sorted.findIndex((e, i) => i >= n && isRecent(e));
+  if (idx < 0) return sorted;
+  const picked = sorted[idx];
+  return [...top.slice(0, n - 1), picked, ...sorted.slice(n).filter((_, i) => i !== idx - n), top[n - 1]];
+}

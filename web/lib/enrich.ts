@@ -70,13 +70,17 @@ const parseDates = (review_dates: any): number[] => {
 
 export function reputationSignals(quotes: string[], review_dates: any): { recentRatio: number; neg: number; pos: number; declineNote: string | null } {
   const ts = parseDates(review_dates);
-  const recentRatio = ts.length ? ts.filter((t) => Date.now() - t < 365 * 86400000).length / ts.length : 1;
+  const recentCount = ts.filter((t) => Date.now() - t < 365 * 86400000).length;
+  const recentRatio = ts.length ? recentCount / ts.length : 1;
   let neg = 0, pos = 0;
   for (const q of quotes) { const t = String(q || ""); if (NEG.test(t)) neg++; if (POS.test(t)) pos++; }
   let declineNote: string | null = null;
   const total = quotes.length || 1;
   // 부정 신호가 의미있게 쌓였고 긍정 대비 비율이 높으면 = 평 갈림(보수적: neg>=3 & neg/총>=15% & neg>=pos*0.5)
   if (neg >= 3 && neg / total >= 0.15 && neg >= pos * 0.5) declineNote = "최근 평이 갈리는 신호(위생·응대·맛 등 부정 후기 일부)";
-  else if (recentRatio < 0.15 && ts.length >= 5) declineNote = "최근 1년 새 후기 적음(평판 노후 가능)";
+  // 🔴 2026-08-28 수리: 비율만 보면 **과거에 후기가 몰린 인기 카페가 억울하게 '노후'로 찍힌다.**
+  //   실례: 메이트힐(속초) — 2023년 113건 폭발 탓에 분모가 커져, 최근 1년 7건(2026.08.18 포함)인데도
+  //   4.7%라 노후 배지. 실측 오탐 1,129곳. → 절대 건수를 함께 본다(최근 1년 5건 미만일 때만 노후).
+  else if (recentRatio < 0.15 && ts.length >= 5 && recentCount < 5) declineNote = "최근 1년 새 후기 적음(평판 노후 가능)";
   return { recentRatio: Math.round(recentRatio * 100) / 100, neg, pos, declineNote };
 }

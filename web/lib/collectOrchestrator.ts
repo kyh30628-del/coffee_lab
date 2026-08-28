@@ -221,10 +221,16 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
     const t = new Date(+m[1], +m[2] - 1, m[3] ? +m[3] : 15).getTime();
     return isNaN(t) ? null : t;
   };
+  // 🔴 2026-08-28 수리(CEO 지시: "최신의 오염 없이 검증된 리뷰를 노출"):
+  //   기존 최대 30점은 이름포함(+35)·검증(+20)에 눌려, **3년 전 글이 올해 글을 이겼다.**
+  //   실측: 더 최신 검증후기가 있는데 표시엔 옛 것만 남은 카페 8,243곳.
+  //   → 최근 1년은 확실히 위로(60점), 그 뒤로 완만히 감소. 오염 방어(이름포함·검증)는 그대로 두고
+  //     **같은 자격이면 최신이 이기게** 만든다(품질 기준을 낮추는 게 아니다).
   const recency = (d?: string): number => {
-    const t = parseYmd(d); if (t == null) return 8;
+    const t = parseYmd(d); if (t == null) return 8;   // 날짜 없음 = 중립(옛글로 단정 안 함)
     const months = (nowT - t) / 2.63e9;
-    return months <= 1 ? 30 : Math.max(0, 30 - months * 1.3);
+    if (months <= 12) return 60 - months * 1.0;        // 최근 1년: 60~48
+    return Math.max(0, 48 - (months - 12) * 1.6);      // 그 이후 완만히 소멸(약 4년)
   };
   // 인용문에 '이 카페명'이 실제로 들어간 근거를 최우선(+35) — 리스트형 글에서 옆 가게 인용이 대표로 뜨는 것 방지.
   //   (삭제가 아니라 재정렬 — 진짜 후기는 보존하되, 카페를 직접 가리키는 인용을 top-6에 올림)

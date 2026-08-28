@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
 import { extractHighlights } from "@/lib/cafeProfile";
-import { sortReviews } from "@/lib/exposureOrder"; // 👁️ 노출 정렬 단일 출처(감시자와 공유)
+import { sortReviews, ensureRecent } from "@/lib/exposureOrder"; // 👁️ 노출 정렬 단일 출처(감시자와 공유)
 export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
     // 매칭 확신도 우선 + 동일 확신도 내 최신순 정렬 → 상위 6건(대표)·전체보기 모두 동일 순서로 노출
     const nowT = Date.now();
     const areaTerms = [rows[0]?.area, rows[0]?.dong].filter(Boolean) as string[];
-    const reviews = Array.isArray(raw) ? sortReviews(raw, rows[0]?.name ?? "", areaTerms, nowT, rows[0]?.dong) : raw;
+    const reviews = Array.isArray(raw) ? ensureRecent(sortReviews(raw, rows[0]?.name ?? "", areaTerms, nowT, rows[0]?.dong)) : raw;
     const quality = rows[0]?.synth_quality ?? null;
     const llmJudged = !!rows[0]?.llm_judged_at;
     // 옥석 리뷰에서 소비자가 꼭 볼 구체 포인트를 빈도로 추출(데이터 기반 핵심)
