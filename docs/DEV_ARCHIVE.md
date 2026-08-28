@@ -278,3 +278,4 @@
 | 2026-08-27 11:05 | #835 | [개발] id1152 동네카페 — 3회 상신에도 근본 코드수정 미집행, 오염 원문 그대로 라이브 9일+ 방치 | 7335e2ac | - | lib/reviewQuality.ts verifyReview() borderline(LLM 재판정) 라우팅 게이트 수정(~1656-1663행). 근본원인: coreEmpty(완전  |
 | 2026-08-27 11:06 | #840 | [룰갭 신규] VENUE_WORDS 누락어 "하이원리조트" — 리조트 복합단지 내 4개 카페 교차오염(최대  | c4ed7e09 | - | web/lib/reviewQuality.ts VENUE_WORDS에 "하이원리조트" 추가(#833 비발디파크와 동일 패턴). tsc 신규에러 0, build 성공. |
 | 2026-08-28 07:05 | #852 | [개발] [정합성 발견] 근접중복(구어체 철자·브랜드축약) 신규 3~4쌍 — discover dedup 사각 | 749ddfb2 | - | lib/reviewQuality.ts에 nearDuplicateCafeName() 추가(공백·까페/캬페 등 구어체 철자·업종어 위치차 정규화 후 완전일치/4자+포함 판정) — br |
+| 2026-08-28 07:06 | #853 | [룰갭 신규] VENUE_WORDS 누락어 "휘닉스파크"(휘닉스 평창) — 강원 리조트 복합단지 교차오염 ( | 40fc31d9 | - | lib/reviewQuality.ts VENUE_WORDS(579행 부근)에 휘닉스파크/휘닉스평창 추가, #833·#840과 동일 isVenueTok 메커니즘 재사용. tsc 신규 |
