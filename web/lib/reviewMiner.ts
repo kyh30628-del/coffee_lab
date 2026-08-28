@@ -3,7 +3,7 @@
 //   LLM 없음(토큰 0). 프랜차이즈·메뉴어·동명·중복 제거. coreTokens(리뷰품질 해자) 재사용해 식별어 검증.
 //   적재는 pipeline_status='new'(비공개) → 기존 게이트(합성·판정·임베딩·검증) 통과해야만 공개.
 import { sql } from "./db";
-import { coreTokens, brandTokenOverlap } from "./reviewQuality";
+import { coreTokens, brandTokenOverlap, nearDuplicateCafeName } from "./reviewQuality";
 import { isFranchise, parseDong } from "./discover";
 import { loadCriteria, getCriterionSync } from "./criteria";
 import { bumpNaver, markNaverExhausted } from "./naverBudget"; // 마이닝도 같은 25k/일 소비 → 공용 예산 계상
@@ -90,8 +90,9 @@ export async function mineArea(areaLabel: string, opts?: { maxCalls?: number; ap
     //   확률이 올라가, 같은 코드가 시간이 갈수록 더 많이 버린다. 실측(발굴 경로)에서 누적 2,852곳일 땐
     //   주 5,327곳 들어오던 게 20,010곳일 땐 주 135곳까지 떨어졌다. 이름 검증으로만 막을 수 있다.
     const nearDup = all.find((a) => a.lat && Math.abs(a.lat - lat) < 0.0005 && Math.abs(a.lng - lng) < 0.0005);
+    // decisions#852: brandTokenOverlap이 놓치는 구어체 철자·업종어 위치차 표기이형은 nearDuplicateCafeName으로 보조 판정.
     if (seen.has(nN) || haveN.some((h) => h.includes(nN) || nN.includes(h))
-      || (nearDup && brandTokenOverlap(nearDup.name, name, [keyword].filter(Boolean)))) continue;
+      || (nearDup && (brandTokenOverlap(nearDup.name, name, [keyword].filter(Boolean)) || nearDuplicateCafeName(nearDup.name, name)))) continue;
     seen.add(nN);
     verified++;
     names.push(name);

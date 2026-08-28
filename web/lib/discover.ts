@@ -7,7 +7,7 @@ import { loadCriteria, getCriterionSync } from "./criteria";
 import { getListSync, loadCriteriaLists } from "./criteriaLists"; // 비카페 순수 리스트 단일출처(BASE=폴백). 캐시 프라임은 discover 진입점이 함.
 import { bumpNaver, markNaverExhausted } from "./naverBudget";
 import { naverHeaders, markKeyExhausted, NAVER_KEY_COUNT } from "./naverKeys"; // 네이버 일일 예산 추적(스윕이 70%만 쓰고 cron-grow에 30% 남기게)
-import { brandTokenOverlap } from "./reviewQuality"; // 상호명↔후보명 브랜드토큰 겹침 검증 단일출처(decisions#780)
+import { brandTokenOverlap, nearDuplicateCafeName } from "./reviewQuality"; // 상호명↔후보명 브랜드토큰 겹침 검증 단일출처(decisions#780), 근접중복 보조판정(decisions#852)
 
 const ID = process.env.NAVER_CLIENT_ID;
 const SECRET = process.env.NAVER_CLIENT_SECRET;
@@ -507,7 +507,8 @@ export async function discoverRegion(region: string, areaLabel: string, keywords
       //   decisions#780 도입)으로 이름이 실제로 연관된 경우에만 좌표매칭을 동일카페로 채택한다.
       if (!m && it.lat != null) {
         const near = pts.find((p) => Math.abs(p.lat - (it.lat as number)) < 0.0005 && Math.abs(p.lng - (it.lng as number)) < 0.0005)?.c;
-        if (near && brandTokenOverlap(near.name, it.name, [storeArea, near.dong, it.dong].filter(Boolean))) m = near;
+        // decisions#852: brandTokenOverlap이 놓치는 구어체 철자·업종어 위치차 표기이형은 nearDuplicateCafeName으로 보조 판정.
+        if (near && (brandTokenOverlap(near.name, it.name, [storeArea, near.dong, it.dong].filter(Boolean)) || nearDuplicateCafeName(near.name, it.name))) m = near;
       }
       if (m) {
         // 기존 카페: 동·카테고리·인스타그램·전화 없으면 백필(카테고리는 비카페 게이트 정확도, 인스타/전화는 B2B 아웃리치용 — coordination#232).
