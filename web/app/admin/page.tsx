@@ -190,7 +190,6 @@ export default function AdminPage() {
     fetch("/api/admin/decisions", h).then((x) => x.json()).then((d) => { if (d.ok) setDec({ pending: d.pending ?? [] }); }).catch(() => {});
     fetch("/api/audit-flags", h).then((x) => x.json()).then((d) => { if (d.ok) setAuditFlags(d); }).catch(() => {});
     fetch("/api/sub-request", h).then((x) => x.json()).then((d) => { if (d.ok) { setSubs(d.requests ?? []); setPurged(d.purgedRecently ?? 0); } }).catch(() => {});
-    fetch("/api/yt-report", h).then((x) => x.json()).then((d) => { if (d.ok) setYt(d); }).catch(() => {});
     fetch("/api/cron-verify?latest=1", h).then((x) => x.json()).then((d) => { if (d.ok) { setVerify(d.report); setGrounding(d.grounding); setVerifyHistory(d.history ?? []); } }).catch(() => {});
     loadBorderline(password);
   };
@@ -1137,7 +1136,7 @@ export default function AdminPage() {
           <button onClick={openAnalytics} className="py-2.5 text-[13px] font-bold text-stone-700 bg-white border border-stone-300 rounded-xl hover:bg-stone-50">📊 접속·유입 현황{tower?.traffic?.dau != null ? ` (DAU ${tower.traffic.dau})` : ""}</button>
           <button onClick={() => setShowSubsModal(true)} className="py-2.5 text-[13px] font-bold text-stone-700 bg-white border border-stone-300 rounded-xl hover:bg-stone-50">💳 구독 카페 현황{subscribers.length ? ` (${subscribers.length})` : ""}</button>
           <button onClick={() => { setShowNL(true); loadNL(); }} className="py-2.5 text-[13px] font-bold text-stone-700 bg-white border border-stone-300 rounded-xl hover:bg-stone-50">📰 주간 뉴스레터{nlList.length ? ` (${nlList.length})` : ""}</button>
-          <button onClick={() => setShowYtModal(true)} className="py-2.5 text-[13px] font-bold text-stone-700 bg-white border border-stone-300 rounded-xl hover:bg-stone-50">📺 유튜브 확보{yt?.withYt != null ? ` (${yt.withYt})` : ""}</button>
+          <button onClick={() => { setShowYtModal(true); if (!yt) fetch("/api/yt-report", { headers: { "x-admin-password": pw }, cache: "no-store" }).then((x) => x.json()).then((d) => { if (d.ok) setYt(d); }).catch(() => {}); }} className="py-2.5 text-[13px] font-bold text-stone-700 bg-white border border-stone-300 rounded-xl hover:bg-stone-50">📺 유튜브 확보{yt?.withYt != null ? ` (${yt.withYt})` : ""}</button>
           <button onClick={() => { setShowVisits(true); fetch("/api/admin/visits", { headers: { "x-admin-password": pw } }).then((x) => x.json()).then((d) => { if (d.ok) setVisits(d); }); }} className="py-2.5 text-[13px] font-bold text-stone-700 bg-white border border-stone-300 rounded-xl hover:bg-stone-50">❤ 추억·찜{visits?.stat?.total != null ? ` (${visits.stat.total}·${visits?.mstat?.total ?? 0})` : ""}</button>
           <button onClick={openRotation} className="py-2.5 text-[13px] font-bold text-stone-700 bg-white border border-stone-300 rounded-xl hover:bg-stone-50">🔁 노출 로테이션 현황</button>
         </div>
