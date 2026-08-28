@@ -42,6 +42,24 @@ try {
     console.log(`  이번 달 컴퓨트 ${cuh.toFixed(1)} CU-h → $${(cuh * 0.106).toFixed(2)} · 전송 ${((p2.data_transfer_bytes ?? 0)/1e9).toFixed(1)}GB`);
     console.log(`  하루 평균: 컴퓨트 ${(cuh/days).toFixed(1)} CU-h · $${(cuh*0.106/days).toFixed(2)}`);
     console.log(`  🌙 활성시간 ${(act/days).toFixed(1)}h/일 ${act/days > 20 ? "← 🔴 거의 안 잠(ISR·크롤러 점검)" : "← 절전 확보됨"}`);
+
+    // 🎯 2026-08-28 /c/[id] ISR 복구(커밋 4778af4)의 **실측 효과**.
+    //   그날 CEO 지시: "숫자 재서 보고해." 월 누계 평균은 배포 전 24일치에 희석돼 효과가 안 보이므로,
+    //   배포 시각의 누계를 박아두고 **그 이후 증가분만** 따로 계산한다.
+    //   기준선 파일이 없으면(측정 종료) 이 블록은 조용히 건너뛴다.
+    try {
+      const { readFileSync } = await import("node:fs");
+      const base = JSON.parse(readFileSync(new URL("../../agent-reports/neon-isr-baseline.json", import.meta.url), "utf8"));
+      const hrs = (Date.now() - new Date(base.at).getTime()) / 3600000;
+      if (hrs >= 1) {
+        const dAct = act - base.active_h_total, dCu = cuh - base.cu_h_total;
+        const actPerDay = dAct / (hrs / 24), cuPerDay = dCu / (hrs / 24);
+        console.log(`  ── ISR 수리 효과(배포 후 ${hrs.toFixed(1)}시간 실측) ──`);
+        console.log(`     활성시간 ${actPerDay.toFixed(1)}h/일  (수리 전 24.4h/일)`);
+        console.log(`     컴퓨트 ${cuPerDay.toFixed(2)} CU-h/일 → 월 $${(cuPerDay * 30 * 0.106).toFixed(2)}  (수리 전 월 $42)`);
+        console.log(`     ${actPerDay < 20 ? "✅ DB가 자기 시작함" : "🔴 여전히 안 잠 — 다른 원인 남아있음"}`);
+      } else console.log(`  ── ISR 수리 효과: 배포 후 ${hrs.toFixed(1)}시간 — 24시간 지나야 유의미`);
+    } catch { /* 기준선 없음 = 측정 종료 */ }
   }
 } catch (e) { console.log("  조회 실패:", String(e).slice(0, 60)); }
 
