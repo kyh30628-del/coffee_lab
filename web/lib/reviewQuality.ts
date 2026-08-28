@@ -118,6 +118,30 @@ const LISTICLE_TITLE = [
 const CAFE_LIST_PATTERNS = /(신상\s*카페\s*리스트|체험단\s*(모음|모집)|인기글\s*top\s*\d+|전국\s*인기\s*카페\s*순위|카페플렉스\s*인기글)/i;
 // 본문에서 여러 가게가 함께 나열되는 신호 (…카페 / …점 / …커피 토큰 다수)
 const PLACE_TOKEN = /[가-힣A-Za-z0-9]{2,}(카페|커피|로스터리|베이커리|디저트)\b/g;
+// 룰갭 rulegap-20260828-1611(decisions#859): 휴게소류 복합시설 소속 카페는 "○○휴게소 간식 추천" listicle
+//   글에서 대상 브랜드명이 카페 접미사 없이(호두과자·도나스 등) 다른 매장명과 나란히 1회만 언급돼 PLACE_TOKEN
+//   (카페 접미사 4개 이상)도 LISTICLE_TITLE(제목 패턴)도 못 잡는다(id24526 만쥬리아 평창휴게소·id20646
+//   교동도나스 시흥하늘휴게소 실측 — 대상 상호명은 본문에 정확히 있어 identity 매칭은 통과). 휴게소/터미널/
+//   공항/역사/환승센터 소속(VENUE_WORDS 교통 복합시설 세트와 동일) 카페에 한해, body에서 쉼표·가운뎃점으로
+//   구분된 짧은 고유명사형 토큰(대상 상호명 제외)이 3개 이상 나열되면 listicle 보조 신호로 인정한다.
+//   시설 소속 카페로 스코프를 좁혀 일반 카페의 "커피랑 케이크랑" 식 정상 나열 오탐을 방지.
+const TRANSIT_VENUE_WORDS = ["휴게소", "고속터미널", "종합터미널", "터미널", "도심공항", "공항", "역사", "환승센터"];
+const isTransitVenueCafe = (name: string) => { const n = norm(name); return TRANSIT_VENUE_WORDS.some((v) => n.includes(norm(v))); };
+const ENUM_ITEM_HAS_CHAR = /[가-힣A-Za-z0-9]{2,}/;
+// 나열 항목은 명사형이라 서술형 어미로 안 끝난다 — 문장 서술(예: "친절했어요")이 쉼표로 섞여 들어오는 걸 배제.
+const ENUM_ITEM_SENTENCE_END = /(다|요|음|함|워|네|고|며|서|죠|중|됨|임)$/;
+function countEnumListItems(text: string, excludeNameN: string): number {
+  const segments = text.split(/[,、·・]/).map((s) => s.trim()).filter(Boolean);
+  let count = 0;
+  for (const seg of segments) {
+    if (seg.length < 2 || seg.length > 14) continue;
+    if (!ENUM_ITEM_HAS_CHAR.test(seg) || ENUM_ITEM_SENTENCE_END.test(seg)) continue;
+    const segN = norm(seg);
+    if (excludeNameN && segN.includes(excludeNameN)) continue;
+    count += 1;
+  }
+  return count;
+}
 
 const GENERIC_CUES = ["란 무엇", "이란?", "뜻과", "종류별", "조절하는 방법", "표현 방법", "하는 법",
   "what is", "how to", "guide to", "정의", "알아보", "효능", "원리", "역사"];
@@ -1340,7 +1364,8 @@ export function verifyReview(input: QualityInput): QualityResult {
           && (idiomDongRequired ? dongPresent : (dongPresent || CAFE_CONTEXT_STRONG.test(fullL) || bodyHasCafeWord))
           && venueCtxOk && landmarkCtxOk)
       : (roadAddrCtxOk && venueCtxOk && (inBodyFull || (distinctInBody && (bodyHasCafeWord || areaPresent) && landmarkCtxOk)));
-  const listicle = LISTICLE_TITLE.some((re) => re.test(title)) || (((`${title} ${body}`.match(PLACE_TOKEN) ?? []).length) >= 4);
+  const listicle = LISTICLE_TITLE.some((re) => re.test(title)) || (((`${title} ${body}`.match(PLACE_TOKEN) ?? []).length) >= 4)
+    || (isTransitVenueCafe(input.name) && countEnumListItems(body, nameN) >= 3);
   const generic = has(fullL, GENERIC_CUES);
   const nameOccurBody = nameN ? countOccur(bodyN, nameN) : 0;
   const foreignInTitle = NON_METRO.find((c) => title.includes(c));
