@@ -51,9 +51,9 @@ async function runChecks(): Promise<Check[]> {
   // 4. 근거 후기 필수필드: quote/link 누락
   add("review_fields", "근거 후기 필수필드(인용·링크) 누락", "fail",
     await n(sql`SELECT count(DISTINCT c.id)::int n FROM cafes c, jsonb_array_elements(c.synth_reviews) r
-      WHERE c.published AND (coalesce(r->>'quote','')='' OR coalesce(r->>'link','')='')`),
+      WHERE c.published AND (c.synth_reviews::text LIKE '%"quote":""%' OR c.synth_reviews::text LIKE '%"link":""%' OR c.synth_reviews::text NOT LIKE '%"link"%') AND (coalesce(r->>'quote','')='' OR coalesce(r->>'link','')='')`),
     await samp(sql`SELECT DISTINCT c.name s FROM cafes c, jsonb_array_elements(c.synth_reviews) r
-      WHERE c.published AND (coalesce(r->>'quote','')='' OR coalesce(r->>'link','')='') LIMIT 6`));
+      WHERE c.published AND (c.synth_reviews::text LIKE '%"quote":""%' OR c.synth_reviews::text LIKE '%"link":""%' OR c.synth_reviews::text NOT LIKE '%"link"%') AND (coalesce(r->>'quote','')='' OR coalesce(r->>'link','')='') LIMIT 6`));
 
   // 5. PII 누출: 표시 인용문에 전화/이메일
   add("pii_leak", "근거 후기에 개인정보(전화·이메일) 노출", "fail",

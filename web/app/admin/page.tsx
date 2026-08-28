@@ -231,7 +231,9 @@ export default function AdminPage() {
     refreshNumbers(pw);
     loadNL(); // 뉴스레터 상태 로드 — 미발송 초안 리마인더용
     loadSubscribers(pw); // 승인 대기 사장님 리마인더용
-    const id = setInterval(() => { if (shouldPoll()) refreshNumbers(pw); }, 15000);
+    // 💰 2026-08-28: 15초→60초. 실측상 관제 집계 쿼리 10여 개가 상위 비용(각 680~880ms)이라
+    //   보고 있는 동안에도 분당 4회 발사가 DB를 큰 CU로 붙잡았다. 화면 조작 시 즉시 갱신되므로 체감 동일.
+    const id = setInterval(() => { if (shouldPoll()) refreshNumbers(pw); }, 60000);
     const onVis = () => { if (document.visibilityState === "visible") refreshNumbers(pw); };
     document.addEventListener("visibilitychange", onVis);
     return () => { clearInterval(id); document.removeEventListener("visibilitychange", onVis); };
@@ -239,7 +241,7 @@ export default function AdminPage() {
   // 📈 접속·유입 대시보드가 열려있는 동안 20초마다 자동 갱신(실시간) — 조용히(silent) 갱신해 깜빡임 없음
   useEffect(() => {
     if (!showAnalytics || !pw) return;
-    const id = setInterval(() => { if (shouldPoll()) loadAnalytics(pw, true); }, 20000);
+    const id = setInterval(() => { if (shouldPoll()) loadAnalytics(pw, true); }, 60000); // 20초→60초(위와 같은 이유)
     return () => clearInterval(id);
   }, [showAnalytics, pw]);
   useLockBodyScroll(!!selAgent || !!todayDetail || towerFull || showVisits || showYtModal || showSubsModal || showBorderline || showAnalytics || showOnboard || showRotation || showNL);
