@@ -4,7 +4,7 @@ import Curated from "../Curated";
 import { getRegions, getRegionCafes, getDongsInArea, SITE } from "@/lib/seoData";
 import { regionPublishedCount } from "@/lib/region";
 
-export const revalidate = 10800; // 30분 — 비공개/신규 반영 빠르게(이전 1일)
+export const revalidate = 86400; // ISR 24시간
 
 export async function generateStaticParams() {
   const regions = await getRegions();

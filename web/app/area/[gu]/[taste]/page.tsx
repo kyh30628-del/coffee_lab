@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import Curated from "../../Curated";
 import { getRegions, getRegionTasteCafes, getRegionTasteCount, getRegionTasteCounts, getRegionTasteGradeBreakdown, areaAliases, TASTES, tasteByKey, SITE, TASTE_MIN_HITS, TASTE_MIN_RATE_PCT } from "@/lib/seoData";
 
-export const revalidate = 10800; // 30분 — 비공개/신규 반영 빠르게(이전 1일)
+export const revalidate = 86400; // ISR 24시간
 
 export async function generateStaticParams() {
   const regions = await getRegions();
