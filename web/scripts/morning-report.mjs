@@ -28,6 +28,23 @@ for (const r of await sql`SELECT area, count(*) n, count(*) FILTER (WHERE synth_
 //   💰 봇 제외 집계 2회 추가일 뿐(아침 1회). BOT_ANON_IDS_SQL은 무겁게 임포트하지 않고 동일 정의를 재사용해야 하나
 //   이 스크립트는 .ts 임포트가 가능하므로 단일출처를 그대로 쓴다.
 const { BOT_ANON_IDS_SQL } = await import("../lib/behaviorBot.ts");
+// 💰 Neon 실측(2026-08-28 NEON_API_KEY 연동) — 추정 금지. 활성시간이 곧 "DB가 안 자는 시간".
+console.log("\n═══ ⑤-b Neon 비용 실측 ═══");
+try {
+  const K = process.env.NEON_API_KEY;
+  if (!K) console.log("  NEON_API_KEY 미설정");
+  else {
+    const r = await fetch("https://console.neon.tech/api/v2/projects/damp-dew-22096939", { headers: { Authorization: `Bearer ${K}`, Accept: "application/json" } });
+    const p2 = (await r.json()).project ?? {};
+    const cuh = (p2.compute_time_seconds ?? 0) / 3600, act = (p2.active_time_seconds ?? 0) / 3600;
+    const start = new Date(p2.consumption_period_start ?? Date.now());
+    const days = Math.max(1, (Date.now() - start.getTime()) / 86400000);
+    console.log(`  이번 달 컴퓨트 ${cuh.toFixed(1)} CU-h → $${(cuh * 0.106).toFixed(2)} · 전송 ${((p2.data_transfer_bytes ?? 0)/1e9).toFixed(1)}GB`);
+    console.log(`  하루 평균: 컴퓨트 ${(cuh/days).toFixed(1)} CU-h · $${(cuh*0.106/days).toFixed(2)}`);
+    console.log(`  🌙 활성시간 ${(act/days).toFixed(1)}h/일 ${act/days > 20 ? "← 🔴 거의 안 잠(ISR·크롤러 점검)" : "← 절전 확보됨"}`);
+  }
+} catch (e) { console.log("  조회 실패:", String(e).slice(0, 60)); }
+
 console.log("\n═══ ⑥ 월 PV 진척률 (애드센스 트리거 10만) ═══");
 const pv = (await sql.query(`SELECT count(*)::int pv, count(DISTINCT anon_id)::int uv FROM traffic_events
   WHERE ts > now()-interval '30 days' AND anon_id NOT IN (${BOT_ANON_IDS_SQL})`))[0];
