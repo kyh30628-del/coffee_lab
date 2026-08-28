@@ -828,6 +828,27 @@ export function brandTokenOverlap(baseName: string, candidateName: string, areaT
   return full.length >= 2 && (cand.includes(full) || full.includes(cand));
 }
 
+// 근접중복(구어체 철자·브랜드축약) 보조 판정(decisions#852) — brandTokenOverlap은 오염 방지용으로 엄격
+// 튜닝돼(위 주석들의 재발방지 이력) 몰/아파트단지명 같은 venueOnly 토큰은 전체이름 원문일치까지 요구한다.
+// 그래서 "하늘채카페"↔"하늘채까페"(까페 구어체 철자), "아자아자로스터리카페 가락점"↔"아자아자 로스터리"
+// (업종어 위치·유무 차이) 같은 정상 표기 이형을 별개 카페로 갈라 discover 배치가 좌표 완전동일한 기존
+// 카페를 재중복 생성했다(coordination#347 관련 패턴, agent-reports/proposals-20260828.md #1~#3).
+// 좌표가 이미 근접 확인된 상태에서만 보조로 호출: 공백·구어체 철자·업종어를 전부 제거한 뒤 완전일치면
+// 동일 카페. 부분포함(브랜드축약)은 "나무카페"/"나무숲카페"처럼 몰·단지 내 무관 업체를 오판정할 위험이
+// 있어(decisions#814 재발방지 이력 참고) 더 짧은 쪽이 최소 4자 이상일 때만 인정한다.
+export function nearDuplicateCafeName(a: string, b: string): boolean {
+  const strip = (s: string) => (s || "")
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .replace(/까페|캬페|카패|까패/g, "카페")
+    .replace(/커피숍|커피샵/g, "커피")
+    .replace(/(카페|커피|로스터리|로스터스|로스터즈|로스터|로스팅|베이커리|베이크샵|베이크하우스|베이글샵|도넛|디저트|케이크|케익|케잌|제과점|제과|과자점|본점|점)/g, "");
+  const na = strip(a), nb = strip(b);
+  if (na.length < 2 || nb.length < 2) return false;
+  if (na === nb) return true;
+  return Math.min(na.length, nb.length) >= 4 && (na.includes(nb) || nb.includes(na));
+}
+
 // 노이즈 게이트: 후기들이 '실제로 그 카페'를 말하는 비율(이름 일관성).
 //   개별 verifyReview를 통과해도, 묶어 보면 카페명이 거의 안 나오면 오염 의심.
 //   유형별 규칙으로 못 잡은 오염(부분문자열·구문·신종)을 공개 전에 잡는 안전망.
