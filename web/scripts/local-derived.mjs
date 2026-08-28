@@ -85,11 +85,15 @@ try {
   const r = await JOBS[job]();
   const ms = Date.now() - t0;
   console.log(JSON.stringify({ job, ms, ...r }, null, 1));
-  // 📒 조직관제가 이 잡을 "살아있다"고 인식하도록 원장에 남긴다(크론과 동일한 잡 이름).
-  if (!DRY) await recordRun(`cron-${job}`, true, `로컬실행 ${r.processed}곳 ${ms}ms`, r.processed, { metrics: { processed: r.processed } });
+  // 📒 원장에는 **`local-` 접두사로 따로** 남긴다.
+  //   크론과 같은 이름(`cron-enrich`)으로 남기면 두 가지가 깨진다:
+  //   ① Vercel 크론이 멈춰도 이 수동 실행이 하트비트를 채워 '정지'를 가려버린다(감시 무력화).
+  //   ② 처리량이 이중 집계돼 관제탑 숫자가 틀어진다.
+  //   그래서 EXPECT_MAX_H에도 등록하지 않는다 — 수동 도구라 '안 돌면 정지'가 아니다.
+  if (!DRY) await recordRun(`local-${job}`, true, `로컬실행 ${r.processed}곳 ${ms}ms`, r.processed, { metrics: { processed: r.processed } });
 } catch (e) {
   console.error("🔴", String(e));
-  if (!DRY) await recordRun(`cron-${job}`, false, String(e).slice(0, 150)).catch(() => {});
+  if (!DRY) await recordRun(`local-${job}`, false, String(e).slice(0, 150)).catch(() => {});
   release(); process.exit(1);
 }
 release();

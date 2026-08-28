@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { invalidateCafeCaches } from "@/lib/cafeCacheInvalidate"; // 🧹 2026-08-28 /c/[id] ISR(48h) 전환 — 비공개 후 캐시 무효화 필수
 import { sql, ensureSchema } from "@/lib/db";
 import { healAreaLabel, healOutOfBox } from "@/lib/synthStore";
 import { recordRun } from "@/lib/agentLog";
@@ -756,6 +757,7 @@ async function healExactDuplicates(): Promise<{ resolved: number; pairs: string[
     (grp[k] = grp[k] || []).push(r);
   }
   const pairs: string[] = [];
+  const losers: number[] = [];
   let resolved = 0;
   for (const g of Object.values(grp)) {
     if (g.length < 2) continue;
@@ -763,10 +765,12 @@ async function healExactDuplicates(): Promise<{ resolved: number; pairs: string[
     const keep = g[0];
     for (const loser of g.slice(1)) {
       await sql`UPDATE cafes SET published = false, pipeline_status = 'excluded', updated_at = now() WHERE id = ${loser.id}`.catch(() => {});
-      resolved++;
+      resolved++; losers.push(loser.id);
       if (pairs.length < 6) pairs.push(`${loser.name} → ${keep.name}(유지)`);
     }
   }
+  // 🧹 2026-08-28 /c/[id] ISR(48h) 전환 대응 — 내린 쪽 캐시 즉시 무효화.
+  if (losers.length) await invalidateCafeCaches(losers).catch(() => {});
   return { resolved, pairs };
 }
 

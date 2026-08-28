@@ -21,6 +21,22 @@ import OutboundLink from "../../OutboundLink";
 export const runtime = "nodejs";
 export const revalidate = 172800; // ISR 48시간
 
+// 🔴 2026-08-28 비용 근본수리: 위 `revalidate`가 **작동하지 않고 있었다.**
+//   Next 문서(generate-static-params.md): "ISR로 런타임에 재검증하려면 generateStaticParams에서
+//   빈 배열을 반환해야 한다. 배열을 반환하지 않으면 라우트는 동적으로 렌더링된다."
+//   실측: 빌드 산출물 `ƒ /c/[id]`(동적) · 프로덕션 헤더 `no-store` + x-vercel-cache MISS 3회 연속.
+//   같은 앱의 /area/[gu]·/taste/[type]은 이 함수가 있어서 `●`(SSG·엣지 HIT)였다 — 상세만 빠져 있었다.
+//   결과: 구글에 올라간 공개 카페 18,000여 페이지를 봇이 훑을 때마다 매번 DB를 깨웠고,
+//   그래서 Neon이 62일 중 2.3시간밖에 자지 못했다(요금=활성시간×CU라 이게 청구서의 본체).
+//
+//   빈 배열인 이유: 전 카페를 빌드에 넣으면 빌드마다 18,000페이지를 생성한다(빌드시간=Vercel 비용).
+//   빈 배열이면 **빌드 비용 증가 0**, 첫 방문 때 만들어 48시간 캐시 = 봇 재방문은 엣지가 받는다.
+//   비공개 처리 시 즉시 반영도 유지된다 — lib/cafeCacheInvalidate.ts 가 이미 revalidatePath(`/c/${id}`)
+//   를 호출하고, ISR 페이지는 그 호출로 엣지 캐시까지 무효화된다(동적 페이지였을 땐 이 무효화가 무의미했다).
+export async function generateStaticParams() {
+  return [];
+}
+
 // 전체 카페 결 분포(강·약 판단용).
 // 💰 2026-08-13 수리: react cache()는 **요청 내** 메모라, ISR 재생성마다 공개 13,495행을 통째로 읽었다.
 //   지난달 ISR 쓰기 45만건(크롤러가 sitemap 14,635 URL 순회) = 그만큼 이 전수 스캔이 반복됐다는 뜻.

@@ -443,7 +443,10 @@ export async function holdZeroEvidenceSuspects(): Promise<{ held: number; releas
         WHERE g.grounded = false AND (
           g.issue ~ '(후기[^,.]{0,6}0건|커피 후기 0|후기[^,.]{0,4}자체 없|전부 다른 (가게|업체|점포)|전부 카페가 아|건 전부.{0,16}(다른|아님|아닌|카페가 아))'
         ))
-    RETURNING name`) as any[];
+    RETURNING id, name`) as any[];
+  // 🧹 2026-08-28: /c/[id]가 ISR(48h)로 바뀌면서, 비공개 처리 후 캐시를 안 지우면 최대 48시간 화면에 남는다.
+  //   (동적 렌더링이던 시절엔 이 호출이 없어도 다음 요청이 곧 최신이라 티가 안 났다.)
+  if (heldRows.length) await invalidateCafeCaches(heldRows.map((r: any) => r.id)).catch(() => {});
   // 복귀 경로(코드는 살아있으나 실질 미발동 — 위 함수 상단 주석 참조): held였는데 재그라운딩에서
   //   grounded=true → 다시 live(다음 재합성이 규칙대로 공개). 그라운딩이 공개 카페만 표본으로 삼는 한
   //   held 카페는 이 UPDATE의 대상(grounded=true row)이 자연 발생하지 않는다.
@@ -608,7 +611,7 @@ export async function healOutOfBox(): Promise<{ excluded: number; names: string[
   const rows = (await sql`UPDATE cafes SET published = false, pipeline_status = 'excluded', updated_at = now()
     WHERE lat IS NOT NULL AND NOT (lat BETWEEN ${latMin} AND ${latMax} AND lng BETWEEN ${lngMin} AND ${lngMax})
       AND pipeline_status IS DISTINCT FROM 'excluded'
-    RETURNING name`) as any[];
+    RETURNING id, name`) as any[];
   // ② 주소 시·도가 비수도권 — 좌표가 박스에 걸쳐도(천안·당진·춘천 등 경계지역) 주소가 진짜 근거.
   //    area가 수도권 시로 잘못 붙는 경계 카페 방어. 주소 '접두'로만 판단(경기 광주시 오인 방지 위해 '광주광역시'만).
   // 🗺️ 서비스 범위 밖 시·도 = lib/serviceScope.ts **단일출처**. 여기 목록을 따로 적어 두면
@@ -616,8 +619,11 @@ export async function healOutOfBox(): Promise<{ excluded: number; names: string[
   const adr = (await sql.query(`UPDATE cafes SET published = false, pipeline_status = 'excluded', updated_at = now()
     WHERE address IS NOT NULL AND (${OUT_OF_SCOPE_SQL})
       AND pipeline_status IS DISTINCT FROM 'excluded'
-    RETURNING name`)) as any[];
+    RETURNING id, name`)) as any[];
   const names = [...rows, ...adr].map((r) => r.name).slice(0, 8);
+  // 🧹 ISR(48h) 전환 대응 — 비공개시킨 카페의 캐시를 즉시 무효화(안 하면 최대 48시간 노출 잔존).
+  const gone = [...rows, ...adr].map((r: any) => r.id).filter(Boolean);
+  if (gone.length) await invalidateCafeCaches(gone).catch(() => {});
   return { excluded: rows.length + adr.length, names };
 }
 
@@ -658,16 +664,19 @@ export async function healExactDuplicates(): Promise<{ resolved: number; pairs: 
     (grp[k] = grp[k] || []).push(r);
   }
   const pairs: string[] = [];
+  const losers: number[] = [];
   let resolved = 0;
   for (const g of Object.values(grp)) {
     if (g.length < 2) continue;
     g.sort((a, b) => b.sc - a.sc || a.id - b.id);
     for (const loser of g.slice(1)) {
       await sql`UPDATE cafes SET published = false, pipeline_status = 'excluded', updated_at = now() WHERE id = ${loser.id}`.catch(() => {});
-      resolved++;
+      resolved++; losers.push(loser.id);
       if (pairs.length < 6) pairs.push(`${loser.name} → ${g[0].name}(유지)`);
     }
   }
+  // 🧹 ISR(48h) 전환 대응 — 중복으로 내린 쪽 캐시 무효화.
+  if (losers.length) await invalidateCafeCaches(losers).catch(() => {});
   return { resolved, pairs };
 }
 
@@ -746,6 +755,7 @@ export async function synthAndStore(cafe: { id: number; name: string; area: stri
   const sources = rawToSources(raw);
   if (sources.length === 0) {
     await sql`UPDATE cafes SET synth_grade='후보', synth_count=0, synth_updated=now(), published=false WHERE id=${cafe.id}`;
+    await invalidateCafeCaches([cafe.id]).catch(() => {}); // 🧹 ISR(48h) 전환 대응
     return { id: cafe.id, name: cafe.name, ok: false, reason: "수집 0", grade: "후보", published: false, fromCache };
   }
 

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { invalidateCafeCaches } from "@/lib/cafeCacheInvalidate"; // 🧹 2026-08-28 /c/[id] ISR(48h) 전환 — 비공개 후 캐시 미무효화 시 최대 48시간 잔존
 import { sql } from "@/lib/db";
 import { ensureLearnedTable, loadLearnedTerms, getLearned, applyLearned, rollbackLearned } from "@/lib/learnedTerms";
 import { healCrossCafeLinkContamination } from "@/lib/synthStore";
@@ -185,17 +186,21 @@ export async function GET(req: NextRequest) {
       const ids = unknownCafes.map((c) => c.id);
       const rev = (await sql`SELECT id, COALESCE(synth_reviews::text, '') t FROM cafes WHERE id = ANY(${ids})`) as { id: number; t: string }[];
       const revMap = new Map(rev.map((r) => [Number(r.id), r.t]));
+      const excludedIds: number[] = [];
       for (const c of unknownCafes) {
         const isFood = /^음식점>/.test(c.cat);
         const txt = revMap.get(Number(c.id)) || "";
         if (isFood && txt && !COFFEE_ID.test(txt)) {
           await sql`UPDATE cafes SET published = false, pipeline_status = 'excluded' WHERE id = ${c.id} AND published = true`;
-          autoExcluded++;
+          autoExcluded++; excludedIds.push(Number(c.id));
           continue; // 결정론적 종결 — 승인대기로 안 올림
         }
         const e = stillUnknownByCat[c.cat] || (stillUnknownByCat[c.cat] = { n: 0, samples: [] });
         e.n++; if (e.samples.length < 6) e.samples.push(c.id);
       }
+      // 🧹 2026-08-28 /c/[id] ISR(48h) 전환 대응 — 자동 제외한 카페의 캐시를 즉시 무효화한다.
+      //   (동적 렌더링이던 시절엔 다음 요청이 곧 최신이라 없어도 됐지만, 이제는 안 지우면 최대 48시간 남는다.)
+      if (excludedIds.length) await invalidateCafeCaches(excludedIds).catch(() => {});
     }
     for (const [cat, e] of Object.entries(stillUnknownByCat).sort((a, b) => b[1].n - a[1].n)) {
       pending.push({ kind: "category_unknown", term: cat, cafes: e.n, samples: e.samples, reason: "비카페 업종이나 커피 정체성 일부 있음 — 기조실장 당일 검토(콘셉트 적합성)" });

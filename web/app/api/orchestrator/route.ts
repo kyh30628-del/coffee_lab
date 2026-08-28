@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { invalidateCafeCaches } from "@/lib/cafeCacheInvalidate"; // 🧹 2026-08-28 /c/[id] ISR(48h) 전환 — 비공개 후 캐시 미무효화 시 최대 48시간 잔존
 import { sql, ensureSchema } from "@/lib/db";
 import { synthAndStore, finalizePipeline, scrubPublishedPII, healVendorTemplateQuotes, healGroundingSuspects, holdZeroEvidenceSuspects, healPublishedAudit, healNonCafeCategory, healOutOfBox, healAreaLabel, healOffConceptByReview } from "@/lib/synthStore";
 import { recordRun } from "@/lib/agentLog";
@@ -166,9 +167,9 @@ export async function GET(req: NextRequest) {
         if (ig.dong_isgu) { const r = await sql`UPDATE cafes SET dong=NULL WHERE dong IS NOT NULL AND (area=dong||'구' OR area=dong||'시' OR area=dong||'군') RETURNING 1`; if (r.length) fixes.push(`동=구명 ${r.length}곳 제거`); }
         if (ig.dong_badfmt) { const r = await sql`UPDATE cafes SET dong=NULL WHERE dong IS NOT NULL AND dong !~ '(동|읍|면|가)$' RETURNING 1`; if (r.length) fixes.push(`동형식오류 ${r.length}곳 제거`); }
         // 비공개 조치는 소수일 때만 자동(20건 초과면 대량 의심 → 자동조치 보류하고 경보로 surface)
-        if (ig.pub_noidentity > 0 && ig.pub_noidentity <= 20) { const r = await sql`UPDATE cafes SET published=false WHERE published AND (synth_identity IS NULL OR synth_identity='') RETURNING 1`; if (r.length) fixes.push(`정체성없음 ${r.length}곳 비공개`); }
+        if (ig.pub_noidentity > 0 && ig.pub_noidentity <= 20) { const r = await sql`UPDATE cafes SET published=false WHERE published AND (synth_identity IS NULL OR synth_identity='') RETURNING id`; if (r.length) { fixes.push(`정체성없음 ${r.length}곳 비공개`); await invalidateCafeCaches(r.map((x: any) => x.id)).catch(() => {}); } }
         else if (ig.pub_noidentity > 20) integrity.push(`정체성없음 공개 ${ig.pub_noidentity}곳 — 대량(자동조치 보류, 점검필요)`);
-        if (ig.pub_badcoord > 0 && ig.pub_badcoord <= 20) { const r = await sql`UPDATE cafes SET published=false WHERE published AND (lat IS NULL OR lat NOT BETWEEN ${latMin} AND ${latMax} OR lng NOT BETWEEN ${lngMin} AND ${lngMax}) RETURNING 1`; if (r.length) fixes.push(`좌표오류 ${r.length}곳 비공개`); }
+        if (ig.pub_badcoord > 0 && ig.pub_badcoord <= 20) { const r = await sql`UPDATE cafes SET published=false WHERE published AND (lat IS NULL OR lat NOT BETWEEN ${latMin} AND ${latMax} OR lng NOT BETWEEN ${lngMin} AND ${lngMax}) RETURNING id`; if (r.length) { fixes.push(`좌표오류 ${r.length}곳 비공개`); await invalidateCafeCaches(r.map((x: any) => x.id)).catch(() => {}); } }
         else if (ig.pub_badcoord > 20) integrity.push(`좌표오류 공개 ${ig.pub_badcoord}곳 — 대량(자동조치 보류, 점검필요)`);
       } catch (e) { integrity.push(`무결성 자동교정 실패(즉시 확인): ${String(e).slice(0, 50)}`); }
       if (fixes.length) healed.push(`🔧 무결성 자율교정: ${fixes.join(", ")}`);
@@ -425,7 +426,7 @@ export async function GET(req: NextRequest) {
             try { await synthAndStore({ id: cf.id, name: cf.name, area: cf.area ?? "" }, { refresh: false }); } catch {}
             const [chk] = (await sql`SELECT jsonb_array_length(COALESCE(synth_reviews, '[]'::jsonb)) ev FROM cafes WHERE id = ${cf.id}`) as any[];
             if ((chk?.ev ?? 0) > 0) recovered++;
-            else { await sql`UPDATE cafes SET published=false, pipeline_status='excluded', updated_at=now() WHERE id=${cf.id}`; heldOrphan++; unpubThisRun++; }
+            else { await sql`UPDATE cafes SET published=false, pipeline_status='excluded', updated_at=now() WHERE id=${cf.id}`; await invalidateCafeCaches([cf.id]).catch(() => {}); heldOrphan++; unpubThisRun++; }
           }
           if (recovered > 0) healed.push(`orphan(근거0) ${recovered}곳 재합성 복구`);
           if (heldOrphan > 0) healed.push(`orphan(근거0·복구불가) ${heldOrphan}곳 자동 비공개`);
@@ -442,8 +443,8 @@ export async function GET(req: NextRequest) {
           integrity.push(`🚨이름오염(coherence<0.3) 급증(${namepol.length}곳+) — 규칙회귀 의심, 자동홀드 중단·즉시 점검`);
         } else if (namepol.length > 0) {
           const r = (await sql`UPDATE cafes SET published=false, pipeline_status='held', updated_at=now()
-            WHERE published AND synth_coherence < 0.3 AND COALESCE(offctx_ok, false) = false RETURNING 1`) as any[];
-          if (r.length) { unpubThisRun += r.length; healed.push(`이름오염(coherence<0.3) ${r.length}곳 자동 홀드(${namepol.slice(0, 3).map((x: any) => x.name).join(", ")})`); }
+            WHERE published AND synth_coherence < 0.3 AND COALESCE(offctx_ok, false) = false RETURNING id`) as any[];
+          if (r.length) { unpubThisRun += r.length; await invalidateCafeCaches(r.map((x: any) => x.id)).catch(() => {}); healed.push(`이름오염(coherence<0.3) ${r.length}곳 자동 홀드(${namepol.slice(0, 3).map((x: any) => x.name).join(", ")})`); }
         }
       } catch {}
       // (e-2) '절대 카페 아님' 카테고리 자동 비공개 — 그랜드파더 비카페(건설·수목원·병원·미용·캠핑 등)를 카테고리로 자동 솎음(수기 불필요)
