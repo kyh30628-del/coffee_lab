@@ -279,3 +279,4 @@
 | 2026-08-27 11:06 | #840 | [룰갭 신규] VENUE_WORDS 누락어 "하이원리조트" — 리조트 복합단지 내 4개 카페 교차오염(최대  | c4ed7e09 | - | web/lib/reviewQuality.ts VENUE_WORDS에 "하이원리조트" 추가(#833 비발디파크와 동일 패턴). tsc 신규에러 0, build 성공. |
 | 2026-08-28 07:05 | #852 | [개발] [정합성 발견] 근접중복(구어체 철자·브랜드축약) 신규 3~4쌍 — discover dedup 사각 | 749ddfb2 | - | lib/reviewQuality.ts에 nearDuplicateCafeName() 추가(공백·까페/캬페 등 구어체 철자·업종어 위치차 정규화 후 완전일치/4자+포함 판정) — br |
 | 2026-08-28 07:06 | #853 | [룰갭 신규] VENUE_WORDS 누락어 "휘닉스파크"(휘닉스 평창) — 강원 리조트 복합단지 교차오염 ( | 40fc31d9 | - | lib/reviewQuality.ts VENUE_WORDS(579행 부근)에 휘닉스파크/휘닉스평창 추가, #833·#840과 동일 isVenueTok 메커니즘 재사용. tsc 신규 |
+| 2026-08-28 11:05 | #854 | [룰갭 신규] identity.weak_token 미등재 — "사무소" (id21579 2/2건 오피스클리닝 | a0e3e359 | - | lib/criteriaListsBase.ts: identity.weak_token 리스트(175행)에 "사무소" 추가(id21579 오피스클리닝 광고 100% 오염 대응). tsc |
