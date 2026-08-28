@@ -27,7 +27,7 @@
     },
     {
       "path": "/api/orchestrator?heal=1",
-      "schedule": "25 3 * * *"
+      "schedule": "25 3,11 * * *"
     },
     {
       "path": "/api/cron-newsletter",
@@ -55,11 +55,11 @@
     },
     {
       "path": "/api/cron-sentinel",
-      "schedule": "0 3 * * *"
+      "schedule": "0 3,11 * * *"
     },
     {
       "path": "/api/cron-issues",
-      "schedule": "0 23 * * *"
+      "schedule": "0 3,7,11,23 * * *"
     },
     {
       "path": "/api/cron-billing",
@@ -67,11 +67,11 @@
     },
     {
       "path": "/api/cron-coord-consumer?mode=live",
-      "schedule": "3 23 * * *"
+      "schedule": "3 3,7,11,23 * * *"
     },
     {
       "path": "/api/cron-selfaudit",
-      "schedule": "20 23 * * *"
+      "schedule": "20 3,11,23 * * *"
     },
     {
       "path": "/api/cron-criteria-verify",

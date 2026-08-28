@@ -59,14 +59,30 @@ async function ensure(): Promise<void> {
 export async function upsertReviewerStats(cafeId: number, stats: Map<string, ReviewerCafeStat>): Promise<number> {
   if (!stats || stats.size === 0) return 0;
   await ensure();
+  // ⚡ 2026-08-28: 원래 건당 1왕복 INSERT 루프였다. 카페 한 곳에 계정이 수백~수천이라
+  //   왕복만 856회/카페(실측·건당 380ms) → 재합성 한 곳에 수 분, 그동안 Neon 활성시간을 그대로 태웠다.
+  //   같은 SQL(ON CONFLICT 포함)을 **다중행 VALUES 한 방**으로 묶는다: 왕복 856회 → 2회.
+  //   Map 키가 rid라 한 청크 안에 (rid, cafe_id) 중복이 없다 = ON CONFLICT 재적용 오류 불가.
+  const rows = [...stats.entries()];
+  const CHUNK = 500; // 행당 파라미터 6개 → 3,000개(Postgres 상한 65,535 훨씬 아래)
   let n = 0;
-  for (const [rid, s] of stats) {
-    await sql`INSERT INTO reviewer_cafes (rid, cafe_id, accepted, rejected_ad, first_dt, last_dt, updated_at)
-      VALUES (${rid}, ${cafeId}, ${s.accepted}, ${s.rejectedAd}, ${s.firstDt}, ${s.lastDt}, now())
-      ON CONFLICT (rid, cafe_id) DO UPDATE SET
-        accepted=EXCLUDED.accepted, rejected_ad=EXCLUDED.rejected_ad,
-        first_dt=EXCLUDED.first_dt, last_dt=EXCLUDED.last_dt, updated_at=now()`;
-    n++;
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    const part = rows.slice(i, i + CHUNK);
+    const params: (string | number | null)[] = [];
+    const values = part.map(([rid, s], j) => {
+      const b = j * 6;
+      params.push(rid, cafeId, s.accepted, s.rejectedAd, s.firstDt, s.lastDt);
+      return `($${b + 1}, $${b + 2}, $${b + 3}, $${b + 4}, $${b + 5}::date, $${b + 6}::date, now())`;
+    });
+    await sql.query(
+      `INSERT INTO reviewer_cafes (rid, cafe_id, accepted, rejected_ad, first_dt, last_dt, updated_at)
+       VALUES ${values.join(", ")}
+       ON CONFLICT (rid, cafe_id) DO UPDATE SET
+         accepted=EXCLUDED.accepted, rejected_ad=EXCLUDED.rejected_ad,
+         first_dt=EXCLUDED.first_dt, last_dt=EXCLUDED.last_dt, updated_at=now()`,
+      params,
+    );
+    n += part.length;
   }
   noteWrite("reviewer_cafes.*");
   return n;
