@@ -281,3 +281,4 @@
 | 2026-08-28 07:06 | #853 | [룰갭 신규] VENUE_WORDS 누락어 "휘닉스파크"(휘닉스 평창) — 강원 리조트 복합단지 교차오염 ( | 40fc31d9 | - | lib/reviewQuality.ts VENUE_WORDS(579행 부근)에 휘닉스파크/휘닉스평창 추가, #833·#840과 동일 isVenueTok 메커니즘 재사용. tsc 신규 |
 | 2026-08-28 11:05 | #854 | [룰갭 신규] identity.weak_token 미등재 — "사무소" (id21579 2/2건 오피스클리닝 | a0e3e359 | - | lib/criteriaListsBase.ts: identity.weak_token 리스트(175행)에 "사무소" 추가(id21579 오피스클리닝 광고 100% 오염 대응). tsc |
 | 2026-08-29 03:05 | #859 | [룰갭 신규] 휴게소 "간식 나열형" listicle 미검출 — PLACE_TOKEN이 비카페 접미사 브랜드 | 41bb8b2d | - | lib/reviewQuality.ts: listicle 판정에 휴게소/터미널/공항/역사/환승센터 소속 카페 한정 보조신호 추가 — body에서 쉼표·가운뎃점 구분 고유명사형 토큰( |
+| 2026-08-29 07:05 | #880 | [룰갭 신규] LANDMARK_WORDS 누락어 "하조대" — 양양 해변/전망대 랜드마크명 타업종 교차오염  | f9f589d8 | - | lib/reviewQuality.ts LANDMARK_WORDS(684행)에 하조대 추가 — 기존 isLandmarkTok 메커니즘 재사용(#584·#766과 동일 패턴). tsc |
