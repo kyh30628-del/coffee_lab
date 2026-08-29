@@ -13,6 +13,9 @@ export const JOB_TEAM: Record<string, string> = {
   "cron-grow": "성장본부", "collect-catchup": "성장본부", "cron-demand": "성장본부", "cron-newsletter": "성장본부", "cron-discover-categories": "성장본부",
   "cafe-collect": "성장본부",
   "cron-issues": "경영지원본부", "cron-coord-consumer": "경영지원본부", "cron-billing": "경영지원본부",
+  // 🔑 인증 프리체크(2026-08-29) — 사이클 시작 전 OAuth 생존 확인. **실패했을 때만** 기록되는 신호용 잡이라
+  //   EXPECT_MAX_H에는 넣지 않는다(성공하면 아무 기록도 안 남는 게 정상 = staleness 감시 대상 아님).
+  "auth-precheck": "기획조정실",
   "cron-costwatch": "경영지원본부", // Neon 데이터전송비 이상탐지 워치독(2026-07-29, CEO 지시 — youtube-backfill 663GB 사고 재발방지)
   // 로컬 launchd 잡(하트비트 경유)
   "discover-sweep": "성장본부", // 🔄2026-08-04 KST 12·20시 전 지역 발굴 스윕(새벽 02:30 → 낮으로 이동, DB통잠)

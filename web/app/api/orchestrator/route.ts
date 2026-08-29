@@ -129,7 +129,7 @@ export async function GET(req: NextRequest) {
     //   원인이 하나면 조치도 하나다 — 쪼개서 보여주면 무엇을 해야 할지가 오히려 안 보인다.
     //   ⚠️ 묶는 건 표시뿐이다. 실패 자체를 숨기지 않고 잡 이름을 모두 적는다.
     const failed = jobRuns.filter((j) => j.ok === false);
-    const isAuthFail = (d: string) => /authenticate|OAuth|session expired|claude-p 무응답|invalid api key|401/i.test(d || "");
+    const isAuthFail = (d: string) => /authenticate|OAuth|session expired|claude-p 무응답|invalid api key|401|인증 만료|로그인 만료|세션 만료/i.test(d || "");
     const authFails = failed.filter((j) => isAuthFail(j.detail || ""));
     const otherFails = failed.filter((j) => !isAuthFail(j.detail || ""));
     const jobFails = [
