@@ -395,6 +395,18 @@ export default function AdminPage() {
                     {ownerFunnel.d7.reachRate !== null ? ` (도달 ${ownerFunnel.d7.reachRate}%)` : ""}
                     {" · 신청 "}{ownerFunnel.d7.submit} · 리드 {ownerFunnel.leads ?? 0} · 유료 {ownerFunnel.subs.paid}
                   </span>
+                  {/* 🎯 아웃리치(B안) — 사장님께 직접 보낸 링크(?src=)로 들어온 것만.
+                      0이면 '실패'가 아니라 '아직 안 보냄'일 수 있다(발송 건수는 사람만 안다). */}
+                  {ownerFunnel.d7.outreach && (
+                    <span className="text-[11px] text-stone-700">
+                      아웃리치 7일 — DM {ownerFunnel.d7.outreach.dm} · 메일 {ownerFunnel.d7.outreach.email}
+                      {" · 카톡 "}{ownerFunnel.d7.outreach.kakao} · 포스터 {ownerFunnel.d7.outreach.poster}
+                      {" · 명함 "}{ownerFunnel.d7.outreach.card}
+                      {(ownerFunnel.d7.outreach.dm + ownerFunnel.d7.outreach.email + ownerFunnel.d7.outreach.kakao
+                        + ownerFunnel.d7.outreach.poster + ownerFunnel.d7.outreach.card) === 0
+                        ? " — 아직 유입 0(발송 전이면 정상)" : ""}
+                    </span>
+                  )}
                 </span>
               </span>
               <span className="text-stone-400 text-xs">펼치기</span>

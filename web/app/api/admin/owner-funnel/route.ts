@@ -44,6 +44,16 @@ export async function GET(req: NextRequest) {
         // 리포트 도달률 = 무료 리포트를 실제로 본 비율. 이게 오늘 고친 것의 성적표다.
         reachRate: ctaTotal > 0 ? Math.round((reportView / ctaTotal) * 100) : null,
         submitRate: reportView > 0 ? Math.round((submit / reportView) * 100) : null,
+        // 🎯 아웃리치(B안) 성과 — 사장님께 직접 보낸 링크(?src=)로 들어온 것만 따로 센다.
+        //   이게 없으면 DM 100건을 보내도 "그냥 흘러든 사람"과 섞여 효과를 판정할 수 없다.
+        //   0으로 나오는 건 실패가 아니라 **아직 안 보냈다**는 뜻일 수 있다 — 발송 건수는 사람만 안다.
+        outreach: {
+          dm: pick(win, "free_report_view", "outreach_dm"),
+          email: pick(win, "free_report_view", "outreach_email"),
+          kakao: pick(win, "free_report_view", "outreach_kakao"),
+          poster: pick(win, "free_report_view", "outreach_poster"),
+          card: pick(win, "free_report_view", "outreach_card"),
+        },
       };
     };
 
