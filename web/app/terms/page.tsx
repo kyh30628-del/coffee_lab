@@ -1,4 +1,5 @@
 import BackLink from "../BackLink";
+import { TRIAL_DAYS } from "@/lib/ownerPlan";
 export const metadata = {
   alternates: { canonical: "/terms" }, title: "이용약관 · 동네 커피 노트" };
 
@@ -58,7 +59,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-lg font-bold mb-2">6. 유료서비스·정기결제·해지·환불</h2>
             <ul className="list-disc ml-5 space-y-1">
-              <li><b>7일 무료 체험</b>: 결제 없이 7일간 사장님 기능을 이용합니다. 무료이므로 환불 대상이 아니며, 기간 종료 시 자동으로 접근이 만료됩니다.</li>
+              <li><b>{TRIAL_DAYS}일 무료 체험</b>: 결제 없이 {TRIAL_DAYS}일간 사장님 기능을 이용합니다. 무료이므로 환불 대상이 아니며, 기간 종료 시 자동으로 접근이 만료됩니다.</li>
               <li><b>우리가게 홍보팩(유료 구독)</b>: 회원이 등록한 결제수단으로 <b>월 단위 요금이 자동 결제·자동 갱신</b>됩니다. 결제 전 금액·주기·갱신 방식을 고지합니다.</li>
               <li><b>요금 증액 또는 무료→유료 전환</b> 시에는 <b>시행 전 사전에 동의</b>를 받으며, 동의하지 않으면 정기결제는 진행되지 않습니다.</li>
               <li><b>해지</b>: 사장님 화면 또는 고객센터(dongnecoffeenote@gmail.com)로 언제든 <b>해지(차기 결제 중지) 또는 즉시 해지</b>할 수 있습니다.</li>

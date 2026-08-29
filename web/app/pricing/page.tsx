@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { TRIAL_DAYS } from "@/lib/ownerPlan";
 import BackLink from "../BackLink";
 import OwnerSignupModal from "../OwnerSignupModal";
 import OwnerFindModal from "../OwnerFindModal";
@@ -95,9 +96,9 @@ export default function Pricing() {
           <div className="text-[11px] text-[#c7ab82] tracking-wider mb-2">홍보 도구도 함께</div>
           <ul className="space-y-1.5 text-[12.5px] text-[#c7ab82] mb-4">{BONUS.map((f) => <li key={f}>{f}</li>)}</ul>
 
-          <button onClick={() => { setTrial(true); setOpen(true); }} className="w-full bg-white text-[#2b2018] rounded-lg py-3 font-bold">✨ 7일 무료 체험</button>
+          <button onClick={() => { setTrial(true); setOpen(true); }} className="w-full bg-white text-[#2b2018] rounded-lg py-3 font-bold">✨ {TRIAL_DAYS}일 무료 체험</button>
           <button onClick={() => { setTrial(false); setOpen(true); }} className="w-full mt-2 bg-[#e8b87a] text-[#2b2018] rounded-lg py-3 font-bold">구독 신청하기</button>
-          <p className="text-[10.5px] text-[#8f7a58] mt-2 text-center">체험은 결제 없이 7일 · 신청하면 결제·세팅을 안내해 드려요</p>
+          <p className="text-[10.5px] text-[#8f7a58] mt-2 text-center">체험은 결제 없이 {TRIAL_DAYS}일 · 신청하면 결제·세팅을 안내해 드려요</p>
         </div>
 
         <p className="text-[11px] text-[#665036] text-center leading-relaxed">

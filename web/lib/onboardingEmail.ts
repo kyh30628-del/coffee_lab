@@ -1,3 +1,4 @@
+import { TRIAL_DAYS, isTrialDuration } from "./ownerPlan";
 // 📧 구독 사장님 온보딩 메일 — 승인(체험·구독) 시 발송되는 '내 카페 열쇠' + 서비스 사용법 패키지.
 //   단일 출처: app/api/subscription/route.ts(activate)와 scripts/resend-onboarding.mjs가 함께 쓴다.
 //   톤: 동네 커피 노트(따뜻한 세리프·크림/커피색) · '손님 후기가 모인 우리 가게 이야기' 정서.
@@ -8,20 +9,20 @@ const esc = (s: string) =>
 
 export type OnboardingEmail = { subject: string; html: string };
 
-// days<=7 → 체험 온보딩, 그 외 → 구독 온보딩. site는 프로토콜 포함 베이스 URL.
+// isTrialDuration(days) → 체험 온보딩(기간은 lib/ownerPlan.ts 단일출처), 그 외 → 구독 온보딩. site는 프로토콜 포함 베이스 URL.
 export function renderOnboardingEmail(opts: { cafeName: string; pin: string; days?: number; site?: string }): OnboardingEmail {
   const days = opts.days ?? 30;
   const site = (opts.site || "https://dongnecoffeenote.com").replace(/\/$/, "");
   const name = esc(opts.cafeName || "우리 카페");
   const pin = esc(opts.pin || "");
-  const isTrial = days <= 7;
+  const isTrial = isTrialDuration(days);
 
-  const kicker = isTrial ? "7일 무료 체험이 준비됐어요" : "우리 가게 이야기가 시작됐어요";
+  const kicker = isTrial ? `${TRIAL_DAYS}일 무료 체험이 준비됐어요` : "우리 가게 이야기가 시작됐어요";
   const intro = isTrial
-    ? `우리 동네 누군가는 오늘도 사장님 가게의 커피 한 잔을 기억합니다. 손님들이 남긴 진심 어린 후기가 모여 만든 <b style="color:#5b4636">‘우리 가게 이야기’</b>를, <b style="color:#5b4636">아래 PIN으로 처음 로그인하는 순간부터 7일 동안</b> 마음껏 들여다보세요. (접속이 늦어져도 기간은 안 깎여요.)`
+    ? `우리 동네 누군가는 오늘도 사장님 가게의 커피 한 잔을 기억합니다. 손님들이 남긴 진심 어린 후기가 모여 만든 <b style="color:#5b4636">‘우리 가게 이야기’</b>를, <b style="color:#5b4636">아래 PIN으로 처음 로그인하는 순간부터 ${TRIAL_DAYS}일 동안</b> 마음껏 들여다보세요. (접속이 늦어져도 기간은 안 깎여요.)`
     : `수많은 손님이 남긴 진심이 모여 사장님 가게만의 색깔이 되었어요. 이제 그 이야기와 함께, 우리 가게를 더 오래 빛나게 해보세요.`;
   // ⏱ 기간 시작 기준 — 체험=첫 로그인(안 쓰면 안 깎임) / 유료=결제 시점(오늘부터). 이 메일이 알려주는 핵심 안내.
-  const startTitle = isTrial ? "체험 기간 안내 — 언제부터 7일인가요?" : "구독 기간 안내 — 언제부터인가요?";
+  const startTitle = isTrial ? `체험 기간 안내 — 언제부터 ${TRIAL_DAYS}일인가요?` : "구독 기간 안내 — 언제부터인가요?";
   const startBody = isTrial
     ? `이 <b>7일</b>은 지금이 아니라, 위 <b>PIN으로 처음 로그인하시는 순간</b>부터 시작돼요. 급하게 안 쓰셔도 <b>하루도 손해 없이 온전히 7일</b>을 쓰실 수 있어요. 로그인하는 그 순간 <b>지도 골드핀·우선 노출·쇼케이스</b>도 함께 켜집니다.`
     : `<b>결제가 확인된 오늘부터</b> 구독 기간이 시작돼요. <b>지도 골드핀·우선 노출·쇼케이스</b>가 지금 바로 켜집니다. 아래 PIN으로 로그인해 우리 가게를 꾸며보세요.`;

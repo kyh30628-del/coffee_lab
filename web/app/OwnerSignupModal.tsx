@@ -1,8 +1,9 @@
 "use client";
 import { useState, useEffect } from "react";
+import { TRIAL_DAYS } from "@/lib/ownerPlan";
 import { useLockBodyScroll } from "@/lib/useLockBodyScroll";
 
-// 사장님 카페 정보 입력 모달(공용) — /pricing(구독)·랜딩(7일 체험)·카페 등록 직후(prefillCafe) 사용.
+// 사장님 카페 정보 입력 모달(공용) — /pricing(구독)·랜딩(무료 체험)·카페 등록 직후(prefillCafe) 사용.
 //   카페 검색·선택(또는 prefill 고정) → 성함·연락처·이메일·동의 → /api/subscription(pending). 승인 시 이메일로 PIN.
 // 📊 #513 신청 퍼널 계측 — 모달 오픈·제출 성공/실패를 /api/owner-funnel에 얕게 기록(개인정보 0, 실패해도 신청 흐름엔 무해).
 function trackFunnel(event: string, extra?: Record<string, unknown>) {
@@ -83,17 +84,17 @@ export default function OwnerSignupModal({ open, onClose, trial = false, prefill
         {done ? (
           <div className="text-center py-6">
             <div className="text-3xl mb-2">🎉</div>
-            <div className="font-bold mb-1">{trial ? "7일 체험 신청 완료" : "구독 신청 완료"}</div>
-            <p className="text-[13px] text-[#524234] leading-relaxed">관리자 승인 후 <b>등록하신 이메일로 키(PIN)</b>가 발송돼요. 그 키로 사장님 화면에 로그인하시면 <b>내 카페 분석으로 바로</b> 들어갑니다.{trial ? " 체험은 승인일로부터 7일간이에요." : ""}</p>
+            <div className="font-bold mb-1">{trial ? `${TRIAL_DAYS}일 체험 신청 완료` : "구독 신청 완료"}</div>
+            <p className="text-[13px] text-[#524234] leading-relaxed">관리자 승인 후 <b>등록하신 이메일로 키(PIN)</b>가 발송돼요. 그 키로 사장님 화면에 로그인하시면 <b>내 카페 분석으로 바로</b> 들어갑니다.{trial ? ` 체험은 승인일로부터 ${TRIAL_DAYS}일간이에요.` : ""}</p>
             <button onClick={close} className="w-full mt-5 bg-[#2b2018] text-[#f4ece0] rounded-lg py-2.5 text-sm font-bold">닫기</button>
           </div>
         ) : (
           <>
             <div className="flex items-start justify-between mb-1">
-              <h3 className="font-bold text-lg">{trial ? "✨ 7일 무료 체험 신청" : "홍보팩 구독 신청"}</h3>
+              <h3 className="font-bold text-lg">{trial ? `✨ ${TRIAL_DAYS}일 무료 체험 신청` : "홍보팩 구독 신청"}</h3>
               <button onClick={close} className="text-2xl text-[#82714f] leading-none -mt-1">×</button>
             </div>
-            <p className="text-[12px] text-[#524234] mb-3">{prefillCafe ? "방금 등록한 카페로 체험을 신청합니다. 사장님 정보를 남겨주세요." : "내 카페를 선택하고 정보를 남겨주세요."} 승인되면 <b>이메일로 키(PIN)</b>를 보내드려요.{trial ? " 결제 없이 7일간 모든 사장님 기능을 써보실 수 있어요." : ""}</p>
+            <p className="text-[12px] text-[#524234] mb-3">{prefillCafe ? "방금 등록한 카페로 체험을 신청합니다. 사장님 정보를 남겨주세요." : "내 카페를 선택하고 정보를 남겨주세요."} 승인되면 <b>이메일로 키(PIN)</b>를 보내드려요.{trial ? ` 결제 없이 ${TRIAL_DAYS}일간 모든 사장님 기능을 써보실 수 있어요.` : ""}</p>
             {prefillCafe ? (
               <div className="mb-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-[14px]"><b>{prefillCafe.name}</b><span className="text-[12px] text-emerald-600 font-bold ml-2">✓ 방금 등록한 내 카페</span><div className="text-[11px] text-[#665036] mt-0.5">검증·공개되면 승인 후 키를 보내드려요.</div></div>
             ) : (
@@ -140,7 +141,7 @@ export default function OwnerSignupModal({ open, onClose, trial = false, prefill
               <span className="text-[11.5px] text-[#52402e] leading-snug"><b>(선택)</b> 📰 <b>주간 커피·디저트 트렌드 뉴스레터</b> 받기. 광고성 정보 수신에 동의합니다(언제든 메일 하단 <b>수신거부</b> 가능).</span>
             </label>
             {err && <p className="text-[12px] text-[#c0392b] mb-2">{err}</p>}
-            <button disabled={busy || !canSubmit} onClick={submit} className="w-full bg-[#e8b87a] text-[#2b2018] rounded-lg py-3 font-bold disabled:opacity-50">{busy ? "신청 중…" : trial ? "7일 체험 신청" : "구독 신청"}</button>
+            <button disabled={busy || !canSubmit} onClick={submit} className="w-full bg-[#e8b87a] text-[#2b2018] rounded-lg py-3 font-bold disabled:opacity-50">{busy ? "신청 중…" : trial ? `${TRIAL_DAYS}일 체험 신청` : "구독 신청"}</button>
           </>
         )}
       </div>

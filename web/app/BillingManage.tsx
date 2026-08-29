@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { isTrialDuration } from "@/lib/ownerPlan";
 
 // 💳 사장님 결제 관리 위젯 — 카드 등록/해지/상태. owner 화면(PIN 로그인)에서 mount.
 //   카드 입력은 토스 SDK 리다이렉트 흐름(requestBillingAuth) — 우리 화면엔 카드번호가 오지 않는다.
@@ -97,7 +98,7 @@ export default function BillingManage({ cafeId, pin }: { cafeId: number; pin: st
 
   if (!sub) return null;
   const hasCard = !!sub.card_last4 && (sub.billing_status === "registered" || sub.billing_status === "active");
-  const isTrial = (sub.duration_days ?? 30) <= 7;
+  const isTrial = isTrialDuration(sub.duration_days);
   const dLeft = daysLeft(sub.expires_at);
   const trialEndingSoon = isTrial && sub.status === "active" && !hasCard && dLeft != null && dLeft <= 3;
 

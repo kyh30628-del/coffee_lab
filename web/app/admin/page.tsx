@@ -1,5 +1,6 @@
 "use client";
 import { shouldPoll } from "./idleGuard";
+import { TRIAL_DAYS, isTrialDuration } from "@/lib/ownerPlan";
 import { useState, useEffect } from "react";
 import BackLink from "../BackLink";
 import { isSearchDegradeTrackItem } from "@/lib/searchDegradeTrack";
@@ -1310,8 +1311,8 @@ export default function AdminPage() {
             <div className="space-y-2">
               {subscribers.map((s) => {
                 const dleft = s.expires_at ? Math.max(0, Math.ceil((new Date(s.expires_at).getTime() - Date.now()) / 86400000)) : null;
-                // 🏷️ 체험(7일 이하)/유료를 status와 결합해 4상태 배지로: 체험중·체험만료·구독요청(결제대기)·구독중. 결제상태(만료/해지/정지)도 색으로 구분.
-                const isTrial = (s.duration_days ?? 30) <= 7;
+                // 🏷️ 체험(TRIAL_DAYS 이하)/유료를 status와 결합해 4상태 배지로: 체험중·체험만료·구독요청(결제대기)·구독중. 결제상태(만료/해지/정지)도 색으로 구분.
+                const isTrial = isTrialDuration(s.duration_days);
                 const badge =
                   s.status === "suspended" ? { label: "🚫 정지", cls: "bg-rose-600 text-white border-rose-600" }
                   : s.status === "cancelled" ? { label: "해지", cls: "bg-stone-200 text-stone-600 border-stone-300" }
@@ -1359,7 +1360,7 @@ export default function AdminPage() {
                     </div>
                     {s.status !== "active" && !s.cafe_published && <div className="mt-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-300 rounded-lg px-2 py-1.5">⚠️ 카페 <b>미공개</b> — 검수·공개(필요 시 분석 생성) 후에 승인할 수 있어요.</div>}
                     <div className="flex gap-2 mt-2">
-                      {s.status !== "active" && <button onClick={() => subAct(s.id, "activate", 7)} disabled={!s.cafe_published} title={s.cafe_published ? "" : "카페가 공개된 뒤 승인할 수 있어요"} className="flex-1 py-1.5 text-[12px] font-bold text-blue-700 bg-blue-50 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed">✓ 체험 승인(7일)</button>}
+                      {s.status !== "active" && <button onClick={() => subAct(s.id, "activate", TRIAL_DAYS)} disabled={!s.cafe_published} title={s.cafe_published ? "" : "카페가 공개된 뒤 승인할 수 있어요"} className="flex-1 py-1.5 text-[12px] font-bold text-blue-700 bg-blue-50 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed">✓ 체험 승인({TRIAL_DAYS}일)</button>}
                       {s.status !== "active" && <button onClick={() => subAct(s.id, "activate", 30)} disabled={!s.cafe_published} title={s.cafe_published ? "" : "카페가 공개된 뒤 승인할 수 있어요"} className="flex-1 py-1.5 text-[12px] font-bold text-emerald-700 bg-emerald-50 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed">✓ 구독 승인(30일)</button>}
                       {s.status === "active" && s.pin && <button onClick={() => subAct(s.id, "remind")} disabled={!s.email} title={s.email ? "온보딩 패키지(PIN+서비스 사용법)를 사장님 이메일로 다시 보냅니다" : "등록 이메일이 없어요 — 화면의 PIN을 직접 전달하세요"} className="flex-1 py-1.5 text-[12px] font-bold text-amber-700 bg-amber-50 border border-amber-300 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed">📧 온보딩 리마인드</button>}
                       {/* 🏦 카드 정기결제(PAYMENTS_LIVE) 오픈 전 — 계좌이체로 먼저 전환 유도. 실제 계좌번호는 이 메일 회신으로만 개별 안내.
@@ -1779,7 +1780,7 @@ export default function AdminPage() {
               ) : (
                 <>
                   <div className="flex gap-1.5 mb-2">
-                    <button onClick={() => setOnboardTab("trial")} className={`flex-1 py-2 text-[12px] font-bold rounded-lg border ${onboardTab === "trial" ? "bg-amber-100 border-amber-300 text-amber-800" : "bg-white border-stone-300 text-stone-700"}`}>🎁 7일 체험 승인 시</button>
+                    <button onClick={() => setOnboardTab("trial")} className={`flex-1 py-2 text-[12px] font-bold rounded-lg border ${onboardTab === "trial" ? "bg-amber-100 border-amber-300 text-amber-800" : "bg-white border-stone-300 text-stone-700"}`}>🎁 {TRIAL_DAYS}일 체험 승인 시</button>
                     <button onClick={() => setOnboardTab("paid")} className={`flex-1 py-2 text-[12px] font-bold rounded-lg border ${onboardTab === "paid" ? "bg-amber-100 border-amber-300 text-amber-800" : "bg-white border-stone-300 text-stone-700"}`}>☕ 구독 승인 시</button>
                   </div>
                   <div className="text-[11px] text-stone-600 bg-white border border-stone-300 rounded-lg px-2.5 py-2 mb-2"><b>제목:</b> {onboard[onboardTab].subject}</div>

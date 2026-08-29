@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
+import { TRIAL_DAYS } from "@/lib/ownerPlan";
 import NoticeModal from "./NoticeModal";
 import { SIDO_GU, SIDO_CENTER } from "@/lib/regionList";
 import InfoDot from "./InfoDot";
@@ -609,7 +610,7 @@ export default function Home() {
   const [ownerAdminMode, setOwnerAdminMode] = useState(false); // 모달 내 '관리자 로그인' 토글
   const [showSignup, setShowSignup] = useState(false);
   // 🏪 사장님 홈 진입: 가입 모달이 아니라 **가게 찾기 → 무료 리포트**가 먼저다(2026-08-27).
-  const [showFind, setShowFind] = useState(false); // 7일 체험 신청 모달
+  const [showFind, setShowFind] = useState(false); // 무료 체험 신청 모달
   const [backToast, setBackToast] = useState(false);
   // 지도용 상태
   const [tasteKey, setTasteKey] = useState<string | null>(null);
@@ -1444,8 +1445,8 @@ export default function Home() {
           <div className="fixed inset-0 z-[5000] flex items-center justify-center px-6">
             <div className="absolute inset-0 bg-black/50" onClick={() => setOwnerPwModal(false)} />
             <div className="relative bg-[#fdfaf4] text-[#2b2018] w-full max-w-sm rounded-2xl p-6 shadow-2xl">
-              {/* 우측 상단: 7일 무료 체험 */}
-              <button onClick={() => setShowSignup(true)} className="absolute top-4 right-4 text-[11px] font-bold bg-[#e8b87a] text-[#2b2018] px-3 py-1.5 rounded-full shadow active:scale-95">✨ 7일 무료 체험</button>
+              {/* 우측 상단: 무료 체험 */}
+              <button onClick={() => setShowSignup(true)} className="absolute top-4 right-4 text-[11px] font-bold bg-[#e8b87a] text-[#2b2018] px-3 py-1.5 rounded-full shadow active:scale-95">✨ {TRIAL_DAYS}일 무료 체험</button>
               {ownerAdminMode ? (
                 <>
                   <h3 className="text-lg font-bold mb-1">🔒 관리자 로그인</h3>
@@ -1470,7 +1471,7 @@ export default function Home() {
                     <button onClick={submitOwnerPin} className="flex-1 bg-[#2b2018] text-[#f4ece0] rounded-xl py-2.5 font-bold">내 카페 들어가기</button>
                     <button onClick={() => setOwnerPwModal(false)} className="px-4 text-[#7a5122]">취소</button>
                   </div>
-                  <p className="text-[12px] text-[#524234] text-center mt-3">키가 없으세요? <button onClick={() => setShowSignup(true)} className="text-[#7a5122] font-bold underline">7일 무료 체험 신청</button></p>
+                  <p className="text-[12px] text-[#524234] text-center mt-3">키가 없으세요? <button onClick={() => setShowSignup(true)} className="text-[#7a5122] font-bold underline">{TRIAL_DAYS}일 무료 체험 신청</button></p>
                   <button onClick={() => { setOwnerAdminMode(true); setOwnerPinErr(""); }} className="block w-full text-center text-[11px] text-[#665036] underline mt-2">관리자세요? 관리자 로그인</button>
                 </>
               )}

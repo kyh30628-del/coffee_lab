@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { TRIAL_DAYS, isTrialDuration } from "@/lib/ownerPlan";
 import { sql, ensureSchema , ensureOnce } from "@/lib/db";
 import { ensureOwnerActivity } from "@/lib/ownerActivity";
 import { encryptPII, decryptPII } from "@/lib/crypto";
@@ -13,7 +14,7 @@ export const runtime = "nodejs";
 // 💳 구독 회원(카페별). 요금제(/pricing)에서 회원가입 → 관리자 활성화 → PIN 발급(이메일)·featured 연동.
 const authed = (req: NextRequest) => !!req.headers.get("x-admin-password") && req.headers.get("x-admin-password") === process.env.ADMIN_PASSWORD;
 // 등록 이메일로 온보딩 메일(내 카페 열쇠 + 전용 서비스 사용법) 발송(Resend). 키 없으면 미발송(관리자 화면에서 PIN 확인·전달).
-//   본문은 lib/onboardingEmail.ts 단일 출처(리뷰 분석·쇼케이스·노출·뉴스레터 안내 포함). 체험/구독 분기(days<=7).
+//   본문은 lib/onboardingEmail.ts 단일 출처(리뷰 분석·쇼케이스·노출·뉴스레터 안내 포함). 체험/구독 분기(lib/ownerPlan.ts isTrialDuration).
 async function sendPinEmail(to: string, pin: string, cafeName: string, days = 30): Promise<boolean> {
   const key = process.env.RESEND_API_KEY;
   if (!key || !to || !to.includes("@")) return false;
@@ -152,8 +153,8 @@ export async function POST(req: NextRequest) {
       const days = Math.min(Math.max(Number(b.days) || 30, 1), 365);
       if (b.action === "activate") {
         const pin = s.pin || genPin(); // 재활성화면 기존 PIN 유지
-        // 체험(≤7일) = 첫 로그인 시점 시작 / 유료 구독 = 결제(=이 승인) 시점 즉시 시작. 온보딩 메일 분기(days<=7)와 동일 기준.
-        const isTrial = days <= 7;
+        // 체험(≤TRIAL_DAYS일) = 첫 로그인 시점 시작 / 유료 구독 = 결제(=이 승인) 시점 즉시 시작. 온보딩 메일 분기와 동일 기준(lib/ownerPlan.ts 단일출처).
+        const isTrial = isTrialDuration(days);
         if (isTrial) {
           // 🕐 무료 체험: 시계는 '첫 로그인'에. 승인 시엔 PIN·이용기간만 확정(started/expires·혜택은 첫 접속 때 lib/ownerActivity가 ON).
           await sql`UPDATE subscriptions SET status='active', started_at=NULL, expires_at=NULL, duration_days=${days}, pin=${pin}, verified=true, conversion_requested_at=NULL, updated_at=now() WHERE id=${id}`;
@@ -246,8 +247,8 @@ export async function POST(req: NextRequest) {
     if (!bizRegUrl) return NextResponse.json({ ok: false, error: "사업자등록증 이미지가 필요합니다" }, { status: 400 });
     const ip = (req.headers.get("x-forwarded-for") ?? req.headers.get("x-real-ip") ?? "").split(",")[0].trim().slice(0, 60);
     const ua = (req.headers.get("user-agent") ?? "").slice(0, 200);
-    const isTrial = !!b.trial;                          // 7일 무료 체험 신청 — 관리자가 7일로 승인
-    const plan = isTrial ? "7일 체험" : PLAN;
+    const isTrial = !!b.trial;                          // 무료 체험 신청 — 관리자가 TRIAL_DAYS(lib/ownerPlan.ts)로 승인
+    const plan = isTrial ? `${TRIAL_DAYS}일 체험` : PLAN;
     const price = isTrial ? 0 : PRICE;
     const optIn = b.newsletter !== false;   // 뉴스레터 수신동의(기본 true)
     await sql`INSERT INTO subscriptions (cafe_id, cafe_name, owner_name, contact, email, plan, price, status, consent, consent_at, biz_reg_url, biz_no, attested, attested_at, signup_ip, signup_ua, newsletter_opt_in)
