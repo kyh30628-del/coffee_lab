@@ -109,10 +109,25 @@ export async function ensureCriteriaTable(): Promise<void> {
     impact_note TEXT
   )`;
   // 시드 — 현재값=value=default_value로 삽입(멱등). 이미 있으면 손대지 않음(운영자 조정값 보존).
-  for (const m of META) {
-    await sql`INSERT INTO criteria (key, category, label, value, default_value, min_value, max_value, unit)
-      VALUES (${m.key}, ${m.category}, ${m.label}, ${m.def}, ${m.def}, ${m.min}, ${m.max}, ${m.unit})
-      ON CONFLICT (key) DO NOTHING`;
+  //
+  // 💰 2026-08-29 수리: 여기가 **기준 키 하나당 INSERT 1왕복**을 돌았다. `ensured` 플래그는 프로세스당
+  //   1회를 보장하지만 서버리스는 콜드스타트가 잦아, 실측상 `INSERT INTO criteria`가 **분당 14.6회**
+  //   실행되고 있었다(26분 창 380회). 시드는 최초 1회만 필요한데 매 콜드스타트마다 전부 다시 쏜 것이다.
+  //   → ①이미 다 들어있으면 **세는 것 한 번으로 건너뛴다** ②정말 채워야 할 때만 **한 방에** 넣는다.
+  //   결과: 콜드스타트당 왕복 (2 + META개) → 3.
+  const [{ n }] = (await sql`SELECT count(*)::int n FROM criteria`) as { n: number }[];
+  if (n < META.length) {
+    const params: (string | number | null)[] = [];
+    const values = META.map((m, i) => {
+      const b = i * 8;
+      params.push(m.key, m.category, m.label, m.def, m.def, m.min, m.max, m.unit);
+      return `($${b + 1}, $${b + 2}, $${b + 3}, $${b + 4}, $${b + 5}, $${b + 6}, $${b + 7}, $${b + 8})`;
+    });
+    await sql.query(
+      `INSERT INTO criteria (key, category, label, value, default_value, min_value, max_value, unit)
+       VALUES ${values.join(", ")} ON CONFLICT (key) DO NOTHING`,
+      params as never[],
+    );
   }
   ensured = true;
 }
