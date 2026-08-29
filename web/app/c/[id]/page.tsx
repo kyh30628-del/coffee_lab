@@ -446,6 +446,19 @@ export default async function CafePage({ params }: Props) {
               <div className="flex flex-wrap gap-2">{tags.map((t) => <span key={t} className="text-[13px] bg-[#efe6d6] rounded-full px-3 py-1">{t}</span>)}</div>
             </div>
           )}
+          {/* ☕ 사장님 CTA — **강·약 분석 바로 다음**(2026-08-29 이전).
+              왜 옮겼나: 원래 FAQ 아래 맨 끝(543줄 중 532행)이라 사실상 안 보였다.
+              실측 30일 — 카페상세 4,719PV 중 CTA 클릭 20회(0.42%)·**30초 이상 머문 방문자는 3%뿐**.
+              자기 가게를 검색해 들어온 사장님이 가장 몰입하는 순간은 '우리 가게 강·약'을 본 직후다.
+              그 자리로 올린다. (중복 배치는 하지 않는다 — 소비자 화면이 광고처럼 보이면 안 된다.) */}
+          {/* 사장님 CTA — 카페 상세 → owner 인사이트 진입(B2B 퍼널, decisions #15). 클릭 계측: decisions #782 */}
+          <OwnerCtaLink cafeId={c.id} cafeName={c.name} className="mt-3 flex items-center justify-between gap-2 w-full rounded-xl px-4 py-3 border border-[#e6d2b5]" style={{ background: "linear-gradient(90deg,#fbf3e4,#f4ece0)" }}>
+            <span className="flex flex-col text-left">
+              <span className="text-[12.5px] font-bold text-[#7a5a2a]">☕ 이 카페 사장님이신가요?</span>
+              <span className="text-[10.5px] text-[#6f6047]">방금 보신 강·약에 <b>동네 순위</b>까지 — 가입 없이 바로 볼 수 있어요</span>
+            </span>
+            <span className="text-[#c98a3c] font-bold whitespace-nowrap">→</span>
+          </OwnerCtaLink>
           <p className="text-[12.5px] text-[#665036] mb-4 leading-relaxed">네이버 공개 후기 <b>{c.synth_count ?? 0}건</b>을 교차검증한 데이터 기반 소개예요. <Link href="/trust" className="underline text-[#7a5122]">검증 방법 보기</Link></p>
           {/* 방문자 후기 — 하단 버튼 바로 위 */}
           {userReviews.length > 0 && <div className="mb-4"><VisitorReviews reviews={userReviews} /></div>}
@@ -528,14 +541,6 @@ export default async function CafePage({ params }: Props) {
               </div>
             </div>
           )}
-          {/* 사장님 CTA — 카페 상세 → owner 인사이트 진입(B2B 퍼널, decisions #15). 클릭 계측: decisions #782 */}
-          <OwnerCtaLink cafeId={c.id} cafeName={c.name} className="mt-3 flex items-center justify-between gap-2 w-full rounded-xl px-4 py-3 border border-[#e6d2b5]" style={{ background: "linear-gradient(90deg,#fbf3e4,#f4ece0)" }}>
-            <span className="flex flex-col text-left">
-              <span className="text-[12.5px] font-bold text-[#7a5a2a]">☕ 이 카페 사장님이신가요?</span>
-              <span className="text-[10.5px] text-[#6f6047]">후기 데이터로 보는 우리 가게 강점·약점 — 무료 인사이트</span>
-            </span>
-            <span className="text-[#c98a3c] font-bold whitespace-nowrap">→</span>
-          </OwnerCtaLink>
         </div>
       </div>
     </main>
