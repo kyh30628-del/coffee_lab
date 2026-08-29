@@ -75,8 +75,15 @@ export async function GET(req: NextRequest) {
       COUNT(*) FILTER (WHERE embedding IS NULL AND (published OR pipeline_status='pending') AND synth_identity IS NOT NULL)::int embed_q,
       COUNT(*) FILTER (WHERE published AND raw_reviews IS NOT NULL AND raw_collected_at > synth_checked_at)::int synth_backlog,
       COUNT(*) FILTER (WHERE published AND (synth_checked_at IS NULL OR synth_checked_at < now() - interval '7 days'))::int synth_stale7,
-      -- 순환 천장 = '가장 오래 안 훑은 카페의 나이'. 고정창(stale7) 대신 이걸로 그물이 실제로 멈췄는지를 잰다(아래 주석).
-      COALESCE(MAX(CASE WHEN published THEN ROUND(EXTRACT(EPOCH FROM (now() - synth_checked_at))/86400)::int END), 0) synth_oldest_d,
+      -- 순환 천장 = '거의 모든 카페가 이 나이 안에는 훑였다'. 그물이 실제로 멈췄는지를 잰다(아래 주석).
+      -- ⚠️ 2026-08-29 재교정: 원래 MAX였는데 **한 곳만 끼어도 영원히 빨강**이었다.
+      --    실측 — 중앙값 6일·p99 19일·21일 초과 **단 1곳**(0.005%)인데 그 1곳이 38일이라 🔴위험이 떠 있었다.
+      --    p99로 바꾼다: 그물이 진짜 멈추면 전체가 같이 늙어 p99가 치솟으므로 감도는 그대로다.
+      --    개별로 낀 카페는 아래에서 '주의'로 따로 표면화한다(빨강 아님 — 소비자 화면 무손상).
+      COALESCE(ROUND(percentile_cont(0.99) WITHIN GROUP (
+        ORDER BY CASE WHEN published THEN EXTRACT(EPOCH FROM (now() - synth_checked_at))/86400 END))::int, 0) synth_oldest_d,
+      COALESCE(MAX(CASE WHEN published THEN ROUND(EXTRACT(EPOCH FROM (now() - synth_checked_at))/86400)::int END), 0) synth_max_d,
+      COUNT(*) FILTER (WHERE published AND synth_checked_at < now() - interval '21 days')::int synth_stuck,
       COUNT(*) FILTER (WHERE published AND synth_checked_at IS NULL)::int synth_never
       FROM cafes`)[0] as any;
     // 판정 대기·오늘 지표 = lib/metrics 단일출처(judge-status와 동일 정의 — 화면별 숫자 어긋남 구조적 차단).
@@ -116,7 +123,22 @@ export async function GET(req: NextRequest) {
     // 로컬 배치 하트비트 — 실패(크래시 등)·정체를 관제탑이 잡아 경보. (예: dong-backfill ReferenceError)
     await sql`CREATE TABLE IF NOT EXISTS agent_runs (job TEXT PRIMARY KEY, ran_at TIMESTAMPTZ DEFAULT now(), ok BOOLEAN DEFAULT true, detail TEXT, processed INT DEFAULT 0)`.catch(() => {});
     const jobRuns = (await sql`SELECT job, ran_at, to_char(ran_at,'MM-DD HH24:MI') ran, ok, detail, EXTRACT(EPOCH FROM (now()-ran_at))/3600 age_h FROM agent_runs`.catch(() => [])) as any[];
-    const jobFails = jobRuns.filter((j) => j.ok === false).map((j) => `${j.job} 오류(${j.ran}): ${(j.detail || "").slice(0, 70)}`);
+    // 🔑 2026-08-29: 같은 원인의 실패를 **한 줄로 묶는다.**
+    //   실측 — 오늘 03시 OAuth 세션이 만료되자 quality-redteam·rulegap·integrity·self-audit·dev 5개 잡이
+    //   똑같은 이유로 죽었는데 관제탑엔 5줄이 따로 떠서 "에러 산더미"로 보였다(CEO 지적).
+    //   원인이 하나면 조치도 하나다 — 쪼개서 보여주면 무엇을 해야 할지가 오히려 안 보인다.
+    //   ⚠️ 묶는 건 표시뿐이다. 실패 자체를 숨기지 않고 잡 이름을 모두 적는다.
+    const failed = jobRuns.filter((j) => j.ok === false);
+    const isAuthFail = (d: string) => /authenticate|OAuth|session expired|claude-p 무응답|invalid api key|401/i.test(d || "");
+    const authFails = failed.filter((j) => isAuthFail(j.detail || ""));
+    const otherFails = failed.filter((j) => !isAuthFail(j.detail || ""));
+    const jobFails = [
+      ...(authFails.length > 0
+        ? [`🔑 자율 에이전트 로그인 만료 — ${authFails.length}개 잡 정지(${authFails.map((j) => j.job).join(", ")}). ` +
+           `조치: 터미널에서 \`claude\` 로그인 1회. 마지막 실패 ${authFails[0].ran}`]
+        : []),
+      ...otherFails.map((j) => `${j.job} 오류(${j.ran}): ${(j.detail || "").slice(0, 70)}`),
+    ];
 
     // 🔎 공개 데이터 무결성 실시간 자가검증 — 사장님이 잡은 버그 유형을 관제탑이 매번 스스로 검사.
     //   (동 형식·동=구명 오추출·동-구 불일치·카테고리 누락·좌표 오류) 위반 시 즉시 경보.
@@ -227,7 +249,10 @@ export async function GET(req: NextRequest) {
     //   → 재는 대상을 바꾼다: **'가장 오래 안 훑은 카페의 나이'(순환 천장)**. 그물이 진짜 멈추면 이 값만 치솟는다.
     //   과거 '주4곳=61년 적체'도 이 지표면 즉시 빨강(천장 수천일) — 감도는 잃지 않고 상시 오경보만 제거.
     if (c.synth_never > 0) risks.push(`재합성 미착수 ${c.synth_never}곳 — 오염그물 사각(한 번도 안 훑음)`);
-    else if (c.synth_oldest_d > 21) risks.push(`재합성 순환 정체 — 최장 ${c.synth_oldest_d}일 미점검(오염그물 멈춤, 처리량 점검)`);
+    else if (c.synth_oldest_d > 21) risks.push(`재합성 순환 정체 — 99%가 ${c.synth_oldest_d}일 이상 미점검(오염그물 멈춤, 처리량 점검)`);
+    // 개별로 순환에서 빠진 카페 — 그물 전체는 도는데 몇 곳만 안 잡히는 상태. 소비자 화면은 멀쩡하므로 **주의**.
+    //   (전체가 멈춘 것과 한 곳이 낀 것은 원인도 조치도 다르다 — 같은 빨강으로 묶으면 진짜 정체를 못 알아본다.)
+    else if (c.synth_stuck > 0) notices.push(`재합성 순환 누락 ${c.synth_stuck}곳(최장 ${c.synth_max_d}일) — 그물은 정상 회전 중, 해당 카페만 재점검 필요`);
     // ⚠️ 2026-08-22 최종 제거: stale7은 **주의로 낮춰도 여전히 상시 발동**이었다.
     //   위 주석대로 정상 순환에서 stale7 = PUB×(C−7)/C이고 현재 C≈16일이라 항상 임계(20%)를 넘는다
     //   → 실측 9,316곳이 "정상 로테이션 지연"이라는 문구를 달고 매일 이슈 목록에 올라왔다.
@@ -561,7 +586,7 @@ export async function GET(req: NextRequest) {
     const health = {
       generatedAt: new Date(now).toISOString(),
       overall, alerts, healed, risks, notices, integrity,
-      coverage: { total: c.total, published: c.published, rawCachedPct: pct(c.raw_cached), judgedPct: pct(c.judged), embeddedPct: c.published ? Math.round((c.pub_embedded / c.published) * 100) : 0, dongPct, synthBacklog: c.synth_backlog, synthStale7: c.synth_stale7, synthOldestD: c.synth_oldest_d, synthNever: c.synth_never },
+      coverage: { total: c.total, published: c.published, rawCachedPct: pct(c.raw_cached), judgedPct: pct(c.judged), embeddedPct: c.published ? Math.round((c.pub_embedded / c.published) * 100) : 0, dongPct, synthBacklog: c.synth_backlog, synthStale7: c.synth_stale7, synthOldestD: c.synth_oldest_d, synthMaxD: c.synth_max_d, synthStuck: c.synth_stuck, synthNever: c.synth_never },
       today: { newCafes: daily.newCafes, synthesized: td.synth_today, published: td.published_today, hasDong: td.has_dong, dongPct, noise: td.noise, newQueue: td.new_q, ytToday: daily.yt, ytTotal: td.yt_total },
       pipeline, agents,
       grounding: { suspectCount: gr?.suspect ?? 0, suspects: grSuspects },
