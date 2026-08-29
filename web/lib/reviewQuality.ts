@@ -699,6 +699,11 @@ const LANDMARK_WORDS = [
   //   흡수(카페 언급 0). 대조군(더숲 초소책방·숲속의 밤)은 6/6 정상 — '숲' 자체가 아니라 '꿈의숲' 랜드마크
   //   미등재가 원인.
   "꿈의숲",
+  // 룰갭 20260829(decisions#880): '하조대'는 양양 해변·전망대 랜드마크명 — id24943('예쁘다 하조대')
+  //   synth_reviews 6건 중 2건(하조대횟집 삿포로수산 방문기·서핑강습 후기)이, id24946('하조대커피')
+  //   5건 중 1건(부커스비치호텔 소개글)이 카페 무관 콘텐츠를 흡수. 대조군(하조대커피 낙산점 id24959,
+  //   경포점 id23713)은 별도 강한 식별어 보유로 정상 — 지명 단독/약한 수식어 조합일 때만 문제.
+  "하조대",
 ];
 const isVenueTok = (t: string) => { const n = norm(t); return VENUE_WORDS.some((v) => n.includes(norm(v))) || HOTEL_BRANDS.some((v) => n.includes(norm(v))) || LANDMARK_WORDS.some((l) => n.includes(norm(l))) || DISTRICT_WORDS.some((d) => n.includes(norm(d))) || UNIV_ABBR_WORDS.some((u) => n.includes(norm(u))) || METRO_NAMES.has(n); };
 // 랜드마크 전용 판정(isVenueTok의 부분집합) — 몰/호텔/대학 등 다른 venue 범주와 분리해, '랜드마크가
