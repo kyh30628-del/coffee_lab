@@ -68,6 +68,35 @@ const pv = (await sql.query(`SELECT count(*)::int pv, count(DISTINCT anon_id)::i
   WHERE ts > now()-interval '30 days' AND anon_id NOT IN (${BOT_ANON_IDS_SQL})`))[0];
 console.log(`  최근 30일: ${Number(pv.pv).toLocaleString()} PV · ${Number(pv.uv).toLocaleString()}명 → 10만 PV의 ${(pv.pv/1000).toFixed(1)}%`);
 
+// 🏪 사장님 퍼널 — 2026-08-29 CEO 지시로 추가. B안(찾아왔을 때 잡기)의 성적표.
+//   같은 날 CTA를 페이지 맨 끝(FAQ 아래)에서 강·약 분석 직후로 올렸다.
+//   이동 전 기준선: 30일 CTA 20회 / 4,719 PV = **0.42%** · 리포트 도달 3 · 리드 0 · 유료 0.
+//   ⚠️ 표본이 작다(월 20클릭). 하루이틀 숫자로 판정하지 말 것 — 최소 한 달은 봐야 유의미하다.
+console.log("\n═══ ⑧ 사장님 퍼널 (CTA 클릭률) ═══");
+try {
+  const cv = (await sql.query(`SELECT count(*)::int pv FROM traffic_events
+    WHERE path LIKE '/c/%' AND ts > now()-interval '30 days' AND anon_id NOT IN (${BOT_ANON_IDS_SQL})`))[0];
+  const ev = await sql.query(`SELECT event, count(*)::int n FROM owner_funnel_events
+    WHERE ts > now()-interval '30 days' GROUP BY 1`);
+  const g = (e) => Number(ev.find((x) => x.event === e)?.n ?? 0);
+  const cta = g("cta_click"), view = g("free_report_view"), submit = g("submit_success");
+  const rate = cv.pv > 0 ? (cta / cv.pv * 100) : 0;
+  const leads = (await sql.query(`SELECT count(*)::int n FROM owner_leads`).catch(() => [{ n: 0 }]))[0].n;
+  const paid = (await sql.query(`SELECT count(*)::int n FROM subscriptions WHERE COALESCE(price,0) > 0`))[0].n;
+  console.log(`  카페상세 ${Number(cv.pv).toLocaleString()} PV → CTA ${cta}회 = ${rate.toFixed(2)}% (이동 전 0.42%)`);
+  console.log(`  → 리포트 도달 ${view} · 신청 ${submit} · 이메일 리드 ${leads} · 유료 ${paid}`);
+  // 판정은 **상대 10% 이상 차이**일 때만. 표본이 20건대라 1~2건 차이는 노이즈다.
+  //   (반올림한 "0.42"와 비교하면 20/4,732=0.4227%가 '상승'으로 잘못 뜬다 — 기준선은 원값으로 둔다.)
+  const BASE = 20 / 4719 * 100; // 이동 전 원값 0.4238%
+  const diff = (rate - BASE) / BASE;
+  const verdict = Math.abs(diff) < 0.10 ? "= 유의미한 변화 없음" : diff > 0 ? `🟢 상승 ${(diff*100).toFixed(0)}%` : `🔻 하락 ${(-diff*100).toFixed(0)}%`;
+  console.log(`  ${verdict}${cta < 30 ? " (표본 작음 — 한 달은 봐야 판정 가능)" : ""}`);
+  // 아웃리치(DM 등)로 들어온 건 따로 — 0이면 '실패'가 아니라 '아직 안 보냄'일 수 있다.
+  const out = (await sql.query(`SELECT count(*)::int n FROM owner_funnel_events
+    WHERE event='free_report_view' AND source LIKE 'outreach_%' AND ts > now()-interval '30 days'`))[0].n;
+  console.log(`  아웃리치 경유 유입: ${out}건${Number(out) === 0 ? " (발송 전이면 정상)" : ""}`);
+} catch (e) { console.log("  집계 실패:", String(e).slice(0, 80)); }
+
 console.log("\n═══ ⑦ 신설 테마(베이커리·테라스) 색인→유입 곡선 ═══");
 const th = await sql.query(`SELECT split_part(path,'/',4) axis, (ts AT TIME ZONE 'Asia/Seoul')::date d, count(*)::int pv
   FROM traffic_events WHERE (path LIKE '%/bakery%' OR path LIKE '%/terrace%')
