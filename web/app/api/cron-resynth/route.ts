@@ -102,6 +102,33 @@ export async function GET(req: NextRequest) {
       }
     };
 
+    // 🔓 held 재평가 레인 — 2026-08-29 신설.
+    //   문제: 위 전수 재합성 쿼리는 `published = true`만 뽑는다. 그래서 한 번 held가 된 카페는
+    //   **영원히 재평가되지 않는다**(실측: held 109곳·평균 35일·최장 67일 방치, 최근 14일 재점검 14곳뿐).
+    //   그중 74곳은 **지금 규칙으로는 held 사유에 해당하지도 않았다** — 옛 규칙으로 묶인 채 갇힌 것이다.
+    //   규칙이 좋아져도 갇힌 카페는 못 나오는 구조 = 자율 조직의 사각. 느린 레인을 하나 연다.
+    //
+    //   안전: synthAndStore가 **현재 규칙 + 결재 잠금(lastUnpublishLocked·lastDowngradeCap)**을 그대로 적용한다.
+    //     CEO가 내린 카페는 재공개되지 않는다(해당 0곳 확인). 자격 없으면 그대로 held로 남는다.
+    //   💰 비용: raw 캐시를 쓰므로 수집 API 호출 0. 회당 20곳이면 109곳이 ~1.5일에 한 바퀴 돌고,
+    //     이후엔 새로 held된 것만 처리하므로 상시 부하가 거의 없다.
+    const HELD_MAX = 20;
+    const heldRows = (await sql`
+      SELECT id, name, area FROM cafes
+      WHERE pipeline_status = 'held' AND published = false AND raw_reviews IS NOT NULL
+        AND (synth_checked_at IS NULL OR synth_checked_at < now() - interval '7 days')
+      ORDER BY synth_checked_at ASC NULLS FIRST
+      LIMIT ${HELD_MAX}`) as unknown as { id: number; name: string; area: string }[];
+    let heldDone = 0, heldFreed = 0, heldErr = 0;
+    for (const c of heldRows) {
+      try {
+        await synthAndStore({ id: c.id, name: c.name, area: c.area ?? "" }, { refresh: false });
+        heldDone++;
+        const [a] = (await sql`SELECT published FROM cafes WHERE id=${c.id}`) as unknown as { published: boolean }[];
+        if (a?.published) heldFreed++;
+      } catch (e) { heldErr++; await noteSilentFail("cron-resynth.held", e); }
+    }
+
     // 🎯 구독(유료) 카페는 신선 재수집(refresh:true, 소량·쿼터보호) — 사장님 분석 항상 최신
     const subResults = [];
     for (const cafe of subTargets) {
@@ -119,7 +146,7 @@ export async function GET(req: NextRequest) {
     if (toInvalidate.length) { const { invalidateCafeCaches } = await import("@/lib/cafeCacheInvalidate"); await invalidateCafeCaches(toInvalidate).catch(() => {}); }
 
     const _u = runUsage(); if (!_u?.overBudget) void clearOverBudget("cron-resynth"); // 💰 하네스 L1 — 이번 런의 큰 컬럼 소비량을 원장에 남긴다
-    await recordRun("cron-resynth", true, `raw정리 ${purged.length} 유튜브 ${ytRefreshed.length} · 구독재수집 ${subResults.length} · 전수적용 ${gDone}(변동 ${gChangedIds.length}·비공개 ${gUnpub.length}·오류 ${gErr})${gErr > 0 ? ` [${gErrSamples.join(" / ")}]` : ""}${gStop ? " ⚠️차단기발동" : ""}`, gDone, { metrics: { blobReads: _u?.blobReads ?? 0, wallMs: _u?.wallMs ?? 0 } });
+    await recordRun("cron-resynth", true, `raw정리 ${purged.length} 유튜브 ${ytRefreshed.length} · 구독재수집 ${subResults.length} · 전수적용 ${gDone}(변동 ${gChangedIds.length}·비공개 ${gUnpub.length}·오류 ${gErr}) · held재평가 ${heldDone}(복귀 ${heldFreed}·오류 ${heldErr})${gErr > 0 ? ` [${gErrSamples.join(" / ")}]` : ""}${gStop ? " ⚠️차단기발동" : ""}`, gDone, { metrics: { blobReads: _u?.blobReads ?? 0, wallMs: _u?.wallMs ?? 0 } });
     return NextResponse.json({ ok: true, ranAt: new Date().toISOString(), rawPurged: purged.length, ytRefreshed: ytRefreshed.length, subResynth: subResults.length, netApplied: gDone, changed: gChangedIds.length, unpublished: gUnpub.length, breaker: gStop });
   } catch (e) {
     await recordRun("cron-resynth", false, String(e).slice(0, 150));
