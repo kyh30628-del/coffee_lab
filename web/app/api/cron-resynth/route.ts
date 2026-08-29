@@ -75,7 +75,7 @@ export async function GET(req: NextRequest) {
       ORDER BY (raw_collected_at > synth_checked_at) DESC, synth_checked_at ASC NULLS FIRST
       LIMIT ${GEN_MAX}
     `) as unknown as { id: number; name: string; area: string; synth_count: number }[];
-    let gi = 0, gDone = 0, gErr = 0; const gUnpub: number[] = []; const gChangedIds: number[] = []; let gStop = false;
+    let gi = 0, gDone = 0, gErr = 0; const gErrSamples: string[] = []; const gUnpub: number[] = []; const gChangedIds: number[] = []; let gStop = false;
     const genWorker = async () => {
       while (!gStop) {
         const c = genRows[gi++]; if (!c) break;
@@ -89,7 +89,14 @@ export async function GET(req: NextRequest) {
           if (a.synth_count !== c.synth_count) gChangedIds.push(c.id);
           if (!a.published) gUnpub.push(c.id);
           if (gDone >= 100 && gUnpub.length / gDone > GEN_RATE_LIMIT) gStop = true; // 차단기 발동
-        } catch { gErr++; }
+        } catch (e) {
+          // 🔎 2026-08-29: 원래 `catch { gErr++ }`로 **오류 내용을 통째로 버렸다.**
+          //   그래서 고덕방(3056)이 38일간 재점검에서 빠졌는데도 '왜'를 아무도 볼 수 없었다
+          //   (그 사이 규칙이 강화돼 후기 0건이 됐는데 옛 등급으로 계속 공개됨 — 실제 소비자 노출 문제).
+          //   숫자만 세지 말고 **무엇이 왜 실패했는지**를 남긴다. 원장 detail에 앞 3건이 실린다.
+          gErr++;
+          if (gErrSamples.length < 3) gErrSamples.push(`${c.name}(${c.id}): ${String(e).slice(0, 60)}`);
+        }
       }
     };
 
@@ -110,7 +117,7 @@ export async function GET(req: NextRequest) {
     if (toInvalidate.length) { const { invalidateCafeCaches } = await import("@/lib/cafeCacheInvalidate"); await invalidateCafeCaches(toInvalidate).catch(() => {}); }
 
     const _u = runUsage(); if (!_u?.overBudget) void clearOverBudget("cron-resynth"); // 💰 하네스 L1 — 이번 런의 큰 컬럼 소비량을 원장에 남긴다
-    await recordRun("cron-resynth", true, `raw정리 ${purged.length} 유튜브 ${ytRefreshed.length} · 구독재수집 ${subResults.length} · 전수적용 ${gDone}(변동 ${gChangedIds.length}·비공개 ${gUnpub.length}·오류 ${gErr})${gStop ? " ⚠️차단기발동" : ""}`, gDone, { metrics: { blobReads: _u?.blobReads ?? 0, wallMs: _u?.wallMs ?? 0 } });
+    await recordRun("cron-resynth", true, `raw정리 ${purged.length} 유튜브 ${ytRefreshed.length} · 구독재수집 ${subResults.length} · 전수적용 ${gDone}(변동 ${gChangedIds.length}·비공개 ${gUnpub.length}·오류 ${gErr})${gErr > 0 ? ` [${gErrSamples.join(" / ")}]` : ""}${gStop ? " ⚠️차단기발동" : ""}`, gDone, { metrics: { blobReads: _u?.blobReads ?? 0, wallMs: _u?.wallMs ?? 0 } });
     return NextResponse.json({ ok: true, ranAt: new Date().toISOString(), rawPurged: purged.length, ytRefreshed: ytRefreshed.length, subResynth: subResults.length, netApplied: gDone, changed: gChangedIds.length, unpublished: gUnpub.length, breaker: gStop });
   } catch (e) {
     await recordRun("cron-resynth", false, String(e).slice(0, 150));
