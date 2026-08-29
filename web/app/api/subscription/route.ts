@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { noteSilentFail } from "@/lib/silentFail";
 import { TRIAL_DAYS, isTrialDuration } from "@/lib/ownerPlan";
 import { sql, ensureSchema , ensureOnce } from "@/lib/db";
 import { ensureOwnerActivity } from "@/lib/ownerActivity";
@@ -132,7 +133,8 @@ export async function POST(req: NextRequest) {
       const s = (await sql`SELECT cafe_name, owner_name, contact, email, status, plan FROM subscriptions WHERE cafe_id=${cafeId}`)[0] as any;
       if (!s) return NextResponse.json({ ok: false, error: "구독 없음" }, { status: 404 });
       await sql`UPDATE subscriptions SET conversion_requested_at=now(), updated_at=now() WHERE cafe_id=${cafeId}`;
-      await sql`INSERT INTO owner_events (cafe_id, event, at) VALUES (${cafeId}, 'request_conversion', now())`.catch(() => {});
+      await sql`INSERT INTO owner_events (cafe_id, event, at) VALUES (${cafeId}, 'request_conversion', now())`
+        .catch((e) => noteSilentFail("subscription.owner_events", e)); // 이력 유실 시 전환 퍼널이 과소집계된다
       const note = String(b.note ?? "").slice(0, 300).replace(/[<>]/g, "");
       await sendCeoAlert(`🔔 구독 전환 요청 — ${s.cafe_name ?? ""}`,
         `<div style="font-family:sans-serif;line-height:1.6"><h2>사장님이 유료 구독 전환을 요청했어요</h2>` +

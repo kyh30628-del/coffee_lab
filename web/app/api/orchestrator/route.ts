@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { recentSilentFails } from "@/lib/silentFail";
 import { invalidateCafeCaches } from "@/lib/cafeCacheInvalidate"; // 🧹 2026-08-28 /c/[id] ISR(48h) 전환 — 비공개 후 캐시 미무효화 시 최대 48시간 잔존
 import { sql, ensureSchema } from "@/lib/db";
 import { synthAndStore, finalizePipeline, scrubPublishedPII, healVendorTemplateQuotes, healGroundingSuspects, holdZeroEvidenceSuspects, healPublishedAudit, healNonCafeCategory, healOutOfBox, healAreaLabel, healOffConceptByReview } from "@/lib/synthStore";
@@ -288,6 +289,14 @@ export async function GET(req: NextRequest) {
     const offctx = (await sql`SELECT COUNT(*)::int n FROM cafes WHERE published AND offctx_rate >= 0.55 AND NOT COALESCE(offctx_ok, false)`.catch(() => [{ n: 0 }]))[0] as any;
     const offctxSuspects = (await sql`SELECT name, area, round(offctx_rate::numeric, 2) AS rate FROM cafes WHERE published AND offctx_rate >= 0.55 AND NOT COALESCE(offctx_ok, false) ORDER BY offctx_rate DESC LIMIT 30`.catch(() => [])) as any[];
     if (offctx.n > 0) notices.push(`리뷰 맥락 의심 ${offctx.n}곳(점검 권장 — 일부 진짜 카페 포함될 수 있음)`);
+    // 🔇 조용한 실패 — 삼킨 오류의 누적. 동작은 안 막았지만 '몇 건 잃었는지'는 보여야 한다(2026-08-29).
+    //   임계(5건) 미만은 안 띄운다 — 한 번 튄 건 소음이고, 계속 막힌 것만 신호다.
+    //   소비자 화면이 깨진 게 아니므로 **주의**(빨강 아님). 단, 유입 지표의 분모가 틀어질 수 있어 조기에 봐야 한다.
+    try {
+      const sf = await recentSilentFails(5);
+      for (const f of sf) notices.push(`조용한 실패 ${f.scope} ${f.n}건(최근 2일) — ${String(f.last_error || "").slice(0, 60)}`);
+    } catch {}
+
     // 🤖 규칙갭 자가학습 에이전트 — 직전 실행에서 자동학습/승인대기/롤백한 내역을 surface.
     try {
       const rg = (await sql`SELECT learned, pending, ran_at FROM rulegap_runs ORDER BY id DESC LIMIT 1`)[0] as any;

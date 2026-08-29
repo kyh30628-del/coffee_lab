@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { noteSilentFail } from "@/lib/silentFail";
 import { sql, ensureSchema } from "@/lib/db";
 import { synthAndStore } from "@/lib/synthStore";
 import { acquireLease, releaseLease } from "@/lib/healLease";
@@ -96,6 +97,7 @@ export async function GET(req: NextRequest) {
           //   숫자만 세지 말고 **무엇이 왜 실패했는지**를 남긴다. 원장 detail에 앞 3건이 실린다.
           gErr++;
           if (gErrSamples.length < 3) gErrSamples.push(`${c.name}(${c.id}): ${String(e).slice(0, 60)}`);
+          await noteSilentFail("cron-resynth.synth", e); // 누적 추이로 '한 번 튄 것'과 '계속 막힌 것'을 가른다
         }
       }
     };

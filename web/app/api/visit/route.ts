@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { noteSilentFail } from "@/lib/silentFail";
 import { sql, ensureSchema, ensureOnce } from "@/lib/db";
 import { sourceBucket } from "@/lib/trafficSource";
 import { KNOWN_BOT_UA_PATTERN } from "@/lib/behaviorBot";
@@ -83,7 +84,10 @@ export async function POST(req: NextRequest) {
         landing = COALESCE(NULLIF(user_consents.landing, ''), NULLIF(EXCLUDED.landing, ''))`;
     // 빈 경로·내부(대표/팀·/admin·/owner)는 페이지뷰 이벤트서 제외(분석 정확도). 봇은 위에서 이미 원천 차단됨.
     if (landing && !isInternal && !/^\/(admin|owner)/.test(landing)) {
-      await sql`INSERT INTO traffic_events (anon_id, path, src) VALUES (${anonId}, ${landing}, ${src})`.catch(() => {});
+      // 🔇 실패해도 사용자 요청은 계속(원래 설계) — 다만 **몇 건 잃었는지는 남긴다.**
+      //   이 값이 유실되면 DAU·MAU·CTA 클릭률 등 유입 판단의 분모가 조용히 틀어진다.
+      await sql`INSERT INTO traffic_events (anon_id, path, src) VALUES (${anonId}, ${landing}, ${src})`
+        .catch((e) => noteSilentFail("visit.traffic_events", e));
     }
     return NextResponse.json({ ok: true });
   } catch (e) {
