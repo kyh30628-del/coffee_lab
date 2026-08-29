@@ -19,6 +19,10 @@ export const META: CriterionMeta[] = [
   // 등급 바닥
   { key: "grade.floor.verified", category: "등급", label: "검증 등급 최소 검증리뷰 수(광고 제외)", def: 30, min: 5, max: 100, unit: "건" },
   { key: "grade.floor.reference", category: "등급", label: "참고 등급 최소 검증리뷰 수(광고 제외)", def: 3, min: 1, max: 50, unit: "건" },
+  // 🔒 2026-08-29 CEO 결재 — **신규** 공개 임계(기존 공개는 위 reference=3 그대로 유지 = 즉시 비공개 0곳).
+  //   근거: 3건짜리 공개 카페 877곳·4건 758곳이 임계 바로 위에 몰려 후기 1건만 빠져도 내려갔다.
+  //   실측 — 3건짜리 193곳 재수집 시 48곳(24%)이 미달로 하락. 여유 2건을 둬 "올렸다 내리기"를 원천 차단한다.
+  { key: "grade.floor.reference_new", category: "등급", label: "신규 공개 최소 검증리뷰 수(기존 공개는 위 값 유지)", def: 5, min: 1, max: 50, unit: "건" },
   // 서비스 범위 좌표 박스 — 2026-08-25 강원 편입으로 위 38.3→38.7(고성), 경 127.9→129.4(삼척) 확대.
   //   ⚠️ DB criteria 행과 반드시 같아야 한다(DB 장애 시 이 값이 진실 → 어긋나면 강원이 통째로 배제된다).
   { key: "geo.box.lat_min", category: "지리", label: "서비스범위 좌표 박스 최소 위도(이하 범위밖 제외)", def: 36.8, min: 34.8, max: 38.8, unit: "°" },

@@ -322,7 +322,17 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   // 🔧 flip-flop 근본수정(2026-07-05): 라이브 카페엔 isNonCafe(name,"")를 '빈 카테고리'로 부르던 게 버그.
   //   그러면 이름만으로 판정해 '고로케·베이커리·쌀카스테라' 등 정상 디저트카페(네이버 "카페,디저트")를 비카페로 오판
   //   → published=false(pl은 live 유지) → 힐 b-2가 재공개 → 무한 진동. 실제 카테고리로 판정하면 정상 카페로 나온다.
-  const gradeOk = grade === "검증" || grade === "참고";
+  // 🔒 2026-08-29 CEO 결재 — 신규 공개 임계를 높여 "올렸다 내리기"를 원천 차단(히스테리시스).
+  //   문제: 공개 최소 기준이 후기 3건이라 **정확히 3건인 공개 카페가 877곳**(4건 758곳, 합 1,635곳=8.6%)
+  //   임계 바로 위에 몰려 있었다. 후기 1건만 빠져도 아래로 떨어진다.
+  //   실측(2026-08-29): 3건짜리 193곳을 재수집하니 **48곳(24%)이 미달로 하락** — 예약된 진동이었다.
+  //   게다가 그 1,635곳 중 843곳은 60일+ 낡은 수집 데이터로 공개 판정돼 있었다.
+  //   → 신규는 5건 이상이어야 올린다(여유 2건 확보). **기존 공개는 3건 그대로 유지**해 즉시 비공개 0곳.
+  //   이 파일의 기존 원칙(신규=엄격 / 라이브=grandfather)과 같은 방향이라 새 개념이 아니다.
+  //   ⚠️ 등급(grade) 자체는 건드리지 않는다 — 화면 표기·검색 가중치가 흔들리면 안 되므로 '공개 자격'만 가른다.
+  const refFloorNew = getCriterionSync("grade.floor.reference_new");
+  const gradeOk = grade === "검증"
+    || (grade === "참고" && (inPipeline ? collected >= refFloorNew : true));
   const nonCafeReal = isNonCafe(name, naverCat); // 실제 카테고리 사용(빈값 name-only 오탐 방지). 카테고리 없으면 grandfather.
   //   라이브(grandfather): 이름 OR 카테고리 중 '하나라도' 카페면 유지 — 둘 다 비카페일 때만 제거. 오제거 최소화.
   //   (고로케=카테고리'카페,디저트'로 유지 · 커피로스터=네이버 '제조업/쇼핑' 오분류지만 이름'커피'로 유지 · 식당=둘다 비카페→제거)
