@@ -331,6 +331,17 @@ export default function OrgDashboard() {
                 <div style={{ fontSize: 10.5, color: "#9c8a6c", marginBottom: 8 }}>
                   하루 2회(12·00시 KST) 전 축 스캔 → 안전한 오염은 결정론 자동 제거·재합성(멱등). 최근 7일 누적 실적:
                 </div>
+                {/* 🔴 스냅샷과 현재값이 다르면 그 사실을 명시한다 — 조치했는데 화면이 계속 빨강이면 관제탑을 못 믿게 된다(2026-08-29 CEO 지적). */}
+                {sentinel.namePollution && (
+                  <div style={{ fontSize: 10.5, marginBottom: 8, color: sentinel.namePollution.live > 0 ? "#a5701e" : "#3f7a4f", fontWeight: 700 }}>
+                    이름오염(coherence&lt;0.3) 지금 <b>{sentinel.namePollution.live}곳</b>
+                    {sentinel.namePollution.resolvedSince
+                      ? ` — 스캔 당시 ${sentinel.namePollution.snapshot}곳이었으나 이후 자가치유로 해소됨(실시간 재계산)`
+                      : sentinel.namePollution.live > 0 ? " — 다음 자가치유 런에서 자동 홀드" : ""}
+                  </div>
+                )}
+                <div style={{ fontSize: 10.5, color: "#9c8a6c", marginBottom: 8 }}>
+                </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 7 }}>
                   {sentinel.detectors?.map((d: any) => (
                     <div key={d.key} style={{ background: d.residual > 0 ? "#fdf6e8" : "#fbf6ec", border: `1px solid ${d.residual > 0 ? "#e0cfa0" : "#e6d8bf"}`, borderRadius: 9, padding: "8px 9px" }}>
