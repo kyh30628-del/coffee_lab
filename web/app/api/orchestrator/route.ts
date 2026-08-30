@@ -131,7 +131,24 @@ export async function GET(req: NextRequest) {
     //   ⚠️ 묶는 건 표시뿐이다. 실패 자체를 숨기지 않고 잡 이름을 모두 적는다.
     const failed = jobRuns.filter((j) => j.ok === false);
     const isAuthFail = (d: string) => /authenticate|OAuth|session expired|claude-p 무응답|invalid api key|401|인증 만료|로그인 만료|세션 만료/i.test(d || "");
-    const authFails = failed.filter((j) => isAuthFail(j.detail || ""));
+    // 🔑 2026-08-31 수리 — **이미 풀린 인증 실패가 화면을 영원히 빨갛게** 만들고 있었다.
+    //   agent_runs는 `job TEXT PRIMARY KEY` = 잡당 1행이라 **마지막 실행 결과만** 남는다.
+    //   그래서 인증이 끊긴 순간 실패한 잡은 **그 잡의 다음 정기 실행이 올 때까지 계속 '정지'로 보인다.**
+    //   실측(08-30): 인증은 그날 밤 복구돼 dev-agent가 8회 연속 성공했는데도, 그 시각에 걸린
+    //   auth-precheck·self-audit-agent 두 줄 때문에 11시간 내내 overall=critical이었다.
+    //   → CEO가 보는 관제탑이 "할 일 없는 빨강"을 상시 띄우면 진짜 빨강을 못 알아본다.
+    //   판정: 로컬 에이전트는 **같은 claude 로그인 하나를 공유**한다. 그러므로
+    //         가장 늦은 인증실패보다 **뒤에 성공한 잡이 하나라도 있으면 인증은 이미 살아있다.**
+    const rawAuthFails = failed.filter((j) => isAuthFail(j.detail || ""));
+    const at = (x: any) => new Date(x).getTime() || 0;
+    const newestAuthFail = rawAuthFails.length ? Math.max(...rawAuthFails.map((j) => at(j.ran_at))) : 0;
+    const newestOk = Math.max(0, ...jobRuns.filter((j) => j.ok !== false).map((j) => at(j.ran_at)));
+    const authRecovered = rawAuthFails.length > 0 && newestOk > newestAuthFail;
+    const authFails = authRecovered ? [] : rawAuthFails;
+    // 숨기지는 않는다 — 복구됐다는 **사실**을 정보로 남긴다(빨강 아님, overall에 반영 안 함).
+    const authNotes = authRecovered
+      ? [`ℹ️ 인증은 복구됨(이후 정상 실행 확인) — ${rawAuthFails.map((j) => j.job).join(", ")}의 기록은 만료 시점 그대로라 다음 정기 실행에서 갱신됩니다. 조치 불필요.`]
+      : [];
     const otherFails = failed.filter((j) => !isAuthFail(j.detail || ""));
     const jobFails = [
       ...(authFails.length > 0
@@ -571,11 +588,15 @@ export async function GET(req: NextRequest) {
     const core = agents.filter((a) => ["collect", "synth"].includes(a.key));
     // 위험(risks)·엔진정지·무결성위반·배치크래시 = critical(빨강). 에이전트 멈춤·지연·경고 = degraded(노랑).
     //   주의(notices)는 백그라운드 대기열이라 전체 상태를 떨어뜨리지 않음 — 정보로만 표시(소비자 무관).
-    const overall = (core.some((a) => a.status === "stalled") || jobFails.length || integrity.length || risks.length) ? "critical"
-      : agents.some((a) => a.status === "stalled" || a.status === "behind" || a.status === "warn") ? "degraded"
+    //   ⚠️ 2026-08-31: 인증 만료는 **소비자 화면 무손상**(내부 에이전트 문제)이고 CEO 로그인 1회면 끝이다.
+    //     CEO 원칙 "빨강은 소비자 손상일 때만"에 따라 critical 승격에서 빼고 degraded(주의)로 내린다.
+    //     바로 위 주석이 이미 "에이전트 멈춤·지연·경고 = degraded"라고 적어놓고 코드는 안 그랬다.
+    //     다른 배치 크래시(otherFails)는 데이터 손상 가능성이 있으므로 critical 그대로 유지한다.
+    const overall = (core.some((a) => a.status === "stalled") || otherFails.length || integrity.length || risks.length) ? "critical"
+      : (authFails.length || agents.some((a) => a.status === "stalled" || a.status === "behind" || a.status === "warn")) ? "degraded"
       : "healthy";
     // 배치 크래시·실패 + 데이터 무결성 위반을 최상단 경보로 — '관제탑이 잡아서 알림'
-    const alerts = [...jobFails, ...integrity.map((s) => `🔎 무결성: ${s}`), ...agents.filter((a) => a.status === "stalled").map((a) => `${a.label} 멈춤(${a.ageH}h 전 마지막 가동)`)];
+    const alerts = [...jobFails, ...authNotes, ...integrity.map((s) => `🔎 무결성: ${s}`), ...agents.filter((a) => a.status === "stalled").map((a) => `${a.label} 멈춤(${a.ageH}h 전 마지막 가동)`)];
 
     const pct = (n: number) => (c.total ? Math.round((n / c.total) * 100) : 0);
     // 신규 카페 조립라인(발굴→합성→AI판정→임베딩→공개). 각 단계 대기 수 = '어디서 막혔나'.
