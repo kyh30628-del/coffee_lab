@@ -96,7 +96,11 @@ export async function GET(req: NextRequest) {
       ...t,
       message: messageFor(t),
       link: `https://dongnecoffeenote.com/owner/r/${t.id}?src=dm`,
-      instagram: `https://www.instagram.com/${t.handle}/`,
+      // 💬 프로필이 아니라 **DM 대화창으로 직행**한다(2026-08-30).
+      //   프로필로 보내면 사장님이 매번 [메시지] 버튼을 찾아 눌러야 한다 — 100건이면 그 클릭만 100번이다.
+      //   ig.me/m/{handle}은 인스타 공식 단축링크로 해당 사용자와의 대화창을 바로 연다(실측 302 확인).
+      instagram: `https://ig.me/m/${t.handle}`,
+      profile: `https://www.instagram.com/${t.handle}/`,
       sentAt: sentMap.get(t.id)?.sent_at ?? null,
       visits: hitMap.get(t.id) ?? 0,
     }));
