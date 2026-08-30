@@ -490,13 +490,21 @@ export async function discoverRegion(region: string, areaLabel: string, keywords
     if (withCoord.length) {
       const minLat = Math.min(...withCoord.map((i) => i.lat as number)) - 0.001, maxLat = Math.max(...withCoord.map((i) => i.lat as number)) + 0.001;
       const minLng = Math.min(...withCoord.map((i) => i.lng as number)) - 0.001, maxLng = Math.max(...withCoord.map((i) => i.lng as number)) + 0.001;
-      ex = (await sql`SELECT id, name, dong, naver_category, phone, instagram_url, lat, lng FROM cafes
+      ex = (await sql`SELECT id, name, dong, naver_category, phone, instagram_url, lat, lng, address FROM cafes
         WHERE name = ANY(${names}) OR (lat BETWEEN ${minLat} AND ${maxLat} AND lng BETWEEN ${minLng} AND ${maxLng})`) as any[];
     } else {
-      ex = (await sql`SELECT id, name, dong, naver_category, phone, instagram_url, lat, lng FROM cafes WHERE name = ANY(${names})`) as any[];
+      ex = (await sql`SELECT id, name, dong, naver_category, phone, instagram_url, lat, lng, address FROM cafes WHERE name = ANY(${names})`) as any[];
     }
     const byName = new Map<string, any>();
     for (const c of ex) if (!byName.has(c.name)) byName.set(c.name, c);
+    // 🐛 재발방지(decisions#896): 지점명 추가/제거·접두어 등으로 이름이 달라지면 byName은 못 잡고,
+    //   신규 지오코딩 좌표가 기존 레코드와 55m(0.0005) 밖으로 갈리면 위 near+brandTokenOverlap도 못 잡는다
+    //   (완전동일주소인데 place_id만 이름해시라 서로 다르게 생성돼 ON CONFLICT를 우회 — 5쌍 실증).
+    //   주소 완전일치는 이름·좌표 오차와 무관하게 같은 물리적 매장을 가리키는 가장 강한 신호이므로
+    //   별도 dedup 키로 추가한다(정규화: 공백 정리만 — 완전일치만 매칭, 유사매치는 오탐 위험이라 배제).
+    const normalizeAddr = (a?: string | null) => (a || "").trim().replace(/\s+/g, " ");
+    const byAddress = new Map<string, any>();
+    for (const c of ex) { const key = normalizeAddr(c.address); if (key && !byAddress.has(key)) byAddress.set(key, c); }
     const pts = ex.filter((c) => c.lat != null).map((c) => ({ lat: Number(c.lat), lng: Number(c.lng), c }));
     for (const it of proc) {
       let m = byName.get(it.name);
@@ -510,6 +518,8 @@ export async function discoverRegion(region: string, areaLabel: string, keywords
         // decisions#852: brandTokenOverlap이 놓치는 구어체 철자·업종어 위치차 표기이형은 nearDuplicateCafeName으로 보조 판정.
         if (near && (brandTokenOverlap(near.name, it.name, [storeArea, near.dong, it.dong].filter(Boolean)) || nearDuplicateCafeName(near.name, it.name))) m = near;
       }
+      // decisions#896: 이름·좌표 오차로 위 두 판정을 모두 놓친 경우, 주소 완전일치를 최종 안전판으로.
+      if (!m && it.address) m = byAddress.get(normalizeAddr(it.address));
       if (m) {
         // 기존 카페: 동·카테고리·인스타그램·전화 없으면 백필(카테고리는 비카페 게이트 정확도, 인스타/전화는 B2B 아웃리치용 — coordination#232).
         if (it.dong && !m.dong) { await sql`UPDATE cafes SET dong = ${it.dong} WHERE id = ${m.id}`; backfilled++; m.dong = it.dong; }
@@ -532,9 +542,11 @@ export async function discoverRegion(region: string, areaLabel: string, keywords
         ON CONFLICT (place_id) DO NOTHING`;
       inserted++;
       // 같은 배치 내 후속 중복 방지(직전에 넣은 것도 대조 대상에 추가)
-      const nc = { id: null, name: it.name, dong: it.dong, naver_category: it.category, lat: it.lat, lng: it.lng };
+      const nc = { id: null, name: it.name, dong: it.dong, naver_category: it.category, lat: it.lat, lng: it.lng, address: it.address };
       byName.set(it.name, nc);
       if (it.lat != null) pts.push({ lat: it.lat as number, lng: it.lng as number, c: nc });
+      const addrKey = normalizeAddr(it.address);
+      if (addrKey && !byAddress.has(addrKey)) byAddress.set(addrKey, nc);
     }
   }
   // apiError: 아무것도 못 건졌는데 API 실패가 있었음 = 쿼터 소진(진짜 빈 지역 아님) → 호출부가 last_run 안 굳히게.
