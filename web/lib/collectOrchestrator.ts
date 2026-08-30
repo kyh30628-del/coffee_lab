@@ -165,8 +165,9 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
       kept++;
 
       // 합성 입력: verified 정가중, reference 절반가중. 출처가중도 반영.
+      // trust도 함께 실어보낸다 — synthEngine의 운영신호(ops) 스캔이 reference(약한 매칭)를 제외하는 근거(#894).
       const reps = verdict === "verified" ? Math.max(1, Math.round(weight)) : 1;
-      for (let i = 0; i < reps; i++) verifiedReviews.push({ text: t.text, time: t.time });
+      for (let i = 0; i < reps; i++) verifiedReviews.push({ text: t.text, time: t.time, trust: verdict === "verified" ? "verified" : "reference" });
       verifiedTexts.push(t.text);
       // "1990.01.01"은 네이버가 발행일 파싱 실패 시 보내는 무음 기본값(캐시된 raw_reviews에도 남아있을 수 있음) — 날짜없음 취급.
       const dateOk = !!t.date && t.date !== "1990.01.01" && /^\d{4}\.\d{2}\.\d{2}$/.test(t.date);
