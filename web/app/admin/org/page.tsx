@@ -439,6 +439,30 @@ export default function OrgDashboard() {
               </span>
               <span style={{ fontSize: 10.5, color: "#9c8a6c" }}>승인→브랜치구현→검증→배포</span>
             </button>
+            {/* 🔔 즉시발화 미설정 경고(2026-08-31) — API가 triggerConfigured를 내보내는데 화면이 안 쓰고 있었다.
+                미설정이면 🚀배포를 눌러도 로컬 워커에 신호가 안 가 최대 4시간 방치된다. 실측 9시간 사례 있음.
+                조용한 실패를 막으려면 **설정 상태를 시스템이 스스로 말해야** 한다. */}
+            {devpipe.triggerConfigured === false && (
+              <div style={{ marginTop: 8, background: "#fbeaea", border: "1px solid #e0b4b4", borderRadius: 9, padding: "8px 10px" }}>
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: "#b03a3a" }}>🔔 즉시발화 꺼져 있음 — 배포를 눌러도 바로 안 나갑니다</div>
+                <div style={{ fontSize: 10.5, color: "#8a4a4a", marginTop: 3, lineHeight: 1.5 }}>
+                  Vercel 환경변수 <b>TRIGGER_NTFY_TOPIC</b> 미설정. 지금은 배포가 정시(08·12·16·20시)까지 대기합니다.
+                  Settings → Environment Variables에 추가 후 재배포하면 즉시 실행됩니다.
+                </div>
+              </div>
+            )}
+            {/* 🚀 배포 확정 후 멈춤(2026-08-31) — 배포를 누르면 감시망에서 사라지던 사각을 메움 */}
+            {devpipe.deployStalledCount > 0 && (
+              <div style={{ marginTop: 8, background: "#fbeaea", border: "1px solid #e0b4b4", borderRadius: 9, padding: "8px 10px" }}>
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: "#b03a3a" }}>🚀 배포 확정했는데 안 나감 {devpipe.deployStalledCount}건 — 30분+ 멈춤</div>
+                {devpipe.deployStalled.map((s: any) => (
+                  <div key={s.id} style={{ fontSize: 10, color: "#8a4a4a", marginTop: 3 }}>
+                    #{s.id} {s.title.replace(/^\[개발\]\s*/, "")} — {s.age_min}분 경과{s.fired && s.fired !== "sent" ? ` · 즉시발화 ${s.fired}` : ""}
+                  </div>
+                ))}
+                <div style={{ fontSize: 10.5, color: "#8a4a4a", marginTop: 4 }}>맥이 신호를 못 받았을 수 있습니다. 위 즉시발화 설정을 확인하세요.</div>
+              </div>
+            )}
             {/* ⏱ 배포정체 경보(#280) — 접힘 여부와 무관하게 항상 노출. source≠'chat'은 자동승격 경로 없음(우선 표시) */}
             {devpipe.stuckCount > 0 && (
               <div style={{ marginTop: 8, background: devpipe.stuckNonChatCount ? "#fbeaea" : "#fdf3e3", border: `1px solid ${devpipe.stuckNonChatCount ? "#e0b4b4" : "#e6cfa0"}`, borderRadius: 9, padding: "8px 10px" }}>
@@ -469,10 +493,15 @@ export default function OrgDashboard() {
                 // 사실대로 — '실패' 왜곡 금지. 색: 회색=중립, 자주=배포대기, 청록=진행, 주황=조치필요, 빨강=진짜오류
                 const sc: Record<string, string> = { "개발대기": "#8a7458", "building": "#2a7a72", "배포대기": "#6a468c", "빌드오류": "#b03a3a", "구현불가": "#9c8a6c", "스코프반려": "#b06a2e", "회귀반려": "#b06a2e", "deploy_approved": "#2a7a72", "배포오류": "#b06a2e" };
                 const sl: Record<string, string> = { "개발대기": "개발 대기", "building": "구현 중", "배포대기": "검증완료·배포대기", "빌드오류": "빌드 오류(수정 필요)", "구현불가": "코드 변경 불필요/불가", "스코프반려": "스코프 반려(목적 외 파일)", "회귀반려": "회귀검증 반려(재작업/폐기)", "deploy_approved": "배포 진행 중", "배포오류": "배포 오류(자동 재시도)" };
+                // 🔴 'deploy_approved'는 "배포 진행 중"이 아니라 **로컬 워커가 가져가야 진행**이다.
+                //   종이 안 울렸거나(deploy_fired≠sent) 30분 넘게 안 나가면 사실대로 말한다.
+                const stalled = j.dev_status === "deploy_approved" && (j.deploy_age_min >= 30 || (j.deploy_fired && j.deploy_fired !== "sent"));
+                const label = stalled ? "🔴 배포 안 나감(워커 대기)" : (sl[j.dev_status] || j.dev_status);
+                const color = stalled ? "#b03a3a" : (sc[j.dev_status] || "#888");
                 return (
                   <div key={j.id} style={{ border: `1px solid ${j.dev_status === "배포대기" ? "#d3c0e6" : "#e6d8bf"}`, borderRadius: 10, padding: "9px 11px", marginBottom: 8, background: j.dev_status === "배포대기" ? "#faf7fd" : "#fbfaf5" }}>
                     <div style={{ display: "flex", gap: 5, alignItems: "center", flexWrap: "wrap" }}>
-                      <span style={{ background: sc[j.dev_status] || "#888", color: "#fff", fontSize: 9.5, fontWeight: 700, padding: "2px 7px", borderRadius: 20 }}>{sl[j.dev_status] || j.dev_status}</span>
+                      <span style={{ background: color, color: "#fff", fontSize: 9.5, fontWeight: 700, padding: "2px 7px", borderRadius: 20 }}>{label}</span>
                       <span style={{ fontWeight: 700, fontSize: 12.5 }}>#{j.id} {j.title.replace(/^\[개발\]\s*/, "")}</span>
                     </div>
                     {j.summary && <div style={{ fontSize: 11.5, color: "#5a4631", lineHeight: 1.45, margin: "4px 0 2px" }}>{j.summary}</div>}

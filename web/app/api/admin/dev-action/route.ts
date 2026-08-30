@@ -17,8 +17,21 @@ export async function POST(req: NextRequest) {
     const ds = d.action_params?.dev_status;
     if (action === "deploy") {
       if (ds !== "배포대기") return NextResponse.json({ ok: false, error: `배포대기 상태가 아님(현재: ${ds || "미빌드"})` }, { status: 400 });
-      await sql`UPDATE decisions SET action_params = action_params || '{"dev_status":"deploy_approved"}'::jsonb, result='CEO 배포 확정 — 배포 진행' WHERE id=${id}`;
+      // ① 승인 상태를 **먼저** 확정한다 — 아래 발화가 실패해도 CEO의 승인 자체는 남아야 한다.
+      await sql`UPDATE decisions SET action_params = action_params
+          || jsonb_build_object('dev_status','deploy_approved','deploy_at', now()::text)
+        WHERE id=${id}`;
       const fired = await pingDevTrigger("deploy"); // 로컬 dev-deploy 즉시 발화(브라우저 승인도 대기 없이)
+      // ② 🔔 종이 울렸는지 **사실대로** 남긴다(2026-08-31 수리).
+      //   예전엔 발화 성공 여부와 무관하게 result='CEO 배포 확정 — 배포 진행'을 박았다. 그래서
+      //   TRIGGER_NTFY_TOPIC이 Vercel에 없어 종이 안 울린 9시간 동안도 화면은 "배포 진행 중"이었다.
+      //   진행 중인 게 없는데 진행 중이라고 말하는 화면이 장애보다 나쁘다 — 사람이 손쓸 기회를 뺏는다.
+      //   (같은 자리에서 2026-08-09에도 4일 죽었다. 그때 남긴 교훈이 화면까지 오지 않았던 것.)
+      const msg = fired === "sent"
+        ? "CEO 배포 확정 — 로컬 배포 워커 발화됨"
+        : `CEO 배포 확정 — 🔴 즉시발화 실패(${fired}) · 다음 정시(08·12·16·20시)까지 대기`;
+      await sql`UPDATE decisions SET action_params = action_params || jsonb_build_object('deploy_fired', ${fired}::text),
+        result=${msg} WHERE id=${id}`;
       return NextResponse.json({ ok: true, status: "deploy_approved", fired });
     }
     if (action === "discard") {
