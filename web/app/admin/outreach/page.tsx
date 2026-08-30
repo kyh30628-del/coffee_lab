@@ -20,7 +20,10 @@ type Item = {
   sentAt: string | null; visits: number;
 };
 
-const DAILY_CAP = 12; // 하루 권장 상한 — 같은 링크 대량 DM은 인스타 스팸 처리 위험
+// 🛑 2026-08-30 CEO 판단으로 12 → 5. 리스크 대비 보상 계산 결과 대량 발송은 수지가 안 맞는다.
+//   보상: 100건 → 유료 0~1곳 = 연 11.9만원. 위험: 과태료(정보통신망법 §50)·인스타 계정 정지·
+//   '스팸 업체' 각인(우리 고객이 될 사람들이다). → 10건만 보내 **반응률만 확인**하고 판단한다.
+const DAILY_CAP = 5;
 
 export default function OutreachPage() {
   const [pw, setPw] = useState("");

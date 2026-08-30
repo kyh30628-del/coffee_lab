@@ -31,14 +31,31 @@ function josaIGa(w: string): string {
   return (c - 0xac00) % 28 !== 0 ? "이" : "가";
 }
 
+/**
+ * 보낼 문구.
+ *
+ * ⚖️ 2026-08-30 법령 대조 후 전면 교체 — 정보통신망법 제50조.
+ *   전자적 전송매체(인스타 DM 포함)로 **영리목적 광고성 정보**를 보내려면 수신자의 명시적 사전 동의가
+ *   필요하고, B2B에도 적용된다("누구든지"). 우리는 이 카페들과 거래관계가 없어 예외에도 안 걸린다.
+ *   이전 문구("무료 리포트를 정리해뒀습니다 → 열면 구독 유도")는 광고성 정보로 볼 여지가 컸다.
+ *
+ *   → **게재 사실 통지**로 프레이밍을 바꾼다. 우리는 이미 그 카페를 공개 게재하고 있고,
+ *     그 사실을 알리며 정정 기회를 주는 것은 광고가 아니라 통지다(언론·디렉토리의 통상적 방식).
+ *     ⚠️ 링크 끝에 유료가 있으므로 회색지대인 건 사실이다. 그래서 규모를 10건으로 제한하고,
+ *       수신거부 문구를 넣어 거부 의사에 즉시 중단한다.
+ *
+ *   ⚠️ 판매 문구(구독·요금·혜택)를 여기에 다시 넣지 말 것 — 넣는 순간 광고가 되고 위 근거가 무너진다.
+ */
 export function messageFor(t: Target): string {
   return [
-    `안녕하세요, 동네 카페를 후기 데이터로 소개하는 '동네 커피 노트'입니다 ☕`,
-    `${t.area} 후기를 정리하다 보니 ${t.name}${josaIGa(t.name)} ${t.area} 카페 ${t.areaN}곳 중 검증 후기 ${t.rank}위더라고요.`,
-    t.strength ? `특히 '${t.strength}' 이야기가 많았어요.` : "",
-    `사장님 가게만의 데이터(동네 순위·강점·손님들이 하는 말)를 무료 리포트로 정리해뒀습니다.`,
-    `가입 없이 바로 보실 수 있어요: https://dongnecoffeenote.com/owner/r/${t.id}?src=dm`,
-  ].filter(Boolean).join("\n");
+    `안녕하세요, 카페를 후기 데이터로 소개하는 '동네 커피 노트'입니다.`,
+    `저희 서비스에 ${t.name}${josaIGa(t.name)} ${t.area} 카페 ${t.areaN}곳 중 검증 후기 ${t.rank}위로 소개되어 있어 알려드립니다.`,
+    t.strength ? `손님 후기에서는 '${t.strength}' 이야기가 가장 많았어요.` : "",
+    `어떤 데이터로 소개되고 있는지 확인하실 수 있고, 잘못된 내용이 있으면 알려주시면 수정하겠습니다.`,
+    `확인: https://dongnecoffeenote.com/owner/r/${t.id}?src=dm`,
+    ``,
+    `※ 안내가 불필요하시면 답장 한 줄 주세요. 다시 보내지 않겠습니다.`,
+  ].filter((x) => x !== "").join("\n");
 }
 
 async function loadTargets(): Promise<Target[]> {
@@ -56,7 +73,7 @@ async function loadTargets(): Promise<Target[]> {
     WHERE rk <= 10 AND synth_grade = '검증'
       AND instagram_url IS NOT NULL AND instagram_url <> ''
       AND NOT EXISTS (SELECT 1 FROM subscriptions s WHERE s.cafe_id = ranked.id)
-    ORDER BY synth_count DESC NULLS LAST LIMIT 300`) as any[];
+    ORDER BY synth_count DESC NULLS LAST LIMIT 40`) as any[];
 
   const v: Target[] = [];
   for (const r of rows) {
