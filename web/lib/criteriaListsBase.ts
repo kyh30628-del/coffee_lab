@@ -110,7 +110,9 @@ export const LIST_META: ListMeta[] = [
   { key: "concept.quiet.triggers", category: "검색개념", label: "개념: 조용·혼자", consumer: "search.route",
     items: ["조용", "혼자", "차분", "사색", "고요", "한적", "혼카", "평온", "힐링", "나홀로", "한가"] },
   { key: "concept.work.triggers", category: "검색개념", label: "개념: 작업·공부", consumer: "search.route",
-    items: ["작업", "공부", "노트북", "콘센트", "스터디", "와이파이", "오래", "독서", "집중", "책"] },
+    // 2026-08-30(#901): "카공"(카페공부) 단독검색이 트리거 목록에 없어 0건이었다(SEO aliases엔 있었으나
+    //   /api/search 질의 정규화엔 미연결) — 실질 수요어라 트리거에 직접 추가.
+    items: ["작업", "공부", "노트북", "콘센트", "스터디", "와이파이", "오래", "독서", "집중", "책", "카공"] },
   { key: "concept.mood.triggers", category: "검색개념", label: "개념: 분위기·감성", consumer: "search.route",
     items: ["분위기", "감성", "예쁜", "이쁜", "데이트", "사진", "인테리어", "뷰", "루프탑", "아늑", "무드", "빈티지", "힙", "감각", "조명", "이국적"] },
   { key: "concept.dessert.triggers", category: "검색개념", label: "개념: 디저트·빵", consumer: "search.route",
