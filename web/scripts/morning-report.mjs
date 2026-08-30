@@ -60,6 +60,28 @@ try {
         console.log(`     ${actPerDay < 20 ? "✅ DB가 자기 시작함" : "🔴 여전히 안 잠 — 다른 원인 남아있음"}`);
       } else console.log(`  ── ISR 수리 효과: 배포 후 ${hrs.toFixed(1)}시간 — 24시간 지나야 유의미`);
     } catch { /* 기준선 없음 = 측정 종료 */ }
+
+    // 🧼 깨끗한 기준선(2026-08-30 새벽) — 위 ISR 기준선은 671곳 판정·191곳 재수집이 겹쳐 오염됐다.
+    //   무거운 배치가 다 끝난 뒤 다시 박았다. CEO 지시: 3일간 아무것도 안 하고 이 값으로 판정한다.
+    //   판정 목적 둘 — ①ISR 수리가 실제로 얼마나 줄였나 ②페이지를 늘려도(지역 확장) 안전한가.
+    try {
+      const { readFileSync } = await import("node:fs");
+      const cb = JSON.parse(readFileSync(new URL("../../agent-reports/neon-clean-baseline.json", import.meta.url), "utf8"));
+      const h = (Date.now() - new Date(cb.at).getTime()) / 3600000;
+      const aDay = (act - cb.active_h_total) / (h / 24), cDay = (cuh - cb.cu_h_total) / (h / 24);
+      console.log(`  ── 🧼 깨끗한 실측(무거운 작업 정지 후 ${h.toFixed(1)}시간) ──`);
+      // ⚠️ 경과가 짧으면 나눗셈이 폭주한다(0.0시간에 "147.9h/일" 같은 무의미한 값). 24시간 전엔 숫자를 아예 안 낸다.
+      if (h < 24) {
+        console.log(`     ${h.toFixed(1)}시간 경과 — 24시간은 지나야 의미 있는 값(그 전엔 표본이 짧아 왜곡)`);
+      } else {
+        console.log(`     활성시간 ${aDay.toFixed(1)}h/일 · 컴퓨트 ${cDay.toFixed(2)} CU-h/일 → 월 $${(cDay * 30 * 0.106).toFixed(2)}`);
+        console.log(`     (수리 전 24.4h/일 · 월 $42 / 카페 ${cb.cafes.toLocaleString()}곳 기준)`);
+        if (h >= 72) {
+          console.log(`     ✅ 3일 경과 — 지역 확장 안전성 판정 가능`);
+          console.log(`     ${aDay < 20 ? "🟢 활성시간 20h 미만 = 페이지를 늘려도 여력 있음" : "🔴 여전히 천장 근처 = 확장 전 원인 재조사 필요"}`);
+        }
+      }
+    } catch { /* 기준선 없음 */ }
   }
 } catch (e) { console.log("  조회 실패:", String(e).slice(0, 60)); }
 
