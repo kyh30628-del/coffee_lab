@@ -62,7 +62,7 @@ async function getCafe(id: string) {
   const n = Number(id);
   if (!Number.isFinite(n) || n <= 0) return null;
   try {
-    return (await sql`SELECT c.id, c.name, c.area, c.dong, c.address, c.lat, c.lng, c.synth_grade, c.synth_identity, c.synth_count, c.char_scores, c.synth_reviews_all, c.synth_reviews, c.reputation_note, c.synth_quality, c.visitor_n, c.visitor_trip, c.visitor_local,
+    return (await sql`SELECT c.id, c.name, c.area, c.dong, c.address, c.lat, c.lng, c.synth_grade, c.synth_identity, c.synth_count, c.char_scores, c.synth_reviews_all, c.synth_reviews, c.reputation_note, c.synth_quality, c.visitor_n, c.visitor_trip, c.visitor_local, c.area_rank, c.area_total,
       COALESCE(dt.is_tourist, false) AS dong_tourist
       FROM cafes c LEFT JOIN dong_tourism dt ON dt.area = c.area AND dt.dong = c.dong
       WHERE c.id=${n} AND c.published=true LIMIT 1`)[0] as any ?? null;
@@ -246,6 +246,16 @@ export default async function CafePage({ params }: Props) {
           <div className="flex items-center gap-2 mb-1 flex-wrap">
             <h1 className="text-2xl font-bold">{c.name}</h1>
             {grade && <span className="text-[11px] font-bold bg-[#2b2018] text-[#e8b87a] px-2 py-0.5 rounded-full">{grade}</span>}
+            {/* 🏅 동네 순위(2026-08-30) — 지금까지 이 사실은 **사장님 리포트에만** 있었다.
+                그래서 사장님이 자기 가게를 검색해 이 페이지에 와도 자랑할 거리가 없어 그냥 지나갔다.
+                공개 화면에 세우면 ①사장님이 스스로 찾아오고 ②공유하고 ③손님에겐 신뢰 신호가 된다.
+                ⚠️ 상위 10위 이내만 — 낮은 순위를 붙이면 그 카페에 해가 된다(우리가 소개하는 가게다).
+                ⚠️ 값은 cron-enrich가 하루 2회 계산해 저장한다. 여기서 동네를 조회하지 않는다(비용 0). */}
+            {typeof c.area_rank === "number" && c.area_rank <= 10 && (c.area_total ?? 0) >= 20 && (
+              <span className="text-[11px] font-bold bg-[#7a5122] text-[#f4ece0] px-2 py-0.5 rounded-full">
+                🏅 {c.area} {c.area_total}곳 중 {c.area_rank}위
+              </span>
+            )}
           </div>
           {/* 🧳🏠 방문객 성격 — "이 후기를 누가 썼나". 카페를 단정하지 않고(관광지다X) 근거만 말한다.
               누군가에겐 관광지여도 거기 사는 사람에겐 동네다 — 그래서 두 배지는 배타적이지 않다(둘 다 붙을 수 있음). */}
