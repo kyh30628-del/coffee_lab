@@ -58,6 +58,12 @@ const CHAR: Record<string, string> = { roast: "🔥 직접로스팅", work: "�
 
 type Props = { params: Promise<{ id: string }> };
 
+// 🔴 2026-08-30 장애 재발방지: 이 함수의 catch가 **모든 실패를 404로 바꾼다.**
+//   그날 area_rank/area_total을 SELECT에 추가하면서 컬럼 생성(cron-enrich)보다 배포가 먼저 나갔고,
+//   "column does not exist"가 이 catch에 먹혀 **공개 카페 전체가 404**가 됐다.
+//   더 나쁜 건 ISR이 그 404를 48시간 캐시한다는 점 — DB를 고쳐도 페이지는 계속 404였다(재배포로 해소).
+//   ⚠️ 규칙: 이 SELECT에 컬럼을 추가할 때는 **먼저 ALTER로 컬럼을 만들고 나서** 배포한다.
+//     스키마 변경을 크론에만 맡기지 말 것 — 크론은 배포보다 늦게 돈다.
 async function getCafe(id: string) {
   const n = Number(id);
   if (!Number.isFinite(n) || n <= 0) return null;
