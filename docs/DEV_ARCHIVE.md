@@ -287,3 +287,4 @@
 | 2026-08-30 21:57 | #847 | [룰갭 신규] SELF_ANNOUNCE 사각 — 예약/주문 유도 홍보글이 리뷰 인용문으로 노출 (12곳, 검 | b9010bec | - | lib/reviewQuality.ts: SELF_ANNOUNCE 옆에 ORDER_SOLICITATION_AD 신규 추가(전화번호 패턴 + 예약문의/주문예약/카톡ID·문의 키워드 동 |
 | 2026-08-30 21:58 | #848 | [룰갭 신규] franchise-branch 스캐너 사각 — 지점 접미사가 "점"류가 아닌 브랜드쌍 완전 미 | 61da97ed | - | app/api/cron-sentinel/route.ts: scanFranchiseBranchPollution()에 접미사 마커(BRANCH_SUFFIX_RE) 무관 보조 탐지 추가 |
 | 2026-08-30 21:59 | #850 | [개발] 팀홀튼 FRANCHISE 코드 블록리스트 미등재 — #834 근본원인 미수정 확인 | 64b2b285 | - | web/lib/discover.ts FRANCHISE 배열에 "팀홀튼"(한글, line26), "TIMHORTONS"(영문, line30) 추가. isFranchise가 공백제거+ |
+| 2026-08-30 22:00 | #865 | [룰갭 신규] COMMON_WORD_NAMES 미등재 "카나리아/CANARIA" — 칵테일메뉴명·지명 동음이 | 27d8e7fe | - | web/lib/reviewQuality.ts:306 COMMON_WORD_NAMES에 카나리아/canaria 추가(norm()이 소문자화해 CANARIA/Canaria 모두 커버) |
