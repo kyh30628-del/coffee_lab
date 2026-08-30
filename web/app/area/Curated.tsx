@@ -9,6 +9,9 @@ const GRADE_BG: Record<string, string> = { 검증: "#5f7355", 참고: "#9c6b3f",
 
 // 동네×취향 검증 카페 큐레이션 — SEO 콘텐츠 페이지 공용 렌더(서버 컴포넌트).
 // 동(洞) 단위 페이지(app/area/[gu]/dong/[dong])도 이 컴포넌트를 재사용 — backHref/showTasteNav/crossLinks로 분기.
+// 🔌 work_facts 키 → 화면 라벨(lib/workDetail.ts RULES와 1:1).
+const WORK_FACT: Record<string, string> = { outlet: "🔌 콘센트 언급", wifi: "📶 와이파이 언급", desk: "🪑 작업 자리 언급" };
+
 export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, heading, intro, cafes, regions = [], grades, canonical, backHref = "/area", backLabel = "지역별 카페", showTasteNav = true, crossLinks, crossLinksLabel = "다른 동네도 둘러보기", extra, tasteCounts, sameTasteNearby = [] }: {
   area: string; tasteKey?: string; tasteLabel?: string; tasteEmoji?: string; heading: string; intro: string; cafes: SeoCafe[]; regions?: { area: string; n: number }[]; grades?: GradeBreakdown; canonical: string;
   backHref?: string; backLabel?: string; showTasteNav?: boolean; crossLinks?: { label: string; href: string }[]; crossLinksLabel?: string; extra?: React.ReactNode;
@@ -152,6 +155,14 @@ export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, headin
                     <p className="text-[11.5px] font-bold text-[#5f7355] mt-1.5 pl-7">
                       {tasteEmoji} {tasteLabel} 후기 {c.tasteHits}건
                       {c.count ? <span className="font-normal text-[#665036]"> · 전체 후기 {c.count}건 중 {Math.round((c.tasteHits / c.count) * 100)}%</span> : null}
+                    </p>
+                  )}
+                  {/* 🔌 카공 시설 사실(2026-08-30) — 경쟁사(naejari.com)는 이름·주소만 주고 이 정보가 아예 없다.
+                      우리만 줄 수 있는 답이라 한줄소개보다 **위**에 세운다. 근거 2건 이상일 때만(1건은 우연일 수 있음).
+                      단정하지 않고 건수를 함께 적는 게 이 서비스 원칙이다. */}
+                  {tasteKey === "work" && Array.isArray(c.work_facts) && c.work_facts.some((f) => f.n >= 2) && (
+                    <p className="text-[11.5px] font-bold text-[#4a6b8a] mt-1.5 pl-7">
+                      {c.work_facts.filter((f) => f.n >= 2).map((f) => `${WORK_FACT[f.k] ?? f.k} ${f.n}건`).join(" · ")}
                     </p>
                   )}
                   {c.identity && <p className="text-[12.5px] text-[#524234] leading-snug mt-1.5 line-clamp-2 pl-7">{c.identity}</p>}

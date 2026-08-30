@@ -33,7 +33,9 @@ export type SeoCafe = { id: number; name: string; dong: string | null; grade: st
   /** 🏅 '이 집만의 한 가지' 뱃지 계산용(동네 안 상대비교) — 작은 jsonb라 전송 영향 무시 수준(2026-08-22). */
   char_scores?: Record<string, number> | null;
   /** 🧳🏠 방문객 성격(lib/visitorMix.ts) — REAL 3개라 전송 영향 없음. 판정은 표시 시점(criteria 임계). */
-  visitor_n?: number | null; visitor_trip?: number | null; visitor_local?: number | null };
+  visitor_n?: number | null; visitor_trip?: number | null; visitor_local?: number | null;
+  /** 🔌 카공 시설 사실(합성 시 저장) — [{k:"outlet",n:5}]. 경쟁사가 안 주는 정보라 목록에 세운다. 작은 배열이라 전송 영향 없음. */
+  work_facts?: { k: string; n: number }[] | null };
 
 // 🎯 취향 페이지 채택 기준(2026-08-06, CEO "기준 상향") — 예전엔 `char_scores.<취향> > 0`,
 //   즉 **후기에 딱 한 번 스쳐도 포함**이었다. 그 결과 "파주시 작업하기 좋은 카페 117곳"인데 실제로
@@ -57,7 +59,7 @@ export async function getRegions(): Promise<{ area: string; n: number }[]> {
 
 export async function getRegionCafes(area: string, limit = 30): Promise<SeoCafe[]> {
   try {
-    return (await sql`SELECT id, name, dong, synth_grade AS grade, synth_count AS count, synth_identity AS identity, char_scores, visitor_n, visitor_trip, visitor_local,
+    return (await sql`SELECT id, name, dong, synth_grade AS grade, synth_count AS count, synth_identity AS identity, char_scores, visitor_n, visitor_trip, visitor_local, work_facts,
       (SELECT left(r->>'quote', 70) FROM jsonb_array_elements(COALESCE(synth_reviews,'[]'::jsonb)) r
         WHERE COALESCE(r->>'quote','') <> '' ORDER BY COALESCE((r->>'score')::int,0) DESC LIMIT 1) AS quote
       FROM cafes WHERE published AND area=${area}
@@ -67,7 +69,7 @@ export async function getRegionCafes(area: string, limit = 30): Promise<SeoCafe[
 
 export async function getRegionTasteCafes(area: string, tasteKey: string, limit = 30): Promise<SeoCafe[]> {
   try {
-    return (await sql`SELECT id, name, dong, synth_grade AS grade, synth_count AS count, synth_identity AS identity, char_scores, visitor_n, visitor_trip, visitor_local,
+    return (await sql`SELECT id, name, dong, synth_grade AS grade, synth_count AS count, synth_identity AS identity, char_scores, visitor_n, visitor_trip, visitor_local, work_facts,
       (char_scores->>${tasteKey})::int AS "tasteHits",
       (SELECT left(r->>'quote', 70) FROM jsonb_array_elements(COALESCE(synth_reviews,'[]'::jsonb)) r
         WHERE COALESCE(r->>'quote','') <> '' ORDER BY COALESCE((r->>'score')::int,0) DESC LIMIT 1) AS quote
@@ -80,11 +82,28 @@ export async function getRegionTasteCafes(area: string, tasteKey: string, limit 
 
 // 지역×취향 공개 카페 곳수 — 취향 페이지 "N곳" 카피의 실제 값(표시 30개를 곳수로 오용 금지).
 export async function getRegionTasteCount(area: string, tasteKey: string): Promise<number> {
+  return (await getRegionTasteStats(area, tasteKey)).n;
+}
+
+/**
+ * 곳수 + **그 카페들의 검증 후기 총합**을 한 번에.
+ *
+ * 왜 후기 합계인가(2026-08-30): 경쟁사 실측 결과 우리 차별점이 여기에 있다.
+ *   naejari.com(내 자리)은 "성남시 카공 카페 **2,180곳** 지도"로 우리(BEST 30) 위 1위인데,
+ *   실제 페이지를 열어보면 **이름·주소만** 있고 후기·평점·콘센트 정보가 전혀 없다(전체 나열).
+ *   모수(카페 수)로는 우리가 507곳이라 작아 보이지만, 우리 30곳 뒤에는 **검증 후기 14,340건**이 있다.
+ *   → 스니펫에서 겨룰 숫자는 '카페 수'가 아니라 '후기 수'다. 그쪽은 0건이라 따라올 수 없다.
+ *
+ * 💰 비용: 위 count 쿼리에 SUM만 더한 것 — **추가 쿼리 0**(같은 WHERE·같은 스캔).
+ *   이 파일 아래 08-17 사고 주석 참조 — 테마 페이지에 조회를 '추가'하면 활성시간이 뛴다. 추가하지 않았다.
+ */
+export async function getRegionTasteStats(area: string, tasteKey: string): Promise<{ n: number; reviews: number }> {
   try {
-    return Number(((await sql`SELECT count(*)::int n FROM cafes WHERE published AND area=${area}
+    const r = (await sql`SELECT count(*)::int n, COALESCE(SUM(synth_count), 0)::int reviews FROM cafes WHERE published AND area=${area}
       AND COALESCE((char_scores->>${tasteKey})::int, 0) >= ${TASTE_MIN_HITS}
-      AND COALESCE((char_scores->>${tasteKey})::int, 0) * 100 >= COALESCE(synth_count,0) * ${TASTE_MIN_RATE_PCT}`)[0] as any)?.n ?? 0);
-  } catch { return 0; }
+      AND COALESCE((char_scores->>${tasteKey})::int, 0) * 100 >= COALESCE(synth_count,0) * ${TASTE_MIN_RATE_PCT}`)[0] as any;
+    return { n: Number(r?.n ?? 0), reviews: Number(r?.reviews ?? 0) };
+  } catch { return { n: 0, reviews: 0 }; }
 }
 
 // 전 지역×전 취향 곳수를 **쿼리 1회**로 — 사이트맵이 얇은 페이지(기준 미달)를 제출하지 않게 거르는 용도.

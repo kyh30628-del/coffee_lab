@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Curated from "../../Curated";
-import { getRegions, getRegionTasteCafes, getRegionTasteCount, getRegionTasteCounts, getRegionTasteGradeBreakdown, areaAliases, TASTES, tasteByKey, SITE, TASTE_MIN_HITS, TASTE_MIN_RATE_PCT } from "@/lib/seoData";
+import { getRegions, getRegionTasteCafes, getRegionTasteCount, getRegionTasteStats, getRegionTasteCounts, getRegionTasteGradeBreakdown, areaAliases, TASTES, tasteByKey, SITE, TASTE_MIN_HITS, TASTE_MIN_RATE_PCT } from "@/lib/seoData";
 
 export const revalidate = 86400; // ISR 24시간
 
@@ -25,7 +25,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   // BEST N 프레이밍(2026-08-13 벤치마킹 B — 다이닝코드 Top100 상품화 차용). ⚠️ 기존 네이버 랭킹 보호:
   //   검색어 머리("{지역} {테마} 카페")는 그대로 두고 BEST N을 덧붙이기만 한다(제목 전면 교체 금지).
   //   ⚠️ 위 cafes는 미리보기 5건 조회라 length를 쓰면 항상 "BEST 5"가 된다 — 본문과 같은 기준(표시 상한 30)으로 계산.
-  const totalForTitle = await getRegionTasteCount(area, taste);
+  const stats = await getRegionTasteStats(area, taste);
+  const totalForTitle = stats.n;
   const shownN = Math.min(totalForTitle || cafes.length, 30);
   const bestN = shownN >= 5 ? ` BEST ${shownN}` : "";
   // 🔍 검색어 정합(2026-08-15): 제목 **머리는 그대로 두고** 실제 검색 표현만 뒤에 병기한다.
@@ -36,7 +37,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const areaShort = areaAliases(area)[0];
   const title = `${area} ${t.label} 카페${bestN} — ${areaShort ? `${areaShort} ` : ""}${alias1} 검증 추천 | 동네 커피 노트`;
   const aliasPhrase = t.aliases.slice(0, 3).join(", ");
-  const desc = `${areaShort2 ? `${areaShort2}·` : ""}${area}에서 ${aliasPhrase}를 찾는다면. ${t.desc} 카페를 영수증 리뷰·광고 없이 진짜 후기로 검증해 골랐어요.${names ? ` ${names} 등.` : ""}`;
+  // 🥊 2026-08-30 경쟁사 대응 — 스니펫에 **후기 수**를 넣는다(제목은 랭킹 보호로 손대지 않음).
+  //   실측: naejari.com이 "성남시 카공 카페 2,180곳 지도"로 우리 위 1위인데, 그 페이지는 이름·주소뿐이고
+  //   후기·콘센트 정보가 없다(전체 나열). 카페 수로는 우리가 작아 보이지만(507 vs 2,180),
+  //   우리 30곳 뒤에는 검증 후기 14,340건이 있다 — 그쪽은 0건이라 따라올 수 없는 숫자다.
+  //   ⚠️ 숫자가 작으면(1,000건 미만) 오히려 약해 보이므로 그때는 기존 문구를 그대로 쓴다.
+  const evidence = stats.reviews >= 1000 ? `검증 후기 ${stats.reviews.toLocaleString()}건에서 ` : "";
+  const desc = `${areaShort2 ? `${areaShort2}·` : ""}${area}에서 ${aliasPhrase}를 찾는다면. ${evidence}${t.desc} 카페를 영수증 리뷰·광고 없이 진짜 후기로 검증해 골랐어요.${names ? ` ${names} 등.` : ""}`;
   const url = `${SITE}/area/${encodeURIComponent(area)}/${taste}`;
   return {
     title, description: desc,

@@ -8,6 +8,7 @@ import { fetchWebReviews } from "./webSearchCollector";
 import { fetchYouTubeReviews } from "./youtubeCollector";
 import { collectAndSynthesize, type RawSource, type BorderlineItem, type CollectResult } from "./collectOrchestrator";
 import { visitorMix } from "./visitorMix";
+import { extractWorkSignals } from "./workDetail";
 import { upsertReviewerStats } from "./reviewerProfiles";
 import { judgeReviews, hasJudgeKey } from "./reviewJudge";
 import { isNonCafe, isFranchise, isGenericFoodName, isSnackStall, isStructuralPhantom, isUnmannedCafe } from "./discover";
@@ -69,6 +70,7 @@ async function ensureCols() {
   await ensureOnce("synthStore.cols", async () => {
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS raw_reviews JSONB`;
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS raw_collected_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS work_facts JSONB`.catch(() => {}); // 🔌 카공 시설 사실(합성 시 1회 계산·목록에서 공짜 읽기)
   // raw_checked_at: 재수집을 '시도'한 시각(커서 전용). raw_collected_at(=내용이 실제 바뀐 시각, 판정 큐 트리거)과 분리.
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS raw_checked_at TIMESTAMPTZ`;
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS llm_judged_at TIMESTAMPTZ`;
@@ -257,6 +259,24 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   const coherence = nameCoherence(name, (evidenceReviews as any[]).map((r) => r?.quote || ""), [loc?.area, loc?.dong].filter(Boolean));
   const offctx = offctxRate(((allEvidence ?? evidenceReviews) as any[]).map((r) => r?.quote || "")); // 맥락없음 비율(관제탑 감시)
   // 🧳🏠 방문객 성격 — offctx와 같은 인용문 풀에서 뽑는다(같은 근거 = 같은 잣대). 추가 조회 0.
+  // 🔌 카공 시설 사실(2026-08-30) — 합성할 때 **한 번** 계산해 저장한다.
+  //   왜 여기서 계산하나: 이 정보는 synth_reviews_all(전체 옥석)에만 있는데, 목록 페이지에서 읽으려면
+  //   지역×취향 778페이지가 재생성될 때마다 큰 컬럼을 정규식 스캔해야 한다(실측 10곳 938ms).
+  //   그건 이 저장소가 이미 크게 데인 패턴이다(synth_reviews_all 전수 반복스캔 → 청구 3배).
+  //   합성은 어차피 이 배열을 손에 들고 있으므로 여기서 계산하면 **추가 조회 0**이고 읽기는 공짜가 된다.
+  //   경쟁사(naejari.com)는 카페 이름·주소만 주고 콘센트·와이파이 정보가 아예 없다 — 우리 차별점을 목록에 세운다.
+  //   ⚠️ 소급 배치는 돌리지 않는다(2026-08-30 CEO: 3일 무부하). 재합성되는 카페부터 자연히 채워진다.
+  //   ⚠️ 근거 건수(yes)를 함께 저장한다 — 단정하지 않고 "콘센트 5건"처럼 세는 게 이 서비스의 원칙이다.
+  //   긍정 판정은 yes > no(부정 언급보다 긍정이 많을 때)만. 애매하면 안 넣는다.
+  const workFacts = (() => {
+    try {
+      const quotes = ((allEvidence ?? evidenceReviews) as any[]).map((r) => r?.quote || "").filter(Boolean);
+      if (!quotes.length) return null;
+      const { signals } = extractWorkSignals(quotes);
+      const pos = signals.filter((x) => x.yes > x.no).map((x) => ({ k: x.key, n: x.yes }));
+      return pos.length ? pos : null;
+    } catch { return null; }
+  })();
   const vmix = visitorMix(((allEvidence ?? evidenceReviews) as any[]).map((r) => r?.quote || ""), name); // name = cleanCafeName 적용된 진짜 상호
   // 🚨 비카페 업체 지배: 노출 리뷰가 '다른 업종 업체어'(킥복싱·냉삼·만두·미용실·펜션…)에 지배되면
   //   이름이 겹쳐 coherence가 속아도(라온=라온킥복싱, PLMM사가정=사가정 만두집) 오염 → 공개 차단.
@@ -362,9 +382,9 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   //   여기 한 곳만으로 자동 적용되고, 계약에 이 대상이 없으면 드리프트로 잡힌다.
   noteWrite("cafes.synth_reviews"); noteWrite("cafes.synth_reviews_all"); noteWrite("cafes.published");
   if (llmJudged) {
-    await sql`UPDATE cafes SET synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_coherence=${coherence}, offctx_rate=${offctx}, visitor_n=${vmix.n}, visitor_trip=${vmix.trip}, visitor_local=${vmix.local}, needs_llm=${needsLLM}, needs_llm_priority=${needsLlmPriority}, borderline_count=${blCount}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${safeJson(evidenceReviews)}, synth_reviews_all=${allEv}, char_scores=${safeJson(charScores)}, synth_quality=${safeJson(quality)}, review_dates=${safeJson(reviewDates)}, pipeline_status=${newPst}, synth_updated=${synthTs}, synth_checked_at=now(), llm_judged_at=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN ${latMin} AND ${latMax} AND lng BETWEEN ${lngMin} AND ${lngMax}) WHERE id=${cafeId}`;
+    await sql`UPDATE cafes SET synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_coherence=${coherence}, offctx_rate=${offctx}, visitor_n=${vmix.n}, visitor_trip=${vmix.trip}, visitor_local=${vmix.local}, needs_llm=${needsLLM}, needs_llm_priority=${needsLlmPriority}, borderline_count=${blCount}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${safeJson(evidenceReviews)}, synth_reviews_all=${allEv}, char_scores=${safeJson(charScores)}, work_facts=${safeJson(workFacts)}, synth_quality=${safeJson(quality)}, review_dates=${safeJson(reviewDates)}, pipeline_status=${newPst}, synth_updated=${synthTs}, synth_checked_at=now(), llm_judged_at=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN ${latMin} AND ${latMax} AND lng BETWEEN ${lngMin} AND ${lngMax}) WHERE id=${cafeId}`;
   } else {
-    await sql`UPDATE cafes SET synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_coherence=${coherence}, offctx_rate=${offctx}, visitor_n=${vmix.n}, visitor_trip=${vmix.trip}, visitor_local=${vmix.local}, needs_llm=${needsLLM}, needs_llm_priority=${needsLlmPriority}, borderline_count=${blCount}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${safeJson(evidenceReviews)}, synth_reviews_all=${allEv}, char_scores=${safeJson(charScores)}, synth_quality=${safeJson(quality)}, review_dates=${safeJson(reviewDates)}, pipeline_status=${newPst}, synth_updated=${synthTs}, synth_checked_at=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN ${latMin} AND ${latMax} AND lng BETWEEN ${lngMin} AND ${lngMax}) WHERE id=${cafeId}`;
+    await sql`UPDATE cafes SET synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_coherence=${coherence}, offctx_rate=${offctx}, visitor_n=${vmix.n}, visitor_trip=${vmix.trip}, visitor_local=${vmix.local}, needs_llm=${needsLLM}, needs_llm_priority=${needsLlmPriority}, borderline_count=${blCount}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${safeJson(evidenceReviews)}, synth_reviews_all=${allEv}, char_scores=${safeJson(charScores)}, work_facts=${safeJson(workFacts)}, synth_quality=${safeJson(quality)}, review_dates=${safeJson(reviewDates)}, pipeline_status=${newPst}, synth_updated=${synthTs}, synth_checked_at=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN ${latMin} AND ${latMax} AND lng BETWEEN ${lngMin} AND ${lngMax}) WHERE id=${cafeId}`;
   }
   return { grade, collected, published: publish, ruleOk, pipeline: newPst, evidence: evidenceReviews.length, coherence: Math.round(coherence * 100), noisy };
 }
