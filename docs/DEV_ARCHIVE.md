@@ -284,3 +284,4 @@
 | 2026-08-29 07:05 | #880 | [룰갭 신규] LANDMARK_WORDS 누락어 "하조대" — 양양 해변/전망대 랜드마크명 타업종 교차오염  | f9f589d8 | - | lib/reviewQuality.ts LANDMARK_WORDS(684행)에 하조대 추가 — 기존 isLandmarkTok 메커니즘 재사용(#584·#766과 동일 패턴). tsc |
 | 2026-08-30 11:05 | #894 | [레드팀 재발] id3376 브라운필빵공장 — requeue_resynth 2회 연속 실패, 환각 문구 코드 | 983c1435 | - | lib/synthEngine.ts(ops 스캔)·lib/collectOrchestrator.ts(trust 전달): 운영신호(직접로스팅 등) 스캔이 trust=reference(약 |
 | 2026-08-30 11:06 | #896 | [정합성 신규] 이름변형 중복등록 — place_id 이름해시 dedup 우회(discover.ts:525) | e2303e64 | - | lib/discover.ts:493-546 — 발굴 dedup에 주소 완전일치 매칭(byAddress) 추가. 이름해시 place_id로 인해 지점명 변형·좌표오차(>55m)로 기 |
+| 2026-08-30 21:57 | #847 | [룰갭 신규] SELF_ANNOUNCE 사각 — 예약/주문 유도 홍보글이 리뷰 인용문으로 노출 (12곳, 검 | b9010bec | - | lib/reviewQuality.ts: SELF_ANNOUNCE 옆에 ORDER_SOLICITATION_AD 신규 추가(전화번호 패턴 + 예약문의/주문예약/카톡ID·문의 키워드 동 |
