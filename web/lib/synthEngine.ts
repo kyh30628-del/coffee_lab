@@ -3,7 +3,7 @@
 import { getCriterionSync } from "./criteria"; // 등급 바닥 임계값 단일출처(캐시 프라임은 synthAndStore가 함)
 import { getListSync } from "./criteriaLists"; // 맛/용도/운영 신호어 사전 단일출처(BASE=폴백, 캐시 프라임은 synthAndStore가 함)
 
-export type Review = { text: string; time?: number }; // time: epoch초(최신성용, 옵션)
+export type Review = { text: string; time?: number; trust?: "verified" | "reference" }; // time: epoch초(최신성용, 옵션). trust: collectOrchestrator가 채움(옵션 — 없으면 verified 취급)
 
 // 맛 3축 — 신호어(강/약/모호)는 lib/criteriaLists.ts가 단일출처(무배포 편집). 여기엔 축·리터럴키만 둔다(dead-knob 스캔용).
 const TASTE_AXES = [
@@ -107,10 +107,16 @@ export function synthesize(name: string, reviews: Review[], area: string[] = [],
     const c = clean.filter((r) => kws.some((k) => r.text.toLowerCase().includes(k.toLowerCase()))).length;
     if (c) uses[u] = c;
   }
+  // 운영 정체성 신호(직접로스팅·원두판매·권위)는 identity에 사실 주장으로 노출되는 고위험 클레임이라
+  // trust="reference"(제목·본문 스침 정도의 약한 매칭)는 제외하고 verified(및 trust 미부여 — 구 호출부
+  // 호환)만 스캔한다. #894: id3376이 이름 유사한 다른 지점('브라운필' 상도힐스테이트점 등)을 언급한
+  // reference 리뷰 2건의 "로스팅" 단어에 걸려 "직접 로스팅하는 곳"을 환각 생성 — 근거 6건 표시엔 안 뜨지만
+  // ops 카운트엔 반영돼 재합성해도 동일 문구가 되살아났다(data-only remedy로 못 고치는 구조적 결함).
+  const opsSource = clean.filter((r) => r.trust !== "reference");
   const ops: Record<string, number> = {};
   for (const { o, key } of OP_KEYS) {
     const kws = getListSync(key);
-    const c = clean.filter((r) => kws.some((k) => r.text.toLowerCase().includes(k.toLowerCase()))).length;
+    const c = opsSource.filter((r) => kws.some((k) => r.text.toLowerCase().includes(k.toLowerCase()))).length;
     if (c) ops[o] = c;
   }
 
