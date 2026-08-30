@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "preflight": "node --import tsx scripts/preflight.mjs",
+    "ship": "npm run preflight && npm run build && git push origin main"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.168",
