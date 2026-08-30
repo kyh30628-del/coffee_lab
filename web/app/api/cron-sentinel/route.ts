@@ -440,6 +440,70 @@ function branchToken(suffix: string): string {
   return suffix.replace(BRANCH_MARKER_RE, "").trim();
 }
 type FranchiseFlag = { id: number; name: string; area: string; brand: string; ownSuffix: string; ownToken: string; otherSuffixes: string[]; otherTokens: string[]; bad: number; shown: number; hitSuffix: string };
+// 🆕 접미사 마커 목록 무관 사각 보완(decisions#848, 2026-08-30): BRANCH_SUFFIX_RE는 "본점|지점|...|점|1st|2nd|3rd|호점"으로
+//   끝나는 이름만 지점으로 인식해 "너디블루 버로우"·"카페굿웨더 범계/안양"처럼 마커 목록에 없는 접미사·아예 접미사가
+//   없는 지점명 쌍은 브랜드 그룹 구성 단계에서부터 제외된다(대조 자체가 안 됨 — 토큰매칭 실패가 아니라 그룹 미형성).
+//   접미사 마커에 의존하지 않고 published 카페 이름 간 "공통 어절 접두"(브랜드+구별자) 관계를 직접 찾아 대조 대상을
+//   넓히고, synth_reviews quote 완전 바이트단위 동일(20자↑ — 원문 블로그 발췌가 그대로 복제돼 우연한 표현중복
+//   가능성 낮음)로 실제 오귀속을 확인한다. 구별자(공통접두 이후 나머지)가 어느 쪽 quote에 등장하는지로 소유를
+//   가른다 — 양쪽 다/둘 다 아니면 모호하므로 조치하지 않는다(정밀도 우선, 오탐보다 미탐이 낫다).
+const NO_OWN_SUFFIX = " -no-own-suffix- "; // quote.includes("")가 항상 true라 빈 구별자를 그대로 쓰면 안 됨(항상 '자기 지점' 오판)
+function commonBrandPrefix(a: string, b: string): { brand: string; restA: string; restB: string } | null {
+  const na = a.replace(/\s+/g, ""), nb = b.replace(/\s+/g, "");
+  if (na === nb) return null;
+  let i = 0;
+  while (i < na.length && i < nb.length && na[i] === nb[i]) i++;
+  if (i < 3) return null;
+  const brand = na.slice(0, i);
+  if (GENERIC_BRAND.has(brand)) return null;
+  const restA = na.slice(i).trim();
+  const restB = nb.slice(i).trim();
+  if (restA === restB) return null; // 실질적으로 같은 이름 — 지점쌍 아님
+  // 구별자 자체가 "카페"·"커피" 같은 흔한 일반어면 안 된다 — 거의 모든 카페 리뷰에 등장해 이후 힐러의
+  // body.includes(구별자) 검사가 무관한 원문까지 대량 오적중한다(자기 이름과 무관한 과잉 삭제 위험).
+  if (GENERIC_BRAND.has(restA) || GENERIC_BRAND.has(restB)) return null;
+  return { brand, restA, restB };
+}
+async function scanDuplicateQuoteBranchFlags(): Promise<FranchiseFlag[]> {
+  const rows = (await sql`
+    WITH q AS (
+      SELECT DISTINCT c.id, c.name, c.area, trim(r->>'quote') AS quote
+      FROM cafes c, jsonb_array_elements(COALESCE(c.synth_reviews_all, c.synth_reviews)) r
+      WHERE c.published AND COALESCE(c.synth_reviews_all, c.synth_reviews) IS NOT NULL
+        AND length(trim(r->>'quote')) >= 20
+    )
+    SELECT q.id, q.name, q.area, q.quote FROM q
+    WHERE q.quote IN (SELECT quote FROM q GROUP BY quote HAVING COUNT(DISTINCT id) > 1)
+  `) as { id: number; name: string; area: string; quote: string }[];
+  const byQuote = new Map<string, { id: number; name: string; area: string }[]>();
+  for (const r of rows) { if (!byQuote.has(r.quote)) byQuote.set(r.quote, []); byQuote.get(r.quote)!.push({ id: r.id, name: r.name, area: r.area }); }
+  const byId = new Map<number, FranchiseFlag>();
+  for (const [quote, arr] of byQuote) {
+    for (let i = 0; i < arr.length; i++) for (let j = 0; j < arr.length; j++) {
+      if (i === j) continue;
+      const a = arr[i], b = arr[j];
+      const cp = commonBrandPrefix(a.name, b.name);
+      if (!cp) continue;
+      const restAOk = cp.restA.length >= 2, restBOk = cp.restB.length >= 2;
+      const hasA = restAOk && quote.includes(cp.restA);
+      const hasB = restBOk && quote.includes(cp.restB);
+      if (hasA || !hasB) continue; // 자기 구별자가 있으면(자기 지점 얘기) 보존, 남 구별자가 없으면(모호) 조치 안 함
+      const prev = byId.get(a.id);
+      if (prev) {
+        if (!prev.otherSuffixes.includes(cp.restB)) { prev.otherSuffixes.push(cp.restB); prev.otherTokens.push(cp.restB); }
+        prev.bad++;
+      } else {
+        byId.set(a.id, { id: a.id, name: a.name, area: a.area, brand: cp.brand, ownSuffix: restAOk ? cp.restA : NO_OWN_SUFFIX, ownToken: cp.restA, otherSuffixes: [cp.restB], otherTokens: [cp.restB], bad: 1, shown: 0, hitSuffix: cp.restB });
+      }
+    }
+  }
+  if (byId.size) {
+    const ids = [...byId.keys()];
+    const shownRows = (await sql`SELECT id, jsonb_array_length(COALESCE(synth_reviews_all, synth_reviews)) AS shown FROM cafes WHERE id = ANY(${ids}::int[])`) as { id: number; shown: number }[];
+    for (const r of shownRows) { const f = byId.get(r.id); if (f) f.shown = r.shown || 0; }
+  }
+  return [...byId.values()];
+}
 async function scanFranchiseBranchPollution(): Promise<{ count: number; samples: string[]; flagged: FranchiseFlag[] }> {
   // 1단계: 이름만으로 가볍게 브랜드 그룹 구성(전체 카페, id+name만이라 경량)
   const nameRows = (await sql`SELECT id, name FROM cafes WHERE published`) as { id: number; name: string }[];
@@ -484,9 +548,25 @@ async function scanFranchiseBranchPollution(): Promise<{ count: number; samples:
       if (bad >= 1) flagged.push({ id: c.id, name: c.name, area: c.area, brand: info.brand, ownSuffix: info.suffix, ownToken: info.token, otherSuffixes: info.others, otherTokens: info.otherTokens, bad, shown: (c.synth_reviews || []).length, hitSuffix });
     }
   }
-  flagged.sort((a, b) => b.bad - a.bad);
-  const samples = flagged.slice(0, 40).map((f) => `#${f.id} ${f.name}[${f.area}] 타지점"${f.hitSuffix}" ${f.bad}/${f.shown}`);
-  return { count: flagged.length, samples, flagged };
+  // 🆕 접미사 마커 목록 무관 사각 보완(위 commonBrandPrefix — decisions#848) 병합: 같은 카페가 양쪽에서 잡히면
+  //   타지점 구별자 목록만 합치고(중복 제거), 신규 카페는 그대로 추가한다.
+  const byId = new Map<number, FranchiseFlag>();
+  for (const f of flagged) byId.set(f.id, f);
+  const dupFlags = await scanDuplicateQuoteBranchFlags().catch(() => [] as FranchiseFlag[]);
+  for (const f of dupFlags) {
+    const prev = byId.get(f.id);
+    if (prev) {
+      for (const s of f.otherSuffixes) if (!prev.otherSuffixes.includes(s)) prev.otherSuffixes.push(s);
+      for (const t of f.otherTokens) if (!prev.otherTokens.includes(t)) prev.otherTokens.push(t);
+      prev.bad += f.bad;
+    } else {
+      byId.set(f.id, f);
+    }
+  }
+  const merged = [...byId.values()];
+  merged.sort((a, b) => b.bad - a.bad);
+  const samples = merged.slice(0, 40).map((f) => `#${f.id} ${f.name}[${f.area}] 타지점"${f.hitSuffix}" ${f.bad}/${f.shown}`);
+  return { count: merged.length, samples, flagged: merged };
 }
 // 🏪 자율 조치: flag된 카페의 raw에서 '브랜드+다른지점접미사' 언급하되 '자기지점접미사' 없는 항목을 결정론 자동 제거·재합성.
 //   보수: 자기 지점명 함께 언급되면 보존(다른 지점 안내 정보일 뿐). 런당 최대 12곳·deadline 시간예산·멱등.
