@@ -195,6 +195,15 @@ const NEWS_BYLINE = /(\[[가-힣A-Za-z0-9·\s]+=\s*[가-힣]{2,4}\s*기자\s*\]|
 //   수봉별마루도너츠). INSTITUTIONAL_PR과 동일 메커니즘(3인칭 발표문+방문신호 무관 정형구)이라 동일 지점에
 //   병렬 적용, 동일 AD_DISCLAIM 가드.
 const SELF_ANNOUNCE = /((오픈|신메뉴\s*출시|이벤트|영업\s*시작)\s*안내|소식을?\s*전해드립니다|소식을?\s*전해드릴께요|소식을?\s*가지고\s*왔습니다)/;
+// coordination#346(데이터정합성팀 handoff, 2026-08-27) → decisions#847: SELF_ANNOUNCE는 "오픈/이벤트 안내"류만
+//   잡고 "예약문의/주문예약/카톡문의" 형태의 자영업자 주문유도 글은 사각지대라 방문후기로 오분류(published 12곳,
+//   검증등급 7곳: id9494 스윗곡간케이크·id11213 페리89·id23235 오하우스 등). 개인 전화번호·카톡ID가 그대로
+//   노출되는 위험도 있다. 전화번호 단독으로는 오탐 위험(진짜 후기가 업체 번호를 언급할 수 있음)이라
+//   솔리시테이션 키워드와 **동시에** 있을 때만 탈락시킨다 — 실측(전체 published 대상): 전화번호만 있고
+//   이 키워드가 없는 케이스 0건 확인(오탐 없이 특이적).
+const ORDER_SOLICITATION_PHONE = /01[0-9][-.\s]?[0-9*]{3,4}[-.\s]?[0-9*]{4}/;
+const ORDER_SOLICITATION_KEYWORD = /(예약\s*문의|주문\s*예약|카톡\s*(ID|아이디|문의|[:：]))/i;
+const ORDER_SOLICITATION_AD = (t: string): boolean => ORDER_SOLICITATION_PHONE.test(t) && ORDER_SOLICITATION_KEYWORD.test(t);
 // 식당 메인 메뉴어(카페 아닌 '음식점' 시그널). 같은 상호 다른 음식점('장꼬방'+'묵은김치찌개') 후기 분리용.
 //   카페가 흔히 파는 것(토스트·샌드위치·파스타·브런치)은 제외 — 명백한 한식·중식 '식당 본메뉴'만.
 const RESTAURANT_MAIN_SRC = "(묵은김치|김치찌개|된장찌개|부대찌개|동태찌개|순두부찌개|순두부|찌개|찌게|백반|국밥|순대국|해장국|감자탕|짜장면|짜장|짬뽕|탕수육|보쌈|족발|곱창|막창|삼겹살|갈비탕|갈비찜|불고기|제육|돈가스|돈까스|냉면|칼국수|쌈밥|한정식|매운탕|추어탕|설렁탕|곰탕|닭갈비|찜닭|아구찜|해물찜|쌀국수|분식)";
@@ -1202,7 +1211,8 @@ export function verifyReview(input: QualityInput): QualityResult {
   const exhibitionPR = EXHIBITION_PR.test(fullL) && !has(fullL, VISIT_CUES) && !AD_DISCLAIM.test(fullL); // decisions#644: 갤러리 전시 공지문(3인칭 초대장)
   const newsByline = NEWS_BYLINE.test(fullL) && !AD_DISCLAIM.test(fullL); // decisions#650: 언론 보도기사 바이라인
   const selfAnnounce = SELF_ANNOUNCE.test(fullL) && !AD_DISCLAIM.test(fullL); // decisions#651: 업체 자체 SNS 공지문
-  if (sponsored || supporterPR || institutionalPR || exhibitionPR || newsByline || selfAnnounce) return { verdict: "rejected", score: 0, reasons: [institutionalPR && !sponsored && !supporterPR ? "기관 보도자료·업무협약/후원 소식 — 자동 제외" : exhibitionPR && !sponsored && !supporterPR ? "갤러리 전시 공지문(3인칭 초대장) — 자동 제외" : supporterPR && !sponsored ? "서포터즈·기자단 위촉 홍보글 — 자동 제외" : newsByline && !sponsored ? "언론 보도기사 바이라인 — 자동 제외" : selfAnnounce && !sponsored ? "업체 자체 SNS 공지문(오픈/이벤트/소식 안내) — 자동 제외" : "광고·협찬 글 — 자동 제외"], signals: { nameInTitle: false, nameInBody: false, visit: false, substance: 0, listicle: false, sponsored: true, areaMatch: false } };
+  const orderSolicitation = ORDER_SOLICITATION_AD(fullL); // decisions#847: 예약/주문 유도 홍보글(전화번호+솔리시테이션 키워드)
+  if (sponsored || supporterPR || institutionalPR || exhibitionPR || newsByline || selfAnnounce || orderSolicitation) return { verdict: "rejected", score: 0, reasons: [institutionalPR && !sponsored && !supporterPR ? "기관 보도자료·업무협약/후원 소식 — 자동 제외" : exhibitionPR && !sponsored && !supporterPR ? "갤러리 전시 공지문(3인칭 초대장) — 자동 제외" : supporterPR && !sponsored ? "서포터즈·기자단 위촉 홍보글 — 자동 제외" : newsByline && !sponsored ? "언론 보도기사 바이라인 — 자동 제외" : selfAnnounce && !sponsored ? "업체 자체 SNS 공지문(오픈/이벤트/소식 안내) — 자동 제외" : orderSolicitation && !sponsored ? "예약/주문 유도 홍보글(전화번호·카톡 노출) — 자동 제외" : "광고·협찬 글 — 자동 제외"], signals: { nameInTitle: false, nameInBody: false, visit: false, substance: 0, listicle: false, sponsored: true, areaMatch: false } };
 
   // [비방문 게시판] 중고나라·창업나무는 물건 거래·상권 문의 게시판(네이버 카페=커뮤니티)이라 방문 후기가 있을 수 없음.
   //   내용에 카페 맥락어가 섞여도(리터럴 "카페" 오탐) 링크 도메인만으로 무조건 탈락.
