@@ -242,6 +242,10 @@ export async function GET(req: NextRequest) {
     //   ※ 이 배열은 lib/issues.ts가 tower-risk 이슈(HIGH)로 그대로 미러하므로, 여기 한 줄이 곧 RM 보드의 빨강이다.
     const risks: string[] = [];
     const notices: string[] = [];
+    // 🟡 2026-08-31 정정 — 이 안내를 어제 alerts에 넣었더니 **화면이 그대로 빨강으로 셌다.**
+    //   /admin은 `alerts.length + risks.length`를 🔴 배지로 쓰고 "🚨 경보(즉시조치)" 빨간 박스에 그린다.
+    //   "조치 불필요"라고 적힌 문장이 즉시조치 경보로 뜬 것 — 가짜 빨강을 없애려다 새 가짜 빨강을 만들었다.
+    //   정보는 notices(주의·소비자 무관)가 제 자리다. alerts는 **조치가 필요할 때만** 쓴다.
     if (aiPaused) notices.push("⏸️ AI 판정·그라운딩 일시정지(CEO 지시 · 구독한도·콘솔비용 보호) — 공개카페는 규칙검증으로 정상 노출, 재개 시 자동 해소");
 
     // 소비자에게 '잘못된 데이터'(그라운딩 업체혼동·환각)가 공개 노출 = 해자(옥석) 직접 훼손.
@@ -596,7 +600,8 @@ export async function GET(req: NextRequest) {
       : (authFails.length || agents.some((a) => a.status === "stalled" || a.status === "behind" || a.status === "warn")) ? "degraded"
       : "healthy";
     // 배치 크래시·실패 + 데이터 무결성 위반을 최상단 경보로 — '관제탑이 잡아서 알림'
-    const alerts = [...jobFails, ...authNotes, ...integrity.map((s) => `🔎 무결성: ${s}`), ...agents.filter((a) => a.status === "stalled").map((a) => `${a.label} 멈춤(${a.ageH}h 전 마지막 가동)`)];
+    if (authNotes.length) notices.unshift(...authNotes); // 🟡 정보 — 빨강 아님(위 정정 참조)
+    const alerts = [...jobFails, ...integrity.map((s) => `🔎 무결성: ${s}`), ...agents.filter((a) => a.status === "stalled").map((a) => `${a.label} 멈춤(${a.ageH}h 전 마지막 가동)`)];
 
     const pct = (n: number) => (c.total ? Math.round((n / c.total) * 100) : 0);
     // 신규 카페 조립라인(발굴→합성→AI판정→임베딩→공개). 각 단계 대기 수 = '어디서 막혔나'.
