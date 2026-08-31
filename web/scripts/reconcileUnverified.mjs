@@ -26,10 +26,12 @@ export async function reconcileUnverified(sql) {
     const isAncestor = sha === liveSha || (() => { try { git(`merge-base --is-ancestor ${sha} ${liveSha}`); return true; } catch { return false; } })();
     if (!isAncestor) { console.error(`  ⏸ #${d.id} 반영미확인 재검증: 아직 라이브(${liveSha.slice(0, 8)}) 조상 아님 — 유지`); continue; }
     const coord = d.action_params?.coord;
+    // ⚠️ #914(협업#361)와 동일 사유: 여기서 확정하는 "반영"은 코드 배포(git ancestor)뿐 — 데이터측
+    //   반영 여부는 미검증이므로 문구로 범위를 명시한다(dev-deploy.mjs 본 경로 참조).
     await sql`UPDATE decisions SET status='done', decided_at=now(), decided_by='CEO',
-      result=${`배포완료·반영 재확인(라이브 HEAD=${liveSha.slice(0, 8)})`},
+      result=${`코드배포 완료·프로덕션 반영 재확인(라이브 HEAD=${liveSha.slice(0, 8)}) — ⚠️ 데이터측 반영은 별도 확인 필요, 이 결재는 코드 배포만 보증`},
       action_params = action_params || ${JSON.stringify({ dev_status: "deployed" })}::jsonb WHERE id=${d.id}`;
-    if (coord) await sql`UPDATE coordination SET status='resolved', resolved_at=now(), stage='완료', resolution=${`개발·배포 완료(#${d.id}, 반영 재확인)`} WHERE id=${Number(coord)}`.catch(() => {});
+    if (coord) await sql`UPDATE coordination SET status='resolved', resolved_at=now(), stage='완료', resolution=${`개발·배포 완료(#${d.id}, 코드 반영 재확인) — 데이터 반영은 별도 확인 필요`} WHERE id=${Number(coord)}`.catch(() => {});
     console.error(`  ✅ #${d.id} 반영미확인 → 재확인 완료(sha=${sha.slice(0, 8)}가 라이브 ${liveSha.slice(0, 8)}의 조상)`);
   }
 }
