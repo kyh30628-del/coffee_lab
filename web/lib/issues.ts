@@ -1,4 +1,5 @@
 import { sql , ensureOnce } from "./db";
+import { noteSilentFail } from "./silentFail";
 import { getCriterionSync } from "./criteria";
 import { OUT_OF_SCOPE_SQL, geoBoxSql } from "./serviceScope";
 import { nameCoherence, cleanCafeName } from "./reviewQuality";
@@ -78,7 +79,7 @@ export async function autoCorrect(): Promise<{ resolved: number; escalated: numb
         }
       }
       if (!ok) { if (log.length < 8) log.push(ids.length ? `승인결정 집행실패 #${d.id} — 다음 사이클 재시도(결재 유지)` : `승인결정 집행실패 #${d.id}(action_params 누락) — 다음 사이클 재시도(결재 유지)`); continue; }
-      await sql`UPDATE decisions SET status='done', result='auto-executed', decided_at=now() WHERE id=${d.id}`.catch(() => {});
+      await sql`UPDATE decisions SET status='done', result='auto-executed', decided_at=now() WHERE id=${d.id}`.catch((e) => noteSilentFail("issues.decision.autoexec_done", e));
       resolved++; if (log.length < 8) log.push(`승인결정 즉시집행 #${d.id}(${msg})`);
     }
   } catch { /* graceful */ }
@@ -202,7 +203,7 @@ export async function coordinationLifecycle(): Promise<{ routed: number; overdue
               ${`요청: ${owner} · 실행: 개발 실행 유닛(협업 #${c.id}). ${String(c.detail || c.topic || "").slice(0, 170)}`},
               ${owner}, 'MED', 'L3', 'dev_task', ${JSON.stringify({ coord: String(c.id), owner })}::jsonb,
               ${`${owner}가 요청한 코드 변경 건입니다(어느 본부도 코드를 안 짜므로 공유 개발 실행 유닛이 담당). 승인하시면 개발 착수(코드→검증→배포), 반려 시 보류.`})`.catch(() => {});
-    await sql`UPDATE coordination SET stage='CEO결재' WHERE id=${c.id}`.catch(() => {});
+    await sql`UPDATE coordination SET stage='CEO결재' WHERE id=${c.id}`.catch((e) => noteSilentFail("issues.coord.stage_ceo", e));
     devEsc++;
   }
   if (devEsc && log.length < 6) log.push(`개발 협업 ${devEsc}건 → CEO 결재 상신`);
@@ -226,7 +227,7 @@ export async function coordinationLifecycle(): Promise<{ routed: number; overdue
               ${`협업 #${c.id}(${owner}→${c.to_team || "미배정"})가 재촉 후에도 미해결. 담당 크론/팀이 자체 처리 못함. ${String(c.detail || "").slice(0, 180)}`},
               ${owner}, 'MED', 'L3', 'route_coord', ${JSON.stringify({ coord: String(c.id) })}::jsonb,
               ${"조치경로 판단: 승인 시 기조실장이 실제 조치항목(코드=dev_task·비공개·검색제한)으로 재배정, 반려 시 폐기."})`.catch(() => {});
-    await sql`UPDATE coordination SET stage='CEO정체판단' WHERE id=${c.id}`.catch(() => {});
+    await sql`UPDATE coordination SET stage='CEO정체판단' WHERE id=${c.id}`.catch((e) => noteSilentFail("issues.coord.stage_stall", e));
     termEsc++;
   }
   if (termEsc && log.length < 6) log.push(`정체 협업 ${termEsc}건 → CEO 조치판단 상신(좀비 차단)`);

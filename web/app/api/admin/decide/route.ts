@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { noteSilentFail } from "@/lib/silentFail";
 import { sql } from "@/lib/db";
 import { pingDevTrigger } from "@/lib/devTrigger";
 
@@ -19,10 +20,10 @@ export async function POST(req: NextRequest) {
       // 개발 결재 반려 → 연결 협업 '종결'(status=resolved). stage만 바꾸면 status=open 좀비로 남아 협업 카운트 부풀리고
       //   기한 지나면 '지연'으로 튀어 이중 좀비가 됨 → route_coord 반려와 동일하게 resolved 처리(좀비 원천 차단).
       if (d.action_type === "dev_task" && d.action_params?.coord)
-        await sql`UPDATE coordination SET status='resolved', resolved_at=now(), stage='보류(CEO반려)', resolution=COALESCE(resolution,'')||' [dev_task CEO반려 → 폐기 종결]' WHERE id=${Number(d.action_params.coord)}`.catch(() => {});
+        await sql`UPDATE coordination SET status='resolved', resolved_at=now(), stage='보류(CEO반려)', resolution=COALESCE(resolution,'')||' [dev_task CEO반려 → 폐기 종결]' WHERE id=${Number(d.action_params.coord)}`.catch((e) => noteSilentFail("decide.coord.reject_hold", e));
       // 정체판단 반려 → 연결 협업 폐기 종결(더는 재촉 안 함 = 좀비 종료)
       if (d.action_type === "route_coord" && d.action_params?.coord)
-        await sql`UPDATE coordination SET status='resolved', resolved_at=now(), stage='폐기(CEO반려)', resolution=COALESCE(resolution,'')||' [CEO 정체판단 반려 → 폐기 종결]' WHERE id=${Number(d.action_params.coord)}`.catch(() => {});
+        await sql`UPDATE coordination SET status='resolved', resolved_at=now(), stage='폐기(CEO반려)', resolution=COALESCE(resolution,'')||' [CEO 정체판단 반려 → 폐기 종결]' WHERE id=${Number(d.action_params.coord)}`.catch((e) => noteSilentFail("decide.coord.reject_discard", e));
       return NextResponse.json({ ok: true, status: "rejected" });
     }
 
@@ -69,13 +70,13 @@ export async function POST(req: NextRequest) {
         case "dev_task": {
           // 개발(코드 변경·배포) 승인 → 개발 실행 대기 큐로. 연결 협업 stage=개발승인. 실제 개발은 개발 실행 경로가 처리.
           status = "approved"; result = "CEO 승인 — 개발 착수 대기(코드 작성→검증→배포)";
-          if (p.coord) await sql`UPDATE coordination SET stage='개발승인' WHERE id=${Number(p.coord)}`.catch(() => {});
+          if (p.coord) await sql`UPDATE coordination SET stage='개발승인' WHERE id=${Number(p.coord)}`.catch((e) => noteSilentFail("decide.coord.dev_approve", e));
           break;
         }
         case "route_coord": {
           // 정체 협업 조치판단 승인 → 기조실장이 실제 조치항목(dev_task·비공개·검색제한)으로 재배정. 협업은 소유 이관(좀비 종료).
           status = "approved"; result = "CEO 승인 — 기획조정실장 재배정 대기(실제 조치항목으로 전환)";
-          if (p.coord) await sql`UPDATE coordination SET stage='기조실장 재배정', to_team='기획조정실' WHERE id=${Number(p.coord)}`.catch(() => {});
+          if (p.coord) await sql`UPDATE coordination SET stage='기조실장 재배정', to_team='기획조정실' WHERE id=${Number(p.coord)}`.catch((e) => noteSilentFail("decide.coord.reassign", e));
           break;
         }
         default:

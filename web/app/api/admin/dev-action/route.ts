@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { noteSilentFail } from "@/lib/silentFail";
 import { sql } from "@/lib/db";
 import { pingDevTrigger } from "@/lib/devTrigger";
 
@@ -37,7 +38,7 @@ export async function POST(req: NextRequest) {
     if (action === "discard") {
       await sql`UPDATE decisions SET status='rejected', decided_at=now(), decided_by='CEO', result='CEO 폐기', action_params = action_params || '{"dev_status":"discarded"}'::jsonb WHERE id=${id}`;
       // 연결 협업 '종결'(status=resolved) — stage만 바꾸면 open 좀비로 남아 카운트 부풀림+지연 재상신됨(#65 사례).
-      if (d.action_params?.coord) await sql`UPDATE coordination SET status='resolved', resolved_at=now(), stage='보류(폐기)', resolution=COALESCE(resolution,'')||' [dev_task 폐기 → 종결]' WHERE id=${Number(d.action_params.coord)}`.catch(() => {});
+      if (d.action_params?.coord) await sql`UPDATE coordination SET status='resolved', resolved_at=now(), stage='보류(폐기)', resolution=COALESCE(resolution,'')||' [dev_task 폐기 → 종결]' WHERE id=${Number(d.action_params.coord)}`.catch((e) => noteSilentFail("devAction.coord.discard", e));
       return NextResponse.json({ ok: true, status: "discarded" });
     }
     return NextResponse.json({ ok: false, error: "action은 deploy|discard" }, { status: 400 });
