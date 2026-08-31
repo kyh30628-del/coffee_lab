@@ -3,8 +3,9 @@ import { NextResponse } from "next/server";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-// 2026-07-01 인천 2군9구 개편 반영(중구·동구→제물포구/영종구, 서구→검단구/서해구, 공식 확인).
-const INCHEON = ["미추홀구","연수구","남동구","부평구","계양구","강화군","옹진군","검단구","서해구","영종구","제물포구"];
+// ⚠️ 2026-08-31 정정(decisions#910): "2026-07-01 인천 2군9구 개편"(제물포구·영종구·검단구·서해구)은
+//   실존하지 않는 행정구역명이었다(coordination#354) — 실제 인천 10개 구·군으로 되돌린다.
+const INCHEON = ["중구","동구","미추홀구","연수구","남동구","부평구","계양구","서구","강화군","옹진군"];
 
 export async function POST(req: Request) {
   try {

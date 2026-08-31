@@ -33,11 +33,11 @@ export async function GET(req: NextRequest) {
     await sql`ALTER TABLE discovery_state ADD COLUMN IF NOT EXISTS last_oob INT`.catch(() => {});
     // 지역 시드(최초 1회)
     for (const r of METRO_REGIONS) await sql`INSERT INTO discovery_state (region, area_label) VALUES (${r.region}, ${r.areaLabel}) ON CONFLICT (region) DO NOTHING`;
-    // 🚨 재발방지(coordination#302): ON CONFLICT DO NOTHING 시딩은 새 지역만 더할 뿐 폐지된 지역을 절대
-    //   못 지운다 — 인천 2026-07-01 구제편(중구·동구·서구 폐지)으로 METRO_REGIONS에서 이미 빠졌는데도
-    //   discovery_state엔 예전 행이 그대로 남아 매일 스윕 대상이 됐다(중구 519건·서구 113건 검색해도
-    //   실제 cafes.area 반영은 각 1·3건뿐 — 네이버 예산만 태우고 성과가 안 남는 죽은 지역). 매 회차
-    //   METRO_REGIONS에 없는 행을 정리해 폐지 지역이 재발해도 다음 cron-grow에서 자동 치유되게 한다.
+    // 🚨 재발방지(coordination#302): ON CONFLICT DO NOTHING 시딩은 새 지역만 더할 뿐 목록에서 빠진 지역을
+    //   절대 못 지운다 — METRO_REGIONS가 바뀌어도(예: 2026-08-31 decisions#910, 실존하지 않던 인천
+    //   제물포구/영종구/검단구/서해구를 실제 구명으로 정정) discovery_state엔 예전 행이 그대로 남아
+    //   계속 스윕 대상이 될 수 있다. 매 회차 METRO_REGIONS에 없는 행을 정리해 이런 드리프트가 재발해도
+    //   다음 cron-grow에서 자동 치유되게 한다.
     const validRegions = METRO_REGIONS.map((r) => r.region);
     await sql`DELETE FROM discovery_state WHERE region <> ALL(${validRegions})`.catch(() => {});
     // 🎯 demand→grow 자율 루프: 에이전트(Claude Code)가 수요·공급갭을 추론해 채우는 타겟 큐. 비면 기존 신선도 순회로 폴백.
