@@ -290,3 +290,4 @@
 | 2026-08-30 22:00 | #865 | [룰갭 신규] COMMON_WORD_NAMES 미등재 "카나리아/CANARIA" — 칵테일메뉴명·지명 동음이 | 27d8e7fe | - | web/lib/reviewQuality.ts:306 COMMON_WORD_NAMES에 카나리아/canaria 추가(norm()이 소문자화해 CANARIA/Canaria 모두 커버) |
 | 2026-08-30 22:02 | #901 | [검색결함] "카공" 단독검색 0건 — 등록된 카공시설 데이터 미연결 | 8fc4b2c7 | - | lib/criteriaListsBase.ts: concept.work.triggers 배열에 "카공" 추가(단일출처, DB오버레이 없음 확인). 근본원인: SEO aliases(s |
 | 2026-08-30 22:43 | #866 | [룰갭 신규] COMMON_WORD_NAMES 미등재 "우상향" — 부동산 관용구 동음이의 오염 (id190 | 0287a27b | - | web/lib/reviewQuality.ts:319 COMMON_WORD_NAMES에 "우상향" 추가(부동산 시황 관용구 동음이의 방지, id19003). tsc 신규에러 0(기존 |
+| 2026-08-31 07:05 | #910 | [개발] 협업 #356: [확대] 인천 가짜 세부지명 3종 정정 필요 — 729건 (coordination# | 395077ed | - | 코드 근본원인 수정: 실존하지 않는 "인천 2026-07-01 2군9구 개편"(제물포구/영종구/검단구/서해구)이 과거 에이전트 환각으로 6개 파일에 사실처럼 박혀 cron-grow |
