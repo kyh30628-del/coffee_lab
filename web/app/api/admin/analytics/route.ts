@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { noteSilentFail } from "@/lib/silentFail";
+import { HOLIDAY_DATES, dayType, holidayName } from "@/lib/holidays";
 import { sql, ensureSchema , ensureOnce } from "@/lib/db";
 import { getTodayInsight, formatTodayInsightLines, type TodayInsight } from "@/lib/dailySummary";
 import { BOT_ANON_IDS_SQL } from "@/lib/behaviorBot";
@@ -119,7 +121,7 @@ function buildDailyInsights(
     } else if (hourRatio >= wdRatio) {
       insights.push(`최근 30일 방문은 ${peakH}시대에 가장 몰려요(전체의 ${Math.round(peakHN / hourTotal * 100)}%, ${peakHN}건).`);
     } else {
-      insights.push(`최근 30일 방문은 ${WEEKDAY_KO[peakW]}요일에 가장 많았어요(전체의 ${Math.round(peakWN / wdTotal * 100)}%, ${peakWN}건).`);
+      insights.push(`최근 30일 방문은 ${WEEKDAY_KO[peakW]}요일에 가장 많았어요(공휴일 제외 · 전체의 ${Math.round(peakWN / wdTotal * 100)}%, ${peakWN}건).`);
     }
   }
 
@@ -248,10 +250,29 @@ export async function GET(req: NextRequest) {
         AND anon_id NOT IN (${sql.unsafe(BOT_ANON_IDS_SQL)}) GROUP BY 1 ORDER BY 1`.catch(() => [])) as any[];
 
     // 요일 분포(KST, 0=일~6=토, 최근 30일) — '일일 분석 요약'의 요일 패턴 문장용
+    // 🔴 2026-08-31: **공휴일을 뺀다.** 8/17(광복절 대체)은 253명으로 평일 평균(48명)의 5배인데
+    //   그걸 '월요일'로 세면 "월요일에 사람이 몰린다"는 거짓 패턴이 만들어진다(실제로 그렇게 오독했다).
+    //   공휴일은 아래에서 따로 센다 — 숨기는 게 아니라 **다른 종류의 날**로 분리하는 것이다.
     const weekdays = (await sql`
       SELECT EXTRACT(dow FROM ts AT TIME ZONE 'Asia/Seoul')::int AS w, COUNT(*)::int n
       FROM traffic_events WHERE ts > now()-interval '30 days'
-        AND anon_id NOT IN (${sql.unsafe(BOT_ANON_IDS_SQL)}) GROUP BY 1`.catch(() => [])) as any[];
+        AND anon_id NOT IN (${sql.unsafe(BOT_ANON_IDS_SQL)})
+        AND to_char(ts AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD') <> ALL(${HOLIDAY_DATES as string[]})
+      GROUP BY 1`.catch(() => [])) as any[];
+
+    // 📅 공휴일·주말·평일 3분류 — 하루 단위 순방문자 평균(최근 90일).
+    //   "쉬는 날에 카페를 찾는다"가 이 서비스의 본질이라 이 세 줄이 요일 7줄보다 정보가 많다.
+    const dayTypes = (await sql`
+      WITH d AS (
+        -- ⚠️ 컬럼명을 day로 쓰면 postgres가 예약어로 읽어 구문오류가 난다(실제로 났고,
+        --   .catch(() => [])가 그걸 삼켜 '데이터 없음'처럼 0이 나왔다 — 오늘 내내 잡던 그 패턴).
+        SELECT to_char(ts AT TIME ZONE 'Asia/Seoul','YYYY-MM-DD') dt,
+               EXTRACT(dow FROM ts AT TIME ZONE 'Asia/Seoul')::int dow, anon_id
+        FROM traffic_events WHERE ts > now()-interval '90 days'
+          AND anon_id NOT IN (${sql.unsafe(BOT_ANON_IDS_SQL)})
+      )
+      SELECT dt, dow, COUNT(DISTINCT anon_id)::int ppl FROM d GROUP BY 1,2`
+      .catch(async (e) => { await noteSilentFail("analytics.dayTypes", e); return []; })) as any[];
 
     // 일별 유입경로별 순방문자(최근 8일, KST, day='MM-DD'로 daily와 동일 포맷) — 오늘 급증/급감 소스 근거용
     const dailySources = (await sql`
@@ -296,7 +317,27 @@ export async function GET(req: NextRequest) {
     //   (scripts/make-digest.mjs의 일일보고서 파이프라인과 동일 쿼리를 공유, #351)
     const todayInsight = await getTodayInsight(sql);
 
+    // 📅 공휴일·주말·평일 평균(하루 순방문자) — 요일 7줄보다 이 3줄이 이 서비스의 성격을 더 잘 말한다.
+    const buckets: Record<string, number[]> = { "공휴일": [], "주말": [], "평일": [] };
+    for (const d of dayTypes) buckets[dayType(String(d.dt), Number(d.dow))].push(Number(d.ppl));
+    const avg = (a: number[]) => (a.length ? Math.round(a.reduce((s, x) => s + x, 0) / a.length) : 0);
+    const dayTypeStats = (["공휴일", "주말", "평일"] as const).map((k) => ({
+      kind: k, days: buckets[k].length, avgPeople: avg(buckets[k]),
+    }));
+    // 최근 90일 안에 있었던 공휴일 실적(있을 때만) — 어떤 날이 왜 튀었는지 화면에서 바로 보이게.
+    const holidayDays = dayTypes
+      .filter((d: any) => holidayName(String(d.dt)))
+      .map((d: any) => ({ day: String(d.dt), name: holidayName(String(d.dt)), people: Number(d.ppl) }))
+      .sort((a: any, b: any) => (a.day < b.day ? -1 : 1));
+
     const dailyInsights = buildDailyInsights(daily, dailySources, dailyDevices, hours, weekdays, todayInsight);
+    {
+      const h = dayTypeStats.find((x) => x.kind === "공휴일");
+      const w = dayTypeStats.find((x) => x.kind === "주말");
+      const p = dayTypeStats.find((x) => x.kind === "평일");
+      if (h && w && p && p.avgPeople > 0 && h.days > 0)
+        dailyInsights.push(`쉬는 날에 사람이 옵니다 — 공휴일 ${h.avgPeople}명 · 주말 ${w.avgPeople}명 · 평일 ${p.avgPeople}명(하루 평균, 최근 90일). 공휴일은 평일의 ${(h.avgPeople / p.avgPeople).toFixed(1)}배.`);
+    }
 
     // 🧑 진짜 사용자 신호 — 봇으로 설명 안 되는 신호(기능사용). r2/r3/r5 = 페이지 열람 2/3/5장+(참고용 관여도, 재방문 아님).
     // 🐛 재발방지(2026-07-26, CEO "여기저기 헷갈리게 표현하지 말고 명쾌하게 한 번만") — 이 자리에 별도로
@@ -379,6 +420,7 @@ export async function GET(req: NextRequest) {
       GROUP BY c.id, c.name, c.area ORDER BY n DESC LIMIT 6`.catch(() => [])) as any[];
 
     return NextResponse.json({
+      dayTypeStats, holidayDays,   // 📅 공휴일 분리 통계(2026-08-31)
       realUsers: {
         r2: cohort?.r2 ?? 0, r3: cohort?.r3 ?? 0, r5: cohort?.r5 ?? 0, trueReturn: retention?.ret ?? 0,
         consent: consentReal, taste: tasteN, bookmark: bookmarkN,
