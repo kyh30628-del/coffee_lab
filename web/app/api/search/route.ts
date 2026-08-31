@@ -268,6 +268,8 @@ export async function GET(req: NextRequest) {
     const parsed = parseQuery(q);
     const tokens = parsed.tokens;
     const hitConcepts = CONCEPTS.filter((c) => c.triggers.some((t) => ql.includes(t)));
+    // 질의 자체가 개념어인가('카공'·'공부'). 부분 상호매칭 바닥값을 뺄지 판단하는 데만 쓴다.
+    const pureConceptQuery = hitConcepts.some((c) => c.triggers.some((t) => ql.trim() === t));
     let effectiveRegion = region;
     let regionExplicit = !!region;
     if (!effectiveRegion) {
@@ -356,6 +358,18 @@ export async function GET(req: NextRequest) {
             const lexRank = new Map<string, number>();
             [...lex].sort((a, b) => (b.exact + b.concept) - (a.exact + a.concept))
               .forEach((l, i) => lexRank.set(String(l.c.id), i));
+            // 🎯 2026-08-31 — 개념 질의('카공'·'조용한')에서 **실제로 그런 카페인가**를 순위에 넣는다.
+            //   실측 문제: "카공" 1위가 카페 공명(work 59)이고, 디벙크(work 123 · "콘센트 갖춘 작업·공부하기 좋은 곳")가
+            //   4위였다. 임베딩이 '카공'과 '카페 공명'을 이름 모양으로 가깝게 봐서 sim 랭킹이 그렇게 만든 것이다.
+            //   concept 점수는 상한 18점이라 lexRank 안에서 묻힌다 → **독립 랭킹**으로 올려야 힘을 갖는다.
+            //   개념이 안 걸린 질의(상호·지역 검색)에는 적용하지 않는다 — 그쪽 동작은 건드리지 않는다.
+            const axisRank = new Map<string, number>();
+            if (hitConcepts.length > 0) {
+              const axisOf = (c: any) => hitConcepts.reduce((m, cc) =>
+                Math.max(m, cc.axis ? Number((c.char_scores ?? {})[cc.axis] ?? 0) : 0), 0);
+              [...lex].sort((a, b) => axisOf(b.c) - axisOf(a.c))
+                .forEach((l, i) => axisRank.set(String(l.c.id), i));
+            }
             scored = lex
               .map(({ c, exact, concept, reasons, snippet, reviewOnly }) => {
                 const sim = Number(c.sim) || 0;
@@ -370,7 +384,9 @@ export async function GET(req: NextRequest) {
                 // RRF 융합값을 0~100 스케일로 환산(두 랭킹 모두 1위면 100). 어휘 미매칭은 의미 랭킹만 반영.
                 const rSim = simRank.get(String(c.id)) ?? lex.length;
                 const rLex = lexMatched ? (lexRank.get(String(c.id)) ?? lex.length) : lex.length * 2;
-                const rrf = (1 / (RRF_K + rSim) + 1 / (RRF_K + rLex)) / (2 / (RRF_K + 0)) * 100;
+                const rAxis = axisRank.size ? (axisRank.get(String(c.id)) ?? lex.length) : null;
+                const parts = rAxis === null ? [rSim, rLex] : [rSim, rLex, rAxis];
+                const rrf = parts.reduce((sum, r) => sum + 1 / (RRF_K + r), 0) / (parts.length / (RRF_K + 0)) * 100;
                 // 🗺️ 지역 미지정 질의의 외곽 상위노출 방지 — 지역을 *명시한* 질의엔 적용하지 않는다.
                 //   (실측: "크루아상 맛집" 1위가 이천시, "고양이 있는 카페" 1위가 강화군이었다.)
                 const corePrior = !regionExplicit && isCoreArea(c.area) ? 6 : 0;
@@ -497,7 +513,14 @@ export async function GET(req: NextRequest) {
             nameResults.push({
               id: c.id, name: c.name, area: c.area, grade: c.synth_grade, count: c.synth_count, vb: vbOf(c),
               identity: c.synth_identity,
-              score: exactName ? 9999 : 200 + gradeBonus(c.synth_grade) + Math.min(50, Number(c.synth_count) || 0),
+              // 🔴 2026-08-31 — 부분 상호매칭의 200점 바닥값이 개념 결과(최대 ~108)를 구조적으로 압도했다.
+              //   실측: "공부" 1위가 공부차파크(참고등급 · work 23 · 정체성 '사진 찍기 좋은 분위기') 231점,
+              //   2위(진짜 작업카페) 110점. 이름에 우연히 '공부'가 들어갔을 뿐인데 2배 격차로 1위였다.
+              //   → **질의 자체가 개념어일 때만** 바닥값을 빼고 일반 결과와 같은 스케일로 경쟁시킨다.
+              //   정확 상호 일치(9999)는 그대로 — 그 카페를 찾는 사람의 의도는 명확하다.
+              //   '공부차' 같은 부분 상호 검색도 그대로 — 질의가 트리거와 정확히 같지 않으면 적용 안 된다.
+              score: exactName ? 9999
+                : (pureConceptQuery ? 0 : 200) + gradeBonus(c.synth_grade) + Math.min(50, Number(c.synth_count) || 0),
               reasons: ["카페명 일치"],
             });
           }
@@ -522,8 +545,13 @@ export async function GET(req: NextRequest) {
     if (franchiseNote) payload.franchiseNote = franchiseNote;
     // 결과가 있으면 캐시에 저장(다음 동일 질문은 재계산 0)
     if (results.length > 0) {
-      sql`INSERT INTO search_cache (qkey, payload, created_at) VALUES (${qkey}, ${JSON.stringify(payload)}, now())
-          ON CONFLICT (qkey) DO UPDATE SET payload=EXCLUDED.payload, created_at=now()`.catch(() => {});
+      // 🛡️ 2026-08-31 — nocache=1은 **읽기만** 건너뛰고 쓰기는 그대로였다.
+      //   search_cache는 프로덕션과 로컬이 같은 Neon을 공유한다. 그래서 로컬에서 실험용으로 nocache를 켜면
+      //   그 결과가 프로덕션 캐시를 덮어써 실제 사용자에게 나간다(A/B 하려다 이 사실을 발견했다).
+      //   디버그 플래그가 공유 상태를 바꾸면 안 된다 — nocache면 쓰지도 않는다.
+      if (!nocache)
+        sql`INSERT INTO search_cache (qkey, payload, created_at) VALUES (${qkey}, ${JSON.stringify(payload)}, now())
+            ON CONFLICT (qkey) DO UPDATE SET payload=EXCLUDED.payload, created_at=now()`.catch(() => {});
     }
     logSearch(q, region, results.length, mode, isInternalCheck, aiErr); // 🔎 수요 로깅(수요-공급 갭·발굴 우선순위·콘텐츠 소재)
     return NextResponse.json(payload, {
