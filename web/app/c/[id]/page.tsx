@@ -197,6 +197,20 @@ export default async function CafePage({ params }: Props) {
     mainEntity: faqs.map((f) => ({ "@type": "Question", name: f.q, acceptedAnswer: { "@type": "Answer", text: f.a } })),
   } : null;
   // 🧭 BreadcrumbList(2026-08-13, 구글 채널 강화) — 홈 > 지역 > 카페. 검색결과 계층 표시 + 구조 이해.
+  // 📝 Review JSON-LD(2026-09-01, coordination#357/전략기획 5회 제언) — 검증 후기 원문을 구조화 마크업으로 노출.
+  //   evAll은 이미 sortReviews(확신도·타지점·광고템플릿)로 걸러진 배열이라 오염 방어가 그대로 적용된다.
+  //   개별 별점은 수집하지 않으므로 reviewRating은 넣지 않는다(아래 aggregateRating은 등급 기반 대리값, #77행).
+  //   작성자는 실명·닉네임을 저장하지 않으므로(개인정보0 원칙) 고정 라벨을 쓴다.
+  const reviewsForLd = evAll
+    .map((e: any) => ({ quote: String(e?.quote || "").trim(), date: e?.date }))
+    .filter((e) => e.quote.length >= 15 && e.quote.length <= 500)
+    .slice(0, 5)
+    .map((e) => ({
+      "@type": "Review",
+      reviewBody: e.quote.slice(0, 300),
+      author: { "@type": "Person", name: "동네 커피 노트 검증 방문자" },
+      ...(typeof e.date === "string" && /^\d{4}\.\d{2}\.\d{2}$/.test(e.date) ? { datePublished: e.date.replace(/\./g, "-") } : {}),
+    }));
   const breadcrumbLd = {
     "@context": "https://schema.org", "@type": "BreadcrumbList",
     itemListElement: [
@@ -225,6 +239,7 @@ export default async function CafePage({ params }: Props) {
         reviewCount: c.synth_count,
         bestRating: 5, worstRating: 1,
       },
+      ...(reviewsForLd.length > 0 ? { review: reviewsForLd } : {}),
     } : {}),
   };
   return (
