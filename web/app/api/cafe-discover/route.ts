@@ -9,9 +9,9 @@ const ID = process.env.NAVER_CLIENT_ID;
 const SECRET = process.env.NAVER_CLIENT_SECRET;
 
 // 프랜차이즈/대형 체인 제외 (헌법0: 동네 카페 정체성)
-const FRANCHISE = ["스타벅스","투썸","이디야","메가커피","메가엠지씨","빽다방","컴포즈","커피빈","할리스","엔제리너스","파스쿠찌","탐앤탐스","폴바셋","드롭탑","요거프레소","더벤티","매머드","공차","스무디킹","스벅","투썸플레이스","카페베네","페이바","감성커피","더카페","코너스톤","하삼동","매가","벤티","고나우","만랩","토프레소","셀렉토","더리터","달콤커피","커피스미스","주커피","백억커피","쥬씨","더치앤빈","감성타코","봉봉방앗간","빈스빈스","커피명가","커피에반하다","카페보니또","더착한커피","감탄커피",
+const FRANCHISE = ["스타벅스","투썸","이디야","메가커피","메가엠지씨","빽다방","컴포즈","커피빈","할리스","엔제리너스","파스쿠찌","탐앤탐스","폴바셋","드롭탑","요거프레소","더벤티","매머드","공차","스무디킹","스벅","투썸플레이스","카페베네","페이바","감성커피","더카페","코너스톤","하삼동","매가","벤티","고나우","만랩","토프레소","셀렉토","더리터","달콤커피","커피스미스","주커피","백억커피","쥬씨","더치앤빈","감성타코","봉봉방앗간","빈스빈스","커피명가","커피에반하다","카페보니또","더착한커피","감탄커피","팀홀튼",
   // 영문/로마자 표기(네이버가 영문 상호로 등재하는 지점 우회 방지 — decisions#565)
-  "STARBUCKS","TWOSOME","EDIYA","MEGACOFFEE","MEGAMGC","PAIKSCOFFEE","PAIKDABANG","COMPOSECOFFEE","COFFEEBEAN","HOLLYS","ANGELINUS","PASCUCCI","TOMNTOMS","PAULBASSETT","DROPTOP","YOGERPRESSO","THEVENTI","MAMMOTHCOFFEE","GONGCHA","SMOOTHIEKING","CAFEBENE","CAFFEBENE","MANLAB","TOPRESSO","SELECTO","DALKOMMCOFFEE","COFFEESMITH","JUICY"];
+  "STARBUCKS","TWOSOME","EDIYA","MEGACOFFEE","MEGAMGC","PAIKSCOFFEE","PAIKDABANG","COMPOSECOFFEE","COFFEEBEAN","HOLLYS","ANGELINUS","PASCUCCI","TOMNTOMS","PAULBASSETT","DROPTOP","YOGERPRESSO","THEVENTI","MAMMOTHCOFFEE","GONGCHA","SMOOTHIEKING","CAFEBENE","CAFFEBENE","MANLAB","TOPRESSO","SELECTO","DALKOMMCOFFEE","COFFEESMITH","JUICY","TIMHORTONS"];
 
 function stripTags(s: string) { return (s || "").replace(/<[^>]+>/g, "").replace(/&[a-z]+;/g, "").trim(); }
 // 명백한 비(非)카페 제외 (고로케·제과·정육 등)
