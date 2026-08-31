@@ -1584,9 +1584,15 @@ export function verifyReview(input: QualityInput): QualityResult {
   //   제목이 "가평 4인 숙소 그라운드휴", "가평리조트 그라운드휴" 등으로 소개, 커피·디저트 등 카페 실질맥락
   //   단어 0건). !CAFE_CONTEXT 가드는 위 HOTEL 게이트와 동일하게 유지 — 실제 F&B 후기(카페 맥락어 동반)는
   //   보호한다.
-  const LODGING_DESC = /펜션|글램핑|리조트|연수원|풀빌라|콘도|숙소/;
+  // [룰갭 신규, decisions#920, rulegap-20260831c.md 제안5] 리조트 브랜드명(비발디파크·하이원·델피노 등) 어휘 갭 —
+  //   #833·#840(VENUE_WORDS)은 '동일 리조트 내 딴 입점업체' 오귀속만 막았을 뿐, 리조트 자체 숙박 콘텐츠(룸·
+  //   체크인아웃·조식) 유입은 여전히 잔존했다. 원인 ①LODGING_DESC가 "리조트" 등 일반명사만 인식해 "리조트"
+  //   문자열이 없는 브랜드명 단독 표기(id24280 소노펫 비발디파크, id24864 델피노 비엔토, id24346 소노펠리체
+  //   비발디파크)는 우회 ②LODGING_SIGNAL도 스위트/콘도(bare)/체크인/체크아웃/그랜드호텔/조식(bare)이 없어
+  //   "리조트" 문자열은 포함하지만(id24607 정선담아 하이원리조트점) 신호사전을 우회. 양쪽 다 보강.
+  const LODGING_DESC = /펜션|글램핑|리조트|연수원|풀빌라|콘도|숙소|비발디파크|소노벨|소노펫|소노펠리체|델피노|하이원|휘닉스파크|휘닉스평창/;
   const LODGING_NAMED = HOTEL_NAMED || LODGING_DESC.test(input.name) || (nameInTitle && LODGING_DESC.test(title));
-  const LODGING_SIGNAL = /(숙박|투숙|킹룸|스탠다드룸|디럭스룸|조식뷔페|호캉스|풀빌라|수영장|연회장|컨벤션\s*후기|웨딩|예식장?|객실|1박|바베큐\s*무한리필|단체\s*워크숍|트리하우스|계곡\s*물놀이)/;
+  const LODGING_SIGNAL = /(숙박|투숙|킹룸|스탠다드룸|디럭스룸|조식뷔페|호캉스|풀빌라|수영장|연회장|컨벤션\s*후기|웨딩|예식장?|객실|1박|바베큐\s*무한리필|단체\s*워크숍|트리하우스|계곡\s*물놀이|스위트|콘도|체크인|체크아웃|그랜드호텔|조식)/;
   if (LODGING_NAMED && LODGING_SIGNAL.test(fullL) && !CAFE_CONTEXT.test(fullL)) {
     return { verdict: "rejected", score: 15, reasons: ["펜션/글램핑 겸업 숙박 후기(카페 맥락 전무) — LLM 재판정"], borderline: true, signals: sig };
   }
