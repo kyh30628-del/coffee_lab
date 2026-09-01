@@ -14,6 +14,7 @@ export async function invalidateCafeCaches(ids: number[]): Promise<void> {
       revalidatePath(`/c/${id}`);
       revalidatePath(`/share/${id}`);
     }
+    revalidatePath("/api/cafes");   // 🗺️ 지도 데이터(2026-09-01 캐시 재도입) — 여기를 빼면 2026-07-01 사고가 그대로 재발한다.
     revalidatePath("/sitemap.xml");
     revalidatePath("/area/[gu]", "page");
     // 🔧 2026-08-18: 테마·동 페이지가 무효화 목록에서 빠져 있었다. ISR 주기를 늘리기 전에 먼저 채운다

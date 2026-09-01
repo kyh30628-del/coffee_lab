@@ -20,6 +20,7 @@ export async function POST(req: NextRequest) {
     const { ids } = await req.json();
     const list = (Array.isArray(ids) ? ids : []).map(Number).filter(Number.isFinite).slice(0, 50);
     for (const id of list) { revalidatePath(`/c/${id}`); revalidatePath(`/share/${id}`); }
+    revalidatePath("/api/cafes");   // 로컬 워커에서 비공개했을 때도 지도 캐시가 지워지도록(같은 이유)
     revalidatePath("/sitemap.xml");
     revalidatePath("/area/[gu]", "page");
     revalidatePath("/area/[gu]/[taste]", "page");

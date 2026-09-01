@@ -5,6 +5,21 @@ import { sql, ensureSchema } from "@/lib/db";
 import { subscriptionLive } from "@/lib/flags";
 import { encodeCharScores } from "@/lib/mapCafes";
 export const runtime = "nodejs";
+// 🧊 2026-09-01 — CDN 캐시 60초 재도입(CEO 승인). 이유와 조건은 아래.
+//
+//   금지였던 이유(2026-07-01 사고): 비공개 결재를 승인했는데 지도에 몇 분~1시간 남았다.
+//     당시엔 **CDN을 지울 수단이 없어서** 캐시 자체를 포기했다(always-fresh).
+//     그때 기록이 재도입 조건까지 적어뒀다 — "캐시는 실제 비용이 있을 때만 · 트래픽 성장 시 재도입".
+//
+//   지금 그 조건이 찼다: MAU 195→1,330(6.8배) · DB가 하루 22.6h(94%) 안 자 월 $40.
+//     원인은 4MB 재생성이 아니라(그건 메모리 캐시로 막았다) **요청마다 도는 버전 확인 쿼리**다.
+//     그게 5분 유휴를 영영 못 만들어 Neon 자동절전이 안 걸린다.
+//
+//   ⚠️ 수동 `Cache-Control: s-maxage` 헤더로 만든 CDN 항목은 revalidatePath로 **못 지운다**(별개 레이어).
+//     그래서 Next 라우트 캐시(revalidate)를 쓴다 — 이건 revalidatePath로 지워진다.
+//     공개상태가 바뀌면 cafeCacheInvalidate가 이 경로를 즉시 purge한다(어제 원격 purge 수리로 로컬 워커도 가능).
+//   60초로 짧게 잡은 이유: purge가 실패해도 소비자 노출은 최대 1분(5분이면 절전 이득은 크지만 사고 시 5분).
+export const revalidate = 60;
 
 // 🗺️ 지도·목록용 응답. 무거운 synth_reviews는 제외(상세 열 때 따로 로드).
 //
@@ -28,7 +43,7 @@ export async function GET() {
     const version = `${v?.n ?? 0}|${v?.u ?? ""}|${v?.s ?? ""}|${live ? 1 : 0}`;
     if (cache && cache.version === version) {
       return new NextResponse(cache.body, {
-        headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=0, must-revalidate", "X-Cafes-Cache": "HIT" },
+        headers: { "Content-Type": "application/json", "X-Cafes-Cache": "HIT" },
       });
     }
     await loadCriteria(); // 배지 임계(criteria) 프라임 — 없으면 폴백 DEFAULTS로 동작
@@ -75,7 +90,7 @@ export async function GET() {
     const body = JSON.stringify({ ok: true, cafes: out });
     cache = { version, body };
     return new NextResponse(body, {
-      headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=0, must-revalidate", "X-Cafes-Cache": "MISS" },
+      headers: { "Content-Type": "application/json", "X-Cafes-Cache": "MISS" },
     });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e), cafes: [] }, { status: 500 });
