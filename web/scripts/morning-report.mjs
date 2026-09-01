@@ -41,7 +41,15 @@ try {
     const days = Math.max(1, (Date.now() - start.getTime()) / 86400000);
     console.log(`  이번 달 컴퓨트 ${cuh.toFixed(1)} CU-h → $${(cuh * 0.106).toFixed(2)} · 전송 ${((p2.data_transfer_bytes ?? 0)/1e9).toFixed(1)}GB`);
     console.log(`  하루 평균: 컴퓨트 ${(cuh/days).toFixed(1)} CU-h · $${(cuh*0.106/days).toFixed(2)}`);
-    console.log(`  🌙 활성시간 ${(act/days).toFixed(1)}h/일 ${act/days > 20 ? "← 🔴 거의 안 잠(ISR·크롤러 점검)" : "← 절전 확보됨"}`);
+    // ⚠️ 2026-09-01 — 하루 24시간을 넘는 값이 나오면 그건 데이터가 아니라 **모순**이다.
+    //   실제로 났다: 과금기간 라벨은 9/1로 넘어갔는데 카운터는 아직 8월 누계(741h)라
+    //   days가 1로 클램프돼 "활성시간 741.1h/일"이 CEO 보고서에 그대로 찍혔다.
+    //   불가능한 숫자를 그럴듯하게 내놓느니 **모른다고 말한다.**
+    const actPerDay = act / days;
+    if (actPerDay > 24.5)
+      console.log(`  🌙 활성시간 계산 불가 — 과금기간(${start.toISOString().slice(0,10)}) 리셋 지연으로 누계와 경과일수가 안 맞음(누계 ${act.toFixed(0)}h / 경과 ${days.toFixed(2)}일). 아래 스냅샷 시계열을 볼 것.`);
+    else
+      console.log(`  🌙 활성시간 ${actPerDay.toFixed(1)}h/일 ${actPerDay > 20 ? "← 🔴 거의 안 잠(ISR·크롤러 점검)" : "← 절전 확보됨"}`);
 
     // 🎯 2026-08-28 /c/[id] ISR 복구(커밋 4778af4)의 **실측 효과**.
     //   그날 CEO 지시: "숫자 재서 보고해." 월 누계 평균은 배포 전 24일치에 희석돼 효과가 안 보이므로,
@@ -82,6 +90,32 @@ try {
         }
       }
     } catch { /* 기준선 없음 */ }
+
+    // 📈 2026-09-01 — 스냅샷 시계열. **단일 기준선은 월 리셋 때 깨진다.**
+    //   Neon의 active/compute 카운터는 과금기간(월)마다 0으로 돌아간다. 실제로 9/1 기준선을 박는 순간
+    //   기간 라벨은 9월인데 값은 아직 8월(741h)이었다 — 이 상태로 빼면 다음 리셋 때 음수가 나온다.
+    //   → 매 실행마다 한 줄씩 쌓고 **연속 두 스냅샷의 차이**로 속도를 낸다. 값이 줄면(리셋) 그 구간만 건너뛴다.
+    try {
+      const { readFileSync, appendFileSync } = await import("node:fs");
+      const f = new URL("../../agent-reports/neon-usage.jsonl", import.meta.url);
+      appendFileSync(f, JSON.stringify({ at: new Date().toISOString(), active_h: Number(act.toFixed(2)), cu_h: Number(cuh.toFixed(2)) }) + "\n");
+      const rows = readFileSync(f, "utf8").trim().split("\n").map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+      const rates = [];
+      for (let i = 1; i < rows.length; i++) {
+        const dh = (new Date(rows[i].at) - new Date(rows[i - 1].at)) / 3600000;
+        const da = rows[i].active_h - rows[i - 1].active_h, dc = rows[i].cu_h - rows[i - 1].cu_h;
+        if (dh < 6 || da < 0 || dc < 0) continue; // 6시간 미만 표본·리셋 구간은 버린다
+        rates.push({ at: rows[i].at.slice(5, 10), aDay: da / (dh / 24), cDay: dc / (dh / 24) });
+      }
+      console.log(`  ── 📈 스냅샷 시계열(${rows.length}개 · 유효구간 ${rates.length}개) ──`);
+      if (!rates.length) console.log("     아직 유효 구간 없음 — 최소 6시간 간격 스냅샷 2개 필요");
+      else {
+        for (const r of rates.slice(-5))
+          console.log(`     ${r.at}  활성 ${r.aDay.toFixed(1)}h/일 · 컴퓨트 ${r.cDay.toFixed(2)} CU-h/일 → 월 $${(r.cDay * 30 * 0.106).toFixed(2)}`);
+        const last = rates[rates.length - 1];
+        console.log(`     ${last.aDay < 20 ? "🟢" : "🔴"} 최신 활성 ${last.aDay.toFixed(1)}h/일 (판정선 20h · 9/1 CDN캐시 적용 전 22.6h)`);
+      }
+    } catch (e) { console.log("  스냅샷 실패:", String(e).slice(0, 60)); }
   }
 } catch (e) { console.log("  조회 실패:", String(e).slice(0, 60)); }
 
