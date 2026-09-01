@@ -10,6 +10,7 @@ import WishButton from "../../WishButton";
 import OwnerCtaLink from "./OwnerCtaLink";
 import VisitorReviews from "../../VisitorReviews";
 import RecentCafes from "../../RecentCafes";
+import SavedCafes from "../../SavedCafes";
 import { buildAxisDist, cafeProfile, extractHighlights, tasteVector, tasteSimilarity, GRADE_RANK } from "@/lib/cafeProfile";
 import { collectionForCafe } from "@/lib/collections";
 import { tasteByKey } from "@/lib/seoData";
@@ -541,6 +542,9 @@ export default async function CafePage({ params }: Props) {
               </div>
             ) : null;
           })()}
+          {/* ❤ 찜한 카페 다시 보기(2026-09-01, 협업#363→결재#932) — 명시적으로 찜한 카페는 자동축적된
+              "최근 본"보다 의도가 강하다. 회수 동선이 지도 앱 즐겨찾기 탭뿐이던 것을 SEO 상세 페이지에도 연다. */}
+          <SavedCafes excludeId={Number(c.id)} />
           {/* 🕘 최근 본 카페(2026-08-16 리텐션) — 이 카페를 기록하고, 이전에 본 카페들을 이어보게 한다.
               저장 행동을 요구하지 않는 자동 축적 방식(기존 북마크는 4건뿐이었다). localStorage·서버 조회 0. */}
           <RecentCafes current={{ id: Number(c.id), name: c.name, area: c.area, grade: grade || undefined }} />
