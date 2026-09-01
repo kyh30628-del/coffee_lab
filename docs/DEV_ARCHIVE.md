@@ -292,3 +292,4 @@
 | 2026-08-30 22:43 | #866 | [룰갭 신규] COMMON_WORD_NAMES 미등재 "우상향" — 부동산 관용구 동음이의 오염 (id190 | 0287a27b | - | web/lib/reviewQuality.ts:319 COMMON_WORD_NAMES에 "우상향" 추가(부동산 시황 관용구 동음이의 방지, id19003). tsc 신규에러 0(기존 |
 | 2026-08-31 07:05 | #910 | [개발] 협업 #356: [확대] 인천 가짜 세부지명 3종 정정 필요 — 729건 (coordination# | 395077ed | - | 코드 근본원인 수정: 실존하지 않는 "인천 2026-07-01 2군9구 개편"(제물포구/영종구/검단구/서해구)이 과거 에이전트 환각으로 6개 파일에 사실처럼 박혀 cron-grow |
 | 2026-09-01 02:29 | #914 | [개발] 협업 #361: decision#894 dev_task "배포완료·반영확인" 처리 후에도 대상 레코 | a8bffb88 | - | scripts/dev-deploy.mjs, scripts/reconcileUnverified.mjs: dev_task 완료 결재의 result/coordination.resolut |
+| 2026-09-01 02:30 | #916 | [룰갭 신규] CAFE_CTX 호텔 애프터눈티/라운지 어휘 미등재 — 정상후기 offctx 오탐 (id250 | 8c8e5313 | - | lib/synthStore.ts CAFE_CTX 정규식에 호텔 F&B 어휘(애프터눈 르구떼 르 꾸떼 딤섬 딸기뷔페 하이티 라운지 해피아워 조식) 9종 추가. tsc 신규에러 0(기 |
