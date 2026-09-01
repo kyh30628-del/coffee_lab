@@ -294,3 +294,4 @@
 | 2026-09-01 02:29 | #914 | [개발] 협업 #361: decision#894 dev_task "배포완료·반영확인" 처리 후에도 대상 레코 | a8bffb88 | - | scripts/dev-deploy.mjs, scripts/reconcileUnverified.mjs: dev_task 완료 결재의 result/coordination.resolut |
 | 2026-09-01 02:30 | #916 | [룰갭 신규] CAFE_CTX 호텔 애프터눈티/라운지 어휘 미등재 — 정상후기 offctx 오탐 (id250 | 8c8e5313 | - | lib/synthStore.ts CAFE_CTX 정규식에 호텔 F&B 어휘(애프터눈 르구떼 르 꾸떼 딤섬 딸기뷔페 하이티 라운지 해피아워 조식) 9종 추가. tsc 신규에러 0(기 |
 | 2026-09-01 02:31 | #917 | [룰갭 신규] COMMON_WORD_NAMES 미등재 "컨시어지" — 호텔예약사이트 상용구 동음충돌 (id2 | b3cb34f5 | - | lib/reviewQuality.ts COMMON_WORD_NAMES에 "컨시어지" 등재(id247 컨시어지커피 — 호텔 컨시어지서비스 상용구 동음충돌, offctx_rate 0. |
+| 2026-09-01 02:33 | #919 | [룰갭 신규] LANDMARK_WORDS 누락 "화진포"/"김일성별장" — 관광지 방문기 교차오염 (id24 | 05579ad8 | - | lib/reviewQuality.ts LANDMARK_WORDS에 화진포·김일성별장 추가(#880 하조대 동일 패턴). isVenueTok/isLandmarkTok이 이미 LAND |
