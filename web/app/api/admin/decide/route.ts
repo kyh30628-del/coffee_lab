@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
     try {
       switch (d.action_type) {
         case "unpublish": {
-          const r = await sql`UPDATE cafes SET published=false, pipeline_status='excluded', updated_at=now() WHERE id=ANY(${ids}) RETURNING id`;
+          const r = await sql`UPDATE cafes SET published=false, pipeline_status='excluded', exclude_reason='CEO 결재 집행 — 관리자 화면에서 승인한 비공개', exclude_at=now(), updated_at=now() WHERE id=ANY(${ids}) RETURNING id`;
           affected = r.length; result = `비공개·제외 ${affected}곳`; break;
         }
         case "downgrade": {

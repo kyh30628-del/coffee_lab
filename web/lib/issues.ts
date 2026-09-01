@@ -67,7 +67,7 @@ export async function autoCorrect(): Promise<{ resolved: number; escalated: numb
       if (ok) {
         try {
           if (d.action_type === "unpublish") {
-            await sql`UPDATE cafes SET published=false, pipeline_status='excluded' WHERE id = ANY(${ids})`;
+            await sql`UPDATE cafes SET published=false, pipeline_status='excluded', exclude_reason='결재 집행(자동교정) — decisions.action_type=unpublish', exclude_at=now() WHERE id = ANY(${ids})`;
             msg = `${ids.length}곳 비공개`;
           } else if (d.action_type === "requeue_resynth") {
             await sql`UPDATE cafes SET synth_updated=NULL WHERE id = ANY(${ids})`;

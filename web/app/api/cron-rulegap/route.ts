@@ -196,7 +196,7 @@ export async function GET(req: NextRequest) {
         const isFood = /^음식점>/.test(c.cat);
         const txt = revMap.get(Number(c.id)) || "";
         if (isFood && txt && !COFFEE_ID.test(txt)) {
-          await sql`UPDATE cafes SET published = false, pipeline_status = 'excluded' WHERE id = ${c.id} AND published = true`;
+          await sql`UPDATE cafes SET published = false, pipeline_status = 'excluded', exclude_reason = '룰갭 에이전트 자동 제외 — 신규 규칙 소급 적용', exclude_at = now() WHERE id = ${c.id} AND published = true`;
           autoExcluded++; excludedIds.push(Number(c.id));
           continue; // 결정론적 종결 — 승인대기로 안 올림
         }

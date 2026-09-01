@@ -68,6 +68,11 @@ async function ensureCols() {
   if (ensured) return;
   // 💰 콜드스타트마다 ALTER 18개를 다시 돌던 낭비 차단(2026-08-18) — 배포 단위 1회로.
   await ensureOnce("synthStore.cols", async () => {
+  // 🧾 2026-09-01 — 제외 사유. 이게 없어서 2026-07-04에 기록 없이 447곳이 묻혔고,
+  //   오늘 그 사유를 시점 추적으로 역산해야 했다. 더 나쁜 건 사유를 모른 채 복원했다가
+  //   북카페 37곳(CEO 2026-06 지시로 제외)을 되살리는 사고를 낸 것 — 이 컬럼이 있었으면 안 났다.
+  await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS exclude_reason TEXT`;
+  await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS exclude_at TIMESTAMPTZ`;
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS raw_reviews JSONB`;
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS raw_collected_at TIMESTAMPTZ`;
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS work_facts JSONB`.catch(() => {}); // 🔌 카공 시설 사실(합성 시 1회 계산·목록에서 공짜 읽기)
@@ -496,7 +501,7 @@ export async function holdZeroEvidenceSuspects(): Promise<{ held: number; releas
 //   '카테고리 없음'으로는 절대 안 내림(누락 ≠ 비카페) — '명백한 비카페 카테고리가 박혀 있을 때'만.
 export async function healNonCafeCategory(): Promise<{ held: number; names: string[] }> {
   const rows = (await sql`
-    UPDATE cafes SET published = false, pipeline_status = 'excluded'
+    UPDATE cafes SET published = false, pipeline_status = 'excluded', exclude_reason = '비카페 카테고리(명백) — 카테고리 누락이 아니라 비카페가 박혀 있음', exclude_at = now()
     WHERE published = true AND naver_category IS NOT NULL
       AND (
         naver_category ~ '(건설|미장|타일|방수|도배|식물원|수목원|동물원|자동차|정비소|주유|부동산|공인중개|병원|의원|약국|한의원|치과|동물병원|미용실|헤어샵|네일|왁싱|에스테틱|피부관리|펜션|모텔|캠핑,야영|글램핑|변호사|법무사|세무사|회계|보험|은행|증권|독서실|고시원|장례|예식장|웨딩홀|장소대여)'
@@ -511,13 +516,13 @@ export async function healNonCafeCategory(): Promise<{ held: number; names: stri
   //   📚 북카페·도서관 — 책/독서가 메인, 커피는 부차 → CEO 지시(2026-06)로 제외. 갤러리·플라워카페는 커피가 메인이라 보존.
   //   카테고리(카페,디저트>북카페·교육,학문>도서관) + 이름(○○북카페) 양쪽으로 잡는다.
   const off = (await sql`
-    UPDATE cafes SET published = false, pipeline_status = 'excluded'
+    UPDATE cafes SET published = false, pipeline_status = 'excluded', exclude_reason = '북카페·서점·도서관·놀이시설(애견/키즈/스터디/방탈출 등) — CEO 2026-06 지시: 커피/디저트 카페만', exclude_at = now()
     WHERE published = true AND naver_category IS NOT NULL
       AND naver_category ~ '(애견|애완|반려동물|펫카페|고양이카페|동물카페|키즈|실내놀이터|놀이방|스터디카페|독서실|만화방|만화카페|룸카페|멀티방|파티룸|방탈출|보드게임|보드카페|볼링|당구|스크린골프|골프연습|코인노래|노래방|찜질방|사우나|클라이밍|트램폴린|트램펄린|서점|북카페|도서관)'
     RETURNING id, name`) as any[];
   // 📚 북카페 — 카테고리가 일반(카페,디저트>카페)으로 붙어도 이름에 '북카페'면 책 메인 → 제외.
   const bookByName = (await sql`
-    UPDATE cafes SET published = false, pipeline_status = 'excluded'
+    UPDATE cafes SET published = false, pipeline_status = 'excluded', exclude_reason = '북카페(이름 기준) — 카테고리는 일반이나 상호가 북카페 → 책이 메인', exclude_at = now()
     WHERE published = true AND name ~ '북카페|북 ?카페'
     RETURNING id, name`) as any[];
   off.push(...bookByName);
@@ -565,7 +570,7 @@ export async function healOffConceptByReview(): Promise<{ held: number; names: s
   const leasedIds: number[] = [];
   for (const id of killIds) { if (await acquireLease("autoCorrect", Number(id), 60)) leasedIds.push(id); }
   if (leasedIds.length) {
-    await sql`UPDATE cafes SET published = false, pipeline_status = 'excluded' WHERE id = ANY(${leasedIds})`;
+    await sql`UPDATE cafes SET published = false, pipeline_status = 'excluded', exclude_reason = '그라운딩 근거 0건 의심 — 노출 후기가 그 카페를 뒷받침 못 함', exclude_at = now() WHERE id = ANY(${leasedIds})`;
     await invalidateCafeCaches(leasedIds).catch(() => {}); // 비공개 → 모든 캐시 레이어 무효화
     for (const id of leasedIds) await releaseLease("autoCorrect", Number(id)).catch(() => {});
   }
@@ -591,7 +596,7 @@ export async function healRestaurantByReview(): Promise<{ held: number; names: s
   //   집합 UPDATE라 자체 원자성은 있지만, 상대가 방금 읽어둔 스냅샷으로 덮어쓰면 이 비공개가 되살아난다.
   const leased: number[] = [];
   for (const id of kill) { if (await acquireLease("autoCorrect", Number(id), 60)) leased.push(id); }
-  if (leased.length) { await sql`UPDATE cafes SET published = false, pipeline_status = 'excluded' WHERE id = ANY(${leased})`; await invalidateCafeCaches(leased).catch(() => {}); }
+  if (leased.length) { await sql`UPDATE cafes SET published = false, pipeline_status = 'excluded', exclude_reason = '좌표박스 밖 — 서비스 지역 경계 이탈', exclude_at = now() WHERE id = ANY(${leased})`; await invalidateCafeCaches(leased).catch(() => {}); }
   for (const id of leased) await releaseLease("autoCorrect", Number(id)).catch(() => {});
   return { held: leased.length, names: names.slice(0, 12) }; // 하네스 원칙: 실제 집행분만 센다(리스 양보분 제외)
 }
@@ -628,7 +633,7 @@ export async function healNonCafeByReview(): Promise<{ held: number; names: stri
   //   집합 UPDATE라 자체 원자성은 있지만, 상대가 방금 읽어둔 스냅샷으로 덮어쓰면 이 비공개가 되살아난다.
   const leased: number[] = [];
   for (const id of kill) { if (await acquireLease("autoCorrect", Number(id), 60)) leased.push(id); }
-  if (leased.length) { await sql`UPDATE cafes SET published = false, pipeline_status = 'excluded' WHERE id = ANY(${leased})`; await invalidateCafeCaches(leased).catch(() => {}); }
+  if (leased.length) { await sql`UPDATE cafes SET published = false, pipeline_status = 'excluded', exclude_reason = '완전중복 후기 — 같은 문장이 여러 카페에 복제됨', exclude_at = now() WHERE id = ANY(${leased})`; await invalidateCafeCaches(leased).catch(() => {}); }
   for (const id of leased) await releaseLease("autoCorrect", Number(id)).catch(() => {});
   return { held: leased.length, names: names.slice(0, 12) }; // 하네스 원칙: 실제 집행분만 센다(리스 양보분 제외)
 }
@@ -640,7 +645,7 @@ export async function healOutOfBox(): Promise<{ excluded: number; names: string[
   const latMin = getCriterionSync("geo.box.lat_min"), latMax = getCriterionSync("geo.box.lat_max");
   const lngMin = getCriterionSync("geo.box.lng_min"), lngMax = getCriterionSync("geo.box.lng_max");
   // ① 좌표 박스 밖
-  const rows = (await sql`UPDATE cafes SET published = false, pipeline_status = 'excluded', updated_at = now()
+  const rows = (await sql`UPDATE cafes SET published = false, pipeline_status = 'excluded', exclude_reason = '좌표박스 밖(재확인)', exclude_at = now(), updated_at = now()
     WHERE lat IS NOT NULL AND NOT (lat BETWEEN ${latMin} AND ${latMax} AND lng BETWEEN ${lngMin} AND ${lngMax})
       AND pipeline_status IS DISTINCT FROM 'excluded'
     RETURNING id, name`) as any[];
@@ -648,7 +653,7 @@ export async function healOutOfBox(): Promise<{ excluded: number; names: string[
   //    area가 수도권 시로 잘못 붙는 경계 카페 방어. 주소 '접두'로만 판단(경기 광주시 오인 방지 위해 '광주광역시'만).
   // 🗺️ 서비스 범위 밖 시·도 = lib/serviceScope.ts **단일출처**. 여기 목록을 따로 적어 두면
   //   범위가 바뀔 때 이 파일만 뒤처져 정상 카페를 배제하거나(여기) 오경보를 낸다(issues.ts에서 실제로 났다).
-  const adr = (await sql.query(`UPDATE cafes SET published = false, pipeline_status = 'excluded', updated_at = now()
+  const adr = (await sql.query(`UPDATE cafes SET published = false, pipeline_status = 'excluded', exclude_reason = '서비스 범위 밖 시·도 주소', exclude_at = now(), updated_at = now()
     WHERE address IS NOT NULL AND (${OUT_OF_SCOPE_SQL})
       AND pipeline_status IS DISTINCT FROM 'excluded'
     RETURNING id, name`)) as any[];
@@ -702,7 +707,7 @@ export async function healExactDuplicates(): Promise<{ resolved: number; pairs: 
     if (g.length < 2) continue;
     g.sort((a, b) => b.sc - a.sc || a.id - b.id);
     for (const loser of g.slice(1)) {
-      await sql`UPDATE cafes SET published = false, pipeline_status = 'excluded', updated_at = now() WHERE id = ${loser.id}`.catch(() => {});
+      await sql`UPDATE cafes SET published = false, pipeline_status = 'excluded', exclude_reason = '중복등록 패자 — 같은 가게가 2건으로 등록됨', exclude_at = now(), updated_at = now() WHERE id = ${loser.id}`.catch(() => {});
       resolved++; losers.push(loser.id);
       if (pairs.length < 6) pairs.push(`${loser.name} → ${g[0].name}(유지)`);
     }
