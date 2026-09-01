@@ -295,3 +295,4 @@
 | 2026-09-01 02:30 | #916 | [룰갭 신규] CAFE_CTX 호텔 애프터눈티/라운지 어휘 미등재 — 정상후기 offctx 오탐 (id250 | 8c8e5313 | - | lib/synthStore.ts CAFE_CTX 정규식에 호텔 F&B 어휘(애프터눈 르구떼 르 꾸떼 딤섬 딸기뷔페 하이티 라운지 해피아워 조식) 9종 추가. tsc 신규에러 0(기 |
 | 2026-09-01 02:31 | #917 | [룰갭 신규] COMMON_WORD_NAMES 미등재 "컨시어지" — 호텔예약사이트 상용구 동음충돌 (id2 | b3cb34f5 | - | lib/reviewQuality.ts COMMON_WORD_NAMES에 "컨시어지" 등재(id247 컨시어지커피 — 호텔 컨시어지서비스 상용구 동음충돌, offctx_rate 0. |
 | 2026-09-01 02:33 | #919 | [룰갭 신규] LANDMARK_WORDS 누락 "화진포"/"김일성별장" — 관광지 방문기 교차오염 (id24 | 05579ad8 | - | lib/reviewQuality.ts LANDMARK_WORDS에 화진포·김일성별장 추가(#880 하조대 동일 패턴). isVenueTok/isLandmarkTok이 이미 LAND |
+| 2026-09-01 02:34 | #920 | [룰갭 신규] 리조트 브랜드(비발디파크·하이원·델피노) 부속 F&B — LODGING_NAMED/LODGIN | 79555a5f | - | lib/reviewQuality.ts LODGING_DESC에 리조트 브랜드명(비발디파크·소노벨·소노펫·소노펠리체·델피노·하이원·휘닉스파크/평창) 추가, LODGING_SIGNAL |
