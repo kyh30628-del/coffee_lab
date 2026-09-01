@@ -15,7 +15,8 @@ export const maxDuration = 30;
 // - exact/개념: 질의 토큰을 카페 텍스트·검증 리뷰에서 직접 매칭 + 느낌→신호 가산(근거 노출).
 // 키 없으면 키워드 기반으로 자동 폴백. 점수는 DB 실제값만 사용(환각 금지).
 
-// 수도권(서울·경기·인천) 외 지역 키워드 — query 또는 region에 포함 시 미서비스 안내.
+// 서비스 범위(서울·경기·인천·강원) 밖 지역 키워드 — query 또는 region에 포함 시 미서비스 안내.
+//   ⚠️ 범위를 늘리면 lib/criteriaListsBase.ts의 search.out_of_coverage와 DB 오버레이를 **둘 다** 손봐야 한다(2026-09-01 사고).
 //   사전은 lib/criteriaLists.ts("search.out_of_coverage")가 단일출처(무배포 편집). 폴백=현재값.
 //   감사수리: bare "광주"는 서비스 지역인 경기 광주시에 오경보 → 명시형만 유지.
 
@@ -23,7 +24,7 @@ function detectOutOfCoverage(q: string, region: string): string | null {
   const text = (q + " " + region).toLowerCase();
   for (const kw of getListSync("search.out_of_coverage")) {
     if (text.includes(kw)) {
-      return `현재 동네 커피 노트는 수도권(서울·경기·인천)만 서비스합니다. '${kw}' 지역 카페는 아직 포함되어 있지 않아요. 수도권 검색어로 다시 시도해 보세요.`;
+      return `현재 동네 커피 노트는 서울·경기·인천·강원만 서비스합니다. '${kw}' 지역 카페는 아직 포함되어 있지 않아요.`;
     }
   }
   return null;
