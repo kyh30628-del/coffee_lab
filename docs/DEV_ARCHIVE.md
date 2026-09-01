@@ -298,3 +298,4 @@
 | 2026-09-01 02:34 | #920 | [룰갭 신규] 리조트 브랜드(비발디파크·하이원·델피노) 부속 F&B — LODGING_NAMED/LODGIN | 79555a5f | - | lib/reviewQuality.ts LODGING_DESC에 리조트 브랜드명(비발디파크·소노벨·소노펫·소노펠리체·델피노·하이원·휘닉스파크/평창) 추가, LODGING_SIGNAL |
 | 2026-09-01 02:35 | #922 | [개발] 팀홀튼 재발 근본원인 — app/api/cafe-discover/route.ts에 lib/disco | ac729c62 | - | app/api/cafe-discover/route.ts, lib/sangga.ts: FRANCHISE 배열에 팀홀튼(KR)+TIMHORTONS(EN) 추가. tsc 신규에러 0(기 |
 | 2026-09-01 03:05 | #923 | [개발] Review schema.org JSON-LD 구조화데이터 추가 — 전략기획 5회 연속 제언(08- | b0023e77 | - | app/c/[id]/page.tsx: 기존 CafeOrCoffeeShop JSON-LD의 aggregateRating 옆에 review[] 추가 — evAll(오염방어 필터 통과한 |
+| 2026-09-01 09:00 | #918 | [룰갭 신규] COMMON_WORD_NAMES 미등재 "아일랜드" — 인테리어/부동산 "아일랜드 식탁" 동음 | 0fd91e01 | - | lib/reviewQuality.ts COMMON_WORD_NAMES에 아일랜드 등재(id6659 아일랜드15 vs 인테리어 아일랜드 식탁/키친 동음충돌 차단). 숫자토큰15는 s |
