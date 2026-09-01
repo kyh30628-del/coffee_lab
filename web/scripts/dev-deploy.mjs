@@ -132,12 +132,16 @@ for (const d of rows) {
     // 🛡️ 정직한 종결(2026-07-02): 반영 확인 전엔 done으로 닫지 않는다 — 과거 live=false(예: Vercel 프로덕션
     //   빌드 실패)여도 'deployed·done' 확정 → 프로덕션 미반영인데 추적 주체가 사라지던 구멍.
     if (live) {
+      // ⚠️ #914(협업#361): 아래 "반영확인"은 /api/version이 배포 sha와 일치함, 즉 **코드 배포가
+      //   프로덕션에 반영됐다는 뜻뿐**이다 — 이 dev_task가 특정 데이터(예: 카페 레코드 재합성) 반영을
+      //   전제하는 경우, 그 데이터측 반영 여부는 여기서 검증되지 않는다(별도 확인 필요). decision#894가
+      //   "배포완료·반영확인"만 보고 데이터 재합성 누락을 놓친 사고 재발 방지 — 문구로 범위를 명시한다.
       await sql`UPDATE decisions SET status='done', decided_at=now(), decided_by='CEO',
-        result=${`배포완료·반영확인 ${br}`},
+        result=${`코드배포 완료·프로덕션 반영확인 ${br} — ⚠️ 데이터측 반영(재합성 등 대상 레코드 갱신)은 별도 확인 필요, 이 결재는 코드 배포만 보증`},
         action_params = action_params || ${JSON.stringify({ dev_status: "deployed", sha })}::jsonb WHERE id=${d.id}`;
-      if (coord) await sql`UPDATE coordination SET status='resolved', resolved_at=now(), stage='완료', resolution=${`개발·배포 완료(#${d.id})`} WHERE id=${Number(coord)}`.catch(() => {});
+      if (coord) await sql`UPDATE coordination SET status='resolved', resolved_at=now(), stage='완료', resolution=${`개발·배포 완료(#${d.id}) — 코드 반영 확인, 데이터 반영은 별도 확인 필요`} WHERE id=${Number(coord)}`.catch(() => {});
       try { git(`branch -d ${br}`); } catch { /* 브랜치 삭제 실패 무시 */ }
-      console.log(`  ✅ 배포완료·반영확인 ${sha.slice(0, 8)}`);
+      console.log(`  ✅ 코드배포 완료·프로덕션 반영확인 ${sha.slice(0, 8)} (데이터 반영은 별도 확인 필요)`);
     } else {
       anyUnverified = true;
       await sql`UPDATE decisions SET result=${`push 완료·프로덕션 반영 미확인(${sha.slice(0, 8)}) — Vercel 빌드 점검 필요`},
