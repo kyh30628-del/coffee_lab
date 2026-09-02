@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { rulesFingerprint } from "@/lib/rulesFingerprint";
 import { noteSilentFail } from "@/lib/silentFail";
 import { sql, ensureSchema } from "@/lib/db";
 import { synthAndStore } from "@/lib/synthStore";
@@ -68,11 +69,20 @@ export async function GET(req: NextRequest) {
     //   ⚠️ no-mass-unpublish 차단기: 100곳 이상 처리 후 비공개율 20% 초과 시 즉시 중단(버그성 대량비공개 방지, 인천사고 교훈).
     // synth_checked_at = '마지막 재점검 시각'(변경 여부 무관 매 재합성마다 갱신) → 이걸로 순환해야 실제 커버리지가 전진.
     //   (synth_updated는 '결과가 바뀐 시각'이라 안 변한 카페는 안 움직여 순환 기준으로 못 씀 — 2026-07-05 정정.)
-    const GEN_CONC = 10, GEN_MAX = 150, GEN_RATE_LIMIT = 0.20; // 150/시×24=3,600/일 → 전수 ~4일(12,864/3,600)
+    const GEN_CONC = 10, GEN_MAX = 150, GEN_RATE_LIMIT = 0.20;
+    // 🧬 2026-09-03 — 맹목 4일 순환 폐지(CEO 지시 1순위: "잘 나오는 건 건들지 마라").
+    //   기존: 4일 지나면 무조건 재검 → 새 후기도 규칙 변경도 없는 카페의 raw_reviews를
+    //   계속 다시 읽었다(하루 수 GB 헛읽기 — 전송비의 주범).
+    //   이제 재검 대상은 ①새 후기 들어옴 ②한 번도 안 봄 ③규칙 지문 변경(코드·기준값·사전)
+    //   ④30일 안전망(지문이 못 잡는 드리프트 대비 — 고덕방 38일 방치 사고의 재발 한도)뿐이다.
+    //   규칙이 바뀌면 지문이 바뀌어 자연히 전수 재검 1회가 돌고, 그 뒤 다시 잠잠해진다.
+    const rulesFp = await rulesFingerprint();
     const genRows = (await sql`
       SELECT id, name, area, synth_count FROM cafes
       WHERE published = true AND raw_reviews IS NOT NULL
-        AND (raw_collected_at > synth_checked_at OR synth_checked_at IS NULL OR synth_checked_at < now() - interval '4 days')
+        AND (raw_collected_at > synth_checked_at OR synth_checked_at IS NULL
+             OR rules_fp IS DISTINCT FROM ${rulesFp}
+             OR synth_checked_at < now() - interval '30 days')
       ORDER BY (raw_collected_at > synth_checked_at) DESC, synth_checked_at ASC NULLS FIRST
       LIMIT ${GEN_MAX}
     `) as unknown as { id: number; name: string; area: string; synth_count: number }[];
@@ -86,6 +96,7 @@ export async function GET(req: NextRequest) {
           try { await synthAndStore({ id: c.id, name: c.name, area: c.area }, { refresh: false }); }
           finally { await releaseLease("cron-resynth", Number(c.id)).catch(() => {}); }
           const [a] = (await sql`SELECT synth_count, published FROM cafes WHERE id=${c.id}`) as unknown as { synth_count: number; published: boolean }[];
+          await sql`UPDATE cafes SET rules_fp = ${rulesFp} WHERE id = ${c.id}`.catch(() => {}); // 이 지문으로 점검했음을 기록 — 지문 불변이면 다음부터 건너뜀
           gDone++;
           if (a.synth_count !== c.synth_count) gChangedIds.push(c.id);
           if (!a.published) gUnpub.push(c.id);

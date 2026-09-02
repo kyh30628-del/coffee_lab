@@ -13,6 +13,9 @@ const nextConfig: NextConfig = {
     "/api/admin/criteria-status": ["./lib/**/*.ts", "./app/api/**/*.ts"],
     // 관제탑이 런타임에 .ai-paused 플래그(판정 의도적 정지)를 읽는다 → 함수 번들에 포함.
     "/api/orchestrator": ["./.ai-paused"],
+    // 🧬 규칙 지문(rulesFingerprint)이 런타임에 규칙 소스를 해시한다 — 번들에 포함해야 읽힌다.
+    //   규칙 파일 3개만(전체 lib 아님 — 번들 크기 영향 최소).
+    "/api/cron-resynth": ["./lib/reviewQuality.ts", "./lib/criteriaListsBase.ts", "./lib/discover.ts"],
   },
   // 🧭 홈(랜딩) HTML은 항상 최신으로 — 인스타·페북 등 인앱 브라우저(WebView)가 must-revalidate를 무시하고
   //   옛 HTML을 디스크캐시로 붙잡아, 코드를 고쳐 배포해도 사용자 화면이 안 바뀌던 문제(2026-07-10 안드로이드
