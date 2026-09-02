@@ -20,7 +20,15 @@ import { extractWorkSignals } from "@/lib/workDetail";
 import OutboundLink from "../../OutboundLink";
 
 export const runtime = "nodejs";
-export const revalidate = 172800; // ISR 48시간
+// 🌙 2026-09-02 — **수면 시간 확보**(CEO 지시: "자는 시간을 무조건 확보하고 깨어 있는 시간에 집중").
+//   실측: DB가 하루 22.6h 깨어 있고 **깨어남이 59~90회/일**. Neon 자동절전은 5분(플랜 하한)이라
+//   1초짜리 쿼리로 깨워도 5분이 과금된다 → 90회 × 5분 = **7.5h가 순수 꼬리 낭비**(전체의 33%).
+//   크론은 이미 4창에 묶여 있고 01~06시엔 잡이 0개인데도 새벽에 75~166분 깨어 있었다.
+//   범인은 크론이 아니라 **ISR 재생성**이었다 — 크롤러가 만료된 페이지를 긁을 때마다 DB가 깬다.
+//   재생성 주기를 늘리면 같은 크롤 트래픽에서도 DB를 두드리는 횟수가 그만큼 줄어든다.
+//   ⚠️ 신선도는 주기가 아니라 **on-demand purge**가 지킨다(cafeCacheInvalidate·/api/admin/revalidate).
+//     공개/비공개 변경은 즉시 반영되고, 후기·순위만 최대 주기만큼 늦어진다(천천히 변하는 값).
+export const revalidate = 604800; // ISR 7일 (48h→7d, 재생성 3.5배 감소)
 
 // 🔴 2026-08-28 비용 근본수리: 위 `revalidate`가 **작동하지 않고 있었다.**
 //   Next 문서(generate-static-params.md): "ISR로 런타임에 재검증하려면 generateStaticParams에서

@@ -3,7 +3,9 @@ import { ogCard, OG_SIZE } from "@/lib/ogCard";
 import { topCharTraits } from "@/lib/charScore";
 
 export const runtime = "nodejs";
-export const revalidate = 21600; // 💰 2026-08-20: 페이지(21600)와 짝 맞춤 — 13.5k 이미지가 1시간마다 재생성 대상이던 것을 6시간으로
+// 🌙 2026-09-02 — OG 이미지가 페이지 본체보다 자주 재생성되고 있었다(6h vs 48h, 8배).
+//   내용은 본문보다 덜 변하는데 주기가 거꾸로였다. 본체와 같은 주기로 맞춘다.
+export const revalidate = 604800; // 💰 2026-08-20: 페이지(21600)와 짝 맞춤 — 13.5k 이미지가 1시간마다 재생성 대상이던 것을 6시간으로
 export const size = OG_SIZE;
 export const contentType = "image/png";
 export const alt = "동네 커피 노트 — 검증한 동네 카페";

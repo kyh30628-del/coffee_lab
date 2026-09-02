@@ -13,6 +13,9 @@ export async function invalidateCafeCaches(ids: number[]): Promise<void> {
     for (const id of ids.slice(0, 50)) {
       revalidatePath(`/c/${id}`);
       revalidatePath(`/share/${id}`);
+      // 🌙 2026-09-02 — OG 이미지는 별도 라우트라 /c/[id] purge로 안 지워진다.
+      //   재생성 주기를 6h→7d로 늘렸으므로 여기서 안 지우면 비공개 카페 이미지가 최대 7일 남는다.
+      revalidatePath(`/c/${id}/opengraph-image`);
     }
     revalidatePath("/api/cafes");   // 🗺️ 지도 데이터(2026-09-01 캐시 재도입) — 여기를 빼면 2026-07-01 사고가 그대로 재발한다.
     revalidatePath("/sitemap.xml");

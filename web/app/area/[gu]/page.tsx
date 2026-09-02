@@ -4,7 +4,7 @@ import Curated from "../Curated";
 import { getRegions, getRegionCafes, getDongsInArea, SITE } from "@/lib/seoData";
 import { regionPublishedCount } from "@/lib/region";
 
-export const revalidate = 86400; // ISR 24시간
+export const revalidate = 259200; // ISR 3일 (24h→3d)
 
 export async function generateStaticParams() {
   const regions = await getRegions();

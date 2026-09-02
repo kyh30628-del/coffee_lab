@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import Curated from "../../Curated";
 import { getRegions, getRegionTasteCafes, getRegionTasteCount, getRegionTasteStats, getRegionTasteCounts, getRegionTasteGradeBreakdown, areaAliases, TASTES, tasteByKey, SITE, TASTE_MIN_HITS, TASTE_MIN_RATE_PCT } from "@/lib/seoData";
 
-export const revalidate = 86400; // ISR 24시간
+export const revalidate = 259200; // ISR 3일 (24h→3d)
 
 export async function generateStaticParams() {
   const regions = await getRegions();

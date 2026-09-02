@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { SITE } from "@/lib/seoData";
 
-export const revalidate = 172800; // ISR 48시간
+export const revalidate = 604800; // ISR 7일 — 본체(/c/[id])와 주기를 맞춘다
 
 type Props = { params: Promise<{ id: string }> };
 type Report = {
