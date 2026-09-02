@@ -386,11 +386,18 @@ export async function GET(req: NextRequest) {
       FROM traffic_events WHERE ts > now()-interval '30 days'
         AND anon_id NOT IN (${sql.unsafe(BOT_ANON_IDS_SQL)})
       GROUP BY 1 ORDER BY views DESC`.catch(() => [])) as any[];
+    // ⚡ 2026-09-02 — 관제탑도 같은 병이었다: 조인이 `te.path = '/c/' || c.id`(계산식)라
+    //   인덱스를 못 써 traffic_events × cafes 전조합을 문자열 비교했다(analytics에선 실측 72초).
+    //   path에서 id를 뽑아 cafes.id(기본키)로 조인한다. 결과 동일.
     const topCafes = (await sql`
-      SELECT c.name, c.area, COUNT(*)::int views, COUNT(DISTINCT te.anon_id)::int uniques
-      FROM traffic_events te JOIN cafes c ON te.path = '/c/' || c.id
-      WHERE te.ts > now()-interval '30 days'
-        AND te.anon_id NOT IN (${sql.unsafe(BOT_ANON_IDS_SQL)})
+      WITH v AS (
+        SELECT (substring(path from '^/c/([0-9]+)$'))::int cid, anon_id
+        FROM traffic_events
+        WHERE ts > now()-interval '30 days' AND path ~ '^/c/[0-9]+$'
+          AND anon_id NOT IN (${sql.unsafe(BOT_ANON_IDS_SQL)})
+      )
+      SELECT c.name, c.area, COUNT(*)::int views, COUNT(DISTINCT v.anon_id)::int uniques
+      FROM v JOIN cafes c ON c.id = v.cid
       GROUP BY c.id, c.name, c.area ORDER BY views DESC LIMIT 10`.catch(() => [])) as any[];
     // 퍼널: 방문자 중 카페상세까지 본 비율(둘러보기→몰입 전환)
     const funnel = (await sql`

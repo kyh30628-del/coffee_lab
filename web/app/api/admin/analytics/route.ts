@@ -228,19 +228,31 @@ export async function GET(req: NextRequest) {
       GROUP BY 1 ORDER BY views DESC`.catch(() => [])) as any[];
 
     // 인기 카페(조회순)
+    // ⚡ 2026-09-02 — **72초 → 정상.** 관제탑 '접속·유입'이 안 열리던 진짜 원인이 여기였다.
+    //   조인 조건이 `te.path = '/c/' || c.id`(계산식)라 인덱스를 못 쓰고
+    //   traffic_events 21,488 × cafes 28,593 = **약 6억 번 문자열 비교**를 했다.
+    //   → path에서 id를 먼저 뽑아 **cafes.id(기본키)로 조인**한다. 결과는 동일, 계산만 싸게.
     const topCafes = (await sql`
-      SELECT c.id, c.name, c.area, COUNT(*)::int views, COUNT(DISTINCT te.anon_id)::int uniques
-      FROM traffic_events te JOIN cafes c ON te.path = '/c/' || c.id
-      WHERE te.ts > now()-interval '30 days'
-        AND te.anon_id NOT IN (${sql.unsafe(BOT_ANON_IDS_SQL)})
+      WITH v AS (
+        SELECT (substring(path from '^/c/([0-9]+)$'))::int cid, anon_id
+        FROM traffic_events
+        WHERE ts > now()-interval '30 days' AND path ~ '^/c/[0-9]+$'
+          AND anon_id NOT IN (${sql.unsafe(BOT_ANON_IDS_SQL)})
+      )
+      SELECT c.id, c.name, c.area, COUNT(*)::int views, COUNT(DISTINCT v.anon_id)::int uniques
+      FROM v JOIN cafes c ON c.id = v.cid
       GROUP BY c.id, c.name, c.area ORDER BY views DESC LIMIT 15`.catch(() => [])) as any[];
 
     // 인기 지역(조회된 카페의 area 집계)
     const topRegions = (await sql`
-      SELECT c.area, COUNT(*)::int views, COUNT(DISTINCT te.anon_id)::int uniques
-      FROM traffic_events te JOIN cafes c ON te.path = '/c/' || c.id
-      WHERE te.ts > now()-interval '30 days'
-        AND te.anon_id NOT IN (${sql.unsafe(BOT_ANON_IDS_SQL)})
+      WITH v AS (
+        SELECT (substring(path from '^/c/([0-9]+)$'))::int cid, anon_id
+        FROM traffic_events
+        WHERE ts > now()-interval '30 days' AND path ~ '^/c/[0-9]+$'
+          AND anon_id NOT IN (${sql.unsafe(BOT_ANON_IDS_SQL)})
+      )
+      SELECT c.area, COUNT(*)::int views, COUNT(DISTINCT v.anon_id)::int uniques
+      FROM v JOIN cafes c ON c.id = v.cid
       GROUP BY c.area ORDER BY views DESC LIMIT 12`.catch(() => [])) as any[];
 
     // 시간대 분포(KST 0~23)
@@ -260,19 +272,7 @@ export async function GET(req: NextRequest) {
         AND to_char(ts AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD') <> ALL(${HOLIDAY_DATES as string[]})
       GROUP BY 1`.catch(() => [])) as any[];
 
-    // 📅 공휴일·주말·평일 3분류 — 하루 단위 순방문자 평균(최근 90일).
-    //   "쉬는 날에 카페를 찾는다"가 이 서비스의 본질이라 이 세 줄이 요일 7줄보다 정보가 많다.
-    const dayTypes = (await sql`
-      WITH d AS (
-        -- ⚠️ 컬럼명을 day로 쓰면 postgres가 예약어로 읽어 구문오류가 난다(실제로 났고,
-        --   .catch(() => [])가 그걸 삼켜 '데이터 없음'처럼 0이 나왔다 — 오늘 내내 잡던 그 패턴).
-        SELECT to_char(ts AT TIME ZONE 'Asia/Seoul','YYYY-MM-DD') dt,
-               EXTRACT(dow FROM ts AT TIME ZONE 'Asia/Seoul')::int dow, anon_id
-        FROM traffic_events WHERE ts > now()-interval '90 days'
-          AND anon_id NOT IN (${sql.unsafe(BOT_ANON_IDS_SQL)})
-      )
-      SELECT dt, dow, COUNT(DISTINCT anon_id)::int ppl FROM d GROUP BY 1,2`
-      .catch(async (e) => { await noteSilentFail("analytics.dayTypes", e); return []; })) as any[];
+
 
     // 일별 유입경로별 순방문자(최근 8일, KST, day='MM-DD'로 daily와 동일 포맷) — 오늘 급증/급감 소스 근거용
     const dailySources = (await sql`
@@ -318,17 +318,26 @@ export async function GET(req: NextRequest) {
     const todayInsight = await getTodayInsight(sql);
 
     // 📅 공휴일·주말·평일 평균(하루 순방문자) — 요일 7줄보다 이 3줄이 이 서비스의 성격을 더 잘 말한다.
+    // 🔴 2026-09-02 — 원래 여기 90일치 COUNT(DISTINCT anon_id) 쿼리를 새로 넣었다가
+    //   **관제탑 접속·유입 화면이 90초 타임아웃으로 안 열렸다**(CEO 지적). 내가 만든 장애다.
+    //   비용 규칙(전수/무거운 쿼리 사전계산)을 어긴 자리 — 화면에 붙이기 전에 계산했어야 했다.
+    //   → 이미 조회 중인 daily(14일)를 재사용한다. **추가 쿼리 0.** 표본은 14일로 짧아지지만
+    //     화면이 열리는 게 먼저고, 공휴일 분리라는 목적(요일 통계 오염 방지)은 weekdays 쿼리가 이미 한다.
     const buckets: Record<string, number[]> = { "공휴일": [], "주말": [], "평일": [] };
-    for (const d of dayTypes) buckets[dayType(String(d.dt), Number(d.dow))].push(Number(d.ppl));
+    for (const d of daily as any[]) {
+      const ds = String(d.date ?? "");
+      if (!ds) continue;
+      const dow = new Date(ds + "T00:00:00+09:00").getDay();
+      buckets[dayType(ds, dow)].push(Number(d.visitors ?? 0));
+    }
     const avg = (a: number[]) => (a.length ? Math.round(a.reduce((s, x) => s + x, 0) / a.length) : 0);
     const dayTypeStats = (["공휴일", "주말", "평일"] as const).map((k) => ({
       kind: k, days: buckets[k].length, avgPeople: avg(buckets[k]),
     }));
     // 최근 90일 안에 있었던 공휴일 실적(있을 때만) — 어떤 날이 왜 튀었는지 화면에서 바로 보이게.
-    const holidayDays = dayTypes
-      .filter((d: any) => holidayName(String(d.dt)))
-      .map((d: any) => ({ day: String(d.dt), name: holidayName(String(d.dt)), people: Number(d.ppl) }))
-      .sort((a: any, b: any) => (a.day < b.day ? -1 : 1));
+    const holidayDays = (daily as any[])
+      .filter((d) => d.date && holidayName(String(d.date)))
+      .map((d) => ({ day: String(d.date), name: holidayName(String(d.date)), people: Number(d.visitors ?? 0) }));
 
     const dailyInsights = buildDailyInsights(daily, dailySources, dailyDevices, hours, weekdays, todayInsight);
     {
@@ -336,7 +345,7 @@ export async function GET(req: NextRequest) {
       const w = dayTypeStats.find((x) => x.kind === "주말");
       const p = dayTypeStats.find((x) => x.kind === "평일");
       if (h && w && p && p.avgPeople > 0 && h.days > 0)
-        dailyInsights.push(`쉬는 날에 사람이 옵니다 — 공휴일 ${h.avgPeople}명 · 주말 ${w.avgPeople}명 · 평일 ${p.avgPeople}명(하루 평균, 최근 90일). 공휴일은 평일의 ${(h.avgPeople / p.avgPeople).toFixed(1)}배.`);
+        dailyInsights.push(`쉬는 날에 사람이 옵니다 — 공휴일 ${h.avgPeople}명 · 주말 ${w.avgPeople}명 · 평일 ${p.avgPeople}명(하루 평균, 최근 14일). 공휴일은 평일의 ${(h.avgPeople / p.avgPeople).toFixed(1)}배.`);
     }
 
     // 🧑 진짜 사용자 신호 — 봇으로 설명 안 되는 신호(기능사용). r2/r3/r5 = 페이지 열람 2/3/5장+(참고용 관여도, 재방문 아님).
