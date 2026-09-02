@@ -2,7 +2,8 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   typescript: { ignoreBuildErrors: true },
-  eslint: { ignoreDuringBuilds: true },
+  // (2026-09-03 감사) `eslint` 키는 Next 16 NextConfig 타입에서 제거됨 — 유일한 tsc 오류의 원인이라 삭제.
+  //   빌드는 원래 lint를 안 돌리므로(next build) 동작 변화 없음.
   // 클라이언트 번들에 현재 배포 버전을 박아넣음(자동 업데이트 감지용). Vercel 커밋 SHA, 없으면 타임스탬프.
   env: { NEXT_PUBLIC_BUILD_ID: process.env.VERCEL_GIT_COMMIT_SHA || String(Date.now()) },
   // 🛡️ 기준 검증 에이전트의 정적 dead-knob 스캔이 런타임에 소비 코드(lib/·app/api/) 소스를 읽는다.
@@ -16,6 +17,7 @@ const nextConfig: NextConfig = {
     // 🧬 규칙 지문(rulesFingerprint)이 런타임에 규칙 소스를 해시한다 — 번들에 포함해야 읽힌다.
     //   규칙 파일 3개만(전체 lib 아님 — 번들 크기 영향 최소).
     "/api/cron-resynth": ["./lib/reviewQuality.ts", "./lib/criteriaListsBase.ts", "./lib/discover.ts"],
+    "/api/cron-sentinel": ["./lib/reviewQuality.ts", "./lib/criteriaListsBase.ts", "./lib/discover.ts"],
   },
   // 🧭 홈(랜딩) HTML은 항상 최신으로 — 인스타·페북 등 인앱 브라우저(WebView)가 must-revalidate를 무시하고
   //   옛 HTML을 디스크캐시로 붙잡아, 코드를 고쳐 배포해도 사용자 화면이 안 바뀌던 문제(2026-07-10 안드로이드

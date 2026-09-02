@@ -151,6 +151,19 @@ export async function GET(req: NextRequest) {
     if (!authed(req)) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
     await ensureSchema();
     await sql`CREATE TABLE IF NOT EXISTS verify_reports (id SERIAL PRIMARY KEY, ran_at TIMESTAMPTZ DEFAULT now(), status TEXT, fails INT, warns INT, checks JSONB)`;
+    // ⏭️ 2026-09-03 무변경 스킵 — 검증 대상(카페 데이터)이 마지막 성공 검증 이후 하나도 안 바뀌었으면
+    //   불변식이 깨졌을 수 없다. synth_quality 전수 집계(회당 수백 MB)를 통째로 생략한다.
+    {
+      const [lastOk] = (await sql`SELECT max(ran_at) t FROM verify_reports`.catch(() => [])) as any[];
+      if (lastOk?.t) {
+        const [chg] = (await sql`SELECT count(*)::int c FROM cafes
+          WHERE GREATEST(COALESCE(updated_at,'epoch'::timestamptz), COALESCE(synth_updated,'epoch'::timestamptz), COALESCE(created_at,'epoch'::timestamptz)) > ${lastOk.t}`) as any[];
+        if (Number(chg.c) === 0) {
+          await recordRun("cron-verify", true, "⏭️ 무변경 스킵 — 마지막 검증 이후 카페 변경 0(전수 집계 생략)", 0).catch(() => {});
+          return NextResponse.json({ ok: true, skipped: "no-change" });
+        }
+      }
+    }
 
     // 🧠 LLM 그라운딩(보조 레이어) 요약 — 로컬 verify-grounding 배치가 적재한 결과 조회
     const grounding = await (async () => {

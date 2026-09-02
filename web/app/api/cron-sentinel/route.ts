@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { OUT_OF_SCOPE_SQL } from "@/lib/serviceScope";
+import { rulesFingerprint } from "@/lib/rulesFingerprint";
 import { invalidateCafeCaches } from "@/lib/cafeCacheInvalidate"; // 🧹 2026-08-28 /c/[id] ISR(48h) 전환 — 비공개 후 캐시 무효화 필수
 import { sql, ensureSchema } from "@/lib/db";
 import { healAreaLabel, healOutOfBox } from "@/lib/synthStore";
@@ -942,6 +944,22 @@ export async function GET(req: NextRequest) {
     //   드라이런을 계약의 일부로 두면 조치 전 확인이 표준 절차가 된다. DB 변경 0 · 큰 컬럼 로드 0.
     const DRY = req.nextUrl.searchParams.get("dry") === "1";
     if (await isCostHalted()) { await recordRun("cron-sentinel", true, "🛑 비용 자동정지 중 — 스킵", 0).catch(() => {}); return NextResponse.json({ ok: true, skipped: "cost-halt" }); }
+    // ⏭️ 2026-09-03 무변경 스킵(CEO 지시: "오염 없는 건 그대로 두고 진짜 봐야 할 것만 봐라") —
+    //   마지막 센티널 이후 **어떤 카페도 안 바뀌었고** 규칙 지문도 그대로면, 새 오염 조합이 생길 수 없다.
+    //   그때는 큰 컬럼(synth_reviews_all) 전수 스캔을 통째로 생략한다(회당 ~1GB 전송비 절약).
+    //   변경 판정은 작은 컬럼 3개(updated_at·synth_updated·created_at)만 본다 — 판정 비용은 수 MB.
+    const _curFp = await rulesFingerprint().catch(() => "");
+    if (!DRY) {
+      const [lastRep] = (await sql`SELECT ran_at, report->>'rules_fp' fp FROM sentinel_reports ORDER BY ran_at DESC LIMIT 1`.catch(() => [])) as any[];
+      if (lastRep?.ran_at) {
+        const [chg] = (await sql`SELECT count(*)::int c FROM cafes
+          WHERE GREATEST(COALESCE(updated_at,'epoch'::timestamptz), COALESCE(synth_updated,'epoch'::timestamptz), COALESCE(created_at,'epoch'::timestamptz)) > ${lastRep.ran_at}`) as any[];
+        if (Number(chg.c) === 0 && lastRep.fp === _curFp) {
+          await recordRun("cron-sentinel", true, `⏭️ 무변경 스킵 — 마지막 센티널 이후 변경 0·규칙 불변(전수 스캔 생략)`, 0).catch(() => {});
+          return NextResponse.json({ ok: true, skipped: "no-change" });
+        }
+      }
+    }
     await sql`CREATE TABLE IF NOT EXISTS sentinel_reports (id SERIAL PRIMARY KEY, ran_at TIMESTAMPTZ DEFAULT now(), clean BOOLEAN, report JSONB)`.catch(() => {});
 
     // ── ① 자동 치유(안전·결정론·멱등) ──
@@ -958,7 +976,10 @@ export async function GET(req: NextRequest) {
       area_mismatch_seoul: await one(sql`SELECT count(*) c FROM cafes WHERE published AND area LIKE '%구' AND area NOT LIKE '인천%' AND address LIKE '서울%' AND position(area in address)=0`),
       area_mismatch_gg: await one(sql`SELECT count(*) c FROM cafes WHERE published AND area LIKE '%시' AND address LIKE '경기%' AND position(replace(area,'시','') in address)=0`),
       out_of_box: await one(sql`SELECT count(*) c FROM cafes WHERE published AND (lat<${latMin} OR lat>${latMax} OR lng<${lngMin} OR lng>${lngMax})`),
-      non_capital_addr: await one(sql`SELECT count(*) c FROM cafes WHERE published AND (address LIKE '충청%' OR address LIKE '강원%' OR address LIKE '전라%' OR address LIKE '경상%' OR address LIKE '대전%' OR address LIKE '부산%' OR address LIKE '대구%' OR address LIKE '울산%' OR address LIKE '광주광역시%' OR address LIKE '세종%' OR address LIKE '제주%')`),
+      // 🔴 2026-09-03 드리프트 수리 — 여기만 자체 하드코딩 목록을 갖고 있었다(강원·충청이 그대로 남아,
+      //   방금 공개된 충청 카페들이 다음 런에서 전부 '비수도권 이상'으로 잡힐 뻔했다). 단일출처만 쓴다.
+      //   2026-08-26 강원 오경보 사고(139곳 HIGH)와 정확히 같은 병 — 목록은 lib/serviceScope.ts 하나뿐이어야 한다.
+      non_capital_addr: await one(sql.query(`SELECT count(*) c FROM cafes WHERE published AND (${OUT_OF_SCOPE_SQL})`) as any),
       missing_synth: await one(sql`SELECT count(*) c FROM cafes WHERE published AND (synth_count IS NULL OR synth_count=0)`),
       missing_char: await one(sql`SELECT count(*) c FROM cafes WHERE published AND char_scores IS NULL`),
       missing_coord: await one(sql`SELECT count(*) c FROM cafes WHERE published AND (lat IS NULL OR lng IS NULL OR lat=0 OR lng=0)`),
@@ -1031,7 +1052,7 @@ export async function GET(req: NextRequest) {
     const harnessNote = (healSkipped || healNoEffect || frozenNow.length)
       ? ` · 🩺하네스: 무효 ${healNoEffect}·동결스킵 ${healSkipped}${frozenNow.length ? `·동결누적 ${frozenNow.reduce((a, b) => a + b.n, 0)}(사람확인 대기)` : ""}${leaseNow ? `·리스점유 ${leaseNow}` : ""}${leasePruned ? `·만료리스정리 ${leasePruned}` : ""}${_scope?.violations.length ? `·🔐스코프위반 ${_scope.violations.join(",")}` : ""}`
       : "";
-    await sql`INSERT INTO sentinel_reports (clean, report) VALUES (${clean}, ${JSON.stringify({ checks, nameMismatch: mismatch.samples, attractionPollution: attr.samples, attractionHealed: attrHeal, weakNamePollution: weak.samples, weakNameHealed: weakHeal, nonCafeBizPollution: ncb.samples, nonCafeBizHealed: ncbHeal, franchiseBranchPollution: fr.samples, franchiseBranchHealed: frHeal, genericTermPollution: gen.samples, genericTermHealed: genHeal, phraseNamePollution: phrase.samples, competitorQuotePollution: comp.samples, competitorQuoteHealed: compHeal, healed: { area: area.fixed, box: box.excluded, dup: dup.resolved, attr: attrHeal.fixed, weak: weakHeal.fixed, ncb: ncbHeal.fixed, fr: frHeal.fixed, gen: genHeal.fixed, comp: compHeal.fixed }, consoleKey: probe, harness: { noEffect: healNoEffect, skipped: healSkipped, frozen: frozenNow } })}::jsonb)`.catch(() => {});
+    await sql`INSERT INTO sentinel_reports (clean, report) VALUES (${clean}, ${JSON.stringify({ checks, rules_fp: _curFp, nameMismatch: mismatch.samples, attractionPollution: attr.samples, attractionHealed: attrHeal, weakNamePollution: weak.samples, weakNameHealed: weakHeal, nonCafeBizPollution: ncb.samples, nonCafeBizHealed: ncbHeal, franchiseBranchPollution: fr.samples, franchiseBranchHealed: frHeal, genericTermPollution: gen.samples, genericTermHealed: genHeal, phraseNamePollution: phrase.samples, competitorQuotePollution: comp.samples, competitorQuoteHealed: compHeal, healed: { area: area.fixed, box: box.excluded, dup: dup.resolved, attr: attrHeal.fixed, weak: weakHeal.fixed, ncb: ncbHeal.fixed, fr: frHeal.fixed, gen: genHeal.fixed, comp: compHeal.fixed }, consoleKey: probe, harness: { noEffect: healNoEffect, skipped: healSkipped, frozen: frozenNow } })}::jsonb)`.catch(() => {});
 
     const probeNote = probe.signal === "ok" ? "콘솔키 크레딧 정상" : probe.signal === "credit" ? "콘솔키 크레딧 소진(콘솔경로 중단·검색 결정론폴백 정상=저영향)" : `콘솔키 프로브 ${probe.signal}`;
     const mmNote = mismatch.count > 0 ? ` · 🔎오염의심 ${mismatch.count}(먼광역시 ${mismatch.far}·이름불일치 ${mismatch.nameMiss})` : "";
