@@ -142,8 +142,34 @@ export const EXPLICIT_BOT_ANON_IDS_SQL = `
 // user_consents 기반이든, "봇 제외"가 필요한 모든 집계(헤드라인 카드·14일 추이 그래프·기타 트래픽
 // 통계)는 이 상수 하나만 참조한다. 필터 기준이 갈라지면 같은 날짜의 방문자·페이지뷰 수치가
 // 화면마다 달라진다(예: 469 vs 467) — 그 재발을 막는 게 이 상수의 존재 이유다.
-export const BOT_ANON_IDS_SQL = `
+/** 원본 계산식 — 무겁다(user_consents LEFT JOIN + UA 정규식). 캐시 갱신에만 쓴다. */
+export const BOT_ANON_IDS_COMPUTE_SQL = `
   SELECT anon_id FROM (${EXPLICIT_BOT_ANON_IDS_SQL}) e
   UNION
   SELECT anon_id FROM (${BEHAVIOR_BOT_ANON_IDS_SQL}) b
 `;
+
+// ⚡ 2026-09-02 — 이 목록이 **관제탑을 못 열게 만들고 있었다**(CEO 지적).
+//   위 계산식은 1회 918ms인데 관제 화면들이 이걸 **84곳에서 반복 평가**한다
+//   (analytics 한 화면에서만 ~15회 → 13~15초). 카페·방문이 늘수록 더 느려진다.
+//   → 결과를 작은 캐시 테이블에 담고, 쿼리들은 그 테이블만 읽는다(741행·기본키 스캔).
+//   호출부 84곳은 **한 줄도 안 고친다** — 이 상수의 값만 바뀌면 전부 따라온다.
+//   ⚠️ 캐시가 비면 봇이 안 걸러진다(숫자가 부풀어 보임). 그래서 읽기 전에 refreshBotCache()로
+//     신선도를 보장한다. 갱신 실패해도 옛 목록으로 계속 동작한다(가용성 우선).
+export const BOT_ANON_IDS_SQL = `SELECT anon_id FROM bot_anon_cache`;
+
+let lastRefresh = 0;
+/** 캐시 갱신 — maxAgeMin보다 오래됐을 때만 재계산한다. 관제 화면·크론 진입부에서 부른다. */
+export async function refreshBotCache(sql: any, maxAgeMin = 30): Promise<void> {
+  try {
+    if (Date.now() - lastRefresh < maxAgeMin * 60_000) return; // 프로세스 내 재호출 차단
+    await sql`CREATE TABLE IF NOT EXISTS bot_anon_cache (anon_id TEXT PRIMARY KEY, updated_at TIMESTAMPTZ DEFAULT now())`;
+    const [row] = await sql`SELECT count(*)::int n, EXTRACT(epoch FROM now()-COALESCE(max(updated_at), 'epoch'))/60 age FROM bot_anon_cache`;
+    if (row && Number(row.n) > 0 && Number(row.age) < maxAgeMin) { lastRefresh = Date.now(); return; }
+    await sql.query(`INSERT INTO bot_anon_cache (anon_id, updated_at)
+      SELECT anon_id, now() FROM (${BOT_ANON_IDS_COMPUTE_SQL}) x
+      ON CONFLICT (anon_id) DO UPDATE SET updated_at = now()`);
+    await sql`DELETE FROM bot_anon_cache WHERE updated_at < now() - interval '1 hour'`; // 더 이상 봇이 아닌 id 정리
+    lastRefresh = Date.now();
+  } catch { /* 갱신 실패해도 옛 목록으로 계속 동작 — 화면을 멈추지 않는다 */ }
+}

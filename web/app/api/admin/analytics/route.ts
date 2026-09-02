@@ -3,7 +3,7 @@ import { noteSilentFail } from "@/lib/silentFail";
 import { HOLIDAY_DATES, dayType, holidayName } from "@/lib/holidays";
 import { sql, ensureSchema , ensureOnce } from "@/lib/db";
 import { getTodayInsight, formatTodayInsightLines, type TodayInsight } from "@/lib/dailySummary";
-import { BOT_ANON_IDS_SQL } from "@/lib/behaviorBot";
+import { BOT_ANON_IDS_SQL, refreshBotCache } from "@/lib/behaviorBot";
 import { getDailyTraffic } from "@/lib/trafficMetrics";
 export const runtime = "nodejs";
 
@@ -136,6 +136,7 @@ export async function GET(req: NextRequest) {
   if (!authed(req)) return NextResponse.json({ ok: false }, { status: 401 });
   try {
     await ensureSchema();
+    await refreshBotCache(sql); // 봇 목록 캐시 신선도 보장(30분) — 아래 쿼리들이 이 캐시만 읽는다
     await ensureOnce("admin-analytics.ddl", async () => {
       await sql`CREATE TABLE IF NOT EXISTS traffic_events (id BIGSERIAL PRIMARY KEY, anon_id TEXT, path TEXT, src TEXT, ts TIMESTAMPTZ NOT NULL DEFAULT now())`.catch(() => {});
       await sql`ALTER TABLE traffic_events ADD COLUMN IF NOT EXISTS duration_ms INT`.catch(() => {});

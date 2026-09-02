@@ -4,7 +4,7 @@ import { invalidateCafeCaches } from "@/lib/cafeCacheInvalidate"; // 🧹 2026-0
 import { sql, ensureSchema } from "@/lib/db";
 import { synthAndStore, finalizePipeline, scrubPublishedPII, healVendorTemplateQuotes, healGroundingSuspects, holdZeroEvidenceSuspects, healPublishedAudit, healNonCafeCategory, healOutOfBox, healAreaLabel, healOffConceptByReview } from "@/lib/synthStore";
 import { recordRun } from "@/lib/agentLog";
-import { BOT_ANON_IDS_SQL } from "@/lib/behaviorBot";
+import { BOT_ANON_IDS_SQL, refreshBotCache } from "@/lib/behaviorBot";
 import { judgeQueueCount, dailyCounts } from "@/lib/metrics";
 import { consoleCreditExhaustedByProbe } from "@/lib/consoleKeyProbe";
 import { loadCriteria, getCriterionSync } from "@/lib/criteria";
@@ -46,6 +46,7 @@ function freshness(ageH: number | null, cadenceH: number): "ok" | "behind" | "st
 
 export async function GET(req: NextRequest) {
   try {
+    await refreshBotCache(sql); // 봇 목록 캐시 신선도 보장(30분)
     await ensureSchema();
     await sql`CREATE TABLE IF NOT EXISTS orchestrator_state (id INT PRIMARY KEY DEFAULT 1, health JSONB, updated_at TIMESTAMPTZ DEFAULT now())`;
     const now = Date.now();

@@ -5,6 +5,7 @@
 //   쓴다(#503) — 예전엔 이 파일이 봇 필터를 아예 안 걸어서 헤드라인 카드·추이그래프와 다른 숫자가 나왔다.
 import { BOT_ANON_IDS_SQL } from "./behaviorBot";
 import { getTodayTraffic } from "./trafficMetrics";
+import { ensureOnce } from "./db";
 
 export type TodayInsight = {
   pages: { bucket: string; views: number; uniques: number }[];
@@ -15,7 +16,12 @@ export type TodayInsight = {
 export async function getTodayInsight(sql: any): Promise<TodayInsight> {
   // duration_ms 컬럼 보장 — 이 함수가 admin 화면 히트 없이(예: make-digest.mjs 단독 실행) 먼저 불려도
   // 안전하도록 여기서도 idempotent 마이그레이션(원본은 app/api/admin/analytics/route.ts에도 있음).
-  await sql`ALTER TABLE traffic_events ADD COLUMN IF NOT EXISTS duration_ms INT`.catch(() => {});
+  // 🔒 매 요청 ALTER 제거(2026-09-02) — `ADD COLUMN IF NOT EXISTS`는 컬럼이 있어도
+  //   ACCESS EXCLUSIVE 잠금을 먼저 잡는다. traffic_events는 방문계측이 상시 INSERT하는 테이블이라
+  //   그 쓰기 뒤에서 대기한다. 컬럼은 이미 존재하므로 프로세스당 1회로 줄인다.
+  await ensureOnce("dailySummary.duration_ms", async () => {
+    await sql`ALTER TABLE traffic_events ADD COLUMN IF NOT EXISTS duration_ms INT`.catch(() => {});
+  }).catch(() => {});
 
   // 📄 오늘 페이지 카테고리별 조회 순위 — 카페상세·홈지도·지역·취향·컬렉션·사장님 등으로 묶어 top 순위·비중
   const todayPages = (await sql`
@@ -30,7 +36,11 @@ export async function getTodayInsight(sql: any): Promise<TodayInsight> {
       ELSE '기타' END AS bucket,
       COUNT(*)::int views, COUNT(DISTINCT anon_id)::int uniques
     FROM traffic_events
-    WHERE (ts AT TIME ZONE 'Asia/Seoul')::date = (now() AT TIME ZONE 'Asia/Seoul')::date
+    -- 2026-09-02: (ts AT TIME ZONE ...)::date = ... 는 ts에 함수를 씌워 인덱스를 못 쓴다.
+    --   같은 뜻의 범위 조건으로 바꿔 idx_traffic_events_ts를 타게 한다(오늘 KST 자정부터).
+    --   지난 시도에서 봇 서브쿼리를 배열로 바꿨다가 쿼리가 깨졌고 catch가 삼켜
+    --     '오늘 페이지'가 빈 배열이 됐다. 서브쿼리 구조는 건드리지 않는다.
+    WHERE ts >= (now() AT TIME ZONE 'Asia/Seoul')::date AT TIME ZONE 'Asia/Seoul'
       AND anon_id NOT IN (${sql.unsafe(BOT_ANON_IDS_SQL)})
     GROUP BY 1 ORDER BY views DESC LIMIT 5`.catch(() => [])) as any[];
 
@@ -56,7 +66,7 @@ export async function getTodayInsight(sql: any): Promise<TodayInsight> {
              COUNT(DISTINCT path) FILTER (WHERE path LIKE '/c/%') AS cafes,
              MAX(COALESCE(duration_ms, 0)) AS max_dur
       FROM traffic_events
-      WHERE (ts AT TIME ZONE 'Asia/Seoul')::date = (now() AT TIME ZONE 'Asia/Seoul')::date
+      WHERE ts >= (now() AT TIME ZONE 'Asia/Seoul')::date AT TIME ZONE 'Asia/Seoul'
         AND anon_id NOT IN (${sql.unsafe(BOT_ANON_IDS_SQL)})
       GROUP BY anon_id
     )
