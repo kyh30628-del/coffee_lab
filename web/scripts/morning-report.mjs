@@ -116,6 +116,27 @@ try {
         console.log(`     ${last.aDay < 20 ? "🟢" : "🔴"} 최신 활성 ${last.aDay.toFixed(1)}h/일 (판정선 20h · 9/1 CDN캐시 적용 전 22.6h)`);
       }
     } catch (e) { console.log("  스냅샷 실패:", String(e).slice(0, 60)); }
+
+    // 🌙 2026-09-02 — **깨어남 횟수**가 핵심 지표다(CEO 지시).
+    //   Neon 자동절전 5분(플랜 하한) → 1초 쿼리로 깨워도 5분이 과금된다.
+    //   실측 59~90회/일 × 5분 = 4.9~7.5h가 순수 꼬리 낭비(하루 22.6h의 22~33%).
+    //   총 활성시간만 보면 "일이 많아 그렇다"로 오해한다 — 실제로는 잘게 깨우는 게 문제였다.
+    //   숫자는 cron-costwatch가 매일 계산해 run_ledger.detail에 남긴다. 여기선 그걸 읽어 추이만 낸다.
+    try {
+      const cw = await sql`SELECT started_at::date d, detail FROM run_ledger
+        WHERE job='cron-costwatch' AND detail LIKE '%깨어남%' ORDER BY started_at DESC LIMIT 7`;
+      console.log("  ── 🌙 깨어남 횟수(적을수록 좋다 · 5분 꼬리가 붙는다) ──");
+      if (!cw.length) console.log("     기록 없음 — costwatch가 아직 안 돌았거나 경보만 남았다");
+      for (const r of cw) {
+        const w = (String(r.detail).match(/깨어남\s*(\d+)\s*회/) || [])[1];
+        const dawn = (String(r.detail).match(/새벽\s*(\d+)\s*분/) || [])[1];
+        const up = (String(r.detail).match(/가동\s*([\d.]+)h/) || [])[1];
+        if (!w) continue;
+        const tail = (Number(w) * 5 / 60).toFixed(1);
+        console.log(`     ${String(r.d).slice(4, 10)}  깨어남 ${String(w).padStart(3)}회 → 꼬리낭비 ${tail}h · 가동 ${up ?? "?"}h · 새벽 ${dawn ?? "?"}분`);
+      }
+      console.log("     (9/2 ISR 재생성 10.6배 감축 배포 — 그 이후 날짜가 줄어야 성공)");
+    } catch (e) { console.log("  깨어남 조회 실패:", String(e).slice(0, 50)); }
   }
 } catch (e) { console.log("  조회 실패:", String(e).slice(0, 60)); }
 
