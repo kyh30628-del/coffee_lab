@@ -412,8 +412,6 @@ export async function discoverRegion(region: string, areaLabel: string, keywords
   };
 
   const gu = region.split(" ").pop() ?? region;
-  // full-region 키(예: "인천 중구") 우선 — 서울과 이름이 겹치는 구를 정확히 구분. 없으면 bare 구 키로 폴백.
-  const dongs = DONGS[region] ?? DONGS[gu] ?? [];
 
   // ⚡ 2026-07-27 쿼리 전략 추가 최적화(실측 근거) — 강남구(포화, 564곳)에서 "카페"·"커피전문점"·
   //   "동네카페" 3개를 검색해보니 겹치는 상위 결과가 대부분(64%가 이미 DB에 있는 곳)이었던 반면,
@@ -428,6 +426,26 @@ export async function discoverRegion(region: string, areaLabel: string, keywords
   const SATURATED_THRESHOLD = 250;
   const addrRows = (await sql`SELECT address FROM cafes WHERE area = ${storeArea} AND address IS NOT NULL`) as unknown as { address: string }[];
   const saturated = addrRows.length >= SATURATED_THRESHOLD;
+
+  // 🏘️ 동 단위 발굴 키워드 — 이게 품질의 핵심이다.
+  //   강원 확장(2026-08-25) 실측: 동 없이 시·군 이름만으로 모은 43곳은 지역 컨텍스트가 없어
+  //   거절 사유 1위가 "카페명이 글에 없음"이었다(모어아워 363건 → 채택 0). '○○시 카페'는
+  //   인기 상위 5곳(대부분 프랜차이즈·기수집)만 돌려주고 롱테일 독립카페를 놓친다.
+  //
+  //   ⚠️ 그런데 읍·면·동 목록을 **손으로 적으면 안 된다.** 행정구역명을 추측해 넣으면
+  //     존재하지 않는 이름으로 네이버를 계속 검색하고, 실주소 매칭에 실패해 가짜 지명을 area에
+  //     찍는다 — 2026-08 인천에서 실제로 난 오염(729건)이 정확히 그 경로였다.
+  //
+  //   → **이미 수집한 실주소에서 뽑는다.** addrRows는 위에서 이미 읽었으므로 추가 조회 0.
+  //     하드코딩 표(DONGS)가 있으면 그걸 우선 쓰고, 없는 지역은 실주소로 자가 부트스트랩한다.
+  //     수집이 쌓일수록 정확해지고, 없는 지명은 애초에 나올 수 없다.
+//     [가-힣]{2,} 제한: 건물명의 '3동'·'가동' 같은 오탐을 막는다(숫자·한 글자는 행정동이 아니다).
+//     도로명만 있는 주소(세종 고운한옥1길)는 동이 없어 안 잡힌다 — 정상이다. 있는 것만 더한다.
+  const learnedDongs = Array.from(new Set(
+    addrRows.map((r) => (String(r.address).match(/\s([가-힣]{2,}[읍면동])\s/) ?? [])[1]).filter(Boolean) as string[],
+  ));
+  // full-region 키(예: "인천 중구") 우선 — 서울과 이름이 겹치는 구를 정확히 구분. 없으면 bare 구 키로 폴백.
+  const dongs = DONGS[region] ?? DONGS[gu] ?? learnedDongs;
   const dongKeywords = saturated ? DONG_KEYWORDS.filter((k) => !GENERIC_CAFE_SYNONYMS.has(k)) : DONG_KEYWORDS;
   const regionKeywords = saturated ? keywords.filter((k) => !GENERIC_CAFE_SYNONYMS.has(k)) : keywords;
 
