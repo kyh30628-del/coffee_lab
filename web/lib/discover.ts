@@ -87,11 +87,15 @@ export const LONGTAIL_TASTE_TARGETS: { region: string; areaLabel: string; keywor
 //   SIDO_GU(lib/regionList.ts, 단일출처)를 실제 인천 10개 구·군(중구·동구·미추홀구·연수구·남동구·
 //   부평구·계양구·서구·강화군·옹진군)으로 되돌렸다 — cron-grow가 없는 구명으로 계속 네이버를 검색하고
 //   parseGuArea가 실주소를 못 매칭해 가짜 구명을 area에 그대로 찍던 오염 진행형 버그(729건)를 여기서 끊는다.
+// 🏷️ area 라벨에 시·도를 붙여야 하는 곳 — 구 이름이 다른 시·도와 겹치는 경우.
+//   인천 중구·동구·서구 ↔ 서울 중구 / 대전 동구·중구·서구 ↔ 서울·인천.
+//   안 붙이면 parseGuArea가 실주소의 '중구'를 엉뚱한 시·도로 찍는다(2026-08 인천 오염 729건과 같은 병).
+const PREFIXED_SIDO = new Set(["인천", "대전"]);
 export const METRO_REGIONS: { region: string; areaLabel: string }[] = (() => {
   const R: Record<string, string[]> = SIDO_GU; // 단일 출처(lib/regionList.ts)
 
   const out: { region: string; areaLabel: string }[] = [];
-  for (const [sido, gus] of Object.entries(R)) for (const gu of gus) out.push({ region: `${sido} ${gu}`, areaLabel: sido === "인천" ? `인천 ${gu}` : gu });
+  for (const [sido, gus] of Object.entries(R)) for (const gu of gus) out.push({ region: `${sido} ${gu}`, areaLabel: PREFIXED_SIDO.has(sido) ? `${sido} ${gu}` : gu });
   return out;
 })();
 
