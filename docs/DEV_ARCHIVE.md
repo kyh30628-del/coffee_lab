@@ -301,3 +301,4 @@
 | 2026-09-01 09:00 | #918 | [룰갭 신규] COMMON_WORD_NAMES 미등재 "아일랜드" — 인테리어/부동산 "아일랜드 식탁" 동음 | 0fd91e01 | - | lib/reviewQuality.ts COMMON_WORD_NAMES에 아일랜드 등재(id6659 아일랜드15 vs 인테리어 아일랜드 식탁/키친 동음충돌 차단). 숫자토큰15는 s |
 | 2026-09-01 23:52 | #932 | [개발] 협업 #363: [관찰공유] naver 재방문 지표 4사이클 정체 — 콘텐츠만으로는 한계, 기능레버 | f035a083 | - | 신규 app/SavedCafes.tsx(찜한 카페 재방문 유도, 기존 /api/bookmark GET 재사용) 추가 + app/c/[id]/page.tsx에 RecentCafes  |
 | 2026-09-03 07:44 | #927 | [룰갭 신규] COMMON_WORD_NAMES 미등재 "오롯이담아내다" — 서술구 동음충돌 (id25659) | 1f5fee9d | - | lib/reviewQuality.ts COMMON_WORD_NAMES에 "오롯이담아내다" 등재(id25659). norm()이 공백제거하므로 nameClean 전체이름 대조(P23 |
+| 2026-09-03 07:46 | #931 | [정책개선] costwatch 데이터전송 임계 절대값→상대값 전환 검토 | 4cf89164 | - | app/api/cron-costwatch/route.ts: 전송량 임계(TOTAL_GB_ALERT 고정 25GB)를 가동시간 워치독과 동일 패턴(최근 7일 중앙값×1.6배, 이력없 |
