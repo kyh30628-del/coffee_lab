@@ -11,8 +11,8 @@ export const runtime = "nodejs";
 //   (feedback: "그런 일들이 원천적으로 일어나지 않아야지... 발견해서 빨리 조치할 수 있게 해줘야 정상 아니냐").
 //   pg_stat_statements를 매일 어제 스냅샷과 비교해 "하루만에 비정상적으로 커진 쿼리"를 결정론으로 잡는다.
 //   임계치 초과 시 ok=false로 recordRun → issues 보드에 HIGH로 자동 상신 + self-audit 자동기동(기존 인프라 재사용, 새 알림채널 없음).
-const PER_QUERY_GB_ALERT = Number(process.env.COST_WATCH_PER_QUERY_GB || 10); // 하루 한 쿼리가 이 이상 새로 읽으면 경보(버그 실측 ~22.8GB/일보다 낮게 잡아 조기탐지)
-const TOTAL_GB_ALERT = Number(process.env.COST_WATCH_TOTAL_GB || 25); // 전체 합산 하루 이 이상이면 경보(정상 베이스라인 ~14GB/일의 ~1.8배)
+const PER_QUERY_GB_ALERT = Number(process.env.COST_WATCH_PER_QUERY_GB || 10); // 하루 한 쿼리가 이 이상 새로 읽으면 경보(버그 실측 ~22.8GB/일보다 낮게 잡아 조기탐지) — 단일쿼리 폭주는 서비스 성장과 무관한 버그 신호라 절대값 유지
+const TOTAL_GB_FLOOR = Number(process.env.COST_WATCH_TOTAL_GB || 25); // 중앙값이 작거나(신규 배포) 이력이 없을 때의 하한(기존 절대임계값 그대로 보존)
 const XFER_RATE = 0.032; // Neon 공용 네트워크 전송(발신) 공개단가 $/GB
 
 // 📧 매일 아침 비용 점검 메일(CEO 지시 2026-08-03). 지난달(cost_baseline) vs 이번달(실행이력) 정면 비교. 새 무거운 조회 없음.
@@ -64,7 +64,34 @@ async function awakeStats(): Promise<{ wakes: number; awakeMin: number; nightMin
 const AWAKE_MEDIAN_MULT = Number(process.env.COST_WATCH_AWAKE_MULT || 1.6);
 const AWAKE_MIN_FLOOR = Number(process.env.COST_WATCH_AWAKE_FLOOR || 900); // 15h — 중앙값이 작을 때 과민반응 방지
 
-async function sendCostReport(todayGb: number, top: { q: string; deltaGb: number } | null, anomaly: boolean, execMin: number) {
+// 🔴 2026-09-03 설계 수리 — 전송량 절대임계(25GB/일)도 위 가동시간과 동일한 함정이었다.
+//   실측: 공개카페 19,220건·대형컬럼 행평균 78KB로 정상 베이스라인 자체가 서비스 성장에 비례해 오른다.
+//   같은 절대임계로 08-19(#785→#786)·08-21(#801)·09-01 세 차례 halt가 걸렸고 매번 "새 버그 아님, 정상 누적"으로
+//   판정됐지만 halt는 다음날까지 24h간 cron-synth/resynth/grow/exposure/youtube-backfill을 전면 정지시켰다.
+//   → 가동시간 워치독과 동일 패턴(최근 7일 중앙값×배수, 이력 없을 때만 절대 하한)으로 전환.
+const TOTAL_MEDIAN_MULT = Number(process.env.COST_WATCH_TOTAL_MULT || 1.6);
+
+// 최근 7일(오늘 제외) costwatch 실행이력에서 일별 총 전송량(GB)의 중앙값을 뽑는다.
+//   agent_runs.detail의 "총 X GB" 표기를 그대로 재사용 — 새 테이블 없음.
+async function transferMedianGb(): Promise<number> {
+  try {
+    const rows = (await sql`SELECT to_char(ran_at AT TIME ZONE 'Asia/Seoul','YYYY-MM-DD') d, detail
+      FROM agent_runs WHERE job='cron-costwatch' AND ran_at > now() - interval '8 days'
+      ORDER BY ran_at DESC`) as { d: string; detail: string }[];
+    const byDay = new Map<string, number>();
+    for (const r of rows) {
+      if (byDay.has(r.d)) continue; // 하루 여러 실행 시 최신값만
+      const m = String(r.detail).match(/총\s*([\d.]+)\s*GB/);
+      if (m) byDay.set(r.d, Number(m[1]));
+    }
+    const vals = [...byDay.values()].filter((n) => Number.isFinite(n)).sort((a, b) => a - b);
+    if (!vals.length) return 0;
+    const mid = Math.floor(vals.length / 2);
+    return vals.length % 2 ? vals[mid] : (vals[mid - 1] + vals[mid]) / 2;
+  } catch { return 0; }
+}
+
+async function sendCostReport(todayGb: number, top: { q: string; deltaGb: number } | null, anomaly: boolean, execMin: number, totalLimit: number) {
   const key = process.env.RESEND_API_KEY; if (!key) return;
   const to = process.env.COST_REPORT_EMAIL || "kyh30628@gmail.com"; // 이미 공개 git 커밋에 있는 주소(신규 노출 아님)
   // 지난달 기준선(인보이스 실측, DB에 저장 — 공개 소스에 금액 하드코딩 안 함)
@@ -119,7 +146,7 @@ async function sendCostReport(todayGb: number, top: { q: string; deltaGb: number
     </div>
     <div style="border:1px solid #e5d8c2;border-radius:12px;padding:16px;margin-bottom:14px">
       <div style="font-size:13px;color:#8a7256">어제 데이터전송</div>
-      <div style="font-size:26px;font-weight:700;color:${c}">${todayGb.toFixed(1)} GB <span style="font-size:13px;color:#8a7256;font-weight:400">/ 임계 ${TOTAL_GB_ALERT}GB · 추정 $${estDay.toFixed(2)}</span></div>
+      <div style="font-size:26px;font-weight:700;color:${c}">${todayGb.toFixed(1)} GB <span style="font-size:13px;color:#8a7256;font-weight:400">/ 임계 ${totalLimit.toFixed(1)}GB(7일 중앙값×${TOTAL_MEDIAN_MULT}) · 추정 $${estDay.toFixed(2)}</span></div>
       ${anomaly ? '<div style="color:#c0392b;font-weight:700;margin-top:6px">🚨 임계 초과 — 확인 필요</div>' : ''}
     </div>
     <div style="border:2px solid ${cmpColor};border-radius:12px;padding:16px;margin-bottom:14px">
@@ -223,18 +250,22 @@ export async function GET(req: NextRequest) {
     const aw = await awakeStats();
     const awakeLimit = Math.max(AWAKE_MIN_FLOOR, Math.round(aw.medianMin * AWAKE_MEDIAN_MULT));
     const awakeBad = aw.medianMin > 0 && aw.awakeMin >= awakeLimit;
+
+    // 전송량 임계 — 이력이 쌓일수록 7일 중앙값을 따라가고, 이력이 없으면 기존 절대 하한(25GB)으로 대체.
+    const medGb = await transferMedianGb();
+    const totalLimit = medGb > 0 ? Math.max(TOTAL_GB_FLOOR, Math.round(medGb * TOTAL_MEDIAN_MULT * 10) / 10) : TOTAL_GB_FLOOR;
     // 🔴 가동시간은 **경보만** 한다 — 자동정지에 넣지 않는다.
     //   전송량 폭주(7월 $58 사고의 지문)는 명백한 버그 신호라 멈추는 게 맞지만,
     //   가동시간은 트래픽이 늘어도 오른다. 여기서 멈추면 **잘 되는 날 서비스를 끄는 셈**이다.
     //   (CEO 원칙 "빨강은 소비자 손상일 때만"과도 같은 결. 가동시간 증가는 소비자 손상이 아니다.)
-    const transferBad = (top && top.deltaGb >= PER_QUERY_GB_ALERT) || totalGb >= TOTAL_GB_ALERT;
+    const transferBad = (top && top.deltaGb >= PER_QUERY_GB_ALERT) || totalGb >= totalLimit;
     const anomaly = transferBad;
     const awakeTxt = `가동 ${(aw.awakeMin / 60).toFixed(1)}h/일(깨어남 ${aw.wakes}회, 새벽 ${aw.nightMin}분, 7일중앙값 ${(aw.medianMin / 60).toFixed(1)}h)`;
     const awakeNote = awakeBad ? `⚠️ 가동시간 주의: ${awakeTxt} — 중앙값의 ${AWAKE_MEDIAN_MULT}배(${(awakeLimit / 60).toFixed(1)}h) 초과. ` : "";
     const detail = anomaly
-      ? awakeNote + `🚨 데이터전송 이상: 오늘 총 ${totalGb.toFixed(1)}GB(임계 ${TOTAL_GB_ALERT}GB)` +
+      ? awakeNote + `🚨 데이터전송 이상: 오늘 총 ${totalGb.toFixed(1)}GB(임계 ${totalLimit.toFixed(1)}GB, 7일중앙값 ${medGb.toFixed(1)}GB×${TOTAL_MEDIAN_MULT})` +
         (top && top.deltaGb >= PER_QUERY_GB_ALERT ? ` · 최다쿼리 ${top.deltaGb.toFixed(1)}GB: ${top.q.replace(/\s+/g, " ").slice(0, 100)}` : "")
-      : awakeNote + `정상 — 총 ${totalGb.toFixed(1)}GB(임계 ${TOTAL_GB_ALERT}GB), ${awakeTxt}`;
+      : awakeNote + `정상 — 총 ${totalGb.toFixed(1)}GB(임계 ${totalLimit.toFixed(1)}GB, 7일중앙값 ${medGb.toFixed(1)}GB×${TOTAL_MEDIAN_MULT}), ${awakeTxt}`;
 
     // 📒 하네스 L5 — 실행 원장 보존정리(90일). 하루 1회·행 수천 개 수준이라 부하 무시 가능.
     const pruned = await pruneLedger(90).catch(() => 0);
@@ -248,8 +279,8 @@ export async function GET(req: NextRequest) {
     await recordRun("cron-costwatch", !anomaly, detail + (pruned ? ` · 원장정리 ${pruned}행` : ""), cur.length);
     // 🛑 과다 시 자동 정지(무거운 자율 크론이 스킵) / 정상 복귀 시 자동 해제 — CEO "과다면 멈춰"
     await setCostHalt(anomaly, anomaly ? `자동정지: ${detail.slice(0, 150)}` : "정상").catch(() => {});
-    await sendCostReport(totalGb, top, anomaly, execMin).catch(() => {}); // 📧 매일 아침 CEO 비용 점검 메일(발송 실패는 점검 자체를 막지 않음)
-    return NextResponse.json({ ok: true, anomaly, halted: anomaly, totalGb: +totalGb.toFixed(2), execMin: +execMin.toFixed(1), awakeHours: +(aw.awakeMin / 60).toFixed(1), wakes: aw.wakes, nightMin: aw.nightMin, awakeMedianH: +(aw.medianMin / 60).toFixed(1), awakeWarn: awakeBad, top, checked: cur.length });
+    await sendCostReport(totalGb, top, anomaly, execMin, totalLimit).catch(() => {}); // 📧 매일 아침 CEO 비용 점검 메일(발송 실패는 점검 자체를 막지 않음)
+    return NextResponse.json({ ok: true, anomaly, halted: anomaly, totalGb: +totalGb.toFixed(2), totalLimit: +totalLimit.toFixed(1), transferMedianGb: +medGb.toFixed(1), execMin: +execMin.toFixed(1), awakeHours: +(aw.awakeMin / 60).toFixed(1), wakes: aw.wakes, nightMin: aw.nightMin, awakeMedianH: +(aw.medianMin / 60).toFixed(1), awakeWarn: awakeBad, top, checked: cur.length });
   } catch (e) {
     await recordRun("cron-costwatch", false, String(e).slice(0, 150));
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
