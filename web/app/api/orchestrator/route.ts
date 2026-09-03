@@ -85,7 +85,9 @@ export async function GET(req: NextRequest) {
       COALESCE(ROUND(percentile_cont(0.99) WITHIN GROUP (
         ORDER BY CASE WHEN published THEN EXTRACT(EPOCH FROM (now() - synth_checked_at))/86400 END))::int, 0) synth_oldest_d,
       COALESCE(MAX(CASE WHEN published THEN ROUND(EXTRACT(EPOCH FROM (now() - synth_checked_at))/86400)::int END), 0) synth_max_d,
-      COUNT(*) FILTER (WHERE published AND synth_checked_at < now() - interval '21 days')::int synth_stuck,
+      -- 🧬 2026-09-03: 지문 게이트 도입으로 '변화 없는 카페는 30일 안전망까지 안 읽는 게 정상'이 됐다.
+      --   21일 창을 그대로 두면 정상 카페 수천 곳이 순차적으로 '누락'으로 잡힌다 → 32일(안전망+여유)로.
+      COUNT(*) FILTER (WHERE published AND synth_checked_at < now() - interval '32 days')::int synth_stuck,
       COUNT(*) FILTER (WHERE published AND synth_checked_at IS NULL)::int synth_never
       FROM cafes`)[0] as any;
     // 판정 대기·오늘 지표 = lib/metrics 단일출처(judge-status와 동일 정의 — 화면별 숫자 어긋남 구조적 차단).
@@ -217,7 +219,15 @@ export async function GET(req: NextRequest) {
     }
     // 카테고리 미보유는 위험/경보 아님 — 검증된 카페라 지장 없음. 카테고리 에이전트에 '주의' 숫자로만 표시.
     // 🛑 지역 통째 사라짐 감지 — 카페 30곳+ 지역인데 공개 0 = 대량 비공개 버그(인천 사태). 정상 지역은 항상 일부 공개됨.
-    const regionGone = (await sql`SELECT area, COUNT(*)::int tot FROM cafes WHERE area IS NOT NULL GROUP BY area HAVING COUNT(*) >= 30 AND COUNT(*) FILTER (WHERE published) = 0`.catch(() => [])) as any[];
+    // 🔧 2026-09-03 오탐 수리 — 충청 편입 당일 '대전 대덕구·세종시'가 이 경보에 걸렸다.
+    //   신규 지역은 아직 수집·판정 전이라 공개 0이 **정상**인데, 원래 조건(등록 30+·공개 0)은
+    //   그걸 인천 사태(공개 지역이 통째로 꺼짐)와 구분 못 했다.
+    //   → '판정까지 끝난 카페 30+ · 공개 0 · 그중 공개등급(검증·참고)인데 비공개가 5+'일 때만 —
+    //   즉 "공개돼야 할 것들이 무더기로 꺼져 있는" 상태만 잡는다. 인천형 사고는 이 조건에 그대로 걸린다.
+    const regionGone = (await sql`SELECT area, COUNT(*)::int tot FROM cafes WHERE area IS NOT NULL GROUP BY area
+      HAVING COUNT(*) FILTER (WHERE synth_updated IS NOT NULL) >= 30
+         AND COUNT(*) FILTER (WHERE published) = 0
+         AND COUNT(*) FILTER (WHERE NOT published AND synth_grade IN ('검증','참고')) >= 5`.catch(() => [])) as any[];
     if (regionGone.length) integrity.push(`⚠️지역 통째 비공개 ${regionGone.length}곳(${regionGone.slice(0, 3).map((r) => r.area).join("·")}) — 대량삭제 의심`);
 
     // 🔧 치유 루프 폐쇄 — 비공개(excluded 등)된 카페의 오염 플래그는 '소비자 노출 remediated' → 자동 resolve.
@@ -272,7 +282,10 @@ export async function GET(req: NextRequest) {
     //   → 재는 대상을 바꾼다: **'가장 오래 안 훑은 카페의 나이'(순환 천장)**. 그물이 진짜 멈추면 이 값만 치솟는다.
     //   과거 '주4곳=61년 적체'도 이 지표면 즉시 빨강(천장 수천일) — 감도는 잃지 않고 상시 오경보만 제거.
     if (c.synth_never > 0) risks.push(`재합성 미착수 ${c.synth_never}곳 — 오염그물 사각(한 번도 안 훑음)`);
-    else if (c.synth_oldest_d > 21) risks.push(`재합성 순환 정체 — 99%가 ${c.synth_oldest_d}일 이상 미점검(오염그물 멈춤, 처리량 점검)`);
+    // 🔧 2026-09-03 이중 수리: ①문구가 사실의 반대였다 — synth_oldest_d는 상위 1% 나이(순환 천장)인데
+    //   "99%가 미점검"으로 읽혔다(실제로 CEO가 이 빨강을 보고 물었다). ②지문 게이트 설계상 천장은
+    //   30일(안전망)까지 가는 게 정상 — 21일 임계면 영구 빨강이 된다. 안전망 파손(35일+)만 빨강.
+    else if (c.synth_oldest_d > 35) risks.push(`재합성 순환 정체 — 가장 오래 안 본 상위 1%가 ${c.synth_oldest_d}일(30일 안전망 초과 = 그물 멈춤 의심)`);
     // 개별로 순환에서 빠진 카페 — 그물 전체는 도는데 몇 곳만 안 잡히는 상태. 소비자 화면은 멀쩡하므로 **주의**.
     //   (전체가 멈춘 것과 한 곳이 낀 것은 원인도 조치도 다르다 — 같은 빨강으로 묶으면 진짜 정체를 못 알아본다.)
     else if (c.synth_stuck > 0) notices.push(`재합성 순환 누락 ${c.synth_stuck}곳(최장 ${c.synth_max_d}일) — 그물은 정상 회전 중, 해당 카페만 재점검 필요`);
