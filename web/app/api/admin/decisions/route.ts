@@ -46,6 +46,24 @@ async function ensure() {
   await sql`CREATE TRIGGER trg_decisions_normalize_action_type
     BEFORE INSERT ON decisions
     FOR EACH ROW EXECUTE FUNCTION decisions_normalize_action_type()`.catch(() => {});
+  // 🚧 #945: status 이탈 재발방지 게이트 — LLM 에이전트가 자유 SQL INSERT 시 상태값을
+  //   pending 대신 proposed/investigate 등으로 자연어 추정해 적어 CEO 결재큐(status='pending' 필터)·
+  //   L2 자동집행 밖으로 새는 구조적 갭(#901·#927·#928·#931, 발견까지 24~27h 지연 반복).
+  //   상신 주체·스크립트와 무관하게 DB 레이어에서 유효 상태값 집합 밖은 pending으로 정규화(원값은 보존).
+  await sql`CREATE OR REPLACE FUNCTION decisions_normalize_status() RETURNS trigger AS $fn$
+    BEGIN
+      IF NEW.status IS NULL OR NEW.status NOT IN ('pending','approved','done','rejected','deferred','resolved','failed') THEN
+        NEW.action_params := COALESCE(NEW.action_params, '{}'::jsonb)
+          || jsonb_build_object('status_gate_945', jsonb_build_object('from', NEW.status, 'at', now()));
+        NEW.status := 'pending';
+      END IF;
+      RETURN NEW;
+    END;
+    $fn$ LANGUAGE plpgsql`.catch(() => {});
+  await sql`DROP TRIGGER IF EXISTS trg_decisions_normalize_status ON decisions`.catch(() => {});
+  await sql`CREATE TRIGGER trg_decisions_normalize_status
+    BEFORE INSERT ON decisions
+    FOR EACH ROW EXECUTE FUNCTION decisions_normalize_status()`.catch(() => {});
   });
 }
 
