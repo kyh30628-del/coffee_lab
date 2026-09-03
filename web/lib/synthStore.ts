@@ -195,13 +195,12 @@ async function gatherRaw(cafe: { id: number; name: string; area: string }, refre
     if (nameCoherence(cleanCafeName(cafe.name), [s.text], webAreaTerms) === 0) continue;
     raw.push({ source: "blog", text: s.text, title: s.title, desc: s.desc, time: s.time, link: s.link, date: s.date, srcName: s.source });
   }
-  // 유튜브는 쿼터가 빡빡해 기본 OFF — 전용 백필(youtube-backfill)이 통제 수집. 인라인은 ENABLE_YOUTUBE_INLINE=1일 때만.
-  let ytErr = false;
-  if (process.env.ENABLE_YOUTUBE_INLINE === "1") {
-    const yt = await fetchYouTubeReviews(cafe.name, cafe.area ?? "");
-    for (const s of yt.snippets) raw.push({ source: "youtube", text: s.text, title: s.title, desc: s.desc, time: s.time, link: s.link, date: s.date, srcName: s.source });
-    ytErr = !!yt.apiError;
-  }
+  // 🛑 유튜브 인라인 수집 — **영구 정지(CEO 명시 지시 2026-09-03: "다시 한번 말하지만 무조건 멈춰")**.
+  //   예전엔 ENABLE_YOUTUBE_INLINE=1 환경변수로 켤 수 있었는데, 환경변수는 어디(Vercel/로컬)에
+  //   설정돼 있는지 코드만 봐서는 알 수 없다 — 정지 지시는 코드에 못박아야 확실하다.
+  //   재개하려면 CEO 승인 + 이 주석을 지우는 코드 변경이 필요하다(조용히 다시 켜질 수 없음).
+  //   ⚠️ cron-resynth의 "유튜브 N건"은 수집이 아니라 **정책 의무 삭제**(30일 경과 데이터 제거·API 0콜)다.
+  const ytErr = false;
   if (raw.length === 0 && (web.apiError || ytErr)) return { raw: [], fromCache: false, apiFailed: true };
   // 내용 비교: 재수집했는데 후기가 그대로면 raw_collected_at을 건드리지 않는다(= 재판정 큐에 다시 안 올라감).
   // raw_checked_at만 갱신 → 커서는 계속 순환하되, 헛 재판정(토큰 낭비)·관제탑 숫자 들쭉날쭉이 사라진다.
