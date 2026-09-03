@@ -140,6 +140,34 @@ try {
   }
 } catch (e) { console.log("  조회 실패:", String(e).slice(0, 60)); }
 
+// ═══ 🔎 색인 스팟체크(월·목) — CEO 지시(2026-09-04) "정기적으로 고정해서 보고" ═══
+//   판정일(강원 9/22·충청 10/6)까지 깜깜이로 기다리지 않는다 — 색인이 시작되는 순간을 먼저 포착.
+//   방법: 우리 페이지 제목을 네이버 웹검색에 그대로 던져 우리 도메인이 잡히는지 실측(콜 3회, 쿼터 무시 수준).
+{
+  const dow = new Date(Date.now() + 9 * 3600_000).getUTCDay(); // KST 요일
+  if (dow === 1 || dow === 4) {
+    console.log("\n═══ 🔎 색인 스팟체크 (네이버 웹검색 실측) ═══");
+    const probe = async (label, q, marks) => {
+      try {
+        const r = await fetch(`https://openapi.naver.com/v1/search/webkr.json?display=10&query=${encodeURIComponent(q)}`, {
+          headers: { "X-Naver-Client-Id": process.env.NAVER_CLIENT_ID, "X-Naver-Client-Secret": process.env.NAVER_CLIENT_SECRET },
+          signal: AbortSignal.timeout(10_000),
+        });
+        const d = await r.json();
+        const items = d.items || [];
+        const ours = items.filter((i) => String(i.link).includes("dongnecoffeenote.com"));
+        const dec = (u) => { try { return decodeURIComponent(u); } catch { return u; } };
+        const hit = ours.filter((i) => marks.some((m) => dec(i.link).includes(m)));
+        console.log(`  ${hit.length ? "🟢" : "⚪"} ${label}: 대상 ${hit.length}건 · 우리도메인 ${ours.length}건${hit.length ? " ← 색인 시작!" : ""}`);
+      } catch (e) { console.log(`  ⚠️ ${label}: 조회 실패 ${String(e).slice(0, 40)}`); }
+    };
+    await probe("강원(강릉)", "강릉시 카페 추천 진짜 후기로 검증한 곳", ["강릉", "춘천", "원주", "속초"]);
+    await probe("강원(카공)", "춘천 카공 카페 검증 추천 동네 커피 노트", ["춘천", "강릉", "원주"]);
+    await probe("충청(청주)", "청주시 카페 추천 진짜 후기로 검증한 곳", ["청주", "천안", "대전", "세종"]);
+    console.log("  (기준선 9/4: 강원 0·충청 0·수도권은 동 단위까지 색인 심화 중 / 판정선: 강원 9/22·충청 10/6)");
+  }
+}
+
 console.log("\n═══ ⑥ 월 PV 진척률 (애드센스 트리거 10만) ═══");
 const pv = (await sql.query(`SELECT count(*)::int pv, count(DISTINCT anon_id)::int uv FROM traffic_events
   WHERE ts > now()-interval '30 days' AND anon_id NOT IN (${BOT_ANON_IDS_SQL})`))[0];
