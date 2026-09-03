@@ -44,3 +44,50 @@ export const SIDO_CENTER: Record<string, [number, number, number]> = {
   대전: [36.3504, 127.3845, 11],
   세종: [36.4801, 127.2890, 11],
 };
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 🧭 지역 분류·매칭 **단일출처** (2026-09-04)
+//
+// 왜 여기인가: '인천만 특별처리'하는 지역 매처가 소비자 API 7곳에 각자 복제돼 있었고,
+//   대전 편입(9/2)으로 이름 겹침(중·동·서구)이 생기자 **세 번째 같은 사고**가 났다 —
+//   ① 8월 인천 area 오염 729곳 ② 9/3 센티널 하드코딩 목록 ③ 9/4 지도 "대전 153"(CEO 발견,
+//   지도는 대전 중구를 서울로·동/서구를 인천으로 세고, 홈피드는 대전 중구 신규 60곳을 0개로 반환).
+//   복제된 로직은 반드시 어긋난다. 분류·매칭은 아래 함수만 쓴다 — 새 접두 시도가 생기면
+//   PREFIXED_SIDOS 한 줄만 바꾸면 전 부위가 따라온다.
+// ⚠️ 이 파일은 의존성 0(클라이언트 번들 안전)을 유지해야 한다 — 순수 함수만 둘 것.
+
+/** 구 이름이 다른 시도와 겹쳐 area에 시도 접두가 붙는 곳("인천 중구"·"대전 중구"). */
+export const PREFIXED_SIDOS = ["인천", "대전"] as const;
+
+const _byLen = (l: readonly string[]) => [...l].sort((a, b) => b.length - a.length);
+const _LONGEST: Record<string, string[]> = Object.fromEntries(
+  Object.entries(SIDO_GU).map(([sido, list]) => [sido, _byLen(list)]),
+);
+
+/** area 문자열 → {sido, sigungu}. 접두 시도는 그 시도 안에서만 구를 찾는다(부분일치 오분류 차단). */
+export function classifyArea(area: string): { sido: string; sigungu: string } {
+  const a = (area ?? "").trim();
+  const pre = PREFIXED_SIDOS.find((ps) => a.includes(ps));
+  if (pre) { for (const gu of _LONGEST[pre]) if (a.includes(gu)) return { sido: pre, sigungu: gu }; return { sido: pre, sigungu: "" }; }
+  for (const [sido, list] of Object.entries(_LONGEST)) for (const gu of list) if (a.includes(gu)) return { sido, sigungu: gu };
+  if (a.includes("구리")) return { sido: "경기", sigungu: "구리시" };
+  if (a.includes("하남")) return { sido: "경기", sigungu: "하남시" };
+  return { sido: "", sigungu: "" };
+}
+
+/** area → 정확한 지역 키("대전 중구"·"강남구"·"청주시"). 분류 실패 시 원문 반환(정보 보존). */
+export function canonicalGu(area: string): string {
+  const { sido, sigungu } = classifyArea(area);
+  if (!sigungu) return (area ?? "").trim();
+  return (PREFIXED_SIDOS as readonly string[]).includes(sido) ? `${sido} ${sigungu}` : sigungu;
+}
+
+/** region 파라미터(시도명 또는 정확 키)와 area의 표준 매칭.
+ *  부분일치 금지 원칙 유지("동구"⊂"남동구" 혼입 사고, 2026-07-26 실측) — 정확 키 비교만. */
+export function areaMatchesRegion(area: string, region: string): boolean {
+  if (!region) return true;
+  const a = (area ?? "").trim(); const r = region.trim();
+  if ((SIDO_GU as Record<string, string[]>)[r]) return classifyArea(a).sido === r; // 시도명("대전"·"충북")
+  return canonicalGu(a) === canonicalGu(r); // 정확 키 비교(양쪽 정규화 — bare "중구"는 서울로 해석됨)
+}

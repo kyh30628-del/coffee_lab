@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { canonicalGu } from "@/lib/regionList";
 import { sql, ensureSchema } from "@/lib/db";
 export const runtime = "nodejs";
 
@@ -11,22 +12,9 @@ export const runtime = "nodejs";
 //   원본 g("인천 동구", 5자)가 더 길어서 먼저 매칭돼 — 서울 성동구·강동구 카페 468곳이 "인천 동구"로
 //   오분류되는 **새 버그**를 만들 뻔했다(배포 전 로컬 실측으로 발견·수정). 근본 수정: 인천 항목은 인천
 //   분기(아래)에서만 다루므로 폴백 루프에는 아예 넣지 않고, 정렬도 실제 비교에 쓰이는 문자열 길이 기준으로.
-const SEOUL_GYEONGGI_GU = [
-  "강남구", "강동구", "강북구", "강서구", "관악구", "광진구", "구로구", "금천구", "노원구", "도봉구", "동대문구", "동작구", "마포구", "서대문구", "서초구", "성동구", "성북구", "송파구", "양천구", "영등포구", "용산구", "은평구", "종로구", "중구", "중랑구",
-  "수원시", "성남시", "고양시", "용인시", "부천시", "안산시", "안양시", "남양주시", "화성시", "평택시", "의정부시", "시흥시", "파주시", "김포시", "광명시", "광주시", "군포시", "하남시", "오산시", "양주시", "구리시", "안성시", "포천시", "의왕시", "여주시", "동두천시", "과천시", "이천시", "양평군", "가평군", "연천군",
-];
-// ⚠️ 2026-08-31 정정(decisions#910): "2026-07-01 인천 2군9구 개편"(제물포구·영종구·검단구·서해구)은
-// 실존하지 않는 행정구역명이었다(coordination#354) — 실제 인천 10개 구·군으로 되돌린다.
-const INCHEON_GU = ["중구", "동구", "미추홀구", "연수구", "남동구", "부평구", "계양구", "서구", "강화군", "옹진군"];
-const _longestFirst = (list: string[]) => [...list].sort((a, b) => b.length - a.length);
-const SEOUL_GYEONGGI_SORTED = _longestFirst(SEOUL_GYEONGGI_GU);
-const INCHEON_SORTED = _longestFirst(INCHEON_GU);
-function guOf(area: string): string {
-  const a = area ?? "";
-  if (a.includes("인천")) { for (const g of INCHEON_SORTED) if (a.includes(g)) return "인천 " + g; return "인천"; }
-  for (const g of SEOUL_GYEONGGI_SORTED) if (a.includes(g)) return g;
-  return a || "기타";
-}
+// 🧭 2026-09-04 — 자체 지역표(서울·경기·인천만) 폐기, 단일출처 사용(강원·충청·대전·세종 자동 커버).
+//   이 표엔 강원·충청이 없어서 그 지역 카페들이 area 원문 그대로 버킷돼 집계가 갈라졌다 — 지도 '대전 153' 사고와 같은 병.
+const guOf = (area: string) => canonicalGu(area ?? "") || "기타";
 
 export async function GET(req: NextRequest) {
   try {

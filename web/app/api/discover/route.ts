@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { canonicalGu, areaMatchesRegion } from "@/lib/regionList";
 import { currentNotice } from "@/lib/noticeStore";
 import { rotateBySido } from "@/lib/sidoRotation";
 import { sql } from "@/lib/db";
@@ -31,25 +32,11 @@ const REGIONS: Record<string, string[]> = {
 //   충돌로 region="인천 동구" 필터가 "인천 남동구"까지 같이 끌어온 적도 있어(실측 확인) area 컬럼이
 //   이미 정제된 정확한 키임을 활용해 부분일치 대신 정확히 같은지만 비교하고, guOf도 긴 이름부터 검사한다.
 const _longestFirst = (list: string[]) => [...list].sort((a, b) => b.length - a.length);
-function guOf(area: string): string {
-  const a = (area ?? "").trim();
-  if (a.includes("인천")) { for (const g of _longestFirst(REGIONS["인천"])) if (a.includes(g)) return "인천 " + g; return "인천"; }
-  for (const list of Object.values(REGIONS)) for (const g of _longestFirst(list)) if (a.includes(g)) return g;
-  if (a.includes("구리")) return "구리시";
-  return a;
-}
-// region 파라미터를 DB area와 매칭하는 함수 — 인천 구는 "연수구" → "인천 연수구" 변환
-function matchRegion(area: string, region: string): boolean {
-  if (!region) return true;
-  const a = area ?? "";
-  // 🗺️ 인천 동명 구(중구·동구) 구분: region="인천 OO"면 인천만, bare면 인천 제외(서울 중구≠인천 중구)
-  if (region === "인천") return a.startsWith("인천");
-  // area는 이미 정제된 정확한 키(예: "인천 남동구")라 부분일치가 아니라 정확히 같은지만 봐야
-  // "동구" 선택 시 "남동구"까지 같이 잡히는 일이 없다(실측: 34곳 vs 195곳 혼입, 07-26 수정).
-  if (region.startsWith("인천")) return a === region;
-  if (a.startsWith("인천")) return false;
-  return guOf(area) === region;
-}
+// 🧭 2026-09-04 — 자체 복제 로직 폐기, 단일출처(lib/regionList) 사용.
+//   여기 있던 guOf가 '대전 중구'를 '중구'로 돌려 matchRegion이 실패 →
+//   **대전 중구 홈피드가 신규 60곳을 두고 0개를 반환**하던 실사고의 자리다(CEO 발견 건의 연쇄).
+const guOf = canonicalGu;
+const matchRegion = areaMatchesRegion;
 const CHAR_LABELS: Record<string, { label: string; emoji: string }> = {
   roast: { label: "직접로스팅", emoji: "🔥" }, work: { label: "작업하기 좋은", emoji: "💻" },
   quiet: { label: "조용한", emoji: "🤍" }, dessert: { label: "디저트", emoji: "🍰" },

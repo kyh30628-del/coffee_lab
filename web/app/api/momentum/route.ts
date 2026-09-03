@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { areaMatchesRegion } from "@/lib/regionList";
 import { rotateBySido } from "@/lib/sidoRotation";
 import { sql } from "@/lib/db";
 export const runtime = "nodejs";
@@ -6,19 +7,8 @@ export const runtime = "nodejs";
 // "📈 요즘 뜨는 카페" — 별점(미제공) 대신 우리 소유 데이터로 모멘텀 산출.
 // 1차 신호(지금 작동): 최근 90/30일 검증 후기 게시 수 = 입소문 버즈(review_dates 기반, recentN=lib/reviewDates).
 // 2차 신호(스냅샷 누적 시): 주간 검증 리뷰 수 증가분(Δ) = 상승세. 둘 다 환각 없이 실데이터.
-function inRegion(area: string, region: string): boolean {
-  if (!region) return true;
-  const a = area ?? "";
-  // 인천 동명 구(중구·동구) 구분 — search/route.ts와 동일 기준
-  if (region.startsWith("인천")) {
-    const gu = region.replace(/^인천\s*/, "");
-    return a.startsWith("인천") && (a.includes(gu) || a.includes(region));
-  }
-  if (a.startsWith("인천")) return false;
-  if (a.includes(region)) return true;
-  const s = region.replace(/(특별시|광역시|시|군|구)$/, "");
-  return s.length >= 2 && a.includes(s);
-}
+// 🧭 2026-09-04 — 단일출처 매칭으로 교체(인천만 알던 복제 로직 폐기, 대전·충청 자동 커버).
+const inRegion = (area: string, region: string) => areaMatchesRegion(area, region);
 
 // 등급 우선순위(결함D: 저표본 참고등급이 순수 버즈 점수로 검증등급을 역전 — 점수 가산(criteria
 // search.grade_bonus.*)은 무한 확장 가능한 버즈 점수 앞에서 상수 가산이라 억제가 불가능했다(#415,

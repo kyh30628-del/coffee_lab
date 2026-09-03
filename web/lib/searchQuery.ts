@@ -156,6 +156,7 @@ export function isCoreArea(area?: string): boolean {
   const a = String(area || "");
   if (!a) return false;
   if (a.startsWith("인천")) return !/강화|옹진/.test(a);
+  if (a.startsWith("대전")) return false;               // 🧭 2026-09-04: '구'로 끝난다고 서울 자치구 취급받아 핵심부 가산을 받던 구멍
   if (a.endsWith("구")) return true;                    // 서울 자치구
   return CORE_GYEONGGI.has(a);
 }

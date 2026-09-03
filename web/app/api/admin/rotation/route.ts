@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { canonicalGu } from "@/lib/regionList";
 import { sql, ensureSchema } from "@/lib/db";
 import { subscriptionLive } from "@/lib/flags";
 import { rotateFeatured, peakInfo } from "@/lib/exposureRotation";
@@ -11,13 +12,8 @@ const authed = (req: NextRequest) =>
   !!req.headers.get("x-admin-password") && req.headers.get("x-admin-password") === process.env.ADMIN_PASSWORD;
 
 // 지번/area에서 구·시·군 추출(광역시 infix 주의 — 마지막 구/시/군 토큰). discover guOf와 동일 취지.
-function guOf(area: string): string {
-  const a = (area ?? "").trim();
-  const incheon = a.includes("인천");
-  const toks = a.match(/[가-힣]+[구시군]/g) || [];
-  const gu = toks.length ? toks[toks.length - 1] : (a.split(/\s+/)[0] || "기타");
-  return incheon ? "인천 " + gu : gu;
-}
+// 🧭 2026-09-04 — 단일출처로 교체(인천만 접두 붙이던 복제 로직 → 대전·충청 자동 커버).
+const guOf = (area: string) => canonicalGu(area) || "기타";
 
 export async function GET(req: NextRequest) {
   if (!authed(req)) return NextResponse.json({ ok: false }, { status: 401 });
