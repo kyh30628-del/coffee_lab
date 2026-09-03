@@ -960,6 +960,17 @@ export async function GET(req: NextRequest) {
         }
       }
     }
+    // 🔒 2026-09-03 협업#365 재발수리 — 재진입 가드. 전수 스캔+치유는 300s에 육박하는 무거운 작업인데
+    //   중복 호출(겹친 스케줄, 사람 직접 확인 curl 등)을 막을 장치가 없었다. Vercel Fluid는 동시 요청이
+    //   같은 인스턴스를 공유해도 별개 실행이라 **두 번째 호출이 통째로 또 5분짜리 전수 스캔을 새로 돌기 시작**
+    //   했다 — 밖에서 보면 "0바이트 무응답"으로 보인다(실은 진행 중, 그저 매우 느릴 뿐). heal_leases를
+    //   카페 하나가 아니라 "이 잡 전체"에 대해 재사용(예약 target_id=-1, 실제 카페 id는 항상 양수라 충돌 없음).
+    const JOB_LOCK_ID = -1;
+    const gotLock = await acquireLease("cron-sentinel.run", JOB_LOCK_ID, 320);
+    if (!gotLock) {
+      await recordRun("cron-sentinel", true, "⏭️ 이미 실행 중 — 중복 전수 스캔 생략(동시 호출)", 0).catch(() => {});
+      return NextResponse.json({ ok: true, skipped: "already-running" });
+    }
     await sql`CREATE TABLE IF NOT EXISTS sentinel_reports (id SERIAL PRIMARY KEY, ran_at TIMESTAMPTZ DEFAULT now(), clean BOOLEAN, report JSONB)`.catch(() => {});
 
     // ── ① 자동 치유(안전·결정론·멱등) ──
@@ -1103,6 +1114,7 @@ export async function GET(req: NextRequest) {
     });
     if (DRY) {
       // 🧪 드라이런 — DB에 아무것도 남기지 않는다(원장·리포트 오염 방지). "무엇이 바뀔 것인가"만 돌려준다.
+      await releaseLease("cron-sentinel.run", JOB_LOCK_ID).catch(() => {});
       return NextResponse.json({ ok: true, dryRun: true, wouldDetect: checks, samples: {
         attraction: attr.samples, weakName: weak.samples, nonCafeBiz: ncb.samples,
         franchise: fr.samples, generic: gen.samples, competitor: comp.samples,
@@ -1118,8 +1130,10 @@ export async function GET(req: NextRequest) {
         scopeViolations: _scope?.violations.length ?? 0,
       },
     });
+    await releaseLease("cron-sentinel.run", -1).catch(() => {});
     return NextResponse.json({ ok: true, ranAt: new Date().toISOString(), clean, healed: { area: area.fixed, areaNames: area.names, box: box.excluded, dup: dup.resolved, dupPairs: dup.pairs }, checks, flags, nameMismatch: mismatch, consoleKey: probe });
   } catch (e) {
+    await releaseLease("cron-sentinel.run", -1).catch(() => {});
     await recordRun("cron-sentinel", false, String(e).slice(0, 150));
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
