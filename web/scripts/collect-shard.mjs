@@ -55,7 +55,13 @@ for (;;) {
   //   강원은 지금 공개가 140곳뿐이라 한 곳이 늘 때 사용자 체감이 크고, 수도권은 이미 13,494곳이 공개돼 있어
   //   적체가 며칠 늦어져도 화면이 비지 않는다. ORDER BY로만 우선순위를 주고 큐는 하나로 유지한다
   //   (큐를 나누면 강원이 끝난 뒤 워커가 놀거나, 필터를 지우는 걸 잊어 수도권이 영영 안 도는 사고가 난다).
-  let rows = FILTER
+  // ♻️ 배분(CEO 지시 09-05): "신규와 기존 미공개를 적절하게 배분" — 4배치 중 1배치(≈신규 60곳당
+  //   미달 10곳, 85:15)는 미달 재수집 몫으로 고정한다. 이전 설계(신규 큐가 완전히 빌 때만)는
+  //   확장 배치가 며칠 이어지면 미달분이 그동안 통째로 굶는 구조였다. 상한(NEARMISS_CAP)은 그대로 —
+  //   창당 몫을 다 쓰면 나머지는 전부 신규. FILTER 창은 확장 전용이라 계속 순수하게 둔다.
+  const nearTurn = !FILTER && nearDone < NEARMISS_CAP && batches % 4 === 3;
+  let tier = "new";
+  let rows = nearTurn ? [] : FILTER
     // 🔒 이중 안전판(2026-08-26): 방금 확인한 카페는 다시 집지 않는다. raw_reviews가 NULL로 남는
     //   경로가 하나라도 생기면 같은 카페를 무한 재수집하며 쿼터를 태운다(실제로 그랬다).
     ? await sql`SELECT id, name, area FROM cafes WHERE raw_reviews IS NULL AND pipeline_status='new'
@@ -65,9 +71,6 @@ for (;;) {
         AND (raw_checked_at IS NULL OR raw_checked_at < now() - interval '12 hours')
         AND (id % ${OF}) = ${SHARD}
         ORDER BY (address LIKE '강원%') DESC, id LIMIT 20`;
-  // ♻️ 레버2 2순위 큐 — 신규 큐가 완전히 빈 뒤에만, 필터 없는 일반 창에서만, 상한 안에서만.
-  //   (FILTER 창은 확장 지역 전용이라 순수하게 둔다 — 대량배치 예산 계산이 흐려지면 안 됨.)
-  let tier = "new";
   if (!rows.length && !FILTER && nearDone < NEARMISS_CAP) {
     rows = await sql`SELECT id, name, area FROM cafes
       WHERE published = false AND synth_count IN (1, 2, 3, 4)
@@ -89,6 +92,13 @@ for (;;) {
       if (!rows.length && picked > 0) continue;
     }
     if (rows.length) tier = "near";
+  }
+  // 미달 몫 차례였는데 미달 풀이 비었으면 신규로 복귀 — 배분 때문에 워커가 놀면 안 된다.
+  if (!rows.length && nearTurn) {
+    rows = await sql`SELECT id, name, area FROM cafes WHERE raw_reviews IS NULL AND pipeline_status='new'
+        AND (raw_checked_at IS NULL OR raw_checked_at < now() - interval '12 hours')
+        AND (id % ${OF}) = ${SHARD}
+        ORDER BY (address LIKE '강원%') DESC, id LIMIT 20`;
   }
   if (!rows.length) { console.log(`${label} 큐 소진 — 완료 ${done}곳${nearDone ? ` (미달재수집 ${nearDone})` : ""}`); break; }
   for (const c of rows) {
