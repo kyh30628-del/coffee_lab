@@ -97,7 +97,9 @@ export async function GET(req: NextRequest) {
     // ── 6) 못 푸는 중대건 → CEO 결재(L3) 자동 상신 + 담당 본부 배정 (중복방지) ──
     for (const f of findings.filter((f) => f.critical)) {
       const ik = (f.ikey ?? `selfaudit:${f.check}`).slice(0, 120);
-      const dup = (await sql`SELECT 1 FROM decisions WHERE action_params->>'ikey'=${ik} AND status IN('pending','approved') LIMIT 1`.catch(() => [])) as any[];
+      // ⚠️ 'done'(수동 종결)도 dedup 대상에 넣는다 — 안 그러면 근본원인이 이미 확정·보고된 이슈(예: OAuth SPOF)가
+      //   매 사이클(4~12h) 재감지 때마다 새 결재로 재상신돼 보드를 오염시킨다(#987). lib/issues.ts:145와 동일 패턴.
+      const dup = (await sql`SELECT 1 FROM decisions WHERE action_params->>'ikey'=${ik} AND status IN('pending','approved','done','rejected','deferred') LIMIT 1`.catch(() => [])) as any[];
       if (!dup.length) {
         await sql`INSERT INTO decisions (title, detail, team, severity, tier, action_type, action_params, recommendation)
           VALUES (${`[자율진단] ${f.check}`.slice(0, 110)},
