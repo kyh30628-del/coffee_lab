@@ -152,7 +152,16 @@ export async function GET(req: NextRequest) {
     const authNotes = authRecovered
       ? [`ℹ️ 인증은 복구됨(이후 정상 실행 확인) — ${rawAuthFails.map((j) => j.job).join(", ")}의 기록은 만료 시점 그대로라 다음 정기 실행에서 갱신됩니다. 조치 불필요.`]
       : [];
-    const otherFails = failed.filter((j) => !isAuthFail(j.detail || ""));
+    // 🛑→🟡 2026-09-04 — costwatch '전송 이상'은 차단기가 이미 작동해 스스로 조치된 상태라면
+    //   사람이 할 일이 없다(어제 확장 배치 53.6GB가 하루 종일 critical을 눌렀다 — 원인 규명·설명 끝난 건인데도).
+    //   빨강 자격 = 사람 조치 필요. 차단기 ON이면 '시스템이 대응 중' 주의로 내리고,
+    //   차단기가 안 걸렸는데 이상이면(대응 실패) 그때만 빨강 유지.
+    const costwatchAnomaly = failed.filter((j) => j.job === "cron-costwatch" && /데이터전송 이상/.test(j.detail || ""));
+    let costHalted = false;
+    try { const [g] = (await sql`SELECT halted FROM cost_guard WHERE id=1`.catch(() => [])) as any[]; costHalted = !!g?.halted; } catch {}
+    const costwatchHandled = costHalted ? costwatchAnomaly : [];
+    const costwatchNotes = costwatchHandled.map((j) => `🛑 전송 이상 감지 → 자동정지 작동 중(무거운 크론 휴무·정상화 시 자동 해제): ${(j.detail || "").slice(0, 90)}`);
+    const otherFails = failed.filter((j) => !isAuthFail(j.detail || "") && !costwatchHandled.includes(j));
     const jobFails = [
       ...(authFails.length > 0
         ? [`🔑 자율 에이전트 로그인 만료 — ${authFails.length}개 잡 정지(${authFails.map((j) => j.job).join(", ")}). ` +
@@ -625,6 +634,7 @@ export async function GET(req: NextRequest) {
       : "healthy";
     // 배치 크래시·실패 + 데이터 무결성 위반을 최상단 경보로 — '관제탑이 잡아서 알림'
     if (authNotes.length) notices.unshift(...authNotes); // 🟡 정보 — 빨강 아님(위 정정 참조)
+    if (costwatchNotes.length) notices.unshift(...costwatchNotes); // 🛑 차단기가 이미 대응 중 — 주의로
     const alerts = [...jobFails, ...integrity.map((s) => `🔎 무결성: ${s}`), ...agents.filter((a) => a.status === "stalled").map((a) => `${a.label} 멈춤(${a.ageH}h 전 마지막 가동)`)];
 
     const pct = (n: number) => (c.total ? Math.round((n / c.total) * 100) : 0);
