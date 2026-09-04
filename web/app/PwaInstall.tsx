@@ -8,6 +8,10 @@ import { usePathname } from "next/navigation";
 //  · 아이폰(Safari): 설치창 API 자체가 없음 → 배너 '방법 보기' → 공유→홈 화면에 추가 안내.
 //  · 이미 설치(standalone)/관리자·사장님 화면/거절 14일 이내면 안 뜸. 첫 화면·종료 시 팝업 없음.
 const DISMISS_KEY = "dcn_pwa_dismiss";
+// 🆕 2026-09-04 CEO 지시: "들어오면 상단에 설치 유도 + 설치 버튼, 안드로이드·아이폰 전부, 최초 1회만."
+//   기존 설계(고의도 순간에만 하단 배너)는 유지하되, **입장 시 1회 상단 배너**를 추가한다.
+//   최초 1회 = 뜨는 순간 영구 키를 박는다(닫아도, 무시해도 다시 안 뜸 — 성가심 방지).
+const ENTRY_KEY = "dcn_pwa_entry_v1";
 const DAY = 864e5;
 
 export default function PwaInstall() {
@@ -33,7 +37,15 @@ export default function PwaInstall() {
     const ios = /iphone|ipad|ipod/i.test(ua); // iOS는 설치창 없음 → 안내만
     iosRef.current = ios; setIsIOS(ios);
 
-    const onBIP = (e: Event) => { e.preventDefault(); deferredRef.current = e; }; // 조용히 보관(배너는 고의도 순간에만)
+    // 입장 1회 노출 판단 — 인앱 브라우저(인스타·카톡 등)는 설치가 불가능하니 제외(헛배너 방지)
+    const inApp = /instagram|kakaotalk|naver\(inapp|line\/|fbav|fban/i.test(ua);
+    let entrySeen = false; try { entrySeen = !!localStorage.getItem(ENTRY_KEY); } catch {}
+    const markEntry = () => { try { localStorage.setItem(ENTRY_KEY, String(Date.now())); } catch {} };
+    if (!entrySeen && !inApp && ios) { setExpanded(true); markEntry(); } // iOS: 설치 API가 없어 즉시 안내 배너
+    const onBIP = (e: Event) => {
+      e.preventDefault(); deferredRef.current = e; // 조용히 보관(고의도 순간용)
+      if (!entrySeen && !inApp) { entrySeen = true; setExpanded(true); markEntry(); } // 안드/PC: 설치 가능 확인된 순간 입장 배너
+    };
     const onInstalled = () => { setExpanded(false); deferredRef.current = null; try { localStorage.setItem(DISMISS_KEY, String(Date.now() + 3650 * DAY)); } catch {} };
     const onHint = () => { if (!dismissedRecently() && (deferredRef.current || iosRef.current)) setExpanded(true); }; // 실제 설치 가능할 때만 배너
     window.addEventListener("beforeinstallprompt", onBIP);
@@ -85,9 +97,9 @@ export default function PwaInstall() {
     );
   }
 
-  // 배너(고의도 순간) — 하단 네비 위, 닫기(✕) 14일 존중
+  // 배너 — 상단 고정(CEO 지시 2026-09-04 "상단에"). 닫기(✕)는 즉시 소멸(입장 배너는 영구 1회).
   return (
-    <div className="fixed z-[1300] left-0 right-0 px-3" style={{ bottom: "calc(3.25rem + env(safe-area-inset-bottom))" }}>
+    <div className="fixed z-[1300] left-0 right-0 px-3" style={{ top: "calc(0.5rem + env(safe-area-inset-top))" }}>
       <div className="max-w-lg mx-auto bg-[#2b2018] text-[#f4ece0] rounded-2xl shadow-xl p-3.5 flex items-center gap-3">
         <div className="text-2xl leading-none">☕</div>
         <div className="flex-1 min-w-0">
