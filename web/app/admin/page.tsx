@@ -91,6 +91,7 @@ export default function AdminPage() {
   const [openSecs, setOpenSecs] = useState<Record<string, boolean>>({ tower: true, auto: true });
   // 📊 지역별 품질(CEO 지시 09-04) — 섹션을 열 때만 조회(닫혀 있으면 쿼리 0 = 비용 0)
   const [rq, setRq] = useState<any>(null);
+  const [rqDetail, setRqDetail] = useState<any>(null); // 🔍 통과율 클릭 → 미달 원인 모달(CEO 지시 09-04)
   const loadRq = () => fetch("/api/admin/region-quality", { headers: { "x-admin-password": pw }, cache: "no-store" }).then((r) => r.json()).then((d) => { if (d.ok) setRq(d); }).catch(() => {});
   const toggleSec = (k: string) => setOpenSecs((s) => ({ ...s, [k]: !s[k] }));
   const [showAnalytics, setShowAnalytics] = useState(false);
@@ -869,7 +870,10 @@ export default function AdminPage() {
                         <td className="py-1.5 pr-3 font-bold text-stone-800">{r.sido}</td>
                         <td className="pr-3 text-right">{Number(r.reg).toLocaleString()}</td>
                         <td className="pr-3 text-right font-bold">{Number(r.pub).toLocaleString()}</td>
-                        <td className={`pr-3 text-right ${Number(r.pass_pct) >= 60 ? "text-emerald-700" : "text-amber-600"}`}>{r.pass_pct}%</td>
+                        <td className="pr-3 text-right">
+                          {/* 🔍 통과율 클릭 → 미달 원인 모달(CEO 지시 09-04) */}
+                          <button onClick={() => setRqDetail(r)} className={`underline decoration-dotted underline-offset-2 cursor-pointer ${Number(r.pass_pct) >= 60 ? "text-emerald-700" : "text-amber-600"}`}>{r.pass_pct}%</button>
+                        </td>
                         <td className="pr-3 text-right">{r.ver_pct ?? 0}%</td>
                         <td className="pr-3 text-right">{r.avg_rv ?? "-"}건</td>
                         <td className={`pr-3 text-right ${pol > 0 ? "text-amber-600 font-bold" : "text-emerald-700"}`}>{pol}</td>
@@ -879,10 +883,47 @@ export default function AdminPage() {
                   })}</tbody>
                 </table>
               )}
-              <p className="text-[10px] text-stone-500 mt-2">통과율=공개/등록 · 오염신호=이름불일치(coh&lt;0.5)+맥락의심 건수 · 새 시도는 발굴 시작 시 자동 표시</p>
+              <p className="text-[10px] text-stone-500 mt-2">통과율=공개/등록 <span className="text-stone-400">(클릭하면 미달 원인)</span> · 오염신호=이름불일치(coh&lt;0.5)+맥락의심 건수 · 새 시도는 발굴 시작 시 자동 표시</p>
             </div>
           )}
         </div>
+
+        {/* 🔍 통과율 미달 원인 모달(CEO 지시 09-04) — 버킷은 상호배타(API에서 우선순위 분류) */}
+        {rqDetail && (() => {
+          const d = rqDetail;
+          const unpub = Number(d.reg) - Number(d.pub);
+          const rows: [string, number, string, string][] = [
+            ["후기 0건", d.b_rv0, "수집은 됐지만 검증 가능한 후기가 아직 없음 — 후기가 쌓이면 자동 재도전", "text-stone-700"],
+            ["후기 1~2건", d.b_rv12, `공개선 3건에 미달 — 이 중 2건(1건 차이)이 ${Number(d.b_rv2 ?? 0).toLocaleString()}곳`, "text-stone-700"],
+            ["후기 3~4건 · 신규 5건 정책", d.b_hys, "올렸다 내리기 방지 히스테리시스(08-29 결재) — 5건 도달 시 자동 공개", "text-sky-700"],
+            ["후기 5건+ · AI 판정 대기", d.b_llm, "후기는 충분, AI 맥락 판정 게이트 대기(콘솔 크레딧 재개 시 풀림)", "text-amber-700"],
+            ["후기 5건+ · 기각 이력", d.b_etc, "과거 판정에서 기각 — 명시적 복원 결정 전엔 미공개(진동 방지)", "text-stone-600"],
+            ["노이즈·보류", d.b_noise, "이름 오염·근거 0건 확정 — 품질 차단(자동 복원 없음)", "text-rose-700"],
+            ["영구 제외", d.b_excl, "비카페·프랜차이즈·업종 제외 — 사람만 해제 가능", "text-stone-500"],
+          ];
+          return (
+            <div className="fixed inset-0 z-[6100] flex items-center justify-center bg-black/60 p-3" onClick={() => setRqDetail(null)}>
+              <div className="w-full max-w-md bg-white rounded-2xl max-h-[85dvh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center justify-between px-4 py-3 border-b sticky top-0 bg-white">
+                  <span className="text-sm font-bold text-stone-800">🔍 {d.sido} 통과율 미달 원인 <span className="font-normal text-[11px] text-stone-600">미공개 {unpub.toLocaleString()}곳</span></span>
+                  <button onClick={() => setRqDetail(null)} className="text-2xl text-stone-600 leading-none">×</button>
+                </div>
+                <div className="p-4 space-y-2">
+                  {rows.filter(([, n]) => Number(n ?? 0) > 0).map(([label, n, desc, color]) => (
+                    <div key={label} className="border border-stone-200 rounded-xl p-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className={`text-[12px] font-bold ${color}`}>{label}</span>
+                        <span className="text-[13px] font-bold text-stone-800 tabular-nums">{Number(n).toLocaleString()}곳 <span className="font-normal text-[10px] text-stone-500">({Math.round((Number(n) / Math.max(unpub, 1)) * 100)}%)</span></span>
+                      </div>
+                      <p className="text-[10.5px] text-stone-600 mt-0.5">{desc}</p>
+                    </div>
+                  ))}
+                  <p className="text-[10px] text-stone-500 pt-1">후기 부족(0~2건)은 품질 문제가 아니라 시간 문제 — 재수집 순환이 돌 때마다 자동 승급됩니다. 미달 원인 중 지금 사람이 조치해서 열 수 있는 곳은 없습니다(품질 차단은 정체성).</p>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* ===== 🔄 크론 자동화 현황 (합성·판정 배치 · 10초 갱신) ===== */}
         {jstatus && (
@@ -1641,10 +1682,12 @@ export default function AdminPage() {
                             <span className="text-stone-700">최근 7일 <b>{a.favorites.last7}</b>건</span>
                           </div>
                           {(a.favorites.daily || []).length > 0 && (
-                            <div className="flex items-end gap-1 h-14 mb-2">
+                            <div className="flex items-end gap-1 h-16 mb-2">
+                              {/* 🔢 막대 위 건수 표기(2026-09-04 CEO 지시) — 막대는 70%로 스케일해 숫자 공간 확보(64px 중 라벨 18px) */}
                               {a.favorites.daily.map((d: any, i: number) => (
                                 <div key={i} className="flex-1 h-full flex flex-col items-center justify-end gap-0.5">
-                                  <div className="w-full bg-rose-400 rounded-t" style={{ height: `${(d.n / maxFav) * 100}%`, minHeight: "2px" }} title={`${d.day}: ${d.n}건`}></div>
+                                  {d.n > 0 && <span className="text-[7px] font-bold text-rose-600 leading-none tabular-nums">{d.n}</span>}
+                                  <div className="w-full bg-rose-400 rounded-t" style={{ height: `${(d.n / maxFav) * 70}%`, minHeight: "2px" }} title={`${d.day}: ${d.n}건`}></div>
                                   <span className="text-[7px] text-stone-600">{d.day.slice(3)}</span>
                                 </div>
                               ))}
@@ -1660,10 +1703,12 @@ export default function AdminPage() {
                         <div className="bg-white rounded-xl border border-stone-300 p-3">
                           <div className="text-[12px] font-bold text-stone-700">일별 방문 추이 <span className="font-normal text-stone-600 text-[10px]">최근 14일</span></div>
                           <p className="text-[9.5px] text-stone-600 mb-2">날짜별 방문자 수 — 늘고 주는 흐름을 봅니다. (막대에 마우스 올리면 상세)</p>
-                          <div className="flex items-end gap-1 h-24">
+                          <div className="flex items-end gap-1 h-28">
+                            {/* 🔢 막대 위 방문자 수 표기(2026-09-04 CEO 지시) — 막대는 82%로 스케일해 숫자 공간 확보 */}
                             {a.daily.map((d: any, i: number) => (
                               <div key={i} className="flex-1 h-full flex flex-col items-center justify-end gap-0.5">
-                                <div className="w-full bg-sky-400 rounded-t" style={{ height: `${(d.visitors / maxDaily) * 100}%`, minHeight: "2px" }} title={`${d.day}: 방문 ${d.visitors}·뷰 ${d.pageviews}`}></div>
+                                {d.visitors > 0 && <span className="text-[7px] font-bold text-sky-700 leading-none tabular-nums">{d.visitors}</span>}
+                                <div className="w-full bg-sky-400 rounded-t" style={{ height: `${(d.visitors / maxDaily) * 82}%`, minHeight: "2px" }} title={`${d.day}: 방문 ${d.visitors}·뷰 ${d.pageviews}`}></div>
                                 <span className="text-[7px] text-stone-600">{d.day.slice(3)}</span>
                               </div>
                             ))}

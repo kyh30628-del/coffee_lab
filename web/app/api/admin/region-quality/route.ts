@@ -32,7 +32,23 @@ export async function GET(req: NextRequest) {
         round(avg(synth_count) FILTER (WHERE published), 1)::float avg_rv,
         count(*) FILTER (WHERE published AND synth_coherence < 0.5)::int low_coh,
         count(*) FILTER (WHERE published AND COALESCE(offctx_rate, 0) > 0.4 AND COALESCE(offctx_ok, false) = false)::int offctx,
-        count(*) FILTER (WHERE NOT published AND synth_updated IS NULL)::int queue
+        count(*) FILTER (WHERE NOT published AND synth_updated IS NULL)::int queue,
+        -- 🔍 통과율 미달 원인 분해(CEO 지시 09-04, 통과율 클릭 모달용) — 미공개분을 상호배타 버킷으로.
+        --   버킷 우선순위: 영구제외 > 노이즈·보류 > 후기수 — 실측 검증(합계=미공개 전수)은 09-04 세션 기록.
+        count(*) FILTER (WHERE NOT published AND (pipeline_status = 'excluded' OR exclude_at IS NOT NULL))::int b_excl,
+        count(*) FILTER (WHERE NOT published AND exclude_at IS NULL AND pipeline_status IN ('noise','held'))::int b_noise,
+        count(*) FILTER (WHERE NOT published AND exclude_at IS NULL AND COALESCE(pipeline_status,'') NOT IN ('excluded','noise','held')
+          AND COALESCE(synth_count, 0) = 0)::int b_rv0,
+        count(*) FILTER (WHERE NOT published AND exclude_at IS NULL AND COALESCE(pipeline_status,'') NOT IN ('excluded','noise','held')
+          AND synth_count IN (1, 2))::int b_rv12,
+        count(*) FILTER (WHERE NOT published AND exclude_at IS NULL AND COALESCE(pipeline_status,'') NOT IN ('excluded','noise','held')
+          AND synth_count = 2)::int b_rv2,
+        count(*) FILTER (WHERE NOT published AND exclude_at IS NULL AND COALESCE(pipeline_status,'') NOT IN ('excluded','noise','held')
+          AND synth_count IN (3, 4))::int b_hys,
+        count(*) FILTER (WHERE NOT published AND exclude_at IS NULL AND COALESCE(pipeline_status,'') NOT IN ('excluded','noise','held')
+          AND synth_count >= 5 AND needs_llm)::int b_llm,
+        count(*) FILTER (WHERE NOT published AND exclude_at IS NULL AND COALESCE(pipeline_status,'') NOT IN ('excluded','noise','held')
+          AND synth_count >= 5 AND NOT COALESCE(needs_llm, false))::int b_etc
       FROM cafes WHERE CASE ${caseExpr} END IS NOT NULL
       GROUP BY 1 ORDER BY 3 DESC`)) as any[];
     return NextResponse.json({ ok: true, rows, at: new Date().toISOString() }, { headers: { "Cache-Control": "no-store" } });
