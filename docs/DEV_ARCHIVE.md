@@ -306,3 +306,4 @@
 | 2026-09-03 23:36 | #945 | [자율진단] decisions.status=proposed 반복 이탈 — 결재큐 스키마 방어 필요 | 09054f9c | - | app/api/admin/decisions/route.ts ensure()에 trg_decisions_normalize_status BEFORE INSERT 트리거 추가(#400  |
 | 2026-09-04 05:47 | #959 | [검색UX] "노키즈존" 검색 0건 — CONCEPTS 축 미등재(3주기 관찰 후 원인 확정) | 1806a907 | - | lib/criteriaListsBase.ts(char.nokids.kws·concept.nokids.triggers 신설)·lib/charScore.ts(CHAR_AXES에 nok |
 | 2026-09-04 07:30 | #928 | [룰갭 신규] COMMON_WORD_NAMES 미등재 "우리동네봄날" — "우리동네 OO" 관용구 동음충돌  | a6aaef3b | - | web/lib/reviewQuality.ts COMMON_WORD_NAMES에 "우리동네봄날" 추가(id2812 우리동네 봄날, 술집/타카페 솔빛로/활어식당 혼입 offctx 0. |
+| 2026-09-04 23:05 | #973 | [룰갭 신규] COMMON_WORD_NAMES 미등재 "커피파는집"·"작은디저트가게" — 서술구 카페명 동음 | 038e9666 | - | lib/reviewQuality.ts COMMON_WORD_NAMES에 커피파는집·작은디저트가게 추가(id16648·id2237 서술구 동음충돌 차단). tsc --noEmit 0 |
