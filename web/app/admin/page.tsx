@@ -89,6 +89,9 @@ export default function AdminPage() {
   // 본체 대시보드: 핵심 운영 섹션(관제탑·자동화 현황)은 기본 펼침, 나머지는 접힘(CEO 확정 2026-07-02).
   //   '전부 접힘'은 org(조직 관제) 전용 규율 — 본체는 운영상태를 한눈에 봐야 해 핵심만 펼친다.
   const [openSecs, setOpenSecs] = useState<Record<string, boolean>>({ tower: true, auto: true });
+  // 📊 지역별 품질(CEO 지시 09-04) — 섹션을 열 때만 조회(닫혀 있으면 쿼리 0 = 비용 0)
+  const [rq, setRq] = useState<any>(null);
+  const loadRq = () => fetch("/api/admin/region-quality", { headers: { "x-admin-password": pw }, cache: "no-store" }).then((r) => r.json()).then((d) => { if (d.ok) setRq(d); }).catch(() => {});
   const toggleSec = (k: string) => setOpenSecs((s) => ({ ...s, [k]: !s[k] }));
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [analytics, setAnalytics] = useState<any>(null);
@@ -843,6 +846,43 @@ export default function AdminPage() {
             </>
           );
         })()}
+
+        {/* ===== 📊 지역별 품질 현황 (CEO 지시 2026-09-04 — 확장 지역이 수도권 동급인지 상시 확인) ===== */}
+        <div className="mb-6 rounded-2xl border border-stone-300 bg-white p-4 sm:p-5">
+          <button onClick={() => { toggleSec("rq"); if (!rq) loadRq(); }} className="w-full flex items-center justify-between text-left">
+            <span className="admin-section-title font-extrabold text-stone-800">{openSecs.rq ? "▾" : "▸"} 📊 지역별 품질 현황 <span className="normal-case font-normal text-stone-600">· 통과율·검증비율·오염 (열 때 갱신)</span></span>
+            <span className="text-[10px] text-stone-600 shrink-0">{openSecs.rq ? "접기" : "보기"}</span>
+          </button>
+          {openSecs.rq && (
+            <div className="mt-3 overflow-x-auto">
+              {!rq ? <p className="text-[12px] text-stone-500">불러오는 중…</p> : (
+                <table className="w-full text-[12px] whitespace-nowrap">
+                  <thead><tr className="text-left text-stone-500 border-b border-stone-200">
+                    <th className="py-1.5 pr-3">지역</th><th className="pr-3 text-right">등록</th><th className="pr-3 text-right">공개</th>
+                    <th className="pr-3 text-right">통과율</th><th className="pr-3 text-right">검증등급</th><th className="pr-3 text-right">평균후기</th>
+                    <th className="pr-3 text-right">오염신호</th><th className="pr-3 text-right">대기</th>
+                  </tr></thead>
+                  <tbody>{rq.rows.map((r: any) => {
+                    const pol = (r.low_coh ?? 0) + (r.offctx ?? 0);
+                    return (
+                      <tr key={r.sido} className="border-b border-stone-100">
+                        <td className="py-1.5 pr-3 font-bold text-stone-800">{r.sido}</td>
+                        <td className="pr-3 text-right">{Number(r.reg).toLocaleString()}</td>
+                        <td className="pr-3 text-right font-bold">{Number(r.pub).toLocaleString()}</td>
+                        <td className={`pr-3 text-right ${Number(r.pass_pct) >= 60 ? "text-emerald-700" : "text-amber-600"}`}>{r.pass_pct}%</td>
+                        <td className="pr-3 text-right">{r.ver_pct ?? 0}%</td>
+                        <td className="pr-3 text-right">{r.avg_rv ?? "-"}건</td>
+                        <td className={`pr-3 text-right ${pol > 0 ? "text-amber-600 font-bold" : "text-emerald-700"}`}>{pol}</td>
+                        <td className="pr-3 text-right text-stone-500">{r.queue ?? 0}</td>
+                      </tr>
+                    );
+                  })}</tbody>
+                </table>
+              )}
+              <p className="text-[10px] text-stone-500 mt-2">통과율=공개/등록 · 오염신호=이름불일치(coh&lt;0.5)+맥락의심 건수 · 새 시도는 발굴 시작 시 자동 표시</p>
+            </div>
+          )}
+        </div>
 
         {/* ===== 🔄 크론 자동화 현황 (합성·판정 배치 · 10초 갱신) ===== */}
         {jstatus && (

@@ -7,7 +7,7 @@ for (const l of env.split("\n")) { const m = l.match(/^([A-Z_0-9]+)=(.*)$/); if 
 const { neon } = await import("@neondatabase/serverless");
 const { computeCharScores } = await import("../lib/charScore.ts");
 const sql = neon(process.env.DATABASE_URL);
-const NEW_AXES = ["bakery", "terrace"]; // 2026-08-27 2차 확장(1차: pet/brunch/view 08-13 완료)
+const NEW_AXES = ["nokids"]; // 2026-09-04 3차 소급(decisions#977, L2 전결) — bakery/terrace는 08-27 기완료라 재소급 불요
 const rows = await sql`
   SELECT id, name, jsonb_path_query_array(synth_reviews, '$[*].quote') quotes
   FROM cafes WHERE published AND synth_reviews IS NOT NULL`;
