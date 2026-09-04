@@ -15,6 +15,7 @@ const env = readFileSync("./.env.local", "utf8");
 for (const l of env.split("\n")) { const m = l.match(/^([A-Z_0-9]+)=(.*)$/); if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^["']|["']$/g, ""); }
 const { neon } = await import("@neondatabase/serverless");
 const { synthAndStore } = await import("../lib/synthStore.ts");
+const { isFranchise, isNonCafe } = await import("../lib/discover.ts");
 const { naverBlocked, naverUsedToday, NAVER_DAILY_QUOTA } = await import("../lib/naverBudget.ts");
 const sql = neon(process.env.DATABASE_URL);
 
@@ -24,6 +25,16 @@ const FILTER = arg("filter", "");
 const label = `[${SHARD}/${OF}]`;
 
 let done = 0, err = 0, consecErr = 0, stale = 0, batches = 0, baselineUsed = 0;
+// ♻️ 레버2(CEO 승인 2026-09-04): 신규 큐가 비면 '아깝게 미달' 카페를 재수집한다(놀던 창 활용).
+//   대상 = 미공개·비차단(제외/노이즈/보류 아님)·검증후기 1~4건. 공개선은 신규 5건(히스테리시스)이라
+//   4건(1건 차이)→3건→2건→1건 순으로 뽑는다. 신규 지역 수집이 항상 우선(큐가 비었을 때만 돈다).
+//   💰 상한 = 샤드·창당 NEARMISS_CAP(기본 12 → 2샤드×4창=하루 최대 96곳). 쿼터는 기존
+//   크론 예약(CRON_RESERVE) 가드가 그대로 덮고, 로컬 실행이라 Vercel 과금 0.
+//   ⚠️ 쿼터 소진 시 gatherRaw가 apiFailed로 빠져 raw_checked_at이 안 찍힌다 → 같은 행이
+//   무한 재선택되는 것을 in-memory nearTried로 차단(신규 큐의 12h 가드와 같은 역할).
+const NEARMISS_CAP = Number(process.env.NEARMISS_CAP || 12);
+let nearDone = 0;
+const nearTried = new Set();
 const CALL_PER_CAFE_STOP = Number(process.env.CALL_PER_CAFE_STOP || 15); // 정상 ~5콜의 3배
 const CRON_RESERVE = Number(process.env.COLLECT_CRON_RESERVE || 2000); // 평판점검·폐업확인 크론 몫
 // ⏰ 창(window) 데드라인 — 정지 조건에 '시간'이 없어 120분 창이 지켜지지 않던 것을 막는다(2026-08-27).
@@ -44,7 +55,7 @@ for (;;) {
   //   강원은 지금 공개가 140곳뿐이라 한 곳이 늘 때 사용자 체감이 크고, 수도권은 이미 13,494곳이 공개돼 있어
   //   적체가 며칠 늦어져도 화면이 비지 않는다. ORDER BY로만 우선순위를 주고 큐는 하나로 유지한다
   //   (큐를 나누면 강원이 끝난 뒤 워커가 놀거나, 필터를 지우는 걸 잊어 수도권이 영영 안 도는 사고가 난다).
-  const rows = FILTER
+  let rows = FILTER
     // 🔒 이중 안전판(2026-08-26): 방금 확인한 카페는 다시 집지 않는다. raw_reviews가 NULL로 남는
     //   경로가 하나라도 생기면 같은 카페를 무한 재수집하며 쿼터를 태운다(실제로 그랬다).
     ? await sql`SELECT id, name, area FROM cafes WHERE raw_reviews IS NULL AND pipeline_status='new'
@@ -54,12 +65,38 @@ for (;;) {
         AND (raw_checked_at IS NULL OR raw_checked_at < now() - interval '12 hours')
         AND (id % ${OF}) = ${SHARD}
         ORDER BY (address LIKE '강원%') DESC, id LIMIT 20`;
-  if (!rows.length) { console.log(`${label} 큐 소진 — 완료 ${done}곳`); break; }
+  // ♻️ 레버2 2순위 큐 — 신규 큐가 완전히 빈 뒤에만, 필터 없는 일반 창에서만, 상한 안에서만.
+  //   (FILTER 창은 확장 지역 전용이라 순수하게 둔다 — 대량배치 예산 계산이 흐려지면 안 됨.)
+  let tier = "new";
+  if (!rows.length && !FILTER && nearDone < NEARMISS_CAP) {
+    rows = await sql`SELECT id, name, area FROM cafes
+      WHERE published = false AND synth_count IN (1, 2, 3, 4)
+        AND COALESCE(pipeline_status, '') NOT IN ('excluded', 'noise', 'held') AND exclude_at IS NULL
+        AND raw_reviews IS NOT NULL
+        AND (raw_checked_at IS NULL OR raw_checked_at < now() - interval '14 days')
+        AND NOT (id = ANY(${[...nearTried, -1]}))
+        AND (id % ${OF}) = ${SHARD}
+      ORDER BY synth_count DESC, raw_checked_at ASC NULLS FIRST, id
+      LIMIT ${Math.min(10, NEARMISS_CAP - nearDone)}`;
+    // 🚫 낭비 차단(09-04 드라이런 실측): 풀 선두에 파리바게뜨·메가MGC 등이 섞여 있었다 —
+    //   프랜차이즈·명백한 비카페는 재수집해도 공개 게이트에서 영원히 탈락하므로 뽑는 즉시 거른다.
+    //   (nearTried에는 넣어 같은 창에서 재선택 안 되게 한다. 상한은 실제 재수집한 곳만 소모.)
+    if (rows.length) {
+      rows.forEach((r) => nearTried.add(r.id));
+      const picked = rows.length;
+      rows = rows.filter((r) => !isFranchise(r.name) && !isNonCafe(r.name, ""));
+      // 배치가 통째로 걸러졌으면 '큐 소진'이 아니다 — 다음 후보를 다시 뽑는다(nearTried가 전진 보장).
+      if (!rows.length && picked > 0) continue;
+    }
+    if (rows.length) tier = "near";
+  }
+  if (!rows.length) { console.log(`${label} 큐 소진 — 완료 ${done}곳${nearDone ? ` (미달재수집 ${nearDone})` : ""}`); break; }
   for (const c of rows) {
     // 배치(20곳)가 도는 중에도 창을 넘기면 즉시 멈춘다 — 배치 단위로만 보면 최대 2분을 초과한다.
     if (overDeadline()) { console.log(`${label} ⏰ 창 종료(${deadlineLabel()}) — 배치 중단. 확보 ${done}곳`); break; }
-    try { await synthAndStore(c, { refresh: false }); done++; consecErr = 0; }
-    catch (e) { err++; consecErr++; if (err <= 3) console.log(`${label} ✗ ${c.name}: ${String(e).slice(0, 50)}`); }
+    // 미달 재수집은 refresh:true(캐시 무시·새 글 수집) — 신규는 기존대로 false(raw 없어서 어차피 수집).
+    try { await synthAndStore(c, { refresh: tier === "near" }); done++; consecErr = 0; if (tier === "near") nearDone++; }
+    catch (e) { err++; consecErr++; if (tier === "near") nearDone++; if (err <= 3) console.log(`${label} ✗ ${c.name}: ${String(e).slice(0, 50)}`); }
     if (consecErr >= 10) { console.log(`${label} 연속 오류 10회 — 중단(재실행시 재개)`); process.exit(0); }
   }
   // 🚨 효율 자동 차단(2026-08-26) — **낭비를 사람이 발견하기 전에 워커가 스스로 멈춘다.**
