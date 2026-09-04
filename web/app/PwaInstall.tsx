@@ -37,15 +37,18 @@ export default function PwaInstall() {
     const ios = /iphone|ipad|ipod/i.test(ua); // iOS는 설치창 없음 → 안내만
     iosRef.current = ios; setIsIOS(ios);
 
-    // 입장 1회 노출 판단 — 인앱 브라우저(인스타·카톡 등)는 설치가 불가능하니 제외(헛배너 방지)
+    // 입장 1회 노출 — 🔴 2026-09-04 2차 수리(CEO "안 나와"):
+    //   1차 설계는 안드/PC를 beforeinstallprompt 신호에 걸었는데, 그 신호는 브라우저 재량이다 —
+    //   시크릿 창·파이어폭스·크롬이 조용히 억제하는 경우 등에서 **영영 안 뜬다**(실제로 안 떴다).
+    //   배너 노출을 신호에 의존하지 않는다: 자격(미설치·인앱 아님·최초)만 되면 **즉시 띄운다**.
+    //   [설치] 클릭 시점에 신호가 있으면 네이티브 설치창, 없으면 플랫폼별 수동 안내(아래 install()).
     const inApp = /instagram|kakaotalk|naver\(inapp|line\/|fbav|fban/i.test(ua);
     let entrySeen = false; try { entrySeen = !!localStorage.getItem(ENTRY_KEY); } catch {}
-    const markEntry = () => { try { localStorage.setItem(ENTRY_KEY, String(Date.now())); } catch {} };
-    if (!entrySeen && !inApp && ios) { setExpanded(true); markEntry(); } // iOS: 설치 API가 없어 즉시 안내 배너
-    const onBIP = (e: Event) => {
-      e.preventDefault(); deferredRef.current = e; // 조용히 보관(고의도 순간용)
-      if (!entrySeen && !inApp) { entrySeen = true; setExpanded(true); markEntry(); } // 안드/PC: 설치 가능 확인된 순간 입장 배너
-    };
+    if (!entrySeen && !inApp) {
+      setExpanded(true);
+      try { localStorage.setItem(ENTRY_KEY, String(Date.now())); } catch {}
+    }
+    const onBIP = (e: Event) => { e.preventDefault(); deferredRef.current = e; }; // 신호는 조용히 보관 — 클릭 시 사용
     const onInstalled = () => { setExpanded(false); deferredRef.current = null; try { localStorage.setItem(DISMISS_KEY, String(Date.now() + 3650 * DAY)); } catch {} };
     const onHint = () => { if (!dismissedRecently() && (deferredRef.current || iosRef.current)) setExpanded(true); }; // 실제 설치 가능할 때만 배너
     window.addEventListener("beforeinstallprompt", onBIP);
@@ -63,7 +66,7 @@ export default function PwaInstall() {
   const install = async () => {
     if (iosRef.current) { setIosGuide(true); setExpanded(false); return; } // iOS는 안내만
     const d = deferredRef.current;
-    if (!d) return;
+    if (!d) { setIosGuide(true); setExpanded(false); return; } // 신호 없음(브라우저 억제) → 수동 안내로 폴백
     try {
       d.prompt();
       const res = await d.userChoice;
@@ -85,12 +88,25 @@ export default function PwaInstall() {
             <div className="font-bold text-[#2b2018] text-[15px]">📲 홈 화면에 추가하기</div>
             <button onClick={dismiss} className="w-8 h-8 rounded-full bg-[#f0e6d4] text-[#594839] text-lg">×</button>
           </div>
-          <ol className="space-y-2.5 text-[13px] text-[#4a3a2a] leading-relaxed">
-            <li>1. 하단(또는 상단)의 <b>공유 버튼 <span style={{ color: "#2f6fb0" }}>⬆︎</span></b>를 누르세요.</li>
-            <li>2. 메뉴에서 <b>‘홈 화면에 추가’</b>를 선택하세요.</li>
-            <li>3. 오른쪽 위 <b>‘추가’</b>를 누르면 바탕화면에 아이콘이 생겨요.</li>
-          </ol>
-          <div className="mt-3 text-[11px] text-[#665036]">※ 아이폰은 <b>Safari</b>에서만 홈 화면에 추가할 수 있어요.</div>
+          {isIOS ? (
+            <>
+              <ol className="space-y-2.5 text-[13px] text-[#4a3a2a] leading-relaxed">
+                <li>1. 하단(또는 상단)의 <b>공유 버튼 <span style={{ color: "#2f6fb0" }}>⬆︎</span></b>를 누르세요.</li>
+                <li>2. 메뉴에서 <b>‘홈 화면에 추가’</b>를 선택하세요.</li>
+                <li>3. 오른쪽 위 <b>‘추가’</b>를 누르면 바탕화면에 아이콘이 생겨요.</li>
+              </ol>
+              <div className="mt-3 text-[11px] text-[#665036]">※ 아이폰은 <b>Safari</b>에서만 홈 화면에 추가할 수 있어요.</div>
+            </>
+          ) : (
+            <>
+              <ol className="space-y-2.5 text-[13px] text-[#4a3a2a] leading-relaxed">
+                <li>1. 브라우저 오른쪽 위 <b>메뉴(⋮)</b>를 누르세요.</li>
+                <li>2. <b>‘앱 설치’</b> 또는 <b>‘홈 화면에 추가’</b>를 선택하세요.</li>
+                <li>3. <b>‘설치’</b>를 누르면 홈 화면에 아이콘이 생겨요.</li>
+              </ol>
+              <div className="mt-3 text-[11px] text-[#665036]">※ Chrome·삼성 인터넷에서 가능해요. 시크릿 창에서는 안 돼요.</div>
+            </>
+          )}
           <button onClick={dismiss} className="w-full mt-4 bg-[#2b2018] text-[#f4ece0] rounded-xl py-3 font-medium">알겠어요</button>
         </div>
       </div>
