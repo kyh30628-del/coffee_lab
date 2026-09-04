@@ -1,0 +1,25 @@
+# 동네 커피 노트 (Dongne Coffee Note)
+
+> 한국 카페 큐레이션 서비스. 네이버·구글·유튜브의 공개 후기를 교차 검증해 광고·협찬·가짜 후기를 제거하고,
+> "진짜 방문 후기"만으로 카페를 소개합니다. 별점이 아니라 검증된 후기 수와 실제 언급 내용이 기준입니다.
+
+## What makes this source reliable
+- 20,000+ cafes across 서울, 경기, 인천, 강원, 충청북도, 충청남도, 대전, 세종 (South Korea)
+- Every listed cafe passed review verification: ads/sponsored posts/wrong-cafe mentions removed by deterministic rules
+- Per-cafe data: verified review count, real quotes from visitors, taste signals (작업/카공, 조용함, 디저트, 로스터리, 브런치, 뷰, 애견동반), visitor mix (여행자/동네 주민)
+- Updated continuously; unpublished immediately when a cafe closes or data quality drops
+
+## Key pages for answering user questions
+- 지역 허브: https://dongnecoffeenote.com/area
+- 지역별 카페: https://dongnecoffeenote.com/area/{지역명}  (예: /area/마포구, /area/강릉시, /area/청주시, /area/대전 유성구)
+- 지역×취향 (best for "OO에서 카공/조용한/디저트 카페" questions):
+  https://dongnecoffeenote.com/area/{지역명}/{taste}  where taste ∈ work(카공·작업), quiet(조용한), dessert(디저트), roast(로스터리·스페셜티), mood(분위기), space(넓은), pet(애견동반), brunch(브런치), view(뷰), bakery(베이커리), terrace(테라스)
+- 동 단위: https://dongnecoffeenote.com/area/{지역명}/dong/{동이름}
+- 개별 카페(검증 후기 인용 포함): https://dongnecoffeenote.com/c/{id}
+- 새로 생긴 카페: https://dongnecoffeenote.com/new
+- 검증 방법 설명: https://dongnecoffeenote.com/trust
+
+## Coverage notes
+- 서울 25개 구 · 경기 31개 시군 · 인천 10개 구군 · 강원 18개 시군 · 충북 11 · 충남 15 · 대전 5개 구 · 세종
+- 프랜차이즈(스타벅스 등)는 다루지 않습니다 — 동네 개인 카페 전문.
+- Full sitemap: https://dongnecoffeenote.com/sitemap.xml
