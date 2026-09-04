@@ -48,6 +48,11 @@ export const LIST_META: ListMeta[] = [
     items: ["테라스", "루프탑", "야외 좌석", "야외좌석", "야외 테이블", "야외석", "노천", "야장"] },
   { key: "char.view.kws", category: "성향축", label: "성향축: 뷰 🌄", consumer: "charScore.computeCharScores",
     items: ["오션뷰", "시티뷰", "한강뷰", "리버뷰", "산뷰", "논뷰", "숲뷰", "바다뷰", "호수뷰", "노을뷰", "야경뷰", "뷰맛집", "뷰 맛집", "뷰가 좋", "뷰가 예쁘", "뷰가 이쁘", "전망이 좋", "창밖 풍경", "탁 트인"] },
+  // decisions#959(2026-09-04): "노키즈존" 검색 0건 — lib/cafeProfile.ts(HIGHLIGHTS)·lib/categoryDiscover.ts엔
+  //   이미 있는데 검색 개념축(concept.nokids.triggers 아래)엔 없어 트리거 사전에서 누락돼 있었다.
+  //   ⚠️ 신설 축이라 기존 카페의 char_scores엔 즉시 반영 안 됨 — scripts/backfill-newaxes.mjs류 1회성 소급 필요.
+  { key: "char.nokids.kws", category: "성향축", label: "성향축: 노키즈존 🚸", consumer: "charScore.computeCharScores",
+    items: ["노키즈존", "노키즈 존", "노키즈"] },
 
   // ── 맛 3축 신호어 (lib/synthEngine.ts · SIGNALS/AMBIGUOUS) — 맛 좌표(산미·바디·단맛) 직접형성 ──
   { key: "taste.acidity.strong", category: "맛축", label: "맛: 산미 강신호", consumer: "synthEngine.synthesize",
@@ -134,6 +139,9 @@ export const LIST_META: ListMeta[] = [
     items: ["테라스", "루프탑", "야외", "노천", "야장"] },
   { key: "concept.view.triggers", category: "검색개념", label: "개념: 뷰 좋은", consumer: "search.route",
     items: ["뷰맛집", "뷰 좋은", "뷰좋은", "한강뷰", "리버뷰", "오션뷰", "시티뷰", "전망 좋은", "창밖", "노을", "야경"] },
+  // decisions#959: search_log 실사용자 질의("노키즈존")가 3사이클 연속 0건이었다 — 개념 미등재가 근본원인.
+  { key: "concept.nokids.triggers", category: "검색개념", label: "개념: 노키즈존", consumer: "search.route",
+    items: ["노키즈존", "노키즈", "노 키즈존", "노키즈카페"] },
   { key: "concept.acidity.triggers", category: "검색개념", label: "개념: 산미 또렷", consumer: "search.route",
     items: ["산미", "상큼", "과일", "베리", "시트러스", "플로럴", "꽃향", "새콤", "산뜻", "후르츠"] },
   { key: "concept.body.triggers", category: "검색개념", label: "개념: 묵직·고소", consumer: "search.route",

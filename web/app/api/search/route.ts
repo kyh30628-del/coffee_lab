@@ -45,6 +45,9 @@ const CONCEPTS_BASE: { id: string; triggersKey: string; axis?: string; taste?: s
   { id: "view", triggersKey: "concept.view.triggers", axis: "view", label: "뷰 좋은" },
   { id: "bakery", triggersKey: "concept.bakery.triggers", axis: "bakery", uses: ["빵"], label: "베이커리" }, // 2026-08-27 신설
   { id: "terrace", triggersKey: "concept.terrace.triggers", axis: "terrace", label: "테라스·야외" }, // 2026-08-27 신설
+  // decisions#959(2026-09-04): "노키즈존" 검색 3사이클 연속 0건 — 개념 트리거 사전 미등재가 근본원인이었다.
+  //   신설 축이라 기존 카페 char_scores 소급(scripts/backfill-newaxes.mjs류)은 별도 데이터 작업 필요.
+  { id: "nokids", triggersKey: "concept.nokids.triggers", axis: "nokids", label: "노키즈존" },
   { id: "acidity", triggersKey: "concept.acidity.triggers", taste: "acidity", label: "산미 또렷" },
   { id: "body", triggersKey: "concept.body.triggers", taste: "body", label: "묵직·고소" },
   { id: "sweet", triggersKey: "concept.sweet.triggers", taste: "sweet", label: "단맛" },
