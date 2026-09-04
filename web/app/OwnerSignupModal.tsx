@@ -120,6 +120,7 @@ export default function OwnerSignupModal({ open, onClose, trial = false, prefill
             {/* 사업자등록증 이미지(필수) — 사칭 방지 증빙 */}
             <label className="block mb-2">
               <div className="text-[11.5px] font-bold text-[#52402e] mb-1">사업자등록증 사진 <span className="text-[#c0392b]">(필수)</span></div>
+              <p className="text-[10.5px] text-[#82714f] mb-1">🔒 가게 확인 용도로만 사용되고, 외부에 공개되지 않아요.</p>
               <div className="flex items-center gap-2">
                 <span className="shrink-0 rounded-lg bg-[#2b2018] text-[#f4ece0] text-[12px] font-bold px-3 py-2">{bizRegBase64 ? "다시 선택" : "📷 이미지 선택"}</span>
                 <span className="text-[11px] text-[#665036] truncate">{bizRegName || "대표자명·상호가 보이게 촬영/스캔"}</span>
