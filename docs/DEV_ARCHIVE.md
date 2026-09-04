@@ -304,3 +304,4 @@
 | 2026-09-03 07:46 | #931 | [정책개선] costwatch 데이터전송 임계 절대값→상대값 전환 검토 | 4cf89164 | - | app/api/cron-costwatch/route.ts: 전송량 임계(TOTAL_GB_ALERT 고정 25GB)를 가동시간 워치독과 동일 패턴(최근 7일 중앙값×1.6배, 이력없 |
 | 2026-09-03 07:47 | #950 | [개발] 협업 #365: /api/cron-sentinel 무응답(hang) — 어제까지의 빠른 cost-h | b33b57de | - | app/api/cron-sentinel/route.ts: 재진입(reentrancy) 가드 추가(heal_leases 재사용, target_id=-1 예약, ttl=320s). 원 |
 | 2026-09-03 23:36 | #945 | [자율진단] decisions.status=proposed 반복 이탈 — 결재큐 스키마 방어 필요 | 09054f9c | - | app/api/admin/decisions/route.ts ensure()에 trg_decisions_normalize_status BEFORE INSERT 트리거 추가(#400  |
+| 2026-09-04 05:47 | #959 | [검색UX] "노키즈존" 검색 0건 — CONCEPTS 축 미등재(3주기 관찰 후 원인 확정) | 1806a907 | - | lib/criteriaListsBase.ts(char.nokids.kws·concept.nokids.triggers 신설)·lib/charScore.ts(CHAR_AXES에 nok |
