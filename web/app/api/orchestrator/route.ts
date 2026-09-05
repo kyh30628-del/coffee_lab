@@ -524,9 +524,10 @@ export async function GET(req: NextRequest) {
       //   정체성없음(pub_noidentity)·그라운딩의심·근거0확정 어느 그물에도 안 걸려 방치되던 사각(검증 fail의 정체).
       //   raw 있으면 재합성으로 근거 복구, 그래도 0이면 비공개(근거 없는 노출 차단). 대량이면 합성회귀로 보고 자동행동 중단·경보.
       try {
+        // 💰 2026-09-05(CEO 승인 수리): jsonb_array_length 전수 디토스트 → 파생컬럼 synth_ev_n(트리거 유지)로 교체.
         const orphans = (await sql`SELECT id, name, area FROM cafes
           WHERE published AND raw_reviews IS NOT NULL
-            AND (synth_reviews IS NULL OR jsonb_array_length(synth_reviews) = 0)
+            AND COALESCE(synth_ev_n, 0) = 0
           ORDER BY id LIMIT 31`) as any[];
         if (orphans.length > 30) {
           integrity.push(`🚨orphan_published 급증(${orphans.length}곳+) — 합성 회귀 의심, 자동교정 중단·즉시 점검`);

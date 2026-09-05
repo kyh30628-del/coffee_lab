@@ -14,6 +14,14 @@
 #   쿼터는 적체 가드(discoveryMayRun)가 발굴을 막아 통째로 남겨준다 — 늦게 시작해도 손해가 없다.
 cd "$(dirname "$0")/.." || exit 1
 export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+# 🌙 새벽 하드가드(2026-09-05, CEO 절대지시 "새벽에 DB 깨우지 마라") — 스케줄이 어떻게 드리프트해도
+#   08시 전에는 무조건 침묵. 실제 사고: plist가 문서(08:15)와 달리 06:05로 옮겨져 있어 매일 새벽 6시에
+#   DB를 깨워 일했다(9/5 06:09 원장 실측). 스케줄은 08:05로 정정했고, 이 가드는 이중 안전판이다.
+H=$((10#$(date +%H)))   # 10# = 강제 10진수("08"의 8진수 오해 방지)
+if [ "$H" -lt 8 ]; then
+  echo "[$(date '+%F %T')] 🌙 새벽 가드 — 08시 전 실행 차단(스킵)" >> /tmp/coffee-collect-catchup.log
+  exit 0
+fi
 LOG="/tmp/coffee-collect-catchup.log"
 LOCK="/tmp/coffee-collect-catchup.lock"
 
