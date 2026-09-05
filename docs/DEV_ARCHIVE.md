@@ -309,3 +309,4 @@
 | 2026-09-04 23:05 | #973 | [룰갭 신규] COMMON_WORD_NAMES 미등재 "커피파는집"·"작은디저트가게" — 서술구 카페명 동음 | 038e9666 | - | lib/reviewQuality.ts COMMON_WORD_NAMES에 커피파는집·작은디저트가게 추가(id16648·id2237 서술구 동음충돌 차단). tsc --noEmit 0 |
 | 2026-09-05 00:07 | #949 | [룰갭 신규] 베이킹·쿠킹 클래스 스튜디오가 카페로 자기등록 — CRAFT_WORKSHOP_ACTIVITY  | 1c5a7dee | - | lib/reviewQuality.ts CRAFT_WORKSHOP_ACTIVITY 정규식에 베이킹/쿠킹 클래스 어휘(키즈베이킹(클래스)?, 베이킹/쿠킹 클래스 수업, 원데이 쿠킹)  |
 | 2026-09-05 00:08 | #978 | [사장님영업] 체험신청 모달 사업자등록증 업로드 마찰 — modal_open 4건 중 submit 0건(서버 | 794ad186 | - | app/OwnerSignupModal.tsx: 사업자등록증 업로드 필드 제목 아래 안심 카피 1줄 추가 (🔒 가게 확인 용도로만 사용되고, 외부에 공개되지 않아요). 안 A —  |
+| 2026-09-05 00:09 | #979 | [검색UX 근본원인] 개념전용 질의가 임베딩 top-80 후보풀에 갇혀 char_scores 축 매칭 기회  | c0468177 | - | app/api/search/route.ts semantic 경로: 개념축 질의(hitConcepts에 axis 있음) 시 top-80 임베딩 후보에 char_scores 해당 축> |
