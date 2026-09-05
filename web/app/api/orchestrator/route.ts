@@ -88,12 +88,33 @@ export async function GET(req: NextRequest) {
       -- 🧬 2026-09-03: 지문 게이트 도입으로 '변화 없는 카페는 30일 안전망까지 안 읽는 게 정상'이 됐다.
       --   21일 창을 그대로 두면 정상 카페 수천 곳이 순차적으로 '누락'으로 잡힌다 → 32일(안전망+여유)로.
       COUNT(*) FILTER (WHERE published AND synth_checked_at < now() - interval '32 days')::int synth_stuck,
-      COUNT(*) FILTER (WHERE published AND synth_checked_at IS NULL)::int synth_never
+      COUNT(*) FILTER (WHERE published AND synth_checked_at IS NULL)::int synth_never,
+      -- 💰 2026-09-05(CEO 승인 다이어트 ④): 아래 지표들이 각각 별도 풀스캔(회당 ~30MB × 회 12회/일)이던 것을
+      --   이 단일 패스에 흡수. 스캔 10회 → 4회(이 쿼리 + published범위 ig + GROUP BY 2개).
+      COUNT(*) FILTER (WHERE published AND synth_grade='검증' AND (llm_judged_at IS NULL OR llm_judged_at < raw_collected_at))::int verified_skip,
+      COUNT(*) FILTER (WHERE published AND audit_checked_at >= now() - interval '7 days')::int audit_a7,
+      MAX(audit_checked_at) last_audit,
+      COUNT(*) FILTER (WHERE published AND offctx_rate >= 0.55 AND NOT COALESCE(offctx_ok, false))::int offctx_n,
+      COUNT(*) FILTER (WHERE published AND dong IS NULL)::int pub_nd,
+      COUNT(*) FILTER (WHERE published AND (naver_category IS NULL OR naver_category=''))::int pub_nocat,
+      COUNT(*) FILTER (WHERE pipeline_status='new')::int p_new,
+      COUNT(*) FILTER (WHERE pipeline_status='new')::int new_q,
+      COUNT(*) FILTER (WHERE pipeline_status='pending')::int p_pending,
+      COUNT(*) FILTER (WHERE pipeline_status='pending' AND llm_judged_at IS NULL)::int wait_judge,
+      COUNT(*) FILTER (WHERE pipeline_status='pending' AND llm_judged_at IS NOT NULL AND embedding IS NULL)::int wait_embed,
+      COUNT(*) FILTER (WHERE pipeline_status='pending' AND llm_judged_at IS NOT NULL AND embedding IS NOT NULL)::int ready,
+      COUNT(*) FILTER (WHERE pipeline_status='live')::int live,
+      COUNT(*) FILTER (WHERE pipeline_status='rejected')::int rejected,
+      COUNT(*) FILTER (WHERE pipeline_status='noise')::int noise,
+      COUNT(*) FILTER (WHERE synth_updated >= date_trunc('day', now() AT TIME ZONE 'Asia/Seoul') AT TIME ZONE 'Asia/Seoul')::int synth_today,
+      COUNT(*) FILTER (WHERE published AND created_at >= date_trunc('day', now() AT TIME ZONE 'Asia/Seoul') AT TIME ZONE 'Asia/Seoul')::int published_today,
+      COUNT(*) FILTER (WHERE dong IS NOT NULL)::int has_dong,
+      COUNT(*) FILTER (WHERE yt_checked_at IS NOT NULL)::int yt_total
       FROM cafes`)[0] as any;
     // 판정 대기·오늘 지표 = lib/metrics 단일출처(judge-status와 동일 정의 — 화면별 숫자 어긋남 구조적 차단).
     const judgeQ = await judgeQueueCount();
     // 옥석(검증) 미판정 = AI판정 '의도적 스킵' 대상(규칙검증 완료·저위험). 대기가 아니라 '완료 처리'임을 화면에 명시(숨김 금지).
-    const verifiedSkip = ((await sql`SELECT COUNT(*)::int n FROM cafes WHERE published AND synth_grade='검증' AND (llm_judged_at IS NULL OR llm_judged_at < raw_collected_at)`.catch(() => [{ n: 0 }]))[0] as any).n;
+    const verifiedSkip = Number(c.verified_skip ?? 0); // 💰 단일패스 c에서 파생(09-05)
     const daily = await dailyCounts();
     const vr = (await sql`SELECT ran_at, fails, warns, status FROM verify_reports ORDER BY ran_at DESC LIMIT 1`)[0] as any;
     // open = '실제 카페 오염' 플래그만(cafe_id 있고 'audit_complete' 시스템 로그 제외 + '공개 중인 카페'만 — 비공개=이미
@@ -123,7 +144,7 @@ export async function GET(req: NextRequest) {
     //   '진짜 굶은 지역'(7일+)만 지연으로 본다. 그 미만은 정상 로테이션이라 노이즈 아님.
     const ds = (await sql`SELECT MIN(last_run) oldest, COUNT(*) FILTER (WHERE last_run < now() - interval '7 days')::int behind, COUNT(*)::int n FROM discovery_state`)[0] as any;
     // 통합 재검증 자가감사 커버리지 — 공개 카페가 '현재 규칙'으로 며칠 안에 1회씩 재검되는지(규칙 드리프트 치유 진행률).
-    const auditCov = (await sql`SELECT COUNT(*) FILTER (WHERE published AND audit_checked_at >= now() - interval '7 days')::int a7, COUNT(*) FILTER (WHERE published)::int pub, MAX(audit_checked_at) last_audit FROM cafes`.catch(() => [{ a7: 0, pub: 0, last_audit: null }]))[0] as any;
+    const auditCov = { a7: Number(c.audit_a7 ?? 0), pub: Number(c.published ?? 0), last_audit: c.last_audit ?? null } as any; // 💰 단일패스 c에서 파생(09-05)
     // 로컬 배치 하트비트 — 실패(크래시 등)·정체를 관제탑이 잡아 경보. (예: dong-backfill ReferenceError)
     await sql`CREATE TABLE IF NOT EXISTS agent_runs (job TEXT PRIMARY KEY, ran_at TIMESTAMPTZ DEFAULT now(), ok BOOLEAN DEFAULT true, detail TEXT, processed INT DEFAULT 0)`.catch(() => {});
     const jobRuns = (await sql`SELECT job, ran_at, to_char(ran_at,'MM-DD HH24:MI') ran, ok, detail, EXTRACT(EPOCH FROM (now()-ran_at))/3600 age_h FROM agent_runs`.catch(() => [])) as any[];
@@ -307,7 +328,7 @@ export async function GET(req: NextRequest) {
     //   **정상인 상태를 알림으로 만들면 목록 전체의 신뢰가 깎인다.** 진짜 정체는 바로 위 순환 천장
     //   (synth_oldest_d > 21)이 이미 잡으므로 이 줄은 감도 손실 없이 삭제한다.
     // 임베딩 대기 = 의미검색만 일부 누락(카페는 정상 노출) → 주의. 단, 절반 이상이면 검색 핵심기능 타격 → 위험.
-    const noemb = (await sql`SELECT COUNT(*)::int n FROM cafes WHERE published AND embedding IS NULL`.catch(() => [{ n: 0 }]))[0] as any;
+    const noemb = { n: Math.max(0, Number(c.published ?? 0) - Number(c.pub_embedded ?? 0)) } as any; // 💰 c에서 파생(09-05)
     if (noemb.n > 0) { if (noemb.n > PUB * 0.5) risks.push(`의미검색 대량 누락 ${noemb.n}곳 — 검색 기능 타격`); else notices.push(`의미검색 임베딩 대기 ${noemb.n}곳`); }
     // 🔑 콘솔키 크레딧 소진 감시 — 소진 시 검색 재정렬(rerankWithClaude)·배치판정이 조용히 규칙폴백(무크래시).
     //   ⚖️ 심각도 판정(CEO 2026-07-08): 소비자 실제영향 × 폴백없음. 콘솔키 소진은 (a) 검색이 결정론(임베딩·성향축·등급)으로
@@ -333,8 +354,8 @@ export async function GET(req: NextRequest) {
     // ⚠️ PROXY(맥락어 없음)라 진짜 카페(찻집·북카페·시적이름)도 오탐됨 → '위험(빨강)' 금지, 항상 '주의'(점검 권장 목록).
     //   사람이 목록 보고 진짜 오염만 비공개. 헛경보(red) 방지가 핵심.
     // offctx_ok=true = 사람이 '진짜 카페'로 확인한 화이트리스트 → 점검목록서 제외(프록시 오탐 반복표시 방지).
-    const offctx = (await sql`SELECT COUNT(*)::int n FROM cafes WHERE published AND offctx_rate >= 0.55 AND NOT COALESCE(offctx_ok, false)`.catch(() => [{ n: 0 }]))[0] as any;
-    const offctxSuspects = (await sql`SELECT name, area, round(offctx_rate::numeric, 2) AS rate FROM cafes WHERE published AND offctx_rate >= 0.55 AND NOT COALESCE(offctx_ok, false) ORDER BY offctx_rate DESC LIMIT 30`.catch(() => [])) as any[];
+    const offctx = { n: Number(c.offctx_n ?? 0) } as any; // 💰 c에서 파생(09-05)
+    const offctxSuspects = offctx.n > 0 ? (await sql`SELECT name, area, round(offctx_rate::numeric, 2) AS rate FROM cafes WHERE published AND offctx_rate >= 0.55 AND NOT COALESCE(offctx_ok, false) ORDER BY offctx_rate DESC LIMIT 30`.catch(() => [])) as any[] : []; // 💰 0건이면 조회 생략(09-05)
     if (offctx.n > 0) notices.push(`리뷰 맥락 의심 ${offctx.n}곳(점검 권장 — 일부 진짜 카페 포함될 수 있음)`);
     // 🔇 조용한 실패 — 삼킨 오류의 누적. 동작은 안 막았지만 '몇 건 잃었는지'는 보여야 한다(2026-08-29).
     //   임계(5건) 미만은 안 띄운다 — 한 번 튄 건 소음이고, 계속 막힌 것만 신호다.
@@ -435,26 +456,11 @@ export async function GET(req: NextRequest) {
       AND anon_id NOT IN (${sql.unsafe(BOT_ANON_IDS_SQL)})`.catch(() => [{ n: 0 }]))[0]?.n ?? 0;
 
     // 파이프라인 진행 상황(신규 카페 조립라인)
-    const pl = (await sql`SELECT
-      COUNT(*) FILTER (WHERE pipeline_status='new')::int p_new,
-      COUNT(*) FILTER (WHERE pipeline_status='pending')::int p_pending,
-      COUNT(*) FILTER (WHERE pipeline_status='pending' AND llm_judged_at IS NULL)::int wait_judge,
-      COUNT(*) FILTER (WHERE pipeline_status='pending' AND llm_judged_at IS NOT NULL AND embedding IS NULL)::int wait_embed,
-      COUNT(*) FILTER (WHERE pipeline_status='pending' AND llm_judged_at IS NOT NULL AND embedding IS NOT NULL)::int ready,
-      COUNT(*) FILTER (WHERE pipeline_status='live')::int live,
-      COUNT(*) FILTER (WHERE pipeline_status='rejected')::int rejected
-      FROM cafes`)[0] as any;
+    const pl = c; // 💰 단일패스 c에 흡수(p_new~rejected 컬럼 동명 유지, 09-05)
 
     // 오늘 수집·진행 현황 + 동 백필 커버리지 — 관리자 '오늘의 수집' 패널용.
     //   ⚠️ new_today·yt_today(오늘 신규·유튜브)는 위 daily(lib/metrics·KST)에서 가져온다 — 화면별 정의 어긋남 방지.
-    const td = (await sql`SELECT
-      COUNT(*) FILTER (WHERE synth_updated >= date_trunc('day', now() AT TIME ZONE 'Asia/Seoul') AT TIME ZONE 'Asia/Seoul')::int synth_today,
-      COUNT(*) FILTER (WHERE published AND created_at >= date_trunc('day', now() AT TIME ZONE 'Asia/Seoul') AT TIME ZONE 'Asia/Seoul')::int published_today,
-      COUNT(*) FILTER (WHERE dong IS NOT NULL)::int has_dong,
-      COUNT(*) FILTER (WHERE pipeline_status='noise')::int noise,
-      COUNT(*) FILTER (WHERE pipeline_status='new')::int new_q,
-      COUNT(*) FILTER (WHERE yt_checked_at IS NOT NULL)::int yt_total
-      FROM cafes`)[0] as any;
+    const td = c; // 💰 단일패스 c에 흡수(synth_today·published_today·has_dong·noise·new_q·yt_total, 09-05)
 
     // ── 2) 자가 치유 ──
     // 결재#408: heal 루프(합성 적체·healPublishedAudit)가 백로그 증가로 길어지면 maxDuration에 걸려
@@ -577,10 +583,10 @@ export async function GET(req: NextRequest) {
     add("synth", "합성 (옥석·등급)", c.last_synth, 24, c.synth_q, c.synth_q ? "미합성 적체" : "적체 없음");
     // 카테고리·동 채움 단계도 개별 모니터(발굴~수집 세분화)
     // pubND(공개 카페 중 동 없음)는 아래 dongPct 계산에도 재사용 — 블록 밖으로 선언(스코프 버그 방지).
-    const pubND = (await sql`SELECT COUNT(*)::int n FROM cafes WHERE published AND dong IS NULL`.catch(() => [{ n: 0 }]))[0] as any;
+    const pubND = { n: Number(c.pub_nd ?? 0) } as any; // 💰 c에서 파생(09-05)
     {
       const catRun = jobRuns.find((j: any) => j.job === "dong-backfill");
-      const pubNoCat = (await sql`SELECT COUNT(*)::int n FROM cafes WHERE published AND (naver_category IS NULL OR naver_category='')`.catch(() => [{ n: 0 }]))[0] as any;
+      const pubNoCat = { n: Number(c.pub_nocat ?? 0) } as any; // 💰 c에서 파생(09-05)
       const cAge = ageHours(catRun?.ran_at ?? null, now);
       // 카테고리 미보유는 소비자 지장 없음(검증된 카페) → 평소엔 정보성. 대량(>1000)일 때만 백필 정체로 보고 warn.
       agents.push({ key: "category", label: "카테고리 검증", lastRun: catRun?.ran_at ?? null, ageH: cAge == null ? null : Math.round(cAge * 10) / 10, cadenceH: 26, status: pubNoCat.n > 1000 ? "warn" : "ok", queue: pubNoCat.n, note: pubNoCat.n ? `미보유 ${pubNoCat.n}(검증카페·지장없음)` : "전수 완료" });

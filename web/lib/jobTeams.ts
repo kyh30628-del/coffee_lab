@@ -52,7 +52,7 @@ export const EXPECT_MAX_H: Record<string, number> = {
   "cron-criteria-verify": 16, // 기준 검증 에이전트 2×/일 + 버퍼
   // 🔄 2026-08-04 4창 클러스터링(커밋 8da8c31, KST 08·12·16·20=UTC 3,7,11,23) 재계산: 4창 잡 최대공백 20→08시=12h(+버퍼14),
   //   2창 잡(enrich·orchestrator·sentinel UTC3,11) 최대공백 11→익일3시=16h(+버퍼18). EXPECT_MAX_H 미갱신이 정지 오탐 원인이었음(자율진단 #604).
-  "cron-grow": 14, "collect-catchup": 30, // 하루 1회(KST 01:10) → 24h 주기 + 버퍼6h
+  "cron-grow": 14, "collect-catchup": 30, // 🔄09-05: 4창(KST 08:05·12:05·16:05·20:05, 06:05 새벽드리프트 정정) 최대공백 12h + 버퍼(창 스킵 허용)
   "cron-enrich": 18, "cron-embed": 14, "cron-synth": 14, "cron-issues": 14, "cron-coord-consumer": 14,
   "cron-billing": 30,     // 정기결제 크론 매일 1회 + 버퍼
   "orchestrator-heal": 18, // 2창(UTC 3,11) 최대공백 16h + 버퍼
