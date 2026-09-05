@@ -53,7 +53,7 @@ export async function GET() {
       .filter((a) => a.cafes >= 2)
       .sort((a, b) => b.mentions - a.mentions);
 
-    return NextResponse.json({ ok: true, totalCafes: rows.length, axes });
+    return NextResponse.json({ ok: true, totalCafes: rows.length, axes }, { headers: { "Cache-Control": "public, max-age=0, s-maxage=3600, stale-while-revalidate=86400" } });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }

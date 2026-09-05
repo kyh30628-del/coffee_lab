@@ -107,7 +107,7 @@ export async function GET(req: NextRequest) {
     // ⚖️ 시·도 순환(lib/sidoRotation.ts) — '입소문순'도 순수 정렬이면 수도권 독식이라 강원이 못 오른다.
     const rising = rotateBySido(scored, 12).map(({ _s, ...x }: any) => x);
     return NextResponse.json({ ok: true, region: region || "전체 지역", hasDelta, count: rising.length, rising }, {
-      headers: { "Cache-Control": "public, max-age=0, must-revalidate" },
+      headers: { "Cache-Control": "public, max-age=0, s-maxage=300, stale-while-revalidate=600" },
     });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });

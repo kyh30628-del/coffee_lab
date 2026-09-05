@@ -37,7 +37,7 @@ export async function GET() {
       pct: Math.round((stat[a.key].cafes / total) * 100),
       mentions: stat[a.key].mentions,
     })).sort((a, b) => b.mentions - a.mentions);
-    return NextResponse.json({ ok: true, total, axes });
+    return NextResponse.json({ ok: true, total, axes }, { headers: { "Cache-Control": "public, max-age=0, s-maxage=3600, stale-while-revalidate=86400" } });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }

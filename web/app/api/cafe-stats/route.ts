@@ -22,7 +22,7 @@ export async function GET() {
       synthed: synthed[0].n,
       needSynth: needSynth[0].n,
       byArea,
-    });
+    }, { headers: { "Cache-Control": "public, max-age=0, s-maxage=3600, stale-while-revalidate=86400" } });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }

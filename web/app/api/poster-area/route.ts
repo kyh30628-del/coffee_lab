@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
             topCafes,
           },
         },
-        { headers: { "Cache-Control": "public, max-age=0, must-revalidate" } },
+        { headers: { "Cache-Control": "public, max-age=0, s-maxage=3600, stale-while-revalidate=86400" } },
       );
     }
 
@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
       SELECT area, count(*)::int AS n FROM cafes
       WHERE published=true AND area IS NOT NULL AND area <> ''
       GROUP BY area HAVING count(*) >= 5 ORDER BY n DESC LIMIT 100`;
-    return NextResponse.json({ ok: true, areas: rows }, { headers: { "Cache-Control": "public, max-age=0, must-revalidate" } });
+    return NextResponse.json({ ok: true, areas: rows }, { headers: { "Cache-Control": "public, max-age=0, s-maxage=3600, stale-while-revalidate=86400" } });
   } catch {
     return NextResponse.json({ ok: false, error: "일시적 오류 — 잠시 후 다시 시도해 주세요" }, { status: 500 });
   }
