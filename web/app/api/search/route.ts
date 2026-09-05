@@ -342,6 +342,36 @@ export async function GET(req: NextRequest) {
                  LIMIT 80`,
                 [lit, effectiveRegion, p1, p2],
               )) as unknown as any[];
+          // 🎯 #979(#977 후속) — 개념 축 질의('노키즈존' 등)는 임베딩 유사도가 약해 그 축을 가진 카페가
+          //   top-80 밖으로 밀려나면 concept/axis 재랭킹 자체가 기회를 못 받는다(임베딩이 뽑은 후보 안에서만 재랭킹하므로).
+          //   → char_scores에 해당 축 점수(>0)를 가진 카페를 별도로 보강 조회해 후보풀에 합류시킨다.
+          //   (char_scores는 축마다 항상 키가 존재하고 값이 0일 수 있어 키 존재만으론 부족 — 값>0을 직접 확인.)
+          const conceptAxes = Array.from(new Set(hitConcepts.filter((c) => c.axis).map((c) => c.axis as string)));
+          if (conceptAxes.length > 0) {
+            const axisRows = metroList
+              ? (await sql.query(
+                  `SELECT ${FIELDS}, 1 - (embedding <=> $1::vector) AS sim
+                   FROM cafes
+                   WHERE published = true AND embedding IS NOT NULL
+                     AND area = ANY($2::text[])
+                     AND EXISTS (SELECT 1 FROM unnest($3::text[]) ax WHERE (char_scores->>ax)::numeric > 0)
+                   ORDER BY (SELECT MAX((char_scores->>ax)::numeric) FROM unnest($3::text[]) ax) DESC
+                   LIMIT 40`,
+                  [lit, metroList, conceptAxes],
+                )) as unknown as any[]
+              : (await sql.query(
+                  `SELECT ${FIELDS}, 1 - (embedding <=> $1::vector) AS sim
+                   FROM cafes
+                   WHERE published = true AND embedding IS NOT NULL
+                     AND ($2 = '' OR area ILIKE $3 OR area ILIKE $4)
+                     AND EXISTS (SELECT 1 FROM unnest($5::text[]) ax WHERE (char_scores->>ax)::numeric > 0)
+                   ORDER BY (SELECT MAX((char_scores->>ax)::numeric) FROM unnest($5::text[]) ax) DESC
+                   LIMIT 40`,
+                  [lit, effectiveRegion, p1, p2, conceptAxes],
+                )) as unknown as any[];
+            const seenIds = new Set(rows.map((r) => r.id));
+            for (const r of axisRows) if (!seenIds.has(r.id)) { rows.push(r); seenIds.add(r.id); }
+          }
           if (rows.length > 0) {
             mode = "semantic";
             for (const c of rows) byId.set(c.id, c);
