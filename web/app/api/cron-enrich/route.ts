@@ -48,7 +48,11 @@ export async function GET(req: NextRequest) {
     await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS area_rank INT`.catch(() => {});
     await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS area_total INT`.catch(() => {});
     let ranked = 0;
-    try {
+    // 💰 2026-09-05(CEO 승인 비용 다이어트): 순위는 RANK 연쇄 특성상 매회 ~7,411행이 실변경돼
+    //   하루 4회 = 3만 행 쓰기였다. 소비자 화면의 순위는 하루 1회면 충분 → 08시 KST(23 UTC) 회차만 계산.
+    //   (IS DISTINCT FROM 가드는 유지 — 안 바뀐 행은 그때도 안 쓴다.)
+    const isRankHour = new Date().getUTCHours() === 23;
+    if (isRankHour) try {
       const rk = (await sql`WITH r AS (
         SELECT id,
                RANK() OVER (PARTITION BY area ORDER BY COALESCE(synth_count,0) DESC, id ASC) rk,
