@@ -79,3 +79,5 @@ export default function KakaoShare({ title, description, imageUrl, link, label =
   }, [title, description, imageUrl, link, source, cafeId]);
   return <button onClick={onClick} className={className} type="button">{msg || children || label}</button>;
 }
+// 📝 2026-09-05: Vercel에 NEXT_PUBLIC_KAKAO_MAP_KEY 설정 + 카카오 콘솔 도메인 등록 완료(CEO 조치).
+//   이 주석 커밋 = env 반영을 위한 재배포 트리거(NEXT_PUBLIC은 빌드타임 주입).
