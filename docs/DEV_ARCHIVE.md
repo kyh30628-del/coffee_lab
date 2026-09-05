@@ -307,3 +307,4 @@
 | 2026-09-04 05:47 | #959 | [검색UX] "노키즈존" 검색 0건 — CONCEPTS 축 미등재(3주기 관찰 후 원인 확정) | 1806a907 | - | lib/criteriaListsBase.ts(char.nokids.kws·concept.nokids.triggers 신설)·lib/charScore.ts(CHAR_AXES에 nok |
 | 2026-09-04 07:30 | #928 | [룰갭 신규] COMMON_WORD_NAMES 미등재 "우리동네봄날" — "우리동네 OO" 관용구 동음충돌  | a6aaef3b | - | web/lib/reviewQuality.ts COMMON_WORD_NAMES에 "우리동네봄날" 추가(id2812 우리동네 봄날, 술집/타카페 솔빛로/활어식당 혼입 offctx 0. |
 | 2026-09-04 23:05 | #973 | [룰갭 신규] COMMON_WORD_NAMES 미등재 "커피파는집"·"작은디저트가게" — 서술구 카페명 동음 | 038e9666 | - | lib/reviewQuality.ts COMMON_WORD_NAMES에 커피파는집·작은디저트가게 추가(id16648·id2237 서술구 동음충돌 차단). tsc --noEmit 0 |
+| 2026-09-05 00:07 | #949 | [룰갭 신규] 베이킹·쿠킹 클래스 스튜디오가 카페로 자기등록 — CRAFT_WORKSHOP_ACTIVITY  | 1c5a7dee | - | lib/reviewQuality.ts CRAFT_WORKSHOP_ACTIVITY 정규식에 베이킹/쿠킹 클래스 어휘(키즈베이킹(클래스)?, 베이킹/쿠킹 클래스 수업, 원데이 쿠킹)  |
