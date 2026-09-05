@@ -51,10 +51,16 @@ export type SeoCafe = { id: number; name: string; dong: string | null; grade: st
 export const TASTE_MIN_HITS = 3;
 export const TASTE_MIN_RATE_PCT = 5;
 
+// 💰 2026-09-05(CEO 승인 다이어트): 이 집계가 pg_stat 1위였다(4.3일 24.1GB·1,554회 — ISR 재생성마다
+//   전 테이블 풀스캔). getTasteCounts와 같은 메모리 캐시 패턴 적용 — 지역 목록은 10분 늦어도 무해.
+let regionsMem: { at: number; v: { area: string; n: number }[] } | null = null;
 export async function getRegions(): Promise<{ area: string; n: number }[]> {
+  if (regionsMem && Date.now() - regionsMem.at < 10 * 60_000) return regionsMem.v;
   try {
-    return (await sql`SELECT area, count(*)::int n FROM cafes WHERE published AND area IS NOT NULL AND area <> '' GROUP BY area HAVING count(*) >= 5 ORDER BY n DESC`) as unknown as { area: string; n: number }[];
-  } catch { return []; }
+    const v = (await sql`SELECT area, count(*)::int n FROM cafes WHERE published AND area IS NOT NULL AND area <> '' GROUP BY area HAVING count(*) >= 5 ORDER BY n DESC`) as unknown as { area: string; n: number }[];
+    regionsMem = { at: Date.now(), v };
+    return v;
+  } catch { return regionsMem?.v ?? []; }
 }
 
 export async function getRegionCafes(area: string, limit = 30): Promise<SeoCafe[]> {
@@ -155,12 +161,17 @@ export async function getRegionTasteGradeBreakdown(area: string, tasteKey: strin
 
 // 동(洞) 단위 프로그래매틱 SEO — "정자동 카페"처럼 실제 검색행태와 가장 가까운 단위(서비스명 "동네" 그 자체).
 // 콘텐츠 얇음(thin content) 방지용 최소 카페수 기준은 구 단위(getRegions)와 동일한 5곳.
+let dongsMem: { at: number; key: number; v: { area: string; dong: string; n: number }[] } | null = null;
 export async function getDongs(minCount = 5): Promise<{ area: string; dong: string; n: number }[]> {
+  // 💰 2026-09-05: getRegions와 동일 사유(ISR 재생성마다 풀스캔) — 10분 메모리 캐시.
+  if (dongsMem && dongsMem.key === minCount && Date.now() - dongsMem.at < 10 * 60_000) return dongsMem.v;
   try {
-    return (await sql`SELECT area, dong, count(*)::int n FROM cafes
+    const v = (await sql`SELECT area, dong, count(*)::int n FROM cafes
       WHERE published AND area IS NOT NULL AND area <> '' AND dong IS NOT NULL AND dong <> ''
       GROUP BY area, dong HAVING count(*) >= ${minCount} ORDER BY n DESC`) as unknown as { area: string; dong: string; n: number }[];
-  } catch { return []; }
+    dongsMem = { at: Date.now(), key: minCount, v };
+    return v;
+  } catch { return dongsMem?.v ?? []; }
 }
 
 // 같은 구 안의 다른 동 목록 — 동 페이지 하단 크로스링크(내부링크로 크롤 확산)용.

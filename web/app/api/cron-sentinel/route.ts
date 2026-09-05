@@ -19,6 +19,12 @@ import { loadCriteriaLists, getListSetSync } from "@/lib/criteriaLists";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
+// 💰 2026-09-05(CEO 승인 다이어트): 변경분 스캔 모드 — 규칙 지문이 같으면 "마지막 리포트 이후 바뀐 행"만
+//   자기행-판정 스캐너 5종이 읽는다(안 바뀐 행은 지난 스캔 판정이 그대로 유효). 교차오염 스캐너
+//   (competitorQuote — 신규 카페명이 옛 카페 인용문을 새로 오염 판정할 수 있음)는 전수 유지.
+//   규칙 지문이 바뀌면 null(전수)로 남아 예전처럼 전체를 다시 본다. GET 진입부에서 세팅.
+let scanSince: string | null = null;
+
 // 🆕 이름-불일치 스캔(coherence 부풀림 사각 전담): 노출후기 다수가 '실제 그 카페명'을 안 담거나(quoteMatchConfidence=0)
 //   제목이 먼 광역시(부산·대구…)를 주제로 삼으면 동명 타지역/옆가게 오염 의심. name_pollution(coherence<0.3)이
 //   '까페'·'대구 중구' 같은 일반어/구名 충돌로 1.0 부풀 때 못 잡던 케이스(비비·MY FAVORITE·외할머니)를 잡는다.
@@ -40,6 +46,7 @@ async function scanNameMismatch(): Promise<{ count: number; far: number; nameMis
     if (Date.now() - t0 > 240000) { truncated = true; break; } // 시간 안전장치(다음 실행이 이어감)
     const rows = (await sql`SELECT id, name, area, dong, COALESCE(synth_reviews_all, synth_reviews) AS synth_reviews FROM cafes
       WHERE published AND COALESCE(synth_reviews_all, synth_reviews) IS NOT NULL AND jsonb_array_length(COALESCE(synth_reviews_all, synth_reviews)) >= 3 AND id > ${lo}
+        AND (${scanSince}::timestamptz IS NULL OR GREATEST(COALESCE(updated_at,'epoch'::timestamptz), COALESCE(synth_updated,'epoch'::timestamptz), COALESCE(created_at,'epoch'::timestamptz)) > ${scanSince}::timestamptz)
       ORDER BY id LIMIT 500`) as any[];
     if (!rows.length) break; lo = rows[rows.length - 1].id;
     for (const c of rows) {
@@ -84,6 +91,7 @@ async function scanAttractionPollution(): Promise<{ count: number; samples: stri
     if (Date.now() - t0 > 90000) { truncated = true; break; } // 시간 안전장치(스캔60~90s → 자동조치 예산 확보)
     const rows = (await sql`SELECT id, name, area, dong, COALESCE(synth_reviews_all, synth_reviews) AS synth_reviews FROM cafes
       WHERE published AND COALESCE(synth_reviews_all, synth_reviews) IS NOT NULL AND jsonb_array_length(COALESCE(synth_reviews_all, synth_reviews)) >= 2 AND id > ${lo}
+        AND (${scanSince}::timestamptz IS NULL OR GREATEST(COALESCE(updated_at,'epoch'::timestamptz), COALESCE(synth_updated,'epoch'::timestamptz), COALESCE(created_at,'epoch'::timestamptz)) > ${scanSince}::timestamptz)
       ORDER BY id LIMIT 500`) as any[];
     if (!rows.length) break; lo = rows[rows.length - 1].id;
     for (const c of rows) {
@@ -217,6 +225,7 @@ async function scanWeakNamePollution(): Promise<{ count: number; samples: string
     if (Date.now() - t0 > 45000) { truncated = true; break; } // 값싼 스캔(대부분 이름체크서 즉시 skip) — 45s컷
     const rows = (await sql`SELECT id, name, area, dong, COALESCE(synth_reviews_all, synth_reviews) AS synth_reviews FROM cafes
       WHERE published AND COALESCE(synth_reviews_all, synth_reviews) IS NOT NULL AND jsonb_array_length(COALESCE(synth_reviews_all, synth_reviews)) >= 3 AND id > ${lo}
+        AND (${scanSince}::timestamptz IS NULL OR GREATEST(COALESCE(updated_at,'epoch'::timestamptz), COALESCE(synth_updated,'epoch'::timestamptz), COALESCE(created_at,'epoch'::timestamptz)) > ${scanSince}::timestamptz)
       ORDER BY id LIMIT 500`) as any[];
     if (!rows.length) break; lo = rows[rows.length - 1].id;
     for (const c of rows) {
@@ -339,6 +348,7 @@ async function scanNonCafeBizPollution(): Promise<{ count: number; samples: stri
     if (Date.now() - t0 > 60000) { truncated = true; break; } // 60s컷(자동조치 예산 확보)
     const rows = (await sql`SELECT id, name, area, dong, COALESCE(synth_reviews_all, synth_reviews) AS synth_reviews FROM cafes
       WHERE published AND COALESCE(synth_reviews_all, synth_reviews) IS NOT NULL AND jsonb_array_length(COALESCE(synth_reviews_all, synth_reviews)) >= 2 AND id > ${lo}
+        AND (${scanSince}::timestamptz IS NULL OR GREATEST(COALESCE(updated_at,'epoch'::timestamptz), COALESCE(synth_updated,'epoch'::timestamptz), COALESCE(created_at,'epoch'::timestamptz)) > ${scanSince}::timestamptz)
       ORDER BY id LIMIT 500`) as any[];
     if (!rows.length) break; lo = rows[rows.length - 1].id;
     for (const c of rows) {
@@ -678,6 +688,7 @@ async function scanGenericTermPollution(): Promise<{ count: number; samples: str
     if (Date.now() - t0 > 30000) { truncated = true; break; } // 값싼 스캔(대부분 토큰체크서 즉시 skip) — 30s컷
     const rows = (await sql`SELECT id, name, area, dong, address, COALESCE(synth_reviews_all, synth_reviews) AS synth_reviews FROM cafes
       WHERE published AND COALESCE(synth_reviews_all, synth_reviews) IS NOT NULL AND jsonb_array_length(COALESCE(synth_reviews_all, synth_reviews)) >= 2 AND id > ${lo}
+        AND (${scanSince}::timestamptz IS NULL OR GREATEST(COALESCE(updated_at,'epoch'::timestamptz), COALESCE(synth_updated,'epoch'::timestamptz), COALESCE(created_at,'epoch'::timestamptz)) > ${scanSince}::timestamptz)
       ORDER BY id LIMIT 500`) as any[];
     if (!rows.length) break; lo = rows[rows.length - 1].id;
     for (const c of rows) {
@@ -958,8 +969,10 @@ export async function GET(req: NextRequest) {
           await recordRun("cron-sentinel", true, `⏭️ 무변경 스킵 — 마지막 센티널 이후 변경 0·규칙 불변(전수 스캔 생략)`, 0).catch(() => {});
           return NextResponse.json({ ok: true, skipped: "no-change" });
         }
-      }
-    }
+        // 💰 변경 있음 + 규칙 불변 → 자기행 스캐너는 변경분만(2026-09-05 다이어트). 규칙 바뀌면 전수(null).
+        scanSince = lastRep.fp === _curFp ? new Date(lastRep.ran_at).toISOString() : null;
+      } else scanSince = null;
+    } else scanSince = null;
     // 🔒 2026-09-03 협업#365 재발수리 — 재진입 가드. 전수 스캔+치유는 300s에 육박하는 무거운 작업인데
     //   중복 호출(겹친 스케줄, 사람 직접 확인 curl 등)을 막을 장치가 없었다. Vercel Fluid는 동시 요청이
     //   같은 인스턴스를 공유해도 별개 실행이라 **두 번째 호출이 통째로 또 5분짜리 전수 스캔을 새로 돌기 시작**

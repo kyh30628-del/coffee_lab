@@ -19,6 +19,8 @@ const authed = (req: NextRequest) => {
 };
 
 type Check = { key: string; label: string; severity: "fail" | "warn"; count: number; samples: string[] };
+// 💰 latest=1(관리자 폴링) 결과 캐시 — 호출당 전수검사 ~1.3GB 디스크읽기 방지(2026-09-05).
+let latestMem: { at: number; v: Check[] } | null = null;
 
 async function n(q: Promise<any[]>): Promise<number> { return Number((await q)[0]?.n ?? 0); }
 async function samp(q: Promise<any[]>): Promise<string[]> { return (await q).map((r: any) => String(r.s)).slice(0, 6); }
@@ -185,11 +187,13 @@ export async function GET(req: NextRequest) {
       } catch { return null; }
     })();
 
-    // 관리자 화면 조회(latest=1) — 캐시된 verify_reports 스냅샷이 아니라 매번 실시간 재산출.
-    //   (직전 버그: 하루 2회 크론 사이 데이터가 정상화돼도 화면은 옛 스냅샷의 '오류 N건'을 몇 시간째 표시 — 실측과 어긋남)
+    // 관리자 화면 조회(latest=1) — 실시간 재산출하되 **10분 메모리 캐시**(2026-09-05 CEO 승인 다이어트).
+    //   💰 실측: 이 경로가 매 호출 16종 전수검사(호출당 디스크 ~1.3GB)를 돌려 pg_stat 상위 14개를 만들었다.
+    //   원래 목적(크론 사이 몇 시간짜리 낡은 스냅샷 방지)은 10분 신선도로 충분히 지켜진다.
     //   DB에 새 행을 쓰지는 않음(폴링마다 insert하면 이력 테이블만 불어남) — 저장은 크론 실행(비-latest)만.
     if (req.nextUrl.searchParams.get("latest")) {
-      const checks = await runChecks();
+      const checks = latestMem && Date.now() - latestMem.at < 10 * 60_000 ? latestMem.v : await runChecks();
+      latestMem = { at: latestMem && checks === latestMem.v ? latestMem.at : Date.now(), v: checks };
       const fails = checks.filter((c) => c.severity === "fail" && c.count > 0).length;
       const warns = checks.filter((c) => c.severity === "warn" && c.count > 0).length;
       const status = fails > 0 ? "fail" : warns > 0 ? "warn" : "pass";
@@ -200,6 +204,7 @@ export async function GET(req: NextRequest) {
     }
 
     const checks = await runChecks();
+    latestMem = { at: Date.now(), v: checks }; // 크론 실행분으로 관리자 캐시도 즉시 신선하게
     const fails = checks.filter((c) => c.severity === "fail" && c.count > 0).length;
     const warns = checks.filter((c) => c.severity === "warn" && c.count > 0).length;
     const status = fails > 0 ? "fail" : warns > 0 ? "warn" : "pass";

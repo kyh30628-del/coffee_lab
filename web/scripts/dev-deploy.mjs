@@ -60,6 +60,7 @@ const rows = await sql`SELECT id, title, detail, action_params FROM decisions WH
 if (!rows.length) { console.log("배포 대상 없음"); process.exit(0); }
 
 let anyUnverified = false;
+const mergedBatch = []; // 💰 묶음배포(09-05): 루프는 병합만, push·반영확인·종결은 아래에서 1회
 for (const d of rows) {
   const br = d.action_params?.branch;
   const coord = d.action_params?.coord;
@@ -115,39 +116,11 @@ for (const d of rows) {
       try { git("checkout -- docs/DEV_ARCHIVE.md"); } catch {}
       console.log(`  ⚠️ 아카이브 append 실패(배포 계속): ${String(ae?.message || ae).slice(0, 90)}`);
     }
-    git("push origin main");
-    // 배포 반영 확인 — ⚠️ 2026-08-17 재교정: 창이 3.5분(14×15초)이었는데 **우리 실제 빌드는 평균 10.5분**
-    //   (인보이스 실측: 6,528분 / 619빌드)이고 20분 넘게 걸린 날도 있다. 정상 배포가 매번 '반영미확인'으로
-    //   기록되고 exit 1 → cronfail 이슈까지 자동 생성됐다(실측 08-17 #743: 20분 뒤 정상 반영됐는데 실패로 표기).
-    //   창을 25분으로 넓힌다. 폴링은 15초 간격 fetch 1회씩이라 비용은 무시할 수준이고,
-    //   진짜 빌드 실패는 25분이 지나도 안 올라오므로 여전히 잡힌다(감도 손실 없음).
-    let live = false;
-    for (let i = 0; i < 100; i++) {
-      try {
-        const r = await fetch("https://dongnecoffeenote.com/api/version", { cache: "no-store" });
-        const j = await r.json(); if (j.v === sha) { live = true; break; }
-      } catch {}
-      await new Promise((x) => setTimeout(x, 15000));
-    }
-    // 🛡️ 정직한 종결(2026-07-02): 반영 확인 전엔 done으로 닫지 않는다 — 과거 live=false(예: Vercel 프로덕션
-    //   빌드 실패)여도 'deployed·done' 확정 → 프로덕션 미반영인데 추적 주체가 사라지던 구멍.
-    if (live) {
-      // ⚠️ #914(협업#361): 아래 "반영확인"은 /api/version이 배포 sha와 일치함, 즉 **코드 배포가
-      //   프로덕션에 반영됐다는 뜻뿐**이다 — 이 dev_task가 특정 데이터(예: 카페 레코드 재합성) 반영을
-      //   전제하는 경우, 그 데이터측 반영 여부는 여기서 검증되지 않는다(별도 확인 필요). decision#894가
-      //   "배포완료·반영확인"만 보고 데이터 재합성 누락을 놓친 사고 재발 방지 — 문구로 범위를 명시한다.
-      await sql`UPDATE decisions SET status='done', decided_at=now(), decided_by='CEO',
-        result=${`코드배포 완료·프로덕션 반영확인 ${br} — ⚠️ 데이터측 반영(재합성 등 대상 레코드 갱신)은 별도 확인 필요, 이 결재는 코드 배포만 보증`},
-        action_params = action_params || ${JSON.stringify({ dev_status: "deployed", sha })}::jsonb WHERE id=${d.id}`;
-      if (coord) await sql`UPDATE coordination SET status='resolved', resolved_at=now(), stage='완료', resolution=${`개발·배포 완료(#${d.id}) — 코드 반영 확인, 데이터 반영은 별도 확인 필요`} WHERE id=${Number(coord)}`.catch(() => {});
-      try { git(`branch -d ${br}`); } catch { /* 브랜치 삭제 실패 무시 */ }
-      console.log(`  ✅ 코드배포 완료·프로덕션 반영확인 ${sha.slice(0, 8)} (데이터 반영은 별도 확인 필요)`);
-    } else {
-      anyUnverified = true;
-      await sql`UPDATE decisions SET result=${`push 완료·프로덕션 반영 미확인(${sha.slice(0, 8)}) — Vercel 빌드 점검 필요`},
-        action_params = action_params || ${JSON.stringify({ dev_status: "반영미확인", sha })}::jsonb WHERE id=${d.id}`;
-      console.log(`  ⚠️ #${d.id} push됐으나 반영 미확인 — 결재 미종결(추적 유지)`);
-    }
+    // 💰 2026-09-05(CEO 승인 다이어트 #3): 태스크당 push→빌드(평균 10.5분 × N회)를 **묶음 1회**로.
+    //   여기서는 병합·아카이브까지만 하고, push와 반영확인·종결은 루프 밖에서 전체 한 번에 처리한다.
+    //   (오늘 실측: dev 6건이 6빌드 = 약 63분 빌드 낭비. "배포는 묶어서" 규칙의 파이프라인 구현.)
+    mergedBatch.push({ d, br, coord, sha });
+    console.log(`  🔗 #${d.id} 병합 완료(푸시는 묶음 1회로) ${sha.slice(0, 8)}`);
   } catch (e) {
     const msg = String(e.message || e);
     // 🛡️ 자기파괴 금지(#221 소실 사고): 병합 이전 단계에서 던진 에러(사람작업보호 dirty가드·branch없음·git락·fetch 등)는
@@ -188,6 +161,43 @@ for (const d of rows) {
     // 🛡️ 락 소유권(2026-07-02): 내가 획득한 락만 해제 — 과거 glock 타임아웃(=남이 보유 중) 후에도
     //   finally가 무조건 rmdir → 남의 락을 파괴해 빌드/배포 상호배제가 소멸하던 P0(git 레이스 재발 경로).
     if (locked) gunlock();
+  }
+}
+
+// 🚀 묶음 푸시 + 반영확인 1회(2026-09-05 다이어트 #3) — 병합된 태스크 전부를 빌드 한 번에 실어 나른다.
+if (mergedBatch.length) {
+  const lockedB = await glock();
+  try {
+    if (!lockedB) throw new Error("git락 타임아웃(묶음 푸시)");
+    git("push origin main");
+  } finally { if (lockedB) gunlock(); }
+  const headSha = git("rev-parse HEAD");
+  console.log(`\n[묶음푸시] ${mergedBatch.length}건 → ${headSha.slice(0, 8)} — 반영 확인 대기(최대 25분)`);
+  // 배포 반영 확인 — 창 25분(실측 평균 빌드 10.5분, 08-17 #743 재교정). 최종 HEAD가 반영되면 병합분 전체가 실린 것.
+  let live = false;
+  for (let i = 0; i < 100; i++) {
+    try {
+      const r = await fetch("https://dongnecoffeenote.com/api/version", { cache: "no-store" });
+      const j = await r.json(); if (j.v === headSha) { live = true; break; }
+    } catch {}
+    await new Promise((x) => setTimeout(x, 15000));
+  }
+  for (const { d, br, coord, sha } of mergedBatch) {
+    if (live) {
+      // ⚠️ #914(협업#361): "반영확인"은 코드 배포 반영뿐 — 데이터측 반영(재합성 등)은 별도 확인 필요(범위 명시).
+      await sql`UPDATE decisions SET status='done', decided_at=now(), decided_by='CEO',
+        result=${`코드배포 완료·프로덕션 반영확인 ${br} (묶음배포 ${headSha.slice(0, 8)}) — ⚠️ 데이터측 반영(재합성 등 대상 레코드 갱신)은 별도 확인 필요, 이 결재는 코드 배포만 보증`},
+        action_params = action_params || ${JSON.stringify({ dev_status: "deployed", sha })}::jsonb WHERE id=${d.id}`.catch(() => {});
+      if (coord) await sql`UPDATE coordination SET status='resolved', resolved_at=now(), stage='완료', resolution=${`개발·배포 완료(#${d.id}) — 코드 반영 확인, 데이터 반영은 별도 확인 필요`} WHERE id=${Number(coord)}`.catch(() => {});
+      try { git(`branch -d ${br}`); } catch { /* 브랜치 삭제 실패 무시 */ }
+      console.log(`  ✅ #${d.id} 코드배포 완료·반영확인(묶음 ${headSha.slice(0, 8)})`);
+    } else {
+      anyUnverified = true;
+      // 🛡️ 정직한 종결(2026-07-02): 반영 확인 전엔 done으로 닫지 않는다.
+      await sql`UPDATE decisions SET result=${`push 완료·프로덕션 반영 미확인(묶음 ${headSha.slice(0, 8)}) — Vercel 빌드 점검 필요`},
+        action_params = action_params || ${JSON.stringify({ dev_status: "반영미확인", sha })}::jsonb WHERE id=${d.id}`.catch(() => {});
+      console.log(`  ⚠️ #${d.id} push됐으나 반영 미확인 — 결재 미종결(추적 유지)`);
+    }
   }
 }
 // 반영 미확인 건이 있으면 비정상 종료 → 래퍼 하트비트(ok=false)로 즉시 이슈화·본부 배정.
