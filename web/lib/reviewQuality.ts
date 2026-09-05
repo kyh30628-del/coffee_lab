@@ -1356,7 +1356,19 @@ export function verifyReview(input: QualityInput): QualityResult {
   //   판정이 모임 공지문의 로지스틱스 서술에 우연 매칭되던 것(id11232 실측)을 차단.
   const clubMeetupLogisticsLeak = CLUB_NAVER_LINK.test(input.link ?? "") && CLUB_MEETUP_LOGISTICS_CUES.test(fullL)
     && !DRINK_TASTING_CUES.test(fullL.replace(NEGATIVE_IMPERATIVE_IDIOM, ""));
-  const visit = has(fullL, VISIT_CUES) && !deliveryOnly && !pickupOnly && !wholesaleOnly && !equipmentServiceOnly && !clubMeetupLogisticsLeak;
+  // 룰갭 신규(2026-09-05, decisions#992): NONVISIT_BOARD(중고나라 등 board-ID 5개) 화이트리스트는
+  //   board-ID 단위라 신규 게시판마다 항상 한발 늦는다(부동산임대·통신사요금제·중고차·자가영업공지·공동구매
+  //   등 board-ID 20+개 신규 확인, 위 5개와 전혀 다른 성격). 근본원인은 board-ID가 아니라 cafe.naver.com
+  //   도메인 자체 특성(네이버가 이 플랫폼을 "카페"라 부름) — CAFE_WORDS/VISIT_CUES의 "카페"·"방문"이
+  //   리터럴 우연매치로 항상 통과된다. board-ID를 몰라도 컨텐츠로 막기 위해: cafe.naver.com(위
+  //   CLUB_NAVER_LINK, "m.cafe.naver.com"도 부분일치로 포함) 링크인데 실제 음료·디저트 소비 서술
+  //   (CAFE_CONTEXT_SUBSTANCE·DRINK_TASTING_CUES·INSTORE_VISIT_CUES 중 하나도 없음)이 전무하면
+  //   VISIT_CUES 매칭을 무효화한다. 진짜 방문후기(id26740 멜팅포인트 실측: "커피맛이 맛있어요" 등
+  //   CAFE_CONTEXT_SUBSTANCE 동반)는 그대로 보존, 무관 콘텐츠(id6084 중고가구·id760 자동차 정비·id22973
+  //   중고차·id26803 통신요금제 실측: 셋 다 전무)만 걸린다.
+  const cafeNaverNoSubstance = CLUB_NAVER_LINK.test(input.link ?? "")
+    && !CAFE_CONTEXT_SUBSTANCE.test(fullL) && !DRINK_TASTING_CUES.test(fullL) && !INSTORE_VISIT_CUES.test(fullL);
+  const visit = has(fullL, VISIT_CUES) && !deliveryOnly && !pickupOnly && !wholesaleOnly && !equipmentServiceOnly && !clubMeetupLogisticsLeak && !cafeNaverNoSubstance;
   const substance = SUBSTANCE_CUES.filter((k) => fullL.includes(k.toLowerCase())).length;
   // [#4] 흔한 단어 이름 오매칭 방지: 전체 이름 일치는 강함. 토큰만 일치면
   //     '카페 맥락(카페·커피·로스터리…)'이나 지역이 함께 있어야 주제로 인정.
@@ -2068,6 +2080,11 @@ export function verifyReview(input: QualityInput): QualityResult {
   //   격하한다(action_params 권고 그대로 반영).
   if (clubMeetupLogisticsLeak && (nameInTitle || nameInBody)) {
     return { verdict: "rejected", score: 30, reasons: ["네이버 카페 동호회 모임 공지문(로지스틱스 정형구 — 카페 실질맥락 없음) — LLM 재판정"], borderline: true, signals: sig };
+  }
+  // 룰갭 신규(decisions#992): 위 cafeNaverNoSubstance와 동일 게이트 — NONVISIT_BOARD board-ID를 몰라도
+  //   cafe.naver.com 링크 + 실질 음료·디저트 서술 전무를 콘텐츠 기반으로 판별해 borderline(LLM 재판정)한다.
+  if (cafeNaverNoSubstance && (nameInTitle || nameInBody)) {
+    return { verdict: "rejected", score: 30, reasons: ["네이버 카페(cafe.naver.com) 게시글(실제 음료·디저트 소비 서술 없음) — LLM 재판정"], borderline: true, signals: sig };
   }
   if (!visit && substance === 0) {
     return { verdict: "rejected", score: 10, reasons: ["방문·경험·평가 내용 없음(언급만)"], signals: sig };
