@@ -1,4 +1,5 @@
 import { sql } from "./db";
+import { SIDO_GU } from "./regionList";
 
 // 🔤 검색어 처리기 — 검색 정확도의 8할이 여기서 결정된다.
 //
@@ -127,6 +128,9 @@ export async function loadGeoIndex(): Promise<GeoIndex> {
 /** 질의 토큰에서 지역을 찾아낸다. 찾으면 그 area와, 지역어로 쓰인 토큰을 함께 돌려준다. */
 export function detectRegion(tokens: string[], geo: GeoIndex): { area: string; token: string } | null {
   for (const t of tokens) {
+    // 🧭 2026-09-06: 시·도명은 동 사전보다 먼저 — 오산시 '부산동'의 bare '부산'이 "부산 카페"를
+    //   오산시로 오인하던 실사고(부산 편입 스모크에서 발견). 시도 토큰은 시도 지역으로 확정한다.
+    if ((SIDO_GU as Record<string, string[]>)[t]) return { area: t, token: t };
     if (geo.area.has(t)) return { area: t, token: t };
     const hit = geo.dong.get(t);
     if (hit) return { area: hit, token: t };
