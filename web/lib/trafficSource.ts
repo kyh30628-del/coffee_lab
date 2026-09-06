@@ -11,6 +11,14 @@ export function sourceBucket(ref: string, utmSource: string): string {
   if (s) return s.slice(0, 40);
   const r = (ref || "").toLowerCase();
   if (!r) return "direct";
+  // 🤖 AI 툴 경유 사람 유입(CEO 최우선 지표, 2026-09-06) — 반드시 검색엔진보다 먼저 판정한다.
+  //   실사고: gemini.google.com이 아래 "google." 매칭에 먼저 걸려 제미나이 유입이 구글로 오집계,
+  //   copilot.microsoft.com은 bing에 묻힘 → AI 유입 추이 측정 자체가 불가능했다.
+  if (r.includes("gemini.google") || r.includes("bard.google")) return "gemini";
+  if (r.includes("chatgpt.com") || r.includes("chat.openai")) return "chatgpt";
+  if (r.includes("claude.ai")) return "claude";
+  if (r.includes("perplexity.")) return "perplexity";
+  if (r.includes("copilot.microsoft")) return "copilot";
   if (r.includes("naver.")) return "naver";
   if (r.includes("google.")) return "google";
   if (r.includes("instagram.")) return "instagram";
