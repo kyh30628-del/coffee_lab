@@ -76,13 +76,19 @@ async function naverSearch(kind: "blog" | "cafearticle", query: string): Promise
   return { items, ok: true };
 }
 
-export async function fetchWebReviews(name: string, area: string): Promise<{ snippets: WebSnippet[]; apiError?: boolean; error?: string; debug?: unknown }> {
+export async function fetchWebReviews(name: string, area: string, dong?: string): Promise<{ snippets: WebSnippet[]; apiError?: boolean; error?: string; debug?: unknown }> {
   if (!ID || !SECRET) return { snippets: [], error: "NAVER_CLIENT_ID/SECRET 미설정", apiError: true };
   try {
     // 지역을 모든 질의에 포함해 같은 상호의 다른 지점·동명 노이즈를 줄인다(#5).
+    // 🏘️ 2026-09-06 동(洞) 계열 질의(CEO "리뷰를 더 풍성하게" — 8/26 실측 근거): 블로그는 시군구가 아니라
+    //   "○○동 카페"로 쓴다(흔한이름 조사: 후기 내 시군구 언급보다 동 언급이 우세). `{이름} {동}`은
+    //   `{이름} {지역}` 결과의 부분집합이 **아니므로**(다른 검색어) 포화 조기중단과 무관하게 항상 1회 돈다.
+    //   비용: 곳당 +2콜(blog·cafearticle) — 쿼터 여유(일 25k) 안. 동명이 지역명에 이미 포함되면 생략.
+    const dongQ = dong && dong.length >= 2 && !(area || "").includes(dong) && dong !== name ? [`${name} ${dong}`] : [];
     const queries = area
-      ? [`${name} ${area}`, `${name} ${area} 카페`, `${name} ${area} 후기`, `${name} ${area} 리뷰`]
-      : [`${name} 카페 후기`, `${name} 카페 리뷰`, `${name} 후기`];
+      ? [`${name} ${area}`, ...dongQ, `${name} ${area} 카페`, `${name} ${area} 후기`, `${name} ${area} 리뷰`]
+      : [...dongQ, `${name} 카페 후기`, `${name} 카페 리뷰`, `${name} 후기`];
+    const alwaysRun = new Set(dongQ); // 포화 조기중단 예외(별개 검색어 계열)
     const seen = new Set<string>();
     const snippets: WebSnippet[] = [];
     const debug: unknown[] = [];
@@ -105,9 +111,20 @@ export async function fetchWebReviews(name: string, area: string): Promise<{ sni
           snippets.push(it);
         }
         await new Promise((r) => setTimeout(r, 120)); // 질의 간 최소 간격 — 샤드 2개가 동시에 때려 버스트 429 나던 걸 완화
-        // 첫 질의가 비포화면 이 종류(blog/cafearticle)의 나머지 질의는 건너뛴다.
+        // 첫 질의가 비포화면 이 종류(blog/cafearticle)의 나머지 **같은 계열** 질의는 건너뛴다.
         //   ⚠️ ok=false(쿼터/오류)일 땐 items가 0이라 '비포화'로 오인할 수 있으므로 ok일 때만 판단한다.
-        if (qi === 0 && ok && items.length < NAVER_DISPLAY) break;
+        //   동 계열(alwaysRun)은 부분집합이 아니라 계속 돈다 — break 대신 지역계열만 스킵.
+        if (qi === 0 && ok && items.length < NAVER_DISPLAY) {
+          const rest = queries.slice(1).filter((x) => alwaysRun.has(x));
+          for (const q2 of rest) {
+            const r2 = await naverSearch(kind, q2);
+            if (r2.ok) anyOk = true; else anyFail = true;
+            debug.push({ q: q2, kind, got: r2.items.length, ok: r2.ok });
+            for (const it of r2.items) { const k2 = it.text.slice(0, 50); if (!seen.has(k2)) { seen.add(k2); snippets.push(it); } }
+            await new Promise((r) => setTimeout(r, 120));
+          }
+          break;
+        }
       }
     }
     // 수집 0인데 호출이 한 번도 성공 못 함 → API 오류/쿼터(진짜 0건과 구분)

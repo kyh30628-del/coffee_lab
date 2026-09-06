@@ -185,12 +185,13 @@ async function gatherRaw(cafe: { id: number; name: string; area: string }, refre
   const raw: RawItem[] = [];
   const places = await fetchPlacesReviews(cafe.name, cafe.area ?? "");
   for (const r of places.reviews) raw.push({ source: "google", text: r.text, time: r.time });
-  const web = await fetchWebReviews(cafe.name, cafe.area ?? "");
+  const webAreaTermsPre = await areaTermsFor(cafe.id, cafe.area); // [지역, 동] — 동 계열 질의용(09-06)
+  const web = await fetchWebReviews(cafe.name, cafe.area ?? "", webAreaTermsPre[1]);
   // 근본원인(coordination#339/decision#816): 네이버 검색 sort=sim 유사도만 믿고 카페명과 무관한 콘텐츠까지
   //   raw_reviews에 그대로 누적되던 문제(스팸 블로그 원문 1건이 259곳 카페에 동일텍스트로 중복). verifyReview의
   //   이름 앵커(nameCoherence)를 여기서도 재사용해, 카페명/지역어와 전혀 안 겹치는 항목은 수집 단계에서 걸러
   //   raw 비대화·재합성 토큰낭비를 막는다. (synth_reviews로는 이미 verifyReview가 걸러 유입되지 않았음.)
-  const webAreaTerms = await areaTermsFor(cafe.id, cafe.area);
+  const webAreaTerms = webAreaTermsPre;
   for (const s of web.snippets) {
     if (nameCoherence(cleanCafeName(cafe.name), [s.text], webAreaTerms) === 0) continue;
     raw.push({ source: "blog", text: s.text, title: s.title, desc: s.desc, time: s.time, link: s.link, date: s.date, srcName: s.source });
