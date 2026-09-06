@@ -53,25 +53,21 @@ async function runChecks(): Promise<Check[]> {
     await samp(sql`SELECT name || ' (#' || id || ')' s FROM cafes WHERE published AND (COALESCE(synth_ev_n, 0) = 0 OR synth_grade IS NULL) ORDER BY id LIMIT 6`));
 
   // 4. 근거 후기 필수필드: quote/link 누락
+  //    💰 2026-09-07(decisions#1010, cost_guard 정지 원인 수리): jsonb_array_elements 풀스캔 →
+  //    파생컬럼 synth_ev_flags(트리거 유지, migrate-verify-derived.mjs)로 교체 — 의미 동일·전송 ~0.
   add("review_fields", "근거 후기 필수필드(인용·링크) 누락", "fail",
-    await n(sql`SELECT count(DISTINCT c.id)::int n FROM cafes c, jsonb_array_elements(c.synth_reviews) r
-      WHERE c.published AND (c.synth_reviews::text LIKE '%"quote":""%' OR c.synth_reviews::text LIKE '%"link":""%' OR c.synth_reviews::text NOT LIKE '%"link"%') AND (coalesce(r->>'quote','')='' OR coalesce(r->>'link','')='')`),
-    await samp(sql`SELECT DISTINCT c.name s FROM cafes c, jsonb_array_elements(c.synth_reviews) r
-      WHERE c.published AND (c.synth_reviews::text LIKE '%"quote":""%' OR c.synth_reviews::text LIKE '%"link":""%' OR c.synth_reviews::text NOT LIKE '%"link"%') AND (coalesce(r->>'quote','')='' OR coalesce(r->>'link','')='') LIMIT 6`));
+    await n(sql`SELECT count(*)::int n FROM cafes WHERE published AND COALESCE((synth_ev_flags->>'badfield_n')::int, 0) > 0`),
+    await samp(sql`SELECT name s FROM cafes WHERE published AND COALESCE((synth_ev_flags->>'badfield_n')::int, 0) > 0 LIMIT 6`));
 
   // 5. PII 누출: 표시 인용문에 전화/이메일
   add("pii_leak", "근거 후기에 개인정보(전화·이메일) 노출", "fail",
-    await n(sql`SELECT count(DISTINCT c.id)::int n FROM cafes c, jsonb_array_elements(c.synth_reviews) r
-      WHERE c.published AND (r->>'quote' ~ '01[0-9][- ]?[0-9]{3,4}[- ]?[0-9]{4}' OR r->>'quote' ~ '\\m050[0-9][-. ]?[0-9]{3,4}[-. ]?[0-9]{3,4}\\M' OR r->>'quote' ~ '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}')`),
-    await samp(sql`SELECT DISTINCT c.name s FROM cafes c, jsonb_array_elements(c.synth_reviews) r
-      WHERE c.published AND (r->>'quote' ~ '01[0-9][- ]?[0-9]{3,4}[- ]?[0-9]{4}' OR r->>'quote' ~ '\\m050[0-9][-. ]?[0-9]{3,4}[-. ]?[0-9]{3,4}\\M' OR r->>'quote' ~ '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}') LIMIT 6`));
+    await n(sql`SELECT count(*)::int n FROM cafes WHERE published AND COALESCE((synth_ev_flags->>'pii_n')::int, 0) > 0`),
+    await samp(sql`SELECT name s FROM cafes WHERE published AND COALESCE((synth_ev_flags->>'pii_n')::int, 0) > 0 LIMIT 6`));
 
   // 6. 링크 형식: http로 시작하지 않는 출처 링크
   add("link_format", "출처 링크 형식 오류(http 아님)", "fail",
-    await n(sql`SELECT count(DISTINCT c.id)::int n FROM cafes c, jsonb_array_elements(c.synth_reviews) r
-      WHERE c.published AND r->>'link' IS NOT NULL AND r->>'link' NOT LIKE 'http%'`),
-    await samp(sql`SELECT DISTINCT c.name s FROM cafes c, jsonb_array_elements(c.synth_reviews) r
-      WHERE c.published AND r->>'link' IS NOT NULL AND r->>'link' NOT LIKE 'http%' LIMIT 6`));
+    await n(sql`SELECT count(*)::int n FROM cafes WHERE published AND COALESCE((synth_ev_flags->>'badlink_n')::int, 0) > 0`),
+    await samp(sql`SELECT name s FROM cafes WHERE published AND COALESCE((synth_ev_flags->>'badlink_n')::int, 0) > 0 LIMIT 6`));
 
   // 7. 좌표 범위: 수도권 밖
   add("coord_bounds", "지도 좌표 범위 이탈(수도권 밖)", "fail",
@@ -79,18 +75,15 @@ async function runChecks(): Promise<Check[]> {
     await samp(sql`SELECT name s FROM cafes WHERE published AND (lat IS NULL OR lng IS NULL OR lat < ${latMin} OR lat > ${latMax} OR lng < ${lngMin} OR lng > ${lngMax}) LIMIT 6`));
 
   // 8. 중복 근거 후기: 한 카페 내 같은 링크 중복
+  //    💰 2026-09-07(decisions#1010): synth_ev_flags.duplink_n(카페별 중복 링크 그룹 수, 트리거 산출) 합산 — 의미 동일.
   add("duplicate_links", "근거 후기 링크 중복", "warn",
-    await n(sql`SELECT count(*)::int n FROM (SELECT c.id, r->>'link' lk FROM cafes c, jsonb_array_elements(c.synth_reviews) r
-      WHERE c.published AND r->>'link' IS NOT NULL GROUP BY c.id, r->>'link' HAVING count(*)>1) x`),
-    await samp(sql`SELECT DISTINCT c.name s FROM cafes c, jsonb_array_elements(c.synth_reviews) r
-      WHERE c.published AND r->>'link' IS NOT NULL GROUP BY c.id, c.name, r->>'link' HAVING count(*)>1 LIMIT 6`));
+    await n(sql`SELECT COALESCE(SUM((synth_ev_flags->>'duplink_n')::int), 0)::int n FROM cafes WHERE published AND COALESCE((synth_ev_flags->>'duplink_n')::int, 0) > 0`),
+    await samp(sql`SELECT name s FROM cafes WHERE published AND COALESCE((synth_ev_flags->>'duplink_n')::int, 0) > 0 LIMIT 6`));
 
   // 9. 출처 표기 누락: 약관상 attribution 필수
   add("source_attribution", "출처(source) 표기 누락", "warn",
-    await n(sql`SELECT count(DISTINCT c.id)::int n FROM cafes c, jsonb_array_elements(c.synth_reviews) r
-      WHERE c.published AND coalesce(r->>'source','')=''`),
-    await samp(sql`SELECT DISTINCT c.name s FROM cafes c, jsonb_array_elements(c.synth_reviews) r
-      WHERE c.published AND coalesce(r->>'source','')='' LIMIT 6`));
+    await n(sql`SELECT count(*)::int n FROM cafes WHERE published AND COALESCE((synth_ev_flags->>'nosrc_n')::int, 0) > 0`),
+    await samp(sql`SELECT name s FROM cafes WHERE published AND COALESCE((synth_ev_flags->>'nosrc_n')::int, 0) > 0 LIMIT 6`));
 
   // 10. 우선노출 정합성: 만료/미승인인데 featured
   add("featured_stale", "우선노출 플래그 정합성(만료·미승인)", "warn",
@@ -117,13 +110,10 @@ async function runChecks(): Promise<Check[]> {
 
   // 14. 광고/협찬 글이 '검증 근거'로 노출 — 해자(진짜 후기) 훼손. 재합성 시 AD 게이트가 제외하지만 구데이터 점검.
   //   면책 문구('협찬 없이'·'광고 아님'·내돈내산)는 진짜 후기이므로 제외(오탐 방지) — verifyReview의 AD_STRONG/AD_DISCLAIM과 동일 기준.
+  //   💰 2026-09-07(decisions#1010): synth_ev_flags.adflag_n(트리거 산출, 판정식 동일)으로 교체.
   add("ad_evidence", "근거후기에 광고·협찬 신호", "warn",
-    await n(sql`SELECT count(DISTINCT c.id)::int n FROM cafes c, jsonb_array_elements(c.synth_reviews) r
-      WHERE c.published AND r->>'quote' ~ '(협찬|제공[[:space:]]*받|원고료|소정의|체험단|유료[[:space:]]*광고|광고입니다|대가를[[:space:]]*받)'
-        AND r->>'quote' !~ '(협찬|광고|제공|대가|유료|체험단)[[:space:]]*([Xx✕✖]|아닌|아니|아님|없이|없는|없습니다|없음|받지[[:space:]]*않)'`),
-    await samp(sql`SELECT DISTINCT c.name s FROM cafes c, jsonb_array_elements(c.synth_reviews) r
-      WHERE c.published AND r->>'quote' ~ '(협찬|제공[[:space:]]*받|원고료|소정의|체험단|유료[[:space:]]*광고|광고입니다|대가를[[:space:]]*받)'
-        AND r->>'quote' !~ '(협찬|광고|제공|대가|유료|체험단)[[:space:]]*([Xx✕✖]|아닌|아니|아님|없이|없는|없습니다|없음|받지[[:space:]]*않)' LIMIT 6`));
+    await n(sql`SELECT count(*)::int n FROM cafes WHERE published AND COALESCE((synth_ev_flags->>'adflag_n')::int, 0) > 0`),
+    await samp(sql`SELECT name s FROM cafes WHERE published AND COALESCE((synth_ev_flags->>'adflag_n')::int, 0) > 0 LIMIT 6`));
 
   // 15. 중복 공개 카페: 같은 이름+지역이 2개 이상 공개(같은 가게 중복 적재) → 사용자 혼란·신뢰 훼손.
   add("duplicate_published", "중복 공개 카페(같은 이름+지역)", "warn",
@@ -132,19 +122,24 @@ async function runChecks(): Promise<Check[]> {
 
   // 16. 🕵️ CROSS_CAFE_QUOTE_DUP(decisions#674) — 서로 다른 공개카페 2곳 이상에 완전동일 quote가 노출되면
   //   블로그·리뷰 글이 여러 카페에 걸쳐 잘못 매핑된 교차오염(브랜드명 동일·지점 다른 카페간 크로스오염 유형).
-  //   저비용 1쿼리(GROUP BY quote HAVING count(DISTINCT id)>1) — 정합성조사팀 3/3 실측 적중(글로리·비바보사·오페라빈,
-  //   coordination#306). 개별 오염건은 각각 별도 결재로 처리하므로 여기선 warn(상시 조기경보)만.
+  //   정합성조사팀 3/3 실측 적중(글로리·비바보사·오페라빈, coordination#306). 개별 오염건은 각각 별도 결재로 처리하므로
+  //   여기선 warn(상시 조기경보)만.
+  //   💰 2026-09-07(decisions#1010): 카페간 비교라 파생컬럼 1개로 못 담아 — quote 해시만 담은 소형 인덱스 테이블
+  //   review_quotes(cafe_id, quote_hash, 트리거 유지)로 교체. synth_reviews 본문을 더 이상 읽지 않음(cost_guard 정지 원인
+  //   중 최다쿼리 13.1GB가 이 검사 — WITH q AS(...)가 두 번 참조돼 published 전수 풀스캔이 사실상 2회 돌았다).
   add("cross_cafe_quote_dup", "카페간 인용문(quote) 완전동일(교차오염 의심)", "warn",
-    await n(sql`WITH q AS (
-        SELECT c.id cid, r->>'quote' AS quote FROM cafes c, jsonb_array_elements(c.synth_reviews) r
-        WHERE c.published AND coalesce(r->>'quote','') <> ''
+    await n(sql`WITH dup AS (
+        SELECT rq.quote_hash FROM review_quotes rq JOIN cafes c ON c.id = rq.cafe_id AND c.published
+        GROUP BY rq.quote_hash HAVING count(DISTINCT rq.cafe_id) > 1
       )
-      SELECT count(DISTINCT cid)::int n FROM q WHERE quote IN (SELECT quote FROM q GROUP BY quote HAVING count(DISTINCT cid) > 1)`),
-    await samp(sql`WITH q AS (
-        SELECT c.id cid, c.name cname, r->>'quote' AS quote FROM cafes c, jsonb_array_elements(c.synth_reviews) r
-        WHERE c.published AND coalesce(r->>'quote','') <> ''
+      SELECT count(DISTINCT rq.cafe_id)::int n FROM review_quotes rq JOIN cafes c ON c.id = rq.cafe_id AND c.published
+      WHERE rq.quote_hash IN (SELECT quote_hash FROM dup)`),
+    await samp(sql`WITH dup AS (
+        SELECT rq.quote_hash FROM review_quotes rq JOIN cafes c ON c.id = rq.cafe_id AND c.published
+        GROUP BY rq.quote_hash HAVING count(DISTINCT rq.cafe_id) > 1
       )
-      SELECT DISTINCT cname s FROM q WHERE quote IN (SELECT quote FROM q GROUP BY quote HAVING count(DISTINCT cid) > 1) LIMIT 6`));
+      SELECT DISTINCT c.name s FROM review_quotes rq JOIN cafes c ON c.id = rq.cafe_id AND c.published
+      WHERE rq.quote_hash IN (SELECT quote_hash FROM dup) LIMIT 6`));
 
   return checks;
 }
