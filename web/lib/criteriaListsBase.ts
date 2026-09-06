@@ -76,7 +76,7 @@ export const LIST_META: ListMeta[] = [
 
   // ── 용도 신호어 (lib/synthEngine.ts · USE_SIGNALS) — 카페 용도 태그 형성 ──
   { key: "use.작업", category: "용도", label: "용도: 작업", consumer: "synthEngine.synthesize",
-    items: ["작업", "노트북", "공부", "콘센트", "좌석", "read", "work", "laptop", "study", "books"] },
+    items: ["작업", "노트북", "공부", "콘센트", "좌석", "카공", "read", "work", "laptop", "study", "books"] },
   { key: "use.혼자", category: "용도", label: "용도: 혼자", consumer: "synthEngine.synthesize",
     items: ["혼자", "조용", "사색", "차분", "고요", "quiet", "serene", "calm", "low key", "low-key", "peaceful"] },
   { key: "use.수다", category: "용도", label: "용도: 수다", consumer: "synthEngine.synthesize",
@@ -85,6 +85,12 @@ export const LIST_META: ListMeta[] = [
     items: ["사진", "인테리어", "예쁜", "감성", "분위기", "루프탑", "interior", "ambience", "ambiance", "aesthetic", "rooftop"] },
   { key: "use.빵", category: "용도", label: "용도: 빵", consumer: "synthEngine.synthesize",
     items: ["빵", "베이커리", "스콘", "크루아상", "디저트", "케이크", "티라미수", "bread", "bakery", "scone", "croissant", "dessert", "cake", "tiramisu", "pastry"] },
+  // decisions#997(레드팀#665 후속, 09-06): "~에서 사진 찍기 좋은 분위기"가 1546곳에 지역명만 바뀐 채 반복 —
+  //   use.사진 신호어가 가장 포괄적이라 거의 항상 1위를 차지하는데, 애견동반처럼 실제 리뷰에 있는 구체 신호는
+  //   기존 5개 용도 어디에도 없어 아예 집계되지 않았다(char.pet.kws는 성향축/검색용일 뿐 synth_identity엔 미반영).
+  //   신규 용도 축으로 추가해 애견동반 리뷰가 있으면 그 신호가 uses 집계·identity 문구에 반영되게 한다.
+  { key: "use.애견", category: "용도", label: "용도: 애견동반", consumer: "synthEngine.synthesize",
+    items: ["애견동반", "애견 동반", "반려견", "반려동물", "펫프렌들리", "펫 프렌들리", "강아지 동반", "강아지랑", "강아지와 함께", "강아지 데리고", "댕댕이랑", "댕댕이 동반"] },
 
   // ── 용도구체어 확장사전 (lib/synthEngine.ts · reviewSpecificTermExt) — 정합성조사 #536→#583→#605→#642(4회
   //   재발) 원인: 용도문구 분기용 구체어가 코드 고정 SPECIFIC_TERM_KEYWORDS뿐이라 협소해 절대다수가 generic
@@ -102,6 +108,10 @@ export const LIST_META: ListMeta[] = [
     items: ["회의실", "넓은테이블"] },
   { key: "specific_term.사진", category: "용도구체어", label: "구체어 확장: 사진", consumer: "synthEngine.reviewSpecificTermExt",
     items: ["정원", "포토존", "대형창", "중정", "마당", "다락방", "통창"] },
+  // decisions#997: 애견동반은 신설 용도라 아직 구체어 사전이 없다(코드 재배포 없이 기획조정실장(L2)이
+  //   /admin/criteria에서 채울 수 있게 빈 상태로 등재 — 채워지기 전까진 USE_PHRASE 일반 문구로 폴백).
+  { key: "specific_term.애견", category: "용도구체어", label: "구체어 확장: 애견동반", consumer: "synthEngine.reviewSpecificTermExt",
+    items: [] },
 
   // ── 운영 정체성 신호어 (lib/synthEngine.ts · OP_SIGNALS) — 직접로스팅·원두판매·권위 주장 탐지 ──
   { key: "op.직접로스팅", category: "운영신호", label: "운영: 직접로스팅 주장", consumer: "synthEngine.synthesize",
