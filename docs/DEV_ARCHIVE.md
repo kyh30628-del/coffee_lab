@@ -317,3 +317,4 @@
 | 2026-09-06 08:35 | #997 | [개발] synth_identity 템플릿 다양화 — 폴백 로직 구체신호 미반영, 231(검증)+1315(참 | 72ad3aed | - | lib/criteriaListsBase.ts: use.애견(신규 용도 사전, char.pet.kws와 동일 신호어)+specific_term.애견(빈 admin확장키) 추가, us |
 | 2026-09-06 08:35 | #1003 | [룰갭] 리조트·휴게소·자연휴양림 부설카페 — 시설명일치=identity 오판(id24607 전량오염 등) | 72de802d | - | web/lib/reviewQuality.ts: RESORT_VENUE_WORDS(리조트/자연휴양림/수목원/워터파크/스키장) 스코프 신설. 이 스코프에서 자기 브랜드 식별토큰 부재( |
 | 2026-09-06 11:36 | #1007 | [검색UX 신규] 도(道) 단위 지역검색 전면 0건 — 강원·충북·충남·경남(오늘편입) 3,679곳 무영향 | 1fef320b | - | app/api/search/route.ts: inRegion을 lib/regionList.ts areaMatchesRegion(단일출처)에 위임, metroAreaList를 SID |
+| 2026-09-06 23:43 | #1010 | [자율진단] cron-verify 풀스캔이 cost_guard 정지 유발 — 검증 파이프라인 마비 (진행중) | 381a1836 | - | app/api/cron-verify/route.ts 7종(review_fields·pii_leak·link_format·duplicate_links·source_attributio |
