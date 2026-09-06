@@ -140,6 +140,29 @@ try {
   }
 } catch (e) { console.log("  조회 실패:", String(e).slice(0, 60)); }
 
+// ═══ 🧹 오염 점검(CEO 지시 09-06 — 오륙도 사건 후 매일 고정) ═══
+try {
+  const PAT = '(지원센터|복지관|주민센터|행정복지|문화센터|자활센터|복지센터|시니어클럽|노인회|보건소|수련관)';
+  const inst = await sql`SELECT id, name, area FROM cafes WHERE published AND name ~ ${PAT}
+    AND created_at > now() - interval '26 hours' LIMIT 10`;
+  const [sen] = await sql`SELECT clean, ran_at::date d FROM sentinel_reports ORDER BY ran_at DESC LIMIT 1`.catch(() => [{}]);
+  console.log("═══ 🧹 오염 점검 ═══");
+  console.log(`  신규 공개 중 기관어 상호(24h): ${inst.length}곳` + (inst.length ? " — 판정 필요: " + inst.map(x => `#${x.id} ${x.name}`).join(", ") : " ✅"));
+  console.log(`  센티널 최신: ${sen?.clean ? "✅ 청정" : "⚠️ 플래그 있음(관제탑 확인)"} (${sen?.d ?? "-"})`);
+} catch (e) { console.log("  오염 점검 실패:", String(e).slice(0, 60)); }
+
+// ═══ 🏗️ 신규 권역 견고화 추이(CEO 지시 09-06 "치밀하게·빠짐없이") — 매일 고정 ═══
+try {
+  const rb = await sql`SELECT CASE WHEN address LIKE '부산%' THEN '부산' WHEN address LIKE '경상남도%' THEN '경남'
+      WHEN address LIKE '강원%' THEN '강원' WHEN address LIKE '충청%' OR address LIKE '대전%' OR address LIKE '세종%' THEN '충청권' END s,
+    count(*)::int reg, count(*) FILTER (WHERE raw_reviews IS NOT NULL)::int col,
+    count(*) FILTER (WHERE published)::int pub,
+    count(*) FILTER (WHERE created_at > now() - interval '24 hours')::int d1
+    FROM cafes WHERE address ~ '^(부산|경상남도|강원|충청|대전|세종)' GROUP BY 1 ORDER BY 1`;
+  console.log("═══ 🏗️ 신규 권역 견고화(등록/수집/공개 · 24h증가) — 목표: 부산+경남 10/4까지 4,000 등록·1,800 공개 ═══");
+  for (const r of rb) console.log(`  ${r.s}\t등록 ${r.reg} · 수집 ${r.col} · 공개 ${r.pub} · +${r.d1}/일`);
+} catch (e) { console.log("  견고화 추이 조회 실패:", String(e).slice(0, 60)); }
+
 // ═══ 🔎 색인 스팟체크(월·목) — CEO 지시(2026-09-04) "정기적으로 고정해서 보고" ═══
 //   판정일(강원 9/22·충청 10/6)까지 깜깜이로 기다리지 않는다 — 색인이 시작되는 순간을 먼저 포착.
 //   방법: 우리 페이지 제목을 네이버 웹검색에 그대로 던져 우리 도메인이 잡히는지 실측(콜 3회, 쿼터 무시 수준).
