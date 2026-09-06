@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
 import { TRIAL_DAYS } from "@/lib/ownerPlan";
 import NoticeModal from "./NoticeModal";
-import { SIDO_GU, SIDO_CENTER } from "@/lib/regionList";
+import { SIDO_GU, SIDO_CENTER, classifyArea, regionKeyFor } from "@/lib/regionList";
 import InfoDot from "./InfoDot";
 import { trackOutbound } from "./trackOutboundClient";
 import ShowcaseBanner, { SHOWCASE_CSS } from "./ShowcaseBanner";
@@ -72,19 +72,12 @@ const _guCache = new Map<string, { sido: string; sigungu: string }>();
 const _longestFirst = (list: string[]) => [...list].sort((a, b) => b.length - a.length);
 const REGIONS_LONGEST: Record<string, string[]> = Object.fromEntries(Object.entries(REGIONS).map(([sido, list]) => [sido, _longestFirst(list)]));
 function toGu(area: string): { sido: string; sigungu: string } {
+  // 🧭 2026-09-06 — 로컬 복제 제거, lib/regionList.classifyArea(단일출처)로 위임.
+  //   09-04 '대전 153' 사고의 재발 지점이었다: 부산 편입 때 이 로컬 PREFIXED에 부산이 빠져
+  //   '부산 중구'가 또 서울로 분류될 뻔했다(경남 고성군→강원 오분류 포함). 캐시만 여기 유지.
   const a = (area ?? "").trim();
   const hit = _guCache.get(a); if (hit) return hit;
-  let res: { sido: string; sigungu: string } = { sido: "", sigungu: "" };
-  // 🔴 2026-09-04 — 시도 접두 처리(CEO 발견: "지도에서 대전이 153으로 카운팅").
-  //   예전엔 '인천'만 특별 처리하고 나머지는 구 이름 부분일치로 시도를 찾았다. 그 결과
-  //   '대전 중구'가 서울 중구로, '대전 동구·서구'가 인천으로 분류돼 지도 카운트·목록이 갈라졌다
-  //   (대전=153은 이름이 유일한 유성구 110+대덕구 43만 남은 숫자였다 — 나머지 183곳은 남의 지역에).
-  //   접두 시도(인천·대전)는 **먼저** 그 시도 안에서만 구를 찾는다. 새 접두 지역이 생기면 여기에 추가.
-  const PREFIXED = ["인천", "대전"] as const;
-  const pre = PREFIXED.find((ps) => a.includes(ps));
-  if (pre) { res = { sido: pre, sigungu: "" }; for (const gu of REGIONS_LONGEST[pre]) { if (a.includes(gu)) { res = { sido: pre, sigungu: gu }; break; } } }
-  else { outer: for (const [sido, list] of Object.entries(REGIONS_LONGEST)) { for (const gu of list) { if (a.includes(gu)) { res = { sido, sigungu: gu }; break outer; } } }
-    if (!res.sigungu) { if (a.includes("구리")) res = { sido: "경기", sigungu: "구리시" }; else if (a.includes("하남")) res = { sido: "경기", sigungu: "하남시" }; } }
+  const res = classifyArea(a);
   _guCache.set(a, res);
   return res;
 }
@@ -818,7 +811,7 @@ export default function Home() {
   const clearAuto = () => { setHomeSido(""); setHomeGu(""); setHomeDong(""); setAutoGu(""); setSido(""); setSigungu(""); setDong(""); setGeoMsg(""); setNearHome(null); };
   // 인천 동명 구(중구·동구) 구분: 인천이면 "인천 OO"로 넘겨야 백엔드가 서울과 안 헷갈림
   // 대전도 인천과 같은 접두 규칙(중·동·서구 이름 충돌) — 안 붙이면 백엔드가 서울 중구로 오인.
-  const homeRegion = homeGu ? (homeSido === "인천" || homeSido === "대전" ? `${homeSido} ${homeGu}` : homeGu) : "";
+  const homeRegion = homeGu ? regionKeyFor(homeSido, homeGu) : ""; // 🧭 09-06 단일출처(부산 접두·경남 고성군 자동)
   useEffect(() => { const u = homeRegion ? `/api/discover?region=${encodeURIComponent(homeRegion)}` : "/api/discover"; setDiscover(null); fetch(u).then((r) => r.json()).then((d) => { if (d.ok) setDiscover(d); }).catch(() => {}); }, [homeRegion]);
   useEffect(() => { const u = homeRegion ? `/api/momentum?region=${encodeURIComponent(homeRegion)}` : "/api/momentum"; setMomentum(null); fetch(u).then((r) => r.json()).then((d) => { if (d.ok) setMomentum({ rising: d.rising ?? [] }); }).catch(() => {}); }, [homeRegion]);
 
