@@ -316,3 +316,4 @@
 | 2026-09-06 08:35 | #958 | [룰갭 신규] 카페명-부동산임대 키워드 충돌 — 사무실/상가 임대 게시글 오염 (id30488) | 8389523b | - | web/lib/reviewQuality.ts OFFTOPIC_SPAM regex 확장: 부동산 임대(rental) 매물광고 정형구 추가(업종+임대/보증금·월세 금액/즉시입주/근린생 |
 | 2026-09-06 08:35 | #997 | [개발] synth_identity 템플릿 다양화 — 폴백 로직 구체신호 미반영, 231(검증)+1315(참 | 72ad3aed | - | lib/criteriaListsBase.ts: use.애견(신규 용도 사전, char.pet.kws와 동일 신호어)+specific_term.애견(빈 admin확장키) 추가, us |
 | 2026-09-06 08:35 | #1003 | [룰갭] 리조트·휴게소·자연휴양림 부설카페 — 시설명일치=identity 오판(id24607 전량오염 등) | 72de802d | - | web/lib/reviewQuality.ts: RESORT_VENUE_WORDS(리조트/자연휴양림/수목원/워터파크/스키장) 스코프 신설. 이 스코프에서 자기 브랜드 식별토큰 부재( |
+| 2026-09-06 11:36 | #1007 | [검색UX 신규] 도(道) 단위 지역검색 전면 0건 — 강원·충북·충남·경남(오늘편입) 3,679곳 무영향 | 1fef320b | - | app/api/search/route.ts: inRegion을 lib/regionList.ts areaMatchesRegion(단일출처)에 위임, metroAreaList를 SID |
