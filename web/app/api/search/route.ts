@@ -25,7 +25,7 @@ function detectOutOfCoverage(q: string, region: string): string | null {
   const text = (q + " " + region).toLowerCase();
   for (const kw of getListSync("search.out_of_coverage")) {
     if (text.includes(kw)) {
-      return `현재 동네 커피 노트는 서울·경기·인천·강원·충청(대전·세종 포함)만 서비스합니다. '${kw}' 지역 카페는 아직 포함되어 있지 않아요.`;
+      return `현재 동네 커피 노트는 서울·경기·인천·강원·충청(대전·세종)·부산·경남을 서비스합니다. '${kw}' 지역 카페는 아직 포함되어 있지 않아요.`;
     }
   }
   return null;

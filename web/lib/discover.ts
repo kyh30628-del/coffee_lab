@@ -1,7 +1,7 @@
 // 카페 발굴 (PRINCIPLES §0·§2): 합법 소스(네이버 지역검색)로 동네·스페셜티 카페 수집.
 // 대규모 프랜차이즈·비(非)카페 제외. 중복(이름/좌표 근사) 제외. 비공개로 적재 후 합성 단계에서 검증.
 import { sql , ensureOnce } from "./db";
-import { SIDO_GU } from "./regionList";
+import { SIDO_GU, regionKeyFor } from "./regionList";
 import { getLearned } from "./learnedTerms";
 import { loadCriteria, getCriterionSync } from "./criteria";
 import { getListSync, loadCriteriaLists } from "./criteriaLists"; // 비카페 순수 리스트 단일출처(BASE=폴백). 캐시 프라임은 discover 진입점이 함.
@@ -90,12 +90,13 @@ export const LONGTAIL_TASTE_TARGETS: { region: string; areaLabel: string; keywor
 // 🏷️ area 라벨에 시·도를 붙여야 하는 곳 — 구 이름이 다른 시·도와 겹치는 경우.
 //   인천 중구·동구·서구 ↔ 서울 중구 / 대전 동구·중구·서구 ↔ 서울·인천.
 //   안 붙이면 parseGuArea가 실주소의 '중구'를 엉뚱한 시·도로 찍는다(2026-08 인천 오염 729건과 같은 병).
-const PREFIXED_SIDO = new Set(["인천", "대전"]);
+// 🔄 2026-09-06(부산·경남 편입): 접두 판단을 지역 단일출처 regionKeyFor로 위임 — 부산 접두·경남 고성군
+//   모호 처리까지 자동으로 따라온다(로컬 Set 복제 금지, 09-04 교훈).
 export const METRO_REGIONS: { region: string; areaLabel: string }[] = (() => {
   const R: Record<string, string[]> = SIDO_GU; // 단일 출처(lib/regionList.ts)
 
   const out: { region: string; areaLabel: string }[] = [];
-  for (const [sido, gus] of Object.entries(R)) for (const gu of gus) out.push({ region: `${sido} ${gu}`, areaLabel: PREFIXED_SIDO.has(sido) ? `${sido} ${gu}` : gu });
+  for (const [sido, gus] of Object.entries(R)) for (const gu of gus) out.push({ region: `${sido} ${gu}`, areaLabel: regionKeyFor(sido, gu) });
   return out;
 })();
 

@@ -157,6 +157,7 @@ export function isCoreArea(area?: string): boolean {
   if (!a) return false;
   if (a.startsWith("인천")) return !/강화|옹진/.test(a);
   if (a.startsWith("대전")) return false;               // 🧭 2026-09-04: '구'로 끝난다고 서울 자치구 취급받아 핵심부 가산을 받던 구멍
+  if (a.startsWith("부산")) return false;               // 🧭 2026-09-06: 부산 편입 — 같은 구멍 선제 차단("부산 해운대구"가 endsWith('구')로 수도권 가산받는 것)
   if (a.endsWith("구")) return true;                    // 서울 자치구
   return CORE_GYEONGGI.has(a);
 }

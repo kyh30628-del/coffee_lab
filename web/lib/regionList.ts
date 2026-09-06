@@ -31,6 +31,13 @@ export const SIDO_GU: Record<string, string[]> = {
         "금산군", "부여군", "서천군", "청양군", "홍성군", "예산군", "태안군"],
   대전: ["동구", "중구", "서구", "유성구", "대덕구"],
   세종: ["세종시"],
+  // 🌊 부산·경남(2026-09-06 편입, CEO 지시 "이제 시작해") — 위키 × DB 실주소 31곳 대조 일치(09-04 사전검증).
+  //   ⚠️ 부산 중·서·동·남·북·강서구는 서울·인천·대전과 겹침 → PREFIXED_SIDOS에 부산 등재(라벨 "부산 중구").
+  //   ⚠️ 경남 고성군 ↔ 강원 고성군(공개 61곳) — 도 단위 최초 시군명 충돌. AMBIGUOUS_GUS로 처리:
+  //     강원이 bare "고성군"(기존 데이터 보존), 경남 쪽만 "경남 고성군" 라벨. classifyArea의 일반 루프는
+  //     삽입 순서상 강원이 먼저라 bare는 강원으로 귀속된다(아래 픽스처로 고정).
+  부산: ["중구", "서구", "동구", "영도구", "부산진구", "동래구", "남구", "북구", "강서구", "해운대구", "사하구", "금정구", "연제구", "수영구", "사상구", "기장군"],
+  경남: ["창원시", "김해시", "양산시", "진주시", "거제시", "통영시", "사천시", "밀양시", "함안군", "거창군", "창녕군", "고성군", "하동군", "합천군", "남해군", "함양군", "산청군", "의령군"],
 };
 
 // 지도앱 시·도 선택 시 이동할 중심좌표·줌. 시·도를 추가하면 여기도 반드시 채운다(없으면 이동이 안 된다).
@@ -43,6 +50,8 @@ export const SIDO_CENTER: Record<string, [number, number, number]> = {
   충남: [36.50, 126.80, 9],
   대전: [36.3504, 127.3845, 11],
   세종: [36.4801, 127.2890, 11],
+  부산: [35.1796, 129.0756, 11],
+  경남: [35.3, 128.3, 9], // 창원~거제~함양이 넓어 줌 낮게
 };
 
 
@@ -58,7 +67,20 @@ export const SIDO_CENTER: Record<string, [number, number, number]> = {
 // ⚠️ 이 파일은 의존성 0(클라이언트 번들 안전)을 유지해야 한다 — 순수 함수만 둘 것.
 
 /** 구 이름이 다른 시도와 겹쳐 area에 시도 접두가 붙는 곳("인천 중구"·"대전 중구"). */
-export const PREFIXED_SIDOS = ["인천", "대전"] as const;
+export const PREFIXED_SIDOS = ["인천", "대전", "부산"] as const;
+
+/** 시군 이름이 '다른 시도의 bare 라벨'과 겹치는 곳 — 값은 bare 라벨을 소유한 기본 시도.
+ *  예: "고성군"(bare)=강원(공개 61곳 기존 데이터), 경남 쪽은 "경남 고성군"으로 접두. */
+export const AMBIGUOUS_GUS: Record<string, string> = { "고성군": "강원" };
+
+/** (sido, sigungu) → 표준 지역 키. 접두 시도이거나, 모호 시군의 비-기본 소유자면 "시도 시군" 형태.
+ *  page.tsx homeRegion·discover areaLabel 등 라벨 생성부는 반드시 이 함수를 쓴다(복제 금지 — 09-04 교훈). */
+export function regionKeyFor(sido: string, sigungu: string): string {
+  if (!sigungu) return sido;
+  if ((PREFIXED_SIDOS as readonly string[]).includes(sido)) return `${sido} ${sigungu}`;
+  if (AMBIGUOUS_GUS[sigungu] && AMBIGUOUS_GUS[sigungu] !== sido) return `${sido} ${sigungu}`;
+  return sigungu;
+}
 
 const _byLen = (l: readonly string[]) => [...l].sort((a, b) => b.length - a.length);
 const _LONGEST: Record<string, string[]> = Object.fromEntries(
@@ -70,6 +92,8 @@ export function classifyArea(area: string): { sido: string; sigungu: string } {
   const a = (area ?? "").trim();
   const pre = PREFIXED_SIDOS.find((ps) => a.includes(ps));
   if (pre) { for (const gu of _LONGEST[pre]) if (a.includes(gu)) return { sido: pre, sigungu: gu }; return { sido: pre, sigungu: "" }; }
+  // 모호 시군 접두("경남 고성군") — 문자열에 시도명이 명시된 경우만 그 시도 안에서 찾는다.
+  if (a.includes("경남")) { for (const gu of _LONGEST["경남"]) if (a.includes(gu)) return { sido: "경남", sigungu: gu }; return { sido: "경남", sigungu: "" }; }
   for (const [sido, list] of Object.entries(_LONGEST)) for (const gu of list) if (a.includes(gu)) return { sido, sigungu: gu };
   if (a.includes("구리")) return { sido: "경기", sigungu: "구리시" };
   if (a.includes("하남")) return { sido: "경기", sigungu: "하남시" };
@@ -80,7 +104,7 @@ export function classifyArea(area: string): { sido: string; sigungu: string } {
 export function canonicalGu(area: string): string {
   const { sido, sigungu } = classifyArea(area);
   if (!sigungu) return (area ?? "").trim();
-  return (PREFIXED_SIDOS as readonly string[]).includes(sido) ? `${sido} ${sigungu}` : sigungu;
+  return regionKeyFor(sido, sigungu);
 }
 
 /** region 파라미터(시도명 또는 정확 키)와 area의 표준 매칭.

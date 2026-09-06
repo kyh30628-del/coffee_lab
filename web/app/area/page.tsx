@@ -6,10 +6,10 @@ import { COLLECTIONS } from "@/lib/collections";
 export const revalidate = 86400; // ISR 24시간
 
 export const metadata: Metadata = {
-  title: "동네별 카페 추천 — 서울·경기·인천·강원·충청 검증 카페 | 동네 커피 노트",
-  description: "서울·경기·인천·강원·충청 동네별로 진짜 후기로 검증한 카페를 찾아보세요. 작업·조용·디저트·스페셜티·분위기 취향별 추천.",
+  title: "동네별 카페 추천 — 서울·경기·인천·강원·충청·부산·경남 검증 카페 | 동네 커피 노트",
+  description: "서울·경기·인천·강원·충청·부산·경남 동네별로 진짜 후기로 검증한 카페를 찾아보세요. 작업·조용·디저트·스페셜티·분위기 취향별 추천.",
   alternates: { canonical: `${SITE}/area` },
-  openGraph: { title: "동네별 카페 추천 — 동네 커피 노트", description: "서울·경기·인천·강원·충청 동네별 검증 카페. 취향별 추천.", url: `${SITE}/area`, siteName: "동네 커피 노트", type: "website", locale: "ko_KR" },
+  openGraph: { title: "동네별 카페 추천 — 동네 커피 노트", description: "서울·경기·인천·강원·충청·부산·경남 동네별 검증 카페. 취향별 추천.", url: `${SITE}/area`, siteName: "동네 커피 노트", type: "website", locale: "ko_KR" },
 };
 
 export default async function AreaIndex() {
@@ -25,7 +25,7 @@ export default async function AreaIndex() {
           <span className="text-[13px] font-semibold text-[#5a4632]">🆕 이번 달 새로 발굴한 카페 보기</span>
           <span className="text-[#7a5122] text-[12px]">→</span>
         </Link>
-        <p className="text-[14px] text-[#524234] leading-relaxed mb-6">서울·경기·인천·강원·충청 동네별로 <b>영수증 리뷰·광고 없이 진짜 후기로 검증</b>한 카페를 모았어요. 취향별로도 골라보세요.</p>
+        <p className="text-[14px] text-[#524234] leading-relaxed mb-6">서울·경기·인천·강원·충청·부산·경남 동네별로 <b>영수증 리뷰·광고 없이 진짜 후기로 검증</b>한 카페를 모았어요. 취향별로도 골라보세요.</p>
 
         {/* 동네 교차검증 컬렉션 — 에디토리얼 SEO 랜딩(레지스트리 구동, 유입 진입점) */}
         <div className="rounded-xl px-4 py-4 mb-7 border border-[#e6d2b5]" style={{ background: "linear-gradient(180deg,#fbf3e4,#f4ece0)" }}>

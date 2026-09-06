@@ -25,7 +25,7 @@ export const META: CriterionMeta[] = [
   { key: "grade.floor.reference_new", category: "등급", label: "신규 공개 최소 검증리뷰 수(기존 공개는 위 값 유지)", def: 5, min: 1, max: 50, unit: "건" },
   // 서비스 범위 좌표 박스 — 2026-08-25 강원 편입으로 위 38.3→38.7(고성), 경 127.9→129.4(삼척) 확대.
   //   ⚠️ DB criteria 행과 반드시 같아야 한다(DB 장애 시 이 값이 진실 → 어긋나면 강원이 통째로 배제된다).
-  { key: "geo.box.lat_min", category: "지리", label: "서비스범위 좌표 박스 최소 위도(이하 범위밖 제외)", def: 36.8, min: 34.8, max: 38.8, unit: "°" },
+  { key: "geo.box.lat_min", category: "지리", label: "서비스범위 좌표 박스 최소 위도(이하 범위밖 제외)", def: 34.5, min: 34.0, max: 38.8, unit: "°" }, // 2026-09-06 부산·경남 편입(남해·거제 34.6)
   { key: "geo.box.lat_max", category: "지리", label: "서비스범위 좌표 박스 최대 위도(이상 범위밖 제외)", def: 38.7, min: 36.3, max: 40.3, unit: "°" },
   { key: "geo.box.lng_min", category: "지리", label: "서비스범위 좌표 박스 최소 경도(이하 범위밖 제외)", def: 124.5, min: 122.5, max: 126.5, unit: "°" },
   { key: "geo.box.lng_max", category: "지리", label: "서비스범위 좌표 박스 최대 경도(이상 범위밖 제외)", def: 129.4, min: 125.9, max: 129.9, unit: "°" },
