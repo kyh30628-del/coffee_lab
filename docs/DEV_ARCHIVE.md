@@ -313,3 +313,4 @@
 | 2026-09-05 00:10 | #987 | [자율진단 발견] cron-selfaudit 결재중복(ikey dedup 사각) — 동일 이슈 사흘간 최대6 | c588714d | - | app/api/cron-selfaudit/route.ts:100 dedup 쿼리에 done/rejected/deferred 상태 추가(lib/issues.ts:145와 동일 패턴) |
 | 2026-09-05 07:52 | #976 | [룰갭 신규] COMMON_WORD_NAMES 미등재 "나의작은카페" — 서술구 카페명 동음충돌 (id172 | a87d1de4 | - | lib/reviewQuality.ts COMMON_WORD_NAMES에 나의작은카페 등재(P23 근접맥락판정 경로 재사용, 로직변경 없음, #973과 동일패턴). tsc --noE |
 | 2026-09-05 13:11 | #992 | [룰갭 신규] NONVISIT_BOARD 구조적 사각 — cafe.naver.com 게시판ID 화이트리스트가 | d9e9c609 | 로직 변경(해자 핵심) — CEO 확인 필요. 정상적인 cafe.naver.com 발 실제 리뷰(예: id26740 멜팅포인트, id24724 에티오피아13월처럼 실제 방문 서술)까지 과잉 격하하지 않도록 DRINK_TASTING_CUES 커버리지 사전 확인 필요. | lib/reviewQuality.ts: cafe.naver.com(m.cafe.naver.com 포함) 링크 콘텐츠기반 게이트 신규 추가(cafeNaverNoSubstance) — |
+| 2026-09-06 08:35 | #958 | [룰갭 신규] 카페명-부동산임대 키워드 충돌 — 사무실/상가 임대 게시글 오염 (id30488) | 8389523b | - | web/lib/reviewQuality.ts OFFTOPIC_SPAM regex 확장: 부동산 임대(rental) 매물광고 정형구 추가(업종+임대/보증금·월세 금액/즉시입주/근린생 |
