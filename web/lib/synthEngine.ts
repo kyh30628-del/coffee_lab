@@ -14,7 +14,7 @@ const TASTE_AXES = [
 // 용도 — uses 출력 키가 곧 사전 키(use.*).
 const USE_KEYS: { u: string; key: string }[] = [
   { u: "작업", key: "use.작업" }, { u: "혼자", key: "use.혼자" }, { u: "수다", key: "use.수다" },
-  { u: "사진", key: "use.사진" }, { u: "빵", key: "use.빵" },
+  { u: "사진", key: "use.사진" }, { u: "빵", key: "use.빵" }, { u: "애견", key: "use.애견" },
 ];
 // 운영 정체성 신호 — ⚠️ 강한 신호만(환각 방지). ops 출력 키가 곧 사전 키(op.*).
 const OP_KEYS: { o: string; key: string }[] = [
@@ -133,7 +133,7 @@ export function synthesize(name: string, reviews: Review[], area: string[] = [],
 //   군더더기('(N건)'·따옴표) 빼고 소비자가 바로 그려지는 표현으로. 풍성함은 위 '강점/아쉬운점' 블록이 보완.
 const USE_PHRASE: Record<string, string> = {
   작업: "작업·공부하기 좋은 곳", 혼자: "혼자 조용히 머물기 좋은 곳", 수다: "함께 도란도란 이야기 나누기 좋은 곳",
-  사진: "사진 찍기 좋은 분위기", 빵: "빵·디저트가 특히 자주 언급되는 곳",
+  사진: "사진 찍기 좋은 분위기", 빵: "빵·디저트가 특히 자주 언급되는 곳", 애견: "애견동반이 가능한 곳",
 };
 // 동일 동네에 같은 최다용도 카테고리가 겹치면 '동+용도' 조합만으로 수십~수백 곳이 완전동일 문구로
 //   수렴한다(정합성조사 #536 '동+빵' 724곳 → #583 breadTerm 완화 → #605 잔여 135그룹/1,772곳: 사진/작업/
@@ -174,7 +174,7 @@ function reviewSpecificTerm(category: string, clean: Review[]): string | null {
 //   /admin/criteria에서 항목만 추가하면 되고, 코드 재배포가 필요없다(decisions#642 구조 전환).
 const SPECIFIC_TERM_EXT_KEYS: Record<string, string> = {
   빵: "specific_term.빵", 작업: "specific_term.작업", 혼자: "specific_term.혼자",
-  수다: "specific_term.수다", 사진: "specific_term.사진",
+  수다: "specific_term.수다", 사진: "specific_term.사진", 애견: "specific_term.애견",
 };
 function reviewSpecificTermExt(category: string, clean: Review[]): string | null {
   const key = SPECIFIC_TERM_EXT_KEYS[category];
@@ -204,6 +204,7 @@ const SPECIFIC_PHRASE: Record<string, (term: string) => string> = {
   혼자: (term) => `${term}에서 혼자 조용히 머물기 좋은 곳`,
   수다: (term) => `${term}에서 함께 도란도란 이야기 나누기 좋은 곳`,
   사진: (term) => `${term}${iGa(term)} 있어 사진 찍기 좋은 분위기`,
+  애견: (term) => `${term}${iGa(term)} 있는 애견동반 카페`,
 };
 function buildIdentity(coords: Record<string, number | null>, basis: Record<string, string>, uses: Record<string, number>, ops: Record<string, number>, area: string[] = [], clean: Review[] = [], naverCategory?: string) {
   const p: string[] = [];
