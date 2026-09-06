@@ -1642,6 +1642,32 @@ export function verifyReview(input: QualityInput): QualityResult {
   if (LODGING_NAMED && LODGING_SIGNAL.test(fullL) && !CAFE_CONTEXT.test(fullL)) {
     return { verdict: "rejected", score: 15, reasons: ["펜션/글램핑 겸업 숙박 후기(카페 맥락 전무) — LLM 재판정"], borderline: true, signals: sig };
   }
+  // [룰갭 신규, decisions#1003, rulegap-proposals-20260906-2.md] 리조트·자연휴양림·수목원·워터파크·스키장 등
+  //   대형 복합시설 부설 카페 — 위 LODGING 게이트는 !CAFE_CONTEXT를 탈출구로 둬, 시설 내 "다른" 입점업체
+  //   (레스토랑·카페테리아 등)를 다루는 글도 그 안에 "카페"·"베이커리" 같은 카페 맥락어가 있으면 그대로
+  //   통과시킨다(id24607 정선담아 하이원리조트점 실측: "베이커리 카페 '운암정' 방문 후기" — 카페 맥락이 있어
+  //   LODGING 게이트를 우회, 이후 borderline(LLM 재판정) 큐에서 AI가 잘못 verified로 승격). 이 스코프에서는
+  //   두 가지를 별도로 하드 차단한다 — ①자기 브랜드 식별토큰이 제목·본문 어디에도 없으면(카페 맥락 여부와
+  //   무관하게) 타업체 혼입으로 간주해 거절 ②카페/음료 맥락이 전무하면(식별토큰이 시설명 부분일치로만 걸려도)
+  //   순수 시설체험기(등산·물놀이·전시 등, id27826 광치자연휴양림 숲속카페 실측)로 간주해 거절. 둘 다 LLM
+  //   재판정에 맡기지 않고 결정론으로 즉시 배제 — 진짜 이 카페 후기는 자기 브랜드명과 카페 맥락을 모두
+  //   동반하므로 안전하게 보존된다.
+  const RESORT_VENUE_WORDS = ["리조트", "자연휴양림", "수목원", "워터파크", "스키장"];
+  const isResortVenueCafe = RESORT_VENUE_WORDS.some((v) => nameN.includes(norm(v)));
+  if (isResortVenueCafe) {
+    const resortBrandAbsent = !inTitleFull && !inBodyFull && !distinctInTitle && !distinctInBody;
+    const resortNoCafeCtx = !CAFE_CONTEXT_STRONG.test(fullL) && !titleHasCafeWord && !bodyHasCafeWord;
+    if (resortBrandAbsent || resortNoCafeCtx) {
+      return {
+        verdict: "rejected",
+        score: 5,
+        reasons: [resortBrandAbsent
+          ? "대형시설(리조트 등) 부설 카페 — 자기 브랜드 토큰 불일치(타업체 혼입 추정)"
+          : "대형시설(리조트 등) 부설 카페 — 카페 맥락 전무(순수 시설체험기)"],
+        signals: sig,
+      };
+    }
+  }
   // [룰갭 rulegap-20260803, decisions#600] 브랜드 체험관(자동차 모터스튜디오·가구/매트리스 쇼룸 등) 부속
   //   카페 — 전시/시승/포토존 방문기가 카페 실질맥락 없이 섞이면 borderline으로 격하(위 BRAND_EXPERIENCE_ACTIVITY 참조).
   if (BRAND_EXPERIENCE_ACTIVITY.test(fullL) && !CAFE_CONTEXT_SUBSTANCE.test(fullL)) {
