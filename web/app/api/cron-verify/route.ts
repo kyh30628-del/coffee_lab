@@ -182,20 +182,29 @@ export async function GET(req: NextRequest) {
       } catch { return null; }
     })();
 
-    // 관리자 화면 조회(latest=1) — 실시간 재산출하되 **10분 메모리 캐시**(2026-09-05 CEO 승인 다이어트).
-    //   💰 실측: 이 경로가 매 호출 16종 전수검사(호출당 디스크 ~1.3GB)를 돌려 pg_stat 상위 14개를 만들었다.
-    //   원래 목적(크론 사이 몇 시간짜리 낡은 스냅샷 방지)은 10분 신선도로 충분히 지켜진다.
-    //   DB에 새 행을 쓰지는 않음(폴링마다 insert하면 이력 테이블만 불어남) — 저장은 크론 실행(비-latest)만.
+    // 관리자 화면 조회(latest=1) — **저장분(크론 실행 결과)만 읽는다**(2026-09-07 재수리).
+    //   💰 1차 수리(10분 메모리 캐시)는 서버리스 인스턴스가 바뀔 때마다 증발해 실패였다 —
+    //   실측: 09-07 아침 40분 동안 전수검사가 6~11회 재실행(수백GB 디스크읽기, 자동정지 3일째의 진범).
+    //   크론이 하루 2회(08·20시 KST) verify_reports에 checks 전문을 저장하므로 여기서는 그 1행만 읽는다.
+    //   저장분이 26h+ 낡았을 때(크론 죽음)만 재산출 — 화면이 조용히 거짓이 되는 것 방지.
     if (req.nextUrl.searchParams.get("latest")) {
-      const checks = latestMem && Date.now() - latestMem.at < 10 * 60_000 ? latestMem.v : await runChecks();
-      latestMem = { at: latestMem && checks === latestMem.v ? latestMem.at : Date.now(), v: checks };
-      const fails = checks.filter((c) => c.severity === "fail" && c.count > 0).length;
-      const warns = checks.filter((c) => c.severity === "warn" && c.count > 0).length;
+      let checks: Check[] | null = latestMem && Date.now() - latestMem.at < 10 * 60_000 ? latestMem.v : null;
+      let ranAt = new Date().toISOString();
+      if (!checks) {
+        const [stored] = (await sql`SELECT ran_at, checks FROM verify_reports ORDER BY ran_at DESC LIMIT 1`.catch(() => [])) as any[];
+        if (stored && Date.now() - new Date(stored.ran_at).getTime() < 26 * 3600_000) {
+          checks = typeof stored.checks === "string" ? JSON.parse(stored.checks) : stored.checks;
+          ranAt = new Date(stored.ran_at).toISOString();
+        } else checks = await runChecks();
+        latestMem = { at: Date.now(), v: checks! };
+      }
+      const fails = checks!.filter((c) => c.severity === "fail" && c.count > 0).length;
+      const warns = checks!.filter((c) => c.severity === "warn" && c.count > 0).length;
       const status = fails > 0 ? "fail" : warns > 0 ? "warn" : "pass";
       // 📈 검사 이력 추이 — 저장된 verify_reports(크론 실행분, 최근 60건 보관)를 그대로 조회만(저비용 단일 SELECT).
       //   화면에 '지금 이 순간' 뿐 아니라 최근 N회 동안 오류·주의가 얼마나 반복됐는지(추이) 보여줌.
       const history = (await sql`SELECT ran_at, fails, warns, status FROM verify_reports ORDER BY ran_at DESC LIMIT 20`.catch(() => [])) as any[];
-      return NextResponse.json({ ok: true, report: { ran_at: new Date().toISOString(), status, fails, warns, checks }, grounding, history: history.reverse() });
+      return NextResponse.json({ ok: true, report: { ran_at: ranAt, status, fails, warns, checks }, grounding, history: history.reverse() });
     }
 
     const checks = await runChecks();
