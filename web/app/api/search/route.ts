@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PREFIXED_SIDOS, SIDO_GU } from "@/lib/regionList";
+import { SIDO_GU, regionKeyFor, areaMatchesRegion } from "@/lib/regionList";
 import { visitorBadges } from "@/lib/visitorMix";
 import { sql, ensureSchema, ensureOnce } from "@/lib/db";
 import { embedQuery, toVectorLiteral, hasEmbedKey } from "@/lib/embed";
@@ -55,19 +55,9 @@ const CONCEPTS_BASE: { id: string; triggersKey: string; axis?: string; taste?: s
 const CONCEPTS: { id: string; triggers: string[]; axis?: string; taste?: string; uses?: string[]; label: string }[] =
   CONCEPTS_BASE.map((c) => ({ id: c.id, axis: c.axis, taste: c.taste, uses: c.uses, label: c.label, get triggers() { return getListSync(c.triggersKey); } }));
 
-// 서울 25개 구 목록 (cafes.area에는 접두사 없이 "마포구" 형태로 저장)
-const SEOUL_GU = [
-  "종로구","중구","용산구","성동구","광진구","동대문구","중랑구","성북구",
-  "강북구","도봉구","노원구","은평구","서대문구","마포구","양천구","강서구",
-  "구로구","금천구","영등포구","동작구","관악구","서초구","강남구","송파구","강동구",
-];
-// 경기도 시·군 목록
-const GYEONGGI_SI = [
-  "수원시","성남시","의정부시","안양시","부천시","광명시","평택시","동두천시",
-  "안산시","고양시","과천시","구리시","남양주시","오산시","시흥시","군포시",
-  "의왕시","하남시","용인시","파주시","이천시","안성시","김포시","화성시",
-  "광주시","양주시","포천시","여주시","연천군","가평군","양평군",
-];
+// 서울·경기 빠른경로 조회용 — 목록 자체는 lib/regionList.ts SIDO_GU 단일출처(복제 금지).
+const SEOUL_GU = SIDO_GU["서울"];
+const GYEONGGI_SI = SIDO_GU["경기"];
 // 동네·상권명 → 행정구 매핑 (region 없는 검색에서 "홍대" → "마포구" 자동 추출)
 const DONG_TO_GU: Record<string, string> = {
   "홍대": "마포구", "합정": "마포구", "망원": "마포구", "연남": "마포구", "상암": "마포구", "상수": "마포구", "공덕": "마포구",
@@ -84,30 +74,21 @@ const DONG_TO_GU: Record<string, string> = {
   "목동": "양천구", "마곡": "강서구",
   "가산": "금천구", "구로": "구로구",
 };
-// 광역명("서울","경기") → 하위 행정구역 목록. 없으면 null.
+// 광역명(SIDO_GU 키 — "서울"·"경기"·"강원"·"충북"·"충남"·"대전"·"세종"·"부산"·"경남"·"인천") → 하위 행정구역
+// 목록(area 컬럼 표기 그대로, 접두 시도는 regionKeyFor로 "인천 중구" 형태 복원). 없으면 null.
+//   🧭 2026-09-06(#1007): 예전엔 서울·경기만 하드코딩 배열로 알아 강원·충북·충남·경남 등 도(道) 단위
+//   검색이 전량 0건이었다(discover.ts와 달리 SIDO_GU 전체를 안 훑음). SIDO_GU 단일출처를 그대로 순회하도록 일반화.
 function metroAreaList(region: string): string[] | null {
-  if (region === "서울" || region === "서울특별시") return SEOUL_GU;
-  if (region === "경기" || region === "경기도") return GYEONGGI_SI;
-  return null;
+  const guList = (SIDO_GU as Record<string, string[]>)[region];
+  if (!guList) return null;
+  return guList.map((gu) => regionKeyFor(region, gu));
 }
 
+// 🗺️ area↔region 매칭 — lib/regionList.ts areaMatchesRegion(단일출처, 2026-09-04)에 위임.
+//   과거엔 인천/대전/부산 접두·서울·경기 광역명만 여기 따로 처리해 강원·충북·충남·경남 도 단위 검색이
+//   전량 실패했다(#1007). 분류·매칭 로직 복제는 반복 사고의 원인이라 새로 만들지 않는다.
 function inRegion(area: string, region: string): boolean {
-  if (!region) return true;
-  const a = area ?? "";
-  // 🗺️ 인천 동명 구(중구·동구) 구분: 인천 area는 "인천 OO"로 저장, 서울/경기는 접두사 없음.
-  //   region이 "인천 OO"면 인천만, 아니면 인천 카페는 제외(서울 중구 ≠ 인천 중구).
-  // 🚨 재발방지(2026-07-26): area는 이미 정제된 정확한 키(lib/region.ts)라 부분일치(.includes)는
-  //   "동구"⊂"남동구" 같은 충돌을 부른다(discover.ts에서 실측 확인된 전례). 정확히 같은지만 비교한다.
-  // 🧭 2026-09-04 접두 일반화 — '인천'만 알던 특칙이 대전 편입으로 구멍(단일출처 PREFIXED_SIDOS).
-  const _pre = PREFIXED_SIDOS.find((ps) => region.startsWith(ps));
-  if (_pre) return a === region;
-  if (PREFIXED_SIDOS.some((ps) => a.startsWith(ps))) return (SIDO_GU as Record<string,string[]>)[region] ? a.startsWith(region) : false;
-  // 서울·경기 광역명 → 하위 구/시 목록으로 확장 매칭
-  const metroList = metroAreaList(region);
-  if (metroList) return metroList.some((g) => a.includes(g));
-  if (a.includes(region)) return true;
-  const short = region.replace(/(특별시|광역시|시|군|구)$/, "");
-  return short.length >= 2 && a.includes(short);
+  return areaMatchesRegion(area ?? "", region);
 }
 const occ = (text: string, kw: string) => (!text || !kw ? 0 : text.toLowerCase().split(kw.toLowerCase()).length - 1);
 
