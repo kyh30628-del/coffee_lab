@@ -257,10 +257,11 @@ export async function GET(req: NextRequest) {
     const regionGone = (await sql`SELECT area, COUNT(*)::int tot FROM cafes WHERE area IS NOT NULL GROUP BY area
       HAVING COUNT(*) FILTER (WHERE synth_updated IS NOT NULL) >= 30
          AND COUNT(*) FILTER (WHERE published) = 0
-         -- pending 제외(2026-09-03 2차): 신규 지역은 등급을 받아도 승격(finalizer) 전까지 pending으로 대기한다.
-         -- 세종이 발굴 당일 여기 걸렸다 — 절차 진행 중인 것은 '꺼진 것'이 아니다. 인천형 사고(라이브였다가
-         -- 꺼짐)는 pending이 아니므로 감지력은 그대로다.
-         AND COUNT(*) FILTER (WHERE NOT published AND synth_grade IN ('검증','참고') AND COALESCE(pipeline_status,'') <> 'pending') >= 5`.catch(() => [])) as any[];
+         -- 3차 수리(2026-09-06, 통영·기장 오탐 연속 — CEO 격노): '대량삭제'의 유일한 결정적 시그니처는
+         -- **공개 이력(pipeline_status='live') 있는 카페가 다수인데 현재 공개 0**이다. 신규 지역은 live가
+         -- 0이라 구조적으로 안 걸리고, 인천형 사고(라이브였다가 일괄 꺼짐)는 live 흔적이 남아 정확히 걸린다.
+         -- 이전 프록시(비pending 검증/참고 5+)는 5건 히스테리시스 대기(rejected·3~4건)까지 잡는 오탐원이었다.
+         AND COUNT(*) FILTER (WHERE pipeline_status = 'live') >= 5`.catch(() => [])) as any[];
     if (regionGone.length) integrity.push(`⚠️지역 통째 비공개 ${regionGone.length}곳(${regionGone.slice(0, 3).map((r) => r.area).join("·")}) — 대량삭제 의심`);
 
     // 🔧 치유 루프 폐쇄 — 비공개(excluded 등)된 카페의 오염 플래그는 '소비자 노출 remediated' → 자동 resolve.
