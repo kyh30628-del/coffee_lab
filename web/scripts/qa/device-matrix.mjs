@@ -50,7 +50,7 @@ for (const m of MATRIX) {
       if (cc) { if (mobile && m.dev.hasTouch) await p.touchscreen.tap(cc[0], cc[1]); else await p.mouse.click(cc[0], cc[1]); await p.waitForTimeout(2500); await dismiss(); r.steps.clusterTap = { cc, ...(await st()) }; cand = await findCand(); }
     }
     if (cand) { if (mobile && m.dev.hasTouch) await p.touchscreen.tap(cand[0], cand[1]); else await p.mouse.click(cand[0], cand[1]); await p.waitForTimeout(1800); }
-    if (cand && !(await st()).sel) { await p.touchscreen.tap(cand[0], cand[1]); await p.waitForTimeout(1500); r.steps.retry = { tap2: (await st()).sel }; if (!r.steps.retry.tap2) { await p.mouse.click(cand[0], cand[1]); await p.waitForTimeout(1500); r.steps.retry.mouse = (await st()).sel; } }
+    if (cand && !(await st()).sel) { if (mobile && m.dev.hasTouch) await p.touchscreen.tap(cand[0], cand[1]); else await p.mouse.click(cand[0], cand[1]); await p.waitForTimeout(1500); r.steps.retry = { tap2: (await st()).sel }; if (!r.steps.retry.tap2) { await p.mouse.click(cand[0], cand[1]); await p.waitForTimeout(1500); r.steps.retry.mouse = (await st()).sel; } }
     if (cand) r.steps.hit = await p.evaluate(([x,y]) => { const el = document.elementFromPoint(x,y); return el ? (el.tagName + '.' + String(el.className).slice(0,40) + (el.closest('.dcn-mk') ? ' IN-MK' : ' NOT-MK')) : null; }, cand);
     r.steps.afterTap = { cand, ...(await st()), panel: /길찾기/.test(await p.evaluate(() => document.body.innerText)) };
     await p.screenshot({ path: `${out}/DEV-${m.name}-3.png` });

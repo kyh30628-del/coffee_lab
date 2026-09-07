@@ -1441,9 +1441,16 @@ export default function Home() {
       try {
         const zL = ml.getZoom() + 1, cur = ml.getPitch();
         // 🏔️ 3D 지형(산이 실제로 솟음) — 3D ON이면 항상. 고도 타일은 무료 공개(AWS), 우리 비용 0.
-        //   ⚠️ WebKit(iOS Safari·iOS Chrome 포함)은 지형을 켜면 카메라 애니메이션이 영구 정지(isMoving=true, DEM 미로드 — 2026-09-07 실측) → Apple 엔진은 음영(hillshade)만, 3D 지형은 제외.
-        const terrainOk = typeof navigator !== "undefined" && !/apple/i.test(navigator.vendor || "");
-        try { const has = !!ml.getTerrain(); if (terrainOk && show3dRef.current && !has && ml.getSource("dcn-dem")) ml.setTerrain({ source: "dcn-dem", exaggeration: 1.35 }); else if ((!show3dRef.current || !terrainOk) && has) ml.setTerrain(null); } catch {}
+        //   ⚠️ 모바일(WebKit iOS·Android Chromium 모두)은 지형을 켜면 카메라 애니메이션이 영구 정지(isMoving=true — 2026-09-07 Playwright 실측, 운영에서 재현)
+        //   → 3D 지형은 **마우스 환경(데스크톱)에서만**, 모바일은 지형 음영(hillshade)만. 또 고도 소스가 다 실리고 카메라가 멈춘 상태에서만 켠다.
+        const terrainOk = typeof navigator !== "undefined" && !/apple/i.test(navigator.vendor || "") && typeof window !== "undefined" && window.matchMedia("(pointer: fine) and (hover: hover)").matches;
+        try {
+          const has = !!ml.getTerrain();
+          if (terrainOk && show3dRef.current && !has && ml.getSource("dcn-dem")) {
+            if (ml.isSourceLoaded("dcn-dem") && !ml.isMoving()) ml.setTerrain({ source: "dcn-dem", exaggeration: 1.35 });
+            else ml.once("idle", () => { try { if (show3dRef.current && !ml.getTerrain() && ml.isSourceLoaded("dcn-dem")) ml.setTerrain({ source: "dcn-dem", exaggeration: 1.35 }); } catch {} });
+          } else if ((!show3dRef.current || !terrainOk) && has) ml.setTerrain(null);
+        } catch {}
         // 자동 기울임: 동네(z≥15) 52° / 광역·산세(z 11~14) 38° / 전국(z<11) 평면 — 아직 안 기울인 상태(pitch≈0)에서만.
         const want = !show3dRef.current ? 0 : zL >= 15 ? 52 : zL >= 11 ? 38 : 0;
         // '손으로 기울인 각도'는 존중: 현재 각도가 우리가 마지막에 자동으로 준 값(또는 0)과 같을 때만 바꾼다.
