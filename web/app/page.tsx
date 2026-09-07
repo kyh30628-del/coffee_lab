@@ -1248,7 +1248,8 @@ export default function Home() {
     }
     // 화면상 셀 크기(px) — 이 안의 카페끼리 한 뭉치. 줌인하면 px 간격 벌어져 쪼개짐.
     //   z≥16(동네 골목 줌)부턴 셀을 줄여 '2·3개 뭉치'가 개별 핀으로 풀리게 — 명동·성수 실측에서 화면이 온통 ●2로 덮였음.
-    const CELL = z >= 17 ? 34 : z >= 16 ? 44 : 64;
+    //   줌별 튜닝(2026-09-07 CEO): 광역(z13~14)은 셀을 키워 '작은 뭉치 난립'을 줄이고, 골목(z16+)은 줄여 개별 핀으로.
+    const CELL = z >= 18 ? 26 : z >= 17 ? 34 : z >= 16 ? 44 : z >= 15 ? 64 : z >= 14 ? 84 : 100;
     const cells = new Map<string, Cafe[]>();
     for (const c of inView) {
       const p = map.project([c.lat, c.lng], z);
