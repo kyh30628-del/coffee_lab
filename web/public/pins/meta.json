@@ -1,0 +1,50 @@
+{
+ "pin-cand.png": {
+  "w": 154,
+  "h": 215,
+  "ratio": 1.3961,
+  "bytes": 30822
+ },
+ "pin-feat.png": {
+  "w": 154,
+  "h": 215,
+  "ratio": 1.3961,
+  "bytes": 33052
+ },
+ "pin-focus.png": {
+  "w": 154,
+  "h": 215,
+  "ratio": 1.3961,
+  "bytes": 32324
+ },
+ "pin-mine.png": {
+  "w": 154,
+  "h": 215,
+  "ratio": 1.3961,
+  "bytes": 32864
+ },
+ "pin-ref.png": {
+  "w": 154,
+  "h": 215,
+  "ratio": 1.3961,
+  "bytes": 31942
+ },
+ "pin-verified.png": {
+  "w": 154,
+  "h": 215,
+  "ratio": 1.3961,
+  "bytes": 30530
+ },
+ "puck-match.png": {
+  "w": 134,
+  "h": 130,
+  "ratio": 0.9701,
+  "bytes": 19085
+ },
+ "puck.png": {
+  "w": 134,
+  "h": 130,
+  "ratio": 0.9701,
+  "bytes": 19690
+ }
+}

@@ -322,7 +322,7 @@ function makeClusterHtml(cnt: number, hasMatch: boolean, verified = 0): string {
   const pct = Math.round((Math.min(cnt, Math.max(0, verified)) / Math.max(1, cnt)) * 100);
   // 🟤 3D 렌더 받침(퍽) 위에 숫자와 링을 얹는다 — 핀과 같은 조명·재질이라 한 세트로 보인다.
   return `<div class="dcn-cluster" style="transform:translate(-50%,-50%);cursor:pointer;">
-    <div class="dcn-cluster-body" style="width:${size}px;height:${Math.round(size * 0.965)}px;background-image:url(/pins/${hasMatch ? "puck-match" : "puck"}.png);">
+    <div class="dcn-cluster-body" style="width:${size}px;height:${Math.round(size * 0.97)}px;background-image:url(/pins/${hasMatch ? "puck-match" : "puck"}.png);">
       <span class="dcn-cluster-ring" style="background:conic-gradient(#8fbf7a 0 ${pct}%, rgba(253,250,244,0.28) ${pct}% 100%);"></span>
       <span class="dcn-cluster-n" style="font-size:${cnt >= 100 ? 12 : cnt >= 10 ? 13 : 14}px;">${cnt}</span>
     </div></div>`;
@@ -434,7 +434,7 @@ function makePinHtml(c: Cafe, isMatch: boolean, isFocus = false, isMine = false,
     </div>`;
   }
   const size = isMine ? 44 : isFocus ? 46 : feat ? 40 : (grade === "검증" || isMatch) ? 38 : 33;
-  // 🎨 3D 렌더 핀(three.js → public/pins/*.png, 알파) — 유광 세라믹 핀. 글리프(SVG)는 머리 중앙에 겹쳐 어떤 DPI에서도 또렷.
+  // 🎨 3D 렌더 핀(Blender Cycles → scripts/blender/render-pins.py → public/pins/*.png, 타이트 크롭·알파) — 유광 세라믹 핀. 글리프(SVG)는 머리 중앙(31.6%)에 겹쳐 어떤 DPI에서도 또렷.
   const sprite = isMine ? "mine" : isFocus ? "focus" : feat ? "feat" : grade === "검증" ? "verified" : grade === "참고" ? "ref" : "cand";
   const labelStyle = isMine ? "background:#d6336c;color:#fff;font-weight:700;"
     : isFocus ? "background:#b5703c;color:#fff;font-weight:700;"
@@ -446,7 +446,7 @@ function makePinHtml(c: Cafe, isMatch: boolean, isFocus = false, isMine = false,
   // 취향 일치(✓)는 머리 우상단 앰버 배지 — 색만으로는 검증(초록)과 구분이 안 됐던 문제 해결
   const matchBadge = isMatch && !isMine && !isFocus && !feat ? `<span class="dcn-pin-match" aria-hidden="true">✓</span>` : "";
   return `<div class="dcn-pin${feat ? " dcn-pin-feat" : ""}${isFocus ? " dcn-pin-focus" : ""}" data-cafe="${c.id}" style="transform:translate(-50%,-100%);text-align:center;">
-    <div class="dcn-pin-body" style="width:${size}px;height:${Math.round(size * 1.25)}px;background-image:url(/pins/pin-${sprite}.png);">
+    <div class="dcn-pin-body" style="width:${size}px;height:${Math.round(size * 1.396)}px;background-image:url(/pins/pin-${sprite}.png);">
       <span class="dcn-pin-shadow" aria-hidden="true"></span>
       <span class="dcn-pin-glyph">${glyph}</span>${matchBadge}</div>
     <div class="dcn-lbl" style="margin-top:2px;${labelStyle}padding:2px 7px;border-radius:8px;font-size:${isFocus || isMine ? 11 : 10}px;white-space:nowrap;display:inline-block;box-shadow:0 2px 6px rgba(0,0,0,0.26);">${esc}${vbGlyph((c as any).vb)}${suffix}</div>
@@ -1591,7 +1591,7 @@ export default function Home() {
         .dcn-enter { animation: dcnEnter .55s cubic-bezier(.2,.75,.25,1) both; }
         /* ① 골드(우선노출) 핀 — 퍼지는 크레마 링 2겹(시선 유도 + B2B 가치 강조) */
         @keyframes dcnHalo { 0% { box-shadow:0 0 0 0 rgba(224,163,46,0.7); opacity:1; } 100% { box-shadow:0 0 0 16px rgba(224,163,46,0); opacity:0; } }
-        .dcn-pin-feat .dcn-pin-body::after, .dcn-pin-focus .dcn-pin-body::after { content:""; position:absolute; left:8%; top:4%; width:84%; aspect-ratio:1; border-radius:50%; pointer-events:none; animation: dcnHalo 1.5s ease-out infinite; }
+        .dcn-pin-feat .dcn-pin-body::after, .dcn-pin-focus .dcn-pin-body::after { content:""; position:absolute; left:2%; top:-2%; width:96%; aspect-ratio:1; border-radius:50%; pointer-events:none; animation: dcnHalo 1.5s ease-out infinite; }
         .dcn-pin-focus .dcn-pin-body::after { animation-name: dcnHaloF; }
         @keyframes dcnHaloF { 0% { box-shadow:0 0 0 0 rgba(181,112,60,0.7); opacity:1; } 100% { box-shadow:0 0 0 16px rgba(181,112,60,0); opacity:0; } }
         /* ② 커피 드립 로딩 — 스피너 대신 잔에 방울이 떨어지고 김이 오르는 연출 */
@@ -1617,7 +1617,7 @@ export default function Home() {
         /* 🎯 카페 핀 상호작용 — hover 살짝 커짐, 선택(.dcn-sel)은 크게+맥동 링. 후보 소형점은 hover 때만 이름. */
         .dcn-pin .dcn-pin-body { position:relative; margin:0 auto; background-size:contain; background-position:center bottom; background-repeat:no-repeat; transform-origin:50% 100%; transition: transform .16s cubic-bezier(.2,.8,.3,1.2), filter .16s; }
         .dcn-pin:hover .dcn-pin-body { transform: scale(1.08); }
-        .dcn-pin-glyph { position:absolute; left:50%; top:36%; width:42%; aspect-ratio:1; transform:translate(-50%,-50%); display:block; filter: drop-shadow(0 1px 1px rgba(0,0,0,.35)); }
+        .dcn-pin-glyph { position:absolute; left:50%; top:31.6%; width:40%; aspect-ratio:1; transform:translate(-50%,-50%); display:block; filter: drop-shadow(0 1px 1px rgba(0,0,0,.35)); }
         .dcn-pin-shadow { position:absolute; left:50%; bottom:-5px; width:70%; height:16%; transform:translateX(-50%); border-radius:50%; background: radial-gradient(ellipse at center, rgba(50,33,20,.42), rgba(50,33,20,0) 70%); pointer-events:none; }
         .dcn-pin-match { position:absolute; right:-4%; top:2%; width:38%; aspect-ratio:1; border-radius:50%; background:#e0a32e; color:#fff; font-size:0.62em; font-weight:900; line-height:1; display:flex; align-items:center; justify-content:center; border:2px solid #fdfaf4; box-shadow:0 1px 3px rgba(0,0,0,.35); }
         .dcn-mk.dcn-sel { z-index: 900 !important; }
@@ -1632,10 +1632,10 @@ export default function Home() {
         .maplibregl-ctrl-top-left, .maplibregl-ctrl-top-right, .maplibregl-ctrl-bottom-left, .maplibregl-ctrl-bottom-right { z-index: 1000 !important; } /* 마커(≤900) 위·React 오버레이(1100) 아래 */
         .dcn-cluster .dcn-cluster-body { position:relative; background-size:contain; background-position:center; background-repeat:no-repeat; transition: transform .14s; filter: drop-shadow(0 3px 5px rgba(50,33,20,.35)); }
         .dcn-cluster:hover .dcn-cluster-body { transform: scale(1.1); }
-        .dcn-cluster-ring { position:absolute; left:0; top:0; width:100%; height:89.7%; border-radius:50%; -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3.5px)); mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3.5px)); pointer-events:none; }
-        .dcn-cluster-n { position:absolute; left:50%; top:44.8%; transform:translate(-50%,-50%); color:#fff; font-weight:800; letter-spacing:-0.3px; line-height:1; text-shadow:0 1px 2px rgba(0,0,0,.45); }
+        .dcn-cluster-ring { position:absolute; left:0; top:0; width:100%; height:90%; border-radius:50%; -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3.5px)); mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3.5px)); pointer-events:none; }
+        .dcn-cluster-n { position:absolute; left:50%; top:45.8%; transform:translate(-50%,-50%); color:#fff; font-weight:800; letter-spacing:-0.3px; line-height:1; text-shadow:0 1px 2px rgba(0,0,0,.45); }
         /* 범례 견본 */
-        .dcn-lg-img { width:12px; height:15px; object-fit:contain; flex:none; }
+        .dcn-lg-img { width:12px; height:17px; object-fit:contain; flex:none; }
         .dcn-lg-pin { display:inline-block; width:11px; height:11px; border-radius:50% 50% 50% 0; transform:rotate(-45deg); border:1.5px solid #fdfaf4; box-shadow:0 1px 2px rgba(0,0,0,.25); flex:none; }
         .dcn-lg-dot { display:inline-block; width:9px; height:9px; border-radius:50%; border:1.5px solid #fdfaf4; box-shadow:0 1px 2px rgba(0,0,0,.25); flex:none; margin:0 1px; }
         .dcn-lg-ring { display:inline-block; width:12px; height:12px; border-radius:50%; background: conic-gradient(#6f8f63 0 60%, rgba(120,90,60,.25) 60% 100%); flex:none; }
