@@ -297,33 +297,24 @@ const RankSpotlight = memo(function RankSpotlight({ top3, momentum, specialty, f
 function makeRegionPinHtml(label: string, cnt: number, maxCnt: number): string {
   // sqrt 스케일 — 한 지역이 압도적이어도 작은 지역끼리 크기 차이가 보이게(선형은 다 최소크기로 뭉침).
   const t = Math.sqrt(Math.min(1, cnt / Math.max(1, maxCnt)));
-  const size = Math.round(26 + t * 28); // 26~54px (작게 — 겹침 최소화)
-  // 농도 색: 적을수록 밝은 카라멜 → 많을수록 진한 에스프레소. 색만 봐도 어디가 많은지 한눈에.
-  const lerp = (a: number, b: number) => Math.round(a + (b - a) * t);
-  const r = lerp(206, 92), g = lerp(160, 56), b = lerp(110, 33);
-  const main = `rgb(${r},${g},${b})`, dark = `rgb(${Math.round(r * 0.68)},${Math.round(g * 0.68)},${Math.round(b * 0.68)})`;
+  const size = Math.round(30 + t * 28); // 30~58px
+  // 🟤 뭉치(클러스터)와 같은 3D 받침 — 스타일 통일. 농도는 밝기로(적을수록 밝은 카라멜, 많을수록 진한 에스프레소).
+  const bright = (1.35 - t * 0.45).toFixed(2);
   const esc = (label || "").replace(/</g, "&lt;");
   return `<div class="dcn-region-pin" style="transform:translate(-50%,-50%);text-align:center;cursor:pointer;">
-    <div style="width:${size}px;height:${size}px;border-radius:50%;
-      background:radial-gradient(circle at 33% 27%, ${main} 0%, ${dark} 80%);
-      border:2px solid rgba(253,250,244,0.97);
-      box-shadow:0 0 0 ${1 + Math.round(t * 3)}px rgba(124,82,48,0.13), 0 4px 11px rgba(50,33,20,0.42);
-      display:flex;align-items:center;justify-content:center;margin:0 auto;">
-      <span style="color:#fdf3e6;font-weight:800;font-size:${Math.round(11 + t * 5)}px;letter-spacing:-0.4px;line-height:1;text-shadow:0 1px 2px rgba(0,0,0,0.3);">${cnt}</span></div>
+    <div class="dcn-cluster-body" style="width:${size}px;height:${Math.round(size * 0.97)}px;background-image:url(/pins/puck.png);filter:brightness(${bright}) drop-shadow(0 3px 5px rgba(50,33,20,.35));margin:0 auto;">
+      <span class="dcn-cluster-n" style="font-size:${Math.round(11 + t * 5)}px;">${cnt}</span></div>
     <div style="margin-top:3px;background:rgba(43,32,24,0.9);color:#f3e6d2;font-weight:600;padding:1.5px 7px;border-radius:9px;font-size:10px;white-space:nowrap;display:inline-block;box-shadow:0 2px 5px rgba(0,0,0,0.22);">${esc}</div>
   </div>`;
 }
 
 // 카페 클러스터 뱃지 — 가까운 카페 여러 개를 한 뭉치로(픽셀 그리드). 개수 표시, 클릭하면 줌인되어 쪼개짐.
 //   집계 원형(makeRegionPinHtml=행정구역)과 달리 화면상 근접도 기준. 취향매칭 카페 포함 시 앰버 강조.
-function makeClusterHtml(cnt: number, hasMatch: boolean, verified = 0): string {
+function makeClusterHtml(cnt: number, hasMatch: boolean, _verified = 0): string {
   const size = cnt >= 100 ? 52 : cnt >= 30 ? 48 : cnt >= 10 ? 43 : cnt >= 4 ? 39 : 35;
-  // 🍩 검증 비율 링 — 뭉치 안에 '검증' 카페가 얼마나 있는지 초록 호(弧)로. 줌인 전에도 옥석 밀도가 보인다.
-  const pct = Math.round((Math.min(cnt, Math.max(0, verified)) / Math.max(1, cnt)) * 100);
-  // 🟤 3D 렌더 받침(퍽) 위에 숫자와 링을 얹는다 — 핀과 같은 조명·재질이라 한 세트로 보인다.
+  // 🟤 3D 렌더 받침(퍽) 위에 숫자만 — 핀과 같은 조명·재질이라 한 세트. (검증비율 게이지는 CEO 지시로 제거)
   return `<div class="dcn-cluster" style="transform:translate(-50%,-50%);cursor:pointer;">
     <div class="dcn-cluster-body" style="width:${size}px;height:${Math.round(size * 0.97)}px;background-image:url(/pins/${hasMatch ? "puck-match" : "puck"}.png);">
-      <span class="dcn-cluster-ring" style="background:conic-gradient(#8fbf7a 0 ${pct}%, rgba(253,250,244,0.28) ${pct}% 100%);"></span>
       <span class="dcn-cluster-n" style="font-size:${cnt >= 100 ? 12 : cnt >= 10 ? 13 : 14}px;">${cnt}</span>
     </div></div>`;
 }
@@ -357,6 +348,35 @@ function makeLandmarkHtml(name: string, icon: string): string {
     <span style="font-size:14px;line-height:1;filter:drop-shadow(0 1px 1px rgba(0,0,0,0.3));flex:none;">${icon}</span>
     <span style="font-size:10.5px;font-weight:700;color:#6b4310;background:rgba(255,250,240,0.95);border:1px solid #e3c79a;padding:0.5px 5px;border-radius:6px;box-shadow:0 1px 2px rgba(0,0,0,0.14);">${(name || "").replace(/</g, "&lt;")}</span>
   </div>`;
+}
+// 🖼️ 지도 절차 질감 — 캔버스로 그려 MapLibre addImage. 외부 파일·요청 0. (pixelRatio 2 기준 픽셀)
+//   물결: 깊은 파랑 바탕에 옅은 잔물결 2겹. 파사드 3종: 벽 색 + 창문 격자(사진처럼 보이게 창틀·유리 하이라이트).
+function makeMapTextures(): Record<string, ImageData> {
+  const out: Record<string, ImageData> = {};
+  const mk = (w: number, h: number, draw: (g: CanvasRenderingContext2D) => void) => { const c = document.createElement("canvas"); c.width = w; c.height = h; const g = c.getContext("2d")!; draw(g); return g.getImageData(0, 0, w, h); };
+  out["dcn-water"] = mk(64, 64, (g) => {
+    g.fillStyle = "#9cc0e2"; g.fillRect(0, 0, 64, 64);
+    g.strokeStyle = "rgba(255,255,255,0.22)"; g.lineWidth = 1.6;
+    for (let y = 6; y < 64; y += 16) { g.beginPath(); for (let x = 0; x <= 64; x += 4) g.lineTo(x, y + Math.sin((x / 64) * Math.PI * 2) * 2.2); g.stroke(); }
+    g.strokeStyle = "rgba(60,110,160,0.16)";
+    for (let y = 14; y < 64; y += 16) { g.beginPath(); for (let x = 0; x <= 64; x += 4) g.lineTo(x, y + Math.cos((x / 64) * Math.PI * 2) * 2.2); g.stroke(); }
+  });
+  const facade = (wall: string, frame: string, glass: string, glassHi: string, cols: number, rows: number, wr: number, hr: number) => (g: CanvasRenderingContext2D) => {
+    g.fillStyle = wall; g.fillRect(0, 0, 32, 32);
+    const cw = 32 / cols, ch = 32 / rows;
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      const x = c * cw + cw * (1 - wr) / 2, y = r * ch + ch * (1 - hr) / 2, w = cw * wr, h = ch * hr;
+      g.fillStyle = frame; g.fillRect(x, y, w, h);
+      g.fillStyle = glass; g.fillRect(x + 1, y + 1, w - 2, h - 2);
+      g.fillStyle = glassHi; g.fillRect(x + 1, y + 1, Math.max(1, (w - 2) * 0.45), Math.max(1, (h - 2) * 0.35));
+    }
+    // 층 구분선(슬래브)
+    g.fillStyle = "rgba(0,0,0,0.07)"; for (let r = 1; r < rows; r++) g.fillRect(0, r * ch - 0.5, 32, 1);
+  };
+  out["dcn-fac-low"] = mk(32, 32, facade("#e4d6bf", "#8a7658", "#5f6b76", "#b9c6d0", 2, 2, 0.48, 0.5));   // 저층: 베이지 벽·목재 창틀
+  out["dcn-fac-mid"] = mk(32, 32, facade("#d3cdc2", "#6e7076", "#55677a", "#a8bccb", 3, 3, 0.56, 0.5));   // 중층: 회백 콘크리트·알루미늄 창
+  out["dcn-fac-tall"] = mk(32, 32, facade("#aab7c3", "#7c8b98", "#6d8aa5", "#d3e1ec", 4, 4, 0.7, 0.62));  // 고층: 커튼월 유리
+  return out;
 }
 function makeIslandHtml(name: string): string {
   // 영토 표현 — 독도/울릉도. 태극 느낌 + 라벨.
@@ -433,7 +453,7 @@ function makePinHtml(c: Cafe, isMatch: boolean, isFocus = false, isMine = false,
       <div class="dcn-lbl" style="margin-top:2px;background:rgba(253,250,244,0.96);color:#4a3526;font-weight:600;padding:1px 6px;border-radius:7px;font-size:10px;white-space:nowrap;display:inline-block;box-shadow:0 2px 6px rgba(0,0,0,0.22);">${esc}</div>
     </div>`;
   }
-  const size = isMine ? 44 : isFocus ? 46 : feat ? 40 : (grade === "검증" || isMatch) ? 38 : 33;
+  const size = isMine ? 34 : isFocus ? 46 : feat ? 40 : (grade === "검증" || isMatch) ? 38 : 33; // 내 카페는 작게(CEO: 너무 커) — 색·하트로 충분히 구분됨
   // 🎨 3D 렌더 핀(Blender Cycles → scripts/blender/render-pins.py → public/pins/*.png, 타이트 크롭·알파) — 유광 세라믹 핀. 글리프(SVG)는 머리 중앙(31.6%)에 겹쳐 어떤 DPI에서도 또렷.
   const sprite = isMine ? "mine" : isFocus ? "focus" : feat ? "feat" : grade === "검증" ? "verified" : grade === "참고" ? "ref" : "cand";
   const labelStyle = isMine ? "background:#d6336c;color:#fff;font-weight:700;"
@@ -480,16 +500,16 @@ function makeCountPinHtml(p: { name: string; cnt: number }, maxCnt: number): str
 
 // 병합 핀 — 내가 저장한 카페를 다른 사람도 저장한 경우. 핑크 하트(내 추억) + 초록 인원 배지(다른 사람)로 한 핀에 표현.
 function makeMinePinHtml(c: Cafe, othersCnt: number): string {
+  // 내 카페(❤) + 다른 사람 인원 배지 — 일반 핀과 같은 3D 스프라이트(작게, CEO 지시)
+  const size = 34;
   const badge = othersCnt > 0
-    ? `<div style="position:absolute;top:-7px;right:-12px;background:#5f7355;color:#fff;border:2px solid #fdfaf4;border-radius:11px;min-width:22px;height:22px;line-height:18px;padding:0 5px;font-size:11px;font-weight:800;box-shadow:0 1px 4px rgba(0,0,0,0.35);">${othersCnt}</div>`
+    ? `<div style="position:absolute;top:-6px;right:-10px;background:#5f7355;color:#fff;border:2px solid #fdfaf4;border-radius:11px;min-width:20px;height:20px;line-height:16px;padding:0 5px;font-size:10px;font-weight:800;box-shadow:0 1px 4px rgba(0,0,0,0.35);">${othersCnt}</div>`
     : "";
-  return `<div style="transform:translate(-50%,-100%);text-align:center;">
-    <div style="position:relative;width:42px;height:42px;margin:0 auto;">
-      <div style="width:42px;height:42px;background:#d6336c;border:2px solid #fdfaf4;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 0 0 5px rgba(214,51,108,0.4),0 3px 10px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;">
-        <span style="transform:rotate(45deg);font-size:13px;">❤</span></div>
-      ${badge}
-    </div>
-    <div style="margin-top:2px;background:#d6336c;color:#fff;font-weight:700;padding:1px 6px;border-radius:7px;font-size:10px;white-space:nowrap;display:inline-block;">${c.name} ❤${othersCnt > 0 ? ` · ${othersCnt}명` : ""}</div>
+  return `<div class="dcn-pin" data-cafe="${c.id}" style="transform:translate(-50%,-100%);text-align:center;">
+    <div class="dcn-pin-body" style="width:${size}px;height:${Math.round(size * 1.396)}px;background-image:url(/pins/pin-mine.png);">
+      <span class="dcn-pin-shadow" aria-hidden="true"></span>
+      <span class="dcn-pin-glyph">${PIN_SVG.heart}</span>${badge}</div>
+    <div class="dcn-lbl" style="margin-top:2px;background:#d6336c;color:#fff;font-weight:700;padding:1px 6px;border-radius:7px;font-size:10px;white-space:nowrap;display:inline-block;box-shadow:0 2px 6px rgba(0,0,0,0.26);">${(c.name || "").replace(/</g, "&lt;")} ❤${othersCnt > 0 ? ` · ${othersCnt}명` : ""}</div>
   </div>`;
 }
 function topChars(c: Cafe, n = 4) {
@@ -655,6 +675,7 @@ export default function Home() {
   const [sheetMode, setSheetMode] = useState<"half" | "full">("half"); // 모바일 바텀시트 — 반만(지도+목록 동시) / 전체
   const markersByIdRef = useRef<Map<number, any>>(new Map()); // 카페id → 마커(선택 강조를 재그리기 없이 DOM 클래스로)
   const selectedRef = useRef<Cafe | null>(null);
+  const autoPitchRef = useRef(0); // 마지막으로 자동 적용한 기울기(사용자 조작과 구분용)
   // 선택된 카페 핀만 클래스로 강조(다시 그리지 않음 — 강남 밀집 84ms 재그리기 회피)
   const applySelectedPin = (id: number | null) => {
     try {
@@ -1021,6 +1042,12 @@ export default function Home() {
         if (!style || !style.layers) return;
         applied = true;
         try { ml.setPaintProperty("background", "background-color", "#f3ecdb"); } catch {}
+        // 🏔️ 지형: 무료 공개 고도 타일(AWS Terrain Tiles, terrarium, CORS 허용·키 없음) → 음영(hillshade) 항상 + 3D 지형은 3D 토글 효과에서 setTerrain.
+        try {
+          if (!ml.getSource("dcn-dem")) ml.addSource("dcn-dem", { type: "raster-dem", tiles: ["https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"], encoding: "terrarium", tileSize: 256, maxzoom: 15, attribution: "Terrain: Mapzen/AWS" });
+        } catch {}
+        // 🖼️ 절차 질감(캔버스 → addImage): 물결·파사드 3종. 실제 건물 사진은 타일에 없으므로 '사진 같은 창문 격자'로 형태·색감을 보완.
+        try { for (const [id, img] of Object.entries(makeMapTextures())) if (!ml.hasImage(id)) ml.addImage(id, img, { pixelRatio: 2 }); } catch {}
         // 🌤️ 3D 건물 조명 — 좌상단에서 비치는 따뜻한 빛(면마다 밝기 차 → 입체감)
         try { ml.setLight({ anchor: "viewport", color: "#fff4e0", intensity: 0.42, position: [1.15, 210, 30] }); } catch {}
         for (const ly of style.layers) {
@@ -1029,24 +1056,27 @@ export default function Home() {
           if (ly.type === "raster") { try { ml.setLayoutProperty(ly.id, "visibility", "none"); } catch {} continue; }
           // 토지구획(지적도) 파셀만 숨김 — landuse_residential/pitch/track/school 등
           if (sl === "landuse" || (/landuse/i.test(ly.id) && ly.type === "fill")) { try { ml.setLayoutProperty(ly.id, "visibility", "none"); } catch {} continue; }
-          // 산·녹지(공원/숲/잔디): 옅고 차분한 녹색(빽빽한 텍스처 없이).
+          // 산·녹지: 숲은 짙은 녹색, 잔디·공원은 밝은 녹색 — 지형 음영과 겹쳐 산세가 살아난다.
           if ((sl === "landcover" || sl === "park") && (ly.type === "fill" || ly.type === "fill-extrusion")) {
-            try { ml.setPaintProperty(ly.id, "fill-color", "#d3e1bd"); ml.setPaintProperty(ly.id, "fill-opacity", 0.55); ml.setLayoutProperty(ly.id, "visibility", "visible"); } catch {}
+            const wood = /wood|forest/i.test(ly.id);
+            try { ml.setPaintProperty(ly.id, "fill-color", wood ? "#a9c78f" : "#c4d9a6"); ml.setPaintProperty(ly.id, "fill-opacity", wood ? 0.78 : 0.7); ml.setLayoutProperty(ly.id, "visibility", "visible"); } catch {}
             continue;
           }
-          // 물 — 크림 지도에 어울리는 부드러운 파랑(원본은 채도가 높아 튐)
-          if (sl === "water" && ly.type === "fill") { try { ml.setPaintProperty(ly.id, "fill-color", "#b7cfe4"); } catch {} continue; }
-          if (sl === "waterway" && ly.type === "line") { try { ml.setPaintProperty(ly.id, "line-color", "#a9c4dc"); } catch {} }
+          // 🌊 물 — 깊은 파랑 + 잔물결 질감(절차 패턴). 호수·강·바다가 평면 색보다 살아 보인다.
+          if (sl === "water" && ly.type === "fill") { try { ml.setPaintProperty(ly.id, "fill-pattern", "dcn-water"); ml.setPaintProperty(ly.id, "fill-opacity", 1); } catch { try { ml.setPaintProperty(ly.id, "fill-color", "#9cc0e2"); } catch {} } continue; }
+          if (sl === "waterway" && ly.type === "line") { try { ml.setPaintProperty(ly.id, "line-color", "#8fb4d6"); } catch {} }
           // 🏢 건물: 평면(2D 폴백)은 크림 베이지, 3D 돌출은 벽면 그라데이션 + 높이(render_height) — 3D 토글이 표시 여부를 관리.
           if (ly.type === "fill" && /building/i.test(ly.id)) { try { ml.setPaintProperty(ly.id, "fill-color", "#ece2cf"); ml.setPaintProperty(ly.id, "fill-outline-color", "#dccfb4"); } catch {} continue; }
           if (ly.type === "fill-extrusion" && /building/i.test(ly.id)) {
             try {
-              ml.setPaintProperty(ly.id, "fill-extrusion-color", ["interpolate", ["linear"], ["coalesce", ["get", "render_height"], 8], 0, "#efe5d3", 30, "#e4d5bc", 120, "#d6c3a4"]);
               ml.setPaintProperty(ly.id, "fill-extrusion-height", ["coalesce", ["get", "render_height"], 8]);
               ml.setPaintProperty(ly.id, "fill-extrusion-base", ["coalesce", ["get", "render_min_height"], 0]);
-              ml.setPaintProperty(ly.id, "fill-extrusion-opacity", 0.92);
+              ml.setPaintProperty(ly.id, "fill-extrusion-opacity", 0.96);
               ml.setPaintProperty(ly.id, "fill-extrusion-vertical-gradient", true);
               ml.setLayerZoomRange(ly.id, 13, 24); // z14(Leaflet 15)부터 — 동네 골목 줌에서 입체
+              // 🏢 높이별 파사드 질감(창문 격자): 저층=베이지 벽·목재창 / 중층=콘크리트·유리창 / 고층=커튼월. 실제 서울 건물 색감(회백·베이지·유리)에 맞춤.
+              try { ml.setPaintProperty(ly.id, "fill-extrusion-pattern", ["step", ["coalesce", ["get", "render_height"], 8], "dcn-fac-low", 24, "dcn-fac-mid", 70, "dcn-fac-tall"]); }
+              catch { ml.setPaintProperty(ly.id, "fill-extrusion-color", ["interpolate", ["linear"], ["coalesce", ["get", "render_height"], 8], 0, "#e6dccb", 30, "#d5cec2", 120, "#b9c4cc"]); }
             } catch {}
             continue;
           }
@@ -1070,6 +1100,10 @@ export default function Home() {
             if (sl === "water_name" || /water_name|waterway/i.test(ly.id)) { try { ml.setPaintProperty(ly.id, "text-color", "#4a78a8"); } catch {} }
           }
         }
+        // 🏔️ 지형 음영 레이어 — 물 아래·녹지 위: 산자락이 크림 지도 위로 은은히 드러난다(따뜻한 그림자·크림 하이라이트).
+        try {
+          if (!ml.getLayer("dcn-hillshade")) ml.addLayer({ id: "dcn-hillshade", type: "hillshade", source: "dcn-dem", maxzoom: 17, paint: { "hillshade-exaggeration": 0.5, "hillshade-shadow-color": "#5c4433", "hillshade-highlight-color": "#fff9ec", "hillshade-accent-color": "#8a6a4a", "hillshade-illumination-direction": 335, "hillshade-illumination-anchor": "map" } }, ml.getLayer("water") ? "water" : undefined);
+        } catch {}
         // 초기 토글 상태(길이름/버스정류장/3D) 반영
         try { applyTogglesToMap(ml, showStreetsRef.current, showBusRef.current, show3dRef.current); } catch {}
       };
@@ -1267,7 +1301,7 @@ export default function Home() {
       if (!(c.lat >= pS && c.lat <= pN && c.lng >= pW && c.lng <= pE)) continue;
       if (pitched) {
         const pt = screenPt(c); if (!pt) continue;
-        if (pt.y < ch * 0.06 || pt.y > ch * 1.08 || pt.x < -cw * 0.08 || pt.x > cw * 1.08) continue; // 지평선 근처·화면 밖 제외
+        if (pt.y < ch * 0.10 || pt.y > ch * 1.08 || pt.x < -cw * 0.08 || pt.x > cw * 1.08) continue; // 지평선 근처(위 10%)·화면 밖 제외 — 원근으로 뭉개지는 먼 곳은 안 그린다
         scr.set(c.id, pt);
       }
       inView.push(c);
@@ -1406,8 +1440,15 @@ export default function Home() {
     const apply = () => {
       try {
         const zL = ml.getZoom() + 1, cur = ml.getPitch();
-        if (show3dRef.current && zL >= 15 && cur < 1) ml.easeTo({ pitch: 52, duration: 500, essential: true });
-        else if ((!show3dRef.current || zL < 14) && cur > 1) ml.easeTo({ pitch: 0, duration: 400, essential: true });
+        // 🏔️ 3D 지형(산이 실제로 솟음) — 3D ON이면 항상. 고도 타일은 무료 공개(AWS), 우리 비용 0.
+        //   ⚠️ WebKit(iOS Safari·iOS Chrome 포함)은 지형을 켜면 카메라 애니메이션이 영구 정지(isMoving=true, DEM 미로드 — 2026-09-07 실측) → Apple 엔진은 음영(hillshade)만, 3D 지형은 제외.
+        const terrainOk = typeof navigator !== "undefined" && !/apple/i.test(navigator.vendor || "");
+        try { const has = !!ml.getTerrain(); if (terrainOk && show3dRef.current && !has && ml.getSource("dcn-dem")) ml.setTerrain({ source: "dcn-dem", exaggeration: 1.35 }); else if ((!show3dRef.current || !terrainOk) && has) ml.setTerrain(null); } catch {}
+        // 자동 기울임: 동네(z≥15) 52° / 광역·산세(z 11~14) 38° / 전국(z<11) 평면 — 아직 안 기울인 상태(pitch≈0)에서만.
+        const want = !show3dRef.current ? 0 : zL >= 15 ? 52 : zL >= 11 ? 38 : 0;
+        // '손으로 기울인 각도'는 존중: 현재 각도가 우리가 마지막에 자동으로 준 값(또는 0)과 같을 때만 바꾼다.
+        const untouched = cur < 1 || Math.abs(cur - autoPitchRef.current) < 1;
+        if (untouched && Math.abs(cur - want) > 1) { autoPitchRef.current = want; ml.easeTo({ pitch: want, duration: want === 0 ? 400 : 500, essential: true }); }
       } catch {}
     };
     ml.on("zoomend", apply); apply();
@@ -1630,9 +1671,8 @@ export default function Home() {
         .dcn-pin-mini:hover .dcn-lbl, .dcn-mk.dcn-sel .dcn-pin-mini .dcn-lbl { display:inline-block !important; }
         .dcn-mk:hover { z-index: 800 !important; }
         .maplibregl-ctrl-top-left, .maplibregl-ctrl-top-right, .maplibregl-ctrl-bottom-left, .maplibregl-ctrl-bottom-right { z-index: 1000 !important; } /* 마커(≤900) 위·React 오버레이(1100) 아래 */
-        .dcn-cluster .dcn-cluster-body { position:relative; background-size:contain; background-position:center; background-repeat:no-repeat; transition: transform .14s; filter: drop-shadow(0 3px 5px rgba(50,33,20,.35)); }
-        .dcn-cluster:hover .dcn-cluster-body { transform: scale(1.1); }
-        .dcn-cluster-ring { position:absolute; left:0; top:0; width:100%; height:90%; border-radius:50%; -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3.5px)); mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3.5px)); pointer-events:none; }
+        .dcn-cluster-body { position:relative; background-size:contain; background-position:center; background-repeat:no-repeat; transition: transform .14s; filter: drop-shadow(0 3px 5px rgba(50,33,20,.35)); }
+        .dcn-cluster:hover .dcn-cluster-body, .dcn-region-pin:hover .dcn-cluster-body { transform: scale(1.1); }
         .dcn-cluster-n { position:absolute; left:50%; top:45.8%; transform:translate(-50%,-50%); color:#fff; font-weight:800; letter-spacing:-0.3px; line-height:1; text-shadow:0 1px 2px rgba(0,0,0,.45); }
         /* 범례 견본 */
         .dcn-lg-img { width:12px; height:17px; object-fit:contain; flex:none; }
@@ -1831,7 +1871,7 @@ export default function Home() {
                       <span className="inline-flex items-center gap-1.5"><span className="relative inline-block"><img className="dcn-lg-img" src="/pins/pin-ref.png" alt="" /><i className="absolute -right-1 -top-1 w-2.5 h-2.5 rounded-full text-[7px] font-black text-white flex items-center justify-center" style={{ background: "#e0a32e" }}>✓</i></span>취향 일치 ✓</span>
                       <span className="inline-flex items-center gap-1.5"><img className="dcn-lg-img" src="/pins/pin-feat.png" alt="" />우선 노출 ★</span>
                       <span className="inline-flex items-center gap-1.5"><img className="dcn-lg-img" src="/pins/pin-mine.png" alt="" />내 카페 ❤</span>
-                      <span className="inline-flex items-center gap-1.5 col-span-2 pt-1 mt-0.5 border-t border-[#eee2d2] text-[#665036]"><i className="dcn-lg-ring" />뭉치의 초록 테두리 = 검증 비율</span>
+                      <span className="inline-flex items-center gap-1.5 col-span-2 pt-1 mt-0.5 border-t border-[#eee2d2] text-[#665036]"><img className="dcn-lg-img" src="/pins/puck.png" alt="" style={{ height: 12 }} />숫자 받침 = 근처 카페 묶음(누르면 확대)</span>
                     </div>
                   </div>
                 ) : (

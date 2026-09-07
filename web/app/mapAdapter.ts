@@ -141,7 +141,7 @@ export class MapA {
   flyToBounds(b: LB, opts?: { padding?: [number, number]; maxZoom?: number; duration?: number }): void {
     const [px, py] = opts?.padding ?? [40, 40];
     try {
-      this.ml.fitBounds([[b.w, b.s], [b.e, b.n]], { padding: { top: py, bottom: py, left: px, right: px }, maxZoom: (opts?.maxZoom ?? 18) - ZOFF, duration: Math.round((opts?.duration ?? 0.45) * 1000), essential: true, pitch: 0 });
+      this.ml.fitBounds([[b.w, b.s], [b.e, b.n]], { padding: { top: py, bottom: py, left: px, right: px }, maxZoom: (opts?.maxZoom ?? 18) - ZOFF, duration: Math.round((opts?.duration ?? 0.45) * 1000), essential: true });
     } catch {}
   }
   on(ev: string, fn: () => void): void { this.ml.on(ev as any, fn); }
