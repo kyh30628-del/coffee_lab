@@ -43,7 +43,8 @@ for (const m of MATRIX) {
     await p.screenshot({ path: `${out}/DEV-${m.name}-2.png` });
     // 화면 안 핀을 진짜 터치/클릭
     const mobile = !!m.dev.isMobile;
-    const findCand = () => p.evaluate(() => [...document.querySelectorAll('.dcn-pin:not(.dcn-pin-mini) .dcn-pin-body')].map(e => { const b = e.getBoundingClientRect(); return [b.x + b.width / 2, b.y + b.height * 0.4]; }).filter(([x, y]) => y > 130 && y < window.innerHeight * 0.42 && x > 90 && x < window.innerWidth - 90)[0] || null);
+    // 후보 = 화면 안 + 그 지점의 최상위 요소가 '그 핀'인 것(뭉치·라벨에 덮인 핀은 제외 — Mac Safari 실측에서 뭉치가 덮은 핀을 눌러 오탐)
+    const findCand = () => p.evaluate(() => [...document.querySelectorAll('.dcn-pin:not(.dcn-pin-mini) .dcn-pin-body')].map(e => { const b = e.getBoundingClientRect(); const x = b.x + b.width / 2, y = b.y + b.height * 0.4; const h = document.elementFromPoint(x, y); return h && e.contains(h) ? [x, y] : null; }).filter(c => c && c[1] > 130 && c[1] < window.innerHeight * 0.42 && c[0] > 90 && c[0] < window.innerWidth - 90)[0] || null);
     let cand = await findCand();
     if (!cand) { // 화면 안에 단독 핀이 없으면 뭉치를 탭해 줌인 후 다시
       const cc = await p.evaluate(() => [...document.querySelectorAll('.dcn-cluster-body')].map(e => { const b = e.getBoundingClientRect(); return [b.x + b.width / 2, b.y + b.height / 2]; }).filter(([x, y]) => y > 130 && y < window.innerHeight * 0.42 && x > 90 && x < window.innerWidth - 90)[0] || null);
