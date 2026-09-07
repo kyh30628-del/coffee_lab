@@ -1439,6 +1439,15 @@ export default function Home() {
     return () => { map.off("drag", live); map.off("moveend", final); if (timer) clearTimeout(timer); };
   }, [drawMarkers, mapReady, dong, focusId, myPinMode, othersMode]);
 
+  // 🗺️ 상세 패널이 열린 채로 지도를 움직일 수 있게 한 뒤(패널이 포인터를 통과시킴), '지도 빈 곳 클릭'을 닫기로 쓴다.
+  //    MapLibre의 click은 드래그와 구분되므로 팬 도중에는 닫히지 않는다. 핀은 자체 핸들러에서 stopPropagation → 여기 안 오고 그 카페로 전환된다.
+  useEffect(() => {
+    const ml = mlRef.current; if (!ml || !mapReady) return;
+    const onMapClick = () => { if (selectedRef.current) setSelected(null); };
+    ml.on("click", onMapClick);
+    return () => { try { ml.off("click", onMapClick); } catch {} };
+  }, [mapReady]);
+
   // 길이름·버스정류장 토글 → 벡터 레이어 visibility 적용(스타일 로드 후엔 styledata로도 한 번 더 보장)
   useEffect(() => {
     if (!mapReady) return;
@@ -2346,9 +2355,12 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
     } catch { /* 사용자 취소 */ }
   };
   return (
-    <div className="fixed inset-0 z-[3000] overflow-hidden" style={{ fontFamily: "'Gowun Batang', AppleMyungjo, 'Apple SD Gothic Neo', 'Noto Serif KR', serif" }}>
-      <div onClick={onClose} className={`absolute inset-0 bg-black/30 transition-opacity duration-300 ${shown ? "opacity-100" : "opacity-0"}`} />
-      <aside className={`absolute top-0 right-0 w-full md:max-w-md bg-[#fdfaf4] shadow-2xl overflow-y-auto transition-transform duration-300 ease-out motion-reduce:transition-none ${shown ? "translate-x-0" : "translate-x-full"}`} style={{ height: "100dvh", paddingTop: "env(safe-area-inset-top)" }}>
+    // 🗺️ 상세가 열려 있어도 **지도는 계속 쓸 수 있다**(CEO 지시) — 껍데기는 포인터를 통과시키고 패널만 받는다.
+    //    데스크톱: 딤·클릭가로채기 없음(지도 팬·줌·다른 핀 선택 그대로). 닫기는 ✕·뒤로가기·지도 빈 곳 클릭.
+    //    모바일: 패널이 화면을 꽉 채우므로 예전처럼 딤+바깥탭 닫기 유지(전환 애니메이션 중에만 보임).
+    <div className="fixed inset-0 z-[3000] overflow-hidden pointer-events-none" style={{ fontFamily: "'Gowun Batang', AppleMyungjo, 'Apple SD Gothic Neo', 'Noto Serif KR', serif" }}>
+      <div onClick={onClose} className={`absolute inset-0 bg-black/30 pointer-events-auto md:bg-transparent md:pointer-events-none transition-opacity duration-300 ${shown ? "opacity-100" : "opacity-0"}`} />
+      <aside className={`absolute top-0 right-0 w-full md:max-w-md bg-[#fdfaf4] shadow-2xl overflow-y-auto pointer-events-auto transition-transform duration-300 ease-out motion-reduce:transition-none ${shown ? "translate-x-0" : "translate-x-full"}`} style={{ height: "100dvh", paddingTop: "env(safe-area-inset-top)" }}>
         {/* 사장님 쇼케이스 — 영상(style 0) 또는 10종 템플릿 */}
         {promo && (
           <>
