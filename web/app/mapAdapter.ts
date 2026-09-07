@@ -37,8 +37,12 @@ type Item = MarkerA | LayerGroupA | LineFeat | CircleFeat;
 export class MarkerA {
   el: HTMLDivElement;
   mk: maplibregl.Marker;
+  /** 재사용 키 — 위치·z순서·HTML이 같으면 '같은 마커'로 보고 DOM을 유지한다(깜빡임의 원인 제거). */
+  readonly key: string;
   private popupHtml: string | null = null;
   private popup: maplibregl.Popup | null = null;
+  private handler: (() => void) | null = null;
+  private proxy: MarkerA | null = null; // 재사용돼 버려진 객체 → 살아 있는 마커로 위임(getElement/openPopup)
   private gl: GL;
   private ml: maplibregl.Map | null = null;
   constructor(gl: GL, latlng: LatLngTuple, opts: { html: string; zIndexOffset?: number; interactive?: boolean }) {
@@ -53,14 +57,23 @@ export class MarkerA {
     if (opts.interactive === false) el.style.pointerEvents = "none";
     el.innerHTML = opts.html;
     this.el = el;
+    this.key = `${latlng[0].toFixed(6)},${latlng[1].toFixed(6)}|${opts.zIndexOffset ?? 0}|${opts.interactive === false ? "s" : "i"}|${opts.html}`;
+    el.addEventListener("click", (e) => { e.stopPropagation(); this.handler?.(); }); // 핸들러는 필드로 — 재사용 시 최신 것으로 갈아끼운다
     this.mk = new gl.Marker({ element: el, anchor: "center" }).setLngLat([latlng[1], latlng[0]]);
   }
   on(ev: string, fn: () => void): this {
-    if (ev === "click") this.el.addEventListener("click", (e) => { e.stopPropagation(); fn(); });
+    if (ev === "click") this.handler = fn;
     return this;
+  }
+  /** 같은 키의 새 마커가 들어오면, 살아 있는 이 마커가 그 역할(핸들러·팝업)을 넘겨받는다. DOM은 그대로 → 깜빡임 없음. */
+  adopt(fresh: MarkerA): void {
+    this.handler = (fresh as any).handler;
+    this.popupHtml = (fresh as any).popupHtml;
+    (fresh as any).proxy = this;
   }
   bindPopup(html: string): this { this.popupHtml = html; return this; }
   openPopup(): void {
+    if (this.proxy) return this.proxy.openPopup();
     if (!this.ml || !this.popupHtml) return;
     try {
       this.popup?.remove();
@@ -68,7 +81,7 @@ export class MarkerA {
         .setLngLat(this.mk.getLngLat()).setHTML(this.popupHtml).addTo(this.ml);
     } catch {}
   }
-  getElement(): HTMLElement { return this.el; }
+  getElement(): HTMLElement { return this.proxy ? this.proxy.getElement() : this.el; }
   addTo(target: MapA | maplibregl.Map): this { const ml = target instanceof MapA ? target.ml : target; this.ml = ml; this.mk.addTo(ml); return this; }
   remove(): void { try { this.popup?.remove(); } catch {} this.popup = null; try { this.mk.remove(); } catch {} }
 }
@@ -79,19 +92,30 @@ export class LayerGroupA {
   private map: MapA | null = null;
   private lines: LineFeat[] = [];
   private circles: CircleFeat[] = [];
-  private markers: MarkerA[] = [];
+  /** 화면에 붙어 있는 마커(키→마커). 다시 그릴 때 같은 키는 DOM을 그대로 재사용한다. */
+  private live = new Map<string, MarkerA>();
+  private recycle: Map<string, MarkerA> | null = null;
+  private shapesDirty = false;
   constructor(items: Item[] = []) { this.items = items; }
   addTo(map: MapA): this { this.map = map; map.ensureOverlaySources(); return this; }
   addLayer(item: Item): this {
     if (!this.map) { this.items.push(item); return this; }
     this.collect(item);
-    this.flushShapes();
+    if (this.shapesDirty) { this.shapesDirty = false; this.flushShapes(); }
     return this;
   }
   private collect(item: Item) {
-    if (item instanceof MarkerA) { item.addTo(this.map!); this.markers.push(item); return; }
+    if (item instanceof MarkerA) {
+      let k = item.key, i = 1;
+      while (this.live.has(k)) k = item.key + "#" + ++i; // 완전히 같은 마커가 둘이면 결정론적으로 구분
+      const old = this.recycle?.get(k);
+      if (old) { this.recycle!.delete(k); old.adopt(item); this.live.set(k, old); return; } // 재사용 — DOM 유지
+      item.addTo(this.map!); this.live.set(k, item);
+      return;
+    }
     if (item instanceof LayerGroupA) { for (const it of item.items) this.collect(it); return; }
     if (item.kind === "line") this.lines.push(item); else this.circles.push(item);
+    this.shapesDirty = true;
   }
   private flushShapes() {
     const map = this.map!;
@@ -104,10 +128,14 @@ export class LayerGroupA {
       features: this.circles.map((c) => ({ type: "Feature", properties: { color: c.color, weight: c.weight, fill: c.fillColor, fillOpacity: c.fillOpacity }, geometry: { type: "Polygon", coordinates: [circlePoly(c.lat, c.lng, c.radius)] } })),
     });
   }
+  /** 지우기 = '재사용 후보'로 옮겨두기. 같은 프레임 안에서 다시 추가된 마커는 그대로 살아남고, 안 쓰인 것만 마이크로태스크에서 제거된다. */
   clearLayers(): void {
-    for (const m of this.markers) m.remove();
-    this.markers = []; this.lines = []; this.circles = [];
+    if (!this.recycle) this.recycle = new Map();
+    for (const [k, m] of this.live) { if (this.recycle.has(k)) m.remove(); else this.recycle.set(k, m); }
+    this.live = new Map();
+    this.lines = []; this.circles = [];
     if (this.map) this.flushShapes();
+    queueMicrotask(() => { const r = this.recycle; this.recycle = null; if (r) for (const m of r.values()) m.remove(); });
   }
 }
 

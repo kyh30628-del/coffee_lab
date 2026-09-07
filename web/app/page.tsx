@@ -378,6 +378,26 @@ function makeMapTextures(): Record<string, ImageData> {
   out["dcn-fac-tall"] = mk(32, 32, facade("#aab7c3", "#7c8b98", "#6d8aa5", "#d3e1ec", 4, 4, 0.7, 0.62));  // 고층: 커튼월 유리
   return out;
 }
+// 🗺️ '실제로 보이는 가까운 화면'의 위경도 경계 — 기울인 화면의 bounds는 지평선까지 포함한 사다리꼴이라 엄청나게 넓다.
+//   화면 아래쪽(가까운 곳)만 네 귀퉁이로 역투영해 상자를 만든다. 회전(bearing)도 네 점이라 자동 반영.
+//   ⚠️ 이 상자는 '카메라 자세'로만 정해지고 마커 소속과 무관 → 팬 중에도 안정적이라 재그리기 생략의 근거가 된다.
+function nearViewBox(mlv: any): { s: number; n: number; w: number; e: number } | null {
+  try {
+    const el = mlv.getContainer(); const w = el.clientWidth, h = el.clientHeight;
+    if (!w || !h) return null;
+    const pitch = mlv.getPitch?.() ?? 0;
+    const topY = pitch > 40 ? h * 0.34 : pitch > 1 ? h * 0.2 : 0; // 많이 기울일수록 먼 곳을 더 잘라낸다
+    let s = 90, n = -90, we = 180, e = -180;
+    for (const [x, y] of [[0, topY], [w, topY], [0, h], [w, h]] as [number, number][]) {
+      const ll = mlv.unproject([x, y]);
+      if (!Number.isFinite(ll.lat) || !Number.isFinite(ll.lng)) return null;
+      if (ll.lat < s) s = ll.lat; if (ll.lat > n) n = ll.lat;
+      if (ll.lng < we) we = ll.lng; if (ll.lng > e) e = ll.lng;
+    }
+    if (e - we > 180) return null; // 날짜변경선 등 이상값 → 폴백
+    return { s, n, w: we, e };
+  } catch { return null; }
+}
 function makeIslandHtml(name: string): string {
   // 영토 표현 — 독도/울릉도. 태극 느낌 + 라벨.
   return `<div style="transform:translate(-50%,-50%);display:flex;align-items:center;gap:3px;white-space:nowrap;">
@@ -1283,28 +1303,19 @@ export default function Home() {
     //   경계를 숫자 4개로 풀어 단일 패스 비교(할당 0). 아울러 **화면보다 50% 넓게(pad)** 걸러 그려 두면
     //   그 여유 안에서 팬(드래그)하는 동안은 재그리기를 통째로 건너뛸 수 있다(아래 lastDrawRef).
     //   클러스터 셀은 절대 픽셀 좌표 기준이라 팬으로는 소속이 안 바뀐다 — 여유분만 있으면 화면이 정확하다.
-    // 🏢 기울인(3D) 화면은 지평선 쪽 경계가 매우 넓다(bounds가 사다리꼴 전체) → 여유분을 줄이고, 화면 좌표로 걸러 먼 곳(위쪽 6%)은 버린다.
-    //   Leaflet 시절 pad 0.5(면적 7.8배)는 MapLibre DOM 마커엔 과함(z15 기울임에서 1,857개 실측) → 평면 0.3·기울임 0.05.
+    // 🏢 기울인(3D) 화면의 bounds는 지평선까지 품은 사다리꼴이라 그대로 쓰면 안 된다 → nearViewBox(가까운 화면만)로 상자를 잡고 여유(pad)를 준다.
+    //   ⚠️ 2026-09-07 수리: 예전엔 기울임일 때 **화면 좌표로 클러스터**를 묶어, 팬할 때마다 소속이 바뀌며 뭉치가 갈라지고 붙어
+    //      "마커가 정신없이 움직인다"(CEO 지적). 이제 평면·기울임 모두 **절대 월드 픽셀 셀**이라 팬으로는 소속이 절대 안 바뀐다.
     const mlv: any = mlRef.current;
-    const pitched = !!mlv && (mlv.getPitch?.() ?? 0) > 1;
-    const pb = b.pad(pitched ? 0.05 : 0.3);
-    const pS = pb.getSouth(), pN = pb.getNorth(), pW = pb.getWest(), pE = pb.getEast();
-    const cw = mlv?.getContainer?.()?.clientWidth ?? 1000, ch = mlv?.getContainer?.()?.clientHeight ?? 800;
-    const screenPt = (c: Cafe): { x: number; y: number } | null => {
-      try { const pt = mlv.project([c.lng, c.lat]); return { x: pt.x, y: pt.y }; } catch { return null; }
-    };
+    const nb = mlv ? nearViewBox(mlv) : null;
+    const raw = nb ?? { s: b.getSouth(), n: b.getNorth(), w: b.getWest(), e: b.getEast() };
+    const dLat = (raw.n - raw.s) * 0.35, dLng = (raw.e - raw.w) * 0.35; // 화면보다 넉넉히 그려 두면 그 안에서 팬하는 동안 재그리기 0
+    const pS = raw.s - dLat, pN = raw.n + dLat, pW = raw.w - dLng, pE = raw.e + dLng;
     markersByIdRef.current = new Map();
     const inView: Cafe[] = [];
-    const scr = new Map<number, { x: number; y: number }>(); // 기울임 시 화면 좌표(클러스터 셀·컬링 공용)
     for (const c of cafes) {
       if (!c.lat || !c.lng) continue;
-      if (!(c.lat >= pS && c.lat <= pN && c.lng >= pW && c.lng <= pE)) continue;
-      if (pitched) {
-        const pt = screenPt(c); if (!pt) continue;
-        if (pt.y < ch * 0.10 || pt.y > ch * 1.08 || pt.x < -cw * 0.08 || pt.x > cw * 1.08) continue; // 지평선 근처(위 10%)·화면 밖 제외 — 원근으로 뭉개지는 먼 곳은 안 그린다
-        scr.set(c.id, pt);
-      }
-      inView.push(c);
+      if (c.lat >= pS && c.lat <= pN && c.lng >= pW && c.lng <= pE) inView.push(c);
     }
     // 화면상 셀 크기(px) — 이 안의 카페끼리 한 뭉치. 줌인하면 px 간격 벌어져 쪼개짐.
     //   z≥16(동네 골목 줌)부턴 셀을 줄여 '2·3개 뭉치'가 개별 핀으로 풀리게 — 명동·성수 실측에서 화면이 온통 ●2로 덮였음.
@@ -1312,8 +1323,8 @@ export default function Home() {
     const CELL = z >= 18 ? 26 : z >= 17 ? 34 : z >= 16 ? 44 : z >= 15 ? 64 : z >= 14 ? 84 : 100;
     const cells = new Map<string, Cafe[]>();
     for (const c of inView) {
-      // 평면: 절대 월드 픽셀 셀(팬에 소속 불변). 기울임: 화면 픽셀 셀(원근으로 촘촘해진 먼 곳이 자연히 더 크게 뭉침) — 팬마다 재클러스터.
-      const p = pitched ? scr.get(c.id)! : map.project([c.lat, c.lng], z);
+      // 절대 월드 픽셀 셀 — 팬으로 소속이 바뀌지 않는다(화면 좌표를 쓰면 움직일 때마다 뭉치가 갈라진다).
+      const p = map.project([c.lat, c.lng], z);
       const k = Math.floor(p.x / CELL) + ":" + Math.floor(p.y / CELL);
       const arr = cells.get(k); if (arr) arr.push(c); else cells.set(k, [c]);
     }
@@ -1374,7 +1385,7 @@ export default function Home() {
     if (focusM) (focusM as any).openPopup();
     applySelectedPin(selectedRef.current?.id ?? null);
     // ⚡ 방금 그린 범위(패딩 포함)와 줌을 기억 — live/final이 "다시 그릴 필요가 있나"를 판단하는 근거.
-    lastDrawRef.current = pitched ? null : { z, s: pS, n: pN, w: pW, e: pE }; // 기울임 상태는 화면 셀이라 팬마다 다시 그린다
+    lastDrawRef.current = { z, s: pS, n: pN, w: pW, e: pE }; // 기울임 포함 — 이 상자 안에서 움직이는 동안은 다시 안 그린다
   }, [filtered, matchSet, sido, sigungu, dong, focusId, myPinMode, myCafeIds, othersMode, othersPins, cafes, stations, exits, lines, landmarks, nearMe]);
 
   // 데이터/지역/모드 변경 시: 화면을 맞춘 뒤 마커를 그린다(맞춘 화면 기준으로 그려짐).
@@ -1416,8 +1427,10 @@ export default function Home() {
     const needRedraw = () => {
       const last = lastDrawRef.current; if (!last) return true;
       if (map.getZoom() !== last.z) return true;
-      const vb2 = map.getBounds();
-      return vb2.getSouth() < last.s || vb2.getNorth() > last.n || vb2.getWest() < last.w || vb2.getEast() > last.e;
+      const mlv: any = mlRef.current;
+      const nb = mlv ? nearViewBox(mlv) : null; // 그릴 때와 똑같은 기준(가까운 화면)으로 비교해야 판단이 일치한다
+      const cur = nb ?? (() => { const v = map.getBounds(); return { s: v.getSouth(), n: v.getNorth(), w: v.getWest(), e: v.getEast() }; })();
+      return cur.s < last.s || cur.n > last.n || cur.w < last.w || cur.e > last.e;
     };
     const live = () => { if (timer) return; timer = setTimeout(() => { timer = null; if (needRedraw()) drawMarkers(); }, 120); }; // 유저 드래그 중 ~120ms마다(필요할 때만) 재클러스터
     const final = () => { if (timer) { clearTimeout(timer); timer = null; } if (needRedraw()) drawMarkers(); }; // 멈춤·줌끝 → 필요 시 1회
@@ -1445,11 +1458,16 @@ export default function Home() {
         //   → 3D 지형은 **마우스 환경(데스크톱)에서만**, 모바일은 지형 음영(hillshade)만. 또 고도 소스가 다 실리고 카메라가 멈춘 상태에서만 켠다.
         const terrainOk = typeof navigator !== "undefined" && !/apple/i.test(navigator.vendor || "") && typeof window !== "undefined" && window.matchMedia("(pointer: fine) and (hover: hover)").matches;
         try {
+          // 🏔️ 지형은 산세가 보이는 광역(38° 구간, z<15)에서만. 동네·골목 줌에선 건물이 주인공이고, 지형이 켜져 있으면
+          //    마커 높이를 매 프레임 지형에 붙여 다시 계산해 **핀이 미세하게 떨린다**(CEO 지적: 최대 줌에서 정신없이 움직임).
+          //    → 기울기 밴드와 일치시킨다: 38°(광역)=지형 ON, 52°(동네)=지형 OFF.
           const has = !!ml.getTerrain();
-          if (terrainOk && show3dRef.current && !has && ml.getSource("dcn-dem")) {
+          const wantTerrain = terrainOk && show3dRef.current && zL < 15;
+          if (!wantTerrain && has) { ml.setTerrain(null); }
+          else if (wantTerrain && !has && ml.getSource("dcn-dem")) {
             if (ml.isSourceLoaded("dcn-dem") && !ml.isMoving()) ml.setTerrain({ source: "dcn-dem", exaggeration: 1.35 });
-            else ml.once("idle", () => { try { if (show3dRef.current && !ml.getTerrain() && ml.isSourceLoaded("dcn-dem")) ml.setTerrain({ source: "dcn-dem", exaggeration: 1.35 }); } catch {} });
-          } else if ((!show3dRef.current || !terrainOk) && has) ml.setTerrain(null);
+            else ml.once("idle", () => { try { if (show3dRef.current && !ml.getTerrain() && ml.isSourceLoaded("dcn-dem") && (ml.getZoom() + 1) < 15) ml.setTerrain({ source: "dcn-dem", exaggeration: 1.35 }); } catch {} });
+          }
         } catch {}
         // 자동 기울임: 동네(z≥15) 52° / 광역·산세(z 11~14) 38° / 전국(z<11) 평면 — 아직 안 기울인 상태(pitch≈0)에서만.
         const want = !show3dRef.current ? 0 : zL >= 15 ? 52 : zL >= 11 ? 38 : 0;
