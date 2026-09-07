@@ -317,16 +317,14 @@ function makeRegionPinHtml(label: string, cnt: number, maxCnt: number): string {
 // 카페 클러스터 뱃지 — 가까운 카페 여러 개를 한 뭉치로(픽셀 그리드). 개수 표시, 클릭하면 줌인되어 쪼개짐.
 //   집계 원형(makeRegionPinHtml=행정구역)과 달리 화면상 근접도 기준. 취향매칭 카페 포함 시 앰버 강조.
 function makeClusterHtml(cnt: number, hasMatch: boolean, verified = 0): string {
-  const size = cnt >= 100 ? 50 : cnt >= 30 ? 46 : cnt >= 10 ? 41 : cnt >= 4 ? 37 : 33;
-  const bg = hasMatch ? "linear-gradient(135deg,#d49a4e 0%,#a85f1c 85%)" : "linear-gradient(135deg,#7c5230 0%,#4a3220 85%)";
+  const size = cnt >= 100 ? 52 : cnt >= 30 ? 48 : cnt >= 10 ? 43 : cnt >= 4 ? 39 : 35;
   // 🍩 검증 비율 링 — 뭉치 안에 '검증' 카페가 얼마나 있는지 초록 호(弧)로. 줌인 전에도 옥석 밀도가 보인다.
   const pct = Math.round((Math.min(cnt, Math.max(0, verified)) / Math.max(1, cnt)) * 100);
-  const ring = `conic-gradient(#6f8f63 0 ${pct}%, rgba(253,250,244,0.55) ${pct}% 100%)`;
+  // 🟤 3D 렌더 받침(퍽) 위에 숫자와 링을 얹는다 — 핀과 같은 조명·재질이라 한 세트로 보인다.
   return `<div class="dcn-cluster" style="transform:translate(-50%,-50%);cursor:pointer;">
-    <div class="dcn-cluster-body" style="width:${size}px;height:${size}px;border-radius:50%;padding:3.5px;background:${ring};box-shadow:0 0 0 2px rgba(253,250,244,0.9),0 3px 9px rgba(50,33,20,0.42);">
-      <div style="width:100%;height:100%;border-radius:50%;background:${bg};display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1;">
-        <span style="color:#fff;font-weight:800;font-size:${cnt >= 100 ? 12 : 13}px;letter-spacing:-0.3px;text-shadow:0 1px 2px rgba(0,0,0,0.3);">${cnt}</span>
-      </div>
+    <div class="dcn-cluster-body" style="width:${size}px;height:${Math.round(size * 0.965)}px;background-image:url(/pins/${hasMatch ? "puck-match" : "puck"}.png);">
+      <span class="dcn-cluster-ring" style="background:conic-gradient(#8fbf7a 0 ${pct}%, rgba(253,250,244,0.28) ${pct}% 100%);"></span>
+      <span class="dcn-cluster-n" style="font-size:${cnt >= 100 ? 12 : cnt >= 10 ? 13 : 14}px;">${cnt}</span>
     </div></div>`;
 }
 
@@ -371,7 +369,7 @@ function makeIslandHtml(name: string): string {
 const _origPoiFilter: Record<string, any> = {}; // poi_r* 원본 필터 보존(토글 복원용)
 // '상세' OFF에도 지도에 남길 주요 시설 클래스(공원·학교 등). 나머지 잡POI(식당·상점·편의점…)는 숨김.
 const MAJOR_POI = ["park", "garden", "school", "college", "university", "kindergarten", "hospital", "clinic", "stadium", "museum", "library", "zoo", "attraction", "theme_park", "aquarium", "cemetery", "townhall", "town_hall"];
-function applyTogglesToMap(ml: any, showStreets: boolean, showBus: boolean): void {
+function applyTogglesToMap(ml: any, showStreets: boolean, showBus: boolean, show3d = true): void {
   if (!ml) return;
   let style: any;
   try { if (!(ml.isStyleLoaded && ml.isStyleLoaded())) return; style = ml.getStyle(); } catch { return; }
@@ -380,9 +378,11 @@ function applyTogglesToMap(ml: any, showStreets: boolean, showBus: boolean): voi
     if (ly.type === "symbol" && (sl === "transportation_name" || /road_label|highway[-_]?name|road[-_]?name|street/i.test(ly.id))) {
       try { ml.setLayoutProperty(ly.id, "visibility", showStreets ? "visible" : "none"); } catch {}
     }
-    // 건물 타일: 길이름 토글과 함께 숨김(사장님 요청 — 길이름 OFF면 건물 폴리곤도 OFF로 깔끔).
-    if (/building/i.test(ly.id) && (ly.type === "fill" || ly.type === "fill-extrusion" || ly.type === "line")) {
-      try { ml.setLayoutProperty(ly.id, "visibility", showStreets ? "visible" : "none"); } catch {}
+    // 건물: 3D ON이면 돌출 건물만(평면 폴리곤은 숨김 — 겹치면 바닥이 이중으로 보임). 3D OFF면 옛 규칙(상세 토글과 함께 평면 표시).
+    if (/building/i.test(ly.id) && ly.type === "fill-extrusion") {
+      try { ml.setLayoutProperty(ly.id, "visibility", show3d ? "visible" : "none"); } catch {}
+    } else if (/building/i.test(ly.id) && (ly.type === "fill" || ly.type === "line")) {
+      try { ml.setLayoutProperty(ly.id, "visibility", !show3d && showStreets ? "visible" : "none"); } catch {}
     }
     // 버스: poi_transit(버스+철도+공항 아이콘) 전체 + 일반 POI(poi_r*)에 섞인 버스(class=bus)까지 제외해야 '버스 전체' 숨김.
     if (/poi_transit/i.test(ly.id)) {
@@ -434,21 +434,22 @@ function makePinHtml(c: Cafe, isMatch: boolean, isFocus = false, isMine = false,
     </div>`;
   }
   const size = isMine ? 44 : isFocus ? 46 : feat ? 40 : (grade === "검증" || isMatch) ? 38 : 33;
-  // 부드럽게 번지는 링(rgba) + 깊이감 있는 드롭섀도 — 색은 의미 유지. 취향 일치(✓)는 앰버 테두리로 한눈에.
-  const halo = isMine ? `0 0 0 5px rgba(214,51,108,0.28)` : isFocus ? `0 0 0 6px rgba(181,112,60,0.3)` : feat ? `0 0 0 5px rgba(224,163,46,0.32)` : isMatch ? `0 0 0 4px rgba(224,163,46,0.38)` : `0 0 0 3px rgba(80,55,35,0.16)`;
-  const border = isMatch && !isMine && !isFocus && !feat ? "#e0a32e" : "#fdfaf4";
+  // 🎨 3D 렌더 핀(three.js → public/pins/*.png, 알파) — 유광 세라믹 핀. 글리프(SVG)는 머리 중앙에 겹쳐 어떤 DPI에서도 또렷.
+  const sprite = isMine ? "mine" : isFocus ? "focus" : feat ? "feat" : grade === "검증" ? "verified" : grade === "참고" ? "ref" : "cand";
   const labelStyle = isMine ? "background:#d6336c;color:#fff;font-weight:700;"
     : isFocus ? "background:#b5703c;color:#fff;font-weight:700;"
     : feat ? "background:#e0a32e;color:#2b2018;font-weight:700;"
     : grade === "검증" ? "background:rgba(253,250,244,0.97);color:#2b2018;font-weight:700;border-left:3px solid #5f7355;"
     : "background:rgba(253,250,244,0.96);color:#4a3526;font-weight:600;";
   const glyph = isMine ? PIN_SVG.heart : isFocus ? PIN_SVG.pin : feat ? PIN_SVG.star : PIN_SVG.cup;
-  const gsize = isFocus ? 22 : isMine || feat ? 19 : grade === "검증" || isMatch ? 18 : 15;
   const suffix = isMine ? " ❤" : isFocus ? "" : feat ? " ★" : isMatch ? ' <span style="color:#b5710f;">✓</span>' : "";
+  // 취향 일치(✓)는 머리 우상단 앰버 배지 — 색만으로는 검증(초록)과 구분이 안 됐던 문제 해결
+  const matchBadge = isMatch && !isMine && !isFocus && !feat ? `<span class="dcn-pin-match" aria-hidden="true">✓</span>` : "";
   return `<div class="dcn-pin${feat ? " dcn-pin-feat" : ""}${isFocus ? " dcn-pin-focus" : ""}" data-cafe="${c.id}" style="transform:translate(-50%,-100%);text-align:center;">
-    <div class="dcn-pin-body" style="width:${size}px;height:${size}px;background:${color};background-image:radial-gradient(circle at 34% 28%, rgba(255,255,255,0.4), rgba(255,255,255,0) 58%);border:2px solid ${border};border-radius:50% 50% 50% 0;box-shadow:${halo}, 0 5px 14px rgba(50,33,20,0.45);display:flex;align-items:center;justify-content:center;margin:0 auto;">
-      <span class="dcn-pin-glyph" style="width:${gsize}px;height:${gsize}px;display:block;filter:drop-shadow(0 1px 1px rgba(0,0,0,0.3));">${glyph}</span></div>
-    <div class="dcn-lbl" style="margin-top:3px;${labelStyle}padding:2px 7px;border-radius:8px;font-size:${isFocus || isMine ? 11 : 10}px;white-space:nowrap;display:inline-block;box-shadow:0 2px 6px rgba(0,0,0,0.26);">${esc}${vbGlyph((c as any).vb)}${suffix}</div>
+    <div class="dcn-pin-body" style="width:${size}px;height:${Math.round(size * 1.25)}px;background-image:url(/pins/pin-${sprite}.png);">
+      <span class="dcn-pin-shadow" aria-hidden="true"></span>
+      <span class="dcn-pin-glyph">${glyph}</span>${matchBadge}</div>
+    <div class="dcn-lbl" style="margin-top:2px;${labelStyle}padding:2px 7px;border-radius:8px;font-size:${isFocus || isMine ? 11 : 10}px;white-space:nowrap;display:inline-block;box-shadow:0 2px 6px rgba(0,0,0,0.26);">${esc}${vbGlyph((c as any).vb)}${suffix}</div>
   </div>`;
 }
 // ☕ 커피 드립 로딩 — 스피너 대신 우리 정체성(잔에 방울·김). label은 로딩 문구.
@@ -588,6 +589,9 @@ export default function Home() {
   const [showBus, setShowBus] = useState(false); // 버스/교통 아이콘 — 기본 OFF
   const showStreetsRef = useRef(true); showStreetsRef.current = showStreets;
   const showBusRef = useRef(true); showBusRef.current = showBus;
+  const [show3d, setShow3d] = useState(true); // 🏢 3D 건물·기울임 — 기본 ON(동네 줌 z≥15에서 자동 기울임)
+  const show3dRef = useRef(true); show3dRef.current = show3d;
+  const [mapErr, setMapErr] = useState(false); // WebGL 미지원 등 지도 초기화 실패
   const [myLocked, setMyLocked] = useState(false); // 공용 PC 잠금 상태
   const [sessionPin, setSessionPin] = useState(""); // 이번 세션에 입력한 PIN(해제용)
   const [bookmarkIds, setBookmarkIds] = useState<Set<number>>(new Set()); // 카페 북마크(내 카페 등록과 별개)
@@ -655,7 +659,7 @@ export default function Home() {
   const applySelectedPin = (id: number | null) => {
     try {
       const root = mapRef.current; if (!root) return;
-      root.querySelectorAll(".leaflet-marker-icon.dcn-sel").forEach((el) => el.classList.remove("dcn-sel"));
+      root.querySelectorAll(".dcn-mk.dcn-sel").forEach((el) => el.classList.remove("dcn-sel"));
       if (id == null) return;
       const m = markersByIdRef.current.get(id); const el = m && m.getElement && m.getElement();
       if (el) el.classList.add("dcn-sel");
@@ -976,105 +980,112 @@ export default function Home() {
   // 탭 전환 시 파괴/재생성하지 않음 → 전환 즉각. 단 랜딩(role===null) 복귀 시엔 div가 사라지므로 파괴.
   useEffect(() => {
     if (role === null) { // 랜딩으로 이탈 → 분리된 DOM에 남지 않게 파괴(재진입 시 새로 초기화)
-      if (mapObj.current) { try { mapObj.current.remove(); } catch {} mapObj.current = null; layerRef.current = null; setMapReady(false); }
+      if (mapObj.current) { try { mapObj.current.remove(); } catch {} mapObj.current = null; layerRef.current = null; mlRef.current = null; setMapReady(false); }
       return;
     }
     if (tab !== "map" || mapObj.current) return; // 지도 탭을 실제로 열 때 1회 초기화(숨김 상태 초기화 금지)
     let cancelled = false;
     (async () => {
-      const L = (await import("leaflet")).default;
-      await import("leaflet/dist/leaflet.css");
+      const maplibregl = (await import("maplibre-gl")).default;
+      await import("maplibre-gl/dist/maplibre-gl.css");
+      const { makeL, MapA } = await import("./mapAdapter");
       if (cancelled || !mapRef.current || mapObj.current) return;
-      LRef.current = L;
-      mapObj.current = L.map(mapRef.current, { zoomControl: true, attributionControl: true }).setView([37.5, 127.05], 10);
-      mapObj.current.attributionControl.setPrefix("");
-      // 📏 축척(전문성) — 미터법만, 좌하단. 스타일은 전역 CSS(.leaflet-control-scale-line)에서 커피 톤으로.
-      try { L.control.scale({ imperial: false, position: "bottomleft", maxWidth: 116 }).addTo(mapObj.current); } catch {}
-      // ⚠️ 래스터 OSM은 항상 깔면 안 됨 — Leaflet z-index 상 벡터 캔버스를 덮어 녹지가 그대로 보였음(검증 완료).
-      //    그래서 벡터 '초기화 실패 시에만' 폴백으로 깐다.
-      // 🗺️ 벡터 OSM(OSM Liberty) — 녹지·토지구획·산·지형래스터를 꺼 도로·시설·역·카페가 또렷. 한글 라벨 유지.
+      // 🗺️ MapLibre GL 단독(2026-09-07 Leaflet 제거) — 벡터 타일(OpenFreeMap Liberty, 무료)·3D 건물·기울임·회전. 줌은 어댑터가 Leaflet 규약(+1)으로 맞춘다.
+      let ml: any;
       try {
-        const maplibregl = (await import("maplibre-gl")).default;
-        await import("maplibre-gl/dist/maplibre-gl.css");
-        await import("@maplibre/maplibre-gl-leaflet");
-        (window as any).maplibregl = maplibregl;
-        const gl = (L as any).maplibreGL({ style: "https://tiles.openfreemap.org/styles/liberty", attribution: "&copy; OpenStreetMap" });
-        gl.addTo(mapObj.current);
-        // 커피 테마와 조화 — 벡터 위에 아주 옅은 크림 톤(tilePane=벡터 캔버스). 라벨 가독성 유지되는 약한 강도.
-        const tp = mapObj.current.getPane("tilePane");
-        if (tp) tp.style.filter = "sepia(0.1) saturate(0.96) brightness(1.01)";
-        const ml = gl.getMaplibreMap();
-        (window as any).__ml = ml; // 디버그 핸들
-        mlRef.current = ml; // 레이어 토글용
-        // 전 세계 한글 표기 — name:ko 우선(없으면 현지명→로마자). ko가 없는 한국 지명은 name이 한글이라 안전.
-        const KO_LABEL: any = ["coalesce", ["get", "name:ko"], ["get", "name"], ["get", "name:latin"]];
-        // 녹지숨김·크림·한글 적용 — 1회만. 레이스(스타일이 리스너보다 먼저 로드) 방지: 즉시+load+styledata 모두에서 시도하되,
-        // 스타일이 완전히 로드된 뒤 단 한 번 적용(setX가 다시 styledata를 유발 → applied 플래그로 무한루프 차단).
-        let applied = false;
-        const applyVectorStyle = () => {
-          if (applied) return;
-          let style: any;
-          try { if (!(ml.isStyleLoaded && ml.isStyleLoaded())) return; style = ml.getStyle(); } catch { return; }
-          if (!style || !style.layers) return;
-          applied = true;
-          try { ml.setPaintProperty("background", "background-color", "#f3ecdb"); } catch {}
-          for (const ly of style.layers) {
-            const sl = (ly as any)["source-layer"] || "";
-            // 지형 음영 래스터(natural_earth/ne2) → 숨김. 저해상도가 확대돼 큰 녹색 덩어리로 보이던 원인.
-            if (ly.type === "raster") { try { ml.setLayoutProperty(ly.id, "visibility", "none"); } catch {} continue; }
-            // 토지구획(지적도) 파셀만 숨김 — landuse_residential/pitch/track/school 등
-            if (sl === "landuse" || (/landuse/i.test(ly.id) && ly.type === "fill")) {
-              try { ml.setLayoutProperty(ly.id, "visibility", "none"); } catch {}
-              continue;
-            }
-            // 산·녹지(공원/숲/잔디): '색+이름'만 — 옅고 차분한 녹색으로 보이게(빽빽한 텍스처 없이). 이름 라벨은 심볼이라 유지됨.
-            if ((sl === "landcover" || sl === "park") && (ly.type === "fill" || ly.type === "fill-extrusion")) {
-              try { ml.setPaintProperty(ly.id, "fill-color", "#d7e4c2"); ml.setPaintProperty(ly.id, "fill-opacity", 0.5); ml.setLayoutProperty(ly.id, "visibility", "visible"); } catch {}
-              continue;
-            }
-            if (ly.type === "fill" && /building/i.test(ly.id)) { try { ml.setPaintProperty(ly.id, "fill-color", "#ece2cf"); ml.setPaintProperty(ly.id, "fill-outline-color", "#dccfb4"); } catch {} continue; }
-            // 주요 도로 강조색(웜 앰버) — 큰길이 한눈에. 물길/철도는 기본 유지.
-            if (ly.type === "line" && /(motorway|trunk|primary)/i.test(ly.id) && !/casing|bridge|tunnel/i.test(ly.id)) {
-              try { ml.setPaintProperty(ly.id, "line-color", "#e6a23c"); } catch {}
-            }
-            if (ly.type === "symbol") {
-              const tf = (ly as any).layout && (ly as any).layout["text-field"];
-              if (tf && JSON.stringify(tf).includes("name")) {
-                try { ml.setLayoutProperty(ly.id, "text-field", KO_LABEL); } catch {}
-              }
-              // 🏪 POI(상호·상가)를 풍성하게 — 더 일찍 보이게(줌 2단계↓) + 가독성 헤일로 + 강조색(교통=파랑, 그 외=커피브라운)
-              if (/poi/i.test(ly.id)) {
-                try { if (typeof (ly as any).minzoom === "number") ml.setLayerZoomRange(ly.id, Math.max(11, (ly as any).minzoom - 3), (ly as any).maxzoom ?? 24); } catch {}
-                try { ml.setPaintProperty(ly.id, "text-color", /transit/i.test(ly.id) ? "#235a86" : "#4a3526"); } catch {}
-                try { ml.setPaintProperty(ly.id, "text-halo-color", "#fdf7ec"); ml.setPaintProperty(ly.id, "text-halo-width", 1.4); } catch {}
-                try { ml.setLayoutProperty(ly.id, "icon-size", 1.15); } catch {}
-                // 최대 줌인 시 교회·음식점·상가까지 '다 보이게' — 고줌(z16 아이콘 / z17 글자)에서 겹침 허용(그 아래는 정갈하게 충돌처리)
-                try { ml.setLayoutProperty(ly.id, "icon-allow-overlap", ["step", ["zoom"], false, 16, true]); } catch {}
-                try { ml.setLayoutProperty(ly.id, "text-allow-overlap", ["step", ["zoom"], false, 17, true]); } catch {}
-                try { ml.setLayoutProperty(ly.id, "text-optional", true); } catch {}
-              }
-            }
+        ml = new maplibregl.Map({
+          container: mapRef.current, style: "https://tiles.openfreemap.org/styles/liberty",
+          center: [127.05, 37.5], zoom: 9, minZoom: 5, maxZoom: 18.5, maxPitch: 62, pitch: 0, bearing: 0,
+          attributionControl: false, dragRotate: true, pitchWithRotate: true, touchPitch: true, fadeDuration: 120,
+        });
+      } catch { setMapErr(true); return; } // WebGL 미지원 브라우저
+      ml.addControl(new maplibregl.NavigationControl({ visualizePitch: true, showZoom: true, showCompass: true }), "top-left");
+      // 📏 축척(전문성) — 미터법만, 좌하단. 스타일은 인라인 CSS(.maplibregl-ctrl-scale)에서 커피 톤으로.
+      ml.addControl(new maplibregl.ScaleControl({ maxWidth: 116, unit: "metric" }), "bottom-left");
+      ml.addControl(new maplibregl.AttributionControl({ compact: false }), "bottom-right"); // 출처 문구는 스타일(OpenFreeMap·OpenMapTiles·OSM)이 제공
+      const L = makeL(maplibregl);
+      LRef.current = L;
+      const mapA = new MapA(maplibregl, ml);
+      mapObj.current = mapA;
+      mlRef.current = ml; // 레이어 토글·3D용
+      (window as any).__ml = ml; // 디버그 핸들
+      ml.on("error", () => {}); // 벡터 타일 일시 오류는 무시
+      // 전 세계 한글 표기 — name:ko 우선(없으면 현지명→로마자). ko가 없는 한국 지명은 name이 한글이라 안전.
+      const KO_LABEL: any = ["coalesce", ["get", "name:ko"], ["get", "name"], ["get", "name:latin"]];
+      // 🎨 커피 톤 스타일 패치 — 스타일 로드 후 1회. 레이스 방지: 즉시+load+styledata 모두에서 시도하되 applied 플래그로 1회 보장.
+      let applied = false;
+      const applyVectorStyle = () => {
+        if (applied) return;
+        let style: any;
+        try { if (!(ml.isStyleLoaded && ml.isStyleLoaded())) return; style = ml.getStyle(); } catch { return; }
+        if (!style || !style.layers) return;
+        applied = true;
+        try { ml.setPaintProperty("background", "background-color", "#f3ecdb"); } catch {}
+        // 🌤️ 3D 건물 조명 — 좌상단에서 비치는 따뜻한 빛(면마다 밝기 차 → 입체감)
+        try { ml.setLight({ anchor: "viewport", color: "#fff4e0", intensity: 0.42, position: [1.15, 210, 30] }); } catch {}
+        for (const ly of style.layers) {
+          const sl = (ly as any)["source-layer"] || "";
+          // 지형 음영 래스터(natural_earth/ne2) → 숨김. 저해상도가 확대돼 큰 녹색 덩어리로 보이던 원인.
+          if (ly.type === "raster") { try { ml.setLayoutProperty(ly.id, "visibility", "none"); } catch {} continue; }
+          // 토지구획(지적도) 파셀만 숨김 — landuse_residential/pitch/track/school 등
+          if (sl === "landuse" || (/landuse/i.test(ly.id) && ly.type === "fill")) { try { ml.setLayoutProperty(ly.id, "visibility", "none"); } catch {} continue; }
+          // 산·녹지(공원/숲/잔디): 옅고 차분한 녹색(빽빽한 텍스처 없이).
+          if ((sl === "landcover" || sl === "park") && (ly.type === "fill" || ly.type === "fill-extrusion")) {
+            try { ml.setPaintProperty(ly.id, "fill-color", "#d3e1bd"); ml.setPaintProperty(ly.id, "fill-opacity", 0.55); ml.setLayoutProperty(ly.id, "visibility", "visible"); } catch {}
+            continue;
           }
-          // 초기 토글 상태(길이름/버스정류장) 반영
-          try { applyTogglesToMap(ml, showStreetsRef.current, showBusRef.current); } catch {}
-        };
-        ml.on("load", applyVectorStyle);
-        ml.on("styledata", applyVectorStyle); // 스타일 로드/변경 시마다 시도(레이스 방지의 핵심, applied로 1회 보장)
-        applyVectorStyle(); // 이미 로드됐으면 즉시
-        ml.on("error", () => {}); // 벡터 타일 일시 오류는 무시
-      } catch {
-        // 벡터 초기화 실패(예: WebGL 미지원) → 래스터 OSM 폴백(이 경우에만)
-        L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: '&copy; OpenStreetMap' }).addTo(mapObj.current);
-      }
-      layerRef.current = L.layerGroup().addTo(mapObj.current);
-      // ⚡ 비클릭 벡터(노선·반경원)는 캔버스 렌더러로 — SVG는 요소 수만큼 DOM·페인트 비용이 드는데
-      //   캔버스는 한 장이다. 시각 결과 동일(안티앨리어싱 미세 차이뿐).
-      canvasRef2.current = L.canvas({ padding: 0.5 });
+          // 물 — 크림 지도에 어울리는 부드러운 파랑(원본은 채도가 높아 튐)
+          if (sl === "water" && ly.type === "fill") { try { ml.setPaintProperty(ly.id, "fill-color", "#b7cfe4"); } catch {} continue; }
+          if (sl === "waterway" && ly.type === "line") { try { ml.setPaintProperty(ly.id, "line-color", "#a9c4dc"); } catch {} }
+          // 🏢 건물: 평면(2D 폴백)은 크림 베이지, 3D 돌출은 벽면 그라데이션 + 높이(render_height) — 3D 토글이 표시 여부를 관리.
+          if (ly.type === "fill" && /building/i.test(ly.id)) { try { ml.setPaintProperty(ly.id, "fill-color", "#ece2cf"); ml.setPaintProperty(ly.id, "fill-outline-color", "#dccfb4"); } catch {} continue; }
+          if (ly.type === "fill-extrusion" && /building/i.test(ly.id)) {
+            try {
+              ml.setPaintProperty(ly.id, "fill-extrusion-color", ["interpolate", ["linear"], ["coalesce", ["get", "render_height"], 8], 0, "#efe5d3", 30, "#e4d5bc", 120, "#d6c3a4"]);
+              ml.setPaintProperty(ly.id, "fill-extrusion-height", ["coalesce", ["get", "render_height"], 8]);
+              ml.setPaintProperty(ly.id, "fill-extrusion-base", ["coalesce", ["get", "render_min_height"], 0]);
+              ml.setPaintProperty(ly.id, "fill-extrusion-opacity", 0.92);
+              ml.setPaintProperty(ly.id, "fill-extrusion-vertical-gradient", true);
+              ml.setLayerZoomRange(ly.id, 13, 24); // z14(Leaflet 15)부터 — 동네 골목 줌에서 입체
+            } catch {}
+            continue;
+          }
+          // 주요 도로 강조색(웜 앰버) — 큰길이 한눈에. 물길/철도는 기본 유지.
+          if (ly.type === "line" && /(motorway|trunk|primary)/i.test(ly.id) && !/casing|bridge|tunnel/i.test(ly.id)) { try { ml.setPaintProperty(ly.id, "line-color", "#e6a23c"); } catch {} }
+          if (ly.type === "line" && /(secondary|tertiary)/i.test(ly.id) && !/casing|bridge|tunnel/i.test(ly.id)) { try { ml.setPaintProperty(ly.id, "line-color", "#f3d9a4"); } catch {} }
+          if (ly.type === "symbol") {
+            const tf = (ly as any).layout && (ly as any).layout["text-field"];
+            if (tf && JSON.stringify(tf).includes("name")) { try { ml.setLayoutProperty(ly.id, "text-field", KO_LABEL); } catch {} }
+            // 🏪 POI(상호·상가)를 풍성하게 — 더 일찍 보이게(줌 2단계↓) + 가독성 헤일로 + 강조색(교통=파랑, 그 외=커피브라운)
+            if (/poi/i.test(ly.id)) {
+              try { if (typeof (ly as any).minzoom === "number") ml.setLayerZoomRange(ly.id, Math.max(11, (ly as any).minzoom - 3), (ly as any).maxzoom ?? 24); } catch {}
+              try { ml.setPaintProperty(ly.id, "text-color", /transit/i.test(ly.id) ? "#235a86" : "#4a3526"); } catch {}
+              try { ml.setPaintProperty(ly.id, "text-halo-color", "#fdf7ec"); ml.setPaintProperty(ly.id, "text-halo-width", 1.4); } catch {}
+              try { ml.setLayoutProperty(ly.id, "icon-size", 1.15); } catch {}
+              try { ml.setLayoutProperty(ly.id, "icon-allow-overlap", ["step", ["zoom"], false, 16, true]); } catch {}
+              try { ml.setLayoutProperty(ly.id, "text-allow-overlap", ["step", ["zoom"], false, 17, true]); } catch {}
+              try { ml.setLayoutProperty(ly.id, "text-optional", true); } catch {}
+            }
+            // 물 이름은 물색 계열로
+            if (sl === "water_name" || /water_name|waterway/i.test(ly.id)) { try { ml.setPaintProperty(ly.id, "text-color", "#4a78a8"); } catch {} }
+          }
+        }
+        // 초기 토글 상태(길이름/버스정류장/3D) 반영
+        try { applyTogglesToMap(ml, showStreetsRef.current, showBusRef.current, show3dRef.current); } catch {}
+      };
+      ml.on("load", applyVectorStyle);
+      ml.on("styledata", applyVectorStyle);
+      applyVectorStyle();
+      layerRef.current = L.layerGroup().addTo(mapA);
+      canvasRef2.current = null; // (Leaflet 캔버스 렌더러 흔적 — 어댑터가 선·원을 GeoJSON 레이어로 그린다)
       // 🇰🇷 독도·울릉도 — 항상 표시(영토 표현). layerRef가 아니라 맵에 직접 붙여 drawMarkers 갱신에도 유지.
-      L.marker([37.2429, 131.8665], { icon: L.divIcon({ className: "", html: makeIslandHtml("독도"), iconSize: [0, 0] }), interactive: false, zIndexOffset: 500 }).addTo(mapObj.current);
-      L.marker([37.4845, 130.9057], { icon: L.divIcon({ className: "", html: makeIslandHtml("울릉도"), iconSize: [0, 0] }), interactive: false, zIndexOffset: 500 }).addTo(mapObj.current);
-      setTimeout(() => mapObj.current?.invalidateSize(), 60);
-      setMapReady(true); // 초기화 완료 → 마커 effect 재실행 트리거
+      L.marker([37.2429, 131.8665], { icon: L.divIcon({ className: "", html: makeIslandHtml("독도"), iconSize: [0, 0] }), interactive: false, zIndexOffset: 500 }).addTo(mapA);
+      L.marker([37.4845, 130.9057], { icon: L.divIcon({ className: "", html: makeIslandHtml("울릉도"), iconSize: [0, 0] }), interactive: false, zIndexOffset: 500 }).addTo(mapA);
+      // 스타일이 실려야 선·원 오버레이 소스가 생긴다 → load 후 준비 신호. 타일 서버 지연 대비 4초 폴백(마커는 DOM이라 스타일 없이도 그려짐).
+      let readyFired = false;
+      const fireReady = () => { if (readyFired || cancelled) return; readyFired = true; try { ml.resize(); } catch {} setMapReady(true); };
+      ml.once("load", fireReady);
+      setTimeout(fireReady, 4000);
     })();
     return () => { cancelled = true; };
   }, [tab, role]);
@@ -1238,13 +1249,28 @@ export default function Home() {
     //   경계를 숫자 4개로 풀어 단일 패스 비교(할당 0). 아울러 **화면보다 50% 넓게(pad)** 걸러 그려 두면
     //   그 여유 안에서 팬(드래그)하는 동안은 재그리기를 통째로 건너뛸 수 있다(아래 lastDrawRef).
     //   클러스터 셀은 절대 픽셀 좌표 기준이라 팬으로는 소속이 안 바뀐다 — 여유분만 있으면 화면이 정확하다.
-    const pb = b.pad(0.5);
+    // 🏢 기울인(3D) 화면은 지평선 쪽 경계가 매우 넓다(bounds가 사다리꼴 전체) → 여유분을 줄이고, 화면 좌표로 걸러 먼 곳(위쪽 6%)은 버린다.
+    //   Leaflet 시절 pad 0.5(면적 7.8배)는 MapLibre DOM 마커엔 과함(z15 기울임에서 1,857개 실측) → 평면 0.3·기울임 0.05.
+    const mlv: any = mlRef.current;
+    const pitched = !!mlv && (mlv.getPitch?.() ?? 0) > 1;
+    const pb = b.pad(pitched ? 0.05 : 0.3);
     const pS = pb.getSouth(), pN = pb.getNorth(), pW = pb.getWest(), pE = pb.getEast();
+    const cw = mlv?.getContainer?.()?.clientWidth ?? 1000, ch = mlv?.getContainer?.()?.clientHeight ?? 800;
+    const screenPt = (c: Cafe): { x: number; y: number } | null => {
+      try { const pt = mlv.project([c.lng, c.lat]); return { x: pt.x, y: pt.y }; } catch { return null; }
+    };
     markersByIdRef.current = new Map();
     const inView: Cafe[] = [];
+    const scr = new Map<number, { x: number; y: number }>(); // 기울임 시 화면 좌표(클러스터 셀·컬링 공용)
     for (const c of cafes) {
       if (!c.lat || !c.lng) continue;
-      if (c.lat >= pS && c.lat <= pN && c.lng >= pW && c.lng <= pE) inView.push(c);
+      if (!(c.lat >= pS && c.lat <= pN && c.lng >= pW && c.lng <= pE)) continue;
+      if (pitched) {
+        const pt = screenPt(c); if (!pt) continue;
+        if (pt.y < ch * 0.06 || pt.y > ch * 1.08 || pt.x < -cw * 0.08 || pt.x > cw * 1.08) continue; // 지평선 근처·화면 밖 제외
+        scr.set(c.id, pt);
+      }
+      inView.push(c);
     }
     // 화면상 셀 크기(px) — 이 안의 카페끼리 한 뭉치. 줌인하면 px 간격 벌어져 쪼개짐.
     //   z≥16(동네 골목 줌)부턴 셀을 줄여 '2·3개 뭉치'가 개별 핀으로 풀리게 — 명동·성수 실측에서 화면이 온통 ●2로 덮였음.
@@ -1252,7 +1278,8 @@ export default function Home() {
     const CELL = z >= 18 ? 26 : z >= 17 ? 34 : z >= 16 ? 44 : z >= 15 ? 64 : z >= 14 ? 84 : 100;
     const cells = new Map<string, Cafe[]>();
     for (const c of inView) {
-      const p = map.project([c.lat, c.lng], z);
+      // 평면: 절대 월드 픽셀 셀(팬에 소속 불변). 기울임: 화면 픽셀 셀(원근으로 촘촘해진 먼 곳이 자연히 더 크게 뭉침) — 팬마다 재클러스터.
+      const p = pitched ? scr.get(c.id)! : map.project([c.lat, c.lng], z);
       const k = Math.floor(p.x / CELL) + ":" + Math.floor(p.y / CELL);
       const arr = cells.get(k); if (arr) arr.push(c); else cells.set(k, [c]);
     }
@@ -1313,7 +1340,7 @@ export default function Home() {
     if (focusM) (focusM as any).openPopup();
     applySelectedPin(selectedRef.current?.id ?? null);
     // ⚡ 방금 그린 범위(패딩 포함)와 줌을 기억 — live/final이 "다시 그릴 필요가 있나"를 판단하는 근거.
-    lastDrawRef.current = { z, s: pS, n: pN, w: pW, e: pE };
+    lastDrawRef.current = pitched ? null : { z, s: pS, n: pN, w: pW, e: pE }; // 기울임 상태는 화면 셀이라 팬마다 다시 그린다
   }, [filtered, matchSet, sido, sigungu, dong, focusId, myPinMode, myCafeIds, othersMode, othersPins, cafes, stations, exits, lines, landmarks, nearMe]);
 
   // 데이터/지역/모드 변경 시: 화면을 맞춘 뒤 마커를 그린다(맞춘 화면 기준으로 그려짐).
@@ -1368,10 +1395,24 @@ export default function Home() {
   // 길이름·버스정류장 토글 → 벡터 레이어 visibility 적용(스타일 로드 후엔 styledata로도 한 번 더 보장)
   useEffect(() => {
     if (!mapReady) return;
-    applyTogglesToMap(mlRef.current, showStreets, showBus);
+    applyTogglesToMap(mlRef.current, showStreets, showBus, show3d);
     const ml = mlRef.current;
-    if (ml) { const h = () => applyTogglesToMap(ml, showStreetsRef.current, showBusRef.current); ml.once && ml.once("idle", h); }
-  }, [showStreets, showBus, mapReady]);
+    if (ml) { const h = () => applyTogglesToMap(ml, showStreetsRef.current, showBusRef.current, show3dRef.current); ml.once && ml.once("idle", h); }
+  }, [showStreets, showBus, show3d, mapReady]);
+  // 🏢 3D 자동 기울임 — 동네 줌(z≥15)으로 들어오면 아직 기울이지 않은 지도를 52°로, 광역(z<14)으로 나가면 평면으로.
+  //   사용자가 손으로 기울인 각도(0이 아닌 값)는 존중해 덮어쓰지 않는다.
+  useEffect(() => {
+    const ml = mlRef.current; if (!ml || !mapReady) return;
+    const apply = () => {
+      try {
+        const zL = ml.getZoom() + 1, cur = ml.getPitch();
+        if (show3dRef.current && zL >= 15 && cur < 1) ml.easeTo({ pitch: 52, duration: 500, essential: true });
+        else if ((!show3dRef.current || zL < 14) && cur > 1) ml.easeTo({ pitch: 0, duration: 400, essential: true });
+      } catch {}
+    };
+    ml.on("zoomend", apply); apply();
+    return () => { try { ml.off("zoomend", apply); } catch {} };
+  }, [mapReady, show3d]);
 
   // 다른 사람은 — 토글 켜면 집계 핀 로드(한 번)
   useEffect(() => {
@@ -1550,9 +1591,8 @@ export default function Home() {
         .dcn-enter { animation: dcnEnter .55s cubic-bezier(.2,.75,.25,1) both; }
         /* ① 골드(우선노출) 핀 — 퍼지는 크레마 링 2겹(시선 유도 + B2B 가치 강조) */
         @keyframes dcnHalo { 0% { box-shadow:0 0 0 0 rgba(224,163,46,0.7); opacity:1; } 100% { box-shadow:0 0 0 16px rgba(224,163,46,0); opacity:0; } }
-        .dcn-pin-feat, .dcn-pin-focus { position:relative; }
-        .dcn-pin-feat::after, .dcn-pin-focus::after { content:""; position:absolute; inset:-5px; border-radius:50%; pointer-events:none; animation: dcnHalo 1.5s ease-out infinite; }
-        .dcn-pin-focus::after { animation-name: dcnHaloF; }
+        .dcn-pin-feat .dcn-pin-body::after, .dcn-pin-focus .dcn-pin-body::after { content:""; position:absolute; left:8%; top:4%; width:84%; aspect-ratio:1; border-radius:50%; pointer-events:none; animation: dcnHalo 1.5s ease-out infinite; }
+        .dcn-pin-focus .dcn-pin-body::after { animation-name: dcnHaloF; }
         @keyframes dcnHaloF { 0% { box-shadow:0 0 0 0 rgba(181,112,60,0.7); opacity:1; } 100% { box-shadow:0 0 0 16px rgba(181,112,60,0); opacity:0; } }
         /* ② 커피 드립 로딩 — 스피너 대신 잔에 방울이 떨어지고 김이 오르는 연출 */
         @keyframes dcnDrip { 0% { transform:translate(-50%,-2px) scaleY(.6); opacity:0; } 25% { opacity:1; } 70% { transform:translate(-50%,15px) scaleY(1); opacity:1; } 100% { transform:translate(-50%,15px) scaleY(.2); opacity:0; } }
@@ -1571,24 +1611,31 @@ export default function Home() {
         @keyframes dcnFly { 0% { transform:translate(-50%,0) scale(.7); opacity:0; } 20% { opacity:1; } 100% { transform:translate(-50%,-38px) scale(1.25); opacity:0; } }
         .dcn-fly { position:absolute; left:50%; top:-2px; font-size:16px; pointer-events:none; animation: dcnFly .75s ease-out 1; }
         @media (prefers-reduced-motion: reduce) {
-          .dcn-enter, .dcn-pin-feat::after, .dcn-pin-focus::after, .dcn-cload .cup::before, .dcn-cload .drip, .dcn-cload .stm, .dcn-pop, .dcn-fly { animation: none !important; }
+          .dcn-enter, .dcn-pin-feat .dcn-pin-body::after, .dcn-pin-focus .dcn-pin-body::after, .dcn-cload .cup::before, .dcn-cload .drip, .dcn-cload .stm, .dcn-pop, .dcn-fly { animation: none !important; }
           .dcn-enter { opacity:1 !important; transform:none !important; }
         }
         /* 🎯 카페 핀 상호작용 — hover 살짝 커짐, 선택(.dcn-sel)은 크게+맥동 링. 후보 소형점은 hover 때만 이름. */
-        .dcn-pin .dcn-pin-body { transition: transform .16s cubic-bezier(.2,.8,.3,1.2), box-shadow .16s; transform: rotate(-45deg); }
-        .dcn-pin:hover .dcn-pin-body { transform: rotate(-45deg) scale(1.1); }
-        .leaflet-marker-icon.dcn-sel { z-index: 9000 !important; }
-        .leaflet-marker-icon.dcn-sel .dcn-pin-body { transform: rotate(-45deg) scale(1.22); box-shadow: 0 0 0 5px rgba(255,255,255,.9), 0 0 0 8px rgba(181,112,60,.55), 0 8px 18px rgba(50,33,20,.5) !important; }
-        .leaflet-marker-icon.dcn-sel .dcn-lbl { font-weight:800 !important; background:#2b2018 !important; color:#fdf3e6 !important; }
-        .dcn-pin-glyph svg { width:100%; height:100%; display:block; transform: rotate(45deg); }
+        .dcn-pin .dcn-pin-body { position:relative; margin:0 auto; background-size:contain; background-position:center bottom; background-repeat:no-repeat; transform-origin:50% 100%; transition: transform .16s cubic-bezier(.2,.8,.3,1.2), filter .16s; }
+        .dcn-pin:hover .dcn-pin-body { transform: scale(1.08); }
+        .dcn-pin-glyph { position:absolute; left:50%; top:36%; width:42%; aspect-ratio:1; transform:translate(-50%,-50%); display:block; filter: drop-shadow(0 1px 1px rgba(0,0,0,.35)); }
+        .dcn-pin-shadow { position:absolute; left:50%; bottom:-5px; width:70%; height:16%; transform:translateX(-50%); border-radius:50%; background: radial-gradient(ellipse at center, rgba(50,33,20,.42), rgba(50,33,20,0) 70%); pointer-events:none; }
+        .dcn-pin-match { position:absolute; right:-4%; top:2%; width:38%; aspect-ratio:1; border-radius:50%; background:#e0a32e; color:#fff; font-size:0.62em; font-weight:900; line-height:1; display:flex; align-items:center; justify-content:center; border:2px solid #fdfaf4; box-shadow:0 1px 3px rgba(0,0,0,.35); }
+        .dcn-mk.dcn-sel { z-index: 900 !important; }
+        .dcn-mk.dcn-sel .dcn-pin-body { transform: scale(1.2); filter: drop-shadow(0 0 3px #fff) drop-shadow(0 0 7px rgba(181,112,60,.95)); }
+        .dcn-mk.dcn-sel .dcn-lbl { font-weight:800 !important; background:#2b2018 !important; color:#fdf3e6 !important; }
+        .dcn-pin-glyph svg { width:100%; height:100%; display:block; }
         .dcn-pin-dot { display:block; width:13px; height:13px; border-radius:50%; margin:0 auto; border:2px solid #fdfaf4; box-shadow:0 0 0 2px rgba(80,55,35,.14), 0 2px 5px rgba(50,33,20,.35); transition: transform .14s; }
         .dcn-pin-mini .dcn-lbl { display:none !important; }
-        .dcn-pin-mini:hover .dcn-pin-dot, .leaflet-marker-icon.dcn-sel .dcn-pin-dot { transform: scale(1.35); }
-        .dcn-pin-mini:hover .dcn-lbl, .leaflet-marker-icon.dcn-sel .dcn-pin-mini .dcn-lbl { display:inline-block !important; }
-        .leaflet-marker-icon:hover { z-index: 8000 !important; }
-        .dcn-cluster .dcn-cluster-body { transition: transform .14s; }
+        .dcn-pin-mini:hover .dcn-pin-dot, .dcn-mk.dcn-sel .dcn-pin-dot { transform: scale(1.35); }
+        .dcn-pin-mini:hover .dcn-lbl, .dcn-mk.dcn-sel .dcn-pin-mini .dcn-lbl { display:inline-block !important; }
+        .dcn-mk:hover { z-index: 800 !important; }
+        .maplibregl-ctrl-top-left, .maplibregl-ctrl-top-right, .maplibregl-ctrl-bottom-left, .maplibregl-ctrl-bottom-right { z-index: 1000 !important; } /* 마커(≤900) 위·React 오버레이(1100) 아래 */
+        .dcn-cluster .dcn-cluster-body { position:relative; background-size:contain; background-position:center; background-repeat:no-repeat; transition: transform .14s; filter: drop-shadow(0 3px 5px rgba(50,33,20,.35)); }
         .dcn-cluster:hover .dcn-cluster-body { transform: scale(1.1); }
+        .dcn-cluster-ring { position:absolute; left:0; top:0; width:100%; height:89.7%; border-radius:50%; -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3.5px)); mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3.5px)); pointer-events:none; }
+        .dcn-cluster-n { position:absolute; left:50%; top:44.8%; transform:translate(-50%,-50%); color:#fff; font-weight:800; letter-spacing:-0.3px; line-height:1; text-shadow:0 1px 2px rgba(0,0,0,.45); }
         /* 범례 견본 */
+        .dcn-lg-img { width:12px; height:15px; object-fit:contain; flex:none; }
         .dcn-lg-pin { display:inline-block; width:11px; height:11px; border-radius:50% 50% 50% 0; transform:rotate(-45deg); border:1.5px solid #fdfaf4; box-shadow:0 1px 2px rgba(0,0,0,.25); flex:none; }
         .dcn-lg-dot { display:inline-block; width:9px; height:9px; border-radius:50%; border:1.5px solid #fdfaf4; box-shadow:0 1px 2px rgba(0,0,0,.25); flex:none; margin:0 1px; }
         .dcn-lg-ring { display:inline-block; width:12px; height:12px; border-radius:50%; background: conic-gradient(#6f8f63 0 60%, rgba(120,90,60,.25) 60% 100%); flex:none; }
@@ -1598,15 +1645,22 @@ export default function Home() {
         @media (prefers-reduced-motion: reduce) { .dcn-pin .dcn-pin-body, .dcn-pin-dot, .dcn-cluster .dcn-cluster-body { transition:none; } }
         @media (max-width: 767px) { .dcn-mapwrap { bottom: var(--dcn-sheet, 0px) !important; transition: bottom .3s ease-out; } }
         /* 🗺️ 지도 기본 컨트롤을 커피 톤으로(전문성) — 톤은 유지, 밋밋한 라이브러리 기본값만 다듬음 */
-        .leaflet-control-zoom { border:none !important; border-radius:12px !important; overflow:hidden; box-shadow:0 3px 12px rgba(50,33,20,.22) !important; }
-        .leaflet-control-zoom a { background:#fffdf9 !important; color:#6b4f35 !important; border:none !important; width:34px !important; height:34px !important; line-height:34px !important; font-size:19px !important; font-weight:700 !important; transition:background .15s, color .15s; }
-        .leaflet-control-zoom a:hover { background:#f4ece0 !important; color:#2b2018 !important; }
-        .leaflet-control-zoom a.leaflet-control-zoom-in { border-bottom:1px solid #ece0cc !important; }
-        .leaflet-control-zoom a.leaflet-disabled { background:#f6f0e6 !important; color:#cbbca4 !important; }
-        .leaflet-control-scale { margin-bottom:88px !important; margin-left:12px !important; } /* 하단 시트 핸들 바 위로 띄움(가림 방지) */
-        .leaflet-control-scale-line { background:rgba(255,253,249,.86) !important; border:1.5px solid #b79a6f !important; border-top:none !important; color:#6b4f35 !important; font:600 10px/1.4 'Gowun Batang',serif !important; padding:1px 6px !important; border-radius:0 0 5px 5px !important; box-shadow:0 1px 5px rgba(50,33,20,.14); }
-        .leaflet-control-attribution { background:rgba(255,253,249,.72) !important; color:#9c8569 !important; font-size:9px !important; padding:1px 6px !important; border-radius:6px 0 0 0 !important; }
-        .leaflet-control-attribution a { color:#8a6d3b !important; }
+        .maplibregl-ctrl-group { border-radius:12px !important; overflow:hidden; box-shadow:0 3px 12px rgba(50,33,20,.22) !important; background:#fffdf9 !important; }
+        .maplibregl-ctrl-group button { width:34px !important; height:34px !important; background:#fffdf9 !important; }
+        .maplibregl-ctrl-group button + button { border-top:1px solid #ece0cc !important; }
+        .maplibregl-ctrl-group button:hover { background:#f4ece0 !important; }
+        .maplibregl-ctrl-group button:disabled { background:#f6f0e6 !important; opacity:.55; }
+        .maplibregl-ctrl-group button .maplibregl-ctrl-icon { filter: sepia(.6) saturate(.7) brightness(.55); } /* 아이콘을 커피 브라운으로 */
+        .maplibregl-ctrl-top-left { top:6px !important; left:10px !important; }
+        @media (max-width: 767px) { .maplibregl-ctrl-zoom-in, .maplibregl-ctrl-zoom-out { display:none !important; } } /* 모바일은 핀치 줌 — 나침반(회전 복귀)만 남김 */
+        @media (max-width: 767px) { .dcn-tgl .dcn-tgl-txt { display:none; } .dcn-tgl { padding-left:.5rem !important; padding-right:.5rem !important; } }
+        .maplibregl-ctrl-bottom-left .maplibregl-ctrl-scale { margin:0 0 12px 12px !important; background:rgba(255,253,249,.86) !important; border:1.5px solid #b79a6f !important; border-top:none !important; color:#6b4f35 !important; font:600 10px/1.4 'Gowun Batang',serif !important; padding:1px 6px !important; }
+        .maplibregl-ctrl-attrib { background:rgba(255,253,249,.72) !important; color:#9c8569 !important; font-size:9px !important; padding:1px 6px !important; border-radius:6px 0 0 0 !important; }
+        .maplibregl-ctrl-attrib a { color:#8a6d3b !important; }
+        .maplibregl-ctrl-bottom-right .maplibregl-ctrl { margin:0 !important; }
+        .dcn-popup .maplibregl-popup-content { background:#fdfaf4; color:#2b2018; font:600 12px/1.4 'Gowun Batang',serif; padding:6px 10px; border-radius:10px; box-shadow:0 4px 14px rgba(50,33,20,.28); }
+        .dcn-popup .maplibregl-popup-tip { border-top-color:#fdfaf4; }
+        .maplibregl-canvas:focus { outline:none; }
       `}</style>
       <header className="shrink-0 bg-[#2b2018] text-[#f4ece0] z-[1500] flex items-center justify-between px-4 gap-3" style={{ height: "calc(3.5rem + env(safe-area-inset-top))", paddingTop: "env(safe-area-inset-top)" }}>
         <div className="flex items-center gap-3 min-w-0">
@@ -1741,9 +1795,14 @@ export default function Home() {
           {/* 📱 모바일: 지도 영역을 바텀시트 '위'까지로 잡는다(--dcn-sheet). 전엔 시트가 지도 하반부를 덮어 지도 중심(서울)이 시트 밑에 숨고 화면엔 동두천·양주가 보였다. */}
           <div className="dcn-mapwrap absolute inset-0 md:relative md:flex-1 md:p-5" style={{ ["--dcn-sheet" as any]: tab === "map" ? (sheetOpen ? (sheetMode === "half" ? "calc(42dvh + 3.25rem)" : "calc(72dvh + 3.25rem)") : "calc(2.75rem + 3.25rem)") : "0px" }}>
             <div ref={mapRef} className="w-full h-full md:rounded-2xl overflow-hidden bg-[#e8e0d3] z-0" />
+            {mapErr && (
+              <div className="absolute inset-0 z-[1150] flex items-center justify-center p-6 text-center text-[13px] text-[#5b4636]" style={{ background: "rgba(244,236,224,0.92)" }}>
+                <div><b>지도를 그릴 수 없는 브라우저예요.</b><br />최신 Chrome·Safari·Samsung 인터넷에서 열어 주세요. 목록과 검색은 그대로 쓸 수 있어요.</div>
+              </div>
+            )}
             {/* 🗺️ 현재 화면 카페 수 — 좌상단 줌버튼 아래(전문성). 커버리지를 숫자로. 이동/줌마다 실시간 갱신 */}
             {/* 🗺️ 좌상단 한 줄: 현재 화면 카페 수(이동/줌마다 실시간) + 모바일용 범례 버튼. 모바일 지도는 42dvh뿐이라 오버레이를 한 줄에 모은다. */}
-            <div className="absolute top-[5.5rem] left-3 z-[1100] flex items-center gap-1.5 max-w-[calc(100vw-1.5rem)]">
+            <div className="absolute top-14 md:top-[8.25rem] left-3 z-[1100] flex items-center gap-1.5 max-w-[calc(100vw-1.5rem)]">
               {inViewCount != null && (
                 <div className="inline-flex items-center gap-1.5 rounded-full pl-2.5 pr-3 h-8 text-[11px] font-bold shadow-lg pointer-events-none whitespace-nowrap" style={{ background: "rgba(43,32,24,0.86)", color: "#f4ece0", backdropFilter: "blur(3px)" }}>
                   <span className="text-[#e8b87a] text-[12px] leading-none">☕</span>
@@ -1752,13 +1811,13 @@ export default function Home() {
               )}
               <div className="md:hidden">{legendOpen ? null : (
                 <button onClick={() => setLegendOpen(true)} className="inline-flex items-center gap-1 h-8 px-2.5 rounded-full text-[11px] font-bold shadow-lg whitespace-nowrap" style={{ background: "rgba(253,250,244,0.96)", color: "#5b4636", border: "1px solid #e6d8c2" }}>
-                  <i className="dcn-lg-pin" style={{ background: "#5f7355" }} /><span>핀 읽는 법</span>
+                  <img className="dcn-lg-img" src="/pins/pin-verified.png" alt="" /><span>핀 읽는 법</span>
                 </button>
               )}</div>
             </div>
             {/* 🗺️ 핀 범례 — 소비자가 색의 뜻(검증/참고/후보/취향/우선/내 카페)을 몰랐음. 데스크톱은 좌하단 기본 펼침, 모바일은 버튼으로 열면 같은 자리에. */}
             {(
-              <div className={`absolute z-[1100] top-[7.75rem] left-3 md:top-auto md:left-8 md:bottom-16 ${legendOpen ? "" : "hidden md:block"}`}>
+              <div className={`absolute z-[1100] top-[6.25rem] left-3 md:top-auto md:left-8 md:bottom-16 ${legendOpen ? "" : "hidden md:block"}`}>
                 {legendOpen ? (
                   <div className="dcn-legend rounded-xl shadow-lg px-3 py-2 text-[11px] text-[#3a2c20] leading-tight" style={{ background: "rgba(253,250,244,0.96)", backdropFilter: "blur(4px)", border: "1px solid #e6d8c2" }}>
                     <div className="flex items-center justify-between gap-3 mb-1.5">
@@ -1766,18 +1825,18 @@ export default function Home() {
                       <button onClick={() => setLegendOpen(false)} aria-label="범례 닫기" className="text-[#8f7a58] text-[12px] leading-none px-1">✕</button>
                     </div>
                     <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-                      <span className="inline-flex items-center gap-1.5"><i className="dcn-lg-pin" style={{ background: "#5f7355" }} />검증된 후기</span>
-                      <span className="inline-flex items-center gap-1.5"><i className="dcn-lg-pin" style={{ background: "#9c6b3f" }} />참고할 만한</span>
+                      <span className="inline-flex items-center gap-1.5"><img className="dcn-lg-img" src="/pins/pin-verified.png" alt="" />검증된 후기</span>
+                      <span className="inline-flex items-center gap-1.5"><img className="dcn-lg-img" src="/pins/pin-ref.png" alt="" />참고할 만한</span>
                       <span className="inline-flex items-center gap-1.5"><i className="dcn-lg-dot" style={{ background: "#a8927a" }} />후보(줌인하면 이름)</span>
-                      <span className="inline-flex items-center gap-1.5"><i className="dcn-lg-pin" style={{ background: "#9c6b3f", boxShadow: "0 0 0 2px #e0a32e" }} />취향 일치 ✓</span>
-                      <span className="inline-flex items-center gap-1.5"><i className="dcn-lg-pin" style={{ background: "#e0a32e" }} />우선 노출 ★</span>
-                      <span className="inline-flex items-center gap-1.5"><i className="dcn-lg-pin" style={{ background: "#d6336c" }} />내 카페 ❤</span>
+                      <span className="inline-flex items-center gap-1.5"><span className="relative inline-block"><img className="dcn-lg-img" src="/pins/pin-ref.png" alt="" /><i className="absolute -right-1 -top-1 w-2.5 h-2.5 rounded-full text-[7px] font-black text-white flex items-center justify-center" style={{ background: "#e0a32e" }}>✓</i></span>취향 일치 ✓</span>
+                      <span className="inline-flex items-center gap-1.5"><img className="dcn-lg-img" src="/pins/pin-feat.png" alt="" />우선 노출 ★</span>
+                      <span className="inline-flex items-center gap-1.5"><img className="dcn-lg-img" src="/pins/pin-mine.png" alt="" />내 카페 ❤</span>
                       <span className="inline-flex items-center gap-1.5 col-span-2 pt-1 mt-0.5 border-t border-[#eee2d2] text-[#665036]"><i className="dcn-lg-ring" />뭉치의 초록 테두리 = 검증 비율</span>
                     </div>
                   </div>
                 ) : (
                   <button onClick={() => setLegendOpen(true)} className="inline-flex items-center gap-1 h-8 px-2.5 rounded-full text-[11px] font-bold shadow-lg whitespace-nowrap" style={{ background: "rgba(253,250,244,0.96)", color: "#5b4636", border: "1px solid #e6d8c2" }}>
-                    <i className="dcn-lg-pin" style={{ background: "#5f7355" }} /><span>핀 읽는 법</span>
+                    <img className="dcn-lg-img" src="/pins/pin-verified.png" alt="" /><span>핀 읽는 법</span>
                   </button>
                 )}
               </div>
@@ -1807,11 +1866,15 @@ export default function Home() {
             <div className="absolute top-14 right-3 z-[1100] flex flex-col gap-1.5 items-end">
               <button onClick={() => setShowStreets((v) => !v)} aria-pressed={showStreets} title="길이름·건물·상가 표시"
                 className={`dcn-tgl inline-flex items-center gap-1.5 h-8 pl-2 pr-3 rounded-full text-[11px] font-bold shadow-lg whitespace-nowrap transition-colors ${showStreets ? "bg-[#5b4636] text-white" : "bg-white/95 text-[#665036] border border-[#e0d3bd]"}`}>
-                <span className={`dcn-tgl-dot ${showStreets ? "on" : ""}`} aria-hidden="true" /><span>상세 지도</span>
+                <span className={`dcn-tgl-dot ${showStreets ? "on" : ""}`} aria-hidden="true" /><span aria-hidden="true" className="md:hidden text-[13px] leading-none">🏷️</span><span className="dcn-tgl-txt">상세 지도</span>
+              </button>
+              <button onClick={() => setShow3d((v) => !v)} aria-pressed={show3d} title="3D 건물·기울임 (동네 줌에서 자동으로 기울어요)"
+                className={`dcn-tgl inline-flex items-center gap-1.5 h-8 pl-2 pr-3 rounded-full text-[11px] font-bold shadow-lg whitespace-nowrap transition-colors ${show3d ? "bg-[#7a5122] text-white" : "bg-white/95 text-[#665036] border border-[#e0d3bd]"}`}>
+                <span className={`dcn-tgl-dot ${show3d ? "on" : ""}`} aria-hidden="true" /><span aria-hidden="true" className="md:hidden text-[13px] leading-none">🏢</span><span className="dcn-tgl-txt">3D 건물</span>
               </button>
               <button onClick={() => setShowBus((v) => !v)} aria-pressed={showBus} title="버스 정류장 표시"
                 className={`dcn-tgl inline-flex items-center gap-1.5 h-8 pl-2 pr-3 rounded-full text-[11px] font-bold shadow-lg whitespace-nowrap transition-colors ${showBus ? "bg-[#235a86] text-white" : "bg-white/95 text-[#665036] border border-[#bcd0e0]"}`}>
-                <span className={`dcn-tgl-dot ${showBus ? "on" : ""}`} aria-hidden="true" /><span>버스 정류장</span>
+                <span className={`dcn-tgl-dot ${showBus ? "on" : ""}`} aria-hidden="true" /><span aria-hidden="true" className="md:hidden text-[13px] leading-none">🚌</span><span className="dcn-tgl-txt">버스 정류장</span>
               </button>
             </div>
             {/* 📍 내 주변 안내/해제 — 활성 또는 안내 메시지 있을 때 */}
