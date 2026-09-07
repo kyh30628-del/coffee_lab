@@ -61,32 +61,57 @@ const slim = (o) => ({
 });
 
 (async () => {
-  let state = { next: 1, kept: 0, seen: 0, total: 0, started: new Date().toISOString() };
-  if (!RESET && existsSync(STATE)) state = JSON.parse(readFileSync(STATE, "utf8"));
-  else writeFileSync(OUT, "");
+  // ⚡ 작업자 풀 — 예전엔 16개를 묶어 Promise.all로 기다렸는데, 그러면 **가장 느린 한 호출이 나머지 15개를 붙잡는다**
+  //    (호출 지연이 12~90초로 들쭉날쭉). 풀 방식은 끝난 작업자가 바로 다음 페이지를 집어 지연을 흡수한다.
+  //    이어받기는 '완료한 페이지 집합'으로 관리한다(순서대로 끝나지 않으므로 watermark 하나로는 부족).
+  let state = { done: [], kept: 0, seen: 0, total: 0, started: new Date().toISOString() };
+  if (!RESET && existsSync(STATE)) {
+    const old = JSON.parse(readFileSync(STATE, "utf8"));
+    if (Array.isArray(old.done)) state = old;
+    else { // 구버전(next 방식) 상태 승계 — 이미 받은 1..next-1은 파일에 들어 있다
+      state = { done: Array.from({ length: (old.next || 1) - 1 }, (_, i) => i + 1), kept: old.kept || 0, seen: old.seen || 0, total: old.total || 0, started: old.started };
+    }
+  } else writeFileSync(OUT, "");
   const first = await fetchPage(1);
-  const total = first.total || 0;
+  const total = first.total || state.total || 0;
   const lastPage = Math.ceil(total / 100);
   state.total = total;
-  console.log(`[${EP}/${ENDPOINTS[EP]}] 전체 ${total.toLocaleString()}건 · ${lastPage.toLocaleString()}페이지 · ${state.next}페이지부터 · 동시 ${CONC}`);
-  const t0 = Date.now();
-  while (state.next <= lastPage) {
-    const pages = [];
-    for (let i = 0; i < CONC && state.next + i <= lastPage; i++) pages.push(state.next + i);
-    const res = await Promise.all(pages.map((p) => fetchPage(p)));
-    const failed = res.filter((r) => !r.items);
-    if (failed.length) { // 한 배치가 통째로 실패 = 쿼터 소진 가능성 → 멈추고 상태 보존(다음 실행이 이어받음)
-      console.error(`⛔ ${failed.length}/${pages.length} 페이지 실패(${failed[0].err}) — ${state.next}페이지에서 중단. 다시 실행하면 이어서.`);
-      break;
-    }
-    let buf = "";
-    for (const r of res) for (const it of r.items) { state.seen++; if (inScope(it.LOTNO_ADDR)) { buf += JSON.stringify(slim(it)) + "\n"; state.kept++; } }
-    if (buf) appendFileSync(OUT, buf);
-    state.next += pages.length;
+  const doneSet = new Set(state.done);
+  const queue = [];
+  for (let p = 1; p <= lastPage; p++) if (!doneSet.has(p)) queue.push(p);
+  console.log(`[${EP}/${ENDPOINTS[EP]}] 전체 ${total.toLocaleString()}건 · ${lastPage.toLocaleString()}페이지 · 남은 ${queue.length.toLocaleString()}페이지 · 작업자 ${CONC}`);
+  const t0 = Date.now(); let doneNow = 0, fails = 0, buf = "";
+  const flush = () => {
+    if (buf) { appendFileSync(OUT, buf); buf = ""; }
+    state.done = [...doneSet];
     writeFileSync(STATE, JSON.stringify(state));
-    const done = state.next - 1, pct = ((done / lastPage) * 100).toFixed(1);
-    const eta = ((Date.now() - t0) / 1000) * ((lastPage - done) / Math.max(1, done - (JSON.parse(readFileSync(STATE, "utf8")).startPage || 0)));
-    if (done % (CONC * 10) < CONC) console.log(`  ${pct}% (${done.toLocaleString()}/${lastPage.toLocaleString()}p) · 지역내 ${state.kept.toLocaleString()}건 · 남은시간 ~${(eta / 3600).toFixed(1)}h`);
-  }
-  console.log(`✅ [${EP}] ${state.next > lastPage ? "완료" : "중단"} · 훑음 ${state.seen.toLocaleString()} · 지역내 ${state.kept.toLocaleString()}건 → ${OUT}`);
+  };
+  let stop = false;
+  const worker = async () => {
+    while (!stop) {
+      const pg = queue.shift();
+      if (pg === undefined) return;
+      const r = await fetchPage(pg);
+      if (!r.items) {
+        fails++;
+        if (fails > 40) { stop = true; console.error(`⛔ 연속 실패 과다(${r.err}) — 중단. 다시 실행하면 남은 페이지부터 이어받는다.`); return; }
+        queue.push(pg); // 뒤로 미뤄 재시도
+        await new Promise((s) => setTimeout(s, 3000));
+        continue;
+      }
+      fails = Math.max(0, fails - 1);
+      for (const it of r.items) { state.seen++; if (inScope(it.LOTNO_ADDR)) { buf += JSON.stringify(slim(it)) + "\n"; state.kept++; } }
+      doneSet.add(pg); doneNow++;
+      if (doneNow % 100 === 0) {
+        flush();
+        const rate = doneNow / ((Date.now() - t0) / 60000);
+        const left = queue.length;
+        console.log(`  ${doneSet.size.toLocaleString()}/${lastPage.toLocaleString()}p (${(doneSet.size / lastPage * 100).toFixed(1)}%) · ${rate.toFixed(0)}p/분 · 지역내 ${state.kept.toLocaleString()}건 · 남은시간 ~${(left / rate / 60).toFixed(1)}h`);
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: CONC }, () => worker()));
+  flush();
+  const okAll = doneSet.size >= lastPage;
+  console.log(`${okAll ? "✅" : "⚠️"} [${EP}] ${okAll ? "완료" : "중단"} · ${doneSet.size.toLocaleString()}/${lastPage.toLocaleString()}p · 훑음 ${state.seen.toLocaleString()} · 지역내 ${state.kept.toLocaleString()}건 → ${OUT}`);
 })();

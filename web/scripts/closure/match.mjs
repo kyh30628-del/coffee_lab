@@ -49,12 +49,25 @@ function lotKey(addr) {
 
 const STOP = /(주식회사|㈜|\(주\)|유한회사|합자회사|사업자|영업소|주\)|커피전문점)/g;
 const normName = (s) => String(s || "").replace(STOP, "").replace(/[^가-힣a-zA-Z0-9]/g, "").toLowerCase();
+/** 상호에서 '핵심 이름'만 남긴다 — 앞뒤 수식어·지점명이 2-gram을 희석해 진짜 같은 가게를 놓쳤다.
+ *   실측 사례: "THE CLASSIC OF 홀빈커피" ↔ "홀빈커피(작은가게)" 유사도 0.16, "커피볶는 시골커피 에이스가산타워점" ↔ 같은 건물 다른 가게.
+ *   → 괄호 안·영문 수식어·지점 표기(…점/지점/본점)를 떼고 남은 토큰들로 한 번 더 비교한다. */
+const BRANCH = /(\(.*?\)|\[.*?\])|((?:[가-힣A-Za-z0-9]+)?(?:본점|지점|직영점|\d*호점|점))$/g;
+function coreName(s) {
+  let t = String(s || "").replace(/\(.*?\)|\[.*?\]/g, " ");
+  t = t.replace(/\b(the|of|cafe|coffee|카페)\b/gi, " ");
+  const toks = t.split(/\s+/).filter(Boolean).map((x) => x.replace(/(본점|직영점|\d*호점|지점)$/, ""));
+  return toks.map(normName).filter((x) => x.length >= 2);
+}
 /** 글자 2-gram 자카드 — 짧은 상호에도 안정적이고 오탈자·공백 차이에 강하다. */
 function nameSim(a, b) {
   const A = normName(a), B = normName(b);
   if (!A || !B) return 0;
   if (A === B) return 1;
   if (A.length >= 3 && B.length >= 3 && (A.includes(B) || B.includes(A))) return 0.9;
+  // 핵심 토큰이 서로 들어 있으면 같은 가게로 본다(3글자 이상이어야 우연 일치를 막는다)
+  const ca = coreName(a), cb = coreName(b);
+  for (const x of ca) for (const y of cb) if (x.length >= 3 && y.length >= 3 && (x === y || x.includes(y) || y.includes(x))) return 0.85;
   const g = (s) => { const set = new Set(); for (let i = 0; i < s.length - 1; i++) set.add(s.slice(i, i + 2)); return set.size ? set : new Set([s]); };
   const ga = g(A), gb = g(B);
   let inter = 0; for (const x of ga) if (gb.has(x)) inter++;
