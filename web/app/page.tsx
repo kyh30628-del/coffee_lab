@@ -316,14 +316,17 @@ function makeRegionPinHtml(label: string, cnt: number, maxCnt: number): string {
 
 // 카페 클러스터 뱃지 — 가까운 카페 여러 개를 한 뭉치로(픽셀 그리드). 개수 표시, 클릭하면 줌인되어 쪼개짐.
 //   집계 원형(makeRegionPinHtml=행정구역)과 달리 화면상 근접도 기준. 취향매칭 카페 포함 시 앰버 강조.
-function makeClusterHtml(cnt: number, hasMatch: boolean): string {
-  const size = cnt >= 100 ? 46 : cnt >= 30 ? 42 : cnt >= 10 ? 37 : 33;
+function makeClusterHtml(cnt: number, hasMatch: boolean, verified = 0): string {
+  const size = cnt >= 100 ? 50 : cnt >= 30 ? 46 : cnt >= 10 ? 41 : cnt >= 4 ? 37 : 33;
   const bg = hasMatch ? "linear-gradient(135deg,#d49a4e 0%,#a85f1c 85%)" : "linear-gradient(135deg,#7c5230 0%,#4a3220 85%)";
-  return `<div style="transform:translate(-50%,-50%);cursor:pointer;">
-    <div style="width:${size}px;height:${size}px;border-radius:50%;background:${bg};
-      border:2.5px solid rgba(253,250,244,0.96);box-shadow:0 0 0 3px rgba(124,82,48,0.12),0 3px 9px rgba(50,33,20,0.42);
-      display:flex;align-items:center;justify-content:center;">
-      <span style="color:#fff;font-weight:800;font-size:${cnt >= 100 ? 12 : 13}px;letter-spacing:-0.3px;line-height:1;text-shadow:0 1px 2px rgba(0,0,0,0.3);">${cnt}</span>
+  // 🍩 검증 비율 링 — 뭉치 안에 '검증' 카페가 얼마나 있는지 초록 호(弧)로. 줌인 전에도 옥석 밀도가 보인다.
+  const pct = Math.round((Math.min(cnt, Math.max(0, verified)) / Math.max(1, cnt)) * 100);
+  const ring = `conic-gradient(#6f8f63 0 ${pct}%, rgba(253,250,244,0.55) ${pct}% 100%)`;
+  return `<div class="dcn-cluster" style="transform:translate(-50%,-50%);cursor:pointer;">
+    <div class="dcn-cluster-body" style="width:${size}px;height:${size}px;border-radius:50%;padding:3.5px;background:${ring};box-shadow:0 0 0 2px rgba(253,250,244,0.9),0 3px 9px rgba(50,33,20,0.42);">
+      <div style="width:100%;height:100%;border-radius:50%;background:${bg};display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1;">
+        <span style="color:#fff;font-weight:800;font-size:${cnt >= 100 ? 12 : 13}px;letter-spacing:-0.3px;text-shadow:0 1px 2px rgba(0,0,0,0.3);">${cnt}</span>
+      </div>
     </div></div>`;
 }
 
@@ -408,23 +411,44 @@ function makeMyLocHtml(): string {
 //   핀은 HTML 문자열로 그려서 React 컴포넌트를 못 쓰므로 별도 헬퍼로 둔다.
 const vbGlyph = (vb?: string) => (vb ? ` ${vb.includes("T") ? "🧳" : ""}${vb.includes("L") ? "🏠" : ""}${vb.includes("D") ? "🗺️" : ""}` : "");
 
-function makePinHtml(c: Cafe, isMatch: boolean, isFocus = false, isMine = false): string {
+// 🎨 핀 글리프 — 이모지(OS마다 모양·크기 제각각) 대신 인라인 SVG. 어떤 기기에서도 같은 모양.
+const PIN_SVG = {
+  cup: `<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 9.5h11v4.5a4 4 0 0 1-4 4h-3a4 4 0 0 1-4-4z"/><path d="M15.5 10.5h1.6a2.4 2.4 0 0 1 0 4.8h-1.6"/><path d="M8 4v2.2M11.5 4v2.2"/></svg>`,
+  heart: `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#fff" d="M12 20.3s-7.4-4.7-7.4-10.2A4.1 4.1 0 0 1 12 7.6a4.1 4.1 0 0 1 7.4 2.5c0 5.5-7.4 10.2-7.4 10.2z"/></svg>`,
+  star: `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#fff" d="M12 3.6l2.5 5.3 5.8.8-4.2 4 1 5.8L12 16.7l-5.1 2.8 1-5.8-4.2-4 5.8-.8z"/></svg>`,
+  pin: `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2" fill="#fff"/></svg>`,
+};
+// 핀 시각 위계(소비자 관점): 검증=초록 큰 핀+라벨 / 참고=브라운 핀+라벨 / 후보=z<16에선 작은 점(라벨은 hover·선택 시)
+//   → 밀집 지역에서 라벨끼리 겹치던 문제를 '중요한 것만 이름 표시'로 해결. 줌인(z≥16)하면 후보도 이름이 보인다.
+function makePinHtml(c: Cafe, isMatch: boolean, isFocus = false, isMine = false, zoom = 16): string {
   const grade = c.synth_grade ?? "후보";
   const feat = !!c.featured && !isFocus; // ✨ 우선 노출 — 골드 핀 강조(포커스 핀이 우선)
+  const mini = !isMine && !isFocus && !feat && !isMatch && grade === "후보" && zoom < 16; // 후보 소형 점
   // 내 카페(MY PIN) — 핑크/레드 하트 핀으로 최우선 강조
-  const color = isMine ? "#d6336c" : isFocus ? "#b5703c" : feat ? "#e0a32e" : isMatch ? "#5f7355" : (GRADE_STYLE[grade]?.bg ?? "#9c6b3f");
-  const size = isMine ? 46 : isFocus ? 48 : feat ? 42 : isMatch ? 40 : 33;
-  // 부드럽게 번지는 링(rgba) + 깊이감 있는 드롭섀도 — 색은 의미 유지, 스타일만 세련되게
-  const halo = isMine ? `0 0 0 5px rgba(214,51,108,0.3)` : isFocus ? `0 0 0 6px rgba(181,112,60,0.32)` : feat ? `0 0 0 5px rgba(224,163,46,0.34)` : isMatch ? `0 0 0 5px rgba(95,115,85,0.3)` : `0 0 0 3px rgba(156,107,63,0.3)`;
-  const ring = `box-shadow:${halo}, 0 5px 14px rgba(50,33,20,0.5);`;
+  const color = isMine ? "#d6336c" : isFocus ? "#b5703c" : feat ? "#e0a32e" : (GRADE_STYLE[grade]?.bg ?? "#9c6b3f");
+  const esc = (c.name || "").replace(/</g, "&lt;");
+  if (mini) {
+    return `<div class="dcn-pin dcn-pin-mini" data-cafe="${c.id}" style="transform:translate(-50%,-50%);text-align:center;">
+      <span class="dcn-pin-dot" style="background:${color};"></span>
+      <div class="dcn-lbl" style="margin-top:2px;background:rgba(253,250,244,0.96);color:#4a3526;font-weight:600;padding:1px 6px;border-radius:7px;font-size:10px;white-space:nowrap;display:inline-block;box-shadow:0 2px 6px rgba(0,0,0,0.22);">${esc}</div>
+    </div>`;
+  }
+  const size = isMine ? 44 : isFocus ? 46 : feat ? 40 : (grade === "검증" || isMatch) ? 38 : 33;
+  // 부드럽게 번지는 링(rgba) + 깊이감 있는 드롭섀도 — 색은 의미 유지. 취향 일치(✓)는 앰버 테두리로 한눈에.
+  const halo = isMine ? `0 0 0 5px rgba(214,51,108,0.28)` : isFocus ? `0 0 0 6px rgba(181,112,60,0.3)` : feat ? `0 0 0 5px rgba(224,163,46,0.32)` : isMatch ? `0 0 0 4px rgba(224,163,46,0.38)` : `0 0 0 3px rgba(80,55,35,0.16)`;
+  const border = isMatch && !isMine && !isFocus && !feat ? "#e0a32e" : "#fdfaf4";
   const labelStyle = isMine ? "background:#d6336c;color:#fff;font-weight:700;"
     : isFocus ? "background:#b5703c;color:#fff;font-weight:700;"
-    : feat ? "background:#e0a32e;color:#2b2018;font-weight:700;" : "background:rgba(253,250,244,0.96);color:#2b2018;font-weight:600;";
-  const glyph = isMine ? "❤" : isFocus ? "📍" : feat ? "⭐" : "☕";
-  return `<div style="transform:translate(-50%,-100%);text-align:center;">
-    <div${feat ? ' class="dcn-pin-feat"' : isFocus ? ' class="dcn-pin-focus"' : ""} style="width:${size}px;height:${size}px;background:${color};background-image:radial-gradient(circle at 34% 28%, rgba(255,255,255,0.42), rgba(255,255,255,0) 58%);border:2px solid #fdfaf4;border-radius:50% 50% 50% 0;transform:rotate(-45deg);${ring}display:flex;align-items:center;justify-content:center;margin:0 auto;">
-      <span style="transform:rotate(45deg);font-size:${isFocus ? 20 : isMatch || feat ? 16 : 14}px;filter:drop-shadow(0 1px 1px rgba(0,0,0,0.25));">${glyph}</span></div>
-    <div style="margin-top:3px;${labelStyle}padding:2px 7px;border-radius:8px;font-size:${isFocus || isMine ? 11 : 10}px;white-space:nowrap;display:inline-block;box-shadow:0 2px 6px rgba(0,0,0,0.28);">${c.name}${vbGlyph((c as any).vb)}${isMine ? " ❤" : isFocus ? "" : feat ? " ⭐" : isMatch ? " ✓" : ""}</div>
+    : feat ? "background:#e0a32e;color:#2b2018;font-weight:700;"
+    : grade === "검증" ? "background:rgba(253,250,244,0.97);color:#2b2018;font-weight:700;border-left:3px solid #5f7355;"
+    : "background:rgba(253,250,244,0.96);color:#4a3526;font-weight:600;";
+  const glyph = isMine ? PIN_SVG.heart : isFocus ? PIN_SVG.pin : feat ? PIN_SVG.star : PIN_SVG.cup;
+  const gsize = isFocus ? 22 : isMine || feat ? 19 : grade === "검증" || isMatch ? 18 : 15;
+  const suffix = isMine ? " ❤" : isFocus ? "" : feat ? " ★" : isMatch ? ' <span style="color:#b5710f;">✓</span>' : "";
+  return `<div class="dcn-pin${feat ? " dcn-pin-feat" : ""}${isFocus ? " dcn-pin-focus" : ""}" data-cafe="${c.id}" style="transform:translate(-50%,-100%);text-align:center;">
+    <div class="dcn-pin-body" style="width:${size}px;height:${size}px;background:${color};background-image:radial-gradient(circle at 34% 28%, rgba(255,255,255,0.4), rgba(255,255,255,0) 58%);border:2px solid ${border};border-radius:50% 50% 50% 0;box-shadow:${halo}, 0 5px 14px rgba(50,33,20,0.45);display:flex;align-items:center;justify-content:center;margin:0 auto;">
+      <span class="dcn-pin-glyph" style="width:${gsize}px;height:${gsize}px;display:block;filter:drop-shadow(0 1px 1px rgba(0,0,0,0.3));">${glyph}</span></div>
+    <div class="dcn-lbl" style="margin-top:3px;${labelStyle}padding:2px 7px;border-radius:8px;font-size:${isFocus || isMine ? 11 : 10}px;white-space:nowrap;display:inline-block;box-shadow:0 2px 6px rgba(0,0,0,0.26);">${esc}${vbGlyph((c as any).vb)}${suffix}</div>
   </div>`;
 }
 // ☕ 커피 드립 로딩 — 스피너 대신 우리 정체성(잔에 방울·김). label은 로딩 문구.
@@ -622,7 +646,21 @@ export default function Home() {
   const layerRef = useRef<any>(null);
   const LRef = useRef<any>(null);
   const [mapReady, setMapReady] = useState(false); // 지도 초기화 완료 신호(마커 재렌더용)
-  const [inViewCount, setInViewCount] = useState<number | null>(null); // 🗺️ 현재 화면(viewport) 안 공개 카페 수(전문성 인디케이터)
+  const [inViewCount, setInViewCount] = useState<number | null>(null);
+  const [legendOpen, setLegendOpen] = useState(false); // 🗺️ 핀 범례(초록=검증 …) — 데스크톱은 기본 펼침(마운트 후 결정)
+  const [sheetMode, setSheetMode] = useState<"half" | "full">("half"); // 모바일 바텀시트 — 반만(지도+목록 동시) / 전체
+  const markersByIdRef = useRef<Map<number, any>>(new Map()); // 카페id → 마커(선택 강조를 재그리기 없이 DOM 클래스로)
+  const selectedRef = useRef<Cafe | null>(null);
+  // 선택된 카페 핀만 클래스로 강조(다시 그리지 않음 — 강남 밀집 84ms 재그리기 회피)
+  const applySelectedPin = (id: number | null) => {
+    try {
+      const root = mapRef.current; if (!root) return;
+      root.querySelectorAll(".leaflet-marker-icon.dcn-sel").forEach((el) => el.classList.remove("dcn-sel"));
+      if (id == null) return;
+      const m = markersByIdRef.current.get(id); const el = m && m.getElement && m.getElement();
+      if (el) el.classList.add("dcn-sel");
+    } catch {}
+  }; // 🗺️ 현재 화면(viewport) 안 공개 카페 수(전문성 인디케이터)
 
   // ⚡ 속도 개선(2026-07-26): /api/cafes는 전 공개카페(13,391곳·char_scores 등 포함, 실측 5.1MB·1.8s)라
   //   지도·지역선택·상세패널에만 필요한데 예전엔 홈 첫 렌더와 동시에(마운트 즉시) 무조건 받아왔다 — 홈
@@ -1040,13 +1078,16 @@ export default function Home() {
     })();
     return () => { cancelled = true; };
   }, [tab, role]);
+  // 선택 카페 핀 강조 — 마커 재생성 없이 클래스 토글
+  useEffect(() => { selectedRef.current = selected; applySelectedPin(selected?.id ?? null); }, [selected]);
+  useEffect(() => { try { if (window.matchMedia("(min-width: 768px)").matches) setLegendOpen(true); } catch {} }, []);
   // 지도 탭 재진입 시 사이즈 보정(숨김→표시 전환 대응). 여러 타이밍에 호출해 확실히 렌더.
   useEffect(() => {
     if (tab === "map" && mapObj.current) {
       const ts = [50, 200, 450].map((d) => setTimeout(() => mapObj.current?.invalidateSize(), d));
       return () => ts.forEach(clearTimeout);
     }
-  }, [tab]);
+  }, [tab, sheetOpen, sheetMode]); // 시트 높이(모바일 지도 영역) 바뀌면 크기 재계산
 
   // '지도에서 위치 보기' — 지도 준비되면 해당 좌표로 이동(핀은 아래 마커 effect가 그림)
   useEffect(() => {
@@ -1199,12 +1240,15 @@ export default function Home() {
     //   클러스터 셀은 절대 픽셀 좌표 기준이라 팬으로는 소속이 안 바뀐다 — 여유분만 있으면 화면이 정확하다.
     const pb = b.pad(0.5);
     const pS = pb.getSouth(), pN = pb.getNorth(), pW = pb.getWest(), pE = pb.getEast();
+    markersByIdRef.current = new Map();
     const inView: Cafe[] = [];
     for (const c of cafes) {
       if (!c.lat || !c.lng) continue;
       if (c.lat >= pS && c.lat <= pN && c.lng >= pW && c.lng <= pE) inView.push(c);
     }
-    const CELL = 64; // 화면상 셀 크기(px) — 이 안의 카페끼리 한 뭉치. 줌인하면 px 간격 벌어져 쪼개짐.
+    // 화면상 셀 크기(px) — 이 안의 카페끼리 한 뭉치. 줌인하면 px 간격 벌어져 쪼개짐.
+    //   z≥16(동네 골목 줌)부턴 셀을 줄여 '2·3개 뭉치'가 개별 핀으로 풀리게 — 명동·성수 실측에서 화면이 온통 ●2로 덮였음.
+    const CELL = z >= 17 ? 34 : z >= 16 ? 44 : 64;
     const cells = new Map<string, Cafe[]>();
     for (const c of inView) {
       const p = map.project([c.lat, c.lng], z);
@@ -1215,8 +1259,9 @@ export default function Home() {
     let focusM: any = null;
     const addPin = (c: Cafe, forceFocus = false) => {
       const isFocus = forceFocus || c.id === focusId, isMatch = matchSet.has(c.id), isMine = myCafeIds.has(c.id);
-      const m = L.marker([c.lat, c.lng], { icon: L.divIcon({ className: "", html: makePinHtml(c, isMatch, isFocus, isMine), iconSize: [0, 0] }), zIndexOffset: isFocus ? 3000 : c.featured ? 2000 : isMatch ? 1000 : 0 }).on("click", () => setSelected(c));
+      const m = L.marker([c.lat, c.lng], { icon: L.divIcon({ className: "", html: makePinHtml(c, isMatch, isFocus, isMine, z), iconSize: [0, 0] }), zIndexOffset: isFocus ? 3000 : c.featured ? 2000 : isMatch ? 1000 : (c.synth_grade === "검증" ? 300 : c.synth_grade === "참고" ? 100 : 0) }).on("click", () => setSelected(c));
       if (isFocus) { m.bindPopup(`<b>${c.name}</b><br>${c.area}`); focusM = m; }
+      markersByIdRef.current.set(c.id, m);
       markers.push(m);
     };
     for (const items of cells.values()) {
@@ -1237,7 +1282,8 @@ export default function Home() {
       const cx = pts.reduce((s, c) => s + c.lat, 0) / pts.length; // 2개+ → 클러스터 뱃지(centroid), 클릭 시 줌인
       const cy = pts.reduce((s, c) => s + c.lng, 0) / pts.length;
       const hasMatch = pts.some((c) => matchSet.has(c.id));
-      markers.push(L.marker([cx, cy], { icon: L.divIcon({ className: "", html: makeClusterHtml(pts.length, hasMatch), iconSize: [0, 0] }), zIndexOffset: 100 }).on("click", () => map.setView([cx, cy], Math.min(z + 2, 18), { animate: true })));
+      const nVerified = pts.reduce((n, c) => n + (c.synth_grade === "검증" ? 1 : 0), 0);
+      markers.push(L.marker([cx, cy], { icon: L.divIcon({ className: "", html: makeClusterHtml(pts.length, hasMatch, nVerified), iconSize: [0, 0] }), zIndexOffset: 500 }).on("click", () => map.setView([cx, cy], Math.min(z + 2, 18), { animate: true })));
     }
     // 🚇🏬 지하철역·대형 랜드마크 — 개별 카페(동) 레벨에서만, 화면 안만. 카페보다 아래·비클릭.
     if (z >= 13) {
@@ -1264,6 +1310,7 @@ export default function Home() {
     }
     layerRef.current.addLayer(L.layerGroup(markers));
     if (focusM) (focusM as any).openPopup();
+    applySelectedPin(selectedRef.current?.id ?? null);
     // ⚡ 방금 그린 범위(패딩 포함)와 줌을 기억 — live/final이 "다시 그릴 필요가 있나"를 판단하는 근거.
     lastDrawRef.current = { z, s: pS, n: pN, w: pW, e: pE };
   }, [filtered, matchSet, sido, sigungu, dong, focusId, myPinMode, myCafeIds, othersMode, othersPins, cafes, stations, exits, lines, landmarks, nearMe]);
@@ -1526,6 +1573,29 @@ export default function Home() {
           .dcn-enter, .dcn-pin-feat::after, .dcn-pin-focus::after, .dcn-cload .cup::before, .dcn-cload .drip, .dcn-cload .stm, .dcn-pop, .dcn-fly { animation: none !important; }
           .dcn-enter { opacity:1 !important; transform:none !important; }
         }
+        /* 🎯 카페 핀 상호작용 — hover 살짝 커짐, 선택(.dcn-sel)은 크게+맥동 링. 후보 소형점은 hover 때만 이름. */
+        .dcn-pin .dcn-pin-body { transition: transform .16s cubic-bezier(.2,.8,.3,1.2), box-shadow .16s; transform: rotate(-45deg); }
+        .dcn-pin:hover .dcn-pin-body { transform: rotate(-45deg) scale(1.1); }
+        .leaflet-marker-icon.dcn-sel { z-index: 9000 !important; }
+        .leaflet-marker-icon.dcn-sel .dcn-pin-body { transform: rotate(-45deg) scale(1.22); box-shadow: 0 0 0 5px rgba(255,255,255,.9), 0 0 0 8px rgba(181,112,60,.55), 0 8px 18px rgba(50,33,20,.5) !important; }
+        .leaflet-marker-icon.dcn-sel .dcn-lbl { font-weight:800 !important; background:#2b2018 !important; color:#fdf3e6 !important; }
+        .dcn-pin-glyph svg { width:100%; height:100%; display:block; transform: rotate(45deg); }
+        .dcn-pin-dot { display:block; width:13px; height:13px; border-radius:50%; margin:0 auto; border:2px solid #fdfaf4; box-shadow:0 0 0 2px rgba(80,55,35,.14), 0 2px 5px rgba(50,33,20,.35); transition: transform .14s; }
+        .dcn-pin-mini .dcn-lbl { display:none !important; }
+        .dcn-pin-mini:hover .dcn-pin-dot, .leaflet-marker-icon.dcn-sel .dcn-pin-dot { transform: scale(1.35); }
+        .dcn-pin-mini:hover .dcn-lbl, .leaflet-marker-icon.dcn-sel .dcn-pin-mini .dcn-lbl { display:inline-block !important; }
+        .leaflet-marker-icon:hover { z-index: 8000 !important; }
+        .dcn-cluster .dcn-cluster-body { transition: transform .14s; }
+        .dcn-cluster:hover .dcn-cluster-body { transform: scale(1.1); }
+        /* 범례 견본 */
+        .dcn-lg-pin { display:inline-block; width:11px; height:11px; border-radius:50% 50% 50% 0; transform:rotate(-45deg); border:1.5px solid #fdfaf4; box-shadow:0 1px 2px rgba(0,0,0,.25); flex:none; }
+        .dcn-lg-dot { display:inline-block; width:9px; height:9px; border-radius:50%; border:1.5px solid #fdfaf4; box-shadow:0 1px 2px rgba(0,0,0,.25); flex:none; margin:0 1px; }
+        .dcn-lg-ring { display:inline-block; width:12px; height:12px; border-radius:50%; background: conic-gradient(#6f8f63 0 60%, rgba(120,90,60,.25) 60% 100%); flex:none; }
+        /* 토글 상태점 — 켜짐=초록점, 꺼짐=빈 원(문구 ON/OFF보다 한눈에) */
+        .dcn-tgl-dot { display:inline-block; width:9px; height:9px; border-radius:50%; border:1.5px solid currentColor; opacity:.55; }
+        .dcn-tgl-dot.on { background:#8fd18a; border-color:#8fd18a; opacity:1; box-shadow:0 0 0 2px rgba(143,209,138,.35); }
+        @media (prefers-reduced-motion: reduce) { .dcn-pin .dcn-pin-body, .dcn-pin-dot, .dcn-cluster .dcn-cluster-body { transition:none; } }
+        @media (max-width: 767px) { .dcn-mapwrap { bottom: var(--dcn-sheet, 0px) !important; transition: bottom .3s ease-out; } }
         /* 🗺️ 지도 기본 컨트롤을 커피 톤으로(전문성) — 톤은 유지, 밋밋한 라이브러리 기본값만 다듬음 */
         .leaflet-control-zoom { border:none !important; border-radius:12px !important; overflow:hidden; box-shadow:0 3px 12px rgba(50,33,20,.22) !important; }
         .leaflet-control-zoom a { background:#fffdf9 !important; color:#6b4f35 !important; border:none !important; width:34px !important; height:34px !important; line-height:34px !important; font-size:19px !important; font-weight:700 !important; transition:background .15s, color .15s; }
@@ -1667,15 +1737,48 @@ export default function Home() {
       {/* 지도 탭 */}
       {/* 지도 블록은 항상 마운트하고 비활성 탭에선 숨김 → 탭 전환 시 지도 파괴/재생성 없음(빠른 전환) */}
       <div className="flex-1 relative md:flex overflow-hidden" style={{ display: tab === "map" ? undefined : "none" }}>
-          <div className="absolute inset-0 md:relative md:flex-1 md:p-5">
+          {/* 📱 모바일: 지도 영역을 바텀시트 '위'까지로 잡는다(--dcn-sheet). 전엔 시트가 지도 하반부를 덮어 지도 중심(서울)이 시트 밑에 숨고 화면엔 동두천·양주가 보였다. */}
+          <div className="dcn-mapwrap absolute inset-0 md:relative md:flex-1 md:p-5" style={{ ["--dcn-sheet" as any]: tab === "map" ? (sheetOpen ? (sheetMode === "half" ? "calc(42dvh + 3.25rem)" : "calc(72dvh + 3.25rem)") : "calc(2.75rem + 3.25rem)") : "0px" }}>
             <div ref={mapRef} className="w-full h-full md:rounded-2xl overflow-hidden bg-[#e8e0d3] z-0" />
             {/* 🗺️ 현재 화면 카페 수 — 좌상단 줌버튼 아래(전문성). 커버리지를 숫자로. 이동/줌마다 실시간 갱신 */}
-            {inViewCount != null && (
-              <div className="absolute top-[5.5rem] left-3 z-[1100] pointer-events-none">
-                <div className="inline-flex items-center gap-1.5 rounded-full pl-2.5 pr-3 py-1.5 text-[11px] font-bold shadow-lg" style={{ background: "rgba(43,32,24,0.86)", color: "#f4ece0", backdropFilter: "blur(3px)" }}>
+            {/* 🗺️ 좌상단 한 줄: 현재 화면 카페 수(이동/줌마다 실시간) + 모바일용 범례 버튼. 모바일 지도는 42dvh뿐이라 오버레이를 한 줄에 모은다. */}
+            <div className="absolute top-[5.5rem] left-3 z-[1100] flex items-center gap-1.5 max-w-[calc(100vw-1.5rem)]">
+              {inViewCount != null && (
+                <div className="inline-flex items-center gap-1.5 rounded-full pl-2.5 pr-3 h-8 text-[11px] font-bold shadow-lg pointer-events-none whitespace-nowrap" style={{ background: "rgba(43,32,24,0.86)", color: "#f4ece0", backdropFilter: "blur(3px)" }}>
                   <span className="text-[#e8b87a] text-[12px] leading-none">☕</span>
                   <span>이 화면 <b className="text-[#e8b87a]">{inViewCount.toLocaleString()}</b>곳</span>
                 </div>
+              )}
+              <div className="md:hidden">{legendOpen ? null : (
+                <button onClick={() => setLegendOpen(true)} className="inline-flex items-center gap-1 h-8 px-2.5 rounded-full text-[11px] font-bold shadow-lg whitespace-nowrap" style={{ background: "rgba(253,250,244,0.96)", color: "#5b4636", border: "1px solid #e6d8c2" }}>
+                  <i className="dcn-lg-pin" style={{ background: "#5f7355" }} /><span>핀 읽는 법</span>
+                </button>
+              )}</div>
+            </div>
+            {/* 🗺️ 핀 범례 — 소비자가 색의 뜻(검증/참고/후보/취향/우선/내 카페)을 몰랐음. 데스크톱은 좌하단 기본 펼침, 모바일은 버튼으로 열면 같은 자리에. */}
+            {(
+              <div className={`absolute z-[1100] top-[7.75rem] left-3 md:top-auto md:left-8 md:bottom-16 ${legendOpen ? "" : "hidden md:block"}`}>
+                {legendOpen ? (
+                  <div className="dcn-legend rounded-xl shadow-lg px-3 py-2 text-[11px] text-[#3a2c20] leading-tight" style={{ background: "rgba(253,250,244,0.96)", backdropFilter: "blur(4px)", border: "1px solid #e6d8c2" }}>
+                    <div className="flex items-center justify-between gap-3 mb-1.5">
+                      <b className="text-[11px] text-[#5b4636]">핀 읽는 법</b>
+                      <button onClick={() => setLegendOpen(false)} aria-label="범례 닫기" className="text-[#8f7a58] text-[12px] leading-none px-1">✕</button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                      <span className="inline-flex items-center gap-1.5"><i className="dcn-lg-pin" style={{ background: "#5f7355" }} />검증된 후기</span>
+                      <span className="inline-flex items-center gap-1.5"><i className="dcn-lg-pin" style={{ background: "#9c6b3f" }} />참고할 만한</span>
+                      <span className="inline-flex items-center gap-1.5"><i className="dcn-lg-dot" style={{ background: "#a8927a" }} />후보(줌인하면 이름)</span>
+                      <span className="inline-flex items-center gap-1.5"><i className="dcn-lg-pin" style={{ background: "#9c6b3f", boxShadow: "0 0 0 2px #e0a32e" }} />취향 일치 ✓</span>
+                      <span className="inline-flex items-center gap-1.5"><i className="dcn-lg-pin" style={{ background: "#e0a32e" }} />우선 노출 ★</span>
+                      <span className="inline-flex items-center gap-1.5"><i className="dcn-lg-pin" style={{ background: "#d6336c" }} />내 카페 ❤</span>
+                      <span className="inline-flex items-center gap-1.5 col-span-2 pt-1 mt-0.5 border-t border-[#eee2d2] text-[#665036]"><i className="dcn-lg-ring" />뭉치의 초록 테두리 = 검증 비율</span>
+                    </div>
+                  </div>
+                ) : (
+                  <button onClick={() => setLegendOpen(true)} className="inline-flex items-center gap-1 h-8 px-2.5 rounded-full text-[11px] font-bold shadow-lg whitespace-nowrap" style={{ background: "rgba(253,250,244,0.96)", color: "#5b4636", border: "1px solid #e6d8c2" }}>
+                    <i className="dcn-lg-pin" style={{ background: "#5f7355" }} /><span>핀 읽는 법</span>
+                  </button>
+                )}
               </div>
             )}
             {/* 내 카페(MY PIN) / 다른 사람은 — 지도 상단 */}
@@ -1701,13 +1804,13 @@ export default function Home() {
             </div>
             {/* 🗺️ 지도 표시 토글 — 우측(상단 컨트롤과 겹치지 않게 한 줄 아래로) */}
             <div className="absolute top-14 right-3 z-[1100] flex flex-col gap-1.5 items-end">
-              <button onClick={() => setShowStreets((v) => !v)}
-                className={`inline-flex items-center gap-1 h-8 px-2.5 rounded-full text-[11px] font-bold shadow-lg whitespace-nowrap transition-colors ${showStreets ? "bg-[#5b4636] text-white" : "bg-white/95 text-[#665036] border border-[#e0d3bd]"}`}>
-                <span className="text-[12px] leading-none">🏷️</span><span>상세 {showStreets ? "ON" : "OFF"}</span>
+              <button onClick={() => setShowStreets((v) => !v)} aria-pressed={showStreets} title="길이름·건물·상가 표시"
+                className={`dcn-tgl inline-flex items-center gap-1.5 h-8 pl-2 pr-3 rounded-full text-[11px] font-bold shadow-lg whitespace-nowrap transition-colors ${showStreets ? "bg-[#5b4636] text-white" : "bg-white/95 text-[#665036] border border-[#e0d3bd]"}`}>
+                <span className={`dcn-tgl-dot ${showStreets ? "on" : ""}`} aria-hidden="true" /><span>상세 지도</span>
               </button>
-              <button onClick={() => setShowBus((v) => !v)}
-                className={`inline-flex items-center gap-1 h-8 px-2.5 rounded-full text-[11px] font-bold shadow-lg whitespace-nowrap transition-colors ${showBus ? "bg-[#235a86] text-white" : "bg-white/95 text-[#665036] border border-[#bcd0e0]"}`}>
-                <span className="text-[12px] leading-none">🚌</span><span>버스 {showBus ? "ON" : "OFF"}</span>
+              <button onClick={() => setShowBus((v) => !v)} aria-pressed={showBus} title="버스 정류장 표시"
+                className={`dcn-tgl inline-flex items-center gap-1.5 h-8 pl-2 pr-3 rounded-full text-[11px] font-bold shadow-lg whitespace-nowrap transition-colors ${showBus ? "bg-[#235a86] text-white" : "bg-white/95 text-[#665036] border border-[#bcd0e0]"}`}>
+                <span className={`dcn-tgl-dot ${showBus ? "on" : ""}`} aria-hidden="true" /><span>버스 정류장</span>
               </button>
             </div>
             {/* 📍 내 주변 안내/해제 — 활성 또는 안내 메시지 있을 때 */}
@@ -1731,12 +1834,18 @@ export default function Home() {
           <aside className="hidden md:block md:w-[380px] md:h-full bg-[#fdfaf4] border-l border-[#ece0cd] overflow-y-auto p-6 relative z-10">
             <MapControls {...{ sido, sigungu, dong, onSido, onSigungu, setDong, dongOptions, tasteKey, setTasteKey, filtered, matchSet, setSelected, openLocation, autoGu, geoMsg, clearAuto, setShowFavs, favCount: cafes.filter((c) => bookmarkIds.has(c.id)).length, closeSheet: () => { setFocusId(null); setSheetOpen(false); } }} />
           </aside>
-          <div className="md:hidden absolute left-0 right-0 bg-[#fdfaf4] rounded-t-3xl shadow-[0_-4px_24px_rgba(0,0,0,0.18)] z-[1200] flex flex-col transition-transform duration-300 ease-out will-change-transform" style={{ bottom: "3.25rem", height: "72dvh", transform: sheetOpen ? "translateY(0)" : "translateY(calc(72dvh - 2.75rem))" }}>
+          {/* 📱 바텀시트 3단: 접힘(핸들만) → 반(지도와 목록이 함께 보임, 기본) → 전체. 전엔 열자마자 72dvh가 지도를 덮어 지도 탭인데 지도가 15%만 보였다. */}
+          <div className="md:hidden absolute left-0 right-0 bg-[#fdfaf4] rounded-t-3xl shadow-[0_-4px_24px_rgba(0,0,0,0.18)] z-[1200] flex flex-col transition-[transform,height] duration-300 ease-out will-change-transform" style={{ bottom: "3.25rem", height: sheetOpen && sheetMode === "half" ? "42dvh" : "72dvh", transform: sheetOpen ? "translateY(0)" : "translateY(calc(72dvh - 2.75rem))" }}>
             {/* 접힘 시 정확히 이 핸들(2.75rem)까지만 보이게 — 아래 목록이 삐져나오지 않음 */}
-            <button onClick={() => setSheetOpen((o) => !o)} className="shrink-0 w-full flex flex-col items-center justify-center gap-1" style={{ height: "2.75rem" }} aria-expanded={sheetOpen}>
-              <div className="w-9 h-1 bg-[#cbb89f] rounded-full" />
-              <span className="text-[11px] font-bold text-[#7a5122] leading-none">{sheetOpen ? "지도 보기 ▾" : `지역·필터 펼치기 ▴ (${filtered.length})`}</span>
-            </button>
+            <div className="shrink-0 w-full flex items-center justify-between px-4" style={{ height: "2.75rem" }}>
+              <button onClick={() => { if (!sheetOpen) { setSheetMode("half"); setSheetOpen(true); } else if (sheetMode === "half") setSheetMode("full"); else setSheetOpen(false); }} className="flex-1 flex flex-col items-center justify-center gap-1 h-full" aria-expanded={sheetOpen}>
+                <div className="w-9 h-1 bg-[#cbb89f] rounded-full" />
+                <span className="text-[11px] font-bold text-[#7a5122] leading-none">{!sheetOpen ? `지역·필터 펼치기 ▴ (${filtered.length})` : sheetMode === "half" ? "더 펼치기 ▴" : "지도 보기 ▾"}</span>
+              </button>
+              {sheetOpen && sheetMode === "full" && (
+                <button onClick={() => setSheetMode("half")} className="shrink-0 text-[11px] font-bold text-[#7a5122] px-2 h-7 rounded-full border border-[#e6d8c2] bg-white">반만 ▾</button>
+              )}
+            </div>
             <div className="flex-1 overflow-y-auto px-5 pb-8" style={{ WebkitOverflowScrolling: "touch" }}>
               <MapControls {...{ sido, sigungu, dong, onSido, onSigungu, setDong, dongOptions, tasteKey, setTasteKey, filtered, matchSet, setSelected, openLocation, autoGu, geoMsg, clearAuto, setShowFavs, favCount: cafes.filter((c) => bookmarkIds.has(c.id)).length, closeSheet: () => { setFocusId(null); setSheetOpen(false); } }} />
             </div>
