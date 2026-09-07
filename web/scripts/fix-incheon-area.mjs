@@ -19,19 +19,32 @@ const { neon } = await import("@neondatabase/serverless");
 const sql = neon(process.env.DATABASE_URL);
 const APPLY = process.argv.includes("--apply");
 
-const guFromAddr = (addr) => {
+// 🔁 2026-09-07 재정정: 2026-07-01 인천 2군9구 개편은 **실재**(인천시 공식 incheon.go.kr/IC01070101 확인,
+//   네이버 로컬도 신구명 주소 반환). 08-31 "환각" 판정(decisions#910)이 과잉 정정이었다.
+//   옛 주소 표기(중구·동구·서구)는 공식 관할 동 기준으로 신설구에 결정론 매핑한다:
+//   동구→제물포구 / 중구: 영종권 동→영종구, 내륙→제물포구 / 서구: 검단권 동→검단구, 남부→서해구.
+const YEONGJONG = /운서|운남|중산동|을왕|남북동|덕교|무의|용유|운북|영종/;
+const GEOMDAN = /검단|원당동|당하동|불로동|마전동|왕길동|시천동|대곡동|오류동|백석동|아라동/;
+const remapOldGu = (gu, dongAddr) => {
+  if (gu === "동구") return "제물포구";
+  if (gu === "중구") return YEONGJONG.test(dongAddr) ? "영종구" : "제물포구";
+  if (gu === "서구") return GEOMDAN.test(dongAddr) ? "검단구" : "서해구";
+  return gu;
+};
+const guFromAddr = (addr, dong) => {
   const m = String(addr || "").match(/인천(?:광역시)?\s*([가-힣]+구|[가-힣]+군)/);
-  return m ? m[1] : null;
+  if (!m) return null;
+  return remapOldGu(m[1], (dong || "") + " " + String(addr || ""));
 };
 
 const rows = await sql`SELECT id, name, area, dong, address FROM cafes
-  WHERE published AND area LIKE '인천%' AND address LIKE '%인천%'`;
+  WHERE (area LIKE '인천%' OR area = '미추홀구') AND address LIKE '%인천%'`;
 
 let checked = 0, ok = 0, fix = [], skip = [];
 for (const c of rows) {
   checked++;
   const cur = String(c.area).replace(/^인천\s*/, "");
-  const truth = guFromAddr(c.address);
+  const truth = guFromAddr(c.address, c.dong);
   if (!truth) { skip.push([c, "주소에서 구 추출 실패"]); continue; }
   if (truth === cur) { ok++; continue; }
   fix.push([c, `인천 ${truth}`]);

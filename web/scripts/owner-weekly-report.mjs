@@ -14,25 +14,26 @@ const AXIS_KO = { mood: "감성", space: "공간", pet: "반려견", dessert: "�
 function momBars(rows) { // rows: [{ym, n}] 최근 7개월
   const max = Math.max(...rows.map(r => r.n), 1);
   const peak = rows.reduce((a, b) => (b.n > a.n ? b : a));
-  const tds = rows.map(r => {
-    const h = Math.max(8, Math.round(88 * r.n / max));
-    const col = r === peak ? "#c0392b" : "#d98e73";
-    return `<td style="width:${(100 / rows.length).toFixed(2)}%;vertical-align:bottom;text-align:center;padding:0 4px">
-      <div style="font-size:13px;font-weight:800;color:${r === peak ? "#c0392b" : "#6a5842"}">${r.n}</div>
-      <div style="height:${h}px;background:${col};border-radius:5px 5px 0 0;margin-top:3px"></div>
-      <div style="font-size:11px;color:#9c8a6c;margin-top:4px;border-top:2px solid #e5d8c2;padding-top:3px">${r.ym.slice(5)}월</div></td>`;
+  const w = (100 / rows.length).toFixed(2);
+  // 3단 구조: ①숫자(상단 한 줄 정렬) ②막대(아래 기준선에서 성장) ③월 라벨 — 숫자가 막대 높이 따라 흩어지지 않게
+  const nums = rows.map(r => `<td style="width:${w}%;text-align:center;font-size:12px;font-weight:800;line-height:1.2;color:${r === peak ? "#c0392b" : "#6a5842"};padding-bottom:4px">${r.n}</td>`).join("");
+  const bars = rows.map(r => {
+    const h = Math.max(4, Math.round(64 * r.n / max));
+    return `<td style="width:${w}%;height:64px;vertical-align:bottom;padding:0 3px"><div style="height:${h}px;background:${r === peak ? "#c0392b" : "#d98e73"};border-radius:4px 4px 0 0"></div></td>`;
   }).join("");
-  return `<table style="border-collapse:collapse;width:100%;margin:10px 0 2px"><tr>${tds}</tr></table>`;
+  const lbls = rows.map(r => `<td style="width:${w}%;text-align:center;font-size:10px;color:#9c8a6c;border-top:2px solid #e5d8c2;padding-top:2px">${Number(r.ym.slice(5))}월</td>`).join("");
+  return `<table style="border-collapse:collapse;width:100%;margin:8px 0 0"><tr>${nums}</tr><tr>${bars}</tr><tr>${lbls}</tr></table>`;
 }
-function hbar(label, val, maxv, color, note = "") {
-  const pct = Math.max(4, Math.round(100 * val / maxv));
-  return `<div style="margin:10px 0">
-    <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px"><b>${label}</b><span style="color:#8a7256;font-size:12px">${note}</span></div>
-    <div style="background:#f0e6d2;border-radius:8px;height:20px;width:100%"><div style="width:${pct}%;height:20px;background:${color};border-radius:8px;color:#fff;font-size:12px;font-weight:800;line-height:20px;padding-left:8px;box-sizing:border-box">${val}</div></div></div>`;
+function hbar(label, val, maxv, color, note = "", unit = "") {
+  const pct = Math.max(4, Math.min(100, Math.round(100 * val / maxv)));
+  const txt = color === "#cdb894" || color === "#f0e6d2" ? "#6a5842" : "#fff";
+  return `<div style="margin:9px 0">
+    <div style="font-size:12.5px;line-height:1.4;margin:0 0 3px;text-align:left"><b>${label}</b>${note ? `&nbsp;<span style="font-size:11px;color:#8a7256;font-weight:400">· ${note}</span>` : ""}</div>
+    <div style="background:#f0e6d2;border-radius:7px;height:18px;width:100%;font-size:0;line-height:0"><div style="display:inline-block;vertical-align:top;width:${pct}%;height:18px;background:${color};border-radius:7px;color:${txt};font-size:11px;font-weight:800;line-height:18px;padding-left:7px;box-sizing:border-box;white-space:nowrap;overflow:visible">${val}${unit}</div></div></div>`;
 }
-const card = (bd, hb, icon, title, body) => `<div style="border:2px solid ${bd};border-radius:14px;margin:14px 0;overflow:hidden"><div style="background:${hb};padding:11px 16px;font-size:16px;font-weight:800">${icon} ${title}</div><div style="padding:12px 16px 14px">${body}</div></div>`;
-const action = (t) => `<div style="background:#3d2b1f;color:#f5ead8;border-radius:10px;padding:11px 14px;font-size:13.5px;font-weight:700;margin-top:10px">✅ 이번 주 할 일 — ${t}</div>`;
-const note = (t) => `<p style="font-size:12.5px;color:#8a7256;margin:8px 0 0">${t}</p>`;
+const card = (bd, hb, icon, title, body) => `<div style="border:2px solid ${bd};border-radius:12px;margin:12px 0;overflow:hidden"><div style="background:${hb};padding:9px 14px;font-size:14.5px;font-weight:800;line-height:1.35">${icon} ${title}</div><div style="padding:10px 14px 12px">${body}</div></div>`;
+const action = (t) => `<div style="background:#3d2b1f;color:#f5ead8;border-radius:9px;padding:9px 12px;font-size:12.5px;font-weight:700;margin-top:9px;line-height:1.45">✅ 이번 주 할 일 — ${t}</div>`;
+const note = (t) => `<p style="font-size:12px;color:#8a7256;margin:7px 0 0;line-height:1.5">${t}</p>`;
 
 async function buildReport(cafeId) {
   const [c] = await sql`SELECT id, name, area, dong, synth_grade, synth_count, area_rank, area_total, visitor_trip, char_scores FROM cafes WHERE id=${cafeId} AND published`;
@@ -59,7 +60,7 @@ async function buildReport(cafeId) {
 
   const cards = [];
   if (momentum === "drop") cards.push(card("#c0392b", "#fdecea", "⚡", "상승 동력이 꺾이는 신호가 잡혔습니다",
-    `<div style="font-size:14px"><b>월별 새 후기 유입</b> — ${mm[peakIdx].ym.slice(5)}월 피크 이후 하락:</div>` + momBars(mm) +
+    `<div style="font-size:12.5px;color:#5d4a35"><b>월별 새 후기 유입</b> · ${Number(mm[peakIdx].ym.slice(5))}월 피크 후 하락</div>` + momBars(mm) +
     note(`피크(${mm[peakIdx].n}건) 대비 최근 두 달 합계가 ${recent2}건입니다. 바이럴이 식기 전 재점화가 가장 싼 마케팅입니다 — 피크 시기 후기들의 공통 소재를 다시 밀어주세요.`) +
     action("피크 시기 후기의 공통 소재로 짧은 SNS 콘텐츠 1개(검증된 소재 재점화)")));
   else cards.push(card(momentum === "up" ? "#3f7a4f" : "#b06a1e", momentum === "up" ? "#eef7ee" : "#faf3e3", momentum === "up" ? "📈" : "📊", momentum === "up" ? "후기 유입이 늘고 있습니다" : "후기 유입 흐름",
@@ -75,8 +76,8 @@ async function buildReport(cafeId) {
   if (avg?.t != null) {
     const gap = myTrip < avg.t - 1 ? "below" : myTrip > avg.t + 1 ? "above" : "avg";
     cards.push(card("#4a6fa5", "#edf2fa", "🧳", gap === "below" ? "여행객 손님 — 저평가된 성장 여백" : gap === "above" ? "여행객 손님을 평균 이상으로 잡고 있습니다" : "여행객 손님 비중 — 지역 평균 수준",
-      hbar(`${c.name}`, myTrip, Math.max(myTrip, avg.t) * 1.3 || 1, gap === "below" ? "#c0392b" : "#4a6fa5", "%") +
-      hbar(`${c.area} 평균`, avg.t, Math.max(myTrip, avg.t) * 1.3 || 1, "#cdb894", "%") +
+      hbar(`${c.name}`, myTrip, Math.max(myTrip, avg.t) * 1.3 || 1, gap === "below" ? "#c0392b" : "#4a6fa5", "여행객 비중", "%") +
+      hbar(`${c.area} 평균`, avg.t, Math.max(myTrip, avg.t) * 1.3 || 1, "#cdb894", "", "%") +
       note(gap === "below" ? "매력 대비 관광 문맥 노출이 비어 있다는 신호입니다 — 나들이·코스 문맥의 사진과 글이 손대지 않은 성장 여백입니다." : gap === "above" ? "관광 수요를 잘 잡고 있습니다 — 주말 피크 운영(좌석 회전·시그니처 재고)이 매출 레버입니다." : "평균 수준입니다 — 나들이 문맥 노출을 늘리면 위로 뚫을 여지가 있습니다.") +
       (gap === "below" ? action("대표 사진을 나들이 문맥(외관·풍경·동반 장면)으로 교체") : "")));
   }
@@ -92,7 +93,8 @@ ${cards.join("")}${guard}
   return { html, name: c.name };
 }
 
-const argId = Number(process.argv[2] || 0);
+const dumpPath = process.argv.includes("--dump") ? process.argv[process.argv.indexOf("--dump") + 1] : null;
+const argId = Number((process.argv.filter(a => /^\d+$/.test(a))[0]) || 0);
 const targets = [];
 if (argId) targets.push({ cafe_id: argId, email: "kyh30628@gmail.com", preview: true });
 else {
@@ -105,6 +107,7 @@ let sent = 0;
 for (const t of targets) {
   const r = await buildReport(t.cafe_id);
   if (!r) continue;
+  if (dumpPath) { const { writeFileSync } = await import("node:fs"); writeFileSync(dumpPath, `<!doctype html><meta charset="utf-8">` + r.html); console.log("dump →", dumpPath); continue; }
   await fetch("https://api.resend.com/emails", { method: "POST", headers: { Authorization: `Bearer ${RESEND}`, "Content-Type": "application/json" },
     body: JSON.stringify({ from: FROM, to: [t.email], subject: `${t.preview ? "[미리보기] " : ""}☕ ${r.name} 주간 당직 보고`, html: r.html }) });
   sent++;

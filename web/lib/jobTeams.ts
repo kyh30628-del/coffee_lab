@@ -21,6 +21,7 @@ export const JOB_TEAM: Record<string, string> = {
   "discover-sweep": "성장본부", // 🔄2026-08-04 KST 12·20시 전 지역 발굴 스윕(새벽 02:30 → 낮으로 이동, DB통잠)
   "youtube-backfill": "품질본부",
   "weekly-evaluation": "전략기획본부",
+  "owner-weekly": "영업본부", // 🆕2026-09-07 매주 월 08:40 사장님 주간 당직 보고(v3) 자동발송 — 결정론·LLM 0원
   "chief-manager": "기획조정실", "self-audit": "기획조정실", "audit-watch": "기획조정실",
   "dev-pipeline": "기획조정실", "dev-deploy": "기획조정실",
   "chat-watch": "경영지원본부",
@@ -61,6 +62,7 @@ export const EXPECT_MAX_H: Record<string, number> = {
   "chief-manager": 20,    // 일간 사이클 KST 08·12·16시
   "self-audit": 18,       // 🔄KST 12·16·20시 (최대공백 20→익일12시=16h + 버퍼)
   "weekly-evaluation": 30, // 매일 10:30 KST(격일 게이트지만 스킵도 하트비트)
+  "owner-weekly": 192,     // 매주 월 08:40 KST — 주 1회(168h) + 버퍼 24h
   "search-quality-agent": 30, // 저녁블록 일 1회 + 버퍼 (coordination#296/#300, decisions#663·664)
   "b2b-sales-agent": 54,      // 격일(짝수/홀수 DOY 로테이션) + 버퍼 (coordination#296/#300, decisions#663·664)
   // 🔄 2026-08-04: chat-watch 폴링(1.5초) 정지로 DB 24h깨우기 제거(컴퓨트 절감) → 로컬 폴러 3개도 60분→KST 08·12·16·20시(최대공백 12h+버퍼14).

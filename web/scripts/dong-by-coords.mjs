@@ -16,7 +16,7 @@ const GJ = JSON.parse(readFileSync(GJ_PATH, "utf8"));
 const polys = [];
 for (const f of GJ.features) {
   const sido = f.properties.sidonm || "";
-  if (!/서울|인천|경기/.test(sido)) continue;
+  if (!new RegExp(process.env.SIDO_RE || "서울|인천|경기").test(sido)) continue;
   const dongAdm = (f.properties.adm_nm || "").split(/\s+/).pop() || "";
   const dong = dongAdm.replace(/제?\d+동$/, "동"); // 행정동→법정동 근사(천호제1동→천호동)
   const gu = f.properties.sggnm || "";
@@ -45,9 +45,10 @@ function findDong(lng, lat) {
 }
 
 const ONLY_NULL = process.env.ALL !== "1"; // 기본: 동 없는 것만(안전). ALL=1이면 전수 재도출.
+const AREA = process.env.AREA || null; // 지정 시 해당 area만(폴리곤 시도필터와 짝 맞춰 오채움 방지)
 const rows = ONLY_NULL
-  ? await sql`SELECT id, area, dong, lat, lng FROM cafes WHERE lat IS NOT NULL AND lng IS NOT NULL AND dong IS NULL`
-  : await sql`SELECT id, area, dong, lat, lng FROM cafes WHERE lat IS NOT NULL AND lng IS NOT NULL`;
+  ? await sql`SELECT id, area, dong, lat, lng FROM cafes WHERE lat IS NOT NULL AND lng IS NOT NULL AND dong IS NULL AND (${AREA}::text IS NULL OR area = ${AREA})`
+  : await sql`SELECT id, area, dong, lat, lng FROM cafes WHERE lat IS NOT NULL AND lng IS NOT NULL AND (${AREA}::text IS NULL OR area = ${AREA})`;
 console.log(`대상 카페: ${rows.length} (${ONLY_NULL ? "동없음만" : "전수"})`);
 let filled = 0, miss = 0, changed = 0;
 for (const c of rows) {
@@ -65,6 +66,6 @@ for (const c of rows) {
   if (!p || !p.dong) { miss++; continue; }
   if (p.dong !== c.dong) { await sql`UPDATE cafes SET dong = ${p.dong} WHERE id = ${c.id}`; if (c.dong) changed++; else filled++; }
 }
-const remain = (await sql`SELECT COUNT(*)::int n FROM cafes WHERE dong IS NULL AND lat IS NOT NULL`)[0].n;
+const remain = (await sql`SELECT COUNT(*)::int n FROM cafes WHERE dong IS NULL AND lat IS NOT NULL AND (${AREA}::text IS NULL OR area = ${AREA})`)[0].n;
 console.log(`좌표 동채움: 신규채움 ${filled} · 교정 ${changed} · 폴리곤밖 ${miss} · 남은 동없음 ${remain}`);
 process.exit(0);
