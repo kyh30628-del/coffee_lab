@@ -150,17 +150,31 @@ ring = bpy.context.active_object; ring.name = "ring"; ring_mat = make_material("
 for o in (dimple, ring):
     for poly in o.data.polygons: poly.use_smooth = True
 
+# 🔎 진단 모드(DIAG_MARK=1): 잔 아이콘이 들어갈 자리(오목 원판=마젠타, 테두리 링=시안)를 발광색으로 칠해 렌더 →
+#    후처리(크롭)까지 거친 뒤 픽셀로 재면 CSS 퍼센트를 눈대중 없이 정확히 계산할 수 있다.
+import os as _os
+if _os.environ.get("DIAG_MARK"):
+    def _emit(mat, rgb):
+        nt = mat.node_tree
+        for n in list(nt.nodes):
+            if n.type != "OUTPUT_MATERIAL": nt.nodes.remove(n)
+        em = nt.nodes.new("ShaderNodeEmission"); em.inputs[0].default_value = (*rgb, 1); em.inputs[1].default_value = 1.0
+        nt.links.new(em.outputs[0], nt.nodes["Material Output"].inputs[0])
+    _emit(dimple_mat, (1, 0, 1)); _emit(ring_mat, (0, 1, 1))
+
 # 카메라: 정면 살짝 위(고도 ~7°) — 프레임을 핀에 타이트하게(투명 여백 최소)
 aim(cam, (0, -7.4, 1.5), (0, 0, -0.45))
 cam_data.lens = 82
 
+def _set_base(mat, rgba):
+    n = mat.node_tree.nodes.get("Principled BSDF")
+    if n is not None: n.inputs["Base Color"].default_value = rgba  # 진단 모드에선 발광으로 바꿔놔서 없을 수 있다
+
 def set_pin_color(hexc):
     rgba = hex_rgb(hexc)
-    pin_mat.node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value = rgba
-    dark = tuple(c * 0.82 for c in rgba[:3]) + (1.0,)
-    dimple_mat.node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value = dark
-    light = tuple(c * 0.45 + 0.55 for c in rgba[:3]) + (1.0,)
-    ring_mat.node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value = light
+    _set_base(pin_mat, rgba)
+    _set_base(dimple_mat, tuple(c * 0.82 for c in rgba[:3]) + (1.0,))
+    _set_base(ring_mat, tuple(c * 0.45 + 0.55 for c in rgba[:3]) + (1.0,))
 
 pin_objs = (pin, shell, dimple, ring)
 import os as _os

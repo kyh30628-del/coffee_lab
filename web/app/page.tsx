@@ -354,13 +354,19 @@ function makeLandmarkHtml(name: string, icon: string): string {
 function makeMapTextures(): Record<string, ImageData> {
   const out: Record<string, ImageData> = {};
   const mk = (w: number, h: number, draw: (g: CanvasRenderingContext2D) => void) => { const c = document.createElement("canvas"); c.width = w; c.height = h; const g = c.getContext("2d")!; draw(g); return g.getImageData(0, 0, w, h); };
-  out["dcn-water"] = mk(64, 64, (g) => {
-    g.fillStyle = "#9cc0e2"; g.fillRect(0, 0, 64, 64);
-    g.strokeStyle = "rgba(255,255,255,0.22)"; g.lineWidth = 1.6;
+  // 🌊 깊이별 물 — 타일에 실제 수심 값은 없으므로 물의 종류(class)를 깊이로 읽는다: 바다 > 호수 > 강 > 연못·수영장.
+  //    깊을수록 어둡고 잔물결이 약하게(멀리서 보는 깊은 물), 얕을수록 밝고 물결이 또렷하게.
+  const water = (base: string, ripple: number) => (g: CanvasRenderingContext2D) => {
+    g.fillStyle = base; g.fillRect(0, 0, 64, 64);
+    g.strokeStyle = `rgba(255,255,255,${0.3 * ripple})`; g.lineWidth = 1.6;
     for (let y = 6; y < 64; y += 16) { g.beginPath(); for (let x = 0; x <= 64; x += 4) g.lineTo(x, y + Math.sin((x / 64) * Math.PI * 2) * 2.2); g.stroke(); }
-    g.strokeStyle = "rgba(60,110,160,0.16)";
+    g.strokeStyle = `rgba(40,85,130,${0.22 * ripple})`;
     for (let y = 14; y < 64; y += 16) { g.beginPath(); for (let x = 0; x <= 64; x += 4) g.lineTo(x, y + Math.cos((x / 64) * Math.PI * 2) * 2.2); g.stroke(); }
-  });
+  };
+  out["dcn-water-ocean"] = mk(64, 64, water("#5d92c0", 0.45)); // 바다 — 가장 깊고 차분
+  out["dcn-water-lake"] = mk(64, 64, water("#7aacd4", 0.75));  // 호수
+  out["dcn-water-river"] = mk(64, 64, water("#93bfe0", 1.0));  // 강
+  out["dcn-water-pond"] = mk(64, 64, water("#aacfea", 1.15));  // 연못·수영장 등 얕은 물
   const facade = (wall: string, frame: string, glass: string, glassHi: string, cols: number, rows: number, wr: number, hr: number) => (g: CanvasRenderingContext2D) => {
     g.fillStyle = wall; g.fillRect(0, 0, 32, 32);
     const cw = 32 / cols, ch = 32 / rows;
@@ -377,6 +383,11 @@ function makeMapTextures(): Record<string, ImageData> {
   out["dcn-fac-mid"] = mk(32, 32, facade("#d3cdc2", "#6e7076", "#55677a", "#a8bccb", 3, 3, 0.56, 0.5));   // 중층: 회백 콘크리트·알루미늄 창
   out["dcn-fac-tall"] = mk(32, 32, facade("#aab7c3", "#7c8b98", "#6d8aa5", "#d3e1ec", 4, 4, 0.7, 0.62));  // 고층: 커튼월 유리
   return out;
+}
+// 첫 심볼(라벨) 레이어 id — 우리가 넣는 면·선은 라벨보다 아래에 깔아야 글씨가 안 묻힌다.
+function firstSymbolId(ml: any): string | undefined {
+  try { for (const ly of ml.getStyle().layers || []) if (ly.type === "symbol") return ly.id; } catch {}
+  return undefined;
 }
 // 🗺️ '실제로 보이는 가까운 화면'의 위경도 경계 — 기울인 화면의 bounds는 지평선까지 포함한 사다리꼴이라 엄청나게 넓다.
 //   화면 아래쪽(가까운 곳)만 네 귀퉁이로 역투영해 상자를 만든다. 회전(bearing)도 네 점이라 자동 반영.
@@ -453,10 +464,12 @@ const vbGlyph = (vb?: string) => (vb ? ` ${vb.includes("T") ? "🧳" : ""}${vb.i
 
 // 🎨 핀 글리프 — 이모지(OS마다 모양·크기 제각각) 대신 인라인 SVG. 어떤 기기에서도 같은 모양.
 const PIN_SVG = {
-  cup: `<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 9.5h11v4.5a4 4 0 0 1-4 4h-3a4 4 0 0 1-4-4z"/><path d="M15.5 10.5h1.6a2.4 2.4 0 0 1 0 4.8h-1.6"/><path d="M8 4v2.2M11.5 4v2.2"/></svg>`,
-  heart: `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#fff" d="M12 20.3s-7.4-4.7-7.4-10.2A4.1 4.1 0 0 1 12 7.6a4.1 4.1 0 0 1 7.4 2.5c0 5.5-7.4 10.2-7.4 10.2z"/></svg>`,
-  star: `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#fff" d="M12 3.6l2.5 5.3 5.8.8-4.2 4 1 5.8L12 16.7l-5.1 2.8 1-5.8-4.2-4 5.8-.8z"/></svg>`,
-  pin: `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2" fill="#fff"/></svg>`,
+  // 🎨 잉크가 viewBox(24×24) 정중앙에 오도록 좌표를 맞춘 채움 아이콘 — 선(stroke) 대신 면이라 작은 크기에서도 또렷하다.
+  //   커피잔: 잔(3.2~15.1) + 손잡이(14.6~21.0) + 받침(2.1~21.9) → 잉크 가로 2.1~21.9(중앙 12.0), 세로 2.9~21.1(중앙 12.0)
+  cup: `<svg viewBox="0 0 24 24" aria-hidden="true"><g fill="#fff"><path d="M3.2 2.9h11.9v8.7a5.95 5.95 0 0 1-11.9 0z"/><path d="M14.6 4.8h2.45a3.95 3.95 0 0 1 0 7.9H14.6v-2.5h2.45a1.45 1.45 0 0 0 0-2.9H14.6z"/><rect x="2.1" y="18.7" width="19.8" height="2.4" rx="1.2"/></g></svg>`,
+  heart: `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#fff" d="M12 19.4s-7.6-4.8-7.6-10.4A4.2 4.2 0 0 1 12 6.4a4.2 4.2 0 0 1 7.6 2.6c0 5.6-7.6 10.4-7.6 10.4z"/></svg>`,
+  star: `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#fff" d="M12 2.6l2.9 6.1 6.7.9-4.85 4.6 1.16 6.7L12 17.66 6.09 20.9l1.16-6.7L2.4 9.6l6.7-.9z"/></svg>`,
+  pin: `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5.6" fill="#fff"/></svg>`,
 };
 // 핀 시각 위계(소비자 관점): 검증=초록 큰 핀+라벨 / 참고=브라운 핀+라벨 / 후보=z<16에선 작은 점(라벨은 hover·선택 시)
 //   → 밀집 지역에서 라벨끼리 겹치던 문제를 '중요한 것만 이름 표시'로 해결. 줌인(z≥16)하면 후보도 이름이 보인다.
@@ -1082,8 +1095,14 @@ export default function Home() {
             try { ml.setPaintProperty(ly.id, "fill-color", wood ? "#a9c78f" : "#c4d9a6"); ml.setPaintProperty(ly.id, "fill-opacity", wood ? 0.78 : 0.7); ml.setLayoutProperty(ly.id, "visibility", "visible"); } catch {}
             continue;
           }
-          // 🌊 물 — 깊은 파랑 + 잔물결 질감(절차 패턴). 호수·강·바다가 평면 색보다 살아 보인다.
-          if (sl === "water" && ly.type === "fill") { try { ml.setPaintProperty(ly.id, "fill-pattern", "dcn-water"); ml.setPaintProperty(ly.id, "fill-opacity", 1); } catch { try { ml.setPaintProperty(ly.id, "fill-color", "#9cc0e2"); } catch {} } continue; }
+          // 🌊 물 — 종류(class)를 깊이로 읽어 색·물결을 다르게: 바다(가장 깊음) → 호수 → 강 → 연못.
+          if (sl === "water" && ly.type === "fill") {
+            try {
+              ml.setPaintProperty(ly.id, "fill-pattern", ["match", ["get", "class"], "ocean", "dcn-water-ocean", "lake", "dcn-water-lake", "river", "dcn-water-river", "dcn-water-pond"]);
+              ml.setPaintProperty(ly.id, "fill-opacity", 1);
+            } catch { try { ml.setPaintProperty(ly.id, "fill-color", ["match", ["get", "class"], "ocean", "#5d92c0", "lake", "#7aacd4", "river", "#93bfe0", "#aacfea"]); } catch {} }
+            continue;
+          }
           if (sl === "waterway" && ly.type === "line") { try { ml.setPaintProperty(ly.id, "line-color", "#8fb4d6"); } catch {} }
           // 🏢 건물: 평면(2D 폴백)은 크림 베이지, 3D 돌출은 벽면 그라데이션 + 높이(render_height) — 3D 토글이 표시 여부를 관리.
           if (ly.type === "fill" && /building/i.test(ly.id)) { try { ml.setPaintProperty(ly.id, "fill-color", "#ece2cf"); ml.setPaintProperty(ly.id, "fill-outline-color", "#dccfb4"); } catch {} continue; }
@@ -1120,6 +1139,14 @@ export default function Home() {
             if (sl === "water_name" || /water_name|waterway/i.test(ly.id)) { try { ml.setPaintProperty(ly.id, "text-color", "#4a78a8"); } catch {} }
           }
         }
+        // 🏝️ 얕은 물가 띠 — 물 가장자리에 밝은 선을 흐리게 얹어 '가까울수록 얕다'를 표현(수심 데이터가 없으니 물가로 대신한다).
+        try {
+          if (!ml.getLayer("dcn-water-edge")) ml.addLayer({
+            id: "dcn-water-edge", type: "line", source: "openmaptiles", "source-layer": "water",
+            filter: ["==", ["geometry-type"], "Polygon"],
+            paint: { "line-color": "#d8ebfa", "line-opacity": 0.75, "line-blur": 1.4, "line-width": ["interpolate", ["linear"], ["zoom"], 6, 0.8, 11, 2, 15, 4.5, 18, 8] },
+          }, firstSymbolId(ml));
+        } catch {}
         // 🏔️ 지형 음영 레이어 — 물 아래·녹지 위: 산자락이 크림 지도 위로 은은히 드러난다(따뜻한 그림자·크림 하이라이트).
         try {
           if (!ml.getLayer("dcn-hillshade")) ml.addLayer({ id: "dcn-hillshade", type: "hillshade", source: "dcn-dem", maxzoom: 17, paint: { "hillshade-exaggeration": 0.5, "hillshade-shadow-color": "#5c4433", "hillshade-highlight-color": "#fff9ec", "hillshade-accent-color": "#8a6a4a", "hillshade-illumination-direction": 335, "hillshade-illumination-anchor": "map" } }, ml.getLayer("water") ? "water" : undefined);
@@ -1692,7 +1719,9 @@ export default function Home() {
         /* 🎯 카페 핀 상호작용 — hover 살짝 커짐, 선택(.dcn-sel)은 크게+맥동 링. 후보 소형점은 hover 때만 이름. */
         .dcn-pin .dcn-pin-body { position:relative; margin:0 auto; background-size:contain; background-position:center bottom; background-repeat:no-repeat; transform-origin:50% 100%; transition: transform .16s cubic-bezier(.2,.8,.3,1.2), filter .16s; }
         .dcn-pin:hover .dcn-pin-body { transform: scale(1.08); }
-        .dcn-pin-glyph { position:absolute; left:50%; top:31.6%; width:40%; aspect-ratio:1; transform:translate(-50%,-50%); display:block; filter: drop-shadow(0 1px 1px rgba(0,0,0,.35)); }
+        /* 🎯 잔 아이콘 자리 — Blender 진단 렌더로 실측한 '핀 머리 안쪽 원판'의 중심(가로 49.68%·세로 39.53%)과 지름(가로 61.04%).
+           글리프는 그 원판의 76%를 채운다(테두리 링에 닿지 않는 최대 크기). 눈대중 금지: 스프라이트를 다시 뽑으면 이 값도 다시 잰다. */
+        .dcn-pin-glyph { position:absolute; left:49.68%; top:39.53%; width:46.4%; aspect-ratio:1; transform:translate(-50%,-50%); display:block; filter: drop-shadow(0 1px 1px rgba(0,0,0,.3)); }
         .dcn-pin-shadow { position:absolute; left:50%; bottom:-5px; width:70%; height:16%; transform:translateX(-50%); border-radius:50%; background: radial-gradient(ellipse at center, rgba(50,33,20,.42), rgba(50,33,20,0) 70%); pointer-events:none; }
         .dcn-pin-match { position:absolute; right:-4%; top:2%; width:38%; aspect-ratio:1; border-radius:50%; background:#e0a32e; color:#fff; font-size:0.62em; font-weight:900; line-height:1; display:flex; align-items:center; justify-content:center; border:2px solid #fdfaf4; box-shadow:0 1px 3px rgba(0,0,0,.35); }
         .dcn-mk.dcn-sel { z-index: 900 !important; }
