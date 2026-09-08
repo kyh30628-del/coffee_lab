@@ -4,6 +4,7 @@ import { loadCriteria } from "@/lib/criteria";
 import { sql, ensureSchema } from "@/lib/db";
 import { subscriptionLive } from "@/lib/flags";
 import { encodeCharScores } from "@/lib/mapCafes";
+import { ownerManagedIds } from "@/lib/ownerManaged"; // 🏅 사장님 관리 배지 단일출처
 export const runtime = "nodejs";
 // 🧊 2026-09-01 — CDN 캐시 60초 재도입(CEO 승인). 이유와 조건은 아래.
 //
@@ -40,7 +41,11 @@ export async function GET() {
     const [v] = (await sql`SELECT COUNT(*)::int n, COALESCE(MAX(updated_at)::text,'') u, COALESCE(MAX(synth_updated)::text,'') s
       FROM cafes WHERE published = true`) as any[];
     const live = subscriptionLive();
-    const version = `${v?.n ?? 0}|${v?.u ?? ""}|${v?.s ?? ""}|${live ? 1 : 0}`;
+    // 🏅 사장님 관리 배지: 구독이 새로 켜져도 cafes 테이블은 안 변한다 → 버전에 사장님 집합을 넣어야
+    //    캐시가 갈리고 배지가 즉시 뜬다(안 넣으면 다음 카페 변경 때까지 안 보인다).
+    const owned = await ownerManagedIds();
+    const ownedSig = [...owned].sort((a, b) => a - b).join(",");
+    const version = `${v?.n ?? 0}|${v?.u ?? ""}|${v?.s ?? ""}|${live ? 1 : 0}|${ownedSig}`;
     if (cache && cache.version === version) {
       return new NextResponse(cache.body, {
         headers: { "Content-Type": "application/json", "X-Cafes-Cache": "HIT" },
@@ -85,6 +90,7 @@ export async function GET() {
       // "D" = 관광지로 알려진 동네(언론 보도 기준·동 단위 판정 — CEO 08-25 "후기 말투가 아니라 공개된 사실로").
       if (c.dong_tourist) vb += "D";
       if (vb) o.vb = vb;
+      if (owned.has(Number(c.id))) o.om = 1; // 🏅 사장님이 직접 관리 중(구독·체험 유효). 해당 카페에만 키를 넣어 페이로드 낭비 0
       return o;
     });
     const body = JSON.stringify({ ok: true, cafes: out });

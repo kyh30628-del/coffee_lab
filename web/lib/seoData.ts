@@ -1,4 +1,5 @@
 import { sql } from "@/lib/db";
+import { ownerManagedIds } from "./ownerManaged"; // 🏅 사장님 관리 배지(조건·문구 단일출처)
 
 // 프로그래매틱 SEO(동네×취향) 데이터 — 검증 카페 목록을 지역·취향별로 조회.
 export const SITE = "https://dongnecoffeenote.com";
@@ -29,7 +30,7 @@ export const TASTES: Taste[] = [
 ];
 export const tasteByKey = (k: string) => TASTES.find((t) => t.key === k);
 
-export type SeoCafe = { id: number; name: string; dong: string | null; grade: string | null; count: number | null; identity: string | null; quote: string | null; tasteHits?: number | null;
+export type SeoCafe = { om?: number; id: number; name: string; dong: string | null; grade: string | null; count: number | null; identity: string | null; quote: string | null; tasteHits?: number | null;
   /** 🏅 '이 집만의 한 가지' 뱃지 계산용(동네 안 상대비교) — 작은 jsonb라 전송 영향 무시 수준(2026-08-22). */
   char_scores?: Record<string, number> | null;
   /** 🧳🏠 방문객 성격(lib/visitorMix.ts) — REAL 3개라 전송 영향 없음. 판정은 표시 시점(criteria 임계). */
@@ -63,26 +64,35 @@ export async function getRegions(): Promise<{ area: string; n: number }[]> {
   } catch { return regionsMem?.v ?? []; }
 }
 
+/** 🏅 목록에 '사장님이 직접 관리' 표시를 붙인다 — 조건·문구는 lib/ownerManaged.ts 단일출처.
+ *  구독이 하나도 없으면 조회 한 번으로 끝나고 아무것도 안 붙는다(현재 상태). */
+async function withOwnerBadge(list: SeoCafe[]): Promise<SeoCafe[]> {
+  if (!list.length) return list;
+  const owned = await ownerManagedIds();
+  if (!owned.size) return list;
+  return list.map((c) => (owned.has(Number(c.id)) ? { ...c, om: 1 } : c));
+}
+
 export async function getRegionCafes(area: string, limit = 30): Promise<SeoCafe[]> {
   try {
-    return (await sql`SELECT id, name, dong, synth_grade AS grade, synth_count AS count, synth_identity AS identity, char_scores, visitor_n, visitor_trip, visitor_local, work_facts,
+    return withOwnerBadge((await sql`SELECT id, name, dong, synth_grade AS grade, synth_count AS count, synth_identity AS identity, char_scores, visitor_n, visitor_trip, visitor_local, work_facts,
       (SELECT left(r->>'quote', 70) FROM jsonb_array_elements(COALESCE(synth_reviews,'[]'::jsonb)) r
         WHERE COALESCE(r->>'quote','') <> '' ORDER BY COALESCE((r->>'score')::int,0) DESC LIMIT 1) AS quote
       FROM cafes WHERE published AND area=${area}
-      ORDER BY (synth_grade='검증') DESC, synth_count DESC NULLS LAST LIMIT ${limit}`) as unknown as SeoCafe[];
+      ORDER BY (synth_grade='검증') DESC, synth_count DESC NULLS LAST LIMIT ${limit}`) as unknown as SeoCafe[]);
   } catch { return []; }
 }
 
 export async function getRegionTasteCafes(area: string, tasteKey: string, limit = 30): Promise<SeoCafe[]> {
   try {
-    return (await sql`SELECT id, name, dong, synth_grade AS grade, synth_count AS count, synth_identity AS identity, char_scores, visitor_n, visitor_trip, visitor_local, work_facts,
+    return withOwnerBadge((await sql`SELECT id, name, dong, synth_grade AS grade, synth_count AS count, synth_identity AS identity, char_scores, visitor_n, visitor_trip, visitor_local, work_facts,
       (char_scores->>${tasteKey})::int AS "tasteHits",
       (SELECT left(r->>'quote', 70) FROM jsonb_array_elements(COALESCE(synth_reviews,'[]'::jsonb)) r
         WHERE COALESCE(r->>'quote','') <> '' ORDER BY COALESCE((r->>'score')::int,0) DESC LIMIT 1) AS quote
       FROM cafes WHERE published AND area=${area}
         AND COALESCE((char_scores->>${tasteKey})::int, 0) >= ${TASTE_MIN_HITS}
         AND COALESCE((char_scores->>${tasteKey})::int, 0) * 100 >= COALESCE(synth_count,0) * ${TASTE_MIN_RATE_PCT}
-      ORDER BY (char_scores->>${tasteKey})::int DESC, synth_count DESC NULLS LAST LIMIT ${limit}`) as unknown as SeoCafe[];
+      ORDER BY (char_scores->>${tasteKey})::int DESC, synth_count DESC NULLS LAST LIMIT ${limit}`) as unknown as SeoCafe[]);
   } catch { return []; }
 }
 
@@ -185,11 +195,11 @@ export async function getDongsInArea(area: string, minCount = 5): Promise<{ dong
 
 export async function getDongCafes(area: string, dong: string, limit = 30): Promise<SeoCafe[]> {
   try {
-    return (await sql`SELECT id, name, dong, synth_grade AS grade, synth_count AS count, synth_identity AS identity, char_scores, visitor_n, visitor_trip, visitor_local,
+    return withOwnerBadge((await sql`SELECT id, name, dong, synth_grade AS grade, synth_count AS count, synth_identity AS identity, char_scores, visitor_n, visitor_trip, visitor_local,
       (SELECT left(r->>'quote', 70) FROM jsonb_array_elements(COALESCE(synth_reviews,'[]'::jsonb)) r
         WHERE COALESCE(r->>'quote','') <> '' ORDER BY COALESCE((r->>'score')::int,0) DESC LIMIT 1) AS quote
       FROM cafes WHERE published AND area=${area} AND dong=${dong}
-      ORDER BY (synth_grade='검증') DESC, synth_count DESC NULLS LAST LIMIT ${limit}`) as unknown as SeoCafe[];
+      ORDER BY (synth_grade='검증') DESC, synth_count DESC NULLS LAST LIMIT ${limit}`) as unknown as SeoCafe[]);
   } catch { return []; }
 }
 

@@ -90,6 +90,7 @@ export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, headin
                 {tasteLabel ? `${tasteEmoji ?? ""} ${tasteLabel} 1위` : "가장 검증이 두꺼운 곳"}
               </span>
               {hero.grade && <span className="text-[10px] font-bold text-white px-1.5 py-0.5 rounded" style={{ background: GRADE_BG[hero.grade] || "#a8927a" }}>{hero.grade}</span>}
+              {hero.om ? <span title="사장님이 직접 정보를 관리하는 카페예요" className="text-[10px] font-bold text-[#7a5122] bg-[#f7e9cf] border border-[#e3c79a] px-1.5 py-0.5 rounded-full whitespace-nowrap">🏅 사장님 관리</span> : null}
               {badges[0] && <span className="text-[10px] font-bold text-[#5a4a2e] bg-[#f0e6d2] border border-[#ddd0b6] px-1.5 py-0.5 rounded-full">{badges[0].emoji} 이 동네에서 유독 {badges[0].label}</span>}
               {vb(hero).map((b) => (
                 <span key={b.key} title={b.note} className="text-[10px] font-bold text-[#4a5a4e] bg-[#e6efe8] border border-[#c9dbcf] px-1.5 py-0.5 rounded-full">{b.emoji} {b.label}</span>
@@ -138,6 +139,7 @@ export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, headin
                   <div className="flex items-center gap-2">
                     <span className="text-[#82714f] text-[13px] font-bold w-5 shrink-0">{i + (hero ? 2 : 1)}</span>
                     <span className="font-bold text-[15px]">{c.name}</span>
+                    {c.om ? <span title="사장님이 직접 정보를 관리하는 카페예요" className="text-[10px] font-bold text-[#7a5122] bg-[#f7e9cf] border border-[#e3c79a] px-1.5 py-0.5 rounded-full whitespace-nowrap">🏅 사장님 관리</span> : null}
                     {c.dong && <span className="text-[12px] text-[#665036]">{c.dong}</span>}
                     {badges[i + (hero ? 1 : 0)] && (
                       <span className="text-[10px] font-bold text-[#5a4a2e] bg-[#f0e6d2] border border-[#ddd0b6] px-1.5 py-0.5 rounded-full shrink-0">

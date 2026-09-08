@@ -24,6 +24,7 @@ type Cafe = {
   hours: string; phone: string; roasts_own: boolean; signature: string; uses: string;
   vibe: string; note: string; tone: string; photo_url: string | null;
   acidity: number; body: number; sweet: number;
+  om?: number; // 🏅 사장님이 직접 관리 중(구독·체험 유효) — /api/cafes가 해당 카페에만 넣어준다
   synth_grade: string | null; synth_identity: string | null;
   synth_count: number | null; synth_reviews?: EvidenceReview[] | null;
   char_scores?: Record<string, number> | null;
@@ -52,6 +53,19 @@ const VB_LABEL: Record<string, { emoji: string; label: string; short: string }> 
   // D = 동 단위 뉴스 판정(언론이 관광 맥락으로 다루는 동네) — 후기 말투(T)와 별개의 '위치 속성'.
   D: { emoji: "🗺️", label: "관광지로 알려진 동네예요 (언론 보도 기준)", short: "관광지 동네" },
 };
+// 🏅 「사장님이 직접 관리」 배지 — 조건·문구는 lib/ownerManaged.ts 단일출처, 화면은 om 플래그만 받아 그린다.
+//   이 컴포넌트를 카페 이름이 나오는 **모든 소비자 화면**에 붙인다(예전에 8곳 중 2곳만 달아 사장님이 발견한 사고 재발 방지).
+function OwnerBadge({ om, dark }: { om?: number; dark?: boolean }) {
+  if (!om) return null;
+  return (
+    <span title="사장님이 직접 정보를 관리하는 카페예요"
+      className={dark
+        ? "text-[10.5px] font-bold bg-[#f4ece0]/20 text-[#f4ece0] px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap"
+        : "text-[9px] font-bold text-[#7a5122] bg-[#f7e9cf] border border-[#e3c79a] px-1.5 py-0.5 rounded-full shrink-0 whitespace-nowrap"}>
+      🏅 사장님 관리
+    </span>
+  );
+}
 function VisitorBadges({ vb, dark }: { vb?: string; dark?: boolean }) {
   if (!vb) return null;
   return (
@@ -496,13 +510,15 @@ function makePinHtml(c: Cafe, isMatch: boolean, isFocus = false, isMine = false,
     : "background:rgba(253,250,244,0.96);color:#4a3526;font-weight:600;";
   const glyph = isMine ? PIN_SVG.heart : isFocus ? PIN_SVG.pin : feat ? PIN_SVG.star : PIN_SVG.cup;
   const suffix = isMine ? " ❤" : isFocus ? "" : feat ? " ★" : isMatch ? ' <span style="color:#b5710f;">✓</span>' : "";
+  // 🏅 사장님이 직접 관리하는 카페 — 핀 라벨에도 표시(지도가 메인 화면이라 여기 없으면 사실상 안 보인다)
+  const ownerMark = (c as any).om ? ' <span title="사장님이 직접 관리" style="font-size:0.9em;">🏅</span>' : "";
   // 취향 일치(✓)는 머리 우상단 앰버 배지 — 색만으로는 검증(초록)과 구분이 안 됐던 문제 해결
   const matchBadge = isMatch && !isMine && !isFocus && !feat ? `<span class="dcn-pin-match" aria-hidden="true">✓</span>` : "";
   return `<div class="dcn-pin${feat ? " dcn-pin-feat" : ""}${isFocus ? " dcn-pin-focus" : ""}" data-cafe="${c.id}" style="transform:translate(-50%,-100%);text-align:center;">
     <div class="dcn-pin-body" style="width:${size}px;height:${Math.round(size * 1.396)}px;background-image:url(/pins/pin-${sprite}.png);">
       <span class="dcn-pin-shadow" aria-hidden="true"></span>
       <span class="dcn-pin-glyph">${glyph}</span>${matchBadge}</div>
-    <div class="dcn-lbl" style="margin-top:2px;${labelStyle}padding:2px 7px;border-radius:8px;font-size:${isFocus || isMine ? 11 : 10}px;white-space:nowrap;display:inline-block;box-shadow:0 2px 6px rgba(0,0,0,0.26);">${esc}${vbGlyph((c as any).vb)}${suffix}</div>
+    <div class="dcn-lbl" style="margin-top:2px;${labelStyle}padding:2px 7px;border-radius:8px;font-size:${isFocus || isMine ? 11 : 10}px;white-space:nowrap;display:inline-block;box-shadow:0 2px 6px rgba(0,0,0,0.26);">${esc}${ownerMark}${vbGlyph((c as any).vb)}${suffix}</div>
   </div>`;
 }
 // ☕ 커피 드립 로딩 — 스피너 대신 우리 정체성(잔에 방울·김). label은 로딩 문구.
@@ -577,6 +593,7 @@ function FavoritesModal({ items, onClose, onOpen, onRemove, onRecord }: { items:
                   <div className="flex items-center gap-1.5">
                     <span className="font-bold text-[#2b2018] text-[14px] truncate">{c.name}</span>
                     {c.synth_grade && GRADE_STYLE[c.synth_grade] && <span className="text-[9px] text-white px-1.5 py-0.5 rounded-full shrink-0" style={{ background: GRADE_STYLE[c.synth_grade].bg }}>{c.synth_grade}</span>}
+                    <OwnerBadge om={(c as any).om} />
                     <VisitorBadges vb={(c as any).vb} />
                   </div>
                   <div className="text-[11px] text-[#7a5122]">{c.area}{c.synth_count ? ` · 리뷰 ${c.synth_count}` : ""}</div>
@@ -1858,7 +1875,8 @@ export default function Home() {
                         <div className="flex items-center gap-1.5 mb-1">
                           <span className="font-bold text-sm text-[#2b2018] truncate">{c.name}</span>
                           {c.synth_grade && GRADE_STYLE[c.synth_grade] && <span className="text-[8px] text-white px-1.5 py-0.5 rounded-full shrink-0" style={{ background: GRADE_STYLE[c.synth_grade].bg }}>{c.synth_grade}</span>}
-                            <VisitorBadges vb={(c as any).vb} />
+                            <OwnerBadge om={(c as any).om} />
+                    <VisitorBadges vb={(c as any).vb} />
                         </div>
                         <div className="text-[11px] text-[#665036]">{c.area}{c.dong ? ` ${c.dong}` : ""} · {Math.round(d)}m · 리뷰 {c.synth_count ?? 0}</div>
                         {c.synth_identity && <p className="text-[12px] text-[#5a4a38] leading-relaxed mt-1.5 line-clamp-2">{c.synth_identity}</p>}
@@ -2295,6 +2313,7 @@ function MapControls({ sido, sigungu, dong, onSido, onSigungu, setDong, dongOpti
                 <div className="flex items-center gap-1.5">
                   <span className="font-bold text-sm text-[#2b2018]">{c.name}</span>
                   {c.synth_grade && GRADE_STYLE[c.synth_grade] && <span className="text-[9px] text-white px-1.5 py-0.5 rounded-full" style={{ background: GRADE_STYLE[c.synth_grade].bg }}>{GRADE_STYLE[c.synth_grade].label}</span>}
+                    <OwnerBadge om={(c as any).om} />
                     <VisitorBadges vb={(c as any).vb} />
                   {tasteKey && matchSet.has(c.id) && <span className="text-[10px] text-[#5f7355]">✓</span>}
                   <span className="text-[10px] text-[#665036] ml-auto">{c.area} · 리뷰 {c.synth_count ?? 0}</span>
@@ -2439,7 +2458,7 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
         )}
         <div className="p-5">
           <div className="flex items-center justify-between mb-1">
-            <div className="flex items-center gap-2 min-w-0"><h3 className="text-xl font-bold text-[#2b2018] truncate">{cafe.name}</h3>{g && <span className="text-[10px] text-white px-2 py-0.5 rounded-full shrink-0" style={{ background: g.bg }}>{g.label}</span>}
+            <div className="flex items-center gap-2 min-w-0"><h3 className="text-xl font-bold text-[#2b2018] truncate">{cafe.name}</h3><OwnerBadge om={(cafe as any).om} />{g && <span className="text-[10px] text-white px-2 py-0.5 rounded-full shrink-0" style={{ background: g.bg }}>{g.label}</span>}
               {/* 🧳🏠 방문객 성격 — 지도에서 카페를 누르면 뜨는 이 패널이 실제 소비 지점이다.
                   여기 표시가 없으면 "지도에서는 구분이 안 된다"는 말이 맞다(CEO 지적). */}
               <VisitorBadges vb={(cafe as any).vb} /></div>

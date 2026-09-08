@@ -18,6 +18,7 @@ import { shareHookText } from "@/lib/shareCopy";
 import { sortReviews, ensureRecent } from "@/lib/exposureOrder";
 import { extractWorkSignals } from "@/lib/workDetail";
 import OutboundLink from "../../OutboundLink";
+import { isOwnerManaged } from "@/lib/ownerManaged"; // 🏅 사장님 관리 배지(조건·문구 단일출처)
 
 export const runtime = "nodejs";
 // 🌙 2026-09-02 — **수면 시간 확보**(CEO 지시: "자는 시간을 무조건 확보하고 깨어 있는 시간에 집중").
@@ -176,6 +177,7 @@ export default async function CafePage({ params }: Props) {
   const userReviews = await getPublicReviews(c.id);
   const nearby = await getSimilar(c.area, c.id, c.char_scores, c.synth_count);
   const grade = c.synth_grade || "";
+  const ownerManaged = await isOwnerManaged(Number(c.id)); // 🏅 구독·체험 유효한 사장님 카페인가(단일출처)
   // 인앱 상세와 동일: 강·약(전체 대비) + 옥석 리뷰 데이터 핵심
   const profile = cafeProfile({ char_scores: c.char_scores, synth_count: c.synth_count }, await getAxisDist());
   // 🔴 2026-08-17: 이 SEO 상세는 리뷰 배열을 **정렬 없이 원본 순서로** 하이라이트에 넣고 있었다.
@@ -276,6 +278,12 @@ export default async function CafePage({ params }: Props) {
           <div className="flex items-center gap-2 mb-1 flex-wrap">
             <h1 className="text-2xl font-bold">{c.name}</h1>
             {grade && <span className="text-[11px] font-bold bg-[#2b2018] text-[#e8b87a] px-2 py-0.5 rounded-full">{grade}</span>}
+            {ownerManaged && (
+              <span title="사장님이 직접 정보를 관리하는 카페예요"
+                className="text-[11px] font-bold text-[#7a5122] bg-[#f7e9cf] border border-[#e3c79a] px-2 py-0.5 rounded-full whitespace-nowrap">
+                🏅 사장님 관리
+              </span>
+            )}
             {/* 🏅 동네 순위(2026-08-30) — 지금까지 이 사실은 **사장님 리포트에만** 있었다.
                 그래서 사장님이 자기 가게를 검색해 이 페이지에 와도 자랑할 거리가 없어 그냥 지나갔다.
                 공개 화면에 세우면 ①사장님이 스스로 찾아오고 ②공유하고 ③손님에겐 신뢰 신호가 된다.
