@@ -738,6 +738,32 @@ const VENUE_WORDS = [
   //   "휘닉스파크"와 통용명 "휘닉스평창" 둘 다 리뷰에 쓰이므로 함께 등록.
   "휘닉스파크", "휘닉스평창",
 ];
+// 룰갭(decisions#1028, rulegap-proposals-20260908-3): 백화점/아울렛/스타필드 입점 프리미엄 디저트·베이커리
+//   브랜드는 지점 접미사('○○점') 없이 '지역명+다른 유통사 브랜드명' 조합만으로 타지점 후기를 서술한다
+//   (id25512 슈퍼말차 스타필드 수원 ← "인천 롯데백화점" 리뷰, id14728 아틀리에폰드 갤러리아백화점 명품관 ←
+//   "잠실 롯데월드몰" 리뷰. 둘 다 지역일치 신호 자체가 없거나 우연 매칭됐는데도 통과). 아래에서 이 사전으로
+//   '자기 계열과 다른 유통사 브랜드+지역명' 조합을 지점 이탈 신호로 잡는다(코드는 verifyReview 내부 참조).
+//   ⚠️ 오탐 방지 핵심: 같은 계열사의 다른 채널명은 실제 같은 복합단지일 수 있다(롯데백화점잠실점≈롯데월드몰,
+//   신세계백화점≈스타필드 — 신세계프라퍼티 운영). 계열(대기업집단) 단위로 묶어 '다른 계열'만 확정적으로
+//   다른 건물로 취급한다(같은 계열 언급 26건 매치 중 24건이 정당한 자기 언급이었던 실측 표본과 일치).
+const RETAIL_FAMILY: Record<string, string> = {
+  "스타필드": "신세계", "신세계백화점": "신세계", "신세계": "신세계", "이마트": "신세계", "트레이더스": "신세계",
+  "타임빌라스": "롯데", "롯데몰": "롯데", "롯데백화점": "롯데", "롯데마트": "롯데", "롯데프리미엄아울렛": "롯데",
+  "롯데프리미엄": "롯데", "롯데아울렛": "롯데", "롯데월드몰": "롯데",
+  "현대백화점": "현대", "현대시티": "현대", "현대프리미엄": "현대", "더현대": "현대",
+  "갤러리아": "갤러리아", "홈플러스": "홈플러스", "코스트코": "코스트코", "이케아": "이케아",
+  "타임스퀘어": "타임스퀘어", "아이파크몰": "아이파크몰", "스퀘어원": "스퀘어원", "엔터식스": "엔터식스",
+  "가든파이브": "가든파이브", "디큐브": "디큐브", "에이케이플라자": "AK", "akplaza": "AK",
+  "세이브존": "세이브존", "뉴코아": "뉴코아", "모다아울렛": "모다",
+};
+const RETAIL_BRAND_WORDS = Object.keys(RETAIL_FAMILY).sort((a, b) => b.length - a.length);
+// 텍스트(주로 카페명)에 등장하는 유통 브랜드의 '계열' 집합 — 카페 자신의 소속 계열 판별용.
+const retailFamiliesIn = (text: string): Set<string> => {
+  const n = norm(text);
+  const out = new Set<string>();
+  for (const w of RETAIL_BRAND_WORDS) if (n.includes(norm(w))) out.add(RETAIL_FAMILY[w]);
+  return out;
+};
 // 신도시·생활권 수식어(시·군·구가 아닌 동네名) — 위치 수식어로만 작동
 const DISTRICT_WORDS = ["위례", "미사", "다산", "별내", "광교", "동탄", "운정", "송도", "청라", "영종", "마곡", "지축", "삼송", "향동", "고덕", "감일", "갈매", "한강신도시", "위례신도시", "루원시티"];
 // 대학교 축약명(기관명 카테고리, 룰갭 제안3): "OO대학교"·"캠퍼스"는 VENUE_WORDS로 걸리지만 축약명("성신여대")은
@@ -1980,6 +2006,31 @@ export function verifyReview(input: QualityInput): QualityResult {
     if (otherBranch && (!dongHere || dongOverridden) && (nameInTitle || nameInBody)) {
       const why = dongOverridden ? "등록주소와 다른 도로명" : `이 동네 '${dongTerm ?? areaTerms[0] ?? ""}' 신호 없음`;
       return { verdict: "rejected", score: 6, reasons: [`다른 지점 후기('${otherBranch}점' 명시, ${why})`], signals: sig };
+    }
+  }
+  // 🏬 [decisions#1028] 백화점/아울렛/스타필드 입점 카페 한정: 자기 계열(RETAIL_FAMILY)과 다른 유통사
+  //   브랜드명이 지역명과 함께 검출되면(예: '인천 롯데백화점', '잠실 롯데월드몰') 접미사 없는 타지점 후기로
+  //   본다. 일반 카페엔 미적용(scope=자기 이름에 유통 브랜드가 있는 카페만) — 오탐 방지.
+  {
+    const myFamilies = retailFamiliesIn(input.name);
+    if (myFamilies.size && (nameInTitle || nameInBody)) {
+      const fullT = `${title} ${body}`;
+      for (const w of RETAIL_BRAND_WORDS) {
+        if (myFamilies.has(RETAIL_FAMILY[w])) continue; // 같은 계열(실제 같은 복합단지일 수 있음) → 정당한 자기 언급
+        // fullL은 fullT를 toLowerCase()만 한 것이라 길이·인덱스가 그대로 대응한다(한글은 무변화, akplaza만 소문자 매칭 목적).
+        const at = fullL.indexOf(w.toLowerCase());
+        if (at === -1) continue;
+        // 브랜드명 바로 앞뒤(15자, '인천 롯데백화점'·'잠실 실내 데이트 롯데월드몰' 같은 근접 수식 범위)에
+        // 지역어(LOC_LIKE·AREA_NAME)가 있는지 본다. 가장 가까운 단어부터(앞쪽은 뒤에서, 뒤쪽은 앞에서) 찾아야
+        // 창이 제목 쪽까지 넓어져도 '멀리 있는 우리 지역어'가 '가까운 남의 지역어'를 가리는 일이 없다.
+        const beforeWords = fullT.slice(Math.max(0, at - 15), at).split(/[^가-힣]+/).filter(Boolean);
+        const afterWords = fullT.slice(at + w.length, at + w.length + 15).split(/[^가-힣]+/).filter(Boolean);
+        const regionWord = [...beforeWords].reverse().find((tk) => isAreaLikeWord(tk)) ?? afterWords.find((tk) => isAreaLikeWord(tk));
+        const regionIsOurs = !!regionWord && areaTerms.some((a) => a.includes(regionWord) || regionWord.includes(guShort(a)));
+        if (regionWord && !regionIsOurs && !areaPresent) {
+          return { verdict: "rejected", score: 6, reasons: [`다른 유통사 지점 후기 추정('${regionWord} ${w}' 명시, 자기 계열 아님)`], signals: sig };
+        }
+      }
     }
   }
   // 지점(브랜치) 구분: 이 카페가 '○○점'이면, 후기가 '이 지점(지점명·지역)'을 가리켜야 인정.
