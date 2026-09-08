@@ -119,6 +119,17 @@ async function getReport(id: number): Promise<Report | null> {
   };
 }
 
+/**
+ * 리포트가 안 나올 때 **왜** 안 나오는지 가른다.
+ * 🔴 2026-09-08 CEO 지적: "없는 카페"와 "잠시 내려간 카페"를 한 문장으로 뭉쳐 놨더니,
+ *   구독 중인 사장님이 알림 메일을 눌렀을 때 **서비스가 자기 가게를 지운 것처럼** 읽혔다.
+ * 💰 비용: 본 조회가 실패한 경로에서만, id 하나로 작은 컬럼 2개. ISR 24시간 캐시 안에서 돈다.
+ */
+async function getMiss(id: number): Promise<{ name: string; area: string | null } | null> {
+  const row = (await sql`SELECT name, area FROM cafes WHERE id = ${id} LIMIT 1`)[0] as any;
+  return row ? { name: String(row.name), area: row.area ?? null } : null;
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   // 🔒 검색엔진에 올리지 않는다 — robots.ts가 /owner를 이미 막지만 메타로도 이중 차단.
@@ -139,7 +150,13 @@ export default async function FreeReportPage({ params }: Props) {
   }
 
   const r = await getReport(n);
-  if (!r) return <Shell><Msg>아직 공개 전이거나 찾을 수 없는 카페예요.</Msg></Shell>;
+  if (!r) {
+    const miss = await getMiss(n);
+    // 진짜로 없는 번호 — 링크가 잘못됐거나 주소를 잘못 친 경우.
+    if (!miss) return <Shell><Msg>그 번호로 등록된 카페가 없어요. 주소를 다시 확인해 주세요.</Msg></Shell>;
+    // 있는데 지금 손님 화면에 안 보이는 경우 — 사장님께는 사정을 설명해야 한다.
+    return <Shell><Unpublished name={miss.name} area={miss.area} /></Shell>;
+  }
 
   return (
     <Shell>
@@ -243,6 +260,13 @@ export default async function FreeReportPage({ params }: Props) {
           <li>· 약점·개선 포인트와 {r.lockedCount}개 축 전체 분석</li>
         </ul>
         <PricingCta cafeId={r.id} />
+        {/* 🔴 2026-09-08 CEO 지적: 차트·액션플랜이 있는 /owner로 가는 입구가 홈 헤더 버튼 하나뿐이었다.
+            알림 메일을 받은 **구독 중인 사장님**이 이 화면에 오면 다시 결제하라는 말만 보였다. */}
+        <div className="mt-4 pt-3 border-t border-[#463628] text-center text-[11.5px] leading-relaxed text-[#c3b096]">
+          이미 구독 중이신가요?{" "}
+          <Link href="/owner" className="underline font-bold text-[#f4ece0]">내 카페 분석 열기 →</Link>
+          <br />승인 메일로 받은 <b>PIN</b>을 넣으면 순위 추이·성격 분석·액션플랜을 전부 보실 수 있어요.
+        </div>
       </div>
 
       {/* 📧 유료가 부담스러운 사장님을 위한 낮은 계단 — 월 1회 무료 요약(리드 수집) */}
@@ -264,6 +288,44 @@ function Shell({ children }: { children: React.ReactNode }) {
       <div className="max-w-md mx-auto px-5 py-8">{children}</div>
       <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet" />
     </main>
+  );
+}
+
+// 🔻 공개가 잠시 내려간 카페 — 구독 중인 사장님도 이 화면으로 온다.
+//   "찾을 수 없다"로 끝내면 가게가 삭제된 걸로 읽힌다. 사정을 설명하고 사람에게 닿는 길을 남긴다.
+function Unpublished({ name, area }: { name: string; area: string | null }) {
+  const mailto = `mailto:dongnecoffeenote@gmail.com?subject=${encodeURIComponent(`[우리 가게 리포트] ${name} 노출 문의`)}`;
+  return (
+    <div className="py-6">
+      <div className="text-[#9c6b3f] text-[11px] tracking-[0.3em] uppercase mb-1">For Owners</div>
+      <h1 className="text-[21px] font-bold text-[#2b2018] leading-snug mb-1">{name}</h1>
+      <p className="text-[12.5px] text-[#7a6a55] mb-5">{area ? `${area} · ` : ""}지금은 손님 화면에 보이지 않아요</p>
+
+      <div className={`${CARD} mb-3`}>
+        <div className="text-[15px] font-bold text-[#2b2018] mb-2">가게 정보는 그대로 있어요</div>
+        <p className="text-[12.5px] text-[#524234] leading-relaxed">
+          저희는 <b>교차검증을 통과한 후기</b>가 기준을 채운 가게만 손님 화면에 올립니다.
+          후기를 다시 확인하는 중이거나 기준을 잠시 못 채우면 그동안 내려둬요.
+          <b> 삭제된 게 아니고</b>, 기준을 다시 채우면 자동으로 돌아옵니다.
+        </p>
+      </div>
+
+      <div className={`${CARD} mb-4`}>
+        <div className="text-[11px] text-[#8a7458] mb-1.5">지금은 이렇게 됩니다</div>
+        <ul className="text-[12.5px] text-[#524234] leading-[1.9]">
+          <li>· 동네 순위·강점 분석은 <b>공개로 돌아온 뒤</b> 다시 열려요.</li>
+          <li>· 구독·체험 중이신데 이 화면이 계속 보이면 <b>기간은 그대로 지켜드립니다.</b></li>
+        </ul>
+      </div>
+
+      <a href={mailto}
+        className="block text-center bg-[#2b2018] text-[#f4ece0] rounded-xl py-3 text-[14px] font-bold mb-3">
+        사람에게 바로 물어보기
+      </a>
+      <p className="text-center text-[12px]">
+        <Link href="/" className="text-[#9c6b3f] underline">홈으로</Link>
+      </p>
+    </div>
   );
 }
 

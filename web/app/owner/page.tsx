@@ -123,7 +123,15 @@ export default function OwnerPage() {
         <div className="w-full max-w-sm">
           <div className="text-[#9c6b3f] text-xs tracking-[0.3em] uppercase mb-2 text-center">For Owners</div>
           <h1 className="text-2xl font-bold mb-1 text-center">사장님 로그인</h1>
-          <p className="text-[13px] text-[#6b5a48] mb-5 text-center">구독 승인 후 <b>이메일로 받은 PIN</b>으로 들어오세요.</p>
+          <p className="text-[13px] text-[#6b5a48] mb-3 text-center">구독 승인 후 <b>이메일로 받은 PIN</b>으로 들어오세요.</p>
+          {/* 🔴 2026-09-08 CEO 지적: 문 앞에서 **안에 뭐가 있는지** 한 줄도 말해주지 않았다.
+              무료 리포트에서 넘어온 사장님이 PIN 칸만 보고 되돌아간다. */}
+          <ul className="bg-white/70 border border-[#e6dcc8] rounded-xl px-4 py-3 mb-4 text-[12px] text-[#524234] leading-[1.9]">
+            <li>📊 동네 순위와 <b>월별 후기 추이</b></li>
+            <li>🕸️ 우리 가게 <b>성격 분석</b>(동네 평균 대비)</li>
+            <li>🍩 후기 <b>구성</b>과 비슷한 카페 비교</li>
+            <li>✅ 지금 무엇을 바꿀지 <b>액션플랜</b></li>
+          </ul>
           <input value={pinInput} onChange={(e) => setPinInput(e.target.value.toUpperCase())} onKeyDown={(e) => e.key === "Enter" && pinLogin()} placeholder="PIN 8자리" maxLength={8} className="w-full rounded-xl border border-[#cbb89f] px-4 py-3 text-center text-xl tracking-[6px] font-bold bg-white mb-2" />
           {pinErr && <p className="text-[12px] text-rose-500 text-center mb-2">{pinErr}</p>}
           <button onClick={pinLogin} disabled={pinInput.trim().length < 6} className="w-full bg-[#2b2018] text-[#f4ece0] rounded-xl py-3 font-bold disabled:opacity-40">내 카페 들어가기</button>

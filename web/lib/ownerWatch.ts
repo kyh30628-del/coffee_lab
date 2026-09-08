@@ -89,6 +89,9 @@ export function buildHtml(cafeName: string, cafeId: number, changes: WatchChange
   <p style="font-size:12.5px;color:#7a6a55;margin:0 0 18px">지난 확인 이후 달라진 점만 모았어요.</p>
   <ul style="background:#fff;border:1px solid #e6dcc8;border-radius:14px;padding:16px 18px 16px 34px;font-size:13.5px;margin:0 0 18px">${items}</ul>
   <a href="${site}/owner/r/${cafeId}" style="display:block;text-align:center;background:#2b2018;color:#f4ece0;text-decoration:none;border-radius:12px;padding:13px;font-size:14px;font-weight:700">우리 가게 리포트 보기</a>
+  <!-- 🔴 2026-09-08: 이 메일은 **구독 중인 사장님에게만** 나간다. 그런데 링크가 무료 리포트 하나뿐이라
+       차트·액션플랜이 있는 /owner로 가는 길이 메일 어디에도 없었다(CEO 지적). -->
+  <p style="text-align:center;font-size:12px;margin:12px 0 0"><a href="${site}/owner" style="color:#9c6b3f;text-decoration:underline">순위 추이·성격 분석·액션플랜 전체 보기 (PIN 로그인)</a></p>
   <p style="font-size:10.5px;color:#8a7458;margin:18px 0 0;line-height:1.7">
     네이버·구글·유튜브 공개 후기를 교차검증한 데이터입니다.<br>
     <a href="${site}/api/newsletter-optout?e=${encodeURIComponent(email)}&t=${optoutToken(email)}" style="color:#9c6b3f">알림 그만 받기</a>
