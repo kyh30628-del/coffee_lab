@@ -3,6 +3,12 @@
 #   data.go.kr 쿼터는 계정당 10,000회/일, KST 자정에 리셋된다. 일반음식점은 22,954페이지라 하루에 못 끝낸다.
 #   매일 00:05 KST에 한 번 돌아 남은 페이지를 이어받고, 쿼터가 마르면 스스로 멈춘다.
 #   ⏹️ 수집이 끝나면 매칭까지 돌리고 자기 자신을 해제한다(임시 잡 — 9/11 첫 보고 뒤 남지 않는다).
+# 🔴 launchd는 PATH가 최소(/usr/bin:/bin:/usr/sbin:/sbin)라 node를 못 찾는다.
+#   2026-09-09 00:05 첫 자동 실행이 "node: command not found"로 통째 실패했다
+#   (대화형 셸에서만 검증해서 놓쳤다). 실행 환경을 스크립트가 스스로 보장한다.
+export PATH="/usr/local/bin:/opt/homebrew/bin:$PATH"
+command -v node >/dev/null 2>&1 || { echo "[$(date '+%F %H:%M')] ⛔ node 없음 — PATH=$PATH" >> "$HOME/coffee-platform/agent-reports/permits/resume.log"; exit 1; }
+
 set -o pipefail   # ⚠️ set -u 금지 — read로 채우는 변수가 비면 스크립트가 통째로 죽는다(2026-09-08 실패 재발 방지)
 cd "$HOME/coffee-platform/web" || exit 1
 EP="general_restaurants"
