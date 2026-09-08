@@ -319,3 +319,4 @@
 | 2026-09-06 11:36 | #1007 | [검색UX 신규] 도(道) 단위 지역검색 전면 0건 — 강원·충북·충남·경남(오늘편입) 3,679곳 무영향 | 1fef320b | - | app/api/search/route.ts: inRegion을 lib/regionList.ts areaMatchesRegion(단일출처)에 위임, metroAreaList를 SID |
 | 2026-09-06 23:43 | #1010 | [자율진단] cron-verify 풀스캔이 cost_guard 정지 유발 — 검증 파이프라인 마비 (진행중) | 381a1836 | - | app/api/cron-verify/route.ts 7종(review_fields·pii_leak·link_format·duplicate_links·source_attributio |
 | 2026-09-08 03:21 | #1025 | [레드팀 자기개선] cron-verify 배포전 비용영향 사전점검 가드 도입 — 349.5GB 자기유발 비용 | a0ecba7b | - | app/api/cron-verify/route.ts 상단에 배포전 비용점검 체크리스트 주석 추가(EXPLAIN ANALYZE BUFFERS·파생컬럼 대체 검토) + scripts/ |
+| 2026-09-08 03:41 | #1022 | [룰갭 회귀] 휴게소 listicle 탐지(#859·#1003) 사각 잔존 — 쉼표 無 나열형 미검출(id2 | 21797783 | - | lib/reviewQuality.ts countEnumListItems: 쉼표 앞뒤 긴 서술절에 잘리던 항목을 경계단어로 보강, "~도 있고/팔고" 접속형 나열, 공백뿐인 4개+  |
