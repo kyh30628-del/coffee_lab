@@ -41,13 +41,28 @@ for (const c of CASES) {
 }
 console.log(`  ${ok}/${CASES.length} 통과\n`);
 
+// ⚠️ 링크가 향할 카페는 **실제 공개 카페**여야 한다 — 2026-09-08 첫 테스트 발송에서 없는 번호(12345)를 써서
+//    사장님이 링크를 눌렀다가 "아직 공개 전이거나 찾을 수 없는 카페예요"를 봤다. 기본값을 실제 카페로 둔다.
+const cafeId = Number((process.argv.find((a) => a.startsWith("--cafe=")) || "").split("=")[1] || 8118);
+// 카페 이름·지역은 DB에서 실제 값을 읽는다 — 본문의 "OO 순위가…"가 그 카페의 실제 동네와 어긋나면
+//   사장님 눈에는 또 하나의 결함으로 보인다(2026-09-08 실측: 양평군 카페인데 본문은 성동구였다).
+let cafeName = (process.argv.find((a) => a.startsWith("--name=")) || "").split("=")[1] || "";
+let cafeArea = "";
+try {
+  const { neon } = await import("@neondatabase/serverless");
+  const rows = await neon(process.env.DATABASE_URL)`SELECT name, area FROM cafes WHERE id=${cafeId}`;
+  if (rows[0]) { cafeName = cafeName || rows[0].name; cafeArea = rows[0].area || ""; }
+} catch { /* DB 없이도 검증기는 돌아야 한다 */ }
+cafeName = cafeName || "테스트카페";
+cafeArea = cafeArea || "성동구";
+
 console.log("② 메일 본문 생성");
-const changes = diffChanges({ synth_count: 20, rank: 7, hood_n: 30 }, { count: 23, rank: 5, hoodN: 33, area: "성동구" });
-const html = buildHtml("테스트카페", 12345, changes, "verify@example.com");
+const changes = diffChanges({ synth_count: 20, rank: 7, hood_n: 30 }, { count: 23, rank: 5, hoodN: 33, area: cafeArea });
+const html = buildHtml(cafeName, cafeId, changes, "verify@example.com");
 // ⚠️ 확인 문자열은 실제 본문 규약과 맞춰야 한다 — 처음에 /c/ 링크와 '수신거부'를 찾다가 멀쩡한 코드를 결함으로 오판했다.
 const checks = [
-  ["카페명", html.includes("테스트카페")],
-  ["사장님 리포트 링크(/owner/r/12345)", html.includes("/owner/r/12345")],
+  ["카페명", html.includes(cafeName)],
+  [`사장님 리포트 링크(/owner/r/${cafeId})`, html.includes(`/owner/r/${cafeId}`)],
   ["알림 그만 받기(수신거부)", html.includes("알림 그만 받기") && html.includes("newsletter-optout")],
   ["지역명이 undefined 아님", !html.includes("undefined")],
 ];
@@ -59,13 +74,22 @@ console.log("\n③ 발송 조건");
 console.log(`  지금 발송 가능 시간대(21~08 KST 제외): ${sendableNow()}`);
 console.log(`  RESEND_API_KEY 설정: ${!!process.env.RESEND_API_KEY} · 발신주소: ${process.env.RESEND_FROM || "(기본값 onboarding@resend.dev)"}`);
 
+// 발송 전 사전점검 — 링크가 실제로 열리는 페이지인지 확인한다(깨진 링크를 사장님께 보내지 않기 위해)
+try {
+  const probe = await fetch(`https://dongnecoffeenote.com/owner/r/${cafeId}`, { signal: AbortSignal.timeout(15000) });
+  const body = await probe.text();
+  const broken = body.includes("아직 공개 전이거나 찾을 수 없는");
+  console.log(`  ${broken ? "❌" : "✅"} 링크 대상 /owner/r/${cafeId} ${broken ? "— 미공개·없는 카페! 발송하면 안 된다" : "정상 열림"}`);
+  if (broken && process.argv.some((a) => a.startsWith("--send="))) { console.error("⛔ 링크가 깨져 발송을 중단한다. --cafe=공개된카페번호 로 지정할 것."); process.exit(1); }
+} catch (e) { console.log(`  ⚠️ 링크 확인 실패(${String(e).slice(0, 40)}) — 발송 전 사람이 직접 확인할 것`); }
+
 const to = (process.argv.find((a) => a.startsWith("--send=")) || "").split("=")[1];
 if (to) {
   console.log(`\n④ 실제 발송 → ${to}`);
   const r = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from: process.env.RESEND_FROM || "동네 커피 노트 <onboarding@resend.dev>", to: [to], subject: "[검증] 테스트카페 — 새로운 변화가 있어요", html }),
+    body: JSON.stringify({ from: process.env.RESEND_FROM || "동네 커피 노트 <onboarding@resend.dev>", to: [to], subject: `[검증] ${cafeName} — 새로운 변화가 있어요`, html }),
   });
   const body = await r.text();
   console.log(`  ${r.ok ? "✅ 발송 성공" : "❌ 실패"} (${r.status}) ${body.slice(0, 160)}`);
