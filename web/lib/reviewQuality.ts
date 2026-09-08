@@ -130,6 +130,11 @@ const isTransitVenueCafe = (name: string) => { const n = norm(name); return TRAN
 const ENUM_ITEM_HAS_CHAR = /[가-힣A-Za-z0-9]{2,}/;
 // 나열 항목은 명사형이라 서술형 어미로 안 끝난다 — 문장 서술(예: "친절했어요")이 쉼표로 섞여 들어오는 걸 배제.
 const ENUM_ITEM_SENTENCE_END = /(다|요|음|함|워|네|고|며|서|죠|중|됨|임)$/;
+const isOwnOrSentenceEnd = (w: string, excludeNameN: string): boolean => {
+  if (ENUM_ITEM_SENTENCE_END.test(w)) return true;
+  const wN = norm(w);
+  return !!excludeNameN && (wN.includes(excludeNameN) || excludeNameN.includes(wN));
+};
 function countEnumListItems(text: string, excludeNameN: string): number {
   const segments = text.split(/[,、·・]/).map((s) => s.trim()).filter(Boolean);
   let count = 0;
@@ -139,6 +144,48 @@ function countEnumListItems(text: string, excludeNameN: string): number {
     const segN = norm(seg);
     if (excludeNameN && segN.includes(excludeNameN)) continue;
     count += 1;
+  }
+  // 룰갭 rulegap-20260908(decisions#1022): 위 세그먼트 분리는 쉼표 앞뒤로 긴 서술절이 붙으면(예: "…펫파크
+  //   콜팝, 사과당, 고래빵 등등 간식의 종류도 많아요") 세그먼트 길이제한(14자)에 걸려 첫/끝 항목이 누락된다.
+  //   쉼표 바로 앞뒤 단어만 별도로 주워, 대상 상호명이 나열 항목 중 하나로 함께 걸리고(전체 3개 이상) 남은
+  //   타항목이 2개 이상이면 listicle로 인정한다(원래 설계의 "자기 제외 3개 이상"과 동등, 절단 버그만 보강).
+  const boundarySeen = new Set<number>();
+  const boundaryWords: string[] = [];
+  for (const m of text.matchAll(/([가-힣A-Za-z0-9]{2,8})\s*[,、·・]/g)) {
+    if (boundarySeen.has(m.index)) continue;
+    boundarySeen.add(m.index);
+    boundaryWords.push(m[1]);
+  }
+  for (const m of text.matchAll(/[,、·・]\s*([가-힣A-Za-z0-9]{2,8})/g)) {
+    const start = m.index + (m[0].length - m[1].length);
+    if (boundarySeen.has(start)) continue;
+    boundarySeen.add(start);
+    boundaryWords.push(m[1]);
+  }
+  const boundaryValid = boundaryWords.filter((w) => !ENUM_ITEM_SENTENCE_END.test(w));
+  const boundaryOther = boundaryValid.filter((w) => !isOwnOrSentenceEnd(w, excludeNameN));
+  if (boundaryValid.length >= 3 && boundaryOther.length >= 2) count = Math.max(count, Math.max(3, boundaryOther.length));
+  // 룰갭 rulegap-20260908(decisions#1022): 쉼표 없이 "~도 있고/팔고" 접속형으로 다른 매장을 나열하는 문장
+  //   (예: "찰보리빵도 팔고 맘스터치도 있다", "프레즐도 있었고 …매장도 있었네요") — 마커 직전 명사를 항목으로 인정.
+  const connOther: string[] = [];
+  for (const m of text.matchAll(/([가-힣A-Za-z0-9]{2,8})\s*도\s*(?:있|팔)(?:았|었)?(?:다|고|네요|어요|음|나요)?/g)) {
+    if (!isOwnOrSentenceEnd(m[1], excludeNameN)) connOther.push(m[1]);
+  }
+  if (connOther.length >= 2) count = Math.max(count, Math.max(3, connOther.length));
+  // 룰갭 rulegap-20260908(decisions#1022): 쉼표·접속사 전무 + 공백만으로 짧은 고유명사형 토큰이 줄줄이(4개+)
+  //   나열되는 경우(예: "못난이꽈배기 앤티앤스 공차 호떡당 이거슨 김밥 뉴욕버거").
+  if (count < 3 && !/[,、·・]/.test(text)) {
+    let run = 0;
+    let maxRun = 0;
+    for (const w of text.split(/\s+/)) {
+      if (w.length >= 2 && w.length <= 8 && ENUM_ITEM_HAS_CHAR.test(w) && !isOwnOrSentenceEnd(w, excludeNameN)) {
+        run += 1;
+        maxRun = Math.max(maxRun, run);
+      } else {
+        run = 0;
+      }
+    }
+    if (maxRun >= 4) count = Math.max(count, maxRun);
   }
   return count;
 }
