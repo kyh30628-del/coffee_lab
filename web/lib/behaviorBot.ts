@@ -26,7 +26,24 @@
 // 따로 박제되어 있다가(facebookexternalhit까지만) 여기서 'meta-externalagent'를 추가한 뒤로도
 // 갱신이 안 돼(#472→#503 사이 드리프트) 수집(INSERT) 자체는 계속 야간마다 오염 누적되고
 // 표출 화면에서만 걸러지고 있었다 — 드리프트 재발 방지가 이 상수의 존재 이유.
-export const KNOWN_BOT_UA_PATTERN = "bot|crawl|spider|slurp|bingpreview|facebookexternalhit|headless|preview|meta-externalagent|Google-Read-Aloud";
+// 🤖 AI 크롤러/에이전트(2026-09-08 CEO 지시로 추가) — 왜 '이것들만' 추가했나:
+//   기존 `bot|crawl|spider`가 이미 **GPTBot·OAI-SearchBot·PerplexityBot·ClaudeBot·CCBot·Amazonbot·
+//   Applebot(-Extended)·YouBot·Diffbot·Bytespider(spider)** 를 전부 잡고 있다. 빠진 건 **이름에 bot이
+//   안 들어가는 에이전트**뿐이라 그것만 채웠다(정규식을 넓히면 사람을 봇으로 잡을 위험이 커진다).
+//   ⚠️ 적용 전 실측(필수 절차): ①이 패턴으로 **추가로** 봇이 되는 브라우저 0개 ②chatgpt.com 리퍼러로
+//      들어온 진짜 사람 304명 중 걸리는 사람 0명 ③전 기간 AI 크롤러 방문 기록 자체가 없음.
+//      즉 지금 숫자는 하나도 안 움직인다 — 앞으로를 막는 예방 조치다.
+//   ⚠️ 한계: `/api/visit`는 JS 핑이라 **JS를 실행하지 않는 크롤러(GPTBot 등)는 애초에 기록되지 않는다.**
+//      이 규칙이 실제로 일하는 대상은 페이지를 렌더링하는 브라우징 에이전트다.
+//   🔴 chatgpt.com은 **리퍼러**(사람이 답변에서 링크를 눌러 온 것)라 봇 신호가 아니다 — UA만 본다.
+//      실측 확인: 그 304개 브라우저의 UA는 전부 실제 모바일(삼성인터넷·아이폰 사파리·안드로이드 크롬).
+//   ⚠️ 조각을 이어 붙일 때 **끝에 파이프를 남기지 말 것**. "a|b|" 같은 문자열은 빈 대안이 생겨
+//      정규식이 '모든 문자열'과 일치한다 — 실제로 이 작업 중 검증 스크립트에서 그렇게 조립했다가
+//      멀쩡한 사람 304명이 전부 봇으로 잡히는 결과를 봤다(코드가 아니라 검증기의 실수였지만,
+//      같은 실수를 코드에서 하면 유입 수치가 0이 된다). 그래서 조각은 파이프 없이 두고 join으로만 잇는다.
+const BASE_BOT_UA_PATTERN = "bot|crawl|spider|slurp|bingpreview|facebookexternalhit|headless|preview|meta-externalagent|Google-Read-Aloud";
+export const AI_AGENT_UA_PATTERN = "ChatGPT-User|Perplexity-User|Claude-Web|anthropic-ai|cohere-ai|Google-Extended|Meta-ExternalFetcher|omgili|img2dataset";
+export const KNOWN_BOT_UA_PATTERN = `${BASE_BOT_UA_PATTERN}|${AI_AGENT_UA_PATTERN}`;
 
 export const BEHAVIOR_BOT_ANON_IDS_SQL = `
   SELECT t.anon_id
