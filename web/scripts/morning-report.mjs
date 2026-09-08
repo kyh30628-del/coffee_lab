@@ -255,6 +255,32 @@ try {
   console.log(`  아웃리치 경유 유입: ${out}건${Number(out) === 0 ? " (발송 전이면 정상)" : ""}`);
 } catch (e) { console.log("  집계 실패:", String(e).slice(0, 80)); }
 
+// 🔔 사장님 알림 파이프라인 — CEO 지시(2026-09-08) "다음 체험 신청 들어오면 알림 실제로 나가는지 검증".
+//   2026-09-08에 이 파이프라인이 **한 번도 실행된 적이 없었음**을 발견했다(cron-billing이 PAYMENTS_LIVE
+//   조기 반환 뒤에서 runOwnerWatch를 부르고 있었다). 같은 일이 조용히 반복되지 않게 매일 눈으로 확인한다.
+//   판정: 활성 구독이 생겼는데 ①기준선이 안 생기거나 ②이틀 넘게 checked_at이 안 움직이면 끊긴 것이다.
+console.log("\n═══ ⑨ 사장님 알림 파이프라인 ═══");
+try {
+  const subs = await sql`SELECT cafe_id, cafe_name, status, expires_at::date ex,
+      (SELECT to_char(checked_at,'MM-DD HH24:MI') FROM owner_watch_state w WHERE w.cafe_id=s.cafe_id) chk,
+      (SELECT to_char(notified_at,'MM-DD HH24:MI') FROM owner_watch_state w WHERE w.cafe_id=s.cafe_id) snt
+    FROM subscriptions s WHERE status='active' ORDER BY cafe_id`;
+  const lastRun = (await sql`SELECT to_char(ran_at,'MM-DD HH24:MI') t, detail FROM agent_runs
+    WHERE job='cron-billing' ORDER BY ran_at DESC LIMIT 1`)[0];
+  console.log(`  마지막 실행: ${lastRun ? `${lastRun.t} · ${String(lastRun.detail).slice(0, 90)}` : "기록 없음 ❌"}`);
+  if (!lastRun || !String(lastRun.detail).includes("watch")) {
+    console.log("  🔴 cron-billing 기록에 watch 결과가 없다 — 알림 블록이 실행되지 않고 있다(2026-09-08과 같은 사고).");
+  }
+  if (!subs.length) {
+    console.log("  활성 구독 0 — 발송 대상 없음(정상). 새 체험이 들어오면 이 줄에 카페가 뜬다.");
+  } else {
+    for (const x of subs) {
+      const ok = x.chk ? "✅" : "🔴 기준선 없음";
+      console.log(`  #${x.cafe_id} ${x.cafe_name} (만료 ${x.ex}) · 마지막 확인 ${x.chk ?? "없음"} · 마지막 발송 ${x.snt ?? "없음"} ${ok}`);
+    }
+  }
+} catch (e) { console.log("  집계 실패:", String(e).slice(0, 80)); }
+
 console.log("\n═══ ⑦ 신설 테마(베이커리·테라스) 색인→유입 곡선 ═══");
 const th = await sql.query(`SELECT split_part(path,'/',4) axis, (ts AT TIME ZONE 'Asia/Seoul')::date d, count(*)::int pv
   FROM traffic_events WHERE (path LIKE '%/bakery%' OR path LIKE '%/terrace%')

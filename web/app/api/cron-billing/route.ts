@@ -10,6 +10,27 @@ export const maxDuration = 120;
 
 const DUNNING_MAX = 4; // 연속 실패 4회(약 4일 유예) 초과 → 일시정지
 
+/**
+ * 🔔 사장님 감시 알림 + 📧 무료 리드 월간 요약.
+ * 결제 스위치와 **완전히 분리**한다 — 둘 다 구독·리드 대상이지 과금과 상관이 없다.
+ * 💰 비용: 새 크론 0(이미 매일 도는 이 잡에 얹혀 있다). 활성 구독이 없으면 작은 조회 1회로 끝난다
+ *   (runOwnerWatch가 구독 0행이면 즉시 반환). 월간 요약은 매월 1일에만 실제로 돈다.
+ */
+async function runOwnerNotifications() {
+  let watch = { subs: 0, refreshed: 0, changed: 0, sent: 0, baseline: 0, skipped: null as string | null };
+  try { const { runOwnerWatch } = await import("@/lib/ownerWatch"); watch = await runOwnerWatch(); }
+  catch (e) { console.error("ownerWatch 실패:", String(e).slice(0, 120)); }
+
+  let digest = { leads: 0, sent: 0, skipped: null as string | null };
+  try { const { runOwnerLeadDigest } = await import("@/lib/ownerWatch"); digest = await runOwnerLeadDigest(); }
+  catch (e) { console.error("leadDigest 실패:", String(e).slice(0, 120)); }
+
+  const detail = `watch subs=${watch.subs} 갱신=${watch.refreshed} 변화=${watch.changed} 발송=${watch.sent}`
+    + (watch.baseline ? ` 기준선=${watch.baseline}` : "") + (watch.skipped ? ` (${watch.skipped})` : "")
+    + (digest.sent ? ` | 월간요약 발송=${digest.sent}` : "");
+  return { watch, digest, detail };
+}
+
 // 💳 정기결제 크론(매일 09:00 KST = UTC 00:00). 만료 임박·유예중 구독을 과금·재시도.
 //   멱등: chargeOnce가 order_id=dcn_{cafeId}_{YYYYMM} 슬롯 선점 → 같은 주기 중복과금 없음.
 export async function GET(req: NextRequest) {
@@ -17,8 +38,18 @@ export async function GET(req: NextRequest) {
   const auth = req.headers.get("authorization");
   if (secret && auth !== `Bearer ${secret}`) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
 
+  // 🔔📧 사장님 알림은 **결제와 무관하다** — 결제 게이트보다 먼저 돌린다.
+  // 🔴 2026-09-08 발견: 이 두 블록이 아래 paymentsLive() 조기 반환 **뒤에** 있었다.
+  //   PAYMENTS_LIVE는 2026-07-16 휴면 배포 이후 계속 꺼져 있어서, agent_runs의 cron-billing 기록이
+  //   전부 "skipped: PAYMENTS_LIVE off"였다 = **감시 알림이 단 한 번도 실행된 적이 없다.**
+  //   구독자가 없어서가 아니라 코드가 그 앞에서 반환했다. 유료 안내 첫 줄로 파는 기능이 구조적으로 죽어 있었다.
+  const notif = await runOwnerNotifications();
+
   // 안전장치: 라이브 아니면 실제 과금 안 함(테스트 환경 보호). 기록만.
-  if (!paymentsLive()) { await recordRun("cron-billing", true, "skipped: PAYMENTS_LIVE off", 0); return NextResponse.json({ ok: true, skipped: true }); }
+  if (!paymentsLive()) {
+    await recordRun("cron-billing", true, `과금 skipped: PAYMENTS_LIVE off | ${notif.detail}`, 0);
+    return NextResponse.json({ ok: true, skipped: true, watch: notif.watch, digest: notif.digest });
+  }
 
   try {
     await ensureBilling();
@@ -49,22 +80,9 @@ export async function GET(req: NextRequest) {
         await sendBillingEmail(to, "failed", { cafeName: row.cafe_name ?? "" }).catch(() => {});
       }
     }
-    // 🔔 사장님 감시 알림 — **새 크론을 만들지 않고** 이미 매일 도는 이 잡에 얹는다(둘 다 구독자 대상).
-    //   구독자 카페만 갱신·비교하고, 변화가 없으면 메일을 보내지 않는다. 실패해도 과금 결과는 그대로 보고한다.
-    let watch = { subs: 0, refreshed: 0, changed: 0, sent: 0, baseline: 0, skipped: null as string | null };
-    try { const { runOwnerWatch } = await import("@/lib/ownerWatch"); watch = await runOwnerWatch(); }
-    catch (e) { console.error("ownerWatch 실패:", String(e).slice(0, 120)); }
-    // 📧 무료 리드 월간 요약 — 매월 1일에만 실제 동작(그 외엔 즉시 반환). 실패해도 과금 보고는 그대로.
-    let digest = { leads: 0, sent: 0, skipped: null as string | null };
-    try { const { runOwnerLeadDigest } = await import("@/lib/ownerWatch"); digest = await runOwnerLeadDigest(); }
-    catch (e) { console.error("leadDigest 실패:", String(e).slice(0, 120)); }
-
-    const detail = `due=${due.length} paid=${paid} failed=${failed} suspended=${suspended} skipped=${skipped}`
-      + ` | watch subs=${watch.subs} 갱신=${watch.refreshed} 변화=${watch.changed} 발송=${watch.sent}`
-      + (watch.baseline ? ` 기준선=${watch.baseline}` : "") + (watch.skipped ? ` (${watch.skipped})` : "")
-      + (digest.sent ? ` | 월간요약 발송=${digest.sent}` : "");
+    const detail = `due=${due.length} paid=${paid} failed=${failed} suspended=${suspended} skipped=${skipped} | ${notif.detail}`;
     await recordRun("cron-billing", true, detail, paid);
-    return NextResponse.json({ ok: true, detail, watch });
+    return NextResponse.json({ ok: true, detail, watch: notif.watch, digest: notif.digest });
   } catch (e) {
     await recordRun("cron-billing", false, String(e), 0);
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
