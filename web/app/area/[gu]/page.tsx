@@ -4,7 +4,7 @@ import Curated from "../Curated";
 import { getRegions, getRegionCafes, getDongsInArea, SITE } from "@/lib/seoData";
 import { regionPublishedCount } from "@/lib/region";
 
-export const revalidate = 259200; // ISR 3일 (24h→3d)
+export const revalidate = 2592000; // ISR 30일 — 새벽 절전(2026-09-09). 무효화는 온디맨드.
 
 export async function generateStaticParams() {
   const regions = await getRegions();

@@ -29,7 +29,8 @@ export const runtime = "nodejs";
 //   재생성 주기를 늘리면 같은 크롤 트래픽에서도 DB를 두드리는 횟수가 그만큼 줄어든다.
 //   ⚠️ 신선도는 주기가 아니라 **on-demand purge**가 지킨다(cafeCacheInvalidate·/api/admin/revalidate).
 //     공개/비공개 변경은 즉시 반영되고, 후기·순위만 최대 주기만큼 늦어진다(천천히 변하는 값).
-export const revalidate = 604800; // ISR 7일 (48h→7d, 재생성 3.5배 감소)
+export const revalidate = 2592000; // ISR 30일 — 🌙 2026-09-09 새벽 절전: 7일이면 23,362곳이 주 1회 재생성되고
+//   그 재생성이 크롤러를 따라 새벽에 몰려 DB가 못 잔다. 데이터가 바뀌면 lib/cafeCacheInvalidate가 즉시 지운다.
 
 // 🔴 2026-08-28 비용 근본수리: 위 `revalidate`가 **작동하지 않고 있었다.**
 //   Next 문서(generate-static-params.md): "ISR로 런타임에 재검증하려면 generateStaticParams에서
