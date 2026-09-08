@@ -3,6 +3,7 @@
 // 프랜차이즈·중복 제외, 비공개로 적재 후 합성 단계에서 검증. 키 없거나 검증 전엔 dry-run.
 import { sql } from "./db";
 import { brandTokenOverlap } from "./reviewQuality";
+import { localSearch } from "./discover"; // 네이버 지역검색(키 로테이션·쿼터 처리 포함) 단일출처
 
 const KEY = process.env.DATA_GO_KR_KEY;
 export const hasSanggaKey = () => !!KEY;
@@ -60,7 +61,36 @@ export async function discoverSangga(signguCd: string, areaLabel: string, opts?:
     await new Promise((x) => setTimeout(x, 200));
   }
 
-  let inserted = 0, skipped = 0;
+  // 🏷️ 카테고리 보강(CEO 결재 2026-09-08) — 공개 게이트(lib/synthStore.ts)의 신규 판정은
+  //   `isCafeCat = hasCategory && !nonCafeReal`이라 **카테고리가 없으면 등급과 무관하게 rejected로 굳는다.**
+  //   실제로 09-06 시드 297곳 중 282곳(95%)이 카테고리 없이 들어와 전부 막혔고, 그 안에 검증 22·참고 73이 있었다.
+  //   → 넣기 전에 네이버에서 카테고리를 확보한다. 못 구하면 그대로 넣되(수집·합성은 진행) 나중에
+  //     `scripts/seed-category-backfill.mjs`가 보강한다.
+  const normName = (x: string) => String(x || "").replace(/<[^>]*>/g, "").replace(/[^가-힣a-zA-Z0-9]/g, "").toLowerCase();
+  let catLookups = 0;
+  const startedAt = Date.now();
+  async function categoryFor(it: { name: string; lat: number; lng: number }): Promise<string | null> {
+    // 라우트 maxDuration(60초) 안에서 끝내야 하므로 예산을 둔다 — 못 채운 건 백필 스크립트 몫.
+    if (catLookups >= 40 || Date.now() - startedAt > 40000) return null;
+    // ⚠️ 질의에 동 이름을 붙이면 0건(실측) → 시·군·구 → 이름 단독 순.
+    for (const q of [`${it.name} ${areaLabel}`.trim(), it.name]) {
+      catLookups++;
+      const items = await localSearch(q);
+      if (!items || !items.length) continue;
+      const target = normName(it.name);
+      // 이름이 맞고 좌표가 약 150m 안일 때만 채택 — 옆가게 카테고리를 뒤집어쓰지 않게(백필 스크립트와 같은 규칙).
+      const hit = items.find((x: any) => {
+        const n = normName(x.name);
+        const nameOk = n === target || (n.length >= 3 && target.length >= 3 && (n.includes(target) || target.includes(n)));
+        return nameOk && x.lat != null && Math.abs(x.lat - it.lat) < 0.0015 && Math.abs(x.lng - it.lng) < 0.0015;
+      });
+      if (hit?.category) return hit.category as string;
+      await new Promise((x) => setTimeout(x, 220)); // 발굴과 쿼터 경쟁 → 간격
+    }
+    return null;
+  }
+
+  let inserted = 0, skipped = 0, withCategory = 0;
   if (apply) {
     for (const it of cands) {
       // 🐛 2026-08-25 전수점검: 좌표 근접(약 55m)만으로 이름검증 없이 '이미 있음' 처리하던 과잉차단 교정
@@ -73,14 +103,19 @@ export async function discoverSangga(signguCd: string, areaLabel: string, opts?:
         : (nearRows.some((r: any) => brandTokenOverlap(r.name, it.name)) ? nearRows : []);
       if (exists.length > 0) { skipped++; continue; }
       const pseudoId = `dg_${it.name.replace(/\s/g, "")}_${Math.round(it.lat * 1e5)}`;
+      const category = await categoryFor(it);
+      // pipeline_status='new' — 발굴 경로(lib/discover.ts)와 동일하게 **풀 게이트**를 타게 한다.
+      //   예전엔 이 값을 안 넣어 NULL이었고, 그러면 게이트가 신규가 아니라 '기존 공개(grandfather)' 분기로 흘러
+      //   카테고리 없이도 이름만으로 공개될 수 있었다(설계와 반대). 시드는 반드시 신규 게이트를 거친다.
       await sql`
-        INSERT INTO cafes (place_id, name, area, address, lat, lng, source, published, roasts_own)
-        VALUES (${pseudoId}, ${it.name}, ${areaLabel}, ${it.address}, ${it.lat}, ${it.lng}, 'sangga', false, false)
+        INSERT INTO cafes (place_id, name, area, address, lat, lng, naver_category, source, published, roasts_own, pipeline_status)
+        VALUES (${pseudoId}, ${it.name}, ${areaLabel}, ${it.address}, ${it.lat}, ${it.lng}, ${category}, 'sangga', false, false, 'new')
         ON CONFLICT (place_id) DO NOTHING`;
       inserted++;
+      if (category) withCategory++;
     }
   }
-  return { signguCd, areaLabel, total, scanned, cafes: cands.length, inserted, skipped, apply, fetchOk: ok, err, sample: cands.slice(0, 8) };
+  return { signguCd, areaLabel, total, scanned, cafes: cands.length, inserted, withCategory, catLookups, skipped, apply, fetchOk: ok, err, sample: cands.slice(0, 8) };
 }
 
 // 수도권 시군구코드(법정동코드 앞 5자리). dry-run으로 검증 후 사용.

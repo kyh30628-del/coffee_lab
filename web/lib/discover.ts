@@ -298,7 +298,10 @@ export const isNonCafe = (name: string, category: string) => {
 // 네이버 지역검색 link 필드가 인스타그램일 때만 채택(스마트플레이스에 SNS를 홈페이지로 등록한 업체) — scripts/instagram-backfill.mjs와 동일 규칙.
 const IG_RE = /^https?:\/\/(www\.)?instagram\.com\//i;
 
-async function localSearch(query: string, sort: "comment" | "random" = "comment") {
+/** 네이버 지역검색 1회. 시드 경로(lib/sangga.ts)에서도 카테고리 보강에 쓰므로 export한다.
+ *  ⚠️ 질의에 **동 이름을 붙이면 0건**이 나온다(2026-09-08 실측: "황실로스터스 회현동" 0건 / "황실로스터스 김해" 1건).
+ *     지역을 붙일 거면 시·군·구까지만, 아니면 이름 단독으로 폴백할 것. */
+export async function localSearch(query: string, sort: "comment" | "random" = "comment") {
   const url = `https://openapi.naver.com/v1/search/local.json?query=${encodeURIComponent(query)}&display=5&sort=${sort}`;
   // 🔑 키가 여러 개면 소진된 키를 건너뛰며 재시도(lib/naverKeys.ts). 키 1개면 기존과 동일 동작.
   let res: Response | null = null;
