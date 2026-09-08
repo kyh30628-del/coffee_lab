@@ -245,9 +245,23 @@ const AREA_ONLY_REGIONS: { region: string; areaLabel: string }[] = [];
 const GU_TO_AREA = new Map<string, string>(
   [...METRO_REGIONS, ...AREA_ONLY_REGIONS].map(({ region, areaLabel }) => [region.split(" ").pop()!, areaLabel]),
 );
+// 🏙️ 구 이름이 겹치는 광역시들("중구"·"동구"·"서구"·"강서구" 등 — 서울·인천·대전·부산 전부 가짐).
+//   전부 '○○광역시/특별시' 공식표기라 실주소 앞머리에 시·도 축약명이 그대로 등장 — includes로 안전 판별 가능.
+const AMBIG_SIDO_CANDIDATES = ["서울", "인천", "대전", "부산"] as const;
 export function parseGuArea(address: string): string | null {
   if (!address) return null;
   const matches = address.match(/[가-힣]+(?:구|시|군)(?![가-힣])/g) ?? [];
+  if (matches.length === 0) return null;
+  // 🚨 재발방지(decisions#1026): GU_TO_AREA는 구 이름만 보는 평면 사전이라, 같은 구 이름을 쓰는
+  //   시·도가 여럿이면 SIDO_GU에 나중에 등재된 시·도가 앞선 것을 덮어써 엉뚱한 시·도로 찍는다
+  //   (실측: 인천 서해구 신설 전엔 인천/대전 '서구'가 충돌, 09-06 부산 편입 후엔 서울·대전 중구·동구·
+  //   서구·강서구가 통째로 '부산 ○○구'로 오분류 — 인천광역시 서해구 주소 6곳이 area='대전 서구'로
+  //   잘못 적재된 사고, id 30567 등). 주소에 실제로 적힌 시·도명으로 먼저 좁힌 뒤 그 시·도 구 목록
+  //   안에서만 찾는다 — 유일명 구(서해구 등)는 기존 전역 사전 폴백으로 그대로 잡힌다.
+  const sido = AMBIG_SIDO_CANDIDATES.find((s) => address.includes(s));
+  if (sido) {
+    for (const token of matches) if ((SIDO_GU[sido] ?? []).includes(token)) return regionKeyFor(sido, token);
+  }
   for (const token of matches) { const area = GU_TO_AREA.get(token); if (area) return area; }
   return null;
 }
