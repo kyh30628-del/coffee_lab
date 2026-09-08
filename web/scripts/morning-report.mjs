@@ -188,6 +188,36 @@ try {
     await probe("강원(카공)", "춘천 카공 카페 검증 추천 동네 커피 노트", ["춘천", "강릉", "원주"]);
     await probe("충청(청주)", "청주시 카페 추천 진짜 후기로 검증한 곳", ["청주", "천안", "대전", "세종"]);
     console.log("  (기준선 9/4: 강원 0·충청 0·수도권은 동 단위까지 색인 심화 중 / 판정선: 강원 9/22·충청 10/6)");
+
+    // 📄 카페 상세(/c/) 색인율 — 2026-09-08 추가. 지역 페이지보다 **이게 유입 엔진**이다(유입은 카페 이름 검색에서 온다).
+    //   표본은 매번 같은 10곳(id 오름차순 고정)으로 뽑아 회차 간 비교가 되게 한다 — 무작위로 뽑으면 숫자가 널뛴다.
+    //   판정: 상세 제목 `{이름} ({지역}) — 동네 커피 노트`로 질의해 우리 /c/ URL이 결과에 있으면 색인(하한값).
+    const detailRate = async (label, likeAddr) => {
+      try {
+        const rows = await sql.query(
+          `SELECT name, area FROM cafes WHERE published AND address LIKE $1 ORDER BY id ASC LIMIT 10`, [likeAddr]);
+        let hit = 0, done = 0;
+        for (const c of rows) {
+          const q = `${c.name} (${c.area}) — 동네 커피 노트`;
+          try {
+            const r = await fetch(`https://openapi.naver.com/v1/search/webkr.json?display=30&query=${encodeURIComponent(q)}`, {
+              headers: { "X-Naver-Client-Id": process.env.NAVER_CLIENT_ID, "X-Naver-Client-Secret": process.env.NAVER_CLIENT_SECRET },
+              signal: AbortSignal.timeout(10_000),
+            });
+            const d = await r.json();
+            done++;
+            if ((d.items || []).some((i) => /dongnecoffeenote\.com\/c\//i.test(String(i.link)))) hit++;
+          } catch { /* 한 건 실패는 분모에서 제외 */ }
+          await new Promise((x) => setTimeout(x, 260));
+        }
+        console.log(`  ${label}: 상세 색인 ${hit}/${done} (${done ? Math.round(hit / done * 100) : 0}%)`);
+      } catch (e) { console.log(`  ⚠️ ${label} 상세 색인 조회 실패 ${String(e).slice(0, 40)}`); }
+    };
+    console.log("  📄 카페 상세(/c/) 색인율 — 고정표본 10곳");
+    await detailRate("강원", "강원%");
+    await detailRate("충청", "충청%");
+    await detailRate("서울(대조군)", "서울%");
+    console.log("  (2026-09-08 실측 기준선: 강원 40%·충청 12%·서울 52% · 표본 25곳 무작위였으므로 위 고정표본 값과는 다를 수 있음)");
   }
 }
 
