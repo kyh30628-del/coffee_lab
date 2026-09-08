@@ -321,3 +321,4 @@
 | 2026-09-08 03:21 | #1025 | [레드팀 자기개선] cron-verify 배포전 비용영향 사전점검 가드 도입 — 349.5GB 자기유발 비용 | a0ecba7b | - | app/api/cron-verify/route.ts 상단에 배포전 비용점검 체크리스트 주석 추가(EXPLAIN ANALYZE BUFFERS·파생컬럼 대체 검토) + scripts/ |
 | 2026-09-08 03:41 | #1022 | [룰갭 회귀] 휴게소 listicle 탐지(#859·#1003) 사각 잔존 — 쉼표 無 나열형 미검출(id2 | 21797783 | - | lib/reviewQuality.ts countEnumListItems: 쉼표 앞뒤 긴 서술절에 잘리던 항목을 경계단어로 보강, "~도 있고/팔고" 접속형 나열, 공백뿐인 4개+  |
 | 2026-09-08 07:46 | #1026 | [개발] 협업 #384: 인천 서해구 신규지역 카페 6곳 area="대전 서구" 오귀속(구역개편 라벨버그 재 | cbf351a1 | - | lib/discover.ts parseGuArea 근본원인 수정: 구 이름이 겹치는 광역시(중구·동구·서구·강서구 — 서울/인천/대전/부산)를 평면 Map(GU_TO_AREA, 마 |
+| 2026-09-08 23:59 | #1028 | [룰갭 신규] 백화점·몰 멀티브랜치 프리미엄 디저트 브랜드 — 접미사 없는 타지점 리뷰 탈출 (id25512 | 65e5cadd | - | web/lib/reviewQuality.ts: RETAIL_FAMILY(계열사 매핑)+retailFamiliesIn 추가, verifyReview에 몰/백화점 입점 카페(자기 이름 |
