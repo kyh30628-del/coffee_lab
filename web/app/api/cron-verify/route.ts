@@ -8,6 +8,16 @@ import { loadCriteria, getCriterionSync } from "@/lib/criteria";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
+// 💰 배포전 비용영향 사전점검 체크리스트(decisions#1025, 09-06 349.5GB 자기유발 비용사고
+//   #1010/#1011 재발방지) — 이 파일에 새 검사(add(...))를 추가할 때마다:
+//   1) 새 쿼리가 `published` 전수를 스캔하면서 synth_reviews·synth_reviews_all·raw_reviews 같은
+//      대용량 jsonb 컬럼을 옵션(단건 id 필터·LIMIT) 없이 직접 읽는지 먼저
+//      `node scripts/cost-preflight-guard.mjs` 로 정적 점검한다.
+//   2) 경고가 뜨거나 새 컬럼·조인이 애매하면 배포 전 Neon 콘솔/psql에서
+//      EXPLAIN(ANALYZE, BUFFERS)를 실제로 돌려 seq scan 대상 행수·예상 I/O(전송 GB)를 확인한다.
+//   3) 큰 컬럼이 필요하면 이 파일의 기존 패턴처럼 트리거 유지 파생 컬럼(synth_ev_n·synth_ev_flags·
+//      review_quotes)으로 대체할 수 있는지 먼저 검토 — 의미 동일·전송 거의 0.
+
 // 🛡️ 검증 에이전트(레드팀) — 결정론적 불변식 검사. LLM 미사용 → 검사기 자체에 환각·오차 없음.
 // 데이터·기능의 무결성을 매일 검사하고 verify_reports에 저장. 관리자 화면이 최신 리포트 표시.
 const authed = (req: NextRequest) => {
