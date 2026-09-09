@@ -83,6 +83,11 @@ export async function getRegionCafes(area: string, limit = 30): Promise<SeoCafe[
   } catch { return []; }
 }
 
+// 🍰 디저트/베이커리 우세 카페가 커피 무관 테마(quiet/work/mood 등)에 순수 베이커리로 상위권을 차지하는 편향
+//   방지(결함C, lib/charScore.ts dessertDominance()와 동일 판정 — app/api/discover/route.ts L112/122/144/182에
+//   이미 적용된 필터가 이 파일(SEO 테마 페이지, 유입 87%)엔 누락돼 있었다, decisions#1033).
+//   dessert/bakery 테마 자체는 디저트가 주제이므로 이 제외 대상에서 뺀다.
+//   ⚠️ neon 태그드 템플릿은 조각 합성이 안 되므로(위 TASTE_MIN_HITS 주석 참조) 아래 4개 쿼리에 같은 문구를 그대로 적는다.
 export async function getRegionTasteCafes(area: string, tasteKey: string, limit = 30): Promise<SeoCafe[]> {
   try {
     return withOwnerBadge((await sql`SELECT id, name, dong, synth_grade AS grade, synth_count AS count, synth_identity AS identity, char_scores, visitor_n, visitor_trip, visitor_local, work_facts,
@@ -92,6 +97,10 @@ export async function getRegionTasteCafes(area: string, tasteKey: string, limit 
       FROM cafes WHERE published AND area=${area}
         AND COALESCE((char_scores->>${tasteKey})::int, 0) >= ${TASTE_MIN_HITS}
         AND COALESCE((char_scores->>${tasteKey})::int, 0) * 100 >= COALESCE(synth_count,0) * ${TASTE_MIN_RATE_PCT}
+        AND (${tasteKey} IN ('dessert','bakery') OR NOT (
+          COALESCE((char_scores->>'dessert')::int,0) > 20
+          AND COALESCE((char_scores->>'roast')::int,0) < 5
+          AND COALESCE((char_scores->>'dessert')::int,0) >= COALESCE((char_scores->>'roast')::int,0) * 8))
       ORDER BY (char_scores->>${tasteKey})::int DESC, synth_count DESC NULLS LAST LIMIT ${limit}`) as unknown as SeoCafe[]);
   } catch { return []; }
 }
@@ -117,7 +126,11 @@ export async function getRegionTasteStats(area: string, tasteKey: string): Promi
   try {
     const r = (await sql`SELECT count(*)::int n, COALESCE(SUM(synth_count), 0)::int reviews FROM cafes WHERE published AND area=${area}
       AND COALESCE((char_scores->>${tasteKey})::int, 0) >= ${TASTE_MIN_HITS}
-      AND COALESCE((char_scores->>${tasteKey})::int, 0) * 100 >= COALESCE(synth_count,0) * ${TASTE_MIN_RATE_PCT}`)[0] as any;
+      AND COALESCE((char_scores->>${tasteKey})::int, 0) * 100 >= COALESCE(synth_count,0) * ${TASTE_MIN_RATE_PCT}
+      AND (${tasteKey} IN ('dessert','bakery') OR NOT (
+        COALESCE((char_scores->>'dessert')::int,0) > 20
+        AND COALESCE((char_scores->>'roast')::int,0) < 5
+        AND COALESCE((char_scores->>'dessert')::int,0) >= COALESCE((char_scores->>'roast')::int,0) * 8))`)[0] as any;
     return { n: Number(r?.n ?? 0), reviews: Number(r?.reviews ?? 0) };
   } catch { return { n: 0, reviews: 0 }; }
 }
@@ -141,10 +154,15 @@ export async function getRegionTasteCounts(): Promise<Record<string, number>> {
     //   그 결과 **sitemap의 `>= 5` 필터에서 전부 탈락 → 신설 테마 171페이지가 검색엔진에 제출조차 안 됐다**
     //   (실측: 사이트맵 내 pet/brunch/view = 0개, 기존 6축 = 391개). "색인 대기"가 아니라 "미제출"이었다.
     //   → TASTES를 단일 출처로 삼아 동적 생성한다. 앞으로 축을 추가해도 여기가 자동으로 따라간다.
-    const cols = TASTES.map((t) =>
-      `COUNT(*) FILTER (WHERE COALESCE((char_scores->>'${t.key}')::int,0) >= ${TASTE_MIN_HITS}
-        AND COALESCE((char_scores->>'${t.key}')::int,0) * 100 >= COALESCE(synth_count,0) * ${TASTE_MIN_RATE_PCT})::int "${t.key}"`
-    ).join(",\n      ");
+    const cols = TASTES.map((t) => {
+      const skipDominance = t.key === "dessert" || t.key === "bakery";
+      const dominanceFilter = skipDominance ? "" : `
+        AND NOT (COALESCE((char_scores->>'dessert')::int,0) > 20
+          AND COALESCE((char_scores->>'roast')::int,0) < 5
+          AND COALESCE((char_scores->>'dessert')::int,0) >= COALESCE((char_scores->>'roast')::int,0) * 8)`;
+      return `COUNT(*) FILTER (WHERE COALESCE((char_scores->>'${t.key}')::int,0) >= ${TASTE_MIN_HITS}
+        AND COALESCE((char_scores->>'${t.key}')::int,0) * 100 >= COALESCE(synth_count,0) * ${TASTE_MIN_RATE_PCT}${dominanceFilter})::int "${t.key}"`;
+    }).join(",\n      ");
     const rows = (await sql.query(`SELECT area,
       ${cols}
       FROM cafes WHERE published AND area IS NOT NULL AND area <> '' GROUP BY area`)) as unknown as Record<string, any>[];
@@ -163,6 +181,10 @@ export async function getRegionTasteGradeBreakdown(area: string, tasteKey: strin
       WHERE published AND area=${area}
         AND COALESCE((char_scores->>${tasteKey})::int, 0) >= ${TASTE_MIN_HITS}
         AND COALESCE((char_scores->>${tasteKey})::int, 0) * 100 >= COALESCE(synth_count,0) * ${TASTE_MIN_RATE_PCT}
+        AND (${tasteKey} IN ('dessert','bakery') OR NOT (
+          COALESCE((char_scores->>'dessert')::int,0) > 20
+          AND COALESCE((char_scores->>'roast')::int,0) < 5
+          AND COALESCE((char_scores->>'dessert')::int,0) >= COALESCE((char_scores->>'roast')::int,0) * 8))
       GROUP BY synth_grade`) as unknown as { grade: string | null; n: number }[];
     const find = (g: string) => rows.find((r) => r.grade === g)?.n ?? 0;
     return { verified: find("검증"), ref: find("참고"), candidate: find("후보") };
