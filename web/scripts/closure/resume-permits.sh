@@ -35,7 +35,7 @@ fi
 
 for i in 1 2 3; do
   BEFORE=$DONE
-  node scripts/closure/fetch-permits.mjs "$EP" --conc=28 >> /tmp/fetch-$EP.log 2>&1
+  node scripts/closure/fetch-permits.mjs "$EP" --conc=8 >> /tmp/fetch-$EP.log 2>&1
   set -- $(progress); DONE=${1:-0}; TOTAL=${2:-0}; KEPT=${3:-0}
   say "이어받기 ${i}회차 후: $DONE / $TOTAL 페이지 (+$((DONE-BEFORE))) · 지역내 ${KEPT}건"
   if [ "$TOTAL" -gt 0 ] && [ "$DONE" -ge "$TOTAL" ]; then
