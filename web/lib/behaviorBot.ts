@@ -159,11 +159,51 @@ export const EXPLICIT_BOT_ANON_IDS_SQL = `
 // user_consents 기반이든, "봇 제외"가 필요한 모든 집계(헤드라인 카드·14일 추이 그래프·기타 트래픽
 // 통계)는 이 상수 하나만 참조한다. 필터 기준이 갈라지면 같은 날짜의 방문자·페이지뷰 수치가
 // 화면마다 달라진다(예: 469 vs 467) — 그 재발을 막는 게 이 상수의 존재 이유다.
+// 📵 체류 0초 · 흔적 없음 봇(2026-09-10 발견 — CEO가 "새벽 88명 진짜 사람 맞냐"고 **여러 번** 물어서 결국 찾았다)
+//
+//   구멍: 위 BEHAVIOR_BOT_ANON_IDS_SQL의 마지막 줄이
+//     `bool_or(user_agent ~* 'Mobile|iPhone|Android') = false`
+//   다. 즉 **모바일 UA면 행동이 아무리 기계 같아도 무조건 사람으로 셌다.** 예전엔 봇이 데스크톱
+//   UA를 썼기 때문에 통했지만, 지금 오는 것들은 iOS 18.2~18.6·Android 14/15·Pixel 8 Pro·SM-S938B를
+//   돌려가며 쓴다. 자바스크립트도 실행해서 /api/visit까지 정상으로 남긴다. 그래서 88명이 전부 통과했다.
+//
+//   실측(2026-09-10 새벽 00~07시): 방문자 88명 · 그중 83명이 **체류시간 0초** · 88명 전원이 **오늘 처음
+//   생긴 anon_id**(저장소에 아무것도 안 남김) · 위치동의 0명 · 82명이 direct · 37명이 홈 1페이지만 찍고 이탈.
+//   같은 시간대 평년치는 13~20명인데 89명이었다(6.8배).
+//
+//   ⚠️ 오탐이 더 나쁘다(과거 '55% 오탐' 사고). 그래서 **검색으로 들어왔거나·위치동의했거나·재방문한
+//     사람은 이 규칙에서 아예 뺀다.** 그 셋 중 하나라도 있으면 사람으로 남긴다.
+//   보정 실측(최근 14일): '사람 확실' 1,887명(검색·동의·재방문) 중 이 규칙에 걸리는 사람 **0명**
+//     (17명이 체류0+경로≤2였지만 전부 검색·동의 신호를 갖고 있어 제외 조건에서 빠진다).
+//     '정체 불명' 782명 중 244명(31.2%) 적중. 전체 2,669명 중 261명(9.8%) 제외.
+const ZERO_DWELL_BOT_ANON_IDS_SQL = `
+  SELECT anon_id FROM (
+    SELECT t.anon_id,
+           count(DISTINCT t.path) AS paths,
+           max(COALESCE(t.duration_ms, 0)) AS maxdur,
+           bool_or(t.src IN ('naver','google','bing','daum','duckduckgo.com')) AS searched,
+           max(COALESCE(u.sessions, 0)) AS sessions,
+           bool_or(COALESCE(u.agreed, false)) AS agreed,
+           bool_or(COALESCE(u.internal, false)) AS internal
+    FROM traffic_events t
+    LEFT JOIN user_consents u ON u.anon_id = t.anon_id
+    GROUP BY t.anon_id
+  ) v
+  WHERE v.maxdur = 0        -- 어떤 페이지에서도 머문 시간이 0
+    AND v.paths <= 2        -- 한두 화면만 찍고 나감
+    AND v.sessions <= 1     -- 저장소에 흔적을 안 남김(매번 새 방문자)
+    AND NOT v.searched      -- 🛡️ 검색으로 들어온 사람은 건드리지 않는다
+    AND NOT v.agreed        -- 🛡️ 위치동의한 사람은 건드리지 않는다
+    AND NOT v.internal
+`;
+
 /** 원본 계산식 — 무겁다(user_consents LEFT JOIN + UA 정규식). 캐시 갱신에만 쓴다. */
 export const BOT_ANON_IDS_COMPUTE_SQL = `
   SELECT anon_id FROM (${EXPLICIT_BOT_ANON_IDS_SQL}) e
   UNION
   SELECT anon_id FROM (${BEHAVIOR_BOT_ANON_IDS_SQL}) b
+  UNION
+  SELECT anon_id FROM (${ZERO_DWELL_BOT_ANON_IDS_SQL}) z
 `;
 
 // ⚡ 2026-09-02 — 이 목록이 **관제탑을 못 열게 만들고 있었다**(CEO 지적).
