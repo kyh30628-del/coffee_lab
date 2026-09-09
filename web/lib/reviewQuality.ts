@@ -1709,7 +1709,7 @@ export function verifyReview(input: QualityInput): QualityResult {
   //   문자열이 없는 브랜드명 단독 표기(id24280 소노펫 비발디파크, id24864 델피노 비엔토, id24346 소노펠리체
   //   비발디파크)는 우회 ②LODGING_SIGNAL도 스위트/콘도(bare)/체크인/체크아웃/그랜드호텔/조식(bare)이 없어
   //   "리조트" 문자열은 포함하지만(id24607 정선담아 하이원리조트점) 신호사전을 우회. 양쪽 다 보강.
-  const LODGING_DESC = /펜션|글램핑|리조트|연수원|풀빌라|콘도|숙소|비발디파크|소노벨|소노펫|소노펠리체|델피노|하이원|휘닉스파크|휘닉스평창/;
+  const LODGING_DESC = /펜션|글램핑|리조트|연수원|풀빌라|콘도|숙소|비발디파크|소노벨|소노펫|소노펠리체|델피노|하이원|휘닉스파크|휘닉스평창|아난티/;
   const LODGING_NAMED = HOTEL_NAMED || LODGING_DESC.test(input.name) || (nameInTitle && LODGING_DESC.test(title));
   const LODGING_SIGNAL = /(숙박|투숙|킹룸|스탠다드룸|디럭스룸|조식뷔페|호캉스|풀빌라|수영장|연회장|컨벤션\s*후기|웨딩|예식장?|객실|1박|바베큐\s*무한리필|단체\s*워크숍|트리하우스|계곡\s*물놀이|스위트|콘도|체크인|체크아웃|그랜드호텔|조식)/;
   if (LODGING_NAMED && LODGING_SIGNAL.test(fullL) && !CAFE_CONTEXT.test(fullL)) {
@@ -1725,7 +1725,13 @@ export function verifyReview(input: QualityInput): QualityResult {
   //   순수 시설체험기(등산·물놀이·전시 등, id27826 광치자연휴양림 숲속카페 실측)로 간주해 거절. 둘 다 LLM
   //   재판정에 맡기지 않고 결정론으로 즉시 배제 — 진짜 이 카페 후기는 자기 브랜드명과 카페 맥락을 모두
   //   동반하므로 안전하게 보존된다.
-  const RESORT_VENUE_WORDS = ["리조트", "자연휴양림", "수목원", "워터파크", "스키장"];
+  // 룰갭(decisions#1032, 협업#389): 위 두 목록(리조트/자연휴양림 등 시설유형어)은 카페명에 그 문자열이
+  //   그대로 들어간 경우만 잡는다. 브랜드명 자체가 유일한 단서인 복합단지(예: "아난티")는 "리조트" 류
+  //   일반명사를 쓰지 않아 우회한다(id34621 아난티 남해 이터널저니 실측: synth_reviews 6건 중 다수가
+  //   같은 단지 내 타업체(워치유어스템 카페·모비딕 야식당)·객실 룸서비스·야외수영장 이용후기로, 이 카페 자체
+  //   맥락은 없다). "아난티"는 강남·부산·가평·남해 등 전국 다점포 리조트 브랜드로 하이원·소노벨·휘닉스와
+  //   동일 클래스라 브랜드명을 시설유형어와 같은 목록에 등록해 동일 게이트를 태운다.
+  const RESORT_VENUE_WORDS = ["리조트", "자연휴양림", "수목원", "워터파크", "스키장", "아난티"];
   const isResortVenueCafe = RESORT_VENUE_WORDS.some((v) => nameN.includes(norm(v)));
   if (isResortVenueCafe) {
     const resortBrandAbsent = !inTitleFull && !inBodyFull && !distinctInTitle && !distinctInBody;
