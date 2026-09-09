@@ -24,7 +24,10 @@ mkdirSync(OUT_DIR, { recursive: true });
 const OUT = path.join(OUT_DIR, "cafes.ndjson");
 
 const rows = await sql`
-  SELECT id, name, address, area, dong, lat, lng, published
+  SELECT id, name, address, area, dong, lat, lng, published,
+         -- 🔎 2026-09-10: 폐업 매칭 기각 규칙용. 배열 전체가 아니라 **최댓값 하나만** 가져온다(전송 최소).
+         --    저장 형식이 "2025.03.07"이라 문자열 최대 = 최신 날짜다.
+         (SELECT max(d) FROM jsonb_array_elements_text(COALESCE(review_dates,'[]'::jsonb)) d) AS last_review
   FROM cafes
   WHERE address IS NOT NULL AND address <> ''
 `;

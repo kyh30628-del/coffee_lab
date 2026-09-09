@@ -93,7 +93,13 @@ console.log(`인허가 ${permits.toLocaleString()}건(${permitFiles.map((f) => f
 const SIM_UNIQUE = 0.45;  // 후보가 하나뿐이면 조금 느슨하게(등기명 차이 흡수)
 const SIM_MULTI = 0.62;   // 여러 사업장이 같은 주소면 엄격하게(옆가게 오매칭 방지)
 
-const out = { matched: 0, unmatched: 0, closedPublished: [], matchedRows: [], byWay: { road: 0, lot: 0 } };
+// 폐업일 이후 이만큼 지나도 후기가 있으면 '살아 있다'로 본다.
+//   후기 작성 지연·인허가 등록 지연을 감안한 여유. 60일이면 계절 한 바퀴 안쪽이라 오판이 적다.
+const GRACE_DAYS = 60;
+const normDate = (v) => { const t = String(v || "").replace(/\./g, "-").replace(/-$/, ""); return /^\d{4}-\d{2}-\d{2}$/.test(t) ? t : null; };
+const addDays = (d, n) => d ? new Date(new Date(d).getTime() + n * 86400000).toISOString().slice(0, 10) : null;
+
+const out = { matched: 0, unmatched: 0, closedPublished: [], rejected: [], rejectedByReview: 0, matchedRows: [], byWay: { road: 0, lot: 0 } };
 for (const c of cafes) {
   const rk = roadKey(c.address), lk = lotKey(c.address);
   let cands = (rk && byRoad.get(rk)) || null, way = "road";
@@ -110,7 +116,16 @@ for (const c of cafes) {
   out.matched++; out.byWay[way]++;
   const row = { id: c.id, name: c.name, addr: c.address, published: c.published, permit: chosen.nm, status: chosen.st, closed: chosen.cl, sim: +best.s.toFixed(2), way, cands: cands.length };
   out.matchedRows.push(row);
-  if (chosen.cd === "02" && c.published) out.closedPublished.push(row);
+  // 🔴 2026-09-10 기각 규칙 — 인허가 원장은 **같은 주소의 과거 폐업 이력을 전부** 담는다.
+  //   그 자리에 새로 연 비슷한 이름의 카페가 옛 폐업 레코드에 붙는다(도로명+이름만으로는 못 가른다).
+  //   실측: 폐업 판정 496건 중 193건이 폐업일 뒤에도 후기가 이어졌다 → 정확도 60.9%.
+  //   폐업일 +GRACE 이후에도 방문 후기가 있으면 **그 카페는 살아 있다**. 폐업 판정을 버린다.
+  if (chosen.cd === "02" && c.published) {
+    const last = normDate(c.last_review);
+    const cutoff = last && chosen.cl ? addDays(normDate(chosen.cl), GRACE_DAYS) : null;
+    if (last && cutoff && last > cutoff) { out.rejectedByReview++; row.lastReview = last; out.rejected.push(row); }
+    else { row.lastReview = last || null; out.closedPublished.push(row); }
+  }
 }
 
 const pub = cafes.filter((c) => c.published).length;
@@ -118,7 +133,9 @@ const matchedPub = out.matchedRows.filter((r) => r.published).length;
 console.log(`\n📊 매칭 결과`);
 console.log(`  전체 ${cafes.length.toLocaleString()}곳 중 매칭 ${out.matched.toLocaleString()} (${(out.matched / cafes.length * 100).toFixed(1)}%) · 도로명 ${out.byWay.road.toLocaleString()} / 지번 ${out.byWay.lot.toLocaleString()}`);
 console.log(`  공개 ${pub.toLocaleString()}곳 중 매칭 ${matchedPub.toLocaleString()} (${(matchedPub / pub * 100).toFixed(1)}%)  ← 목표 85%+`);
-console.log(`  🚪 공식 폐업인데 공개 중: ${out.closedPublished.length.toLocaleString()}곳`);
+const rawClosed = out.closedPublished.length + out.rejectedByReview;
+console.log(`  🚪 공식 폐업 판정 ${rawClosed.toLocaleString()}곳 → 후기 활동으로 기각 ${out.rejectedByReview.toLocaleString()}곳`);
+console.log(`  ✅ 고신뢰 '폐업인데 공개 중': ${out.closedPublished.length.toLocaleString()}곳 (기각률 ${(out.rejectedByReview / Math.max(1, rawClosed) * 100).toFixed(1)}%)`);
 
 out.closedPublished.sort((a, b) => String(b.closed).localeCompare(String(a.closed)));
 console.log(`\n🔎 수동 대조용 표본 ${SAMPLE_N}건(폐업 판정분 최신순)`);
