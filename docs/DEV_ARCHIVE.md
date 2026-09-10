@@ -328,3 +328,4 @@
 | 2026-09-10 03:05 | #1031 | [개발] 협업 #387: [레드팀 발견] 09-09 204.3GB 재발 — 원인은 cron-verify 아닌 | c9585f00 | - | web/AGENTS.md에 스크래치 조사 스크립트 컨벤션 명문화(scripts/tmp/ 또는 scripts/_*.mjs만 사용, 완료후 삭제, published전수+jsonb_ar |
 | 2026-09-10 04:18 | #1037 | [자율진단] cron-sentinel 6회째 재발 — 근본원인 특정: 8개 스캐너 개별시간budget 합산이 | eed85151 | - | app/api/cron-sentinel/route.ts: GET 핸들러에 공용 누적 데드라인(260s, started 기준) 추가 — 초과 시 미실행 스캐너/치유는 truncate |
 | 2026-09-10 04:18 | #1038 | [룰갭 신규] 역명 지점(OO역점) 랜드마크 오탐 — 형제지점 '근처' 서술이 이 지점 신호로 오판 (id3 | 9b659cdf | - | lib/reviewQuality.ts:2055 branchIsMetroWide에 /(역 터미널 공항)$/.test(myBranch) 조건 추가 — 역명·터미널·공항 지점명은 시/구 |
+| 2026-09-10 09:03 | #1042 | [룰갭 신규] 카페명-소비재 브랜드 동음이의 혼입 — 몬스터커피 인천부평시장점에 전자담배 액상 후기 참고등급 | 217fa349 | - | lib/reviewQuality.ts: VAPE_ECIG_RETAIL_CUES 상수 신설(전자담배/액상/JUUL/쥴/베이프) + !CAFE_CONTEXT_SUBSTANCE 결합 하 |
