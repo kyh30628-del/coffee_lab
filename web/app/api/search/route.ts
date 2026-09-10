@@ -455,11 +455,23 @@ export async function GET(req: NextRequest) {
 
     scored.sort((a, b) => b.score - a.score);
 
+    // 🏢 브랜드 다지점(8곳+ 동일상호 부분일치, decisions#1045) — 전 지점이 질의와 동일하게 "의미적합"이라
+    //   AI재정렬 순위가 사실상 노이즈인데, 그 노이즈가 등급가산 고정폭(gradeBonus)을 이겨 참고 지점이
+    //   검증 지점보다 위로 노출되던 버그(테라로사 스타필드하남점(참고·15) > 동탄호수점(검증·56) 재현).
+    //   판정되면 AI재정렬을 건너뛰고, 기존 상호매칭 블록(아래)과 같은 등급→리뷰수 결정론 정렬을 적용한다.
+    const brandDq = ql.replace(/\s+/g, "");
+    const brandIsCategory = CATEGORY_WORD.has(brandDq) || tokens.every((t) => CATEGORY_WORD.has(t));
+    const isBrandMultiLocation = brandDq.length >= 2 && !brandIsCategory &&
+      scored.filter((s) => (s.name ?? "").toLowerCase().replace(/\s+/g, "").includes(brandDq)).length >= 8;
+    if (isBrandMultiLocation) {
+      scored.sort((a, b) => gradeBonus(b.grade) - gradeBonus(a.grade) || (Number(b.count) || 0) - (Number(a.count) || 0));
+    }
+
     // ===== Claude Sonnet 맥락 재정렬 (콘솔 API 키 있을 때) =====
     // 후보를 압축해 보내고, 질문 의도에 맞는 곳만 선별·정렬. 실패/키없음 시 위 점수순 폴백.
     let results = scored.slice(0, 24);
     let aiErr: string | null = null; // 결재#135: rerankWithClaude 실패 사유(검색 로그에 함께 적재)
-    if (hasSearchLLM() && scored.length > 0) {
+    if (hasSearchLLM() && scored.length > 0 && !isBrandMultiLocation) {
       const cands: SearchCand[] = scored.slice(0, 25).map((s) => {
         const c = byId.get(s.id) ?? {};
         return { id: s.id, name: s.name, area: s.area, identity: c.synth_identity ?? s.identity, tags: charTags(c.char_scores), quotes: quotesOf(c.synth_reviews) };
