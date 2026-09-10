@@ -330,3 +330,4 @@
 | 2026-09-10 04:18 | #1038 | [룰갭 신규] 역명 지점(OO역점) 랜드마크 오탐 — 형제지점 '근처' 서술이 이 지점 신호로 오판 (id3 | 9b659cdf | - | lib/reviewQuality.ts:2055 branchIsMetroWide에 /(역 터미널 공항)$/.test(myBranch) 조건 추가 — 역명·터미널·공항 지점명은 시/구 |
 | 2026-09-10 09:03 | #1042 | [룰갭 신규] 카페명-소비재 브랜드 동음이의 혼입 — 몬스터커피 인천부평시장점에 전자담배 액상 후기 참고등급 | 217fa349 | - | lib/reviewQuality.ts: VAPE_ECIG_RETAIL_CUES 상수 신설(전자담배/액상/JUUL/쥴/베이프) + !CAFE_CONTEXT_SUBSTANCE 결합 하 |
 | 2026-09-10 11:05 | #1042 | [룰갭 신규] 카페명-소비재 브랜드 동음이의 혼입 — 몬스터커피 인천부평시장점에 전자담배 액상 후기 참고등급 | 4ffd32d3 | - | lib/reviewQuality.ts: VAPE_ECIG_RETAIL_CUES 상수 신설(전자담배/액상/JUUL/쥴/베이프) + !CAFE_CONTEXT_SUBSTANCE 결합 하 |
+| 2026-09-10 11:16 | #1042 | [룰갭 신규] 카페명-소비재 브랜드 동음이의 혼입 — 몬스터커피 인천부평시장점에 전자담배 액상 후기 참고등급 | 07d4ad37 | - | lib/reviewQuality.ts: VAPE_ECIG_RETAIL_CUES 상수 신설(전자담배/액상/JUUL/쥴/베이프) + !CAFE_CONTEXT_SUBSTANCE 결합 하 |
