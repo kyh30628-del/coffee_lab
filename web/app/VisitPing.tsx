@@ -10,6 +10,7 @@ export default function VisitPing() {
   useEffect(() => {
     try {
       let a = localStorage.getItem("dcn_anon");
+      const wasReturning = !!a;   // 이 브라우저에 이미 흔적이 있던 사람 = 확실한 재방문
       if (!a) {
         a = crypto?.randomUUID?.() ?? `a${Date.now()}${Math.floor(Math.random() * 1e6)}`;
         localStorage.setItem("dcn_anon", a);
@@ -27,12 +28,31 @@ export default function VisitPing() {
         body.utm_medium = u.searchParams.get("utm_medium") || "";
         body.utm_campaign = u.searchParams.get("utm_campaign") || "";
       }
-      fetch("/api/visit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-        keepalive: true,
-      }).catch(() => {});
+      const send = () => {
+        fetch("/api/visit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+          keepalive: true,
+        }).catch(() => {});
+      };
+
+      // 🌙 2026-09-10 CEO 결재 — 0초 이탈 봇이 새벽 내내 DB를 깨우던 것을 **요청 단계에서** 끊는다.
+      //   실측: 새벽 00~08시 방문 88명 중 83명이 체류 0초·전원 첫 방문·위치동의 0명이었고,
+      //   그 방문 기록 쓰기가 5분 간격을 계속 메워 DB가 한 번도 못 잤다(수면 0시간).
+      //   → 처음 온 사람이 검색을 거치지도 않았으면 **4초를 머문 뒤에** 기록한다. 그 전에 떠나면 안 쓴다.
+      //   ⚠️ 진짜 사람을 잃지 않도록 예외를 둔다: 재방문자·검색 유입·내부는 **즉시** 기록한다
+      //     (봇 필터의 면제 조건과 같은 기준 — lib/behaviorBot.ts ZERO_DWELL 규칙).
+      const SEARCH_HOSTS = /(^|\.)(naver|google|bing|daum|duckduckgo)\./i;
+      let fromSearch = false;
+      try { fromSearch = !!document.referrer && SEARCH_HOSTS.test(new URL(document.referrer).hostname); } catch {}
+      if (wasReturning || fromSearch || isInternal) { send(); return; }
+
+      const DWELL_MS = 4000;
+      const timer = setTimeout(send, DWELL_MS);
+      const cancelIfHidden = () => { if (document.visibilityState === "hidden") clearTimeout(timer); };
+      document.addEventListener("visibilitychange", cancelIfHidden);
+      return () => { clearTimeout(timer); document.removeEventListener("visibilitychange", cancelIfHidden); };
     } catch {}
   }, [pathname]);
 

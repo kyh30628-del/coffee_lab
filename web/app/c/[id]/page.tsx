@@ -12,6 +12,7 @@ import VisitorReviews from "../../VisitorReviews";
 import RecentCafes from "../../RecentCafes";
 import SavedCafes from "../../SavedCafes";
 import { buildAxisDist, cafeProfile, extractHighlights, tasteVector, tasteSimilarity, GRADE_RANK } from "@/lib/cafeProfile";
+import { topCharTraits } from "@/lib/charScore";
 import { collectionForCafe } from "@/lib/collections";
 import { tasteByKey } from "@/lib/seoData";
 import { shareHookText } from "@/lib/shareCopy";
@@ -122,6 +123,24 @@ function buildFaq(c: any, grade: string, highlights: { emoji: string; label: str
   return faqs;
 }
 
+// ⚠️ 체크표시(✓)는 OG 폰트에 없어서 두부(□)로 깨진다 — 운영 로그의 "Failed to load dynamic font for ✓"가 이것이다.
+//   글자만 쓴다(2026-09-10 로컬 렌더로 확인).
+const OG_GRADE_BADGE: Record<string, string> = { "검증": "검증", "참고": "참고" };
+/** 카페 한 곳의 OG 카드 URL — 이미지에 필요한 값만 쿼리로 넘긴다(이미지 라우트는 DB를 안 읽는다). */
+function ogUrl(c: any): string {
+  const loc = [c.area, c.dong].filter(Boolean).join(" ");
+  const p = new URLSearchParams({
+    t: String(c.name ?? ""),
+    s: String(c.synth_identity ? String(c.synth_identity).slice(0, 60) : loc),
+    f: `${loc} · 진짜 후기로 검증`,
+  });
+  const badge = (c.synth_grade && OG_GRADE_BADGE[c.synth_grade]) || c.synth_grade;
+  if (badge) p.set("b", String(badge));
+  const traits = topCharTraits(c.char_scores, 2);
+  if (traits?.length) p.set("r", traits.join("|"));
+  return `${SITE}/api/og/cafe?${p.toString()}`;
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   const c = await getCafe(id);
@@ -132,9 +151,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title, description: desc,
     alternates: { canonical: url },
-    // og:image·twitter:image는 같은 폴더의 opengraph-image.tsx(동적 카드)가 자동 적용됨.
-    openGraph: { title, description: desc, url, siteName: "동네 커피 노트", type: "article", locale: "ko_KR" },
-    twitter: { card: "summary_large_image", title, description: desc },
+    // 🌙 2026-09-10: og:image를 **DB를 안 치는** /api/og/cafe 로 돌린다(CEO 결재).
+    //   예전엔 같은 폴더 opengraph-image.tsx가 자동 적용됐는데, 크롤러가 이미지를 가져갈 때마다
+    //   그 라우트가 자기 요청으로 DB를 쳤다(2026-09-09 새벽 8시간에 2,146회·전부 캐시 미스).
+    //   필요한 값은 여기서 이미 읽어둔 c 하나로 충분하다 → 쿼리에 실어 보내면 이미지 쪽 DB 접속 0.
+    openGraph: { title, description: desc, url, siteName: "동네 커피 노트", type: "article", locale: "ko_KR", images: [ogUrl(c)] },
+    twitter: { card: "summary_large_image", title, description: desc, images: [ogUrl(c)] },
   };
 }
 
