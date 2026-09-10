@@ -363,6 +363,27 @@ function makeLandmarkHtml(name: string, icon: string): string {
     <span style="font-size:10.5px;font-weight:700;color:#6b4310;background:rgba(255,250,240,0.95);border:1px solid #e3c79a;padding:0.5px 5px;border-radius:6px;box-shadow:0 1px 2px rgba(0,0,0,0.14);">${(name || "").replace(/</g, "&lt;")}</span>
   </div>`;
 }
+// 🎨 Blender Cycles 렌더 질감(2026-09-11, CEO 지시 "바다·강·호수·산 깊이별 색감을 블렌더로") — scripts/blender/render-map-textures.py → public/map/*.png
+//   물 4종은 종류를 깊이로 읽어 색·너울·흐름결·바닥비침이 다르고, 지표 5종은 숲(수관)·풀·모래·습지·얼음 질감. 128px 렌더를 pixelRatio 2로 얹는다(=64 CSS px 타일).
+//   로드 실패(오프라인 등)는 아래 캔버스 절차 질감이 대신한다 — 화면이 비지 않는다.
+const MAP_TEXTURES: Record<string, string> = {
+  "dcn-water-ocean": "/map/water-ocean.png", "dcn-water-lake": "/map/water-lake.png", "dcn-water-river": "/map/water-river.png", "dcn-water-pond": "/map/water-pond.png",
+  "dcn-land-wood": "/map/land-wood.png", "dcn-land-grass": "/map/land-grass.png", "dcn-land-sand": "/map/land-sand.png", "dcn-land-wetland": "/map/land-wetland.png", "dcn-land-ice": "/map/land-ice.png",
+};
+async function loadMapTextures(ml: any): Promise<number> {
+  let ok = 0;
+  await Promise.all(Object.entries(MAP_TEXTURES).map(async ([id, url]) => {
+    try {
+      const r = await ml.loadImage(url);               // MapLibre 5: Promise<{ data }>
+      const img = r?.data ?? r;
+      if (!img) return;
+      if (ml.hasImage(id)) ml.removeImage(id);         // 캔버스 폴백이 먼저 들어갔으면 교체(updateImage는 크기가 같아야 해서 못 씀)
+      ml.addImage(id, img, { pixelRatio: 2 }); ok++;
+    } catch { /* 폴백 유지 */ }
+  }));
+  return ok;
+}
+
 // 🖼️ 지도 절차 질감 — 캔버스로 그려 MapLibre addImage. 외부 파일·요청 0. (pixelRatio 2 기준 픽셀)
 //   물결: 깊은 파랑 바탕에 옅은 잔물결 2겹. 파사드 3종: 벽 색 + 창문 격자(사진처럼 보이게 창틀·유리 하이라이트).
 function makeMapTextures(): Record<string, ImageData> {
@@ -1098,6 +1119,8 @@ export default function Home() {
         } catch {}
         // 🖼️ 절차 질감(캔버스 → addImage): 물결·파사드 3종. 실제 건물 사진은 타일에 없으므로 '사진 같은 창문 격자'로 형태·색감을 보완.
         try { for (const [id, img] of Object.entries(makeMapTextures())) if (!ml.hasImage(id)) ml.addImage(id, img, { pixelRatio: 2 }); } catch {}
+        // 🎨 Blender 렌더 질감을 비동기로 얹고, 다 실리면 패턴 지정을 한 번 더 돌린다(멱등).
+        if (!(ml as any).__dcnTexLoading) { (ml as any).__dcnTexLoading = true; void loadMapTextures(ml).then(() => { try { applyVectorStyle(); } catch {} }); }
         // 🌤️ 3D 건물 조명 — 좌상단에서 비치는 따뜻한 빛(면마다 밝기 차 → 입체감)
         try { ml.setLight({ anchor: "viewport", color: "#fff4e0", intensity: 0.42, position: [1.15, 210, 30] }); } catch {}
         for (const ly of style.layers) {
@@ -1109,13 +1132,19 @@ export default function Home() {
           // 산·녹지: 숲은 짙은 녹색, 잔디·공원은 밝은 녹색 — 지형 음영과 겹쳐 산세가 살아난다.
           if ((sl === "landcover" || sl === "park") && (ly.type === "fill" || ly.type === "fill-extrusion")) {
             const wood = /wood|forest/i.test(ly.id);
-            try { ml.setPaintProperty(ly.id, "fill-color", wood ? "#a9c78f" : "#c4d9a6"); ml.setPaintProperty(ly.id, "fill-opacity", wood ? 0.78 : 0.7); ml.setLayoutProperty(ly.id, "visibility", "visible"); } catch {}
+            // 🌲 지표 질감(Blender): 숲=수관 돔, 풀·공원=풀결, 모래=고운 입자, 습지=풀+물웅덩이, 얼음=균열. 이미지가 없으면 색만.
+            const pat = /wood|forest/i.test(ly.id) ? "dcn-land-wood" : /sand/i.test(ly.id) ? "dcn-land-sand" : /wetland/i.test(ly.id) ? "dcn-land-wetland" : /ice|glacier/i.test(ly.id) ? "dcn-land-ice" : "dcn-land-grass";
+            try {
+              ml.setPaintProperty(ly.id, "fill-color", wood ? "#a9c78f" : "#c4d9a6");
+              if (ml.hasImage(pat)) ml.setPaintProperty(ly.id, "fill-pattern", pat);
+              ml.setPaintProperty(ly.id, "fill-opacity", wood ? 0.9 : 0.78); ml.setLayoutProperty(ly.id, "visibility", "visible");
+            } catch {}
             continue;
           }
           // 🌊 물 — 종류(class)를 깊이로 읽어 색·물결을 다르게: 바다(가장 깊음) → 호수 → 강 → 연못.
           if (sl === "water" && ly.type === "fill") {
             try {
-              ml.setPaintProperty(ly.id, "fill-pattern", ["match", ["get", "class"], "ocean", "dcn-water-ocean", "lake", "dcn-water-lake", "river", "dcn-water-river", "dcn-water-pond"]);
+              ml.setPaintProperty(ly.id, "fill-pattern", ["match", ["get", "class"], "ocean", "dcn-water-ocean", "lake", "dcn-water-lake", "river", "dcn-water-river", ["pond", "swimming_pool", "dock"], "dcn-water-pond", "dcn-water-lake"]);
               ml.setPaintProperty(ly.id, "fill-opacity", 1);
             } catch { try { ml.setPaintProperty(ly.id, "fill-color", ["match", ["get", "class"], "ocean", "#5d92c0", "lake", "#7aacd4", "river", "#93bfe0", "#aacfea"]); } catch {} }
             continue;
@@ -1156,13 +1185,36 @@ export default function Home() {
             if (sl === "water_name" || /water_name|waterway/i.test(ly.id)) { try { ml.setPaintProperty(ly.id, "text-color", "#4a78a8"); } catch {} }
           }
         }
-        // 🏝️ 얕은 물가 띠 — 물 가장자리에 밝은 선을 흐리게 얹어 '가까울수록 얕다'를 표현(수심 데이터가 없으니 물가로 대신한다).
+        // 🏝️ 얕은 물가 띠 2겹 — 수심 데이터가 없으니 '물가에 가까울수록 얕다'를 띠로 표현.
+        //    ① 넓고 흐린 청록 띠(얕은 물의 색 변화) ② 얇고 밝은 거품선(물가). 물 폴리곤 위·심볼 아래.
         try {
+          if (!ml.getLayer("dcn-water-shallow")) ml.addLayer({
+            id: "dcn-water-shallow", type: "line", source: "openmaptiles", "source-layer": "water",
+            filter: ["all", ["==", ["geometry-type"], "Polygon"], ["!=", ["get", "brunnel"], "tunnel"]],
+            paint: { "line-color": "#9fd3de", "line-opacity": ["interpolate", ["linear"], ["zoom"], 8, 0.25, 12, 0.42, 16, 0.5], "line-blur": ["interpolate", ["linear"], ["zoom"], 8, 2, 12, 5, 16, 12],
+                     "line-width": ["interpolate", ["linear"], ["zoom"], 8, 2, 11, 5, 14, 12, 17, 28] },
+          }, firstSymbolId(ml));
           if (!ml.getLayer("dcn-water-edge")) ml.addLayer({
             id: "dcn-water-edge", type: "line", source: "openmaptiles", "source-layer": "water",
-            filter: ["==", ["geometry-type"], "Polygon"],
-            paint: { "line-color": "#d8ebfa", "line-opacity": 0.75, "line-blur": 1.4, "line-width": ["interpolate", ["linear"], ["zoom"], 6, 0.8, 11, 2, 15, 4.5, 18, 8] },
+            filter: ["all", ["==", ["geometry-type"], "Polygon"], ["!=", ["get", "brunnel"], "tunnel"]],
+            paint: { "line-color": "#e8f4fb", "line-opacity": 0.8, "line-blur": 1.2, "line-width": ["interpolate", ["linear"], ["zoom"], 6, 0.6, 11, 1.6, 15, 3.2, 18, 6] },
           }, firstSymbolId(ml));
+        } catch {}
+        // 🏔️ 고도별 색(color-relief, MapLibre 5.6+) — 실제 고도 타일(terrarium) 값으로 평야 크림→연녹→올리브→황갈→갈회→정상 회백.
+        //    한국 지형 기준 밴드(한강 저지 0~50m · 북한산 836 · 설악 1,708 · 지리 1,915 · 한라 1,950). 음영(hillshade)은 그대로 위에 얹는다.
+        //    광역에선 또렷하게, 골목 줌에선 옅게(건물이 주인공) — 불투명도를 줌으로 보간. 지원 안 되는 구버전이면 조용히 건너뛴다.
+        try {
+          // MapLibre 권고: 3D 지형과 color-relief는 소스를 분리해야 렌더 품질이 유지된다(같은 소스면 경고). 타일 URL은 같아 브라우저 캐시를 공유한다.
+          if (!ml.getSource("dcn-dem-relief")) ml.addSource("dcn-dem-relief", { type: "raster-dem", tiles: ["https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"], encoding: "terrarium", tileSize: 256, maxzoom: 15 });
+          if (!ml.getLayer("dcn-color-relief") && ml.getSource("dcn-dem-relief")) ml.addLayer({
+            id: "dcn-color-relief", type: "color-relief", source: "dcn-dem-relief", maxzoom: 17,
+            paint: {
+              "color-relief-color": ["interpolate", ["linear"], ["elevation"],
+                0, "rgba(246,239,224,0.0)", 40, "rgba(240,238,216,0.55)", 120, "#e6ebc9", 250, "#d3dfb1", 450, "#bfcf98",
+                700, "#aab882", 950, "#a29a70", 1200, "#9b8c6c", 1500, "#a59c8e", 1800, "#d9d6cf", 2000, "#f1efe9"],
+              "color-relief-opacity": ["interpolate", ["linear"], ["zoom"], 6, 0.62, 11, 0.55, 14, 0.38, 16, 0.16, 18, 0.06],
+            },
+          } as any, ml.getLayer("water") ? "water" : firstSymbolId(ml));   // 물 아래(음영도 같은 자리에 들어가 색→음영→물 순)
         } catch {}
         // 🏔️ 지형 음영 레이어 — 물 아래·녹지 위: 산자락이 크림 지도 위로 은은히 드러난다(따뜻한 그림자·크림 하이라이트).
         try {

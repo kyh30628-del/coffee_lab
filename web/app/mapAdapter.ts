@@ -59,7 +59,10 @@ export class MarkerA {
     this.el = el;
     this.key = `${latlng[0].toFixed(6)},${latlng[1].toFixed(6)}|${opts.zIndexOffset ?? 0}|${opts.interactive === false ? "s" : "i"}|${opts.html}`;
     el.addEventListener("click", (e) => { e.stopPropagation(); this.handler?.(); }); // 핸들러는 필드로 — 재사용 시 최신 것으로 갈아끼운다
-    this.mk = new gl.Marker({ element: el, anchor: "center" }).setLngLat([latlng[1], latlng[0]]);
+    // ⚠️ MapLibre 5(2026-09-11 업그레이드): 3D 지형이 켜지면 "지형에 가려진" 마커를 기본 20%로 흐리게 한다(opacityWhenCovered="0.2").
+    //   4.7에선 사실상 안 걸리던 판정이 5.24에선 한강 z13·pitch40에서 마커 326개 중 194개를 흐리게 만들었다(Playwright 실측).
+    //   카페 핀은 골짜기·강변에 있어도 늘 보여야 하고 지평선 컬링은 우리가 따로 한다 → 가림 판정을 끈다(항상 100%).
+    this.mk = new gl.Marker({ element: el, anchor: "center", opacityWhenCovered: "1" }).setLngLat([latlng[1], latlng[0]]);
   }
   on(ev: string, fn: () => void): this {
     if (ev === "click") this.handler = fn;

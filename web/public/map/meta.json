@@ -1,0 +1,65 @@
+{
+ "land-grass.png": {
+  "w": 128,
+  "h": 128,
+  "bytes": 22023,
+  "seam_before": 3.4,
+  "seam_after": 2.6
+ },
+ "land-ice.png": {
+  "w": 128,
+  "h": 128,
+  "bytes": 8781,
+  "seam_before": 1.9,
+  "seam_after": 1.1
+ },
+ "land-sand.png": {
+  "w": 128,
+  "h": 128,
+  "bytes": 9144,
+  "seam_before": 0.8,
+  "seam_after": 0.5
+ },
+ "land-wetland.png": {
+  "w": 128,
+  "h": 128,
+  "bytes": 22900,
+  "seam_before": 16.1,
+  "seam_after": 5.7
+ },
+ "land-wood.png": {
+  "w": 128,
+  "h": 128,
+  "bytes": 26097,
+  "seam_before": 12.1,
+  "seam_after": 6.1
+ },
+ "water-lake.png": {
+  "w": 128,
+  "h": 128,
+  "bytes": 19637,
+  "seam_before": 4.3,
+  "seam_after": 2.2
+ },
+ "water-ocean.png": {
+  "w": 128,
+  "h": 128,
+  "bytes": 19624,
+  "seam_before": 4.5,
+  "seam_after": 2.2
+ },
+ "water-pond.png": {
+  "w": 128,
+  "h": 128,
+  "bytes": 22228,
+  "seam_before": 4.2,
+  "seam_after": 2.8
+ },
+ "water-river.png": {
+  "w": 128,
+  "h": 128,
+  "bytes": 24103,
+  "seam_before": 6.0,
+  "seam_after": 4.6
+ }
+}
