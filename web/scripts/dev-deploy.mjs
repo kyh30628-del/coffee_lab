@@ -165,17 +165,28 @@ for (const d of rows) {
 }
 
 // 🚀 묶음 푸시 + 반영확인 1회(2026-09-05 다이어트 #3) — 병합된 태스크 전부를 빌드 한 번에 실어 나른다.
+let deferredPush = false;
 if (mergedBatch.length) {
   const lockedB = await glock();
   try {
     if (!lockedB) throw new Error("git락 타임아웃(묶음 푸시)");
-    git("push origin main");
+    // 🕗 2026-09-10: pre-push 훅이 08~17시 KST 밖의 푸시를 막는다(새벽 ISR 재생성 폭풍 방지).
+    //   그 훅 때문에 20:16 자율 배포가 exit 1로 죽어 관제탑에 실패로 찍혔다 — 실패가 아니라 **대기**다.
+    //   병합은 이미 끝났고 다음 창(08:05)에 그대로 나간다. 워킹트리를 되돌리지 않고 조용히 보류한다.
+    const H = Number(new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Seoul", hour: "2-digit", hour12: false }).format(new Date()));
+    if (H < 8 || H >= 17) {
+      console.log(`\n[묶음푸시] 보류 — 지금 ${H}시 KST는 배포 창(08~17시) 밖. 병합 ${mergedBatch.length}건은 다음 창에 나간다.`);
+      deferredPush = true;
+    } else {
+      git("push origin main");
+    }
   } finally { if (lockedB) gunlock(); }
   const headSha = git("rev-parse HEAD");
-  console.log(`\n[묶음푸시] ${mergedBatch.length}건 → ${headSha.slice(0, 8)} — 반영 확인 대기(최대 25분)`);
+  if (deferredPush) { console.log(`[묶음푸시] 반영 확인 생략(보류 상태) — HEAD ${headSha.slice(0, 8)}`); }
+  else console.log(`\n[묶음푸시] ${mergedBatch.length}건 → ${headSha.slice(0, 8)} — 반영 확인 대기(최대 25분)`);
   // 배포 반영 확인 — 창 25분(실측 평균 빌드 10.5분, 08-17 #743 재교정). 최종 HEAD가 반영되면 병합분 전체가 실린 것.
   let live = false;
-  for (let i = 0; i < 100; i++) {
+  for (let i = 0; i < 100 && !deferredPush; i++) {
     try {
       const r = await fetch("https://dongnecoffeenote.com/api/version", { cache: "no-store" });
       const j = await r.json(); if (j.v === headSha) { live = true; break; }

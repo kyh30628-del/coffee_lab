@@ -20,6 +20,7 @@ import { loadLearnedTerms } from "./learnedTerms";
 import { loadCriteria, getCriterionSync } from "./criteria";
 import { loadCriteriaLists } from "./criteriaLists";
 import { invalidateCafeCaches } from "./cafeCacheInvalidate"; // 비공개 후 캐시 무효화(2026-07-29: heal* 경로가 ISR/search_cache 미반영이던 틈 수리)
+import { createHash } from "node:crypto";
 
 // 카페 지역어(시 + 동洞) — 동까지 넘겨야 reviewQuality가 '분당점=성남시' 같은 市단위 동명 지점 오인을 거른다.
 async function areaTermsFor(id: number, area?: string | null): Promise<string[]> {
@@ -548,11 +549,55 @@ function offconceptBrand(name: string): string {
 //   진짜 대량정리가 필요하면 CEO가 HEAL_UNPUB_CAP env를 올리거나 결재로 집행(healPublishedAudit의 unpubCap과 동일 사상).
 const HEAL_UNPUB_CAP = Number(process.env.HEAL_UNPUB_CAP || 50);
 
+/**
+ * 🔴 2026-09-10 비용사고 대응 — 후기 본문(큰 컬럼)에 정규식을 거는 치유기의 공통 사전작업.
+ *
+ * 문제: `synth_reviews::text ~ '...'`를 WHERE에 걸면 결과가 0행이어도 공개 카페 전량(24,731행)의
+ *   큰 컬럼을 디토스트해서 정규식을 돌린다. 이 치유기들은 autoCorrect가 부르고, autoCorrect는
+ *   cron-issues·cron-synth·cron-selfaudit + **관리자 화면을 열 때마다** 돈다(하루 11회 이상).
+ *   실측: 비카페 치유기 한 개가 9.5GB/일로 전송량 1위였고, 09-09·09-10 이틀 연속 비용 차단기를
+ *   작동시켜 재합성·발굴을 각각 5시간·12시간 멈췄다.
+ *
+ * 해법: 워터마크. 지난 검사 이후 **후기가 바뀐 카페만** 다시 본다.
+ *   사전(정규식)이 바뀌면 워터마크를 지워 전수 재검사한다 → 판정 집합은 그대로 유지된다.
+ * @returns 이번에 검사할 카페 id. 빈 배열이면 할 일이 없다.
+ */
+async function dueForReviewScan(key: string, dictSource: string): Promise<number[]> {
+  const col = `${key}_scan_at`;
+  await sql.query(`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS ${col} TIMESTAMPTZ`).catch(() => {});
+  await sql`CREATE TABLE IF NOT EXISTS heal_dict_state (k TEXT PRIMARY KEY, v TEXT)`.catch(() => {});
+  const hash = createHash("sha1").update(dictSource).digest("hex").slice(0, 16);
+  const prev = (await sql`SELECT v FROM heal_dict_state WHERE k = ${key}`.catch(() => []))[0] as any;
+  if (prev?.v !== hash) {
+    await sql.query(`UPDATE cafes SET ${col} = NULL WHERE ${col} IS NOT NULL`).catch(() => {});
+    await sql`INSERT INTO heal_dict_state (k, v) VALUES (${key}, ${hash})
+      ON CONFLICT (k) DO UPDATE SET v = ${hash}`.catch(() => {});
+  }
+  const CAP = Number(process.env.HEAL_SCAN_CAP || 3000); // 첫 실행(전수)이 한 번에 몰리지 않게
+  const rows = await sql.query(
+    `SELECT id FROM cafes
+      WHERE published = true AND synth_reviews IS NOT NULL
+        AND (${col} IS NULL OR synth_updated > ${col})
+      ORDER BY synth_updated DESC NULLS LAST LIMIT $1`, [CAP]);
+  return (rows as any[]).map((r) => Number(r.id));
+}
+
+/** 검사 완료 표시 — 후보가 아니었던 행도 반드시 표시한다(안 그러면 매번 다시 읽는다). */
+async function markReviewScanned(key: string, ids: number[]): Promise<void> {
+  if (!ids.length) return;
+  await sql.query(`UPDATE cafes SET ${key}_scan_at = now() WHERE id = ANY($1)`, [ids]).catch(() => {});
+}
+
 export async function healOffConceptByReview(): Promise<{ held: number; names: string[]; capped?: number }> {
+  // 🔴 2026-09-10 — 비카페 치유기와 같은 전수 디토스트 문제. 같은 워터마크를 쓴다.
+  const OFF_CONCEPT_SQL = '애견카페|고양이카페|동물카페|키즈카페|만화카페|만화방|보드게임카페|방탈출|룸익스케이프|멀티방|룸카페|파티룸|스터디카페|스터디룸|독서실|코인노래|노래방|피씨방|pc방|볼링장|당구장|스크린골프|골프연습|찜질방|사우나|클라이밍|소품\\s?샵|소품숍|소품가게|기프트\\s?샵|기프트숍|편집\\s?샵|편집숍|셀렉트\\s?샵|셀렉트숍';
+  const dueIds = await dueForReviewScan("offconcept", OFF_CONCEPT_SQL);
+  if (!dueIds.length) return { held: 0, names: [] };
   const cand = (await sql`
     SELECT id, name, synth_reviews FROM cafes
-    WHERE published = true AND synth_reviews IS NOT NULL
-      AND synth_reviews::text ~* '애견카페|고양이카페|동물카페|키즈카페|만화카페|만화방|보드게임카페|방탈출|룸익스케이프|멀티방|룸카페|파티룸|스터디카페|스터디룸|독서실|코인노래|노래방|피씨방|pc방|볼링장|당구장|스크린골프|골프연습|찜질방|사우나|클라이밍|소품\\s?샵|소품숍|소품가게|기프트\\s?샵|기프트숍|편집\\s?샵|편집숍|셀렉트\\s?샵|셀렉트숍'`) as any[];
+    WHERE id = ANY(${dueIds})
+      AND synth_reviews::text ~* ${OFF_CONCEPT_SQL}`) as any[];
+  await markReviewScanned("offconcept", dueIds);
   const killIds: number[] = []; const killNames: string[] = [];
   for (const c of cand) {
     let sr: any = c.synth_reviews; try { sr = JSON.parse(sr); } catch { /* already obj */ }
@@ -616,9 +661,13 @@ export async function healNonCafeByReview(): Promise<{ held: number; names: stri
   //   !~* CAFE_BELONGS)를 WHERE로 내려 압도적 다수(정체성 있는 정상 카페)를 SQL에서 걸러 전송량을 급감시킨다.
   //   ⚠️ 아래 JS의 texts.some(CAFE_BELONGS) 보존조건과 동일 사전(CAFE_BELONGS_SQL은 CAFE_BELONGS와 같은 패턴)이라
   //      죽는 집합 불변(SQL에서 거른 행은 JS도 반드시 보존했을 행) — 배포 전 실측으로 kill-set 동일함을 검증함.
+  // 🔴 2026-09-10 비용사고 — 전수 디토스트를 워터마크 방식으로 바꿨다(dueForReviewScan 주석 참조).
+  const dueIds = await dueForReviewScan("noncafe", CAFE_BELONGS_SQL);
+  if (!dueIds.length) return { held: 0, names: [] };
   const cand = (await sql`SELECT id, name, synth_reviews FROM cafes
-    WHERE published = true AND synth_reviews IS NOT NULL
+    WHERE id = ANY(${dueIds})
       AND synth_reviews::text !~ ${CAFE_BELONGS_SQL}`) as any[];
+  await markReviewScanned("noncafe", dueIds);
   const kill: number[] = []; const names: string[] = [];
   for (const c of cand) {
     let sr: any = c.synth_reviews; try { sr = JSON.parse(sr); } catch { /* obj */ }
