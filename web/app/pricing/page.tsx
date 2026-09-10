@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { TRIAL_DAYS } from "@/lib/ownerPlan";
 import BackLink from "../BackLink";
 import OwnerSignupModal from "../OwnerSignupModal";
@@ -43,6 +43,26 @@ export default function Pricing() {
   const [open, setOpen] = useState(false);
   const [trial, setTrial] = useState(false);
   const [find, setFind] = useState(false);
+
+  // 📊 /pricing 도달 계측(decisions#1046) — 3개 유입경로가 전부 여길 거쳐야 신청모달(modal_open source=pricing)에
+  //   닿는데, 도달 자체를 못 봤다. modal_open 0건이 "안 옴" vs "와서 안 누름" 중 뭔지 가르기 위한 최소 계측.
+  //   세션당 1회만(새로고침마다 쏘면 표본이 부풀고 요청도 는다). 실패해도 화면은 그대로.
+  useEffect(() => {
+    const key = "dcn_of_pricing_view";
+    try {
+      if (sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, "1");
+    } catch { return; }
+    try {
+      const anonId = localStorage.getItem("dcn_anon") || "";
+      const ref = document.referrer || "";
+      const source = ref.includes("/owner/r/") ? "free_report" : null;
+      fetch("/api/owner-funnel", {
+        method: "POST", headers: { "Content-Type": "application/json" }, keepalive: true,
+        body: JSON.stringify({ anonId, event: "pricing_view", source, path: "/pricing" }),
+      }).catch(() => {});
+    } catch {}
+  }, []);
 
   return (
     <main className="min-h-screen bg-[#f4ece0] text-[#2b2018]" style={{ fontFamily: "'Gowun Batang', serif" }}>
