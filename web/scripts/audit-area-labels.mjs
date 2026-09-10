@@ -15,6 +15,8 @@ const sidoOf = (addr) => { const a = String(addr || ""); for (const [pre, label]
 /** 주소에서 그 시도의 시군구를 찾는다(가장 긴 이름 우선 — 부분일치 오분류 차단). */
 const guOf = (addr, sido) => {
   const list = [...(SIDO_GU[sido] ?? [])].sort((a, b) => b.length - a.length);
+  // 🏙️ 단층 자치시(세종)는 주소에 시군구 이름이 안 적힌다 — 목록이 하나면 그곳이다.
+  if (list.length === 1) return list[0];
   const a = String(addr || "");
   for (const gu of list) if (a.includes(gu)) return gu;
   return null;
@@ -37,7 +39,16 @@ for (const f of fixes) { const k = `${f.from} → ${f.to}`; (byPair[k] ??= []).p
 for (const [k, v] of Object.entries(byPair).sort((a, b) => b[1].length - a[1].length))
   console.log(`  ${String(v.length).padStart(4)}곳  ${k}   예: ${v[0].name} (${String(v[0].addr).slice(0, 32)})`);
 
-if (unresolved.length) console.log(`\n⚠️ 시군구 못 찾은 ${unresolved.length}곳(건드리지 않음): ` + unresolved.slice(0, 5).map(c => `${c.name}[${String(c.address).slice(0,20)}]`).join(" · "));
+// ⚠️ 주소만으로 시군구를 못 정하는 곳(인천 옛 구명 — 2026-07-01 2군9구 개편으로 중·동·서구 폐지).
+//   옛 구 하나가 새 구 둘로 갈렸으므로 **옛 주소만으로는 새 구를 특정할 수 없다** — 추측해서 바꾸지 않는다.
+//   대신 "라벨이 최소한 유효한 지역인가"는 검증한다. 그래야 이 무리 안에서 틀려도 잡힌다.
+if (unresolved.length) {
+  const valid = new Set(Object.entries(SIDO_GU).flatMap(([sd, list]) => list.map((g) => regionKeyFor(sd, g))));
+  const bad = unresolved.filter((c) => !c.area || !valid.has(c.area));
+  console.log(`\n⚠️ 주소로 시군구 판정 불가 ${unresolved.length}곳 — 라벨 유효성만 검사: ${bad.length ? `❌ 유효하지 않은 라벨 ${bad.length}곳` : "✅ 전부 유효한 지역 라벨"}`);
+  for (const c of bad.slice(0, 10)) console.log(`    #${c.id} ${c.name} · area="${c.area}" · ${String(c.address).slice(0, 34)}`);
+  if (!bad.length) console.log(`    (인천 옛 구명 주소 — 라벨은 개편 후 새 구로 정상 부여됨)`);
+}
 
 if (!APPLY) { console.log("\n--apply 로 실행할 것"); process.exit(0); }
 let n = 0;

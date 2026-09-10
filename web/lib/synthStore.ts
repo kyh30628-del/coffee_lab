@@ -739,8 +739,11 @@ export async function healAreaLabel(): Promise<{ fixed: number; names: string[] 
     if (!sido) continue;
     // 그 시도의 시군구를 긴 이름부터 찾는다(부분일치 오분류 차단).
     const list = [...(SIDO_GU[sido] ?? [])].sort((a, b) => b.length - a.length);
-    const gu = list.find((g) => addr.includes(g));
-    // ⚠️ 못 찾으면 **건드리지 않는다**. 인천 옛 구명(중·동·서구, 2026-07-01 폐지)이나 세종(단층 자치시)처럼
+    // 🏙️ 단층 자치시(세종) — 시군구가 하나뿐이면 주소에 그 이름이 안 적혀 있어도 그곳이다.
+    //   ("세종특별자치시 조치원읍…"에는 '세종시'라는 문자열이 없어 예전엔 통째로 건너뛰었고,
+    //    그 사이 세종 카페 8곳이 공주시·청주시 라벨을 달고 있었다 — 2026-09-10 실측.)
+    const gu = list.length === 1 ? list[0] : list.find((g) => addr.includes(g));
+    // ⚠️ 그래도 못 찾으면 **건드리지 않는다**. 인천 옛 구명(중·동·서구, 2026-07-01 폐지)처럼
     //   주소만으로는 판정할 수 없는 경우가 있다 — 모르면 그대로 두는 게 맞다.
     if (!gu) continue;
     const want = regionKeyFor(sido, gu);
