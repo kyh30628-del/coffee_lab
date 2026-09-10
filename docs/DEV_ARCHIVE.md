@@ -325,3 +325,4 @@
 | 2026-09-10 00:14 | #1032 | [개발] 협업 #389: #1030 dev_task 착수 전 스코프 정정 필요 — 예시 3건 중 2건은 신규 | f1da39b6 | - | lib/reviewQuality.ts: LODGING_DESC regex·RESORT_VENUE_WORDS 배열에 아난티 브랜드 추가(#1003 리조트복합단지 게이트를 아난티 계열 |
 | 2026-09-10 00:14 | #1033 | [검색UX 신규] SEO 취향(테마) 페이지 — dessertDominance 필터 누락으로 디저트집이 qu | 4761eb2b | - | lib/seoData.ts: getRegionTasteCafes·getRegionTasteStats·getRegionTasteCounts·getRegionTasteGradeBrea |
 | 2026-09-10 00:14 | #1035 | [개발] dailySummary.ts KST 경계 계산 버그 — "오늘 유의미 사용자" 상시 0 오표시 | 00476e91 | - | web/lib/dailySummary.ts L43,L69: (now() AT TIME ZONE Asia/Seoul)::date AT TIME ZONE Asia/Seoul → dat |
+| 2026-09-10 03:05 | #1031 | [개발] 협업 #387: [레드팀 발견] 09-09 204.3GB 재발 — 원인은 cron-verify 아닌 | c9585f00 | - | web/AGENTS.md에 스크래치 조사 스크립트 컨벤션 명문화(scripts/tmp/ 또는 scripts/_*.mjs만 사용, 완료후 삭제, published전수+jsonb_ar |
