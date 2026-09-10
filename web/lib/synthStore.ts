@@ -21,6 +21,7 @@ import { loadCriteria, getCriterionSync } from "./criteria";
 import { loadCriteriaLists } from "./criteriaLists";
 import { invalidateCafeCaches } from "./cafeCacheInvalidate"; // 비공개 후 캐시 무효화(2026-07-29: heal* 경로가 ISR/search_cache 미반영이던 틈 수리)
 import { createHash } from "node:crypto";
+import { regionKeyFor, SIDO_GU } from "./regionList";
 
 // 카페 지역어(시 + 동洞) — 동까지 넘겨야 reviewQuality가 '분당점=성남시' 같은 市단위 동명 지점 오인을 거른다.
 async function areaTermsFor(id: number, area?: string | null): Promise<string[]> {
@@ -716,29 +717,48 @@ export async function healOutOfBox(): Promise<{ excluded: number; names: string[
 // 🏷️ area 라벨 교정 — 발굴 당시 검색지역으로 area가 붙어 실제 주소 도시와 어긋나는 문제(경기 시/군·서울 구).
 //   검색·필터·SEO·폐업체크 오염 + closure 오탐 유발. 주소에서 진짜 도시를 파싱해 교정(2시간마다 안전망).
 export async function healAreaLabel(): Promise<{ fixed: number; names: string[] }> {
-  // 서울: 주소 구 ≠ area 구 (인천 제외). substring으로 주소의 첫 구 토큰 추출.
-  const seoul = (await sql`UPDATE cafes SET area = substring(address from '서울[^ ]* ([가-힣]+구)'), closure_misses = 0, updated_at = now()
-    WHERE address LIKE '서울%' AND area LIKE '%구' AND area NOT LIKE '인천%'
-      AND substring(address from '서울[^ ]* ([가-힣]+구)') IS NOT NULL
-      AND substring(address from '서울[^ ]* ([가-힣]+구)') <> area
-    RETURNING name`) as any[];
-  // 경기: 주소 시/군 ≠ area 시/군.
-  const gg = (await sql`UPDATE cafes SET area = substring(address from '경기[^ ]* ([가-힣]+[시군])'), closure_misses = 0, updated_at = now()
-    WHERE address LIKE '경기%' AND (area LIKE '%시' OR area LIKE '%군')
-      AND substring(address from '경기[^ ]* ([가-힣]+[시군])') IS NOT NULL
-      AND substring(address from '경기[^ ]* ([가-힣]+[시군])') <> area
-    RETURNING name`) as any[];
-  // 강원: 주소 시/군 ≠ area. (2026-08-25 확장) 서울·경기와 달리 area 접미사 조건을 걸지 않는다 —
-  //   강원 카페들은 발굴 당시 검색지역이 그대로 붙어 '남양주시'·'김포시'·'종로구'처럼 **다른 시도의 라벨**을
-  //   달고 있었다(주소는 춘천인데 area는 남양주시). '%시|%군'만 고치면 '구'로 잘못 붙은 건들이 남는다.
-  const gw = (await sql`UPDATE cafes SET area = substring(address from '강원[^ ]* ([가-힣]+[시군])'), closure_misses = 0, updated_at = now()
-    WHERE address LIKE '강원%'
-      AND substring(address from '강원[^ ]* ([가-힣]+[시군])') IS NOT NULL
-      AND substring(address from '강원[^ ]* ([가-힣]+[시군])') IS DISTINCT FROM area
-    RETURNING name`) as any[];
-  const names = [...seoul, ...gg, ...gw].map((r) => r.name).slice(0, 8);
-  return { fixed: seoul.length + gg.length + gw.length, names };
+  // 🔴 2026-09-10 CEO 지적("지역별 품질 현황과 지도 숫자가 안 맞는다") — 원인은 이 함수였다.
+  //   예전 구현은 **서울·경기·강원 세 곳만** 손으로 짠 SQL 세 덩어리로 고쳤다. 대전(9/2)·부산·경남(9/6)을
+  //   연 뒤에도 그 목록을 안 늘려서, 대전 카페 89곳이 "부산 서구/중구/동구" 라벨을 달고 지도에 부산으로
+  //   찍히고 있었다(실측 108곳 교정). regionList.ts가 이미 경고한 그대로다 — "복제된 로직은 반드시 어긋난다".
+  //   → 지역별 분기를 없애고 **단일 출처(regionKeyFor + SIDO_GU)**로 전 시도를 한 번에 본다.
+  //     새 지역을 열어도 이 함수는 손댈 필요가 없다.
+  // 💰 비용: 작은 컬럼(id·area·address)만 읽는다. 공개 24,728행 ≈ 2.5MB/회, 센티널 2회/일.
+  const SIDO_OF_ADDR: [string, string][] = [
+    ["서울", "서울"], ["경기", "경기"], ["인천", "인천"], ["강원", "강원"],
+    ["충청북도", "충북"], ["충청남도", "충남"], ["대전", "대전"], ["세종", "세종"],
+    ["부산", "부산"], ["경상남도", "경남"], ["대구", "대구"], ["경상북도", "경북"],
+    ["광주광역시", "광주"], ["전북", "전북"], ["전라남도", "전남"], ["울산", "울산"], ["제주", "제주"],
+  ];
+  const rows = (await sql`SELECT id, name, area, address FROM cafes
+    WHERE published = true AND address IS NOT NULL AND address <> ''`) as any[];
+  const fixes: { id: number; name: string; to: string }[] = [];
+  for (const c of rows) {
+    const addr = String(c.address);
+    const sido = SIDO_OF_ADDR.find(([pre]) => addr.startsWith(pre))?.[1];
+    if (!sido) continue;
+    // 그 시도의 시군구를 긴 이름부터 찾는다(부분일치 오분류 차단).
+    const list = [...(SIDO_GU[sido] ?? [])].sort((a, b) => b.length - a.length);
+    const gu = list.find((g) => addr.includes(g));
+    // ⚠️ 못 찾으면 **건드리지 않는다**. 인천 옛 구명(중·동·서구, 2026-07-01 폐지)이나 세종(단층 자치시)처럼
+    //   주소만으로는 판정할 수 없는 경우가 있다 — 모르면 그대로 두는 게 맞다.
+    if (!gu) continue;
+    const want = regionKeyFor(sido, gu);
+    if (want && c.area !== want) fixes.push({ id: Number(c.id), name: String(c.name), to: want });
+  }
+  // 🛡️ 대량 변동 차단기 — 사전·규칙이 잘못 바뀌면 수천 곳 라벨이 한 번에 뒤집힌다. 그럴 땐 멈추고 보고한다.
+  const CAP = Number(process.env.AREA_HEAL_CAP || 300);
+  if (fixes.length > CAP) {
+    console.error(`[healAreaLabel] 교정 대상 ${fixes.length}곳 > 상한 ${CAP} — 중단(사람 확인 필요)`);
+    return { fixed: 0, names: [`⛔ 대량변동 ${fixes.length}곳 — 자동교정 중단`] };
+  }
+  for (const f of fixes) {
+    await sql`UPDATE cafes SET area = ${f.to}, closure_misses = 0, updated_at = now() WHERE id = ${f.id}`.catch(() => {});
+  }
+  if (fixes.length) await invalidateCafeCaches(fixes.map((f) => f.id)).catch(() => {});
+  return { fixed: fixes.length, names: fixes.map((f) => f.name).slice(0, 8) };
 }
+
 
 // 🔁 명백 중복 자동 해소 — 정규화 이름 동일 + 좌표 ~55m(같은 자리 같은 이름=같은 카페). 후기 많은 쪽만 남김(보수).
 const normNameForDup = (s: string) => (s || "").replace(/\s/g, "").replace(/(\d+호?점|본점|지점)$/, "").toLowerCase();
