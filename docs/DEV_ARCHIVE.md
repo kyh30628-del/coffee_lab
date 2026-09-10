@@ -336,3 +336,4 @@
 | 2026-09-10 11:16 | #1046 | [사장님영업] /pricing 페이지 조회 계측 공백 — 모든 신청경로가 여길 거쳐야 모달인데 도달여부 자체 | 4dd61f40 | - | app/api/owner-funnel/route.ts EVENTS 화이트리스트에 pricing_view 추가 + app/pricing/page.tsx 마운트 시 세션당 1회 pri |
 | 2026-09-10 22:09 | #1042 | [룰갭 신규] 카페명-소비재 브랜드 동음이의 혼입 — 몬스터커피 인천부평시장점에 전자담배 액상 후기 참고등급 | 1f8ebcab | - | lib/reviewQuality.ts: VAPE_ECIG_RETAIL_CUES 상수 신설(전자담배/액상/JUUL/쥴/베이프) + !CAFE_CONTEXT_SUBSTANCE 결합 하 |
 | 2026-09-10 22:09 | #1045 | [UX 검색품질] 브랜드 다지점 검색 시 검증 지점이 참고 지점보다 하위 노출(테라로사, id31174 등) | 7c64a7ad | - | app/api/search/route.ts:456-467 브랜드 다지점(8곳+ 동일상호 부분일치) 판정 시 AI재정렬 스킵+등급→리뷰수 결정론 정렬 적용(테라로사 22지점 실측:  |
+| 2026-09-10 22:09 | #1046 | [사장님영업] /pricing 페이지 조회 계측 공백 — 모든 신청경로가 여길 거쳐야 모달인데 도달여부 자체 | 85784d92 | - | app/api/owner-funnel/route.ts EVENTS 화이트리스트에 pricing_view 추가 + app/pricing/page.tsx 마운트 시 세션당 1회 pri |
