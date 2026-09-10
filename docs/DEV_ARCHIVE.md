@@ -327,3 +327,4 @@
 | 2026-09-10 00:14 | #1035 | [개발] dailySummary.ts KST 경계 계산 버그 — "오늘 유의미 사용자" 상시 0 오표시 | 00476e91 | - | web/lib/dailySummary.ts L43,L69: (now() AT TIME ZONE Asia/Seoul)::date AT TIME ZONE Asia/Seoul → dat |
 | 2026-09-10 03:05 | #1031 | [개발] 협업 #387: [레드팀 발견] 09-09 204.3GB 재발 — 원인은 cron-verify 아닌 | c9585f00 | - | web/AGENTS.md에 스크래치 조사 스크립트 컨벤션 명문화(scripts/tmp/ 또는 scripts/_*.mjs만 사용, 완료후 삭제, published전수+jsonb_ar |
 | 2026-09-10 04:18 | #1037 | [자율진단] cron-sentinel 6회째 재발 — 근본원인 특정: 8개 스캐너 개별시간budget 합산이 | eed85151 | - | app/api/cron-sentinel/route.ts: GET 핸들러에 공용 누적 데드라인(260s, started 기준) 추가 — 초과 시 미실행 스캐너/치유는 truncate |
+| 2026-09-10 04:18 | #1038 | [룰갭 신규] 역명 지점(OO역점) 랜드마크 오탐 — 형제지점 '근처' 서술이 이 지점 신호로 오판 (id3 | 9b659cdf | - | lib/reviewQuality.ts:2055 branchIsMetroWide에 /(역 터미널 공항)$/.test(myBranch) 조건 추가 — 역명·터미널·공항 지점명은 시/구 |
