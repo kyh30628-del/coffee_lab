@@ -40,7 +40,11 @@ export async function getTodayInsight(sql: any): Promise<TodayInsight> {
     --   같은 뜻의 범위 조건으로 바꿔 idx_traffic_events_ts를 타게 한다(오늘 KST 자정부터).
     --   지난 시도에서 봇 서브쿼리를 배열로 바꿨다가 쿼리가 깨졌고 catch가 삼켜
     --     '오늘 페이지'가 빈 배열이 됐다. 서브쿼리 구조는 건드리지 않는다.
-    WHERE ts >= (now() AT TIME ZONE 'Asia/Seoul')::date AT TIME ZONE 'Asia/Seoul'
+    -- ⚠️ 2026-09-09(#1035): ::date로 캐스트한 뒤 AT TIME ZONE을 다시 적용하면 date가
+    --   timestamptz로 암시적 캐스트되며(세션 tz 기준) 이중 변환이 일어나 KST 자정이 아닌
+    --   엉뚱한 시각이 기준이 됐다(유의미 사용자 상시 0 오표시). date_trunc로 timestamp 타입을
+    --   유지한 채 AT TIME ZONE을 적용해야 KST 자정 정각의 timestamptz가 나온다.
+    WHERE ts >= date_trunc('day', now() AT TIME ZONE 'Asia/Seoul') AT TIME ZONE 'Asia/Seoul'
       AND anon_id NOT IN (${sql.unsafe(BOT_ANON_IDS_SQL)})
     GROUP BY 1 ORDER BY views DESC LIMIT 5`.catch(() => [])) as any[];
 
@@ -66,7 +70,7 @@ export async function getTodayInsight(sql: any): Promise<TodayInsight> {
              COUNT(DISTINCT path) FILTER (WHERE path LIKE '/c/%') AS cafes,
              MAX(COALESCE(duration_ms, 0)) AS max_dur
       FROM traffic_events
-      WHERE ts >= (now() AT TIME ZONE 'Asia/Seoul')::date AT TIME ZONE 'Asia/Seoul'
+      WHERE ts >= date_trunc('day', now() AT TIME ZONE 'Asia/Seoul') AT TIME ZONE 'Asia/Seoul'
         AND anon_id NOT IN (${sql.unsafe(BOT_ANON_IDS_SQL)})
       GROUP BY anon_id
     )
