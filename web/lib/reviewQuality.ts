@@ -2052,7 +2052,12 @@ export function verifyReview(input: QualityInput): QualityResult {
     //   성남시, '중랑점'의 '중랑'=중랑구) 형제 지점('미금점'·'분당점'도 다 성남시)이 공유하는 광역어라 지점
     //   식별력이 없다 → 이땐 '○○점' 원문(성남점)이 본문에 있어야만 '이 지점' 랜드마크로 인정(형제 지점 배제).
     //   구체 지점명(은평역촌·안성코아루)은 그대로 랜드마크 인정.
-    const branchIsMetroWide = areaTerms.some((a) => norm(a) === norm(myBranch) || norm(guShort(a)) === norm(myBranch));
+    //   [decisions#1038] '○○역점'·'○○터미널점'·'○○공항점'처럼 지점명이 대형 교통 랜드마크면, "역 근처" 같은
+    //   지역 서술어가 인근 모든 형제지점 리뷰에 공용돼 myBranch 포함만으로 '이 지점' 신호로 오판된다
+    //   (id33383: '부산역' 언급이 실제로는 형제지점 '초량본점' 리뷰에도 등장). 시/구 공유 지점명과 동일하게
+    //   '{myBranch}점' 원문 요구로 격상.
+    const branchIsMetroWide = areaTerms.some((a) => norm(a) === norm(myBranch) || norm(guShort(a)) === norm(myBranch))
+      || /(역|터미널|공항)$/.test(myBranch);
     const myBranchHere = myBranch !== "본" && (branchIsMetroWide
       ? fullTN.includes(norm(myBranch + "점"))
       : fullTN.includes(norm(myBranch))); // '이 지점' 랜드마크 직접 언급(공백무시)
