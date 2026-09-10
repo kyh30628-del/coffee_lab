@@ -326,3 +326,4 @@
 | 2026-09-10 00:14 | #1033 | [검색UX 신규] SEO 취향(테마) 페이지 — dessertDominance 필터 누락으로 디저트집이 qu | 4761eb2b | - | lib/seoData.ts: getRegionTasteCafes·getRegionTasteStats·getRegionTasteCounts·getRegionTasteGradeBrea |
 | 2026-09-10 00:14 | #1035 | [개발] dailySummary.ts KST 경계 계산 버그 — "오늘 유의미 사용자" 상시 0 오표시 | 00476e91 | - | web/lib/dailySummary.ts L43,L69: (now() AT TIME ZONE Asia/Seoul)::date AT TIME ZONE Asia/Seoul → dat |
 | 2026-09-10 03:05 | #1031 | [개발] 협업 #387: [레드팀 발견] 09-09 204.3GB 재발 — 원인은 cron-verify 아닌 | c9585f00 | - | web/AGENTS.md에 스크래치 조사 스크립트 컨벤션 명문화(scripts/tmp/ 또는 scripts/_*.mjs만 사용, 완료후 삭제, published전수+jsonb_ar |
+| 2026-09-10 04:18 | #1037 | [자율진단] cron-sentinel 6회째 재발 — 근본원인 특정: 8개 스캐너 개별시간budget 합산이 | eed85151 | - | app/api/cron-sentinel/route.ts: GET 핸들러에 공용 누적 데드라인(260s, started 기준) 추가 — 초과 시 미실행 스캐너/치유는 truncate |
