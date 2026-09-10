@@ -331,3 +331,4 @@
 | 2026-09-10 09:03 | #1042 | [룰갭 신규] 카페명-소비재 브랜드 동음이의 혼입 — 몬스터커피 인천부평시장점에 전자담배 액상 후기 참고등급 | 217fa349 | - | lib/reviewQuality.ts: VAPE_ECIG_RETAIL_CUES 상수 신설(전자담배/액상/JUUL/쥴/베이프) + !CAFE_CONTEXT_SUBSTANCE 결합 하 |
 | 2026-09-10 11:05 | #1042 | [룰갭 신규] 카페명-소비재 브랜드 동음이의 혼입 — 몬스터커피 인천부평시장점에 전자담배 액상 후기 참고등급 | 4ffd32d3 | - | lib/reviewQuality.ts: VAPE_ECIG_RETAIL_CUES 상수 신설(전자담배/액상/JUUL/쥴/베이프) + !CAFE_CONTEXT_SUBSTANCE 결합 하 |
 | 2026-09-10 11:16 | #1042 | [룰갭 신규] 카페명-소비재 브랜드 동음이의 혼입 — 몬스터커피 인천부평시장점에 전자담배 액상 후기 참고등급 | 07d4ad37 | - | lib/reviewQuality.ts: VAPE_ECIG_RETAIL_CUES 상수 신설(전자담배/액상/JUUL/쥴/베이프) + !CAFE_CONTEXT_SUBSTANCE 결합 하 |
+| 2026-09-10 11:16 | #1042 | [룰갭 신규] 카페명-소비재 브랜드 동음이의 혼입 — 몬스터커피 인천부평시장점에 전자담배 액상 후기 참고등급 | 858d8782 | - | lib/reviewQuality.ts: VAPE_ECIG_RETAIL_CUES 상수 신설(전자담배/액상/JUUL/쥴/베이프) + !CAFE_CONTEXT_SUBSTANCE 결합 하 |
