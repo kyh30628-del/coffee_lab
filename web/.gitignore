@@ -42,3 +42,7 @@ next-env.d.ts
 
 # 로컬 판정 배치 비밀 env
 scripts/.judge.env
+
+# 레드팀/룰갭 스크래치 조사 스크립트 (세션 종료 시 삭제, 커밋 금지) — web/AGENTS.md 참조
+scripts/tmp/
+scripts/_*.mjs
