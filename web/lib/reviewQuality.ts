@@ -445,6 +445,13 @@ const BRAND_NAMESAKE_COMMERCE_LEAK = /(지금\s*[가-힣a-zA-Z0-9]{0,10}\s*만�
 //   테라스형 오픈 발코니 등)를 별도 게이트로 잡아 표현이 달라도 막는다 — 실질 음료·디저트 맥락
 //   (CAFE_CONTEXT_SUBSTANCE)이 있으면(겸업 카페가 있는 단지 소개 등) 그대로 보존한다.
 const REAL_ESTATE_LISTING_CUES = /(전용면적\s*\d|테라스형\s*오픈\s*발코니|주택형\s*(안내|구성)|미분양(아파트)?|분양가|모델하우스|(집값|땅값)\s*(은|는|이|가)?\s*우상향)/;
+// ★ 룰갭 신규(2026-09-10, decisions#1042): 카페명-소비재 브랜드 동음이의 혼입 — 카페 상호가 흔한 소비재
+//   브랜드명(에너지드링크/전자담배 액상 브랜드 "몬스터" 등)과 정확 일치할 때, 그 상품을 파는 무관 온라인
+//   커머스/판매점 블로그(전자담배 액상 판매점 소개글 등)가 이름 정확일치로 유입된다(id15342 몬스터커피
+//   인천부평시장점: "위베이프 굴포천점" 블로그의 "전자담배 액상 추천 / 쥬스 몬스터 애플몬!", "몬스터 JUUL"
+//   실측 — 카페 맥락어 전무한데도 score 59/51로 reference 통과해 라이브 노출). BRAND_NAMESAKE_COMMERCE_LEAK
+//   와 동일 구조 — 실질 음료·디저트 맥락(CAFE_CONTEXT_SUBSTANCE) 부재 시 곧장 하드 거절한다.
+const VAPE_ECIG_RETAIL_CUES = /(전자담배|액상\s*(추천|후기)|JUUL|쥴\b|베이프)/i;
 // ★ 룰갭 H18(2026-08-07, decisions#631): 바리스타/커피 교육원(naver_category="직업,기술교육>바리스타") —
 //   P61(isNonFnbCategory)은 naver_category가 F&B 대분류 밖일 때 "다른 상호명/다른 지역 혼입"이 있을 때만
 //   거절하는 교차오염 전용 게이트라, 자기 자신에 대한 자기완결적 수강후기(정규 수강생 후기 — SCA 커리큘럼·
@@ -1608,6 +1615,12 @@ export function verifyReview(input: QualityInput): QualityResult {
   //   속 리터럴 "카페"가 CAFE_CONTEXT_STRONG을 통과해도, 실질 음료·디저트 맥락 전무 시 곧장 하드 거절한다.
   if (REAL_ESTATE_LISTING_CUES.test(fullL) && !CAFE_CONTEXT_SUBSTANCE.test(fullL)) {
     return { verdict: "rejected", score: 4, reasons: ["부동산 분양 매물 홍보문(전용면적·발코니 용도 나열 등 — 카페 실질맥락 전무)"], signals: sig };
+  }
+  // [룰갭 신규, decisions#1042] 카페명-소비재 브랜드 동음이의 혼입 — 전자담배 액상 판매점 블로그 등 무관
+  //   업종 콘텐츠가 카페명(흔한 소비재 브랜드명과 동음이의)과 정확일치로 유입되면, 실질 음료·디저트 맥락
+  //   전무 시 곧장 하드 거절한다(id15342 몬스터커피 인천부평시장점 실측).
+  if (VAPE_ECIG_RETAIL_CUES.test(fullL) && !CAFE_CONTEXT_SUBSTANCE.test(fullL)) {
+    return { verdict: "rejected", score: 4, reasons: ["전자담배·액상 판매점 콘텐츠(카페명 동음이의 혼입 — 카페 실질맥락 전무)"], signals: sig };
   }
   // [룰갭 rulegap-20260815-1214, decisions#730] 확정 비카페 dish-specific naver_category(한식>순대,순댓국·
   //   한식>죽·이탈리아음식>스파게티,파스타전문·전통식품>떡,한과)인데 상호에 "카페"를 브랜딩으로 넣으면(예:
