@@ -72,16 +72,40 @@ export async function GET(req: NextRequest) {
       //   그 정도는 평소대로 큐 우선 → 큐 비면 굶은 지역으로 폴백.
       // 🎯 단, PRIORITY_REGIONS(강동·송파·구리)는 사업 우선순위상 10일까지 기다릴 수 없어 3일+ 방치되면
       //   큐를 밀어낸다 — 대상이 64지역 전체가 아니라 이 3곳뿐이라 #109의 상시-기아 재발은 없다(coord#107).
+      // 🌾 2026-09-11 수확률 기반 쿨다운 — CEO 지적("발굴 낭비 잡아") 후 실측으로 도입.
+      //   그전까지 지역 선택은 **순번(last_run ASC)뿐**이라, 수확률 0.2%인 서울 서대문구와
+      //   23.6%인 충남 천안시를 똑같이 3.7일마다 돌았다.
+      //   실측(151개 지역, 직전 스윕 기준):
+      //     2% 미만 76개 지역 — 훑음 20,951 → 신규 145곳   (호출의 절반 이상을 여기서 태운다)
+      //     10% 이상 47개 지역 — 훑음  9,698 → 신규 3,095곳 (같은 훑음으로 21배를 건진다)
+      //   → 직전 수확률이 낮을수록 다음 스윕을 미룬다. 같은 예산을 수확처로 옮기는 게 목적이지
+      //     그 지역을 버리는 게 아니다: 아래 critical(10일+ 또는 미실행)이 절대 우선이라
+      //     **어떤 지역도 10일을 넘겨 방치되지 않는다**(12일 구간은 사실상 10일로 캡된다).
+      //   ⚠️ 표본이 작으면(훑음 50 미만) 판단하지 않는다 — 신설 지역을 잘못 얼리지 않기 위해.
+      const YIELD_COOLDOWN = sql`(
+        last_run IS NULL OR last_run < now() - (
+          CASE
+            WHEN COALESCE(last_found, 0) < 50 THEN interval '0 days'
+            WHEN last_inserted::float / last_found < 0.02 THEN interval '12 days'
+            WHEN last_inserted::float / last_found < 0.05 THEN interval '6 days'
+            WHEN last_inserted::float / last_found < 0.10 THEN interval '3 days'
+            ELSE interval '0 days'
+          END)
+      )`;
+
       const priorityStarved = (await sql`SELECT region, area_label FROM discovery_state WHERE region = ANY(${PRIORITY_REGIONS}) AND (last_run IS NULL OR last_run < now() - interval '3 days') ORDER BY last_run ASC NULLS FIRST LIMIT 1`)[0] as { region: string; area_label: string } | undefined;
       // 🐛 재발방지(2026-07-26): priorityStarved(위 줄)는 NULL(한 번도 미발굴)을 안전 처리하는데 이 쿼리는
       //   WHERE last_run < ... 만 있어 NULL은 SQL에서 '비교 결과 unknown'이라 결과에서 아예 빠졌다 — 즉
       //   한 번도 발굴 안 된 신설 지역(예: 인천 행정구역 개편 신설구)이 '5일+ 굶음'보다도 우선순위가
       //   낮게 취급돼 큐가 안 비는 한 영영 못 뽑혔다. NULL을 최우선(critical)으로 명시 처리.
-      const starved = (await sql`SELECT region, area_label, (last_run IS NULL OR last_run < now() - interval '10 days') AS critical FROM discovery_state WHERE last_run IS NULL OR last_run < now() - interval '5 days' ORDER BY last_run ASC NULLS FIRST LIMIT 1`)[0] as { region: string; area_label: string; critical: boolean } | undefined;
+      const starved = (await sql`SELECT region, area_label, (last_run IS NULL OR last_run < now() - interval '10 days') AS critical FROM discovery_state WHERE (last_run IS NULL OR last_run < now() - interval '5 days') AND ${YIELD_COOLDOWN} ORDER BY last_run ASC NULLS FIRST LIMIT 1`)[0] as { region: string; area_label: string; critical: boolean } | undefined;
       const critical = priorityStarved ?? (starved?.critical ? starved : undefined);
       const at = critical ? null : (await sql`SELECT id, region, area_label, keywords FROM discovery_targets WHERE status='pending' ORDER BY priority DESC, created_at ASC LIMIT 1`)[0] as any;
-      const target = critical ?? (at ?? starved ?? ((await sql`SELECT region, area_label FROM discovery_state
-        ORDER BY (region = ANY(${PRIORITY_REGIONS}) AND (last_run IS NULL OR last_run < now() - interval '6 hours')) DESC, last_run ASC NULLS FIRST LIMIT 1`)[0] as { region: string; area_label: string } | undefined));
+      const rotate = async (cooled: boolean) => (await sql`SELECT region, area_label FROM discovery_state
+        WHERE ${cooled ? YIELD_COOLDOWN : sql`true`}
+        ORDER BY (region = ANY(${PRIORITY_REGIONS}) AND (last_run IS NULL OR last_run < now() - interval '6 hours')) DESC, last_run ASC NULLS FIRST LIMIT 1`)[0] as { region: string; area_label: string } | undefined;
+      // 쿨다운을 통과한 지역 우선. 전부 쿨다운이면 예전 규칙으로 폴백해 교착을 만들지 않는다.
+      const target = critical ?? (at ?? starved ?? (await rotate(true)) ?? (await rotate(false)));
       if (!target) break;
       const kw = at && Array.isArray(at.keywords) && at.keywords.length ? (at.keywords as string[]) : undefined;
       try {
