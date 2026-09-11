@@ -61,5 +61,113 @@
   "bytes": 24103,
   "seam_before": 6.0,
   "seam_after": 4.6
+ },
+ "fac-brick.png": {
+  "w": 128,
+  "h": 128,
+  "bytes": 13369,
+  "kind": "raw(periodic)"
+ },
+ "fac-curtain.png": {
+  "w": 128,
+  "h": 128,
+  "bytes": 14584,
+  "kind": "raw(periodic)"
+ },
+ "fac-glass.png": {
+  "w": 128,
+  "h": 128,
+  "bytes": 16331,
+  "kind": "raw(periodic)"
+ },
+ "fac-office.png": {
+  "w": 128,
+  "h": 128,
+  "bytes": 13395,
+  "kind": "raw(periodic)"
+ },
+ "fac-villa.png": {
+  "w": 128,
+  "h": 128,
+  "bytes": 12108,
+  "kind": "raw(periodic)"
+ },
+ "lc-forest.png": {
+  "w": 128,
+  "h": 128,
+  "bytes": 19302,
+  "kind": "seamXY"
+ },
+ "lc-garden.png": {
+  "w": 128,
+  "h": 128,
+  "bytes": 15758,
+  "kind": "seamXY"
+ },
+ "lc-meadow.png": {
+  "w": 128,
+  "h": 128,
+  "bytes": 10377,
+  "kind": "seamXY"
+ },
+ "lc-park.png": {
+  "w": 128,
+  "h": 128,
+  "bytes": 18144,
+  "kind": "seamXY"
+ },
+ "lc-wood.png": {
+  "w": 128,
+  "h": 128,
+  "bytes": 19271,
+  "kind": "seamXY"
+ },
+ "poi-bus.png": {
+  "w": 86,
+  "h": 86,
+  "bytes": 4972,
+  "kind": "icon"
+ },
+ "poi-park.png": {
+  "w": 86,
+  "h": 86,
+  "bytes": 6333,
+  "kind": "icon"
+ },
+ "poi-parking.png": {
+  "w": 86,
+  "h": 86,
+  "bytes": 4894,
+  "kind": "icon"
+ },
+ "poi-subway.png": {
+  "w": 86,
+  "h": 86,
+  "bytes": 6017,
+  "kind": "icon"
+ },
+ "rd-alley.png": {
+  "w": 512,
+  "h": 128,
+  "bytes": 27135,
+  "kind": "seamX"
+ },
+ "rd-bridge.png": {
+  "w": 512,
+  "h": 128,
+  "bytes": 43542,
+  "kind": "seamX"
+ },
+ "rd-major.png": {
+  "w": 512,
+  "h": 128,
+  "bytes": 36599,
+  "kind": "seamX"
+ },
+ "rd-street.png": {
+  "w": 512,
+  "h": 128,
+  "bytes": 30818,
+  "kind": "seamX"
  }
 }

@@ -369,7 +369,14 @@ function makeLandmarkHtml(name: string, icon: string): string {
 const MAP_TEXTURES: Record<string, string> = {
   "dcn-water-ocean": "/map/water-ocean.png", "dcn-water-lake": "/map/water-lake.png", "dcn-water-river": "/map/water-river.png", "dcn-water-pond": "/map/water-pond.png",
   "dcn-land-wood": "/map/land-wood.png", "dcn-land-grass": "/map/land-grass.png", "dcn-land-sand": "/map/land-sand.png", "dcn-land-wetland": "/map/land-wetland.png", "dcn-land-ice": "/map/land-ice.png",
+  // 2차(2026-09-11 CEO "다 한번에"): 파사드 5종(높이대별 지붕·창) · 지표 5종(subclass별) · 도로 스트립 3종(line-pattern, 512×128) · 시설 아이콘 4종(알파) — scripts/blender/render-map-textures-2.py
+  "dcn-fac-villa": "/map/fac-villa.png", "dcn-fac-brick": "/map/fac-brick.png", "dcn-fac-office": "/map/fac-office.png", "dcn-fac-curtain": "/map/fac-curtain.png", "dcn-fac-glass": "/map/fac-glass.png",
+  "dcn-lc-park": "/map/lc-park.png", "dcn-lc-garden": "/map/lc-garden.png", "dcn-lc-wood": "/map/lc-wood.png", "dcn-lc-forest": "/map/lc-forest.png", "dcn-lc-meadow": "/map/lc-meadow.png",
+  "dcn-rd-bridge": "/map/rd-bridge.png", "dcn-rd-major": "/map/rd-major.png", "dcn-rd-street": "/map/rd-street.png",
+  "dcn-poi-subway": "/map/poi-subway.png", "dcn-poi-bus": "/map/poi-bus.png", "dcn-poi-park": "/map/poi-park.png", "dcn-poi-parking": "/map/poi-parking.png",
 };
+// 화면 크기 규약: 타일 질감 128px→pixelRatio 2(64 CSS px 반복) · 파사드는 4(32px 반복 = 창문 한 칸 16px, 골목 줌에서 창이 층처럼 읽힘) · 아이콘 86px→5(약 17px, 스프라이트보다 한 단계 큼).
+const texRatio = (id: string) => (id.startsWith("dcn-poi-") ? 5 : id.startsWith("dcn-fac-") ? 4 : 2);
 async function loadMapTextures(ml: any): Promise<number> {
   let ok = 0;
   await Promise.all(Object.entries(MAP_TEXTURES).map(async ([id, url]) => {
@@ -378,7 +385,7 @@ async function loadMapTextures(ml: any): Promise<number> {
       const img = r?.data ?? r;
       if (!img) return;
       if (ml.hasImage(id)) ml.removeImage(id);         // 캔버스 폴백이 먼저 들어갔으면 교체(updateImage는 크기가 같아야 해서 못 씀)
-      ml.addImage(id, img, { pixelRatio: 2 }); ok++;
+      ml.addImage(id, img, { pixelRatio: texRatio(id) }); ok++;
     } catch { /* 폴백 유지 */ }
   }));
   return ok;
@@ -453,6 +460,7 @@ function makeIslandHtml(name: string): string {
 }
 // 길이름(transportation_name)·버스정류장 토글 — 벡터 레이어 visibility/filter 제어
 const _origPoiFilter: Record<string, any> = {}; // poi_r* 원본 필터 보존(토글 복원용)
+const _origPoiIcon: Record<string, any> = {};   // poi_* 원본 icon-image 보존(질감 재적용 시 중첩 방지)
 // '상세' OFF에도 지도에 남길 주요 시설 클래스(공원·학교 등). 나머지 잡POI(식당·상점·편의점…)는 숨김.
 const MAJOR_POI = ["park", "garden", "school", "college", "university", "kindergarten", "hospital", "clinic", "stadium", "museum", "library", "zoo", "attraction", "theme_park", "aquarium", "cemetery", "townhall", "town_hall"];
 function applyTogglesToMap(ml: any, showStreets: boolean, showBus: boolean, show3d = true): void {
@@ -1106,10 +1114,11 @@ export default function Home() {
       const KO_LABEL: any = ["coalesce", ["get", "name:ko"], ["get", "name"], ["get", "name:latin"]];
       // 🎨 커피 톤 스타일 패치 — 스타일 로드 후 1회. 레이스 방지: 즉시+load+styledata 모두에서 시도하되 applied 플래그로 1회 보장.
       let applied = false;
-      const applyVectorStyle = () => {
+      //   force: 질감 로드 완료 후 재적용 통과 — isStyleLoaded()는 타일이 하나라도 내려오는 중이면 false라 이 검사로는 재적용이 영영 안 돈다(실측). 첫 통과가 끝난 뒤라 스타일은 이미 있다.
+      const applyVectorStyle = (force = false) => {
         if (applied) return;
         let style: any;
-        try { if (!(ml.isStyleLoaded && ml.isStyleLoaded())) return; style = ml.getStyle(); } catch { return; }
+        try { if (!force && !(ml.isStyleLoaded && ml.isStyleLoaded())) return; style = ml.getStyle(); } catch { return; }
         if (!style || !style.layers) return;
         applied = true;
         try { ml.setPaintProperty("background", "background-color", "#f3ecdb"); } catch {}
@@ -1120,7 +1129,7 @@ export default function Home() {
         // 🖼️ 절차 질감(캔버스 → addImage): 물결·파사드 3종. 실제 건물 사진은 타일에 없으므로 '사진 같은 창문 격자'로 형태·색감을 보완.
         try { for (const [id, img] of Object.entries(makeMapTextures())) if (!ml.hasImage(id)) ml.addImage(id, img, { pixelRatio: 2 }); } catch {}
         // 🎨 Blender 렌더 질감을 비동기로 얹고, 다 실리면 패턴 지정을 한 번 더 돌린다(멱등).
-        if (!(ml as any).__dcnTexLoading) { (ml as any).__dcnTexLoading = true; void loadMapTextures(ml).then(() => { try { applyVectorStyle(); } catch {} }); }
+        if (!(ml as any).__dcnTexLoading) { (ml as any).__dcnTexLoading = true; void loadMapTextures(ml).then(() => { applied = false; try { applyVectorStyle(true); } catch {} }); } // applied 가드를 풀어야 패턴 지정이 실제로 다시 돈다
         // 🌤️ 3D 건물 조명 — 좌상단에서 비치는 따뜻한 빛(면마다 밝기 차 → 입체감)
         try { ml.setLight({ anchor: "viewport", color: "#fff4e0", intensity: 0.42, position: [1.15, 210, 30] }); } catch {}
         for (const ly of style.layers) {
@@ -1133,11 +1142,19 @@ export default function Home() {
           if ((sl === "landcover" || sl === "park") && (ly.type === "fill" || ly.type === "fill-extrusion")) {
             const wood = /wood|forest/i.test(ly.id);
             // 🌲 지표 질감(Blender): 숲=수관 돔, 풀·공원=풀결, 모래=고운 입자, 습지=풀+물웅덩이, 얼음=균열. 이미지가 없으면 색만.
-            const pat = /wood|forest/i.test(ly.id) ? "dcn-land-wood" : /sand/i.test(ly.id) ? "dcn-land-sand" : /wetland/i.test(ly.id) ? "dcn-land-wetland" : /ice|glacier/i.test(ly.id) ? "dcn-land-ice" : "dcn-land-grass";
+            const base = /wood|forest/i.test(ly.id) ? "dcn-land-wood" : /sand/i.test(ly.id) ? "dcn-land-sand" : /wetland/i.test(ly.id) ? "dcn-land-wetland" : /ice|glacier/i.test(ly.id) ? "dcn-land-ice" : "dcn-land-grass";
+            // 🌳 2차: OpenMapTiles subclass로 더 잘게 — 숲(forest, 빽빽)·잡목(wood)·공원(잔디+벤치)·정원(화단)·초지(meadow). 2차 이미지가 모두 실렸을 때만 데이터 구동 패턴, 아니면 1차 단일 패턴.
+            const has = (...ids: string[]) => ids.every((i) => ml.hasImage(i));
+            const pat: any = wood && has("dcn-lc-forest", "dcn-lc-wood") ? ["match", ["get", "subclass"], "forest", "dcn-lc-forest", "dcn-lc-wood"]
+              : sl === "park" && has("dcn-lc-park", "dcn-land-grass") ? ["match", ["get", "class"], "park", "dcn-lc-park", "dcn-land-grass"]
+              : /grass/i.test(ly.id) && has("dcn-lc-park", "dcn-lc-garden", "dcn-lc-meadow", "dcn-land-grass")
+                ? ["match", ["get", "subclass"], ["park", "village_green", "recreation_ground", "golf_course"], "dcn-lc-park", ["garden", "allotments", "orchard", "vineyard", "plant_nursery"], "dcn-lc-garden", ["meadow", "grassland", "farmland", "farm", "heath"], "dcn-lc-meadow", "dcn-land-grass"]
+              : ml.hasImage(base) ? base : null;
             try {
               ml.setPaintProperty(ly.id, "fill-color", wood ? "#a9c78f" : "#c4d9a6");
-              if (ml.hasImage(pat)) ml.setPaintProperty(ly.id, "fill-pattern", pat);
-              ml.setPaintProperty(ly.id, "fill-opacity", wood ? 0.9 : 0.78); ml.setLayoutProperty(ly.id, "visibility", "visible");
+              if (pat) ml.setPaintProperty(ly.id, "fill-pattern", pat);
+              // 숲은 광역 줌에서 옅게(고도별 색 밴드·음영이 비치게) → 동네 줌에서 또렷하게. 수관 타일은 64px 고정이라 z11 산맥에선 결만 남기는 게 맞다.
+              ml.setPaintProperty(ly.id, "fill-opacity", wood ? ["interpolate", ["linear"], ["zoom"], 8, 0.5, 11, 0.62, 13, 0.9] : 0.78); ml.setLayoutProperty(ly.id, "visibility", "visible");
             } catch {}
             continue;
           }
@@ -1160,7 +1177,11 @@ export default function Home() {
               ml.setPaintProperty(ly.id, "fill-extrusion-vertical-gradient", true);
               ml.setLayerZoomRange(ly.id, 13, 24); // z14(Leaflet 15)부터 — 동네 골목 줌에서 입체
               // 🏢 높이별 파사드 질감(창문 격자): 저층=베이지 벽·목재창 / 중층=콘크리트·유리창 / 고층=커튼월. 실제 서울 건물 색감(회백·베이지·유리)에 맞춤.
-              try { ml.setPaintProperty(ly.id, "fill-extrusion-pattern", ["step", ["coalesce", ["get", "render_height"], 8], "dcn-fac-low", 24, "dcn-fac-mid", 70, "dcn-fac-tall"]); }
+              // 2차: Blender 파사드 5단계(빌라 <13m · 벽돌 상가 13~30 · 오피스 30~70 · 커튼월 70~120 · 유리 초고층). 다 실리기 전엔 캔버스 3단계.
+              const fac5 = ["dcn-fac-villa", "dcn-fac-brick", "dcn-fac-office", "dcn-fac-curtain", "dcn-fac-glass"].every((i) => ml.hasImage(i));
+              try { ml.setPaintProperty(ly.id, "fill-extrusion-pattern", fac5
+                ? ["step", ["coalesce", ["get", "render_height"], 8], "dcn-fac-villa", 13, "dcn-fac-brick", 30, "dcn-fac-office", 70, "dcn-fac-curtain", 120, "dcn-fac-glass"]
+                : ["step", ["coalesce", ["get", "render_height"], 8], "dcn-fac-low", 24, "dcn-fac-mid", 70, "dcn-fac-tall"]); }
               catch { ml.setPaintProperty(ly.id, "fill-extrusion-color", ["interpolate", ["linear"], ["coalesce", ["get", "render_height"], 8], 0, "#e6dccb", 30, "#d5cec2", 120, "#b9c4cc"]); }
             } catch {}
             continue;
@@ -1177,6 +1198,15 @@ export default function Home() {
               try { ml.setPaintProperty(ly.id, "text-color", /transit/i.test(ly.id) ? "#235a86" : "#4a3526"); } catch {}
               try { ml.setPaintProperty(ly.id, "text-halo-color", "#fdf7ec"); ml.setPaintProperty(ly.id, "text-halo-width", 1.4); } catch {}
               try { ml.setLayoutProperty(ly.id, "icon-size", 1.15); } catch {}
+              // 🚇 2차: 대표 시설 아이콘을 Blender 렌더로(역·버스·공원·주차). 나머지는 스프라이트 유지. 원본 icon-image는 첫 통과 때 보존(재적용 시 중첩 방지).
+              //    OpenMapTiles 역은 class=railway(subclass station/subway/…) — 출입구(subway_entrance)는 제외해 역 하나에 아이콘 하나.
+              try {
+                if (_origPoiIcon[ly.id] === undefined) _origPoiIcon[ly.id] = (ly as any).layout?.["icon-image"] ?? null;
+                const oi = _origPoiIcon[ly.id];
+                if (oi && ["dcn-poi-subway", "dcn-poi-bus", "dcn-poi-park", "dcn-poi-parking"].every((i) => ml.hasImage(i))) ml.setLayoutProperty(ly.id, "icon-image", ["case",
+                  ["all", ["match", ["get", "class"], ["railway", "rail"], true, false], ["match", ["get", "subclass"], ["station", "subway", "halt", "tram_stop", "train_station"], true, false]], "dcn-poi-subway",
+                  ["==", ["get", "class"], "bus"], "dcn-poi-bus", ["==", ["get", "class"], "park"], "dcn-poi-park", ["==", ["get", "class"], "parking"], "dcn-poi-parking", oi]);
+              } catch {}
               try { ml.setLayoutProperty(ly.id, "icon-allow-overlap", ["step", ["zoom"], false, 16, true]); } catch {}
               try { ml.setLayoutProperty(ly.id, "text-allow-overlap", ["step", ["zoom"], false, 17, true]); } catch {}
               try { ml.setLayoutProperty(ly.id, "text-optional", true); } catch {}
@@ -1185,6 +1215,25 @@ export default function Home() {
             if (sl === "water_name" || /water_name|waterway/i.test(ly.id)) { try { ml.setPaintProperty(ly.id, "text-color", "#4a78a8"); } catch {} }
           }
         }
+        // 🛣️ 2차: 도로·다리 질감(line-pattern) — 원본 선은 그대로 두고(광역 줌의 앰버 강조 유지) z14+에서만 같은 필터·선폭의 복제 선을 원본 바로 위에 얹는다.
+        //    이미지가 없으면 복제 자체를 안 만든다(회귀 0). 다리=난간 데크(회색), 큰길=앰버 차선·연석, 2차로·골목=연앰버. 줌 1단계에 걸쳐 서서히 나타난다(툭 튀지 않게).
+        try {
+          const ROAD_TEX: [string, string, number][] = [
+            ["road_motorway", "dcn-rd-major", 14], ["road_trunk_primary", "dcn-rd-major", 14], ["road_secondary_tertiary", "dcn-rd-street", 14], ["road_minor", "dcn-rd-street", 15],
+            ["bridge_motorway", "dcn-rd-bridge", 14], ["bridge_trunk_primary", "dcn-rd-bridge", 14], ["bridge_secondary_tertiary", "dcn-rd-bridge", 14], ["bridge_street", "dcn-rd-bridge", 14],
+            ["bridge_link", "dcn-rd-bridge", 14], ["bridge_motorway_link", "dcn-rd-bridge", 14], ["bridge_path_pedestrian", "dcn-rd-bridge", 15],
+          ];
+          for (const [orig, pat, minz] of ROAD_TEX) {
+            const id = `dcn-tex-${orig}`; if (ml.getLayer(id) || !ml.hasImage(pat)) continue;
+            const i = style.layers.findIndex((l: any) => l.id === orig); if (i < 0) continue;
+            const src: any = style.layers[i]; const lw = src?.paint?.["line-width"]; if (src.type !== "line" || lw === undefined) continue;
+            ml.addLayer({ id, type: "line", source: src.source, "source-layer": src["source-layer"], filter: src.filter, minzoom: Math.max(src.minzoom || 0, minz),
+              layout: { "line-cap": src.layout?.["line-cap"] || "butt", "line-join": src.layout?.["line-join"] || "round" },
+              paint: { "line-width": lw, "line-pattern": pat, "line-opacity": ["interpolate", ["linear"], ["zoom"], minz, 0, minz + 1, 1] } } as any, style.layers[i + 1]?.id);
+          }
+        } catch {}
+        // 🌅 2차: 하늘·안개 — 기울인 화면의 지평선을 크림→연하늘로, 먼 곳은 지도 바탕색 안개로 녹인다(멀수록 자연스럽게 사라짐). 광역(z<9)은 대기 효과 0(전국 화면 불변).
+        try { ml.setSky({ "sky-color": "#dbe7f2", "horizon-color": "#f7eedc", "fog-color": "#f3ecdb", "fog-ground-blend": 0.55, "horizon-fog-blend": 0.75, "sky-horizon-blend": 0.7, "atmosphere-blend": ["interpolate", ["linear"], ["zoom"], 9, 0, 11, 1] }); } catch {}
         // 🏝️ 얕은 물가 띠 2겹 — 수심 데이터가 없으니 '물가에 가까울수록 얕다'를 띠로 표현.
         //    ① 넓고 흐린 청록 띠(얕은 물의 색 변화) ② 얇고 밝은 거품선(물가). 물 폴리곤 위·심볼 아래.
         try {
@@ -1223,8 +1272,8 @@ export default function Home() {
         // 초기 토글 상태(길이름/버스정류장/3D) 반영
         try { applyTogglesToMap(ml, showStreetsRef.current, showBusRef.current, show3dRef.current); } catch {}
       };
-      ml.on("load", applyVectorStyle);
-      ml.on("styledata", applyVectorStyle);
+      ml.on("load", () => applyVectorStyle());
+      ml.on("styledata", () => applyVectorStyle());
       applyVectorStyle();
       layerRef.current = L.layerGroup().addTo(mapA);
       canvasRef2.current = null; // (Leaflet 캔버스 렌더러 흔적 — 어댑터가 선·원을 GeoJSON 레이어로 그린다)
