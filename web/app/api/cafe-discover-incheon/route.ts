@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
+import { SIDO_GU } from "@/lib/regionList";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-// ⚠️ 2026-08-31 정정(decisions#910): "2026-07-01 인천 2군9구 개편"(제물포구·영종구·검단구·서해구)은
-//   실존하지 않는 행정구역명이었다(coordination#354) — 실제 인천 10개 구·군으로 되돌린다.
-const INCHEON = ["중구","동구","미추홀구","연수구","남동구","부평구","계양구","서구","강화군","옹진군"];
+// 🔁 2026-09-07 재정정(decisions#1048): "2026-07-01 인천 2군9구 개편"(제물포구·영종구·검단구·서해구)은
+//   인천시 공식(incheon.go.kr) 1차소스로 확인된 실재 행정구역이다 — 08-31의 "존재하지 않는다"는
+//   결론(decisions#910)이 오히려 틀렸다(자세한 경위는 lib/regionList.ts 참조). 단일출처(SIDO_GU) 사용.
+const INCHEON = SIDO_GU.인천;
 
 export async function POST(req: Request) {
   try {
