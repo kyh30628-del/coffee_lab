@@ -340,3 +340,4 @@
 | 2026-09-10 22:10 | #1043 | [룰갭 신규] COMMON_WORD_NAMES 미등재 "아지트"/"오두막"/"작은연못" — 일반명사 카페명  | 14dc545b | - | web/lib/reviewQuality.ts:386 COMMON_WORD_NAMES에 아지트/오두막/작은연못 3항목 추가(기존 P23 화이트리스트 확장, 새 로직 없음). tsc  |
 | 2026-09-10 22:10 | #1044 | [룰갭 신규] LOC_SUFFIX 정규식에 행정리(里) 접미 "리" 누락 — 동/읍/면은 걸러지는데 리만 통 | e4307f90 | - | web/lib/reviewQuality.ts:684 LOC_SUFFIX 정규식에 리 추가 (역 동 구 시 군 읍 면 리 로 길). 동일 처리경로 재사용, tsc/build 통과.  |
 | 2026-09-11 02:05 | #1047 | [자율진단] dev-deploy — 야간 배포차단 훅과 재시도가 안 맞물려 #1042 중복 아카이브·크래시  | b3106896 | - | scripts/dev-deploy.mjs: (1) 묶음푸시 git push origin main을 try/catch로 감싸 실패 시 pushFailed 플래그로 처리 — decis |
+| 2026-09-11 03:14 | #1048 | [개발] 협업 #395: 🚨 approved decisions#1040 실행 중단 요청 — "인천 서해구= | e86ca484 | - | 이 태스크의 요청(#1040 보류·#392 재분류)은 코드작업이 아닌 결정/협업 row 상태변경이라 dev worker 권한 밖 — 손대지 않음. 대신 같은 잘못된 결론(decis |
