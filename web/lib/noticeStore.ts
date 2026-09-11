@@ -48,19 +48,28 @@ const toNotice = (r: any): Notice => ({
   from: new Date(r.from_at).getTime(), pastFrom: new Date(r.past_from_at).getTime(), until: new Date(r.until_at).getTime(),
 });
 
-/** 지금 띄울 공지 — DB 우선, 실패하면 코드 폴백. 겹치면 나중에 시작한 것. */
+/** 지금 띄울 공지 — DB 우선, 실패하면 코드 폴백. 겹치면 나중에 시작한 것.
+ *
+ *  🔴 2026-09-11 CEO 지적으로 발견한 '공지 부활' — 규칙이 "기간 안 + 가장 최근 시작"뿐이라,
+ *    **더 나중에 시작한 공지가 끝나면 그보다 오래된 공지가 자동으로 되살아난다.**
+ *    실측: 부산·경남(9/6~9/10)이 끝난 9/10 오후, 이미 17일 지난 강원(8/25~9/16)이 다시 떴다.
+ *    사용자에겐 한참 전에 알린 소식이 새 소식인 양 보인다.
+ *    → '한 번 다른 공지에 자리를 내준 공지는 다시 올라오지 않는다'를 규칙으로 못박는다:
+ *      **지금 가장 최근 시작한 공지**가 곧 현재 공지이고, 그게 기간 밖이면 '없음'이다(앞으로 되감지 않는다).
+ *    운영상 되살리려면 사람이 그 공지의 from_at을 새로 잡거나 새 id로 올린다(의도가 기록에 남는다). */
 export async function currentNotice(): Promise<Notice | null> {
   try {
     await ensureNoticeSchema();
+    // 기간과 무관하게 '가장 최근 시작한, 켜져 있는' 공지 하나만 본다 → 그게 기간 안일 때만 띄운다.
     const r = (await sql`SELECT * FROM notices
-      WHERE enabled AND now() >= from_at AND now() < until_at
+      WHERE enabled AND now() >= from_at
       ORDER BY from_at DESC LIMIT 1`) as any[];
-    if (r.length) return toNotice(r[0]);
-    return null; // DB는 살아 있는데 대상이 없으면 '없음'이 정답(폴백으로 되살리면 안 내려간다)
+    if (!r.length) return null;
+    return new Date(r[0].until_at).getTime() > Date.now() ? toNotice(r[0]) : null;
   } catch {
     const now = Date.now();
-    const live = NOTICES.filter((n) => now >= n.from && now < n.until);
-    return live.sort((a, b) => b.from - a.from)[0] ?? null;
+    const started = NOTICES.filter((n) => now >= n.from).sort((a, b) => b.from - a.from)[0];
+    return started && now < started.until ? started : null;
   }
 }
 
