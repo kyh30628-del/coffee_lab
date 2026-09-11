@@ -339,3 +339,4 @@
 | 2026-09-10 22:09 | #1046 | [사장님영업] /pricing 페이지 조회 계측 공백 — 모든 신청경로가 여길 거쳐야 모달인데 도달여부 자체 | 85784d92 | - | app/api/owner-funnel/route.ts EVENTS 화이트리스트에 pricing_view 추가 + app/pricing/page.tsx 마운트 시 세션당 1회 pri |
 | 2026-09-10 22:10 | #1043 | [룰갭 신규] COMMON_WORD_NAMES 미등재 "아지트"/"오두막"/"작은연못" — 일반명사 카페명  | 14dc545b | - | web/lib/reviewQuality.ts:386 COMMON_WORD_NAMES에 아지트/오두막/작은연못 3항목 추가(기존 P23 화이트리스트 확장, 새 로직 없음). tsc  |
 | 2026-09-10 22:10 | #1044 | [룰갭 신규] LOC_SUFFIX 정규식에 행정리(里) 접미 "리" 누락 — 동/읍/면은 걸러지는데 리만 통 | e4307f90 | - | web/lib/reviewQuality.ts:684 LOC_SUFFIX 정규식에 리 추가 (역 동 구 시 군 읍 면 리 로 길). 동일 처리경로 재사용, tsc/build 통과.  |
+| 2026-09-11 02:05 | #1047 | [자율진단] dev-deploy — 야간 배포차단 훅과 재시도가 안 맞물려 #1042 중복 아카이브·크래시  | b3106896 | - | scripts/dev-deploy.mjs: (1) 묶음푸시 git push origin main을 try/catch로 감싸 실패 시 pushFailed 플래그로 처리 — decis |
