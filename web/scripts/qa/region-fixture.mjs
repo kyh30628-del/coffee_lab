@@ -18,7 +18,8 @@ t("경산시 → 경북", classifyArea("경산시"), { sido: "경북", sigungu: 
 // 군위군은 대구, 경북에 없어야 한다
 t("군위군은 대구 소속", SIDO_GU["대구"].includes("군위군"), true);
 t("군위군은 경북에 없음", SIDO_GU["경북"].includes("군위군"), false);
-t("울릉군 제외(좌표박스 밖)", SIDO_GU["경북"].includes("울릉군"), false);
+t("울릉군 포함", SIDO_GU["경북"].includes("울릉군"), true);
+t("경북 22개", SIDO_GU["경북"].length, 22);
 // 기존 지역 개수 불변
 t("서울 25(자치구 수 불변)", SIDO_GU["서울"].length, 25);
 t("부산 16", SIDO_GU["부산"].length, 16);

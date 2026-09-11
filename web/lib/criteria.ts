@@ -28,7 +28,7 @@ export const META: CriterionMeta[] = [
   { key: "geo.box.lat_min", category: "지리", label: "서비스범위 좌표 박스 최소 위도(이하 범위밖 제외)", def: 34.5, min: 34.0, max: 38.8, unit: "°" }, // 2026-09-06 부산·경남 편입(남해·거제 34.6)
   { key: "geo.box.lat_max", category: "지리", label: "서비스범위 좌표 박스 최대 위도(이상 범위밖 제외)", def: 38.7, min: 36.3, max: 40.3, unit: "°" },
   { key: "geo.box.lng_min", category: "지리", label: "서비스범위 좌표 박스 최소 경도(이하 범위밖 제외)", def: 124.5, min: 122.5, max: 126.5, unit: "°" },
-  { key: "geo.box.lng_max", category: "지리", label: "서비스범위 좌표 박스 최대 경도(이상 범위밖 제외)", def: 129.4, min: 125.9, max: 129.9, unit: "°" },
+  { key: "geo.box.lng_max", category: "지리", label: "서비스범위 좌표 박스 최대 경도(이상 범위밖 제외)", def: 129.4, min: 125.9, max: 132.0, unit: "°" }, // 2026-09-11 울릉군(130.9) 개방으로 상한 129.9→132.0(독도 131.87까지 포함)
   // 검색 등급 가산점
   { key: "search.grade_bonus.verified", category: "검색", label: "검색 랭킹 등급 가산점(검증)", def: 25, min: 0, max: 100, unit: "점" },
   { key: "search.grade_bonus.reference", category: "검색", label: "검색 랭킹 등급 가산점(참고)", def: 8, min: 0, max: 100, unit: "점" },
