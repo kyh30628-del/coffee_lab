@@ -119,11 +119,15 @@ export async function GET(req: NextRequest) {
         //   과거엔 at일 때 discovery_targets만 done하고 discovery_state를 안 찍어, 요청타깃으로 발굴된
         //   로테이션 지역(예: 포천시)이 옛 날짜로 남아 "N일 굶음" 오표기됐다(관제탑 #555 부풀림).
         //   target.region이 discovery_state에 없으면 no-op라 안전.
-        if (at) await sql`UPDATE discovery_targets SET status='done', consumed_at=now(), found=${d.found}, inserted=${d.inserted} WHERE id=${at.id}`;
+        // 🐛 재발방지(decisions#1051): region 기준으로 pending 큐를 정리한다(at.id만이 아니라) — critical/starved
+        //   로테이션이 큐보다 먼저 선택돼도(line 81) 같은 지역이 큐에 대기 중이면 실제로는 이미 발굴이 끝난
+        //   것이므로 done 처리한다. 예전엔 at(큐에서 직접 뽑힌 경우)만 done 처리해, 로테이션이 먼저 그 지역을
+        //   훑으면 큐 항목이 영영 pending으로 남았다(협업#396: 의정부·수원·김포·양주 5~6일 정체).
+        await sql`UPDATE discovery_targets SET status='done', consumed_at=now(), found=${d.found}, inserted=${d.inserted} WHERE region=${target.region} AND status='pending'`;
         await sql`UPDATE discovery_state SET last_run=now(), last_found=${d.found}, last_inserted=${d.inserted}, last_skipped=${d.skipped}, last_oob=${d.oob} WHERE region=${target.region}`;
         discoveries.push({ region: d.region, found: d.found, inserted: d.inserted, stopped: d.stopped, agent: !!at });
       } catch (e) {
-        if (at) await sql`UPDATE discovery_targets SET status='done', consumed_at=now() WHERE id=${at.id}`; // 실패해도 큐서 빼 무한루프 방지
+        await sql`UPDATE discovery_targets SET status='done', consumed_at=now() WHERE region=${target.region} AND status='pending'`; // 실패해도 큐서 빼 무한루프 방지(region 기준, at.id만이 아님)
         await sql`UPDATE discovery_state SET last_run=now() WHERE region=${target.region}`; // 발굴 시도된 로테이션 지역 시계도 찍어 일관성(없으면 no-op)
         discoveries.push({ region: target.region, error: String(e).slice(0, 60) });
         break; // 네이버 한도/오류 시 이번 회차 발굴 중단(다음 cron에서 이어감)
