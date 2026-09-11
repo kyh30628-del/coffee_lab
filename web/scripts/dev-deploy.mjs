@@ -105,16 +105,28 @@ for (const d of rows) {
     }
     preMergeHead = git("rev-parse HEAD").trim(); // 병합 실패 시 복원 지점 — origin/main이 아니라 '로컬 묶음 포함' 현재 HEAD
     mergeStarted = true; // 이 지점부터의 실패만 아래 catch의 병합/워킹트리 정리(merge --abort·reset) 대상
-    // 🛡️ 커밋 메시지는 execSync 셸문자열이라 제목의 큰따옴표·백틱·$·\ 가 -m "..." 을 깨 배포 전면실패시킴
-    //   (2026-07-23 #456 근본원인: 제목 '…"플래그십(스토어)"…' 의 따옴표로 git merge Command failed). 셸 위험문자 제거.
-    const safeTitle = String(d.title).slice(0, 60).replace(/["`$\\]/g, "");
-    git(`merge --no-ff ${br} -m "deploy: #${d.id} ${safeTitle}\n\nCEO 배포 확정. Co-Authored-By: Claude <noreply@anthropic.com>"`);
-    let sha = git("rev-parse HEAD");
-    // 📜 배포 아카이브 자동 append(커밋 로그 미러). 아카이브 커밋을 얹은 뒤 그 HEAD를 배포 sha로 확정.
-    //   실패해도 배포는 계속 — 워킹트리 오염만 정리(다음 배포 dirty가드 보호).
-    try { sha = archiveDeploy(d, sha) || sha; } catch (ae) {
-      try { git("checkout -- docs/DEV_ARCHIVE.md"); } catch {}
-      console.log(`  ⚠️ 아카이브 append 실패(배포 계속): ${String(ae?.message || ae).slice(0, 90)}`);
+    // ♻️ 재시도 idempotency(#1047): 이전 실행이 merge+archive까지 끝낸 뒤 크래시해 dev_status가
+    //   'deploy_approved'로 남으면, 다음 실행이 이미 로컬 main의 조상인 브랜치를 또 merge --no-ff한다.
+    //   --no-ff라 git이 에러 없이 통과시키므로 아래 archiveDeploy가 무조건 재호출돼 DEV_ARCHIVE.md에
+    //   동일 건이 중복 append된다(실사고: #1042가 2회 중복). merge-base로 선제 감지해 스킵.
+    let sha;
+    let alreadyMerged = false;
+    try { git(`merge-base --is-ancestor ${br} HEAD`); alreadyMerged = true; } catch { alreadyMerged = false; }
+    if (alreadyMerged) {
+      sha = preMergeHead;
+      console.log(`  ♻️ #${d.id} 이미 로컬 병합됨(재시도) — merge/아카이브 스킵, 기존 HEAD 재사용 ${sha.slice(0, 8)}`);
+    } else {
+      // 🛡️ 커밋 메시지는 execSync 셸문자열이라 제목의 큰따옴표·백틱·$·\ 가 -m "..." 을 깨 배포 전면실패시킴
+      //   (2026-07-23 #456 근본원인: 제목 '…"플래그십(스토어)"…' 의 따옴표로 git merge Command failed). 셸 위험문자 제거.
+      const safeTitle = String(d.title).slice(0, 60).replace(/["`$\\]/g, "");
+      git(`merge --no-ff ${br} -m "deploy: #${d.id} ${safeTitle}\n\nCEO 배포 확정. Co-Authored-By: Claude <noreply@anthropic.com>"`);
+      sha = git("rev-parse HEAD");
+      // 📜 배포 아카이브 자동 append(커밋 로그 미러). 아카이브 커밋을 얹은 뒤 그 HEAD를 배포 sha로 확정.
+      //   실패해도 배포는 계속 — 워킹트리 오염만 정리(다음 배포 dirty가드 보호).
+      try { sha = archiveDeploy(d, sha) || sha; } catch (ae) {
+        try { git("checkout -- docs/DEV_ARCHIVE.md"); } catch {}
+        console.log(`  ⚠️ 아카이브 append 실패(배포 계속): ${String(ae?.message || ae).slice(0, 90)}`);
+      }
     }
     // 💰 2026-09-05(CEO 승인 다이어트 #3): 태스크당 push→빌드(평균 10.5분 × N회)를 **묶음 1회**로.
     //   여기서는 병합·아카이브까지만 하고, push와 반영확인·종결은 루프 밖에서 전체 한 번에 처리한다.
@@ -166,6 +178,8 @@ for (const d of rows) {
 
 // 🚀 묶음 푸시 + 반영확인 1회(2026-09-05 다이어트 #3) — 병합된 태스크 전부를 빌드 한 번에 실어 나른다.
 let deferredPush = false;
+let pushFailed = false;
+let pushError = "";
 if (mergedBatch.length) {
   const lockedB = await glock();
   try {
@@ -178,15 +192,25 @@ if (mergedBatch.length) {
       console.log(`\n[묶음푸시] 보류 — 지금 ${H}시 KST는 배포 창(08~17시) 밖. 병합 ${mergedBatch.length}건은 다음 창에 나간다.`);
       deferredPush = true;
     } else {
-      git("push origin main");
+      // 🛡️ 미처리 크래시 방지(#1047): 위 시간창 가드를 피해도 push 자체는 네트워크·인증·훅 등으로
+      //   실패할 수 있다. try/catch 없이 던지면 아래 반영확인·DB 갱신이 전부 스킵된 채 프로세스가
+      //   죽어 dev_status가 'deploy_approved'로 남고, 다음 실행이 이미 병합된 브랜치를 재merge하며
+      //   archiveDeploy를 또 호출해 DEV_ARCHIVE.md가 중복된다(#1042 실사고). 정직히 잡아 기록한다.
+      try { git("push origin main"); }
+      catch (e) {
+        pushFailed = true;
+        pushError = String(e.message || e).slice(0, 200);
+        console.log(`\n[묶음푸시] 실패(재시도 예정, 로컬 병합 보존): ${pushError}`);
+      }
     }
   } finally { if (lockedB) gunlock(); }
   const headSha = git("rev-parse HEAD");
-  if (deferredPush) { console.log(`[묶음푸시] 반영 확인 생략(보류 상태) — HEAD ${headSha.slice(0, 8)}`); }
+  if (pushFailed) { /* 위에서 이미 로그 출력 */ }
+  else if (deferredPush) { console.log(`[묶음푸시] 반영 확인 생략(보류 상태) — HEAD ${headSha.slice(0, 8)}`); }
   else console.log(`\n[묶음푸시] ${mergedBatch.length}건 → ${headSha.slice(0, 8)} — 반영 확인 대기(최대 25분)`);
   // 배포 반영 확인 — 창 25분(실측 평균 빌드 10.5분, 08-17 #743 재교정). 최종 HEAD가 반영되면 병합분 전체가 실린 것.
   let live = false;
-  for (let i = 0; i < 100 && !deferredPush; i++) {
+  for (let i = 0; i < 100 && !deferredPush && !pushFailed; i++) {
     try {
       const r = await fetch("https://dongnecoffeenote.com/api/version", { cache: "no-store" });
       const j = await r.json(); if (j.v === headSha) { live = true; break; }
@@ -202,6 +226,12 @@ if (mergedBatch.length) {
       if (coord) await sql`UPDATE coordination SET status='resolved', resolved_at=now(), stage='완료', resolution=${`개발·배포 완료(#${d.id}) — 코드 반영 확인, 데이터 반영은 별도 확인 필요`} WHERE id=${Number(coord)}`.catch(() => {});
       try { git(`branch -d ${br}`); } catch { /* 브랜치 삭제 실패 무시 */ }
       console.log(`  ✅ #${d.id} 코드배포 완료·반영확인(묶음 ${headSha.slice(0, 8)})`);
+    } else if (pushFailed) {
+      anyUnverified = true;
+      // 🛡️ dev_status는 건드리지 않는다(=deploy_approved 유지) — 다음 실행이 자동 재시도한다.
+      //   위 idempotency 가드 덕분에 재시도는 merge/archiveDeploy를 스킵하고 push만 재도전한다.
+      await sql`UPDATE decisions SET result=${`묶음푸시 실패(재시도 필요, 로컬 병합 보존): ${pushError}`} WHERE id=${d.id}`.catch(() => {});
+      console.log(`  ⚠️ #${d.id} 푸시 실패 — dev_status 유지, 다음 실행 자동 재시도`);
     } else {
       anyUnverified = true;
       // 🛡️ 정직한 종결(2026-07-02): 반영 확인 전엔 done으로 닫지 않는다.
