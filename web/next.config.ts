@@ -26,6 +26,11 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       { source: "/", headers: [{ key: "Cache-Control", value: "no-store, must-revalidate" }] },
+      // 🎨 지도 질감·핀(불변 자산) — 내용이 바뀌면 파일명이 아니라 **파일 자체를 새로 렌더**하므로 URL이 같다.
+      //   그래도 1년 고정이 맞다: Blender 렌더 결과를 바꾸는 일은 배포 때뿐이고, 그땐 배포와 함께 새로 받게 된다.
+      //   기본값(max-age=0, must-revalidate)이면 지도 첫 로드마다 9+8건이 304 재검증을 왕복한다(실측).
+      { source: "/map/:path*", headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }] },
+      { source: "/pins/:path*", headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }] },
     ];
   },
 };
