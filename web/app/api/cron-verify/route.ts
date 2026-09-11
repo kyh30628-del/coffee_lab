@@ -6,7 +6,7 @@ import { openScope } from "@/lib/writeScope";
 import { fingerprintOf } from "@/lib/runLedger";
 import { loadCriteria, getCriterionSync } from "@/lib/criteria";
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 // 💰 배포전 비용영향 사전점검 체크리스트(decisions#1025, 09-06 349.5GB 자기유발 비용사고
 //   #1010/#1011 재발방지) — 이 파일에 새 검사(add(...))를 추가할 때마다:
