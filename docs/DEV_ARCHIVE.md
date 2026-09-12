@@ -344,3 +344,4 @@
 | 2026-09-11 11:50 | #1051 | [개발] 협업 #396: cron-grow discovery_targets 큐 소비 안 됨(4건 5~6일 정 | a74ceb7c | - | app/api/cron-grow/route.ts: discovery_targets done 갱신을 at.id 기준→target.region+status=pending 기준으로 변경 |
 | 2026-09-11 11:50 | #1052 | [자율진단] cron-verify 60초 타임아웃으로 정기 검증런 1회 결손 — maxDuration 상향  | 9826201f | - | app/api/cron-verify/route.ts: maxDuration 60->300 (다른 전수스캔 크론과 동일 플랫폼 상한). tsc 신규에러 0, npm run build |
 | 2026-09-12 10:07 | #1055 | [룰갭 P68] DELIVERY_ONLY_CUES 어휘 확장 — 택배/온라인주문 후기가 VISIT_CUES  | 9956ab34 | - | web/lib/reviewQuality.ts:54 DELIVERY_ONLY_CUES 정규식에 OR절 추가(택배 주문 택배로도 온라인 (택배 )?주문 배송 후기 스마트스토어(를 통해 |
+| 2026-09-12 11:03 | #1056 | [룰갭 P69] 레터링/주문제작 케이크 전문점 PICKUP_ONLY_CUES 사각 — #597 이후 신규 표 | 25f28348 | - | lib/reviewQuality.ts: PICKUP_ONLY_CUES 정규식에 레터링케이크/당일케이크/커스텀케이크/무료레터링 표현 추가, 카페 표시명(PICKUP_ONLY_NAME |
