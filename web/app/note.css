@@ -13,7 +13,7 @@
   --nt-ink: #17100b;
   --nt-ink2: #4f3f31;
   --nt-ink3: #7d6e5f;
-  --nt-rule: rgba(84, 104, 140, 0.36);
+  --nt-rule: rgba(84, 104, 140, 0.26);
   --nt-margin: rgba(208, 96, 88, 0.55);
   --nt-hand: #2f3550;      /* 만년필 잉크(블루블랙) */
   --nt-coffee: #7a5122;
@@ -150,7 +150,8 @@
 
 /* ── 작은 눈금 제목(색인) ── */
 .nt-eyebrow { font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--nt-ink3); font-family: var(--nt-sans); font-weight: 500; }
-.nt-sec { display: flex; width: max-content; align-items: center; gap: 6px; font-size: 17px; letter-spacing: 0.02em; color: #1f140d; font-family: var(--nt-display); font-weight: 400; height: 34px; box-sizing: border-box; padding: 0 16px; margin-left: -8px; background: url("/note/tape.webp") center / 100% 30px no-repeat; transform: rotate(-1.2deg); filter: drop-shadow(0 1px 1px rgba(60,40,20,.18)); white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.nt-sec { display: flex; width: max-content; align-items: center; gap: 8px; font-size: 17px; letter-spacing: 0.02em; color: #f6ecdf; font-family: var(--nt-display); font-weight: 400; height: 34px; box-sizing: border-box; padding: 0 14px 0 12px; margin-left: -6px; background: linear-gradient(180deg, #3a281d, #241812); border-radius: 5px; box-shadow: 0 3px 8px -3px rgba(20,12,8,.6); white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.nt-sec::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--nt-caramel); flex: none; }
 .nt-sec.g { background-image: url("/note/tape2.webp"); }
 .nt-title { font-family: var(--nt-display); font-weight: 400; color: var(--nt-ink); text-wrap: balance; letter-spacing: 0; }
 .nt-brush { font-family: var(--nt-brush); font-weight: 400; letter-spacing: 0.01em; }

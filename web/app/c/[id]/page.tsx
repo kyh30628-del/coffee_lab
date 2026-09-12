@@ -316,7 +316,7 @@ export default async function CafePage({ params }: Props) {
         </div>
 
         {/* 이름 · 도장 · 배지 */}
-        <div className="nt-ruled nt-margin-gutter relative z-[1]" style={{ paddingTop: 34, paddingRight: grade ? 100 : 18 }}>
+        <div className="nt-ruled nt-margin-gutter relative z-[1] nt-band nt-torn-b" style={{ paddingTop: 34, paddingBottom: 34, paddingRight: grade ? 100 : 18, ["--nt-rule" as any]: "rgba(84,104,140,0.22)" }}>
           {grade && (
             <div className={`nt-stamp in absolute ${stampKind}`} style={{ right: 16, top: 22 }} aria-label={`등급 ${grade}`}>{grade}<small>{stampEn}</small></div>
           )}
@@ -348,7 +348,7 @@ export default async function CafePage({ params }: Props) {
             </div>
           )}
           <div className="flex items-center justify-between gap-2" style={{ height: 34 }}>
-            <p className="text-[12px] text-[#8f8071] min-w-0 truncate">{c.area}{c.dong ? ` ${c.dong}` : ""} · 검증 후기 <b className="text-[#5c4b3c]">{c.synth_count ?? 0}</b>건</p>
+            <p className="text-[12px] text-[#6a4318] min-w-0 truncate">{c.area}{c.dong ? ` ${c.dong}` : ""} <span className="nt-pill fill ml-1" style={{ color: "#241812" }}><span>검증 후기 {c.synth_count ?? 0}건</span></span></p>
             {/* ❤ 2026-08-21: 이 자리는 **고르는 사람**의 자리 — 무마찰 찜. */}
             <span className="nt-free"><WishButton cafeId={c.id} /></span>
           </div>
@@ -371,7 +371,7 @@ export default async function CafePage({ params }: Props) {
 
         {/* 🗺️ 지도 CTA를 첫 화면으로(2026-08-16) — 바로 착지한 방문자 이탈 87%, 지도 도달 시 3%. 테이프로 붙인 메모. */}
         <div className="px-3 pt-4">
-          <Link href={`/?region=${encodeURIComponent(c.area)}`} className="nt-scrap r block px-4 py-3">
+          <Link href={`/?region=${encodeURIComponent(c.area)}`} className="nt-scrap r kraft block px-4 py-3">
             <i className="nt-tape sm" aria-hidden />
             <span className="flex items-center justify-between gap-2">
               <span className="text-[13.5px] font-bold text-[#2a1f17]">
@@ -403,8 +403,8 @@ export default async function CafePage({ params }: Props) {
 
         {/* 🧭 "다음 행동" 묶음(2026-08-22) — 지도·다음 카페를 위로. nearby는 위에서 조회한 값 재사용(추가 쿼리 0). */}
         <div className="px-3 pt-4">
-          <div className="nt-scrap px-4 py-3">
-            <i className="nt-tape tl sm" aria-hidden />
+          <div className="nt-scrap kraft px-4 py-3">
+            <i className="nt-tape k tl sm" aria-hidden />
             <OutboundLink href={mapHref} target="map_cta" cafeId={c.id} source="카페상세" className="flex items-center justify-between gap-2">
               <span className="text-[13.5px] font-bold text-[#2a1f17]">
                 🗺️ 지도에서 위치·주변 함께 보기
@@ -490,7 +490,7 @@ export default async function CafePage({ params }: Props) {
                 {profile.strong.map((s) => (
                   <div key={s.key} className="flex items-baseline gap-2 flex-wrap">
                     <span className="text-[15px] w-5 text-center flex-none">{s.emoji}</span>
-                    <span className="text-[14.5px] font-bold text-[#2a1f17]">{s.text}</span>
+                    <span className="text-[14.5px] font-bold text-[#5a3a12]"><span className="nt-hl">{s.text}</span></span>
                     <span className="ml-auto flex items-baseline gap-2 whitespace-nowrap">
                       <span className="nt-hand sm coffee">평균의 {s.mult}배</span>
                       <span className="nt-pill verify">상위 {s.topPct}%</span>
