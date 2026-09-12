@@ -313,7 +313,13 @@ export async function GET(req: NextRequest) {
       if (hit?.payload && Array.isArray(hit.payload.results) && hit.payload.results.length > 0) {
         logSearch(q, region, Number(hit.payload?.count ?? 0), "cache", isInternalCheck);
         // 📍 장소는 캐시 경로에서도 매번 붙인다 — 메모리 인덱스라 DB·API 비용 0이고, 옛 캐시에도 즉시 반영된다.
-        return NextResponse.json({ ...hit.payload, places: searchPlaces(q, { near: nearOf(req) }), cached: true }, {
+        // 🔴 미서비스 안내는 **캐시에 굳히지 않는다**(2026-09-12 실사고): 대구·경북을 열고 목록에서 지웠는데도
+        //   "'대구' 지역 카페는 아직 포함되어 있지 않아요"가 캐시에서 계속 나왔다. 서비스 범위는 자주 바뀌므로
+        //   매 응답에서 지금 목록으로 다시 판정한다(메모리 조회라 비용 0).
+        const freshNote = detectOutOfCoverage(q, region);
+        const cachedPayload: Record<string, unknown> = { ...hit.payload };
+        if (freshNote) cachedPayload.coverageNote = freshNote; else delete cachedPayload.coverageNote;
+        return NextResponse.json({ ...cachedPayload, places: searchPlaces(placeKey(q) || q, { near: nearOf(req) }), cached: true }, {
           headers: { "Cache-Control": "public, max-age=0, s-maxage=300, stale-while-revalidate=600" },
         });
       }
