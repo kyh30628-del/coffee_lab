@@ -68,6 +68,11 @@ const DONG_TO_GU: Record<string, string> = {
   "광안리": "부산 수영구", "광안": "부산 수영구", "해리단길": "부산 해운대구", "송정": "부산 해운대구",
   "황리단길": "경주시", "동성로": "대구 중구", "김광석거리": "대구 중구", "앞산": "대구 남구",
   "망리단길": "마포구", "연트럴파크": "마포구", "경리단길": "용산구", "송리단길": "송파구",
+  // 신도시·생활권 이름 — 행정동이 아니라 사전에 없으면 "분당 래미안"이 전국에서 아무거나 잡는다(실측).
+  "분당": "성남시", "판교": "성남시", "정자": "성남시", "서현": "성남시", "야탑": "성남시", "위례": "성남시",
+  "일산": "고양시", "화정": "고양시", "행신": "고양시", "평촌": "안양시", "범계": "안양시",
+  "중동": "부천시", "상동": "부천시", "산본": "군포시", "구래": "김포시", "한강신도시": "김포시",
+  "동탄": "화성시", "영통": "수원시", "광교": "수원시", "청라": "인천 서구", "송도": "인천 연수구", "영종": "인천 중구",
   "홍대": "마포구", "합정": "마포구", "망원": "마포구", "연남": "마포구", "상암": "마포구", "상수": "마포구", "공덕": "마포구",
   "이태원": "용산구", "한남": "용산구", "해방촌": "용산구", "경리단": "용산구",
   "성수": "성동구", "서울숲": "성동구", "왕십리": "성동구",
@@ -495,7 +500,28 @@ export async function GET(req: NextRequest) {
           return pn === qk || (qk.startsWith(pn) && pn.length >= 4 && qk.length - pn.length <= 2);
         })
       : undefined;
-    if (placeHit) {
+    // 🏘️ 지역 + 부분 이름("구리 한일" · "분당 래미안") — 지역이 명시됐으니 부분일치를 허용해도 안전하다.
+    //   실사고(2026-09-12): "구리 한일"이 0곳이었다. 접두 매칭을 없앤 뒤로 지역+약칭 조합을 못 잡았다.
+    //   지역 중심에서 10km 안의 장소만 본다 — 같은 이름이 전국에 널린 경우(한일병원 등)를 배제한다.
+    let placeHit2 = placeHit;
+    if (!placeHit2 && effectiveRegion && tokens.length > 0 && tokens.join("").length >= 2) {
+      //   ⚠️ 중심+반경 10km는 너무 넓다 — 구리시 중심에서 10km면 서울 동북부가 다 들어와
+      //      "구리 한일"이 성북구 한일맨션으로 갔다(실측). 그 지역 **카페들의 실제 경계 상자**로 좁힌다.
+      const bx = (await sql.query(
+        `SELECT min(lat)::float8 s, max(lat)::float8 n, min(lng)::float8 w, max(lng)::float8 e,
+                avg(lat)::float8 la, avg(lng)::float8 ln
+         FROM cafes WHERE published = true AND lat IS NOT NULL AND (area ILIKE $1 OR area ILIKE $2)`, [p1, p2])) as unknown as any[];
+      const b = bx?.[0] ?? {};
+      const la = Number(b.la), ln = Number(b.ln), M = 0.01;   // 경계 밖 살짝(약 1km)까지는 같은 생활권으로 본다
+      if (Number.isFinite(la) && Number.isFinite(ln)) {
+        const key = tokens.join("");
+        const cands = searchPlaces(key, { limit: 80, near: [la, ln] })
+          .filter((pl) => pl.lat >= Number(b.s) - M && pl.lat <= Number(b.n) + M && pl.lng >= Number(b.w) - M && pl.lng <= Number(b.e) + M);
+        if (cands.length) placeHit2 = cands[0];
+      }
+    }
+    if (placeHit2) {
+      const placeHit = placeHit2;
       const R = 0.027;                                   // 위도 약 3km — 캠퍼스·공원처럼 중심 좌표가 외곽인 곳까지 담는다
       const lngR = R / Math.max(0.3, Math.cos((placeHit.lat * Math.PI) / 180));
       const near = (await sql.query(

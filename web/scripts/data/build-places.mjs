@@ -16,6 +16,10 @@ const els = [
   ...(JSON.parse(fs.readFileSync(path.join(SRC, 'ov-places.json'), 'utf8')).elements || []),
   // 2차 확장(2026-09-12 CEO "장소 검색도 더 풍부해야 한다") — 학교·종교시설·마트·산·사적지 등 '근처'의 기준점이 되는 것들.
   ...(fs.existsSync(path.join(SRC, 'ov-places2.json')) ? (JSON.parse(fs.readFileSync(path.join(SRC, 'ov-places2.json'), 'utf8')).elements || []) : []),
+  // 3차(2026-09-12): 태그가 아니라 **이름**으로 긁은 주거단지.
+  //   실사고: "구리 한일"이 안 나왔다. 구리 토평동 한일아파트는 OSM에 있는데 building/landuse 태그가 하나도 없어
+  //   태그 기준 필터(building=apartments · landuse=residential)에 안 걸렸다. 전국 "…아파트" 이름만 24,970개.
+  ...(fs.existsSync(path.join(SRC, 'ov-apt.json')) ? (JSON.parse(fs.readFileSync(path.join(SRC, 'ov-apt.json'), 'utf8')).elements || []) : []),
 ];
 
 // 종류 코드 — 검색 결과에 아이콘·라벨로 쓴다. 여기 없는 태그는 버린다(우체통·화장실 같은 잡음 차단).
@@ -36,8 +40,11 @@ const KIND = {
   castle: ['성', '🏯'], monument: ['기념물', '🗿'], memorial: ['기념관', '🗿'], ruins: ['유적', '🏛️'],
   archaeological_site: ['유적', '🏛️'], golf_course: ['골프장', '⛳'], viewpoint: ['전망대', '🔭'], arts_centre: ['문화예술', '🎨'],
 };
+const APT_NAME = /(아파트|빌라|맨션|타운|단지|캐슬|자이|푸르지오|힐스테이트|래미안|편한세상|더샵|아이파크|위브|스위첸|데시앙|비발디|리슈빌|어울림|센트레빌|해모로|베르디움|파크뷰|팰리스)$/;
 const kindOf = (t) => {
   if (t.landuse === 'residential' || t.building === 'apartments') return 'apt';
+  // 태그가 없어도 이름이 주거단지형이면 아파트로 본다(위 3차 수집분).
+  if (APT_NAME.test((t['name:ko'] || t.name || '').trim())) return 'apt';
   for (const k of ['shop', 'amenity', 'tourism', 'leisure', 'aeroway', 'office', 'natural', 'historic']) {
     const v = t[k]; if (v && KIND[v]) return v === 'government' ? 'government' : v;
   }

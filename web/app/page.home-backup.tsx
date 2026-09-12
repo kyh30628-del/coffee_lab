@@ -1,6 +1,10 @@
 import Link from "next/link";
-import CoffeeHero from "./components/CoffeeHeroClient";
+import dynamic from "next/dynamic";
 
+const CoffeeHero = dynamic(() => import("./components/CoffeeHero"), {
+  ssr: false,
+  loading: () => <div style={{ aspectRatio: "1 / 1", maxHeight: 580 }} />,
+});
 
 export default function Home() {
   return (
