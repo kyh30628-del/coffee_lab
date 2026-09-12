@@ -276,6 +276,11 @@ export default async function CafePage({ params }: Props) {
       ...(reviewsForLd.length > 0 ? { review: reviewsForLd } : {}),
     } : {}),
   };
+  // 🗺️ 지도 딥링크(2026-09-12) — 좌표를 실어 보내 지도 탭이 이 카페로 줌인하고 핀을 강조한다.
+  //   좌표가 없는 카페(지오코딩 전)는 예전 링크로 폴백해 회귀가 없다.
+  const mapHref = (typeof c.lat === "number" && typeof c.lng === "number")
+    ? `/?cafe=${c.id}&clat=${c.lat}&clng=${c.lng}&cz=17`
+    : `/?cafe=${c.id}`;
   return (
     <main className="min-h-screen bg-[#f4ece0] text-[#2b2018]" style={{ fontFamily: "'Gowun Batang', serif" }}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
@@ -397,7 +402,7 @@ export default async function CafePage({ params }: Props) {
               ⚠️ 하단 블록은 그대로 둔다 — 끝까지 읽은 사람의 자연스러운 다음 행동이라 성격이 다르다.
               비용 0: nearby는 이미 위에서 조회해둔 값을 재사용(추가 쿼리 없음). */}
           <div className="rounded-xl border border-[#d8c8ad] bg-white px-4 py-3 mb-3">
-            <OutboundLink href={`/?cafe=${c.id}`} target="map_cta" cafeId={c.id} source="카페상세" className="flex items-center justify-between gap-2">
+            <OutboundLink href={mapHref} target="map_cta" cafeId={c.id} source="카페상세" className="flex items-center justify-between gap-2">
               <span className="text-[13px] font-semibold text-[#3d2f22]">
                 🗺️ 지도에서 위치·주변 함께 보기
                 <span className="block text-[10.5px] text-[#8a7355] font-normal mt-0.5">근처 다른 카페까지 한눈에</span>
@@ -533,7 +538,7 @@ export default async function CafePage({ params }: Props) {
           <p className="text-[12.5px] text-[#665036] mb-4 leading-relaxed">네이버 공개 후기 <b>{c.synth_count ?? 0}건</b>을 교차검증한 데이터 기반 소개예요. <Link href="/trust" className="underline text-[#7a5122]">검증 방법 보기</Link></p>
           {/* 방문자 후기 — 하단 버튼 바로 위 */}
           {userReviews.length > 0 && <div className="mb-4"><VisitorReviews reviews={userReviews} /></div>}
-          <Link href={`/?cafe=${c.id}`} className="block w-full text-center bg-[#2b2018] text-[#f4ece0] rounded-xl py-3.5 font-bold">지도·근거 후기 보기 →</Link>
+          <Link href={mapHref} className="block w-full text-center bg-[#2b2018] text-[#f4ece0] rounded-xl py-3.5 font-bold">지도·근거 후기 보기 →</Link>
           {/* 메뉴·가격·영업시간은 권위 원천(네이버 플레이스)으로 연결 — 항상 정확·최신 */}
           <OutboundLink href={`/api/naver-place-redirect?id=${c.id}`} target="naver_place" cafeId={c.id} source="카페상세" className="mt-2.5 flex items-center justify-center gap-1.5 w-full text-center border-2 rounded-xl py-3 text-[13px] font-semibold bg-white" style={{ borderColor: "#03c75a", color: "#03c75a" }}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="#03c75a"><path d="M16.273 12.845L7.376 0H0v24h7.727V11.155L16.624 24H24V0h-7.727z"/></svg>

@@ -10,6 +10,8 @@ const nextConfig: NextConfig = {
   //   Vercel 함수 번들엔 기본적으로 .ts 소스가 없으므로, 이 라우트 함수에 소스를 강제 포함(트레이싱)해야
   //   배포 환경에서도 실제 코드를 대조할 수 있다. 검증 크론 1개 함수에만 적용(번들 영향 국소).
   outputFileTracingIncludes: {
+    // 📍 장소 인덱스(전국 59,504곳, 3.1MB) — 검색 함수가 런타임에 읽는다. public/이 아니라 번들에만 넣어 브라우저 전송 0.
+    "/api/search": ["./data/places.json"],
     "/api/cron-criteria-verify": ["./lib/**/*.ts", "./app/api/**/*.ts"],
     "/api/admin/criteria-status": ["./lib/**/*.ts", "./app/api/**/*.ts"],
     // 관제탑이 런타임에 .ai-paused 플래그(판정 의도적 정지)를 읽는다 → 함수 번들에 포함.

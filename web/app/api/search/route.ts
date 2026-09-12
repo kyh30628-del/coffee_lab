@@ -8,6 +8,7 @@ import { loadCriteria, getCriterionSync } from "@/lib/criteria";
 import { loadCriteriaLists, getListSync } from "@/lib/criteriaLists";
 import { parseQuery, loadGeoIndex, detectRegion, isCoreArea } from "@/lib/searchQuery";
 import { isFranchise } from "@/lib/discover";
+import { searchPlaces } from "@/lib/placeIndex";
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
@@ -241,6 +242,12 @@ function logSearch(q: string, region: string, results: number, mode: string, int
   sql`INSERT INTO search_log (q, region, results, mode, ai_err) VALUES (${q.slice(0, 80)}, ${(region || "").slice(0, 40)}, ${results}, ${mode}, ${aiErr ?? null})`.catch(() => {});
 }
 
+// 지도 화면 중심(있으면) — 같은 이름의 장소가 전국에 여럿일 때 가까운 것부터 보여준다.
+function nearOf(req: NextRequest): [number, number] | undefined {
+  const la = Number(req.nextUrl.searchParams.get("lat")), ln = Number(req.nextUrl.searchParams.get("lng"));
+  return Number.isFinite(la) && Number.isFinite(ln) && la !== 0 ? [la, ln] : undefined;
+}
+
 export async function GET(req: NextRequest) {
   // ⚡ 두 캐시 프라임 병렬(독립, 동기 getter 사용 전에 완료). 결과 불변.
   await Promise.all([loadCriteria(), loadCriteriaLists()]);
@@ -284,7 +291,8 @@ export async function GET(req: NextRequest) {
       const hit = (await sql`SELECT payload FROM search_cache WHERE qkey=${qkey} AND created_at > now() - (${getCriterionSync("search.cache_ttl_hours")} || ' hours')::interval LIMIT 1`)[0];
       if (hit?.payload && Array.isArray(hit.payload.results) && hit.payload.results.length > 0) {
         logSearch(q, region, Number(hit.payload?.count ?? 0), "cache", isInternalCheck);
-        return NextResponse.json({ ...hit.payload, cached: true }, {
+        // 📍 장소는 캐시 경로에서도 매번 붙인다 — 메모리 인덱스라 DB·API 비용 0이고, 옛 캐시에도 즉시 반영된다.
+        return NextResponse.json({ ...hit.payload, places: searchPlaces(q, { near: nearOf(req) }), cached: true }, {
           headers: { "Cache-Control": "public, max-age=0, s-maxage=300, stale-while-revalidate=600" },
         });
       }
@@ -570,6 +578,9 @@ export async function GET(req: NextRequest) {
       ok: true, mode, region: effectiveRegion || "전체 지역", q,
       concepts: hitConcepts.map((c) => c.label),
       count: results.length, results,
+      // 📍 "가려는 곳"(역·백화점·대학·병원·아파트 단지 등 전국 59,504곳). 누르면 지도가 그 자리로 이동한다.
+      //    DB를 타지 않는 메모리 인덱스 — 이 응답을 만드는 데 드는 추가 비용은 없다.
+      places: searchPlaces(q, { near: nearOf(req) }),
     };
     if (coverageNote) payload.coverageNote = coverageNote;
     if (franchiseNote) payload.franchiseNote = franchiseNote;

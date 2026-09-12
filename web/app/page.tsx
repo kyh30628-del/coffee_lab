@@ -33,7 +33,8 @@ type Cafe = {
 type DCafe = { id: number; name: string; area: string; lat: number; lng: number; grade: string | null; count: number | null; identity: string | null; note: string | null; beanNote: string[]; reason?: string; isNew?: boolean };
 type Discover = { headlineA: DCafe | null; headlineB: DCafe | null; headlineAList?: DCafe[]; headlineBList?: DCafe[]; themeB?: { emoji: string; label: string } | null; top3: DCafe[]; fresh: DCafe[]; specialty: DCafe[]; featured?: DCafe[]; scopeCount: number };
 type SearchResult = { id: number; name: string; area: string; grade: string | null; count: number | null; identity: string | null; score: number; reasons: string[] };
-type SearchRes = { ok: boolean; region: string; q: string; concepts: string[]; count: number; results: SearchResult[]; coverageNote?: string; franchiseNote?: string };
+type Place = { name: string; lat: number; lng: number; kind: string; label: string; icon: string };
+type SearchRes = { ok: boolean; region: string; q: string; concepts: string[]; count: number; results: SearchResult[]; coverageNote?: string; franchiseNote?: string; places?: Place[] };
 const SEARCH_EXAMPLES = ["비 오는 날 혼자 조용히", "감성 사진 데이트", "노트북 작업하기 좋은", "산미 또렷한 커피", "빵 맛있는 집"];
 // 쇼케이스 1차 성과 집계(노출·클릭·재생)
 const trackPromo = (cafeId: number, type: "view" | "click" | "play") => { fetch("/api/promo-event", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cafeId, type }) }).catch(() => {}); };
@@ -871,7 +872,12 @@ export default function Home() {
     const cafeId = Number(sp.get("cafe"));
     if (cafeId) {
       try { sessionStorage.setItem("dcn_role", "consumer"); } catch {}
-      setRole("consumer"); setTab("home");
+      setRole("consumer");
+      // 🗺️ 상세의 '지도에서 보기'는 좌표를 싣고 온다(?cafe=&clat=&clng=&cz=) → 지도 탭을 열고 그 카페로 줌인·핀 강조.
+      //   좌표가 없으면(옛 공유 링크·카톡) 예전처럼 목록 탭 + 해당 구 로드로 동작한다(회귀 없음).
+      const cla = Number(sp.get("clat")), cln = Number(sp.get("clng")), cz2 = Number(sp.get("cz"));
+      if (cla && cln) { regionCtr.current = [cla, cln, cz2 || 17]; setFocusId(cafeId); setTab("map"); }
+      else setTab("home");
       fetch(`/api/cafe-detail?id=${cafeId}`).then((r) => r.json()).then((d) => { if (d?.area) setHomeGu(d.area); }).catch(() => {});
     }
   }, []);
@@ -1067,12 +1073,23 @@ export default function Home() {
     return () => { window.removeEventListener("popstate", onPop); cleanupTouch(); };
   }, []);
 
+  // 📍 장소(역·백화점·아파트 등)나 카페 좌표로 지도를 이동시킨다 — "가려는 곳 주변에 어떤 카페가 있나"의 출발점.
+  //   지도가 아직 안 떴으면 regionCtr에 실어 두면, 지도 준비 효과가 1회 센터링하고 소진한다(기존 딥링크 배선 재사용).
+  const goToPlace = useCallback((lat: number, lng: number, zoom = 16) => {
+    setShowSearch(false); setTab("map");
+    const m = mapObj.current;
+    if (m && mapReady) { try { m.setView([lat, lng], zoom, { animate: true }); return; } catch {} }
+    regionCtr.current = [lat, lng, zoom];
+  }, [mapReady]);
+
   const runSearch = async (query: string) => {
     const qq = query.trim();
     if (!qq) return;
     setSearchQ(qq); setSearchLoading(true); setSearchRes(null);
     try {
-      const u = `/api/search?q=${encodeURIComponent(qq)}${homeRegion ? `&region=${encodeURIComponent(homeRegion)}` : ""}`;
+      // 지도 중심을 같이 보낸다 — "○○주민센터"처럼 전국에 같은 이름이 많을 때 보고 있는 곳부터 보여주려고.
+      let ctr = ""; try { const c = mapObj.current?.getCenter?.(); if (c) ctr = `&lat=${c.lat.toFixed(4)}&lng=${c.lng.toFixed(4)}`; } catch {}
+      const u = `/api/search?q=${encodeURIComponent(qq)}${homeRegion ? `&region=${encodeURIComponent(homeRegion)}` : ""}${ctr}`;
       const d = await (await fetch(u)).json();
       if (d.ok) setSearchRes(d);
     } catch {}
@@ -2253,9 +2270,26 @@ export default function Home() {
                         ☕ {searchRes.franchiseNote}
                       </div>
                     )}
+                    {/* 📍 가려는 곳 — 누르면 지도가 그 자리로 이동한다(주변 카페가 바로 보인다). 2026-09-12 사용자 피드백. */}
+                    {!!searchRes.places?.length && (
+                      <div className="mb-3">
+                        <div className="text-[11px] text-[#665036] mb-1.5">📍 이 장소로 지도 이동 — 주변 카페를 바로 봐요</div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {searchRes.places.map((p, i) => (
+                            <button key={`${p.name}-${i}`} onClick={() => goToPlace(p.lat, p.lng, p.kind === "apt" || p.kind === "station" ? 16.5 : 15.5)}
+                              className="flex items-center gap-1 bg-white border border-[#d8c8ad] rounded-full pl-2 pr-2.5 py-1.5 text-[12px] text-[#2b2018] hover:border-[#9c6b3f] active:bg-[#faf5ea]">
+                              <span>{p.icon}</span><b className="font-semibold">{p.name}</b>
+                              <span className="text-[10px] text-[#8a7a68]">{p.label}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     {searchRes.concepts.length > 0 && <div className="text-[11px] text-[#5f7355] mb-3">감지된 느낌: <b>{searchRes.concepts.join(" · ")}</b></div>}
                     {searchRes.results.length === 0 ? (
-                      <p className="text-center text-[#665036] py-10 text-sm">결과가 없어요. 다른 표현이나 더 넓은 동네로 시도해 보세요.</p>
+                      <p className="text-center text-[#665036] py-10 text-sm">{searchRes.places?.length
+                        ? "이 이름의 카페는 없어요. 위의 📍장소를 누르면 그 주변 카페를 지도에서 볼 수 있어요."
+                        : "결과가 없어요. 다른 표현이나 더 넓은 동네로 시도해 보세요."}</p>
                     ) : (
                       <div className="space-y-2">
                         <div className="text-[11px] text-[#665036] mb-1">{searchRes.region} · {searchRes.count}곳 중 가까운 순</div>
