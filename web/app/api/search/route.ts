@@ -336,6 +336,11 @@ export async function GET(req: NextRequest) {
     const short = shortRaw.length >= 2 ? shortRaw : effectiveRegion; // '중구'→'중'(1자)는 중랑구까지 오매칭 → 전체이름 유지
     const p1 = `%${effectiveRegion}%`, p2 = `%${short}%`;
     const metroList = metroAreaList(effectiveRegion);
+    // 🗺️ 지역 조건 — 도(道) 단위 이름은 area 컬럼에 아예 없다("경북" 카페의 area는 "포항시"·"안동시").
+    //   결재 #1057(자율 진단) 실측: "경북·강원·충남·충북 카페"가 전부 0곳인 조용한 실패였다.
+    //   시맨틱 경로는 이미 metroList로 분기하는데 아래 두 경로가 리터럴 ILIKE라 빠져 있었다.
+    const areaCond = (i: number) => (metroList ? `area = ANY($${i}::text[])` : `(area ILIKE $${i} OR area ILIKE $${i + 1})`);
+    const areaParams: any[] = metroList ? [metroList] : [p1, p2];
 
     let mode: "semantic" | "keyword" | "ai" | "region" | "place" = "keyword";   // region = 지역만 말한 질의(그 동네 대표)
     let scored: any[] = [];
@@ -510,7 +515,7 @@ export async function GET(req: NextRequest) {
       const bx = (await sql.query(
         `SELECT min(lat)::float8 s, max(lat)::float8 n, min(lng)::float8 w, max(lng)::float8 e,
                 avg(lat)::float8 la, avg(lng)::float8 ln
-         FROM cafes WHERE published = true AND lat IS NOT NULL AND (area ILIKE $1 OR area ILIKE $2)`, [p1, p2])) as unknown as any[];
+         FROM cafes WHERE published = true AND lat IS NOT NULL AND ${areaCond(1)}`, areaParams)) as unknown as any[];
       const b = bx?.[0] ?? {};
       const la = Number(b.la), ln = Number(b.ln), M = 0.01;   // 경계 밖 살짝(약 1km)까지는 같은 생활권으로 본다
       if (Number.isFinite(la) && Number.isFinite(ln)) {
@@ -565,9 +570,9 @@ export async function GET(req: NextRequest) {
                 char_scores, synth_acidity, synth_body, synth_sweet,
                 jsonb_path_query_array(synth_reviews, '$[*].quote') AS synth_reviews
          FROM cafes
-         WHERE published = true AND (area ILIKE $1 OR area ILIKE $2)
+         WHERE published = true AND ${areaCond(1)}
          ORDER BY CASE synth_grade WHEN '검증' THEN 0 WHEN '참고' THEN 1 ELSE 2 END, synth_count DESC NULLS LAST
-         LIMIT 24`, [p1, p2])) as unknown as any[];
+         LIMIT 24`, areaParams)) as unknown as any[];
       if (rows.length) {
         mode = "region";
         for (const c of rows) byId.set(c.id, c);
