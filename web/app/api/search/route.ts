@@ -286,11 +286,14 @@ export async function GET(req: NextRequest) {
     if (!effectiveRegion) {
       // ① 기존 하드코딩 사전(빠른 경로·상권 별칭: 홍대·경리단 등 행정동에 없는 이름을 커버)
       const geoForAlt = await loadGeoIndex();
-      for (const tok of tokens) {
-        if (DONG_TO_GU[tok]) { effectiveRegion = DONG_TO_GU[tok]; consumed.add(tok);
+      // 붙여 쓴 형태도 본다 — "홍대카페"가 1곳뿐이던 실측 결함("홍대 카페"는 24곳). 꼬리말은 장소를 뜻하는 말만.
+      const TAIL_RE = /(카페|커피|맛집|거리|근처|동네)$/;
+      for (const tok0 of tokens) {
+        const tok = DONG_TO_GU[tok0] ? tok0 : (TAIL_RE.test(tok0) && DONG_TO_GU[tok0.replace(TAIL_RE, "")] ? tok0.replace(TAIL_RE, "") : tok0);
+        if (DONG_TO_GU[tok]) { effectiveRegion = DONG_TO_GU[tok]; consumed.add(tok0);
           regionAlts = (geoForAlt.alt.get(tok) ?? [geoForAlt.dong.get(tok) ?? ""]).filter((a) => a && a !== effectiveRegion).slice(0, 3); break; }
-        if (SEOUL_GU.includes(tok)) { effectiveRegion = tok; consumed.add(tok); break; }
-        if (GYEONGGI_SI.includes(tok)) { effectiveRegion = tok; consumed.add(tok); break; }
+        if (SEOUL_GU.includes(tok)) { effectiveRegion = tok; consumed.add(tok0); break; }
+        if (GYEONGGI_SI.includes(tok)) { effectiveRegion = tok; consumed.add(tok0); break; }
       }
       // ② DB 실데이터(dong/area) 전수 인덱스 — '우면동·자양동'처럼 사전에 없던 동을 커버(정확도 실패의 주원인).
       if (!effectiveRegion) {
@@ -528,7 +531,9 @@ export async function GET(req: NextRequest) {
     // ===== 🏘️ 지역만 말한 질의 — 그 동네 대표 카페 =====
     //   "성수역 카페"·"홍대 카페"처럼 내용 조건이 없는 질의는 의미·어휘로 맞출 게 없다(그래서 0곳이 나왔다).
     //   검증 등급·리뷰 수 순으로 그 지역의 대표를 보여주는 게 사용자가 원한 답이다. 작은 컬럼만 조회(큰 컬럼 미조회).
-    if (regionOnly && scored.length === 0) {
+    //   ⚠️ 지역을 알아냈는데 결과가 0이면(의미유사 하한에 전부 걸리는 경우 — "강릉 바다 보이는 카페" 실측)
+    //      막다른 길로 두지 않고 그 동네 대표를 보여준다. 사용자가 빈 화면을 보는 것보다 낫다.
+    if ((regionOnly || (effectiveRegion && scored.length === 0)) && scored.length === 0) {
       const rows = (await sql.query(
         `SELECT id, name, area, synth_grade, synth_count, synth_identity, signature, note, vibe, uses, beans,
                 char_scores, synth_acidity, synth_body, synth_sweet,

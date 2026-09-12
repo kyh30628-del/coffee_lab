@@ -179,6 +179,10 @@ export function detectRegion(tokens: string[], geo: GeoIndex): { area: string; t
       const head = t.slice(0, len);
       const tail = t.slice(len);
       if (!PLACE_TAIL.has(tail)) continue;
+      // 🧭 2026-09-12: 여기서도 **시·군·구가 동보다 먼저**여야 한다. 안 그러면 "강남역"의 머리 '강남'이
+      //   진주시 강남동으로 가 표시 지역이 진주시가 됐다(본문 순서와 같은 함정을 이 경로만 빠뜨렸다).
+      const sgHead = geo.sgg.get(head);
+      if (sgHead) return { area: sgHead, token: t, key: head };
       const hit = geo.dong.get(head);
       if (hit) return { area: hit, token: t, key: head };   // token=원본('성수역'), key=사전키('성수')
     }
