@@ -46,7 +46,7 @@ export default async function TrustPage() {
     description: "리뷰 교차검증 방법론과 실제 숫자 공개", url: `${SITE}/trust`,
   };
   return (
-    <main className="min-h-screen bg-[#f4ece0] text-[#2b2018]" style={{ fontFamily: "'Gowun Batang', serif" }}>
+    <main className="min-h-screen bg-[#f4ece0] text-[#2b2018]" style={{ fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <div className="max-w-2xl mx-auto px-5 py-9">
         <Link href="/" className="text-[#7a5122] text-[13px] underline">← 동네 커피 노트</Link>

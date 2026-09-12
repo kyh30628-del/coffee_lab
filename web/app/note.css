@@ -1,0 +1,236 @@
+/* 📓 동네 커피 노트 — "한 권의 노트" 디자인 체계(2026-09-12, 로컬 적용).
+   원칙: 정보 구조·URL·데이터 무변(SEO), 손글씨는 "판정"에만, 비용 0(정적 재질 7장·폰트 1종 추가).
+   재질은 전부 /public/note/* (절차 생성·자체 제작): paper(종이 결 타일) · ring/ring2(커피 잔 자국) ·
+   tape/tape2(마스킹테이프) · grunge(도장 잉크 마스크) · hero(정물 렌더).
+   ── 줄노트 규약 ──
+   .nt-ruled 블록은 자기 줄을 직접 그린다(--lh 간격, --base = 글자 밑선이 놓이는 위치).
+   블록 안 모든 글자는 line-height:var(--lh)이고, 여백은 padding으로만(줄이 끊기지 않게) --lh 배수.
+   붙인 종이(.nt-scrap)는 줄 위에 얹히는 불투명 조각이라 격자와 무관하게 높이를 가져도 된다. */
+
+:root {
+  --nt-paper: #f7f0e4;
+  --nt-paper2: #ede2d0;
+  --nt-ink: #17100b;
+  --nt-ink2: #4f3f31;
+  --nt-ink3: #7d6e5f;
+  --nt-rule: rgba(84, 104, 140, 0.36);
+  --nt-margin: rgba(208, 96, 88, 0.55);
+  --nt-hand: #2f3550;      /* 만년필 잉크(블루블랙) */
+  --nt-coffee: #7a5122;
+  --nt-caramel: #b9793b;
+  --nt-verify: #3e7a5a;
+  --nt-ref: #b07a2a;
+  --nt-stamp: #c0473e;
+  --nt-line: rgba(90, 70, 50, 0.18);
+  --nt-shadow: rgba(60, 40, 20, 0.22);
+  --nt-font: "DCN Hand", "Nanum Pen Script", "Apple SD Gothic Neo", sans-serif;
+  --nt-hand-font: "DCN Letter", "Nanum Pen Script", cursive;
+  --nt-display: "DCN Hand Bold", "DCN Hand", "Nanum Pen Script", sans-serif;
+  --nt-sans: "DCN Hand", "Nanum Pen Script", sans-serif;
+  --nt-brush: "DCN Hand Bold", "Nanum Pen Script", cursive;
+}
+
+/* ── 종이 ── */
+.nt-paper { background-color: var(--nt-paper); background-image: url("/note/paper.webp"); background-size: 512px 512px; color: var(--nt-ink); }
+.nt-paper2 { background-color: var(--nt-paper2); background-image: linear-gradient(rgba(240, 232, 218, 0.55), rgba(240, 232, 218, 0.55)), url("/note/paper.webp"); background-size: 512px 512px; }
+
+/* ── 줄 ── */
+.nt-ruled {
+  --lh: 34px; --base: 28px;
+  line-height: var(--lh);
+  background-image: repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--lh) - 1px), var(--nt-rule) calc(var(--lh) - 1px), var(--nt-rule) var(--lh));
+  background-position: 0 calc(var(--base) - var(--lh));
+  background-origin: padding-box;
+}
+.nt-ruled.nt-h { --base: 27px; }                /* 26px 제목: 밑선 26.3 → 줄 27 */
+/* 줄 안의 모든 글자는 줄 간격을 따른다(Tailwind text-sm 등 행간 덮어씀). 외부 컴포넌트는 .nt-free로 빠져나간다. */
+.nt-ruled *:not(.nt-free, .nt-free *) { line-height: var(--lh); }
+.nt-ruled { font-size: 17px; }
+.nt-ruled .nt-hand.sm { font-size: 19px; }
+.nt-free, .nt-free * { line-height: 1.4; }
+.nt-ruled .nt-chip, .nt-ruled .nt-pill, .nt-ruled .nt-chip *, .nt-ruled .nt-pill * { line-height: 26px; }
+.nt-ruled .nt-stamp, .nt-ruled .nt-stamp * { line-height: 1.1; }
+/* 칩 줄: 24px 칩 + 6px 틈 = 30px 한 줄. 마지막 줄 아래 6px 보정으로 다음 글자가 격자에 다시 붙는다. */
+.nt-chips { display: flex; flex-wrap: wrap; gap: 6px; padding-bottom: 6px; align-items: flex-start; }
+.nt-ruled .nt-chip { height: 28px; }
+
+/* 페이지: 왼쪽 붉은 여백선 */
+.nt-page { position: relative; }
+.nt-page::before { content: ""; position: absolute; top: 0; bottom: 0; left: var(--nt-mx, 38px); width: 1px; background: var(--nt-margin); pointer-events: none; }
+.nt-margin-gutter { padding-left: calc(var(--nt-mx, 38px) + 14px); padding-right: 18px; }
+
+/* ── 손글씨(판정에만) ── */
+.nt-hand { font-family: var(--nt-hand-font); font-size: 22px; color: var(--nt-hand); letter-spacing: 0.005em; font-weight: 400; }
+.nt-hand.sm { font-size: 19px; }
+.nt-hand.lg { font-size: 26px; }
+.nt-hand.coffee { color: var(--nt-coffee); }
+.nt-hand.faint { color: var(--nt-ink3); }
+
+/* ── 도장(고무도장 잉크 얼룩) ── */
+.nt-stamp {
+  --c: var(--nt-stamp);
+  width: 74px; height: 74px; border-radius: 50%; border: 3px solid var(--c); color: var(--c);
+  display: grid; place-items: center; text-align: center; font-family: var(--nt-font); font-weight: 700; font-size: 15px; line-height: 1.1; letter-spacing: 0.08em;
+  transform: rotate(-11deg); mix-blend-mode: multiply; opacity: 0.94; flex: none;
+  -webkit-mask-image: url("/note/grunge.webp"); mask-image: url("/note/grunge.webp"); -webkit-mask-size: cover; mask-size: cover;
+}
+.nt-stamp:not(.absolute) { position: relative; }
+.nt-stamp::before { content: ""; position: absolute; inset: 4px; border: 1px solid var(--c); border-radius: 50%; opacity: 0.8; }
+.nt-stamp small { display: block; font-size: 7.5px; letter-spacing: 0.16em; font-weight: 500; margin-top: 2px; }
+.nt-stamp.ref { --c: var(--nt-ref); }
+.nt-stamp.cand { --c: #8a7a68; }
+.nt-stamp.xs { width: 44px; height: 44px; font-size: 10.5px; border-width: 2px; }
+.nt-stamp.xs::before { inset: 3px; }
+.nt-stamp.xs small { display: none; }
+.nt-stamp.sm { width: 58px; height: 58px; font-size: 12px; border-width: 2.5px; }
+.nt-stamp.sm small { font-size: 6.5px; }
+/* 도장이 찍히는 순간 */
+@keyframes ntStampIn { 0% { transform: rotate(-11deg) scale(1.6); opacity: 0; } 60% { transform: rotate(-11deg) scale(0.96); opacity: 1; } 100% { transform: rotate(-11deg) scale(1); opacity: 0.94; } }
+.nt-stamp.in { animation: ntStampIn 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.2) both; }
+
+/* ── 마스킹테이프 ── */
+.nt-tape { position: absolute; left: 50%; top: -11px; width: 112px; height: 24px; transform: translateX(-50%) rotate(-2deg); background: url("/note/tape.webp") center / 100% 100% no-repeat; pointer-events: none; z-index: 3; filter: drop-shadow(0 1px 1px rgba(60, 40, 20, 0.16)); }
+.nt-tape.g { background-image: url("/note/tape2.webp"); }
+.nt-tape.tl { left: 18px; transform: rotate(-6deg); }
+.nt-tape.tr { left: auto; right: 14px; transform: rotate(5deg); }
+.nt-tape.sm { width: 84px; height: 18px; top: -8px; }
+
+/* ── 붙인 종이(스크랩) ── */
+.nt-scrap {
+  position: relative; border-radius: 3px;
+  background-color: #fffefb;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0.62)), url("/note/paper.webp");
+  background-size: auto, 512px 512px;
+  border: 1px solid rgba(90, 70, 50, 0.10);
+  box-shadow: 0 1px 1px rgba(60, 40, 20, 0.06), 0 10px 22px -14px rgba(60, 40, 20, 0.45);
+  transform: rotate(var(--rot, -0.35deg));
+}
+.nt-scrap.r { --rot: 0.4deg; }
+.nt-scrap.flat { --rot: 0deg; }
+.nt-scrap.kraft { background-color: #f3e9d6; background-image: linear-gradient(rgba(243, 233, 214, 0.55), rgba(243, 233, 214, 0.55)), url("/note/paper.webp"); }
+.nt-scrap.pink { background-color: #fdf1f3; background-image: linear-gradient(rgba(253, 241, 243, 0.6), rgba(253, 241, 243, 0.6)), url("/note/paper.webp"); }
+.nt-scrap.sage { background-color: #eef4ee; background-image: linear-gradient(rgba(238, 244, 238, 0.6), rgba(238, 244, 238, 0.6)), url("/note/paper.webp"); }
+/* 붙인 종이 안 글은 격자 무관 — 일반 행간 */
+.nt-scrap, .nt-scrap * { line-height: 1.45; }
+
+/* ── 커피 잔 자국(장식) ── */
+.nt-ring { position: absolute; width: 190px; aspect-ratio: 1; background: url("/note/ring.webp") center / contain no-repeat; pointer-events: none; mix-blend-mode: multiply; opacity: 0.8; z-index: 0; }
+.nt-ring.b { background-image: url("/note/ring2.webp"); }
+
+/* ── 연필 동그라미(강조) ── */
+.nt-mark { position: relative; display: inline-block; padding: 0 6px; }
+.nt-mark svg { position: absolute; inset: -6px -8px; width: calc(100% + 16px); height: calc(100% + 12px); pointer-events: none; }
+.nt-mark svg path { fill: none; stroke: var(--nt-coffee); stroke-width: 1.6; stroke-linecap: round; opacity: 0.75; }
+
+/* ── 칩/알약/버튼 ── */
+.nt-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 15px; font-family: var(--nt-sans); font-weight: 700; padding: 0 10px; height: 28px; border: 1px solid rgba(90, 70, 50, 0.22); border-radius: 4px; background: rgba(255, 255, 255, 0.8); color: var(--nt-ink); vertical-align: middle; white-space: nowrap; font-family: var(--nt-font); }
+.nt-chip b { color: var(--nt-coffee); font-weight: 700; }
+.nt-chip.ink { background: var(--nt-ink); color: #fbf7f0; border-color: var(--nt-ink); }
+.nt-chip.ink b { color: #f0d9a8; }
+.nt-chip.good { background: #eef4ee; border-color: #c6dccb; color: #2f5f3c; }
+.nt-chip.warn { background: #fbeeee; border-color: #e3c3c3; color: #8a4040; }
+.nt-chip.soft { background: #fdf4e3; border-color: #e7d3b3; color: #8a6a3a; }
+.nt-pill { display: inline-flex; align-items: center; font-size: 12px; font-weight: 700; font-family: var(--nt-sans); padding: 0 7px; height: 20px; border-radius: 999px; border: 1px solid currentColor; vertical-align: middle; white-space: nowrap; letter-spacing: 0.02em; }
+.nt-pill.verify { color: var(--nt-verify); }
+.nt-pill.ref { color: var(--nt-ref); }
+.nt-pill.cand { color: #8a7a68; }
+.nt-pill.fill { background: currentColor; }
+.nt-pill.fill > span { color: #fff; }
+
+.nt-btn-ink { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; background: linear-gradient(180deg, #2c1f17, #1c120c); color: #f6ecdf; border-radius: 8px; font-weight: 700; font-family: var(--nt-sans); letter-spacing: 0.01em; box-shadow: 0 12px 20px -14px rgba(0, 0, 0, 0.6); transition: transform 0.12s ease; }
+.nt-btn-ink:active { transform: scale(0.985); }
+.nt-btn-line { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; background: rgba(255, 255, 255, 0.75); color: var(--nt-ink); border: 1px solid rgba(90, 70, 50, 0.28); border-radius: 8px; font-weight: 700; font-family: var(--nt-font); }
+.nt-input { border: 0; border-bottom: 1.5px solid rgba(90, 70, 50, 0.35); background: transparent; border-radius: 0; color: var(--nt-ink); font-family: var(--nt-font); outline: none; }
+.nt-input:focus { border-bottom-color: var(--nt-coffee); }
+.nt-select { border: 1px solid rgba(90, 70, 50, 0.28); background: rgba(255, 255, 255, 0.85); border-radius: 5px; color: var(--nt-ink); font-family: var(--nt-font); font-weight: 700; }
+
+/* ── 리본 책갈피(홈) ── */
+.nt-ribbon { position: absolute; top: 0; width: 14px; height: 78px; background: linear-gradient(90deg, #cf5f5a, #e3766f 55%, #c9544f); box-shadow: 0 6px 10px -6px rgba(120, 30, 20, 0.5); pointer-events: none; z-index: 2; }
+.nt-ribbon::after { content: ""; position: absolute; left: 0; right: 0; bottom: -7px; border-left: 7px solid transparent; border-right: 7px solid transparent; border-top: 7px solid #d6605a; width: 0; }
+
+/* ── 작은 눈금 제목(색인) ── */
+.nt-eyebrow { font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--nt-ink3); font-family: var(--nt-sans); font-weight: 500; }
+.nt-sec { display: inline-flex; align-items: center; gap: 6px; font-size: 17px; letter-spacing: 0.02em; color: #1f140d; font-family: var(--nt-display); font-weight: 400; height: 30px; padding: 0 16px; margin-left: -8px; background: url("/note/tape.webp") center / 100% 100% no-repeat; transform: rotate(-1.2deg); filter: drop-shadow(0 1px 1px rgba(60,40,20,.18)); white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.nt-sec.g { background-image: url("/note/tape2.webp"); }
+.nt-title { font-family: var(--nt-display); font-weight: 400; color: var(--nt-ink); text-wrap: balance; letter-spacing: 0; }
+.nt-brush { font-family: var(--nt-brush); font-weight: 400; letter-spacing: 0.01em; }
+
+/* ── 목차 줄(번호 손글씨) ── */
+.nt-ln { display: flex; align-items: baseline; gap: 8px; width: 100%; text-align: left; }
+.nt-ln .n { font-family: var(--nt-hand-font); font-size: 22px; color: var(--nt-coffee); width: 26px; flex: none; }
+.nt-ln .nm { flex: 1; min-width: 0; font-family: var(--nt-display); font-weight: 400; font-size: 17px; color: var(--nt-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nt-ln .m { font-size: 13.5px; color: var(--nt-ink3); font-variant-numeric: tabular-nums; flex: none; }
+
+/* ── 책장 넘김(탭 전환) ── */
+.nt-turn { position: absolute; inset: 0; z-index: 1450; pointer-events: none; transform-origin: left center; background-color: var(--nt-paper); background-image: url("/note/paper.webp"); background-size: 512px 512px; box-shadow: -14px 0 30px rgba(40, 25, 10, 0.16); animation: ntTurn 0.55s cubic-bezier(0.45, 0.02, 0.2, 1) forwards; backface-visibility: hidden; }
+.nt-turn::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(0, 0, 0, 0.10), rgba(0, 0, 0, 0) 30%); }
+@keyframes ntTurn { 0% { transform: perspective(1400px) rotateY(0deg); opacity: 1; } 100% { transform: perspective(1400px) rotateY(-105deg); opacity: 0.85; } }
+/* 페이지 내용 살짝 들어옴 */
+@keyframes ntPageIn { 0% { opacity: 0.4; transform: translateX(8px); } 100% { opacity: 1; transform: none; } }
+.nt-page-in { animation: ntPageIn 0.45s ease-out both; }
+
+/* ── 랜딩: 채워지는 메모 ── */
+.nt-w .ch { display: inline-block; opacity: 0; color: #5b6a9a; clip-path: inset(-20% 100% -20% -6%); transform: translateY(var(--y, 0px)) rotate(var(--r, 0deg)); transition: clip-path 0.14s linear, opacity 0.05s linear, color 0.9s ease-out; }
+.nt-w .ch.sp { width: 0.32em; }
+.nt-w .ch.on { opacity: 1; clip-path: inset(-20% -6% -20% -6%); color: #2f3550; }
+.nt-w.done .ch { opacity: 1; clip-path: none; color: #2f3550; transition: none; }
+.nt-nib { position: absolute; left: 0; top: 0; width: 34px; height: 34px; transform-origin: 3px 31px; opacity: 0; transition: opacity 0.2s; pointer-events: none; z-index: 5; filter: drop-shadow(1px 3px 3px rgba(0, 0, 0, 0.35)); will-change: transform; }
+
+@media (prefers-reduced-motion: reduce) {
+  .nt-turn { animation: none; display: none; }
+  .nt-page-in { animation: none; }
+  .nt-stamp.in { animation: none; }
+  .nt-w .ch { opacity: 1; clip-path: none; color: #2f3550; transform: none; transition: none; }
+}
+
+/* ══ 2차(09-12 밤): 커피 톤 포인트·섹션 구분·접어 붙인 지도 ══ */
+:root { --nt-espresso: #241812; --nt-latte: #e9d6bd; --nt-mocha: #4a3020; }
+/* 에스프레소 머리띠 — 모든 화면의 구조색(밝은 종이의 기준점) */
+.nt-header { background-color: var(--nt-espresso); background-image: linear-gradient(180deg, rgba(20,12,8,.25), rgba(20,12,8,.45)), url("/note/wood.webp"); background-size: auto, cover; background-position: center; color: #f4ebdf; }
+.nt-header .nt-title { color: #f4ebdf; }
+/* 커피 형광펜 — 시선이 모일 한 줄에만 */
+.nt-hl { background-image: linear-gradient(104deg, rgba(185,121,59,0) 0%, rgba(185,121,59,.30) 4%, rgba(185,121,59,.30) 96%, rgba(185,121,59,0) 100%); background-repeat: no-repeat; background-size: 100% 46%; background-position: 0 78%; padding: 0 .15em; }
+.nt-hl.latte { background-image: linear-gradient(104deg, rgba(233,214,189,0) 0%, rgba(233,214,189,.9) 4%, rgba(233,214,189,.9) 96%, rgba(233,214,189,0) 100%); }
+/* 찢은 가장자리 띠 — 섹션 구분(오늘의 테마 등) */
+.nt-band { position: relative; background-color: #efe4d2; background-image: linear-gradient(rgba(214,190,160,.30), rgba(214,190,160,.30)), url("/note/paper.webp"); background-size: auto, 512px 512px; }
+.nt-band.dark { background-color: var(--nt-mocha); background-image: linear-gradient(rgba(74,48,32,.85), rgba(74,48,32,.85)), url("/note/paper.webp"); color: #f4ebdf; }
+.nt-torn { -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 1000 100%22 preserveAspectRatio=%22none%22%3E%3Cpolygon fill=%22#000%22 points=%220,100 0,18.6 14,22.1 29,10.5 43,7.7 58,6.9 72,-0.4 87,1.6 101,7.6 116,5.2 130,15.5 145,21.9 159,13.0 174,10.8 188,16.5 203,6.6 217,2.3 232,6.8 246,5.7 261,8.2 275,15.6 290,17.2 304,11.3 319,19.3 333,7.5 348,2.5 362,8.3 377,3.3 391,4.6 406,15.3 420,13.7 435,13.9 449,15.2 464,16.1 478,4.8 493,4.7 507,5.2 522,1.5 536,6.0 551,12.1 565,12.2 580,16.4 594,22.0 609,8.5 623,7.3 638,11.1 652,0.3 667,2.3 681,9.2 696,5.7 710,15.4 725,18.6 739,16.6 754,9.9 768,15.9 783,3.4 797,2.6 812,8.0 826,4.7 841,9.0 855,19.6 870,18.2 884,12.2 899,14.8 913,10.6 928,-1.4 942,7.0 957,6.1 971,1.9 986,15.2 1000,15.3 1000,100%22/%3E%3C/svg%3E"), linear-gradient(#000, #000); mask-image: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 1000 100%22 preserveAspectRatio=%22none%22%3E%3Cpolygon fill=%22#000%22 points=%220,100 0,18.6 14,22.1 29,10.5 43,7.7 58,6.9 72,-0.4 87,1.6 101,7.6 116,5.2 130,15.5 145,21.9 159,13.0 174,10.8 188,16.5 203,6.6 217,2.3 232,6.8 246,5.7 261,8.2 275,15.6 290,17.2 304,11.3 319,19.3 333,7.5 348,2.5 362,8.3 377,3.3 391,4.6 406,15.3 420,13.7 435,13.9 449,15.2 464,16.1 478,4.8 493,4.7 507,5.2 522,1.5 536,6.0 551,12.1 565,12.2 580,16.4 594,22.0 609,8.5 623,7.3 638,11.1 652,0.3 667,2.3 681,9.2 696,5.7 710,15.4 725,18.6 739,16.6 754,9.9 768,15.9 783,3.4 797,2.6 812,8.0 826,4.7 841,9.0 855,19.6 870,18.2 884,12.2 899,14.8 913,10.6 928,-1.4 942,7.0 957,6.1 971,1.9 986,15.2 1000,15.3 1000,100%22/%3E%3C/svg%3E"), linear-gradient(#000, #000); -webkit-mask-size: 100% 14px, 100% calc(100% - 13px); mask-size: 100% 14px, 100% calc(100% - 13px); -webkit-mask-position: top, bottom; mask-position: top, bottom; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; }
+.nt-torn-b { -webkit-mask-image: linear-gradient(#000, #000), url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 1000 100%22 preserveAspectRatio=%22none%22%3E%3Cpolygon fill=%22#000%22 points=%220,100 0,18.6 14,22.1 29,10.5 43,7.7 58,6.9 72,-0.4 87,1.6 101,7.6 116,5.2 130,15.5 145,21.9 159,13.0 174,10.8 188,16.5 203,6.6 217,2.3 232,6.8 246,5.7 261,8.2 275,15.6 290,17.2 304,11.3 319,19.3 333,7.5 348,2.5 362,8.3 377,3.3 391,4.6 406,15.3 420,13.7 435,13.9 449,15.2 464,16.1 478,4.8 493,4.7 507,5.2 522,1.5 536,6.0 551,12.1 565,12.2 580,16.4 594,22.0 609,8.5 623,7.3 638,11.1 652,0.3 667,2.3 681,9.2 696,5.7 710,15.4 725,18.6 739,16.6 754,9.9 768,15.9 783,3.4 797,2.6 812,8.0 826,4.7 841,9.0 855,19.6 870,18.2 884,12.2 899,14.8 913,10.6 928,-1.4 942,7.0 957,6.1 971,1.9 986,15.2 1000,15.3 1000,100%22/%3E%3C/svg%3E"); mask-image: linear-gradient(#000, #000), url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 1000 100%22 preserveAspectRatio=%22none%22%3E%3Cpolygon fill=%22#000%22 points=%220,100 0,18.6 14,22.1 29,10.5 43,7.7 58,6.9 72,-0.4 87,1.6 101,7.6 116,5.2 130,15.5 145,21.9 159,13.0 174,10.8 188,16.5 203,6.6 217,2.3 232,6.8 246,5.7 261,8.2 275,15.6 290,17.2 304,11.3 319,19.3 333,7.5 348,2.5 362,8.3 377,3.3 391,4.6 406,15.3 420,13.7 435,13.9 449,15.2 464,16.1 478,4.8 493,4.7 507,5.2 522,1.5 536,6.0 551,12.1 565,12.2 580,16.4 594,22.0 609,8.5 623,7.3 638,11.1 652,0.3 667,2.3 681,9.2 696,5.7 710,15.4 725,18.6 739,16.6 754,9.9 768,15.9 783,3.4 797,2.6 812,8.0 826,4.7 841,9.0 855,19.6 870,18.2 884,12.2 899,14.8 913,10.6 928,-1.4 942,7.0 957,6.1 971,1.9 986,15.2 1000,15.3 1000,100%22/%3E%3C/svg%3E"); -webkit-mask-size: 100% calc(100% - 13px), 100% 14px; mask-size: 100% calc(100% - 13px), 100% 14px; -webkit-mask-position: top, bottom; mask-position: top, bottom; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; transform: scaleY(1); }
+.nt-torn-b { --flip: 1; }
+/* 위아래 모두 찢김 */
+.nt-torn-tb { -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 1000 100%22 preserveAspectRatio=%22none%22%3E%3Cpolygon fill=%22#000%22 points=%220,100 0,18.6 14,22.1 29,10.5 43,7.7 58,6.9 72,-0.4 87,1.6 101,7.6 116,5.2 130,15.5 145,21.9 159,13.0 174,10.8 188,16.5 203,6.6 217,2.3 232,6.8 246,5.7 261,8.2 275,15.6 290,17.2 304,11.3 319,19.3 333,7.5 348,2.5 362,8.3 377,3.3 391,4.6 406,15.3 420,13.7 435,13.9 449,15.2 464,16.1 478,4.8 493,4.7 507,5.2 522,1.5 536,6.0 551,12.1 565,12.2 580,16.4 594,22.0 609,8.5 623,7.3 638,11.1 652,0.3 667,2.3 681,9.2 696,5.7 710,15.4 725,18.6 739,16.6 754,9.9 768,15.9 783,3.4 797,2.6 812,8.0 826,4.7 841,9.0 855,19.6 870,18.2 884,12.2 899,14.8 913,10.6 928,-1.4 942,7.0 957,6.1 971,1.9 986,15.2 1000,15.3 1000,100%22/%3E%3C/svg%3E"), linear-gradient(#000, #000), url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 1000 100%22 preserveAspectRatio=%22none%22%3E%3Cpolygon fill=%22#000%22 points=%220,100 0,18.6 14,22.1 29,10.5 43,7.7 58,6.9 72,-0.4 87,1.6 101,7.6 116,5.2 130,15.5 145,21.9 159,13.0 174,10.8 188,16.5 203,6.6 217,2.3 232,6.8 246,5.7 261,8.2 275,15.6 290,17.2 304,11.3 319,19.3 333,7.5 348,2.5 362,8.3 377,3.3 391,4.6 406,15.3 420,13.7 435,13.9 449,15.2 464,16.1 478,4.8 493,4.7 507,5.2 522,1.5 536,6.0 551,12.1 565,12.2 580,16.4 594,22.0 609,8.5 623,7.3 638,11.1 652,0.3 667,2.3 681,9.2 696,5.7 710,15.4 725,18.6 739,16.6 754,9.9 768,15.9 783,3.4 797,2.6 812,8.0 826,4.7 841,9.0 855,19.6 870,18.2 884,12.2 899,14.8 913,10.6 928,-1.4 942,7.0 957,6.1 971,1.9 986,15.2 1000,15.3 1000,100%22/%3E%3C/svg%3E"); mask-image: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 1000 100%22 preserveAspectRatio=%22none%22%3E%3Cpolygon fill=%22#000%22 points=%220,100 0,18.6 14,22.1 29,10.5 43,7.7 58,6.9 72,-0.4 87,1.6 101,7.6 116,5.2 130,15.5 145,21.9 159,13.0 174,10.8 188,16.5 203,6.6 217,2.3 232,6.8 246,5.7 261,8.2 275,15.6 290,17.2 304,11.3 319,19.3 333,7.5 348,2.5 362,8.3 377,3.3 391,4.6 406,15.3 420,13.7 435,13.9 449,15.2 464,16.1 478,4.8 493,4.7 507,5.2 522,1.5 536,6.0 551,12.1 565,12.2 580,16.4 594,22.0 609,8.5 623,7.3 638,11.1 652,0.3 667,2.3 681,9.2 696,5.7 710,15.4 725,18.6 739,16.6 754,9.9 768,15.9 783,3.4 797,2.6 812,8.0 826,4.7 841,9.0 855,19.6 870,18.2 884,12.2 899,14.8 913,10.6 928,-1.4 942,7.0 957,6.1 971,1.9 986,15.2 1000,15.3 1000,100%22/%3E%3C/svg%3E"), linear-gradient(#000, #000), url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 1000 100%22 preserveAspectRatio=%22none%22%3E%3Cpolygon fill=%22#000%22 points=%220,100 0,18.6 14,22.1 29,10.5 43,7.7 58,6.9 72,-0.4 87,1.6 101,7.6 116,5.2 130,15.5 145,21.9 159,13.0 174,10.8 188,16.5 203,6.6 217,2.3 232,6.8 246,5.7 261,8.2 275,15.6 290,17.2 304,11.3 319,19.3 333,7.5 348,2.5 362,8.3 377,3.3 391,4.6 406,15.3 420,13.7 435,13.9 449,15.2 464,16.1 478,4.8 493,4.7 507,5.2 522,1.5 536,6.0 551,12.1 565,12.2 580,16.4 594,22.0 609,8.5 623,7.3 638,11.1 652,0.3 667,2.3 681,9.2 696,5.7 710,15.4 725,18.6 739,16.6 754,9.9 768,15.9 783,3.4 797,2.6 812,8.0 826,4.7 841,9.0 855,19.6 870,18.2 884,12.2 899,14.8 913,10.6 928,-1.4 942,7.0 957,6.1 971,1.9 986,15.2 1000,15.3 1000,100%22/%3E%3C/svg%3E"); -webkit-mask-size: 100% 14px, 100% calc(100% - 26px), 100% 14px; mask-size: 100% 14px, 100% calc(100% - 26px), 100% 14px; -webkit-mask-position: top, center, bottom; mask-position: top, center, bottom; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; }
+/* 접힌 종이 모서리(붙인 카드 오른쪽 위) */
+.nt-corner::after { content: ""; position: absolute; right: 0; top: 0; width: 22px; height: 22px; background: linear-gradient(225deg, var(--nt-paper) 0 50%, rgba(120,90,60,.22) 50% 52%, #e6d9c4 52% 100%); box-shadow: -2px 2px 4px -2px rgba(60,40,20,.35); border-bottom-left-radius: 3px; }
+/* 대표 카드(오늘의 숨은 보석) — 라떼 톤 종이 + 커피색 왼쪽 띠 */
+.nt-scrap.featured { box-shadow: inset 3px 0 0 var(--nt-caramel), 0 1px 1px rgba(60,40,20,.06), 0 14px 26px -16px rgba(60,40,20,.55); }
+.nt-tape.k { background-image: url("/note/tape3.webp"); }
+/* 접어 붙인 지도 — 찢은 윗단·접힌 자국 두 줄·테이프·크라프트 테두리 */
+.nt-mapfold { position: absolute; inset: 0; pointer-events: none; z-index: 1050; }
+.nt-mapfold::before { content: ""; position: absolute; left: 33.3%; top: 0; bottom: 0; width: 2px; background: linear-gradient(90deg, rgba(60,40,20,.16), rgba(255,255,255,.18) 60%, rgba(60,40,20,.06)); }
+.nt-mapfold::after { content: ""; position: absolute; left: 66.6%; top: 0; bottom: 0; width: 2px; background: linear-gradient(90deg, rgba(60,40,20,.14), rgba(255,255,255,.16) 60%, rgba(60,40,20,.05)); }
+.nt-mapfold .h { position: absolute; left: 0; right: 0; top: 50%; height: 2px; background: linear-gradient(180deg, rgba(60,40,20,.14), rgba(255,255,255,.16) 60%, rgba(60,40,20,.05)); }
+.nt-mapfold .edge { position: absolute; inset: 0; box-shadow: inset 0 0 0 1px rgba(90,70,50,.35), inset 0 0 40px rgba(60,40,20,.18); }
+.nt-mapframe { position: absolute; inset: 0; pointer-events: none; z-index: 1049; background: #e7dcc8; }
+
+.nt-mapfold .nt-tear { position: absolute; left: 0; right: 0; top: -1px; height: 16px; background: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 1000 100%22 preserveAspectRatio=%22none%22%3E%3Cpolygon fill=%22#f4eee3%22 points=%220,100 0,18.6 14,22.1 29,10.5 43,7.7 58,6.9 72,-0.4 87,1.6 101,7.6 116,5.2 130,15.5 145,21.9 159,13.0 174,10.8 188,16.5 203,6.6 217,2.3 232,6.8 246,5.7 261,8.2 275,15.6 290,17.2 304,11.3 319,19.3 333,7.5 348,2.5 362,8.3 377,3.3 391,4.6 406,15.3 420,13.7 435,13.9 449,15.2 464,16.1 478,4.8 493,4.7 507,5.2 522,1.5 536,6.0 551,12.1 565,12.2 580,16.4 594,22.0 609,8.5 623,7.3 638,11.1 652,0.3 667,2.3 681,9.2 696,5.7 710,15.4 725,18.6 739,16.6 754,9.9 768,15.9 783,3.4 797,2.6 812,8.0 826,4.7 841,9.0 855,19.6 870,18.2 884,12.2 899,14.8 913,10.6 928,-1.4 942,7.0 957,6.1 971,1.9 986,15.2 1000,15.3 1000,100%22/%3E%3C/svg%3E") center / 100% 100% no-repeat; transform: scaleY(-1); filter: drop-shadow(0 2px 2px rgba(30,18,10,.25)); }
+@media (min-width: 768px) { .nt-mapfold .nt-tear { display: none; } }
+
+/* 손글씨(Gaegu)는 같은 px에서 작게 보인다 — 소비자 화면(.nt-app) 안의 작은 글자를 한 단계씩 키운다 */
+.nt-app .text-\[10px\] { font-size: 13px; }
+.nt-app .text-\[10\.5px\] { font-size: 13.5px; }
+.nt-app .text-\[11px\] { font-size: 14px; }
+.nt-app .text-\[11\.5px\] { font-size: 14.5px; }
+.nt-app .text-\[12px\] { font-size: 15px; }
+.nt-app .text-\[12\.5px\] { font-size: 15.5px; }
+.nt-app .text-\[13px\] { font-size: 16px; }
+.nt-app .text-\[13\.5px\] { font-size: 16.5px; }
+.nt-app .text-\[14px\] { font-size: 17px; }
+.nt-app .text-\[14\.5px\] { font-size: 17.5px; }
+.nt-app .text-\[15px\] { font-size: 18px; }
+.nt-app .text-\[16px\] { font-size: 18.5px; }
+.nt-app .text-\[17px\] { font-size: 19.5px; }
+.nt-app { font-size: 17px; }
+.nt-app select, .nt-app input, .nt-app textarea, .nt-app button { font-family: inherit; }
+
+/* 손글씨 굵게: 바른히피엔 굵은 굵기가 없다 → 굵은 글자는 성실체(펜 굵은 획)로 바꿔 쓴다 */
+.nt-app b, .nt-app strong, .nt-app .font-bold, .nt-app .font-semibold, .nt-app .font-black { font-family: var(--nt-display); font-weight: 400; }

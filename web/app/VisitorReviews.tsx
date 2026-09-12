@@ -5,7 +5,7 @@ import { useLockBodyScroll } from "@/lib/useLockBodyScroll";
 
 type R = { memory: string; photos: string[]; favorite: boolean; date?: string };
 const fmt = (d?: string) => (d ? new Date(d).toLocaleDateString("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit" }) : "");
-const SERIF = "'Gowun Batang', AppleMyungjo, 'Apple SD Gothic Neo', 'Noto Serif KR', serif";
+const SERIF = "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif";
 
 // 방문자 후기 — 버튼 → 목록(최신순) → 항목 클릭 시 상세 모달. 인앱 CafePanel·공유링크 /c/[id] 공용.
 export default function VisitorReviews({ reviews }: { reviews: R[] }) {

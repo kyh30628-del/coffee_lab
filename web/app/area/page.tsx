@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 export default async function AreaIndex() {
   const regions = await getRegions();
   return (
-    <main className="min-h-screen bg-[#f4ece0] text-[#2b2018]" style={{ fontFamily: "'Gowun Batang', serif" }}>
+    <main className="min-h-screen bg-[#f4ece0] text-[#2b2018]" style={{ fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }}>
       <div className="max-w-2xl mx-auto px-5 py-10">
         <Link href="/" className="text-[#7a5122] text-[13px] underline">← 홈</Link>
         <div className="text-[#7a5122] text-[11px] tracking-[0.25em] uppercase mt-4 mb-1">동네 커피 노트</div>

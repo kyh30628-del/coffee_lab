@@ -156,21 +156,27 @@ const TONE_GRADIENTS = [
 
 // 홈 잡지 카드 — 모듈 스코프(컴포넌트 내부 정의 금지). 내부에 두면 렌더마다 재마운트되어 뒤로가기/탭전환이 느려짐.
 // 2026-07-25: 높이 압축 피드백 — 패딩·폰트·여백 축소, identity 2줄→1줄.
-const HeadlineCard = memo(function HeadlineCard({ c, kicker, tone, onOpen }: { c: DCafe; kicker: string; tone: number; onOpen: (id: number) => void }) {
+const HeadlineCard = memo(function HeadlineCard({ c, kicker, tone, onOpen, featured = false }: { c: DCafe; kicker: string; tone: number; onOpen: (id: number) => void; featured?: boolean }) {
+  // 📓 2026-09-12 "한 권의 노트": 카드 = 테이프로 붙인 종이. 이름은 명조, 판정 한 줄만 손글씨, 등급은 작은 도장.
+  //   배치(제목 줄 → 이름·배지 → 지역·리뷰 → 판정 → 원두 노트 태그)는 그대로.
+  const stamp = c.grade === "참고" ? "ref" : c.grade === "후보" ? "cand" : "";
   return (
-    <button onClick={() => onOpen(c.id)} className="w-full text-left rounded-2xl overflow-hidden shadow-md mb-4" style={{ backgroundImage: TONE_GRADIENTS[tone] }}>
-      <div className="p-3.5 text-[#f4ece0]">
-        <div className="text-[9px] tracking-[0.2em] uppercase text-[#e8d4b0] mb-1.5">{kicker}</div>
-        <div className="flex items-center gap-2 mb-1">
-          <h2 className="text-lg font-bold leading-tight">{c.name}</h2>
-          {c.grade && <span className="text-[10px] bg-[#f4ece0]/20 px-2 py-0.5 rounded-full">{c.grade}</span>}
-          {c.isNew && <span className="text-[10px] bg-[#ffd9a0]/90 text-[#3a2a12] font-bold px-2 py-0.5 rounded-full">NEW</span>}
-          <VisitorBadges vb={(c as any).vb} dark />
+    <button onClick={() => onOpen(c.id)} className={`w-full text-left nt-scrap mb-4 px-4 pt-4 pb-3.5 ${featured ? "featured" : ""}`} style={{ ["--rot" as any]: tone % 2 ? "0.35deg" : "-0.35deg" }}>
+      <i className={`nt-tape sm ${featured ? "k tl" : tone % 3 === 0 ? "" : tone % 3 === 1 ? "tl g" : "tr"}`} aria-hidden />
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="nt-eyebrow mb-1">{kicker}</div>
+          <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+            <h2 className="nt-title text-[18px] leading-tight">{c.name}</h2>
+            {c.isNew && <span className="nt-pill" style={{ color: "#b9793b" }}>NEW</span>}
+            <VisitorBadges vb={(c as any).vb} />
+          </div>
+          <div className="text-[11.5px] text-[#8f8071] mb-1">{c.area} · 리뷰 {c.count ?? 0}건</div>
         </div>
-        <div className="text-[11px] text-[#e8d4b0] mb-1.5">{c.area} · 리뷰 {c.count ?? 0}건</div>
-        {c.identity && <p className="text-[12px] text-[#f0e6d4] leading-snug mb-2 line-clamp-1">{c.identity}</p>}
-        {c.beanNote.length > 0 && <div className="flex flex-wrap gap-1.5">{c.beanNote.map((b) => <span key={b} className="text-[10px] bg-[#f4ece0]/15 px-2 py-0.5 rounded-full">{b}</span>)}</div>}
+        {c.grade && <div className={`nt-stamp ${featured ? "sm" : "xs"} ${stamp}`} aria-label={`등급 ${c.grade}`}>{c.grade}{featured && <small>VERIFIED</small>}</div>}
       </div>
+      {c.identity && <p className={`nt-hand text-[#2f3550] line-clamp-1 mb-1.5 ${featured ? "" : "sm"}`} style={{ lineHeight: featured ? "30px" : "26px" }}>{featured ? <span className="nt-hl">{c.identity}</span> : c.identity}</p>}
+      {c.beanNote.length > 0 && <div className="flex flex-wrap gap-1.5">{c.beanNote.map((b) => <span key={b} className="nt-chip" style={{ height: 22, fontSize: 11.5 }}>{b}</span>)}</div>}
     </button>
   );
 });
@@ -178,7 +184,7 @@ const HeadlineCard = memo(function HeadlineCard({ c, kicker, tone, onOpen }: { c
 //   HeadlineCard를 그대로 재사용해 상단 💎숨은보석·🎯오늘의테마와 톤·배지·태그가 통일된다(추가 코드 최소화).
 //   터치/클릭하면 5초간 멈췄다가 재개(읽는 도중 안 넘어감). 좌우 스와이프로 수동 이동도 가능.
 //   제목 표시줄이 없는 '코어'만 — Spotlight(단일기준)·RankSpotlight(탭전환)가 공유해서 쓴다.
-const SpotlightCore = memo(function SpotlightCore({ items, onOpen, toneOffset = 0, intervalMs = 4000 }: { items: DCafe[]; onOpen: (id: number) => void; toneOffset?: number; intervalMs?: number }) {
+const SpotlightCore = memo(function SpotlightCore({ items, onOpen, toneOffset = 0, intervalMs = 4000, featured = false }: { items: DCafe[]; onOpen: (id: number) => void; toneOffset?: number; intervalMs?: number; featured?: boolean }) {
   const [idx, setIdx] = useState(0);
   const [prevIdx, setPrevIdx] = useState<number | null>(null); // 진짜 크로스페이드용 — 이전 카드가 사라지는 동안만 유지
   const [paused, setPaused] = useState(false);
@@ -233,11 +239,11 @@ const SpotlightCore = memo(function SpotlightCore({ items, onOpen, toneOffset = 
         }}
       >
         <div key={`cur-${c.id}`} className={prevIdx !== null ? "dcn-spotlight-in" : undefined}>
-          <HeadlineCard c={c} kicker={`${idx + 1} / ${items.length}`} tone={(toneOffset + idx) % TONES.length} onOpen={onOpen} />
+          <HeadlineCard c={c} kicker={`${idx + 1} / ${items.length}`} tone={(toneOffset + idx) % TONES.length} onOpen={onOpen} featured={featured} />
         </div>
         {prevIdx !== null && items[prevIdx] && (
           <div key={`prev-${items[prevIdx].id}`} className="absolute inset-0 dcn-spotlight-out">
-            <HeadlineCard c={items[prevIdx]} kicker={`${prevIdx + 1} / ${items.length}`} tone={(toneOffset + prevIdx) % TONES.length} onOpen={onOpen} />
+            <HeadlineCard c={items[prevIdx]} kicker={`${prevIdx + 1} / ${items.length}`} tone={(toneOffset + prevIdx) % TONES.length} onOpen={onOpen} featured={featured} />
           </div>
         )}
       </div>
@@ -245,7 +251,7 @@ const SpotlightCore = memo(function SpotlightCore({ items, onOpen, toneOffset = 
         <div className="flex justify-center gap-1.5 mt-1">
           {items.map((_, i) => (
             <button key={i} onClick={() => { goTo(i); pauseThenResume(); }} aria-label={`${i + 1}번째`}
-              className={`h-1.5 rounded-full transition-all duration-300 ${i === idx ? "w-5 bg-[#9c6b3f]" : "w-1.5 bg-[#d9c6a5]"}`} />
+              className={`h-1.5 rounded-full transition-all duration-300 ${i === idx ? "w-5 bg-[#b9793b]" : "w-1.5 bg-[#d9cdb9]"}`} />
           ))}
         </div>
       )}
@@ -254,15 +260,15 @@ const SpotlightCore = memo(function SpotlightCore({ items, onOpen, toneOffset = 
 });
 
 // 제목표시줄+SpotlightCore — 단일 기준 섹션(추천·신규발견)용 얇은 래퍼.
-const Spotlight = memo(function Spotlight({ title, items, sub, info, onOpen, toneOffset = 0, intervalMs = 4000 }: { title: string; items: DCafe[]; sub?: string; info?: React.ReactNode; onOpen: (id: number) => void; toneOffset?: number; intervalMs?: number }) {
+const Spotlight = memo(function Spotlight({ title, items, sub, info, onOpen, toneOffset = 0, intervalMs = 4000, featured = false }: { title: string; items: DCafe[]; sub?: string; info?: React.ReactNode; onOpen: (id: number) => void; toneOffset?: number; intervalMs?: number; featured?: boolean }) {
   if (!items?.length) return null;
   return (
     <div className="mb-7">
-      <div className="flex items-baseline justify-between mb-1 pb-1 border-b-2 border-[#2b2018]">
-        <div className="text-base font-bold text-[#2b2018] flex items-center gap-1.5">{title}{info && <InfoDot title={title.replace(/^[^가-힣A-Za-z]+/, "")}>{info}</InfoDot>}</div>
-        {sub && <div className="text-[10px] text-[#7a5122] shrink-0">↕ {sub}</div>}
+      <div className="flex items-baseline justify-between mb-2 nt-ruled">
+        <div className={`nt-title text-[17px] flex items-center gap-1.5 ${featured ? "text-[#7a5122]" : ""}`}>{featured ? <span className="nt-hl latte">{title}</span> : title}{info && <span className="nt-free"><InfoDot title={title.replace(/^[^가-힣A-Za-z]+/, "")}>{info}</InfoDot></span>}</div>
+        {sub && <div className="text-[10.5px] text-[#8f8071] shrink-0">↕ {sub}</div>}
       </div>
-      <SpotlightCore items={items} onOpen={onOpen} toneOffset={toneOffset} intervalMs={intervalMs} />
+      <SpotlightCore items={items} onOpen={onOpen} toneOffset={toneOffset} intervalMs={intervalMs} featured={featured} />
     </div>
   );
 });
@@ -292,13 +298,13 @@ const RankSpotlight = memo(function RankSpotlight({ top3, momentum, specialty, f
   const safeKey = RANK_TABS[safeIdx].key;
   return (
     <div className="mb-7">
-      <div className="flex items-baseline justify-between mb-1 pb-1 border-b-2 border-[#2b2018]">
-        <div className="text-base font-bold text-[#2b2018] flex items-center gap-1.5">🔍 카페 둘러보기<InfoDot title="카페 둘러보기">{infoByKey[safeKey]}</InfoDot></div>
+      <div className="flex items-baseline justify-between mb-2 nt-ruled">
+        <div className="nt-title text-[17px] flex items-center gap-1.5">🔍 카페 둘러보기<span className="nt-free"><InfoDot title="카페 둘러보기">{infoByKey[safeKey]}</InfoDot></span></div>
       </div>
-      <div className="flex gap-1.5 mb-2 mt-1.5 flex-wrap">
+      <div className="flex gap-1.5 mb-2.5 mt-1 flex-wrap">
         {RANK_TABS.map((t, i) => (dataByKey[t.key] || []).length > 0 && (
           <button key={t.key} onClick={() => setTabIdx(i)}
-            className={`text-[11px] font-medium px-2.5 py-1 rounded-full border transition-colors ${i === safeIdx ? "bg-[#2b2018] text-[#f4ece0] border-[#2b2018]" : "bg-white text-[#7a5122] border-[#e3d3b8] hover:border-[#9c6b3f]"}`}>
+            className={`nt-chip transition-colors ${i === safeIdx ? "ink" : "hover:border-[#9c6b3f]"}`} style={{ fontSize: 11.5 }}>
             {t.label}
           </button>
         ))}
@@ -606,8 +612,8 @@ function topChars(c: Cafe, n = 4) {
 //   기억이 살아있는 순간에 기록으로 잇는다(강요 아님 — 작은 보조 버튼).
 function FavoritesModal({ items, onClose, onOpen, onRemove, onRecord }: { items: Cafe[]; onClose: () => void; onOpen: (c: Cafe) => void; onRemove: (id: number) => void; onRecord: (c: Cafe) => void }) {
   return (
-    <div className="fixed inset-0 z-[5000] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)", fontFamily: "'Gowun Batang', AppleMyungjo, 'Apple SD Gothic Neo', 'Noto Serif KR', serif" }} onClick={onClose}>
-      <div className="w-full max-w-lg bg-[#fdfaf4] rounded-t-2xl max-h-[80dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-[5000] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)", fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }} onClick={onClose}>
+      <div className="w-full max-w-lg nt-paper rounded-t-2xl max-h-[80dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-[#f0e6d4]">
           <div className="font-bold text-[#2b2018] text-[15px]"><span style={{ color: "#f0a832" }}>★</span> 즐겨찾기 <span className="text-[#665036] text-[12px] font-normal">{items.length}곳</span></div>
           <button onClick={onClose} className="w-8 h-8 rounded-full bg-[#f0e6d4] text-[#594839] text-lg">×</button>
@@ -636,6 +642,165 @@ function FavoritesModal({ items, onClose, onOpen, onRemove, onRecord }: { items:
               <button onClick={() => onRemove(c.id)} aria-label="찜 해제" className="shrink-0 text-[#d6336c] text-[18px] px-1 active:scale-90">❤</button>
             </div>
           ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// 📓 랜딩 = 테이블 위 노트(2026-09-12 2차). 어두운 호두나무 테이블 정물(Blender) 위, **렌더된 노트 페이지에 직접** 손글씨가
+//   원근을 따라 써진다(네모 메모 박스 없음). 위=어두운 나무+제목(커피 톤), 가운데=밝은 페이지(글이 채워짐), 아래=에스프레소 띠 위 CTA.
+//   · 채워지는 연출은 첫 방문에만(localStorage dcn_note_written) 약 2.6초, 움직임 줄이기면 즉시 완성본.
+//   · 문구는 기존 랜딩 카피 그대로. 메모 줄엔 숫자 주장 없음.
+//   · 페이지 4모서리 좌표는 Blender 카메라에서 실측(render/hero7.json: TL,TR,BR,BL, 이미지 비율 0~1). 렌더를 다시 뽑으면 이 값도 다시 잰다.
+const LANDING_MEMO_FALLBACK = ["오늘, 우리 동네.", "별점은 안 봤다. 다녀온 사람 글만 읽었다.", "광고·협찬 글은 걸러냈다.", "마음에 든 곳엔 도장 하나."];
+// 📓 오늘의 메모 — 홈 스포트라이트(매일 바뀌는 숨은 보석·오늘의 테마)에서 발췌한 진짜 문장. 숫자는 전부 데이터 값.
+function landingMemo(d: Discover | null): string[] {
+  const a = d?.headlineAList?.[0]; const b = d?.headlineBList?.[0]; const th = d?.themeB?.label;
+  if (!a) return LANDING_MEMO_FALLBACK;
+  const now = new Date(); const day = ["일", "월", "화", "수", "목", "금", "토"][now.getDay()];
+  const cut = (t: string, n: number) => { const x = (t || "").replace(/\s+/g, " ").trim(); return x.length > n ? x.slice(0, n).replace(/[\s·,]+$/, "") + "…" : x; };
+  const lines = [`${now.getMonth() + 1}월 ${now.getDate()}일 ${day}요일, ${cut(a.area, 9)}.`, `${cut(a.name, 9)} — ${cut(a.identity || "", 11)}`, `검증 후기 ${a.count ?? 0}건만 읽고 적었다.`];
+  if (b) lines.push(th && th.length <= 8 ? `${th}: ${cut(b.name, 9)} ✓` : `${cut(b.name, 12)}도 한 곳 ✓`);
+  lines.push("마음에 든 곳엔 도장 하나.");
+  return lines.slice(0, 5);
+}
+const HERO_W = 1400, HERO_H = 1680;
+const HERO_PAGE: [number, number][] = [[0.22101, 0.29961], [0.70849, 0.30326], [0.77393, 0.82833], [0.10523, 0.82145]];
+const PAGE_SW = 280, PAGE_SH = 387;            // 글을 쓰는 원본 사각형(px) — 페이지 비율 2.10:2.90
+const PAGE_RULE0 = 560 / 2900 * PAGE_SH;       // 첫 줄 y(텍스처 page-right-blank.json과 동일 규격)
+const PAGE_PITCH = 170 / 2900 * PAGE_SH;   // 줄 하나 = 손편지 한 줄(글리프가 줄 사이에 앉는다)       // 줄 간격
+// 단위 사각형→임의 사각형 호모그래피(adjugate 법) → CSS matrix3d
+function homographyMatrix3d(sw: number, sh: number, q: [number, number][]): string {
+  const adj = (m: number[]) => [m[4]*m[8]-m[5]*m[7], m[2]*m[7]-m[1]*m[8], m[1]*m[5]-m[2]*m[4], m[5]*m[6]-m[3]*m[8], m[0]*m[8]-m[2]*m[6], m[2]*m[3]-m[0]*m[5], m[3]*m[7]-m[4]*m[6], m[1]*m[6]-m[0]*m[7], m[0]*m[4]-m[1]*m[3]];
+  const mul = (a: number[], b: number[]) => { const r = new Array(9).fill(0); for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) for (let k = 0; k < 3; k++) r[3*i+j] += a[3*i+k]*b[3*k+j]; return r; };
+  const basis = (x1: number, y1: number, x2: number, y2: number, x3: number, y3: number, x4: number, y4: number) => {
+    const m = [x1, x2, x3, y1, y2, y3, 1, 1, 1]; const v = adj(m); const [l, mm, t] = [v[0]*x4+v[1]*y4+v[2], v[3]*x4+v[4]*y4+v[5], v[6]*x4+v[7]*y4+v[8]];
+    return [x1*l, x2*mm, x3*t, y1*l, y2*mm, y3*t, l, mm, t];
+  };
+  const s = basis(0, 0, sw, 0, sw, sh, 0, sh); const d = basis(q[0][0], q[0][1], q[1][0], q[1][1], q[2][0], q[2][1], q[3][0], q[3][1]);
+  const h = mul(d, adj(s)); const n = h[8] || 1; const H = h.map((v) => v / n);
+  return `matrix3d(${H[0]},${H[3]},0,${H[6]},${H[1]},${H[4]},0,${H[7]},0,0,1,0,${H[2]},${H[5]},0,${H[8]})`;
+}
+function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: () => void; onOwner: () => void; onLogin: () => void; discover: Discover | null }) {
+  const LANDING_MEMO = useMemo(() => landingMemo(discover), [discover]);
+  const [done, setDone] = useState<boolean | null>(null); // null=판단 전(SSR), true=완성본, false=쓰는 중
+  const [pos, setPos] = useState<[number, number]>([0, 0]); // [줄, 글자]
+  const [mtx, setMtx] = useState<string>("");
+  const heroRef = useRef<HTMLDivElement | null>(null);
+  const pageRef = useRef<HTMLDivElement | null>(null);
+  const nibRef = useRef<SVGSVGElement | null>(null);
+  const jitter = useMemo(() => LANDING_MEMO.map((l) => Array.from(l).map(() => [(Math.random() * 3.2 - 1.6).toFixed(2), (Math.random() * 2 - 1).toFixed(2)])), [LANDING_MEMO]);
+  // 페이지 사각형을 화면 픽셀로 — 이미지는 object-fit: cover(가운데)라 스케일·오프셋을 같이 계산
+  useEffect(() => {
+    const el = heroRef.current; if (!el) return;
+    const calc = () => {
+      const cw = el.clientWidth, ch = el.clientHeight; if (!cw || !ch) return;
+      const s = Math.max(cw / HERO_W, ch / HERO_H); const ox = (cw - HERO_W * s) / 2, oy = (ch - HERO_H * s) / 2;
+      const q = HERO_PAGE.map(([fx, fy]) => [fx * HERO_W * s + ox, fy * HERO_H * s + oy] as [number, number]);
+      setMtx(homographyMatrix3d(PAGE_SW, PAGE_SH, q));
+    };
+    calc(); const ro = new ResizeObserver(calc); ro.observe(el); return () => ro.disconnect();
+  }, []);
+  useEffect(() => {
+    // ✍ 매 방문 글씨가 써진다(약 2.6초, CEO 지시 "써지는 느낌") — 움직임 줄이기 설정만 즉시 완성본.
+    const reduce = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce) { setDone(true); return; }
+    setDone(false);
+    // ⏱ 시간 기반 진행(약 2.6초) — 백그라운드 탭에서 늦춰져도 총 길이 그대로.
+    const slow = typeof location !== "undefined" && /nt_slow/.test(location.search); // 검수용: ?nt_slow 로 느리게
+    const CPS = slow ? 5 : 32, GAP = 0.16;
+    const lens = LANDING_MEMO.map((l) => Array.from(l).length);
+    const starts: number[] = []; let acc = 0.6;
+    lens.forEach((n) => { starts.push(acc); acc += n / CPS + GAP; });
+    const total = acc; const t0 = performance.now(); let raf = 0; let alive = true;
+    const step = () => {
+      if (!alive) return;
+      const el = (performance.now() - t0) / 1000;
+      if (el >= total) { setPos([LANDING_MEMO.length, 0]); setDone(true); if (nibRef.current) nibRef.current.style.opacity = "0"; return; }
+      let li = 0; while (li + 1 < starts.length && el >= starts[li + 1]) li++;
+      const prog = (el - starts[li]) * CPS;                       // 이 줄에서 몇 글자째(소수 = 획 진행률)
+      const ci = Math.max(0, Math.min(lens[li], Math.floor(prog)));
+      setPos((p) => (p[0] === li && p[1] === ci ? p : [li, ci]));
+      // ✒ 펜촉: 지금 쓰는 글자의 왼쪽에서 오른쪽으로 획 진행률만큼 이동 + 손 떨림(위아래 1px, 기울기 ±3°). 줄 사이 쉼엔 살짝 든다.
+      const nib = nibRef.current, page = pageRef.current;
+      if (nib && page) {
+        const lineEl = page.querySelectorAll<HTMLElement>(".nt-w")[li];
+        const chars = lineEl ? lineEl.querySelectorAll<HTMLElement>(".ch") : null;
+        const idx = Math.min(ci, lens[li] - 1); const ch = chars && chars[idx];
+        if (lineEl && ch) {
+          const frac = prog >= lens[li] ? 1 : Math.max(0, prog - Math.floor(prog));
+          const lifted = prog >= lens[li];
+          const x = lineEl.offsetLeft + ch.offsetLeft + ch.offsetWidth * (lifted ? 1 : frac);
+          const y = lineEl.offsetTop + ch.offsetTop + ch.offsetHeight * 0.82 + Math.sin(el * 31) * 0.8;
+          nib.style.opacity = "1";
+          nib.style.transform = `translate(${x - 3}px, ${y - 31 - (lifted ? 6 : 0)}px) rotate(${12 + Math.sin(el * 17) * 3}deg)`;
+        }
+      }
+      raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => { alive = false; cancelAnimationFrame(raf); };
+  }, [LANDING_MEMO]);
+  const allDone = done === true;
+  const lineTop = PAGE_RULE0 - 21;   // 첫 줄부터: 손편지체 19px(행간=줄 간격 22.7px) 글리프 바닥이 줄보다 2.6px 위(실측 asc .92·desc .23·글 bbox 바닥 -.117em)
+  return (
+    <div className="w-full max-w-md mx-auto flex flex-col" style={{ minHeight: "100dvh", background: "var(--nt-espresso)" }}>
+      {/* 정물: 호두나무 테이블·펼친 노트·에스프레소·원두(Blender). 세로 5:6, 가운데 맞춤 */}
+      <div ref={heroRef} className="relative w-full overflow-hidden" style={{ height: "min(76dvh, 640px)" }}>
+        <img src="/note/hero.webp" alt="" aria-hidden className="absolute inset-0 w-full h-full object-cover" />
+        {/* 위: 어두운 나무 위 제목(커피 톤) · 아래: 에스프레소 띠로 녹아듦 */}
+        <div className="absolute inset-x-0 top-0 h-40" style={{ background: "linear-gradient(180deg, rgba(20,12,8,.62), rgba(20,12,8,0))" }} />
+        <div className="absolute inset-x-0 bottom-0 h-28" style={{ background: "linear-gradient(0deg, var(--nt-espresso), rgba(36,24,18,0))" }} />
+        <div className="absolute left-6 top-6 right-6">
+          <div className="nt-eyebrow" style={{ color: "#d9c7ad" }}>Dongne Coffee Note</div>
+          <h1 className="nt-title text-[34px] leading-[1.15] mt-1" style={{ color: "#f6ecdf", textShadow: "0 2px 12px rgba(0,0,0,.5)" }}>별점도 광고도 아닌,<br /><span className="nt-hl">진짜 후기.</span></h1>
+        </div>
+        {/* 렌더된 오른쪽 페이지 위에 원근 정합으로 얹는 글 */}
+        <div ref={pageRef} className="absolute left-0 top-0" style={{ width: PAGE_SW, height: PAGE_SH, transformOrigin: "0 0", transform: mtx || "translate(-9999px,0)" }}>
+          <div className="absolute" style={{ left: 42, right: 10, top: lineTop }}>
+            {LANDING_MEMO.map((line, li) => (
+              <div key={li} className={`nt-w nt-hand ${allDone || (done === false && li < pos[0]) ? "done" : ""}`} style={{ fontSize: 19, lineHeight: `${PAGE_PITCH}px`, height: PAGE_PITCH, color: "#2f3550", whiteSpace: "nowrap", overflow: "hidden" }}>
+                {done === null ? null : Array.from(line).map((ch, ci) => (
+                  <span key={ci} className={`ch${ch === " " ? " sp" : ""}${!allDone && li === pos[0] && ci < pos[1] ? " on" : ""}`}
+                    style={ch === " " ? undefined : { ["--r" as any]: `${jitter[li][ci][0]}deg`, ["--y" as any]: `${jitter[li][ci][1]}px` }}>{ch}</span>
+                ))}
+              </div>
+            ))}
+          </div>
+          <div className={`nt-stamp absolute ${allDone ? "in" : ""}`} style={{ right: 18, bottom: 26, opacity: allDone ? undefined : 0 }} aria-hidden>검증<small>VERIFIED</small></div>
+          {done === false && (
+            <svg ref={nibRef} className="nt-nib" viewBox="0 0 24 24" aria-hidden style={{ width: 22, height: 22 }}><path d="M3 21l3.5-1 11-11-2.5-2.5-11 11L3 21z" fill="#1f2640" stroke="#2a1f17" strokeWidth="1" /><path d="M14.5 6.5l2.5 2.5 2-2a1.7 1.7 0 0 0 0-2.4l-.1-.1a1.7 1.7 0 0 0-2.4 0l-2 2z" fill="#e0b25a" stroke="#2a1f17" strokeWidth="1" /><path d="M3 21l1-3.2 2.2 2.2L3 21z" fill="#2a1f17" /></svg>
+          )}
+        </div>
+      </div>
+      {/* 에스프레소 띠 — CTA */}
+      <div className="px-5 pb-6 -mt-2 relative z-[1]" style={{ color: "#f6ecdf" }}>
+        <p className="text-[15px] font-bold text-center leading-snug">우리 동네 카페, <span style={{ color: "#e9c99a" }}>진짜 후기만 가려</span> 골라드려요.</p>
+        <p className="text-[12.5px] text-center leading-relaxed mt-1" style={{ color: "#c9b391" }}>마음에 든 곳은 <span style={{ color: "#ff7fa6" }}>❤</span>로 <b style={{ color: "#f6ecdf" }}>나만의 동네 지도</b>에.</p>
+        <div className="space-y-2.5 mt-5 max-w-md mx-auto">
+          <button onClick={onConsumer} className="w-full rounded-lg py-4 px-5 text-left flex flex-col gap-0.5 active:scale-[0.99] transition" style={{ background: "linear-gradient(180deg, #f3e6d2, #e6d0b2)", color: "#241812", boxShadow: "0 14px 26px -14px rgba(0,0,0,.7), inset 0 1px 0 #fff8ec" }}>
+            <span className="text-[17px] font-bold">☕ 우리 동네 카페 보러가기</span>
+            <span className="text-[12px]" style={{ color: "#6b5340" }}>진짜 후기로 검증 · 내 취향에 딱 맞게</span>
+          </button>
+          <button onClick={onOwner} className="w-full rounded-lg py-4 px-5 text-left flex flex-col gap-0.5 active:scale-[0.99] transition" style={{ background: "rgba(255,255,255,.06)", border: "1px solid rgba(233,214,189,.45)", color: "#f6ecdf" }}>
+            <span className="text-[16px] font-bold">🏪 사장님, 우리 카페 보러가기</span>
+            <span className="text-[12px]" style={{ color: "#c9b391" }}>검증된 후기로 내 카페 경쟁력 진단 · <b style={{ color: "#e9c99a" }}>가입 없이 바로 확인</b></span>
+          </button>
+          <button onClick={onLogin} className="block w-full text-center text-[12px] underline underline-offset-2" style={{ color: "#c9b391" }}>
+            이미 키가 있어요 · 로그인
+          </button>
+        </div>
+        <div className="flex flex-wrap justify-center gap-1.5 mt-5">
+          {["별점, 이제 그만 믿어요", "리뷰 옥석만 남겼어요"].map((t) => (
+            <span key={t} className="nt-chip" style={{ background: "rgba(255,255,255,.08)", color: "#e9d6bd", borderColor: "rgba(233,214,189,.35)" }}>{t}</span>
+          ))}
+        </div>
+        <p className="text-[10.5px] mt-6 text-center leading-relaxed" style={{ color: "#9d8a70" }}>네이버·구글·유튜브 공개 후기 교차검증 + AI 맥락 판정<br />광고·협찬·무관 글은 자동 제외</p>
+        <div className="mt-3 text-[10.5px] flex gap-3 justify-center" style={{ color: "#9d8a70" }}>
+          <a href="/area" className="underline">동네별 카페</a>
+          <a href="/privacy" className="underline">개인정보처리방침</a>
+          <a href="/terms" className="underline">이용약관</a>
         </div>
       </div>
     </div>
@@ -721,6 +886,10 @@ export default function Home() {
   }, []);
   // 자연어 검색
   const [showSearch, setShowSearch] = useState(false);
+  const [turnKey, setTurnKey] = useState(0); // 📖 책장 넘김 카운터(탭 전환마다 +1 → 새 종이 한 장)
+  const [todayLabel, setTodayLabel] = useState(""); // ✍ 홈 제목 옆 손글씨 날짜(마운트 후 — SSR 시각 불일치 방지)
+  useEffect(() => { const d = new Date(); setTodayLabel(`${d.getMonth() + 1}월 ${d.getDate()}일 ${["일", "월", "화", "수", "목", "금", "토"][d.getDay()]}요일`); }, []);
+  const prevTabRef = useRef<string>("home");
   const [searchQ, setSearchQ] = useState("");
   const [searchRes, setSearchRes] = useState<SearchRes | null>(null);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -997,6 +1166,7 @@ export default function Home() {
   // 뒤로가기 가드: 현재 UI 레이어를 ref로 추적(리스너에서 최신값 참조)
   const uiRef = useRef<{ selected: boolean; showSearch: boolean; showConsent: boolean; tab: string; role: string | null; ownerPwModal: boolean; showSignup: boolean; sido: string; sigungu: string; dong: string; nearMe: boolean; nearHome: boolean }>({ selected: false, showSearch: false, showConsent: false, tab: "home", role: null, ownerPwModal: false, showSignup: false, sido: "", sigungu: "", dong: "", nearMe: false, nearHome: false });
   uiRef.current = { selected: !!selected, showSearch, showConsent, tab, role, ownerPwModal, showSignup, sido, sigungu, dong, nearMe: !!nearMe, nearHome: !!nearHome };
+  useEffect(() => { if (prevTabRef.current !== tab) { prevTabRef.current = tab; setTurnKey((k) => k + 1); } }, [tab]);
   // 위에서 연 레이어를 우선순위대로 즉시 닫는다(공통). allowMapBack=false면 지도→홈은 건너뜀(지도 패닝과 충돌 방지).
   const closeTopLayer = (allowMapBack = true) => {
     const u = uiRef.current;
@@ -1709,73 +1879,15 @@ export default function Home() {
     //   인스타 안드로이드 인앱 WebView가 페이지 폭을 못 구하고 좁은 뷰포트로 폴백→화면 확대(초기화면만 깨지던 원인, 2026-07-10).
     //   /area 등 min-h-screen 페이지는 정상이던 것과 동일 패턴으로 맞춤. 세로 가운데정렬은 유지.
     return (
-      <div className="min-h-screen w-full flex flex-col items-center justify-center px-6" style={{ paddingTop: "calc(env(safe-area-inset-top) + 1.5rem)", paddingBottom: "calc(env(safe-area-inset-bottom) + 1.5rem)", background: "radial-gradient(125% 85% at 50% -5%, #4a3526 0%, #3a2a1d 30%, #2b2018 60%, #241510 100%)", color: "#f4ece0", fontFamily: "'Gowun Batang', AppleMyungjo, 'Apple SD Gothic Neo', 'Noto Serif KR', serif" }}>
-        <style>{`
-          @keyframes dcnRise { from { opacity:0; transform: translateY(22px); } to { opacity:1; transform: translateY(0); } }
-          /* 홀로그램: 무지갯빛이 가로로 천천히 흐르며 미세하게 색조가 도는 은은한 효과(평평·베벨 없음) */
-          @keyframes dcnHolo { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
-          .dcn-rise { animation: dcnRise .4s cubic-bezier(.2,.7,.2,1) both; }
-          .dcn-title {
-            display:inline-block;
-            background: linear-gradient(100deg,#efe2cd 0%,#f3d7a8 28%,#e8b87a 50%,#f3d7a8 72%,#efe2cd 100%);
-            background-size: 220% auto; -webkit-background-clip:text; background-clip:text;
-            -webkit-text-fill-color:transparent; color:transparent;
-            animation: dcnRise .45s cubic-bezier(.2,.7,.2,1) both, dcnHolo 9s ease-in-out .45s infinite;
-          }
-          @keyframes dcnSteam {
-            0%   { opacity:0; transform: translateY(2px) translateX(0) scaleX(.8); }
-            22%  { opacity:.5; }
-            55%  { transform: translateY(-18px) translateX(5px) scaleX(1.25); }
-            100% { opacity:0; transform: translateY(-38px) translateX(-4px) scaleX(1.5); }
-          }
-          .dcn-cup { position:relative; display:inline-block; }
-          .dcn-steam { position:absolute; top:-22px; width:9px; height:28px; border-radius:50%;
-            background: linear-gradient(to top, rgba(244,236,224,0), rgba(244,236,224,.5)); filter: blur(5px); opacity:0; pointer-events:none; }
-          .dcn-s1 { left:39%; animation: dcnSteam 4.4s ease-in-out 1.4s infinite; }
-          .dcn-s2 { left:50%; animation: dcnSteam 5.0s ease-in-out 2.2s infinite; }
-          .dcn-s3 { left:61%; animation: dcnSteam 4.7s ease-in-out 3.0s infinite; }
-          /* 진입 심볼: 은은히 둥실 + 홀로그램 색조가 미세하게 도는 효과 */
-          @keyframes dcnFade { from { opacity:0; } to { opacity:1; } }
-          @keyframes dcnFloat { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
-          @keyframes dcnSymHolo { 0%,100% { filter: hue-rotate(0deg) saturate(1); } 50% { filter: hue-rotate(-13deg) saturate(1.12); } }
-          .dcn-symbol { display:block; margin:0 auto 12px; animation: dcnFade .9s ease both, dcnFloat 6s ease-in-out .9s infinite, dcnSymHolo 9s ease-in-out infinite; }
-          @media (prefers-reduced-motion: reduce) { .dcn-rise,.dcn-title { animation: dcnRise .01s both; } .dcn-title{ -webkit-text-fill-color:#f4ece0; color:#f4ece0; } .dcn-steam{ display:none; } .dcn-symbol{ animation: dcnFade .01s both; } }
-        `}</style>
-        <div className="dcn-cup mb-5">
-          <h1 className="dcn-title text-[2.9rem] sm:text-[3.3rem] leading-[1.12] font-bold tracking-tight">동네 커피 노트</h1>
-        </div>
-        <p className="dcn-rise text-[17px] text-[#f4ece0] mb-1.5 text-center leading-snug font-bold" style={{ animationDelay: ".05s" }}>별점도 광고도 아닌, <span className="text-[#e8b87a]">진짜 후기</span>.</p>
-        <p className="dcn-rise text-[15px] text-[#f4ece0] mb-2 text-center leading-relaxed font-bold" style={{ animationDelay: ".1s" }}>우리 동네 카페, <span className="text-[#e8b87a]">진짜 후기만 가려</span> 골라드려요.</p>
-        <p className="dcn-rise text-[13px] text-[#8f7a58] mb-5 text-center leading-relaxed" style={{ animationDelay: ".14s" }}>마음에 든 곳은 <span style={{ color: "#d6336c" }}>❤</span>로 <b className="text-[#f4ece0]">나만의 동네 지도</b>에.</p>
-        <div className="dcn-rise flex flex-wrap justify-center gap-1.5 mb-8 max-w-xs" style={{ animationDelay: ".16s" }}>
-          {["별점, 이제 그만 믿어요", "리뷰 옥석만 남겼어요"].map((t) => (
-            <span key={t} className="text-[12px] text-[#e8b87a] border border-[#5b4636] rounded-full px-3 py-1 whitespace-nowrap">{t}</span>
-          ))}
-        </div>
-        <div className="dcn-rise w-full max-w-sm space-y-3" style={{ animationDelay: ".18s" }}>
-          <button onClick={chooseConsumer} className="w-full bg-[#e6d3b2] text-[#2b2018] rounded-2xl py-5 px-5 text-left shadow-lg active:scale-[0.99] transition">
-            <div className="text-lg font-bold">☕ 우리 동네 카페 보러가기</div>
-            <div className="text-[12px] text-[#7c6a55] mt-0.5">진짜 후기로 검증 · 내 취향에 딱 맞게</div>
-          </button>
-          <button onClick={() => { trackOwnerCta(); setShowFind(true); }} className="w-full rounded-2xl py-5 px-5 text-left shadow-lg active:scale-[0.99] transition" style={{ background: "#2b2018", border: "1px solid #6b5334" }}>
-            <div className="text-lg font-bold text-[#f4ece0]">🏪 사장님, 우리 카페 보러가기</div>
-            <div className="text-[12px] text-[#c7ab82] mt-0.5">검증된 후기로 내 카페 경쟁력 진단 · <b className="text-[#e8b87a]">가입 없이 바로 확인</b></div>
-          </button>
-          <button onClick={() => { setOwnerPw(""); setOwnerErr(""); setOwnerPin(""); setOwnerPinErr(""); setOwnerAdminMode(false); setOwnerPwModal(true); }} className="block w-full text-center text-[12px] text-[#8f7a58] underline">
-            이미 키가 있어요 · 로그인
-          </button>
-        </div>
-        <p className="text-[10px] text-[#665036] mt-10 text-center leading-relaxed">네이버·구글·유튜브 공개 후기 교차검증 + AI 맥락 판정<br />광고·협찬·무관 글은 자동 제외</p>
-        <div className="mt-3 text-[10px] text-[#665036] flex gap-3">
-          <a href="/area" className="underline">동네별 카페</a>
-          <a href="/privacy" className="underline">개인정보처리방침</a>
-          <a href="/terms" className="underline">이용약관</a>
-        </div>
+      <div className="min-h-screen w-full nt-app" style={{ background: "var(--nt-espresso)", paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)", fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }}>
+        <LandingNote discover={discover} onConsumer={chooseConsumer}
+          onOwner={() => { trackOwnerCta(); setShowFind(true); }}
+          onLogin={() => { setOwnerPw(""); setOwnerErr(""); setOwnerPin(""); setOwnerPinErr(""); setOwnerAdminMode(false); setOwnerPwModal(true); }} />
 
         {ownerPwModal && (
           <div className="fixed inset-0 z-[5000] flex items-center justify-center px-6">
             <div className="absolute inset-0 bg-black/50" onClick={() => setOwnerPwModal(false)} />
-            <div className="relative bg-[#fdfaf4] text-[#2b2018] w-full max-w-sm rounded-2xl p-6 shadow-2xl">
+            <div className="relative nt-paper text-[#2a1f17] w-full max-w-sm rounded-2xl p-6 shadow-2xl">
               {/* 우측 상단: 무료 체험 */}
               <button onClick={() => setShowSignup(true)} className="absolute top-4 right-4 text-[11px] font-bold bg-[#e8b87a] text-[#2b2018] px-3 py-1.5 rounded-full shadow active:scale-95">✨ {TRIAL_DAYS}일 무료 체험</button>
               {ownerAdminMode ? (
@@ -1813,7 +1925,7 @@ export default function Home() {
           onNoMatch={() => { setShowFind(false); setShowSignup(true); }} />
         <OwnerSignupModal open={showSignup} onClose={() => setShowSignup(false)} trial source="home" />
         {backToast && (
-          <div className="fixed left-1/2 -translate-x-1/2 bottom-8 z-[6000] bg-[#f4ece0] text-[#2b2018] text-sm px-5 py-3 rounded-full shadow-xl">
+          <div className="fixed left-1/2 -translate-x-1/2 bottom-8 z-[6000] bg-[#2a1f17] text-[#fbf7f0] text-sm px-5 py-3 rounded-full shadow-xl">
             한 번 더 누르면 나가요
           </div>
         )}
@@ -1822,7 +1934,9 @@ export default function Home() {
   }
 
   return (
-    <div className="flex flex-col bg-[#f4ece0]" style={{ position: "fixed", inset: 0, fontFamily: "'Gowun Batang', AppleMyungjo, 'Apple SD Gothic Neo', 'Noto Serif KR', serif" }}>
+    <div className="flex flex-col nt-paper nt-app" style={{ position: "fixed", inset: 0, fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }}>
+      {/* 📖 책장 넘김 — 탭이 바뀔 때 종이 한 장이 왼쪽으로 넘어간다(0.55s, 움직임 줄이기면 없음) */}
+      {turnKey > 0 && <div key={turnKey} className="nt-turn" style={{ zIndex: 1600 }} aria-hidden />}
       {/* 📣 접속 시 안내 공지 — 데이터는 /api/discover 응답에 얹혀 온다(전용 요청 0, 비용 증가 0) */}
       <NoticeModal source={(discover as any)?.notice ?? null} />
       {/* ✨ 동적 연출(2026-07-30) — CSS 전용·가볍게·reduced-motion 존중. 우리 정체성을 '느끼게': ①골드핀 맥동 ②커피드립 로딩 ③저장 손맛 ④옥석 가리기 */}
@@ -1896,21 +2010,21 @@ export default function Home() {
         .maplibregl-ctrl-top-left { top:6px !important; left:10px !important; }
         @media (max-width: 767px) { .maplibregl-ctrl-zoom-in, .maplibregl-ctrl-zoom-out { display:none !important; } } /* 모바일은 핀치 줌 — 나침반(회전 복귀)만 남김 */
         @media (max-width: 767px) { .dcn-tgl .dcn-tgl-txt { display:none; } .dcn-tgl { padding-left:.5rem !important; padding-right:.5rem !important; } }
-        .maplibregl-ctrl-bottom-left .maplibregl-ctrl-scale { margin:0 0 12px 12px !important; background:rgba(255,253,249,.86) !important; border:1.5px solid #b79a6f !important; border-top:none !important; color:#6b4f35 !important; font:600 10px/1.4 'Gowun Batang',serif !important; padding:1px 6px !important; }
+        .maplibregl-ctrl-bottom-left .maplibregl-ctrl-scale { margin:0 0 12px 12px !important; background:rgba(255,253,249,.86) !important; border:1.5px solid #b79a6f !important; border-top:none !important; color:#6b4f35 !important; font:600 10px/1.4 'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif !important; padding:1px 6px !important; }
         .maplibregl-ctrl-attrib { background:rgba(255,253,249,.72) !important; color:#9c8569 !important; font-size:9px !important; padding:1px 6px !important; border-radius:6px 0 0 0 !important; }
         .maplibregl-ctrl-attrib a { color:#8a6d3b !important; }
         .maplibregl-ctrl-bottom-right .maplibregl-ctrl { margin:0 !important; }
-        .dcn-popup .maplibregl-popup-content { background:#fdfaf4; color:#2b2018; font:600 12px/1.4 'Gowun Batang',serif; padding:6px 10px; border-radius:10px; box-shadow:0 4px 14px rgba(50,33,20,.28); }
+        .dcn-popup .maplibregl-popup-content { background:#fdfaf4; color:#2b2018; font:600 12px/1.4 'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif; padding:6px 10px; border-radius:10px; box-shadow:0 4px 14px rgba(50,33,20,.28); }
         .dcn-popup .maplibregl-popup-tip { border-top-color:#fdfaf4; }
         .maplibregl-canvas:focus { outline:none; }
       `}</style>
-      <header className="shrink-0 bg-[#2b2018] text-[#f4ece0] z-[1500] flex items-center justify-between px-4 gap-3" style={{ height: "calc(3.5rem + env(safe-area-inset-top))", paddingTop: "env(safe-area-inset-top)" }}>
+      <header className="shrink-0 nt-header z-[1500] flex items-center justify-between px-4 gap-3 relative" style={{ height: "calc(3.5rem + env(safe-area-inset-top))", paddingTop: "env(safe-area-inset-top)", boxShadow: "0 2px 10px rgba(30,18,10,.28)" }}>
         <div className="flex items-center gap-3 min-w-0">
-          <button onClick={() => { try { sessionStorage.removeItem("dcn_role"); } catch {} setRole(null); }} className="text-lg font-bold shrink-0 dcn-shimmer" aria-label="랜딩으로">동네 커피 노트</button>
-          {/* 홈/지도/추억 토글 */}
-          <div className="flex bg-[#3d2f22] rounded-full p-0.5">
+          <button onClick={() => { try { sessionStorage.removeItem("dcn_role"); } catch {} setRole(null); }} className="nt-title text-[22px] leading-none shrink-0" aria-label="랜딩으로">동네 커피 노트</button>
+          {/* 홈/지도/추억 토글 — 노트 색인 탭 */}
+          <div className="flex rounded-full p-0.5" style={{ background: "rgba(255,255,255,.10)" }}>
             {(["home", "map", "memory"] as const).map((t) => (
-              <button key={t} onClick={() => setTab(t)} className={`px-2.5 sm:px-3 py-1.5 text-[13px] font-bold rounded-full transition-colors whitespace-nowrap ${tab === t ? "bg-[#f4ece0] text-[#2b2018]" : "text-[#e8d4b0]"}`}>
+              <button key={t} onClick={() => setTab(t)} className={`px-2.5 sm:px-3 py-1.5 text-[13px] font-bold rounded-full transition-colors whitespace-nowrap ${tab === t ? "bg-[#e9d6bd] text-[#241812]" : "text-[#d9c7ad]"}`}>
                 {t === "home" ? "홈" : t === "map" ? "지도" : "추억"}
               </button>
             ))}
@@ -1919,11 +2033,11 @@ export default function Home() {
         <div className="flex gap-2 shrink-0 items-center">
           {role === "owner" ? (
             <>
-              <a href="/owner" className="bg-[#9c6b3f] rounded-full px-3 py-1.5 text-xs whitespace-nowrap">내 카페 분석</a>
-              <a href="/cafe/register" className="bg-[#3d2f22] rounded-full px-3 py-1.5 text-xs whitespace-nowrap hidden sm:inline-block">사장님 등록</a>
+              <a href="/owner" className="bg-[#9c6b3f] text-[#fbf7f0] rounded-full px-3 py-1.5 text-xs whitespace-nowrap">내 카페 분석</a>
+              <a href="/cafe/register" className="bg-[#2a1f17] text-[#fbf7f0] rounded-full px-3 py-1.5 text-xs whitespace-nowrap hidden sm:inline-block">사장님 등록</a>
             </>
           ) : (
-            <button onClick={() => { try { sessionStorage.removeItem("dcn_role"); } catch {} setRole(null); }} className="text-[11px] text-[#8f7a58] underline whitespace-nowrap">사장님이세요?</button>
+            <button onClick={() => { try { sessionStorage.removeItem("dcn_role"); } catch {} setRole(null); }} className="text-[11px] text-[#c9b391] underline whitespace-nowrap">사장님이세요?</button>
           )}
         </div>
       </header>
@@ -1932,40 +2046,33 @@ export default function Home() {
       {tab === "home" && (
         <div className="flex-1 overflow-y-auto" style={{ paddingBottom: "3.25rem", position: "relative" }}>
           {/* 원두 실루엣 장식 제거(2026-07-31 CEO 지시) */}
-          <div className="max-w-2xl mx-auto px-5 pt-4 pb-6" style={{
-            // 📓 "커피 노트" 정체성 — 콘텐츠 폭에만 딱 맞춘 줄노트 텍스처(전체 화면폭이 아니라 실제
-            // 카드가 놓이는 영역에만 스코프해 넓은 화면에서 배경이 따로 노는 것 방지).
-            backgroundImage: "repeating-linear-gradient(to bottom, transparent 0, transparent 27px, rgba(43,32,24,0.06) 27px, rgba(43,32,24,0.06) 28px)",
-            backgroundPosition: "0 6px",
-            position: "relative", zIndex: 1,
-          }}>
+          <div className="max-w-2xl mx-auto px-5 pt-4 pb-6 nt-page-in" key={`home-${turnKey}`} style={{ position: "relative", zIndex: 1 }}>
+            {/* 📓 "한 권의 노트"(2026-09-12) — 배치·블록은 그대로, 재질만 종이·잉크·테이프·도장으로. 붉은 리본 책갈피가 위에서 내려온다. */}
+            <i className="nt-ribbon" style={{ right: 26, top: -6, height: 64 }} aria-hidden />
             <div className="text-center mb-6" style={{ position: "relative" }}>
-              {/* ☕ 커피잔 링 자국 재추가(2026-07-26 v6) — 비네트(어두운 배경 그라데이션)는 "코너가
-                  안 보인다"는 피드백으로 뺐지만, 은은한 링 자국만 다시 — 어둡게 깔지 않고 옅은
-                  링 두 겹만 그려 텍스트 가독성에 영향 없음. */}
-              <div aria-hidden style={{
-                position: "absolute", top: -8, right: -4, width: 70, height: 70, pointerEvents: "none", zIndex: 0,
-                backgroundImage:
-                  "radial-gradient(circle at 80% 25%, transparent 22px, rgba(120,80,40,0.16) 24px, rgba(120,80,40,0.16) 27px, transparent 29px), " +
-                  "radial-gradient(circle at 80% 25%, transparent 12px, rgba(120,80,40,0.11) 14px, rgba(120,80,40,0.11) 16px, transparent 18px)",
-              }} />
-              <div className="text-[10px] tracking-[0.3em] uppercase text-[#7a5122]" style={{ position: "relative" }}>데이터로 큐레이션하는</div>
-              <div className="text-xl font-bold border-y-2 border-[#2b2018] py-2 mt-1 dcn-shimmer-dark">{homeGu ? `${homeGu}의 오늘의 커피` : "오늘의 동네 커피"}</div>
+              {/* ☕ 커피 잔 자국 — 실제 마른 자국 이미지(절차 생성), 제목 오른쪽 위에 반쯤 걸쳐서 */}
+              <div className="nt-ring b" aria-hidden style={{ top: -46, right: -54, width: 150 }} />
+              {/* ✍ 날짜 — 노트 줄 하나를 차지하고 그 줄 위에 손글씨로 앉는다(요일 포함) */}
+              <div className="nt-ruled text-left relative" style={{ marginTop: -4 }}>{todayLabel && <span className="nt-hand sm coffee">{todayLabel}</span>}</div>
+              <div className="nt-eyebrow" style={{ position: "relative", lineHeight: "34px" }}>데이터로 큐레이션하는</div>
+              <div className="nt-title text-[21px] py-2 relative" style={{ borderTop: "1px solid rgba(42,31,23,.55)", borderBottom: "1px solid rgba(42,31,23,.55)" }}>
+                <span className="nt-hl text-[24px]">{homeGu ? `${homeGu}의 오늘의 커피` : "오늘의 동네 커피"}</span>
+              </div>
               {/* 시·도 → 시·군·구 → 동·면 계층 선택(우리 동네). 검색 돋보기 제거. */}
               <div className="flex gap-1.5 justify-center mt-3 flex-wrap">
-                <select value={homeSido} onChange={(e) => { setHomeSido(e.target.value); setHomeGu(""); setHomeDong(""); }} className="border border-[#cbb89f] rounded-lg px-2.5 py-2 text-sm font-bold bg-white text-[#2b2018]">
+                <select value={homeSido} onChange={(e) => { setHomeSido(e.target.value); setHomeGu(""); setHomeDong(""); }} className="nt-select px-2.5 py-2 text-sm">
                   <option value="">시·도</option>{Object.keys(REGIONS).map((s) => <option key={s} value={s}>{s}</option>)}
                 </select>
-                <select value={homeGu} onChange={(e) => { setHomeGu(e.target.value); setHomeDong(""); }} disabled={!homeSido} className="border border-[#cbb89f] rounded-lg px-2.5 py-2 text-sm font-bold bg-white text-[#2b2018] disabled:opacity-40">
+                <select value={homeGu} onChange={(e) => { setHomeGu(e.target.value); setHomeDong(""); }} disabled={!homeSido} className="nt-select px-2.5 py-2 text-sm disabled:opacity-40">
                   <option value="">시·군·구</option>{homeSido && REGIONS[homeSido].map((g) => <option key={g} value={g}>{g}</option>)}
                 </select>
-                <select value={homeDong} onChange={(e) => { const d = e.target.value; setHomeDong(d); if (d) { setSido(homeSido); setSigungu(homeGu); setDong(d); setFocusId(null); setSheetOpen(false); setTab("map"); } }} disabled={!homeGu || !homeDongOptions.length} className="border border-[#cbb89f] rounded-lg px-2.5 py-2 text-sm font-bold bg-white text-[#2b2018] disabled:opacity-40">
+                <select value={homeDong} onChange={(e) => { const d = e.target.value; setHomeDong(d); if (d) { setSido(homeSido); setSigungu(homeGu); setDong(d); setFocusId(null); setSheetOpen(false); setTab("map"); } }} disabled={!homeGu || !homeDongOptions.length} className="nt-select px-2.5 py-2 text-sm disabled:opacity-40">
                   <option value="">{homeGu && !homeDongOptions.length ? "우리 동네 (수집중)" : "우리 동네"}</option>{homeDongOptions.map((d) => <option key={d} value={d}>{d}</option>)}
                 </select>
                 {/* 📍 내 주변 옥석 카페 바로 찾기 — 아이콘만, 하단 내비 '내 위치' 핀과 같은 외곽선 아이콘으로 통일(발광 없음, 주변 select와 같은 톤) */}
                 <button onClick={() => (nearHome ? clearNearHome() : openLocation())}
                   aria-label={nearHome ? "내 주변 500m 해제" : "내 주변 옥석 카페 바로 찾기"}
-                  className={`shrink-0 w-9 h-9 flex items-center justify-center rounded-lg border transition-colors ${nearHome ? "border-[#7a5122] bg-[#f0e6d4]" : "border-[#cbb89f] bg-white"}`}>
+                  className={`shrink-0 w-9 h-9 flex items-center justify-center rounded-[5px] border transition-colors ${nearHome ? "border-[#7a5122] bg-[#f0e6d4]" : "border-[rgba(90,70,50,.28)] bg-white/85"}`}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={nearHome ? "#7a5122" : "#8a7458"} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M12 21c4.2-4 7-7.2 7-10.5A7 7 0 0 0 5 10.5C5 13.8 7.8 17 12 21Z" /><circle cx="12" cy="10.5" r="2.4" />
                   </svg>
@@ -1984,8 +2091,8 @@ export default function Home() {
             </div>
             {nearHome ? (
               <div>
-                <div className="flex items-baseline justify-between mb-2 pb-1 border-b-2 border-[#2b2018]">
-                  <div className="text-base font-bold text-[#2b2018]">📍 내 주변 500m 옥석 카페</div>
+                <div className="flex items-baseline justify-between mb-2 nt-ruled">
+                  <div className="nt-title text-[17px]">📍 내 주변 500m 옥석 카페</div>
                   <div className="text-[11px] text-[#2f6fb0] shrink-0 font-medium">{nearHomeCafes.length}곳</div>
                 </div>
                 {nearHomeCafes.length === 0 ? (
@@ -1993,7 +2100,7 @@ export default function Home() {
                 ) : (
                   <div className="flex flex-col gap-2">
                     {nearHomeCafes.map(({ c, d }) => (
-                      <button key={c.id} onClick={() => setSelected(c)} className="w-full text-left bg-white rounded-xl p-3.5 border border-[#ece0cd] hover:border-[#9c6b3f] hover:shadow-md transition-all flex flex-col">
+                      <button key={c.id} onClick={() => setSelected(c)} className="w-full text-left nt-scrap flat px-3.5 py-3 hover:shadow-md transition-all flex flex-col">
                         <div className="flex items-center gap-1.5 mb-1">
                           <span className="font-bold text-sm text-[#2b2018] truncate">{c.name}</span>
                           {c.synth_grade && GRADE_STYLE[c.synth_grade] && <span className="text-[8px] text-white px-1.5 py-0.5 rounded-full shrink-0" style={{ background: GRADE_STYLE[c.synth_grade].bg }}>{c.synth_grade}</span>}
@@ -2011,7 +2118,7 @@ export default function Home() {
               <>
                 {discover.headlineAList && discover.headlineAList.length > 0 && (
                   <div className="dcn-enter" style={{ animationDelay: "0s" }}>
-                    <Spotlight title="💎 오늘의 숨은 보석" items={discover.headlineAList} onOpen={openById} sub="검증됐지만 덜 알려진" toneOffset={0}
+                    <Spotlight title="💎 오늘의 숨은 보석" items={discover.headlineAList} onOpen={openById} sub="검증됐지만 덜 알려진" toneOffset={0} featured
                       info={<>검증 등급인데 아직 <b>리뷰가 적어 덜 알려진</b> 카페예요. 매일 다른 곳이 스포트라이트에 올라와요.</>} />
                   </div>
                 )}
@@ -2023,10 +2130,10 @@ export default function Home() {
                 )}
                 {discover.featured && discover.featured.length > 0 && <div className="dcn-enter" style={{ animationDelay: ".2s" }}><Spotlight title="✨ 추천 카페" items={discover.featured} onOpen={openById} sub="쇼케이스" toneOffset={2} info={<>사장님이 직접 <b>홍보 중인 쇼케이스 카페</b>예요(우선 노출). 후기·등급은 다른 카페와 똑같이 검증된 값이에요.</>} /></div>}
                 <div className="dcn-enter" style={{ animationDelay: ".3s" }}><RankSpotlight top3={discover.top3} momentum={momentum?.rising.slice(0, 5) ?? []} specialty={discover.specialty} fresh={discover.fresh} onOpen={openById} /></div>
-                <button onClick={() => { setSido(homeSido); setSigungu(homeGu); setDong(homeDong); setFocusId(null); setSheetOpen(false); setTab("map"); }} className="w-full bg-[#2b2018] text-[#f4ece0] rounded-xl py-3.5 font-medium mt-2">🗺 {homeDong ? `${homeDong} 지도로 보기` : homeGu ? `${homeGu} 지도로 보기` : "지도에서 전체 둘러보기"} →</button>
+                <button onClick={() => { setSido(homeSido); setSigungu(homeGu); setDong(homeDong); setFocusId(null); setSheetOpen(false); setTab("map"); }} className="nt-btn-ink py-3.5 mt-2">🗺 {homeDong ? `${homeDong} 지도로 보기` : homeGu ? `${homeGu} 지도로 보기` : "지도에서 전체 둘러보기"} →</button>
               </>
             )}
-            <p className="text-[10px] text-[#665036] mt-6 text-center leading-relaxed">모든 큐레이션은 네이버 공개 후기를 교차검증한 데이터 기반입니다.</p>
+            <p className="text-[10.5px] text-[#8f8071] mt-6 text-center leading-relaxed">모든 큐레이션은 네이버 공개 후기를 교차검증한 데이터 기반입니다.</p>
           </div>
 
         </div>
@@ -2037,7 +2144,11 @@ export default function Home() {
       <div className="flex-1 relative md:flex overflow-hidden" style={{ display: tab === "map" ? undefined : "none" }}>
           {/* 📱 모바일: 지도 영역을 바텀시트 '위'까지로 잡는다(--dcn-sheet). 전엔 시트가 지도 하반부를 덮어 지도 중심(서울)이 시트 밑에 숨고 화면엔 동두천·양주가 보였다. */}
           <div className="dcn-mapwrap absolute inset-0 md:relative md:flex-1 md:p-5" style={{ ["--dcn-sheet" as any]: tab === "map" ? (sheetOpen ? (sheetMode === "half" ? "calc(42dvh + 3.25rem)" : "calc(72dvh + 3.25rem)") : "calc(2.75rem + 3.25rem)") : "0px" }}>
-            <div ref={mapRef} className="w-full h-full md:rounded-2xl overflow-hidden bg-[#e8e0d3] z-0" />
+            <div ref={mapRef} className="w-full h-full md:rounded-sm overflow-hidden bg-[#e8e0d3] z-0 md:shadow-[0_18px_30px_-18px_rgba(30,18,10,.6)]" />
+            {/* 📓 접어 붙인 지도 — 접힌 자국 두 줄+가로 한 줄, 가장자리 그늘, 찢은 윗단, 테이프 2장(시안 그대로). 지도 조작은 그대로 통과 */}
+            <div className="nt-mapfold md:inset-5" aria-hidden><i className="h" /><i className="edge" /><i className="nt-tear" /></div>
+            <i className="nt-tape k" style={{ left: "18%", top: 6, transform: "rotate(-5deg)", zIndex: 1100 }} aria-hidden />
+            <i className="nt-tape" style={{ left: "auto", right: "12%", top: 8, transform: "rotate(4deg)", zIndex: 1100 }} aria-hidden />
             {mapErr && (
               <div className="absolute inset-0 z-[1150] flex items-center justify-center p-6 text-center text-[13px] text-[#5b4636]" style={{ background: "rgba(244,236,224,0.92)" }}>
                 <div><b>지도를 그릴 수 없는 브라우저예요.</b><br />최신 Chrome·Safari·Samsung 인터넷에서 열어 주세요. 목록과 검색은 그대로 쓸 수 있어요.</div>
@@ -2138,15 +2249,16 @@ export default function Home() {
           </div>
           {/* MapControls(지역/결/목록)는 무겁다(전체 정렬). 지도 탭일 때만 마운트 → 다른 화면 상태변경 시 재조정/정렬 안 함. 지도 div는 위에서 항상 유지. */}
           {tab === "map" && (<>
-          <aside className="hidden md:block md:w-[380px] md:h-full bg-[#fdfaf4] border-l border-[#ece0cd] overflow-y-auto p-6 relative z-10">
+          <aside className="hidden md:block md:w-[380px] md:h-full nt-paper2 border-l border-[#d9cdb9] overflow-y-auto p-6 relative z-10">
+            <div className="nt-eyebrow mb-3">접힌 지도 · {dong || sigungu || sido || "전국"}</div>
             <MapControls {...{ sido, sigungu, dong, onSido, onSigungu, setDong, dongOptions, tasteKey, setTasteKey, filtered, matchSet, setSelected, openLocation, autoGu, geoMsg, clearAuto, setShowFavs, favCount: cafes.filter((c) => bookmarkIds.has(c.id)).length, closeSheet: () => { setFocusId(null); setSheetOpen(false); } }} />
           </aside>
           {/* 📱 바텀시트 3단: 접힘(핸들만) → 반(지도와 목록이 함께 보임, 기본) → 전체. 전엔 열자마자 72dvh가 지도를 덮어 지도 탭인데 지도가 15%만 보였다. */}
-          <div className="md:hidden absolute left-0 right-0 bg-[#fdfaf4] rounded-t-3xl shadow-[0_-4px_24px_rgba(0,0,0,0.18)] z-[1200] flex flex-col transition-[transform,height] duration-300 ease-out will-change-transform" style={{ bottom: "3.25rem", height: sheetOpen && sheetMode === "half" ? "42dvh" : "72dvh", transform: sheetOpen ? "translateY(0)" : "translateY(calc(72dvh - 2.75rem))" }}>
+          <div className="md:hidden absolute left-0 right-0 nt-paper2 nt-torn shadow-[0_-4px_24px_rgba(0,0,0,0.18)] z-[1200] flex flex-col transition-[transform,height] duration-300 ease-out will-change-transform" style={{ bottom: "3.25rem", height: sheetOpen && sheetMode === "half" ? "42dvh" : "72dvh", transform: sheetOpen ? "translateY(0)" : "translateY(calc(72dvh - 2.75rem))" }}>
             {/* 접힘 시 정확히 이 핸들(2.75rem)까지만 보이게 — 아래 목록이 삐져나오지 않음 */}
             <div className="shrink-0 w-full flex items-center justify-between px-4" style={{ height: "2.75rem" }}>
               <button onClick={() => { if (!sheetOpen) { setSheetMode("half"); setSheetOpen(true); } else if (sheetMode === "half") setSheetMode("full"); else setSheetOpen(false); }} className="flex-1 flex flex-col items-center justify-center gap-1 h-full" aria-expanded={sheetOpen}>
-                <div className="w-9 h-1 bg-[#cbb89f] rounded-full" />
+                <div className="w-9 h-1 bg-[#c9bda9] rounded-full" />
                 <span className="text-[11px] font-bold text-[#7a5122] leading-none">{!sheetOpen ? `지역·필터 펼치기 ▴ (${filtered.length})` : sheetMode === "half" ? "더 펼치기 ▴" : "지도 보기 ▾"}</span>
               </button>
               {sheetOpen && sheetMode === "full" && (
@@ -2169,7 +2281,7 @@ export default function Home() {
         onRestore={(dev: string) => { try { localStorage.setItem("dcn_device", dev); } catch {} setDeviceId(dev); reloadMyCafes(dev, ""); }} />}
 
       {/* 하단 빠른 액션 바 — 모바일 전용. 뷰포트 바닥에 직접 고정 + 안전영역(홈인디케이터)까지 바 색으로 채움(네이버 방식) */}
-      <nav className="md:hidden flex items-stretch" style={{ position: "fixed", left: 0, right: 0, bottom: 0, height: "3.25rem", zIndex: 1300, background: tab === "map" ? "#fdfaf4" : "#f4ece0", boxShadow: "0 -1px 0 rgba(0,0,0,0.06)" }}>
+      <nav className="md:hidden flex items-stretch nt-paper2" style={{ position: "fixed", left: 0, right: 0, bottom: 0, height: "3.25rem", zIndex: 1300, boxShadow: "0 -1px 0 rgba(90,70,50,0.18)" }}>
         {[
           { k: "home", label: "홈", icon: <path d="M3 11.2 12 4l9 7.2M5.5 9.7V20h13V9.7" />, solid: false, active: tab === "home" && !showFavs && !showSearch },
           { k: "fav", label: "즐겨찾기", icon: <path d="M12 4.5l2.3 4.7 5.2.8-3.75 3.65.9 5.15L12 16.9l-4.65 2.45.9-5.15L4.5 10l5.2-.8z" />, solid: true, active: showFavs },
@@ -2187,7 +2299,7 @@ export default function Home() {
             else if (a.k === "search") { setSearchRes(null); setSearchQ(""); setShowSearch(true); }
             else openLocation();
           }} className="flex-1 flex flex-col items-center justify-center active:bg-[#ece0cd]" aria-label={a.label} aria-current={a.active ? "page" : undefined}>
-            <div className="flex flex-col items-center justify-center gap-0.5 rounded-2xl px-4 py-1 transition-colors" style={{ background: a.active ? "#f0e6d4" : "transparent" }}>
+            <div className="flex flex-col items-center justify-center gap-0.5 rounded-2xl px-4 py-1 transition-colors" style={{ background: a.active ? "rgba(185,121,59,.14)" : "transparent" }}>
               <svg width="22" height="22" viewBox="0 0 24 24" fill={a.solid && a.active ? color : "none"} stroke={color} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>{a.icon}</svg>
               <span className="text-[10px] font-bold leading-none whitespace-nowrap" style={{ color }}>{a.label}</span>
             </div>
@@ -2240,19 +2352,21 @@ export default function Home() {
       {showSearch && (
         <div className="fixed inset-0 z-[4000] flex items-start justify-center sm:p-6">
           <div className="absolute inset-0 bg-black/40" onClick={() => setShowSearch(false)} />
-          <div className="relative bg-[#fdfaf4] w-full sm:max-w-lg h-full sm:h-auto sm:max-h-[85vh] sm:rounded-2xl flex flex-col shadow-2xl overflow-hidden" style={{ height: "100dvh", paddingTop: "env(safe-area-inset-top)" }}>
-            <div className="shrink-0 p-4 border-b border-[#ece0cd]">
-              <div className="flex items-center gap-2">
+          <div className="relative nt-paper w-full sm:max-w-lg h-full sm:h-auto sm:max-h-[85vh] sm:rounded-lg flex flex-col shadow-2xl overflow-hidden" style={{ height: "100dvh", paddingTop: "env(safe-area-inset-top)" }}>
+            <div className="shrink-0 px-4 pt-4 pb-3 nt-header">
+              <div className="nt-eyebrow mb-2" style={{ color: "#c9b391" }}>느낌으로 찾기</div>
+              <div className="flex items-center gap-2 rounded-lg px-3" style={{ background: "rgba(247,240,228,.96)", boxShadow: "0 10px 18px -12px rgba(0,0,0,.7)" }}>
+                <span className="text-[#8f8071] text-[15px] shrink-0" aria-hidden>🔍</span>
                 <input autoFocus value={searchQ} onChange={(e) => setSearchQ(e.target.value)} onKeyDown={(e) => e.key === "Enter" && runSearch(searchQ)}
-                  placeholder={`느낌 또는 ☕카페 이름으로 찾기`} className="flex-1 border border-[#cbb89f] rounded-lg px-3 py-2.5 text-base bg-white text-[#2b2018]" />
-                <button onClick={() => runSearch(searchQ)} className="bg-[#2b2018] text-[#f4ece0] rounded-lg px-4 py-2.5 text-sm font-medium shrink-0">검색</button>
-                <button onClick={() => setShowSearch(false)} className="text-2xl text-[#7a5122] leading-none px-1 shrink-0">×</button>
+                  placeholder={`느낌 또는 ☕카페 이름으로 찾기`} className="flex-1 min-w-0 bg-transparent px-1 py-3 text-[17px] outline-none" style={{ fontFamily: "var(--nt-font)" }} />
+                <button onClick={() => runSearch(searchQ)} className="nt-btn-ink !w-auto px-4 py-1.5 text-sm shrink-0">검색</button>
+                <button onClick={() => setShowSearch(false)} className="text-2xl text-[#8f8071] leading-none px-1 shrink-0">×</button>
               </div>
-              <div className="text-[11px] text-[#5f7355] mt-2 font-medium">💡 “비 오는 날 조용히” 같은 <b>느낌</b>은 물론, <b>카페 이름</b>을 바로 적어도 찾아드려요.</div>
-              <div className="text-[11px] text-[#665036] mt-1">{homeGu ? `📍 ${homeGu} 안에서` : "전체 지역에서"} 검색</div>
+              <div className="text-[11.5px] mt-2.5" style={{ color: "#e9d6bd" }}>💡 “비 오는 날 조용히” 같은 <b>느낌</b>은 물론, <b>카페 이름</b>을 바로 적어도 찾아드려요.</div>
+              <div className="text-[11px] mt-1" style={{ color: "#c9b391" }}>{homeGu ? `📍 ${homeGu} 안에서` : "전체 지역에서"} 검색</div>
               <div className="flex flex-wrap gap-1.5 mt-2">
                 {SEARCH_EXAMPLES.map((ex) => (
-                  <button key={ex} onClick={() => runSearch(ex)} className="text-[11px] text-[#524234] bg-[#f0e6d4] rounded-full px-2.5 py-1">{ex}</button>
+                  <button key={ex} onClick={() => runSearch(ex)} className="nt-chip" style={{ fontSize: 11.5, background: "rgba(255,255,255,.08)", color: "#e9d6bd", borderColor: "rgba(233,214,189,.35)" }}>{ex}</button>
                 ))}
               </div>
             </div>
@@ -2262,12 +2376,12 @@ export default function Home() {
                 : (
                   <>
                     {searchRes.coverageNote && (
-                      <div className="mb-3 rounded-xl border border-[#e3c79a] bg-[#fff8ec] px-3.5 py-3 text-[12px] text-[#7a5a1e] leading-relaxed">
+                      <div className="mb-3 nt-scrap kraft px-3.5 py-3 text-[12px] text-[#7a5a1e] leading-relaxed">
                         ⚠️ {searchRes.coverageNote}
                       </div>
                     )}
                     {searchRes.franchiseNote && (
-                      <div className="mb-3 rounded-xl border border-[#d8c8ad] bg-[#faf5ea] px-3.5 py-3 text-[12px] text-[#6b5640] leading-relaxed">
+                      <div className="mb-3 nt-scrap r px-3.5 py-3 text-[12px] text-[#6b5640] leading-relaxed">
                         ☕ {searchRes.franchiseNote}
                       </div>
                     )}
@@ -2278,7 +2392,7 @@ export default function Home() {
                         <div className="flex flex-wrap gap-1.5">
                           {searchRes.places.map((p, i) => (
                             <button key={`${p.name}-${i}`} onClick={() => goToPlace(p.lat, p.lng, p.kind === "apt" || p.kind === "station" ? 16.5 : 15.5)}
-                              className="flex items-center gap-1 bg-white border border-[#d8c8ad] rounded-full pl-2 pr-2.5 py-1.5 text-[12px] text-[#2b2018] hover:border-[#9c6b3f] active:bg-[#faf5ea]">
+                              className="nt-chip hover:border-[#9c6b3f] active:bg-[#faf5ea]" style={{ height: 28 }}>
                               <span>{p.icon}</span><b className="font-semibold">{p.name}</b>
                               <span className="text-[10px] text-[#8a7a68]">{p.label}</span>
                             </button>
@@ -2310,10 +2424,10 @@ export default function Home() {
                           </div>
                         )}
                         {searchRes.results.map((r) => (
-                          <button key={r.id} onClick={() => { openById(r.id); setShowSearch(false); }} className="w-full text-left bg-white rounded-xl p-3.5 border border-[#ece0cd] hover:border-[#9c6b3f]">
+                          <button key={r.id} onClick={() => { openById(r.id); setShowSearch(false); }} className="w-full text-left nt-scrap flat px-3.5 py-3 hover:border-[#9c6b3f]">
                             <div className="flex items-center gap-1.5 mb-0.5">
-                              <span className="font-bold text-sm text-[#2b2018]">{r.name}</span>
-                              {r.grade && GRADE_STYLE[r.grade] && <span className="text-[8px] text-white px-1 py-0.5 rounded-full" style={{ background: GRADE_STYLE[r.grade].bg }}>{r.grade}</span>}
+                              <span className="font-bold text-sm text-[#2a1f17]">{r.name}</span>
+                              {r.grade && GRADE_STYLE[r.grade] && <span className={`nt-pill ${r.grade === "검증" ? "verify" : r.grade === "참고" ? "ref" : "cand"}`}>{r.grade}</span>}
                                 <VisitorBadges vb={(r as any).vb} />
                               <span className="text-[10px] text-[#665036] ml-auto">{r.area} · 리뷰 {r.count ?? 0}</span>
                             </div>
@@ -2407,19 +2521,19 @@ function MapControls({ sido, sigungu, dong, onSido, onSigungu, setDong, dongOpti
       )}
       <div className="mb-5">
         <div className="flex items-center justify-between mb-2.5">
-          <div className="text-sm font-bold text-[#52402e]">📍 지역</div>
+          <div className="nt-title text-[15px]">📍 지역</div>
           {autoGu
             ? <span className="text-[11px] text-[#5f7355] bg-[#eef3ea] border border-[#cfe0c2] rounded-full px-2 py-0.5">내 위치 <b>{autoGu}</b></span>
             : <button onClick={openLocation} className="text-[11px] text-white bg-[#5f7355] rounded-full px-2.5 py-1 font-medium">📍 내 위치로</button>}
         </div>
         <div className="flex gap-1.5">
-          <select value={sido} onChange={(e) => onSido(e.target.value)} className="flex-1 min-w-0 border border-[#cbb89f] rounded-lg px-2.5 py-2.5 text-[15px] bg-white text-[#2b2018]">
+          <select value={sido} onChange={(e) => onSido(e.target.value)} className="flex-1 min-w-0 nt-select px-2.5 py-2.5 text-[15px] font-normal">
             <option value="">시·도</option>{Object.keys(REGIONS).map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
-          <select value={sigungu} onChange={(e) => onSigungu(e.target.value)} disabled={!sido} className="flex-1 min-w-0 border border-[#cbb89f] rounded-lg px-2.5 py-2.5 text-[15px] bg-white text-[#2b2018] disabled:opacity-50">
+          <select value={sigungu} onChange={(e) => onSigungu(e.target.value)} disabled={!sido} className="flex-1 min-w-0 nt-select px-2.5 py-2.5 text-[15px] font-normal disabled:opacity-50">
             <option value="">시·군·구</option>{sido && REGIONS[sido].map((g: string) => <option key={g} value={g}>{g}</option>)}
           </select>
-          <select value={dong} onChange={(e) => { const d = e.target.value; setDong(d); if (d && closeSheet) closeSheet(); }} disabled={!sigungu || !(dongOptions?.length)} className="flex-1 min-w-0 border border-[#cbb89f] rounded-lg px-2.5 py-2.5 text-[15px] bg-white text-[#2b2018] disabled:opacity-50">
+          <select value={dong} onChange={(e) => { const d = e.target.value; setDong(d); if (d && closeSheet) closeSheet(); }} disabled={!sigungu || !(dongOptions?.length)} className="flex-1 min-w-0 nt-select px-2.5 py-2.5 text-[15px] font-normal disabled:opacity-50">
             <option value="">{sigungu && !(dongOptions?.length) ? "우리 동네(수집중)" : "우리 동네"}</option>{(dongOptions ?? []).map((d: string) => <option key={d} value={d}>{d}</option>)}
           </select>
         </div>
@@ -2427,12 +2541,13 @@ function MapControls({ sido, sigungu, dong, onSido, onSigungu, setDong, dongOpti
         {(sido || sigungu || dong) && <button onClick={() => { if (clearAuto) clearAuto(); else { onSido(""); } }} className="text-xs text-[#7a5122] underline mt-2">전체</button>}
       </div>
       <div className="mb-5">
-        <div className="text-sm font-bold text-[#52402e] mb-2.5 flex items-center gap-1.5">☕ 어떤 카페 찾으세요?<InfoDot title="'결'로 거르기"><b>결</b>은 후기에서 자주 언급되는 카페의 성격이에요(조용·작업·디저트·로스팅 등). 고르면 그 결이 강한 카페만 핀·목록에 뜨고, <b>그 결이 많이 언급된 순</b>으로 정렬돼요. 측정값이 아니라 '리뷰에서 자주 나온 정도'입니다.</InfoDot></div>
+        <div className="nt-title text-[15px] mb-2.5 flex items-center gap-1.5">☕ 어떤 카페 찾으세요?<InfoDot title="'결'로 거르기"><b>결</b>은 후기에서 자주 언급되는 카페의 성격이에요(조용·작업·디저트·로스팅 등). 고르면 그 결이 강한 카페만 핀·목록에 뜨고, <b>그 결이 많이 언급된 순</b>으로 정렬돼요. 측정값이 아니라 '리뷰에서 자주 나온 정도'입니다.</InfoDot></div>
         <div className="grid grid-cols-2 gap-2.5">
           {TASTE_CHOICES.map((t) => (
-            <button key={t.key} onClick={() => setTasteKey(tasteKey === t.key ? null : t.key)} className={`rounded-xl p-3 text-left border transition-colors ${tasteKey === t.key ? "bg-[#2b2018] text-[#f4ece0] border-[#2b2018]" : "bg-white text-[#2b2018] border-[#cbb89f]"}`}>
-              <div className="text-xl mb-0.5">{t.emoji}</div><div className="text-xs font-bold">{t.label}</div>
-              <div className={`text-[10px] mt-0.5 ${tasteKey === t.key ? "text-[#d4a574]" : "text-[#665036]"}`}>{t.desc}</div>
+            <button key={t.key} onClick={() => setTasteKey(tasteKey === t.key ? null : t.key)} className={`nt-scrap p-3 text-left transition-colors ${tasteKey === t.key ? "!bg-[#2a1f17] text-[#fbf7f0]" : "text-[#2a1f17]"}`} style={tasteKey === t.key ? { backgroundImage: "none" } : undefined}>
+              <i className="nt-tape sm" aria-hidden style={{ width: 62, height: 14, top: -6 }} />
+              <div className="text-2xl mb-0.5">{t.emoji}</div><div className="nt-title text-[13.5px]">{t.label}</div>
+              <div className={`text-[10px] mt-0.5 ${tasteKey === t.key ? "text-[#d4a574]" : "text-[#8f8071]"}`}>{t.desc}</div>
             </button>
           ))}
         </div>
@@ -2444,9 +2559,9 @@ function MapControls({ sido, sigungu, dong, onSido, onSigungu, setDong, dongOpti
         )}
       </div>
       <div>
-        <div className="flex items-baseline justify-between mb-2">
-          <div className="text-sm font-bold text-[#52402e]">목록 ({listCafes.length}{tasteKey ? ` · ${TASTE_CHOICES.find((t: any) => t.key === tasteKey)?.label}` : ""})</div>
-          <div className="text-[10px] text-[#7a5122] shrink-0">↕ {sortLabel}</div>
+        <div className="flex items-baseline justify-between nt-ruled">
+          <div className="nt-title text-[15px]">목록 ({listCafes.length}{tasteKey ? ` · ${TASTE_CHOICES.find((t: any) => t.key === tasteKey)?.label}` : ""})</div>
+          <div className="text-[10px] text-[#8f8071] shrink-0">↕ {sortLabel}</div>
         </div>
         {/* 🧳🏠 방문객 성격 필터 — 배지가 소수라 목록을 훑어선 못 찾는다. 곳수를 함께 보여줘 헛클릭을 막는다. */}
         {(vbCounts.L > 0 || vbCounts.T > 0 || vbCounts.D > 0) && (
@@ -2460,19 +2575,22 @@ function MapControls({ sido, sigungu, dong, onSido, onSigungu, setDong, dongOpti
             {vbFilter && <button onClick={() => setVbFilter("")} className="text-[11px] text-[#7a5122] underline px-1">전체</button>}
           </div>
         )}
-        {listCafes.length === 0 ? <p className="text-xs text-[#665036] bg-[#f4ece0] rounded-lg p-4">{tasteKey ? "이 카테고리에 해당하는 카페가 이 지역엔 없어요. 다른 결을 골라보세요." : "지역을 선택하면 목록이 나와요."}</p> : (
-          <div className="space-y-2">
-            {listCafes.slice(0, 50).map((c: Cafe) => (
-              <button key={c.id} onClick={() => setSelected(c)} className="w-full text-left bg-[#f4ece0] rounded-xl p-3">
-                <div className="flex items-center gap-1.5">
-                  <span className="font-bold text-sm text-[#2b2018]">{c.name}</span>
-                  {c.synth_grade && GRADE_STYLE[c.synth_grade] && <span className="text-[9px] text-white px-1.5 py-0.5 rounded-full" style={{ background: GRADE_STYLE[c.synth_grade].bg }}>{GRADE_STYLE[c.synth_grade].label}</span>}
-                    <OwnerBadge om={(c as any).om} />
-                    <VisitorBadges vb={(c as any).vb} />
-                  {tasteKey && matchSet.has(c.id) && <span className="text-[10px] text-[#5f7355]">✓</span>}
-                  <span className="text-[10px] text-[#665036] ml-auto">{c.area} · 리뷰 {c.synth_count ?? 0}</span>
+        {listCafes.length === 0 ? <p className="text-xs text-[#8f8071] nt-ruled" style={{ paddingTop: 17 }}>{tasteKey ? "이 카테고리에 해당하는 카페가 이 지역엔 없어요. 다른 결을 골라보세요." : "지역을 선택하면 목록이 나와요."}</p> : (
+          <div className="nt-ruled">
+            {/* 📓 목차 줄 — 번호는 손글씨, 이름은 명조, 한 줄 메모는 그 아래 줄 */}
+            {listCafes.slice(0, 50).map((c: Cafe, i: number) => (
+              <button key={c.id} onClick={() => setSelected(c)} className="w-full text-left block">
+                <div className="nt-ln">
+                  <span className="n">{i + 1}.</span>
+                  <span className="nm text-[14px] flex items-center gap-1.5 min-w-0">
+                    <span className="truncate">{c.name}</span>
+                    {c.synth_grade && GRADE_STYLE[c.synth_grade] && <span className={`nt-pill ${c.synth_grade === "검증" ? "verify" : c.synth_grade === "참고" ? "ref" : "cand"}`}>{GRADE_STYLE[c.synth_grade].label}</span>}
+                    <span className="nt-free inline-flex items-center gap-1"><OwnerBadge om={(c as any).om} /><VisitorBadges vb={(c as any).vb} /></span>
+                    {tasteKey && matchSet.has(c.id) && <span className="text-[11px] text-[#3e7a5a]">✓</span>}
+                  </span>
+                  <span className="m">{c.area} · 리뷰 {c.synth_count ?? 0}</span>
                 </div>
-                <div className="text-[11px] text-[#524234] line-clamp-1">{c.note || c.vibe}</div>
+                {(c.note || c.vibe) && <div className="text-[12px] text-[#5c4b3c] truncate" style={{ paddingLeft: 34 }}>{c.note || c.vibe}</div>}
               </button>
             ))}
           </div>
@@ -2560,9 +2678,9 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
     // 🗺️ 상세가 열려 있어도 **지도는 계속 쓸 수 있다**(CEO 지시) — 껍데기는 포인터를 통과시키고 패널만 받는다.
     //    데스크톱: 딤·클릭가로채기 없음(지도 팬·줌·다른 핀 선택 그대로). 닫기는 ✕·뒤로가기·지도 빈 곳 클릭.
     //    모바일: 패널이 화면을 꽉 채우므로 예전처럼 딤+바깥탭 닫기 유지(전환 애니메이션 중에만 보임).
-    <div className="fixed inset-0 z-[3000] overflow-hidden pointer-events-none" style={{ fontFamily: "'Gowun Batang', AppleMyungjo, 'Apple SD Gothic Neo', 'Noto Serif KR', serif" }}>
+    <div className="fixed inset-0 z-[3000] overflow-hidden pointer-events-none" style={{ fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }}>
       <div onClick={onClose} className={`absolute inset-0 bg-black/30 pointer-events-auto md:bg-transparent md:pointer-events-none transition-opacity duration-300 ${shown ? "opacity-100" : "opacity-0"}`} />
-      <aside className={`absolute top-0 right-0 w-full md:max-w-md bg-[#fdfaf4] shadow-2xl overflow-y-auto pointer-events-auto transition-transform duration-300 ease-out motion-reduce:transition-none ${shown ? "translate-x-0" : "translate-x-full"}`} style={{ height: "100dvh", paddingTop: "env(safe-area-inset-top)" }}>
+      <aside className={`absolute top-0 right-0 w-full md:max-w-md nt-paper shadow-2xl overflow-y-auto pointer-events-auto transition-transform duration-300 ease-out motion-reduce:transition-none ${shown ? "translate-x-0" : "translate-x-full"}`} style={{ height: "100dvh", paddingTop: "env(safe-area-inset-top)" }}>
         {/* 사장님 쇼케이스 — 영상(style 0) 또는 10종 템플릿 */}
         {promo && (
           <>
@@ -2593,26 +2711,16 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
         )}
         {/* 상단 테마 배너 — 5종 랜덤, 액자 느낌 */}
         {!promo && (
-          <div style={{ background: "#2b2018", fontFamily: "'Gowun Batang', AppleMyungjo, 'Apple SD Gothic Neo', 'Noto Serif KR', serif" }} className="w-full px-5 pt-5 pb-4">
-            <style>{`
-              @keyframes dcnHoloB { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
-              .dcn-title-b {
-                display: inline-block;
-                background: linear-gradient(100deg,#efe2cd 0%,#f3d7a8 28%,#e8b87a 50%,#f3d7a8 72%,#efe2cd 100%);
-                background-size: 220% auto; -webkit-background-clip: text; background-clip: text;
-                -webkit-text-fill-color: transparent; color: transparent;
-                animation: dcnHoloB 9s ease-in-out infinite;
-              }
-            `}</style>
-            <div className="dcn-title-b text-[1.15rem] font-bold tracking-tight leading-snug mb-1">동네 커피 노트</div>
-            <p className="text-[11px] leading-relaxed" style={{ color: "#cbb89f" }}>
-              별점 말고, <span style={{ color: "#e8b87a", fontWeight: 700 }}>검증된 후기</span>로 고르세요.
-            </p>
+          <div className="w-full px-5 pt-4 pb-3 nt-paper2 relative" style={{ boxShadow: "0 1px 0 rgba(90,70,50,.18)" }}>
+            <div className="nt-eyebrow">Dongne Coffee Note · 한 장</div>
+            <div className="nt-title text-[17px] mt-0.5">동네 커피 노트</div>
+            <p className="text-[11.5px] text-[#8f8071]">별점 말고, <span className="text-[#7a5122] font-bold">검증된 후기</span>로 고르세요.</p>
           </div>
         )}
-        <div className="p-5">
-          <div className="flex items-center justify-between mb-1">
-            <div className="flex items-center gap-2 min-w-0"><h3 className="text-xl font-bold text-[#2b2018] truncate">{cafe.name}</h3><OwnerBadge om={(cafe as any).om} />{g && <span className="text-[10px] text-white px-2 py-0.5 rounded-full shrink-0" style={{ background: g.bg }}>{g.label}</span>}
+        <div className="p-5 relative">
+          <div className="nt-ring" aria-hidden style={{ right: -60, top: 120, width: 180 }} />
+          <div className="flex items-center justify-between mb-1 relative">
+            <div className="flex items-center gap-2 min-w-0"><h3 className="text-xl font-bold text-[#2a1f17] truncate">{cafe.name}</h3><OwnerBadge om={(cafe as any).om} />{g && <span className={`nt-pill shrink-0 ${cafe.synth_grade === "검증" ? "verify" : cafe.synth_grade === "참고" ? "ref" : "cand"}`}>{g.label}</span>}
               {/* 🧳🏠 방문객 성격 — 지도에서 카페를 누르면 뜨는 이 패널이 실제 소비 지점이다.
                   여기 표시가 없으면 "지도에서는 구분이 안 된다"는 말이 맞다(CEO 지적). */}
               <VisitorBadges vb={(cafe as any).vb} /></div>
@@ -2638,8 +2746,7 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
           {/* ❤ MY PIN(내 카페 추억) 노출 배너 — 지도 패널에서도 눈에 띄게(#339/#347, /c/[id] 배너와 동일 톤). 2단계 저장·무가입 원칙 무변, 노출만 강화 */}
           {onSaveMemory && (
             <button type="button" onClick={onSaveMemory}
-              className="w-full flex items-center justify-between gap-2 rounded-xl px-4 py-3 border border-[#f0b8cc] text-left mb-3"
-              style={{ background: "linear-gradient(90deg,#fdeaf1,#f4ece0)" }}>
+              className="w-full nt-scrap flat pink flex items-center justify-between gap-2 px-4 py-3 text-left mb-3">
               <span className="flex flex-col">
                 <span className="text-[12.5px] font-bold text-[#b23a5f] flex items-center gap-1">
                   <span className="text-[14px] leading-none">❤</span> 이 카페, 다녀가셨나요?
@@ -2649,23 +2756,20 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
               <span className="text-[#d6336c] font-bold whitespace-nowrap">→</span>
             </button>
           )}
-          <div className="text-[#7a5122] text-sm mb-3">{cafe.area} · {cafe.vibe}</div>
-          {cafe.note && <p className="text-[15px] text-[#3d2f22] font-medium leading-relaxed mb-4">"{cafe.note}"</p>}
+          <div className="text-[#8f8071] text-sm mb-3 relative">{cafe.area} · {cafe.vibe}</div>
+          {cafe.note && <p className="text-[15px] text-[#2a1f17] font-medium leading-relaxed mb-4 relative">"{cafe.note}"</p>}
           {/* ⭐ 한눈에 판단 — 전체 카페 대비 강점/아쉬운점(리뷰 옥석 보기 전 직관 판단의 핵심) */}
           {/* 📊 리뷰 데이터 분석 — 옥석 후기 핵심(가장 먼저 눈에 띄게, 구미 당기는 hook) */}
           {(highlights.length > 0 || cafe.synth_identity) && (
-            <div className="bg-gradient-to-b from-[#f4eee2] to-[#ece4d4] rounded-xl px-4 py-3.5 mb-3 border border-[#d8c8ad]">
-              <div className="text-[11px] font-bold text-[#7a5f3c] uppercase tracking-wider mb-2">📊 리뷰 데이터 분석 <span className="font-normal lowercase tracking-normal text-[#7a5122]">· 검증 후기 {cafe.synth_count}건</span></div>
-              {cafe.synth_identity && <div className="text-[14px] font-semibold text-[#3d2f22] leading-relaxed mb-2.5">{cafe.synth_identity}</div>}
+            <div className="nt-ruled mb-3 relative">
+              <div className="nt-sec">우리가 읽고 적은 판정 · 검증 후기 {cafe.synth_count}건</div>
+              {cafe.synth_identity && <p className="nt-hand">{cafe.synth_identity}</p>}
               {highlights.length > 0 && (
                 <>
-                  <div className="text-[10.5px] text-[#7a5122] mb-1.5">후기에서 가장 많이 나온 것 <span className="text-[#b9a78a]">· 숫자=언급 후기 수</span></div>
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="text-[12px] text-[#8f8071]">후기에서 가장 많이 나온 것 · 숫자=언급 후기 수</div>
+                  <div className="nt-chips">
                     {highlights.map((h, i) => (
-                      <span key={h.label} className={`text-[12.5px] rounded-full pl-2.5 pr-1.5 py-1 border font-semibold inline-flex items-center gap-1.5 ${i === 0 ? "bg-[#2b2018] text-[#f4ece0] border-[#2b2018]" : "bg-white text-[#52402e] border-[#d8c8ad]"}`}>
-                        {h.emoji} {h.label}
-                        <span className={`text-[10px] font-bold rounded-full px-1.5 py-[1px] ${i === 0 ? "bg-[#e8b87a] text-[#2b2018]" : "bg-[#efe9dd] text-[#665036]"}`}>{h.count}</span>
-                      </span>
+                      <span key={h.label} className={`nt-chip ${i === 0 ? "ink" : ""}`}>{h.emoji} {h.label}<b>{h.count}</b></span>
                     ))}
                   </div>
                 </>
@@ -2674,49 +2778,47 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
           )}
           {/* 메뉴·가격은 카테고리화 한계로 잠정 비노출(추후 LLM으로 주력메뉴+실가격 정확 추출 예정). 평판은 유지. */}
           {reputationNote && (
-            <div className="bg-[#fbf3ea] rounded-xl px-4 py-2.5 mb-3 border border-[#e7d3b3]">
-              <div className="text-[12px] text-[#8a6a3a]">⚖️ <b>참고</b> · {reputationNote}</div>
+            <div className="nt-ruled mb-3 relative">
+              <div className="text-[13px] text-[#8a6a3a]">⚖️ <b>참고</b> · {reputationNote}</div>
             </div>
           )}
           {/* 👍 강점 / 🔎 아쉬운점 — 전체 카페 대비 상대 위치 + 언급수/평균 */}
           {profile.ok ? (
-            <div className="bg-[#efe9dd] rounded-xl px-4 py-3.5 mb-4 border border-[#ddd0bb]">
-              <div className="text-[11px] font-bold text-[#7a5f3c] uppercase tracking-wider mb-2.5">한눈에 강·약 <span className="font-normal lowercase tracking-normal text-[#7a5122]">· 전체 카페 대비</span></div>
+            <div className="nt-ruled mb-4 relative">
+              <div className="nt-sec">한눈에 강·약 · 전체 카페 대비</div>
               {profile.strong.length > 0 && (
-                <div className={profile.weak.length > 0 ? "mb-2.5" : ""}>
-                  <div className="text-[11px] font-bold text-[#3f7a4f] mb-1.5">👍 이런 점이 강해요</div>
-                  <div className="flex flex-col gap-1.5">
-                    {profile.strong.map((s) => (
-                      <div key={s.key} className="flex items-center gap-2 bg-[#e8f3ea] border border-[#c6e2cc] rounded-lg px-2.5 py-1.5">
-                        <span className="text-[15px]">{s.emoji}</span><span className="text-[13.5px] font-bold text-[#2f5f3c]">{s.text}</span>
-                        <span className="ml-auto flex items-center gap-1.5 whitespace-nowrap">
-                          <span className="text-[10.5px] text-[#6f9577]">평균의 {s.mult}배</span>
-                          <span className="text-[10.5px] font-bold text-white bg-[#3f7a4f] px-2 py-[3px] rounded-full">상위 {s.topPct}%</span>
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                <>
+                  <div className="text-[12.5px] font-bold text-[#3e7a5a]">👍 이런 점이 강해요</div>
+                  {profile.strong.map((s) => (
+                    <div key={s.key} className="flex items-baseline gap-2 flex-wrap">
+                      <span className="text-[15px] w-5 text-center flex-none">{s.emoji}</span>
+                      <span className="text-[14px] font-bold text-[#2a1f17]">{s.text}</span>
+                      <span className="ml-auto flex items-baseline gap-2 whitespace-nowrap">
+                        <span className="nt-hand sm coffee">평균의 {s.mult}배</span>
+                        <span className="nt-pill verify">상위 {s.topPct}%</span>
+                      </span>
+                    </div>
+                  ))}
+                </>
               )}
               {profile.weak.length > 0 && (
-                <div>
-                  <div className="text-[11px] font-bold text-[#b06a2e] mb-1.5">🔎 이런 점은 참고하세요</div>
-                  <div className="flex flex-col gap-1.5">
-                    {profile.weak.map((w) => (
-                      <div key={w.key} className="flex items-center gap-2 bg-[#f6ecdf] border border-[#e6d2b5] rounded-lg px-2.5 py-1.5">
-                        <span className="text-[14px]">{w.emoji}</span><span className="text-[12.5px] font-medium text-[#8a6534]">{w.text}</span>
-                        <span className="ml-auto text-[10.5px] text-[#b9935f] whitespace-nowrap">{w.mult < 0.2 ? "거의 언급 없음" : `평균의 ${w.mult}배`}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                <>
+                  <div className="text-[12.5px] font-bold text-[#b07a2a]">🔎 이런 점은 참고하세요</div>
+                  {profile.weak.map((w) => (
+                    <div key={w.key} className="flex items-baseline gap-2 flex-wrap">
+                      <span className="text-[14px] w-5 text-center flex-none">{w.emoji}</span>
+                      <span className="text-[13px] text-[#5c4b3c]">{w.text}</span>
+                      <span className="ml-auto nt-hand sm faint whitespace-nowrap">{w.mult < 0.2 ? "거의 언급 없음" : `평균의 ${w.mult}배`}</span>
+                    </div>
+                  ))}
+                </>
               )}
-              <p className="text-[10px] text-[#665036] mt-2.5 leading-relaxed">기준은 <b>후기 1건당 언급 비율</b>이에요 — 후기 수가 많고 적음을 보정한 공정한 비교입니다. '평균의 N배'·'상위/하위 %'는 전체 카페와 같은 기준으로 비교한 값. 절대 평가가 아닙니다.</p>
+              <p className="text-[11px] text-[#8f8071]">기준은 <b>후기 1건당 언급 비율</b>이에요 — 후기 수가 많고 적음을 보정한 공정한 비교입니다. '평균의 N배'·'상위/하위 %'는 전체 카페와 같은 기준으로 비교한 값. 절대 평가가 아닙니다.</p>
             </div>
           ) : chars.length > 0 && (
-            <div className="bg-[#efe9dd] rounded-lg px-4 py-3 mb-4 border border-[#ddd0bb]">
-              <div className="text-[11px] text-[#665036] uppercase tracking-wider mb-2">이 카페가 자주 언급되는 결</div>
-              <div className="flex flex-wrap gap-1.5">{chars.map((ch) => <span key={ch.label} className="text-[12px] bg-white text-[#52402e] px-2.5 py-1 rounded-full border border-[#e0d4c0]">{ch.emoji} {ch.label}</span>)}</div>
+            <div className="nt-ruled mb-4 relative">
+              <div className="nt-sec">이 카페가 자주 언급되는 결</div>
+              <div className="nt-chips">{chars.map((ch) => <span key={ch.label} className="nt-chip">{ch.emoji} {ch.label}</span>)}</div>
             </div>
           )}
           {cafe.signature && <div className="text-sm text-[#524234] mb-4"><span className="text-[#7a5122]">추천 </span>{cafe.signature}</div>}
@@ -2724,7 +2826,7 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
           {userReviews.length > 0 && <div className="mb-4"><VisitorReviews reviews={userReviews} /></div>}
           {/* ===== 버튼 3개 — 리뷰 위에 배치, 눈에 잘 띄게 ===== */}
           <div className="flex gap-2 mb-4">
-            <a href={`https://map.kakao.com/?q=${encodeURIComponent(cafe.name + " " + cafe.area)}`} target="_blank" rel="noopener noreferrer" onClick={() => trackOutbound({ target: "kakao_map", cafeId: cafe.id, source: "지도앱" })} className="flex-1 text-center bg-[#2b2018] text-[#f4ece0] rounded-xl py-2.5 text-[12px] font-semibold hover:bg-[#3d2f22] transition-colors flex items-center justify-center">길찾기</a>
+            <a href={`https://map.kakao.com/?q=${encodeURIComponent(cafe.name + " " + cafe.area)}`} target="_blank" rel="noopener noreferrer" onClick={() => trackOutbound({ target: "kakao_map", cafeId: cafe.id, source: "지도앱" })} className="flex-1 nt-btn-ink py-2.5 text-[12px] hover:bg-[#3d2f22] transition-colors flex items-center justify-center">길찾기</a>
             <a href={`/api/naver-place-redirect?id=${cafe.id}`} target="_blank" rel="noopener noreferrer" onClick={() => trackOutbound({ target: "naver_place", cafeId: cafe.id, source: "지도앱" })} className="flex-1 text-center border-2 rounded-xl py-2.5 text-[12px] font-semibold bg-white hover:bg-[#f0fef8] transition-colors flex items-center justify-center gap-1" style={{ borderColor: "#03c75a", color: "#03c75a" }}>
               <svg width="11" height="11" viewBox="0 0 24 24" fill="#03c75a"><path d="M16.273 12.845L7.376 0H0v24h7.727V11.155L16.624 24H24V0h-7.727z"/></svg>
               메뉴·시간
@@ -2733,8 +2835,9 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
 
           {loadingRev && <CoffeeLoader label="근거 후기 우려내는 중…" />}
           {!loadingRev && quality && quality.raw > 0 && (
-            <div className="bg-[#eef3ea] border border-[#cfe0c2] rounded-lg px-4 py-2.5 mb-4">
-              <div className="text-[11px] text-[#4f6a43] leading-relaxed flex items-start gap-1">
+            <div className="nt-scrap flat sage px-4 py-2.5 mb-4">
+              <i className="nt-tape g sm" aria-hidden />
+              <div className="text-[11.5px] text-[#4f6a43] leading-relaxed flex items-start gap-1">
                 <span className="flex-1">🔍 네이버·유튜브 공개 글 <b>{quality.raw}건</b>{quality.duplicates ? <>(중복 {quality.duplicates}건 별도 제거)</> : null}을 검증해, 다른 가게·모음글·동명 카페 등 <b>노이즈 {quality.rejected}건</b>을 걸러내고<b> 옥석 {kept}건</b>만 분석에 썼어요.</span>
                 <InfoDot title="옥석 검증이 뭐예요?"><b>이 서비스의 핵심</b>이에요. 수천 개 공개 후기에서 ① 광고·협찬, ② 카페명만 스친 글, ③ '맛집 N곳' 나열식, ④ 다른 지역·다른 지점의 <b>동명(同名)</b> 카페 글을 규칙으로 걸러내고, <b>Claude AI</b>가 내용·맥락까지 읽어 <b>진짜 방문 후기만</b> 남겨요. 모든 판정엔 근거가 붙습니다.</InfoDot>
               </div>
@@ -2756,9 +2859,9 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
                   <div key={i} className="border-b border-[#f0e6d4] pb-3 last:border-0">
                     <div className="flex items-center gap-1.5 mb-1 flex-wrap">
                       {rv.trust === "verified"
-                        ? <span className="text-[9px] text-white px-1.5 py-0.5 rounded-full" style={{ background: "#5f7355" }}>검증 ✓</span>
+                        ? <span className="nt-pill verify" style={{ height: 18, fontSize: 9.5 }}>검증 ✓</span>
                         : rv.trust === "reference"
-                        ? <span className="text-[9px] text-white px-1.5 py-0.5 rounded-full" style={{ background: "#9c6b3f" }}>참고</span>
+                        ? <span className="nt-pill ref" style={{ height: 18, fontSize: 9.5 }}>참고</span>
                         : null}
                       {rv.why?.some((w) => w.includes("AI 검증"))
                         ? <span className="text-[9px] text-white px-1.5 py-0.5 rounded-full" style={{ background: "#7c5cbf" }}>✨ AI 검증</span>
@@ -2787,17 +2890,13 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
           {/* 🔁 비슷한 카페 더보기 — 같은 동네 + 결(taste) 유사도, 검증/참고 등급 우선(리텐션, decisions #338/#347) */}
           {nearby.length > 0 && (
             <div className="mt-5">
-              <div className="text-[13px] font-bold text-[#5a4632] mb-2">☕ {cafe.area} 비슷한 카페 더보기</div>
-              <div className="flex flex-col gap-2">
-                {nearby.map((nc) => (
-                  <button key={nc.id} type="button" onClick={() => onOpenCafe?.(nc.id)}
-                    className="flex items-center gap-2 bg-white border border-[#e0d3bd] rounded-xl px-3.5 py-2.5 text-left">
-                    <span className="flex flex-col text-left min-w-0">
-                      <span className="text-[13.5px] font-bold text-[#3d2f22] truncate">{nc.name}</span>
-                      <span className="text-[10.5px] text-[#6f6047] truncate">검증후기 {nc.synth_count ?? 0}건</span>
-                    </span>
-                    {nc.synth_grade && <span className="ml-auto text-[10px] font-bold bg-[#2b2018] text-[#e8b87a] px-2 py-0.5 rounded-full whitespace-nowrap shrink-0">{nc.synth_grade}</span>}
-                      <VisitorBadges vb={(nc as any).vb} />
+              <div className="nt-ruled">
+                <div className="nt-sec">☕ {cafe.area} 비슷한 카페 더보기</div>
+                {nearby.map((nc, i) => (
+                  <button key={nc.id} type="button" onClick={() => onOpenCafe?.(nc.id)} className="nt-ln">
+                    <span className="n">{i + 1}.</span>
+                    <span className="nm text-[14px] flex items-center gap-1.5 min-w-0"><span className="truncate">{nc.name}</span>{nc.synth_grade && <span className={`nt-pill ${nc.synth_grade === "검증" ? "verify" : nc.synth_grade === "참고" ? "ref" : "cand"}`}>{nc.synth_grade}</span>}<span className="nt-free inline-flex"><VisitorBadges vb={(nc as any).vb} /></span></span>
+                    <span className="m">검증후기 {nc.synth_count ?? 0}건</span>
                   </button>
                 ))}
               </div>
@@ -2808,7 +2907,7 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
       {/* ===== 전체 리뷰 모달 — aside 밖(z-[3000] 컨테이너 직속)으로 이동. aside는 overflow-y:auto라 스크롤되며, 그 안에 있던 position:fixed 모달이 스크롤량(scrollTop)만큼 화면 밖으로 밀리고 패널 너비로 잘려 아예 안 보였음. 스크롤 안 되는 컨테이너 직속으로 빼서 항상 전체 화면(뷰포트)에 온전히 뜨게 함. ===== */}
         {showAllReviews && (
           <div className="fixed inset-0 z-[3100] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)" }} onClick={() => setShowAllReviews(false)}>
-            <div className="w-full max-w-lg bg-[#fdf8f2] rounded-t-2xl max-h-[90dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="w-full max-w-lg nt-paper rounded-t-2xl max-h-[90dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
               {/* 헤더 */}
               <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-[#f0e6d4]">
                 <div>
@@ -2864,9 +2963,9 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
                   <div key={i} className="border-b border-[#f0e6d4] pb-3 last:border-0">
                     <div className="flex items-center gap-1.5 mb-1 flex-wrap">
                       {rv.trust === "verified"
-                        ? <span className="text-[9px] text-white px-1.5 py-0.5 rounded-full" style={{ background: "#5f7355" }}>검증 ✓</span>
+                        ? <span className="nt-pill verify" style={{ height: 18, fontSize: 9.5 }}>검증 ✓</span>
                         : rv.trust === "reference"
-                        ? <span className="text-[9px] text-white px-1.5 py-0.5 rounded-full" style={{ background: "#9c6b3f" }}>참고</span>
+                        ? <span className="nt-pill ref" style={{ height: 18, fontSize: 9.5 }}>참고</span>
                         : null}
                       {rv.why?.some((w) => w.includes("AI 검증"))
                         ? <span className="text-[9px] text-white px-1.5 py-0.5 rounded-full" style={{ background: "#7c5cbf" }}>✨ AI 검증</span>
@@ -2936,8 +3035,9 @@ function MemoryTab({ device, visits, locked = false, sessionPin = "", onReload, 
 
   if (locked) {
     return (
-      <div className="flex-1 overflow-y-auto flex items-start justify-center px-6 pt-16" style={{ fontFamily: "'Gowun Batang', AppleMyungjo, 'Apple SD Gothic Neo', 'Noto Serif KR', serif" }}>
-        <div className="bg-white rounded-2xl px-7 py-8 text-center max-w-xs w-full shadow-sm border border-[#ece0cd]">
+      <div className="flex-1 overflow-y-auto flex items-start justify-center px-6 pt-16" style={{ fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }}>
+        <div className="nt-scrap px-7 py-8 text-center max-w-xs w-full">
+          <i className="nt-tape" aria-hidden />
           <div className="text-[34px] mb-2">🔒</div>
           <div className="text-[16px] font-bold text-[#2b2018] mb-1">잠긴 추억 보관소</div>
           <div className="text-[12px] text-[#594839] leading-relaxed mb-4">공용 PC 보호를 위해 PIN으로 잠겨 있어요.<br />내 PIN을 입력하면 내 기록만 보여요.</div>
@@ -2950,28 +3050,47 @@ function MemoryTab({ device, visits, locked = false, sessionPin = "", onReload, 
   }
 
   return (
-    <div className="flex-1 overflow-y-auto" style={{ fontFamily: "'Gowun Batang', AppleMyungjo, 'Apple SD Gothic Neo', 'Noto Serif KR', serif" }}>
-      <div className="max-w-lg mx-auto px-4 py-5 pb-[3.5rem]">
-        <div className="flex items-center justify-between mb-3">
+    <div className="flex-1 overflow-y-auto nt-page-in" style={{ fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }}>
+      <div className="max-w-lg mx-auto px-4 py-5 pb-[3.5rem] relative">
+        <div className="nt-ring" aria-hidden style={{ right: -70, top: 150, width: 200 }} />
+        <div className="flex items-center justify-between mb-3 relative">
           <div>
-            <div className="text-[17px] font-bold text-[#2b2018]">🗃 추억 보관소</div>
-            <div className="text-[11px] text-[#665036]">이 기기의 내 추억 {visits.length}곳 · 다른 사람 기록은 안 보여요</div>
+            <div className="nt-eyebrow">스탬프 수첩</div>
+            <div className="nt-title text-[21px]">🗃 추억 보관소</div>
+            <div className="text-[11px] text-[#8f8071]">이 기기의 내 추억 {visits.length}곳 · 다른 사람 기록은 안 보여요</div>
           </div>
-          <button onClick={() => setShowSettings(true)} className="inline-flex items-center gap-1 h-9 px-3 rounded-full text-[12px] font-bold bg-white text-[#594839] border border-[#e6d9c8] shrink-0">⚙ 설정</button>
+          <button onClick={() => setShowSettings(true)} className="inline-flex items-center gap-1 h-9 px-3 rounded-full text-[12px] font-bold bg-white/80 text-[#5c4b3c] border border-[rgba(90,70,50,.25)] shrink-0">⚙ 설정</button>
         </div>
-        <button onClick={onRegister} className="w-full inline-flex items-center justify-center gap-1.5 bg-[#d6336c] text-white rounded-xl py-3.5 text-[14px] font-bold shadow-sm mb-4">
+        {/* 📓 도장 자리 — 다녀온 곳마다 도장 하나(위치 인증=진한 도장, 미인증=연한 도장). 빈 자리는 점선. */}
+        <div className="nt-eyebrow mb-1 relative">다녀온 곳 · 도장 {visits.length}개</div>
+        <div className="grid grid-cols-4 gap-2.5 mb-4 relative nt-band nt-torn-tb -mx-4 px-4 pt-6 pb-5">
+          {Array.from({ length: Math.max(8, Math.ceil(visits.length / 4) * 4) }).map((_, i) => {
+            const v = visits[i];
+            if (!v) return <div key={`e${i}`} className="aspect-square rounded-full border-[1.5px] border-dashed border-[#c9bda9] flex items-center justify-center text-[10px] text-[#b3a692] bg-white/40">비어 있음</div>;
+            const d = v.created_at ? new Date(v.created_at) : null;
+            return (
+              <button key={v.id} type="button" onClick={() => { setVerifyMsg(""); setViewVisit(v); }}
+                className={`aspect-square nt-stamp !w-auto !h-auto ${v.verified === false ? "cand" : ""}`} style={{ fontSize: 11, transform: `rotate(${(i % 3) * 5 - 6}deg)` }} aria-label={v.name}>
+                <span className="px-1 leading-[1.15] line-clamp-2 break-keep">{v.name}</span>
+                {d && !isNaN(d.getTime()) && <small style={{ fontSize: 8, letterSpacing: ".06em" }}>{d.getMonth() + 1}. {d.getDate()}</small>}
+              </button>
+            );
+          })}
+        </div>
+        <button onClick={onRegister} className="w-full inline-flex items-center justify-center gap-1.5 bg-[#d6336c] text-white rounded-lg py-3.5 text-[14px] font-bold shadow-sm mb-4">
           <span className="text-[16px] leading-none">➕</span> 새 카페 추억 등록하기
         </button>
         {visits.length === 0 ? (
-          <div className="text-center text-[#665036] text-[13px] py-14 bg-white rounded-2xl border border-[#ece0cd] leading-relaxed">아직 등록한 추억이 없어요.<br />카페에서 위치 인증하고 첫 추억을 남겨보세요.</div>
+          <div className="nt-ruled text-center text-[#8f8071] text-[13px]" style={{ paddingTop: 34, paddingBottom: 34 }}>아직 등록한 추억이 없어요.<br />카페에서 위치 인증하고 첫 추억을 남겨보세요.</div>
         ) : (
           <div className="space-y-2.5">
             {visits.map((v) => {
               const photoCount = Array.isArray(v.photos) ? v.photos.length : (v.photo_url ? 1 : 0);
               return (
-              <button key={v.id} type="button" onClick={() => { setVerifyMsg(""); setViewVisit(v); }} className="w-full text-left bg-white rounded-2xl border border-[#ece0cd] p-3.5 flex gap-3 hover:border-[#d6b9c4] active:scale-[0.995] transition">
+              <button key={v.id} type="button" onClick={() => { setVerifyMsg(""); setViewVisit(v); }} className="w-full text-left nt-scrap p-3.5 flex gap-3 hover:shadow-md active:scale-[0.995] transition" style={{ ["--rot" as any]: (v.id % 2) ? "0.4deg" : "-0.4deg" }}>
+                <i className="nt-tape sm tl" aria-hidden />
                 <div className="relative w-16 h-16 shrink-0">
-                  {v.photo_url ? <img src={v.photo_url} alt="" className="w-16 h-16 rounded-xl object-cover" /> : <div className="w-16 h-16 rounded-xl bg-[#f3ede1] flex items-center justify-center text-[22px]">{v.favorite ? "★" : "☕"}</div>}
+                  {v.photo_url ? <img src={v.photo_url} alt="" className="w-16 h-16 rounded-sm object-cover border-[3px] border-white shadow-sm" /> : <div className="w-16 h-16 rounded-sm bg-[#f3ede1] border-[3px] border-white shadow-sm flex items-center justify-center text-[22px]">{v.favorite ? "★" : "☕"}</div>}
                   {photoCount > 1 && <span className="absolute bottom-0.5 right-0.5 bg-black/60 text-white text-[9px] px-1 rounded">📷{photoCount}</span>}
                 </div>
                 <div className="min-w-0 flex-1">
@@ -2980,13 +3099,13 @@ function MemoryTab({ device, visits, locked = false, sessionPin = "", onReload, 
                     <span className="font-bold text-[#2b2018] text-[14px] truncate">{v.name}</span>
                     <span className="text-[10px] text-[#7a5122] shrink-0">{v.area}</span>
                     {v.verified === false ? (
-                      <span className="text-[9px] font-bold text-[#665036] bg-[#f3ede1] rounded-full px-1.5 py-0.5 shrink-0">미인증</span>
+                      <span className="nt-pill cand shrink-0" style={{ height: 18, fontSize: 9.5 }}>미인증</span>
                     ) : (
-                      <span className="text-[9px] font-bold text-[#5f7355] bg-[#eef3ea] rounded-full px-1.5 py-0.5 shrink-0">인증</span>
+                      <span className="nt-pill verify shrink-0" style={{ height: 18, fontSize: 9.5 }}>인증</span>
                     )}
                     <span className="ml-auto text-[10px] text-[#665036] shrink-0">보기 ›</span>
                   </div>
-                  {v.memory ? <p className="text-[12px] text-[#52402e] leading-relaxed mt-0.5 line-clamp-2">{v.memory}</p> : <p className="text-[12px] text-[#665036] mt-0.5">기억 메모 없음</p>}
+                  {v.memory ? <p className="nt-hand sm mt-0.5 line-clamp-2" style={{ fontSize: 18 }}>{v.memory}</p> : <p className="text-[12px] text-[#8f8071] mt-0.5">기억 메모 없음</p>}
                   <div className="text-[10px] text-[#665036] mt-1">{fmtDate(v.created_at)}</div>
                 </div>
               </button>
@@ -2999,8 +3118,8 @@ function MemoryTab({ device, visits, locked = false, sessionPin = "", onReload, 
       {viewVisit && (() => {
         const vphotos: string[] = Array.isArray(viewVisit.photos) && viewVisit.photos.length ? viewVisit.photos : (viewVisit.photo_url ? [viewVisit.photo_url] : []);
         return (
-          <div className="fixed inset-0 z-[5000] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)", fontFamily: "'Gowun Batang', AppleMyungjo, 'Apple SD Gothic Neo', 'Noto Serif KR', serif" }} onClick={() => setViewVisit(null)}>
-            <div className="w-full max-w-lg bg-[#fdfaf4] rounded-t-2xl max-h-[90dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+          <div className="fixed inset-0 z-[5000] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)", fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }} onClick={() => setViewVisit(null)}>
+            <div className="w-full max-w-lg nt-paper rounded-t-2xl max-h-[90dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-[#f0e6d4]">
                 <div className="flex items-center gap-2 min-w-0">
                   {viewVisit.favorite && <span className="text-[#f0a832] text-[18px] leading-none">★</span>}
@@ -3021,7 +3140,7 @@ function MemoryTab({ device, visits, locked = false, sessionPin = "", onReload, 
                 )}
                 <div>
                   <div className="text-[12px] text-[#594839] mb-1 font-medium">기억</div>
-                  {viewVisit.memory ? <p className="text-[14px] text-[#2b2018] leading-relaxed whitespace-pre-wrap">{viewVisit.memory}</p> : <p className="text-[13px] text-[#665036]">기억 메모 없음</p>}
+                  {viewVisit.memory ? <p className="nt-hand whitespace-pre-wrap" style={{ lineHeight: "30px" }}>{viewVisit.memory}</p> : <p className="text-[13px] text-[#8f8071]">기억 메모 없음</p>}
                 </div>
                 <div className="text-[11px] text-[#665036]">{fmtDate(viewVisit.created_at)}{viewVisit.favorite ? " · ★ 즐겨찾기" : ""}</div>
                 {viewVisit.verified === false && (
@@ -3140,7 +3259,7 @@ function MemorySettingsModal({ device, visits, hasPin, onPinChange, onClose, onR
         <div style="font-size:10px;color:#8a7458;margin-top:8px;">${new Date(v.created_at).toLocaleString("ko-KR")}</div>
       </div>`).join("");
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>내 커피 기억</title>
-      <style>body{font-family:'Gowun Batang',serif;background:#fdfaf4;color:#2b2018;padding:24px;max-width:600px;margin:0 auto;}h1{font-size:22px;}</style></head>
+      <style>body{font-family:'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif;background:#fdfaf4;color:#2b2018;padding:24px;max-width:600px;margin:0 auto;}h1{font-size:22px;}</style></head>
       <body><h1>☕ 동네 커피 노트 — 내 기억</h1><p style="color:#7a6452;font-size:12px;">총 ${visits.length}곳 · 내보낸 날짜 ${new Date().toLocaleDateString("ko-KR")}</p>${rows}
       <script>window.onload=function(){setTimeout(function(){window.print();},400);}</script></body></html>`;
     const w = window.open("", "_blank");
@@ -3148,7 +3267,7 @@ function MemorySettingsModal({ device, visits, hasPin, onPinChange, onClose, onR
   };
 
   return (
-    <div className="fixed inset-0 z-[5000] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)", fontFamily: "'Gowun Batang', AppleMyungjo, 'Apple SD Gothic Neo', 'Noto Serif KR', serif" }} onClick={onClose}>
+    <div className="fixed inset-0 z-[5000] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)", fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }} onClick={onClose}>
       <div className="w-full max-w-lg bg-[#fdfaf4] rounded-t-2xl max-h-[88dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-[#f0e6d4]">
           <div className="font-bold text-[#2b2018] text-[15px]">⚙ 설정</div>

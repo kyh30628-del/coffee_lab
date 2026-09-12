@@ -5,7 +5,7 @@ export const metadata = {
 export default function PrivacyPage() {
   const updated = "2026-06-13";
   return (
-    <main className="min-h-screen bg-[#f4ece0] text-[#2b2018]" style={{ fontFamily: "'Gowun Batang', serif" }}>
+    <main className="min-h-screen bg-[#f4ece0] text-[#2b2018]" style={{ fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }}>
       <div className="max-w-2xl mx-auto px-6 py-12">
         <BackLink to="/" label="홈" className="text-[#7a5122] mb-4" />
         <div className="text-[#7a5122] text-xs tracking-[0.3em] uppercase mb-2">Privacy Policy</div>

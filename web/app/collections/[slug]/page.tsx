@@ -73,7 +73,7 @@ export default async function CollectionPage({ params }: { params: Promise<{ slu
     itemListElement: cafes.slice(0, 20).map((cf, i) => ({ "@type": "ListItem", position: i + 1, url: `${SITE}/c/${cf.id}`, name: cf.name })),
   };
   return (
-    <main className="min-h-screen bg-[#f4ece0] text-[#2b2018]" style={{ fontFamily: "'Gowun Batang', serif" }}>
+    <main className="min-h-screen bg-[#f4ece0] text-[#2b2018]" style={{ fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonld) }} />
       <div className="max-w-2xl mx-auto px-5 py-9">
         <Link href={areaHref} className="text-[#7a5122] text-[13px] underline">← {area} 카페 전체</Link>

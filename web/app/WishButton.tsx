@@ -91,7 +91,7 @@ export default function WishButton({ cafeId, variant = "pill" }: { cafeId: numbe
   }
   return (
     <button type="button" onClick={toggle} aria-pressed={on} aria-label={on ? "찜 해제" : "찜하기"}
-      className={`flex items-center gap-1.5 rounded-full pl-2.5 pr-3 py-1.5 text-[12px] font-bold border transition ${on ? "bg-[#d6336c] text-white border-[#d6336c]" : "bg-white text-[#b23a5f] border-[#f0b8cc]"}`}>
+      className={`flex items-center gap-1.5 rounded-full pl-2.5 pr-3 py-1.5 text-[12px] font-bold border transition whitespace-nowrap ${on ? "bg-[#d6336c] text-white border-[#d6336c]" : "bg-white text-[#b23a5f] border-[#f0b8cc]"}`}>
       <span className="text-[14px] leading-none">{on ? "❤" : "🤍"}</span>{on ? "찜함" : "찜하기"}
     </button>
   );

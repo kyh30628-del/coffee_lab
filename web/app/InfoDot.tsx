@@ -12,7 +12,7 @@ export default function InfoDot({ title, children, dark }: { title: string; chil
         className={`inline-flex items-center justify-center w-[15px] h-[15px] shrink-0 rounded-full text-[10px] font-bold leading-none align-middle ${dark ? "bg-[#f4ece0]/25 text-[#f4ece0]" : "bg-[#cbb89f] text-white"}`}
         aria-label={`${title} 설명`}>!</button>
       {open && (
-        <div className="fixed inset-0 z-[5600]" style={{ fontFamily: "'Gowun Batang', serif" }} onClick={(e) => { e.stopPropagation(); setOpen(false); }}>
+        <div className="fixed inset-0 z-[5600]" style={{ fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }} onClick={(e) => { e.stopPropagation(); setOpen(false); }}>
           <div className="absolute inset-0 bg-black/45" />
           <div className="absolute inset-x-0 bottom-0 sm:inset-0 sm:m-auto sm:w-[340px] sm:h-fit bg-[#fdfaf4] rounded-t-2xl sm:rounded-2xl p-5 shadow-2xl" style={{ maxHeight: "82dvh" }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between mb-2">

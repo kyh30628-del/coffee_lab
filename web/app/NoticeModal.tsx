@@ -64,7 +64,7 @@ export default function NoticeModal({ source }: { source?: Notice | null }) {
       className="fixed inset-0 z-[1200] flex items-center justify-center px-6"
       style={{ background: "rgba(20,14,8,0.55)" }}>
       <div onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-[340px] bg-[#f4ece0] rounded-2xl border border-[#d9c9ab] shadow-xl px-6 pt-6 pb-4 text-center">
+        className="w-full max-w-[340px] nt-paper rounded-lg border border-[#d9cdb9] shadow-xl px-6 pt-6 pb-4 text-center">
         <div className="text-[34px] leading-none mb-3">{notice.emoji}</div>
         <h2 id="dcn-notice-title" className="text-[17px] font-bold text-[#2b2018] leading-snug mb-2">
           {past ? notice.titlePast : notice.title}

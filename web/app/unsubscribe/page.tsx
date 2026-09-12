@@ -11,7 +11,7 @@ export default function Unsubscribe() {
       .then((r) => r.json()).then((d) => setState(d.ok ? "ok" : "err")).catch(() => setState("err"));
   }, []);
   return (
-    <main className="min-h-screen bg-[#f4ece0] text-[#2b2018] flex items-center justify-center p-6" style={{ fontFamily: "'Gowun Batang', serif" }}>
+    <main className="min-h-screen bg-[#f4ece0] text-[#2b2018] flex items-center justify-center p-6" style={{ fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }}>
       <div className="bg-[#fdfaf4] rounded-2xl p-10 text-center max-w-md border border-[#ece0cd]">
         <div className="text-4xl mb-4">☕</div>
         {state === "idle" && <p className="text-[#524234]">처리 중…</p>}

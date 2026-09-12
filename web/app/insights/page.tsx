@@ -56,7 +56,7 @@ export default async function InsightsPage() {
     </ol>
   );
   return (
-    <main className="min-h-screen bg-[#f4ece0] text-[#2b2018]" style={{ fontFamily: "'Gowun Batang', serif" }}>
+    <main className="min-h-screen bg-[#f4ece0] text-[#2b2018]" style={{ fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }}>
       <div className="max-w-2xl mx-auto px-5 py-10">
         <div className="text-[#7a5122] text-[11px] tracking-[0.25em] uppercase mb-1">동네 커피 노트 · 데이터 리포트</div>
         <h1 className="text-[26px] font-bold leading-tight mb-2">검증 후기로 본 카페 지형</h1>

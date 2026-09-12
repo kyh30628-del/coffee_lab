@@ -1,4 +1,6 @@
 @import "tailwindcss";
+@import "./note.css";
+@import "./fonts-hand.css";
 
 :root {
   --background: #ffffff;
