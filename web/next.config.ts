@@ -29,6 +29,11 @@ const nextConfig: NextConfig = {
       // 🎨 지도 질감·핀(불변 자산) — 내용이 바뀌면 파일명이 아니라 **파일 자체를 새로 렌더**하므로 URL이 같다.
       //   그래도 1년 고정이 맞다: Blender 렌더 결과를 바꾸는 일은 배포 때뿐이고, 그땐 배포와 함께 새로 받게 된다.
       //   기본값(max-age=0, must-revalidate)이면 지도 첫 로드마다 9+8건이 304 재검증을 왕복한다(실측).
+      { // 🚇 철도 데이터(전국 1,332역·70노선, 2026-09-12) — 지도 탭 첫 진입에 1회 받는다.
+        //   자주 안 바뀌므로 하루 캐시 + 재검증 유예. 지역을 새로 열어 갱신하면 하루 안에 따라온다.
+        source: "/data/:path*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=86400, stale-while-revalidate=604800" }],
+      },
       { source: "/map/:path*", headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }] },
       { source: "/pins/:path*", headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }] },
     ];

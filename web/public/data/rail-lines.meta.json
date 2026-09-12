@@ -1,0 +1,562 @@
+[
+ {
+  "ref": "3호선",
+  "name": "수도권 전철 3호선",
+  "type": "subway",
+  "color": "#ED6C00",
+  "segs": 9,
+  "pts": 166
+ },
+ {
+  "ref": "부산2",
+  "name": "부산 도시철도 2호선",
+  "type": "subway",
+  "color": "#81BF48",
+  "segs": 2,
+  "pts": 126
+ },
+ {
+  "ref": "부산3",
+  "name": "부산 도시철도 3호선",
+  "type": "subway",
+  "color": "#BB8C00",
+  "segs": 2,
+  "pts": 38
+ },
+ {
+  "ref": "부산1",
+  "name": "부산 도시철도 1호선",
+  "type": "subway",
+  "color": "#F06A00",
+  "segs": 2,
+  "pts": 110
+ },
+ {
+  "ref": "2호선",
+  "name": "서울 지하철 2호선",
+  "type": "subway",
+  "color": "#00A23F",
+  "segs": 2,
+  "pts": 115
+ },
+ {
+  "ref": "4호선",
+  "name": "수도권 전철 4호선",
+  "type": "subway",
+  "color": "#009BCE",
+  "segs": 34,
+  "pts": 292
+ },
+ {
+  "ref": "9호선",
+  "name": "서울 지하철 9호선",
+  "type": "subway",
+  "color": "#A49D87",
+  "segs": 12,
+  "pts": 139
+ },
+ {
+  "ref": "8호선",
+  "name": "서울 지하철 8호선",
+  "type": "subway",
+  "color": "#D11D70",
+  "segs": 2,
+  "pts": 76
+ },
+ {
+  "ref": "6호선",
+  "name": "서울 지하철 6호선",
+  "type": "subway",
+  "color": "#7C4932",
+  "segs": 1,
+  "pts": 83
+ },
+ {
+  "ref": "2호선지선",
+  "name": "서울 지하철 2호선 성수지선",
+  "type": "subway",
+  "color": "#00A23F",
+  "segs": 4,
+  "pts": 34
+ },
+ {
+  "ref": "5호선",
+  "name": "서울 지하철 5호선",
+  "type": "subway",
+  "color": "#794698",
+  "segs": 5,
+  "pts": 183
+ },
+ {
+  "ref": "1호선",
+  "name": "수도권 전철 1호선",
+  "type": "subway",
+  "color": "#004A85",
+  "segs": 71,
+  "pts": 629
+ },
+ {
+  "ref": "신분당선",
+  "name": "수도권 전철 신분당선",
+  "type": "subway",
+  "color": "#B81B30",
+  "segs": 5,
+  "pts": 126
+ },
+ {
+  "ref": "경강선",
+  "name": "수도권 전철 경강선",
+  "type": "subway",
+  "color": "#0B318F",
+  "segs": 120,
+  "pts": 392
+ },
+ {
+  "ref": "대전1",
+  "name": "대전 도시철도 1호선",
+  "type": "subway",
+  "color": "#007448",
+  "segs": 2,
+  "pts": 56
+ },
+ {
+  "ref": "대구1",
+  "name": "대구 도시철도 1호선",
+  "type": "subway",
+  "color": "#D93F5C",
+  "segs": 2,
+  "pts": 89
+ },
+ {
+  "ref": "대구2",
+  "name": "대구 도시철도 2호선",
+  "type": "subway",
+  "color": "#00AA80",
+  "segs": 2,
+  "pts": 59
+ },
+ {
+  "ref": "7호선",
+  "name": "서울 지하철 7호선",
+  "type": "subway",
+  "color": "#6E7E31",
+  "segs": 4,
+  "pts": 123
+ },
+ {
+  "ref": "광주1",
+  "name": "광주 도시철도 1호선",
+  "type": "subway",
+  "color": "#009088",
+  "segs": 2,
+  "pts": 52
+ },
+ {
+  "ref": "인천1",
+  "name": "인천 도시철도 1호선",
+  "type": "subway",
+  "color": "#B4C7E7",
+  "segs": 2,
+  "pts": 94
+ },
+ {
+  "ref": "김해",
+  "name": "부산김해경전철",
+  "type": "light_rail",
+  "color": "#8652A1",
+  "segs": 2,
+  "pts": 62
+ },
+ {
+  "ref": "용인",
+  "name": "용인 경전철",
+  "type": "light_rail",
+  "color": "#44A436",
+  "segs": 2,
+  "pts": 63
+ },
+ {
+  "ref": "인천2",
+  "name": "인천 도시철도 2호선",
+  "type": "light_rail",
+  "color": "#F4A462",
+  "segs": 2,
+  "pts": 70
+ },
+ {
+  "ref": "의정부",
+  "name": "의정부경전철",
+  "type": "light_rail",
+  "color": "#F0831E",
+  "segs": 4,
+  "pts": 44
+ },
+ {
+  "ref": "우이신설",
+  "name": "우이신설선",
+  "type": "light_rail",
+  "color": "#BACC50",
+  "segs": 2,
+  "pts": 38
+ },
+ {
+  "ref": "광주2",
+  "name": "광주 도시철도 2호선",
+  "type": "light_rail",
+  "color": "#5a6b7a",
+  "segs": 1,
+  "pts": 58
+ },
+ {
+  "ref": "김포",
+  "name": "김포 골드라인",
+  "type": "light_rail",
+  "color": "#957326",
+  "segs": 2,
+  "pts": 58
+ },
+ {
+  "ref": "신림",
+  "name": "서울 경전철 신림선",
+  "type": "light_rail",
+  "color": "#6789CA",
+  "segs": 2,
+  "pts": 38
+ },
+ {
+  "ref": "부산4",
+  "name": "부산 도시철도 4호선",
+  "type": "monorail",
+  "color": "#217DCB",
+  "segs": 3,
+  "pts": 24
+ },
+ {
+  "ref": "대구3",
+  "name": "대구 도시철도 3호선",
+  "type": "monorail",
+  "color": "#FFB100",
+  "segs": 1,
+  "pts": 27
+ },
+ {
+  "ref": "자기부상",
+  "name": "인천공항 자기부상철도",
+  "type": "monorail",
+  "color": "yellow",
+  "segs": 2,
+  "pts": 27
+ },
+ {
+  "ref": "월미",
+  "name": "월미바다열차",
+  "type": "monorail",
+  "color": "#5a6b7a",
+  "segs": 1,
+  "pts": 17
+ },
+ {
+  "ref": "대전2",
+  "name": "대전 도시철도 2호선",
+  "type": "tram",
+  "color": "#5fc0b9",
+  "segs": 9,
+  "pts": 86
+ },
+ {
+  "ref": "수인분당",
+  "name": "수인분당선",
+  "type": "train",
+  "color": "#ECA300",
+  "segs": 57,
+  "pts": 581
+ },
+ {
+  "ref": "경부선",
+  "name": "경부선",
+  "type": "rail",
+  "color": "#5a6b7a",
+  "segs": 319,
+  "pts": 1191
+ },
+ {
+  "ref": "경의중앙",
+  "name": "경의·중앙선",
+  "type": "train",
+  "color": "#6AC2B3",
+  "segs": 5,
+  "pts": 268
+ },
+ {
+  "ref": "동해선",
+  "name": "동해선 광역전철",
+  "type": "train",
+  "color": "#0054A6",
+  "segs": 267,
+  "pts": 837
+ },
+ {
+  "ref": "태백선",
+  "name": "태백선 백산 방면",
+  "type": "rail",
+  "color": "#5a6b7a",
+  "segs": 82,
+  "pts": 252
+ },
+ {
+  "ref": "영동선",
+  "name": "영동선",
+  "type": "rail",
+  "color": "#5a6b7a",
+  "segs": 135,
+  "pts": 467
+ },
+ {
+  "ref": "경전선",
+  "name": "경전선",
+  "type": "rail",
+  "color": "#5a6b7a",
+  "segs": 204,
+  "pts": 620
+ },
+ {
+  "ref": "경춘선",
+  "name": "수도권 전철 경춘선",
+  "type": "train",
+  "color": "#007A62",
+  "segs": 67,
+  "pts": 349
+ },
+ {
+  "ref": "서해선",
+  "name": "서해선",
+  "type": "train",
+  "color": "#5EAC41",
+  "segs": 79,
+  "pts": 301
+ },
+ {
+  "ref": "경북선",
+  "name": "경북선",
+  "type": "rail",
+  "color": "#5a6b7a",
+  "segs": 67,
+  "pts": 231
+ },
+ {
+  "ref": "호남선",
+  "name": "호남선 KTX",
+  "type": "rail",
+  "color": "#5a6b7a",
+  "segs": 169,
+  "pts": 555
+ },
+ {
+  "ref": "전라선",
+  "name": "전라선 KTX",
+  "type": "rail",
+  "color": "#5a6b7a",
+  "segs": 176,
+  "pts": 514
+ },
+ {
+  "ref": "강릉선",
+  "name": "강릉선 KTX",
+  "type": "rail",
+  "color": "#5a6b7a",
+  "segs": 2,
+  "pts": 25
+ },
+ {
+  "ref": "중앙선",
+  "name": "경의·중앙선 셔틀",
+  "type": "train",
+  "color": "#6AC2B3",
+  "segs": 277,
+  "pts": 657
+ },
+ {
+  "ref": "장항선",
+  "name": "장항선 새마을호",
+  "type": "rail",
+  "color": "#5a6b7a",
+  "segs": 1,
+  "pts": 19
+ },
+ {
+  "ref": "ITX-청춘",
+  "name": "ITX-청춘",
+  "type": "rail",
+  "color": "#37b366",
+  "segs": 2,
+  "pts": 93
+ },
+ {
+  "ref": "중부내륙선",
+  "name": "중부내륙선 KTX",
+  "type": "rail",
+  "color": "#5a6b7a",
+  "segs": 69,
+  "pts": 159
+ },
+ {
+  "ref": "GTX-A",
+  "name": "수도권 광역급행철도 A선",
+  "type": "train",
+  "color": "#AB087D",
+  "segs": 6,
+  "pts": 129
+ },
+ {
+  "ref": "대경선",
+  "name": "대경선",
+  "type": "train",
+  "color": "#0054A6",
+  "segs": 3,
+  "pts": 170
+ },
+ {
+  "ref": "교외선",
+  "name": "교외선 무궁화호",
+  "type": "rail",
+  "color": "#E06040",
+  "segs": 25,
+  "pts": 75
+ },
+ {
+  "ref": "평택선",
+  "name": "평택선 ITX 마음",
+  "type": "rail",
+  "color": "#C30E2F",
+  "segs": 16,
+  "pts": 42
+ },
+ {
+  "ref": "경부고속선",
+  "name": "경부고속선",
+  "type": "rail",
+  "color": "#7b6a57",
+  "segs": 254,
+  "pts": 533
+ },
+ {
+  "ref": "경의선",
+  "name": "경의선",
+  "type": "rail",
+  "color": "#7b6a57",
+  "segs": 41,
+  "pts": 89
+ },
+ {
+  "ref": "삼척선",
+  "name": "삼척선",
+  "type": "rail",
+  "color": "#7b6a57",
+  "segs": 18,
+  "pts": 36
+ },
+ {
+  "ref": "광주선",
+  "name": "광주선",
+  "type": "rail",
+  "color": "#7b6a57",
+  "segs": 6,
+  "pts": 14
+ },
+ {
+  "ref": "충북선",
+  "name": "충북선",
+  "type": "rail",
+  "color": "#7b6a57",
+  "segs": 66,
+  "pts": 159
+ },
+ {
+  "ref": "대구선",
+  "name": "대구선",
+  "type": "rail",
+  "color": "#7b6a57",
+  "segs": 13,
+  "pts": 33
+ },
+ {
+  "ref": "호남고속선",
+  "name": "호남고속선",
+  "type": "rail",
+  "color": "#7b6a57",
+  "segs": 117,
+  "pts": 239
+ },
+ {
+  "ref": "진해선",
+  "name": "진해선",
+  "type": "rail",
+  "color": "#7b6a57",
+  "segs": 15,
+  "pts": 33
+ },
+ {
+  "ref": "함백선",
+  "name": "함백선",
+  "type": "rail",
+  "color": "#7b6a57",
+  "segs": 3,
+  "pts": 13
+ },
+ {
+  "ref": "경인선",
+  "name": "경인선",
+  "type": "rail",
+  "color": "#7b6a57",
+  "segs": 17,
+  "pts": 39
+ },
+ {
+  "ref": "진접선",
+  "name": "진접선",
+  "type": "rail",
+  "color": "#7b6a57",
+  "segs": 5,
+  "pts": 14
+ },
+ {
+  "ref": "수서평택고속선",
+  "name": "수서평택고속선",
+  "type": "rail",
+  "color": "#7b6a57",
+  "segs": 16,
+  "pts": 46
+ },
+ {
+  "ref": "경원선",
+  "name": "경원선",
+  "type": "rail",
+  "color": "#7b6a57",
+  "segs": 92,
+  "pts": 201
+ },
+ {
+  "ref": "정선선",
+  "name": "정선선",
+  "type": "rail",
+  "color": "#7b6a57",
+  "segs": 36,
+  "pts": 86
+ },
+ {
+  "ref": "목포보성선",
+  "name": "목포보성선",
+  "type": "rail",
+  "color": "#7b6a57",
+  "segs": 66,
+  "pts": 135
+ },
+ {
+  "ref": "공항철도",
+  "name": "인천국제공항 셔틀트레인",
+  "type": "light_rail",
+  "color": "#0079AC",
+  "segs": 30,
+  "pts": 183
+ }
+]

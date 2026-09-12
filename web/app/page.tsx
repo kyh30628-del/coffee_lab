@@ -337,10 +337,13 @@ function makeClusterHtml(cnt: number, hasMatch: boolean, _verified = 0): string 
 function makeStationHtml(name: string, colors: string[], refs: string[]): string {
   // 지하철역 — 호선별 색 번호 뱃지(환승역=여러 개) + 역명. 버스정류장(베이스맵 아이콘)과 명확히 구분.
   const cols = colors && colors.length ? colors : ["#2f6fb0"];
+  // 라벨: 서울 N호선은 숫자만(기존 규약), 그 외는 이름 그대로 최대 4자("수인분당"·"경의중앙"이 잘리지 않게).
+  //   전국 편입(2026-09-12)으로 "부산1"·"경부선"·"GTX-A" 같은 라벨이 들어온다 — 글자 수에 따라 크기를 줄인다.
   const badge = (c: string, r: string) => {
     const m = (r || "").match(/^(\d+)호선/);
-    const lbl = m ? m[1] : (r || "").replace(/호선|선/g, "").slice(0, 3) || "·";
-    return `<span style="background:${c};color:#fff;font-size:13px;font-weight:900;line-height:1;min-width:22px;height:23px;display:inline-flex;align-items:center;justify-content:center;border-radius:12px;padding:0 5px;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.45);">${lbl}</span>`;
+    const lbl = m ? m[1] : ((r || "").replace(/호선$/, "").replace(/([가-힣]{2,})선$/, "$1").slice(0, 4) || "·");
+    const fs = lbl.length >= 4 ? 10.5 : lbl.length === 3 ? 11.5 : 13;
+    return `<span style="background:${c};color:#fff;font-size:${fs}px;font-weight:900;line-height:1;min-width:22px;height:23px;display:inline-flex;align-items:center;justify-content:center;border-radius:12px;padding:0 5px;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.45);">${lbl}</span>`;
   };
   const badges = cols.map((c, i) => badge(c, refs && refs[i])).join("");
   return `<div style="transform:translate(-50%,-50%);display:flex;align-items:center;gap:5px;white-space:nowrap;">
