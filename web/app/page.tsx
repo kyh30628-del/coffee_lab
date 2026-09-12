@@ -667,6 +667,7 @@ function landingMemo(d: Discover | null): string[] {
 }
 const HERO_W = 1400, HERO_H = 1680;
 const HERO_PAGE: [number, number][] = [[0.22101, 0.29961], [0.70849, 0.30326], [0.77393, 0.82833], [0.10523, 0.82145]];
+const HERO_CUP: [number, number] = [0.845, 0.30];   // 잔 액면 중심(이미지 비율) — 김이 여기서 오른다
 const PAGE_SW = 280, PAGE_SH = 387;            // 글을 쓰는 원본 사각형(px) — 페이지 비율 2.10:2.90
 const PAGE_RULE0 = 560 / 2900 * PAGE_SH;       // 첫 줄 y(텍스처 page-right-blank.json과 동일 규격)
 const PAGE_PITCH = 170 / 2900 * PAGE_SH;   // 줄 하나 = 손편지 한 줄(글리프가 줄 사이에 앉는다)       // 줄 간격
@@ -687,6 +688,7 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
   const [done, setDone] = useState<boolean | null>(null); // null=판단 전(SSR), true=완성본, false=쓰는 중
   const [pos, setPos] = useState<[number, number]>([0, 0]); // [줄, 글자]
   const [mtx, setMtx] = useState<string>("");
+  const [cupPos, setCupPos] = useState<[number, number] | null>(null);
   const heroRef = useRef<HTMLDivElement | null>(null);
   const pageRef = useRef<HTMLDivElement | null>(null);
   const nibRef = useRef<SVGSVGElement | null>(null);
@@ -699,6 +701,7 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
       const s = Math.max(cw / HERO_W, ch / HERO_H); const ox = (cw - HERO_W * s) / 2, oy = (ch - HERO_H * s) / 2;
       const q = HERO_PAGE.map(([fx, fy]) => [fx * HERO_W * s + ox, fy * HERO_H * s + oy] as [number, number]);
       setMtx(homographyMatrix3d(PAGE_SW, PAGE_SH, q));
+      setCupPos([HERO_CUP[0] * HERO_W * s + ox, HERO_CUP[1] * HERO_H * s + oy]);
     };
     calc(); const ro = new ResizeObserver(calc); ro.observe(el); return () => ro.disconnect();
   }, []);
@@ -745,9 +748,9 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
   const allDone = done === true;
   const lineTop = PAGE_RULE0 - 21;   // 첫 줄부터: 손편지체 19px(행간=줄 간격 22.7px) 글리프 바닥이 줄보다 2.6px 위(실측 asc .92·desc .23·글 bbox 바닥 -.117em)
   return (
-    <div className="w-full max-w-md mx-auto flex flex-col nt-landing" style={{ height: "100vh", overflow: "hidden", background: "var(--nt-espresso)", padding: "calc(env(safe-area-inset-top) + 8px) 8px calc(env(safe-area-inset-bottom) + 8px)" }}>
+    <div className="w-full max-w-md mx-auto flex flex-col nt-landing" style={{ height: "100%", overflowY: "auto", overflowX: "hidden", background: "var(--nt-espresso)", padding: "calc(env(safe-area-inset-top) + 8px) 8px calc(env(safe-area-inset-bottom) + 8px)", boxSizing: "border-box" }}>
       {/* 📱 프레임: 화면 가장자리에 얇은 크림 경계선 — 노트 표지 안쪽 테두리처럼. 정물은 남는 높이를 전부 채우고 아래 블록은 고정 높이(어떤 폰이든 한 화면) */}
-      <div className="flex flex-col flex-1 min-h-0 rounded-[10px]" style={{ border: "1px solid rgba(233,214,189,.42)", boxShadow: "inset 0 0 0 4px rgba(20,12,8,.35)", overflow: "hidden" }}>
+      <div className="flex flex-col flex-1 rounded-[10px]" style={{ minHeight: 0, border: "1px solid rgba(233,214,189,.42)", boxShadow: "inset 0 0 0 4px rgba(20,12,8,.35)", overflow: "hidden" }}>
       <div ref={heroRef} className="relative w-full overflow-hidden" style={{ flex: "1 1 0%", minHeight: 220 }}>
         <img src="/note/hero.webp" alt="" aria-hidden className="absolute inset-0 w-full h-full object-cover" />
         {/* 위: 어두운 나무 위 제목(커피 톤) · 아래: 에스프레소 띠로 녹아듦 */}
@@ -757,6 +760,12 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
           <div className="nt-eyebrow" style={{ color: "#d9c7ad" }}>Dongne Coffee Note</div>
           <h1 className="nt-title text-[34px] leading-[1.15] mt-1" style={{ color: "#f6ecdf", textShadow: "0 2px 12px rgba(0,0,0,.5)" }}>별점도 광고도 아닌,<br /><span className="nt-hl">진짜 후기.</span></h1>
         </div>
+        {/* ☕ 김 — 잔에서 세 가닥이 흔들리며 오른다(움직임 줄이기면 없음) */}
+        {cupPos && (
+          <div className="nt-steam" aria-hidden style={{ left: cupPos[0], top: cupPos[1] }}>
+            <i className="s1" /><i className="s2" /><i className="s3" />
+          </div>
+        )}
         {/* 렌더된 오른쪽 페이지 위에 원근 정합으로 얹는 글 */}
         <div ref={pageRef} className="absolute left-0 top-0" style={{ width: PAGE_SW, height: PAGE_SH, transformOrigin: "0 0", transform: mtx || "translate(-9999px,0)" }}>
           <div className="absolute" style={{ left: 42, right: 10, top: lineTop }}>
@@ -1876,7 +1885,7 @@ export default function Home() {
     //   인스타 안드로이드 인앱 WebView가 페이지 폭을 못 구하고 좁은 뷰포트로 폴백→화면 확대(초기화면만 깨지던 원인, 2026-07-10).
     //   /area 등 min-h-screen 페이지는 정상이던 것과 동일 패턴으로 맞춤. 세로 가운데정렬은 유지.
     return (
-      <div className="w-full nt-app" style={{ background: "var(--nt-espresso)", minHeight: "100vh", fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }}>
+      <div className="nt-app" style={{ position: "fixed", inset: 0, overflow: "hidden", background: "var(--nt-espresso)", fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }}>
         <LandingNote discover={discover} onConsumer={chooseConsumer}
           onOwner={() => { trackOwnerCta(); setShowFind(true); }}
           onLogin={() => { setOwnerPw(""); setOwnerErr(""); setOwnerPin(""); setOwnerPinErr(""); setOwnerAdminMode(false); setOwnerPwModal(true); }} />

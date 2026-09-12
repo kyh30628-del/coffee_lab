@@ -246,4 +246,17 @@
 /* 📱 스크롤 컨테이너는 세로만 */
 .nt-app [class*="overflow-y-auto"] { overflow-x: hidden; }
 
-@supports (height: 100dvh) { .nt-landing { height: 100dvh !important; } }
+
+/* ☕ 김 — 부드러운 흰 김 세 가닥, 위로 오르며 흔들리고 흩어진다 */
+.nt-steam { position: absolute; width: 0; height: 0; pointer-events: none; z-index: 3; }
+.nt-steam i { position: absolute; bottom: 0; width: 14px; height: 46px; border-radius: 50% 50% 40% 40%; background: linear-gradient(to top, rgba(255,246,232,0), rgba(255,246,232,.55) 40%, rgba(255,246,232,0)); filter: blur(4px); opacity: 0; transform-origin: 50% 100%; }
+.nt-steam .s1 { left: -22px; animation: ntSteam 3.6s ease-in-out 0.2s infinite; }
+.nt-steam .s2 { left: -6px;  animation: ntSteam 4.2s ease-in-out 1.3s infinite; height: 56px; }
+.nt-steam .s3 { left: 10px;  animation: ntSteam 3.9s ease-in-out 2.4s infinite; }
+@keyframes ntSteam {
+  0%   { opacity: 0;   transform: translateY(6px) translateX(0) scaleX(.7) rotate(0deg); }
+  25%  { opacity: .75; }
+  60%  { opacity: .45; transform: translateY(-34px) translateX(6px) scaleX(1.15) rotate(6deg); }
+  100% { opacity: 0;   transform: translateY(-68px) translateX(-5px) scaleX(1.5) rotate(-8deg); }
+}
+@media (prefers-reduced-motion: reduce) { .nt-steam { display: none; } }
