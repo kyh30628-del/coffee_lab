@@ -161,7 +161,7 @@ const HeadlineCard = memo(function HeadlineCard({ c, kicker, tone, onOpen, featu
   //   배치(제목 줄 → 이름·배지 → 지역·리뷰 → 판정 → 원두 노트 태그)는 그대로.
   const stamp = c.grade === "참고" ? "ref" : c.grade === "후보" ? "cand" : "";
   return (
-    <button onClick={() => onOpen(c.id)} className={`w-full text-left nt-scrap kraft mb-4 px-4 pt-4 pb-3.5 ${featured ? "featured" : ""}`} style={{ ["--rot" as any]: tone % 2 ? "0.35deg" : "-0.35deg" }}>
+    <button onClick={() => onOpen(c.id)} className={`w-full text-left nt-scrap mb-4 px-4 pt-4 pb-3.5 ${featured ? "featured" : ""}`} style={{ ["--rot" as any]: tone % 2 ? "0.35deg" : "-0.35deg" }}>
       <i className={`nt-tape sm ${featured ? "k tl" : tone % 3 === 0 ? "" : tone % 3 === 1 ? "tl g" : "tr"}`} aria-hidden />
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
@@ -265,7 +265,7 @@ const Spotlight = memo(function Spotlight({ title, items, sub, info, onOpen, ton
   return (
     <div className="mb-7">
       <div className="flex items-baseline justify-between mb-2 nt-ruled">
-        <div className="flex items-center gap-2 min-w-0"><span className="nt-sec">{title}</span>{info && <span className="nt-free"><InfoDot title={title.replace(/^[^가-힣A-Za-z]+/, "")}>{info}</InfoDot></span>}</div>
+        <div className="nt-title text-[17px] flex items-center gap-1.5 text-[#6a4318]">{featured ? <span className="nt-hl latte">{title}</span> : title}{info && <span className="nt-free"><InfoDot title={title.replace(/^[^가-힣A-Za-z]+/, "")}>{info}</InfoDot></span>}</div>
         {sub && <div className="text-[10.5px] text-[#a0672a] shrink-0">↕ {sub}</div>}
       </div>
       <SpotlightCore items={items} onOpen={onOpen} toneOffset={toneOffset} intervalMs={intervalMs} featured={featured} />
@@ -299,7 +299,7 @@ const RankSpotlight = memo(function RankSpotlight({ top3, momentum, specialty, f
   return (
     <div className="mb-7">
       <div className="flex items-baseline justify-between mb-2 nt-ruled">
-        <div className="flex items-center gap-2 min-w-0"><span className="nt-sec">🔍 카페 둘러보기</span><span className="nt-free"><InfoDot title="카페 둘러보기">{infoByKey[safeKey]}</InfoDot></span></div>
+        <div className="nt-title text-[17px] flex items-center gap-1.5 text-[#6a4318]">🔍 카페 둘러보기<span className="nt-free"><InfoDot title="카페 둘러보기">{infoByKey[safeKey]}</InfoDot></span></div>
       </div>
       <div className="flex gap-1.5 mb-2.5 mt-1 flex-wrap">
         {RANK_TABS.map((t, i) => (dataByKey[t.key] || []).length > 0 && (
@@ -2055,13 +2055,14 @@ export default function Home() {
           <div className="max-w-2xl mx-auto px-5 pt-4 pb-6 nt-page-in" key={`home-${turnKey}`} style={{ position: "relative", zIndex: 1 }}>
             {/* 📓 "한 권의 노트"(2026-09-12) — 배치·블록은 그대로, 재질만 종이·잉크·테이프·도장으로. 붉은 리본 책갈피가 위에서 내려온다. */}
             <i className="nt-ribbon" style={{ right: 26, top: -6, height: 64 }} aria-hidden />
-            <div className="text-center mb-6 nt-header -mx-5 px-5 pb-5 rounded-b-2xl" style={{ position: "relative", marginTop: -16, paddingTop: 12, boxShadow: "0 10px 24px -14px rgba(20,12,8,.7)" }}>
+            <div className="text-center mb-6 nt-band nt-torn-b -mx-5 px-5 pb-5" style={{ position: "relative", marginTop: -16, paddingTop: 12 }}>
               {/* ☕ 커피 잔 자국 — 실제 마른 자국 이미지(절차 생성), 제목 오른쪽 위에 반쯤 걸쳐서 */}
+              <div className="nt-ring b" aria-hidden style={{ top: -46, right: -54, width: 150 }} />
               {/* ✍ 날짜 — 노트 줄 하나를 차지하고 그 줄 위에 손글씨로 앉는다(요일 포함) */}
-              <div className="text-left relative" style={{ lineHeight: "34px" }}>{todayLabel && <span className="nt-hand sm" style={{ color: "#e9c99a" }}>{todayLabel}</span>}</div>
-              <div className="nt-eyebrow" style={{ position: "relative", lineHeight: "30px", color: "#d9c7ad" }}>데이터로 큐레이션하는</div>
-              <div className="nt-title text-[21px] py-2 relative" style={{ color: "#f6ecdf", borderTop: "1px solid rgba(233,214,189,.35)", borderBottom: "1px solid rgba(233,214,189,.35)" }}>
-                <span className="nt-hl text-[25px]">{homeGu ? `${homeGu}의 오늘의 커피` : "오늘의 동네 커피"}</span>
+              <div className="nt-ruled text-left relative" style={{ marginTop: -4 }}>{todayLabel && <span className="nt-hand sm coffee">{todayLabel}</span>}</div>
+              <div className="nt-eyebrow" style={{ position: "relative", lineHeight: "34px" }}>데이터로 큐레이션하는</div>
+              <div className="nt-title text-[21px] py-2 relative" style={{ borderTop: "1px solid rgba(42,31,23,.55)", borderBottom: "1px solid rgba(42,31,23,.55)" }}>
+                <span className="nt-hl text-[24px]">{homeGu ? `${homeGu}의 오늘의 커피` : "오늘의 동네 커피"}</span>
               </div>
               {/* 시·도 → 시·군·구 → 동·면 계층 선택(우리 동네). 검색 돋보기 제거. */}
               <div className="flex gap-1.5 justify-center mt-3 flex-wrap">
@@ -2097,7 +2098,7 @@ export default function Home() {
             {nearHome ? (
               <div>
                 <div className="flex items-baseline justify-between mb-2 nt-ruled">
-                  <span className="nt-sec">📍 내 주변 500m 옥석 카페</span>
+                  <div className="nt-title text-[17px]">📍 내 주변 500m 옥석 카페</div>
                   <div className="text-[11px] text-[#2f6fb0] shrink-0 font-medium">{nearHomeCafes.length}곳</div>
                 </div>
                 {nearHomeCafes.length === 0 ? (
@@ -2151,7 +2152,7 @@ export default function Home() {
           <div className="dcn-mapwrap absolute inset-0 md:relative md:flex-1 md:p-5" style={{ ["--dcn-sheet" as any]: tab === "map" ? (sheetOpen ? (sheetMode === "half" ? "calc(42dvh + 3.25rem)" : "calc(72dvh + 3.25rem)") : "calc(2.75rem + 3.25rem)") : "0px" }}>
             <div ref={mapRef} className="w-full h-full md:rounded-sm overflow-hidden bg-[#e8e0d3] z-0 md:shadow-[0_18px_30px_-18px_rgba(30,18,10,.6)]" />
             {/* 📓 접어 붙인 지도 — 접힌 자국 두 줄+가로 한 줄, 가장자리 그늘, 찢은 윗단, 테이프 2장(시안 그대로). 지도 조작은 그대로 통과 */}
-            <div className="nt-mapfold md:inset-5" aria-hidden><i className="grain" /><i className="h" /><i className="edge" /><i className="nt-tear" /></div>
+            <div className="nt-mapfold md:inset-5" aria-hidden><i className="h" /><i className="edge" /><i className="nt-tear" /></div>
             <i className="nt-tape k" style={{ left: "18%", top: 6, transform: "rotate(-5deg)", zIndex: 1100 }} aria-hidden />
             <i className="nt-tape" style={{ left: "auto", right: "12%", top: 8, transform: "rotate(4deg)", zIndex: 1100 }} aria-hidden />
             {mapErr && (
