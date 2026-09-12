@@ -460,13 +460,36 @@ export async function GET(req: NextRequest) {
     //   CEO 지시(2026-09-12): "아파트·건물·상호를 검색해도 근처 카페가 나와야 한다".
     //   지역(구·동) 단위는 너무 넓다 — 좌표에서 가까운 순으로 준다. 인덱스 idx_cafes_geo로 Seq Scan 없음.
     const placeCands = payloadPlaces;
+    const geo0 = await loadGeoIndex();   // 메모리/한 행 캐시 — 추가 조회 없음
     const qk = placeKey(q);
-    //   하이재킹 방지: "강남 작업하기 좋은 카페"의 '강남'처럼 **짧은 장소명이 질의 앞머리와 겹치는 것만으로**
-    //   장소 검색으로 둔갑하면 안 된다 → 정확 일치이거나, 꼬리가 거의 없을 때(2글자 이내)만 인정한다.
-    const placeHit = qk.length >= 3
+    //   🔴 하이재킹 방지(2026-09-12 실사고 2건):
+    //     ① "연희동 카페" → 장소 '연희동물병원'(인천)에 걸려 인천 카페가 나왔다. "신사동 카페" → '신사동산'(용인).
+    //        한국어는 단어 경계가 없어 접두 일치만으로는 '연희동'+'물병원'이 이어붙는다.
+    //        → **정식 행정동·시군구 이름이 질의에 있으면 장소 검색을 쓰지 않는다**(지역 검색이 정답이다).
+    //     ② "강남 작업하기 좋은 카페"의 '강남'처럼 짧은 장소명이 앞머리와 겹치는 것도 막는다.
+    //   그래서 접두 일치는 **원본 이름에서 단어가 실제로 끊기는 자리**(공백·괄호·끝)일 때만 인정한다.
+    //   ⚠️ 차단은 **질의가 지역어로만 이뤄졌을 때**만 — "스타필드 하남"은 '하남'이 시(市) 이름이어도
+    //      '스타필드'라는 비지역어가 있으니 장소 검색이 맞다(과잉 차단으로 place→semantic이 되던 것을 교정).
+    const isRegionWord = (t: string) => geo0.dong.has(t) || geo0.sgg.has(t) || !!DONG_TO_GU[t] || !!(SIDO_GU as Record<string, string[]>)[t];
+    const regionWordInQuery = parsed.tokens.length > 0 && parsed.tokens.every(isRegionWord);
+    const wordBoundaryPrefix = (name: string) => {
+      // 공백을 지운 비교용 문자열에서 qk가 접두일 때, 원본에서 그 지점이 단어 경계인지 본다.
+      let seen = 0;
+      for (let i = 0; i < name.length; i++) {
+        const ch = name[i];
+        if (/[\s·・\-_,()]/.test(ch)) { if (seen === qk.length) return true; continue; }
+        seen++;
+        if (seen === qk.length) return i + 1 >= name.length || /[\s·・\-_,()]/.test(name[i + 1]);
+      }
+      return seen === qk.length;
+    };
+    const placeHit = qk.length >= 3 && !regionWordInQuery
       ? placeCands.find((p) => {
           const pn = normName(p.name);
-          return pn === qk || (pn.startsWith(qk) && pn.length - qk.length <= 4) || (qk.startsWith(pn) && pn.length >= 4 && qk.length - pn.length <= 2);
+          //   🔴 접두 일치는 아예 쓰지 않는다(2026-09-12): "조용한 카페"가 '조용한…'으로 시작하는 장소에 걸려
+          //      장소 검색으로 갔다. 우리 본래 강점인 '느낌 검색'을 장소가 가로채면 안 된다.
+          //      정확 일치이거나, 질의가 장소 이름 + 꼬리 2자 이내일 때("스타필드 하남 점")만 장소로 본다.
+          return pn === qk || (qk.startsWith(pn) && pn.length >= 4 && qk.length - pn.length <= 2);
         })
       : undefined;
     if (placeHit) {
