@@ -260,3 +260,14 @@
   100% { opacity: 0;   transform: translateY(-68px) translateX(-5px) scaleX(1.5) rotate(-8deg); }
 }
 @media (prefers-reduced-motion: reduce) { .nt-steam { display: none; } }
+
+/* 🗺️ 지도도 노트 한 장 — 캔버스에 세피아 톤(핀·오버레이는 제외), 종이 결을 곱해 '종이에 인쇄된 지도' */
+.dcn-mapwrap canvas.maplibregl-canvas { filter: sepia(0.32) saturate(0.78) contrast(0.96) brightness(1.03); }
+.nt-mapfold .grain { position: absolute; inset: 0; background: url("/note/paper.webp") center / 512px 512px; mix-blend-mode: multiply; opacity: 0.55; }
+.nt-mapfold::before, .nt-mapfold::after { opacity: 1.6; }
+.nt-mapfold .edge { box-shadow: inset 0 0 0 1px rgba(90,70,50,.45), inset 0 0 60px rgba(60,40,20,.28); }
+/* 홈 섹션 스티커 옆 정보점·부제 */
+.nt-app .nt-sec + .nt-free { flex: none; }
+
+/* 호두나무 띠 위 선택상자는 불투명 크림 */
+.nt-header .nt-select, .nt-header select, .nt-header button.nt-select { background: #f6ecdf !important; color: #241812; border-color: rgba(233,214,189,.6); }
