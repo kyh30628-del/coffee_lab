@@ -79,7 +79,7 @@ export function parseQuery(q: string): ParsedQuery {
 // ── 지역 인식: DB의 실제 dong/area가 단일 출처 ────────────────────────────────
 //   하드코딩 사전을 늘리는 대신 실데이터를 쓴다. 값은 거의 안 변하므로 프로세스 메모리에 캐시(6시간).
 //   ⚠️ 조회는 작은 컬럼 2개 GROUP BY 한 번뿐 — 큰 컬럼 미조회.
-type GeoIndex = { dong: Map<string, string>; area: Set<string> };
+type GeoIndex = { dong: Map<string, string>; area: Set<string>; sgg: Map<string, string> };
 let geoCache: { at: number; idx: GeoIndex } | null = null;
 const GEO_TTL_MS = 6 * 60 * 60 * 1000;
 
@@ -87,41 +87,60 @@ const GEO_TTL_MS = 6 * 60 * 60 * 1000;
 //   프로세스 메모리 캐시가 비어 있으므로, 그대로 두면 **콜드 스타트마다 전수 스캔**이 돈다(검색 트래픽이 적을수록
 //   콜드 비율이 높아 더 나쁘다). 그래서 결과를 `search_cache` 한 행에 말아 넣고, 콜드 스타트는
 //   **기본키 조회 1건**(1페이지)만 하게 한다. 전수 스캔은 하루 1회로 수렴한다.
-const GEO_CACHE_KEY = "__geo_index_v1__";
+//   v2(2026-09-12): sgg(시·군·구 어간) 추가 — 옛 payload에는 없으므로 키를 올려 섞이지 않게 한다.
+const GEO_CACHE_KEY = "__geo_index_v3__";
 
 export async function loadGeoIndex(): Promise<GeoIndex> {
   if (geoCache && Date.now() - geoCache.at < GEO_TTL_MS) return geoCache.idx;
   // ① DB 한 행 캐시(콜드 스타트 경로) — PK 조회라 사실상 공짜
   try {
     const hit = (await sql`SELECT payload FROM search_cache WHERE qkey=${GEO_CACHE_KEY} AND created_at > now() - interval '24 hours' LIMIT 1`)[0] as any;
-    if (hit?.payload?.dong) {
-      const idx = { dong: new Map<string, string>(Object.entries(hit.payload.dong as Record<string, string>)), area: new Set<string>(hit.payload.area as string[]) };
+    if (hit?.payload?.dong && hit?.payload?.sgg) {
+      const idx = { dong: new Map<string, string>(Object.entries(hit.payload.dong as Record<string, string>)), area: new Set<string>(hit.payload.area as string[]), sgg: new Map<string, string>(Object.entries(hit.payload.sgg as Record<string, string>)) };
       geoCache = { at: Date.now(), idx };
       return idx;
     }
   } catch { /* 캐시 실패 시 아래에서 직접 만든다 */ }
   const dong = new Map<string, string>();
   const area = new Set<string>();
+  const sgg = new Map<string, string>();   // 시·군·구 어간 → area ("하남"→하남시 · "연제"→부산 연제구)
   try {
+    // 🧭 시·군·구 어간 사전(2026-09-12) — 카페 수 많은 쪽을 대표로. 동명 시군구(고성군 2곳)는 큰 쪽이 이긴다.
+    const areas = (await sql`SELECT area, COUNT(*)::int n FROM cafes WHERE published AND area IS NOT NULL GROUP BY area ORDER BY n DESC`) as any[];
+    for (const r of areas) {
+      const a = String(r.area).trim(); area.add(a);
+      const last = a.split(" ").pop()!;                          // "부산 연제구" → "연제구"
+      for (const k of [last, last.replace(/(특별자치)?(시|군|구)$/, "")]) {
+        if (k.length >= 2 && !sgg.has(k)) sgg.set(k, a);         // "연제구"·"연제" 둘 다 키로
+      }
+    }
     const rows = (await sql`
       SELECT dong, area, COUNT(*)::int n FROM cafes
       WHERE published AND dong IS NOT NULL AND area IS NOT NULL
       GROUP BY dong, area ORDER BY n DESC`) as any[];
     for (const r of rows) {
       const d = String(r.dong).trim();
-      area.add(String(r.area));
       if (d.length < 2) continue;
-      if (!dong.has(d)) dong.set(d, String(r.area));           // 같은 동명은 카페 많은 쪽 우선(ORDER BY n DESC)
-      const bare = d.replace(/(동|가|읍|면|리)$/, "");           // '우면동'→'우면'도 같은 구로
-      if (bare.length >= 2 && !dong.has(bare)) dong.set(bare, String(r.area));
+      // 🧭 법정동 번호 표기 흡수(2026-09-12): DB에는 '성수동1가'로 들어 있어 사용자가 쓰는 '성수동'·'성수'가
+      //   키에 없었다(운영에서 "성수동 조용한 곳"이 지역 판정 실패 → 전국 검색이 되던 실측 결함).
+      const keys = new Set<string>([d]);
+      const a = d.replace(/\d+가$/, "");          // 성수동1가 → 성수동 · 종로1가 → 종로
+      if (a.length >= 2) keys.add(a);
+      const b = d.replace(/\d+동$/, "동");         // 상계1동 → 상계동
+      if (b.length >= 2) keys.add(b);
+      for (const k of [...keys]) {
+        const bare = k.replace(/(동|가|읍|면|리)$/, "");          // '우면동'→'우면'도 같은 구로
+        if (bare.length >= 2) keys.add(bare);
+      }
+      for (const k of keys) if (!dong.has(k)) dong.set(k, String(r.area));   // 같은 이름은 카페 많은 쪽 우선(ORDER BY n DESC)
     }
   } catch { /* DB 실패 시 빈 인덱스 — 기존 하드코딩 폴백이 살아 있다 */ }
   // ② 만든 지도를 한 행에 적재 — 다음 콜드 스타트부터는 전수 스캔 없이 이 행만 읽는다(비차단).
   if (dong.size > 0) {
-    sql`INSERT INTO search_cache (qkey, payload, created_at) VALUES (${GEO_CACHE_KEY}, ${JSON.stringify({ dong: Object.fromEntries(dong), area: [...area] })}, now())
+    sql`INSERT INTO search_cache (qkey, payload, created_at) VALUES (${GEO_CACHE_KEY}, ${JSON.stringify({ dong: Object.fromEntries(dong), area: [...area], sgg: Object.fromEntries(sgg) })}, now())
         ON CONFLICT (qkey) DO UPDATE SET payload=EXCLUDED.payload, created_at=now()`.catch(() => {});
   }
-  geoCache = { at: Date.now(), idx: { dong, area } };
+  geoCache = { at: Date.now(), idx: { dong, area, sgg } };
   return geoCache.idx;
 }
 
@@ -132,6 +151,11 @@ export function detectRegion(tokens: string[], geo: GeoIndex): { area: string; t
     //   오산시로 오인하던 실사고(부산 편입 스모크에서 발견). 시도 토큰은 시도 지역으로 확정한다.
     if ((SIDO_GU as Record<string, string[]>)[t]) return { area: t, token: t };
     if (geo.area.has(t)) return { area: t, token: t };
+    // 🧭 2026-09-12 실사고: 동(洞) 어간이 시·군·구 이름보다 먼저 잡혀 "스타필드 하남"→화천군(하남면),
+    //   "구미"→성남시(구미동), "거제"→부산 연제구(거제동), "동해"→경남 고성군(동해면), "상주"→남해군(상주면)이 됐다.
+    //   실측 8개 질의 중 6개 오판. 행정 위계상 **시·군·구가 하위 동보다 앞선다** — 그 순서로 바로잡는다.
+    const sg = geo.sgg.get(t);
+    if (sg) return { area: sg, token: t };
     const hit = geo.dong.get(t);
     if (hit) return { area: hit, token: t };
   }
