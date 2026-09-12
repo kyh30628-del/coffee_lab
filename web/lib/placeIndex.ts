@@ -39,6 +39,9 @@ function rows(): Row[] {
 export const placeCount = () => rows().length;
 
 const norm = (s: string) => s.toLowerCase().replace(/[\s·・\-_,()]/g, "");
+/** 질의에서 장소명만 남긴다("스타필드 하남 카페" → "스타필드하남"). 장소 검색인지 판단하는 데 쓴다. */
+export const placeKey = (q: string) => norm(q).replace(/(카페|커피|맛집|근처|주변|추천|가볼만한곳|가볼만한)/g, "");
+export const normName = norm;
 const R = 6371, rad = (d: number) => (d * Math.PI) / 180;
 const km = (a: number, b: number, c: number, d: number) => {
   const x = rad(c - a), y = rad(d - b);

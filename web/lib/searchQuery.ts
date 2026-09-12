@@ -79,7 +79,7 @@ export function parseQuery(q: string): ParsedQuery {
 // ── 지역 인식: DB의 실제 dong/area가 단일 출처 ────────────────────────────────
 //   하드코딩 사전을 늘리는 대신 실데이터를 쓴다. 값은 거의 안 변하므로 프로세스 메모리에 캐시(6시간).
 //   ⚠️ 조회는 작은 컬럼 2개 GROUP BY 한 번뿐 — 큰 컬럼 미조회.
-type GeoIndex = { dong: Map<string, string>; area: Set<string>; sgg: Map<string, string> };
+type GeoIndex = { dong: Map<string, string>; area: Set<string>; sgg: Map<string, string>; alt: Map<string, string[]> };
 let geoCache: { at: number; idx: GeoIndex } | null = null;
 const GEO_TTL_MS = 6 * 60 * 60 * 1000;
 
@@ -88,15 +88,15 @@ const GEO_TTL_MS = 6 * 60 * 60 * 1000;
 //   콜드 비율이 높아 더 나쁘다). 그래서 결과를 `search_cache` 한 행에 말아 넣고, 콜드 스타트는
 //   **기본키 조회 1건**(1페이지)만 하게 한다. 전수 스캔은 하루 1회로 수렴한다.
 //   v2(2026-09-12): sgg(시·군·구 어간) 추가 — 옛 payload에는 없으므로 키를 올려 섞이지 않게 한다.
-const GEO_CACHE_KEY = "__geo_index_v3__";
+const GEO_CACHE_KEY = "__geo_index_v4__";
 
 export async function loadGeoIndex(): Promise<GeoIndex> {
   if (geoCache && Date.now() - geoCache.at < GEO_TTL_MS) return geoCache.idx;
   // ① DB 한 행 캐시(콜드 스타트 경로) — PK 조회라 사실상 공짜
   try {
     const hit = (await sql`SELECT payload FROM search_cache WHERE qkey=${GEO_CACHE_KEY} AND created_at > now() - interval '24 hours' LIMIT 1`)[0] as any;
-    if (hit?.payload?.dong && hit?.payload?.sgg) {
-      const idx = { dong: new Map<string, string>(Object.entries(hit.payload.dong as Record<string, string>)), area: new Set<string>(hit.payload.area as string[]), sgg: new Map<string, string>(Object.entries(hit.payload.sgg as Record<string, string>)) };
+    if (hit?.payload?.dong && hit?.payload?.sgg && hit?.payload?.alt) {
+      const idx = { dong: new Map<string, string>(Object.entries(hit.payload.dong as Record<string, string>)), area: new Set<string>(hit.payload.area as string[]), sgg: new Map<string, string>(Object.entries(hit.payload.sgg as Record<string, string>)), alt: new Map<string, string[]>(Object.entries(hit.payload.alt as Record<string, string[]>)) };
       geoCache = { at: Date.now(), idx };
       return idx;
     }
@@ -104,6 +104,10 @@ export async function loadGeoIndex(): Promise<GeoIndex> {
   const dong = new Map<string, string>();
   const area = new Set<string>();
   const sgg = new Map<string, string>();   // 시·군·구 어간 → area ("하남"→하남시 · "연제"→부산 연제구)
+  // 🔀 동명(同名) 후보 — 같은 동 이름이 여러 시·군·구에 있을 때 **우리가 고른 쪽 말고 나머지**.
+  //   "고덕동"(강동구·평택시)·"가좌동"(인천 서해구·진주시)처럼 어느 쪽인지 우리가 단정할 수 없다.
+  //   추측해서 하나로 몰지 않고 사용자가 한 번에 바꿀 수 있게 후보를 넘긴다(2026-09-12 전수감사에서 12건 확인).
+  const alt = new Map<string, string[]>();
   try {
     // 🧭 시·군·구 어간 사전(2026-09-12) — 카페 수 많은 쪽을 대표로. 동명 시군구(고성군 2곳)는 큰 쪽이 이긴다.
     const areas = (await sql`SELECT area, COUNT(*)::int n FROM cafes WHERE published AND area IS NOT NULL GROUP BY area ORDER BY n DESC`) as any[];
@@ -132,32 +136,39 @@ export async function loadGeoIndex(): Promise<GeoIndex> {
         const bare = k.replace(/(동|가|읍|면|리)$/, "");          // '우면동'→'우면'도 같은 구로
         if (bare.length >= 2) keys.add(bare);
       }
-      for (const k of keys) if (!dong.has(k)) dong.set(k, String(r.area));   // 같은 이름은 카페 많은 쪽 우선(ORDER BY n DESC)
+      for (const k of keys) {
+        if (!dong.has(k)) dong.set(k, String(r.area));                        // 같은 이름은 카페 많은 쪽 우선(ORDER BY n DESC)
+        else if (dong.get(k) !== String(r.area)) {                            // 이미 다른 지역이 차지 → 후보로 남긴다
+          const a = alt.get(k) ?? []; if (!a.includes(String(r.area)) && a.length < 4) { a.push(String(r.area)); alt.set(k, a); }
+        }
+      }
     }
   } catch { /* DB 실패 시 빈 인덱스 — 기존 하드코딩 폴백이 살아 있다 */ }
   // ② 만든 지도를 한 행에 적재 — 다음 콜드 스타트부터는 전수 스캔 없이 이 행만 읽는다(비차단).
   if (dong.size > 0) {
-    sql`INSERT INTO search_cache (qkey, payload, created_at) VALUES (${GEO_CACHE_KEY}, ${JSON.stringify({ dong: Object.fromEntries(dong), area: [...area], sgg: Object.fromEntries(sgg) })}, now())
+    sql`INSERT INTO search_cache (qkey, payload, created_at) VALUES (${GEO_CACHE_KEY}, ${JSON.stringify({ dong: Object.fromEntries(dong), area: [...area], sgg: Object.fromEntries(sgg), alt: Object.fromEntries(alt) })}, now())
         ON CONFLICT (qkey) DO UPDATE SET payload=EXCLUDED.payload, created_at=now()`.catch(() => {});
   }
-  geoCache = { at: Date.now(), idx: { dong, area, sgg } };
+  geoCache = { at: Date.now(), idx: { dong, area, sgg, alt } };
   return geoCache.idx;
 }
 
 /** 질의 토큰에서 지역을 찾아낸다. 찾으면 그 area와, 지역어로 쓰인 토큰을 함께 돌려준다. */
-export function detectRegion(tokens: string[], geo: GeoIndex): { area: string; token: string } | null {
+//   반환 token = **질의에 실제로 있던 원본 토큰**("성수역"), key = 사전 조회에 쓴 키("성수").
+//   호출측은 token으로 내용 검색어에서 지역어를 걷어내고, key로 동명 후보를 찾는다.
+export function detectRegion(tokens: string[], geo: GeoIndex): { area: string; token: string; key: string } | null {
   for (const t of tokens) {
     // 🧭 2026-09-06: 시·도명은 동 사전보다 먼저 — 오산시 '부산동'의 bare '부산'이 "부산 카페"를
     //   오산시로 오인하던 실사고(부산 편입 스모크에서 발견). 시도 토큰은 시도 지역으로 확정한다.
-    if ((SIDO_GU as Record<string, string[]>)[t]) return { area: t, token: t };
-    if (geo.area.has(t)) return { area: t, token: t };
+    if ((SIDO_GU as Record<string, string[]>)[t]) return { area: t, token: t, key: t };
+    if (geo.area.has(t)) return { area: t, token: t, key: t };
     // 🧭 2026-09-12 실사고: 동(洞) 어간이 시·군·구 이름보다 먼저 잡혀 "스타필드 하남"→화천군(하남면),
     //   "구미"→성남시(구미동), "거제"→부산 연제구(거제동), "동해"→경남 고성군(동해면), "상주"→남해군(상주면)이 됐다.
     //   실측 8개 질의 중 6개 오판. 행정 위계상 **시·군·구가 하위 동보다 앞선다** — 그 순서로 바로잡는다.
     const sg = geo.sgg.get(t);
-    if (sg) return { area: sg, token: t };
+    if (sg) return { area: sg, token: t, key: t };
     const hit = geo.dong.get(t);
-    if (hit) return { area: hit, token: t };
+    if (hit) return { area: hit, token: t, key: t };
   }
   // '성수동카페'처럼 붙여 쓴 경우 — 토큰 앞부분이 동명과 일치하는지.
   //   ⚠️ 접두 일치만으로 지역을 단정하면 **'고양이'가 '고양'시로 잡힌다**(골든셋이 이 회귀를 잡아냈다:
@@ -169,7 +180,7 @@ export function detectRegion(tokens: string[], geo: GeoIndex): { area: string; t
       const tail = t.slice(len);
       if (!PLACE_TAIL.has(tail)) continue;
       const hit = geo.dong.get(head);
-      if (hit) return { area: hit, token: head };
+      if (hit) return { area: hit, token: t, key: head };   // token=원본('성수역'), key=사전키('성수')
     }
   }
   return null;

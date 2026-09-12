@@ -42,7 +42,9 @@ export const GOLDEN = [
   // ── 무의미: 억지로 결과를 만들면 안 된다
   { q: "asdfqwerzxcv", type: "none", max: 2 },
   { q: "ㅁㄴㅇㄹㅎ", type: "none", max: 2 },
-  { q: "부산 해운대 카페", type: "none", max: 24, coverage: true },
+  // 2026-09-06 부산·경남 편입 후 정정 — 예전엔 "미서비스 안내가 떠야 한다"였다(서비스 지역이 됐으니 지역 정확도로 바꾼다).
+  { q: "부산 해운대 카페", type: "area", expect: ["부산 해운대구"] },
+  { q: "대구 수성구 카페", type: "area", expect: ["대구 수성구"] },   // 2026-09-12 대구·경북 편입
 ];
 
 const norm = (s) => String(s || "").toLowerCase().replace(/\s+/g, "");

@@ -12,7 +12,11 @@ import path from 'node:path';
 
 const SRC = process.argv[2];
 const ROOT = path.join(path.dirname(new URL(import.meta.url).pathname), '../..');
-const els = JSON.parse(fs.readFileSync(path.join(SRC, 'ov-places.json'), 'utf8')).elements || [];
+const els = [
+  ...(JSON.parse(fs.readFileSync(path.join(SRC, 'ov-places.json'), 'utf8')).elements || []),
+  // 2차 확장(2026-09-12 CEO "장소 검색도 더 풍부해야 한다") — 학교·종교시설·마트·산·사적지 등 '근처'의 기준점이 되는 것들.
+  ...(fs.existsSync(path.join(SRC, 'ov-places2.json')) ? (JSON.parse(fs.readFileSync(path.join(SRC, 'ov-places2.json'), 'utf8')).elements || []) : []),
+];
 
 // 종류 코드 — 검색 결과에 아이콘·라벨로 쓴다. 여기 없는 태그는 버린다(우체통·화장실 같은 잡음 차단).
 const KIND = {
@@ -26,10 +30,15 @@ const KIND = {
   library: ['도서관', '📚'], townhall: ['행정', '🏛️'], government: ['행정', '🏛️'], courthouse: ['법원', '⚖️'],
   hotel: ['호텔', '🏨'], resort: ['리조트', '🏨'], park: ['공원', '🌳'],
   apt: ['아파트', '🏢'], station: ['역', '🚇'], landmark: ['명소', '📍'],
+  school: ['학교', '🏫'], kindergarten: ['유치원', '🧸'], place_of_worship: ['종교시설', '⛪'],
+  post_office: ['우체국', '📮'], community_centre: ['문화센터', '🏘️'], clinic: ['의원', '🩺'],
+  ferry_terminal: ['여객터미널', '⛴️'], supermarket: ['마트', '🛒'], peak: ['산', '⛰️'],
+  castle: ['성', '🏯'], monument: ['기념물', '🗿'], memorial: ['기념관', '🗿'], ruins: ['유적', '🏛️'],
+  archaeological_site: ['유적', '🏛️'], golf_course: ['골프장', '⛳'], viewpoint: ['전망대', '🔭'], arts_centre: ['문화예술', '🎨'],
 };
 const kindOf = (t) => {
   if (t.landuse === 'residential' || t.building === 'apartments') return 'apt';
-  for (const k of ['shop', 'amenity', 'tourism', 'leisure', 'aeroway', 'office']) {
+  for (const k of ['shop', 'amenity', 'tourism', 'leisure', 'aeroway', 'office', 'natural', 'historic']) {
     const v = t[k]; if (v && KIND[v]) return v === 'government' ? 'government' : v;
   }
   return null;

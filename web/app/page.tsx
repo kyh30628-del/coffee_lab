@@ -34,7 +34,7 @@ type DCafe = { id: number; name: string; area: string; lat: number; lng: number;
 type Discover = { headlineA: DCafe | null; headlineB: DCafe | null; headlineAList?: DCafe[]; headlineBList?: DCafe[]; themeB?: { emoji: string; label: string } | null; top3: DCafe[]; fresh: DCafe[]; specialty: DCafe[]; featured?: DCafe[]; scopeCount: number };
 type SearchResult = { id: number; name: string; area: string; grade: string | null; count: number | null; identity: string | null; score: number; reasons: string[] };
 type Place = { name: string; lat: number; lng: number; kind: string; label: string; icon: string };
-type SearchRes = { ok: boolean; region: string; q: string; concepts: string[]; count: number; results: SearchResult[]; coverageNote?: string; franchiseNote?: string; places?: Place[] };
+type SearchRes = { ok: boolean; region: string; q: string; concepts: string[]; count: number; results: SearchResult[]; coverageNote?: string; franchiseNote?: string; places?: Place[]; regionAlts?: string[]; nearPlace?: Place };
 const SEARCH_EXAMPLES = ["비 오는 날 혼자 조용히", "감성 사진 데이트", "노트북 작업하기 좋은", "산미 또렷한 커피", "빵 맛있는 집"];
 // 쇼케이스 1차 성과 집계(노출·클릭·재생)
 const trackPromo = (cafeId: number, type: "view" | "click" | "play") => { fetch("/api/promo-event", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cafeId, type }) }).catch(() => {}); };
@@ -1082,14 +1082,15 @@ export default function Home() {
     regionCtr.current = [lat, lng, zoom];
   }, [mapReady]);
 
-  const runSearch = async (query: string) => {
+  const runSearch = async (query: string, forceRegion?: string) => {
     const qq = query.trim();
     if (!qq) return;
     setSearchQ(qq); setSearchLoading(true); setSearchRes(null);
     try {
       // 지도 중심을 같이 보낸다 — "○○주민센터"처럼 전국에 같은 이름이 많을 때 보고 있는 곳부터 보여주려고.
       let ctr = ""; try { const c = mapObj.current?.getCenter?.(); if (c) ctr = `&lat=${c.lat.toFixed(4)}&lng=${c.lng.toFixed(4)}`; } catch {}
-      const u = `/api/search?q=${encodeURIComponent(qq)}${homeRegion ? `&region=${encodeURIComponent(homeRegion)}` : ""}${ctr}`;
+      const reg = forceRegion ?? homeRegion;   // 동명 후보를 누르면 그 지역으로 고정해 다시 찾는다
+      const u = `/api/search?q=${encodeURIComponent(qq)}${reg ? `&region=${encodeURIComponent(reg)}` : ""}${ctr}`;
       const d = await (await fetch(u)).json();
       if (d.ok) setSearchRes(d);
     } catch {}
@@ -2292,7 +2293,22 @@ export default function Home() {
                         : "결과가 없어요. 다른 표현이나 더 넓은 동네로 시도해 보세요."}</p>
                     ) : (
                       <div className="space-y-2">
-                        <div className="text-[11px] text-[#665036] mb-1">{searchRes.region} · {searchRes.count}곳 중 가까운 순</div>
+                        {/* 📍 장소 주변 결과면 기준점을 명확히 — "어디에서 몇 m"인지 각 항목 근거에도 나온다. */}
+                        <div className="text-[11px] text-[#665036] mb-1">
+                          {searchRes.nearPlace
+                            ? <><b className="text-[#2b2018]">{searchRes.nearPlace.icon} {searchRes.nearPlace.name}</b> 주변 {searchRes.count}곳 · 가까운 순</>
+                            : <>{searchRes.region} · {searchRes.count}곳 중 가까운 순</>}
+                        </div>
+                        {/* 🔀 같은 동 이름이 여러 곳에 있을 때(고덕동=강동구·평택시) — 우리가 단정하지 않고 한 번에 바꾸게 한다. */}
+                        {!!searchRes.regionAlts?.length && (
+                          <div className="flex items-center flex-wrap gap-1.5 mb-2 text-[11px] text-[#665036]">
+                            <span>혹시 이쪽인가요?</span>
+                            {searchRes.regionAlts.map((a) => (
+                              <button key={a} onClick={() => runSearch(searchRes.q, a)}
+                                className="border border-[#d8c8ad] bg-white rounded-full px-2.5 py-1 font-semibold text-[#2b2018] hover:border-[#9c6b3f]">{a}</button>
+                            ))}
+                          </div>
+                        )}
                         {searchRes.results.map((r) => (
                           <button key={r.id} onClick={() => { openById(r.id); setShowSearch(false); }} className="w-full text-left bg-white rounded-xl p-3.5 border border-[#ece0cd] hover:border-[#9c6b3f]">
                             <div className="flex items-center gap-1.5 mb-0.5">

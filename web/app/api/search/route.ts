@@ -8,7 +8,7 @@ import { loadCriteria, getCriterionSync } from "@/lib/criteria";
 import { loadCriteriaLists, getListSync } from "@/lib/criteriaLists";
 import { parseQuery, loadGeoIndex, detectRegion, isCoreArea } from "@/lib/searchQuery";
 import { isFranchise } from "@/lib/discover";
-import { searchPlaces } from "@/lib/placeIndex";
+import { searchPlaces, placeKey, normName } from "@/lib/placeIndex";
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
@@ -26,7 +26,7 @@ function detectOutOfCoverage(q: string, region: string): string | null {
   const text = (q + " " + region).toLowerCase();
   for (const kw of getListSync("search.out_of_coverage")) {
     if (text.includes(kw)) {
-      return `현재 동네 커피 노트는 서울·경기·인천·강원·충청(대전·세종)·부산·경남을 서비스합니다. '${kw}' 지역 카페는 아직 포함되어 있지 않아요.`;
+      return `현재 동네 커피 노트는 서울·경기·인천·강원·충청(대전·세종)·부산·경남·대구·경북을 서비스합니다. '${kw}' 지역 카페는 아직 포함되어 있지 않아요.`;
     }
   }
   return null;
@@ -61,6 +61,13 @@ const SEOUL_GU = SIDO_GU["서울"];
 const GYEONGGI_SI = SIDO_GU["경기"];
 // 동네·상권명 → 행정구 매핑 (region 없는 검색에서 "홍대" → "마포구" 자동 추출)
 const DONG_TO_GU: Record<string, string> = {
+  // 🏙️ 2026-09-12 상권 별칭 보강 — 행정동에 없는 '부르는 이름'은 실데이터 인덱스로 못 잡는다(실측 0곳).
+  //   근거: 네이버 지역검색 실측("서면 카페"=부산광역시 부산진구 전포동·부전동) + 우리 DB 확인
+  //   ("서면"은 홍천·춘천·철원의 면(面)으로만 존재해 "서면 카페"가 홍천군으로 갔다).
+  "서면": "부산 부산진구", "전포": "부산 부산진구", "전포카페거리": "부산 부산진구",
+  "광안리": "부산 수영구", "광안": "부산 수영구", "해리단길": "부산 해운대구", "송정": "부산 해운대구",
+  "황리단길": "경주시", "동성로": "대구 중구", "김광석거리": "대구 중구", "앞산": "대구 남구",
+  "망리단길": "마포구", "연트럴파크": "마포구", "경리단길": "용산구", "송리단길": "송파구",
   "홍대": "마포구", "합정": "마포구", "망원": "마포구", "연남": "마포구", "상암": "마포구", "상수": "마포구", "공덕": "마포구",
   "이태원": "용산구", "한남": "용산구", "해방촌": "용산구", "경리단": "용산구",
   "성수": "성동구", "서울숲": "성동구", "왕십리": "성동구",
@@ -261,28 +268,42 @@ export async function GET(req: NextRequest) {
     const ql = q.toLowerCase();
     // 🔤 불용어 제거·조사 절단(lib/searchQuery) — '카페·맛집·좋은'이 전 카페에 매칭돼 랭킹을 지배하던 문제 해결.
     const parsed = parseQuery(q);
-    const tokens = parsed.tokens;
+    let tokens = parsed.tokens;
     const hitConcepts = CONCEPTS.filter((c) => c.triggers.some((t) => ql.includes(t)));
     // 질의 자체가 개념어인가('카공'·'공부'). 부분 상호매칭 바닥값을 뺄지 판단하는 데만 쓴다.
     const pureConceptQuery = hitConcepts.some((c) => c.triggers.some((t) => ql.trim() === t));
     let effectiveRegion = region;
     let regionExplicit = !!region;
+    // 🔀 같은 동 이름이 여러 시·군·구에 있을 때의 나머지 후보("고덕동"=강동구·평택시). 화면에서 한 번에 바꾸라고 내려준다.
+    let regionAlts: string[] = [];
+    let nearPlace: { name: string; icon: string; label: string; lat: number; lng: number } | null = null;
+    const payloadPlaces = searchPlaces(placeKey(q) || q, { near: nearOf(req) });   // "성수역 카페"→"성수역"으로 찾는다
+    // 🧹 지역어로 소비된 토큰 — 내용 검색어에서 걷어낸다.
+    //   2026-09-12 실측 결함: "성수역 카페"는 지역 판정(성동구)에 성공하고도 **결과 0곳**이었다.
+    //   '성수역'이 내용 검색어로도 남아, 그 글자가 본문에 없는 카페가 전부 탈락했기 때문이다
+    //   ("잠실역 카페"·"동대구역 카페" 0곳, "홍대 카페"는 마포구 수백 곳 중 14곳). 지역은 지역 필터로 이미 반영된다.
+    const consumed = new Set<string>();
     if (!effectiveRegion) {
       // ① 기존 하드코딩 사전(빠른 경로·상권 별칭: 홍대·경리단 등 행정동에 없는 이름을 커버)
+      const geoForAlt = await loadGeoIndex();
       for (const tok of tokens) {
-        if (DONG_TO_GU[tok]) { effectiveRegion = DONG_TO_GU[tok]; break; }
-        if (SEOUL_GU.includes(tok)) { effectiveRegion = tok; break; }
-        if (GYEONGGI_SI.includes(tok)) { effectiveRegion = tok; break; }
+        if (DONG_TO_GU[tok]) { effectiveRegion = DONG_TO_GU[tok]; consumed.add(tok);
+          regionAlts = (geoForAlt.alt.get(tok) ?? [geoForAlt.dong.get(tok) ?? ""]).filter((a) => a && a !== effectiveRegion).slice(0, 3); break; }
+        if (SEOUL_GU.includes(tok)) { effectiveRegion = tok; consumed.add(tok); break; }
+        if (GYEONGGI_SI.includes(tok)) { effectiveRegion = tok; consumed.add(tok); break; }
       }
       // ② DB 실데이터(dong/area) 전수 인덱스 — '우면동·자양동'처럼 사전에 없던 동을 커버(정확도 실패의 주원인).
       if (!effectiveRegion) {
         const geo = await loadGeoIndex();
         // 지역 판정은 **원형 토큰**으로 — 절단본을 쓰면 '고양이'가 '고양'이 돼 고양시로 잡힌다(실측 사고).
         const hit = detectRegion(parsed.rawTokens, geo);
-        if (hit) effectiveRegion = hit.area;
+        if (hit) { effectiveRegion = hit.area; consumed.add(hit.token); regionAlts = (geo.alt.get(hit.key) ?? []).filter((a) => a !== hit.area).slice(0, 3); }
       }
       regionExplicit = !!effectiveRegion;
+      if (consumed.size) tokens = tokens.filter((t) => !consumed.has(t));   // 지역어를 뺀 '내용' 토큰만 남긴다
     }
+    // 지역만 말한 질의("성수역 카페"·"홍대 카페")는 내용 토큰이 하나도 안 남는다 → 그 동네 대표 카페를 보여준다.
+    const regionOnly = tokens.length === 0 && !!effectiveRegion;
 
     // 캐시 조회: 같은 질문+지역이면 즉시 반환(LLM·임베딩 호출 0). ensureCache는 위 Promise.all에서 이미 프라임됨.
     const qkey = q.toLowerCase().replace(/\s+/g, " ").trim() + "|" + effectiveRegion;
@@ -302,7 +323,7 @@ export async function GET(req: NextRequest) {
     const p1 = `%${effectiveRegion}%`, p2 = `%${short}%`;
     const metroList = metroAreaList(effectiveRegion);
 
-    let mode: "semantic" | "keyword" | "ai" = "keyword";
+    let mode: "semantic" | "keyword" | "ai" | "region" | "place" = "keyword";   // region = 지역만 말한 질의(그 동네 대표)
     let scored: any[] = [];
     const byId = new Map<number, any>(); // Claude 재정렬용 원본 row 보관
 
@@ -429,6 +450,75 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // ===== 📍 장소를 물은 질의 — 그 건물·아파트·역 **주변** 카페 =====
+    //   CEO 지시(2026-09-12): "아파트·건물·상호를 검색해도 근처 카페가 나와야 한다".
+    //   지역(구·동) 단위는 너무 넓다 — 좌표에서 가까운 순으로 준다. 인덱스 idx_cafes_geo로 Seq Scan 없음.
+    const placeCands = payloadPlaces;
+    const qk = placeKey(q);
+    //   하이재킹 방지: "강남 작업하기 좋은 카페"의 '강남'처럼 **짧은 장소명이 질의 앞머리와 겹치는 것만으로**
+    //   장소 검색으로 둔갑하면 안 된다 → 정확 일치이거나, 꼬리가 거의 없을 때(2글자 이내)만 인정한다.
+    const placeHit = qk.length >= 3
+      ? placeCands.find((p) => {
+          const pn = normName(p.name);
+          return pn === qk || (pn.startsWith(qk) && pn.length - qk.length <= 4) || (qk.startsWith(pn) && pn.length >= 4 && qk.length - pn.length <= 2);
+        })
+      : undefined;
+    if (placeHit) {
+      const R = 0.027;                                   // 위도 약 3km — 캠퍼스·공원처럼 중심 좌표가 외곽인 곳까지 담는다
+      const lngR = R / Math.max(0.3, Math.cos((placeHit.lat * Math.PI) / 180));
+      const near = (await sql.query(
+        `SELECT id, name, area, synth_grade, synth_count, synth_identity, signature, note, vibe, uses, beans,
+                char_scores, synth_acidity, synth_body, synth_sweet, lat, lng,
+                jsonb_path_query_array(synth_reviews, '$[*].quote') AS synth_reviews
+         FROM cafes
+         WHERE published = true AND lat IS NOT NULL
+           AND lat BETWEEN $1 AND $2 AND lng BETWEEN $3 AND $4
+         ORDER BY (lat - $5) * (lat - $5) + (lng - $6) * (lng - $6)
+         LIMIT 60`,
+        [placeHit.lat - R, placeHit.lat + R, placeHit.lng - lngR, placeHit.lng + lngR, placeHit.lat, placeHit.lng])) as unknown as any[];
+      // ⚠️ 상한을 거리순으로 자른다 — 예전엔 LIMIT 200을 순서 없이 잘라, 상자 안에 카페가 많은 곳(하남 미사 등)에서
+      //   정작 그 장소 안에 있는 카페("아우어베이커리 스타필드 하남점")가 잘려 나갔다.
+      const m = (la: number, ln: number) => Math.round(Math.hypot((la - placeHit.lat) * 111000, (ln - placeHit.lng) * 88000));
+      //   상호에 그 장소가 들어간 카페("아우어베이커리 스타필드 하남점")는 거리와 무관하게 먼저 보여준다.
+      const sortedNear = near
+        .map((c) => ({ c, d: m(Number(c.lat), Number(c.lng)), inName: normName(String(c.name || "")).includes(qk) }))
+        .sort((a, b) => (Number(b.inName) - Number(a.inName)) || a.d - b.d)
+        .slice(0, 24);
+      if (sortedNear.length) {
+        mode = "place"; scored.length = 0;
+        for (const { c, d } of sortedNear) {
+          byId.set(c.id, c);
+          scored.push({ id: c.id, name: c.name, area: c.area, grade: c.synth_grade, count: c.synth_count,
+            identity: c.synth_identity, vb: vbOf(c), score: 1000 - d,
+            reasons: [`${placeHit.name}에서 ${d < 1000 ? d + "m" : (d / 1000).toFixed(1) + "km"}`].concat(c.synth_count ? [`검증 후기 ${c.synth_count}건`] : []).slice(0, 3), snippet: undefined });
+        }
+        nearPlace = { name: placeHit.name, icon: placeHit.icon, label: placeHit.label, lat: placeHit.lat, lng: placeHit.lng };
+      }
+    }
+
+    // ===== 🏘️ 지역만 말한 질의 — 그 동네 대표 카페 =====
+    //   "성수역 카페"·"홍대 카페"처럼 내용 조건이 없는 질의는 의미·어휘로 맞출 게 없다(그래서 0곳이 나왔다).
+    //   검증 등급·리뷰 수 순으로 그 지역의 대표를 보여주는 게 사용자가 원한 답이다. 작은 컬럼만 조회(큰 컬럼 미조회).
+    if (regionOnly && scored.length === 0) {
+      const rows = (await sql.query(
+        `SELECT id, name, area, synth_grade, synth_count, synth_identity, signature, note, vibe, uses, beans,
+                char_scores, synth_acidity, synth_body, synth_sweet,
+                jsonb_path_query_array(synth_reviews, '$[*].quote') AS synth_reviews
+         FROM cafes
+         WHERE published = true AND (area ILIKE $1 OR area ILIKE $2)
+         ORDER BY CASE synth_grade WHEN '검증' THEN 0 WHEN '참고' THEN 1 ELSE 2 END, synth_count DESC NULLS LAST
+         LIMIT 24`, [p1, p2])) as unknown as any[];
+      if (rows.length) {
+        mode = "region";
+        for (const c of rows) byId.set(c.id, c);
+        for (const c of rows) {
+          scored.push({ id: c.id, name: c.name, area: c.area, grade: c.synth_grade, count: c.synth_count,
+            identity: c.synth_identity, vb: vbOf(c), score: 0,
+            reasons: [`${c.area} 대표`, ...(c.synth_count ? [`검증 후기 ${c.synth_count}건`] : [])].slice(0, 3), snippet: undefined });
+        }
+      }
+    }
+
     // ===== 키워드/개념 폴백 =====
     if (scored.length === 0) {
       // 💰 2026-08-10 비용 수리: 예전엔 `SELECT <synth_reviews 포함 전 필드> FROM cafes WHERE published`로
@@ -469,7 +559,8 @@ export async function GET(req: NextRequest) {
     //   판정되면 AI재정렬을 건너뛰고, 기존 상호매칭 블록(아래)과 같은 등급→리뷰수 결정론 정렬을 적용한다.
     const brandDq = ql.replace(/\s+/g, "");
     const brandIsCategory = CATEGORY_WORD.has(brandDq) || tokens.every((t) => CATEGORY_WORD.has(t));
-    const isBrandMultiLocation = brandDq.length >= 2 && !brandIsCategory &&
+    //   ⚠️ 장소 주변(mode="place")은 거리순이 곧 답이다 — 등급·AI 재정렬이 덮으면 93m 카페가 1.1km 뒤로 밀린다(실측).
+    const isBrandMultiLocation = mode !== "place" && brandDq.length >= 2 && !brandIsCategory &&
       scored.filter((s) => (s.name ?? "").toLowerCase().replace(/\s+/g, "").includes(brandDq)).length >= 8;
     if (isBrandMultiLocation) {
       scored.sort((a, b) => gradeBonus(b.grade) - gradeBonus(a.grade) || (Number(b.count) || 0) - (Number(a.count) || 0));
@@ -479,7 +570,7 @@ export async function GET(req: NextRequest) {
     // 후보를 압축해 보내고, 질문 의도에 맞는 곳만 선별·정렬. 실패/키없음 시 위 점수순 폴백.
     let results = scored.slice(0, 24);
     let aiErr: string | null = null; // 결재#135: rerankWithClaude 실패 사유(검색 로그에 함께 적재)
-    if (hasSearchLLM() && scored.length > 0 && !isBrandMultiLocation) {
+    if (hasSearchLLM() && scored.length > 0 && !isBrandMultiLocation && mode !== "place") {
       const cands: SearchCand[] = scored.slice(0, 25).map((s) => {
         const c = byId.get(s.id) ?? {};
         return { id: s.id, name: s.name, area: s.area, identity: c.synth_identity ?? s.identity, tags: charTags(c.char_scores), quotes: quotesOf(c.synth_reviews) };
@@ -580,7 +671,10 @@ export async function GET(req: NextRequest) {
       count: results.length, results,
       // 📍 "가려는 곳"(역·백화점·대학·병원·아파트 단지 등 전국 59,504곳). 누르면 지도가 그 자리로 이동한다.
       //    DB를 타지 않는 메모리 인덱스 — 이 응답을 만드는 데 드는 추가 비용은 없다.
-      places: searchPlaces(q, { near: nearOf(req) }),
+      places: payloadPlaces,
+      ...(nearPlace ? { nearPlace } : {}),
+      // 어느 동네인지 우리가 단정할 수 없을 때의 다른 후보 — 추측으로 밀어붙이지 않고 사용자가 고르게 한다.
+      ...(regionAlts.length ? { regionAlts } : {}),
     };
     if (coverageNote) payload.coverageNote = coverageNote;
     if (franchiseNote) payload.franchiseNote = franchiseNote;
