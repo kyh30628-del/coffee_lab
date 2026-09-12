@@ -65,7 +65,14 @@ const INSTORE_VISIT_CUES = /(매장에서|카페에\s*앉|좌석에?\s*앉|자�
 //   실물방문 신호가 전무하면 VISIT_CUES 매칭을 무효화하고 P63과 동일하게 borderline(LLM 재판정)으로 격하한다.
 //   대조군(id83·9121·9704 — 실제 walk-in 베이커리카페)은 "매장/좌석/테이블에 앉" 등 INSTORE_VISIT_CUES가
 //   공존해 제외되므로 오탐 없음.
-const PICKUP_ONLY_CUES = /(100%\s*(주문제작\s*)?예약제|완전\s*예약제|전\s*예약제\s*운영|무인\s*픽업|픽업\s*(시간|전용|만\s*가능)|카톡\s*(ID|아이디|문의|상담)|카카오톡\s*(ID|아이디|문의|상담)|주문\s*제작\s*(케이크|전문|만)|공방\s*운영|원\s*데이\s*클래스|원데이클래스)/i;
+// 룰갭 P69(2026-09-12, decisions#1056): #597 이후 레터링/당일/커스텀 케이크 전문점(예약제·무인픽업)이
+//   다른 어휘를 써서 위 08-03 표본 문구를 100% 비껴간다(id5340·28032·8551·14366·21343·14816 실측: 표시
+//   verified 리뷰 28건 전수에서 PICKUP_ONLY_CUES/INSTORE_VISIT_CUES 매칭 0건). 신규 표현을 추가한다.
+const PICKUP_ONLY_CUES = /(100%\s*(주문제작\s*)?예약제|완전\s*예약제|전\s*예약제\s*운영|무인\s*픽업|픽업\s*(시간|전용|만\s*가능)|카톡\s*(ID|아이디|문의|상담)|카카오톡\s*(ID|아이디|문의|상담)|주문\s*제작\s*(케이크|전문|만)|공방\s*운영|원\s*데이\s*클래스|원데이클래스|레터링\s*케이크|당일\s*(주문\s*)?케이크|커스텀\s*케이크|무료\s*레터링)/i;
+// 룰갭 P69: 이 업종은 유독 상호 자체에 "레터링케이크/주문제작케이크"가 박혀 있어(예: "온당 앙금플라워
+//   떡케이크 레터링케이크 주문제작케이크") 카페 표시명도 pickupOnly 후보 신호로 채택한다(공백 무시 비교).
+//   INSTORE_VISIT_CUES 부재 조건은 그대로 유지 — 좌석 있는 겸업 베이커리카페 오탐 방지.
+const PICKUP_ONLY_NAME_CUES = /(레터링케이크|주문제작케이크|커스텀케이크)/;
 // 룰갭 rulegap-20260804(decisions#618): 원두 도매/로스팅공장 + 소매아울렛 — 사업자 대상 대량구매·창고형
 //   소매점 구매후기가 DELIVERY_ONLY_CUES/PICKUP_ONLY_CUES 사각으로 남는다(택배·예약픽업 어휘가 없고 실제
 //   오프라인 매장 방문 자체는 있는 유형이라 "매장에서/앉아" 류 INSTORE_VISIT_CUES조차 없어 두 게이트 모두
@@ -1438,7 +1445,7 @@ export function verifyReview(input: QualityInput): QualityResult {
   const deliveryOnly = DELIVERY_ONLY_CUES.test(fullL) && !INSTORE_VISIT_CUES.test(fullL);
   // 룰갭 rulegap-20260803(decisions#597): 위와 대칭 — 예약제/무인픽업 주문제작 공방 강신호가 있고 매장
   //   실물방문 신호가 없으면 VISIT_CUES의 "주문/갔/방문" 오탐(제작 문의·픽업 안내)을 무효화한다.
-  const pickupOnly = PICKUP_ONLY_CUES.test(fullL) && !INSTORE_VISIT_CUES.test(fullL);
+  const pickupOnly = (PICKUP_ONLY_CUES.test(fullL) || PICKUP_ONLY_NAME_CUES.test(nameN)) && !INSTORE_VISIT_CUES.test(fullL);
   // 룰갭 rulegap-20260804(decisions#618): 도매/소매 강신호가 있고 매장 실물방문·시음 신호가 전무하면
   //   P63/rulegap-20260803과 동일하게 VISIT_CUES 매칭을 무효화한다.
   const wholesaleOnly = WHOLESALE_RETAIL_CUES.test(fullL) && !INSTORE_VISIT_CUES.test(fullL) && !DRINK_TASTING_CUES.test(fullL);
