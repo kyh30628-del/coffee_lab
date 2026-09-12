@@ -343,3 +343,4 @@
 | 2026-09-11 03:14 | #1048 | [개발] 협업 #395: 🚨 approved decisions#1040 실행 중단 요청 — "인천 서해구= | e86ca484 | - | 이 태스크의 요청(#1040 보류·#392 재분류)은 코드작업이 아닌 결정/협업 row 상태변경이라 dev worker 권한 밖 — 손대지 않음. 대신 같은 잘못된 결론(decis |
 | 2026-09-11 11:50 | #1051 | [개발] 협업 #396: cron-grow discovery_targets 큐 소비 안 됨(4건 5~6일 정 | a74ceb7c | - | app/api/cron-grow/route.ts: discovery_targets done 갱신을 at.id 기준→target.region+status=pending 기준으로 변경 |
 | 2026-09-11 11:50 | #1052 | [자율진단] cron-verify 60초 타임아웃으로 정기 검증런 1회 결손 — maxDuration 상향  | 9826201f | - | app/api/cron-verify/route.ts: maxDuration 60->300 (다른 전수스캔 크론과 동일 플랫폼 상한). tsc 신규에러 0, npm run build |
+| 2026-09-12 10:07 | #1055 | [룰갭 P68] DELIVERY_ONLY_CUES 어휘 확장 — 택배/온라인주문 후기가 VISIT_CUES  | 9956ab34 | - | web/lib/reviewQuality.ts:54 DELIVERY_ONLY_CUES 정규식에 OR절 추가(택배 주문 택배로도 온라인 (택배 )?주문 배송 후기 스마트스토어(를 통해 |
