@@ -20,6 +20,9 @@ const els = [
   //   실사고: "구리 한일"이 안 나왔다. 구리 토평동 한일아파트는 OSM에 있는데 building/landuse 태그가 하나도 없어
   //   태그 기준 필터(building=apartments · landuse=residential)에 안 걸렸다. 전국 "…아파트" 이름만 24,970개.
   ...(fs.existsSync(path.join(SRC, 'ov-apt.json')) ? (JSON.parse(fs.readFileSync(path.join(SRC, 'ov-apt.json'), 'utf8')).elements || []) : []),
+  // 4차(2026-09-12 CEO "상호 검색도 넣어"): 이름 있는 상업 POI 전국 219,013건
+  //   — 식당·미용실·편의점·카페·마트·은행·주유소·약국·학원·헬스장·사무소 등. "○○식당 근처 카페"가 되게.
+  ...(fs.existsSync(path.join(SRC, 'ov-biz.json')) ? (JSON.parse(fs.readFileSync(path.join(SRC, 'ov-biz.json'), 'utf8')).elements || []) : []),
 ];
 
 // 종류 코드 — 검색 결과에 아이콘·라벨로 쓴다. 여기 없는 태그는 버린다(우체통·화장실 같은 잡음 차단).
@@ -39,6 +42,9 @@ const KIND = {
   ferry_terminal: ['여객터미널', '⛴️'], supermarket: ['마트', '🛒'], peak: ['산', '⛰️'],
   castle: ['성', '🏯'], monument: ['기념물', '🗿'], memorial: ['기념관', '🗿'], ruins: ['유적', '🏛️'],
   archaeological_site: ['유적', '🏛️'], golf_course: ['골프장', '⛳'], viewpoint: ['전망대', '🔭'], arts_centre: ['문화예술', '🎨'],
+  biz_food: ['음식점', '🍚'], biz_cafe: ['카페·바', '🍹'], biz_bank: ['은행', '🏦'], biz_care: ['약국·의원', '💊'],
+  biz_car: ['주유·세차', '⛽'], biz_edu: ['학원', '📖'], biz_cvs: ['편의점', '🏪'], biz_shop: ['상점', '🛍️'],
+  biz_office: ['사무소', '🏢'], biz_gym: ['체육시설', '🏋️'],
 };
 const APT_NAME = /(아파트|빌라|맨션|타운|단지|캐슬|자이|푸르지오|힐스테이트|래미안|편한세상|더샵|아이파크|위브|스위첸|데시앙|비발디|리슈빌|어울림|센트레빌|해모로|베르디움|파크뷰|팰리스)$/;
 const kindOf = (t) => {
@@ -48,6 +54,17 @@ const kindOf = (t) => {
   for (const k of ['shop', 'amenity', 'tourism', 'leisure', 'aeroway', 'office', 'natural', 'historic']) {
     const v = t[k]; if (v && KIND[v]) return v === 'government' ? 'government' : v;
   }
+  // 위 표에 없는 상업 POI는 큰 갈래로 접는다 — 종류를 다 나열하는 대신 화면에 쓸 라벨만 맞춘다.
+  if (t.amenity === 'restaurant' || t.amenity === 'fast_food' || t.amenity === 'food_court') return 'biz_food';
+  if (t.amenity === 'cafe' || t.amenity === 'bar' || t.amenity === 'pub' || t.amenity === 'ice_cream') return 'biz_cafe';
+  if (t.amenity === 'bank') return 'biz_bank';
+  if (t.amenity === 'pharmacy' || t.amenity === 'dentist' || t.amenity === 'veterinary') return 'biz_care';
+  if (t.amenity === 'fuel' || t.amenity === 'car_wash') return 'biz_car';
+  if (t.amenity === 'language_school' || t.amenity === 'driving_school') return 'biz_edu';
+  if (t.shop === 'convenience') return 'biz_cvs';
+  if (t.shop) return 'biz_shop';
+  if (t.office) return 'biz_office';
+  if (t.leisure) return 'biz_gym';
   return null;
 };
 // 아파트 동 이름("래미안 101동", "101동")은 단지명으로 접는다.

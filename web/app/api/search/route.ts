@@ -509,7 +509,10 @@ export async function GET(req: NextRequest) {
     //   실사고(2026-09-12): "구리 한일"이 0곳이었다. 접두 매칭을 없앤 뒤로 지역+약칭 조합을 못 잡았다.
     //   지역 중심에서 10km 안의 장소만 본다 — 같은 이름이 전국에 널린 경우(한일병원 등)를 배제한다.
     let placeHit2 = placeHit;
-    if (!placeHit2 && effectiveRegion && tokens.length > 0 && tokens.join("").length >= 2) {
+    //   🛡️ 상호 22만 건이 들어온 뒤(2026-09-12) 이 부분일치가 느낌 검색을 삼킬 위험이 커졌다
+    //      ("강남 조용한" → 상호 '조용한…'). 남은 토큰이 **하나뿐이고 개념어가 아닐 때**만 장소로 본다.
+    const leftoverIsConcept = hitConcepts.length > 0 || tokens.some((t) => CONCEPTS.some((c) => c.triggers.includes(t)));
+    if (!placeHit2 && effectiveRegion && tokens.length === 1 && tokens[0].length >= 2 && !leftoverIsConcept) {
       //   ⚠️ 중심+반경 10km는 너무 넓다 — 구리시 중심에서 10km면 서울 동북부가 다 들어와
       //      "구리 한일"이 성북구 한일맨션으로 갔다(실측). 그 지역 **카페들의 실제 경계 상자**로 좁힌다.
       const bx = (await sql.query(
@@ -525,7 +528,15 @@ export async function GET(req: NextRequest) {
         if (cands.length) placeHit2 = cands[0];
       }
     }
-    if (placeHit2) {
+    //   ☕ 우리 카페 상호가 먼저다 — "프릳츠"·"블루보틀"은 그 카페를 찾는 질의지 '프릳츠 주변'이 아니다.
+    //      상업 POI 22만 건이 들어오면서 카페 상호까지 장소로 잡히기 시작했다(2026-09-12 픽스처가 잡음).
+    //      판정: 이미 찾은 카페 이름이 질의로 시작하고 꼬리가 지점명 수준(5자 이내)이면 카페 검색을 유지한다.
+    //      ("아우어베이커리 스타필드 하남점"처럼 질의가 이름 **중간**에 있는 건 장소 검색이 맞다.)
+    const cafeNameHit = qk.length >= 2 && scored.some((sc) => {
+      const cn = normName(String(sc.name || ""));
+      return cn === qk || (cn.startsWith(qk) && cn.length - qk.length <= 5);
+    });
+    if (placeHit2 && !cafeNameHit) {
       const placeHit = placeHit2;
       const R = 0.027;                                   // 위도 약 3km — 캠퍼스·공원처럼 중심 좌표가 외곽인 곳까지 담는다
       const lngR = R / Math.max(0.3, Math.cos((placeHit.lat * Math.PI) / 180));

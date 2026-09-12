@@ -23,9 +23,20 @@ const KIND: Record<string, [string, string]> = {
   library: ["도서관", "📚"], townhall: ["행정", "🏛️"], government: ["행정", "🏛️"],
   courthouse: ["법원", "⚖️"], hotel: ["호텔", "🏨"], resort: ["리조트", "🏨"],
   park: ["공원", "🌳"], apt: ["아파트", "🏢"], station: ["역", "🚇"], landmark: ["명소", "📍"],
+  school: ["학교", "🏫"], kindergarten: ["유치원", "🧸"], place_of_worship: ["종교시설", "⛪"],
+  post_office: ["우체국", "📮"], community_centre: ["문화센터", "🏘️"], clinic: ["의원", "🩺"],
+  ferry_terminal: ["여객터미널", "⛴️"], supermarket: ["마트", "🛒"], peak: ["산", "⛰️"],
+  castle: ["성", "🏯"], monument: ["기념물", "🗿"], memorial: ["기념관", "🗿"], ruins: ["유적", "🏛️"],
+  archaeological_site: ["유적", "🏛️"], golf_course: ["골프장", "⛳"], viewpoint: ["전망대", "🔭"], arts_centre: ["문화예술", "🎨"],
+  // 상호(2026-09-12 CEO "상호 검색도 넣어") — 전국 상업 POI 219,013건
+  biz_food: ["음식점", "🍚"], biz_cafe: ["카페·바", "🍹"], biz_bank: ["은행", "🏦"], biz_care: ["약국·의원", "💊"],
+  biz_car: ["주유·세차", "⛽"], biz_edu: ["학원", "📖"], biz_cvs: ["편의점", "🏪"], biz_shop: ["상점", "🛍️"],
+  biz_office: ["사무소", "🏢"], biz_gym: ["체육시설", "🏋️"],
 };
 // 같은 점수면 '가려는 곳'으로 자주 쓰이는 종류를 먼저 — 역·터미널·공항 > 큰 시설 > 아파트·공원.
-const PRIO: Record<string, number> = { station: 0, bus_station: 0, aerodrome: 0, department_store: 1, mall: 1, university: 1, hospital: 1, theme_park: 1, stadium: 1, museum: 2, aquarium: 2, zoo: 2, marketplace: 2, cinema: 2, theatre: 2, hotel: 3, apt: 3, library: 3, townhall: 4, government: 4, park: 5 };
+//   상호(biz_*)는 같은 이름이 전국에 수백 개씩 있어 랜드마크보다 뒤에 둔다 — '강남역'이 '강남역국밥'보다 먼저.
+const PRIO: Record<string, number> = { station: 0, bus_station: 0, aerodrome: 0, department_store: 1, mall: 1, university: 1, hospital: 1, theme_park: 1, stadium: 1, museum: 2, aquarium: 2, zoo: 2, marketplace: 2, cinema: 2, theatre: 2, hotel: 3, apt: 3, library: 3, supermarket: 3, school: 3, peak: 4, townhall: 4, government: 4, park: 5,
+  biz_food: 6, biz_cafe: 6, biz_shop: 6, biz_cvs: 7, biz_bank: 6, biz_care: 6, biz_car: 6, biz_edu: 6, biz_office: 7, biz_gym: 6 };
 
 let ROWS: Row[] | null = null;
 function rows(): Row[] {
