@@ -34,14 +34,14 @@ input::placeholder, textarea::placeholder { color: #8a7458; }
    device-width를 무시하고 좁은 뷰포트로 렌더해 고정px 텍스트를 전부 부풀린다(=인스타 링크로 들어오면 화면이 너무
    확대돼 보이던 원인·2026-07-10). text-size-adjust:100%로 어떤 뷰포트에서도 지정한 px를 그대로 쓰게 강제. Chrome은 무영향. */
 html {
-  background: #f4ece0;
+  background: #241812; /* 📓 첫 페인트 = 에스프레소(랜딩·머리띠와 같은 색, 크림 번쩍임 없음) */
   overflow-x: hidden; /* 📱 2026-09-13: 장식(잔 자국·리본·띠)이 오른쪽으로 삐져나와도 가로 스크롤이 생기지 않게 */
   -webkit-text-size-adjust: 100%;
   -moz-text-size-adjust: 100%;
   text-size-adjust: 100%;
 }
 body {
-  background: #f4ece0;
+  background: #241812;
   overflow-x: hidden; max-width: 100vw;
   color: var(--foreground);
   -webkit-text-size-adjust: 100%;

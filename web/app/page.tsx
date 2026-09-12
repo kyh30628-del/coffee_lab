@@ -745,9 +745,10 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
   const allDone = done === true;
   const lineTop = PAGE_RULE0 - 21;   // 첫 줄부터: 손편지체 19px(행간=줄 간격 22.7px) 글리프 바닥이 줄보다 2.6px 위(실측 asc .92·desc .23·글 bbox 바닥 -.117em)
   return (
-    <div className="w-full max-w-md mx-auto flex flex-col" style={{ height: "100dvh", overflowY: "auto", background: "var(--nt-espresso)" }}>
-      {/* 정물: 호두나무 테이블·펼친 노트·에스프레소·원두(Blender). 세로 5:6, 가운데 맞춤 */}
-      <div ref={heroRef} className="relative w-full overflow-hidden shrink-0" style={{ height: "calc(100dvh - 336px)", minHeight: 300, maxHeight: 640 }}>
+    <div className="w-full max-w-md mx-auto flex flex-col nt-landing" style={{ height: "100vh", overflow: "hidden", background: "var(--nt-espresso)", padding: "calc(env(safe-area-inset-top) + 8px) 8px calc(env(safe-area-inset-bottom) + 8px)" }}>
+      {/* 📱 프레임: 화면 가장자리에 얇은 크림 경계선 — 노트 표지 안쪽 테두리처럼. 정물은 남는 높이를 전부 채우고 아래 블록은 고정 높이(어떤 폰이든 한 화면) */}
+      <div className="flex flex-col flex-1 min-h-0 rounded-[10px]" style={{ border: "1px solid rgba(233,214,189,.42)", boxShadow: "inset 0 0 0 4px rgba(20,12,8,.35)", overflow: "hidden" }}>
+      <div ref={heroRef} className="relative w-full overflow-hidden" style={{ flex: "1 1 0%", minHeight: 220 }}>
         <img src="/note/hero.webp" alt="" aria-hidden className="absolute inset-0 w-full h-full object-cover" />
         {/* 위: 어두운 나무 위 제목(커피 톤) · 아래: 에스프레소 띠로 녹아듦 */}
         <div className="absolute inset-x-0 top-0 h-40" style={{ background: "linear-gradient(180deg, rgba(20,12,8,.62), rgba(20,12,8,0))" }} />
@@ -775,7 +776,7 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
         </div>
       </div>
       {/* 에스프레소 띠 — CTA */}
-      <div className="px-5 -mt-2 relative z-[1] shrink-0" style={{ color: "#f6ecdf", paddingBottom: "calc(env(safe-area-inset-bottom) + 10px)" }}>
+      <div className="px-4 -mt-2 relative z-[1] shrink-0" style={{ color: "#f6ecdf", paddingBottom: 10 }}>
         <p className="text-[15px] font-bold text-center leading-snug">우리 동네 카페, <span style={{ color: "#e9c99a" }}>진짜 후기만 가려</span> 골라드려요.</p>
         <p className="text-[12.5px] text-center leading-snug mt-0.5" style={{ color: "#c9b391" }}>마음에 든 곳은 <span style={{ color: "#ff7fa6" }}>❤</span>로 <b style={{ color: "#f6ecdf" }}>나만의 동네 지도</b>에.</p>
         <div className="space-y-2 mt-3 max-w-md mx-auto">
@@ -797,6 +798,7 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
           <a href="/privacy" className="underline">개인정보처리방침</a>
           <a href="/terms" className="underline">이용약관</a>
         </div>
+      </div>
       </div>
     </div>
   );
@@ -1874,7 +1876,7 @@ export default function Home() {
     //   인스타 안드로이드 인앱 WebView가 페이지 폭을 못 구하고 좁은 뷰포트로 폴백→화면 확대(초기화면만 깨지던 원인, 2026-07-10).
     //   /area 등 min-h-screen 페이지는 정상이던 것과 동일 패턴으로 맞춤. 세로 가운데정렬은 유지.
     return (
-      <div className="min-h-screen w-full nt-app" style={{ background: "var(--nt-espresso)", paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)", fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }}>
+      <div className="w-full nt-app" style={{ background: "var(--nt-espresso)", minHeight: "100vh", fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }}>
         <LandingNote discover={discover} onConsumer={chooseConsumer}
           onOwner={() => { trackOwnerCta(); setShowFind(true); }}
           onLogin={() => { setOwnerPw(""); setOwnerErr(""); setOwnerPin(""); setOwnerPinErr(""); setOwnerAdminMode(false); setOwnerPwModal(true); }} />
@@ -2260,7 +2262,7 @@ export default function Home() {
                 <button onClick={() => setSheetMode("half")} className="shrink-0 text-[11px] font-bold text-[#7a5122] px-2 h-7 rounded-full border border-[#e6d8c2] bg-white">반만 ▾</button>
               )}
             </div>
-            <div className="flex-1 overflow-y-auto px-5 pb-8" style={{ WebkitOverflowScrolling: "touch" }}>
+            <div className="flex-1 overflow-y-auto overflow-x-hidden px-5 pb-8" style={{ WebkitOverflowScrolling: "touch" }}>
               <MapControls {...{ sido, sigungu, dong, onSido, onSigungu, setDong, dongOptions, tasteKey, setTasteKey, filtered, matchSet, setSelected, openLocation, autoGu, geoMsg, clearAuto, setShowFavs, favCount: cafes.filter((c) => bookmarkIds.has(c.id)).length, closeSheet: () => { setFocusId(null); setSheetOpen(false); } }} />
             </div>
           </div>
@@ -2365,7 +2367,7 @@ export default function Home() {
                 ))}
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 pb-[calc(1rem_+_env(safe-area-inset-bottom))]">
+            <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 pb-[calc(1rem_+_env(safe-area-inset-bottom))]">
               {searchLoading ? <CoffeeLoader label="취향 맞는 카페 찾는 중…" />
                 : !searchRes ? <p className="text-center text-[#665036] py-10 text-sm leading-relaxed">"비 오는 날 혼자 조용히", "감성 사진 데이트"처럼<br />구체적이지 않아도 떠오르는 느낌으로 찾아드려요.</p>
                 : (
@@ -2570,7 +2572,7 @@ function MapControls({ sido, sigungu, dong, onSido, onSigungu, setDong, dongOpti
             {vbFilter && <button onClick={() => setVbFilter("")} className="text-[11px] text-[#7a5122] underline px-1">전체</button>}
           </div>
         )}
-        {listCafes.length === 0 ? <p className="text-xs text-[#8f8071] nt-ruled" style={{ paddingTop: 17 }}>{tasteKey ? "이 카테고리에 해당하는 카페가 이 지역엔 없어요. 다른 결을 골라보세요." : "지역을 선택하면 목록이 나와요."}</p> : (
+        {listCafes.length === 0 ? <p className="text-xs text-[#8f8071] nt-ruled" style={{ paddingTop: 34 }}>{tasteKey ? "이 카테고리에 해당하는 카페가 이 지역엔 없어요. 다른 결을 골라보세요." : "지역을 선택하면 목록이 나와요."}</p> : (
           <div className="nt-ruled" style={{ ["--nt-rule" as any]: "rgba(84,104,140,0.42)" }}>
             {/* 📓 목차 줄 — 번호는 손글씨, 이름은 성실체, 한 줄 메모는 그 아래 줄. 항목마다 정확히 1~2줄 */}
             {listCafes.slice(0, 50).map((c: Cafe, i: number) => (
@@ -2675,7 +2677,7 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
     //    모바일: 패널이 화면을 꽉 채우므로 예전처럼 딤+바깥탭 닫기 유지(전환 애니메이션 중에만 보임).
     <div className="fixed inset-0 z-[3000] overflow-hidden pointer-events-none" style={{ fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }}>
       <div onClick={onClose} className={`absolute inset-0 bg-black/30 pointer-events-auto md:bg-transparent md:pointer-events-none transition-opacity duration-300 ${shown ? "opacity-100" : "opacity-0"}`} />
-      <aside className={`absolute top-0 right-0 w-full md:max-w-md nt-paper shadow-2xl overflow-y-auto pointer-events-auto transition-transform duration-300 ease-out motion-reduce:transition-none ${shown ? "translate-x-0" : "translate-x-full"}`} style={{ height: "100dvh", paddingTop: "env(safe-area-inset-top)" }}>
+      <aside className={`absolute top-0 right-0 w-full md:max-w-md nt-paper shadow-2xl overflow-y-auto overflow-x-hidden pointer-events-auto transition-transform duration-300 ease-out motion-reduce:transition-none ${shown ? "translate-x-0" : "translate-x-full"}`} style={{ height: "100dvh", paddingTop: "env(safe-area-inset-top)" }}>
         {/* 사장님 쇼케이스 — 영상(style 0) 또는 10종 템플릿 */}
         {promo && (
           <>

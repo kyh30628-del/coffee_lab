@@ -347,8 +347,8 @@ export default async function CafePage({ params }: Props) {
               )}
             </div>
           )}
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-[12px] text-[#8f8071] min-w-0">{c.area}{c.dong ? ` ${c.dong}` : ""} · 검증 후기 <b className="text-[#5c4b3c]">{c.synth_count ?? 0}</b>건</p>
+          <div className="flex items-center justify-between gap-2" style={{ height: 34 }}>
+            <p className="text-[12px] text-[#8f8071] min-w-0 truncate">{c.area}{c.dong ? ` ${c.dong}` : ""} · 검증 후기 <b className="text-[#5c4b3c]">{c.synth_count ?? 0}</b>건</p>
             {/* ❤ 2026-08-21: 이 자리는 **고르는 사람**의 자리 — 무마찰 찜. */}
             <span className="nt-free"><WishButton cafeId={c.id} /></span>
           </div>
@@ -532,7 +532,7 @@ export default async function CafePage({ params }: Props) {
           </OwnerCtaLink>
         </div>
 
-        <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 17 }}>
+        <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
           <p className="text-[12.5px] text-[#5c4b3c]">네이버 공개 후기 <b>{c.synth_count ?? 0}건</b>을 교차검증한 데이터 기반 소개예요. <Link href="/trust" className="underline underline-offset-2 text-[#7a5122]">검증 방법 보기</Link></p>
         </div>
 

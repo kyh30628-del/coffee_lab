@@ -150,14 +150,14 @@
 
 /* ── 작은 눈금 제목(색인) ── */
 .nt-eyebrow { font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--nt-ink3); font-family: var(--nt-sans); font-weight: 500; }
-.nt-sec { display: inline-flex; align-items: center; gap: 6px; font-size: 17px; letter-spacing: 0.02em; color: #1f140d; font-family: var(--nt-display); font-weight: 400; height: 30px; padding: 0 16px; margin-left: -8px; background: url("/note/tape.webp") center / 100% 100% no-repeat; transform: rotate(-1.2deg); filter: drop-shadow(0 1px 1px rgba(60,40,20,.18)); white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.nt-sec { display: flex; width: max-content; align-items: center; gap: 6px; font-size: 17px; letter-spacing: 0.02em; color: #1f140d; font-family: var(--nt-display); font-weight: 400; height: 34px; box-sizing: border-box; padding: 0 16px; margin-left: -8px; background: url("/note/tape.webp") center / 100% 30px no-repeat; transform: rotate(-1.2deg); filter: drop-shadow(0 1px 1px rgba(60,40,20,.18)); white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .nt-sec.g { background-image: url("/note/tape2.webp"); }
 .nt-title { font-family: var(--nt-display); font-weight: 400; color: var(--nt-ink); text-wrap: balance; letter-spacing: 0; }
 .nt-brush { font-family: var(--nt-brush); font-weight: 400; letter-spacing: 0.01em; }
 
 /* ── 목차 줄(번호 손글씨) ── */
-.nt-ln { display: flex; align-items: baseline; gap: 8px; width: 100%; text-align: left; }
-.nt-ln .n { font-family: var(--nt-hand-font); font-size: 22px; color: var(--nt-coffee); width: 26px; flex: none; }
+.nt-ln { display: flex; align-items: flex-start; gap: 8px; width: 100%; text-align: left; height: var(--lh, 34px); overflow: hidden; }
+.nt-ln .n { font-family: var(--nt-hand-font); font-size: 20px; color: var(--nt-coffee); width: 26px; flex: none; }
 .nt-ln .nm { flex: 1; min-width: 0; font-family: var(--nt-display); font-weight: 400; font-size: 17px; color: var(--nt-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nt-ln .m { font-size: 13.5px; color: var(--nt-ink3); font-variant-numeric: tabular-nums; flex: none; }
 
@@ -238,3 +238,11 @@
 /* 📱 모바일: 가로 넘침 금지(장식은 잘라낸다) */
 .nt-app { overflow-x: hidden; max-width: 100vw; }
 .nt-app > * { max-width: 100%; }
+
+/* 📏 격자 안 flex 행은 baseline 정렬 금지 — 글꼴 크기가 다른 항목끼리 밑선을 맞추면 행이 1~2px 커져 줄과 어긋난다 */
+.nt-ruled .items-baseline { align-items: flex-start !important; }
+.nt-ruled .nt-ln > * { line-height: var(--lh); height: var(--lh); }
+/* 📱 스크롤 컨테이너는 세로만 */
+.nt-app [class*="overflow-y-auto"] { overflow-x: hidden; }
+
+@supports (height: 100dvh) { .nt-landing { height: 100dvh !important; } }
