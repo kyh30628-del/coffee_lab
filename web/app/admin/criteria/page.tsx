@@ -117,7 +117,7 @@ export default function CriteriaPage() {
   };
 
   return (
-    <main style={{ minHeight: "100vh", background: "#efe7d8", color: "#2b2018", fontFamily: "'Gowun Batang',serif", padding: 12, maxWidth: 720, margin: "0 auto", paddingTop: "calc(12px + env(safe-area-inset-top))" }}>
+    <main className="nt-paper nt-app" style={{ minHeight: "100vh", color: "#17100b", fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif", padding: 12, maxWidth: 720, margin: "0 auto", paddingTop: "calc(12px + env(safe-area-inset-top))" }}>
       <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet" />
       <style>{`*{box-sizing:border-box}input{font-family:inherit}`}</style>
       <BackLink to="/admin" label="대시보드" className="text-stone-500 mb-2" />

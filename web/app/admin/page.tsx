@@ -288,7 +288,7 @@ export default function AdminPage() {
 
   if (!authed) {
     return (
-      <main className="min-h-screen bg-stone-100 flex items-center justify-center p-6">
+      <main className="min-h-screen nt-paper nt-app flex items-center justify-center p-6">
         <div className="bg-white rounded-2xl p-8 w-full max-w-sm shadow-sm">
           <BackLink to="/" label="홈" className="text-stone-600 mb-4" />
           <h1 className="text-xl font-bold mb-1">관리자 대시보드</h1>
@@ -357,7 +357,7 @@ export default function AdminPage() {
   const pendingActionsN = dec.pending.length;
 
   return (
-    <main className="min-h-screen bg-stone-100 p-4 sm:p-6" style={{ paddingTop: "calc(1rem + env(safe-area-inset-top))" }}>
+    <main className="min-h-screen nt-paper nt-app p-4 sm:p-6" style={{ paddingTop: "calc(1rem + env(safe-area-inset-top))" }}>
       <div className="max-w-3xl lg:max-w-4xl xl:max-w-5xl mx-auto">
         <div className="flex items-center gap-3 mb-6">
           <BackLink to="/" label="홈" className="text-stone-700" />

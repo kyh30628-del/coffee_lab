@@ -25,7 +25,7 @@ export default function BadgePage() {
   const html = cafe ? `<a href="${site}/c/${cafe.id}" target="_blank" rel="noopener"><img src="${site}/api/badge/${cafe.id}" alt="동네 커피 노트 검증 카페 — ${cafe.name}" width="230" height="54" /></a>` : "";
 
   return (
-    <main className="min-h-screen bg-[#f4ece0] text-[#2b2018] px-5 py-10" style={{ fontFamily: "'Gowun Batang', serif" }}>
+    <main className="min-h-screen nt-paper nt-app text-[#17100b] px-5 py-10" style={{ fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }}>
       <div className="max-w-lg mx-auto">
         <h1 className="text-2xl font-bold mb-2">🏅 검증 배지 달기</h1>
         <p className="text-[13.5px] text-[#524234] leading-relaxed mb-6">

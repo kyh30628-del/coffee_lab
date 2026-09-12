@@ -467,9 +467,9 @@ export default function PosterCarouselPage() {
 
   return (
     <main
-      className="min-h-screen bg-[#f4ece0] text-[#2b2018]"
+      className="min-h-screen nt-paper nt-app text-[#17100b]"
       style={{
-        fontFamily: "'Gowun Batang', serif",
+        fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif",
         paddingBottom: "env(safe-area-inset-bottom)",
         paddingLeft: "env(safe-area-inset-left)",
         paddingRight: "env(safe-area-inset-right)",

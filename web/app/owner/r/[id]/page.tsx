@@ -251,7 +251,7 @@ export default async function FreeReportPage({ params }: Props) {
       )}
 
       {/* 유료 안내 — '노출'이 아니라 '감시'를 판다 */}
-      <div className="bg-[#2b2018] text-[#f4ece0] rounded-2xl px-5 py-5 mb-4">
+      <div className="nt-header rounded-lg px-5 py-5 mb-4">
         <div className="text-[15px] font-bold mb-2">우리 가게 리포트</div>
         <ul className="text-[12.5px] leading-[1.9] text-[#e2d5c0] mb-4">
           <li>· <b className="text-[#f4ece0]">새 후기가 올라오면</b> 알려드려요</li>
@@ -284,7 +284,7 @@ export default async function FreeReportPage({ params }: Props) {
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <main className="min-h-screen bg-[#f4ece0]" style={{ fontFamily: "'Gowun Batang', AppleMyungjo, serif" }}>
+    <main className="min-h-screen nt-paper nt-app" style={{ fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }}>
       <div className="max-w-md mx-auto px-5 py-8">{children}</div>
       <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet" />
     </main>

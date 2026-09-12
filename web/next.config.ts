@@ -12,6 +12,12 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     // 📍 장소 인덱스(전국 59,504곳, 3.1MB) — 검색 함수가 런타임에 읽는다. public/이 아니라 번들에만 넣어 브라우저 전송 0.
     "/api/search": ["./data/places.json"],
+    // 📓 OG 카드 손글씨(성실체 KS 서브셋 830KB) — 5개 OG 라우트가 런타임에 읽는다
+    "/api/og/cafe": ["./data/fonts/NanumSeongSirCe.ttf"],
+    "/area/[gu]/opengraph-image": ["./data/fonts/NanumSeongSirCe.ttf"],
+    "/area/[gu]/[taste]/opengraph-image": ["./data/fonts/NanumSeongSirCe.ttf"],
+    "/area/[gu]/dong/[dong]/opengraph-image": ["./data/fonts/NanumSeongSirCe.ttf"],
+    "/collections/[slug]/opengraph-image": ["./data/fonts/NanumSeongSirCe.ttf"],
     "/api/cron-criteria-verify": ["./lib/**/*.ts", "./app/api/**/*.ts"],
     "/api/admin/criteria-status": ["./lib/**/*.ts", "./app/api/**/*.ts"],
     // 관제탑이 런타임에 .ai-paused 플래그(판정 의도적 정지)를 읽는다 → 함수 번들에 포함.

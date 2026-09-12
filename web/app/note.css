@@ -234,3 +234,7 @@
 
 /* 손글씨 굵게: 바른히피엔 굵은 굵기가 없다 → 굵은 글자는 성실체(펜 굵은 획)로 바꿔 쓴다 */
 .nt-app b, .nt-app strong, .nt-app .font-bold, .nt-app .font-semibold, .nt-app .font-black { font-family: var(--nt-display); font-weight: 400; }
+
+/* 📱 모바일: 가로 넘침 금지(장식은 잘라낸다) */
+.nt-app { overflow-x: hidden; max-width: 100vw; }
+.nt-app > * { max-width: 100%; }

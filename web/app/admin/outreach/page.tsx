@@ -45,7 +45,7 @@ export default function OutreachPage() {
 
   if (!data) {
     return (
-      <main className="min-h-screen bg-[#f7f3ec] p-6 flex flex-col items-center justify-center gap-3">
+      <main className="min-h-screen nt-paper nt-app p-6 flex flex-col items-center justify-center gap-3">
         <h1 className="font-bold text-stone-800">📇 아웃리치 콘솔</h1>
         <input type="password" value={pw} onChange={(e) => setPw(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && load(pw)} placeholder="관리자 비밀번호"
@@ -78,7 +78,7 @@ export default function OutreachPage() {
   };
 
   return (
-    <main className="min-h-screen bg-[#f7f3ec] pb-16">
+    <main className="min-h-screen nt-paper nt-app pb-16">
       <div className="sticky top-0 bg-[#f7f3ec] border-b border-stone-200 px-4 py-3 z-10">
         <h1 className="font-bold text-stone-800 text-[15px]">📇 아웃리치 콘솔</h1>
         <p className="text-[12px] text-stone-700 mt-1">

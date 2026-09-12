@@ -115,11 +115,11 @@ export default function OwnerPage() {
     setNlSaving(false);
   };
 
-  if (!authReady) return <div className="min-h-screen bg-[#f4ece0] text-[#9c6b3f] flex items-center justify-center" style={{ fontFamily: "'Gowun Batang', serif" }}>확인 중…</div>;
+  if (!authReady) return <div className="min-h-screen nt-paper nt-app text-[#9c6b3f] flex items-center justify-center" style={{ fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }}>확인 중…</div>;
   // 미인증 → 구독 PIN 로그인(관리자/등록은 홈에서)
   if (!pw && !pin) {
     return (
-      <div className="min-h-screen bg-[#f4ece0] text-[#2b2018] flex items-center justify-center px-6" style={{ fontFamily: "'Gowun Batang', serif" }}>
+      <div className="min-h-screen nt-paper nt-app text-[#17100b] flex items-center justify-center px-6" style={{ fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }}>
         <div className="w-full max-w-sm">
           <div className="text-[#9c6b3f] text-xs tracking-[0.3em] uppercase mb-2 text-center">For Owners</div>
           <h1 className="text-2xl font-bold mb-1 text-center">사장님 로그인</h1>
@@ -147,8 +147,8 @@ export default function OwnerPage() {
   const pieData = insight ? insight.charProfile.filter((c) => c.me > 0).map((c) => ({ name: c.label, value: c.me })) : [];
 
   return (
-    <div className="min-h-screen bg-[#f4ece0] text-[#2b2018]" style={{ fontFamily: "'Gowun Batang', serif" }}>
-      <header className="bg-[#2b2018] text-[#f4ece0] px-4 pb-3 flex items-center justify-between gap-2" style={{ paddingTop: "calc(0.75rem + env(safe-area-inset-top))" }}>
+    <div className="min-h-screen nt-paper nt-app text-[#17100b]" style={{ fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }}>
+      <header className="nt-header px-4 pb-3 flex items-center justify-between gap-2" style={{ paddingTop: "calc(0.75rem + env(safe-area-inset-top))" }}>
         <div className="flex items-center gap-2 min-w-0">
           <BackLink to="/" label="홈" className="text-[#cbb89f] shrink-0" />
           <h1 className="text-[15px] font-bold truncate">사장님 분석</h1>
@@ -336,7 +336,7 @@ export default function OwnerPage() {
       </div>
 
       {showShowcase && insight?.me?.id && (
-        <div className="fixed inset-0 z-[5000]" style={{ fontFamily: "'Gowun Batang', serif" }}>
+        <div className="fixed inset-0 z-[5000]" style={{ fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }}>
           <div className="absolute inset-0 bg-black/50" onClick={() => setShowShowcase(false)} />
           <div className="absolute inset-x-0 bottom-0 sm:inset-0 sm:m-auto sm:w-[460px] sm:h-fit bg-[#fdfaf4] rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col" style={{ maxHeight: "92dvh" }}>
             <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-[#ece0cd]">
