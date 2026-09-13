@@ -349,3 +349,4 @@
 | 2026-09-13 08:08 | #1063 | [개발] 협업 #400: 09-13 cron-costwatch(338.6GB) 재진단 — 원인은 스크래치 아 | 906794cd | - | app/api/search/route.ts 캐시 read/write 대칭화(0건도 캐시): pg_stat_statements 실측(queryid -895080333599341959 |
 | 2026-09-13 08:08 | #1064 | [개발] 협업 #402: 대구·경북 신규편입 area 교차오염 6건 + 검증카페 address 가비지값 1건 | 944c88a3 | - | lib/discover.ts: AMBIG_SIDO_CANDIDATES 하드코딩(서울·인천·대전·부산)을 PREFIXED_SIDOS(lib/regionList.ts 단일출처) 기반으 |
 | 2026-09-13 11:47 | #1068 | [자율진단] LOC_SUFFIX "리" 추가(#1044)의 회귀 — 짧은 이름 카페 coreTokens 전멸 | e1a6572b | - | lib/reviewQuality.ts coreTokensDetail: LOC_SUFFIX 필터에 빈배열 원복 가드 추가(#1044 회귀 수정). 짧은 이름(아코리 등)이 지역어 접 |
+| 2026-09-13 11:47 | #1069 | [개발] 협업 #397 후속: 검색 지역판정 오탐 버그 — "노트북 하기 좋은 카페" 등 흔한 어미가 법정동 | fafbed50 | - | lib/searchQuery.ts: loadGeoIndex()의 dong bare-key(접미사 동/가/읍/면/리 제거) 생성 시 STOPWORDS(흔한 조사/어미/범용어 사전)와 |
