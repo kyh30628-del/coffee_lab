@@ -1012,6 +1012,10 @@ export async function GET(req: NextRequest) {
       missing_char: await one(sql`SELECT count(*) c FROM cafes WHERE published AND char_scores IS NULL`),
       missing_coord: await one(sql`SELECT count(*) c FROM cafes WHERE published AND (lat IS NULL OR lng IS NULL OR lat=0 OR lng=0)`),
       missing_address: await one(sql`SELECT count(*) c FROM cafes WHERE published AND (address IS NULL OR address='')`),
+      // 🆕 재발방지(decisions#1064, id40319 벨베꼼메): address가 NULL/빈문자가 아니어서 missing_address는
+      //   통과하지만 실제로는 name과 동일한 가비지값(필드 채움 실패의 다른 형태) — 지도·주소 표시가 카페명
+      //   을 그대로 복제해 보여주는 소비자 노출 결함. NULL만 보던 사각지대를 채운다.
+      garbage_address: await one(sql`SELECT count(*) c FROM cafes WHERE published AND address IS NOT NULL AND address <> '' AND address = name`),
       bad_grade: await one(sql`SELECT count(*) c FROM cafes WHERE published AND synth_grade IS NOT NULL AND synth_grade NOT IN ('검증','참고','후보')`),
       // 🆕 이름일치율 사각(구구커피류): 노출 후기가 '실제 그 카페'를 거의 안 말함(<0.3). offctx로는 안 보이는 오염
       //   (남의 카페 후기도 '카페 맥락어'는 있으니까). cleanCafeName 게이트 배포 후 재합성분은 정확. 경보만(재등급은 결재).

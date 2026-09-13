@@ -1,7 +1,7 @@
 // 카페 발굴 (PRINCIPLES §0·§2): 합법 소스(네이버 지역검색)로 동네·스페셜티 카페 수집.
 // 대규모 프랜차이즈·비(非)카페 제외. 중복(이름/좌표 근사) 제외. 비공개로 적재 후 합성 단계에서 검증.
 import { sql , ensureOnce } from "./db";
-import { SIDO_GU, regionKeyFor } from "./regionList";
+import { SIDO_GU, PREFIXED_SIDOS, regionKeyFor } from "./regionList";
 import { getLearned } from "./learnedTerms";
 import { loadCriteria, getCriterionSync } from "./criteria";
 import { getListSync, loadCriteriaLists } from "./criteriaLists"; // 비카페 순수 리스트 단일출처(BASE=폴백). 캐시 프라임은 discover 진입점이 함.
@@ -245,9 +245,13 @@ const AREA_ONLY_REGIONS: { region: string; areaLabel: string }[] = [];
 const GU_TO_AREA = new Map<string, string>(
   [...METRO_REGIONS, ...AREA_ONLY_REGIONS].map(({ region, areaLabel }) => [region.split(" ").pop()!, areaLabel]),
 );
-// 🏙️ 구 이름이 겹치는 광역시들("중구"·"동구"·"서구"·"강서구" 등 — 서울·인천·대전·부산 전부 가짐).
+// 🏙️ 구 이름이 겹치는 광역시들("중구"·"동구"·"서구"·"강서구" 등 — 서울·인천·대전·부산·대구 전부 가짐).
 //   전부 '○○광역시/특별시' 공식표기라 실주소 앞머리에 시·도 축약명이 그대로 등장 — includes로 안전 판별 가능.
-const AMBIG_SIDO_CANDIDATES = ["서울", "인천", "대전", "부산"] as const;
+// 🚨 재발방지(decisions#1064): 이 목록을 PREFIXED_SIDOS(lib/regionList.ts 단일출처)와 별도로 손으로
+//   들고 있다가, 09-11 대구 편입 때 여긴 안 고쳐 disambiguation이 미작동(대구 동구 카페가 '부산 중구' 등
+//   엉뚱한 area로 오분류)하는 사고가 났다. "서울" 하나만 여기 남기고 나머지는 PREFIXED_SIDOS를 그대로 쓴다
+//   — 새 접두 시도가 편입돼도 이 파일을 또 고칠 필요가 없다.
+const AMBIG_SIDO_CANDIDATES = ["서울", ...PREFIXED_SIDOS] as const;
 export function parseGuArea(address: string): string | null {
   if (!address) return null;
   const matches = address.match(/[가-힣]+(?:구|시|군)(?![가-힣])/g) ?? [];
