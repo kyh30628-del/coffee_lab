@@ -73,14 +73,19 @@ export async function GET(req: NextRequest) {
                  ELSE '[]'::jsonb END
           ) r WHERE r->>'quote' ~ ${CLOSURE_TEXT_SIGNAL}
         ) AS closure_signal
-      FROM cafes WHERE published AND raw_reviews IS NOT NULL
-      ORDER BY closure_signal DESC, closure_checked_at ASC NULLS FIRST LIMIT 600`) as any[];
+      , COALESCE(p.status_cd = '02', false) AS permit_closed, p.closed_ymd AS permit_closed_ymd
+      FROM cafes LEFT JOIN cafe_permits p ON p.cafe_id = cafes.id
+      WHERE published AND raw_reviews IS NOT NULL
+      ORDER BY permit_closed DESC, closure_signal DESC, closure_checked_at ASC NULLS FIRST LIMIT 600`) as any[];
 
-    let checked = 0, alive = 0, quotaStop = false, skippedFresh = 0, newSuspect = 0, signalBypass = 0;
+    let checked = 0, alive = 0, quotaStop = false, skippedFresh = 0, newSuspect = 0, signalBypass = 0, permitClosed = 0;
     const suspectNames: string[] = [];
     for (const c of rows) {
       const mo = latestReviewMonths(c.raw_dates);
-      if (!c.closure_signal && mo != null && mo < STALE_MONTHS) { // 활발 → 영업중 명백, 네이버 호출 없이 통과
+      // 🏛️ 2026-09-13 공공데이터 전환 1단계 — 인허가 원장(cafe_permits)이 '폐업(02)'이면 **최상위 폐업 신호**.
+      //   활발해도 무료 통과시키지 않고 네이버 재확인을 우선 배정한다. 자동 비공개는 여전히 없다(3회 미발견 → 사람 검토).
+      if (c.permit_closed) permitClosed++;
+      if (!c.closure_signal && !c.permit_closed && mo != null && mo < STALE_MONTHS) { // 활발 → 영업중 명백, 네이버 호출 없이 통과
         await sql`UPDATE cafes SET closure_checked_at = now(), closure_misses = 0 WHERE id = ${c.id}`.catch(() => {});
         skippedFresh++; continue;
       }
@@ -101,7 +106,10 @@ export async function GET(req: NextRequest) {
     }
 
     // 검토 대기 = 3회+ 지속 미발견 카페(여전히 공개 중). 사람이 정밀확인·승인 후에만 처리.
-    const reviewQueue = (await sql`SELECT id, name, area, closure_misses FROM cafes WHERE published AND closure_misses >= 3 ORDER BY closure_misses DESC, closure_checked_at ASC LIMIT 30`) as any[];
+    // 검토 대기: ①3회+ 미발견 ②인허가 폐업 + 네이버 1회+ 미발견(두 출처가 동시에 '없다'면 사람이 바로 본다). 자동 비공개 없음.
+    const reviewQueue = (await sql`SELECT c.id, c.name, c.area, c.closure_misses, (p.status_cd='02') AS permit_closed FROM cafes c LEFT JOIN cafe_permits p ON p.cafe_id=c.id
+      WHERE c.published AND (c.closure_misses >= 3 OR (p.status_cd='02' AND c.closure_misses >= 1))
+      ORDER BY (p.status_cd='02') DESC NULLS LAST, c.closure_misses DESC, c.closure_checked_at ASC LIMIT 30`) as any[];
 
     // coord#266 보조지표: misses=0(네이버는 여전히 발견됨)이라도 검증등급 근거의 최신 후기가 STALE_EVIDENCE_MONTHS+ 지난 카페.
     //   자동 비공개·misses 변경 없음(증거부재≠폐업) — 집계만 해서 selfaudit 정합성체크로 넘김(비중대·운영본부 관측용).
@@ -113,7 +121,7 @@ export async function GET(req: NextRequest) {
       SELECT count(*) c FROM x WHERE latest < now() - (${STALE_EVIDENCE_MONTHS}||' months')::interval
     `.then((r: any[]) => Number(r[0].c)).catch(() => 0);
 
-    const detail = `재확인 ${checked} 영업중 ${alive} 의심+${newSuspect} 검토대기 ${reviewQueue.length} 활발스킵 ${skippedFresh} 텍스트신호우선${signalBypass} 증거노후${STALE_EVIDENCE_MONTHS}mo+ ${staleEvidenceCount}${quotaStop ? " 쿼터중단" : ""}`;
+    const detail = `재확인 ${checked} 영업중 ${alive} 의심+${newSuspect} 검토대기 ${reviewQueue.length} 활발스킵 ${skippedFresh} 텍스트신호우선${signalBypass} 증거노후${STALE_EVIDENCE_MONTHS}mo+ ${staleEvidenceCount}${quotaStop ? " 쿼터중단" : ""} · 인허가폐업 ${permitClosed}`;
     // 📒 하네스 L5 — 지문은 **남은 일(백로그)** 기준. 할 일이 없으면(0) 지문을 안 남긴다 —
     //   "일이 없어 조용한 것"과 "일이 있는데 못 끝내는 것"을 구분해야 정체 탐지가 소음이 안 된다.
     await recordRun("cron-closure", true, detail, newSuspect, { fingerprint: (newSuspect) > 0 ? fingerprintOf({ suspect: newSuspect }) : undefined, metrics: { suspect: newSuspect } });

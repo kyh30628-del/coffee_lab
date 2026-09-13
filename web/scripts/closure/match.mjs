@@ -56,7 +56,13 @@ const BRANCH = /(\(.*?\)|\[.*?\])|((?:[가-힣A-Za-z0-9]+)?(?:본점|지점|직�
 function coreName(s) {
   let t = String(s || "").replace(/\(.*?\)|\[.*?\]/g, " ");
   t = t.replace(/\b(the|of|cafe|coffee|카페)\b/gi, " ");
-  const toks = t.split(/\s+/).filter(Boolean).map((x) => x.replace(/(본점|직영점|\d*호점|지점)$/, ""));
+  // 🔴 2026-09-13 수동 대조에서 잡힌 오매칭: "뉴컬쳐커피 운양점" ↔ "세븐일레븐 김포운양점" (지점명 '운양'이 핵심 토큰으로 남아 0.85).
+  //   지점 표기(…점/지점/본점/호점)에서 나온 토큰은 위치어라 같은 동네 다른 가게와 공유한다 → 다른 토큰이 있으면 비교에서 뺀다.
+  const raw = t.split(/\s+/).filter(Boolean);
+  const isBranch = (x) => /(본점|직영점|\d*호점|지점|점)$/.test(x);
+  const nonBranch = raw.filter((x) => !isBranch(x));
+  const pool = nonBranch.length ? nonBranch : raw;
+  const toks = pool.map((x) => x.replace(/(본점|직영점|\d*호점|지점|점)$/, ""));
   return toks.map(normName).filter((x) => x.length >= 2);
 }
 /** 글자 2-gram 자카드 — 짧은 상호에도 안정적이고 오탈자·공백 차이에 강하다. */
@@ -174,5 +180,7 @@ if (arg("write-db", "") === "1") {
        b.map((r) => r.closed || ""), b.map((r) => r.tel || ""), b.map((r) => r.opened || ""), b.map((r) => Number(r.sim) || 0), b.map((r) => r.way || ""), b.length]);
     n += b.length;
   }
-  console.log(`\n🗄️ cafe_permits 적재 ${n.toLocaleString()}행 (부수 테이블 · cafes 본표 무변경)`);
+  // 이번 실행에서 매칭되지 않은 옛 행은 지운다(규칙이 바뀌어 떨어져 나간 오매칭이 남지 않게)
+  const pruned = await sql.query(`DELETE FROM cafe_permits WHERE matched_at < now() - interval '30 minutes' RETURNING cafe_id`);
+  console.log(`\n🗄️ cafe_permits 적재 ${n.toLocaleString()}행 · 옛 행 정리 ${pruned.length.toLocaleString()} (부수 테이블 · cafes 본표 무변경)`);
 }
