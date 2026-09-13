@@ -727,7 +727,7 @@ function homographyMatrix3d(sw: number, sh: number, q: [number, number][]): stri
   return `matrix3d(${H[0]},${H[3]},0,${H[6]},${H[1]},${H[4]},0,${H[7]},0,0,1,0,${H[2]},${H[5]},0,${H[8]})`;
 }
 // 페이지 로드 단위 단일 기록 — 메모 문장·완료 여부. (모듈 변수: 같은 로드 안에서 컴포넌트가 몇 번 마운트돼도 하나)
-const landingOnce: { memo: string[] | null; done: boolean } = { memo: null, done: false };
+const landingOnce: { memo: string[] | null; done: boolean; t0: number | null } = { memo: null, done: false, t0: null };
 // 🔬 계측용 로드 id — 이 JS 번들이 실행될 때 한 번 정해진다(페이지가 다시 로드되면 바뀐다).
 const landingLoadId = Math.random().toString(36).slice(2, 10) + "-" + Date.now().toString(36);
 function landingBeacon(note: string, extra: Record<string, unknown> = {}) {
@@ -791,7 +791,11 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
     if (landingOnce.done) { setDone(true); landingBeacon("skip-done", { mountId }); return; }    // 이 로드에서 이미 한 번 썼다 — 완성본만(두 번째 연출 금지)
     const reduce = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (reduce) { setDone(true); return; }
-    landingBeacon("write-start", { mountId, memoHash: LANDING_MEMO.join("|").length + ":" + LANDING_MEMO[0]?.slice(0, 12) });
+    // 🔴 2026-09-13 실측(landing_debug): 안드로이드 PWA 첫 실행에서 같은 로드 안에 이 컴포넌트가 3.5초 뒤 **다시 마운트**돼
+    //   처음부터 다시 썼다(두 번 써짐의 실체). 재마운트 원인과 별개로, 시작 시각을 컴포넌트 밖(landingOnce.t0)에 두어
+    //   두 번째 인스턴스는 **그 시점부터 이어서** 쓴다 — 화면상 한 번의 쓰기로 보인다.
+    const resumed = landingOnce.t0 != null;
+    landingBeacon(resumed ? "write-resume" : "write-start", { mountId, memoHash: LANDING_MEMO.join("|").length + ":" + LANDING_MEMO[0]?.slice(0, 12) });
     setDone(false);
     // ⏱ 시간 기반 진행(약 2.6초) — 백그라운드 탭에서 늦춰져도 총 길이 그대로.
     const slow = typeof location !== "undefined" && /nt_slow/.test(location.search); // 검수용: ?nt_slow 로 느리게
@@ -801,7 +805,7 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
     const lens = LANDING_MEMO.map((l) => Array.from(l).length);
     const starts: number[] = []; let acc = 0.6;
     lens.forEach((n) => { starts.push(acc); acc += n / CPS + GAP; });
-    const total = acc; const t0 = performance.now(); let raf = 0; let alive = true;
+    const total = acc; const t0 = landingOnce.t0 ?? (landingOnce.t0 = performance.now()); let raf = 0; let alive = true;
     const step = () => {
       if (!alive) return;
       const el = (performance.now() - t0) / 1000;
@@ -921,6 +925,7 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
 }
 
 export default function Home() {
+  useEffect(() => { landingBeacon("home-mount"); }, []); // 🔬 페이지 컴포넌트 자체가 재마운트되는지(랜딩 두 번 써짐 원인 추적)
   const [cafes, setCafes] = useState<Cafe[]>([]);
   const [stations, setStations] = useState<{ n: string; lat: number; lng: number; c: string[]; r: string[] }[]>([]); // 지하철역(이름,좌표,호선색,호선명)
   const [landmarks, setLandmarks] = useState<[string, number, number, string, number][]>([]); // 랜드마크(이름,위도,경도,아이콘,우선순위)
