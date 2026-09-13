@@ -8,6 +8,7 @@ import KakaoShare from "../../KakaoShare";
 import SaveMemoryButton from "./SaveMemoryButton";
 import WishButton from "../../WishButton";
 import OwnerCtaLink from "./OwnerCtaLink";
+import ReportButton from "./ReportButton";
 import VisitorReviews from "../../VisitorReviews";
 import RecentCafes from "../../RecentCafes";
 import SavedCafes from "../../SavedCafes";
@@ -80,7 +81,7 @@ async function getCafe(id: string) {
   const n = Number(id);
   if (!Number.isFinite(n) || n <= 0) return null;
   try {
-    return (await sql`SELECT c.id, c.name, c.area, c.dong, c.address, c.lat, c.lng, c.synth_grade, c.synth_identity, c.synth_count, c.char_scores, c.synth_reviews_all, c.synth_reviews, c.reputation_note, c.synth_quality, c.visitor_n, c.visitor_trip, c.visitor_local, c.area_rank, c.area_total,
+    return (await sql`SELECT c.id, c.name, c.area, c.dong, c.address, c.lat, c.lng, c.synth_grade, c.synth_identity, c.synth_count, c.char_scores, c.synth_reviews_all, c.synth_reviews, c.reputation_note, c.synth_quality, c.visitor_n, c.visitor_trip, c.visitor_local, c.area_rank, c.area_total, c.review_dates,
       COALESCE(dt.is_tourist, false) AS dong_tourist
       FROM cafes c LEFT JOIN dong_tourism dt ON dt.area = c.area AND dt.dong = c.dong
       WHERE c.id=${n} AND c.published=true LIMIT 1`)[0] as any ?? null;
@@ -222,6 +223,16 @@ export default async function CafePage({ params }: Props) {
   //   → 이 카페의 실제 숫자로, 결정하는 화면 안에서 보여준다. 추가 조회 없이 같은 행에서 읽는다.
   const sq = (c.synth_quality ?? null) as any;
   const sqRaw = Number(sq?.raw ?? 0);
+  // 🕒 최신성 — review_dates는 검증+참고 후기의 발행일("YYYY.MM.DD") 배열. 최근 12개월 건수·최신 월·1년 공백 여부.
+  const freshness = (() => {
+    const arr = Array.isArray(c.review_dates) ? (c.review_dates as unknown[]).map(String).filter((d) => /^\d{4}\.\d{2}\.\d{2}$/.test(d)) : [];
+    if (!arr.length) return null;
+    const ts = arr.map((d) => new Date(d.replace(/\./g, "-")).getTime()).filter((t) => Number.isFinite(t));
+    if (!ts.length) return null;
+    const latestT = Math.max(...ts); const cut = Date.now() - 365 * 86400000;
+    const latest = new Date(latestT); const recent = ts.filter((t) => t >= cut).length;
+    return { recent, latest: `${latest.getFullYear()}.${String(latest.getMonth() + 1).padStart(2, "0")}`, stale: latestT < cut };
+  })();
   const sqReasons: [string, number][] = sq?.rejectReasons && typeof sq.rejectReasons === "object"
     ? (Object.entries(sq.rejectReasons) as [string, number][]).filter(([, n]) => Number(n) > 0).sort((a, b) => Number(b[1]) - Number(a[1])).slice(0, 3)
     : [];
@@ -358,6 +369,8 @@ export default async function CafePage({ params }: Props) {
         {(highlights.length > 0 || c.synth_identity) && (
           <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
             <div className="nt-sec">우리가 읽고 적은 판정 · 검증 후기 {c.synth_count ?? 0}건</div>
+            {/* 🕒 최신성(2026-09-13 해자 감사) — "지금도 그런가"에 답하는 한 줄. review_dates(작은 jsonb, 검증+참고 후기 날짜)에서 계산. */}
+            {freshness && <div className="text-[12.5px] text-[#63523f]">🕒 최근 12개월 후기 <b className="text-[#2a1f17]">{freshness.recent}건</b> · 가장 최신 <b className="text-[#2a1f17]">{freshness.latest}</b>{freshness.stale && <span className="text-[#a93a32]"> · 1년 넘게 새 후기 없음</span>}</div>}
             {c.synth_identity && <p className="nt-hand"><span className="nt-hl">{c.synth_identity}</span></p>}
             {highlights.length > 0 && (
               <>
@@ -431,7 +444,10 @@ export default async function CafePage({ params }: Props) {
                 ))}
               </ul>
             )}
-            <Link href="/trust" className="inline-block text-[12px] text-[#7a5122] underline underline-offset-2">검증 방법 자세히 →</Link>
+            <div className="flex items-center gap-4 flex-wrap">
+              <Link href="/trust" className="inline-block text-[12px] text-[#7a5122] underline underline-offset-2">검증 방법 자세히 →</Link>
+              <ReportButton cafeId={Number(c.id)} />
+            </div>
           </div>
         )}
 

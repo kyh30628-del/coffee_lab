@@ -21,7 +21,10 @@ import { sql } from "./db";
 // ⚠️ 소스 파일은 outputFileTracingIncludes로 이 라우트 번들에 포함해야 런타임에 읽힌다(next.config).
 //   파일을 못 읽으면 그 부분은 생략된다 — 지문이 덜 정밀해질 뿐 동작은 계속된다(30일 순환이 보완).
 
-const RULE_FILES = ["lib/reviewQuality.ts", "lib/criteriaListsBase.ts", "lib/discover.ts"];
+// 2026-09-13 해자 감사: 등급 가중·게이트(synthStore·collectOrchestrator)·광고템플릿·경쟁인용 파일이 빠져 있어
+//   그 파일이 바뀌어도 재검이 안 돌았다(지문 16종 공존 실측). 판정을 바꿀 수 있는 파일은 전부 넣는다.
+const RULE_FILES = ["lib/reviewQuality.ts", "lib/criteriaListsBase.ts", "lib/discover.ts",
+  "lib/synthStore.ts", "lib/collectOrchestrator.ts", "lib/adTemplate.ts", "lib/competitorQuote.ts"];
 let cached: { at: number; fp: string } | null = null;
 
 export async function rulesFingerprint(): Promise<string> {

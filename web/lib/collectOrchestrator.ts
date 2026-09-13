@@ -30,6 +30,9 @@ export type EvidenceReview = {
 export type QualityStats = {
   raw: number; verified: number; reference: number; rejected: number; duplicates: number;
   rejectReasons: Record<string, number>; // 탈락 사유별 건수 (투명성)
+  // 2026-09-13 해자 감사 — 등급 산정에서 빠진 옥석(표시는 되지만 '검증' 등급 근거로는 안 세는 것)
+  gradeExcluded?: { closureMention: number; accountCap: number; oldHalf: number };
+  closureMentions?: number; // 제목에 폐업·문닫음 언급 + 카페명 — cron-closure 재확인 우선 신호
 };
 
 export type BorderlineItem = { key: string; title?: string; body: string; text?: string };
@@ -95,7 +98,24 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
   const seen = new Set<string>();
   const reviewerStats = new Map<string, ReviewerCafeStat>(); // 👤 #699 1단계 — 판정 무영향, 적재용
   const seenLinks = new Set<string>();     // 같은 글(URL) 중복 수집 제거용
-  const stats: QualityStats = { raw: 0, verified: 0, reference: 0, rejected: 0, duplicates: 0, rejectReasons: {} };
+  const stats: QualityStats = { raw: 0, verified: 0, reference: 0, rejected: 0, duplicates: 0, rejectReasons: {}, gradeExcluded: { closureMention: 0, accountCap: 0, oldHalf: 0 }, closureMentions: 0 };
+  // 🔴 2026-09-13 해자 감사 — 등급 산정 전용 누계(표시 카운트 trustCount와 분리).
+  //   ⓐ 사장님·공식 계정 글은 아예 제외(아래 루프, rejectReasons로 투명 공개) — "광고도 아닌 진짜 후기" 약속.
+  //   ⓑ 같은 블로그 계정은 등급 근거로 최대 2건(사업자 계정 30건이 그것만으로 '검증'을 만들던 구멍).
+  //   ⓒ 3년 넘은 글은 등급 근거 0.5 가중(표시·trustCount엔 그대로).
+  //   ⓓ 제목이 폐업·문닫음을 말하는 글은 등급 근거 제외 + 폐업 신호 카운트(자동 비공개 아님, cron-closure가 우선 재확인).
+  let gradeVerified = 0, gradeReference = 0;
+  const accountKept = new Map<string, number>();
+  const nameCoreForSelf = coreTokens(name, area).map((t) => t.replace(/\s/g, "").toLowerCase()).filter((t) => t.length >= 3);
+  const nameNormForSelf = name.replace(/\s/g, "").toLowerCase();
+  const isSelfSource = (src?: string): boolean => {
+    const n = String(src ?? "").replace(/\s/g, "").toLowerCase();
+    if (!n) return false;
+    if (/(공식|official|본사|본점|스토어|store)/i.test(n)) return true;
+    return n === nameNormForSelf || nameCoreForSelf.some((t) => n.includes(t));
+  };
+  const CLOSURE_TITLE = /(폐업|문\s*닫|없어졌|사라졌|철수|영업\s*종료|폐점)/;
+  const ageMonths = (d?: string): number | null => { const ld = looseDate(d); const t = ld ? new Date(String(ld)).getTime() : NaN; return Number.isFinite(t) ? (Date.now() - t) / 2.63e9 : null; };
   // 블로그 URL 정규화(프로토콜·m.·쿼리·해시·끝슬래시 무시) → 같은 글 1회만
   const linkKeyOf = (u?: string) => (u ?? "").trim().toLowerCase().replace(/^https?:\/\//, "").replace(/^m\./, "").replace(/[#?].*$/, "").replace(/\/+$/, "");
 
@@ -148,6 +168,7 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
       let reasons = rule.reasons;
       let score = rule.score;
       if (isAd) { verdict = "rejected"; reasons = ["광고·협찬 — 자동 제외(판정보다 우선)"]; score = 0; }
+      else if (verdict !== "rejected" && isSelfSource((t as any).source)) { verdict = "rejected"; reasons = ["사장님·공식 계정 글 — 자기 홍보 제외"]; score = 0; }
       else if (hardReject) { /* 규칙 하드 거절 — 과거 결정·whitelist로 못 살림(규칙 절대 우선) */ }
       else if (opts?.decisions && key in opts.decisions) {
         if (opts.decisions[key]) { verdict = rule.verdict === "verified" ? "verified" : "reference"; reasons = ["✨ AI 검증: 실제 후기"]; score = 80; }
@@ -162,6 +183,21 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
       }
       if (verdict === "verified") stats.verified++; else stats.reference++;
       { const rid = extractRid(t.link); if (rid) { const cur = reviewerStats.get(rid)!; if (cur) cur.accepted++; } } // 👤 #699
+      // 등급 근거 누계(위 ⓑⓒⓓ) — 표시·trustCount는 건드리지 않는다.
+      {
+        const rid = extractRid(t.link) ?? "";
+        const kept = rid ? (accountKept.get(rid) ?? 0) : 0;
+        const closureHit = !!t.title && CLOSURE_TITLE.test(t.title) && (t.title.replace(/\s/g, "").toLowerCase().includes(nameNormForSelf) || nameCoreForSelf.some((k) => t.title!.replace(/\s/g, "").toLowerCase().includes(k)));
+        if (closureHit) { stats.closureMentions!++; stats.gradeExcluded!.closureMention++; }
+        else if (rid && kept >= 2) { stats.gradeExcluded!.accountCap++; }
+        else {
+          const mo = ageMonths((t as any).date);
+          const w = mo != null && mo > 36 ? 0.5 : 1;
+          if (w < 1) stats.gradeExcluded!.oldHalf++;
+          if (verdict === "verified") gradeVerified += w; else gradeReference += w;
+        }
+        if (rid) accountKept.set(rid, kept + 1);
+      }
       kept++;
 
       // 합성 입력: verified 정가중, reference 절반가중. 출처가중도 반영.
@@ -196,7 +232,8 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
   //   DB로 안 빼고 코드 상수로 둔다(grade.floor.*처럼 공개상태 대량변동을 부르는 값이 아니라 그 값의 산정
   //   방식 보정이며, 조정 시 재합성이 필요해 무배포 즉시효과 대상이 아님).
   const REFERENCE_GRADE_WEIGHT = 0.5;
-  const gradeCount = stats.verified + stats.reference * REFERENCE_GRADE_WEIGHT;
+  // 2026-09-13: 등급 근거는 위 누계(자기글 제외·계정당 2건·3년+ 절반·폐업 언급 제외)를 쓴다. trustCount(표시)는 불변.
+  const gradeCount = gradeVerified + gradeReference * REFERENCE_GRADE_WEIGHT;
   // 공개 floor = 검증리뷰 3건 (2026-06-30, CEO "검증된 리뷰 3건 이상"). trustCount는 옥석(verified+reference)만 —
   //   가비지·노이즈(rejected: 동명·무관·광고·SEO·nameAsWord)는 카운트 안 됨. 진짜 검증 리뷰 3건+ 있으면 참고(공개).
   //   얇아도 *진짜* 카페는 살리되 1~2건은 너무 얇아 보류. 오염/비카페는 coherence·카테고리 게이트가 별도로 막음.
