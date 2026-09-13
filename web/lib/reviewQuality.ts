@@ -941,7 +941,7 @@ export function coreTokensDetail(name: string, areaTerms: string[]): { tokens: s
   //   중첩 등)이 랜드마크 단어를 걸러내는 이유는 제각각이라, filter 전 원본 분리단어에서 먼저 확인해둔다.
   const rawWordsForLandmark = name.split(/\s+/).flatMap((w) => w.split(/(?<=[가-힣])(?=[A-Za-z0-9])|(?<=[A-Za-z0-9])(?=[가-힣])/));
   const hasLandmarkRawWord = rawWordsForLandmark.some((w) => isLandmarkTok(w));
-  const parts = name.split(/\s+/).flatMap((w) => { const branch = isBranchWord(w);
+  const parts0 = name.split(/\s+/).flatMap((w) => { const branch = isBranchWord(w);
       return w.split(/(?<=[가-힣])(?=[A-Za-z0-9])|(?<=[A-Za-z0-9])(?=[가-힣])/).map((raw) => ({ raw, branch })); })
     // 룰갭(#307): 쉼표 붙은 업종어('카페,')는 GENERIC_SUFFIX의 $ 앵커가 안 걸려 그대로 살아남아
     //   '카페, 여유'처럼 콤마로 쪼개진 이름의 진짜 유일토큰('여유')이 weakSingle 보호를 못 받고
@@ -959,8 +959,13 @@ export function coreTokensDetail(name: string, areaTerms: string[]): { tokens: s
     //   → 지역어와 **정확일치**하거나, 지역어를 뺀 나머지가 1글자 이하일 때만(사실상 지역명) 제거한다.
     //     'a.includes(core)' 방향(지역어가 토큰을 품음: '오남'⊂'오남읍')은 그대로 — 그건 진짜 위치어다.
     //     지점 표식('○○점')에서 나온 토큰(branch)은 예전 규칙 그대로 부분포함도 제거 — '남양주오남점'→'남양주오남'은 위치어다.
-    .filter(({ core, branch }) => { const c = norm(core); return !an.some((a) => a === c || a.includes(c) || (c.includes(a) && (branch || c.replace(a, "").length <= 1))); })
-    .filter(({ core }) => !LOC_SUFFIX.test(core));
+    .filter(({ core, branch }) => { const c = norm(core); return !an.some((a) => a === c || a.includes(c) || (c.includes(a) && (branch || c.replace(a, "").length <= 1))); });
+  // 짧은 이름(2~3자)의 유일 토큰이 우연히 지역어 접미(역동구시군읍면리로길)로 끝나면(예: '아코리') 이 필터가
+  //   코어토큰을 통째로 비워 이후 coherence 계산이 무조건 0으로 확정된다(#1044 LOC_SUFFIX에 '리' 추가 후 회귀,
+  //   decisions#1068 id20346 오탐). 근처 다른 필터(nonBranch.length?nonBranch:parts)와 동일하게 결과가
+  //   빈 배열이면 이 필터만 원복한다(정규식 자체는 유지).
+  const afterLocSuffix = parts0.filter(({ core }) => !LOC_SUFFIX.test(core));
+  const parts = afterLocSuffix.length ? afterLocSuffix : parts0;
   const nonBranch = parts.filter((p) => !p.branch);
   const pool = nonBranch.length ? nonBranch : parts; // 지점어만 있는 이름(브랜드 없음)은 그대로 유지
   const base = pool.map((p) => p.core);
