@@ -19,7 +19,12 @@ export async function GET(req: NextRequest) {
   startJobRun("cron-resynth"); // 💰 하네스 L1 — 큰 컬럼 소비 계량 시작
   // 🪟 하네스 L1 — 창 총량 예산: 최근 24h 누적 blob 로드가 상한을 넘으면 이번 런은 재합성을 건너뛴다.
   //   런당 예산만으론 "조금씩 자주"를 못 막는다(2026-07 유튜브 백필 663GB가 그 형태였다).
-  if (await windowBudgetExceeded("cron-resynth", 24, 600)) {
+  // 🔴 2026-09-14 실측 수리 — 어제 GEN_MAX를 150→300으로 올렸는데 **처리량이 그대로였다**.
+  //   진짜 상한은 이 창 예산(24h 누적 blobReads 600)이었기 때문이다: 300짜리 런이 326을 쓰니 하루 2번만 돌고
+  //   12·20시 런이 통째로 스킵됐다(실측 09-13: 08시 170·16시 326, 12·20시 스킵 = 하루 450곳).
+  //   blobReads 1건 = raw_reviews 1곳(평균 26KB) → 1,800건이라야 하루 약 47MB. 7월 유튜브 사고(663GB)와 자릿수가 다르다.
+  //   600 → 1,800으로 올려 하루 4런(=약 1,200곳)이 전부 돌게 한다. 규칙 전파 20일 → 10일.
+  if (await windowBudgetExceeded("cron-resynth", 24, 1800)) {
     await recordRun("cron-resynth", true, "🪟 창 예산 초과 — 이번 런 스킵(다음 창에서 재개)", 0).catch(() => {});
     return NextResponse.json({ ok: true, skipped: "window-budget" });
   }
