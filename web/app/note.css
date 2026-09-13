@@ -177,7 +177,8 @@
 .nt-idx > button:last-child { margin-right: 0; }
 
 /* ── 랜딩: 채워지는 메모 ── */
-.nt-w .ch { display: inline-block; opacity: 0; color: #5b6a9a; clip-path: inset(-20% 100% -20% -6%); transform: translateY(var(--y, 0px)) rotate(var(--r, 0deg)); transition: color 0.9s ease-out; }
+/* 2026-09-13: 0.9초 '잉크 마름' 색 전이 제거 — 펜 뒤로 색이 따라오며 바뀌는 두 번째 물결이 '또 써지는 것'처럼 보였다. 처음부터 마른 잉크색. */
+.nt-w .ch { display: inline-block; opacity: 0; color: #2f3550; clip-path: inset(-20% 100% -20% -6%); transform: translateY(var(--y, 0px)) rotate(var(--r, 0deg)); }
 .nt-w .ch.sp { width: 0.32em; }
 .nt-w .ch.on { opacity: 1; clip-path: inset(-20% -6% -20% -6%); color: #2f3550; }
 .nt-w.done .ch { opacity: 1; clip-path: none; color: #2f3550; transition: none; }

@@ -804,6 +804,23 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
     if (landingOnce.done) { setDone(true); landingBeacon("skip-done", { mountId }); return; }    // 이 로드에서 이미 한 번 썼다 — 완성본만(두 번째 연출 금지)
     const reduce = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (reduce) { setDone(true); return; }
+    // 🔴 2026-09-13 '두 번 써짐'의 진짜 원인 = **폰트 스왑**.
+    //   손글씨(DCN Letter)는 121조각 동적 서브셋 + font-display:swap이다. 글자를 한 자씩 써 나가면 새 글자마다
+    //   새 조각을 내려받고, 도착 전까지는 기본 고딕으로 보이다가 도착하는 순간 이미 쓴 글자까지 **한꺼번에 손글씨로 바뀐다**.
+    //   폰(느린 회선)에선 이게 "썼던 글씨가 다시 써지는 것"으로 보이고, 글자 폭이 변하니 펜도 어긋난다(데스크톱은 빨라서 안 보였다).
+    //   → 쓰기 전에 이 메모에 실제로 쓰인 글자들의 조각을 **전부 받아온 뒤** 시작한다. 최대 2.5초만 기다리고, 실패해도 그냥 진행.
+    let cancelled = false;
+    const startWhenFontReady = (go: () => void) => {
+      const txt = LANDING_MEMO.join("");
+      const f: any = (document as any).fonts;
+      if (!f?.load) { go(); return; }
+      let fired = false;
+      const once = (why: string) => { if (fired || cancelled) return; fired = true; landingBeacon("font", { mountId, navType: why }); go(); };
+      const timer = setTimeout(() => once("timeout"), 2500);
+      Promise.all([f.load(`19px "DCN Letter"`, txt), f.load(`17px "DCN Hand"`, txt)])
+        .then(() => { clearTimeout(timer); once("loaded"); })
+        .catch(() => { clearTimeout(timer); once("error"); });
+    };
     // 🔴 2026-09-13 실측(landing_debug): 안드로이드 PWA 첫 실행에서 같은 로드 안에 이 컴포넌트가 3.5초 뒤 **다시 마운트**돼
     //   처음부터 다시 썼다(두 번 써짐의 실체). 재마운트 원인과 별개로, 시작 시각을 컴포넌트 밖(landingOnce.t0)에 두어
     //   두 번째 인스턴스는 **그 시점부터 이어서** 쓴다 — 화면상 한 번의 쓰기로 보인다.
@@ -814,7 +831,7 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
     const slow = typeof location !== "undefined" && /nt_slow/.test(location.search); // 검수용: ?nt_slow 로 느리게
     // ✍ 2026-09-13 재설계(CEO "진짜 펜으로 쓰이는 것처럼"): 초당 36자는 글자당 2프레임이라 펜이 미끄러져 보일 뿐이었다.
     //   사람 손 속도(초당 9자)로 낮추고, 글자는 왼쪽 위→오른쪽 아래 사선으로 드러내며, 촉은 그 경계를 따라 획 긋듯 내려간다.
-    const CPS = slow ? 3 : 9, GAP = 0.32;
+    const CPS = slow ? 3 : 17, GAP = 0.2;   // 실측 13초는 너무 길다 → 약 7초. 손 속도 느낌은 유지.
     const lens = LANDING_MEMO.map((l) => Array.from(l).length);
     const starts: number[] = []; let acc = 0.6;
     lens.forEach((n) => { starts.push(acc); acc += n / CPS + GAP; });
@@ -866,8 +883,8 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
       }
       raf = requestAnimationFrame(step);
     };
-    raf = requestAnimationFrame(step);
-    return () => { alive = false; cancelAnimationFrame(raf); if (curRef.current) { curRef.current.style.clipPath = ""; curRef.current.style.opacity = ""; curRef.current = null; } };
+    startWhenFontReady(() => { if (!alive) return; raf = requestAnimationFrame(step); });
+    return () => { alive = false; cancelled = true; cancelAnimationFrame(raf); if (curRef.current) { curRef.current.style.clipPath = ""; curRef.current.style.opacity = ""; curRef.current = null; } };
   }, [LANDING_MEMO]);
   const allDone = done === true;
   const lineTop = PAGE_RULE0 - 21;   // 첫 줄부터: 손편지체 19px(행간=줄 간격 22.7px) 글리프 바닥이 줄보다 2.6px 위(실측 asc .92·desc .23·글 bbox 바닥 -.117em)
