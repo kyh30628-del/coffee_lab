@@ -23,7 +23,7 @@ let ensured = false;
 //      트라이그램 GIN으로 29블록(477배↓ · 86ms→0.6ms). 인덱스 5MB.
 //   ⚠️ 지우면 그대로 재발한다. 쿼리 모양(replace/lower/공백제거)이 바뀌면 인덱스 식도 같이 바꿔야 탄다.
 export async function ensureSearchIndexes() {
-  await ensureOnce("db.searchIndexes.v1", async () => {
+  await ensureOnce("db.searchIndexes.v2", async () => {
     await sql`CREATE EXTENSION IF NOT EXISTS pg_trgm`.catch(() => {});
     await sql`CREATE INDEX IF NOT EXISTS idx_cafes_name_norm_trgm
       ON cafes USING gin (replace(lower(name), ' ', '') gin_trgm_ops) WHERE published`.catch(() => {});
@@ -35,6 +35,15 @@ export async function ensureSearchIndexes() {
     //   ③ idx_cafes_pub_ver — /api/cafes·/api/discover가 **요청마다** 도는 버전 쿼리
     //      (COUNT + MAX(updated_at) + MAX(synth_updated))를 인덱스 전용 스캔으로. 9,002블록 → 104블록.
     await sql`CREATE INDEX IF NOT EXISTS idx_cafes_pub_ver ON cafes (updated_at DESC, synth_updated) WHERE published`.catch(() => {});
+    //   ④ idx_cafes_axis_pos — 개념축 보강 조회(검색의 '노키즈존'·'애견동반' 등)가 cafes를 통째로 훑고 있었다.
+    //      실측 09-13: 한 번에 37,035블록(303MB)·8일 누계 122GB(디스크 읽기 1위). 09-13 08시 비용경보의 최대 단일원인.
+    //      원인: `EXISTS (SELECT 1 FROM unnest($axes) ax WHERE (char_scores->>ax)::numeric > 0)` 은 인덱스가 못 탄다.
+    //      해법: 점수>0인 축 이름만 뽑는 **불변 표현식**에 GIN을 걸고 질의는 ?| 배열중첩으로 바꾼다.
+    //      동치 검증(같은 세션 실측): quiet 14,531=14,531 · nokids+pet 8,754=8,754 (건수 완전 일치).
+    //      효과: nokids 37,026→1,699블록(21.8배), quiet 37,035→22,040블록(전체의 74%가 해당해 이득이 작음).
+    await sql`CREATE INDEX IF NOT EXISTS idx_cafes_axis_pos
+      ON cafes USING gin ((jsonb_path_query_array(char_scores, '$.keyvalue() ? (@.value > 0).key')))
+      WHERE published = true AND embedding IS NOT NULL`.catch(() => {});
   });
 }
 

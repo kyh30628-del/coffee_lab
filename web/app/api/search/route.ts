@@ -399,6 +399,9 @@ export async function GET(req: NextRequest) {
           //   top-80 밖으로 밀려나면 concept/axis 재랭킹 자체가 기회를 못 받는다(임베딩이 뽑은 후보 안에서만 재랭킹하므로).
           //   → char_scores에 해당 축 점수(>0)를 가진 카페를 별도로 보강 조회해 후보풀에 합류시킨다.
           //   (char_scores는 축마다 항상 키가 존재하고 값이 0일 수 있어 키 존재만으론 부족 — 값>0을 직접 확인.)
+          // 💰 2026-09-13: 이 보강 조회가 cafes 전수스캔이었다(1회 37,035블록·303MB, 8일 누계 122GB로 디스크 읽기 1위).
+          //   `EXISTS (unnest(axes) … char_scores->>ax > 0)`은 인덱스를 못 탄다 → 점수>0인 축 이름 배열에 GIN(idx_cafes_axis_pos)을
+          //   걸고 ?| 로 바꿨다. 건수 동치는 실측 확인(quiet 14,531=14,531 · nokids+pet 8,754=8,754).
           const conceptAxes = Array.from(new Set(hitConcepts.filter((c) => c.axis).map((c) => c.axis as string)));
           if (conceptAxes.length > 0) {
             const axisRows = areaList
@@ -407,7 +410,7 @@ export async function GET(req: NextRequest) {
                    FROM cafes
                    WHERE published = true AND embedding IS NOT NULL
                      AND area = ANY($2::text[])
-                     AND EXISTS (SELECT 1 FROM unnest($3::text[]) ax WHERE (char_scores->>ax)::numeric > 0)
+                     AND jsonb_path_query_array(char_scores, '$.keyvalue() ? (@.value > 0).key') ?| $3::text[]
                    ORDER BY (SELECT MAX((char_scores->>ax)::numeric) FROM unnest($3::text[]) ax) DESC
                    LIMIT 40`,
                   [lit, areaList, conceptAxes],
@@ -416,7 +419,7 @@ export async function GET(req: NextRequest) {
                   `SELECT ${FIELDS}, 1 - (embedding <=> $1::vector) AS sim
                    FROM cafes
                    WHERE published = true AND embedding IS NOT NULL
-                     AND EXISTS (SELECT 1 FROM unnest($2::text[]) ax WHERE (char_scores->>ax)::numeric > 0)
+                     AND jsonb_path_query_array(char_scores, '$.keyvalue() ? (@.value > 0).key') ?| $2::text[]
                    ORDER BY (SELECT MAX((char_scores->>ax)::numeric) FROM unnest($2::text[]) ax) DESC
                    LIMIT 40`,
                   [lit, conceptAxes],

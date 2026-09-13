@@ -113,6 +113,9 @@ const HOT = [
   ["치유기: offconcept 대기열", `SELECT id FROM cafes WHERE published = true AND synth_reviews IS NOT NULL AND (offconcept_scan_at IS NULL OR synth_updated > offconcept_scan_at) ORDER BY synth_updated DESC NULLS LAST LIMIT 3000`],
   ["지도/홈: 버전 쿼리", `SELECT COUNT(*)::int n, COALESCE(MAX(updated_at)::text,'') u, COALESCE(MAX(synth_updated)::text,'') s FROM cafes WHERE published = true`],
   ["치유기: noncafe 대기열", `SELECT id FROM cafes WHERE published = true AND synth_reviews IS NOT NULL AND (noncafe_scan_at IS NULL OR synth_updated > noncafe_scan_at) ORDER BY synth_updated DESC NULLS LAST LIMIT 3000`],
+  // 2026-09-13 2차 — 위 6개를 막은 그날에도 **이 쿼리는 빠져 있었다**(누계 122GB, 디스크 읽기 1위).
+  //   교훈: 목록에 없는 쿼리는 검사가 아니라 사각지대다. 새 뜨거운 쿼리는 반드시 여기 추가할 것.
+  ["검색: 개념축 보강", `SELECT id, name FROM cafes WHERE published = true AND embedding IS NOT NULL AND jsonb_path_query_array(char_scores, '$.keyvalue() ? (@.value > 0).key') ?| ARRAY['nokids'] ORDER BY (SELECT MAX((char_scores->>ax)::numeric) FROM unnest(ARRAY['nokids']) ax) DESC LIMIT 40`],
 ];
 const slow = [];
 for (const [label, q] of HOT) {
