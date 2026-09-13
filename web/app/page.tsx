@@ -735,8 +735,8 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
   const [memo, setMemo] = useState<string[] | null>(null);
   useEffect(() => {
     if (memo) return;                                   // 이미 확정 — 무슨 일이 있어도 다시 안 쓴다
-    if (discover) { setMemo(landingMemo(discover, seed)); return; }
-    const t = setTimeout(() => setMemo((m) => m ?? landingMemo(null, seed)), 1200);
+    if (discover) { setMemo(landingMemo(discover, seed).slice(0, 7)); return; }
+    const t = setTimeout(() => setMemo((m) => m ?? landingMemo(null, seed).slice(0, 7)), 1200);
     return () => clearTimeout(t);
   }, [discover, memo, seed]);
   const LANDING_MEMO = useMemo(() => memo ?? [], [memo]);
@@ -748,6 +748,7 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
   const pageRef = useRef<HTMLDivElement | null>(null);
   const nibRef = useRef<SVGSVGElement | null>(null);
   const curRef = useRef<HTMLElement | null>(null); // 지금 써지는 글자(인라인 clip 정리용)
+  const penRef = useRef<[number, number] | null>(null); // 촉의 현재 위치(부드러운 이동)
   const jitter = useMemo(() => LANDING_MEMO.map((l) => Array.from(l).map(() => [(Math.random() * 3.2 - 1.6).toFixed(2), (Math.random() * 2 - 1).toFixed(2)])), [LANDING_MEMO]);
   // 페이지 사각형을 화면 픽셀로 — 이미지는 object-fit: cover(가운데)라 스케일·오프셋을 같이 계산
   useEffect(() => {
@@ -769,7 +770,9 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
     setDone(false);
     // ⏱ 시간 기반 진행(약 2.6초) — 백그라운드 탭에서 늦춰져도 총 길이 그대로.
     const slow = typeof location !== "undefined" && /nt_slow/.test(location.search); // 검수용: ?nt_slow 로 느리게
-    const CPS = slow ? 5 : 36, GAP = 0.13;
+    // ✍ 2026-09-13 재설계(CEO "진짜 펜으로 쓰이는 것처럼"): 초당 36자는 글자당 2프레임이라 펜이 미끄러져 보일 뿐이었다.
+    //   사람 손 속도(초당 9자)로 낮추고, 글자는 왼쪽 위→오른쪽 아래 사선으로 드러내며, 촉은 그 경계를 따라 획 긋듯 내려간다.
+    const CPS = slow ? 3 : 9, GAP = 0.32;
     const lens = LANDING_MEMO.map((l) => Array.from(l).length);
     const starts: number[] = []; let acc = 0.6;
     lens.forEach((n) => { starts.push(acc); acc += n / CPS + GAP; });
@@ -782,10 +785,8 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
       const prog = (el - starts[li]) * CPS;                       // 이 줄에서 몇 글자째(소수 = 획 진행률)
       const ci = Math.max(0, Math.min(lens[li], Math.floor(prog)));
       setPos((p) => (p[0] === li && p[1] === ci ? p : [li, ci]));
-      // ✒ 펜이 글자를 **써내려간다**(2026-09-13 수정, CEO "글씨와 펜이 따로 논다").
-      //   전엔 글자가 펜이 지나간 뒤 클래스 전이(0.14s)로 통째로 나타나 펜이 늘 앞서 있었고,
-      //   펜촉 기준점이 34px 아이콘 기준(3,31)인데 실제 22px로 그려 촉이 잉크보다 ~12px 떠 있었다.
-      //   → 지금 쓰는 글자는 매 프레임 진행률만큼 인라인 clip으로 드러내고(전이 없음), 펜촉은 그 잉크 끝에 정확히 둔다.
+      // ✒ 펜이 글자를 **써내려간다** — 현재 글자를 사선(왼쪽 위→오른쪽 아래)으로 진행률만큼 드러내고, 촉은 그 경계 위를 지그재그로 내려간다.
+      //   전엔 가로 clip + 클래스 전이(0.14s)로 글자가 펜 뒤에 통째로 떴고, 촉 기준점이 34px 아이콘 기준이라 잉크보다 ~12px 떠 있었다.
       const nib = nibRef.current, page = pageRef.current;
       if (nib && page) {
         const lineEl = page.querySelectorAll<HTMLElement>(".nt-w")[li];
@@ -794,17 +795,28 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
         if (lineEl && ch) {
           const frac = prog >= lens[li] ? 1 : Math.max(0, prog - Math.floor(prog));
           const lifted = prog >= lens[li];
-          // 현재 글자: 왼쪽에서 frac만큼만 보이게(획이 그어지는 중). 이전 글자로 넘어가면 인라인을 지워 클래스(.on)가 이어받는다.
           const cur = curRef.current;
           if (cur && cur !== ch) { cur.style.clipPath = ""; cur.style.opacity = ""; }
-          if (!lifted) { ch.style.opacity = "1"; ch.style.clipPath = `inset(-20% ${Math.max(-6, 106 - frac * 112)}% -20% -6%)`; curRef.current = ch; }
-          else if (cur) { cur.style.clipPath = ""; cur.style.opacity = ""; curRef.current = null; }
-          const x = lineEl.offsetLeft + ch.offsetLeft + ch.offsetWidth * (lifted ? 1 : frac);
-          const y = lineEl.offsetTop + ch.offsetTop + ch.offsetHeight * 0.86 + Math.sin(el * 31) * 0.6;
-          const size = nib.clientWidth || 22, tipX = size * (3 / 24), tipY = size * (21 / 24);   // 아이콘의 촉 끝(viewBox 3,21)
+          if (!lifted) {
+            // 사선 경계: 위쪽은 x=1.5t, 아래쪽은 x=1.5t-0.5 (t=0: 안 보임, t=1: 전부). 획이 위에서 아래로 그어지는 느낌.
+            const xt = Math.round(frac * 150 - 2), xb = Math.round(frac * 150 - 52);
+            ch.style.opacity = "1";
+            ch.style.clipPath = `polygon(-12% -25%, ${xt}% -25%, ${xb}% 125%, -12% 125%)`;
+            curRef.current = ch;
+          } else if (cur) { cur.style.clipPath = ""; cur.style.opacity = ""; curRef.current = null; }
+          // 촉 목표점: 글자 안을 왼쪽 위→오른쪽 아래로 가로지르며 위아래로 두 번 꺾인다(획 긋는 손).
+          const w = ch.offsetWidth, h = ch.offsetHeight;
+          const isSpace = ch.classList.contains("sp");
+          const tx = lineEl.offsetLeft + ch.offsetLeft + (lifted || isSpace ? w : w * (0.12 + 0.8 * frac));
+          const ty = lineEl.offsetTop + ch.offsetTop + (lifted || isSpace ? h * 0.55 : h * (0.28 + 0.5 * frac) + Math.sin(frac * Math.PI * 3) * h * 0.14);
+          // 부드럽게 따라가기(줄 바꿈·띄어쓰기에서 순간이동 금지) — 목표까지 매 프레임 45%씩 접근
+          const pv = penRef.current; const k = pv ? 0.45 : 1;
+          const px = pv ? pv[0] + (tx - pv[0]) * k : tx, py = pv ? pv[1] + (ty - pv[1]) * k : ty;
+          penRef.current = [px, py];
+          const size = nib.clientWidth || 26, tipX = size * (3 / 24), tipY = size * (21 / 24);   // 아이콘 촉 끝(viewBox 3,21)
           nib.style.transformOrigin = `${tipX}px ${tipY}px`;
           nib.style.opacity = "1";
-          nib.style.transform = `translate(${x - tipX}px, ${y - tipY - (lifted ? 5 : 0)}px) rotate(${10 + Math.sin(el * 17) * 2.5}deg)`;
+          nib.style.transform = `translate(${px - tipX}px, ${py - tipY - (lifted ? 4 : 0)}px) rotate(${14 + Math.sin(el * 9) * 3}deg)`;
         }
       }
       raf = requestAnimationFrame(step);
@@ -847,7 +859,7 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
           </div>
           <div className={`nt-stamp absolute ${allDone ? "in" : ""}`} style={{ right: 18, bottom: 26, opacity: allDone ? undefined : 0 }} aria-hidden>검증<small>VERIFIED</small></div>
           {done === false && (
-            <svg ref={nibRef} className="nt-nib" viewBox="0 0 24 24" aria-hidden style={{ width: 22, height: 22 }}><path d="M3 21l3.5-1 11-11-2.5-2.5-11 11L3 21z" fill="#1f2640" stroke="#2a1f17" strokeWidth="1" /><path d="M14.5 6.5l2.5 2.5 2-2a1.7 1.7 0 0 0 0-2.4l-.1-.1a1.7 1.7 0 0 0-2.4 0l-2 2z" fill="#e0b25a" stroke="#2a1f17" strokeWidth="1" /><path d="M3 21l1-3.2 2.2 2.2L3 21z" fill="#2a1f17" /></svg>
+            <svg ref={nibRef} className="nt-nib" viewBox="0 0 24 24" aria-hidden style={{ width: 26, height: 26 }}><path d="M3 21l3.5-1 11-11-2.5-2.5-11 11L3 21z" fill="#1f2640" stroke="#2a1f17" strokeWidth="1" /><path d="M14.5 6.5l2.5 2.5 2-2a1.7 1.7 0 0 0 0-2.4l-.1-.1a1.7 1.7 0 0 0-2.4 0l-2 2z" fill="#e0b25a" stroke="#2a1f17" strokeWidth="1" /><path d="M3 21l1-3.2 2.2 2.2L3 21z" fill="#2a1f17" /></svg>
           )}
         </div>
       </div>
@@ -2009,8 +2021,7 @@ export default function Home() {
   return (
     <div className="flex flex-col nt-paper nt-app" style={{ position: "fixed", inset: 0, fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }}>
       {/* 📖 책장 넘김 — 탭이 바뀔 때 종이 한 장이 왼쪽으로 넘어간다(0.55s, 움직임 줄이기면 없음) */}
-      {/* 📖 책장 넘김(2026-09-13 재설계, CEO "전면 넘김은 투박 — 우측 상단만 살짝·빠르게") : 모서리 귀접이만 0.38s */}
-      {turnKey > 0 && <div key={turnKey} className="nt-curl" aria-hidden />}
+      {/* 📖 책장 넘김 연출은 2026-09-13 CEO 지시로 삭제(전면 회전·모서리 귀접이 모두). turnKey는 탭 전환 시 홈 목록 재마운트 키로만 남는다. */}
       {/* 📣 접속 시 안내 공지 — 데이터는 /api/discover 응답에 얹혀 온다(전용 요청 0, 비용 증가 0) */}
       <NoticeModal source={(discover as any)?.notice ?? null} />
       {/* ✨ 동적 연출(2026-07-30) — CSS 전용·가볍게·reduced-motion 존중. 우리 정체성을 '느끼게': ①골드핀 맥동 ②커피드립 로딩 ③저장 손맛 ④옥석 가리기 */}

@@ -163,16 +163,8 @@
 .nt-ln .m { font-size: 13.5px; color: var(--nt-ink3); font-variant-numeric: tabular-nums; flex: none; }
 
 /* ── 책장 넘김(탭 전환) ── */
-/* ── 📖 책장 넘김(2026-09-13 재설계) — 전면 회전은 투박하다는 CEO 지적 → **우측 상단 귀접이만** 빠르게(0.38s).
-   .nt-curl = 종이 모서리가 들려 뒤집히는 삼각(뒷면 종이 톤 + 접힌 선의 그늘 + 아래 장에 떨어지는 그림자). 커졌다가 사라지고,
-   새 장(.nt-page-in)은 오른쪽에서 아주 살짝 들어온다. 움직임 줄이기면 전부 없음. */
-.nt-curl { position: absolute; top: 56px; right: 0; width: 132px; height: 132px; z-index: 1600; pointer-events: none; transform-origin: 100% 0; animation: ntCurl 0.38s cubic-bezier(0.3, 0.7, 0.2, 1) forwards; will-change: transform, opacity; }
-.nt-curl::before { content: ""; position: absolute; inset: 0; clip-path: polygon(0 0, 100% 0, 100% 100%); background: linear-gradient(225deg, #f7f0e4 0%, #efe5d3 38%, #d9ccb4 47%, #b8a78c 50%, rgba(60,40,20,.28) 50.5%, rgba(60,40,20,0) 62%); }
-.nt-curl::after { content: ""; position: absolute; inset: 0; clip-path: polygon(0 0, 100% 0, 100% 100%); background: linear-gradient(225deg, rgba(0,0,0,0) 40%, rgba(0,0,0,.18) 49%, rgba(0,0,0,0) 50%); }
-@keyframes ntCurl { 0% { transform: scale(0.1); opacity: 0; } 35% { opacity: 1; } 70% { transform: scale(1); opacity: 1; } 100% { transform: scale(1.06) translate(-6px, 6px); opacity: 0; } }
-/* 새 장 — 살짝만 */
-@keyframes ntPageIn { 0% { opacity: 0.55; transform: translateX(10px); } 100% { opacity: 1; transform: none; } }
-.nt-page-in { animation: ntPageIn 0.32s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+/* 📖 책장 넘김 연출 — 2026-09-13 CEO 지시로 삭제(전면 회전·귀접이 모두). .nt-page-in은 무효과로 남긴다. */
+.nt-page-in { animation: none; }
 
 /* ── 🔖 노트 색인 탭(홈·지도·추억, 2026-09-13 2차) — 머리띠(호두나무) 아래로 종이 색인이 삐져나온 모양.
    활성 = 크림 종이가 앞으로 나와 있고 왼쪽에 붉은 색인 띠, 잉크 손글씨. 비활성 = 크라프트 종이가 뒤에 반쯤 가려짐.
@@ -192,7 +184,6 @@
 .nt-nib { position: absolute; left: 0; top: 0; width: 34px; height: 34px; transform-origin: 3px 31px; opacity: 0; transition: opacity 0.2s; pointer-events: none; z-index: 5; filter: drop-shadow(1px 3px 3px rgba(0, 0, 0, 0.35)); will-change: transform; }
 
 @media (prefers-reduced-motion: reduce) {
-  .nt-curl { animation: none; display: none; }
   .nt-page-in { animation: none; }
   .nt-stamp.in { animation: none; }
   .nt-w .ch { opacity: 1; clip-path: none; color: #2f3550; transform: none; transition: none; }
