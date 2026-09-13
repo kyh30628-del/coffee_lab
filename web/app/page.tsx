@@ -654,16 +654,57 @@ function FavoritesModal({ items, onClose, onOpen, onRemove, onRecord }: { items:
 //   · 문구는 기존 랜딩 카피 그대로. 메모 줄엔 숫자 주장 없음.
 //   · 페이지 4모서리 좌표는 Blender 카메라에서 실측(render/hero7.json: TL,TR,BR,BL, 이미지 비율 0~1). 렌더를 다시 뽑으면 이 값도 다시 잰다.
 const LANDING_MEMO_FALLBACK = ["오늘, 우리 동네.", "별점은 안 봤다. 다녀온 사람 글만 읽었다.", "광고·협찬 글은 걸러냈다.", "마음에 든 곳엔 도장 하나."];
-// 📓 오늘의 메모 — 홈 스포트라이트(매일 바뀌는 숨은 보석·오늘의 테마)에서 발췌한 진짜 문장. 숫자는 전부 데이터 값.
-function landingMemo(d: Discover | null): string[] {
-  const a = d?.headlineAList?.[0]; const b = d?.headlineBList?.[0]; const th = d?.themeB?.label;
-  if (!a) return LANDING_MEMO_FALLBACK;
-  const now = new Date(); const day = ["일", "월", "화", "수", "목", "금", "토"][now.getDay()];
-  const cut = (t: string, n: number) => { const x = (t || "").replace(/\s+/g, " ").trim(); return x.length > n ? x.slice(0, n).replace(/[\s·,]+$/, "") + "…" : x; };
-  const lines = [`${now.getMonth() + 1}월 ${now.getDate()}일 ${day}요일, ${cut(a.area, 9)}.`, `${cut(a.name, 9)} — ${cut(a.identity || "", 11)}`, `검증 후기 ${a.count ?? 0}건만 읽고 적었다.`];
-  if (b) lines.push(th && th.length <= 8 ? `${th}: ${cut(b.name, 9)} ✓` : `${cut(b.name, 12)}도 한 곳 ✓`);
+// 📓 오늘의 메모 — 홈 화면에 실제로 떠 있는 카페들(숨은 보석·오늘의 테마·둘러보기 4탭)에서
+//   **매번 무작위로** 골라 노트에 옮겨 적는다. 새로고침하면 다른 카페가 적힌다.
+//   숫자·이름·판정은 전부 홈과 같은 데이터(지어내지 않는다). 못 채우면 고정 문구로 떨어진다.
+//   ⚠️ 노트 한 줄은 폭이 정해져 있다(nowrap·overflow hidden) — 넘치면 소리 없이 잘려 깨져 보인다.
+//      그래서 글자폭을 재서(한글 1.0 · 그 외 0.55) 예산 안에 드는 문장만 쓴다. 실측 기준 13.2가 한 줄.
+const LINE_BUDGET = 13.2;
+const lineWidth = (t: string) => Array.from(t).reduce((a, ch) => a + (/[\u3131-\uD79D\u4E00-\u9FFF]/.test(ch) ? 1 : 0.55), 0);
+const fitLine = (t: string) => {
+  const x = (t || "").replace(/\s+/g, " ").trim();
+  if (lineWidth(x) <= LINE_BUDGET) return x;
+  let out = "";
+  for (const ch of Array.from(x)) { if (lineWidth(out + ch) > LINE_BUDGET - 0.6) break; out += ch; }
+  return out.replace(/[\s·,—-]+$/, "") + "…";
+};
+function landingMemo(d: Discover | null, seed: number): string[] {
+  const pools = [d?.headlineAList, d?.headlineBList, d?.top3, d?.specialty, d?.fresh, d?.featured];
+  const pool: DCafe[] = [];
+  const seen = new Set<number>();
+  for (const p of pools) for (const c of p ?? []) if (c && !seen.has(c.id)) { seen.add(c.id); pool.push(c); }
+  if (pool.length === 0) return LANDING_MEMO_FALLBACK;
+  // 결정론적 셔플(seed) — 렌더가 여러 번 돌아도 같은 줄이 나오게(쓰는 도중 글자가 바뀌면 안 된다).
+  let r = seed || 1;
+  const rnd = () => { r = (r * 1103515245 + 12345) & 0x7fffffff; return r / 0x7fffffff; };
+  const shuffled = [...pool].map((c) => ({ c, k: rnd() })).sort((a, b) => a.k - b.k).map((x) => x.c);
+  const now = new Date();
+  const day = ["일", "월", "화", "수", "목", "금", "토"][now.getDay()];
+  // 날짜 줄 — 동네 이름이 길면 요일부터 덜어낸다(잘라서 "대구 달…"이 되지 않게).
+  const m = now.getMonth() + 1, dd = now.getDate(), area0 = shuffled[0].area || "";
+  const dateCands = [`${m}월 ${dd}일 ${day}요일, ${area0}.`, `${m}월 ${dd}일, ${area0}.`, `${m}월 ${dd}일 ${day}요일.`];
+  const lines: string[] = [fitLine(dateCands.find((t) => lineWidth(t) <= LINE_BUDGET) ?? dateCands[2])];
+  const usedPhrase = new Set<string>();          // 같은 판정 문구가 반복되지 않게
+  const kindUsed: Record<string, number> = {};   // 같은 문장 틀만 이어지지 않게(한 틀당 최대 2줄)
+  for (const c of shuffled) {
+    if (lines.length >= 7) break;
+    const name = c.name || "";
+    // 문장 틀 4종. 틀이 이미 2번 쓰였으면 건너뛰어 다른 틀이 나오게 한다.
+    const phrase = (c.identity || "").split(/[·,]/)[0]?.trim() || "";
+    const cands: [string, string, string][] = [];   // [종류, 중복키, 문장]
+    if (phrase) cands.push(["identity", phrase, `${name} — ${phrase}`]);
+    if (c.beanNote?.length) cands.push(["bean", c.beanNote[0], `${name} · ${c.beanNote[0]}`]);
+    if (c.isNew) cands.push(["new", `새로:${name}`, `새로 적은 곳 — ${name}`]);
+    if ((c.count ?? 0) > 0) cands.push(["count", `후기${c.count}`, `${name}, 후기 ${c.count}건`]);
+    const pick = cands.find(([kind, k, t]) => (kindUsed[kind] ?? 0) < 2 && !usedPhrase.has(k) && lineWidth(t) <= LINE_BUDGET);
+    if (!pick) continue;
+    kindUsed[pick[0]] = (kindUsed[pick[0]] ?? 0) + 1;
+    usedPhrase.add(pick[1]);
+    lines.push(pick[2]);
+  }
+  lines.push("광고·협찬 글은 걸러냈다.");
   lines.push("마음에 든 곳엔 도장 하나.");
-  return lines.slice(0, 5);
+  return lines;
 }
 const HERO_W = 1400, HERO_H = 1680;
 const HERO_PAGE: [number, number][] = [[0.22101, 0.29961], [0.70849, 0.30326], [0.77393, 0.82833], [0.10523, 0.82145]];
@@ -684,7 +725,9 @@ function homographyMatrix3d(sw: number, sh: number, q: [number, number][]): stri
   return `matrix3d(${H[0]},${H[3]},0,${H[6]},${H[1]},${H[4]},0,${H[7]},0,0,1,0,${H[2]},${H[5]},0,${H[8]})`;
 }
 function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: () => void; onOwner: () => void; onLogin: () => void; discover: Discover | null }) {
-  const LANDING_MEMO = useMemo(() => landingMemo(discover), [discover]);
+  // 방문(마운트)마다 다른 씨앗 — 새로고침하면 다른 카페가 적힌다. SSR에선 글자를 안 그리므로 불일치 없음.
+  const seed = useMemo(() => Math.floor(Math.random() * 1e9) + 1, []);
+  const LANDING_MEMO = useMemo(() => landingMemo(discover, seed), [discover, seed]);
   const [done, setDone] = useState<boolean | null>(null); // null=판단 전(SSR), true=완성본, false=쓰는 중
   const [pos, setPos] = useState<[number, number]>([0, 0]); // [줄, 글자]
   const [mtx, setMtx] = useState<string>("");
@@ -712,7 +755,7 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
     setDone(false);
     // ⏱ 시간 기반 진행(약 2.6초) — 백그라운드 탭에서 늦춰져도 총 길이 그대로.
     const slow = typeof location !== "undefined" && /nt_slow/.test(location.search); // 검수용: ?nt_slow 로 느리게
-    const CPS = slow ? 5 : 32, GAP = 0.16;
+    const CPS = slow ? 5 : 36, GAP = 0.13;
     const lens = LANDING_MEMO.map((l) => Array.from(l).length);
     const starts: number[] = []; let acc = 0.6;
     lens.forEach((n) => { starts.push(acc); acc += n / CPS + GAP; });

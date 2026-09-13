@@ -85,6 +85,9 @@ function interleaveByRegion<T extends { id: number | string; area?: string }>(po
   return out;
 }
 
+// 🧠 공개 카페 전량(홈 피드 재료)의 버전 기반 메모리 캐시 — 위 GET 안 주석 참조. 인스턴스당 1벌.
+let allCache: { version: string; rows: any[] } | null = null;
+
 export async function GET(req: NextRequest) {
   try {
     // ⚡ 홈 로딩 속도 — ensureSchema()는 이미 오래 안정된 스키마를 매 콜드스타트마다 순차 DDL 4회
@@ -93,9 +96,23 @@ export async function GET(req: NextRequest) {
     await loadCriteria();
     const region = req.nextUrl.searchParams.get("region") ?? ""; // 시군구 이름(선택)
     const featRowsP = sql`SELECT cafe_id FROM cafe_promos WHERE featured = true AND approved = true AND (featured_until IS NULL OR featured_until > now())` as unknown as Promise<{ cafe_id: number }[]>;
-    const all = await sql`
-      SELECT id, name, area, lat, lng, synth_grade, synth_count, synth_identity, note, char_scores, created_at, review_dates
-      FROM cafes WHERE published = true` as unknown as any[];
+    // 💰 2026-09-13 비용 수리 — 이 한 줄이 홈 요청마다 공개 카페 전량(26,188행 · char_scores·review_dates는
+    //   JSONB/TOAST)을 읽었다. 실측 하루 36.7GB/1,721회로 전송량 상위였다.
+    //   ⚠️ CDN(s-maxage 300)이 있는데도 왜 샜나: 응답이 `?region=` 별로 갈려 캐시 키가 ~185개로 쪼개진다.
+    //   → /api/cafes와 같은 **버전 기반 메모리 캐시**. 값 3개짜리 버전 쿼리(idx_cafes_pub_ver 인덱스 전용 스캔,
+    //     104블록)로 바뀐 게 없으면 직전 결과를 그대로 쓴다. 지역 필터는 이 배열을 JS에서 거르므로 지역별로
+    //     다시 읽을 이유가 없다(원래도 region-무관 쿼리였다).
+    //   always-fresh 유지: 공개/후기 변경은 count·MAX(updated_at)·MAX(synth_updated)를 즉시 바꿔 캐시가 갈린다.
+    const [ver] = (await sql`SELECT COUNT(*)::int n, COALESCE(MAX(updated_at)::text,'') u, COALESCE(MAX(synth_updated)::text,'') s
+      FROM cafes WHERE published = true`) as any[];
+    const allVersion = `${ver?.n ?? 0}|${ver?.u ?? ""}|${ver?.s ?? ""}`;
+    if (!allCache || allCache.version !== allVersion) {
+      const rows = await sql`
+        SELECT id, name, area, lat, lng, synth_grade, synth_count, synth_identity, note, char_scores, created_at, review_dates
+        FROM cafes WHERE published = true` as unknown as any[];
+      allCache = { version: allVersion, rows };
+    }
+    const all = allCache.rows;
     const scope = region ? all.filter((c) => matchRegion(c.area, region)) : all;
 
     // 정렬된 후보 — 헤드라인 제외 '후' 잘라야 개수가 안 줄어든다(예: Top3가 2개로 줄던 버그)

@@ -111,6 +111,7 @@ const HOT = [
   ["검색: 지역 목록", `SELECT area, count(*)::int n FROM cafes WHERE published AND area IS NOT NULL AND area <> '' GROUP BY area HAVING count(*) >= 5 ORDER BY n DESC`],
   ["관리자: 노이즈 집계", `SELECT AVG(sq_rejected::float / NULLIF(sq_raw::float,0)) FROM cafes WHERE sq_raw IS NOT NULL`],
   ["치유기: offconcept 대기열", `SELECT id FROM cafes WHERE published = true AND synth_reviews IS NOT NULL AND (offconcept_scan_at IS NULL OR synth_updated > offconcept_scan_at) ORDER BY synth_updated DESC NULLS LAST LIMIT 3000`],
+  ["지도/홈: 버전 쿼리", `SELECT COUNT(*)::int n, COALESCE(MAX(updated_at)::text,'') u, COALESCE(MAX(synth_updated)::text,'') s FROM cafes WHERE published = true`],
   ["치유기: noncafe 대기열", `SELECT id FROM cafes WHERE published = true AND synth_reviews IS NOT NULL AND (noncafe_scan_at IS NULL OR synth_updated > noncafe_scan_at) ORDER BY synth_updated DESC NULLS LAST LIMIT 3000`],
 ];
 const slow = [];

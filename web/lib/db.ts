@@ -32,6 +32,9 @@ export async function ensureSearchIndexes() {
     //      scripts/migrations/2026-09-13-sq-cols.mjs 로 1회 집행. 열이 없으면 인덱스 생성만 조용히 실패하고
     //      관리자 라우트는 옛 쿼리로 폴백한다(화면 안 깨짐).
     await sql`CREATE INDEX IF NOT EXISTS idx_cafes_sq_cols ON cafes (sq_raw, sq_rejected) WHERE sq_raw IS NOT NULL`.catch(() => {});
+    //   ③ idx_cafes_pub_ver — /api/cafes·/api/discover가 **요청마다** 도는 버전 쿼리
+    //      (COUNT + MAX(updated_at) + MAX(synth_updated))를 인덱스 전용 스캔으로. 9,002블록 → 104블록.
+    await sql`CREATE INDEX IF NOT EXISTS idx_cafes_pub_ver ON cafes (updated_at DESC, synth_updated) WHERE published`.catch(() => {});
   });
 }
 
