@@ -754,6 +754,19 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
   const [memo, setMemo] = useState<string[] | null>(() => landingOnce.memo);
   const mountId = useMemo(() => Math.random().toString(36).slice(2, 8), []);
   useEffect(() => { landingBeacon("mount", { mountId }); }, [mountId]);
+  // 🔬 화면 타임라인 — 눈에 보이는 글자 수(불투명 .ch)를 0.25초마다 25초간 기록. 0으로 떨어졌다 다시 오르면 '두 번 써짐'이 화면에서 실재.
+  useEffect(() => {
+    const samples: number[] = []; const t0 = performance.now(); let fontReady = false;
+    try { (document as any).fonts?.load('19px "DCN Letter"').then(() => { fontReady = true; }); } catch {}
+    const id = setInterval(() => {
+      const page = pageRef.current; if (!page) { samples.push(-1); return; }
+      let n = 0; page.querySelectorAll<HTMLElement>(".ch").forEach((el) => { if (getComputedStyle(el).opacity !== "0") n++; });
+      samples.push(n);
+      if (performance.now() - t0 > 25000) { clearInterval(id); landingBeacon("timeline", { mountId, memoHash: samples.join(","), navType: fontReady ? "font-ok" : "font-wait" }); }
+    }, 250);
+    return () => { clearInterval(id); if (samples.length) landingBeacon("timeline-unmount", { mountId, memoHash: samples.join(",") }); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mountId]);
   useEffect(() => {
     if (memo) return;                                   // 이미 확정 — 무슨 일이 있어도 다시 안 쓴다
     const fix = (m: string[]) => { landingOnce.memo = m; setMemo(m); };
@@ -762,7 +775,7 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
     return () => clearTimeout(t);
   }, [discover, memo, seed]);
   const LANDING_MEMO = useMemo(() => memo ?? [], [memo]);
-  const [done, setDone] = useState<boolean | null>(null); // null=판단 전(SSR), true=완성본, false=쓰는 중
+  const [done, setDone] = useState<boolean | null>(() => (landingOnce.done ? true : landingOnce.t0 != null ? false : null)); // null=판단 전(SSR), true=완성본, false=쓰는 중 — 재마운트면 즉시 이어진 상태로
   const [pos, setPos] = useState<[number, number]>([0, 0]); // [줄, 글자]
   const [mtx, setMtx] = useState<string>("");
   const [cupPos, setCupPos] = useState<[number, number] | null>(null);

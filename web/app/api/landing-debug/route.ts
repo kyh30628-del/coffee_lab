@@ -18,8 +18,9 @@ export async function POST(req: NextRequest) {
     await ensure();
     const b = await req.json().catch(() => ({}));
     const s = (v: unknown, n = 80) => String(v ?? "").slice(0, n);
+  const memoHash = String(b.memoHash ?? "").slice(0, 600);
     await sql`INSERT INTO landing_debug (load_id, mount_id, anon, memo_hash, nav_type, standalone, visible, ua, t_since_load, note)
-      VALUES (${s(b.loadId, 40)}, ${s(b.mountId, 40)}, ${s(b.anon, 64)}, ${s(b.memoHash, 24)}, ${s(b.navType, 20)}, ${!!b.standalone}, ${s(b.visible, 12)}, ${s(b.ua, 200)}, ${Number(b.tSinceLoad) || 0}, ${s(b.note, 120)})`;
+      VALUES (${s(b.loadId, 40)}, ${s(b.mountId, 40)}, ${s(b.anon, 64)}, ${memoHash}, ${s(b.navType, 20)}, ${!!b.standalone}, ${s(b.visible, 12)}, ${s(b.ua, 200)}, ${Number(b.tSinceLoad) || 0}, ${s(b.note, 120)})`;
     sql`DELETE FROM landing_debug WHERE created_at < now() - interval '7 days'`.catch(() => {});
     return NextResponse.json({ ok: true });
   } catch (e) { return NextResponse.json({ ok: false, error: String(e).slice(0, 80) }, { status: 500 }); }
