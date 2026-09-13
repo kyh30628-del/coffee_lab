@@ -338,7 +338,11 @@ export async function GET(req: NextRequest) {
     const nocache = req.nextUrl.searchParams.get("nocache") === "1";
     if (!nocache) {
       const hit = (await sql`SELECT payload FROM search_cache WHERE qkey=${qkey} AND created_at > now() - (${getCriterionSync("search.cache_ttl_hours")} || ' hours')::interval LIMIT 1`)[0];
-      if (hit?.payload && Array.isArray(hit.payload.results) && hit.payload.results.length > 0) {
+      // 💰 결재 #1063(협업#400): 0건 결과도 캐시한다 — 봇이 "반포자이아파트"류 무의미 질의를 같은 문구로
+      //   수십 회 반복해도(2026-09-12 실측 31회) 예전엔 결과 0건이면 캐시에 안 남아 매번 임베딩 HNSW를
+      //   재실행했다(질의벡터가 분포 밖이라 그래프 순회비용이 유독 컸다 — 최다쿼리 하루 338.6GB의 원인).
+      //   공개상태가 바뀌면 invalidateCafeCaches가 search_cache를 통째로 지우므로 신선도는 그대로 보장된다.
+      if (hit?.payload && Array.isArray(hit.payload.results)) {
         logSearch(q, region, Number(hit.payload?.count ?? 0), "cache", isInternalCheck);
         // 📍 장소는 캐시 경로에서도 매번 붙인다 — 메모리 인덱스라 DB·API 비용 0이고, 옛 캐시에도 즉시 반영된다.
         // 🔴 미서비스 안내는 **캐시에 굳히지 않는다**(2026-09-12 실사고): 대구·경북을 열고 목록에서 지웠는데도
@@ -779,16 +783,14 @@ export async function GET(req: NextRequest) {
     };
     if (coverageNote) payload.coverageNote = coverageNote;
     if (franchiseNote) payload.franchiseNote = franchiseNote;
-    // 결과가 있으면 캐시에 저장(다음 동일 질문은 재계산 0)
-    if (results.length > 0) {
-      // 🛡️ 2026-08-31 — nocache=1은 **읽기만** 건너뛰고 쓰기는 그대로였다.
-      //   search_cache는 프로덕션과 로컬이 같은 Neon을 공유한다. 그래서 로컬에서 실험용으로 nocache를 켜면
-      //   그 결과가 프로덕션 캐시를 덮어써 실제 사용자에게 나간다(A/B 하려다 이 사실을 발견했다).
-      //   디버그 플래그가 공유 상태를 바꾸면 안 된다 — nocache면 쓰지도 않는다.
-      if (!nocache)
-        sql`INSERT INTO search_cache (qkey, payload, created_at) VALUES (${qkey}, ${JSON.stringify(payload)}, now())
-            ON CONFLICT (qkey) DO UPDATE SET payload=EXCLUDED.payload, created_at=now()`.catch(() => {});
-    }
+    // 캐시에 저장(다음 동일 질문은 재계산 0) — 0건 결과도 저장한다(위 캐시조회 조건과 대칭, 결재 #1063).
+    //   🛡️ 2026-08-31 — nocache=1은 **읽기만** 건너뛰고 쓰기는 그대로였다.
+    //   search_cache는 프로덕션과 로컬이 같은 Neon을 공유한다. 그래서 로컬에서 실험용으로 nocache를 켜면
+    //   그 결과가 프로덕션 캐시를 덮어써 실제 사용자에게 나간다(A/B 하려다 이 사실을 발견했다).
+    //   디버그 플래그가 공유 상태를 바꾸면 안 된다 — nocache면 쓰지도 않는다.
+    if (!nocache)
+      sql`INSERT INTO search_cache (qkey, payload, created_at) VALUES (${qkey}, ${JSON.stringify(payload)}, now())
+          ON CONFLICT (qkey) DO UPDATE SET payload=EXCLUDED.payload, created_at=now()`.catch(() => {});
     logSearch(q, region, results.length, mode, isInternalCheck, aiErr); // 🔎 수요 로깅(수요-공급 갭·발굴 우선순위·콘텐츠 소재)
     return NextResponse.json(payload, {
       headers: { "Cache-Control": "public, max-age=0, s-maxage=300, stale-while-revalidate=600" },
