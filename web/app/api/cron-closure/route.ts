@@ -16,7 +16,10 @@ export const maxDuration = 300;
 //   쿼터/오류는 판단보류. 발굴과 쿼터 경쟁하므로 회당 소량.
 
 const STALE_MONTHS = 15;   // 최신 리뷰가 이만큼 지난 카페만 재확인 대상(활발한 카페는 명백히 영업중 → 스킵)
-const PER_RUN = 35;        // 회당 네이버 재확인 수(쿼터 절약)
+const PER_RUN_BASE = 35;   // 회당 네이버 재확인 수(쿼터 절약)
+// 2026-09-13 결재 #1070: 쿼터가 새로 차는 08시(KST) 회차만 150 — 하루 ~220곳·~600호출을 폐업 예약(1,200) 안에서 소화.
+const perRunNow = () => { const h = (new Date().getUTCHours() + 9) % 24; return h >= 7 && h <= 9 ? 150 : PER_RUN_BASE; };
+const PER_RUN = perRunNow();
 
 // coord#304: 저장된 synth_reviews(노출 근거) 텍스트 자체의 명시적 폐업 신호 — 활발(최근 리뷰)해도
 //   STALE_MONTHS 게이트를 우회해 네이버 재확인을 최우선 배정한다. 자동 비공개는 여전히 안 함(신호는
@@ -71,7 +74,7 @@ export async function GET(req: NextRequest) {
           ) r WHERE r->>'quote' ~ ${CLOSURE_TEXT_SIGNAL}
         ) AS closure_signal
       FROM cafes WHERE published AND raw_reviews IS NOT NULL
-      ORDER BY closure_signal DESC, closure_checked_at ASC NULLS FIRST LIMIT 400`) as any[];
+      ORDER BY closure_signal DESC, closure_checked_at ASC NULLS FIRST LIMIT 600`) as any[];
 
     let checked = 0, alive = 0, quotaStop = false, skippedFresh = 0, newSuspect = 0, signalBypass = 0;
     const suspectNames: string[] = [];
@@ -81,7 +84,7 @@ export async function GET(req: NextRequest) {
         await sql`UPDATE cafes SET closure_checked_at = now(), closure_misses = 0 WHERE id = ${c.id}`.catch(() => {});
         skippedFresh++; continue;
       }
-      if (checked >= PER_RUN) break; // 쿼터 절약: 회당 재확인 상한
+      if (checked >= PER_RUN) continue; // 회당 네이버 상한 도달 — 네이버 필요 건만 건너뛴다(#1070: 예전 break가 뒤에 오는 '활발→무료 통과'까지 막아 커버리지가 478에서 정체됐다)
       if (c.closure_signal && mo != null && mo < STALE_MONTHS) signalBypass++; // 활발해도 텍스트 신호로 우선 재확인
       const exists = await naverExistsRobust(c.name, c.area ?? "", c.dong ?? "", c.lat, c.lng, NAVER_NAME_ALIASES[Number(c.id)]);
       if (exists === null) { quotaStop = true; break; } // 전 쿼리 쿼터/오류 → 이번 회차 중단(판단 보류)

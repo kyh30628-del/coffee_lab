@@ -1075,12 +1075,18 @@ export default function Home() {
     const t = setTimeout(load, 300);
     return () => clearTimeout(t);
   }, []);
-  // 자동 업데이트: 앱 복귀/포커스/로드 시 서버 배포버전과 비교 → 다르면 새로고침(PWA·PC·모바일 항상 최신). 같은 버전엔 1회만 시도(루프 방지).
+  // 자동 업데이트: 앱 복귀/포커스 시 서버 배포버전과 비교 → 다르면 새로고침(PWA·PC·모바일 항상 최신). 같은 버전엔 1회만 시도(루프 방지).
+  // 🔴 2026-09-13 — **랜딩 글씨가 두 번 써지던 진짜 원인.** 예전엔 '로드 직후'에도 검사해 서버 버전과 다르면 즉시 location.reload()했다.
+  //   PWA는 켤 때마다 새 세션이라 sessionStorage 기록이 없고, CDN이 이전 빌드 HTML을 잠시 내주면(x-vercel-cache HIT) 매 실행마다
+  //   "다르다" → 리로드 → 글씨가 처음부터 다시 써졌다. 배포가 잦은 날은 더 자주. 컴포넌트 안에서 아무리 막아도 페이지 자체가 두 번 뜬 것.
+  //   → 로드 직후엔 **버전만 기록**하고 리로드하지 않는다. 리로드는 페이지가 2분 이상 열려 있다가 복귀/포커스했을 때만(= 사용 중 업데이트).
   useEffect(() => {
     const mine = process.env.NEXT_PUBLIC_BUILD_ID;
     if (!mine) return;
+    const loadedAt = Date.now();
     const check = () => {
       if (document.visibilityState !== "visible") return;
+      if (Date.now() - loadedAt < 120_000) return; // 로드 직후·랜딩 연출 중엔 절대 리로드하지 않는다
       fetch("/api/version", { cache: "no-store" }).then((r) => r.json()).then((d) => {
         if (d?.v && d.v !== mine) {
           let last = ""; try { last = sessionStorage.getItem("dcn_rv") || ""; } catch {}

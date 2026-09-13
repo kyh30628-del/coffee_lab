@@ -17,6 +17,16 @@ import { sql } from "./db";
 export const NAVER_DAILY_QUOTA = 25000;
 // 발굴 스윕이 남겨둘 예약분(cron-grow 2h용). 기본 30%(7,500) — 하루 12회 cron-grow가 지역당 ~600콜.
 export const NAVER_SWEEP_RESERVE = Number(process.env.NAVER_SWEEP_RESERVE || 7500);
+// 🚪 폐업 재확인 예약(2026-09-13 결재 #1070): 하루 25,000 중 1,200(4.8%)은 발굴·스윕이 못 쓴다.
+//   폐업 크론(카페당 1~3호출, 하루 ~220곳)이 '쿼터중단'으로 굶던 것을 끝낸다. 예약은 상한이 아니라 최소 보장 —
+//   폐업 크론이 덜 쓰면 남은 몫은 자정 리셋까지 그냥 남는다(발굴이 예약선까지는 계속 쓴다).
+export const NAVER_CLOSURE_RESERVE = Number(process.env.NAVER_CLOSURE_RESERVE || 1200);
+/** 발굴(cron-grow)·재수집 등 '폐업 아닌' 소비자가 지금 더 써도 되는가 — 예약분 1,200을 남긴다. */
+export async function nonClosureMayUse(): Promise<{ ok: boolean; remaining: number }> {
+  const used = await naverUsedToday();
+  const remaining = Math.max(0, NAVER_DAILY_QUOTA - used);
+  return { ok: remaining > NAVER_CLOSURE_RESERVE, remaining };
+}
 
 // 🚦 적체 가드(2026-08-25) — **발굴이 쿼터를 독식해 수집이 굶던 구조를 끊는다.**
 //   기존 설계는 25,000을 전부 발굴에 배정했다(스윕 17,500 + cron-grow 예약 7,500).
@@ -91,5 +101,5 @@ export async function sweepMayContinue(): Promise<{ ok: boolean; used: number; r
   const used = await naverUsedToday();
   const blocked = await naverBlocked();
   const remaining = Math.max(0, NAVER_DAILY_QUOTA - used);
-  return { ok: !blocked && remaining > NAVER_SWEEP_RESERVE, used, remaining, blocked };
+  return { ok: !blocked && remaining > NAVER_SWEEP_RESERVE + NAVER_CLOSURE_RESERVE, used, remaining, blocked }; // 스윕은 발굴 예약 + 폐업 예약 둘 다 남긴다
 }

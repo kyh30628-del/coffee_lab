@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { discoveryMayRun } from "@/lib/naverBudget";
+import { discoveryMayRun, nonClosureMayUse } from "@/lib/naverBudget";
 import { sql, ensureSchema } from "@/lib/db";
 import { discoverRegion, METRO_REGIONS, PRIORITY_REGIONS, LONGTAIL_TASTE_TARGETS, LONGTAIL_SEED_REASON } from "@/lib/discover";
 import { synthAndStore } from "@/lib/synthStore";
@@ -119,6 +119,8 @@ export async function GET(req: NextRequest) {
       // 쿨다운을 통과한 지역 우선. 전부 쿨다운이면 예전 규칙으로 폴백해 교착을 만들지 않는다.
       const target = critical ?? (at ?? starved ?? (await rotate(true)) ?? (await rotate(false)));
       if (!target) break;
+      // 🚪 폐업 재확인 예약(#1070): 오늘 잔여가 1,200 이하면 발굴은 여기서 멈춘다(폐업 크론 몫). 자정 리셋 후 재개.
+      { const g = await nonClosureMayUse().catch(() => ({ ok: true, remaining: 0 })); if (!g.ok) { discoveries.push({ region: target.region, error: `naver-closure-reserve(잔여 ${g.remaining})` }); break; } }
       const kw = at && Array.isArray(at.keywords) && at.keywords.length ? (at.keywords as string[]) : undefined;
       try {
         const d = await discoverRegion(target.region, target.area_label ?? target.region, kw, { deadlineMs: t0 + GROW_BUDGET_MS, sorts: ["comment", "random"] });
