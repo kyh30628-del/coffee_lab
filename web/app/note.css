@@ -163,42 +163,36 @@
 .nt-ln .m { font-size: 13.5px; color: var(--nt-ink3); font-variant-numeric: tabular-nums; flex: none; }
 
 /* ── 책장 넘김(탭 전환) ── */
-/* ── 📖 책장 넘김(2026-09-13 강화, CEO "노트를 넘기는 느낌이 물씬") ──
-   구조: ①넘어가는 장(.nt-turn) — 종이 결+줄 인쇄된 앞면이 왼쪽 제본선을 축으로 -160°까지 젖혀지고,
-        90°를 지나며 뒷면(살짝 어두운 종이)이 보인다(backface 대신 ::before 불투명도로 표현).
-        ②접히는 결(.nt-turn::after) — 종이가 휘는 부분의 하이라이트/그늘 띠가 회전과 같이 움직인다.
-        ③아래 장에 드리우는 그림자(.nt-turn-shade) — 넘어가는 장이 새 장 위를 쓸고 가는 그늘. 이게 '한 권'을 느끼게 한다.
-        ④새 장(.nt-page-in) — 종이가 눌려 자리 잡듯 오른쪽에서 살짝 들어오며 펴진다. */
-.nt-turn { position: absolute; inset: 0; z-index: 1450; pointer-events: none; transform-origin: left center; background-color: var(--nt-paper); background-image: repeating-linear-gradient(180deg, transparent 0 33px, rgba(84,104,140,.28) 33px 34px), url("/note/paper.webp"); background-size: auto 34px, 512px 512px; box-shadow: -18px 0 38px rgba(40, 25, 10, 0.28), inset 22px 0 30px -20px rgba(40,25,10,.25); animation: ntTurn 0.72s cubic-bezier(0.42, 0.02, 0.18, 1) forwards; will-change: transform, opacity; }
-.nt-turn::before { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, #d9cbb6, #e6dac7 40%, #d3c4ad); opacity: 0; animation: ntTurnBack 0.72s linear forwards; }
-.nt-turn::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(0,0,0,.22), rgba(0,0,0,0) 18%, rgba(255,255,255,0) 55%, rgba(255,255,255,.28) 78%, rgba(0,0,0,.14) 100%); mix-blend-mode: multiply; animation: ntCurl 0.72s ease-in-out forwards; }
-.nt-turn-shade { position: absolute; inset: 0; z-index: 1449; pointer-events: none; background: linear-gradient(90deg, rgba(20,12,8,.55), rgba(20,12,8,.18) 38%, rgba(20,12,8,0) 70%); animation: ntShade 0.72s cubic-bezier(0.42, 0.02, 0.18, 1) forwards; }
-@keyframes ntTurn { 0% { transform: perspective(1100px) rotateY(0deg); opacity: 1; } 55% { opacity: 1; } 100% { transform: perspective(1100px) rotateY(-162deg); opacity: 0; } }
-@keyframes ntTurnBack { 0%, 48% { opacity: 0; } 62%, 100% { opacity: 0.96; } }
-@keyframes ntCurl { 0% { opacity: 0; } 25% { opacity: 1; } 100% { opacity: .6; } }
-@keyframes ntShade { 0% { opacity: 0; transform: translateX(0); } 20% { opacity: 1; } 100% { opacity: 0; transform: translateX(-60%); } }
-/* 새 장이 자리 잡는 움직임 — 종이가 눌려 펴지듯 */
-@keyframes ntPageIn { 0% { opacity: 0.35; transform: perspective(1100px) translateX(22px) rotateY(-7deg); } 60% { opacity: 1; } 100% { opacity: 1; transform: none; } }
-.nt-page-in { animation: ntPageIn 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both; transform-origin: left center; }
+/* ── 📖 책장 넘김(2026-09-13 재설계) — 전면 회전은 투박하다는 CEO 지적 → **우측 상단 귀접이만** 빠르게(0.38s).
+   .nt-curl = 종이 모서리가 들려 뒤집히는 삼각(뒷면 종이 톤 + 접힌 선의 그늘 + 아래 장에 떨어지는 그림자). 커졌다가 사라지고,
+   새 장(.nt-page-in)은 오른쪽에서 아주 살짝 들어온다. 움직임 줄이기면 전부 없음. */
+.nt-curl { position: absolute; top: 56px; right: 0; width: 132px; height: 132px; z-index: 1600; pointer-events: none; transform-origin: 100% 0; animation: ntCurl 0.38s cubic-bezier(0.3, 0.7, 0.2, 1) forwards; will-change: transform, opacity; }
+.nt-curl::before { content: ""; position: absolute; inset: 0; clip-path: polygon(0 0, 100% 0, 100% 100%); background: linear-gradient(225deg, #f7f0e4 0%, #efe5d3 38%, #d9ccb4 47%, #b8a78c 50%, rgba(60,40,20,.28) 50.5%, rgba(60,40,20,0) 62%); }
+.nt-curl::after { content: ""; position: absolute; inset: 0; clip-path: polygon(0 0, 100% 0, 100% 100%); background: linear-gradient(225deg, rgba(0,0,0,0) 40%, rgba(0,0,0,.18) 49%, rgba(0,0,0,0) 50%); }
+@keyframes ntCurl { 0% { transform: scale(0.1); opacity: 0; } 35% { opacity: 1; } 70% { transform: scale(1); opacity: 1; } 100% { transform: scale(1.06) translate(-6px, 6px); opacity: 0; } }
+/* 새 장 — 살짝만 */
+@keyframes ntPageIn { 0% { opacity: 0.55; transform: translateX(10px); } 100% { opacity: 1; transform: none; } }
+.nt-page-in { animation: ntPageIn 0.32s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
 
-/* ── 🔖 노트 색인 탭(홈·지도·추억, 2026-09-13) — 머리띠(호두나무) 위에 종이 색인 탭이 꽂힌 모양.
-   활성 = 크림 종이가 앞으로 나와 있고(잉크 글씨·살짝 올라감), 비활성 = 크라프트 색인이 뒤에 반쯤 가려짐. 위쪽만 둥글게(탭 실루엣). */
-.nt-idx { display: flex; align-items: flex-end; gap: 3px; height: 30px; }
-.nt-idx > button { position: relative; height: 26px; padding: 0 11px; border-radius: 7px 7px 2px 2px; font-family: var(--nt-display); font-size: 13.5px; letter-spacing: .01em; white-space: nowrap; color: #4a3826; background: linear-gradient(180deg, #cdb493, #b99c78); box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 1px 0 rgba(0,0,0,.35); transform: translateY(2px); transition: transform .18s ease, background .18s ease, color .18s ease; -webkit-text-stroke: .2px currentColor; }
-.nt-idx > button::after { content: ""; position: absolute; left: 8px; right: 8px; bottom: 3px; height: 1px; background: rgba(84,104,140,.28); }
-.nt-idx > button[aria-current="page"] { height: 30px; color: var(--nt-ink); background: var(--nt-paper) url("/note/paper.webp"); background-size: 256px 256px; box-shadow: inset 0 1px 0 rgba(255,255,255,.6), 0 -1px 0 rgba(0,0,0,.15), 0 2px 6px -2px rgba(0,0,0,.5); transform: translateY(0); z-index: 1; }
-.nt-idx > button[aria-current="page"]::before { content: ""; position: absolute; left: 6px; right: 6px; top: 5px; height: 4px; border-radius: 2px; background: var(--nt-stamp); opacity: .55; }
-.nt-idx > button[aria-current="page"]::after { background: rgba(84,104,140,.42); }
+/* ── 🔖 노트 색인 탭(홈·지도·추억, 2026-09-13 2차) — 머리띠(호두나무) 아래로 종이 색인이 삐져나온 모양.
+   활성 = 크림 종이가 앞으로 나와 있고 왼쪽에 붉은 색인 띠, 잉크 손글씨. 비활성 = 크라프트 종이가 뒤에 반쯤 가려짐.
+   탭끼리 살짝 겹치고(-6px) 위쪽만 둥글다. */
+.nt-idx { display: flex; align-items: flex-end; height: 36px; margin-left: 2px; }
+.nt-idx > button { position: relative; height: 28px; margin-right: -6px; padding: 0 13px 0 15px; border-radius: 8px 8px 0 0; font-family: var(--nt-hand-b, var(--nt-display)); font-size: 14.5px; letter-spacing: .01em; white-space: nowrap; color: #4a3826; background: linear-gradient(180deg, #d2b995, #b89b76); background-blend-mode: multiply; box-shadow: inset 0 1px 0 rgba(255,255,255,.4), 0 1px 0 rgba(0,0,0,.4); transform: translateY(2px); transition: transform .16s ease, color .16s ease; -webkit-text-stroke: .2px currentColor; z-index: 0; }
+.nt-idx > button::before { content: ""; position: absolute; left: 6px; top: 7px; bottom: 5px; width: 3px; border-radius: 2px; background: rgba(90,60,30,.35); }
+.nt-idx > button[aria-current="page"] { height: 34px; padding-top: 2px; color: var(--nt-ink); background: var(--nt-paper) url("/note/paper.webp"); background-size: 256px 256px; box-shadow: inset 0 1px 0 rgba(255,255,255,.7), 0 -1px 0 rgba(0,0,0,.12), 0 4px 8px -3px rgba(0,0,0,.55); transform: translateY(0); z-index: 1; }
+.nt-idx > button[aria-current="page"]::before { background: var(--nt-stamp); opacity: .8; }
+.nt-idx > button:last-child { margin-right: 0; }
 
 /* ── 랜딩: 채워지는 메모 ── */
-.nt-w .ch { display: inline-block; opacity: 0; color: #5b6a9a; clip-path: inset(-20% 100% -20% -6%); transform: translateY(var(--y, 0px)) rotate(var(--r, 0deg)); transition: clip-path 0.14s linear, opacity 0.05s linear, color 0.9s ease-out; }
+.nt-w .ch { display: inline-block; opacity: 0; color: #5b6a9a; clip-path: inset(-20% 100% -20% -6%); transform: translateY(var(--y, 0px)) rotate(var(--r, 0deg)); transition: color 0.9s ease-out; }
 .nt-w .ch.sp { width: 0.32em; }
 .nt-w .ch.on { opacity: 1; clip-path: inset(-20% -6% -20% -6%); color: #2f3550; }
 .nt-w.done .ch { opacity: 1; clip-path: none; color: #2f3550; transition: none; }
 .nt-nib { position: absolute; left: 0; top: 0; width: 34px; height: 34px; transform-origin: 3px 31px; opacity: 0; transition: opacity 0.2s; pointer-events: none; z-index: 5; filter: drop-shadow(1px 3px 3px rgba(0, 0, 0, 0.35)); will-change: transform; }
 
 @media (prefers-reduced-motion: reduce) {
-  .nt-turn, .nt-turn-shade { animation: none; display: none; }
+  .nt-curl { animation: none; display: none; }
   .nt-page-in { animation: none; }
   .nt-stamp.in { animation: none; }
   .nt-w .ch { opacity: 1; clip-path: none; color: #2f3550; transform: none; transition: none; }

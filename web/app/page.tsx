@@ -747,6 +747,7 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
   const heroRef = useRef<HTMLDivElement | null>(null);
   const pageRef = useRef<HTMLDivElement | null>(null);
   const nibRef = useRef<SVGSVGElement | null>(null);
+  const curRef = useRef<HTMLElement | null>(null); // 지금 써지는 글자(인라인 clip 정리용)
   const jitter = useMemo(() => LANDING_MEMO.map((l) => Array.from(l).map(() => [(Math.random() * 3.2 - 1.6).toFixed(2), (Math.random() * 2 - 1).toFixed(2)])), [LANDING_MEMO]);
   // 페이지 사각형을 화면 픽셀로 — 이미지는 object-fit: cover(가운데)라 스케일·오프셋을 같이 계산
   useEffect(() => {
@@ -776,12 +777,15 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
     const step = () => {
       if (!alive) return;
       const el = (performance.now() - t0) / 1000;
-      if (el >= total) { setPos([LANDING_MEMO.length, 0]); setDone(true); if (nibRef.current) nibRef.current.style.opacity = "0"; return; }
+      if (el >= total) { setPos([LANDING_MEMO.length, 0]); setDone(true); if (nibRef.current) nibRef.current.style.opacity = "0"; if (curRef.current) { curRef.current.style.clipPath = ""; curRef.current.style.opacity = ""; curRef.current = null; } return; }
       let li = 0; while (li + 1 < starts.length && el >= starts[li + 1]) li++;
       const prog = (el - starts[li]) * CPS;                       // 이 줄에서 몇 글자째(소수 = 획 진행률)
       const ci = Math.max(0, Math.min(lens[li], Math.floor(prog)));
       setPos((p) => (p[0] === li && p[1] === ci ? p : [li, ci]));
-      // ✒ 펜촉: 지금 쓰는 글자의 왼쪽에서 오른쪽으로 획 진행률만큼 이동 + 손 떨림(위아래 1px, 기울기 ±3°). 줄 사이 쉼엔 살짝 든다.
+      // ✒ 펜이 글자를 **써내려간다**(2026-09-13 수정, CEO "글씨와 펜이 따로 논다").
+      //   전엔 글자가 펜이 지나간 뒤 클래스 전이(0.14s)로 통째로 나타나 펜이 늘 앞서 있었고,
+      //   펜촉 기준점이 34px 아이콘 기준(3,31)인데 실제 22px로 그려 촉이 잉크보다 ~12px 떠 있었다.
+      //   → 지금 쓰는 글자는 매 프레임 진행률만큼 인라인 clip으로 드러내고(전이 없음), 펜촉은 그 잉크 끝에 정확히 둔다.
       const nib = nibRef.current, page = pageRef.current;
       if (nib && page) {
         const lineEl = page.querySelectorAll<HTMLElement>(".nt-w")[li];
@@ -790,16 +794,23 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
         if (lineEl && ch) {
           const frac = prog >= lens[li] ? 1 : Math.max(0, prog - Math.floor(prog));
           const lifted = prog >= lens[li];
+          // 현재 글자: 왼쪽에서 frac만큼만 보이게(획이 그어지는 중). 이전 글자로 넘어가면 인라인을 지워 클래스(.on)가 이어받는다.
+          const cur = curRef.current;
+          if (cur && cur !== ch) { cur.style.clipPath = ""; cur.style.opacity = ""; }
+          if (!lifted) { ch.style.opacity = "1"; ch.style.clipPath = `inset(-20% ${Math.max(-6, 106 - frac * 112)}% -20% -6%)`; curRef.current = ch; }
+          else if (cur) { cur.style.clipPath = ""; cur.style.opacity = ""; curRef.current = null; }
           const x = lineEl.offsetLeft + ch.offsetLeft + ch.offsetWidth * (lifted ? 1 : frac);
-          const y = lineEl.offsetTop + ch.offsetTop + ch.offsetHeight * 0.82 + Math.sin(el * 31) * 0.8;
+          const y = lineEl.offsetTop + ch.offsetTop + ch.offsetHeight * 0.86 + Math.sin(el * 31) * 0.6;
+          const size = nib.clientWidth || 22, tipX = size * (3 / 24), tipY = size * (21 / 24);   // 아이콘의 촉 끝(viewBox 3,21)
+          nib.style.transformOrigin = `${tipX}px ${tipY}px`;
           nib.style.opacity = "1";
-          nib.style.transform = `translate(${x - 3}px, ${y - 31 - (lifted ? 6 : 0)}px) rotate(${12 + Math.sin(el * 17) * 3}deg)`;
+          nib.style.transform = `translate(${x - tipX}px, ${y - tipY - (lifted ? 5 : 0)}px) rotate(${10 + Math.sin(el * 17) * 2.5}deg)`;
         }
       }
       raf = requestAnimationFrame(step);
     };
     raf = requestAnimationFrame(step);
-    return () => { alive = false; cancelAnimationFrame(raf); };
+    return () => { alive = false; cancelAnimationFrame(raf); if (curRef.current) { curRef.current.style.clipPath = ""; curRef.current.style.opacity = ""; curRef.current = null; } };
   }, [LANDING_MEMO]);
   const allDone = done === true;
   const lineTop = PAGE_RULE0 - 21;   // 첫 줄부터: 손편지체 19px(행간=줄 간격 22.7px) 글리프 바닥이 줄보다 2.6px 위(실측 asc .92·desc .23·글 bbox 바닥 -.117em)
@@ -1998,8 +2009,8 @@ export default function Home() {
   return (
     <div className="flex flex-col nt-paper nt-app" style={{ position: "fixed", inset: 0, fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }}>
       {/* 📖 책장 넘김 — 탭이 바뀔 때 종이 한 장이 왼쪽으로 넘어간다(0.55s, 움직임 줄이기면 없음) */}
-      {turnKey > 0 && <div key={`sh-${turnKey}`} className="nt-turn-shade" style={{ zIndex: 1599 }} aria-hidden />}
-      {turnKey > 0 && <div key={turnKey} className="nt-turn" style={{ zIndex: 1600 }} aria-hidden />}
+      {/* 📖 책장 넘김(2026-09-13 재설계, CEO "전면 넘김은 투박 — 우측 상단만 살짝·빠르게") : 모서리 귀접이만 0.38s */}
+      {turnKey > 0 && <div key={turnKey} className="nt-curl" aria-hidden />}
       {/* 📣 접속 시 안내 공지 — 데이터는 /api/discover 응답에 얹혀 온다(전용 요청 0, 비용 증가 0) */}
       <NoticeModal source={(discover as any)?.notice ?? null} />
       {/* ✨ 동적 연출(2026-07-30) — CSS 전용·가볍게·reduced-motion 존중. 우리 정체성을 '느끼게': ①골드핀 맥동 ②커피드립 로딩 ③저장 손맛 ④옥석 가리기 */}
