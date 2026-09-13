@@ -95,7 +95,7 @@ export default async function InsightsPage() {
 
         <section className="mb-8">
           <h2 className="text-[17px] font-bold mb-1">🗺️ 뉴스가 &lsquo;관광지&rsquo;로 다루는 카페 동네 TOP 10</h2>
-          <p className="text-[12.5px] text-[#665036] mb-3">
+          <p className="text-[12.5px] text-[#54432c] mb-3">
             전국 {Number(s.tCnt?.total ?? 0).toLocaleString()}개 동의 최근 언론 보도를 표본 조사해, 관광 맥락 기사 비율이
             높은 동네를 가려냈습니다(판정 {s.tCnt?.tourist ?? 0}곳). 후기 말투가 아니라 <b>공개된 보도</b>로 판정한 수치입니다.
           </p>
@@ -111,12 +111,12 @@ export default async function InsightsPage() {
           </div>
         </section>
 
-        <p className="text-[11.5px] text-[#665036] bg-white/60 border border-[#e6dcc8] rounded-lg px-3 py-2.5 leading-relaxed">
+        <p className="text-[11.5px] text-[#54432c] bg-white/60 border border-[#e6dcc8] rounded-lg px-3 py-2.5 leading-relaxed">
           집계 방법: 네이버·구글·유튜브 공개 후기를 교차 수집한 뒤 광고·협찬 표기, 서포터즈·기자단, 동명·옆가게 오염,
           템플릿 도배를 규칙 기반으로 제외했습니다. <Link href="/trust" className="underline text-[#7a5122]">검증 방법 자세히</Link>
         </p>
         {/* 📎 인용 안내 — 이 페이지의 존재 이유(백링크). 조건을 낮추고 명확하게. */}
-        <p className="mt-3 text-[11.5px] text-[#665036] bg-[#fdf6e9] border border-[#ecd9b0] rounded-lg px-3 py-2.5 leading-relaxed">
+        <p className="mt-3 text-[11.5px] text-[#54432c] bg-[#fdf6e9] border border-[#ecd9b0] rounded-lg px-3 py-2.5 leading-relaxed">
           📎 <b>이 리포트의 수치·순위는 출처 표기 시 자유롭게 인용하실 수 있습니다.</b>{" "}
           &ldquo;동네 커피 노트(dongnecoffeenote.com)&rdquo;와 링크를 함께 적어주세요. 기사·영상용 상세 데이터가
           필요하면 언제든 요청 주세요.

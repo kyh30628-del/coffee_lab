@@ -59,10 +59,10 @@ export default async function TrustPage() {
 
         {s && (
           <div className="grid grid-cols-2 gap-2.5 mb-8">
-            <div className="bg-white rounded-xl border border-[#e0d3bd] px-4 py-3.5"><div className="text-[22px] font-bold">{s.total.toLocaleString()}</div><div className="text-[11.5px] text-[#6f6047]">검토한 카페</div></div>
-            <div className="bg-white rounded-xl border border-[#e0d3bd] px-4 py-3.5"><div className="text-[22px] font-bold">{s.pub.toLocaleString()}</div><div className="text-[11.5px] text-[#6f6047]">검증을 통과해 공개된 카페</div></div>
-            <div className="bg-white rounded-xl border border-[#e0d3bd] px-4 py-3.5"><div className="text-[22px] font-bold">{s.passed.toLocaleString()}</div><div className="text-[11.5px] text-[#6f6047]">교차검증을 통과한 후기</div></div>
-            <div className="bg-white rounded-xl border border-[#e0d3bd] px-4 py-3.5"><div className="text-[22px] font-bold text-[#8a4f3f]">{s.excluded.toLocaleString()}</div><div className="text-[11.5px] text-[#6f6047]">오염·비카페로 격리(비공개)</div></div>
+            <div className="bg-white rounded-xl border border-[#e0d3bd] px-4 py-3.5"><div className="text-[22px] font-bold">{s.total.toLocaleString()}</div><div className="text-[11.5px] text-[#544636]">검토한 카페</div></div>
+            <div className="bg-white rounded-xl border border-[#e0d3bd] px-4 py-3.5"><div className="text-[22px] font-bold">{s.pub.toLocaleString()}</div><div className="text-[11.5px] text-[#544636]">검증을 통과해 공개된 카페</div></div>
+            <div className="bg-white rounded-xl border border-[#e0d3bd] px-4 py-3.5"><div className="text-[22px] font-bold">{s.passed.toLocaleString()}</div><div className="text-[11.5px] text-[#544636]">교차검증을 통과한 후기</div></div>
+            <div className="bg-white rounded-xl border border-[#e0d3bd] px-4 py-3.5"><div className="text-[22px] font-bold text-[#8a4f3f]">{s.excluded.toLocaleString()}</div><div className="text-[11.5px] text-[#544636]">오염·비카페로 격리(비공개)</div></div>
           </div>
         )}
 
@@ -71,7 +71,7 @@ export default async function TrustPage() {
           {RULES.map((r) => (
             <div key={r.name} className="bg-white rounded-xl border border-[#e6dcc8] px-4 py-3">
               <div className="text-[13.5px] font-bold">{r.icon} {r.name}</div>
-              <div className="text-[12px] text-[#665036] mt-0.5 leading-relaxed">{r.how}</div>
+              <div className="text-[12px] text-[#54432c] mt-0.5 leading-relaxed">{r.how}</div>
             </div>
           ))}
         </div>

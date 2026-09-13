@@ -42,9 +42,9 @@ export default function SaveMemoryButton({ cafeId, cafeName, cafeArea, variant =
             <span className="text-[12.5px] font-bold flex items-center gap-1" style={{ color: unverified ? "#8a6a3a" : "#b23a5f" }}>
               <span className="text-[14px] leading-none">{unverified ? "📍" : "❤"}</span>
               {unverified ? "미인증 상태로 저장돼 있어요" : recorded ? "이미 추억을 기록했어요" : "이 카페, 다녀가셨나요?"}
-              {unverified && <span className="text-[9px] font-bold text-[#665036] bg-[#f3ede1] rounded-full px-1.5 py-0.5">나만 보임</span>}
+              {unverified && <span className="text-[9px] font-bold text-[#54432c] bg-[#f3ede1] rounded-full px-1.5 py-0.5">나만 보임</span>}
             </span>
-            <span className="text-[10.5px] text-[#6f6047] leading-relaxed">
+            <span className="text-[10.5px] text-[#544636] leading-relaxed">
               {unverified
                 ? "이 카페에서 GPS 30m 이내로 '지금 인증하기'를 누르면 지도에 공개돼요"
                 : recorded ? "사진·기억을 더하거나 고쳐보세요" : "위치인증하고 나만의 추억으로 저장 — 무가입·30초"}

@@ -2,7 +2,7 @@
 // ⚡ admin 관제 차트 — next/dynamic(ssr:false)로 지연 로드되는 recharts 청크. 출력은 원본과 100% 동일.
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip } from "recharts";
 
-const GRADE_COLOR: Record<string, string> = { 검증: "#5f7355", 참고: "#9c6b3f", 후보: "#a8927a", 미합성: "#cbd5e1" };
+const GRADE_COLOR: Record<string, string> = { 검증: "#5f7355", 참고: "#9c6b3f", 후보: "#7a6750", 미합성: "#cbd5e1" };
 const BAR = "#9c6b3f";
 
 export function GradePie({ data }: { data: { grade: string; n: number }[] }) {

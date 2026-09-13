@@ -49,7 +49,7 @@ export default async function TastePage({ params }: Props) {
         <p className="text-[15px] text-[#e6dcc8] leading-relaxed mb-7">{t.line}</p>
         <Link href={`/?taste=${type}`} className="block w-full bg-[#f4ece0] text-[#2b2018] rounded-xl py-3.5 font-bold mb-2.5">내 취향 카페 보러가기 →</Link>
         <ShareBtn name={t.name} />
-        <Link href="/" className="text-[12px] text-[#a8927a] underline">동네 커피 노트 홈</Link>
+        <Link href="/" className="text-[12px] text-[#7a6750] underline">동네 커피 노트 홈</Link>
       </div>
     </main>
   );

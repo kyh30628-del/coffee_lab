@@ -121,7 +121,7 @@ export default function Pricing() {
           <p className="text-[10.5px] text-[#8f7a58] mt-2 text-center">체험은 결제 없이 {TRIAL_DAYS}일 · 신청하면 결제·세팅을 안내해 드려요</p>
         </div>
 
-        <p className="text-[11px] text-[#665036] text-center leading-relaxed">
+        <p className="text-[11px] text-[#54432c] text-center leading-relaxed">
           소비자에게 보여지는 후기·등급은 <b>모든 카페가 동일하게 검증</b>됩니다.
           구독은 <b>내 가게 데이터를 보는 도구</b>이며, 후기 평가를 돈으로 바꾸지 않습니다.
         </p>

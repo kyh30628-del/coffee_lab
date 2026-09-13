@@ -299,7 +299,7 @@ export default async function CafePage({ params }: Props) {
 
         {/* 첫 줄: 뒤로 · 공유 */}
         <div className="nt-ruled nt-margin-gutter flex items-center justify-between gap-2 relative z-[1]" style={{ paddingTop: 34 }}>
-          <Link href="/" className="text-[13px] text-[#8f8071]">← 동네 커피 노트</Link>
+          <Link href="/" className="text-[13px] text-[#63523f]">← 동네 커피 노트</Link>
           <span className="nt-free">
             <KakaoShare
               title={`${c.name} (${c.area})`}
@@ -349,38 +349,9 @@ export default async function CafePage({ params }: Props) {
           )}
           <div className="flex items-center justify-between gap-2" style={{ height: 34 }}>
             <p className="text-[12px] text-[#6a4318] min-w-0 truncate">{c.area}{c.dong ? ` ${c.dong}` : ""} <span className="nt-pill fill ml-1" style={{ color: "#241812" }}><span>검증 후기 {c.synth_count ?? 0}건</span></span></p>
-            {/* ❤ 2026-08-21: 이 자리는 **고르는 사람**의 자리 — 무마찰 찜. */}
-            <span className="nt-free"><WishButton cafeId={c.id} /></span>
+            {/* ❤ 찜은 아래 배너 하나로 통합(2026-09-13) — 첫 화면에 찜·저장 CTA가 3개라 무엇을 눌러야 할지
+                알 수 없었다(실측: 첫 화면 791px 중 클릭요소가 402px·51%). 링크는 지우지 않고 자리만 정리한다. */}
           </div>
-        </div>
-
-        {/* ❤ 찜 배너 — 붙인 종이 */}
-        <div className="px-3 pt-4">
-          <div className="nt-scrap flat pink"><WishButton cafeId={c.id} variant="banner" /></div>
-        </div>
-
-        {/* 🧭 위치인증 방문기록은 2순위로(실제 방문자에게 계속 열어둔다) */}
-        <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
-          <details className="group">
-            <summary className="cursor-pointer list-none text-[12px] text-[#7a5122] underline underline-offset-2">
-              이미 다녀오셨나요? 위치인증하고 추억으로 남기기 →
-            </summary>
-            <div className="nt-free py-2"><SaveMemoryButton cafeId={c.id} cafeName={c.name} cafeArea={c.area} variant="banner" /></div>
-          </details>
-        </div>
-
-        {/* 🗺️ 지도 CTA를 첫 화면으로(2026-08-16) — 바로 착지한 방문자 이탈 87%, 지도 도달 시 3%. 테이프로 붙인 메모. */}
-        <div className="px-3 pt-4">
-          <Link href={`/?region=${encodeURIComponent(c.area)}`} className="nt-scrap r kraft block px-4 py-3">
-            <i className="nt-tape sm" aria-hidden />
-            <span className="flex items-center justify-between gap-2">
-              <span className="text-[13.5px] font-bold text-[#2a1f17]">
-                🗺️ {c.area} 카페 지도에서 둘러보기
-                <span className="block text-[11px] text-[#8f8071] font-normal mt-0.5">근처 검증 카페를 위치·취향으로 한눈에</span>
-              </span>
-              <span className="text-[#7a5122] text-[14px]">→</span>
-            </span>
-          </Link>
         </div>
 
         {/* 📊 우리가 읽고 적은 판정 — 옥석 후기 핵심. 판정 문장만 손글씨. */}
@@ -390,7 +361,7 @@ export default async function CafePage({ params }: Props) {
             {c.synth_identity && <p className="nt-hand"><span className="nt-hl">{c.synth_identity}</span></p>}
             {highlights.length > 0 && (
               <>
-                <div className="text-[12px] text-[#8f8071]">후기에서 가장 많이 나온 것 · 숫자=언급 후기 수</div>
+                <div className="text-[12px] text-[#63523f]">후기에서 가장 많이 나온 것 · 숫자=언급 후기 수</div>
                 <div className="nt-chips">
                   {highlights.map((h, i) => (
                     <span key={h.label} className={`nt-chip ${i === 0 ? "ink" : ""}`}>{h.emoji} {h.label}<b>{h.count}</b></span>
@@ -401,32 +372,45 @@ export default async function CafePage({ params }: Props) {
           </div>
         )}
 
-        {/* 🧭 "다음 행동" 묶음(2026-08-22) — 지도·다음 카페를 위로. nearby는 위에서 조회한 값 재사용(추가 쿼리 0). */}
-        <div className="px-3 pt-4">
-          <div className="nt-scrap kraft px-4 py-3">
-            <i className="nt-tape k tl sm" aria-hidden />
-            <OutboundLink href={mapHref} target="map_cta" cafeId={c.id} source="카페상세" className="flex items-center justify-between gap-2">
-              <span className="text-[13.5px] font-bold text-[#2a1f17]">
-                🗺️ 지도에서 위치·주변 함께 보기
-                <span className="block text-[11px] text-[#8f8071] font-normal mt-0.5">근처 다른 카페까지 한눈에</span>
-              </span>
-              <span className="text-[#7a5122] text-[14px]">→</span>
-            </OutboundLink>
-            {nearby.length > 0 && (
-              <div className="mt-2.5 pt-2.5 border-t border-dashed border-[#d9cdb9]">
-                <div className="text-[11px] text-[#8f8071] mb-1.5">이 동네 비슷한 곳</div>
-                <div className="flex flex-wrap gap-1.5">
-                  {nearby.slice(0, 3).map((nc: any) => (
-                    <OutboundLink key={nc.id} href={`/c/${nc.id}`} target="nearby" cafeId={c.id} source="카페상세" className="nt-chip">
-                      {nc.name}
-                      {nc.synth_grade === "검증" && <span className="text-[9.5px] font-bold text-[#3e7a5a]">검증</span>}
-                    </OutboundLink>
-                  ))}
-                </div>
-              </div>
+        {/* 👍 강점 / 🔎 아쉬운점 — 전체 카페 대비. 배수는 손글씨(판정). */}
+        {profile.ok ? (
+          <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 68 }}>
+            <div className="nt-sec">한눈에 강·약 · 전체 카페 대비</div>
+            {profile.strong.length > 0 && (
+              <>
+                <div className="text-[12.5px] font-bold text-[#33684b]">👍 이런 점이 강해요</div>
+                {profile.strong.map((s) => (
+                  <div key={s.key} className="flex items-baseline gap-2 flex-wrap">
+                    <span className="text-[15px] w-5 text-center flex-none">{s.emoji}</span>
+                    <span className="text-[14.5px] font-bold text-[#5a3a12]"><span className="nt-hl">{s.text}</span></span>
+                    <span className="ml-auto flex items-baseline gap-2 whitespace-nowrap">
+                      <span className="nt-hand sm coffee">평균의 {s.mult}배</span>
+                      <span className="nt-pill verify">상위 {s.topPct}%</span>
+                    </span>
+                  </div>
+                ))}
+              </>
             )}
+            {profile.weak.length > 0 && (
+              <>
+                <div className="text-[12.5px] font-bold text-[#8a5a12]">🔎 이런 점은 참고하세요</div>
+                {profile.weak.map((w) => (
+                  <div key={w.key} className="flex items-baseline gap-2 flex-wrap">
+                    <span className="text-[14px] w-5 text-center flex-none">{w.emoji}</span>
+                    <span className="text-[13.5px] text-[#5c4b3c]">{w.text}</span>
+                    <span className="ml-auto nt-hand sm faint whitespace-nowrap">{w.mult < 0.2 ? "거의 언급 없음" : `평균의 ${w.mult}배`}</span>
+                  </div>
+                ))}
+              </>
+            )}
+            <p className="text-[11px] text-[#63523f]">기준은 <b>후기 1건당 언급 비율</b>이에요 — 후기 수가 많고 적음을 보정한 공정한 비교입니다. '평균의 N배'·'상위/하위 %'는 전체 카페와 같은 기준으로 비교한 값. 절대 평가가 아닙니다.</p>
           </div>
-        </div>
+        ) : tags.length > 0 && (
+          <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 68 }}>
+            <div className="nt-sec">이 카페가 후기에서 자주 언급되는 결</div>
+            <div className="nt-chips">{tags.map((t) => <span key={t} className="nt-chip">{t}</span>)}</div>
+          </div>
+        )}
 
         {/* 🛡️ 이 카페를 어떻게 골랐나 — 이 카페의 실제 숫자로. (duplicates는 raw 이전 단계라 여기 넣지 않는다) */}
         {sqRaw > 0 && (
@@ -441,7 +425,7 @@ export default async function CafePage({ params }: Props) {
               <ul>
                 {sqReasons.map(([why, n]) => (
                   <li key={why} className="text-[12.5px] text-[#5c4b3c] flex gap-2">
-                    <span className="text-[#b9a68f]">—</span>
+                    <span className="text-[#7a6750]">—</span>
                     <span>{why} <b className="text-[#7a5122]">{Number(n).toLocaleString()}건</b> 제외</span>
                   </li>
                 ))}
@@ -450,6 +434,38 @@ export default async function CafePage({ params }: Props) {
             <Link href="/trust" className="inline-block text-[12px] text-[#7a5122] underline underline-offset-2">검증 방법 자세히 →</Link>
           </div>
         )}
+
+        {/* ❤ 찜 배너 — 붙인 종이 */}
+        <div className="px-3 pt-4">
+          <div className="nt-scrap flat pink"><WishButton cafeId={c.id} variant="banner" /></div>
+        </div>
+
+        {/* 🧭 "다음 행동" 묶음(2026-08-22) — 지도·다음 카페를 위로. nearby는 위에서 조회한 값 재사용(추가 쿼리 0). */}
+        <div className="px-3 pt-4">
+          <div className="nt-scrap kraft px-4 py-3">
+            <i className="nt-tape k tl sm" aria-hidden />
+            <OutboundLink href={mapHref} target="map_cta" cafeId={c.id} source="카페상세" className="flex items-center justify-between gap-2">
+              <span className="text-[13.5px] font-bold text-[#2a1f17]">
+                🗺️ 지도에서 위치·주변 함께 보기
+                <span className="block text-[11px] text-[#63523f] font-normal mt-0.5">근처 다른 카페까지 한눈에</span>
+              </span>
+              <span className="text-[#7a5122] text-[14px]">→</span>
+            </OutboundLink>
+            {nearby.length > 0 && (
+              <div className="mt-2.5 pt-2.5 border-t border-dashed border-[#d9cdb9]">
+                <div className="text-[11px] text-[#63523f] mb-1.5">이 동네 비슷한 곳</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {nearby.slice(0, 3).map((nc: any) => (
+                    <OutboundLink key={nc.id} href={`/c/${nc.id}`} target="nearby" cafeId={c.id} source="카페상세" className="nt-chip">
+                      {nc.name}
+                      {nc.synth_grade === "검증" && <span className="text-[9.5px] font-bold text-[#33684b]">검증</span>}
+                    </OutboundLink>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* 💻 카공 시설 — 근거 건수를 반드시 함께. "없다"도 숨기지 않는다. */}
         {(work.signals.length > 0 || work.timeLimit > 0) && (
@@ -469,7 +485,7 @@ export default async function CafePage({ params }: Props) {
                 <span className="nt-chip soft">⏱ 이용 시간 제한 언급<span className="text-[10px] font-bold opacity-80">후기 {work.timeLimit}건</span></span>
               )}
             </div>
-            <div className="text-[11.5px] text-[#8f8071]">후기에 실제로 적힌 말만 셌어요. 언급이 없으면 표시하지 않습니다.</div>
+            <div className="text-[11.5px] text-[#63523f]">후기에 실제로 적힌 말만 셌어요. 언급이 없으면 표시하지 않습니다.</div>
           </div>
         )}
 
@@ -480,53 +496,13 @@ export default async function CafePage({ params }: Props) {
           </div>
         )}
 
-        {/* 👍 강점 / 🔎 아쉬운점 — 전체 카페 대비. 배수는 손글씨(판정). */}
-        {profile.ok ? (
-          <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 68 }}>
-            <div className="nt-sec">한눈에 강·약 · 전체 카페 대비</div>
-            {profile.strong.length > 0 && (
-              <>
-                <div className="text-[12.5px] font-bold text-[#3e7a5a]">👍 이런 점이 강해요</div>
-                {profile.strong.map((s) => (
-                  <div key={s.key} className="flex items-baseline gap-2 flex-wrap">
-                    <span className="text-[15px] w-5 text-center flex-none">{s.emoji}</span>
-                    <span className="text-[14.5px] font-bold text-[#5a3a12]"><span className="nt-hl">{s.text}</span></span>
-                    <span className="ml-auto flex items-baseline gap-2 whitespace-nowrap">
-                      <span className="nt-hand sm coffee">평균의 {s.mult}배</span>
-                      <span className="nt-pill verify">상위 {s.topPct}%</span>
-                    </span>
-                  </div>
-                ))}
-              </>
-            )}
-            {profile.weak.length > 0 && (
-              <>
-                <div className="text-[12.5px] font-bold text-[#b07a2a]">🔎 이런 점은 참고하세요</div>
-                {profile.weak.map((w) => (
-                  <div key={w.key} className="flex items-baseline gap-2 flex-wrap">
-                    <span className="text-[14px] w-5 text-center flex-none">{w.emoji}</span>
-                    <span className="text-[13.5px] text-[#5c4b3c]">{w.text}</span>
-                    <span className="ml-auto nt-hand sm faint whitespace-nowrap">{w.mult < 0.2 ? "거의 언급 없음" : `평균의 ${w.mult}배`}</span>
-                  </div>
-                ))}
-              </>
-            )}
-            <p className="text-[11px] text-[#8f8071]">기준은 <b>후기 1건당 언급 비율</b>이에요 — 후기 수가 많고 적음을 보정한 공정한 비교입니다. '평균의 N배'·'상위/하위 %'는 전체 카페와 같은 기준으로 비교한 값. 절대 평가가 아닙니다.</p>
-          </div>
-        ) : tags.length > 0 && (
-          <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 68 }}>
-            <div className="nt-sec">이 카페가 후기에서 자주 언급되는 결</div>
-            <div className="nt-chips">{tags.map((t) => <span key={t} className="nt-chip">{t}</span>)}</div>
-          </div>
-        )}
-
         {/* ☕ 사장님 CTA — 강·약 바로 다음(2026-08-29). 중복 배치 없음. 클릭 계측: decisions #782 */}
         <div className="px-3 pt-4">
           <OwnerCtaLink cafeId={c.id} cafeName={c.name} className="nt-scrap r kraft flex items-center justify-between gap-2 w-full px-4 py-3">
             <i className="nt-tape g tr sm" aria-hidden />
             <span className="flex flex-col text-left">
               <span className="text-[13px] font-bold text-[#7a5122]">☕ 이 카페 사장님이신가요?</span>
-              <span className="text-[11px] text-[#6f6047]">방금 보신 강·약에 <b>동네 순위</b>까지 — 가입 없이 바로 볼 수 있어요</span>
+              <span className="text-[11px] text-[#544636]">방금 보신 강·약에 <b>동네 순위</b>까지 — 가입 없이 바로 볼 수 있어요</span>
             </span>
             <span className="text-[#b9793b] font-bold whitespace-nowrap">→</span>
           </OwnerCtaLink>
@@ -546,6 +522,20 @@ export default async function CafePage({ params }: Props) {
             <svg width="12" height="12" viewBox="0 0 24 24" fill="#03c75a"><path d="M16.273 12.845L7.376 0H0v24h7.727V11.155L16.624 24H24V0h-7.727z"/></svg>
             네이버에서 메뉴·가격·영업시간 보기
           </OutboundLink>
+        </div>
+
+        {/* 🗺️ 지도 CTA를 첫 화면으로(2026-08-16) — 바로 착지한 방문자 이탈 87%, 지도 도달 시 3%. 테이프로 붙인 메모. */}
+        <div className="px-3 pt-4">
+          <Link href={`/?region=${encodeURIComponent(c.area)}`} className="nt-scrap r kraft block px-4 py-3">
+            <i className="nt-tape sm" aria-hidden />
+            <span className="flex items-center justify-between gap-2">
+              <span className="text-[13.5px] font-bold text-[#2a1f17]">
+                🗺️ {c.area} 카페 지도에서 둘러보기
+                <span className="block text-[11px] text-[#63523f] font-normal mt-0.5">근처 검증 카페를 위치·취향으로 한눈에</span>
+              </span>
+              <span className="text-[#7a5122] text-[14px]">→</span>
+            </span>
+          </Link>
         </div>
 
         {/* 🔁 비슷한 카페 더보기 — 목차 줄(번호 손글씨). 같은 동네 + 결 유사도, 검증/참고 우선(decisions #338) */}
@@ -584,6 +574,16 @@ export default async function CafePage({ params }: Props) {
           ) : null;
         })()}
 
+        {/* 🧭 위치인증 방문기록은 2순위로(실제 방문자에게 계속 열어둔다) */}
+        <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
+          <details className="group">
+            <summary className="cursor-pointer list-none text-[12px] text-[#7a5122] underline underline-offset-2">
+              이미 다녀오셨나요? 위치인증하고 추억으로 남기기 →
+            </summary>
+            <div className="nt-free py-2"><SaveMemoryButton cafeId={c.id} cafeName={c.name} cafeArea={c.area} variant="banner" /></div>
+          </details>
+        </div>
+
         {/* ❤ 찜한 카페 다시 보기 · 🕘 최근 본 카페 — localStorage 기반 클라이언트 컴포넌트(서버 조회 0) */}
         <div className="nt-margin-gutter nt-free">
           <SavedCafes excludeId={Number(c.id)} />
@@ -599,7 +599,7 @@ export default async function CafePage({ params }: Props) {
                 <i className="nt-tape sm" aria-hidden />
                 <span className="flex flex-col text-left">
                   <span className="text-[13px] font-bold text-[#5c4b3c]">📌 {col.label} 카페, 협찬 없이 교차검증한 곳</span>
-                  <span className="text-[11px] text-[#8f8071]">광고·협찬·타지점 후기 빼고 실방문 후기로만 모아보기</span>
+                  <span className="text-[11px] text-[#63523f]">광고·협찬·타지점 후기 빼고 실방문 후기로만 모아보기</span>
                 </span>
                 <span className="text-[#7a5122] font-bold whitespace-nowrap">→</span>
               </Link>

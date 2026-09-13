@@ -68,7 +68,7 @@ export default function Showcase({ cafeId, cafeName, pw, pin }: { cafeId: number
     setBusy(false);
   };
 
-  if (!promo) return <p className="text-[12px] text-[#665036]">불러오는 중…</p>;
+  if (!promo) return <p className="text-[12px] text-[#54432c]">불러오는 중…</p>;
   const status = promo.style === 0
     ? (promo.video_url ? (promo.approved ? "🟢 공개 중 — 카페 상세에 영상이 노출돼요" : "🟡 영상 — 관리자 승인 대기 중") : "🎬 홍보 영상을 올려주세요")
     : promo.ai_pending ? "🕐 관리자가 생성 요청함 — AI 카피 생성 중"
@@ -109,7 +109,7 @@ export default function Showcase({ cafeId, cafeName, pw, pin }: { cafeId: number
               </div>
             </div>
           )}
-          <div className="text-[9px] text-[#a8927a] mb-1">누적</div>
+          <div className="text-[9px] text-[#7a6750] mb-1">누적</div>
           <div className="grid grid-cols-3 gap-1.5">
             <div className="bg-black/25 rounded-lg py-2 text-center"><div className="text-lg font-bold text-[#e8b87a]">{promo.views ?? 0}</div><div className="text-[9px] text-[#8f7a58]">노출(조회)</div></div>
             <div className="bg-black/25 rounded-lg py-2 text-center"><div className="text-lg font-bold text-[#e8b87a]">{promo.clicks ?? 0}</div><div className="text-[9px] text-[#8f7a58]">클릭</div></div>

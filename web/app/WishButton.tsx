@@ -73,7 +73,7 @@ export default function WishButton({ cafeId, variant = "pill" }: { cafeId: numbe
             <span className="text-[15px] leading-none">{on ? "❤" : "🤍"}</span>
             {on ? "찜한 곳에 담았어요" : "가보고 싶은 곳에 담아두기"}
           </span>
-          <span className="text-[10.5px] text-[#6f6047] mt-0.5">
+          <span className="text-[10.5px] text-[#544636] mt-0.5">
             {on ? "지도에서 찜한 곳만 모아볼 수 있어요" : "탭 한 번 · 가입도 위치확인도 없어요"}
           </span>
         </span>

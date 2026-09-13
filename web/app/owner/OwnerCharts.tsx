@@ -5,7 +5,7 @@ import { BarChart, Bar, XAxis, YAxis, Cell, ResponsiveContainer,
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Legend,
   PieChart, Pie, Tooltip, AreaChart, Area, CartesianGrid } from "recharts";
 
-const PIE_COLORS = ["#9c6b3f", "#5f7355", "#c8893f", "#6f4e37", "#c97a6d", "#a8927a"];
+const PIE_COLORS = ["#9c6b3f", "#5f7355", "#c8893f", "#6f4e37", "#c97a6d", "#7a6750"];
 
 // 레이더 축 라벨: 길면 두 줄로 쪼개 잘림 방지
 function RadarTick({ x, y, textAnchor, payload }: any) {
@@ -39,7 +39,7 @@ export function RadarChartBox({ data }: { data: { axis: string; 우리카페: nu
         <PolarGrid stroke="#e3d6c2" />
         <PolarAngleAxis dataKey="axis" tick={<RadarTick />} />
         <PolarRadiusAxis angle={90} domain={[0, 100]} tickCount={3} tick={{ fontSize: 9, fill: "#bcab92" }} axisLine={false} />
-        <Radar name="동네평균" dataKey="동네평균" stroke="#a8927a" strokeWidth={2} fill="#a8927a" fillOpacity={0.2} dot={{ r: 2.5, fill: "#a8927a" }} />
+        <Radar name="동네평균" dataKey="동네평균" stroke="#7a6750" strokeWidth={2} fill="#7a6750" fillOpacity={0.2} dot={{ r: 2.5, fill: "#7a6750" }} />
         <Radar name="우리카페" dataKey="우리카페" stroke="#9c6b3f" strokeWidth={2} fill="#9c6b3f" fillOpacity={0.4} dot={{ r: 2.5, fill: "#9c6b3f" }} />
         <Legend wrapperStyle={{ fontSize: 12 }} />
       </RadarChart>
@@ -66,7 +66,7 @@ export function CadenceChart({ months }: { months: { ym: string; label: string; 
         <defs><linearGradient id="cad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#9c6b3f" stopOpacity={0.5} /><stop offset="100%" stopColor="#9c6b3f" stopOpacity={0.05} /></linearGradient></defs>
         <CartesianGrid stroke="#f0e6d4" vertical={false} />
         <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#8a7458" }} interval={1} axisLine={false} tickLine={false} />
-        <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: "#a8927a" }} axisLine={false} tickLine={false} width={28} />
+        <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: "#7a6750" }} axisLine={false} tickLine={false} width={28} />
         <Tooltip cursor={{ stroke: "#cbb89f" }} formatter={(v: any) => [`${v}건`, "리뷰"]} />
         <Area type="monotone" dataKey="count" stroke="#9c6b3f" strokeWidth={2} fill="url(#cad)" />
       </AreaChart>

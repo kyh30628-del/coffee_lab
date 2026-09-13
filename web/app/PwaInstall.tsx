@@ -95,7 +95,7 @@ export default function PwaInstall() {
                 <li>2. 메뉴에서 <b>‘홈 화면에 추가’</b>를 선택하세요.</li>
                 <li>3. 오른쪽 위 <b>‘추가’</b>를 누르면 바탕화면에 아이콘이 생겨요.</li>
               </ol>
-              <div className="mt-3 text-[11px] text-[#665036]">※ 아이폰은 <b>Safari</b>에서만 홈 화면에 추가할 수 있어요.</div>
+              <div className="mt-3 text-[11px] text-[#54432c]">※ 아이폰은 <b>Safari</b>에서만 홈 화면에 추가할 수 있어요.</div>
             </>
           ) : (
             <>
@@ -104,7 +104,7 @@ export default function PwaInstall() {
                 <li>2. <b>‘앱 설치’</b> 또는 <b>‘홈 화면에 추가’</b>를 선택하세요.</li>
                 <li>3. <b>‘설치’</b>를 누르면 홈 화면에 아이콘이 생겨요.</li>
               </ol>
-              <div className="mt-3 text-[11px] text-[#665036]">※ Chrome·삼성 인터넷에서 가능해요. 시크릿 창에서는 안 돼요.</div>
+              <div className="mt-3 text-[11px] text-[#54432c]">※ Chrome·삼성 인터넷에서 가능해요. 시크릿 창에서는 안 돼요.</div>
             </>
           )}
           <button onClick={dismiss} className="w-full mt-4 bg-[#2b2018] text-[#f4ece0] rounded-xl py-3 font-medium">알겠어요</button>

@@ -10,7 +10,7 @@ export default function PrivacyPage() {
         <BackLink to="/" label="홈" className="text-[#7a5122] mb-4" />
         <div className="text-[#7a5122] text-xs tracking-[0.3em] uppercase mb-2">Privacy Policy</div>
         <h1 className="text-3xl font-bold mb-1">개인정보처리방침</h1>
-        <p className="text-[13px] text-[#665036] mb-8">동네 커피 노트 (Dongne Coffee Note) · 최종 업데이트 {updated}</p>
+        <p className="text-[13px] text-[#54432c] mb-8">동네 커피 노트 (Dongne Coffee Note) · 최종 업데이트 {updated}</p>
 
         <div className="space-y-7 text-[14px] leading-relaxed text-[#3d2f22]">
           <section>

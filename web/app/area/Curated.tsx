@@ -5,7 +5,7 @@ import { visitorBadges } from "@/lib/visitorMix";
 import KakaoShare from "../KakaoShare";
 import RecentCafes from "../RecentCafes";
 
-const GRADE_BG: Record<string, string> = { 검증: "#5f7355", 참고: "#9c6b3f", 후보: "#a8927a" };
+const GRADE_BG: Record<string, string> = { 검증: "#5f7355", 참고: "#9c6b3f", 후보: "#7a6750" };
 
 // 동네×취향 검증 카페 큐레이션 — SEO 콘텐츠 페이지 공용 렌더(서버 컴포넌트).
 // 동(洞) 단위 페이지(app/area/[gu]/dong/[dong])도 이 컴포넌트를 재사용 — backHref/showTasteNav/crossLinks로 분기.
@@ -55,11 +55,11 @@ export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, headin
         <div className="text-[#7a5122] text-[11px] tracking-[0.25em] uppercase mt-4 mb-1">동네 커피 노트 · 검증 큐레이션</div>
         <h1 className="text-[26px] font-bold leading-tight mb-2">{heading}</h1>
         <p className="text-[14px] text-[#524234] leading-relaxed mb-3">{intro}</p>
-        <p className="text-[12px] text-[#665036] bg-white/60 border border-[#e6dcc8] rounded-lg px-3 py-2 mb-6">☕ <b>영수증 리뷰·광고·협찬은 빼고</b>, 네이버·구글·유튜브 공개 후기를 교차검증해 진짜 후기로만 골랐어요. <Link href="/trust" className="underline text-[#7a5122]">검증 방법</Link></p>
+        <p className="text-[12px] text-[#54432c] bg-white/60 border border-[#e6dcc8] rounded-lg px-3 py-2 mb-6">☕ <b>영수증 리뷰·광고·협찬은 빼고</b>, 네이버·구글·유튜브 공개 후기를 교차검증해 진짜 후기로만 골랐어요. <Link href="/trust" className="underline text-[#7a5122]">검증 방법</Link></p>
 
         {/* 후기 근거 요약 — 등급 분포로 검증 신뢰도를 투명하게 표시(콘텐츠 밀도 보강) */}
         {tasteKey && grades && (grades.verified + grades.ref + grades.candidate) > 0 && (
-          <p className="text-[11.5px] text-[#665036] -mt-4 mb-6">
+          <p className="text-[11.5px] text-[#54432c] -mt-4 mb-6">
             후기 근거: 검증 {grades.verified}곳 · 참고 {grades.ref}곳{grades.candidate ? ` · 후보 ${grades.candidate}곳` : ""}
           </p>
         )}
@@ -89,7 +89,7 @@ export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, headin
               <span className="text-[10px] font-bold text-white bg-[#7a5122] px-2 py-0.5 rounded-full">
                 {tasteLabel ? `${tasteEmoji ?? ""} ${tasteLabel} 1위` : "가장 검증이 두꺼운 곳"}
               </span>
-              {hero.grade && <span className="text-[10px] font-bold text-white px-1.5 py-0.5 rounded" style={{ background: GRADE_BG[hero.grade] || "#a8927a" }}>{hero.grade}</span>}
+              {hero.grade && <span className="text-[10px] font-bold text-white px-1.5 py-0.5 rounded" style={{ background: GRADE_BG[hero.grade] || "#7a6750" }}>{hero.grade}</span>}
               {hero.om ? <span title="사장님이 직접 정보를 관리하는 카페예요" className="text-[10px] font-bold text-[#7a5122] bg-[#f7e9cf] border border-[#e3c79a] px-1.5 py-0.5 rounded-full whitespace-nowrap">🏅 사장님 관리</span> : null}
               {badges[0] && <span className="text-[10px] font-bold text-[#5a4a2e] bg-[#f0e6d2] border border-[#ddd0b6] px-1.5 py-0.5 rounded-full">{badges[0].emoji} 이 동네에서 유독 {badges[0].label}</span>}
               {vb(hero).map((b) => (
@@ -98,19 +98,19 @@ export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, headin
             </div>
             <div className="flex items-baseline gap-2 flex-wrap">
               <span className="font-bold text-[21px] leading-tight">{hero.name}</span>
-              {hero.dong && <span className="text-[12.5px] text-[#665036]">{hero.dong}</span>}
+              {hero.dong && <span className="text-[12.5px] text-[#54432c]">{hero.dong}</span>}
             </div>
             {/* 근거를 문장이 아니라 **숫자**로 — 이게 우리가 다른 서비스와 다른 지점이다. */}
             <p className="text-[13px] font-bold text-[#5f7355] mt-2">
               {tasteKey && typeof hero.tasteHits === "number" && hero.tasteHits > 0 ? (
                 <>후기 {hero.count ?? 0}건 중 <span className="text-[15px]">{hero.tasteHits}건</span>이 {tasteLabel} 이야기
-                  {hero.count ? <span className="font-normal text-[#665036]"> ({Math.round((hero.tasteHits / hero.count) * 100)}%)</span> : null}</>
+                  {hero.count ? <span className="font-normal text-[#54432c]"> ({Math.round((hero.tasteHits / hero.count) * 100)}%)</span> : null}</>
               ) : (
                 <>교차검증한 진짜 후기 <span className="text-[15px]">{hero.count ?? 0}건</span></>
               )}
             </p>
             {hero.identity && <p className="text-[13px] text-[#3d2f22] leading-relaxed mt-1.5">{hero.identity}</p>}
-            {hero.quote && <p className="text-[12.5px] text-[#665036] leading-relaxed mt-2 pl-2.5 border-l-2 border-[#e0d3b8]">“{hero.quote}”</p>}
+            {hero.quote && <p className="text-[12.5px] text-[#54432c] leading-relaxed mt-2 pl-2.5 border-l-2 border-[#e0d3b8]">“{hero.quote}”</p>}
             <span className="inline-block text-[12.5px] font-semibold text-[#7a5122] mt-2.5">근거 후기 전부 보기 →</span>
           </Link>
         )}
@@ -123,14 +123,14 @@ export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, headin
           className="flex items-center justify-between gap-2 w-full rounded-xl px-4 py-3 mb-5 border border-[#d8c8ad] bg-white">
           <span className="text-[13px] font-semibold text-[#3d2f22]">
             🗺️ {area} {tasteLabel ? `${tasteLabel} ` : ""}카페 지도에서 보기
-            <span className="block text-[11px] text-[#8a7355] font-normal mt-0.5">위치·거리 확인하고 취향으로 골라보기</span>
+            <span className="block text-[11px] text-[#63523f] font-normal mt-0.5">위치·거리 확인하고 취향으로 골라보기</span>
           </span>
           <span className="text-[#7a5122] text-[13px]">→</span>
         </Link>
 
         {/* 목록 */}
         {cafes.length === 0 ? (
-          <p className="text-[13px] text-[#665036] py-8 text-center">아직 이 조건에 맞는 검증 카페가 적어요. <Link href={`/area/${encodeURIComponent(area)}`} className="underline text-[#7a5122]">{area} 전체 보기</Link></p>
+          <p className="text-[13px] text-[#54432c] py-8 text-center">아직 이 조건에 맞는 검증 카페가 적어요. <Link href={`/area/${encodeURIComponent(area)}`} className="underline text-[#7a5122]">{area} 전체 보기</Link></p>
         ) : (
           <ol className="space-y-2.5">
             {rest.map((c, i) => (
@@ -140,7 +140,7 @@ export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, headin
                     <span className="text-[#82714f] text-[13px] font-bold w-5 shrink-0">{i + (hero ? 2 : 1)}</span>
                     <span className="font-bold text-[15px]">{c.name}</span>
                     {c.om ? <span title="사장님이 직접 정보를 관리하는 카페예요" className="text-[10px] font-bold text-[#7a5122] bg-[#f7e9cf] border border-[#e3c79a] px-1.5 py-0.5 rounded-full whitespace-nowrap">🏅 사장님 관리</span> : null}
-                    {c.dong && <span className="text-[12px] text-[#665036]">{c.dong}</span>}
+                    {c.dong && <span className="text-[12px] text-[#54432c]">{c.dong}</span>}
                     {badges[i + (hero ? 1 : 0)] && (
                       <span className="text-[10px] font-bold text-[#5a4a2e] bg-[#f0e6d2] border border-[#ddd0b6] px-1.5 py-0.5 rounded-full shrink-0">
                         {badges[i + (hero ? 1 : 0)]!.emoji} {badges[i + (hero ? 1 : 0)]!.label}
@@ -149,14 +149,14 @@ export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, headin
                     {vb(c).map((b) => (
                       <span key={b.key} title={b.note} className="text-[10px] font-bold text-[#4a5a4e] bg-[#e6efe8] border border-[#c9dbcf] px-1.5 py-0.5 rounded-full shrink-0">{b.emoji}</span>
                     ))}
-                    {c.grade && <span className="text-[10px] font-bold text-white px-1.5 py-0.5 rounded ml-auto shrink-0" style={{ background: GRADE_BG[c.grade] || "#a8927a" }}>{c.grade}</span>}
+                    {c.grade && <span className="text-[10px] font-bold text-white px-1.5 py-0.5 rounded ml-auto shrink-0" style={{ background: GRADE_BG[c.grade] || "#7a6750" }}>{c.grade}</span>}
                   </div>
                   {/* 🎯 이 페이지의 취향이 '이 카페 후기에서 실제로 몇 번 나왔는지' — 목록 전체가 같은 한줄소개로
                       보이던 문제(공개 13,460곳 중 고유 한줄 7,654개)를 이 카페만의 숫자로 갈라준다. */}
                   {tasteKey && typeof c.tasteHits === "number" && c.tasteHits > 0 && (
                     <p className="text-[11.5px] font-bold text-[#5f7355] mt-1.5 pl-7">
                       {tasteEmoji} {tasteLabel} 후기 {c.tasteHits}건
-                      {c.count ? <span className="font-normal text-[#665036]"> · 전체 후기 {c.count}건 중 {Math.round((c.tasteHits / c.count) * 100)}%</span> : null}
+                      {c.count ? <span className="font-normal text-[#54432c]"> · 전체 후기 {c.count}건 중 {Math.round((c.tasteHits / c.count) * 100)}%</span> : null}
                     </p>
                   )}
                   {/* 🔌 카공 시설 사실(2026-08-30) — 경쟁사(naejari.com)는 이름·주소만 주고 이 정보가 아예 없다.
@@ -168,7 +168,7 @@ export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, headin
                     </p>
                   )}
                   {c.identity && <p className="text-[12.5px] text-[#524234] leading-snug mt-1.5 line-clamp-2 pl-7">{c.identity}</p>}
-                  {c.quote && <p className="text-[11.5px] text-[#665036] leading-snug mt-1 line-clamp-1 pl-7">“{c.quote}”</p>}
+                  {c.quote && <p className="text-[11.5px] text-[#54432c] leading-snug mt-1 line-clamp-1 pl-7">“{c.quote}”</p>}
                 </Link>
               </li>
             ))}
@@ -221,7 +221,7 @@ export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, headin
             ))}
           </div>
         </div>
-        <div className="mt-6 text-[11px] text-[#665036]"><Link href="/" className="underline">동네 커피 노트 홈</Link> · 진짜 후기로 고른 우리 동네 카페</div>
+        <div className="mt-6 text-[11px] text-[#54432c]"><Link href="/" className="underline">동네 커피 노트 홈</Link> · 진짜 후기로 고른 우리 동네 카페</div>
       </div>
       <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet" />
     </main>

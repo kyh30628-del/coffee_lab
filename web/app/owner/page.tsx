@@ -26,7 +26,7 @@ type Insight = {
   similar: { name: string; grade: string | null; count: number | null }[];
   actions: Action[]; reviewCadence?: ReviewCadence;
 };
-const GRADE_BG: Record<string, string> = { 검증: "#5f7355", 참고: "#9c6b3f", 후보: "#a8927a" };
+const GRADE_BG: Record<string, string> = { 검증: "#5f7355", 참고: "#9c6b3f", 후보: "#7a6750" };
 const TABS = [{ k: "rank", l: "📊 순위" }, { k: "radar", l: "🕸️ 성격" }, { k: "pie", l: "🍩 구성" }];
 const TONE: Record<string, { bg: string; border: string; tag: string }> = {
   good: { bg: "#eef3ea", border: "#bcd4ad", tag: "#5f7355" },

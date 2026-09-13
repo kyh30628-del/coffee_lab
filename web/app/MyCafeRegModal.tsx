@@ -133,16 +133,16 @@ export default function MyCafeRegModal({ cafes, device, visits, pin = "", initia
                 <b className="text-[#d6336c]">{picked?.name}</b> 위치 인증이 끝났어요.<br />
                 이 경험을 내 지도에 영구 기록할까요?
               </div>
-              <div className="text-[11px] text-[#665036] mt-2 leading-relaxed">위치 인증으로 <b>진짜 그 카페에서의 경험</b>임이 확인됐어요.</div>
+              <div className="text-[11px] text-[#54432c] mt-2 leading-relaxed">위치 인증으로 <b>진짜 그 카페에서의 경험</b>임이 확인됐어요.</div>
             </>
           ) : (
             <>
-              <span className="inline-block text-[9px] font-bold text-[#665036] bg-[#f3ede1] rounded-full px-1.5 py-0.5 mb-1.5">미인증</span>
+              <span className="inline-block text-[9px] font-bold text-[#54432c] bg-[#f3ede1] rounded-full px-1.5 py-0.5 mb-1.5">미인증</span>
               <div className="text-[13px] text-[#594839] leading-relaxed">
                 <b className="text-[#d6336c]">{picked?.name}</b> 추억을<br />
                 <b>미인증</b>으로 기록할까요?
               </div>
-              <div className="text-[11px] text-[#665036] mt-2 leading-relaxed">
+              <div className="text-[11px] text-[#54432c] mt-2 leading-relaxed">
                 위치 인증을 못 했어요. <b>지금은 미인증 상태로 저장</b>돼요.<br />
                 <b>나에게만 보임(비공개)</b> — 지도에서 다른 사람에게는 안 보여요. <b>인증된 기록만</b> 타인에게 지도로 공개돼요.<br />
                 나중에 이 카페를 다시 방문해 <b>GPS 30m 이내</b>에서 인증하면 <b>인증 상태로 전환</b>돼 지도에 공개될 수 있어요.
@@ -172,7 +172,7 @@ export default function MyCafeRegModal({ cafes, device, visits, pin = "", initia
           ) : (
             <>
               <div className="text-[40px] mb-2">📍</div>
-              <span className="inline-block text-[9px] font-bold text-[#665036] bg-[#f3ede1] rounded-full px-1.5 py-0.5 mb-1">미인증</span>
+              <span className="inline-block text-[9px] font-bold text-[#54432c] bg-[#f3ede1] rounded-full px-1.5 py-0.5 mb-1">미인증</span>
               <div className="text-[16px] font-bold text-[#2b2018] mb-1.5">미인증으로 저장됐어요</div>
               <div className="text-[13px] text-[#594839] leading-relaxed">
                 <b className="text-[#d6336c]">{done}</b> 기억이 <b>미인증 상태</b>로 저장됐어요.<br />
@@ -210,7 +210,7 @@ export default function MyCafeRegModal({ cafes, device, visits, pin = "", initia
                     {visits.some((v) => v.id === c.id) && <span className="text-[10px] text-[#d6336c] font-bold">❤ 기록있음</span>}
                   </button>
                 ))}
-                {q.length >= 1 && results.length === 0 && <p className="text-[12px] text-[#665036] px-1">검색 결과가 없어요</p>}
+                {q.length >= 1 && results.length === 0 && <p className="text-[12px] text-[#54432c] px-1">검색 결과가 없어요</p>}
               </div>
             </>
           ) : (
@@ -233,12 +233,12 @@ export default function MyCafeRegModal({ cafes, device, visits, pin = "", initia
                     <label className="aspect-square rounded-lg border-2 border-dashed border-[#cbb89f] bg-white flex flex-col items-center justify-center text-[#7a5122] cursor-pointer">
                       <span className="text-[20px] leading-none">＋</span>
                       <span className="text-[10px] mt-0.5">사진 추가</span>
-                      <span className="text-[9px] text-[#665036]">{photos.length}/5</span>
+                      <span className="text-[9px] text-[#54432c]">{photos.length}/5</span>
                       <input type="file" accept="image/*" multiple onChange={onPhoto} className="hidden" />
                     </label>
                   )}
                 </div>
-                <p className="text-[10px] text-[#665036] mt-1">갤러리에서 여러 장 선택하거나 카메라로 촬영할 수 있어요.</p>
+                <p className="text-[10px] text-[#54432c] mt-1">갤러리에서 여러 장 선택하거나 카메라로 촬영할 수 있어요.</p>
               </div>
               {/* 기억 — 카페에서의 나의 경험 */}
               <div>
@@ -246,7 +246,7 @@ export default function MyCafeRegModal({ cafes, device, visits, pin = "", initia
                 <textarea value={memory} onChange={(e) => setMemory(e.target.value)} rows={4} maxLength={2000}
                   placeholder="오늘의 커피, 분위기, 함께한 사람… 소중한 순간을 적어보세요."
                   className="w-full border border-[#cbb89f] rounded-lg px-3 py-2.5 text-[14px] text-[#2b2018] bg-white resize-none leading-relaxed" />
-                <div className="text-right text-[10px] text-[#665036]">{memory.length}/2000</div>
+                <div className="text-right text-[10px] text-[#54432c]">{memory.length}/2000</div>
               </div>
               {/* 공개 설정 — 공개 시 카페 상세에 익명 방문자 후기로 노출(리뷰 재활용) */}
               <div>
@@ -261,7 +261,7 @@ export default function MyCafeRegModal({ cafes, device, visits, pin = "", initia
                     <div className="text-[10px] text-[#7a5122] mt-0.5">카페 상세에 익명 후기로</div>
                   </button>
                 </div>
-                {isPublic && <p className="text-[10px] text-[#665036] mt-1.5">공개하면 다른 사람이 이 카페를 볼 때 <b>익명</b>으로 사진·기억이 보여요. 타인 얼굴·개인정보가 담긴 사진은 올리지 마세요.</p>}
+                {isPublic && <p className="text-[10px] text-[#54432c] mt-1.5">공개하면 다른 사람이 이 카페를 볼 때 <b>익명</b>으로 사진·기억이 보여요. 타인 얼굴·개인정보가 담긴 사진은 올리지 마세요.</p>}
               </div>
               {visits.some((v) => v.id === picked.id) ? (
                 <>
@@ -275,7 +275,7 @@ export default function MyCafeRegModal({ cafes, device, visits, pin = "", initia
                       <div>지도에서 다른 사람에게는 안 보입니다. <b>지금 이 카페 안(GPS 30m 이내)</b>에 계시면 아래로 인증해 공개로 바꿀 수 있어요.</div>
                     </div>
                   ) : (
-                    <p className="text-[11px] text-[#665036] leading-relaxed">※ 이미 기록한 추억이에요. 사진(갤러리에서 추가 가능)·기억을 고치고 저장하세요. <b>이미 인증된 방문</b>이라 위치 확인은 다시 안 해도 돼요.</p>
+                    <p className="text-[11px] text-[#54432c] leading-relaxed">※ 이미 기록한 추억이에요. 사진(갤러리에서 추가 가능)·기억을 고치고 저장하세요. <b>이미 인증된 방문</b>이라 위치 확인은 다시 안 해도 돼요.</p>
                   )}
                   {msg && <p className="text-[12px] text-[#c0392b]">{msg}</p>}
                   {visits.find((v) => v.id === picked.id)?.verified === false && (
@@ -294,7 +294,7 @@ export default function MyCafeRegModal({ cafes, device, visits, pin = "", initia
                     <div className="mb-1.5"><b className="text-[#5f7355]">✅ 카페 30m 이내에서 인증</b> → <b>진짜 방문 후기</b>로 지도에 공개돼요.</div>
                     <div><b className="text-[#b06a2e]">📍 30m 밖이면 무인증</b>으로 저장 → <b>나에게만 보여요</b>(지도에 안 뜸). 나중에 그 카페에 다시 가서 인증하면 <b>공개로 전환</b>됩니다.</div>
                   </div>
-                  <p className="text-[11.5px] text-[#665036] leading-relaxed">※ 타인의 얼굴·개인정보가 담긴 사진은 올리지 마세요.</p>
+                  <p className="text-[11.5px] text-[#54432c] leading-relaxed">※ 타인의 얼굴·개인정보가 담긴 사진은 올리지 마세요.</p>
                   {msg && <p className="text-[12.5px] font-bold text-[#c0392b]">{msg}</p>}
                   <button onClick={stage} disabled={busy} className="w-full bg-[#d6336c] text-white rounded-xl py-3 font-bold text-[14px] disabled:opacity-60">
                     {busy ? "위치 확인 중..." : "이 카페에서 위치 인증 (임시저장)"}

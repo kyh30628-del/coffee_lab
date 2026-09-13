@@ -11,7 +11,7 @@ import KakaoShare from "../../KakaoShare";
 export const revalidate = 86400; // ISR 24시간
 export const dynamicParams = false;
 
-const GRADE_BG: Record<string, string> = { 검증: "#5f7355", 참고: "#9c6b3f", 후보: "#a8927a" };
+const GRADE_BG: Record<string, string> = { 검증: "#5f7355", 참고: "#9c6b3f", 후보: "#7a6750" };
 
 type Row = { id: number; name: string; dong: string | null; grade: string | null; count: number | null; identity: string | null };
 type Agg = { cafes: number; raw: number; verified: number; ad: number; branch: number };
@@ -94,15 +94,15 @@ export default async function CollectionPage({ params }: { params: Promise<{ slu
               <li>· 다른 지점·동명 카페 오염 후기 <b>{nf(agg.branch)}건</b> 제외</li>
               <li>· 실제 방문·경험 후기 <b>{nf(agg.verified)}건</b>만 채택</li>
             </ul>
-            <p className="text-[11px] text-[#665036] mt-2">※ 수치는 실시간 검증 데이터 기준이라 조금씩 변할 수 있어요.</p>
+            <p className="text-[11px] text-[#54432c] mt-2">※ 수치는 실시간 검증 데이터 기준이라 조금씩 변할 수 있어요.</p>
           </div>
         )}
 
-        <p className="text-[12px] text-[#665036] bg-white/60 border border-[#e6dcc8] rounded-lg px-3 py-2 mb-6">☕ <b>영수증 리뷰·광고·협찬은 빼고</b>, 네이버·구글·유튜브 공개 후기를 교차검증해 진짜 후기로만 골랐어요.</p>
+        <p className="text-[12px] text-[#54432c] bg-white/60 border border-[#e6dcc8] rounded-lg px-3 py-2 mb-6">☕ <b>영수증 리뷰·광고·협찬은 빼고</b>, 네이버·구글·유튜브 공개 후기를 교차검증해 진짜 후기로만 골랐어요.</p>
 
         <h2 className="text-[17px] font-bold mb-3">후기로 검증한 {label} 카페</h2>
         {cafes.length === 0 ? (
-          <p className="text-[13px] text-[#665036] py-8 text-center">지금 목록을 불러오지 못했어요. <Link href={areaHref} className="underline text-[#7a5122]">{area} 전체 보기</Link></p>
+          <p className="text-[13px] text-[#54432c] py-8 text-center">지금 목록을 불러오지 못했어요. <Link href={areaHref} className="underline text-[#7a5122]">{area} 전체 보기</Link></p>
         ) : (
           <ol className="space-y-2.5">
             {cafes.map((cf, i) => (
@@ -111,8 +111,8 @@ export default async function CollectionPage({ params }: { params: Promise<{ slu
                   <div className="flex items-center gap-2">
                     <span className="text-[#82714f] text-[13px] font-bold w-5 shrink-0">{i + 1}</span>
                     <span className="font-bold text-[15px]">{cf.name}</span>
-                    {cf.dong && <span className="text-[12px] text-[#665036]">{cf.dong}</span>}
-                    {cf.grade && <span className="text-[10px] font-bold text-white px-1.5 py-0.5 rounded ml-auto shrink-0" style={{ background: GRADE_BG[cf.grade] || "#a8927a" }}>{cf.grade}</span>}
+                    {cf.dong && <span className="text-[12px] text-[#54432c]">{cf.dong}</span>}
+                    {cf.grade && <span className="text-[10px] font-bold text-white px-1.5 py-0.5 rounded ml-auto shrink-0" style={{ background: GRADE_BG[cf.grade] || "#7a6750" }}>{cf.grade}</span>}
                   </div>
                   {cf.identity && <p className="text-[12.5px] text-[#524234] leading-snug mt-1.5 line-clamp-2 pl-7">{cf.identity}</p>}
                 </Link>

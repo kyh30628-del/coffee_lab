@@ -15,7 +15,7 @@ type Hist = { id: number; cafe_id: number; name: string; verdict: string; note: 
 const card: React.CSSProperties = { background: "#fff", border: "1px solid #ddc9a8", borderRadius: 12, padding: "12px 14px", minWidth: 0 };
 const sub: React.CSSProperties = { fontSize: 10.5, color: "#8a7a5c", fontWeight: 600 };
 const VERDICT_LABEL: Record<string, string> = { keep_excluded: "제외 유지", republish: "재공개", needs_look: "추가검토 필요" };
-const VERDICT_COLOR: Record<string, string> = { keep_excluded: "#8a7355", republish: "#3f7a4f", needs_look: "#b5731f" };
+const VERDICT_COLOR: Record<string, string> = { keep_excluded: "#63523f", republish: "#3f7a4f", needs_look: "#b5731f" };
 
 export default function RecheckPage() {
   const [pw, setPw] = useState("");
@@ -101,7 +101,7 @@ export default function RecheckPage() {
                 style={{ width: "100%", marginTop: 8, padding: "7px 9px", border: "1px solid #d8c4a4", borderRadius: 8, fontSize: 13, minHeight: 40, resize: "vertical" }} />
               <div style={{ display: "flex", gap: 7, marginTop: 8, flexWrap: "wrap" }}>
                 <button disabled={busy === String(it.id)} onClick={() => resolve(it, "keep_excluded")}
-                  style={{ padding: "8px 12px", background: "#8a7355", color: "#fff", border: "none", borderRadius: 8, fontSize: 12.5, fontWeight: 700 }}>제외 유지</button>
+                  style={{ padding: "8px 12px", background: "#63523f", color: "#fff", border: "none", borderRadius: 8, fontSize: 12.5, fontWeight: 700 }}>제외 유지</button>
                 <button disabled={busy === String(it.id)} onClick={() => resolve(it, "republish")}
                   style={{ padding: "8px 12px", background: "#3f7a4f", color: "#fff", border: "none", borderRadius: 8, fontSize: 12.5, fontWeight: 700 }}>
                   {busy === String(it.id) ? "…" : "재공개(공개 전환)"}

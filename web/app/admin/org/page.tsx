@@ -785,7 +785,7 @@ export default function OrgDashboard() {
                       <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 700, color: L.ok ? "#3f7a4f" : "#c0762a" }}>{L.ok ? "정상" : "확인 필요"}</span>
                     </div>
                     <div style={{ fontSize: 11, color: "#4a3a2a", marginTop: 4, fontWeight: 600 }}>{L.stat}</div>
-                    <div style={{ fontSize: 10, color: "#8a7355", marginTop: 3, lineHeight: 1.5 }}>{L.note}</div>
+                    <div style={{ fontSize: 10, color: "#63523f", marginTop: 3, lineHeight: 1.5 }}>{L.note}</div>
                     <div style={{ fontSize: 9.5, color: "#b09b78", marginTop: 2, fontFamily: "monospace" }}>{L.file}</div>
                     {L.link && <a href={L.link} style={{ display: "inline-block", marginTop: 5, fontSize: 11, fontWeight: 700, color: "#6a468c", textDecoration: "none" }}>리뷰 화면 열기 →</a>}
                   </div>
@@ -794,13 +794,13 @@ export default function OrgDashboard() {
 
               {/* 예산 실측 — 계약 대비 큰컬럼 로드 */}
               <div style={{ marginTop: 14, fontSize: 12.5, fontWeight: 700, color: "#2b2018" }}>💰 24시간 큰 데이터 로드 (계약 대비)</div>
-              <div style={{ fontSize: 10, color: "#8a7355", margin: "3px 0 6px" }}>리뷰 원문 같은 큰 컬럼을 몇 번 읽었는지. 계약 상한을 넘으면 원장에 기록됩니다(현재 관측 모드 — 막지는 않음).</div>
+              <div style={{ fontSize: 10, color: "#63523f", margin: "3px 0 6px" }}>리뷰 원문 같은 큰 컬럼을 몇 번 읽었는지. 계약 상한을 넘으면 원장에 기록됩니다(현재 관측 모드 — 막지는 않음).</div>
               <div style={{ display: "grid", gap: 4 }}>
                 {(harness.budgets || []).length === 0 && <div style={{ fontSize: 11, color: "#9c8a6c" }}>기록 없음</div>}
                 {(harness.budgets || []).map((b: any) => (
                   <div key={b.job} style={{ display: "flex", alignItems: "center", gap: 8, background: "#fff", borderRadius: 8, padding: "6px 9px", fontSize: 11 }}>
                     <span style={{ fontFamily: "monospace", color: "#4a3a2a", flex: 1 }}>{b.job}</span>
-                    <span style={{ color: "#8a7355" }}>{b.runs}회</span>
+                    <span style={{ color: "#63523f" }}>{b.runs}회</span>
                     <span style={{ fontWeight: 700, color: b.over ? "#b03a3a" : "#3f7a4f" }}>{b.used ?? 0} / {b.limit}</span>
                   </div>
                 ))}
@@ -815,32 +815,32 @@ export default function OrgDashboard() {
               </>)}
               {(harness.frozen || []).length > 0 && (<>
                 <div style={{ marginTop: 14, fontSize: 12.5, fontWeight: 700, color: "#2b2018" }}>🧊 동결 — 자동으로 못 고쳐 사람에게 넘긴 것</div>
-                <div style={{ fontSize: 10, color: "#8a7355", margin: "3px 0 6px" }}>2회 시도해도 효과가 없으면 계속 재시도하지 않고 멈춥니다(무한루프 차단).</div>
+                <div style={{ fontSize: 10, color: "#63523f", margin: "3px 0 6px" }}>2회 시도해도 효과가 없으면 계속 재시도하지 않고 멈춥니다(무한루프 차단).</div>
                 {(harness.frozen || []).map((f: any) => (
                   <div key={f.job} style={{ display: "flex", gap: 8, fontSize: 11, background: "#fff", borderRadius: 8, padding: "6px 9px", marginTop: 4 }}>
                     <span style={{ fontFamily: "monospace", color: "#4a3a2a", flex: 1 }}>{f.job}</span>
-                    <span style={{ color: "#8a7355" }}>{f.n}건 · 판독 {f.read} · 오탐 {f.fp}</span>
+                    <span style={{ color: "#63523f" }}>{f.n}건 · 판독 {f.read} · 오탐 {f.fp}</span>
                   </div>
                 ))}
               </>)}
 
               {/* 원장 최근 실행 */}
               <div style={{ marginTop: 14, fontSize: 12.5, fontWeight: 700, color: "#2b2018" }}>📒 원장 — 최근 24시간 실행</div>
-              <div style={{ fontSize: 10, color: "#8a7355", margin: "3px 0 6px" }}>지문=같은 문제집합 반복(헛돎) 검출용 · blob=큰 데이터 로드 횟수 · 동결스킵=시도조차 안 한 건</div>
+              <div style={{ fontSize: 10, color: "#63523f", margin: "3px 0 6px" }}>지문=같은 문제집합 반복(헛돎) 검출용 · blob=큰 데이터 로드 횟수 · 동결스킵=시도조차 안 한 건</div>
               <div style={{ display: "grid", gap: 3 }}>
                 {(harness.runs || []).map((r: any, i: number) => (
                   <div key={i} style={{ display: "flex", gap: 7, alignItems: "center", background: "#fff", borderRadius: 7, padding: "5px 8px", fontSize: 10.5 }}>
                     <span style={{ color: "#9c8a6c", fontFamily: "monospace" }}>{String(r.kst).slice(5, 16)}</span>
                     <span>{r.ok ? "✅" : "❌"}</span>
                     <span style={{ fontFamily: "monospace", color: "#4a3a2a", minWidth: 120 }}>{r.job}</span>
-                    <span style={{ color: "#8a7355", flex: 1 }}>
+                    <span style={{ color: "#63523f", flex: 1 }}>
                       {r.fp ? "지문 " : ""}{r.blob != null ? `blob${r.blob} ` : ""}{r.skipped ? `동결스킵${r.skipped} ` : ""}{r.scope_viol ? `🔐위반${r.scope_viol}` : ""}
                     </span>
                   </div>
                 ))}
               </div>
 
-              <div style={{ marginTop: 14, fontSize: 10, color: "#8a7355", lineHeight: 1.6, background: "#efe2cf", borderRadius: 8, padding: "8px 10px" }}>
+              <div style={{ marginTop: 14, fontSize: 10, color: "#63523f", lineHeight: 1.6, background: "#efe2cf", borderRadius: 8, padding: "8px 10px" }}>
                 <b>하네스도 못 넘는 제약</b> — L3(코드·배포) 자동승인 없음 · 자동 재공개 없음 · 이슈↔결재 자동변환 금지 · 감시자에게 집행 권한 없음.
               </div>
             </>)}

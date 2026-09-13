@@ -31,7 +31,7 @@ export default function ShowcaseStyles() {
                 <div className="mb-2">
                   <span className="inline-block text-[11px] font-bold text-white bg-[#9c6b3f] rounded-full px-2 py-0.5 mr-1.5">{t.id}</span>
                   <span className="text-[#2b2018] font-bold">{t.name}</span>
-                  <span className="text-[12px] text-[#665036]"> · {t.desc}</span>
+                  <span className="text-[12px] text-[#54432c]"> · {t.desc}</span>
                 </div>
                 <div className="rounded-2xl overflow-hidden shadow-lg bg-[#fdfaf4]">
                   <ShowcaseBanner style={t.id} scene={s.scene} headline={s.headline} tagline={s.tagline} points={s.points} cta={s.cta} height="220px" />
@@ -40,7 +40,7 @@ export default function ShowcaseStyles() {
             );
           })}
         </div>
-        <p className="text-[12px] text-[#665036] mt-8 text-center">마음에 드는 번호들을 알려주시면 사장님 등록 화면에 ‘템플릿 선택’으로 적용돼 있어요.</p>
+        <p className="text-[12px] text-[#54432c] mt-8 text-center">마음에 드는 번호들을 알려주시면 사장님 등록 화면에 ‘템플릿 선택’으로 적용돼 있어요.</p>
       </div>
       <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet" />
     </main>

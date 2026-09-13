@@ -60,7 +60,7 @@ export default function RecentCafes({ current, title = "🕘 최근 본 카페" 
             className="flex items-center gap-2.5 bg-white border border-[#e0d3bd] rounded-xl px-3.5 py-2.5">
             <span className="flex flex-col text-left min-w-0">
               <span className="text-[13.5px] font-bold text-[#3d2f22] truncate">{c.name}</span>
-              <span className="text-[10.5px] text-[#6f6047] truncate">{c.area}</span>
+              <span className="text-[10.5px] text-[#544636] truncate">{c.area}</span>
             </span>
             {c.grade && <span className="ml-auto text-[10px] font-bold bg-[#2b2018] text-[#e8b87a] px-2 py-0.5 rounded-full whitespace-nowrap">{c.grade}</span>}
           </Link>
