@@ -4,7 +4,7 @@ import { invalidateCafeCaches } from "@/lib/cafeCacheInvalidate"; // 🧹 2026-0
 import { sql, ensureSchema } from "@/lib/db";
 import { synthAndStore, finalizePipeline, scrubPublishedPII, healVendorTemplateQuotes, healGroundingSuspects, holdZeroEvidenceSuspects, healPublishedAudit, healNonCafeCategory, healOutOfBox, healAreaLabel, healOffConceptByReview } from "@/lib/synthStore";
 import { recordRun } from "@/lib/agentLog";
-import { BOT_ANON_IDS_SQL, refreshBotCache } from "@/lib/behaviorBot";
+import { BOT_ANON_IDS_SQL, refreshBotCache, verdictFreshness } from "@/lib/behaviorBot";
 import { judgeQueueCount, dailyCounts } from "@/lib/metrics";
 import { consoleCreditExhaustedByProbe } from "@/lib/consoleKeyProbe";
 import { loadCriteria, getCriterionSync } from "@/lib/criteria";
@@ -681,6 +681,8 @@ export async function GET(req: NextRequest) {
         retention: { newcomers: retention?.newcomers ?? 0, returning: retention?.ret ?? 0 },
         pageviews30d, pageBuckets, topCafes,
         funnel: { visitors: funnel?.visitors ?? 0, viewedCafe: funnel?.viewed_cafe ?? 0 },
+        // 🕒 판정 신선도 — 오늘 숫자가 왜 오르내리는지·언제 확정되는지(CEO 요청 2026-09-14)
+        verdict: verdictFreshness(((await sql`SELECT max(updated_at) m FROM bot_anon_cache`.catch(() => [])) as any[])[0]?.m ?? null),
       },
     };
 

@@ -703,6 +703,12 @@ export default function AdminPage() {
                     <span>월간(MAU) <b className="text-sky-700">{tower.traffic.mau}</b></span>
                     <span>재방문 <b className="text-stone-700">{tower.traffic.retention?.returning ?? 0}</b></span>
                   </div>
+                  {/* 🕒 판정 신선도(2026-09-14) — "50이었다가 45로 줄었다"의 답을 화면에 둔다. */}
+                  <div className="mt-1 pt-1 border-t border-sky-200/70 text-[10px] leading-relaxed text-stone-600">
+                    <b className="text-amber-700">오늘 숫자는 집계 중</b>이라 오르내립니다 · 확정 <b className="text-stone-800">{tower.traffic.verdict?.settlesAt ?? "다음 날 00:30"}</b>
+                    {tower.traffic.verdict?.cacheAgeMin != null && <> · 마지막 판정 <b className="text-stone-800">{tower.traffic.verdict.cacheAgeMin}분 전</b></>}
+                    <div className="text-stone-500">봇을 빼는 게 아니라 <b>사람 증거(검색 유입·2페이지·재방문·모바일) 있는 사람만</b> 셉니다. 방금 온 사람은 아직 증거가 없어 다음 판정에서 빠지고, 나중에 더 보거나 다시 오면 다시 들어옵니다.</div>
+                  </div>
                 </button>
               )}
               {/* 🤖 LLM 보강 대기 — 경계후기는 노출서 제외(소비자 신뢰 유지), LLM 판정 후 확인분만 보강 */}

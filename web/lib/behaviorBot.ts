@@ -216,6 +216,27 @@ export const BOT_ANON_IDS_COMPUTE_SQL = `
 export const BOT_ANON_IDS_SQL = `SELECT anon_id FROM bot_anon_cache`;
 
 let lastRefresh = 0;
+/**
+ * 🕒 판정 신선도(2026-09-14, CEO "숫자가 50에서 45로 줄어드는 이유") —
+ *   방문자 수는 '봇을 빼는' 게 아니라 **'사람이라는 증거가 하나라도 있는 사람만' 세는** 방식이다.
+ *   증거 4종 = 검색엔진 유입 · 2페이지 이상 · 2일 이상 재방문 · 모바일 기기.
+ *   막 들어온 방문자는 아직 증거를 만들 시간이 없다. 그런데 판정 캐시는 최대 30분마다 갱신되므로,
+ *   **방금 온 사람은 잠깐 사람으로 세어졌다가 다음 갱신에서 빠진다** → 숫자가 내려간다.
+ *   반대로 나중에 두 번째 페이지를 보거나 다시 오면 증거가 생겨 다시 들어온다 → 숫자가 올라간다.
+ *
+ *   확정 규칙(내려가는 움직임 기준):
+ *     · 어떤 날의 마지막 방문자가 들어오고 **30분**이 지나면 그날 숫자는 더 내려가지 않는다.
+ *       → 그날 자정 + 30분 = **다음 날 00:30 KST에 확정**(그 뒤로는 증거가 쌓여 올라갈 일만 남는다).
+ *     · 오늘 숫자는 계속 집계 중이다.
+ */
+export function verdictFreshness(cacheUpdatedAt: string | Date | null): { cacheAgeMin: number | null; settlesAt: string; todayPending: boolean } {
+  const now = new Date();
+  const kstNow = new Date(now.getTime() + 9 * 3600_000);
+  const settle = new Date(Date.UTC(kstNow.getUTCFullYear(), kstNow.getUTCMonth(), kstNow.getUTCDate() + 1, 0, 30)); // 다음 날 00:30 KST
+  const ageMin = cacheUpdatedAt ? Math.max(0, Math.round((now.getTime() - new Date(cacheUpdatedAt).getTime()) / 60000)) : null;
+  return { cacheAgeMin: ageMin, settlesAt: `${settle.getUTCMonth() + 1}월 ${settle.getUTCDate()}일 00:30`, todayPending: true };
+}
+
 /** 캐시 갱신 — maxAgeMin보다 오래됐을 때만 재계산한다. 관제 화면·크론 진입부에서 부른다. */
 export async function refreshBotCache(sql: any, maxAgeMin = 30): Promise<void> {
   try {
