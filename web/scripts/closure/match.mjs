@@ -114,7 +114,7 @@ for (const c of cafes) {
   const live = sameName.find((x) => x.p.cd === "01");
   const chosen = live ? live.p : best.p;
   out.matched++; out.byWay[way]++;
-  const row = { id: c.id, name: c.name, addr: c.address, published: c.published, permit: chosen.nm, status: chosen.st, closed: chosen.cl, sim: +best.s.toFixed(2), way, cands: cands.length };
+  const row = { id: c.id, name: c.name, addr: c.address, published: c.published, permit: chosen.nm, status: chosen.st, cd: chosen.cd, closed: chosen.cl, no: chosen.no, tel: (chosen.tel || "").trim(), opened: chosen.opn || "", sim: +best.s.toFixed(2), way, cands: cands.length };
   out.matchedRows.push(row);
   // 🔴 2026-09-10 기각 규칙 — 인허가 원장은 **같은 주소의 과거 폐업 이력을 전부** 담는다.
   //   그 자리에 새로 연 비슷한 이름의 카페가 옛 폐업 레코드에 붙는다(도로명+이름만으로는 못 가른다).
@@ -145,3 +145,34 @@ for (const r of out.closedPublished.slice(0, SAMPLE_N)) {
 }
 writeFileSync(path.join(DIR, "match-report.json"), JSON.stringify({ at: new Date().toISOString(), permits, cafes: cafes.length, published: pub, matched: out.matched, matchedPublished: matchedPub, closedPublished: out.closedPublished, byWay: out.byWay }, null, 1));
 console.log(`\n저장: ${path.join(DIR, "match-report.json")} (DB 반영 없음)`);
+
+
+// ══ 2026-09-13 공공데이터 전환 1단계(CEO 지시 "공공데이터 전환 착수") — 매칭 결과를 **부수 테이블 cafe_permits**에 적재.
+//   cafes 본표는 건드리지 않는다(이름·주소·좌표 교체는 2단계, 정확도 검증 뒤). 여기 실린 것:
+//   인허가 관리번호·등기상호·영업상태·폐업일·전화(공공데이터 TELNO, 이용허락범위 제한 없음)·개업일·유사도.
+//   용도: ①사장님 전화 리스트의 합법 전화 출처 ②cron-closure 최상위 폐업 신호(자동 비공개 아님) ③2단계 신원 교체의 근거.
+//   실행: node --import tsx scripts/closure/match.mjs --write-db=1   (web/.env.local의 DATABASE_URL)
+if (arg("write-db", "") === "1") {
+  const { neon } = await import("@neondatabase/serverless");
+  const envTxt = readFileSync(path.join(process.cwd(), ".env.local"), "utf8");
+  const url = (envTxt.match(/^DATABASE_URL=(.*)$/m) || [])[1]?.replace(/^["']|["']$/g, "");
+  if (!url) { console.error("DATABASE_URL 없음"); process.exit(1); }
+  const sql = neon(url);
+  await sql.query(`CREATE TABLE IF NOT EXISTS cafe_permits (
+    cafe_id INT PRIMARY KEY, mng_no TEXT, permit_nm TEXT, status_cd TEXT, status_nm TEXT, closed_ymd TEXT, tel TEXT, opened_ymd TEXT,
+    sim REAL, way TEXT, matched_at TIMESTAMPTZ NOT NULL DEFAULT now())`);
+  await sql.query(`CREATE INDEX IF NOT EXISTS idx_cafe_permits_status ON cafe_permits (status_cd)`);
+  const rows = out.matchedRows;
+  let n = 0;
+  for (let i = 0; i < rows.length; i += 500) {
+    const b = rows.slice(i, i + 500);
+    await sql.query(`INSERT INTO cafe_permits (cafe_id, mng_no, permit_nm, status_cd, status_nm, closed_ymd, tel, opened_ymd, sim, way, matched_at)
+      SELECT * FROM unnest($1::int[], $2::text[], $3::text[], $4::text[], $5::text[], $6::text[], $7::text[], $8::text[], $9::real[], $10::text[], array_fill(now(), ARRAY[$11::int]))
+      ON CONFLICT (cafe_id) DO UPDATE SET mng_no=EXCLUDED.mng_no, permit_nm=EXCLUDED.permit_nm, status_cd=EXCLUDED.status_cd, status_nm=EXCLUDED.status_nm,
+        closed_ymd=EXCLUDED.closed_ymd, tel=EXCLUDED.tel, opened_ymd=EXCLUDED.opened_ymd, sim=EXCLUDED.sim, way=EXCLUDED.way, matched_at=now()`,
+      [b.map((r) => Number(r.id)), b.map((r) => r.no || ""), b.map((r) => r.permit || ""), b.map((r) => r.cd || ""), b.map((r) => r.status || ""),
+       b.map((r) => r.closed || ""), b.map((r) => r.tel || ""), b.map((r) => r.opened || ""), b.map((r) => Number(r.sim) || 0), b.map((r) => r.way || ""), b.length]);
+    n += b.length;
+  }
+  console.log(`\n🗄️ cafe_permits 적재 ${n.toLocaleString()}행 (부수 테이블 · cafes 본표 무변경)`);
+}
