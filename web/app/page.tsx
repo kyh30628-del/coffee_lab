@@ -751,6 +751,11 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
   // 🔴 2026-09-13 3차 — CEO "왜 자꾸 두 번 써지냐". 컴포넌트 상태만으론 부족했다(이 컴포넌트가 어떤 경로로든 다시
   //   마운트되면 상태가 초기화돼 처음부터 다시 쓴다). → **페이지 로드 단위 전역 기록**(landingOnce): 한 번 확정한 메모와
   //   완료 여부를 모듈 변수에 두고, 두 번째 마운트부터는 애니메이션 없이 완성본을 그대로 보여준다. 새로고침(새 로드)에서만 다시 쓴다.
+  // 🔴 2026-09-13 최종 — CEO "9월 13일로 시작하는 글 말고 그 전에 글 하나 써지잖아".
+  //   기록이 답이었다: 폰 첫 실행은 /api/discover가 1.2초 안에 안 온다(실측 mount+1203ms에 폴백으로 확정).
+  //   그래서 **고정 문구('오늘, 우리 동네. …')가 먼저 써지고**, 그 다음(재진입·새로고침·데이터 도착 경로)에 진짜 메모가 써진다.
+  //   → 폴백 대기를 1.2초 → 4초로 늘려 실제 데이터를 기다린다. 4초 안에 오면 **처음부터 진짜 메모 하나만** 써진다.
+  //     (4초 안에도 못 오면 그때만 고정 문구. 그 경우에도 바뀌지 않는다.)
   const [memo, setMemo] = useState<string[] | null>(() => landingOnce.memo);
   const mountId = useMemo(() => Math.random().toString(36).slice(2, 8), []);
   useEffect(() => { landingBeacon("mount", { mountId }); }, [mountId]);
@@ -770,8 +775,8 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
   useEffect(() => {
     if (memo) return;                                   // 이미 확정 — 무슨 일이 있어도 다시 안 쓴다
     const fix = (m: string[]) => { landingOnce.memo = m; setMemo(m); };
-    if (discover) { fix(landingMemo(discover, seed).slice(0, 7)); return; }
-    const t = setTimeout(() => { if (!landingOnce.memo) fix(landingMemo(null, seed).slice(0, 7)); }, 1200);
+    if (discover) { landingBeacon("memo-fix", { mountId, memoHash: "real:" + (landingMemo(discover, seed)[0] ?? "").slice(0, 14) }); fix(landingMemo(discover, seed).slice(0, 7)); return; }
+    const t = setTimeout(() => { if (!landingOnce.memo) { landingBeacon("memo-fix", { mountId, memoHash: "fallback" }); fix(landingMemo(null, seed).slice(0, 7)); } }, 4000);
     return () => clearTimeout(t);
   }, [discover, memo, seed]);
   const LANDING_MEMO = useMemo(() => memo ?? [], [memo]);
