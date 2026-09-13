@@ -75,12 +75,19 @@ const TOTAL_MEDIAN_MULT = Number(process.env.COST_WATCH_TOTAL_MULT || 1.6);
 //   agent_runs.detail의 "총 X GB" 표기를 그대로 재사용 — 새 테이블 없음.
 async function transferMedianGb(): Promise<number> {
   try {
-    const rows = (await sql`SELECT to_char(ran_at AT TIME ZONE 'Asia/Seoul','YYYY-MM-DD') d, detail
-      FROM agent_runs WHERE job='cron-costwatch' AND ran_at > now() - interval '8 days'
-      ORDER BY ran_at DESC`) as { d: string; detail: string }[];
+    // 🔴 2026-09-13 수리 — 여기가 **agent_runs**를 읽고 있었다. 그 테이블은 `job TEXT PRIMARY KEY`라
+    //   잡당 1행만 남는다. 즉 '7일 중앙값'이라고 화면·메일에 찍히던 값은 **직전 실행 1개**였다.
+    //   그래서 임계가 매일 널뛰었다(실측: 09-11 133.2 → 09-12 52.3 → 09-12재실행 172.8 → 09-13 13.5).
+    //   특히 하루 중 수동 재실행이 끼면 그 몇 시간치 소량이 '그날 총량'으로 박혀 다음날 임계를 바닥(하한 25GB)까지 끌어내렸다.
+    //   임계가 바닥이면 차단기가 오작동으로 걸리고 무거운 크론이 24h 전면 정지한다 — 실제 피해가 있는 결함이다.
+    //   → 전 이력이 있는 **run_ledger**를 읽고, 하루에 여러 번 돌았으면 **정기 실행(그날 첫 실행)** 값만 쓴다.
+    const rows = (await sql`SELECT to_char(started_at AT TIME ZONE 'Asia/Seoul','YYYY-MM-DD') d, detail
+      FROM run_ledger WHERE job='cron-costwatch' AND started_at > now() - interval '8 days'
+        AND started_at < date_trunc('day', now() AT TIME ZONE 'Asia/Seoul') AT TIME ZONE 'Asia/Seoul'
+      ORDER BY started_at ASC`) as { d: string; detail: string }[];
     const byDay = new Map<string, number>();
     for (const r of rows) {
-      if (byDay.has(r.d)) continue; // 하루 여러 실행 시 최신값만
+      if (byDay.has(r.d)) continue; // 하루 여러 실행 시 **정기 실행(첫 실행)** 값만 — 수동 재실행이 중앙값을 오염시키던 원인
       const m = String(r.detail).match(/총\s*([\d.]+)\s*GB/);
       if (m) byDay.set(r.d, Number(m[1]));
     }
