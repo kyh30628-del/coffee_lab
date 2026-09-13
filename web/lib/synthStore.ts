@@ -566,6 +566,11 @@ const HEAL_UNPUB_CAP = Number(process.env.HEAL_UNPUB_CAP || 50);
 async function dueForReviewScan(key: string, dictSource: string): Promise<number[]> {
   const col = `${key}_scan_at`;
   await sql.query(`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS ${col} TIMESTAMPTZ`).catch(() => {});
+  // 💰 2026-09-13 — 워터마크는 제 일을 했는데(대기 0행) **그 0행을 찾는 조회 자체가** 매번 cafes 전체를
+  //   훑고 있었다(13,818블록·108MB). autoCorrect가 크론·관리자화면에서 하루 558회 불러 60GB/일이 샜다.
+  //   조건과 똑같은 부분 인덱스를 만들면 대기열이 비었을 때 **1블록**으로 끝난다(실측 35ms → 0.02ms).
+  await sql.query(`CREATE INDEX IF NOT EXISTS idx_cafes_${key}_due ON cafes (synth_updated DESC NULLS LAST)
+    WHERE published = true AND synth_reviews IS NOT NULL AND (${col} IS NULL OR synth_updated > ${col})`).catch(() => {});
   await sql`CREATE TABLE IF NOT EXISTS heal_dict_state (k TEXT PRIMARY KEY, v TEXT)`.catch(() => {});
   const hash = createHash("sha1").update(dictSource).digest("hex").slice(0, 16);
   const prev = (await sql`SELECT v FROM heal_dict_state WHERE k = ${key}`.catch(() => []))[0] as any;

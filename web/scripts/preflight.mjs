@@ -91,4 +91,43 @@ if (bad.length) {
   process.exit(1);
 }
 
-console.log(`✅ preflight 통과 — cafes 컬럼 참조 정상(스키마 ${cols.size}개 대조)`);
+console.log(`✅ cafes 컬럼 참조 정상(스키마 ${cols.size}개 대조)`);
+
+// ═══ ② 쿼리플랜 검사 — cafes 전체 스캔 금지(2026-09-13 비용사고 재발방지) ═══
+//
+// 그날 무슨 일이 있었나:
+//   하루 전송량 338.6GB(임계 25GB)로 비용 차단기가 걸려 크론이 전부 멈췄다. 원인은 한 줄짜리 버그가 아니라
+//   **인덱스를 못 타는 쿼리들이 조용히 쌓인 것**이었다 — 이름검색 185.6GB/1,437회, 관리자 집계 2.1GB×540회,
+//   오염 워터마크 조회가 0행을 찾으려고 108MB×558회. 전부 "동작은 맞고 느리기만 한" 코드라 아무도 안 잡았다.
+//
+// 왜 검사인가:
+//   이런 건 리뷰로 못 잡는다. 테이블이 커지면 어제 싼 쿼리가 오늘 비싸진다.
+//   사람이 매번 EXPLAIN 하지 않는다 → 기계가 배포 전에 막는다.
+//
+// 무엇을 검사하나: 실제로 자주 도는 쿼리를 EXPLAIN(실행 안 함)해서 cafes에 Seq Scan이 뜨면 배포를 멈춘다.
+//   ⚠️ 새로 만든 뜨거운 쿼리는 여기에 추가할 것. 여기 없으면 다음에도 조용히 샌다.
+const HOT = [
+  ["검색: 카페 이름", `SELECT id, name FROM cafes WHERE published = true AND replace(lower(name), ' ', '') LIKE ANY(ARRAY['%프릳츠%']) LIMIT 8`],
+  ["검색: 지역 목록", `SELECT area, count(*)::int n FROM cafes WHERE published AND area IS NOT NULL AND area <> '' GROUP BY area HAVING count(*) >= 5 ORDER BY n DESC`],
+  ["관리자: 노이즈 집계", `SELECT AVG(sq_rejected::float / NULLIF(sq_raw::float,0)) FROM cafes WHERE sq_raw IS NOT NULL`],
+  ["치유기: offconcept 대기열", `SELECT id FROM cafes WHERE published = true AND synth_reviews IS NOT NULL AND (offconcept_scan_at IS NULL OR synth_updated > offconcept_scan_at) ORDER BY synth_updated DESC NULLS LAST LIMIT 3000`],
+  ["치유기: noncafe 대기열", `SELECT id FROM cafes WHERE published = true AND synth_reviews IS NOT NULL AND (noncafe_scan_at IS NULL OR synth_updated > noncafe_scan_at) ORDER BY synth_updated DESC NULLS LAST LIMIT 3000`],
+];
+const slow = [];
+for (const [label, q] of HOT) {
+  try {
+    const rows = await sql.query("EXPLAIN " + q);
+    const plan = rows.map((r) => String(r["QUERY PLAN"] ?? Object.values(r)[0])).join("\n");
+    if (/Seq Scan on cafes/.test(plan)) slow.push({ label, plan: plan.split("\n").find((l) => l.includes("Seq Scan on cafes")).trim() });
+  } catch (e) {
+    slow.push({ label, plan: `EXPLAIN 실패: ${e.message}` }); // 컬럼·인덱스가 없어도 여기서 걸린다
+  }
+}
+if (slow.length) {
+  console.error("🔴 배포 중단 — cafes 전체 스캔(또는 EXPLAIN 실패)이 있습니다:");
+  for (const s of slow) console.error(`   ${s.label}\n      ${s.plan}`);
+  console.error("\n   조치: 인덱스를 만들거나(부분·표현식 인덱스) 필터를 인덱스 탈 수 있는 모양으로 바꾸세요.");
+  console.error("   한 번 전체 스캔이 뚫리면 호출수만큼 곱해져 하루 수백 GB가 됩니다(2026-09-13: 338.6GB).");
+  process.exit(1);
+}
+console.log(`✅ preflight 통과 — 뜨거운 쿼리 ${HOT.length}개 전부 인덱스 사용`);

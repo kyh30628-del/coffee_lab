@@ -27,6 +27,11 @@ export async function ensureSearchIndexes() {
     await sql`CREATE EXTENSION IF NOT EXISTS pg_trgm`.catch(() => {});
     await sql`CREATE INDEX IF NOT EXISTS idx_cafes_name_norm_trgm
       ON cafes USING gin (replace(lower(name), ' ', '') gin_trgm_ops) WHERE published`.catch(() => {});
+    //   ② idx_cafes_sq_cols — 관리자 노이즈 집계(하루 540회)가 Index Only Scan을 타게 한다.
+    //      생성열 sq_raw·sq_rejected는 느린 DDL(테이블 재작성 6분)이라 여기서 만들지 않는다 →
+    //      scripts/migrations/2026-09-13-sq-cols.mjs 로 1회 집행. 열이 없으면 인덱스 생성만 조용히 실패하고
+    //      관리자 라우트는 옛 쿼리로 폴백한다(화면 안 깨짐).
+    await sql`CREATE INDEX IF NOT EXISTS idx_cafes_sq_cols ON cafes (sq_raw, sq_rejected) WHERE sq_raw IS NOT NULL`.catch(() => {});
   });
 }
 

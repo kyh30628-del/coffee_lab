@@ -39,10 +39,20 @@ export async function GET(req: NextRequest) {
       COUNT(*) FILTER (WHERE llm_judged_at IS NOT NULL)::int llm_judged
       FROM cafes`)[0];
     const grades = await sql`SELECT COALESCE(synth_grade,'미합성') grade, COUNT(*)::int n FROM cafes WHERE published GROUP BY synth_grade`;
+    // 💰 2026-09-13 비용사고 수리 — 예전엔 `synth_quality->>'raw'`를 39,806행에 대해 계산했다.
+    //   synth_quality는 JSONB(TOAST)라 행마다 디토스트가 일어나 **1회 2.1GB·2.9초**였고, 관리자 화면이
+    //   하루 540회 부르면서 전송량 상위였다(58.0GB/일). 값은 정수 둘뿐인데 큰 컬럼을 통째로 읽고 있었다.
+    //   → sq_raw·sq_rejected **생성열(GENERATED ALWAYS … STORED)**로 뽑아 둔다. Postgres가 쓰기마다
+    //     자동 계산하므로 드리프트가 구조적으로 0이고(쓰기 경로 수정 없음), 인라인 int라 TOAST를 안 읽는다.
+    //   실측: 327,406블록·2,871ms → 79블록·12ms(Index Only Scan, idx_cafes_sq_cols). 값 동일 검증함.
+    //   ⚠️ 생성열이 없는 DB(신규 복제본 등)에서는 옛 쿼리로 폴백한다 — 화면이 비지 않게.
     const quality = (await sql`SELECT
+      ROUND(AVG(sq_rejected::float / NULLIF(sq_raw::float,0))::numeric * 100, 1) avg_noise_pct,
+      SUM(sq_raw)::int raw, SUM(sq_rejected)::int rejected
+      FROM cafes WHERE sq_raw IS NOT NULL`.catch(async () => (await sql`SELECT
       ROUND(AVG((synth_quality->>'rejected')::float / NULLIF((synth_quality->>'raw')::float,0))::numeric * 100, 1) avg_noise_pct,
       SUM((synth_quality->>'raw')::int)::int raw, SUM((synth_quality->>'rejected')::int)::int rejected
-      FROM cafes WHERE synth_quality IS NOT NULL`)[0];
+      FROM cafes WHERE synth_quality IS NOT NULL`)))[0];
 
     // 지역별 공개 카페 분포 (JS 버킷)
     const areas = (await sql`SELECT area FROM cafes WHERE published`) as unknown as { area: string }[];
