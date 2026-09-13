@@ -242,4 +242,8 @@ if (mergedBatch.length) {
   }
 }
 // 반영 미확인 건이 있으면 비정상 종료 → 래퍼 하트비트(ok=false)로 즉시 이슈화·본부 배정.
-process.exit(anyUnverified ? 1 : 0);
+// 🔴 2026-09-13 수리: **배포 창 밖 보류(deferredPush)는 실패가 아니라 대기**다. 그런데 보류 경로도 anyUnverified=true가 돼
+//   매일 저녁 dev-deploy가 exit 1로 찍히고 관제탑이 빨갛게 떴다(실측 09-13 20:47). 보류면 정상 종료한다.
+//   (푸시 실패·진짜 반영 미확인은 그대로 exit 1 — 사람이 봐야 한다.)
+if (deferredPush) console.log(`[묶음푸시] 대기 상태로 정상 종료 — 다음 배포 창(08:05)에 자동 재시도`);
+process.exit(anyUnverified && !deferredPush ? 1 : 0);
