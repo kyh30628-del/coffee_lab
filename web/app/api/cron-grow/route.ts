@@ -82,18 +82,25 @@ export async function GET(req: NextRequest) {
       //     그 지역을 버리는 게 아니다: 아래 critical(10일+ 또는 미실행)이 절대 우선이라
       //     **어떤 지역도 10일을 넘겨 방치되지 않는다**(12일 구간은 사실상 10일로 캡된다).
       //   ⚠️ 표본이 작으면(훑음 50 미만) 판단하지 않는다 — 신설 지역을 잘못 얼리지 않기 위해.
+      //   🔴 2026-09-13 재측정(CEO 지시) — 12/6/3일로는 못 막았다. 그날 돈 14개 지역 실측:
+      //     대전 유성구 294훑음 53신규(18.0%) · 부산진구 14.4% · 부산 북구 13.2%  ← 수확처
+      //     강남구 511훑음 3신규(0.6%) · 포천 0.4% · 강동구·연천군·양양군·동래구 **0.0%** ← 빈 우물
+      //     182개 중 71개(39%)가 쿨다운을 통과해 절반이 빈 우물로 갔다. 배수를 30/14/7일로 늘린다.
+      //     방치 상한은 그대로 유지된다 — 30일이면 critical(10일+)로 올라와 반드시 한 번은 돈다.
       const YIELD_COOLDOWN = sql`(
         last_run IS NULL OR last_run < now() - (
           CASE
             WHEN COALESCE(last_found, 0) < 50 THEN interval '0 days'
-            WHEN last_inserted::float / last_found < 0.02 THEN interval '12 days'
-            WHEN last_inserted::float / last_found < 0.05 THEN interval '6 days'
-            WHEN last_inserted::float / last_found < 0.10 THEN interval '3 days'
+            WHEN last_inserted::float / last_found < 0.02 THEN interval '30 days'
+            WHEN last_inserted::float / last_found < 0.05 THEN interval '14 days'
+            WHEN last_inserted::float / last_found < 0.10 THEN interval '7 days'
             ELSE interval '0 days'
           END)
       )`;
 
-      const priorityStarved = (await sql`SELECT region, area_label FROM discovery_state WHERE region = ANY(${PRIORITY_REGIONS}) AND (last_run IS NULL OR last_run < now() - interval '3 days') ORDER BY last_run ASC NULLS FIRST LIMIT 1`)[0] as { region: string; area_label: string } | undefined;
+      // ⚠️ 2026-09-13 — 우선권역도 쿨다운을 존중한다. 강동구는 직전 150훑음 0신규(0.0%)인데 이 줄이
+      //   쿨다운을 건너뛰어 3일마다 불려 나와 매번 빈손으로 쿼터만 태웠다. 7일로 늘리고 쿨다운을 건다.
+      const priorityStarved = (await sql`SELECT region, area_label FROM discovery_state WHERE region = ANY(${PRIORITY_REGIONS}) AND (last_run IS NULL OR last_run < now() - interval '7 days') AND ${YIELD_COOLDOWN} ORDER BY last_run ASC NULLS FIRST LIMIT 1`)[0] as { region: string; area_label: string } | undefined;
       // 🐛 재발방지(2026-07-26): priorityStarved(위 줄)는 NULL(한 번도 미발굴)을 안전 처리하는데 이 쿼리는
       //   WHERE last_run < ... 만 있어 NULL은 SQL에서 '비교 결과 unknown'이라 결과에서 아예 빠졌다 — 즉
       //   한 번도 발굴 안 된 신설 지역(예: 인천 행정구역 개편 신설구)이 '5일+ 굶음'보다도 우선순위가
@@ -101,9 +108,14 @@ export async function GET(req: NextRequest) {
       const starved = (await sql`SELECT region, area_label, (last_run IS NULL OR last_run < now() - interval '10 days') AS critical FROM discovery_state WHERE (last_run IS NULL OR last_run < now() - interval '5 days') AND ${YIELD_COOLDOWN} ORDER BY last_run ASC NULLS FIRST LIMIT 1`)[0] as { region: string; area_label: string; critical: boolean } | undefined;
       const critical = priorityStarved ?? (starved?.critical ? starved : undefined);
       const at = critical ? null : (await sql`SELECT id, region, area_label, keywords FROM discovery_targets WHERE status='pending' ORDER BY priority DESC, created_at ASC LIMIT 1`)[0] as any;
+      // 🎯 2026-09-13 — 같은 쿼터를 수확처에 먼저 쓴다(CEO 지시 "신규 권역 집중").
+      //   쿨다운을 통과한 지역 중 **직전 수확률 10% 이상**을 앞세운다(실측: 10%+ 지역이 같은 훑음으로 20~30배를 건진다).
+      //   굶주림은 여전히 critical(10일+·미실행)이 보장한다 — 여기서 밀린 지역도 30일 안에 반드시 한 번 돈다.
       const rotate = async (cooled: boolean) => (await sql`SELECT region, area_label FROM discovery_state
         WHERE ${cooled ? YIELD_COOLDOWN : sql`true`}
-        ORDER BY (region = ANY(${PRIORITY_REGIONS}) AND (last_run IS NULL OR last_run < now() - interval '6 hours')) DESC, last_run ASC NULLS FIRST LIMIT 1`)[0] as { region: string; area_label: string } | undefined;
+        ORDER BY (region = ANY(${PRIORITY_REGIONS}) AND (last_run IS NULL OR last_run < now() - interval '6 hours')) DESC,
+                 (COALESCE(last_inserted, 0)::float / NULLIF(last_found, 0) >= 0.10) DESC NULLS LAST,
+                 last_run ASC NULLS FIRST LIMIT 1`)[0] as { region: string; area_label: string } | undefined;
       // 쿨다운을 통과한 지역 우선. 전부 쿨다운이면 예전 규칙으로 폴백해 교착을 만들지 않는다.
       const target = critical ?? (at ?? starved ?? (await rotate(true)) ?? (await rotate(false)));
       if (!target) break;
