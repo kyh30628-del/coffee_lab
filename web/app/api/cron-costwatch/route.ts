@@ -237,16 +237,17 @@ export async function GET(req: NextRequest) {
     //   (pg_stat_statements.shared_blks_read × 8KB). 그런데 '데이터전송 이상'이라 써서 청구서로 오해하게 만들었다.
     //   실청구 전송은 Neon API의 data_transfer_bytes다 — 같은 줄에 함께 찍어 두 번 다시 헷갈리지 않게 한다.
     //   실측 09-13: 경보 338.6GB(디스크 읽기) vs 실청구 전송 14.6GB/일(무료 500GB의 36.7%) — 자릿수가 다르다.
+    // 🔑 2026-09-14: 실청구 지표는 **DB에서 읽는다**. NEON_API_KEY가 Vercel 환경변수에 없어(09-14 실측: 이 줄이 비어 나옴)
+    //   여기서 직접 호출하면 늘 실패한다. 키를 가진 로컬이 하루 1회 scripts/neon-billing-snapshot.mjs로 neon_billing에 적재하고
+    //   여기선 최신 1행만 읽는다 — 시크릿이 배포 환경으로 안 나가고, 이력이 남아 추세 비교도 된다.
     let billed = "";
     try {
-      const r = await fetch("https://console.neon.tech/api/v2/projects/damp-dew-22096939",
-        { headers: { Authorization: `Bearer ${process.env.NEON_API_KEY}`, Accept: "application/json" } });
-      const pj = (await r.json())?.project;
-      const eg = (pj?.data_transfer_bytes ?? 0) / 1e9, cuh = (pj?.compute_time_seconds ?? 0) / 3600;
-      const st = new Date(pj?.consumption_period_start ?? Date.now());
-      const days = Math.max(0.5, (Date.now() - st.getTime()) / 86400000);
-      if (eg > 0) billed = ` · 💳실청구 전송 ${(eg / days).toFixed(1)}GB/일(월누계 ${eg.toFixed(0)}GB·무료 500GB의 ${Math.round(eg / 5)}%) · 컴퓨트 ${(cuh / days).toFixed(1)}CU-h/일`;
-    } catch { /* API 실패 시 디스크 읽기만 */ }
+      const b = (await sql`SELECT egress_gb, egress_per_day, compute_per_day, taken_at FROM neon_billing ORDER BY taken_at DESC LIMIT 1`.catch(() => []))[0] as any;
+      if (b) {
+        const ageH = Math.round((Date.now() - new Date(b.taken_at).getTime()) / 3600000);
+        billed = ` · 💳실청구 전송 ${Number(b.egress_per_day).toFixed(1)}GB/일(월누계 ${Number(b.egress_gb).toFixed(0)}GB·무료 500GB의 ${Math.round(Number(b.egress_gb) / 5)}%) · 컴퓨트 ${Number(b.compute_per_day).toFixed(1)}CU-h/일${ageH > 30 ? `(${ageH}h 전 기준)` : ""}`;
+      } else billed = " · 💳실청구 미수집(로컬 neon-billing 스냅샷 확인 필요)";
+    } catch { /* 실패해도 디스크 읽기만으로 보고 */ }
     const detail = anomaly
       ? awakeNote + `🚨 디스크 읽기 이상(내부 I/O·청구액 아님): 오늘 총 ${totalGb.toFixed(1)}GB(임계 ${totalLimit.toFixed(1)}GB, 7일중앙값 ${medGb.toFixed(1)}GB×${TOTAL_MEDIAN_MULT})${billed}` +
         (top && top.deltaGb >= PER_QUERY_GB_ALERT ? ` · 최다쿼리 ${top.deltaGb.toFixed(1)}GB: ${top.q.replace(/\s+/g, " ").slice(0, 100)}` : "")

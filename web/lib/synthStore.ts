@@ -11,7 +11,7 @@ import { visitorMix } from "./visitorMix";
 import { extractWorkSignals } from "./workDetail";
 import { upsertReviewerStats } from "./reviewerProfiles";
 import { judgeReviews, hasJudgeKey } from "./reviewJudge";
-import { isNonCafe, isFranchise, isGenericFoodName, isSnackStall, isStructuralPhantom, isUnmannedCafe } from "./discover";
+import { isNonCafe, isFranchise, isGenericFoodName, isSnackStall, isStructuralPhantom, isUnmannedCafe, parseGuArea } from "./discover";
 import { tickBlob } from "./blobBudget";
 import { acquireLease, releaseLease } from "./healLease";
 import { noteWrite } from "./writeScope";
@@ -386,6 +386,23 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   const unpublishLocked = !otherwiseBlocked && ruleOk && await lastUnpublishLocked(cafeId);
   const newPst = excluded ? "excluded" : unpublishLocked ? "excluded" : held ? "held" : stuckNoise ? "noise" : inPipeline ? (ruleOk ? "pending" : "rejected") : pst;
   const publish = (otherwiseBlocked || unpublishLocked) ? false : ruleOk; // 제외·잠금·held·노이즈·파이프라인은 비공개 고정
+
+  // 🗺️ 2026-09-14(협업#408-3) — parseGuArea가 **discover 삽입 시에만** 불려서, 코드가 고쳐져도
+  //   이미 적재된 오염 행(주소 시도와 area가 다른 106건 실측)은 영원히 안 고쳐졌다. 재합성 때 한 번 더 본다.
+  //   ⚠️ 안전: 주소에서 실제로 읽힌 값이 있고 현재 area와 다를 때만 바꾼다(주소 없음·해석 실패면 손대지 않음).
+  //   ⚠️ address가 이름과 같은 '가비지'면 지역 판정 근거가 아니므로 건드리지 않고 그대로 둔다(별도 수집 수리 대상).
+  try {
+    const row = (await sql`SELECT address, area, name FROM cafes WHERE id=${cafeId}`)[0] as any;
+    const addr = String(row?.address ?? "");
+    const garbage = addr && row?.name && addr.replace(/\s/g, "") === String(row.name).replace(/\s/g, "");
+    if (addr && !garbage) {
+      const fixed = parseGuArea(addr);
+      if (fixed && fixed !== row.area) {
+        await sql`UPDATE cafes SET area=${fixed}, updated_at=now() WHERE id=${cafeId}`;
+        noteWrite("cafes.area");
+      }
+    }
+  } catch { /* 지역 재판정 실패는 합성을 막지 않는다 */ }
 
   // 🔐 하네스 L3 — 합성 결과 쓰기의 **단일 지점**에서 신고한다. 스코프를 연 잡(openScope)은
   //   여기 한 곳만으로 자동 적용되고, 계약에 이 대상이 없으면 드리프트로 잡힌다.

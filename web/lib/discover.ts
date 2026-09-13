@@ -252,7 +252,13 @@ const GU_TO_AREA = new Map<string, string>(
 //   엉뚱한 area로 오분류)하는 사고가 났다. "서울" 하나만 여기 남기고 나머지는 PREFIXED_SIDOS를 그대로 쓴다
 //   — 새 접두 시도가 편입돼도 이 파일을 또 고칠 필요가 없다.
 const AMBIG_SIDO_CANDIDATES = ["서울", ...PREFIXED_SIDOS] as const;
-export function parseGuArea(address: string): string | null {
+// 🧹 2026-09-14(협업#409) — 네이버 주소에 **비표준 시도 접두사**가 붙어 오는 케이스가 실재한다.
+//   실측 108건: "전남광주통합특별시 여수시 화양면 …" — 실주소는 정상 전남 지명인데 이 접두사 때문에
+//   parseGuArea가 첫 토큰 '통합특별시'를 못 읽고 엉뚱한 구를 잡아 area가 완전 무관값이 됐다(여수시 주소 → area=영천시).
+//   접두사를 떼고 실제 지명부터 읽는다. (published=false만 있었지만 공개되면 지도·검색이 통째로 틀린다.)
+const BAD_SIDO_PREFIX = /^(전남광주통합특별시|전라남도광주|광주전남통합특별시)\s*/;
+export function parseGuArea(addressRaw: string): string | null {
+  const address = String(addressRaw ?? "").replace(BAD_SIDO_PREFIX, "").trim();
   if (!address) return null;
   const matches = address.match(/[가-힣]+(?:구|시|군)(?![가-힣])/g) ?? [];
   if (matches.length === 0) return null;
