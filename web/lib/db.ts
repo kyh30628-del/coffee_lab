@@ -17,6 +17,19 @@ import { neon } from "@neondatabase/serverless";
 export const sql = neon(process.env.DATABASE_URL || "postgresql://unused:unused@localhost/unused");
 
 let ensured = false;
+// 💰🔎 검색 비용·품질 인덱스(2026-09-13, 결재 #1061). 배포 단위 1회만 확인한다(ensureOnce).
+//   ① idx_cafes_name_norm_trgm — `replace(lower(name),' ','') LIKE '%..%'`(카페 이름 검색)가 인덱스를 못 타
+//      호출마다 cafes 전체(13,838블록)를 훑었다. 09-13 비용경보 338.6GB 중 185.6GB(1,437회)가 이 쿼리였다.
+//      트라이그램 GIN으로 29블록(477배↓ · 86ms→0.6ms). 인덱스 5MB.
+//   ⚠️ 지우면 그대로 재발한다. 쿼리 모양(replace/lower/공백제거)이 바뀌면 인덱스 식도 같이 바꿔야 탄다.
+export async function ensureSearchIndexes() {
+  await ensureOnce("db.searchIndexes.v1", async () => {
+    await sql`CREATE EXTENSION IF NOT EXISTS pg_trgm`.catch(() => {});
+    await sql`CREATE INDEX IF NOT EXISTS idx_cafes_name_norm_trgm
+      ON cafes USING gin (replace(lower(name), ' ', '') gin_trgm_ops) WHERE published`.catch(() => {});
+  });
+}
+
 export async function ensureSchema() {
   if (ensured) return;
   // 💰 2026-08-18: 여기도 콜드스타트마다 다시 돌았다 — 배포 단위 1회로.

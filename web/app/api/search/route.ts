@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SIDO_GU, regionKeyFor, areaMatchesRegion } from "@/lib/regionList";
 import { visitorBadges } from "@/lib/visitorMix";
-import { sql, ensureSchema, ensureOnce } from "@/lib/db";
+import { sql, ensureSchema, ensureOnce, ensureSearchIndexes } from "@/lib/db";
 import { embedQuery, toVectorLiteral, hasEmbedKey } from "@/lib/embed";
 import { hasSearchLLM, rerankWithClaude, lastRerankError, type SearchCand } from "@/lib/searchAgent";
 import { loadCriteria, getCriterionSync } from "@/lib/criteria";
@@ -95,6 +95,26 @@ function metroAreaList(region: string): string[] | null {
   const guList = (SIDO_GU as Record<string, string[]>)[region];
   if (!guList) return null;
   return guList.map((gu) => regionKeyFor(region, gu));
+}
+
+// 🗺️💰 지역명 → 실제 area 라벨 목록(정적 해석 · DB 조회 0). 결재 #1061 수리(2026-09-13).
+//   왜: `area ILIKE '%성남%'`는 인덱스를 못 탄다. 벡터 ORDER BY와 만나면 플래너가 HNSW 인덱스를 고르고
+//   **필터를 뒤에** 걸어, 후보 상한(ef_search)을 먼저 소진하고 멈춘다 —
+//   실측(09-13): "성남시" 시맨틱 검색이 80건 요청에 **16건만** 반환(품질 손실), 비용은 하루 185.6GB/1,437회.
+//   area 목록으로 바꾸면 cafes_pub_area(btree, published 부분인덱스)를 타고 후보를 먼저 좁힌다.
+//   ⚠️ 목록을 못 만들면 null → 옛 ILIKE 경로 그대로(동작 무변). 라벨은 regionKeyFor 단일출처를 따른다.
+function areaListFor(region: string): string[] | null {
+  if (!region) return null;
+  const metro = metroAreaList(region);
+  if (metro) return metro;
+  const short = region.replace(/(특별시|광역시|시|군|구)$/, "");
+  const hit = (label: string, gu: string) =>
+    label.includes(region) || gu.includes(region) || (short.length >= 2 && (label.includes(short) || gu.includes(short)));
+  const out = new Set<string>();
+  for (const [sido, gus] of Object.entries(SIDO_GU as Record<string, string[]>)) {
+    for (const gu of gus) { const label = regionKeyFor(sido, gu); if (hit(label, gu)) out.add(label); }
+  }
+  return out.size > 0 ? Array.from(out) : null;
 }
 
 // 🗺️ area↔region 매칭 — lib/regionList.ts areaMatchesRegion(단일출처, 2026-09-04)에 위임.
@@ -264,7 +284,7 @@ export async function GET(req: NextRequest) {
   // ⚡ 두 캐시 프라임 병렬(독립, 동기 getter 사용 전에 완료). 결과 불변.
   await Promise.all([loadCriteria(), loadCriteriaLists()]);
   try {
-    await Promise.all([ensureSchema(), ensureCache()]); // ⚡ 독립 DDL 프라임 병렬(cafes·search_cache)
+    await Promise.all([ensureSchema(), ensureCache(), ensureSearchIndexes()]); // ⚡ 독립 DDL 프라임 병렬(cafes·search_cache·검색인덱스)
     const q = (req.nextUrl.searchParams.get("q") ?? "").trim();
     const region = (req.nextUrl.searchParams.get("region") ?? "").trim();
     if (q.length < 1) return NextResponse.json({ ok: false, error: "검색어 필요" }, { status: 400 });
@@ -336,11 +356,13 @@ export async function GET(req: NextRequest) {
     const short = shortRaw.length >= 2 ? shortRaw : effectiveRegion; // '중구'→'중'(1자)는 중랑구까지 오매칭 → 전체이름 유지
     const p1 = `%${effectiveRegion}%`, p2 = `%${short}%`;
     const metroList = metroAreaList(effectiveRegion);
+    //   #1061: 시·군·구 단위도 목록으로 해석해 ILIKE 전체스캔을 없앤다(해석 실패 시 null → 옛 경로).
+    const areaList = effectiveRegion ? (metroList ?? areaListFor(effectiveRegion)) : null;
     // 🗺️ 지역 조건 — 도(道) 단위 이름은 area 컬럼에 아예 없다("경북" 카페의 area는 "포항시"·"안동시").
     //   결재 #1057(자율 진단) 실측: "경북·강원·충남·충북 카페"가 전부 0곳인 조용한 실패였다.
     //   시맨틱 경로는 이미 metroList로 분기하는데 아래 두 경로가 리터럴 ILIKE라 빠져 있었다.
-    const areaCond = (i: number) => (metroList ? `area = ANY($${i}::text[])` : `(area ILIKE $${i} OR area ILIKE $${i + 1})`);
-    const areaParams: any[] = metroList ? [metroList] : [p1, p2];
+    const areaCond = (i: number) => (areaList ? `area = ANY($${i}::text[])` : `(area ILIKE $${i} OR area ILIKE $${i + 1})`);
+    const areaParams: any[] = areaList ? [areaList] : [p1, p2];
 
     let mode: "semantic" | "keyword" | "ai" | "region" | "place" = "keyword";   // region = 지역만 말한 질의(그 동네 대표)
     let scored: any[] = [];
@@ -352,24 +374,26 @@ export async function GET(req: NextRequest) {
         const qvec = await embedQuery(q);
         if (qvec) {
           const lit = toVectorLiteral(qvec);
-          const rows = metroList
+          // 💰 #1061: 지역이 있으면 **area로 먼저 좁힌 뒤**(MATERIALIZED CTE가 인라인을 막는다) 그 안에서 거리정렬.
+          //   지역이 없으면 필터가 없으니 HNSW를 그대로 쓴다(원래도 싸다). CTE 컬럼명을 cid로 둬야 FIELDS의 id와 안 겹친다.
+          const rows = areaList
             ? (await sql.query(
-                `SELECT ${FIELDS}, 1 - (embedding <=> $1::vector) AS sim
-                 FROM cafes
-                 WHERE published = true AND embedding IS NOT NULL
-                   AND area = ANY($2::text[])
+                `WITH cand AS MATERIALIZED (
+                   SELECT id AS cid FROM cafes
+                   WHERE published = true AND embedding IS NOT NULL AND area = ANY($2::text[]))
+                 SELECT ${FIELDS}, 1 - (embedding <=> $1::vector) AS sim
+                 FROM cafes JOIN cand ON cafes.id = cand.cid
                  ORDER BY embedding <=> $1::vector
                  LIMIT 80`,
-                [lit, metroList],
+                [lit, areaList],
               )) as unknown as any[]
             : (await sql.query(
                 `SELECT ${FIELDS}, 1 - (embedding <=> $1::vector) AS sim
                  FROM cafes
                  WHERE published = true AND embedding IS NOT NULL
-                   AND ($2 = '' OR area ILIKE $3 OR area ILIKE $4)
                  ORDER BY embedding <=> $1::vector
                  LIMIT 80`,
-                [lit, effectiveRegion, p1, p2],
+                [lit],
               )) as unknown as any[];
           // 🎯 #979(#977 후속) — 개념 축 질의('노키즈존' 등)는 임베딩 유사도가 약해 그 축을 가진 카페가
           //   top-80 밖으로 밀려나면 concept/axis 재랭킹 자체가 기회를 못 받는다(임베딩이 뽑은 후보 안에서만 재랭킹하므로).
@@ -377,7 +401,7 @@ export async function GET(req: NextRequest) {
           //   (char_scores는 축마다 항상 키가 존재하고 값이 0일 수 있어 키 존재만으론 부족 — 값>0을 직접 확인.)
           const conceptAxes = Array.from(new Set(hitConcepts.filter((c) => c.axis).map((c) => c.axis as string)));
           if (conceptAxes.length > 0) {
-            const axisRows = metroList
+            const axisRows = areaList
               ? (await sql.query(
                   `SELECT ${FIELDS}, 1 - (embedding <=> $1::vector) AS sim
                    FROM cafes
@@ -386,17 +410,16 @@ export async function GET(req: NextRequest) {
                      AND EXISTS (SELECT 1 FROM unnest($3::text[]) ax WHERE (char_scores->>ax)::numeric > 0)
                    ORDER BY (SELECT MAX((char_scores->>ax)::numeric) FROM unnest($3::text[]) ax) DESC
                    LIMIT 40`,
-                  [lit, metroList, conceptAxes],
+                  [lit, areaList, conceptAxes],
                 )) as unknown as any[]
               : (await sql.query(
                   `SELECT ${FIELDS}, 1 - (embedding <=> $1::vector) AS sim
                    FROM cafes
                    WHERE published = true AND embedding IS NOT NULL
-                     AND ($2 = '' OR area ILIKE $3 OR area ILIKE $4)
-                     AND EXISTS (SELECT 1 FROM unnest($5::text[]) ax WHERE (char_scores->>ax)::numeric > 0)
-                   ORDER BY (SELECT MAX((char_scores->>ax)::numeric) FROM unnest($5::text[]) ax) DESC
+                     AND EXISTS (SELECT 1 FROM unnest($2::text[]) ax WHERE (char_scores->>ax)::numeric > 0)
+                   ORDER BY (SELECT MAX((char_scores->>ax)::numeric) FROM unnest($2::text[]) ax) DESC
                    LIMIT 40`,
-                  [lit, effectiveRegion, p1, p2, conceptAxes],
+                  [lit, conceptAxes],
                 )) as unknown as any[];
             const seenIds = new Set(rows.map((r) => r.id));
             for (const r of axisRows) if (!seenIds.has(r.id)) { rows.push(r); seenIds.add(r.id); }
@@ -685,20 +708,22 @@ export async function GET(req: NextRequest) {
         // 브랜드가 영문 상호로 등록된 경우(STARBUCKS 등)를 대비해 한글 질의에 별칭을 더해 함께 매칭.
         const dqVariants = Array.from(new Set([dq, ...(BRAND_ALIAS[dq] ?? [])]));
         const likePatterns = dqVariants.map((v) => `%${v}%`);
-        const nameRows = metroList
+        // 💰 2026-09-13: 이 쿼리가 오늘 비용경보의 최다 쿼리였다(185.6GB · 1,437회). `replace(lower(name),' ','') LIKE '%..%'`가
+        //   인덱스를 못 타 매 호출마다 cafes 전체(13,838블록)를 훑었다 → 같은 식(expression)에 트라이그램 GIN 인덱스
+        //   `idx_cafes_name_norm_trgm`을 만들어 29블록으로 내렸다(실측 477배·86ms→0.6ms). 쿼리 모양은 그대로 둬야 인덱스를 탄다.
+        const nameRows = areaList
           ? (await sql.query(
               `SELECT ${FIELDS} FROM cafes WHERE published = true
                  AND replace(lower(name), ' ', '') LIKE ANY($1::text[])
                  AND area = ANY($2::text[])
                ORDER BY (replace(lower(name), ' ', '') = ANY($3::text[])) DESC, (synth_grade = '검증') DESC, synth_count DESC NULLS LAST LIMIT 8`,
-              [likePatterns, metroList, dqVariants],
+              [likePatterns, areaList, dqVariants],
             )) as unknown as any[]
           : (await sql.query(
               `SELECT ${FIELDS} FROM cafes WHERE published = true
                  AND replace(lower(name), ' ', '') LIKE ANY($1::text[])
-                 AND ($2 = '' OR area ILIKE $3 OR area ILIKE $4)
-               ORDER BY (replace(lower(name), ' ', '') = ANY($5::text[])) DESC, (synth_grade = '검증') DESC, synth_count DESC NULLS LAST LIMIT 8`,
-              [likePatterns, effectiveRegion, p1, p2, dqVariants],
+               ORDER BY (replace(lower(name), ' ', '') = ANY($2::text[])) DESC, (synth_grade = '검증') DESC, synth_count DESC NULLS LAST LIMIT 8`,
+              [likePatterns, dqVariants],
             )) as unknown as any[];
         if (nameRows.length > 0) {
           const byId = new Map(results.map((r: any) => [r.id, r]));
