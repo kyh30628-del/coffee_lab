@@ -727,7 +727,19 @@ function homographyMatrix3d(sw: number, sh: number, q: [number, number][]): stri
 function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: () => void; onOwner: () => void; onLogin: () => void; discover: Discover | null }) {
   // 방문(마운트)마다 다른 씨앗 — 새로고침하면 다른 카페가 적힌다. SSR에선 글자를 안 그리므로 불일치 없음.
   const seed = useMemo(() => Math.floor(Math.random() * 1e9) + 1, []);
-  const LANDING_MEMO = useMemo(() => landingMemo(discover, seed), [discover, seed]);
+  // 🔴 2026-09-13 — 글씨가 **두 번 써지던** 버그.
+  //   원인: LANDING_MEMO가 `discover`에 걸려 있었다. 홈 데이터는 처음 null로 시작해 fetch 뒤에 채워지고,
+  //   지역(homeRegion)이 바뀌면 setDiscover(null) → 재요청으로 또 한 번 null↔데이터를 오간다.
+  //   그때마다 메모 문장이 새로 만들어지고 아래 쓰기 이펙트의 의존성이 바뀌어 **처음부터 다시 써졌다.**
+  //   → 메모는 **한 번만 확정**한다: 홈 데이터가 오면 그걸로, 안 오면 1.2초 뒤 폴백으로. 확정 후엔 다시 안 바뀐다.
+  const [memo, setMemo] = useState<string[] | null>(null);
+  useEffect(() => {
+    if (memo) return;                                   // 이미 확정 — 무슨 일이 있어도 다시 안 쓴다
+    if (discover) { setMemo(landingMemo(discover, seed)); return; }
+    const t = setTimeout(() => setMemo((m) => m ?? landingMemo(null, seed)), 1200);
+    return () => clearTimeout(t);
+  }, [discover, memo, seed]);
+  const LANDING_MEMO = useMemo(() => memo ?? [], [memo]);
   const [done, setDone] = useState<boolean | null>(null); // null=판단 전(SSR), true=완성본, false=쓰는 중
   const [pos, setPos] = useState<[number, number]>([0, 0]); // [줄, 글자]
   const [mtx, setMtx] = useState<string>("");
@@ -750,6 +762,7 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
   }, []);
   useEffect(() => {
     // ✍ 매 방문 글씨가 써진다(약 2.6초, CEO 지시 "써지는 느낌") — 움직임 줄이기 설정만 즉시 완성본.
+    if (!LANDING_MEMO.length) return;                   // 메모 확정 전 — 아무것도 그리지 않는다(빈 줄로 한 번 '완료'되는 걸 막는다)
     const reduce = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (reduce) { setDone(true); return; }
     setDone(false);
