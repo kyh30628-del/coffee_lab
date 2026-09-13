@@ -728,6 +728,18 @@ function homographyMatrix3d(sw: number, sh: number, q: [number, number][]): stri
 }
 // 페이지 로드 단위 단일 기록 — 메모 문장·완료 여부. (모듈 변수: 같은 로드 안에서 컴포넌트가 몇 번 마운트돼도 하나)
 const landingOnce: { memo: string[] | null; done: boolean } = { memo: null, done: false };
+// 🔬 계측용 로드 id — 이 JS 번들이 실행될 때 한 번 정해진다(페이지가 다시 로드되면 바뀐다).
+const landingLoadId = Math.random().toString(36).slice(2, 10) + "-" + Date.now().toString(36);
+function landingBeacon(note: string, extra: Record<string, unknown> = {}) {
+  try {
+    const nav = (performance.getEntriesByType("navigation")[0] as any)?.type ?? "";
+    let anon = ""; try { anon = localStorage.getItem("dcn_device") || ""; } catch {}
+    const body = JSON.stringify({ loadId: landingLoadId, anon, navType: nav, standalone: window.matchMedia("(display-mode: standalone)").matches || (navigator as any).standalone === true,
+      visible: document.visibilityState, ua: navigator.userAgent, tSinceLoad: Math.round(performance.now()), note, ...extra });
+    if (navigator.sendBeacon) navigator.sendBeacon("/api/landing-debug", new Blob([body], { type: "application/json" }));
+    else fetch("/api/landing-debug", { method: "POST", headers: { "content-type": "application/json" }, body, keepalive: true }).catch(() => {});
+  } catch {}
+}
 function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: () => void; onOwner: () => void; onLogin: () => void; discover: Discover | null }) {
   // 방문(마운트)마다 다른 씨앗 — 새로고침하면 다른 카페가 적힌다. SSR에선 글자를 안 그리므로 불일치 없음.
   const seed = useMemo(() => Math.floor(Math.random() * 1e9) + 1, []);
@@ -740,6 +752,8 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
   //   마운트되면 상태가 초기화돼 처음부터 다시 쓴다). → **페이지 로드 단위 전역 기록**(landingOnce): 한 번 확정한 메모와
   //   완료 여부를 모듈 변수에 두고, 두 번째 마운트부터는 애니메이션 없이 완성본을 그대로 보여준다. 새로고침(새 로드)에서만 다시 쓴다.
   const [memo, setMemo] = useState<string[] | null>(() => landingOnce.memo);
+  const mountId = useMemo(() => Math.random().toString(36).slice(2, 8), []);
+  useEffect(() => { landingBeacon("mount", { mountId }); }, [mountId]);
   useEffect(() => {
     if (memo) return;                                   // 이미 확정 — 무슨 일이 있어도 다시 안 쓴다
     const fix = (m: string[]) => { landingOnce.memo = m; setMemo(m); };
@@ -774,9 +788,10 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
   useEffect(() => {
     // ✍ 매 방문 글씨가 써진다(약 2.6초, CEO 지시 "써지는 느낌") — 움직임 줄이기 설정만 즉시 완성본.
     if (!LANDING_MEMO.length) return;                   // 메모 확정 전 — 아무것도 그리지 않는다(빈 줄로 한 번 '완료'되는 걸 막는다)
-    if (landingOnce.done) { setDone(true); return; }    // 이 로드에서 이미 한 번 썼다 — 완성본만(두 번째 연출 금지)
+    if (landingOnce.done) { setDone(true); landingBeacon("skip-done", { mountId }); return; }    // 이 로드에서 이미 한 번 썼다 — 완성본만(두 번째 연출 금지)
     const reduce = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (reduce) { setDone(true); return; }
+    landingBeacon("write-start", { mountId, memoHash: LANDING_MEMO.join("|").length + ":" + LANDING_MEMO[0]?.slice(0, 12) });
     setDone(false);
     // ⏱ 시간 기반 진행(약 2.6초) — 백그라운드 탭에서 늦춰져도 총 길이 그대로.
     const slow = typeof location !== "undefined" && /nt_slow/.test(location.search); // 검수용: ?nt_slow 로 느리게
