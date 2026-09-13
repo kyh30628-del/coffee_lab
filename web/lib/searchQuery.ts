@@ -88,7 +88,8 @@ const GEO_TTL_MS = 6 * 60 * 60 * 1000;
 //   콜드 비율이 높아 더 나쁘다). 그래서 결과를 `search_cache` 한 행에 말아 넣고, 콜드 스타트는
 //   **기본키 조회 1건**(1페이지)만 하게 한다. 전수 스캔은 하루 1회로 수렴한다.
 //   v2(2026-09-12): sgg(시·군·구 어간) 추가 — 옛 payload에는 없으므로 키를 올려 섞이지 않게 한다.
-const GEO_CACHE_KEY = "__geo_index_v4__";
+//   v5(2026-09-13, #1069): bare key 불용어 가드 추가 — 옛 payload에는 "하기" 같은 오탐 키가 남아있어 키를 올린다.
+const GEO_CACHE_KEY = "__geo_index_v5__";
 
 export async function loadGeoIndex(): Promise<GeoIndex> {
   if (geoCache && Date.now() - geoCache.at < GEO_TTL_MS) return geoCache.idx;
@@ -134,7 +135,10 @@ export async function loadGeoIndex(): Promise<GeoIndex> {
       if (b.length >= 2) keys.add(b);
       for (const k of [...keys]) {
         const bare = k.replace(/(동|가|읍|면|리)$/, "");          // '우면동'→'우면'도 같은 구로
-        if (bare.length >= 2) keys.add(bare);
+        // 🧭 2026-09-13(#1069): bare key가 흔한 조사/어미와 정확일치하면 지역 오탐이 난다
+        //   ("하기동"→"하기"가 "노트북 하기 좋은 카페"의 "하기"와 충돌 → 대전 유성구로 오판정).
+        //   STOPWORDS는 이미 그런 흔한 어미·범용어 사전이므로 재사용해 bare key 등록을 막는다.
+        if (bare.length >= 2 && !STOPWORDS.has(bare)) keys.add(bare);
       }
       for (const k of keys) {
         if (!dong.has(k)) dong.set(k, String(r.area));                        // 같은 이름은 카페 많은 쪽 우선(ORDER BY n DESC)
