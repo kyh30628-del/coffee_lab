@@ -15,7 +15,7 @@
     },
     {
       "path": "/api/cron-grow",
-      "schedule": "10 3,7,11,23 * * *"
+      "schedule": "10 0-11,23 * * *"
     },
     {
       "path": "/api/cron-synth",
