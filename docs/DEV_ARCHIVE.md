@@ -347,3 +347,4 @@
 | 2026-09-12 11:03 | #1056 | [룰갭 P69] 레터링/주문제작 케이크 전문점 PICKUP_ONLY_CUES 사각 — #597 이후 신규 표 | 25f28348 | - | lib/reviewQuality.ts: PICKUP_ONLY_CUES 정규식에 레터링케이크/당일케이크/커스텀케이크/무료레터링 표현 추가, 카페 표시명(PICKUP_ONLY_NAME |
 | 2026-09-12 11:03 | #1058 | [개발 재상신] cron-costwatch 스크래치 janitor — #1036·#1041 통합·범위축소 ( | f88cd7db | - | web/scripts/janitor-scratch.mjs 신규(1파일, 스코프준수). git ls-files --others로 미추적파일 나열, tmp_*.js tmp_*.cjs  |
 | 2026-09-13 08:08 | #1063 | [개발] 협업 #400: 09-13 cron-costwatch(338.6GB) 재진단 — 원인은 스크래치 아 | 906794cd | - | app/api/search/route.ts 캐시 read/write 대칭화(0건도 캐시): pg_stat_statements 실측(queryid -895080333599341959 |
+| 2026-09-13 08:08 | #1064 | [개발] 협업 #402: 대구·경북 신규편입 area 교차오염 6건 + 검증카페 address 가비지값 1건 | 944c88a3 | - | lib/discover.ts: AMBIG_SIDO_CANDIDATES 하드코딩(서울·인천·대전·부산)을 PREFIXED_SIDOS(lib/regionList.ts 단일출처) 기반으 |
