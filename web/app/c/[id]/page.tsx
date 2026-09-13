@@ -356,7 +356,7 @@ export default async function CafePage({ params }: Props) {
 
         {/* 📊 우리가 읽고 적은 판정 — 옥석 후기 핵심. 판정 문장만 손글씨. */}
         {(highlights.length > 0 || c.synth_identity) && (
-          <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 68 }}>
+          <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
             <div className="nt-sec">우리가 읽고 적은 판정 · 검증 후기 {c.synth_count ?? 0}건</div>
             {c.synth_identity && <p className="nt-hand"><span className="nt-hl">{c.synth_identity}</span></p>}
             {highlights.length > 0 && (
@@ -374,7 +374,7 @@ export default async function CafePage({ params }: Props) {
 
         {/* 👍 강점 / 🔎 아쉬운점 — 전체 카페 대비. 배수는 손글씨(판정). */}
         {profile.ok ? (
-          <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 68 }}>
+          <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
             <div className="nt-sec">한눈에 강·약 · 전체 카페 대비</div>
             {profile.strong.length > 0 && (
               <>
@@ -406,7 +406,7 @@ export default async function CafePage({ params }: Props) {
             <p className="text-[11px] text-[#63523f]">기준은 <b>후기 1건당 언급 비율</b>이에요 — 후기 수가 많고 적음을 보정한 공정한 비교입니다. '평균의 N배'·'상위/하위 %'는 전체 카페와 같은 기준으로 비교한 값. 절대 평가가 아닙니다.</p>
           </div>
         ) : tags.length > 0 && (
-          <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 68 }}>
+          <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
             <div className="nt-sec">이 카페가 후기에서 자주 언급되는 결</div>
             <div className="nt-chips">{tags.map((t) => <span key={t} className="nt-chip">{t}</span>)}</div>
           </div>
@@ -414,7 +414,7 @@ export default async function CafePage({ params }: Props) {
 
         {/* 🛡️ 이 카페를 어떻게 골랐나 — 이 카페의 실제 숫자로. (duplicates는 raw 이전 단계라 여기 넣지 않는다) */}
         {sqRaw > 0 && (
-          <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 68 }}>
+          <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
             <div className="nt-sec">이 카페를 어떻게 골랐나</div>
             <p className="text-[14px] text-[#2a1f17]">
               🛡️ 이 카페가 나온 글 <b>{sqRaw.toLocaleString()}건</b>을 확인해
@@ -469,7 +469,7 @@ export default async function CafePage({ params }: Props) {
 
         {/* 💻 카공 시설 — 근거 건수를 반드시 함께. "없다"도 숨기지 않는다. */}
         {(work.signals.length > 0 || work.timeLimit > 0) && (
-          <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 68 }}>
+          <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
             <div className="nt-sec">💻 작업하기 전에 확인</div>
             <div className="nt-chips">
               {work.signals.map((sg) => {
@@ -491,7 +491,7 @@ export default async function CafePage({ params }: Props) {
 
         {/* ⚖️ 평판 신선도 */}
         {c.reputation_note && (
-          <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 68 }}>
+          <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
             <div className="text-[13px] text-[#8a6a3a]">⚖️ <b>참고</b> · {c.reputation_note}</div>
           </div>
         )}
@@ -540,7 +540,7 @@ export default async function CafePage({ params }: Props) {
 
         {/* 🔁 비슷한 카페 더보기 — 목차 줄(번호 손글씨). 같은 동네 + 결 유사도, 검증/참고 우선(decisions #338) */}
         {nearby.length > 0 && (
-          <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 68 }}>
+          <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
             <div className="flex items-baseline justify-between gap-2">
               <div className="nt-sec">☕ {c.area} 비슷한 카페 더보기</div>
               <Link href={`/area/${encodeURIComponent(c.area)}`} className="text-[11.5px] text-[#7a5122] whitespace-nowrap">동네 전체 보기 →</Link>
@@ -563,7 +563,7 @@ export default async function CafePage({ params }: Props) {
             .slice(0, 2)
             .map(([k]) => tasteByKey(k)!);
           return themed.length > 0 ? (
-            <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 68 }}>
+            <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
               {themed.map((t) => (
                 <Link key={t.key} href={`/area/${encodeURIComponent(c.area)}/${t.key}`} className="flex items-center justify-between gap-2">
                   <span className="text-[13.5px] font-bold text-[#5c4b3c]">{t.emoji} {c.area} {t.label} 카페 더 찾기</span>
@@ -609,7 +609,7 @@ export default async function CafePage({ params }: Props) {
 
         {/* ❓ 자주 묻는 질문 — 위 FAQPage JSON-LD와 동일 내용 */}
         {faqs.length > 0 && (
-          <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 68 }}>
+          <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
             <div className="nt-sec">❓ 자주 묻는 질문</div>
             {faqs.map((f) => (
               <details key={f.q}>

@@ -19,6 +19,7 @@ export const JOB_TEAM: Record<string, string> = {
   "cron-costwatch": "경영지원본부", // Neon 데이터전송비 이상탐지 워치독(2026-07-29, CEO 지시 — youtube-backfill 663GB 사고 재발방지)
   // 로컬 launchd 잡(하트비트 경유)
   "discover-sweep": "성장본부", // 🔄2026-08-04 KST 12·20시 전 지역 발굴 스윕(새벽 02:30 → 낮으로 이동, DB통잠)
+  "indexnow": "성장본부", // 🔎2026-09-13 KST 09:40 IndexNow 일일 제출(사이트맵 미제출분만 → 네이버·빙 수신)
   "youtube-backfill": "품질본부",
   "weekly-evaluation": "전략기획본부",
   "owner-weekly": "영업본부", // 🆕2026-09-07 매주 월 08:40 사장님 주간 당직 보고(v3) 자동발송 — 결정론·LLM 0원
@@ -59,6 +60,7 @@ export const EXPECT_MAX_H: Record<string, number> = {
   "orchestrator-heal": 18, // 2창(UTC 3,11) 최대공백 16h + 버퍼
   // 로컬 launchd 잡
   "discover-sweep": 30,    // 🔄2026-08-04 KST 12·20시 발굴 스윕 + 버퍼
+  "indexnow": 30,          // 🔎2026-09-13 KST 09:40 하루 1회 + 버퍼
   "chief-manager": 20,    // 일간 사이클 KST 08·12·16시
   "self-audit": 18,       // 🔄KST 12·16·20시 (최대공백 20→익일12시=16h + 버퍼)
   "weekly-evaluation": 30, // 매일 10:30 KST(격일 게이트지만 스킵도 하트비트)
@@ -87,6 +89,7 @@ export const LAUNCHD_JOBS: Record<string, { label: string; sched: string }> = {
   "dev-deploy":        { label: "배포 워커",       sched: "승인 즉시+08·12·16·20시" },
   "weekly-evaluation": { label: "주간 거버넌스",   sched: "10:30(격일)" },
   "discover-sweep":    { label: "발굴 스윕",       sched: "12·20시" },
+  "indexnow":          { label: "IndexNow 제출",   sched: "09:40" },
 };
 
 // 🛑 **의도적으로 은퇴(plist .disabled)한 잡의 명시적 단일 출처.**

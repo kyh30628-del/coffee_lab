@@ -1998,6 +1998,7 @@ export default function Home() {
   return (
     <div className="flex flex-col nt-paper nt-app" style={{ position: "fixed", inset: 0, fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }}>
       {/* 📖 책장 넘김 — 탭이 바뀔 때 종이 한 장이 왼쪽으로 넘어간다(0.55s, 움직임 줄이기면 없음) */}
+      {turnKey > 0 && <div key={`sh-${turnKey}`} className="nt-turn-shade" style={{ zIndex: 1599 }} aria-hidden />}
       {turnKey > 0 && <div key={turnKey} className="nt-turn" style={{ zIndex: 1600 }} aria-hidden />}
       {/* 📣 접속 시 안내 공지 — 데이터는 /api/discover 응답에 얹혀 온다(전용 요청 0, 비용 증가 0) */}
       <NoticeModal source={(discover as any)?.notice ?? null} />
@@ -2084,9 +2085,9 @@ export default function Home() {
         <div className="flex items-center gap-3 min-w-0">
           <button onClick={() => { try { sessionStorage.removeItem("dcn_role"); } catch {} setRole(null); }} className="nt-title text-[22px] leading-none shrink-0" aria-label="랜딩으로">동네 커피 노트</button>
           {/* 홈/지도/추억 토글 — 노트 색인 탭 */}
-          <div className="flex rounded-full p-0.5" style={{ background: "rgba(255,255,255,.10)" }}>
+          <div className="nt-idx" role="tablist" aria-label="노트 색인">
             {(["home", "map", "memory"] as const).map((t) => (
-              <button key={t} onClick={() => setTab(t)} className={`px-2.5 sm:px-3 py-1.5 text-[13px] font-bold rounded-full transition-colors whitespace-nowrap ${tab === t ? "bg-[#e9d6bd] text-[#241812]" : "text-[#d9c7ad]"}`}>
+              <button key={t} role="tab" onClick={() => setTab(t)} aria-current={tab === t ? "page" : undefined}>
                 {t === "home" ? "홈" : t === "map" ? "지도" : "추억"}
               </button>
             ))}
