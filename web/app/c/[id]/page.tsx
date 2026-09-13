@@ -9,6 +9,7 @@ import SaveMemoryButton from "./SaveMemoryButton";
 import WishButton from "../../WishButton";
 import OwnerCtaLink from "./OwnerCtaLink";
 import ReportButton from "./ReportButton";
+import { publicOwnerContent } from "@/lib/ownerContent";
 import VisitorReviews from "../../VisitorReviews";
 import RecentCafes from "../../RecentCafes";
 import SavedCafes from "../../SavedCafes";
@@ -221,6 +222,7 @@ export default async function CafePage({ params }: Props) {
   // 🛡️ 검증 근거 공개(2026-08-17) — 우리 해자의 증거가 synth_quality에 다 있는데 화면엔 한 글자도 안 나갔다.
   //   /trust 페이지로 따로 빼뒀더니 30일 방문 **1명**이었다. 설명을 별도 페이지에 가두면 아무도 안 읽는다.
   //   → 이 카페의 실제 숫자로, 결정하는 화면 안에서 보여준다. 추가 조회 없이 같은 행에서 읽는다.
+  const oc = await publicOwnerContent(Number(c.id)).catch(() => null); // 📷✍ 사장님 사진·한마디(구독 활성일 때만 값)
   const sq = (c.synth_quality ?? null) as any;
   const sqRaw = Number(sq?.raw ?? 0);
   // 🕒 최신성 — review_dates는 검증+참고 후기의 발행일("YYYY.MM.DD") 배열. 최근 12개월 건수·최신 월·1년 공백 여부.
@@ -364,6 +366,25 @@ export default async function CafePage({ params }: Props) {
                 알 수 없었다(실측: 첫 화면 791px 중 클릭요소가 402px·51%). 링크는 지우지 않고 자리만 정리한다. */}
           </div>
         </div>
+
+        {/* 📷✍ 사장님 사진·한마디(2026-09-13) — 사장님이 직접 올린 것. 후기·판정과 분리 표기(광고 아님·검증 무관). 구독 활성일 때만. */}
+        {oc && (
+          <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
+            <div className="nt-sec">🏅 사장님이 직접 올린 사진과 한마디</div>
+            {oc.photos.length > 0 && (
+              <div className="nt-free flex gap-3 overflow-x-auto pb-2" style={{ marginLeft: -6 }}>
+                {oc.photos.map((p, i) => (
+                  <figure key={p.url} className="nt-scrap flat shrink-0" style={{ padding: 6, transform: `rotate(${i % 2 ? 1.2 : -1.4}deg)` }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={p.url} alt={`${c.name} 사장님 제공 사진 ${i + 1}`} loading="lazy" className="block rounded-[3px] object-cover" style={{ width: 168, height: 126 }} />
+                  </figure>
+                ))}
+              </div>
+            )}
+            {oc.note.trim() && <p className="nt-hand"><span className="nt-hl latte">“{oc.note.trim()}”</span></p>}
+            <div className="text-[11.5px] text-[#63523f]">사장님 제공 · 검증 후기·등급과는 별개예요{oc.noteAt ? ` · ${new Date(oc.noteAt).getFullYear()}.${String(new Date(oc.noteAt).getMonth() + 1).padStart(2, "0")}` : ""}</div>
+          </div>
+        )}
 
         {/* 📊 우리가 읽고 적은 판정 — 옥석 후기 핵심. 판정 문장만 손글씨. */}
         {(highlights.length > 0 || c.synth_identity) && (

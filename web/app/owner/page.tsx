@@ -5,6 +5,7 @@ import BackLink from "../BackLink";
 import InfoDot from "../InfoDot";
 import Showcase from "../Showcase";
 import BillingManage from "../BillingManage";
+import OwnerContentEditor from "./OwnerContentEditor";
 import { useLockBodyScroll } from "@/lib/useLockBodyScroll";
 
 // ⚡ recharts 지연 로드 — 차트는 데이터 도착 후에만 렌더되므로 초기 JS에서 제외(출력 동일). 높이맞춤 폴백으로 레이아웃 시프트 없음.
@@ -196,6 +197,8 @@ export default function OwnerPage() {
               <div className="text-sm text-[#9c6b3f] mb-2">{insight.me.identity}</div>
               <div className="text-sm font-bold">{insight.gu} {insight.hoodCount}곳 중 <span className="text-[#9c6b3f]">{insight.rank}위</span></div>
             </div>
+
+            {locked && pin && <OwnerContentEditor cafeId={locked.id} pin={pin} />}
 
             {/* 🔎 검색어 리포트(2026-09-13) — 손님이 어떤 검색으로 우리 가게를 봤나. search_log.top_ids 실측. */}
             <div className="bg-white rounded-2xl p-4 sm:p-5 border border-[#ece0cd] mb-4">
