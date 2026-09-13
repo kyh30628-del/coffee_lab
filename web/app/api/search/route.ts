@@ -267,11 +267,15 @@ async function ensureCache() {
 
 // 🔎 검색 수요 로깅(비차단) — 무엇을 찾고 결과가 충분했는지 적재. cron-demand가 수요-공급 갭 분석.
 //   내부 헬스체크 호출(X-Internal-Check 헤더)은 실사용자 수요가 아니므로 제외 — 아니면 수요분석이 봇을 실사용자로 오인(#113).
-function logSearch(q: string, region: string, results: number, mode: string, internal: boolean, aiErr?: string | null) {
+function logSearch(q: string, region: string, results: number, mode: string, internal: boolean, aiErr?: string | null, topIds: number[] = []) {
   if (!q || q.length < 1 || internal) return;
   sql`CREATE TABLE IF NOT EXISTS search_log (id BIGSERIAL PRIMARY KEY, q TEXT, region TEXT, results INT, mode TEXT, ts TIMESTAMPTZ DEFAULT now())`.catch(() => {});
   sql`ALTER TABLE search_log ADD COLUMN IF NOT EXISTS ai_err TEXT`.catch(() => {});
-  sql`INSERT INTO search_log (q, region, results, mode, ai_err) VALUES (${q.slice(0, 80)}, ${(region || "").slice(0, 40)}, ${results}, ${mode}, ${aiErr ?? null})`.catch(() => {});
+  // 🔎 2026-09-13 검색어 리포트(사장님 구독): 이 검색에서 상위 10에 노출된 카페 id — "손님이 이 검색으로 당신 가게를 봤어요"의 근거.
+  //   INT[] + GIN이라 카페별 역조회가 인덱스로 끝난다(월 ~1,400행, 비용 무시 수준).
+  sql`ALTER TABLE search_log ADD COLUMN IF NOT EXISTS top_ids INT[]`.catch(() => {});
+  sql`CREATE INDEX IF NOT EXISTS idx_search_log_top_ids ON search_log USING gin (top_ids)`.catch(() => {});
+  sql`INSERT INTO search_log (q, region, results, mode, ai_err, top_ids) VALUES (${q.slice(0, 80)}, ${(region || "").slice(0, 40)}, ${results}, ${mode}, ${aiErr ?? null}, ${topIds.slice(0, 10)})`.catch(() => {});
 }
 
 // 지도 화면 중심(있으면) — 같은 이름의 장소가 전국에 여럿일 때 가까운 것부터 보여준다.
@@ -343,7 +347,7 @@ export async function GET(req: NextRequest) {
       //   재실행했다(질의벡터가 분포 밖이라 그래프 순회비용이 유독 컸다 — 최다쿼리 하루 338.6GB의 원인).
       //   공개상태가 바뀌면 invalidateCafeCaches가 search_cache를 통째로 지우므로 신선도는 그대로 보장된다.
       if (hit?.payload && Array.isArray(hit.payload.results)) {
-        logSearch(q, region, Number(hit.payload?.count ?? 0), "cache", isInternalCheck);
+        logSearch(q, region, Number(hit.payload?.count ?? 0), "cache", isInternalCheck, null, (hit.payload.results as any[]).slice(0, 10).map((r) => Number(r?.id)).filter((n) => Number.isFinite(n)));
         // 📍 장소는 캐시 경로에서도 매번 붙인다 — 메모리 인덱스라 DB·API 비용 0이고, 옛 캐시에도 즉시 반영된다.
         // 🔴 미서비스 안내는 **캐시에 굳히지 않는다**(2026-09-12 실사고): 대구·경북을 열고 목록에서 지웠는데도
         //   "'대구' 지역 카페는 아직 포함되어 있지 않아요"가 캐시에서 계속 나왔다. 서비스 범위는 자주 바뀌므로
@@ -794,7 +798,7 @@ export async function GET(req: NextRequest) {
     if (!nocache)
       sql`INSERT INTO search_cache (qkey, payload, created_at) VALUES (${qkey}, ${JSON.stringify(payload)}, now())
           ON CONFLICT (qkey) DO UPDATE SET payload=EXCLUDED.payload, created_at=now()`.catch(() => {});
-    logSearch(q, region, results.length, mode, isInternalCheck, aiErr); // 🔎 수요 로깅(수요-공급 갭·발굴 우선순위·콘텐츠 소재)
+    logSearch(q, region, results.length, mode, isInternalCheck, aiErr, (results as any[]).slice(0, 10).map((r) => Number(r?.id)).filter((n) => Number.isFinite(n))); // 🔎 수요 로깅 + 노출 카페(검색어 리포트)
     return NextResponse.json(payload, {
       headers: { "Cache-Control": "public, max-age=0, s-maxage=300, stale-while-revalidate=600" },
     });

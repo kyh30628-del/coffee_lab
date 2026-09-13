@@ -37,7 +37,8 @@ export async function GET(req: NextRequest) {
 
     const myGu = guOf(me.area);
     // id 포함 — 동명 카페를 이름이 아니라 id로 식별(순위·isMe 오표시 방지, 2026-07-02).
-    const all = await sql`SELECT id, name, area, synth_grade, synth_count, synth_identity, char_scores FROM cafes WHERE published = true` as unknown as any[];
+    // 💰 2026-09-13: 공개 전량(26k행)이 아니라 같은 동네(area)만 읽는다 — guOf(area)==area가 전 지역에서 성립함을 실측(owner/r과 동일 원칙).
+    const all = await sql`SELECT id, name, area, dong, synth_grade, synth_count, synth_identity, char_scores FROM cafes WHERE published = true AND area = ${me.area}` as unknown as any[];
     const hood = all.filter((c) => guOf(c.area) === myGu);
 
     // 순위 — 본인 식별은 id 기준(동명 카페가 있어도 정확). 동점 시 id로 타이브레이크(2026-07-26) —
@@ -89,6 +90,35 @@ export async function GET(req: NextRequest) {
       const v = CHAR_AXES.map((ax) => (c.char_scores ?? {})[ax.key] ?? 0);
       return { name: c.name, grade: c.synth_grade, count: c.synth_count, dist: Math.sqrt(myV.reduce((s, x, i) => s + (x - v[i]) ** 2, 0)) };
     }).sort((a, b) => a.dist - b.dist).slice(0, 3);
+
+    // ===== ⚔️ 동네 경쟁 비교(2026-09-13, 구독 상품 '경쟁 비교') =====
+    //   같은 동(洞) 후기 상위 3곳(없으면 같은 구) vs 나 — 축별 백분위 차이로 '이기는 축·지는 축'을 낸다. 전부 이미 있는 작은 컬럼.
+    const meDong = me.dong ?? null;
+    const dongPool = meDong ? hood.filter((c) => c.dong === meDong && Number(c.id) !== Number(me.id)) : [];
+    const rivalPool = (dongPool.length >= 2 ? dongPool : hood.filter((c) => Number(c.id) !== Number(me.id)));
+    const rivalScope = dongPool.length >= 2 ? (meDong as string) : myGu;
+    const myAxis: Record<string, number> = {}; for (const ax of CHAR_AXES) myAxis[ax.key] = axisScore((me.char_scores ?? {})[ax.key] ?? 0, ax.key);
+    const competitors = [...rivalPool].sort((a, b) => (b.synth_count ?? 0) - (a.synth_count ?? 0) || Number(a.id) - Number(b.id)).slice(0, 3).map((c) => {
+      const theirs: Record<string, number> = {}; for (const ax of CHAR_AXES) theirs[ax.key] = axisScore((c.char_scores ?? {})[ax.key] ?? 0, ax.key);
+      const win = CHAR_AXES.filter((ax) => myAxis[ax.key] - theirs[ax.key] >= 15).map((ax) => `${ax.emoji} ${ax.label}`);
+      const lose = CHAR_AXES.filter((ax) => theirs[ax.key] - myAxis[ax.key] >= 15).map((ax) => `${ax.emoji} ${ax.label}`);
+      const top = [...CHAR_AXES].sort((a, b) => theirs[b.key] - theirs[a.key])[0];
+      return { id: Number(c.id), name: c.name, grade: c.synth_grade, count: c.synth_count ?? 0, identity: c.synth_identity ?? null,
+        topAxis: theirs[top.key] > 0 ? `${top.emoji} ${top.label}` : null, win, lose };
+    });
+    // 빈 포지션: 경쟁 3곳도 나도 약한(<40) 축 — 아무도 안 잡은 자리
+    const openAxes = CHAR_AXES.filter((ax) => myAxis[ax.key] < 40 && competitors.every((c) => !c.win.includes(`${ax.emoji} ${ax.label}`) && !c.lose.includes(`${ax.emoji} ${ax.label}`))).map((ax) => `${ax.emoji} ${ax.label}`).slice(0, 3);
+
+    // ===== 🔎 검색어 리포트(2026-09-13) — 최근 30일 우리 검색에서 이 카페가 상위 10에 노출된 질의 =====
+    //   search_log.top_ids INT[] + GIN(검색 라우트가 기록). 카페별 역조회 1회, 큰 컬럼 0.
+    let searchQueries: { q: string; region: string; n: number; best: number }[] = []; let searchTotal = 0;
+    try {
+      const rows = (await sql`SELECT q, COALESCE(region,'') region, count(*)::int n, min(array_position(top_ids, ${Number(me.id)}::int))::int best
+        FROM search_log WHERE top_ids @> ARRAY[${Number(me.id)}::int] AND ts > now() - interval '30 days'
+        GROUP BY 1, 2 ORDER BY 3 DESC, 4 ASC LIMIT 12`) as any[];
+      searchQueries = rows.map((r) => ({ q: r.q, region: r.region, n: Number(r.n), best: Number(r.best) }));
+      searchTotal = rows.reduce((a, r) => a + Number(r.n), 0);
+    } catch { /* 컬럼 없으면(배포 직후) 빈 값 — 화면은 '아직 집계 전' 안내 */ }
 
     // ===== 액션 플랜 자동 생성 (데이터에서만 도출) =====
     const actions: { type: string; title: string; body: string; tone: "good" | "warn" | "info" }[] = [];
@@ -169,6 +199,7 @@ export async function GET(req: NextRequest) {
       ok: true,
       me: { id: me.id, name: me.name, area: me.area, grade: me.synth_grade, count: me.synth_count, identity: me.synth_identity },
       gu: myGu, hoodCount: hood.length, rank, rankList, charProfile, similar, actions, reviewCadence,
+      competitors, rivalScope, openAxes, searchQueries, searchTotal,
     });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });

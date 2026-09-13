@@ -95,7 +95,8 @@ export default function Pricing() {
         <div className="bg-gradient-to-br from-[#2b2018] to-[#4a3424] text-[#f4ece0] rounded-2xl p-5 mb-5 shadow-xl relative overflow-hidden">
           <div className="absolute top-3 right-3 text-[9px] font-bold bg-[#e8b87a] text-[#2b2018] px-2 py-0.5 rounded-full">추천</div>
           <div className="font-bold text-lg mb-1">우리 가게 리포트</div>
-          <div className="mb-4"><span className="text-2xl font-bold text-[#e8b87a]">₩9,900</span><span className="text-[12px] text-[#8f7a58]"> / 월</span></div>
+          <div className="mb-1"><span className="text-2xl font-bold text-[#e8b87a]">₩9,900</span><span className="text-[12px] text-[#8f7a58]"> / 월</span></div>
+          <div className="mb-4 text-[12px] text-[#c7ab82]">연 결제 <b className="text-[#e8b87a]">₩99,000</b> (월 8,250원 꼴 · 2개월 무료)</div>
 
           <div className="text-[11px] text-[#c7ab82] tracking-wider mb-2">매일 지켜보고 알려드려요</div>
           <ul className="space-y-2.5 mb-4">

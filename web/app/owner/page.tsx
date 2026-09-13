@@ -25,6 +25,9 @@ type Insight = {
   rankList: RankItem[]; charProfile: CharItem[];
   similar: { name: string; grade: string | null; count: number | null }[];
   actions: Action[]; reviewCadence?: ReviewCadence;
+  competitors?: { id: number; name: string; grade: string | null; count: number; identity: string | null; topAxis: string | null; win: string[]; lose: string[] }[];
+  rivalScope?: string; openAxes?: string[];
+  searchQueries?: { q: string; region: string; n: number; best: number }[]; searchTotal?: number;
 };
 const GRADE_BG: Record<string, string> = { 검증: "#5f7355", 참고: "#9c6b3f", 후보: "#7a6750" };
 const TABS = [{ k: "rank", l: "📊 순위" }, { k: "radar", l: "🕸️ 성격" }, { k: "pie", l: "🍩 구성" }];
@@ -193,6 +196,51 @@ export default function OwnerPage() {
               <div className="text-sm text-[#9c6b3f] mb-2">{insight.me.identity}</div>
               <div className="text-sm font-bold">{insight.gu} {insight.hoodCount}곳 중 <span className="text-[#9c6b3f]">{insight.rank}위</span></div>
             </div>
+
+            {/* 🔎 검색어 리포트(2026-09-13) — 손님이 어떤 검색으로 우리 가게를 봤나. search_log.top_ids 실측. */}
+            <div className="bg-white rounded-2xl p-4 sm:p-5 border border-[#ece0cd] mb-4">
+              <div className="text-sm font-bold text-[#52402e] mb-1 flex items-center gap-1.5">🔎 손님이 이 검색으로 우리 가게를 봤어요<InfoDot title="검색어 리포트가 뭐예요?">동네 커피 노트 안에서 손님이 검색했을 때 <b>우리 가게가 상위 10에 나온 검색어</b>예요. 손님이 어떤 말로 우리를 찾는지 알면 메뉴판·SNS 소개 문구를 그 말로 맞출 수 있어요. 최근 30일 기준.</InfoDot></div>
+              {(insight.searchQueries?.length ?? 0) > 0 ? (
+                <>
+                  <div className="text-[11.5px] text-[#8a7458] mb-2">최근 30일 <b className="text-[#52402e]">{insight.searchTotal}회</b> 노출 · 검색어별 횟수와 최고 순위</div>
+                  <ul className="space-y-1.5">
+                    {insight.searchQueries!.map((r) => (
+                      <li key={`${r.q}|${r.region}`} className="flex items-center gap-2 text-[13px]">
+                        <span className="font-bold text-[#2b2018] truncate">“{r.q}”</span>
+                        {r.region && <span className="text-[11px] text-[#8a7458] shrink-0">{r.region}</span>}
+                        <span className="ml-auto shrink-0 text-[11.5px] text-[#7a5122]">{r.n}회 · 최고 {r.best}위</span>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              ) : (
+                <p className="text-[12.5px] text-[#8a7458] leading-relaxed">아직 30일 안에 우리 가게가 노출된 검색이 없어요. 손님 검색은 매일 쌓이니 다음 주에 다시 확인해 보세요.</p>
+              )}
+            </div>
+
+            {/* ⚔️ 동네 경쟁 비교(2026-09-13) — 같은 동 상위 3곳과 축별 이기는/지는 곳 */}
+            {(insight.competitors?.length ?? 0) > 0 && (
+              <div className="bg-white rounded-2xl p-4 sm:p-5 border border-[#ece0cd] mb-4">
+                <div className="text-sm font-bold text-[#52402e] mb-1 flex items-center gap-1.5">⚔️ {insight.rivalScope} 경쟁 카페와 비교<InfoDot title="경쟁 비교가 뭐예요?">같은 동네에서 후기가 가장 많은 3곳과 <b>후기에서 드러난 성격 6축</b>을 비교해요. 점수는 동네 안 백분위라 규모가 달라도 공정하게 견줍니다. <b>이기는 축</b>은 홍보 문구로, <b>지는 축</b>은 보완 포인트로 쓰세요.</InfoDot></div>
+                <ul className="space-y-2.5 mt-2">
+                  {insight.competitors!.map((c) => (
+                    <li key={c.id} className="rounded-xl border border-[#ece0cd] p-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[13.5px] font-bold text-[#2b2018] truncate">{c.name}</span>
+                        {c.grade && <span className="text-[10px] text-white px-1.5 py-0.5 rounded-full shrink-0" style={{ background: GRADE_BG[c.grade] ?? "#7a6750" }}>{c.grade}</span>}
+                        <span className="ml-auto text-[11.5px] text-[#8a7458] shrink-0">후기 {c.count}건{c.topAxis ? ` · 강점 ${c.topAxis}` : ""}</span>
+                      </div>
+                      <div className="mt-1.5 flex flex-wrap gap-1.5 text-[11.5px]">
+                        {c.win.length > 0 && <span className="px-2 py-0.5 rounded-full bg-[#eef3ea] text-[#4a6a42]">우리가 앞서요: {c.win.join(" · ")}</span>}
+                        {c.lose.length > 0 && <span className="px-2 py-0.5 rounded-full bg-[#f7ede4] text-[#9a5f2e]">저쪽이 앞서요: {c.lose.join(" · ")}</span>}
+                        {c.win.length === 0 && c.lose.length === 0 && <span className="text-[#8a7458]">성격이 비슷해요 — 차이는 후기 수예요</span>}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+                {(insight.openAxes?.length ?? 0) > 0 && <p className="mt-2.5 text-[12.5px] text-[#52402e]">🪧 <b>비어 있는 자리</b>: {insight.openAxes!.join(" · ")} — 경쟁 3곳도 우리도 약한 축이에요. 먼저 잡으면 동네에서 그 말의 주인이 됩니다.</p>}
+              </div>
+            )}
 
             {/* 📣 공유 리포트 — 손님·SNS에 공유해 단골·신규 유입 (B2B 바이럴) */}
             {insight.me.id && (() => {

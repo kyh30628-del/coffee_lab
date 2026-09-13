@@ -12,6 +12,13 @@ export const PLAN = "홍보팩";
 export const PRICE = 9900;
 export const PERIOD_DAYS = 30; // 정기결제 1주기
 export const ORDER_NAME = "동네 커피 노트 우리가게 홍보팩 (월 구독)";
+// 📅 연 결제(2026-09-13, CEO "연 결제 먼저 완성"): 월 9,900 × 10 = 99,000(2개월 무료). 선불이라 '고정 수입'이 된다.
+//   구독 행의 plan/price가 단일출처 — chargeOnce가 이 값을 읽어 금액·연장일수를 정한다(코드 상수 하드코딩 금지).
+export const PLAN_YEAR = "홍보팩(연)";
+export const PRICE_YEAR = 99000;
+export const PERIOD_DAYS_YEAR = 365;
+export const ORDER_NAME_YEAR = "동네 커피 노트 우리가게 홍보팩 (연 구독)";
+export const isYearlyPlan = (plan?: string | null) => /연/.test(String(plan ?? ""));
 const TOSS_BASE = "https://api.tosspayments.com";
 
 // 영문+숫자 8자리 PIN(혼동 문자 제외) — subscription/route.ts와 동일 규칙(단일 출처).
@@ -163,8 +170,12 @@ export async function markPaidAndActivate(cafeId: number, amount: number, opts: 
 //   실패는 다음날 새 orderId로 재시도 가능. dunning 임계 초과 시 suspend는 호출측(cron)이 판단.
 export async function chargeOnce(cafeId: number): Promise<{ ok: boolean; skipped?: boolean; reason?: string }> {
   await ensureBilling();
-  const s = (await sql`SELECT id, billing_key, billing_customer_key, cafe_name FROM subscriptions WHERE cafe_id=${cafeId}`)[0] as any;
+  const s = (await sql`SELECT id, billing_key, billing_customer_key, cafe_name, plan, price FROM subscriptions WHERE cafe_id=${cafeId}`)[0] as any;
   if (!s?.billing_key || !s?.billing_customer_key) return { ok: false, reason: "no_billing_key" };
+  const yearly = isYearlyPlan(s.plan);
+  const amount = yearly ? PRICE_YEAR : PRICE;          // 구독 행의 plan이 단일출처(가격은 상수로 고정 — 행의 price가 틀려도 과금액은 상수)
+  const periodDays = yearly ? PERIOD_DAYS_YEAR : PERIOD_DAYS;
+  const orderName = yearly ? ORDER_NAME_YEAR : ORDER_NAME;
   const now = new Date();
   const periodKey = billingPeriodKey(cafeId, now);
   // ① 이번 주기 이미 결제 성공? → 스킵(중복과금 차단)
@@ -173,13 +184,13 @@ export async function chargeOnce(cafeId: number): Promise<{ ok: boolean; skipped
   // ② 오늘 시도 슬롯 선점(동시 실행/재시도 중복 차단). 실패 재시도는 다음날 새 orderId로.
   const orderId = attemptOrderId(cafeId, now);
   const slot = (await sql`INSERT INTO payments (order_id, cafe_id, subscription_id, amount, status)
-    VALUES (${orderId}, ${cafeId}, ${s.id}, ${PRICE}, 'pending') ON CONFLICT (order_id) DO NOTHING RETURNING id`)[0] as any;
+    VALUES (${orderId}, ${cafeId}, ${s.id}, ${amount}, 'pending') ON CONFLICT (order_id) DO NOTHING RETURNING id`)[0] as any;
   if (!slot) return { ok: true, skipped: true, reason: "attempt_in_progress" };
-  const res = await chargeBilling({ billingKey: s.billing_key, customerKey: s.billing_customer_key, amount: PRICE, orderId, orderName: ORDER_NAME });
+  const res = await chargeBilling({ billingKey: s.billing_key, customerKey: s.billing_customer_key, amount, orderId, orderName });
   const d = res.data ?? {};
   if (res.ok && d.status === "DONE") {
     await sql`UPDATE payments SET status='paid', payment_key=${d.paymentKey ?? null}, method=${d.method ?? null}, paid_at=now(), raw=${JSON.stringify(d)} WHERE order_id=${orderId}`;
-    await markPaidAndActivate(cafeId, PRICE, { orderId });
+    await markPaidAndActivate(cafeId, amount, { orderId, periodDays });
     return { ok: true };
   }
   await sql`UPDATE payments SET status='failed', fail_code=${d.code ?? null}, fail_reason=${d.message ?? String(res.status)}, raw=${JSON.stringify(d)} WHERE order_id=${orderId}`;

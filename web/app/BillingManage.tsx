@@ -9,6 +9,7 @@ type Sub = {
   autopay?: boolean; billing_status?: string | null; card_last4?: string | null;
   card_company?: string | null; next_billing_at?: string | null;
   conversion_requested_at?: string | null;
+  plan?: string | null; price?: number | null;
 };
 
 const fmt = (d?: string | null) => {
@@ -96,6 +97,18 @@ export default function BillingManage({ cafeId, pin }: { cafeId: number; pin: st
     setBusy(false);
   };
 
+  const yearly = /연/.test(String(sub?.plan ?? ""));
+  const priceLabel = yearly ? "연 ₩99,000" : "월 ₩9,900";
+  const setPlan = async (plan: "month" | "year") => {
+    setBusy(true);
+    try {
+      const r = await fetch("/api/subscription", { method: "POST", headers: hdr, body: JSON.stringify({ action: "set_plan", cafeId, plan }) });
+      const d = await r.json();
+      if (d.ok) { setSub((p) => (p ? { ...p, plan: d.plan, price: d.price } : p)); setMsg(plan === "year" ? "✅ 연 결제로 바꿨어요. 다음 결제부터 ₩99,000(2개월 무료)이 적용돼요." : "✅ 월 결제로 바꿨어요. 다음 결제부터 ₩9,900이 적용돼요."); }
+      else setMsg(d.error || "변경 실패");
+    } catch { setMsg("네트워크 오류"); }
+    setBusy(false);
+  };
   if (!sub) return null;
   const hasCard = !!sub.card_last4 && (sub.billing_status === "registered" || sub.billing_status === "active");
   const isTrial = isTrialDuration(sub.duration_days);
@@ -106,6 +119,12 @@ export default function BillingManage({ cafeId, pin }: { cafeId: number; pin: st
     <div className="bg-white rounded-2xl p-4 sm:p-5 border border-[#ece0cd] mb-4">
       <div className="text-sm font-bold text-[#52402e] mb-1 flex items-center gap-1.5">💳 결제 관리</div>
       {msg && <p className="text-[12px] text-[#7a5122] bg-[#fff8ee] border border-[#e7d3b3] rounded-lg px-3 py-2 my-2">{msg}</p>}
+      {/* 📅 요금제: 월 / 연(2개월 무료) — 다음 결제부터 적용 */}
+      <div className="flex items-center gap-2 my-2 text-[12px]">
+        <span className="text-[#8a7458] shrink-0">요금제</span>
+        <button type="button" onClick={() => setPlan("month")} disabled={busy || !yearly} className={`px-2.5 py-1 rounded-full border ${!yearly ? "bg-[#2b2018] text-[#f4ece0] border-[#2b2018]" : "text-[#52402e] border-[#d9c7ad]"}`}>월 ₩9,900</button>
+        <button type="button" onClick={() => setPlan("year")} disabled={busy || yearly} className={`px-2.5 py-1 rounded-full border ${yearly ? "bg-[#2b2018] text-[#f4ece0] border-[#2b2018]" : "text-[#52402e] border-[#d9c7ad]"}`}>연 ₩99,000 <span className="text-[10px] opacity-80">2개월 무료</span></button>
+      </div>
 
       {/* 체험 만료 임박 배너 */}
       {trialEndingSoon && (
@@ -121,7 +140,7 @@ export default function BillingManage({ cafeId, pin }: { cafeId: number; pin: st
             <span className="font-bold">{sub.card_company || "카드"} •••• {sub.card_last4}</span>
             <span className={`text-[10px] px-2 py-0.5 rounded-full ${sub.autopay ? "bg-[#e6f0e2] text-[#4a7a4a]" : "bg-[#f0e6d4] text-[#8a7458]"}`}>{sub.autopay ? "정기결제 켜짐" : "정기결제 꺼짐"}</span>
           </div>
-          {sub.autopay && sub.next_billing_at && <div className="text-[11.5px] text-[#8a7458] mt-1">다음 결제 예정일 <b className="text-[#52402e]">{fmt(sub.next_billing_at)}</b> · 월 ₩9,900</div>}
+          {sub.autopay && sub.next_billing_at && <div className="text-[11.5px] text-[#8a7458] mt-1">다음 결제 예정일 <b className="text-[#52402e]">{fmt(sub.next_billing_at)}</b> · {priceLabel}</div>}
           {sub.autopay
             ? <button onClick={cancel} disabled={busy} className="mt-3 text-[12px] text-[#9c6b3f] underline disabled:opacity-40">정기결제 해지</button>
             : <button onClick={startBilling} disabled={busy || !live} className="mt-3 w-full bg-[#2b2018] text-[#f4ece0] rounded-xl py-2.5 text-[13px] font-bold disabled:opacity-40">카드 다시 등록하고 정기결제 켜기</button>}

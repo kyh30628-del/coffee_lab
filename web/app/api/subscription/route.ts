@@ -7,7 +7,7 @@ import { encryptPII, decryptPII } from "@/lib/crypto";
 import { subscriptionLive, paymentsLive, bankTransferEmailEnabled } from "@/lib/flags";
 import { renderOnboardingEmail } from "@/lib/onboardingEmail";
 import { ownerScope } from "@/lib/ownerAuth";
-import { PLAN, PRICE, genPin, ensureBilling } from "@/lib/billing"; // 상품 상수·PIN·결제 스키마 단일 출처
+import { PLAN, PRICE, genPin, ensureBilling, PLAN_YEAR, PRICE_YEAR } from "@/lib/billing"; // 상품 상수·PIN·결제 스키마 단일 출처
 import { sendBillingEmail } from "@/lib/billingEmail";
 import { put } from "@vercel/blob";
 export const runtime = "nodejs";
@@ -143,6 +143,20 @@ export async function POST(req: NextRequest) {
         `<b>현재 상태</b>: ${s.status ?? "-"} · ${s.plan ?? ""}</p>${note ? `<p><b>메모</b>: ${note}</p>` : ""}` +
         `<p>→ /admin '💳 구독 카페 현황'에서 승인(activate) 또는 계좌이체 안내로 진행하세요.</p></div>`);
       return NextResponse.json({ ok: true, requested: true });
+    }
+
+    // 📅 사장님發 요금제 선택(2026-09-13): 월 9,900 ↔ 연 99,000. 다음 결제부터 적용(이미 낸 기간은 그대로).
+    if (b.action === "set_plan") {
+      const cafeId = Number(b.cafeId);
+      if (!cafeId) return NextResponse.json({ ok: false, error: "cafeId 필요" }, { status: 400 });
+      const scope = await ownerScope(req);
+      if (scope !== "admin" && scope !== cafeId) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+      const yearly = b.plan === "year";
+      if (b.plan !== "year" && b.plan !== "month") return NextResponse.json({ ok: false, error: "plan은 month|year" }, { status: 400 });
+      const r = (await sql`UPDATE subscriptions SET plan=${yearly ? PLAN_YEAR : PLAN}, price=${yearly ? PRICE_YEAR : PRICE}, updated_at=now() WHERE cafe_id=${cafeId} RETURNING plan, price`)[0] as any;
+      if (!r) return NextResponse.json({ ok: false, error: "구독 없음" }, { status: 404 });
+      await sql`INSERT INTO owner_events (cafe_id, event, at) VALUES (${cafeId}, ${yearly ? "set_plan_year" : "set_plan_month"}, now())`.catch((e) => noteSilentFail("subscription.owner_events", e));
+      return NextResponse.json({ ok: true, plan: r.plan, price: Number(r.price) });
     }
 
     // 관리자 액션: 활성화/해지/연장 (관리자 인증 필요)
