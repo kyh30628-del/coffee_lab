@@ -233,10 +233,24 @@ export async function GET(req: NextRequest) {
     const anomaly = transferBad;
     const awakeTxt = `가동 ${(aw.awakeMin / 60).toFixed(1)}h/일(깨어남 ${aw.wakes}회, 새벽 ${aw.nightMin}분, 7일중앙값 ${(aw.medianMin / 60).toFixed(1)}h)`;
     const awakeNote = awakeBad ? `⚠️ 가동시간 주의: ${awakeTxt} — 중앙값의 ${AWAKE_MEDIAN_MULT}배(${(awakeLimit / 60).toFixed(1)}h) 초과. ` : "";
+    // 🔴 2026-09-13 라벨 정정(CEO "338.6기가는 이해가 안 되네") — 이 숫자는 **네트워크 전송이 아니라 DB 디스크 읽기**다
+    //   (pg_stat_statements.shared_blks_read × 8KB). 그런데 '데이터전송 이상'이라 써서 청구서로 오해하게 만들었다.
+    //   실청구 전송은 Neon API의 data_transfer_bytes다 — 같은 줄에 함께 찍어 두 번 다시 헷갈리지 않게 한다.
+    //   실측 09-13: 경보 338.6GB(디스크 읽기) vs 실청구 전송 14.6GB/일(무료 500GB의 36.7%) — 자릿수가 다르다.
+    let billed = "";
+    try {
+      const r = await fetch("https://console.neon.tech/api/v2/projects/damp-dew-22096939",
+        { headers: { Authorization: `Bearer ${process.env.NEON_API_KEY}`, Accept: "application/json" } });
+      const pj = (await r.json())?.project;
+      const eg = (pj?.data_transfer_bytes ?? 0) / 1e9, cuh = (pj?.compute_time_seconds ?? 0) / 3600;
+      const st = new Date(pj?.consumption_period_start ?? Date.now());
+      const days = Math.max(0.5, (Date.now() - st.getTime()) / 86400000);
+      if (eg > 0) billed = ` · 💳실청구 전송 ${(eg / days).toFixed(1)}GB/일(월누계 ${eg.toFixed(0)}GB·무료 500GB의 ${Math.round(eg / 5)}%) · 컴퓨트 ${(cuh / days).toFixed(1)}CU-h/일`;
+    } catch { /* API 실패 시 디스크 읽기만 */ }
     const detail = anomaly
-      ? awakeNote + `🚨 데이터전송 이상: 오늘 총 ${totalGb.toFixed(1)}GB(임계 ${totalLimit.toFixed(1)}GB, 7일중앙값 ${medGb.toFixed(1)}GB×${TOTAL_MEDIAN_MULT})` +
+      ? awakeNote + `🚨 디스크 읽기 이상(내부 I/O·청구액 아님): 오늘 총 ${totalGb.toFixed(1)}GB(임계 ${totalLimit.toFixed(1)}GB, 7일중앙값 ${medGb.toFixed(1)}GB×${TOTAL_MEDIAN_MULT})${billed}` +
         (top && top.deltaGb >= PER_QUERY_GB_ALERT ? ` · 최다쿼리 ${top.deltaGb.toFixed(1)}GB: ${top.q.replace(/\s+/g, " ").slice(0, 100)}` : "")
-      : awakeNote + `정상 — 총 ${totalGb.toFixed(1)}GB(임계 ${totalLimit.toFixed(1)}GB, 7일중앙값 ${medGb.toFixed(1)}GB×${TOTAL_MEDIAN_MULT}), ${awakeTxt}`;
+      : awakeNote + `정상 — 디스크 읽기 ${totalGb.toFixed(1)}GB(임계 ${totalLimit.toFixed(1)}GB, 7일중앙값 ${medGb.toFixed(1)}GB×${TOTAL_MEDIAN_MULT})${billed}, ${awakeTxt}`;
 
     // 📒 하네스 L5 — 실행 원장 보존정리(90일). 하루 1회·행 수천 개 수준이라 부하 무시 가능.
     const pruned = await pruneLedger(90).catch(() => 0);
