@@ -757,6 +757,18 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
   //   → 폴백 대기를 1.2초 → 4초로 늘려 실제 데이터를 기다린다. 4초 안에 오면 **처음부터 진짜 메모 하나만** 써진다.
   //     (4초 안에도 못 오면 그때만 고정 문구. 그 경우에도 바뀌지 않는다.)
   const [memo, setMemo] = useState<string[] | null>(() => landingOnce.memo);
+  // ⚡ 랜딩 전용 초경량 풀 — /api/discover(홈 피드 전체)는 폰 첫 실행에서 4초 안에도 안 온다(실측 +5,096ms).
+  //   메모에 필요한 필드만 담은 몇 KB짜리를 CDN 캐시로 받아 수백 ms 안에 진짜 메모로 시작한다.
+  const [lite, setLite] = useState<Discover | null>(null);
+  useEffect(() => {
+    if (landingOnce.memo) return;
+    let alive = true;
+    fetch("/api/landing-memo", { cache: "default" }).then((r) => r.json()).then((d) => {
+      if (!alive || !d?.ok || !Array.isArray(d.pool) || !d.pool.length) return;
+      setLite({ headlineAList: d.pool, top3: [], fresh: [], specialty: [], featured: [] } as unknown as Discover);
+    }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
   const mountId = useMemo(() => Math.random().toString(36).slice(2, 8), []);
   useEffect(() => { landingBeacon("mount", { mountId }); }, [mountId]);
   // 🔬 화면 타임라인 — 눈에 보이는 글자 수(불투명 .ch)를 0.25초마다 25초간 기록. 0으로 떨어졌다 다시 오르면 '두 번 써짐'이 화면에서 실재.
@@ -775,10 +787,11 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
   useEffect(() => {
     if (memo) return;                                   // 이미 확정 — 무슨 일이 있어도 다시 안 쓴다
     const fix = (m: string[]) => { landingOnce.memo = m; setMemo(m); };
-    if (discover) { landingBeacon("memo-fix", { mountId, memoHash: "real:" + (landingMemo(discover, seed)[0] ?? "").slice(0, 14) }); fix(landingMemo(discover, seed).slice(0, 7)); return; }
+    const src = discover ?? lite;   // 홈 데이터가 오면 그걸로, 아직이면 초경량 풀로 — 둘 중 먼저 오는 쪽
+    if (src) { landingBeacon("memo-fix", { mountId, memoHash: (discover ? "real:" : "lite:") + (landingMemo(src, seed)[0] ?? "").slice(0, 14) }); fix(landingMemo(src, seed).slice(0, 7)); return; }
     const t = setTimeout(() => { if (!landingOnce.memo) { landingBeacon("memo-fix", { mountId, memoHash: "fallback" }); fix(landingMemo(null, seed).slice(0, 7)); } }, 4000);
     return () => clearTimeout(t);
-  }, [discover, memo, seed]);
+  }, [discover, lite, memo, seed]);
   const LANDING_MEMO = useMemo(() => memo ?? [], [memo]);
   const [done, setDone] = useState<boolean | null>(() => (landingOnce.done ? true : landingOnce.t0 != null ? false : null)); // null=판단 전(SSR), true=완성본, false=쓰는 중 — 재마운트면 즉시 이어진 상태로
   const [pos, setPos] = useState<[number, number]>([0, 0]); // [줄, 글자]
