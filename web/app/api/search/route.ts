@@ -412,26 +412,38 @@ export async function GET(req: NextRequest) {
           //   걸고 ?| 로 바꿨다. 건수 동치는 실측 확인(quiet 14,531=14,531 · nokids+pet 8,754=8,754).
           const conceptAxes = Array.from(new Set(hitConcepts.filter((c) => c.axis).map((c) => c.axis as string)));
           if (conceptAxes.length > 0) {
-            const axisRows = areaList
-              ? (await sql.query(
-                  `SELECT ${FIELDS}, 1 - (embedding <=> $1::vector) AS sim
-                   FROM cafes
-                   WHERE published = true AND embedding IS NOT NULL
-                     AND area = ANY($2::text[])
-                     AND jsonb_path_query_array(char_scores, '$.keyvalue() ? (@.value > 0).key') ?| $3::text[]
-                   ORDER BY (SELECT MAX((char_scores->>ax)::numeric) FROM unnest($3::text[]) ax) DESC
-                   LIMIT 40`,
-                  [lit, areaList, conceptAxes],
-                )) as unknown as any[]
-              : (await sql.query(
-                  `SELECT ${FIELDS}, 1 - (embedding <=> $1::vector) AS sim
-                   FROM cafes
-                   WHERE published = true AND embedding IS NOT NULL
-                     AND jsonb_path_query_array(char_scores, '$.keyvalue() ? (@.value > 0).key') ?| $2::text[]
-                   ORDER BY (SELECT MAX((char_scores->>ax)::numeric) FROM unnest($2::text[]) ax) DESC
-                   LIMIT 40`,
-                  [lit, conceptAxes],
-                )) as unknown as any[];
+            // 🔴 결재#1071(협업#407) — "디저트"·"빵집"처럼 흔한 축은 idx_cafes_axis_pos가 걸러도
+            //   published 26,352곳 중 27,039행(거의 전체)이 매칭돼 Bitmap Heap Scan이 되고, 실측(EXPLAIN
+            //   ANALYZE) 콜드캐시에서 38,199블록(약300MB) 디스크 읽기로 20.7초가 걸렸다(웜캐시면 1~2초 —
+            //   Neon 컴퓨트가 유휴 후 서스펜드되면 매 요청이 콜드다). maxDuration=30s에 근접해 504로 총실패.
+            //   이 조회는 "보강"(없어도 본 임베딩 결과는 살아있다) — 예산을 넘으면 버리고 계속 진행한다.
+            let axisRows: any[] = [];
+            try {
+              axisRows = areaList
+                ? (await sql.query(
+                    `SELECT ${FIELDS}, 1 - (embedding <=> $1::vector) AS sim
+                     FROM cafes
+                     WHERE published = true AND embedding IS NOT NULL
+                       AND area = ANY($2::text[])
+                       AND jsonb_path_query_array(char_scores, '$.keyvalue() ? (@.value > 0).key') ?| $3::text[]
+                     ORDER BY (SELECT MAX((char_scores->>ax)::numeric) FROM unnest($3::text[]) ax) DESC
+                     LIMIT 40`,
+                    [lit, areaList, conceptAxes],
+                    { fetchOptions: { signal: AbortSignal.timeout(5000) } },
+                  )) as unknown as any[]
+                : (await sql.query(
+                    `SELECT ${FIELDS}, 1 - (embedding <=> $1::vector) AS sim
+                     FROM cafes
+                     WHERE published = true AND embedding IS NOT NULL
+                       AND jsonb_path_query_array(char_scores, '$.keyvalue() ? (@.value > 0).key') ?| $2::text[]
+                     ORDER BY (SELECT MAX((char_scores->>ax)::numeric) FROM unnest($2::text[]) ax) DESC
+                     LIMIT 40`,
+                    [lit, conceptAxes],
+                    { fetchOptions: { signal: AbortSignal.timeout(5000) } },
+                  )) as unknown as any[];
+            } catch {
+              axisRows = []; // 타임아웃/오류 시 보강 없이 진행 — 본 임베딩 결과(rows)는 이미 확보돼 있다.
+            }
             const seenIds = new Set(rows.map((r) => r.id));
             for (const r of axisRows) if (!seenIds.has(r.id)) { rows.push(r); seenIds.add(r.id); }
           }
