@@ -707,6 +707,8 @@ function landingMemo(d: Discover | null, seed: number): string[] {
   return lines;
 }
 const HERO_W = 1400, HERO_H = 1680;
+// ✒ Blender 렌더 만년펜(public/note/pen.webp) — 페이지 좌표계 표시 크기와 촉 끝 위치(이미지 비율, 렌더 후 알파채널로 실측)
+const PEN_W = 21, PEN_H = 174, PEN_TIP: [number, number] = [0.4641, 0.9935]; // 렌더 167×1382px, 촉 끝 실측(알파채널)
 const HERO_PAGE: [number, number][] = [[0.22101, 0.29961], [0.70849, 0.30326], [0.77393, 0.82833], [0.10523, 0.82145]];
 const HERO_CUP: [number, number] = [0.845, 0.30];   // 잔 액면 중심(이미지 비율) — 김이 여기서 오른다
 const PAGE_SW = 280, PAGE_SH = 387;            // 글을 쓰는 원본 사각형(px) — 페이지 비율 2.10:2.90
@@ -724,6 +726,8 @@ function homographyMatrix3d(sw: number, sh: number, q: [number, number][]): stri
   const h = mul(d, adj(s)); const n = h[8] || 1; const H = h.map((v) => v / n);
   return `matrix3d(${H[0]},${H[3]},0,${H[6]},${H[1]},${H[4]},0,${H[7]},0,0,1,0,${H[2]},${H[5]},0,${H[8]})`;
 }
+// 페이지 로드 단위 단일 기록 — 메모 문장·완료 여부. (모듈 변수: 같은 로드 안에서 컴포넌트가 몇 번 마운트돼도 하나)
+const landingOnce: { memo: string[] | null; done: boolean } = { memo: null, done: false };
 function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: () => void; onOwner: () => void; onLogin: () => void; discover: Discover | null }) {
   // 방문(마운트)마다 다른 씨앗 — 새로고침하면 다른 카페가 적힌다. SSR에선 글자를 안 그리므로 불일치 없음.
   const seed = useMemo(() => Math.floor(Math.random() * 1e9) + 1, []);
@@ -732,11 +736,15 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
   //   지역(homeRegion)이 바뀌면 setDiscover(null) → 재요청으로 또 한 번 null↔데이터를 오간다.
   //   그때마다 메모 문장이 새로 만들어지고 아래 쓰기 이펙트의 의존성이 바뀌어 **처음부터 다시 써졌다.**
   //   → 메모는 **한 번만 확정**한다: 홈 데이터가 오면 그걸로, 안 오면 1.2초 뒤 폴백으로. 확정 후엔 다시 안 바뀐다.
-  const [memo, setMemo] = useState<string[] | null>(null);
+  // 🔴 2026-09-13 3차 — CEO "왜 자꾸 두 번 써지냐". 컴포넌트 상태만으론 부족했다(이 컴포넌트가 어떤 경로로든 다시
+  //   마운트되면 상태가 초기화돼 처음부터 다시 쓴다). → **페이지 로드 단위 전역 기록**(landingOnce): 한 번 확정한 메모와
+  //   완료 여부를 모듈 변수에 두고, 두 번째 마운트부터는 애니메이션 없이 완성본을 그대로 보여준다. 새로고침(새 로드)에서만 다시 쓴다.
+  const [memo, setMemo] = useState<string[] | null>(() => landingOnce.memo);
   useEffect(() => {
     if (memo) return;                                   // 이미 확정 — 무슨 일이 있어도 다시 안 쓴다
-    if (discover) { setMemo(landingMemo(discover, seed).slice(0, 7)); return; }
-    const t = setTimeout(() => setMemo((m) => m ?? landingMemo(null, seed).slice(0, 7)), 1200);
+    const fix = (m: string[]) => { landingOnce.memo = m; setMemo(m); };
+    if (discover) { fix(landingMemo(discover, seed).slice(0, 7)); return; }
+    const t = setTimeout(() => { if (!landingOnce.memo) fix(landingMemo(null, seed).slice(0, 7)); }, 1200);
     return () => clearTimeout(t);
   }, [discover, memo, seed]);
   const LANDING_MEMO = useMemo(() => memo ?? [], [memo]);
@@ -746,9 +754,10 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
   const [cupPos, setCupPos] = useState<[number, number] | null>(null);
   const heroRef = useRef<HTMLDivElement | null>(null);
   const pageRef = useRef<HTMLDivElement | null>(null);
-  const nibRef = useRef<SVGSVGElement | null>(null);
+  const nibRef = useRef<HTMLImageElement | null>(null);
   const curRef = useRef<HTMLElement | null>(null); // 지금 써지는 글자(인라인 clip 정리용)
   const penRef = useRef<[number, number] | null>(null); // 촉의 현재 위치(부드러운 이동)
+  const lastElRef = useRef<number | null>(null); // 직전 프레임 시각(시간 기반 접근용)
   const jitter = useMemo(() => LANDING_MEMO.map((l) => Array.from(l).map(() => [(Math.random() * 3.2 - 1.6).toFixed(2), (Math.random() * 2 - 1).toFixed(2)])), [LANDING_MEMO]);
   // 페이지 사각형을 화면 픽셀로 — 이미지는 object-fit: cover(가운데)라 스케일·오프셋을 같이 계산
   useEffect(() => {
@@ -765,6 +774,7 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
   useEffect(() => {
     // ✍ 매 방문 글씨가 써진다(약 2.6초, CEO 지시 "써지는 느낌") — 움직임 줄이기 설정만 즉시 완성본.
     if (!LANDING_MEMO.length) return;                   // 메모 확정 전 — 아무것도 그리지 않는다(빈 줄로 한 번 '완료'되는 걸 막는다)
+    if (landingOnce.done) { setDone(true); return; }    // 이 로드에서 이미 한 번 썼다 — 완성본만(두 번째 연출 금지)
     const reduce = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (reduce) { setDone(true); return; }
     setDone(false);
@@ -780,7 +790,7 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
     const step = () => {
       if (!alive) return;
       const el = (performance.now() - t0) / 1000;
-      if (el >= total) { setPos([LANDING_MEMO.length, 0]); setDone(true); if (nibRef.current) nibRef.current.style.opacity = "0"; if (curRef.current) { curRef.current.style.clipPath = ""; curRef.current.style.opacity = ""; curRef.current = null; } return; }
+      if (el >= total) { landingOnce.done = true; setPos([LANDING_MEMO.length, 0]); setDone(true); if (nibRef.current) nibRef.current.style.opacity = "0"; if (curRef.current) { curRef.current.style.clipPath = ""; curRef.current.style.opacity = ""; curRef.current = null; } return; }
       let li = 0; while (li + 1 < starts.length && el >= starts[li + 1]) li++;
       const prog = (el - starts[li]) * CPS;                       // 이 줄에서 몇 글자째(소수 = 획 진행률)
       const ci = Math.max(0, Math.min(lens[li], Math.floor(prog)));
@@ -810,13 +820,16 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
           const tx = lineEl.offsetLeft + ch.offsetLeft + (lifted || isSpace ? w : w * (0.12 + 0.8 * frac));
           const ty = lineEl.offsetTop + ch.offsetTop + (lifted || isSpace ? h * 0.55 : h * (0.28 + 0.5 * frac) + Math.sin(frac * Math.PI * 3) * h * 0.14);
           // 부드럽게 따라가기(줄 바꿈·띄어쓰기에서 순간이동 금지) — 목표까지 매 프레임 45%씩 접근
-          const pv = penRef.current; const k = pv ? 0.45 : 1;
+          // 프레임률 무관(시간 기반) 접근: 50ms 시정수 — 60fps든 30fps든 같은 손 움직임
+          const pv = penRef.current; const dt = Math.min(0.1, Math.max(0.001, el - (lastElRef.current ?? el))); lastElRef.current = el;
+          const k = pv ? 1 - Math.exp(-dt / 0.05) : 1;
           const px = pv ? pv[0] + (tx - pv[0]) * k : tx, py = pv ? pv[1] + (ty - pv[1]) * k : ty;
           penRef.current = [px, py];
-          const size = nib.clientWidth || 26, tipX = size * (3 / 24), tipY = size * (21 / 24);   // 아이콘 촉 끝(viewBox 3,21)
+          // 렌더된 펜 이미지: 촉 끝 = 이미지의 (PEN_TIP[0]·폭, PEN_TIP[1]·높이). 그 점을 잉크 끝에 두고 오른쪽 위로 기울인다.
+          const pw = nib.clientWidth || PEN_W, ph = nib.clientHeight || PEN_H, tipX = pw * PEN_TIP[0], tipY = ph * PEN_TIP[1];
           nib.style.transformOrigin = `${tipX}px ${tipY}px`;
           nib.style.opacity = "1";
-          nib.style.transform = `translate(${px - tipX}px, ${py - tipY - (lifted ? 4 : 0)}px) rotate(${14 + Math.sin(el * 9) * 3}deg)`;
+          nib.style.transform = `translate(${px - tipX}px, ${py - tipY - (lifted ? 3 : 0)}px) rotate(${34 + Math.sin(el * 9) * 2}deg)`;
         }
       }
       raf = requestAnimationFrame(step);
@@ -859,7 +872,7 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
           </div>
           <div className={`nt-stamp absolute ${allDone ? "in" : ""}`} style={{ right: 18, bottom: 26, opacity: allDone ? undefined : 0 }} aria-hidden>검증<small>VERIFIED</small></div>
           {done === false && (
-            <svg ref={nibRef} className="nt-nib" viewBox="0 0 24 24" aria-hidden style={{ width: 26, height: 26 }}><path d="M3 21l3.5-1 11-11-2.5-2.5-11 11L3 21z" fill="#1f2640" stroke="#2a1f17" strokeWidth="1" /><path d="M14.5 6.5l2.5 2.5 2-2a1.7 1.7 0 0 0 0-2.4l-.1-.1a1.7 1.7 0 0 0-2.4 0l-2 2z" fill="#e0b25a" stroke="#2a1f17" strokeWidth="1" /><path d="M3 21l1-3.2 2.2 2.2L3 21z" fill="#2a1f17" /></svg>
+            <img ref={nibRef} className="nt-nib" src="/note/pen.webp" alt="" aria-hidden draggable={false} style={{ width: PEN_W, height: PEN_H }} />
           )}
         </div>
       </div>

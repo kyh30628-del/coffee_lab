@@ -181,7 +181,7 @@
 .nt-w .ch.sp { width: 0.32em; }
 .nt-w .ch.on { opacity: 1; clip-path: inset(-20% -6% -20% -6%); color: #2f3550; }
 .nt-w.done .ch { opacity: 1; clip-path: none; color: #2f3550; transition: none; }
-.nt-nib { position: absolute; left: 0; top: 0; width: 34px; height: 34px; transform-origin: 3px 31px; opacity: 0; transition: opacity 0.2s; pointer-events: none; z-index: 5; filter: drop-shadow(1px 3px 3px rgba(0, 0, 0, 0.35)); will-change: transform; }
+.nt-nib { position: absolute; left: 0; top: 0; opacity: 0; transition: opacity 0.2s; pointer-events: none; z-index: 5; filter: drop-shadow(2px 6px 5px rgba(20, 12, 8, 0.45)); will-change: transform; user-select: none; }
 
 @media (prefers-reduced-motion: reduce) {
   .nt-page-in { animation: none; }

@@ -63,13 +63,30 @@ export async function GET(req: NextRequest) {
       ORDER BY c.synth_updated ASC NULLS FIRST
       LIMIT 3
     ` as unknown as { id: number; name: string; area: string }[];
+    // 🔁 raw 파기 후 재수집 레인(2026-09-13 CEO 승인) — 90일 파기된 공개 카페는 raw가 NULL이라 규칙이 바뀌어도
+    //   영영 소급되지 않았다(실측: 공개 229곳 이미 동결, 60일 내 12,910곳 추가 진입). 회당 소량만 네이버로 재수집한다.
+    //   비용: 네이버 검색 호출(카페당 수 회) — naverBlocked/naverRemaining 게이트로 발굴·수집 예산과 같은 지갑을 쓴다.
+    //   ⚠️ 0건 재수집(gatherRaw의 '0건이면 [] 저장' 규칙)으로 raw가 채워지면 다음 회차 대상에서 빠진다(무한 재수집 없음).
+    const RECOLLECT_MAX = 6;
+    let recollected = 0, recollectErr = 0, recollectSkip = "";
+    {
+      const { naverBlocked, naverRemaining } = await import("@/lib/naverBudget");
+      if (await naverBlocked()) recollectSkip = "네이버 차단";
+      else if ((await naverRemaining()) < 2000) recollectSkip = "네이버 잔여<2000";
+      else {
+        await sql`CREATE INDEX IF NOT EXISTS idx_cafes_pub_rawnull ON cafes (synth_checked_at ASC NULLS FIRST) WHERE published = true AND raw_reviews IS NULL`.catch(() => {});
+        const targets = (await sql`SELECT id, name, area FROM cafes WHERE published = true AND raw_reviews IS NULL
+          ORDER BY synth_checked_at ASC NULLS FIRST LIMIT ${RECOLLECT_MAX}`) as unknown as { id: number; name: string; area: string }[];
+        for (const c of targets) { try { await synthOne(c); recollected++; } catch { recollectErr++; } }
+      }
+    }
     // 🧹 오염그물 재적용 — '진짜 필요한 카페만'(낭비 0). refresh:false=재수집X·규칙만 재적용, API·토큰·쿼터 0(순수 결정론).
     //   대상: ①새 리뷰 수집됨(raw_collected_at > synth_updated → 규칙 재적용 필요) ②4일+ 미갱신(규칙변경 자동커버, 전수 ~4일 순환).
     //   ⚠️ 신선한(4일 내·새 raw 없는) 카페는 재처리 안 함 → 안 변한 것 반복 재계산 낭비 제거. 필요한 것 우선(새 raw) 먼저.
     //   ⚠️ no-mass-unpublish 차단기: 100곳 이상 처리 후 비공개율 20% 초과 시 즉시 중단(버그성 대량비공개 방지, 인천사고 교훈).
     // synth_checked_at = '마지막 재점검 시각'(변경 여부 무관 매 재합성마다 갱신) → 이걸로 순환해야 실제 커버리지가 전진.
     //   (synth_updated는 '결과가 바뀐 시각'이라 안 변한 카페는 안 움직여 순환 기준으로 못 씀 — 2026-07-05 정정.)
-    const GEN_CONC = 10, GEN_MAX = 150, GEN_RATE_LIMIT = 0.20;
+    const GEN_CONC = 10, GEN_MAX = 300, GEN_RATE_LIMIT = 0.20; // 150→300 (CEO 승인 2026-09-13: 규칙 전파 43일→22일. 컴퓨트 창 시간 증가는 창 예산 게이트가 상한)
     // 🧬 2026-09-03 — 맹목 4일 순환 폐지(CEO 지시 1순위: "잘 나오는 건 건들지 마라").
     //   기존: 4일 지나면 무조건 재검 → 새 후기도 규칙 변경도 없는 카페의 raw_reviews를
     //   계속 다시 읽었다(하루 수 GB 헛읽기 — 전송비의 주범).
@@ -157,7 +174,7 @@ export async function GET(req: NextRequest) {
     if (toInvalidate.length) { const { invalidateCafeCaches } = await import("@/lib/cafeCacheInvalidate"); await invalidateCafeCaches(toInvalidate).catch(() => {}); }
 
     const _u = runUsage(); if (!_u?.overBudget) void clearOverBudget("cron-resynth"); // 💰 하네스 L1 — 이번 런의 큰 컬럼 소비량을 원장에 남긴다
-    await recordRun("cron-resynth", true, `raw정리 ${purged.length} 유튜브 ${ytRefreshed.length} · 구독재수집 ${subResults.length} · 전수적용 ${gDone}(변동 ${gChangedIds.length}·비공개 ${gUnpub.length}·오류 ${gErr}) · held재평가 ${heldDone}(복귀 ${heldFreed}·오류 ${heldErr})${gErr > 0 ? ` [${gErrSamples.join(" / ")}]` : ""}${gStop ? " ⚠️차단기발동" : ""}`, gDone, { metrics: { blobReads: _u?.blobReads ?? 0, wallMs: _u?.wallMs ?? 0 } });
+    await recordRun("cron-resynth", true, `raw정리 ${purged.length} 유튜브 ${ytRefreshed.length} · 구독재수집 ${subResults.length} · 파기재수집 ${recollected}${recollectErr ? `(오류 ${recollectErr})` : ""}${recollectSkip ? `(스킵:${recollectSkip})` : ""} · 전수적용 ${gDone}(변동 ${gChangedIds.length}·비공개 ${gUnpub.length}·오류 ${gErr}) · held재평가 ${heldDone}(복귀 ${heldFreed}·오류 ${heldErr})${gErr > 0 ? ` [${gErrSamples.join(" / ")}]` : ""}${gStop ? " ⚠️차단기발동" : ""}`, gDone, { metrics: { blobReads: _u?.blobReads ?? 0, wallMs: _u?.wallMs ?? 0 } });
     return NextResponse.json({ ok: true, ranAt: new Date().toISOString(), rawPurged: purged.length, ytRefreshed: ytRefreshed.length, subResynth: subResults.length, netApplied: gDone, changed: gChangedIds.length, unpublished: gUnpub.length, breaker: gStop });
   } catch (e) {
     await recordRun("cron-resynth", false, String(e).slice(0, 150));
