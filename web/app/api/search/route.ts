@@ -616,7 +616,8 @@ export async function GET(req: NextRequest) {
     //      이름이 **완전히 같고** 종류가 확실한 기준점(공원·명소·역·몰 등, 상호·아파트 제외)이면 장소가 정답이다.
     //      과거 사고(연희동→연희동물병원·신사동→신사동산)는 전부 **접두** 일치였으므로 이 예외에 걸리지 않는다.
     const anchorExact = placeCands.find((p) => isAnchorKind(p.kind) && (normName(p.name) === qk || normName(p.name) === qkA));
-    const placeHit = qk.length >= 3 && (!regionWordInQuery || !!anchorExact)
+    //   ⚠️ 길이 하한은 **별칭을 푼 뒤**로 본다 — "고터"(2자)가 여기서 잘려 고속터미널역(6자)을 못 썼다(실측).
+    const placeHit = Math.max(qk.length, qkA.length) >= 3 && (!regionWordInQuery || !!anchorExact)
       ? (anchorExact ?? placeCands.find((p) => {
           const pn = normName(p.name);
           //   🔴 접두 일치는 아예 쓰지 않는다(2026-09-12): "조용한 카페"가 '조용한…'으로 시작하는 장소에 걸려
