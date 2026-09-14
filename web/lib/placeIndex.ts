@@ -75,7 +75,8 @@ const ALIAS: Record<string, string> = {
   "더현대": "더현대서울", "여의도더현대": "더현대서울",
 };
 /** 질의에서 장소명만 남긴다("스타필드 하남 카페" → "스타필드하남"). 장소 검색인지 판단하는 데 쓴다. */
-export const placeKey = (q: string) => norm(q).replace(/(카페|커피|맛집|근처|주변|추천|가볼만한곳|가볼만한)/g, "");
+//   🏢 2026-09-14: 회사 질의의 꼬리말도 뗀다 — "네이버 본사"가 인덱스의 '네이버'와 안 맞아 semantic으로 빠졌다.
+export const placeKey = (q: string) => norm(q).replace(/(카페|커피|맛집|근처|주변|추천|가볼만한곳|가볼만한|본사|사옥|오피스|캠퍼스|지사)/g, "");
 /** 별칭을 푼 검색키 — 라우트의 장소 판정도 같은 이름을 봐야 한다(2026-09-14: 별칭이 인덱스 안에서만 적용돼
  *  "남산타워"·"고터"·"롯데타워"가 후보는 맞게 찾고도 place 모드로 못 넘어갔다). */
 export const placeKeyAliased = (q: string) => { const k = placeKey(q); return ALIAS[k] ? norm(ALIAS[k]) : k; };

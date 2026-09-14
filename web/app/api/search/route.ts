@@ -617,7 +617,9 @@ export async function GET(req: NextRequest) {
     //      과거 사고(연희동→연희동물병원·신사동→신사동산)는 전부 **접두** 일치였으므로 이 예외에 걸리지 않는다.
     const anchorExact = placeCands.find((p) => isAnchorKind(p.kind) && (normName(p.name) === qk || normName(p.name) === qkA));
     //   ⚠️ 길이 하한은 **별칭을 푼 뒤**로 본다 — "고터"(2자)가 여기서 잘려 고속터미널역(6자)을 못 썼다(실측).
-    const placeHit = Math.max(qk.length, qkA.length) >= 3 && (!regionWordInQuery || !!anchorExact)
+    //   ⚠️ 정확일치 앵커가 있으면 길이 하한도 넘긴다 — "넥슨"·"토스"(2자)가 여기서 잘려 0건이었다.
+    //      큐레이션된 이름과 **완전히 같은** 질의는 짧아도 모호하지 않다.
+    const placeHit = (Math.max(qk.length, qkA.length) >= 3 || !!anchorExact) && (!regionWordInQuery || !!anchorExact)
       ? (anchorExact ?? placeCands.find((p) => {
           const pn = normName(p.name);
           //   🔴 접두 일치는 아예 쓰지 않는다(2026-09-12): "조용한 카페"가 '조용한…'으로 시작하는 장소에 걸려
@@ -666,7 +668,10 @@ export async function GET(req: NextRequest) {
       const cn = normName(String(sc.name || ""));
       return cn === qk || (cn.startsWith(qk) && cn.length - qk.length <= 5);
     });
-    if (placeHit2 && !cafeNameHit) {
+    //   🔴 2026-09-14: 이 가드가 '카카오'를 삼켰다 — 카페 '카카오브로'가 질의로 시작한다는 이유로
+    //      회사 '카카오'(정확일치)를 밀어냈다. **이름이 완전히 같은 기준점**이 있으면 그쪽이 답이다.
+    //      ('프릳츠'처럼 카페 이름과 정확히 같은 경우는 anchorExact가 안 생기므로 기존 동작 그대로다.)
+    if (placeHit2 && (!cafeNameHit || !!anchorExact)) {
       const placeHit = placeHit2;
       const R = 0.027;                                   // 위도 약 3km — 캠퍼스·공원처럼 중심 좌표가 외곽인 곳까지 담는다
       const lngR = R / Math.max(0.3, Math.cos((placeHit.lat * Math.PI) / 180));
