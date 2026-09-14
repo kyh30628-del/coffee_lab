@@ -289,3 +289,55 @@ export async function getRegionFacetGradeBreakdown(area: string, label: string):
     return g;
   } catch { return { verified: 0, ref: 0, candidate: 0 }; }
 }
+
+
+// 🏘️ 동×취향 — 결재 #1083 2단계(CEO 지시 2026-09-14 "지금 열어").
+//   왜: 사람이 실제로 치는 형태가 "{동네} {취향} 카페"("연남동 카공 카페")인데 우리는 구 단위뿐이었다.
+//   채택 기준은 지역×취향과 **완전히 동일**하다(TASTE_MIN_HITS·TASTE_MIN_RATE_PCT) — 같은 약속을 다른 단위로 지킨다.
+//   ⚠️ area+dong+char_scores 조건은 지역×취향과 같은 인덱스를 탄다(preflight로 상시 감시).
+export async function getDongTasteCafes(area: string, dong: string, tasteKey: string, limit = 30): Promise<SeoCafe[]> {
+  try {
+    return withOwnerBadge((await sql`SELECT id, name, dong, synth_grade AS grade, synth_count AS count, synth_identity AS identity, char_scores, visitor_n, visitor_trip, visitor_local, work_facts, cautions,
+      (char_scores->>${tasteKey})::int AS "tasteHits",
+      (SELECT left(r->>'quote', 70) FROM jsonb_array_elements(COALESCE(synth_reviews,'[]'::jsonb)) r
+        WHERE COALESCE(r->>'quote','') <> '' ORDER BY COALESCE((r->>'score')::int,0) DESC LIMIT 1) AS quote
+      FROM cafes WHERE published AND area=${area} AND dong=${dong}
+        AND COALESCE((char_scores->>${tasteKey})::int, 0) >= ${TASTE_MIN_HITS}
+        AND COALESCE((char_scores->>${tasteKey})::int, 0) * 100 >= COALESCE(synth_count,0) * ${TASTE_MIN_RATE_PCT}
+        AND (${tasteKey} IN ('dessert','bakery') OR NOT (
+          COALESCE((char_scores->>'dessert')::int,0) > 20
+          AND COALESCE((char_scores->>'roast')::int,0) < 5
+          AND COALESCE((char_scores->>'dessert')::int,0) >= COALESCE((char_scores->>'roast')::int,0) * 8))
+      ORDER BY (char_scores->>${tasteKey})::int DESC, synth_count DESC NULLS LAST LIMIT ${limit}`) as unknown as SeoCafe[]);
+  } catch { return []; }
+}
+/** 전 동×취향 카운트 — **쿼리 1회 + 메모리 캐시**.
+ *  ⚠️ 처음엔 취향마다 쿼리를 돌려 11회였다. 이 값은 동 페이지·동×취향 페이지·사이트맵이 모두 부르므로
+ *     5,047페이지가 처음 생성될 때 11회 × 5,047 = 5만 5천 쿼리가 될 뻔했다(크롤 몰릴 때 비용 폭발).
+ *     지역×취향(getRegionTasteCounts)과 **같은 방식**으로 FILTER 집계 1회 + 6시간 캐시로 맞춘다. */
+let dongTasteCountsMem: { at: number; v: Record<string, number> } | null = null;
+export async function getDongTasteCounts(): Promise<Record<string, number>> {
+  if (dongTasteCountsMem && Date.now() - dongTasteCountsMem.at < TASTE_COUNTS_TTL_MS) return dongTasteCountsMem.v;
+  try {
+    const cols = TASTES.map((t) => {
+      const skipDominance = t.key === "dessert" || t.key === "bakery";
+      const dominanceFilter = skipDominance ? "" : `
+        AND NOT (COALESCE((char_scores->>'dessert')::int,0) > 20
+          AND COALESCE((char_scores->>'roast')::int,0) < 5
+          AND COALESCE((char_scores->>'dessert')::int,0) >= COALESCE((char_scores->>'roast')::int,0) * 8)`;
+      return `COUNT(*) FILTER (WHERE COALESCE((char_scores->>'${t.key}')::int,0) >= ${TASTE_MIN_HITS}
+        AND COALESCE((char_scores->>'${t.key}')::int,0) * 100 >= COALESCE(synth_count,0) * ${TASTE_MIN_RATE_PCT}${dominanceFilter})::int "${t.key}"`;
+    }).join(",\n      ");
+    const rows = (await sql.query(`SELECT area, dong,
+      ${cols}
+      FROM cafes WHERE published AND area IS NOT NULL AND area <> '' AND dong IS NOT NULL AND dong <> ''
+      GROUP BY area, dong`)) as unknown as Record<string, any>[];
+    const out: Record<string, number> = {};
+    for (const r of rows) for (const t of TASTES) {
+      const n = Number(r[t.key] ?? 0);
+      if (n >= 5) out[`${r.area}|${r.dong}|${t.key}`] = n;   // 5곳 미만은 담지 않는다(사이트맵·칩 기준과 동일)
+    }
+    dongTasteCountsMem = { at: Date.now(), v: out };
+    return out;
+  } catch { return dongTasteCountsMem?.v ?? {}; }
+}

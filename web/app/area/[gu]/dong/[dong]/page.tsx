@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Curated from "../../../Curated";
-import { getDongsInArea, getDongCafes, getDongPublishedCount, SITE } from "@/lib/seoData";
+import { getDongsInArea, getDongCafes, getDongPublishedCount, getDongTasteCounts, TASTES, SITE } from "@/lib/seoData";
 
 export const revalidate = 2592000; // ISR 30일 — 새벽 절전(2026-09-09). 무효화는 온디맨드.
 
@@ -34,7 +34,12 @@ export default async function DongPage({ params }: Props) {
   const { gu, dong } = await params;
   const area = decodeURIComponent(gu);
   const d = decodeURIComponent(dong);
-  const [cafes, siblings, total] = await Promise.all([getDongCafes(area, d, 30), getDongsInArea(area), getDongPublishedCount(area, d)]);
+  const [cafes, siblings, total, dongTasteCounts] = await Promise.all([
+    getDongCafes(area, d, 30), getDongsInArea(area), getDongPublishedCount(area, d), getDongTasteCounts(),
+  ]);
+  //   🏘️ 이 동네의 취향별 페이지 링크(2026-09-14) — 5곳 이상인 것만. 내부 링크가 있어야 크롤러가 타고 들어간다.
+  const tasteLinks = TASTES.filter((t) => (dongTasteCounts[`${area}|${d}|${t.key}`] ?? 0) >= 5)
+    .map((t) => ({ label: `${t.emoji} ${d} ${t.short} ${dongTasteCounts[`${area}|${d}|${t.key}`]}`, href: `/area/${encodeURIComponent(area)}/dong/${encodeURIComponent(d)}/${t.key}` }));
   if (!cafes.length && !total) notFound();
   const heading = `${d} 카페 추천`;
   const intro = `${area} ${d}에서 가볼 만한 동네 카페 ${total || cafes.length}곳을 진짜 후기로 검증해 모았어요.`;
@@ -49,8 +54,8 @@ export default async function DongPage({ params }: Props) {
       backHref={`/area/${encodeURIComponent(area)}`}
       backLabel={`${area} 전체`}
       showTasteNav={false}
-      crossLinks={crossLinks}
-      crossLinksLabel={`${area}의 다른 동네도 둘러보기`}
+      crossLinks={tasteLinks.length ? [...tasteLinks, ...crossLinks] : crossLinks}
+      crossLinksLabel={tasteLinks.length ? `${d} 취향별로 보기 · ${area}의 다른 동네` : `${area}의 다른 동네도 둘러보기`}
     />
   );
 }

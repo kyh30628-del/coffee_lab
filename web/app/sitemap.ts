@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 import { sql } from "@/lib/db";
-import { getRegions, getDongs, getRegionTasteCounts, getRegionFacetCounts, TASTES } from "@/lib/seoData";
+import { getRegions, getDongs, getRegionTasteCounts, getRegionFacetCounts, getDongTasteCounts, TASTES } from "@/lib/seoData";
 import { FACET_PAGES, FACET_MIN_CAFES } from "@/lib/facetPages";
 import { COLLECTIONS } from "@/lib/collections";
 
@@ -52,6 +52,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const dongUrls: MetadataRoute.Sitemap = dongs.map((d) => ({
     url: `${SITE}/area/${encodeURIComponent(d.area)}/dong/${encodeURIComponent(d.dong)}`, changeFrequency: "weekly", priority: 0.65,
   }));
+  // 🏘️ 동×취향(결재 #1083 2단계, CEO 지시 2026-09-14 "지금 열어") — "연남동 카공 카페"처럼
+  //   사람이 실제로 치는 형태. 채택 기준은 지역×취향과 **완전히 동일**하고 5곳 이상만 제출한다.
+  //   ⚠️ 크롤 예산: 이미 12,069개가 '발견됐지만 크롤 대기'인데 여기서 5천여 개가 더 들어간다.
+  //      CEO 결정으로 1단계 관찰 없이 연다 — 기존 색인 지연 여부를 09-28 스팟체크에서 반드시 확인할 것.
+  const dongTasteCounts = await getDongTasteCounts();
+  const dongTasteUrls: MetadataRoute.Sitemap = Object.entries(dongTasteCounts)
+    .filter(([, n]) => n >= 5)
+    .map(([k]) => { const [a, d, t] = k.split("|");
+      return { url: `${SITE}/area/${encodeURIComponent(a)}/dong/${encodeURIComponent(d)}/${t}`, changeFrequency: "weekly" as const, priority: 0.6 }; });
   // 동네 교차검증 컬렉션(에디토리얼 SEO 랜딩) — lib/collections.ts 레지스트리 단일출처.
   const collectionUrls: MetadataRoute.Sitemap = COLLECTIONS.map((c) => ({
     url: `${SITE}/collections/${c.slug}`, changeFrequency: "weekly", priority: 0.85,
@@ -69,6 +78,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...regionTasteUrls,
     ...facetUrls,
     ...dongUrls,
+    ...dongTasteUrls,
     ...cafeUrls,
   ];
 }
