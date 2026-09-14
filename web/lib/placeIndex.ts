@@ -32,10 +32,16 @@ const KIND: Record<string, [string, string]> = {
   biz_food: ["음식점", "🍚"], biz_cafe: ["카페·바", "🍹"], biz_bank: ["은행", "🏦"], biz_care: ["약국·의원", "💊"],
   biz_car: ["주유·세차", "⛽"], biz_edu: ["학원", "📖"], biz_cvs: ["편의점", "🏪"], biz_shop: ["상점", "🛍️"],
   biz_office: ["사무소", "🏢"], biz_gym: ["체육시설", "🏋️"],
+  // 🗺️ 2026-09-14(CEO "건물·상호·회사·랜드마크 파워풀하게") — 한국관광공사 TourAPI(공공누리) 16,156건 편입.
+  //   실측 실패가 근거다: 서울숲→카페 1곳 · DDP→1곳 · 남산타워→0곳. OSM엔 '서울숲'이 아파트 이름으로만 있었다.
+  culture: ["문화시설", "🎨"], leisure: ["레포츠", "⛰️"],   // landmark는 위에 이미 있다
 };
 // 같은 점수면 '가려는 곳'으로 자주 쓰이는 종류를 먼저 — 역·터미널·공항 > 큰 시설 > 아파트·공원.
 //   상호(biz_*)는 같은 이름이 전국에 수백 개씩 있어 랜드마크보다 뒤에 둔다 — '강남역'이 '강남역국밥'보다 먼저.
-const PRIO: Record<string, number> = { station: 0, bus_station: 0, aerodrome: 0, department_store: 1, mall: 1, university: 1, hospital: 1, theme_park: 1, stadium: 1, museum: 2, aquarium: 2, zoo: 2, marketplace: 2, cinema: 2, theatre: 2, hotel: 3, apt: 3, library: 3, supermarket: 3, school: 3, peak: 4, townhall: 4, government: 4, park: 5,
+//   🔴 2026-09-14 가중치 재설계: 예전엔 점수에 PRIO*0.5만 곱해 길이 페널티(0~6)에 묻혔다.
+//     그래서 '코엑스' 질의에 '강남교자 스타필드 코엑스몰점'(biz_food)이 '스타필드 코엑스몰'(mall)을 이겼다.
+//     PRIO*2로 올려 **종류가 실제로 순위를 가르게** 한다(같은 종류 안에서는 여전히 이름이 짧은 쪽이 먼저).
+const PRIO: Record<string, number> = { landmark: 0, attraction: 0, culture: 0, station: 0, bus_station: 0, aerodrome: 0, leisure: 1, department_store: 1, mall: 1, university: 1, hospital: 1, theme_park: 1, stadium: 1, museum: 2, aquarium: 2, zoo: 2, marketplace: 2, cinema: 2, theatre: 2, hotel: 3, apt: 3, library: 3, supermarket: 3, school: 3, peak: 4, townhall: 4, government: 4, park: 5,
   biz_food: 6, biz_cafe: 6, biz_shop: 6, biz_cvs: 7, biz_bank: 6, biz_care: 6, biz_car: 6, biz_edu: 6, biz_office: 7, biz_gym: 6 };
 
 let ROWS: Row[] | null = null;
@@ -50,6 +56,21 @@ function rows(): Row[] {
 export const placeCount = () => rows().length;
 
 const norm = (s: string) => s.toLowerCase().replace(/[\s·・\-_,()]/g, "");
+
+// 🔤 별칭 — 공식 명칭과 사람이 쓰는 말이 다르다. 실측으로 확인된 것만 등재한다(추측 금지).
+//   실패 사례: "남산타워"(공식 남산서울타워) 0건 · "DDP"(공식 동대문디자인플라자) 1건 · "63빌딩"(공식 63스퀘어) 2건.
+const ALIAS: Record<string, string> = {
+  "남산타워": "남산서울타워", "n서울타워": "남산서울타워", "엔서울타워": "남산서울타워",
+  "ddp": "동대문디자인플라자", "동대문dp": "동대문디자인플라자",
+  // ⚠️ "코엑스"는 별칭을 넣지 않는다 — 인덱스에 '코엑스'(culture) 정확일치가 이미 있는데
+  //   별칭이 '스타필드코엑스몰'로 바꿔버려 정확일치를 놓치고 음식점이 1위가 됐다(실측).
+  //   "63빌딩"도 뺀다 — 63스퀘어가 인덱스에 없어 가리킬 대상이 없다.
+  "연트럴파크": "경의선숲길", "북꿈숲": "북서울꿈의숲",
+  "롯데타워": "롯데월드타워", "잠실롯데타워": "롯데월드타워", "서울스카이": "롯데월드타워서울스카이",
+  "예당": "예술의전당", "세종문화": "세종문화회관", "아셈": "코엑스",
+  "고터": "고속터미널역", "강남터미널": "고속터미널역", "센트럴시티": "고속터미널역",
+  "더현대": "더현대서울", "여의도더현대": "더현대서울",
+};
 /** 질의에서 장소명만 남긴다("스타필드 하남 카페" → "스타필드하남"). 장소 검색인지 판단하는 데 쓴다. */
 export const placeKey = (q: string) => norm(q).replace(/(카페|커피|맛집|근처|주변|추천|가볼만한곳|가볼만한)/g, "");
 export const normName = norm;
@@ -59,9 +80,39 @@ const km = (a: number, b: number, c: number, d: number) => {
   return 2 * R * Math.asin(Math.sqrt(Math.sin(x / 2) ** 2 + Math.cos(rad(a)) * Math.cos(rad(c)) * Math.sin(y / 2) ** 2));
 };
 
+// 🔁 폴백용 — 질의가 인덱스 이름보다 길면 부분일치가 통째로 실패한다(실측: "여의도 IFC몰" → 0건, 인덱스엔 "IFC 서울").
+//   ① 일반 접미어(몰·빌딩·타워…)를 떼고 ② 그래도 없으면 가장 긴 토큰으로 다시 찾는다. 둘 다 원질의보다 느슨하므로
+//   **원질의로 찾은 결과가 하나라도 있으면 절대 쓰지 않는다**(느슨한 매칭이 정확한 결과를 밀어내면 안 된다).
+const GENERIC_TAIL = /(몰|빌딩|타워|센터|쎈터|프라자|플라자|백화점|아울렛|점)$/;
+function fallbackKeys(nq: string, raw: string): string[] {
+  const out: string[] = [];
+  const stripped = nq.replace(GENERIC_TAIL, "");
+  if (stripped.length >= 2 && stripped !== nq) out.push(stripped);
+  const toks = String(raw).split(/[\s·・,]+/).map((t) => norm(t)).filter((t) => t.length >= 2);
+  if (toks.length > 1) {
+    const longest = toks.slice().sort((a, b) => b.length - a.length)[0];
+    if (longest && !out.includes(longest)) out.push(longest);
+    const ls = longest.replace(GENERIC_TAIL, "");
+    if (ls.length >= 2 && !out.includes(ls)) out.push(ls);
+  }
+  return out;
+}
+
 /** 이름으로 장소를 찾는다. near가 있으면 같은 점수 안에서 가까운 곳을 먼저 준다. */
 export function searchPlaces(q: string, opts: { limit?: number; near?: [number, number] } = {}): Place[] {
-  const nq = norm(q);
+  const direct = searchPlacesExact(q, opts);
+  if (direct.length) return direct;
+  const nq0 = ALIAS[norm(q)] ? norm(ALIAS[norm(q)]) : norm(q);
+  for (const k of fallbackKeys(nq0, q)) {
+    const r = searchPlacesExact(k, opts);
+    if (r.length) return r;
+  }
+  return [];
+}
+
+function searchPlacesExact(q: string, opts: { limit?: number; near?: [number, number] } = {}): Place[] {
+  const nq0 = norm(q);
+  const nq = ALIAS[nq0] ? norm(ALIAS[nq0]) : nq0;
   if (nq.length < 2) return [];                            // 1글자는 후보가 수천 개 — 의미 없다
   const limit = opts.limit ?? 6;
   const scored: { r: Row; s: number; d: number }[] = [];
@@ -73,7 +124,7 @@ export function searchPlaces(q: string, opts: { limit?: number; near?: [number, 
     else if (nn.includes(nq)) s = 2;
     else continue;
     // 질의가 이름의 대부분을 차지할수록(= 군더더기가 적을수록) 위로.
-    s = s * 10 + Math.min(6, Math.floor((nn.length - nq.length) / 3)) + (PRIO[r[3]] ?? 5) * 0.5;
+    s = s * 10 + Math.min(6, Math.floor((nn.length - nq.length) / 3)) + (PRIO[r[3]] ?? 5) * 2;
     const d = opts.near ? km(opts.near[0], opts.near[1], r[1], r[2]) : 0;
     scored.push({ r, s, d });
     if (scored.length > 4000) break;                       // 과도한 일반어 방어(상한 도달 시 그만)
