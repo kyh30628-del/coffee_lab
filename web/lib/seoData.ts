@@ -40,7 +40,9 @@ export type SeoCafe = { om?: number; id: number; name: string; dong: string | nu
   /** ⚠️ "이건 알고 가세요"(2026-09-14) — 목록 카드에서도 보여준다. 작은 jsonb라 전송 영향 없음.
    *  왜 목록에도: 우리 우위는 '좋은 곳을 찾아준다'가 아니라 **'헛걸음을 막아준다'** 인데,
    *  그 증거가 상세 페이지 안에만 있으면 목록만 보고 떠나는 사람은 영원히 못 느낀다. */
-  cautions?: { label: string; emoji: string; count: number; quote?: string }[] | null };
+  cautions?: { label: string; emoji: string; count: number; quote?: string }[] | null;
+  /** 🅿️ 시설 패싯 — 카드의 시각 앵커(2026-09-14 A안). 작은 text[]라 전송 영향 없음. */
+  facets?: string[] | null };
 
 // 🎯 취향 페이지 채택 기준(2026-08-06, CEO "기준 상향") — 예전엔 `char_scores.<취향> > 0`,
 //   즉 **후기에 딱 한 번 스쳐도 포함**이었다. 그 결과 "파주시 작업하기 좋은 카페 117곳"인데 실제로
@@ -79,7 +81,7 @@ async function withOwnerBadge(list: SeoCafe[]): Promise<SeoCafe[]> {
 
 export async function getRegionCafes(area: string, limit = 30): Promise<SeoCafe[]> {
   try {
-    return withOwnerBadge((await sql`SELECT id, name, dong, synth_grade AS grade, synth_count AS count, synth_identity AS identity, char_scores, visitor_n, visitor_trip, visitor_local, work_facts, cautions,
+    return withOwnerBadge((await sql`SELECT id, name, dong, synth_grade AS grade, synth_count AS count, synth_identity AS identity, char_scores, visitor_n, visitor_trip, visitor_local, work_facts, cautions, facets,
       (SELECT left(r->>'quote', 70) FROM jsonb_array_elements(COALESCE(synth_reviews,'[]'::jsonb)) r
         WHERE COALESCE(r->>'quote','') <> '' ORDER BY COALESCE((r->>'score')::int,0) DESC LIMIT 1) AS quote
       FROM cafes WHERE published AND area=${area}
@@ -94,7 +96,7 @@ export async function getRegionCafes(area: string, limit = 30): Promise<SeoCafe[
 //   ⚠️ neon 태그드 템플릿은 조각 합성이 안 되므로(위 TASTE_MIN_HITS 주석 참조) 아래 4개 쿼리에 같은 문구를 그대로 적는다.
 export async function getRegionTasteCafes(area: string, tasteKey: string, limit = 30): Promise<SeoCafe[]> {
   try {
-    return withOwnerBadge((await sql`SELECT id, name, dong, synth_grade AS grade, synth_count AS count, synth_identity AS identity, char_scores, visitor_n, visitor_trip, visitor_local, work_facts, cautions,
+    return withOwnerBadge((await sql`SELECT id, name, dong, synth_grade AS grade, synth_count AS count, synth_identity AS identity, char_scores, visitor_n, visitor_trip, visitor_local, work_facts, cautions, facets,
       (char_scores->>${tasteKey})::int AS "tasteHits",
       (SELECT left(r->>'quote', 70) FROM jsonb_array_elements(COALESCE(synth_reviews,'[]'::jsonb)) r
         WHERE COALESCE(r->>'quote','') <> '' ORDER BY COALESCE((r->>'score')::int,0) DESC LIMIT 1) AS quote
@@ -221,7 +223,7 @@ export async function getDongsInArea(area: string, minCount = 5): Promise<{ dong
 
 export async function getDongCafes(area: string, dong: string, limit = 30): Promise<SeoCafe[]> {
   try {
-    return withOwnerBadge((await sql`SELECT id, name, dong, synth_grade AS grade, synth_count AS count, synth_identity AS identity, char_scores, visitor_n, visitor_trip, visitor_local, cautions,
+    return withOwnerBadge((await sql`SELECT id, name, dong, synth_grade AS grade, synth_count AS count, synth_identity AS identity, char_scores, visitor_n, visitor_trip, visitor_local, cautions, facets,
       (SELECT left(r->>'quote', 70) FROM jsonb_array_elements(COALESCE(synth_reviews,'[]'::jsonb)) r
         WHERE COALESCE(r->>'quote','') <> '' ORDER BY COALESCE((r->>'score')::int,0) DESC LIMIT 1) AS quote
       FROM cafes WHERE published AND area=${area} AND dong=${dong}
@@ -260,7 +262,7 @@ export function areaAliases(area: string): string[] {
 //   ⚠️ facets에 GIN 인덱스가 있어야 한다(preflight의 '시설 패싯' 뜨거운 쿼리로 감시 중).
 export async function getRegionFacetCafes(area: string, label: string, limit = 30): Promise<SeoCafe[]> {
   try {
-    return withOwnerBadge((await sql`SELECT id, name, dong, synth_grade AS grade, synth_count AS count, synth_identity AS identity, char_scores, visitor_n, visitor_trip, visitor_local, work_facts, cautions,
+    return withOwnerBadge((await sql`SELECT id, name, dong, synth_grade AS grade, synth_count AS count, synth_identity AS identity, char_scores, visitor_n, visitor_trip, visitor_local, work_facts, cautions, facets,
       (SELECT left(r->>'quote', 70) FROM jsonb_array_elements(COALESCE(synth_reviews,'[]'::jsonb)) r
         WHERE COALESCE(r->>'quote','') <> '' ORDER BY COALESCE((r->>'score')::int,0) DESC LIMIT 1) AS quote
       FROM cafes WHERE published AND area=${area} AND facets @> ARRAY[${label}]::text[]
@@ -297,7 +299,7 @@ export async function getRegionFacetGradeBreakdown(area: string, label: string):
 //   ⚠️ area+dong+char_scores 조건은 지역×취향과 같은 인덱스를 탄다(preflight로 상시 감시).
 export async function getDongTasteCafes(area: string, dong: string, tasteKey: string, limit = 30): Promise<SeoCafe[]> {
   try {
-    return withOwnerBadge((await sql`SELECT id, name, dong, synth_grade AS grade, synth_count AS count, synth_identity AS identity, char_scores, visitor_n, visitor_trip, visitor_local, work_facts, cautions,
+    return withOwnerBadge((await sql`SELECT id, name, dong, synth_grade AS grade, synth_count AS count, synth_identity AS identity, char_scores, visitor_n, visitor_trip, visitor_local, work_facts, cautions, facets,
       (char_scores->>${tasteKey})::int AS "tasteHits",
       (SELECT left(r->>'quote', 70) FROM jsonb_array_elements(COALESCE(synth_reviews,'[]'::jsonb)) r
         WHERE COALESCE(r->>'quote','') <> '' ORDER BY COALESCE((r->>'score')::int,0) DESC LIMIT 1) AS quote
@@ -362,7 +364,7 @@ export function josa(word: string, pair: "을/를" | "이/가" | "은/는" | "�
 //   왜 필요한가: 경쟁사가 1위인 자리가 정확히 "{동네} {시설} 카페"("목동 주차 가능한 카페")다.
 export async function getDongFacetCafes(area: string, dong: string, label: string, limit = 30): Promise<SeoCafe[]> {
   try {
-    return withOwnerBadge((await sql`SELECT id, name, dong, synth_grade AS grade, synth_count AS count, synth_identity AS identity, char_scores, visitor_n, visitor_trip, visitor_local, work_facts, cautions,
+    return withOwnerBadge((await sql`SELECT id, name, dong, synth_grade AS grade, synth_count AS count, synth_identity AS identity, char_scores, visitor_n, visitor_trip, visitor_local, work_facts, cautions, facets,
       (SELECT left(r->>'quote', 70) FROM jsonb_array_elements(COALESCE(synth_reviews,'[]'::jsonb)) r
         WHERE COALESCE(r->>'quote','') <> '' ORDER BY COALESCE((r->>'score')::int,0) DESC LIMIT 1) AS quote
       FROM cafes WHERE published AND area=${area} AND dong=${dong} AND facets @> ARRAY[${label}]::text[]

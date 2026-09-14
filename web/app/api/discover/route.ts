@@ -3,6 +3,7 @@ import { canonicalGu, areaMatchesRegion } from "@/lib/regionList";
 import { currentNotice } from "@/lib/noticeStore";
 import { rotateBySido } from "@/lib/sidoRotation";
 import { sql } from "@/lib/db";
+import { cardFacets } from "@/lib/cafeProfile";
 import { subscriptionLive } from "@/lib/flags";
 import { dessertDominance } from "@/lib/charScore";
 import { rotateFeatured, rotateByPeriod, dayIndexKST } from "@/lib/exposureRotation";
@@ -65,6 +66,9 @@ function slim(c: any, kind = "", theme?: Theme) {
     grade: c.synth_grade, count: c.synth_count, identity: c.synth_identity, note: c.note,
     // ⚠️ "이건 알고 가세요" — 라벨 2개만 "·"로 이어 짧게(있는 카페에만 값이 생긴다).
     cau: Array.isArray(c.cautions) && c.cautions.length ? c.cautions.slice(0, 2).map((x: any) => String(x?.label ?? "")).filter(Boolean).join("·") : undefined,
+    // 🅿️ 시설 3개 — **우리는 사진이 없으므로 이 자리가 카드의 시각 앵커다**(2026-09-14 A안).
+    //   "이 카페가 어떻게 생겼나" 대신 "여기가 나한테 맞나"를 먼저 준다. 작은 배열이라 전송 영향 없음.
+    fac: cardFacets(c.facets, 3),
     isNew: isNewCafe(c), beanNote: beanNote(c), reason: reasonFor(c, kind, theme) };
 }
 
@@ -110,7 +114,7 @@ export async function GET(req: NextRequest) {
     const allVersion = `${ver?.n ?? 0}|${ver?.u ?? ""}|${ver?.s ?? ""}`;
     if (!allCache || allCache.version !== allVersion) {
       const rows = await sql`
-        SELECT id, name, area, lat, lng, synth_grade, synth_count, synth_identity, note, char_scores, created_at, review_dates, cautions
+        SELECT id, name, area, lat, lng, synth_grade, synth_count, synth_identity, note, char_scores, created_at, review_dates, cautions, facets
         FROM cafes WHERE published = true` as unknown as any[];
       allCache = { version: allVersion, rows };
     }

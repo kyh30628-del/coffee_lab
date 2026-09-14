@@ -5,6 +5,7 @@ import { sql, ensureSchema } from "@/lib/db";
 import { subscriptionLive } from "@/lib/flags";
 import { encodeCharScores } from "@/lib/mapCafes";
 import { ownerManagedIds } from "@/lib/ownerManaged"; // 🏅 사장님 관리 배지 단일출처
+import { cardFacets } from "@/lib/cafeProfile";
 export const runtime = "nodejs";
 // 🧊 2026-09-01 — CDN 캐시 60초 재도입(CEO 승인). 이유와 조건은 아래.
 //
@@ -55,7 +56,7 @@ export async function GET() {
     const cafes = await sql`
       SELECT c.id, c.name, c.area, c.dong, c.lat, c.lng, c.vibe, c.note, c.signature,
              c.synth_grade, c.synth_count, c.synth_identity, c.char_scores,
-             c.visitor_n, c.visitor_trip, c.visitor_local, c.cautions,
+             c.visitor_n, c.visitor_trip, c.visitor_local, c.cautions, c.facets,
              COALESCE(p.featured AND p.approved AND (p.featured_until IS NULL OR p.featured_until > now()), false) AS featured,
              COALESCE(dt.is_tourist, false) AS dong_tourist
       FROM cafes c
@@ -96,6 +97,12 @@ export async function GET() {
       if (Array.isArray(c.cautions) && c.cautions.length) {
         const cau = c.cautions.slice(0, 2).map((x: any) => String(x?.label ?? "")).filter(Boolean).join("·");
         if (cau) o.cau = cau;
+      }
+      // 🅿️ 시설 3개 — 카드 시각 앵커. ⚠️ 이 응답은 공개 전량(2.51MB)이라 **아이콘/라벨 문자열은 싣지 않는다.**
+      //   라벨만 "·"로 이은 짧은 문자열로 보내고, 아이콘은 클라이언트가 사전에서 붙인다(전송 최소).
+      if (Array.isArray(c.facets) && c.facets.length) {
+        const f = cardFacets(c.facets, 3).map((x: { label: string }) => x.label).join("·");
+        if (f) o.fac = f;
       }
       if (owned.has(Number(c.id))) o.om = 1; // 🏅 사장님이 직접 관리 중(구독·체험 유효). 해당 카페에만 키를 넣어 페이로드 낭비 0
       return o;

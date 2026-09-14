@@ -194,6 +194,18 @@ export function extractFacets(texts: string[]): string[] {
   return extractHighlights(texts, 99).map((h) => h.label);
 }
 export const ALL_FACET_LABELS: string[] = HIGHLIGHTS.map((h) => h.label);
+/** 라벨 → 아이콘. 카드에 **시각 띠**로 쓴다(2026-09-14) — 우리는 사진이 없으므로 이 자리가 시각 앵커다. */
+export const FACET_EMOJI: Record<string, string> = Object.fromEntries(HIGHLIGHTS.map((h) => [h.label, h.emoji]));
+/** 카드에 세울 우선순위 — '가기 전에 확인하는 사실'이 인상평보다 먼저. 사진이 없으니 이게 첫인상이다. */
+const FACET_CARD_ORDER = ["주차 편함", "작업·노트북", "단체·모임룸", "반려동물 동반", "루프탑·테라스", "늦게까지·심야",
+  "노키즈존", "넓고 탁 트인 공간", "통창·창밖 뷰", "강·바다 뷰", "정원·자연 속", "한옥·전통", "책·북카페",
+  "커피가 맛있는", "디저트 맛집", "베이커리", "수제·당일 베이킹", "차·티 전문", "비건·건강한", "와인·주류"];
+export function cardFacets(facets: string[] | null | undefined, n = 3): { label: string; emoji: string }[] {
+  const has = new Set(facets ?? []);
+  const out: { label: string; emoji: string }[] = [];
+  for (const l of FACET_CARD_ORDER) { if (has.has(l) && FACET_EMOJI[l]) { out.push({ label: l, emoji: FACET_EMOJI[l] }); if (out.length >= n) break; } }
+  return out;
+}
 
 // ⚠️ 2026-09-14(CEO 승인) — "이건 알고 가세요": 후기에서 확인된 **주의점**.
 //   왜 만드나: 카페 고르기의 본질은 성공을 찾는 게 아니라 실패를 피하는 것이다. 광고는 절대 못 하는 말이라

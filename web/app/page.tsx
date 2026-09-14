@@ -13,6 +13,7 @@ import KakaoShare from "./KakaoShare";
 import { trackShare } from "./trackShareClient";
 import MyCafeRegModal from "./MyCafeRegModal";
 import { buildAxisDist, cafeProfile, tasteVector, tasteSimilarity, GRADE_RANK, type AxisDist } from "@/lib/cafeProfile";
+import { FACET_EMOJI } from "@/lib/cafeProfile";
 import { useLockBodyScroll } from "@/lib/useLockBodyScroll";
 import { shareHookText } from "@/lib/shareCopy";
 import { decodeCafeScores } from "@/lib/mapCafes";
@@ -25,14 +26,14 @@ type Cafe = {
   vibe: string; note: string; tone: string; photo_url: string | null;
   acidity: number; body: number; sweet: number;
   om?: number; // 🏅 사장님이 직접 관리 중(구독·체험 유효) — /api/cafes가 해당 카페에만 넣어준다
-  synth_grade: string | null; synth_identity: string | null; cau?: string;
+  synth_grade: string | null; synth_identity: string | null; cau?: string; fac?: string;
   synth_count: number | null; synth_reviews?: EvidenceReview[] | null;
   char_scores?: Record<string, number> | null;
   featured?: boolean;
 };
-type DCafe = { id: number; name: string; area: string; lat: number; lng: number; grade: string | null; count: number | null; identity: string | null; note: string | null; beanNote: string[]; reason?: string; isNew?: boolean; cau?: string };
+type DCafe = { id: number; name: string; area: string; lat: number; lng: number; grade: string | null; count: number | null; identity: string | null; note: string | null; beanNote: string[]; reason?: string; isNew?: boolean; cau?: string; fac?: { label: string; emoji: string }[] };
 type Discover = { headlineA: DCafe | null; headlineB: DCafe | null; headlineAList?: DCafe[]; headlineBList?: DCafe[]; themeB?: { emoji: string; label: string } | null; top3: DCafe[]; fresh: DCafe[]; specialty: DCafe[]; featured?: DCafe[]; scopeCount: number };
-type SearchResult = { id: number; name: string; area: string; grade: string | null; count: number | null; identity: string | null; score: number; reasons: string[]; cau?: string };
+type SearchResult = { id: number; name: string; area: string; grade: string | null; count: number | null; identity: string | null; score: number; reasons: string[]; cau?: string; fac?: { label: string; emoji: string }[] };
 type Place = { name: string; lat: number; lng: number; kind: string; label: string; icon: string };
 type SearchRes = { ok: boolean; region: string; q: string; concepts: string[]; count: number; results: SearchResult[]; coverageNote?: string; franchiseNote?: string; places?: Place[]; regionAlts?: string[]; nearPlace?: Place };
 const SEARCH_EXAMPLES = ["비 오는 날 혼자 조용히", "감성 사진 데이트", "노트북 작업하기 좋은", "산미 또렷한 커피", "빵 맛있는 집"];
@@ -159,6 +160,26 @@ const TONE_GRADIENTS = [
 // ⚠️ "이건 알고 가세요" 한 줄 — **단일 출처**. 홈 카드·지도 목록·검색 결과가 같은 모양으로 그린다.
 //   2026-09-14: 처음엔 지역 페이지와 상세에만 달아 CEO가 "도대체 어디에 표기되는 거야"라고 물었다.
 //   같은 실수가 사장님 배지(lib/ownerManaged.ts)에서 이미 한 번 났었다 — 그래서 이번엔 렌더러를 하나로 둔다.
+// 🅿️ 시설 띠 — **사진 없는 카드의 시각 앵커**(2026-09-14, CEO "A로 가. 카드 디자인 손보고").
+//   사진 자리를 비워 두면 '결함'으로 보인다. 대신 결정에 실제로 쓰이는 사실을 아이콘으로 세운다.
+//   카페맵 썸네일이 주는 건 "어떻게 생겼나"고, 우리가 주는 건 "여기가 나한테 맞나"다.
+function FacetStrip({ fac, size = 11.5 }: { fac?: { label: string; emoji: string }[] | string | null; size?: number }) {
+  //   지도 응답(/api/cafes)은 전량 2.5MB라 라벨 문자열만 온다 — 아이콘은 여기서 붙인다(전송 최소).
+  const list = typeof fac === "string"
+    ? fac.split("·").filter(Boolean).map((label) => ({ label, emoji: FACET_EMOJI[label] ?? "•" }))
+    : (fac ?? []);
+  if (!list.length) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+      {list.map((f) => (
+        <span key={f.label} className="inline-flex items-center gap-1 rounded-[4px] border border-[rgba(90,70,50,0.22)] bg-white/80 px-1.5 py-0.5 font-bold text-[#4a3a2a]" style={{ fontSize: size }}>
+          <span style={{ fontSize: size + 2 }}>{f.emoji}</span>{f.label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function CautionLine({ cau, size = 11 }: { cau?: string | null; size?: number }) {
   if (!cau) return null;
   return <p className="font-bold text-[#8a5a3a] mt-1" style={{ fontSize: size }}>⚠️ {cau} <span className="font-normal text-[#54432c]">· 후기에서 확인</span></p>;
@@ -184,8 +205,9 @@ const HeadlineCard = memo(function HeadlineCard({ c, kicker, tone, onOpen, featu
         {c.grade && <div className={`nt-stamp ${featured ? "sm" : "xs"} ${stamp}`} aria-label={`등급 ${c.grade}`}>{c.grade}{featured && <small>VERIFIED</small>}</div>}
       </div>
       {c.identity && <p className={`nt-hand text-[#2f3550] line-clamp-1 mb-1.5 ${featured ? "" : "sm"}`} style={{ lineHeight: featured ? "30px" : "26px" }}>{featured ? <span className="nt-hl">{c.identity}</span> : c.identity}</p>}
+      <FacetStrip fac={c.fac} size={featured ? 12 : 11} />
       <CautionLine cau={c.cau} size={featured ? 12 : 11} />
-      {c.beanNote.length > 0 && <div className="flex flex-wrap gap-1.5">{c.beanNote.map((b) => <span key={b} className="nt-chip" style={{ height: 22, fontSize: 11.5 }}>{b}</span>)}</div>}
+      {c.beanNote.length > 0 && <div className="flex flex-wrap gap-1.5 mt-1.5">{c.beanNote.map((b) => <span key={b} className="nt-chip" style={{ height: 22, fontSize: 11.5 }}>{b}</span>)}</div>}
     </button>
   );
 });
@@ -2290,6 +2312,7 @@ export default function Home() {
                         </div>
                         <div className="text-[11px] text-[#54432c]">{c.area}{c.dong ? ` ${c.dong}` : ""} · {Math.round(d)}m · 리뷰 {c.synth_count ?? 0}</div>
                         {c.synth_identity && <p className="text-[12px] text-[#5a4a38] leading-relaxed mt-1.5 line-clamp-2">{c.synth_identity}</p>}
+                        <FacetStrip fac={c.fac} size={11} />
                         <CautionLine cau={c.cau} size={11} />
                       </button>
                     ))}
@@ -2616,6 +2639,7 @@ export default function Home() {
                               <span className="text-[10px] text-[#54432c] ml-auto">{r.area} · 리뷰 {r.count ?? 0}</span>
                             </div>
                             {r.identity && <p className="text-[11px] text-[#524234] line-clamp-1 mb-1">{r.identity}</p>}
+                            <FacetStrip fac={r.fac} size={10.5} />
                             <CautionLine cau={r.cau} size={10.5} />
                             {r.reasons.length > 0 && <div className="text-[10px] text-[#b08440]">🔎 {r.reasons.join(" · ")}</div>}
                           </button>

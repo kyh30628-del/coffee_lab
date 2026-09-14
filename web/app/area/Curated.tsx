@@ -2,6 +2,7 @@ import Link from "next/link";
 import { TASTES, SITE, type SeoCafe, type GradeBreakdown } from "@/lib/seoData";
 import { standoutBadges } from "@/lib/standoutBadge";
 import { FACET_PAGES } from "@/lib/facetPages";
+import { cardFacets } from "@/lib/cafeProfile";
 import { visitorBadges } from "@/lib/visitorMix";
 import KakaoShare from "../KakaoShare";
 import RecentCafes from "../RecentCafes";
@@ -240,6 +241,15 @@ export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, headin
                       {c.count ? <span className="font-normal text-[#54432c]"> · 검증 후기 {c.count}건</span> : null}
                     </p>
                   )}
+                  {/* 🅿️ 시설 띠(2026-09-14 A안) — 사진 없는 카드의 시각 앵커. 화면마다 다르면 또 어긋난다(홈·검색과 같은 모양). */}
+                  {(() => { const fs = cardFacets(c.facets, 3); return fs.length ? (
+                    <div className="flex flex-wrap items-center gap-1.5 mt-1.5 pl-7">
+                      {fs.map((f) => (
+                        <span key={f.label} className="inline-flex items-center gap-1 rounded-[4px] border border-[rgba(90,70,50,0.22)] bg-white/80 px-1.5 py-0.5 text-[11px] font-bold text-[#4a3a2a]">
+                          <span className="text-[12.5px]">{f.emoji}</span>{f.label}
+                        </span>
+                      ))}
+                    </div>) : null; })()}
                   {/* ⚠️ "이건 알고 가세요"(2026-09-14, CEO "소비자가 우위를 느끼게") — **목록 카드에도** 올린다.
                       우리 우위는 '좋은 곳 추천'이 아니라 **'헛걸음 방지'** 인데, 그 증거가 상세 안에만 있으면
                       목록만 보고 떠나는 사람은 영원히 못 느낀다. 경쟁 서비스는 단점을 '거르기만' 하고 보여주지 않는다.

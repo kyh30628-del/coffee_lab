@@ -8,6 +8,7 @@ import { loadCriteria, getCriterionSync } from "@/lib/criteria";
 import { loadCriteriaLists, getListSync } from "@/lib/criteriaLists";
 import { parseQuery, loadGeoIndex, detectRegion, isCoreArea } from "@/lib/searchQuery";
 import { isFranchise } from "@/lib/discover";
+import { cardFacets } from "@/lib/cafeProfile";
 import { searchPlaces, placeKey, placeKeyAliased, placeKeyNoSuffix, isAnchorKind, normName } from "@/lib/placeIndex";
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -188,6 +189,8 @@ function lexicalScore(c: any, tokens: string[], hitConcepts: typeof CONCEPTS) {
 // 💰 synth_reviews는 통째로 싣지 않고 **SQL 안에서 quote만 잘라** 받는다(TOAST 1.9GB 컬럼 → 인용문 몇 줄).
 //   후보 80건 × 리뷰 전체를 앱으로 옮기던 것이 검색 응답 지연·전송비의 주범이었다.
 // ⚠️ "이건 알고 가세요"(2026-09-14) — 검색 결과 카드에도 붙인다. 라벨 2개만 짧은 문자열로.
+//   🅿️ 시설 3개 — 카드의 시각 앵커(2026-09-14 A안). 홈·지역 목록과 같은 모양으로 그린다.
+const facOf = (c: any) => cardFacets(c?.facets, 3);
 const cauOf = (c: any): string | undefined => {
   const a = c?.cautions;
   if (!Array.isArray(a) || !a.length) return undefined;
@@ -568,7 +571,7 @@ export async function GET(req: NextRequest) {
                 const corePrior = !regionExplicit && isCoreArea(c.area) ? 6 : 0;
                 const total = rrf + (qualifies ? gradeBonus(c.synth_grade) : 0) + corePrior;
                 const why = [`의미 유사 ${Math.round(sim * 100)}%`, ...reasons];
-                return { sim, qualifies, item: { id: c.id, name: c.name, area: c.area, grade: c.synth_grade, count: c.synth_count, identity: c.synth_identity, cau: cauOf(c), vb: vbOf(c), score: Math.round(total * 10) / 10, reasons: why.slice(0, 3), snippet } };
+                return { sim, qualifies, item: { id: c.id, name: c.name, area: c.area, grade: c.synth_grade, count: c.synth_count, identity: c.synth_identity, cau: cauOf(c), fac: facOf(c), vb: vbOf(c), score: Math.round(total * 10) / 10, reasons: why.slice(0, 3), snippet } };
               })
               .filter((x) => x.qualifies || x.sim >= semanticFloor)
               .map((x) => x.item);
@@ -706,7 +709,7 @@ export async function GET(req: NextRequest) {
         for (const { c, d } of sortedNear) {
           byId.set(c.id, c);
           scored.push({ id: c.id, name: c.name, area: c.area, grade: c.synth_grade, count: c.synth_count,
-            identity: c.synth_identity, cau: cauOf(c), vb: vbOf(c), score: 1000 - d,
+            identity: c.synth_identity, cau: cauOf(c), fac: facOf(c), vb: vbOf(c), score: 1000 - d,
             reasons: [`${placeHit.name}에서 ${d < 1000 ? d + "m" : (d / 1000).toFixed(1) + "km"}`].concat(c.synth_count ? [`검증 후기 ${c.synth_count}건`] : []).slice(0, 3), snippet: undefined });
         }
         nearPlace = { name: placeHit.name, icon: placeHit.icon, label: placeHit.label, lat: placeHit.lat, lng: placeHit.lng };
@@ -734,7 +737,7 @@ export async function GET(req: NextRequest) {
         for (const c of rows) byId.set(c.id, c);
         for (const c of rows) {
           scored.push({ id: c.id, name: c.name, area: c.area, grade: c.synth_grade, count: c.synth_count,
-            identity: c.synth_identity, cau: cauOf(c), vb: vbOf(c), score: 0,
+            identity: c.synth_identity, cau: cauOf(c), fac: facOf(c), vb: vbOf(c), score: 0,
             reasons: [`${c.area} 대표`, ...(c.synth_count ? [`검증 후기 ${c.synth_count}건`] : [])].slice(0, 3), snippet: undefined });
         }
       }
@@ -768,7 +771,7 @@ export async function GET(req: NextRequest) {
         const total = exact + concept + (qualifies ? gradeBonus(c.synth_grade) : 0);
         if (exact + concept <= 0) continue;
         byId.set(c.id, c);
-        scored.push({ id: c.id, name: c.name, area: c.area, grade: c.synth_grade, count: c.synth_count, identity: c.synth_identity, cau: cauOf(c), vb: vbOf(c), score: Math.round(total * 10) / 10, reasons: reasons.slice(0, 3), snippet });
+        scored.push({ id: c.id, name: c.name, area: c.area, grade: c.synth_grade, count: c.synth_count, identity: c.synth_identity, cau: cauOf(c), fac: facOf(c), vb: vbOf(c), score: Math.round(total * 10) / 10, reasons: reasons.slice(0, 3), snippet });
       }
     }
 
