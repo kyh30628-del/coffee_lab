@@ -84,6 +84,29 @@ export const placeKeyNoSuffix = (q: string) => placeKey(q).replace(/(본사|사�
  *  "남산타워"·"고터"·"롯데타워"가 후보는 맞게 찾고도 place 모드로 못 넘어갔다). */
 export const placeKeyAliased = (q: string) => { const k = placeKey(q); return ALIAS[k] ? norm(ALIAS[k]) : k; };
 /** 정확일치로 볼 수 있는 '확실한 기준점' 종류 — 상호(biz_*)·아파트는 동명이 흔해 제외. */
+// 🔤 영문 사명의 **한글 음차** — CEO 지적 2026-09-14 "삼성이앤에이가 왜 검색이 안 되냐".
+//   원인: KRX 공식명은 '삼성E&A'인데 사람은 '삼성이앤에이'로 친다. 지금은 'CU 삼성이앤에이점'(편의점)만 잡혔다.
+//   특정 회사만 손으로 넣으면 LG씨엔에스·HD현대·SK이터닉스…가 전부 같은 문제를 낸다(영문 포함 사명 242곳).
+//   → 알파벳을 한글 읽기로 바꾼 **별칭 이름을 만들어** 같은 좌표로 한 줄 더 둔다. 일반 해법이라 앞으로 들어올 회사도 자동.
+const LETTER_KO: Record<string, string> = {
+  a: "에이", b: "비", c: "씨", d: "디", e: "이", f: "에프", g: "지", h: "에이치", i: "아이",
+  j: "제이", k: "케이", l: "엘", m: "엠", n: "엔", o: "오", p: "피", q: "큐", r: "알",
+  s: "에스", t: "티", u: "유", v: "브이", w: "더블유", x: "엑스", y: "와이", z: "제트", "&": "앤",
+};
+/** "삼성E&A" → "삼성이앤에이". 한글로 읽히지 않는 글자가 있으면 null(억지로 만들지 않는다). */
+export function koreanizeName(name: string): string | null {
+  if (!/[A-Za-z&]/.test(name)) return null;
+  let out = "", changed = false;
+  for (const ch of name) {
+    const k = LETTER_KO[ch.toLowerCase()];
+    if (k) { out += k; changed = true; }
+    else if (/[0-9가-힣]/.test(ch)) out += ch;
+    else if (/\s/.test(ch)) out += "";
+    else return null;                       // 해석 못 하는 기호가 있으면 만들지 않는다
+  }
+  return changed && out.length >= 2 ? out : null;
+}
+
 export const isAnchorKind = (k: string) => ["landmark", "attraction", "culture", "leisure", "park", "station", "bus_station", "aerodrome", "mall", "department_store", "university", "theme_park", "stadium", "museum", "aquarium", "marketplace", "company"].includes(k);
 export const normName = norm;
 const R = 6371, rad = (d: number) => (d * Math.PI) / 180;
