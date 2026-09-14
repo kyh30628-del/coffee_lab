@@ -1890,6 +1890,12 @@ export function verifyReview(input: QualityInput): QualityResult {
     if (!ctxNearName(fullN, commonAnchor, CAFE_CONTEXT_SUBSTANCE) && !titleHasCafeWord) {
       return { verdict: "rejected", score: 2, reasons: ["일반어 카페명 우연일치(카페명 근접 맥락 전무) — nameAsWord 오염"], signals: sig };
     }
+    // 🔴 2026-09-14 시도했다가 **철회**한 규칙(협업#411) — "일반어 상호 앞에 다른 고유어가 붙으면 타업체"
+    //   목적은 맞았다(id12574 커피하우스의 '홍사우 커피 하우스'·'짙은 커피하우스' 2건을 정확히 잡았다).
+    //   그런데 실측 회귀가 컸다: 커피하우스 40→12(-70%) · 작은연못 10→2(-80%) · 카페 오두막 10→0(-100%)로
+    //   **진짜 카페 3곳이 공개에서 탈락**했다. 한국어 후기는 상호 앞에 수식어가 붙는 게 정상이라
+    //   '앞 토큰' 휴리스틱으론 남의 간판과 수식어를 못 가른다. 소비자 손상이 이득보다 커서 되돌렸다.
+    //   재시도하려면: 앞 토큰이 **다른 업체의 등록 상호**임을 인허가(cafe_permits)·발굴 인덱스로 확인하는 방식이어야 한다.
   } else if (nameShort) {
     // 1~2글자 이름(관용구 사전에 없는 것)은 근접 창이 불안정(진짜후기 과다거절 위험) → 기존 '전역' 맥락판정 유지.
     if (!CAFE_CONTEXT_STRONG.test(fullL) && !titleHasCafeWord && !bodyHasCafeWord) {
