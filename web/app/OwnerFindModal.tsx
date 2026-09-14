@@ -30,13 +30,20 @@ export default function OwnerFindModal({
     const s = q.trim();
     if (s.length < 2) return; // 한 글자 검색은 결과가 수백 건이라 의미도 없고 부하만 준다
     setLoading(true);
+    let hitCount = 0;
     try {
       const r = await fetch(`/api/search?q=${encodeURIComponent(s)}`);
       const d = await r.json();
-      setHits((d.results ?? []).slice(0, 8));
+      const results = (d.results ?? []).slice(0, 8);
+      hitCount = results.length;
+      setHits(results);
     } catch { setHits([]); }
     setLoading(false);
     setSearched(true);
+    try {
+      const anonId = localStorage.getItem("dcn_anon") || "";
+      fetch("/api/owner-funnel", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ anonId, event: "cta_click", source: "find_search", meta: { hitCount } }), keepalive: true }).catch(() => {});
+    } catch {}
   };
 
   if (!open) return null;
@@ -88,7 +95,13 @@ export default function OwnerFindModal({
         )}
 
         {/* 못 찾은 사장님을 위한 길 — 여기서 기존 체험 신청으로 넘긴다 */}
-        <button onClick={onNoMatch}
+        <button onClick={() => {
+            try {
+              const anonId = localStorage.getItem("dcn_anon") || "";
+              fetch("/api/owner-funnel", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ anonId, event: "cta_click", source: "find_nomatch" }), keepalive: true }).catch(() => {});
+            } catch {}
+            onNoMatch();
+          }}
           className="w-full text-center text-[12px] text-[#9c6b3f] underline py-2">
           우리 가게가 안 보여요 · 등록·체험 신청
         </button>
