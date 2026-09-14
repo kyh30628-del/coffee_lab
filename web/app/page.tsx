@@ -2283,7 +2283,7 @@ export default function Home() {
                     {nearHomeCafes.map(({ c, d }) => (
                       <button key={c.id} onClick={() => setSelected(c)} className="w-full text-left nt-scrap flat px-3.5 py-3 hover:shadow-md transition-all flex flex-col">
                         <div className="flex items-center gap-1.5 mb-1">
-                          <span className="font-bold text-sm text-[#2b2018] truncate">{c.name}</span>
+                          <span className="nt-title text-[16.5px] leading-tight truncate">{c.name}</span>
                           {c.synth_grade && GRADE_STYLE[c.synth_grade] && <span className="text-[8px] text-white px-1.5 py-0.5 rounded-full shrink-0" style={{ background: GRADE_STYLE[c.synth_grade].bg }}>{c.synth_grade}</span>}
                             <OwnerBadge om={(c as any).om} />
                     <VisitorBadges vb={(c as any).vb} />
@@ -2608,7 +2608,9 @@ export default function Home() {
                         {searchRes.results.map((r) => (
                           <button key={r.id} onClick={() => { openById(r.id); setShowSearch(false); }} className="w-full text-left nt-scrap flat px-3.5 py-3 hover:border-[#9c6b3f]">
                             <div className="flex items-center gap-1.5 mb-0.5">
-                              <span className="font-bold text-sm text-[#2a1f17]">{r.name}</span>
+                              {/* 2026-09-14 CEO "검색 카페명이 너무 안 보인다" — font-bold는 손글씨체에선 굵어지지 않는다.
+                                  홈 카드와 같은 .nt-title(명조 + text-stroke)로 통일하고 크기를 키운다. */}
+                              <span className="nt-title text-[16.5px] leading-tight">{r.name}</span>
                               {r.grade && GRADE_STYLE[r.grade] && <span className={`nt-pill ${r.grade === "검증" ? "verify" : r.grade === "참고" ? "ref" : "cand"}`}>{r.grade}</span>}
                                 <VisitorBadges vb={(r as any).vb} />
                               <span className="text-[10px] text-[#54432c] ml-auto">{r.area} · 리뷰 {r.count ?? 0}</span>

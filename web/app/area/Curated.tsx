@@ -193,7 +193,8 @@ export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, headin
                 <Link href={`/c/${c.id}`} className="block bg-white rounded-xl border border-[#e6dcc8] px-4 py-3 hover:shadow-sm transition">
                   <div className="flex items-center gap-2">
                     <span className="text-[#82714f] text-[13px] font-bold w-5 shrink-0">{i + (hero ? 2 : 1)}</span>
-                    <span className="font-bold text-[15px]">{c.name}</span>
+                    {/* 2026-09-14: 목록 카페명도 같은 규약(.nt-title) — 손글씨체에서 font-bold는 굵어지지 않는다. */}
+                    <span className="nt-title text-[16.5px] leading-tight">{c.name}</span>
                     {c.om ? <span title="사장님이 직접 정보를 관리하는 카페예요" className="text-[10px] font-bold text-[#7a5122] bg-[#f7e9cf] border border-[#e3c79a] px-1.5 py-0.5 rounded-full whitespace-nowrap">🏅 사장님 관리</span> : null}
                     {c.dong && <span className="text-[12px] text-[#54432c]">{c.dong}</span>}
                     {badges[i + (hero ? 1 : 0)] && (
