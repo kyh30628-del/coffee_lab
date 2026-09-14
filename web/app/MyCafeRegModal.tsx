@@ -221,6 +221,12 @@ export default function MyCafeRegModal({ cafes, device, visits, pin = "", initia
               </div>
               <div>
                 <div className="text-[12px] text-[#594839] mb-1.5 font-medium">방문 사진 (최대 5장 · 선택)</div>
+                {/* 📷 저작권·초상권 안내(결재 #1084, 2026-09-14) — 합법성의 근거는 '찍은 사람이 권리자'라는 것 하나뿐이다.
+                    그래서 본인 촬영본만 받고, 저작권은 올린 분에게 그대로 두며(우리는 게재 허락만), 사람 나온 사진은 받지 않는다. */}
+                <p className="text-[10.5px] text-[#8a7458] leading-relaxed mb-1.5 bg-[#faf6ef] border border-[#e6dcc8] rounded-lg px-2 py-1.5">
+                  <b>직접 찍은 사진만</b> 올려주세요. 저작권은 올려주신 분께 그대로 있고, 저희는 카페 페이지에 싣는 허락만 받습니다(닉네임 함께 표기).
+                  <b> 사람이 나온 사진은 올리지 말아 주세요</b>(초상권). 확인 후 올라갑니다.
+                </p>
                 <div className="grid grid-cols-3 gap-2">
                   {photos.map((p, i) => (
                     <div key={i} className="relative aspect-square">

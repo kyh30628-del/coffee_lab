@@ -169,7 +169,11 @@ async function getPublicReviews(cafeId: number) {
       await sql`ALTER TABLE user_visits ADD COLUMN IF NOT EXISTS is_public BOOLEAN DEFAULT false`;
     }).catch(() => {});
     const rows = await sql`SELECT memory, photos, photo_url, favorite, created_at FROM user_visits
-      WHERE cafe_id=${cafeId} AND is_public=true AND finalized=true AND verified=true AND (COALESCE(memory,'')<>'' OR photo_url IS NOT NULL)
+      -- 🔐 승인 게이트(결재 #1084, 2026-09-14): **사진이 붙은 기록은 관리자 승인 후에만** 노출한다.
+      --   남의 가게에 엉뚱한·부적절한 사진이 걸리면 우리 해자가 통째로 무너진다. 글만 있는 기록은 종전대로.
+      WHERE cafe_id=${cafeId} AND is_public=true AND finalized=true AND verified=true
+        AND (COALESCE(memory,'')<>'' OR photo_url IS NOT NULL)
+        AND (photo_approved = true OR (photo_url IS NULL AND jsonb_array_length(COALESCE(photos,'[]'::jsonb)) = 0))
       ORDER BY created_at DESC LIMIT 20`;
     return (rows as any[]).map((r) => ({ memory: r.memory || "", photos: Array.isArray(r.photos) && r.photos.length ? r.photos : (r.photo_url ? [r.photo_url] : []), favorite: !!r.favorite, date: r.created_at ? new Date(r.created_at).toISOString() : undefined }));
   } catch { return []; }
@@ -631,14 +635,22 @@ export default async function CafePage({ params }: Props) {
           ) : null;
         })()}
 
-        {/* 🧭 위치인증 방문기록은 2순위로(실제 방문자에게 계속 열어둔다) */}
+        {/* 📷 손님 사진 제보(결재 #1084, 2026-09-14) — 진입점을 꺼낸다.
+            왜: 기능은 원래 있었는데 **접힌 <details> 안에 "추억으로 남기기"**로만 있어
+              전 서비스 사진이 6장이었다. 사람들이 못 찾은 게 아니라 우리가 숨겨 뒀다.
+            프레이밍도 바꾼다 — '내 추억'이 아니라 **'다음 사람을 위한 기여'**.
+            ⚠️ 합법성의 근거는 하나뿐이다: 찍은 사람이 권리자다. 그래서 본인 촬영본만 받고,
+              저작권은 올린 분에게 그대로 두며(게재 허락만), 사람이 나온 사진은 받지 않는다(초상권). */}
         <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
-          <details className="group">
-            <summary className="cursor-pointer list-none text-[12px] text-[#7a5122] underline underline-offset-2">
-              이미 다녀오셨나요? 위치인증하고 추억으로 남기기 →
-            </summary>
-            <div className="nt-free py-2"><SaveMemoryButton cafeId={c.id} cafeName={c.name} cafeArea={c.area} variant="banner" /></div>
-          </details>
+          <div className="nt-sec">사진 한 장 보태주실래요?</div>
+          <p className="text-[12.5px] text-[#63523f] leading-relaxed mb-2">
+            {c.name}은(는) 아직 사진이 없어요. 다녀오셨다면 <b className="text-[#2a1f17]">직접 찍은 사진</b>을 올려주시면
+            다음 사람이 고를 때 큰 도움이 됩니다. 올린 분 이름과 함께 실려요.
+          </p>
+          <p className="text-[11.5px] text-[#8a7458] leading-relaxed mb-2.5">
+            저작권은 <b>올려주신 분에게 그대로</b> 있고 저희는 게재 허락만 받습니다 · 사람이 나온 사진은 올리지 말아 주세요(초상권) · 확인 후 올라갑니다
+          </p>
+          <div className="nt-free"><SaveMemoryButton cafeId={c.id} cafeName={c.name} cafeArea={c.area} variant="banner" /></div>
         </div>
 
         {/* ❤ 찜한 카페 다시 보기 · 🕘 최근 본 카페 — localStorage 기반 클라이언트 컴포넌트(서버 조회 0) */}
