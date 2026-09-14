@@ -4,7 +4,7 @@
 //   적재는 pipeline_status='new'(비공개) → 기존 게이트(합성·판정·임베딩·검증) 통과해야만 공개.
 import { sql } from "./db";
 import { coreTokens, brandTokenOverlap, nearDuplicateCafeName } from "./reviewQuality";
-import { isFranchise, parseDong } from "./discover";
+import { isFranchise, parseDong, parseGuArea, addressSidoScope } from "./discover";
 import { loadCriteria, getCriterionSync } from "./criteria";
 import { bumpNaver, markNaverExhausted } from "./naverBudget"; // 마이닝도 같은 25k/일 소비 → 공용 예산 계상
 
@@ -97,10 +97,16 @@ export async function mineArea(areaLabel: string, opts?: { maxCalls?: number; ap
     verified++;
     names.push(name);
     if (apply) {
-      const dong = parseDong(hit.address || hit.roadAddress || "");
+      const addr = hit.address || hit.roadAddress || "";
+      // 🔒 결재 #1080 — 이 경로는 area에 **검색 키워드를 그대로** 넣고 있었다(주소 검증 0).
+      //   "수원시 …"로 마이닝하다 제주 카페가 걸리면 그대로 area='수원시'가 됐다.
+      //   ① 범위 밖 시·도면 적재하지 않는다 ② 주소에서 읽히는 구·시·군이 있으면 그 값을 쓴다.
+      if (addressSidoScope(addr).scope === "out") continue;
+      const areaFromAddr = parseGuArea(addr);
+      const dong = parseDong(addr);
       const pid = `mn_${name.replace(/\s/g, "")}_${Math.round(lat * 1e5)}`;
       await sql`INSERT INTO cafes (place_id, name, area, dong, naver_category, address, lat, lng, source, published, roasts_own, pipeline_status)
-        VALUES (${pid}, ${name}, ${keyword}, ${dong}, ${hit.category || ""}, ${hit.address || ""}, ${lat}, ${lng}, 'discover', false, false, 'new')
+        VALUES (${pid}, ${name}, ${areaFromAddr ?? keyword}, ${dong}, ${hit.category || ""}, ${hit.address || ""}, ${lat}, ${lng}, 'discover', false, false, 'new')
         ON CONFLICT (place_id) DO NOTHING`;
       inserted++;
     }

@@ -257,7 +257,38 @@ const AMBIG_SIDO_CANDIDATES = ["서울", ...PREFIXED_SIDOS] as const;
 //   parseGuArea가 첫 토큰 '통합특별시'를 못 읽고 엉뚱한 구를 잡아 area가 완전 무관값이 됐다(여수시 주소 → area=영천시).
 //   접두사를 떼고 실제 지명부터 읽는다. (published=false만 있었지만 공개되면 지도·검색이 통째로 틀린다.)
 const BAD_SIDO_PREFIX = /^(전남광주통합특별시|전라남도광주|광주전남통합특별시)\s*/;
+
+// 🗺️ 2026-09-14 결재 #1080 — **주소의 시·도를 먼저 읽는다.**
+//   실측 300곳(공개 0곳): 제주 카페가 area='수원시', 전남 목포가 '의정부시', 광주광역시 서구가 '대구 서구'였다.
+//   원인 두 가지:
+//     유형A 259곳 — parseGuArea가 null이면 호출부가 **검색질의 지역으로 조용히 폴백**했다(주소가 있는데도 추측).
+//     유형B 41곳  — 시·도를 못 좁히면 GU_TO_AREA 평면사전으로 내려가 범위 밖 '서구/동구/남구'를 범위 안으로 단정했다.
+//                  같은 주소가 '대구 남구'와 '부산 남구' 양쪽으로 찍히기도 했다(사전 등재순서 의존 = 값이 흔들림).
+//   ⚠️ '광주'는 반드시 **광주광역시**로만 판정한다 — 경기도 광주시가 실제로 있다(여기서 틀리면 정반대가 된다).
+const OUT_OF_SCOPE_SIDO = /^(광주광역시|울산광역시|전라남도|전라북도|전북특별자치도|제주특별자치도|제주도)/;
+const IN_SCOPE_SIDO: [RegExp, string][] = [
+  [/^서울(특별시)?/, "서울"], [/^인천(광역시)?/, "인천"], [/^경기(도)?/, "경기"],
+  [/^강원(특별자치도|도)?/, "강원"], [/^충청북도|^충북/, "충북"], [/^충청남도|^충남/, "충남"],
+  [/^대전(광역시)?/, "대전"], [/^세종(특별자치시|시)?/, "세종"], [/^부산(광역시)?/, "부산"],
+  [/^경상남도|^경남/, "경남"], [/^대구(광역시)?/, "대구"], [/^경상북도|^경북/, "경북"],
+];
+/** 주소 머리의 시·도를 읽어 서비스 범위를 판정한다. "out"이면 **적재하지 않는다**(추측 금지). */
+export function addressSidoScope(addressRaw: string): { scope: "in" | "out" | "unknown"; sido?: string } {
+  const raw0 = String(addressRaw ?? "");
+  // ⚠️ 비표준 접두사('전남광주통합특별시' 등)가 붙었다는 것 자체가 전남·광주 주소라는 뜻이다 → 범위 밖.
+  //   접두사만 떼고 넘기면 "여수시 화양면"이 남아 시·도를 못 읽고 unknown이 된다(픽스처로 발견).
+  if (BAD_SIDO_PREFIX.test(raw0)) return { scope: "out" };
+  const a = raw0.trim();
+  if (!a) return { scope: "unknown" };
+  if (OUT_OF_SCOPE_SIDO.test(a)) return { scope: "out" };
+  for (const [re, sido] of IN_SCOPE_SIDO) if (re.test(a)) return { scope: "in", sido };
+  return { scope: "unknown" };
+}
+
 export function parseGuArea(addressRaw: string): string | null {
+  // 🔒 범위 밖 시·도면 **어떤 폴백도 하지 않는다** — 평면사전으로 내려가면 유형B가 재발한다.
+  const sc = addressSidoScope(addressRaw);
+  if (sc.scope === "out") return null;
   const address = String(addressRaw ?? "").replace(BAD_SIDO_PREFIX, "").trim();
   if (!address) return null;
   const matches = address.match(/[가-힣]+(?:구|시|군)(?![가-힣])/g) ?? [];
@@ -268,6 +299,13 @@ export function parseGuArea(addressRaw: string): string | null {
   //   서구·강서구가 통째로 '부산 ○○구'로 오분류 — 인천광역시 서해구 주소 6곳이 area='대전 서구'로
   //   잘못 적재된 사고, id 30567 등). 주소에 실제로 적힌 시·도명으로 먼저 좁힌 뒤 그 시·도 구 목록
   //   안에서만 찾는다 — 유일명 구(서해구 등)는 기존 전역 사전 폴백으로 그대로 잡힌다.
+  //   🔒 주소 머리에서 읽은 시·도가 있으면 **그 시·도 안에서만** 찾고, 못 찾으면 null이다.
+  //     다른 시·도로 넘어가면 안 된다 — 픽스처에서 "서울특별시 서구"(서울엔 서구가 없다)가
+  //     평면사전 폴백을 타고 '대구 서구'로 찍히는 것을 잡았다. 모르면 모른다고 해야 한다.
+  if (sc.scope === "in" && sc.sido) {
+    for (const token of matches) if ((SIDO_GU[sc.sido] ?? []).includes(token)) return regionKeyFor(sc.sido, token);
+    return null;
+  }
   const sido = AMBIG_SIDO_CANDIDATES.find((s) => address.includes(s));
   if (sido) {
     for (const token of matches) if ((SIDO_GU[sido] ?? []).includes(token)) return regionKeyFor(sido, token);
@@ -425,6 +463,10 @@ export async function discoverRegion(region: string, areaLabel: string, keywords
     for (const it of items) {
       if (!it.name || !it.lat || !it.lng) continue;
       if (isFranchise(it.name) || isNonCafe(it.name, it.category)) continue;
+      // 🔒 결재 #1080 — 주소의 시·도가 **서비스 범위 밖이면 적재하지 않는다.**
+      //   예전엔 parseGuArea가 null을 주면 아래에서 storeArea(검색질의 지역)로 폴백해,
+      //   제주 카페가 '수원시'로, 전남 목포가 '의정부시'로 들어왔다(실측 259곳). 주소가 있는데 추측하면 안 된다.
+      if (addressSidoScope(it.address).scope === "out") continue;
       const key = it.name.replace(/\s/g, "") + Math.round(it.lat * 1000);
       if (seen.has(key)) continue;
       seen.add(key);

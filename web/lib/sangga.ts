@@ -3,7 +3,7 @@
 // 프랜차이즈·중복 제외, 비공개로 적재 후 합성 단계에서 검증. 키 없거나 검증 전엔 dry-run.
 import { sql } from "./db";
 import { brandTokenOverlap } from "./reviewQuality";
-import { localSearch } from "./discover"; // 네이버 지역검색(키 로테이션·쿼터 처리 포함) 단일출처
+import { localSearch, parseGuArea, addressSidoScope } from "./discover"; // 네이버 지역검색(키 로테이션·쿼터 처리 포함) 단일출처
 
 const KEY = process.env.DATA_GO_KR_KEY;
 export const hasSanggaKey = () => !!KEY;
@@ -102,6 +102,10 @@ export async function discoverSangga(signguCd: string, areaLabel: string, opts?:
       const exists = nameHit.length ? nameHit
         : (nearRows.some((r: any) => brandTokenOverlap(r.name, it.name)) ? nearRows : []);
       if (exists.length > 0) { skipped++; continue; }
+      // 🔒 결재 #1080 — 공공데이터 시군구코드로 받은 areaLabel을 그대로 쓰고 있었다(주소 대조 0).
+      //   코드가 어긋나면 그대로 오적재된다. 주소에서 읽히는 값이 있으면 그쪽을 쓰고, 범위 밖이면 넣지 않는다.
+      if (addressSidoScope(it.address).scope === "out") { skipped++; continue; }
+      const areaFromAddr = parseGuArea(it.address);
       const pseudoId = `dg_${it.name.replace(/\s/g, "")}_${Math.round(it.lat * 1e5)}`;
       const category = await categoryFor(it);
       // pipeline_status='new' — 발굴 경로(lib/discover.ts)와 동일하게 **풀 게이트**를 타게 한다.
@@ -109,7 +113,7 @@ export async function discoverSangga(signguCd: string, areaLabel: string, opts?:
       //   카테고리 없이도 이름만으로 공개될 수 있었다(설계와 반대). 시드는 반드시 신규 게이트를 거친다.
       await sql`
         INSERT INTO cafes (place_id, name, area, address, lat, lng, naver_category, source, published, roasts_own, pipeline_status)
-        VALUES (${pseudoId}, ${it.name}, ${areaLabel}, ${it.address}, ${it.lat}, ${it.lng}, ${category}, 'sangga', false, false, 'new')
+        VALUES (${pseudoId}, ${it.name}, ${areaFromAddr ?? areaLabel}, ${it.address}, ${it.lat}, ${it.lng}, ${category}, 'sangga', false, false, 'new')
         ON CONFLICT (place_id) DO NOTHING`;
       inserted++;
       if (category) withCategory++;
