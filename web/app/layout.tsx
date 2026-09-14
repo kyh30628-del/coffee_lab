@@ -71,6 +71,24 @@ export default function RootLayout({
         <link rel="apple-touch-startup-image" href="/splash/apple-splash-750x1334.png" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" />
       </head>
       <body className="min-h-full">
+        {/* 🏢 Organization · WebSite(2026-09-15) — 카페맵 대조에서 나온 갭(그쪽 12블록 / 우리 2블록).
+            사이트 전체 신뢰 신호라 모든 페이지 순위에 영향한다. SearchAction은 검색엔진·AI에게
+            "이 사이트 안에서 이렇게 찾을 수 있다"를 알려 준다. 정적 마크업이라 비용 0. */}
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
+          "@context": "https://schema.org", "@type": "Organization",
+          name: "동네 커피 노트", alternateName: "Dongne Coffee Note",
+          url: "https://dongnecoffeenote.com", logo: "https://dongnecoffeenote.com/icon-512.png",
+          description: "네이버·구글·유튜브 공개 후기를 교차검증해 광고·협찬을 걸러낸 동네 카페 큐레이션. 별점이 아니라 검증된 후기 수와 실제 언급된 사실이 기준입니다.",
+          knowsAbout: ["카페 추천", "카공 카페", "동네 카페", "스페셜티 커피", "카페 주차", "베이커리 카페"],
+        }) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
+          "@context": "https://schema.org", "@type": "WebSite",
+          name: "동네 커피 노트", url: "https://dongnecoffeenote.com", inLanguage: "ko-KR",
+          publisher: { "@type": "Organization", name: "동네 커피 노트", url: "https://dongnecoffeenote.com" },
+          potentialAction: { "@type": "SearchAction",
+            target: { "@type": "EntryPoint", urlTemplate: "https://dongnecoffeenote.com/?q={search_term_string}" },
+            "query-input": "required name=search_term_string" },
+        }) }} />
         {children}
         <PwaInstall />
         <VisitPing />

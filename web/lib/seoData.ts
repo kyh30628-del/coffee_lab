@@ -152,7 +152,7 @@ export async function getRegionTasteStats(area: string, tasteKey: string): Promi
 let tasteCountsMem: { at: number; v: Record<string, number> } | null = null;
 const TASTE_COUNTS_TTL_MS = 6 * 60 * 60 * 1000;
 
-export async function getRegionTasteCounts(): Promise<Record<string, number>> {
+export async function computeRegionTasteCounts(): Promise<Record<string, number>> {
   if (tasteCountsMem && Date.now() - tasteCountsMem.at < TASTE_COUNTS_TTL_MS) return tasteCountsMem.v;
   try {
     // ⚠️ 2026-08-15 수리: 예전엔 6개 축(work/quiet/dessert/roast/mood/space)을 **SQL에 하드코딩**했다.
@@ -273,7 +273,7 @@ export async function getRegionFacetCount(area: string, label: string): Promise<
   try { const r = (await sql`SELECT count(*)::int n FROM cafes WHERE published AND area=${area} AND facets @> ARRAY[${label}]::text[]`) as unknown as { n: number }[]; return r[0]?.n ?? 0; } catch { return 0; }
 }
 /** 전 지역×패싯 카운트 1회 — 칩 표시와 사이트맵이 같은 값을 쓰게 한다(표시와 목록이 어긋나던 과거 버그 방지). */
-export async function getRegionFacetCounts(): Promise<Record<string, number>> {
+export async function computeRegionFacetCounts(): Promise<Record<string, number>> {
   try {
     const rows = (await sql`SELECT area, f AS label, count(*)::int n FROM cafes, unnest(facets) f
       WHERE published AND area IS NOT NULL AND facets IS NOT NULL GROUP BY area, f HAVING count(*) >= 5`) as unknown as { area: string; label: string; n: number }[];
@@ -318,7 +318,7 @@ export async function getDongTasteCafes(area: string, dong: string, tasteKey: st
  *     5,047페이지가 처음 생성될 때 11회 × 5,047 = 5만 5천 쿼리가 될 뻔했다(크롤 몰릴 때 비용 폭발).
  *     지역×취향(getRegionTasteCounts)과 **같은 방식**으로 FILTER 집계 1회 + 6시간 캐시로 맞춘다. */
 let dongTasteCountsMem: { at: number; v: Record<string, number> } | null = null;
-export async function getDongTasteCounts(): Promise<Record<string, number>> {
+export async function computeDongTasteCounts(): Promise<Record<string, number>> {
   if (dongTasteCountsMem && Date.now() - dongTasteCountsMem.at < TASTE_COUNTS_TTL_MS) return dongTasteCountsMem.v;
   try {
     const cols = TASTES.map((t) => {
@@ -373,7 +373,7 @@ export async function getDongFacetCafes(area: string, dong: string, label: strin
 }
 /** 전 동×시설 카운트 — 쿼리 1회 + 6시간 캐시(지역×취향과 같은 규약). 5곳 미만은 담지 않는다. */
 let dongFacetCountsMem: { at: number; v: Record<string, number> } | null = null;
-export async function getDongFacetCounts(): Promise<Record<string, number>> {
+export async function computeDongFacetCounts(): Promise<Record<string, number>> {
   if (dongFacetCountsMem && Date.now() - dongFacetCountsMem.at < TASTE_COUNTS_TTL_MS) return dongFacetCountsMem.v;
   try {
     const rows = (await sql`SELECT area, dong, f AS label, count(*)::int n FROM cafes, unnest(facets) f
@@ -384,3 +384,57 @@ export async function getDongFacetCounts(): Promise<Record<string, number>> {
     return out;
   } catch { return dongFacetCountsMem?.v ?? {}; }
 }
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 📦 SEO 카운트 — **집계가 아니라 조회**(2026-09-15)
+//
+// 🔴 왜 바꿨나(실측): 6시간 메모리 캐시를 걸었는데도 `getRegionFacetCounts`가 하루 **4,406회 · 14GB**를 읽었다.
+//   서버리스는 **인스턴스마다 캐시가 따로**라, 크롤러가 새 페이지 4,835개를 동시에 치면 인스턴스 수만큼 집계가 돈다.
+//   메모리 캐시로는 못 막는다 — 집계 결과를 테이블에 넣고 페이지는 **작은 테이블 1회 조회**로 끝낸다.
+//   집계는 하루 1회 크론(refreshSeoCounts)만 돈다. 4,406회 → 1회.
+// ⚠️ 표시와 사이트맵이 같은 값을 써야 한다 — 그래서 단일 테이블 하나로 모은다.
+export type SeoCountKind = "region_taste" | "region_facet" | "dong_taste" | "dong_facet";
+const countsMem: Partial<Record<SeoCountKind, { at: number; v: Record<string, number> }>> = {};
+const COUNTS_TTL_MS = 30 * 60 * 1000;   // 인스턴스 내 30분 — 테이블 조회도 공짜는 아니므로 가볍게만
+
+/** 저장된 카운트를 읽는다. 집계하지 않는다. 테이블이 비어 있으면 빈 객체(페이지는 안전하게 비표시). */
+export async function getSeoCounts(kind: SeoCountKind): Promise<Record<string, number>> {
+  const m = countsMem[kind];
+  if (m && Date.now() - m.at < COUNTS_TTL_MS) return m.v;
+  try {
+    const rows = (await sql`SELECT key, n FROM seo_counts WHERE kind=${kind}`) as unknown as { key: string; n: number }[];
+    const out: Record<string, number> = {};
+    for (const r of rows) out[r.key] = Number(r.n);
+    countsMem[kind] = { at: Date.now(), v: out };
+    return out;
+  } catch { return countsMem[kind]?.v ?? {}; }
+}
+
+/** 🕐 하루 1회 갱신 — 크론에서만 부른다. 여기가 유일하게 집계를 도는 곳이다. */
+export async function refreshSeoCounts(): Promise<Record<SeoCountKind, number>> {
+  const put = async (kind: SeoCountKind, v: Record<string, number>) => {
+    const entries = Object.entries(v).filter(([, n]) => n >= 5);
+    // 원자적 교체 — 지웠다 넣는 사이에 페이지가 빈 값을 보지 않도록 한 트랜잭션처럼 묶어 쓴다.
+    await sql`DELETE FROM seo_counts WHERE kind=${kind}`;
+    for (let i = 0; i < entries.length; i += 500) {
+      const chunk = entries.slice(i, i + 500);
+      await sql`INSERT INTO seo_counts (kind, key, n, updated_at)
+        SELECT ${kind}, k, x::int, now() FROM unnest(${chunk.map((e) => e[0])}::text[], ${chunk.map((e) => String(e[1]))}::text[]) AS t(k, x)
+        ON CONFLICT (kind, key) DO UPDATE SET n=EXCLUDED.n, updated_at=now()`;
+    }
+    return entries.length;
+  };
+  const out = {} as Record<SeoCountKind, number>;
+  out.region_taste = await put("region_taste", await computeRegionTasteCounts());
+  out.region_facet = await put("region_facet", await computeRegionFacetCounts());
+  out.dong_taste = await put("dong_taste", await computeDongTasteCounts());
+  out.dong_facet = await put("dong_facet", await computeDongFacetCounts());
+  return out;
+}
+
+// 호출부를 바꾸지 않기 위한 얇은 래퍼 — 안은 전부 **조회**다(집계 아님).
+export const getRegionTasteCounts = () => getSeoCounts("region_taste");
+export const getRegionFacetCounts = () => getSeoCounts("region_facet");
+export const getDongTasteCounts = () => getSeoCounts("dong_taste");
+export const getDongFacetCounts = () => getSeoCounts("dong_facet");

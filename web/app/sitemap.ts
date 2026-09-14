@@ -9,7 +9,29 @@ export const revalidate = 21600; // 감사수리: 결재 집행(공개/비공개
 
 const SITE = "https://dongnecoffeenote.com";
 
+// 📑 2026-09-15 — 유형별 사이트맵을 **추가로** 제공한다(CEO 승인).
+//   왜: 34,455 URL이 단일 5.7MB 파일이라 Search Console에서 **유형별 색인 수를 볼 수 없다.**
+//   09-28에 "기존 페이지 색인이 늦어졌는지"를 판단하려면 카페상세·지역×취향·시설축을 따로 봐야 한다.
+//   ⚠️ **/sitemap.xml은 그대로 둔다** — IndexNow(scripts/indexnow-submit.mjs)와 robots.txt가 이 주소를 읽는다.
+//      분할(generateSitemaps)로 바꾸면 /sitemap.xml이 사라져 제출이 통째로 끊긴다(빌드로 확인하고 되돌림).
+//      대신 /sitemaps/{유형}.xml을 **덧붙이고** robots.txt에 함께 싣는다. 같은 URL이 두 사이트맵에 있어도 무방하다.
+export type SitemapKind = "cafes" | "areas" | "taste" | "facet" | "dong" | "dongtaste" | "dongfacet" | "misc";
+export async function sitemapByKind(kind: SitemapKind): Promise<MetadataRoute.Sitemap> {
+  const all = await buildAll();
+  return all[kind] ?? [];
+}
+
+async function buildAll(): Promise<Record<SitemapKind, MetadataRoute.Sitemap>> {
+  const s = await sitemapParts();
+  return s;
+}
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const p = await sitemapParts();
+  return [...p.misc, ...p.areas, ...p.taste, ...p.facet, ...p.dong, ...p.dongtaste, ...p.dongfacet, ...p.cafes];
+}
+
+async function sitemapParts(): Promise<Record<SitemapKind, MetadataRoute.Sitemap>> {
   let cafes: { id: number; synth_updated?: string }[] = [];
   try {
     // 전량 제출(2026-08-06). 예전 LIMIT 5000은 공개 13,460곳 중 8,460곳(63%)을 검색엔진에 제출조차
@@ -74,7 +96,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const collectionUrls: MetadataRoute.Sitemap = COLLECTIONS.map((c) => ({
     url: `${SITE}/collections/${c.slug}`, changeFrequency: "weekly", priority: 0.85,
   }));
-  return [
+  const misc: MetadataRoute.Sitemap = [
     { url: SITE, changeFrequency: "daily", priority: 1 },
     { url: `${SITE}/area`, changeFrequency: "daily", priority: 0.9 },
     { url: `${SITE}/insights`, changeFrequency: "daily", priority: 0.7 }, // 📊 데이터 리포트(인용 유도 — 백링크 전략)
@@ -83,12 +105,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE}/pricing`, changeFrequency: "monthly", priority: 0.5 },
     ...collectionUrls,
     ...tasteUrls,
-    ...regionUrls,
-    ...regionTasteUrls,
-    ...facetUrls,
-    ...dongUrls,
-    ...dongTasteUrls,
-    ...dongFacetUrls,
-    ...cafeUrls,
   ];
+  return { misc, areas: regionUrls, taste: regionTasteUrls, facet: facetUrls,
+    dong: dongUrls, dongtaste: dongTasteUrls, dongfacet: dongFacetUrls, cafes: cafeUrls };
 }

@@ -394,6 +394,12 @@ export default async function CafePage({ params }: Props) {
         {(highlights.length > 0 || c.synth_identity) && (
           <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
             <div className="nt-sec">우리가 읽고 적은 판정 · 검증 후기 {c.synth_count ?? 0}건</div>
+            {/* 🤖 인용용 사실 한 줄(2026-09-15) — 우리 페이지의 78%가 이 상세인데 여기에 인용할 문장이 없었다.
+                AI는 **숫자와 기준일이 붙은 문장**을 인용한다. 지역·취향 페이지엔 넣었는데 정작 제일 많은 면이 비어 있었다.
+                ⚠️ 추가 조회 0 — 이미 읽은 값으로만 만든다. */}
+            <p className="text-[12px] text-[#6b5a45]">
+              검증 후기 {(c.synth_count ?? 0).toLocaleString()}건 · 영수증 리뷰·광고·협찬 제외 · 최종 확인 {new Date().toISOString().slice(0, 10)}
+            </p>
             {/* 🕒 최신성(2026-09-13 해자 감사) — "지금도 그런가"에 답하는 한 줄. review_dates(작은 jsonb, 검증+참고 후기 날짜)에서 계산. */}
             {freshness && <div className="text-[12.5px] text-[#63523f]">🕒 최근 12개월 후기 <b className="text-[#2a1f17]">{freshness.recent}건</b> · 가장 최신 <b className="text-[#2a1f17]">{freshness.latest}</b>{freshness.stale && <span className="text-[#a93a32]"> · 1년 넘게 새 후기 없음</span>}</div>}
             {c.synth_identity && <p className="nt-hand"><span className="nt-hl">{c.synth_identity}</span></p>}

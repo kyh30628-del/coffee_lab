@@ -99,7 +99,15 @@ export async function GET(req: NextRequest) {
     // 📒 하네스 L5 — 지문은 **남은 일(백로그)** 기준. 할 일이 없으면(0) 지문을 안 남긴다 —
     //   "일이 없어 조용한 것"과 "일이 있는데 못 끝내는 것"을 구분해야 정체 탐지가 소음이 안 된다.
     await recordRun("cron-enrich", true, detail, processed, { fingerprint: (processed) > 0 ? fingerprintOf({ processed }) : undefined, metrics: { processed } });
-    return NextResponse.json({ ok: true, ranAt: new Date().toISOString(), processed, declining, declineNames, remaining: rows.length === limit });
+
+
+    // 📦 SEO 카운트 갱신(2026-09-15) — 페이지가 집계를 돌지 않게 **여기서 하루치를 만들어 둔다.**
+    //   실측: 메모리 캐시만으로는 서버리스 인스턴스마다 따로라 하루 4,406회·14GB가 나갔다(크롤러 몰릴 때 폭발).
+    //   집계는 이 한 곳에서만 돈다 — 페이지는 작은 테이블 1회 조회.
+    let seoCounts: unknown = null;
+    try { const { refreshSeoCounts } = await import("@/lib/seoData"); seoCounts = await refreshSeoCounts(); }
+    catch (e) { seoCounts = { error: String(e).slice(0, 80) }; }
+    return NextResponse.json({ ok: true, ranAt: new Date().toISOString(), processed, declining, declineNames, seoCounts, remaining: rows.length === limit });
   } catch (e) {
     await recordRun("cron-enrich", false, String(e).slice(0, 150));
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
