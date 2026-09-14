@@ -90,7 +90,10 @@ async function ensureCols() {
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS visitor_n INT`;
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS visitor_trip REAL`;
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS visitor_local REAL`; // 표시 리뷰 중 '카페 맥락어 없는 비율'(0~1) — 규칙-사각 오염(딴업종·문구이름) 관제탑 감시 지표
-  await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS offctx_ok BOOLEAN DEFAULT false`; // 사람이 '진짜 카페'로 확인한 화이트리스트 → offctx 점검목록서 제외(프록시 오탐 반복 방지)
+  await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS offctx_ok BOOLEAN DEFAULT false`;
+  // ⚠️ 2026-09-14 "이건 알고 가세요" — 후기 2건 이상에서 확인된 주의점 [{label,emoji,count,quote}].
+  //   근거 문장을 함께 담는다: 우리 판단이 아니라 손님이 쓴 말임을 화면에서 보이기 위해.
+  await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS cautions JSONB`; // 사람이 '진짜 카페'로 확인한 화이트리스트 → offctx 점검목록서 제외(프록시 오탐 반복 방지)
   });
   ensured = true;
 }
@@ -245,7 +248,7 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   const latMin = getCriterionSync("geo.box.lat_min"), latMax = getCriterionSync("geo.box.lat_max");
   const lngMin = getCriterionSync("geo.box.lng_min"), lngMax = getCriterionSync("geo.box.lng_max");
   name = cleanCafeName(name); // 매칭·게이트(coherence·generic·nonCafe·franchise)는 SEO 서술어 꼬리 뗀 진짜 상호로 — '구구커피 원두 핸드드립 로스팅' 오염 차단
-  const { synth, collected, charScores, facets, evidenceReviews: evidenceReviewsRaw, allEvidence: allEvidenceRaw, reviewDates, quality, borderline } = result;
+  const { synth, collected, charScores, facets, cautions, evidenceReviews: evidenceReviewsRaw, allEvidence: allEvidenceRaw, reviewDates, quality, borderline } = result;
   // [coordination#225 근본수정] 위 loadLinkExclusions는 이제 호출부(synthAndStore 등)가 collectAndSynthesize
   //   호출 *전에* 먼저 불러 opts.excludeLinks로 넘긴다 — 그래야 원본 raw_reviews 풀에서 같은 근거가 재판정
   //   자체에서 빠져 등급판정 카운트에도 반영된다(07-07(#196)부터 3차례 재발했던 "healer가 정리해도 다음
@@ -390,7 +393,7 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   // 🔎 2026-09-14 — 검색용 시설 패싯(주차·콘센트·단체·루프탑·반려동물 …)을 여기서 저장한다.
   //   화면 하이라이트와 같은 사전·같은 임계라 표시와 검색이 어긋나지 않는다. 작은 text[] 1개라 비용 무시 수준.
   try {
-    await sql`UPDATE cafes SET facets=${(facets ?? []) as string[]} WHERE id=${cafeId}`;
+    await sql`UPDATE cafes SET facets=${(facets ?? []) as string[]}, cautions=${safeJson(cautions ?? [])} WHERE id=${cafeId}`;
     noteWrite("cafes.facets");
   } catch { /* 패싯 저장 실패는 합성을 막지 않는다 */ }
 

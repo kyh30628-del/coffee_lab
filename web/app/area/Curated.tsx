@@ -42,9 +42,23 @@ export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, headin
   const vb = (c: SeoCafe) => visitorBadges({ n: c.visitor_n ?? 0, trip: c.visitor_trip ?? 0, local: c.visitor_local ?? 0 });
   const hero = cafes.length >= 3 ? cafes[0] : null;
   const rest = hero ? cafes.slice(1) : cafes;
+  // 🤖 2026-09-14(CEO 승인) — AI 인용 최적화.
+  //   실측 근거: AI 경유 유입이 07월 3 → 08월 35 → 09월 105 PV로 늘고 검색엔진 경유는 43 → 14로 줄었다.
+  //   도착지가 전부 이 페이지(/area/{지역}/{취향})다 — LLM이 "수원 카공 카페" 질문에 우리를 인용한다.
+  //   LLM은 **숫자와 기준일이 붙은 문장**을 인용한다. 그 한 줄을 화면과 JSON-LD 양쪽에 같은 값으로 둔다.
+  //   비용 0 — 이미 받아온 배열에서 합산하는 순수계산(추가 조회 없음).
+  const evTotal = cafes.reduce((a, c) => a + (Number((c as any).synth_count) || 0), 0);
+  const factLine = `검증 후기 ${evTotal.toLocaleString()}건을 근거로 고른 ${cafes.length}곳 · 광고·협찬 후기 제외 · 기준 ${new Date().toISOString().slice(0, 10)}`;
   const jsonld = {
     "@context": "https://schema.org", "@type": "ItemList", name: heading, numberOfItems: cafes.length,
-    itemListElement: cafes.slice(0, 20).map((c, i) => ({ "@type": "ListItem", position: i + 1, url: `${SITE}/c/${c.id}`, name: c.name })),
+    description: factLine,
+    itemListElement: cafes.slice(0, 20).map((c, i) => ({
+      "@type": "ListItem", position: i + 1, url: `${SITE}/c/${c.id}`, name: c.name,
+      // 카페마다 '근거 후기 수'를 붙인다 — 별점이 아니라 이 숫자가 우리 주장의 단위다.
+      item: { "@type": "CafeOrCoffeeShop", name: c.name, url: `${SITE}/c/${c.id}`,
+              address: { "@type": "PostalAddress", addressLocality: (c as any).area ?? undefined, addressCountry: "KR" },
+              additionalProperty: [{ "@type": "PropertyValue", name: "검증 후기 수", value: Number((c as any).synth_count) || 0 }] },
+    })),
   };
   return (
     <main className="min-h-screen bg-[#f4ece0] text-[#2b2018]" style={{ fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }}>
@@ -55,6 +69,8 @@ export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, headin
         <div className="text-[#7a5122] text-[11px] tracking-[0.25em] uppercase mt-4 mb-1">동네 커피 노트 · 검증 큐레이션</div>
         <h1 className="text-[26px] font-bold leading-tight mb-2">{heading}</h1>
         <p className="text-[14px] text-[#524234] leading-relaxed mb-3">{intro}</p>
+        {/* 🤖 인용용 사실 한 줄 — 사람에게도 근거가 되고, AI에겐 그대로 인용할 문장이 된다. */}
+        <p className="text-[12px] text-[#6b5a45] mb-3">{factLine}</p>
         <p className="text-[12px] text-[#54432c] bg-white/60 border border-[#e6dcc8] rounded-lg px-3 py-2 mb-6">☕ <b>영수증 리뷰·광고·협찬은 빼고</b>, 네이버·구글·유튜브 공개 후기를 교차검증해 진짜 후기로만 골랐어요. <Link href="/trust" className="underline text-[#7a5122]">검증 방법</Link></p>
 
         {/* 후기 근거 요약 — 등급 분포로 검증 신뢰도를 투명하게 표시(콘텐츠 밀도 보강) */}

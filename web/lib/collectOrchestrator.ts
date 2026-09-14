@@ -5,7 +5,7 @@ import { extractRid, looseDate, type ReviewerCafeStat } from "./reviewerProfiles
 import { isAdTemplateQuote } from "./adTemplate";
 import { synthesize, type Review, type SynthResult } from "./synthEngine";
 import { computeCharScores } from "./charScore";
-import { extractFacets } from "./cafeProfile";
+import { extractFacets, extractCautions, type Caution } from "./cafeProfile";
 import { getCriterionSync } from "./criteria"; // 등급 바닥 임계값 단일출처(캐시 프라임은 synthAndStore 등 진입점이 함)
 import type { WebSnippet } from "./webSearchCollector";
 
@@ -44,6 +44,7 @@ export type CollectResult = {
   collected: number;          // = 검증 통과 고유 리뷰 수 (신뢰 헤드라인 숫자)
   grade: "검증" | "참고" | "후보";
   charScores: Record<string, number>;
+  cautions: Caution[]; // ⚠️ 2026-09-14 "이건 알고 가세요" — 후기 2건 이상에서 확인된 주의점 + 근거 문장
   facets: string[];   // 🔎 2026-09-14 검색용 시설 패싯(주차·콘센트·단체·반려동물 …) — 화면 하이라이트와 같은 사전·임계
   perSource: { source: string; raw: number; kept: number }[];
   evidenceReviews: EvidenceReview[];   // 상위 6건 (기본 표시용)
@@ -337,5 +338,7 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
 
   // 🔎 2026-09-14 검색용 시설 패싯 — 화면 하이라이트와 같은 사전·임계(9%+·최소3건·부정어 가드)로 전량 추출.
   const facets = extractFacets(verifiedTexts);
-  return { synth, collected: trustCount, grade, charScores, facets, perSource, evidenceReviews: topEvidence, allEvidence, reviewDates, borderline, auditItems, quality: stats, reviewerStats };
+  // ⚠️ 주의점도 **같은 verifiedTexts**에서 뽑는다 — 표시와 검색과 주의점이 같은 근거를 쓰게.
+  const cautions = extractCautions(verifiedTexts);
+  return { synth, collected: trustCount, grade, charScores, facets, cautions, perSource, evidenceReviews: topEvidence, allEvidence, reviewDates, borderline, auditItems, quality: stats, reviewerStats };
 }

@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 
-// 📷✍ 사장님 사진·한마디 편집(PIN 로그인 사장님 전용). 저장 즉시 카페 상세에 반영(구독 활성 중일 때 노출).
+// 📷✍ 사장님 사진·한마디 편집(PIN 로그인 사장님 전용). 저장 즉시 카페 상세에 반영.
+//   2026-09-14(CEO 승인): **사진은 구독과 무관하게 항상 노출**. 한마디·🏅배지는 구독 활성일 때만.
 type Photo = { url: string; at: string };
 export default function OwnerContentEditor({ cafeId, pin }: { cafeId: number; pin: string }) {
   const [photos, setPhotos] = useState<Photo[]>([]);
@@ -39,6 +40,7 @@ export default function OwnerContentEditor({ cafeId, pin }: { cafeId: number; pi
     <div className="bg-white rounded-2xl p-4 sm:p-5 border border-[#ece0cd] mb-4">
       <div className="text-sm font-bold text-[#52402e] mb-1">📷 우리 가게 사진 · ✍ 사장님 한마디</div>
       <p className="text-[12px] text-[#8a7458] leading-relaxed mb-3">손님이 보는 카페 페이지에 <b>사장님이 직접 올린 사진</b>과 <b>한마디</b>가 실려요. 후기·등급은 그대로예요(사장님 글은 따로 표시). 사진은 직접 촬영한 것만 올려주세요(저작권·초상권 책임은 올리는 분에게 있어요).</p>
+      <p className="text-[12px] text-[#54432c] bg-white/60 border border-[#e6dcc8] rounded-lg px-3 py-2 mb-3">📷 <b>사진은 구독과 상관없이 계속 보여요.</b> 구독이 끝나도 내려가지 않아요. <b>사장님 한마디</b>와 <b>🏅 직접 관리 배지</b>는 구독 중에만 표시돼요.</p>
       <div className="flex gap-2 flex-wrap mb-2">
         {keep.map((p) => (
           <div key={p.url} className="relative w-20 h-20 rounded-lg overflow-hidden border border-[#ece0cd]">

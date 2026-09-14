@@ -194,3 +194,71 @@ export function extractFacets(texts: string[]): string[] {
   return extractHighlights(texts, 99).map((h) => h.label);
 }
 export const ALL_FACET_LABELS: string[] = HIGHLIGHTS.map((h) => h.label);
+
+// ⚠️ 2026-09-14(CEO 승인) — "이건 알고 가세요": 후기에서 확인된 **주의점**.
+//   왜 만드나: 카페 고르기의 본질은 성공을 찾는 게 아니라 실패를 피하는 것이다. 광고는 절대 못 하는 말이라
+//   우리 해자와 가장 멀리 떨어진 차별점이고, 경쟁 서비스(카페맵 포함)도 부정 신호를 '거르는 데만' 쓰고 보여주진 않는다.
+//
+// 🔴 설계에서 가장 중요한 결정: **긍정 키워드 + 부정어(NEG) 조합으로 만들지 않는다.**
+//   "주차 걱정 없이"·"주차 부족함 없"·"아쉬움 없이"가 전부 부정으로 뒤집혀 잡힌다(실측 어휘로 확인).
+//   대신 **그 자체로 부정인 표현**만 등재한다. 각 항목이 자기완결적이라 맥락 추론이 필요 없다.
+const CAUTIONS: { label: string; emoji: string; kws: string[] }[] = [
+  { label: "주차 어려움", emoji: "🅿️", kws: ["주차가 불편", "주차 불편", "주차하기 불편", "주차가 어렵", "주차하기 어렵", "주차 어려", "주차가 힘들", "주차 힘들", "주차공간이 협소", "주차 공간이 협소", "주차장이 협소", "주차장이 좁", "주차가 협소", "주차 자리가 없", "주차할 곳이 없", "주차장이 없", "주차 불가", "주차가 안 되"] },
+  { label: "좌석 부족", emoji: "💺", kws: ["자리가 없", "자리가 부족", "좌석이 부족", "좌석이 적", "자리가 적", "테이블이 적", "좌석수가 적", "앉을 자리가 없", "자리 잡기 힘들", "자리 경쟁"] },
+  { label: "웨이팅 있음", emoji: "⏳", kws: ["웨이팅이 길", "웨이팅 길", "웨이팅이 심", "오래 기다", "한참 기다", "대기가 길", "줄이 길", "줄 서서 기다"] },
+  { label: "콘센트 부족", emoji: "🔌", kws: ["콘센트가 없", "콘센트 없", "콘센트가 부족", "콘센트가 적", "콘센트가 거의"] },
+  { label: "소음 있음", emoji: "🔊", kws: [/* 2026-09-14: 맨 어간 "시끄러"는 '시끄러운 곳을 피해' 같은 회피 서술도 잡았다 → 종결형만 */
+    "시끄러워", "시끄러웠", "시끄럽고", "시끄러움", "시끄럽습", "시끄러운 편", "소음이 있", "소란스", "음악이 너무 크", "대화 소리가 크"] },
+  { label: "공간 협소", emoji: "📐", kws: ["공간이 협소", "매장이 협소", "내부가 좁", "공간이 좁", "매장이 좁", "생각보다 좁", "협소해서"] },
+  { label: "주말 혼잡", emoji: "🧍", kws: ["주말엔 사람이 많", "주말에는 사람이 많", "주말엔 붐", "주말에 붐", "주말엔 복잡", "주말에 복잡", "주말엔 웨이팅"] },
+  { label: "계단 있음", emoji: "🪜", kws: ["계단이 많", "계단을 올라", "계단이 가파", "엘리베이터가 없", "엘리베이터 없"] },
+  { label: "반려동물 불가", emoji: "🚫", kws: ["반려동물은 불가", "애견 불가", "반려동물 동반 불가", "강아지는 안 되", "노펫"] },
+  { label: "가격대 높음", emoji: "💰", kws: ["가격이 비싸", "비싼 편", "가격대가 높", "가격이 좀 있", "가성비는 아쉽", "가격은 아쉽"] },
+  { label: "결제 제한", emoji: "💳", kws: ["현금만", "현금 결제만", "카드가 안 되", "카드 안 되", "카드 결제가 안"] },
+  { label: "화장실 외부", emoji: "🚻", kws: ["화장실이 밖", "화장실이 외부", "화장실이 건물", "공용 화장실"] },
+  { label: "예약 필요", emoji: "📅", kws: ["예약 필수", "예약이 필수", "예약제로 운영", "사전 예약 필", "예약하고 가야", "예약 후 방문"] },
+  { label: "브레이크타임", emoji: "⏸️", kws: ["브레이크타임", "브레이크 타임"] },
+];
+
+// 부정 표현이 다시 뒤집히는 경우만 막는다: "주차가 불편하지 않아요" · "자리가 없지 않" 등.
+//   키워드 **직후 8자 안**에 '않/아니'가 오면 그 언급은 주의점이 아니다.
+// 🔴 2026-09-14 실측 보강 2종:
+//   ① 뒤집기: "주차가 불편하지 않아요" — 직후 8자 안에 '않/아니'
+//   ② **가정문**: "여차하여 자리가 없으면 조별로" — 실제로 자리가 없었다는 진술이 아니다(실측 오탐, 테라로사 포스코센터점).
+const CAUTION_FLIP = /^(?:[^.!?\n]{0,8}(?:않|아니)|으?면)/;
+function hasCautionMention(text: string, kws: string[]): string | null {
+  for (const k of kws) {
+    const kl = k.toLowerCase();
+    let i = text.indexOf(kl);
+    while (i !== -1) {
+      if (!CAUTION_FLIP.test(text.slice(i + kl.length, i + kl.length + 10))) {
+        // 근거 문장을 함께 돌려준다 — "우리 판단"이 아니라 "손님이 쓴 말"임을 보이기 위해.
+        // 🔴 2026-09-14 실측 수정: 마침표로 문장을 자르면 블로그 후기(마침표 거의 없음)에서
+        //   **키워드가 빠진 엉뚱한 구간**이 근거로 붙었다(실측: '주차 어려움'인데 근거엔 주차 얘기 없음).
+        //   반드시 매치 위치를 중심으로 잘라 **근거 안에 그 표현이 들어있게** 한다.
+        const from = Math.max(0, i - 40), to = Math.min(text.length, i + kl.length + 45);
+        return text.slice(from, to).replace(/\s+/g, " ").trim();
+      }
+      i = text.indexOf(kl, i + 1);
+    }
+  }
+  return null;
+}
+
+export type Caution = { label: string; emoji: string; count: number; quote: string };
+/** 주의점 추출 — 서로 다른 후기 **2건 이상**에서 확인될 때만. 근거 문장 1개를 함께 담는다. */
+export function extractCautions(texts: string[], topN = 4): Caution[] {
+  const arr = (texts || []).map((t) => (t || "").toLowerCase()).filter(Boolean);
+  if (arr.length < 6) return []; // 하이라이트와 같은 규약 — 표본이 적으면 판단하지 않는다
+  const out: Caution[] = [];
+  for (const c of CAUTIONS) {
+    let count = 0, quote = "";
+    for (const t of arr) {
+      const q = hasCautionMention(t, c.kws);
+      if (q) { count++; if (!quote) quote = q; }
+    }
+    if (count >= 2) out.push({ label: c.label, emoji: c.emoji, count, quote });
+  }
+  return out.sort((a, b) => b.count - a.count).slice(0, topN);
+}
+export const ALL_CAUTION_LABELS: string[] = CAUTIONS.map((c) => c.label);

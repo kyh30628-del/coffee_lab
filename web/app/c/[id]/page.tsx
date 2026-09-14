@@ -82,7 +82,7 @@ async function getCafe(id: string) {
   const n = Number(id);
   if (!Number.isFinite(n) || n <= 0) return null;
   try {
-    return (await sql`SELECT c.id, c.name, c.area, c.dong, c.address, c.lat, c.lng, c.synth_grade, c.synth_identity, c.synth_count, c.char_scores, c.synth_reviews_all, c.synth_reviews, c.reputation_note, c.synth_quality, c.visitor_n, c.visitor_trip, c.visitor_local, c.area_rank, c.area_total, c.review_dates,
+    return (await sql`SELECT c.id, c.name, c.area, c.dong, c.address, c.lat, c.lng, c.synth_grade, c.synth_identity, c.synth_count, c.char_scores, c.synth_reviews_all, c.synth_reviews, c.reputation_note, c.synth_quality, c.visitor_n, c.visitor_trip, c.visitor_local, c.area_rank, c.area_total, c.review_dates, c.cautions,
       COALESCE(dt.is_tourist, false) AS dong_tourist
       FROM cafes c LEFT JOIN dong_tourism dt ON dt.area = c.area AND dt.dong = c.dong
       WHERE c.id=${n} AND c.published=true LIMIT 1`)[0] as any ?? null;
@@ -402,6 +402,26 @@ export default async function CafePage({ params }: Props) {
                   ))}
                 </div>
               </>
+            )}
+          </div>
+        )}
+
+        {/* ⚠️ 이건 알고 가세요(2026-09-14, CEO 승인) — 후기 2건 이상에서 확인된 주의점 + 손님이 쓴 근거 문장.
+            왜 넣나: 카페 고르기는 '좋은 곳 찾기'보다 '헛걸음 피하기'다. 광고가 절대 못 하는 말이라 우리 해자와 가장 멀리 있다.
+            ⚠️ 추가 조회 0 — 합성 때 계산해 cafes.cautions에 넣어둔 값을 그대로 읽는다. */}
+        {Array.isArray(c.cautions) && c.cautions.length > 0 && (
+          <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
+            <div className="nt-sec">이건 알고 가세요</div>
+            <div className="text-[12px] text-[#63523f]">후기 2건 이상에서 확인된 것만 · 숫자=언급 후기 수</div>
+            <div className="nt-chips">
+              {(c.cautions as any[]).map((x: any) => (
+                <span key={x.label} className="nt-chip">{x.emoji} {x.label}<b>{x.count}</b></span>
+              ))}
+            </div>
+            {(c.cautions as any[])[0]?.quote && (
+              <p className="text-[12.5px] text-[#63523f]" style={{ marginTop: 6 }}>
+                손님 말: <span className="text-[#2a1f17]">“…{(c.cautions as any[])[0].quote}…”</span>
+              </p>
             )}
           </div>
         )}
