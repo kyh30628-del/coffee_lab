@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { sql } from "@/lib/db";
+import { SITE } from "@/lib/seoData";
 
 // 📊 데이터 리포트 — **인용되기 위한 페이지**다(2026-08-26 CEO 승인, 백링크 전략 ③).
 //   우리만 가진 숫자(검증 후기 규모·동네/여행 구분)를 공개해 기자·블로거가 출처 링크와 함께
@@ -23,6 +24,13 @@ async function getStats() {
     const [vb] = (await sql`SELECT
       count(*) FILTER (WHERE published AND visitor_n>=10 AND visitor_local>=0.08)::int local,
       count(*) FILTER (WHERE published AND visitor_n>=15 AND visitor_trip>=0.20)::int trip FROM cafes`) as any[];
+    // ⚠️ 주의점 통계(2026-09-14) — **경쟁 서비스가 못 만드는 숫자**라 인용·백링크가 붙는 자리다.
+    //   "수도권 카페 4곳 중 1곳은 주차가 어렵다"는 문장은 기사·블로그·AI가 그대로 인용할 수 있다.
+    const cautionTop = (await sql`SELECT x->>'label' AS label, count(*)::int n
+      FROM cafes, jsonb_array_elements(cautions) x
+      WHERE published AND cautions IS NOT NULL GROUP BY 1 ORDER BY 2 DESC LIMIT 8`) as any[];
+    const [cautionTot] = (await sql`SELECT count(*) FILTER (WHERE published AND cautions IS NOT NULL AND jsonb_array_length(cautions)>0)::int with_c,
+      count(*) FILTER (WHERE published AND cautions IS NOT NULL)::int judged FROM cafes`) as any[];
     const localTop = (await sql`SELECT area, count(*)::int n FROM cafes
       WHERE published AND visitor_n>=10 AND visitor_local>=0.08 AND area IS NOT NULL
       GROUP BY area ORDER BY 2 DESC LIMIT 10`) as any[];
@@ -38,7 +46,7 @@ async function getStats() {
         (SELECT count(*)::int FROM cafes c WHERE c.published AND c.area=t.area AND c.dong=t.dong) cafes
       FROM dong_tourism t WHERE t.is_tourist ORDER BY t.rate DESC LIMIT 10`) as any[];
     const [tCnt] = (await sql`SELECT count(*)::int total, count(*) FILTER (WHERE is_tourist)::int tourist FROM dong_tourism`) as any[];
-    return { tot, vb, localTop, tripTop, grow, touristDong, tCnt };
+    return { tot, vb, cautionTop, cautionTot, localTop, tripTop, grow, touristDong, tCnt };
   } catch { return null; }
 }
 
@@ -55,8 +63,35 @@ export default async function InsightsPage() {
       </li>))}
     </ol>
   );
+  // 📊 구조화 데이터(2026-09-14) — 이 페이지에 **ld+json이 0개**였다. 인용·리치결과가 가장 잘 붙는 면인데 비어 있었다.
+  //   Dataset: AI·검색엔진이 "이건 인용 가능한 데이터셋"으로 인식하게 한다. 라이선스·갱신주기·출처를 명시한다.
+  const datasetLd = {
+    "@context": "https://schema.org", "@type": "Dataset",
+    name: "검증 후기로 본 한국 카페 지형",
+    description: `광고·협찬·무관 글을 걸러낸 공개 후기 ${s.tot.reviews.toLocaleString()}건으로 집계한 카페 데이터. 공개 카페 ${s.tot.pub.toLocaleString()}곳, 검증 등급 ${s.tot.v.toLocaleString()}곳.`,
+    url: `${SITE}/insights`, isAccessibleForFree: true, dateModified: new Date().toISOString().slice(0, 10),
+    creator: { "@type": "Organization", name: "동네 커피 노트", url: SITE },
+    temporalCoverage: new Date().toISOString().slice(0, 10),
+    variableMeasured: [
+      { "@type": "PropertyValue", name: "공개 카페 수", value: s.tot.pub },
+      { "@type": "PropertyValue", name: "검증 등급 카페 수", value: s.tot.v },
+      { "@type": "PropertyValue", name: "검증 통과 후기 수", value: s.tot.reviews },
+      ...(s.cautionTot ? [{ "@type": "PropertyValue", name: "주의점이 확인된 카페 수", value: s.cautionTot.with_c }] : []),
+    ],
+  };
+  const faqLd = {
+    "@context": "https://schema.org", "@type": "FAQPage",
+    mainEntity: [
+      { "@type": "Question", name: "이 숫자는 어떻게 집계했나요?",
+        acceptedAnswer: { "@type": "Answer", text: `네이버·구글·유튜브 공개 후기를 교차검증해 광고·협찬·영수증 리뷰와 다른 가게 이야기를 제거한 뒤 집계했습니다. 별점은 쓰지 않습니다. 기준일 ${upd}, 매일 갱신됩니다.` } },
+      ...(s.cautionTot?.with_c ? [{ "@type": "Question", name: "카페의 단점 정보도 있나요?",
+        acceptedAnswer: { "@type": "Answer", text: `있습니다. 판정한 ${s.cautionTot.judged.toLocaleString()}곳 중 ${s.cautionTot.with_c.toLocaleString()}곳에서 서로 다른 후기 2건 이상으로 확인된 주의점(주차 어려움·웨이팅·좌석 부족 등)을 찾아 표기합니다. 좋은 점만 적지 않습니다.` } }] : []),
+    ],
+  };
   return (
     <main className="min-h-screen bg-[#f4ece0] text-[#2b2018]" style={{ fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }}>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(datasetLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqLd) }} />
       <div className="max-w-2xl mx-auto px-5 py-10">
         <div className="text-[#7a5122] text-[11px] tracking-[0.25em] uppercase mb-1">동네 커피 노트 · 데이터 리포트</div>
         <h1 className="text-[26px] font-bold leading-tight mb-2">검증 후기로 본 카페 지형</h1>
@@ -71,6 +106,27 @@ export default async function InsightsPage() {
               <div className="text-[17px] font-bold">{v}</div><div className="text-[10.5px] text-[#7a5122] mt-1">{k}</div>
             </div>))}
         </div>
+
+        {/* ⚠️ 주의점 리포트(2026-09-14) — 우리만 만들 수 있는 숫자. 인용·백링크가 붙는 자리다.
+            메모리에 "유일한 실질 가속 = 백링크"라고 적혀 있다. 그 백링크를 만드는 게 이 섹션의 목적이다. */}
+        {s.cautionTop?.length > 0 && (
+          <section className="mb-8">
+            <h2 className="text-[17px] font-bold mb-1">⚠️ 후기가 말한 &lsquo;가기 전 알아둘 점&rsquo;</h2>
+            <p className="text-[12.5px] text-[#524234] leading-relaxed mb-2">
+              광고는 절대 말하지 않는 정보예요. 판정한 <b>{s.cautionTot.judged.toLocaleString()}곳</b> 중
+              <b> {s.cautionTot.with_c.toLocaleString()}곳({Math.round(s.cautionTot.with_c / Math.max(1, s.cautionTot.judged) * 100)}%)</b>에서
+              서로 다른 후기 2건 이상으로 확인된 주의점이 나왔어요.
+            </p>
+            <ol className="space-y-1.5">
+              {s.cautionTop.map((c: any, i: number) => (
+                <li key={c.label} className="flex items-center gap-2 text-[13.5px]">
+                  <span className="w-5 text-right font-bold text-[#82714f]">{i + 1}</span>
+                  <span className="text-[#2b2018]">{c.label}</span>
+                  <span className="ml-auto text-[#8a5a3a] font-bold">{c.n.toLocaleString()}곳</span>
+                </li>))}
+            </ol>
+          </section>
+        )}
 
         <section className="mb-8">
           <h2 className="text-[17px] font-bold mb-1">🏠 동네 단골 카페 vs 🧳 여행객 카페</h2>
