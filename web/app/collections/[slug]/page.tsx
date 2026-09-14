@@ -13,7 +13,7 @@ export const dynamicParams = false;
 
 const GRADE_BG: Record<string, string> = { 검증: "#5f7355", 참고: "#9c6b3f", 후보: "#7a6750" };
 
-type Row = { id: number; name: string; dong: string | null; grade: string | null; count: number | null; identity: string | null };
+type Row = { id: number; name: string; dong: string | null; grade: string | null; count: number | null; identity: string | null; cautions?: { label: string; emoji: string; count: number }[] | null };
 type Agg = { cafes: number; raw: number; verified: number; ad: number; branch: number };
 
 export function generateStaticParams() {
@@ -22,7 +22,7 @@ export function generateStaticParams() {
 
 async function getCafes(label: string, area: string, limit = 12): Promise<Row[]> {
   try {
-    return (await sql`SELECT id, name, dong, synth_grade AS grade, synth_count AS count, synth_identity AS identity
+    return (await sql`SELECT id, name, dong, synth_grade AS grade, synth_count AS count, synth_identity AS identity, cautions
       FROM cafes WHERE published AND synth_grade='검증' AND area=${area} AND regexp_replace(dong, '[0-9]+가$', '')=${label}
       ORDER BY synth_count DESC NULLS LAST LIMIT ${limit}`) as unknown as Row[];
   } catch { return []; }
@@ -115,6 +115,10 @@ export default async function CollectionPage({ params }: { params: Promise<{ slu
                     {cf.grade && <span className="text-[10px] font-bold text-white px-1.5 py-0.5 rounded ml-auto shrink-0" style={{ background: GRADE_BG[cf.grade] || "#7a6750" }}>{cf.grade}</span>}
                   </div>
                   {cf.identity && <p className="text-[12.5px] text-[#524234] leading-snug mt-1.5 line-clamp-2 pl-7">{cf.identity}</p>}
+                  {/* ⚠️ 이건 알고 가세요 — 목록에서도 단점을 먼저 말한다(2026-09-14). */}
+                  {Array.isArray(cf.cautions) && cf.cautions.length > 0 && (
+                    <p className="text-[11px] font-bold text-[#8a5a3a] mt-1 pl-7">⚠️ {cf.cautions.slice(0, 2).map((x) => `${x.emoji} ${x.label}`).join(" · ")} <span className="font-normal text-[#54432c]">· 후기에서 확인</span></p>
+                  )}
                 </Link>
               </li>
             ))}

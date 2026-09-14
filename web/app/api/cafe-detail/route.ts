@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
     // 감사수리: published 조건 없이 비공개 카페 리뷰가 새던 누수 차단
     // 💰 2026-08-22: 두 배열을 **둘 다** 받아놓고 실제로는 `all ?? top6` 하나만 썼다(카페당 1,290B 낭비).
     //   COALESCE로 하나만 받는다 — 결과 동일, 전송 7,470B → 6,180B(-17%).
-    const rows = await sql`SELECT name, area, dong, COALESCE(synth_reviews_all, synth_reviews) AS synth_reviews_all, synth_quality, llm_judged_at, reputation_note FROM cafes WHERE id=${idNum} AND published=true LIMIT 1`;
+    const rows = await sql`SELECT name, area, dong, COALESCE(synth_reviews_all, synth_reviews) AS synth_reviews_all, synth_quality, llm_judged_at, reputation_note, cautions FROM cafes WHERE id=${idNum} AND published=true LIMIT 1`;
     if (!rows[0]) return NextResponse.json({ ok: false, error: "카페를 찾을 수 없어요" }, { status: 404 });
     // 전체보기용: synth_reviews_all(옥석 전체) 우선, 없으면 기존 top6
     const raw = (rows[0]?.synth_reviews_all ?? []) as any[];
@@ -27,7 +27,9 @@ export async function GET(req: NextRequest) {
     const llmJudged = !!rows[0]?.llm_judged_at;
     // 옥석 리뷰에서 소비자가 꼭 볼 구체 포인트를 빈도로 추출(데이터 기반 핵심)
     const highlights = extractHighlights((Array.isArray(reviews) ? reviews : []).map((r: any) => r?.quote || ""));
-    return NextResponse.json({ ok: true, area: rows[0]?.area ?? null, reviews, quality, llmJudged, highlights, reputationNote: rows[0]?.reputation_note ?? null }, {
+    // ⚠️ "이건 알고 가세요" — 지도·홈에서 여는 상세 패널에도 근거 문장까지 그대로 내려준다(작은 jsonb 1개).
+    const cautions = Array.isArray(rows[0]?.cautions) ? rows[0].cautions : [];
+    return NextResponse.json({ ok: true, area: rows[0]?.area ?? null, reviews, quality, llmJudged, highlights, cautions, reputationNote: rows[0]?.reputation_note ?? null }, {
       headers: { "Cache-Control": "public, max-age=0, must-revalidate" },
     });
   } catch {

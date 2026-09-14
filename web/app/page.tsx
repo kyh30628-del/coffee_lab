@@ -25,14 +25,14 @@ type Cafe = {
   vibe: string; note: string; tone: string; photo_url: string | null;
   acidity: number; body: number; sweet: number;
   om?: number; // 🏅 사장님이 직접 관리 중(구독·체험 유효) — /api/cafes가 해당 카페에만 넣어준다
-  synth_grade: string | null; synth_identity: string | null;
+  synth_grade: string | null; synth_identity: string | null; cau?: string;
   synth_count: number | null; synth_reviews?: EvidenceReview[] | null;
   char_scores?: Record<string, number> | null;
   featured?: boolean;
 };
-type DCafe = { id: number; name: string; area: string; lat: number; lng: number; grade: string | null; count: number | null; identity: string | null; note: string | null; beanNote: string[]; reason?: string; isNew?: boolean };
+type DCafe = { id: number; name: string; area: string; lat: number; lng: number; grade: string | null; count: number | null; identity: string | null; note: string | null; beanNote: string[]; reason?: string; isNew?: boolean; cau?: string };
 type Discover = { headlineA: DCafe | null; headlineB: DCafe | null; headlineAList?: DCafe[]; headlineBList?: DCafe[]; themeB?: { emoji: string; label: string } | null; top3: DCafe[]; fresh: DCafe[]; specialty: DCafe[]; featured?: DCafe[]; scopeCount: number };
-type SearchResult = { id: number; name: string; area: string; grade: string | null; count: number | null; identity: string | null; score: number; reasons: string[] };
+type SearchResult = { id: number; name: string; area: string; grade: string | null; count: number | null; identity: string | null; score: number; reasons: string[]; cau?: string };
 type Place = { name: string; lat: number; lng: number; kind: string; label: string; icon: string };
 type SearchRes = { ok: boolean; region: string; q: string; concepts: string[]; count: number; results: SearchResult[]; coverageNote?: string; franchiseNote?: string; places?: Place[]; regionAlts?: string[]; nearPlace?: Place };
 const SEARCH_EXAMPLES = ["비 오는 날 혼자 조용히", "감성 사진 데이트", "노트북 작업하기 좋은", "산미 또렷한 커피", "빵 맛있는 집"];
@@ -156,6 +156,14 @@ const TONE_GRADIENTS = [
 
 // 홈 잡지 카드 — 모듈 스코프(컴포넌트 내부 정의 금지). 내부에 두면 렌더마다 재마운트되어 뒤로가기/탭전환이 느려짐.
 // 2026-07-25: 높이 압축 피드백 — 패딩·폰트·여백 축소, identity 2줄→1줄.
+// ⚠️ "이건 알고 가세요" 한 줄 — **단일 출처**. 홈 카드·지도 목록·검색 결과가 같은 모양으로 그린다.
+//   2026-09-14: 처음엔 지역 페이지와 상세에만 달아 CEO가 "도대체 어디에 표기되는 거야"라고 물었다.
+//   같은 실수가 사장님 배지(lib/ownerManaged.ts)에서 이미 한 번 났었다 — 그래서 이번엔 렌더러를 하나로 둔다.
+function CautionLine({ cau, size = 11 }: { cau?: string | null; size?: number }) {
+  if (!cau) return null;
+  return <p className="font-bold text-[#8a5a3a] mt-1" style={{ fontSize: size }}>⚠️ {cau} <span className="font-normal text-[#54432c]">· 후기에서 확인</span></p>;
+}
+
 const HeadlineCard = memo(function HeadlineCard({ c, kicker, tone, onOpen, featured = false }: { c: DCafe; kicker: string; tone: number; onOpen: (id: number) => void; featured?: boolean }) {
   // 📓 2026-09-12 "한 권의 노트": 카드 = 테이프로 붙인 종이. 이름은 명조, 판정 한 줄만 손글씨, 등급은 작은 도장.
   //   배치(제목 줄 → 이름·배지 → 지역·리뷰 → 판정 → 원두 노트 태그)는 그대로.
@@ -176,6 +184,7 @@ const HeadlineCard = memo(function HeadlineCard({ c, kicker, tone, onOpen, featu
         {c.grade && <div className={`nt-stamp ${featured ? "sm" : "xs"} ${stamp}`} aria-label={`등급 ${c.grade}`}>{c.grade}{featured && <small>VERIFIED</small>}</div>}
       </div>
       {c.identity && <p className={`nt-hand text-[#2f3550] line-clamp-1 mb-1.5 ${featured ? "" : "sm"}`} style={{ lineHeight: featured ? "30px" : "26px" }}>{featured ? <span className="nt-hl">{c.identity}</span> : c.identity}</p>}
+      <CautionLine cau={c.cau} size={featured ? 12 : 11} />
       {c.beanNote.length > 0 && <div className="flex flex-wrap gap-1.5">{c.beanNote.map((b) => <span key={b} className="nt-chip" style={{ height: 22, fontSize: 11.5 }}>{b}</span>)}</div>}
     </button>
   );
@@ -2281,6 +2290,7 @@ export default function Home() {
                         </div>
                         <div className="text-[11px] text-[#54432c]">{c.area}{c.dong ? ` ${c.dong}` : ""} · {Math.round(d)}m · 리뷰 {c.synth_count ?? 0}</div>
                         {c.synth_identity && <p className="text-[12px] text-[#5a4a38] leading-relaxed mt-1.5 line-clamp-2">{c.synth_identity}</p>}
+                        <CautionLine cau={c.cau} size={11} />
                       </button>
                     ))}
                   </div>
@@ -2604,6 +2614,7 @@ export default function Home() {
                               <span className="text-[10px] text-[#54432c] ml-auto">{r.area} · 리뷰 {r.count ?? 0}</span>
                             </div>
                             {r.identity && <p className="text-[11px] text-[#524234] line-clamp-1 mb-1">{r.identity}</p>}
+                            <CautionLine cau={r.cau} size={10.5} />
                             {r.reasons.length > 0 && <div className="text-[10px] text-[#b08440]">🔎 {r.reasons.join(" · ")}</div>}
                           </button>
                         ))}
@@ -2809,10 +2820,11 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
   const [reviewFilter, setReviewFilter] = useState<"all" | "verified" | "reference" | "ai" | "youtube">("all");
   const [userReviews, setUserReviews] = useState<{ memory: string; photos: string[]; favorite: boolean; date: string }[]>([]); // 공개 방문자 후기
   const [highlights, setHighlights] = useState<{ label: string; emoji: string; count: number }[]>([]); // 옥석 리뷰 데이터 핵심
+  const [cautions, setCautions] = useState<{ label: string; emoji: string; count: number; quote?: string }[]>([]); // ⚠️ 이건 알고 가세요
   const [reputationNote, setReputationNote] = useState<string | null>(null);
   useEffect(() => {
     let live = true; setLoadingRev(true); setPromo(null); setUserReviews([]); setHighlights([]); setReputationNote(null);
-    fetch(`/api/cafe-detail?id=${cafe.id}`).then((r) => r.json()).then((d) => { if (live) { setReviews(d.reviews ?? []); setQuality(d.quality ?? null); setLlmJudged(!!d.llmJudged); setHighlights(d.highlights ?? []); setReputationNote(d.reputationNote ?? null); setLoadingRev(false); } }).catch(() => { if (live) setLoadingRev(false); });
+    fetch(`/api/cafe-detail?id=${cafe.id}`).then((r) => r.json()).then((d) => { if (live) { setReviews(d.reviews ?? []); setQuality(d.quality ?? null); setLlmJudged(!!d.llmJudged); setHighlights(d.highlights ?? []); setCautions(d.cautions ?? []); setReputationNote(d.reputationNote ?? null); setLoadingRev(false); } }).catch(() => { if (live) setLoadingRev(false); });
     fetch(`/api/owner-promo?cafeId=${cafe.id}`).then((r) => r.json()).then((d) => { if (live && d.promo && (d.promo.ai_headline || d.promo.video_url)) { setPromo(d.promo); trackPromo(cafe.id, "view"); } }).catch(() => {});
     fetch(`/api/cafe-reviews?cafeId=${cafe.id}`).then((r) => r.json()).then((d) => { if (live && d.ok) setUserReviews(d.reviews ?? []); }).catch(() => {});
     return () => { live = false; };
@@ -2930,6 +2942,16 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
           )}
           <div className="text-[#63523f] text-sm mb-3 relative">{cafe.area} · {cafe.vibe}</div>
           {cafe.note && <p className="text-[15px] text-[#2a1f17] font-medium leading-relaxed mb-4 relative">"{cafe.note}"</p>}
+          {/* ⚠️ 이건 알고 가세요 — 후기 2건 이상에서 확인된 주의점 + 손님이 쓴 근거 문장. */}
+          {cautions.length > 0 && (
+            <div className="nt-ruled mb-3 relative">
+              <div className="nt-sec">이건 알고 가세요</div>
+              <div className="nt-chips">
+                {cautions.map((x) => <span key={x.label} className="nt-chip">{x.emoji} {x.label}<b>{x.count}</b></span>)}
+              </div>
+              {cautions[0]?.quote && <p className="text-[12px] text-[#63523f] mt-1.5">손님 말: <span className="text-[#2a1f17]">“…{cautions[0].quote}…”</span></p>}
+            </div>
+          )}
           {/* ⭐ 한눈에 판단 — 전체 카페 대비 강점/아쉬운점(리뷰 옥석 보기 전 직관 판단의 핵심) */}
           {/* 📊 리뷰 데이터 분석 — 옥석 후기 핵심(가장 먼저 눈에 띄게, 구미 당기는 hook) */}
           {(highlights.length > 0 || cafe.synth_identity) && (

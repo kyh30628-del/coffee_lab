@@ -19,7 +19,7 @@ export const metadata: Metadata = {
 async function getNew() {
   try {
     return (await sql`
-      SELECT id, name, area, dong, synth_grade, synth_count, synth_identity,
+      SELECT id, name, area, dong, synth_grade, synth_count, synth_identity, cautions,
         (created_at AT TIME ZONE 'Asia/Seoul')::date AS found_on
       FROM cafes WHERE published AND created_at > now() - interval '30 days'
       ORDER BY created_at DESC LIMIT 300`) as any[];
@@ -65,6 +65,10 @@ export default async function NewCafesPage() {
                   <span className="flex flex-col text-left min-w-0">
                     <span className="text-[13.5px] font-bold text-[#3d2f22] truncate">{c.name}</span>
                     <span className="text-[10.5px] text-[#544636] truncate">{[c.dong, c.synth_identity].filter(Boolean).join(" · ").slice(0, 46)}</span>
+                    {/* ⚠️ 이건 알고 가세요 — 목록에서도 단점을 먼저 말한다(2026-09-14). */}
+                    {Array.isArray((c as any).cautions) && (c as any).cautions.length > 0 && (
+                      <span className="text-[10.5px] font-bold text-[#8a5a3a] truncate">⚠️ {(c as any).cautions.slice(0, 2).map((x: any) => x.label).join(" · ")}</span>
+                    )}
                   </span>
                   {c.synth_grade && <span className="ml-auto text-[10px] font-bold bg-[#2b2018] text-[#e8b87a] px-2 py-0.5 rounded-full whitespace-nowrap">{c.synth_grade}</span>}
                 </Link>

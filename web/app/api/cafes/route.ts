@@ -55,7 +55,7 @@ export async function GET() {
     const cafes = await sql`
       SELECT c.id, c.name, c.area, c.dong, c.lat, c.lng, c.vibe, c.note, c.signature,
              c.synth_grade, c.synth_count, c.synth_identity, c.char_scores,
-             c.visitor_n, c.visitor_trip, c.visitor_local,
+             c.visitor_n, c.visitor_trip, c.visitor_local, c.cautions,
              COALESCE(p.featured AND p.approved AND (p.featured_until IS NULL OR p.featured_until > now()), false) AS featured,
              COALESCE(dt.is_tourist, false) AS dong_tourist
       FROM cafes c
@@ -90,6 +90,13 @@ export async function GET() {
       // "D" = 관광지로 알려진 동네(언론 보도 기준·동 단위 판정 — CEO 08-25 "후기 말투가 아니라 공개된 사실로").
       if (c.dong_tourist) vb += "D";
       if (vb) o.vb = vb;
+      // ⚠️ "이건 알고 가세요"(2026-09-14) — 지도·목록 카드에도 붙인다.
+      //   ⚠️ 이 응답은 공개 전량(약 26,700곳·2.51MB)이라 jsonb를 통째로 실으면 안 된다.
+      //   라벨 2개만 "·"로 이어 **짧은 문자열 1개**로 보낸다(있는 카페에만 키 추가 → 없는 곳은 낭비 0).
+      if (Array.isArray(c.cautions) && c.cautions.length) {
+        const cau = c.cautions.slice(0, 2).map((x: any) => String(x?.label ?? "")).filter(Boolean).join("·");
+        if (cau) o.cau = cau;
+      }
       if (owned.has(Number(c.id))) o.om = 1; // 🏅 사장님이 직접 관리 중(구독·체험 유효). 해당 카페에만 키를 넣어 페이로드 낭비 0
       return o;
     });
