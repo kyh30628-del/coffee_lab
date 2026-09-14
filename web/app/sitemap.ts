@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 import { sql } from "@/lib/db";
-import { getRegions, getDongs, getRegionTasteCounts, TASTES } from "@/lib/seoData";
+import { getRegions, getDongs, getRegionTasteCounts, getRegionFacetCounts, TASTES } from "@/lib/seoData";
+import { FACET_PAGES, FACET_MIN_CAFES } from "@/lib/facetPages";
 import { COLLECTIONS } from "@/lib/collections";
 
 export const runtime = "nodejs";
@@ -37,6 +38,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     TASTES.filter((t) => (tasteCounts[`${r.area}|${t.key}`] ?? 0) >= 5)
       .map((t) => ({ url: `${SITE}/area/${encodeURIComponent(r.area)}/${t.key}`, changeFrequency: "weekly" as const, priority: 0.6 }))
   );
+  // 🅿️ 시설축(결재 #1083 1단계, 2026-09-14) — "목동 주차 가능한 카페"처럼 사람들이 실제로 치는 형태.
+  //   데이터는 원래 있었는데(cafes.facets) URL이 없어 노출이 0이었다. 지역×취향과 같은 기준(5곳 이상)만 제출한다.
+  //   ⚠️ 크롤 예산이 유일한 실질 리스크다(현재 12,069개가 '발견됐지만 크롤 대기').
+  //      그래서 **1단계는 시설축만** 올리고 2주 관찰 후 동×취향을 연다 — 한 번에 5,950개를 열지 않는다.
+  const facetCounts = await getRegionFacetCounts();
+  const facetUrls: MetadataRoute.Sitemap = regions.flatMap((r) =>
+    FACET_PAGES.filter((f) => (facetCounts[`${r.area}|${f.label}`] ?? 0) >= FACET_MIN_CAFES)
+      .map((f) => ({ url: `${SITE}/area/${encodeURIComponent(r.area)}/f/${f.slug}`, changeFrequency: "weekly" as const, priority: 0.62 }))
+  );
   // 동(洞) 단위 — "정자동 카페"처럼 실검색행태에 가장 가까운 단위(카페 5곳↑ 동만, 얇은 콘텐츠 방지)
   const dongs = await getDongs();
   const dongUrls: MetadataRoute.Sitemap = dongs.map((d) => ({
@@ -57,6 +67,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...tasteUrls,
     ...regionUrls,
     ...regionTasteUrls,
+    ...facetUrls,
     ...dongUrls,
     ...cafeUrls,
   ];

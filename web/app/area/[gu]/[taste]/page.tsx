@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Curated from "../../Curated";
-import { getRegions, getRegionTasteCafes, getRegionTasteCount, getRegionTasteStats, getRegionTasteCounts, getRegionTasteGradeBreakdown, areaAliases, TASTES, tasteByKey, SITE, TASTE_MIN_HITS, TASTE_MIN_RATE_PCT } from "@/lib/seoData";
+import { getRegions, getRegionTasteCafes, getRegionTasteCount, getRegionTasteStats, getRegionTasteCounts, getRegionTasteGradeBreakdown, getRegionFacetCounts, areaAliases, TASTES, tasteByKey, SITE, TASTE_MIN_HITS, TASTE_MIN_RATE_PCT } from "@/lib/seoData";
+import { FACET_PAGES } from "@/lib/facetPages";
 
 export const revalidate = 2592000; // ISR 30일 — 새벽 절전(2026-09-09). 무효화는 온디맨드.
 
@@ -59,10 +60,13 @@ export default async function RegionTastePage({ params }: Props) {
   if (!t) notFound();
   // 🧭 동선 데이터(2026-08-15): 전 지역×테마 카운트 1회 조회로 ①이 지역의 테마별 개수(빈 칩 숨김)
   //   ②같은 테마 다른 동네 링크를 동시에 만든다. 집계 1회·작은 컬럼뿐, ISR 30분 캐시라 부하 무시 수준.
-  const [cafes, regions, total, grades, allCounts] = await Promise.all([
+  const [cafes, regions, total, grades, allCounts, allFacetCounts] = await Promise.all([
     getRegionTasteCafes(area, taste, 30), getRegions(), getRegionTasteCount(area, taste),
-    getRegionTasteGradeBreakdown(area, taste), getRegionTasteCounts(),
+    getRegionTasteGradeBreakdown(area, taste), getRegionTasteCounts(), getRegionFacetCounts(),
   ]);
+  //   🅿️ 시설 칩(2026-09-14) — 취향으로 들어온 사람도 "주차 되는 곳"으로 좁힐 수 있게 같은 줄에 둔다.
+  const facetCounts: Record<string, number> = {};
+  for (const x of FACET_PAGES) facetCounts[x.slug] = allFacetCounts[`${area}|${x.label}`] ?? 0;
   const tasteCounts: Record<string, number> = {};
   for (const t of TASTES) tasteCounts[t.key] = allCounts[`${area}|${t.key}`] ?? 0;
   // 같은 테마 보유량이 많은 다른 동네 순 — 빈 페이지로 보내지 않도록 5곳 이상만(sitemap 기준과 동일).
@@ -79,5 +83,5 @@ export default async function RegionTastePage({ params }: Props) {
   const aliasIntro = t.aliases.slice(0, 2).join("·");
   const areaBare = areaAliases(area)[0] || area;
   const intro = `${areaBare} ${aliasIntro} 찾으시나요? ${area}에서 ${t.desc} 카페 ${total || cafes.length}곳. 후기에 ${t.short} 이야기가 ${TASTE_MIN_HITS}건 이상, 그 카페 전체 후기의 ${TASTE_MIN_RATE_PCT}% 이상 나온 곳만 골랐어요.`;
-  return <Curated area={area} tasteKey={taste} tasteLabel={t.short} tasteEmoji={t.emoji} heading={heading} intro={intro} cafes={cafes} regions={regions} grades={grades} tasteCounts={tasteCounts} sameTasteNearby={sameTasteNearby} canonical={`${SITE}/area/${encodeURIComponent(area)}/${taste}`} />;
+  return <Curated area={area} tasteKey={taste} tasteLabel={t.short} tasteEmoji={t.emoji} heading={heading} intro={intro} cafes={cafes} regions={regions} grades={grades} tasteCounts={tasteCounts} sameTasteNearby={sameTasteNearby} facetCounts={facetCounts} canonical={`${SITE}/area/${encodeURIComponent(area)}/${taste}`} />;
 }

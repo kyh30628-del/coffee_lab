@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { TASTES, SITE, type SeoCafe, type GradeBreakdown } from "@/lib/seoData";
 import { standoutBadges } from "@/lib/standoutBadge";
+import { FACET_PAGES } from "@/lib/facetPages";
 import { visitorBadges } from "@/lib/visitorMix";
 import KakaoShare from "../KakaoShare";
 import RecentCafes from "../RecentCafes";
@@ -12,20 +13,23 @@ const GRADE_BG: Record<string, string> = { 검증: "#5f7355", 참고: "#9c6b3f",
 // 🔌 work_facts 키 → 화면 라벨(lib/workDetail.ts RULES와 1:1).
 const WORK_FACT: Record<string, string> = { outlet: "🔌 콘센트 언급", wifi: "📶 와이파이 언급", desk: "🪑 작업 자리 언급" };
 
-export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, heading, intro, cafes, regions = [], grades, canonical, backHref = "/area", backLabel = "지역별 카페", showTasteNav = true, crossLinks, crossLinksLabel = "다른 동네도 둘러보기", extra, tasteCounts, sameTasteNearby = [] }: {
+export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, heading, intro, cafes, regions = [], grades, canonical, backHref = "/area", backLabel = "지역별 카페", showTasteNav = true, crossLinks, crossLinksLabel = "다른 동네도 둘러보기", extra, tasteCounts, sameTasteNearby = [], facetSlug, facetCounts }: {
   area: string; tasteKey?: string; tasteLabel?: string; tasteEmoji?: string; heading: string; intro: string; cafes: SeoCafe[]; regions?: { area: string; n: number }[]; grades?: GradeBreakdown; canonical: string;
   backHref?: string; backLabel?: string; showTasteNav?: boolean; crossLinks?: { label: string; href: string }[]; crossLinksLabel?: string; extra?: React.ReactNode;
   /** 이 지역의 테마별 카페 수 — 빈 테마 칩을 숨겨 '눌렀더니 빈 페이지' 이탈을 막는다(2026-08-15). */
   tasteCounts?: Record<string, number>;
   /** 같은 테마를 유지한 인근 지역 링크 — 기존 크로스링크는 테마를 잃어버려 맥락이 끊겼다. */
   sameTasteNearby?: { area: string; n: number }[];
+  /** 🅿️ 시설축 페이지(결재 #1083) — 지금 보고 있는 시설 slug와 이 지역의 시설별 카페 수. */
+  facetSlug?: string;
+  facetCounts?: Record<string, number>;
 }) {
   // 🧭 BreadcrumbList(2026-08-13, 구글 채널 강화) — 구글이 검색결과에 계층 경로를 표시하고
   //   사이트 구조를 이해하는 근거. 테마 페이지는 홈>지역>테마, 동/지역 페이지는 홈>지역 2단.
   const crumbs = [
     { name: "동네 커피 노트", url: SITE },
     { name: `${area} 카페`, url: `${SITE}/area/${encodeURIComponent(area)}` },
-    ...(tasteKey && tasteLabel ? [{ name: `${area} ${tasteLabel} 카페`, url: canonical }] : []),
+    ...((tasteKey || facetSlug) && tasteLabel ? [{ name: `${area} ${tasteLabel} 카페`, url: canonical }] : []),
   ];
   const breadcrumbLd = {
     "@context": "https://schema.org", "@type": "BreadcrumbList",
@@ -84,6 +88,19 @@ export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, headin
             <li>🕒 <b>{factLine}</b></li>
           </ul>
         </div>
+
+        {/* 🅿️ 시설로 좁혀보기(2026-09-14) — 주차·단체·심야처럼 '가기 전에 확인해야 하는 것'.
+            데이터는 원래 있었는데 URL이 없어 검색에 안 잡혔다. 값이 5곳 이상인 시설만 보여준다. */}
+        {facetCounts && Object.values(facetCounts).some((n) => n >= 5) && (
+          <div className="flex flex-wrap gap-1.5 mb-5">
+            {FACET_PAGES.filter((f) => (facetCounts[f.slug] ?? 0) >= 5).slice(0, 12).map((f) => (
+              <Link key={f.slug} href={`/area/${encodeURIComponent(area)}/f/${f.slug}`}
+                className={`text-[12px] px-2.5 py-1 rounded-full border ${facetSlug === f.slug ? "bg-[#2b2018] text-[#f4ece0] border-[#2b2018]" : "bg-white text-[#524234] border-[#d9c9b0]"}`}>
+                {f.emoji} {f.title} <span className="opacity-60">{facetCounts[f.slug]}</span>
+              </Link>
+            ))}
+          </div>
+        )}
 
         {/* 후기 근거 요약 — 등급 분포로 검증 신뢰도를 투명하게 표시(콘텐츠 밀도 보강) */}
         {tasteKey && grades && (grades.verified + grades.ref + grades.candidate) > 0 && (

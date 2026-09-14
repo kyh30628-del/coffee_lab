@@ -253,3 +253,39 @@ export function areaAliases(area: string): string[] {
   push(area.replace(/(특별시|광역시|시|군|구)$/, ""));                  // 안산시 → 안산
   return out;
 }
+
+
+// 🅿️ 시설축 페이지용 조회 — 결재 #1083 1단계(2026-09-14).
+//   취향(char_scores)과 달리 패싯은 이미 라벨 배열(cafes.facets)로 저장돼 있어 조건이 단순하다.
+//   ⚠️ facets에 GIN 인덱스가 있어야 한다(preflight의 '시설 패싯' 뜨거운 쿼리로 감시 중).
+export async function getRegionFacetCafes(area: string, label: string, limit = 30): Promise<SeoCafe[]> {
+  try {
+    return withOwnerBadge((await sql`SELECT id, name, dong, synth_grade AS grade, synth_count AS count, synth_identity AS identity, char_scores, visitor_n, visitor_trip, visitor_local, work_facts, cautions,
+      (SELECT left(r->>'quote', 70) FROM jsonb_array_elements(COALESCE(synth_reviews,'[]'::jsonb)) r
+        WHERE COALESCE(r->>'quote','') <> '' ORDER BY COALESCE((r->>'score')::int,0) DESC LIMIT 1) AS quote
+      FROM cafes WHERE published AND area=${area} AND facets @> ARRAY[${label}]::text[]
+      ORDER BY (synth_grade='검증') DESC, synth_count DESC NULLS LAST LIMIT ${limit}`) as unknown as SeoCafe[]);
+  } catch { return []; }
+}
+export async function getRegionFacetCount(area: string, label: string): Promise<number> {
+  try { const r = (await sql`SELECT count(*)::int n FROM cafes WHERE published AND area=${area} AND facets @> ARRAY[${label}]::text[]`) as unknown as { n: number }[]; return r[0]?.n ?? 0; } catch { return 0; }
+}
+/** 전 지역×패싯 카운트 1회 — 칩 표시와 사이트맵이 같은 값을 쓰게 한다(표시와 목록이 어긋나던 과거 버그 방지). */
+export async function getRegionFacetCounts(): Promise<Record<string, number>> {
+  try {
+    const rows = (await sql`SELECT area, f AS label, count(*)::int n FROM cafes, unnest(facets) f
+      WHERE published AND area IS NOT NULL AND facets IS NOT NULL GROUP BY area, f HAVING count(*) >= 5`) as unknown as { area: string; label: string; n: number }[];
+    const out: Record<string, number> = {};
+    for (const r of rows) out[`${r.area}|${r.label}`] = Number(r.n);
+    return out;
+  } catch { return {}; }
+}
+export async function getRegionFacetGradeBreakdown(area: string, label: string): Promise<GradeBreakdown> {
+  try {
+    const rows = (await sql`SELECT synth_grade AS grade, count(*)::int n FROM cafes
+      WHERE published AND area=${area} AND facets @> ARRAY[${label}]::text[] GROUP BY 1`) as unknown as { grade: string; n: number }[];
+    const g = { verified: 0, ref: 0, candidate: 0 };
+    for (const r of rows) { if (r.grade === "검증") g.verified = r.n; else if (r.grade === "참고") g.ref = r.n; else g.candidate += r.n; }
+    return g;
+  } catch { return { verified: 0, ref: 0, candidate: 0 }; }
+}
