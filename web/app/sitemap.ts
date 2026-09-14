@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 import { sql } from "@/lib/db";
-import { getRegions, getDongs, getRegionTasteCounts, getRegionFacetCounts, getDongTasteCounts, TASTES } from "@/lib/seoData";
+import { getRegions, getDongs, getRegionTasteCounts, getRegionFacetCounts, getDongTasteCounts, getDongFacetCounts, TASTES } from "@/lib/seoData";
 import { FACET_PAGES, FACET_MIN_CAFES } from "@/lib/facetPages";
 import { COLLECTIONS } from "@/lib/collections";
 
@@ -61,6 +61,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     .filter(([, n]) => n >= 5)
     .map(([k]) => { const [a, d, t] = k.split("|");
       return { url: `${SITE}/area/${encodeURIComponent(a)}/dong/${encodeURIComponent(d)}/${t}`, changeFrequency: "weekly" as const, priority: 0.6 }; });
+  // 🅿️🏘️ 동×시설(2026-09-14) — 경쟁사가 1위인 자리가 정확히 이 형태다("목동 주차 가능한 카페").
+  //   실측 369개뿐(주차 142·수제베이킹 66·데이트 39…)이고 ISR 30일이라 하루 12회 재생성. 사실상 공짜.
+  const dongFacetCounts = await getDongFacetCounts();
+  const facetLabels = new Set(FACET_PAGES.map((f) => f.label));
+  const slugByLabel = new Map(FACET_PAGES.map((f) => [f.label, f.slug]));
+  const dongFacetUrls: MetadataRoute.Sitemap = Object.entries(dongFacetCounts)
+    .filter(([k, n]) => n >= FACET_MIN_CAFES && facetLabels.has(k.split("|")[2]))
+    .map(([k]) => { const [a, d, label] = k.split("|");
+      return { url: `${SITE}/area/${encodeURIComponent(a)}/dong/${encodeURIComponent(d)}/f/${slugByLabel.get(label)}`, changeFrequency: "weekly" as const, priority: 0.63 }; });
   // 동네 교차검증 컬렉션(에디토리얼 SEO 랜딩) — lib/collections.ts 레지스트리 단일출처.
   const collectionUrls: MetadataRoute.Sitemap = COLLECTIONS.map((c) => ({
     url: `${SITE}/collections/${c.slug}`, changeFrequency: "weekly", priority: 0.85,
@@ -79,6 +88,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...facetUrls,
     ...dongUrls,
     ...dongTasteUrls,
+    ...dongFacetUrls,
     ...cafeUrls,
   ];
 }

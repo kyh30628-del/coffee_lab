@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Curated from "../../../Curated";
-import { getDongsInArea, getDongCafes, getDongPublishedCount, getDongTasteCounts, TASTES, SITE } from "@/lib/seoData";
+import { getDongsInArea, getDongCafes, getDongPublishedCount, getDongTasteCounts, getDongFacetCounts, TASTES, SITE } from "@/lib/seoData";
+import { FACET_PAGES, FACET_MIN_CAFES } from "@/lib/facetPages";
 
 export const revalidate = 2592000; // ISR 30일 — 새벽 절전(2026-09-09). 무효화는 온디맨드.
 
@@ -34,9 +35,12 @@ export default async function DongPage({ params }: Props) {
   const { gu, dong } = await params;
   const area = decodeURIComponent(gu);
   const d = decodeURIComponent(dong);
-  const [cafes, siblings, total, dongTasteCounts] = await Promise.all([
-    getDongCafes(area, d, 30), getDongsInArea(area), getDongPublishedCount(area, d), getDongTasteCounts(),
+  const [cafes, siblings, total, dongTasteCounts, dongFacetCounts] = await Promise.all([
+    getDongCafes(area, d, 30), getDongsInArea(area), getDongPublishedCount(area, d), getDongTasteCounts(), getDongFacetCounts(),
   ]);
+  //   🅿️ 이 동네의 시설별 페이지 링크(2026-09-14) — "목동 주차 가능한 카페"로 들어올 자리.
+  const facetLinks = FACET_PAGES.filter((f) => (dongFacetCounts[`${area}|${d}|${f.label}`] ?? 0) >= FACET_MIN_CAFES)
+    .map((f) => ({ label: `${f.emoji} ${d} ${f.title} ${dongFacetCounts[`${area}|${d}|${f.label}`]}`, href: `/area/${encodeURIComponent(area)}/dong/${encodeURIComponent(d)}/f/${f.slug}` }));
   //   🏘️ 이 동네의 취향별 페이지 링크(2026-09-14) — 5곳 이상인 것만. 내부 링크가 있어야 크롤러가 타고 들어간다.
   const tasteLinks = TASTES.filter((t) => (dongTasteCounts[`${area}|${d}|${t.key}`] ?? 0) >= 5)
     .map((t) => ({ label: `${t.emoji} ${d} ${t.short} ${dongTasteCounts[`${area}|${d}|${t.key}`]}`, href: `/area/${encodeURIComponent(area)}/dong/${encodeURIComponent(d)}/${t.key}` }));
@@ -54,8 +58,8 @@ export default async function DongPage({ params }: Props) {
       backHref={`/area/${encodeURIComponent(area)}`}
       backLabel={`${area} 전체`}
       showTasteNav={false}
-      crossLinks={tasteLinks.length ? [...tasteLinks, ...crossLinks] : crossLinks}
-      crossLinksLabel={tasteLinks.length ? `${d} 취향별로 보기 · ${area}의 다른 동네` : `${area}의 다른 동네도 둘러보기`}
+      crossLinks={[...tasteLinks, ...facetLinks, ...crossLinks]}
+      crossLinksLabel={tasteLinks.length || facetLinks.length ? `${d} 취향·시설별로 보기 · ${area}의 다른 동네` : `${area}의 다른 동네도 둘러보기`}
     />
   );
 }

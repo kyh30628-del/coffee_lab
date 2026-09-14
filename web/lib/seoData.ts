@@ -354,3 +354,31 @@ export function josa(word: string, pair: "을/를" | "이/가" | "은/는" | "�
   if (pair === "으로/로") return jong === 0 || jong === 8 ? withoutJong : withJong;  // ㄹ 받침은 '로'
   return jong === 0 ? withoutJong : withJong;
 }
+
+
+// 🅿️🏘️ 동×시설 — 결재 #1083 확장(CEO 2026-09-14 "동단위로 열었으면 좋겠는데 비용이 많이 들어?").
+//   실측 답: 369개뿐이고(주차 142·수제베이킹 66·데이트 39…) 목록 쿼리는 인덱스를 탄다(비용 8.32).
+//   ISR 30일이라 하루 12회 재생성 = 약 37쿼리/일. 사실상 공짜다.
+//   왜 필요한가: 경쟁사가 1위인 자리가 정확히 "{동네} {시설} 카페"("목동 주차 가능한 카페")다.
+export async function getDongFacetCafes(area: string, dong: string, label: string, limit = 30): Promise<SeoCafe[]> {
+  try {
+    return withOwnerBadge((await sql`SELECT id, name, dong, synth_grade AS grade, synth_count AS count, synth_identity AS identity, char_scores, visitor_n, visitor_trip, visitor_local, work_facts, cautions,
+      (SELECT left(r->>'quote', 70) FROM jsonb_array_elements(COALESCE(synth_reviews,'[]'::jsonb)) r
+        WHERE COALESCE(r->>'quote','') <> '' ORDER BY COALESCE((r->>'score')::int,0) DESC LIMIT 1) AS quote
+      FROM cafes WHERE published AND area=${area} AND dong=${dong} AND facets @> ARRAY[${label}]::text[]
+      ORDER BY (synth_grade='검증') DESC, synth_count DESC NULLS LAST LIMIT ${limit}`) as unknown as SeoCafe[]);
+  } catch { return []; }
+}
+/** 전 동×시설 카운트 — 쿼리 1회 + 6시간 캐시(지역×취향과 같은 규약). 5곳 미만은 담지 않는다. */
+let dongFacetCountsMem: { at: number; v: Record<string, number> } | null = null;
+export async function getDongFacetCounts(): Promise<Record<string, number>> {
+  if (dongFacetCountsMem && Date.now() - dongFacetCountsMem.at < TASTE_COUNTS_TTL_MS) return dongFacetCountsMem.v;
+  try {
+    const rows = (await sql`SELECT area, dong, f AS label, count(*)::int n FROM cafes, unnest(facets) f
+      WHERE published AND dong IS NOT NULL AND dong <> '' GROUP BY area, dong, f HAVING count(*) >= 5`) as unknown as { area: string; dong: string; label: string; n: number }[];
+    const out: Record<string, number> = {};
+    for (const r of rows) out[`${r.area}|${r.dong}|${r.label}`] = Number(r.n);
+    dongFacetCountsMem = { at: Date.now(), v: out };
+    return out;
+  } catch { return dongFacetCountsMem?.v ?? {}; }
+}
