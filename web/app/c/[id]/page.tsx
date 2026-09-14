@@ -420,7 +420,7 @@ export default async function CafePage({ params }: Props) {
             </div>
             {(c.cautions as any[])[0]?.quote && (
               <p className="text-[12.5px] text-[#63523f]" style={{ marginTop: 6 }}>
-                손님 말: <span className="text-[#2a1f17]">“…{(c.cautions as any[])[0].quote}…”</span>
+                후기에서: <span className="text-[#2a1f17]">“…{(c.cautions as any[])[0].quote}…”</span>
               </p>
             )}
           </div>

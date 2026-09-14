@@ -2949,7 +2949,7 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
               <div className="nt-chips">
                 {cautions.map((x) => <span key={x.label} className="nt-chip">{x.emoji} {x.label}<b>{x.count}</b></span>)}
               </div>
-              {cautions[0]?.quote && <p className="text-[12px] text-[#63523f] mt-1.5">손님 말: <span className="text-[#2a1f17]">“…{cautions[0].quote}…”</span></p>}
+              {cautions[0]?.quote && <p className="text-[12px] text-[#63523f] mt-1.5">후기에서: <span className="text-[#2a1f17]">“…{cautions[0].quote}…”</span></p>}
             </div>
           )}
           {/* ⭐ 한눈에 판단 — 전체 카페 대비 강점/아쉬운점(리뷰 옥석 보기 전 직관 판단의 핵심) */}

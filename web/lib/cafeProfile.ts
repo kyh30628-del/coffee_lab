@@ -226,6 +226,9 @@ const CAUTIONS: { label: string; emoji: string; kws: string[] }[] = [
 //   ① 뒤집기: "주차가 불편하지 않아요" — 직후 8자 안에 '않/아니'
 //   ② **가정문**: "여차하여 자리가 없으면 조별로" — 실제로 자리가 없었다는 진술이 아니다(실측 오탐, 테라로사 포스코센터점).
 const CAUTION_FLIP = /^(?:[^.!?\n]{0,8}(?:않|아니)|으?면)/;
+// 블로그 '정보란'(영업시간·전화번호·출구 안내 나열) 판별 — 실측 2026-09-14: 근거 문장의 75%가 이 형태였다.
+//   사실 정확도는 오히려 높지만 **손님이 겪은 말이 아니다.** 서술형 근거가 있으면 그쪽을 먼저 보여준다.
+const INFO_BLOCK = /(\d{2,4}-\d{3,4}-\d{4}|\d{1,2}:\d{2}|영업시간|라스트\s?오더|라스트오더|⏰|☎|정기휴무|휴무일|번\s?출구)/;
 function hasCautionMention(text: string, kws: string[]): string | null {
   for (const k of kws) {
     const kl = k.toLowerCase();
@@ -236,7 +239,10 @@ function hasCautionMention(text: string, kws: string[]): string | null {
         // 🔴 2026-09-14 실측 수정: 마침표로 문장을 자르면 블로그 후기(마침표 거의 없음)에서
         //   **키워드가 빠진 엉뚱한 구간**이 근거로 붙었다(실측: '주차 어려움'인데 근거엔 주차 얘기 없음).
         //   반드시 매치 위치를 중심으로 잘라 **근거 안에 그 표현이 들어있게** 한다.
-        const from = Math.max(0, i - 40), to = Math.min(text.length, i + kl.length + 45);
+        let from = Math.max(0, i - 40), to = Math.min(text.length, i + kl.length + 45);
+        // 단어 중간에서 잘려 "길 8 k.c빌딩"처럼 시작하던 것 방지 — 앞쪽은 가장 가까운 공백으로 스냅.
+        const sp = text.lastIndexOf(" ", from + 12);
+        if (sp > from - 1 && sp < i) from = sp + 1;
         return text.slice(from, to).replace(/\s+/g, " ").trim();
       }
       i = text.indexOf(kl, i + 1);
@@ -252,11 +258,12 @@ export function extractCautions(texts: string[], topN = 4): Caution[] {
   if (arr.length < 6) return []; // 하이라이트와 같은 규약 — 표본이 적으면 판단하지 않는다
   const out: Caution[] = [];
   for (const c of CAUTIONS) {
-    let count = 0, quote = "";
+    let count = 0, quote = "", proseQuote = "";
     for (const t of arr) {
       const q = hasCautionMention(t, c.kws);
-      if (q) { count++; if (!quote) quote = q; }
+      if (q) { count++; if (!quote) quote = q; if (!proseQuote && !INFO_BLOCK.test(q)) proseQuote = q; }
     }
+    quote = proseQuote || quote;   // 손님 서술형이 하나라도 있으면 그것을 근거로 보여준다
     if (count >= 2) out.push({ label: c.label, emoji: c.emoji, count, quote });
   }
   return out.sort((a, b) => b.count - a.count).slice(0, topN);
