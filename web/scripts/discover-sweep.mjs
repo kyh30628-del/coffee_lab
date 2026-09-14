@@ -20,7 +20,7 @@ const sido = (process.env.SWEEP_SIDO || "").trim();                 // 특정 �
 const t0 = Date.now();
 const runStart = new Date(t0).toISOString();                        // 이번 회차 시작 — 전 지역 한 바퀴 돌면 종료(무한 재순회 방지)
 let totalNew = 0, done = 0, stop = "";
-console.log(`발굴 스윕 — 신선도순 순환 · 지역당 ${PER_REGION_MS / 1000}s · 상한 ${Math.round(TOTAL_MS / 60000)}분(한 바퀴 완주 시 조기종료)${sido ? ` · ${sido}` : ""}`);
+console.log(`발굴 스윕 — 수확률순(덜 훑은 곳 우선) · 지역당 ${PER_REGION_MS / 1000}s · 상한 ${Math.round(TOTAL_MS / 60000)}분(한 바퀴 완주 시 조기종료)${sido ? ` · ${sido}` : ""}`);
 
 // 🚦 적체 가드 — 발굴만 하고 후기를 못 모으면 사용자에겐 0이다. 수집 대기가 임계를 넘으면
 //   오늘 발굴은 건너뛰고 쿼터를 통째로 수집(collect-catchup·cron)에 넘긴다(2026-08-25).
@@ -40,11 +40,26 @@ while (Date.now() - t0 < TOTAL_MS && !stop) {
       : `네이버 예약분 도달 — 스윕 정지(${bud.used.toLocaleString()}/${NAVER_DAILY_QUOTA.toLocaleString()} 사용 · cron-grow용 ${NAVER_SWEEP_RESERVE.toLocaleString()} 예약). 정상.`;
     break;
   }
-  const reg = (await sql`SELECT region, area_label, last_run FROM discovery_state
+  // 🎯 2026-09-15(CEO "덜 훑은 지역부터 우선 돌게 해줘") — 순서를 **신선도순 → 수확률순**으로 바꾼다.
+  //   왜: 실측으로 포화가 확인됐다. 중구 발견 435 → 적재 **0**, 용산구 438 → 2, 성동구 367 → 3.
+  //     이미 다 가진 지역을 공정하게 돌아봐야 같은 카페만 다시 본다. 반면 부산 중구는 530 → 29였다.
+  //     쿼터는 유한하니 **아직 캘 게 남은 지역**에 먼저 쓴다.
+  //   ⚠️ 기아 방지: 수확률만 보면 낮은 지역이 영영 안 돌고, 그러면 그 추정치가 낡아 판단 자체가 틀어진다.
+  //     7일 이상 안 훑은 지역은 수확률과 무관하게 맨 앞으로 올린다.
+  //   ⚠️ 한 바퀴 판정: 예전엔 '가장 오래된 지역'으로 완주를 판단했는데, 순서가 바뀌면 그 기준이 깨진다
+  //     (같은 지역을 무한 반복할 수 있다). 이번 회차에 이미 훑은 지역을 **쿼리에서 제외**하는 방식으로 바꾼다.
+  const reg = (await sql`SELECT region, area_label, last_run,
+      COALESCE(last_inserted,0)::float / NULLIF(last_found,0) AS yield_rate
+    FROM discovery_state
     WHERE (${sido} = '' OR region LIKE ${sido + '%'})
-    ORDER BY last_run ASC NULLS FIRST LIMIT 1`)[0];
-  if (!reg) { stop = "대상 지역 없음"; break; }
-  if (reg.last_run && new Date(reg.last_run).toISOString() >= runStart) { stop = "전 지역 한 바퀴 완주"; break; } // 가장 오래된 지역도 이번 회차에 이미 발굴됨 = 모두 커버
+      AND (last_run IS NULL OR last_run < ${runStart}::timestamptz)
+    ORDER BY
+      (last_run IS NULL OR last_run < now() - interval '7 days') DESC,   -- ① 오래 방치된 곳(기아 방지)
+      COALESCE(last_inserted,0)::float / NULLIF(last_found,0) DESC NULLS FIRST,  -- ② 수확률(미측정은 먼저 재본다)
+      COALESCE(last_inserted,0) DESC,                                     -- ③ 절대 적재량
+      last_run ASC NULLS FIRST                                            -- ④ 동률이면 오래된 순
+    LIMIT 1`)[0];
+  if (!reg) { stop = "전 지역 한 바퀴 완주"; break; }
   const budget = Math.min(PER_REGION_MS, TOTAL_MS - (Date.now() - t0));
   try {
     const res = await discoverRegion(reg.region, reg.area_label ?? reg.region, undefined, { deadlineMs: Date.now() + budget, sorts: ["comment", "random"] });
@@ -56,8 +71,8 @@ while (Date.now() - t0 < TOTAL_MS && !stop) {
       try { const mr = await mineArea(reg.area_label ?? reg.region, { maxCalls: MINE_CALLS, apply: true }); mined = mr?.inserted ?? 0; totalNew += mined; }
       catch { /* 마이닝 실패는 무시(발굴은 이미 완료) */ }
     }
-    console.log(`[${done}] ${reg.region}: 발견 ${res.found} · 신규 ${res.inserted}${mined ? ` +마이닝 ${mined}` : ""} · 누적신규 ${totalNew}`);
-    if (res.apiError) stop = "네이버 한도 추정(429) — 중단(다음 회차 신선도순 재개)";
+    console.log(`[${done}] ${reg.region}(직전수확률 ${reg.yield_rate == null ? "미측정" : (reg.yield_rate * 100).toFixed(1) + "%"}): 발견 ${res.found} · 신규 ${res.inserted}${mined ? ` +마이닝 ${mined}` : ""} · 누적신규 ${totalNew}`);
+    if (res.apiError) stop = "네이버 한도 추정(429) — 중단(다음 회차 수확률순 재개)";
   } catch (e) {
     const m = String(e).slice(0, 80);
     console.log(`${reg.region}: 오류 — ${m}`);
