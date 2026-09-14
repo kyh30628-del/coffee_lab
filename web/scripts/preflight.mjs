@@ -116,6 +116,7 @@ const HOT = [
   // 2026-09-13 2차 — 위 6개를 막은 그날에도 **이 쿼리는 빠져 있었다**(누계 122GB, 디스크 읽기 1위).
   //   교훈: 목록에 없는 쿼리는 검사가 아니라 사각지대다. 새 뜨거운 쿼리는 반드시 여기 추가할 것.
   ["재합성: 파기 재수집 대기열", `SELECT id, name, area FROM cafes WHERE published = true AND raw_reviews IS NULL ORDER BY synth_checked_at ASC NULLS FIRST LIMIT 6`],
+  ["검색: 시설 패싯", `SELECT id, name FROM cafes WHERE published = true AND facets && ARRAY['주차 편함'] ORDER BY synth_count DESC NULLS LAST LIMIT 40`],
   ["검색: 개념축 보강", `SELECT id, name FROM cafes WHERE published = true AND embedding IS NOT NULL AND jsonb_path_query_array(char_scores, '$.keyvalue() ? (@.value > 0).key') ?| ARRAY['nokids'] ORDER BY (SELECT MAX((char_scores->>ax)::numeric) FROM unnest(ARRAY['nokids']) ax) DESC LIMIT 40`],
 ];
 const slow = [];

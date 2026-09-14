@@ -187,7 +187,7 @@ function lexicalScore(c: any, tokens: string[], hitConcepts: typeof CONCEPTS) {
 
 // 💰 synth_reviews는 통째로 싣지 않고 **SQL 안에서 quote만 잘라** 받는다(TOAST 1.9GB 컬럼 → 인용문 몇 줄).
 //   후보 80건 × 리뷰 전체를 앱으로 옮기던 것이 검색 응답 지연·전송비의 주범이었다.
-const FIELDS = `id, name, area, synth_grade, synth_count, visitor_n, visitor_trip, visitor_local, synth_identity, signature, note, vibe, uses, beans, char_scores, jsonb_path_query_array(synth_reviews, '$[*].quote') AS synth_reviews, synth_acidity, synth_body, synth_sweet`;
+const FIELDS = `id, name, area, synth_grade, synth_count, visitor_n, visitor_trip, visitor_local, synth_identity, signature, note, vibe, uses, beans, char_scores, facets, jsonb_path_query_array(synth_reviews, '$[*].quote') AS synth_reviews, synth_acidity, synth_body, synth_sweet`;
 
 // 🧳🏠 방문객 성격 배지 — /api/cafes와 **같은 규약**(붙는 곳만 "T"/"L"/"TL"). 지도앱이 한 컴포넌트로 렌더한다.
 const vbOf = (c: any): string | undefined => {
@@ -243,6 +243,35 @@ function diversifyChains<T extends { name: string }>(list: T[]): T[] {
 }
 
 // Claude 후보용: char_scores → 한국어 특징 태그, 검증 리뷰 → 인용
+// 🅿️🐾 시설·특징 패싯 검색(2026-09-14, CEO "주차·반려동물 같은 정보로도 검색되게").
+//   왜: 예전엔 '주차되는 카페'가 축(넓은공간)으로 근사돼 엉뚱하게 걸렸고, '콘센트'는 '작업·공부'로만,
+//   '단체 모임'도 '넓은공간'으로 갔다. 이제 후기에서 뽑아 저장한 cafes.facets(text[])를 직접 찾는다.
+//   라벨은 lib/cafeProfile.ts HIGHLIGHTS와 **같은 문자열**이라 화면에 보이는 것과 검색이 어긋나지 않는다.
+const FACET_TRIGGERS: { label: string; triggers: string[] }[] = [
+  { label: "주차 편함", triggers: ["주차", "주차장", "차 가지고", "차로 가", "발렛", "주차되는", "주차 가능"] },
+  { label: "반려동물 동반", triggers: ["반려동물", "애견", "강아지", "반려견", "펫", "댕댕이", "개 데리고"] },
+  { label: "작업·노트북", triggers: ["콘센트", "노트북", "충전", "카공", "공부", "작업", "와이파이", "좌석 편"] },
+  { label: "단체·모임룸", triggers: ["단체", "모임", "대관", "룸", "프라이빗", "회식", "세미나", "스터디룸"] },
+  { label: "루프탑·테라스", triggers: ["루프탑", "테라스", "야외", "옥상", "루프톱"] },
+  { label: "늦게까지·심야", triggers: ["늦게까지", "심야", "24시", "밤늦", "새벽", "야간"] },
+  { label: "키즈·놀이공간", triggers: ["키즈", "아이와", "아기", "놀이방", "유모차", "아이 데리고"] },
+  { label: "노키즈존", triggers: ["노키즈", "노키즈존", "어른만"] },
+  { label: "책·북카페", triggers: ["북카페", "책", "독서", "책방"] },
+  { label: "비건·건강한", triggers: ["비건", "글루텐프리", "글루텐 프리", "건강한"] },
+  { label: "차·티 전문", triggers: ["티룸", "전통차", "말차", "차 전문", "티 전문"] },
+  { label: "와인·주류", triggers: ["와인", "칵테일", "주류", "보틀숍", "와인바"] },
+  { label: "한옥·전통", triggers: ["한옥", "고택", "전통 가옥"] },
+  { label: "전시·작품", triggers: ["전시", "갤러리", "작품"] },
+  { label: "원두 판매·로스터리", triggers: ["원두 판매", "원두 구입", "원두 사", "드립백"] },
+  { label: "가성비 좋은", triggers: ["가성비", "저렴", "싼", "가격 착"] },
+  { label: "강·바다 뷰", triggers: ["바다", "오션뷰", "한강", "강뷰", "호수", "리버뷰", "물멍"] },
+  { label: "정원·자연 속", triggers: ["정원", "숲", "마당", "자연 속", "가든"] },
+  { label: "통창·창밖 뷰", triggers: ["통창", "큰 창", "창밖"] },
+  { label: "데이트·기념일", triggers: ["데이트", "기념일", "프러포즈", "특별한 날"] },
+  { label: "수제·당일 베이킹", triggers: ["수제", "직접 만든", "당일 생산", "홈메이드"] },
+  { label: "친절한 응대", triggers: ["친절", "사장님이 좋", "응대"] },
+];
+
 const AXIS_LABEL: Record<string, string> = Object.fromEntries(CONCEPTS.filter((c) => c.axis).map((c) => [c.axis as string, c.label]));
 function charTags(cs: any): string {
   if (!cs || typeof cs !== "object") return "";
@@ -299,6 +328,8 @@ export async function GET(req: NextRequest) {
     const parsed = parseQuery(q);
     let tokens = parsed.tokens;
     const hitConcepts = CONCEPTS.filter((c) => c.triggers.some((t) => ql.includes(t)));
+    // 🅿️ 시설 패싯 — 질의에 '주차·콘센트·단체·루프탑…'이 있으면 그 패싯을 가진 카페를 직접 찾는다(최대 3개).
+    const hitFacets = FACET_TRIGGERS.filter((f) => f.triggers.some((t) => ql.includes(t))).map((f) => f.label).slice(0, 3);
     // 질의 자체가 개념어인가('카공'·'공부'). 부분 상호매칭 바닥값을 뺄지 판단하는 데만 쓴다.
     const pureConceptQuery = hitConcepts.some((c) => c.triggers.some((t) => ql.trim() === t));
     let effectiveRegion = region;
@@ -447,6 +478,26 @@ export async function GET(req: NextRequest) {
             const seenIds = new Set(rows.map((r) => r.id));
             for (const r of axisRows) if (!seenIds.has(r.id)) { rows.push(r); seenIds.add(r.id); }
           }
+          // 🅿️ 시설 패싯 보강 — '주차되는 카페'처럼 시설을 물으면 그 패싯을 실제로 가진 카페를 후보에 합류시킨다.
+          //   facets(text[]) + GIN(idx_cafes_facets)라 인덱스로 끝난다. 지역이 있으면 지역 안에서만.
+          if (hitFacets.length > 0) {
+            let facetRows: any[] = [];
+            try {
+              facetRows = areaList
+                ? ((await sql.query(
+                    `SELECT ${FIELDS}, 1 - (embedding <=> $1::vector) AS sim FROM cafes
+                     WHERE published = true AND area = ANY($2::text[]) AND facets && $3::text[]
+                     ORDER BY synth_count DESC NULLS LAST LIMIT 40`,
+                    [lit, areaList, hitFacets], { fetchOptions: { signal: AbortSignal.timeout(5000) } })) as unknown as any[])
+                : ((await sql.query(
+                    `SELECT ${FIELDS}, 1 - (embedding <=> $1::vector) AS sim FROM cafes
+                     WHERE published = true AND facets && $2::text[]
+                     ORDER BY synth_count DESC NULLS LAST LIMIT 40`,
+                    [lit, hitFacets], { fetchOptions: { signal: AbortSignal.timeout(5000) } })) as unknown as any[]);
+            } catch { facetRows = []; }
+            const seen2 = new Set(rows.map((r) => r.id));
+            for (const r of facetRows) if (!seen2.has(r.id)) { rows.push(r); seen2.add(r.id); }
+          }
           if (rows.length > 0) {
             mode = "semantic";
             for (const c of rows) byId.set(c.id, c);
@@ -454,6 +505,12 @@ export async function GET(req: NextRequest) {
             // #219: exact+concept은 필드가중치 누적이라 상한이 없어(다중토큰·다중필드 매치 시 수십점) gradeBonus 격차(17점)를
             //   쉽게 뭉개고 참고등급이 검증등급 위로 노출되던 버그 — sim*100과 같은 0~100 스케일로 후보군 내 상대값 정규화해
             //   AI재정렬 경로(아래 rankScore 0~100 정규화+gradeBonus)와 두 경로를 일치시킨다.
+            // 🅿️ 시설을 물었으면 그 시설을 실제로 가진 카페를 확실히 위로(패싯 1개당 +14, 최대 +28).
+            if (hitFacets.length > 0) for (const l of lex) {
+              const f: string[] = Array.isArray((l.c as any).facets) ? (l.c as any).facets : [];
+              const hit = hitFacets.filter((x) => f.includes(x)).length;
+              if (hit > 0) l.concept += Math.min(28, hit * 14);
+            }
             const maxLex = Math.max(1, ...lex.map((l) => l.exact + l.concept));
             // #532: 어휘일치가 전혀 없는(lexMatched===false) 후보는 의미유사도(sim) 단독값만으로 순위가 매겨져
             //   무관 질의(오타·무의미 문자열·미보유 프랜차이즈명)에도 하한 없이 24건이 검증배지와 함께 확정노출되던 버그.
@@ -799,6 +856,7 @@ export async function GET(req: NextRequest) {
       ...(nearPlace ? { nearPlace } : {}),
       // 어느 동네인지 우리가 단정할 수 없을 때의 다른 후보 — 추측으로 밀어붙이지 않고 사용자가 고르게 한다.
       ...(regionAlts.length ? { regionAlts } : {}),
+      ...(hitFacets.length ? { facets: hitFacets } : {}),   // 🅿️ 이번 검색이 인식한 시설 조건(화면 칩 표시용)
     };
     if (coverageNote) payload.coverageNote = coverageNote;
     if (franchiseNote) payload.franchiseNote = franchiseNote;

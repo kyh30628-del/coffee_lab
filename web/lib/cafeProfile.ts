@@ -169,3 +169,12 @@ export function extractHighlights(texts: string[], topN = 6): Highlight[] {
   }
   return out.sort((a, b) => b.count - a.count).slice(0, topN);
 }
+
+// 🔎 검색용 시설·특징 패싯(2026-09-14, CEO "주차·반려동물 같은 정보로도 검색되게").
+//   화면 하이라이트는 상위 6개만 보여주지만, **검색은 전부 알아야** '주차되는 카페'가 제대로 걸린다.
+//   같은 사전·같은 보수 임계(9%+·최소 3건·부정어 가드)를 쓰므로 화면과 검색이 어긋나지 않는다.
+//   결과는 라벨 문자열 배열 → cafes.facets(text[])에 저장하고 GIN으로 찾는다.
+export function extractFacets(texts: string[]): string[] {
+  return extractHighlights(texts, 99).map((h) => h.label);
+}
+export const ALL_FACET_LABELS: string[] = HIGHLIGHTS.map((h) => h.label);
