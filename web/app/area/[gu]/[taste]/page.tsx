@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Curated from "../../Curated";
-import { getRegions, getRegionTasteCafes, getRegionTasteCount, getRegionTasteStats, getRegionTasteCounts, getRegionTasteGradeBreakdown, getRegionFacetCounts, areaAliases, TASTES, tasteByKey, SITE, TASTE_MIN_HITS, TASTE_MIN_RATE_PCT } from "@/lib/seoData";
+import { getRegions, getRegionTasteCafes, getRegionTasteCount, getRegionTasteStats, getRegionTasteCounts, getRegionTasteGradeBreakdown, getRegionFacetCounts, areaAliases, TASTES, tasteByKey, SITE, TASTE_MIN_HITS, TASTE_MIN_RATE_PCT, josa } from "@/lib/seoData";
 import { FACET_PAGES } from "@/lib/facetPages";
 
 export const revalidate = 2592000; // ISR 30일 — 새벽 절전(2026-09-09). 무효화는 온디맨드.
@@ -38,13 +38,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const areaShort = areaAliases(area)[0];
   const title = `${area} ${t.label} 카페${bestN} — ${areaShort ? `${areaShort} ` : ""}${alias1} 검증 추천 | 동네 커피 노트`;
   const aliasPhrase = t.aliases.slice(0, 3).join(", ");
+  const aliasLast = t.aliases.slice(0, 3).slice(-1)[0] ?? "";
   // 🥊 2026-08-30 경쟁사 대응 — 스니펫에 **후기 수**를 넣는다(제목은 랭킹 보호로 손대지 않음).
   //   실측: naejari.com이 "성남시 카공 카페 2,180곳 지도"로 우리 위 1위인데, 그 페이지는 이름·주소뿐이고
   //   후기·콘센트 정보가 없다(전체 나열). 카페 수로는 우리가 작아 보이지만(507 vs 2,180),
   //   우리 30곳 뒤에는 검증 후기 14,340건이 있다 — 그쪽은 0건이라 따라올 수 없는 숫자다.
   //   ⚠️ 숫자가 작으면(1,000건 미만) 오히려 약해 보이므로 그때는 기존 문구를 그대로 쓴다.
   const evidence = stats.reviews >= 1000 ? `검증 후기 ${stats.reviews.toLocaleString()}건에서 ` : "";
-  const desc = `${areaShort2 ? `${areaShort2}·` : ""}${area}에서 ${aliasPhrase}를 찾는다면. ${evidence}${t.desc} 카페를 영수증 리뷰·광고 없이 진짜 후기로 검증해 골랐어요.${names ? ` ${names} 등.` : ""}`;
+  const desc = `${areaShort2 ? `${areaShort2}·` : ""}${area}에서 ${aliasPhrase}${josa(aliasLast, "을/를")} 찾는다면. ${evidence}${t.desc} 카페를 영수증 리뷰·광고 없이 진짜 후기로 검증해 골랐어요.${names ? ` ${names} 등.` : ""}`;
   const url = `${SITE}/area/${encodeURIComponent(area)}/${taste}`;
   return {
     title, description: desc,

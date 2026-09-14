@@ -341,3 +341,16 @@ export async function getDongTasteCounts(): Promise<Record<string, number>> {
     return out;
   } catch { return dongTasteCountsMem?.v ?? {}; }
 }
+
+
+/** 🇰🇷 받침에 맞는 조사 — "디저트 맛집**를** 찾는다면"처럼 틀린 조사가 수천 페이지에 나갔다(2026-09-14 실측).
+ *  한글 마지막 글자의 종성 유무로 고른다. 한글이 아니면(영문·숫자) 뒤 글자를 기준으로 판단할 수 없어 기본값을 쓴다. */
+export function josa(word: string, pair: "을/를" | "이/가" | "은/는" | "과/와" | "으로/로"): string {
+  const [withJong, withoutJong] = pair.split("/");
+  const ch = String(word ?? "").trim().slice(-1);
+  const code = ch.charCodeAt(0);
+  if (!(code >= 0xac00 && code <= 0xd7a3)) return withoutJong;   // 한글이 아니면 받침 없는 쪽
+  const jong = (code - 0xac00) % 28;
+  if (pair === "으로/로") return jong === 0 || jong === 8 ? withoutJong : withJong;  // ㄹ 받침은 '로'
+  return jong === 0 ? withoutJong : withJong;
+}
