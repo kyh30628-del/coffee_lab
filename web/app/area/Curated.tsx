@@ -31,6 +31,28 @@ export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, headin
     { name: `${area} 카페`, url: `${SITE}/area/${encodeURIComponent(area)}` },
     ...((tasteKey || facetSlug) && tasteLabel ? [{ name: `${area} ${tasteLabel} 카페`, url: canonical }] : []),
   ];
+  const evTotal = cafes.reduce((a, c) => a + (Number(c.count) || 0), 0);
+  const cautionCount = cafes.filter((c) => Array.isArray(c.cautions) && c.cautions.length > 0).length;
+  const factLine = `검증 후기 ${evTotal.toLocaleString()}건을 근거로 고른 ${cafes.length}곳 · 광고·협찬 후기 제외 · 기준 ${new Date().toISOString().slice(0, 10)}`;
+  // ❓ FAQPage(2026-09-14) — 경쟁사는 FAQ 리치결과를 노리는데 우리 지역 페이지엔 없었다.
+  //   ⚠️ 답은 **이 페이지가 실제로 가진 숫자**로만 만든다(지어낸 FAQ는 구조화 데이터 위반이자 우리 원칙 위반).
+  //   🔑 세 번째 질문("주의할 점")은 경쟁사가 절대 못 쓴다 — 단점 데이터를 가진 쪽만 답할 수 있다.
+  const cautionTop = (() => {
+    const tally: Record<string, number> = {};
+    for (const c of cafes) for (const x of (c.cautions ?? [])) tally[x.label] = (tally[x.label] ?? 0) + 1;
+    return Object.entries(tally).sort((a, b) => b[1] - a[1]).slice(0, 3);
+  })();
+  const faqLd = {
+    "@context": "https://schema.org", "@type": "FAQPage",
+    mainEntity: [
+      { "@type": "Question", name: `${heading}는 어떻게 골랐나요?`,
+        acceptedAnswer: { "@type": "Answer", text: `네이버·구글·유튜브 공개 후기를 교차검증해 영수증 리뷰·광고·협찬 후기를 빼고 골랐어요. ${factLine}` } },
+      ...(grades && (grades.verified + grades.ref) > 0 ? [{ "@type": "Question", name: `검증 등급은 무엇인가요?`,
+        acceptedAnswer: { "@type": "Answer", text: `이 목록에는 검증 ${grades.verified}곳, 참고 ${grades.ref}곳이 있어요. 검증은 서로 다른 출처의 실제 방문 후기로 충분히 확인된 곳, 참고는 근거가 더 쌓이면 올라가는 곳이에요.` } }] : []),
+      ...(cautionTop.length ? [{ "@type": "Question", name: `가기 전에 알아둘 점이 있나요?`,
+        acceptedAnswer: { "@type": "Answer", text: `이 목록 ${cautionCount}곳은 후기에서 확인된 주의점이 있어요. 가장 많은 건 ${cautionTop.map(([l, n]) => `${l} ${n}곳`).join(", ")}이에요. 좋은 점만 적지 않아요.` } }] : []),
+    ],
+  };
   const breadcrumbLd = {
     "@context": "https://schema.org", "@type": "BreadcrumbList",
     itemListElement: crumbs.map((b, i) => ({ "@type": "ListItem", position: i + 1, name: b.name, item: b.url })),
@@ -52,9 +74,6 @@ export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, headin
   //   LLM은 **숫자와 기준일이 붙은 문장**을 인용한다. 그 한 줄을 화면과 JSON-LD 양쪽에 같은 값으로 둔다.
   //   비용 0 — 이미 받아온 배열에서 합산하는 순수계산(추가 조회 없음).
   //   ⚠️ 필드명은 `count`다(synth_count 아님 — SeoCafe로 좁혀 담는다). 실측에서 0건으로 나가 바로 잡았다.
-  const evTotal = cafes.reduce((a, c) => a + (Number(c.count) || 0), 0);
-  const cautionCount = cafes.filter((c) => Array.isArray(c.cautions) && c.cautions.length > 0).length;
-  const factLine = `검증 후기 ${evTotal.toLocaleString()}건을 근거로 고른 ${cafes.length}곳 · 광고·협찬 후기 제외 · 기준 ${new Date().toISOString().slice(0, 10)}`;
   const jsonld = {
     "@context": "https://schema.org", "@type": "ItemList", name: heading, numberOfItems: cafes.length,
     description: factLine,
@@ -70,6 +89,7 @@ export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, headin
     <main className="min-h-screen bg-[#f4ece0] text-[#2b2018]" style={{ fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonld) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }} />
+      {faqLd.mainEntity.length > 0 && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqLd) }} />}
       <div className="max-w-2xl mx-auto px-5 py-9">
         <Link href={backHref} className="text-[#7a5122] text-[13px] underline">← {backLabel}</Link>
         <div className="text-[#7a5122] text-[11px] tracking-[0.25em] uppercase mt-4 mb-1">동네 커피 노트 · 검증 큐레이션</div>
@@ -81,7 +101,9 @@ export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, headin
             ②는 경쟁 서비스가 아무도 안 하는 항목이라 여기에 반드시 들어가야 한다.
             ⚠️ 추가 조회 0 — 전부 이미 받아온 값(factLine·cautionCount)으로 만든다. */}
         <div className="bg-white/70 border border-[#e0d3b8] rounded-xl px-3.5 py-3 mb-6">
-          <div className="text-[11px] font-bold tracking-[0.18em] text-[#7a5122] uppercase mb-1.5">왜 여기 목록이 다른가</div>
+          {/* 2026-09-14: div였다. 이 페이지에 h2가 **하나도 없었다**(경쟁사 12개) — 검색엔진이 구조를 못 읽는다.
+              보이는 모양은 그대로 두고 태그만 h2로 올린다. */}
+          <h2 className="text-[11px] font-bold tracking-[0.18em] text-[#7a5122] uppercase mb-1.5">왜 여기 목록이 다른가</h2>
           <ul className="text-[12.5px] text-[#3d2f22] leading-[1.65] space-y-0.5">
             <li>☕ <b>광고·협찬·영수증 리뷰를 뺐어요.</b> 네이버·구글·유튜브 공개 후기를 교차검증했어요. <Link href="/trust" className="underline text-[#7a5122]">검증 방법</Link></li>
             {cautionCount > 0 && <li>⚠️ <b>좋은 점만 쓰지 않아요.</b> 이 목록 {cautionCount}곳은 주차·웨이팅 같은 <b>주의점</b>까지 후기에서 찾아 적었어요.</li>}
@@ -101,6 +123,9 @@ export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, headin
             ))}
           </div>
         )}
+
+        {/* 목록 본문의 h2 — 이 페이지가 무엇의 목록인지 검색엔진에 명시한다(시각적으로는 읽어주기 전용). */}
+        <h2 className="sr-only">{heading} 목록</h2>
 
         {/* 후기 근거 요약 — 등급 분포로 검증 신뢰도를 투명하게 표시(콘텐츠 밀도 보강) */}
         {tasteKey && grades && (grades.verified + grades.ref + grades.candidate) > 0 && (
@@ -260,7 +285,7 @@ export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, headin
             같은 테마를 유지한 채 옆 동네로 넘어가게 해 다음 행동을 만든다. 추가 조회 없음(부모가 이미 가진 카운트 재사용). */}
         {tasteKey && tasteLabel && sameTasteNearby.length > 0 && (
           <div className="mt-7">
-            <div className="text-[13px] font-bold text-[#5a4632] mb-2">🧭 다른 동네 {tasteLabel} 카페</div>
+            <h2 className="text-[13px] font-bold text-[#5a4632] mb-2">🧭 다른 동네 {tasteLabel} 카페</h2>
             <div className="flex flex-wrap gap-1.5">
               {sameTasteNearby.map((r) => (
                 <Link key={r.area} href={`/area/${encodeURIComponent(r.area)}/${tasteKey}`}
