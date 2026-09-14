@@ -47,7 +47,8 @@ export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, headin
   //   도착지가 전부 이 페이지(/area/{지역}/{취향})다 — LLM이 "수원 카공 카페" 질문에 우리를 인용한다.
   //   LLM은 **숫자와 기준일이 붙은 문장**을 인용한다. 그 한 줄을 화면과 JSON-LD 양쪽에 같은 값으로 둔다.
   //   비용 0 — 이미 받아온 배열에서 합산하는 순수계산(추가 조회 없음).
-  const evTotal = cafes.reduce((a, c) => a + (Number((c as any).synth_count) || 0), 0);
+  //   ⚠️ 필드명은 `count`다(synth_count 아님 — SeoCafe로 좁혀 담는다). 실측에서 0건으로 나가 바로 잡았다.
+  const evTotal = cafes.reduce((a, c) => a + (Number(c.count) || 0), 0);
   const factLine = `검증 후기 ${evTotal.toLocaleString()}건을 근거로 고른 ${cafes.length}곳 · 광고·협찬 후기 제외 · 기준 ${new Date().toISOString().slice(0, 10)}`;
   const jsonld = {
     "@context": "https://schema.org", "@type": "ItemList", name: heading, numberOfItems: cafes.length,
@@ -56,8 +57,8 @@ export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, headin
       "@type": "ListItem", position: i + 1, url: `${SITE}/c/${c.id}`, name: c.name,
       // 카페마다 '근거 후기 수'를 붙인다 — 별점이 아니라 이 숫자가 우리 주장의 단위다.
       item: { "@type": "CafeOrCoffeeShop", name: c.name, url: `${SITE}/c/${c.id}`,
-              address: { "@type": "PostalAddress", addressLocality: (c as any).area ?? undefined, addressCountry: "KR" },
-              additionalProperty: [{ "@type": "PropertyValue", name: "검증 후기 수", value: Number((c as any).synth_count) || 0 }] },
+              address: { "@type": "PostalAddress", addressLocality: c.dong ?? undefined, addressCountry: "KR" },
+              additionalProperty: [{ "@type": "PropertyValue", name: "검증 후기 수", value: Number(c.count) || 0 }] },
     })),
   };
   return (
