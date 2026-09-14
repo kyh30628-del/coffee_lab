@@ -675,7 +675,12 @@ export async function GET(req: NextRequest) {
     //      회사 '카카오'(정확일치)를 밀어냈다. **이름이 완전히 같은 기준점**이 있으면 그쪽이 답이다.
     //      ('프릳츠'처럼 카페 이름과 정확히 같은 경우는 anchorExact가 안 생기므로 기존 동작 그대로다.)
     if (placeHit2 && (!cafeNameHit || !!anchorExact)) {
-      const placeHit = placeHit2;
+      // 🔁 2026-09-14 — **기준점 주변에 카페가 없으면 다음 후보를 본다.**
+      //   실측: "에이치디현대"가 울산 HD현대중공업에 걸려 0건이었다(울산엔 우리 카페가 없다).
+      //   같은 이름의 장소가 전국에 여러 곳일 때 첫 후보가 빈손이면 그냥 빈 화면을 주던 구조였다.
+      //   ⚠️ 순서는 그대로 유지한다(가장 적합한 후보가 먼저) — 카페가 있는 첫 후보에서 멈춘다.
+      const tryPlaces = [placeHit2, ...placeCands.filter((p) => p !== placeHit2 && isAnchorKind(p.kind))].slice(0, 4);
+      for (const placeHit of tryPlaces) {
       const R = 0.027;                                   // 위도 약 3km — 캠퍼스·공원처럼 중심 좌표가 외곽인 곳까지 담는다
       const lngR = R / Math.max(0.3, Math.cos((placeHit.lat * Math.PI) / 180));
       const near = (await sql.query(
@@ -705,6 +710,8 @@ export async function GET(req: NextRequest) {
             reasons: [`${placeHit.name}에서 ${d < 1000 ? d + "m" : (d / 1000).toFixed(1) + "km"}`].concat(c.synth_count ? [`검증 후기 ${c.synth_count}건`] : []).slice(0, 3), snippet: undefined });
         }
         nearPlace = { name: placeHit.name, icon: placeHit.icon, label: placeHit.label, lat: placeHit.lat, lng: placeHit.lng };
+        break;                      // 카페가 나온 첫 후보에서 멈춘다
+      }
       }
     }
 
