@@ -10,10 +10,11 @@ const { neon } = await import("@neondatabase/serverless");
 const { extractFacets } = await import("../lib/cafeProfile.ts");
 const sql = neon(process.env.DATABASE_URL);
 const BATCH = 500;
+const FORCE = process.argv.includes("--force");   // 사전·임계가 바뀌면 이미 채운 것도 다시 계산해야 한다
 let cursor = 0, done = 0, withFacets = 0;
 for (;;) {
   const rows = await sql`SELECT id, jsonb_path_query_array(COALESCE(synth_reviews_all, synth_reviews, '[]'::jsonb), '$[*].quote') AS quotes
-    FROM cafes WHERE published = true AND facets IS NULL AND id > ${cursor} ORDER BY id LIMIT ${BATCH}`;
+    FROM cafes WHERE published = true AND (${FORCE} OR facets IS NULL) AND id > ${cursor} ORDER BY id LIMIT ${BATCH}`;
   if (!rows.length) break;
   for (const r of rows) {
     const texts = Array.isArray(r.quotes) ? r.quotes.filter((x) => typeof x === "string") : [];
