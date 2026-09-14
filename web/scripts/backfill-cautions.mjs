@@ -33,5 +33,11 @@ for (;;) {
   }
   console.log(`  ${seen}곳 처리 · 주의점 있음 ${filled} · 없음 ${empty}`);
 }
+// 🔴 필수 마무리 — 대량 UPDATE는 visibility map을 더럽혀 **index-only scan을 깨뜨린다.**
+//   실측(2026-09-14): 이 백필을 돌리는 중 preflight의 뜨거운 쿼리 3개(지역 목록·노이즈 집계·버전 쿼리)가
+//   전부 Seq Scan으로 떨어졌고, VACUUM 한 번으로 전부 복구됐다(all-visible 11,804/11,857 페이지).
+//   전수 스캔은 호출수만큼 곱해져 하루 수백 GB가 된다(09-13: 338.6GB) — 백필이 스스로 되돌린다.
+await sql`VACUUM (ANALYZE) cafes`;
+console.log("🧹 VACUUM ANALYZE 완료 — index-only scan 복구");
 console.log(`\n✅ 백필 완료 — ${seen}곳 처리 · 주의점 부착 ${filled}곳 (${seen ? (filled / seen * 100).toFixed(0) : 0}%)`);
 console.table(Object.entries(tally).sort((a, b) => b[1] - a[1]).map(([라벨, 곳]) => ({ 라벨, 곳 })));

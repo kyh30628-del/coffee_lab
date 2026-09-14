@@ -36,7 +36,11 @@ export type SeoCafe = { om?: number; id: number; name: string; dong: string | nu
   /** 🧳🏠 방문객 성격(lib/visitorMix.ts) — REAL 3개라 전송 영향 없음. 판정은 표시 시점(criteria 임계). */
   visitor_n?: number | null; visitor_trip?: number | null; visitor_local?: number | null;
   /** 🔌 카공 시설 사실(합성 시 저장) — [{k:"outlet",n:5}]. 경쟁사가 안 주는 정보라 목록에 세운다. 작은 배열이라 전송 영향 없음. */
-  work_facts?: { k: string; n: number }[] | null };
+  work_facts?: { k: string; n: number }[] | null;
+  /** ⚠️ "이건 알고 가세요"(2026-09-14) — 목록 카드에서도 보여준다. 작은 jsonb라 전송 영향 없음.
+   *  왜 목록에도: 우리 우위는 '좋은 곳을 찾아준다'가 아니라 **'헛걸음을 막아준다'** 인데,
+   *  그 증거가 상세 페이지 안에만 있으면 목록만 보고 떠나는 사람은 영원히 못 느낀다. */
+  cautions?: { label: string; emoji: string; count: number; quote?: string }[] | null };
 
 // 🎯 취향 페이지 채택 기준(2026-08-06, CEO "기준 상향") — 예전엔 `char_scores.<취향> > 0`,
 //   즉 **후기에 딱 한 번 스쳐도 포함**이었다. 그 결과 "파주시 작업하기 좋은 카페 117곳"인데 실제로
@@ -75,7 +79,7 @@ async function withOwnerBadge(list: SeoCafe[]): Promise<SeoCafe[]> {
 
 export async function getRegionCafes(area: string, limit = 30): Promise<SeoCafe[]> {
   try {
-    return withOwnerBadge((await sql`SELECT id, name, dong, synth_grade AS grade, synth_count AS count, synth_identity AS identity, char_scores, visitor_n, visitor_trip, visitor_local, work_facts,
+    return withOwnerBadge((await sql`SELECT id, name, dong, synth_grade AS grade, synth_count AS count, synth_identity AS identity, char_scores, visitor_n, visitor_trip, visitor_local, work_facts, cautions,
       (SELECT left(r->>'quote', 70) FROM jsonb_array_elements(COALESCE(synth_reviews,'[]'::jsonb)) r
         WHERE COALESCE(r->>'quote','') <> '' ORDER BY COALESCE((r->>'score')::int,0) DESC LIMIT 1) AS quote
       FROM cafes WHERE published AND area=${area}
@@ -90,7 +94,7 @@ export async function getRegionCafes(area: string, limit = 30): Promise<SeoCafe[
 //   ⚠️ neon 태그드 템플릿은 조각 합성이 안 되므로(위 TASTE_MIN_HITS 주석 참조) 아래 4개 쿼리에 같은 문구를 그대로 적는다.
 export async function getRegionTasteCafes(area: string, tasteKey: string, limit = 30): Promise<SeoCafe[]> {
   try {
-    return withOwnerBadge((await sql`SELECT id, name, dong, synth_grade AS grade, synth_count AS count, synth_identity AS identity, char_scores, visitor_n, visitor_trip, visitor_local, work_facts,
+    return withOwnerBadge((await sql`SELECT id, name, dong, synth_grade AS grade, synth_count AS count, synth_identity AS identity, char_scores, visitor_n, visitor_trip, visitor_local, work_facts, cautions,
       (char_scores->>${tasteKey})::int AS "tasteHits",
       (SELECT left(r->>'quote', 70) FROM jsonb_array_elements(COALESCE(synth_reviews,'[]'::jsonb)) r
         WHERE COALESCE(r->>'quote','') <> '' ORDER BY COALESCE((r->>'score')::int,0) DESC LIMIT 1) AS quote
@@ -217,7 +221,7 @@ export async function getDongsInArea(area: string, minCount = 5): Promise<{ dong
 
 export async function getDongCafes(area: string, dong: string, limit = 30): Promise<SeoCafe[]> {
   try {
-    return withOwnerBadge((await sql`SELECT id, name, dong, synth_grade AS grade, synth_count AS count, synth_identity AS identity, char_scores, visitor_n, visitor_trip, visitor_local,
+    return withOwnerBadge((await sql`SELECT id, name, dong, synth_grade AS grade, synth_count AS count, synth_identity AS identity, char_scores, visitor_n, visitor_trip, visitor_local, cautions,
       (SELECT left(r->>'quote', 70) FROM jsonb_array_elements(COALESCE(synth_reviews,'[]'::jsonb)) r
         WHERE COALESCE(r->>'quote','') <> '' ORDER BY COALESCE((r->>'score')::int,0) DESC LIMIT 1) AS quote
       FROM cafes WHERE published AND area=${area} AND dong=${dong}

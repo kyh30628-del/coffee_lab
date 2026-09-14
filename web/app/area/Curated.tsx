@@ -49,6 +49,7 @@ export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, headin
   //   비용 0 — 이미 받아온 배열에서 합산하는 순수계산(추가 조회 없음).
   //   ⚠️ 필드명은 `count`다(synth_count 아님 — SeoCafe로 좁혀 담는다). 실측에서 0건으로 나가 바로 잡았다.
   const evTotal = cafes.reduce((a, c) => a + (Number(c.count) || 0), 0);
+  const cautionCount = cafes.filter((c) => Array.isArray(c.cautions) && c.cautions.length > 0).length;
   const factLine = `검증 후기 ${evTotal.toLocaleString()}건을 근거로 고른 ${cafes.length}곳 · 광고·협찬 후기 제외 · 기준 ${new Date().toISOString().slice(0, 10)}`;
   const jsonld = {
     "@context": "https://schema.org", "@type": "ItemList", name: heading, numberOfItems: cafes.length,
@@ -70,9 +71,19 @@ export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, headin
         <div className="text-[#7a5122] text-[11px] tracking-[0.25em] uppercase mt-4 mb-1">동네 커피 노트 · 검증 큐레이션</div>
         <h1 className="text-[26px] font-bold leading-tight mb-2">{heading}</h1>
         <p className="text-[14px] text-[#524234] leading-relaxed mb-3">{intro}</p>
-        {/* 🤖 인용용 사실 한 줄 — 사람에게도 근거가 되고, AI에겐 그대로 인용할 문장이 된다. */}
-        <p className="text-[12px] text-[#6b5a45] mb-3">{factLine}</p>
-        <p className="text-[12px] text-[#54432c] bg-white/60 border border-[#e6dcc8] rounded-lg px-3 py-2 mb-6">☕ <b>영수증 리뷰·광고·협찬은 빼고</b>, 네이버·구글·유튜브 공개 후기를 교차검증해 진짜 후기로만 골랐어요. <Link href="/trust" className="underline text-[#7a5122]">검증 방법</Link></p>
+        {/* 🏁 2026-09-14(CEO "결국은 소비자가 어떻게 느끼느냐가 핵심") — 우리 우위를 **읽히게** 세운다.
+            그동안 근거는 다 있었는데 전부 옅은 회색 잔글씨라 소비자 눈에 안 들어왔다(모바일 실측 확인).
+            세 줄로 고정한다: ①무엇을 뺐나 ②단점도 적는다 ③언제 확인한 정보인가.
+            ②는 경쟁 서비스가 아무도 안 하는 항목이라 여기에 반드시 들어가야 한다.
+            ⚠️ 추가 조회 0 — 전부 이미 받아온 값(factLine·cautionCount)으로 만든다. */}
+        <div className="bg-white/70 border border-[#e0d3b8] rounded-xl px-3.5 py-3 mb-6">
+          <div className="text-[11px] font-bold tracking-[0.18em] text-[#7a5122] uppercase mb-1.5">왜 여기 목록이 다른가</div>
+          <ul className="text-[12.5px] text-[#3d2f22] leading-[1.65] space-y-0.5">
+            <li>☕ <b>광고·협찬·영수증 리뷰를 뺐어요.</b> 네이버·구글·유튜브 공개 후기를 교차검증했어요. <Link href="/trust" className="underline text-[#7a5122]">검증 방법</Link></li>
+            {cautionCount > 0 && <li>⚠️ <b>좋은 점만 쓰지 않아요.</b> 이 목록 {cautionCount}곳은 주차·웨이팅 같은 <b>주의점</b>까지 후기에서 찾아 적었어요.</li>}
+            <li>🕒 <b>{factLine}</b></li>
+          </ul>
+        </div>
 
         {/* 후기 근거 요약 — 등급 분포로 검증 신뢰도를 투명하게 표시(콘텐츠 밀도 보강) */}
         {tasteKey && grades && (grades.verified + grades.ref + grades.candidate) > 0 && (
@@ -119,14 +130,24 @@ export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, headin
             </div>
             {/* 근거를 문장이 아니라 **숫자**로 — 이게 우리가 다른 서비스와 다른 지점이다. */}
             <p className="text-[13px] font-bold text-[#5f7355] mt-2">
+              {/* 🔴 2026-09-14 수정 — "후기 37건 중 42건이 카공 이야기 (114%)"가 소비자 화면에 나가고 있었다.
+                  원인: tasteHits는 char_scores(=키워드 **언급 횟수**, lib/charScore.ts countHits)인데
+                  synth_count(=검증 통과 **후기 수**)로 나눴다. 단위가 다른 두 수를 분수로 만든 것.
+                  실측: 디저트는 공개 카페의 33.4%(8,914곳)가 100%를 넘고 최대 806%였다.
+                  → 분수를 버리고 **있는 그대로** 쓴다. 숫자는 여전히 우리 강점이고, 틀린 분수만 없앤다. */}
               {tasteKey && typeof hero.tasteHits === "number" && hero.tasteHits > 0 ? (
-                <>후기 {hero.count ?? 0}건 중 <span className="text-[15px]">{hero.tasteHits}건</span>이 {tasteLabel} 이야기
-                  {hero.count ? <span className="font-normal text-[#54432c]"> ({Math.round((hero.tasteHits / hero.count) * 100)}%)</span> : null}</>
+                <>검증 후기 <span className="text-[15px]">{hero.count ?? 0}건</span>에서 {tasteLabel} 이야기가 <span className="text-[15px]">{hero.tasteHits}번</span> 나왔어요</>
               ) : (
                 <>교차검증한 진짜 후기 <span className="text-[15px]">{hero.count ?? 0}건</span></>
               )}
             </p>
             {hero.identity && <p className="text-[13px] text-[#3d2f22] leading-relaxed mt-1.5">{hero.identity}</p>}
+            {Array.isArray(hero.cautions) && hero.cautions.length > 0 && (
+              <p className="text-[12px] font-bold text-[#8a5a3a] mt-1.5">
+                {hero.cautions.slice(0, 3).map((x) => `${x.emoji} ${x.label}`).join(" · ")}
+                <span className="font-normal text-[#54432c]"> · 후기에서 확인한 주의점</span>
+              </p>
+            )}
             {hero.quote && <p className="text-[12.5px] text-[#54432c] leading-relaxed mt-2 pl-2.5 border-l-2 border-[#e0d3b8]">“{hero.quote}”</p>}
             <span className="inline-block text-[12.5px] font-semibold text-[#7a5122] mt-2.5">근거 후기 전부 보기 →</span>
           </Link>
@@ -172,8 +193,18 @@ export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, headin
                       보이던 문제(공개 13,460곳 중 고유 한줄 7,654개)를 이 카페만의 숫자로 갈라준다. */}
                   {tasteKey && typeof c.tasteHits === "number" && c.tasteHits > 0 && (
                     <p className="text-[11.5px] font-bold text-[#5f7355] mt-1.5 pl-7">
-                      {tasteEmoji} {tasteLabel} 후기 {c.tasteHits}건
-                      {c.count ? <span className="font-normal text-[#54432c]"> · 전체 후기 {c.count}건 중 {Math.round((c.tasteHits / c.count) * 100)}%</span> : null}
+                      {tasteEmoji} {tasteLabel} 언급 {c.tasteHits}번
+                      {c.count ? <span className="font-normal text-[#54432c]"> · 검증 후기 {c.count}건</span> : null}
+                    </p>
+                  )}
+                  {/* ⚠️ "이건 알고 가세요"(2026-09-14, CEO "소비자가 우위를 느끼게") — **목록 카드에도** 올린다.
+                      우리 우위는 '좋은 곳 추천'이 아니라 **'헛걸음 방지'** 인데, 그 증거가 상세 안에만 있으면
+                      목록만 보고 떠나는 사람은 영원히 못 느낀다. 경쟁 서비스는 단점을 '거르기만' 하고 보여주지 않는다.
+                      추가 조회 0 — 합성 때 계산해 둔 작은 jsonb를 같은 SELECT에서 읽는다. */}
+                  {Array.isArray(c.cautions) && c.cautions.length > 0 && (
+                    <p className="text-[11.5px] font-bold text-[#8a5a3a] mt-1.5 pl-7">
+                      {c.cautions.slice(0, 2).map((x) => `${x.emoji} ${x.label}`).join(" · ")}
+                      <span className="font-normal text-[#54432c]"> · 후기에서 확인</span>
                     </p>
                   )}
                   {/* 🔌 카공 시설 사실(2026-08-30) — 경쟁사(naejari.com)는 이름·주소만 주고 이 정보가 아예 없다.
