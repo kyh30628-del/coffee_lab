@@ -595,6 +595,8 @@ export async function GET(req: NextRequest) {
     //      '스타필드'라는 비지역어가 있으니 장소 검색이 맞다(과잉 차단으로 place→semantic이 되던 것을 교정).
     const isRegionWord = (t: string) => geo0.dong.has(t) || geo0.sgg.has(t) || !!DONG_TO_GU[t] || !!(SIDO_GU as Record<string, string[]>)[t];
     const regionWordInQuery = parsed.tokens.length > 0 && parsed.tokens.every(isRegionWord);
+    // ⚠️ 2026-09-14: 이 함수는 정의만 되고 **아무데서도 안 쓰이고 있었다**(죽은 코드).
+    //   접두 매칭을 걷어낼 때 호출부만 지워진 것으로 보인다. 아래 placeHit에서 다시 쓴다.
     const wordBoundaryPrefix = (name: string) => {
       // 공백을 지운 비교용 문자열에서 qk가 접두일 때, 원본에서 그 지점이 단어 경계인지 본다.
       let seen = 0;
@@ -612,7 +614,14 @@ export async function GET(req: NextRequest) {
           //   🔴 접두 일치는 아예 쓰지 않는다(2026-09-12): "조용한 카페"가 '조용한…'으로 시작하는 장소에 걸려
           //      장소 검색으로 갔다. 우리 본래 강점인 '느낌 검색'을 장소가 가로채면 안 된다.
           //      정확 일치이거나, 질의가 장소 이름 + 꼬리 2자 이내일 때("스타필드 하남 점")만 장소로 본다.
-          return pn === qk || (qk.startsWith(pn) && pn.length >= 4 && qk.length - pn.length <= 2);
+          if (pn === qk) return true;
+          if (qk.startsWith(pn) && pn.length >= 4 && qk.length - pn.length <= 2) return true;
+          // 🔁 2026-09-14 역방향 접두 — 공식명에 꼬리가 붙어 정확일치가 깨지는 경우.
+          //   실측: "동대문디자인플라자" 질의가 인덱스의 '동대문디자인플라자(DDP)'와 안 맞아 2건으로 끝났다.
+          //   ⚠️ 개념어 하이재킹("조용한 카페"→'조용한…')을 막기 위해 **질의가 6자 이상일 때만** 허용한다.
+          //      긴 질의는 고유명이지 느낌어가 아니다. 꼬리는 4자 이내 + 단어 경계에서 끊길 때만.
+          if (qk.length >= 6 && pn.startsWith(qk) && pn.length - qk.length <= 4 && wordBoundaryPrefix(p.name)) return true;
+          return false;
         })
       : undefined;
     // 🏘️ 지역 + 부분 이름("구리 한일" · "분당 래미안") — 지역이 명시됐으니 부분일치를 허용해도 안전하다.
