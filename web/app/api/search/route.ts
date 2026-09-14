@@ -8,7 +8,7 @@ import { loadCriteria, getCriterionSync } from "@/lib/criteria";
 import { loadCriteriaLists, getListSync } from "@/lib/criteriaLists";
 import { parseQuery, loadGeoIndex, detectRegion, isCoreArea } from "@/lib/searchQuery";
 import { isFranchise } from "@/lib/discover";
-import { searchPlaces, placeKey, placeKeyAliased, isAnchorKind, normName } from "@/lib/placeIndex";
+import { searchPlaces, placeKey, placeKeyAliased, placeKeyNoSuffix, isAnchorKind, normName } from "@/lib/placeIndex";
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
@@ -588,6 +588,8 @@ export async function GET(req: NextRequest) {
     //   🔤 별칭을 푼 키도 함께 본다 — "남산타워"(공식 남산서울타워)·"고터"(고속터미널역)·"롯데타워".
     //      예전엔 별칭이 placeIndex 안에서만 적용돼, 후보는 정확히 찾고도 아래 판정에서 떨어져 place 모드로 못 갔다.
     const qkA = placeKeyAliased(q);
+    //   🏢 "네이버 본사" → "네이버". 원래 키(qk)로 먼저 보고 안 맞을 때만 쓴다(삼성전자 서초사옥 보호).
+    const qkB = placeKeyNoSuffix(q);
     //   🔴 하이재킹 방지(2026-09-12 실사고 2건):
     //     ① "연희동 카페" → 장소 '연희동물병원'(인천)에 걸려 인천 카페가 나왔다. "신사동 카페" → '신사동산'(용인).
     //        한국어는 단어 경계가 없어 접두 일치만으로는 '연희동'+'물병원'이 이어붙는다.
@@ -615,7 +617,8 @@ export async function GET(req: NextRequest) {
     //      하이재킹 가드(regionWordInQuery)에 막혀 검색 결과가 카페 1곳이었다(실측, region=성동구로 빠짐).
     //      이름이 **완전히 같고** 종류가 확실한 기준점(공원·명소·역·몰 등, 상호·아파트 제외)이면 장소가 정답이다.
     //      과거 사고(연희동→연희동물병원·신사동→신사동산)는 전부 **접두** 일치였으므로 이 예외에 걸리지 않는다.
-    const anchorExact = placeCands.find((p) => isAnchorKind(p.kind) && (normName(p.name) === qk || normName(p.name) === qkA));
+    const anchorExact = placeCands.find((p) => isAnchorKind(p.kind) && (normName(p.name) === qk || normName(p.name) === qkA))
+      ?? (qkB !== qk && qkB.length >= 2 ? placeCands.find((p) => isAnchorKind(p.kind) && normName(p.name) === qkB) : undefined);
     //   ⚠️ 길이 하한은 **별칭을 푼 뒤**로 본다 — "고터"(2자)가 여기서 잘려 고속터미널역(6자)을 못 썼다(실측).
     //   ⚠️ 정확일치 앵커가 있으면 길이 하한도 넘긴다 — "넥슨"·"토스"(2자)가 여기서 잘려 0건이었다.
     //      큐레이션된 이름과 **완전히 같은** 질의는 짧아도 모호하지 않다.
