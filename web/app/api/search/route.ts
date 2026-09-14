@@ -617,13 +617,22 @@ export async function GET(req: NextRequest) {
     //      하이재킹 가드(regionWordInQuery)에 막혀 검색 결과가 카페 1곳이었다(실측, region=성동구로 빠짐).
     //      이름이 **완전히 같고** 종류가 확실한 기준점(공원·명소·역·몰 등, 상호·아파트 제외)이면 장소가 정답이다.
     //      과거 사고(연희동→연희동물병원·신사동→신사동산)는 전부 **접두** 일치였으므로 이 예외에 걸리지 않는다.
-    const anchorExact = placeCands.find((p) => isAnchorKind(p.kind) && (normName(p.name) === qk || normName(p.name) === qkA))
-      ?? (qkB !== qk && qkB.length >= 2 ? placeCands.find((p) => isAnchorKind(p.kind) && normName(p.name) === qkB) : undefined);
+    // 🏪 결재 #1086(2026-09-14): 프랜차이즈 상호 POI는 장소 기준점 후보에서 제외한다.
+    //   "카페 상호를 검색했더니 그 근처의 무관한 카페들을 보여준다"는 자기참조라 무의미하고, 프랜차이즈명이
+    //   전국에 동일 이름으로 수백 곳(+ '(주)OO코리아 OO점'류 오분류 포함) 있어 첫 후보가 사실상
+    //   무작위 지역(부천시 등)으로 고정됐다("스타벅스"→부천시 무관 카페 24건, "커피빈"+서초구→상호 매칭
+    //   0건인데 place 모드로 감, 강남구 무관 카페까지 노출). kind=biz_cafe만으론 부족했다 — 실측으로
+    //   '커피빈코리아 OO점'류가 biz_food(음식점)로 잘못 분류돼 있어 이름 기반(isFranchise)으로 걸러야 한다.
+    //   우리 카페(cafes 테이블) 상호 일치는 아래 "카페명 일치" 섹션이 이미 전담한다.
+    const isFranchisePlace = (p: { name: string }) => isFranchise(p.name.replace(/\s+/g, ""));
+    const anchorExact = placeCands.find((p) => isAnchorKind(p.kind) && !isFranchisePlace(p) && (normName(p.name) === qk || normName(p.name) === qkA))
+      ?? (qkB !== qk && qkB.length >= 2 ? placeCands.find((p) => isAnchorKind(p.kind) && !isFranchisePlace(p) && normName(p.name) === qkB) : undefined);
     //   ⚠️ 길이 하한은 **별칭을 푼 뒤**로 본다 — "고터"(2자)가 여기서 잘려 고속터미널역(6자)을 못 썼다(실측).
     //   ⚠️ 정확일치 앵커가 있으면 길이 하한도 넘긴다 — "넥슨"·"토스"(2자)가 여기서 잘려 0건이었다.
     //      큐레이션된 이름과 **완전히 같은** 질의는 짧아도 모호하지 않다.
     const placeHit = (Math.max(qk.length, qkA.length) >= 3 || !!anchorExact) && (!regionWordInQuery || !!anchorExact)
       ? (anchorExact ?? placeCands.find((p) => {
+          if (isFranchisePlace(p)) return false;
           const pn = normName(p.name);
           //   🔴 접두 일치는 아예 쓰지 않는다(2026-09-12): "조용한 카페"가 '조용한…'으로 시작하는 장소에 걸려
           //      장소 검색으로 갔다. 우리 본래 강점인 '느낌 검색'을 장소가 가로채면 안 된다.
@@ -659,7 +668,7 @@ export async function GET(req: NextRequest) {
       if (Number.isFinite(la) && Number.isFinite(ln)) {
         const key = tokens.join("");
         const cands = searchPlaces(key, { limit: 80, near: [la, ln] })
-          .filter((pl) => pl.lat >= Number(b.s) - M && pl.lat <= Number(b.n) + M && pl.lng >= Number(b.w) - M && pl.lng <= Number(b.e) + M);
+          .filter((pl) => !isFranchisePlace(pl) && pl.lat >= Number(b.s) - M && pl.lat <= Number(b.n) + M && pl.lng >= Number(b.w) - M && pl.lng <= Number(b.e) + M);
         if (cands.length) placeHit2 = cands[0];
       }
     }
