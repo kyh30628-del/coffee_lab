@@ -73,6 +73,11 @@ const ALIAS: Record<string, string> = {
 };
 /** 질의에서 장소명만 남긴다("스타필드 하남 카페" → "스타필드하남"). 장소 검색인지 판단하는 데 쓴다. */
 export const placeKey = (q: string) => norm(q).replace(/(카페|커피|맛집|근처|주변|추천|가볼만한곳|가볼만한)/g, "");
+/** 별칭을 푼 검색키 — 라우트의 장소 판정도 같은 이름을 봐야 한다(2026-09-14: 별칭이 인덱스 안에서만 적용돼
+ *  "남산타워"·"고터"·"롯데타워"가 후보는 맞게 찾고도 place 모드로 못 넘어갔다). */
+export const placeKeyAliased = (q: string) => { const k = placeKey(q); return ALIAS[k] ? norm(ALIAS[k]) : k; };
+/** 정확일치로 볼 수 있는 '확실한 기준점' 종류 — 상호(biz_*)·아파트는 동명이 흔해 제외. */
+export const isAnchorKind = (k: string) => ["landmark", "attraction", "culture", "leisure", "park", "station", "bus_station", "aerodrome", "mall", "department_store", "university", "theme_park", "stadium", "museum", "aquarium", "marketplace"].includes(k);
 export const normName = norm;
 const R = 6371, rad = (d: number) => (d * Math.PI) / 180;
 const km = (a: number, b: number, c: number, d: number) => {

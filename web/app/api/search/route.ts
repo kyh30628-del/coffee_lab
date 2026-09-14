@@ -8,7 +8,7 @@ import { loadCriteria, getCriterionSync } from "@/lib/criteria";
 import { loadCriteriaLists, getListSync } from "@/lib/criteriaLists";
 import { parseQuery, loadGeoIndex, detectRegion, isCoreArea } from "@/lib/searchQuery";
 import { isFranchise } from "@/lib/discover";
-import { searchPlaces, placeKey, normName } from "@/lib/placeIndex";
+import { searchPlaces, placeKey, placeKeyAliased, isAnchorKind, normName } from "@/lib/placeIndex";
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
@@ -585,6 +585,9 @@ export async function GET(req: NextRequest) {
     const placeCands = payloadPlaces;
     const geo0 = await loadGeoIndex();   // 메모리/한 행 캐시 — 추가 조회 없음
     const qk = placeKey(q);
+    //   🔤 별칭을 푼 키도 함께 본다 — "남산타워"(공식 남산서울타워)·"고터"(고속터미널역)·"롯데타워".
+    //      예전엔 별칭이 placeIndex 안에서만 적용돼, 후보는 정확히 찾고도 아래 판정에서 떨어져 place 모드로 못 갔다.
+    const qkA = placeKeyAliased(q);
     //   🔴 하이재킹 방지(2026-09-12 실사고 2건):
     //     ① "연희동 카페" → 장소 '연희동물병원'(인천)에 걸려 인천 카페가 나왔다. "신사동 카페" → '신사동산'(용인).
     //        한국어는 단어 경계가 없어 접두 일치만으로는 '연희동'+'물병원'이 이어붙는다.
@@ -608,8 +611,13 @@ export async function GET(req: NextRequest) {
       }
       return seen === qk.length;
     };
-    const placeHit = qk.length >= 3 && !regionWordInQuery
-      ? placeCands.find((p) => {
+    //   🏞️ 정확일치 예외(2026-09-14): "서울숲"은 **랜드마크이면서 동시에 지역어**로도 등록돼 있어
+    //      하이재킹 가드(regionWordInQuery)에 막혀 검색 결과가 카페 1곳이었다(실측, region=성동구로 빠짐).
+    //      이름이 **완전히 같고** 종류가 확실한 기준점(공원·명소·역·몰 등, 상호·아파트 제외)이면 장소가 정답이다.
+    //      과거 사고(연희동→연희동물병원·신사동→신사동산)는 전부 **접두** 일치였으므로 이 예외에 걸리지 않는다.
+    const anchorExact = placeCands.find((p) => isAnchorKind(p.kind) && (normName(p.name) === qk || normName(p.name) === qkA));
+    const placeHit = qk.length >= 3 && (!regionWordInQuery || !!anchorExact)
+      ? (anchorExact ?? placeCands.find((p) => {
           const pn = normName(p.name);
           //   🔴 접두 일치는 아예 쓰지 않는다(2026-09-12): "조용한 카페"가 '조용한…'으로 시작하는 장소에 걸려
           //      장소 검색으로 갔다. 우리 본래 강점인 '느낌 검색'을 장소가 가로채면 안 된다.
@@ -621,8 +629,10 @@ export async function GET(req: NextRequest) {
           //   ⚠️ 개념어 하이재킹("조용한 카페"→'조용한…')을 막기 위해 **질의가 6자 이상일 때만** 허용한다.
           //      긴 질의는 고유명이지 느낌어가 아니다. 꼬리는 4자 이내 + 단어 경계에서 끊길 때만.
           if (qk.length >= 6 && pn.startsWith(qk) && pn.length - qk.length <= 4 && wordBoundaryPrefix(p.name)) return true;
+          //   별칭을 푼 키로도 같은 판정을 한다("남산타워"→남산서울타워, "고터"→고속터미널역).
+          if (qkA !== qk && (pn === qkA || (pn.startsWith(qkA) && pn.length - qkA.length <= 4))) return true;
           return false;
-        })
+        }))
       : undefined;
     // 🏘️ 지역 + 부분 이름("구리 한일" · "분당 래미안") — 지역이 명시됐으니 부분일치를 허용해도 안전하다.
     //   실사고(2026-09-12): "구리 한일"이 0곳이었다. 접두 매칭을 없앤 뒤로 지역+약칭 조합을 못 잡았다.
