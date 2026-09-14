@@ -35,13 +35,16 @@ const KIND: Record<string, [string, string]> = {
   // 🗺️ 2026-09-14(CEO "건물·상호·회사·랜드마크 파워풀하게") — 한국관광공사 TourAPI(공공누리) 16,156건 편입.
   //   실측 실패가 근거다: 서울숲→카페 1곳 · DDP→1곳 · 남산타워→0곳. OSM엔 '서울숲'이 아파트 이름으로만 있었다.
   culture: ["문화시설", "🎨"], leisure: ["레포츠", "⛰️"],   // landmark는 위에 이미 있다
+  // 🏢 2026-09-14(결재 #1085) — 상장사 본사. KRX 상장법인 목록 + 네이버 좌표, 시도 교차검증 통과분만.
+  company: ["회사", "🏢"],
 };
 // 같은 점수면 '가려는 곳'으로 자주 쓰이는 종류를 먼저 — 역·터미널·공항 > 큰 시설 > 아파트·공원.
 //   상호(biz_*)는 같은 이름이 전국에 수백 개씩 있어 랜드마크보다 뒤에 둔다 — '강남역'이 '강남역국밥'보다 먼저.
 //   🔴 2026-09-14 가중치 재설계: 예전엔 점수에 PRIO*0.5만 곱해 길이 페널티(0~6)에 묻혔다.
 //     그래서 '코엑스' 질의에 '강남교자 스타필드 코엑스몰점'(biz_food)이 '스타필드 코엑스몰'(mall)을 이겼다.
 //     PRIO*2로 올려 **종류가 실제로 순위를 가르게** 한다(같은 종류 안에서는 여전히 이름이 짧은 쪽이 먼저).
-const PRIO: Record<string, number> = { landmark: 0, attraction: 0, culture: 0, station: 0, bus_station: 0, aerodrome: 0, leisure: 1, department_store: 1, mall: 1, university: 1, hospital: 1, theme_park: 1, stadium: 1, museum: 2, aquarium: 2, zoo: 2, marketplace: 2, cinema: 2, theatre: 2, hotel: 3, apt: 3, library: 3, supermarket: 3, school: 3, peak: 4, townhall: 4, government: 4, park: 5,
+//   회사(company)는 상호(biz_*)보다 확실히 앞이어야 한다 — '삼성전자'는 판매점이 아니라 회사를 찾는 질의다.
+const PRIO: Record<string, number> = { landmark: 0, attraction: 0, culture: 0, station: 0, bus_station: 0, aerodrome: 0, leisure: 1, company: 2, department_store: 1, mall: 1, university: 1, hospital: 1, theme_park: 1, stadium: 1, museum: 2, aquarium: 2, zoo: 2, marketplace: 2, cinema: 2, theatre: 2, hotel: 3, apt: 3, library: 3, supermarket: 3, school: 3, peak: 4, townhall: 4, government: 4, park: 5,
   biz_food: 6, biz_cafe: 6, biz_shop: 6, biz_cvs: 7, biz_bank: 6, biz_care: 6, biz_car: 6, biz_edu: 6, biz_office: 7, biz_gym: 6 };
 
 let ROWS: Row[] | null = null;
@@ -77,7 +80,7 @@ export const placeKey = (q: string) => norm(q).replace(/(카페|커피|맛집|�
  *  "남산타워"·"고터"·"롯데타워"가 후보는 맞게 찾고도 place 모드로 못 넘어갔다). */
 export const placeKeyAliased = (q: string) => { const k = placeKey(q); return ALIAS[k] ? norm(ALIAS[k]) : k; };
 /** 정확일치로 볼 수 있는 '확실한 기준점' 종류 — 상호(biz_*)·아파트는 동명이 흔해 제외. */
-export const isAnchorKind = (k: string) => ["landmark", "attraction", "culture", "leisure", "park", "station", "bus_station", "aerodrome", "mall", "department_store", "university", "theme_park", "stadium", "museum", "aquarium", "marketplace"].includes(k);
+export const isAnchorKind = (k: string) => ["landmark", "attraction", "culture", "leisure", "park", "station", "bus_station", "aerodrome", "mall", "department_store", "university", "theme_park", "stadium", "museum", "aquarium", "marketplace", "company"].includes(k);
 export const normName = norm;
 const R = 6371, rad = (d: number) => (d * Math.PI) / 180;
 const km = (a: number, b: number, c: number, d: number) => {
