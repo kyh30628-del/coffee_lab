@@ -333,8 +333,28 @@ const one = async (q: any): Promise<number> => Number((await q)[0].c);
 export async function detectIssues(): Promise<Issue[]> {
   const out: Issue[] = [];
   // 1) 크론·에이전트 실패 (job별 최신이 실패)
-  const crons = (await sql`SELECT DISTINCT ON (job) job, ok, detail FROM agent_runs ORDER BY job, ran_at DESC`) as any[];
-  for (const c of crons) if (!c.ok) out.push({ ikey: `cronfail:${c.job}`, source: "크론", severity: "HIGH", type: "크론 실패", title: `${c.job} 실패`, detail: String(c.detail || "").slice(0, 200), team: teamOf(c.job), consumer: false });
+  // 🔴 2026-09-15(CEO "관제탑 좀 고쳐") — 여기가 관제탑 오해의 진원지였다.
+  //   `agent_runs`는 **job이 PK**라 잡당 1행만 남는다. 즉 여기 보이는 건 '지금 상태'가 아니라
+  //   **그 잡이 마지막으로 돌았을 때의 상태**다. 하루 1회 도는 잡이 아침에 한 번 실패하면
+  //   다음 날 아침까지 24시간 내내 "실패"로 떠 있다 — 이미 지나간 일인데 현재형으로 읽힌다.
+  //   실측: #5806이 08-19부터 27일, #5376이 07-31부터 46일 상주했다.
+  //   → 기록 나이를 함께 싣는다. 그 잡의 기대주기(EXPECT_MAX_H)를 넘겼으면 '낡은 기록'이라고 못박는다.
+  const crons = (await sql`SELECT DISTINCT ON (job) job, ok, detail, ran_at FROM agent_runs ORDER BY job, ran_at DESC`) as any[];
+  for (const c of crons) {
+    if (c.ok) continue;
+    const ageH = Math.max(0, (Date.now() - new Date(c.ran_at).getTime()) / 36e5);
+    const ageTxt = ageH < 1 ? `${Math.round(ageH * 60)}분 전` : ageH < 48 ? `${ageH.toFixed(0)}시간 전` : `${Math.floor(ageH / 24)}일 전`;
+    // 기대주기를 넘긴 기록 = 그 사이 재실행이 없었다는 뜻. 지금 고장인지 아닌지 이 행만으론 모른다.
+    const stale = ageH > (EXPECT_MAX_H[c.job] ?? 24);
+    out.push({
+      ikey: `cronfail:${c.job}`, source: "크론",
+      severity: stale ? "MED" : "HIGH",
+      type: stale ? "크론 실패(낡은 기록)" : "크론 실패",
+      title: `${c.job} 실패 — ${ageTxt} 기록${stale ? " · 이후 재실행 없음" : ""}`,
+      detail: (stale ? `⏳ 이 기록은 ${ageTxt}이고 그 뒤로 이 잡이 다시 돌지 않았다(기대주기 ${EXPECT_MAX_H[c.job] ?? 24}h). 지금도 고장인지는 다음 정기 실행이 말해준다. · ` : "") + String(c.detail || "").slice(0, 200),
+      team: teamOf(c.job), consumer: false,
+    });
+  }
 
   // 1-b) 💰 비용 — 관제탑이 **정작 중요한 사실을 안 보여주던 자리**(2026-09-15 수리).
   //   예전엔 cron-costwatch가 이상을 감지하면 스스로 ok=false를 찍어 '크론 실패'로만 떴다.

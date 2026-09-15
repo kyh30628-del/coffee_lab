@@ -547,14 +547,22 @@ export default function OrgDashboard() {
                 {i.detail && <div style={{ fontSize: 11, color: "#5a4631", margin: "4px 0 3px", lineHeight: 1.4 }}>{i.detail}</div>}
                 {(() => {
                   const st = i.state || "처리중";
+                  const hrs = Number(i.hrs) || 0;
+                  // 🔴 2026-09-15(CEO "관제탑 좀 고쳐") — 여기가 보드가 거짓말하던 자리다.
+                  //   '처리중' 이슈엔 무조건 "다음 자동 교정 사이클 (~10분 주기)"를 찍었다. 그런데 실측하면
+                  //   #5376은 46일, #5806은 27일을 그 문구를 단 채 앉아 있었다. 10분마다 교정된다더니
+                  //   실제로는 **아무 자동화도 손댈 수 없는 건**이었다(둘 다 사람 결정이 필요했다).
+                  //   → 약속한 주기를 크게 넘긴 건 더는 "곧 자동 처리"라고 말하지 않는다. 사실대로 쓴다.
+                  const stalled = st === "처리중" && hrs >= 24;
                   const eta = st === "결재대기" ? "대표님 결재 시 즉시 집행"
                     : st === "OUTSTANDING" ? "기조실장 집행 — 시점 추적 중(자동 미해결)"
+                    : stalled ? `자동 교정으로 안 풀림 — ${hrs >= 48 ? `${Math.floor(hrs / 24)}일째 ` : ""}사람 결정 필요`
                     : (i.note && /(시간|매시|매 |분|즉시|:\d|주기|사이클|일\b)/.test(i.note)) ? i.note
                     : "다음 자동 교정 사이클 (~10분 주기)";
-                  const elapsed = Number(i.hrs) >= 24 ? `${Math.floor(Number(i.hrs) / 24)}일 경과` : Number(i.hrs) >= 1 ? `${Math.floor(Number(i.hrs))}시간 경과` : "방금";
+                  const elapsed = hrs >= 24 ? `${Math.floor(hrs / 24)}일 경과` : hrs >= 1 ? `${Math.floor(hrs)}시간 경과` : "방금";
                   return (
-                    <div style={{ fontSize: 10.5, color: "#9c8a6c", lineHeight: 1.55 }}>
-                      🕐 <b>발생</b> {i.seen} ({elapsed}) · ⏱ <b>조치예상</b> {eta} · 담당 <b style={{ color: "#7a5a2a" }}>{i.team}</b>
+                    <div style={{ fontSize: 10.5, color: stalled ? "#b06a2e" : "#9c8a6c", lineHeight: 1.55 }}>
+                      🕐 <b>발생</b> {i.seen} (<b style={{ color: stalled ? "#b03a3a" : "inherit" }}>{elapsed}</b>) · ⏱ <b>조치예상</b> {stalled ? <b style={{ color: "#b03a3a" }}>⚠️ {eta}</b> : eta} · 담당 <b style={{ color: "#7a5a2a" }}>{i.team}</b>
                     </div>
                   );
                 })()}
