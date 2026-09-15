@@ -10,8 +10,20 @@ export const runtime = "nodejs";
 //   배경: youtube-backfill.mjs의 반복조회 버그가 한 달간 조용히 ~660GB를 읽어 청구서($58.58)로 처음 발견됐다
 //   (feedback: "그런 일들이 원천적으로 일어나지 않아야지... 발견해서 빨리 조치할 수 있게 해줘야 정상 아니냐").
 //   pg_stat_statements를 매일 어제 스냅샷과 비교해 "하루만에 비정상적으로 커진 쿼리"를 결정론으로 잡는다.
-//   임계치 초과 시 ok=false로 recordRun → issues 보드에 HIGH로 자동 상신 + self-audit 자동기동(기존 인프라 재사용, 새 알림채널 없음).
-const PER_QUERY_GB_ALERT = Number(process.env.COST_WATCH_PER_QUERY_GB || 10); // 하루 한 쿼리가 이 이상 새로 읽으면 경보(버그 실측 ~22.8GB/일보다 낮게 잡아 조기탐지) — 단일쿼리 폭주는 서비스 성장과 무관한 버그 신호라 절대값 유지
+//   🔴 2026-09-15 수리(CEO "관제탑에 계속 에러가 떠있자나") — 예전엔 이상을 감지하면 `recordRun(..., ok=false)`로 찍었다.
+//   그러면 lib/issues.ts의 '크론 실패' 스캐너가 이걸 집어 **"cron-costwatch 실패"**로 띄운다.
+//   크론은 멀쩡히 돌아 탐지에 성공한 것인데 실패로 찍히니 ①관제탑에 27일째 상주(#5806)
+//   ②진짜 실패(500·타임아웃)와 구분 불가. 선례가 이미 있다 — cron-discover-categories가
+//   크레딧 소진을 '크론 실패'로 띄우던 false-red를 같은 방식으로 걷어냈다.
+//   → **실행 성공은 ok=true로 찍고, 이상은 '비용 이상'이라는 제 이름의 이슈로 올린다.**
+// 하루 한 쿼리가 이 이상 새로 읽으면 **경보**(버그 실측 ~22.8GB/일보다 낮게 잡아 조기탐지).
+// 🔴 2026-09-15 — 이 값으로 **파이프라인을 정지시키지 않는다**(경보만). 이유는 실측이다:
+//   09-15 총 디스크읽기 219.3GB < 임계 242.6GB로 총량은 정상인데, 최다쿼리 13.7GB(총량의 6%)가
+//   이 절대값 10GB를 넘겨 자동정지가 걸렸다. 기준선이 85GB/일이던 시절 잡은 절대값을 총량이
+//   150~220GB/일로 큰 지금 그대로 쓰니, 정상 비율의 쿼리가 매번 걸린다.
+//   실측 피해: 최근 30일 중 **14일** 정지 · 누적 119회 스킵(cron-grow·synth·resynth·exposure).
+//   메모리 규율 그대로다 — "고정창 임계 금지 → 순환천장". 같은 파일의 가동시간도 이미 경보만 한다.
+const PER_QUERY_GB_ALERT = Number(process.env.COST_WATCH_PER_QUERY_GB || 10);
 const TOTAL_GB_FLOOR = Number(process.env.COST_WATCH_TOTAL_GB || 25); // 중앙값이 작거나(신규 배포) 이력이 없을 때의 하한(기존 절대임계값 그대로 보존)
 const XFER_RATE = 0.032; // Neon 공용 네트워크 전송(발신) 공개단가 $/GB
 
@@ -229,8 +241,12 @@ export async function GET(req: NextRequest) {
     //   전송량 폭주(7월 $58 사고의 지문)는 명백한 버그 신호라 멈추는 게 맞지만,
     //   가동시간은 트래픽이 늘어도 오른다. 여기서 멈추면 **잘 되는 날 서비스를 끄는 셈**이다.
     //   (CEO 원칙 "빨강은 소비자 손상일 때만"과도 같은 결. 가동시간 증가는 소비자 손상이 아니다.)
-    const transferBad = (top && top.deltaGb >= PER_QUERY_GB_ALERT) || totalGb >= totalLimit;
-    const anomaly = transferBad;
+    const perQueryBad = !!(top && top.deltaGb >= PER_QUERY_GB_ALERT); // 경보만
+    const totalBad = totalGb >= totalLimit;                            // 이것만 정지시킨다
+    // 🛑 자동정지는 **총량 폭주**에만 건다 — 7월 $58 사고의 지문이 그거였다(한 달간 조용히 660GB).
+    //   단일쿼리는 살펴볼 값이지 하루치 파이프라인을 얼릴 근거가 아니다.
+    const anomaly = totalBad;
+    const alertOnly = perQueryBad && !totalBad;
     const awakeTxt = `가동 ${(aw.awakeMin / 60).toFixed(1)}h/일(깨어남 ${aw.wakes}회, 새벽 ${aw.nightMin}분, 7일중앙값 ${(aw.medianMin / 60).toFixed(1)}h)`;
     const awakeNote = awakeBad ? `⚠️ 가동시간 주의: ${awakeTxt} — 중앙값의 ${AWAKE_MEDIAN_MULT}배(${(awakeLimit / 60).toFixed(1)}h) 초과. ` : "";
     // 🔴 2026-09-13 라벨 정정(CEO "338.6기가는 이해가 안 되네") — 이 숫자는 **네트워크 전송이 아니라 DB 디스크 읽기**다
@@ -248,9 +264,11 @@ export async function GET(req: NextRequest) {
         billed = ` · 💳실청구 전송 ${Number(b.egress_per_day).toFixed(1)}GB/일(월누계 ${Number(b.egress_gb).toFixed(0)}GB·무료 500GB의 ${Math.round(Number(b.egress_gb) / 5)}%) · 컴퓨트 ${Number(b.compute_per_day).toFixed(1)}CU-h/일${ageH > 30 ? `(${ageH}h 전 기준)` : ""}`;
       } else billed = " · 💳실청구 미수집(로컬 neon-billing 스냅샷 확인 필요)";
     } catch { /* 실패해도 디스크 읽기만으로 보고 */ }
+    const topTxt = perQueryBad ? ` · 최다쿼리 ${top!.deltaGb.toFixed(1)}GB: ${top!.q.replace(/\s+/g, " ").slice(0, 100)}` : "";
     const detail = anomaly
-      ? awakeNote + `🚨 디스크 읽기 이상(내부 I/O·청구액 아님): 오늘 총 ${totalGb.toFixed(1)}GB(임계 ${totalLimit.toFixed(1)}GB, 7일중앙값 ${medGb.toFixed(1)}GB×${TOTAL_MEDIAN_MULT})${billed}` +
-        (top && top.deltaGb >= PER_QUERY_GB_ALERT ? ` · 최다쿼리 ${top.deltaGb.toFixed(1)}GB: ${top.q.replace(/\s+/g, " ").slice(0, 100)}` : "")
+      ? awakeNote + `🚨 디스크 읽기 총량 이상 — 자동정지: 오늘 총 ${totalGb.toFixed(1)}GB(임계 ${totalLimit.toFixed(1)}GB, 7일중앙값 ${medGb.toFixed(1)}GB×${TOTAL_MEDIAN_MULT})${billed}${topTxt}`
+      : alertOnly
+      ? awakeNote + `⚠️ 단일쿼리 주의(정지 아님): 최다 ${top!.deltaGb.toFixed(1)}GB ≥ ${PER_QUERY_GB_ALERT}GB — 총량은 정상 ${totalGb.toFixed(1)}GB/임계 ${totalLimit.toFixed(1)}GB${billed}${topTxt}`
       : awakeNote + `정상 — 디스크 읽기 ${totalGb.toFixed(1)}GB(임계 ${totalLimit.toFixed(1)}GB, 7일중앙값 ${medGb.toFixed(1)}GB×${TOTAL_MEDIAN_MULT})${billed}, ${awakeTxt}`;
 
     // 📒 하네스 L5 — 실행 원장 보존정리(90일). 하루 1회·행 수천 개 수준이라 부하 무시 가능.
@@ -262,7 +280,9 @@ export async function GET(req: NextRequest) {
     await sql`DELETE FROM share_events WHERE ts < now() - interval '365 days'`.catch(() => {});
     await sql`DELETE FROM outbound_clicks WHERE ts < now() - interval '365 days'`.catch(() => {});
     await sql`DELETE FROM owner_funnel_events WHERE ts < now() - interval '365 days'`.catch(() => {});
-    await recordRun("cron-costwatch", !anomaly, detail + (pruned ? ` · 원장정리 ${pruned}행` : ""), cur.length);
+    // ✅ 실행에 성공했으면 ok=true다. 이상 여부는 detail이 말하고, 관제탑엔 '비용 이상'이라는
+    //   제 이름의 이슈로 뜬다(lib/issues.ts). 여기서 false를 찍으면 '크론 실패'로 둔갑한다.
+    await recordRun("cron-costwatch", true, detail + (pruned ? ` · 원장정리 ${pruned}행` : ""), cur.length);
     // 🛑 과다 시 자동 정지(무거운 자율 크론이 스킵) / 정상 복귀 시 자동 해제 — CEO "과다면 멈춰"
     await setCostHalt(anomaly, anomaly ? `자동정지: ${detail.slice(0, 150)}` : "정상").catch(() => {});
     await sendCostReport(totalGb, top, anomaly, execMin, totalLimit).catch(() => {}); // 📧 매일 아침 CEO 비용 점검 메일(발송 실패는 점검 자체를 막지 않음)

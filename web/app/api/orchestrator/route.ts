@@ -177,7 +177,10 @@ export async function GET(req: NextRequest) {
     //   사람이 할 일이 없다(어제 확장 배치 53.6GB가 하루 종일 critical을 눌렀다 — 원인 규명·설명 끝난 건인데도).
     //   빨강 자격 = 사람 조치 필요. 차단기 ON이면 '시스템이 대응 중' 주의로 내리고,
     //   차단기가 안 걸렸는데 이상이면(대응 실패) 그때만 빨강 유지.
-    const costwatchAnomaly = failed.filter((j) => j.job === "cron-costwatch" && /데이터전송 이상/.test(j.detail || ""));
+    // 🔴 2026-09-15 — 이 필터는 죽어 있었다. 09-13에 문구를 '데이터전송 이상'→'디스크 읽기'로 고치면서
+    //   여길 같이 안 고쳐, 이후 한 건도 안 잡혔다(라벨과 판정이 따로 노는 그 패턴). 현행 문구로 맞춘다.
+    //   costwatch가 이제 ok=true로 찍으므로 failed가 아니라 전체 실행에서 찾는다.
+    const costwatchAnomaly = jobRuns.filter((j: any) => j.job === "cron-costwatch" && /디스크 읽기 총량 이상/.test(j.detail || ""));
     let costHalted = false;
     try { const [g] = (await sql`SELECT halted FROM cost_guard WHERE id=1`.catch(() => [])) as any[]; costHalted = !!g?.halted; } catch {}
     const costwatchHandled = costHalted ? costwatchAnomaly : [];

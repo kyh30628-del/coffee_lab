@@ -336,6 +336,28 @@ export async function detectIssues(): Promise<Issue[]> {
   const crons = (await sql`SELECT DISTINCT ON (job) job, ok, detail FROM agent_runs ORDER BY job, ran_at DESC`) as any[];
   for (const c of crons) if (!c.ok) out.push({ ikey: `cronfail:${c.job}`, source: "크론", severity: "HIGH", type: "크론 실패", title: `${c.job} 실패`, detail: String(c.detail || "").slice(0, 200), team: teamOf(c.job), consumer: false });
 
+  // 1-b) 💰 비용 — 관제탑이 **정작 중요한 사실을 안 보여주던 자리**(2026-09-15 수리).
+  //   예전엔 cron-costwatch가 이상을 감지하면 스스로 ok=false를 찍어 '크론 실패'로만 떴다.
+  //   그래서 화면엔 "크론이 고장났다"고 나오는데, 실제로 벌어진 일은 **파이프라인 4종이 정지**였다.
+  //   그 정지는 어디에도 안 떴다 — 30일 중 14일(누적 119회 스킵)이 조용히 지나갔다.
+  //   이제 둘을 각자 제 이름으로 띄운다: 이상 감지는 '비용 이상', 정지는 '파이프라인 정지'.
+  {
+    const cw = crons.find((c: any) => c.job === "cron-costwatch");
+    const d = String(cw?.detail || "");
+    if (d.startsWith("🚨") || d.includes("🚨 디스크 읽기"))
+      out.push({ ikey: "cost:anomaly", source: "비용", severity: "MED", type: "비용 이상", title: "디스크 읽기 총량 임계 초과", detail: d.slice(0, 200), team: "경영지원본부", consumer: false });
+    else if (d.includes("⚠️ 단일쿼리 주의"))
+      out.push({ ikey: "cost:query", source: "비용", severity: "LOW", type: "비용 주의", title: "단일쿼리 디스크 읽기 주의(정지 아님)", detail: d.slice(0, 200), team: "경영지원본부", consumer: false });
+
+    // 🛑 정지 자체를 띄운다. 이게 소비자에게 가는 실제 영향이다 — 새 카페가 공개로 안 넘어간다.
+    const [g] = (await sql`SELECT halted, reason, set_at FROM cost_guard WHERE id = 1`.catch(() => [])) as any[];
+    if (g?.halted) {
+      const h = Math.max(0, Math.round((Date.now() - new Date(g.set_at).getTime()) / 36e5));
+      const [sk] = (await sql`SELECT count(*)::int c FROM run_ledger WHERE detail LIKE '%비용 자동정지%' AND started_at >= ${g.set_at}`.catch(() => [{ c: 0 }])) as any[];
+      out.push({ ikey: "cost:halt", source: "비용", severity: "HIGH", type: "파이프라인 정지", title: `비용 자동정지 ${h}시간째 — 수집·합성 중단(스킵 ${sk?.c ?? 0}회)`, detail: `정지 사유: ${String(g.reason || "").slice(0, 150)} · 멈춘 크론: cron-grow·cron-synth·cron-resynth·cron-exposure. 신규 적재분이 공개로 넘어가지 않는다.`, team: "경영지원본부", consumer: true });
+    }
+  }
+
   // 2) 데이터 정합성 위반 (sentinel 축)
   // 🚨 2026-08-26: 여기 좌표가 하드코딩(36.8~38.3/124.5~127.9)돼 있어, criteria로 박스를 넓힌 뒤에도
   //   정상 공개된 강원 카페 764곳을 "박스 밖 공개" HIGH로 잘못 경보했다. 앞서 메시지만 고치고
