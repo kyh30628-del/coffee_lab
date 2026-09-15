@@ -352,3 +352,4 @@
 | 2026-09-13 11:47 | #1069 | [개발] 협업 #397 후속: 검색 지역판정 오탐 버그 — "노트북 하기 좋은 카페" 등 흔한 어미가 법정동 | fafbed50 | - | lib/searchQuery.ts: loadGeoIndex()의 dong bare-key(접미사 동/가/읍/면/리 제거) 생성 시 STOPWORDS(흔한 조사/어미/범용어 사전)와 |
 | 2026-09-14 00:24 | #1071 | [개발] 협업 #407: #1063 보강증거: 나이브 키워드 검색("디저트"/"빵집") 504 타임아웃 실사 | 5a6a9dfb | - | app/api/search/route.ts 개념축 보강조회(dessert 등)에 5초 AbortSignal.timeout+catch 추가: EXPLAIN ANALYZE 실측(콜드캐 |
 | 2026-09-15 11:05 | #1073 | [자율진단] cron-sentinel 7회째 재발 — #1037 공용데드라인 배포 후에도 300s 타임아웃( | 34fa15a0 | - | app/api/cron-sentinel/route.ts: GLOBAL_DEADLINE_MS 260s to 220s, 6 heal deadlines tightened from up- |
+| 2026-09-15 11:05 | #1074 | [룰갭 신규] COMMON_WORD_NAMES 미등재 "프리마베라" — 제품/차종 모델명 동음이의 충돌 (i | c935ed32 | - | web/lib/reviewQuality.ts:406-409에 COMMON_WORD_NAMES.add("프리마베라") 추가(동음이의 모델명/메뉴명 오염 방지, id31796). ts |
