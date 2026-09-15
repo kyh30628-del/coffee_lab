@@ -1025,7 +1025,9 @@ export async function GET(req: NextRequest) {
     //   무제한)로, 공용 누적 데드라인이 없으면 Vercel 300s 하드타임아웃에 강제종료돼 catch-all recordRun조차
     //   못 남기는 "완전 무응답"이 6회 재발했다(#860·#950·#969·#999·#1029). 전체 시작(started) 기준 260s 누적
     //   경과 시 남은 스캐너/치유는 건너뛰고 truncated로 표시 — 최악의 경우에도 recordRun은 반드시 남긴다.
-    const GLOBAL_DEADLINE_MS = 260000;
+    // ⚠️(#1073, 7회+ 재발) 260s는 스캐너 앞단만 막고 테일(콘솔키 프로브·리스정리·리포트 INSERT)엔
+    //   여유가 4~20초뿐이었다 — 300s 하드킬까지 40~70s 여유를 두도록 220s대로 낮춤.
+    const GLOBAL_DEADLINE_MS = 220000;
     const overBudget = () => Date.now() - started > GLOBAL_DEADLINE_MS;
     const truncatedScanners: string[] = [];
     function skip<T>(name: string, fallback: T): T { truncatedScanners.push(name); return fallback; }
@@ -1036,7 +1038,7 @@ export async function GET(req: NextRequest) {
     // 🎡 명소·행사 오염(약한토큰 사각) — 탐지·경보만.
     const attr = overBudget() ? skip("attraction", { count: 0, samples: [] as string[], flagged: [] as AttrFlag[] }) : await scanAttractionPollution().catch(() => ({ count: 0, samples: [] as string[], flagged: [] as AttrFlag[] }));
     // 🎡 자율 조치: flag된 명소·행사 오염을 남은 시간예산 안에서 자동 제거(런당 최대 12곳, deadline 270s). 나머지는 다음 런.
-    const attrHeal = (DRY || overBudget()) ? { fixed: 0, dropped: 0, unpub: 0, names: [] as string[], skipped: 0, noEffect: 0, frozen: 0 } : await healAttractionPollution(attr.flagged || [], started + 240000).catch(() => ({ fixed: 0, dropped: 0, unpub: 0, names: [] as string[], skipped: 0, noEffect: 0, frozen: 0 }));
+    const attrHeal = (DRY || overBudget()) ? { fixed: 0, dropped: 0, unpub: 0, names: [] as string[], skipped: 0, noEffect: 0, frozen: 0 } : await healAttractionPollution(attr.flagged || [], started + 190000).catch(() => ({ fixed: 0, dropped: 0, unpub: 0, names: [] as string[], skipped: 0, noEffect: 0, frozen: 0 }));
     // 🧾 사람이 판독을 끝낸 건(=동결)은 **탐지 카운트에서 뺀다** — 2026-08-08 15건 판독 결과
     //   오탐 5·보존판정 9·확인필요 1로 **데이터 삭제가 필요한 건 0건**이었다. 그런데도 매 런 22건이
     //   그대로 잡히면 워치리스트가 영원히 빨간 상태로 남아 진짜 신규 오염이 묻힌다.
@@ -1044,19 +1046,19 @@ export async function GET(req: NextRequest) {
     (checks as any).attraction_pollution = Math.max(0, attr.count - attrHeal.fixed - (await frozenTargets("sentinel.attraction")).size); // 자동조치 후 잔여
     // 🔤 약한이름(1글자) 흡수 오염(name_mismatch가 의도적 제외하는 사각) — 명시적 타카페명만 자동 제거.
     const weak = overBudget() ? skip("weak_name", { count: 0, samples: [] as string[], flagged: [] as WeakFlag[] }) : await scanWeakNamePollution().catch(() => ({ count: 0, samples: [] as string[], flagged: [] as WeakFlag[] }));
-    const weakHeal = (DRY || overBudget()) ? { fixed: 0, dropped: 0, unpub: 0, names: [] as string[], skipped: 0, noEffect: 0, frozen: 0 } : await healWeakNamePollution(weak.flagged || [], started + 250000).catch(() => ({ fixed: 0, dropped: 0, unpub: 0, names: [] as string[], skipped: 0, noEffect: 0, frozen: 0 }));
+    const weakHeal = (DRY || overBudget()) ? { fixed: 0, dropped: 0, unpub: 0, names: [] as string[], skipped: 0, noEffect: 0, frozen: 0 } : await healWeakNamePollution(weak.flagged || [], started + 200000).catch(() => ({ fixed: 0, dropped: 0, unpub: 0, names: [] as string[], skipped: 0, noEffect: 0, frozen: 0 }));
     (checks as any).weak_name_pollution = Math.max(0, weak.count - weakHeal.fixed - (await frozenTargets("sentinel.weak-name")).size); // 자동조치 후 잔여
     // 🏢 비카페 업종 오염(부동산·마사지·시계·구인 등, xref 사각) — 강한 업종어 + 카페명마커 부재만 자동 제거.
     const ncb = overBudget() ? skip("noncafe_biz", { count: 0, samples: [] as string[], flagged: [] as NcbFlag[] }) : await scanNonCafeBizPollution().catch(() => ({ count: 0, samples: [] as string[], flagged: [] as NcbFlag[] }));
-    const ncbHeal = (DRY || overBudget()) ? { fixed: 0, dropped: 0, unpub: 0, names: [] as string[], skipped: 0, noEffect: 0, frozen: 0 } : await healNonCafeBizPollution(ncb.flagged || [], started + 280000).catch(() => ({ fixed: 0, dropped: 0, unpub: 0, names: [] as string[], skipped: 0, noEffect: 0, frozen: 0 }));
+    const ncbHeal = (DRY || overBudget()) ? { fixed: 0, dropped: 0, unpub: 0, names: [] as string[], skipped: 0, noEffect: 0, frozen: 0 } : await healNonCafeBizPollution(ncb.flagged || [], started + 208000).catch(() => ({ fixed: 0, dropped: 0, unpub: 0, names: [] as string[], skipped: 0, noEffect: 0, frozen: 0 }));
     (checks as any).noncafe_biz_pollution = Math.max(0, ncb.count - ncbHeal.fixed - (await frozenTargets("sentinel.noncafe-biz")).size); // 자동조치 후 잔여
     // 🏪 프랜차이즈 지점 간 오염(브랜드+타지점 접미사 동시등장, xref보다 안전 — 대조대상이 우리 DB 실존 지점) — 자동 제거.
     const fr = overBudget() ? skip("franchise_branch", { count: 0, samples: [] as string[], flagged: [] as FranchiseFlag[] }) : await scanFranchiseBranchPollution().catch(() => ({ count: 0, samples: [] as string[], flagged: [] as FranchiseFlag[] }));
-    const frHeal = (DRY || overBudget()) ? { fixed: 0, dropped: 0, unpub: 0, names: [] as string[], skipped: 0, noEffect: 0, frozen: 0 } : await healFranchiseBranchPollution(fr.flagged || [], started + 288000).catch(() => ({ fixed: 0, dropped: 0, unpub: 0, names: [] as string[], skipped: 0, noEffect: 0, frozen: 0 }));
+    const frHeal = (DRY || overBudget()) ? { fixed: 0, dropped: 0, unpub: 0, names: [] as string[], skipped: 0, noEffect: 0, frozen: 0 } : await healFranchiseBranchPollution(fr.flagged || [], started + 214000).catch(() => ({ fixed: 0, dropped: 0, unpub: 0, names: [] as string[], skipped: 0, noEffect: 0, frozen: 0 }));
     (checks as any).franchise_branch_pollution = Math.max(0, fr.count - frHeal.fixed - (await frozenTargets("sentinel.franchise-branch")).size); // 자동조치 후 잔여
     // 🔠 흔한단어/동음이의어 이름 오염(identity.weak_token 사전 재사용, name_mismatch·weak_name 사각 전담) — 자동 제거.
     const gen = overBudget() ? skip("generic_term", { count: 0, samples: [] as string[], flagged: [] as GenericFlag[] }) : await scanGenericTermPollution().catch(() => ({ count: 0, samples: [] as string[], flagged: [] as GenericFlag[] }));
-    const genHeal = (DRY || overBudget()) ? { fixed: 0, dropped: 0, unpub: 0, names: [] as string[], skipped: 0, noEffect: 0, frozen: 0 } : await healGenericTermPollution(gen.flagged || [], started + 296000).catch(() => ({ fixed: 0, dropped: 0, unpub: 0, names: [] as string[], skipped: 0, noEffect: 0, frozen: 0 }));
+    const genHeal = (DRY || overBudget()) ? { fixed: 0, dropped: 0, unpub: 0, names: [] as string[], skipped: 0, noEffect: 0, frozen: 0 } : await healGenericTermPollution(gen.flagged || [], started + 218000).catch(() => ({ fixed: 0, dropped: 0, unpub: 0, names: [] as string[], skipped: 0, noEffect: 0, frozen: 0 }));
     (checks as any).generic_term_pollution = Math.max(0, gen.count - genHeal.fixed - (await frozenTargets("sentinel.generic-term")).size); // 자동조치 후 잔여
     // 🗣️ 문구형 이름 오염(신규 재발 조기경보 — 조사·어미 종결 토큰, 아직 사전 미등재분) — 탐지·워치리스트 전용(자동조치 없음).
     const phrase = overBudget() ? skip("phrase_name", { count: 0, samples: [] as string[], flagged: [] as PhraseFlag[] }) : await scanPhraseNamePollution().catch(() => ({ count: 0, samples: [] as string[], flagged: [] as PhraseFlag[] }));
@@ -1064,7 +1066,7 @@ export async function GET(req: NextRequest) {
 
     // 🕵️ 인용문 교차오염(다른 카페 상호 섞임) — 탐지+자율조치(경쟁 상호 인용문만 제거, 비공개 안 함)
     const comp = overBudget() ? skip("competitor_quote", { count: 0, samples: [] as string[], flagged: [] as CompFlag[] }) : await scanCompetitorQuotePollution().catch(() => ({ count: 0, samples: [] as string[], flagged: [] as CompFlag[] }));
-    const compHeal = (DRY || overBudget()) ? { fixed: 0, dropped: 0, unpub: 0, names: [] as string[], skipped: 0, noEffect: 0, frozen: 0 } : await healCompetitorQuotePollution(comp.flagged || [], started + 288000).catch(() => ({ fixed: 0, dropped: 0, unpub: 0, names: [] as string[], skipped: 0, noEffect: 0, frozen: 0 }));
+    const compHeal = (DRY || overBudget()) ? { fixed: 0, dropped: 0, unpub: 0, names: [] as string[], skipped: 0, noEffect: 0, frozen: 0 } : await healCompetitorQuotePollution(comp.flagged || [], started + 214000).catch(() => ({ fixed: 0, dropped: 0, unpub: 0, names: [] as string[], skipped: 0, noEffect: 0, frozen: 0 }));
     (checks as any).competitor_quote_pollution = Math.max(0, comp.count - compHeal.fixed - (await frozenTargets("sentinel.competitor-quote")).size);
 
     // name_mismatch·attraction·weak_name·noncafe_biz·franchise_branch·generic_term·phrase_name은 '정합성 실패'가 아니라 검토 워치리스트 → clean 판정서 제외.
@@ -1078,7 +1080,11 @@ export async function GET(req: NextRequest) {
     //   여기서 소액 호출(max_tokens:1)로 크레딧 상태를 직접 확인해 console_key_state에 적재. 관제탑·재무팀이 이 값을
     //   읽어 '정상' 단정 대신 실측으로 판단한다. 소진 시 호출=400=과금0. ※ 소진은 저영향(검색 결정론 폴백·moat 구독 유지)
     //   이라 여기선 정보성 로그로만 남긴다 — 위험 판정은 관제탑이 폴백 유무를 반영해 LOW로 표면화(CEO 2026-07-08).
-    const probe = await probeConsoleKey().catch((e) => ({ signal: "exception" as const, ok: true, detail: String(e).slice(0, 100) }));
+    // ⚠️(#1073) 여기까지 스캐너/치유가 예산을 다 썼으면 이 외부 API 호출(+테일 DB 쓰기)이 300s 하드킬까지
+    //   물고 늘어질 수 있었다 — overBudget()이면 스킵(다음 런이 재시도, probeConsoleKey 자체에도 5s 타임아웃 추가).
+    const probe = overBudget()
+      ? skip("console_key_probe", { signal: "skipped" as const, ok: true, detail: "예산초과—스킵(다음 런이 재시도)" })
+      : await probeConsoleKey().catch((e) => ({ signal: "exception" as const, ok: true, detail: String(e).slice(0, 100) }));
 
     // ── ③ 리포트 ──
     const flags = Object.entries(checks).filter(([k, n]) => n > 0 && !WATCH.has(k)).map(([k, n]) => `${k}:${n}`);

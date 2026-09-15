@@ -77,11 +77,21 @@ export async function probeConsoleKey(): Promise<ProbeResult> {
   }
   let r: ProbeResult;
   try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-api-key": CONSOLE_KEY, "anthropic-version": "2023-06-01" },
-      body: JSON.stringify({ model: PROBE_MODEL, max_tokens: 1, messages: [{ role: "user", content: "ping" }] }),
-    });
+    // ⚠️(#1073) cron-sentinel의 시간예산 게이트는 이 호출 *시작 전*까지만 지켜준다 — 네트워크가
+    //   지연되면 이 fetch 자체가 300s 하드킬까지 물고 늘어질 수 있었다(7회+ 재발). 자체 5s 타임아웃으로 상한.
+    const ac = new AbortController();
+    const to = setTimeout(() => ac.abort(), 5000);
+    let res: Response;
+    try {
+      res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-api-key": CONSOLE_KEY, "anthropic-version": "2023-06-01" },
+        body: JSON.stringify({ model: PROBE_MODEL, max_tokens: 1, messages: [{ role: "user", content: "ping" }] }),
+        signal: ac.signal,
+      });
+    } finally {
+      clearTimeout(to);
+    }
     if (res.ok) {
       r = { signal: "ok", ok: true, detail: `http_${res.status} 정상` };
     } else {
