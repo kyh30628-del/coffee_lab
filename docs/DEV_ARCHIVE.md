@@ -354,3 +354,4 @@
 | 2026-09-15 11:05 | #1073 | [자율진단] cron-sentinel 7회째 재발 — #1037 공용데드라인 배포 후에도 300s 타임아웃( | 34fa15a0 | - | app/api/cron-sentinel/route.ts: GLOBAL_DEADLINE_MS 260s to 220s, 6 heal deadlines tightened from up- |
 | 2026-09-15 11:05 | #1074 | [룰갭 신규] COMMON_WORD_NAMES 미등재 "프리마베라" — 제품/차종 모델명 동음이의 충돌 (i | c935ed32 | - | web/lib/reviewQuality.ts:406-409에 COMMON_WORD_NAMES.add("프리마베라") 추가(동음이의 모델명/메뉴명 오염 방지, id31796). ts |
 | 2026-09-15 11:05 | #1078 | [개발] 협업 #408: 결재#1064 데이터 미반영 + id38333 신규 address 가비지 + are | 9873ab80 | - | 신규 scripts/backfill-gu-area.mjs(부산·대구·대전·인천 광역시-구 교차오염 274건→실측278건 중 fix가능 238곳, 드라이런검증: published 영 |
+| 2026-09-15 11:05 | #1079 | [개발] 협업 #415: /api/search 등 공개 API 전역 레이트리밋 부재 — 봇 추정 트래픽이 비 | 820ce469 | - | proxy.ts(신규)+lib/rateLimit.ts(신규): Next16 proxy로 /api/* 전역 IP 레이트리밋(admin·cron-*·orchestrator 제외) —  |
