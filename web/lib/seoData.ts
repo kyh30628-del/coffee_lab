@@ -1,5 +1,6 @@
 import { sql } from "@/lib/db";
 import { ownerManagedIds } from "./ownerManaged"; // 🏅 사장님 관리 배지(조건·문구 단일출처)
+import { CHAR_AXES } from "./charScore"; // 🎯 도미넌스 필터(아래) — 축 전수를 단일출처에서 뽑는다(신설 축 자동 반영)
 
 // 프로그래매틱 SEO(동네×취향) 데이터 — 검증 카페 목록을 지역·취향별로 조회.
 export const SITE = "https://dongnecoffeenote.com";
@@ -58,6 +59,14 @@ export type SeoCafe = { om?: number; id: number; name: string; dong: string | nu
 export const TASTE_MIN_HITS = 3;
 export const TASTE_MIN_RATE_PCT = 5;
 
+// 🎯 도미넌스 필터 — tasteKey가 아닌 다른 축이 그 카페의 진짜 정체성이면 제외(결재#1087, #1033 일반화).
+//   #1033은 dessert-vs-roast 조합만 하드코딩해 brunch-vs-quiet·space-vs-quiet 등은 못 걸렀다(3차 재발).
+//   → CHAR_AXES 전 축을 대상으로 "다른 축이 유의미(>20)하고 tasteKey축을 8배 이상 압도"하면 제외.
+//   dessert/bakery 테마 자체는 예외(그 페이지의 주제가 바로 디저트이므로 자기 제외 방지 — 기존 dessertDominance와 동일 원칙).
+function otherAxisKeys(tasteKey: string): string[] {
+  return CHAR_AXES.map((a) => a.key).filter((k) => k !== tasteKey);
+}
+
 // 💰 2026-09-05(CEO 승인 다이어트): 이 집계가 pg_stat 1위였다(4.3일 24.1GB·1,554회 — ISR 재생성마다
 //   전 테이블 풀스캔). getTasteCounts와 같은 메모리 캐시 패턴 적용 — 지역 목록은 10분 늦어도 무해.
 let regionsMem: { at: number; v: { area: string; n: number }[] } | null = null;
@@ -89,12 +98,13 @@ export async function getRegionCafes(area: string, limit = 30): Promise<SeoCafe[
   } catch { return []; }
 }
 
-// 🍰 디저트/베이커리 우세 카페가 커피 무관 테마(quiet/work/mood 등)에 순수 베이커리로 상위권을 차지하는 편향
-//   방지(결함C, lib/charScore.ts dessertDominance()와 동일 판정 — app/api/discover/route.ts L112/122/144/182에
-//   이미 적용된 필터가 이 파일(SEO 테마 페이지, 유입 87%)엔 누락돼 있었다, decisions#1033).
+// 🍰 정체성과 무관한 대형 카페가 절대 언급량만으로 무관 테마(quiet/work/mood 등) 상위권을 차지하는 편향 방지.
+//   결재#1033(2026-09-10 배포)이 dessert-vs-roast 조합만 하드코딩해 걸렀는데, brunch-vs-quiet·space-vs-quiet
+//   조합(예: quiet=22인데 space=262가 압도적인 카페)은 못 걸러 3차 재발(결재#1087) — otherAxisKeys()로 일반화.
 //   dessert/bakery 테마 자체는 디저트가 주제이므로 이 제외 대상에서 뺀다.
 //   ⚠️ neon 태그드 템플릿은 조각 합성이 안 되므로(위 TASTE_MIN_HITS 주석 참조) 아래 4개 쿼리에 같은 문구를 그대로 적는다.
 export async function getRegionTasteCafes(area: string, tasteKey: string, limit = 30): Promise<SeoCafe[]> {
+  const others = otherAxisKeys(tasteKey);
   try {
     return withOwnerBadge((await sql`SELECT id, name, dong, synth_grade AS grade, synth_count AS count, synth_identity AS identity, char_scores, visitor_n, visitor_trip, visitor_local, work_facts, cautions, facets,
       (char_scores->>${tasteKey})::int AS "tasteHits",
@@ -103,10 +113,10 @@ export async function getRegionTasteCafes(area: string, tasteKey: string, limit 
       FROM cafes WHERE published AND area=${area}
         AND COALESCE((char_scores->>${tasteKey})::int, 0) >= ${TASTE_MIN_HITS}
         AND COALESCE((char_scores->>${tasteKey})::int, 0) * 100 >= COALESCE(synth_count,0) * ${TASTE_MIN_RATE_PCT}
-        AND (${tasteKey} IN ('dessert','bakery') OR NOT (
-          COALESCE((char_scores->>'dessert')::int,0) > 20
-          AND COALESCE((char_scores->>'roast')::int,0) < 5
-          AND COALESCE((char_scores->>'dessert')::int,0) >= COALESCE((char_scores->>'roast')::int,0) * 8))
+        AND (${tasteKey} IN ('dessert','bakery') OR NOT EXISTS (
+          SELECT 1 FROM unnest(${others}::text[]) ak(key)
+          WHERE COALESCE((char_scores->>ak.key)::int,0) > 20
+            AND COALESCE((char_scores->>ak.key)::int,0) >= COALESCE((char_scores->>${tasteKey})::int,0) * 8))
       ORDER BY (char_scores->>${tasteKey})::int DESC, synth_count DESC NULLS LAST LIMIT ${limit}`) as unknown as SeoCafe[]);
   } catch { return []; }
 }
@@ -129,14 +139,15 @@ export async function getRegionTasteCount(area: string, tasteKey: string): Promi
  *   이 파일 아래 08-17 사고 주석 참조 — 테마 페이지에 조회를 '추가'하면 활성시간이 뛴다. 추가하지 않았다.
  */
 export async function getRegionTasteStats(area: string, tasteKey: string): Promise<{ n: number; reviews: number }> {
+  const others = otherAxisKeys(tasteKey);
   try {
     const r = (await sql`SELECT count(*)::int n, COALESCE(SUM(synth_count), 0)::int reviews FROM cafes WHERE published AND area=${area}
       AND COALESCE((char_scores->>${tasteKey})::int, 0) >= ${TASTE_MIN_HITS}
       AND COALESCE((char_scores->>${tasteKey})::int, 0) * 100 >= COALESCE(synth_count,0) * ${TASTE_MIN_RATE_PCT}
-      AND (${tasteKey} IN ('dessert','bakery') OR NOT (
-        COALESCE((char_scores->>'dessert')::int,0) > 20
-        AND COALESCE((char_scores->>'roast')::int,0) < 5
-        AND COALESCE((char_scores->>'dessert')::int,0) >= COALESCE((char_scores->>'roast')::int,0) * 8))`)[0] as any;
+      AND (${tasteKey} IN ('dessert','bakery') OR NOT EXISTS (
+        SELECT 1 FROM unnest(${others}::text[]) ak(key)
+        WHERE COALESCE((char_scores->>ak.key)::int,0) > 20
+          AND COALESCE((char_scores->>ak.key)::int,0) >= COALESCE((char_scores->>${tasteKey})::int,0) * 8))`)[0] as any;
     return { n: Number(r?.n ?? 0), reviews: Number(r?.reviews ?? 0) };
   } catch { return { n: 0, reviews: 0 }; }
 }
@@ -162,10 +173,11 @@ export async function computeRegionTasteCounts(): Promise<Record<string, number>
     //   → TASTES를 단일 출처로 삼아 동적 생성한다. 앞으로 축을 추가해도 여기가 자동으로 따라간다.
     const cols = TASTES.map((t) => {
       const skipDominance = t.key === "dessert" || t.key === "bakery";
+      const otherAxisList = otherAxisKeys(t.key).map((k) => `'${k}'`).join(",");
       const dominanceFilter = skipDominance ? "" : `
-        AND NOT (COALESCE((char_scores->>'dessert')::int,0) > 20
-          AND COALESCE((char_scores->>'roast')::int,0) < 5
-          AND COALESCE((char_scores->>'dessert')::int,0) >= COALESCE((char_scores->>'roast')::int,0) * 8)`;
+        AND NOT EXISTS (SELECT 1 FROM unnest(ARRAY[${otherAxisList}]) ak(key)
+          WHERE COALESCE((char_scores->>ak.key)::int,0) > 20
+            AND COALESCE((char_scores->>ak.key)::int,0) >= COALESCE((char_scores->>'${t.key}')::int,0) * 8)`;
       return `COUNT(*) FILTER (WHERE COALESCE((char_scores->>'${t.key}')::int,0) >= ${TASTE_MIN_HITS}
         AND COALESCE((char_scores->>'${t.key}')::int,0) * 100 >= COALESCE(synth_count,0) * ${TASTE_MIN_RATE_PCT}${dominanceFilter})::int "${t.key}"`;
     }).join(",\n      ");
@@ -182,15 +194,16 @@ export async function computeRegionTasteCounts(): Promise<Record<string, number>
 // 지역×취향 후기 근거 등급 분포(검증/참고/후보) — 표시 30개가 아닌 전체 모수 기준. 콘텐츠 밀도 보강용 근거 요약.
 export type GradeBreakdown = { verified: number; ref: number; candidate: number };
 export async function getRegionTasteGradeBreakdown(area: string, tasteKey: string): Promise<GradeBreakdown> {
+  const others = otherAxisKeys(tasteKey);
   try {
     const rows = (await sql`SELECT synth_grade AS grade, count(*)::int n FROM cafes
       WHERE published AND area=${area}
         AND COALESCE((char_scores->>${tasteKey})::int, 0) >= ${TASTE_MIN_HITS}
         AND COALESCE((char_scores->>${tasteKey})::int, 0) * 100 >= COALESCE(synth_count,0) * ${TASTE_MIN_RATE_PCT}
-        AND (${tasteKey} IN ('dessert','bakery') OR NOT (
-          COALESCE((char_scores->>'dessert')::int,0) > 20
-          AND COALESCE((char_scores->>'roast')::int,0) < 5
-          AND COALESCE((char_scores->>'dessert')::int,0) >= COALESCE((char_scores->>'roast')::int,0) * 8))
+        AND (${tasteKey} IN ('dessert','bakery') OR NOT EXISTS (
+          SELECT 1 FROM unnest(${others}::text[]) ak(key)
+          WHERE COALESCE((char_scores->>ak.key)::int,0) > 20
+            AND COALESCE((char_scores->>ak.key)::int,0) >= COALESCE((char_scores->>${tasteKey})::int,0) * 8))
       GROUP BY synth_grade`) as unknown as { grade: string | null; n: number }[];
     const find = (g: string) => rows.find((r) => r.grade === g)?.n ?? 0;
     return { verified: find("검증"), ref: find("참고"), candidate: find("후보") };
