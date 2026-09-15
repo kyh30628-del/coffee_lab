@@ -355,3 +355,4 @@
 | 2026-09-15 11:05 | #1074 | [룰갭 신규] COMMON_WORD_NAMES 미등재 "프리마베라" — 제품/차종 모델명 동음이의 충돌 (i | c935ed32 | - | web/lib/reviewQuality.ts:406-409에 COMMON_WORD_NAMES.add("프리마베라") 추가(동음이의 모델명/메뉴명 오염 방지, id31796). ts |
 | 2026-09-15 11:05 | #1078 | [개발] 협업 #408: 결재#1064 데이터 미반영 + id38333 신규 address 가비지 + are | 9873ab80 | - | 신규 scripts/backfill-gu-area.mjs(부산·대구·대전·인천 광역시-구 교차오염 274건→실측278건 중 fix가능 238곳, 드라이런검증: published 영 |
 | 2026-09-15 11:05 | #1079 | [개발] 협업 #415: /api/search 등 공개 API 전역 레이트리밋 부재 — 봇 추정 트래픽이 비 | 820ce469 | - | proxy.ts(신규)+lib/rateLimit.ts(신규): Next16 proxy로 /api/* 전역 IP 레이트리밋(admin·cron-*·orchestrator 제외) —  |
+| 2026-09-15 11:05 | #1086 | [검색UX 재확인/3차] 프랜차이즈 단독 상호 검색 시 무관 지역 고정노출 + 브랜드간 응답 비일관 | f41f7dea | - | app/api/search/route.ts + lib/placeIndex.ts 수정. 근본원인: 프랜차이즈 상호가 상업POI(전국 219,013건, 일부는 biz_food로 오분류 |
