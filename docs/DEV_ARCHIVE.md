@@ -356,3 +356,4 @@
 | 2026-09-15 11:05 | #1078 | [개발] 협업 #408: 결재#1064 데이터 미반영 + id38333 신규 address 가비지 + are | 9873ab80 | - | 신규 scripts/backfill-gu-area.mjs(부산·대구·대전·인천 광역시-구 교차오염 274건→실측278건 중 fix가능 238곳, 드라이런검증: published 영 |
 | 2026-09-15 11:05 | #1079 | [개발] 협업 #415: /api/search 등 공개 API 전역 레이트리밋 부재 — 봇 추정 트래픽이 비 | 820ce469 | - | proxy.ts(신규)+lib/rateLimit.ts(신규): Next16 proxy로 /api/* 전역 IP 레이트리밋(admin·cron-*·orchestrator 제외) —  |
 | 2026-09-15 11:05 | #1086 | [검색UX 재확인/3차] 프랜차이즈 단독 상호 검색 시 무관 지역 고정노출 + 브랜드간 응답 비일관 | f41f7dea | - | app/api/search/route.ts + lib/placeIndex.ts 수정. 근본원인: 프랜차이즈 상호가 상업POI(전국 219,013건, 일부는 biz_food로 오분류 |
+| 2026-09-15 11:05 | #1087 | [검색UX 신규] 취향 페이지 도미넌스 필터가 dessert축에만 하드코딩 — brunch/space 압도  | f996a745 | - | lib/seoData.ts: dessertDominance(dessert-vs-roast 하드코딩)를 CHAR_AXES 전축 대상 범용 도미넌스 필터로 교체(otherAxisKey |
