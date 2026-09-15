@@ -418,9 +418,9 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   //   여기 한 곳만으로 자동 적용되고, 계약에 이 대상이 없으면 드리프트로 잡힌다.
   noteWrite("cafes.synth_reviews"); noteWrite("cafes.synth_reviews_all"); noteWrite("cafes.published");
   if (llmJudged) {
-    await sql`UPDATE cafes SET synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_coherence=${coherence}, offctx_rate=${offctx}, visitor_n=${vmix.n}, visitor_trip=${vmix.trip}, visitor_local=${vmix.local}, needs_llm=${needsLLM}, needs_llm_priority=${needsLlmPriority}, borderline_count=${blCount}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${safeJson(evidenceReviews)}, synth_reviews_all=${allEv}, char_scores=${safeJson(charScores)}, work_facts=${safeJson(workFacts)}, synth_quality=${safeJson(quality)}, review_dates=${safeJson(reviewDates)}, pipeline_status=${newPst}, synth_updated=${synthTs}, synth_checked_at=now(), llm_judged_at=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN ${latMin} AND ${latMax} AND lng BETWEEN ${lngMin} AND ${lngMax}) WHERE id=${cafeId}`;
+    await sql`UPDATE cafes SET synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_coherence=${coherence}, offctx_rate=${offctx}, visitor_n=${vmix.n}, visitor_trip=${vmix.trip}, visitor_local=${vmix.local}, needs_llm=${needsLLM}, needs_llm_priority=${needsLlmPriority}, borderline_count=${blCount}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${safeJson(tidyDisplayQuotes(evidenceReviews as any[]))}, synth_reviews_all=${allEv}, char_scores=${safeJson(charScores)}, work_facts=${safeJson(workFacts)}, synth_quality=${safeJson(quality)}, review_dates=${safeJson(reviewDates)}, pipeline_status=${newPst}, synth_updated=${synthTs}, synth_checked_at=now(), llm_judged_at=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN ${latMin} AND ${latMax} AND lng BETWEEN ${lngMin} AND ${lngMax}) WHERE id=${cafeId}`;
   } else {
-    await sql`UPDATE cafes SET synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_coherence=${coherence}, offctx_rate=${offctx}, visitor_n=${vmix.n}, visitor_trip=${vmix.trip}, visitor_local=${vmix.local}, needs_llm=${needsLLM}, needs_llm_priority=${needsLlmPriority}, borderline_count=${blCount}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${safeJson(evidenceReviews)}, synth_reviews_all=${allEv}, char_scores=${safeJson(charScores)}, work_facts=${safeJson(workFacts)}, synth_quality=${safeJson(quality)}, review_dates=${safeJson(reviewDates)}, pipeline_status=${newPst}, synth_updated=${synthTs}, synth_checked_at=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN ${latMin} AND ${latMax} AND lng BETWEEN ${lngMin} AND ${lngMax}) WHERE id=${cafeId}`;
+    await sql`UPDATE cafes SET synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_coherence=${coherence}, offctx_rate=${offctx}, visitor_n=${vmix.n}, visitor_trip=${vmix.trip}, visitor_local=${vmix.local}, needs_llm=${needsLLM}, needs_llm_priority=${needsLlmPriority}, borderline_count=${blCount}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${safeJson(tidyDisplayQuotes(evidenceReviews as any[]))}, synth_reviews_all=${allEv}, char_scores=${safeJson(charScores)}, work_facts=${safeJson(workFacts)}, synth_quality=${safeJson(quality)}, review_dates=${safeJson(reviewDates)}, pipeline_status=${newPst}, synth_updated=${synthTs}, synth_checked_at=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN ${latMin} AND ${latMax} AND lng BETWEEN ${lngMin} AND ${lngMax}) WHERE id=${cafeId}`;
   }
   return { grade, collected, published: publish, ruleOk, pipeline: newPst, evidence: evidenceReviews.length, coherence: Math.round(coherence * 100), noisy };
 }
@@ -991,6 +991,28 @@ export async function markJudged(cafeId: number) {
 //   검증된 판정기를 재사용해 로직 중복·드리프트를 막는다(같은 개념의 사전이 파일마다 따로 놀며 갱신이 누락되던
 //   패턴 — '제과점'이 GENERIC_WORD엔 있었지만 지점앵커 사전엔 없어 반복 재발한 것과 동일한 구조적 문제).
 const SCORE_ONLY_REJECT_REASON = "종합 품질 미달";
+// 🧹 표시용 인용문 정리(2026-09-15, CEO "광고성 오염을 리뷰에서 제대로 걸러줘야되")
+//   SEO 블로그가 글 끝에 해시태그를 도배한다. 그게 그대로 인용문으로 나가 소비자가
+//   "#비터 #성내동카페 #강동구수제초콜릿 #성내동맛집…"만 보는 일이 생겼다(실측: 공개 3,000곳 표본 중
+//   태그 제거 시 15자도 안 남는 인용문 151건·0.86%, 꼬리 태그가 붙은 것 428건·2.4%).
+//
+//   🔴 왜 '표시본만' 정리하나 — 이름 일관성(nameCoherence)·offctx는 원문으로 계산해야 한다.
+//   실측 87곳은 **카페 이름이 해시태그 안에만** 있다(#비터). 판정 단계에서 태그를 지우면 이름이 사라져
+//   멀쩡한 카페가 '오염 의심'으로 비공개된다. 그래서 모든 판정이 끝난 뒤, 저장 직전에만 손댄다.
+//   실측 확인: 이 정리로 표시 인용문을 **전부** 잃는 카페는 0곳이다(빈 상세가 안 생긴다).
+function tidyDisplayQuotes(arr: any[]): any[] {
+  if (!Array.isArray(arr)) return arr;
+  const out: any[] = [];
+  for (const r of arr) {
+    const raw = String(r?.quote ?? "");
+    const cleaned = raw.replace(/#[^\s#]+/g, " ").replace(/\s+/g, " ").trim();
+    if (!raw) { out.push(r); continue; }
+    if (cleaned.length < 15) continue;   // 태그 빼면 할 말이 없는 글 — 보여줄 가치가 없다
+    out.push(cleaned === raw ? r : { ...r, quote: cleaned });
+  }
+  return out;
+}
+
 function evidenceHitsCafe(quote: string, name: string, areaTerms: string[], addr?: string, link?: string): boolean {
   const norm = (s: string) => (s || "").toLowerCase().replace(/\s+/g, "");
   const cleaned = cleanCafeName(name);
