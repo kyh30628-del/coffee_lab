@@ -457,9 +457,14 @@ export async function discoverRegion(region: string, areaLabel: string, keywords
   const found: any[] = [];
   let stopped = false;
   let apiFails = 0; // 네이버 쿼터/API 실패 횟수 — found=0인데 이게 >0이면 '진짜 빈 지역'이 아니라 쿼터 소진
+  // 🎯 고갈 감지(2026-09-15) — 연속 몇 개 쿼리가 'DB에 없던 신규'를 0건 냈는지.
+  //   40 = 상위5×40 = 이미 아는 곳만 200건 연속. 셔플된 목록이라 편중이 아닌 지역 고갈 신호다.
+  let dryStreak = 0, exhausted = false;
+  const DRY_STREAK_STOP = Number(process.env.DISCOVER_DRY_STREAK || 40);
   const collect = async (query: string, sort: "comment" | "random") => {
     const items = await localSearch(query, sort);
     if (items === null) { apiFails++; await new Promise((r) => setTimeout(r, 220)); return; }
+    let fresh = 0;
     for (const it of items) {
       if (!it.name || !it.lat || !it.lng) continue;
       if (isFranchise(it.name) || isNonCafe(it.name, it.category)) continue;
@@ -471,7 +476,12 @@ export async function discoverRegion(region: string, areaLabel: string, keywords
       if (seen.has(key)) continue;
       seen.add(key);
       found.push(it);
+      if (!ownedKeys.has(key)) fresh++; // DB에 없던 진짜 신규
     }
+    // 🔴 마른 쿼리 추적 — 이 지역에서 더 캘 게 남았는지 판단하는 유일한 신호.
+    //   작업 목록은 셔플돼 있으므로 연속 N개가 전부 '이미 아는 곳'이면 특정 동·키워드 편중이 아니라
+    //   **지역 자체가 고갈**됐다고 본다.
+    if (fresh > 0) dryStreak = 0; else dryStreak++;
     await new Promise((r) => setTimeout(r, 220));
   };
 
@@ -488,7 +498,16 @@ export async function discoverRegion(region: string, areaLabel: string, keywords
     "카페추천", "예쁜카페", "분위기카페", "조용한카페", "카페거리", "테이크아웃커피",
   ]);
   const SATURATED_THRESHOLD = 250;
-  const addrRows = (await sql`SELECT address FROM cafes WHERE area = ${storeArea} AND address IS NOT NULL`) as unknown as { address: string }[];
+  // 🎯 2026-09-15(CEO "주어진 자원으로 효율적으로 fully 사용하라") — name/lat을 함께 읽는다.
+  //   이유: 지금까지 이 지역에 **이미 가진 카페가 뭔지 모른 채** 쿼리를 던졌다. 그래서 상위5가 전부
+  //   보유분인 쿼리도 '발견'으로 계상하고 계속 다음 쿼리를 던졌다(실측 대구 서구 발견 194 → 신규 29,
+  //   즉 165건이 이미 아는 곳). 아래 dryStreak 판정에 쓸 보유 키를 여기서 만든다.
+  //   ⚠️ 같은 테이블·같은 WHERE에 작은 컬럼 2개 추가일 뿐 — 큰 컬럼(synth_reviews_all 등) 아님.
+  const addrRows = (await sql`SELECT address, name, lat FROM cafes WHERE area = ${storeArea} AND address IS NOT NULL`) as unknown as { address: string; name: string; lat: number | null }[];
+  const ownedKeys = new Set(
+    addrRows.filter((r) => r.name && r.lat != null)
+      .map((r) => r.name.replace(/\s/g, "") + Math.round(Number(r.lat) * 1000)),
+  );
   const saturated = addrRows.length >= SATURATED_THRESHOLD;
 
   // 🏘️ 동 단위 발굴 키워드 — 이게 품질의 핵심이다.
@@ -546,6 +565,10 @@ export async function discoverRegion(region: string, areaLabel: string, keywords
 
   for (const t of tasks) {
     if (Date.now() > deadline) { stopped = true; break; }
+    // 🎯 고갈 조기 이탈 — 남은 시간·쿼터를 **다음 지역**에 넘긴다.
+    //   스윕은 수확률순이라 다음 지역이 지금 여기보다 잘 나온다. 안 나오는 곳에서 120초를
+    //   끝까지 버티는 건 그 자체가 낭비다(실측: 하루 25,000콜 전량 소진, 카페 1곳당 26.7콜).
+    if (dryStreak >= DRY_STREAK_STOP) { exhausted = true; break; }
     await collect(t.q, t.sort);
   }
 
@@ -634,7 +657,7 @@ export async function discoverRegion(region: string, areaLabel: string, keywords
   }
   // apiError: 아무것도 못 건졌는데 API 실패가 있었음 = 쿼터 소진(진짜 빈 지역 아님) → 호출부가 last_run 안 굳히게.
   const apiError = found.length === 0 && apiFails > 0;
-  return { region, found: found.length, inserted, skipped, backfilled, oob, stopped, apiError, apiFails, tasks: tasks.length, names: found.map((f) => f.name) };
+  return { region, found: found.length, inserted, skipped, backfilled, oob, stopped, apiError, apiFails, exhausted, tasks: tasks.length, names: found.map((f) => f.name) };
 }
 
 // 🔧 인스타그램 오귀속 자가치유(decisions#811, coordination#335) — 위 464행의 brandTokenOverlap 게이트(#780)는

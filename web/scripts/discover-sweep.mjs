@@ -71,7 +71,7 @@ while (Date.now() - t0 < TOTAL_MS && !stop) {
       try { const mr = await mineArea(reg.area_label ?? reg.region, { maxCalls: MINE_CALLS, apply: true }); mined = mr?.inserted ?? 0; totalNew += mined; }
       catch { /* 마이닝 실패는 무시(발굴은 이미 완료) */ }
     }
-    console.log(`[${done}] ${reg.region}(직전수확률 ${reg.yield_rate == null ? "미측정" : (reg.yield_rate * 100).toFixed(1) + "%"}): 발견 ${res.found} · 신규 ${res.inserted}${mined ? ` +마이닝 ${mined}` : ""} · 누적신규 ${totalNew}`);
+    console.log(`[${done}] ${reg.region}(직전수확률 ${reg.yield_rate == null ? "미측정" : (reg.yield_rate * 100).toFixed(1) + "%"}): 발견 ${res.found} · 신규 ${res.inserted}${mined ? ` +마이닝 ${mined}` : ""}${res.exhausted ? " · 🪫고갈 조기이탈" : ""} · 누적신규 ${totalNew}`);
     if (res.apiError) stop = "네이버 한도 추정(429) — 중단(다음 회차 수확률순 재개)";
   } catch (e) {
     const m = String(e).slice(0, 80);
