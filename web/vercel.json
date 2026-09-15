@@ -84,10 +84,6 @@
     {
       "path": "/api/cron-exposure",
       "schedule": "10 4 * * *"
-    },
-    {
-      "path": "/api/cron-batch-judge",
-      "schedule": "45 2,14 * * *"
     }
   ]
 }

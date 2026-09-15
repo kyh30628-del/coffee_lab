@@ -38,11 +38,23 @@ export async function GET(req: NextRequest) {
     await sql`CREATE TABLE IF NOT EXISTS judge_batches (batch_id TEXT PRIMARY KEY, manifest JSONB, applied BOOLEAN DEFAULT false, created_at TIMESTAMPTZ DEFAULT now())`;
 
     // ── ① 끝난 배치 수거·적용 ──
-    let appliedCafes = 0, rescued = 0, inTok = 0, outTok = 0, stillRunning = 0;
+    let appliedCafes = 0, rescued = 0, inTok = 0, outTok = 0, stillRunning = 0, expiredBatches = 0;
     const open = (await sql`SELECT batch_id, manifest FROM judge_batches WHERE NOT applied ORDER BY created_at LIMIT 5`) as any[];
     for (const row of open) {
       const b = await getBatch(KEY, row.batch_id);
       if (b.processing_status !== "ended") { stillRunning++; continue; }
+      // 🔴 2026-09-15 수리 — 이 줄이 없어서 **이 엔드포인트가 07-27부터 아예 죽어 있었다.**
+      //   Anthropic은 배치 결과를 29일만 보관한다. 그 뒤엔 processing_status는 "ended"인데
+      //   results_url이 null로 돌아온다. 그대로 streamResults(KEY, null)에 넘기면
+      //   `Cannot read properties of null (reading 'toString')`로 터지고, 그 순간 ①에서 죽으니
+      //   ②(신규 배치 제출)까지 **도달 자체를 못 한다**. 07-27 취소분 12건이 큐 맨 앞에 앉아
+      //   그 뒤 모든 수동 청산 호출을 막고 있었다(판정대기 149곳이 안 풀리던 진짜 이유).
+      //   → 결과를 못 받는 배치는 적용 완료로 닫고 넘어간다. 되살릴 방법이 없으니 붙잡을 이유도 없다.
+      if (!b.results_url) {
+        expiredBatches++;
+        await sql`UPDATE judge_batches SET applied = true WHERE batch_id = ${row.batch_id}`;
+        continue;
+      }
       const cafes = row.manifest?.cafes ?? {};
       for await (const res of streamResults(KEY, b.results_url)) {
         const entry = cafes[res.custom_id];
@@ -132,6 +144,7 @@ export async function GET(req: NextRequest) {
       ok: true,
       applied: { cafes: appliedCafes, rescuedReviews: rescued, costUsd: Number(cost.toFixed(4)), inTok, outTok },
       pollingBatches: stillRunning,
+      expiredClosed: expiredBatches, // 결과 보관기간(29일) 지나 회수 불가 → 닫은 배치 수
       submitted: { newBatchId: batchId, cafes: submitted, noBorderlineMarked: noCand },
     });
   } catch (e: any) {
