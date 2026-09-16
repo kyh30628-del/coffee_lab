@@ -6,7 +6,7 @@
 export const JOB_TEAM: Record<string, string> = {
   "cron-exposure": "경험본부",   // 👁️ 노출 감시자(2026-08-08 신설) — 사용자가 실제로 보는 상위 6건 품질
   // Vercel 크론
-  "cron-synth": "운영본부", "cron-resynth": "운영본부", "cron-embed": "운영본부", "cron-snapshot": "운영본부",
+  "cron-synth": "운영본부", "cron-resynth": "운영본부", "recollect-purged": "운영본부", "cron-embed": "운영본부", "cron-snapshot": "운영본부",
   "cron-closure": "운영본부", "cron-enrich": "운영본부",
   "orchestrator-heal": "품질본부", "cron-sentinel": "품질본부", "cron-verify": "품질본부", "cron-rulegap": "품질본부",
   "cron-batch-judge": "품질본부", "cron-criteria-verify": "품질본부",
@@ -56,7 +56,7 @@ export const EXPECT_MAX_H: Record<string, number> = {
   // 🔄 2026-08-04 4창 클러스터링(커밋 8da8c31, KST 08·12·16·20=UTC 3,7,11,23) 재계산: 4창 잡 최대공백 20→08시=12h(+버퍼14),
   //   2창 잡(enrich·orchestrator·sentinel UTC3,11) 최대공백 11→익일3시=16h(+버퍼18). EXPECT_MAX_H 미갱신이 정지 오탐 원인이었음(자율진단 #604).
   "cron-grow": 14, "collect-catchup": 30, // 🔄09-05: 4창(KST 08:05·12:05·16:05·20:05, 06:05 새벽드리프트 정정) 최대공백 12h + 버퍼(창 스킵 허용)
-  "cron-enrich": 18, "cron-embed": 14, "cron-synth": 14, "cron-batch-judge": 20, "cron-issues": 14, "cron-coord-consumer": 14,
+  "cron-enrich": 18, "cron-embed": 14, "cron-synth": 14, "cron-batch-judge": 20, "recollect-purged": 30, "cron-issues": 14, "cron-coord-consumer": 14,
   "cron-billing": 30,     // 정기결제 크론 매일 1회 + 버퍼
   "orchestrator-heal": 18, // 2창(UTC 3,11) 최대공백 16h + 버퍼
   // 로컬 launchd 잡

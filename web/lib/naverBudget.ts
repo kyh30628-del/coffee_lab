@@ -21,6 +21,16 @@ export const NAVER_SWEEP_RESERVE = Number(process.env.NAVER_SWEEP_RESERVE || 750
 //   폐업 크론(카페당 1~3호출, 하루 ~220곳)이 '쿼터중단'으로 굶던 것을 끝낸다. 예약은 상한이 아니라 최소 보장 —
 //   폐업 크론이 덜 쓰면 남은 몫은 자정 리셋까지 그냥 남는다(발굴이 예약선까지는 계속 쓴다).
 export const NAVER_CLOSURE_RESERVE = Number(process.env.NAVER_CLOSURE_RESERVE || 1200);
+// 🔁 파기 재수집 예약(2026-09-16 결재 승인 B안): 하루 25,000 중 1,500(5.9%)은 발굴·스윕이 못 쓴다.
+//   왜: raw는 약관 준수로 90일에 파기되는데(cron-resynth), 그 짝인 재수집 장치 `warmup`이
+//   **어느 스케줄러에도 존재하지 않았다**(코드엔 주석만 남음). 파기만 돌았다.
+//   실측 2026-09-16: 하루 파기 604곳 vs 재수집 24곳 — 25배 격차.
+//   원본이 없으면 cron-resynth 선정조건(raw_reviews IS NOT NULL)에 안 걸려
+//   **규칙이 바뀌어도 영영 재검이 안 된다**(광고 규칙도 안 퍼진다).
+//   이미 784곳이 그 상태고 그중 254곳이 '검증' 등급이다. 7일이면 약 5,000곳이 된다.
+//   CEO 승인 범위 = **검증 등급 우선**(하루 246곳 · 카페당 ~6콜 = 1,474콜 ≈ 5.9%).
+//   ⚠️ 보관기간 연장(90→180일)은 선택지가 아니다 — 네이버 약관 7.3.③ 방어선이자 /terms 공개 약속이다.
+export const NAVER_RECOLLECT_RESERVE = Number(process.env.NAVER_RECOLLECT_RESERVE || 1500);
 /** 발굴(cron-grow)·재수집 등 '폐업 아닌' 소비자가 지금 더 써도 되는가 — 예약분 1,200을 남긴다. */
 export async function nonClosureMayUse(): Promise<{ ok: boolean; remaining: number }> {
   const used = await naverUsedToday();
@@ -101,5 +111,13 @@ export async function sweepMayContinue(): Promise<{ ok: boolean; used: number; r
   const used = await naverUsedToday();
   const blocked = await naverBlocked();
   const remaining = Math.max(0, NAVER_DAILY_QUOTA - used);
-  return { ok: !blocked && remaining > NAVER_SWEEP_RESERVE + NAVER_CLOSURE_RESERVE, used, remaining, blocked }; // 스윕은 발굴 예약 + 폐업 예약 둘 다 남긴다
+  // 스윕은 발굴(cron-grow)·폐업·파기재수집 예약 셋을 모두 남긴다
+  return { ok: !blocked && remaining > NAVER_SWEEP_RESERVE + NAVER_CLOSURE_RESERVE + NAVER_RECOLLECT_RESERVE, used, remaining, blocked };
+}
+
+/** 파기 재수집 전용: 자기 예약분(1,500) 안에서만 쓴다 — 폐업 예약은 건드리지 않는다. */
+export async function recollectMayUse(): Promise<{ ok: boolean; remaining: number }> {
+  const used = await naverUsedToday();
+  const remaining = Math.max(0, NAVER_DAILY_QUOTA - used);
+  return { ok: !(await naverBlocked()) && remaining > NAVER_CLOSURE_RESERVE, remaining };
 }
