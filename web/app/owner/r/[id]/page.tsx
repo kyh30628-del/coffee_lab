@@ -277,6 +277,12 @@ export default async function FreeReportPage({ params }: Props) {
         <Link href="/trust" className="underline text-[#9c6b3f]">검증 방법</Link>
         {" · "}
         <Link href={`/c/${r.id}`} className="underline text-[#9c6b3f]">손님이 보는 화면</Link>
+        {r.grade === "검증" || r.grade === "참고" ? (
+          <>
+            {" · "}
+            <Link href={`/owner/badge?q=${encodeURIComponent(r.name)}`} className="underline text-[#9c6b3f]">🏅 배지 달기</Link>
+          </>
+        ) : null}
       </p>
     </Shell>
   );
