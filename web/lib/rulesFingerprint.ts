@@ -25,6 +25,36 @@ import { sql } from "./db";
 //   그 파일이 바뀌어도 재검이 안 돌았다(지문 16종 공존 실측). 판정을 바꿀 수 있는 파일은 전부 넣는다.
 const RULE_FILES = ["lib/reviewQuality.ts", "lib/criteriaListsBase.ts", "lib/discover.ts",
   "lib/synthStore.ts", "lib/collectOrchestrator.ts", "lib/adTemplate.ts", "lib/competitorQuote.ts"];
+/** 🧬 규칙 소스 정규화 — 판정 로직만 남긴다.
+ *
+ *  왜(2026-09-16 실측): 지문은 파일 **바이트**를 통째로 해시했다. 주석도 바이트다.
+ *  09-15에 근거 설명 주석을 길게 단 것만으로 지문이 바뀌어 공개 27,500곳 전부가 재검 대상이 됐다.
+ *  재검은 300곳×4회/일이라 한 바퀴에 23일이 걸리는데, 규칙 파일은 최근 14일 동안 **57번** 수정됐다.
+ *  그래서 지문이 22종 공존하고 현재 지문 일치율이 **1%**(296/27,500) — 건너뛰기가 사실상 작동하지 않았다.
+ *
+ *  🔴 왜 '통째 줄'만 지우나 — 순진한 주석 제거기는 **문자열·정규식 안의 //** 에서 깨진다.
+ *     "https://a.com" → "https:  으로 잘리고, /https?:\/\// 도 잘린다. 이 저장소엔 둘 다 널려 있다.
+ *     그러면 서로 다른 규칙이 같은 지문을 갖게 되고 — **규칙 변경이 영영 안 퍼진다**(훨씬 위험한 실패).
+ *     → 코드가 한 글자라도 있는 줄은 **절대 건드리지 않는다.** 통째로 주석인 줄만 버린다.
+ *     줄 끝 주석(`const X = 1; // 설명`)은 그대로 남는다 — 놓치는 이득보다 안전이 우선이다.
+ *
+ *  ⚠️ 이 함수를 고치면 scripts/fixtures-rulesfp.mjs를 반드시 먼저 돌릴 것.
+ */
+export function normalizeRuleSource(src: string): string {
+  const out: string[] = [];
+  let inBlock = false;
+  for (const raw of String(src).split("\n")) {
+    const t = raw.trim();
+    if (inBlock) { if (t.includes("*/")) inBlock = false; continue; }   // 블록 주석 내부
+    if (!t) continue;                                                   // 빈 줄
+    if (t.startsWith("//")) continue;                                   // 통째 줄 주석
+    if (t.startsWith("/*")) { if (!t.includes("*/")) inBlock = true; continue; } // 블록 시작
+    if (t.startsWith("*")) continue;                                    // 블록 주석 본문(* 로 시작)
+    out.push(t);                                                        // 코드 줄 — 원문 그대로(들여쓰기만 정규화)
+  }
+  return out.join("\n");
+}
+
 let cached: { at: number; fp: string } | null = null;
 
 export async function rulesFingerprint(): Promise<string> {
@@ -32,7 +62,7 @@ export async function rulesFingerprint(): Promise<string> {
   const h = createHash("sha1");
   let filesOk = 0;
   for (const f of RULE_FILES) {
-    try { h.update(readFileSync(`${process.cwd()}/${f}`)); filesOk++; } catch { /* 번들 밖 — 생략 */ }
+    try { h.update(normalizeRuleSource(readFileSync(`${process.cwd()}/${f}`, "utf8"))); filesOk++; } catch { /* 번들 밖 — 생략 */ }
   }
   try {
     const [c] = (await sql`SELECT COALESCE(md5(string_agg(key || '=' || value::text, ',' ORDER BY key)), '') m FROM criteria`) as any[];
