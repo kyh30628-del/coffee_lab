@@ -21,8 +21,8 @@ const { synthAndStore } = await import("../lib/synthStore.ts");
 const { sql } = await import("../lib/db.ts");
 const { recollectMayUse, naverUsedToday, NAVER_DAILY_QUOTA, NAVER_RECOLLECT_RESERVE } = await import("../lib/naverBudget.ts");
 
-// 하루 목표. ⚠️ 실측 카페당 8콜(내 추정 6콜은 틀렸다) → 예약 1,500콜이면 실제 처리량은 약 187곳/일.
-// 정상분만 246곳/일이 필요하므로 이 예약으로는 **하루 약 59곳씩 백로그가 남는다**(CEO 보고·판단 대기).
+// 하루 목표. 실측 카페당 8콜(최초 추정 6콜은 틀렸다 — 3곳에 24콜).
+// 예약 2,300콜 ÷ 8 = 하루 약 287곳 > 정상 파기분 246곳/일 → 여유 41곳으로 백로그를 갉아 7일 내 소진.
 const MAX = Number(process.env.RECOLLECT_MAX || 280);
 const ALL_GRADES = process.env.RECOLLECT_ALL === "1";        // 참고 등급까지(A안) — 기본 꺼짐
 const TOTAL_MS = Number(process.env.RECOLLECT_TOTAL_MS || 90 * 60_000);

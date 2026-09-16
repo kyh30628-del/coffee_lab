@@ -28,9 +28,12 @@ export const NAVER_CLOSURE_RESERVE = Number(process.env.NAVER_CLOSURE_RESERVE ||
 //   원본이 없으면 cron-resynth 선정조건(raw_reviews IS NOT NULL)에 안 걸려
 //   **규칙이 바뀌어도 영영 재검이 안 된다**(광고 규칙도 안 퍼진다).
 //   이미 784곳이 그 상태고 그중 254곳이 '검증' 등급이다. 7일이면 약 5,000곳이 된다.
-//   CEO 승인 범위 = **검증 등급 우선**(하루 246곳 · 카페당 ~6콜 = 1,474콜 ≈ 5.9%).
+//   CEO 승인 = **검증 등급 우선**(2026-09-16).
+//   ⚠️ 최초 결재 때 내가 카페당 6콜로 계산해 1,500콜(5.9%)을 올렸는데 **스모크 테스트 실측은 8콜**이었다
+//     (3곳에 24콜). 1,500이면 하루 187곳뿐이라 정상 파기분 246곳/일에 미달 — 매일 59곳씩 밀린다.
+//     실측 보고 후 CEO가 2,300콜(9.2%)로 상향 승인 → 하루 287곳, 7일 내 백로그 소진 후 유지.
 //   ⚠️ 보관기간 연장(90→180일)은 선택지가 아니다 — 네이버 약관 7.3.③ 방어선이자 /terms 공개 약속이다.
-export const NAVER_RECOLLECT_RESERVE = Number(process.env.NAVER_RECOLLECT_RESERVE || 1500);
+export const NAVER_RECOLLECT_RESERVE = Number(process.env.NAVER_RECOLLECT_RESERVE || 2300);
 /** 발굴(cron-grow)·재수집 등 '폐업 아닌' 소비자가 지금 더 써도 되는가 — 예약분 1,200을 남긴다. */
 export async function nonClosureMayUse(): Promise<{ ok: boolean; remaining: number }> {
   const used = await naverUsedToday();
