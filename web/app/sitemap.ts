@@ -26,9 +26,23 @@ async function buildAll(): Promise<Record<SitemapKind, MetadataRoute.Sitemap>> {
   return s;
 }
 
+// 🔴 2026-09-16 — 통합 사이트맵에서 **동×취향·동×시설을 뺀다**(CEO 승인). 페이지는 그대로 살아 있고
+//   제출만 멈춘다. `/sitemaps/dongtaste.xml`·`/sitemaps/dongfacet.xml`은 유지되므로 필요하면 개별 제출 가능.
+//
+//   근거(서치콘솔 실측 2026-09-16):
+//     사이트맵 제출 34,455 → **색인 3,100(9%)** · 미색인 19,800
+//     미색인 사유 1위 = "발견됨 — 현재 색인 생성 안 됨" **18,318개**(구글이 크롤링조차 안 함)
+//     09-14 개방 직전엔 이 대기열이 12,069였다 → 4,835페이지를 더 열고 **6,249 늘었다.**
+//   그리고 노출 상위 10개 페이지가 홈 1개 + **카페 상세 9개**다. 동×취향은 구글 노출이 사실상 0.
+//   → 크롤 예산은 정해져 있다. 구글에서 한 번도 안 뜨는 유형이 예산을 먹으면 카페 상세가 굶는다.
+//
+//   ⚠️ 네이버 리스크 판단: 네이버 유입의 74%가 지역×취향/동 계열이다. 그래서 겁나는 조치다.
+//     다만 사이트맵은 **발견 힌트이지 색인 지시가 아니다** — 이미 색인된 페이지는 빠지지 않는다.
+//     영향은 '앞으로 새로 생기는 동×취향의 네이버 발견이 느려지는 것'에 한정된다.
+//   🔙 되돌림 조건: 2주 내 네이버 경유 동 계열 유입이 20% 이상 줄면 즉시 원복(이 줄만 되돌리면 된다).
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const p = await sitemapParts();
-  return [...p.misc, ...p.areas, ...p.taste, ...p.facet, ...p.dong, ...p.dongtaste, ...p.dongfacet, ...p.cafes];
+  return [...p.misc, ...p.areas, ...p.taste, ...p.facet, ...p.dong, ...p.cafes];
 }
 
 async function sitemapParts(): Promise<Record<SitemapKind, MetadataRoute.Sitemap>> {

@@ -34,9 +34,12 @@ export default function robots(): MetadataRoute.Robots {
       { userAgent: "*", allow: "/", disallow: DISALLOW },
     ],
     // 전체 + 유형별을 함께 싣는다 — 유형별은 Search Console에서 **색인 수를 따로 보기 위한 것**이다.
+    // 🔴 2026-09-16 — dongtaste·dongfacet 제외(CEO 승인). 라우트(/sitemaps/dongtaste.xml)는 살아 있고
+    //   여기서 '크롤해달라'는 신호만 뺀다. 근거는 app/sitemap.ts 주석 참조
+    //   (제출 34,455 → 색인 3,100(9%) · "발견됐지만 크롤 안 함" 18,318개 · 노출 상위 10개 중 9개가 카페 상세).
     sitemap: [
       "https://dongnecoffeenote.com/sitemap.xml",
-      ...["cafes", "areas", "taste", "facet", "dong", "dongtaste", "dongfacet", "misc"]
+      ...["cafes", "areas", "taste", "facet", "dong", "misc"]
         .map((k) => `https://dongnecoffeenote.com/sitemaps/${k}.xml`),
     ],
     host: "https://dongnecoffeenote.com",
