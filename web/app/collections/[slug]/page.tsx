@@ -129,7 +129,7 @@ export default async function CollectionPage({ params }: { params: Promise<{ slu
           <Link href={`/?region=${encodeURIComponent(area)}`} className="block w-full bg-[#2b2018] text-[#f4ece0] rounded-xl py-3 text-center font-bold">{label} 카페 지도에서 더 보기 →</Link>
           <div className="mt-3">
             <KakaoShare
-              title={`${label} 카페 추천 — 협찬 없이 진짜 후기로 검증`}
+              title={`${label} 카페 추천 — 협찬 없이 실제 방문 후기로 검증`}
               description={`광고·협찬·타지점 후기 빼고 진짜 방문 후기로 검증한 ${label} 카페`}
               imageUrl={`${canon}/opengraph-image`}
               link={canon}

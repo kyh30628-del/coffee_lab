@@ -24,7 +24,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const bestN = shownN >= 5 ? ` BEST ${shownN}` : "";
   // 제목은 사람들이 실제로 치는 말 그대로 — "{지역} {시설} 카페". 경쟁사가 1위인 자리가 정확히 이 형태다.
   const title = `${area} ${f.title} 카페${bestN} — ${areaShort ? `${areaShort} ` : ""}${f.aliases[0]} 검증 추천 | 동네 커피 노트`;
-  const desc = `${areaShort ? `${areaShort}·` : ""}${area}에서 ${f.aliases.slice(0, 2).join(", ")}${josa(f.aliases[Math.min(1, f.aliases.length - 1)] ?? "", "을/를")} 찾는다면. ${f.desc} 카페 ${total}곳을 영수증 리뷰·광고 없이 진짜 후기로 검증해 골랐어요.${names ? ` ${names} 등.` : ""}`;
+  const desc = `${areaShort ? `${areaShort}·` : ""}${area}에서 ${f.aliases.slice(0, 2).join(", ")}${josa(f.aliases[Math.min(1, f.aliases.length - 1)] ?? "", "을/를")} 찾는다면. ${f.desc} 카페 ${total}곳을 영수증 리뷰·광고 없이 실제 방문 후기로 검증해 골랐어요.${names ? ` ${names} 등.` : ""}`;
   const url = `${SITE}/area/${encodeURIComponent(area)}/f/${facet}`;
   return { title, description: desc, alternates: { canonical: url },
     openGraph: { title, description: desc, url, siteName: "동네 커피 노트", type: "website", locale: "ko_KR" } };

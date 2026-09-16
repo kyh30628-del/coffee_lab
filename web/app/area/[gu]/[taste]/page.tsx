@@ -45,7 +45,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   //   우리 30곳 뒤에는 검증 후기 14,340건이 있다 — 그쪽은 0건이라 따라올 수 없는 숫자다.
   //   ⚠️ 숫자가 작으면(1,000건 미만) 오히려 약해 보이므로 그때는 기존 문구를 그대로 쓴다.
   const evidence = stats.reviews >= 1000 ? `검증 후기 ${stats.reviews.toLocaleString()}건에서 ` : "";
-  const desc = `${areaShort2 ? `${areaShort2}·` : ""}${area}에서 ${aliasPhrase}${josa(aliasLast, "을/를")} 찾는다면. ${evidence}${t.desc} 카페를 영수증 리뷰·광고 없이 진짜 후기로 검증해 골랐어요.${names ? ` ${names} 등.` : ""}`;
+  const desc = `${areaShort2 ? `${areaShort2}·` : ""}${area}에서 ${aliasPhrase}${josa(aliasLast, "을/를")} 찾는다면. ${evidence}${t.desc} 카페를 영수증 리뷰·광고 없이 실제 방문 후기로 검증해 골랐어요.${names ? ` ${names} 등.` : ""}`;
   const url = `${SITE}/area/${encodeURIComponent(area)}/${taste}`;
   return {
     title, description: desc,

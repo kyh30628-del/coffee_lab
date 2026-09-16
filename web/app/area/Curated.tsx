@@ -34,7 +34,11 @@ export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, headin
   ];
   const evTotal = cafes.reduce((a, c) => a + (Number(c.count) || 0), 0);
   const cautionCount = cafes.filter((c) => Array.isArray(c.cautions) && c.cautions.length > 0).length;
-  const factLine = `검증 후기 ${evTotal.toLocaleString()}건을 근거로 고른 ${cafes.length}곳 · 광고·협찬 후기 제외 · 기준 ${new Date().toISOString().slice(0, 10)}`;
+  // 🔑 2026-09-16 — 이 한 줄은 AI가 그대로 인용하는 문장이다. 실측으로 표현을 골랐다.
+  //   Perplexity 10질의 결과: "검증"·"실제 후기"가 들어간 질의는 3/3 인용, 일반 "OO 카페 추천"은 0/4.
+  //   실제로 인용된 답변이 "교차검증 후기 21" 형식을 그대로 표에 옮겨 적었다 — 우리 문구가 곧 AI의 답이 된다.
+  //   그래서 이긴 표현(별점이 아니라 · 실제 방문 후기 · 교차검증)을 이 줄에 명시적으로 담는다.
+  const factLine = `별점이 아니라 실제 방문 후기로 검증한 ${cafes.length}곳 · 교차검증 후기 ${evTotal.toLocaleString()}건 · 광고·협찬·리뷰이벤트 글 제외 · 기준 ${new Date().toISOString().slice(0, 10)}`;
   // ❓ FAQPage(2026-09-14) — 경쟁사는 FAQ 리치결과를 노리는데 우리 지역 페이지엔 없었다.
   //   ⚠️ 답은 **이 페이지가 실제로 가진 숫자**로만 만든다(지어낸 FAQ는 구조화 데이터 위반이자 우리 원칙 위반).
   //   🔑 세 번째 질문("주의할 점")은 경쟁사가 절대 못 쓴다 — 단점 데이터를 가진 쪽만 답할 수 있다.
@@ -280,7 +284,7 @@ export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, headin
           <Link href={`/?region=${encodeURIComponent(area)}${tasteKey ? `&taste=${tasteKey}` : ""}`} className="block w-full bg-[#2b2018] text-[#f4ece0] rounded-xl py-3 text-center font-bold">🗺️ {area} 카페 지도에서 보기 →</Link>
           <KakaoShare
             title={heading}
-            description="영수증 리뷰·광고 빼고 진짜 후기로 검증한 우리 동네 카페"
+            description="영수증 리뷰·광고 빼고 실제 방문 후기로 검증한 우리 동네 카페"
             imageUrl={`${canonical}/opengraph-image`}
             link={canonical}
             source="동네목록"

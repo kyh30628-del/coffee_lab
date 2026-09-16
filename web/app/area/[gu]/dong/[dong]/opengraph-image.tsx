@@ -15,5 +15,5 @@ export default async function Image({ params }: { params: Promise<{ gu: string; 
   const d = decodeURIComponent(dong);
   const cafes = await getDongCafes(area, d, 3);
   const names = cafes.map((c) => c.name).join(" · ");
-  return ogCard({ title: `${d} 카페 추천`, subtitle: names || "진짜 후기로 검증한 동네 카페", badge: "검증", footer: OG_HINT });
+  return ogCard({ title: `${d} 카페 추천`, subtitle: names || "실제 방문 후기로 검증한 동네 카페", badge: "검증", footer: OG_HINT });
 }

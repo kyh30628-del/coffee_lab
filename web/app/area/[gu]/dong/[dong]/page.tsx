@@ -21,8 +21,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const d = decodeURIComponent(dong);
   const cafes = await getDongCafes(area, d, 5);
   const names = cafes.map((c) => c.name).slice(0, 3).join(", ");
-  const title = `${d} 카페 추천 — 진짜 후기로 검증한 곳 | 동네 커피 노트`;
-  const desc = `${area} ${d}에서 가볼 만한 카페를 영수증 리뷰·광고 없이 네이버·구글·유튜브 공개 후기로 검증해 골랐어요.${names ? ` ${names} 등.` : ""}`;
+  const title = `${d} 카페 추천 — 실제 방문 후기로 검증한 곳 | 동네 커피 노트`;
+  const desc = `${area} ${d}에서 가볼 만한 카페를 영수증 리뷰·광고 없이 네이버·구글·유튜브 공개 후기를 교차검증해 골랐어요.${names ? ` ${names} 등.` : ""}`;
   const url = `${SITE}/area/${encodeURIComponent(area)}/dong/${encodeURIComponent(d)}`;
   return {
     title, description: desc,
@@ -46,7 +46,7 @@ export default async function DongPage({ params }: Props) {
     .map((t) => ({ label: `${t.emoji} ${d} ${t.short} ${dongTasteCounts[`${area}|${d}|${t.key}`]}`, href: `/area/${encodeURIComponent(area)}/dong/${encodeURIComponent(d)}/${t.key}` }));
   if (!cafes.length && !total) notFound();
   const heading = `${d} 카페 추천`;
-  const intro = `${area} ${d}에서 가볼 만한 동네 카페 ${total || cafes.length}곳을 진짜 후기로 검증해 모았어요.`;
+  const intro = `${area} ${d}에서 가볼 만한 동네 카페 ${total || cafes.length}곳을 실제 방문 후기로 검증해 모았어요.`;
   const crossLinks = siblings.filter((s) => s.dong !== d).slice(0, 24).map((s) => ({ label: s.dong, href: `/area/${encodeURIComponent(area)}/dong/${encodeURIComponent(s.dong)}` }));
   return (
     <Curated

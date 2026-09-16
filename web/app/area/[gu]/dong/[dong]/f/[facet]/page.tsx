@@ -21,7 +21,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   // 🔑 제목 단위가 **동네명**이다 — 경쟁사가 1위인 자리가 정확히 이 형태다("목동 주차 가능한 카페").
   const title = `${d} ${f.title} 카페${bestN} — ${d} ${f.aliases[0]} 검증 추천 | 동네 커피 노트`;
   const a2 = f.aliases.slice(0, 2);
-  const desc = `${area} ${d}에서 ${a2.join(", ")}${josa(a2[a2.length - 1] ?? "", "을/를")} 찾는다면. ${f.desc} 카페 ${total}곳을 영수증 리뷰·광고 없이 진짜 후기로 검증해 골랐어요.${names ? ` ${names} 등.` : ""}`;
+  const desc = `${area} ${d}에서 ${a2.join(", ")}${josa(a2[a2.length - 1] ?? "", "을/를")} 찾는다면. ${f.desc} 카페 ${total}곳을 영수증 리뷰·광고 없이 실제 방문 후기로 검증해 골랐어요.${names ? ` ${names} 등.` : ""}`;
   const url = `${SITE}/area/${encodeURIComponent(area)}/dong/${encodeURIComponent(d)}/f/${facet}`;
   return { title, description: desc, alternates: { canonical: url },
     openGraph: { title, description: desc, url, siteName: "동네 커피 노트", type: "website", locale: "ko_KR" } };
