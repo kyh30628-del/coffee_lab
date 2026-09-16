@@ -895,7 +895,15 @@ export async function synthAndStore(cafe: { id: number; name: string; area: stri
   if (apiFailed) return { id: cafe.id, name: cafe.name, ok: false, reason: "수집 API 오류/쿼터 — 보존", skipped: true };
   const sources = rawToSources(raw);
   if (sources.length === 0) {
-    await sql`UPDATE cafes SET synth_grade='후보', synth_count=0, synth_updated=now(), published=false WHERE id=${cafe.id}`;
+    // 🔴 2026-09-16 수리 — 여기서 `pipeline_status`를 안 건드린 게 **968곳 불일치의 원인**이었다.
+    //   공개 중이던 카페가 재합성에서 근거 0건이 되면 published=false로 내려가는데 status는 'live'로 남는다.
+    //   실측: status=live·published=false **800곳**, 06-24부터 하루 20~40곳씩 누적. 전부 '후보' 등급.
+    //   피해가 두 겹이었다:
+    //     ① 관제·보고가 pipeline_status로 "공개 수"를 세면 **389곳을 과다 계상**한다(내가 그렇게 보고해 왔다).
+    //     ② 'live'로 남아 있어 **held 재평가 레인(7일 주기)에 안 걸린다** — 근거가 다시 모여도 영영 안 돌아온다.
+    //   → 'held'로 내린다. cron-resynth의 held 레인이 7일마다 다시 보고, 자격이 돌아오면 재공개한다.
+    await sql`UPDATE cafes SET synth_grade='후보', synth_count=0, synth_updated=now(), published=false,
+      pipeline_status='held', exclude_reason='수집 근거 0건 — held 재평가 대기', exclude_at=now() WHERE id=${cafe.id}`;
     await invalidateCafeCaches([cafe.id]).catch(() => {}); // 🧹 ISR(48h) 전환 대응
     return { id: cafe.id, name: cafe.name, ok: false, reason: "수집 0", grade: "후보", published: false, fromCache };
   }
