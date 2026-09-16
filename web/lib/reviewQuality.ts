@@ -424,6 +424,17 @@ const COMMON_WORD_NAMES = new Set(["일상적", "마찬가지", "그리고", "�
 //   병설)는 베스파 스쿠터 모델명("베스파 프리마베라")·이탈리아 파스타 메뉴명과 동음이의라 무관 블로그·홍보글이
 //   nameAsWord로 매칭됐다(표시리뷰 6건 중 3건 무관). 등재만으로 기존 P23 근접매칭 게이트 재사용.
 COMMON_WORD_NAMES.add("프리마베라");
+// 룰갭 신규(2026-09-13, decisions#1075): 유행 상호 접미어(TRENDING_BRAND_SUFFIX) — 카페명의 코어토큰이
+//   "방앗간"/"스튜디오"처럼 최근 유행해 여러 무관 업체가 함께 쓰는 상호 접미어로 끝나면, 전체이름 원문일치
+//   없이 그 접미어 단어만 원문에 등장해도(동일 접미어를 쓰는 전혀 다른 업체) 근접매칭·borderline 경로가
+//   우리 카페 이야기로 오판한다. 실측 3건(09-13 2·3차 사이클): (1) id5583 은근한방앗간(광진구) 표시리뷰
+//   6건 중 2건이 id19509·id4019 외계인방앗간(강남구·고양시) 리뷰. (2) id31796 프리마베라 — 동일 메커니즘의
+//   변형이라 위 COMMON_WORD_NAMES에 별도 등재. (3) id6721 커피스튜디오(영등포구) 표시리뷰 중 id22373
+//   스페셜티 스튜디오(같은 구, 다른 동) 리뷰가 "스튜디오" 단어 단독일치로 borderline→LLM 오판정까지
+//   뚫었다(COMMON_WORD_NAMES의 titleHasCafeWord 우회 때문에 P23 경로만으로는 못 막음). 대조군(창고·공방
+//   접미어, id5755·30074·5084·7846·26271)은 오염 미확인이라 접미어 공유 자체는 위험신호가 아니므로
+//   방앗간·스튜디오만 보수적으로 등재한다. 아래 verifyReview의 하드리젝트 게이트(P23류)가 이 사전을 쓴다.
+const TRENDING_BRAND_SUFFIX = new Set(["방앗간", "스튜디오"]);
 // ★ 비카페 업종이 '제목을 지배'할 때의 가드 — 매장·음료·주문·메뉴·좌석은 피부관리/필라테스 등 비카페도 흔히 써서
 //   가드를 뚫는다('피부관리 하이드뷰티…매장 전화번호'→결). 이 경로엔 진짜 커피전문 어휘(카페·커피·디저트·원두…)만 인정(2026-06-28).
 const CAFE_CONTEXT_STRONG = /(카페|커피|라떼|아메리카노|에스프레소|콜드브루|핸드드립|디저트|케이크|베이커리|빵|제과|원두|바리스타|아인슈페너|브런치|로스팅|카공|cafe|coffee|latte|목장|치즈|요거트|답례품|파충류|재즈|공연|전시|밀크티|버블티|망고사고)/i;
@@ -1876,6 +1887,42 @@ export function verifyReview(input: QualityInput): QualityResult {
   //   전혀 없음' → 카페 이름이 유명 문구라서 딸려온 글(비에도지지않고=시). 카페 맥락 있으면 보존.
   if (OFFTOPIC_TOPIC.test(fullL) && !CAFE_CONTEXT.test(fullL)) {
     return { verdict: "rejected", score: 3, reasons: ["비카페 주제 글(문학·게임·미디어·뮤지컬·방송)"], signals: sig };
+  }
+  // [유행 상호 접미어 단독일치 — 룰갭 신규 decisions#1075] 코어토큰이 TRENDING_BRAND_SUFFIX(방앗간·스튜디오)
+  //   '그 자체'거나(다중토큰 이름의 한 토큰이 접미어와 완전일치, 예: "은근한 방앗간"→["은근한","방앗간"])
+  //   'GENERIC_WORD 접두 + 접미어'뿐일 때(단일토큰 이름이 접미어로 끝나는데 그 앞이 GENERIC_WORD라 실질
+  //   식별력이 없음, 예: "커피스튜디오"→접두 "커피"가 GENERIC_WORD) — 이 접미어가 '유일한' 식별 신호다.
+  //   ⚠️ "호랑이방앗간"(접두 "호랑이"는 GENERIC_WORD 아님)·"이코복스 스튜디오"(다른 토큰 "이코복스"도 함께
+  //   등장) 같은 진짜 고유 브랜드는 여기 해당하지 않는다 — 접미어 외 다른 코어토큰이 원문에 '함께' 있으면
+  //   진짜 자기 브랜드 언급으로 보고 건드리지 않는다(실측: id3016 이코복스커피 스튜디오·id11610 등 오탐
+  //   방지 확인). 전체이름 원문일치가 없는데 접미어만 '단독으로' 등장하면, 근접 카페맥락(CAFE_CONTEXT_SUBSTANCE)
+  //   과 지역(동 정보가 있으면 동, 없으면 구) 둘 다 갖춰야만 인정 — 하나라도 없으면 동명 타업체로 보고
+  //   하드 거절한다(은근한방앗간←외계인방앗간, 커피스튜디오←스페셜티 스튜디오 실측 재현).
+  let trendingAnchor: { tok: string; suf: string } | undefined;
+  for (const raw of tokens) {
+    const t = norm(raw);
+    for (const suf of TRENDING_BRAND_SUFFIX) {
+      if (t === suf || (t.endsWith(suf) && GENERIC_WORD.has(t.slice(0, t.length - suf.length)))) {
+        trendingAnchor = { tok: raw, suf };
+        break;
+      }
+    }
+    if (trendingAnchor) break;
+  }
+  if (trendingAnchor && !inTitleFull && !inBodyFull) {
+    const { suf } = trendingAnchor;
+    const fullN2 = norm(`${title} ${body}`);
+    // otherTok는 nameHit(경계매칭)이 아니라 부분포함으로 본다 — "이코복스"가 원문에 "이코복스커피"처럼
+    //   붙어 나오면 경계매칭은 실패하지만(뒤에 경계문자가 없음) 우리 브랜드 언급인 건 맞다(id3016 실측).
+    //   접미어 단독앵커 여부만 가리는 자리라 느슨한 포함검사가 안전한 방향(오탐 방지 우선).
+    const otherToks = tokens.filter((tk) => tk !== trendingAnchor!.tok);
+    const otherTokHit = otherToks.some((tk) => fullN2.includes(norm(tk)));
+    if (!otherTokHit && (nameHit(title, titleN, suf) || nameHit(body, bodyN, suf))) {
+      const regionOk = hasDongTerm ? dongPresent : areaPresent;
+      if (!ctxNearName(fullN2, suf, CAFE_CONTEXT_SUBSTANCE) || !regionOk) {
+        return { verdict: "rejected", score: 4, reasons: [`유행 상호 접미어('${suf}') 단독일치(근접 카페맥락·지역 불일치) — 동명 타업체 추정`], signals: sig };
+      }
+    }
   }
   // [nameAsWord 오염 — 룰갭 제안15] 1~2글자/일반어 카페명(이해·봄·탐·결·수·목이·일상적…)이 법률·의료·시공·운송 SEO나
   //   무관 글에 '문장 성분(동사/형용사)'으로 우연일치해 통과하던 것 차단. 짧은/일반어 이름 + 카페 맥락(CAFE_CONTEXT·카페어)
