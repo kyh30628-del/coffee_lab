@@ -330,7 +330,7 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS needs_llm_priority TEXT`.catch(() => {}); // needs_llm 재판정 큐 우선순위 태그(rulegap-20260808-0815)
   const allEv = safeJson(allEvidence ?? evidenceReviews);
   // 현재 상태(파이프라인 단계·카테고리·이전 합성값) 먼저 — 카테고리 게이트 분기에 pst 필요.
-  const cur = (await sql`SELECT pipeline_status, naver_category, synth_identity, synth_count, synth_updated, jsonb_array_length(COALESCE(synth_reviews,'[]'::jsonb)) prev_ev,
+  const cur = (await sql`SELECT pipeline_status, naver_category, synth_identity, synth_count, synth_updated, raw_collected_at, jsonb_array_length(COALESCE(synth_reviews,'[]'::jsonb)) prev_ev,
     (COALESCE(raw_reviews::text,'') ~* '커피|디저트|음료|아메리카노|에스프레소|카푸치노|콜드브루|플랫화이트|핸드드립|카페라') AS raw_coffee
     FROM cafes WHERE id=${cafeId} LIMIT 1`)[0] as any;
   const pst: string | null = cur?.pipeline_status ?? null;
@@ -363,8 +363,15 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   //   이 파일의 기존 원칙(신규=엄격 / 라이브=grandfather)과 같은 방향이라 새 개념이 아니다.
   //   ⚠️ 등급(grade) 자체는 건드리지 않는다 — 화면 표기·검색 가중치가 흔들리면 안 되므로 '공개 자격'만 가른다.
   const refFloorNew = getCriterionSync("grade.floor.reference_new");
+  // 🆕 2026-09-17 — 문턱과 **짝으로** 신선도를 건다(CEO 승인). 08-29에 문턱을 3→5로 올린 진짜 이유는
+  //   "3건이 부족해서"가 아니라 **60일+ 낡은 수집으로 3건을 세서**였다(1,635곳 중 843곳이 그랬다).
+  //   문턱 인상은 증상 대응이었다 — 원인인 '데이터 나이'를 직접 막으면 같은 3건도 믿을 수 있다.
+  //   fromCache=true(재수집 없이 캐시 재사용)여도 raw_collected_at 자체가 나이를 말하므로 그대로 쓴다.
+  const freshDays = getCriterionSync("grade.floor.reference_new_fresh_days");
+  const rawAgeDays = cur?.raw_collected_at ? (Date.now() - new Date(cur.raw_collected_at).getTime()) / 86400e3 : Infinity;
+  const freshOk = !freshDays || rawAgeDays <= freshDays;
   const gradeOk = grade === "검증"
-    || (grade === "참고" && (inPipeline ? collected >= refFloorNew : true));
+    || (grade === "참고" && (inPipeline ? (collected >= refFloorNew && freshOk) : true));
   const nonCafeReal = isNonCafe(name, naverCat); // 실제 카테고리 사용(빈값 name-only 오탐 방지). 카테고리 없으면 grandfather.
   //   라이브(grandfather): 이름 OR 카테고리 중 '하나라도' 카페면 유지 — 둘 다 비카페일 때만 제거. 오제거 최소화.
   //   (고로케=카테고리'카페,디저트'로 유지 · 커피로스터=네이버 '제조업/쇼핑' 오분류지만 이름'커피'로 유지 · 식당=둘다 비카페→제거)
