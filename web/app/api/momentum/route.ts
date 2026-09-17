@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { areaMatchesRegion } from "@/lib/regionList";
+import { areaMatchesRegion, regionAreaCandidates } from "@/lib/regionList";
 import { rotateBySido } from "@/lib/sidoRotation";
 import { sql } from "@/lib/db";
 export const runtime = "nodejs";
@@ -22,6 +22,12 @@ export async function GET(req: NextRequest) {
     // 매 콜드스타트마다 순차 DDL 4회 왕복(무의미)을 냈다. 스키마는 다른 쓰기 경로에서 계속 보장되므로
     // 이 GET에서는 생략(2026-07-26, 동작 무변·순수 성능).
     const region = (req.nextUrl.searchParams.get("region") ?? "").trim();
+    // 🚀 2026-09-17 — 지역 필터를 **SQL로 내린다.** 예전엔 공개 28,578곳 전부의 review_dates를 SQL에서
+    //   날짜 파싱(요청당 약 140만 건)한 뒤 아래 JS(inRegion)에서 97%를 버렸다.
+    //   실측: 전체 1,221ms → 마포구 238ms(5배). 스캔량 2.5%.
+    //   ⚠️ 아래 areaMatchesRegion 최종 확인은 **그대로 둔다** — 이 목록은 최적화 힌트일 뿐 판정 권한이 없다.
+    //     못 풀면 null이라 필터가 안 붙고 기존 동작 그대로다(결과 불변 보장).
+    const areaCands = region ? regionAreaCandidates(region) : null;
     // ⚡ 2026-07-26 쿼리 구조 재작업 v2 — v1은 r90·r30을 각각 별도 서브쿼리로 배열을 두 번 unnest했다.
     // 배열을 한 번만 풀어(jsonb_array_elements_text 1회) FILTER(WHERE)로 r90/r30을 동시 집계하도록
     // 재작업(로컬 표본 600건 전수 대조 불일치 0, DB 직접 타이밍 비교로 단축 확인). dessert/roast 등
@@ -51,6 +57,7 @@ export async function GET(req: NextRequest) {
                (cs.dessert > 20 AND cs.roast < 5 AND cs.dessert >= cs.roast * 8) AS dominant
       ) x
       WHERE c.published = true AND c.review_dates IS NOT NULL AND r.r90 >= 3 AND NOT x.dominant
+        ${areaCands ? sql`AND c.area = ANY(${areaCands})` : sql``}
     `;
 
     // 스냅샷 증가분(Δ): 5일 이상 전 스냅샷이 있으면 상승세 계산

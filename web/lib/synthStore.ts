@@ -94,6 +94,15 @@ async function ensureCols() {
   // ⚠️ 2026-09-14 "이건 알고 가세요" — 후기 2건 이상에서 확인된 주의점 [{label,emoji,count,quote}].
   //   근거 문장을 함께 담는다: 우리 판단이 아니라 손님이 쓴 말임을 화면에서 보이기 위해.
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS cautions JSONB`; // 사람이 '진짜 카페'로 확인한 화이트리스트 → offctx 점검목록서 제외(프록시 오탐 반복 방지)
+  // 🔴 2026-09-17 이관 — 아래 5개는 synthAndStore **핫패스(옛 326~330행)**에 맨몸으로 박혀 있었다.
+  //   pg_stat_statements 실측: `ALTER ... synth_reviews_all` 하나만 **39,271회 · 누적 1,699초**.
+  //   5개니까 약 20만 번이 돌았고, 합성 1건마다 왕복 5회가 붙었다.
+  //   2026-08-18에 "콜드스타트마다 ALTER 18개" 낭비를 ensureOnce로 막았는데 이 5개가 그 밖에 남아 있었다.
+  await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_reviews_all JSONB`;
+  await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS pipeline_status TEXT`;
+  await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS needs_llm BOOLEAN`;
+  await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS borderline_count INT`;
+  await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS needs_llm_priority TEXT`; // needs_llm 재판정 큐 우선순위 태그(rulegap-20260808-0815)
   });
   ensured = true;
 }
@@ -323,11 +332,7 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   const campaignSignal = detectCampaignCluster(((allEvidence ?? evidenceReviews) as any[]).map((r) => ({ quote: String(r?.quote || ""), date: r?.date })));
   const needsLLM = ambiguousEvidence || recoverableEdge || campaignSignal.suspect;
   const needsLlmPriority = campaignSignal.suspect ? "동일날짜 SEO반복 캠페인 의심" : null;
-  await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_reviews_all JSONB`.catch(() => {});
-  await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS pipeline_status TEXT`.catch(() => {});
-  await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS needs_llm BOOLEAN`.catch(() => {});
-  await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS borderline_count INT`.catch(() => {});
-  await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS needs_llm_priority TEXT`.catch(() => {}); // needs_llm 재판정 큐 우선순위 태그(rulegap-20260808-0815)
+  // (컬럼 보장 DDL 5개는 ensureCols로 이관 — 2026-09-17, 핫패스에서 20만 회 돌던 낭비)
   const allEv = safeJson(allEvidence ?? evidenceReviews);
   // 현재 상태(파이프라인 단계·카테고리·이전 합성값) 먼저 — 카테고리 게이트 분기에 pst 필요.
   const cur = (await sql`SELECT pipeline_status, naver_category, synth_identity, synth_count, synth_updated, raw_collected_at, jsonb_array_length(COALESCE(synth_reviews,'[]'::jsonb)) prev_ev,
