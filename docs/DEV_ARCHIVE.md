@@ -362,3 +362,4 @@
 | 2026-09-17 00:11 | #1099 | [사장님영업] 무료 리포트 → 검증배지(/owner/badge) 크로스링크 부재 — 이미 만든 바이럴 자산  | 37a6ff90 | - | app/owner/r/[id]/page.tsx: grade가 검증/참고인 카페에 한해 하단 링크줄에 배지 달기(/owner/badge?q=카페명) 추가. app/owner/badg |
 | 2026-09-17 05:14 | #1105 | [룰갭 P70] LOCAL_SEO_SERVICES 사전 갭 — 가전렌탈/설치기사/음향렌탈 SEO스팸 미등재( | ab89b041 | - | lib/reviewQuality.ts:361 LOCAL_SEO_SERVICES 정규식에 공기청정기 정수기 렌탈 가전 렌탈 렌탈 상품 설치기사 방문후기 노래방기계 대여 음향 렌탈 비 |
 | 2026-09-17 08:25 | #1110 | [개발] 협업 #422: 인천 원도심(중구·서구) discovery_targets consumed에도 dis | 2dc14001 | - | app/api/cron-grow/route.ts: 확인된 순수 코드버그 — discoverRegion 자체는 정상 실행(found 497/58건), discovery_targets |
+| 2026-09-17 08:25 | #1111 | [개발] 협업 #423: [리스크] decisions#1079 레이트리밋이 인스턴스 로컬 메모리 방식 — 분 | e9a69c41 | - | lib/rateLimit.ts를 인스턴스 로컬 메모리 슬라이딩윈도우 → Neon Postgres(rate_limit_buckets 테이블) 원자적 UPSERT 카운터로 전환. pr |
