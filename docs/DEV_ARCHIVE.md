@@ -359,3 +359,4 @@
 | 2026-09-15 11:05 | #1087 | [검색UX 신규] 취향 페이지 도미넌스 필터가 dessert축에만 하드코딩 — brunch/space 압도  | f996a745 | - | lib/seoData.ts: dessertDominance(dessert-vs-roast 하드코딩)를 CHAR_AXES 전축 대상 범용 도미넌스 필터로 교체(otherAxisKey |
 | 2026-09-15 11:05 | #1088 | [사장님영업] OwnerFindModal(홈 '우리 가게 찾기') 검색 흐름 계측 공백 — 홈 경로 무료리포 | 5724dce8 | - | app/OwnerFindModal.tsx: run() 검색성공 직후 cta_click(source=find_search, meta.hitCount) 전송 + onNoMatch 버튼 |
 | 2026-09-16 03:46 | #1075 | [룰갭 신규] 유행 상호 접미어(TRENDING_BRAND_SUFFIX) 단독 앵커화 — GENERIC_WO | 95b44ec2 | - | lib/reviewQuality.ts: TRENDING_BRAND_SUFFIX Set([방앗간,스튜디오]) 신규 등록 + verifyReview에 P23류 하드리젝트 게이트 추가  |
+| 2026-09-17 00:11 | #1099 | [사장님영업] 무료 리포트 → 검증배지(/owner/badge) 크로스링크 부재 — 이미 만든 바이럴 자산  | 37a6ff90 | - | app/owner/r/[id]/page.tsx: grade가 검증/참고인 카페에 한해 하단 링크줄에 배지 달기(/owner/badge?q=카페명) 추가. app/owner/badg |
