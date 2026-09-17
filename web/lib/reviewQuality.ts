@@ -2309,6 +2309,15 @@ export function verifyReview(input: QualityInput): QualityResult {
   if (listicle && !nameInBody) {
     return { verdict: "rejected", score: 10, reasons: ["나열식 모음글에 언급만 됨(주제 아님)"], signals: sig };
   }
+  // 룰갭 P71(2026-09-17, decisions#1112): TRANSIT_VENUE_WORDS(휴게소·터미널·공항·역사·환승센터) 소속 카페는
+  //   nameInBody가 참(정체성 매칭 통과)이어도 본문이 실제로 여러 매장을 상세히 다루는 listicle이면 기존
+  //   -22 소프트 페널티(2392행)만으론 참고등급 문턱(38점)을 못 넘기지 못하는 사례가 반복 확인됐다(id20646·
+  //   27837·32559·32586·35971 — offctx 0.23~0.36, 타브랜드가 nameOccurBody와 나란히 4개 이상 나열).
+  //   바로 위 'listicle && !nameInBody' 하드거부와 대칭으로, TRANSIT_VENUE 카테고리에 한정해 나열 항목이
+  //   4개 이상(이미 계산되는 countEnumListItems 재사용)이면 nameInBody 여부와 무관하게 하드 배제한다.
+  if (listicle && isTransitVenueCafe(input.name) && countEnumListItems(body, nameN) >= 4) {
+    return { verdict: "rejected", score: 10, reasons: ["교통 복합시설(휴게소 등) 나열식 모음글 — 타업체 다수 상세 서술(정체성 일치해도 하드 배제)"], signals: sig };
+  }
   // 룰갭 P63(2026-07-28, decisions#530): 배송-전용 강신호(택배·스마트스토어 구매 등)만 있고 매장 실물방문
   //   신호가 전무하면 하드 탈락 대신 borderline(LLM 재판정)으로 격하 — SUBSTANCE_CUES(빵·맛 등)는 배송
   //   후기에도 흔해 score만으론 방문후기와 구분 안 되므로, 하드 verified 산입을 막고 LLM이 확인하게 한다.
