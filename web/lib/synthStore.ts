@@ -524,9 +524,16 @@ export async function holdZeroEvidenceSuspects(): Promise<{ held: number; releas
   // 복귀 경로(코드는 살아있으나 실질 미발동 — 위 함수 상단 주석 참조): held였는데 재그라운딩에서
   //   grounded=true → 다시 live(다음 재합성이 규칙대로 공개). 그라운딩이 공개 카페만 표본으로 삼는 한
   //   held 카페는 이 UPDATE의 대상(grounded=true row)이 자연 발생하지 않는다.
+  // 🔴 2026-09-17 수리 — "실질 미발동"이라던 이 경로가 **깨어났다**. 09-16·17에 957곳을 held로 소급 정정하자
+  //   그중 옛 grounded=true 행을 가진 143곳이 여기 걸려 status만 'live'로 튀었다(published는 false 그대로).
+  //   두 겹으로 틀렸다: ①published와 어긋남(관제 과다계상·픽스처 실패) ②142곳은 '후보' 등급이라 공개 자격 자체가 없다.
+  //   그리고 "다음 재합성이 규칙대로 공개"라는 주석 전제가 거짓이다 — 재합성 genRows는 published=true만 뽑으므로
+  //   live/비공개 카페는 영영 재평가되지 않는다(어제 고친 '조용히 죽은 카페' 함정과 동일).
+  //   → 'live'가 아니라 **'pending'**으로 보낸다. cron-embed의 finalizePipeline이 등급·임베딩 게이트를 거쳐 승격한다.
+  //     후보 등급은 held에 그대로 둔다(근거 없음 → 공개 대상 아님). release-scope-excluded.mjs와 같은 규칙.
   const rel = (await sql`
-    UPDATE cafes SET pipeline_status = 'live'
-    WHERE pipeline_status = 'held'
+    UPDATE cafes SET pipeline_status = 'pending', exclude_reason = NULL, exclude_at = NULL
+    WHERE pipeline_status = 'held' AND synth_grade IN ('검증','참고')
       AND id IN (SELECT cafe_id FROM grounding_checks WHERE grounded = true)
     RETURNING name`) as any[];
   return { held: heldRows.length, released: rel.length, names: heldRows.map((r) => r.name).slice(0, 8) };

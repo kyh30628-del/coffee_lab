@@ -55,5 +55,35 @@ const j = await sql`SELECT job, ok, to_char(ran_at AT TIME ZONE 'Asia/Seoul','HH
   FROM agent_runs WHERE job IN ('cron-grow','cron-synth','cron-resynth','cron-embed','discover-sweep') ORDER BY ran_at DESC`;
 say(`⑥ 잡: ${j.map((x) => `${x.job.replace("cron-", "")}=${x.t}${x.ok ? "" : "❌"}`).join(" · ")}`);
 
+// ⑦ 지역별 유입 효율 — 지방 확장이 방문자를 데려오는지(2026-09-17 CEO 지시 "제대로 똑바로 해놔")
+//   판정선 10-08: 신규 5개 시도 PV/천곳 ≥ 40 → 지방 확장 계속 · < 40 → 지방 발굴 중단, 수도권·AI로 회수.
+//   실측 09-17: 수도권 373 · 강원(3주) 50.2 · 대구경북(5일) 2.9. 강원이 3주에 50을 찍었으니 같은 기간을 준다.
+//   ⚠️ 매일 찍는 이유: 3주를 기다리지 않고도 '오르는 중인지 멈춰 있는지' 추세가 보이게.
+try {
+  const { BOT_ANON_IDS_SQL } = await import("../lib/behaviorBot.ts");
+  const SIDO = `CASE
+      WHEN c.address LIKE '서울%' THEN '서울' WHEN c.address LIKE '경기%' THEN '경기' WHEN c.address LIKE '인천%' THEN '인천'
+      WHEN c.address LIKE '강원%' THEN '강원' WHEN c.address LIKE '충청북%' OR c.address LIKE '충북%' THEN '충북'
+      WHEN c.address LIKE '충청남%' OR c.address LIKE '충남%' THEN '충남' WHEN c.address LIKE '대전%' THEN '대전'
+      WHEN c.address LIKE '세종%' THEN '세종' WHEN c.address LIKE '부산%' THEN '부산'
+      WHEN c.address LIKE '경상남%' OR c.address LIKE '경남%' THEN '경남' WHEN c.address LIKE '대구%' THEN '대구'
+      WHEN c.address LIKE '경상북%' OR c.address LIKE '경북%' THEN '경북'
+      WHEN c.address LIKE '전남광주통합%' OR c.address LIKE '광주광역시%' THEN '광주'
+      WHEN c.address LIKE '전라남%' THEN '전남' WHEN c.address LIKE '전북%' OR c.address LIKE '전라북%' THEN '전북'
+      WHEN c.address LIKE '울산%' THEN '울산' WHEN c.address LIKE '제주%' THEN '제주' ELSE '기타' END`;
+  const pv = await sql.query(`SELECT ${SIDO} AS sido, count(*)::int pv FROM traffic_events t
+    JOIN cafes c ON c.id = substring(t.path from '^/c/([0-9]+)')::int
+    WHERE t.ts >= now() - interval '30 days' AND t.path LIKE '/c/%' AND t.anon_id NOT IN (${BOT_ANON_IDS_SQL})
+    GROUP BY 1`);
+  const cnt = await sql.query(`SELECT ${SIDO} AS sido, count(*)::int n FROM cafes c WHERE published GROUP BY 1`);
+  const P = Object.fromEntries(pv.map((x) => [x.sido, x.pv])), C = Object.fromEntries(cnt.map((x) => [x.sido, x.n]));
+  const row = (k) => { const n = C[k] ?? 0, p = P[k] ?? 0; return n ? `${k} ${(p / n * 1000).toFixed(1)}` : `${k} -`; };
+  const capital = ["서울", "경기", "인천"], mature = ["강원", "충북", "충남", "대전", "세종", "부산", "경남", "대구", "경북"], fresh = ["광주", "전남", "전북", "울산", "제주"];
+  const agg = (ks) => { const n = ks.reduce((s, k) => s + (C[k] ?? 0), 0), p = ks.reduce((s, k) => s + (P[k] ?? 0), 0); return n ? (p / n * 1000).toFixed(1) : "-"; };
+  say(`⑦ 유입효율 PV/천곳(30일)  수도권 ${agg(capital)} · 기존지방 ${agg(mature)} · 신규5시도 ${agg(fresh)} ${Number(agg(fresh)) >= 40 ? "✅ 판정선 40 통과" : "(판정선 40 · 10-08 확정)"}`);
+  say(`   ${[...capital, ...mature].map(row).join(" · ")}`);
+  say(`   신규: ${fresh.map(row).join(" · ")}`);
+} catch (e) { say(`⑦ 유입효율 조회 실패: ${String(e).slice(0, 60)}`); }
+
 const { writeFileSync } = await import("node:fs");
 writeFileSync(`${dir}/morning-sweep-${ymd}.log`, out.join("\n") + "\n");
