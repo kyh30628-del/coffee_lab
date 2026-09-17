@@ -33,7 +33,15 @@ export const NAVER_CLOSURE_RESERVE = Number(process.env.NAVER_CLOSURE_RESERVE ||
 //     (3곳에 24콜). 1,500이면 하루 187곳뿐이라 정상 파기분 246곳/일에 미달 — 매일 59곳씩 밀린다.
 //     실측 보고 후 CEO가 2,300콜(9.2%)로 상향 승인 → 하루 287곳, 7일 내 백로그 소진 후 유지.
 //   ⚠️ 보관기간 연장(90→180일)은 선택지가 아니다 — 네이버 약관 7.3.③ 방어선이자 /terms 공개 약속이다.
-export const NAVER_RECOLLECT_RESERVE = Number(process.env.NAVER_RECOLLECT_RESERVE || 2300);
+// 🔴 2026-09-17 폐지(CEO 승인) — 0으로 내린다. 이유는 **유입 우선**이라는 대전제다.
+//   실측으로 카페 수 ↔ 방문자 연결이 확인됐다(1,000카페당 방문자 53.8 → 116.1 → 133.1 상승 추세).
+//   그 기준으로 재수집 2,300콜의 기회비용을 계산하면:
+//     2,300콜 ÷ 스윕 실효 22콜 = 신규 약 105곳/일 = 월 3,150곳 ≈ **월 419 방문자**
+//   반면 재수집이 지키는 것은 유입과 무관하다 — raw가 없어도 카페 페이지는 그대로 노출된다
+//   (인용문은 synth_reviews에 따로 저장). 재수집은 '규칙이 바뀌었을 때 재판정할 수 있게' 하는 것뿐이다.
+//   ⚠️ 내가 09-16에 이 예약을 받아낸 근거("검증 등급이 재검 불가가 된다")는 유입과 무관했다. 전제가 틀렸다.
+//   → 0. 전수 재검이 꼭 필요한 시점엔 scripts/recollect-purged.mjs를 수동으로 돌린다(스크립트·레인은 보존).
+export const NAVER_RECOLLECT_RESERVE = Number(process.env.NAVER_RECOLLECT_RESERVE || 0);
 /** 발굴(cron-grow)·재수집 등 '폐업 아닌' 소비자가 지금 더 써도 되는가 — 예약분 1,200을 남긴다. */
 export async function nonClosureMayUse(): Promise<{ ok: boolean; remaining: number }> {
   const used = await naverUsedToday();
