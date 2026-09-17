@@ -13,6 +13,29 @@ const say = (s) => { out.push(s); console.log(s); };
 
 say(`═══ 아침 스윕 보고 ${KST()} KST ═══`);
 
+// ⓪ 사람 유입(어제, 봇 제외) — 북극성 지표. 카페 수는 수단이고 이게 결과다(CEO 2026-09-14 "사람의 검색으로 유입되는 것만 중요").
+//   ⚠️ 봇 제외는 BOT_ANON_IDS_SQL 단일출처. 어제 = KST 어제 00:00~24:00.
+try {
+  const { BOT_ANON_IDS_SQL } = await import("../lib/behaviorBot.ts");
+  const Y0 = "(date_trunc('day', now() AT TIME ZONE 'Asia/Seoul') AT TIME ZONE 'Asia/Seoul') - interval '1 day'";
+  const Y1 = "(date_trunc('day', now() AT TIME ZONE 'Asia/Seoul') AT TIME ZONE 'Asia/Seoul')";
+  const [v] = await sql.query(`SELECT count(DISTINCT anon_id)::int uv, count(*)::int pv,
+      count(*) FILTER (WHERE src='naver')::int naver,
+      count(*) FILTER (WHERE src LIKE '%chatgpt%' OR src IN ('openai','perplexity','perplexity.ai','claude.ai','gemini','copilot.com'))::int ai,
+      count(*) FILTER (WHERE src='google')::int google,
+      count(*) FILTER (WHERE src='naver' AND path ~ '^/area/[^/]+/dong/')::int naver_dong
+    FROM traffic_events WHERE ts >= ${Y0} AND ts < ${Y1} AND anon_id NOT IN (${BOT_ANON_IDS_SQL})`);
+  const [w] = await sql.query(`SELECT count(DISTINCT anon_id)::int uv,
+      count(*) FILTER (WHERE src='naver' AND path ~ '^/area/[^/]+/dong/')::int naver_dong
+    FROM traffic_events WHERE ts >= ${Y0} - interval '7 days' AND ts < ${Y0} AND anon_id NOT IN (${BOT_ANON_IDS_SQL})`);
+  const avg7 = Math.round(w.uv / 7);
+  say(`⓪ 사람 유입(어제) 방문자 ${v.uv}명 · PV ${v.pv}  ← 7일평균 ${avg7}명 ${v.uv < avg7 * 0.7 ? "🔴 -30%↓" : v.uv > avg7 * 1.3 ? "📈 +30%↑" : ""}`);
+  say(`   출처: 네이버 ${v.naver} · AI ${v.ai} · 구글 ${v.google}`);
+  // 🔙 사이트맵에서 동×취향을 뺀(09-17) 되돌림 조건: 네이버 경유 동 계열 유입이 20% 이상 줄면 원복
+  const dongAvg7 = w.naver_dong / 7;
+  say(`   네이버→동 계열 ${v.naver_dong} (7일평균 ${dongAvg7.toFixed(1)}) ${dongAvg7 > 0 && v.naver_dong < dongAvg7 * 0.8 ? "🔴 -20%↓ 사이트맵 원복 검토" : "✅"}`);
+} catch (e) { say(`⓪ 사람 유입 조회 실패: ${String(e).slice(0, 60)}`); }
+
 // ① 스윕 로그 — 오늘 07시대 것
 const dir = "/Users/wangwida/coffee-platform/agent-reports/logs";
 const ymd = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10).replace(/-/g, "");
@@ -32,7 +55,14 @@ else {
 // ② 적재·공개
 const t = await sql`SELECT count(*)::int n, count(*) FILTER (WHERE published)::int pub FROM cafes WHERE created_at >= ${K}`;
 const p = await sql`SELECT count(*) FILTER (WHERE published)::int pub FROM cafes`;
-say(`② 오늘 적재 ${t[0].n.toLocaleString()}곳 (공개 ${t[0].pub}) · 전체 공개 ${p[0].pub.toLocaleString()}곳`);
+let pubDelta = "";
+try {
+  const yd = new Date(Date.now() + 9 * 3600e3 - 86400e3).toISOString().slice(0, 10).replace(/-/g, "");
+  const prev = readFileSync(`${dir}/morning-sweep-${yd}.log`, "utf8").match(/전체 공개 ([\d,]+)곳/);
+  if (prev) { const b = Number(prev[1].replace(/,/g, "")); const d = p[0].pub - b;
+    pubDelta = ` (전일 ${b.toLocaleString()} → ${d >= 0 ? "+" : ""}${d.toLocaleString()})${d < -b * 0.03 ? " 🔴 -3%↓ 대량 비공개 의심(09-12형)" : ""}`; }
+} catch { /* 첫날은 전일 로그가 없다 */ }
+say(`② 오늘 적재 ${t[0].n.toLocaleString()}곳 (공개 ${t[0].pub}) · 전체 공개 ${p[0].pub.toLocaleString()}곳${pubDelta}`);
 
 // ③ 신규 5개 시도 (전국 개방 성과)
 const g = await sql`SELECT count(*)::int n, count(*) FILTER (WHERE published)::int pub FROM cafes
@@ -53,7 +83,13 @@ say(`⑤ 정합성 published ${mm[0].a.toLocaleString()} vs live ${mm[0].b.toLoc
 // ⑥ 잡 실행
 const j = await sql`SELECT job, ok, to_char(ran_at AT TIME ZONE 'Asia/Seoul','HH24:MI') AS t
   FROM agent_runs WHERE job IN ('cron-grow','cron-synth','cron-resynth','cron-embed','discover-sweep') ORDER BY ran_at DESC`;
-say(`⑥ 잡: ${j.map((x) => `${x.job.replace("cron-", "")}=${x.t}${x.ok ? "" : "❌"}`).join(" · ")}`);
+// 08:20 기준 '오늘 08시대 실행이 있어야 하는 잡'이 어제 시각을 달고 있으면 = 아침 회차가 조용히 죽은 것.
+//   (cron-resynth 20시 타임아웃이 기록조차 안 남아 관제탑에 안 보이던 2026-09-16 함정 재발 방지)
+const expectMorning = new Set(["cron-grow", "cron-synth", "cron-resynth", "cron-embed", "discover-sweep"]);
+//   ⚠️ 08:15~09:30 사이에 돌 때만 판정한다 — 낮에 수동으로 돌리면 아침 시각이 아니라 거짓 빨강이 난다(21시 시험에서 실제로 났다).
+const hhmm = Number(new Date(Date.now() + 9 * 3600e3).toISOString().slice(11, 16).replace(":", ""));
+const missed = (hhmm >= 815 && hhmm <= 930) ? j.filter((x) => expectMorning.has(x.job) && !/^0[78]:/.test(x.t)).map((x) => x.job.replace("cron-", "")) : [];
+say(`⑥ 잡: ${j.map((x) => `${x.job.replace("cron-", "")}=${x.t}${x.ok ? "" : "❌"}`).join(" · ")}${missed.length ? ` 🔴 아침 회차 누락: ${missed.join(",")}` : ""}`);
 
 // ⑦ 지역별 유입 효율 — 지방 확장이 방문자를 데려오는지(2026-09-17 CEO 지시 "제대로 똑바로 해놔")
 //   판정선 10-08: 신규 5개 시도 PV/천곳 ≥ 40 → 지방 확장 계속 · < 40 → 지방 발굴 중단, 수도권·AI로 회수.
