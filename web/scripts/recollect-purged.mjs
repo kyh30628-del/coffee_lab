@@ -29,12 +29,32 @@ const TOTAL_MS = Number(process.env.RECOLLECT_TOTAL_MS || 90 * 60_000);
 const t0 = Date.now();
 const startUsed = await naverUsedToday();
 
+// 🎯 2026-09-17(CEO 승인) — 대상을 "'검증' 등급 전체"에서 **"사람이 실제로 연 카페"**로 좁힌다.
+//   왜: 첫 자동 실행 실측이 내 추정을 4배 뒤엎었다 — 카페당 **33콜**(결재 때 6콜, 스모크 8콜이라 보고했다).
+//     '검증' 11,553곳을 지키려면 하루 246곳 × 33콜 = 8,118콜 = **쿼터의 32%**. 발굴을 3분의 1로 줄여야 한다.
+//     게다가 파기가 재수집보다 4배 빨라(22:01 회차 파기 281 vs 재수집 70) 격차가 매일 벌어진다.
+//   실측: 공개 27,626곳 중 **최근 90일 사람이 연 카페는 4,114곳(14.9%)뿐**이다.
+//     아무도 안 여는 카페의 원본을 지키느라 쿼터를 태우고 있었다.
+//     4,114곳이면 하루 70곳으로 **59일에 한 바퀴** — 90일 파기 주기 안에 든다. 따라잡을 수 있다.
+//   ⚠️ 굶기지 않는다: 열람분이 떨어지면 '검증' 등급, 그다음 오래된 순으로 자연히 내려간다(ORDER BY 3단).
+//   💰 비용: traffic_events는 33,717행·5.8MB에 ts 인덱스가 있다. 실행당 1회 226ms — 무시할 수준.
+const { BOT_ANON_IDS_SQL } = await import("../lib/behaviorBot.ts");
+const viewed = await sql.query(
+  `SELECT DISTINCT substring(path from '^/c/([0-9]+)')::int AS id FROM traffic_events
+   WHERE ts >= now() - interval '90 days' AND path LIKE '/c/%'
+     AND anon_id NOT IN (${BOT_ANON_IDS_SQL})`);
+const viewedIds = viewed.map((r) => r.id).filter(Number.isInteger);
+console.log(`  최근 90일 열람된 카페 ${viewedIds.length.toLocaleString()}곳 — 이들을 먼저 지킨다`);
+
 const rows = await sql`SELECT id, name, area, synth_grade FROM cafes
   WHERE published = true AND raw_reviews IS NULL
-    AND (${ALL_GRADES} OR synth_grade = '검증')
-  ORDER BY (synth_grade = '검증') DESC, synth_checked_at ASC NULLS FIRST
+    AND (${ALL_GRADES} OR synth_grade = '검증' OR id = ANY(${viewedIds}))
+  ORDER BY (id = ANY(${viewedIds})) DESC,          -- ① 사람이 실제로 연 카페
+           (synth_grade = '검증') DESC,             -- ② 그다음 검증 등급
+           synth_checked_at ASC NULLS FIRST         -- ③ 오래된 순
   LIMIT ${MAX}`;
-console.log(`파기 재수집 — 대상 ${rows.length}곳(${ALL_GRADES ? "전 등급" : "검증 등급만"}) · 예약 ${(NAVER_DAILY_QUOTA - startUsed).toLocaleString()}콜 여유 · 상한 ${Math.round(TOTAL_MS / 60000)}분`);
+const pri = rows.filter((c) => viewedIds.includes(Number(c.id))).length;
+console.log(`파기 재수집 — 대상 ${rows.length}곳(${ALL_GRADES ? "전 등급" : "열람분 우선 + 검증 등급"}) · 그중 열람분 ${pri}곳 · 예약 ${(NAVER_DAILY_QUOTA - startUsed).toLocaleString()}콜 여유 · 상한 ${Math.round(TOTAL_MS / 60000)}분`);
 
 let done = 0, err = 0, stop = "";
 for (const c of rows) {
@@ -51,6 +71,6 @@ for (const c of rows) {
 }
 const used = (await naverUsedToday()) - startUsed;
 // 실제로 원본이 돌아왔는지 확인 — '실행했다'가 아니라 '효과가 났다'로 본다(하네스 3원칙).
-const [chk] = await sql`SELECT count(*)::int n FROM cafes WHERE published AND raw_reviews IS NULL AND synth_grade='검증'`;
+const [chk] = await sql`SELECT count(*)::int n FROM cafes WHERE published AND raw_reviews IS NULL AND id = ANY(${viewedIds})`;
 console.log(`재수집 ${done}곳 · 오류 ${err} · 네이버 ${used.toLocaleString()}콜 사용${stop ? ` · 중단(${stop})` : ""}`);
-console.log(`남은 '검증' 등급 재검불가: ${chk.n.toLocaleString()}곳`);
+console.log(`남은 **열람된 카페** 재검불가: ${chk.n.toLocaleString()}곳  ← 이게 진짜 지켜야 할 수`);
