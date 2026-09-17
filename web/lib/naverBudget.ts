@@ -41,12 +41,23 @@ export const NAVER_CLOSURE_RESERVE = Number(process.env.NAVER_CLOSURE_RESERVE ||
 //   (인용문은 synth_reviews에 따로 저장). 재수집은 '규칙이 바뀌었을 때 재판정할 수 있게' 하는 것뿐이다.
 //   ⚠️ 내가 09-16에 이 예약을 받아낸 근거("검증 등급이 재검 불가가 된다")는 유입과 무관했다. 전제가 틀렸다.
 //   → 0. 전수 재검이 꼭 필요한 시점엔 scripts/recollect-purged.mjs를 수동으로 돌린다(스크립트·레인은 보존).
+// 📥 후기 수집 예약(2026-09-17 CEO 승인): 하루 25,000 중 7,000(28%)은 **발굴이 못 쓴다.**
+//   왜: 09-17 전국 개방 첫날 실측 — 적재 1,114곳인데 수집 완료 370곳(33%)뿐이고 적체가 744곳까지 갔다
+//     (차단 임계 800). 발굴이 쿼터를 먼저 다 써서 수집이 남는 걸로 연명하는 구조였다.
+//   🔑 판단 근거: **수집이 곧 유입이다.** 후기가 없으면 공개가 안 되고, 공개가 안 되면 페이지가 없고,
+//     페이지가 없으면 유입이 0이다. 많이 캐고 3분의 1만 쓰는 것보다 적게 캐고 다 쓰는 게 낫다.
+//     (같은 날 폐지한 재수집 예약과는 다르다 — 그건 이미 공개된 카페의 원본 보존이라 유입과 무관했다.)
+//   ⚠️ 이 예약은 **발굴 경로에만** 건다: sweepMayContinue(스윕) · nonClosureMayUse(cron-grow 발굴 루프).
+//     수집 경로(webSearchCollector)는 이 가드를 호출하지 않으므로 스스로 막히지 않는다.
+//   💡 예산 배분 결과: 스윕 9,300 + grow 7,500 + 수집 7,000 + 폐업 1,200 = 25,000
+export const NAVER_COLLECT_RESERVE = Number(process.env.NAVER_COLLECT_RESERVE || 7000);
 export const NAVER_RECOLLECT_RESERVE = Number(process.env.NAVER_RECOLLECT_RESERVE || 0);
 /** 발굴(cron-grow)·재수집 등 '폐업 아닌' 소비자가 지금 더 써도 되는가 — 예약분 1,200을 남긴다. */
 export async function nonClosureMayUse(): Promise<{ ok: boolean; remaining: number }> {
   const used = await naverUsedToday();
   const remaining = Math.max(0, NAVER_DAILY_QUOTA - used);
-  return { ok: remaining > NAVER_CLOSURE_RESERVE, remaining };
+  // 발굴(cron-grow)은 폐업 예약 + **수집 예약**을 둘 다 남긴다. 수집은 이 함수를 호출하지 않으므로 안 막힌다.
+  return { ok: remaining > NAVER_CLOSURE_RESERVE + NAVER_COLLECT_RESERVE, remaining };
 }
 
 // 🚦 적체 가드(2026-08-25) — **발굴이 쿼터를 독식해 수집이 굶던 구조를 끊는다.**
@@ -122,8 +133,8 @@ export async function sweepMayContinue(): Promise<{ ok: boolean; used: number; r
   const used = await naverUsedToday();
   const blocked = await naverBlocked();
   const remaining = Math.max(0, NAVER_DAILY_QUOTA - used);
-  // 스윕은 발굴(cron-grow)·폐업·파기재수집 예약 셋을 모두 남긴다
-  return { ok: !blocked && remaining > NAVER_SWEEP_RESERVE + NAVER_CLOSURE_RESERVE + NAVER_RECOLLECT_RESERVE, used, remaining, blocked };
+  // 스윕은 발굴(cron-grow)·폐업·파기재수집·**수집** 예약을 모두 남긴다
+  return { ok: !blocked && remaining > NAVER_SWEEP_RESERVE + NAVER_CLOSURE_RESERVE + NAVER_RECOLLECT_RESERVE + NAVER_COLLECT_RESERVE, used, remaining, blocked };
 }
 
 /** 파기 재수집 전용: 자기 예약분(1,500) 안에서만 쓴다 — 폐업 예약은 건드리지 않는다. */
