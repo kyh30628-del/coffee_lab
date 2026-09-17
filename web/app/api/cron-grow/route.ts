@@ -132,17 +132,26 @@ export async function GET(req: NextRequest) {
         // 요청타깃(at)이든 로테이션이든 실제 발굴한 지역의 로테이션 시계(last_run)를 항상 찍는다.
         //   과거엔 at일 때 discovery_targets만 done하고 discovery_state를 안 찍어, 요청타깃으로 발굴된
         //   로테이션 지역(예: 포천시)이 옛 날짜로 남아 "N일 굶음" 오표기됐다(관제탑 #555 부풀림).
-        //   target.region이 discovery_state에 없으면 no-op라 안전.
+        // 🐛 재발방지(decisions#1110): UPDATE는 target.region이 discovery_state에 없으면(METRO_REGIONS 밖의
+        //   ad-hoc/구명칭 큐 타겟 — 예: 2026-07-01 인천 개편 이전 이름 "인천 중구"/"인천 서구") no-op라
+        //   discovery_targets는 done 처리됐는데 discovery_state에는 발굴 흔적이 영영 안 남았다(협업#422).
+        //   INSERT ... ON CONFLICT로 바꿔 METRO_REGIONS 밖 타겟도 반드시 기록되게 한다(다음 회차 정리 스윕은
+        //   여전히 METRO_REGIONS 밖 행을 청소하지만, 그 전까지는 발굴이 실제로 실행됐다는 증거가 남는다).
         // 🐛 재발방지(decisions#1051): region 기준으로 pending 큐를 정리한다(at.id만이 아니라) — critical/starved
         //   로테이션이 큐보다 먼저 선택돼도(line 81) 같은 지역이 큐에 대기 중이면 실제로는 이미 발굴이 끝난
         //   것이므로 done 처리한다. 예전엔 at(큐에서 직접 뽑힌 경우)만 done 처리해, 로테이션이 먼저 그 지역을
         //   훑으면 큐 항목이 영영 pending으로 남았다(협업#396: 의정부·수원·김포·양주 5~6일 정체).
         await sql`UPDATE discovery_targets SET status='done', consumed_at=now(), found=${d.found}, inserted=${d.inserted} WHERE region=${target.region} AND status='pending'`;
-        await sql`UPDATE discovery_state SET last_run=now(), last_found=${d.found}, last_inserted=${d.inserted}, last_skipped=${d.skipped}, last_oob=${d.oob} WHERE region=${target.region}`;
+        await sql`INSERT INTO discovery_state (region, area_label, last_run, last_found, last_inserted, last_skipped, last_oob)
+          VALUES (${target.region}, ${target.area_label ?? target.region}, now(), ${d.found}, ${d.inserted}, ${d.skipped}, ${d.oob})
+          ON CONFLICT (region) DO UPDATE SET area_label=EXCLUDED.area_label, last_run=EXCLUDED.last_run,
+            last_found=EXCLUDED.last_found, last_inserted=EXCLUDED.last_inserted, last_skipped=EXCLUDED.last_skipped, last_oob=EXCLUDED.last_oob`;
         discoveries.push({ region: d.region, found: d.found, inserted: d.inserted, stopped: d.stopped, agent: !!at });
       } catch (e) {
         await sql`UPDATE discovery_targets SET status='done', consumed_at=now() WHERE region=${target.region} AND status='pending'`; // 실패해도 큐서 빼 무한루프 방지(region 기준, at.id만이 아님)
-        await sql`UPDATE discovery_state SET last_run=now() WHERE region=${target.region}`; // 발굴 시도된 로테이션 지역 시계도 찍어 일관성(없으면 no-op)
+        // 발굴 시도된 로테이션 지역 시계도 찍어 일관성(#1110: METRO_REGIONS 밖 타겟도 기록되게 upsert)
+        await sql`INSERT INTO discovery_state (region, area_label, last_run) VALUES (${target.region}, ${target.area_label ?? target.region}, now())
+          ON CONFLICT (region) DO UPDATE SET last_run=EXCLUDED.last_run`;
         discoveries.push({ region: target.region, error: String(e).slice(0, 60) });
         break; // 네이버 한도/오류 시 이번 회차 발굴 중단(다음 cron에서 이어감)
       }
