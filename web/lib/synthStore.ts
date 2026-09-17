@@ -387,8 +387,16 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   //   다른 사유로 이미 비공개 확정이면(제외·held·노이즈·파이프라인) 조회 자체가 불필요 — ruleOk가 실제로 재공개를 시도할 때만 확인.
   const otherwiseBlocked = excluded || held || stuckNoise || inPipeline;
   const unpublishLocked = !otherwiseBlocked && ruleOk && await lastUnpublishLocked(cafeId);
-  const newPst = excluded ? "excluded" : unpublishLocked ? "excluded" : held ? "held" : stuckNoise ? "noise" : inPipeline ? (ruleOk ? "pending" : "rejected") : pst;
+  const newPstRaw = excluded ? "excluded" : unpublishLocked ? "excluded" : held ? "held" : stuckNoise ? "noise" : inPipeline ? (ruleOk ? "pending" : "rejected") : pst;
   const publish = (otherwiseBlocked || unpublishLocked) ? false : ruleOk; // 제외·잠금·held·노이즈·파이프라인은 비공개 고정
+  // 🔴 2026-09-17 수리 — 위 삼항의 **마지막 폴백 `: pst`(기존값 유지)**가 published와 어긋나는 진짜 원인이었다.
+  //   공개 중이던 카페가 등급 게이트(ruleOk)에서 떨어지면 published만 false가 되고 status는 'live'로 남는다.
+  //   실측: status=live·published=false 151곳(전부 '후보' 등급). 09-16에 synthStore의 '근거 0건' 분기만
+  //   고쳤는데, 그건 두 경로 중 하나였을 뿐이다. 여기가 나머지 절반이다.
+  //   피해: ①관제·보고가 공개 수를 과다 계상 ②'live'라 held 재평가 레인에 안 걸려 영영 못 돌아온다.
+  //   → 두 필드를 **마지막에 강제로 정렬**한다. 공개면 live, 비공개인데 live로 남으려 하면 held로 내린다.
+  //   ⚠️ 다른 상태(excluded·noise·pending·rejected)는 그대로 둔다 — 각자 뜻이 있고 이미 published와 일치한다.
+  const newPst = publish ? "live" : (newPstRaw === "live" ? "held" : newPstRaw);
 
   // 🔎 2026-09-14 — 검색용 시설 패싯(주차·콘센트·단체·루프탑·반려동물 …)을 여기서 저장한다.
   //   화면 하이라이트와 같은 사전·같은 임계라 표시와 검색이 어긋나지 않는다. 작은 text[] 1개라 비용 무시 수준.
