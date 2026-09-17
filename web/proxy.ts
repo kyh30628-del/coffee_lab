@@ -16,14 +16,14 @@ function clientIp(req: NextRequest): string {
   return req.headers.get("x-real-ip") || "unknown";
 }
 
-export function proxy(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
   if (EXEMPT_PREFIXES.some((p) => pathname.startsWith(p))) return NextResponse.next();
 
   const isSearch = pathname === "/api/search" || pathname.startsWith("/api/search/");
   const { max, windowMs } = isSearch ? SEARCH_LIMIT : DEFAULT_LIMIT;
   const key = `${clientIp(req)}:${isSearch ? "search" : "api"}`;
-  const { allowed, remaining, resetMs } = checkRateLimit(key, max, windowMs);
+  const { allowed, remaining, resetMs } = await checkRateLimit(key, max, windowMs);
 
   if (!allowed) {
     return NextResponse.json(
