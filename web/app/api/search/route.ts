@@ -628,12 +628,18 @@ export async function GET(req: NextRequest) {
     //   '커피빈코리아 OO점'류가 biz_food(음식점)로 잘못 분류돼 있어 이름 기반(isFranchise)으로 걸러야 한다.
     //   우리 카페(cafes 테이블) 상호 일치는 아래 "카페명 일치" 섹션이 이미 전담한다.
     const isFranchisePlace = (p: { name: string }) => isFranchise(p.name.replace(/\s+/g, ""));
-    const anchorExact = placeCands.find((p) => isAnchorKind(p.kind) && !isFranchisePlace(p) && (normName(p.name) === qk || normName(p.name) === qkA))
+    //   🎯 개념어 정확일치 하이재킹 방지(decisions#1134, 2026-09-18): "테라스" 질의가 CONCEPTS 사전의
+    //      terrace 트리거와 완전히 같은데도 place index(전국 POI 27만+, 아산시 소재 "테라스" 상호)에
+    //      동명 앵커가 있어 place 모드로 강제 전환됐다 — 연희동·신사동 사고(2026-09-12)와 같은 계열이지만
+    //      정식 행정동/시군구가 아니라 잡히지 않았다. pureConceptQuery(질의가 트리거 단어와 완전일치)면
+    //      regionWordInQuery와 동일하게 장소 검색 자체를 쓰지 않는다.
+    const anchorExact = pureConceptQuery ? undefined
+      : placeCands.find((p) => isAnchorKind(p.kind) && !isFranchisePlace(p) && (normName(p.name) === qk || normName(p.name) === qkA))
       ?? (qkB !== qk && qkB.length >= 2 ? placeCands.find((p) => isAnchorKind(p.kind) && !isFranchisePlace(p) && normName(p.name) === qkB) : undefined);
     //   ⚠️ 길이 하한은 **별칭을 푼 뒤**로 본다 — "고터"(2자)가 여기서 잘려 고속터미널역(6자)을 못 썼다(실측).
     //   ⚠️ 정확일치 앵커가 있으면 길이 하한도 넘긴다 — "넥슨"·"토스"(2자)가 여기서 잘려 0건이었다.
     //      큐레이션된 이름과 **완전히 같은** 질의는 짧아도 모호하지 않다.
-    const placeHit = (Math.max(qk.length, qkA.length) >= 3 || !!anchorExact) && (!regionWordInQuery || !!anchorExact)
+    const placeHit = !pureConceptQuery && (Math.max(qk.length, qkA.length) >= 3 || !!anchorExact) && (!regionWordInQuery || !!anchorExact)
       ? (anchorExact ?? placeCands.find((p) => {
           if (isFranchisePlace(p)) return false;
           const pn = normName(p.name);
