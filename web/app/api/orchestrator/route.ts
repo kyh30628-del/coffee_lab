@@ -142,7 +142,11 @@ export async function GET(req: NextRequest) {
     const grSuspects = (await sql`SELECT c.name, c.area, g.issue FROM grounding_checks g JOIN cafes c ON c.id = g.cafe_id WHERE NOT g.grounded AND c.llm_judged_at IS NOT NULL AND c.llm_judged_at >= c.raw_collected_at ORDER BY g.checked_at DESC LIMIT 20`.catch(() => [])) as any[];
     // 발굴은 '다양성(전수 아님)' 전략 — 전 지역 3일 신선도는 불필요. 로테이션 현실(64지역·하루 12회=~5일 한바퀴)에 맞춰
     //   '진짜 굶은 지역'(7일+)만 지연으로 본다. 그 미만은 정상 로테이션이라 노이즈 아님.
-    const ds = (await sql`SELECT MIN(last_run) oldest, COUNT(*) FILTER (WHERE last_run < now() - interval '7 days')::int behind, COUNT(*)::int n FROM discovery_state`)[0] as any;
+    // 🔴 2026-09-18 — '7일'은 로테이션 실제 주기와 안 맞아 구조적으로 항상 경고가 떴다(81일 상주 #555).
+    //   실측: 전체 230개 지역 · 하루 평균 25개 순회 → **한 바퀴 9일**. 7일 기준이면 늘 40여 곳이 '굶음'으로 잡힌다.
+    //   굶은 게 아니라 아직 차례가 안 온 것이다. 기준을 한 바퀴(9일)에 여유를 둔 14일로 맞춘다.
+    //   ⚠️ 지역 수가 늘면 주기도 길어진다 — 확장할 때 이 값을 같이 본다.
+    const ds = (await sql`SELECT MIN(last_run) oldest, COUNT(*) FILTER (WHERE last_run < now() - interval '14 days')::int behind, COUNT(*)::int n FROM discovery_state`)[0] as any;
     // 통합 재검증 자가감사 커버리지 — 공개 카페가 '현재 규칙'으로 며칠 안에 1회씩 재검되는지(규칙 드리프트 치유 진행률).
     const auditCov = { a7: Number(c.audit_a7 ?? 0), pub: Number(c.published ?? 0), last_audit: c.last_audit ?? null } as any; // 💰 단일패스 c에서 파생(09-05)
     // 로컬 배치 하트비트 — 실패(크래시 등)·정체를 관제탑이 잡아 경보. (예: dong-backfill ReferenceError)
@@ -304,7 +308,7 @@ export async function GET(req: NextRequest) {
       else notices.push(`품질 의심 ${suspect}곳(소수 — 비공개 처리 대상)`);
     }
     // 아래는 모두 '소비자에 보이는 손상 아님' = 주의(백그라운드). 진행 속도·완성도·감사 대기.
-    if ((ds?.behind ?? 0) > 0) notices.push(`발굴 7일+ 미발굴 지역 ${ds.behind}곳(굶은 로테이션 — cron-grow 우선처리 중)`);
+    if ((ds?.behind ?? 0) > 0) notices.push(`발굴 14일+ 미발굴 지역 ${ds.behind}곳(굶은 로테이션 — cron-grow 우선처리 중)`);
     if ((af?.open ?? 0) > 0) notices.push(`오염 플래그 ${af.open}건(검토 대기)`);
     const dgap = (await sql`SELECT COUNT(*)::int n FROM (SELECT area FROM cafes WHERE published GROUP BY area HAVING COUNT(*) >= 10 AND COUNT(*) FILTER (WHERE dong IS NOT NULL)::float / COUNT(*) < 0.9) x`.catch(() => [{ n: 0 }]))[0] as any;
     if (dgap.n > 0) notices.push(`동 채움 미흡 지역 ${dgap.n}곳(<90%)`);
@@ -582,7 +586,7 @@ export async function GET(req: NextRequest) {
     // 신선도는 '수집을 시도한 시각'(raw_checked_at)으로 판단 — 재수집이 돌아도 내용이 같으면 raw_collected_at은 안 변하므로,
     //   raw_collected_at으로 신선도를 보면 멀쩡히 도는데도 stale로 오인됨(들쭉날쭉 수정의 부작용 차단).
     const lastCheck = c.last_check ?? c.last_collect;
-    add("discover", "발굴 (grow·지역수색)", lastCheck, 24, ds.behind, ds.behind ? `${ds.behind}/${ds.n} 지역 7일+ 미발굴(굶음)` : `${ds.n}개 지역 순환중`);
+    add("discover", "발굴 (grow·지역수색)", lastCheck, 24, ds.behind, ds.behind ? `${ds.behind}/${ds.n} 지역 14일+ 미발굴(굶음)` : `${ds.n}개 지역 순환중`);
     add("collect", "수집 (warmup·raw)", lastCheck, 16, c.collect_q, c.collect_q ? `${c.collect_q}곳 미수집` : `raw 수집·재수집`);
     add("synth", "합성 (옥석·등급)", c.last_synth, 24, c.synth_q, c.synth_q ? "미합성 적체" : "적체 없음");
     // 카테고리·동 채움 단계도 개별 모니터(발굴~수집 세분화)
