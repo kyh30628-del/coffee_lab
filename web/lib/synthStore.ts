@@ -257,7 +257,7 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   const latMin = getCriterionSync("geo.box.lat_min"), latMax = getCriterionSync("geo.box.lat_max");
   const lngMin = getCriterionSync("geo.box.lng_min"), lngMax = getCriterionSync("geo.box.lng_max");
   name = cleanCafeName(name); // 매칭·게이트(coherence·generic·nonCafe·franchise)는 SEO 서술어 꼬리 뗀 진짜 상호로 — '구구커피 원두 핸드드립 로스팅' 오염 차단
-  const { synth, collected, charScores, facets, cautions, evidenceReviews: evidenceReviewsRaw, allEvidence: allEvidenceRaw, reviewDates, quality, borderline } = result;
+  const { synth, collected, charScores, facets, cautions, evidenceReviews: evidenceReviewsRaw, allEvidence: allEvidenceRaw, coherenceRaw, onTopicCount, filterApplied, reviewDates, quality, borderline } = result;
   // [coordination#225 근본수정] 위 loadLinkExclusions는 이제 호출부(synthAndStore 등)가 collectAndSynthesize
   //   호출 *전에* 먼저 불러 opts.excludeLinks로 넘긴다 — 그래야 원본 raw_reviews 풀에서 같은 근거가 재판정
   //   자체에서 빠져 등급판정 카운트에도 반영된다(07-07(#196)부터 3차례 재발했던 "healer가 정리해도 다음
@@ -277,7 +277,10 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   //   노이즈: 공개건수(5+)인데 이름 일관성<40% → 오염 의심 → 공개 보류. 사용자에 garbage 안 나감.
   //   저건수도 적용('만조커피 9건'이 전부 동네 딴 가게였던 사례 차단). 전체이름 매칭은 nameCoherence가 보완.
   const loc = (await sql`SELECT area, dong FROM cafes WHERE id=${cafeId}`)[0] as any; // 지역어(시+동) — coherence가 지역어를 식별토큰서 빼게
-  const coherence = nameCoherence(name, (evidenceReviews as any[]).map((r) => r?.quote || ""), [loc?.area, loc?.dong].filter(Boolean));
+  // 🔴 2026-09-18 — 오염 후기를 뺀 뒤에 비율을 다시 재면 **항상 1.0**이다(분자=분모). 그대로 쓰면
+  //   공개 게이트가 스스로를 무력화한다. 그래서 저장·판정에 쓰는 비율은 **필터 이전 값**이다.
+  //   합성 경로가 아닌 재판정 경로(applyDecisions 등)는 coherenceRaw가 없으므로 종전대로 직접 계산한다.
+  const coherence = coherenceRaw ?? nameCoherence(name, (evidenceReviews as any[]).map((r) => r?.quote || ""), [loc?.area, loc?.dong].filter(Boolean));
   const offctx = offctxRate(((allEvidence ?? evidenceReviews) as any[]).map((r) => r?.quote || "")); // 맥락없음 비율(관제탑 감시)
   // 🧳🏠 방문객 성격 — offctx와 같은 인용문 풀에서 뽑는다(같은 근거 = 같은 잣대). 추가 조회 0.
   // 🔌 카공 시설 사실(2026-08-30) — 합성할 때 **한 번** 계산해 저장한다.
@@ -324,7 +327,11 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   //      이미 '깨끗한 후기'로 검증/참고 등급이 난 카페는 규칙으로 공개해도 안전(품질 위험 0).
   //   LLM 필요 = ① 근거 자체가 애매(이름일관성<0.55 OR 맥락오염≥0.5)  또는
   //             ② '후보'등급(깨끗한 후기 부족)인데 경계후기를 살리면 등급이 오를 여지 있음(LLM이 복원).
-  const ambiguousEvidence = coherence < getCriterionSync("contamination.ambiguous.coherence_max") || offctx >= getCriterionSync("contamination.ambiguous.offctx_min");
+  // 🔴 2026-09-18 (대표님 지시 b) — 오염을 실제로 빼냈고 남은 진짜 근거가 문턱 이상이면 더 이상 '애매'가 아니다.
+  //   종전에는 비율만 봐서, 오염 3건 때문에 진짜 3건까지 묻히고 AI 판정을 기다리다 영영 안 열렸다(181곳 실측).
+  //   ⚠️ 비율(coherence)은 필터 이전 값 그대로 남는다 — 관제가 오염 정도를 계속 볼 수 있어야 한다.
+  const cleanedOk = filterApplied === true && (onTopicCount ?? 0) >= getCriterionSync("contamination.filter.min_ontopic");
+  const ambiguousEvidence = (!cleanedOk && coherence < getCriterionSync("contamination.ambiguous.coherence_max")) || offctx >= getCriterionSync("contamination.ambiguous.offctx_min");
   const blCount = borderline?.length ?? 0; // 경계후기 수(노출 제외·LLM 보강 대기) — 관제탑 가시화용
   const recoverableEdge = grade === "후보" && blCount > 0;
   // rulegap-20260808-0815(coordination#293, decisions#636): 동일날짜 SEO 템플릿반복(미표기 체험단) 의심 —

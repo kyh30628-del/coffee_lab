@@ -624,7 +624,13 @@ function nameHit(rawText: string, normText: string, term: string): boolean {
 //   한글 접두어가 있으면 전혀 다른 업체(두레커피마을 ⊃ 커피마을)일 수 있다. 접두어가 카페 자신의
 //   지역수식어(area/dong)거나 흔한 형용사류 수식어면 정상 매칭이므로 제외(id4835 카페온뜰·id4069
 //   카페 정원처럼 "신상카페온뜰"·"핫한카페정원" 식 자연스러운 붙여쓰기 보호).
-const NAME_PREFIX_WHITELIST = new Set(["신상", "대형", "감성", "인생", "핫한", "유명한", "합리적", "가성비", "레트로", "빈티지", "모던", "아늑한", "조용한", "넓은", "작은", "새로운", "오래된", "숨은", "동네", "우리", "그", "이", "저"]);
+// 🔴 2026-09-18 실측수리: 업종어가 상호 **앞**에 붙은 표기("카페민들레")를 다른 업체 접두어로 오인해
+//   진짜 후기를 통째로 놓치고 있었다. "민들레카페"(뒤)는 통과하는데 "카페민들레"(앞)만 MISS —
+//   같은 가게를 부르는 두 표기 중 하나만 인정하던 비대칭. 실측: 여주 민들레 카페 후기에 주소·영업시간이
+//   그대로 적힌 진짜 글이 MISS로 떨어져 공개 게이트(coherence<0.55)에 걸려 있었다.
+//   업종어는 GENERIC_SUFFIX가 이미 "상호가 아닌 말"로 취급하는 단어들이라, 접두로 와도 동일하게 본다.
+const NAME_PREFIX_TRADE = ["카페", "까페", "캬페", "커피", "커피숍", "커피샵", "베이커리", "로스터리", "디저트", "도넛", "제과", "케이크", "케익", "케잌", "빵집", "브런치"];
+const NAME_PREFIX_WHITELIST = new Set(["신상", "대형", "감성", "인생", "핫한", "유명한", "합리적", "가성비", "레트로", "빈티지", "모던", "아늑한", "조용한", "넓은", "작은", "새로운", "오래된", "숨은", "동네", "우리", "그", "이", "저", ...NAME_PREFIX_TRADE]);
 function attachedNamePrefix(text: string, name: string, areaTerms: string[]): string | null {
   const t = text || "";
   const q = (name || "").trim();
@@ -1095,6 +1101,15 @@ export function nameCoherence(name: string, quotes: string[], areaTerms: string[
   const strongTerms = terms.filter((t) => !isAreaLikeWord(t));
   const locTerms = terms.filter(isAreaLikeWord);
   const nameN = norm(name); // 전체 이름(붙여쓰기) — '성북동빵공장'처럼 토큰 경계검사가 놓치는 경우 보완
+  const brandN = norm(strongTerms.join("")); // 지점명 뗀 브랜드만 이어붙인 형태 — 띄어쓰기 변형 흡수
+  // 🔴 2026-09-18 실측수리②: 업종어를 상호 **앞**에 붙여 부르는 표기("카페민들레"). "민들레카페"(뒤)는
+  //   통과하는데 앞은 MISS였다 — boundedHit의 앞경계 검사가 막는다. 그 검사는 접두 결합 오염
+  //   ("두레커피마을" ⊃ "커피마을")을 막는 진짜 방어라 그대로 두고, **이름에 실제로 있는 업종어**를
+  //   brandN 앞에 붙인 형태만 별도 후보로 인정한다. 업종어가 명시돼 있어 카페 맥락이 보장되고,
+  //   4자 문턱이 짧은 우연일치를 막는다.
+  const tradeSwapped = brandN.length >= 2
+    ? NAME_PREFIX_TRADE.filter((w) => nameN.includes(w)).map((w) => w + brandN).filter((v) => v.length >= 4)
+    : [];
   let hit = 0;
   for (const q of qs) {
     const qN = norm(q);
@@ -1108,6 +1123,13 @@ export function nameCoherence(name: string, quotes: string[], areaTerms: string[
     }
     if (
       (nameN.length >= 4 && qN.includes(nameN)) ||
+      // 🔴 2026-09-18 실측수리: 상호를 붙여 쓴 표기("베이커 바미"→"베이커바미")를 못 잡아
+      //   진짜 후기 3/6을 오염으로 떨어뜨리고 있었다. 지점명을 뗀 브랜드 토큰을 이름 순서대로
+      //   이어붙인 형태로도 본다. nameN과 같은 4자 문턱을 써서 짧은 우연일치는 막는다.
+      (brandN.length >= 4 && nameHit(q, qN, brandN)) ||   // ⚠️ 경계 검사 필수 — 단순 포함은 "두레커피마을"⊃"커피마을"을 통과시킨다(픽스처)
+      // ⚠️ 여기서 qN(공백제거) 단순 포함을 쓰면 "두레커피마을"이 "커피마을"로 통과한다(픽스처가 잡음).
+      //   기존 경계 검사(nameHit)를 그대로 태워 접두 결합 오염 방어를 유지한다.
+      tradeSwapped.some((v) => nameHit(q, qN, v)) ||
       strongTerms.some((t) => nameHit(q, qN, t)) ||
       (locTerms.some((t) => nameHit(q, qN, t)) && CAFE_CONTEXT_STRONG.test(q))
     ) hit++;

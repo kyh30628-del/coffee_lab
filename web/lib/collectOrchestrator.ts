@@ -1,6 +1,6 @@
 // 수집 오케스트레이터 (PRINCIPLES §1·§2·§3·§4·§7)
 // 모든 수집 글을 '리뷰 품질 검증 엔진'에 통과시켜 옥석을 가린 뒤에만 합성·집계·노출한다.
-import { verifyReview, coreTokens, isNonCafeFnbCategory, COFFEE_SUBSTANCE, type QualityVerdict, type SourceKind } from "./reviewQuality";
+import { verifyReview, coreTokens, nameCoherence, isNonCafeFnbCategory, COFFEE_SUBSTANCE, type QualityVerdict, type SourceKind } from "./reviewQuality";
 import { extractRid, looseDate, type ReviewerCafeStat } from "./reviewerProfiles";
 import { isAdTemplateQuote } from "./adTemplate";
 import { synthesize, type Review, type SynthResult } from "./synthEngine";
@@ -49,6 +49,10 @@ export type CollectResult = {
   perSource: { source: string; raw: number; kept: number }[];
   evidenceReviews: EvidenceReview[];   // 상위 6건 (기본 표시용)
   allEvidence: EvidenceReview[];        // 옥석 전체 (전체보기용)
+  // 🔴 2026-09-18 오염 후기 필터(대표님 지시 b) — 게이트가 스스로 무력화되지 않게 필터 '이전' 신호를 같이 넘긴다.
+  coherenceRaw: number;   // 필터 전 이름 일관성 비율 — 관제·감시가 계속 봐야 할 진짜 신호
+  onTopicCount: number;   // 이 카페 얘기로 판정된 근거 건수 — 새 게이트의 기준
+  filterApplied: boolean; // 실제로 오염을 빼냈는가(뺐고 남은 게 문턱 이상일 때만 true)
   reviewDates: string[];
   borderline: BorderlineItem[]; // 카페명 불명확하나 후기 맥락 있음 → LLM 재판정 대상(경계)
   auditItems: BorderlineItem[]; // 규칙상 on-topic 전체 → Sonnet 최종 심사 대상
@@ -299,12 +303,10 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
   // 유튜브는 카페당 '정확히 1건'만 — 가장 우선인 유튜브 1개를 끝자리에 예약, 나머지 5칸은 블로그/구글.
   // (있으면 1개 보장, 2개 이상이면 1개로 제한, 없으면 6칸 모두 글로 채움.)
   const isYt = (e: EvidenceReview) => /youtu\.?be/.test(e.link ?? "");
-  const bestYt = evDedup.find(isYt);
-  const nonYt = evDedup.filter((e) => !isYt(e));
   // [rulegap #625] 표시 근거는 같은 블로거(source=bloggername) 최대 2건 — 단일 블로거(사업자 자체 계정 추정)가
   //   top-6를 지배하는 것 방지. 같은 링크 dedup과 동일 사상: 삭제 아님, 밀린 포스팅은 allEvidence(전체보기)엔 그대로 유지.
-  const blogCap = new Map<string, number>();
   const pickDiverse = (list: EvidenceReview[], limit: number): EvidenceReview[] => {
+    const blogCap = new Map<string, number>(); // ⚠️ 호출마다 새로 — 필터 전/후 두 번 뽑아도 서로 간섭 없게(2026-09-18)
     const out: EvidenceReview[] = [];
     for (const e of list) {
       if (out.length >= limit) break;
@@ -327,9 +329,37 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
     const ad = list.filter((e) => isAdTemplateQuote(e.quote));
     return [...real, ...ad];
   };
-  let topEvidence = bestYt ? [...pickDiverse(deprioritizeAd(nonYt), 5), bestYt] : pickDiverse(deprioritizeAd(nonYt), 6);
+  // 🔴 2026-09-18 (대표님 지시 "규칙으로 오염 후기 빼고 재합성") — 여기가 그 지점이다.
+  //   그전까지는 '이 카페 얘기인 후기 비율'(coherence)이 낮으면 **근거 전체를 통째로 막았다**.
+  //   오염 3건 때문에 진짜 3건까지 같이 묻혀 승격대기 181곳이 영영 안 열리고 있었다(09-18 실측).
+  //   이제 오염으로 판정된 것만 빼고 남은 것으로 합성한다.
+  //
+  //   ⚠️ 설계 함정(반드시 기억): 뺀 다음 비율을 다시 재면 **항상 1.0이 나온다** — 게이트가
+  //      스스로를 무력화한다. 그래서 게이트를 '비율'이 아니라 **남은 진짜 후기 건수**로 옮긴다.
+  //      비율(coherenceRaw)은 필터 '이전' 값으로 계속 내보내 관제 신호를 잃지 않는다.
+  //   ⚠️ 판정기가 완벽하지 않다(09-18 실측: 상호가 우연히 든 무관 글을 통과시키는 사각 있음).
+  //      그래서 남은 건수가 문턱에 못 미치면 **필터를 적용하지 않고** 원래 근거를 그대로 둔다 —
+  //      근거가 얇아져 등급이 조용히 내려가는 사고를 막는 쪽이 안전하다.
+  const cohAreaTerms = (area ?? []).filter(Boolean);
+  const onTopic = (e: EvidenceReview) => nameCoherence(name, [e.quote ?? ""], cohAreaTerms) === 1;
+  const evOnTopic = evDedup.filter(onTopic);
+  // ⚠️ 분모를 바꾸면 안 된다(2026-09-18에 하마터면 사고). 종전 coherence는 **표시 6건** 기준이고
+  //   noisy 게이트(0.4 미만=오염 즉시 차단)가 그 값을 본다. 옥석 전체로 분모를 키우면 값이 내려가
+  //   이미 공개된 카페가 무더기로 오염 판정을 받는다. 그래서 '필터 전 top6'로 종전과 똑같이 잰다.
+  const pickTop = (pool: EvidenceReview[]): EvidenceReview[] => {
+    const yt = pool.find(isYt), non = pool.filter((e) => !isYt(e));
+    return yt ? [...pickDiverse(deprioritizeAd(non), 5), yt] : pickDiverse(deprioritizeAd(non), 6);
+  };
+  const topUnfiltered = pickTop(evDedup);
+  const coherenceRaw = topUnfiltered.length
+    ? topUnfiltered.filter((e) => onTopic(e)).length / topUnfiltered.length
+    : 1;
+  const minOnTopic = getCriterionSync("contamination.filter.min_ontopic");
+  const filterApplied = evOnTopic.length < evDedup.length && evOnTopic.length >= minOnTopic;
+  const evUsed = filterApplied ? evOnTopic : evDedup;
+  let topEvidence = filterApplied ? pickTop(evUsed) : topUnfiltered;
   // 옥석 전체(노이즈 제거 후 verified+reference 전부) — 전체보기용
-  const allEvidence = evDedup;
+  const allEvidence = evUsed;
 
   const synth = synthesize(name, verifiedReviews, area, opts?.naverCategory);
   synth.grade = grade;
@@ -340,5 +370,5 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
   const facets = extractFacets(verifiedTexts);
   // ⚠️ 주의점도 **같은 verifiedTexts**에서 뽑는다 — 표시와 검색과 주의점이 같은 근거를 쓰게.
   const cautions = extractCautions(verifiedTexts);
-  return { synth, collected: trustCount, grade, charScores, facets, cautions, perSource, evidenceReviews: topEvidence, allEvidence, reviewDates, borderline, auditItems, quality: stats, reviewerStats };
+  return { synth, collected: trustCount, grade, charScores, facets, cautions, perSource, evidenceReviews: topEvidence, allEvidence, coherenceRaw, onTopicCount: evOnTopic.length, filterApplied, reviewDates, borderline, auditItems, quality: stats, reviewerStats };
 }

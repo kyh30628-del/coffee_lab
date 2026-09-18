@@ -47,6 +47,9 @@ export const META: CriterionMeta[] = [
   { key: "contamination.noisy.min_collected", category: "오염", label: "노이즈 게이트 최소 수집건수(이상+이름일관성 낮으면 오염보류)", def: 5, min: 1, max: 50, unit: "건" },
   { key: "contamination.noisy.coherence_max", category: "오염", label: "노이즈 게이트 이름일관성 상한(미만이면 오염보류)", def: 0.4, min: 0, max: 1, unit: "비율" },
   { key: "contamination.ambiguous.coherence_max", category: "오염", label: "LLM 재판정 트리거: 이름일관성 상한(미만이면 애매)", def: 0.55, min: 0, max: 1, unit: "비율" },
+  // 🔴 2026-09-18 — 오염 후기를 뺀 뒤 "이 카페 얘기"로 남은 근거가 최소 몇 건이어야 공개를 허용하나.
+  //   이 값 미만이면 필터를 아예 적용하지 않고 원래 근거를 그대로 둔다(근거가 얇아져 등급이 조용히 내려가는 것 방지).
+  { key: "contamination.filter.min_ontopic", category: "오염", label: "오염 제거 후 공개 허용 최소 근거건수", def: 3, min: 1, max: 20, unit: "건" },
   { key: "contamination.ambiguous.offctx_min", category: "오염", label: "LLM 재판정 트리거: 맥락없음비율 하한(이상이면 애매)", def: 0.5, min: 0, max: 1, unit: "비율" },
   { key: "contamination.offctx.min_sample", category: "오염", label: "맥락없음비율 산출 최소 인용문 수(미만이면 0)", def: 8, min: 1, max: 50, unit: "건" },
   // 방문객 성격(🧳여행/🏠동네) — lib/visitorMix.ts 소비. 관광 배지는 오탐(동네 카페에 관광지 낙인)이
