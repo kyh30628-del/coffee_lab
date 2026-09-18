@@ -18,12 +18,14 @@ export async function GET(req: NextRequest) {
   if (!authed(req)) return NextResponse.json({ ok: false }, { status: 401 });
   try {
     // 창(7일·30일)별 단계 집계 — source까지 갈라야 "어느 입구가 막혔나"가 보인다.
+    // anon_id=''는 크롤러가 /c/[id]를 렌더하며 /owner/r/[id] JS를 실행할 때 매번 새 컨텍스트라 찍히는
+    // 값(decisions#1135, 09-18 reachRate 967% 왜곡 원인) — 사람 지표 집계에서 제외한다.
     const rows = (await sql`
       SELECT
         CASE WHEN ts > now() - interval '7 days' THEN 7 ELSE 30 END AS win,
         event, COALESCE(source, '(없음)') AS source, count(*)::int AS n
       FROM owner_funnel_events
-      WHERE ts > now() - interval '30 days'
+      WHERE ts > now() - interval '30 days' AND anon_id <> ''
       GROUP BY 1, 2, 3`) as unknown as { win: number; event: string; source: string; n: number }[];
 
     const pick = (win: number, event: string, source?: string) =>
