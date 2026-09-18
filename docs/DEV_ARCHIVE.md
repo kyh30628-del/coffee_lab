@@ -365,3 +365,4 @@
 | 2026-09-17 08:25 | #1111 | [개발] 협업 #423: [리스크] decisions#1079 레이트리밋이 인스턴스 로컬 메모리 방식 — 분 | e9a69c41 | - | lib/rateLimit.ts를 인스턴스 로컬 메모리 슬라이딩윈도우 → Neon Postgres(rate_limit_buckets 테이블) 원자적 UPSERT 카운터로 전환. pr |
 | 2026-09-17 11:37 | #1112 | [룰갭 P71] 휴게소류 listicle 리뷰 — score -22 페널티만으론 reference 진입 차단 | 9f3638cb | - | lib/reviewQuality.ts: TRANSIT_VENUE(휴게소·터미널·공항·역사·환승센터) 카페의 listicle을 nameInBody 무관하게 countEnumListI |
 | 2026-09-17 11:37 | #1113 | [검색UX 신규] 취향 페이지 dessert/bakery 도미넌스 예외 — 소규모 지역서 brunch/spa | 0bd4d948 | - | lib/seoData.ts: 도미넌스 필터의 dessert/bakery IN 예외 제거(4곳: getRegionTasteCafes L116, getRegionTasteStats L |
+| 2026-09-18 23:05 | #1132 | [자율진단] jobTeams.ts RETIRED_JOBS 미등재로 거짓 정지의심 반복 발행 — recolle | 097cdc1b | - | web/lib/jobTeams.ts: RETIRED_JOBS Set에 recollect-purged, cron-batch-judge 추가(라인104) + 폐지사유 주석. tsc 에 |
