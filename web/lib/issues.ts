@@ -356,6 +356,21 @@ export async function detectIssues(): Promise<Issue[]> {
     });
   }
 
+  // 1-c) 🛡️ 기준 드리프트(2026-09-18) — cron-criteria-verify가 잡은 '기준값이 실제로 안 먹는' 상태.
+  //   criteria는 값(DB)과 허용범위(코드)가 짝이라, 한쪽만 바꾸면 getCriterionSync가 조용히 DEFAULTS로 폴백한다.
+  //   실사고: 09-17 전국 개방에서 geo.box.lat_min을 DB만 33.1로 내려 이틀간 무시됐다(제주 전역 공개 불가).
+  //   ⚠️ consumer 판정 — 좌표박스·등급바닥이 어긋나면 카페가 실제로 화면에서 사라지거나 안 나온다.
+  {
+    const cv = crons.find((c: any) => c.job === "cron-criteria-verify");
+    const d = String(cv?.detail || "");
+    if (d.startsWith("dead-knob/드리프트")) {
+      const geo = /geo\.box|grade\.floor/.test(d);
+      out.push({ ikey: "criteria:drift", source: "기준", severity: "MED", type: "기준 드리프트",
+        title: "기준값이 실제로 적용되지 않음(허용범위 밖 → 코드 기본값으로 폴백)",
+        detail: d.slice(0, 200), team: "품질본부", consumer: geo });
+    }
+  }
+
   // 1-b) 💰 비용 — 관제탑이 **정작 중요한 사실을 안 보여주던 자리**(2026-09-15 수리).
   //   예전엔 cron-costwatch가 이상을 감지하면 스스로 ok=false를 찍어 '크론 실패'로만 떴다.
   //   그래서 화면엔 "크론이 고장났다"고 나오는데, 실제로 벌어진 일은 **파이프라인 4종이 정지**였다.

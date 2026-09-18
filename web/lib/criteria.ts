@@ -31,7 +31,11 @@ export const META: CriterionMeta[] = [
   { key: "grade.floor.reference_new_fresh_days", category: "등급", label: "신규 공개 시 수집 데이터 최대 나이(0=조건없음)", def: 30, min: 0, max: 180, unit: "일" },
   // 서비스 범위 좌표 박스 — 2026-08-25 강원 편입으로 위 38.3→38.7(고성), 경 127.9→129.4(삼척) 확대.
   //   ⚠️ DB criteria 행과 반드시 같아야 한다(DB 장애 시 이 값이 진실 → 어긋나면 강원이 통째로 배제된다).
-  { key: "geo.box.lat_min", category: "지리", label: "서비스범위 좌표 박스 최소 위도(이하 범위밖 제외)", def: 34.5, min: 34.0, max: 38.8, unit: "°" }, // 2026-09-06 부산·경남 편입(남해·거제 34.6)
+  // 🔴 2026-09-18 수리 — 09-17 전국 개방 때 DB value만 33.1로 내리고 **허용 범위(min)를 안 내려서**
+  //   getCriterionSync의 inRange가 33.1을 버리고 DEFAULTS 34.5로 폴백하고 있었다. 즉 제주(33.1~33.6)는
+  //   DB를 고쳤는데도 이틀간 계속 좌표박스 밖이었다. 기준 검증 크론이 value_out_of_range로 잡아낸 건이다.
+  //   ⚠️ 교훈: criteria는 값(DB)과 허용범위(코드)가 짝이다. 한쪽만 바꾸면 조용히 무시된다.
+  { key: "geo.box.lat_min", category: "지리", label: "서비스범위 좌표 박스 최소 위도(이하 범위밖 제외)", def: 33.1, min: 33.0, max: 38.8, unit: "°" }, // 2026-09-18 제주(마라도 33.11) 편입
   { key: "geo.box.lat_max", category: "지리", label: "서비스범위 좌표 박스 최대 위도(이상 범위밖 제외)", def: 38.7, min: 36.3, max: 40.3, unit: "°" },
   { key: "geo.box.lng_min", category: "지리", label: "서비스범위 좌표 박스 최소 경도(이하 범위밖 제외)", def: 124.5, min: 122.5, max: 126.5, unit: "°" },
   { key: "geo.box.lng_max", category: "지리", label: "서비스범위 좌표 박스 최대 경도(이상 범위밖 제외)", def: 129.4, min: 125.9, max: 132.0, unit: "°" }, // 2026-09-11 울릉군(130.9) 개방으로 상한 129.9→132.0(독도 131.87까지 포함)

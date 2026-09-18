@@ -32,8 +32,13 @@ export async function GET(req: NextRequest) {
       VALUES (${report.status}, ${report.fails}, ${report.warns}, ${report.deadKnobs.join(",")}, ${JSON.stringify(report.checks)})`;
     await sql`DELETE FROM criteria_verify_reports WHERE id NOT IN (SELECT id FROM criteria_verify_reports ORDER BY ran_at DESC LIMIT 60)`;
 
-    // 하트비트 + 에스컬레이션. status='fail'(dead-knob·범위이탈=무결성 위반)일 때만 ok=false로 기존 cronfail 경로 점화(품질본부 자동배정·자율진단 트리거).
-    //   warn(프록시 실효과)은 ok=true — 빨강 금지(CLAUDE.md §3), 관제탑 카드로만 노란 표면화.
+    // 🔴 2026-09-18 수리 — 예전엔 status='fail'일 때 ok=false를 찍어 기존 cronfail 이슈경로를 빌려 썼다.
+    //   새 이슈 유형을 안 만들려던 절약이었는데, 결과는 **크론은 멀쩡한데 화면엔 "cron-criteria-verify 실패"**였다.
+    //   진짜 크론 실패(500·타임아웃)와 구분이 안 되고, 정작 무엇이 어긋났는지는 안 보인다.
+    //   실제로 그 탓에 09-17 전국 개방의 좌표박스 드리프트(lat_min 33.1이 범위 밖이라 무시되던 건)가
+    //   "크론 실패"로만 떠 있었다 — 제주가 이틀간 공개 불가였는데 아무도 그렇게 읽지 못했다.
+    //   → 실행이 됐으면 ok=true. 탐지 결과는 lib/issues.ts가 '기준 드리프트'라는 제 이름으로 띄운다
+    //     (cron-costwatch를 09-15에 같은 방식으로 고쳤다 — 같은 버그 클래스의 마지막 잔여분).
     const hardFail = report.status === "fail";
     const detail = hardFail
       ? `dead-knob/드리프트 ${report.fails}건${report.deadKnobs.length ? ` [${report.deadKnobs.join(",")}]` : ""}`
@@ -43,7 +48,7 @@ export async function GET(req: NextRequest) {
     //   🔴 자동 재공개 없음 — '사람이 볼 목록'까지만 만든다.
     const rq = await runRecheckTrigger(26).catch(() => ({ policyChanged: false, scanned: 0, queued: 0, ref: "" }));
     const rqNote = rq.policyChanged ? ` · ♻️소급재판정 대상 ${rq.queued}곳 적재(스캔 ${rq.scanned})` : "";
-    await recordRun("cron-criteria-verify", !hardFail, detail + rqNote, report.fails + report.warns);
+    await recordRun("cron-criteria-verify", true, detail + rqNote, report.fails + report.warns);
 
     return NextResponse.json({ ok: true, report });
   } catch (e) {
