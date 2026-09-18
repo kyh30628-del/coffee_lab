@@ -70,11 +70,30 @@ const g = await sql`SELECT count(*)::int n, count(*) FILTER (WHERE published)::i
      OR address LIKE '전북%' OR address LIKE '전라북%' OR address LIKE '울산%' OR address LIKE '제주%'`;
 say(`③ 신규 5개 시도 ${g[0].n.toLocaleString()}곳 · 공개 ${g[0].pub.toLocaleString()}곳  (09-17 개방 직후 777곳에서 출발)`);
 
+// ③-b 🗺️ 전국 완주 현황 — 대표님이 매일 묻는 "어디까지 열렸나"를 한 줄로(2026-09-18 신설).
+//   미착수(last_run IS NULL)가 0이 되면 전국 한 바퀴 완주다. 시·도별로 남은 곳을 그대로 적는다.
+{
+  const un = await sql`SELECT region FROM discovery_state WHERE last_run IS NULL ORDER BY region`;
+  const bySido = {};
+  for (const r of un) { const k = String(r.region).split(" ")[0]; (bySido[k] ??= []).push(String(r.region).split(" ").slice(1).join(" ")); }
+  const total = un.length;
+  if (!total) say(`③-b 🗺️ 전국 완주 — 미착수 0개 지역 (전 지역 최소 1회 발굴 완료)`);
+  else {
+    say(`③-b 🗺️ 미착수 ${total}개 지역 남음`);
+    for (const [k, v] of Object.entries(bySido)) say(`   ${k} ${v.length}곳: ${v.join(" · ")}`);
+  }
+}
+
 // ④ 적체·쿼터·비용
 const bl = await sql`SELECT count(*)::int n FROM cafes WHERE pipeline_status='new' AND raw_reviews IS NULL`;
 const nb = await sql`SELECT used FROM naver_budget WHERE day = to_char(now() AT TIME ZONE 'Asia/Seoul','YYYY-MM-DD')`;
 const ch = await sql`SELECT halted FROM cost_guard WHERE id=1`;
-say(`④ 적체 ${bl[0].n}곳/800 ${bl[0].n >= 800 ? "🛑 발굴 차단" : ""} · 네이버 ${(nb[0]?.used ?? 0).toLocaleString()}/25,000 · 비용정지 ${ch[0].halted ? "🛑" : "꺼짐"}`);
+// ⚠️ 2026-09-18 — 임계를 800으로 **하드코딩**해 두고 있었다. 같은 날 임계를 1,500으로 올렸는데
+//   리포트만 800으로 판정해 "발굴 차단"이라고 거짓 보고할 뻔했다. 가드 본체와 같은 값을 읽는다.
+//   (판정 기준을 두 군데 적어두면 반드시 갈라진다 — criteria 하드코딩 금지와 같은 자리다.)
+const { discoveryMayRun } = await import("../lib/naverBudget.ts");
+const dgd = await discoveryMayRun();
+say(`④ 적체 ${dgd.backlog.toLocaleString()}곳/${dgd.limit.toLocaleString()} ${dgd.ok ? "✅ 발굴 허용" : "🛑 발굴 차단"} · 네이버 ${(nb[0]?.used ?? 0).toLocaleString()}/25,000 · 비용정지 ${ch[0].halted ? "🛑" : "꺼짐"}`);
 
 // ⑤ 정합성 (픽스처와 같은 불변식)
 const mm = await sql`SELECT count(*) FILTER (WHERE published)::int a, count(*) FILTER (WHERE pipeline_status='live')::int b FROM cafes`;
