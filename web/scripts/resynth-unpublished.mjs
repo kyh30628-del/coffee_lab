@@ -24,6 +24,12 @@ const { synthAndStore } = await import("../lib/synthStore.ts");
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? Number(process.argv[i + 1]) : d; };
 const APPLY = process.argv.includes("--apply");
 const LIMIT = arg("--limit", 500), CONC = arg("--conc", 4);
+// ⏰ 2026-09-18 — 대량 재판정이 새벽을 침범하지 않게 하드 데드라인(KST 시각, 기본 23시).
+//   Neon은 06~23시엔 사람 트래픽·크론으로 이미 깨어 있어 얹어도 추가 가동 0이지만,
+//   그 밖(특히 03~05시)에서 돌면 **없던 가동이 새로 생긴다**(CEO 절대지시: 새벽에 DB 깨우지 말 것).
+//   중단해도 손실 0 — 다음 실행이 synth_checked_at 오래된 순으로 이어받는다.
+const STOP_H = arg("--stop-hour", 23);
+const pastDeadline = () => new Date(Date.now() + 9 * 3600e3).getUTCHours() >= STOP_H;
 
 // 대상: 미공개 + 원본 보유 + 영구제외 아님. 오래 방치된 것부터.
 const rows = await sql`SELECT id, name, area, synth_grade, synth_count, pipeline_status FROM cafes
@@ -35,11 +41,12 @@ console.log(`대상 ${rows.length.toLocaleString()}곳 (상한 ${LIMIT}) · 상�
 console.log(`네이버 쿼터 0(refresh:false) · 동시 ${CONC} · 예상 ${Math.ceil(rows.length * 3.5 / CONC / 60)}분`);
 if (!APPLY) { console.log("\n▶ 미리보기다. 실제로 돌리려면 --apply 를 붙여라."); process.exit(0); }
 
-let i = 0, ok = 0, err = 0;
+let i = 0, ok = 0, err = 0, stoppedByTime = false;
 const t0 = Date.now();
 const worker = async () => {
   while (true) {
     const c = rows[i++]; if (!c) break;
+    if (pastDeadline()) { stoppedByTime = true; break; }
     try { await synthAndStore({ id: c.id, name: c.name, area: c.area ?? "" }, { refresh: false }); ok++; }
     catch (e) { err++; if (err <= 3) console.log(`  오류 ${c.name}: ${String(e).slice(0, 70)}`); }
     if (ok % 100 === 0 && ok) console.log(`  … ${ok}곳 (${Math.round((Date.now() - t0) / 1000)}초)`);
@@ -48,6 +55,6 @@ const worker = async () => {
 await Promise.all(Array.from({ length: CONC }, worker));
 const after = await sql`SELECT pipeline_status, count(*)::int n, count(*) FILTER (WHERE published)::int pub
   FROM cafes WHERE id = ANY(${rows.map((r) => r.id)}) GROUP BY 1 ORDER BY 2 DESC`;
-console.log(`\n완료 ${ok}곳 · 오류 ${err} · ${Math.round((Date.now() - t0) / 1000)}초`);
+console.log(`\n완료 ${ok}곳 · 오류 ${err} · ${Math.round((Date.now() - t0) / 1000)}초${stoppedByTime ? ` · ⏰ ${STOP_H}시 데드라인 도달로 중단(나머지는 다음 실행이 이어받음)` : ""}`);
 console.log("결과:", after.map((x) => `${x.pipeline_status}=${x.n}(공개 ${x.pub})`).join(" · "));
 console.log("→ pending은 cron-embed(08:01·12:01·16:01·20:03)의 finalizePipeline이 임베딩 후 승격한다.");
