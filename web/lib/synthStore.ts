@@ -1047,7 +1047,16 @@ function tidyDisplayQuotes(arr: any[]): any[] {
   const out: any[] = [];
   for (const r of arr) {
     const raw = String(r?.quote ?? "");
-    const cleaned = raw.replace(/#[^\s#]+/g, " ").replace(/\s+/g, " ").trim();
+    // 🔴 2026-09-19 — 네이버 검색 API는 **긴 제목을 `....`로 잘라서** 준다(약 40자).
+    //   우리는 text=`제목 + 설명`으로 합치므로, 표시 인용문(앞부분)이 **잘린 제목만** 보여주고
+    //   정작 후기 내용인 설명은 뒤에 묻힌다. 지방 카페는 제목이 길어(지역명+상호+메뉴) 특히 심했다:
+    //   실측 09-19 신규 공개분 23%가 '....'로 끝남(기존 공개분 1%) — 대표님이 "퀄리티 낮다"고 지적한 지점.
+    //   → 앞머리의 잘린 제목을 떼고 실제 내용부터 보여준다.
+    //   ⚠️ 판정·매칭용 text(raw_reviews·synth_reviews_all)는 그대로 둔다 — 제목의 상호가 이름일치에 쓰인다.
+    //   ⚠️ 떼고 남는 게 부실하면(25자 미만) 떼지 않는다 — 제목이 유일한 내용인 글을 빈껍데기로 만들지 않게.
+    const detitled = raw.replace(/^.{0,80}?\.{3,}\s*/, "");
+    const base = detitled.length >= 25 ? detitled : raw;
+    const cleaned = base.replace(/#[^\s#]+/g, " ").replace(/\s+/g, " ").trim();
     if (!raw) { out.push(r); continue; }
     if (cleaned.length < 15) continue;   // 태그 빼면 할 말이 없는 글 — 보여줄 가치가 없다
     out.push(cleaned === raw ? r : { ...r, quote: cleaned });
