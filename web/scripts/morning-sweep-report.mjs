@@ -29,11 +29,27 @@ try {
       count(*) FILTER (WHERE src='naver' AND path ~ '^/area/[^/]+/dong/')::int naver_dong
     FROM traffic_events WHERE ts >= ${Y0} - interval '7 days' AND ts < ${Y0} AND anon_id NOT IN (${BOT_ANON_IDS_SQL})`);
   const avg7 = Math.round(w.uv / 7);
-  say(`⓪ 사람 유입(어제) 방문자 ${v.uv}명 · PV ${v.pv}  ← 7일평균 ${avg7}명 ${v.uv < avg7 * 0.7 ? "🔴 -30%↓" : v.uv > avg7 * 1.3 ? "📈 +30%↑" : ""}`);
+  // 🔴 2026-09-18 — 판정을 '어제 하루 vs 7일평균'으로 하면 **평일마다 거짓 경보**가 뜬다.
+  //   실측 요일편차: 네이버 PV 일요일 977 vs 화요일 431(2.3배). 평일은 구조적으로 주간평균보다 낮다.
+  //   실제로 09-18 아침 리포트가 '🔴 -20%↓ 사이트맵 원복 검토'를 띄웠는데, 주 단위로 재보니
+  //   동 계열은 88 → 165(+88%)로 **늘고 있었다.** 되돌릴 이유가 없는데 되돌릴 뻔했다.
+  //   → 어제 수치는 정보로 계속 보여주되, **판정은 7일 합계끼리** 한다(요일 효과 상쇄).
+  say(`⓪ 사람 유입(어제) 방문자 ${v.uv}명 · PV ${v.pv}  ← 7일평균 ${avg7}명 (일별 판정 안 함 — 요일편차 2.3배)`);
   say(`   출처: 네이버 ${v.naver} · AI ${v.ai} · 구글 ${v.google}`);
   // 🔙 사이트맵에서 동×취향을 뺀(09-17) 되돌림 조건: 네이버 경유 동 계열 유입이 20% 이상 줄면 원복
-  const dongAvg7 = w.naver_dong / 7;
-  say(`   네이버→동 계열 ${v.naver_dong} (7일평균 ${dongAvg7.toFixed(1)}) ${dongAvg7 > 0 && v.naver_dong < dongAvg7 * 0.8 ? "🔴 -20%↓ 사이트맵 원복 검토" : "✅"}`);
+  // 주 단위 추세 — 이게 실제 판정선이다(요일 효과 없음).
+  const [wk] = await sql.query(`SELECT
+      count(DISTINCT anon_id) FILTER (WHERE ts >= now() - interval '7 days')::int uv0,
+      count(DISTINCT anon_id) FILTER (WHERE ts >= now() - interval '14 days' AND ts < now() - interval '7 days')::int uv1,
+      count(*) FILTER (WHERE src='naver' AND ts >= now() - interval '7 days')::int nv0,
+      count(*) FILTER (WHERE src='naver' AND ts >= now() - interval '14 days' AND ts < now() - interval '7 days')::int nv1,
+      count(*) FILTER (WHERE src='naver' AND path ~ '^/area/[^/]+/dong/' AND ts >= now() - interval '7 days')::int dg0,
+      count(*) FILTER (WHERE src='naver' AND path ~ '^/area/[^/]+/dong/' AND ts >= now() - interval '14 days' AND ts < now() - interval '7 days')::int dg1
+    FROM traffic_events WHERE ts >= now() - interval '14 days' AND anon_id NOT IN (${BOT_ANON_IDS_SQL})`);
+  const pct = (a, b) => b > 0 ? `${a >= b ? "+" : ""}${((a - b) / b * 100).toFixed(0)}%` : "-";
+  say(`   📊 주 단위(최근7일 ← 직전7일): 방문자 ${wk.uv0} ← ${wk.uv1} ${pct(wk.uv0, wk.uv1)} · 네이버 ${wk.nv0} ← ${wk.nv1} ${pct(wk.nv0, wk.nv1)}`);
+  // 🔙 사이트맵에서 동×취향을 뺀 되돌림 조건 — **주 단위로** 20% 이상 줄었을 때만.
+  say(`   네이버→동 계열(주) ${wk.dg0} ← ${wk.dg1} ${pct(wk.dg0, wk.dg1)} ${wk.dg1 > 0 && wk.dg0 < wk.dg1 * 0.8 ? "🔴 -20%↓ 사이트맵 원복 검토" : "✅"}`);
 } catch (e) { say(`⓪ 사람 유입 조회 실패: ${String(e).slice(0, 60)}`); }
 
 // ① 스윕 로그 — 오늘 07시대 것
