@@ -84,10 +84,15 @@ export async function GET(req: NextRequest) {
       --    개별로 낀 카페는 아래에서 '주의'로 따로 표면화한다(빨강 아님 — 소비자 화면 무손상).
       COALESCE(ROUND(percentile_cont(0.99) WITHIN GROUP (
         ORDER BY CASE WHEN published THEN EXTRACT(EPOCH FROM (now() - synth_checked_at))/86400 END))::int, 0) synth_oldest_d,
-      COALESCE(MAX(CASE WHEN published THEN ROUND(EXTRACT(EPOCH FROM (now() - synth_checked_at))/86400)::int END), 0) synth_max_d,
+      COALESCE(MAX(CASE WHEN published AND raw_reviews IS NOT NULL THEN ROUND(EXTRACT(EPOCH FROM (now() - synth_checked_at))/86400)::int END), 0) synth_max_d,
       -- 🧬 2026-09-03: 지문 게이트 도입으로 '변화 없는 카페는 30일 안전망까지 안 읽는 게 정상'이 됐다.
       --   21일 창을 그대로 두면 정상 카페 수천 곳이 순차적으로 '누락'으로 잡힌다 → 32일(안전망+여유)로.
-      COUNT(*) FILTER (WHERE published AND synth_checked_at < now() - interval '32 days')::int synth_stuck,
+      -- 🔴 2026-09-19: raw_reviews가 없으면 **cron-resynth가 아예 선정하지 않는다**(세 레인 전부
+      --   `raw_reviews IS NOT NULL` 조건). 즉 원본이 90일 파기된 카페는 '누락'이 아니라 **대상이 아니다**.
+      --   그걸 누락으로 세면 영영 안 꺼지는 경고가 된다(#6643이 09-01부터 상주). 더 나쁜 건, 그 경고를 믿고
+      --   재합성을 돌리면 근거 0건 분기를 타서 **멀쩡히 공개 중인 카페가 비공개로 내려간다** —
+      --   원본 없는 공개 카페가 2,252곳이고, 이들은 표시 인용문·검증 후기를 온전히 갖고 있어 화면은 정상이다.
+      COUNT(*) FILTER (WHERE published AND raw_reviews IS NOT NULL AND synth_checked_at < now() - interval '32 days')::int synth_stuck,
       COUNT(*) FILTER (WHERE published AND synth_checked_at IS NULL)::int synth_never,
       -- 💰 2026-09-05(CEO 승인 다이어트 ④): 아래 지표들이 각각 별도 풀스캔(회당 ~30MB × 회 12회/일)이던 것을
       --   이 단일 패스에 흡수. 스캔 10회 → 4회(이 쿼리 + published범위 ig + GROUP BY 2개).
