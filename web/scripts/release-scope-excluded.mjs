@@ -21,10 +21,14 @@ const { sql } = await import("../lib/db.ts");
 const { addressSidoScope } = await import("../lib/discover.ts");
 
 const APPLY = process.argv.includes("--apply");
-const REASON = "서비스 범위 밖 시·도 주소";
+// 🔴 2026-09-18 — 정확일치로 보다가 **56곳을 통째로 놓쳤다.** 같은 성격인데 문구가 달랐다:
+//   "서비스 범위 밖 — 주소 시도가 미편입 지역인데 area가 동명 시군구로 오분류됨(2026-09-14 확인)"
+//   제외 사유 문구는 사람이 그때그때 쓰므로 정확일치는 반드시 샌다. 접두로 본다.
+//   ⚠️ 그래도 안전하다 — 아래에서 **주소를 다시 검증**해 현재 서비스 범위 안인 것만 푼다.
+const REASON_PREFIX = "서비스 범위 밖";
 
 const rows = await sql`SELECT id, name, address, synth_grade FROM cafes
-  WHERE pipeline_status='excluded' AND exclude_reason=${REASON}`;
+  WHERE pipeline_status='excluded' AND exclude_reason LIKE ${REASON_PREFIX + '%'}`;
 if (!rows.length) { console.log("✅ '범위 밖'으로 제외된 카페가 없다 — 할 일 없음."); process.exit(0); }
 
 const inNow = [], stillOut = [];
@@ -47,6 +51,6 @@ for (const [status, ids] of Object.entries(plan)) {
   done += r.length;
   console.log(`  ✅ ${status} ${r.length.toLocaleString()}곳`);
 }
-const [left] = await sql`SELECT count(*)::int n FROM cafes WHERE exclude_reason=${REASON}`;
+const [left] = await sql`SELECT count(*)::int n FROM cafes WHERE exclude_reason LIKE ${REASON_PREFIX + '%'}`;
 console.log(`\n해제 ${done.toLocaleString()}곳 · 잔여 ${left.n.toLocaleString()}곳`);
 console.log("공개 승격은 cron-embed(08:01·12:01·16:01·20:03)의 finalizePipeline이 게이트를 거쳐 처리한다.");
