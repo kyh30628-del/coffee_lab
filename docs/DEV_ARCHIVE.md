@@ -367,3 +367,4 @@
 | 2026-09-17 11:37 | #1113 | [검색UX 신규] 취향 페이지 dessert/bakery 도미넌스 예외 — 소규모 지역서 brunch/spa | 0bd4d948 | - | lib/seoData.ts: 도미넌스 필터의 dessert/bakery IN 예외 제거(4곳: getRegionTasteCafes L116, getRegionTasteStats L |
 | 2026-09-18 23:05 | #1132 | [자율진단] jobTeams.ts RETIRED_JOBS 미등재로 거짓 정지의심 반복 발행 — recolle | 097cdc1b | - | web/lib/jobTeams.ts: RETIRED_JOBS Set에 recollect-purged, cron-batch-judge 추가(라인104) + 폐지사유 주석. tsc 에 |
 | 2026-09-18 23:05 | #1133 | [룰갭 신규] 2업체 콤보 포스트 — 인용문(quote)이 타업체명으로 시작 (3곳, verified 2곳  | 375eef3d | - | lib/reviewQuality.ts: COMBO_LEAD 정규식(선두 접두어+"점(") 추가, verifyReview()에 comboLead 신호(한글4자+ 접두어면서 카페명과  |
+| 2026-09-18 23:05 | #1135 | [사장님영업] CEO 사장님퍼널 대시보드 reachRate 966%로 깨짐 — /owner/r/[id] fr | 270a942b | - | app/api/admin/owner-funnel/route.ts: owner_funnel_events 집계 쿼리에 WHERE anon_id <> '' 추가해 크롤러 추정(anon_ |
