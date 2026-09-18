@@ -130,6 +130,14 @@ const LISTICLE_TITLE = [
 const CAFE_LIST_PATTERNS = /(신상\s*카페\s*리스트|체험단\s*(모음|모집)|인기글\s*top\s*\d+|전국\s*인기\s*카페\s*순위|카페플렉스\s*인기글)/i;
 // 본문에서 여러 가게가 함께 나열되는 신호 (…카페 / …점 / …커피 토큰 다수)
 const PLACE_TOKEN = /[가-힣A-Za-z0-9]{2,}(카페|커피|로스터리|베이커리|디저트)\b/g;
+// 룰갭 rulegap-20260918-2(decisions#1133): 2업체 콤보 포스트 — "A점(설명)/B점(설명)" 나열형 또는
+//   "맛집 B점(feat.A)" 태그형 콤보 글은 업체가 딱 2곳뿐이라 위 LISTICLE_TITLE/PLACE_TOKEN>=4 문턱을
+//   못 넘어 룰 사각이었다(id8274 아날로그3호점·id18035 서오릉제빵소 참나무닭장작구이 양주점·id11181
+//   프루케 생과일케이크 위례점 실측, rulegap-proposals-20260918-2.md). 인용문(quote) 선두가
+//   '[타업체명]점(' 패턴으로 시작하면 매칭 — 접두어 유효성(한글 4자+ = 진짜 고유상호)과 대상 카페명
+//   무관성은 아래 comboLead 계산에서 함께 검사한다(자기 지점 라벨 "3호점(쿠키랩)" 등은 접두어가
+//   한글 4자 미만인 차수/숫자뿐이라 제외, id23861 대조군 실증).
+const COMBO_LEAD = /^([가-힣a-zA-Z0-9·\s]{2,14})점\(/;
 // 룰갭 rulegap-20260828-1611(decisions#859): 휴게소류 복합시설 소속 카페는 "○○휴게소 간식 추천" listicle
 //   글에서 대상 브랜드명이 카페 접미사 없이(호두과자·도나스 등) 다른 매장명과 나란히 1회만 언급돼 PLACE_TOKEN
 //   (카페 접미사 4개 이상)도 LISTICLE_TITLE(제목 패턴)도 못 잡는다(id24526 만쥬리아 평창휴게소·id20646
@@ -1602,6 +1610,15 @@ export function verifyReview(input: QualityInput): QualityResult {
       : (roadAddrCtxOk && venueCtxOk && (inBodyFull || (distinctInBody && (bodyHasCafeWord || areaPresent) && landmarkCtxOk)));
   const listicle = LISTICLE_TITLE.some((re) => re.test(title)) || (((`${title} ${body}`.match(PLACE_TOKEN) ?? []).length) >= 4)
     || (isTransitVenueCafe(input.name) && countEnumListItems(body, nameN) >= 3);
+  // 룰갭 rulegap-20260918-2(decisions#1133): 인용문 선두 콤보 리드 — COMBO_LEAD 주석 참조.
+  const comboLeadMatch = body.match(COMBO_LEAD);
+  const comboLead = !!comboLeadMatch && (() => {
+    const lead = comboLeadMatch[1];
+    const leadKo = (lead.match(/[가-힣]/g) ?? []).length;
+    if (leadKo < 4) return false; // 차수·숫자뿐인 자기 지점 라벨("3호점(쿠키랩)") 오탐 방지
+    const leadN = norm(lead);
+    return !leadN.includes(nameN) && !nameN.includes(leadN); // 대상 카페명과 무관해야 콤보 리드로 인정
+  })();
   const generic = has(fullL, GENERIC_CUES);
   const nameOccurBody = nameN ? countOccur(bodyN, nameN) : 0;
   const foreignInTitle = NON_METRO.find((c) => title.includes(c));
@@ -2421,6 +2438,7 @@ export function verifyReview(input: QualityInput): QualityResult {
 
   // ---- 감점 ----
   if (listicle) { score -= 22; reasons.push("모음글 성격(주제 분산)"); }
+  if (comboLead) { score -= 20; reasons.push("2업체 콤보 포스트(인용문이 타업체명으로 시작)"); }
   if (!nameInTitle && body.length > 180 && nameOccurBody <= 1) { score -= 16; reasons.push("긴 글에 한 번만 스침"); }
   if (sponsored) { score -= 10; reasons.push("광고/협찬 신호"); }
   if (((fullL.match(/#/g) ?? []).length) > 8) { score -= 8; reasons.push("해시태그 과다(홍보성)"); }
@@ -2444,6 +2462,14 @@ export function verifyReview(input: QualityInput): QualityResult {
     verdict = "reference";
     score = Math.min(score, 59);
     reasons.push("라이브카페 주류/공연 활동기(카페 실질맥락 전무) — 참고등급 캡");
+  }
+  // 룰갭 rulegap-20260918-2(decisions#1133): 2업체 콤보 포스트는 방문·구체후기 신호가 강해(id8274
+  //   score95, id18035 score79) 위 -20 감점만으론 verified 문턱을 못 벗어난다 — 위 라이브카페 캡과
+  //   동일 구조로 verified 승격을 막고 reference 상한으로 캡한다.
+  if (verdict === "verified" && comboLead) {
+    verdict = "reference";
+    score = Math.min(score, 59);
+    reasons.push("인용문 경계 의심(콤보 포스트) — 참고등급 캡");
   }
 
   return { verdict, score: Math.round(score), reasons, signals: sig };
