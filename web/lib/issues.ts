@@ -402,7 +402,15 @@ export async function detectIssues(): Promise<Issue[]> {
   // 🗺️ 서비스 범위 밖 시·도는 lib/serviceScope.ts 단일출처(강원 편입 후 여기만 뒤처져 139곳 오경보난 자리).
   const nonCap = await one(sql.query(`SELECT count(*) c FROM cafes WHERE published AND (${OUT_OF_SCOPE_SQL})`) as any);
   if (nonCap > 0) out.push({ ikey: "integ:noncap", source: "정합성", severity: "HIGH", type: "정합성", title: `서비스 범위 밖 주소 공개 ${nonCap}곳`, detail: "주소 시·도가 서비스 범위 밖인데 공개 중", team: "품질본부", consumer: true });
-  const namePol = await one(sql`SELECT count(*) c FROM cafes WHERE published AND synth_coherence IS NOT NULL AND synth_coherence < 0.3 AND COALESCE(offctx_ok,false)=false`);
+  // 🔴 2026-09-20 — 임계 0.3이 **오탐을 상시 HIGH로 띄우고 있었다**(06-30부터 상주).
+  //   실측: 걸린 카페를 전수 육안 확인하니 대부분 진짜 그 카페였다.
+  //     아빠랑식빵이랑 0.25 — 표시 후기에 "도로명주소: 인천 강화군 강화읍 강화대로 418" 그대로 적혀 있다.
+  //     오슬로 0.00 · 카페이면 0.25 — 주소·영업시간은 정확한데 본문에 상호가 안 나올 뿐.
+  //   비율이 낮은 건 '나머지 후기가 짧아서'지 오염이 아니다. 진짜 오염은 **하나도 안 맞는** 경우다:
+  //     데이인케이크 0.00 — 인용문이 남양주중고차매매단지 글·타 주소(09-20 비공개 처리).
+  //   → HIGH는 '확증 0건'(coherence=0)만. 0 초과 0.3 미만은 아래 맥락 watchlist(LOW)가 이미 본다.
+  //   ⚠️ 빨강은 소비자 손상일 때만(CLAUDE.md §3). 상시 켜진 빨강은 아무도 안 본다 — #555와 같은 교훈.
+  const namePol = await one(sql`SELECT count(*) c FROM cafes WHERE published AND synth_coherence IS NOT NULL AND synth_coherence = 0 AND COALESCE(offctx_ok,false)=false`);
   if (namePol > 0) out.push({ ikey: "integ:namepol", source: "정합성", severity: "HIGH", type: "오염", title: `이름 오염 의심 공개 ${namePol}곳`, detail: "노출 후기가 실제 그 카페를 거의 안 말함(coherence<0.3) — 구구커피류", team: "품질본부", consumer: true });
   const areaMis = await one(sql`SELECT count(*) c FROM cafes WHERE published AND area LIKE '%구' AND area NOT LIKE '인천%' AND address LIKE '서울%' AND position(area in address)=0`);
   if (areaMis > 0) out.push({ ikey: "integ:areamis", source: "정합성", severity: "MED", type: "정합성", title: `area-주소 불일치 ${areaMis}곳`, detail: "area 라벨이 실제 주소 구와 어긋남", team: "품질본부", consumer: true });
