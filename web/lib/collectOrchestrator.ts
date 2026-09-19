@@ -87,8 +87,17 @@ export function toQuote(text: string, name = "", maxLen = 90): string {
   //   카페에서 진짜 후기가 시 구절을 인용해도, 대표 인용은 '카페 내용 문장'이 뜨도록.
   const OFFTOPIC_SENT = /(미야자와|겐지|그림책|바람에도\s*지지|폭풍에도\s*지지|더위에도\s*지지|눈에도\s*지지|독후감|책추천|시\s*한\s*편|문학|독서모임|월드컵|게임\s*이벤트)/;
   const score = (s: string) => (COFFEE_TERMS.test(s) ? 4 : 0) + (namePart && s.replace(/\s+/g, "").includes(namePart) ? 2 : 0) - (OFFTOPIC_SENT.test(s) ? 6 : 0);
-  let best = sentences[0], bestSc = score(sentences[0]);
-  for (const s of sentences) { const sc = score(s); if (sc > bestSc) { best = s; bestSc = sc; } }
+  // 🔴 2026-09-19 — 네이버가 **긴 제목을 `....`로 잘라** 보내는데, 그 점이 문장 구분자로 먹혀
+  //   '잘린 제목'이 독립 문장이 된다. 그리고 제목에는 상호(+2)와 커피 용어(+4)가 다 들어 있어
+  //   **항상 최고점을 받아 대표 인용문으로 뽑혔다.** 화면엔 후기가 아니라 검색 제목이 떴다:
+  //     "[전주카페] 직접 로스팅한 원두 향이 가득한 전주 빈부커피 신시가...."
+  //   실측(09-19): 신규 공개분 인용문 23%가 이 형태(기존 공개분 1%). 대표님이 "퀄리티 낮다"고 지적한 지점.
+  //   → 잘린 문장은 후보에서 뺀다. 단 **전부 잘렸으면 그대로 쓴다**(빈 인용문을 만들지 않게).
+  const TRUNCATED_SENT = /(\.{3,}|…)\s*$/;
+  const usable = sentences.filter((s) => !TRUNCATED_SENT.test(s));
+  const pool = usable.length ? usable : sentences;
+  let best = pool[0], bestSc = score(pool[0]);
+  for (const s of pool) { const sc = score(s); if (sc > bestSc) { best = s; bestSc = sc; } }
   return best.length <= maxLen ? best : best.slice(0, maxLen) + "…";
 }
 const dedupeKey = (s: string) => s.toLowerCase().replace(/\s+/g, "").slice(0, 60);
