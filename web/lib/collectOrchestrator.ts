@@ -338,6 +338,17 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
     const ad = list.filter((e) => isAdTemplateQuote(e.quote));
     return [...real, ...ad];
   };
+  // 🔴 2026-09-19 — toQuote가 잘린 제목을 피하도록 고쳤지만, **원본에 잘린 제목밖에 없는 글**은
+  //   대안이 없어 그대로 남는다(실측 잔여 14.8%: "목포 한적한 바다뷰카페 디저트와 커피 맛집 달몬트 ....").
+  //   그런 글은 화면에서 정보가 0이므로 **표시 6칸 경쟁에서 뒤로 민다** — 쓸 만한 후기가 하나라도
+  //   있으면 그게 먼저 뽑힌다. 제거가 아니라 후순위(광고 템플릿과 같은 사상): 그것밖에 없는
+  //   카페는 여전히 그것으로 칸을 채워 빈 화면을 막는다.
+  const TRUNCATED_Q = /(\.{3,}|…)\s*$/;
+  const deprioritizeTruncated = (list: EvidenceReview[]): EvidenceReview[] => {
+    const full = list.filter((e) => !TRUNCATED_Q.test(e.quote ?? ""));
+    const cut = list.filter((e) => TRUNCATED_Q.test(e.quote ?? ""));
+    return [...full, ...cut];
+  };
   // 🔴 2026-09-18 (대표님 지시 "규칙으로 오염 후기 빼고 재합성") — 여기가 그 지점이다.
   //   그전까지는 '이 카페 얘기인 후기 비율'(coherence)이 낮으면 **근거 전체를 통째로 막았다**.
   //   오염 3건 때문에 진짜 3건까지 같이 묻혀 승격대기 181곳이 영영 안 열리고 있었다(09-18 실측).
@@ -357,7 +368,8 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
   //   이미 공개된 카페가 무더기로 오염 판정을 받는다. 그래서 '필터 전 top6'로 종전과 똑같이 잰다.
   const pickTop = (pool: EvidenceReview[]): EvidenceReview[] => {
     const yt = pool.find(isYt), non = pool.filter((e) => !isYt(e));
-    return yt ? [...pickDiverse(deprioritizeAd(non), 5), yt] : pickDiverse(deprioritizeAd(non), 6);
+    const ordered = deprioritizeTruncated(deprioritizeAd(non));
+    return yt ? [...pickDiverse(ordered, 5), yt] : pickDiverse(ordered, 6);
   };
   const topUnfiltered = pickTop(evDedup);
   const coherenceRaw = topUnfiltered.length
