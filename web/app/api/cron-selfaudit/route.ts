@@ -18,7 +18,7 @@ export const runtime = "nodejs";
 
 // 잡별 감시 계약(정상 최대 경과·담당 본부) = lib/jobTeams.ts **단일 출처**(2026-07-02 수리).
 //   과거: ①3벌 맵 drift ②제거된 잡(dong-backfill·qualityaudit) 잔존 ③주석과 실제 주기 불일치("self-audit 01시").
-import { EXPECT_MAX_H, teamOf } from "@/lib/jobTeams";
+import { EXPECT_MAX_H, teamOf, isRetired } from "@/lib/jobTeams";
 import { loadCriteria, getCriterionSync } from "@/lib/criteria";
 
 export async function GET(req: NextRequest) {
@@ -81,6 +81,7 @@ export async function GET(req: NextRequest) {
     //   오탐 없음). 미등록 잡(일회성 스크립트·제거된 잡 잔류 기록)은 실패(ok=false)만 감지 — 영구 오탐 클래스 차단.
     const crons = (await sql`SELECT DISTINCT ON (job) job, ok, ran_at, processed FROM agent_runs ORDER BY job, ran_at DESC`) as any[];
     for (const c of crons) {
+      if (isRetired(c.job)) continue; // 은퇴 잡(RETIRED_JOBS)은 실패·정지 감시 대상에서 제외 — jobTeams.ts:107
       if (!c.ok) findings.push({ check: `크론 실패 ${c.job}`, count: 1, team: teamOf(c.job), critical: true });
       const expect = EXPECT_MAX_H[c.job];
       if (expect == null) continue; // 감시 계약 없는 잡은 staleness 미적용
