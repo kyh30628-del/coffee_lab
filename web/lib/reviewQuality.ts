@@ -1092,7 +1092,21 @@ export function nearDuplicateCafeName(a: string, b: string): boolean {
 // 노이즈 게이트: 후기들이 '실제로 그 카페'를 말하는 비율(이름 일관성).
 //   개별 verifyReview를 통과해도, 묶어 보면 카페명이 거의 안 나오면 오염 의심.
 //   유형별 규칙으로 못 잡은 오염(부분문자열·구문·신종)을 공개 전에 잡는 안전망.
-export function nameCoherence(name: string, quotes: string[], areaTerms: string[] = []): number {
+// 🔴 2026-09-20 — 주소 신호 추가(대표님 지시 "오탐 3곳 일관성 지표 개선").
+//   후기에 상호가 **아예 안 나오는** 진짜 후기가 있다. 실측 3곳:
+//     카페이면  "제주시 한림읍 금능 5길 13 1층 월-금 10:00~15:00"  ← 주소·영업시간만, 상호 없음
+//     케익먹는곰 "주변분들이 케이크맛집이라고 추천많이해주셨는데"      ← 상호 없음
+//   이런 글이 오염으로 잡혀 관제탑 HIGH가 상시 떴고, 믿고 내렸으면 멀쩡한 카페가 죽는다.
+//   주소의 **도로명+건물번호**가 후기에 그대로 있으면 그 카페가 맞다 — 상호보다 강한 증거다.
+//   ⚠️ 동/읍만으로는 인정하지 않는다(같은 동 옆가게가 통과한다). 번지까지 붙은 것만.
+const ROAD_NO = /([가-힣A-Za-z0-9]{2,}(?:로|길))\s*(\d+(?:-\d+)?)/g;
+export function addrKeys(addr?: string): string[] {
+  const out: string[] = [];
+  if (!addr) return out;
+  for (const m of String(addr).matchAll(ROAD_NO)) out.push(norm(m[1] + m[2]));
+  return out.filter((x) => x.length >= 5);
+}
+export function nameCoherence(name: string, quotes: string[], areaTerms: string[] = [], addr?: string): number {
   const qs = (quotes || []).filter(Boolean);
   if (!qs.length) return 1; // 표본 없으면 보류(공개 막지 않음)
   // ⚠️ areaTerms를 넘겨야 지역어('사가정'·'진리')가 식별토큰에서 빠진다 — 안 넘기면 지역어가 같은 동네
@@ -1108,6 +1122,7 @@ export function nameCoherence(name: string, quotes: string[], areaTerms: string[
   //   언급돼도 단일 hit로 coherence=1.0을 받던 버그 — 지명형 term은 카페맥락 동반을 요구해 걸러낸다.
   const strongTerms = terms.filter((t) => !isAreaLikeWord(t));
   const locTerms = terms.filter(isAreaLikeWord);
+  const aKeys = addrKeys(addr);
   const nameN = norm(name); // 전체 이름(붙여쓰기) — '성북동빵공장'처럼 토큰 경계검사가 놓치는 경우 보완
   const brandN = norm(strongTerms.join("")); // 지점명 뗀 브랜드만 이어붙인 형태 — 띄어쓰기 변형 흡수
   // 🔴 2026-09-18 실측수리②: 업종어를 상호 **앞**에 붙여 부르는 표기("카페민들레"). "민들레카페"(뒤)는
@@ -1130,6 +1145,7 @@ export function nameCoherence(name: string, quotes: string[], areaTerms: string[
       continue;
     }
     if (
+      aKeys.some((k) => qN.includes(k)) ||   // 주소(도로명+번지) 일치 — 상호가 없어도 그 카페다
       (nameN.length >= 4 && qN.includes(nameN)) ||
       // 🔴 2026-09-18 실측수리: 상호를 붙여 쓴 표기("베이커 바미"→"베이커바미")를 못 잡아
       //   진짜 후기 3/6을 오염으로 떨어뜨리고 있었다. 지점명을 뗀 브랜드 토큰을 이름 순서대로

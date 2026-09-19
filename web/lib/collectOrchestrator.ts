@@ -361,7 +361,7 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
   //      그래서 남은 건수가 문턱에 못 미치면 **필터를 적용하지 않고** 원래 근거를 그대로 둔다 —
   //      근거가 얇아져 등급이 조용히 내려가는 사고를 막는 쪽이 안전하다.
   const cohAreaTerms = (area ?? []).filter(Boolean);
-  const onTopic = (e: EvidenceReview) => nameCoherence(name, [e.quote ?? ""], cohAreaTerms) === 1;
+  const onTopic = (e: EvidenceReview) => nameCoherence(name, [e.quote ?? ""], cohAreaTerms, opts?.address) === 1;
   const evOnTopic = evDedup.filter(onTopic);
   // ⚠️ 분모를 바꾸면 안 된다(2026-09-18에 하마터면 사고). 종전 coherence는 **표시 6건** 기준이고
   //   noisy 게이트(0.4 미만=오염 즉시 차단)가 그 값을 본다. 옥석 전체로 분모를 키우면 값이 내려가

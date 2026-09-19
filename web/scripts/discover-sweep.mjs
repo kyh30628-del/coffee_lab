@@ -54,6 +54,13 @@ while (Date.now() - t0 < TOTAL_MS && !stop) {
     WHERE (${sido} = '' OR region LIKE ${sido + '%'})
       AND (last_run IS NULL OR last_run < ${runStart}::timestamptz)
     ORDER BY
+      -- 🔴 2026-09-20 대표님 지시 "전 지역 확장했으니 완벽하게 채워. 덜 열린 지역부터".
+      --   기존 1순위가 '7일 방치'라 **어제 연 신규 지역이 최근이라는 이유로 뒤로 밀렸다.**
+      --   실측: 스윕이 충남 태안군(수확률 2.5%·142발견→0곳)을 훑는 동안
+      --   전북 정읍시 90.2% · 전남 순천시 89.9% · 제주 제주시 83.7%가 대기 중이었다.
+      --   한 번 훑은 지역은 표면만 긁힌 상태다 — 수확률이 살아 있으면 계속 파는 게 맞다.
+      --   → 수확률 30%+ 를 최우선. 고갈되면(30% 미만) 자연히 아래 기아방지 로테이션으로 넘어간다.
+      (COALESCE(last_inserted,0)::float / NULLIF(last_found,0) >= 0.3) DESC NULLS LAST,  -- ⓪ 아직 캘 게 남은 곳
       (last_run IS NULL OR last_run < now() - interval '7 days') DESC,   -- ① 오래 방치된 곳(기아 방지)
       COALESCE(last_inserted,0)::float / NULLIF(last_found,0) DESC NULLS FIRST,  -- ② 수확률(미측정은 먼저 재본다)
       COALESCE(last_inserted,0) DESC,                                     -- ③ 절대 적재량

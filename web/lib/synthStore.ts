@@ -276,11 +276,11 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   // 공개 가드: 등급 충족 + 비카페 아님 + 노이즈 게이트(후기가 실제 그 카페 얘기인지).
   //   노이즈: 공개건수(5+)인데 이름 일관성<40% → 오염 의심 → 공개 보류. 사용자에 garbage 안 나감.
   //   저건수도 적용('만조커피 9건'이 전부 동네 딴 가게였던 사례 차단). 전체이름 매칭은 nameCoherence가 보완.
-  const loc = (await sql`SELECT area, dong FROM cafes WHERE id=${cafeId}`)[0] as any; // 지역어(시+동) — coherence가 지역어를 식별토큰서 빼게
+  const loc = (await sql`SELECT area, dong, address FROM cafes WHERE id=${cafeId}`)[0] as any;  // address: 2026-09-20 주소 신호(상호 없는 진짜 후기 구제) // 지역어(시+동) — coherence가 지역어를 식별토큰서 빼게
   // 🔴 2026-09-18 — 오염 후기를 뺀 뒤에 비율을 다시 재면 **항상 1.0**이다(분자=분모). 그대로 쓰면
   //   공개 게이트가 스스로를 무력화한다. 그래서 저장·판정에 쓰는 비율은 **필터 이전 값**이다.
   //   합성 경로가 아닌 재판정 경로(applyDecisions 등)는 coherenceRaw가 없으므로 종전대로 직접 계산한다.
-  const coherence = coherenceRaw ?? nameCoherence(name, (evidenceReviews as any[]).map((r) => r?.quote || ""), [loc?.area, loc?.dong].filter(Boolean));
+  const coherence = coherenceRaw ?? nameCoherence(name, (evidenceReviews as any[]).map((r) => r?.quote || ""), [loc?.area, loc?.dong].filter(Boolean), loc?.address);
   const offctx = offctxRate(((allEvidence ?? evidenceReviews) as any[]).map((r) => r?.quote || "")); // 맥락없음 비율(관제탑 감시)
   // 🧳🏠 방문객 성격 — offctx와 같은 인용문 풀에서 뽑는다(같은 근거 = 같은 잣대). 추가 조회 0.
   // 🔌 카공 시설 사실(2026-08-30) — 합성할 때 **한 번** 계산해 저장한다.

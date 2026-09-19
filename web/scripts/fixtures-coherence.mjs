@@ -8,7 +8,13 @@
 const { nameCoherence } = await import("../lib/reviewQuality.ts");
 
 // [카페명, 후기, 히트여야 하나, areaTerms, 출처]
+// [카페명, 후기, 히트여야 하나, areaTerms, 출처, 주소(선택)]
 const CASES = [
+  // ── ③ 주소 신호(2026-09-20) — 상호가 없어도 도로명+번지가 맞으면 그 카페다 ──
+  ["카페이면", "제주시 한림읍 금능 5길 13 1층 월-금 10:00 ~ 15:00 매주 토, 일 정기휴무", true, ["제주시", "한림읍"], "주소·영업시간만 적힌 진짜 후기", "제주특별자치도 제주시 한림읍 금능5길 13 1층"],
+  ["카페이면", "제주시 한림읍에 있는 다른 카페 다녀왔어요 분위기 좋더라구요", false, ["제주시", "한림읍"], "동만 일치하는 옆가게 — 통과시키면 안 된다", "제주특별자치도 제주시 한림읍 금능5길 13 1층"],
+  ["카페이면", "오늘 날씨가 좋아서 산책을 했다 기분이 좋았다", false, ["제주시", "한림읍"], "무관 글", "제주특별자치도 제주시 한림읍 금능5길 13 1층"],
+
   // ── ① 진짜인데 버려지던 것(2026-09-18 실측, 승격대기 카페에서 채취) ──
   ["민들레 카페", "여주점동 레트로분위기 가득한 카페민들레 여주시 점동면 청안리길 2 Open 오전 9시", true, ["여주시", "점동면"], "id? 업종어가 상호 앞"],
   ["민들레 카페", "아기자기 소담한 카페 민들레 여주시 점동 핫플에 위치한 민들레카페 소개합니다", true, ["여주시", "점동면"], "정상 표기"],
@@ -28,8 +34,8 @@ const CASES = [
 ];
 
 let pass = 0, fail = 0;
-for (const [name, quote, want, area, src] of CASES) {
-  const got = nameCoherence(name, [quote], area) === 1;
+for (const [name, quote, want, area, src, addr] of CASES) {
+  const got = nameCoherence(name, [quote], area, addr) === 1;
   if (got === want) { pass++; }
   else { fail++; console.log(`  ❌ [${name}] 기대 ${want ? "HIT" : "MISS"} → 실제 ${got ? "HIT" : "MISS"}  (${src})\n     "${quote.slice(0, 60)}"`); }
 }
