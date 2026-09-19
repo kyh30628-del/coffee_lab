@@ -86,6 +86,11 @@ const WHOLESALE_RETAIL_CUES = /(대량주문|사업자\s*(원두|샘플)|도매�
 //   "카페" 자기등록조차 없는 업종이라 도매 마케팅/창고형 매장일 확률이 더 높다(id7124=서비스,산업>제조업,
 //   id4799=쇼핑,유통>쇼핑센터,할인매장 — 둘 다 비F&B 카테고리 실측, P61과 결합해 가중치 상향).
 const DRINK_TASTING_CUES = /(마셨|마시고|시켜서\s*마|시켰|한\s*잔\s*하고|앉아서)/;
+// 룰갭 신규(2026-09-20, decisions#1155): 카페 구인공고/채용 게시글("정직원 바리스타 구합니다" 등)이
+//   카페명·주소·연락처 등 구체 정보를 담아 "구체 후기 신호"를 통과, 방문후기로 오채택됐다(id14678 카페
+//   아에르·id20206 카페 토스카나 등 10곳 실측, 전건 published). WHOLESALE_RETAIL_CUES와 동일 메커니즘 —
+//   구인공고 강신호가 있고 매장 실물방문 신호가 전무하면 VISIT_CUES 매칭을 무효화한다.
+const RECRUITMENT_POST_CUES = /(알바\s*(모집|구함|공고)|직원\s*(모집|채용)|바리스타\s*(모집|채용|구합니다)|구인\s*(공고|중)|채용\s*공고|정직원\s*모집|근무자\s*모집|같이\s*일하실\s*분|주방(보조)?\s*모집)/;
 // 룰갭 P67(2026-08-12, decisions#667): 커피머신/에스프레소머신 정비업체의 B2B 영업일지("OO카페 커피머신
 //   수리 방문 드렸습니다")가 커피 어휘가 풍부해 CAFE_CONTEXT류를 전부 통과, "검증" 방문후기로 노출된다
 //   (8곳 10건 실측: 네오·카페와바·블루하라·찻집소·데이카페·플로우카페·만옥제과). "수리 방문 드렸습니다"의
@@ -1546,6 +1551,9 @@ export function verifyReview(input: QualityInput): QualityResult {
   // 룰갭 rulegap-20260804(decisions#618): 도매/소매 강신호가 있고 매장 실물방문·시음 신호가 전무하면
   //   P63/rulegap-20260803과 동일하게 VISIT_CUES 매칭을 무효화한다.
   const wholesaleOnly = WHOLESALE_RETAIL_CUES.test(fullL) && !INSTORE_VISIT_CUES.test(fullL) && !DRINK_TASTING_CUES.test(fullL);
+  // 룰갭 신규(decisions#1155): 채용/구인공고 강신호가 있고 매장 실물방문 신호가 전무하면 위 wholesaleOnly와
+  //   동일하게 VISIT_CUES 매칭(구인공고의 "방문 문의 주세요" 류)을 무효화한다.
+  const recruitmentOnly = RECRUITMENT_POST_CUES.test(fullL) && !INSTORE_VISIT_CUES.test(fullL);
   // 룰갭 P67(decisions#667): 정비업체 영업일지 강신호가 있고 매장 실물방문·시음 신호가 전무하면 위 세
   //   패턴과 동일하게 VISIT_CUES 매칭(정비기사의 "방문 드렸습니다")을 무효화한다.
   const equipmentServiceOnly = EQUIPMENT_SERVICE_BLOG.test(fullL) && !INSTORE_VISIT_CUES.test(fullL) && !DRINK_TASTING_CUES.test(fullL);
@@ -1566,7 +1574,7 @@ export function verifyReview(input: QualityInput): QualityResult {
   //   중고차·id26803 통신요금제 실측: 셋 다 전무)만 걸린다.
   const cafeNaverNoSubstance = CLUB_NAVER_LINK.test(input.link ?? "")
     && !CAFE_CONTEXT_SUBSTANCE.test(fullL) && !DRINK_TASTING_CUES.test(fullL) && !INSTORE_VISIT_CUES.test(fullL);
-  const visit = has(fullL, VISIT_CUES) && !deliveryOnly && !pickupOnly && !wholesaleOnly && !equipmentServiceOnly && !clubMeetupLogisticsLeak && !cafeNaverNoSubstance;
+  const visit = has(fullL, VISIT_CUES) && !deliveryOnly && !pickupOnly && !wholesaleOnly && !recruitmentOnly && !equipmentServiceOnly && !clubMeetupLogisticsLeak && !cafeNaverNoSubstance;
   const substance = SUBSTANCE_CUES.filter((k) => fullL.includes(k.toLowerCase())).length;
   // [#4] 흔한 단어 이름 오매칭 방지: 전체 이름 일치는 강함. 토큰만 일치면
   //     '카페 맥락(카페·커피·로스터리…)'이나 지역이 함께 있어야 주제로 인정.
@@ -2394,6 +2402,11 @@ export function verifyReview(input: QualityInput): QualityResult {
       return { verdict: "rejected", score: 6, reasons: ["원두 도매/소매 사업자용 후기(비F&B 카테고리 + 매장 시음·착석 단서 없음)"], signals: sig };
     }
     return { verdict: "rejected", score: 30, reasons: ["원두 도매/소매 구매후기(매장 시음·착석 단서 없음) — LLM 재판정"], borderline: true, signals: sig };
+  }
+  // 룰갭 신규(decisions#1155): 카페 구인공고/채용 게시글(정직원 모집·바리스타 구합니다 등)은 매장 실물방문
+  //   신호가 전무하면 P63/rulegap-20260803과 동일하게 borderline(LLM 재판정)으로 격하한다.
+  if (recruitmentOnly && (nameInTitle || nameInBody)) {
+    return { verdict: "rejected", score: 30, reasons: ["구인/채용 공고(매장 방문 단서 없음) — LLM 재판정"], borderline: true, signals: sig };
   }
   // 룰갭 P67(decisions#667): 커피머신/에스프레소머신 정비업체 영업일지는 구조적으로 고객의 방문경험이
   //   아니므로(정비기사 작업일지), VISIT_CUES/SUBSTANCE_CUES가 실제로 동반되지 않으면 하드 거절 —
