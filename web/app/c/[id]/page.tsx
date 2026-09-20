@@ -343,7 +343,7 @@ export default async function CafePage({ params }: Props) {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }} />
       {faqJsonLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />}
-      <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Hahmlet:wght@700&family=Nanum+Pen+Script&display=swap" rel="stylesheet" />
+      {/* 서체는 layout에서 로드(Noto Serif KR·Pretendard) — 여기서 따로 싣지 않는다 */}
       <div className="max-w-xl mx-auto nt-page pb-6" style={{ ["--nt-mx" as any]: "36px" }}>
         {/* 장식 — 잔 자국 하나, 오른쪽 위에 반쯤 걸쳐서 */}
         <div className="nt-ring" aria-hidden style={{ right: -78, top: 96, width: 220 }} />

@@ -77,7 +77,7 @@ function VisitorBadges({ vb, dark }: { vb?: string; dark?: boolean }) {
         <span key={k} title={VB_LABEL[k].label}
           className={dark ? "text-[10.5px] font-bold bg-[#f4ece0]/20 px-2 py-0.5 rounded-full shrink-0"
                           : "text-[10px] font-bold leading-none text-[#4a5a4e] bg-[#e6efe8] border border-[#c9dbcf] px-2 py-1 rounded-full shrink-0"}>
-          {VB_LABEL[k].emoji} {VB_LABEL[k].short}
+          {VB_LABEL[k].short}
         </span>
       ))}
     </>
@@ -173,9 +173,7 @@ function FacetStrip({ fac, size = 11.5 }: { fac?: { label: string; emoji: string
   return (
     <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
       {list.map((f) => (
-        <span key={f.label} className="inline-flex items-center gap-1 rounded-[4px] border border-[rgba(90,70,50,0.22)] bg-white/80 px-1.5 py-0.5 font-bold text-[#4a3a2a]" style={{ fontSize: size }}>
-          <span style={{ fontSize: size + 2 }}>{f.emoji}</span>{f.label}
-        </span>
+        <span key={f.label} className="nt-facet" style={{ fontSize: size + 0.5 }}>{f.label}</span>
       ))}
     </div>
   );
@@ -183,7 +181,7 @@ function FacetStrip({ fac, size = 11.5 }: { fac?: { label: string; emoji: string
 
 function CautionLine({ cau, size = 11 }: { cau?: string | null; size?: number }) {
   if (!cau) return null;
-  return <p className="font-bold text-[#8a5a3a] mt-1" style={{ fontSize: size }}>⚠️ {cau} <span className="font-normal text-[#54432c]">· 후기에서 확인</span></p>;
+  return <p className="nt-cau mt-1" style={{ fontSize: size + 0.5 }}>{cau} <span>· 후기에서 확인된 주의점</span></p>;
 }
 
 const HeadlineCard = memo(function HeadlineCard({ c, kicker, tone, onOpen, featured = false }: { c: DCafe; kicker: string; tone: number; onOpen: (id: number) => void; featured?: boolean }) {
@@ -208,7 +206,7 @@ const HeadlineCard = memo(function HeadlineCard({ c, kicker, tone, onOpen, featu
       {c.identity && <p className={`nt-hand text-[#2f3550] line-clamp-1 mb-1.5 ${featured ? "" : "sm"}`} style={{ lineHeight: featured ? "30px" : "26px" }}><span className="nt-hl">{c.identity}</span></p>}
       <FacetStrip fac={c.fac} size={featured ? 12 : 11} />
       <CautionLine cau={c.cau} size={featured ? 12 : 11} />
-      {c.beanNote.length > 0 && <div className="flex flex-wrap gap-1.5 mt-1.5">{c.beanNote.map((b) => <span key={b} className="nt-chip" style={{ height: 22, fontSize: 11.5 }}>{b}</span>)}</div>}
+      {c.beanNote.length > 0 && <div className="flex flex-wrap gap-1.5 mt-1.5">{c.beanNote.map((b) => <span key={b} className="nt-chip" style={{ height: 22, fontSize: 11.5 }}>{CHAR_LABEL[b] ?? b}</span>)}</div>}
     </button>
   );
 });
@@ -331,7 +329,7 @@ const RankSpotlight = memo(function RankSpotlight({ top3, momentum, specialty, f
   return (
     <div className="mb-7">
       <div className="flex items-baseline justify-between mb-2 nt-ruled">
-        <div className="nt-title text-[17px] flex items-center gap-1.5 text-[#6a4318]">🔍 카페 둘러보기<span className="nt-free"><InfoDot title="카페 둘러보기">{infoByKey[safeKey]}</InfoDot></span></div>
+        <div className="nt-title text-[17px] flex items-center gap-1.5 text-[#6a4318]">카페 둘러보기<span className="nt-free"><InfoDot title="카페 둘러보기">{infoByKey[safeKey]}</InfoDot></span></div>
       </div>
       <div className="flex gap-1.5 mb-2.5 mt-1 flex-wrap">
         {RANK_TABS.map((t, i) => (dataByKey[t.key] || []).length > 0 && (
@@ -2296,7 +2294,7 @@ export default function Home() {
             {nearHome ? (
               <div>
                 <div className="flex items-baseline justify-between mb-2 nt-ruled">
-                  <div className="nt-title text-[17px]">📍 내 주변 500m 옥석 카페</div>
+                  <div className="nt-title text-[17px]">내 주변 500m 옥석 카페</div>
                   <div className="text-[11px] text-[#2f6fb0] shrink-0 font-medium">{nearHomeCafes.length}곳</div>
                 </div>
                 {nearHomeCafes.length === 0 ? (
@@ -2324,17 +2322,17 @@ export default function Home() {
               <>
                 {discover.headlineAList && discover.headlineAList.length > 0 && (
                   <div className="dcn-enter" style={{ animationDelay: "0s" }}>
-                    <Spotlight title="💎 오늘의 숨은 보석" items={discover.headlineAList} onOpen={openById} sub="검증됐지만 덜 알려진" toneOffset={0} featured
+                    <Spotlight title="오늘의 숨은 보석" items={discover.headlineAList} onOpen={openById} sub="검증됐지만 덜 알려진" toneOffset={0} featured
                       info={<>검증 등급인데 아직 <b>리뷰가 적어 덜 알려진</b> 카페예요. 매일 다른 곳이 스포트라이트에 올라와요.</>} />
                   </div>
                 )}
                 {discover.headlineBList && discover.headlineBList.length > 0 && (
                   <div className="dcn-enter" style={{ animationDelay: ".1s" }}>
-                    <Spotlight title={discover.themeB ? `${discover.themeB.emoji} 오늘의 테마 · ${discover.themeB.label}` : "🔥 커피에 진심인 집"} items={discover.headlineBList} onOpen={openById} sub="테마 매칭 순" toneOffset={1}
+                    <Spotlight title={discover.themeB ? `오늘의 테마 · ${discover.themeB.label}` : "커피에 진심인 집"} items={discover.headlineBList} onOpen={openById} sub="테마 매칭 순" toneOffset={1}
                       info={<>커피 성격(로스팅·작업·조용함·디저트·분위기·공간) 중 하나를 <b>매일 돌아가며</b> 소개해요.</>} />
                   </div>
                 )}
-                {discover.featured && discover.featured.length > 0 && <div className="dcn-enter" style={{ animationDelay: ".2s" }}><Spotlight title="✨ 추천 카페" items={discover.featured} onOpen={openById} sub="쇼케이스" toneOffset={2} info={<>사장님이 직접 <b>홍보 중인 쇼케이스 카페</b>예요(우선 노출). 후기·등급은 다른 카페와 똑같이 검증된 값이에요.</>} /></div>}
+                {discover.featured && discover.featured.length > 0 && <div className="dcn-enter" style={{ animationDelay: ".2s" }}><Spotlight title="추천 카페" items={discover.featured} onOpen={openById} sub="쇼케이스" toneOffset={2} info={<>사장님이 직접 <b>홍보 중인 쇼케이스 카페</b>예요(우선 노출). 후기·등급은 다른 카페와 똑같이 검증된 값이에요.</>} /></div>}
                 <div className="dcn-enter" style={{ animationDelay: ".3s" }}><RankSpotlight top3={discover.top3} momentum={momentum?.rising.slice(0, 5) ?? []} specialty={discover.specialty} fresh={discover.fresh} onOpen={openById} /></div>
                 <button onClick={() => { setSido(homeSido); setSigungu(homeGu); setDong(homeDong); setFocusId(null); setSheetOpen(false); setTab("map"); }} className="nt-btn-ink py-3.5 mt-2">🗺 {homeDong ? `${homeDong} 지도로 보기` : homeGu ? `${homeGu} 지도로 보기` : "지도에서 전체 둘러보기"} →</button>
               </>
@@ -2685,7 +2683,7 @@ export default function Home() {
               </div>
             </details>
             <div className="flex flex-col gap-2">
-              <button onClick={onAgree} className="w-full bg-[#2b2018] text-[#f4ece0] rounded-xl py-3 font-bold">📍 내 주변 옥석 카페 보기</button>
+              <button onClick={onAgree} className="w-full bg-[#2b2018] text-[#f4ece0] rounded-xl py-3 font-bold">내 주변 옥석 카페 보기</button>
               <button onClick={onDecline} className="w-full text-[#7a5122] rounded-xl py-2 text-sm">아니요, 전체 볼게요</button>
             </div>
           </div>
@@ -2751,7 +2749,7 @@ function MapControls({ sido, sigungu, dong, onSido, onSigungu, setDong, dongOpti
         {(sido || sigungu || dong) && <button onClick={() => { if (clearAuto) clearAuto(); else { onSido(""); } }} className="text-xs text-[#7a5122] underline mt-2">전체</button>}
       </div>
       <div className="mb-5">
-        <div className="nt-title text-[15px] mb-2.5 flex items-center gap-1.5">☕ 어떤 카페 찾으세요?<InfoDot title="'결'로 거르기"><b>결</b>은 후기에서 자주 언급되는 카페의 성격이에요(조용·작업·디저트·로스팅 등). 고르면 그 결이 강한 카페만 핀·목록에 뜨고, <b>그 결이 많이 언급된 순</b>으로 정렬돼요. 측정값이 아니라 '리뷰에서 자주 나온 정도'입니다.</InfoDot></div>
+        <div className="nt-title text-[15px] mb-2.5 flex items-center gap-1.5">어떤 카페 찾으세요?<InfoDot title="'결'로 거르기"><b>결</b>은 후기에서 자주 언급되는 카페의 성격이에요(조용·작업·디저트·로스팅 등). 고르면 그 결이 강한 카페만 핀·목록에 뜨고, <b>그 결이 많이 언급된 순</b>으로 정렬돼요. 측정값이 아니라 '리뷰에서 자주 나온 정도'입니다.</InfoDot></div>
         <div className="grid grid-cols-2 gap-2.5">
           {TASTE_CHOICES.map((t) => (
             <button key={t.key} onClick={() => setTasteKey(tasteKey === t.key ? null : t.key)} className={`nt-scrap p-3 text-left transition-colors ${tasteKey === t.key ? "!bg-[#2a1f17] text-[#fbf7f0]" : "text-[#2a1f17]"}`} style={tasteKey === t.key ? { backgroundImage: "none" } : undefined}>
