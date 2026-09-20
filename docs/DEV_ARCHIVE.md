@@ -375,3 +375,4 @@
 | 2026-09-20 11:05 | #1158 | [룰갭 신규] 비카페 하드거절 게이트 — 상호명 자기회귀로 CAFE_CONTEXT_SUBSTANCE 무력화  | 2b242c01 | - | lib/reviewQuality.ts: 공용 헬퍼 hasCafeSubstanceExcludingName 추가(CAFE_CONTEXT_SUBSTANCE 검사 전 카페 자신의 상호명을 |
 | 2026-09-20 14:11 | #1159 | [룰갭 신규] 블로거 자기신원(srcName) 신호 미연결 — 시공/설치업체 SEO 위장 리뷰 5곳 확정 | 2e6c24a0 | - | lib/reviewQuality.ts: QualityInput에 srcName 필드 추가 + VENDOR_SELF_IDENTITY_CUES(시공문의 설치문의 카페창업컨설팅 인테리어 |
 | 2026-09-20 14:11 | #1165 | [룰갭 신규] LANDMARK_WORDS 자연관광명소 5건 신규 — 순창/구례/인제/하동/태백 확정오염 | d35ff677 | - | lib/reviewQuality.ts LANDMARK_WORDS에 하늘길·용궐산·성삼재·자작나무숲·북천·구문소 6개 토큰 추가(제안서 명시 6건 전부, 기존 9개 선례와 동일 is |
+| 2026-09-20 23:05 | #1166 | [검색UX 신규] 비등재 묘사어("감성카페") 상호부분일치 200점 바닥값이 참고등급을 검증등급 위로 — 2 | 7cf705a2 | - | app/api/search/route.ts: pureConceptQuery 판정을 CATEGORY_WORD 접미사 제거 방식으로 확장(감성카페 등 트리거+업종범용어 결합 질의도 순 |
