@@ -13,12 +13,13 @@ import { publicOwnerContent } from "@/lib/ownerContent";
 import VisitorReviews from "../../VisitorReviews";
 import RecentCafes from "../../RecentCafes";
 import SavedCafes from "../../SavedCafes";
-import { buildAxisDist, cafeProfile, extractHighlights, tasteVector, tasteSimilarity, GRADE_RANK } from "@/lib/cafeProfile";
+import { buildAxisDist, cafeProfile, extractHighlights } from "@/lib/cafeProfile";
 import { topCharTraits } from "@/lib/charScore";
 import { collectionForCafe } from "@/lib/collections";
 import { tasteByKey } from "@/lib/seoData";
 import { shareHookText } from "@/lib/shareCopy";
-import { sortReviews, ensureRecent, isReadableQuote } from "@/lib/exposureOrder";
+import { sortReviews, ensureRecent } from "@/lib/exposureOrder";
+import { isReadableQuote, rankNearby, nearbyTitle, fmtKm, monthlySeries, freshnessOf, CHAR_LABEL, charBarsOf, addrTail, igHandle, type NearbyCafe } from "@/lib/cafeDetailView";
 import { extractWorkSignals } from "@/lib/workDetail";
 import OutboundLink from "../../OutboundLink";
 import { isOwnerManaged } from "@/lib/ownerManaged"; // 🏅 사장님 관리 배지(조건·문구 단일출처)
@@ -184,13 +185,6 @@ async function getPublicReviews(cafeId: number) {
 //   → 순서를 **같은 읍면동 → 반경 10km → 같은 시군구**로 바꾸고, 화면엔 실제 거리(km)를 적는다.
 //   비용: 좌표 박스 조회 1회(부분 인덱스 idx_cafes_geo(lat,lng) WHERE published — 09-20 실재 확인). 박스 안이 6곳 미만인
 //   희소 지역만 시군구 조회 1회를 보탠다. 좌표 없는 카페는 종전 시군구 조회로 폴백(회귀 없음).
-function distKm(aLat: number, aLng: number, bLat: number, bLng: number): number {
-  const R = 6371, toR = (d: number) => (d * Math.PI) / 180;
-  const dLat = toR(bLat - aLat), dLng = toR(bLng - aLng);
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(toR(aLat)) * Math.cos(toR(bLat)) * Math.sin(dLng / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(h));
-}
-type NearbyCafe = { id: number; name: string; synth_grade: string | null; synth_count: number | null; area: string; dong: string | null; km: number | null; tier: 0 | 1 | 2 };
 async function getNearby(c: any): Promise<NearbyCafe[]> {
   const excludeId = Number(c.id);
   const hasGeo = typeof c.lat === "number" && typeof c.lng === "number";
@@ -210,53 +204,9 @@ async function getNearby(c: any): Promise<NearbyCafe[]> {
       const seen = new Set(rows.map((r) => r.id));
       for (const r of more) if (!seen.has(r.id)) rows.push(r);
     }
-    const mine = tasteVector(c.char_scores, c.synth_count);
-    return rows
-      .map((r) => {
-        const km = hasGeo && typeof r.lat === "number" && typeof r.lng === "number" ? distKm(c.lat, c.lng, r.lat, r.lng) : null;
-        const tier: 0 | 1 | 2 = r.dong && r.dong === c.dong && r.area === c.area ? 0 : km !== null && km <= 10 ? 1 : 2;
-        return { id: r.id, name: r.name, synth_grade: r.synth_grade, synth_count: r.synth_count, area: r.area, dong: r.dong, km, tier,
-          sim: tasteSimilarity(mine, tasteVector(r.char_scores, r.synth_count)) };
-      })
-      .filter((r) => r.tier < 2 || r.area === c.area) // 10km 밖이면서 다른 시군구 = 근처가 아니다
-      .sort((a, b) =>
-        a.tier - b.tier ||
-        (GRADE_RANK[a.synth_grade ?? ""] ?? 3) - (GRADE_RANK[b.synth_grade ?? ""] ?? 3) ||
-        (a.km ?? 99) - (b.km ?? 99) ||
-        b.sim - a.sim ||
-        (b.synth_count ?? 0) - (a.synth_count ?? 0))
-      .slice(0, 6)
-      .map(({ sim: _s, ...r }) => r);
+    return rankNearby(c, rows);
   } catch { return []; }
 }
-const fmtKm = (km: number | null) => km === null ? "" : km < 1 ? `${Math.max(1, Math.round(km * 10)) * 100}m` : km < 10 ? `${km.toFixed(1)}km` : `${Math.round(km)}km`;
-
-// 📈 월별 후기 흐름 — review_dates("YYYY.MM.DD")를 최근 N개월 칸에 센다. 이미 읽은 작은 jsonb라 조회 0.
-function monthlySeries(dates: unknown, months = 14): { key: string; n: number }[] | null {
-  const arr = Array.isArray(dates) ? (dates as unknown[]).map(String).filter((d) => /^\d{4}\.\d{2}\.\d{2}$/.test(d)) : [];
-  if (!arr.length) return null;
-  const now = new Date(); const out: { key: string; n: number }[] = [];
-  for (let i = months - 1; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    out.push({ key: `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}`, n: 0 });
-  }
-  const idx = new Map(out.map((o, i) => [o.key, i]));
-  for (const d of arr) { const i = idx.get(d.slice(0, 7)); if (i !== undefined) out[i].n++; }
-  return out;
-}
-// 이름표(이모지 없음) — 결 막대·타일용. CHAR(위)는 OG·FAQ 문장이 쓰므로 그대로 둔다.
-const CHAR_LABEL: Record<string, string> = { roast: "직접 로스팅", work: "작업하기 좋은", quiet: "조용한", dessert: "디저트", mood: "분위기", space: "넓은 공간", pet: "애견 동반", brunch: "브런치", view: "뷰", bakery: "베이커리", terrace: "테라스·야외" };
-// 주소 표시 — 시도·시군구·읍면동 접두를 떼고 도로명부터. 앞은 굵게(시군구 읍면동).
-function addrTail(address: string | null | undefined, area: string, dong: string | null | undefined): string {
-  if (!address) return "";
-  const toks = String(address).trim().split(/\s+/);
-  let i = 0;
-  if (toks[i] && /(특별자치도|특별자치시|특별시|광역시|도)$/.test(toks[i]) && toks[i] !== area) i++;
-  while (i < toks.length && (toks[i] === area || (dong && toks[i] === dong) || area.split(" ").includes(toks[i]))) i++;
-  return toks.slice(i).join(" ");
-}
-const igHandle = (u: string | null | undefined) => { const m = String(u ?? "").match(/instagram\.com\/([A-Za-z0-9._]+)/); return m ? m[1] : null; };
-
 export default async function CafePage({ params }: Props) {
   const { id } = await params;
   const c = await getCafe(id);
@@ -296,15 +246,7 @@ export default async function CafePage({ params }: Props) {
   const sq = (c.synth_quality ?? null) as any;
   const sqRaw = Number(sq?.raw ?? 0);
   // 🕒 최신성 — review_dates는 검증+참고 후기의 발행일("YYYY.MM.DD") 배열. 최근 12개월 건수·최신 월·1년 공백 여부.
-  const freshness = (() => {
-    const arr = Array.isArray(c.review_dates) ? (c.review_dates as unknown[]).map(String).filter((d) => /^\d{4}\.\d{2}\.\d{2}$/.test(d)) : [];
-    if (!arr.length) return null;
-    const ts = arr.map((d) => new Date(d.replace(/\./g, "-")).getTime()).filter((t) => Number.isFinite(t));
-    if (!ts.length) return null;
-    const latestT = Math.max(...ts); const cut = Date.now() - 365 * 86400000;
-    const latest = new Date(latestT); const recent = ts.filter((t) => t >= cut).length;
-    return { recent, latest: `${latest.getFullYear()}.${String(latest.getMonth() + 1).padStart(2, "0")}`, stale: latestT < cut };
-  })();
+  const freshness = freshnessOf(c.review_dates);
   const faqs = buildFaq(c, grade, highlights, profile, tags);
   const faqJsonLd = faqs.length > 0 ? {
     "@context": "https://schema.org", "@type": "FAQPage",
@@ -370,17 +312,14 @@ export default async function CafePage({ params }: Props) {
   const series = monthlySeries(c.review_dates);
   const seriesMax = series ? Math.max(1, ...series.map((m) => m.n)) : 1;
   const seriesLast = series ? series.reduce((acc, m, i) => (m.n > 0 ? i : acc), -1) : -1;
-  const charBars = Object.entries((c.char_scores ?? {}) as Record<string, number>)
-    .filter(([k, v]) => CHAR_LABEL[k] && Number(v) > 0)
-    .sort((a, b) => Number(b[1]) - Number(a[1]))
-    .slice(0, 5);
+  const charBars = charBarsOf(c.char_scores);
   const barMax = charBars.length ? Number(charBars[0][1]) : 1;
   const addrRest = addrTail(c.address, c.area, c.dong);
   const ig = igHandle(c.instagram_url);
   const facts = highlights.slice(0, 4);
   const vBadges = visitorBadges({ n: c.visitor_n ?? 0, trip: c.visitor_trip ?? 0, local: c.visitor_local ?? 0 });
   const showRank = typeof c.area_rank === "number" && c.area_rank <= 10 && (c.area_total ?? 0) >= 20;
-  const nearTitle = nearby.length > 0 && nearby[0].tier === 0 && c.dong ? `${c.dong} 근처 카페` : nearby.length > 0 && nearby[0].tier === 1 ? "가까운 카페" : `${c.area}의 다른 카페`;
+  const nearTitle = nearbyTitle(nearby, c.area, c.dong);
   const checkedOn = new Date().toISOString().slice(0, 10);
   const srcLine = (
     <p className="nt-src">네이버 공개 후기 {(c.synth_count ?? 0).toLocaleString()}건 교차검증 · 영수증 리뷰·광고·협찬 제외 · {checkedOn} 확인</p>

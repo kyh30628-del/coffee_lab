@@ -360,3 +360,12 @@
 .nt-detail .nt-cta .nt-btn-line { border: 1.5px solid rgba(90, 70, 50, 0.32); background: transparent; color: var(--nt-ink2); }
 .nt-detail .nt-margin-gutter { padding-right: 20px; }
 @media (max-width: 380px) { .nt-detail .nt-tiles { gap: 6px; } .nt-detail .nt-tile { padding: 8px 9px; } .nt-detail .nt-tile .v { font-size: 19px; } }
+/* 지도 상세 패널은 .nt-app(홈) 안에 산다 — .nt-app의 손글씨 굵기·5단 글자 스냅이 새 판을 덮지 않게 같은 규칙을 되돌린다. */
+.nt-app .nt-detail { font-size: 15.5px; }
+.nt-app .nt-detail b, .nt-app .nt-detail strong, .nt-app .nt-detail .font-bold, .nt-app .nt-detail .font-semibold { font-family: inherit; font-weight: 700; -webkit-text-stroke: 0; }
+.nt-app .nt-detail .nt-name { font-family: var(--nt-name); }
+.nt-app .nt-detail .text-\[10px\] { font-size: 10px; } .nt-app .nt-detail .text-\[10\.5px\] { font-size: 10.5px; } .nt-app .nt-detail .text-\[11px\] { font-size: 11px; }
+.nt-app .nt-detail .text-\[11\.5px\] { font-size: 11.5px; } .nt-app .nt-detail .text-\[12px\] { font-size: 12px; } .nt-app .nt-detail .text-\[12\.5px\] { font-size: 12.5px; }
+.nt-app .nt-detail .text-\[13px\] { font-size: 13px; } .nt-app .nt-detail .text-\[13\.5px\] { font-size: 13.5px; } .nt-app .nt-detail .text-\[14px\] { font-size: 14px; }
+.nt-app .nt-detail .text-\[14\.5px\] { font-size: 14.5px; } .nt-app .nt-detail .text-\[15px\] { font-size: 15px; } .nt-app .nt-detail .text-\[15\.5px\] { font-size: 15.5px; }
+.nt-app .nt-detail .text-\[16px\] { font-size: 16px; } .nt-app .nt-detail .text-\[17px\] { font-size: 17px; } .nt-app .nt-detail .text-\[18px\] { font-size: 18px; }

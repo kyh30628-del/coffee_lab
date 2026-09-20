@@ -17,6 +17,7 @@ import { FACET_EMOJI } from "@/lib/cafeProfile";
 import { useLockBodyScroll } from "@/lib/useLockBodyScroll";
 import { shareHookText } from "@/lib/shareCopy";
 import { decodeCafeScores } from "@/lib/mapCafes";
+import { isReadableQuote, rankNearby, nearbyTitle, fmtKm, monthlySeries, freshnessOf, CHAR_LABEL, charBarsOf, addrTail, igHandle } from "@/lib/cafeDetailView"; // 📓 상세 패널 2차 공용 계산
 
 type EvidenceReview = { quote: string; link?: string; source?: string; date?: string; trust?: "verified" | "reference" | "rejected"; score?: number; why?: string[] };
 type QualityStats = { raw: number; verified: number; reference: number; rejected: number; duplicates?: number; rejectReasons?: Record<string, number> };
@@ -2833,7 +2834,6 @@ function hlQuote(text?: string) {
 }
 
 function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarked = false, onToggleBookmark, onSaveMemory }: { cafe: Cafe; dist: AxisDist; allCafes?: Cafe[]; onOpenCafe?: (id: number) => void; onClose: () => void; onMap: () => void; bookmarked?: boolean; onToggleBookmark?: () => void; onSaveMemory?: () => void }) {
-  const g = cafe.synth_grade ? GRADE_STYLE[cafe.synth_grade] : null;
   const [saveFx, setSaveFx] = useState(false); // ③ 저장 손맛 — 담는 순간에만 팝+하트 연출
   const onBookmark = () => { const willSave = !bookmarked; onToggleBookmark?.(); if (willSave) { setSaveFx(true); setTimeout(() => setSaveFx(false), 800); } };
   const [reviews, setReviews] = useState<EvidenceReview[]>([]);
@@ -2848,29 +2848,24 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
   const [highlights, setHighlights] = useState<{ label: string; emoji: string; count: number }[]>([]); // 옥석 리뷰 데이터 핵심
   const [cautions, setCautions] = useState<{ label: string; emoji: string; count: number; quote?: string }[]>([]); // ⚠️ 이건 알고 가세요
   const [reputationNote, setReputationNote] = useState<string | null>(null);
+  const [extra, setExtra] = useState<{ address?: string | null; instagramUrl?: string | null; reviewDates?: string[] | null }>({}); // 📓 주소·인스타·후기 날짜(2차)
   useEffect(() => {
-    let live = true; setLoadingRev(true); setPromo(null); setUserReviews([]); setHighlights([]); setReputationNote(null);
-    fetch(`/api/cafe-detail?id=${cafe.id}`).then((r) => r.json()).then((d) => { if (live) { setReviews(d.reviews ?? []); setQuality(d.quality ?? null); setLlmJudged(!!d.llmJudged); setHighlights(d.highlights ?? []); setCautions(d.cautions ?? []); setReputationNote(d.reputationNote ?? null); setLoadingRev(false); } }).catch(() => { if (live) setLoadingRev(false); });
+    let live = true; setLoadingRev(true); setPromo(null); setUserReviews([]); setHighlights([]); setReputationNote(null); setExtra({});
+    fetch(`/api/cafe-detail?id=${cafe.id}`).then((r) => r.json()).then((d) => { if (live) { setReviews(d.reviews ?? []); setQuality(d.quality ?? null); setLlmJudged(!!d.llmJudged); setHighlights(d.highlights ?? []); setCautions(d.cautions ?? []); setReputationNote(d.reputationNote ?? null); setExtra({ address: d.address ?? null, instagramUrl: d.instagramUrl ?? null, reviewDates: d.reviewDates ?? null }); setLoadingRev(false); } }).catch(() => { if (live) setLoadingRev(false); });
     fetch(`/api/owner-promo?cafeId=${cafe.id}`).then((r) => r.json()).then((d) => { if (live && d.promo && (d.promo.ai_headline || d.promo.video_url)) { setPromo(d.promo); trackPromo(cafe.id, "view"); } }).catch(() => {});
     fetch(`/api/cafe-reviews?cafeId=${cafe.id}`).then((r) => r.json()).then((d) => { if (live && d.ok) setUserReviews(d.reviews ?? []); }).catch(() => {});
     return () => { live = false; };
   }, [cafe.id]);
   const kept = quality ? quality.verified + quality.reference : 0;
-  const chars = topChars(cafe, 4);
   const profile = useMemo(() => cafeProfile(cafe, dist), [cafe, dist]); // 전체 대비 강점/아쉬운점
-  // 🔁 리텐션 훅 — 지도 패널에서도 /c/[id] 상세와 동일 로직으로 '비슷한 카페 더보기'(decisions #338/#347).
-  //   지도가 이미 전체 공개 카페(cafes)를 들고 있어 별도 API 호출 없이 클라이언트에서 바로 계산.
+  // 📍 근처 카페(2026-09-20) — /c/[id]와 같은 순위(lib/cafeDetailView.rankNearby): 같은 읍면동 → 10km → 시군구.
+  //   지도가 이미 전체 공개 카페를 들고 있어 API 호출 0. 후보는 같은 시군구 ∪ 좌표 박스(±10km)만 넘긴다.
   const nearby = useMemo(() => {
     if (!allCafes || allCafes.length === 0) return [];
-    const mine = tasteVector(cafe.char_scores, cafe.synth_count);
-    return allCafes
-      .filter((c) => c.area === cafe.area && c.id !== cafe.id)
-      .map((c) => ({ ...c, sim: tasteSimilarity(mine, tasteVector(c.char_scores, c.synth_count)) }))
-      .sort((a, b) =>
-        (GRADE_RANK[a.synth_grade ?? ""] ?? 3) - (GRADE_RANK[b.synth_grade ?? ""] ?? 3) ||
-        b.sim - a.sim ||
-        (b.synth_count ?? 0) - (a.synth_count ?? 0))
-      .slice(0, 6);
+    const hasGeo = typeof cafe.lat === "number" && typeof cafe.lng === "number";
+    const pool = allCafes.filter((c) => c.id !== cafe.id && (c.area === cafe.area ||
+      (hasGeo && typeof c.lat === "number" && typeof c.lng === "number" && Math.abs(c.lat - cafe.lat) <= 0.09 && Math.abs(c.lng - cafe.lng) <= 0.11)));
+    return rankNearby(cafe, pool);
   }, [allCafes, cafe]);
   const [shared, setShared] = useState(false);
   // 부드러운 슬라이드인 등장 — 마운트 직후 한 프레임 뒤 transition을 트리거(오른쪽에서 미끄러져 들어옴).
@@ -2884,57 +2879,74 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
       else { await navigator.clipboard.writeText(url); trackShare({ channel: "clipboard", source: "카페상세", cafeId: cafe.id }); setShared(true); setTimeout(() => setShared(false), 1800); }
     } catch { /* 사용자 취소 */ }
   };
+  const grade = cafe.synth_grade ?? "";
+  const stampKind = grade === "참고" ? "ref" : grade === "후보" ? "cand" : "";
+  const stampEn = grade === "검증" ? "VERIFIED" : grade === "참고" ? "REFERENCE" : "CANDIDATE";
+  const readable = useMemo(() => reviews.filter((r) => isReadableQuote(r?.quote, cafe.name)), [reviews, cafe.name]);
+  const shownQuotes = readable.slice(0, 3), moreQuotes = readable.slice(3, 12);
+  const showQuotes = shownQuotes.length >= 2;
+  const series = monthlySeries(extra.reviewDates);
+  const freshness = freshnessOf(extra.reviewDates);
+  const seriesMax = series ? Math.max(1, ...series.map((m) => m.n)) : 1;
+  const seriesLast = series ? series.reduce((acc, m, i) => (m.n > 0 ? i : acc), -1) : -1;
+  const charBars = charBarsOf(cafe.char_scores);
+  const barMax = charBars.length ? charBars[0][1] : 1;
+  const addrRest = addrTail(extra.address, cafe.area, cafe.dong);
+  const ig = igHandle(extra.instagramUrl);
+  const facts = highlights.slice(0, 4);
+  const vb = String((cafe as any).vb ?? "");
+  const nearTitle = nearbyTitle(nearby, cafe.area, cafe.dong);
+  const checkedOn = new Date().toISOString().slice(0, 10);
+  const srcLine = <p className="nt-src">네이버 공개 후기 {(cafe.synth_count ?? 0).toLocaleString()}건 교차검증 · 영수증 리뷰·광고·협찬 제외 · {checkedOn} 확인</p>;
+  const quoteOf = (e: EvidenceReview, i: number) => (
+    <blockquote key={e?.link ?? i} className="nt-q">
+      {e.link ? <a href={e.link} target="_blank" rel="noopener noreferrer" className="hover:text-[#7a5122]">“{String(e.quote).trim()}”</a> : <>“{String(e.quote).trim()}”</>}
+      {(e?.source || e?.date) && <span className="m">{e?.source ?? ""}{e?.date ? ` · ${String(e.date).slice(0, 7)}` : ""}</span>}
+    </blockquote>
+  );
+  const IcoPin = () => <svg viewBox="0 0 24 24" aria-hidden><path d="M12 22s7-6.2 7-12a7 7 0 0 0-14 0c0 5.8 7 12 7 12z"/><circle cx="12" cy="10" r="2.6"/></svg>;
+  const IcoInfo = () => <svg viewBox="0 0 24 24" aria-hidden><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>;
   return (
     // 🗺️ 상세가 열려 있어도 **지도는 계속 쓸 수 있다**(CEO 지시) — 껍데기는 포인터를 통과시키고 패널만 받는다.
     //    데스크톱: 딤·클릭가로채기 없음(지도 팬·줌·다른 핀 선택 그대로). 닫기는 ✕·뒤로가기·지도 빈 곳 클릭.
     //    모바일: 패널이 화면을 꽉 채우므로 예전처럼 딤+바깥탭 닫기 유지(전환 애니메이션 중에만 보임).
-    <div className="fixed inset-0 z-[3000] overflow-hidden pointer-events-none" style={{ fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }}>
+    // 📓 2026-09-20 2차 — /c/[id]와 같은 한 장(lib/cafeDetailView 공용 계산·note.css .nt-detail 공용 스타일).
+    //    줄노트·도장·찢은 띠·손글씨 판정 유지, 본문 명조·라벨 고딕, 이모지 0, 하단 고정 행동 2개.
+    <div className="fixed inset-0 z-[3000] overflow-hidden pointer-events-none">
       <div onClick={onClose} className={`absolute inset-0 bg-black/30 pointer-events-auto md:bg-transparent md:pointer-events-none transition-opacity duration-300 ${shown ? "opacity-100" : "opacity-0"}`} />
-      <aside className={`absolute top-0 right-0 w-full md:max-w-md nt-paper shadow-2xl overflow-y-auto overflow-x-hidden pointer-events-auto transition-transform duration-300 ease-out motion-reduce:transition-none ${shown ? "translate-x-0" : "translate-x-full"}`} style={{ height: "100dvh", paddingTop: "env(safe-area-inset-top)" }}>
+      <aside className={`absolute top-0 right-0 w-full md:max-w-md nt-paper nt-detail shadow-2xl overflow-y-auto overflow-x-hidden pointer-events-auto transition-transform duration-300 ease-out motion-reduce:transition-none ${shown ? "translate-x-0" : "translate-x-full"}`} style={{ height: "100dvh", paddingTop: "env(safe-area-inset-top)" }}>
         {/* 사장님 쇼케이스 — 영상(style 0) 또는 10종 템플릿 */}
         {promo && (
           <>
             <style dangerouslySetInnerHTML={{ __html: SHOWCASE_CSS }} />
             {promo.style === 0 && promo.video_url ? (
-              // 🖼 액자형 — 따뜻한 매트 + 패딩 + 테두리·그림자
               <div className="w-full px-4 pt-4 pb-3" style={{ background: "linear-gradient(135deg,#f4ece0,#e8dcc8)" }}>
                 <div className="relative rounded-xl overflow-hidden shadow-lg ring-1 ring-[#cbb89f] bg-black">
                   <video src={promo.video_url} controls playsInline preload="metadata" onPlay={() => trackPromo(cafe.id, "play")} className="w-full block bg-black" style={{ maxHeight: "22rem" }} />
-                  <span className="absolute top-2.5 left-2.5 z-10 text-[9px] font-bold text-[#2b2018] bg-[#e8b87a] px-2.5 py-1 rounded-full shadow-md pointer-events-none">🎀 사장님 쇼케이스</span>
+                  <span className="absolute top-2.5 left-2.5 z-10 text-[9px] font-bold text-[#2b2018] bg-[#e8b87a] px-2.5 py-1 rounded-full shadow-md pointer-events-none nt-g">사장님 쇼케이스</span>
                 </div>
-                <div className="text-center text-[10px] text-[#7a5122] mt-2 tracking-wide">사장님이 직접 올린 우리 가게 영상</div>
+                <div className="text-center text-[10px] text-[#7a5122] mt-2 tracking-wide nt-g">사장님이 직접 올린 우리 가게 영상</div>
               </div>
             ) : (
               <div onClick={() => trackPromo(cafe.id, "click")}>
                 <ShowcaseBanner style={promo.style || 1} headline={promo.ai_headline} tagline={promo.ai_tagline} points={Array.isArray(promo.ai_points) ? promo.ai_points : []} photo={promo.photos?.[0] || null} height="16rem" />
               </div>
             )}
-            {/* 🎟 방문 혜택(쿠폰) */}
             {promo.coupon && (
-              <div className="flex items-center gap-2 bg-[#fff4e0] border-y border-[#e8d3a8] px-4 py-2.5">
-                <span className="text-[15px]">🎟</span>
-                <span className="text-[13px] text-[#7a4f1a] font-medium leading-snug flex-1">{promo.coupon}</span>
+              <div className="flex items-center gap-2 bg-[#fff4e0] border-y border-[#e8d3a8] px-4 py-2.5 nt-g">
+                <span className="text-[13px] text-[#7a4f1a] font-medium leading-snug flex-1">방문 혜택 · {promo.coupon}</span>
                 <span className="text-[9px] text-[#b08a4a] shrink-0">사장님 제공</span>
               </div>
             )}
           </>
         )}
-        {/* 상단 테마 배너 — 5종 랜덤, 액자 느낌 */}
-        {!promo && (
-          <div className="w-full px-5 pt-4 pb-3 nt-paper2 relative" style={{ boxShadow: "0 1px 0 rgba(90,70,50,.18)" }}>
-            <div className="nt-eyebrow">Dongne Coffee Note · 한 장</div>
-            <div className="nt-title text-[17px] mt-0.5">동네 커피 노트</div>
-            <p className="text-[11.5px] text-[#63523f]">별점 말고, <span className="text-[#7a5122] font-bold">검증된 후기</span>로 고르세요.</p>
-          </div>
-        )}
-        <div className="p-5 relative">
-          <div className="nt-ring" aria-hidden style={{ right: -60, top: 120, width: 180 }} />
-          <div className="flex items-center justify-between mb-1 relative">
-            <div className="flex items-center gap-2 min-w-0"><h3 className="text-xl font-bold text-[#2a1f17] truncate">{cafe.name}</h3><OwnerBadge om={(cafe as any).om} />{g && <span className={`nt-pill shrink-0 ${cafe.synth_grade === "검증" ? "verify" : cafe.synth_grade === "참고" ? "ref" : "cand"}`}>{g.label}</span>}
-              {/* 🧳🏠 방문객 성격 — 지도에서 카페를 누르면 뜨는 이 패널이 실제 소비 지점이다.
-                  여기 표시가 없으면 "지도에서는 구분이 안 된다"는 말이 맞다(CEO 지적). */}
-              <VisitorBadges vb={(cafe as any).vb} /></div>
-            <div className="flex items-center gap-1 shrink-0">
+        <div className="nt-page relative" style={{ ["--nt-mx" as any]: "30px" }}>
+          <div className="nt-ring" aria-hidden style={{ right: -60, top: 110, width: 180 }} />
+
+          {/* 첫 줄: 지도로 · 즐겨찾기 · 공유 · 닫기 */}
+          <div className="nt-ruled nt-margin-gutter flex items-center justify-between gap-2 relative z-[2]" style={{ paddingTop: 34 }}>
+            <button type="button" onClick={onClose} className="nt-g text-[12.5px] text-[#63523f]">← 지도로</button>
+            <span className="nt-free flex items-center gap-1 nt-g">
               <span className="relative inline-flex">
                 {saveFx && <span className="dcn-fly" aria-hidden="true">★</span>}
                 <button onClick={() => { trackOutbound({ target: "fav_toggle", source: "지도앱" }); onBookmark?.(); }} aria-label="즐겨찾기" className={`flex items-center gap-1 border rounded-full px-2.5 py-1 text-[12px] font-medium transition-colors ${saveFx ? "dcn-pop" : ""}`} style={bookmarked ? { color: "#fff", background: "#f0a832", borderColor: "#f0a832" } : { color: "#9c6b3f", borderColor: "#e0d2bd" }}>{bookmarked ? "★ 즐겨찾기" : "☆ 즐겨찾기"}</button>
@@ -2950,178 +2962,177 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="#3c1e1e"><path d="M12 3C6.5 3 2 6.6 2 11c0 2.8 1.9 5.3 4.7 6.7-.2.7-.7 2.6-.8 3-.1.5.2.5.4.4.2-.1 2.6-1.8 3.7-2.5.6.1 1.3.1 2 .1 5.5 0 10-3.6 10-8S17.5 3 12 3z"/></svg>
                 공유
               </KakaoShare>
-              <button onClick={onClose} className="text-3xl text-[#7a5122] leading-none px-1">×</button>
-            </div>
-          </div>
-          {/* ❤ MY PIN(내 카페 추억) 노출 배너 — 지도 패널에서도 눈에 띄게(#339/#347, /c/[id] 배너와 동일 톤). 2단계 저장·무가입 원칙 무변, 노출만 강화 */}
-          {onSaveMemory && (
-            <button type="button" onClick={onSaveMemory}
-              className="w-full nt-scrap flat pink flex items-center justify-between gap-2 px-4 py-3 text-left mb-3">
-              <span className="flex flex-col">
-                <span className="text-[12.5px] font-bold text-[#b23a5f] flex items-center gap-1">
-                  <span className="text-[14px] leading-none">❤</span> 이 카페, 다녀가셨나요?
-                </span>
-                <span className="text-[10.5px] text-[#544636]">위치인증하고 나만의 추억으로 저장 — 무가입·30초</span>
-              </span>
-              <span className="text-[#d6336c] font-bold whitespace-nowrap">→</span>
-            </button>
-          )}
-          <div className="text-[#63523f] text-sm mb-3 relative">{cafe.area} · {cafe.vibe}</div>
-          {cafe.note && <p className="text-[15px] text-[#2a1f17] font-medium leading-relaxed mb-4 relative">"{cafe.note}"</p>}
-          {/* ⚠️ 이건 알고 가세요 — 후기 2건 이상에서 확인된 주의점 + 손님이 쓴 근거 문장. */}
-          {cautions.length > 0 && (
-            <div className="nt-ruled mb-3 relative">
-              <div className="nt-sec">이건 알고 가세요</div>
-              <div className="nt-chips">
-                {cautions.map((x) => <span key={x.label} className="nt-chip">{x.emoji} {x.label}<b>{x.count}</b></span>)}
-              </div>
-              {cautions[0]?.quote && <p className="text-[12px] text-[#63523f] mt-1.5">후기에서: <span className="text-[#2a1f17]">“…{cautions[0].quote}…”</span></p>}
-            </div>
-          )}
-          {/* ⭐ 한눈에 판단 — 전체 카페 대비 강점/아쉬운점(리뷰 옥석 보기 전 직관 판단의 핵심) */}
-          {/* 📊 리뷰 데이터 분석 — 옥석 후기 핵심(가장 먼저 눈에 띄게, 구미 당기는 hook) */}
-          {(highlights.length > 0 || cafe.synth_identity) && (
-            <div className="nt-ruled mb-3 relative">
-              <div className="nt-sec">우리가 읽고 적은 판정 · 검증 후기 {cafe.synth_count}건</div>
-              {cafe.synth_identity && <p className="nt-hand">{cafe.synth_identity}</p>}
-              {highlights.length > 0 && (
-                <>
-                  <div className="text-[12px] text-[#63523f]">후기에서 가장 많이 나온 것 · 숫자=언급 후기 수</div>
-                  <div className="nt-chips">
-                    {highlights.map((h, i) => (
-                      <span key={h.label} className={`nt-chip ${i === 0 ? "ink" : ""}`}>{h.emoji} {h.label}<b>{h.count}</b></span>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-          {/* 메뉴·가격은 카테고리화 한계로 잠정 비노출(추후 LLM으로 주력메뉴+실가격 정확 추출 예정). 평판은 유지. */}
-          {reputationNote && (
-            <div className="nt-ruled mb-3 relative">
-              <div className="text-[13px] text-[#8a6a3a]">⚖️ <b>참고</b> · {reputationNote}</div>
-            </div>
-          )}
-          {/* 👍 강점 / 🔎 아쉬운점 — 전체 카페 대비 상대 위치 + 언급수/평균 */}
-          {profile.ok ? (
-            <div className="nt-ruled mb-4 relative">
-              <div className="nt-sec">한눈에 강·약 · 전체 카페 대비</div>
-              {profile.strong.length > 0 && (
-                <>
-                  <div className="text-[12.5px] font-bold text-[#33684b]">👍 이런 점이 강해요</div>
-                  {profile.strong.map((s) => (
-                    <div key={s.key} className="flex items-baseline gap-2 flex-wrap">
-                      <span className="text-[15px] w-5 text-center flex-none">{s.emoji}</span>
-                      <span className="text-[14px] font-bold text-[#2a1f17]">{s.text}</span>
-                      <span className="ml-auto flex items-baseline gap-2 whitespace-nowrap">
-                        <span className="nt-hand sm coffee">평균의 {s.mult}배</span>
-                        <span className="nt-pill verify">상위 {s.topPct}%</span>
-                      </span>
-                    </div>
-                  ))}
-                </>
-              )}
-              {profile.weak.length > 0 && (
-                <>
-                  <div className="text-[12.5px] font-bold text-[#8a5a12]">🔎 이런 점은 참고하세요</div>
-                  {profile.weak.map((w) => (
-                    <div key={w.key} className="flex items-baseline gap-2 flex-wrap">
-                      <span className="text-[14px] w-5 text-center flex-none">{w.emoji}</span>
-                      <span className="text-[13px] text-[#5c4b3c]">{w.text}</span>
-                      <span className="ml-auto nt-hand sm faint whitespace-nowrap">{w.mult < 0.2 ? "거의 언급 없음" : `평균의 ${w.mult}배`}</span>
-                    </div>
-                  ))}
-                </>
-              )}
-              <p className="text-[11px] text-[#63523f]">기준은 <b>후기 1건당 언급 비율</b>이에요 — 후기 수가 많고 적음을 보정한 공정한 비교입니다. '평균의 N배'·'상위/하위 %'는 전체 카페와 같은 기준으로 비교한 값. 절대 평가가 아닙니다.</p>
-            </div>
-          ) : chars.length > 0 && (
-            <div className="nt-ruled mb-4 relative">
-              <div className="nt-sec">이 카페가 자주 언급되는 결</div>
-              <div className="nt-chips">{chars.map((ch) => <span key={ch.label} className="nt-chip">{ch.emoji} {ch.label}</span>)}</div>
-            </div>
-          )}
-          {cafe.signature && <div className="text-sm text-[#524234] mb-4"><span className="text-[#7a5122]">추천 </span>{cafe.signature}</div>}
-          {/* 방문자 후기 — 길찾기 버튼 바로 위에 배치(목록 → 상세 모달). 공개 방문기록 있을 때만. */}
-          {userReviews.length > 0 && <div className="mb-4"><VisitorReviews reviews={userReviews} /></div>}
-          {/* ===== 버튼 3개 — 리뷰 위에 배치, 눈에 잘 띄게 ===== */}
-          <div className="flex gap-2 mb-4">
-            <a href={`https://map.kakao.com/?q=${encodeURIComponent(cafe.name + " " + cafe.area)}`} target="_blank" rel="noopener noreferrer" onClick={() => trackOutbound({ target: "kakao_map", cafeId: cafe.id, source: "지도앱" })} className="flex-1 nt-btn-ink py-2.5 text-[12px] hover:bg-[#3d2f22] transition-colors flex items-center justify-center">길찾기</a>
-            <a href={`/api/naver-place-redirect?id=${cafe.id}`} target="_blank" rel="noopener noreferrer" onClick={() => trackOutbound({ target: "naver_place", cafeId: cafe.id, source: "지도앱" })} className="flex-1 text-center border-2 rounded-xl py-2.5 text-[12px] font-semibold bg-white hover:bg-[#f0fef8] transition-colors flex items-center justify-center gap-1" style={{ borderColor: "#03c75a", color: "#03c75a" }}>
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="#03c75a"><path d="M16.273 12.845L7.376 0H0v24h7.727V11.155L16.624 24H24V0h-7.727z"/></svg>
-              메뉴·시간
-            </a>
+              <button onClick={onClose} aria-label="닫기" className="text-2xl text-[#7a5122] leading-none px-1.5">×</button>
+            </span>
           </div>
 
-          {loadingRev && <CoffeeLoader label="근거 후기 우려내는 중…" />}
-          {!loadingRev && quality && quality.raw > 0 && (
-            <div className="nt-scrap flat sage px-4 py-2.5 mb-4">
-              <i className="nt-tape g sm" aria-hidden />
-              <div className="text-[11.5px] text-[#4f6a43] leading-relaxed flex items-start gap-1">
-                <span className="flex-1">🔍 네이버·유튜브 공개 글 <b>{quality.raw}건</b>{quality.duplicates ? <>(중복 {quality.duplicates}건 별도 제거)</> : null}을 검증해, 다른 가게·모음글·동명 카페 등 <b>노이즈 {quality.rejected}건</b>을 걸러내고<b> 옥석 {kept}건</b>만 분석에 썼어요.</span>
-                <InfoDot title="옥석 검증이 뭐예요?"><b>이 서비스의 핵심</b>이에요. 수천 개 공개 후기에서 ① 광고·협찬, ② 카페명만 스친 글, ③ '맛집 N곳' 나열식, ④ 다른 지역·다른 지점의 <b>동명(同名)</b> 카페 글을 규칙으로 걸러내고, <b>Claude AI</b>가 내용·맥락까지 읽어 <b>진짜 방문 후기만</b> 남겨요. 모든 판정엔 근거가 붙습니다.</InfoDot>
+          {/* 머리 — 등급줄 · 이름 · 주소 · 인스타 · 배지. 도장은 오른쪽. */}
+          <header className="nt-ruled nt-margin-gutter relative z-[1] nt-band nt-torn-b" style={{ paddingTop: 34, paddingBottom: 34, paddingRight: grade ? 96 : 20, ["--nt-rule" as any]: "rgba(84,104,140,0.22)" }}>
+            {grade && <div className={`nt-stamp in absolute ${stampKind}`} style={{ right: 14, top: 30 }} aria-label={`등급 ${grade}`}>{grade}<small>{stampEn}</small></div>}
+            <div className={`nt-grade ${stampKind}`}>{grade || "카페"} · 후기 {(cafe.synth_count ?? 0).toLocaleString()}건</div>
+            <h2 className={`nt-name ${String(cafe.name).length > 12 ? "long" : ""}`}>{cafe.name}</h2>
+            <p className="nt-addr"><IcoPin /><span><b>{cafe.area}{cafe.dong ? ` ${cafe.dong}` : ""}</b>{addrRest ? ` ${addrRest}` : ""}</span></p>
+            {ig && (
+              <a className="nt-ig" href={extra.instagramUrl ?? undefined} target="_blank" rel="noopener noreferrer nofollow">
+                <svg viewBox="0 0 24 24" aria-hidden><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="3.8"/><circle cx="17.4" cy="6.6" r=".9" fill="currentColor" stroke="none"/></svg>
+                @{ig}
+              </a>
+            )}
+            {((cafe as any).om || vb) && (
+              <div className="nt-chips">
+                {(cafe as any).om ? <span title="사장님이 직접 정보를 관리하는 카페예요" className="nt-chip soft">사장님 관리</span> : null}
+                {vb.includes("T") && <span className="nt-chip good" title={VB_LABEL.T?.label}>{VB_LABEL.T?.short}</span>}
+                {vb.includes("L") && <span className="nt-chip good" title={VB_LABEL.L?.label}>{VB_LABEL.L?.short}</span>}
+                {vb.includes("D") && <span className="nt-chip" title="언론 보도 기준">관광지로 알려진 동네</span>}
               </div>
-              {llmJudged && (
-                <div className="mt-2 pt-2 border-t border-[#cfe0c2] text-[11px] text-[#5a3a82] font-medium flex items-center gap-1">
-                  ✨ <span>Claude AI가 후기 내용·맥락까지 한 건씩 읽어 <b>최종 검증</b>했어요</span>
-                </div>
-              )}
+            )}
+          </header>
+
+          {/* ✍ 판정 한 줄 + 자주 나온 말 */}
+          {(cafe.synth_identity || facts.length > 0) && (
+            <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
+              {cafe.synth_identity && <p className="nt-verdict"><span className="nt-hl">{cafe.synth_identity}</span></p>}
+              {facts.length > 0 && <div className="nt-chips">{facts.map((h) => <span key={h.label} className="nt-chip">{h.label}<b>{h.count}</b></span>)}</div>}
             </div>
           )}
-          {!loadingRev && reviews.length > 0 && (
-            <div className="mb-4">
-              <div className="flex items-center justify-between mb-2">
-                <div className="text-[11px] text-[#54432c]">이 분석의 근거가 된 실제 후기 (네이버 공개 글)</div>
-                <button onClick={() => setShowAllReviews(true)} className="text-[11px] text-[#7a5122] font-medium underline">{"전체 "}{reviews.length}{"건 보기 →"}</button>
-              </div>
-              <div className="space-y-3">
-                {reviews.slice(0, 6).map((rv, i) => (
-                  <div key={i} className="border-b border-[#f0e6d4] pb-3 last:border-0">
-                    <div className="flex items-center gap-1.5 mb-1 flex-wrap">
-                      {rv.trust === "verified"
-                        ? <span className="nt-pill verify" style={{ height: 18, fontSize: 9.5 }}>검증 ✓</span>
-                        : rv.trust === "reference"
-                        ? <span className="nt-pill ref" style={{ height: 18, fontSize: 9.5 }}>참고</span>
-                        : null}
-                      {rv.why?.some((w) => w.includes("AI 검증"))
-                        ? <span className="text-[9px] text-white px-1.5 py-0.5 rounded-full" style={{ background: "#7c5cbf" }}>✨ AI 검증</span>
-                        : rv.why?.[0] && <span className="text-[10px] text-[#54432c]">{rv.why[0]}</span>}
-                    </div>
-                    {rv.link
-                      ? <a href={rv.link} target="_blank" rel="noopener noreferrer" className="block text-[13.5px] text-[#3d2f22] leading-[1.75] hover:text-[#7a5122] transition-colors">"{hlQuote(rv.quote)}"</a>
-                      : <div className="text-[13.5px] text-[#3d2f22] leading-[1.75]">"{hlQuote(rv.quote)}"</div>}
-                    <div className="flex items-center gap-2 mt-1.5 text-[10px] text-[#54432c]">
-                      {rv.link && /youtu\.?be/.test(rv.link) && <span className="text-white rounded-[3px] px-1 py-0.5" style={{ background: "#c4302b", fontSize: "8px" }}>▶ YouTube</span>}
-                      <span>{rv.source}</span>{rv.date && <span>· {rv.date}</span>}
-                      {rv.link && (/youtu\.?be/.test(rv.link)
-                        ? <a href={rv.link} target="_blank" rel="noopener noreferrer" className="text-[#c4302b] font-medium ml-auto">영상 보기 →</a>
-                        : <a href={rv.link} target="_blank" rel="noopener noreferrer" className="text-[#7a5122] underline ml-auto">원문 →</a>)}
-                    </div>
+
+          {/* 📖 사람들이 쓴 말 */}
+          {loadingRev && <div className="nt-margin-gutter pt-6 nt-free"><CoffeeLoader label="후기 우려내는 중…" /></div>}
+          {!loadingRev && showQuotes && (
+            <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
+              <div className="nt-lbl">사람들이 쓴 말 <em>· 후기 원문</em></div>
+              {shownQuotes.map(quoteOf)}
+              {moreQuotes.length > 0 && (
+                <details className="nt-more">
+                  <summary><span className="t1">후기 {moreQuotes.length}건 더 읽기</span><span className="t2">접기</span></summary>
+                  {moreQuotes.map(quoteOf)}
+                </details>
+              )}
+              {reviews.length > 0 && <button type="button" onClick={() => setShowAllReviews(true)} className="nt-g text-[12.5px] text-[#7a5122] block text-left">근거 후기 전체 {reviews.length}건 원문 보기 →</button>}
+              {srcLine}
+            </div>
+          )}
+
+          {/* ⚠️ 이건 알고 가세요 */}
+          {cautions.length > 0 && (
+            <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
+              <div className="nt-lbl">이건 알고 가세요 <em>· 후기 2건 이상에서 확인된 것만</em></div>
+              <div className="nt-chips">{cautions.map((x) => <span key={x.label} className="nt-chip warn">{x.label}<b>{x.count}</b></span>)}</div>
+              {cautions[0]?.quote && <blockquote className="nt-q" style={{ borderColor: "#a93a32" }}>“…{cautions[0].quote}…”</blockquote>}
+            </div>
+          )}
+
+          {/* 📊 이곳의 결 */}
+          {charBars.length > 0 && (
+            <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
+              <div className="nt-lbl">이곳의 결 <em>· 후기에서 언급된 횟수</em></div>
+              <div className="nt-free">
+                {charBars.map(([k, v], i) => (
+                  <div key={k} className={`nt-bar ${i === 0 ? "top" : ""}`}>
+                    <span>{CHAR_LABEL[k]}</span>
+                    <span className="tr"><span className="fl" style={{ width: `${Math.max(4, Math.round((v / barMax) * 100))}%` }} /></span>
+                    <span className="n">{v.toLocaleString()}</span>
                   </div>
                 ))}
               </div>
-              {reviews.length > 6 && (
-                <button onClick={() => setShowAllReviews(true)} className="w-full mt-2 py-2 text-[12px] text-[#7a5122] border border-[#e6d9c8] rounded-lg">
-                  + {reviews.length - 6}건 더 보기
-                </button>
-              )}
             </div>
           )}
-          {/* 🔁 비슷한 카페 더보기 — 같은 동네 + 결(taste) 유사도, 검증/참고 등급 우선(리텐션, decisions #338/#347) */}
-          {nearby.length > 0 && (
-            <div className="mt-5">
-              <div className="nt-ruled">
-                <div className="nt-sec">☕ {cafe.area} 비슷한 카페 더보기</div>
-                {nearby.map((nc, i) => (
-                  <button key={nc.id} type="button" onClick={() => onOpenCafe?.(nc.id)} className="nt-ln">
-                    <span className="n">{i + 1}.</span>
-                    <span className="nm text-[14px] flex items-center gap-1.5 min-w-0"><span className="truncate">{nc.name}</span>{nc.synth_grade && <span className={`nt-pill ${nc.synth_grade === "검증" ? "verify" : nc.synth_grade === "참고" ? "ref" : "cand"}`}>{nc.synth_grade}</span>}<span className="nt-free inline-flex"><VisitorBadges vb={(nc as any).vb} /></span></span>
-                    <span className="m">검증후기 {nc.synth_count ?? 0}건</span>
-                  </button>
+
+          {/* 👍 다른 카페보다 */}
+          {profile.ok && profile.strong.length > 0 && (
+            <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
+              <div className="nt-lbl">다른 카페보다 <em>· 전체 검증 카페 대비</em></div>
+              <div className="nt-free nt-tiles">
+                {profile.strong.slice(0, 3).map((s) => (
+                  <div key={s.key} className="nt-tile"><div className="k">{CHAR_LABEL[s.key] ?? s.label}</div><div className="v">{s.topPct}<small>% 안</small></div></div>
                 ))}
+              </div>
+              {profile.weak.length > 0 && <p className="nt-note"><IcoInfo /><span>‘{profile.weak.map((w) => CHAR_LABEL[w.key] ?? w.label).join(" · ")}’는 후기에 거의 언급이 없어요.</span></p>}
+            </div>
+          )}
+
+          {/* 📈 후기 흐름 */}
+          {series && freshness && (
+            <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
+              <div className="nt-lbl">후기 흐름 <em>· 최근 {series.length}개월</em></div>
+              <div className="nt-free nt-flow">
+                <svg viewBox={`0 0 ${series.length * 10} 44`} preserveAspectRatio="none" role="img" aria-label={`월별 후기 수, 최근 ${series.length}개월`}>
+                  {series.map((m, i) => {
+                    const h = m.n > 0 ? Math.max(3, Math.round((m.n / seriesMax) * 40)) : 2;
+                    return <rect key={m.key} x={1 + i * 10} y={44 - h} width={8} height={h} fill={i === seriesLast ? "#7a5122" : m.n > 0 ? "#c9a26b" : "rgba(90,70,50,0.18)"}><title>{`${m.key} · ${m.n}건`}</title></rect>;
+                  })}
+                </svg>
+                <div className="fs"><b>{freshness.recent}건</b>최근 12개월 · 최신 {freshness.latest}{freshness.stale && <span style={{ color: "#a93a32" }}> · 1년 넘게 새 후기 없음</span>}</div>
               </div>
             </div>
           )}
+
+          {/* ⚖️ 평판 참고 */}
+          {reputationNote && (
+            <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
+              <p className="nt-note"><IcoInfo /><span><b>참고</b> · {reputationNote}</span></p>
+            </div>
+          )}
+
+          {/* 📍 근처 카페 — 같은 읍면동 → 10km → 시군구. 지도가 이미 든 전체 카페로 클라이언트 계산(호출 0). */}
+          {nearby.length > 0 && (
+            <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
+              <div className="nt-lbl">{nearTitle} <em>· 검증 우선 · 거리 표시</em></div>
+              {nearby.map((nc) => (
+                <button key={nc.id} type="button" onClick={() => onOpenCafe?.(nc.id)} className="nt-near w-full text-left">
+                  <span className="nm">{nc.name}</span>
+                  <span className="s">
+                    {nc.synth_grade && <span className={nc.synth_grade === "검증" ? "g" : ""}>{nc.synth_grade}</span>}
+                    <span>{nc.synth_count ?? 0}건</span>
+                    {nc.km !== null && <span>{fmtKm(nc.km)}</span>}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {!loadingRev && !showQuotes && <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>{srcLine}{reviews.length > 0 && <button type="button" onClick={() => setShowAllReviews(true)} className="nt-g text-[12.5px] text-[#7a5122] block text-left">근거 후기 전체 {reviews.length}건 원문 보기 →</button>}</div>}
+
+          {/* 방문자 후기 */}
+          {userReviews.length > 0 && <div className="px-3 pt-3 nt-free nt-g"><VisitorReviews reviews={userReviews} /></div>}
+
+          {/* 접힘 — 판정 방법 · 더 하기 */}
+          <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34, paddingBottom: 34 }}>
+            {quality && quality.raw > 0 && (
+              <details className="nt-x">
+                <summary>이 판정을 어떻게 냈나</summary>
+                <div className="nt-body">
+                  <p>이 카페가 나온 글 <b>{quality.raw.toLocaleString()}건</b>{quality.duplicates ? `(중복 ${quality.duplicates}건 별도 제거)` : ""}을 확인해 <b>{quality.rejected.toLocaleString()}건</b>을 걸러내고 <b>{kept.toLocaleString()}건</b>의 실제 방문 후기로 판단했어요.{llmJudged ? " 후기 내용·맥락까지 한 건씩 읽어 최종 검증했어요." : ""}</p>
+                  <p>'이곳의 결'은 후기에서 그 말이 나온 횟수, '다른 카페보다'는 후기 1건당 언급 비율을 전체 검증 카페와 비교한 순위예요. 절대 평가가 아닙니다.</p>
+                  <p><a href="/trust" target="_blank" rel="noopener noreferrer">검증 방법 자세히 →</a></p>
+                </div>
+              </details>
+            )}
+            <details className="nt-x">
+              <summary>더 하기 — 추억 저장 · 공유 페이지</summary>
+              <div className="nt-free flex flex-col gap-3 nt-g" style={{ padding: "10px 0 4px" }}>
+                {onSaveMemory && (
+                  <button type="button" onClick={onSaveMemory} className="w-full nt-scrap flat pink flex items-center justify-between gap-2 px-4 py-3 text-left">
+                    <span className="flex flex-col">
+                      <span className="text-[12.5px] font-bold text-[#b23a5f]">이 카페, 다녀가셨나요?</span>
+                      <span className="text-[10.5px] text-[#544636]">위치인증하고 나만의 추억으로 저장 — 무가입·30초</span>
+                    </span>
+                    <span className="text-[#d6336c] font-bold whitespace-nowrap">→</span>
+                  </button>
+                )}
+                <a href={`/c/${cafe.id}`} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between gap-2 px-1 text-[13px] text-[#5c4b3c]"><span>이 카페 페이지 새 창으로 열기</span><span className="text-[#7a5122]">→</span></a>
+              </div>
+            </details>
+          </div>
+
+          {/* 하단 고정 행동 2개 — 길찾기 · 네이버(메뉴·가격·영업시간) */}
+          <div className="nt-cta">
+            <a href={`https://map.kakao.com/?q=${encodeURIComponent(cafe.name + " " + cafe.area)}`} target="_blank" rel="noopener noreferrer" onClick={() => trackOutbound({ target: "kakao_map", cafeId: cafe.id, source: "지도앱" })} className="nt-btn-ink">길찾기</a>
+            <a href={`/api/naver-place-redirect?id=${cafe.id}`} target="_blank" rel="noopener noreferrer" onClick={() => trackOutbound({ target: "naver_place", cafeId: cafe.id, source: "지도앱" })} className="nt-btn-line">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="#03c75a" aria-hidden><path d="M16.273 12.845L7.376 0H0v24h7.727V11.155L16.624 24H24V0h-7.727z"/></svg>
+              네이버 플레이스
+            </a>
+          </div>
         </div>
       </aside>
       {/* ===== 전체 리뷰 모달 — aside 밖(z-[3000] 컨테이너 직속)으로 이동. aside는 overflow-y:auto라 스크롤되며, 그 안에 있던 position:fixed 모달이 스크롤량(scrollTop)만큼 화면 밖으로 밀리고 패널 너비로 잘려 아예 안 보였음. 스크롤 안 되는 컨테이너 직속으로 빼서 항상 전체 화면(뷰포트)에 온전히 뜨게 함. ===== */}

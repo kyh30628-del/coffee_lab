@@ -30,24 +30,9 @@ function recencyBonus(d: string | undefined, nowT: number): number {
 //   실측(09-20): 서귀피안 87건 중 의견 문장 13건, 부코 29건 중 5건, 카페 애니 4건 중 0건.
 //   → 정렬은 그대로 두되(오염 방어 순서 불변) **읽히는 문장을 뒤로 밀지 않게** 키를 하나 더 두고,
 //     상세 페이지는 이 판별을 통과한 것만 보여준다. 통과분이 없으면 아무것도 안 보여준다(주소 덩어리보다 낫다).
-const RQ_TRUNC = /(\.{3,}|…)\s*$/;
-const RQ_META = /(영업시간|운영시간|주차|도로명|지번|주소|위치\s*[:：]|OPEN|CLOSE|\d{1,2}:\d{2}|전화|문의)/gi;
-const RQ_PRED = /(어요|아요|네요|습니다|해요|였어요|했어요|더라고요|더라구요|거예요|답니다|드려요|같아요|좋았|맛있|추천|만족|아쉬|별로|괜찮)/;
-const RQ_OTHER_BIZ = /(호텔|펜션|숙소|리조트|모텔|게스트하우스)/;
-export function isReadableQuote(q: unknown, cafeName = ""): boolean {
-  const s = String(q ?? "").trim();
-  if (s.length < 20 || RQ_TRUNC.test(s)) return false;
-  if ((s.match(/#/g) ?? []).length >= 3) return false;
-  if ((s.match(RQ_META) ?? []).length >= 2) return false;
-  if (/^\[/.test(s) && !RQ_PRED.test(s)) return false;
-  // 이름을 공유하는 다른 업종(실사고: '호텔 서귀피안' 글이 '서귀피안 베이커리'에 붙음) — 상호 첫 토큰 앞뒤에 숙박어가 붙으면 제외
-  const first = cafeName.trim().split(/\s+/)[0] ?? "";
-  if (first.length >= 2) {
-    const esc = first.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    if (new RegExp(`${esc}\\s*(호텔|펜션|숙소|리조트|모텔|게스트하우스)|(호텔|펜션|숙소|리조트|모텔|게스트하우스)\\s*${esc}`).test(s)) return false;
-  }
-  return RQ_PRED.test(s);
-}
+// 읽히는 문장 판정은 lib/cafeDetailView(클라이언트 안전)로 옮겼다(2026-09-20) — 정렬과 화면이 같은 기준.
+import { isReadableQuote } from "./cafeDetailView";
+export { isReadableQuote };
 
 // 정확도(score) — 후기 한 건의 판정 정확도 수치(0~100). 등급 다음가는 정렬 기준(CEO 2026-08-05).
 function accuracy(e: any): number {
