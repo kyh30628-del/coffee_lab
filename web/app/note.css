@@ -382,22 +382,21 @@
 .nt-cau span { font-weight: 400; color: var(--nt-ink3); }
 
 /* ── 누르는 것(2026-09-20 밤, CEO): 더 읽기·전체 보기는 링크 글자가 아니라 **테두리 있는 버튼**으로 ── */
-.nt-btn-ghost { display: flex; width: 100%; align-items: center; justify-content: center; gap: 8px; height: 46px; padding: 0 18px; border-radius: 12px; border: 1.5px solid var(--nt-ink); background: #fff; font: 400 18px/1 var(--nt-sans); color: var(--nt-ink); -webkit-text-stroke: 0.2px currentColor; cursor: pointer; white-space: nowrap; box-shadow: 0 3px 0 rgba(42, 31, 23, 0.55); transition: transform 0.1s ease, box-shadow 0.1s ease; }
+.nt-btn-ghost { display: flex; width: 100%; align-items: center; justify-content: center; gap: 8px; height: 44px; padding: 0 18px; border-radius: 12px; border: 1.5px solid var(--nt-ink); background: #fff; font: 400 18px/1 var(--nt-sans); color: var(--nt-ink); -webkit-text-stroke: 0.2px currentColor; cursor: pointer; white-space: nowrap; box-shadow: 0 3px 0 rgba(42, 31, 23, 0.55); transition: transform 0.1s ease, box-shadow 0.1s ease; }
 .nt-btn-ghost:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(42, 31, 23, 0.55); }
 .nt-btn-ghost svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .nt-btn-ghost.fill { background: linear-gradient(180deg, #2c1f17, #1c120c); color: #f6ecdf; border-color: #1c120c; box-shadow: 0 3px 0 rgba(0, 0, 0, 0.5); }
-.nt-btn-row { display: flex; flex-direction: column; gap: 10px; padding: 6px 0 14px; }
-.nt-detail details.nt-more > summary { list-style: none; display: block; padding: 0; }
+.nt-btn-row { display: flex; flex-direction: column; gap: 24px; padding: 12px 0; } /* 44 + 12 + 12 = 68 = 줄 2칸 */
+.nt-detail details.nt-more > summary { list-style: none; display: block; padding: 12px 0; } /* 44 + 24 = 68 = 줄 2칸 */
 .nt-detail details.nt-more[open] > summary .nt-btn-ghost svg { transform: rotate(180deg); }
 
 /* ❤ 추억 저장 — 카페 이름 아래, 찢은 띠 가장자리에 걸쳐 붙는 짧은 버튼(2026-09-20 밤, CEO)
    ⚠️ 머리띠(.nt-torn-b)는 마스크라 밖으로 나간 요소를 잘라낸다 → 버튼은 띠 **다음 줄**에 두고 위로 17px 겹친다. */
-.nt-mem-row { position: relative; z-index: 4; height: 0; overflow: visible; }
-.nt-mem { position: absolute; top: -19px; right: 20px; display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 16px 0 13px; border-radius: 999px; background: #d6336c; color: #fff; font: 400 17px/1 var(--nt-display); border: 2px solid var(--nt-paper); cursor: pointer; box-shadow: 0 6px 14px -6px rgba(214, 51, 108, 0.75), 0 2px 0 rgba(120, 20, 50, 0.45); white-space: nowrap; }
-.nt-mem svg { width: 15px; height: 15px; fill: currentColor; }
+.nt-mem-line { display: flex; align-items: center; justify-content: space-between; gap: 10px; height: 34px; }
+.nt-mem { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px 0 12px; border-radius: 999px; background: #d6336c; color: #fff; font: 400 16px/1 var(--nt-display); border: 0; cursor: pointer; box-shadow: 0 4px 10px -5px rgba(214, 51, 108, 0.7), 0 1px 0 rgba(120, 20, 50, 0.4); white-space: nowrap; flex: none; }
+.nt-mem svg { width: 14px; height: 14px; fill: currentColor; }
 .nt-mem:active { transform: translateY(1px); }
-.nt-mem-row > span { position: absolute; top: -19px; right: 20px; }
-.nt-mem-row > span > button { height: 38px; font-size: 17px; font-family: var(--nt-display); border: 2px solid var(--nt-paper); box-shadow: 0 4px 10px -4px rgba(214, 51, 108, 0.7), 0 2px 0 rgba(120, 20, 50, 0.45); }
+.nt-mem-line > span > button { height: 32px; font-size: 16px; font-family: var(--nt-display); box-shadow: 0 4px 10px -5px rgba(214, 51, 108, 0.7), 0 1px 0 rgba(120, 20, 50, 0.4); }
 /* 손편지체는 가늘다 — 작은 회색 글자는 한 단계 진하게 */
 .nt-detail .nt-src, .nt-detail .nt-q .m, .nt-detail .nt-lbl em, .nt-detail .nt-near .s, .nt-detail .nt-bar .n { color: #6f5e4b; }
 .nt-detail .nt-src { font-size: 15px; }

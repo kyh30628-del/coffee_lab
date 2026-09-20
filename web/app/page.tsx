@@ -2972,11 +2972,22 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
             <div className={`nt-grade ${stampKind}`}>{grade || "카페"} · 후기 {(cafe.synth_count ?? 0).toLocaleString()}건</div>
             <h2 className={`nt-name ${String(cafe.name).length > 12 ? "long" : ""}`}>{cafe.name}</h2>
             <p className="nt-addr"><IcoPin /><span><b>{cafe.area}{cafe.dong ? ` ${cafe.dong}` : ""}</b>{addrRest ? ` ${addrRest}` : ""}</span></p>
-            {ig && (
-              <a className="nt-ig" href={extra.instagramUrl ?? undefined} target="_blank" rel="noopener noreferrer nofollow">
-                <svg viewBox="0 0 24 24" aria-hidden><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="3.8"/><circle cx="17.4" cy="6.6" r=".9" fill="currentColor" stroke="none"/></svg>
-                @{ig}
-              </a>
+            {/* 인스타 줄 — 오른쪽 끝(도장 바로 아래)에 ❤ 추억 저장. 머리띠 오른쪽 여백(도장 자리)을 이 줄만 되돌려 도장과 세로로 맞춘다 */}
+            {(ig || onSaveMemory) && (
+              <div className="nt-mem-line" style={{ marginRight: grade ? -76 : 0 }}>
+                {ig ? (
+                  <a className="nt-ig" href={extra.instagramUrl ?? undefined} target="_blank" rel="noopener noreferrer nofollow">
+                    <svg viewBox="0 0 24 24" aria-hidden><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="3.8"/><circle cx="17.4" cy="6.6" r=".9" fill="currentColor" stroke="none"/></svg>
+                    @{ig}
+                  </a>
+                ) : <span />}
+                {onSaveMemory && (
+                  <button type="button" onClick={onSaveMemory} className="nt-mem nt-free" aria-label="이 카페 추억 저장">
+                    <svg viewBox="0 0 24 24" aria-hidden><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 5 6.4 5c2 0 3.3 1 4.1 2.3C11.3 6 12.6 5 14.6 5 18 5 20.1 8.4 18.6 11.8 16.5 16.4 12 21 12 21z"/></svg>
+                    추억 저장
+                  </button>
+                )}
+              </div>
             )}
             {((cafe as any).om || vb) && (
               <div className="nt-chips">
@@ -2987,14 +2998,6 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
               </div>
             )}
           </header>
-          {onSaveMemory && (
-            <div className="nt-mem-row nt-free">
-              <button type="button" onClick={onSaveMemory} className="nt-mem" aria-label="이 카페 추억 저장">
-                <svg viewBox="0 0 24 24" aria-hidden><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 5 6.4 5c2 0 3.3 1 4.1 2.3C11.3 6 12.6 5 14.6 5 18 5 20.1 8.4 18.6 11.8 16.5 16.4 12 21 12 21z"/></svg>
-                추억 저장
-              </button>
-            </div>
-          )}
 
           {/* ✍ 판정 한 줄 + 자주 나온 말 */}
           {(cafe.synth_identity || facts.length > 0) && (

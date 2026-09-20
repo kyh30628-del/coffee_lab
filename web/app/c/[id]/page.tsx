@@ -374,12 +374,16 @@ export default async function CafePage({ params }: Props) {
           <div className={`nt-grade ${stampKind}`}>{grade || "카페"} · 후기 {(c.synth_count ?? 0).toLocaleString()}건</div>
           <h1 className={`nt-name ${String(c.name).length > 12 ? "long" : ""}`}>{c.name}</h1>
           <p className="nt-addr"><IcoPin /><span><b>{c.area}{c.dong ? ` ${c.dong}` : ""}</b>{addrRest ? ` ${addrRest}` : ""}</span></p>
-          {ig && (
-            <a className="nt-ig" href={c.instagram_url} target="_blank" rel="noopener noreferrer nofollow">
-              <svg viewBox="0 0 24 24" aria-hidden><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="3.8"/><circle cx="17.4" cy="6.6" r=".9" fill="currentColor" stroke="none"/></svg>
-              @{ig}
-            </a>
-          )}
+          {/* 인스타 줄 — 오른쪽 끝(도장 바로 아래)에 ❤ 추억 저장 */}
+          <div className="nt-mem-line" style={{ marginRight: grade ? -80 : 0 }}>
+            {ig ? (
+              <a className="nt-ig" href={c.instagram_url} target="_blank" rel="noopener noreferrer nofollow">
+                <svg viewBox="0 0 24 24" aria-hidden><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="3.8"/><circle cx="17.4" cy="6.6" r=".9" fill="currentColor" stroke="none"/></svg>
+                @{ig}
+              </a>
+            ) : <span />}
+            <span className="nt-free"><SaveMemoryButton cafeId={c.id} cafeName={c.name} cafeArea={c.area} variant="pill" /></span>
+          </div>
           {(ownerManaged || showRank || vBadges.length > 0 || c.dong_tourist) && (
             <div className="nt-chips">
               {ownerManaged && <span title="사장님이 직접 정보를 관리하는 카페예요" className="nt-chip soft">사장님 관리</span>}
@@ -397,7 +401,6 @@ export default async function CafePage({ params }: Props) {
             </div>
           )}
         </header>
-        <div className="nt-mem-row nt-free"><span><SaveMemoryButton cafeId={c.id} cafeName={c.name} cafeArea={c.area} variant="pill" /></span></div>
 
         {/* ✍ 우리가 읽고 적은 판정 — 손글씨 한 줄 + 후기에 자주 나온 말 */}
         {(c.synth_identity || facts.length > 0) && (
