@@ -372,3 +372,4 @@
 | 2026-09-20 07:57 | #1144 | [자율진단] cron-selfaudit가 RETIRED_JOBS 무시 — recollect-purged 영구 | 42a3a91f | - | app/api/cron-selfaudit/route.ts: isRetired(c.job) 크론 감시 루프(82-91행)에 skip 추가 + lib/jobTeams.ts EXPECT |
 | 2026-09-20 07:57 | #1155 | [룰갭 신규] 채용공고(구인/알바모집)가 방문후기로 오채택 — 10곳 확정오염 | 40841041 | - | lib/reviewQuality.ts: RECRUITMENT_POST_CUES 정규식 신설(알바/직원/바리스타/구인/채용/정직원/근무자모집 등) + recruitmentOnly 게 |
 | 2026-09-20 11:05 | #1157 | [개발] 협업 #432: cron-grow 발굴 큐(discovery_targets) 3일+ 미소비 관찰 | b02e9aa2 | - | app/api/cron-grow/route.ts: critical(priorityStarved/10일+) 큐 선점을 회차당 1회로 제한(criticalUsedThisRun 플래그) |
+| 2026-09-20 11:05 | #1158 | [룰갭 신규] 비카페 하드거절 게이트 — 상호명 자기회귀로 CAFE_CONTEXT_SUBSTANCE 무력화  | 2b242c01 | - | lib/reviewQuality.ts: 공용 헬퍼 hasCafeSubstanceExcludingName 추가(CAFE_CONTEXT_SUBSTANCE 검사 전 카페 자신의 상호명을 |
