@@ -185,12 +185,13 @@ function CautionLine({ cau, size = 11 }: { cau?: string | null; size?: number })
   return <p className="nt-cau mt-1" style={{ fontSize: size + 0.5 }}>{cau} <span>· 후기에서 확인된 주의점</span></p>;
 }
 
-const HeadlineCard = memo(function HeadlineCard({ c, kicker, tone, onOpen, featured = false }: { c: DCafe; kicker: string; tone: number; onOpen: (id: number) => void; featured?: boolean }) {
+const HeadlineCard = memo(function HeadlineCard({ c, kicker, tone, onOpen, onSave, featured = false }: { c: DCafe; kicker: string; tone: number; onOpen: (id: number) => void; onSave?: (id: number) => void; featured?: boolean }) {
   // 📓 2026-09-12 "한 권의 노트": 카드 = 테이프로 붙인 종이. 이름은 명조, 판정 한 줄만 손글씨, 등급은 작은 도장.
   //   배치(제목 줄 → 이름·배지 → 지역·리뷰 → 판정 → 원두 노트 태그)는 그대로.
   const stamp = c.grade === "참고" ? "ref" : c.grade === "후보" ? "cand" : "";
   return (
-    <button onClick={() => onOpen(c.id)} className={`w-full text-left nt-scrap mb-4 px-4 pt-4 pb-3.5 ${featured ? "featured" : ""}`} style={{ ["--rot" as any]: tone % 2 ? "0.35deg" : "-0.35deg" }}>
+    // 카드 안에 ❤ 추억 저장 버튼이 들어가므로(버튼 중첩 금지) 카드 자체는 role=button div로.
+    <div role="button" tabIndex={0} onClick={() => onOpen(c.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(c.id); } }} className={`w-full text-left nt-scrap mb-4 px-4 pt-4 pb-3.5 cursor-pointer ${featured ? "featured" : ""}`} style={{ ["--rot" as any]: tone % 2 ? "0.35deg" : "-0.35deg" }}>
       <i className={`nt-tape sm ${featured ? "k tl" : tone % 3 === 0 ? "" : tone % 3 === 1 ? "tl g" : "tr"}`} aria-hidden />
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
@@ -200,22 +201,31 @@ const HeadlineCard = memo(function HeadlineCard({ c, kicker, tone, onOpen, featu
             {c.isNew && <span className="nt-pill" style={{ color: "#b9793b" }}>NEW</span>}
             <VisitorBadges vb={(c as any).vb} />
           </div>
-          <div className="text-[11.5px] text-[#7a5122] mb-1 nt-meta">{c.area} · 검증 후기 <b>{c.count ?? 0}건</b></div>
         </div>
         {c.grade && <div className={`nt-stamp ${featured ? "sm" : "xs"} ${stamp}`} aria-label={`등급 ${c.grade}`}>{c.grade}{featured && <small>VERIFIED</small>}</div>}
+      </div>
+      {/* 메타 줄 — 왼쪽 지역·후기 수, 오른쪽 끝(도장 바로 아래) ❤ 추억 저장. 상세 패널과 같은 자리. */}
+      <div className="flex items-center justify-between gap-2 mb-1">
+        <div className="text-[11.5px] text-[#7a5122] nt-meta">{c.area} · 검증 후기 <b>{c.count ?? 0}건</b></div>
+        {onSave && (
+          <button type="button" onClick={(e) => { e.stopPropagation(); onSave(c.id); }} className="nt-mem sm" aria-label={`${c.name} 추억 저장`}>
+            <svg viewBox="0 0 24 24" aria-hidden><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 5 6.4 5c2 0 3.3 1 4.1 2.3C11.3 6 12.6 5 14.6 5 18 5 20.1 8.4 18.6 11.8 16.5 16.4 12 21 12 21z"/></svg>
+            추억 저장
+          </button>
+        )}
       </div>
       {c.identity && <p className={`nt-hand text-[#2f3550] line-clamp-1 mb-1.5 ${featured ? "" : "sm"}`} style={{ lineHeight: featured ? "30px" : "26px" }}><span className="nt-hl">{c.identity}</span></p>}
       <FacetStrip fac={c.fac} size={featured ? 12 : 11} />
       <CautionLine cau={c.cau} size={featured ? 12 : 11} />
       {c.beanNote.length > 0 && <div className="flex flex-wrap gap-1.5 mt-1.5">{c.beanNote.map((b) => <span key={b} className="nt-chip" style={{ height: 22, fontSize: 11.5 }}>{CHAR_LABEL[b] ?? b}</span>)}</div>}
-    </button>
+    </div>
   );
 });
 // 🎬 자동 스포트라이트(넷플릭스식) 본체 — 큰 카드 1개가 몇 초마다 자동 전환 + 점(dot)으로 위치 표시.
 //   HeadlineCard를 그대로 재사용해 상단 💎숨은보석·🎯오늘의테마와 톤·배지·태그가 통일된다(추가 코드 최소화).
 //   터치/클릭하면 5초간 멈췄다가 재개(읽는 도중 안 넘어감). 좌우 스와이프로 수동 이동도 가능.
 //   제목 표시줄이 없는 '코어'만 — Spotlight(단일기준)·RankSpotlight(탭전환)가 공유해서 쓴다.
-const SpotlightCore = memo(function SpotlightCore({ items, onOpen, toneOffset = 0, intervalMs = 4000, featured = false }: { items: DCafe[]; onOpen: (id: number) => void; toneOffset?: number; intervalMs?: number; featured?: boolean }) {
+const SpotlightCore = memo(function SpotlightCore({ items, onOpen, onSave, toneOffset = 0, intervalMs = 4000, featured = false }: { items: DCafe[]; onOpen: (id: number) => void; onSave?: (id: number) => void; toneOffset?: number; intervalMs?: number; featured?: boolean }) {
   const [idx, setIdx] = useState(0);
   const [prevIdx, setPrevIdx] = useState<number | null>(null); // 진짜 크로스페이드용 — 이전 카드가 사라지는 동안만 유지
   const [paused, setPaused] = useState(false);
@@ -270,11 +280,11 @@ const SpotlightCore = memo(function SpotlightCore({ items, onOpen, toneOffset = 
         }}
       >
         <div key={`cur-${c.id}`} className={prevIdx !== null ? "dcn-spotlight-in" : undefined}>
-          <HeadlineCard c={c} kicker={`${idx + 1} / ${items.length}`} tone={(toneOffset + idx) % TONES.length} onOpen={onOpen} featured={featured} />
+          <HeadlineCard c={c} kicker={`${idx + 1} / ${items.length}`} tone={(toneOffset + idx) % TONES.length} onOpen={onOpen} onSave={onSave} featured={featured} />
         </div>
         {prevIdx !== null && items[prevIdx] && (
           <div key={`prev-${items[prevIdx].id}`} className="absolute inset-0 dcn-spotlight-out">
-            <HeadlineCard c={items[prevIdx]} kicker={`${prevIdx + 1} / ${items.length}`} tone={(toneOffset + prevIdx) % TONES.length} onOpen={onOpen} featured={featured} />
+            <HeadlineCard c={items[prevIdx]} kicker={`${prevIdx + 1} / ${items.length}`} tone={(toneOffset + prevIdx) % TONES.length} onOpen={onOpen} onSave={onSave} featured={featured} />
           </div>
         )}
       </div>
@@ -291,7 +301,7 @@ const SpotlightCore = memo(function SpotlightCore({ items, onOpen, toneOffset = 
 });
 
 // 제목표시줄+SpotlightCore — 단일 기준 섹션(추천·신규발견)용 얇은 래퍼.
-const Spotlight = memo(function Spotlight({ title, items, sub, info, onOpen, toneOffset = 0, intervalMs = 4000, featured = false }: { title: string; items: DCafe[]; sub?: string; info?: React.ReactNode; onOpen: (id: number) => void; toneOffset?: number; intervalMs?: number; featured?: boolean }) {
+const Spotlight = memo(function Spotlight({ title, items, sub, info, onOpen, onSave, toneOffset = 0, intervalMs = 4000, featured = false }: { title: string; items: DCafe[]; sub?: string; info?: React.ReactNode; onOpen: (id: number) => void; onSave?: (id: number) => void; toneOffset?: number; intervalMs?: number; featured?: boolean }) {
   if (!items?.length) return null;
   return (
     <div className="mb-7">
@@ -299,7 +309,7 @@ const Spotlight = memo(function Spotlight({ title, items, sub, info, onOpen, ton
         <div className="nt-title text-[17px] flex items-center gap-1.5 text-[#6a4318]">{featured ? <span className="nt-hl latte">{title}</span> : title}{info && <span className="nt-free"><InfoDot title={title.replace(/^[^가-힣A-Za-z]+/, "")}>{info}</InfoDot></span>}</div>
         {sub && <div className="text-[10.5px] text-[#a0672a] shrink-0">↕ {sub}</div>}
       </div>
-      <SpotlightCore items={items} onOpen={onOpen} toneOffset={toneOffset} intervalMs={intervalMs} featured={featured} />
+      <SpotlightCore items={items} onOpen={onOpen} onSave={onSave} toneOffset={toneOffset} intervalMs={intervalMs} featured={featured} />
     </div>
   );
 });
@@ -313,7 +323,7 @@ const RANK_TABS: { key: "top3" | "momentum" | "specialty" | "fresh"; label: stri
   { key: "specialty", label: "로스팅순" },
   { key: "fresh", label: "신규순" },
 ];
-const RankSpotlight = memo(function RankSpotlight({ top3, momentum, specialty, fresh, onOpen }: { top3: DCafe[]; momentum: DCafe[]; specialty: DCafe[]; fresh: DCafe[]; onOpen: (id: number) => void }) {
+const RankSpotlight = memo(function RankSpotlight({ top3, momentum, specialty, fresh, onOpen, onSave }: { top3: DCafe[]; momentum: DCafe[]; specialty: DCafe[]; fresh: DCafe[]; onOpen: (id: number) => void; onSave?: (id: number) => void }) {
   const [tabIdx, setTabIdx] = useState(0);
   const dataByKey: Record<string, DCafe[]> = { top3, momentum, specialty, fresh };
   const infoByKey: Record<string, React.ReactNode> = {
@@ -340,7 +350,7 @@ const RankSpotlight = memo(function RankSpotlight({ top3, momentum, specialty, f
           </button>
         ))}
       </div>
-      <SpotlightCore items={dataByKey[safeKey]} onOpen={onOpen} toneOffset={safeIdx} />
+      <SpotlightCore items={dataByKey[safeKey]} onOpen={onOpen} onSave={onSave} toneOffset={safeIdx} />
     </div>
   );
 });
@@ -1339,6 +1349,8 @@ export default function Home() {
   useEffect(() => { const u = homeRegion ? `/api/momentum?region=${encodeURIComponent(homeRegion)}` : "/api/momentum"; setMomentum(null); fetch(u).then((r) => r.json()).then((d) => { if (d.ok) setMomentum({ rising: d.rising ?? [] }); }).catch(() => {}); }, [homeRegion]);
 
   const openById = useCallback((id: number) => { const c = cafes.find((x) => x.id === id); if (c) setSelected(c); }, [cafes]);
+  // ❤ 홈 카드의 추억 저장 — 상세 패널과 같은 모달(MY PIN)을 그 카페로 연다(2026-09-21 CEO).
+  const openMemory = useCallback((id: number) => { trackOutbound({ target: "record", cafeId: id, source: "홈카드" }); setEditCafeId(id); setShowMyCafeReg(true); }, []);
 
   // 홈 '내 주변 옥석 카페' — 현재 위치 반경 500m의 옥석(검증·참고 등급만, 후보 제외) 카페를 가까운 순으로.
   const nearHomeCafes = useMemo(() => {
@@ -2323,18 +2335,18 @@ export default function Home() {
               <>
                 {discover.headlineAList && discover.headlineAList.length > 0 && (
                   <div className="dcn-enter" style={{ animationDelay: "0s" }}>
-                    <Spotlight title="오늘의 숨은 보석" items={discover.headlineAList} onOpen={openById} sub="검증됐지만 덜 알려진" toneOffset={0} featured
+                    <Spotlight title="오늘의 숨은 보석" items={discover.headlineAList} onOpen={openById} onSave={openMemory} sub="검증됐지만 덜 알려진" toneOffset={0} featured
                       info={<>검증 등급인데 아직 <b>리뷰가 적어 덜 알려진</b> 카페예요. 매일 다른 곳이 스포트라이트에 올라와요.</>} />
                   </div>
                 )}
                 {discover.headlineBList && discover.headlineBList.length > 0 && (
                   <div className="dcn-enter" style={{ animationDelay: ".1s" }}>
-                    <Spotlight title={discover.themeB ? `오늘의 테마 · ${discover.themeB.label}` : "커피에 진심인 집"} items={discover.headlineBList} onOpen={openById} sub="테마 매칭 순" toneOffset={1}
+                    <Spotlight title={discover.themeB ? `오늘의 테마 · ${discover.themeB.label}` : "커피에 진심인 집"} items={discover.headlineBList} onOpen={openById} onSave={openMemory} sub="테마 매칭 순" toneOffset={1}
                       info={<>커피 성격(로스팅·작업·조용함·디저트·분위기·공간) 중 하나를 <b>매일 돌아가며</b> 소개해요.</>} />
                   </div>
                 )}
-                {discover.featured && discover.featured.length > 0 && <div className="dcn-enter" style={{ animationDelay: ".2s" }}><Spotlight title="추천 카페" items={discover.featured} onOpen={openById} sub="쇼케이스" toneOffset={2} info={<>사장님이 직접 <b>홍보 중인 쇼케이스 카페</b>예요(우선 노출). 후기·등급은 다른 카페와 똑같이 검증된 값이에요.</>} /></div>}
-                <div className="dcn-enter" style={{ animationDelay: ".3s" }}><RankSpotlight top3={discover.top3} momentum={momentum?.rising.slice(0, 5) ?? []} specialty={discover.specialty} fresh={discover.fresh} onOpen={openById} /></div>
+                {discover.featured && discover.featured.length > 0 && <div className="dcn-enter" style={{ animationDelay: ".2s" }}><Spotlight title="추천 카페" items={discover.featured} onOpen={openById} onSave={openMemory} sub="쇼케이스" toneOffset={2} info={<>사장님이 직접 <b>홍보 중인 쇼케이스 카페</b>예요(우선 노출). 후기·등급은 다른 카페와 똑같이 검증된 값이에요.</>} /></div>}
+                <div className="dcn-enter" style={{ animationDelay: ".3s" }}><RankSpotlight top3={discover.top3} momentum={momentum?.rising.slice(0, 5) ?? []} specialty={discover.specialty} fresh={discover.fresh} onOpen={openById} onSave={openMemory} /></div>
                 <button onClick={() => { setSido(homeSido); setSigungu(homeGu); setDong(homeDong); setFocusId(null); setSheetOpen(false); setTab("map"); }} className="nt-btn-ink py-3.5 mt-2">{homeDong ? `${homeDong} 지도로 보기` : homeGu ? `${homeGu} 지도로 보기` : "지도에서 전체 둘러보기"} →</button>
               </>
             )}

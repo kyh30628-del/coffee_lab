@@ -403,3 +403,6 @@
 .nt-detail .nt-q .m { font-size: 14.5px; }
 .nt-detail .nt-chip { -webkit-text-stroke: 0.15px currentColor; }
 .nt-app .nt-eyebrow { font-size: 14px; letter-spacing: 0.06em; text-transform: none; }
+/* 홈 카드용 작은 추억 저장(도장 아래 메타 줄 오른쪽 끝) */
+.nt-mem.sm { height: 28px; padding: 0 12px 0 10px; font-size: 14.5px; margin-top: 6px; } /* 도장 아래 6px 띄움(실측: 도장 하단 414 / 버튼 상단 409 겹침) */
+.nt-mem.sm svg { width: 13px; height: 13px; }
