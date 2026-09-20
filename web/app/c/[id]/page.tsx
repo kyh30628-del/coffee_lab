@@ -397,7 +397,7 @@ export default async function CafePage({ params }: Props) {
             </div>
           )}
         </header>
-        <div className="nt-mem-row nt-free"><span className="absolute top-0"><SaveMemoryButton cafeId={c.id} cafeName={c.name} cafeArea={c.area} variant="pill" /></span></div>
+        <div className="nt-mem-row nt-free"><span><SaveMemoryButton cafeId={c.id} cafeName={c.name} cafeArea={c.area} variant="pill" /></span></div>
 
         {/* ✍ 우리가 읽고 적은 판정 — 손글씨 한 줄 + 후기에 자주 나온 말 */}
         {(c.synth_identity || facts.length > 0) && (
