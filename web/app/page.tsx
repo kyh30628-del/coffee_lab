@@ -2334,7 +2334,7 @@ export default function Home() {
                 )}
                 {discover.featured && discover.featured.length > 0 && <div className="dcn-enter" style={{ animationDelay: ".2s" }}><Spotlight title="추천 카페" items={discover.featured} onOpen={openById} sub="쇼케이스" toneOffset={2} info={<>사장님이 직접 <b>홍보 중인 쇼케이스 카페</b>예요(우선 노출). 후기·등급은 다른 카페와 똑같이 검증된 값이에요.</>} /></div>}
                 <div className="dcn-enter" style={{ animationDelay: ".3s" }}><RankSpotlight top3={discover.top3} momentum={momentum?.rising.slice(0, 5) ?? []} specialty={discover.specialty} fresh={discover.fresh} onOpen={openById} /></div>
-                <button onClick={() => { setSido(homeSido); setSigungu(homeGu); setDong(homeDong); setFocusId(null); setSheetOpen(false); setTab("map"); }} className="nt-btn-ink py-3.5 mt-2">🗺 {homeDong ? `${homeDong} 지도로 보기` : homeGu ? `${homeGu} 지도로 보기` : "지도에서 전체 둘러보기"} →</button>
+                <button onClick={() => { setSido(homeSido); setSigungu(homeGu); setDong(homeDong); setFocusId(null); setSheetOpen(false); setTab("map"); }} className="nt-btn-ink py-3.5 mt-2">{homeDong ? `${homeDong} 지도로 보기` : homeGu ? `${homeGu} 지도로 보기` : "지도에서 전체 둘러보기"} →</button>
               </>
             )}
             <p className="text-[10.5px] text-[#63523f] mt-6 text-center leading-relaxed">모든 큐레이션은 네이버 공개 후기를 교차검증한 데이터 기반입니다.</p>
