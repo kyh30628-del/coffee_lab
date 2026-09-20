@@ -926,6 +926,17 @@ const LANDMARK_WORDS = [
   //   블로그(입장료·개장시간·이승만/이기붕 별장 비교 등, 카페 무관)를 흡수. #880(하조대)와 동일 구조.
   "화진포",
   "김일성별장",
+  // 룰갭 20260920(decisions#1165, rulegap-proposals-20260920-3.md): 자연관광명소 5건 신규 —
+  //   카페 상호의 유일 실질토큰이 인근 자연관광명소 고유명사와 겹쳐, 그 명소 여행기/등산기/축제안내
+  //   전체가 카페 방문후기로 오채택됨. 용궐산 하늘길(순창, id47374 6/6 완전오염)·성삼재(구례, id49423
+  //   6/6)·자작나무숲(인제, id28407 6/6)·북천 코스모스(하동, id44237 5/5)·구문소(태백, id24027
+  //   6건 중 3건 부분오염). 기존 9개와 동일 메커니즘의 사전 확장.
+  "하늘길",
+  "용궐산",
+  "성삼재",
+  "자작나무숲",
+  "북천",
+  "구문소",
 ];
 const isVenueTok = (t: string) => { const n = norm(t); return VENUE_WORDS.some((v) => n.includes(norm(v))) || HOTEL_BRANDS.some((v) => n.includes(norm(v))) || LANDMARK_WORDS.some((l) => n.includes(norm(l))) || DISTRICT_WORDS.some((d) => n.includes(norm(d))) || UNIV_ABBR_WORDS.some((u) => n.includes(norm(u))) || METRO_NAMES.has(n); };
 // 랜드마크 전용 판정(isVenueTok의 부분집합) — 몰/호텔/대학 등 다른 venue 범주와 분리해, '랜드마크가
