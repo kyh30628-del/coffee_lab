@@ -18,7 +18,7 @@ import { topCharTraits } from "@/lib/charScore";
 import { collectionForCafe } from "@/lib/collections";
 import { tasteByKey } from "@/lib/seoData";
 import { shareHookText } from "@/lib/shareCopy";
-import { sortReviews, ensureRecent } from "@/lib/exposureOrder";
+import { sortReviews, ensureRecent, isReadableQuote } from "@/lib/exposureOrder";
 import { extractWorkSignals } from "@/lib/workDetail";
 import OutboundLink from "../../OutboundLink";
 import { isOwnerManaged } from "@/lib/ownerManaged"; // 🏅 사장님 관리 배지(조건·문구 단일출처)
@@ -218,6 +218,11 @@ export default async function CafePage({ params }: Props) {
     ? ensureRecent(sortReviews(evRaw, c.name ?? "", [c.area, c.dong].filter(Boolean) as string[], Date.now(), c.dong))
     : [];
   const quotesAll = evAll.map((e: any) => e?.quote || "");
+  // 📖 화면에 보여줄 후기(2026-09-20) — 이 페이지는 후기 100건을 읽어 통계만 뽑고 **문장은 한 줄도 안 보여주고 있었다.**
+  //   대표님: "상세 페이지 열어서 문구들이 제대로 보이냐? 글자만 오지게 많고 난장판". 통계·방법론·면책만 있고 정작
+  //   사람이 쓴 말이 없었다. 정렬 순서 그대로, 읽히는 문장(isReadableQuote)만 최대 3건. 2건 미만이면 안 보여준다.
+  const shownQuotes = evAll.filter((e: any) => isReadableQuote(e?.quote, c.name ?? "")).slice(0, 3);
+  const showQuotes = shownQuotes.length >= 2;
   const highlights = extractHighlights(quotesAll);
   // 💻 카공 세부 신호(2026-08-17) — "작업하기 좋음" 한 축으로 뭉뚱그리던 것을 콘센트·와이파이·자리로 쪼갠다.
   //   실측: 테마 수요 상위 8개 중 7개가 카공인데 정작 카공족이 묻는 건 이 시설 정보였다.
@@ -393,19 +398,21 @@ export default async function CafePage({ params }: Props) {
         {/* 📊 우리가 읽고 적은 판정 — 옥석 후기 핵심. 판정 문장만 손글씨. */}
         {(highlights.length > 0 || c.synth_identity) && (
           <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
-            <div className="nt-sec">우리가 읽고 적은 판정 · 검증 후기 {c.synth_count ?? 0}건</div>
-            {/* 🤖 인용용 사실 한 줄(2026-09-15) — 우리 페이지의 78%가 이 상세인데 여기에 인용할 문장이 없었다.
-                AI는 **숫자와 기준일이 붙은 문장**을 인용한다. 지역·취향 페이지엔 넣었는데 정작 제일 많은 면이 비어 있었다.
-                ⚠️ 추가 조회 0 — 이미 읽은 값으로만 만든다. */}
-            <p className="text-[12px] text-[#6b5a45]">
-              검증 후기 {(c.synth_count ?? 0).toLocaleString()}건 · 영수증 리뷰·광고·협찬 제외 · 최종 확인 {new Date().toISOString().slice(0, 10)}
-            </p>
-            {/* 🕒 최신성(2026-09-13 해자 감사) — "지금도 그런가"에 답하는 한 줄. review_dates(작은 jsonb, 검증+참고 후기 날짜)에서 계산. */}
-            {freshness && <div className="text-[12.5px] text-[#63523f]">🕒 최근 12개월 후기 <b className="text-[#2a1f17]">{freshness.recent}건</b> · 가장 최신 <b className="text-[#2a1f17]">{freshness.latest}</b>{freshness.stale && <span className="text-[#a93a32]"> · 1년 넘게 새 후기 없음</span>}</div>}
+            {/* 2026-09-20 정리(CEO): '검증 후기 N건'이 첫 화면에 4번 나오던 것을 헤더 칩 + 하단 사실줄 둘로 줄였다.
+                방법론 문장(광고·협찬 제외·최종 확인)은 AI 인용용이라 지우지 않고 하단 사실줄로 합쳤다. */}
+            <div className="nt-sec">우리가 읽고 적은 판정</div>
             {c.synth_identity && <p className="nt-hand"><span className="nt-hl">{c.synth_identity}</span></p>}
+            {/* 📖 사람이 쓴 문장 — 통계 앞에 온다. 이 페이지에서 가장 먼저 읽혀야 할 것. */}
+            {showQuotes && shownQuotes.map((e: any, i: number) => (
+              <p key={e?.link ?? i} className="text-[15px] text-[#2a1f17]">
+                <span className="text-[#a08868]">“</span>{String(e.quote).trim()}<span className="text-[#a08868]">”</span>
+                {(e?.source || e?.date) && <span className="text-[11.5px] text-[#8a785f] ml-1.5 whitespace-nowrap">— {e?.source ?? ""}{e?.date ? ` ${String(e.date).slice(0, 7)}` : ""}</span>}
+              </p>
+            ))}
+            {/* 🕒 최신성 — "지금도 그런가". review_dates(작은 jsonb)에서 계산. */}
+            {freshness && <div className="text-[12.5px] text-[#63523f]">🕒 최근 12개월 후기 <b className="text-[#2a1f17]">{freshness.recent}건</b> · 최신 <b className="text-[#2a1f17]">{freshness.latest}</b>{freshness.stale && <span className="text-[#a93a32]"> · 1년 넘게 새 후기 없음</span>}</div>}
             {highlights.length > 0 && (
               <>
-                <div className="text-[12px] text-[#63523f]">후기에서 가장 많이 나온 것 · 숫자=언급 후기 수</div>
                 <div className="nt-chips">
                   {highlights.map((h, i) => (
                     <span key={h.label} className={`nt-chip ${i === 0 ? "ink" : ""}`}>{h.emoji} {h.label}<b>{h.count}</b></span>
@@ -447,10 +454,8 @@ export default async function CafePage({ params }: Props) {
                   <div key={s.key} className="flex items-baseline gap-2 flex-wrap">
                     <span className="text-[15px] w-5 text-center flex-none">{s.emoji}</span>
                     <span className="text-[14.5px] font-bold text-[#5a3a12]"><span className="nt-hl">{s.text}</span></span>
-                    <span className="ml-auto flex items-baseline gap-2 whitespace-nowrap">
-                      <span className="nt-hand sm coffee">평균의 {s.mult}배</span>
-                      <span className="nt-pill verify">상위 {s.topPct}%</span>
-                    </span>
+                    {/* 2026-09-20: '평균의 16.2배'+'상위 2%' 두 숫자 → 상위 %만. 배수는 읽는 사람이 해석 못 한다. */}
+                    <span className="ml-auto nt-pill verify whitespace-nowrap">상위 {s.topPct}%</span>
                   </div>
                 ))}
               </>
@@ -462,12 +467,12 @@ export default async function CafePage({ params }: Props) {
                   <div key={w.key} className="flex items-baseline gap-2 flex-wrap">
                     <span className="text-[14px] w-5 text-center flex-none">{w.emoji}</span>
                     <span className="text-[13.5px] text-[#5c4b3c]">{w.text}</span>
-                    <span className="ml-auto nt-hand sm faint whitespace-nowrap">{w.mult < 0.2 ? "거의 언급 없음" : `평균의 ${w.mult}배`}</span>
+                    <span className="ml-auto text-[12px] text-[#8a785f] whitespace-nowrap">{w.mult < 0.2 ? "거의 언급 없음" : "언급 적음"}</span>
                   </div>
                 ))}
               </>
             )}
-            <p className="text-[11px] text-[#63523f]">기준은 <b>후기 1건당 언급 비율</b>이에요 — 후기 수가 많고 적음을 보정한 공정한 비교입니다. '평균의 N배'·'상위/하위 %'는 전체 카페와 같은 기준으로 비교한 값. 절대 평가가 아닙니다.</p>
+            {/* 방법론 면책 2줄은 삭제(2026-09-20) — '검증 방법 자세히' 링크가 아래에 있다. 결정하는 화면에 각주를 넣지 않는다. */}
           </div>
         ) : tags.length > 0 && (
           <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
@@ -485,16 +490,8 @@ export default async function CafePage({ params }: Props) {
               <b> {(sqRaw - Number(sq?.verified ?? 0) - Number(sq?.reference ?? 0)).toLocaleString()}건을 걸러내고</b>{" "}
               <b>{Number(sq?.verified ?? 0).toLocaleString()}건</b>의 진짜 방문 후기로 판단했어요.
             </p>
-            {sqReasons.length > 0 && (
-              <ul>
-                {sqReasons.map(([why, n]) => (
-                  <li key={why} className="text-[12.5px] text-[#5c4b3c] flex gap-2">
-                    <span className="text-[#7a6750]">—</span>
-                    <span>{why} <b className="text-[#7a5122]">{Number(n).toLocaleString()}건</b> 제외</span>
-                  </li>
-                ))}
-              </ul>
-            )}
+            {/* 🔴 2026-09-20 삭제: "카페명 불명확하나 후기 맥락 있음(LLM 재판정 대상) 55건 제외" 같은 **내부 파이프라인 분류명**이
+                소비자 화면에 그대로 나가고 있었다. 요약 문장(확인→걸러냄→판단)만 남기고 사유 목록은 /trust로. */}
             <div className="flex items-center gap-4 flex-wrap">
               <Link href="/trust" className="inline-block text-[12px] text-[#7a5122] underline underline-offset-2">검증 방법 자세히 →</Link>
               <ReportButton cafeId={Number(c.id)} />
@@ -576,7 +573,7 @@ export default async function CafePage({ params }: Props) {
         </div>
 
         <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
-          <p className="text-[12.5px] text-[#5c4b3c]">네이버 공개 후기 <b>{c.synth_count ?? 0}건</b>을 교차검증한 데이터 기반 소개예요. <Link href="/trust" className="underline underline-offset-2 text-[#7a5122]">검증 방법 보기</Link></p>
+          <p className="text-[12.5px] text-[#5c4b3c]">네이버 공개 후기 <b>{(c.synth_count ?? 0).toLocaleString()}건</b>을 교차검증한 데이터 기반 소개예요 · 영수증 리뷰·광고·협찬 제외 · 최종 확인 {new Date().toISOString().slice(0, 10)}. <Link href="/trust" className="underline underline-offset-2 text-[#7a5122]">검증 방법 보기</Link></p>
         </div>
 
         {/* 방문자 후기 — 하단 버튼 바로 위 */}

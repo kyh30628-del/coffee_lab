@@ -25,6 +25,30 @@ function recencyBonus(d: string | undefined, nowT: number): number {
   if (months <= 1) return 45;
   return Math.max(0, 45 - months * 2);
 }
+// 📖 읽히는 문장인가(2026-09-20, CEO "글자만 오지게 많고 난장판") — 상세 페이지에 후기를 **한 줄도 안 보여주고**
+//   있었다. 보여주려고 정렬 상위를 열어 보니 대부분 '제목+주소+영업시간' 덩어리거나 "…"로 잘린 제목이었다.
+//   실측(09-20): 서귀피안 87건 중 의견 문장 13건, 부코 29건 중 5건, 카페 애니 4건 중 0건.
+//   → 정렬은 그대로 두되(오염 방어 순서 불변) **읽히는 문장을 뒤로 밀지 않게** 키를 하나 더 두고,
+//     상세 페이지는 이 판별을 통과한 것만 보여준다. 통과분이 없으면 아무것도 안 보여준다(주소 덩어리보다 낫다).
+const RQ_TRUNC = /(\.{3,}|…)\s*$/;
+const RQ_META = /(영업시간|운영시간|주차|도로명|지번|주소|위치\s*[:：]|OPEN|CLOSE|\d{1,2}:\d{2}|전화|문의)/gi;
+const RQ_PRED = /(어요|아요|네요|습니다|해요|였어요|했어요|더라고요|더라구요|거예요|답니다|드려요|같아요|좋았|맛있|추천|만족|아쉬|별로|괜찮)/;
+const RQ_OTHER_BIZ = /(호텔|펜션|숙소|리조트|모텔|게스트하우스)/;
+export function isReadableQuote(q: unknown, cafeName = ""): boolean {
+  const s = String(q ?? "").trim();
+  if (s.length < 20 || RQ_TRUNC.test(s)) return false;
+  if ((s.match(/#/g) ?? []).length >= 3) return false;
+  if ((s.match(RQ_META) ?? []).length >= 2) return false;
+  if (/^\[/.test(s) && !RQ_PRED.test(s)) return false;
+  // 이름을 공유하는 다른 업종(실사고: '호텔 서귀피안' 글이 '서귀피안 베이커리'에 붙음) — 상호 첫 토큰 앞뒤에 숙박어가 붙으면 제외
+  const first = cafeName.trim().split(/\s+/)[0] ?? "";
+  if (first.length >= 2) {
+    const esc = first.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    if (new RegExp(`${esc}\\s*(호텔|펜션|숙소|리조트|모텔|게스트하우스)|(호텔|펜션|숙소|리조트|모텔|게스트하우스)\\s*${esc}`).test(s)) return false;
+  }
+  return RQ_PRED.test(s);
+}
+
 // 정확도(score) — 후기 한 건의 판정 정확도 수치(0~100). 등급 다음가는 정렬 기준(CEO 2026-08-05).
 function accuracy(e: any): number {
   return typeof e?.score === "number" ? e.score : 50;
@@ -73,12 +97,14 @@ export function sortReviews(raw: any[], name: string, areaTerms: string[], nowT:
       //   삭제가 아니라 순서만 바꾸므로 오탐이 나도 후기는 사라지지 않는다. 추가 DB 조회 0.
       real: isAdTemplateQuote(e?.quote) ? 0 : 1, // 0 = 정보 카드형 → 진짜 후기 뒤로
       solo: inCampaign(e) ? 0 : 1,               // 0 = 캠페인 묶음 글 → 뒤로
+      read: isReadableQuote(e?.quote, name) ? 1 : 0, // 0 = 제목/주소 덩어리·잘린 문장 → 뒤로(2026-09-20)
     }))
     .sort((a, b) => {
       if (b.conf !== a.conf) return b.conf - a.conf;
       if (b.mine !== a.mine) return b.mine - a.mine;
       if (b.real !== a.real) return b.real - a.real;
       if (b.solo !== a.solo) return b.solo - a.solo;
+      if (b.read !== a.read) return b.read - a.read;
       const tier = trustTier(b.e) - trustTier(a.e);
       if (tier !== 0) return tier;
       // 🔴 2026-08-28 수리(CEO: "최신의 오염 없이 검증된 리뷰를 노출"):
