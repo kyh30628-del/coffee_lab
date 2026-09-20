@@ -371,3 +371,4 @@
 | 2026-09-20 07:57 | #1134 | [검색UX 신규] 개념 키워드 "테라스" 검색이 전국 테라스 카페 대신 아산시 동명 장소(POI) 인근 카페 | 4df8e067 | - | app/api/search/route.ts: pureConceptQuery(질의=CONCEPTS 트리거 완전일치)일 때 anchorExact/placeHit 계산을 skip하도록  |
 | 2026-09-20 07:57 | #1144 | [자율진단] cron-selfaudit가 RETIRED_JOBS 무시 — recollect-purged 영구 | 42a3a91f | - | app/api/cron-selfaudit/route.ts: isRetired(c.job) 크론 감시 루프(82-91행)에 skip 추가 + lib/jobTeams.ts EXPECT |
 | 2026-09-20 07:57 | #1155 | [룰갭 신규] 채용공고(구인/알바모집)가 방문후기로 오채택 — 10곳 확정오염 | 40841041 | - | lib/reviewQuality.ts: RECRUITMENT_POST_CUES 정규식 신설(알바/직원/바리스타/구인/채용/정직원/근무자모집 등) + recruitmentOnly 게 |
+| 2026-09-20 11:05 | #1157 | [개발] 협업 #432: cron-grow 발굴 큐(discovery_targets) 3일+ 미소비 관찰 | b02e9aa2 | - | app/api/cron-grow/route.ts: critical(priorityStarved/10일+) 큐 선점을 회차당 1회로 제한(criticalUsedThisRun 플래그) |
