@@ -60,6 +60,11 @@ export async function GET(req: NextRequest) {
     const GROW_BUDGET_MS = 225_000; // 발굴 225s + 마이닝·합성 여유 → maxDuration 300s 안전마진(실측 290s→타임아웃 위험 해소)
     const t0 = Date.now();
     const discoveries: { region: string; found?: number; inserted?: number; stopped?: boolean; error?: string; agent?: boolean }[] = [];
+    // 🐛 재발방지(협업#432): 230개 순회지역·30일 쿨다운 구조상 10일+ critical 지역이 상시 존재(실측 09-20 14곳) —
+    //   매 반복 critical을 큐보다 무조건 앞세우면 큐가 구조적으로 기아 상태에 빠진다(#109와 같은 유형이 10일 문턱에서 재발).
+    //   회차당 critical 선점을 1회로 제한해, critical 백로그도 매 회차 최소 1곳씩 계속 줄고(10일 상한 취지 유지)
+    //   나머지 예산은 큐가 쓰도록 되돌린다.
+    let criticalUsedThisRun = false;
     // 🚦 적체 가드(2026-08-25) — 수집 대기가 임계를 넘으면 발굴을 건너뛰고 쿼터를 수집에 넘긴다.
     //   발굴만 하고 후기를 못 모으면 공개가 안 돼 사용자에겐 0이다(실측: 발굴이 쿼터 92%를 먹어 수집 205곳).
     const dgrow = await discoveryMayRun();
@@ -106,7 +111,8 @@ export async function GET(req: NextRequest) {
       //   한 번도 발굴 안 된 신설 지역(예: 인천 행정구역 개편 신설구)이 '5일+ 굶음'보다도 우선순위가
       //   낮게 취급돼 큐가 안 비는 한 영영 못 뽑혔다. NULL을 최우선(critical)으로 명시 처리.
       const starved = (await sql`SELECT region, area_label, (last_run IS NULL OR last_run < now() - interval '10 days') AS critical FROM discovery_state WHERE (last_run IS NULL OR last_run < now() - interval '5 days') AND ${YIELD_COOLDOWN} ORDER BY last_run ASC NULLS FIRST LIMIT 1`)[0] as { region: string; area_label: string; critical: boolean } | undefined;
-      const critical = priorityStarved ?? (starved?.critical ? starved : undefined);
+      const critical = criticalUsedThisRun ? undefined : (priorityStarved ?? (starved?.critical ? starved : undefined));
+      if (critical) criticalUsedThisRun = true;
       const at = critical ? null : (await sql`SELECT id, region, area_label, keywords FROM discovery_targets WHERE status='pending' ORDER BY priority DESC, created_at ASC LIMIT 1`)[0] as any;
       // 🎯 2026-09-13 — 같은 쿼터를 수확처에 먼저 쓴다(CEO 지시 "신규 권역 집중").
       //   쿨다운을 통과한 지역 중 **직전 수확률 10% 이상**을 앞세운다(실측: 10%+ 지역이 같은 훑음으로 20~30배를 건진다).
