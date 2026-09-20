@@ -459,6 +459,22 @@ const CAFE_CONTEXT_STRONG = /(카페|커피|라떼|아메리카노|에스프레�
 //   블로그 "…커피테이블로도 안성맞춤인…", id3525 커피나무 화훼샵 "…커피나무 공기정화식물…" 실측). 두
 //   복합어 뒤에 바로 이어지는 경우만 실질맥락으로 인정하지 않도록 부정형 lookahead로 제외한다.
 const CAFE_CONTEXT_SUBSTANCE = /(커피(?!\s*(테이블|나무))|라떼|아메리카노|에스프레소|콜드브루|핸드드립|디저트|케이크|베이커리|빵|제과|원두|바리스타|아인슈페너|브런치|로스팅|치즈|요거트|답례품|밀크티|버블티|망고사고)/i;
+// ★ 룰갭 신규(2026-09-20, decisions#1158): 아래 하드거절 게이트 7종(CRAFT_WORKSHOP_ACTIVITY·AQUASCAPE_PET_RETAIL·
+//   NONCAFE_INTERIOR_CUES·BRAND_NAMESAKE_COMMERCE_LEAK·REAL_ESTATE_LISTING_CUES·VAPE_ECIG_RETAIL_CUES·
+//   DISH_SPECIFIC_NONCAFE_CATEGORY)가 공통으로 <업종큐 매칭> && !CAFE_CONTEXT_SUBSTANCE 구조인데,
+//   CAFE_CONTEXT_SUBSTANCE가 카페 자신의 상호명 재진술만으로 매칭돼버려 실질맥락 없음 판정이 무력화된다
+//   (id6760 커피시네마: "여의도 카페 커피시네마 인테리어 시공사례…"의 유일한 SUBSTANCE 매칭이 상호
+//   "커피시네마"의 "커피"뿐. id8672 벌크커피 상봉점: "…벌크커피 상봉점 시공사례…"도 동일 메커니즘,
+//   rulegap-proposals-20260920-2.md 제안1). 7개 게이트 전부 카페 자신의 상호명을 제거(공백 유연 매칭)한
+//   텍스트로 CAFE_CONTEXT_SUBSTANCE를 재검사하는 공용 헬퍼로 통일한다 — 상호명과 무관하게 별도로 등장하는
+//   진짜 실질맥락(예: "아메리카노 마셨다")은 그대로 보존되므로 오탐 없음.
+function hasCafeSubstanceExcludingName(text: string, name: string): boolean {
+  const chars = (name || "").replace(/\s+/g, "").split("");
+  if (!chars.length) return CAFE_CONTEXT_SUBSTANCE.test(text);
+  const pattern = chars.map((c) => c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\s*");
+  const stripped = text.replace(new RegExp(pattern, "gi"), " ");
+  return CAFE_CONTEXT_SUBSTANCE.test(stripped);
+}
 // ★ 룰갭 P59(2026-07-25, decisions#497): 체험공방(도자기 원데이클래스) — 카페 상호 자체가 "OO도예공방"이라
 //   nameInTitle/nameInBody가 정상 발동해도 글 내용이 순수 공방 체험(물레·핸드빌딩·원데이클래스·찰흙놀이 등)뿐이면
 //   카페 후기가 아니다(id16151 실측: raw 247건 중 대다수 도자기 체험기, 커피/디저트 언급 사실상 전무). 기존
@@ -1713,34 +1729,34 @@ export function verifyReview(input: QualityInput): QualityResult {
   //   원데이클래스·찰흙놀이·도자기 만들기/굽기/페인팅 등)이고 카페 실질맥락(CAFE_CONTEXT_SUBSTANCE — 커피·
   //   라떼·디저트 등)이 전무하면 borderline 없이 곧장 하드 거절한다. 대조군(카페더함186 도자기체험공방·
   //   도자기카페 이클림 등)은 리뷰에 실제 음료 소비가 함께 언급돼 CAFE_CONTEXT_SUBSTANCE로 보존되므로 오탐 없음.
-  if (CRAFT_WORKSHOP_ACTIVITY.test(fullL) && !CAFE_CONTEXT_SUBSTANCE.test(fullL)) {
+  if (CRAFT_WORKSHOP_ACTIVITY.test(fullL) && !hasCafeSubstanceExcludingName(fullL, input.name)) {
     return { verdict: "rejected", score: 4, reasons: ["체험공방 활동기(도자기·도예 원데이클래스 등 — 카페 실질맥락 전무)"], signals: sig };
   }
   // [룰갭 P67, decisions#543] 반려식물/수족관 소매업 — "카페" 리터럴이 있어도 실질 음료·디저트 맥락이
   //   전무하면 P59와 동일하게 참고등급 진입 없이 곧장 하드 거절한다(id3313 실측).
-  if (AQUASCAPE_PET_RETAIL.test(fullL) && !CAFE_CONTEXT_SUBSTANCE.test(fullL)) {
+  if (AQUASCAPE_PET_RETAIL.test(fullL) && !hasCafeSubstanceExcludingName(fullL, input.name)) {
     return { verdict: "rejected", score: 4, reasons: ["반려식물·수족관 소매업 글(수초/어항/물생활 — 카페 실질맥락 전무)"], signals: sig };
   }
   // [룰갭 rulegap-20260805-1220, decisions#623] 인테리어/가구업계 콘텐츠 — "카페" 부분문자열 오매칭이나
   //   이름-길이 예외로 맥락검사가 생략돼도, 실질 음료·디저트 맥락 전무 시 곧장 하드 거절한다.
-  if (NONCAFE_INTERIOR_CUES.test(fullL) && !CAFE_CONTEXT_SUBSTANCE.test(fullL)) {
+  if (NONCAFE_INTERIOR_CUES.test(fullL) && !hasCafeSubstanceExcludingName(fullL, input.name)) {
     return { verdict: "rejected", score: 4, reasons: ["인테리어·가구업계 콘텐츠(가구 재설치·거래·시공사례 등 — 카페 실질맥락 전무)"], signals: sig };
   }
   // [룰갭 rulegap-20260824-1224, decisions#812] 동명 상품/식물명 판매 콘텐츠 — 상품 판매 CTA·구매조건·
   //   벤더 쇼룸 안내 정형구가 있고 실질 음료·디저트 맥락 전무 시 곧장 하드 거절한다(id10605 꼬모까사·
   //   id3525 커피나무 실측).
-  if (BRAND_NAMESAKE_COMMERCE_LEAK.test(fullL) && !CAFE_CONTEXT_SUBSTANCE.test(fullL)) {
+  if (BRAND_NAMESAKE_COMMERCE_LEAK.test(fullL) && !hasCafeSubstanceExcludingName(fullL, input.name)) {
     return { verdict: "rejected", score: 4, reasons: ["동명 상품/식물명 판매 콘텐츠(구매 CTA·배송조건·벤더 쇼룸 안내 등 — 카페 실질맥락 전무)"], signals: sig };
   }
   // [룰갭 decisions#805] 부동산 분양 매물 홍보문 — 발코니 용도 나열("화단, 바비큐장, 카페 등으로 사용")
   //   속 리터럴 "카페"가 CAFE_CONTEXT_STRONG을 통과해도, 실질 음료·디저트 맥락 전무 시 곧장 하드 거절한다.
-  if (REAL_ESTATE_LISTING_CUES.test(fullL) && !CAFE_CONTEXT_SUBSTANCE.test(fullL)) {
+  if (REAL_ESTATE_LISTING_CUES.test(fullL) && !hasCafeSubstanceExcludingName(fullL, input.name)) {
     return { verdict: "rejected", score: 4, reasons: ["부동산 분양 매물 홍보문(전용면적·발코니 용도 나열 등 — 카페 실질맥락 전무)"], signals: sig };
   }
   // [룰갭 신규, decisions#1042] 카페명-소비재 브랜드 동음이의 혼입 — 전자담배 액상 판매점 블로그 등 무관
   //   업종 콘텐츠가 카페명(흔한 소비재 브랜드명과 동음이의)과 정확일치로 유입되면, 실질 음료·디저트 맥락
   //   전무 시 곧장 하드 거절한다(id15342 몬스터커피 인천부평시장점 실측).
-  if (VAPE_ECIG_RETAIL_CUES.test(fullL) && !CAFE_CONTEXT_SUBSTANCE.test(fullL)) {
+  if (VAPE_ECIG_RETAIL_CUES.test(fullL) && !hasCafeSubstanceExcludingName(fullL, input.name)) {
     return { verdict: "rejected", score: 4, reasons: ["전자담배·액상 판매점 콘텐츠(카페명 동음이의 혼입 — 카페 실질맥락 전무)"], signals: sig };
   }
   // [룰갭 rulegap-20260815-1214, decisions#730] 확정 비카페 dish-specific naver_category(한식>순대,순댓국·
@@ -1751,7 +1767,7 @@ export function verifyReview(input: QualityInput): QualityResult {
   //   화이트리스트일 때만 실질 음료·디저트 맥락(CAFE_CONTEXT_SUBSTANCE) 부재 시 titleHasCafeWord와 무관하게
   //   곧장 하드 거절한다(P59/P67과 동일 처리방식 — 겸업 실제 카페 후기는 CAFE_CONTEXT_SUBSTANCE로 보존).
   const DISH_SPECIFIC_NONCAFE_CATEGORY = /한식>순대,순댓국|한식>죽|이탈리아음식>스파게티,파스타전문|전통식품>떡,한과/;
-  if (DISH_SPECIFIC_NONCAFE_CATEGORY.test(input.naverCategory ?? "") && !CAFE_CONTEXT_SUBSTANCE.test(fullL)) {
+  if (DISH_SPECIFIC_NONCAFE_CATEGORY.test(input.naverCategory ?? "") && !hasCafeSubstanceExcludingName(fullL, input.name)) {
     return { verdict: "rejected", score: 4, reasons: ["확정 비카페 dish 전용업종(순대국·죽·파스타전문·떡한과 — 카페 실질맥락 전무)"], signals: sig };
   }
   // [룰갭 H18, decisions#631] 바리스타/커피 교육원 자기완결형 수강 후기 — naver_category가 직업,기술교육
