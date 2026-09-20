@@ -341,7 +341,18 @@ export async function GET(req: NextRequest) {
     // 🅿️ 시설 패싯 — 질의에 '주차·콘센트·단체·루프탑…'이 있으면 그 패싯을 가진 카페를 직접 찾는다(최대 3개).
     const hitFacets = FACET_TRIGGERS.filter((f) => f.triggers.some((t) => ql.includes(t))).map((f) => f.label).slice(0, 3);
     // 질의 자체가 개념어인가('카공'·'공부'). 부분 상호매칭 바닥값을 뺄지 판단하는 데만 쓴다.
-    const pureConceptQuery = hitConcepts.some((c) => c.triggers.some((t) => ql.trim() === t));
+    //   🔴 2026-09-20(#1166) — "감성카페"류: 트리거("감성") 뒤에 업종 범용어("카페")가 붙은 한 덩어리 질의는
+    //   완전일치(ql.trim()===t)를 통과 못 해 200점 바닥값이 그대로 걸렸다(2026-08-31 "공부차파크"와 동일 구조 재현,
+    //   CONCEPTS 사전에 없던 사각지대). CATEGORY_WORD(업종 범용어)를 접미사로 떼어낸 나머지가 트리거와
+    //   완전일치하면 같은 순수개념질의로 본다.
+    const qlNoSpace = ql.trim().replace(/\s+/g, "");
+    const qlConceptCore = (() => {
+      for (const suf of CATEGORY_WORD) {
+        if (qlNoSpace.length > suf.length && qlNoSpace.endsWith(suf)) return qlNoSpace.slice(0, -suf.length);
+      }
+      return qlNoSpace;
+    })();
+    const pureConceptQuery = hitConcepts.some((c) => c.triggers.some((t) => ql.trim() === t || qlConceptCore === t));
     let effectiveRegion = region;
     let regionExplicit = !!region;
     // 🔀 같은 동 이름이 여러 시·군·구에 있을 때의 나머지 후보("고덕동"=강동구·평택시). 화면에서 한 번에 바꾸라고 내려준다.
