@@ -11,7 +11,7 @@ export const maxDuration = 300;
 // 매 실행: ① 지난번 제출 배치가 끝났으면 결과 수거·적용  ② 판정 대기 카페로 새 배치 제출.
 //   비동기라 결과가 한 사이클(크론 간격) 늦게 반영되지만, 카페 큐레이션엔 무방.
 //   매니페스트(custom_id→cafe·keys)는 DB(judge_batches)에 보관(서버리스 /tmp 비영속 대응).
-const BUILD_LIMIT = Number(process.env.BATCH_JUDGE_LIMIT || 150); // 빌드 시 getAuditCandidates가 카페당 합성 → 300s 내로 제한
+const BUILD_LIMIT = Number(process.env.BATCH_JUDGE_LIMIT || 120);  // 2026-09-20 대표님 지시로 150→120(크기 중복가드 회피 + 300s 여유) // 빌드 시 getAuditCandidates가 카페당 합성 → 300s 내로 제한
 const PER_CAFE = 35;
 // 🎯 위험군 게이트(2026-07-05 CEO): 공개 카페 '재판정'은 신뢰도 낮은 등급만 — 파이프라인 자체 등급으로 원리적 선.
 //   '검증'(verified, 평균 85리뷰 = 옥석 코어)은 스킵(재판정 불필요), 그 외('참고' 등, 평균 12리뷰)는 판정.
@@ -162,7 +162,15 @@ export async function GET(req: NextRequest) {
       } catch { try { await markJudged(c.id); } catch {} }
     }
     if (requests.length > 0) {
-      const b = await createBatch(KEY, requests);
+      const b = await createBatch(KEY, requests, {
+      // 🔴 2026-09-20 — 크기 중복가드(같은 건수 24h 내 재제출 차단)를 여기서만 푼다.
+      //   그 가드는 오늘 두 번 나를 막아준 좋은 장치지만 **크기만 보기 때문에**
+      //   150건씩 이어 던지는 정당한 연속 배치까지 막았다(rejected 3,929곳이 그대로 남았다).
+      //   대신 더 강한 장치가 이미 위에 있다: **진행 중 배치가 하나라도 있으면 제출 경로를 안 탄다.**
+      //   즉 한 번에 하나씩만 나가므로 크기 중복은 구조적으로 불가능하다.
+      //   + inFlight(같은 카페 제외) + submit=1 명시 요구까지 3중이다.
+      allowDuplicate: true,
+    });
       batchId = b.id;
       try { await sql`INSERT INTO judge_batches (batch_id, manifest) VALUES (${b.id}, ${JSON.stringify({ cafes: manifestCafes })}::jsonb) ON CONFLICT (batch_id) DO NOTHING`; }
       catch (e) { return NextResponse.json({ ok: false, error: "manifest 저장 실패", detail: String(e).slice(0, 120), batchId: b.id }); }
