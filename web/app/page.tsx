@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
+import { createPortal } from "react-dom"; // 🔴 후기 전체 모달을 body로 — pointer-events-none 래퍼·transform 조상 밖으로
 import { TRIAL_DAYS } from "@/lib/ownerPlan";
 import NoticeModal from "./NoticeModal";
 import { SIDO_GU, SIDO_CENTER, classifyArea, regionKeyFor } from "@/lib/regionList";
@@ -2841,6 +2842,7 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
   const [promo, setPromo] = useState<any>(null);
   const [showAllReviews, setShowAllReviews] = useState(false);
   useLockBodyScroll(showAllReviews);
+  useEffect(() => { if (!showAllReviews) return; const k = (e: KeyboardEvent) => { if (e.key === "Escape") setShowAllReviews(false); }; window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }, [showAllReviews]);
   const [reviewFilter, setReviewFilter] = useState<"all" | "verified" | "reference" | "ai" | "youtube">("all");
   const [userReviews, setUserReviews] = useState<{ memory: string; photos: string[]; favorite: boolean; date: string }[]>([]); // 공개 방문자 후기
   const [highlights, setHighlights] = useState<{ label: string; emoji: string; count: number }[]>([]); // 옥석 리뷰 데이터 핵심
@@ -2985,6 +2987,14 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
               </div>
             )}
           </header>
+          {onSaveMemory && (
+            <div className="nt-mem-row nt-free">
+              <button type="button" onClick={onSaveMemory} className="nt-mem" aria-label="이 카페 추억 저장">
+                <svg viewBox="0 0 24 24" aria-hidden><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 5 6.4 5c2 0 3.3 1 4.1 2.3C11.3 6 12.6 5 14.6 5 18 5 20.1 8.4 18.6 11.8 16.5 16.4 12 21 12 21z"/></svg>
+                추억 저장
+              </button>
+            </div>
+          )}
 
           {/* ✍ 판정 한 줄 + 자주 나온 말 */}
           {(cafe.synth_identity || facts.length > 0) && (
@@ -3002,13 +3012,13 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
               {shownQuotes.map(quoteOf)}
               {moreQuotes.length > 0 && (
                 <details className="nt-more">
-                  <summary><span className="nt-btn-ghost"><span className="t1">후기 {moreQuotes.length}건 더 읽기</span><span className="t2">접기</span><svg viewBox="0 0 24 24" aria-hidden><path d="m6 9 6 6 6-6"/></svg></span></summary>
+                  <summary className="nt-free"><span className="nt-btn-ghost"><span className="t1">후기 {moreQuotes.length}건 더 보기</span><span className="t2">접기</span><svg viewBox="0 0 24 24" aria-hidden><path d="m6 9 6 6 6-6"/></svg></span></summary>
                   {moreQuotes.map(quoteOf)}
                 </details>
               )}
               {reviews.length > 0 && (
                 <div className="nt-free nt-btn-row">
-                  <button type="button" onClick={() => setShowAllReviews(true)} className="nt-btn-ghost fill">근거 후기 전체 {reviews.length}건 원문<svg viewBox="0 0 24 24" aria-hidden><path d="M7 17 17 7M8 7h9v9"/></svg></button>
+                  <button type="button" onClick={() => setShowAllReviews(true)} className="nt-btn-ghost fill">근거 후기 전체 {reviews.length}건 보기<svg viewBox="0 0 24 24" aria-hidden><path d="M7 17 17 7M8 7h9v9"/></svg></button>
                 </div>
               )}
               {srcLine}
@@ -3093,7 +3103,7 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
             </div>
           )}
 
-          {!loadingRev && !showQuotes && <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>{srcLine}{reviews.length > 0 && <div className="nt-free nt-btn-row"><button type="button" onClick={() => setShowAllReviews(true)} className="nt-btn-ghost fill">근거 후기 전체 {reviews.length}건 원문<svg viewBox="0 0 24 24" aria-hidden><path d="M7 17 17 7M8 7h9v9"/></svg></button></div>}</div>}
+          {!loadingRev && !showQuotes && <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>{srcLine}{reviews.length > 0 && <div className="nt-free nt-btn-row"><button type="button" onClick={() => setShowAllReviews(true)} className="nt-btn-ghost fill">근거 후기 전체 {reviews.length}건 보기<svg viewBox="0 0 24 24" aria-hidden><path d="M7 17 17 7M8 7h9v9"/></svg></button></div>}</div>}
 
           {/* 방문자 후기 */}
           {userReviews.length > 0 && <div className="px-3 pt-3 nt-free nt-g"><VisitorReviews reviews={userReviews} /></div>}
@@ -3138,8 +3148,8 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
         </div>
       </aside>
       {/* ===== 전체 리뷰 모달 — aside 밖(z-[3000] 컨테이너 직속)으로 이동. aside는 overflow-y:auto라 스크롤되며, 그 안에 있던 position:fixed 모달이 스크롤량(scrollTop)만큼 화면 밖으로 밀리고 패널 너비로 잘려 아예 안 보였음. 스크롤 안 되는 컨테이너 직속으로 빼서 항상 전체 화면(뷰포트)에 온전히 뜨게 함. ===== */}
-        {showAllReviews && (
-          <div className="fixed inset-0 z-[3100] flex items-end justify-center pointer-events-auto" style={{ background: "rgba(0,0,0,0.5)" }} onClick={() => setShowAllReviews(false)}>
+        {showAllReviews && typeof document !== "undefined" && createPortal(
+          <div className="nt-app fixed inset-0 z-[4000] flex items-end justify-center pointer-events-auto" style={{ background: "rgba(0,0,0,0.55)", fontFamily: "var(--nt-font)" }} onClick={() => setShowAllReviews(false)} role="dialog" aria-modal="true">
             <div className="w-full max-w-lg nt-paper rounded-t-2xl max-h-[90dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
               {/* 헤더 */}
               <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-[#f0e6d4]">
@@ -3152,7 +3162,7 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
                     {quality && quality.rejected > 0 && <span className="text-[#c0a08a]">/ 제외 {quality.rejected}</span>}
                   </div>
                 </div>
-                <button type="button" onClick={() => setShowAllReviews(false)} aria-label="닫기" className="w-10 h-10 flex items-center justify-center rounded-full bg-[#2b2018] text-[#f4ece0] text-xl leading-none shrink-0">×</button>
+                <button type="button" onClick={(e) => { e.stopPropagation(); setShowAllReviews(false); }} aria-label="닫기" className="h-10 px-4 flex items-center justify-center gap-1 rounded-full bg-[#2b2018] text-[#f4ece0] text-[15px] leading-none shrink-0">닫기 ×</button>
               </div>
               {/* 필터 — wrap으로 잘림 방지 */}
               <div className="px-4 py-2.5 border-b border-[#f0e6d4]">
@@ -3219,7 +3229,7 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
               </div>
             </div>
           </div>
-        )}
+        , document.body)}
     </div>
   );
 }

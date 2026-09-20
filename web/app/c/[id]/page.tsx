@@ -397,6 +397,7 @@ export default async function CafePage({ params }: Props) {
             </div>
           )}
         </header>
+        <div className="nt-mem-row nt-free"><span className="absolute top-0"><SaveMemoryButton cafeId={c.id} cafeName={c.name} cafeArea={c.area} variant="pill" /></span></div>
 
         {/* ✍ 우리가 읽고 적은 판정 — 손글씨 한 줄 + 후기에 자주 나온 말 */}
         {(c.synth_identity || facts.length > 0) && (
@@ -417,7 +418,7 @@ export default async function CafePage({ params }: Props) {
             {shownQuotes.map(quoteOf)}
             {moreQuotes.length > 0 && (
               <details className="nt-more">
-                <summary><span className="nt-btn-ghost"><span className="t1">후기 {moreQuotes.length}건 더 읽기</span><span className="t2">접기</span><svg viewBox="0 0 24 24" aria-hidden><path d="m6 9 6 6 6-6"/></svg></span></summary>
+                <summary className="nt-free"><span className="nt-btn-ghost"><span className="t1">후기 {moreQuotes.length}건 더 보기</span><span className="t2">접기</span><svg viewBox="0 0 24 24" aria-hidden><path d="m6 9 6 6 6-6"/></svg></span></summary>
                 {moreQuotes.map(quoteOf)}
               </details>
             )}
