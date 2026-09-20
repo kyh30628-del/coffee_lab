@@ -84,6 +84,19 @@ export async function GET(req: NextRequest) {
     //   배치가 끝나기 전에 이 엔드포인트를 다시 호출하면 SELECT가 매번 같은 상위 N개를 또 뽑아 같은 카페가
     //   여러 배치에 중복 제출된다(수동청산 중 29개 중복배치 발생·취소로 복구). 아직 안 끝난(NOT applied) 배치의
     //   매니페스트에 이미 들어있는 카페는 여기서 명시적으로 제외 — 짧은 간격으로 반복 호출해도 안전(멱등)하게 만든다.
+    // 🔴 2026-09-20 하드 가드 — **진행 중 배치가 하나라도 있으면 신규 제출을 아예 하지 않는다.**
+    //   사고: 기조실장이 이 엔드포인트를 '상태 폴링'인 줄 알고 반복 호출해, 148곳 배치가 도는 중에
+    //   113곳 배치가 추가로 나갔다. 이 엔드포인트는 조회가 아니라 **①수거 ②신규제출**을 같이 한다 —
+    //   **호출 = 제출**이다. 기존 inFlight 가드는 '같은 카페 중복'만 막았지 '새 카페 추가 제출'은 못 막았다.
+    //   대표님이 크레딧 낭비를 반복해 경고한 지점이라, 사람이 조심하는 대신 코드가 막는다.
+    //   상태 확인은 Anthropic API를 직접 읽을 것(과금 0, 배치 생성 없음).
+    const openBatches = (await sql`SELECT COUNT(*)::int c FROM judge_batches WHERE NOT applied`) as any[];
+    if ((openBatches[0]?.c ?? 0) > 0 && stillRunning > 0) {
+      return NextResponse.json({ ok: true, blocked: "in-flight",
+        note: `진행 중 배치 ${stillRunning}건 — 끝날 때까지 신규 제출을 막는다(중복 과금 방지). 수거만 수행했다.`,
+        applied: { cafes: appliedCafes, rescuedReviews: rescued, costUsd: +(inTok * BATCH_PRICE_IN + outTok * BATCH_PRICE_OUT).toFixed(4), inTok, outTok },
+        pollingBatches: stillRunning });
+    }
     const inFlight = (await sql`
       SELECT DISTINCT (v->>'id')::int AS id
       FROM judge_batches, jsonb_each(manifest->'cafes') AS kv(k, v)
