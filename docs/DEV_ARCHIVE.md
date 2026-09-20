@@ -369,3 +369,4 @@
 | 2026-09-18 23:05 | #1133 | [룰갭 신규] 2업체 콤보 포스트 — 인용문(quote)이 타업체명으로 시작 (3곳, verified 2곳  | 375eef3d | - | lib/reviewQuality.ts: COMBO_LEAD 정규식(선두 접두어+"점(") 추가, verifyReview()에 comboLead 신호(한글4자+ 접두어면서 카페명과  |
 | 2026-09-18 23:05 | #1135 | [사장님영업] CEO 사장님퍼널 대시보드 reachRate 966%로 깨짐 — /owner/r/[id] fr | 270a942b | - | app/api/admin/owner-funnel/route.ts: owner_funnel_events 집계 쿼리에 WHERE anon_id <> '' 추가해 크롤러 추정(anon_ |
 | 2026-09-20 07:57 | #1134 | [검색UX 신규] 개념 키워드 "테라스" 검색이 전국 테라스 카페 대신 아산시 동명 장소(POI) 인근 카페 | 4df8e067 | - | app/api/search/route.ts: pureConceptQuery(질의=CONCEPTS 트리거 완전일치)일 때 anchorExact/placeHit 계산을 skip하도록  |
+| 2026-09-20 07:57 | #1144 | [자율진단] cron-selfaudit가 RETIRED_JOBS 무시 — recollect-purged 영구 | 42a3a91f | - | app/api/cron-selfaudit/route.ts: isRetired(c.job) 크론 감시 루프(82-91행)에 skip 추가 + lib/jobTeams.ts EXPECT |
