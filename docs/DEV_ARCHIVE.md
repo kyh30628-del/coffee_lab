@@ -373,3 +373,4 @@
 | 2026-09-20 07:57 | #1155 | [룰갭 신규] 채용공고(구인/알바모집)가 방문후기로 오채택 — 10곳 확정오염 | 40841041 | - | lib/reviewQuality.ts: RECRUITMENT_POST_CUES 정규식 신설(알바/직원/바리스타/구인/채용/정직원/근무자모집 등) + recruitmentOnly 게 |
 | 2026-09-20 11:05 | #1157 | [개발] 협업 #432: cron-grow 발굴 큐(discovery_targets) 3일+ 미소비 관찰 | b02e9aa2 | - | app/api/cron-grow/route.ts: critical(priorityStarved/10일+) 큐 선점을 회차당 1회로 제한(criticalUsedThisRun 플래그) |
 | 2026-09-20 11:05 | #1158 | [룰갭 신규] 비카페 하드거절 게이트 — 상호명 자기회귀로 CAFE_CONTEXT_SUBSTANCE 무력화  | 2b242c01 | - | lib/reviewQuality.ts: 공용 헬퍼 hasCafeSubstanceExcludingName 추가(CAFE_CONTEXT_SUBSTANCE 검사 전 카페 자신의 상호명을 |
+| 2026-09-20 14:11 | #1159 | [룰갭 신규] 블로거 자기신원(srcName) 신호 미연결 — 시공/설치업체 SEO 위장 리뷰 5곳 확정 | 2e6c24a0 | - | lib/reviewQuality.ts: QualityInput에 srcName 필드 추가 + VENDOR_SELF_IDENTITY_CUES(시공문의 설치문의 카페창업컨설팅 인테리어 |
