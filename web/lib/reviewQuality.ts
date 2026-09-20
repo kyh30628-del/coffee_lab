@@ -24,6 +24,7 @@ export type QualityInput = {
   addr?: string;        // 카페 등록주소(도로명) — 리뷰 주소 불일치 검증용
   link?: string;        // 출처 URL — 비방문 게시판(중고나라·창업나무 등) 판별용
   naverCategory?: string; // 네이버 업종 카테고리 — 비F&B 조합신호(룰갭 P61) 판별용
+  srcName?: string;       // 글쓴이 표시명(블로그명 등) — 벤더 자기신원 판별용(룰갭 rulegap-20260920-2, decisions#1159)
   source: SourceKind;
 };
 
@@ -379,6 +380,13 @@ const LOCAL_SEO_SERVICES = /(개인회생|채무조정|파산신청|전세사기
 //   이게 함께 나오면 카페 자기묘사 여부와 무관하게 지역 SEO 서비스 홍보로 거절한다.
 const SELF_BIZ_PROMO_MARKERS = [/쇼룸/, /매장\s*주소/, /오프라인\s*매장/, /방문\s*예약/, /카톡\s*방문/, /시공\s*갤러리/];
 const SELF_BIZ_PROMO = new RegExp(`(${SELF_BIZ_PROMO_MARKERS.map((r) => r.source).join("|")})`);
+// 룰갭 P71(2026-09-20, agent-reports/rulegap-proposals-20260920-2.md, decisions#1159): 블로거 표시명(srcName)
+//   자체가 시공/설치업체·창업컨설팅 자기소개인 경우 — "OO카페 후기" SEO 제목·문체로 위장해도 본문 텍스트는
+//   위 LOCAL_SEO_SERVICES/SELF_BIZ_PROMO 게이트를 전부 우회한다(실측: id32292 트레포사 등 5곳·2개 벤더,
+//   srcName="메테오라 영남센터 : 카페창업컨설팅 커피머신전문"/"시공문의 010.7903.2030" — 본문은 정상 카페
+//   후기 문체라 CAFE_CONTEXT_SUBSTANCE가 항상 참). 계정 표시명 자체가 벤더임을 알리는 강신호이므로 본문
+//   맥락과 무관하게 하드 거절한다.
+const VENDOR_SELF_IDENTITY_CUES = /시공\s*문의|설치\s*문의|카페\s*창업\s*컨설팅|인테리어\s*전문|익스테리어\s*전문|커피머신\s*전문|01[016789][.\-]?\d{3,4}[.\-]?\d{4}/;
 // 진짜 카페 글이면 거의 항상 들어가는 '강한 카페 맥락'(점·일반어 제외 — 오탐 방지)
 // ★ 협업#278(품질본부 룰갭발굴팀 2~4차 사이클, 08-02~08-03): 목장·치즈체험·요거트·답례품·파충류카페·재즈공연·
 //   문화기획전시·티카페(밀크티·버블티·망고사고) 등 니치 업종 어휘 미등재로 진짜 카페 후기가 offctx로 과대측정되던
@@ -1446,6 +1454,11 @@ export function verifyReview(input: QualityInput): QualityResult {
   const selfAnnounce = SELF_ANNOUNCE.test(fullL) && !AD_DISCLAIM.test(fullL); // decisions#651: 업체 자체 SNS 공지문
   const orderSolicitation = ORDER_SOLICITATION_AD(fullL); // decisions#847: 예약/주문 유도 홍보글(전화번호+솔리시테이션 키워드)
   if (sponsored || supporterPR || institutionalPR || exhibitionPR || newsByline || selfAnnounce || orderSolicitation) return { verdict: "rejected", score: 0, reasons: [institutionalPR && !sponsored && !supporterPR ? "기관 보도자료·업무협약/후원 소식 — 자동 제외" : exhibitionPR && !sponsored && !supporterPR ? "갤러리 전시 공지문(3인칭 초대장) — 자동 제외" : supporterPR && !sponsored ? "서포터즈·기자단 위촉 홍보글 — 자동 제외" : newsByline && !sponsored ? "언론 보도기사 바이라인 — 자동 제외" : selfAnnounce && !sponsored ? "업체 자체 SNS 공지문(오픈/이벤트/소식 안내) — 자동 제외" : orderSolicitation && !sponsored ? "예약/주문 유도 홍보글(전화번호·카톡 노출) — 자동 제외" : "광고·협찬 글 — 자동 제외"], signals: { nameInTitle: false, nameInBody: false, visit: false, substance: 0, listicle: false, sponsored: true, areaMatch: false } };
+
+  // [벤더 자기신원] 표시명 자체가 시공/설치업체·창업컨설팅 자기소개 — 본문 맥락과 무관하게 하드 거절(위 정의부 주석 참조).
+  if (input.srcName && VENDOR_SELF_IDENTITY_CUES.test(input.srcName)) {
+    return { verdict: "rejected", score: 0, reasons: ["벤더 자기신원(글쓴이 표시명이 시공/설치업체·창업컨설팅) — 자동 제외"], signals: { nameInTitle: false, nameInBody: false, visit: false, substance: 0, listicle: false, sponsored: false, areaMatch: false } };
+  }
 
   // [비방문 게시판] 중고나라·창업나무는 물건 거래·상권 문의 게시판(네이버 카페=커뮤니티)이라 방문 후기가 있을 수 없음.
   //   내용에 카페 맥락어가 섞여도(리터럴 "카페" 오탐) 링크 도메인만으로 무조건 탈락.

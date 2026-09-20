@@ -154,7 +154,7 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
       seen.add(key);
       stats.raw++;   // 고유 글만 '전체'로 집계 → 전체 = 노이즈 + 옥석 (정확히 맞음)
 
-      const rule = verifyReview({ title: t.title, body: t.desc ?? t.text, name, areaTerms: area, addr: opts?.address, link: t.link, naverCategory: opts?.naverCategory, source: kind });
+      const rule = verifyReview({ title: t.title, body: t.desc ?? t.text, name, areaTerms: area, addr: opts?.address, link: t.link, naverCategory: opts?.naverCategory, srcName: t.source, source: kind });
 
       // 규칙상 on-topic(검증·참고 또는 경계)은 Sonnet 최종 심사 후보로 노출
       // ⚠️ text도 함께 보존(#683): 표시 대표문(evidence.quote)은 toQuote(t.text, …)로 뽑히는데
