@@ -15,8 +15,13 @@ import { sql } from "./db";
 //   ⚠️ 2026-08-25 사고: 이 값(21,906)을 '네이버 전체 잔여'로 오해해 후기 수집을 스스로 멈췄다.
 //      실제로는 local·blog·webkr 모두 200 정상이었다. 이 숫자로 수집 경로를 막지 말 것.
 export const NAVER_DAILY_QUOTA = 25000;
-// 발굴 스윕이 남겨둘 예약분(cron-grow 2h용). 기본 30%(7,500) — 하루 12회 cron-grow가 지역당 ~600콜.
-export const NAVER_SWEEP_RESERVE = Number(process.env.NAVER_SWEEP_RESERVE || 7500);
+// 🔴 2026-09-20 배분 재설계(대표님 지시 "낭비 없이 정확하게") — cron-grow 예약 7,500 → 0.
+//   실측(09-20 오전): 스윕 9,411콜 → 849곳(카페당 11.1콜) vs cron-grow 등 4,593콜 → 63곳(72.9콜).
+//   **6.6배 비효율인데, 스윕이 그 예약에 막혀 정지하고 있었다** — 효율 나쁜 쪽을 위해 좋은 쪽을 멈춘 구조.
+//   cron-grow는 고갈된 기존 182개 지역(평균 수확률 2.2%)을 훑기 때문이다.
+//   ⚠️ cron-grow를 죽인 게 아니다. nonClosureMayUse가 COLLECT+CLOSURE 예약선을 보므로
+//      수집·폐업 몫이 남아 있는 동안엔 돌고, 스윕과 같은 선에서 함께 멈춘다.
+export const NAVER_SWEEP_RESERVE = Number(process.env.NAVER_SWEEP_RESERVE || 0);
 // 🚪 폐업 재확인 예약(2026-09-13 결재 #1070): 하루 25,000 중 1,200(4.8%)은 발굴·스윕이 못 쓴다.
 //   폐업 크론(카페당 1~3호출, 하루 ~220곳)이 '쿼터중단'으로 굶던 것을 끝낸다. 예약은 상한이 아니라 최소 보장 —
 //   폐업 크론이 덜 쓰면 남은 몫은 자정 리셋까지 그냥 남는다(발굴이 예약선까지는 계속 쓴다).
@@ -49,8 +54,15 @@ export const NAVER_CLOSURE_RESERVE = Number(process.env.NAVER_CLOSURE_RESERVE ||
 //     (같은 날 폐지한 재수집 예약과는 다르다 — 그건 이미 공개된 카페의 원본 보존이라 유입과 무관했다.)
 //   ⚠️ 이 예약은 **발굴 경로에만** 건다: sweepMayContinue(스윕) · nonClosureMayUse(cron-grow 발굴 루프).
 //     수집 경로(webSearchCollector)는 이 가드를 호출하지 않으므로 스스로 막히지 않는다.
-//   💡 예산 배분 결과: 스윕 9,300 + grow 7,500 + 수집 7,000 + 폐업 1,200 = 25,000
-export const NAVER_COLLECT_RESERVE = Number(process.env.NAVER_COLLECT_RESERVE || 7000);
+//   🔴 2026-09-20 재설계 — **발굴과 수집을 2.3:1로 묶는다.**
+//   왜 이 비율인가(전부 실측): 카페 1곳을 공개까지 보내는 원가 = 발굴 16.9콜 + 수집 7콜 = 23.9콜.
+//   즉 발굴에 쓴 만큼의 0.44배를 수집에 써야 **그날 캔 걸 그날 공개**까지 보낸다.
+//   09-20 사고: 발굴 20,507콜(82%) : 수집 1,743콜(7%) = **12:1**로 깨져, 1,292곳을 캐놓고 249곳만
+//   수집했다. 나머지 1,040곳이 적체로 묶여 그날 공개가 553곳에 그쳤다(같은 쿼터로 694곳이 가능했다).
+//   배분: 폐업 1,200 + 수집 7,200 + 발굴 16,600 = 25,000
+//     발굴 16,600 ÷ 16.9콜 = 982곳  ·  수집 7,200 ÷ 7콜 = 1,029곳  → 수집이 발굴을 앞서 적체가 줄어든다.
+//   ⚠️ 단가가 바뀌면 이 비율도 바뀐다. 미개척지는 발굴 3.4콜(09-18 전북)이라 그때는 발굴 몫을 늘려야 한다.
+export const NAVER_COLLECT_RESERVE = Number(process.env.NAVER_COLLECT_RESERVE || 7200);
 export const NAVER_RECOLLECT_RESERVE = Number(process.env.NAVER_RECOLLECT_RESERVE || 0);
 /** 발굴(cron-grow)·재수집 등 '폐업 아닌' 소비자가 지금 더 써도 되는가 — 예약분 1,200을 남긴다. */
 export async function nonClosureMayUse(): Promise<{ ok: boolean; remaining: number }> {
