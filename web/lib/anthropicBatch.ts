@@ -58,3 +58,8 @@ export async function* streamResults(key: string, url: string): AsyncGenerator<a
 // Haiku 4.5 Batches 단가(정가 50%): 입력 $0.50 / 출력 $2.50 per 1M
 export const BATCH_PRICE_IN = 0.5 / 1e6;
 export const BATCH_PRICE_OUT = 2.5 / 1e6;
+
+/** 배치 취소 — manifest 저장 실패 등으로 **수거할 수 없게 된 배치의 과금을 끊는다**(2026-09-20 고아배치 사고). */
+export async function cancelBatch(key: string, id: string): Promise<void> {
+  await fetch(`https://api.anthropic.com/v1/messages/batches/${id}/cancel`, { method: "POST", headers: HDR(key) });
+}

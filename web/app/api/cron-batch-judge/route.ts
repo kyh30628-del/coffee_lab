@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
 import { getAuditCandidates, applyDecisions, markJudged } from "@/lib/synthStore";
-import { createBatch, getBatch, streamResults, BATCH_PRICE_IN, BATCH_PRICE_OUT } from "@/lib/anthropicBatch";
+import { createBatch, getBatch, streamResults, cancelBatch, BATCH_PRICE_IN, BATCH_PRICE_OUT } from "@/lib/anthropicBatch";
 import { RUBRIC, buildUserText, parseVerdicts, CLAUDE_MODEL } from "@/lib/reviewJudge";
 
 export const runtime = "nodejs";
@@ -173,8 +173,21 @@ export async function GET(req: NextRequest) {
       allowDuplicate: true,
     });
       batchId = b.id;
-      try { await sql`INSERT INTO judge_batches (batch_id, manifest) VALUES (${b.id}, ${JSON.stringify({ cafes: manifestCafes })}::jsonb) ON CONFLICT (batch_id) DO NOTHING`; }
-      catch (e) { return NextResponse.json({ ok: false, error: "manifest 저장 실패", detail: String(e).slice(0, 120), batchId: b.id }); }
+      // 🔴 2026-09-20 — **여기서 실패하면 돈만 나가고 결과를 영영 못 받는다.**
+      //   실사고: manifest가 `invalid input syntax for type json`으로 저장 실패했는데 배치는 이미 제출된 뒤라,
+      //   고아 배치 3건(240요청 ≈ $0.45)이 수거 불가 상태로 남았다. Postgres jsonb는 \u0000과
+      //   짝 없는 서로게이트를 거부한다 — 카페 이름·area·key에 섞여 들어오면 그대로 터진다.
+      //   ① 저장 전에 씻는다  ② 그래도 실패하면 **배치를 즉시 취소**해 과금을 끊는다(고아로 남기지 않는다).
+      const scrub = (v: unknown): any => typeof v === "string"
+        ? v.replace(/[\u0000-\u001F\u007F]/g, "").replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "")
+        : Array.isArray(v) ? v.map(scrub)
+        : v && typeof v === "object" ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, scrub(x)]))
+        : v;
+      try { await sql`INSERT INTO judge_batches (batch_id, manifest) VALUES (${b.id}, ${JSON.stringify(scrub({ cafes: manifestCafes }))}::jsonb) ON CONFLICT (batch_id) DO NOTHING`; }
+      catch (e) {
+        await cancelBatch(KEY, b.id).catch(() => {});   // 수거 못 할 배치는 살려둘 이유가 없다 — 과금부터 끊는다
+        return NextResponse.json({ ok: false, error: "manifest 저장 실패 — 배치 취소함", detail: String(e).slice(0, 120), batchId: b.id });
+      }
       submitted = requests.length;
     }
 
