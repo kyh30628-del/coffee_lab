@@ -84,6 +84,17 @@ export async function GET(req: NextRequest) {
     //   배치가 끝나기 전에 이 엔드포인트를 다시 호출하면 SELECT가 매번 같은 상위 N개를 또 뽑아 같은 카페가
     //   여러 배치에 중복 제출된다(수동청산 중 29개 중복배치 발생·취소로 복구). 아직 안 끝난(NOT applied) 배치의
     //   매니페스트에 이미 들어있는 카페는 여기서 명시적으로 제외 — 짧은 간격으로 반복 호출해도 안전(멱등)하게 만든다.
+    // 🔴 2026-09-20 ②차 수리 — ①차 가드(진행중이면 차단)가 **수거 직후에 뚫렸다.**
+    //   수거를 마치면 stillRunning=0이 되므로 조건이 풀려 그 자리에서 또 제출됐다(112곳 추가 과금).
+    //   근본 원인은 이 엔드포인트가 '수거'와 '제출'을 한 호출에 묶어둔 것이다 —
+    //   **수거하고 싶을 때마다 제출이 따라온다.** 그래서 둘을 파라미터로 분리한다.
+    //   기본(=수거만)이 안전한 쪽이고, 제출은 `&submit=1`을 명시해야만 한다.
+    if (req.nextUrl.searchParams.get("submit") !== "1") {
+      return NextResponse.json({ ok: true, mode: "collect-only",
+        note: "수거만 수행했다. 신규 제출은 &submit=1 을 명시할 때만 — 상태 확인 목적 호출이 과금을 만들지 않게(09-20 중복제출 사고).",
+        applied: { cafes: appliedCafes, rescuedReviews: rescued, costUsd: +(inTok * BATCH_PRICE_IN + outTok * BATCH_PRICE_OUT).toFixed(4), inTok, outTok },
+        pollingBatches: stillRunning, expiredClosed: expiredBatches });
+    }
     // 🔴 2026-09-20 하드 가드 — **진행 중 배치가 하나라도 있으면 신규 제출을 아예 하지 않는다.**
     //   사고: 기조실장이 이 엔드포인트를 '상태 폴링'인 줄 알고 반복 호출해, 148곳 배치가 도는 중에
     //   113곳 배치가 추가로 나갔다. 이 엔드포인트는 조회가 아니라 **①수거 ②신규제출**을 같이 한다 —
