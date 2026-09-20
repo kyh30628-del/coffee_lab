@@ -131,9 +131,15 @@ export async function GET(req: NextRequest) {
                -- 🎯 결재#784(#490 옵션2, 08-20): 크레딧 희소 상황 — 이미 신뢰확보(공개)된 카페 재정제를
                --   후보구제보다 먼저 처리해 늦추지 않되, 그 안에서는 최근합성(synth_updated 최신)순으로
                --   신선한 데이터부터 판정해 무작위 순환보다 효율화.
-               (published AND synth_grade IS DISTINCT FROM ${TRUSTED_GRADE}) DESC,  -- 신뢰확보 카페 재정제 우선
+               -- 🔴 2026-09-20 순서 역전(대표님 지시 "카페 수를 늘려라" + 크레딧 유한).
+               --   기존은 '공개 카페 재정제'가 후보구제보다 먼저였다(결재#784, 08-20 크레딧 희소 상황 판단).
+               --   그런데 재정제는 **이미 공개된 카페의 품질을 다듬는 것이라 공개 수를 늘리지 않는다.**
+               --   pending이 0이 된 지금 그대로 두면 유한한 크레딧이 전부 재정제로 간다.
+               --   실측: 판정 397곳 → 공개 377곳(95%)이 나온 건 전부 '미공개였던' 카페다.
+               --   남은 대상 18,800곳을 다 돌리려면 $35이고 우리는 $4.3뿐 — **공개를 늘리는 쪽에 먼저 쓴다.**
+               (synth_grade = '후보' AND NOT COALESCE(published, false)) DESC,  -- 후보구제(신규 공개) 최우선
+               (published AND synth_grade IS DISTINCT FROM ${TRUSTED_GRADE}) DESC,  -- 공개 카페 재정제는 그 다음
                synth_updated DESC NULLS LAST,          -- 최근합성 우선
-               (synth_grade = '후보' AND NOT COALESCE(published, false)) DESC,  -- 후보구제(신규 공개 가능성)
                COALESCE(synth_count, 0) ASC,           -- 리뷰 적어 취약한 순 우선(옥석 많은 곳은 뒤로)
                id LIMIT ${BUILD_LIMIT}`) as any[];
     const requests: any[] = [];
