@@ -78,6 +78,13 @@ for (const fn of ["rest_cafes", "bakeries"]) {
 }
 console.log(`원장 후보 ${cand.length.toLocaleString()}곳 (영업중 커피숍·제과점 중 우리에게 없는 것 · 프랜차이즈 ${skipFranchise.toLocaleString()}·한시/구내 ${skipOther.toLocaleString()}·이미 시도 ${skipTried.toLocaleString()} 제외)`);
 const byArea = {}; for (const c of cand) byArea[c.area] = (byArea[c.area] ?? 0) + 1;
+// 🔄 지역 라운드로빈(2026-09-21 CEO "모든 지역 극대화") — 원장 파일 순서대로 돌면 한 시군구가 하루치를 독식한다.
+//   시군구별 줄을 세워 한 곳씩 번갈아 뽑는다 → 매일 전 지역이 고르게 늘고, 상한이 작아도 특정 지역이 굶지 않는다.
+{
+  const queues = new Map(); for (const c of cand) { if (!queues.has(c.area)) queues.set(c.area, []); queues.get(c.area).push(c); }
+  const keys = [...queues.keys()]; cand.length = 0; let left = keys.length;
+  while (left > 0) { left = 0; for (const k of keys) { const q = queues.get(k); if (q.length) { cand.push(q.shift()); if (q.length) left++; } } }
+}
 console.log("상위 지역:", Object.entries(byArea).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([k, v]) => `${k} ${v}`).join(" · "));
 
 if (!APPLY) { console.log(`\n▶ 드라이런. --apply 로 적재(상한 ${LIMIT}곳 · 예산 ${BUDGET}콜).`); process.exit(0); }
