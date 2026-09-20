@@ -27,7 +27,10 @@ export function sourceBucket(ref: string, utmSource: string): string {
   if (r.includes("youtube.") || r.includes("youtu.be")) return "youtube";
   if (r.includes("facebook.") || r.includes("fb.")) return "facebook";
   if (r.includes("bing.")) return "bing";
-  if (r.includes("dongnecoffeenote.com")) return "internal";
+  // 🔴 2026-09-21(CEO 승인): 우리 도메인이 referrer면 'internal'이 아니라 **출처 없음(direct)**.
+  //   실측 960행 — /c/ID의 "지도에서 보기"(/?cafe=ID&clat…)를 따라 들어온 렌더러·재진입(PWA/북마크)이 전부
+  //   'internal'로 찍혀 유입경로 집계에서 '내부'로 오해됐다. 'internal'은 자사 Vercel 프리뷰(.vercel.app)에만 쓴다.
+  if (r.includes("dongnecoffeenote.com")) return "direct";
   if (r.includes(".vercel.app")) return "internal"; // 자사 프리뷰 배포(프로젝트명-git-*.vercel.app 등)
   if (SPAM_REFERRER_PATTERN.test(r)) return "spam";
   try { return new URL(ref).hostname.replace(/^www\./, "").slice(0, 40); } catch { return "other"; }

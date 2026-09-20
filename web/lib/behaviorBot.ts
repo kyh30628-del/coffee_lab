@@ -197,6 +197,30 @@ const ZERO_DWELL_BOT_ANON_IDS_SQL = `
     AND NOT v.internal
 `;
 
+// 🔗 자기 딥링크 자기참조 렌더러(2026-09-21, CEO 승인) — 첫 referrer가 **우리 사이트의 /?cafe=ID(&clat…) 딥링크**인데
+//   궤적은 '/ → /c/ID' 두 걸음, 체류 0, 저장소 흔적 없음. 실측 960행 중 736행이 어떤 규칙에도 안 걸린 채 '방문자'로 세어졌다.
+//   24시간 평탄 분포(새벽 2~5시 시간당 35~41건)라 사람 곡선이 아니다. /c/ID 페이지의 "지도에서 보기" 링크를 따라
+//   JS까지 실행하는 크롤러/링크 렌더러(실기기 UA 위장)로 본다.
+//   ⚠️ 오탐 방어는 ZERO_DWELL과 동일: 검색 유입·위치동의·재방문(세션≥3)·내부는 절대 건드리지 않는다.
+//     자기 딥링크 referrer는 '/c에서 지도로 넘어온 사람'도 만들 수 있지만, 그 사람은 /c 페이지 핑이 먼저 있어
+//     첫 referrer가 검색엔진이 된다(여기 안 걸린다).
+const SELF_DEEPLINK_BOT_ANON_IDS_SQL = `
+  SELECT anon_id FROM (
+    SELECT u.anon_id,
+           count(DISTINCT t.path) AS paths,
+           max(COALESCE(t.duration_ms, 0)) AS maxdur,
+           bool_or(t.src IN ('naver','google','bing','daum','duckduckgo.com')) AS searched
+    FROM user_consents u
+    LEFT JOIN traffic_events t ON t.anon_id = u.anon_id
+    WHERE u.referrer ILIKE '%dongnecoffeenote.com/?cafe=%'
+      AND COALESCE(u.agreed, false) = false
+      AND COALESCE(u.internal, false) = false
+      AND COALESCE(u.sessions, 1) <= 2
+    GROUP BY u.anon_id
+  ) v
+  WHERE v.maxdur = 0 AND v.paths <= 2 AND NOT v.searched
+`;
+
 /** 원본 계산식 — 무겁다(user_consents LEFT JOIN + UA 정규식). 캐시 갱신에만 쓴다. */
 export const BOT_ANON_IDS_COMPUTE_SQL = `
   SELECT anon_id FROM (${EXPLICIT_BOT_ANON_IDS_SQL}) e
@@ -204,6 +228,8 @@ export const BOT_ANON_IDS_COMPUTE_SQL = `
   SELECT anon_id FROM (${BEHAVIOR_BOT_ANON_IDS_SQL}) b
   UNION
   SELECT anon_id FROM (${ZERO_DWELL_BOT_ANON_IDS_SQL}) z
+  UNION
+  SELECT anon_id FROM (${SELF_DEEPLINK_BOT_ANON_IDS_SQL}) s
 `;
 
 // ⚡ 2026-09-02 — 이 목록이 **관제탑을 못 열게 만들고 있었다**(CEO 지적).
