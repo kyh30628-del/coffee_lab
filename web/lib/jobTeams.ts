@@ -18,7 +18,8 @@ export const JOB_TEAM: Record<string, string> = {
   "auth-precheck": "기획조정실",
   "cron-costwatch": "경영지원본부", // Neon 데이터전송비 이상탐지 워치독(2026-07-29, CEO 지시 — youtube-backfill 663GB 사고 재발방지)
   // 로컬 launchd 잡(하트비트 경유)
-  "discover-sweep": "성장본부", // 🔄2026-08-04 KST 12·20시 전 지역 발굴 스윕(새벽 02:30 → 낮으로 이동, DB통잠)
+  "discover-sweep": "성장본부", // 🔄2026-08-04 KST 12·20시 전 지역 발굴 스윕 — ⏸ 2026-09-21 정지(공공원장 적재로 대체, RETIRED_JOBS)
+  "import-permits": "성장본부", // 🧾2026-09-21 매일 07:00 공공 인허가 원장 적재(--limit 2700, 실측 1.69콜/곳)
   "indexnow": "성장본부", // 🔎2026-09-13 KST 09:40 IndexNow 일일 제출(사이트맵 미제출분만 → 네이버·빙 수신)
   "neon-billing": "경영지원본부", // 💳2026-09-14 KST 07:50 Neon 실청구 지표 스냅샷(키가 로컬에만 있어 로컬이 DB에 적재)
   "youtube-backfill": "품질본부",
@@ -60,7 +61,8 @@ export const EXPECT_MAX_H: Record<string, number> = {
   "cron-billing": 30,     // 정기결제 크론 매일 1회 + 버퍼
   "orchestrator-heal": 18, // 2창(UTC 3,11) 최대공백 16h + 버퍼
   // 로컬 launchd 잡
-  "discover-sweep": 30,    // 🔄2026-08-04 KST 12·20시 발굴 스윕 + 버퍼
+  "discover-sweep": 30,    // 🔄2026-08-04 KST 12·20시 발굴 스윕 + 버퍼(2026-09-21 정지)
+  "import-permits": 30,    // 🧾2026-09-21 매일 07:00 원장 적재 + 버퍼
   "indexnow": 30,          // 🔎2026-09-13 KST 09:40 하루 1회 + 버퍼
   "neon-billing": 30,      // 💳2026-09-14 KST 07:50 하루 1회 + 버퍼
   "chief-manager": 20,    // 일간 사이클 KST 08·12·16시
@@ -90,7 +92,8 @@ export const LAUNCHD_JOBS: Record<string, { label: string; sched: string }> = {
   "dev-pipeline":      { label: "개발 파이프라인", sched: "승인 즉시+08·12·16·20시" },
   "dev-deploy":        { label: "배포 워커",       sched: "승인 즉시+08·12·16·20시" },
   "weekly-evaluation": { label: "주간 거버넌스",   sched: "10:30(격일)" },
-  "discover-sweep":    { label: "발굴 스윕",       sched: "12·20시" },
+  "discover-sweep":    { label: "발굴 스윕",       sched: "정지(09-21)" },
+  "import-permits":    { label: "원장 적재",       sched: "07:00" },
   "indexnow":          { label: "IndexNow 제출",   sched: "09:40" },
   "neon-billing":      { label: "Neon 청구 스냅샷", sched: "07:50" },
 };
@@ -101,7 +104,7 @@ export const LAUNCHD_JOBS: Record<string, { label: string; sched: string }> = {
 //   quality-redteam-agent·team-legal-agent·dev-agent 등)가 전부 걸린다 → 그들의 investigate 결재가
 //   CEO가 보기도 전에(수십초~2분) '은퇴 확인'으로 오종결돼 L3 에스컬레이션이 무력화됐다(2026-07-07 #200).
 //   → 진짜 은퇴는 여기 **명시적으로만** 표기한다. 은퇴 시 추가, 재활성 시 제거(위 JOB_TEAM 주석과 동기).
-export const RETIRED_JOBS: ReadonlySet<string> = new Set(["dong-backfill", "qualityaudit", "chat-watch", "youtube-backfill", "recollect-purged", "cron-batch-judge"]); // chat-watch: 2026-08-04 컴퓨트 절감 위해 정지(관제 챗봇, 필요시 수동 재기동)
+export const RETIRED_JOBS: ReadonlySet<string> = new Set(["dong-backfill", "qualityaudit", "chat-watch", "youtube-backfill", "recollect-purged", "cron-batch-judge", "discover-sweep"]); // discover-sweep: 2026-09-21 CEO 승인 정지 — 공공원장 적재(import-permits, 1.69콜/곳)가 발굴(16.9콜/곳)을 대체. plist unload. // chat-watch: 2026-08-04 컴퓨트 절감 위해 정지(관제 챗봇, 필요시 수동 재기동)
 // youtube-backfill: 2026-08-12 CEO 지시로 정지 — 몇 달간 커버리지 24%(3,302/13,495)에 남은 분량 107일 소요 대비 매 실행 GB급 판독. 재기동 = plist에서 .disabled 제거 후 launchctl load.
 // recollect-purged: 2026-09-17 13:22 CEO 승인 폐지(24a60fbe, plist .disabled). cron-batch-judge: vercel.json crons에서 제거된 폐지 잡.
 export const isRetired = (job: string) => RETIRED_JOBS.has(job);

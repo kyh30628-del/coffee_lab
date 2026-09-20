@@ -62,7 +62,10 @@ export const NAVER_CLOSURE_RESERVE = Number(process.env.NAVER_CLOSURE_RESERVE ||
 //   배분: 폐업 1,200 + 수집 7,200 + 발굴 16,600 = 25,000
 //     발굴 16,600 ÷ 16.9콜 = 982곳  ·  수집 7,200 ÷ 7콜 = 1,029곳  → 수집이 발굴을 앞서 적체가 줄어든다.
 //   ⚠️ 단가가 바뀌면 이 비율도 바뀐다. 미개척지는 발굴 3.4콜(09-18 전북)이라 그때는 발굴 몫을 늘려야 한다.
-export const NAVER_COLLECT_RESERVE = Number(process.env.NAVER_COLLECT_RESERVE || 7200);
+// 🔁 2026-09-21 공공원장 전환(CEO 승인 09-20): 발굴(스윕)을 원장 적재로 바꿨다. 실측 적재 1.69콜/곳·수집 7콜/곳 →
+//   하루 2,700곳 = 적재 4,600 + 수집 18,900 + 폐업 1,200 ≈ 24,700. 수집 몫을 7,200 → 19,000으로 올려 배분을 강제한다.
+//   (import-permits 예산 = 25,000 − 폐업 − 이 값 = 4,800콜, 스윕도 같은 선에서 자동 정지)
+export const NAVER_COLLECT_RESERVE = Number(process.env.NAVER_COLLECT_RESERVE || 19000);
 export const NAVER_RECOLLECT_RESERVE = Number(process.env.NAVER_RECOLLECT_RESERVE || 0);
 /** 발굴(cron-grow)·재수집 등 '폐업 아닌' 소비자가 지금 더 써도 되는가 — 예약분 1,200을 남긴다. */
 export async function nonClosureMayUse(): Promise<{ ok: boolean; remaining: number }> {
