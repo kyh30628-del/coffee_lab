@@ -106,3 +106,21 @@ export function addrTail(address: string | null | undefined, area: string, dong:
   return toks.slice(i).join(" ");
 }
 export const igHandle = (u: string | null | undefined) => { const m = String(u ?? "").match(/instagram\.com\/([A-Za-z0-9._]+)/); return m ? m[1] : null; };
+
+// ── 후기 문장 속 핵심어(2026-09-20 CEO: "영역별로 강조·하이라이트") — 결정하는 데 쓰이는 말만. 화면은 <mark class="nt-key">로 감싼다.
+const KEY_TERMS = ["오션뷰","바다뷰","한강뷰","뷰가 끝내","뷰가 좋","뷰 맛집","뷰맛집","전망","뷰","바다","노을","일출","소금빵","크루아상","크로플","휘낭시에","스콘","케이크","케익","디저트","빵이 맛","빵 맛","빵","커피가 맛","커피 맛","커피","라떼","아메리카노","맛있","맛집","분위기","감성","조용","넓","좌석","주차","콘센트","와이파이","친절","재방문","또 오","또 가","인생","최고","추천","가성비","웨이팅","아쉬","별로"];
+const KEY_RE = new RegExp("(" + KEY_TERMS.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|") + ")", "g");
+export function splitKeyTerms(text: unknown): { t: string; k: boolean }[] {
+  const s = String(text ?? "");
+  if (!s) return [];
+  const out: { t: string; k: boolean }[] = [];
+  let last = 0;
+  for (const m of s.matchAll(KEY_RE)) {
+    const i = m.index ?? 0;
+    if (i > last) out.push({ t: s.slice(last, i), k: false });
+    out.push({ t: m[0], k: true });
+    last = i + m[0].length;
+  }
+  if (last < s.length) out.push({ t: s.slice(last), k: false });
+  return out;
+}

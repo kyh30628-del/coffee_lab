@@ -23,10 +23,10 @@
   --nt-stamp: #a93a32;
   --nt-line: rgba(90, 70, 50, 0.18);
   --nt-shadow: rgba(60, 40, 20, 0.22);
-  --nt-font: "DCN Hand", "Nanum Pen Script", "Apple SD Gothic Neo", sans-serif;
+  --nt-font: "Gowun Batang", "Apple SD Gothic Neo", serif;            /* 본문 = 명조(2026-09-20: 손글씨 일변도 → 읽히는 판) */
   --nt-hand-font: "DCN Letter", "Nanum Pen Script", cursive;
-  --nt-display: "DCN Hand Bold", "DCN Hand", "Nanum Pen Script", sans-serif;
-  --nt-sans: "DCN Hand", "Nanum Pen Script", sans-serif;
+  --nt-display: "Hahmlet", "Gowun Batang", serif;                      /* 제목·굵게 */
+  --nt-sans: "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif; /* 라벨·숫자·칩 */
   --nt-brush: "DCN Hand Bold", "Nanum Pen Script", cursive;
 }
 
@@ -45,7 +45,7 @@
 .nt-ruled.nt-h { --base: 27px; }                /* 26px 제목: 밑선 26.3 → 줄 27 */
 /* 줄 안의 모든 글자는 줄 간격을 따른다(Tailwind text-sm 등 행간 덮어씀). 외부 컴포넌트는 .nt-free로 빠져나간다. */
 .nt-ruled *:not(.nt-free, .nt-free *) { line-height: var(--lh); }
-.nt-ruled { font-size: 17px; }
+.nt-ruled { font-size: 15.5px; }
 .nt-ruled .nt-hand.sm { font-size: 19px; }
 .nt-free, .nt-free * { line-height: 1.4; }
 .nt-ruled .nt-chip, .nt-ruled .nt-pill, .nt-ruled .nt-chip *, .nt-ruled .nt-pill * { line-height: 26px; }
@@ -123,7 +123,7 @@
 .nt-mark svg path { fill: none; stroke: var(--nt-coffee); stroke-width: 1.6; stroke-linecap: round; opacity: 0.75; }
 
 /* ── 칩/알약/버튼 ── */
-.nt-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 15px; font-family: var(--nt-sans); font-weight: 700; padding: 0 10px; height: 28px; border: 1px solid rgba(90, 70, 50, 0.22); border-radius: 4px; background: rgba(255, 255, 255, 0.8); color: var(--nt-ink); vertical-align: middle; white-space: nowrap; font-family: var(--nt-font); }
+.nt-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 15px; font-family: var(--nt-sans); font-weight: 700; padding: 0 10px; height: 28px; border: 1px solid rgba(90, 70, 50, 0.22); border-radius: 4px; background: rgba(255, 255, 255, 0.8); color: var(--nt-ink); vertical-align: middle; white-space: nowrap; font-family: var(--nt-sans); font-size: 13px; font-weight: 600; }
 .nt-chip b { color: var(--nt-coffee); font-weight: 700; }
 .nt-chip.ink { background: var(--nt-ink); color: #fbf7f0; border-color: var(--nt-ink); }
 .nt-chip.ink b { color: #f0d9a8; }
@@ -139,10 +139,10 @@
 
 .nt-btn-ink { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; background: linear-gradient(180deg, #2c1f17, #1c120c); color: #f6ecdf; border-radius: 8px; font-weight: 700; font-family: var(--nt-sans); letter-spacing: 0.01em; box-shadow: 0 12px 20px -14px rgba(0, 0, 0, 0.6); transition: transform 0.12s ease; }
 .nt-btn-ink:active { transform: scale(0.985); }
-.nt-btn-line { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; background: rgba(255, 255, 255, 0.75); color: var(--nt-ink); border: 1px solid rgba(90, 70, 50, 0.28); border-radius: 8px; font-weight: 700; font-family: var(--nt-font); }
-.nt-input { border: 0; border-bottom: 1.5px solid rgba(90, 70, 50, 0.35); background: transparent; border-radius: 0; color: var(--nt-ink); font-family: var(--nt-font); outline: none; }
+.nt-btn-line { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; background: rgba(255, 255, 255, 0.75); color: var(--nt-ink); border: 1px solid rgba(90, 70, 50, 0.28); border-radius: 8px; font-weight: 700; font-family: var(--nt-sans); }
+.nt-input { border: 0; border-bottom: 1.5px solid rgba(90, 70, 50, 0.35); background: transparent; border-radius: 0; color: var(--nt-ink); font-family: var(--nt-sans); outline: none; }
 .nt-input:focus { border-bottom-color: var(--nt-coffee); }
-.nt-select { border: 1px solid rgba(90, 70, 50, 0.28); background: rgba(255, 255, 255, 0.85); border-radius: 5px; color: var(--nt-ink); font-family: var(--nt-font); font-weight: 700; }
+.nt-select { border: 1px solid rgba(90, 70, 50, 0.28); background: rgba(255, 255, 255, 0.85); border-radius: 5px; color: var(--nt-ink); font-family: var(--nt-sans); font-weight: 600; }
 
 /* ── 리본 책갈피(홈) ── */
 .nt-ribbon { position: absolute; top: 0; width: 14px; height: 78px; background: linear-gradient(90deg, #cf5f5a, #e3766f 55%, #c9544f); box-shadow: 0 6px 10px -6px rgba(120, 30, 20, 0.5); pointer-events: none; z-index: 2; }
@@ -150,16 +150,16 @@
 
 /* ── 작은 눈금 제목(색인) ── */
 .nt-eyebrow { font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--nt-ink3); font-family: var(--nt-sans); font-weight: 500; }
-.nt-sec { display: flex; width: max-content; align-items: center; gap: 8px; font-size: 17px; letter-spacing: 0.02em; color: #f6ecdf; font-family: var(--nt-display); font-weight: 400; height: 34px; box-sizing: border-box; padding: 0 14px 0 12px; margin-left: -6px; background: linear-gradient(180deg, #3a281d, #241812); border-radius: 5px; box-shadow: 0 3px 8px -3px rgba(20,12,8,.6); white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.nt-sec { display: flex; width: max-content; align-items: center; gap: 8px; font-size: 15px; letter-spacing: 0.01em; color: #f6ecdf; font-family: var(--nt-display); font-weight: 600; height: 34px; box-sizing: border-box; padding: 0 14px 0 12px; margin-left: -6px; background: linear-gradient(180deg, #3a281d, #241812); border-radius: 5px; box-shadow: 0 3px 8px -3px rgba(20,12,8,.6); white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .nt-sec::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--nt-caramel); flex: none; }
 .nt-sec.g { background-image: url("/note/tape2.webp"); }
-.nt-title { font-family: var(--nt-display); font-weight: 400; color: var(--nt-ink); text-wrap: balance; letter-spacing: 0; }
+.nt-title { font-family: var(--nt-display); font-weight: 700; color: var(--nt-ink); text-wrap: balance; letter-spacing: -0.01em; }
 .nt-brush { font-family: var(--nt-brush); font-weight: 400; letter-spacing: 0.01em; }
 
 /* ── 목차 줄(번호 손글씨) ── */
 .nt-ln { display: flex; align-items: flex-start; gap: 8px; width: 100%; text-align: left; height: var(--lh, 34px); overflow: hidden; }
 .nt-ln .n { font-family: var(--nt-hand-font); font-size: 20px; color: var(--nt-coffee); width: 26px; flex: none; }
-.nt-ln .nm { flex: 1; min-width: 0; font-family: var(--nt-display); font-weight: 400; font-size: 17px; color: var(--nt-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nt-ln .nm { flex: 1; min-width: 0; font-family: var(--nt-display); font-weight: 600; font-size: 15.5px; color: var(--nt-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nt-ln .m { font-size: 13.5px; color: var(--nt-ink3); font-variant-numeric: tabular-nums; flex: none; }
 
 /* ── 책장 넘김(탭 전환) ── */
@@ -226,7 +226,7 @@
 .nt-app select, .nt-app input, .nt-app textarea, .nt-app button { font-family: inherit; }
 
 /* 손글씨 굵게: 바른히피엔 굵은 굵기가 없다 → 굵은 글자는 성실체(펜 굵은 획)로 바꿔 쓴다 */
-.nt-app b, .nt-app strong, .nt-app .font-bold, .nt-app .font-semibold, .nt-app .font-black { font-family: var(--nt-display); font-weight: 400; }
+.nt-app b, .nt-app strong, .nt-app .font-bold, .nt-app .font-semibold, .nt-app .font-black { font-family: var(--nt-display); font-weight: 700; }
 
 /* 📱 모바일: 가로 넘침 금지(장식은 잘라낸다) */
 .nt-app { overflow-x: hidden; max-width: 100vw; }
@@ -256,28 +256,28 @@
 /* 📏 글자 크기 5단 스냅(2026-09-13) — 실측에서 한 화면에 크기가 **14종**이었다. 종류가 많으면 위계가 아니라 소음이다.
    Tailwind의 text-[Npx]를 캡션 13.5 · 보조 15 · 본문 17 · 강조 19 · 소제목 21 다섯 칸으로 몰아 붙인다
    (손글씨는 같은 px에서 고딕보다 작게 보여 전체적으로 한 단계 키운 값이다). */
-.nt-app .text-\[10px\] { font-size: 13.5px; }
-.nt-app .text-\[10\.5px\] { font-size: 13.5px; }
-.nt-app .text-\[11px\] { font-size: 13.5px; }
-.nt-app .text-\[11\.5px\] { font-size: 15px; }
-.nt-app .text-\[12px\] { font-size: 15px; }
-.nt-app .text-\[12\.5px\] { font-size: 15px; }
-.nt-app .text-\[13px\] { font-size: 17px; }
-.nt-app .text-\[13\.5px\] { font-size: 17px; }
-.nt-app .text-\[14px\] { font-size: 17px; }
-.nt-app .text-\[14\.5px\] { font-size: 19px; }
-.nt-app .text-\[15px\] { font-size: 19px; }
-.nt-app .text-\[15\.5px\] { font-size: 19px; }
-.nt-app .text-\[16px\] { font-size: 19px; }
-.nt-app .text-\[17px\] { font-size: 21px; }
-.nt-app .text-\[18px\] { font-size: 21px; }
-.nt-app { font-size: 17px; }
+.nt-app .text-\[10px\] { font-size: 11.5px; }
+.nt-app .text-\[10\.5px\] { font-size: 12px; }
+.nt-app .text-\[11px\] { font-size: 12px; }
+.nt-app .text-\[11\.5px\] { font-size: 12.5px; }
+.nt-app .text-\[12px\] { font-size: 13px; }
+.nt-app .text-\[12\.5px\] { font-size: 13px; }
+.nt-app .text-\[13px\] { font-size: 14px; }
+.nt-app .text-\[13\.5px\] { font-size: 14px; }
+.nt-app .text-\[14px\] { font-size: 14.5px; }
+.nt-app .text-\[14\.5px\] { font-size: 15.5px; }
+.nt-app .text-\[15px\] { font-size: 16px; }
+.nt-app .text-\[15\.5px\] { font-size: 16px; }
+.nt-app .text-\[16px\] { font-size: 16.5px; }
+.nt-app .text-\[17px\] { font-size: 18px; }
+.nt-app .text-\[18px\] { font-size: 19px; }
+.nt-app { font-size: 15.5px; }
 
 /* ✍️ 굵기 대비 — 손글씨 서체엔 굵은 굵기가 **없다**. font-weight:700을 줘도 화면에선 본문과 똑같이 그려진다
    (실측: 텍스트 116개 중 '굵게' 지정 11개가 전부 무효였다). 그래서 굵기를 획 두께로 만든다.
    ⚠️ 작은 글자에 쓰면 뭉개진다 — 제목·강조 단어에만. */
-.nt-app h1, .nt-title { -webkit-text-stroke: 0.55px currentColor; }
-.nt-sec, .nt-app b, .nt-app strong { -webkit-text-stroke: 0.3px currentColor; }
+.nt-app h1, .nt-title { -webkit-text-stroke: 0; font-weight: 700; }
+.nt-sec, .nt-app b, .nt-app strong { -webkit-text-stroke: 0; }
 .nt-hand, .nt-hand b, .nt-hand strong { -webkit-text-stroke: 0; }
 
 /* ══ 📓 카페 상세 2차(2026-09-20, CEO 승인 시안) — 줄노트 위에 "읽히는 한 장" ══
@@ -290,31 +290,35 @@
 .nt-detail .nt-name { font-family: var(--nt-name); font-weight: 700; font-size: 30px; letter-spacing: -0.01em; color: var(--nt-ink); text-wrap: balance; -webkit-text-stroke: 0; }
 .nt-detail .nt-name.long { font-size: 24px; }
 .nt-detail .nt-g { font-family: var(--nt-gothic); }
-.nt-detail .nt-grade { display: flex; align-items: center; gap: 8px; font: 500 11.5px/34px var(--nt-gothic); letter-spacing: 0.14em; color: var(--nt-verify); }
+.nt-detail .nt-grade { display: flex; align-items: center; gap: 8px; font: 700 12.5px/34px var(--nt-gothic); letter-spacing: 0.12em; color: var(--nt-verify); }
 .nt-detail .nt-grade::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none; }
 .nt-detail .nt-grade.ref { color: var(--nt-ref); }
 .nt-detail .nt-grade.cand { color: #8a7a68; }
 .nt-detail .nt-addr { display: flex; gap: 7px; align-items: flex-start; font: 400 13px/34px var(--nt-gothic); color: var(--nt-ink3); }
-.nt-detail .nt-addr b { font-weight: 500; color: var(--nt-ink2); }
+.nt-detail .nt-addr b { font-weight: 700; color: var(--nt-ink); }
 .nt-detail .nt-addr svg, .nt-detail .nt-ig svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex: none; margin-top: 9.5px; }
 .nt-detail .nt-ig { display: inline-flex; align-items: center; gap: 5px; font: 500 12.5px/34px var(--nt-gothic); color: var(--nt-coffee); text-decoration: none; }
 .nt-detail .nt-ig svg { margin-top: 0; }
 /* 손글씨 판정 한 줄 — 노트의 만년필. 34px 줄에 두 줄까지. */
-.nt-detail .nt-verdict { font-family: var(--nt-hand-font); font-size: 25px; color: var(--nt-hand); -webkit-text-stroke: 0; }
+.nt-detail .nt-verdict { font-family: var(--nt-hand-font); font-size: 27px; color: var(--nt-hand); -webkit-text-stroke: 0; }
 /* 라벨 — 작은 고딕 + 가는 선. 줄 하나(34px)를 차지한다. */
-.nt-detail .nt-lbl { display: flex; align-items: center; gap: 10px; font: 500 11px/34px var(--nt-gothic); letter-spacing: 0.12em; color: #8a7a66; text-transform: uppercase; white-space: nowrap; }
+.nt-detail .nt-lbl { display: flex; align-items: center; gap: 10px; font: 700 16px/34px var(--nt-name); letter-spacing: -0.01em; color: var(--nt-ink); white-space: nowrap; }
+.nt-detail .nt-lbl::before { content: ""; width: 4px; height: 16px; border-radius: 2px; background: var(--nt-coffee); flex: none; }
 .nt-detail .nt-lbl::after { content: ""; flex: 1; height: 1px; background: var(--nt-line); }
-.nt-detail .nt-lbl em { font-style: normal; letter-spacing: 0; text-transform: none; font-weight: 400; }
+.nt-detail .nt-lbl em { font: 400 12px/34px var(--nt-gothic); color: #8a7a66; }
 /* 칩 — 선 하나·고딕·둥근 모서리. 이모지 없이 글자와 숫자만. */
 .nt-detail .nt-chip { font-family: var(--nt-gothic); font-size: 12.5px; font-weight: 500; height: 28px; padding: 0 11px; border-radius: 999px; border: 1px solid rgba(90, 70, 50, 0.32); background: transparent; color: var(--nt-ink2); gap: 6px; }
 .nt-detail .nt-chip b { font-family: var(--nt-gothic); font-weight: 700; color: var(--nt-coffee); -webkit-text-stroke: 0; }
+.nt-detail .nt-chip.ink { background: var(--nt-ink); color: #fbf7f0; border-color: var(--nt-ink); }
+.nt-detail .nt-chip.ink b { color: #f0d9a8; }
 .nt-detail .nt-chip.good { background: transparent; border-color: rgba(51, 104, 75, 0.45); color: var(--nt-verify); }
 .nt-detail .nt-chip.warn { background: transparent; border-color: rgba(169, 58, 50, 0.4); color: #8a4040; }
 .nt-detail .nt-chip.soft { background: transparent; border-color: rgba(138, 106, 58, 0.4); color: #8a6a3a; }
 .nt-detail .nt-chips { gap: 8px; padding: 3px 0; }
 .nt-detail .nt-pill { font-family: var(--nt-gothic); font-weight: 500; font-size: 11.5px; }
 /* 후기 인용 — 왼쪽 커피색 세로선. */
-.nt-detail .nt-q { margin: 0; padding: 0 0 0 14px; border-left: 2px solid var(--nt-coffee); color: var(--nt-ink); }
+.nt-detail .nt-q { margin: 0; padding: 0 0 0 14px; border-left: 3px solid var(--nt-coffee); color: var(--nt-ink); font-size: 16px; }
+.nt-detail .nt-key { background: linear-gradient(transparent 52%, rgba(233, 214, 189, 0.95) 52%); color: var(--nt-ink); font-weight: 700; padding: 0 1px; border-radius: 1px; }
 .nt-detail .nt-q .m { display: block; font: 400 12px/34px var(--nt-gothic); color: #8a7a66; }
 .nt-detail details.nt-more > summary { list-style: none; cursor: pointer; font: 500 13px/34px var(--nt-gothic); color: var(--nt-coffee); }
 .nt-detail details.nt-more > summary::-webkit-details-marker { display: none; }
@@ -325,12 +329,14 @@
 .nt-detail .nt-bar .tr { display: block; height: 8px; background: rgba(90, 70, 50, 0.14); border-radius: 4px; overflow: hidden; }
 .nt-detail .nt-bar .fl { display: block; height: 100%; background: linear-gradient(90deg, #a8763e, var(--nt-coffee)); border-radius: 4px; }
 .nt-detail .nt-bar.top .fl { background: linear-gradient(90deg, var(--nt-coffee), #5a3a16); }
+.nt-detail .nt-bar.top > span:first-child { font-weight: 700; color: var(--nt-ink); }
+.nt-detail .nt-bar.top .n { font-weight: 700; color: var(--nt-coffee); }
 .nt-detail .nt-bar .n { text-align: right; font-variant-numeric: tabular-nums; color: #8a7a66; font-size: 12.5px; }
 /* 다른 카페보다 — 큰 숫자 타일 3개(3줄=102px). 종이에 붙인 조각이라 줄 위에 얹힌다. */
 .nt-detail .nt-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; height: 102px; padding: 4px 0; }
 .nt-detail .nt-tile { background: var(--nt-paper2); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; justify-content: space-between; min-width: 0; }
-.nt-detail .nt-tile .k { font: 700 13px/1.35 var(--nt-serif); color: var(--nt-ink); text-wrap: balance; }
-.nt-detail .nt-tile .v { font: 700 22px/1 var(--nt-name); color: var(--nt-coffee); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.nt-detail .nt-tile .k { font: 700 14px/1.35 var(--nt-name); color: var(--nt-ink); text-wrap: balance; }
+.nt-detail .nt-tile .v { font: 700 26px/1 var(--nt-name); color: var(--nt-coffee); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
 .nt-detail .nt-tile .v small { font: 500 10.5px var(--nt-gothic); color: #8a7a66; letter-spacing: 0.04em; margin-left: 3px; }
 .nt-detail .nt-note { display: flex; gap: 8px; align-items: flex-start; font: 400 13px/34px var(--nt-gothic); color: var(--nt-ink3); }
 .nt-detail .nt-note svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; flex: none; margin-top: 9.5px; color: #8a7a66; }
@@ -341,7 +347,8 @@
 .nt-detail .nt-flow .fs b { display: block; font: 700 18px/1.15 var(--nt-name); color: var(--nt-ink); font-variant-numeric: tabular-nums; -webkit-text-stroke: 0; }
 /* 근처 카페 — 한 줄에 한 곳. 이름 · 등급 · 후기 수 · 거리. */
 .nt-detail .nt-near { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; height: 34px; color: var(--nt-ink); text-decoration: none; }
-.nt-detail .nt-near .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; }
+.nt-detail .nt-near .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 15px/34px var(--nt-name); }
+.nt-detail .nt-near .s > span:last-child { font-weight: 700; color: var(--nt-ink2); }
 .nt-detail .nt-near .s { display: flex; gap: 8px; align-items: center; font: 400 12.5px/34px var(--nt-gothic); color: #8a7a66; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .nt-detail .nt-near .s .g { color: var(--nt-verify); font-weight: 500; }
 /* 접힘 — 판정 방법·더 하기·FAQ. 요약줄 34px, 오른쪽 ＋/－. */
@@ -351,7 +358,7 @@
 .nt-detail details.nt-x > summary::after { content: "＋"; color: #8a7a66; }
 .nt-detail details.nt-x[open] > summary::after { content: "－"; }
 .nt-detail .nt-body { font: 400 13px/34px var(--nt-gothic); color: var(--nt-ink3); }
-.nt-detail .nt-body b { font-weight: 500; color: var(--nt-ink2); }
+.nt-detail .nt-body b { font-weight: 700; color: var(--nt-ink); }
 .nt-detail .nt-body a { color: var(--nt-coffee); }
 .nt-detail .nt-scrap, .nt-detail .nt-scrap * { font-family: var(--nt-gothic); }
 /* 하단 고정 행동 2개 — 종이 위로 떠 있는 띠. */
@@ -369,3 +376,8 @@
 .nt-app .nt-detail .text-\[13px\] { font-size: 13px; } .nt-app .nt-detail .text-\[13\.5px\] { font-size: 13.5px; } .nt-app .nt-detail .text-\[14px\] { font-size: 14px; }
 .nt-app .nt-detail .text-\[14\.5px\] { font-size: 14.5px; } .nt-app .nt-detail .text-\[15px\] { font-size: 15px; } .nt-app .nt-detail .text-\[15\.5px\] { font-size: 15.5px; }
 .nt-app .nt-detail .text-\[16px\] { font-size: 16px; } .nt-app .nt-detail .text-\[17px\] { font-size: 17px; } .nt-app .nt-detail .text-\[18px\] { font-size: 18px; }
+
+/* 홈 카드 메타(지역 · 검증 후기 N건) — 숫자만 진하게 */
+.nt-app .nt-meta { font-family: var(--nt-sans); }
+.nt-app .nt-meta b { font-family: var(--nt-sans); color: var(--nt-ink); }
+.nt-eyebrow { font-weight: 600; }

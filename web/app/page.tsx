@@ -17,7 +17,7 @@ import { FACET_EMOJI } from "@/lib/cafeProfile";
 import { useLockBodyScroll } from "@/lib/useLockBodyScroll";
 import { shareHookText } from "@/lib/shareCopy";
 import { decodeCafeScores } from "@/lib/mapCafes";
-import { isReadableQuote, rankNearby, nearbyTitle, fmtKm, monthlySeries, freshnessOf, CHAR_LABEL, charBarsOf, addrTail, igHandle } from "@/lib/cafeDetailView"; // 📓 상세 패널 2차 공용 계산
+import { isReadableQuote, splitKeyTerms, rankNearby, nearbyTitle, fmtKm, monthlySeries, freshnessOf, CHAR_LABEL, charBarsOf, addrTail, igHandle } from "@/lib/cafeDetailView"; // 📓 상세 패널 2차 공용 계산
 
 type EvidenceReview = { quote: string; link?: string; source?: string; date?: string; trust?: "verified" | "reference" | "rejected"; score?: number; why?: string[] };
 type QualityStats = { raw: number; verified: number; reference: number; rejected: number; duplicates?: number; rejectReasons?: Record<string, number> };
@@ -201,11 +201,11 @@ const HeadlineCard = memo(function HeadlineCard({ c, kicker, tone, onOpen, featu
             {c.isNew && <span className="nt-pill" style={{ color: "#b9793b" }}>NEW</span>}
             <VisitorBadges vb={(c as any).vb} />
           </div>
-          <div className="text-[11.5px] text-[#7a5122] mb-1">{c.area} · 리뷰 {c.count ?? 0}건</div>
+          <div className="text-[11.5px] text-[#7a5122] mb-1 nt-meta">{c.area} · 검증 후기 <b>{c.count ?? 0}건</b></div>
         </div>
         {c.grade && <div className={`nt-stamp ${featured ? "sm" : "xs"} ${stamp}`} aria-label={`등급 ${c.grade}`}>{c.grade}{featured && <small>VERIFIED</small>}</div>}
       </div>
-      {c.identity && <p className={`nt-hand text-[#2f3550] line-clamp-1 mb-1.5 ${featured ? "" : "sm"}`} style={{ lineHeight: featured ? "30px" : "26px" }}>{featured ? <span className="nt-hl">{c.identity}</span> : c.identity}</p>}
+      {c.identity && <p className={`nt-hand text-[#2f3550] line-clamp-1 mb-1.5 ${featured ? "" : "sm"}`} style={{ lineHeight: featured ? "30px" : "26px" }}><span className="nt-hl">{c.identity}</span></p>}
       <FacetStrip fac={c.fac} size={featured ? 12 : 11} />
       <CautionLine cau={c.cau} size={featured ? 12 : 11} />
       {c.beanNote.length > 0 && <div className="flex flex-wrap gap-1.5 mt-1.5">{c.beanNote.map((b) => <span key={b} className="nt-chip" style={{ height: 22, fontSize: 11.5 }}>{b}</span>)}</div>}
@@ -644,7 +644,7 @@ function topChars(c: Cafe, n = 4) {
 //   기억이 살아있는 순간에 기록으로 잇는다(강요 아님 — 작은 보조 버튼).
 function FavoritesModal({ items, onClose, onOpen, onRemove, onRecord }: { items: Cafe[]; onClose: () => void; onOpen: (c: Cafe) => void; onRemove: (id: number) => void; onRecord: (c: Cafe) => void }) {
   return (
-    <div className="fixed inset-0 z-[5000] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)", fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }} onClick={onClose}>
+    <div className="fixed inset-0 z-[5000] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)", fontFamily: "var(--nt-font)" }} onClick={onClose}>
       <div className="w-full max-w-lg nt-paper rounded-t-2xl max-h-[80dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-[#f0e6d4]">
           <div className="font-bold text-[#2b2018] text-[15px]"><span style={{ color: "#f0a832" }}>★</span> 즐겨찾기 <span className="text-[#54432c] text-[12px] font-normal">{items.length}곳</span></div>
@@ -2083,7 +2083,7 @@ export default function Home() {
     //   인스타 안드로이드 인앱 WebView가 페이지 폭을 못 구하고 좁은 뷰포트로 폴백→화면 확대(초기화면만 깨지던 원인, 2026-07-10).
     //   /area 등 min-h-screen 페이지는 정상이던 것과 동일 패턴으로 맞춤. 세로 가운데정렬은 유지.
     return (
-      <div className="nt-app" style={{ position: "fixed", inset: 0, overflow: "hidden", background: "var(--nt-espresso)", fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }}>
+      <div className="nt-app" style={{ position: "fixed", inset: 0, overflow: "hidden", background: "var(--nt-espresso)", fontFamily: "var(--nt-font)" }}>
         <LandingNote discover={discover} onConsumer={chooseConsumer}
           onOwner={() => { trackOwnerCta(); setShowFind(true); }}
           onLogin={() => { setOwnerPw(""); setOwnerErr(""); setOwnerPin(""); setOwnerPinErr(""); setOwnerAdminMode(false); setOwnerPwModal(true); }} />
@@ -2138,7 +2138,7 @@ export default function Home() {
   }
 
   return (
-    <div className="flex flex-col nt-paper nt-app" style={{ position: "fixed", inset: 0, fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }}>
+    <div className="flex flex-col nt-paper nt-app" style={{ position: "fixed", inset: 0, fontFamily: "var(--nt-font)" }}>
       {/* 📖 책장 넘김 — 탭이 바뀔 때 종이 한 장이 왼쪽으로 넘어간다(0.55s, 움직임 줄이기면 없음) */}
       {/* 📖 책장 넘김 연출은 2026-09-13 CEO 지시로 삭제(전면 회전·모서리 귀접이 모두). turnKey는 탭 전환 시 홈 목록 재마운트 키로만 남는다. */}
       {/* 📣 접속 시 안내 공지 — 데이터는 /api/discover 응답에 얹혀 온다(전용 요청 0, 비용 증가 0) */}
@@ -2900,7 +2900,7 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
   const srcLine = <p className="nt-src">네이버 공개 후기 {(cafe.synth_count ?? 0).toLocaleString()}건 교차검증 · 영수증 리뷰·광고·협찬 제외 · {checkedOn} 확인</p>;
   const quoteOf = (e: EvidenceReview, i: number) => (
     <blockquote key={e?.link ?? i} className="nt-q">
-      {e.link ? <a href={e.link} target="_blank" rel="noopener noreferrer" className="hover:text-[#7a5122]">“{String(e.quote).trim()}”</a> : <>“{String(e.quote).trim()}”</>}
+      {(() => { const body = <>“{splitKeyTerms(String(e.quote).trim()).map((seg, j) => seg.k ? <mark key={j} className="nt-key">{seg.t}</mark> : <span key={j}>{seg.t}</span>)}”</>; return e.link ? <a href={e.link} target="_blank" rel="noopener noreferrer" className="hover:text-[#7a5122]">{body}</a> : body; })()}
       {(e?.source || e?.date) && <span className="m">{e?.source ?? ""}{e?.date ? ` · ${String(e.date).slice(0, 7)}` : ""}</span>}
     </blockquote>
   );
@@ -2992,7 +2992,7 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
           {(cafe.synth_identity || facts.length > 0) && (
             <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
               {cafe.synth_identity && <p className="nt-verdict"><span className="nt-hl">{cafe.synth_identity}</span></p>}
-              {facts.length > 0 && <div className="nt-chips">{facts.map((h) => <span key={h.label} className="nt-chip">{h.label}<b>{h.count}</b></span>)}</div>}
+              {facts.length > 0 && <div className="nt-chips">{facts.map((h, i) => <span key={h.label} className={`nt-chip ${i === 0 ? "ink" : ""}`}>{h.label}<b>{h.count}</b></span>)}</div>}
             </div>
           )}
 
@@ -3266,7 +3266,7 @@ function MemoryTab({ device, visits, locked = false, sessionPin = "", onReload, 
 
   if (locked) {
     return (
-      <div className="flex-1 overflow-y-auto flex items-start justify-center px-6 pt-16" style={{ fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }}>
+      <div className="flex-1 overflow-y-auto flex items-start justify-center px-6 pt-16" style={{ fontFamily: "var(--nt-font)" }}>
         <div className="nt-scrap px-7 py-8 text-center max-w-xs w-full">
           <i className="nt-tape" aria-hidden />
           <div className="text-[34px] mb-2">🔒</div>
@@ -3281,7 +3281,7 @@ function MemoryTab({ device, visits, locked = false, sessionPin = "", onReload, 
   }
 
   return (
-    <div className="flex-1 overflow-y-auto overflow-x-hidden nt-page-in" style={{ fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }}>
+    <div className="flex-1 overflow-y-auto overflow-x-hidden nt-page-in" style={{ fontFamily: "var(--nt-font)" }}>
       <div className="max-w-lg mx-auto px-4 py-5 pb-[3.5rem] relative">
         <div className="nt-ring" aria-hidden style={{ right: -70, top: 150, width: 200 }} />
         <div className="flex items-center justify-between mb-3 relative">
@@ -3349,7 +3349,7 @@ function MemoryTab({ device, visits, locked = false, sessionPin = "", onReload, 
       {viewVisit && (() => {
         const vphotos: string[] = Array.isArray(viewVisit.photos) && viewVisit.photos.length ? viewVisit.photos : (viewVisit.photo_url ? [viewVisit.photo_url] : []);
         return (
-          <div className="fixed inset-0 z-[5000] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)", fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }} onClick={() => setViewVisit(null)}>
+          <div className="fixed inset-0 z-[5000] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)", fontFamily: "var(--nt-font)" }} onClick={() => setViewVisit(null)}>
             <div className="w-full max-w-lg nt-paper rounded-t-2xl max-h-[90dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-[#f0e6d4]">
                 <div className="flex items-center gap-2 min-w-0">
@@ -3498,7 +3498,7 @@ function MemorySettingsModal({ device, visits, hasPin, onPinChange, onClose, onR
   };
 
   return (
-    <div className="fixed inset-0 z-[5000] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)", fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }} onClick={onClose}>
+    <div className="fixed inset-0 z-[5000] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)", fontFamily: "var(--nt-font)" }} onClick={onClose}>
       <div className="w-full max-w-lg bg-[#fdfaf4] rounded-t-2xl max-h-[88dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-[#f0e6d4]">
           <div className="font-bold text-[#2b2018] text-[15px]">⚙ 설정</div>

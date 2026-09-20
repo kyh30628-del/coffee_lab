@@ -19,7 +19,7 @@ import { collectionForCafe } from "@/lib/collections";
 import { tasteByKey } from "@/lib/seoData";
 import { shareHookText } from "@/lib/shareCopy";
 import { sortReviews, ensureRecent } from "@/lib/exposureOrder";
-import { isReadableQuote, rankNearby, nearbyTitle, fmtKm, monthlySeries, freshnessOf, CHAR_LABEL, charBarsOf, addrTail, igHandle, type NearbyCafe } from "@/lib/cafeDetailView";
+import { isReadableQuote, splitKeyTerms, rankNearby, nearbyTitle, fmtKm, monthlySeries, freshnessOf, CHAR_LABEL, charBarsOf, addrTail, igHandle, type NearbyCafe } from "@/lib/cafeDetailView";
 import { extractWorkSignals } from "@/lib/workDetail";
 import OutboundLink from "../../OutboundLink";
 import { isOwnerManaged } from "@/lib/ownerManaged"; // 🏅 사장님 관리 배지(조건·문구 단일출처)
@@ -326,7 +326,7 @@ export default async function CafePage({ params }: Props) {
   );
   const quoteOf = (e: any, i: number) => (
     <blockquote key={e?.link ?? i} className="nt-q">
-      “{String(e.quote).trim()}”
+      “{splitKeyTerms(String(e.quote).trim()).map((seg, j) => seg.k ? <mark key={j} className="nt-key">{seg.t}</mark> : <span key={j}>{seg.t}</span>)}”
       {(e?.source || e?.date) && <span className="m">{e?.source ?? ""}{e?.date ? ` · ${String(e.date).slice(0, 7)}` : ""}</span>}
     </blockquote>
   );
@@ -404,7 +404,7 @@ export default async function CafePage({ params }: Props) {
             {c.synth_identity && <p className="nt-verdict"><span className="nt-hl">{c.synth_identity}</span></p>}
             {facts.length > 0 && (
               <div className="nt-chips">
-                {facts.map((h) => <span key={h.label} className="nt-chip">{h.label}<b>{h.count}</b></span>)}
+                {facts.map((h, i) => <span key={h.label} className={`nt-chip ${i === 0 ? "ink" : ""}`}>{h.label}<b>{h.count}</b></span>)}
               </div>
             )}
           </div>
