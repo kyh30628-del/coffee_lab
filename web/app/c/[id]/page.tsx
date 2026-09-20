@@ -82,7 +82,7 @@ async function getCafe(id: string) {
   const n = Number(id);
   if (!Number.isFinite(n) || n <= 0) return null;
   try {
-    return (await sql`SELECT c.id, c.name, c.area, c.dong, c.address, c.lat, c.lng, c.synth_grade, c.synth_identity, c.synth_count, c.char_scores, c.synth_reviews_all, c.synth_reviews, c.reputation_note, c.synth_quality, c.visitor_n, c.visitor_trip, c.visitor_local, c.area_rank, c.area_total, c.review_dates, c.cautions,
+    return (await sql`SELECT c.id, c.name, c.area, c.dong, c.address, c.lat, c.lng, c.synth_grade, c.synth_identity, c.synth_count, c.char_scores, c.synth_reviews_all, c.synth_reviews, c.reputation_note, c.synth_quality, c.visitor_n, c.visitor_trip, c.visitor_local, c.area_rank, c.area_total, c.review_dates, c.cautions, c.instagram_url,
       COALESCE(dt.is_tourist, false) AS dong_tourist
       FROM cafes c LEFT JOIN dong_tourism dt ON dt.area = c.area AND dt.dong = c.dong
       WHERE c.id=${n} AND c.published=true LIMIT 1`)[0] as any ?? null;
@@ -179,24 +179,83 @@ async function getPublicReviews(cafeId: number) {
   } catch { return []; }
 }
 
-// 🔁 리텐션 훅 — 같은 동네(area) + 결(taste) 유사도 기반 '비슷한 카페 더보기'.
-//   1페이지 이탈↓·2페이지 유도(홍보×경험 #94, decisions #338 — 상세 89% 1페이지 이탈 대응).
-//   검증/참고 등급 우선 노출(등급 낮은 순 정렬) → 동급 안에서는 결 유사도·검증후기 수로 정렬. published=true라 오염 카페는 이미 제외.
-async function getSimilar(area: string, excludeId: number, char_scores: any, synth_count: number) {
+// 📍 근처 카페(2026-09-20 CEO 승인) — 종전엔 같은 시군구(area) 안에서 결 유사도로 골라 "이 동네 비슷한 곳"이라 불렀다.
+//   실측: 서귀포시 성산읍 카페의 '이 동네'가 31·67·71km 떨어진 곳이었다(시군구가 넓으면 동네가 아니다).
+//   → 순서를 **같은 읍면동 → 반경 10km → 같은 시군구**로 바꾸고, 화면엔 실제 거리(km)를 적는다.
+//   비용: 좌표 박스 조회 1회(부분 인덱스 idx_cafes_geo(lat,lng) WHERE published — 09-20 실재 확인). 박스 안이 6곳 미만인
+//   희소 지역만 시군구 조회 1회를 보탠다. 좌표 없는 카페는 종전 시군구 조회로 폴백(회귀 없음).
+function distKm(aLat: number, aLng: number, bLat: number, bLng: number): number {
+  const R = 6371, toR = (d: number) => (d * Math.PI) / 180;
+  const dLat = toR(bLat - aLat), dLng = toR(bLng - aLng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(toR(aLat)) * Math.cos(toR(bLat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+type NearbyCafe = { id: number; name: string; synth_grade: string | null; synth_count: number | null; area: string; dong: string | null; km: number | null; tier: 0 | 1 | 2 };
+async function getNearby(c: any): Promise<NearbyCafe[]> {
+  const excludeId = Number(c.id);
+  const hasGeo = typeof c.lat === "number" && typeof c.lng === "number";
   try {
-    const rows = (await sql`SELECT id, name, synth_grade, synth_count, char_scores FROM cafes
-      WHERE published=true AND area=${area} AND id<>${excludeId}
-      ORDER BY COALESCE(synth_count,0) DESC LIMIT 40`) as any[];
-    const mine = tasteVector(char_scores, synth_count);
+    let rows: any[] = [];
+    if (hasGeo) {
+      const dLat = 0.09, dLng = 0.11; // ≈ 위도 10km · 경도 10km(북위 35~38°)
+      rows = (await sql`SELECT id, name, synth_grade, synth_count, char_scores, area, dong, lat, lng FROM cafes
+        WHERE published=true AND id<>${excludeId} AND lat IS NOT NULL
+          AND lat BETWEEN ${c.lat - dLat} AND ${c.lat + dLat} AND lng BETWEEN ${c.lng - dLng} AND ${c.lng + dLng}
+        ORDER BY (dong = ${c.dong ?? ""} AND area = ${c.area}) DESC, COALESCE(synth_count,0) DESC LIMIT 80`) as any[];
+    }
+    if (rows.length < 6) {
+      const more = (await sql`SELECT id, name, synth_grade, synth_count, char_scores, area, dong, lat, lng FROM cafes
+        WHERE published=true AND area=${c.area} AND id<>${excludeId}
+        ORDER BY COALESCE(synth_count,0) DESC LIMIT 40`) as any[];
+      const seen = new Set(rows.map((r) => r.id));
+      for (const r of more) if (!seen.has(r.id)) rows.push(r);
+    }
+    const mine = tasteVector(c.char_scores, c.synth_count);
     return rows
-      .map((r) => ({ ...r, sim: tasteSimilarity(mine, tasteVector(r.char_scores, r.synth_count)) }))
+      .map((r) => {
+        const km = hasGeo && typeof r.lat === "number" && typeof r.lng === "number" ? distKm(c.lat, c.lng, r.lat, r.lng) : null;
+        const tier: 0 | 1 | 2 = r.dong && r.dong === c.dong && r.area === c.area ? 0 : km !== null && km <= 10 ? 1 : 2;
+        return { id: r.id, name: r.name, synth_grade: r.synth_grade, synth_count: r.synth_count, area: r.area, dong: r.dong, km, tier,
+          sim: tasteSimilarity(mine, tasteVector(r.char_scores, r.synth_count)) };
+      })
+      .filter((r) => r.tier < 2 || r.area === c.area) // 10km 밖이면서 다른 시군구 = 근처가 아니다
       .sort((a, b) =>
-        (GRADE_RANK[a.synth_grade] ?? 3) - (GRADE_RANK[b.synth_grade] ?? 3) ||
+        a.tier - b.tier ||
+        (GRADE_RANK[a.synth_grade ?? ""] ?? 3) - (GRADE_RANK[b.synth_grade ?? ""] ?? 3) ||
+        (a.km ?? 99) - (b.km ?? 99) ||
         b.sim - a.sim ||
         (b.synth_count ?? 0) - (a.synth_count ?? 0))
-      .slice(0, 6);
+      .slice(0, 6)
+      .map(({ sim: _s, ...r }) => r);
   } catch { return []; }
 }
+const fmtKm = (km: number | null) => km === null ? "" : km < 1 ? `${Math.max(1, Math.round(km * 10)) * 100}m` : km < 10 ? `${km.toFixed(1)}km` : `${Math.round(km)}km`;
+
+// 📈 월별 후기 흐름 — review_dates("YYYY.MM.DD")를 최근 N개월 칸에 센다. 이미 읽은 작은 jsonb라 조회 0.
+function monthlySeries(dates: unknown, months = 14): { key: string; n: number }[] | null {
+  const arr = Array.isArray(dates) ? (dates as unknown[]).map(String).filter((d) => /^\d{4}\.\d{2}\.\d{2}$/.test(d)) : [];
+  if (!arr.length) return null;
+  const now = new Date(); const out: { key: string; n: number }[] = [];
+  for (let i = months - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    out.push({ key: `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}`, n: 0 });
+  }
+  const idx = new Map(out.map((o, i) => [o.key, i]));
+  for (const d of arr) { const i = idx.get(d.slice(0, 7)); if (i !== undefined) out[i].n++; }
+  return out;
+}
+// 이름표(이모지 없음) — 결 막대·타일용. CHAR(위)는 OG·FAQ 문장이 쓰므로 그대로 둔다.
+const CHAR_LABEL: Record<string, string> = { roast: "직접 로스팅", work: "작업하기 좋은", quiet: "조용한", dessert: "디저트", mood: "분위기", space: "넓은 공간", pet: "애견 동반", brunch: "브런치", view: "뷰", bakery: "베이커리", terrace: "테라스·야외" };
+// 주소 표시 — 시도·시군구·읍면동 접두를 떼고 도로명부터. 앞은 굵게(시군구 읍면동).
+function addrTail(address: string | null | undefined, area: string, dong: string | null | undefined): string {
+  if (!address) return "";
+  const toks = String(address).trim().split(/\s+/);
+  let i = 0;
+  if (toks[i] && /(특별자치도|특별자치시|특별시|광역시|도)$/.test(toks[i]) && toks[i] !== area) i++;
+  while (i < toks.length && (toks[i] === area || (dong && toks[i] === dong) || area.split(" ").includes(toks[i]))) i++;
+  return toks.slice(i).join(" ");
+}
+const igHandle = (u: string | null | undefined) => { const m = String(u ?? "").match(/instagram\.com\/([A-Za-z0-9._]+)/); return m ? m[1] : null; };
 
 export default async function CafePage({ params }: Props) {
   const { id } = await params;
@@ -204,7 +263,7 @@ export default async function CafePage({ params }: Props) {
   if (!c) notFound();
   const tags = topTags(c.char_scores);
   const userReviews = await getPublicReviews(c.id);
-  const nearby = await getSimilar(c.area, c.id, c.char_scores, c.synth_count);
+  const nearby = await getNearby(c);
   const grade = c.synth_grade || "";
   const ownerManaged = await isOwnerManaged(Number(c.id)); // 🏅 구독·체험 유효한 사장님 카페인가(단일출처)
   // 인앱 상세와 동일: 강·약(전체 대비) + 옥석 리뷰 데이터 핵심
@@ -221,7 +280,9 @@ export default async function CafePage({ params }: Props) {
   // 📖 화면에 보여줄 후기(2026-09-20) — 이 페이지는 후기 100건을 읽어 통계만 뽑고 **문장은 한 줄도 안 보여주고 있었다.**
   //   대표님: "상세 페이지 열어서 문구들이 제대로 보이냐? 글자만 오지게 많고 난장판". 통계·방법론·면책만 있고 정작
   //   사람이 쓴 말이 없었다. 정렬 순서 그대로, 읽히는 문장(isReadableQuote)만 최대 3건. 2건 미만이면 안 보여준다.
-  const shownQuotes = evAll.filter((e: any) => isReadableQuote(e?.quote, c.name ?? "")).slice(0, 3);
+  const readable = evAll.filter((e: any) => isReadableQuote(e?.quote, c.name ?? ""));
+  const shownQuotes = readable.slice(0, 3);
+  const moreQuotes = readable.slice(3, 12); // 접힘 — 페이지 길이는 안 늘고 정보는 있다
   const showQuotes = shownQuotes.length >= 2;
   const highlights = extractHighlights(quotesAll);
   // 💻 카공 세부 신호(2026-08-17) — "작업하기 좋음" 한 축으로 뭉뚱그리던 것을 콘센트·와이파이·자리로 쪼갠다.
@@ -244,9 +305,6 @@ export default async function CafePage({ params }: Props) {
     const latest = new Date(latestT); const recent = ts.filter((t) => t >= cut).length;
     return { recent, latest: `${latest.getFullYear()}.${String(latest.getMonth() + 1).padStart(2, "0")}`, stale: latestT < cut };
   })();
-  const sqReasons: [string, number][] = sq?.rejectReasons && typeof sq.rejectReasons === "object"
-    ? (Object.entries(sq.rejectReasons) as [string, number][]).filter(([, n]) => Number(n) > 0).sort((a, b) => Number(b[1]) - Number(a[1])).slice(0, 3)
-    : [];
   const faqs = buildFaq(c, grade, highlights, profile, tags);
   const faqJsonLd = faqs.length > 0 ? {
     "@context": "https://schema.org", "@type": "FAQPage",
@@ -303,25 +361,57 @@ export default async function CafePage({ params }: Props) {
   const mapHref = (typeof c.lat === "number" && typeof c.lng === "number")
     ? `/?cafe=${c.id}&clat=${c.lat}&clng=${c.lng}&cz=17`
     : `/?cafe=${c.id}`;
-  // 📓 2026-09-12 "한 권의 노트" — 이 페이지는 줄노트 한 장이다.
-  //   · 글자는 전부 줄(.nt-ruled, 30px 간격)에 밑선을 맞춰 앉는다. 붙인 종이(.nt-scrap)만 격자 밖.
-  //   · 손글씨는 "판정"(우리가 읽고 적은 문장·강약의 배수)에만. 도장은 등급.
-  //   · 정보 구조·링크·문구·JSON-LD 전부 그대로(SEO 무변). 비용 0(정적 재질만).
+  // 📓 2026-09-20 2차(CEO 승인 시안 → 적용). "한 권의 노트"는 유지 — 줄(34px)·여백선·도장·찢은 띠·손글씨 판정.
+  //   바뀐 것: 본문 명조·이름 Hahmlet·라벨 고딕(글씨 종류 3), 이모지 0, 강조색 커피 하나,
+  //   정보 블록 추가(주소·인스타·자주 나온 말·후기 더 읽기·결 막대·상위% 타일·후기 흐름·근처 거리),
+  //   CTA는 하단 고정 2개로. 정보 구조·링크·JSON-LD는 그대로(SEO 무변). 추가 조회는 근처 좌표 박스 1회뿐.
   const stampKind = grade === "참고" ? "ref" : grade === "후보" ? "cand" : "";
   const stampEn = grade === "검증" ? "VERIFIED" : grade === "참고" ? "REFERENCE" : "CANDIDATE";
+  const series = monthlySeries(c.review_dates);
+  const seriesMax = series ? Math.max(1, ...series.map((m) => m.n)) : 1;
+  const seriesLast = series ? series.reduce((acc, m, i) => (m.n > 0 ? i : acc), -1) : -1;
+  const charBars = Object.entries((c.char_scores ?? {}) as Record<string, number>)
+    .filter(([k, v]) => CHAR_LABEL[k] && Number(v) > 0)
+    .sort((a, b) => Number(b[1]) - Number(a[1]))
+    .slice(0, 5);
+  const barMax = charBars.length ? Number(charBars[0][1]) : 1;
+  const addrRest = addrTail(c.address, c.area, c.dong);
+  const ig = igHandle(c.instagram_url);
+  const facts = highlights.slice(0, 4);
+  const vBadges = visitorBadges({ n: c.visitor_n ?? 0, trip: c.visitor_trip ?? 0, local: c.visitor_local ?? 0 });
+  const showRank = typeof c.area_rank === "number" && c.area_rank <= 10 && (c.area_total ?? 0) >= 20;
+  const nearTitle = nearby.length > 0 && nearby[0].tier === 0 && c.dong ? `${c.dong} 근처 카페` : nearby.length > 0 && nearby[0].tier === 1 ? "가까운 카페" : `${c.area}의 다른 카페`;
+  const checkedOn = new Date().toISOString().slice(0, 10);
+  const srcLine = (
+    <p className="nt-src">네이버 공개 후기 {(c.synth_count ?? 0).toLocaleString()}건 교차검증 · 영수증 리뷰·광고·협찬 제외 · {checkedOn} 확인</p>
+  );
+  const quoteOf = (e: any, i: number) => (
+    <blockquote key={e?.link ?? i} className="nt-q">
+      “{String(e.quote).trim()}”
+      {(e?.source || e?.date) && <span className="m">{e?.source ?? ""}{e?.date ? ` · ${String(e.date).slice(0, 7)}` : ""}</span>}
+    </blockquote>
+  );
+  const themed = Object.entries((c.char_scores ?? {}) as Record<string, number>)
+    .filter(([k, v]) => Number(v) > 0 && tasteByKey(k))
+    .sort((a, b) => Number(b[1]) - Number(a[1]))
+    .slice(0, 2)
+    .map(([k]) => tasteByKey(k)!);
+  const col = collectionForCafe(c.dong, c.area);
+  const IcoPin = () => <svg viewBox="0 0 24 24" aria-hidden><path d="M12 22s7-6.2 7-12a7 7 0 0 0-14 0c0 5.8 7 12 7 12z"/><circle cx="12" cy="10" r="2.6"/></svg>;
+  const IcoInfo = () => <svg viewBox="0 0 24 24" aria-hidden><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>;
   return (
-    <main className="min-h-screen nt-paper nt-app text-[#2a1f17]" style={{ fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }}>
+    <main className="min-h-screen nt-paper nt-detail">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }} />
       {faqJsonLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />}
-      <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Nanum+Pen+Script&display=swap" rel="stylesheet" />
-      <div className="max-w-xl mx-auto nt-page pb-12 overflow-hidden" style={{ ["--nt-mx" as any]: "36px" }}>
+      <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Hahmlet:wght@700&family=Nanum+Pen+Script&display=swap" rel="stylesheet" />
+      <div className="max-w-xl mx-auto nt-page pb-6" style={{ ["--nt-mx" as any]: "36px" }}>
         {/* 장식 — 잔 자국 하나, 오른쪽 위에 반쯤 걸쳐서 */}
         <div className="nt-ring" aria-hidden style={{ right: -78, top: 96, width: 220 }} />
 
         {/* 첫 줄: 뒤로 · 공유 */}
         <div className="nt-ruled nt-margin-gutter flex items-center justify-between gap-2 relative z-[1]" style={{ paddingTop: 34 }}>
-          <Link href="/" className="text-[13px] text-[#63523f]">← 동네 커피 노트</Link>
+          <Link href="/" className="nt-g text-[12.5px] text-[#63523f]">← 동네 커피 노트</Link>
           <span className="nt-free">
             <KakaoShare
               title={`${c.name} (${c.area})`}
@@ -329,7 +419,7 @@ export default async function CafePage({ params }: Props) {
               imageUrl={`${SITE}/c/${c.id}/opengraph-image`}
               link={`${SITE}/c/${c.id}`}
               source="카페상세"
-              className="inline-flex items-center gap-1.5 bg-[#FEE500] text-[#3c1e1e] rounded-full pl-2.5 pr-3 py-1 text-[12px] font-bold"
+              className="inline-flex items-center gap-1.5 bg-[#FEE500] text-[#3c1e1e] rounded-full pl-2.5 pr-3 py-1 text-[12px] font-bold nt-g"
             >
               <svg width="15" height="15" viewBox="0 0 24 24" fill="#3c1e1e"><path d="M12 3C6.5 3 2 6.6 2 11c0 2.8 1.9 5.3 4.7 6.7-.2.7-.7 2.6-.8 3-.1.5.2.5.4.4.2-.1 2.6-1.8 3.7-2.5.6.1 1.3.1 2 .1 5.5 0 10-3.6 10-8S17.5 3 12 3z"/></svg>
               공유
@@ -337,49 +427,146 @@ export default async function CafePage({ params }: Props) {
           </span>
         </div>
 
-        {/* 이름 · 도장 · 배지 */}
-        <div className="nt-ruled nt-margin-gutter relative z-[1] nt-band nt-torn-b" style={{ paddingTop: 34, paddingBottom: 34, paddingRight: grade ? 100 : 18, ["--nt-rule" as any]: "rgba(84,104,140,0.22)" }}>
+        {/* 머리 — 등급줄 · 이름 · 주소 · 인스타 · 배지. 도장은 오른쪽. */}
+        <header className="nt-ruled nt-margin-gutter relative z-[1] nt-band nt-torn-b" style={{ paddingTop: 34, paddingBottom: 34, paddingRight: grade ? 100 : 20, ["--nt-rule" as any]: "rgba(84,104,140,0.22)" }}>
           {grade && (
-            <div className={`nt-stamp in absolute ${stampKind}`} style={{ right: 16, top: 22 }} aria-label={`등급 ${grade}`}>{grade}<small>{stampEn}</small></div>
+            <div className={`nt-stamp in absolute ${stampKind}`} style={{ right: 16, top: 30 }} aria-label={`등급 ${grade}`}>{grade}<small>{stampEn}</small></div>
           )}
-          <h1 className="nt-title text-[28px] relative text-balance"><span className="nt-hl latte">{c.name}</span></h1>
-          {(ownerManaged || (typeof c.area_rank === "number" && c.area_rank <= 10 && (c.area_total ?? 0) >= 20)) && (
-            <div className="nt-chips" style={{ paddingTop: 3, paddingBottom: 3 }}>
-              {ownerManaged && (
-                <span title="사장님이 직접 정보를 관리하는 카페예요" className="nt-chip soft">🏅 사장님 관리</span>
-              )}
-              {/* 🏅 동네 순위(2026-08-30) — 상위 10위 이내만(낮은 순위는 그 카페에 해가 된다). 값은 cron-enrich가 하루 2회 계산해 저장(여기서 조회 0). */}
-              {typeof c.area_rank === "number" && c.area_rank <= 10 && (c.area_total ?? 0) >= 20 && (
-                <span className="nt-mark text-[13px] text-[#5c4b3c]">
-                  🏅 {c.area} {c.area_total}곳 중 <b className="text-[#7a5122]">{c.area_rank}위</b>
+          <div className={`nt-grade ${stampKind}`}>{grade || "카페"} · 후기 {(c.synth_count ?? 0).toLocaleString()}건</div>
+          <h1 className={`nt-name ${String(c.name).length > 12 ? "long" : ""}`}>{c.name}</h1>
+          <p className="nt-addr"><IcoPin /><span><b>{c.area}{c.dong ? ` ${c.dong}` : ""}</b>{addrRest ? ` ${addrRest}` : ""}</span></p>
+          {ig && (
+            <a className="nt-ig" href={c.instagram_url} target="_blank" rel="noopener noreferrer nofollow">
+              <svg viewBox="0 0 24 24" aria-hidden><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="3.8"/><circle cx="17.4" cy="6.6" r=".9" fill="currentColor" stroke="none"/></svg>
+              @{ig}
+            </a>
+          )}
+          {(ownerManaged || showRank || vBadges.length > 0 || c.dong_tourist) && (
+            <div className="nt-chips">
+              {ownerManaged && <span title="사장님이 직접 정보를 관리하는 카페예요" className="nt-chip soft">사장님 관리</span>}
+              {/* 🏅 동네 순위 — 상위 10위 이내만(낮은 순위는 그 카페에 해가 된다). cron-enrich가 하루 2회 계산(조회 0). */}
+              {showRank && (
+                <span className="nt-mark nt-g text-[12.5px] text-[#5c4b3c]">
+                  {c.area} {c.area_total}곳 중 <b className="text-[#7a5122]">{c.area_rank}위</b>
                   <svg viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden><path d="M8 20 C 10 6, 40 3, 62 6 S 96 14, 92 24 S 60 38, 36 36 S 3 30, 9 18 S 24 8, 40 9" /></svg>
                 </span>
               )}
+              {/* 🧳🏠 방문객 성격 — "이 후기를 누가 썼나". 두 배지는 배타적이지 않다. */}
+              {vBadges.map((b) => <span key={b.key} className="nt-chip good" title={b.note}>{b.label}</span>)}
+              {/* 📰 동 단위 뉴스 판정 — 후기 말투(위)와 별개의 '위치 속성'. */}
+              {c.dong_tourist && <span className="nt-chip" title="언론 보도 기준">관광지로 알려진 동네</span>}
             </div>
           )}
-          {/* 🧳🏠 방문객 성격 — "이 후기를 누가 썼나". 두 배지는 배타적이지 않다. */}
-          {(visitorBadges({ n: c.visitor_n ?? 0, trip: c.visitor_trip ?? 0, local: c.visitor_local ?? 0 }).length > 0 || c.dong_tourist) && (
-            <div className="nt-chips" style={{ paddingTop: 3, paddingBottom: 3 }}>
-              {visitorBadges({ n: c.visitor_n ?? 0, trip: c.visitor_trip ?? 0, local: c.visitor_local ?? 0 }).map((b) => (
-                <span key={b.key} className="nt-chip good">{b.emoji} {b.label} <span className="font-normal opacity-80">({b.note})</span></span>
-              ))}
-              {/* 📰 동 단위 뉴스 판정(2026-08-27) — 후기 말투(위)와 별개의 '위치 속성'. */}
-              {c.dong_tourist && (
-                <span className="nt-chip" style={{ color: "#4a5a6e", background: "#e6ebf2", borderColor: "#c9d3e0" }}>🗺️ 관광지로 알려진 동네 <span className="font-normal opacity-80">(언론 보도 기준)</span></span>
-              )}
-            </div>
-          )}
-          <div className="flex items-center justify-between gap-2" style={{ height: 34 }}>
-            <p className="text-[12px] text-[#6a4318] min-w-0 truncate">{c.area}{c.dong ? ` ${c.dong}` : ""} <span className="nt-pill fill ml-1" style={{ color: "#241812" }}><span>검증 후기 {c.synth_count ?? 0}건</span></span></p>
-            {/* ❤ 찜은 아래 배너 하나로 통합(2026-09-13) — 첫 화면에 찜·저장 CTA가 3개라 무엇을 눌러야 할지
-                알 수 없었다(실측: 첫 화면 791px 중 클릭요소가 402px·51%). 링크는 지우지 않고 자리만 정리한다. */}
-          </div>
-        </div>
+        </header>
 
-        {/* 📷✍ 사장님 사진·한마디(2026-09-13) — 사장님이 직접 올린 것. 후기·판정과 분리 표기(광고 아님·검증 무관). 구독 활성일 때만. */}
+        {/* ✍ 우리가 읽고 적은 판정 — 손글씨 한 줄 + 후기에 자주 나온 말 */}
+        {(c.synth_identity || facts.length > 0) && (
+          <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
+            {c.synth_identity && <p className="nt-verdict"><span className="nt-hl">{c.synth_identity}</span></p>}
+            {facts.length > 0 && (
+              <div className="nt-chips">
+                {facts.map((h) => <span key={h.label} className="nt-chip">{h.label}<b>{h.count}</b></span>)}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 📖 사람들이 쓴 말 — 이 페이지에서 가장 먼저 읽혀야 할 것. 정렬 순서 그대로 읽히는 문장 3건 + 접힘 9건. */}
+        {showQuotes && (
+          <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
+            <div className="nt-lbl">사람들이 쓴 말 <em>· 후기 원문</em></div>
+            {shownQuotes.map(quoteOf)}
+            {moreQuotes.length > 0 && (
+              <details className="nt-more">
+                <summary><span className="t1">후기 {moreQuotes.length}건 더 읽기</span><span className="t2">접기</span></summary>
+                {moreQuotes.map(quoteOf)}
+              </details>
+            )}
+            {srcLine}
+          </div>
+        )}
+
+        {/* ⚠️ 이건 알고 가세요 — 후기 2건 이상에서 확인된 주의점 + 손님이 쓴 근거 문장. cafes.cautions(합성 때 계산, 조회 0). */}
+        {Array.isArray(c.cautions) && c.cautions.length > 0 && (
+          <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
+            <div className="nt-lbl">이건 알고 가세요 <em>· 후기 2건 이상에서 확인된 것만</em></div>
+            <div className="nt-chips">
+              {(c.cautions as any[]).map((x: any) => <span key={x.label} className="nt-chip warn">{x.label}<b>{x.count}</b></span>)}
+            </div>
+            {(c.cautions as any[])[0]?.quote && (
+              <blockquote className="nt-q" style={{ borderColor: "#a93a32" }}>“…{(c.cautions as any[])[0].quote}…”</blockquote>
+            )}
+          </div>
+        )}
+
+        {/* 📊 이곳의 결 — char_scores 상위 5축. 현재 페이지엔 아예 안 나오던 값. */}
+        {charBars.length > 0 && (
+          <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
+            <div className="nt-lbl">이곳의 결 <em>· 후기에서 언급된 횟수</em></div>
+            <div className="nt-free">
+              {charBars.map(([k, v], i) => (
+                <div key={k} className={`nt-bar ${i === 0 ? "top" : ""}`}>
+                  <span>{CHAR_LABEL[k]}</span>
+                  <span className="tr"><span className="fl" style={{ width: `${Math.max(4, Math.round((Number(v) / barMax) * 100))}%` }} /></span>
+                  <span className="n">{Number(v).toLocaleString()}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 👍 다른 카페보다 — 전체 검증 카페 대비 상위 %(후기당 언급률 순위). 약점은 한 줄로. */}
+        {profile.ok && profile.strong.length > 0 && (
+          <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
+            <div className="nt-lbl">다른 카페보다 <em>· 전체 검증 카페 대비</em></div>
+            <div className="nt-free nt-tiles">
+              {profile.strong.slice(0, 3).map((s) => (
+                <div key={s.key} className="nt-tile">
+                  <div className="k">{CHAR_LABEL[s.key] ?? s.label}</div>
+                  <div className="v">{s.topPct}<small>% 안</small></div>
+                </div>
+              ))}
+            </div>
+            {profile.weak.length > 0 && (
+              <p className="nt-note"><IcoInfo /><span>‘{profile.weak.map((w) => CHAR_LABEL[w.key] ?? w.label).join(" · ")}’는 후기에 거의 언급이 없어요.</span></p>
+            )}
+          </div>
+        )}
+
+        {/* 💻 작업하기 전에 확인 — 근거 건수를 반드시 함께. 언급이 없으면 표시하지 않는다. */}
+        {(work.signals.length > 0 || work.timeLimit > 0) && (
+          <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
+            <div className="nt-lbl">작업하기 전에 확인 <em>· 후기에 실제로 적힌 말만</em></div>
+            <div className="nt-chips">
+              {work.signals.map((sg) => {
+                const pos = sg.yes >= sg.no;
+                return <span key={sg.key} className={`nt-chip ${pos ? "good" : "warn"}`}>{pos ? sg.label : sg.negLabel}<b>{Math.max(sg.yes, sg.no)}</b></span>;
+              })}
+              {work.timeLimit > 0 && <span className="nt-chip soft">이용 시간 제한 언급<b>{work.timeLimit}</b></span>}
+            </div>
+          </div>
+        )}
+
+        {/* 📈 후기 흐름 — 월별 스파크라인 + 최근 12개월·최신 월. review_dates(작은 jsonb) 기반, 조회 0. */}
+        {series && freshness && (
+          <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
+            <div className="nt-lbl">후기 흐름 <em>· 최근 {series.length}개월</em></div>
+            <div className="nt-free nt-flow">
+              <svg viewBox={`0 0 ${series.length * 10} 44`} preserveAspectRatio="none" role="img" aria-label={`월별 후기 수, 최근 ${series.length}개월`}>
+                {series.map((m, i) => {
+                  const h = m.n > 0 ? Math.max(3, Math.round((m.n / seriesMax) * 40)) : 2;
+                  return <rect key={m.key} x={1 + i * 10} y={44 - h} width={8} height={h} fill={i === seriesLast ? "#7a5122" : m.n > 0 ? "#c9a26b" : "rgba(90,70,50,0.18)"}><title>{`${m.key} · ${m.n}건`}</title></rect>;
+                })}
+              </svg>
+              <div className="fs"><b>{freshness.recent}건</b>최근 12개월 · 최신 {freshness.latest}{freshness.stale && <span style={{ color: "#a93a32" }}> · 1년 넘게 새 후기 없음</span>}</div>
+            </div>
+          </div>
+        )}
+
+        {/* 📷✍ 사장님 사진·한마디 — 사장님이 직접 올린 것. 후기·판정과 분리 표기. 구독 활성일 때만. */}
         {oc && (
           <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
-            <div className="nt-sec">🏅 사장님이 직접 올린 사진과 한마디</div>
+            <div className="nt-lbl">사장님이 직접 올린 사진과 한마디</div>
             {oc.photos.length > 0 && (
               <div className="nt-free flex gap-3 overflow-x-auto pb-2" style={{ marginLeft: -6 }}>
                 {oc.photos.map((p, i) => (
@@ -390,309 +577,121 @@ export default async function CafePage({ params }: Props) {
                 ))}
               </div>
             )}
-            {oc.note.trim() && <p className="nt-hand"><span className="nt-hl latte">“{oc.note.trim()}”</span></p>}
-            <div className="text-[11.5px] text-[#63523f]">사장님 제공 · 검증 후기·등급과는 별개예요{oc.noteAt ? ` · ${new Date(oc.noteAt).getFullYear()}.${String(new Date(oc.noteAt).getMonth() + 1).padStart(2, "0")}` : ""}</div>
+            {oc.note.trim() && <p className="nt-verdict"><span className="nt-hl latte">“{oc.note.trim()}”</span></p>}
+            <p className="nt-src">사장님 제공 · 검증 후기·등급과는 별개예요{oc.noteAt ? ` · ${new Date(oc.noteAt).getFullYear()}.${String(new Date(oc.noteAt).getMonth() + 1).padStart(2, "0")}` : ""}</p>
           </div>
         )}
 
-        {/* 📊 우리가 읽고 적은 판정 — 옥석 후기 핵심. 판정 문장만 손글씨. */}
-        {(highlights.length > 0 || c.synth_identity) && (
-          <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
-            {/* 2026-09-20 정리(CEO): '검증 후기 N건'이 첫 화면에 4번 나오던 것을 헤더 칩 + 하단 사실줄 둘로 줄였다.
-                방법론 문장(광고·협찬 제외·최종 확인)은 AI 인용용이라 지우지 않고 하단 사실줄로 합쳤다. */}
-            <div className="nt-sec">우리가 읽고 적은 판정</div>
-            {c.synth_identity && <p className="nt-hand"><span className="nt-hl">{c.synth_identity}</span></p>}
-            {/* 📖 사람이 쓴 문장 — 통계 앞에 온다. 이 페이지에서 가장 먼저 읽혀야 할 것. */}
-            {showQuotes && shownQuotes.map((e: any, i: number) => (
-              <p key={e?.link ?? i} className="text-[15px] text-[#2a1f17]">
-                <span className="text-[#a08868]">“</span>{String(e.quote).trim()}<span className="text-[#a08868]">”</span>
-                {(e?.source || e?.date) && <span className="text-[11.5px] text-[#8a785f] ml-1.5 whitespace-nowrap">— {e?.source ?? ""}{e?.date ? ` ${String(e.date).slice(0, 7)}` : ""}</span>}
-              </p>
-            ))}
-            {/* 🕒 최신성 — "지금도 그런가". review_dates(작은 jsonb)에서 계산. */}
-            {freshness && <div className="text-[12.5px] text-[#63523f]">🕒 최근 12개월 후기 <b className="text-[#2a1f17]">{freshness.recent}건</b> · 최신 <b className="text-[#2a1f17]">{freshness.latest}</b>{freshness.stale && <span className="text-[#a93a32]"> · 1년 넘게 새 후기 없음</span>}</div>}
-            {highlights.length > 0 && (
-              <>
-                <div className="nt-chips">
-                  {highlights.map((h, i) => (
-                    <span key={h.label} className={`nt-chip ${i === 0 ? "ink" : ""}`}>{h.emoji} {h.label}<b>{h.count}</b></span>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        )}
-
-        {/* ⚠️ 이건 알고 가세요(2026-09-14, CEO 승인) — 후기 2건 이상에서 확인된 주의점 + 손님이 쓴 근거 문장.
-            왜 넣나: 카페 고르기는 '좋은 곳 찾기'보다 '헛걸음 피하기'다. 광고가 절대 못 하는 말이라 우리 해자와 가장 멀리 있다.
-            ⚠️ 추가 조회 0 — 합성 때 계산해 cafes.cautions에 넣어둔 값을 그대로 읽는다. */}
-        {Array.isArray(c.cautions) && c.cautions.length > 0 && (
-          <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
-            <div className="nt-sec">이건 알고 가세요</div>
-            <div className="text-[12px] text-[#63523f]">후기 2건 이상에서 확인된 것만 · 숫자=언급 후기 수</div>
-            <div className="nt-chips">
-              {(c.cautions as any[]).map((x: any) => (
-                <span key={x.label} className="nt-chip">{x.emoji} {x.label}<b>{x.count}</b></span>
-              ))}
-            </div>
-            {(c.cautions as any[])[0]?.quote && (
-              <p className="text-[12.5px] text-[#63523f]" style={{ marginTop: 6 }}>
-                후기에서: <span className="text-[#2a1f17]">“…{(c.cautions as any[])[0].quote}…”</span>
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* 👍 강점 / 🔎 아쉬운점 — 전체 카페 대비. 배수는 손글씨(판정). */}
-        {profile.ok ? (
-          <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
-            <div className="nt-sec">한눈에 강·약 · 전체 카페 대비</div>
-            {profile.strong.length > 0 && (
-              <>
-                <div className="text-[12.5px] font-bold text-[#33684b]">👍 이런 점이 강해요</div>
-                {profile.strong.map((s) => (
-                  <div key={s.key} className="flex items-baseline gap-2 flex-wrap">
-                    <span className="text-[15px] w-5 text-center flex-none">{s.emoji}</span>
-                    <span className="text-[14.5px] font-bold text-[#5a3a12]"><span className="nt-hl">{s.text}</span></span>
-                    {/* 2026-09-20: '평균의 16.2배'+'상위 2%' 두 숫자 → 상위 %만. 배수는 읽는 사람이 해석 못 한다. */}
-                    <span className="ml-auto nt-pill verify whitespace-nowrap">상위 {s.topPct}%</span>
-                  </div>
-                ))}
-              </>
-            )}
-            {profile.weak.length > 0 && (
-              <>
-                <div className="text-[12.5px] font-bold text-[#8a5a12]">🔎 이런 점은 참고하세요</div>
-                {profile.weak.map((w) => (
-                  <div key={w.key} className="flex items-baseline gap-2 flex-wrap">
-                    <span className="text-[14px] w-5 text-center flex-none">{w.emoji}</span>
-                    <span className="text-[13.5px] text-[#5c4b3c]">{w.text}</span>
-                    <span className="ml-auto text-[12px] text-[#8a785f] whitespace-nowrap">{w.mult < 0.2 ? "거의 언급 없음" : "언급 적음"}</span>
-                  </div>
-                ))}
-              </>
-            )}
-            {/* 방법론 면책 2줄은 삭제(2026-09-20) — '검증 방법 자세히' 링크가 아래에 있다. 결정하는 화면에 각주를 넣지 않는다. */}
-          </div>
-        ) : tags.length > 0 && (
-          <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
-            <div className="nt-sec">이 카페가 후기에서 자주 언급되는 결</div>
-            <div className="nt-chips">{tags.map((t) => <span key={t} className="nt-chip">{t}</span>)}</div>
-          </div>
-        )}
-
-        {/* 🛡️ 이 카페를 어떻게 골랐나 — 이 카페의 실제 숫자로. (duplicates는 raw 이전 단계라 여기 넣지 않는다) */}
-        {sqRaw > 0 && (
-          <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
-            <div className="nt-sec">이 카페를 어떻게 골랐나</div>
-            <p className="text-[14px] text-[#2a1f17]">
-              🛡️ 이 카페가 나온 글 <b>{sqRaw.toLocaleString()}건</b>을 확인해
-              <b> {(sqRaw - Number(sq?.verified ?? 0) - Number(sq?.reference ?? 0)).toLocaleString()}건을 걸러내고</b>{" "}
-              <b>{Number(sq?.verified ?? 0).toLocaleString()}건</b>의 진짜 방문 후기로 판단했어요.
-            </p>
-            {/* 🔴 2026-09-20 삭제: "카페명 불명확하나 후기 맥락 있음(LLM 재판정 대상) 55건 제외" 같은 **내부 파이프라인 분류명**이
-                소비자 화면에 그대로 나가고 있었다. 요약 문장(확인→걸러냄→판단)만 남기고 사유 목록은 /trust로. */}
-            <div className="flex items-center gap-4 flex-wrap">
-              <Link href="/trust" className="inline-block text-[12px] text-[#7a5122] underline underline-offset-2">검증 방법 자세히 →</Link>
-              <ReportButton cafeId={Number(c.id)} />
-            </div>
-          </div>
-        )}
-
-        {/* ❤ 찜 배너 — 붙인 종이 */}
-        <div className="px-3 pt-4">
-          <div className="nt-scrap flat pink"><WishButton cafeId={c.id} variant="banner" /></div>
-        </div>
-
-        {/* 🧭 "다음 행동" 묶음(2026-08-22) — 지도·다음 카페를 위로. nearby는 위에서 조회한 값 재사용(추가 쿼리 0). */}
-        <div className="px-3 pt-4">
-          <div className="nt-scrap kraft px-4 py-3">
-            <i className="nt-tape k tl sm" aria-hidden />
-            <OutboundLink href={mapHref} target="map_cta" cafeId={c.id} source="카페상세" className="flex items-center justify-between gap-2">
-              <span className="text-[13.5px] font-bold text-[#2a1f17]">
-                🗺️ 지도에서 위치·주변 함께 보기
-                <span className="block text-[11px] text-[#63523f] font-normal mt-0.5">근처 다른 카페까지 한눈에</span>
-              </span>
-              <span className="text-[#7a5122] text-[14px]">→</span>
-            </OutboundLink>
-            {nearby.length > 0 && (
-              <div className="mt-2.5 pt-2.5 border-t border-dashed border-[#d9cdb9]">
-                <div className="text-[11px] text-[#63523f] mb-1.5">이 동네 비슷한 곳</div>
-                <div className="flex flex-wrap gap-1.5">
-                  {nearby.slice(0, 3).map((nc: any) => (
-                    <OutboundLink key={nc.id} href={`/c/${nc.id}`} target="nearby" cafeId={c.id} source="카페상세" className="nt-chip">
-                      {nc.name}
-                      {nc.synth_grade === "검증" && <span className="text-[9.5px] font-bold text-[#33684b]">검증</span>}
-                    </OutboundLink>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* 💻 카공 시설 — 근거 건수를 반드시 함께. "없다"도 숨기지 않는다. */}
-        {(work.signals.length > 0 || work.timeLimit > 0) && (
-          <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
-            <div className="nt-sec">💻 작업하기 전에 확인</div>
-            <div className="nt-chips">
-              {work.signals.map((sg) => {
-                const pos = sg.yes >= sg.no;
-                return (
-                  <span key={sg.key} className={`nt-chip ${pos ? "good" : "warn"}`}>
-                    {sg.emoji} {pos ? sg.label : sg.negLabel}
-                    <span className="text-[10px] font-bold opacity-80">후기 {Math.max(sg.yes, sg.no)}건</span>
-                  </span>
-                );
-              })}
-              {work.timeLimit > 0 && (
-                <span className="nt-chip soft">⏱ 이용 시간 제한 언급<span className="text-[10px] font-bold opacity-80">후기 {work.timeLimit}건</span></span>
-              )}
-            </div>
-            <div className="text-[11.5px] text-[#63523f]">후기에 실제로 적힌 말만 셌어요. 언급이 없으면 표시하지 않습니다.</div>
-          </div>
-        )}
-
-        {/* ⚖️ 평판 신선도 */}
+        {/* ⚖️ 평판 참고 */}
         {c.reputation_note && (
           <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
-            <div className="text-[13px] text-[#8a6a3a]">⚖️ <b>참고</b> · {c.reputation_note}</div>
+            <p className="nt-note"><IcoInfo /><span><b>참고</b> · {c.reputation_note}</span></p>
           </div>
         )}
 
-        {/* ☕ 사장님 CTA — 강·약 바로 다음(2026-08-29). 중복 배치 없음. 클릭 계측: decisions #782 */}
-        <div className="px-3 pt-4">
-          <OwnerCtaLink cafeId={c.id} cafeName={c.name} className="nt-scrap r kraft flex items-center justify-between gap-2 w-full px-4 py-3">
-            <i className="nt-tape g tr sm" aria-hidden />
-            <span className="flex flex-col text-left">
-              <span className="text-[13px] font-bold text-[#7a5122]">☕ 이 카페 사장님이신가요?</span>
-              <span className="text-[11px] text-[#544636]">방금 보신 강·약에 <b>동네 순위</b>까지 — 가입 없이 바로 볼 수 있어요</span>
-            </span>
-            <span className="text-[#b9793b] font-bold whitespace-nowrap">→</span>
-          </OwnerCtaLink>
-        </div>
-
-        <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
-          <p className="text-[12.5px] text-[#5c4b3c]">네이버 공개 후기 <b>{(c.synth_count ?? 0).toLocaleString()}건</b>을 교차검증한 데이터 기반 소개예요 · 영수증 리뷰·광고·협찬 제외 · 최종 확인 {new Date().toISOString().slice(0, 10)}. <Link href="/trust" className="underline underline-offset-2 text-[#7a5122]">검증 방법 보기</Link></p>
-        </div>
-
-        {/* 방문자 후기 — 하단 버튼 바로 위 */}
-        {userReviews.length > 0 && <div className="px-3 pt-3 nt-free"><VisitorReviews reviews={userReviews} /></div>}
-
-        <div className="nt-margin-gutter pt-5 flex flex-col gap-2.5">
-          <Link href={mapHref} className="nt-btn-ink py-3.5 text-[15px]">지도·근거 후기 보기 →</Link>
-          {/* 메뉴·가격·영업시간은 권위 원천(네이버 플레이스)으로 연결 — 항상 정확·최신 */}
-          <OutboundLink href={`/api/naver-place-redirect?id=${c.id}`} target="naver_place" cafeId={c.id} source="카페상세" className="nt-btn-line py-3 text-[13px]" style={{ borderColor: "#03c75a", color: "#03c75a" }}>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="#03c75a"><path d="M16.273 12.845L7.376 0H0v24h7.727V11.155L16.624 24H24V0h-7.727z"/></svg>
-            네이버에서 메뉴·가격·영업시간 보기
-          </OutboundLink>
-        </div>
-
-        {/* 🗺️ 지도 CTA를 첫 화면으로(2026-08-16) — 바로 착지한 방문자 이탈 87%, 지도 도달 시 3%. 테이프로 붙인 메모. */}
-        <div className="px-3 pt-4">
-          <Link href={`/?region=${encodeURIComponent(c.area)}`} className="nt-scrap r kraft block px-4 py-3">
-            <i className="nt-tape sm" aria-hidden />
-            <span className="flex items-center justify-between gap-2">
-              <span className="text-[13.5px] font-bold text-[#2a1f17]">
-                🗺️ {c.area} 카페 지도에서 둘러보기
-                <span className="block text-[11px] text-[#63523f] font-normal mt-0.5">근처 검증 카페를 위치·취향으로 한눈에</span>
-              </span>
-              <span className="text-[#7a5122] text-[14px]">→</span>
-            </span>
-          </Link>
-        </div>
-
-        {/* 🔁 비슷한 카페 더보기 — 목차 줄(번호 손글씨). 같은 동네 + 결 유사도, 검증/참고 우선(decisions #338) */}
+        {/* 📍 근처 카페 — 같은 읍면동 → 10km → 시군구. 거리는 실제 km. */}
         {nearby.length > 0 && (
           <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
-            <div className="flex items-baseline justify-between gap-2">
-              <div className="nt-sec">☕ {c.area} 비슷한 카페 더보기</div>
-              <Link href={`/area/${encodeURIComponent(c.area)}`} className="text-[11.5px] text-[#7a5122] whitespace-nowrap">동네 전체 보기 →</Link>
-            </div>
-            {nearby.map((nc: any, i: number) => (
-              <Link key={nc.id} href={`/c/${nc.id}`} className="nt-ln">
-                <span className="n">{i + 1}.</span>
-                <span className="nm text-[14px]">{nc.name}{nc.synth_grade && <span className={`nt-pill ml-1.5 ${nc.synth_grade === "검증" ? "verify" : nc.synth_grade === "참고" ? "ref" : "cand"}`}>{nc.synth_grade}</span>}</span>
-                <span className="m">검증후기 {nc.synth_count ?? 0}건</span>
-              </Link>
+            <div className="nt-lbl">{nearTitle} <em>· 검증 우선 · 거리 표시</em></div>
+            {nearby.map((nc) => (
+              <OutboundLink key={nc.id} href={`/c/${nc.id}`} target="nearby" cafeId={c.id} source="카페상세" className="nt-near">
+                <span className="nm">{nc.name}</span>
+                <span className="s">
+                  {nc.synth_grade && <span className={nc.synth_grade === "검증" ? "g" : ""}>{nc.synth_grade}</span>}
+                  <span>{nc.synth_count ?? 0}건</span>
+                  {nc.km !== null && <span>{fmtKm(nc.km)}</span>}
+                </span>
+              </OutboundLink>
             ))}
+            <Link href={`/area/${encodeURIComponent(c.area)}`} className="nt-g text-[12.5px] text-[#7a5122] block">{c.area} 전체 보기 →</Link>
           </div>
         )}
 
-        {/* 🧭 테마 페이지 역링크(2026-08-13) — 이 카페가 강한 결 상위 2개를 앵커텍스트로. char_scores 키 = TASTES 키. */}
-        {(() => {
-          const themed = Object.entries((c.char_scores ?? {}) as Record<string, number>)
-            .filter(([k, v]) => Number(v) > 0 && tasteByKey(k))
-            .sort((a, b) => Number(b[1]) - Number(a[1]))
-            .slice(0, 2)
-            .map(([k]) => tasteByKey(k)!);
-          return themed.length > 0 ? (
-            <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
+        {!showQuotes && <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>{srcLine}</div>}
+
+        {/* 방문자 후기 */}
+        {userReviews.length > 0 && <div className="px-3 pt-3 nt-free"><VisitorReviews reviews={userReviews} /></div>}
+
+        {/* 접힘 — 판정 방법 · 자주 묻는 질문 · 더 하기(담아두기·추억·사진·사장님·더 찾기) */}
+        <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
+          {sqRaw > 0 && (
+            <details className="nt-x">
+              <summary>이 판정을 어떻게 냈나</summary>
+              <div className="nt-body">
+                <p>이 카페가 나온 글 <b>{sqRaw.toLocaleString()}건</b>을 확인해 <b>{(sqRaw - Number(sq?.verified ?? 0) - Number(sq?.reference ?? 0)).toLocaleString()}건</b>을 걸러내고 <b>{Number(sq?.verified ?? 0).toLocaleString()}건</b>의 실제 방문 후기로 판단했어요.</p>
+                <p>'이곳의 결'은 후기에서 그 말이 나온 횟수, '다른 카페보다'는 후기 1건당 언급 비율을 전체 검증 카페와 비교한 순위예요. 절대 평가가 아닙니다.</p>
+                <p className="flex items-center gap-3 flex-wrap"><Link href="/trust">검증 방법 자세히 →</Link><span className="nt-free"><ReportButton cafeId={Number(c.id)} /></span></p>
+              </div>
+            </details>
+          )}
+          {faqs.length > 0 && (
+            <details className="nt-x">
+              <summary>자주 묻는 질문</summary>
+              <div className="nt-body">
+                {faqs.map((f) => (
+                  <details key={f.q}>
+                    <summary className="cursor-pointer list-none"><b>Q.</b> {f.q}</summary>
+                    <p className="pl-5">{f.a}</p>
+                  </details>
+                ))}
+              </div>
+            </details>
+          )}
+          <details className="nt-x">
+            <summary>더 하기 — 담아두기 · 추억 저장 · 사진 보태기 · 사장님</summary>
+            <div className="nt-free flex flex-col gap-3" style={{ padding: "10px 0 16px" }}>
+              {/* ❤ 찜 — 가입도 위치확인도 없는 탭 한 번 */}
+              <div className="nt-scrap flat pink"><WishButton cafeId={c.id} variant="banner" /></div>
+              {/* 📷 손님 사진 제보(결재 #1084) — 찍은 사람이 권리자. 본인 촬영본만, 저작권은 올린 분에게, 사람 나온 사진 금지. */}
+              <div className="nt-scrap flat">
+                <p className="text-[12.5px] text-[#63523f] mb-2">직접 찍은 사진을 보태주시면 다음 사람이 고를 때 큰 도움이 돼요. 저작권은 올려주신 분에게 그대로 있고, 사람이 나온 사진은 받지 않아요(초상권). 확인 후 올라갑니다.</p>
+                <SaveMemoryButton cafeId={c.id} cafeName={c.name} cafeArea={c.area} variant="banner" />
+              </div>
+              {/* ☕ 사장님 CTA — 클릭 계측: decisions #782 */}
+              <OwnerCtaLink cafeId={c.id} cafeName={c.name} className="nt-scrap r kraft flex items-center justify-between gap-2 w-full px-4 py-3">
+                <i className="nt-tape g tr sm" aria-hidden />
+                <span className="flex flex-col text-left">
+                  <span className="text-[13px] font-bold text-[#7a5122]">이 카페 사장님이신가요?</span>
+                  <span className="text-[11px] text-[#544636]">방금 보신 강·약에 <b>동네 순위</b>까지 — 가입 없이 바로 볼 수 있어요</span>
+                </span>
+                <span className="text-[#b9793b] font-bold whitespace-nowrap">→</span>
+              </OwnerCtaLink>
+              {/* 동네 교차검증 컬렉션 · 테마 역링크 · 동네 지도(크롤 동선·SEO) */}
+              {col && (
+                <Link href={`/collections/${col.slug}`} className="nt-scrap flex items-center justify-between gap-2 w-full px-4 py-3">
+                  <span className="flex flex-col text-left">
+                    <span className="text-[13px] font-bold text-[#5c4b3c]">{col.label} 카페, 협찬 없이 교차검증한 곳</span>
+                    <span className="text-[11px] text-[#63523f]">광고·협찬·타지점 후기 빼고 실방문 후기로만 모아보기</span>
+                  </span>
+                  <span className="text-[#7a5122] font-bold whitespace-nowrap">→</span>
+                </Link>
+              )}
               {themed.map((t) => (
-                <Link key={t.key} href={`/area/${encodeURIComponent(c.area)}/${t.key}`} className="flex items-center justify-between gap-2">
-                  <span className="text-[13.5px] font-bold text-[#5c4b3c]">{t.emoji} {c.area} {t.label} 카페 더 찾기</span>
-                  <span className="text-[#7a5122] text-[13px]">→</span>
+                <Link key={t.key} href={`/area/${encodeURIComponent(c.area)}/${t.key}`} className="nt-g flex items-center justify-between gap-2 px-1 text-[13px] text-[#5c4b3c]">
+                  <span>{c.area} {t.label} 카페 더 찾기</span><span className="text-[#7a5122]">→</span>
                 </Link>
               ))}
+              <Link href={`/?region=${encodeURIComponent(c.area)}`} className="nt-g flex items-center justify-between gap-2 px-1 text-[13px] text-[#5c4b3c]">
+                <span>{c.area} 카페 지도에서 둘러보기</span><span className="text-[#7a5122]">→</span>
+              </Link>
             </div>
-          ) : null;
-        })()}
-
-        {/* 📷 손님 사진 제보(결재 #1084, 2026-09-14) — 진입점을 꺼낸다.
-            왜: 기능은 원래 있었는데 **접힌 <details> 안에 "추억으로 남기기"**로만 있어
-              전 서비스 사진이 6장이었다. 사람들이 못 찾은 게 아니라 우리가 숨겨 뒀다.
-            프레이밍도 바꾼다 — '내 추억'이 아니라 **'다음 사람을 위한 기여'**.
-            ⚠️ 합법성의 근거는 하나뿐이다: 찍은 사람이 권리자다. 그래서 본인 촬영본만 받고,
-              저작권은 올린 분에게 그대로 두며(게재 허락만), 사람이 나온 사진은 받지 않는다(초상권). */}
-        <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
-          <div className="nt-sec">사진 한 장 보태주실래요?</div>
-          <p className="text-[12.5px] text-[#63523f] leading-relaxed mb-2">
-            {c.name}은(는) 아직 사진이 없어요. 다녀오셨다면 <b className="text-[#2a1f17]">직접 찍은 사진</b>을 올려주시면
-            다음 사람이 고를 때 큰 도움이 됩니다. 올린 분 이름과 함께 실려요.
-          </p>
-          <p className="text-[11.5px] text-[#8a7458] leading-relaxed mb-2.5">
-            저작권은 <b>올려주신 분에게 그대로</b> 있고 저희는 게재 허락만 받습니다 · 사람이 나온 사진은 올리지 말아 주세요(초상권) · 확인 후 올라갑니다
-          </p>
-          <div className="nt-free"><SaveMemoryButton cafeId={c.id} cafeName={c.name} cafeArea={c.area} variant="banner" /></div>
+          </details>
         </div>
 
         {/* ❤ 찜한 카페 다시 보기 · 🕘 최근 본 카페 — localStorage 기반 클라이언트 컴포넌트(서버 조회 0) */}
-        <div className="nt-margin-gutter nt-free">
+        <div className="nt-margin-gutter nt-free nt-g">
           <SavedCafes excludeId={Number(c.id)} />
           <RecentCafes current={{ id: Number(c.id), name: c.name, area: c.area, grade: grade || undefined }} />
         </div>
 
-        {/* 동네 교차검증 컬렉션 상호링크(크롤 동선·SEO) */}
-        {(() => {
-          const col = collectionForCafe(c.dong, c.area);
-          return col ? (
-            <div className="px-3 pt-4">
-              <Link href={`/collections/${col.slug}`} className="nt-scrap flex items-center justify-between gap-2 w-full px-4 py-3">
-                <i className="nt-tape sm" aria-hidden />
-                <span className="flex flex-col text-left">
-                  <span className="text-[13px] font-bold text-[#5c4b3c]">📌 {col.label} 카페, 협찬 없이 교차검증한 곳</span>
-                  <span className="text-[11px] text-[#63523f]">광고·협찬·타지점 후기 빼고 실방문 후기로만 모아보기</span>
-                </span>
-                <span className="text-[#7a5122] font-bold whitespace-nowrap">→</span>
-              </Link>
-            </div>
-          ) : null;
-        })()}
-
-        {/* ❓ 자주 묻는 질문 — 위 FAQPage JSON-LD와 동일 내용 */}
-        {faqs.length > 0 && (
-          <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
-            <div className="nt-sec">❓ 자주 묻는 질문</div>
-            {faqs.map((f) => (
-              <details key={f.q}>
-                <summary className="text-[13.5px] font-bold text-[#2a1f17] cursor-pointer list-none">
-                  <span className="text-[#b9793b] mr-1.5">Q.</span>{f.q}
-                </summary>
-                <p className="text-[13px] text-[#5c4b3c] pl-5">{f.a}</p>
-              </details>
-            ))}
-          </div>
-        )}
+        {/* 하단 고정 행동 2개 — 지도 · 네이버(메뉴·가격·영업시간은 권위 원천으로) */}
+        <div className="nt-cta">
+          <Link href={mapHref} className="nt-btn-ink">지도에서 보기</Link>
+          <OutboundLink href={`/api/naver-place-redirect?id=${c.id}`} target="naver_place" cafeId={c.id} source="카페상세" className="nt-btn-line">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="#03c75a" aria-hidden><path d="M16.273 12.845L7.376 0H0v24h7.727V11.155L16.624 24H24V0h-7.727z"/></svg>
+            네이버 플레이스
+          </OutboundLink>
+        </div>
       </div>
     </main>
   );
