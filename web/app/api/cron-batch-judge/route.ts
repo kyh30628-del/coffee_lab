@@ -11,7 +11,8 @@ export const maxDuration = 300;
 // 매 실행: ① 지난번 제출 배치가 끝났으면 결과 수거·적용  ② 판정 대기 카페로 새 배치 제출.
 //   비동기라 결과가 한 사이클(크론 간격) 늦게 반영되지만, 카페 큐레이션엔 무방.
 //   매니페스트(custom_id→cafe·keys)는 DB(judge_batches)에 보관(서버리스 /tmp 비영속 대응).
-const BUILD_LIMIT = Number(process.env.BATCH_JUDGE_LIMIT || 120);  // 2026-09-20 대표님 지시로 150→120(크기 중복가드 회피 + 300s 여유) // 빌드 시 getAuditCandidates가 카페당 합성 → 300s 내로 제한
+const BUILD_LIMIT = Number(process.env.BATCH_JUDGE_LIMIT || 60);  // 2026-09-20 150→120→60. 120에서 8회차가 300s 타임아웃으로 빈 응답을 냈다(rejected 3,089곳이 남았는데 '대상 없음'처럼 보였다).
+//   원인: 후보 선정 정렬이 synth_count ASC(후기 적은 순)라 **회차가 갈수록 무거운 카페**가 온다 — 카페당 합성이 느려진다. // 빌드 시 getAuditCandidates가 카페당 합성 → 300s 내로 제한
 const PER_CAFE = 35;
 // 🎯 위험군 게이트(2026-07-05 CEO): 공개 카페 '재판정'은 신뢰도 낮은 등급만 — 파이프라인 자체 등급으로 원리적 선.
 //   '검증'(verified, 평균 85리뷰 = 옥석 코어)은 스킵(재판정 불필요), 그 외('참고' 등, 평균 12리뷰)는 판정.
