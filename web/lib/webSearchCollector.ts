@@ -5,7 +5,7 @@ import { naverHeaders, markKeyExhausted, NAVER_KEY_COUNT } from "./naverKeys";
 // 한 번에 받아오는 최대 건수. 포화 판정("이만큼 왔으면 더 있다")의 기준이기도 하다.
 const NAVER_DISPLAY = 100;
 // (A)방식: 원문 복제 금지. 인용 한 줄(요약) + 출처 링크 + 날짜만 보존.
-export type WebSnippet = { text: string; title?: string; desc?: string; kind?: "blog" | "cafearticle"; time?: number; link?: string; source?: string; date?: string };
+export type WebSnippet = { text: string; title?: string; desc?: string; kind?: "blog" | "cafearticle"; time?: number; link?: string; source?: string; date?: string; q?: number /* 질의 순번(0=가장 넓은 질의) — 2026-09-21 절감 측정용 */ };
 
 const ID = process.env.NAVER_CLIENT_ID;
 const SECRET = process.env.NAVER_CLIENT_SECRET;
@@ -98,9 +98,14 @@ export async function fetchWebReviews(name: string, area: string, dong?: string)
     //   더 좁은 질의(+카페/+후기/+리뷰)는 그 부분집합만 돌려준다 → 호출해도 **신규 0건**.
     //   검증: 비포화 6곳 전수에서 q2~q4 추가 신규 0건(위반 0). 포화(=100)일 때만 나머지를 돈다.
     //   효과: 표본상 절반이 비포화 → 곳당 8콜 → 평균 5콜(약 47% 절감), **손실 0**.
+    // 💰 2026-09-21(CEO "수집 7콜 줄여서 적용"): 네이버 **카페글(cafearticle)은 가장 넓은 질의 1콜만** 돈다.
+    //   실측(공개 600곳·옥석 15,676건): 카페글 출처 옥석 572건 = 3.6%인데 콜은 블로그와 같은 계열(2~5콜)을 썼다.
+    //   등급 경계 영향: 카페글을 아예 빼면 검증 경계 5/144·참고 신규 경계 8/456이 내려간다 → 완전 제거 대신 1콜 유지.
+    //   첫 질의가 가장 넓어(부분집합 관계) 그 572건의 대부분을 그대로 잡는다. 곳당 평균 7콜 → 약 4.5콜.
     for (const kind of ["blog", "cafearticle"] as const) {
-      for (let qi = 0; qi < queries.length; qi++) {
-        const q = queries[qi];
+      const kindQueries = kind === "cafearticle" ? queries.slice(0, 1) : queries;
+      for (let qi = 0; qi < kindQueries.length; qi++) {
+        const q = kindQueries[qi];
         const { items, ok } = await naverSearch(kind, q);
         if (ok) anyOk = true; else anyFail = true;
         debug.push({ q, kind, got: items.length, ok });
@@ -108,19 +113,19 @@ export async function fetchWebReviews(name: string, area: string, dong?: string)
           const key = it.text.slice(0, 50);
           if (seen.has(key)) continue;
           seen.add(key);
-          snippets.push(it);
+          snippets.push({ ...it, q: qi });
         }
         await new Promise((r) => setTimeout(r, 120)); // 질의 간 최소 간격 — 샤드 2개가 동시에 때려 버스트 429 나던 걸 완화
         // 첫 질의가 비포화면 이 종류(blog/cafearticle)의 나머지 **같은 계열** 질의는 건너뛴다.
         //   ⚠️ ok=false(쿼터/오류)일 땐 items가 0이라 '비포화'로 오인할 수 있으므로 ok일 때만 판단한다.
         //   동 계열(alwaysRun)은 부분집합이 아니라 계속 돈다 — break 대신 지역계열만 스킵.
         if (qi === 0 && ok && items.length < NAVER_DISPLAY) {
-          const rest = queries.slice(1).filter((x) => alwaysRun.has(x));
+          const rest = kindQueries.slice(1).filter((x) => alwaysRun.has(x));
           for (const q2 of rest) {
             const r2 = await naverSearch(kind, q2);
             if (r2.ok) anyOk = true; else anyFail = true;
             debug.push({ q: q2, kind, got: r2.items.length, ok: r2.ok });
-            for (const it of r2.items) { const k2 = it.text.slice(0, 50); if (!seen.has(k2)) { seen.add(k2); snippets.push(it); } }
+            for (const it of r2.items) { const k2 = it.text.slice(0, 50); if (!seen.has(k2)) { seen.add(k2); snippets.push({ ...it, q: queries.indexOf(q2) }); } }
             await new Promise((r) => setTimeout(r, 120));
           }
           break;
