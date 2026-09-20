@@ -417,7 +417,7 @@ export default async function CafePage({ params }: Props) {
             {shownQuotes.map(quoteOf)}
             {moreQuotes.length > 0 && (
               <details className="nt-more">
-                <summary><span className="t1">후기 {moreQuotes.length}건 더 읽기</span><span className="t2">접기</span></summary>
+                <summary><span className="nt-btn-ghost"><span className="t1">후기 {moreQuotes.length}건 더 읽기</span><span className="t2">접기</span><svg viewBox="0 0 24 24" aria-hidden><path d="m6 9 6 6 6-6"/></svg></span></summary>
                 {moreQuotes.map(quoteOf)}
               </details>
             )}

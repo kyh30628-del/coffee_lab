@@ -56,7 +56,7 @@ export default function RootLayout({
         {/* 폰트를 문서 head에서 조기 연결·로딩 → 아이폰에서 글자가 점점 뜨던 문제 완화 */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;600;700&family=Nanum+Pen+Script&display=swap" />
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nanum+Pen+Script&display=swap" />
         {/* Pretendard — 라벨·숫자·칩·버튼용 고딕(2026-09-20 서체 통일). 가변 1종·동적 서브셋이라 실제 쓰는 글자만 받는다 */}
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
         {/* 📓 PWA 첫 화면(iOS 스플래시) — 랜딩과 같은 에스프레소·정물·로고. 기기별 해상도 11종 */}
