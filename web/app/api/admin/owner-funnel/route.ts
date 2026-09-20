@@ -36,6 +36,11 @@ export async function GET(req: NextRequest) {
       const reportView = pick(win, "free_report_view");
       const ctaTotal = pick(win, "cta_click");
       const submit = pick(win, "submit_success");
+      // 리포트 도달률 = 무료 리포트를 실제로 본 비율. reportView는 cta_click을 거치지 않고도
+      // 발생한다(재방문 북마크·크로스링크·검색엔진 직접색인 등)라 분자가 분모를 넘어설 수 있다
+      // (decisions#1167) — 100%로 캡하고, 원시값이 캡을 넘었거나 표본(ctaTotal)이 작으면
+      // 프론트에서 "이상치/표본부족" 배지를 붙이도록 플래그를 함께 내려준다.
+      const rawReachRate = ctaTotal > 0 ? Math.round((reportView / ctaTotal) * 100) : null;
       return {
         cta: { total: ctaTotal, home: pick(win, "cta_click", "home"),
                cafe_detail: pick(win, "cta_click", "cafe_detail"),
@@ -43,8 +48,9 @@ export async function GET(req: NextRequest) {
         reportView,
         modalOpen: pick(win, "modal_open"),
         submit,
-        // 리포트 도달률 = 무료 리포트를 실제로 본 비율. 이게 오늘 고친 것의 성적표다.
-        reachRate: ctaTotal > 0 ? Math.round((reportView / ctaTotal) * 100) : null,
+        reachRate: rawReachRate !== null ? Math.min(rawReachRate, 100) : null,
+        reachRateCapped: rawReachRate !== null && rawReachRate > 100,
+        lowSample: ctaTotal < 5,
         submitRate: reportView > 0 ? Math.round((submit / reportView) * 100) : null,
         // 🎯 아웃리치(B안) 성과 — 사장님께 직접 보낸 링크(?src=)로 들어온 것만 따로 센다.
         //   이게 없으면 DM 100건을 보내도 "그냥 흘러든 사람"과 섞여 효과를 판정할 수 없다.

@@ -396,7 +396,8 @@ export default function AdminPage() {
                   <span className="font-bold text-stone-800">사장님 퍼널 (우리 가게 리포트)</span>
                   <span className="text-[11px] text-stone-700">
                     7일 — 진입 {ownerFunnel.d7.cta.total} · 리포트 {ownerFunnel.d7.reportView}
-                    {ownerFunnel.d7.reachRate !== null ? ` (도달 ${ownerFunnel.d7.reachRate}%)` : ""}
+                    {ownerFunnel.d7.reachRate !== null ? ` (도달 ${ownerFunnel.d7.reachRate}%${ownerFunnel.d7.reachRateCapped ? "+" : ""})` : ""}
+                    {(ownerFunnel.d7.reachRateCapped || ownerFunnel.d7.lowSample) ? " ⚠️표본이상치" : ""}
                     {" · 신청 "}{ownerFunnel.d7.submit} · 리드 {ownerFunnel.leads ?? 0} · 유료 {ownerFunnel.subs.paid}
                   </span>
                   {/* 🎯 아웃리치(B안) — 사장님께 직접 보낸 링크(?src=)로 들어온 것만.
@@ -445,11 +446,24 @@ export default function AdminPage() {
                   ))}
                   <tr className="font-bold">
                     <td className="py-1.5">리포트 도달률</td>
-                    <td className="py-1.5 text-right tabular-nums">{ownerFunnel.d7.reachRate ?? "—"}{ownerFunnel.d7.reachRate !== null ? "%" : ""}</td>
-                    <td className="py-1.5 text-right tabular-nums text-stone-500">{ownerFunnel.d30.reachRate ?? "—"}{ownerFunnel.d30.reachRate !== null ? "%" : ""}</td>
+                    <td className="py-1.5 text-right tabular-nums">
+                      {ownerFunnel.d7.reachRate ?? "—"}{ownerFunnel.d7.reachRate !== null ? "%" : ""}
+                      {ownerFunnel.d7.reachRateCapped ? "+" : ""}
+                    </td>
+                    <td className="py-1.5 text-right tabular-nums text-stone-500">
+                      {ownerFunnel.d30.reachRate ?? "—"}{ownerFunnel.d30.reachRate !== null ? "%" : ""}
+                      {ownerFunnel.d30.reachRateCapped ? "+" : ""}
+                    </td>
                   </tr>
                 </tbody>
               </table>
+              {(ownerFunnel.d7.reachRateCapped || ownerFunnel.d7.lowSample) && (
+                <p className="mt-2 text-[11px] text-amber-700">
+                  ⚠️ 7일창 표본 이상치 — 진입(cta_click) {ownerFunnel.d7.cta.total}건으로 분모가 작아
+                  {ownerFunnel.d7.reachRateCapped ? " 원시 도달률이 100%를 넘어 100%로 표시를 캡했습니다." : " 비율이 튈 수 있습니다."}
+                  리포트 조회는 재방문·크로스링크 등 CTA를 거치지 않은 유입도 포함합니다.
+                </p>
+              )}
               <div className="mt-3 text-[11px] text-stone-600">
                 구독 {ownerFunnel.subs.total}건 · 활성 {ownerFunnel.subs.active} · <b className={ownerFunnel.subs.paid > 0 ? "text-emerald-700" : "text-stone-800"}>유료 {ownerFunnel.subs.paid}건</b>
               </div>
