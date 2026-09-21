@@ -91,7 +91,7 @@ box("ribbon", (0.012, 0.09, 0.0008), (-PW * 0.55, -0.035, 0.0022), rib)
 
 # ── 커피잔·받침·커피(render-cup.py와 동일 재질) ──
 R, H, T = 0.042, 0.062, 0.0045
-CUP_AT = (0.245, 0.25)
+CUP_AT = (0.300, 0.31)  # 받침(반지름 7.8cm)이 노트 오른쪽 가장자리(x≈0.219)에 안 닿게 + 위쪽으로
 cup = lathe("cup", [(R * 0.78, 0.0), (R * 0.80, 0.004), (R * 0.90, 0.012), (R, H * 0.55), (R * 1.02, H - 0.006), (R * 1.02, H), (R * 1.02 - T, H), (R * 0.985 - T, H - 0.010), (R * 0.92 - T, H * 0.45), (R * 0.80 - T, 0.012), (0.0, 0.0085)])
 cer, cnt2, cb2 = mat("ceramic"); setin(cb2, "Base Color", (0.86, 0.83, 0.79, 1)); setin(cb2, "Roughness", 0.12); setin(cb2, "Coat Weight", 0.8); setin(cb2, "Coat Roughness", 0.05); setin(cb2, "Subsurface Weight", 0.08); setin(cb2, "Subsurface Radius", (0.006, 0.004, 0.003))
 cup.data.materials.append(cer)
@@ -130,7 +130,7 @@ bnt.links.new(bn.outputs["Fac"], br.inputs["Fac"]); bnt.links.new(br.outputs["Co
 bbump = bnt.nodes.new("ShaderNodeBump"); bbump.inputs["Strength"].default_value = 0.30; bbump.inputs["Distance"].default_value = 0.0002; bnt.links.new(bn.outputs["Fac"], bbump.inputs["Height"]); bnt.links.new(bbump.outputs["Normal"], bb.inputs["Normal"])
 setin(bb, "Roughness", 0.5); setin(bb, "Coat Weight", 0.3); setin(bb, "Coat Roughness", 0.15)
 def bean(loc, rz, seed):
-    bpy.ops.mesh.primitive_uv_sphere_add(segments=96, ring_count=64, radius=0.0074); ob = bpy.context.object; ob.name = f"bean{seed}"; ob.scale = (1.0, 0.66, 0.52)
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=96, ring_count=64, radius=0.0105); ob = bpy.context.object; ob.name = f"bean{seed}"  # 카메라가 노트에 가까워 멀리 있는 원두가 작아짐 → 크게; ob.scale = (1.0, 0.66, 0.52)
     bm = bmesh.new(); bm.from_mesh(ob.data); rnd = random.Random(seed)
     for v in bm.verts:
         x, y, z = v.co
@@ -138,7 +138,7 @@ def bean(loc, rz, seed):
         v.co += v.normal * (rnd.random() - 0.5) * 0.00006
     bm.to_mesh(ob.data); bm.free(); smooth(ob, 2)
     ob.rotation_euler = (math.radians(6), math.radians(-4), math.radians(rz)); ob.location = (loc[0], loc[1], 0.0031); ob.data.materials.append(bmat)
-for i, (loc, rz) in enumerate([((0.04, 0.46), 20), ((0.22, 0.43), 75), ((0.26, 0.49), -40), ((-0.08, 0.40), 110), ((0.30, -0.03), 15)]): bean(loc, rz, i + 1)  # 프레임 안에 5알(위 2·왼쪽 위 1·잔 옆 1·펜 아래 1)
+for i, (loc, rz) in enumerate([((0.05, 0.44), 20), ((0.25, 0.42), 75), ((-0.10, 0.39), 110), ((0.31, 0.12), -40), ((0.29, -0.04), 15), ((0.40, 0.06), 60)]): bean(loc, rz, i + 1)  # 가까운 쪽(오른쪽 아래)에도  # 프레임 안에 5알(위 2·왼쪽 위 1·잔 옆 1·펜 아래 1)
 
 # ── 만년필(세련된 시가형): 검정 래커 + 금장. 오른쪽 페이지 아래에 36° 대각으로 눕힘 ──
 def build_pen():
@@ -155,11 +155,11 @@ def build_pen():
     bev = clip.modifiers.new("bev", "BEVEL"); bev.width = 0.0006; bev.segments = 4
     parts = [body, ring, fin, nib, clip]
     piv = bpy.data.objects.new("penpivot", None); bpy.context.collection.objects.link(piv)
-    for o in parts: o.parent = piv
+    for o in parts: o.parent = piv; o.hide_render = True  # 장면에선 숨김(CEO: 펜은 글 쓰는 펜 하나만)
     return piv, L, Rb
 pen_piv, PEN_L, PEN_R = build_pen()
 # 눕히기: z축 → 테이블 위, 촉이 오른쪽 아래(카메라 쪽)로. 페이지 위(z = 0.006+TH)에 놓는다.
-pen_piv.rotation_euler = (0, math.radians(90), math.radians(54))  # 촉이 오른쪽 아래(카메라 쪽)로 — 프리뷰에선 반대로 누워 캡이 프레임 밖
+pen_piv.hide_render = True; pen_piv.rotation_euler = (0, math.radians(90), math.radians(54))  # 촉이 오른쪽 아래(카메라 쪽)로 — 프리뷰에선 반대로 누워 캡이 프레임 밖
 pen_piv.location = (0.192, 0.012, 0.006 + TH + PEN_R)  # 페이지 오른쪽 아래 구석(손글씨 줄과 안 겹치게 — 오버레이 글은 페이지 폭 거의 전부를 쓴다)
 
 # ── 조명·카메라 ──
@@ -171,7 +171,7 @@ aim = bpy.data.objects.new("aim", None); bpy.context.collection.objects.link(aim
 light("key", (-0.9, -0.6, 1.4), 55, 1.2, aim); light("fill", (1.1, -0.7, 0.9), 12, 1.6, aim, (0.95, 0.93, 0.95)); light("rim", (0.2, 1.4, 1.2), 22, 1.0, aim)
 light("window", (-0.05, 0.42, 0.62), 3.0, 0.14, aim, (1, 1, 1))  # 커피 표면 창 하이라이트(작게)  # 1차 프리뷰 전면 백화 → 1/8
 cd = bpy.data.cameras.new("cam"); cd.lens = 42; cd.clip_start = 0.01; cam = bpy.data.objects.new("cam", cd); bpy.context.collection.objects.link(cam); sc.camera = cam
-CAM = json.loads(os.environ.get("HERO_CAM", "null")) or {"loc": [0.11, -0.17, 0.34], "aim": [0.115, 0.155, 0.0], "lens": 38}  # 09-21 스윕 확정: 옛 히어로 페이지 사각형(0.22,0.30)-(0.71,0.30)-(0.77,0.83)-(0.105,0.82)에 근접
+CAM = json.loads(os.environ.get("HERO_CAM", "null")) or {"loc": [0.12, -0.17, 0.34], "aim": [0.135, 0.16, 0.0], "lens": 37}  # 09-21 스윕 확정: 옛 히어로 페이지 사각형(0.22,0.30)-(0.71,0.30)-(0.77,0.83)-(0.105,0.82)에 근접
 cam.location = tuple(CAM["loc"]); cd.lens = CAM["lens"]; aim.location = tuple(CAM["aim"])
 tr = cam.constraints.new("TRACK_TO"); tr.target = aim; tr.track_axis = "TRACK_NEGATIVE_Z"; tr.up_axis = "UP_Y"
 bpy.context.view_layer.update()
@@ -190,6 +190,8 @@ sc.render.filepath = os.path.join(OUT, "hero.png"); bpy.ops.render.render(write_
 #   같은 펜 모델을 정수직 위에서 본다. 촉 끝 비율(PEN_TIP)은 알파 채널로 실측해 quad.json에 함께 적는다.
 for o in list(bpy.data.objects):
     if o.name not in ("penbody", "penring", "penfinial", "pennib", "penclip", "penpivot"): bpy.data.objects.remove(o, do_unlink=True)
+for o in bpy.data.objects:
+    if o.name.startswith("pen"): o.hide_render = False
 pen_piv.rotation_euler = (0, 0, 0); pen_piv.location = (0, 0, 0)  # 축 z: 촉(-z)이 아래, 캡 피니얼이 위
 sc2 = bpy.context.scene; sc2.render.film_transparent = True; sc2.render.image_settings.color_mode = "RGBA"
 sc2.render.resolution_x, sc2.render.resolution_y, sc2.render.resolution_percentage = 167, 1382, 100

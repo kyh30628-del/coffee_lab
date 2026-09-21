@@ -750,8 +750,8 @@ function landingMemo(d: Discover | null, seed: number): string[] {
 const HERO_W = 1400, HERO_H = 1680;
 // ✒ Blender 렌더 만년펜(public/note/pen.webp) — 페이지 좌표계 표시 크기와 촉 끝 위치(이미지 비율, 렌더 후 알파채널로 실측)
 const PEN_W = 21, PEN_H = 174, PEN_TIP: [number, number] = [0.497, 0.979]; // 렌더 167×1382px, 촉 끝 실측(알파채널)
-const HERO_PAGE: [number, number][] = [[0.23463, 0.29059], [0.71801, 0.28697], [0.85853, 0.79555], [0.0984, 0.80451]];
-const HERO_CUP: [number, number] = [0.82886, 0.26417];   // 잔 액면 중심(이미지 비율) — 김이 여기서 오른다
+const HERO_PAGE: [number, number][] = [[0.18724, 0.30924], [0.65814, 0.29884], [0.79498, 0.79018], [0.05144, 0.81612]];
+const HERO_CUP: [number, number] = [0.8598, 0.2084];   // 잔 액면 중심(이미지 비율) — 김이 여기서 오른다
 const PAGE_SW = 280, PAGE_SH = 387;            // 글을 쓰는 원본 사각형(px) — 페이지 비율 2.10:2.90
 const PAGE_RULE0 = 560 / 2900 * PAGE_SH;       // 첫 줄 y(텍스처 page-right-blank.json과 동일 규격)
 const PAGE_PITCH = 170 / 2900 * PAGE_SH;   // 줄 하나 = 손편지 한 줄(글리프가 줄 사이에 앉는다)       // 줄 간격
@@ -898,7 +898,7 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
     const step = () => {
       if (!alive) return;
       const el = (performance.now() - t0) / 1000;
-      if (el >= total) { landingOnce.done = true; setPos([LANDING_MEMO.length, 0]); setDone(true); if (nibRef.current) nibRef.current.style.opacity = "0"; if (curRef.current) { curRef.current.style.clipPath = ""; curRef.current.style.opacity = ""; curRef.current = null; } return; }
+      if (el >= total) { landingOnce.done = true; setPos([LANDING_MEMO.length, 0]); setDone(true); /* 펜은 그 자리에 놓인다(2026-09-21 CEO: 펜은 하나) */ if (curRef.current) { curRef.current.style.clipPath = ""; curRef.current.style.opacity = ""; curRef.current = null; } return; }
       let li = 0; while (li + 1 < starts.length && el >= starts[li + 1]) li++;
       const prog = (el - starts[li]) * CPS;                       // 이 줄에서 몇 글자째(소수 = 획 진행률)
       const ci = Math.max(0, Math.min(lens[li], Math.floor(prog)));
@@ -947,12 +947,24 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
   }, [LANDING_MEMO]);
   const allDone = done === true;
   const lineTop = PAGE_RULE0 - 21;   // 첫 줄부터: 손편지체 19px(행간=줄 간격 22.7px) 글리프 바닥이 줄보다 2.6px 위(실측 asc .92·desc .23·글 bbox 바닥 -.117em)
+  // ✒ 펜은 하나(2026-09-21 CEO) — 장면에 그려 넣은 펜을 없애고, 글 쓰는 펜이 다 쓰면 **마지막 글자 옆에 그대로 놓인다.**
+  //   재방문(애니메이션 없이 완성본)에도 같은 자리에 놓여 있어야 하므로 done/allDone/mtx가 준비될 때마다 자리를 잡는다.
+  useEffect(() => {
+    if (!(done || allDone) || !mtx) return;
+    const nib = nibRef.current, page = pageRef.current; if (!nib || !page) return;
+    const lines = page.querySelectorAll<HTMLElement>(".nt-w"); const lineEl = lines[lines.length - 1]; if (!lineEl) return;
+    const chars = lineEl.querySelectorAll<HTMLElement>(".ch"); const ch = chars[chars.length - 1]; if (!ch) return;
+    const tx = lineEl.offsetLeft + ch.offsetLeft + ch.offsetWidth + 8, ty = lineEl.offsetTop + ch.offsetTop + ch.offsetHeight * 0.6;
+    const pw = nib.clientWidth || PEN_W, ph = nib.clientHeight || PEN_H, tipX = pw * PEN_TIP[0], tipY = ph * PEN_TIP[1];
+    nib.style.transformOrigin = `${tipX}px ${tipY}px`; nib.style.opacity = "1";
+    nib.style.transform = `translate(${tx - tipX}px, ${ty - tipY}px) rotate(40deg)`;
+  }, [done, allDone, mtx]);
   return (
     <div className="w-full max-w-md mx-auto flex flex-col nt-landing" style={{ height: "100%", overflowY: "auto", overflowX: "hidden", background: "var(--nt-espresso)", padding: "calc(env(safe-area-inset-top) + 8px) 8px calc(env(safe-area-inset-bottom) + 8px)", boxSizing: "border-box" }}>
       {/* 📱 프레임: 화면 가장자리에 얇은 크림 경계선 — 노트 표지 안쪽 테두리처럼. 정물은 남는 높이를 전부 채우고 아래 블록은 고정 높이(어떤 폰이든 한 화면) */}
       <div className="flex flex-col flex-1 rounded-[10px]" style={{ minHeight: 0, overflow: "hidden" }}>{/* 테두리·안쪽 그림자 삭제(2026-09-21 CEO "아웃라인 테두리 선 삭제") */}
       <div ref={heroRef} className="relative w-full overflow-hidden" style={{ flex: "1 1 0%", minHeight: 220 }}>
-        <img src="/note/hero4.webp" alt="" aria-hidden className="absolute inset-0 w-full h-full object-cover" />
+        <img src="/note/hero5.webp" alt="" aria-hidden className="absolute inset-0 w-full h-full object-cover" />
         {/* 위: 어두운 나무 위 제목(커피 톤) · 아래: 에스프레소 띠로 녹아듦 */}
         <div className="absolute inset-x-0 top-0 h-40" style={{ background: "linear-gradient(180deg, rgba(20,12,8,.62), rgba(20,12,8,0))" }} />
         <div className="absolute inset-x-0 bottom-0 h-28" style={{ background: "linear-gradient(0deg, var(--nt-espresso), rgba(36,24,18,0))" }} />
@@ -979,9 +991,7 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
             ))}
           </div>
           <div className={`nt-stamp absolute ${allDone ? "in" : ""}`} style={{ right: 18, bottom: 26, opacity: allDone ? undefined : 0 }} aria-hidden>검증<small>VERIFIED</small></div>
-          {done === false && (
-            <img ref={nibRef} className="nt-nib" src="/note/pen.webp" alt="" aria-hidden draggable={false} style={{ width: PEN_W, height: PEN_H }} />
-          )}
+          <img ref={nibRef} className="nt-nib" src="/note/pen.webp" alt="" aria-hidden draggable={false} style={{ width: PEN_W, height: PEN_H }} />
         </div>
       </div>
       {/* 에스프레소 띠 — CTA */}
