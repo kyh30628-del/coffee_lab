@@ -43,8 +43,8 @@ function accuracy(e: any): number {
 function trustTier(e: any): number {
   return e?.trust === "verified" ? 2 : e?.trust === "reference" ? 1 : 0;
 }
-// 노출 정렬(CEO 확정 2026-08-05) — **①신뢰등급(검증 > 참고 > 그 외) ②같은 등급 안에서 정확도(score) 높은 순**
-//   ③동점이면 최신순 ④그래도 동점이면 안정 타이브레이크. 검증 등급은 무조건 최우선으로 노출된다.
+// 노출 정렬(CEO 확정 2026-08-05 → 2026-09-22 재확정) — **①신뢰등급(검증 > 참고 > 그 외) ②같은 등급 안에서 최신순**
+//   ③같은 날이면 정확도(score) ④그래도 동점이면 안정 타이브레이크. 검증 등급은 무조건 최우선으로 노출된다.
 // ⚠️ 단 하나의 선행 관문 = 카페명 매칭 확신도(quoteMatchConfidence, 0/1). conf=0 = 인용문에 이 카페 이름조차
 //   안 맞는 '다른 카페 의심' 건이라 등급과 무관하게 맨 뒤로 내린다(#307 '카페 여유'에 붙은 '노아브런치카페'
 //   오염이 최상단을 차지한 사고의 방어선 — 저장 시점 등급만 믿으면 재발한다). 실제 데이터의 절대다수는
@@ -85,13 +85,19 @@ export function sortReviews(raw: any[], name: string, areaTerms: string[], nowT:
       read: isReadableQuote(e?.quote, name) ? 1 : 0, // 0 = 제목/주소 덩어리·잘린 문장 → 뒤로(2026-09-20)
     }))
     .sort((a, b) => {
+      // 🔴 2026-09-22 CEO 확정("검증이 우선이고 최신순. 이게 기본"):
+      //   다른 카페 오염 관문(확신도·타지점) 바로 다음이 **신뢰등급**이다. 광고템플릿·캠페인·가독성 관문은
+      //   등급 **안에서만** 순서를 바꾼다 — 종전엔 이 셋이 등급보다 위에 있어 '읽히는 참고'가 '검증'을 밀어냈다.
+      //   같은 등급·같은 관문이면 **최신순**, 그다음에야 정확도.
       if (b.conf !== a.conf) return b.conf - a.conf;
       if (b.mine !== a.mine) return b.mine - a.mine;
+      const tier = trustTier(b.e) - trustTier(a.e);
+      if (tier !== 0) return tier;
       if (b.real !== a.real) return b.real - a.real;
       if (b.solo !== a.solo) return b.solo - a.solo;
       if (b.read !== a.read) return b.read - a.read;
-      const tier = trustTier(b.e) - trustTier(a.e);
-      if (tier !== 0) return tier;
+      const ta = parseYmd(a.e?.date) ?? 0, tb = parseYmd(b.e?.date) ?? 0;
+      if (tb !== ta) return tb - ta;
       // 🔴 2026-08-28 수리(CEO: "최신의 오염 없이 검증된 리뷰를 노출"):
       //   최신성이 **맨 마지막 타이브레이커**라, score가 1점만 달라도 3년 전 글이 올해 글을 이겼다
       //   (실측: 더 최신 검증후기가 있는데 옛 글만 표시된 카페 8,243곳).
@@ -112,8 +118,8 @@ export function sortReviews(raw: any[], name: string, areaTerms: string[], nowT:
       //   ⚠️ 안전 근거: 이 비교는 trustTier(검증>참고>기타) **아래**에 있다. 등급은 이미 위에서 갈렸으므로
       //     참고 후기가 검증 후기를 밀어낼 수 없다 = 상위6의 '검증 후기 개수'는 수학적으로 불변이다.
       //     (지난번 합산 시도가 검증 개수를 줄인 건 등급보다 위에서 합산했기 때문이다.)
-      const merit = (x: any) => accuracy(x) + recencyBonus(x?.date, nowT);
-      return merit(b.e) - merit(a.e);
+      // 날짜까지 같을 때만 정확도(같은 날 글 사이의 안정 타이브레이크). recencyBonus는 이제 날짜 정렬이 대신한다.
+      return accuracy(b.e) - accuracy(a.e);
     })
     .map(({ e }) => e);
 }

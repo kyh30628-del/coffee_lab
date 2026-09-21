@@ -699,8 +699,8 @@ const LANDING_MEMO_FALLBACK = ["오늘, 우리 동네.", "별점은 안 봤다. 
 //   **매번 무작위로** 골라 노트에 옮겨 적는다. 새로고침하면 다른 카페가 적힌다.
 //   숫자·이름·판정은 전부 홈과 같은 데이터(지어내지 않는다). 못 채우면 고정 문구로 떨어진다.
 //   ⚠️ 노트 한 줄은 폭이 정해져 있다(nowrap·overflow hidden) — 넘치면 소리 없이 잘려 깨져 보인다.
-//      그래서 글자폭을 재서(한글 1.0 · 그 외 0.55) 예산 안에 드는 문장만 쓴다. 실측 기준 13.2가 한 줄.
-const LINE_BUDGET = 13.2;
+//      그래서 글자폭을 재서(한글 1.0 · 그 외 0.55) 예산 안에 드는 문장만 쓴다. 실측 기준 19px에 13.2가 한 줄(22px은 11.4).
+const LINE_BUDGET = 11.4;   // 2026-09-22 글씨 19→22px(CEO '줄 수 5로 줄이고 글씨 키워') — 13.2×19/22
 const lineWidth = (t: string) => Array.from(t).reduce((a, ch) => a + (/[\u3131-\uD79D\u4E00-\u9FFF]/.test(ch) ? 1 : 0.55), 0);
 const fitLine = (t: string) => {
   const x = (t || "").replace(/\s+/g, " ").trim();
@@ -728,7 +728,7 @@ function landingMemo(d: Discover | null, seed: number): string[] {
   const usedPhrase = new Set<string>();          // 같은 판정 문구가 반복되지 않게
   const kindUsed: Record<string, number> = {};   // 같은 문장 틀만 이어지지 않게(한 틀당 최대 2줄)
   for (const c of shuffled) {
-    if (lines.length >= 7) break;
+    if (lines.length >= 3) break;   // 날짜 1 + 카페 2 + 맺음 2 = 다섯 줄(2026-09-22, 종전 일곱 줄)
     const name = c.name || "";
     // 문장 틀 4종. 틀이 이미 2번 쓰였으면 건너뛰어 다른 틀이 나오게 한다.
     const phrase = (c.identity || "").split(/[·,]/)[0]?.trim() || "";
@@ -982,7 +982,7 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
         <div ref={pageRef} className="absolute left-0 top-0" style={{ width: PAGE_SW, height: PAGE_SH, transformOrigin: "0 0", transform: mtx || "translate(-9999px,0)" }}>
           <div className="absolute" style={{ left: 42, right: 10, top: lineTop }}>
             {LANDING_MEMO.map((line, li) => (
-              <div key={li} className={`nt-w nt-hand ${allDone || (done === false && li < pos[0]) ? "done" : ""}`} style={{ fontSize: 19, lineHeight: `${PAGE_PITCH}px`, height: PAGE_PITCH, color: "#2f3550", whiteSpace: "nowrap", overflow: "hidden" }}>
+              <div key={li} className={`nt-w nt-hand ${allDone || (done === false && li < pos[0]) ? "done" : ""}`} style={{ fontSize: 22, lineHeight: `${PAGE_PITCH}px`, height: PAGE_PITCH, color: "#2f3550", whiteSpace: "nowrap", overflow: "hidden" }}>
                 {done === null ? null : Array.from(line).map((ch, ci) => (
                   <span key={ci} className={`ch${ch === " " ? " sp" : ""}${!allDone && li === pos[0] && ci < pos[1] ? " on" : ""}`}
                     style={ch === " " ? undefined : { ["--r" as any]: `${jitter[li][ci][0]}deg`, ["--y" as any]: `${jitter[li][ci][1]}px` }}>{ch}</span>
