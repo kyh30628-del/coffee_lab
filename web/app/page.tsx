@@ -995,7 +995,7 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
       <div className="flex flex-col flex-1 rounded-[10px]" style={{ minHeight: 0, overflow: "hidden" }}>{/* 테두리·안쪽 그림자 삭제(2026-09-21 CEO "아웃라인 테두리 선 삭제") */}
       <div ref={heroRef} className="relative w-full overflow-hidden min-h-[220px]" style={{ flex: "0 1 auto", minHeight: 220, aspectRatio: `${HERO_W} / ${HERO_H}`, background: "var(--nt-espresso)" }}>{/* 2026-09-22 CEO("노트 위 공백"): 히어로는 그림 높이만큼만(제목은 그림 위 나무 위에 얹힘). 남는 높이는 아래 CTA 블록이 고르게 나눠 갖는다. 짧은 화면은 flex-shrink로 줄고 calc가 축소 */}
         <div className="absolute bottom-0" style={heroBox ? { width: heroBox[0], height: heroBox[1], left: heroBox[2] } : { left: 0, width: "100%", aspectRatio: `${HERO_W} / ${HERO_H}` }}>
-          <img src="/note/hero10.webp" alt="" aria-hidden className="block w-full h-full" />
+          <img src="/note/hero11.webp" alt="" aria-hidden className="block w-full h-full" />
           <div className="absolute inset-x-0 top-0 h-32" style={{ background: "linear-gradient(180deg, var(--nt-espresso), rgba(36,24,18,0))" }} />{/* 그림 윗단이 띠로 녹아듦 */}
           {heroBox && heroBox[2] > 0.5 && <div className="absolute inset-0" style={{ boxShadow: "inset 0 0 64px 36px var(--nt-espresso)" }} />}{/* 축소된 경우만: 옆·아래 가장자리가 바닥색으로 녹아 네모 테두리가 안 보인다 */}
         </div>
@@ -1015,6 +1015,10 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
         {/* 📖 왼쪽 페이지 — 어제 적은 메모(마른 잉크·도장). 오늘 글이 확정된 뒤에만 보인다 */}
         {YESTERDAY_MEMO.length > 0 && mtxL && (
           <div className="absolute left-0 top-0" aria-hidden style={{ width: PAGE_SW, height: PAGE_SH, transformOrigin: "0 0", transform: mtxL, pointerEvents: "none" }}>
+            <div className="absolute" style={{ left: 42, right: 10, top: 23 }}>{/* 📓 머리글 — 두 페이지 공통, 서비스 서체(성실체+eyebrow). 2026-09-22 텍스처에 굽던 제목을 HTML로 */}
+              <div style={{ fontFamily: "var(--nt-display)", fontSize: 22, lineHeight: "26px", color: "#3a2c22", letterSpacing: "0.01em", whiteSpace: "nowrap" }}>동네 커피 노트</div>
+              <div style={{ fontFamily: "var(--nt-sans)", fontSize: 6.6, lineHeight: "8px", letterSpacing: "0.24em", color: "#8a7a66", marginTop: 3, whiteSpace: "nowrap" }}>DONGNE COFFEE NOTE · 2026</div>
+            </div>
             <div className="absolute" style={{ left: 42, right: 10, top: lineTop }}>
               {YESTERDAY_MEMO.map((line, li) => (
                 <div key={li} className="nt-w nt-hand done" style={{ fontSize: 22, lineHeight: `${PAGE_PITCH}px`, height: PAGE_PITCH, color: "#3b4260", opacity: 0.8, whiteSpace: "nowrap", overflow: "hidden" }}>
@@ -1027,6 +1031,10 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
         )}
         {/* 렌더된 오른쪽 페이지 위에 원근 정합으로 얹는 글 */}
         <div ref={pageRef} className="absolute left-0 top-0" style={{ width: PAGE_SW, height: PAGE_SH, transformOrigin: "0 0", transform: mtx || "translate(-9999px,0)" }}>
+          <div className="absolute" style={{ left: 42, right: 10, top: 23 }}>{/* 📓 머리글 — 두 페이지 공통, 서비스 서체(성실체+eyebrow). 2026-09-22 텍스처에 굽던 제목을 HTML로 */}
+            <div style={{ fontFamily: "var(--nt-display)", fontSize: 22, lineHeight: "26px", color: "#3a2c22", letterSpacing: "0.01em", whiteSpace: "nowrap" }}>동네 커피 노트</div>
+            <div style={{ fontFamily: "var(--nt-sans)", fontSize: 6.6, lineHeight: "8px", letterSpacing: "0.24em", color: "#8a7a66", marginTop: 3, whiteSpace: "nowrap" }}>DONGNE COFFEE NOTE · 2026</div>
+          </div>
           <div className="absolute" style={{ left: 42, right: 10, top: lineTop }}>
             {LANDING_MEMO.map((line, li) => (
               <div key={li} className={`nt-w nt-hand ${allDone || (done === false && li < pos[0]) ? "done" : ""}`} style={{ fontSize: 22, lineHeight: `${PAGE_PITCH}px`, height: PAGE_PITCH, color: "#2f3550", whiteSpace: "nowrap", overflow: "hidden" }}>

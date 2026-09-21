@@ -26,7 +26,7 @@ def page(path, title):
         f2 = ImageFont.truetype("/System/Library/Fonts/Supplemental/AppleGothic.ttf", 50)
         d.text((338, 420), "D O N G N E   C O F F E E   N O T E   ·   2 0 2 6", font=f2, fill=(150, 138, 122))
     im.save(path)
-page(sys.argv[1], "동네 커피 노트"); page(sys.argv[2], "")
+page(sys.argv[1], ""); page(sys.argv[2], "")   # 2026-09-22: 제목은 굽지 않는다 — 두 페이지 머리글을 HTML(서비스 서체)로 얹어 톤을 통일
 ''', PAGE_TEX, PAGE_TEX_L], check=True)
 
 # ───────── 장면 ─────────
