@@ -30,7 +30,14 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [{ url: "/icon-192.png", sizes: "192x192", type: "image/png" }, { url: "/icon-512.png", sizes: "512x512", type: "image/png" }],
-    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+    // 🍎 2026-09-22 CEO("아이폰 홈화면 추가하면 '동' 글자 아이콘만 나온다"): iOS는 manifest 아이콘을 안 쓰고 apple-touch-icon만 본다.
+    //   type 속성 없이 크기별 링크를 전부 주고, 링크를 못 읽는 경우 Safari가 루트에서 더듬는 예비 파일
+    //   (/apple-touch-icon-precomposed.png, /apple-touch-icon-180x180.png 등)도 같은 그림으로 깔았다.
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180" },
+      { url: "/apple-touch-icon-167x167.png", sizes: "167x167" },
+      { url: "/apple-touch-icon-152x152.png", sizes: "152x152" },
+    ],
   },
   appleWebApp: { capable: true, title: "동네 커피 노트", statusBarStyle: "black-translucent" },
 };

@@ -1241,6 +1241,20 @@ export default function Home() {
     check();
     return () => { document.removeEventListener("visibilitychange", check); window.removeEventListener("focus", check); };
   }, []);
+  // 🍎 2026-09-22 CEO("아이폰에서 글씨 써지는 효과가 안 나온다"): iOS 홈화면 앱은 닫아도 페이지가 메모리에 그대로 남아
+  //   다시 열면 **같은 로드**가 이어진다 → landingOnce.done이 true라 완성본만 보인다(안드로이드는 대개 새로 시작해 다시 쓴다).
+  //   → 5분 넘게 숨겨졌다 돌아왔고 랜딩이 떠 있으면, 새 방문으로 보고 메모를 새로 골라 처음부터 다시 쓴다.
+  const [landingKey, setLandingKey] = useState(0);
+  const hiddenAtRef = useRef<number | null>(null);
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState === "hidden") { hiddenAtRef.current = Date.now(); return; }
+      const away = hiddenAtRef.current ? Date.now() - hiddenAtRef.current : 0; hiddenAtRef.current = null;
+      if (away >= 5 * 60_000) { landingOnce.memo = null; landingOnce.done = false; landingOnce.t0 = null; setLandingKey((k) => k + 1); landingBeacon("rewrite-after-resume", { navType: String(Math.round(away / 1000)) }); }
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, []);
   // 공유 링크(/?cafe=id)로 도착하면 해당 카페 상세를 자동으로 연다(1회)
   const deepLinked = useRef(false);
   const regionCtr = useRef<[number, number, number] | null>(null); // 관제 지역카드 딥링크(?clat&clng&cz) → 지도 센터링(필터 무변경)
@@ -2128,7 +2142,7 @@ export default function Home() {
     //   /area 등 min-h-screen 페이지는 정상이던 것과 동일 패턴으로 맞춤. 세로 가운데정렬은 유지.
     return (
       <div className="nt-app" style={{ position: "fixed", inset: 0, overflow: "hidden", background: "var(--nt-espresso)", fontFamily: "var(--nt-font)" }}>
-        <LandingNote discover={discover} onConsumer={chooseConsumer}
+        <LandingNote key={landingKey} discover={discover} onConsumer={chooseConsumer}
           onOwner={() => { trackOwnerCta(); setShowFind(true); }}
           onLogin={() => { setOwnerPw(""); setOwnerErr(""); setOwnerPin(""); setOwnerPinErr(""); setOwnerAdminMode(false); setOwnerPwModal(true); }} />
 
