@@ -749,6 +749,7 @@ function landingMemo(d: Discover | null, seed: number): string[] {
 }
 const HERO_W = 1400, HERO_H = 1310;   // hero10.webp(1400×1680에서 빈 바닥 22% 제거)
 const HERO_NB_TOP = 1 - 0.46;         // 노트 윗변이 그림 높이의 46% 지점 → 아래 54%가 제목 아래에 있어야 겹치지 않는다
+const HERO_PROP_TOP = 1 - 0.33;       // 가장 위 소품(디저트 접시·잔 윗선)이 35.3% 지점(알파 실측) → 아래 67%는 반드시 화면 안(위가 잘리면 접시가 잘린다)
 const HERO_TITLE_H = 125;             // 제목 블록(eyebrow+두 줄) 실측 약 120px(px) — 이 아래부터 노트가 시작해야 한다
 // ✒ Blender 렌더 만년펜(public/note/pen.webp) — 페이지 좌표계 표시 크기와 촉 끝 위치(이미지 비율, 렌더 후 알파채널로 실측)
 const PEN_W = 21, PEN_H = 174, PEN_TIP: [number, number] = [0.497, 0.979]; // 렌더 167×1382px, 촉 끝 실측(알파채널)
@@ -856,8 +857,9 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
       // 2026-09-22: object-cover(가운데 자르기) 폐기 — 그림은 **폭에 맞춰 바닥에 붙인다**. 어떤 폭이든 옆이 잘리지 않고,
       //   높은 화면은 남는 높이가 제목 쪽 어두운 띠가 된다(노트 아래 빈 나무 바닥이 넓게 남던 것, CEO 지적).
       //   아주 짧은 화면(옛 소형폰·낮은 창)만 예외: 제목(≈150px)이 노트 윗변과 겹치지 않을 만큼만 그림을 줄여 가운데 둔다.
+      //   2026-09-22 데스크톱(1264×436) 실측: 60% 하한 때문에 위가 잘려 접시가 짤렸다 → 하한 폐지, 대신 '소품 윗선까지 화면 안' 조건 추가.
       const sw = cw / HERO_W;
-      const s = Math.min(sw, Math.max(0.6 * sw, (ch - HERO_TITLE_H) / (HERO_NB_TOP * HERO_H))); // 최대 60%까지만 줄인다
+      const s = Math.min(sw, ch / (HERO_PROP_TOP * HERO_H), (ch - HERO_TITLE_H) / (HERO_NB_TOP * HERO_H));
       const ox = (cw - HERO_W * s) / 2, oy = ch - HERO_H * s;
       setHeroBox([HERO_W * s, HERO_H * s, ox]);
       const q = HERO_PAGE.map(([fx, fy]) => [fx * HERO_W * s + ox, fy * HERO_H * s + oy] as [number, number]);
