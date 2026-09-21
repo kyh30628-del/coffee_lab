@@ -4,10 +4,10 @@
 //   loadLearnedTerms()로 캐시를 갱신(TTL 60s)하고, 규칙은 getLearned()로 동기 조회한다.
 import { sql } from "./db";
 
-export type LearnedKind = "nonbranch" | "district" | "generic" | "franchise";
-const KINDS: LearnedKind[] = ["nonbranch", "district", "generic", "franchise"];
+export type LearnedKind = "nonbranch" | "district" | "generic" | "franchise" | "branch_reviewed"; // branch_reviewed: 규칙갭 '다른지점 의심' 항목을 사람이 검토해 끝낸 용어(재상신 금지) — 2026-09-21
+const KINDS: LearnedKind[] = ["nonbranch", "district", "generic", "franchise", "branch_reviewed"];
 
-let CACHE: Record<LearnedKind, Set<string>> = { nonbranch: new Set(), district: new Set(), generic: new Set(), franchise: new Set() };
+let CACHE: Record<LearnedKind, Set<string>> = { nonbranch: new Set(), district: new Set(), generic: new Set(), franchise: new Set(), branch_reviewed: new Set() };
 let loadedAt = 0;
 let ensured = false;
 
@@ -34,7 +34,7 @@ export async function loadLearnedTerms(force = false): Promise<void> {
   try {
     await ensureLearnedTable();
     const rows = (await sql`SELECT term, kind FROM learned_terms WHERE status='active'`) as { term: string; kind: string }[];
-    const next: Record<LearnedKind, Set<string>> = { nonbranch: new Set(), district: new Set(), generic: new Set(), franchise: new Set() };
+    const next: Record<LearnedKind, Set<string>> = { nonbranch: new Set(), district: new Set(), generic: new Set(), franchise: new Set(), branch_reviewed: new Set() };
     for (const r of rows) if ((KINDS as string[]).includes(r.kind)) next[r.kind as LearnedKind].add(r.term);
     CACHE = next;
     loadedAt = Date.now();

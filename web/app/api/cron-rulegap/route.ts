@@ -163,6 +163,7 @@ export async function GET(req: NextRequest) {
     // 지점 의심 ○○점(장소형): 자동적용 안 함(로직 위험 — 오적용 시 정상 후기 배제). 관제탑 승인대기로 surface.
     for (const cand of rank(branchHits)) {
       if (cand.cafes < 3) continue;
+      if (getLearned("branch_reviewed").has(`${cand.term}점`)) continue; // 사람이 검토를 끝낸 용어(2026-09-21 '시청점': 3곳 인용문 전부 자기 지점 — 규칙 변경 없음)
       pending.push({ kind: "branch_review", term: `${cand.term}점`, cafes: cand.cafes, reason: "다른지점 의심 — 로직 검토 후 적용(승인)" });
     }
 

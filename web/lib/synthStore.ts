@@ -1204,10 +1204,17 @@ export async function healPublishedAudit(limit = 600, unpubCap = 120, budgetMs?:
       //   DB에 남아 cron-selfaudit(synth_coherence<0.3 조건)가 매 사이클 같은 카페를 오탐 재상신한다.
       await sql`UPDATE cafes SET synth_coherence=${coh} WHERE id=${r.id}`.catch(() => {});
       if (coh < getCriterionSync("contamination.noisy.coherence_max")) {
-        flagged++;
+        // 🔴 2026-09-21(CEO 승인): 신규 공개는 noisy 게이트(0.4)가 막는데 **이미 공개된 카페**는 재합성에서 낮게 나와도
+        //   플래그만 남기고 계속 노출됐다 → 남의 가게 후기를 단 채 공개(실측 81곳, 전부 후기 ≤5건). 이제 같은 기준으로 내린다.
+        //   안전장치는 동일: unpubCap(회당 대량 비공개 차단·규칙 회귀 의심 시 중단). 플래그는 이력으로 남기되 해소 처리.
+        const pct = Math.round(coh * 100);
+        await sql`UPDATE cafes SET published=false, pipeline_status='held', exclude_reason=${`오염 — 재합성 후 카페명 일치율 ${pct}% (noisy 게이트, 자동 held)`}, exclude_at=now(), updated_at=now() WHERE id=${r.id} AND published`.catch(() => {});
+        await invalidateCafeCaches([r.id]).catch(() => {});
         await sql`INSERT INTO audit_flags (cafe_id, cafe_name, issue, detail, resolved)
-          SELECT ${r.id}, ${r.name}, ${"근거오염"}, ${`재합성후에도 카페명 일치율 ${Math.round(coh * 100)}%`}, false
-          WHERE NOT EXISTS (SELECT 1 FROM audit_flags WHERE cafe_id=${r.id} AND issue=${"근거오염"} AND NOT resolved)`.catch(() => {});
+          VALUES (${r.id}, ${r.name}, ${"근거오염"}, ${`재합성후에도 카페명 일치율 ${pct}% → 자동 held`}, true)`.catch(() => {});
+        await sql`UPDATE audit_flags SET resolved=true WHERE cafe_id=${r.id} AND issue=${"근거오염"} AND NOT resolved`.catch(() => {});
+        flagged++; unpublished++; names.push(r.name);
+        if (unpublished > unpubCap) { regression = true; break; } // 대량 비공개 = 규칙 회귀 의심 → 중단
       } else {
         await sql`UPDATE audit_flags SET resolved=true WHERE cafe_id=${r.id} AND issue=${"근거오염"} AND NOT resolved`.catch(() => {});
       }
