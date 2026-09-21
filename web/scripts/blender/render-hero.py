@@ -120,7 +120,7 @@ coffee.data.materials.append(km)
 for o in (cup, handle, saucer, coffee):
     o.location.x += CUP_AT[0]; o.location.y += CUP_AT[1]
     if o is not saucer: o.location.z += 0.0028
-    o.rotation_euler.z = math.radians(-25)  # 손잡이가 오른쪽 위로
+    o.rotation_euler.z = math.radians(60)  # 손잡이를 위·오른쪽(먼 쪽)으로 — 오른쪽 프레임 밖으로 안 나가게(hero6에서 손잡이 끝 잘림)
 
 # ── 원두 5알 ──
 bmat, bnt, bb = mat("bean")
@@ -208,7 +208,7 @@ zp = 0.006 + TH + 0.0003; x0 = 0.002
 quad = [proj((x0, PH, zp)), proj((x0 + PW, PH, zp)), proj((x0 + PW, 0, zp)), proj((x0, 0, zp))]
 cupc = proj((CUP_AT[0], CUP_AT[1], 0.0028 + LIQ_Z))
 json.dump({"HERO_PAGE": quad, "HERO_CUP": cupc}, open(os.path.join(OUT, "quad.json"), "w"))
-print("QUAD", json.dumps({"HERO_PAGE": quad, "HERO_CUP": cupc, "PLATE": proj((PLATE_AT[0], PLATE_AT[1], 0.01)), "CUP_R": proj((CUP_AT[0] + SR, CUP_AT[1], 0.0)), "CUP_TOP": proj((CUP_AT[0], CUP_AT[1] + SR, 0.0))}))
+print("QUAD", json.dumps({"HERO_PAGE": quad, "HERO_CUP": cupc, "PLATE": proj((PLATE_AT[0], PLATE_AT[1], 0.01)), "CUP_R": proj((CUP_AT[0] + SR, CUP_AT[1], 0.0)), "CUP_TOP": proj((CUP_AT[0], CUP_AT[1] + SR, 0.0)), "HANDLE": proj((CUP_AT[0] + 0.075 * math.cos(math.radians(60)), CUP_AT[1] + 0.075 * math.sin(math.radians(60)), 0.035))}))
 sc.render.filepath = os.path.join(OUT, "hero.png"); bpy.ops.render.render(write_still=True); print("RENDERED", sc.render.filepath)
 
 # ───────── 글 쓰는 펜 오버레이(public/note/pen.webp 규격 167×1382, 투명, 촉이 아래) ─────────
