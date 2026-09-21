@@ -64,6 +64,16 @@ DEADLINE=$(( $(date +%s) + 120*60 ))
   done
   [ "$(date +%s)" -ge "$DEADLINE" ] && echo "120분 창 종료 — 다음 창(4시간 뒤)에 이어감"
 
+  # 🚀 임베딩+승격을 바로 당긴다(2026-09-21 실측): 수집·판정이 끝나도 공개는 cron-embed(UTC 3·7·11·23 = KST 12·16·20·08)가
+  #   돌아야 일어난다 — 오전에 판정 437곳이 4시간 동안 '판정됐는데 비공개'로 앉아 있었다. 창이 끝나면 즉시 두 번 당겨
+  #   (회당 600곳) 그날 수집분을 그날 공개한다. Gemini 무료 쿼터·DB는 이미 깨어 있는 창 안이라 추가 비용 0.
+  SECRET=$(grep '^CRON_SECRET=' .env.local | cut -d= -f2- | tr -d '"')
+  for _ in 1 2; do
+    r=$(curl -s --max-time 300 -H "Authorization: Bearer $SECRET" "https://dongnecoffeenote.com/api/cron-embed" || true)
+    echo "embed: $(echo "$r" | cut -c1-120)"
+    echo "$r" | grep -q '"remaining":0' && break
+  done
+
   # 🔎 IndexNow 색인 제출 — 새로 공개된 URL을 네이버·빙에 알린다(구글은 미참여, 구조상 불가).
   #   ⚠️ 키 파일을 막 올린 직후에는 엔진이 아직 검증을 못 해 403(SiteVerificationNotCompleted)이 난다.
   #      실패해도 그냥 넘어가고 다음 창에서 다시 시도한다 — 미제출분만 보내므로 중복도 안 생긴다.
