@@ -950,9 +950,9 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
   return (
     <div className="w-full max-w-md mx-auto flex flex-col nt-landing" style={{ height: "100%", overflowY: "auto", overflowX: "hidden", background: "var(--nt-espresso)", padding: "calc(env(safe-area-inset-top) + 8px) 8px calc(env(safe-area-inset-bottom) + 8px)", boxSizing: "border-box" }}>
       {/* 📱 프레임: 화면 가장자리에 얇은 크림 경계선 — 노트 표지 안쪽 테두리처럼. 정물은 남는 높이를 전부 채우고 아래 블록은 고정 높이(어떤 폰이든 한 화면) */}
-      <div className="flex flex-col flex-1 rounded-[10px]" style={{ minHeight: 0, border: "1px solid rgba(233,214,189,.42)", boxShadow: "inset 0 0 0 4px rgba(20,12,8,.35)", overflow: "hidden" }}>
+      <div className="flex flex-col flex-1 rounded-[10px]" style={{ minHeight: 0, overflow: "hidden" }}>{/* 테두리·안쪽 그림자 삭제(2026-09-21 CEO "아웃라인 테두리 선 삭제") */}
       <div ref={heroRef} className="relative w-full overflow-hidden" style={{ flex: "1 1 0%", minHeight: 220 }}>
-        <img src="/note/hero2.webp" alt="" aria-hidden className="absolute inset-0 w-full h-full object-cover" />
+        <img src="/note/hero3.webp" alt="" aria-hidden className="absolute inset-0 w-full h-full object-cover" />
         {/* 위: 어두운 나무 위 제목(커피 톤) · 아래: 에스프레소 띠로 녹아듦 */}
         <div className="absolute inset-x-0 top-0 h-40" style={{ background: "linear-gradient(180deg, rgba(20,12,8,.62), rgba(20,12,8,0))" }} />
         <div className="absolute inset-x-0 bottom-0 h-28" style={{ background: "linear-gradient(0deg, var(--nt-espresso), rgba(36,24,18,0))" }} />

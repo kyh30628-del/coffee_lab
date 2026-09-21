@@ -61,25 +61,25 @@ cup.location.z = 0.0028; handle.location.z += 0.0028
 LIQ_Z = 0.0028 + H - 0.009
 coffee = lathe("coffee", [(R * 0.985 - T + 0.0004, LIQ_Z), (0.0, LIQ_Z)], steps=96)
 km, knt, kb = mat("crema")
-tex = knt.nodes.new("ShaderNodeTexNoise"); tex.inputs["Scale"].default_value = 55.0; tex.inputs["Detail"].default_value = 6.0; tex.inputs["Roughness"].default_value = 0.55; tex.inputs["Distortion"].default_value = 1.6  # 크레마 무늬: 촘촘한 점 → 흐르는 결(타이거)  # 크레마 얼룩(타이거 스트라이프)이 보이는 크기
-tex2 = knt.nodes.new("ShaderNodeTexNoise"); tex2.inputs["Scale"].default_value = 16.0; tex2.inputs["Detail"].default_value = 3.0
-vor = knt.nodes.new("ShaderNodeTexVoronoi"); vor.inputs["Scale"].default_value = 300.0
-ramp = knt.nodes.new("ShaderNodeValToRGB"); ramp.color_ramp.elements[0].position = 0.30; ramp.color_ramp.elements[0].color = (0.16, 0.07, 0.025, 1)
-ramp.color_ramp.elements[1].position = 0.72; ramp.color_ramp.elements[1].color = (0.72, 0.47, 0.21, 1)
-e = ramp.color_ramp.elements.new(0.50); e.color = (0.44, 0.24, 0.09, 1)
-mixn = knt.nodes.new("ShaderNodeMath"); mixn.operation = "MULTIPLY_ADD"; mixn.inputs[1].default_value = 0.55; mixn.inputs[2].default_value = 0.0
-knt.links.new(tex.outputs["Fac"], mixn.inputs[0]); knt.links.new(tex2.outputs["Fac"], mixn.inputs[2])
-grad_tc = knt.nodes.new("ShaderNodeTexCoord"); grad_len = knt.nodes.new("ShaderNodeVectorMath"); grad_len.operation = "LENGTH"
-knt.links.new(grad_tc.outputs["Object"], grad_len.inputs[0])
-edge = knt.nodes.new("ShaderNodeMapRange"); edge.inputs["From Min"].default_value = 0.024; edge.inputs["From Max"].default_value = 0.035; edge.inputs["To Min"].default_value = 0.0; edge.inputs["To Max"].default_value = -0.28
-knt.links.new(grad_len.outputs["Value"], edge.inputs["Value"])
-addn = knt.nodes.new("ShaderNodeMath"); addn.operation = "ADD"; knt.links.new(mixn.outputs[0], addn.inputs[0]); knt.links.new(edge.outputs["Result"], addn.inputs[1])
-knt.links.new(addn.outputs[0], ramp.inputs["Fac"]); knt.links.new(ramp.outputs["Color"], kb.inputs["Base Color"])
-bump = knt.nodes.new("ShaderNodeBump"); bump.inputs["Strength"].default_value = 0.18; bump.inputs["Distance"].default_value = 0.0006
-bump2 = knt.nodes.new("ShaderNodeBump"); bump2.inputs["Strength"].default_value = 0.10; bump2.inputs["Distance"].default_value = 0.0004
-knt.links.new(vor.outputs["Distance"], bump.inputs["Height"]); knt.links.new(tex.outputs["Fac"], bump2.inputs["Height"]); knt.links.new(bump.outputs["Normal"], bump2.inputs["Normal"])
-knt.links.new(bump2.outputs["Normal"], kb.inputs["Normal"])
-setin(kb, "Roughness", 0.30); setin(kb, "Coat Weight", 0.35); setin(kb, "Coat Roughness", 0.12); setin(kb, "Subsurface Weight", 0.15); setin(kb, "Subsurface Radius", (0.003, 0.0015, 0.0008))
+# ☕ 2026-09-21 2차(CEO "내용물이 커피 아닌 것 같다"): 전면 얼룩 크레마 → **어둡고 반짝이는 커피 표면** + 벽 쪽 얇은 황금 크레마 링 + 기포.
+#   커피로 읽히는 건 색보다 '검고 젖은 반사'다. 액체는 거울에 가깝게(roughness 0.06·coat 1), 크레마는 가장자리 링에만 두텁고 가운데는 옅은 소용돌이.
+tc = knt.nodes.new("ShaderNodeTexCoord"); flat = knt.nodes.new("ShaderNodeVectorMath"); flat.operation = "MULTIPLY"; flat.inputs[1].default_value = (1, 1, 0)
+knt.links.new(tc.outputs["Object"], flat.inputs[0]); rad = knt.nodes.new("ShaderNodeVectorMath"); rad.operation = "LENGTH"; knt.links.new(flat.outputs["Vector"], rad.inputs[0])  # XY 반지름(z 섞이면 전면 크레마 — 4차 실사고)
+ringw = knt.nodes.new("ShaderNodeMapRange"); ringw.inputs["From Min"].default_value = 0.0295; ringw.inputs["From Max"].default_value = 0.0352  # 벽 쪽 얇은 크레마·기포 링(≈5mm); ringw.inputs["To Min"].default_value = 0.0; ringw.inputs["To Max"].default_value = 1.0
+knt.links.new(rad.outputs["Value"], ringw.inputs["Value"])
+swirl = knt.nodes.new("ShaderNodeTexNoise"); swirl.inputs["Scale"].default_value = 14.0; swirl.inputs["Detail"].default_value = 3.0; swirl.inputs["Roughness"].default_value = 0.5; swirl.inputs["Distortion"].default_value = 1.8
+sw = knt.nodes.new("ShaderNodeMapRange"); sw.inputs["From Min"].default_value = 0.45; sw.inputs["From Max"].default_value = 0.80; sw.inputs["To Min"].default_value = 0.0; sw.inputs["To Max"].default_value = 0.14  # 가운데는 옅은 소용돌이만
+knt.links.new(swirl.outputs["Fac"], sw.inputs["Value"])
+cremaF = knt.nodes.new("ShaderNodeMath"); cremaF.operation = "MAXIMUM"; knt.links.new(ringw.outputs["Result"], cremaF.inputs[0]); knt.links.new(sw.outputs["Result"], cremaF.inputs[1])
+mixc = knt.nodes.new("ShaderNodeMix"); mixc.data_type = "RGBA"; mixc.inputs[6].default_value = (0.040, 0.018, 0.007, 1); mixc.inputs[7].default_value = (0.46, 0.27, 0.10, 1)
+knt.links.new(cremaF.outputs[0], mixc.inputs[0]); knt.links.new(mixc.outputs[2], kb.inputs["Base Color"])
+mixr = knt.nodes.new("ShaderNodeMapRange"); mixr.inputs["From Min"].default_value = 0.0; mixr.inputs["From Max"].default_value = 1.0; mixr.inputs["To Min"].default_value = 0.10; mixr.inputs["To Max"].default_value = 0.45
+knt.links.new(cremaF.outputs[0], mixr.inputs["Value"]); knt.links.new(mixr.outputs["Result"], kb.inputs["Roughness"])
+vor = knt.nodes.new("ShaderNodeTexVoronoi"); vor.inputs["Scale"].default_value = 520.0
+bub = knt.nodes.new("ShaderNodeMath"); bub.operation = "MULTIPLY"; knt.links.new(vor.outputs["Distance"], bub.inputs[0]); knt.links.new(ringw.outputs["Result"], bub.inputs[1])
+bump = knt.nodes.new("ShaderNodeBump"); bump.inputs["Strength"].default_value = 0.25; bump.inputs["Distance"].default_value = 0.0005
+knt.links.new(bub.outputs[0], bump.inputs["Height"]); knt.links.new(bump.outputs["Normal"], kb.inputs["Normal"])
+setin(kb, "Coat Weight", 0.6); setin(kb, "Coat Roughness", 0.03); setin(kb, "Specular IOR Level", 0.4)  # 3차: 코트 1.0+큰 조명이 표면 전체를 살구색 반사로 덮어 라떼처럼 보였다 → 반사는 뚜렷한 하이라이트 한 점만
 coffee.data.materials.append(km)
 # 크레마 가장자리의 얇은 어두운 링(잔 벽 접촉선) — 액체 표면 가장자리에 살짝 오목한 메니스커스
 ring = lathe("meniscus", [(R * 0.985 - T + 0.0004, LIQ_Z + 0.0012), (R * 0.985 - T - 0.0015, LIQ_Z)], steps=96)
@@ -92,9 +92,10 @@ def light(name, kind, loc, energy, size=0.3, color=(1, 0.93, 0.82)):
     if kind == "AREA": d.size = size
     o = bpy.data.objects.new(name, d); bpy.context.collection.objects.link(o); o.location = loc
     tr = o.constraints.new("TRACK_TO"); tr.target = cup; tr.track_axis = "TRACK_NEGATIVE_Z"; tr.up_axis = "UP_Y"; return o
-light("key", "AREA", (-0.35, -0.25, 0.55), 5, 0.30)
+light("key", "AREA", (-0.35, -0.25, 0.55), 5, 0.22)
 light("fill", "AREA", (0.45, -0.30, 0.30), 1.2, 0.5, (0.95, 0.93, 0.95))
 light("top", "AREA", (0.05, 0.10, 0.70), 2, 0.9)
+light("window", "AREA", (-0.12, 0.30, 0.80), 2.0, 0.22, (1, 1, 1))  # 커피 표면에 비치는 창 하이라이트
 w = bpy.data.worlds.new("w"); sc.world = w; w.use_nodes = True; w.node_tree.nodes["Background"].inputs["Color"].default_value = (0.18, 0.11, 0.07, 1); w.node_tree.nodes["Background"].inputs["Strength"].default_value = 0.15
 # ── 카메라: 히어로와 같은 내려다보는 시점(앞·약간 왼쪽에서 약 38°) ──
 cam_d = bpy.data.cameras.new("cam"); cam_d.lens = 55; cam = bpy.data.objects.new("cam", cam_d); bpy.context.collection.objects.link(cam); sc.camera = cam
