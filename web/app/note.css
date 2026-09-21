@@ -187,7 +187,9 @@
 @media (prefers-reduced-motion: reduce) {
   .nt-page-in { animation: none; }
   .nt-stamp.in { animation: none; }
-  .nt-w .ch { opacity: 1; clip-path: none; color: #2f3550; transform: none; transition: none; }
+  /* 2026-09-22: '움직임 줄이기'에서도 글씨는 써진다(CEO 아이폰 실측: JS는 쓰기 시작했는데 이 규칙이 전 글자를 즉시 보여 연출이 사라짐).
+     글자 기울임(transform)·전이만 끄고, 드러남(opacity·clip-path)은 JS가 그대로 제어한다. */
+  .nt-w .ch { transform: none; transition: none; }
 }
 
 /* ══ 2차(09-12 밤): 커피 톤 포인트·섹션 구분·접어 붙인 지도 ══ */
