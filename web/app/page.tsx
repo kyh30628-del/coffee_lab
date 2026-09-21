@@ -747,11 +747,13 @@ function landingMemo(d: Discover | null, seed: number): string[] {
   lines.push("마음에 든 곳엔 도장 하나.");
   return lines;
 }
-const HERO_W = 1400, HERO_H = 1680;
+const HERO_W = 1400, HERO_H = 1310;   // hero10.webp(1400×1680에서 빈 바닥 22% 제거)
+const HERO_NB_TOP = 1 - 0.46;         // 노트 윗변이 그림 높이의 46% 지점 → 아래 54%가 제목 아래에 있어야 겹치지 않는다
+const HERO_TITLE_H = 125;             // 제목 블록(eyebrow+두 줄) 실측 약 120px(px) — 이 아래부터 노트가 시작해야 한다
 // ✒ Blender 렌더 만년펜(public/note/pen.webp) — 페이지 좌표계 표시 크기와 촉 끝 위치(이미지 비율, 렌더 후 알파채널로 실측)
 const PEN_W = 21, PEN_H = 174, PEN_TIP: [number, number] = [0.497, 0.979]; // 렌더 167×1382px, 촉 끝 실측(알파채널)
-const HERO_PAGE: [number, number][] = [[0.43867, 0.3739], [0.71633, 0.37555], [0.76978, 0.63686], [0.41661, 0.6342]];
-const HERO_CUP: [number, number] = [0.84754, 0.39272];   // 잔 액면 중심(이미지 비율) — 김이 여기서 오른다
+const HERO_PAGE: [number, number][] = [[0.43867, 0.47936], [0.71633, 0.48147], [0.76978, 0.81649], [0.41661, 0.81308]];   // hero10 = hero9 아래 22% 잘라냄(2026-09-22) → y/0.78
+const HERO_CUP: [number, number] = [0.84754, 0.50349];   // 잔 액면 중심(이미지 비율) — 김이 여기서 오른다
 const PAGE_SW = 280, PAGE_SH = 387;            // 글을 쓰는 원본 사각형(px) — 페이지 비율 2.10:2.90
 const PAGE_RULE0 = 560 / 2900 * PAGE_SH;       // 첫 줄 y(텍스처 page-right-blank.json과 동일 규격)
 const PAGE_PITCH = 170 / 2900 * PAGE_SH;   // 줄 하나 = 손편지 한 줄(글리프가 줄 사이에 앉는다)       // 줄 간격
@@ -837,6 +839,7 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
   const [done, setDone] = useState<boolean | null>(() => (landingOnce.done ? true : landingOnce.t0 != null ? false : null)); // null=판단 전(SSR), true=완성본, false=쓰는 중 — 재마운트면 즉시 이어진 상태로
   const [pos, setPos] = useState<[number, number]>([0, 0]); // [줄, 글자]
   const [mtx, setMtx] = useState<string>("");
+  const [heroBox, setHeroBox] = useState<[number, number, number] | null>(null); // 그림 상자 [폭, 높이, 왼쪽 오프셋](px) — 짧은 화면 축소용
   const [cupPos, setCupPos] = useState<[number, number] | null>(null);
   const heroRef = useRef<HTMLDivElement | null>(null);
   const pageRef = useRef<HTMLDivElement | null>(null);
@@ -850,7 +853,13 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
     const el = heroRef.current; if (!el) return;
     const calc = () => {
       const cw = el.clientWidth, ch = el.clientHeight; if (!cw || !ch) return;
-      const s = Math.max(cw / HERO_W, ch / HERO_H); const ox = (cw - HERO_W * s) / 2, oy = (ch - HERO_H * s) / 2;
+      // 2026-09-22: object-cover(가운데 자르기) 폐기 — 그림은 **폭에 맞춰 바닥에 붙인다**. 어떤 폭이든 옆이 잘리지 않고,
+      //   높은 화면은 남는 높이가 제목 쪽 어두운 띠가 된다(노트 아래 빈 나무 바닥이 넓게 남던 것, CEO 지적).
+      //   아주 짧은 화면(옛 소형폰·낮은 창)만 예외: 제목(≈150px)이 노트 윗변과 겹치지 않을 만큼만 그림을 줄여 가운데 둔다.
+      const sw = cw / HERO_W;
+      const s = Math.min(sw, Math.max(0.6 * sw, (ch - HERO_TITLE_H) / (HERO_NB_TOP * HERO_H))); // 최대 60%까지만 줄인다
+      const ox = (cw - HERO_W * s) / 2, oy = ch - HERO_H * s;
+      setHeroBox([HERO_W * s, HERO_H * s, ox]);
       const q = HERO_PAGE.map(([fx, fy]) => [fx * HERO_W * s + ox, fy * HERO_H * s + oy] as [number, number]);
       setMtx(homographyMatrix3d(PAGE_SW, PAGE_SH, q));
       setCupPos([HERO_CUP[0] * HERO_W * s + ox, HERO_CUP[1] * HERO_H * s + oy]);
@@ -963,8 +972,12 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
     <div className="w-full max-w-md mx-auto flex flex-col nt-landing" style={{ height: "100%", overflowY: "auto", overflowX: "hidden", background: "var(--nt-espresso)", padding: "calc(env(safe-area-inset-top) + 8px) 8px calc(env(safe-area-inset-bottom) + 8px)", boxSizing: "border-box" }}>
       {/* 📱 프레임: 화면 가장자리에 얇은 크림 경계선 — 노트 표지 안쪽 테두리처럼. 정물은 남는 높이를 전부 채우고 아래 블록은 고정 높이(어떤 폰이든 한 화면) */}
       <div className="flex flex-col flex-1 rounded-[10px]" style={{ minHeight: 0, overflow: "hidden" }}>{/* 테두리·안쪽 그림자 삭제(2026-09-21 CEO "아웃라인 테두리 선 삭제") */}
-      <div ref={heroRef} className="relative w-full overflow-hidden min-h-[220px] md:min-h-[720px]" style={{ flex: "1 1 0%" }}>{/* 데스크톱(가로)에서 세로 이미지의 가운데 띠만 보여 잔이 잘리던 것(2026-09-21 CEO) → 넓은 화면은 히어로를 높게 */}
-        <img src="/note/hero9.webp" alt="" aria-hidden className="absolute inset-0 w-full h-full object-cover" />
+      <div ref={heroRef} className="relative w-full overflow-hidden min-h-[220px]" style={{ flex: "1 1 0%", background: "var(--nt-espresso)" }}>{/* 그림은 폭 맞춤·바닥 정렬(옆·아래 안 잘림). 짧은 화면은 위쪽 나무만 잘리고, 높은 화면은 위가 에스프레소 띠 */}
+        <div className="absolute bottom-0" style={heroBox ? { width: heroBox[0], height: heroBox[1], left: heroBox[2] } : { left: 0, width: "100%", aspectRatio: `${HERO_W} / ${HERO_H}` }}>
+          <img src="/note/hero10.webp" alt="" aria-hidden className="block w-full h-full" />
+          <div className="absolute inset-x-0 top-0 h-32" style={{ background: "linear-gradient(180deg, var(--nt-espresso), rgba(36,24,18,0))" }} />{/* 그림 윗단이 띠로 녹아듦 */}
+          {heroBox && heroBox[2] > 0.5 && <div className="absolute inset-0" style={{ boxShadow: "inset 0 0 64px 36px var(--nt-espresso)" }} />}{/* 축소된 경우만: 옆·아래 가장자리가 바닥색으로 녹아 네모 테두리가 안 보인다 */}
+        </div>
         {/* 위: 어두운 나무 위 제목(커피 톤) · 아래: 에스프레소 띠로 녹아듦 */}
         <div className="absolute inset-x-0 top-0 h-40" style={{ background: "linear-gradient(180deg, rgba(20,12,8,.62), rgba(20,12,8,0))" }} />
         <div className="absolute inset-x-0 bottom-0 h-28" style={{ background: "linear-gradient(0deg, var(--nt-espresso), rgba(36,24,18,0))" }} />
