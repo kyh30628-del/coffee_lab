@@ -142,7 +142,7 @@ def bean(loc, rz, seed):
         v.co += v.normal * (rnd.random() - 0.5) * 0.00006
     bm.to_mesh(ob.data); bm.free(); smooth(ob, 2)
     ob.rotation_euler = (math.radians(6), math.radians(-4), math.radians(rz)); ob.location = (loc[0], loc[1], 0.0031); ob.data.materials.append(bmat)
-for i, (loc, rz) in enumerate([((0.04, 0.45), 20), ((0.30, 0.50), 75), ((-0.10, 0.39), 110), ((0.42, 0.34), -40), ((0.27, -0.06), 15), ((0.40, 0.08), 60)]): bean(loc, rz, i + 1)  # 디저트 접시(0.335,0.075 r0.055) 피해서  # 프레임 안에 5알(위 2·왼쪽 위 1·잔 옆 1·펜 아래 1)
+for i, (loc, rz) in enumerate([((0.00, 0.36), 20), ((0.31, 0.37), 75), ((-0.29, 0.29), 110), ((0.36, 0.05), -40), ((-0.27, -0.03), 15)]): bean(loc, rz, i + 1)  # 전부 프레임 안·노트 밖(09-22)
 
 # ── 만년필(세련된 시가형): 검정 래커 + 금장. 오른쪽 페이지 아래에 36° 대각으로 눕힘 ──
 def build_pen():
@@ -200,7 +200,7 @@ aim = bpy.data.objects.new("aim", None); bpy.context.collection.objects.link(aim
 light("key", (-0.9, -0.6, 1.4), 55, 1.2, aim); light("fill", (1.1, -0.7, 0.9), 12, 1.6, aim, (0.95, 0.93, 0.95)); light("rim", (0.2, 1.4, 1.2), 22, 1.0, aim)
 light("window", (-0.05, 0.42, 0.62), 3.0, 0.14, aim, (1, 1, 1))  # 커피 표면 창 하이라이트(작게)  # 1차 프리뷰 전면 백화 → 1/8
 cd = bpy.data.cameras.new("cam"); cd.lens = 42; cd.clip_start = 0.01; cam = bpy.data.objects.new("cam", cd); bpy.context.collection.objects.link(cam); sc.camera = cam
-CAM = json.loads(os.environ.get("HERO_CAM", "null")) or {"loc": [0.12, -0.17, 0.34], "aim": [0.145, 0.16, 0.0], "lens": 37}  # 09-21 스윕 확정: 옛 히어로 페이지 사각형(0.22,0.30)-(0.71,0.30)-(0.77,0.83)-(0.105,0.82)에 근접
+CAM = json.loads(os.environ.get("HERO_CAM", "null")) or {"loc": [0.0565, -0.435, 0.6175], "aim": [0.05, 0.15, 0.0], "lens": 37}  # 09-22 스윕: 노트 전체(표지 왼쪽 끝 x≈0.04)·잔(우측 0.91)·접시(y 0.30)·원두 전부 프레임 안, 데스크톱 띠(0.23~0.77) 안  # 09-22 CEO "노트 줄여서 전부 안 잘리게": 카메라 1.4배 뒤로  # 09-21 스윕 확정: 옛 히어로 페이지 사각형(0.22,0.30)-(0.71,0.30)-(0.77,0.83)-(0.105,0.82)에 근접
 cam.location = tuple(CAM["loc"]); cd.lens = CAM["lens"]; aim.location = tuple(CAM["aim"])
 tr = cam.constraints.new("TRACK_TO"); tr.target = aim; tr.track_axis = "TRACK_NEGATIVE_Z"; tr.up_axis = "UP_Y"
 bpy.context.view_layer.update()
@@ -212,7 +212,7 @@ zp = 0.006 + TH + 0.0003; x0 = 0.002
 quad = [proj((x0, PH, zp)), proj((x0 + PW, PH, zp)), proj((x0 + PW, 0, zp)), proj((x0, 0, zp))]
 cupc = proj((CUP_AT[0], CUP_AT[1], 0.0028 + LIQ_Z))
 json.dump({"HERO_PAGE": quad, "HERO_CUP": cupc}, open(os.path.join(OUT, "quad.json"), "w"))
-print("QUAD", json.dumps({"HERO_PAGE": quad, "HERO_CUP": cupc, "PLATE": proj((PLATE_AT[0], PLATE_AT[1], 0.01)), "CUP_R": proj((CUP_AT[0] + SR, CUP_AT[1], 0.0)), "CUP_TOP": proj((CUP_AT[0], CUP_AT[1] + SR, 0.0)), "HANDLE": proj((CUP_AT[0] + 0.078 * math.cos(HANDLE_TH), CUP_AT[1] + 0.078 * math.sin(HANDLE_TH), 0.035))}))
+print("QUAD", json.dumps({"HERO_PAGE": quad, "HERO_CUP": cupc, "PLATE": proj((PLATE_AT[0], PLATE_AT[1], 0.01)), "CUP_R": proj((CUP_AT[0] + SR, CUP_AT[1], 0.0)), "CUP_TOP": proj((CUP_AT[0], CUP_AT[1] + SR, 0.0)), "NB_BL": proj((-PW - 0.009, -0.006, zp)), "NB_TL": proj((-PW - 0.009, PH + 0.006, zp)), "HANDLE": proj((CUP_AT[0] + 0.078 * math.cos(HANDLE_TH), CUP_AT[1] + 0.078 * math.sin(HANDLE_TH), 0.035))}))
 sc.render.filepath = os.path.join(OUT, "hero.png"); bpy.ops.render.render(write_still=True); print("RENDERED", sc.render.filepath)
 
 # ───────── 글 쓰는 펜 오버레이(public/note/pen.webp 규격 167×1382, 투명, 촉이 아래) ─────────
