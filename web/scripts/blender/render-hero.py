@@ -1,0 +1,204 @@
+# 📓 랜딩 히어로 **한 장면** 재렌더(2026-09-21 CEO "잔 주변 자국 거슬려, 한 장면으로 다시") — 호두나무 테이블·펼친 노트·커피잔·원두·만년필.
+#   실행: Blender -b --python scripts/blender/render-hero.py -- <out_dir> [samples] [scale%]
+#   산출: hero.png(1400×1680) · quad.json(오른쪽 페이지 4모서리·잔 액면 중심의 이미지 비율 좌표 → app/page.tsx HERO_PAGE/HERO_CUP)
+#        · pen-top.png(167×1382, 글 쓰는 펜 오버레이 public/note/pen.webp용, 촉 끝 비율 포함)
+#   페이지 텍스처는 PIL로 생성(2100×2900: 제목·줄·여백선) — 손글씨 오버레이 규격(첫 줄 560/2900·간격 170/2900)과 동일.
+import bpy, bmesh, sys, math, os, json, random, subprocess
+from mathutils import Vector
+from bpy_extras.object_utils import world_to_camera_view
+argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
+OUT = argv[0] if argv else "/tmp/hero"; SAMPLES = int(argv[1]) if len(argv) > 1 else 128; SCALE = int(argv[2]) if len(argv) > 2 else 100
+os.makedirs(OUT, exist_ok=True)
+
+# ───────── 페이지 텍스처(PIL, 별도 프로세스 — Blender 파이썬엔 PIL이 없다) ─────────
+PAGE_TEX = os.path.join(OUT, "page.png"); PAGE_TEX_L = os.path.join(OUT, "page-left.png")
+subprocess.run(["/usr/bin/python3", "-c", r'''
+import sys
+from PIL import Image, ImageDraw, ImageFont
+W, H = 2100, 2900
+def page(path, title):
+    im = Image.new("RGB", (W, H), (247, 241, 229)); d = ImageDraw.Draw(im)
+    for y in range(560, H - 120, 170): d.line((150, y, W - 90, y), fill=(196, 202, 214), width=3)   # 줄(파랑기 회색)
+    d.line((300, 360, 300, H - 100), fill=(214, 120, 110), width=3)                                   # 여백선(붉은)
+    if title:
+        f = ImageFont.truetype("/System/Library/Fonts/Supplemental/AppleMyungjo.ttf", 190)
+        d.text((330, 200), title, font=f, fill=(58, 44, 34))
+        f2 = ImageFont.truetype("/System/Library/Fonts/Supplemental/AppleGothic.ttf", 50)
+        d.text((338, 420), "D O N G N E   C O F F E E   N O T E   ·   2 0 2 6", font=f2, fill=(150, 138, 122))
+    im.save(path)
+page(sys.argv[1], "동네 커피 노트"); page(sys.argv[2], "")
+''', PAGE_TEX, PAGE_TEX_L], check=True)
+
+# ───────── 장면 ─────────
+bpy.ops.wm.read_factory_settings(use_empty=True)
+sc = bpy.context.scene
+sc.render.engine = "CYCLES"; sc.cycles.samples = SAMPLES; sc.cycles.use_denoising = True; sc.cycles.device = "CPU"
+sc.render.resolution_x, sc.render.resolution_y, sc.render.resolution_percentage = 1400, 1680, SCALE
+sc.render.image_settings.file_format = "PNG"; sc.render.image_settings.color_mode = "RGB"
+vts = [i.identifier for i in sc.view_settings.bl_rna.properties["view_transform"].enum_items]
+sc.view_settings.view_transform = "AgX" if "AgX" in vts else "Standard"; sc.view_settings.look = "None"; sc.view_settings.exposure = -1.0
+w = bpy.data.worlds.new("w"); sc.world = w; w.use_nodes = True
+w.node_tree.nodes["Background"].inputs["Color"].default_value = (0.20, 0.13, 0.08, 1); w.node_tree.nodes["Background"].inputs["Strength"].default_value = 0.35
+
+def mat(name):
+    m = bpy.data.materials.new(name); m.use_nodes = True; return m, m.node_tree, m.node_tree.nodes["Principled BSDF"]
+def setin(b, k, v):
+    if k in b.inputs: b.inputs[k].default_value = v
+def smooth(ob, sub=2):
+    for p in ob.data.polygons: p.use_smooth = True
+    if sub: m = ob.modifiers.new("sub", "SUBSURF"); m.levels = min(2, sub); m.render_levels = sub
+def lathe(name, profile, steps=96, sub=3):
+    bm = bmesh.new(); vs = [bm.verts.new((r, 0.0, z)) for r, z in profile]
+    es = [bm.edges.new((vs[i], vs[i + 1])) for i in range(len(vs) - 1)]
+    bmesh.ops.spin(bm, geom=vs + es, cent=(0, 0, 0), axis=(0, 0, 1), angle=math.tau, steps=steps, use_merge=True)
+    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-5)
+    me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free(); ob = bpy.data.objects.new(name, me); bpy.context.collection.objects.link(ob); smooth(ob, sub); return ob
+def box(name, size, loc, m):
+    bpy.ops.mesh.primitive_cube_add(size=1, location=loc); ob = bpy.context.object; ob.name = name; ob.scale = size; ob.data.materials.append(m)
+    bev = ob.modifiers.new("bev", "BEVEL"); bev.width = 0.0015; bev.segments = 3; return ob
+
+# ── 테이블: 호두나무(늘인 노이즈 결) ──
+bpy.ops.mesh.primitive_plane_add(size=3.0, location=(0, 0.2, 0)); table = bpy.context.object; table.name = "table"
+wm, wnt, wb = mat("walnut")
+tc = wnt.nodes.new("ShaderNodeTexCoord"); mp = wnt.nodes.new("ShaderNodeMapping"); mp.inputs["Scale"].default_value = (2.2, 26.0, 1.0); mp.inputs["Rotation"].default_value = (0, 0, math.radians(4))
+wnt.links.new(tc.outputs["Object"], mp.inputs["Vector"])
+nz = wnt.nodes.new("ShaderNodeTexNoise"); nz.inputs["Scale"].default_value = 1.6; nz.inputs["Detail"].default_value = 6.0; nz.inputs["Roughness"].default_value = 0.55; nz.inputs["Distortion"].default_value = 0.9
+wnt.links.new(mp.outputs["Vector"], nz.inputs["Vector"])
+wave = wnt.nodes.new("ShaderNodeTexWave"); wave.wave_type = "BANDS"; wave.bands_direction = "Y"; wave.inputs["Scale"].default_value = 3.2; wave.inputs["Distortion"].default_value = 4.5; wave.inputs["Detail"].default_value = 3.0
+wnt.links.new(mp.outputs["Vector"], wave.inputs["Vector"])
+mixw = wnt.nodes.new("ShaderNodeMath"); mixw.operation = "MULTIPLY_ADD"; mixw.inputs[1].default_value = 0.55; wnt.links.new(wave.outputs["Fac"], mixw.inputs[0]); wnt.links.new(nz.outputs["Fac"], mixw.inputs[2])
+wr = wnt.nodes.new("ShaderNodeValToRGB"); wr.color_ramp.elements[0].position = 0.25; wr.color_ramp.elements[0].color = (0.055, 0.030, 0.018, 1)
+wr.color_ramp.elements[1].position = 0.95; wr.color_ramp.elements[1].color = (0.26, 0.15, 0.085, 1); e = wr.color_ramp.elements.new(0.6); e.color = (0.15, 0.085, 0.045, 1)
+wnt.links.new(mixw.outputs[0], wr.inputs["Fac"]); wnt.links.new(wr.outputs["Color"], wb.inputs["Base Color"])
+wbump = wnt.nodes.new("ShaderNodeBump"); wbump.inputs["Strength"].default_value = 0.08; wbump.inputs["Distance"].default_value = 0.0005; wnt.links.new(mixw.outputs[0], wbump.inputs["Height"]); wnt.links.new(wbump.outputs["Normal"], wb.inputs["Normal"])
+setin(wb, "Roughness", 0.38); setin(wb, "Coat Weight", 0.35); setin(wb, "Coat Roughness", 0.25)
+table.data.materials.append(wm)
+
+# ── 노트: 표지(적갈색) + 페이지 뭉치 2 + 윗장 텍스처 + 책갈피 리본 ──
+PW, PH = 0.210, 0.290; TH = 0.012
+cov, cnt, cb = mat("cover"); setin(cb, "Base Color", (0.40, 0.22, 0.16, 1)); setin(cb, "Roughness", 0.55)
+box("cover", (PW * 2 + 0.014, PH + 0.012, 0.006), (0, PH / 2, 0.003), cov)
+pap, pnt, pb = mat("paper"); setin(pb, "Base Color", (0.93, 0.90, 0.84, 1)); setin(pb, "Roughness", 0.9)
+box("stackL", (PW - 0.002, PH - 0.002, TH), (-PW / 2 - 0.002, PH / 2, 0.006 + TH / 2), pap)
+box("stackR", (PW - 0.002, PH - 0.002, TH), (PW / 2 + 0.002, PH / 2, 0.006 + TH / 2), pap)
+def top_page(name, tex, x0):
+    bpy.ops.mesh.primitive_plane_add(size=1, location=(x0 + PW / 2, PH / 2, 0.006 + TH + 0.0003)); ob = bpy.context.object; ob.name = name; ob.scale = (PW, PH, 1)
+    m, nt, b = mat(name + "_m"); img = nt.nodes.new("ShaderNodeTexImage"); img.image = bpy.data.images.load(tex); nt.links.new(img.outputs["Color"], b.inputs["Base Color"])
+    setin(b, "Roughness", 0.92); setin(b, "Coat Weight", 0.0); ob.data.materials.append(m); return ob
+pageR = top_page("pageR", PAGE_TEX, 0.002); pageL = top_page("pageL", PAGE_TEX_L, -PW - 0.002)
+rib, rnt, rb = mat("ribbon"); setin(rb, "Base Color", (0.85, 0.42, 0.45, 1)); setin(rb, "Roughness", 0.6)
+box("ribbon", (0.012, 0.09, 0.0008), (-PW * 0.55, -0.035, 0.0022), rib)
+
+# ── 커피잔·받침·커피(render-cup.py와 동일 재질) ──
+R, H, T = 0.042, 0.062, 0.0045
+CUP_AT = (0.245, 0.25)
+cup = lathe("cup", [(R * 0.78, 0.0), (R * 0.80, 0.004), (R * 0.90, 0.012), (R, H * 0.55), (R * 1.02, H - 0.006), (R * 1.02, H), (R * 1.02 - T, H), (R * 0.985 - T, H - 0.010), (R * 0.92 - T, H * 0.45), (R * 0.80 - T, 0.012), (0.0, 0.0085)])
+cer, cnt2, cb2 = mat("ceramic"); setin(cb2, "Base Color", (0.86, 0.83, 0.79, 1)); setin(cb2, "Roughness", 0.12); setin(cb2, "Coat Weight", 0.8); setin(cb2, "Coat Roughness", 0.05); setin(cb2, "Subsurface Weight", 0.08); setin(cb2, "Subsurface Radius", (0.006, 0.004, 0.003))
+cup.data.materials.append(cer)
+bpy.ops.mesh.primitive_torus_add(major_radius=0.019, minor_radius=0.0055, major_segments=64, minor_segments=24, location=(R * 1.02 + 0.012, 0, H * 0.52), rotation=(math.radians(90), 0, 0))
+handle = bpy.context.object; handle.name = "handle"; handle.scale = (1.0, 1.25, 1.0); smooth(handle, 0); handle.data.materials.append(cer)
+SR = 0.078
+saucer = lathe("saucer", [(SR, 0.0035), (SR * 0.98, 0.0), (SR * 0.55, 0.0), (SR * 0.50, 0.0005), (0.0, 0.0005), (0.0, 0.0028), (SR * 0.46, 0.0028), (SR * 0.60, 0.0055), (SR * 0.90, 0.0105), (SR, 0.0115)])
+saucer.data.materials.append(cer)
+LIQ_Z = 0.0028 + H - 0.009
+coffee = lathe("coffee", [(R * 0.985 - T + 0.0004, LIQ_Z), (0.0, LIQ_Z)])
+km, knt, kb = mat("coffee")
+tcc = knt.nodes.new("ShaderNodeTexCoord"); flat = knt.nodes.new("ShaderNodeVectorMath"); flat.operation = "MULTIPLY"; flat.inputs[1].default_value = (1, 1, 0); knt.links.new(tcc.outputs["Object"], flat.inputs[0])
+rad = knt.nodes.new("ShaderNodeVectorMath"); rad.operation = "LENGTH"; knt.links.new(flat.outputs["Vector"], rad.inputs[0])
+ringw = knt.nodes.new("ShaderNodeMapRange"); ringw.inputs["From Min"].default_value = 0.0295; ringw.inputs["From Max"].default_value = 0.0352; knt.links.new(rad.outputs["Value"], ringw.inputs["Value"])
+swirl = knt.nodes.new("ShaderNodeTexNoise"); swirl.inputs["Scale"].default_value = 14.0; swirl.inputs["Detail"].default_value = 3.0; swirl.inputs["Distortion"].default_value = 1.8
+sw = knt.nodes.new("ShaderNodeMapRange"); sw.inputs["From Min"].default_value = 0.45; sw.inputs["From Max"].default_value = 0.80; sw.inputs["To Max"].default_value = 0.14; knt.links.new(swirl.outputs["Fac"], sw.inputs["Value"])
+cf = knt.nodes.new("ShaderNodeMath"); cf.operation = "MAXIMUM"; knt.links.new(ringw.outputs["Result"], cf.inputs[0]); knt.links.new(sw.outputs["Result"], cf.inputs[1])
+mixc = knt.nodes.new("ShaderNodeMix"); mixc.data_type = "RGBA"; mixc.inputs[6].default_value = (0.040, 0.018, 0.007, 1); mixc.inputs[7].default_value = (0.46, 0.27, 0.10, 1)
+knt.links.new(cf.outputs[0], mixc.inputs[0]); knt.links.new(mixc.outputs[2], kb.inputs["Base Color"])
+mixr = knt.nodes.new("ShaderNodeMapRange"); mixr.inputs["To Min"].default_value = 0.10; mixr.inputs["To Max"].default_value = 0.45; knt.links.new(cf.outputs[0], mixr.inputs["Value"]); knt.links.new(mixr.outputs["Result"], kb.inputs["Roughness"])
+vor = knt.nodes.new("ShaderNodeTexVoronoi"); vor.inputs["Scale"].default_value = 520.0
+bub = knt.nodes.new("ShaderNodeMath"); bub.operation = "MULTIPLY"; knt.links.new(vor.outputs["Distance"], bub.inputs[0]); knt.links.new(ringw.outputs["Result"], bub.inputs[1])
+kbump = knt.nodes.new("ShaderNodeBump"); kbump.inputs["Strength"].default_value = 0.25; kbump.inputs["Distance"].default_value = 0.0005; knt.links.new(bub.outputs[0], kbump.inputs["Height"]); knt.links.new(kbump.outputs["Normal"], kb.inputs["Normal"])
+setin(kb, "Coat Weight", 0.6); setin(kb, "Coat Roughness", 0.03); setin(kb, "Specular IOR Level", 0.4)
+coffee.data.materials.append(km)
+for o in (cup, handle, saucer, coffee):
+    o.location.x += CUP_AT[0]; o.location.y += CUP_AT[1]
+    if o is not saucer: o.location.z += 0.0028
+    o.rotation_euler.z = math.radians(-25)  # 손잡이가 오른쪽 위로
+
+# ── 원두 5알 ──
+bmat, bnt, bb = mat("bean")
+bn = bnt.nodes.new("ShaderNodeTexNoise"); bn.inputs["Scale"].default_value = 900.0; bn.inputs["Detail"].default_value = 6.0
+br = bnt.nodes.new("ShaderNodeValToRGB"); br.color_ramp.elements[0].color = (0.055, 0.022, 0.008, 1); br.color_ramp.elements[1].color = (0.20, 0.095, 0.035, 1)
+bnt.links.new(bn.outputs["Fac"], br.inputs["Fac"]); bnt.links.new(br.outputs["Color"], bb.inputs["Base Color"])
+bbump = bnt.nodes.new("ShaderNodeBump"); bbump.inputs["Strength"].default_value = 0.30; bbump.inputs["Distance"].default_value = 0.0002; bnt.links.new(bn.outputs["Fac"], bbump.inputs["Height"]); bnt.links.new(bbump.outputs["Normal"], bb.inputs["Normal"])
+setin(bb, "Roughness", 0.5); setin(bb, "Coat Weight", 0.3); setin(bb, "Coat Roughness", 0.15)
+def bean(loc, rz, seed):
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=96, ring_count=64, radius=0.0074); ob = bpy.context.object; ob.name = f"bean{seed}"; ob.scale = (1.0, 0.66, 0.52)
+    bm = bmesh.new(); bm.from_mesh(ob.data); rnd = random.Random(seed)
+    for v in bm.verts:
+        x, y, z = v.co
+        if z > 0 and abs(y) < 0.0013: f = 1.0 - abs(y) / 0.0013; v.co.z -= 0.0030 * (f ** 0.7)
+        v.co += v.normal * (rnd.random() - 0.5) * 0.00006
+    bm.to_mesh(ob.data); bm.free(); smooth(ob, 2)
+    ob.rotation_euler = (math.radians(6), math.radians(-4), math.radians(rz)); ob.location = (loc[0], loc[1], 0.0031); ob.data.materials.append(bmat)
+for i, (loc, rz) in enumerate([((0.04, 0.46), 20), ((0.22, 0.43), 75), ((0.26, 0.49), -40), ((-0.08, 0.40), 110), ((0.30, -0.03), 15)]): bean(loc, rz, i + 1)  # 프레임 안에 5알(위 2·왼쪽 위 1·잔 옆 1·펜 아래 1)
+
+# ── 만년필(세련된 시가형): 검정 래커 + 금장. 오른쪽 페이지 아래에 36° 대각으로 눕힘 ──
+def build_pen():
+    L = 0.138; Rb = 0.0062
+    lac, lnt, lb = mat("lacquer"); setin(lb, "Base Color", (0.010, 0.010, 0.012, 1)); setin(lb, "Roughness", 0.12); setin(lb, "Coat Weight", 1.0); setin(lb, "Coat Roughness", 0.03)
+    gold, gnt, gb = mat("gold"); setin(gb, "Base Color", (0.93, 0.70, 0.30, 1)); setin(gb, "Metallic", 1.0); setin(gb, "Roughness", 0.18)
+    # 캡+몸통을 하나의 회전체(시가형: 양끝이 부드럽게 좁아짐). 축 = z → 나중에 x축으로 눕힘
+    prof = [(0.0, 0.0), (Rb * 0.55, 0.0), (Rb * 0.92, 0.010), (Rb, 0.030), (Rb, L * 0.44), (Rb * 0.98, L * 0.44 + 0.002), (Rb * 0.98, L * 0.80), (Rb * 0.90, L * 0.88), (Rb * 0.62, L * 0.93), (0.0, L * 0.93)]
+    body = lathe("penbody", prof, steps=96, sub=2); body.data.materials.append(lac)
+    ring = lathe("penring", [(Rb * 0.98, L * 0.44 - 0.004), (Rb * 1.05, L * 0.44 - 0.003), (Rb * 1.05, L * 0.44 + 0.004), (Rb * 0.98, L * 0.44 + 0.005)], steps=96, sub=1); ring.data.materials.append(gold)
+    fin = lathe("penfinial", [(0.0, L * 0.93), (Rb * 0.62, L * 0.93), (Rb * 0.55, L * 0.945), (Rb * 0.30, L * 0.96), (0.0, L * 0.965)], steps=64, sub=2); fin.data.materials.append(gold)
+    nib = lathe("pennib", [(0.0, 0.0), (Rb * 0.55, 0.0), (Rb * 0.42, -0.010), (Rb * 0.12, -0.020), (0.0, -0.0205)], steps=64, sub=2); nib.data.materials.append(gold); nib.scale = (1.0, 0.55, 1.0)
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(Rb * 1.15, 0, L * 0.72)); clip = bpy.context.object; clip.name = "penclip"; clip.scale = (Rb * 0.45, Rb * 0.55, L * 0.30); clip.data.materials.append(gold)
+    bev = clip.modifiers.new("bev", "BEVEL"); bev.width = 0.0006; bev.segments = 4
+    parts = [body, ring, fin, nib, clip]
+    piv = bpy.data.objects.new("penpivot", None); bpy.context.collection.objects.link(piv)
+    for o in parts: o.parent = piv
+    return piv, L, Rb
+pen_piv, PEN_L, PEN_R = build_pen()
+# 눕히기: z축 → 테이블 위, 촉이 오른쪽 아래(카메라 쪽)로. 페이지 위(z = 0.006+TH)에 놓는다.
+pen_piv.rotation_euler = (0, math.radians(90), math.radians(54))  # 촉이 오른쪽 아래(카메라 쪽)로 — 프리뷰에선 반대로 누워 캡이 프레임 밖
+pen_piv.location = (0.192, 0.012, 0.006 + TH + PEN_R)  # 페이지 오른쪽 아래 구석(손글씨 줄과 안 겹치게 — 오버레이 글은 페이지 폭 거의 전부를 쓴다)
+
+# ── 조명·카메라 ──
+def light(name, loc, energy, size, target, color=(1, 0.93, 0.82)):
+    d = bpy.data.lights.new(name, "AREA"); d.energy = energy; d.size = size; d.color = color
+    o = bpy.data.objects.new(name, d); bpy.context.collection.objects.link(o); o.location = loc
+    tr = o.constraints.new("TRACK_TO"); tr.target = target; tr.track_axis = "TRACK_NEGATIVE_Z"; tr.up_axis = "UP_Y"
+aim = bpy.data.objects.new("aim", None); bpy.context.collection.objects.link(aim); aim.location = (0.06, 0.16, 0.0)
+light("key", (-0.9, -0.6, 1.4), 55, 1.2, aim); light("fill", (1.1, -0.7, 0.9), 12, 1.6, aim, (0.95, 0.93, 0.95)); light("rim", (0.2, 1.4, 1.2), 22, 1.0, aim)
+light("window", (-0.05, 0.42, 0.62), 3.0, 0.14, aim, (1, 1, 1))  # 커피 표면 창 하이라이트(작게)  # 1차 프리뷰 전면 백화 → 1/8
+cd = bpy.data.cameras.new("cam"); cd.lens = 42; cd.clip_start = 0.01; cam = bpy.data.objects.new("cam", cd); bpy.context.collection.objects.link(cam); sc.camera = cam
+CAM = json.loads(os.environ.get("HERO_CAM", "null")) or {"loc": [0.11, -0.17, 0.34], "aim": [0.115, 0.155, 0.0], "lens": 38}  # 09-21 스윕 확정: 옛 히어로 페이지 사각형(0.22,0.30)-(0.71,0.30)-(0.77,0.83)-(0.105,0.82)에 근접
+cam.location = tuple(CAM["loc"]); cd.lens = CAM["lens"]; aim.location = tuple(CAM["aim"])
+tr = cam.constraints.new("TRACK_TO"); tr.target = aim; tr.track_axis = "TRACK_NEGATIVE_Z"; tr.up_axis = "UP_Y"
+bpy.context.view_layer.update()
+
+# ── 좌표 산출: 오른쪽 페이지 4모서리(TL,TR,BR,BL: 먼 쪽이 위)·잔 액면 중심 ──
+def proj(p):
+    v = world_to_camera_view(sc, cam, Vector(p)); return [round(v.x, 5), round(1 - v.y, 5)]
+zp = 0.006 + TH + 0.0003; x0 = 0.002
+quad = [proj((x0, PH, zp)), proj((x0 + PW, PH, zp)), proj((x0 + PW, 0, zp)), proj((x0, 0, zp))]
+cupc = proj((CUP_AT[0], CUP_AT[1], 0.0028 + LIQ_Z))
+json.dump({"HERO_PAGE": quad, "HERO_CUP": cupc}, open(os.path.join(OUT, "quad.json"), "w"))
+print("QUAD", json.dumps({"HERO_PAGE": quad, "HERO_CUP": cupc}))
+sc.render.filepath = os.path.join(OUT, "hero.png"); bpy.ops.render.render(write_still=True); print("RENDERED", sc.render.filepath)
+
+# ───────── 글 쓰는 펜 오버레이(public/note/pen.webp 규격 167×1382, 투명, 촉이 아래) ─────────
+#   같은 펜 모델을 정수직 위에서 본다. 촉 끝 비율(PEN_TIP)은 알파 채널로 실측해 quad.json에 함께 적는다.
+for o in list(bpy.data.objects):
+    if o.name not in ("penbody", "penring", "penfinial", "pennib", "penclip", "penpivot"): bpy.data.objects.remove(o, do_unlink=True)
+pen_piv.rotation_euler = (0, 0, 0); pen_piv.location = (0, 0, 0)  # 축 z: 촉(-z)이 아래, 캡 피니얼이 위
+sc2 = bpy.context.scene; sc2.render.film_transparent = True; sc2.render.image_settings.color_mode = "RGBA"
+sc2.render.resolution_x, sc2.render.resolution_y, sc2.render.resolution_percentage = 167, 1382, 100
+sc2.cycles.samples = max(64, SAMPLES)
+cd2 = bpy.data.cameras.new("cam2"); cd2.type = "ORTHO"; cd2.ortho_scale = 0.175; cd2.clip_start = 0.01; cam2 = bpy.data.objects.new("cam2", cd2); bpy.context.collection.objects.link(cam2); sc2.camera = cam2
+cam2.location = (0.5, 0, PEN_L * 0.46); cam2.rotation_euler = (math.radians(90), 0, math.radians(90))  # +x에서 -x를 본다(펜 축 z가 화면 세로)
+# 조명: 위(+z 방향은 화면 위쪽)·앞(+x)에서
+for name, loc in (("k2", (0.5, -0.4, 0.5)), ("f2", (0.5, 0.4, 0.2))):
+    d = bpy.data.lights.new(name, "AREA"); d.energy = 25 if name == "k2" else 8; d.size = 0.6; o = bpy.data.objects.new(name, d); bpy.context.collection.objects.link(o); o.location = loc
+    tr = o.constraints.new("TRACK_TO"); tr.target = pen_piv; tr.track_axis = "TRACK_NEGATIVE_Z"; tr.up_axis = "UP_Y"
+w2 = bpy.data.worlds.new("w2"); sc2.world = w2; w2.use_nodes = True; w2.node_tree.nodes["Background"].inputs["Strength"].default_value = 0.3
+sc2.render.filepath = os.path.join(OUT, "pen-top.png"); bpy.ops.render.render(write_still=True); print("RENDERED", sc2.render.filepath)
