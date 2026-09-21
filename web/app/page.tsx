@@ -709,17 +709,19 @@ const fitLine = (t: string) => {
   for (const ch of Array.from(x)) { if (lineWidth(out + ch) > LINE_BUDGET - 0.6) break; out += ch; }
   return out.replace(/[\s·,—-]+$/, "") + "…";
 };
-function landingMemo(d: Discover | null, seed: number): string[] {
+// opts(2026-09-22, 왼쪽 페이지 '어제 메모'): dayOffset=-1이면 어제 날짜, exclude=오늘 글에 쓴 카페명(겹치지 않게), cafeLines=카페 줄 수, closing=맺음 두 줄 여부
+function landingMemo(d: Discover | null, seed: number, opts: { dayOffset?: number; exclude?: Set<string>; cafeLines?: number; closing?: boolean } = {}): string[] {
+  const { dayOffset = 0, exclude, cafeLines = 2, closing = true } = opts;
   const pools = [d?.headlineAList, d?.headlineBList, d?.top3, d?.specialty, d?.fresh, d?.featured];
   const pool: DCafe[] = [];
   const seen = new Set<number>();
-  for (const p of pools) for (const c of p ?? []) if (c && !seen.has(c.id)) { seen.add(c.id); pool.push(c); }
-  if (pool.length === 0) return LANDING_MEMO_FALLBACK;
+  for (const p of pools) for (const c of p ?? []) if (c && !seen.has(c.id) && !(exclude && c.name && exclude.has(c.name))) { seen.add(c.id); pool.push(c); }
+  if (pool.length === 0) return dayOffset < 0 ? LANDING_MEMO_YESTERDAY_FALLBACK : LANDING_MEMO_FALLBACK;
   // 결정론적 셔플(seed) — 렌더가 여러 번 돌아도 같은 줄이 나오게(쓰는 도중 글자가 바뀌면 안 된다).
   let r = seed || 1;
   const rnd = () => { r = (r * 1103515245 + 12345) & 0x7fffffff; return r / 0x7fffffff; };
   const shuffled = [...pool].map((c) => ({ c, k: rnd() })).sort((a, b) => a.k - b.k).map((x) => x.c);
-  const now = new Date();
+  const now = new Date(Date.now() + dayOffset * 86400000);
   const day = ["일", "월", "화", "수", "목", "금", "토"][now.getDay()];
   // 날짜 줄 — 동네 이름이 길면 요일부터 덜어낸다(잘라서 "대구 달…"이 되지 않게).
   const m = now.getMonth() + 1, dd = now.getDate(), area0 = shuffled[0].area || "";
@@ -728,7 +730,7 @@ function landingMemo(d: Discover | null, seed: number): string[] {
   const usedPhrase = new Set<string>();          // 같은 판정 문구가 반복되지 않게
   const kindUsed: Record<string, number> = {};   // 같은 문장 틀만 이어지지 않게(한 틀당 최대 2줄)
   for (const c of shuffled) {
-    if (lines.length >= 3) break;   // 날짜 1 + 카페 2 + 맺음 2 = 다섯 줄(2026-09-22, 종전 일곱 줄)
+    if (lines.length >= 1 + cafeLines) break;   // 오늘: 날짜 1 + 카페 2 + 맺음 2 = 다섯 줄 · 어제(왼쪽): 날짜 1 + 카페 4
     const name = c.name || "";
     // 문장 틀 4종. 틀이 이미 2번 쓰였으면 건너뛰어 다른 틀이 나오게 한다.
     const phrase = (c.identity || "").split(/[·,]/)[0]?.trim() || "";
@@ -743,10 +745,10 @@ function landingMemo(d: Discover | null, seed: number): string[] {
     usedPhrase.add(pick[1]);
     lines.push(pick[2]);
   }
-  lines.push("광고·협찬 글은 걸러냈다.");
-  lines.push("마음에 든 곳엔 도장 하나.");
+  if (closing) { lines.push("광고·협찬 글은 걸러냈다."); lines.push("마음에 든 곳엔 도장 하나."); }
   return lines;
 }
+const LANDING_MEMO_YESTERDAY_FALLBACK = ["어제도 우리 동네.", "별점은 안 봤다.", "다녀온 사람 글만 읽었다.", "광고·협찬 글은 걸러냈다."];
 const HERO_W = 1400, HERO_H = 1310;   // hero10.webp(1400×1680에서 빈 바닥 22% 제거)
 const HERO_NB_TOP = 1 - 0.46;         // 노트 윗변이 그림 높이의 46% 지점 → 아래 54%가 제목 아래에 있어야 겹치지 않는다
 const HERO_PROP_TOP = 1 - 0.33;       // 가장 위 소품(디저트 접시·잔 윗선)이 35.3% 지점(알파 실측) → 아래 67%는 반드시 화면 안(위가 잘리면 접시가 잘린다)
@@ -754,7 +756,10 @@ const HERO_TITLE_H = 125;             // 제목 블록(eyebrow+두 줄) 실측 �
 // ✒ Blender 렌더 만년펜(public/note/pen.webp) — 페이지 좌표계 표시 크기와 촉 끝 위치(이미지 비율, 렌더 후 알파채널로 실측)
 const PEN_W = 21, PEN_H = 174, PEN_TIP: [number, number] = [0.497, 0.979]; // 렌더 167×1382px, 촉 끝 실측(알파채널)
 const HERO_PAGE: [number, number][] = [[0.43867, 0.47936], [0.71633, 0.48147], [0.76978, 0.81649], [0.41661, 0.81308]];   // hero10 = hero9 아래 22% 잘라냄(2026-09-22) → y/0.78
-const HERO_CUP: [number, number] = [0.84754, 0.50349];   // 잔 액면 중심(이미지 비율) — 김이 여기서 오른다
+const HERO_CUP: [number, number] = [0.84754, 0.50349];
+// 📖 왼쪽 페이지(2026-09-22 CEO "글씨 연출 옆 페이지가 너무 비었다") — hero10 알파·크림색 경계 실측으로 잡은 네 모서리(이미지 비율).
+//   TL·TR·BR·BL. 오른쪽 페이지와 같은 줄 규격(PAGE_RULE0·PAGE_PITCH)이라 글이 같은 줄 위에 앉는다.
+const HERO_PAGE_L: [number, number][] = [[0.1566, 0.4776], [0.4329, 0.4788], [0.4091, 0.8124], [0.058, 0.8095]];   // 잔 액면 중심(이미지 비율) — 김이 여기서 오른다
 const PAGE_SW = 280, PAGE_SH = 387;            // 글을 쓰는 원본 사각형(px) — 페이지 비율 2.10:2.90
 const PAGE_RULE0 = 560 / 2900 * PAGE_SH;       // 첫 줄 y(텍스처 page-right-blank.json과 동일 규격)
 const PAGE_PITCH = 170 / 2900 * PAGE_SH;   // 줄 하나 = 손편지 한 줄(글리프가 줄 사이에 앉는다)       // 줄 간격
@@ -837,9 +842,18 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
     return () => clearTimeout(t);
   }, [discover, lite, memo, seed]);
   const LANDING_MEMO = useMemo(() => memo ?? [], [memo]);
+  // 📖 어제 메모(왼쪽 페이지) — 오늘 글이 확정된 뒤, 오늘 글에 나온 카페는 빼고 같은 풀에서 4곳. 이미 마른 잉크로 바로 보인다(연출 없음).
+  const YESTERDAY_MEMO = useMemo(() => {
+    if (!memo) return [] as string[];
+    const src = discover ?? lite;
+    const used = new Set<string>();
+    for (const c of [src?.headlineAList, src?.headlineBList, src?.top3, src?.specialty, src?.fresh, src?.featured].flatMap((p) => p ?? [])) if (c?.name && memo.some((l) => l.includes(c.name))) used.add(c.name);
+    return landingMemo(src, seed + 7919, { dayOffset: -1, exclude: used, cafeLines: 4, closing: false }).slice(0, 5);
+  }, [memo, discover, lite, seed]);
   const [done, setDone] = useState<boolean | null>(() => (landingOnce.done ? true : landingOnce.t0 != null ? false : null)); // null=판단 전(SSR), true=완성본, false=쓰는 중 — 재마운트면 즉시 이어진 상태로
   const [pos, setPos] = useState<[number, number]>([0, 0]); // [줄, 글자]
   const [mtx, setMtx] = useState<string>("");
+  const [mtxL, setMtxL] = useState<string>("");   // 왼쪽 페이지(어제 메모) 원근 행렬
   const [heroBox, setHeroBox] = useState<[number, number, number] | null>(null); // 그림 상자 [폭, 높이, 왼쪽 오프셋](px) — 짧은 화면 축소용
   const [cupPos, setCupPos] = useState<[number, number] | null>(null);
   const heroRef = useRef<HTMLDivElement | null>(null);
@@ -864,6 +878,7 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
       setHeroBox([HERO_W * s, HERO_H * s, ox]);
       const q = HERO_PAGE.map(([fx, fy]) => [fx * HERO_W * s + ox, fy * HERO_H * s + oy] as [number, number]);
       setMtx(homographyMatrix3d(PAGE_SW, PAGE_SH, q));
+      setMtxL(homographyMatrix3d(PAGE_SW, PAGE_SH, HERO_PAGE_L.map(([fx, fy]) => [fx * HERO_W * s + ox, fy * HERO_H * s + oy] as [number, number])));
       setCupPos([HERO_CUP[0] * HERO_W * s + ox, HERO_CUP[1] * HERO_H * s + oy]);
     };
     calc(); const ro = new ResizeObserver(calc); ro.observe(el); return () => ro.disconnect();
@@ -995,6 +1010,19 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
         {cupPos && (
           <div className="nt-steam" aria-hidden style={{ left: cupPos[0], top: cupPos[1] }}>
             <i className="s1" /><i className="s2" /><i className="s3" />
+          </div>
+        )}
+        {/* 📖 왼쪽 페이지 — 어제 적은 메모(마른 잉크·도장). 오늘 글이 확정된 뒤에만 보인다 */}
+        {YESTERDAY_MEMO.length > 0 && mtxL && (
+          <div className="absolute left-0 top-0" aria-hidden style={{ width: PAGE_SW, height: PAGE_SH, transformOrigin: "0 0", transform: mtxL, pointerEvents: "none" }}>
+            <div className="absolute" style={{ left: 42, right: 10, top: lineTop }}>
+              {YESTERDAY_MEMO.map((line, li) => (
+                <div key={li} className="nt-w nt-hand done" style={{ fontSize: 22, lineHeight: `${PAGE_PITCH}px`, height: PAGE_PITCH, color: "#3b4260", opacity: 0.8, whiteSpace: "nowrap", overflow: "hidden" }}>
+                  {Array.from(line).map((ch, ci) => <span key={ci} className={`ch${ch === " " ? " sp" : ""}`}>{ch}</span>)}
+                </div>
+              ))}
+            </div>
+            <div className="nt-stamp absolute in" style={{ right: 18, bottom: 26, opacity: 0.5, animation: "none" }}>검증<small>VERIFIED</small></div>
           </div>
         )}
         {/* 렌더된 오른쪽 페이지 위에 원근 정합으로 얹는 글 */}
