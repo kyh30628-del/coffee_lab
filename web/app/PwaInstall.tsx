@@ -119,7 +119,7 @@ export default function PwaInstall() {
       <div className="max-w-lg mx-auto bg-[#2b2018] text-[#f4ece0] rounded-2xl shadow-xl p-3.5 flex items-center gap-3">
         <div className="text-2xl leading-none">☕</div>
         <div className="flex-1 min-w-0">
-          <div className="font-bold text-[13px]">홈 화면에 ‘커피 노트’ 추가</div>
+          <div className="font-bold text-[13px]">홈 화면에 ‘동네 커피 노트’ 추가</div>
           <div className="text-[11px] text-[#d9c9b3] leading-snug">한 번 누르면 앱처럼 바로 열려요{isIOS ? " · 아이폰은 공유→홈 화면에 추가" : ""}</div>
         </div>
         <button onClick={install} className="bg-[#e0a32e] text-[#2b2018] font-bold text-[12px] rounded-full px-3.5 py-2 whitespace-nowrap shrink-0">{isIOS ? "방법 보기" : "설치"}</button>
