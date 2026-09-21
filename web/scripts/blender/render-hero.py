@@ -91,13 +91,13 @@ box("ribbon", (0.012, 0.09, 0.0008), (-PW * 0.55, -0.035, 0.0022), rib)
 
 # ── 커피잔·받침·커피(render-cup.py와 동일 재질) ──
 R, H, T = 0.042, 0.062, 0.0045
-CUP_AT = (0.300, 0.31)  # 받침(반지름 7.8cm)이 노트 오른쪽 가장자리(x≈0.219)에 안 닿게 + 위쪽으로
+CUP_AT = (0.29, 0.22)  # 노트 오른쪽 가장자리(0.219)+받침 반지름(0.078) 밖, 이미지 y≈0.3(데스크톱 띠 안)  # 데스크톱은 세로 이미지의 가운데 띠(y≈0.35~0.65)만 보인다 → 잔을 그 띠 안으로(카메라 쪽으로)  # 받침(반지름 7.8cm)이 노트 오른쪽 가장자리(x≈0.219)에 안 닿게 + 위쪽으로
 cup = lathe("cup", [(R * 0.78, 0.0), (R * 0.80, 0.004), (R * 0.90, 0.012), (R, H * 0.55), (R * 1.02, H - 0.006), (R * 1.02, H), (R * 1.02 - T, H), (R * 0.985 - T, H - 0.010), (R * 0.92 - T, H * 0.45), (R * 0.80 - T, 0.012), (0.0, 0.0085)])
 cer, cnt2, cb2 = mat("ceramic"); setin(cb2, "Base Color", (0.86, 0.83, 0.79, 1)); setin(cb2, "Roughness", 0.12); setin(cb2, "Coat Weight", 0.8); setin(cb2, "Coat Roughness", 0.05); setin(cb2, "Subsurface Weight", 0.08); setin(cb2, "Subsurface Radius", (0.006, 0.004, 0.003))
 cup.data.materials.append(cer)
 bpy.ops.mesh.primitive_torus_add(major_radius=0.019, minor_radius=0.0055, major_segments=64, minor_segments=24, location=(R * 1.02 + 0.012, 0, H * 0.52), rotation=(math.radians(90), 0, 0))
 handle = bpy.context.object; handle.name = "handle"; handle.scale = (1.0, 1.25, 1.0); smooth(handle, 0); handle.data.materials.append(cer)
-SR = 0.078
+SR = 0.068  # 에스프레소 받침 13.6cm(15.6cm는 프레임 오른쪽에서 잘림)
 saucer = lathe("saucer", [(SR, 0.0035), (SR * 0.98, 0.0), (SR * 0.55, 0.0), (SR * 0.50, 0.0005), (0.0, 0.0005), (0.0, 0.0028), (SR * 0.46, 0.0028), (SR * 0.60, 0.0055), (SR * 0.90, 0.0105), (SR, 0.0115)])
 saucer.data.materials.append(cer)
 LIQ_Z = 0.0028 + H - 0.009
@@ -138,7 +138,7 @@ def bean(loc, rz, seed):
         v.co += v.normal * (rnd.random() - 0.5) * 0.00006
     bm.to_mesh(ob.data); bm.free(); smooth(ob, 2)
     ob.rotation_euler = (math.radians(6), math.radians(-4), math.radians(rz)); ob.location = (loc[0], loc[1], 0.0031); ob.data.materials.append(bmat)
-for i, (loc, rz) in enumerate([((0.05, 0.44), 20), ((0.25, 0.42), 75), ((-0.10, 0.39), 110), ((0.31, 0.12), -40), ((0.29, -0.04), 15), ((0.40, 0.06), 60)]): bean(loc, rz, i + 1)  # 가까운 쪽(오른쪽 아래)에도  # 프레임 안에 5알(위 2·왼쪽 위 1·잔 옆 1·펜 아래 1)
+for i, (loc, rz) in enumerate([((0.04, 0.45), 20), ((0.30, 0.50), 75), ((-0.10, 0.39), 110), ((0.42, 0.34), -40), ((0.27, -0.06), 15), ((0.40, 0.08), 60)]): bean(loc, rz, i + 1)  # 디저트 접시(0.335,0.075 r0.055) 피해서  # 프레임 안에 5알(위 2·왼쪽 위 1·잔 옆 1·펜 아래 1)
 
 # ── 만년필(세련된 시가형): 검정 래커 + 금장. 오른쪽 페이지 아래에 36° 대각으로 눕힘 ──
 def build_pen():
@@ -162,6 +162,31 @@ pen_piv, PEN_L, PEN_R = build_pen()
 pen_piv.hide_render = True; pen_piv.rotation_euler = (0, math.radians(90), math.radians(54))  # 촉이 오른쪽 아래(카메라 쪽)로 — 프리뷰에선 반대로 누워 캡이 프레임 밖
 pen_piv.location = (0.192, 0.012, 0.006 + TH + PEN_R)  # 페이지 오른쪽 아래 구석(손글씨 줄과 안 겹치게 — 오버레이 글은 페이지 폭 거의 전부를 쓴다)
 
+# ── 디저트: 작은 접시 위 마카롱 3개(딸기·피스타치오·초콜릿) — 노트 오른쪽·잔 아래, 어디와도 안 겹치게 ──
+PLATE_AT = (0.20, 0.41); PR = 0.055  # 노트 위쪽(y>0.30)·잔 왼쪽 — 어디와도 안 겹침
+plate = lathe("plate", [(PR, 0.006), (PR * 0.97, 0.0025), (PR * 0.60, 0.0), (0.0, 0.0), (0.0, 0.0015), (PR * 0.58, 0.0015), (PR * 0.92, 0.0045), (PR, 0.007)])
+plate.data.materials.append(cer); plate.location = (PLATE_AT[0], PLATE_AT[1], 0)
+def macaron(name, loc, rz, tilt, shell_rgb, fill_rgb):
+    mr = 0.020  # 지름 4cm
+    shm, snt, sb = mat(name + "_shell"); setin(sb, "Base Color", (*shell_rgb, 1)); setin(sb, "Roughness", 0.62); setin(sb, "Subsurface Weight", 0.35); setin(sb, "Subsurface Radius", (0.004, 0.003, 0.002))
+    sn = snt.nodes.new("ShaderNodeTexNoise"); sn.inputs["Scale"].default_value = 1400.0; sn.inputs["Detail"].default_value = 5.0
+    sbump = snt.nodes.new("ShaderNodeBump"); sbump.inputs["Strength"].default_value = 0.25; sbump.inputs["Distance"].default_value = 0.00012; snt.links.new(sn.outputs["Fac"], sbump.inputs["Height"]); snt.links.new(sbump.outputs["Normal"], sb.inputs["Normal"])
+    fm, fnt, fb = mat(name + "_fill"); setin(fb, "Base Color", (*fill_rgb, 1)); setin(fb, "Roughness", 0.45); setin(fb, "Subsurface Weight", 0.3)
+    piv = bpy.data.objects.new(name, None); bpy.context.collection.objects.link(piv)
+    parts = []
+    for sign, z0 in ((1, 0.0105), (-1, 0.0095)):   # 위 껍질(볼록 위) · 아래 껍질(볼록 아래)
+        bpy.ops.mesh.primitive_uv_sphere_add(segments=64, ring_count=32, radius=mr, location=(0, 0, z0)); sh = bpy.context.object; sh.scale = (1, 1, 0.42 * sign if sign > 0 else 0.42); sh.name = name + ("_top" if sign > 0 else "_bot")
+        if sign < 0: sh.rotation_euler.x = math.radians(180)
+        smooth(sh, 1); sh.data.materials.append(shm); parts.append(sh)
+        bpy.ops.mesh.primitive_torus_add(major_radius=mr * 0.86, minor_radius=mr * 0.13, major_segments=64, minor_segments=16, location=(0, 0, z0 + (-0.0045 if sign > 0 else 0.0045)))  # 발(피에)
+        ft = bpy.context.object; smooth(ft, 0); ft.data.materials.append(shm); parts.append(ft)
+    bpy.ops.mesh.primitive_cylinder_add(vertices=64, radius=mr * 0.82, depth=0.006, location=(0, 0, 0.010)); fl = bpy.context.object; smooth(fl, 0); fl.data.materials.append(fm); parts.append(fl)
+    for o in parts: o.parent = piv
+    piv.location = (loc[0], loc[1], 0.007 + (0.0 if tilt == 0 else 0.004)); piv.rotation_euler = (math.radians(tilt), 0, math.radians(rz))
+macaron("mac_straw", (PLATE_AT[0] - 0.016, PLATE_AT[1] + 0.012, 0), 15, 0, (0.93, 0.55, 0.62), (0.98, 0.90, 0.88))
+macaron("mac_pist", (PLATE_AT[0] + 0.020, PLATE_AT[1] + 0.006, 0), -30, 0, (0.72, 0.80, 0.50), (0.93, 0.95, 0.80))
+macaron("mac_choc", (PLATE_AT[0] + 0.002, PLATE_AT[1] - 0.022, 0), 40, 28, (0.33, 0.20, 0.12), (0.55, 0.36, 0.22))  # 하나는 기대어 놓음
+
 # ── 조명·카메라 ──
 def light(name, loc, energy, size, target, color=(1, 0.93, 0.82)):
     d = bpy.data.lights.new(name, "AREA"); d.energy = energy; d.size = size; d.color = color
@@ -171,7 +196,7 @@ aim = bpy.data.objects.new("aim", None); bpy.context.collection.objects.link(aim
 light("key", (-0.9, -0.6, 1.4), 55, 1.2, aim); light("fill", (1.1, -0.7, 0.9), 12, 1.6, aim, (0.95, 0.93, 0.95)); light("rim", (0.2, 1.4, 1.2), 22, 1.0, aim)
 light("window", (-0.05, 0.42, 0.62), 3.0, 0.14, aim, (1, 1, 1))  # 커피 표면 창 하이라이트(작게)  # 1차 프리뷰 전면 백화 → 1/8
 cd = bpy.data.cameras.new("cam"); cd.lens = 42; cd.clip_start = 0.01; cam = bpy.data.objects.new("cam", cd); bpy.context.collection.objects.link(cam); sc.camera = cam
-CAM = json.loads(os.environ.get("HERO_CAM", "null")) or {"loc": [0.12, -0.17, 0.34], "aim": [0.135, 0.16, 0.0], "lens": 37}  # 09-21 스윕 확정: 옛 히어로 페이지 사각형(0.22,0.30)-(0.71,0.30)-(0.77,0.83)-(0.105,0.82)에 근접
+CAM = json.loads(os.environ.get("HERO_CAM", "null")) or {"loc": [0.12, -0.17, 0.34], "aim": [0.145, 0.16, 0.0], "lens": 37}  # 09-21 스윕 확정: 옛 히어로 페이지 사각형(0.22,0.30)-(0.71,0.30)-(0.77,0.83)-(0.105,0.82)에 근접
 cam.location = tuple(CAM["loc"]); cd.lens = CAM["lens"]; aim.location = tuple(CAM["aim"])
 tr = cam.constraints.new("TRACK_TO"); tr.target = aim; tr.track_axis = "TRACK_NEGATIVE_Z"; tr.up_axis = "UP_Y"
 bpy.context.view_layer.update()
@@ -183,7 +208,7 @@ zp = 0.006 + TH + 0.0003; x0 = 0.002
 quad = [proj((x0, PH, zp)), proj((x0 + PW, PH, zp)), proj((x0 + PW, 0, zp)), proj((x0, 0, zp))]
 cupc = proj((CUP_AT[0], CUP_AT[1], 0.0028 + LIQ_Z))
 json.dump({"HERO_PAGE": quad, "HERO_CUP": cupc}, open(os.path.join(OUT, "quad.json"), "w"))
-print("QUAD", json.dumps({"HERO_PAGE": quad, "HERO_CUP": cupc}))
+print("QUAD", json.dumps({"HERO_PAGE": quad, "HERO_CUP": cupc, "PLATE": proj((PLATE_AT[0], PLATE_AT[1], 0.01)), "CUP_R": proj((CUP_AT[0] + SR, CUP_AT[1], 0.0)), "CUP_TOP": proj((CUP_AT[0], CUP_AT[1] + SR, 0.0))}))
 sc.render.filepath = os.path.join(OUT, "hero.png"); bpy.ops.render.render(write_still=True); print("RENDERED", sc.render.filepath)
 
 # ───────── 글 쓰는 펜 오버레이(public/note/pen.webp 규격 167×1382, 투명, 촉이 아래) ─────────

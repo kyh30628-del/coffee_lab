@@ -750,8 +750,8 @@ function landingMemo(d: Discover | null, seed: number): string[] {
 const HERO_W = 1400, HERO_H = 1680;
 // ✒ Blender 렌더 만년펜(public/note/pen.webp) — 페이지 좌표계 표시 크기와 촉 끝 위치(이미지 비율, 렌더 후 알파채널로 실측)
 const PEN_W = 21, PEN_H = 174, PEN_TIP: [number, number] = [0.497, 0.979]; // 렌더 167×1382px, 촉 끝 실측(알파채널)
-const HERO_PAGE: [number, number][] = [[0.18724, 0.30924], [0.65814, 0.29884], [0.79498, 0.79018], [0.05144, 0.81612]];
-const HERO_CUP: [number, number] = [0.8598, 0.2084];   // 잔 액면 중심(이미지 비율) — 김이 여기서 오른다
+const HERO_PAGE: [number, number][] = [[0.15461, 0.31509], [0.62657, 0.29774], [0.77517, 0.78465], [0.03012, 0.82795]];
+const HERO_CUP: [number, number] = [0.85848, 0.30463];   // 잔 액면 중심(이미지 비율) — 김이 여기서 오른다
 const PAGE_SW = 280, PAGE_SH = 387;            // 글을 쓰는 원본 사각형(px) — 페이지 비율 2.10:2.90
 const PAGE_RULE0 = 560 / 2900 * PAGE_SH;       // 첫 줄 y(텍스처 page-right-blank.json과 동일 규격)
 const PAGE_PITCH = 170 / 2900 * PAGE_SH;   // 줄 하나 = 손편지 한 줄(글리프가 줄 사이에 앉는다)       // 줄 간격
@@ -963,8 +963,8 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
     <div className="w-full max-w-md mx-auto flex flex-col nt-landing" style={{ height: "100%", overflowY: "auto", overflowX: "hidden", background: "var(--nt-espresso)", padding: "calc(env(safe-area-inset-top) + 8px) 8px calc(env(safe-area-inset-bottom) + 8px)", boxSizing: "border-box" }}>
       {/* 📱 프레임: 화면 가장자리에 얇은 크림 경계선 — 노트 표지 안쪽 테두리처럼. 정물은 남는 높이를 전부 채우고 아래 블록은 고정 높이(어떤 폰이든 한 화면) */}
       <div className="flex flex-col flex-1 rounded-[10px]" style={{ minHeight: 0, overflow: "hidden" }}>{/* 테두리·안쪽 그림자 삭제(2026-09-21 CEO "아웃라인 테두리 선 삭제") */}
-      <div ref={heroRef} className="relative w-full overflow-hidden" style={{ flex: "1 1 0%", minHeight: 220 }}>
-        <img src="/note/hero5.webp" alt="" aria-hidden className="absolute inset-0 w-full h-full object-cover" />
+      <div ref={heroRef} className="relative w-full overflow-hidden md:min-h-[720px]" style={{ flex: "1 1 0%", minHeight: 220 }}>{/* 데스크톱(가로)에서 세로 이미지의 가운데 띠만 보여 잔이 잘리던 것(2026-09-21 CEO) → 넓은 화면은 히어로를 높게 */}
+        <img src="/note/hero6.webp" alt="" aria-hidden className="absolute inset-0 w-full h-full object-cover" />
         {/* 위: 어두운 나무 위 제목(커피 톤) · 아래: 에스프레소 띠로 녹아듦 */}
         <div className="absolute inset-x-0 top-0 h-40" style={{ background: "linear-gradient(180deg, rgba(20,12,8,.62), rgba(20,12,8,0))" }} />
         <div className="absolute inset-x-0 bottom-0 h-28" style={{ background: "linear-gradient(0deg, var(--nt-espresso), rgba(36,24,18,0))" }} />
