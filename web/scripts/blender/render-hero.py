@@ -117,10 +117,14 @@ bub = knt.nodes.new("ShaderNodeMath"); bub.operation = "MULTIPLY"; knt.links.new
 kbump = knt.nodes.new("ShaderNodeBump"); kbump.inputs["Strength"].default_value = 0.25; kbump.inputs["Distance"].default_value = 0.0005; knt.links.new(bub.outputs[0], kbump.inputs["Height"]); knt.links.new(kbump.outputs["Normal"], kb.inputs["Normal"])
 setin(kb, "Coat Weight", 0.6); setin(kb, "Coat Roughness", 0.03); setin(kb, "Specular IOR Level", 0.4)
 coffee.data.materials.append(km)
-for o in (cup, handle, saucer, coffee):
+for o in (cup, saucer, coffee):
     o.location.x += CUP_AT[0]; o.location.y += CUP_AT[1]
     if o is not saucer: o.location.z += 0.0028
-    o.rotation_euler.z = math.radians(60)  # 손잡이를 위·오른쪽(먼 쪽)으로 — 오른쪽 프레임 밖으로 안 나가게(hero6에서 손잡이 끝 잘림)
+# 🔴 손잡이는 자기 원점(잔 오른쪽)에서 회전하면 제자리에서만 돈다(hero7 실사고: 여전히 오른쪽 프레임에 걸림).
+#   잔 중심을 축으로 **위치를 옮겨** 붙인다. θ=120° = 뒤·왼쪽(잔과 노트 사이 위쪽, 프레임 안·노트와 안 겹침: x_min≈0.238>0.219)
+HANDLE_TH = math.radians(120); HD = R * 1.02 + 0.012
+handle.location = (CUP_AT[0] + HD * math.cos(HANDLE_TH), CUP_AT[1] + HD * math.sin(HANDLE_TH), H * 0.52 + 0.0028)
+handle.rotation_euler = (math.radians(90), 0, HANDLE_TH)
 
 # ── 원두 5알 ──
 bmat, bnt, bb = mat("bean")
@@ -208,7 +212,7 @@ zp = 0.006 + TH + 0.0003; x0 = 0.002
 quad = [proj((x0, PH, zp)), proj((x0 + PW, PH, zp)), proj((x0 + PW, 0, zp)), proj((x0, 0, zp))]
 cupc = proj((CUP_AT[0], CUP_AT[1], 0.0028 + LIQ_Z))
 json.dump({"HERO_PAGE": quad, "HERO_CUP": cupc}, open(os.path.join(OUT, "quad.json"), "w"))
-print("QUAD", json.dumps({"HERO_PAGE": quad, "HERO_CUP": cupc, "PLATE": proj((PLATE_AT[0], PLATE_AT[1], 0.01)), "CUP_R": proj((CUP_AT[0] + SR, CUP_AT[1], 0.0)), "CUP_TOP": proj((CUP_AT[0], CUP_AT[1] + SR, 0.0)), "HANDLE": proj((CUP_AT[0] + 0.075 * math.cos(math.radians(60)), CUP_AT[1] + 0.075 * math.sin(math.radians(60)), 0.035))}))
+print("QUAD", json.dumps({"HERO_PAGE": quad, "HERO_CUP": cupc, "PLATE": proj((PLATE_AT[0], PLATE_AT[1], 0.01)), "CUP_R": proj((CUP_AT[0] + SR, CUP_AT[1], 0.0)), "CUP_TOP": proj((CUP_AT[0], CUP_AT[1] + SR, 0.0)), "HANDLE": proj((CUP_AT[0] + 0.078 * math.cos(HANDLE_TH), CUP_AT[1] + 0.078 * math.sin(HANDLE_TH), 0.035))}))
 sc.render.filepath = os.path.join(OUT, "hero.png"); bpy.ops.render.render(write_still=True); print("RENDERED", sc.render.filepath)
 
 # ───────── 글 쓰는 펜 오버레이(public/note/pen.webp 규격 167×1382, 투명, 촉이 아래) ─────────
