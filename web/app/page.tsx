@@ -18,7 +18,7 @@ import { FACET_EMOJI } from "@/lib/cafeProfile";
 import { useLockBodyScroll } from "@/lib/useLockBodyScroll";
 import { shareHookText } from "@/lib/shareCopy";
 import { decodeCafeScores } from "@/lib/mapCafes";
-import { isReadableQuote, splitKeyTerms, rankNearby, nearbyTitle, fmtKm, monthlySeries, freshnessOf, CHAR_LABEL, charBarsOf, addrTail, igHandle } from "@/lib/cafeDetailView"; // 📓 상세 패널 2차 공용 계산
+import { isOtherBusinessQuote, displayQuote, splitKeyTerms, rankNearby, nearbyTitle, fmtKm, monthlySeries, freshnessOf, CHAR_LABEL, charBarsOf, addrTail, igHandle } from "@/lib/cafeDetailView"; // 📓 상세 패널 2차 공용 계산
 
 type EvidenceReview = { quote: string; link?: string; source?: string; date?: string; trust?: "verified" | "reference" | "rejected"; score?: number; why?: string[] };
 type QualityStats = { raw: number; verified: number; reference: number; rejected: number; duplicates?: number; rejectReasons?: Record<string, number> };
@@ -2917,7 +2917,8 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
   const grade = cafe.synth_grade ?? "";
   const stampKind = grade === "참고" ? "ref" : grade === "후보" ? "cand" : "";
   const stampEn = grade === "검증" ? "VERIFIED" : grade === "참고" ? "REFERENCE" : "CANDIDATE";
-  const readable = useMemo(() => reviews.filter((r) => isReadableQuote(r?.quote, cafe.name)), [reviews, cafe.name]);
+  // 2026-09-22: 가독성 관문 폐지(최신 검증 후기 누락 원인). 다른 업종 글만 빼고 정렬 그대로 — 제목 조각은 displayQuote가 다듬는다.
+  const readable = useMemo(() => reviews.filter((r) => !isOtherBusinessQuote(r?.quote, cafe.name) && !displayQuote(r?.quote, cafe.name).empty), [reviews, cafe.name]);
   const shownQuotes = readable.slice(0, 3), moreQuotes = readable.slice(3, 12);
   const showQuotes = shownQuotes.length >= 2;
   const series = monthlySeries(extra.reviewDates);
@@ -2933,12 +2934,17 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
   const nearTitle = nearbyTitle(nearby, cafe.area, cafe.dong);
   const checkedOn = new Date().toISOString().slice(0, 10);
   const srcLine = <p className="nt-src">네이버 공개 후기 {(cafe.synth_count ?? 0).toLocaleString()}건 교차검증 · 영수증 리뷰·광고·협찬 제외 · {checkedOn} 확인</p>;
-  const quoteOf = (e: EvidenceReview, i: number) => (
-    <blockquote key={e?.link ?? i} className="nt-q">
-      {(() => { const body = <>“{splitKeyTerms(String(e.quote).trim()).map((seg, j) => seg.k ? <mark key={j} className="nt-key">{seg.t}</mark> : <span key={j}>{seg.t}</span>)}”</>; return e.link ? <a href={e.link} target="_blank" rel="noopener noreferrer" className="hover:text-[#7a5122]">{body}</a> : body; })()}
-      {(e?.source || e?.date) && <span className="m">{e?.source ?? ""}{e?.date ? ` · ${String(e.date).slice(0, 7)}` : ""}</span>}
-    </blockquote>
-  );
+  const quoteOf = (e: EvidenceReview, i: number) => {
+    const dq = displayQuote(e?.quote, cafe.name);
+    const segs = splitKeyTerms(dq.text).map((seg, j) => seg.k ? <mark key={j} className="nt-key">{seg.t}</mark> : <span key={j}>{seg.t}</span>);
+    const body = dq.readable ? <>“{segs}”</> : <>{segs}</>;
+    return (
+      <blockquote key={e?.link ?? i} className={dq.readable ? "nt-q" : "nt-q t"}>
+        {e.link ? <a href={e.link} target="_blank" rel="noopener noreferrer" className="hover:text-[#7a5122]">{body}</a> : body}
+        {(e?.source || e?.date) && <span className="m">{e?.source ?? ""}{e?.date ? ` · ${String(e.date).slice(0, 7)}` : ""}</span>}
+      </blockquote>
+    );
+  };
   const IcoPin = () => <svg viewBox="0 0 24 24" aria-hidden><path d="M12 22s7-6.2 7-12a7 7 0 0 0-14 0c0 5.8 7 12 7 12z"/><circle cx="12" cy="10" r="2.6"/></svg>;
   const IcoInfo = () => <svg viewBox="0 0 24 24" aria-hidden><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>;
   return (

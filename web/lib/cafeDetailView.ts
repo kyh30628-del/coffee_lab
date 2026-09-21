@@ -7,19 +7,48 @@ import { tasteVector, tasteSimilarity, GRADE_RANK } from "./cafeProfile";
 const RQ_TRUNC = /(\.{3,}|…)\s*$/;
 const RQ_META = /(영업시간|운영시간|주차|도로명|지번|주소|위치\s*[:：]|OPEN|CLOSE|\d{1,2}:\d{2}|전화|문의)/gi;
 const RQ_PRED = /(어요|아요|네요|습니다|해요|였어요|했어요|더라고요|더라구요|거예요|답니다|드려요|같아요|좋았|맛있|추천|만족|아쉬|별로|괜찮)/;
+// 이름을 공유하는 다른 업종(실사고: '호텔 서귀피안' 글이 '서귀피안 베이커리'에 붙음) — 상호 첫 토큰 앞뒤에 숙박어가 붙으면 **다른 가게 글**.
+//   이건 가독성이 아니라 오염이라 화면에서 제외하고 정렬에서도 맨 뒤로 보낸다(2026-09-22 분리).
+export function isOtherBusinessQuote(q: unknown, cafeName = ""): boolean {
+  const s = String(q ?? "").trim();
+  const first = cafeName.trim().split(/\s+/)[0] ?? "";
+  if (first.length < 2) return false;
+  const esc = first.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`${esc}\\s*(호텔|펜션|숙소|리조트|모텔|게스트하우스)|(호텔|펜션|숙소|리조트|모텔|게스트하우스)\\s*${esc}`).test(s);
+}
 export function isReadableQuote(q: unknown, cafeName = ""): boolean {
   const s = String(q ?? "").trim();
-  if (s.length < 20 || RQ_TRUNC.test(s)) return false;
+  // 2026-09-22: 잘린 꼬리(…)는 더 이상 탈락 사유가 아니다 — 수집 스니펫이 91자에서 잘리며 전부 …로 끝나, 사실상 최신 글 전부를
+  //   '안 읽힘'으로 몰아 숨겼다(CEO 지적). 술어가 있으면 잘려도 읽히는 문장이다(…를 붙여 그대로 인용).
+  if (s.length < 20) return false;
   if ((s.match(/#/g) ?? []).length >= 3) return false;
   if ((s.match(RQ_META) ?? []).length >= 2) return false;
   if (/^\[/.test(s) && !RQ_PRED.test(s)) return false;
-  // 이름을 공유하는 다른 업종(실사고: '호텔 서귀피안' 글이 '서귀피안 베이커리'에 붙음) — 상호 첫 토큰 앞뒤에 숙박어가 붙으면 제외
-  const first = cafeName.trim().split(/\s+/)[0] ?? "";
-  if (first.length >= 2) {
-    const esc = first.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    if (new RegExp(`${esc}\\s*(호텔|펜션|숙소|리조트|모텔|게스트하우스)|(호텔|펜션|숙소|리조트|모텔|게스트하우스)\\s*${esc}`).test(s)) return false;
-  }
+  if (isOtherBusinessQuote(s, cafeName)) return false;
   return RQ_PRED.test(s);
+}
+// 🔴 2026-09-22 CEO("최신 후기를 왜 누락시키냐 — 밑에는 26년 6월인데 목록은 3월이 최신"): 읽히지 않는 글(제목 조각·정보카드·
+//   해시태그 덩어리)을 **숨기지 않고** 제목처럼 다듬어 보여준다. 실측(7곳 전부): 최신 검증 후기 대부분이 이 관문에 걸려 화면에서
+//   사라졌다(서귀피안 검증최신 2026.08 → 화면 2025.11). 인용문 88%가 본문이 아니라 스니펫이라 생기는 구조적 한계.
+//   readable=false면 따옴표 없이 제목 줄로 렌더한다. 정리: 앞머리 [태그]·이모지 제거, 해시태그 제거, 영업시간/주소/전화
+//   정보카드 시작점에서 자르기, 잘린 꼬리(....)는 …로.
+const DQ_META_CUT = /(\s*[ㅁ□■▪️•⏰☎📍📞🕐]?\s*(영업시간|운영시간|오픈시간|주차\s*여부|주차\s*[:：]|주소\s*[:：]?|위치\s*[:：]|전화\s*[:：]?|문의\s*[:：]?|OPEN|CLOSE)|\s\d{1,2}:\d{2}\s*[~\-–])/i;
+//   empty=true: 다듬고 나니 상호·지역 말고는 남는 말이 없는 조각("☕ 속초 메이트힐 로스터리 카페 (feat.") — 이건 보여줄 정보가 없어 뺀다.
+export function displayQuote(q: unknown, cafeName = ""): { text: string; readable: boolean; empty: boolean } {
+  const raw = String(q ?? "").replace(/\s+/g, " ").trim();
+  if (isReadableQuote(raw, cafeName)) return { text: raw, readable: true, empty: false };
+  const truncated = RQ_TRUNC.test(raw) || /\(feat\.?\s*$/.test(raw);
+  let t = raw.replace(/\(feat\.?\s*$/, "").replace(RQ_TRUNC, "");
+  t = t.replace(/^(\s*[\[(【][^\]\)】]{0,24}[\])】]\s*)+/, "");       // 앞머리 [제주카페] (양평 카페)
+  t = t.replace(/^[^\p{L}\p{N}"'“]+/u, "");                               // 앞머리 이모지·기호
+  t = t.replace(/#[^\s#]+/g, " ");                                        // 해시태그
+  const cut = t.search(DQ_META_CUT); if (cut > 12) t = t.slice(0, cut);   // 정보카드 시작점에서 자름
+  t = t.replace(/[\s·,\-–—:|｜/]+$/g, "").replace(/\s+/g, " ").trim();
+  if (t.length < 8) t = raw;                                              // 너무 깎이면 원문 그대로
+  let rest = t;
+  for (const tok of cafeName.split(/\s+/).filter((x) => x.length >= 2)) rest = rest.split(tok).join(" ");
+  const empty = (rest.match(/[\p{L}]/gu) ?? []).length < 6;
+  return { text: truncated || t.length < raw.length - 4 ? t + "…" : t, readable: false, empty };
 }
 
 // ── 거리 ──

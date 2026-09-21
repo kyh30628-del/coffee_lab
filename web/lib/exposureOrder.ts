@@ -31,7 +31,7 @@ function recencyBonus(d: string | undefined, nowT: number): number {
 //   → 정렬은 그대로 두되(오염 방어 순서 불변) **읽히는 문장을 뒤로 밀지 않게** 키를 하나 더 두고,
 //     상세 페이지는 이 판별을 통과한 것만 보여준다. 통과분이 없으면 아무것도 안 보여준다(주소 덩어리보다 낫다).
 // 읽히는 문장 판정은 lib/cafeDetailView(클라이언트 안전)로 옮겼다(2026-09-20) — 정렬과 화면이 같은 기준.
-import { isReadableQuote } from "./cafeDetailView";
+import { isReadableQuote, isOtherBusinessQuote } from "./cafeDetailView";
 export { isReadableQuote };
 
 // 정확도(score) — 후기 한 건의 판정 정확도 수치(0~100). 등급 다음가는 정렬 기준(CEO 2026-08-05).
@@ -82,7 +82,9 @@ export function sortReviews(raw: any[], name: string, areaTerms: string[], nowT:
       //   삭제가 아니라 순서만 바꾸므로 오탐이 나도 후기는 사라지지 않는다. 추가 DB 조회 0.
       real: isAdTemplateQuote(e?.quote) ? 0 : 1, // 0 = 정보 카드형 → 진짜 후기 뒤로
       solo: inCampaign(e) ? 0 : 1,               // 0 = 캠페인 묶음 글 → 뒤로
-      read: isReadableQuote(e?.quote, name) ? 1 : 0, // 0 = 제목/주소 덩어리·잘린 문장 → 뒤로(2026-09-20)
+      // 2026-09-22: 가독성(read) 관문 폐지 — 최신 검증 후기가 제목 조각이라는 이유로 뒤로 밀려 화면에서 사라졌다(CEO 지적).
+      //   가독성은 화면 렌더(displayQuote)가 다듬어 처리한다. 대신 '이름만 같은 다른 업종'(호텔 서귀피안)은 오염이라 맨 뒤로.
+      biz: isOtherBusinessQuote(e?.quote, name) ? 0 : 1,
     }))
     .sort((a, b) => {
       // 🔴 2026-09-22 CEO 확정("검증이 우선이고 최신순. 이게 기본"):
@@ -91,11 +93,11 @@ export function sortReviews(raw: any[], name: string, areaTerms: string[], nowT:
       //   같은 등급·같은 관문이면 **최신순**, 그다음에야 정확도.
       if (b.conf !== a.conf) return b.conf - a.conf;
       if (b.mine !== a.mine) return b.mine - a.mine;
+      if (b.biz !== a.biz) return b.biz - a.biz;
       const tier = trustTier(b.e) - trustTier(a.e);
       if (tier !== 0) return tier;
       if (b.real !== a.real) return b.real - a.real;
       if (b.solo !== a.solo) return b.solo - a.solo;
-      if (b.read !== a.read) return b.read - a.read;
       const ta = parseYmd(a.e?.date) ?? 0, tb = parseYmd(b.e?.date) ?? 0;
       if (tb !== ta) return tb - ta;
       // 🔴 2026-08-28 수리(CEO: "최신의 오염 없이 검증된 리뷰를 노출"):

@@ -19,7 +19,7 @@ import { collectionForCafe } from "@/lib/collections";
 import { tasteByKey } from "@/lib/seoData";
 import { shareHookText } from "@/lib/shareCopy";
 import { sortReviews, ensureRecent } from "@/lib/exposureOrder";
-import { isReadableQuote, splitKeyTerms, rankNearby, nearbyTitle, fmtKm, monthlySeries, freshnessOf, CHAR_LABEL, charBarsOf, addrTail, igHandle, type NearbyCafe } from "@/lib/cafeDetailView";
+import { isOtherBusinessQuote, displayQuote, splitKeyTerms, rankNearby, nearbyTitle, fmtKm, monthlySeries, freshnessOf, CHAR_LABEL, charBarsOf, addrTail, igHandle, type NearbyCafe } from "@/lib/cafeDetailView";
 import { extractWorkSignals } from "@/lib/workDetail";
 import OutboundLink from "../../OutboundLink";
 import { isOwnerManaged } from "@/lib/ownerManaged"; // 🏅 사장님 관리 배지(조건·문구 단일출처)
@@ -229,8 +229,10 @@ export default async function CafePage({ params }: Props) {
   const quotesAll = evAll.map((e: any) => e?.quote || "");
   // 📖 화면에 보여줄 후기(2026-09-20) — 이 페이지는 후기 100건을 읽어 통계만 뽑고 **문장은 한 줄도 안 보여주고 있었다.**
   //   대표님: "상세 페이지 열어서 문구들이 제대로 보이냐? 글자만 오지게 많고 난장판". 통계·방법론·면책만 있고 정작
-  //   사람이 쓴 말이 없었다. 정렬 순서 그대로, 읽히는 문장(isReadableQuote)만 최대 3건. 2건 미만이면 안 보여준다.
-  const readable = evAll.filter((e: any) => isReadableQuote(e?.quote, c.name ?? ""));
+  //   사람이 쓴 말이 없었다. 정렬 순서 그대로 최대 3건. 2건 미만이면 안 보여준다.
+  //   🔴 2026-09-22: '읽히는 문장만' 관문 폐지(최신 검증 후기가 통째로 사라지던 원인, CEO 지적). 다른 업종 글만 빼고
+  //   정렬(검증 우선·최신순) 그대로 보여주되, 제목 조각·정보카드는 displayQuote가 다듬어 제목 줄로 렌더한다.
+  const readable = evAll.filter((e: any) => !isOtherBusinessQuote(e?.quote, c.name ?? "") && !displayQuote(e?.quote, c.name ?? "").empty);
   const shownQuotes = readable.slice(0, 3);
   const moreQuotes = readable.slice(3, 12); // 접힘 — 페이지 길이는 안 늘고 정보는 있다
   const showQuotes = shownQuotes.length >= 2;
@@ -324,12 +326,16 @@ export default async function CafePage({ params }: Props) {
   const srcLine = (
     <p className="nt-src">네이버 공개 후기 {(c.synth_count ?? 0).toLocaleString()}건 교차검증 · 영수증 리뷰·광고·협찬 제외 · {checkedOn} 확인</p>
   );
-  const quoteOf = (e: any, i: number) => (
-    <blockquote key={e?.link ?? i} className="nt-q">
-      “{splitKeyTerms(String(e.quote).trim()).map((seg, j) => seg.k ? <mark key={j} className="nt-key">{seg.t}</mark> : <span key={j}>{seg.t}</span>)}”
-      {(e?.source || e?.date) && <span className="m">{e?.source ?? ""}{e?.date ? ` · ${String(e.date).slice(0, 7)}` : ""}</span>}
-    </blockquote>
-  );
+  const quoteOf = (e: any, i: number) => {
+    const dq = displayQuote(e?.quote, c.name ?? "");
+    const body = splitKeyTerms(dq.text).map((seg, j) => seg.k ? <mark key={j} className="nt-key">{seg.t}</mark> : <span key={j}>{seg.t}</span>);
+    return (
+      <blockquote key={e?.link ?? i} className={dq.readable ? "nt-q" : "nt-q t"}>
+        {dq.readable ? <>“{body}”</> : body}
+        {(e?.source || e?.date) && <span className="m">{e?.source ?? ""}{e?.date ? ` · ${String(e.date).slice(0, 7)}` : ""}</span>}
+      </blockquote>
+    );
+  };
   const themed = Object.entries((c.char_scores ?? {}) as Record<string, number>)
     .filter(([k, v]) => Number(v) > 0 && tasteByKey(k))
     .sort((a, b) => Number(b[1]) - Number(a[1]))

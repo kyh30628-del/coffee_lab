@@ -320,6 +320,7 @@
 .nt-detail .nt-q { margin: 0; padding: 0 0 0 14px; border-left: 3px solid var(--nt-coffee); color: var(--nt-ink); font-size: 17.5px; letter-spacing: 0; }
 .nt-detail .nt-key { background: linear-gradient(transparent 52%, rgba(233, 214, 189, 0.95) 52%); color: var(--nt-ink); font-weight: 400; -webkit-text-stroke: 0.15px currentColor; padding: 0 1px; border-radius: 1px; }
 .nt-detail .nt-q .m { display: block; font: 400 14px/34px var(--nt-gothic); color: #8a7a66; }
+.nt-detail .nt-q.t { border-left-style: dashed; color: #3d2f24; }   /* 글 제목 줄(본문 문장이 아닌 스니펫) — 따옴표 없이, 점선 */
 .nt-detail details.nt-more > summary { list-style: none; cursor: pointer; font: 500 13px/34px var(--nt-gothic); color: var(--nt-coffee); }
 .nt-detail details.nt-more > summary::-webkit-details-marker { display: none; }
 .nt-detail details.nt-more[open] > summary .t1, .nt-detail details.nt-more:not([open]) > summary .t2 { display: none; }
