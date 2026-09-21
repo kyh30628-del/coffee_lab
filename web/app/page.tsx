@@ -872,8 +872,12 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
     // ✍ 매 방문 글씨가 써진다(약 2.6초, CEO 지시 "써지는 느낌") — 움직임 줄이기 설정만 즉시 완성본.
     if (!LANDING_MEMO.length) return;                   // 메모 확정 전 — 아무것도 그리지 않는다(빈 줄로 한 번 '완료'되는 걸 막는다)
     if (landingOnce.done) { setDone(true); landingBeacon("skip-done", { mountId }); return; }    // 이 로드에서 이미 한 번 썼다 — 완성본만(두 번째 연출 금지)
+    // 🔴 2026-09-22 CEO("왜 아이폰에서는 글씨 써지는 효과가 안 나오냐"): landing_debug 실측 — 아이폰 PWA(iOS 18.7) 세션에서
+    //   memo-fix 뒤 write-start가 없이 곧바로 완성본(타임라인 0,0,98,98…). 유일한 무기록 경로가 '움직임 줄이기'였다.
+    //   아이폰은 '동작 줄이기'가 켜진 기기가 많고, 손글씨 드러남은 시차·흔들림 연출이 아니라 정체성이라 **줄이기 설정에서도 쓴다**
+    //   (김·맥동 같은 장식 애니메이션은 CSS에서 계속 꺼진다). 얼마나 많은지 재려고 기록만 남긴다.
     const reduce = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reduce) { setDone(true); return; }
+    if (reduce) landingBeacon("reduce-motion", { mountId });
     // 🔴 2026-09-13 '두 번 써짐'의 진짜 원인 = **폰트 스왑**.
     //   손글씨(DCN Letter)는 121조각 동적 서브셋 + font-display:swap이다. 글자를 한 자씩 써 나가면 새 글자마다
     //   새 조각을 내려받고, 도착 전까지는 기본 고딕으로 보이다가 도착하는 순간 이미 쓴 글자까지 **한꺼번에 손글씨로 바뀐다**.
@@ -974,7 +978,7 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
     <div className="w-full max-w-md mx-auto flex flex-col nt-landing" style={{ height: "100%", overflowY: "auto", overflowX: "hidden", background: "var(--nt-espresso)", padding: "calc(env(safe-area-inset-top) + 8px) 8px calc(env(safe-area-inset-bottom) + 8px)", boxSizing: "border-box" }}>
       {/* 📱 프레임: 화면 가장자리에 얇은 크림 경계선 — 노트 표지 안쪽 테두리처럼. 정물은 남는 높이를 전부 채우고 아래 블록은 고정 높이(어떤 폰이든 한 화면) */}
       <div className="flex flex-col flex-1 rounded-[10px]" style={{ minHeight: 0, overflow: "hidden" }}>{/* 테두리·안쪽 그림자 삭제(2026-09-21 CEO "아웃라인 테두리 선 삭제") */}
-      <div ref={heroRef} className="relative w-full overflow-hidden min-h-[220px]" style={{ flex: "1 1 0%", background: "var(--nt-espresso)" }}>{/* 그림은 폭 맞춤·바닥 정렬(옆·아래 안 잘림). 짧은 화면은 위쪽 나무만 잘리고, 높은 화면은 위가 에스프레소 띠 */}
+      <div ref={heroRef} className="relative w-full overflow-hidden min-h-[220px]" style={{ flex: "0 1 auto", minHeight: 220, aspectRatio: `${HERO_W} / ${HERO_H}`, background: "var(--nt-espresso)" }}>{/* 2026-09-22 CEO("노트 위 공백"): 히어로는 그림 높이만큼만(제목은 그림 위 나무 위에 얹힘). 남는 높이는 아래 CTA 블록이 고르게 나눠 갖는다. 짧은 화면은 flex-shrink로 줄고 calc가 축소 */}
         <div className="absolute bottom-0" style={heroBox ? { width: heroBox[0], height: heroBox[1], left: heroBox[2] } : { left: 0, width: "100%", aspectRatio: `${HERO_W} / ${HERO_H}` }}>
           <img src="/note/hero10.webp" alt="" aria-hidden className="block w-full h-full" />
           <div className="absolute inset-x-0 top-0 h-32" style={{ background: "linear-gradient(180deg, var(--nt-espresso), rgba(36,24,18,0))" }} />{/* 그림 윗단이 띠로 녹아듦 */}
@@ -1010,9 +1014,11 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
         </div>
       </div>
       {/* 에스프레소 띠 — CTA */}
-      <div className="px-4 -mt-2 relative z-[1] shrink-0" style={{ color: "#f6ecdf", paddingBottom: 10 }}>
+      <div className="px-4 -mt-2 relative z-[1] flex flex-col justify-evenly" style={{ color: "#f6ecdf", paddingBottom: 10, flex: "1 0 auto" }}>{/* 남는 높이를 문단·버튼 사이에 고르게 — 한 덩어리 빈 띠가 안 생긴다 */}
+        <div>{/* 소개 두 줄은 한 묶음 — 남는 높이는 묶음 사이에만 */}
         <p className="text-[15px] font-bold text-center leading-snug">우리 동네 카페, <span style={{ color: "#e9c99a" }}>진짜 후기만 가려</span> 골라드려요.</p>
         <p className="text-[12.5px] text-center leading-snug mt-0.5" style={{ color: "#c9b391" }}>마음에 든 곳은 <span style={{ color: "#ff7fa6" }}>❤</span>로 <b style={{ color: "#f6ecdf" }}>나만의 동네 지도</b>에.</p>
+        </div>
         <div className="space-y-2 mt-3 max-w-md mx-auto">
           <button onClick={onConsumer} className="w-full rounded-lg py-3 px-5 text-left flex flex-col gap-0 active:scale-[0.99] transition" style={{ background: "linear-gradient(180deg, #f3e6d2, #e6d0b2)", color: "#241812", boxShadow: "0 14px 26px -14px rgba(0,0,0,.7), inset 0 1px 0 #fff8ec" }}>
             <span className="text-[17px] font-bold">☕ 우리 동네 카페 보러가기</span>
@@ -1026,11 +1032,13 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
             이미 키가 있어요 · 로그인
           </button>
         </div>
+        <div>
         <p className="text-[10.5px] mt-2 text-center leading-snug" style={{ color: "#9d8a70" }}>별점, 이제 그만 믿어요 · 리뷰 옥석만 남겼어요 — 네이버·구글·유튜브 공개 후기 교차검증 + AI 맥락 판정, 광고·협찬·무관 글은 자동 제외</p>
         <div className="mt-1.5 text-[10.5px] flex gap-3 justify-center" style={{ color: "#9d8a70" }}>
           <a href="/area" className="underline">동네별 카페</a>
           <a href="/privacy" className="underline">개인정보처리방침</a>
           <a href="/terms" className="underline">이용약관</a>
+        </div>
         </div>
       </div>
       </div>
