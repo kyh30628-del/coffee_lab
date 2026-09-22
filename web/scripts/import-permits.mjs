@@ -89,10 +89,19 @@ console.log(`원장 후보 ${cand.length.toLocaleString()}곳 (영업중 커피�
 const byArea = {}; for (const c of cand) byArea[c.area] = (byArea[c.area] ?? 0) + 1;
 // 🔄 지역 라운드로빈(2026-09-21 CEO "모든 지역 극대화") — 원장 파일 순서대로 돌면 한 시군구가 하루치를 독식한다.
 //   시군구별 줄을 세워 한 곳씩 번갈아 뽑는다 → 매일 전 지역이 고르게 늘고, 상한이 작아도 특정 지역이 굶지 않는다.
+// ⚖️ 신규 지역 가중치(2026-09-22 CEO "신규 지역 가중치 두 배로 바로 적용"): 원장이 늦게 들어온 시·도는 아직 얇으니
+//   한 라운드에 두 곳씩 뽑는다. 기간·대상은 env로 조정(기본 09-29까지, 대구·경북·광주·전남·전북·울산·제주).
+const BOOST_SIDOS = new Set((process.env.PERMIT_BOOST_SIDOS || "대구,경북,광주,전남,전북,울산,제주").split(",").map((x) => x.trim()).filter(Boolean));
+const BOOST_UNTIL = process.env.PERMIT_BOOST_UNTIL || "2026-09-29";
+const BOOST_ON = new Date().toISOString().slice(0, 10) <= BOOST_UNTIL;
+const GU2SIDO = new Map(); for (const [sd, gus] of Object.entries(SIDO_GU)) for (const g of gus) GU2SIDO.set(PREFIXED.has(sd) ? `${sd} ${g}` : g, sd);
+const weightOf = (area) => (BOOST_ON && BOOST_SIDOS.has(GU2SIDO.get(area) ?? "") ? 2 : 1);
 {
   const queues = new Map(); for (const c of cand) { if (!queues.has(c.area)) queues.set(c.area, []); queues.get(c.area).push(c); }
   const keys = [...queues.keys()]; cand.length = 0; let left = keys.length;
-  while (left > 0) { left = 0; for (const k of keys) { const q = queues.get(k); if (q.length) { cand.push(q.shift()); if (q.length) left++; } } }
+  while (left > 0) { left = 0; for (const k of keys) { const q = queues.get(k); for (let i = 0; i < weightOf(k) && q.length; i++) cand.push(q.shift()); if (q.length) left++; } }
+  const boosted = keys.filter((k) => weightOf(k) === 2).length;
+  console.log(`지역 라운드로빈: 시군구 ${keys.length}개 · 가중치 2배 ${boosted}개(${BOOST_ON ? [...BOOST_SIDOS].join("·") + " · " + BOOST_UNTIL + "까지" : "꺼짐"})`);
 }
 console.log("상위 지역:", Object.entries(byArea).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([k, v]) => `${k} ${v}`).join(" · "));
 
