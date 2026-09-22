@@ -878,7 +878,7 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
   const curRef = useRef<HTMLElement | null>(null); // 지금 써지는 글자(인라인 clip 정리용)
   const penRef = useRef<[number, number] | null>(null); // 촉의 현재 위치(부드러운 이동)
   const lastElRef = useRef<number | null>(null); // 직전 프레임 시각(시간 기반 접근용)
-  const jitter = useMemo(() => LANDING_MEMO.map((l) => memoChars(l).map(() => [(Math.random() * 3.2 - 1.6).toFixed(2), (Math.random() * 2 - 1).toFixed(2)])), [LANDING_MEMO]);
+  const jitter = useMemo(() => LANDING_MEMO.map((l) => memoChars(l).map(() => [(Math.random() * 3.2 - 1.6).toFixed(2), (Math.random() * 2 - 1).toFixed(2), (0.78 + Math.random() * 0.22).toFixed(2)])), [LANDING_MEMO]); // [기울기, 높낮이, 잉크 농담]
   // 페이지 사각형을 화면 픽셀로 — 이미지는 object-fit: cover(가운데)라 스케일·오프셋을 같이 계산
   useEffect(() => {
     const el = heroRef.current; if (!el) return;
@@ -1040,14 +1040,14 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
             <div className="absolute" style={{ left: 42, right: 10, top: lineTop }}>
               {YESTERDAY_MEMO.map((line, li) => (
                 <div key={li} className={`nt-w nt-hand done${li === 0 ? " date" : ""}`} style={{ fontSize: 22, lineHeight: `${PAGE_PITCH}px`, height: PAGE_PITCH, color: "#3b4260", opacity: 0.8, whiteSpace: "nowrap", overflow: "hidden" }}>
-                  {(() => { const runs = memoRuns(line).map((run, ri) => { const spans = run.chars.map(({ ch, ci }) => <span key={ci} className={`ch${ch === " " ? " sp" : ""}`}>{ch}</span>); return run.h ? <span key={ri} className={`hlw${run.h === 2 ? " p" : ""}`}>{spans}</span> : <span key={ri}>{spans}</span>; }); return li === 0 ? <span className="dl">{runs}</span> : runs; })()}
+                  {(() => { const runs = memoRuns(line).map((run, ri) => { const spans = run.chars.map(({ ch, ci }) => <span key={ci} className={`ch${ch === " " ? " sp" : ""}`} style={ch === " " ? undefined : { ["--r" as any]: `${(((ci * 7 + li * 3) % 9) - 4) * 0.35}deg`, ["--y" as any]: `${(((ci * 5 + li) % 5) - 2) * 0.4}px`, ["--k" as any]: (0.72 + ((ci * 11 + li * 5) % 7) * 0.03).toFixed(2) } }>{ch}</span>); return run.h ? <span key={ri} className={`hlw${run.h === 2 ? " p" : ""}`}>{spans}</span> : <span key={ri}>{spans}</span>; }); return li === 0 ? <span className="dl">{runs}</span> : runs; })()}
                   {/다녀|한 잔/.test(line) && <i className="nt-heart" aria-hidden />}
                   {/다시 갈|좋았다/.test(line) && <i className="nt-star" aria-hidden />}
                 </div>
               ))}
             </div>
             <div className="nt-stamp absolute in" style={{ right: 18, bottom: 26, opacity: 0.5, animation: "none" }}>검증<small>VERIFIED</small></div>
-            <div className="nt-pno" aria-hidden>· {new Date(Date.now() - 86400000).getDate()} ·</div>
+            <div className="nt-pno l" aria-hidden>{new Date(Date.now() - 86400000).getDate()}</div>
           </div>
         )}
         {/* 렌더된 오른쪽 페이지 위에 원근 정합으로 얹는 글 */}
@@ -1064,7 +1064,7 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
                 {done === null ? null : (() => { const runs = memoRuns(line).map((run, ri) => {
                   const spans = run.chars.map(({ ch, ci }) => (
                     <span key={ci} className={`ch${ch === " " ? " sp" : ""}${!allDone && li === pos[0] && ci < pos[1] ? " on" : ""}`}
-                      style={ch === " " ? undefined : { ["--r" as any]: `${jitter[li][ci][0]}deg`, ["--y" as any]: `${jitter[li][ci][1]}px` }}>{ch}</span>
+                      style={ch === " " ? undefined : { ["--r" as any]: `${jitter[li][ci][0]}deg`, ["--y" as any]: `${jitter[li][ci][1]}px`, ["--k" as any]: jitter[li][ci][2] }}>{ch}</span>
                   ));
                   return run.h ? <span key={ri} className={`hlw${run.h === 2 ? " p" : ""}`}>{spans}</span> : <span key={ri}>{spans}</span>;
                 }); return li === 0 ? <span className="dl">{runs}</span> : runs; })()}
@@ -1074,7 +1074,7 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
             ))}
           </div>
           <i className="nt-ribbon" style={{ right: 22, top: -2, width: 12, height: 56 }} aria-hidden />
-          <div className="nt-pno" aria-hidden>· {new Date().getDate()} ·</div>{/* 붉은 책갈피 리본 — 홈 헤더와 같은 것(2026-09-22 CEO) */}
+          <div className="nt-pno r" aria-hidden>{new Date().getDate()}</div>{/* 붉은 책갈피 리본 — 홈 헤더와 같은 것(2026-09-22 CEO) */}
           <div className={`nt-stamp absolute ${allDone ? "in" : ""}`} style={{ right: 18, bottom: 26, opacity: allDone ? undefined : 0 }} aria-hidden>검증<small>VERIFIED</small></div>
           <img ref={nibRef} className="nt-nib" src="/note/pen.webp" alt="" aria-hidden draggable={false} style={{ width: PEN_W, height: PEN_H }} />
         </div>

@@ -178,12 +178,12 @@
 
 /* ── 랜딩: 채워지는 메모 ── */
 /* 2026-09-13: 0.9초 '잉크 마름' 색 전이 제거 — 펜 뒤로 색이 따라오며 바뀌는 두 번째 물결이 '또 써지는 것'처럼 보였다. 처음부터 마른 잉크색. */
-.nt-w .ch { display: inline-block; opacity: 0; color: #2f3550; clip-path: inset(-20% 100% -20% -6%); transform: translateY(var(--y, 0px)) rotate(var(--r, 0deg)); }
+.nt-w .ch { display: inline-block; opacity: 0; color: #2f3550; clip-path: inset(-20% 100% -20% -6%); transform: translateY(var(--y, 0px)) rotate(var(--r, 0deg)); text-shadow: 0 0 0.35px rgba(47, 53, 80, 0.55); }
 .nt-w .ch.sp { width: 0.32em; }
-.nt-w .ch.on { opacity: 1; clip-path: inset(-20% -6% -20% -6%); color: #2f3550; }
-.nt-w.done .ch { opacity: 1; clip-path: none; color: #2f3550; transition: none; }
+.nt-w .ch.on { opacity: var(--k, 1); clip-path: inset(-20% -6% -20% -6%); color: #2f3550; }
+.nt-w.done .ch { opacity: var(--k, 1); clip-path: none; color: #2f3550; transition: none; }
 /* ✍ 형광펜(2026-09-22) — 【…】 구간. 줄이 다 써진 뒤에 칠해진다(쓰고 나서 그은 느낌). 글자마다 약간 기울어 손으로 그은 띠처럼 보인다. */
-.nt-w .hlw { display: inline-block; padding: 0 3px; margin: 0 -3px; border-radius: 3px; background: linear-gradient(180deg, transparent 0 36%, rgba(255, 199, 66, 0) 36% 94%, transparent 94%); transform: rotate(-0.6deg); }
+.nt-w .hlw { display: inline-block; padding: 0 4px 0 3px; margin: 0 -4px 0 -3px; border-radius: 6px 3px 7px 4px / 8px 5px 9px 4px; background: linear-gradient(180deg, transparent 0 36%, rgba(255, 199, 66, 0) 36% 94%, transparent 94%); transform: rotate(-0.6deg); }
 .nt-w.done .hlw { background: linear-gradient(180deg, transparent 0 36%, rgba(255, 199, 66, 0.6) 36% 94%, transparent 94%); transition: background 0.35s ease 0.25s; }
 .nt-w .hlw.p { background: linear-gradient(180deg, transparent 0 36%, rgba(255, 150, 170, 0) 36% 94%, transparent 94%); transform: rotate(0.5deg); }
 .nt-w.done .hlw.p { background: linear-gradient(180deg, transparent 0 36%, rgba(255, 150, 170, 0.5) 36% 94%, transparent 94%); }
@@ -195,7 +195,11 @@
 .nt-w .nt-star { display: inline-block; width: 11px; height: 11px; margin-left: 5px; vertical-align: -1px; opacity: 0; transform: rotate(12deg); background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 3.2l2.6 5.6 6.1.7-4.5 4.2 1.2 6.1L12 16.8l-5.4 3 1.2-6.1-4.5-4.2 6.1-.7z' fill='none' stroke='%23b9793b' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat; }
 .nt-w.done .nt-star { opacity: 0.9; transition: opacity 0.3s ease 0.45s; }
 /* 페이지 번호 — 아래 가운데, 인쇄체 eyebrow */
-.nt-pno { position: absolute; left: 0; right: 0; bottom: 9px; text-align: center; font-family: var(--nt-sans); font-size: 6.6px; letter-spacing: 0.3em; color: #a08f7a; pointer-events: none; }
+/* 페이지 번호 — 진짜 노트처럼 바깥 아래 모서리에 작게 인쇄(왼쪽 페이지는 왼쪽, 오른쪽은 오른쪽). 잉크가 아니라 인쇄라 옅은 회갈색·가는 획 */
+.nt-pno { position: absolute; bottom: 8px; font-family: var(--nt-sans); font-size: 7px; letter-spacing: 0.08em; color: #a89a86; opacity: 0.85; pointer-events: none; }
+.nt-pno.l { left: 14px; } .nt-pno.r { right: 14px; }
+.nt-pno::before { content: ""; display: inline-block; width: 10px; height: 1px; background: #c9bda9; vertical-align: 2px; margin-right: 4px; }
+.nt-pno.r::before { display: none; } .nt-pno.r::after { content: ""; display: inline-block; width: 10px; height: 1px; background: #c9bda9; vertical-align: 2px; margin-left: 4px; }
 /* ♥ 다녀온 줄 끝의 작은 손그림 하트(추억 저장 분홍) — 줄이 끝나면 나타난다 */
 .nt-w .nt-heart { display: inline-block; width: 11px; height: 11px; margin-left: 5px; vertical-align: -1px; opacity: 0; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 20.5c-1-1-8-5.6-8-11A4.6 4.6 0 0 1 12 7a4.6 4.6 0 0 1 8 2.5c0 5.4-7 10-8 11z' fill='none' stroke='%23e0607a' stroke-width='2.2' stroke-linejoin='round' stroke-linecap='round'/%3E%3C/svg%3E") center / contain no-repeat; transform: rotate(-8deg); }
 .nt-w.done .nt-heart { opacity: 0.9; transition: opacity 0.3s ease 0.45s; }
