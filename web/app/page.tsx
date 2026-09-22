@@ -701,7 +701,7 @@ const LANDING_MEMO_FALLBACK = ["오늘, 우리 동네.", "별점은 안 봤다. 
 //   ⚠️ 노트 한 줄은 폭이 정해져 있다(nowrap·overflow hidden) — 넘치면 소리 없이 잘려 깨져 보인다.
 //      그래서 글자폭을 재서(한글 1.0 · 그 외 0.55) 예산 안에 드는 문장만 쓴다. 실측 기준 19px에 13.2가 한 줄(22px은 11.4).
 const LINE_BUDGET = 11.4;   // 2026-09-22 글씨 19→22px(CEO '줄 수 5로 줄이고 글씨 키워') — 13.2×19/22
-const lineWidth = (t: string) => Array.from(t).reduce((a, ch) => a + (/[\u3131-\uD79D\u4E00-\u9FFF]/.test(ch) ? 1 : 0.55), 0);
+const lineWidth = (t: string) => Array.from(t.replace(/[【】]/g, "")).reduce((a, ch) => a + (/[\u3131-\uD79D\u4E00-\u9FFF]/.test(ch) ? 1 : 0.55), 0);
 const fitLine = (t: string) => {
   const x = (t || "").replace(/\s+/g, " ").trim();
   if (lineWidth(x) <= LINE_BUDGET) return x;
@@ -709,7 +709,9 @@ const fitLine = (t: string) => {
   for (const ch of Array.from(x)) { if (lineWidth(out + ch) > LINE_BUDGET - 0.6) break; out += ch; }
   return out.replace(/[\s·,—-]+$/, "") + "…";
 };
-// opts(2026-09-22, 왼쪽 페이지 '어제 메모'): dayOffset=-1이면 어제 날짜, exclude=오늘 글에 쓴 카페명(겹치지 않게), cafeLines=카페 줄 수, closing=맺음 두 줄 여부
+// opts(2026-09-22, 왼쪽 페이지 '어제 메모'): dayOffset=-1이면 어제 날짜, exclude=오늘 글에 쓴 카페명(겹치지 않게), cafeLines=카페 수, closing=맺음 두 줄 여부
+// ✍ 2026-09-22 CEO("글만 쭉 나열하지 말고 일기 쓰듯 현실감 있게, 하이라이트펜 강조"): 카페당 두 줄 — '다녀왔다' 한 줄 + 한 마디(결·원두·후기 수·새로 적음).
+//   【…】로 감싼 구간은 화면에서 형광펜으로 칠해진다(줄이 다 써진 뒤에). 폭 계산은 표식을 뺀 글자로 한다. 숫자·이름·판정은 전부 홈 데이터.
 function landingMemo(d: Discover | null, seed: number, opts: { dayOffset?: number; exclude?: Set<string>; cafeLines?: number; closing?: boolean } = {}): string[] {
   const { dayOffset = 0, exclude, cafeLines = 2, closing = true } = opts;
   const pools = [d?.headlineAList, d?.headlineBList, d?.top3, d?.specialty, d?.fresh, d?.featured];
@@ -717,36 +719,50 @@ function landingMemo(d: Discover | null, seed: number, opts: { dayOffset?: numbe
   const seen = new Set<number>();
   for (const p of pools) for (const c of p ?? []) if (c && !seen.has(c.id) && !(exclude && c.name && exclude.has(c.name))) { seen.add(c.id); pool.push(c); }
   if (pool.length === 0) return dayOffset < 0 ? LANDING_MEMO_YESTERDAY_FALLBACK : LANDING_MEMO_FALLBACK;
-  // 결정론적 셔플(seed) — 렌더가 여러 번 돌아도 같은 줄이 나오게(쓰는 도중 글자가 바뀌면 안 된다).
   let r = seed || 1;
   const rnd = () => { r = (r * 1103515245 + 12345) & 0x7fffffff; return r / 0x7fffffff; };
   const shuffled = [...pool].map((c) => ({ c, k: rnd() })).sort((a, b) => a.k - b.k).map((x) => x.c);
   const now = new Date(Date.now() + dayOffset * 86400000);
   const day = ["일", "월", "화", "수", "목", "금", "토"][now.getDay()];
-  // 날짜 줄 — 동네 이름이 길면 요일부터 덜어낸다(잘라서 "대구 달…"이 되지 않게).
   const m = now.getMonth() + 1, dd = now.getDate(), area0 = shuffled[0].area || "";
+  const fits = (t: string) => lineWidth(t) <= LINE_BUDGET;
   const dateCands = [`${m}월 ${dd}일 ${day}요일, ${area0}.`, `${m}월 ${dd}일, ${area0}.`, `${m}월 ${dd}일 ${day}요일.`];
-  const lines: string[] = [fitLine(dateCands.find((t) => lineWidth(t) <= LINE_BUDGET) ?? dateCands[2])];
-  const usedPhrase = new Set<string>();          // 같은 판정 문구가 반복되지 않게
-  const kindUsed: Record<string, number> = {};   // 같은 문장 틀만 이어지지 않게(한 틀당 최대 2줄)
+  const lines: string[] = [fitLine(dateCands.find(fits) ?? dateCands[2])];
+  const kindUsed: Record<string, number> = {};
+  let n = 0;
   for (const c of shuffled) {
-    if (lines.length >= 1 + cafeLines) break;   // 오늘: 날짜 1 + 카페 2 + 맺음 2 = 다섯 줄 · 어제(왼쪽): 날짜 1 + 카페 4
-    const name = c.name || "";
-    // 문장 틀 4종. 틀이 이미 2번 쓰였으면 건너뛰어 다른 틀이 나오게 한다.
-    const phrase = (c.identity || "").split(/[·,]/)[0]?.trim() || "";
-    const cands: [string, string, string][] = [];   // [종류, 중복키, 문장]
-    if (phrase) cands.push(["identity", phrase, `${name} — ${phrase}`]);
-    if (c.beanNote?.length) cands.push(["bean", c.beanNote[0], `${name} · ${c.beanNote[0]}`]);
-    if (c.isNew) cands.push(["new", `새로:${name}`, `새로 적은 곳 — ${name}`]);
-    if ((c.count ?? 0) > 0) cands.push(["count", `후기${c.count}`, `${name}, 후기 ${c.count}건`]);
-    const pick = cands.find(([kind, k, t]) => (kindUsed[kind] ?? 0) < 2 && !usedPhrase.has(k) && lineWidth(t) <= LINE_BUDGET);
-    if (!pick) continue;
-    kindUsed[pick[0]] = (kindUsed[pick[0]] ?? 0) + 1;
-    usedPhrase.add(pick[1]);
-    lines.push(pick[2]);
+    if (n >= cafeLines) break;
+    const name = (c.name || "").trim(); if (!name) continue;
+    const visit = [`【${name}】에 다녀왔다.`, `【${name}】, 다녀옴.`, `【${name}】에서 한 잔.`].find(fits);
+    if (!visit) continue;
+    const trait = (c.identity || "").split(/[·,]/)[0]?.trim() || "";
+    const bean = c.beanNote?.[0] ? (CHAR_LABEL[c.beanNote[0]] ?? c.beanNote[0]) : "";
+    const cnt = c.count ?? 0;
+    const cands: [string, string][] = [];
+    if (trait) cands.push(["trait", `【${trait}】 얘기가 많다.`], ["trait", `다들 【${trait}】라 했다.`], ["trait", `【${trait}】, 맞는 말.`]);
+    if (bean) cands.push(["bean", `원두는 【${bean}】.`], ["bean", `【${bean}】라고 적어 둔다.`]);
+    if (cnt > 0) cands.push(["count", `후기 ${cnt}건을 읽었다.`], ["count", `후기 ${cnt}건, 다 읽음.`]);
+    if (c.isNew) cands.push(["new", "새로 적은 곳이다."]);
+    cands.push(["mood", "다시 갈 것 같다."], ["mood", "조용해서 좋았다."]);
+    const pick = cands.find(([k, t]) => (kindUsed[k] ?? 0) < 1 && fits(t)) ?? cands.find(([, t]) => fits(t));
+    lines.push(visit);
+    if (pick) { kindUsed[pick[0]] = (kindUsed[pick[0]] ?? 0) + 1; lines.push(pick[1]); }
+    n++;
   }
-  if (closing) { lines.push("광고·협찬 글은 걸러냈다."); lines.push("마음에 든 곳엔 도장 하나."); }
+  if (closing) { lines.push("광고·협찬 글은 걸러냈다."); lines.push("마음에 든 곳엔 【도장】 하나."); }
   return lines;
+}
+// 연속 구간으로 묶는다(형광 띠를 글자별이 아니라 한 띠로 칠하려고). ci는 전체 글자 인덱스(애니메이션 pos와 같은 축).
+function memoRuns(line: string): { h: boolean; chars: { ch: string; ci: number }[] }[] {
+  const runs: { h: boolean; chars: { ch: string; ci: number }[] }[] = [];
+  memoChars(line).forEach(({ ch, h }, ci) => { const last = runs[runs.length - 1]; if (last && last.h === h) last.chars.push({ ch, ci }); else runs.push({ h, chars: [{ ch, ci }] }); });
+  return runs;
+}
+// 【…】 표식을 걷어내고 글자마다 형광 여부(h)를 붙인다 — 애니메이션·펜·폭 계산이 전부 이 배열 길이를 쓴다.
+function memoChars(line: string): { ch: string; h: boolean }[] {
+  const out: { ch: string; h: boolean }[] = []; let h = false;
+  for (const ch of Array.from(line)) { if (ch === "【") h = true; else if (ch === "】") h = false; else out.push({ ch, h }); }
+  return out;
 }
 const LANDING_MEMO_YESTERDAY_FALLBACK = ["어제도 우리 동네.", "별점은 안 봤다.", "다녀온 사람 글만 읽었다.", "광고·협찬 글은 걸러냈다."];
 const HERO_W = 1400, HERO_H = 1310;   // hero10.webp(1400×1680에서 빈 바닥 22% 제거)
@@ -848,7 +864,7 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
     const src = discover ?? lite;
     const used = new Set<string>();
     for (const c of [src?.headlineAList, src?.headlineBList, src?.top3, src?.specialty, src?.fresh, src?.featured].flatMap((p) => p ?? [])) if (c?.name && memo.some((l) => l.includes(c.name))) used.add(c.name);
-    return landingMemo(src, seed + 7919, { dayOffset: -1, exclude: used, cafeLines: 4, closing: false }).slice(0, 5);
+    return landingMemo(src, seed + 7919, { dayOffset: -1, exclude: used, cafeLines: 3, closing: false }).slice(0, 7);
   }, [memo, discover, lite, seed]);
   const [done, setDone] = useState<boolean | null>(() => (landingOnce.done ? true : landingOnce.t0 != null ? false : null)); // null=판단 전(SSR), true=완성본, false=쓰는 중 — 재마운트면 즉시 이어진 상태로
   const [pos, setPos] = useState<[number, number]>([0, 0]); // [줄, 글자]
@@ -862,7 +878,7 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
   const curRef = useRef<HTMLElement | null>(null); // 지금 써지는 글자(인라인 clip 정리용)
   const penRef = useRef<[number, number] | null>(null); // 촉의 현재 위치(부드러운 이동)
   const lastElRef = useRef<number | null>(null); // 직전 프레임 시각(시간 기반 접근용)
-  const jitter = useMemo(() => LANDING_MEMO.map((l) => Array.from(l).map(() => [(Math.random() * 3.2 - 1.6).toFixed(2), (Math.random() * 2 - 1).toFixed(2)])), [LANDING_MEMO]);
+  const jitter = useMemo(() => LANDING_MEMO.map((l) => memoChars(l).map(() => [(Math.random() * 3.2 - 1.6).toFixed(2), (Math.random() * 2 - 1).toFixed(2)])), [LANDING_MEMO]);
   // 페이지 사각형을 화면 픽셀로 — 이미지는 object-fit: cover(가운데)라 스케일·오프셋을 같이 계산
   useEffect(() => {
     const el = heroRef.current; if (!el) return;
@@ -900,7 +916,7 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
     //   → 쓰기 전에 이 메모에 실제로 쓰인 글자들의 조각을 **전부 받아온 뒤** 시작한다. 최대 2.5초만 기다리고, 실패해도 그냥 진행.
     let cancelled = false;
     const startWhenFontReady = (go: () => void) => {
-      const txt = LANDING_MEMO.join("");
+      const txt = LANDING_MEMO.join("").replace(/[【】]/g, "");
       const f: any = (document as any).fonts;
       if (!f?.load) { go(); return; }
       let fired = false;
@@ -921,7 +937,7 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
     // ✍ 2026-09-13 재설계(CEO "진짜 펜으로 쓰이는 것처럼"): 초당 36자는 글자당 2프레임이라 펜이 미끄러져 보일 뿐이었다.
     //   사람 손 속도(초당 9자)로 낮추고, 글자는 왼쪽 위→오른쪽 아래 사선으로 드러내며, 촉은 그 경계를 따라 획 긋듯 내려간다.
     const CPS = slow ? 3 : 17, GAP = 0.2;   // 실측 13초는 너무 길다 → 약 7초. 손 속도 느낌은 유지.
-    const lens = LANDING_MEMO.map((l) => Array.from(l).length);
+    const lens = LANDING_MEMO.map((l) => memoChars(l).length);
     const starts: number[] = []; let acc = 0.6;
     lens.forEach((n) => { starts.push(acc); acc += n / CPS + GAP; });
     const total = acc; const t0 = landingOnce.t0 ?? (landingOnce.t0 = performance.now()); let raf = 0; let alive = true;
@@ -1024,7 +1040,8 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
             <div className="absolute" style={{ left: 42, right: 10, top: lineTop }}>
               {YESTERDAY_MEMO.map((line, li) => (
                 <div key={li} className="nt-w nt-hand done" style={{ fontSize: 22, lineHeight: `${PAGE_PITCH}px`, height: PAGE_PITCH, color: "#3b4260", opacity: 0.8, whiteSpace: "nowrap", overflow: "hidden" }}>
-                  {Array.from(line).map((ch, ci) => <span key={ci} className={`ch${ch === " " ? " sp" : ""}`}>{ch}</span>)}
+                  {memoRuns(line).map((run, ri) => { const spans = run.chars.map(({ ch, ci }) => <span key={ci} className={`ch${ch === " " ? " sp" : ""}`}>{ch}</span>); return run.h ? <span key={ri} className="hlw">{spans}</span> : <span key={ri}>{spans}</span>; })}
+                  {/다녀|한 잔/.test(line) && <i className="nt-heart" aria-hidden />}
                 </div>
               ))}
             </div>
@@ -1042,13 +1059,18 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
           <div className="absolute" style={{ left: 42, right: 10, top: lineTop }}>
             {LANDING_MEMO.map((line, li) => (
               <div key={li} className={`nt-w nt-hand ${allDone || (done === false && li < pos[0]) ? "done" : ""}`} style={{ fontSize: 22, lineHeight: `${PAGE_PITCH}px`, height: PAGE_PITCH, color: "#2f3550", whiteSpace: "nowrap", overflow: "hidden" }}>
-                {done === null ? null : Array.from(line).map((ch, ci) => (
-                  <span key={ci} className={`ch${ch === " " ? " sp" : ""}${!allDone && li === pos[0] && ci < pos[1] ? " on" : ""}`}
-                    style={ch === " " ? undefined : { ["--r" as any]: `${jitter[li][ci][0]}deg`, ["--y" as any]: `${jitter[li][ci][1]}px` }}>{ch}</span>
-                ))}
+                {done === null ? null : memoRuns(line).map((run, ri) => {
+                  const spans = run.chars.map(({ ch, ci }) => (
+                    <span key={ci} className={`ch${ch === " " ? " sp" : ""}${!allDone && li === pos[0] && ci < pos[1] ? " on" : ""}`}
+                      style={ch === " " ? undefined : { ["--r" as any]: `${jitter[li][ci][0]}deg`, ["--y" as any]: `${jitter[li][ci][1]}px` }}>{ch}</span>
+                  ));
+                  return run.h ? <span key={ri} className="hlw">{spans}</span> : <span key={ri}>{spans}</span>;
+                })}
+                {done !== null && /다녀|한 잔/.test(line) && <i className="nt-heart" aria-hidden />}
               </div>
             ))}
           </div>
+          <i className="nt-ribbon" style={{ right: 22, top: -2, width: 12, height: 56 }} aria-hidden />{/* 붉은 책갈피 리본 — 홈 헤더와 같은 것(2026-09-22 CEO) */}
           <div className={`nt-stamp absolute ${allDone ? "in" : ""}`} style={{ right: 18, bottom: 26, opacity: allDone ? undefined : 0 }} aria-hidden>검증<small>VERIFIED</small></div>
           <img ref={nibRef} className="nt-nib" src="/note/pen.webp" alt="" aria-hidden draggable={false} style={{ width: PEN_W, height: PEN_H }} />
         </div>
