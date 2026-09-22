@@ -27,11 +27,17 @@ if (!KEY) { console.error("DATA_GO_KR_API_KEY 없음(~/budongsan-note/.env.local
 
 const OUT_DIR = path.join(homedir(), "coffee-platform/agent-reports/permits");
 mkdirSync(OUT_DIR, { recursive: true });
-const OUT = path.join(OUT_DIR, `${EP}.ndjson`);
-const STATE = path.join(OUT_DIR, `${EP}.state.json`);
+// 🔴 2026-09-22 CEO("전남 등 새 지역 수집이 왜 저 모양이냐"): 09-07 당시 서비스 지역만 걸러 저장해 대구·경북·광주·전남·전북·울산·제주는
+//   원장 파일에 한 건도 없었다 → 원장 적재가 그 지역을 아예 못 봤다. API는 필터가 없어 전체를 다시 훑어야 한다.
+//   --only=시도1,시도2 로 지역을 지정하면 별도 파일(<ep>.extra.ndjson)에 쌓는다(기존 파일은 그대로).
+const ONLY = arg("only", "") ? arg("only", "").split(",").map((x) => x.trim()).filter(Boolean) : null;
+const SUFFIX = ONLY ? ".extra" : "";
+const OUT = path.join(OUT_DIR, `${EP}${SUFFIX}.ndjson`);
+const STATE = path.join(OUT_DIR, `${EP}${SUFFIX}.state.json`);
 
 // 우리가 서비스하는 시·도만 남긴다(전국 300만 건을 다 들고 있을 이유가 없다). 주소 표기는 API 원문 기준.
-const REGIONS = ["서울특별시", "인천광역시", "경기도", "강원특별자치도", "강원도", "대전광역시", "세종특별자치시", "충청남도", "충청북도", "부산광역시", "경상남도"];
+const REGIONS = ONLY ?? ["서울특별시", "인천광역시", "경기도", "강원특별자치도", "강원도", "대전광역시", "세종특별자치시", "충청남도", "충청북도", "부산광역시", "경상남도",
+  "대구광역시", "경상북도", "광주광역시", "전라남도", "전남광주통합특별시", "전북특별자치도", "전라북도", "울산광역시", "제주특별자치도"];
 const inScope = (addr) => !!addr && REGIONS.some((r) => addr.startsWith(r));
 
 const url = (page) => `https://apis.data.go.kr/1741000/${EP}/info?serviceKey=${KEY}&pageNo=${page}&numOfRows=100&resultType=json`;

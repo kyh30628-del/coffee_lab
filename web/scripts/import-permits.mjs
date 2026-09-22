@@ -33,7 +33,7 @@ const LIMIT = arg("--limit", 3000);
 const BUDGET = arg("--budget", 0) || (NAVER_DAILY_QUOTA - NAVER_CLOSURE_RESERVE - NAVER_COLLECT_RESERVE);
 
 const PREFIXED = new Set(["인천", "대전", "부산", "대구", "광주", "울산"]);
-const ADDR2SIDO = { "제주특별자치도": "제주", "전북특별자치도": "전북", "전라남도": "전남", "경상남도": "경남", "경상북도": "경북",
+const ADDR2SIDO = { "제주특별자치도": "제주", "전북특별자치도": "전북", "전라북도": "전북", "전라남도": "전남", "경상남도": "경남", "경상북도": "경북",
   "충청남도": "충남", "충청북도": "충북", "강원특별자치도": "강원", "경기도": "경기", "서울특별시": "서울",
   "인천광역시": "인천", "대전광역시": "대전", "부산광역시": "부산", "대구광역시": "대구", "광주광역시": "광주", "울산광역시": "울산", "세종특별자치시": "세종" };
 const norm = (s) => String(s || "").toLowerCase().replace(/[\s()·\-_,.]/g, "");
@@ -41,7 +41,10 @@ const norm = (s) => String(s || "").toLowerCase().replace(/[\s()·\-_,.]/g, "");
 /** 주소 → area 라벨. 그 시·도의 정당한 시군구일 때만 반환(추측 매핑 없음). */
 function areaOf(addr) {
   const parts = String(addr || "").trim().split(/\s+/);
-  const sido = ADDR2SIDO[parts[0]]; if (!sido) return null;
+  let sido = ADDR2SIDO[parts[0]];
+  if (!sido && parts[0] === "전남광주통합특별시") sido = (SIDO_GU["광주"] ?? []).includes(parts[1]) ? "광주" : "전남"; // 2026 통합 표기 — 다음 토큰이 광주 구면 광주
+  if (!sido) return null;
+  if (sido === "세종") return "세종시";                                  // 세종은 구가 없다("세종특별자치시 시청대로 …") — 09-22 실측 749곳 중 1곳만 매핑되던 구멍
   const gus = SIDO_GU[sido] ?? [];
   for (const tok of parts.slice(1, 4)) if (gus.includes(tok)) return PREFIXED.has(sido) ? `${sido} ${tok}` : tok;
   return null;
@@ -60,8 +63,9 @@ const cand = []; let skipFranchise = 0, skipOther = 0, skipTried = 0;
 const TRIED_PATH = `${homedir()}/coffee-platform/agent-reports/permits/tried.json`;
 const tried0 = new Set(existsSync(TRIED_PATH) ? JSON.parse(readFileSync(TRIED_PATH, "utf8")) : []);
 const triedKey = (nm, addr) => norm(nm) + "|" + norm(addr).slice(0, 20);
-for (const fn of ["rest_cafes", "bakeries"]) {
-  const rl = readline.createInterface({ input: createReadStream(`${homedir()}/coffee-platform/agent-reports/permits/${fn}.ndjson`), crlfDelay: Infinity });
+for (const fn of ["rest_cafes", "bakeries", "rest_cafes.extra", "bakeries.extra"]) {   // .extra = 09-22 추가 지역분(대구·경북·광주·전남·전북·울산·제주)
+  const fp = `${homedir()}/coffee-platform/agent-reports/permits/${fn}.ndjson`; if (!existsSync(fp)) continue;
+  const rl = readline.createInterface({ input: createReadStream(fp), crlfDelay: Infinity });
   for await (const line of rl) {
     let d; try { d = JSON.parse(line); } catch { continue; }
     if (!CAFE_BIZ.has(d.biz || "")) continue;
