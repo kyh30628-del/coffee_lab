@@ -976,7 +976,7 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
     return () => { alive = false; cancelled = true; cancelAnimationFrame(raf); if (curRef.current) { curRef.current.style.clipPath = ""; curRef.current.style.opacity = ""; curRef.current = null; } };
   }, [LANDING_MEMO]);
   const allDone = done === true;
-  const lineTop = PAGE_RULE0 - 24.7;   // 2026-09-22 재보정(성실체 22px·행간 22.69): 기준선=행 위에서 18.84px(폰트 asc 20/desc 5), 한글 잉크는 기준선 아래 4.66px까지 → 잉크 바닥이 줄 1.2px 위에 앉는다. (종전 −21은 손편지체 19px 기준이라 글자가 줄에 걸쳤다 — CEO 지적)
+  const lineTop = PAGE_RULE0 + 2 * PAGE_PITCH - 24.7;   // 2026-09-22: 위 두 줄은 서비스 머리(테이프·제목) 자리 → 메모는 셋째 줄부터.   // 2026-09-22 재보정(성실체 22px·행간 22.69): 기준선=행 위에서 18.84px(폰트 asc 20/desc 5), 한글 잉크는 기준선 아래 4.66px까지 → 잉크 바닥이 줄 1.2px 위에 앉는다. (종전 −21은 손편지체 19px 기준이라 글자가 줄에 걸쳤다 — CEO 지적)
   // ✒ 펜은 하나(2026-09-21 CEO) — 장면에 그려 넣은 펜을 없애고, 글 쓰는 펜이 다 쓰면 **마지막 글자 옆에 그대로 놓인다.**
   //   재방문(애니메이션 없이 완성본)에도 같은 자리에 놓여 있어야 하므로 done/allDone/mtx가 준비될 때마다 자리를 잡는다.
   useEffect(() => {
@@ -1015,9 +1015,11 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
         {/* 📖 왼쪽 페이지 — 어제 적은 메모(마른 잉크·도장). 오늘 글이 확정된 뒤에만 보인다 */}
         {YESTERDAY_MEMO.length > 0 && mtxL && (
           <div className="absolute left-0 top-0" aria-hidden style={{ width: PAGE_SW, height: PAGE_SH, transformOrigin: "0 0", transform: mtxL, pointerEvents: "none" }}>
-            <div className="absolute" style={{ left: 42, right: 10, top: 23 }}>{/* 📓 머리글 — 두 페이지 공통, 서비스 서체(성실체+eyebrow). 2026-09-22 텍스처에 굽던 제목을 HTML로 */}
-              <div style={{ fontFamily: "var(--nt-display)", fontSize: 22, lineHeight: "26px", color: "#3a2c22", letterSpacing: "0.01em", whiteSpace: "nowrap" }}>동네 커피 노트</div>
-              <div style={{ fontFamily: "var(--nt-sans)", fontSize: 6.6, lineHeight: "8px", letterSpacing: "0.24em", color: "#8a7a66", marginTop: 3, whiteSpace: "nowrap" }}>DONGNE COFFEE NOTE · 2026</div>
+            <div className="absolute" style={{ left: 0, right: 0, top: 0, height: 92 }}>{/* 📓 페이지 머리 — 서비스 홈 헤더 문법 그대로(2026-09-22 CEO "상단에 우리 서비스만의 디자인"): 테이프·eyebrow·성실체 제목+형광 밑줄·커피색 짧은 선 */}
+              <i className="nt-tape sm" aria-hidden style={{ left: 30, top: -6, transform: "rotate(-7deg)" }} />
+              <div style={{ position: "absolute", left: 42, top: 27, fontFamily: "var(--nt-sans)", fontSize: 6.4, lineHeight: "8px", letterSpacing: "0.26em", color: "#8a7a66", whiteSpace: "nowrap" }}>DONGNE COFFEE NOTE · 2026</div>
+              <div style={{ position: "absolute", left: 42, top: 37, fontFamily: "var(--nt-display)", fontSize: 24, lineHeight: "28px", color: "#3a2c22", letterSpacing: "0.01em", whiteSpace: "nowrap" }}><span className="nt-hl">동네 커피 노트</span></div>
+              <div style={{ position: "absolute", left: 42, top: 70, width: 34, height: 2, background: "var(--nt-coffee)", opacity: 0.85 }} />
             </div>
             <div className="absolute" style={{ left: 42, right: 10, top: lineTop }}>
               {YESTERDAY_MEMO.map((line, li) => (
@@ -1031,9 +1033,11 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
         )}
         {/* 렌더된 오른쪽 페이지 위에 원근 정합으로 얹는 글 */}
         <div ref={pageRef} className="absolute left-0 top-0" style={{ width: PAGE_SW, height: PAGE_SH, transformOrigin: "0 0", transform: mtx || "translate(-9999px,0)" }}>
-          <div className="absolute" style={{ left: 42, right: 10, top: 23 }}>{/* 📓 머리글 — 두 페이지 공통, 서비스 서체(성실체+eyebrow). 2026-09-22 텍스처에 굽던 제목을 HTML로 */}
-            <div style={{ fontFamily: "var(--nt-display)", fontSize: 22, lineHeight: "26px", color: "#3a2c22", letterSpacing: "0.01em", whiteSpace: "nowrap" }}>동네 커피 노트</div>
-            <div style={{ fontFamily: "var(--nt-sans)", fontSize: 6.6, lineHeight: "8px", letterSpacing: "0.24em", color: "#8a7a66", marginTop: 3, whiteSpace: "nowrap" }}>DONGNE COFFEE NOTE · 2026</div>
+          <div className="absolute" style={{ left: 0, right: 0, top: 0, height: 92 }}>{/* 📓 페이지 머리 — 서비스 홈 헤더 문법 그대로(2026-09-22 CEO "상단에 우리 서비스만의 디자인"): 테이프·eyebrow·성실체 제목+형광 밑줄·커피색 짧은 선 */}
+            <i className="nt-tape sm" aria-hidden style={{ left: 30, top: -6, transform: "rotate(-7deg)" }} />
+            <div style={{ position: "absolute", left: 42, top: 27, fontFamily: "var(--nt-sans)", fontSize: 6.4, lineHeight: "8px", letterSpacing: "0.26em", color: "#8a7a66", whiteSpace: "nowrap" }}>DONGNE COFFEE NOTE · 2026</div>
+            <div style={{ position: "absolute", left: 42, top: 37, fontFamily: "var(--nt-display)", fontSize: 24, lineHeight: "28px", color: "#3a2c22", letterSpacing: "0.01em", whiteSpace: "nowrap" }}><span className="nt-hl">동네 커피 노트</span></div>
+            <div style={{ position: "absolute", left: 42, top: 70, width: 34, height: 2, background: "var(--nt-coffee)", opacity: 0.85 }} />
           </div>
           <div className="absolute" style={{ left: 42, right: 10, top: lineTop }}>
             {LANDING_MEMO.map((line, li) => (
