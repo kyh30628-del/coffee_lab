@@ -63,18 +63,27 @@ console.log(`보유 ${own.length.toLocaleString()}곳(이름 ${haveName.size.toL
 
 // ── 원장에서 후보 뽑기(로컬 파일·비용 0) ──
 const CAFE_BIZ = new Set(["커피숍", "제과점영업"]);
+// ☕ 일반음식점 원장 속 카페 겸업(2026-09-22 CEO "준비해") — 실측: 영업중 501,650건 중 업태 '까페' 17,034 + 카페형 상호 18,490(비카페어 제외).
+//   업태가 '까페'이거나, 상호에 카페·커피·로스터·베이커리·디저트·브런치·티룸 같은 말이 있고 식당·주점·치킨 같은 말이 없을 때만 후보.
+//   정밀도가 낮은 소스라 같은 시군구 줄에서 커피숍·제과점 뒤에 선다. 네이버 카테고리(isNonCafeFnbCategory)가 마지막 관문.
+const GR_CAFE_RE = /카페|까페|카훼|커피|coffee|cafe|caffe|로스터|로스팅|roaster|베이커리|bakery|디저트|dessert|브런치|brunch|티룸|tea ?room|찻집|에스프레소|espresso|라떼|latte|마카롱|케이크|cake|도넛|donut|와플|waffle|크로플|빙수|스콘/i;
+const GR_NONCAFE_RE = /치킨|호프|주점|포차|술집|맥주|bar$|삼겹|갈비|곱창|족발|보쌈|국밥|국수|칼국수|냉면|분식|떡볶이|김밥|피자|pizza|버거|burger|돈까스|돈가스|초밥|스시|횟집|해장|감자탕|찜닭|고기|정육|뷔페|식당|반점|중국집|짬뽕|짜장|쌀국수|파스타|이자카야|노래|클럽|게임|pc방|라이브/i;
+const isGeneralCafe = (d) => d.biz === "까페" ? !GR_NONCAFE_RE.test(String(d.nm || "")) : (GR_CAFE_RE.test(String(d.nm || "")) && !GR_NONCAFE_RE.test(String(d.nm || "")));
+let grCand = 0;
 const cand = []; let skipFranchise = 0, skipOther = 0, skipTried = 0;
 // 🧾 시도 캐시 — 네이버에 없던 상호를 매일 다시 묻지 않는다(09-21: 같은 30곳을 세 번 물어 90콜 낭비). 성공분은 DB(haveName)가 막는다.
 const TRIED_PATH = `${homedir()}/coffee-platform/agent-reports/permits/tried.json`;
 const tried0 = new Set(existsSync(TRIED_PATH) ? JSON.parse(readFileSync(TRIED_PATH, "utf8")) : []);
 const triedKey = (nm, addr) => norm(nm) + "|" + norm(addr).slice(0, 20);
-for (const fn of ["rest_cafes", "bakeries", "rest_cafes.extra", "bakeries.extra"]) {   // .extra = 09-22 추가 지역분(대구·경북·광주·전남·전북·울산·제주)
+for (const fn of ["rest_cafes", "bakeries", "rest_cafes.extra", "bakeries.extra", "general_restaurants", "general_restaurants.extra"]) {   // .extra = 09-22 추가 지역분 · general_restaurants = 일반음식점 카페 겸업(뒤에 선다)
   const fp = `${homedir()}/coffee-platform/agent-reports/permits/${fn}.ndjson`; if (!existsSync(fp)) continue;
   const rl = readline.createInterface({ input: createReadStream(fp), crlfDelay: Infinity });
   for await (const line of rl) {
     let d; try { d = JSON.parse(line); } catch { continue; }
-    if (!CAFE_BIZ.has(d.biz || "")) continue;
     if (!String(d.st || "").includes("영업")) continue;
+    const fromGeneral = fn.startsWith("general_restaurants");
+    if (fromGeneral ? !isGeneralCafe(d) : !CAFE_BIZ.has(d.biz || "")) continue;
+    if (fromGeneral) grCand++;
     const addr = d.rn || d.ln || "";
     const area = areaOf(addr); if (!area) continue;            // 서비스 범위 밖·주소 파싱 불가 → 건너뜀
     if (haveName.has(norm(d.nm)) || haveAddr.has(norm(addr))) continue;
@@ -85,6 +94,7 @@ for (const fn of ["rest_cafes", "bakeries", "rest_cafes.extra", "bakeries.extra"
     cand.push({ nm: d.nm, addr, area, tel: d.tel || null });
   }
 }
+console.log(`  (일반음식점 카페 겸업 후보 ${grCand.toLocaleString()}곳 포함 — 필터 통과·미보유·미시도)`);
 console.log(`원장 후보 ${cand.length.toLocaleString()}곳 (영업중 커피숍·제과점 중 우리에게 없는 것 · 프랜차이즈 ${skipFranchise.toLocaleString()}·한시/구내 ${skipOther.toLocaleString()}·이미 시도 ${skipTried.toLocaleString()} 제외)`);
 const byArea = {}; for (const c of cand) byArea[c.area] = (byArea[c.area] ?? 0) + 1;
 // 🔄 지역 라운드로빈(2026-09-21 CEO "모든 지역 극대화") — 원장 파일 순서대로 돌면 한 시군구가 하루치를 독식한다.
