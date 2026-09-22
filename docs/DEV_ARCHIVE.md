@@ -377,3 +377,4 @@
 | 2026-09-20 14:11 | #1165 | [룰갭 신규] LANDMARK_WORDS 자연관광명소 5건 신규 — 순창/구례/인제/하동/태백 확정오염 | d35ff677 | - | lib/reviewQuality.ts LANDMARK_WORDS에 하늘길·용궐산·성삼재·자작나무숲·북천·구문소 6개 토큰 추가(제안서 명시 6건 전부, 기존 9개 선례와 동일 is |
 | 2026-09-20 23:05 | #1166 | [검색UX 신규] 비등재 묘사어("감성카페") 상호부분일치 200점 바닥값이 참고등급을 검증등급 위로 — 2 | 7cf705a2 | - | app/api/search/route.ts: pureConceptQuery 판정을 CATEGORY_WORD 접미사 제거 방식으로 확장(감성카페 등 트리거+업종범용어 결합 질의도 순 |
 | 2026-09-20 23:05 | #1167 | [사장님영업] #1135 완결조건 미충족 — anon_id 필터 후에도 7일창 reachRate 433% 표 | 7d6ee513 | - | app/api/admin/owner-funnel/route.ts: reachRate를 Math.min(v,100)으로 캡, reachRateCapped/lowSample(ctaTo |
+| 2026-09-22 03:27 | #1207 | [성장본부] import-permits 파이프라인 place_id 접두사 분리로 discover와 cross | be55f334 | - | scripts/import-permits.mjs: pm_ place_id 삽입 직전 Naver 정본(hit) 이름/좌표로 discover.ts와 동일한 교차소스 dedup(이름완전 |
