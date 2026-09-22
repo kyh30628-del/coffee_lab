@@ -65,7 +65,11 @@ export const NAVER_CLOSURE_RESERVE = Number(process.env.NAVER_CLOSURE_RESERVE ||
 // 🔁 2026-09-21 공공원장 전환(CEO 승인 09-20): 발굴(스윕)을 원장 적재로 바꿨다. 실측 적재 1.69콜/곳·수집 7콜/곳 →
 //   하루 2,700곳 = 적재 4,600 + 수집 18,900 + 폐업 1,200 ≈ 24,700. 수집 몫을 7,200 → 19,000으로 올려 배분을 강제한다.
 //   (import-permits 예산 = 25,000 − 폐업 − 이 값 = 4,800콜, 스윕도 같은 선에서 자동 정지)
-export const NAVER_COLLECT_RESERVE = Number(process.env.NAVER_COLLECT_RESERVE || 19000);
+// 🔢 2026-09-23 재배분(CEO "쿼터 써서 카페 수 늘려") — 예약이 과했다. 실측 단가: 적재 1.91콜/곳 · 수집 4.5콜/곳 = 곳당 6.4콜.
+//   09-22·23 이틀 모두 **적재가 예산(4,800콜)에서 먼저 멈췄고** 수집은 예약 19,000 중 8,000대만 썼다(하루 9,000콜 유휴).
+//   끝까지(적재→수집→공개) 가는 하루 처리량 = (25,000 − 폐업 1,200) / 6.7콜 ≈ 3,550곳.
+//   → 수집 예약을 16,000으로 낮춰 적재 예산을 7,800콜로 키운다(2,517 → 약 3,600곳/일). 수집은 창 3개(12·16·20시)로 충분.
+export const NAVER_COLLECT_RESERVE = Number(process.env.NAVER_COLLECT_RESERVE || 16000);
 export const NAVER_RECOLLECT_RESERVE = Number(process.env.NAVER_RECOLLECT_RESERVE || 0);
 /** 발굴(cron-grow)·재수집 등 '폐업 아닌' 소비자가 지금 더 써도 되는가 — 예약분 1,200을 남긴다. */
 export async function nonClosureMayUse(): Promise<{ ok: boolean; remaining: number }> {
