@@ -24,7 +24,7 @@ const { sql } = await import("../lib/db.ts");
 const { localSearch, isFranchise } = await import("../lib/discover.ts");
 const { naverUsedToday, NAVER_DAILY_QUOTA, NAVER_CLOSURE_RESERVE, NAVER_COLLECT_RESERVE } = await import("../lib/naverBudget.ts");
 const { SIDO_GU } = await import("../lib/regionList.ts");
-const { isNonCafeFnbCategory } = await import("../lib/reviewQuality.ts");
+const { isNonCafeFnbCategory, brandTokenOverlap, nearDuplicateCafeName } = await import("../lib/reviewQuality.ts");
 
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? Number(process.argv[i + 1]) : d; };
 const APPLY = process.argv.includes("--apply");
@@ -48,9 +48,14 @@ function areaOf(addr) {
 }
 
 // ── 우리가 이미 가진 것(이름+주소 두 축으로 중복 차단) ──
-const own = await sql`SELECT name, address FROM cafes`;
+const own = await sql`SELECT name, address, dong, lat, lng FROM cafes`;
 const haveName = new Set(own.map((r) => norm(r.name)).filter(Boolean));
 const haveAddr = new Set(own.map((r) => norm(r.address)).filter((x) => x && x.length >= 10));
+// 🐛 재발방지(decisions#1207): pm_ place_id는 원장 상호(영문병기 등 표기이형)+좌표해시라 discover의 nl_
+//   place_id(네이버 canonical 상호)와 문자열이 달라 ON CONFLICT를 우회 — 855건 cross-source 중복등록 실증.
+//   위 haveName/haveAddr는 원장의 원문 이름·주소(Naver 조회 전)로만 걸러 표기이형을 놓친다. 아래에서
+//   Naver가 실제로 돌려준 정본 이름·좌표(hit)로 discover.ts와 같은 좌표근접+브랜드토큰겹침 판정을 한 번 더 건다.
+const ownPts = own.filter((r) => r.lat != null).map((r) => ({ lat: Number(r.lat), lng: Number(r.lng), name: r.name, dong: r.dong }));
 console.log(`보유 ${own.length.toLocaleString()}곳(이름 ${haveName.size.toLocaleString()} · 주소 ${haveAddr.size.toLocaleString()})`);
 
 // ── 원장에서 후보 뽑기(로컬 파일·비용 0) ──
@@ -91,7 +96,7 @@ if (!APPLY) { console.log(`\n▶ 드라이런. --apply 로 적재(상한 ${LIMIT
 
 // ── 네이버 local 1콜로 좌표·실재 확인 후 적재 ──
 let used0 = await naverUsedToday();
-let tried = 0, added = 0, miss = 0, skipNonCafe = 0, calls = 0;
+let tried = 0, added = 0, miss = 0, skipNonCafe = 0, skipDup = 0, calls = 0;
 const VERBOSE = process.argv.includes("--verbose");
 // 🔎 09-21 실증 교훈: 원장 상호(인허가명)와 네이버 간판명은 자주 다르다("카페 OO"↔"OO카페", "(주)…", 지점 표기).
 //   이름 완전일치만 보면 74%가 '미발견'으로 새어 곳당 4콜이 됐다. 두 축을 더 본다:
@@ -117,12 +122,23 @@ for (const c of cand) {
   if (!hit) { miss++; if (VERBOSE) console.log(`  ✗ ${c.nm} | ${c.area} | 네이버: ${items.slice(0, 2).map((i) => `${i.name} @ ${i.address}`).join(" ; ") || "(결과 없음)"}`); continue; } // 네이버에 없으면 적재하지 않는다(폐업·미등록)
   if (VERBOSE && norm(hit.name) !== norm(c.nm)) console.log(`  ≈ ${c.nm} → ${hit.name} (${addrKey(hit.address) === ck ? "주소일치" : "느슨한 이름"})`);
   if (isNonCafeFnbCategory(hit.category || "")) { skipNonCafe++; continue; }
+  const hitName = hit.name || c.nm, hitAddr = hit.address || c.addr;
+  // ★ 정본(Naver) 이름·주소·좌표로 최종 재확인 — discover.ts와 동일 판정(이름 완전일치 → 좌표근접+브랜드토큰겹침/근접중복 → 주소완전일치).
+  let dup = haveName.has(norm(hitName)) || (hitAddr && haveAddr.has(norm(hitAddr)));
+  if (!dup && hit.lat != null) {
+    const near = ownPts.find((p) => Math.abs(p.lat - hit.lat) < 0.0005 && Math.abs(p.lng - hit.lng) < 0.0005);
+    if (near && (brandTokenOverlap(near.name, hitName, [c.area, near.dong, hit.dong].filter(Boolean)) || nearDuplicateCafeName(near.name, hitName))) dup = true;
+  }
+  if (dup) { skipDup++; if (VERBOSE) console.log(`  ⊘ 교차소스 중복(기존 보유) ${hitName} @ ${hitAddr}`); continue; }
   const area = areaOf(hit.address) || c.area;
   const pseudoId = `pm_${String(c.nm).replace(/\s/g, "")}_${Math.round(hit.lat * 1e5)}`;
   await sql`INSERT INTO cafes (place_id, name, area, dong, naver_category, address, lat, lng, phone, instagram_url, source, published, roasts_own, pipeline_status)
-    VALUES (${pseudoId}, ${hit.name || c.nm}, ${area}, ${hit.dong}, ${hit.category}, ${hit.address || c.addr}, ${hit.lat}, ${hit.lng}, ${hit.phone || c.tel}, ${hit.instagramUrl}, 'permit', false, false, 'new')
+    VALUES (${pseudoId}, ${hitName}, ${area}, ${hit.dong}, ${hit.category}, ${hitAddr}, ${hit.lat}, ${hit.lng}, ${hit.phone || c.tel}, ${hit.instagramUrl}, 'permit', false, false, 'new')
     ON CONFLICT (place_id) DO NOTHING`;
   added++;
+  // 같은 실행 내 후속 후보와도 대조(직전에 넣은 것도 대조 대상에 추가)
+  haveName.add(norm(hitName)); if (hitAddr) haveAddr.add(norm(hitAddr));
+  if (hit.lat != null) ownPts.push({ lat: hit.lat, lng: hit.lng, name: hitName, dong: hit.dong });
   if (added % 200 === 0) console.log(`  … ${added}곳 적재 (시도 ${tried} · ${(await naverUsedToday()) - used0}콜)`);
   // 🚨 효율 자동 차단(collect-shard와 같은 사상) — **낭비를 사람이 발견하기 전에 스스로 멈춘다.**
   //   설계 원가는 곳당 1콜이다(이름을 아니까 '확인'만 한다). 3콜을 넘으면 전제가 깨진 것이다:
@@ -136,5 +152,5 @@ for (const c of cand) {
 }
 try { writeFileSync(TRIED_PATH, JSON.stringify([...tried0])); } catch (e) { console.log("시도 캐시 저장 실패:", e?.message); }
 const spent = (await naverUsedToday()) - used0;
-console.log(`\n적재 ${added}곳 · 시도 ${tried} · 네이버 미발견 ${miss} · 비카페 제외 ${skipNonCafe}`);
+console.log(`\n적재 ${added}곳 · 시도 ${tried} · 네이버 미발견 ${miss} · 비카페 제외 ${skipNonCafe} · 교차소스 중복 제외 ${skipDup}`);
 console.log(`이 스크립트 호출 ${calls}콜 → 적재 1곳당 ${(calls / Math.max(added, 1)).toFixed(2)}콜 (기존 발굴 16.9콜) · 같은 시간 네이버 전체 사용 ${spent}콜(크론 포함)`);
