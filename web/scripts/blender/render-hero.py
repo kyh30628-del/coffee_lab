@@ -16,17 +16,31 @@ subprocess.run(["/usr/bin/python3", "-c", r'''
 import sys
 from PIL import Image, ImageDraw, ImageFont
 W, H = 2100, 2900
-def page(path, title):
-    im = Image.new("RGB", (W, H), (247, 241, 229)); d = ImageDraw.Draw(im)
-    for y in range(560, H - 120, 170): d.line((150, y, W - 90, y), fill=(196, 202, 214), width=3)   # 줄(파랑기 회색)
-    d.line((300, 360, 300, H - 100), fill=(214, 120, 110), width=3)                                   # 여백선(붉은)
+def page(path, title, ring=False):
+    # 2026-09-22 CEO("밋밋하다·실감나게"): 종이 결(미세 잡티)·가장자리 살짝 누런 톤·잉크 번짐 없는 얇은 줄·연한 커피 자국(왼쪽 페이지)
+    import random; rnd = random.Random(7)
+    im = Image.new("RGB", (W, H), (247, 241, 229)); px = im.load()
+    for _ in range(90000):                                    # 종이 섬유 잡티
+        x, y = rnd.randrange(W), rnd.randrange(H); v = rnd.randint(-9, 6); r, g, b = px[x, y]; px[x, y] = (max(0, min(255, r + v)), max(0, min(255, g + v)), max(0, min(255, b + v - 1)))
+    d = ImageDraw.Draw(im, "RGBA")
+    for i in range(14):                                       # 가장자리 누런 기운(바깥으로 갈수록)
+        d.rectangle((i * 6, i * 6, W - 1 - i * 6, H - 1 - i * 6), outline=(200, 170, 120, 5 + (14 - i)), width=6)
+    for y in range(560, H - 120, 170):
+        d.line((150, y, W - 90, y), fill=(150, 160, 186, 245), width=4)                                # 줄(파랑기 회색) — 조명에 씻겨 안 보이던 것을 진하게(09-22)
+        d.line((150, y + 3, W - 90, y + 3), fill=(178, 186, 204, 40), width=1)                          # 인쇄 번짐 한 줄
+    d.line((300, 360, 300, H - 100), fill=(214, 120, 110, 235), width=3)                                # 여백선(붉은)
+    if ring:                                                  # 잔 자국 — 두 겹 얇은 고리(커피색)
+        cx, cy, R = 1500, 2300, 235
+        for k, (rr, a) in enumerate([(R, 34), (R - 10, 18), (R + 8, 12)]):
+            d.ellipse((cx - rr, cy - rr, cx + rr, cy + rr), outline=(120, 78, 44, a), width=9 - k * 2)
+        d.arc((cx - R - 2, cy - R - 2, cx + R + 2, cy + R + 2), 200, 330, fill=(120, 78, 44, 60), width=14)
     if title:
         f = ImageFont.truetype("/System/Library/Fonts/Supplemental/AppleMyungjo.ttf", 190)
         d.text((330, 200), title, font=f, fill=(58, 44, 34))
         f2 = ImageFont.truetype("/System/Library/Fonts/Supplemental/AppleGothic.ttf", 50)
         d.text((338, 420), "D O N G N E   C O F F E E   N O T E   ·   2 0 2 6", font=f2, fill=(150, 138, 122))
     im.save(path)
-page(sys.argv[1], ""); page(sys.argv[2], "")   # 2026-09-22: 제목은 굽지 않는다 — 두 페이지 머리글을 HTML(서비스 서체)로 얹어 톤을 통일
+page(sys.argv[1], ""); page(sys.argv[2], "", ring=True)   # 2026-09-22: 제목은 굽지 않는다(머리글은 HTML) · 왼쪽 페이지엔 잔 자국
 ''', PAGE_TEX, PAGE_TEX_L], check=True)
 
 # ───────── 장면 ─────────

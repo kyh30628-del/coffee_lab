@@ -976,7 +976,7 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
     return () => { alive = false; cancelled = true; cancelAnimationFrame(raf); if (curRef.current) { curRef.current.style.clipPath = ""; curRef.current.style.opacity = ""; curRef.current = null; } };
   }, [LANDING_MEMO]);
   const allDone = done === true;
-  const lineTop = PAGE_RULE0 - 21;   // 첫 줄부터: 손편지체 19px(행간=줄 간격 22.7px) 글리프 바닥이 줄보다 2.6px 위(실측 asc .92·desc .23·글 bbox 바닥 -.117em)
+  const lineTop = PAGE_RULE0 - 24.7;   // 2026-09-22 재보정(성실체 22px·행간 22.69): 기준선=행 위에서 18.84px(폰트 asc 20/desc 5), 한글 잉크는 기준선 아래 4.66px까지 → 잉크 바닥이 줄 1.2px 위에 앉는다. (종전 −21은 손편지체 19px 기준이라 글자가 줄에 걸쳤다 — CEO 지적)
   // ✒ 펜은 하나(2026-09-21 CEO) — 장면에 그려 넣은 펜을 없애고, 글 쓰는 펜이 다 쓰면 **마지막 글자 옆에 그대로 놓인다.**
   //   재방문(애니메이션 없이 완성본)에도 같은 자리에 놓여 있어야 하므로 done/allDone/mtx가 준비될 때마다 자리를 잡는다.
   useEffect(() => {
@@ -995,7 +995,7 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
       <div className="flex flex-col flex-1 rounded-[10px]" style={{ minHeight: 0, overflow: "hidden" }}>{/* 테두리·안쪽 그림자 삭제(2026-09-21 CEO "아웃라인 테두리 선 삭제") */}
       <div ref={heroRef} className="relative w-full overflow-hidden min-h-[220px]" style={{ flex: "0 1 auto", minHeight: 220, aspectRatio: `${HERO_W} / ${HERO_H}`, background: "var(--nt-espresso)" }}>{/* 2026-09-22 CEO("노트 위 공백"): 히어로는 그림 높이만큼만(제목은 그림 위 나무 위에 얹힘). 남는 높이는 아래 CTA 블록이 고르게 나눠 갖는다. 짧은 화면은 flex-shrink로 줄고 calc가 축소 */}
         <div className="absolute bottom-0" style={heroBox ? { width: heroBox[0], height: heroBox[1], left: heroBox[2] } : { left: 0, width: "100%", aspectRatio: `${HERO_W} / ${HERO_H}` }}>
-          <img src="/note/hero11.webp" alt="" aria-hidden className="block w-full h-full" />
+          <img src="/note/hero13.webp" alt="" aria-hidden className="block w-full h-full" />
           <div className="absolute inset-x-0 top-0 h-32" style={{ background: "linear-gradient(180deg, var(--nt-espresso), rgba(36,24,18,0))" }} />{/* 그림 윗단이 띠로 녹아듦 */}
           {heroBox && heroBox[2] > 0.5 && <div className="absolute inset-0" style={{ boxShadow: "inset 0 0 64px 36px var(--nt-espresso)" }} />}{/* 축소된 경우만: 옆·아래 가장자리가 바닥색으로 녹아 네모 테두리가 안 보인다 */}
         </div>
