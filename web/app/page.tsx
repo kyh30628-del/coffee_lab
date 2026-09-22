@@ -6,6 +6,7 @@ import NoticeModal from "./NoticeModal";
 import { SIDO_GU, SIDO_CENTER, classifyArea, regionKeyFor } from "@/lib/regionList";
 import InfoDot from "./InfoDot";
 import { trackOutbound } from "./trackOutboundClient";
+import PlaceCta from "./PlaceCta";
 import ShowcaseBanner, { SHOWCASE_CSS } from "./ShowcaseBanner";
 import OwnerSignupModal from "./OwnerSignupModal";
 import OwnerFindModal from "./OwnerFindModal";
@@ -3272,13 +3273,7 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
           </div>
 
           {/* 하단 고정 행동 2개 — 길찾기 · 네이버(메뉴·가격·영업시간) */}
-          <div className="nt-cta">
-            <a href={`https://map.kakao.com/?q=${encodeURIComponent(cafe.name + " " + cafe.area)}`} target="_blank" rel="noopener noreferrer" onClick={() => trackOutbound({ target: "kakao_map", cafeId: cafe.id, source: "지도앱" })} className="nt-btn-ink">길찾기</a>
-            <a href={`/api/naver-place-redirect?id=${cafe.id}`} target="_blank" rel="noopener noreferrer" onClick={() => trackOutbound({ target: "naver_place", cafeId: cafe.id, source: "지도앱" })} className="nt-btn-line">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="#03c75a" aria-hidden><path d="M16.273 12.845L7.376 0H0v24h7.727V11.155L16.624 24H24V0h-7.727z"/></svg>
-              네이버 플레이스
-            </a>
-          </div>
+          <PlaceCta cafeId={cafe.id} mapHref={`https://map.kakao.com/?q=${encodeURIComponent(cafe.name + " " + cafe.area)}`} mapLabel="길찾기" mapExternal screen="지도앱" />{/* 🧪 A/B — app/PlaceCta.tsx */}
         </div>
       </aside>
       {/* ===== 전체 리뷰 모달 — aside 밖(z-[3000] 컨테이너 직속)으로 이동. aside는 overflow-y:auto라 스크롤되며, 그 안에 있던 position:fixed 모달이 스크롤량(scrollTop)만큼 화면 밖으로 밀리고 패널 너비로 잘려 아예 안 보였음. 스크롤 안 되는 컨테이너 직속으로 빼서 항상 전체 화면(뷰포트)에 온전히 뜨게 함. ===== */}

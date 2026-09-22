@@ -21,6 +21,7 @@ import { shareHookText } from "@/lib/shareCopy";
 import { sortReviews, ensureRecent } from "@/lib/exposureOrder";
 import { isOtherBusinessQuote, displayQuote, splitKeyTerms, rankNearby, nearbyTitle, fmtKm, monthlySeries, freshnessOf, CHAR_LABEL, charBarsOf, addrTail, igHandle, type NearbyCafe } from "@/lib/cafeDetailView";
 import { extractWorkSignals } from "@/lib/workDetail";
+import PlaceCta from "@/app/PlaceCta";
 import OutboundLink from "../../OutboundLink";
 import { isOwnerManaged } from "@/lib/ownerManaged"; // 🏅 사장님 관리 배지(조건·문구 단일출처)
 
@@ -634,13 +635,7 @@ export default async function CafePage({ params }: Props) {
         </div>
 
         {/* 하단 고정 행동 2개 — 지도 · 네이버(메뉴·가격·영업시간은 권위 원천으로) */}
-        <div className="nt-cta">
-          <Link href={mapHref} className="nt-btn-ink">지도에서 보기</Link>
-          <OutboundLink href={`/api/naver-place-redirect?id=${c.id}`} target="naver_place" cafeId={c.id} source="카페상세" className="nt-btn-line">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="#03c75a" aria-hidden><path d="M16.273 12.845L7.376 0H0v24h7.727V11.155L16.624 24H24V0h-7.727z"/></svg>
-            네이버 플레이스
-          </OutboundLink>
-        </div>
+        <PlaceCta cafeId={c.id} mapHref={mapHref} mapLabel="지도에서 보기" screen="카페상세" />{/* 🧪 A/B — app/PlaceCta.tsx */}
       </div>
     </main>
   );
