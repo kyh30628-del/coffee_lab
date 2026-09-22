@@ -15,12 +15,12 @@ export const metadata: Metadata = {
   //     (SEO 대상 페이지 10종 전수 확인 완료 — 선언 없는 곳은 아래 ②에서 개별 부여).
   alternates: { canonical: "/" },
   title: "동네 커피 노트 — 취향으로 찾는 동네 카페",
-  description: "수도권 동네 로스터리·카페를 취향과 근거로 안내합니다. 네이버 공개 후기를 교차검증해 산미·바디·단맛까지.",
+  description: "전국 동네 로스터리·카페를 취향과 근거로 안내합니다. 네이버·구글·유튜브 공개 후기를 교차검증해 광고·협찬을 걸러낸 진짜 방문 후기만.",
   manifest: "/manifest.json",
   openGraph: {
     type: "website", siteName: "동네 커피 노트", locale: "ko_KR",
     title: "동네 커피 노트 — 취향으로 찾는 동네 카페",
-    description: "수도권 동네 카페를 취향과 데이터로 안내해요. 네이버 공개 후기를 교차검증한 산미·바디·단맛·결.",
+    description: "전국 동네 카페를 취향과 데이터로 안내해요. 네이버·구글·유튜브 공개 후기를 교차검증한 진짜 방문 후기만.",
     images: ["/og.png"],
   },
   twitter: { card: "summary_large_image", title: "동네 커피 노트", description: "취향으로 찾는 우리 동네 카페", images: ["/og.png"] },

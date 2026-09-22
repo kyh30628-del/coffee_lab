@@ -331,7 +331,7 @@ function drawSlide1(ctx: Ctx, W: number, H: number) {
   drawPin(ctx, cx, pinCy, W * 0.088);
   txt(ctx, "진짜 방문한 사람만 남긴 후기,", cx, H * 0.55, `700 58px ${FONT}`, ESPRESSO);
   txt(ctx, "우리 동네 카페", cx, H * 0.635, `700 82px ${FONT}`, CARAMEL);
-  txt(ctx, "서울·수도권 카페를 리뷰로 검증한 큐레이션", cx, H * 0.715, `400 34px ${FONT}`, SUBTEXT);
+  txt(ctx, "전국 카페를 리뷰로 검증한 큐레이션", cx, H * 0.715, `400 34px ${FONT}`, SUBTEXT);
   drawDivider(ctx, cx, H * 0.785);
   txt(ctx, "dongnecoffeenote.com", cx, H * 0.85, `700 44px ${FONT}`, ESPRESSO);
   txt(ctx, "@dongnecoffeenote", cx, H * 0.9, `400 28px ${FONT}`, BROWN);

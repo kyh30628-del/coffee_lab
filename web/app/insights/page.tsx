@@ -12,7 +12,7 @@ export const revalidate = 86400;
 
 export const metadata: Metadata = {
   title: "카페 데이터 리포트 — 동네 커피 노트",
-  description: "광고·협찬을 걸러낸 검증 후기 데이터로 본 서울·수도권·강원 카페 지형. 동네 단골 vs 여행객 카페 분포, 뉴스 기반 관광지 카페 동네 랭킹을 공개합니다.",
+  description: "광고·협찬을 걸러낸 검증 후기 데이터로 본 전국 카페 지형. 동네 단골 vs 여행객 카페 분포, 뉴스 기반 관광지 카페 동네 랭킹을 공개합니다.",
   alternates: { canonical: "/insights" },
 };
 
