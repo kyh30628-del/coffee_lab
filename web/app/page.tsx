@@ -701,7 +701,7 @@ const LANDING_MEMO_FALLBACK = ["오늘, 우리 동네.", "별점은 안 봤다. 
 //   ⚠️ 노트 한 줄은 폭이 정해져 있다(nowrap·overflow hidden) — 넘치면 소리 없이 잘려 깨져 보인다.
 //      그래서 글자폭을 재서(한글 1.0 · 그 외 0.55) 예산 안에 드는 문장만 쓴다. 실측 기준 19px에 13.2가 한 줄(22px은 11.4).
 const LINE_BUDGET = 11.4;   // 2026-09-22 글씨 19→22px(CEO '줄 수 5로 줄이고 글씨 키워') — 13.2×19/22
-const lineWidth = (t: string) => Array.from(t.replace(/[【】]/g, "")).reduce((a, ch) => a + (/[\u3131-\uD79D\u4E00-\u9FFF]/.test(ch) ? 1 : 0.55), 0);
+const lineWidth = (t: string) => Array.from(t.replace(/[【】〔〕]/g, "")).reduce((a, ch) => a + (/[\u3131-\uD79D\u4E00-\u9FFF]/.test(ch) ? 1 : 0.55), 0);
 const fitLine = (t: string) => {
   const x = (t || "").replace(/\s+/g, " ").trim();
   if (lineWidth(x) <= LINE_BUDGET) return x;
@@ -739,8 +739,8 @@ function landingMemo(d: Discover | null, seed: number, opts: { dayOffset?: numbe
     const bean = c.beanNote?.[0] ? (CHAR_LABEL[c.beanNote[0]] ?? c.beanNote[0]) : "";
     const cnt = c.count ?? 0;
     const cands: [string, string][] = [];
-    if (trait) cands.push(["trait", `【${trait}】 얘기가 많다.`], ["trait", `다들 【${trait}】라 했다.`], ["trait", `【${trait}】, 맞는 말.`]);
-    if (bean) cands.push(["bean", `원두는 【${bean}】.`], ["bean", `【${bean}】라고 적어 둔다.`]);
+    if (trait) cands.push(["trait", `〔${trait}〕 얘기가 많다.`], ["trait", `다들 〔${trait}〕라 했다.`], ["trait", `〔${trait}〕, 맞는 말.`]);
+    if (bean) cands.push(["bean", `원두는 〔${bean}〕.`], ["bean", `〔${bean}〕라고 적어 둔다.`]);
     if (cnt > 0) cands.push(["count", `후기 ${cnt}건을 읽었다.`], ["count", `후기 ${cnt}건, 다 읽음.`]);
     if (c.isNew) cands.push(["new", "새로 적은 곳이다."]);
     cands.push(["mood", "다시 갈 것 같다."], ["mood", "조용해서 좋았다."]);
@@ -749,19 +749,19 @@ function landingMemo(d: Discover | null, seed: number, opts: { dayOffset?: numbe
     if (pick) { kindUsed[pick[0]] = (kindUsed[pick[0]] ?? 0) + 1; lines.push(pick[1]); }
     n++;
   }
-  if (closing) { lines.push("광고·협찬 글은 걸러냈다."); lines.push("마음에 든 곳엔 【도장】 하나."); }
+  if (closing) { lines.push("광고·협찬 글은 걸러냈다."); lines.push("마음에 든 곳엔 〔도장〕 하나."); }
   return lines;
 }
 // 연속 구간으로 묶는다(형광 띠를 글자별이 아니라 한 띠로 칠하려고). ci는 전체 글자 인덱스(애니메이션 pos와 같은 축).
-function memoRuns(line: string): { h: boolean; chars: { ch: string; ci: number }[] }[] {
-  const runs: { h: boolean; chars: { ch: string; ci: number }[] }[] = [];
+function memoRuns(line: string): { h: 0 | 1 | 2; chars: { ch: string; ci: number }[] }[] {
+  const runs: { h: 0 | 1 | 2; chars: { ch: string; ci: number }[] }[] = [];
   memoChars(line).forEach(({ ch, h }, ci) => { const last = runs[runs.length - 1]; if (last && last.h === h) last.chars.push({ ch, ci }); else runs.push({ h, chars: [{ ch, ci }] }); });
   return runs;
 }
 // 【…】 표식을 걷어내고 글자마다 형광 여부(h)를 붙인다 — 애니메이션·펜·폭 계산이 전부 이 배열 길이를 쓴다.
-function memoChars(line: string): { ch: string; h: boolean }[] {
-  const out: { ch: string; h: boolean }[] = []; let h = false;
-  for (const ch of Array.from(line)) { if (ch === "【") h = true; else if (ch === "】") h = false; else out.push({ ch, h }); }
+function memoChars(line: string): { ch: string; h: 0 | 1 | 2 }[] {
+  const out: { ch: string; h: 0 | 1 | 2 }[] = []; let h: 0 | 1 | 2 = 0;
+  for (const ch of Array.from(line)) { if (ch === "【") h = 1; else if (ch === "〔") h = 2; else if (ch === "】" || ch === "〕") h = 0; else out.push({ ch, h }); }
   return out;
 }
 const LANDING_MEMO_YESTERDAY_FALLBACK = ["어제도 우리 동네.", "별점은 안 봤다.", "다녀온 사람 글만 읽었다.", "광고·협찬 글은 걸러냈다."];
@@ -916,7 +916,7 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
     //   → 쓰기 전에 이 메모에 실제로 쓰인 글자들의 조각을 **전부 받아온 뒤** 시작한다. 최대 2.5초만 기다리고, 실패해도 그냥 진행.
     let cancelled = false;
     const startWhenFontReady = (go: () => void) => {
-      const txt = LANDING_MEMO.join("").replace(/[【】]/g, "");
+      const txt = LANDING_MEMO.join("").replace(/[【】〔〕]/g, "");
       const f: any = (document as any).fonts;
       if (!f?.load) { go(); return; }
       let fired = false;
@@ -1011,7 +1011,7 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
       <div className="flex flex-col flex-1 rounded-[10px]" style={{ minHeight: 0, overflow: "hidden" }}>{/* 테두리·안쪽 그림자 삭제(2026-09-21 CEO "아웃라인 테두리 선 삭제") */}
       <div ref={heroRef} className="relative w-full overflow-hidden min-h-[220px]" style={{ flex: "0 1 auto", minHeight: 220, aspectRatio: `${HERO_W} / ${HERO_H}`, background: "var(--nt-espresso)" }}>{/* 2026-09-22 CEO("노트 위 공백"): 히어로는 그림 높이만큼만(제목은 그림 위 나무 위에 얹힘). 남는 높이는 아래 CTA 블록이 고르게 나눠 갖는다. 짧은 화면은 flex-shrink로 줄고 calc가 축소 */}
         <div className="absolute bottom-0" style={heroBox ? { width: heroBox[0], height: heroBox[1], left: heroBox[2] } : { left: 0, width: "100%", aspectRatio: `${HERO_W} / ${HERO_H}` }}>
-          <img src="/note/hero13.webp" alt="" aria-hidden className="block w-full h-full" />
+          <img src="/note/hero14.webp" alt="" aria-hidden className="block w-full h-full" />
           <div className="absolute inset-x-0 top-0 h-32" style={{ background: "linear-gradient(180deg, var(--nt-espresso), rgba(36,24,18,0))" }} />{/* 그림 윗단이 띠로 녹아듦 */}
           {heroBox && heroBox[2] > 0.5 && <div className="absolute inset-0" style={{ boxShadow: "inset 0 0 64px 36px var(--nt-espresso)" }} />}{/* 축소된 경우만: 옆·아래 가장자리가 바닥색으로 녹아 네모 테두리가 안 보인다 */}
         </div>
@@ -1039,13 +1039,15 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
             </div>
             <div className="absolute" style={{ left: 42, right: 10, top: lineTop }}>
               {YESTERDAY_MEMO.map((line, li) => (
-                <div key={li} className="nt-w nt-hand done" style={{ fontSize: 22, lineHeight: `${PAGE_PITCH}px`, height: PAGE_PITCH, color: "#3b4260", opacity: 0.8, whiteSpace: "nowrap", overflow: "hidden" }}>
-                  {memoRuns(line).map((run, ri) => { const spans = run.chars.map(({ ch, ci }) => <span key={ci} className={`ch${ch === " " ? " sp" : ""}`}>{ch}</span>); return run.h ? <span key={ri} className="hlw">{spans}</span> : <span key={ri}>{spans}</span>; })}
+                <div key={li} className={`nt-w nt-hand done${li === 0 ? " date" : ""}`} style={{ fontSize: 22, lineHeight: `${PAGE_PITCH}px`, height: PAGE_PITCH, color: "#3b4260", opacity: 0.8, whiteSpace: "nowrap", overflow: "hidden" }}>
+                  {(() => { const runs = memoRuns(line).map((run, ri) => { const spans = run.chars.map(({ ch, ci }) => <span key={ci} className={`ch${ch === " " ? " sp" : ""}`}>{ch}</span>); return run.h ? <span key={ri} className={`hlw${run.h === 2 ? " p" : ""}`}>{spans}</span> : <span key={ri}>{spans}</span>; }); return li === 0 ? <span className="dl">{runs}</span> : runs; })()}
                   {/다녀|한 잔/.test(line) && <i className="nt-heart" aria-hidden />}
+                  {/다시 갈|좋았다/.test(line) && <i className="nt-star" aria-hidden />}
                 </div>
               ))}
             </div>
             <div className="nt-stamp absolute in" style={{ right: 18, bottom: 26, opacity: 0.5, animation: "none" }}>검증<small>VERIFIED</small></div>
+            <div className="nt-pno" aria-hidden>· {new Date(Date.now() - 86400000).getDate()} ·</div>
           </div>
         )}
         {/* 렌더된 오른쪽 페이지 위에 원근 정합으로 얹는 글 */}
@@ -1058,19 +1060,21 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
           </div>
           <div className="absolute" style={{ left: 42, right: 10, top: lineTop }}>
             {LANDING_MEMO.map((line, li) => (
-              <div key={li} className={`nt-w nt-hand ${allDone || (done === false && li < pos[0]) ? "done" : ""}`} style={{ fontSize: 22, lineHeight: `${PAGE_PITCH}px`, height: PAGE_PITCH, color: "#2f3550", whiteSpace: "nowrap", overflow: "hidden" }}>
-                {done === null ? null : memoRuns(line).map((run, ri) => {
+              <div key={li} className={`nt-w nt-hand${li === 0 ? " date" : ""} ${allDone || (done === false && li < pos[0]) ? "done" : ""}`} style={{ fontSize: 22, lineHeight: `${PAGE_PITCH}px`, height: PAGE_PITCH, color: "#2f3550", whiteSpace: "nowrap", overflow: "hidden" }}>
+                {done === null ? null : (() => { const runs = memoRuns(line).map((run, ri) => {
                   const spans = run.chars.map(({ ch, ci }) => (
                     <span key={ci} className={`ch${ch === " " ? " sp" : ""}${!allDone && li === pos[0] && ci < pos[1] ? " on" : ""}`}
                       style={ch === " " ? undefined : { ["--r" as any]: `${jitter[li][ci][0]}deg`, ["--y" as any]: `${jitter[li][ci][1]}px` }}>{ch}</span>
                   ));
-                  return run.h ? <span key={ri} className="hlw">{spans}</span> : <span key={ri}>{spans}</span>;
-                })}
+                  return run.h ? <span key={ri} className={`hlw${run.h === 2 ? " p" : ""}`}>{spans}</span> : <span key={ri}>{spans}</span>;
+                }); return li === 0 ? <span className="dl">{runs}</span> : runs; })()}
                 {done !== null && /다녀|한 잔/.test(line) && <i className="nt-heart" aria-hidden />}
+                {done !== null && /다시 갈|좋았다/.test(line) && <i className="nt-star" aria-hidden />}
               </div>
             ))}
           </div>
-          <i className="nt-ribbon" style={{ right: 22, top: -2, width: 12, height: 56 }} aria-hidden />{/* 붉은 책갈피 리본 — 홈 헤더와 같은 것(2026-09-22 CEO) */}
+          <i className="nt-ribbon" style={{ right: 22, top: -2, width: 12, height: 56 }} aria-hidden />
+          <div className="nt-pno" aria-hidden>· {new Date().getDate()} ·</div>{/* 붉은 책갈피 리본 — 홈 헤더와 같은 것(2026-09-22 CEO) */}
           <div className={`nt-stamp absolute ${allDone ? "in" : ""}`} style={{ right: 18, bottom: 26, opacity: allDone ? undefined : 0 }} aria-hidden>검증<small>VERIFIED</small></div>
           <img ref={nibRef} className="nt-nib" src="/note/pen.webp" alt="" aria-hidden draggable={false} style={{ width: PEN_W, height: PEN_H }} />
         </div>

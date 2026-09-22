@@ -40,7 +40,7 @@ def page(path, title, ring=False):
         f2 = ImageFont.truetype("/System/Library/Fonts/Supplemental/AppleGothic.ttf", 50)
         d.text((338, 420), "D O N G N E   C O F F E E   N O T E   ·   2 0 2 6", font=f2, fill=(150, 138, 122))
     im.save(path)
-page(sys.argv[1], ""); page(sys.argv[2], "", ring=True)   # 2026-09-22: 제목은 굽지 않는다(머리글은 HTML) · 왼쪽 페이지엔 잔 자국
+page(sys.argv[1], ""); page(sys.argv[2], "")   # 2026-09-22: 제목은 굽지 않는다(머리글은 HTML). 잔 자국은 CEO 지시로 뺌(도장 옆 자국이 지저분)
 ''', PAGE_TEX, PAGE_TEX_L], check=True)
 
 # ───────── 장면 ─────────
