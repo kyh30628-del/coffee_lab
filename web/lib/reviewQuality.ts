@@ -295,6 +295,16 @@ const SELF_ANNOUNCE = /((오픈|신메뉴\s*출시|이벤트|영업\s*시작)\s*
 const ORDER_SOLICITATION_PHONE = /01[0-9][-.\s]?[0-9*]{3,4}[-.\s]?[0-9*]{4}/;
 const ORDER_SOLICITATION_KEYWORD = /(예약\s*문의|주문\s*예약|카톡\s*(ID|아이디|문의|[:：]))/i;
 const ORDER_SOLICITATION_AD = (t: string): boolean => ORDER_SOLICITATION_PHONE.test(t) && ORDER_SOLICITATION_KEYWORD.test(t);
+// 룰갭 rulegap-20260922(decisions#1209): 네이버 지역카페(cafe.naver.com, 맘카페/동네모임 게시판)나 업체
+//   공식 블로그(blog.naver.com)에 올라온 업체 본인 작성 영업공지(오픈/휴무/선주문/판매/픽업 안내)가
+//   방문객 후기와 동일하게 채택됨(32개 카페·33건: id44633 큰따옴표·id21284 디에그 가산점·id27166
+//   카페게이트 광명아크포레점 등). SELF_ANNOUNCE(오픈/이벤트 안내류)와 달리 협찬 문구 없는 순수 운영
+//   공지문이라 AD_DISCLAIM/SUPPORTER_PR 어디에도 안 걸림. 방문 서술이 있으면 무효화 —
+//   진짜 방문후기가 우연히 "공동구매 중이었다" 등을 언급하는 경우 보호.
+const OWNER_OPS_NOTICE = /(오픈합니다|정식오픈합니다|영업\s*시작합니다|휴무\s*안내(드려요|드립니다)?|정기휴무\s*안내드|선?주문\s*받습니다|판매합니다|입고되었습니다|공동구매|창고\s*정리(합니다)?|픽업\s*안내|준비\s*도와드릴)/;
+// P63(decisions#530)와 동일 사각지대: VISIT_CUES의 "주문"이 "선주문 받습니다" 자체와 겹쳐 무효화 가드가
+//   항상 걸린다. 이 규칙 전용 가드에서만 "주문"을 뺀 방문서술 목록을 쓴다.
+const OWNER_OPS_VISIT_CUES = VISIT_CUES.filter((w) => w !== "주문");
 // 식당 메인 메뉴어(카페 아닌 '음식점' 시그널). 같은 상호 다른 음식점('장꼬방'+'묵은김치찌개') 후기 분리용.
 //   카페가 흔히 파는 것(토스트·샌드위치·파스타·브런치)은 제외 — 명백한 한식·중식 '식당 본메뉴'만.
 const RESTAURANT_MAIN_SRC = "(묵은김치|김치찌개|된장찌개|부대찌개|동태찌개|순두부찌개|순두부|찌개|찌게|백반|국밥|순대국|해장국|감자탕|짜장면|짜장|짬뽕|탕수육|보쌈|족발|곱창|막창|삼겹살|갈비탕|갈비찜|불고기|제육|돈가스|돈까스|냉면|칼국수|쌈밥|한정식|매운탕|추어탕|설렁탕|곰탕|닭갈비|찜닭|아구찜|해물찜|쌀국수|분식)";
@@ -1485,7 +1495,8 @@ export function verifyReview(input: QualityInput): QualityResult {
   const newsByline = NEWS_BYLINE.test(fullL) && !AD_DISCLAIM.test(fullL); // decisions#650: 언론 보도기사 바이라인
   const selfAnnounce = SELF_ANNOUNCE.test(fullL) && !AD_DISCLAIM.test(fullL); // decisions#651: 업체 자체 SNS 공지문
   const orderSolicitation = ORDER_SOLICITATION_AD(fullL); // decisions#847: 예약/주문 유도 홍보글(전화번호+솔리시테이션 키워드)
-  if (sponsored || supporterPR || institutionalPR || exhibitionPR || newsByline || selfAnnounce || orderSolicitation) return { verdict: "rejected", score: 0, reasons: [institutionalPR && !sponsored && !supporterPR ? "기관 보도자료·업무협약/후원 소식 — 자동 제외" : exhibitionPR && !sponsored && !supporterPR ? "갤러리 전시 공지문(3인칭 초대장) — 자동 제외" : supporterPR && !sponsored ? "서포터즈·기자단 위촉 홍보글 — 자동 제외" : newsByline && !sponsored ? "언론 보도기사 바이라인 — 자동 제외" : selfAnnounce && !sponsored ? "업체 자체 SNS 공지문(오픈/이벤트/소식 안내) — 자동 제외" : orderSolicitation && !sponsored ? "예약/주문 유도 홍보글(전화번호·카톡 노출) — 자동 제외" : "광고·협찬 글 — 자동 제외"], signals: { nameInTitle: false, nameInBody: false, visit: false, substance: 0, listicle: false, sponsored: true, areaMatch: false } };
+  const ownerOpsNotice = OWNER_OPS_NOTICE.test(fullL) && !has(fullL, OWNER_OPS_VISIT_CUES) && !AD_DISCLAIM.test(fullL); // decisions#1209: 업체 1인칭 영업공지(오픈/휴무/선주문/판매/픽업 안내)
+  if (sponsored || supporterPR || institutionalPR || exhibitionPR || newsByline || selfAnnounce || orderSolicitation || ownerOpsNotice) return { verdict: "rejected", score: 0, reasons: [institutionalPR && !sponsored && !supporterPR ? "기관 보도자료·업무협약/후원 소식 — 자동 제외" : exhibitionPR && !sponsored && !supporterPR ? "갤러리 전시 공지문(3인칭 초대장) — 자동 제외" : supporterPR && !sponsored ? "서포터즈·기자단 위촉 홍보글 — 자동 제외" : newsByline && !sponsored ? "언론 보도기사 바이라인 — 자동 제외" : selfAnnounce && !sponsored ? "업체 자체 SNS 공지문(오픈/이벤트/소식 안내) — 자동 제외" : orderSolicitation && !sponsored ? "예약/주문 유도 홍보글(전화번호·카톡 노출) — 자동 제외" : ownerOpsNotice && !sponsored ? "업체 1인칭 영업공지(오픈/휴무/선주문/판매/픽업 안내) — 자동 제외" : "광고·협찬 글 — 자동 제외"], signals: { nameInTitle: false, nameInBody: false, visit: false, substance: 0, listicle: false, sponsored: true, areaMatch: false } };
 
   // [벤더 자기신원] 표시명 자체가 시공/설치업체·창업컨설팅 자기소개 — 본문 맥락과 무관하게 하드 거절(위 정의부 주석 참조).
   if (input.srcName && VENDOR_SELF_IDENTITY_CUES.test(input.srcName)) {
