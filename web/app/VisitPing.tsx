@@ -27,6 +27,8 @@ export default function VisitPing() {
         body.utm_source = u.searchParams.get("utm_source") || "";
         body.utm_medium = u.searchParams.get("utm_medium") || "";
         body.utm_campaign = u.searchParams.get("utm_campaign") || "";
+        // PWA 홈화면설치 후 standalone 실행 여부(referrer 없는 direct 유입의 정체 파악용, coord#441)
+        try { body.standalone = window.matchMedia("(display-mode: standalone)").matches; } catch {}
       }
       const send = () => {
         fetch("/api/visit", {

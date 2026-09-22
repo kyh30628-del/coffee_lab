@@ -35,6 +35,8 @@ async function ensure() {
   await sql`ALTER TABLE user_consents ADD COLUMN IF NOT EXISTS internal BOOLEAN DEFAULT false`;
   // 세션 수 — '다시 켠 것'(같은 날 포함)을 센다. 브라우저 세션(sessionStorage) 새로 시작할 때마다 +1. visit_count(페이지뷰)와 다름.
   await sql`ALTER TABLE user_consents ADD COLUMN IF NOT EXISTS sessions INT DEFAULT 1`;
+  // PWA 홈화면설치 후 standalone 실행 여부 — direct 채널 고재방문율이 PWA 사용자인지 판별용(coord#441). 한번 감지되면 유지.
+  await sql`ALTER TABLE user_consents ADD COLUMN IF NOT EXISTS pwa_standalone BOOLEAN DEFAULT false`;
   // 방문핑 행은 동의 '미정'(NULL)이어야 거절(false)과 구분됨
   await sql`ALTER TABLE user_consents ALTER COLUMN agreed DROP NOT NULL`;
   await sql`ALTER TABLE user_consents ALTER COLUMN agreed DROP DEFAULT`;
@@ -66,11 +68,12 @@ export async function POST(req: NextRequest) {
     // 내부(대표·팀) 판정: /admin·/owner 페이지를 봤거나 클라가 내부로 표시 → 이 방문자는 집계 제외 대상
     const isInternal = b.internal === true || /^\/(admin|owner)/.test(landing);
     const newSession = b.newSession === true; // 세션 첫 핑(브라우저 새로 켬) → 세션 +1(같은 날 재방문도 잡힘)
+    const pwaStandalone = b.standalone === true; // PWA 홈화면설치 후 standalone 실행(세션 첫 핑에서만 옴)
     // 방문 기록: 첫 방문이면 행 생성(동의 미정=NULL), 재방문이면 카운트·최근시각 갱신.
     // 출처(src/referrer/utm/landing)는 첫터치만 보존 — 이미 있으면 덮어쓰지 않음(COALESCE).
     await sql`
-      INSERT INTO user_consents (anon_id, visit_count, last_seen, user_agent, src, referrer, utm_source, utm_medium, utm_campaign, landing, internal)
-      VALUES (${anonId}, 1, now(), ${ua}, ${src}, ${ref}, ${utmSource}, ${utmMedium}, ${utmCampaign}, ${landing}, ${isInternal})
+      INSERT INTO user_consents (anon_id, visit_count, last_seen, user_agent, src, referrer, utm_source, utm_medium, utm_campaign, landing, internal, pwa_standalone)
+      VALUES (${anonId}, 1, now(), ${ua}, ${src}, ${ref}, ${utmSource}, ${utmMedium}, ${utmCampaign}, ${landing}, ${isInternal}, ${pwaStandalone})
       ON CONFLICT (anon_id) DO UPDATE SET
         visit_count = COALESCE(user_consents.visit_count, 1) + 1,
         sessions = COALESCE(user_consents.sessions, 1) + ${newSession ? 1 : 0},
@@ -81,7 +84,8 @@ export async function POST(req: NextRequest) {
         utm_source = COALESCE(NULLIF(user_consents.utm_source, ''), NULLIF(EXCLUDED.utm_source, '')),
         utm_medium = COALESCE(NULLIF(user_consents.utm_medium, ''), NULLIF(EXCLUDED.utm_medium, '')),
         utm_campaign = COALESCE(NULLIF(user_consents.utm_campaign, ''), NULLIF(EXCLUDED.utm_campaign, '')),
-        landing = COALESCE(NULLIF(user_consents.landing, ''), NULLIF(EXCLUDED.landing, ''))`;
+        landing = COALESCE(NULLIF(user_consents.landing, ''), NULLIF(EXCLUDED.landing, '')),
+        pwa_standalone = COALESCE(user_consents.pwa_standalone, false) OR ${pwaStandalone}`;
     // 빈 경로·내부(대표/팀·/admin·/owner)는 페이지뷰 이벤트서 제외(분석 정확도). 봇은 위에서 이미 원천 차단됨.
     if (landing && !isInternal && !/^\/(admin|owner)/.test(landing)) {
       // 🔇 실패해도 사용자 요청은 계속(원래 설계) — 다만 **몇 건 잃었는지는 남긴다.**
