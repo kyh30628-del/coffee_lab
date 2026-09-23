@@ -379,3 +379,4 @@
 | 2026-09-20 23:05 | #1167 | [사장님영업] #1135 완결조건 미충족 — anon_id 필터 후에도 7일창 reachRate 433% 표 | 7d6ee513 | - | app/api/admin/owner-funnel/route.ts: reachRate를 Math.min(v,100)으로 캡, reachRateCapped/lowSample(ctaTo |
 | 2026-09-22 03:27 | #1207 | [성장본부] import-permits 파이프라인 place_id 접두사 분리로 discover와 cross | be55f334 | - | scripts/import-permits.mjs: pm_ place_id 삽입 직전 Naver 정본(hit) 이름/좌표로 discover.ts와 동일한 교차소스 dedup(이름완전 |
 | 2026-09-22 08:48 | #1209 | [룰갭] 업체 1인칭 영업공지(오픈/휴무/판매)가 고객 후기로 오채택 — 32개 카페 33건 | 9a2b33f7 | - | lib/reviewQuality.ts: OWNER_OPS_NOTICE 정규식(오픈/휴무/선주문/판매/픽업 공지 어휘) 추가, VISIT_CUES(주문 제외판) 부재+AD_DISCL |
+| 2026-09-23 07:43 | #1211 | [검색UX 신규] FACET_TRIGGERS 전용어("북카페")가 pureConceptQuery 가드 밖이라 | 9e39e81e | - | app/api/search/route.ts: pureConceptQuery(355행)에 FACET_TRIGGERS 완전일치 체크 추가(북카페 등 시설전용 트리거어도 place 하이 |
