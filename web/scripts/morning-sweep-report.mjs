@@ -115,6 +115,22 @@ say(`④ 적체 ${dgd.backlog.toLocaleString()}곳/${dgd.limit.toLocaleString()}
 const mm = await sql`SELECT count(*) FILTER (WHERE published)::int a, count(*) FILTER (WHERE pipeline_status='live')::int b FROM cafes`;
 say(`⑤ 정합성 published ${mm[0].a.toLocaleString()} vs live ${mm[0].b.toLocaleString()} ${mm[0].a === mm[0].b ? "✅" : "🔴 불일치 " + Math.abs(mm[0].a - mm[0].b)}`);
 
+// ⑤-b 🗺️ 지도 데이터 신선도(2026-09-23 신설) — 09-23 사고: /api/cafes 응답이 캐시 한도를 넘겨 2시간45분간 굳었고
+//   공개 35,405곳인데 지도는 34,376곳을 보여줬다(대표님이 화면 숫자로 발견). 사람이 발견하는 건 방어선이 아니다.
+//   응답 맨 앞 `"n":건수`만 Range로 200바이트 받아 대조한다(전송 0에 가깝다).
+try {
+  const r = await fetch("https://dongnecoffeenote.com/api/cafes", { headers: { Range: "bytes=0-199" } });
+  const head = await r.text();
+  const m = head.match(/"n":(\d+)/);
+  const mapN = m ? Number(m[1]) : null;
+  const age = Number(r.headers.get("age") || 0);
+  if (mapN == null) say("⑤-b 🗺️ 지도 데이터 — 건수 확인 불가(응답 형식 변경 의심)");
+  else {
+    const gap = Math.abs(mapN - mm[0].a);
+    say(`⑤-b 🗺️ 지도 데이터 ${mapN.toLocaleString()}곳 vs 공개 ${mm[0].a.toLocaleString()}곳 ${gap <= 50 ? "✅" : "🔴 굳음 " + gap + "곳 차이(캐시 점검)"}${age > 300 ? ` · 캐시나이 ${age}s` : ""}`);
+  }
+} catch (e) { say(`⑤-b 🗺️ 지도 데이터 확인 실패: ${String(e).slice(0, 60)}`); }
+
 // ⑥ 잡 실행
 const j = await sql`SELECT job, ok, to_char(ran_at AT TIME ZONE 'Asia/Seoul','HH24:MI') AS t
   FROM agent_runs WHERE job IN ('cron-grow','cron-synth','cron-resynth','cron-embed','discover-sweep') ORDER BY ran_at DESC`;

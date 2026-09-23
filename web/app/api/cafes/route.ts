@@ -118,7 +118,10 @@ export async function GET() {
       if (owned.has(Number(c.id))) o.om = 1; // 🏅 사장님이 직접 관리 중(구독·체험 유효). 해당 카페에만 키를 넣어 페이로드 낭비 0
       return o;
     });
-    const body = JSON.stringify({ ok: true, cafes: out });
+    // 🔎 재발 감시(2026-09-23): 맨 앞에 건수를 넣어 **첫 200바이트만 받아도** 지도 데이터가 굳었는지 알 수 있게 한다.
+    //   09-23 사고: 응답이 캐시 한도를 넘겨 2시간 45분간 옛 데이터가 나갔는데 아무도 몰랐다(대표님이 화면 숫자로 발견).
+    //   아침 스윕이 Range 요청 1회로 DB 공개 수와 대조한다 — 전송 0에 가깝다.
+    const body = JSON.stringify({ ok: true, n: out.length, cafes: out });
     cache = { version, body };
     return new NextResponse(body, {
       headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=0, s-maxage=60, must-revalidate", "X-Cafes-Cache": "MISS" },
