@@ -30,6 +30,9 @@ export const runtime = "nodejs";
 //   비용: 요청마다 버전 쿼리 1회지만 09-22 추가한 `idx_cafes_pub_freshness`로 Index Only Scan이다(비용 1/4).
 //   10.8MB 본문은 데이터가 바뀔 때만 다시 만든다(메모리 캐시 적중 시 전송만).
 export const dynamic = "force-dynamic";
+// 🧊 대신 **CDN 60초**(수동 s-maxage)로 DB 깨움을 막는다. 라우트 캐시와 달리 CDN은 10MB급도 담고,
+//   시간이 지나면 스스로 만료돼 "저장 실패 → 옛 항목 영구 노출" 함정이 없다. 최악 지연 60초(원설계가 허용한 값).
+//   ⚠️ 이 항목은 revalidatePath로 못 지운다 — 그래서 60초로 짧게 잡는다.
 
 // 🗺️ 지도·목록용 응답. 무거운 synth_reviews는 제외(상세 열 때 따로 로드).
 //
@@ -57,7 +60,7 @@ export async function GET() {
     const version = `${v?.n ?? 0}|${v?.u ?? ""}|${v?.s ?? ""}|${live ? 1 : 0}|${ownedSig}`;
     if (cache && cache.version === version) {
       return new NextResponse(cache.body, {
-        headers: { "Content-Type": "application/json", "X-Cafes-Cache": "HIT" },
+        headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=0, s-maxage=60, must-revalidate", "X-Cafes-Cache": "HIT" },
       });
     }
     await loadCriteria(); // 배지 임계(criteria) 프라임 — 없으면 폴백 DEFAULTS로 동작
@@ -118,7 +121,7 @@ export async function GET() {
     const body = JSON.stringify({ ok: true, cafes: out });
     cache = { version, body };
     return new NextResponse(body, {
-      headers: { "Content-Type": "application/json", "X-Cafes-Cache": "MISS" },
+      headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=0, s-maxage=60, must-revalidate", "X-Cafes-Cache": "MISS" },
     });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e), cafes: [] }, { status: 500 });
