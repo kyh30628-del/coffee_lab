@@ -352,7 +352,11 @@ export async function GET(req: NextRequest) {
       }
       return qlNoSpace;
     })();
-    const pureConceptQuery = hitConcepts.some((c) => c.triggers.some((t) => ql.trim() === t || qlConceptCore === t));
+    //   🔴 decisions#1211(2026-09-22) — "북카페"류: FACET_TRIGGERS 전용 트리거어(CONCEPTS엔 없음)는 이 판정에서
+    //   빠져 place 하이재킹 가드(anchorExact/placeHit)를 그대로 우회했다(#1134와 동일 계열, 커버리지 구멍).
+    //   CONCEPTS와 동일한 완전일치 규칙으로 FACET_TRIGGERS도 함께 게이트에 넣는다.
+    const pureConceptQuery = hitConcepts.some((c) => c.triggers.some((t) => ql.trim() === t || qlConceptCore === t))
+      || FACET_TRIGGERS.some((f) => f.triggers.some((t) => ql.trim() === t || qlConceptCore === t));
     let effectiveRegion = region;
     let regionExplicit = !!region;
     // 🔀 같은 동 이름이 여러 시·군·구에 있을 때의 나머지 후보("고덕동"=강동구·평택시). 화면에서 한 번에 바꾸라고 내려준다.
@@ -675,7 +679,8 @@ export async function GET(req: NextRequest) {
     let placeHit2 = placeHit;
     //   🛡️ 상호 22만 건이 들어온 뒤(2026-09-12) 이 부분일치가 느낌 검색을 삼킬 위험이 커졌다
     //      ("강남 조용한" → 상호 '조용한…'). 남은 토큰이 **하나뿐이고 개념어가 아닐 때**만 장소로 본다.
-    const leftoverIsConcept = hitConcepts.length > 0 || tokens.some((t) => CONCEPTS.some((c) => c.triggers.includes(t)));
+    const leftoverIsConcept = hitConcepts.length > 0 || tokens.some((t) => CONCEPTS.some((c) => c.triggers.includes(t)))
+      || hitFacets.length > 0 || tokens.some((t) => FACET_TRIGGERS.some((f) => f.triggers.includes(t)));
     if (!placeHit2 && effectiveRegion && tokens.length === 1 && tokens[0].length >= 2 && !leftoverIsConcept) {
       //   ⚠️ 중심+반경 10km는 너무 넓다 — 구리시 중심에서 10km면 서울 동북부가 다 들어와
       //      "구리 한일"이 성북구 한일맨션으로 갔다(실측). 그 지역 **카페들의 실제 경계 상자**로 좁힌다.
