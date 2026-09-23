@@ -130,12 +130,20 @@ const _LONGEST: Record<string, string[]> = Object.fromEntries(
 export function classifyArea(area: string): { sido: string; sigungu: string } {
   const a = (area ?? "").trim();
   const pre = PREFIXED_SIDOS.find((ps) => a.includes(ps));
-  if (pre) { for (const gu of _LONGEST[pre]) if (a.includes(gu)) return { sido: pre, sigungu: gu }; return { sido: pre, sigungu: "" }; }
+  if (pre) {
+    for (const gu of _LONGEST[pre]) if (a.includes(gu)) return { sido: pre, sigungu: gu };
+    // 🔴 2026-09-23 수리 — 광역시 이름을 **부분문자열로 품은 다른 시군**이 광역시로 넘어가던 버그.
+    //   실측: "광주시"(경기도 광주시) 공개 241곳이 광주광역시로 집계돼 지도·관리자 표가 어긋났다.
+    //   "해운대구"도 '대구'를 품어 같은 함정이었다(접두가 붙어 있을 때만 우연히 살아 있었다).
+    //   → 그 광역시의 **구가 실제로 있을 때**나 **시도명 그 자체일 때만** 광역시로 본다. 아니면 아래 일반 탐색으로 넘긴다.
+    if (a === pre) return { sido: pre, sigungu: "" };
+  }
   // 모호 시군 접두("경남 고성군") — 문자열에 시도명이 명시된 경우만 그 시도 안에서 찾는다.
   if (a.includes("경남")) { for (const gu of _LONGEST["경남"]) if (a.includes(gu)) return { sido: "경남", sigungu: gu }; return { sido: "경남", sigungu: "" }; }
   for (const [sido, list] of Object.entries(_LONGEST)) for (const gu of list) if (a.includes(gu)) return { sido, sigungu: gu };
   if (a.includes("구리")) return { sido: "경기", sigungu: "구리시" };
   if (a.includes("하남")) return { sido: "경기", sigungu: "하남시" };
+  if (pre) return { sido: pre, sigungu: "" };   // 일반 탐색도 실패하면 예전처럼 접두 시도로(회귀 방지)
   return { sido: "", sigungu: "" };
 }
 
@@ -168,4 +176,49 @@ export function areaMatchesRegion(area: string, region: string): boolean {
   const a = (area ?? "").trim(); const r = region.trim();
   if ((SIDO_GU as Record<string, string[]>)[r]) return classifyArea(a).sido === r; // 시도명("대전"·"충북")
   return canonicalGu(a) === canonicalGu(r); // 정확 키 비교(양쪽 정규화 — bare "중구"는 서울로 해석됨)
+}
+
+// 🧭 주소 → 시도 (2026-09-23 신설, 단일출처) — 지금까지 화면·스크립트마다 `address LIKE '전라남도%'` 목록을
+//   따로 적어두고 있었고, 2026 통합표기 **"전남광주통합특별시"**가 빠진 곳에서 숫자가 조용히 사라지거나
+//   전남이 통째로 광주로 집계됐다(09-23 사고 2건). 주소 파싱이 꼭 필요한 곳은 **여기만** 쓴다.
+//   ⚠️ 카페 집계는 원칙적으로 `classifyArea(area)`를 쓴다 — 이 함수는 area가 없거나 area↔주소 대조가 필요할 때만.
+const ADDR_SIDO: [string, string][] = [
+  ["서울특별시", "서울"], ["서울", "서울"], ["경기도", "경기"], ["경기", "경기"],
+  ["인천광역시", "인천"], ["인천", "인천"], ["강원특별자치도", "강원"], ["강원도", "강원"], ["강원", "강원"],
+  ["충청북도", "충북"], ["충북", "충북"], ["충청남도", "충남"], ["충남", "충남"],
+  ["대전광역시", "대전"], ["대전", "대전"], ["세종특별자치시", "세종"], ["세종", "세종"],
+  ["부산광역시", "부산"], ["부산", "부산"], ["경상남도", "경남"], ["경남", "경남"],
+  ["대구광역시", "대구"], ["대구", "대구"], ["경상북도", "경북"], ["경북", "경북"],
+  ["광주광역시", "광주"], ["전라남도", "전남"], ["전남", "전남"],
+  ["전북특별자치도", "전북"], ["전라북도", "전북"], ["전북", "전북"],
+  ["울산광역시", "울산"], ["울산", "울산"], ["제주특별자치도", "제주"], ["제주", "제주"],
+];
+/** 주소 문자열에서 시도를 뽑는다. 통합표기(전남광주통합특별시)는 다음 토큰이 광주의 구면 광주, 아니면 전남. */
+export function sidoFromAddress(address: string): string | null {
+  const a = String(address || "").trim(); if (!a) return null;
+  const parts = a.split(/\s+/);
+  if (parts[0] === "전남광주통합특별시") return (SIDO_GU["광주"] ?? []).includes(parts[1]) ? "광주" : "전남";
+  for (const [pre, sido] of ADDR_SIDO) if (a.startsWith(pre)) return sido;
+  return null;
+}
+/** 같은 규칙의 SQL CASE 식(컬럼명을 넘긴다). SQL 집계에서도 목록을 따로 적지 않게 한다. */
+export function sidoFromAddressSql(col = "address"): string {
+  const gwangjuGu = (SIDO_GU["광주"] ?? []).map((g) => `'${g}'`).join(",");
+  const whens = ADDR_SIDO.map(([pre, sido]) => `WHEN ${col} LIKE '${pre}%' THEN '${sido}'`).join(" ");
+  return `CASE WHEN ${col} LIKE '전남광주통합특별시%' THEN (CASE WHEN split_part(${col}, ' ', 2) IN (${gwangjuGu}) THEN '광주' ELSE '전남' END) ${whens} END`;
+}
+
+/** classifyArea와 같은 판정을 **SQL CASE**로. 지역별 집계 SQL이 목록을 따로 적지 않게 한다(09-23 사고 재발 방지).
+ *  ⚠️ classifyArea는 부분일치(includes)라 SQL도 LIKE '%구%'로 맞춘다. 접두 시도(인천·부산…)를 먼저 본다.
+ */
+export function sidoFromAreaSql(col = "area"): string {
+  const esc = (x: string) => x.replace(/'/g, "''");
+  const parts: string[] = [];
+  for (const ps of PREFIXED_SIDOS) parts.push(`WHEN ${col} LIKE '%${esc(ps)}%' THEN '${esc(ps)}'`);
+  parts.push(`WHEN ${col} LIKE '%경남%' THEN '경남'`);
+  for (const [sido, list] of Object.entries(SIDO_GU)) {
+    const ins = [...list].sort((a, b) => b.length - a.length).map((g) => `${col} LIKE '%${esc(g)}%'`).join(" OR ");
+    if (ins) parts.push(`WHEN ${ins} THEN '${esc(sido)}'`);
+  }
+  return `CASE ${parts.join(" ")} END`;
 }

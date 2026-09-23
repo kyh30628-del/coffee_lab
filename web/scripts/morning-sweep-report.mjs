@@ -3,6 +3,7 @@
 //   사람 기억에 기대지 않는다. 세션이 끊겨도 이 파일이 리포트를 남긴다.
 //   출력: agent-reports/logs/morning-sweep-YYYYMMDD.log  (+ stdout)
 import { readFileSync, readdirSync } from "node:fs";
+import { sidoFromAreaSql } from "../lib/regionList.ts";
 const env = readFileSync(new URL("../.env.local", import.meta.url), "utf8");
 for (const l of env.split("\n")) { const m = l.match(/^([A-Z_0-9]+)=(.*)$/); if (m) process.env[m[1]] = m[2].replace(/^["']|["']$/g, ""); }
 const { sql } = await import("../lib/db.ts");
@@ -81,9 +82,9 @@ try {
 say(`② 오늘 적재 ${t[0].n.toLocaleString()}곳 (공개 ${t[0].pub}) · 전체 공개 ${p[0].pub.toLocaleString()}곳${pubDelta}`);
 
 // ③ 신규 5개 시도 (전국 개방 성과)
-const g = await sql`SELECT count(*)::int n, count(*) FILTER (WHERE published)::int pub FROM cafes
-  WHERE address LIKE '전남광주통합%' OR address LIKE '광주광역시%' OR address LIKE '전라남%'
-     OR address LIKE '전북%' OR address LIKE '전라북%' OR address LIKE '울산%' OR address LIKE '제주%'`;
+// 🧭 2026-09-23: 주소 접두 목록 → area 단일출처(sidoFromAreaSql). 통합표기 누락으로 숫자가 새던 사고 재발 방지.
+const g = await sql.query(`SELECT count(*)::int n, count(*) FILTER (WHERE published)::int pub FROM cafes
+  WHERE ${sidoFromAreaSql("area")} IN ('광주','전남','전북','울산','제주')`);
 say(`③ 신규 5개 시도 ${g[0].n.toLocaleString()}곳 · 공개 ${g[0].pub.toLocaleString()}곳  (09-17 개방 직후 777곳에서 출발)`);
 
 // ③-b 🗺️ 전국 완주 현황 — 대표님이 매일 묻는 "어디까지 열렸나"를 한 줄로(2026-09-18 신설).
@@ -148,21 +149,14 @@ say(`⑥ 잡: ${j.map((x) => `${x.job.replace("cron-", "")}=${x.t}${x.ok ? "" : 
 //   ⚠️ 매일 찍는 이유: 3주를 기다리지 않고도 '오르는 중인지 멈춰 있는지' 추세가 보이게.
 try {
   const { BOT_ANON_IDS_SQL } = await import("../lib/behaviorBot.ts");
-  const SIDO = `CASE
-      WHEN c.address LIKE '서울%' THEN '서울' WHEN c.address LIKE '경기%' THEN '경기' WHEN c.address LIKE '인천%' THEN '인천'
-      WHEN c.address LIKE '강원%' THEN '강원' WHEN c.address LIKE '충청북%' OR c.address LIKE '충북%' THEN '충북'
-      WHEN c.address LIKE '충청남%' OR c.address LIKE '충남%' THEN '충남' WHEN c.address LIKE '대전%' THEN '대전'
-      WHEN c.address LIKE '세종%' THEN '세종' WHEN c.address LIKE '부산%' THEN '부산'
-      WHEN c.address LIKE '경상남%' OR c.address LIKE '경남%' THEN '경남' WHEN c.address LIKE '대구%' THEN '대구'
-      WHEN c.address LIKE '경상북%' OR c.address LIKE '경북%' THEN '경북'
-      WHEN c.address LIKE '전남광주통합%' OR c.address LIKE '광주광역시%' THEN '광주'
-      WHEN c.address LIKE '전라남%' THEN '전남' WHEN c.address LIKE '전북%' OR c.address LIKE '전라북%' THEN '전북'
-      WHEN c.address LIKE '울산%' THEN '울산' WHEN c.address LIKE '제주%' THEN '제주' ELSE '기타' END`;
-  const pv = await sql.query(`SELECT ${SIDO} AS sido, count(*)::int pv FROM traffic_events t
+  // 🧭 2026-09-23 수리: 주소 접두 CASE는 '전남광주통합특별시'를 전부 광주로 몰아넣어 **전남이 0으로 보였다**(카페가 없어서가 아니었다).
+  //   지도·관리자와 같은 area 단일출처로 통일한다.
+  const SIDO = sidoFromAreaSql("c.area");
+  const pv = await sql.query(`SELECT COALESCE(${SIDO},'기타') AS sido, count(*)::int pv FROM traffic_events t
     JOIN cafes c ON c.id = substring(t.path from '^/c/([0-9]+)')::int
     WHERE t.ts >= now() - interval '30 days' AND t.path LIKE '/c/%' AND t.anon_id NOT IN (${BOT_ANON_IDS_SQL})
     GROUP BY 1`);
-  const cnt = await sql.query(`SELECT ${SIDO} AS sido, count(*)::int n FROM cafes c WHERE published GROUP BY 1`);
+  const cnt = await sql.query(`SELECT COALESCE(${SIDO},'기타') AS sido, count(*)::int n FROM cafes c WHERE published GROUP BY 1`);
   const P = Object.fromEntries(pv.map((x) => [x.sido, x.pv])), C = Object.fromEntries(cnt.map((x) => [x.sido, x.n]));
   const row = (k) => { const n = C[k] ?? 0, p = P[k] ?? 0; return n ? `${k} ${(p / n * 1000).toFixed(1)}` : `${k} -`; };
   const capital = ["서울", "경기", "인천"], mature = ["강원", "충북", "충남", "대전", "세종", "부산", "경남", "대구", "경북"], fresh = ["광주", "전남", "전북", "울산", "제주"];
