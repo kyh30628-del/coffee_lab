@@ -132,6 +132,23 @@ try {
   }
 } catch (e) { say(`⑤-b 🗺️ 지도 데이터 확인 실패: ${String(e).slice(0, 60)}`); }
 
+// ⑤-c 🧮 지표 자동 검산(2026-09-23 신설) — **쪼갠 합이 전체와 맞는가**를 매일 기계가 대조한다.
+//   09-22~23 사고 4건이 전부 "쪼갠 값이 조용히 새는" 형태였고, 넷 다 대표님이 화면에서 먼저 발견하셨다.
+//   사람이 발견하는 건 방어선이 아니다. 어긋나면 여기서 🔴로 뜬다. 비용: 작은 집계 6회.
+try {
+  const A = sidoFromAreaSql("area");
+  const bad = [];
+  const [x1] = await sql.query(`SELECT count(*)::int tot, (SELECT coalesce(sum(n),0)::int FROM (SELECT count(*)::int n FROM cafes WHERE published GROUP BY ${A}) q) AS parts FROM cafes WHERE published`);
+  if (x1.tot !== x1.parts) bad.push(`시도별 합 ${x1.parts} ≠ 공개 ${x1.tot}`);
+  const [x2] = await sql`SELECT count(*)::int tot, (SELECT coalesce(sum(n),0)::int FROM (SELECT count(*)::int n FROM cafes WHERE published GROUP BY synth_grade) q) AS parts FROM cafes WHERE published`;
+  if (x2.tot !== x2.parts) bad.push(`등급별 합 ${x2.parts} ≠ 공개 ${x2.tot}`);
+  const [x3] = await sql`SELECT count(*) FILTER (WHERE published AND pipeline_status<>'live')::int a, count(*) FILTER (WHERE NOT published AND pipeline_status='live')::int b FROM cafes`;
+  if (x3.a || x3.b) bad.push(`공개↔상태 어긋남 ${x3.a + x3.b}곳`);
+  const [x4] = await sql`SELECT count(*)::int tot, count(*) FILTER (WHERE lat IS NOT NULL AND lng IS NOT NULL)::int geo FROM cafes WHERE published`;
+  if (x4.tot !== x4.geo) bad.push(`좌표 없는 공개 ${x4.tot - x4.geo}곳(지도에서 빠짐)`);
+  say(bad.length ? `⑤-c 🧮 지표 검산 🔴 ${bad.length}건 — ${bad.join(" · ")}` : "⑤-c 🧮 지표 검산 ✅ 시도·등급·상태·좌표 합계 전부 일치");
+} catch (e) { say(`⑤-c 🧮 지표 검산 실패: ${String(e).slice(0, 60)}`); }
+
 // ⑥ 잡 실행
 const j = await sql`SELECT job, ok, to_char(ran_at AT TIME ZONE 'Asia/Seoul','HH24:MI') AS t
   FROM agent_runs WHERE job IN ('cron-grow','cron-synth','cron-resynth','cron-embed','discover-sweep') ORDER BY ran_at DESC`;
