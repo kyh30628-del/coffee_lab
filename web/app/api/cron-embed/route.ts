@@ -56,9 +56,9 @@ export async function GET(req: NextRequest) {
     //   💰 새 크론·새 함수 실행 0 — 이미 도는 이 함수 안에서 UPDATE 한 번. 임베딩이 없었으면 부르지도 않는다.
     //   ⚠️ 캐시 무효화는 하지 않는다 — heal도 '비공개'일 때만 search_cache를 지운다(공개는 자연 만료 대기).
     //   공개를 즉시 반영하려고 캐시를 지우면 검색이 통째로 재계산돼 비용이 는다.
-    let promoted = 0;
+    let promoted = 0, released = 0;
     if (updated > 0) {
-      try { promoted = (await finalizePipeline()).promoted; } catch { /* 승격 실패가 임베딩 성과를 되돌리지 않는다 */ }
+      try { const fp = await finalizePipeline(); promoted = fp.promoted; released = fp.released ?? 0; } catch { /* 승격 실패가 임베딩 성과를 되돌리지 않는다 */ }
     }
     // 🔴 A(2026-08-27): '남음' 집계가 큐 조건과 달라 **적체를 0으로 보고**하던 사각지대를 고친다.
     //   큐는 (published OR pending) + 재임베딩 대상까지 집는데, 집계는 published만 세어
@@ -70,7 +70,7 @@ export async function GET(req: NextRequest) {
         AND (embedding IS NULL OR embed_updated IS NULL OR embed_updated < synth_updated)`)[0].n;
     // 📒 하네스 L5 — 지문은 **남은 일(백로그)** 기준. 할 일이 없으면(0) 지문을 안 남긴다 —
     //   "일이 없어 조용한 것"과 "일이 있는데 못 끝내는 것"을 구분해야 정체 탐지가 소음이 안 된다.
-    await recordRun("cron-embed", true, `임베딩 ${updated} 남음 ${remain}${promoted ? ` · 공개승격 ${promoted}` : ""}`, updated, { fingerprint: (remain) > 0 ? fingerprintOf({ remain, updated, promoted }) : undefined, metrics: { remain, updated, promoted } });
+    await recordRun("cron-embed", true, `임베딩 ${updated} 남음 ${remain}${promoted ? ` · 공개승격 ${promoted}` : ""}${released ? ` · held해제 ${released}` : ""}`, updated, { fingerprint: (remain) > 0 ? fingerprintOf({ remain, updated, promoted }) : undefined, metrics: { remain, updated, promoted } });
     return NextResponse.json({ ok: true, ranAt: new Date().toISOString(), embedded: updated, remaining: remain, promoted });
   } catch (e) {
     await recordRun("cron-embed", false, String(e).slice(0, 150));

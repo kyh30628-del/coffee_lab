@@ -889,9 +889,31 @@ export async function healGroundingSuspects(): Promise<{ resynthed: number; name
 //      · 규칙으로 '명확'(근거후기 이름일관성↑·맥락오염↓·경계후기 없음) → LLM 없이 규칙으로 공개.
 //      · '애매'(경계후기 있음·일관성↓·오염↑) → LLM 판정(llm_judged_at) 통과해야만 공개(심화 검증 보류).
 //   needs_llm: 신규 합성분은 정확 신호 저장. 기존분(NULL)은 coherence·offctx 프록시로 판단.
-export async function finalizePipeline(): Promise<{ promoted: number; names: string[]; pending: number; stuck: any }> {
+export async function finalizePipeline(): Promise<{ promoted: number; names: string[]; pending: number; stuck: any; released?: number }> {
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS pipeline_status TEXT`.catch(() => {});
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS needs_llm BOOLEAN`.catch(() => {});
+  // 🔓 held 해제 레인(2026-09-24 신설) — **held에서 빠져나오는 길이 없었다.**
+  //   실측: 사유 없는 held 104곳 중 43곳이 모든 공개 게이트를 통과하는데도 잠겨 있었다.
+  //   소과당 홍대점(검증·후기 167·일치율 1.0)이 6월부터 석 달간 비공개였다. exclude_reason은 비어 있었다.
+  //   원인 3중: ①synthStore에서 held는 자기유지(`held = pst === "held"`) ②finalizePipeline은 pending만 승격
+  //   ③recheckTrigger는 excluded만 본다(사유 문구가 'held 재평가 대기'인데 그 대기열이 없었다).
+  //   → 사람이 남긴 사유가 없고(=자동 부산물) 모든 결정론 게이트를 통과하면 pending으로 되돌린다.
+  //     공개 여부는 아래 승격 게이트가 그대로 결정한다. 오염(일치율<0.5·무관율≥0.2)·플래그·사유 있는 held는 손대지 않는다.
+  //   ⚠️ 한 번에 200곳 상한 — 대량 변동 차단(힐러 규약과 동일).
+  let released = 0;
+  try {
+    const rel = (await sql`UPDATE cafes SET pipeline_status = 'pending', updated_at = now()
+      WHERE id IN (
+        SELECT c.id FROM cafes c
+        WHERE NOT c.published AND c.pipeline_status = 'held' AND COALESCE(c.exclude_reason, '') = ''
+          AND c.synth_grade IN ('검증','참고') AND c.embedding IS NOT NULL
+          AND COALESCE(c.synth_coherence, 0) >= 0.5 AND COALESCE(c.offctx_rate, 0) < 0.2
+          AND NOT EXISTS (SELECT 1 FROM audit_flags af WHERE af.cafe_id = c.id AND NOT af.resolved)
+        LIMIT 200)
+      RETURNING id`) as any[];
+    released = rel.length;
+    if (released) await invalidateCafeCaches(rel.map((r) => Number(r.id)));
+  } catch { /* 해제 실패가 승격을 막지 않는다 */ }
   await loadCriteria(); // 수도권 좌표박스 기준 캐시 프라임 — 공개 승격 게이트가 synth와 같은 진실(폴백=criteria DEFAULTS(현재 36.8~38.7/124.5~129.4))
   const latMin = getCriterionSync("geo.box.lat_min"), latMax = getCriterionSync("geo.box.lat_max");
   const lngMin = getCriterionSync("geo.box.lng_min"), lngMax = getCriterionSync("geo.box.lng_max");
@@ -916,7 +938,7 @@ export async function finalizePipeline(): Promise<{ promoted: number; names: str
     COUNT(*) FILTER (WHERE pipeline_status='new')::int wait_synth,
     COUNT(*) FILTER (WHERE pipeline_status='rejected')::int rejected
     FROM cafes` as any[];
-  return { promoted: promoted.length, names: promoted.map((r) => r.name).slice(0, 10), pending: p.pending, stuck: { wait_synth: p.wait_synth, wait_judge: p.wait_judge, wait_embed: p.wait_embed, rejected: p.rejected } };
+  return { released, promoted: promoted.length, names: promoted.map((r) => r.name).slice(0, 10), pending: p.pending, stuck: { wait_synth: p.wait_synth, wait_judge: p.wait_judge, wait_embed: p.wait_embed, rejected: p.rejected } };
 }
 
 // opts.refresh=true면 새로 수집(최신성). 기본은 캐시 재사용(쿼터 절약).
