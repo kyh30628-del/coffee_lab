@@ -21,7 +21,15 @@ export const runtime = "nodejs";
 //     그래서 Next 라우트 캐시(revalidate)를 쓴다 — 이건 revalidatePath로 지워진다.
 //     공개상태가 바뀌면 cafeCacheInvalidate가 이 경로를 즉시 purge한다(어제 원격 purge 수리로 로컬 워커도 가능).
 //   60초로 짧게 잡은 이유: purge가 실패해도 소비자 노출은 최대 1분(5분이면 절전 이득은 크지만 사고 시 5분).
-export const revalidate = 60;
+// 🔴 2026-09-23 수리(CEO "지도 왼쪽 상단 숫자가 공개 수와 다르다") — **응답이 2시간 45분째 얼어 있었다.**
+//   실측: DB 공개 35,405곳인데 이 응답은 34,376곳(x-vercel-cache: STALE, age 9,800s가 계속 증가).
+//   원인: 공개 카페가 13,460→34,376곳으로 늘며 응답이 2.5MB→**10.8MB**가 됐고, Vercel 라우트 캐시가
+//   담을 수 있는 크기를 넘겨 **재생성 결과를 저장하지 못한다**. 저장 실패 → 예전(작던 시절) 항목을 계속 STALE로 내어준다.
+//   즉 캐시가 커질수록 지도가 과거에 갇히고, 그 격차는 매일 벌어진다(하루 +1,000곳).
+//   → 라우트 캐시를 끄고 **버전 기반 메모리 캐시**만 쓴다(원래 설계의 always-fresh로 복귀).
+//   비용: 요청마다 버전 쿼리 1회지만 09-22 추가한 `idx_cafes_pub_freshness`로 Index Only Scan이다(비용 1/4).
+//   10.8MB 본문은 데이터가 바뀔 때만 다시 만든다(메모리 캐시 적중 시 전송만).
+export const dynamic = "force-dynamic";
 
 // 🗺️ 지도·목록용 응답. 무거운 synth_reviews는 제외(상세 열 때 따로 로드).
 //
