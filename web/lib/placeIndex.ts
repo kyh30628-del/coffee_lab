@@ -119,6 +119,39 @@ const km = (a: number, b: number, c: number, d: number) => {
   return 2 * R * Math.asin(Math.sqrt(Math.sin(x / 2) ** 2 + Math.cos(rad(a)) * Math.cos(rad(c)) * Math.sin(y / 2) ** 2));
 };
 
+// 🔴 결재 #1225(2026-09-23): anchor-kind이면서 이름이 비고유 일반명사(공원·근린공원·쉼터 등)인 항목이
+//   다수 존재(공원 5건·근린공원 59건·어린이공원 45건·중앙공원 31건·놀이터 67건·쉼터 25건·소공원 17건 등).
+//   route.ts의 anchorExact 판정은 이름 완전일치만 보고 고유 지명인지는 검증하지 않아, 질의가 이런 일반명사와
+//   우연히 완전일치하면 전국 수십 곳 중 인덱스 순서상 첫 항목이 임의로 앵커가 됐다("공원 근처 카페"가
+//   경남 성주군 무관 POI로 하이재킹).
+//   ⚠️ 단순 이름 중복 개수로만 걸면 "경의선숲길"처럼 OSM에 여러 세그먼트로 쪼개져 있을 뿐인 **하나의 진짜
+//   장소**까지 억울하게 제외된다(실측: 3개 포인트가 전부 서로 1km 안). searchPlacesExact와 같은 5km
+//   클러스터링으로 "서로 멀리 떨어진 동명 지점"만 센다 — 그게 3곳 이상이면 전국에 흩어진 진짜 비고유
+//   일반명사로 보고 앵커 자격에서 제외한다.
+let AMBIGUOUS_ANCHOR_NAMES: Set<string> | null = null;
+function ambiguousAnchorNames(): Set<string> {
+  if (AMBIGUOUS_ANCHOR_NAMES) return AMBIGUOUS_ANCHOR_NAMES;
+  const byName = new Map<string, Row[]>();
+  const anchorNames = new Set<string>();
+  for (const r of rows()) {
+    const n = norm(r[0]);
+    (byName.get(n) ?? byName.set(n, []).get(n)!).push(r);
+    if (isAnchorKind(r[3])) anchorNames.add(n);
+  }
+  const result = new Set<string>();
+  for (const n of anchorNames) {
+    const kept: Row[] = [];
+    for (const r of byName.get(n)!) {
+      if (kept.some((k) => km(k[1], k[2], r[1], r[2]) < 5)) continue;
+      kept.push(r);
+    }
+    if (kept.length >= 3) result.add(n);
+  }
+  AMBIGUOUS_ANCHOR_NAMES = result;
+  return result;
+}
+export const isAmbiguousAnchorName = (name: string) => ambiguousAnchorNames().has(norm(name));
+
 // 🔁 폴백용 — 질의가 인덱스 이름보다 길면 부분일치가 통째로 실패한다(실측: "여의도 IFC몰" → 0건, 인덱스엔 "IFC 서울").
 //   ① 일반 접미어(몰·빌딩·타워…)를 떼고 ② 그래도 없으면 가장 긴 토큰으로 다시 찾는다. 둘 다 원질의보다 느슨하므로
 //   **원질의로 찾은 결과가 하나라도 있으면 절대 쓰지 않는다**(느슨한 매칭이 정확한 결과를 밀어내면 안 된다).
