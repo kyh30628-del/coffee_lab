@@ -25,15 +25,18 @@ const { localSearch, isFranchise, isNonCafe, isSnackStall, isStructuralPhantom, 
 const { loadLearnedTerms } = await import("../lib/learnedTerms.ts");
 const { loadCriteriaLists } = await import("../lib/criteriaLists.ts");
 await loadLearnedTerms(); await loadCriteriaLists(); // 공개 관문(synthStore)과 같은 사전으로 판정하려면 먼저 프라임해야 한다
-const { naverUsedToday, NAVER_DAILY_QUOTA, NAVER_CLOSURE_RESERVE, NAVER_COLLECT_RESERVE } = await import("../lib/naverBudget.ts");
+const { naverUsedToday, NAVER_DAILY_QUOTA, NAVER_CLOSURE_RESERVE, NAVER_COLLECT_RESERVE, NAVER_GROW_RESERVE } = await import("../lib/naverBudget.ts");
 const { SIDO_GU } = await import("../lib/regionList.ts");
 const { isNonCafeFnbCategory, brandTokenOverlap, nearDuplicateCafeName } = await import("../lib/reviewQuality.ts");
 
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? Number(process.argv[i + 1]) : d; };
 const APPLY = process.argv.includes("--apply");
 const LIMIT = arg("--limit", 3000);
-// 예산: 기본은 '수집 몫을 남기고' 쓴다 — 적재만 하고 후기를 못 모으면 사용자에겐 0이다(적체 가드와 같은 사상).
-const BUDGET = arg("--budget", 0) || (NAVER_DAILY_QUOTA - NAVER_CLOSURE_RESERVE - NAVER_COLLECT_RESERVE);
+// 예산: 기본은 '수집 몫'과 '발굴(cron-grow) 몫'을 남기고 쓴다 — 적재만 하고 후기를 못 모으면 사용자에겐 0이다
+//   (적체 가드와 같은 사상). 2026-09-24(협업#450·decisions#1241): 예전엔 COLLECT까지만 뺐는데, 그게 cron-grow의
+//   유일한 게이트(nonClosureMayUse) 문턱과 같은 값이라 이 스크립트 혼자 매일 07:00 그 몫을 다 써버리면
+//   cron-grow가 자정까지 전면 차단됐다 — GROW_RESERVE만큼 더 덜어낸다.
+const BUDGET = arg("--budget", 0) || (NAVER_DAILY_QUOTA - NAVER_CLOSURE_RESERVE - NAVER_COLLECT_RESERVE - NAVER_GROW_RESERVE);
 
 const PREFIXED = new Set(["인천", "대전", "부산", "대구", "광주", "울산"]);
 const ADDR2SIDO = { "제주특별자치도": "제주", "전북특별자치도": "전북", "전라북도": "전북", "전라남도": "전남", "경상남도": "경남", "경상북도": "경북",

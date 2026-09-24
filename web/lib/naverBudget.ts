@@ -71,6 +71,16 @@ export const NAVER_CLOSURE_RESERVE = Number(process.env.NAVER_CLOSURE_RESERVE ||
 //   → 수집 예약을 16,000으로 낮춰 적재 예산을 7,800콜로 키운다(2,517 → 약 3,600곳/일). 수집은 창 3개(12·16·20시)로 충분.
 export const NAVER_COLLECT_RESERVE = Number(process.env.NAVER_COLLECT_RESERVE || 16000);
 export const NAVER_RECOLLECT_RESERVE = Number(process.env.NAVER_RECOLLECT_RESERVE || 0);
+// 🌱 2026-09-24 재도입(협업#450 진단 → decisions#1241 승인): import-permits(매일 07:00 1회, scripts/import-permits.mjs)의
+//   BUDGET이 그동안 QUOTA − CLOSURE − COLLECT 전부(=nonClosureMayUse 게이트의 문턱과 정확히 같은 값)였다 —
+//   import-permits가 그 몫을 아침에 한 번에 몰아 쓰면(실측 09-24 08:49 이미 47% 소진) 같은 날 나머지 시간 내내
+//   nonClosureMayUse가 닫혀 cron-grow discoverRegion 루프(app/api/cron-grow/route.ts:129)가 하루 대부분
+//   전면 차단됐다(discovery_state.last_run 60시간+ 정지, decisions#1224). mineArea(리뷰 속 숨은 카페 채굴)는
+//   이 게이트를 안 타 계속 돌아 발굴이 살아있는 것 같은 착시만 남겼다.
+//   → import-permits 자기 예산에서만 이만큼 덜어내(import-permits.mjs BUDGET 계산) cron-grow에게 하루 전
+//   구간에 걸쳐 쓸 여지를 되돌려준다. nonClosureMayUse 게이트(CLOSURE+COLLECT 문턱)는 그대로 두므로 폐업·
+//   수집 예약의 기존 보장은 안 건드린다.
+export const NAVER_GROW_RESERVE = Number(process.env.NAVER_GROW_RESERVE || 3000);
 /** 발굴(cron-grow)·재수집 등 '폐업 아닌' 소비자가 지금 더 써도 되는가 — 예약분 1,200을 남긴다. */
 export async function nonClosureMayUse(): Promise<{ ok: boolean; remaining: number }> {
   const used = await naverUsedToday();
