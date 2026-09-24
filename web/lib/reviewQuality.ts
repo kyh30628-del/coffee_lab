@@ -1219,19 +1219,25 @@ export function brandTokenOverlap(baseName: string, candidateName: string, areaT
   const { tokens: toks, venueOnly } = coreTokensDetail(baseName, areaTerms);
   const cand = norm(candidateName);
   const full = norm(baseName);
+  const fullNameSubstring = () => full.length >= 2 && (cand.includes(full) || full.includes(cand));
   if (toks.length) {
     const candToks = coreTokensDetail(candidateName, areaTerms).tokens;
     const overlap = candToks.length
       ? toks.some((t) => candToks.some((ct) => norm(ct) === norm(t)))
       : toks.some((t) => cand.includes(norm(t)));
-    if (!overlap) return false;
+    // 🐛 구조적 결함 재발방지(decisions#1237): 후보명이 괄호 병기 상호("앤서라운지(ANSWERLOUNGE)")면
+    //   coreTokensDetail의 분리 경계가 가-힣/영문 전환점만 봐서 괄호 앞뒤가 안 갈리고 통째로 한 토큰이
+    //   된다 — 토큰 완전일치 비교가 실패해 명백한 동일상호를 놓쳤다(import-permits.mjs 교차중복 실사례,
+    //   coordination#444). 토큰 겹침이 없어도 두 이름 전체가 서로를 포함하는 경우까지는 놓치지 않는다
+    //   (아래 weak 분기와 동일하게 검증된 전체이름 포함 판정을 재사용 — 무관 이름끼리는 여전히 불일치).
+    if (!overlap) return fullNameSubstring();
     // 몰/밀집매장 다중테넌트 식별(venueOnly)이거나 2자 이하 초약체 토큰뿐이면 겹침만으론 불충분 — 전체이름까지 요구.
     const weak = venueOnly || toks.every((t) => norm(t).length <= 2);
     if (!weak) return true;
-    return full.length >= 2 && (cand.includes(full) || full.includes(cand));
+    return fullNameSubstring();
   }
   // 식별토큰이 하나도 없는(전부 일반어) 이름은 토큰매칭이 불가하므로 원본 이름 전체 포함으로 대체 판정.
-  return full.length >= 2 && (cand.includes(full) || full.includes(cand));
+  return fullNameSubstring();
 }
 
 // 근접중복(구어체 철자·브랜드축약) 보조 판정(decisions#852) — brandTokenOverlap은 오염 방지용으로 엄격
