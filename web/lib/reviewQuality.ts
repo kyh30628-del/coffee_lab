@@ -1703,7 +1703,10 @@ export function verifyReview(input: QualityInput): QualityResult {
   //   도시 이름만 맞는 무관 글('켄싱턴리조트 충주')까지 가점으로 통과시켰고, 이름 일치율이 떨어져 카페 16곳이 noise로 떨어졌다.
   const areaPresent = areaTerms.length ? areaTerms.some((a) => `${title} ${body}`.includes(a)) : false;
   const ownTok = ownAreaTokens(areaTerms); // 광역시 앞머리("대구 중구"의 "대구")까지 — 첫 수리(끝 단어만)가 놓쳤다
-  const ownMention = areaPresent || (areaTerms.length ? ownTok.some((a) => `${title} ${body}`.includes(a)) : false);
+  //   단어 경계 필수(09-24 재판정 감시에서 발견): 아산 '순천향로 421' 주소의 '순천'을 순천시 언급으로 봐 타지역 판정이 꺼졌다.
+  //   지명 뒤엔 행정 접미어·조사·흔한 결합어만 허용(순천시·순천에서·순천카페 ○ / 순천향로 ×).
+  const OWN_TAIL = "(?:시|군|구|동|읍|면|역|리|에서|에|의|은|는|이|가|을|를|로|으로|도|카페|맛집|여행|나들이|데이트|빵집|베이커리|디저트|커피|신상|근교|핫플|가볼만한|\\s|[^가-힣]|$)";
+  const ownMention = areaPresent || (areaTerms.length ? ownTok.some((a) => new RegExp(`(^|[^가-힣])${escRe(a)}${OWN_TAIL}`).test(`${title} ${body}`)) : false);
   // 룰갭 P43-원인2(#397, coord#208): bareWeak(흔한 인명·일반용어 유일토큰, 아래)의 지역 게이트가 areaTerms
   //   전체(시·구 단위까지 포함)를 인정해, "구" 단위(성동구·마포구 등 핫플 자치구) 일치만으로도 통과했다
   //   (id9426·id1520 실측 — 같은 구 안 무관 콘텐츠와 흔한 인명 오매칭). 동/읍/면/가/리 단위만 골라 더 좁게 요구.
