@@ -578,6 +578,24 @@ const BARISTA_EDU_ACTIVITY = /(SCA\s*커리큘럼|바리스타\s*자격증|자�
 //   라이트하우스 id14892, 전구공장 개조 카페)은 "아메리카노 주문" 등 실제 카페 이용 서술이 있어
 //   CAFE_CONTEXT_SUBSTANCE로 보존되므로 오탐 없음.
 const BRAND_EXPERIENCE_ACTIVITY = /(전시\s*(후기|관람)|시승\s*(후기|체험)|포토존|쇼룸\s*(투어|구경)|캐릭터\s*전시)/;
+// ★ 룰갭 신규(2026-09-24, decisions#1243, rulegap-proposals-20260924.md): 상위개체 부속 카페 — 카페가 훨씬
+//   크고 유명한 상위개체(관광명소·축제·리조트·브랜드체험관·복지시설)의 부속시설일 때, 그 상위개체 자체
+//   방문기/뉴스가 카페 검증리뷰로 오채택된다(8곳 독립 재현: id47374 하늘길카페=용궐산 출렁다리, id49269
+//   휴애리커피샵=테마파크 탐방기, id44237 북천 코스모스 열차카페=축제, id41824 추억의 금당실=전통마을 야행
+//   축제, id36370 르네블루 바이 쏠비치=리조트 투숙기, id42814 산리오 러버스 클럽 해운대점=굿즈샵 방문기
+//   (synth_grade=검증 즉시영향), id58717 고스티 쇼룸 성수=브랜드쇼룸, id19186 시흥시니어클럽 시니나떼=복지
+//   기관 뉴스, offctx_rate 0.40~0.53). 대조군 검증(이름에 수목원/휴양림 포함 14곳 중 12곳, 쇼룸 포함 9곳
+//   중 7곳은 offctx_rate 정상)에서 이름 키워드만으로는 일반화 불가로 확인돼, 이름 앵커 대신 콘텐츠 구조
+//   신호로 게이트한다 — 관광/시설 소개 어휘가 문장 다수를 차지(2회 이상)하고 카페 실질맥락
+//   (CAFE_CONTEXT_SUBSTANCE)이 전무하면 오염 후보. 어휘 선정: 최초 후보(오션뷰·캠핑장·레일바이크·둘레길·
+//   가볼만한곳·관광지추천)는 currently-published 검증리뷰 8,019건 실측 대조에서 머드포레스트·멜로우티·
+//   파라토도스 등 offctx_rate 정상인 진짜 카페 자기소개("영흥도 카페 오션뷰 끝내주는…")를 오탐시켜 제외 —
+//   "오션뷰"류는 해안 카페가 흔히 쓰는 정상 자기서술이라 밀도 신호로 부적합. 남은 좁은 어휘(입장료·개장
+//   시간·매표소·체크인·투숙·굿즈샵·체험관·복지사업·돌봄강화·일자리창출·전통마을·야행축제·탐방후기·
+//   출렁다리 — 상위개체 자체 운영정보/시설안내 어휘로 카페 자기소개엔 거의 안 쓰임)는 동일 대조군
+//   8,019건에서 오탐 0건 확인 후 채택. 카페+명소 병기(실질 음료 언급 동반) 정상 후기는
+//   CAFE_CONTEXT_SUBSTANCE로 보존되므로 오탐 없음.
+const TOURIST_FACILITY_INFO_VOCAB = /(입장료|개장\s*시간|운영\s*시간|매표소|체크인|체크아웃|투숙|굿즈샵|체험존|체험관|복지\s*사업|돌봄\s*(강화|사업)|일자리\s*창출|전통마을|야행\s*축제|탐방\s*후기|출렁다리)/;
 
 // 수도권 시·군·구 — 같은 상호의 '다른 지점'을 지역으로 구분하기 위함
 const ALL_GU = [
@@ -2550,6 +2568,17 @@ export function verifyReview(input: QualityInput): QualityResult {
     verdict = "reference";
     score = Math.min(score, 59);
     reasons.push("인용문 경계 의심(콤보 포스트) — 참고등급 캡");
+  }
+  // [룰갭 신규, decisions#1243] 상위개체(관광지·리조트·체험관·복지시설) 부속 카페 — 위 TOURIST_FACILITY_INFO_VOCAB
+  //   참조. 이름 앵커가 없는 순수 콘텐츠 구조 신호라 라이브카페·콤보 포스트 캡과 동일하게 verified 승격만 막고
+  //   reference 상한으로 캡한다(하드 탈락은 오탐 위험 — 대조군에서 확인).
+  if (verdict === "verified" && !CAFE_CONTEXT_SUBSTANCE.test(fullL)) {
+    const touristFacilityHits = (fullL.match(new RegExp(TOURIST_FACILITY_INFO_VOCAB.source, "g")) ?? []).length;
+    if (touristFacilityHits >= 2) {
+      verdict = "reference";
+      score = Math.min(score, 59);
+      reasons.push("상위개체(관광지·리조트·체험관·복지시설) 소개 콘텐츠(카페 실질맥락 전무) — 참고등급 캡");
+    }
   }
 
   return { verdict, score: Math.round(score), reasons, signals: sig };
