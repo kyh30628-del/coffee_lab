@@ -382,3 +382,4 @@
 | 2026-09-23 07:43 | #1211 | [검색UX 신규] FACET_TRIGGERS 전용어("북카페")가 pureConceptQuery 가드 밖이라 | 9e39e81e | - | app/api/search/route.ts: pureConceptQuery(355행)에 FACET_TRIGGERS 완전일치 체크 추가(북카페 등 시설전용 트리거어도 place 하이 |
 | 2026-09-23 07:43 | #1213 | [개발] direct 트래픽 PWA-standalone 여부 계측 태깅 — #1208/coordination | 9232ccf7 | - | app/VisitPing.tsx: 세션 첫 핑에 matchMedia(display-mode:standalone) 결과를 body.standalone으로 추가 전송. app/api/ |
 | 2026-09-24 00:18 | #1223 | [개발] 협업 #447: sentinel.attraction 동결 42건 0판독 — 표본 2건 오탐 확인(a | 80039bb7 | - | app/api/cron-sentinel/route.ts: attrMarkers()에 커피숍/로스터리/베이커리/제과점 접미사 추가(canonName과 동기화, 카페 접미사만 있던 버 |
+| 2026-09-24 00:18 | #1225 | [검색UX 신규] 장소인덱스 제네릭 명칭(공원·근린공원·쉼터 등) 앵커오탐 — POI 하이재킹 신규 계열 | 7ca55385 | - | lib/placeIndex.ts: isAmbiguousAnchorName() 추가(같은 anchor-kind 이름이 5km+ 떨어진 지점 3곳 이상이면 비고유로 판정, search |
