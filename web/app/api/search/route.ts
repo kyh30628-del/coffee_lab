@@ -9,7 +9,7 @@ import { loadCriteriaLists, getListSync } from "@/lib/criteriaLists";
 import { parseQuery, loadGeoIndex, detectRegion, isCoreArea } from "@/lib/searchQuery";
 import { isFranchise } from "@/lib/discover";
 import { cardFacets } from "@/lib/cafeProfile";
-import { searchPlaces, placeKey, placeKeyAliased, placeKeyNoSuffix, isAnchorKind, normName } from "@/lib/placeIndex";
+import { searchPlaces, placeKey, placeKeyAliased, placeKeyNoSuffix, isAnchorKind, normName, isAmbiguousAnchorName } from "@/lib/placeIndex";
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
@@ -648,15 +648,20 @@ export async function GET(req: NextRequest) {
     //      동명 앵커가 있어 place 모드로 강제 전환됐다 — 연희동·신사동 사고(2026-09-12)와 같은 계열이지만
     //      정식 행정동/시군구가 아니라 잡히지 않았다. pureConceptQuery(질의가 트리거 단어와 완전일치)면
     //      regionWordInQuery와 동일하게 장소 검색 자체를 쓰지 않는다.
+    //   🔴 결재 #1225(2026-09-23): 이름이 비고유 일반명사(공원·근린공원·쉼터 등, anchor-kind 내 3곳+ 중복)면
+    //      앵커 자격에서 제외한다 — 전국 수십 곳 중 인덱스 순서상 첫 항목이 임의로 앵커가 되던 것을 막는다.
     const anchorExact = pureConceptQuery ? undefined
-      : placeCands.find((p) => isAnchorKind(p.kind) && !isFranchisePlace(p) && (normName(p.name) === qk || normName(p.name) === qkA))
-      ?? (qkB !== qk && qkB.length >= 2 ? placeCands.find((p) => isAnchorKind(p.kind) && !isFranchisePlace(p) && normName(p.name) === qkB) : undefined);
+      : placeCands.find((p) => isAnchorKind(p.kind) && !isFranchisePlace(p) && !isAmbiguousAnchorName(p.name) && (normName(p.name) === qk || normName(p.name) === qkA))
+      ?? (qkB !== qk && qkB.length >= 2 ? placeCands.find((p) => isAnchorKind(p.kind) && !isFranchisePlace(p) && !isAmbiguousAnchorName(p.name) && normName(p.name) === qkB) : undefined);
     //   ⚠️ 길이 하한은 **별칭을 푼 뒤**로 본다 — "고터"(2자)가 여기서 잘려 고속터미널역(6자)을 못 썼다(실측).
     //   ⚠️ 정확일치 앵커가 있으면 길이 하한도 넘긴다 — "넥슨"·"토스"(2자)가 여기서 잘려 0건이었다.
     //      큐레이션된 이름과 **완전히 같은** 질의는 짧아도 모호하지 않다.
     const placeHit = !pureConceptQuery && (Math.max(qk.length, qkA.length) >= 3 || !!anchorExact) && (!regionWordInQuery || !!anchorExact)
       ? (anchorExact ?? placeCands.find((p) => {
           if (isFranchisePlace(p)) return false;
+          //   결재 #1225: anchorExact와 동일하게, 비고유 일반명사 anchor는 이 정확일치 폴백에서도 제외한다
+          //   ("근린공원 카페"가 4자라 길이 하한을 넘어 anchorExact 없이도 이 블록에서 하이재킹됐다).
+          if (isAnchorKind(p.kind) && isAmbiguousAnchorName(p.name)) return false;
           const pn = normName(p.name);
           //   🔴 접두 일치는 아예 쓰지 않는다(2026-09-12): "조용한 카페"가 '조용한…'으로 시작하는 장소에 걸려
           //      장소 검색으로 갔다. 우리 본래 강점인 '느낌 검색'을 장소가 가로채면 안 된다.
