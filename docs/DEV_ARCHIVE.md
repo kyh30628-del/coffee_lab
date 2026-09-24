@@ -388,3 +388,4 @@
 | 2026-09-24 07:56 | #1240 | [개발] 협업 #449: cost_guard 자동정지 발동(09-23 23:00 UTC) — cron-sen | 5082acc7 | - | scripts/make-digest.mjs: cost_guard 상태를 크론 건강 섹션에 직접 표출 — halted 중엔 ⚠️경고줄(발동시각·사유) + 영향받는 크론(exposur |
 | 2026-09-24 07:56 | #1241 | [개발] 협업 #450: decision#1224 근본원인 확정: nonClosureMayUse 예약설계가  | a9bb0d98 | - | lib/naverBudget.ts에 NAVER_GROW_RESERVE(기본 3000) 신설 + scripts/import-permits.mjs BUDGET 계산에 반영(QUOTA- |
 | 2026-09-24 07:56 | #1246 | [자율진단] decisions dedup 'done' 영구봉인 — 근거오염 2→33건(16배) 급증에도 재상 | 71ba37fb | - | app/api/cron-selfaudit/route.ts: dedup을 종결(done/rejected/deferred) 영구스킵에서 급증재상신으로 변경 — 종결 당시 count 대 |
+| 2026-09-24 11:33 | #1245 | [개발] orchestrator-heal 크론 코드버그 — NeonDbError $5 파라미터 타입 미확정( | 2218c388 | - | app/api/orchestrator/route.ts ig 무결성 쿼리: sidoFromAreaSql/sidoFromAddressSql이 반환하는 SQL CASE식 문자열을 sql |
