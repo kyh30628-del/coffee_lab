@@ -881,7 +881,7 @@ export default function AdminPage() {
                   <thead><tr className="text-left text-stone-500 border-b border-stone-200">
                     <th className="py-1.5 pr-3">지역</th><th className="pr-3 text-right">등록</th><th className="pr-3 text-right">공개</th>
                     <th className="pr-3 text-right">통과율</th><th className="pr-3 text-right">검증등급</th><th className="pr-3 text-right">평균후기</th>
-                    <th className="pr-3 text-right">오염신호</th><th className="pr-3 text-right">대기</th>
+                    <th className="pr-3 text-right">오염신호</th><th className="pr-3 text-right" title="날짜 있는 공개 카페 중 최근 18개월 후기가 1건 이상인 비율">최신성</th><th className="pr-3 text-right" title="검증 후기가 전부 18개월 넘은 공개 카페">전부 오래됨</th><th className="pr-3 text-right">대기</th>
                   </tr></thead>
                   <tbody>{rq.rows.map((r: any) => {
                     const pol = (r.low_coh ?? 0) + (r.offctx ?? 0);
@@ -897,13 +897,15 @@ export default function AdminPage() {
                         <td className="pr-3 text-right">{r.ver_pct ?? 0}%</td>
                         <td className="pr-3 text-right">{r.avg_rv ?? "-"}건</td>
                         <td className={`pr-3 text-right ${pol > 0 ? "text-amber-600 font-bold" : "text-emerald-700"}`}>{pol}</td>
+                        <td className={`pr-3 text-right ${r.fresh_pct == null ? "text-stone-400" : Number(r.fresh_pct) >= 90 ? "text-emerald-700" : "text-amber-600"}`}>{r.fresh_pct == null ? "-" : `${r.fresh_pct}%`}</td>
+                        <td className={`pr-3 text-right ${Number(r.all_old ?? 0) > 0 ? "text-amber-600" : "text-stone-500"}`}>{Number(r.all_old ?? 0).toLocaleString()}</td>
                         <td className="pr-3 text-right text-stone-500">{r.queue ?? 0}</td>
                       </tr>
                     );
                   })}</tbody>
                 </table>
               )}
-              <p className="text-[10px] text-stone-500 mt-2">통과율=공개/등록 <span className="text-stone-400">(클릭하면 미달 원인)</span> · 오염신호=이름불일치(coh&lt;0.5)+맥락의심 건수 · 새 시도는 발굴 시작 시 자동 표시</p>
+              <p className="text-[10px] text-stone-500 mt-2">통과율=공개/등록 <span className="text-stone-400">(클릭하면 미달 원인)</span> · 오염신호=이름불일치(coh&lt;0.5)+맥락의심 건수 · 최신성=최근 {rq.criteria?.oldMonths ?? 18}개월({rq.criteria?.cut ?? ""} 이후) 검증 후기 보유율 · 전부 오래됨=재수집·폐업확인 대상 · 공개선 검증 {rq.criteria?.floor ?? "?"}건·수집 {rq.criteria?.freshDays ?? "?"}일 이내(현행 기준 자동 반영) · 새 시도는 발굴 시작 시 자동 표시</p>
             </div>
           )}
         </div>
@@ -914,10 +916,10 @@ export default function AdminPage() {
           const unpub = Number(d.reg) - Number(d.pub);
           const rows: [string, number, string, string][] = [
             ["후기 0건", d.b_rv0, "수집은 됐지만 검증 가능한 후기가 아직 없음 — 후기가 쌓이면 자동 재도전", "text-stone-700"],
-            ["후기 1~2건", d.b_rv12, `공개선 3건에 미달 — 이 중 2건(1건 차이)이 ${Number(d.b_rv2 ?? 0).toLocaleString()}곳`, "text-stone-700"],
-            ["후기 3~4건 · 신규 5건 정책", d.b_hys, "올렸다 내리기 방지 히스테리시스(08-29 결재) — 5건 도달 시 자동 공개", "text-sky-700"],
-            ["후기 5건+ · AI 판정 대기", d.b_llm, "후기는 충분, AI 맥락 판정 게이트 대기(콘솔 크레딧 재개 시 풀림)", "text-amber-700"],
-            ["후기 5건+ · 기각 이력", d.b_etc, "과거 판정에서 기각 — 명시적 복원 결정 전엔 미공개(진동 방지)", "text-stone-600"],
+            [`후기 1~${Math.max(1, Number(rq?.criteria?.floor ?? 2) - 1)}건`, d.b_rvlow, `공개선 검증 ${rq?.criteria?.floor ?? 2}건에 미달`, "text-stone-700"],
+            ["후기 충분 · 수집 낡음", d.b_stale, `공개선은 넘지만 수집이 ${rq?.criteria?.freshDays ?? 30}일 넘음 — 재수집되면 자동 공개 재도전`, "text-sky-700"],
+            ["후기 충분 · AI 판정 대기", d.b_llm, "경계 후기가 있어 AI 맥락 판정 대기(콘솔 크레딧 재개 시 풀림)", "text-amber-700"],
+            ["후기 충분 · 기타", d.b_etc, "규칙(비카페·프랜차이즈 등)·과거 기각·임베딩 대기 — 사유는 개별 확인", "text-stone-600"],
             ["노이즈·보류", d.b_noise, "이름 오염·근거 0건 확정 — 품질 차단(자동 복원 없음)", "text-rose-700"],
             ["영구 제외", d.b_excl, "비카페·프랜차이즈·업종 제외 — 사람만 해제 가능", "text-stone-500"],
           ];

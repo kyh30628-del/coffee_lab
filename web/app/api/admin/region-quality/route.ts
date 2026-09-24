@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { classifyArea } from "@/lib/regionList"; // 🧭 지도·검색·SEO와 같은 단일출처
+import { loadCriteria, getCriterionSync } from "@/lib/criteria"; // 🎛️ 공개 문턱·신선도 — 버킷이 현행 기준을 따라가게(09-24)
+import { OLD_REVIEW_MONTHS } from "@/lib/cafeProfile";
 
 export const runtime = "nodejs";
 
@@ -19,39 +21,41 @@ export async function GET(req: NextRequest) {
   if (req.headers.get("x-admin-password") !== process.env.ADMIN_PASSWORD)
     return NextResponse.json({ ok: false }, { status: 401 });
   try {
+    // 🕰️ 2026-09-24 CEO "지역별 품질 현황에도 최신성" — 공개 카페의 **최근 18개월 후기 보유율**과 '전부 오래된 카페' 수.
+    //   review_dates(작은 jsonb 날짜 배열)만 본다 — 큰 후기 컬럼 미접촉. 경계는 고정 날짜가 아니라 오늘 기준으로 매번 계산.
+    //   비공개 사유 버킷도 **현행 기준(DB criteria)**으로 가른다 — 09-24 공개선 3→2 변경 후 옛 '3~4건·5건 정책' 칸이 거짓이 됐다.
+    await loadCriteria();
+    const R = getCriterionSync("grade.floor.reference_new"), FRESH = getCriterionSync("grade.floor.reference_new_fresh_days");
+    const cut = new Date(); cut.setMonth(cut.getMonth() - OLD_REVIEW_MONTHS);
+    const cutStr = `${cut.getFullYear()}.${String(cut.getMonth() + 1).padStart(2, "0")}.${String(cut.getDate()).padStart(2, "0")}`;
+    const hasDates = `jsonb_typeof(review_dates)='array' AND jsonb_array_length(review_dates) > 0`;
+    const hasRecent = `EXISTS (SELECT 1 FROM jsonb_array_elements_text(review_dates) d WHERE d >= $1)`;
+    const live = `NOT published AND exclude_at IS NULL AND COALESCE(pipeline_status,'') NOT IN ('excluded','noise','held')`;
     const raw = (await sql.query(`
       SELECT area,
         count(*)::int reg,
         count(*) FILTER (WHERE published)::int pub,
-        round(100.0 * count(*) FILTER (WHERE published) / NULLIF(count(*), 0), 1)::float pass_pct,
         count(*) FILTER (WHERE published AND synth_grade = '검증')::int verified,
-        round(100.0 * count(*) FILTER (WHERE published AND synth_grade = '검증')
-          / NULLIF(count(*) FILTER (WHERE published), 0), 1)::float ver_pct,
         COALESCE(sum(synth_count) FILTER (WHERE published), 0)::int rv_sum,
         count(*) FILTER (WHERE published AND synth_coherence < 0.5)::int low_coh,
         count(*) FILTER (WHERE published AND COALESCE(offctx_rate, 0) > 0.4 AND COALESCE(offctx_ok, false) = false)::int offctx,
         count(*) FILTER (WHERE NOT published AND synth_updated IS NULL)::int queue,
-        -- 🔍 통과율 미달 원인 분해(CEO 지시 09-04, 통과율 클릭 모달용) — 미공개분을 상호배타 버킷으로.
-        --   버킷 우선순위: 영구제외 > 노이즈·보류 > 후기수 — 실측 검증(합계=미공개 전수)은 09-04 세션 기록.
+        count(*) FILTER (WHERE published AND ${hasDates} AND ${hasRecent})::int fresh,
+        count(*) FILTER (WHERE published AND ${hasDates} AND NOT ${hasRecent})::int all_old,
+        count(*) FILTER (WHERE published AND NOT (${hasDates}))::int no_date,
+        -- 🔍 통과율 미달 원인(상호배타 버킷, 현행 기준): 영구제외 > 노이즈·보류 > 후기 0 > 문턱 미달 > 수집 낡음 > AI 판정 대기 > 기타
         count(*) FILTER (WHERE NOT published AND (pipeline_status = 'excluded' OR exclude_at IS NOT NULL))::int b_excl,
         count(*) FILTER (WHERE NOT published AND exclude_at IS NULL AND pipeline_status IN ('noise','held'))::int b_noise,
-        count(*) FILTER (WHERE NOT published AND exclude_at IS NULL AND COALESCE(pipeline_status,'') NOT IN ('excluded','noise','held')
-          AND COALESCE(synth_count, 0) = 0)::int b_rv0,
-        count(*) FILTER (WHERE NOT published AND exclude_at IS NULL AND COALESCE(pipeline_status,'') NOT IN ('excluded','noise','held')
-          AND synth_count IN (1, 2))::int b_rv12,
-        count(*) FILTER (WHERE NOT published AND exclude_at IS NULL AND COALESCE(pipeline_status,'') NOT IN ('excluded','noise','held')
-          AND synth_count = 2)::int b_rv2,
-        count(*) FILTER (WHERE NOT published AND exclude_at IS NULL AND COALESCE(pipeline_status,'') NOT IN ('excluded','noise','held')
-          AND synth_count IN (3, 4))::int b_hys,
-        count(*) FILTER (WHERE NOT published AND exclude_at IS NULL AND COALESCE(pipeline_status,'') NOT IN ('excluded','noise','held')
-          AND synth_count >= 5 AND needs_llm)::int b_llm,
-        count(*) FILTER (WHERE NOT published AND exclude_at IS NULL AND COALESCE(pipeline_status,'') NOT IN ('excluded','noise','held')
-          AND synth_count >= 5 AND NOT COALESCE(needs_llm, false))::int b_etc
+        count(*) FILTER (WHERE ${live} AND COALESCE(synth_count, 0) = 0)::int b_rv0,
+        count(*) FILTER (WHERE ${live} AND synth_count BETWEEN 1 AND $2 - 1)::int b_rvlow,
+        count(*) FILTER (WHERE ${live} AND synth_count >= $2 AND $3 > 0 AND (raw_collected_at IS NULL OR raw_collected_at < now() - make_interval(days => $3::int)))::int b_stale,
+        count(*) FILTER (WHERE ${live} AND synth_count >= $2 AND NOT ($3 > 0 AND (raw_collected_at IS NULL OR raw_collected_at < now() - make_interval(days => $3::int))) AND needs_llm AND llm_judged_at IS NULL)::int b_llm,
+        count(*) FILTER (WHERE ${live} AND synth_count >= $2 AND NOT ($3 > 0 AND (raw_collected_at IS NULL OR raw_collected_at < now() - make_interval(days => $3::int))) AND NOT (needs_llm AND llm_judged_at IS NULL))::int b_etc
       FROM cafes WHERE area IS NOT NULL AND area <> ''
-      GROUP BY 1`)) as any[];
+      GROUP BY 1`, [cutStr, R, FRESH])) as any[];
     // 🧭 시도 롤업 — 지도와 같은 classifyArea. 합계 가능한 항목만 더하고, 비율·평균은 합계에서 다시 계산한다.
-    const SUM_KEYS = ["reg", "pub", "verified", "rv_sum", "low_coh", "offctx", "queue",
-      "b_excl", "b_noise", "b_rv0", "b_rv12", "b_rv2", "b_hys", "b_llm", "b_etc"] as const;
+    const SUM_KEYS = ["reg", "pub", "verified", "rv_sum", "low_coh", "offctx", "queue", "fresh", "all_old", "no_date",
+      "b_excl", "b_noise", "b_rv0", "b_rvlow", "b_stale", "b_llm", "b_etc"] as const;
     const acc = new Map<string, Record<string, number>>();
     let unmapped = 0;
     for (const r of raw) {
@@ -61,13 +65,14 @@ export async function GET(req: NextRequest) {
       for (const k of SUM_KEYS) cur[k] = (cur[k] ?? 0) + (Number(r[k]) || 0);
       acc.set(sido, cur);
     }
-    const rows = [...acc.entries()].map(([sido, v]) => ({
-      sido, ...v,
+    const rows = [...acc.entries()].map(([sido, v]: [string, Record<string, number>]) => ({
+      sido, ...v, pub: v.pub, reg: v.reg,
       pass_pct: v.reg ? Math.round((1000 * v.pub) / v.reg) / 10 : null,
       ver_pct: v.pub ? Math.round((1000 * v.verified) / v.pub) / 10 : null,
       avg_rv: v.pub ? Math.round((10 * v.rv_sum) / v.pub) / 10 : null,
+      fresh_pct: (v.fresh + v.all_old) ? Math.round((1000 * v.fresh) / (v.fresh + v.all_old)) / 10 : null, // 날짜 있는 공개 카페 중 최근 18개월 후기 보유율
     })).sort((a, b) => b.pub - a.pub);
-    return NextResponse.json({ ok: true, rows, unmapped, at: new Date().toISOString() }, { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json({ ok: true, rows, unmapped, criteria: { floor: R, freshDays: FRESH, oldMonths: OLD_REVIEW_MONTHS, cut: cutStr }, at: new Date().toISOString() }, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e).slice(0, 120) }, { status: 500 });
   }
