@@ -19,6 +19,8 @@ export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 #   cron-enrich는 네이버를 **한 콜도 안 쓴다**(평판 점검은 DB 작업) — 예약 근거가 없었다.
 #   과다 예약분이 그대로 수집을 굶겨 적체가 쌓였다. 실측의 3배(600)만 남긴다.
 export COLLECT_CRON_RESERVE=${COLLECT_CRON_RESERVE:-600}
+# 🔬 측정 스위치(09-25) — /tmp/coffee-qlog-on 이 있을 때만 질의별 상호 일치 건수를 남긴다(추가 콜·샤드 0, 동작 무변경).
+[ -f /tmp/coffee-qlog-on ] && export COLLECT_QLOG="/Users/wangwida/coffee-platform/agent-reports/logs/collect-qlog-$(date +%Y%m%d).ndjson"
 # 🌙 새벽 하드가드(2026-09-05, CEO 절대지시 "새벽에 DB 깨우지 마라") — 스케줄이 어떻게 드리프트해도
 #   08시 전에는 무조건 침묵. 실제 사고: plist가 문서(08:15)와 달리 06:05로 옮겨져 있어 매일 새벽 6시에
 #   DB를 깨워 일했다(9/5 06:09 원장 실측). 스케줄은 08:05로 정정했고, 이 가드는 이중 안전판이다.
