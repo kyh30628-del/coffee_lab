@@ -24,7 +24,8 @@ import { sql } from "./db";
 // 2026-09-13 해자 감사: 등급 가중·게이트(synthStore·collectOrchestrator)·광고템플릿·경쟁인용 파일이 빠져 있어
 //   그 파일이 바뀌어도 재검이 안 돌았다(지문 16종 공존 실측). 판정을 바꿀 수 있는 파일은 전부 넣는다.
 const RULE_FILES = ["lib/reviewQuality.ts", "lib/criteriaListsBase.ts", "lib/discover.ts",
-  "lib/synthStore.ts", "lib/collectOrchestrator.ts", "lib/adTemplate.ts", "lib/competitorQuote.ts"];
+  "lib/synthStore.ts", "lib/collectOrchestrator.ts", "lib/adTemplate.ts", "lib/competitorQuote.ts",
+  "lib/data/dong-index.json"]; // 09-24: 동 사전(타지역 판정 입력)이 바뀌면 재검이 돌아야 한다 — next.config 추적 목록과 짝
 /** 🧬 규칙 소스 정규화 — 판정 로직만 남긴다.
  *
  *  왜(2026-09-16 실측): 지문은 파일 **바이트**를 통째로 해시했다. 주석도 바이트다.

@@ -24,7 +24,7 @@ const nextConfig: NextConfig = {
     "/api/orchestrator": ["./.ai-paused"],
     // 🧬 규칙 지문(rulesFingerprint)이 런타임에 규칙 소스를 해시한다 — 번들에 포함해야 읽힌다.
     //   규칙 파일 3개만(전체 lib 아님 — 번들 크기 영향 최소).
-    "/api/cron-resynth": ["./lib/reviewQuality.ts", "./lib/criteriaListsBase.ts", "./lib/discover.ts", "./lib/synthStore.ts", "./lib/collectOrchestrator.ts", "./lib/adTemplate.ts", "./lib/competitorQuote.ts"],
+    "/api/cron-resynth": ["./lib/reviewQuality.ts", "./lib/criteriaListsBase.ts", "./lib/discover.ts", "./lib/synthStore.ts", "./lib/collectOrchestrator.ts", "./lib/adTemplate.ts", "./lib/competitorQuote.ts", "./lib/data/dong-index.json"],
     "/api/cron-sentinel": ["./lib/reviewQuality.ts", "./lib/criteriaListsBase.ts", "./lib/discover.ts"],
   },
   // 🧭 홈(랜딩) HTML은 항상 최신으로 — 인스타·페북 등 인앱 브라우저(WebView)가 must-revalidate를 무시하고
