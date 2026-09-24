@@ -905,7 +905,7 @@ export default function AdminPage() {
                   })}</tbody>
                 </table>
               )}
-              <p className="text-[10px] text-stone-500 mt-2">통과율=공개/등록 <span className="text-stone-400">(클릭하면 미달 원인)</span> · 오염신호=이름불일치(coh&lt;0.5)+맥락의심 건수 · 최신성=최근 {rq.criteria?.oldMonths ?? 18}개월({rq.criteria?.cut ?? ""} 이후) 검증 후기 보유율 · 전부 오래됨=재수집·폐업확인 대상 · 공개선 검증 {rq.criteria?.floor ?? "?"}건·수집 {rq.criteria?.freshDays ?? "?"}일 이내(현행 기준 자동 반영) · 새 시도는 발굴 시작 시 자동 표시</p>
+              <p className="text-[10px] text-stone-500 mt-2">통과율=공개/등록 <span className="text-stone-400">(클릭하면 미달 원인)</span> · 오염신호=이름불일치(coh&lt;0.5)+맥락의심 건수 · 최신성=최근 {rq?.criteria?.oldMonths ?? 18}개월({rq?.criteria?.cut ?? ""} 이후) 검증 후기 보유율 · 전부 오래됨=재수집·폐업확인 대상 · 공개선 검증 {rq?.criteria?.floor ?? "?"}건·수집 {rq?.criteria?.freshDays ?? "?"}일 이내(현행 기준 자동 반영) · 새 시도는 발굴 시작 시 자동 표시</p>
             </div>
           )}
         </div>
