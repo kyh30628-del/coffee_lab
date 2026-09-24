@@ -322,7 +322,11 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   const _ob = offconceptBrand(name);
   const _offHit = qz.filter((q) => OFFCONCEPT_VENUE.test(q));
   const offConceptHit = _offHit.length >= 3 && _ob.length >= 2 && (_offHit.filter((q) => q.includes(_ob)).length / Math.max(qz.length, 1)) >= 0.66;
-  const noisy = (collected >= getCriterionSync("contamination.noisy.min_collected") && coherence < getCriterionSync("contamination.noisy.coherence_max")) || isGenericFoodName(name) || entityPolluted || noCafeIdentity || offConceptHit;
+  // 🔧 09-24: 09-18 설계("게이트를 비율이 아니라 **남은 진짜 후기 건수**로") — LLM 분기(cleanedOk)에만 적용되고
+  //   영구 비공개(noise)는 비율만 봤다. 오염을 걸러낸 뒤 진짜 후기가 문턱 이상 남고 화면엔 그것만 나가면 noise로 떨어뜨리지 않는다.
+  //   (계기: 자기 지역 오판 수리로 진짜 후기가 늘자 비율이 내려가 멀쩡한 카페가 noise 영구 비공개 — 소도리카페·페이스커피 등)
+  const cleanedEnough = filterApplied === true && (onTopicCount ?? 0) >= getCriterionSync("contamination.filter.min_ontopic");
+  const noisy = (collected >= getCriterionSync("contamination.noisy.min_collected") && coherence < getCriterionSync("contamination.noisy.coherence_max") && !cleanedEnough) || isGenericFoodName(name) || entityPolluted || noCafeIdentity || offConceptHit;
   // 🔀 판정 분기 신호: 진짜 '맥락판단'이 필요한 경우만 LLM으로(규칙 우선 극대화).
   //   ⚠️ 경계후기 존재만으로 LLM 보내지 않음 — 경계후기는 어차피 합성서 제외되어 공개 내용에 안 들어가고,
   //      이미 '깨끗한 후기'로 검증/참고 등급이 난 카페는 규칙으로 공개해도 안전(품질 위험 0).

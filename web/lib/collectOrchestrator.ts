@@ -379,7 +379,11 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
   //      그래서 남은 건수가 문턱에 못 미치면 **필터를 적용하지 않고** 원래 근거를 그대로 둔다 —
   //      근거가 얇아져 등급이 조용히 내려가는 사고를 막는 쪽이 안전하다.
   const cohAreaTerms = (area ?? []).filter(Boolean);
-  const onTopic = (e: EvidenceReview) => nameCoherence(name, [e.quote ?? ""], cohAreaTerms, opts?.address) === 1;
+  // 🔧 09-24: '제목이 이 카페(주제 글)'로 검증된 글은 인용 조각에 상호가 없어도 이 카페 얘기다(제목이 가장 강한 신호).
+  //   종전엔 조각만 봐서, 자기 지역 오판 수리로 되살아난 진짜 후기('사천 소도리카페' 제목)가 일치율을 깎아 카페가 noise로 떨어졌다
+  //   (실측 9곳: 소도리카페 0.8→0.33·노아스로스팅 0.6→0.33). 타지역·타지점 동명 글은 이 단계 전에 지역 판정이 거른다.
+  const onTopic = (e: EvidenceReview) => nameCoherence(name, [e.quote ?? ""], cohAreaTerms, opts?.address) === 1
+    || (e.trust === "verified" && ((e as any).why ?? []).some((w: string) => String(w).startsWith("제목이 이 카페")));
   const evOnTopic = evDedup.filter(onTopic);
   // ⚠️ 분모를 바꾸면 안 된다(2026-09-18에 하마터면 사고). 종전 coherence는 **표시 6건** 기준이고
   //   noisy 게이트(0.4 미만=오염 즉시 차단)가 그 값을 본다. 옥석 전체로 분모를 키우면 값이 내려가
