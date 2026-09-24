@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "preflight": "node --import tsx scripts/preflight.mjs",
-    "ship": "npm run preflight && npm run build && npm run smoke && git push origin main",
+    "ship": "npm run preflight && npm run fixtures && npm run build && npm run smoke && git push origin main",
+    "fixtures": "node scripts/fixtures-all.mjs",
     "smoke": "node --import tsx scripts/smoke.mjs"
   },
   "dependencies": {

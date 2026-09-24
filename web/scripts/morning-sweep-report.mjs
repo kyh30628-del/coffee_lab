@@ -191,5 +191,12 @@ try {
   say(`   신규: ${fresh.map(row).join(" · ")}`);
 } catch (e) { say(`⑦ 유입효율 조회 실패: ${String(e).slice(0, 60)}`); }
 
+// ⑧ 🛡️ 검증 엔진 회귀 관문 — DB 학습 사전까지 적용해서(2026-09-24). 룰갭 에이전트가 밤새 바꾼 사전이 기존 규칙을 깼는지 매일 본다.
+try {
+  const { spawnSync } = await import("node:child_process");
+  const fx = spawnSync(process.execPath, ["scripts/fixtures-all.mjs", "--db"], { cwd: new URL("..", import.meta.url).pathname, encoding: "utf8", timeout: 600_000 });
+  const out = `${fx.stdout || ""}`.trim().split("\n");
+  say(fx.status === 0 ? `⑧ 🛡️ ${out[0]} ✅` : `⑧ 🛡️ 🔴 ${out.join(" / ").slice(0, 300)} — 규칙 회귀(오염 재개방 위험), 오늘 규칙 변경부터 확인`);
+} catch (e) { say(`⑧ 검증 엔진 회귀 관문 실행 실패: ${String(e).slice(0, 60)}`); }
 const { writeFileSync } = await import("node:fs");
 writeFileSync(`${dir}/morning-sweep-${ymd}.log`, out.join("\n") + "\n");

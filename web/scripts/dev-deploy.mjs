@@ -2,7 +2,7 @@
 //   브랜치를 main에 merge + push(=Vercel 배포) + /api/version 반영 확인 → decision done · coordination resolved.
 //   서버(Vercel)는 배포 못 하므로 로컬에서만. 실패 시 정직히 기록(deploy_failed), main 오염 안 되게 안전 처리.
 import { readFileSync, mkdirSync, rmdirSync, existsSync, writeFileSync, appendFileSync, statSync } from "node:fs";
-import { execSync } from "node:child_process";
+import { execSync, spawnSync } from "node:child_process";
 import { neon } from "@neondatabase/serverless";
 import { reconcileUnverified } from "./reconcileUnverified.mjs";
 const ROOT = "/Users/wangwida/coffee-platform";
@@ -131,6 +131,12 @@ for (const d of rows) {
     // 💰 2026-09-05(CEO 승인 다이어트 #3): 태스크당 push→빌드(평균 10.5분 × N회)를 **묶음 1회**로.
     //   여기서는 병합·아카이브까지만 하고, push와 반영확인·종결은 루프 밖에서 전체 한 번에 처리한다.
     //   (오늘 실측: dev 6건이 6빌드 = 약 63분 빌드 낭비. "배포는 묶어서" 규칙의 파이프라인 구현.)
+    // 🛡️ 검증 엔진 회귀 관문(2026-09-24 CEO 지시) — 병합된 코드로 픽스처 전부를 돌린다. 실패하면 throw →
+    //   아래 catch(mergeStarted=true)가 이 병합을 되돌리고 결재에 사유를 남긴다. 어제 막은 오염이 에이전트 배포로 다시 열리는 걸 막는다.
+    {
+      const fx = spawnSync(process.execPath, ["scripts/fixtures-all.mjs"], { cwd: `${ROOT}/web`, encoding: "utf8", timeout: 600_000 });
+      if (fx.status !== 0) throw new Error(`검증 엔진 회귀 관문 실패 — 배포 중단: ${`${fx.stdout || ""}${fx.stderr || ""}`.replace(/\s+/g, " ").slice(0, 220)}`);
+    }
     mergedBatch.push({ d, br, coord, sha });
     console.log(`  🔗 #${d.id} 병합 완료(푸시는 묶음 1회로) ${sha.slice(0, 8)}`);
   } catch (e) {
