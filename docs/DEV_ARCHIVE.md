@@ -384,3 +384,4 @@
 | 2026-09-24 00:18 | #1223 | [개발] 협업 #447: sentinel.attraction 동결 42건 0판독 — 표본 2건 오탐 확인(a | 80039bb7 | - | app/api/cron-sentinel/route.ts: attrMarkers()에 커피숍/로스터리/베이커리/제과점 접미사 추가(canonName과 동기화, 카페 접미사만 있던 버 |
 | 2026-09-24 00:18 | #1225 | [검색UX 신규] 장소인덱스 제네릭 명칭(공원·근린공원·쉼터 등) 앵커오탐 — POI 하이재킹 신규 계열 | 7ca55385 | - | lib/placeIndex.ts: isAmbiguousAnchorName() 추가(같은 anchor-kind 이름이 5km+ 떨어진 지점 3곳 이상이면 비고유로 판정, search |
 | 2026-09-24 07:05 | #1237 | [정합성] import-permits 교차중복 재발(#444 후속) — 이름변형(영문/병기) 때문에 dedu | 451862df | - | lib/reviewQuality.ts brandTokenOverlap() 구조수정: 토큰레벨 완전일치 실패 시(예: 괄호 병기 상호로 코어토큰이 통째로 뭉쳐 비교실패) 전체이름 상 |
+| 2026-09-24 07:11 | #1243 | [룰갭 신규] 상위개체 부속 카페 — 관광지·리조트·체험관·복지시설 콘텐츠가 검증리뷰로 오채택(8곳, 1곳  | 17f8c67d | - | lib/reviewQuality.ts: TOURIST_FACILITY_INFO_VOCAB 신규 상수(입장료·체크인·굿즈샵·체험관·복지사업·돌봄강화·일자리창출·전통마을·야행축제·탐방 |
