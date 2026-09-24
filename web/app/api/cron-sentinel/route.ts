@@ -77,10 +77,17 @@ async function scanNameMismatch(): Promise<{ count: number; far: number; nameMis
 //   판정: 노출후기가 ①강한 명소·행사 문맥어를 담고 ②카페명 마커(글자붙인 전체명 or 코어토큰+카페/커피)가 없으면 오염.
 //   ⚠️ 탐지·경보 전용(자동 비공개 안 함) — 명소 근처 정상 카페 오탐 가능, CEO/기조실장 검토 큐로만.
 const ATTR_STRONG = /(축제|공연장|풍물|사물놀이|남사당놀이|무형문화재|셔틀\s*버스|입장료|매표소|관람권|전시회|전시관|박물관|미술관|테마파크|놀이공원|팜랜드|퍼레이드|불꽃놀이|행사장|축제장|민속촌|한옥마을|동물원|식물원|수목원|워터파크|케이블카|유원지|경기장|야구장|경마장|바우덕이|풍물단)/;
+// ⚠️ canonName(line ~204)이 인식하는 업종 접미사(카페/커피숍/커피/로스터리/베이커리/제과점)와 반드시 동기화 —
+//   빠진 접미사가 있으면 그 업종으로 이름 붙인 카페의 정상 자기서술 후기가 마커 미매칭으로 오탐-동결된다
+//   (협업#447, decisions#1223: 베이커리·제과점 누락으로 타르데마 베이커리·벨라쿠키 2건 오탐 확인).
+const ATTR_SUFFIXES = ["카페", "커피숍", "커피", "로스터리", "베이커리", "제과점"];
 function attrMarkers(name: string, at: string[]): string[] {
   const s = new Set<string>();
   const raw = (name || "").replace(/\s/g, "").toLowerCase(); if (raw.length >= 3) s.add(raw);
-  for (const t of coreTokens(name, at)) { const n = t.replace(/\s/g, "").toLowerCase(); if (n.length >= 2) { s.add(n + "카페"); s.add(n + "커피"); s.add("카페" + n); s.add("커피" + n); } }
+  for (const t of coreTokens(name, at)) {
+    const n = t.replace(/\s/g, "").toLowerCase();
+    if (n.length >= 2) { for (const suf of ATTR_SUFFIXES) { s.add(n + suf); s.add(suf + n); } }
+  }
   return [...s];
 }
 type AttrFlag = { id: number; name: string; area: string; bad: number; shown: number };
