@@ -1252,3 +1252,5 @@ export async function healPublishedAudit(limit = 600, unpubCap = 120, budgetMs?:
   }
   return { scanned, unpublished, flagged, regression, names: names.slice(0, 8) };
 }
+
+// 2026-09-24 재배포 트리거 — 09:26 푸시(86993218)가 Vercel 웹훅 미발화로 빌드되지 않았다.
