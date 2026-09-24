@@ -105,6 +105,9 @@ export function monthlySeries(dates: unknown, months = 14): { key: string; n: nu
   for (const d of arr) { const i = idx.get(d.slice(0, 7)); if (i !== undefined) out[i].n++; }
   return out;
 }
+// 🕰️ 후기 나이 — 정의는 cafeProfile.ts(요약 가중치도 같이 쓴다·순환 import 방지). 화면 네 곳은 여기서 가져간다.
+export { reviewAge, OLD_REVIEW_MONTHS } from "./cafeProfile";
+
 export function freshnessOf(dates: unknown): { recent: number; latest: string; stale: boolean } | null {
   const arr = Array.isArray(dates) ? (dates as unknown[]).map(String).filter((d) => DATE_RE.test(d)) : [];
   if (!arr.length) return null;

@@ -430,3 +430,5 @@
 /* 홈 카드용 작은 추억 저장(도장 아래 메타 줄 오른쪽 끝) */
 .nt-mem.sm { height: 28px; padding: 0 12px 0 10px; font-size: 14.5px; margin-top: 6px; } /* 도장 아래 6px 띄움(실측: 도장 하단 414 / 버튼 상단 409 겹침) */
 .nt-mem.sm svg { width: 13px; height: 13px; }
+/* 🕰️ 1년 반(18개월) 넘은 후기 날짜 딱지(2026-09-24 CEO 지시 "눈에 띄게") — 주의점과 같은 도장색. 네 화면 공용(전역). */
+.nt-old { display: inline-flex; align-items: center; margin-left: 6px; padding: 0 7px; height: 20px; border: 1.5px solid var(--nt-stamp, #a93a32); border-radius: 4px; background: rgba(169, 58, 50, 0.08); color: var(--nt-stamp, #a93a32); font: 600 12.5px/1 var(--nt-gothic, system-ui, sans-serif); letter-spacing: 0; vertical-align: 2px; white-space: nowrap; -webkit-text-stroke: 0; }

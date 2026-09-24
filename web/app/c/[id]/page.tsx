@@ -19,7 +19,7 @@ import { collectionForCafe } from "@/lib/collections";
 import { tasteByKey } from "@/lib/seoData";
 import { shareHookText } from "@/lib/shareCopy";
 import { sortReviews, ensureRecent } from "@/lib/exposureOrder";
-import { isOtherBusinessQuote, displayQuote, splitKeyTerms, rankNearby, nearbyTitle, fmtKm, monthlySeries, freshnessOf, CHAR_LABEL, charBarsOf, addrTail, igHandle, type NearbyCafe } from "@/lib/cafeDetailView";
+import { isOtherBusinessQuote, displayQuote, splitKeyTerms, rankNearby, nearbyTitle, fmtKm, monthlySeries, freshnessOf, CHAR_LABEL, charBarsOf, addrTail, igHandle, reviewAge, type NearbyCafe } from "@/lib/cafeDetailView";
 import { extractWorkSignals } from "@/lib/workDetail";
 import PlaceCta from "@/app/PlaceCta";
 import OutboundLink from "../../OutboundLink";
@@ -237,7 +237,7 @@ export default async function CafePage({ params }: Props) {
   const shownQuotes = readable.slice(0, 3);
   const moreQuotes = readable.slice(3, 12); // 접힘 — 페이지 길이는 안 늘고 정보는 있다
   const showQuotes = shownQuotes.length >= 2;
-  const highlights = extractHighlights(quotesAll);
+  const highlights = extractHighlights(quotesAll, 6, evAll.map((e: any) => e?.date)); // 🕰️ 최근 후기 가중(09-24)
   // 💻 카공 세부 신호(2026-08-17) — "작업하기 좋음" 한 축으로 뭉뚱그리던 것을 콘센트·와이파이·자리로 쪼갠다.
   //   실측: 테마 수요 상위 8개 중 7개가 카공인데 정작 카공족이 묻는 건 이 시설 정보였다.
   //   ⚠️ 추가 조회 0(이미 읽은 인용문 재사용) · LLM 0(규칙) · 근거 없으면 아무것도 안 그린다.
@@ -333,7 +333,7 @@ export default async function CafePage({ params }: Props) {
     return (
       <blockquote key={e?.link ?? i} className={dq.readable ? "nt-q" : "nt-q t"}>
         {dq.readable ? <>“{body}”</> : body}
-        {(e?.source || e?.date) && <span className="m">{e?.source ?? ""}{e?.date ? ` · ${String(e.date).slice(0, 7)}` : ""}</span>}
+        {(e?.source || e?.date) && (() => { const ag = reviewAge(e?.date); return <span className="m">{e?.source ?? ""}{ag?.old ? <span className="nt-old">{ag.ym} · {ag.ago} 후기</span> : e?.date ? ` · ${String(e.date).slice(0, 7)}` : ""}</span>; })()}
       </blockquote>
     );
   };

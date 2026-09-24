@@ -4,6 +4,7 @@ import BackLink from "../BackLink";
 import { trackOutbound } from "../trackOutboundClient";
 import { useLockBodyScroll } from "@/lib/useLockBodyScroll";
 import { decodeCafeScores } from "@/lib/mapCafes";
+import { reviewAge } from "@/lib/cafeDetailView"; // 🕰️ 1년 반 넘은 후기 날짜 딱지(09-24)
 
 type EvidenceReview = { quote: string; link?: string; source?: string; date?: string };
 type Cafe = {
@@ -144,7 +145,7 @@ function EvidencePanel({ cafe, onClose }: { cafe: Cafe | null; onClose: () => vo
               <div key={i} className="border-b border-[#f0e6d4] pb-3 last:border-0">
                 <div className="text-[14px] text-[#3d2f22] leading-relaxed">“{rv.quote}”</div>
                 <div className="flex items-center gap-2 mt-1.5 text-[11px] text-[#6b5847]">
-                  <span>{rv.source}</span>{rv.date && <span>· {rv.date}</span>}
+                  <span>{rv.source}</span>{rv.date && (() => { const ag = reviewAge(rv.date); return ag?.old ? <span className="nt-old" style={{ marginLeft: 0 }}>{ag.ym} · {ag.ago} 후기</span> : <span>· {rv.date}</span>; })()}
                   {rv.link && <a href={rv.link} target="_blank" rel="noopener noreferrer" className="text-[#7a4d1c] underline ml-auto">원문 보기 →</a>}
                 </div>
               </div>

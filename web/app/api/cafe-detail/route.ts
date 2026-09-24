@@ -26,7 +26,8 @@ export async function GET(req: NextRequest) {
     const quality = rows[0]?.synth_quality ?? null;
     const llmJudged = !!rows[0]?.llm_judged_at;
     // 옥석 리뷰에서 소비자가 꼭 볼 구체 포인트를 빈도로 추출(데이터 기반 핵심)
-    const highlights = extractHighlights((Array.isArray(reviews) ? reviews : []).map((r: any) => r?.quote || ""));
+    const revArr = Array.isArray(reviews) ? reviews : [];
+    const highlights = extractHighlights(revArr.map((r: any) => r?.quote || ""), 6, revArr.map((r: any) => r?.date)); // 🕰️ 최근 후기 가중(09-24)
     // ⚠️ "이건 알고 가세요" — 지도·홈에서 여는 상세 패널에도 근거 문장까지 그대로 내려준다(작은 jsonb 1개).
     const cautions = Array.isArray(rows[0]?.cautions) ? rows[0].cautions : [];
     return NextResponse.json({ ok: true, area: rows[0]?.area ?? null, reviews, quality, llmJudged, highlights, cautions, reputationNote: rows[0]?.reputation_note ?? null,

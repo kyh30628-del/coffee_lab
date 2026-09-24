@@ -173,17 +173,36 @@ function hasPositiveMention(text: string, kws: string[]): boolean {
 
 export type Highlight = { label: string; emoji: string; count: number };
 // 검증 리뷰들에서 피처별 '긍정 언급 후기 수'를 세어 상위 N개. 보수적 임계(표본의 9%+·최소 3건).
-export function extractHighlights(texts: string[], topN = 6): Highlight[] {
-  const arr = (texts || []).map((t) => (t || "").toLowerCase()).filter(Boolean);
-  if (arr.length < 6) return []; // 표본 너무 적으면(분석 신뢰 낮음) 생략
-  const minCount = Math.max(3, Math.round(arr.length * 0.09)); // 보수적: 9%+ & 최소 3건
-  const out: Highlight[] = [];
+// 🕰️ 후기 나이(2026-09-24 CEO 지시: "1년 반 전 후기는 눈에 띄게 날짜 처리") — 메뉴·분위기는 바뀐다.
+//   실측(공개 1,000곳): 검증 후기의 56%가 18개월보다 오래됐다. 빼면 공개 카페 16.7%가 사라지므로
+//   **빼지 않고 드러낸다**. 네 화면(패널 인용·패널 전체 목록·/c/[id]·/cafe)이 이 함수 하나를 쓴다.
+export const OLD_REVIEW_MONTHS = 18;
+export function reviewAge(date: unknown, now = Date.now()): { ym: string; old: boolean; ago: string } | null {
+  const m = String(date ?? "").match(/^(\d{4})[.\-](\d{1,2})/);
+  if (!m) return null;
+  const d = new Date(now);
+  const months = (d.getFullYear() - Number(m[1])) * 12 + (d.getMonth() + 1 - Number(m[2]));
+  const ym = `${m[1]}.${m[2].padStart(2, "0")}`;
+  if (months < OLD_REVIEW_MONTHS) return { ym, old: false, ago: "" };
+  return { ym, old: true, ago: months < 24 ? "1년 반 전" : `${Math.floor(months / 12)}년 전` };
+}
+
+// 🕰️ dates(선택, texts와 같은 순서) — 2026-09-24 CEO 승인 "요약은 최근 후기에 가중".
+//   표시 숫자(count)와 등장 기준(9%·최소 3건)은 **실제 건수 그대로**. 바뀌는 건 순서·상위 N 선정뿐이다:
+//   18개월 넘은 후기는 0.5점으로 쳐서 요즘 많이 나오는 특징이 앞에 선다(정보는 빠지지 않는다).
+//   검색 패싯(extractFacets)은 dates를 넘기지 않으므로 무변.
+export function extractHighlights(texts: string[], topN = 6, dates?: unknown[]): Highlight[] {
+  const rows = (texts || []).map((t, i) => ({ t: (t || "").toLowerCase(), w: dates ? (reviewAge(dates[i])?.old ? 0.5 : 1) : 1 })).filter((r) => r.t);
+  if (rows.length < 6) return []; // 표본 너무 적으면(분석 신뢰 낮음) 생략
+  const minCount = Math.max(3, Math.round(rows.length * 0.09)); // 보수적: 9%+ & 최소 3건
+  const out: (Highlight & { score: number })[] = [];
   for (const f of HIGHLIGHTS) {
-    const c = arr.filter((t) => hasPositiveMention(t, f.kws)).length;
+    const hit = rows.filter((r) => hasPositiveMention(r.t, f.kws));
+    const c = hit.length;
     const need = f.min ?? minCount;   // 사실형 피처(주차·단체·노키즈…)는 전용 최소치, 인상 어휘는 공통 보수 임계
-    if (c >= need) out.push({ label: f.label, emoji: f.emoji, count: c });
+    if (c >= need) out.push({ label: f.label, emoji: f.emoji, count: c, score: hit.reduce((s, r) => s + r.w, 0) });
   }
-  return out.sort((a, b) => b.count - a.count).slice(0, topN);
+  return out.sort((a, b) => b.score - a.score || b.count - a.count).slice(0, topN).map(({ score: _s, ...h }) => h);
 }
 
 // 🔎 검색용 시설·특징 패싯(2026-09-14, CEO "주차·반려동물 같은 정보로도 검색되게").

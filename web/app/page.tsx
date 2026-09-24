@@ -19,7 +19,7 @@ import { FACET_EMOJI } from "@/lib/cafeProfile";
 import { useLockBodyScroll } from "@/lib/useLockBodyScroll";
 import { shareHookText } from "@/lib/shareCopy";
 import { decodeCafeScores } from "@/lib/mapCafes";
-import { isOtherBusinessQuote, displayQuote, splitKeyTerms, rankNearby, nearbyTitle, fmtKm, monthlySeries, freshnessOf, CHAR_LABEL, charBarsOf, addrTail, igHandle } from "@/lib/cafeDetailView"; // 📓 상세 패널 2차 공용 계산
+import { isOtherBusinessQuote, displayQuote, splitKeyTerms, rankNearby, nearbyTitle, fmtKm, monthlySeries, freshnessOf, CHAR_LABEL, charBarsOf, addrTail, igHandle, reviewAge } from "@/lib/cafeDetailView"; // 📓 상세 패널 2차 공용 계산
 
 type EvidenceReview = { quote: string; link?: string; source?: string; date?: string; trust?: "verified" | "reference" | "rejected"; score?: number; why?: string[] };
 type QualityStats = { raw: number; verified: number; reference: number; rejected: number; duplicates?: number; rejectReasons?: Record<string, number> };
@@ -3032,7 +3032,7 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
     return (
       <blockquote key={e?.link ?? i} className={dq.readable ? "nt-q" : "nt-q t"}>
         {e.link ? <a href={e.link} target="_blank" rel="noopener noreferrer" className="hover:text-[#7a5122]">{body}</a> : body}
-        {(e?.source || e?.date) && <span className="m">{e?.source ?? ""}{e?.date ? ` · ${String(e.date).slice(0, 7)}` : ""}</span>}
+        {(e?.source || e?.date) && (() => { const ag = reviewAge(e?.date); return <span className="m">{e?.source ?? ""}{ag?.old ? <span className="nt-old">{ag.ym} · {ag.ago} 후기</span> : e?.date ? ` · ${String(e.date).slice(0, 7)}` : ""}</span>; })()}
       </blockquote>
     );
   };
@@ -3348,7 +3348,7 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
                       : <div className="text-[13.5px] text-[#3d2f22] leading-[1.75]">"{hlQuote(rv.quote)}"</div>}
                     <div className="flex items-center gap-2 mt-1.5 text-[10px] text-[#54432c]">
                       {rv.link && /youtu\.?be/.test(rv.link) && <span className="text-white rounded-[3px] px-1 py-0.5" style={{ background: "#c4302b", fontSize: "8px" }}>▶ YouTube</span>}
-                      <span>{rv.source}</span>{rv.date && <span>· {rv.date}</span>}
+                      <span>{rv.source}</span>{rv.date && (() => { const ag = reviewAge(rv.date); return ag?.old ? <span className="nt-old" style={{ marginLeft: 0 }}>{ag.ym} · {ag.ago} 후기</span> : <span>· {rv.date}</span>; })()}
                       {rv.link && (/youtu\.?be/.test(rv.link)
                         ? <a href={rv.link} target="_blank" rel="noopener noreferrer" className="text-[#c4302b] font-medium ml-auto">영상 보기 →</a>
                         : <a href={rv.link} target="_blank" rel="noopener noreferrer" className="text-[#7a5122] underline ml-auto">원문 →</a>)}
