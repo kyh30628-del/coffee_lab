@@ -420,6 +420,28 @@ const VENDOR_SRC = /어닝|간판|광고\s*디자인|디자인\s*(그룹|즈)|�
 const PLACE_CARD_COPY = /카페\s*,\s*디저트\s*[-–]\s*(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주|전라|경상|충청)/;
 const LISTING_REPORT = /(창업|개업|인허가)\s*(음식점\s*)?현황|신축\s*분양|(아파트|오피스텔|상가|빌라|타운하우스)\s*분양|분양\s*(상담|공급|대행|사무소|현장|홍보관)/; // '분양 정보'만으론 안 잡는다(동물 분양 카페 실측 오탐)
 const ROAD_ADDR_G = /[가-힣0-9]{2,}(?:로|길|리|동)\s*\d+(?:-\d+)?/g; // 도로명·지번 둘 다(id41648은 지번 나열)
+// 🧭 우리 지역 단어 집합(2026-09-24 단일 정의) — "인천 계양구"·"강릉시" 같은 **통째 문자열 비교**가 구성 단어("인천"·"계양"·"강릉")를
+//   우리 지역으로 못 알아봐, 여러 규칙이 **자기 지역을 타지역으로** 버렸다(실측: 다른 지역 동명 135,727건/10,271곳 · 비F&B 다른지역 혼입
+//   2,129건 · 다른 광역시 118건 · 다른 지점 9건). 모든 지역 비교는 이 집합을 쓴다.
+//   ⚠️ 중구·동구·서구·남구·북구는 넣지 않는다 — 여러 도시에 있어 넣으면 대구 중구 카페에 서울 중구 글이 새어 든다.
+const DONG_BARE_STOP = new Set(["중앙", "역전", "시장", "본", "신", "구", "대", "상", "하", "내", "외", "남산", "북", "중"]);
+const AMBIG_GU = new Set(["중구", "동구", "서구", "남구", "북구", "중", "동", "서", "남", "북"]);
+function ownAreaTokens(areaTerms: string[]): string[] {
+  const out = new Set<string>();
+  for (const a of areaTerms) {
+    const full = String(a || "").trim(); if (!full) continue;
+    out.add(full);
+    for (const tk of full.split(/\s+/)) {
+      if (tk.length >= 2 && !AMBIG_GU.has(tk)) out.add(tk);
+      const bare = tk.replace(/(특별시|광역시|특별자치시|특별자치도|시|군|구)$/, "");
+      if (bare.length >= 2 && !AMBIG_GU.has(bare)) out.add(bare);
+      // 동·읍·면 줄임형("신안동"→"신안") — 홀드아웃 오탐: 진주 올디스 "올디스(신안)"를 전남 신안군으로 봤다. 흔한 말이 되는 건 제외.
+      const dbare = tk.replace(/\d*가?(동|읍|면)$/, "");
+      if (dbare !== tk && dbare.length >= 2 && !DONG_BARE_STOP.has(dbare)) out.add(dbare);
+    }
+  }
+  return [...out];
+}
 // 상호 핵심어·지점명(09-24) — "양와당 부천시청점"→핵심 ["양와당"], 지점 ["부천시청점"]. 제목 가드는 띄어쓰기·지점명 차이를 무시하고 본다.
 const NAME_GENERIC_TOK = /^(카페|커피|coffee|cafe|베이커리|bakery|디저트|로스터리|로스터스|로스터즈|제과점|제과|빵집|하우스)$/i;
 function nameParts(name: string): { core: string[]; branch: string[] } {
@@ -1672,8 +1694,8 @@ export function verifyReview(input: QualityInput): QualityResult {
   // 🔴 2026-09-24 수리 — 지역어가 "강릉시"·"광양시"처럼 **전체 이름뿐**이라 제목의 줄임말("강릉 카페 미르마르")을 우리 지역으로
   //   못 알아봤다 → NON_METRO 판정이 **자기 도시를 '다른 지역 동명 카페'로** 버렸다. 실측: 6,654곳·후기 96,235건 오판
   //   (미르마르 145·보사노바 강릉점 76), 그중 비공개 1,135곳. 시군구 줄임말(2자+)을 '우리 지역 언급'에 넣는다(보호 신호로만 쓰임).
-  const areaShorts = areaTerms.map((a) => String(a || "").split(/\s+/).pop()!.replace(/(시|군|구)$/, "")).filter((s) => s.length >= 2 && !areaTerms.includes(s));
-  const areaPresent = areaTerms.length ? [...areaTerms, ...areaShorts].some((a) => `${title} ${body}`.includes(a)) : false;
+  const ownTok = ownAreaTokens(areaTerms); // 광역시 앞머리("대구 중구"의 "대구")까지 — 첫 수리(끝 단어만)가 놓쳤다
+  const areaPresent = areaTerms.length ? ownTok.some((a) => `${title} ${body}`.includes(a)) : false;
   // 룰갭 P43-원인2(#397, coord#208): bareWeak(흔한 인명·일반용어 유일토큰, 아래)의 지역 게이트가 areaTerms
   //   전체(시·구 단위까지 포함)를 인정해, "구" 단위(성동구·마포구 등 핫플 자치구) 일치만으로도 통과했다
   //   (id9426·id1520 실측 — 같은 구 안 무관 콘텐츠와 흔한 인명 오매칭). 동/읍/면/가/리 단위만 골라 더 좁게 요구.
@@ -1815,7 +1837,7 @@ export function verifyReview(input: QualityInput): QualityResult {
   const foreignInTitle = NON_METRO.find((c) => title.includes(c));
   // [#5] 수도권 내 동명 '다른 지점': 대상 시·군·구를 알 때, 제목에 다른 시·군·구가
   //     박히고 대상 지역어가 어디에도 없으면 다른 지점으로 보고 배제.
-  const targetShorts = ALL_GU.map(guShort).filter((s) => s.length >= 2 && areaTerms.some((a) => a.includes(s)));
+  const targetShorts = [...ALL_GU.map(guShort).filter((s) => s.length >= 2 && areaTerms.some((a) => a.includes(s))), ...ownAreaTokens(areaTerms)]; // 09-24: 광주광역시 카페의 '광주'(경기 광주시와 동명) 보호
   const otherGuInTitle = targetShorts.length
     // 🔧 2026-09-24 — title.includes(s)였다: '고양이'가 고양시로, '이천원'이 이천시로 잡혀 진짜 후기가 '다른 지점'으로 버려졌다
     //   (픽스처가 잡음: 마포 카페 "고양이 있는 카페" 제목 후기 거절). 전국판과 같은 단어경계·일반어 제외를 쓴다.
@@ -1829,9 +1851,10 @@ export function verifyReview(input: QualityInput): QualityResult {
     const selfSido = sidoFromAddress(input.addr) ?? "";
     const selfGu = selfSido ? (SIDO_GU[selfSido] ?? []).find((g) => input.addr!.includes(g)) ?? "" : "";
     const selfShort = selfGu.replace(/(시|군|구)$/, "");
-    if (selfSido && selfShort && !`${title} ${body}`.includes(selfShort)) {
+    // 09-24: '우리 지역 언급'은 위 areaPresent(ownAreaTokens)가 이미 판단 — 한 글자 줄임말('중')로 비교하면 서울 중구의 '중'에도 걸려 판정이 꺼졌다.
+    if (selfSido) {
       const fT = foreignSigunguInTitle(title, selfSido, selfShort);
-      if (fT) return { verdict: "rejected", score: 6, reasons: [`다른 지역 동명 가게 추정(제목 '${fT}', 이 카페 ${selfShort} 언급 없음)`], signals: sig };
+      if (fT) return { verdict: "rejected", score: 6, reasons: [`다른 지역 동명 가게 추정(제목 '${fT}', 이 카페 ${selfGu || selfShort} 언급 없음)`], signals: sig };
       const fA = foreignSidoAddress(`${title} ${body}`, selfSido);
       if (fA) return { verdict: "rejected", score: 6, reasons: [`다른 지역 주소 명시('${fA}', 이 카페 ${selfShort} 언급 없음)`], signals: sig };
       const fD = foreignDongInTitle(title, selfSido);
@@ -1887,7 +1910,7 @@ export function verifyReview(input: QualityInput): QualityResult {
       const bare = w.replace(/(동|읍|면|가|리|구|시)$/, "");
       const isKnownArea = LOC_LIKE.test(w) || (bare.length >= 2 && (LOC_LIKE.test(bare) || AREA_NAME.has(bare) || ALL_GU.some((g) => norm(guShort(g)) === norm(bare))));
       if (!isKnownArea) return false;
-      return !areaTerms.some((a) => { const an = norm(a).replace(/(동|읍|면|가|리|구|시)$/, ""); return norm(a) === norm(w) || (an.length >= 2 && an === norm(bare)); });
+      return !ownAreaTokens(areaTerms).some((a) => { const an = norm(a).replace(/(동|읍|면|가|리|구|시)$/, ""); return norm(a) === norm(w) || (an.length >= 2 && an === norm(bare)); }); // 09-24: 구성 단어 단위 비교(인천 계양구 → '인천' 우리 지역)
     });
     if ((otherBizName || otherAreaWord) && !areaPresent) {
       return { verdict: "rejected", score: 6, reasons: [otherBizName ? `naver_category 비F&B 조합 — 다른 상호명 혼입('${otherBizName}')` : `naver_category 비F&B 조합 — 다른 지역 혼입('${otherAreaWord}')`], signals: sig };
@@ -2326,7 +2349,7 @@ export function verifyReview(input: QualityInput): QualityResult {
   const farInTitle = HARD_FAR_METRO.find((m) => title.includes(m));
   if (farInTitle) {
     const farBare = farInTitle.replace("광역시", "");
-    const cafeInFar = areaTerms.some((a) => a.includes(farBare)) || nameNoSpace.includes(farBare);
+    const cafeInFar = areaTerms.some((a) => a.includes(farBare)) || ownAreaTokens(areaTerms).includes(farBare) || nameNoSpace.includes(farBare);
     // 우리 지역이 제목에 함께 있으면(브랜치 소개·출신언급 '대전서 유명한 X의 부천점') 보존.
     //   시·도뿐 아니라 우리 카페의 area/dong 토큰이 제목에 있으면 '우리 지역 글'로 본다(강남·공덕·우면동 등).
     //   ⚠️ 2자 구名(중구·서구…)은 '대구 중구'처럼 먼 광역시에 붙어 우리 지역으로 오인되므로 제외 —

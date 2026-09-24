@@ -24,17 +24,23 @@ const { acquireLease, releaseLease } = await import("../lib/healLease.ts");
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? Number(process.argv[i + 1]) : d; };
 const APPLY = process.argv.includes("--apply");
 const LIMIT = arg("--limit", 7000), CONC = arg("--conc", 4), STOP_H = arg("--stop-hour", 23);
-const pastDeadline = () => new Date(Date.now() + 9 * 3600e3).getUTCHours() >= STOP_H;
+// 🧭 --own-area: 탈락 사유에 **자기 시군구·광역시 앞머리**가 찍힌(09-24 자기 지역 오판 수리 대상) 공개 카페
+const OWN_AREA = process.argv.includes("--own-area");
+const pastDeadline =() => new Date(Date.now() + 9 * 3600e3).getUTCHours() >= STOP_H;
 
 const fp = await rulesFingerprint();
 const top3 = (r) => [0, 1, 2].map((i) => r?.[`l${i}`] ?? "").join("|");
 const rows = await sql`SELECT id, name, area, synth_count, published,
     synth_reviews->0->>'link' l0, synth_reviews->1->>'link' l1, synth_reviews->2->>'link' l2
   FROM cafes WHERE published AND raw_reviews IS NOT NULL
-    AND (synth_count <= 4 OR COALESCE((synth_quality->>'verified')::int, 0) = 0)
+    AND (CASE WHEN ${OWN_AREA} THEN (
+          synth_quality::text LIKE ('%(제목 ''' || regexp_replace(split_part(area, ' ', array_length(string_to_array(area, ' '), 1)), '(시|군|구)$', '') || '''%')
+       OR synth_quality::text LIKE ('%(제목 ''' || split_part(area, ' ', 1) || '''%')
+       OR synth_quality::text LIKE ('%혼입(''' || split_part(area, ' ', 1) || '''%'))
+      ELSE (synth_count <= 4 OR COALESCE((synth_quality->>'verified')::int, 0) = 0) END)
     AND rules_fp IS DISTINCT FROM ${fp}
   ORDER BY synth_count ASC, id ASC LIMIT ${LIMIT}`;
-console.log(`대상 ${rows.length.toLocaleString()}곳(검증 ≤4건 또는 주제 글 0건, 현행 지문 미적용) · 쿼터 0 · 동시 ${CONC} · 지문 ${fp.slice(0, 8)}`);
+console.log(`대상 ${rows.length.toLocaleString()}곳(${OWN_AREA ? "자기 지역 오판 이력" : "검증 ≤4건 또는 주제 글 0건"}, 현행 지문 미적용) · 쿼터 0 · 동시 ${CONC} · 지문 ${fp.slice(0, 8)}`);
 if (!APPLY) { console.log("▶ 미리보기. --apply 로 실행."); process.exit(0); }
 
 let i = 0, done = 0, err = 0, stop = "";
@@ -70,7 +76,7 @@ for (let k = 0; k < inval.length; k += 50) {
   invalOk += Number(r?.revalidated ?? 0);
 }
 const day = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10).replace(/-/g, "");
-const out = `${process.env.HOME}/coffee-platform/agent-reports/resynth-risk-${day}.json`;
+const out = `${process.env.HOME}/coffee-platform/agent-reports/resynth-${OWN_AREA ? "ownarea" : "risk"}-${day}.json`;
 writeFileSync(out, JSON.stringify({ done, err, stop, unpub, dispChanged: dispChanged.length, countDrop: countDrop.length, invalidated: invalOk }, null, 1));
 console.log(`\n완료 ${done}곳 · 오류 ${err} · ${Math.round((Date.now() - t0) / 1000)}초${stop ? ` · ⏹ ${stop}` : ""}`);
 console.log(`비공개 전환 ${unpub.length}곳 · 노출 인용 변경 ${dispChanged.length}곳 · 검증 수 감소 ${countDrop.length}곳 · 캐시 무효화 ${invalOk}곳 → ${out}`);
