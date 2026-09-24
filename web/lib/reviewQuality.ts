@@ -12,7 +12,8 @@
 
 import { getLearned } from "./learnedTerms";
 import { getListSetSync } from "./criteriaLists";
-import { SIDO_GU, sidoFromAddress } from "./regionList"; // 🧭 전국 시군구 단일출처(09-24 타지역 동명 판정 전국화) // 초약체 유일토큰 사전 단일출처(BASE=폴백). 캐시 프라임은 합성 진입점이 함.
+import { SIDO_GU, sidoFromAddress } from "./regionList";
+import DONG_INDEX_RAW from "./data/dong-index.json"; // 🧭 전국 동·읍·면 → 시군구(scripts/build-dong-index.mjs, 인허가 원장 지번주소) // 🧭 전국 시군구 단일출처(09-24 타지역 동명 판정 전국화) // 초약체 유일토큰 사전 단일출처(BASE=폴백). 캐시 프라임은 합성 진입점이 함.
 
 export type QualityVerdict = "verified" | "reference" | "rejected";
 export type SourceKind = "google" | "blog" | "cafearticle" | "youtube" | "etc";
@@ -413,12 +414,24 @@ const VENDOR_SELF_IDENTITY_CUES = /시공\s*문의|설치\s*문의|카페\s*창�
 const VENDOR_CASE = /(설치|시공|납품)\s*(사례|현장|완료)|(설치|시공)\s*(했습니다|하였습니다|해\s*드렸|해드렸)|현장을?\s*소개|소개해?\s*드릴\s*현장|양도\s*[.·\/]?\s*양수|양수\s*구함|양도\s*(합니다|해요|중입니다)|작업을?\s*다녀왔습니다/;
 //   글쓴이 표시명이 업체인 경우(본문은 손님 문체로 위장 가능) — VENDOR_SELF_IDENTITY_CUES의 업종어 확장.
 //   '공식 블로그'는 가게·브랜드 자기 홍보라 독립 후기가 아니다(id37080 몬스터HNM커피 공식블로그).
-const VENDOR_SRC = /어닝|간판|광고\s*디자인|디자인\s*(그룹|즈)|키오스크|단말기|씨앤씨밴|카드\s*밴|커피\s*머신|제과\s*제빵\s*기계|제빵기계|윈드\s*케어|청소\s*(전문|업체)|(인테리어|익스테리어)\s*(디자인|시공|업체|전문|공사|스튜디오|그룹)|시공|분양|신축|공식\s*블로그/;
+const VENDOR_SRC = /어닝|간판|광고\s*디자인|디자인\s*(그룹|즈)|키오스크|단말기|씨앤씨밴|카드\s*밴|커피\s*머신|제과\s*제빵\s*기계|제빵기계|윈드\s*케어|청소\s*(전문|업체)|(인테리어|익스테리어)\s*(디자인|시공|업체|전문|공사|스튜디오|그룹)|시공|분양\s*(상담|공급|대행|사무소|현장|정보)|분양공급|신축\s*분양|공식\s*블로그/; // '얄리 분양 맛집' 같은 블로거 이름 오탐 방지(09-24 실측)
 // 📋 목록·정보 나열 글(후기 아님) — 네이버 플레이스 카드 복사("상호-카페,디저트-주소", id56040·id36663),
 //   창업/분양 현황표(id62409 "2018년 상반기 창업 음식점 현황", id20833 신축분양 글).
 const PLACE_CARD_COPY = /카페\s*,\s*디저트\s*[-–]\s*(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주|전라|경상|충청)/;
-const LISTING_REPORT = /(창업|개업|인허가)\s*(음식점\s*)?현황|신축\s*분양|분양\s*(정보|상담|문의|안내)/;
+const LISTING_REPORT = /(창업|개업|인허가)\s*(음식점\s*)?현황|신축\s*분양|(아파트|오피스텔|상가|빌라|타운하우스)\s*분양|분양\s*(상담|공급|대행|사무소|현장|홍보관)/; // '분양 정보'만으론 안 잡는다(동물 분양 카페 실측 오탐)
 const ROAD_ADDR_G = /[가-힣0-9]{2,}(?:로|길|리|동)\s*\d+(?:-\d+)?/g; // 도로명·지번 둘 다(id41648은 지번 나열)
+// 상호 핵심어·지점명(09-24) — "양와당 부천시청점"→핵심 ["양와당"], 지점 ["부천시청점"]. 제목 가드는 띄어쓰기·지점명 차이를 무시하고 본다.
+const NAME_GENERIC_TOK = /^(카페|커피|coffee|cafe|베이커리|bakery|디저트|로스터리|로스터스|로스터즈|제과점|제과|빵집|하우스)$/i;
+function nameParts(name: string): { core: string[]; branch: string[] } {
+  const toks = String(name || "").split(/\s+/).map((t) => t.toLowerCase().replace(/[()·]/g, "")).filter(Boolean);
+  const branch = toks.filter((t) => /점$/.test(t) && t.length >= 3);
+  const core = toks.filter((t) => !/점$/.test(t) && !NAME_GENERIC_TOK.test(t) && t.length >= 2);
+  const joined = toks.filter((t) => !/점$/.test(t)).join("");
+  if (joined.length >= 2 && !core.includes(joined)) core.push(joined);
+  return { core, branch };
+}
+const titleHasOwnName = (title: string, name: string) => { const tn = norm(title); const { core } = nameParts(name); return core.some((c) => tn.includes(c.replace(/\s+/g, ""))); };
+const titleHasOwnBranch = (title: string, name: string) => { const tn = norm(title); return nameParts(name).branch.some((b) => tn.includes(b)); };
 // 🧭 타지역 동명 가게 판정 — 전국판(2026-09-24 CEO "검증 엔진 더 파워풀하게").
 //   기존 NON_METRO·ALL_GU는 **수도권 시절 복제 목록**이라 09-17 전국 개방 후 두 방향이 다 뚫렸다:
 //   ①카페가 비수도권이면(계룡·경산·의정부 밖…) 자기 지역이 목록에 없어 판정 자체가 꺼짐 ②제목의 타지역이
@@ -439,10 +452,39 @@ function foreignSigunguInTitle(title: string, selfSido: string, selfShort: strin
   for (const g of SIGUNGU_ALL) {
     if (g.short.length < 2 || PLACE_WORD_STOP.has(g.short) || g.short === selfShort) continue;
     if (g.sido === selfSido && (g.short === "강서" || g.short === "고성")) continue;
-    const re = new RegExp(`(^|[^가-힣])${escRe(g.short)}(시|군|구|역)?(?![가-힣])`);
+    const re = new RegExp(`(^|[^가-힣])${escRe(g.short)}(시|군|구)?(?![가-힣])`); // '역' 제외: 역명은 타 지명과 겹친다(군포 금정역≠부산 금정구)
     if (re.test(title)) return g.short;
   }
   return null;
+}
+// 🧭 [동 단위 타지점] 제목의 동·읍·면이 **우리 시군구에 없는 동**이면 다른 동네 동명 가게(09-24 실측: 인천 SIGORO←'압구정 청담동').
+//   같은 시군구 안의 다른 동은 보지 않는다(이웃 동 언급이 흔해 오탐 위험 — 거여동 vs 방이동 같은 건 주제 글 앵커가 막는다).
+const DONG_INDEX = DONG_INDEX_RAW as Record<string, string[]>;
+//   ⚠️ 다른 **시도**의 동일 때만(09-24 검산: 공개 카페 동의 91.7%만 사전과 시군구까지 일치 — 원장의 옛 구 이름·경계 차이로
+//   같은 시도 안에서는 사전이 틀릴 수 있다). 인천 카페←서울 청담동 같은 원거리 혼입만 확정 신호로 쓴다.
+function foreignDongInTitle(title: string, selfSido: string): string | null {
+  const toks = title.match(/[가-힣]{2,7}(?:동|읍|면)(?=$|[^가-힣]|카페|맛집|디저트|빵집|베이커리|브런치|커피|데이트)/g) ?? [];
+  for (const t of toks) { const keys = DONG_INDEX[t]; if (keys && !keys.some((k) => k.startsWith(`${selfSido}|`))) return t; }
+  return null;
+}
+// 🔗 [합성 상호] 제목에서 우리 상호가 **다른 글자와 붙어 다른 이름**으로만 쓰이면 다른 가게(09-24: '코지'←"코지커피앤니팅").
+//   조사('코지에서')·업종어('코지카페')가 붙은 건 정상. 본문은 활용형('좋은날이었어요') 오탐이 커서 제목만 본다.
+const NAME_TAIL_OK = /^(카페|커피|coffee|cafe|베이커리|디저트|로스터리|로스터스|로스터즈|하우스|점|본점|에서의|에서|으로|이라는|라는|이랑|랑|까지|부터|에|의|은|는|이|가|을|를|도|와|과|로|만)+/i;
+/** 텍스트에서 상호 core의 쓰임: none(없음)·genuine(정상 쓰임 하나라도)·composite(전부 다른 이름의 일부). 공백은 원문 그대로 본다. */
+function nameUse(text: string, core: string): { kind: "none" | "genuine" | "composite"; sample?: string } {
+  if (core.length < 2) return { kind: "none" };
+  const t = text.toLowerCase(), c = core.toLowerCase(); let i = t.indexOf(c), sample: string | undefined;
+  if (i < 0) return { kind: "none" };
+  while (i >= 0) {
+    const next = (t.slice(i + c.length).match(/^[가-힣a-z]+/) ?? [""])[0];
+    const rest = next.replace(NAME_TAIL_OK, "");
+    if (rest.length < 2) return { kind: "genuine" };
+    if (/[가-힣]/.test(c) && /^[a-z]+$/.test(next)) return { kind: "genuine" };   // 한글 상호 + 영문 병기('카페비엔BIEN')
+    if (/점$/.test(next) && next.length <= 8) return { kind: "genuine" };          // 지점 표기('아빠의바게트천왕역점')
+    sample ??= text.slice(i, i + c.length + next.length);
+    i = t.indexOf(c, i + 1);
+  }
+  return { kind: "composite", sample };
 }
 /** 본문 속 '다른 시도' 주소("대구 중구 삼덕동", "경기 안양시 동안구") */
 function foreignSidoAddress(text: string, selfSido: string): string | null {
@@ -1560,8 +1602,7 @@ export function verifyReview(input: QualityInput): QualityResult {
     if (PLACE_CARD_COPY.test(fullL) || LISTING_REPORT.test(fullL)) return { verdict: "rejected", score: 0, reasons: ["정보 나열·현황표(플레이스 카드 복사·창업/분양 현황 — 후기 아님)"], signals: { ...nosig, listicle: true } };
     // 주소가 3곳 이상 나열되고 방문 단서가 없으면 목록 글(id41648 "엑셀로 주식하는 남자" 주소 나열)
     //   ⚠️ 제목에 그 카페 이름이 있으면 그 카페가 주제인 글이다 — 주변 가게 주소가 섞여도 목록이 아니다(실데이터 재생 오탐: id40535 경주 아덴 방문기).
-    const nmT = norm(input.name);
-    if (!(nmT.length >= 2 && norm(title).includes(nmT)) && (fullL.match(ROAD_ADDR_G)?.length ?? 0) >= 3 && !has(fullL, VISIT_CUES)) return { verdict: "rejected", score: 1, reasons: ["주소 목록 글(여러 가게 주소 나열·방문 단서 없음)"], signals: { ...nosig, listicle: true } };
+    if (!titleHasOwnName(title, input.name) && (fullL.match(ROAD_ADDR_G)?.length ?? 0) >= 3 && !has(fullL, VISIT_CUES)) return { verdict: "rejected", score: 1, reasons: ["주소 목록 글(여러 가게 주소 나열·방문 단서 없음)"], signals: { ...nosig, listicle: true } };
     // 상호·주소만 있고 내용이 없는 글(id11703 "머지 플라워 카페 … 신흥로 223 101동 202호.")
     //   ⚠️ 공백 단위로 '주소 단어'만 지운다 — 공백을 먼저 없애면 "…다음에도"처럼 접미어로 끝나는 정상 문장이 통째로 지워진다.
     const addrWord = (w: string) => /^[\d.,·\-()~:/#]+$/.test(w) || /^[가-힣]{1,7}(특별시|광역시|특별자치시|특별자치도|도|시|군|구|읍|면|동|가|리|로|길)$/.test(w.replace(/[.,()]/g, "")) || /^[\d\-]+(층|호|동|번지)?[.,]?$/.test(w);
@@ -1772,10 +1813,34 @@ export function verifyReview(input: QualityInput): QualityResult {
   const otherGuInTitle = targetShorts.length
     // 🔧 2026-09-24 — title.includes(s)였다: '고양이'가 고양시로, '이천원'이 이천시로 잡혀 진짜 후기가 '다른 지점'으로 버려졌다
     //   (픽스처가 잡음: 마포 카페 "고양이 있는 카페" 제목 후기 거절). 전국판과 같은 단어경계·일반어 제외를 쓴다.
-    ? ALL_GU.map(guShort).find((s) => s.length >= 2 && !PLACE_WORD_STOP.has(s) && !targetShorts.includes(s) && new RegExp(`(^|[^가-힣])${escRe(s)}(시|군|구|역)?(?![가-힣])`).test(title) && !areaTerms.some((a) => a.includes(s)))
+    ? ALL_GU.map(guShort).find((s) => s.length >= 2 && !PLACE_WORD_STOP.has(s) && !targetShorts.includes(s) && new RegExp(`(^|[^가-힣])${escRe(s)}(시|군|구)?(?![가-힣])`).test(title) && !areaTerms.some((a) => a.includes(s)))
     : undefined;
 
   const sig = { nameInTitle, nameInBody, visit, substance, listicle, sponsored, areaMatch: areaPresent };
+  // ⚡ 09-24: 아래 두 확정 신호는 **모든 경계(LLM 재판정) 반환보다 앞**에 둔다 — 경계로 빠지면 과거 AI 승인이 되살린다(실측: 똑똑카페·점프카페 AI 오승인).
+  // 🧭 [타지역 동명·전국] 정의부 주석 참조. 우리 지역어·동이 어디에도 없을 때만(경계 카페·여행기 보호).
+  if (input.addr && !areaPresent && !dongPresent && !titleHasOwnBranch(title, input.name)) { // 제목에 우리 지점명('민락점')이 있으면 우리 글(09-24 실측 오탐)
+    const selfSido = sidoFromAddress(input.addr) ?? "";
+    const selfGu = selfSido ? (SIDO_GU[selfSido] ?? []).find((g) => input.addr!.includes(g)) ?? "" : "";
+    const selfShort = selfGu.replace(/(시|군|구)$/, "");
+    if (selfSido && selfShort && !`${title} ${body}`.includes(selfShort)) {
+      const fT = foreignSigunguInTitle(title, selfSido, selfShort);
+      if (fT) return { verdict: "rejected", score: 6, reasons: [`다른 지역 동명 가게 추정(제목 '${fT}', 이 카페 ${selfShort} 언급 없음)`], signals: sig };
+      const fA = foreignSidoAddress(`${title} ${body}`, selfSido);
+      if (fA) return { verdict: "rejected", score: 6, reasons: [`다른 지역 주소 명시('${fA}', 이 카페 ${selfShort} 언급 없음)`], signals: sig };
+      const fD = foreignDongInTitle(title, selfSido);
+      if (fD) return { verdict: "rejected", score: 6, reasons: [`다른 지역 동명 가게 추정(제목 '${fD}'은 다른 시도의 동, 이 카페 ${selfShort} 언급 없음)`], signals: sig };
+    }
+  }
+  // 🔗 [합성 상호] 정의부 주석 참조 — 제목이 전부 합성 쓰임이고 본문에 정상 쓰임이 없을 때만.
+  {
+    const cn = cleanCafeName(input.name).replace(/\s+/g, "");
+    const core = cn.replace(/(카페|커피|coffee|cafe)$/i, "") || cn;
+    const tu = nameUse(title, core);
+    if (tu.kind === "composite" && nameUse(body, core).kind !== "genuine") {
+      return { verdict: "rejected", score: 5, reasons: [`다른 가게 이름(제목 '${tu.sample}' — 우리 상호가 다른 이름의 일부로만 쓰임)`], signals: sig };
+    }
+  }
 
   // 🌍 [동음이의 지명] 카페 식별토큰이 '해외 지명'과 겹치면(콜롬보=스리랑카 수도, id7272 실측) 여행·현지
   //   맥락에서 그 토큰만 우연 일치해 해외 여행기가 딸려온다. 우리 지역어도 없고 카페 맥락(CAFE_CONTEXT_STRONG)도
@@ -2240,18 +2305,6 @@ export function verifyReview(input: QualityInput): QualityResult {
   }
   // 신도시·생활권(청라·송도·동탄 등) 동명 지점: 제목에 '점'이 안 붙어도, 다른 생활권名이 박히고
   //   대상 지역어(시·동)가 어디에도 없으면 다른 지점/동명 카페로 본다. (areaTerms에 우리 동洞 포함 → 우리 생활권은 제외됨)
-  // 🧭 [타지역 동명·전국] 정의부 주석 참조. 우리 지역어·동이 어디에도 없을 때만(경계 카페·여행기 보호).
-  if (input.addr && !areaPresent && !dongPresent) {
-    const selfSido = sidoFromAddress(input.addr) ?? "";
-    const selfGu = selfSido ? (SIDO_GU[selfSido] ?? []).find((g) => input.addr!.includes(g)) ?? "" : "";
-    const selfShort = selfGu.replace(/(시|군|구)$/, "");
-    if (selfSido && selfShort && !`${title} ${body}`.includes(selfShort)) {
-      const fT = foreignSigunguInTitle(title, selfSido, selfShort);
-      if (fT) return { verdict: "rejected", score: 6, reasons: [`다른 지역 동명 가게 추정(제목 '${fT}', 이 카페 ${selfShort} 언급 없음)`], signals: sig };
-      const fA = foreignSidoAddress(`${title} ${body}`, selfSido);
-      if (fA) return { verdict: "rejected", score: 6, reasons: [`다른 지역 주소 명시('${fA}', 이 카페 ${selfShort} 언급 없음)`], signals: sig };
-    }
-  }
   const otherDistrictInTitle = [...DISTRICT_WORDS, ...getLearned("district")].find((d) => title.includes(d) && !areaTerms.some((a) => a.includes(d)));
   if (otherDistrictInTitle && !areaPresent) {
     return { verdict: "rejected", score: 7, reasons: [`다른 생활권 동명 카페 추정(제목 '${otherDistrictInTitle}', 대상 지역 언급 없음)`], signals: sig };

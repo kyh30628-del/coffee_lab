@@ -382,8 +382,14 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   const freshDays = getCriterionSync("grade.floor.reference_new_fresh_days");
   const rawAgeDays = cur?.raw_collected_at ? (Date.now() - new Date(cur.raw_collected_at).getTime()) / 86400e3 : Infinity;
   const freshOk = !freshDays || rawAgeDays <= freshDays;
+  // 🎯 2026-09-24 '주제 글 1건' 앵커(CEO "검증 엔진 최고 수준으로") — **신규 공개에만**.
+  //   공개선(2건)은 '제목이 이 카페인 글'(verified)과 '본문에만 스친 글'(reference)을 똑같이 센다.
+  //   실측(표본 148건 수작업 채점): verified 정확도 82% · reference 59%. 오답 대부분이 다른 주제 글에
+  //   상호가 한 번 스친 것(휴게소 먹거리·여행기·모음 글·TV 목록)이었다. 스침 2건만으로 공개되던 구멍을 막는다.
+  //   기존 공개(grandfather)는 건드리지 않는다 — 공개 중 '주제 글 0건' 870곳은 CEO 결재 대상(대량 비공개 방지).
+  const subjectN = Number((quality as any)?.verified ?? 0);
   const gradeOk = grade === "검증"
-    || (grade === "참고" && (inPipeline ? (collected >= refFloorNew && freshOk) : true));
+    || (grade === "참고" && (inPipeline ? (collected >= refFloorNew && freshOk && subjectN >= 1) : true));
   const nonCafeReal = isNonCafe(name, naverCat); // 실제 카테고리 사용(빈값 name-only 오탐 방지). 카테고리 없으면 grandfather.
   //   라이브(grandfather): 이름 OR 카테고리 중 '하나라도' 카페면 유지 — 둘 다 비카페일 때만 제거. 오제거 최소화.
   //   (고로케=카테고리'카페,디저트'로 유지 · 커피로스터=네이버 '제조업/쇼핑' 오분류지만 이름'커피'로 유지 · 식당=둘다 비카페→제거)
