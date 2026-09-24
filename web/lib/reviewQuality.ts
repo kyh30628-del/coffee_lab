@@ -402,6 +402,22 @@ const SELF_BIZ_PROMO = new RegExp(`(${SELF_BIZ_PROMO_MARKERS.map((r) => r.source
 //   후기 문체라 CAFE_CONTEXT_SUBSTANCE가 항상 참). 계정 표시명 자체가 벤더임을 알리는 강신호이므로 본문
 //   맥락과 무관하게 하드 거절한다.
 const VENDOR_SELF_IDENTITY_CUES = /시공\s*문의|설치\s*문의|카페\s*창업\s*컨설팅|인테리어\s*전문|익스테리어\s*전문|커피머신\s*전문|01[016789][.\-]?\d{3,4}[.\-]?\d{4}/;
+// 🧾 2026-09-24 CEO 지시("업체 홍보글·협찬·목록 글 규칙 보강") — 공개문턱 정확도 표본 250곳 실측에서 샌 글들.
+//   카페를 '고객'으로 소개하는 시공·설치업체 포트폴리오 글은 카페명·카페어를 품고 있어 CAFE_CONTEXT 가드와
+//   LOCAL_SEO_SERVICES(카페맥락 있으면 예외)를 넘고 verified로 통과했다. 실례(전부 verified 노출):
+//   id33625 파우즈 "A타입 고정어닝을 설치했습니다"(에버그린어닝) · id55911 모란 "오늘 소개해 드릴 현장은"(수경어닝) ·
+//   id21054 단홍 "포스기 설치 사례" · id24265 길가말커피 "커피머신 설치"(메테오라) · id31463 올인베이커리 "[키오스크 설치사례]" ·
+//   id18811 베어빗 "매장 시공 소개"(P&P 광고디자인) · id57372 은하당 "양도.양수구함 … 저희가 직접 시공한" · id37147 "작업을 다녀왔습니다"(윈드케어).
+//   방문 후기에는 나오지 않는 업체 1인칭 정형구만 잡는다('설치했더라구요' 같은 손님 관찰문은 걸리지 않는다).
+const VENDOR_CASE = /(설치|시공|납품)\s*(사례|현장|완료)|(설치|시공)\s*(했습니다|하였습니다|해\s*드렸|해드렸)|현장을?\s*소개|소개해?\s*드릴\s*현장|양도\s*[.·\/]?\s*양수|양수\s*구함|양도\s*(합니다|해요|중입니다)|작업을?\s*다녀왔습니다/;
+//   글쓴이 표시명이 업체인 경우(본문은 손님 문체로 위장 가능) — VENDOR_SELF_IDENTITY_CUES의 업종어 확장.
+//   '공식 블로그'는 가게·브랜드 자기 홍보라 독립 후기가 아니다(id37080 몬스터HNM커피 공식블로그).
+const VENDOR_SRC = /어닝|간판|광고\s*디자인|디자인\s*(그룹|즈)|키오스크|단말기|씨앤씨밴|카드\s*밴|커피\s*머신|제과\s*제빵\s*기계|제빵기계|윈드\s*케어|청소\s*(전문|업체)|(인테리어|익스테리어)\s*(디자인|시공|업체|전문|공사|스튜디오|그룹)|시공|분양|신축|공식\s*블로그/;
+// 📋 목록·정보 나열 글(후기 아님) — 네이버 플레이스 카드 복사("상호-카페,디저트-주소", id56040·id36663),
+//   창업/분양 현황표(id62409 "2018년 상반기 창업 음식점 현황", id20833 신축분양 글).
+const PLACE_CARD_COPY = /카페\s*,\s*디저트\s*[-–]\s*(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주|전라|경상|충청)/;
+const LISTING_REPORT = /(창업|개업|인허가)\s*(음식점\s*)?현황|신축\s*분양|분양\s*(정보|상담|문의|안내)/;
+const ROAD_ADDR_G = /[가-힣0-9]{2,}(?:로|길|리|동)\s*\d+(?:-\d+)?/g; // 도로명·지번 둘 다(id41648은 지번 나열)
 // 진짜 카페 글이면 거의 항상 들어가는 '강한 카페 맥락'(점·일반어 제외 — 오탐 방지)
 // ★ 협업#278(품질본부 룰갭발굴팀 2~4차 사이클, 08-02~08-03): 목장·치즈체험·요거트·답례품·파충류카페·재즈공연·
 //   문화기획전시·티카페(밀크티·버블티·망고사고) 등 니치 업종 어휘 미등재로 진짜 카페 후기가 offctx로 과대측정되던
@@ -1501,6 +1517,25 @@ export function verifyReview(input: QualityInput): QualityResult {
   // [벤더 자기신원] 표시명 자체가 시공/설치업체·창업컨설팅 자기소개 — 본문 맥락과 무관하게 하드 거절(위 정의부 주석 참조).
   if (input.srcName && VENDOR_SELF_IDENTITY_CUES.test(input.srcName)) {
     return { verdict: "rejected", score: 0, reasons: ["벤더 자기신원(글쓴이 표시명이 시공/설치업체·창업컨설팅) — 자동 제외"], signals: { nameInTitle: false, nameInBody: false, visit: false, substance: 0, listicle: false, sponsored: false, areaMatch: false } };
+  }
+  // [업체 사례글·목록글] 2026-09-24 — 정의부 주석 참조. 카페 맥락이 있어도 거절한다(그 맥락 자체가 고객 소개다).
+  {
+    const nosig = { nameInTitle: false, nameInBody: false, visit: false, substance: 0, listicle: false, sponsored: false, areaMatch: false };
+    if (VENDOR_CASE.test(fullL)) return { verdict: "rejected", score: 0, reasons: ["업체 시공·설치 사례/양도 글(방문 후기 아님) — 자동 제외"], signals: nosig };
+    if (input.srcName && VENDOR_SRC.test(input.srcName)) return { verdict: "rejected", score: 0, reasons: ["업체·공식 계정 글(글쓴이 표시명이 업체/브랜드 공식) — 자동 제외"], signals: nosig };
+    if (PLACE_CARD_COPY.test(fullL) || LISTING_REPORT.test(fullL)) return { verdict: "rejected", score: 0, reasons: ["정보 나열·현황표(플레이스 카드 복사·창업/분양 현황 — 후기 아님)"], signals: { ...nosig, listicle: true } };
+    // 주소가 3곳 이상 나열되고 방문 단서가 없으면 목록 글(id41648 "엑셀로 주식하는 남자" 주소 나열)
+    //   ⚠️ 제목에 그 카페 이름이 있으면 그 카페가 주제인 글이다 — 주변 가게 주소가 섞여도 목록이 아니다(실데이터 재생 오탐: id40535 경주 아덴 방문기).
+    const nmT = norm(input.name);
+    if (!(nmT.length >= 2 && norm(title).includes(nmT)) && (fullL.match(ROAD_ADDR_G)?.length ?? 0) >= 3 && !has(fullL, VISIT_CUES)) return { verdict: "rejected", score: 1, reasons: ["주소 목록 글(여러 가게 주소 나열·방문 단서 없음)"], signals: { ...nosig, listicle: true } };
+    // 상호·주소만 있고 내용이 없는 글(id11703 "머지 플라워 카페 … 신흥로 223 101동 202호.")
+    //   ⚠️ 공백 단위로 '주소 단어'만 지운다 — 공백을 먼저 없애면 "…다음에도"처럼 접미어로 끝나는 정상 문장이 통째로 지워진다.
+    const addrWord = (w: string) => /^[\d.,·\-()~:/#]+$/.test(w) || /^[가-힣]{1,7}(특별시|광역시|특별자치시|특별자치도|도|시|군|구|읍|면|동|가|리|로|길)$/.test(w.replace(/[.,()]/g, "")) || /^[\d\-]+(층|호|동|번지)?[.,]?$/.test(w);
+    const nm = norm(input.name);
+    let residue = norm(`${title} ${body}`.split(/\s+/).filter((w) => w && !addrWord(w)).join(""));
+    if (nm.length >= 2) residue = residue.split(nm).join("");
+    residue = residue.replace(/[\d.,·\-()~:/#]+/g, "");
+    if (residue.length < 6 && !has(fullL, VISIT_CUES)) return { verdict: "rejected", score: 1, reasons: ["상호·주소만 있는 글(후기 내용 없음)"], signals: nosig };
   }
 
   // [비방문 게시판] 중고나라·창업나무는 물건 거래·상권 문의 게시판(네이버 카페=커뮤니티)이라 방문 후기가 있을 수 없음.
