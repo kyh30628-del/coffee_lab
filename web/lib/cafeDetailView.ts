@@ -137,7 +137,18 @@ export function addrTail(address: string | null | undefined, area: string, dong:
   while (i < toks.length && (toks[i] === area || (dong && toks[i] === dong) || area.split(" ").includes(toks[i]))) i++;
   return toks.slice(i).join(" ");
 }
-export const igHandle = (u: string | null | undefined) => { const m = String(u ?? "").match(/instagram\.com\/([A-Za-z0-9._]+)/); return m ? m[1] : null; };
+// 📸 09-24: 첫 경로를 무조건 계정으로 읽어 '@p'·'@reel'·'@stories'·'@invites'가 떴다(공개 84곳 실측).
+//   계정 형식(`/계정`·`/@계정`)과 스토리(`/stories/계정/`)만 계정으로 인정하고, 게시물·초대·태그처럼 계정을 알 수 없는 링크는 숨긴다.
+const IG_RESERVED = new Set(["p", "reel", "reels", "tv", "stories", "explore", "accounts", "s", "_u", "share", "direct", "web", "about", "invites", "legal", "developer"]);
+export const igHandle = (u: string | null | undefined) => {
+  const m = String(u ?? "").match(/instagram\.com\/@?([A-Za-z0-9._]+)(?:\/([A-Za-z0-9._]+))?/);
+  if (!m) return null;
+  const first = m[1].toLowerCase();
+  if (first === "stories") return m[2] && !IG_RESERVED.has(m[2].toLowerCase()) ? m[2] : null;
+  return IG_RESERVED.has(first) ? null : m[1];
+};
+// 링크도 계정 프로필로 통일(추적 파라미터·스토리 만료 링크 제거). 계정을 모르면 null.
+export const igProfileUrl = (u: string | null | undefined) => { const h = igHandle(u); return h ? `https://www.instagram.com/${h}/` : null; };
 
 // ── 후기 문장 속 핵심어(2026-09-20 CEO: "영역별로 강조·하이라이트") — 결정하는 데 쓰이는 말만. 화면은 <mark class="nt-key">로 감싼다.
 const KEY_TERMS = ["오션뷰","바다뷰","한강뷰","뷰가 끝내","뷰가 좋","뷰 맛집","뷰맛집","전망","뷰","바다","노을","일출","소금빵","크루아상","크로플","휘낭시에","스콘","케이크","케익","디저트","빵이 맛","빵 맛","빵","커피가 맛","커피 맛","커피","라떼","아메리카노","맛있","맛집","분위기","감성","조용","넓","좌석","주차","콘센트","와이파이","친절","재방문","또 오","또 가","인생","최고","추천","가성비","웨이팅","아쉬","별로"];

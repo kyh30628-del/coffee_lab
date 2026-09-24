@@ -19,7 +19,7 @@ import { collectionForCafe } from "@/lib/collections";
 import { tasteByKey } from "@/lib/seoData";
 import { shareHookText } from "@/lib/shareCopy";
 import { sortReviews, ensureRecent } from "@/lib/exposureOrder";
-import { isOtherBusinessQuote, displayQuote, splitKeyTerms, rankNearby, nearbyTitle, fmtKm, monthlySeries, freshnessOf, CHAR_LABEL, charBarsOf, addrTail, igHandle, reviewAge, type NearbyCafe } from "@/lib/cafeDetailView";
+import { isOtherBusinessQuote, displayQuote, splitKeyTerms, rankNearby, nearbyTitle, fmtKm, monthlySeries, freshnessOf, CHAR_LABEL, charBarsOf, addrTail, igHandle, igProfileUrl, reviewAge, type NearbyCafe } from "@/lib/cafeDetailView";
 import { extractWorkSignals } from "@/lib/workDetail";
 import PlaceCta from "@/app/PlaceCta";
 import OutboundLink from "../../OutboundLink";
@@ -384,9 +384,9 @@ export default async function CafePage({ params }: Props) {
           {/* 인스타 줄 — 오른쪽 끝(도장 바로 아래)에 ❤ 추억 저장 */}
           <div className="nt-mem-line" style={{ marginRight: grade ? -80 : 0 }}>
             {ig ? (
-              <a className="nt-ig" href={c.instagram_url} target="_blank" rel="noopener noreferrer nofollow">
+              <a className="nt-ig" href={igProfileUrl(c.instagram_url) ?? undefined} target="_blank" rel="noopener noreferrer nofollow">
                 <svg viewBox="0 0 24 24" aria-hidden><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="3.8"/><circle cx="17.4" cy="6.6" r=".9" fill="currentColor" stroke="none"/></svg>
-                @{ig}
+                <span>@{ig}</span>
               </a>
             ) : <span />}
             <span className="nt-free"><SaveMemoryButton cafeId={c.id} cafeName={c.name} cafeArea={c.area} variant="pill" /></span>

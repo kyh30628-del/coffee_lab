@@ -22,6 +22,7 @@ import { loadCriteriaLists } from "./criteriaLists";
 import { invalidateCafeCaches } from "./cafeCacheInvalidate"; // 비공개 후 캐시 무효화(2026-07-29: heal* 경로가 ISR/search_cache 미반영이던 틈 수리)
 import { createHash } from "node:crypto";
 import { regionKeyFor, SIDO_GU } from "./regionList";
+import { igHandle } from "./cafeDetailView"; // 인스타 계정 추출 단일출처(화면·사장님 글 판정 공용)
 
 // 카페 지역어(시 + 동洞) — 동까지 넘겨야 reviewQuality가 '분당점=성남시' 같은 市단위 동명 지점 오인을 거른다.
 async function areaTermsFor(id: number, area?: string | null): Promise<string[]> {
@@ -34,7 +35,8 @@ async function areaTermsFor(id: number, area?: string | null): Promise<string[]>
 async function synthMetaFor(id: number): Promise<{ address: string; naverCategory: string; selfHandles: string[] }> {
   try {
     const r = (await sql`SELECT address, naver_category, instagram_url FROM cafes WHERE id=${id}`) as any[];
-    const h = String(r[0]?.instagram_url ?? "").match(/instagram\.com\/([A-Za-z0-9_.]+)/i)?.[1] ?? "";
+    // 09-24: 화면과 같은 추출기 — 게시물·초대·태그 링크의 'p'·'invites'·'explore'를 계정으로 오인하면 그 단어가 든 블로그 ID 후기가 '사장님 글'로 버려진다.
+    const h = igHandle(r[0]?.instagram_url) ?? "";
     return { address: String(r[0]?.address ?? ""), naverCategory: String(r[0]?.naver_category ?? ""), selfHandles: h ? [h] : [] };
   } catch { return { address: "", naverCategory: "", selfHandles: [] }; }
 }

@@ -19,7 +19,7 @@ import { FACET_EMOJI } from "@/lib/cafeProfile";
 import { useLockBodyScroll } from "@/lib/useLockBodyScroll";
 import { shareHookText } from "@/lib/shareCopy";
 import { decodeCafeScores } from "@/lib/mapCafes";
-import { isOtherBusinessQuote, displayQuote, splitKeyTerms, rankNearby, nearbyTitle, fmtKm, monthlySeries, freshnessOf, CHAR_LABEL, charBarsOf, addrTail, igHandle, reviewAge } from "@/lib/cafeDetailView"; // 📓 상세 패널 2차 공용 계산
+import { isOtherBusinessQuote, displayQuote, splitKeyTerms, rankNearby, nearbyTitle, fmtKm, monthlySeries, freshnessOf, CHAR_LABEL, charBarsOf, addrTail, igHandle, igProfileUrl, reviewAge } from "@/lib/cafeDetailView"; // 📓 상세 패널 2차 공용 계산
 
 type EvidenceReview = { quote: string; link?: string; source?: string; date?: string; trust?: "verified" | "reference" | "rejected"; score?: number; why?: string[] };
 type QualityStats = { raw: number; verified: number; reference: number; rejected: number; duplicates?: number; rejectReasons?: Record<string, number> };
@@ -3113,9 +3113,9 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
             {(ig || onSaveMemory) && (
               <div className="nt-mem-line" style={{ marginRight: grade ? -76 : 0 }}>
                 {ig ? (
-                  <a className="nt-ig" href={extra.instagramUrl ?? undefined} target="_blank" rel="noopener noreferrer nofollow">
+                  <a className="nt-ig" href={igProfileUrl(extra.instagramUrl) ?? undefined} target="_blank" rel="noopener noreferrer nofollow">
                     <svg viewBox="0 0 24 24" aria-hidden><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="3.8"/><circle cx="17.4" cy="6.6" r=".9" fill="currentColor" stroke="none"/></svg>
-                    @{ig}
+                    <span>@{ig}</span>
                   </a>
                 ) : <span />}
                 {onSaveMemory && (

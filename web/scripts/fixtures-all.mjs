@@ -7,7 +7,7 @@
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 const DIR = fileURLToPath(new URL(".", import.meta.url));
-const FILES = ["fixtures-ads", "fixtures-vendor", "fixtures-foreign-region", "fixtures-branch", "fixtures-selfsource", "fixtures-cautions", "fixtures-coherence", "fixtures-area", "fixtures-rulesfp", "test-region-fixtures"];
+const FILES = ["fixtures-ads", "fixtures-vendor", "fixtures-foreign-region", "fixtures-branch", "fixtures-selfsource", "fixtures-ighandle", "fixtures-cautions", "fixtures-coherence", "fixtures-area", "fixtures-rulesfp", "test-region-fixtures"];
 const DB = process.argv.includes("--db");
 const fails = []; let ok = 0;
 for (const f of FILES) {
