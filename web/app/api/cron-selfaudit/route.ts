@@ -100,8 +100,24 @@ export async function GET(req: NextRequest) {
       const ik = (f.ikey ?? `selfaudit:${f.check}`).slice(0, 120);
       // ⚠️ 'done'(수동 종결)도 dedup 대상에 넣는다 — 안 그러면 근본원인이 이미 확정·보고된 이슈(예: OAuth SPOF)가
       //   매 사이클(4~12h) 재감지 때마다 새 결재로 재상신돼 보드를 오염시킨다(#987). lib/issues.ts:145와 동일 패턴.
-      const dup = (await sql`SELECT 1 FROM decisions WHERE action_params->>'ikey'=${ik} AND status IN('pending','approved','done','rejected','deferred') LIMIT 1`.catch(() => [])) as any[];
-      if (!dup.length) {
+      // ⚠️ 단, 'done'·'rejected'·'deferred'(종결)는 **영구** 침묵이 아니다 — 종결 당시 건수 대비 지금 건수가
+      //   크게(2배 이상 & +5건 이상) 늘면 근본원인이 재발/악화한 것이므로 재상신한다(#1246: coherence<0.3이
+      //   8건→33건 16배로 급증했는데 dedup이 4주간 영구 침묵시킨 사고). 'pending'·'approved'(진행중)는 기존대로 항상 스킵.
+      const last = (await sql`SELECT status, (action_params->>'count')::numeric AS count FROM decisions
+        WHERE action_params->>'ikey'=${ik} ORDER BY created_at DESC LIMIT 1`.catch(() => [])) as any[];
+      const prev = last[0];
+      let dup = false;
+      if (prev) {
+        if (prev.status === "pending" || prev.status === "approved") {
+          dup = true; // 이미 진행중인 결재가 있음 — 재상신 불필요
+        } else {
+          // done/rejected/deferred(종결): 종결 당시 건수 대비 유의미하게 급증했을 때만 재상신
+          const prevCount = Number(prev.count) || 0;
+          const surged = f.count >= Math.max(prevCount * 2, prevCount + 5);
+          dup = !surged;
+        }
+      }
+      if (!dup) {
         await sql`INSERT INTO decisions (title, detail, team, severity, tier, action_type, action_params, recommendation)
           VALUES (${`[자율진단] ${f.check}`.slice(0, 110)},
                   ${`상시 자율진단이 자동교정으로 해소 못 한 중대 이상(${f.count}건). 담당 ${f.team}. 기조실장 1차 조사 → 대표님 판단 필요.`},
