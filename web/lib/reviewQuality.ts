@@ -1837,7 +1837,8 @@ export function verifyReview(input: QualityInput): QualityResult {
     const cn = cleanCafeName(input.name).replace(/\s+/g, "");
     const core = cn.replace(/(카페|커피|coffee|cafe)$/i, "") || cn;
     const tu = nameUse(title, core);
-    if (tu.kind === "composite" && nameUse(body, core).kind !== "genuine") {
+    //   ⚠️ 우리 지역·동이 글에 있으면 적용 안 함 — 간판명이 DB명보다 길 수 있다(09-24 실측 오탐: 두레커피 ← "두레커피마을))월피동 광덕종합시장").
+    if (tu.kind === "composite" && !areaPresent && !dongPresent && nameUse(body, core).kind !== "genuine") {
       return { verdict: "rejected", score: 5, reasons: [`다른 가게 이름(제목 '${tu.sample}' — 우리 상호가 다른 이름의 일부로만 쓰임)`], signals: sig };
     }
   }
