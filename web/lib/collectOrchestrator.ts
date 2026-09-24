@@ -102,7 +102,7 @@ export function toQuote(text: string, name = "", maxLen = 90): string {
 }
 const dedupeKey = (s: string) => s.toLowerCase().replace(/\s+/g, "").slice(0, 60);
 
-export function collectAndSynthesize(name: string, area: string[], sources: RawSource[], opts?: { whitelist?: Set<string>; decisions?: Record<string, boolean>; address?: string; naverCategory?: string; excludeLinks?: Set<string> }): CollectResult {
+export function collectAndSynthesize(name: string, area: string[], sources: RawSource[], opts?: { whitelist?: Set<string>; decisions?: Record<string, boolean>; address?: string; naverCategory?: string; excludeLinks?: Set<string>; selfHandles?: string[] }): CollectResult {
   const whitelist = opts?.whitelist;
   const verifiedReviews: Review[] = [];   // 합성 입력(검증, 출처가중 반영)
   const perSource: { source: string; raw: number; kept: number }[] = [];
@@ -124,8 +124,17 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
   const accountKept = new Map<string, number>();
   const nameCoreForSelf = coreTokens(name, area).map((t) => t.replace(/\s/g, "").toLowerCase()).filter((t) => t.length >= 3);
   const nameNormForSelf = name.replace(/\s/g, "").toLowerCase();
-  const isSelfSource = (src?: string): boolean => {
+  // 👤 사장님 본인 글 — 09-24 보강: 영문 계정명("SWEET_CHOU"·"BIBBIA CAFE"·"mimiheon_")이 한글 상호 대조를 빠져나갔다
+  //   (정확도 표본 5건+ 구간에서 3곳 실측). 카페 인스타 계정과 작성자명·블로그 아이디를 일반어(cafe·coffee…)를 뺀 뒤 대조한다.
+  const LATIN_GENERIC = /(coffee|caffe|cafe|bakery|bake|dessert|official|korea|seoul|roasters|roastery|roaster|studio|house|the|kr)/g;
+  const latinCore = (x: string) => x.toLowerCase().replace(/[^a-z0-9]/g, "").replace(LATIN_GENERIC, "");
+  const handleCores = (opts?.selfHandles ?? []).map(latinCore).filter((h) => h.length >= 4);
+  const isSelfSource = (src?: string, link?: string): boolean => {
     const n = String(src ?? "").replace(/\s/g, "").toLowerCase();
+    if (handleCores.length) {
+      const sc = latinCore(String(src ?? "")), bid = latinCore(String(link ?? "").match(/blog\.naver\.com\/([A-Za-z0-9_\-]+)/i)?.[1] ?? "");
+      if (handleCores.some((h) => (sc.length >= 4 && (sc === h || (sc.length >= 5 && (h.includes(sc) || sc.includes(h))))) || (bid.length >= 5 && (bid === h || bid.includes(h) || h.includes(bid))))) return true;
+    }
     if (!n) return false;
     if (/(공식|official|본사|본점|스토어|store)/i.test(n)) return true;
     return n === nameNormForSelf || nameCoreForSelf.some((t) => n.includes(t));
@@ -184,7 +193,7 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
       let reasons = rule.reasons;
       let score = rule.score;
       if (isAd) { verdict = "rejected"; reasons = ["광고·협찬 — 자동 제외(판정보다 우선)"]; score = 0; }
-      else if (verdict !== "rejected" && isSelfSource((t as any).source)) { verdict = "rejected"; reasons = ["사장님·공식 계정 글 — 자기 홍보 제외"]; score = 0; }
+      else if (verdict !== "rejected" && isSelfSource((t as any).source, t.link)) { verdict = "rejected"; reasons = ["사장님·공식 계정 글 — 자기 홍보 제외"]; score = 0; }
       else if (hardReject) { /* 규칙 하드 거절 — 과거 결정·whitelist로 못 살림(규칙 절대 우선) */ }
       else if (opts?.decisions && key in opts.decisions) {
         if (opts.decisions[key]) { verdict = rule.verdict === "verified" ? "verified" : "reference"; reasons = ["✨ AI 검증: 실제 후기"]; score = 80; }

@@ -1599,6 +1599,8 @@ export function verifyReview(input: QualityInput): QualityResult {
     const nosig = { nameInTitle: false, nameInBody: false, visit: false, substance: 0, listicle: false, sponsored: false, areaMatch: false };
     if (VENDOR_CASE.test(fullL)) return { verdict: "rejected", score: 0, reasons: ["업체 시공·설치 사례/양도 글(방문 후기 아님) — 자동 제외"], signals: nosig };
     if (input.srcName && VENDOR_SRC.test(input.srcName)) return { verdict: "rejected", score: 0, reasons: ["업체·공식 계정 글(글쓴이 표시명이 업체/브랜드 공식) — 자동 제외"], signals: nosig };
+    // 🔎 검색결과 짜깁기 계정(09-24 정확도 표본: '카페다래' 인용 3개 전부 "전국 맛집/카페 소개"·"전화번호-업종편", 본문 "출처:google검색")
+    if (/출처\s*[:：]?\s*(google|구글)\s*(검색|지도)|google\s*검색\s*결과/i.test(fullL) || (input.srcName && /업종편|전화번호\s*[-·]|인포\s*센터|전국\s*맛집\s*[\/·]?\s*카페\s*소개/.test(input.srcName))) return { verdict: "rejected", score: 0, reasons: ["검색결과 짜깁기 글(출처 구글검색·업종 안내 계정 — 방문 후기 아님)"], signals: { ...nosig, listicle: true } };
     if (PLACE_CARD_COPY.test(fullL) || LISTING_REPORT.test(fullL)) return { verdict: "rejected", score: 0, reasons: ["정보 나열·현황표(플레이스 카드 복사·창업/분양 현황 — 후기 아님)"], signals: { ...nosig, listicle: true } };
     // 주소가 3곳 이상 나열되고 방문 단서가 없으면 목록 글(id41648 "엑셀로 주식하는 남자" 주소 나열)
     //   ⚠️ 제목에 그 카페 이름이 있으면 그 카페가 주제인 글이다 — 주변 가게 주소가 섞여도 목록이 아니다(실데이터 재생 오탐: id40535 경주 아덴 방문기).
