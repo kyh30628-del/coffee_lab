@@ -30,6 +30,11 @@ for (const [title, body, name, addr, areaTerms, want, src] of CASES) {
   const hit = r.verdict === "rejected" && NEW.test(r.reasons.join(" "));
   if (hit === want) pass++; else fail.push(`  ✗ ${src}: 기대 ${want ? "차단" : "통과"} · 실제 ${hit ? "차단" : "통과"} (${r.verdict} · ${r.reasons.join(",").slice(0, 70)})`);
 }
-console.log(`타지역 동명 픽스처: ${pass}/${CASES.length} 통과`);
+// 🚫 부작용 사고 고정(09-24): 넓힌 '우리 지역 언급'이 가점으로 쓰여 도시명만 맞는 무관 글이 통과 → 카페 16곳 noise. 반드시 거절.
+for (const [title, body, name, addr, area, src] of [
+  ["[충북 충주] 애견동반여행 강력추천! 내돈내산 켄싱턴리조트 충주", "[충북 충주] 애견동반여행 강력추천!", "에센스카페", "충청북도 충주시 무학천변길 4", ["충주시", "봉방동"], "도시명만 일치(리조트)"],
+  ["[온천] 충주 수안보 패밀리스파텔", "그리고 로비카페 한쪽에 오락기가 있는데 무료다!", "에센스카페", "충청북도 충주시 무학천변길 4", ["충주시", "봉방동"], "도시명만 일치(온천)"],
+]) { const r = verifyReview({ title, body, name, addr, areaTerms: area, source: "blog" }); if (r.verdict === "rejected") pass++; else fail.push(`  ✗ ${src}: 거절돼야 하는데 ${r.verdict}`); }
+console.log(`타지역 동명 픽스처: ${pass}/${CASES.length} 통과(부작용 고정 2 포함)`.replace(`/${CASES.length} `, `/${CASES.length + 2} `));
 if (fail.length) { console.log(fail.join("\n")); process.exit(1); }
 console.log("✅ 타지역 제목·타시도 주소 차단 · 경계도시·일반어(이천원·동해·고양이)·조사·우리지역 명시·여행기 보호");

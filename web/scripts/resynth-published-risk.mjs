@@ -26,6 +26,8 @@ const APPLY = process.argv.includes("--apply");
 const LIMIT = arg("--limit", 7000), CONC = arg("--conc", 4), STOP_H = arg("--stop-hour", 23);
 // 🧭 --own-area: 탈락 사유에 **자기 시군구·광역시 앞머리**가 찍힌(09-24 자기 지역 오판 수리 대상) 공개 카페
 const OWN_AREA = process.argv.includes("--own-area");
+// ♻️ --touched-since ISO: 그 시각 이후 재판정된 공개 카페도 포함(09-24 부작용 코드로 판정된 카페를 고친 코드로 다시)
+const TOUCHED = (process.argv.find((a) => a.startsWith("--touched-since=")) || "").split("=")[1] || "2999-01-01T00:00:00Z";
 const pastDeadline =() => new Date(Date.now() + 9 * 3600e3).getUTCHours() >= STOP_H;
 
 const fp = await rulesFingerprint();
@@ -33,7 +35,7 @@ const top3 = (r) => [0, 1, 2].map((i) => r?.[`l${i}`] ?? "").join("|");
 const rows = await sql`SELECT id, name, area, synth_count, published,
     synth_reviews->0->>'link' l0, synth_reviews->1->>'link' l1, synth_reviews->2->>'link' l2
   FROM cafes WHERE published AND raw_reviews IS NOT NULL
-    AND (CASE WHEN ${OWN_AREA} THEN (
+    AND (synth_checked_at > ${TOUCHED}::timestamptz OR CASE WHEN ${OWN_AREA} THEN (
           synth_quality::text LIKE ('%(제목 ''' || regexp_replace(split_part(area, ' ', array_length(string_to_array(area, ' '), 1)), '(시|군|구)$', '') || '''%')
        OR synth_quality::text LIKE ('%(제목 ''' || split_part(area, ' ', 1) || '''%')
        OR synth_quality::text LIKE ('%혼입(''' || split_part(area, ' ', 1) || '''%'))

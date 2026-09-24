@@ -1694,8 +1694,12 @@ export function verifyReview(input: QualityInput): QualityResult {
   // 🔴 2026-09-24 수리 — 지역어가 "강릉시"·"광양시"처럼 **전체 이름뿐**이라 제목의 줄임말("강릉 카페 미르마르")을 우리 지역으로
   //   못 알아봤다 → NON_METRO 판정이 **자기 도시를 '다른 지역 동명 카페'로** 버렸다. 실측: 6,654곳·후기 96,235건 오판
   //   (미르마르 145·보사노바 강릉점 76), 그중 비공개 1,135곳. 시군구 줄임말(2자+)을 '우리 지역 언급'에 넣는다(보호 신호로만 쓰임).
+  // ⚠️ 09-24 용도 분리(부작용 사고 후): areaPresent = **가점·수용 신호**(엄격: 지역어 원문 그대로),
+  //   ownMention = **타지역 판정 보류용 방어**(넓게: 줄임말·광역시 앞머리·동 줄임형). 첫 수리가 둘을 합쳐
+  //   도시 이름만 맞는 무관 글('켄싱턴리조트 충주')까지 가점으로 통과시켰고, 이름 일치율이 떨어져 카페 16곳이 noise로 떨어졌다.
+  const areaPresent = areaTerms.length ? areaTerms.some((a) => `${title} ${body}`.includes(a)) : false;
   const ownTok = ownAreaTokens(areaTerms); // 광역시 앞머리("대구 중구"의 "대구")까지 — 첫 수리(끝 단어만)가 놓쳤다
-  const areaPresent = areaTerms.length ? ownTok.some((a) => `${title} ${body}`.includes(a)) : false;
+  const ownMention = areaPresent || (areaTerms.length ? ownTok.some((a) => `${title} ${body}`.includes(a)) : false);
   // 룰갭 P43-원인2(#397, coord#208): bareWeak(흔한 인명·일반용어 유일토큰, 아래)의 지역 게이트가 areaTerms
   //   전체(시·구 단위까지 포함)를 인정해, "구" 단위(성동구·마포구 등 핫플 자치구) 일치만으로도 통과했다
   //   (id9426·id1520 실측 — 같은 구 안 무관 콘텐츠와 흔한 인명 오매칭). 동/읍/면/가/리 단위만 골라 더 좁게 요구.
@@ -1847,7 +1851,7 @@ export function verifyReview(input: QualityInput): QualityResult {
   const sig = { nameInTitle, nameInBody, visit, substance, listicle, sponsored, areaMatch: areaPresent };
   // ⚡ 09-24: 아래 두 확정 신호는 **모든 경계(LLM 재판정) 반환보다 앞**에 둔다 — 경계로 빠지면 과거 AI 승인이 되살린다(실측: 똑똑카페·점프카페 AI 오승인).
   // 🧭 [타지역 동명·전국] 정의부 주석 참조. 우리 지역어·동이 어디에도 없을 때만(경계 카페·여행기 보호).
-  if (input.addr && !areaPresent && !dongPresent && !titleHasOwnBranch(title, input.name)) { // 제목에 우리 지점명('민락점')이 있으면 우리 글(09-24 실측 오탐)
+  if (input.addr && !ownMention && !dongPresent && !titleHasOwnBranch(title, input.name)) { // 제목에 우리 지점명('민락점')이 있으면 우리 글(09-24 실측 오탐)
     const selfSido = sidoFromAddress(input.addr) ?? "";
     const selfGu = selfSido ? (SIDO_GU[selfSido] ?? []).find((g) => input.addr!.includes(g)) ?? "" : "";
     const selfShort = selfGu.replace(/(시|군|구)$/, "");
@@ -1867,7 +1871,7 @@ export function verifyReview(input: QualityInput): QualityResult {
     const core = cn.replace(/(카페|커피|coffee|cafe)$/i, "") || cn;
     const tu = nameUse(title, core);
     //   ⚠️ 우리 지역·동이 글에 있으면 적용 안 함 — 간판명이 DB명보다 길 수 있다(09-24 실측 오탐: 두레커피 ← "두레커피마을))월피동 광덕종합시장").
-    if (tu.kind === "composite" && !areaPresent && !dongPresent && nameUse(body, core).kind !== "genuine") {
+    if (tu.kind === "composite" && !ownMention && !dongPresent && nameUse(body, core).kind !== "genuine") {
       return { verdict: "rejected", score: 5, reasons: [`다른 가게 이름(제목 '${tu.sample}' — 우리 상호가 다른 이름의 일부로만 쓰임)`], signals: sig };
     }
   }
@@ -1885,7 +1889,7 @@ export function verifyReview(input: QualityInput): QualityResult {
     ["콜롬보", FOREIGN_HOMONYM_GENERIC],
     ["바이워드마켓", /오타와|캐나다|Ottawa|Byward/i],
   ]);
-  if (tokens.length && tokens.every((t) => FOREIGN_HOMONYM.has(norm(t))) && !areaPresent
+  if (tokens.length && tokens.every((t) => FOREIGN_HOMONYM.has(norm(t))) && !ownMention
       && !CAFE_CONTEXT_STRONG.test(fullL)) {
     const homonymCtxRe = tokens.map((t) => FOREIGN_HOMONYM.get(norm(t))).find(Boolean) ?? FOREIGN_HOMONYM_GENERIC;
     if (homonymCtxRe.test(fullL)) {
@@ -1912,7 +1916,7 @@ export function verifyReview(input: QualityInput): QualityResult {
       if (!isKnownArea) return false;
       return !ownAreaTokens(areaTerms).some((a) => { const an = norm(a).replace(/(동|읍|면|가|리|구|시)$/, ""); return norm(a) === norm(w) || (an.length >= 2 && an === norm(bare)); }); // 09-24: 구성 단어 단위 비교(인천 계양구 → '인천' 우리 지역)
     });
-    if ((otherBizName || otherAreaWord) && !areaPresent) {
+    if ((otherBizName || otherAreaWord) && !ownMention) {
       return { verdict: "rejected", score: 6, reasons: [otherBizName ? `naver_category 비F&B 조합 — 다른 상호명 혼입('${otherBizName}')` : `naver_category 비F&B 조합 — 다른 지역 혼입('${otherAreaWord}')`], signals: sig };
     }
   }
@@ -2236,7 +2240,7 @@ export function verifyReview(input: QualityInput): QualityResult {
   //   카페어가 붙어 있어 위 근접판정으로는 못 막는다(상품 글도 '커피'를 말한다). 우리 지역·동이 글에 있을 때만 인정.
   const FLAVOR_NAMES = new Set(["카라멜", "캐러멜", "바닐라", "시나몬", "헤이즐넛", "피스타치오", "얼그레이", "민트", "모카", "메이플", "허니", "레몬", "블루베리", "크림치즈", "흑임자", "밤", "유자", "자몽", "캐모마일", "라벤더"]);
   const flavorAnchor = FLAVOR_NAMES.has(nameClean) ? nameClean : onlyTok && FLAVOR_NAMES.has(onlyTok) ? onlyTok : soleSubstTok && FLAVOR_NAMES.has(soleSubstTok) ? soleSubstTok : "";
-  if (flavorAnchor && areaTerms.length && !areaPresent && !dongPresent) {
+  if (flavorAnchor && areaTerms.length && !ownMention && !dongPresent) {
     return { verdict: "rejected", score: 2, reasons: [`맛·재료명 상호('${flavorAnchor}') — 우리 지역 언급 없는 글(상품 맛 후기 혼입)`], signals: sig };
   }
   if (nameCommonPhrase) {
@@ -2333,17 +2337,17 @@ export function verifyReview(input: QualityInput): QualityResult {
     }
   }
   // 동명 카페: 제목이 수도권 밖 도시인데 대상 지역어가 어디에도 없음 → 다른 지역 동명점
-  if (foreignInTitle && !areaPresent) {
+  if (foreignInTitle && !ownMention) {
     return { verdict: "rejected", score: 5, reasons: [`다른 지역 동명 카페 추정(제목 '${foreignInTitle}')`], signals: sig };
   }
   // 수도권 내 다른 시·군·구의 동명 지점
-  if (otherGuInTitle && !areaPresent) {
+  if (otherGuInTitle && !ownMention) {
     return { verdict: "rejected", score: 8, reasons: [`다른 지점 추정(제목 '${otherGuInTitle}', 대상 지역 언급 없음)`], signals: sig };
   }
   // 신도시·생활권(청라·송도·동탄 등) 동명 지점: 제목에 '점'이 안 붙어도, 다른 생활권名이 박히고
   //   대상 지역어(시·동)가 어디에도 없으면 다른 지점/동명 카페로 본다. (areaTerms에 우리 동洞 포함 → 우리 생활권은 제외됨)
   const otherDistrictInTitle = [...DISTRICT_WORDS, ...getLearned("district")].find((d) => title.includes(d) && !areaTerms.some((a) => a.includes(d)));
-  if (otherDistrictInTitle && !areaPresent) {
+  if (otherDistrictInTitle && !ownMention) {
     return { verdict: "rejected", score: 7, reasons: [`다른 생활권 동명 카페 추정(제목 '${otherDistrictInTitle}', 대상 지역 언급 없음)`], signals: sig };
   }
   // 🚏 [먼 광역시 동명] 제목이 다른 광역시(부산·대구·대전…)를 명시하는데 우리 카페가 그 광역시가 아니면,
@@ -2441,7 +2445,7 @@ export function verifyReview(input: QualityInput): QualityResult {
         const afterWords = fullT.slice(at + w.length, at + w.length + 15).split(/[^가-힣]+/).filter(Boolean);
         const regionWord = [...beforeWords].reverse().find((tk) => isAreaLikeWord(tk)) ?? afterWords.find((tk) => isAreaLikeWord(tk));
         const regionIsOurs = !!regionWord && areaTerms.some((a) => a.includes(regionWord) || regionWord.includes(guShort(a)));
-        if (regionWord && !regionIsOurs && !areaPresent) {
+        if (regionWord && !regionIsOurs && !ownMention) {
           return { verdict: "rejected", score: 6, reasons: [`다른 유통사 지점 후기 추정('${regionWord} ${w}' 명시, 자기 계열 아님)`], signals: sig };
         }
       }
