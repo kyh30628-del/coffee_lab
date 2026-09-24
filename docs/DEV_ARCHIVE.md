@@ -386,3 +386,4 @@
 | 2026-09-24 07:05 | #1237 | [정합성] import-permits 교차중복 재발(#444 후속) — 이름변형(영문/병기) 때문에 dedu | 451862df | - | lib/reviewQuality.ts brandTokenOverlap() 구조수정: 토큰레벨 완전일치 실패 시(예: 괄호 병기 상호로 코어토큰이 통째로 뭉쳐 비교실패) 전체이름 상 |
 | 2026-09-24 07:11 | #1243 | [룰갭 신규] 상위개체 부속 카페 — 관광지·리조트·체험관·복지시설 콘텐츠가 검증리뷰로 오채택(8곳, 1곳  | 17f8c67d | - | lib/reviewQuality.ts: TOURIST_FACILITY_INFO_VOCAB 신규 상수(입장료·체크인·굿즈샵·체험관·복지사업·돌봄강화·일자리창출·전통마을·야행축제·탐방 |
 | 2026-09-24 07:56 | #1240 | [개발] 협업 #449: cost_guard 자동정지 발동(09-23 23:00 UTC) — cron-sen | 5082acc7 | - | scripts/make-digest.mjs: cost_guard 상태를 크론 건강 섹션에 직접 표출 — halted 중엔 ⚠️경고줄(발동시각·사유) + 영향받는 크론(exposur |
+| 2026-09-24 07:56 | #1241 | [개발] 협업 #450: decision#1224 근본원인 확정: nonClosureMayUse 예약설계가  | a9bb0d98 | - | lib/naverBudget.ts에 NAVER_GROW_RESERVE(기본 3000) 신설 + scripts/import-permits.mjs BUDGET 계산에 반영(QUOTA- |
