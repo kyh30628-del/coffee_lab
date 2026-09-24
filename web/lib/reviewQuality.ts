@@ -2232,6 +2232,13 @@ export function verifyReview(input: QualityInput): QualityResult {
     : onlyTok && COMMON_WORD_NAMES.has(onlyTok) ? onlyTok
     : soleSubstTok && COMMON_WORD_NAMES.has(soleSubstTok) ? soleSubstTok : "";
   const nameCommonPhrase = !!commonAnchor;
+  // 🍯 맛·재료명 상호(09-24 정확도 표본: 해운대 '카라멜' 노출 인용에 "포션커피 카라멜 맛"·"코스트코 카라멜 맛 대추야자") —
+  //   카페어가 붙어 있어 위 근접판정으로는 못 막는다(상품 글도 '커피'를 말한다). 우리 지역·동이 글에 있을 때만 인정.
+  const FLAVOR_NAMES = new Set(["카라멜", "캐러멜", "바닐라", "시나몬", "헤이즐넛", "피스타치오", "얼그레이", "민트", "모카", "메이플", "허니", "레몬", "블루베리", "크림치즈", "흑임자", "밤", "유자", "자몽", "캐모마일", "라벤더"]);
+  const flavorAnchor = FLAVOR_NAMES.has(nameClean) ? nameClean : onlyTok && FLAVOR_NAMES.has(onlyTok) ? onlyTok : soleSubstTok && FLAVOR_NAMES.has(soleSubstTok) ? soleSubstTok : "";
+  if (flavorAnchor && areaTerms.length && !areaPresent && !dongPresent) {
+    return { verdict: "rejected", score: 2, reasons: [`맛·재료명 상호('${flavorAnchor}') — 우리 지역 언급 없는 글(상품 맛 후기 혼입)`], signals: sig };
+  }
   if (nameCommonPhrase) {
     // 관용구·일반어 카페명은 상호명 토큰 ±25자 근접 안에 카페맥락어가 있을 때만 진짜후기로 인정(제목 카페어는 강신호로 예외).
     //   멀리 떨어진 카페어 우연 동시언급은 더 이상 게이트를 무력화하지 못한다(전역 bodyHasCafeWord 예외 제거 — 근접판정 무력화 방지).

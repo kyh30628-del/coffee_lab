@@ -40,7 +40,9 @@ const rows = await sql`SELECT id, name, area, synth_grade, synth_count, pipeline
   WHERE NOT published AND raw_reviews IS NOT NULL
     AND pipeline_status NOT IN ('excluded','noise')
     AND (${ONLY_N} < 0 OR synth_count = ${ONLY_N})
-    AND (NOT ${OWN_CITY} OR synth_quality::text LIKE ('%다른 지역 동명 카페 추정(제목 ''' || regexp_replace(split_part(area, ' ', array_length(string_to_array(area, ' '), 1)), '(시|군|구)$', '') || '''%'))
+    AND (NOT ${OWN_CITY} OR synth_quality::text LIKE ('%다른 지역 동명 카페 추정(제목 ''' || regexp_replace(split_part(area, ' ', array_length(string_to_array(area, ' '), 1)), '(시|군|구)$', '') || '''%')
+         OR synth_quality::text LIKE ('%(제목 ''' || split_part(area, ' ', 1) || '''%')
+         OR synth_quality::text LIKE ('%혼입(''' || split_part(area, ' ', 1) || '''%'))
   ORDER BY synth_checked_at ASC NULLS FIRST LIMIT ${LIMIT}`;
 const byStatus = rows.reduce((m, r) => { m[r.pipeline_status ?? "(없음)"] = (m[r.pipeline_status ?? "(없음)"] ?? 0) + 1; return m; }, {});
 console.log(`대상 ${rows.length.toLocaleString()}곳 (상한 ${LIMIT}) · 상태: ${Object.entries(byStatus).map(([k, v]) => `${k}=${v}`).join(" · ")}`);
