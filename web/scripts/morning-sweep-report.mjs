@@ -53,12 +53,20 @@ try {
   say(`   네이버→동 계열(주) ${wk.dg0} ← ${wk.dg1} ${pct(wk.dg0, wk.dg1)} ${wk.dg1 > 0 && wk.dg0 < wk.dg1 * 0.8 ? "🔴 -20%↓ 사이트맵 원복 검토" : "✅"}`);
 } catch (e) { say(`⓪ 사람 유입 조회 실패: ${String(e).slice(0, 60)}`); }
 
-// ① 스윕 로그 — 오늘 07시대 것
+// ① 07시 적재 로그 — 09-21부터 discover-sweep(정지)은 원장 적재(import-permits)로 대체됐다.
+//   09-24 수리: 정지된 스윕 로그를 계속 찾아 매일 '🔴 로그 없음' 오경보를 냈다. 살아 있는 잡을 본다.
 const dir = "/Users/wangwida/coffee-platform/agent-reports/logs";
 const ymd = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10).replace(/-/g, "");
-const f = readdirSync(dir).filter((x) => x.startsWith(`discover-sweep-${ymd}-07`)).sort().pop();
-if (!f) say("🔴 오늘 07시 스윕 로그 없음 — launchd 미발화 의심");
+const pf = readdirSync(dir).filter((x) => x.startsWith(`import-permits-${ymd}-07`)).sort().pop();
+if (!pf) say("⚠️ 오늘 07시 원장 적재 로그 없음 — launchd 미발화 의심");
 else {
+  const plog = readFileSync(`${dir}/${pf}`, "utf8");
+  const m = plog.match(/적재 (\d+)곳 · 시도 (\d+) · 네이버 미발견 (\d+).*?공개규칙 불가 제외 (\d+) · 교차소스 중복 제외 (\d+)/) || plog.match(/적재 (\d+)곳 · 시도 (\d+) · 네이버 미발견 (\d+)/);
+  const per = plog.match(/적재 1곳당 ([\d.]+)콜/);
+  say(`① 원장 적재 — ${m ? `${m[1]}곳 · 시도 ${m[2]} · 미발견 ${m[3]}${m[4] ? ` · 공개불가 ${m[4]} · 중복 ${m[5]}` : ""} · 곳당 ${per ? per[1] : "?"}콜` : "종료줄 없음(진행 중이거나 중단)"}`);
+}
+const f = null; // 스윕 로그 파서는 재기동 대비로 남겨 둔다(discover-sweep 재가동 시 f를 되살릴 것)
+if (f) {
   const log = readFileSync(`${dir}/${f}`, "utf8");
   const regions = [...log.matchAll(/^\[(\d+)\] (.+?)\(직전수확률 ([^)]+)\): 발견 (\d+) · 신규 (\d+)/gm)];
   const end = log.match(/처리 (\d+)개 지역 · 신규 (\d+)곳 적재 · 네이버 ([\d,]+)/);
@@ -154,7 +162,7 @@ const j = await sql`SELECT job, ok, to_char(ran_at AT TIME ZONE 'Asia/Seoul','HH
   FROM agent_runs WHERE job IN ('cron-grow','cron-synth','cron-resynth','cron-embed','discover-sweep') ORDER BY ran_at DESC`;
 // 08:20 기준 '오늘 08시대 실행이 있어야 하는 잡'이 어제 시각을 달고 있으면 = 아침 회차가 조용히 죽은 것.
 //   (cron-resynth 20시 타임아웃이 기록조차 안 남아 관제탑에 안 보이던 2026-09-16 함정 재발 방지)
-const expectMorning = new Set(["cron-grow", "cron-synth", "cron-resynth", "cron-embed", "discover-sweep"]);
+const expectMorning = new Set(["cron-grow", "cron-synth", "cron-resynth", "cron-embed"]); // discover-sweep은 09-21 정지(RETIRED) — 기대 목록에서 제외
 //   ⚠️ 08:15~09:30 사이에 돌 때만 판정한다 — 낮에 수동으로 돌리면 아침 시각이 아니라 거짓 빨강이 난다(21시 시험에서 실제로 났다).
 const hhmm = Number(new Date(Date.now() + 9 * 3600e3).toISOString().slice(11, 16).replace(":", ""));
 const missed = (hhmm >= 815 && hhmm <= 930) ? j.filter((x) => expectMorning.has(x.job) && !/^0[78]:/.test(x.t)).map((x) => x.job.replace("cron-", "")) : [];
