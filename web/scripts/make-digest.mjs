@@ -45,13 +45,20 @@ const today = new Date().toISOString().slice(0, 10);
   try { ({ EXPECT_MAX_H: EXPECT } = await import("../lib/jobTeams.ts")); } catch {}
   try {
     const runs = await sql`SELECT DISTINCT ON (job) job, ok, detail, EXTRACT(EPOCH FROM (now()-ran_at))/3600 h FROM agent_runs ORDER BY job, ran_at DESC`;
+    // 💰 cost_guard(lib/costGuard.ts) 상태 — 협업#449: halted 중엔 무거운 크론이 스킵(ok:true, detail="🛑 비용
+    //   자동정지 중 — 스킵")되는데, 이 섹션은 agent_runs.ok만 보고 스킵도 정상종료라 ok=true라서 halted 상태에서도
+    //   전부 초록으로 뜬다 — 대량정지가 대시보드에 안 보이는 사각. cost_guard.halted를 직접 읽어 표출한다.
+    const cg = (await sql`SELECT halted, reason, EXTRACT(EPOCH FROM (now()-set_at))/3600 h FROM cost_guard WHERE id=1`.catch(() => []))[0];
+    const costSkipped = runs.filter((r) => /비용 자동정지 중/.test(r.detail || ""));
     const bad = runs.filter((r) => !r.ok);
     const stale = runs.filter((r) => r.ok && EXPECT[r.job] != null && +r.h > EXPECT[r.job]);
     L.push(`## 🤖 크론 건강 (${runs.length}개)`);
-    if (!bad.length && !stale.length) L.push(`- ✅ 전 크론 정상`);
+    if (cg?.halted) L.push(`- 💰 **cost_guard 자동정지 중** (${(+cg.h).toFixed(1)}h전 발동): ${(cg.reason || "").slice(0, 100)} — 무거운 크론이 ok:true로 찍히지만 실제로는 스킵됨`);
+    else if (costSkipped.length) L.push(`- 💰 최근 비용정지로 스킵된 이력 있음(현재는 해제): ${costSkipped.map((r) => r.job).join(", ")}`);
+    if (!bad.length && !stale.length && !cg?.halted) L.push(`- ✅ 전 크론 정상`);
     if (bad.length) L.push(bad.map((r) => `- ❌ **${r.job}** (${(+r.h).toFixed(1)}h전): ${(r.detail || "").slice(0, 80)}`).join("\n"));
     if (stale.length) L.push(stale.map((r) => `- ⏸️ **${r.job} 정지의심** (${(+r.h).toFixed(1)}h전 — 정상주기 ${EXPECT[r.job]}h 초과)`).join("\n"));
-    L.push(runs.map((r) => `${!r.ok ? "❌" : (EXPECT[r.job] != null && +r.h > EXPECT[r.job]) ? "⏸️" : "✅"}${r.job}(${(+r.h).toFixed(0)}h)`).join(" · ") + "\n");
+    L.push(runs.map((r) => `${!r.ok ? "❌" : /비용 자동정지 중/.test(r.detail || "") ? "💰" : (EXPECT[r.job] != null && +r.h > EXPECT[r.job]) ? "⏸️" : "✅"}${r.job}(${(+r.h).toFixed(0)}h)`).join(" · ") + "\n");
   } catch (e) { L.push(`(크론 조회 실패)\n`); }
 
   // 1.5) 🚨 제안서 미인입 감시 (협업#187·#219 재발 원인 — 결재 #419, coord#221~224 재발 원인 — 결재 #421) —
