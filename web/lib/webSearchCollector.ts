@@ -134,6 +134,18 @@ export async function fetchWebReviews(name: string, area: string, dong?: string)
     }
     // 수집 0인데 호출이 한 번도 성공 못 함 → API 오류/쿼터(진짜 0건과 구분)
     const apiError = snippets.length === 0 && anyFail && !anyOk;
+    // 🔬 측정 전용(COLLECT_QLOG=파일경로일 때만, 동작 무변경) — 질의별로 '상호가 맞는 글'이 몇 건 나왔는지 남긴다.
+    //   목적(09-25): 첫 블로그 질의에서 상호 일치 0건이면 나머지 질의를 건너뛰어도 되는지 실측(원본 0건 카페 공개 0곳).
+    if (process.env.COLLECT_QLOG) {
+      try {
+        const { nameCoherence, cleanCafeName } = await import("./reviewQuality");
+        const { appendFileSync } = await import("node:fs");
+        const nm = cleanCafeName(name), terms = [area, dong].filter(Boolean) as string[];
+        const hits: Record<string, number> = {};
+        for (const s of snippets) { if (nameCoherence(nm, [s.text], terms) === 0) continue; const k = `${s.kind === "cafearticle" ? "cafe" : "blog"}${s.q}`; hits[k] = (hits[k] ?? 0) + 1; }
+        appendFileSync(process.env.COLLECT_QLOG, JSON.stringify({ name, area, calls: debug.length, got: debug, hits }) + "\n");
+      } catch { /* 측정 실패는 무시 */ }
+    }
     return { snippets, apiError, debug };
   } catch (e) {
     return { snippets: [], error: String(e) };
