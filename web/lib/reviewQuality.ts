@@ -1621,6 +1621,8 @@ export function verifyReview(input: QualityInput): QualityResult {
   // [업체 사례글·목록글] 2026-09-24 — 정의부 주석 참조. 카페 맥락이 있어도 거절한다(그 맥락 자체가 고객 소개다).
   {
     const nosig = { nameInTitle: false, nameInBody: false, visit: false, substance: 0, listicle: false, sponsored: false, areaMatch: false };
+    // 🧁 업체 1인칭 작업 후기(09-24: 군산 더스윗미 노출 인용 전부 "어르신 간식세트로 준비해드렸답니다"류 — 인스타 없는 가게의 본인 글)
+    if (/(준비|제작|포장|세팅|구성|배송|납품|주문\s*제작)\s*해\s*드렸(습니다|어요|답니다|네요|어용|습니당)|(맞춰서|맞춰)\s*(준비|구성)\s*해\s*드렸/.test(fullL)) return { verdict: "rejected", score: 0, reasons: ["업체 1인칭 작업·주문 안내 글(사장님 본인 글 — 방문 후기 아님)"], signals: nosig };
     if (VENDOR_CASE.test(fullL)) return { verdict: "rejected", score: 0, reasons: ["업체 시공·설치 사례/양도 글(방문 후기 아님) — 자동 제외"], signals: nosig };
     if (input.srcName && VENDOR_SRC.test(input.srcName)) return { verdict: "rejected", score: 0, reasons: ["업체·공식 계정 글(글쓴이 표시명이 업체/브랜드 공식) — 자동 제외"], signals: nosig };
     // 🔎 검색결과 짜깁기 계정(09-24 정확도 표본: '카페다래' 인용 3개 전부 "전국 맛집/카페 소개"·"전화번호-업종편", 본문 "출처:google검색")
