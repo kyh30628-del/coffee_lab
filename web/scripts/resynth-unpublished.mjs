@@ -24,6 +24,8 @@ const { synthAndStore } = await import("../lib/synthStore.ts");
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? Number(process.argv[i + 1]) : d; };
 const APPLY = process.argv.includes("--apply");
 const LIMIT = arg("--limit", 500), CONC = arg("--conc", 4);
+// 🎯 --synth-count N: 검증후기 수가 N인 카페만(2026-09-24 문턱 3→2 소급 — 1건짜리 큰 컬럼까지 헛읽지 않게 대상을 좁힌다)
+const ONLY_N = arg("--synth-count", -1);
 // ⏰ 2026-09-18 — 대량 재판정이 새벽을 침범하지 않게 하드 데드라인(KST 시각, 기본 23시).
 //   Neon은 06~23시엔 사람 트래픽·크론으로 이미 깨어 있어 얹어도 추가 가동 0이지만,
 //   그 밖(특히 03~05시)에서 돌면 **없던 가동이 새로 생긴다**(CEO 절대지시: 새벽에 DB 깨우지 말 것).
@@ -35,6 +37,7 @@ const pastDeadline = () => new Date(Date.now() + 9 * 3600e3).getUTCHours() >= ST
 const rows = await sql`SELECT id, name, area, synth_grade, synth_count, pipeline_status FROM cafes
   WHERE NOT published AND raw_reviews IS NOT NULL
     AND pipeline_status NOT IN ('excluded','noise')
+    AND (${ONLY_N} < 0 OR synth_count = ${ONLY_N})
   ORDER BY synth_checked_at ASC NULLS FIRST LIMIT ${LIMIT}`;
 const byStatus = rows.reduce((m, r) => { m[r.pipeline_status ?? "(없음)"] = (m[r.pipeline_status ?? "(없음)"] ?? 0) + 1; return m; }, {});
 console.log(`대상 ${rows.length.toLocaleString()}곳 (상한 ${LIMIT}) · 상태: ${Object.entries(byStatus).map(([k, v]) => `${k}=${v}`).join(" · ")}`);
