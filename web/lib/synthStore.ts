@@ -897,22 +897,30 @@ export async function finalizePipeline(): Promise<{ promoted: number; names: str
   //   소과당 홍대점(검증·후기 167·일치율 1.0)이 6월부터 석 달간 비공개였다. exclude_reason은 비어 있었다.
   //   원인 3중: ①synthStore에서 held는 자기유지(`held = pst === "held"`) ②finalizePipeline은 pending만 승격
   //   ③recheckTrigger는 excluded만 본다(사유 문구가 'held 재평가 대기'인데 그 대기열이 없었다).
-  //   → 사람이 남긴 사유가 없고(=자동 부산물) 모든 결정론 게이트를 통과하면 pending으로 되돌린다.
-  //     공개 여부는 아래 승격 게이트가 그대로 결정한다. 오염(일치율<0.5·무관율≥0.2)·플래그·사유 있는 held는 손대지 않는다.
-  //   ⚠️ 한 번에 200곳 상한 — 대량 변동 차단(힐러 규약과 동일).
+  //
+  //   🔴 2026-09-24 같은 날 수리 — 첫 배포(eed89967)는 SQL 게이트만 걸고 **이름·업종 규칙을 빼먹었다.**
+  //     그대로 뒀으면 다음 실행에 밀면집·모래놀이터·텐퍼센트커피·백소정·에스피씨삼립 13곳이 공개될 뻔했다.
+  //     SQL로는 isFranchise·isNonCafe를 재현할 수 없다 → **후보만 SQL로 뽑고 판정은 TS 규칙으로 한다.**
+  //     recheckTrigger(excluded 레인)가 쓰는 것과 **같은 규칙 세트**다. 한쪽만 고치지 않는다.
   let released = 0;
   try {
-    const rel = (await sql`UPDATE cafes SET pipeline_status = 'pending', updated_at = now()
-      WHERE id IN (
-        SELECT c.id FROM cafes c
-        WHERE NOT c.published AND c.pipeline_status = 'held' AND COALESCE(c.exclude_reason, '') = ''
-          AND c.synth_grade IN ('검증','참고') AND c.embedding IS NOT NULL
-          AND COALESCE(c.synth_coherence, 0) >= 0.5 AND COALESCE(c.offctx_rate, 0) < 0.2
-          AND NOT EXISTS (SELECT 1 FROM audit_flags af WHERE af.cafe_id = c.id AND NOT af.resolved)
-        LIMIT 200)
-      RETURNING id`) as any[];
-    released = rel.length;
-    if (released) await invalidateCafeCaches(rel.map((r) => Number(r.id)));
+    const cand = (await sql`SELECT id, name, naver_category cat FROM cafes c
+      WHERE NOT c.published AND c.pipeline_status = 'held' AND COALESCE(c.exclude_reason, '') = ''
+        AND c.synth_grade IN ('검증','참고') AND c.embedding IS NOT NULL
+        AND COALESCE(c.synth_coherence, 0) >= 0.5 AND COALESCE(c.offctx_rate, 0) < 0.2
+        AND COALESCE(c.naver_category, '') <> ''
+        AND NOT EXISTS (SELECT 1 FROM audit_flags af WHERE af.cafe_id = c.id AND NOT af.resolved)
+      LIMIT 500`) as any[];
+    const ok = cand.filter((c) => {
+      const nm = String(c.name || ""), ct = String(c.cat || "");
+      return !isFranchise(nm) && !isNonCafe(nm, ct) && !isSnackStall(nm) && !isStructuralPhantom(nm) && !isUnmannedCafe(nm);
+    }).slice(0, 200); // 1회 200곳 상한 — 대량 변동 차단(힐러 규약과 동일)
+    if (ok.length) {
+      const ids = ok.map((c) => Number(c.id));
+      await sql`UPDATE cafes SET pipeline_status = 'pending', updated_at = now() WHERE id = ANY(${ids})`;
+      await invalidateCafeCaches(ids);
+      released = ids.length;
+    }
   } catch { /* 해제 실패가 승격을 막지 않는다 */ }
   await loadCriteria(); // 수도권 좌표박스 기준 캐시 프라임 — 공개 승격 게이트가 synth와 같은 진실(폴백=criteria DEFAULTS(현재 36.8~38.7/124.5~129.4))
   const latMin = getCriterionSync("geo.box.lat_min"), latMax = getCriterionSync("geo.box.lat_max");
