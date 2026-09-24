@@ -18,7 +18,10 @@ export async function GET(req: NextRequest) {
     if (!me || !me.published) return NextResponse.json({ ok: false, error: "공개된 카페가 아닙니다" }, { status: 404 });
 
     const myGu = guOf(me.area);
-    const hood = (await sql`SELECT id, name, area, synth_count, char_scores FROM cafes WHERE published = true`) as any[];
+    // ⚠️ 2026-09-25: 예전엔 WHERE 없이 공개카페 전량(38,648건)의 char_scores jsonb를 통째로 끌어와
+    //   JS에서 guOf로 사후필터했다 — cost_guard 자동정지(360.7GB, 최다쿼리 52.3GB) 원인이었다.
+    //   area는 guOf와 동일한 클린 키(lib/region.ts)라 SQL에서 바로 좁힐 수 있다.
+    const hood = (await sql`SELECT id, name, area, synth_count, char_scores FROM cafes WHERE published = true AND area = ${myGu}`) as any[];
     const inHood = hood.filter((c) => guOf(c.area) === myGu);
     // 순위 동점 시 id로 타이브레이크(2026-07-26) — ORDER BY 없는 SELECT라 정렬 전 배열 순서가 보장 안 돼,
     // 리뷰수 같은 카페끼리는 순위가 재조회 때마다 흔들릴 수 있었다(badge/[cafeId] 라우트와 동일 원칙 통일).
