@@ -211,11 +211,17 @@ export async function GET(req: NextRequest) {
     const latMin = getCriterionSync("geo.box.lat_min"), latMax = getCriterionSync("geo.box.lat_max");
     const lngMin = getCriterionSync("geo.box.lng_min"), lngMax = getCriterionSync("geo.box.lng_max");
     const AREA_SIDO = sidoFromAreaSql("area"), ADDR_SIDO = sidoFromAddressSql("address"); // 🧭 지역 판정 단일출처
-    const ig = (await sql`SELECT
+    // 🩹 2026-09-24 수리(결재#1245): AREA_SIDO/ADDR_SIDO는 SQL CASE식 "문자열"이다(값이 아니라 코드 조각).
+    //   sql`...${AREA_SIDO}...`(태그 템플릿)로 넣으면 neon 드라이버가 이걸 바인드 파라미터로 이스케이프해
+    //   "(CASE ... END) IS NOT NULL" 대신 "($5) IS NOT NULL"이 되고, IS NOT NULL만으로는 파라미터 타입을
+    //   추론할 문맥이 없어 NeonDbError("could not determine data type of parameter $5")로 매번 실패했다.
+    //   신뢰할 수 있는(정적 사전에서 생성된) SQL 조각이므로 sql.query()의 쿼리문 문자열에 직접 splice하고,
+    //   실제 값(latMin 등)만 위치 파라미터($1~$4)로 바인딩한다.
+    const ig = (await sql.query(`SELECT
       COUNT(*) FILTER (WHERE dong IS NOT NULL AND (area=dong||'구' OR area=dong||'시' OR area=dong||'군'))::int dong_isgu,
       COUNT(*) FILTER (WHERE dong IS NOT NULL AND dong !~ '(동|읍|면|가)$')::int dong_badfmt,
       COUNT(*) FILTER (WHERE naver_category IS NULL OR naver_category='')::int pub_nocat,
-      COUNT(*) FILTER (WHERE lat IS NULL OR lat NOT BETWEEN ${latMin} AND ${latMax} OR lng NOT BETWEEN ${lngMin} AND ${lngMax})::int pub_badcoord,
+      COUNT(*) FILTER (WHERE lat IS NULL OR lat NOT BETWEEN $1 AND $2 OR lng NOT BETWEEN $3 AND $4)::int pub_badcoord,
       COUNT(*) FILTER (WHERE synth_identity IS NULL OR synth_identity='')::int pub_noidentity,
       -- 도(道) 교차오염: area의 도(인천%→인천, 끝이 구→서울, 끝이 시/군→경기)와 주소의 도가 다름 (예: area=강동구인데 주소=경기 남양주)
       -- 🧭 2026-09-23 수리: 서울·인천·경기 3개만 보던 탓에 공개 16,502곳(47%)이 **검사 자체를 안 받았다**.
@@ -223,7 +229,7 @@ export async function GET(req: NextRequest) {
       COUNT(*) FILTER (WHERE address IS NOT NULL AND address<>''
         AND (${AREA_SIDO}) IS NOT NULL AND (${ADDR_SIDO}) IS NOT NULL
         AND (${AREA_SIDO}) <> (${ADDR_SIDO}))::int area_xprov
-      FROM cafes WHERE published = true`)[0] as any;
+      FROM cafes WHERE published = true`, [latMin, latMax, lngMin, lngMax]))[0] as any;
     // 결정론적 '진짜 에러'는 검출 즉시 자율 교정(컨펌 불필요). 교정 실패 시에만 integrity 경보로 남김.
     // ⚠️ 자율교정은 '안전·결정론적인 것만' — 단, 비공개로 만드는 조치는 1회 상한(대량삭제 차단). pub_nocat는
     //   기존 검증카페까지 숨겨 인천 사태를 유발 → 자동 비공개에서 제외(카테고리 없음=비카페 아님). 동 교정만 무제한.
