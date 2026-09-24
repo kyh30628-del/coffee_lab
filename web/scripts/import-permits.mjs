@@ -15,7 +15,7 @@
 //   후기 없는 카페는 지금과 똑같이 공개되지 않는다.
 //
 // 사용: node --import tsx scripts/import-permits.mjs [--apply] [--limit N] [--budget N]
-import { readFileSync, createReadStream, writeFileSync, existsSync } from "node:fs";
+import { readFileSync, createReadStream, writeFileSync, existsSync, appendFileSync } from "node:fs";
 import { homedir } from "node:os";
 import readline from "node:readline";
 const env = readFileSync(new URL("../.env.local", import.meta.url), "utf8");
@@ -111,7 +111,7 @@ for (const fn of ["rest_cafes", "bakeries", "rest_cafes.extra", "bakeries.extra"
     // 🚫 상호만으로 공개 불가가 확정인 곳(09-24 실측: 공개 3,562곳 중 오탐 1곳·그마저 브런치 정책 위반, 공개불가 144곳 적중)
     if (isNonCafe(String(d.nm), "")) { skipNameNonCafe++; continue; }
     { const same = ownByAddrKey.get(addrKey(addr)); if (same && same.some((n) => nameLoose(n, d.nm))) { skipBldgDup++; continue; } }
-    cand.push({ nm: d.nm, addr, area, tel: d.tel || null });
+    cand.push({ nm: d.nm, addr, area, tel: d.tel || null, opn: d.opn || null, biz: d.biz || null });
   }
 }
 console.log(`  (일반음식점 카페 겸업 후보 ${grCand.toLocaleString()}곳 포함 — 필터 통과·미보유·미시도)`);
@@ -140,6 +140,9 @@ if (!APPLY) { console.log(`\n▶ 드라이런. --apply 로 적재(상한 ${LIMIT
 // ── 네이버 local 1콜로 좌표·실재 확인 후 적재 ──
 let used0 = await naverUsedToday();
 let tried = 0, added = 0, miss = 0, skipNonCafe = 0, skipRuleDead = 0, skipDup = 0, calls = 0;
+// 🔬 09-25 결과 기록(동작 무변경) — 미발견(오늘 2,492콜·31%)이 개업시기·업종·전화 유무에 몰리는지 보려면 항목별 결과가 필요하다.
+const OUT_PATH = `${homedir()}/coffee-platform/agent-reports/permits/outcome-${new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10).replace(/-/g, "")}.ndjson`;
+const outcome = (c, r) => { try { appendFileSync(OUT_PATH, JSON.stringify({ r, nm: c.nm, area: c.area, opn: c.opn ?? null, biz: c.biz ?? null, tel: c.tel ? 1 : 0 }) + "\n"); } catch {} };
 const VERBOSE = process.argv.includes("--verbose");
 for (const c of cand) {
   if (added >= LIMIT) break;
@@ -149,35 +152,35 @@ for (const c of cand) {
   // 질의 정리 — "요에라(Yoera)"·"카페:옆집"·"카페cafe 메종@학동" 같은 인허가 표기는 네이버가 0건을 돌려준다(09-21 실증)
   const qn = String(c.nm).replace(/\([^)]*\)/g, " ").replace(/[:@·,\/]+/g, " ").replace(/\s+/g, " ").trim() || c.nm;
   const items = await localSearch(`${qn} ${c.area}`); calls++;
-  if (!items) { miss++; continue; }                             // API 오류/쿼터 → 보류
+  if (!items) { miss++; outcome(c, "api"); continue; }                             // API 오류/쿼터 → 보류
   const ck = addrKey(c.addr);
   const hit = items.find((it) => it.lat != null && (
     norm(it.name) === norm(c.nm) ||                              // 이름 완전일치
     (ck && addrKey(it.address) === ck) ||                        // 도로명+번지 일치(같은 건물)
     nameLoose(it.name, c.nm)));                                  // 업종어·법인어 뺀 느슨한 포함
-  if (!hit) { miss++; if (VERBOSE) console.log(`  ✗ ${c.nm} | ${c.area} | 네이버: ${items.slice(0, 2).map((i) => `${i.name} @ ${i.address}`).join(" ; ") || "(결과 없음)"}`); continue; } // 네이버에 없으면 적재하지 않는다(폐업·미등록)
+  if (!hit) { miss++; outcome(c, items.length ? "miss_nomatch" : "miss_empty"); if (VERBOSE) console.log(`  ✗ ${c.nm} | ${c.area} | 네이버: ${items.slice(0, 2).map((i) => `${i.name} @ ${i.address}`).join(" ; ") || "(결과 없음)"}`); continue; } // 네이버에 없으면 적재하지 않는다(폐업·미등록)
   if (VERBOSE && norm(hit.name) !== norm(c.nm)) console.log(`  ≈ ${c.nm} → ${hit.name} (${addrKey(hit.address) === ck ? "주소일치" : "느슨한 이름"})`);
-  if (isNonCafeFnbCategory(hit.category || "")) { skipNonCafe++; continue; }
+  if (isNonCafeFnbCategory(hit.category || "")) { skipNonCafe++; outcome(c, "noncafe"); continue; }
   const hitName = hit.name || c.nm, hitAddr = hit.address || c.addr;
   // 🔒 공개 관문과 같은 규칙으로 적재 전에 거른다(2026-09-24 CEO "낭비 막아").
   //   실측 09-21~24: 적재 12,910곳 중 2,549곳(프랜차이즈 302·비카페 업종 2,247)이 네이버 정본 상호·업종만으로
   //   공개 불가가 확정인데 적재돼 수집 쿼터(곳당 ~4.4콜)를 태웠다 — 그중 공개 1곳. 약 2,800콜/일 낭비.
   //   원인: 여기는 isFranchise(원장 상호)+isNonCafeFnbCategory만, 공개 관문(synthStore ruleOk)은
   //   isFranchise(정본 상호)+isNonCafe(상호,업종)+노점/유령/무인을 본다. 두 관문을 같은 함수로 맞춘다.
-  if (isFranchise(hitName) || isNonCafe(hitName, hit.category || "") || isSnackStall(hitName) || isStructuralPhantom(hitName) || isUnmannedCafe(hitName)) { skipRuleDead++; continue; }
+  if (isFranchise(hitName) || isNonCafe(hitName, hit.category || "") || isSnackStall(hitName) || isStructuralPhantom(hitName) || isUnmannedCafe(hitName)) { skipRuleDead++; outcome(c, "ruledead"); continue; }
   // ★ 정본(Naver) 이름·주소·좌표로 최종 재확인 — discover.ts와 동일 판정(이름 완전일치 → 좌표근접+브랜드토큰겹침/근접중복 → 주소완전일치).
   let dup = haveName.has(norm(hitName)) || (hitAddr && haveAddr.has(norm(hitAddr)));
   if (!dup && hit.lat != null) {
     const near = ownPts.find((p) => Math.abs(p.lat - hit.lat) < 0.0005 && Math.abs(p.lng - hit.lng) < 0.0005);
     if (near && (brandTokenOverlap(near.name, hitName, [c.area, near.dong, hit.dong].filter(Boolean)) || nearDuplicateCafeName(near.name, hitName))) dup = true;
   }
-  if (dup) { skipDup++; if (VERBOSE) console.log(`  ⊘ 교차소스 중복(기존 보유) ${hitName} @ ${hitAddr}`); continue; }
+  if (dup) { skipDup++; outcome(c, "dup"); if (VERBOSE) console.log(`  ⊘ 교차소스 중복(기존 보유) ${hitName} @ ${hitAddr}`); continue; }
   const area = areaOf(hit.address) || c.area;
   const pseudoId = `pm_${String(c.nm).replace(/\s/g, "")}_${Math.round(hit.lat * 1e5)}`;
   await sql`INSERT INTO cafes (place_id, name, area, dong, naver_category, address, lat, lng, phone, instagram_url, source, published, roasts_own, pipeline_status)
     VALUES (${pseudoId}, ${hitName}, ${area}, ${hit.dong}, ${hit.category}, ${hitAddr}, ${hit.lat}, ${hit.lng}, ${hit.phone || c.tel}, ${hit.instagramUrl}, 'permit', false, false, 'new')
     ON CONFLICT (place_id) DO NOTHING`;
-  added++;
+  added++; outcome(c, "added");
   // 같은 실행 내 후속 후보와도 대조(직전에 넣은 것도 대조 대상에 추가)
   haveName.add(norm(hitName)); if (hitAddr) haveAddr.add(norm(hitAddr));
   if (hit.lat != null) ownPts.push({ lat: hit.lat, lng: hit.lng, name: hitName, dong: hit.dong });
