@@ -1462,7 +1462,9 @@ export default function Home() {
   useEffect(() => { const u = homeRegion ? `/api/discover?region=${encodeURIComponent(homeRegion)}` : "/api/discover"; setDiscover(null); fetch(u).then((r) => r.json()).then((d) => { if (d.ok) setDiscover(d); }).catch(() => {}); }, [homeRegion]);
   useEffect(() => { const u = homeRegion ? `/api/momentum?region=${encodeURIComponent(homeRegion)}` : "/api/momentum"; setMomentum(null); fetch(u).then((r) => r.json()).then((d) => { if (d.ok) setMomentum({ rising: d.rising ?? [] }); }).catch(() => {}); }, [homeRegion]);
 
-  const openById = useCallback((id: number) => { const c = cafes.find((x) => x.id === id); if (c) setSelected(c); }, [cafes]);
+  // 🔧 2026-09-24 수리 — 지도 API의 id는 런타임에 **문자열**("2")이다(bigint). 근처 카페(rankNearby)는 Number로 넘겨 `===`가
+  //   항상 실패 → 상세 하단 근처 카페를 눌러도 아무 일도 없었다(CEO 지적). 형식과 무관하게 비교한다(부르는 곳 전부 보호).
+  const openById = useCallback((id: number | string) => { const k = String(id); const c = cafes.find((x) => String(x.id) === k); if (c) setSelected(c); }, [cafes]);
   // ❤ 홈 카드의 추억 저장 — 상세 패널과 같은 모달(MY PIN)을 그 카페로 연다(2026-09-21 CEO).
   const openMemory = useCallback((id: number) => { trackOutbound({ target: "record", cafeId: id, source: "홈카드" }); setEditCafeId(id); setShowMyCafeReg(true); }, []);
 
@@ -2959,6 +2961,9 @@ function hlQuote(text?: string) {
 }
 
 function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarked = false, onToggleBookmark, onSaveMemory }: { cafe: Cafe; dist: AxisDist; allCafes?: Cafe[]; onOpenCafe?: (id: number) => void; onClose: () => void; onMap: () => void; bookmarked?: boolean; onToggleBookmark?: () => void; onSaveMemory?: () => void }) {
+  // ⬆️ 근처 카페 등으로 다른 카페를 열면 패널을 맨 위로(스크롤이 바닥에 남아 "안 바뀐 것처럼" 보이던 문제, 09-24)
+  const panelRef = useRef<HTMLElement | null>(null);
+  useEffect(() => { panelRef.current?.scrollTo({ top: 0 }); }, [cafe.id]);
   const [saveFx, setSaveFx] = useState(false); // ③ 저장 손맛 — 담는 순간에만 팝+하트 연출
   const onBookmark = () => { const willSave = !bookmarked; onToggleBookmark?.(); if (willSave) { setSaveFx(true); setTimeout(() => setSaveFx(false), 800); } };
   const [reviews, setReviews] = useState<EvidenceReview[]>([]);
@@ -3046,7 +3051,7 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
     //    줄노트·도장·찢은 띠·손글씨 판정 유지, 본문 명조·라벨 고딕, 이모지 0, 하단 고정 행동 2개.
     <div className="fixed inset-0 z-[3000] overflow-hidden pointer-events-none">
       <div onClick={onClose} className={`absolute inset-0 bg-black/30 pointer-events-auto md:bg-transparent md:pointer-events-none transition-opacity duration-300 ${shown ? "opacity-100" : "opacity-0"}`} />
-      <aside className={`absolute top-0 right-0 w-full md:max-w-md nt-paper nt-detail shadow-2xl overflow-y-auto overflow-x-hidden pointer-events-auto transition-transform duration-300 ease-out motion-reduce:transition-none ${shown ? "translate-x-0" : "translate-x-full"}`} style={{ height: "100dvh", paddingTop: "env(safe-area-inset-top)" }}>
+      <aside ref={panelRef} className={`absolute top-0 right-0 w-full md:max-w-md nt-paper nt-detail shadow-2xl overflow-y-auto overflow-x-hidden pointer-events-auto transition-transform duration-300 ease-out motion-reduce:transition-none ${shown ? "translate-x-0" : "translate-x-full"}`} style={{ height: "100dvh", paddingTop: "env(safe-area-inset-top)" }}>
         {/* 사장님 쇼케이스 — 영상(style 0) 또는 10종 템플릿 */}
         {promo && (
           <>
