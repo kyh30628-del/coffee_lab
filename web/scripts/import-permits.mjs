@@ -139,6 +139,7 @@ if (!APPLY) { console.log(`\n▶ 드라이런. --apply 로 적재(상한 ${LIMIT
 
 // ── 네이버 local 1콜로 좌표·실재 확인 후 적재 ──
 let used0 = await naverUsedToday();
+const OFFCONCEPT_CAT = /(애견|애완|반려동물|펫카페|고양이카페|동물카페|키즈|실내놀이터|놀이방|스터디카페|독서실|만화방|만화카페|룸카페|멀티방|파티룸|방탈출|보드게임|보드카페|볼링|당구|스크린골프|골프연습|코인노래|노래방|찜질방|사우나|클라이밍|트램폴린|트램펄린|서점|북카페|도서관)/;
 let tried = 0, added = 0, miss = 0, skipNonCafe = 0, skipRuleDead = 0, skipDup = 0, calls = 0;
 // 🔬 09-25 결과 기록(동작 무변경) — 미발견(오늘 2,492콜·31%)이 개업시기·업종·전화 유무에 몰리는지 보려면 항목별 결과가 필요하다.
 const OUT_PATH = `${homedir()}/coffee-platform/agent-reports/permits/outcome-${new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10).replace(/-/g, "")}.ndjson`;
@@ -167,6 +168,9 @@ for (const c of cand) {
   //   공개 불가가 확정인데 적재돼 수집 쿼터(곳당 ~4.4콜)를 태웠다 — 그중 공개 1곳. 약 2,800콜/일 낭비.
   //   원인: 여기는 isFranchise(원장 상호)+isNonCafeFnbCategory만, 공개 관문(synthStore ruleOk)은
   //   isFranchise(정본 상호)+isNonCafe(상호,업종)+노점/유령/무인을 본다. 두 관문을 같은 함수로 맞춘다.
+  // 📚 09-25: 공개 단계 오프콘셉 제외(synthStore healNonCafeCategory — 북카페·서점·애견·키즈·보드게임 등, CEO 2026-06 지시)와 같은 기준.
+  //   실측: 북카페 0/256·서점 0/80·독립서점 0/45·보드카페 0/33 공개 — 적재하면 수집 쿼터(곳당 ~4.4콜)만 탄다. ⚠️ 정규식은 synthStore와 짝으로 유지.
+  if (OFFCONCEPT_CAT.test(hit.category || "") || /북 ?카페/.test(hitName)) { skipRuleDead++; outcome(c, "offconcept"); continue; }
   if (isFranchise(hitName) || isNonCafe(hitName, hit.category || "") || isSnackStall(hitName) || isStructuralPhantom(hitName) || isUnmannedCafe(hitName)) { skipRuleDead++; outcome(c, "ruledead"); continue; }
   // ★ 정본(Naver) 이름·주소·좌표로 최종 재확인 — discover.ts와 동일 판정(이름 완전일치 → 좌표근접+브랜드토큰겹침/근접중복 → 주소완전일치).
   let dup = haveName.has(norm(hitName)) || (hitAddr && haveAddr.has(norm(hitAddr)));
