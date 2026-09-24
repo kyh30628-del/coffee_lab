@@ -140,6 +140,10 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
     return n === nameNormForSelf || nameCoreForSelf.some((t) => n.includes(t));
   };
   const CLOSURE_TITLE = /(폐업|문\s*닫|없어졌|사라졌|철수|영업\s*종료|폐점)/;
+  // 🚪 09-24: 본문에서 '끝난 사실'로 쓴 폐업(과거형·표기형)만 — "폐업하기 전까지 갈 거예요" 같은 미래형은 아니다.
+  //   실측: 공개 카페 12곳 노출 인용에 '폐업'(오베이글리 "폐업했습니다"·소란 "[폐업]"·다온 "(폐업)"). 제목 검사만 있어 본문형은 노출됐다.
+  const CLOSURE_BODY = /폐업\s*(했|하였|됐|되었|함|해서|이라|입니다)|문\s*(을\s*)?닫았|영업\s*(을\s*)?종료(했|됨|되었|하였)|[\(\[]\s*(현재\s*)?폐업\s*[\)\]]|폐점\s*(했|하였|됐)/;
+  const CLOSURE_REASON = "폐업 언급 — 노출 제외(폐업 확인 대상)";
   const ageMonths = (d?: string): number | null => { const ld = looseDate(d); const t = ld ? new Date(String(ld)).getTime() : NaN; return Number.isFinite(t) ? (Date.now() - t) / 2.63e9 : null; };
   // 블로그 URL 정규화(프로토콜·m.·쿼리·해시·끝슬래시 무시) → 같은 글 1회만
   const linkKeyOf = (u?: string) => (u ?? "").trim().toLowerCase().replace(/^https?:\/\//, "").replace(/^m\./, "").replace(/[#?].*$/, "").replace(/\/+$/, "");
@@ -193,6 +197,11 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
       let reasons = rule.reasons;
       let score = rule.score;
       if (isAd) { verdict = "rejected"; reasons = ["광고·협찬 — 자동 제외(판정보다 우선)"]; score = 0; }
+      else if (verdict !== "rejected" && (() => { // 🚪 폐업 언급(제목 또는 본문, 우리 상호와 함께) → 노출 제외 + 폐업 확인 신호(cron-closure가 rejectReasons로 우선 확인)
+        const ti = String(t.title ?? ""), bo = String((t as any).desc ?? t.text ?? "");
+        const hasName = (x: string) => { const n = x.replace(/\s/g, "").toLowerCase(); return n.includes(nameNormForSelf) || nameCoreForSelf.some((k) => n.includes(k)); };
+        return (CLOSURE_TITLE.test(ti) && hasName(ti)) || (CLOSURE_BODY.test(`${ti} ${bo}`) && hasName(`${ti} ${bo}`));
+      })()) { verdict = "rejected"; reasons = [CLOSURE_REASON]; score = 0; }
       else if (verdict !== "rejected" && isSelfSource((t as any).source, t.link)) { verdict = "rejected"; reasons = ["사장님·공식 계정 글 — 자기 홍보 제외"]; score = 0; }
       else if (hardReject) { /* 규칙 하드 거절 — 과거 결정·whitelist로 못 살림(규칙 절대 우선) */ }
       else if (opts?.decisions && key in opts.decisions) {

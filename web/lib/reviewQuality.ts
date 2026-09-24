@@ -1669,7 +1669,11 @@ export function verifyReview(input: QualityInput): QualityResult {
   });
   const reqFull = coreEmpty || weakSingle || allTokensWeak;
   const distinct = tokens.length ? tokens : (nameN ? [input.name] : []);
-  const areaPresent = areaTerms.length ? areaTerms.some((a) => `${title} ${body}`.includes(a)) : false;
+  // 🔴 2026-09-24 수리 — 지역어가 "강릉시"·"광양시"처럼 **전체 이름뿐**이라 제목의 줄임말("강릉 카페 미르마르")을 우리 지역으로
+  //   못 알아봤다 → NON_METRO 판정이 **자기 도시를 '다른 지역 동명 카페'로** 버렸다. 실측: 6,654곳·후기 96,235건 오판
+  //   (미르마르 145·보사노바 강릉점 76), 그중 비공개 1,135곳. 시군구 줄임말(2자+)을 '우리 지역 언급'에 넣는다(보호 신호로만 쓰임).
+  const areaShorts = areaTerms.map((a) => String(a || "").split(/\s+/).pop()!.replace(/(시|군|구)$/, "")).filter((s) => s.length >= 2 && !areaTerms.includes(s));
+  const areaPresent = areaTerms.length ? [...areaTerms, ...areaShorts].some((a) => `${title} ${body}`.includes(a)) : false;
   // 룰갭 P43-원인2(#397, coord#208): bareWeak(흔한 인명·일반용어 유일토큰, 아래)의 지역 게이트가 areaTerms
   //   전체(시·구 단위까지 포함)를 인정해, "구" 단위(성동구·마포구 등 핫플 자치구) 일치만으로도 통과했다
   //   (id9426·id1520 실측 — 같은 구 안 무관 콘텐츠와 흔한 인명 오매칭). 동/읍/면/가/리 단위만 골라 더 좁게 요구.

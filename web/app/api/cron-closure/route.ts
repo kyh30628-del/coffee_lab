@@ -72,7 +72,7 @@ export async function GET(req: NextRequest) {
                  THEN COALESCE(synth_reviews_all, synth_reviews, '[]'::jsonb)
                  ELSE '[]'::jsonb END
           ) r WHERE r->>'quote' ~ ${CLOSURE_TEXT_SIGNAL}
-        ) AS closure_signal
+        ) OR COALESCE(synth_quality->'rejectReasons' ? '폐업 언급 — 노출 제외(폐업 확인 대상)', false) AS closure_signal -- 09-24: 폐업 언급 글은 노출에서 빠지므로 사유 기록으로 신호를 잇는다
       , COALESCE(p.status_cd = '02', false) AS permit_closed, p.closed_ymd AS permit_closed_ymd
       FROM cafes LEFT JOIN cafe_permits p ON p.cafe_id = cafes.id
       WHERE published AND raw_reviews IS NOT NULL

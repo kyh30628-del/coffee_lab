@@ -37,6 +37,17 @@ for (const [title, body, name, srcName, want] of SEO) {
   const hit = r.verdict === "rejected" && /검색결과 짜깁기/.test(r.reasons.join(" "));
   if (hit === want) pass++; else fail.push(`  ✗ 짜깁기(${srcName}): 기대 ${want ? "차단" : "통과"} · 실제 ${hit ? "차단" : "통과"}`);
 }
-console.log(`사장님 글·짜깁기 픽스처: ${pass}/${CASES.length + SEO.length} 통과`);
+// 🚪 폐업 언급(본문 과거형·표기형)은 노출 제외, 미래형은 유지
+const CLO = [
+  ["오베이글리", ["광양시", "광양읍"], { title: "광양 중마동 신상 빵집 오베이글리 빵 추천", text: "정보업데이트 오베이글리 폐업했습니다ㅠㅠ 베이글 맛집이었는데 아쉬워요", desc: "오베이글리 폐업했습니다ㅠㅠ 베이글 맛집이었는데", link: "https://blog.naver.com/a/1", source: "빵순이" }, true],
+  ["소란", ["인천 남동구", "장수동"], { title: "[폐업] 인천 남동구 장수동 카페 소란 로스터리", text: "소란 로스터리 건물 옆에 차 세우고 라떼 마셨어요", desc: "소란 로스터리 라떼", link: "https://blog.naver.com/b/2", source: "여행자" }, true],
+  ["웰컴레인베이크샵", ["순천시", "연향동"], { title: "순천 카페 웰컴레인베이크샵 후기", text: "만족하실 순천 카페 웰컴레인베이크샵 저는 폐업하기 전까지 방문할 것이여요 스콘 맛있어요", desc: "웰컴레인베이크샵 스콘 맛있어요 폐업하기 전까지 방문할 것", link: "https://blog.naver.com/c/3", source: "순천댁" }, false],
+];
+for (const [name, area, item, want] of CLO) {
+  const r = collectAndSynthesize(name, area, [{ source: "blog", texts: [item] }], { address: "" });
+  const hit = /폐업 언급/.test(JSON.stringify(r.quality?.rejectReasons ?? {}));
+  if (hit === want) pass++; else fail.push(`  ✗ 폐업(${name}): 기대 ${want ? "노출 제외" : "유지"} · 실제 ${hit ? "제외" : "유지"}`);
+}
+console.log(`사장님 글·짜깁기·폐업 픽스처: ${pass}/${CASES.length + SEO.length + CLO.length} 통과`);
 if (fail.length) { console.log(fail.join("\n")); process.exit(1); }
 console.log("✅ 영문 계정명·블로그 아이디로 사장님 글 제외 · 손님 블로그·일반어 겹침 보호 · 구글검색 짜깁기 차단");
