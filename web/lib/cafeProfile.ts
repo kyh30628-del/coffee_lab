@@ -226,6 +226,13 @@ export function cardFacets(facets: string[] | null | undefined, n = 3): { label:
   return out;
 }
 
+// 🏷️ amenityFeature JSON-LD(2026-09-25, decisions#1253/coordination#452) — cafes.facets(이미 검증된 시설패싯,
+//   이 파일이 단일출처)를 schema.org LocationFeatureSpecification으로 그대로 매핑. 신규 수집·판정 없음 —
+//   화면 카드 아이콘 띠(cardFacets)와 같은 배열을 쓰므로 노출·마크업이 어긋나지 않는다.
+export function amenityFeaturesOf(facets: string[] | null | undefined): { "@type": "LocationFeatureSpecification"; name: string; value: true }[] {
+  return (facets ?? []).filter(Boolean).map((label) => ({ "@type": "LocationFeatureSpecification" as const, name: label, value: true as const }));
+}
+
 // ⚠️ 2026-09-14(CEO 승인) — "이건 알고 가세요": 후기에서 확인된 **주의점**.
 //   왜 만드나: 카페 고르기의 본질은 성공을 찾는 게 아니라 실패를 피하는 것이다. 광고는 절대 못 하는 말이라
 //   우리 해자와 가장 멀리 떨어진 차별점이고, 경쟁 서비스(카페맵 포함)도 부정 신호를 '거르는 데만' 쓰고 보여주진 않는다.
