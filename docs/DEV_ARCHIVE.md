@@ -389,3 +389,4 @@
 | 2026-09-24 07:56 | #1241 | [개발] 협업 #450: decision#1224 근본원인 확정: nonClosureMayUse 예약설계가  | a9bb0d98 | - | lib/naverBudget.ts에 NAVER_GROW_RESERVE(기본 3000) 신설 + scripts/import-permits.mjs BUDGET 계산에 반영(QUOTA- |
 | 2026-09-24 07:56 | #1246 | [자율진단] decisions dedup 'done' 영구봉인 — 근거오염 2→33건(16배) 급증에도 재상 | 71ba37fb | - | app/api/cron-selfaudit/route.ts: dedup을 종결(done/rejected/deferred) 영구스킵에서 급증재상신으로 변경 — 종결 당시 count 대 |
 | 2026-09-24 11:33 | #1245 | [개발] orchestrator-heal 크론 코드버그 — NeonDbError $5 파라미터 타입 미확정( | 2218c388 | - | app/api/orchestrator/route.ts ig 무결성 쿼리: sidoFromAreaSql/sidoFromAddressSql이 반환하는 SQL CASE식 문자열을 sql |
+| 2026-09-25 03:23 | #1249 | [자율진단] /api/share-report 무WHERE char_scores 전수SELECT — 오늘 co | e4fdead1 | - | app/api/share-report/route.ts:21 — WHERE published=true 전수SELECT(38,648건 char_scores jsonb 통째)를 area |
