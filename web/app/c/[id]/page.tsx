@@ -13,7 +13,7 @@ import { publicOwnerContent } from "@/lib/ownerContent";
 import VisitorReviews from "../../VisitorReviews";
 import RecentCafes from "../../RecentCafes";
 import SavedCafes from "../../SavedCafes";
-import { buildAxisDist, cafeProfile, extractHighlights } from "@/lib/cafeProfile";
+import { buildAxisDist, cafeProfile, extractHighlights, amenityFeaturesOf } from "@/lib/cafeProfile";
 import { topCharTraits } from "@/lib/charScore";
 import { collectionForCafe } from "@/lib/collections";
 import { tasteByKey } from "@/lib/seoData";
@@ -84,7 +84,7 @@ async function getCafe(id: string) {
   const n = Number(id);
   if (!Number.isFinite(n) || n <= 0) return null;
   try {
-    return (await sql`SELECT c.id, c.name, c.area, c.dong, c.address, c.lat, c.lng, c.synth_grade, c.synth_identity, c.synth_count, c.char_scores, c.synth_reviews_all, c.synth_reviews, c.reputation_note, c.synth_quality, c.visitor_n, c.visitor_trip, c.visitor_local, c.area_rank, c.area_total, c.review_dates, c.cautions, c.instagram_url,
+    return (await sql`SELECT c.id, c.name, c.area, c.dong, c.address, c.lat, c.lng, c.synth_grade, c.synth_identity, c.synth_count, c.char_scores, c.synth_reviews_all, c.synth_reviews, c.reputation_note, c.synth_quality, c.visitor_n, c.visitor_trip, c.visitor_local, c.area_rank, c.area_total, c.review_dates, c.cautions, c.instagram_url, c.facets,
       COALESCE(dt.is_tourist, false) AS dong_tourist
       FROM cafes c LEFT JOIN dong_tourism dt ON dt.area = c.area AND dt.dong = c.dong
       WHERE c.id=${n} AND c.published=true LIMIT 1`)[0] as any ?? null;
@@ -291,6 +291,7 @@ export default async function CafePage({ params }: Props) {
     url: `${SITE}/c/${c.id}`, servesCuisine: "Coffee",
     ...(typeof c.lat === "number" && typeof c.lng === "number" ? { geo: { "@type": "GeoCoordinates", latitude: c.lat, longitude: c.lng } } : {}),
     ...(c.synth_identity ? { description: c.synth_identity } : {}),
+    ...(Array.isArray(c.facets) && c.facets.length > 0 ? { amenityFeature: amenityFeaturesOf(c.facets) } : {}),
     ...(c.synth_count > 0 ? {
       aggregateRating: {
         "@type": "AggregateRating",
