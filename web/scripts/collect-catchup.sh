@@ -62,7 +62,9 @@ DEADLINE=$(( $(date +%s) + 120*60 ))
     done
     wait
     if tail -4 "$LOG" | grep -q "큐 소진"; then echo "큐 소진 — 라운드 ${round}에서 종료"; break; fi
-    if tail -4 "$LOG" | grep -q "쿼터 소진 추정"; then echo "쿼터 소진 — 라운드 ${round}에서 종료"; break; fi
+    # 🔴 09-25 실측: 샤드가 '크론 예약분 도달'로 정상 종료해도 이 루프가 못 알아봐 2시간 동안 샤드를 ~9,000번 재기동했다
+    #   (실패 호출 38,632회·같은 카페 최대 403회 재시도 — 새 프로세스마다 네이버에 한도초과 요청을 다시 보내고 DB를 두드렸다).
+    if tail -4 "$LOG" | grep -qE "쿼터 소진 추정|크론 예약분 도달"; then echo "쿼터 소진 — 라운드 ${round}에서 종료"; break; fi
   done
   [ "$(date +%s)" -ge "$DEADLINE" ] && echo "120분 창 종료 — 다음 창(4시간 뒤)에 이어감"
 
