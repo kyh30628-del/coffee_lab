@@ -391,3 +391,4 @@
 | 2026-09-24 11:33 | #1245 | [개발] orchestrator-heal 크론 코드버그 — NeonDbError $5 파라미터 타입 미확정( | 2218c388 | - | app/api/orchestrator/route.ts ig 무결성 쿼리: sidoFromAreaSql/sidoFromAddressSql이 반환하는 SQL CASE식 문자열을 sql |
 | 2026-09-25 03:23 | #1249 | [자율진단] /api/share-report 무WHERE char_scores 전수SELECT — 오늘 co | e4fdead1 | - | app/api/share-report/route.ts:21 — WHERE published=true 전수SELECT(38,648건 char_scores jsonb 통째)를 area |
 | 2026-09-25 07:33 | #1253 | 카페상세 시설 amenityFeature schema.org 마크업 dev_task 전환 | 98c880e5 | - | lib/cafeProfile.ts: amenityFeaturesOf() 추가(cafes.facets 배열→LocationFeatureSpecification[] 1:1 매핑, 신규 |
+| 2026-09-25 23:58 | #1255 | 카페상세 근처카페(getNearby) 쿼리 비용 — 비용자동정지 반복 유발 | dc412e7b | - | app/c/[id]/page.tsx getNearby(): 원행 SQL 2건(bbox+area)을 unstable_cache로 카페id당 6시간 캐시(순수함수 rankNearby는 |
