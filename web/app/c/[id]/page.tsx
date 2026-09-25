@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import { sql, ensureOnce } from "@/lib/db";
 import { visitorBadges } from "@/lib/visitorMix";
 import KakaoShare from "../../KakaoShare";
@@ -186,25 +187,40 @@ async function getPublicReviews(cafeId: number) {
 //   → 순서를 **같은 읍면동 → 반경 10km → 같은 시군구**로 바꾸고, 화면엔 실제 거리(km)를 적는다.
 //   비용: 좌표 박스 조회 1회(부분 인덱스 idx_cafes_geo(lat,lng) WHERE published — 09-20 실재 확인). 박스 안이 6곳 미만인
 //   희소 지역만 시군구 조회 1회를 보탠다. 좌표 없는 카페는 종전 시군구 조회로 폴백(회귀 없음).
+// 💰 2026-09-25 비용수리(decision#1255) — char_scores 포함 넓은 행(최대 120행)을 페이지뷰마다 반복 조회해
+//   cost_guard 자동정지(210,739회 호출·104.52GB)를 유발했다. 결과는 몇 시간 묵어도 안 바뀌는 값(발굴·재합성
+//   주기)이라 unstable_cache로 카페id당 6시간 캐시 — SEO 페이지라 실시간성 불요, 크롤러 반복조회를 흡수한다.
+//   순위 계산(rankNearby)은 순수함수라 캐시 밖에서 매번 돌려도 조회 비용이 0이다.
+const getNearbyRows = unstable_cache(
+  async (excludeId: number, lat: number | null, lng: number | null, dong: string | null, area: string): Promise<any[]> => {
+    try {
+      let rows: any[] = [];
+      if (typeof lat === "number" && typeof lng === "number") {
+        const dLat = 0.09, dLng = 0.11; // ≈ 위도 10km · 경도 10km(북위 35~38°)
+        rows = (await sql`SELECT id, name, synth_grade, synth_count, char_scores, area, dong, lat, lng FROM cafes
+          WHERE published=true AND id<>${excludeId} AND lat IS NOT NULL
+            AND lat BETWEEN ${lat - dLat} AND ${lat + dLat} AND lng BETWEEN ${lng - dLng} AND ${lng + dLng}
+          ORDER BY (dong = ${dong ?? ""} AND area = ${area}) DESC, COALESCE(synth_count,0) DESC LIMIT 80`) as any[];
+      }
+      if (rows.length < 6) {
+        const more = (await sql`SELECT id, name, synth_grade, synth_count, char_scores, area, dong, lat, lng FROM cafes
+          WHERE published=true AND area=${area} AND id<>${excludeId}
+          ORDER BY COALESCE(synth_count,0) DESC LIMIT 40`) as any[];
+        const seen = new Set(rows.map((r) => r.id));
+        for (const r of more) if (!seen.has(r.id)) rows.push(r);
+      }
+      return rows;
+    } catch { return []; }
+  },
+  ["c-id.nearby-rows"],
+  { revalidate: 6 * 60 * 60 },
+);
 async function getNearby(c: any): Promise<NearbyCafe[]> {
   const excludeId = Number(c.id);
-  const hasGeo = typeof c.lat === "number" && typeof c.lng === "number";
+  const lat = typeof c.lat === "number" ? c.lat : null;
+  const lng = typeof c.lng === "number" ? c.lng : null;
   try {
-    let rows: any[] = [];
-    if (hasGeo) {
-      const dLat = 0.09, dLng = 0.11; // ≈ 위도 10km · 경도 10km(북위 35~38°)
-      rows = (await sql`SELECT id, name, synth_grade, synth_count, char_scores, area, dong, lat, lng FROM cafes
-        WHERE published=true AND id<>${excludeId} AND lat IS NOT NULL
-          AND lat BETWEEN ${c.lat - dLat} AND ${c.lat + dLat} AND lng BETWEEN ${c.lng - dLng} AND ${c.lng + dLng}
-        ORDER BY (dong = ${c.dong ?? ""} AND area = ${c.area}) DESC, COALESCE(synth_count,0) DESC LIMIT 80`) as any[];
-    }
-    if (rows.length < 6) {
-      const more = (await sql`SELECT id, name, synth_grade, synth_count, char_scores, area, dong, lat, lng FROM cafes
-        WHERE published=true AND area=${c.area} AND id<>${excludeId}
-        ORDER BY COALESCE(synth_count,0) DESC LIMIT 40`) as any[];
-      const seen = new Set(rows.map((r) => r.id));
-      for (const r of more) if (!seen.has(r.id)) rows.push(r);
-    }
+    const rows = await getNearbyRows(excludeId, lat, lng, c.dong ?? null, c.area);
     return rankNearby(c, rows);
   } catch { return []; }
 }
