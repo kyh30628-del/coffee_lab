@@ -19,12 +19,16 @@ export function abVariant(): "A" | "B" {
 }
 const NIcon = () => <svg width="11" height="11" viewBox="0 0 24 24" fill="#03c75a" aria-hidden><path d="M16.273 12.845L7.376 0H0v24h7.727V11.155L16.624 24H24V0h-7.727z"/></svg>;
 
-export default function PlaceCta({ cafeId, mapHref, mapLabel, mapExternal, screen }: {
+export default function PlaceCta({ cafeId, mapHref, mapLabel, mapExternal, screen, slot }: {
   cafeId: number; mapHref: string; mapLabel: string; mapExternal?: boolean; screen: "카페상세" | "지도앱";
+  /** 🆕 2026-09-26 — 화면 안에서 **어느 위치**의 버튼인지. 위치별 클릭률을 같은 표(outbound_clicks.source)에서 가른다.
+   *  왜: 기존 A/B는 문구·순서만 실험했고 버튼 자체가 문서 맨 끝(242블록 중 242번째)에 있었다.
+   *  상세 중위 체류가 6.5초인데 맨 밑 버튼은 **볼 수가 없다** — 위치가 진짜 변수였다. */
+  slot?: "상단";
 }) {
   const [v, setV] = useState<"A" | "B">("A");
   useEffect(() => { setV(abVariant()); }, []);
-  const src = `${screen}:${v}`;
+  const src = `${screen}${slot ?? ""}:${v}`; // 예) 카페상세상단:A · 카페상세:A(기존 하단, 표기 불변)
   const place = `/api/naver-place-redirect?id=${cafeId}`;
   const mapProps = mapExternal ? { target: "_blank", rel: "noopener noreferrer" } : {};
   const MapEl = mapExternal ? "a" : Link;

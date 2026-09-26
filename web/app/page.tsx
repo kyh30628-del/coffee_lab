@@ -3144,6 +3144,22 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
             </div>
           )}
 
+          {/* ⚠️ 이건 알고 가세요 */}
+          {cautions.length > 0 && (
+            <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
+              <div className="nt-lbl">이건 알고 가세요 <em>· 후기 2건 이상에서 확인된 것만</em></div>
+              <div className="nt-chips">{cautions.map((x) => <span key={x.label} className="nt-chip warn">{x.label}<b>{x.count}</b></span>)}</div>
+              {cautions[0]?.quote && <blockquote className="nt-q" style={{ borderColor: "#a93a32" }}>“…{cautions[0].quote}…”</blockquote>}
+            </div>
+          )}
+
+          {/* 🎯 2026-09-26 — 지도 패널도 첫 화면 행동 버튼 신설(/c/[id]와 동일 조치).
+              실측: 카페상세 중위 체류 6.5초인데 행동 버튼이 문서 맨 끝에 있었다. 두 화면 다 고쳐야 한다
+              (2026-08-26 사고 교훈: 카드가 뜨는 8개 화면 중 2곳만 고치고 '완료'라고 보고했다). */}
+          <div className="nt-margin-gutter">
+            <PlaceCta cafeId={cafe.id} mapHref={`https://map.kakao.com/?q=${encodeURIComponent(cafe.name + " " + cafe.area)}`} mapLabel="길찾기" mapExternal screen="지도앱" slot="상단" />
+          </div>
+
           {/* 📖 사람들이 쓴 말 */}
           {loadingRev && <div className="nt-margin-gutter pt-6 nt-free"><CoffeeLoader label="후기 우려내는 중…" /></div>}
           {!loadingRev && showQuotes && (
@@ -3162,15 +3178,6 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
                 </div>
               )}
               {srcLine}
-            </div>
-          )}
-
-          {/* ⚠️ 이건 알고 가세요 */}
-          {cautions.length > 0 && (
-            <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
-              <div className="nt-lbl">이건 알고 가세요 <em>· 후기 2건 이상에서 확인된 것만</em></div>
-              <div className="nt-chips">{cautions.map((x) => <span key={x.label} className="nt-chip warn">{x.label}<b>{x.count}</b></span>)}</div>
-              {cautions[0]?.quote && <blockquote className="nt-q" style={{ borderColor: "#a93a32" }}>“…{cautions[0].quote}…”</blockquote>}
             </div>
           )}
 

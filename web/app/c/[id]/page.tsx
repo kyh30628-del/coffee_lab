@@ -438,6 +438,27 @@ export default async function CafePage({ params }: Props) {
           </div>
         )}
 
+        {/* ⚠️ 이건 알고 가세요 — 후기 2건 이상에서 확인된 주의점 + 손님이 쓴 근거 문장. cafes.cautions(합성 때 계산, 조회 0). */}
+        {Array.isArray(c.cautions) && c.cautions.length > 0 && (
+          <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
+            <div className="nt-lbl">이건 알고 가세요 <em>· 후기 2건 이상에서 확인된 것만</em></div>
+            <div className="nt-chips">
+              {(c.cautions as any[]).map((x: any) => <span key={x.label} className="nt-chip warn">{x.label}<b>{x.count}</b></span>)}
+            </div>
+            {(c.cautions as any[])[0]?.quote && (
+              <blockquote className="nt-q" style={{ borderColor: "#a93a32" }}>“…{(c.cautions as any[])[0].quote}…”</blockquote>
+            )}
+          </div>
+        )}
+
+        {/* 🎯 2026-09-26 — 첫 화면 행동 버튼(신설). 실측 근거: 상세 중위 체류 **6.5초**인데
+            '네이버 플레이스' 버튼이 문서 242블록 중 **242번째(맨 끝)**에 있었다 → 6.5초 안엔 볼 수가 없다.
+            30일 퍼널: 상세 5,594회 열람 → '가기로 결정' 442명(6.6%). 위치가 병목이라 판단해 위로 올린다.
+            하단 버튼은 **그대로 둔다**(끝까지 읽은 사람의 경로). 위치별 클릭률은 source(카페상세상단 vs 카페상세)로 가른다. */}
+        <div className="nt-margin-gutter">
+          <PlaceCta cafeId={c.id} mapHref={mapHref} mapLabel="지도에서 보기" screen="카페상세" slot="상단" />
+        </div>
+
         {/* 📖 사람들이 쓴 말 — 이 페이지에서 가장 먼저 읽혀야 할 것. 정렬 순서 그대로 읽히는 문장 3건 + 접힘 9건. */}
         {showQuotes && (
           <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
@@ -450,19 +471,6 @@ export default async function CafePage({ params }: Props) {
               </details>
             )}
             {srcLine}
-          </div>
-        )}
-
-        {/* ⚠️ 이건 알고 가세요 — 후기 2건 이상에서 확인된 주의점 + 손님이 쓴 근거 문장. cafes.cautions(합성 때 계산, 조회 0). */}
-        {Array.isArray(c.cautions) && c.cautions.length > 0 && (
-          <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
-            <div className="nt-lbl">이건 알고 가세요 <em>· 후기 2건 이상에서 확인된 것만</em></div>
-            <div className="nt-chips">
-              {(c.cautions as any[]).map((x: any) => <span key={x.label} className="nt-chip warn">{x.label}<b>{x.count}</b></span>)}
-            </div>
-            {(c.cautions as any[])[0]?.quote && (
-              <blockquote className="nt-q" style={{ borderColor: "#a93a32" }}>“…{(c.cautions as any[])[0].quote}…”</blockquote>
-            )}
           </div>
         )}
 

@@ -59,6 +59,39 @@ export type SeoCafe = { om?: number; id: number; name: string; dong: string | nu
 export const TASTE_MIN_HITS = 3;
 export const TASTE_MIN_RATE_PCT = 5;
 
+// 🔴 축별 밀도 문턱(2026-09-26) — 느슨한 축 4종이 "큐레이션"이 아니라 전체 목록이었던 것을 고친다.
+//
+// ## 무엇이 잘못됐나 (실측)
+//   `char_scores`는 **후기 전체를 한 덩어리로 합쳐 키워드 등장 '총 횟수'**를 센다(lib/charScore.ts computeCharScores).
+//   그런데 위 조건은 그 횟수를 **후기 '건수'**와 비교한다 — 단위가 다르다.
+//   실제로 등장 횟수는 후기 건수의 1~2배가 예사여서(파주 레드파이프: 언급 519 / 후기 248 = 밀도 2.09)
+//   `언급×100 >= 후기×5`(=밀도 0.05)는 **거의 모든 카페가 통과한다.** 게이트가 사실상 없었다.
+//   결과: 전국 공개 42,059곳 중 dessert 68.2% · space 57.5% · mood 49.4% · bakery 32.8%가 통과.
+//   "넓은 카페"를 검색해 들어오면 파주시 303곳·용산구 330곳이 나온다 — 어디 갈지 답을 못 준다.
+//
+// ## 이게 실제로 유입을 깎고 있었다 (30일 실측)
+//   느슨한 축일수록 상세 도달률이 낮다 — 상관계수 r = -0.404.
+//   work(통과 3.1%) 48.8% ↔ bakery(32.8%) 22.1% · dessert(68.2%) 27.3% · space(57.5%) 35.1%.
+//   느슨한 4축 랜딩 1,137명 중 766명을 상세로 못 보냈다.
+//
+// ## 왜 '문턱 올리기'가 아니라 '밀도'인가
+//   언급 건수 문턱(3→8건)만 올려도 space는 36.9%로 거의 안 줄었다(실측). 후기 많은 카페가 그대로 통과한다.
+//   밀도(=언급÷후기)로 보면 후기 물량 편향이 사라진다. 값은 실측 분포에서 골랐다(목표: 각 축 공개의 2~13%):
+//     space 밀도 1.0 → 3,379곳(8.0%) · mood 1.0 → 2,325곳(5.5%) · bakery 1.5 → 4,601곳(10.9%) · dessert 2.5 → 5,370곳(12.8%)
+//   ⚠️ **전 축에 일괄 적용은 금지** — work는 밀도 0.5에서 222곳(0.5%)까지 무너진다(가장 잘 되는 축을 죽인다).
+//   그래서 손대는 축만 명시한다. 나머지는 기존값(5)을 그대로 쓴다.
+//
+// ⚠️ 표기 규칙 불변: 여기 값은 **정수 백분율**이다(밀도 1.0 = 100). 소수를 파라미터로 넘기면 Postgres가
+//   정수로 추론해 죽고 호출부 try/catch가 빈 배열로 삼켜 페이지가 조용히 0곳이 된다(위 주석 참조).
+export const TASTE_MIN_RATE_PCT_BY_KEY: Record<string, number> = {
+  space: 100,    // 밀도 1.0 — 57.5% → 8.0%
+  mood: 100,     // 밀도 1.0 — 49.4% → 5.5%
+  bakery: 150,   // 밀도 1.5 — 32.8% → 10.9%
+  dessert: 250,  // 밀도 2.5 — 68.2% → 12.8%(디저트는 본래 언급이 잦아 다른 축보다 높게 잡는다)
+};
+/** 그 축의 밀도 문턱(정수 백분율). 지정 안 된 축은 기존 기준 그대로. 게이트를 쓰는 모든 쿼리가 이것만 본다. */
+export const minRatePct = (tasteKey: string): number => TASTE_MIN_RATE_PCT_BY_KEY[tasteKey] ?? TASTE_MIN_RATE_PCT;
+
 // 🎯 도미넌스 필터 — tasteKey가 아닌 다른 축이 그 카페의 진짜 정체성이면 제외(결재#1087, #1033 일반화).
 //   #1033은 dessert-vs-roast 조합만 하드코딩해 brunch-vs-quiet·space-vs-quiet 등은 못 걸렀다(3차 재발).
 //   → CHAR_AXES 전 축을 대상으로 "다른 축이 유의미(>20)하고 tasteKey축을 8배 이상 압도"하면 제외.
@@ -107,7 +140,10 @@ export async function getRegionCafes(area: string, limit = 30): Promise<SeoCafe[
 //   dessert/bakery도 예외 없이 동일 검사를 받는다(결재#1113 — 소규모 지역에서 dessert 자격카페가 몇 곳뿐이면
 //   brunch/space가 8배+ 압도하는 카페가 그대로 "디저트 맛집" 상위에 남는 사고가 있었다).
 //   ⚠️ neon 태그드 템플릿은 조각 합성이 안 되므로(위 TASTE_MIN_HITS 주석 참조) 아래 4개 쿼리에 같은 문구를 그대로 적는다.
-export async function getRegionTasteCafes(area: string, tasteKey: string, limit = 30): Promise<SeoCafe[]> {
+/** 밀도 문턱(축별) — `loose`면 기존 기준(5)으로 되돌린다. 자동 완화 경로가 이걸 쓴다. */
+const gatePct = (tasteKey: string, loose?: boolean) => (loose ? TASTE_MIN_RATE_PCT : minRatePct(tasteKey));
+
+export async function getRegionTasteCafes(area: string, tasteKey: string, limit = 30, loose?: boolean): Promise<SeoCafe[]> {
   const others = otherAxisKeys(tasteKey);
   try {
     return withOwnerBadge((await sql`SELECT id, name, dong, synth_grade AS grade, synth_count AS count, synth_identity AS identity, char_scores, visitor_n, visitor_trip, visitor_local, work_facts, cautions, facets,
@@ -116,13 +152,26 @@ export async function getRegionTasteCafes(area: string, tasteKey: string, limit 
         WHERE COALESCE(r->>'quote','') <> '' ORDER BY COALESCE((r->>'score')::int,0) DESC LIMIT 1) AS quote
       FROM cafes WHERE published AND area=${area}
         AND COALESCE((char_scores->>${tasteKey})::int, 0) >= ${TASTE_MIN_HITS}
-        AND COALESCE((char_scores->>${tasteKey})::int, 0) * 100 >= COALESCE(synth_count,0) * ${TASTE_MIN_RATE_PCT}
+        AND COALESCE((char_scores->>${tasteKey})::int, 0) * 100 >= COALESCE(synth_count,0) * ${gatePct(tasteKey, loose)}
         AND NOT EXISTS (
           SELECT 1 FROM unnest(${others}::text[]) ak(key)
           WHERE COALESCE((char_scores->>ak.key)::int,0) > 20
             AND COALESCE((char_scores->>ak.key)::int,0) >= COALESCE((char_scores->>${tasteKey})::int,0) * 8)
       ORDER BY (char_scores->>${tasteKey})::int DESC, synth_count DESC NULLS LAST LIMIT ${limit}`) as unknown as SeoCafe[]);
   } catch { return []; }
+}
+
+/** 🛟 자동 완화(2026-09-26) — 조인 기준으로 5곳이 안 되면 **기존 기준으로 되돌려** 답을 준다.
+ *  왜: 밀도 문턱을 넣으면 공개가 얇은 지역은 페이지가 1~4곳으로 줄어든다
+ *      (실측: 조인 4축 30일 랜딩 1,137명 중 173명 = 15.2%가 그런 페이지에 도착한다).
+ *      큐레이션을 조이는 목적은 '답을 더 잘 주기'인데 답이 사라지면 목적에 반한다.
+ *  → 어떤 페이지도 **오늘보다 얇아지지 않는다.** 비용: 얇은 페이지에서만 쿼리 1회 추가(조인 축만).
+ */
+export async function getRegionTasteCafesGraceful(area: string, tasteKey: string, limit = 30): Promise<{ cafes: SeoCafe[]; relaxed: boolean }> {
+  const tight = await getRegionTasteCafes(area, tasteKey, limit);
+  if (tight.length >= 5 || gatePct(tasteKey) === TASTE_MIN_RATE_PCT) return { cafes: tight, relaxed: false };
+  const loose = await getRegionTasteCafes(area, tasteKey, limit, true);
+  return loose.length > tight.length ? { cafes: loose, relaxed: true } : { cafes: tight, relaxed: false };
 }
 
 // 지역×취향 공개 카페 곳수 — 취향 페이지 "N곳" 카피의 실제 값(표시 30개를 곳수로 오용 금지).
@@ -142,12 +191,12 @@ export async function getRegionTasteCount(area: string, tasteKey: string): Promi
  * 💰 비용: 위 count 쿼리에 SUM만 더한 것 — **추가 쿼리 0**(같은 WHERE·같은 스캔).
  *   이 파일 아래 08-17 사고 주석 참조 — 테마 페이지에 조회를 '추가'하면 활성시간이 뛴다. 추가하지 않았다.
  */
-export async function getRegionTasteStats(area: string, tasteKey: string): Promise<{ n: number; reviews: number }> {
+export async function getRegionTasteStats(area: string, tasteKey: string, loose?: boolean): Promise<{ n: number; reviews: number }> {
   const others = otherAxisKeys(tasteKey);
   try {
     const r = (await sql`SELECT count(*)::int n, COALESCE(SUM(synth_count), 0)::int reviews FROM cafes WHERE published AND area=${area}
       AND COALESCE((char_scores->>${tasteKey})::int, 0) >= ${TASTE_MIN_HITS}
-      AND COALESCE((char_scores->>${tasteKey})::int, 0) * 100 >= COALESCE(synth_count,0) * ${TASTE_MIN_RATE_PCT}
+      AND COALESCE((char_scores->>${tasteKey})::int, 0) * 100 >= COALESCE(synth_count,0) * ${gatePct(tasteKey, loose)}
       AND NOT EXISTS (
         SELECT 1 FROM unnest(${others}::text[]) ak(key)
         WHERE COALESCE((char_scores->>ak.key)::int,0) > 20
@@ -182,7 +231,7 @@ export async function computeRegionTasteCounts(): Promise<Record<string, number>
           WHERE COALESCE((char_scores->>ak.key)::int,0) > 20
             AND COALESCE((char_scores->>ak.key)::int,0) >= COALESCE((char_scores->>'${t.key}')::int,0) * 8)`;
       return `COUNT(*) FILTER (WHERE COALESCE((char_scores->>'${t.key}')::int,0) >= ${TASTE_MIN_HITS}
-        AND COALESCE((char_scores->>'${t.key}')::int,0) * 100 >= COALESCE(synth_count,0) * ${TASTE_MIN_RATE_PCT}${dominanceFilter})::int "${t.key}"`;
+        AND COALESCE((char_scores->>'${t.key}')::int,0) * 100 >= COALESCE(synth_count,0) * ${minRatePct(t.key)}${dominanceFilter})::int "${t.key}"`;
     }).join(",\n      ");
     const rows = (await sql.query(`SELECT area,
       ${cols}
@@ -202,7 +251,7 @@ export async function getRegionTasteGradeBreakdown(area: string, tasteKey: strin
     const rows = (await sql`SELECT synth_grade AS grade, count(*)::int n FROM cafes
       WHERE published AND area=${area}
         AND COALESCE((char_scores->>${tasteKey})::int, 0) >= ${TASTE_MIN_HITS}
-        AND COALESCE((char_scores->>${tasteKey})::int, 0) * 100 >= COALESCE(synth_count,0) * ${TASTE_MIN_RATE_PCT}
+        AND COALESCE((char_scores->>${tasteKey})::int, 0) * 100 >= COALESCE(synth_count,0) * ${minRatePct(tasteKey)}
         AND NOT EXISTS (
           SELECT 1 FROM unnest(${others}::text[]) ak(key)
           WHERE COALESCE((char_scores->>ak.key)::int,0) > 20
@@ -340,7 +389,7 @@ export async function getDongTasteCafes(area: string, dong: string, tasteKey: st
         WHERE COALESCE(r->>'quote','') <> '' ORDER BY COALESCE((r->>'score')::int,0) DESC LIMIT 1) AS quote
       FROM cafes WHERE published AND area=${area} AND dong=${dong}
         AND COALESCE((char_scores->>${tasteKey})::int, 0) >= ${TASTE_MIN_HITS}
-        AND COALESCE((char_scores->>${tasteKey})::int, 0) * 100 >= COALESCE(synth_count,0) * ${TASTE_MIN_RATE_PCT}
+        AND COALESCE((char_scores->>${tasteKey})::int, 0) * 100 >= COALESCE(synth_count,0) * ${minRatePct(tasteKey)}
         AND (${tasteKey} IN ('dessert','bakery') OR NOT (
           COALESCE((char_scores->>'dessert')::int,0) > 20
           AND COALESCE((char_scores->>'roast')::int,0) < 5
@@ -363,7 +412,7 @@ export async function computeDongTasteCounts(): Promise<Record<string, number>> 
           AND COALESCE((char_scores->>'roast')::int,0) < 5
           AND COALESCE((char_scores->>'dessert')::int,0) >= COALESCE((char_scores->>'roast')::int,0) * 8)`;
       return `COUNT(*) FILTER (WHERE COALESCE((char_scores->>'${t.key}')::int,0) >= ${TASTE_MIN_HITS}
-        AND COALESCE((char_scores->>'${t.key}')::int,0) * 100 >= COALESCE(synth_count,0) * ${TASTE_MIN_RATE_PCT}${dominanceFilter})::int "${t.key}"`;
+        AND COALESCE((char_scores->>'${t.key}')::int,0) * 100 >= COALESCE(synth_count,0) * ${minRatePct(t.key)}${dominanceFilter})::int "${t.key}"`;
     }).join(",\n      ");
     const rows = (await sql.query(`SELECT area, dong,
       ${cols}

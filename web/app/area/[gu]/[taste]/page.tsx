@@ -1,8 +1,20 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Curated from "../../Curated";
-import { getRegions, getRegionTasteCafes, getRegionTasteCount, getRegionTasteStats, getRegionTasteCounts, getRegionTasteGradeBreakdown, getRegionFacetCounts, areaAliases, TASTES, tasteByKey, SITE, TASTE_MIN_HITS, TASTE_MIN_RATE_PCT, josa } from "@/lib/seoData";
+import { getRegions, getRegionTasteCafes, getRegionTasteCafesGraceful, getRegionTasteCount, getRegionTasteStats, getRegionTasteCounts, getRegionTasteGradeBreakdown, getRegionFacetCounts, areaAliases, TASTES, tasteByKey, SITE, TASTE_MIN_HITS, minRatePct, josa } from "@/lib/seoData";
 import { FACET_PAGES } from "@/lib/facetPages";
+
+// 📝 골라낸 기준을 화면에 **사실대로** 적는다(2026-09-26).
+//   이전 문구는 "전체 후기의 5% 이상 나온 곳만"이었는데, char_scores는 후기 '건수'가 아니라
+//   키워드 **등장 총 횟수**여서 단위가 맞지 않았다(밀도 0.05 = 사실상 게이트 없음).
+//   축별로 문턱이 달라졌으니 문구도 그 축의 실제 값을 말한다.
+function gateCopy(key: string, short: string): string {
+  const d = minRatePct(key) / 100;
+  return d >= 1
+    ? `후기 한 건당 ${short} 이야기가 평균 ${d}번 이상 나온 곳만 골랐어요.`
+    : `후기에 ${short} 이야기가 ${TASTE_MIN_HITS}번 이상 나온 곳만 골랐어요.`;
+}
+
 
 export const revalidate = 2592000; // ISR 30일 — 새벽 절전(2026-09-09). 무효화는 온디맨드.
 
@@ -61,10 +73,14 @@ export default async function RegionTastePage({ params }: Props) {
   if (!t) notFound();
   // 🧭 동선 데이터(2026-08-15): 전 지역×테마 카운트 1회 조회로 ①이 지역의 테마별 개수(빈 칩 숨김)
   //   ②같은 테마 다른 동네 링크를 동시에 만든다. 집계 1회·작은 컬럼뿐, ISR 30분 캐시라 부하 무시 수준.
-  const [cafes, regions, total, grades, allCounts, allFacetCounts] = await Promise.all([
-    getRegionTasteCafes(area, taste, 30), getRegions(), getRegionTasteCount(area, taste),
+  // 🛟 조인 밀도 기준으로 5곳이 안 되면 기존 기준으로 자동 완화한다(어떤 페이지도 오늘보다 얇아지지 않는다).
+  const [picked, regions, tightTotal, grades, allCounts, allFacetCounts] = await Promise.all([
+    getRegionTasteCafesGraceful(area, taste, 30), getRegions(), getRegionTasteCount(area, taste),
     getRegionTasteGradeBreakdown(area, taste), getRegionTasteCounts(), getRegionFacetCounts(),
   ]);
+  const cafes = picked.cafes;
+  // 완화된 페이지의 "N곳"은 완화 기준으로 다시 센다 — 화면에 적는 숫자와 보여주는 목록이 어긋나면 안 된다.
+  const total = picked.relaxed ? (await getRegionTasteStats(area, taste, true)).n : tightTotal;
   //   🅿️ 시설 칩(2026-09-14) — 취향으로 들어온 사람도 "주차 되는 곳"으로 좁힐 수 있게 같은 줄에 둔다.
   const facetCounts: Record<string, number> = {};
   for (const x of FACET_PAGES) facetCounts[x.slug] = allFacetCounts[`${area}|${x.label}`] ?? 0;
@@ -83,6 +99,6 @@ export default async function RegionTastePage({ params }: Props) {
   //   과장·나열 금지: 어떻게 골랐는지 설명하는 기존 문장은 그대로 두고 한 문장만 앞에 덧붙인다.
   const aliasIntro = t.aliases.slice(0, 2).join("·");
   const areaBare = areaAliases(area)[0] || area;
-  const intro = `${areaBare} ${aliasIntro} 찾으시나요? ${area}에서 ${t.desc} 카페 ${total || cafes.length}곳. 후기에 ${t.short} 이야기가 ${TASTE_MIN_HITS}건 이상, 그 카페 전체 후기의 ${TASTE_MIN_RATE_PCT}% 이상 나온 곳만 골랐어요.`;
+  const intro = `${areaBare} ${aliasIntro} 찾으시나요? ${area}에서 ${t.desc} 카페 ${total || cafes.length}곳. ${picked.relaxed ? `후기에 ${t.short} 이야기가 ${TASTE_MIN_HITS}번 이상 나온 곳만 골랐어요.` : gateCopy(t.key, t.short)}`;
   return <Curated area={area} tasteKey={taste} tasteLabel={t.short} tasteEmoji={t.emoji} heading={heading} intro={intro} cafes={cafes} regions={regions} grades={grades} tasteCounts={tasteCounts} sameTasteNearby={sameTasteNearby} facetCounts={facetCounts} canonical={`${SITE}/area/${encodeURIComponent(area)}/${taste}`} />;
 }

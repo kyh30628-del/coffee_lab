@@ -1,7 +1,19 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Curated from "../../../../Curated";
-import { getDongTasteCafes, getDongTasteCounts, getDongsInArea, tasteByKey, TASTES, SITE, TASTE_MIN_HITS, TASTE_MIN_RATE_PCT, josa } from "@/lib/seoData";
+import { getDongTasteCafes, getDongTasteCounts, getDongsInArea, tasteByKey, TASTES, SITE, TASTE_MIN_HITS, minRatePct, josa } from "@/lib/seoData";
+
+// 📝 골라낸 기준을 화면에 **사실대로** 적는다(2026-09-26).
+//   이전 문구는 "전체 후기의 5% 이상 나온 곳만"이었는데, char_scores는 후기 '건수'가 아니라
+//   키워드 **등장 총 횟수**여서 단위가 맞지 않았다(밀도 0.05 = 사실상 게이트 없음).
+//   축별로 문턱이 달라졌으니 문구도 그 축의 실제 값을 말한다.
+function gateCopy(key: string, short: string): string {
+  const d = minRatePct(key) / 100;
+  return d >= 1
+    ? `후기 한 건당 ${short} 이야기가 평균 ${d}번 이상 나온 곳만 골랐어요.`
+    : `후기에 ${short} 이야기가 ${TASTE_MIN_HITS}번 이상 나온 곳만 골랐어요.`;
+}
+
 
 export const revalidate = 2592000; // ISR 30일 — 기존 지역×취향·동 페이지와 같은 규약.
 
@@ -50,7 +62,7 @@ export default async function DongTastePage({ params }: Props) {
     .sort((a, b) => b.n - a.n).slice(0, 12);
   const total = allCounts[`${area}|${d}|${taste}`] ?? cafes.length;
   const heading = `${d} ${t.label} 카페${total >= 5 ? ` BEST ${total}` : ""}`;
-  const intro = `${d} ${t.aliases.slice(0, 2).join("·")} 찾으시나요? ${area} ${d}에서 ${t.desc} 카페 ${total}곳. 후기에 ${t.short} 이야기가 ${TASTE_MIN_HITS}건 이상, 그 카페 전체 후기의 ${TASTE_MIN_RATE_PCT}% 이상 나온 곳만 골랐어요.`;
+  const intro = `${d} ${t.aliases.slice(0, 2).join("·")} 찾으시나요? ${area} ${d}에서 ${t.desc} 카페 ${total}곳. ${gateCopy(t.key, t.short)}`;
   return <Curated area={area} tasteKey={taste} tasteLabel={t.short} tasteEmoji={t.emoji} heading={heading} intro={intro}
     cafes={cafes} sameTasteNearby={sameTasteNearby}
     backHref={`/area/${encodeURIComponent(area)}/dong/${encodeURIComponent(d)}`} backLabel={`${d} 전체`}
