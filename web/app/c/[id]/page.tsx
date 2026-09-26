@@ -451,12 +451,13 @@ export default async function CafePage({ params }: Props) {
           </div>
         )}
 
-        {/* 🎯 2026-09-26 — 첫 화면 행동 버튼(신설). 실측 근거: 상세 중위 체류 **6.5초**인데
+        {/* 🎯 2026-09-26 — 첫 화면 행동 버튼. 실측 근거: 상세 중위 체류 **6.5초**인데
             '네이버 플레이스' 버튼이 문서 242블록 중 **242번째(맨 끝)**에 있었다 → 6.5초 안엔 볼 수가 없다.
-            30일 퍼널: 상세 5,594회 열람 → '가기로 결정' 442명(6.6%). 위치가 병목이라 판단해 위로 올린다.
-            하단 버튼은 **그대로 둔다**(끝까지 읽은 사람의 경로). 위치별 클릭률은 source(카페상세상단 vs 카페상세)로 가른다. */}
+            30일 퍼널: 상세 5,594회 열람 → '가기로 결정' 442명(6.6%). 위치가 병목이라 판단해 위로 올렸다.
+            ⚠️ 09-26 초판은 하단에도 같은 버튼을 남겨(위치 A/B 목적) **똑같이 생긴 버튼 2개**가 한 페이지에
+            보였다 — CEO 지적(09-27) "왜 중복으로 들어가 있어". 하단 제거, 이거 하나만 남긴다. */}
         <div className="nt-margin-gutter">
-          <PlaceCta cafeId={c.id} mapHref={mapHref} mapLabel="지도에서 보기" screen="카페상세" slot="상단" />
+          <PlaceCta cafeId={c.id} mapHref={mapHref} mapLabel="지도에서 보기" screen="카페상세" />
         </div>
 
         {/* 📖 사람들이 쓴 말 — 이 페이지에서 가장 먼저 읽혀야 할 것. 정렬 순서 그대로 읽히는 문장 3건 + 접힘 9건. */}
@@ -658,9 +659,6 @@ export default async function CafePage({ params }: Props) {
           <SavedCafes excludeId={Number(c.id)} />
           <RecentCafes current={{ id: Number(c.id), name: c.name, area: c.area, grade: grade || undefined }} />
         </div>
-
-        {/* 하단 고정 행동 2개 — 지도 · 네이버(메뉴·가격·영업시간은 권위 원천으로) */}
-        <PlaceCta cafeId={c.id} mapHref={mapHref} mapLabel="지도에서 보기" screen="카페상세" />{/* 🧪 A/B — app/PlaceCta.tsx */}
       </div>
     </main>
   );

@@ -3153,11 +3153,13 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
             </div>
           )}
 
-          {/* 🎯 2026-09-26 — 지도 패널도 첫 화면 행동 버튼 신설(/c/[id]와 동일 조치).
+          {/* 🎯 2026-09-26 — 지도 패널도 첫 화면 행동 버튼(/c/[id]와 동일 조치).
               실측: 카페상세 중위 체류 6.5초인데 행동 버튼이 문서 맨 끝에 있었다. 두 화면 다 고쳐야 한다
-              (2026-08-26 사고 교훈: 카드가 뜨는 8개 화면 중 2곳만 고치고 '완료'라고 보고했다). */}
+              (2026-08-26 사고 교훈: 카드가 뜨는 8개 화면 중 2곳만 고치고 '완료'라고 보고했다).
+              ⚠️ 09-26 초판은 하단에도 같은 버튼을 남겨 **똑같이 생긴 버튼 2개**가 보였다 —
+              CEO 지적(09-27) "왜 중복으로 들어가 있어". 하단 제거, 이거 하나만 남긴다. */}
           <div className="nt-margin-gutter">
-            <PlaceCta cafeId={cafe.id} mapHref={`https://map.kakao.com/?q=${encodeURIComponent(cafe.name + " " + cafe.area)}`} mapLabel="길찾기" mapExternal screen="지도앱" slot="상단" />
+            <PlaceCta cafeId={cafe.id} mapHref={`https://map.kakao.com/?q=${encodeURIComponent(cafe.name + " " + cafe.area)}`} mapLabel="길찾기" mapExternal screen="지도앱" />
           </div>
 
           {/* 📖 사람들이 쓴 말 */}
@@ -3284,8 +3286,6 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
             </details>
           </div>
 
-          {/* 하단 고정 행동 2개 — 길찾기 · 네이버(메뉴·가격·영업시간) */}
-          <PlaceCta cafeId={cafe.id} mapHref={`https://map.kakao.com/?q=${encodeURIComponent(cafe.name + " " + cafe.area)}`} mapLabel="길찾기" mapExternal screen="지도앱" />{/* 🧪 A/B — app/PlaceCta.tsx */}
         </div>
       </aside>
       {/* ===== 전체 리뷰 모달 — aside 밖(z-[3000] 컨테이너 직속)으로 이동. aside는 overflow-y:auto라 스크롤되며, 그 안에 있던 position:fixed 모달이 스크롤량(scrollTop)만큼 화면 밖으로 밀리고 패널 너비로 잘려 아예 안 보였음. 스크롤 안 되는 컨테이너 직속으로 빼서 항상 전체 화면(뷰포트)에 온전히 뜨게 함. ===== */}
