@@ -110,9 +110,10 @@ const HOT = [
   ["검색: 카페 이름", `SELECT id, name FROM cafes WHERE published = true AND replace(lower(name), ' ', '') LIKE ANY(ARRAY['%프릳츠%']) LIMIT 8`],
   ["검색: 지역 목록", `SELECT area, count(*)::int n FROM cafes WHERE published AND area IS NOT NULL AND area <> '' GROUP BY area HAVING count(*) >= 5 ORDER BY n DESC`],
   ["관리자: 노이즈 집계", `SELECT AVG(sq_rejected::float / NULLIF(sq_raw::float,0)) FROM cafes WHERE sq_raw IS NOT NULL`],
-  ["치유기: offconcept 대기열", `SELECT id FROM cafes WHERE published = true AND synth_reviews IS NOT NULL AND (offconcept_scan_at IS NULL OR synth_updated > offconcept_scan_at) ORDER BY synth_updated DESC NULLS LAST LIMIT 3000`],
+  // 2026-09-26 — decision#1262: scan_at 워터마크가 cafes 컬럼→cafe_scan_state(경량 테이블) 조인으로 이동.
+  ["치유기: offconcept 대기열", `SELECT c.id FROM cafes c LEFT JOIN cafe_scan_state s ON s.cafe_id = c.id WHERE c.published = true AND c.synth_reviews IS NOT NULL AND (s.offconcept_scan_at IS NULL OR c.synth_updated > s.offconcept_scan_at) ORDER BY c.synth_updated DESC NULLS LAST LIMIT 3000`],
   ["지도/홈: 버전 쿼리", `SELECT COUNT(*)::int n, COALESCE(MAX(updated_at)::text,'') u, COALESCE(MAX(synth_updated)::text,'') s FROM cafes WHERE published = true`],
-  ["치유기: noncafe 대기열", `SELECT id FROM cafes WHERE published = true AND synth_reviews IS NOT NULL AND (noncafe_scan_at IS NULL OR synth_updated > noncafe_scan_at) ORDER BY synth_updated DESC NULLS LAST LIMIT 3000`],
+  ["치유기: noncafe 대기열", `SELECT c.id FROM cafes c LEFT JOIN cafe_scan_state s ON s.cafe_id = c.id WHERE c.published = true AND c.synth_reviews IS NOT NULL AND (s.noncafe_scan_at IS NULL OR c.synth_updated > s.noncafe_scan_at) ORDER BY c.synth_updated DESC NULLS LAST LIMIT 3000`],
   // 2026-09-13 2차 — 위 6개를 막은 그날에도 **이 쿼리는 빠져 있었다**(누계 122GB, 디스크 읽기 1위).
   //   교훈: 목록에 없는 쿼리는 검사가 아니라 사각지대다. 새 뜨거운 쿼리는 반드시 여기 추가할 것.
   ["재합성: 파기 재수집 대기열", `SELECT id, name, area FROM cafes WHERE published = true AND raw_reviews IS NULL ORDER BY synth_checked_at ASC NULLS FIRST LIMIT 6`],

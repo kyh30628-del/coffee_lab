@@ -624,6 +624,34 @@ function offconceptBrand(name: string): string {
 //   진짜 대량정리가 필요하면 CEO가 HEAL_UNPUB_CAP env를 올리거나 결재로 집행(healPublishedAudit의 unpubCap과 동일 사상).
 const HEAL_UNPUB_CAP = Number(process.env.HEAL_UNPUB_CAP || 50);
 
+// 🪶 2026-09-26 비용수리(decision#1262) — 워터마크(scan_at)를 cafes 컬럼에 두면 "타임스탬프 하나만" 갱신해도
+//   넓은 행(평균 78KB, 벡터·GIN 인덱스 다수) 전체를 다시 써야 한다. pg_stat_statements 실측: noncafe UPDATE
+//   89.7GB·offconcept UPDATE 33.5GB·사전변경 전체리셋 38.6GB×2 = lifetime 162GB, 09-26 08:00 cost_guard
+//   자동정지의 최다쿼리(70.5GB)가 바로 이것. #1255(getNearby)와 같은 계열 — 해법도 동일 사상(경량 테이블 분리):
+//   워터마크 전용 얇은 테이블(cafe_scan_state)로 옮기면 이 UPDATE가 cafes를 전혀 건드리지 않는다.
+async function ensureScanStateTable(): Promise<void> {
+  await sql`CREATE TABLE IF NOT EXISTS cafe_scan_state (
+    cafe_id BIGINT PRIMARY KEY REFERENCES cafes(id) ON DELETE CASCADE,
+    noncafe_scan_at TIMESTAMPTZ,
+    offconcept_scan_at TIMESTAMPTZ
+  )`.catch(() => {});
+}
+
+// 🔀 1회 이관 — 예전 cafes.{key}_scan_at(넓은 컬럼)에 남은 워터마크를 경량 테이블로 옮기고 원본 컬럼을 지운다.
+//   안 옮기면 배포 직후 전량이 "미검사"로 보여 대량 재검사(읽기비용)가 한 번에 몰린다. 이관 후엔 컬럼이 없어
+//   information_schema 조회만 하고 즉시 리턴 — 사실상 공짜.
+async function migrateLegacyScanColumn(key: string): Promise<void> {
+  const col = `${key}_scan_at`;
+  const exists = (await sql`SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'cafes' AND column_name = ${col}`.catch(() => [])) as any[];
+  if (!exists.length) return;
+  await sql.query(`
+    INSERT INTO cafe_scan_state (cafe_id, ${col})
+    SELECT id, ${col} FROM cafes WHERE ${col} IS NOT NULL
+    ON CONFLICT (cafe_id) DO UPDATE SET ${col} = EXCLUDED.${col}`).catch(() => {});
+  await sql.query(`ALTER TABLE cafes DROP COLUMN IF EXISTS ${col}`).catch(() => {}); // 종속 부분인덱스도 함께 사라짐
+}
+
 /**
  * 🔴 2026-09-10 비용사고 대응 — 후기 본문(큰 컬럼)에 정규식을 거는 치유기의 공통 사전작업.
  *
@@ -639,33 +667,42 @@ const HEAL_UNPUB_CAP = Number(process.env.HEAL_UNPUB_CAP || 50);
  */
 async function dueForReviewScan(key: string, dictSource: string): Promise<number[]> {
   const col = `${key}_scan_at`;
-  await sql.query(`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS ${col} TIMESTAMPTZ`).catch(() => {});
+  await ensureScanStateTable();
+  await migrateLegacyScanColumn(key);
   // 💰 2026-09-13 — 워터마크는 제 일을 했는데(대기 0행) **그 0행을 찾는 조회 자체가** 매번 cafes 전체를
-  //   훑고 있었다(13,818블록·108MB). autoCorrect가 크론·관리자화면에서 하루 558회 불러 60GB/일이 샜다.
-  //   조건과 똑같은 부분 인덱스를 만들면 대기열이 비었을 때 **1블록**으로 끝난다(실측 35ms → 0.02ms).
-  await sql.query(`CREATE INDEX IF NOT EXISTS idx_cafes_${key}_due ON cafes (synth_updated DESC NULLS LAST)
-    WHERE published = true AND synth_reviews IS NOT NULL AND (${col} IS NULL OR synth_updated > ${col})`).catch(() => {});
+  //   훑고 있었다(13,818블록·108MB). 후보 자체(published+synth_reviews)에 대한 부분 인덱스는 두 워터마크가
+  //   공유(둘 다 같은 후보 모집단) — scan_at 조건은 cafe_scan_state 쪽 얇은 테이블 조인으로 거른다.
+  await sql.query(`CREATE INDEX IF NOT EXISTS idx_cafes_scan_candidates ON cafes (synth_updated DESC NULLS LAST)
+    WHERE published = true AND synth_reviews IS NOT NULL`).catch(() => {});
   await sql`CREATE TABLE IF NOT EXISTS heal_dict_state (k TEXT PRIMARY KEY, v TEXT)`.catch(() => {});
   const hash = createHash("sha1").update(dictSource).digest("hex").slice(0, 16);
   const prev = (await sql`SELECT v FROM heal_dict_state WHERE k = ${key}`.catch(() => []))[0] as any;
   if (prev?.v !== hash) {
-    await sql.query(`UPDATE cafes SET ${col} = NULL WHERE ${col} IS NOT NULL`).catch(() => {});
+    await sql.query(`UPDATE cafe_scan_state SET ${col} = NULL WHERE ${col} IS NOT NULL`).catch(() => {});
     await sql`INSERT INTO heal_dict_state (k, v) VALUES (${key}, ${hash})
       ON CONFLICT (k) DO UPDATE SET v = ${hash}`.catch(() => {});
   }
   const CAP = Number(process.env.HEAL_SCAN_CAP || 3000); // 첫 실행(전수)이 한 번에 몰리지 않게
   const rows = await sql.query(
-    `SELECT id FROM cafes
-      WHERE published = true AND synth_reviews IS NOT NULL
-        AND (${col} IS NULL OR synth_updated > ${col})
-      ORDER BY synth_updated DESC NULLS LAST LIMIT $1`, [CAP]);
+    `SELECT c.id FROM cafes c
+       LEFT JOIN cafe_scan_state s ON s.cafe_id = c.id
+      WHERE c.published = true AND c.synth_reviews IS NOT NULL
+        AND (s.${col} IS NULL OR c.synth_updated > s.${col})
+      ORDER BY c.synth_updated DESC NULLS LAST LIMIT $1`, [CAP]);
   return (rows as any[]).map((r) => Number(r.id));
 }
 
-/** 검사 완료 표시 — 후보가 아니었던 행도 반드시 표시한다(안 그러면 매번 다시 읽는다). */
+/** 검사 완료 표시 — 후보가 아니었던 행도 반드시 표시한다(안 그러면 매번 다시 읽는다).
+ *  cafe_scan_state(얇은 테이블)에만 쓴다 — cafes 쪽엔 이제 이 컬럼이 없다. */
 async function markReviewScanned(key: string, ids: number[]): Promise<void> {
   if (!ids.length) return;
-  await sql.query(`UPDATE cafes SET ${key}_scan_at = now() WHERE id = ANY($1)`, [ids]).catch(() => {});
+  const col = `${key}_scan_at`;
+  await sql.query(
+    `INSERT INTO cafe_scan_state (cafe_id, ${col})
+       SELECT unnest($1::bigint[]), now()
+     ON CONFLICT (cafe_id) DO UPDATE SET ${col} = EXCLUDED.${col}`,
+    [ids],
+  ).catch(() => {});
 }
 
 export async function healOffConceptByReview(): Promise<{ held: number; names: string[]; capped?: number }> {
