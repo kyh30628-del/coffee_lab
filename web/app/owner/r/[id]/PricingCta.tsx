@@ -17,7 +17,7 @@ export default function PricingCta({ cafeId }: { cafeId: number }) {
   return (
     <Link href="/pricing" onClick={track}
       className="block text-center bg-[#f4ece0] text-[#2b2018] rounded-xl py-3 text-[14px] font-bold active:scale-[0.98] transition-transform">
-      자세히 보기
+      우리 동네 카페 중 내 순위 확인
     </Link>
   );
 }
