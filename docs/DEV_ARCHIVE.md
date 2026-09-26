@@ -392,3 +392,4 @@
 | 2026-09-25 03:23 | #1249 | [자율진단] /api/share-report 무WHERE char_scores 전수SELECT — 오늘 co | e4fdead1 | - | app/api/share-report/route.ts:21 — WHERE published=true 전수SELECT(38,648건 char_scores jsonb 통째)를 area |
 | 2026-09-25 07:33 | #1253 | 카페상세 시설 amenityFeature schema.org 마크업 dev_task 전환 | 98c880e5 | - | lib/cafeProfile.ts: amenityFeaturesOf() 추가(cafes.facets 배열→LocationFeatureSpecification[] 1:1 매핑, 신규 |
 | 2026-09-25 23:58 | #1255 | 카페상세 근처카페(getNearby) 쿼리 비용 — 비용자동정지 반복 유발 | dc412e7b | - | app/c/[id]/page.tsx getNearby(): 원행 SQL 2건(bbox+area)을 unstable_cache로 카페id당 6시간 캐시(순수함수 rankNearby는 |
+| 2026-09-26 07:13 | #1261 | [개발] 협업 #453: 🔍 cron-grow discovery_targets 큐 구조적 기아 7일+ (d | 8c7d36c6 | - | app/api/cron-grow/route.ts:108-120 — critical vs 큐(discovery_targets) 완전 배타 택일 로직 수정. 큐 최고령 pending이 |
