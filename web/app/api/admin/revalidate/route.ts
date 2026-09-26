@@ -17,15 +17,19 @@ export async function POST(req: NextRequest) {
   if (req.headers.get("x-admin-password") !== process.env.ADMIN_PASSWORD)
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   try {
-    const { ids } = await req.json();
+    const { ids, broad } = await req.json();
     const list = (Array.isArray(ids) ? ids : []).map(Number).filter(Number.isFinite).slice(0, 50);
     for (const id of list) { revalidatePath(`/c/${id}`); revalidatePath(`/share/${id}`); revalidatePath(`/c/${id}/opengraph-image`); }
     revalidatePath("/api/cafes");   // 로컬 워커에서 비공개했을 때도 지도 캐시가 지워지도록(같은 이유)
+    // 🔴 2026-09-26 — 유형 전체 purge는 호출측(lib/cafeCacheInvalidate.claimBroadPurge)이 정한 대로만 한다.
+    //   여기가 무조건 지우고 있어서 카페 1곳마다 4,163페이지가 식었다(하루 5,740회 = 2,390만 페이지).
+    //   `broad`가 명시적으로 false면 건너뛴다. 필드가 없으면(옛 호출자) 기존 동작 유지 = 항상 지운다.
+    if (broad === false) return NextResponse.json({ ok: true, revalidated: list.length, broad: false });
     revalidatePath("/sitemap.xml");
     revalidatePath("/area/[gu]", "page");
     revalidatePath("/area/[gu]/[taste]", "page");
     revalidatePath("/area/[gu]/dong/[dong]", "page");
-    return NextResponse.json({ ok: true, revalidated: list.length });
+    return NextResponse.json({ ok: true, revalidated: list.length, broad: true });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e).slice(0, 150) }, { status: 500 });
   }
