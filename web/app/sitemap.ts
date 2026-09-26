@@ -88,6 +88,23 @@ async function sitemapParts(): Promise<Record<SitemapKind, MetadataRoute.Sitemap
   const dongUrls: MetadataRoute.Sitemap = dongs.map((d) => ({
     url: `${SITE}/area/${encodeURIComponent(d.area)}/dong/${encodeURIComponent(d.dong)}`, changeFrequency: "weekly", priority: 0.65,
   }));
+  // 🗣️ 통칭 동 랜딩(2026-09-26, CEO "네이버·AI 상위 노출") — 사람은 "성수동 카페"로 검색하는데
+  //   우리에겐 법정동 `성수동1가`·`성수동2가`만 있어 `/dong/성수동`이 404였다(실측 확인).
+  //   페이지는 resolveDongNames가 묶어서 답한다. 여기선 **그 주소를 사이트맵에 실어 크롤러가 찾게** 한다.
+  //   정확히 일치하는 동이 이미 있으면 통칭을 만들지 않는다(같은 내용 두 페이지 방지).
+  const dongKeys = new Set(dongs.map((d) => `${d.area}|${d.dong}`));
+  const aliasN = new Map<string, number>();
+  for (const d of dongs) {
+    const m = /^(.+?)[0-9]+가$/.exec(d.dong);
+    if (!m) continue;
+    const key = `${d.area}|${m[1]}`;
+    if (dongKeys.has(key)) continue;
+    aliasN.set(key, (aliasN.get(key) ?? 0) + d.n);
+  }
+  const dongAliasUrls: MetadataRoute.Sitemap = [...aliasN.keys()].map((k) => {
+    const [a2, base] = k.split("|");
+    return { url: `${SITE}/area/${encodeURIComponent(a2)}/dong/${encodeURIComponent(base)}`, changeFrequency: "weekly" as const, priority: 0.65 };
+  });
   // 🏘️ 동×취향(결재 #1083 2단계, CEO 지시 2026-09-14 "지금 열어") — "연남동 카공 카페"처럼
   //   사람이 실제로 치는 형태. 채택 기준은 지역×취향과 **완전히 동일**하고 5곳 이상만 제출한다.
   //   ⚠️ 크롤 예산: 이미 12,069개가 '발견됐지만 크롤 대기'인데 여기서 5천여 개가 더 들어간다.
@@ -121,5 +138,5 @@ async function sitemapParts(): Promise<Record<SitemapKind, MetadataRoute.Sitemap
     ...tasteUrls,
   ];
   return { misc, areas: regionUrls, taste: regionTasteUrls, facet: facetUrls,
-    dong: dongUrls, dongtaste: dongTasteUrls, dongfacet: dongFacetUrls, cafes: cafeUrls };
+    dong: [...dongUrls, ...dongAliasUrls], dongtaste: dongTasteUrls, dongfacet: dongFacetUrls, cafes: cafeUrls };
 }

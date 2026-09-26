@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { listNotices, ensureNoticeSchema } from "@/lib/noticeStore";
+import { BOT_ANON_IDS_SQL } from "@/lib/behaviorBot"; // 봇·내부 제외 단일출처(CEO 절대원칙: 방문자 수치는 예외 없이 이것만 쓴다)
 export const runtime = "nodejs";
 
 // 📣 공지 관리(관리자) — 목록·이력 조회 + 생성/수정/중지. 무배포로 공지를 운영한다.
@@ -17,8 +18,11 @@ export async function GET(req: NextRequest) {
     const reachById = new Map<string, number>();
     for (const n of need) {
       try {
+        // 🔴 2026-09-26 수리: 봇 필터가 빠져 있어 공지 도달이 부풀려졌다(최근 7일 실측 4,578 vs 사람만 2,528 = +81%).
+        //   방문자 수치는 예외 없이 BOT_ANON_IDS_SQL 하나로 거른다 — 여기가 유일한 누락 지점이었다.
         const r = (await sql`SELECT count(DISTINCT anon_id)::int n FROM traffic_events
-          WHERE ts >= ${new Date(n.from).toISOString()} AND ts < LEAST(${new Date(n.until).toISOString()}::timestamptz, now())`) as any[];
+          WHERE ts >= ${new Date(n.from).toISOString()} AND ts < LEAST(${new Date(n.until).toISOString()}::timestamptz, now())
+            AND anon_id NOT IN (${sql.unsafe(BOT_ANON_IDS_SQL)})`) as any[];
         reachById.set(n.id, Number(r[0]?.n ?? 0));
       } catch { /* 실패해도 목록은 보여준다 */ }
     }

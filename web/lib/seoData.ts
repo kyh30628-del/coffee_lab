@@ -237,19 +237,38 @@ export async function getDongsInArea(area: string, minCount = 5): Promise<{ dong
   } catch { return []; }
 }
 
-export async function getDongCafes(area: string, dong: string, limit = 30): Promise<SeoCafe[]> {
+/**
+ * 🗣️ 통칭 동 이름 → 법정동 묶음 (2026-09-26, CEO "네이버·AI 상위 노출")
+ *   사람은 "성수동 카페"로 검색하는데 DB엔 법정동 `성수동1가`·`성수동2가`만 있어
+ *   `/area/성동구/dong/성수동`이 **404**였다(실측). 실검색어에 랜딩이 없으면 색인도 AI 인용도 안 된다.
+ *   규칙: 정확히 일치하는 동이 있으면 **그것만 쓴다**(묶으면 같은 내용 두 페이지가 된다).
+ *         없을 때만 `{이름}N가` 형태를 모아 하나의 통칭 페이지로 답한다.
+ */
+export async function resolveDongNames(area: string, dong: string): Promise<string[]> {
+  try {
+    const esc = dong.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); // 정규식 메타문자 방어
+    const rows = (await sql`SELECT DISTINCT dong FROM cafes
+      WHERE published AND area=${area} AND dong IS NOT NULL AND dong <> ''
+        AND (dong = ${dong} OR dong ~ ${"^" + esc + "[0-9]+가$"})`) as any[];
+    const names = rows.map((r) => String(r.dong)).filter(Boolean);
+    if (names.includes(dong)) return [dong];
+    return names.length ? names.sort() : [dong];
+  } catch { return [dong]; }
+}
+
+export async function getDongCafes(area: string, dong: string | string[], limit = 30): Promise<SeoCafe[]> {
   try {
     return withOwnerBadge((await sql`SELECT id, name, dong, synth_grade AS grade, synth_count AS count, synth_identity AS identity, char_scores, visitor_n, visitor_trip, visitor_local, cautions, facets,
       (SELECT left(r->>'quote', 70) FROM jsonb_array_elements(COALESCE(synth_reviews,'[]'::jsonb)) r
         WHERE COALESCE(r->>'quote','') <> '' ORDER BY COALESCE((r->>'score')::int,0) DESC LIMIT 1) AS quote
-      FROM cafes WHERE published AND area=${area} AND dong=${dong}
+      FROM cafes WHERE published AND area=${area} AND dong = ANY(${Array.isArray(dong) ? dong : [dong]})
       ORDER BY (synth_grade='검증') DESC, synth_count DESC NULLS LAST LIMIT ${limit}`) as unknown as SeoCafe[]);
   } catch { return []; }
 }
 
 // 동 공개 카페 곳수 — "N곳" 카피의 실제 값(표시 30개를 곳수로 오용 금지, lib/region.ts regionPublishedCount와 동일 원칙).
-export async function getDongPublishedCount(area: string, dong: string): Promise<number> {
-  try { return Number(((await sql`SELECT count(*)::int n FROM cafes WHERE published AND area=${area} AND dong=${dong}`)[0] as any)?.n ?? 0); }
+export async function getDongPublishedCount(area: string, dong: string | string[]): Promise<number> {
+  try { return Number(((await sql`SELECT count(*)::int n FROM cafes WHERE published AND area=${area} AND dong = ANY(${Array.isArray(dong) ? dong : [dong]})`)[0] as any)?.n ?? 0); }
   catch { return 0; }
 }
 

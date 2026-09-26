@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Curated from "../../../Curated";
-import { getDongsInArea, getDongCafes, getDongPublishedCount, getDongTasteCounts, getDongFacetCounts, TASTES, SITE } from "@/lib/seoData";
+import { getDongsInArea, getDongCafes, getDongPublishedCount, getDongTasteCounts, getDongFacetCounts, resolveDongNames, TASTES, SITE } from "@/lib/seoData";
 import { FACET_PAGES, FACET_MIN_CAFES } from "@/lib/facetPages";
 
 export const revalidate = 2592000; // ISR 30일 — 새벽 절전(2026-09-09). 무효화는 온디맨드.
@@ -19,7 +19,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { gu, dong } = await params;
   const area = decodeURIComponent(gu);
   const d = decodeURIComponent(dong);
-  const cafes = await getDongCafes(area, d, 5);
+  const cafes = await getDongCafes(area, await resolveDongNames(area, d), 5);
   const names = cafes.map((c) => c.name).slice(0, 3).join(", ");
   const title = `${d} 카페 추천 — 실제 방문 후기로 검증한 곳 | 동네 커피 노트`;
   const desc = `${area} ${d}에서 가볼 만한 카페를 영수증 리뷰·광고 없이 네이버·구글·유튜브 공개 후기를 교차검증해 골랐어요.${names ? ` ${names} 등.` : ""}`;
@@ -35,8 +35,10 @@ export default async function DongPage({ params }: Props) {
   const { gu, dong } = await params;
   const area = decodeURIComponent(gu);
   const d = decodeURIComponent(dong);
+  // 🗣️ 통칭 동("성수동")으로 들어와도 법정동("성수동1가·2가")을 묶어 답한다 — 없으면 예전처럼 404.
+  const dongNames = await resolveDongNames(area, d);
   const [cafes, siblings, total, dongTasteCounts, dongFacetCounts] = await Promise.all([
-    getDongCafes(area, d, 30), getDongsInArea(area), getDongPublishedCount(area, d), getDongTasteCounts(), getDongFacetCounts(),
+    getDongCafes(area, dongNames, 30), getDongsInArea(area), getDongPublishedCount(area, dongNames), getDongTasteCounts(), getDongFacetCounts(),
   ]);
   //   🅿️ 이 동네의 시설별 페이지 링크(2026-09-14) — "목동 주차 가능한 카페"로 들어올 자리.
   const facetLinks = FACET_PAGES.filter((f) => (dongFacetCounts[`${area}|${d}|${f.label}`] ?? 0) >= FACET_MIN_CAFES)

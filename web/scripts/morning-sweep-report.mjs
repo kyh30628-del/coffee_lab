@@ -18,11 +18,12 @@ say(`═══ 아침 스윕 보고 ${KST()} KST ═══`);
 //   ⚠️ 봇 제외는 BOT_ANON_IDS_SQL 단일출처. 어제 = KST 어제 00:00~24:00.
 try {
   const { BOT_ANON_IDS_SQL } = await import("../lib/behaviorBot.ts");
+  const { AI_SRC_SQL } = await import("../lib/trafficSource.ts"); // AI 출처 단일출처(목록 중복 정의 금지)
   const Y0 = "(date_trunc('day', now() AT TIME ZONE 'Asia/Seoul') AT TIME ZONE 'Asia/Seoul') - interval '1 day'";
   const Y1 = "(date_trunc('day', now() AT TIME ZONE 'Asia/Seoul') AT TIME ZONE 'Asia/Seoul')";
   const [v] = await sql.query(`SELECT count(DISTINCT anon_id)::int uv, count(*)::int pv,
       count(*) FILTER (WHERE src='naver')::int naver,
-      count(*) FILTER (WHERE src LIKE '%chatgpt%' OR src IN ('openai','perplexity','perplexity.ai','claude.ai','gemini','copilot.com'))::int ai,
+      count(*) FILTER (WHERE ${AI_SRC_SQL})::int ai,
       count(*) FILTER (WHERE src='google')::int google,
       count(*) FILTER (WHERE src='naver' AND path ~ '^/area/[^/]+/dong/')::int naver_dong
     FROM traffic_events WHERE ts >= ${Y0} AND ts < ${Y1} AND anon_id NOT IN (${BOT_ANON_IDS_SQL})`);
@@ -37,6 +38,19 @@ try {
   //   → 어제 수치는 정보로 계속 보여주되, **판정은 7일 합계끼리** 한다(요일 효과 상쇄).
   say(`⓪ 사람 유입(어제) 방문자 ${v.uv}명 · PV ${v.pv}  ← 7일평균 ${avg7}명 (일별 판정 안 함 — 요일편차 2.3배)`);
   say(`   출처: 네이버 ${v.naver} · AI ${v.ai} · 구글 ${v.google}`);
+  // 🤖 ⓪-b AI 출처별 분해(2026-09-26, CEO "AI 유입 다양하게") — 지금은 ChatGPT 쏠림이다.
+  //   다양화가 됐는지는 합계가 아니라 **출처별로** 봐야 안다. 30일 기준(일별은 표본이 작다).
+  {
+    const rows = await sql.query(`SELECT lower(split_part(src,'.',1)) g, count(*)::int pv, count(DISTINCT anon_id)::int uv
+      FROM traffic_events WHERE ts > now() - interval '30 days'
+        AND anon_id NOT IN (${BOT_ANON_IDS_SQL}) AND ${AI_SRC_SQL}
+      GROUP BY 1 ORDER BY 2 DESC`);
+    const tot = rows.reduce((a2, r) => a2 + r.pv, 0);
+    const top = rows[0];
+    const share = tot ? Math.round((top?.pv ?? 0) / tot * 100) : 0;
+    say(`⓪-b 🤖 AI 경유 30일 ${tot.toLocaleString()}PV — ${rows.map((r) => `${r.g} ${r.pv}(${r.uv}명)`).join(" · ") || "없음"}`);
+    say(`     출처 ${rows.length}종 · 1위 ${top?.g ?? "-"} 점유 ${share}%${rows.length <= 1 ? " ⚠️ 단일 출처 쏠림(다양화 필요)" : share >= 90 ? " ⚠️ 쏠림 90%↑" : " ✅"}`);
+  }
   // 🔙 사이트맵에서 동×취향을 뺀(09-17) 되돌림 조건: 네이버 경유 동 계열 유입이 20% 이상 줄면 원복
   // 주 단위 추세 — 이게 실제 판정선이다(요일 효과 없음).
   const [wk] = await sql.query(`SELECT

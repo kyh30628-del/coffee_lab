@@ -6,6 +6,17 @@
 const SPAM_REFERRER_PATTERN = /semalt|buttons-for-website|free-social-buttons|darodar|ilovevitaly|econom\.co|4webmasters|simple-share-buttons|hulfingtonpost|myftpupload|traffic2cash|best-seo-offer/i;
 
 // referrer/UTM → 출처 버킷. utm_source가 있으면 우선(우리가 붙인 공유링크 식별).
+/**
+ * 🤖 AI 경유 유입의 **단일출처** (2026-09-26, CEO "AI 상위 노출·다양화").
+ *   왜 필요했나: sourceBucket은 claude.ai → `claude`, copilot.microsoft → `copilot`으로 기록하는데
+ *   아침 리포트는 `'claude.ai'`·`'copilot.com'`만 세고 있었다 — **Claude 경유가 들어와도 AI 숫자에 안 잡혔다.**
+ *   목록을 두 군데 적으면 반드시 갈라진다(BOT_ANON_IDS_SQL과 같은 자리). 여기 하나만 쓴다.
+ *   접두 매칭이라 `chatgpt`·`chatgpt.com`(ChatGPT가 붙이는 utm_source) 둘 다 잡힌다.
+ */
+export const AI_SRC_BUCKETS = ["chatgpt", "claude", "perplexity", "gemini", "copilot", "openai", "bard", "you.com", "phind"] as const;
+/** SQL `WHERE` 에 그대로 넣는 조건식(컬럼명 src 고정). 표시·집계 어디서든 이것만 쓴다. */
+export const AI_SRC_SQL = `src ~* '^(chatgpt|claude|perplexity|gemini|copilot|openai|bard|you\\.com|phind)'`;
+
 export function sourceBucket(ref: string, utmSource: string): string {
   const s = (utmSource || "").toLowerCase().trim();
   if (s) return s.slice(0, 40);
