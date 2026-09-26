@@ -111,9 +111,15 @@ export async function GET(req: NextRequest) {
       //   한 번도 발굴 안 된 신설 지역(예: 인천 행정구역 개편 신설구)이 '5일+ 굶음'보다도 우선순위가
       //   낮게 취급돼 큐가 안 비는 한 영영 못 뽑혔다. NULL을 최우선(critical)으로 명시 처리.
       const starved = (await sql`SELECT region, area_label, (last_run IS NULL OR last_run < now() - interval '10 days') AS critical FROM discovery_state WHERE (last_run IS NULL OR last_run < now() - interval '5 days') AND ${YIELD_COOLDOWN} ORDER BY last_run ASC NULLS FIRST LIMIT 1`)[0] as { region: string; area_label: string; critical: boolean } | undefined;
-      const critical = criticalUsedThisRun ? undefined : (priorityStarved ?? (starved?.critical ? starved : undefined));
+      const queueTop = (await sql`SELECT id, region, area_label, keywords, created_at FROM discovery_targets WHERE status='pending' ORDER BY priority DESC, created_at ASC LIMIT 1`)[0] as any;
+      // 🐛 재발방지(coordination#453): critical이 하나라도 있으면 그 회차는 큐를 아예 안 보는 완전 배타
+      //   택일이었다 — "상시 14곳+ starved" 구조상 critical이 거의 매회 선점해 큐가 구조적으로 기아
+      //   상태에 빠졌다(성장본부 큐레이션 고가치 타겟 9일+ 정체 실측, 소비 7일간 0건). 큐 최고령 pending이
+      //   3일+ 대기 중이면 그 회차는 critical보다 큐를 우선해 교대를 보장한다.
+      const queueStarved = !!(queueTop && Date.now() - new Date(queueTop.created_at).getTime() > 3 * 24 * 60 * 60 * 1000);
+      const critical = queueStarved ? undefined : (criticalUsedThisRun ? undefined : (priorityStarved ?? (starved?.critical ? starved : undefined)));
       if (critical) criticalUsedThisRun = true;
-      const at = critical ? null : (await sql`SELECT id, region, area_label, keywords FROM discovery_targets WHERE status='pending' ORDER BY priority DESC, created_at ASC LIMIT 1`)[0] as any;
+      const at = critical ? null : queueTop;
       // 🎯 2026-09-13 — 같은 쿼터를 수확처에 먼저 쓴다(CEO 지시 "신규 권역 집중").
       //   쿨다운을 통과한 지역 중 **직전 수확률 10% 이상**을 앞세운다(실측: 10%+ 지역이 같은 훑음으로 20~30배를 건진다).
       //   굶주림은 여전히 critical(10일+·미실행)이 보장한다 — 여기서 밀린 지역도 30일 안에 반드시 한 번 돈다.
