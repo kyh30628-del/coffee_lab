@@ -149,8 +149,18 @@ export async function naverBlocked(): Promise<boolean> {
   return !!(r[0]?.exhausted && r[0]?.recent);
 }
 
+// 🧮 이 프로세스가 실제로 쓴 성공 호출 수(자기 몫 예산 측정 전용).
+//   왜 필요한가(2026-09-26 실측 사고): 스크립트가 '내 예산 8,100콜을 썼나'를 naverUsedToday()의 증가분으로
+//   재면 **동시에 도는 다른 잡의 콜까지 자기가 쓴 것으로 계산**한다. 09-26 07:00 원장 적재는 자기 콜 4,212건
+//   시점에 전역이 8,102로 올라(같은 시각 07:05 발굴 스윕이 3,890콜 소비) "예산 8,100 도달"로 조기 중단했다.
+//   → 적재가 계획의 52%(1,855곳)에서 멈췄다. 자기 몫은 반드시 이 카운터로 잰다.
+//   ⚠️ 전역 한도(25,000)를 넘지 않게 하는 가드는 여전히 naverUsedToday()(전역 절대값)로 재야 한다 — 용도가 다르다.
+let processCalls = 0;
+export function naverCallsThisProcess(): number { return processCalls; }
+
 // 성공 호출 1건(또는 n건) 계상 + 소진플래그 해제(성공 = Naver가 응답 = 쿼터 있음 → 자가치유).
 export async function bumpNaver(n = 1): Promise<void> {
+  processCalls += n; // ⚠️ 첫 줄(동기) — 호출자가 await 없이 부르고 .catch()로 흘려보내도 누락되지 않는다
   await ensure();
   await sql`INSERT INTO naver_budget (day, used, exhausted) VALUES (${kstDay()}, ${n}, false)
     ON CONFLICT (day) DO UPDATE SET used = naver_budget.used + ${n}, exhausted = false, updated_at = now()`.catch(() => {});

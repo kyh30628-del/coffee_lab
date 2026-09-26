@@ -16,7 +16,7 @@
 import { readFileSync } from "fs";
 for (const l of readFileSync(".env.local", "utf8").split("\n")) { const m = l.match(/^([A-Z_0-9]+)=(.*)$/); if (m) process.env[m[1]] = m[2].replace(/^["']|["']$/g, ""); }
 const { discoverRegion, METRO_REGIONS } = await import("../lib/discover.ts");
-const { naverUsedToday, naverBlocked } = await import("../lib/naverBudget.ts");
+const { naverUsedToday, naverCallsThisProcess, naverBlocked } = await import("../lib/naverBudget.ts");
 const { neon } = await import("@neondatabase/serverless");
 const sql = neon(process.env.DATABASE_URL);
 
@@ -34,14 +34,17 @@ try {
   for (const x of st) order.set(x.region, x.last_run ? new Date(x.last_run).getTime() : 0);
 } catch {}
 const targets = pool.sort((a, b) => (order.get(a.region) ?? 0) - (order.get(b.region) ?? 0));
-const startUsed = await naverUsedToday();
+const startUsed = await naverUsedToday();  // 전역 기준선 — 보고용
+const mine0 = naverCallsThisProcess();     // 자기 기준선 — 예산 판정용
 console.log(`대상 ${targets.length}개 지역${FILTER ? ` (필터: ${FILTER})` : ""} · 시작 시점 쿼터 사용 ${startUsed}/25000 · 이번 실행 예산 ${BUDGET}콜\n`);
 
 let totalNew = 0, totalFound = 0, done = 0, stoppedBy = "";
 for (const r of targets) {
   // 쿼터 안전판 — 예산 소진이나 실제 429 차단이면 즉시 멈춘다(크론 몫까지 태우지 않기 위해).
-  const used = await naverUsedToday();
-  if (used - startUsed >= BUDGET) { stoppedBy = `예산 소진(${used - startUsed}콜)`; break; }
+  //   ⚠️ 2026-09-26 수리: 자기 예산을 전역 증가분으로 재고 있었다 — 동시에 도는 잡의 콜까지 자기 지출로
+  //   계산돼 예산이 남았는데 멈춘다(import-permits 조기중단과 같은 버그 클래스).
+  const mine = naverCallsThisProcess() - mine0;
+  if (mine >= BUDGET) { stoppedBy = `예산 소진(자기 호출 ${mine}콜)`; break; }
   if (await naverBlocked()) { stoppedBy = "네이버 429 차단 상태"; break; }
 
   try {
@@ -57,5 +60,5 @@ for (const r of targets) {
 }
 const endUsed = await naverUsedToday();
 console.log(`\n=== 발굴 완료 — 지역 ${done}/${targets.length}${stoppedBy ? ` (중단: ${stoppedBy})` : ""} ===`);
-console.log(`  신규 ${totalNew}곳 (발견 ${totalFound}건 중) · 네이버 호출 ${endUsed - startUsed}건 · 오늘 누계 ${endUsed}/25000`);
+console.log(`  신규 ${totalNew}곳 (발견 ${totalFound}건 중) · 네이버 호출 ${naverCallsThisProcess() - mine0}건(자기) · 오늘 누계 ${endUsed}/25000`);
 console.log(`  신규는 전부 미공개 상태다 — 후기 수집·합성·등급 판정을 통과해야 공개된다.`);

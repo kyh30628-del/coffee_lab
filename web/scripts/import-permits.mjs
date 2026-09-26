@@ -25,7 +25,7 @@ const { localSearch, isFranchise, isNonCafe, isSnackStall, isStructuralPhantom, 
 const { loadLearnedTerms } = await import("../lib/learnedTerms.ts");
 const { loadCriteriaLists } = await import("../lib/criteriaLists.ts");
 await loadLearnedTerms(); await loadCriteriaLists(); // 공개 관문(synthStore)과 같은 사전으로 판정하려면 먼저 프라임해야 한다
-const { naverUsedToday, NAVER_DAILY_QUOTA, NAVER_CLOSURE_RESERVE, NAVER_COLLECT_RESERVE, NAVER_GROW_RESERVE } = await import("../lib/naverBudget.ts");
+const { naverUsedToday, naverCallsThisProcess, NAVER_DAILY_QUOTA, NAVER_CLOSURE_RESERVE, NAVER_COLLECT_RESERVE, NAVER_GROW_RESERVE } = await import("../lib/naverBudget.ts");
 const { SIDO_GU } = await import("../lib/regionList.ts");
 const { isNonCafeFnbCategory, brandTokenOverlap, nearDuplicateCafeName } = await import("../lib/reviewQuality.ts");
 
@@ -138,7 +138,8 @@ console.log("상위 지역:", Object.entries(byArea).sort((a, b) => b[1] - a[1])
 if (!APPLY) { console.log(`\n▶ 드라이런. --apply 로 적재(상한 ${LIMIT}곳 · 예산 ${BUDGET}콜).`); process.exit(0); }
 
 // ── 네이버 local 1콜로 좌표·실재 확인 후 적재 ──
-let used0 = await naverUsedToday();
+let used0 = await naverUsedToday();        // 전역 기준선 — 보고용(같은 시간 다른 잡 포함)
+const mine0 = naverCallsThisProcess();     // 자기 기준선 — 예산 판정용(이 프로세스의 콜만)
 const OFFCONCEPT_CAT = /(애견|애완|반려동물|펫카페|고양이카페|동물카페|키즈|실내놀이터|놀이방|스터디카페|독서실|만화방|만화카페|룸카페|멀티방|파티룸|방탈출|보드게임|보드카페|볼링|당구|스크린골프|골프연습|코인노래|노래방|찜질방|사우나|클라이밍|트램폴린|트램펄린|서점|북카페|도서관)/;
 let tried = 0, added = 0, miss = 0, skipNonCafe = 0, skipRuleDead = 0, skipDup = 0, calls = 0;
 // 🔬 09-25 결과 기록(동작 무변경) — 미발견(오늘 2,492콜·31%)이 개업시기·업종·전화 유무에 몰리는지 보려면 항목별 결과가 필요하다.
@@ -147,8 +148,16 @@ const outcome = (c, r) => { try { appendFileSync(OUT_PATH, JSON.stringify({ r, n
 const VERBOSE = process.argv.includes("--verbose");
 for (const c of cand) {
   if (added >= LIMIT) break;
-  const spent = (await naverUsedToday()) - used0;
-  if (spent >= BUDGET) { console.log(`예산 ${BUDGET}콜 도달 — 중단`); break; }
+  // 💰 자기 몫 예산 = **내가 쓴 콜**로 잰다(2026-09-26 수리). 전역 증가분으로 재면 동시에 도는 잡의 콜까지
+  //   내가 쓴 것으로 계산돼 절반에서 멈춘다(09-26 07:00: 자기 4,212콜인데 전역 8,102 → 조기중단, 적재 52%).
+  const mine = naverCallsThisProcess() - mine0;
+  if (mine >= BUDGET) { console.log(`예산 ${BUDGET}콜 도달(자기 호출 ${mine}콜) — 중단`); break; }
+  // 🛑 전역 한도 백스톱 — 자기 예산이 남아도 하루 총량을 넘겨선 안 된다(폐업 크론 몫은 남긴다).
+  //   전역 절대값으로 재는 게 맞는 유일한 지점(용도가 '내 몫'이 아니라 '하루 천장'이라서).
+  if (tried % 50 === 0) {
+    const g = await naverUsedToday();
+    if (g >= NAVER_DAILY_QUOTA - NAVER_CLOSURE_RESERVE) { console.log(`전역 한도 근접(${g}/${NAVER_DAILY_QUOTA}, 폐업예약 ${NAVER_CLOSURE_RESERVE} 보존) — 중단`); break; }
+  }
   tried++; tried0.add(triedKey(c.nm, c.addr));
   // 질의 정리 — "요에라(Yoera)"·"카페:옆집"·"카페cafe 메종@학동" 같은 인허가 표기는 네이버가 0건을 돌려준다(09-21 실증)
   const qn = String(c.nm).replace(/\([^)]*\)/g, " ").replace(/[:@·,\/]+/g, " ").replace(/\s+/g, " ").trim() || c.nm;
@@ -188,7 +197,7 @@ for (const c of cand) {
   // 같은 실행 내 후속 후보와도 대조(직전에 넣은 것도 대조 대상에 추가)
   haveName.add(norm(hitName)); if (hitAddr) haveAddr.add(norm(hitAddr));
   if (hit.lat != null) ownPts.push({ lat: hit.lat, lng: hit.lng, name: hitName, dong: hit.dong });
-  if (added % 200 === 0) console.log(`  … ${added}곳 적재 (시도 ${tried} · ${(await naverUsedToday()) - used0}콜)`);
+  if (added % 200 === 0) console.log(`  … ${added}곳 적재 (시도 ${tried} · 자기 ${naverCallsThisProcess() - mine0}콜 / 전역 ${(await naverUsedToday()) - used0}콜)`);
   // 🚨 효율 자동 차단(collect-shard와 같은 사상) — **낭비를 사람이 발견하기 전에 스스로 멈춘다.**
   //   설계 원가는 곳당 1콜이다(이름을 아니까 '확인'만 한다). 3콜을 넘으면 전제가 깨진 것이다:
   //   네이버 미발견이 많아 헛 호출이 쌓이거나, 원장 상호가 간판명과 달라 매칭이 안 되는 경우다.
@@ -202,4 +211,7 @@ for (const c of cand) {
 try { writeFileSync(TRIED_PATH, JSON.stringify([...tried0])); } catch (e) { console.log("시도 캐시 저장 실패:", e?.message); }
 const spent = (await naverUsedToday()) - used0;
 console.log(`\n적재 ${added}곳 · 시도 ${tried} · 네이버 미발견 ${miss} · 비카페 제외 ${skipNonCafe} · 공개규칙 불가 제외 ${skipRuleDead} · 교차소스 중복 제외 ${skipDup}`);
-console.log(`이 스크립트 호출 ${calls}콜 → 적재 1곳당 ${(calls / Math.max(added, 1)).toFixed(2)}콜 (기존 발굴 16.9콜) · 같은 시간 네이버 전체 사용 ${spent}콜(크론 포함)`);
+console.log(`이 스크립트 호출 ${calls}콜(예산 계상 ${naverCallsThisProcess() - mine0}콜 / 한도 ${BUDGET}) → 적재 1곳당 ${(calls / Math.max(added, 1)).toFixed(2)}콜 (기존 발굴 16.9콜)`);
+// 전역과 자기 몫이 크게 벌어지면 **다른 잡이 같은 시간에 쿼터를 먹고 있다** — 09-26 스윕 부활을 이 차이로 잡았다.
+const other = spent - (naverCallsThisProcess() - mine0);
+console.log(`같은 시간 네이버 전체 사용 ${spent}콜${other > 200 ? ` · ⚠️ 그중 다른 잡이 ${other}콜 — 동시 실행 잡을 확인하라` : ""}`);

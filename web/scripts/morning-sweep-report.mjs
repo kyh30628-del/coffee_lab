@@ -120,6 +120,20 @@ const { discoveryMayRun } = await import("../lib/naverBudget.ts");
 const dgd = await discoveryMayRun();
 say(`④ 적체 ${dgd.backlog.toLocaleString()}곳/${dgd.limit.toLocaleString()} ${dgd.ok ? "✅ 발굴 허용" : "🛑 발굴 차단"} · 네이버 ${(nb[0]?.used ?? 0).toLocaleString()}/25,000 · 비용정지 ${ch[0].halted ? "🛑" : "꺼짐"}`);
 
+// ④-b 🧟 은퇴 잡 부활 감시 — 2026-09-26 사고: CEO 승인으로 09-21 은퇴시킨 `discover-sweep`이 되살아나
+//   그날 아침 쿼터 3,890콜(하루의 16%)을 먹고 있었다. 원인은 `launchctl unload`만 하고 plist를 남겨둔 것 —
+//   unload는 재로그인하면 풀린다(다른 은퇴 잡 5종은 전부 `.plist.disabled`였는데 이 잡만 규약을 벗어나 있었다).
+//   사람이 로그를 뒤져야 알 수 있던 것을 매일 자동으로 잡는다. 판정은 launchd가 아니라 **실행 흔적**으로 한다.
+{
+  const { RETIRED_JOBS } = await import("../lib/jobTeams.ts");
+  //   ⚠️ 시각은 SQL에서 **문자열로** 받는다 — `AT TIME ZONE`이 준 벽시계를 드라이버가 로컬시각으로 재해석해
+  //   9시간 어긋나던 것을 막는다(이 파일이 naver_budget 날짜를 to_char로 받는 것과 같은 이유).
+  const zombies = await sql`SELECT job, to_char(max(ran_at) AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD HH24:MI') last, count(*)::int n
+    FROM agent_runs WHERE ran_at > now() - interval '24 hours' AND job = ANY(${[...RETIRED_JOBS]}) GROUP BY 1 ORDER BY 2 DESC`;
+  if (!zombies.length) say(`④-b 🧟 은퇴 잡 부활 없음 ✅ (감시 ${RETIRED_JOBS.size}종)`);
+  else for (const z of zombies) say(`④-b 🔴 은퇴 잡 '${z.job}'이 24h 내 ${z.n}회 실행됨(최근 ${z.last} KST) — plist가 .disabled인지 확인하라`);
+}
+
 // ⑤ 정합성 (픽스처와 같은 불변식)
 const mm = await sql`SELECT count(*) FILTER (WHERE published)::int a, count(*) FILTER (WHERE pipeline_status='live')::int b FROM cafes`;
 say(`⑤ 정합성 published ${mm[0].a.toLocaleString()} vs live ${mm[0].b.toLocaleString()} ${mm[0].a === mm[0].b ? "✅" : "🔴 불일치 " + Math.abs(mm[0].a - mm[0].b)}`);

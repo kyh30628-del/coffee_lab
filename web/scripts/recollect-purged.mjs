@@ -19,7 +19,7 @@ const env = readFileSync(new URL("../.env.local", import.meta.url), "utf8");
 for (const l of env.split("\n")) { const m = l.match(/^([A-Z_0-9]+)=(.*)$/); if (m) process.env[m[1]] = m[2].replace(/^["']|["']$/g, ""); }
 const { synthAndStore } = await import("../lib/synthStore.ts");
 const { sql } = await import("../lib/db.ts");
-const { recollectMayUse, naverUsedToday, NAVER_DAILY_QUOTA, NAVER_RECOLLECT_RESERVE } = await import("../lib/naverBudget.ts");
+const { recollectMayUse, naverUsedToday, naverCallsThisProcess, NAVER_DAILY_QUOTA, NAVER_RECOLLECT_RESERVE } = await import("../lib/naverBudget.ts");
 
 // 하루 목표. 실측 카페당 8콜(최초 추정 6콜은 틀렸다 — 3곳에 24콜).
 // 예약 2,300콜 ÷ 8 = 하루 약 287곳 > 정상 파기분 246곳/일 → 여유 41곳으로 백로그를 갉아 7일 내 소진.
@@ -27,7 +27,8 @@ const MAX = Number(process.env.RECOLLECT_MAX || 280);
 const ALL_GRADES = process.env.RECOLLECT_ALL === "1";        // 참고 등급까지(A안) — 기본 꺼짐
 const TOTAL_MS = Number(process.env.RECOLLECT_TOTAL_MS || 90 * 60_000);
 const t0 = Date.now();
-const startUsed = await naverUsedToday();
+const startUsed = await naverUsedToday();       // 전역 기준선 — 보고용
+const mine0 = naverCallsThisProcess();          // 자기 기준선 — 예산 판정용
 
 // 🎯 2026-09-17(CEO 승인) — 대상을 "'검증' 등급 전체"에서 **"사람이 실제로 연 카페"**로 좁힌다.
 //   왜: 첫 자동 실행 실측이 내 추정을 4배 뒤엎었다 — 카페당 **33콜**(결재 때 6콜, 스모크 8콜이라 보고했다).
@@ -61,7 +62,9 @@ for (const c of rows) {
   if (Date.now() - t0 > TOTAL_MS) { stop = "시간 상한"; break; }
   // 🔒 자기 몫만 쓴다 — '남은 쿼터'로 판단하면 발굴(cron-grow) 예약분까지 먹는다.
   //   이번 실행에서 쓴 콜을 직접 세어 예약분(1,500)에서 멈춘다. 초과 지출 구조적 차단.
-  const spent = (await naverUsedToday()) - startUsed;
+  //   ⚠️ 2026-09-26 수리: 주석대로 '직접 세어'가 아니라 전역 증가분을 쓰고 있었다 — 동시에 도는 잡의 콜까지
+  //   자기 지출로 계산돼 예약분을 다 쓰기 전에 멈춘다(import-permits와 같은 버그, 그쪽은 적재 52%에서 조기중단).
+  const spent = naverCallsThisProcess() - mine0;
   if (spent >= NAVER_RECOLLECT_RESERVE) { stop = `자기 예약분 소진(${spent.toLocaleString()}/${NAVER_RECOLLECT_RESERVE.toLocaleString()}콜)`; break; }
   const g = await recollectMayUse();
   if (!g.ok) { stop = `네이버 한도/차단(잔여 ${g.remaining.toLocaleString()})`; break; }
@@ -69,7 +72,7 @@ for (const c of rows) {
   catch (e) { err++; if (err <= 3) console.log(`  오류 ${c.name}: ${String(e).slice(0, 70)}`); }
   if (done % 25 === 0 && done) console.log(`  … ${done}곳 완료`);
 }
-const used = (await naverUsedToday()) - startUsed;
+const used = naverCallsThisProcess() - mine0;   // 자기 콜(전역 증가분 아님)
 // 실제로 원본이 돌아왔는지 확인 — '실행했다'가 아니라 '효과가 났다'로 본다(하네스 3원칙).
 const [chk] = await sql`SELECT count(*)::int n FROM cafes WHERE published AND raw_reviews IS NULL AND id = ANY(${viewedIds})`;
 console.log(`재수집 ${done}곳 · 오류 ${err} · 네이버 ${used.toLocaleString()}콜 사용${stop ? ` · 중단(${stop})` : ""}`);
