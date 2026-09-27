@@ -17,7 +17,8 @@ export function abVariant(): "A" | "B" {
     return (h & 1) === 0 ? "A" : "B";
   } catch { return "A"; }
 }
-const NIcon = () => <svg width="11" height="11" viewBox="0 0 24 24" fill="#03c75a" aria-hidden><path d="M16.273 12.845L7.376 0H0v24h7.727V11.155L16.624 24H24V0h-7.727z"/></svg>;
+// 2026-09-27 — 13px로(전 11px). 네이버 버튼이 브랜드색 칩으로 작아진 만큼 아이콘이 먼저 눈에 띄어야 한다.
+const NIcon = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="#03c75a" aria-hidden><path d="M16.273 12.845L7.376 0H0v24h7.727V11.155L16.624 24H24V0h-7.727z"/></svg>;
 
 export default function PlaceCta({ cafeId, mapHref, mapLabel, mapExternal, screen }: {
   cafeId: number; mapHref: string; mapLabel: string; mapExternal?: boolean; screen: "카페상세" | "지도앱";
