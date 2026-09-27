@@ -2085,10 +2085,6 @@ export function verifyReview(input: QualityInput): QualityResult {
   //   raw 352건 중 159건(45%)이 사전을 우회. bare form 추가하되 CAFE_CONTEXT 가드는 그대로 유지(카페 실질
   //   후기의 드문 "객실"·"수영장" 단독 언급은 통과 보호).
   const HOTEL_NAMED = input.name.includes("호텔") || HOTEL_BRANDS.some((b) => input.name.includes(b));
-  const HOTEL_LODGING_SIGNAL = /(숙박|투숙|킹룸|스탠다드룸|디럭스룸|조식뷔페|호캉스|풀빌라|수영장|연회장|컨벤션\s*후기|웨딩|예식장?|객실|1박)/;
-  if (HOTEL_NAMED && HOTEL_LODGING_SIGNAL.test(fullL) && !CAFE_CONTEXT.test(fullL)) {
-    return { verdict: "rejected", score: 15, reasons: ["호텔 객실/부대시설 이용후기(카페 맥락 전무) — LLM 재판정"], borderline: true, signals: sig };
-  }
   // [룰갭 rulegap-proposals-20260820-1214 제안1] 카페+펜션/글램핑/연수원 겸업 — 위 HOTEL_NAMED는 카페명에
   //   "호텔"류만 인정해, 시골·근교 감성카페 상권에 흔한 "카페+펜션/글램핑/연수원" 겸업 업체는 완전히
   //   우회한다(id3069 카페_백란_펜션 실측: 47건 중 5건 펜션 겸업 맥락, 카페 실질맥락 부재). 카페 상호
@@ -2105,9 +2101,29 @@ export function verifyReview(input: QualityInput): QualityResult {
   //   "리조트" 문자열은 포함하지만(id24607 정선담아 하이원리조트점) 신호사전을 우회. 양쪽 다 보강.
   const LODGING_DESC = /펜션|글램핑|리조트|연수원|풀빌라|콘도|숙소|비발디파크|소노벨|소노펫|소노펠리체|델피노|하이원|휘닉스파크|휘닉스평창|아난티/;
   const LODGING_NAMED = HOTEL_NAMED || LODGING_DESC.test(input.name) || (nameInTitle && LODGING_DESC.test(title));
-  const LODGING_SIGNAL = /(숙박|투숙|킹룸|스탠다드룸|디럭스룸|조식뷔페|호캉스|풀빌라|수영장|연회장|컨벤션\s*후기|웨딩|예식장?|객실|1박|바베큐\s*무한리필|단체\s*워크숍|트리하우스|계곡\s*물놀이|스위트|콘도|체크인|체크아웃|그랜드호텔|조식)/;
-  if (LODGING_NAMED && LODGING_SIGNAL.test(fullL) && !CAFE_CONTEXT.test(fullL)) {
-    return { verdict: "rejected", score: 15, reasons: ["펜션/글램핑 겸업 숙박 후기(카페 맥락 전무) — LLM 재판정"], borderline: true, signals: sig };
+  // [룰갭 신규, decisions#1265, rulegap-proposals-20260927-2.md] 호텔/펜션 부속 카페 게이트 강화 리트로핏 —
+  //   위 두 게이트는 !CAFE_CONTEXT(bare "카페"/"커피" 카테고리어 포함) 단순 부재만 이스케이프로 요구해,
+  //   "커피숍"/"카페테리아" 같은 업종 카테고리 단어 하나가 CAFE_CONTEXT를 트리거해 순수 숙박 후기(조식·
+  //   체크인/아웃·사우나·객실 등)를 그대로 통과시켰다(id60593 동해현진관광호텔 커피숍, id21890 쉐르빌
+  //   온천관광호텔 카페테리아, id27633 태백호텔 베이커리카페 실측, offctx 0.25~0.38). RESORT_VENUE_WORDS
+  //   (decisions#1003)가 쓰는 2단 하드컷을 동일하게 리트로핏 — ①카페 합성명(풀네임)이 title/body 어디에도
+  //   없으면(inTitleFull/inBodyFull/distinctInTitle/distinctInBody 전부 미스) 숙박신호 매칭 여부와 무관하게
+  //   즉시 거절(타업체 혼입 추정) ②카페 실질맥락이 전무하면 거절. CAFE_CONTEXT_SUBSTANCE(카테고리어 "카페"/
+  //   cafe/coffee/카공을 뺀 실제 음료·디저트 어휘만)를 써서 bare 카테고리어 단독 매칭은 더 이상 탈출구로
+  //   인정하지 않는다.
+  if (HOTEL_NAMED || LODGING_NAMED) {
+    const lodgingBrandAbsent = !inTitleFull && !inBodyFull && !distinctInTitle && !distinctInBody;
+    const lodgingNoCafeCtx = !CAFE_CONTEXT_SUBSTANCE.test(fullL);
+    if (lodgingBrandAbsent || lodgingNoCafeCtx) {
+      return {
+        verdict: "rejected",
+        score: 5,
+        reasons: [lodgingBrandAbsent
+          ? "호텔/펜션 부속 카페 — 자기 브랜드 토큰 불일치(타업체 혼입 추정)"
+          : "호텔/펜션 부속 카페 — 카페 실질맥락 전무(순수 숙박시설 체험기, 카테고리어 단독 매칭 불인정)"],
+        signals: sig,
+      };
+    }
   }
   // [룰갭 신규, decisions#1003, rulegap-proposals-20260906-2.md] 리조트·자연휴양림·수목원·워터파크·스키장 등
   //   대형 복합시설 부설 카페 — 위 LODGING 게이트는 !CAFE_CONTEXT를 탈출구로 둬, 시설 내 "다른" 입점업체
