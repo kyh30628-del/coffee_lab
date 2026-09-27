@@ -188,6 +188,14 @@ for (const c of cand) {
     if (near && (brandTokenOverlap(near.name, hitName, [c.area, near.dong, hit.dong].filter(Boolean)) || nearDuplicateCafeName(near.name, hitName))) dup = true;
   }
   if (dup) { skipDup++; outcome(c, "dup"); if (VERBOSE) console.log(`  ⊘ 교차소스 중복(기존 보유) ${hitName} @ ${hitAddr}`); continue; }
+  // 🐛 재발방지(coord#444→coord#454→decisions#1264): haveName/haveAddr/ownPts는 스크립트 시작 시
+  //   찍은 스냅샷이다. 이 스크립트는 후보 수천 건을 순차 처리하며 수 분~수십 분 걸리는데, 그 사이
+  //   discover.ts(cron-grow) 등 다른 잡이 같은 카페를 먼저 적재하면 스냅샷엔 없다 — place_id 접두사도
+  //   소스별로 달라(nl_ vs pm_) ON CONFLICT도 못 잡는다. 09-26 트럭트/블루 브리지/또오브베이크 3쌍이
+  //   전부 discover.ts 삽입 30초~2분 뒤 이 스크립트가 같은 이름·주소로 다시 삽입해 뚫렸다(정확일치 확인,
+  //   norm() 드리프트 아님). 적재 직전(added 건수만큼만, 하루 수백~수천 건 규모) 라이브 재확인으로 막는다.
+  const race = await sql`SELECT 1 FROM cafes WHERE name = ${hitName} OR (${hitAddr}::text IS NOT NULL AND address = ${hitAddr}) LIMIT 1`;
+  if (race.length) { skipDup++; outcome(c, "dup_race"); if (VERBOSE) console.log(`  ⊘ 동시적재 레이스 중복(라이브 재확인) ${hitName} @ ${hitAddr}`); continue; }
   const area = areaOf(hit.address) || c.area;
   const pseudoId = `pm_${String(c.nm).replace(/\s/g, "")}_${Math.round(hit.lat * 1e5)}`;
   await sql`INSERT INTO cafes (place_id, name, area, dong, naver_category, address, lat, lng, phone, instagram_url, source, published, roasts_own, pipeline_status)
