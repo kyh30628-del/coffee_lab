@@ -17,8 +17,21 @@ export function abVariant(): "A" | "B" {
     return (h & 1) === 0 ? "A" : "B";
   } catch { return "A"; }
 }
-// 2026-09-27 — 13px로(전 11px). 네이버 버튼이 브랜드색 칩으로 작아진 만큼 아이콘이 먼저 눈에 띄어야 한다.
-const NIcon = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="#03c75a" aria-hidden><path d="M16.273 12.845L7.376 0H0v24h7.727V11.155L16.624 24H24V0h-7.727z"/></svg>;
+// 2026-09-27 2차 — CEO "길찾기·네이버 플레이스를 아이콘으로 눈에 잘 띄게".
+//   네이버 N 로고를 흰 배지 안에 넣어 "브랜드 앱 아이콘"처럼 도드라지게 한다
+//   (맨몸 초록 글자보다 인식·신뢰 신호가 강하다 — 네이버·카카오 등 실제 앱들이 쓰는 방식).
+const NBadge = () => (
+  <span className="nt-nbadge" aria-hidden>
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="#03c75a"><path d="M16.273 12.845L7.376 0H0v24h7.727V11.155L16.624 24H24V0h-7.727z" /></svg>
+  </span>
+);
+// 지도 핀 — Material "place" 글리프(구멍 뚫린 단일 path, 별도 원 합성 불필요). 사이트 아이콘 언어(stroke 아웃라인)와
+// 달리 **채움**으로 그린다 — 어두운 버튼 위에서 15px 크기에 얇은 선보다 덩어리진 실루엣이 더 잘 읽힌다(실측 대조).
+const PinIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z" />
+  </svg>
+);
 
 export default function PlaceCta({ cafeId, mapHref, mapLabel, mapExternal, screen }: {
   cafeId: number; mapHref: string; mapLabel: string; mapExternal?: boolean; screen: "카페상세" | "지도앱";
@@ -33,10 +46,10 @@ export default function PlaceCta({ cafeId, mapHref, mapLabel, mapExternal, scree
   const mapProps = mapExternal ? { target: "_blank", rel: "noopener noreferrer" } : {};
   const MapEl = mapExternal ? "a" : Link;
   const map = (cls: string) => (
-    <MapEl href={mapHref} className={cls} {...(mapProps as any)} onClick={() => trackOutbound({ target: mapExternal ? "kakao_map" : "map_cta", cafeId, source: src })}>{mapLabel}</MapEl>
+    <MapEl href={mapHref} className={cls} {...(mapProps as any)} onClick={() => trackOutbound({ target: mapExternal ? "kakao_map" : "map_cta", cafeId, source: src })}><PinIcon />{mapLabel}</MapEl>
   );
   const naver = (cls: string, label: string) => (
-    <a href={place} target="_blank" rel="noopener noreferrer" className={cls} onClick={() => trackOutbound({ target: "naver_place", cafeId, source: src })}><NIcon />{label}</a>
+    <a href={place} target="_blank" rel="noopener noreferrer" className={cls} onClick={() => trackOutbound({ target: "naver_place", cafeId, source: src })}><NBadge />{label}</a>
   );
   return v === "B"
     ? <div className="nt-cta" data-ab="B">{naver("nt-btn-ink", "네이버에서 후기·메뉴 더 보기")}{map("nt-btn-line")}</div>
