@@ -61,7 +61,6 @@ export const EXPECT_MAX_H: Record<string, number> = {
   "cron-billing": 30,     // 정기결제 크론 매일 1회 + 버퍼
   "orchestrator-heal": 18, // 2창(UTC 3,11) 최대공백 16h + 버퍼
   // 로컬 launchd 잡
-  "discover-sweep": 30,    // 🔄2026-08-04 KST 12·20시 발굴 스윕 + 버퍼(2026-09-21 정지)
   "import-permits": 30,    // 🧾2026-09-21 매일 07:00 원장 적재 + 버퍼
   "indexnow": 30,          // 🔎2026-09-13 KST 09:40 하루 1회 + 버퍼
   "neon-billing": 30,      // 💳2026-09-14 KST 07:50 하루 1회 + 버퍼
