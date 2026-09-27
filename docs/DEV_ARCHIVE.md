@@ -394,3 +394,4 @@
 | 2026-09-25 23:58 | #1255 | 카페상세 근처카페(getNearby) 쿼리 비용 — 비용자동정지 반복 유발 | dc412e7b | - | app/c/[id]/page.tsx getNearby(): 원행 SQL 2건(bbox+area)을 unstable_cache로 카페id당 6시간 캐시(순수함수 rankNearby는 |
 | 2026-09-26 07:13 | #1261 | [개발] 협업 #453: 🔍 cron-grow discovery_targets 큐 구조적 기아 7일+ (d | 8c7d36c6 | - | app/api/cron-grow/route.ts:108-120 — critical vs 큐(discovery_targets) 완전 배타 택일 로직 수정. 큐 최고령 pending이 |
 | 2026-09-26 07:25 | #1262 | [자율진단] noncafe/offconcept_scan_at 워터마크 UPDATE — 09-26 08:00  | 581b78dc | - | lib/synthStore.ts: noncafe/offconcept_scan_at 워터마크를 cafes 컬럼→경량 cafe_scan_state 테이블(cafe_id PK+2 TIM |
+| 2026-09-27 03:16 | #1263 | [사장님영업] 무료리포트 CTA 카피 교체 — "자세히 보기"→순위 노출형(09-24 제안 후 미등재 발견) | 04e3d7d0 | - | app/owner/r/[id]/PricingCta.tsx: CTA 문구 '자세히 보기'→'우리 동네 카페 중 내 순위 확인' 교체(카피만, UI/계측 변경 없음). tsc 신규에러 |
