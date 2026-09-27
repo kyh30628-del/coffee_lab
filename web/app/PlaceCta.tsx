@@ -31,7 +31,7 @@ export default function PlaceCta({ cafeId, mapHref, mapLabel, mapExternal, scree
         <span className="nt-cta-badge"><PinIcon /></span>{mapLabel}
       </MapEl>
       <a href={place} target="_blank" rel="noopener noreferrer" className="nt-cta-naver" onClick={() => trackOutbound({ target: "naver_place", cafeId, source: screen })}>
-        <span className="nt-cta-badge"><NIcon /></span>네이버
+        <span className="nt-cta-badge"><NIcon /></span>네이버 플레이스
       </a>
     </div>
   );
