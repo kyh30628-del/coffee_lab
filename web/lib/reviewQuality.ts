@@ -2207,7 +2207,11 @@ export function verifyReview(input: QualityInput): QualityResult {
   //   경로(bodyCtxGate, :1877)만 source='cafearticle'(네이버 카페 커뮤니티)일 때 CAFE_CONTEXT_SUBSTANCE로
   //   격상했고, 이 title-match 경로는 그대로 CAFE_CONTEXT(약함, "카페" 단독 토큰도 인정)를 써 동일 사각이
   //   남아있었다 — 네이버 카페 자기홍보 정형구("카페 가입/카페 성장")만으로 통과(id3063 실측). 대칭 적용.
-  if (inTitleFull && ((nameNoSpace.length >= 1 && nameNoSpace.length <= 4) || weakWhitelist || nameLatinHeavy)) {
+  // [룰갭 신규 decisions#1273] 전체이름 길이만 보면 브랜드 핵심토큰(≤4자)+"카페/커피" 등 흔한 접미어가
+  //   붙어 전체이름이 길어진 경우(예: "돈키호테"+"커피"="돈키호테커피" 6자) 문턱을 넘어 게이트가 무력화된다.
+  //   onlyTok(coreTokensDetail이 GENERIC_WORD 접미어 제거 후 남긴 유일 식별토큰, :1707)이 짧으면 함께 게이트.
+  const onlyTokShort = onlyTok.length >= 1 && onlyTok.length <= 4;
+  if (inTitleFull && ((nameNoSpace.length >= 1 && nameNoSpace.length <= 4) || onlyTokShort || weakWhitelist || nameLatinHeavy)) {
     const ctxGate = nameNoSpace.length <= 3 ? CAFE_CONTEXT_STRONG : input.source === "cafearticle" ? CAFE_CONTEXT_SUBSTANCE : CAFE_CONTEXT;
     if (!ctxGate.test(fullL)) {
       return { verdict: "rejected", score: 20, reasons: ["제목=카페명 일치하나 카페 맥락 전무(흔한 이름·타업종 혼입 의심) — LLM 재판정"], borderline: true, signals: sig };
