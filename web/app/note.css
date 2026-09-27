@@ -390,21 +390,18 @@
 .nt-detail .nt-body b { font-weight: 400; color: var(--nt-ink); -webkit-text-stroke: 0.2px currentColor; }
 .nt-detail .nt-body a { color: var(--nt-coffee); }
 .nt-detail .nt-scrap, .nt-detail .nt-scrap * { font-family: var(--nt-gothic); }
-/* 하단 고정 행동 2개 — 종이 위로 떠 있는 띠.
-   2026-09-27 리디자인(CEO "눈에 띄되 세련되고 컴팩트하게, 지금은 투박") —
-   전(균등폭 flex:1 · 18px 굵은 글씨 · 진한 블러 그림자 · 아웃라인 두꺼운 테두리)의
-   "앱 기본 버튼" 느낌을 벗긴다. 지도=주 동작(넓게) · 네이버=브랜드 색 칩(컴팩트)으로 위계를 나눈다. */
-.nt-detail .nt-cta { position: sticky; bottom: 0; z-index: 5; display: flex; align-items: stretch; gap: 8px; padding: 10px 18px 14px; background: linear-gradient(to top, var(--nt-paper) 72%, rgba(247, 240, 228, 0)); }
-.nt-detail .nt-cta a { font-family: var(--nt-gothic); font-size: 15px; font-weight: 600; letter-spacing: -0.1px; border-radius: 10px; padding: 11px 16px; white-space: nowrap; -webkit-text-stroke: 0.15px currentColor; }
-/* ⚠️ 기본 .nt-btn-ink/.nt-btn-line(140·142행)가 width:100%를 박아둔다 — flex-basis:auto일 때
-   그 100%를 기준폭으로 잡아 flex 계산이 깨진다(line이 100%를 고집해 ink가 찌그러짐, 실측 확인).
-   여기서 width:auto로 되돌려야 아래 flex 값이 의도대로 동작한다. */
-.nt-detail .nt-cta .nt-btn-ink { width: auto; flex: 1; box-shadow: 0 3px 10px -4px rgba(28, 18, 12, 0.45); }
-.nt-detail .nt-cta .nt-btn-line { width: auto; flex: 0 0 auto; border: 1px solid rgba(3, 199, 90, 0.38); background: rgba(3, 199, 90, 0.09); color: #167a44; }
-/* 2026-09-27 2차 — 아이콘으로 눈에 띄게(CEO). 지도=채운 핀(어두운 버튼 위 실루엣이 또렷). */
-.nt-detail .nt-cta .nt-btn-ink svg { flex: none; }
-/* 네이버=흰 배지 안 로고 — 맨몸 초록 글자보다 "브랜드 앱 아이콘" 신호가 강하다. */
-.nt-nbadge { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 5px; background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15); flex: none; }
+/* 길찾기·네이버 미니 칩 — 2026-09-27 3차(CEO "아이콘+짧은 이름으로, 인스타 표시 하단에 작게 영역 안에").
+   앞선 두 번의 리디자인(하단 큰 버튼→상단 큰 버튼)은 여전히 "화면을 가로지르는 CTA"였다.
+   이번엔 인스타 배지(.nt-ig, 아래)와 같은 크기·같은 언어(30px 알약 + 22px 색배지 아이콘 + 짧은 라벨)로
+   만들어 인스타 줄 바로 아래, 정보 칩 줄의 일부로 넣는다 — 별도 CTA가 아니라 카드 안 정보처럼 보이게. */
+.nt-detail .nt-cta-mini { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.nt-detail .nt-cta-mini a { display: inline-flex; align-items: center; height: 30px; padding: 0 12px 0 4px; gap: 7px; border-radius: 999px; background: rgba(255, 255, 255, 0.55); font: 400 14.5px/1 var(--nt-gothic); color: var(--nt-ink); -webkit-text-stroke: 0.2px currentColor; box-shadow: 0 1px 0 rgba(90, 70, 50, 0.12); white-space: nowrap; text-decoration: none; }
+.nt-detail .nt-cta-mini a:active { transform: translateY(1px); }
+.nt-detail .nt-cta-mini .nt-cta-badge { width: 22px; height: 22px; border-radius: 7px; display: flex; align-items: center; justify-content: center; flex: none; }
+.nt-detail .nt-cta-mini .nt-cta-map { border: 1px solid rgba(90, 70, 50, 0.28); }
+.nt-detail .nt-cta-mini .nt-cta-map .nt-cta-badge { background: linear-gradient(180deg, #2c1f17, #1c120c); }
+.nt-detail .nt-cta-mini .nt-cta-naver { border: 1px solid rgba(3, 199, 90, 0.38); }
+.nt-detail .nt-cta-mini .nt-cta-naver .nt-cta-badge { background: #03c75a; }
 .nt-detail .nt-margin-gutter { padding-right: 20px; }
 @media (max-width: 380px) { .nt-detail .nt-tiles { gap: 6px; } .nt-detail .nt-tile { padding: 8px 9px; } .nt-detail .nt-tile .v { font-size: 19px; } }
 

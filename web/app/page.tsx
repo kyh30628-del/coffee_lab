@@ -3126,6 +3126,8 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
                 )}
               </div>
             )}
+            {/* 🎯 2026-09-27 3차 — 인스타 배지 바로 아래, 같은 칩 언어로(CEO 지시). 근거는 app/PlaceCta.tsx 참조. */}
+            <PlaceCta cafeId={cafe.id} mapHref={`https://map.kakao.com/?q=${encodeURIComponent(cafe.name + " " + cafe.area)}`} mapLabel="길찾기" mapExternal screen="지도앱" />
             {((cafe as any).om || vb) && (
               <div className="nt-chips">
                 {(cafe as any).om ? <span title="사장님이 직접 정보를 관리하는 카페예요" className="nt-chip soft">사장님 관리</span> : null}
@@ -3152,15 +3154,6 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
               {cautions[0]?.quote && <blockquote className="nt-q" style={{ borderColor: "#a93a32" }}>“…{cautions[0].quote}…”</blockquote>}
             </div>
           )}
-
-          {/* 🎯 2026-09-26 — 지도 패널도 첫 화면 행동 버튼(/c/[id]와 동일 조치).
-              실측: 카페상세 중위 체류 6.5초인데 행동 버튼이 문서 맨 끝에 있었다. 두 화면 다 고쳐야 한다
-              (2026-08-26 사고 교훈: 카드가 뜨는 8개 화면 중 2곳만 고치고 '완료'라고 보고했다).
-              ⚠️ 09-26 초판은 하단에도 같은 버튼을 남겨 **똑같이 생긴 버튼 2개**가 보였다 —
-              CEO 지적(09-27) "왜 중복으로 들어가 있어". 하단 제거, 이거 하나만 남긴다. */}
-          <div className="nt-margin-gutter">
-            <PlaceCta cafeId={cafe.id} mapHref={`https://map.kakao.com/?q=${encodeURIComponent(cafe.name + " " + cafe.area)}`} mapLabel="길찾기" mapExternal screen="지도앱" />
-          </div>
 
           {/* 📖 사람들이 쓴 말 */}
           {loadingRev && <div className="nt-margin-gutter pt-6 nt-free"><CoffeeLoader label="후기 우려내는 중…" /></div>}
