@@ -40,13 +40,36 @@ export async function ensureNoticeSchema(): Promise<void> {
   });
 }
 
-const toNotice = (r: any): Notice => ({
-  id: r.id, emoji: r.emoji,
-  title: r.title, titlePast: r.title_past, highlight: r.highlight ?? undefined,
-  body: r.body, bodyPast: r.body_past, sub: r.sub, subPast: r.sub_past,
-  cta: r.cta, ctaPast: r.cta_past, ctaHref: r.cta_href ?? undefined,
-  from: new Date(r.from_at).getTime(), pastFrom: new Date(r.past_from_at).getTime(), until: new Date(r.until_at).getTime(),
-});
+// 🔴 2026-09-27 CEO 격노(공지가 34,000곳이라고 며칠째 말하는데 실제 43,952곳) —
+//   공지 문구에 카페 수를 **글자로 박아둔 게 원인**이었다(nationwide-2026-09.sub: "34,000곳 넘게").
+//   작성 시점(09-22)엔 맞았지만 그 뒤로도 하루 ~1,500곳씩 공개가 늘어 5일 만에 1만 곳 어긋났다.
+//   같은 클래스 사고가 09-14에도 있었다(llms.txt "22,000+"가 8일 만에 낡음, revalidate=86400으로 수리).
+//   → 이번에도 **글자를 고치는 게 아니라 틀릴 수 없게** 만든다: 본문에 `{count}` 자리표시자를 쓰면
+//   여기서 실시간에 가까운 실제 공개 수(1시간 캐시, 반올림)로 치환한다. 관리자가 /admin/notices에서
+//   "{count}곳 넘게"라고만 적으면 그 뒤로 다시는 틀리지 않는다.
+let pubCountMem: { at: number; v: number } | null = null;
+const PUB_COUNT_TTL_MS = 60 * 60 * 1000; // 1시간 — 공지 문구는 실시간일 필요 없다, 며칠 단위로만 안 틀리면 된다
+async function livePublishedCount(): Promise<number> {
+  if (pubCountMem && Date.now() - pubCountMem.at < PUB_COUNT_TTL_MS) return pubCountMem.v;
+  try {
+    const [r] = (await sql`SELECT count(*)::int n FROM cafes WHERE published`) as any[];
+    const v = Math.floor((r?.n ?? 0) / 1000) * 1000; // 천 단위 반올림 — "43,952곳"이 아니라 "43,000곳 넘게"처럼 쓰는 문구용
+    pubCountMem = { at: Date.now(), v };
+    return v;
+  } catch { return pubCountMem?.v ?? 0; }
+}
+const fillCount = (s: string, n: number) => s.replaceAll("{count}", n.toLocaleString());
+
+const toNotice = async (r: any): Promise<Notice> => {
+  const n = /\{count\}/.test(`${r.title}${r.body}${r.sub}${r.cta}`) ? await livePublishedCount() : 0;
+  return {
+    id: r.id, emoji: r.emoji,
+    title: fillCount(r.title, n), titlePast: fillCount(r.title_past, n), highlight: r.highlight ?? undefined,
+    body: fillCount(r.body, n), bodyPast: fillCount(r.body_past, n), sub: fillCount(r.sub, n), subPast: fillCount(r.sub_past, n),
+    cta: fillCount(r.cta, n), ctaPast: fillCount(r.cta_past, n), ctaHref: r.cta_href ?? undefined,
+    from: new Date(r.from_at).getTime(), pastFrom: new Date(r.past_from_at).getTime(), until: new Date(r.until_at).getTime(),
+  };
+};
 
 /** 지금 띄울 공지 — DB 우선, 실패하면 코드 폴백. 겹치면 나중에 시작한 것.
  *
@@ -65,7 +88,7 @@ export async function currentNotice(): Promise<Notice | null> {
       WHERE enabled AND now() >= from_at
       ORDER BY from_at DESC LIMIT 1`) as any[];
     if (!r.length) return null;
-    return new Date(r[0].until_at).getTime() > Date.now() ? toNotice(r[0]) : null;
+    return new Date(r[0].until_at).getTime() > Date.now() ? await toNotice(r[0]) : null;
   } catch {
     const now = Date.now();
     const started = NOTICES.filter((n) => now >= n.from).sort((a, b) => b.from - a.from)[0];
