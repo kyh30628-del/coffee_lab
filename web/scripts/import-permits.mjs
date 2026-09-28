@@ -20,7 +20,12 @@ import { homedir } from "node:os";
 import readline from "node:readline";
 const env = readFileSync(new URL("../.env.local", import.meta.url), "utf8");
 for (const l of env.split("\n")) { const m = l.match(/^([A-Z_0-9]+)=(.*)$/); if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^["']|["']$/g, ""); }
-const { sql } = await import("../lib/db.ts");
+const { sql, ensureSearchIndexes } = await import("../lib/db.ts");
+// 🐛 재발방지(decisions#1272): 아래 동시적재 레이스 재확인 쿼리(197행)가 쓰는 name/address 등호 인덱스는
+//   /api/search 콜드스타트에서만 보장돼(lib/db.ts ensureSearchIndexes), 이 스크립트는 launchd가 웹앱과
+//   무관하게 단독 실행한다 — 인덱스가 아직 없는 상태로 돌면 09-28 cost_guard 자동정지(640.3GB, 최다쿼리
+//   191.5GB) 재발. 실행마다 먼저 보장한다(IF NOT EXISTS라 이미 있으면 무해).
+await ensureSearchIndexes();
 const { localSearch, isFranchise, isNonCafe, isSnackStall, isStructuralPhantom, isUnmannedCafe } = await import("../lib/discover.ts");
 const { loadLearnedTerms } = await import("../lib/learnedTerms.ts");
 const { loadCriteriaLists } = await import("../lib/criteriaLists.ts");

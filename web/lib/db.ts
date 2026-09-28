@@ -44,6 +44,14 @@ export async function ensureSearchIndexes() {
     await sql`CREATE INDEX IF NOT EXISTS idx_cafes_axis_pos
       ON cafes USING gin ((jsonb_path_query_array(char_scores, '$.keyvalue() ? (@.value > 0).key')))
       WHERE published = true AND embedding IS NOT NULL`.catch(() => {});
+    //   ⑤ idx_cafes_name_eq / idx_cafes_address_eq — decisions#1272. import-permits.mjs의 동시적재
+    //      레이스 재확인(`name = $1 OR address = $2`, decisions#1264)이 09-28 08:00 cost_guard
+    //      자동정지(640.3GB) 최다쿼리(191.5GB)였다: name엔 published-only 트라이그램 GIN만, address엔
+    //      인덱스가 아예 없어 OR 결합이 매번 cafes 전체(76,611행) Seq Scan으로 빠졌다. 레이스 재확인은
+    //      미공개(pipeline_status='new') 적재까지 잡아야 해 published 조건을 걸 수 없다 — 등호 매칭 전용
+    //      전체-테이블 btree를 따로 둔다. 실측(EXPLAIN): Total Cost 24,382 → 12.8(약 1,900배↓, Seq Scan → BitmapOr).
+    await sql`CREATE INDEX IF NOT EXISTS idx_cafes_name_eq ON cafes (name)`.catch(() => {});
+    await sql`CREATE INDEX IF NOT EXISTS idx_cafes_address_eq ON cafes (address) WHERE address IS NOT NULL`.catch(() => {});
   });
 }
 
