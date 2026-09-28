@@ -250,6 +250,21 @@ export default async function FreeReportPage({ params }: Props) {
         </div>
       )}
 
+      {/* 무료 배지 크로스링크 — 유료 CTA·리드폼을 다 지나친 하단 11px 유틸리티 링크에 묻혀 있던 걸
+          독립 카드로 승격(decisions#1275, 09-28). 198건 100% 노출에도 클릭 0 → 배치 문제로 판단. */}
+      {(r.grade === "검증" || r.grade === "참고") && (
+        <Link
+          href={`/owner/badge?q=${encodeURIComponent(r.name)}`}
+          className={`${CARD} mb-3 block border-[#d8c49c] bg-[#fbf6ea]`}
+        >
+          <div className="text-[11px] text-[#8a7458] mb-1.5">무료 · 신청 없이 바로</div>
+          <div className="text-[15px] font-bold text-[#2b2018] mb-1">🏅 우리 가게 검증배지 무료로 받기</div>
+          <p className="text-[12.5px] text-[#524234] leading-relaxed">
+            블로그·인스타에 붙이면 손님이 봐요. 결제·신청 없이 바로 받을 수 있어요.
+          </p>
+        </Link>
+      )}
+
       {/* 유료 안내 — '노출'이 아니라 '감시'를 판다 */}
       <div className="nt-header rounded-lg px-5 py-5 mb-4">
         <div className="text-[15px] font-bold mb-2">우리 가게 리포트</div>
@@ -277,12 +292,6 @@ export default async function FreeReportPage({ params }: Props) {
         <Link href="/trust" className="underline text-[#9c6b3f]">검증 방법</Link>
         {" · "}
         <Link href={`/c/${r.id}`} className="underline text-[#9c6b3f]">손님이 보는 화면</Link>
-        {r.grade === "검증" || r.grade === "참고" ? (
-          <>
-            {" · "}
-            <Link href={`/owner/badge?q=${encodeURIComponent(r.name)}`} className="underline text-[#9c6b3f]">🏅 배지 달기</Link>
-          </>
-        ) : null}
       </p>
     </Shell>
   );
