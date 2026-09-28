@@ -50,14 +50,17 @@ try {
   //   기준 단일출처의 존재 이유가 바로 이런 조용한 드리프트다. criteria에서 읽도록 교정.
   const latMin = getCriterionSync("geo.box.lat_min"), latMax = getCriterionSync("geo.box.lat_max");
   const lngMin = getCriterionSync("geo.box.lng_min"), lngMax = getCriterionSync("geo.box.lng_max");
+  // 🔴 2026-09-28 — needs_llm 게이트 추가(오케스트레이터 b-2 경로 사고와 같은 클래스, 전수 점검으로 같이 막는다).
   const rows = FILTER
     ? await sql`UPDATE cafes SET published = true, pipeline_status = 'live'
         WHERE pipeline_status = 'pending' AND address LIKE ${FILTER + "%"}
           AND lat IS NOT NULL AND lat BETWEEN ${latMin} AND ${latMax} AND lng BETWEEN ${lngMin} AND ${lngMax}
+          AND (llm_judged_at IS NOT NULL OR needs_llm = false OR needs_llm IS NULL)
         RETURNING id`
     : await sql`UPDATE cafes SET published = true, pipeline_status = 'live'
         WHERE pipeline_status = 'pending'
           AND lat IS NOT NULL AND lat BETWEEN ${latMin} AND ${latMax} AND lng BETWEEN ${lngMin} AND ${lngMax}
+          AND (llm_judged_at IS NOT NULL OR needs_llm = false OR needs_llm IS NULL)
         RETURNING id`;
   promoted = rows.length;
 } catch (e) { console.log("승격 실패: " + String(e).slice(0, 60)); }

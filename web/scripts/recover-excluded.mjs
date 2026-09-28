@@ -116,10 +116,12 @@ const ids = pass.map((c) => Number(c.id));
 let done = 0;
 for (let i = 0; i < ids.length; i += 200) {
   const chunk = ids.slice(i, i + 200);
+  // 🔴 2026-09-28 — needs_llm 게이트 추가(오케스트레이터 b-2 경로 사고와 같은 클래스, 전수 점검으로 같이 막는다).
   const r = await sql`UPDATE cafes SET published=true, pipeline_status='live',
       exclude_reason = '2026-09-08 복구: 사유 미기록 일괄 제외분을 게이트 재적용으로 되살림(결재 없는 제외였음)',
       exclude_at = NULL, updated_at = now()
-    WHERE id = ANY(${chunk}) AND pipeline_status='excluded' RETURNING id`;
+    WHERE id = ANY(${chunk}) AND pipeline_status='excluded'
+      AND (llm_judged_at IS NOT NULL OR needs_llm = false OR needs_llm IS NULL) RETURNING id`;
   done += r.length;
 }
 console.log(`\n✅ 복구 ${done}곳`);

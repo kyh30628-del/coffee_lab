@@ -528,11 +528,17 @@ export async function GET(req: NextRequest) {
       // (b-2) 좌표 백필 지연으로 굳은 미공개 복원 — 합성 시점엔 좌표 없거나 박스 밖이라 published=false로 굳었으나,
       //   이후 지오코딩 백필로 박스 안에 들어온 카페. pipeline_status='live'(그라운딩 보류 'held' 아님) + 검증/참고면 공개해야 정상.
       //   (광주시 통째 비공개 경보의 근본 원인 — 재합성 없이도 자동 복원)
+      // 🔴 2026-09-28 CEO 지적("AI 맥락 판정 63%… 걱정된다")으로 발견·수리 — 이 복원 쿼리에 needs_llm 게이트가
+      //   빠져 있었다. finalizePipeline()의 정식 승격 게이트는 `llm_judged_at IS NOT NULL OR needs_llm=false`를
+      //   반드시 보는데, 여긴 등급·좌표만 보고 published=true로 되돌려 **AI 맥락 확인을 통째로 건너뛰었다**.
+      //   실측: needs_llm=true·llm_judged_at NULL인데 공개 중인 카페 127곳(7월~9월 누적, coherence 0까지 있음
+      //   — 동명 다른 가게 후기 오염 위험). 정식 게이트와 똑같은 조건을 추가해 구멍을 막는다.
       try {
         const r = await sql`UPDATE cafes SET published=true, updated_at=now()
           WHERE pipeline_status='live' AND NOT published
             AND synth_grade IN ('검증','참고')
             AND lat BETWEEN ${latMin} AND ${latMax} AND lng BETWEEN ${lngMin} AND ${lngMax}
+            AND (llm_judged_at IS NOT NULL OR needs_llm = false OR needs_llm IS NULL)
           RETURNING 1`;
         if (r.length) healed.push(`좌표백필 미공개 ${r.length}곳 자동 복원(live+박스안+검증/참고)`);
       } catch {}

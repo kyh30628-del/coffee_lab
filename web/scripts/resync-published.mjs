@@ -19,7 +19,11 @@ for (const c of cafes) {
     await sql`UPDATE cafes SET published = false, pipeline_status = 'rejected' WHERE id = ${c.id} AND published = true`;
     rej++; if (rejNames.length < 15) rejNames.push(c.name);
   } else {
-    await sql`UPDATE cafes SET published = true, pipeline_status = 'live' WHERE id = ${c.id} AND published = false`;
+    // 🔴 2026-09-28 — 정식 승격 게이트(finalizePipeline)와 같은 needs_llm 확인을 추가(오케스트레이터
+    //   b-2 경로에서 이게 빠져 127곳이 AI 맥락 확인 없이 샌 사고 재발 방지, 전수 점검으로 같이 막는다).
+    await sql`UPDATE cafes SET published = true, pipeline_status = 'live'
+      WHERE id = ${c.id} AND published = false
+        AND (llm_judged_at IS NOT NULL OR needs_llm = false OR needs_llm IS NULL)`;
     pub++;
   }
 }

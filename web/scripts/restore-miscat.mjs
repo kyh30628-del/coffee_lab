@@ -16,7 +16,9 @@ const restoredNames = [];
 for (const c of rows) {
   const cafe = !isFranchise(c.name) && !isNonCafe(c.name, c.naver_category);
   if (cafe) {
-    await sql`UPDATE cafes SET published = true, pipeline_status = 'live', needs_category = false WHERE id = ${c.id}`;
+    // 🔴 2026-09-28 — needs_llm 게이트 추가(오케스트레이터 b-2 경로 사고와 같은 클래스, 전수 점검으로 같이 막는다).
+    await sql`UPDATE cafes SET published = true, pipeline_status = 'live', needs_category = false
+      WHERE id = ${c.id} AND (llm_judged_at IS NOT NULL OR needs_llm = false OR needs_llm IS NULL)`;
     restored++; if (restoredNames.length < 40) restoredNames.push(`${c.name} [${c.naver_category}]`);
   } else kept++;
 }
