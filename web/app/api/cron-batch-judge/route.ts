@@ -3,6 +3,7 @@ import { sql, ensureSchema } from "@/lib/db";
 import { getAuditCandidates, applyDecisions, markJudged } from "@/lib/synthStore";
 import { createBatch, getBatch, streamResults, cancelBatch, BATCH_PRICE_IN, BATCH_PRICE_OUT } from "@/lib/anthropicBatch";
 import { RUBRIC, buildUserText, parseVerdicts, CLAUDE_MODEL } from "@/lib/reviewJudge";
+import { OLD_REVIEW_MONTHS } from "@/lib/cafeProfile";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -114,6 +115,13 @@ export async function GET(req: NextRequest) {
       FROM judge_batches, jsonb_each(manifest->'cafes') AS kv(k, v)
       WHERE NOT applied`) as any[];
     const inFlightIds = inFlight.map((r) => r.id).filter((n) => Number.isInteger(n));
+    // 🎯 2026-09-28 CEO 지시("최근 후기 있는 카페 우선") — 리뷰 자체가 오래된 카페(18개월 기준,
+    //   lib/cafeProfile.ts OLD_REVIEW_MONTHS와 동일 정의)는 판정해봤자 "의미 있는 최신 리뷰"로서의
+    //   가치가 낮다. 하루 상한이 유한하니 최근 리뷰가 있는 카페부터 쓴다.
+    //   ⚠️ synth_updated(우리가 언제 합성했나)와는 다른 축이다 — 이건 review_dates(그 리뷰가 언제
+    //   쓰였나)를 본다. 둘 다 있는 카페 중에서도 리뷰 자체가 신선한 쪽을 먼저 판정한다.
+    const oldCut = new Date(); oldCut.setMonth(oldCut.getMonth() - OLD_REVIEW_MONTHS);
+    const oldCutStr = `${oldCut.getFullYear()}.${String(oldCut.getMonth() + 1).padStart(2, "0")}.${String(oldCut.getDate()).padStart(2, "0")}`;
     const rows = (await sql`SELECT id, name, area FROM cafes
       WHERE raw_reviews IS NOT NULL
         AND (llm_judged_at IS NULL OR llm_judged_at < raw_collected_at)
@@ -140,6 +148,9 @@ export async function GET(req: NextRequest) {
                --   남은 대상 18,800곳을 다 돌리려면 $35이고 우리는 $4.3뿐 — **공개를 늘리는 쪽에 먼저 쓴다.**
                (synth_grade = '후보' AND NOT COALESCE(published, false)) DESC,  -- 후보구제(신규 공개) 최우선
                (published AND synth_grade IS DISTINCT FROM ${TRUSTED_GRADE}) DESC,  -- 공개 카페 재정제는 그 다음
+               -- 🎯 2026-09-28 CEO 지시 — 리뷰 자체가 최근(18개월 내) 있는 카페 우선. 하루 상한이 유한하니
+               --   "의미 있는 최신 리뷰"부터 판정에 쓴다. review_dates 없는 카페는 이 신호가 없으니 기존 순서로.
+               (EXISTS (SELECT 1 FROM jsonb_array_elements_text(review_dates) d WHERE d >= ${oldCutStr})) DESC,
                synth_updated DESC NULLS LAST,          -- 최근합성 우선
                COALESCE(synth_count, 0) ASC,           -- 리뷰 적어 취약한 순 우선(옥석 많은 곳은 뒤로)
                id LIMIT ${BUILD_LIMIT}`) as any[];
