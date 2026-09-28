@@ -398,3 +398,4 @@
 | 2026-09-27 07:30 | #1264 | [개발] 협업 #454: import-permits 정확일치 dedup 여전히 뚫림 — 09-26 신규 3쌍 | f4920314 | - | scripts/import-permits.mjs: dedup 스냅샷-타이밍 레이스 수정. 원인 실측(id68497/68566 또오브베이크 등 3쌍) — haveName/haveAd |
 | 2026-09-27 07:31 | #1265 | [룰갭 신규] 호텔/펜션 부속카페 게이트(HOTEL_NAMED·LODGING_NAMED) — decision | 413764fd | - | lib/reviewQuality.ts:2087-2124 HOTEL_NAMED/LODGING_NAMED 게이트를 RESORT_VENUE_WORDS(#1003)와 동일한 2단 하드컷으 |
 | 2026-09-27 23:28 | #1271 | [룰갭] discover-sweep EXPECT_MAX_H 미정리 — 은퇴 후에도 매일 정지의심 오탐 | 08cdeba9 | - | lib/jobTeams.ts:64 EXPECT_MAX_H에서 discover-sweep:30 삭제(1줄). 09-21 RETIRED_JOBS 은퇴 후 잔류하던 감시계약 제거 — s |
+| 2026-09-28 03:16 | #1272 | [자율진단] import-permits 레이스체크(#1264) 풀스캔 — 09-28 08:00 cost_gu | 06167528 | - | lib/db.ts(ensureSearchIndexes)에 idx_cafes_name_eq(전체 btree)·idx_cafes_address_eq(부분 btree) 추가 + scri |
