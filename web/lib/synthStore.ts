@@ -5,6 +5,7 @@ import { sql , ensureOnce } from "./db";
 import { OUT_OF_SCOPE_SQL } from "./serviceScope";
 import { fetchPlacesReviews } from "./placesCollector";
 import { fetchWebReviews } from "./webSearchCollector";
+import { naverBlocked } from "./naverBudget";
 import { fetchYouTubeReviews } from "./youtubeCollector";
 import { collectAndSynthesize, type RawSource, type BorderlineItem, type CollectResult } from "./collectOrchestrator";
 import { visitorMix } from "./visitorMix";
@@ -199,6 +200,10 @@ async function gatherRaw(cafe: { id: number; name: string; area: string }, refre
     const cached = await loadRaw(cafe.id);
     if (cached.length) return { raw: cached, fromCache: true, apiFailed: false };
   }
+  // 🩹 2026-09-28 — 실측: 캐시가 없어 라이브 호출로 넘어갈 때 예산 소진 여부를 안 보고 무조건 시도했다
+  // (bumpNaver는 성공에만 찍혀 콜 낭비는 아니지만, 전수 재합성 배치가 소진 중에 돌면 카페마다 왕복 2~3회씩
+  //  헛시도한다). collect-shard.mjs 등 다른 배치는 이미 naverBlocked()를 먼저 본다 — 여기만 빠져 있었다.
+  if (await naverBlocked()) return { raw: [], fromCache: false, apiFailed: true };
   const raw: RawItem[] = [];
   const places = await fetchPlacesReviews(cafe.name, cafe.area ?? "");
   for (const r of places.reviews) raw.push({ source: "google", text: r.text, time: r.time });
@@ -350,7 +355,7 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   const allEv = safeJson(allEvidence ?? evidenceReviews);
   // 현재 상태(파이프라인 단계·카테고리·이전 합성값) 먼저 — 카테고리 게이트 분기에 pst 필요.
   const cur = (await sql`SELECT pipeline_status, naver_category, synth_identity, synth_count, synth_updated, raw_collected_at, jsonb_array_length(COALESCE(synth_reviews,'[]'::jsonb)) prev_ev,
-    embedding IS NOT NULL AS has_embed,
+    embedding IS NOT NULL AS has_embed, exclude_reason AS prev_exclude_reason,
     (COALESCE(raw_reviews::text,'') ~* '커피|디저트|음료|아메리카노|에스프레소|카푸치노|콜드브루|플랫화이트|핸드드립|카페라') AS raw_coffee
     FROM cafes WHERE id=${cafeId} LIMIT 1`)[0] as any;
   const pst: string | null = cur?.pipeline_status ?? null;
@@ -447,6 +452,48 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   //   ⚠️ 다른 상태(excluded·noise·pending·rejected)는 그대로 둔다 — 각자 뜻이 있고 이미 published와 일치한다.
   const newPst = publish ? "live" : (newPstRaw === "live" ? "held" : newPstRaw);
 
+  // 🩹 2026-09-28 CEO 지시(전수점검) — exclude_reason 추적성 수리. 이 함수(매일 도는 핵심 재합성 경로)는
+  //   rejected/held/noise/excluded로 내릴 때 사유를 한 번도 안 남겼다(아래 다른 배치 정리 함수들 — 597·612·
+  //   618·752·778·820·832·840행 — 은 이미 남기는데 여기만 빠져 있었다). 실측: exclude_reason NULL인
+  //   rejected 19,164곳 중 844곳이 등급(검증/참고)·건수(5+)만 보면 멀쩡했다 — 그중 하나가 컨텍스트베이커리카페
+  //   (원인: 09-28 신선도/카테고리/프랜차이즈 게이트 오적용, 이미 수리)였다. 원인을 자동 기록해 같은 수동조사를
+  //   반복하지 않게 한다. pending·live로 돌아오면 사유를 지운다(해소됐다는 뜻).
+  const gateFailReasons: string[] = [];
+  if (!gradeOk) {
+    if (grade !== "검증" && grade !== "참고") gateFailReasons.push(`등급미달(${grade})`);
+    else if (!everPassedGate && !freshOk) gateFailReasons.push(`원본신선도초과(${Math.round(rawAgeDays)}일>${freshDays}일)`);
+    else if (!everPassedGate && subjectN < 1) gateFailReasons.push("주제글0건");
+    else if (!everPassedGate && collected < refFloorNew) gateFailReasons.push(`건수미달(${collected}<${refFloorNew})`);
+    else gateFailReasons.push("등급게이트");
+  }
+  if (!isCafeCat) gateFailReasons.push("카테고리(비카페 분류)");
+  if (inPipeline && !everPassedGate && isFranchise(name)) gateFailReasons.push("프랜차이즈");
+  if (noisy) gateFailReasons.push("노이즈(오염 후기비중 초과)");
+  // ⚠️ 상태가 안 바뀌었고(pst===newPst) 기존 사유가 이미 있으면 보존한다 — 다른 배치 정리 함수(597·612·618·
+  //   752·778·820·832·840행)가 여기보다 더 구체적인 사유를 남겨뒀을 수 있는데, 매일 도는 이 경로가 매번
+  //   일반화된 사유로 덮어쓰면 그 구체성이 사라진다. 새로 이 상태에 들어왔거나 사유가 비어 있을 때만 새로 채운다.
+  const prevReason: string | null = cur?.prev_exclude_reason ?? null;
+  let exReason: string | null = null;
+  if (newPst === "excluded") {
+    exReason = (pst === "excluded" && prevReason) ? prevReason
+      : unpublishLocked ? "승인된 비공개 결재 재발가드"
+      : isSnackStall(name) ? "노점간식(이름)"
+      : isStructuralPhantom(name) ? "유령상호(이름)"
+      : isUnmannedCafe(name) ? "무인카페(이름)"
+      : foodNoCoffee ? "먹거리류·커피無(이름)"
+      : pst === "excluded" ? "기존 영구제외 유지(사유 미기록)" : "비카페(정의적 제외)";
+  } else if (newPst === "held") {
+    exReason = (pst === "held" && prevReason) ? prevReason
+      : pst === "held" ? "그라운딩 근거0건 보류 유지"
+      : (gateFailReasons.length ? gateFailReasons.join(" + ") : "재판정 게이트 탈락(기존 라이브 카페)");
+  } else if (newPst === "noise") {
+    exReason = (pst === "noise" && prevReason) ? prevReason
+      : gateFailReasons.length ? gateFailReasons.join(" + ") : "노이즈(오염) 유지";
+  } else if (newPst === "rejected") {
+    exReason = (pst === "rejected" && prevReason) ? prevReason
+      : gateFailReasons.length ? gateFailReasons.join(" + ") : "사유 미분류(점검 필요)";
+  }
+
   // 🔎 2026-09-14 — 검색용 시설 패싯(주차·콘센트·단체·루프탑·반려동물 …)을 여기서 저장한다.
   //   화면 하이라이트와 같은 사전·같은 임계라 표시와 검색이 어긋나지 않는다. 작은 text[] 1개라 비용 무시 수준.
   try {
@@ -475,9 +522,9 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   //   여기 한 곳만으로 자동 적용되고, 계약에 이 대상이 없으면 드리프트로 잡힌다.
   noteWrite("cafes.synth_reviews"); noteWrite("cafes.synth_reviews_all"); noteWrite("cafes.published");
   if (llmJudged) {
-    await sql`UPDATE cafes SET synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_coherence=${coherence}, offctx_rate=${offctx}, visitor_n=${vmix.n}, visitor_trip=${vmix.trip}, visitor_local=${vmix.local}, needs_llm=${needsLLM}, needs_llm_priority=${needsLlmPriority}, borderline_count=${blCount}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${safeJson(tidyDisplayQuotes(evidenceReviews as any[]))}, synth_reviews_all=${allEv}, char_scores=${safeJson(charScores)}, work_facts=${safeJson(workFacts)}, synth_quality=${safeJson(quality)}, review_dates=${safeJson(reviewDates)}, pipeline_status=${newPst}, synth_updated=${synthTs}, synth_checked_at=now(), llm_judged_at=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN ${latMin} AND ${latMax} AND lng BETWEEN ${lngMin} AND ${lngMax}) WHERE id=${cafeId}`;
+    await sql`UPDATE cafes SET synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_coherence=${coherence}, offctx_rate=${offctx}, visitor_n=${vmix.n}, visitor_trip=${vmix.trip}, visitor_local=${vmix.local}, needs_llm=${needsLLM}, needs_llm_priority=${needsLlmPriority}, borderline_count=${blCount}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${safeJson(tidyDisplayQuotes(evidenceReviews as any[]))}, synth_reviews_all=${allEv}, char_scores=${safeJson(charScores)}, work_facts=${safeJson(workFacts)}, synth_quality=${safeJson(quality)}, review_dates=${safeJson(reviewDates)}, pipeline_status=${newPst}, exclude_reason=${exReason}, exclude_at=${exReason ? new Date() : null}, synth_updated=${synthTs}, synth_checked_at=now(), llm_judged_at=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN ${latMin} AND ${latMax} AND lng BETWEEN ${lngMin} AND ${lngMax}) WHERE id=${cafeId}`;
   } else {
-    await sql`UPDATE cafes SET synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_coherence=${coherence}, offctx_rate=${offctx}, visitor_n=${vmix.n}, visitor_trip=${vmix.trip}, visitor_local=${vmix.local}, needs_llm=${needsLLM}, needs_llm_priority=${needsLlmPriority}, borderline_count=${blCount}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${safeJson(tidyDisplayQuotes(evidenceReviews as any[]))}, synth_reviews_all=${allEv}, char_scores=${safeJson(charScores)}, work_facts=${safeJson(workFacts)}, synth_quality=${safeJson(quality)}, review_dates=${safeJson(reviewDates)}, pipeline_status=${newPst}, synth_updated=${synthTs}, synth_checked_at=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN ${latMin} AND ${latMax} AND lng BETWEEN ${lngMin} AND ${lngMax}) WHERE id=${cafeId}`;
+    await sql`UPDATE cafes SET synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_coherence=${coherence}, offctx_rate=${offctx}, visitor_n=${vmix.n}, visitor_trip=${vmix.trip}, visitor_local=${vmix.local}, needs_llm=${needsLLM}, needs_llm_priority=${needsLlmPriority}, borderline_count=${blCount}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${safeJson(tidyDisplayQuotes(evidenceReviews as any[]))}, synth_reviews_all=${allEv}, char_scores=${safeJson(charScores)}, work_facts=${safeJson(workFacts)}, synth_quality=${safeJson(quality)}, review_dates=${safeJson(reviewDates)}, pipeline_status=${newPst}, exclude_reason=${exReason}, exclude_at=${exReason ? new Date() : null}, synth_updated=${synthTs}, synth_checked_at=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN ${latMin} AND ${latMax} AND lng BETWEEN ${lngMin} AND ${lngMax}) WHERE id=${cafeId}`;
   }
   return { grade, collected, published: publish, ruleOk, pipeline: newPst, evidence: evidenceReviews.length, coherence: Math.round(coherence * 100), noisy };
 }
