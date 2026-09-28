@@ -412,10 +412,15 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   const nonCafeReal = isNonCafe(name, naverCat); // 실제 카테고리 사용(빈값 name-only 오탐 방지). 카테고리 없으면 grandfather.
   //   라이브(grandfather): 이름 OR 카테고리 중 '하나라도' 카페면 유지 — 둘 다 비카페일 때만 제거. 오제거 최소화.
   //   (고로케=카테고리'카페,디저트'로 유지 · 커피로스터=네이버 '제조업/쇼핑' 오분류지만 이름'커피'로 유지 · 식당=둘다 비카페→제거)
-  const isCafeCat = inPipeline ? (hasCategory && !nonCafeReal) : ((hasCategory && !nonCafeReal) || !isNonCafe(name, ""));
-  // 신규(파이프라인): 프랜차이즈 제외 포함 엄격 게이트. 라이브(grandfather): 등급+실제카테고리만 —
+  // 🩹 2026-09-28 — 위 everPassedGate와 같은 사고(전수 점검, 09-28): category·franchise도 "신규만 엄격"이라는
+  //   같은 설계 의도(바로 아래 주석 "라이브: 소프트룰로 기존 공개 카페를 내리지 않는다")인데 코드가 inPipeline만
+  //   봐서 재편입 카페엔 안 지켜졌다. 실측: 과거 통과 이력(임베딩) 있는 재편입 카페 288곳 중 92곳이 이 두 체크
+  //   때문에만 막혀 있었다(브런치카페·도서관병설 북카페 등 category 오분류 51곳, 와플대학 등 franchise 25곳,
+  //   중복 16곳). everPassedGate면 grandfather와 동일하게 완화한다.
+  const isCafeCat = inPipeline && !everPassedGate ? (hasCategory && !nonCafeReal) : ((hasCategory && !nonCafeReal) || !isNonCafe(name, ""));
+  // 신규(파이프라인): 프랜차이즈 제외 포함 엄격 게이트. 라이브(grandfather)·재편입(everPassedGate): 등급+실제카테고리만 —
   //   프랜차이즈 등 소프트룰로 기존 공개 카페를 내리지 않는다(힐 b-2 복원조건과 일치 → 진동 원천 제거). 정의적 비카페는 아래 excluded가 처리.
-  const ruleOk = inPipeline
+  const ruleOk = inPipeline && !everPassedGate
     ? (gradeOk && isCafeCat && !isFranchise(name) && !noisy)
     : (gradeOk && isCafeCat && !noisy);
 
