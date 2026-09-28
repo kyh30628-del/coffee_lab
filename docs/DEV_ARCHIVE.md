@@ -401,3 +401,4 @@
 | 2026-09-28 03:16 | #1272 | [자율진단] import-permits 레이스체크(#1264) 풀스캔 — 09-28 08:00 cost_gu | 06167528 | - | lib/db.ts(ensureSearchIndexes)에 idx_cafes_name_eq(전체 btree)·idx_cafes_address_eq(부분 btree) 추가 + scri |
 | 2026-09-28 03:16 | #1273 | [룰갭 신규] 브랜드동음이의 게이트 임계값(전체이름 길이) 구조갭 — 접미어 결합형 상호(돈키호테커피 등)  | 5b9f80fd | - | lib/reviewQuality.ts:2210 title-match 게이트에 onlyTokShort(onlyTok.length 1~4) OR분기 추가 — 브랜드핵심토큰+카페/커피  |
 | 2026-09-28 23:55 | #1256 | [룰갭] 잡코리아 자소서/면접후기 취준블로그 — RECRUITMENT_POST_CUES 정규식 우회 18곳 | 9889e55e | - | lib/reviewQuality.ts: JOBPREP_BLOG_CUES 신규(자소서/면접답변 SEO블로그 시그니처+블로그 자기홍보 상용구+스펙업) 추가, jobPrepBlogOnl |
+| 2026-09-28 23:57 | #1275 | [사장님영업] 무료리포트 배지 크로스링크 조기결론 — 198건 100%자격노출·클릭 0, 표본부족 가설 기각 | 4edf3786 | - | app/owner/r/[id]/page.tsx: 배지 크로스링크를 하단 11px 유틸리티 링크(283행)에서 제거하고, 약점 카드~유료안내(nt-header) 사이 독립 카드로 승 |
