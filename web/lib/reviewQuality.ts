@@ -94,6 +94,16 @@ const DRINK_TASTING_CUES = /(마셨|마시고|시켜서\s*마|시켰|한\s*잔\s
 //   아에르·id20206 카페 토스카나 등 10곳 실측, 전건 published). WHOLESALE_RETAIL_CUES와 동일 메커니즘 —
 //   구인공고 강신호가 있고 매장 실물방문 신호가 전무하면 VISIT_CUES 매칭을 무효화한다.
 const RECRUITMENT_POST_CUES = /(알바\s*(모집|구함|공고)|직원\s*(모집|채용)|바리스타\s*(모집|채용|구합니다)|구인\s*(공고|중)|채용\s*공고|정직원\s*모집|근무자\s*모집|같이\s*일하실\s*분|주방(보조)?\s*모집)/;
+// 룰갭 신규(2026-09-28, decisions#1256): 위 RECRUITMENT_POST_CUES(#1155)의 후속 — 잡코리아 제휴
+//   "자소서 예시/면접 답변" SEO 콘텐츠 블로그가 "모집/채용/구인" 단어 없이 회사명(=카페명)만 일치해 카페
+//   리뷰로 오채택됐다(전수 스캔 18곳·31건, 17곳 검증. 기존 정규식을 표본에 직접 실행 시 5/7(71%) 미매칭
+//   재현). "…를 위한 자기소개서 상품 보러가기"·"…를 위한 면접 답변"류 정형구와, 이 블로그 네트워크가
+//   반복하는 자기홍보 상용구("카페 가입, 좋아요 클릭, 댓글 작성은 카페 성장에 큰 도움" — 여기서 "카페"는
+//   네이버 카페 커뮤니티를 뜻해 CAFE_WORDS/offctx_rate 게이트까지 우연통과), "스펙업"(취준 콘텐츠 브랜드),
+//   "인기글 모음"류가 시그니처(id5548/14207/1255 타르데마 베이커리, id41634 하우스소서, id4471 당신을
+//   위한 베이커리(제3브랜드 교차오염), id1947 우리동네 커피볶는집 실측). 매장 실물방문 신호가 전무하면
+//   위 RECRUITMENT_POST_CUES와 동일하게 VISIT_CUES 매칭을 무효화한다.
+const JOBPREP_BLOG_CUES = /(자기소개서\s*(예시|샘플|항목|작성법)?\s*상품\s*보러가기|면접\s*(답변|기출|예상\s*질문)|스펙업|자소서\s*(항목|샘플|우수예시)|카페\s*가입,?\s*좋아요\s*클릭,?\s*댓글\s*작성|카페\s*성장에\s*큰\s*도움|금주\s*BEST\s*인기글)/i;
 // 룰갭 P67(2026-08-12, decisions#667): 커피머신/에스프레소머신 정비업체의 B2B 영업일지("OO카페 커피머신
 //   수리 방문 드렸습니다")가 커피 어휘가 풍부해 CAFE_CONTEXT류를 전부 통과, "검증" 방문후기로 노출된다
 //   (8곳 10건 실측: 네오·카페와바·블루하라·찻집소·데이카페·플로우카페·만옥제과). "수리 방문 드렸습니다"의
@@ -1778,6 +1788,9 @@ export function verifyReview(input: QualityInput): QualityResult {
   // 룰갭 신규(decisions#1155): 채용/구인공고 강신호가 있고 매장 실물방문 신호가 전무하면 위 wholesaleOnly와
   //   동일하게 VISIT_CUES 매칭(구인공고의 "방문 문의 주세요" 류)을 무효화한다.
   const recruitmentOnly = RECRUITMENT_POST_CUES.test(fullL) && !INSTORE_VISIT_CUES.test(fullL);
+  // 룰갭 신규(decisions#1256): 잡코리아 제휴 자소서/면접후기 취준블로그 강신호가 있고 매장 실물방문 신호가
+  //   전무하면 위 recruitmentOnly와 동일하게 VISIT_CUES 매칭을 무효화한다.
+  const jobPrepBlogOnly = JOBPREP_BLOG_CUES.test(fullL) && !INSTORE_VISIT_CUES.test(fullL) && !DRINK_TASTING_CUES.test(fullL);
   // 룰갭 P67(decisions#667): 정비업체 영업일지 강신호가 있고 매장 실물방문·시음 신호가 전무하면 위 세
   //   패턴과 동일하게 VISIT_CUES 매칭(정비기사의 "방문 드렸습니다")을 무효화한다.
   const equipmentServiceOnly = EQUIPMENT_SERVICE_BLOG.test(fullL) && !INSTORE_VISIT_CUES.test(fullL) && !DRINK_TASTING_CUES.test(fullL);
@@ -1798,7 +1811,7 @@ export function verifyReview(input: QualityInput): QualityResult {
   //   중고차·id26803 통신요금제 실측: 셋 다 전무)만 걸린다.
   const cafeNaverNoSubstance = CLUB_NAVER_LINK.test(input.link ?? "")
     && !CAFE_CONTEXT_SUBSTANCE.test(fullL) && !DRINK_TASTING_CUES.test(fullL) && !INSTORE_VISIT_CUES.test(fullL);
-  const visit = has(fullL, VISIT_CUES) && !deliveryOnly && !pickupOnly && !wholesaleOnly && !recruitmentOnly && !equipmentServiceOnly && !clubMeetupLogisticsLeak && !cafeNaverNoSubstance;
+  const visit = has(fullL, VISIT_CUES) && !deliveryOnly && !pickupOnly && !wholesaleOnly && !recruitmentOnly && !jobPrepBlogOnly && !equipmentServiceOnly && !clubMeetupLogisticsLeak && !cafeNaverNoSubstance;
   const substance = SUBSTANCE_CUES.filter((k) => fullL.includes(k.toLowerCase())).length;
   // [#4] 흔한 단어 이름 오매칭 방지: 전체 이름 일치는 강함. 토큰만 일치면
   //     '카페 맥락(카페·커피·로스터리…)'이나 지역이 함께 있어야 주제로 인정.
