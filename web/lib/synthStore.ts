@@ -350,6 +350,7 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   const allEv = safeJson(allEvidence ?? evidenceReviews);
   // 현재 상태(파이프라인 단계·카테고리·이전 합성값) 먼저 — 카테고리 게이트 분기에 pst 필요.
   const cur = (await sql`SELECT pipeline_status, naver_category, synth_identity, synth_count, synth_updated, raw_collected_at, jsonb_array_length(COALESCE(synth_reviews,'[]'::jsonb)) prev_ev,
+    embedding IS NOT NULL AS has_embed,
     (COALESCE(raw_reviews::text,'') ~* '커피|디저트|음료|아메리카노|에스프레소|카푸치노|콜드브루|플랫화이트|핸드드립|카페라') AS raw_coffee
     FROM cafes WHERE id=${cafeId} LIMIT 1`)[0] as any;
   const pst: string | null = cur?.pipeline_status ?? null;
@@ -395,8 +396,19 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   //   상호가 한 번 스친 것(휴게소 먹거리·여행기·모음 글·TV 목록)이었다. 스침 2건만으로 공개되던 구멍을 막는다.
   //   기존 공개(grandfather)는 건드리지 않는다 — 공개 중 '주제 글 0건' 870곳은 CEO 결재 대상(대량 비공개 방지).
   const subjectN = Number((quality as any)?.verified ?? 0);
+  // 🩹 2026-09-28 CEO 지적 — "수집 30일 지났다고 리뷰가 이상해지냐?" 정곡. 이 게이트(freshOk·subjectN)의
+  //   실제 목적(위 09-17·09-24 주석)은 **한 번도 검증 안 된 신규 카페**가 얇고 낡은 데이터로 참고 등급을
+  //   따는 걸 막는 것뿐이다. 그런데 inPipeline은 "pipeline_status가 new/pending/rejected"만 보고 판단해서,
+  //   오케스트레이터(b-2) 게이트 사고 복구처럼 **이미 한 번 합성·공개까지 됐던 카페**를 AI 재판정 때문에
+  //   pending으로 되돌린 경우까지 "신규"로 오분류해 걸었다(113곳 재편입 중 14곳 실사고, 컨텍스트베이커리카페 등).
+  //   원본 나이가 등급을 좌우할 근거가 없다(리뷰 텍스트 자체는 나이와 무관).
+  //   ⚠️ synth_updated는 매 실행마다 찍혀 "합성 시도 이력"일 뿐 "통과 이력"이 아니다(신규가 첫 판정에서
+  //   떨어져도 다음 재합성 땐 synth_updated가 이미 있어 그걸 기준으로 삼으면 진짜 신규도 게이트가 뚫린다).
+  //   embedding은 cron-embed가 (published OR pipeline_status='pending')인 카페만 만든다 — 즉 **과거 어느
+  //   시점엔가 이 게이트를 실제로 통과해 pending/live에 도달한 적 있다**는 확정 증거만 남긴다(이후 안 지워짐).
+  const everPassedGate = !!cur?.has_embed;
   const gradeOk = grade === "검증"
-    || (grade === "참고" && (inPipeline ? (collected >= refFloorNew && freshOk && subjectN >= 1) : true));
+    || (grade === "참고" && (inPipeline && !everPassedGate ? (collected >= refFloorNew && freshOk && subjectN >= 1) : true));
   const nonCafeReal = isNonCafe(name, naverCat); // 실제 카테고리 사용(빈값 name-only 오탐 방지). 카테고리 없으면 grandfather.
   //   라이브(grandfather): 이름 OR 카테고리 중 '하나라도' 카페면 유지 — 둘 다 비카페일 때만 제거. 오제거 최소화.
   //   (고로케=카테고리'카페,디저트'로 유지 · 커피로스터=네이버 '제조업/쇼핑' 오분류지만 이름'커피'로 유지 · 식당=둘다 비카페→제거)
