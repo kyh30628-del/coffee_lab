@@ -399,3 +399,4 @@
 | 2026-09-27 07:31 | #1265 | [룰갭 신규] 호텔/펜션 부속카페 게이트(HOTEL_NAMED·LODGING_NAMED) — decision | 413764fd | - | lib/reviewQuality.ts:2087-2124 HOTEL_NAMED/LODGING_NAMED 게이트를 RESORT_VENUE_WORDS(#1003)와 동일한 2단 하드컷으 |
 | 2026-09-27 23:28 | #1271 | [룰갭] discover-sweep EXPECT_MAX_H 미정리 — 은퇴 후에도 매일 정지의심 오탐 | 08cdeba9 | - | lib/jobTeams.ts:64 EXPECT_MAX_H에서 discover-sweep:30 삭제(1줄). 09-21 RETIRED_JOBS 은퇴 후 잔류하던 감시계약 제거 — s |
 | 2026-09-28 03:16 | #1272 | [자율진단] import-permits 레이스체크(#1264) 풀스캔 — 09-28 08:00 cost_gu | 06167528 | - | lib/db.ts(ensureSearchIndexes)에 idx_cafes_name_eq(전체 btree)·idx_cafes_address_eq(부분 btree) 추가 + scri |
+| 2026-09-28 03:16 | #1273 | [룰갭 신규] 브랜드동음이의 게이트 임계값(전체이름 길이) 구조갭 — 접미어 결합형 상호(돈키호테커피 등)  | 5b9f80fd | - | lib/reviewQuality.ts:2210 title-match 게이트에 onlyTokShort(onlyTok.length 1~4) OR분기 추가 — 브랜드핵심토큰+카페/커피  |
