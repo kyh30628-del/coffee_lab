@@ -355,8 +355,12 @@ export async function GET(req: NextRequest) {
     //   🔴 decisions#1211(2026-09-22) — "북카페"류: FACET_TRIGGERS 전용 트리거어(CONCEPTS엔 없음)는 이 판정에서
     //   빠져 place 하이재킹 가드(anchorExact/placeHit)를 그대로 우회했다(#1134와 동일 계열, 커버리지 구멍).
     //   CONCEPTS와 동일한 완전일치 규칙으로 FACET_TRIGGERS도 함께 게이트에 넣는다.
-    const pureConceptQuery = hitConcepts.some((c) => c.triggers.some((t) => ql.trim() === t || qlConceptCore === t))
-      || FACET_TRIGGERS.some((f) => f.triggers.some((t) => ql.trim() === t || qlConceptCore === t));
+    //   🔴 #1291(2026-09-29) — "조용한 카페"류: 트리거("조용") 뒤에 형용사 활용 어미(한/인/하/은)가 붙은 core("조용한")는
+    //   완전일치 실패로 가드를 우회해 상호부분일치 200점 바닥값이 걸렸다("월정 조용한 카페 앤 펍"이 1위). 어미 1자만 허용.
+    const isTriggerCore = (t: string) => qlConceptCore === t
+      || (qlConceptCore.length === t.length + 1 && qlConceptCore.startsWith(t) && "한인하은".includes(qlConceptCore.slice(-1)));
+    const pureConceptQuery = hitConcepts.some((c) => c.triggers.some((t) => ql.trim() === t || isTriggerCore(t)))
+      || FACET_TRIGGERS.some((f) => f.triggers.some((t) => ql.trim() === t || isTriggerCore(t)));
     let effectiveRegion = region;
     let regionExplicit = !!region;
     // 🔀 같은 동 이름이 여러 시·군·구에 있을 때의 나머지 후보("고덕동"=강동구·평택시). 화면에서 한 번에 바꾸라고 내려준다.
