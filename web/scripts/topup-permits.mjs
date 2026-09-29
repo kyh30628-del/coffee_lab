@@ -34,7 +34,10 @@ const [now] = await sql`SELECT to_char(now() AT TIME ZONE 'Asia/Seoul','HH24:MI'
 //   적재가 쓴 콜은 permit 적재분 × 적재단가로 추정하지 않고, 적재 로그가 남긴 실측을 못 믿을 때를 대비해
 //   '수집 완료 수'로 나눈 값을 쓴다(폐업 크론 콜이 섞여 약간 보수적 = 과적재 방지 쪽으로 틀린다).
 const [m] = await sql`SELECT
-  (SELECT COALESCE(used,0) FROM naver_budget WHERE day = to_char(now() AT TIME ZONE 'Asia/Seoul','YYYY-MM-DD')) used,
+  -- 🩹 2026-09-30 — 하루 첫 네이버 호출 전(naver_budget에 오늘 행 자체가 아직 없음)엔 이 스칼라 서브쿼리가
+  --   행 자체를 못 찾아 NULL이 된다(안쪽 COALESCE는 '행은 있는데 used가 NULL'만 막지 '행이 없음'은 못 막음).
+  --   08:00 전 아침 루틴 실행 시 실측(06:51 KST, 아직 어떤 크론도 안 돎)으로 크래시 확인 후 바깥에 한 겹 더 COALESCE.
+  COALESCE((SELECT COALESCE(used,0) FROM naver_budget WHERE day = to_char(now() AT TIME ZONE 'Asia/Seoul','YYYY-MM-DD')), 0) used,
   (SELECT count(*)::int FROM cafes WHERE pipeline_status='new' AND raw_reviews IS NULL) backlog,
   (SELECT count(*)::int FROM cafes WHERE raw_collected_at >= ${T}) collected_today,
   (SELECT count(*)::int FROM cafes WHERE created_at >= ${T} AND source='permit') imported_today`;
