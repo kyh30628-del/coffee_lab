@@ -101,7 +101,11 @@ export async function nonClosureMayUse(): Promise<{ ok: boolean; remaining: numb
 //   같은 날 오후 수집으로 적체를 626까지 내리고 스윕을 수동 실행하니 2,898콜에 862곳(카페당 3.4콜).
 //   즉 가드가 지키려던 것(후기 없는 카페 양산)보다 막아버린 것(발굴 자체)이 컸다.
 //   기준: 하루 수집 소화량 실측 1,447곳(09-18)의 약 1배 — 하루 안에 따라잡을 수 있는 양까지는 허용한다.
-const COLLECT_BACKLOG_STOP = Number(process.env.COLLECT_BACKLOG_STOP || 1500);
+// 🔴 2026-09-29 대표님 지시로 1,500 → 3,000.
+//   09-28 비용 자동정지(23시간)로 cron-grow가 하루 종일 스킵되며 수집 적체가 2,169까지 쌓여
+//   발굴이 자동으로 멈췄다(사고의 여파이지 발굴 자체의 문제가 아님). 임계를 일시적으로 올려
+//   발굴을 다시 켠다 — 하루 수집 소화량(실측 907~1,447곳)의 약 2~3배까지는 허용.
+const COLLECT_BACKLOG_STOP = Number(process.env.COLLECT_BACKLOG_STOP || 3000);
 
 /** 후기 수집 대기(적재만 되고 후기 없는 카페) 수. */
 export async function collectBacklog(): Promise<number> {
