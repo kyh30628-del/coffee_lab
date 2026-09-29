@@ -70,6 +70,10 @@ export const EXPECT_MAX_H: Record<string, number> = {
   "owner-weekly": 192,     // 매주 월 08:40 KST — 주 1회(168h) + 버퍼 24h
   "search-quality-agent": 30, // 저녁블록 일 1회 + 버퍼 (coordination#296/#300, decisions#663·664)
   "b2b-sales-agent": 54,      // 격일(짝수/홀수 DOY 로테이션) + 버퍼 (coordination#296/#300, decisions#663·664)
+  // 🩹 2026-09-29 — deep-judge-agent가 EXPECT_MAX_H 밖이라 .ai-paused(07-01)로 81일 무실행이 아무 경보 없이
+  //   방치됐다(대표님 지시로 발견). 정지 중엔 heartbeat.mjs가 ok=true로 매회 갱신하므로(run-deep-judge-agent.sh)
+  //   여기 등록해도 오탐 없다 — 정지가 풀렸는데 진짜로 죽으면 그때만 이 임계가 잡아준다.
+  "deep-judge-agent": 60,     // 격일 08·17시 + 버퍼(정지 중엔 heartbeat가 항상 갱신해 오탐 없음)
   // 🔄 2026-08-04: chat-watch 폴링(1.5초) 정지로 DB 24h깨우기 제거(컴퓨트 절감) → 로컬 폴러 3개도 60분→KST 08·12·16·20시(최대공백 12h+버퍼14).
   "audit-watch": 14,      // 이벤트 워처 KST 08·12·16·20시
   "dev-pipeline": 14,     // 개발 파이프라인 KST 08·12·16·20시
