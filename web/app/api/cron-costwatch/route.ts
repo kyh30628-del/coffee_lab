@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { recordRun } from "@/lib/agentLog";
 import { pruneLedger } from "@/lib/runLedger";
-import { setCostHalt } from "@/lib/costGuard";
+import { setCostHalt, setJobHalts, attributeCostJob } from "@/lib/costGuard";
 
 export const runtime = "nodejs";
 
@@ -245,7 +245,12 @@ export async function GET(req: NextRequest) {
     const totalBad = totalGb >= totalLimit;                            // 이것만 정지시킨다
     // 🛑 자동정지는 **총량 폭주**에만 건다 — 7월 $58 사고의 지문이 그거였다(한 달간 조용히 660GB).
     //   단일쿼리는 살펴볼 값이지 하루치 파이프라인을 얼릴 근거가 아니다.
+    //   🔧 #1326: 정지 범위를 좁힌다 — 최다쿼리로 원천 job이 특정되면 그 job만, 미특정이면 총량이 임계의 2배 이상일 때만
+    //   전역(4개 크론 동시정지). 미특정+경미(<2배)는 경보만 — 오탐 1건이 전 파이프라인을 얼리던 SPOF 제거.
+    const culprit = totalBad ? attributeCostJob(top?.q) : null;
+    const globalHalt = totalBad && !culprit && totalGb >= totalLimit * 2;
     const anomaly = totalBad;
+    const scopeTxt = culprit ? `개별정지(${culprit})` : globalHalt ? "자동정지(전역)" : "경보만(정지 없음·원인 미특정 경미)";
     const alertOnly = perQueryBad && !totalBad;
     const awakeTxt = `가동 ${(aw.awakeMin / 60).toFixed(1)}h/일(깨어남 ${aw.wakes}회, 새벽 ${aw.nightMin}분, 7일중앙값 ${(aw.medianMin / 60).toFixed(1)}h)`;
     const awakeNote = awakeBad ? `⚠️ 가동시간 주의: ${awakeTxt} — 중앙값의 ${AWAKE_MEDIAN_MULT}배(${(awakeLimit / 60).toFixed(1)}h) 초과. ` : "";
@@ -266,7 +271,7 @@ export async function GET(req: NextRequest) {
     } catch { /* 실패해도 디스크 읽기만으로 보고 */ }
     const topTxt = perQueryBad ? ` · 최다쿼리 ${top!.deltaGb.toFixed(1)}GB: ${top!.q.replace(/\s+/g, " ").slice(0, 100)}` : "";
     const detail = anomaly
-      ? awakeNote + `🚨 디스크 읽기 총량 이상 — 자동정지: 오늘 총 ${totalGb.toFixed(1)}GB(임계 ${totalLimit.toFixed(1)}GB, 7일중앙값 ${medGb.toFixed(1)}GB×${TOTAL_MEDIAN_MULT})${billed}${topTxt}`
+      ? awakeNote + `🚨 디스크 읽기 총량 이상 — ${scopeTxt}: 오늘 총 ${totalGb.toFixed(1)}GB(임계 ${totalLimit.toFixed(1)}GB, 7일중앙값 ${medGb.toFixed(1)}GB×${TOTAL_MEDIAN_MULT})${billed}${topTxt}`
       : alertOnly
       ? awakeNote + `⚠️ 단일쿼리 주의(정지 아님): 최다 ${top!.deltaGb.toFixed(1)}GB ≥ ${PER_QUERY_GB_ALERT}GB — 총량은 정상 ${totalGb.toFixed(1)}GB/임계 ${totalLimit.toFixed(1)}GB${billed}${topTxt}`
       : awakeNote + `정상 — 디스크 읽기 ${totalGb.toFixed(1)}GB(임계 ${totalLimit.toFixed(1)}GB, 7일중앙값 ${medGb.toFixed(1)}GB×${TOTAL_MEDIAN_MULT})${billed}, ${awakeTxt}`;
@@ -284,9 +289,10 @@ export async function GET(req: NextRequest) {
     //   제 이름의 이슈로 뜬다(lib/issues.ts). 여기서 false를 찍으면 '크론 실패'로 둔갑한다.
     await recordRun("cron-costwatch", true, detail + (pruned ? ` · 원장정리 ${pruned}행` : ""), cur.length);
     // 🛑 과다 시 자동 정지(무거운 자율 크론이 스킵) / 정상 복귀 시 자동 해제 — CEO "과다면 멈춰"
-    await setCostHalt(anomaly, anomaly ? `자동정지: ${detail.slice(0, 150)}` : "정상").catch(() => {});
+    await setCostHalt(globalHalt, globalHalt ? `자동정지: ${detail.slice(0, 150)}` : "정상").catch(() => {});
+    await setJobHalts(culprit ? [{ job: culprit, reason: `개별정지: ${detail.slice(0, 150)}` }] : []).catch(() => {});
     await sendCostReport(totalGb, top, anomaly, execMin, totalLimit).catch(() => {}); // 📧 매일 아침 CEO 비용 점검 메일(발송 실패는 점검 자체를 막지 않음)
-    return NextResponse.json({ ok: true, anomaly, halted: anomaly, totalGb: +totalGb.toFixed(2), totalLimit: +totalLimit.toFixed(1), transferMedianGb: +medGb.toFixed(1), execMin: +execMin.toFixed(1), awakeHours: +(aw.awakeMin / 60).toFixed(1), wakes: aw.wakes, nightMin: aw.nightMin, awakeMedianH: +(aw.medianMin / 60).toFixed(1), awakeWarn: awakeBad, top, checked: cur.length });
+    return NextResponse.json({ ok: true, anomaly, halted: globalHalt, haltedJob: culprit, totalGb: +totalGb.toFixed(2), totalLimit: +totalLimit.toFixed(1), transferMedianGb: +medGb.toFixed(1), execMin: +execMin.toFixed(1), awakeHours: +(aw.awakeMin / 60).toFixed(1), wakes: aw.wakes, nightMin: aw.nightMin, awakeMedianH: +(aw.medianMin / 60).toFixed(1), awakeWarn: awakeBad, top, checked: cur.length });
   } catch (e) {
     await recordRun("cron-costwatch", false, String(e).slice(0, 150));
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });

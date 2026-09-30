@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
     }
 
     await ensureSchema();
-    if (await isCostHalted()) { await recordRun("cron-resynth", true, "🛑 비용 자동정지 중 — 스킵", 0).catch(() => {}); return NextResponse.json({ ok: true, skipped: "cost-halt" }); }
+    if (await isCostHalted("cron-resynth")) { await recordRun("cron-resynth", true, "🛑 비용 자동정지 중 — 스킵", 0).catch(() => {}); return NextResponse.json({ ok: true, skipped: "cost-halt" }); }
     await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_reviews JSONB`;
     await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS char_scores JSONB`;
     await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS synth_quality JSONB`;

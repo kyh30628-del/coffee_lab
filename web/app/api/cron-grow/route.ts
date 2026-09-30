@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
     }
     await ensureSchema();
-    if (await isCostHalted()) { await recordRun("cron-grow", true, "🛑 비용 자동정지 중 — 스킵", 0).catch(() => {}); return NextResponse.json({ ok: true, skipped: "cost-halt" }); }
+    if (await isCostHalted("cron-grow")) { await recordRun("cron-grow", true, "🛑 비용 자동정지 중 — 스킵", 0).catch(() => {}); return NextResponse.json({ ok: true, skipped: "cost-halt" }); }
     await sql`CREATE TABLE IF NOT EXISTS discovery_state (region TEXT PRIMARY KEY, area_label TEXT, last_run TIMESTAMPTZ, last_found INT, last_inserted INT)`;
     // 재현가능한 진단(decisions#814 권장조치②) — skip/oob도 last_found/last_inserted처럼 영구 보존해
     //   좌표전용 dedup 과잉차단 같은 회귀를 회차별 diff로 잡을 수 있게 한다.

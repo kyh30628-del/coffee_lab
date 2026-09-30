@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
   }
   try {
     await ensureSchema();
-    if (await isCostHalted()) { await recordRun("cron-synth", true, "🛑 비용 자동정지 중 — 스킵", 0).catch(() => {}); return NextResponse.json({ ok: true, skipped: "cost-halt" }); }
+    if (await isCostHalted("cron-synth")) { await recordRun("cron-synth", true, "🛑 비용 자동정지 중 — 스킵", 0).catch(() => {}); return NextResponse.json({ ok: true, skipped: "cost-halt" }); }
     const BUDGET_MS = 280_000; // maxDuration 300초 내 안전 여유
     const t0 = Date.now();
     let processed = 0, published = 0, skipped = 0, failed = 0;
