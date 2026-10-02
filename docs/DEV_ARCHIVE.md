@@ -403,3 +403,4 @@
 | 2026-09-28 23:55 | #1256 | [룰갭] 잡코리아 자소서/면접후기 취준블로그 — RECRUITMENT_POST_CUES 정규식 우회 18곳 | 9889e55e | - | lib/reviewQuality.ts: JOBPREP_BLOG_CUES 신규(자소서/면접답변 SEO블로그 시그니처+블로그 자기홍보 상용구+스펙업) 추가, jobPrepBlogOnl |
 | 2026-09-28 23:57 | #1275 | [사장님영업] 무료리포트 배지 크로스링크 조기결론 — 198건 100%자격노출·클릭 0, 표본부족 가설 기각 | 4edf3786 | - | app/owner/r/[id]/page.tsx: 배지 크로스링크를 하단 11px 유틸리티 링크(283행)에서 제거하고, 약점 카드~유료안내(nt-header) 사이 독립 카드로 승 |
 | 2026-10-02 23:05 | #1291 | [검색UX 신규] "조용한 카페" 1위가 상호일치 바닥값으로 제주 참고등급(quiet 18) — #1166  | cd534e51 | - | app/api/search/route.ts: pureConceptQuery가 트리거+어미 1자(한/인/하/은) core("조용한")도 순수개념질의로 인식(CONCEPTS·FACET |
+| 2026-10-02 23:05 | #1326 | [비용가드 SPOF] job별 개별 halt 재설계 (#1290 승인 후속 dev_task) | 2ca5100b | - | lib/costGuard.ts: cost_guard_jobs 테이블·isCostHalted(job)·setJobHalts·attributeCostJob 추가. cron-costwa |
