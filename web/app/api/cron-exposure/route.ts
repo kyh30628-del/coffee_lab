@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
     }
     await ensureSchema();
-    if (await isCostHalted()) { await recordRun("cron-exposure", true, "🛑 비용 자동정지 중 — 스킵", 0).catch(() => {}); return NextResponse.json({ ok: true, skipped: "cost-halt" }); }
+    if (await isCostHalted("cron-exposure")) { await recordRun("cron-exposure", true, "🛑 비용 자동정지 중 — 스킵", 0).catch(() => {}); return NextResponse.json({ ok: true, skipped: "cost-halt" }); }
 
     // 층화 샘플: 지점 카페(다른 지점 오염 위험군) + 최근 재합성분 + 무작위.
     //   ⚠️ 조회 1회. synth_reviews_all·raw_reviews는 건드리지 않는다.
