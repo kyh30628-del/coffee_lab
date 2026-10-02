@@ -3,17 +3,15 @@
 // 프랜차이즈·중복 제외, 비공개로 적재 후 합성 단계에서 검증. 키 없거나 검증 전엔 dry-run.
 import { sql } from "./db";
 import { brandTokenOverlap } from "./reviewQuality";
-import { localSearch, parseGuArea, addressSidoScope } from "./discover"; // 네이버 지역검색(키 로테이션·쿼터 처리 포함) 단일출처
+import { localSearch, parseGuArea, addressSidoScope, isFranchise } from "./discover"; // 네이버 지역검색(키 로테이션·쿼터 처리 포함)·프랜차이즈 판정 단일출처
+// 🩹 2026-10-02 — 여기 따로 있던 로컬 FRANCHISE 목록(약 40개)이 공용 목록(discover.ts, 학습분 포함 100+개)보다
+//   훨씬 좁아 바나프레소·우지커피·하삼동 등이 그대로 새었다(강남구 테스트 적재 1,151곳 표본에서 3건 실증).
+//   단일출처로 교체 — rulegap-agent가 학습으로 추가하는 프랜차이즈도 이제 자동으로 같이 막힌다.
 
 const KEY = process.env.DATA_GO_KR_KEY;
 export const hasSanggaKey = () => !!KEY;
 // storeListInDong: 시군구코드(signguCd)로 그 구의 상가 조회
 const ENDPOINT = "https://apis.data.go.kr/B553077/api/open/sdsc2/storeListInDong";
-
-const FRANCHISE = ["스타벅스", "투썸", "이디야", "메가커피", "메가엠지씨", "빽다방", "컴포즈", "커피빈", "할리스", "엔제리너스", "파스쿠찌", "탐앤탐스", "폴바셋", "드롭탑", "요거프레소", "더벤티", "매머드", "공차", "스무디킹", "투썸플레이스", "카페베네", "만랩", "토프레소", "셀렉토", "더리터", "달콤커피", "커피스미스", "주커피", "백억커피", "쥬씨", "더치앤빈", "팀홀튼",
-  // 영문/로마자 표기(네이버가 영문 상호로 등재하는 지점 우회 방지 — decisions#565)
-  "STARBUCKS", "TWOSOME", "EDIYA", "MEGACOFFEE", "MEGAMGC", "PAIKSCOFFEE", "PAIKDABANG", "COMPOSECOFFEE", "COFFEEBEAN", "HOLLYS", "ANGELINUS", "PASCUCCI", "TOMNTOMS", "PAULBASSETT", "DROPTOP", "YOGERPRESSO", "THEVENTI", "MAMMOTHCOFFEE", "GONGCHA", "SMOOTHIEKING", "CAFEBENE", "CAFFEBENE", "MANLAB", "TOPRESSO", "SELECTO", "DALKOMMCOFFEE", "COFFEESMITH", "JUICY", "TIMHORTONS"];
-const isFranchise = (n: string) => { const x = (n || "").replace(/\s/g, "").toUpperCase(); return FRANCHISE.some((f) => x.includes(f.toUpperCase())); };
 // 카페 업종: 소분류명이 커피/카페/다방 (코드 필터가 빗나가도 안전망)
 const isCafe = (indsSclsNm: string, indsMclsNm: string) => /커피|카페|다방/.test(indsSclsNm || "") || /비알콜/.test(indsMclsNm || "");
 

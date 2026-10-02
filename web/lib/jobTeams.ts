@@ -20,6 +20,7 @@ export const JOB_TEAM: Record<string, string> = {
   // 로컬 launchd 잡(하트비트 경유)
   "discover-sweep": "성장본부", // 🔄2026-08-04 KST 12·20시 전 지역 발굴 스윕 — ⏸ 2026-09-21 정지(공공원장 적재로 대체, RETIRED_JOBS)
   "import-permits": "성장본부", // 🧾2026-09-21 매일 07:00 공공 인허가 원장 적재(--limit 2700, 실측 1.69콜/곳)
+  "sangga-rollout": "성장본부", // 🏪2026-10-02 매일 07:00 소상공인 상가업소정보 수도권 롤아웃(CEO 지시, 원장과 별개 소스)
   "indexnow": "성장본부", // 🔎2026-09-13 KST 09:40 IndexNow 일일 제출(사이트맵 미제출분만 → 네이버·빙 수신)
   "neon-billing": "경영지원본부", // 💳2026-09-14 KST 07:50 Neon 실청구 지표 스냅샷(키가 로컬에만 있어 로컬이 DB에 적재)
   "youtube-backfill": "품질본부",
@@ -62,6 +63,7 @@ export const EXPECT_MAX_H: Record<string, number> = {
   "orchestrator-heal": 18, // 2창(UTC 3,11) 최대공백 16h + 버퍼
   // 로컬 launchd 잡
   "import-permits": 30,    // 🧾2026-09-21 매일 07:00 원장 적재 + 버퍼
+  "sangga-rollout": 30,    // 🏪2026-10-02 매일 07:00 상가업소정보 롤아웃 + 버퍼
   "indexnow": 30,          // 🔎2026-09-13 KST 09:40 하루 1회 + 버퍼
   "neon-billing": 30,      // 💳2026-09-14 KST 07:50 하루 1회 + 버퍼
   "chief-manager": 20,    // 일간 사이클 KST 08·12·16시
@@ -97,6 +99,7 @@ export const LAUNCHD_JOBS: Record<string, { label: string; sched: string }> = {
   "weekly-evaluation": { label: "주간 거버넌스",   sched: "10:30(격일)" },
   "discover-sweep":    { label: "발굴 스윕",       sched: "정지(09-21)" },
   "import-permits":    { label: "원장 적재",       sched: "07:00" },
+  "sangga-rollout":    { label: "상가업소 롤아웃", sched: "07:00" },
   "indexnow":          { label: "IndexNow 제출",   sched: "09:40" },
   "neon-billing":      { label: "Neon 청구 스냅샷", sched: "07:50" },
 };

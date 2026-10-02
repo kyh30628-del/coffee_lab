@@ -100,9 +100,13 @@ const slim = (o) => ({
       const r = await fetchPage(pg);
       if (!r.items) {
         fails++;
-        if (fails > 40) { stop = true; console.error(`⛔ 연속 실패 과다(${r.err}) — 중단. 다시 실행하면 남은 페이지부터 이어받는다.`); return; }
+        // 🩹 2026-10-02 — general_restaurants(230만 건·23,011페이지)에서 재현: CONC=8·16 둘 다 금방
+        //   HTTP 504 연쇄(40회 초과)로 중단됐다. fetchPage 안 재시도(1.5~4.5초)로도 못 버틸 만큼 서버가
+        //   혼잡한 구간 — 고정 3초 백오프 + 임계 40은 이 큰 엔드포인트엔 너무 짧다. 실패가 쌓일수록
+        //   쉬는 시간을 늘리고(지수 백오프, 최대 30초) 임계도 넉넉히 올려 느려도 끝까지 받는다.
+        if (fails > 150) { stop = true; console.error(`⛔ 연속 실패 과다(${r.err}) — 중단. 다시 실행하면 남은 페이지부터 이어받는다.`); return; }
         queue.push(pg); // 뒤로 미뤄 재시도
-        await new Promise((s) => setTimeout(s, 3000));
+        await new Promise((s) => setTimeout(s, Math.min(30000, 3000 * Math.ceil(fails / 5))));
         continue;
       }
       fails = Math.max(0, fails - 1);
