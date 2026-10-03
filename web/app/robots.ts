@@ -6,7 +6,13 @@ import type { MetadataRoute } from "next";
 //   (2026 실무 가이드 공통 권고). ChatGPT 검색(OAI-SearchBot)·학습(GPTBot)·응답근거(ChatGPT-User),
 //   Claude(ClaudeBot·Claude-Web), Perplexity, Gemini 학습(Google-Extended)을 **명시 허용** —
 //   내부 도구·관리자만 계속 차단. AI 인용의 재료는 이미 있음(JSON-LD 3블록·llms.txt·검증후기 인용).
-const DISALLOW = ["/admin", "/api/", "/owner", "/poster", "/showcase-styles"];
+// 🔴 2026-10-03 — Vercel 지출관리 한도 재정지 임박(ISR Writes가 온디맨드의 64%) CEO 지시로 임시 추가.
+//   09-16에 색인율 9%(34,455 제출→3,100 색인)라 사이트맵에서는 이미 뺀 동×취향·동×시설축 조합 페이지를
+//   로봇 차단까지 마저 건다 — 봇이 이 페이지들을 재방문할 때마다 ISR 재생성(=과금)이 발생했다.
+//   사람 방문(직접 링크·검색결과로 이미 들어온 사용자)엔 영향 없음, 봇의 "새로 긁기"만 막는다.
+//   /area/{gu}/dong/{dong} 본체는 그대로 허용, 그 아래 조합(/{taste}·/f/{facet})만 막는다.
+//   🔁 10/11 결제주기 리셋되면 이 줄 제거하고 복원할 것.
+const DISALLOW = ["/admin", "/api/", "/owner", "/poster", "/showcase-styles", "/area/*/dong/*/"];
 // 🔴 2026-09-15 공식 문서 대조로 명단을 고쳤다(CEO "사람의 검색으로 유입되는 것만 중요하다").
 //   전에는 **학습용 봇만 정확히** 넣고 정작 **답변·검색용 봇이 빠져 있었다** — 유입을 만드는 건 후자다.
 //   Anthropic 공식 3종: ClaudeBot(학습) · Claude-SearchBot(검색) · Claude-User(사용자 질문) —
