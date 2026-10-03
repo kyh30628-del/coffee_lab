@@ -263,7 +263,8 @@ export async function GET(req: NextRequest) {
     //   여기선 최신 1행만 읽는다 — 시크릿이 배포 환경으로 안 나가고, 이력이 남아 추세 비교도 된다.
     let billed = "";
     try {
-      const b = (await sql`SELECT egress_gb, egress_per_day, compute_per_day, taken_at FROM neon_billing ORDER BY taken_at DESC LIMIT 1`.catch(() => []))[0] as any;
+      // 🔴 2026-10-03: neon_billing이 카페+부동산 2개 DB를 같이 기록하므로 project로 좁힌다(안 그러면 날에 따라 부동산 행을 읽는다).
+      const b = (await sql`SELECT egress_gb, egress_per_day, compute_per_day, taken_at FROM neon_billing WHERE project='coffee-db' ORDER BY taken_at DESC LIMIT 1`.catch(() => []))[0] as any;
       if (b) {
         const ageH = Math.round((Date.now() - new Date(b.taken_at).getTime()) / 3600000);
         billed = ` · 💳실청구 전송 ${Number(b.egress_per_day).toFixed(1)}GB/일(월누계 ${Number(b.egress_gb).toFixed(0)}GB·무료 500GB의 ${Math.round(Number(b.egress_gb) / 5)}%) · 컴퓨트 ${Number(b.compute_per_day).toFixed(1)}CU-h/일${ageH > 30 ? `(${ageH}h 전 기준)` : ""}`;
