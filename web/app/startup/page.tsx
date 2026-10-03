@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { STARTUP_REPORTS, REPORT_PRICE } from "@/lib/startupReport";
 
-export const revalidate = 86400;
+export const revalidate = 2592000; // 🔴2026-10-03 임시 30일 동결(모든 자동화 정지 중이라 콘텐츠 불변 — 10/11 리셋 후 원복)
 export const metadata: Metadata = { title: "동네 카페 창업 리포트 — 검증 후기로 본 상권 | 동네 커피 노트", description: "성수동·연남동·망원동 카페 창업 리포트. 검증 후기 데이터로 본 성격 12축, 비어 있는 포지션, 개업·폐업(인허가), 손님 검색어.", alternates: { canonical: "https://dongnecoffeenote.com/startup" } };
 
 export default function StartupIndex() {

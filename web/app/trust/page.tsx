@@ -8,7 +8,7 @@ import { SITE } from "@/lib/seoData";
 //   2026-07 네이버 영수증 리뷰 29,000건 조작 검거 보도로 리뷰 신뢰가 공론화된 시점 — 방법론을 실데이터 숫자로 공개한다.
 //   ⚠️ 여기 숫자는 전부 DB 실시간 집계(작은 컬럼·배열 헤더만) — 과장 금지, 화면≠사실 금지.
 export const runtime = "nodejs";
-export const revalidate = 86400; // 1일 — 숫자는 천천히 변한다
+export const revalidate = 2592000; // 🔴2026-10-03 임시 30일 동결(모든 자동화 정지 중이라 콘텐츠 불변 — 10/11 리셋 후 원복)
 
 export const metadata: Metadata = {
   title: "검증 방법 — 동네 커피 노트가 후기를 거르는 기준",

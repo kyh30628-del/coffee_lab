@@ -10,7 +10,7 @@ import { FACET_PAGES } from "@/lib/facetPages";
 // ⚠️ 카페 26,732곳을 전부 싣지 않는다(파일이 수 MB가 되고 아무도 안 읽는다).
 //   **지역별 집계 + 지역 대표 카페**까지만 — AI가 "OO 카페 추천"에 답할 수 있는 최소 단위다.
 // 💰 하루 1회(s-maxage 86400) 집계 3회. 전수 스캔 아님(집계는 인덱스, 대표 카페는 지역당 5곳 LIMIT).
-export const revalidate = 86400;
+export const revalidate = 2592000; // 🔴2026-10-03 임시 30일 동결(모든 자동화 정지 중이라 콘텐츠 불변 — 10/11 리셋 후 원복)
 
 export async function GET() {
   let tot: any = {}, byArea: any[] = [], topCautions: any[] = [], topFacets: any[] = [], reps: any[] = [];

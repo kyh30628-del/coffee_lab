@@ -6,7 +6,7 @@ import Report from "./Report";
 import OrderForm from "./OrderForm";
 
 export const runtime = "nodejs";
-export const revalidate = 86400; // 무료 미리보기: 하루 1회만 DB
+export const revalidate = 2592000; // 🔴2026-10-03 임시 30일 동결(모든 자동화 정지 중이라 콘텐츠 불변 — 10/11 리셋 후 원복)
 export const dynamicParams = false;
 export function generateStaticParams() { return STARTUP_REPORTS.map((r) => ({ slug: r.slug })); }
 

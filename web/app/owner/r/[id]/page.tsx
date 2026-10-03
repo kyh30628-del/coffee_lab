@@ -25,7 +25,7 @@ import LeadForm from "./LeadForm";
 //    유료 = 약점 내용·전체 축·액션플랜·경쟁카페·후기 원문·감시 알림. 약점은 **제목만 보이고 내용은 가린다**.
 
 export const runtime = "nodejs";
-export const revalidate = 86400; // 24시간 — 후기·순위는 하루 단위로도 충분히 최신이다
+export const revalidate = 2592000; // 🔴2026-10-03 임시 30일 동결(모든 자동화 정지 중이라 콘텐츠 불변 — 10/11 리셋 후 원복)
 
 type Props = { params: Promise<{ id: string }> };
 

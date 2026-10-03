@@ -8,7 +8,7 @@ import { SITE } from "@/lib/seoData";
 //   인용하게 한다. 링크 구매(정책 위반)가 아니라 콘텐츠로 버는 백링크.
 //
 // 💰 ISR 24시간 — 전부 숫자 컬럼 집계(큰 blob 없음)라 쿼리 자체도 싸고, 하루 1번만 DB에 닿는다.
-export const revalidate = 86400;
+export const revalidate = 2592000; // 🔴2026-10-03 임시 30일 동결(모든 자동화 정지 중이라 콘텐츠 불변 — 10/11 리셋 후 원복)
 
 export const metadata: Metadata = {
   title: "카페 데이터 리포트 — 동네 커피 노트",

@@ -7,7 +7,7 @@ import { SITE } from "@/lib/seoData";
 //   **경쟁자가 못 베끼는 독점 데이터**다(데이터랩 '신상카페' 수요 상시 존재). 최근 30일 공개분을 지역별로 노출.
 //   비용: 작은 컬럼 조회 1회 · ISR 12시간(하루 2회 재생성).
 export const runtime = "nodejs";
-export const revalidate = 43200;
+export const revalidate = 2592000; // 🔴2026-10-03 임시 30일 동결(모든 자동화 정지 중이라 콘텐츠 불변 — 10/11 리셋 후 원복)
 
 export const metadata: Metadata = {
   title: "이번 달 새로 발굴한 카페 — 동네 커피 노트",

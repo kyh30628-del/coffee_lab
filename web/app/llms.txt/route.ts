@@ -9,7 +9,7 @@ import { SIDO_GU } from "@/lib/regionList";
 //   → 지역 목록은 regionList에서, 카페 수는 DB에서 읽어 **편입·수집과 자동으로 같이 움직이게** 한다.
 //
 // 💰 비용: 하루 1회 COUNT 1번(s-maxage 86400). ISR 재생성 빈도 불변. 전수 스캔 아님.
-export const revalidate = 86400;
+export const revalidate = 2592000; // 🔴2026-10-03 임시 30일 동결(모든 자동화 정지 중이라 콘텐츠 불변 — 10/11 리셋 후 원복)
 
 const SIDO_LABEL: Record<string, string> = {
   서울: "서울", 인천: "인천", 경기: "경기", 강원: "강원", 충북: "충청북도", 충남: "충청남도",

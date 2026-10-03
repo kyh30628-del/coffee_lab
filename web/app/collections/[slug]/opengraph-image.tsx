@@ -5,7 +5,7 @@ import { COLLECTIONS, collectionBySlug } from "@/lib/collections";
 export const runtime = "nodejs";
 // 🌙 2026-09-02 — OG 이미지가 페이지 본체보다 자주 재생성되고 있었다(6h vs 48h, 8배).
 //   내용은 본문보다 덜 변하는데 주기가 거꾸로였다. 본체와 같은 주기로 맞춘다.
-export const revalidate = 259200;
+export const revalidate = 2592000; // 🔴2026-10-03 임시 30일 동결(모든 자동화 정지 중이라 콘텐츠 불변 — 10/11 리셋 후 원복)
 export const size = OG_SIZE;
 export const contentType = "image/png";
 export const alt = "동네 카페 추천 — 협찬 없이 진짜 후기로 교차검증 — 동네 커피 노트";

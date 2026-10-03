@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
 
 export const runtime = "nodejs";
-export const revalidate = 600;
+export const revalidate = 2592000; // 🔴2026-10-03 임시 30일 동결(모든 자동화 정지 중이라 콘텐츠 불변 — 10/11 리셋 후 원복)
 
 // ✍ 랜딩 메모 전용 초경량 풀(2026-09-13).
 //   왜: 랜딩 글씨는 /api/discover(홈 피드 전체)를 기다렸는데, 폰 첫 실행에선 **4초 안에도 안 왔다**(landing_debug 실측

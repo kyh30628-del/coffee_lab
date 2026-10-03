@@ -5,7 +5,7 @@ import { FACET_PAGES, FACET_MIN_CAFES } from "@/lib/facetPages";
 import { COLLECTIONS } from "@/lib/collections";
 
 export const runtime = "nodejs";
-export const revalidate = 21600; // 감사수리: 결재 집행(공개/비공개) 반영 지연 축소 — 페이지(3600)와 짝 맞춤
+export const revalidate = 2592000; // 🔴2026-10-03 임시 30일 동결(모든 자동화 정지 중이라 콘텐츠 불변 — 10/11 리셋 후 원복)
 
 const SITE = "https://dongnecoffeenote.com";
 

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { getRegions, TASTES, SITE } from "@/lib/seoData";
 import { COLLECTIONS } from "@/lib/collections";
 
-export const revalidate = 86400; // ISR 24시간
+export const revalidate = 2592000; // 🔴2026-10-03 임시 30일 동결(모든 자동화 정지 중이라 콘텐츠 불변 — 10/11 리셋 후 원복)
 
 export const metadata: Metadata = {
   title: "동네별 카페 추천 — 전국(서울·경기부터 부산·광주·전남·제주까지) 검증 카페 | 동네 커피 노트",
