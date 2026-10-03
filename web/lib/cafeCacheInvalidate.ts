@@ -17,9 +17,11 @@ import { sql, ensureOnce } from "./db";
 // ## 조치
 //   카페별 경로(/c/{id}·/share/{id}·og)와 지도 데이터(/api/cafes)는 **그대로 즉시** purge한다(소비자 정확성).
 //   비싼 쪽(유형 전체 3종 + search_cache 전삭)만 **원자적 클레임으로 묶는다** — 창 안에서 첫 호출만 수행.
-//   대가: 비공개된 카페가 목록 페이지에 최대 CACHE_BROAD_MIN_SEC(기본 120초)간 남을 수 있다.
-//   그 페이지들은 본래 ISR 30분~30일이라 기존 staleness 안에 있고, 카페 상세·지도는 즉시 반영된다.
-const BROAD_MIN_SEC = Number(process.env.CACHE_BROAD_MIN_SEC || 120);
+//   대가: 비공개된 카페가 "목록" 페이지(지역×취향·동)에 최대 CACHE_BROAD_MIN_SEC간 남을 수 있다 — 단,
+//   카페 상세(/c/{id})·지도(/api/cafes)는 위에서 **항상 즉시** 반영되므로 사용자가 들어가 보면 바로 맞는 상태다.
+//   🔴 2026-10-03 — Vercel 지출관리 예산 초과(503) 사고 후 ISR Writes가 전체 온디맨드 비용의 64%($32/월)로
+//   드러나 CEO 지시로 120초→21600초(6시간, sitemap.ts 기존 6시간 주기와 동일선상)로 대폭 확대.
+const BROAD_MIN_SEC = Number(process.env.CACHE_BROAD_MIN_SEC || 21600);
 
 /** 유형 전체 purge 권한을 원자적으로 딱 하나만 가져간다(프로세스가 여러 개여도 창당 1회). */
 async function claimBroadPurge(): Promise<boolean> {
