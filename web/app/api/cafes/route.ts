@@ -76,7 +76,8 @@ function mapResponse(body: Uint8Array, mark: "HIT" | "MISS") {
 }
 let cache: Cached | null = null;
 
-export async function GET() {
+export async function GET(req: Request) {
+  const probe = new URL(req.url).searchParams.get("probe"); // TEMP-PROBE
   try {
     await ensureSchema();
     const [v] = (await sql`SELECT COUNT(*)::int n, COALESCE(MAX(updated_at)::text,'') u, COALESCE(MAX(synth_updated)::text,'') s
@@ -87,6 +88,12 @@ export async function GET() {
     const owned = await ownerManagedIds();
     const ownedSig = [...owned].sort((a, b) => a - b).join(",");
     const version = `${v?.n ?? 0}|${v?.u ?? ""}|${v?.s ?? ""}|${live ? 1 : 0}|${ownedSig}`;
+    if (probe && cache) { // TEMP-PROBE
+      if (probe === "1") return mapResponse(cache.body.subarray(0, 1000), "HIT");
+      if (probe === "2") { const r = mapResponse(cache.body, "HIT"); r.headers.delete("Vercel-CDN-Cache-Control"); r.headers.set("Cache-Control", "public, max-age=0, s-maxage=600"); return r; }
+      if (probe === "3") return new NextResponse(cache.body as unknown as BodyInit, { headers: { "Content-Type": "application/json", "Vercel-CDN-Cache-Control": "public, max-age=600", "Cache-Control": "public, max-age=0, must-revalidate" } });
+      if (probe === "4") return mapResponse(cache.body.subarray(0, 9_000_000), "HIT");
+    }
     if (cache && cache.version === version) return mapResponse(cache.body, "HIT");
     await loadCriteria(); // 배지 임계(criteria) 프라임 — 없으면 폴백 DEFAULTS로 동작
     const cafes = await sql`
