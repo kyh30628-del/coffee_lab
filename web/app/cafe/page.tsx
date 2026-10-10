@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import BackLink from "../BackLink";
 import { trackOutbound } from "../trackOutboundClient";
 import { useLockBodyScroll } from "@/lib/useLockBodyScroll";
-import { decodeCafeScores } from "@/lib/mapCafes";
+import { decodeCafeScores, fetchMapCafes } from "@/lib/mapCafes";
 import { reviewAge } from "@/lib/cafeDetailView"; // 🕰️ 1년 반 넘은 후기 날짜 딱지(09-24)
 
 type EvidenceReview = { quote: string; link?: string; source?: string; date?: string };
@@ -166,7 +166,7 @@ export default function CafePage() {
   const [evidenceCafe, setEvidenceCafe] = useState<Cafe | null>(null);
 
   useEffect(() => {
-    fetch("/api/cafes").then((r) => r.json()).then((d) => { setCafes(decodeCafeScores(d.cafes ?? [])); setLoading(false); }).catch(() => setLoading(false));
+    fetchMapCafes().then((list) => { setCafes(decodeCafeScores(list)); setLoading(false); }).catch(() => setLoading(false));
   }, []);
 
   // 목적 축(char_scores) 점수 높은 순 정렬 — 실제 전 카페에 값이 있는 데이터로 순위 매김.

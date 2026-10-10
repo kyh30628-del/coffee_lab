@@ -18,3 +18,37 @@ export function decodeCafeScores<T extends { cs?: number[]; char_scores?: Record
     return { ...(rest as T), char_scores };
   });
 }
+
+// 🧩 지도 데이터 조각 수(2026-10-10) — Vercel CDN은 10MB 넘는 응답을 캐시하지 않는다(미리보기 실측: 9MB HIT·14.9MB MISS).
+//   조각 = id % MAP_PARTS. 서버(app/api/cafes)와 아래 fetchMapCafes가 이 값 하나를 함께 쓴다.
+export const MAP_PARTS = 4;
+
+type MapCafeRaw = { id: number | string; note?: string; synth_count?: number | null };
+
+// 서버 원래 순서(메모 있는 곳 먼저 → 후기 수 많은 순)를 조각을 합친 뒤 똑같이 재현한다. 동률은 id로 고정.
+function byServerOrder(a: MapCafeRaw, b: MapCafeRaw): number {
+  const na = a.note ? 1 : 0, nb = b.note ? 1 : 0;
+  if (na !== nb) return nb - na;
+  const ca = a.synth_count ?? -1, cb = b.synth_count ?? -1;
+  if (ca !== cb) return cb - ca;
+  return Number(a.id) - Number(b.id);
+}
+
+/** 지도용 공개 카페 전량. 조각 4개를 병렬로 받아 합치고, 하나라도 실패하면 전체 응답 1개로 되돌아간다(화면은 절대 비지 않게). */
+export async function fetchMapCafes<T = any>(): Promise<T[]> {
+  try {
+    const ds = await Promise.all(Array.from({ length: MAP_PARTS }, (_, k) =>
+      fetch(`/api/cafes?part=${k}`).then((r) => { if (!r.ok) throw new Error(String(r.status)); return r.json(); })));
+    if (ds.every((d, k) => d?.ok && d.part === k && d.parts === MAP_PARTS && Array.isArray(d.cafes))) {
+      const seen = new Set<string>();
+      const all: MapCafeRaw[] = [];
+      for (const d of ds) for (const c of d.cafes as MapCafeRaw[]) {
+        const key = String(c.id);
+        if (!seen.has(key)) { seen.add(key); all.push(c); }
+      }
+      if (all.length > 0) return all.sort(byServerOrder) as unknown as T[];
+    }
+  } catch {}
+  const d = await (await fetch("/api/cafes")).json();
+  return (d?.cafes ?? []) as T[];
+}
