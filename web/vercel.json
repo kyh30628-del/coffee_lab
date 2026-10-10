@@ -4,6 +4,14 @@
     {
       "path": "/api/cron-costwatch",
       "schedule": "0 23 * * *"
+    },
+    {
+      "path": "/api/cron-cache-flush?tier=hour",
+      "schedule": "7 * * * *"
+    },
+    {
+      "path": "/api/cron-cache-flush?tier=day",
+      "schedule": "20 18 * * *"
     }
   ]
 }

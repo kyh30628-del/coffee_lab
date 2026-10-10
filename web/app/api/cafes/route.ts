@@ -6,6 +6,7 @@ import { subscriptionLive } from "@/lib/flags";
 import { encodeCharScores } from "@/lib/mapCafes";
 import { ownerManagedIds } from "@/lib/ownerManaged"; // 🏅 사장님 관리 배지 단일출처
 import { cardFacets } from "@/lib/cafeProfile";
+import { CAFES_MAP_TAG } from "@/lib/cafeCacheInvalidate";
 export const runtime = "nodejs";
 // 🧊 2026-09-01 — CDN 캐시 60초 재도입(CEO 승인). 이유와 조건은 아래.
 //
@@ -30,9 +31,7 @@ export const runtime = "nodejs";
 //   비용: 요청마다 버전 쿼리 1회지만 09-22 추가한 `idx_cafes_pub_freshness`로 Index Only Scan이다(비용 1/4).
 //   10.8MB 본문은 데이터가 바뀔 때만 다시 만든다(메모리 캐시 적중 시 전송만).
 export const dynamic = "force-dynamic";
-// 🧊 대신 **CDN 60초**(수동 s-maxage)로 DB 깨움을 막는다. 라우트 캐시와 달리 CDN은 10MB급도 담고,
-//   시간이 지나면 스스로 만료돼 "저장 실패 → 옛 항목 영구 노출" 함정이 없다. 최악 지연 60초(원설계가 허용한 값).
-//   ⚠️ 이 항목은 revalidatePath로 못 지운다 — 그래서 60초로 짧게 잡는다.
+// 🧊 대신 CDN 캐시로 DB 깨움을 막는다 — 2026-10-10부터 아래 mapResponse(스트리밍·태그 purge) 참조.
 
 // 🗺️ 지도·목록용 응답. 무거운 synth_reviews는 제외(상세 열 때 따로 로드).
 //
@@ -44,7 +43,37 @@ export const dynamic = "force-dynamic";
 //   (공개 수 · MAX(updated_at) · MAX(synth_updated)) 직전과 같으면 만들어 둔 응답을 그대로 준다.
 //   데이터가 바뀌면 버전이 즉시 달라져 **always-fresh는 그대로**고, 안 바뀐 동안의 4MB 전송만 사라진다.
 //   실측 근거: 공개 카페 변경은 최근 1시간 0건·24시간 21건 → 대부분의 요청이 캐시 적중.
-type Cached = { version: string; body: string };
+type Cached = { version: string; body: Uint8Array };
+
+// 🧊 2026-10-10 — CDN 캐시를 실제로 걸리게 고쳤다(CEO "ISR·재생성 제대로").
+//   실측(10-09): 본문 14.9MB라 **매 요청 x-vercel-cache: MISS** — Vercel CDN은 일반 함수 응답을 10MB까지만
+//   담는다(스트리밍 응답은 20MB). 그래서 위의 s-maxage=60은 아무 효과가 없었고, 지도를 열 때마다
+//   함수 실행 + 15MB 원점 전송 + 버전 쿼리(DB 깨움)가 일어났다.
+//   → ①본문을 바이트 조각으로 **스트리밍** 해 20MB 한도 안에 든다(문자열을 자르면 한글 서로게이트가 깨지므로
+//        한 번 UTF-8로 인코딩한 바이트를 자른다) ②CDN 전용 헤더로 10분 보관 + 태그.
+//   신선도: 공개/등급이 바뀌면 lib/cafeCacheInvalidate가 태그로 즉시 지운다(2분 1회로 묶음).
+//           그 밖의 변경(후기 수 등)은 최대 10분 뒤 반영. 브라우저 캐시는 계속 0(max-age=0).
+//   ⚠️ 하루 수백 곳씩 늘어 20MB에 닿으면 다시 MISS로 돌아간다(장애는 아님, 비용만 지금 수준) — 아침 스윕이 크기를 볼 것.
+const CHUNK = 256 * 1024;
+function mapResponse(body: Uint8Array, mark: "HIT" | "MISS") {
+  let i = 0;
+  const stream = new ReadableStream<Uint8Array>({
+    pull(ctrl) {
+      if (i >= body.length) { ctrl.close(); return; }
+      ctrl.enqueue(body.subarray(i, i + CHUNK));
+      i += CHUNK;
+    },
+  });
+  return new NextResponse(stream, {
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": "public, max-age=0, must-revalidate",
+      "Vercel-CDN-Cache-Control": "public, max-age=600, stale-while-revalidate=600",
+      "Vercel-Cache-Tag": CAFES_MAP_TAG,
+      "X-Cafes-Cache": mark,
+    },
+  });
+}
 let cache: Cached | null = null;
 
 export async function GET() {
@@ -58,11 +87,7 @@ export async function GET() {
     const owned = await ownerManagedIds();
     const ownedSig = [...owned].sort((a, b) => a - b).join(",");
     const version = `${v?.n ?? 0}|${v?.u ?? ""}|${v?.s ?? ""}|${live ? 1 : 0}|${ownedSig}`;
-    if (cache && cache.version === version) {
-      return new NextResponse(cache.body, {
-        headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=0, s-maxage=60, must-revalidate", "X-Cafes-Cache": "HIT" },
-      });
-    }
+    if (cache && cache.version === version) return mapResponse(cache.body, "HIT");
     await loadCriteria(); // 배지 임계(criteria) 프라임 — 없으면 폴백 DEFAULTS로 동작
     const cafes = await sql`
       SELECT c.id, c.name, c.area, c.dong, c.lat, c.lng, c.vibe, c.note, c.signature,
@@ -121,11 +146,9 @@ export async function GET() {
     // 🔎 재발 감시(2026-09-23): 맨 앞에 건수를 넣어 **첫 200바이트만 받아도** 지도 데이터가 굳었는지 알 수 있게 한다.
     //   09-23 사고: 응답이 캐시 한도를 넘겨 2시간 45분간 옛 데이터가 나갔는데 아무도 몰랐다(대표님이 화면 숫자로 발견).
     //   아침 스윕이 Range 요청 1회로 DB 공개 수와 대조한다 — 전송 0에 가깝다.
-    const body = JSON.stringify({ ok: true, n: out.length, cafes: out });
+    const body = new TextEncoder().encode(JSON.stringify({ ok: true, n: out.length, cafes: out }));
     cache = { version, body };
-    return new NextResponse(body, {
-      headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=0, s-maxage=60, must-revalidate", "X-Cafes-Cache": "MISS" },
-    });
+    return mapResponse(body, "MISS");
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e), cafes: [] }, { status: 500 });
   }
