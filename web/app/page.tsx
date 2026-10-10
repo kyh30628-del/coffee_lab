@@ -18,7 +18,7 @@ import { buildAxisDist, cafeProfile, tasteVector, tasteSimilarity, GRADE_RANK, t
 import { FACET_EMOJI } from "@/lib/cafeProfile";
 import { useLockBodyScroll } from "@/lib/useLockBodyScroll";
 import { shareHookText } from "@/lib/shareCopy";
-import { decodeCafeScores } from "@/lib/mapCafes";
+import { decodeCafeScores, fetchMapCafes } from "@/lib/mapCafes";
 import { isOtherBusinessQuote, displayQuote, splitKeyTerms, rankNearby, nearbyTitle, fmtKm, monthlySeries, freshnessOf, CHAR_LABEL, charBarsOf, addrTail, igHandle, igProfileUrl, reviewAge } from "@/lib/cafeDetailView"; // 📓 상세 패널 2차 공용 계산
 
 type EvidenceReview = { quote: string; link?: string; source?: string; date?: string; trust?: "verified" | "reference" | "rejected"; score?: number; why?: string[] };
@@ -1271,12 +1271,11 @@ export default function Home() {
         }
       } catch {}
       try {
-        const r = await fetch("/api/cafes");
-        const r2 = r.clone(); // 본문 재직렬화 없이 스트림째 캐시에 저장
-        const d = await r.json();
+        // 🧩 2026-10-10: 조각 4개(각 ~3.7MB, CDN 캐시 가능)로 받아 합친다 — 실패하면 전체 1개로 자동 폴백(lib/mapCafes).
+        const list = await fetchMapCafes();
         fresh = true;
-        setCafes(decodeCafeScores(d.cafes ?? []));
-        try { await (await caches.open("dcn-cafes-v1")).put("/api/cafes", r2); localStorage.setItem("dcn_cafes_at", String(Date.now())); } catch {}
+        setCafes(decodeCafeScores(list));
+        try { await (await caches.open("dcn-cafes-v1")).put("/api/cafes", new Response(JSON.stringify({ ok: true, cafes: list }), { headers: { "Content-Type": "application/json" } })); localStorage.setItem("dcn_cafes_at", String(Date.now())); } catch {}
       } catch {}
     };
     const ric = (window as any).requestIdleCallback as ((cb: () => void, opts?: { timeout: number }) => number) | undefined;

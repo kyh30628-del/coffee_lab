@@ -3,7 +3,7 @@ import { visitorBadges } from "@/lib/visitorMix";
 import { loadCriteria } from "@/lib/criteria";
 import { sql, ensureSchema } from "@/lib/db";
 import { subscriptionLive } from "@/lib/flags";
-import { encodeCharScores } from "@/lib/mapCafes";
+import { encodeCharScores, MAP_PARTS } from "@/lib/mapCafes";
 import { ownerManagedIds } from "@/lib/ownerManaged"; // 🏅 사장님 관리 배지 단일출처
 import { cardFacets } from "@/lib/cafeProfile";
 import { CAFES_MAP_TAG } from "@/lib/cafeCacheInvalidate";
@@ -43,7 +43,7 @@ export const dynamic = "force-dynamic";
 //   (공개 수 · MAX(updated_at) · MAX(synth_updated)) 직전과 같으면 만들어 둔 응답을 그대로 준다.
 //   데이터가 바뀌면 버전이 즉시 달라져 **always-fresh는 그대로**고, 안 바뀐 동안의 4MB 전송만 사라진다.
 //   실측 근거: 공개 카페 변경은 최근 1시간 0건·24시간 21건 → 대부분의 요청이 캐시 적중.
-type Cached = { version: string; body: Uint8Array };
+type Cached = { version: string; body: Uint8Array; parts: Uint8Array[] };
 
 // 🧊 2026-10-10 — CDN 캐시를 실제로 걸리게 고쳤다(CEO "ISR·재생성 제대로").
 //   실측(10-09): 본문 14.9MB라 **매 요청 x-vercel-cache: MISS** — Vercel CDN은 일반 함수 응답을 10MB까지만
@@ -53,7 +53,11 @@ type Cached = { version: string; body: Uint8Array };
 //        한 번 UTF-8로 인코딩한 바이트를 자른다) ②CDN 전용 헤더로 10분 보관 + 태그.
 //   신선도: 공개/등급이 바뀌면 lib/cafeCacheInvalidate가 태그로 즉시 지운다(2분 1회로 묶음).
 //           그 밖의 변경(후기 수 등)은 최대 10분 뒤 반영. 브라우저 캐시는 계속 0(max-age=0).
-//   ⚠️ 하루 수백 곳씩 늘어 20MB에 닿으면 다시 MISS로 돌아간다(장애는 아님, 비용만 지금 수준) — 아침 스윕이 크기를 볼 것.
+// 🔴 미리보기 실측(10-10): 스트리밍으로 보내도 **9MB는 HIT, 14.9MB는 계속 MISS** — 이 프로젝트엔 실제로 10MB 한도가 걸린다.
+//   → 지도 화면은 `?part=0..3`(id % 4로 나눈 조각, 각 ~3.7MB)을 받아 합친다(lib/mapCafes.fetchMapCafes).
+//     id로 나누므로 조각끼리 갱신 시점이 달라도 빠짐·중복이 없고, 순서는 클라이언트가 같은 기준으로 다시 정렬한다.
+//   전체 응답(파라미터 없음)은 그대로 둔다 — 옛 화면·/cafe·아침 스윕(n 대조)이 쓴다. 이건 CDN에 안 담긴다(크기).
+//   ⚠️ 공개 카페가 지금의 ~2.7배(약 13만 곳)가 되면 조각도 10MB에 닿는다 — 그때 MAP_PARTS를 늘릴 것.
 const CHUNK = 256 * 1024;
 function mapResponse(body: Uint8Array, mark: "HIT" | "MISS") {
   let i = 0;
@@ -75,9 +79,14 @@ function mapResponse(body: Uint8Array, mark: "HIT" | "MISS") {
   });
 }
 let cache: Cached | null = null;
+let building: { version: string; p: Promise<Cached> } | null = null;
 
 export async function GET(req: Request) {
-  const probe = new URL(req.url).searchParams.get("probe"); // TEMP-PROBE
+  const partRaw = new URL(req.url).searchParams.get("part");
+  const part = partRaw == null ? null : Number(partRaw);
+  if (part != null && !(Number.isInteger(part) && part >= 0 && part < MAP_PARTS))
+    return NextResponse.json({ ok: false, error: "bad part" }, { status: 400 });
+  const pick = (c: Cached) => (part == null ? c.body : c.parts[part]);
   try {
     await ensureSchema();
     const [v] = (await sql`SELECT COUNT(*)::int n, COALESCE(MAX(updated_at)::text,'') u, COALESCE(MAX(synth_updated)::text,'') s
@@ -88,74 +97,81 @@ export async function GET(req: Request) {
     const owned = await ownerManagedIds();
     const ownedSig = [...owned].sort((a, b) => a - b).join(",");
     const version = `${v?.n ?? 0}|${v?.u ?? ""}|${v?.s ?? ""}|${live ? 1 : 0}|${ownedSig}`;
-    if (probe && cache) { // TEMP-PROBE
-      if (probe === "1") return mapResponse(cache.body.subarray(0, 1000), "HIT");
-      if (probe === "2") { const r = mapResponse(cache.body, "HIT"); r.headers.delete("Vercel-CDN-Cache-Control"); r.headers.set("Cache-Control", "public, max-age=0, s-maxage=600"); return r; }
-      if (probe === "3") return new NextResponse(cache.body as unknown as BodyInit, { headers: { "Content-Type": "application/json", "Vercel-CDN-Cache-Control": "public, max-age=600", "Cache-Control": "public, max-age=0, must-revalidate" } });
-      if (probe === "4") return mapResponse(cache.body.subarray(0, 9_000_000), "HIT");
+    if (cache && cache.version === version) return mapResponse(pick(cache), "HIT");
+    // 🔒 같은 버전을 동시에 여러 요청이 만들지 않게 한 번만 짓고 나눠 쓴다(조각 4개가 동시에 MISS 나는 순간 대비).
+    //   로컬 실측: 동시 콜드 요청 5개 중 3개가 대용량 쿼리 "terminated"로 500이었다.
+    if (!building || building.version !== version) {
+      const p = (async (): Promise<Cached> => {
+        await loadCriteria(); // 배지 임계(criteria) 프라임 — 없으면 폴백 DEFAULTS로 동작
+        const cafes = await sql`
+          SELECT c.id, c.name, c.area, c.dong, c.lat, c.lng, c.vibe, c.note, c.signature,
+                 c.synth_grade, c.synth_count, c.synth_identity, c.char_scores,
+                 c.visitor_n, c.visitor_trip, c.visitor_local, c.cautions, c.facets,
+                 COALESCE(p.featured AND p.approved AND (p.featured_until IS NULL OR p.featured_until > now()), false) AS featured,
+                 COALESCE(dt.is_tourist, false) AS dong_tourist
+          FROM cafes c
+          LEFT JOIN cafe_promos p ON p.cafe_id = c.id
+          -- 📰 관광지 동네(뉴스 기반, 2026-08-27) — dong_tourism은 ~1천 행이라 조인 비용 무시 수준.
+          LEFT JOIN dong_tourism dt ON dt.area = c.area AND dt.dong = c.dong
+          WHERE c.published = true
+          ORDER BY (c.note IS NOT NULL AND c.note <> '') DESC, c.synth_count DESC NULLS LAST
+        `;
+        // 📉 페이로드 축소 — 담는 정보는 그대로 두고 낭비만 걷어낸다(실측 raw 4.04MB→2.51MB).
+        //   ①빈 값은 키 자체를 뺀다(vibe·note·signature는 13,460곳 중 11곳만 값이 있다)
+        //   ②좌표는 소수 5자리(약 1m)로 반올림
+        //   ③char_scores 6축은 키 이름 대신 고정 순서 배열 `cs`로(단일 최대 항목, 전체의 26%)
+        //   구독 라이브 전에는 featured(금색 핀·추천)를 소비자에 숨긴다 — 예전과 동일하게 값 자체를 안 보냄.
+        const out = (cafes as any[]).map((c) => {
+          const o: Record<string, unknown> = {
+            id: c.id, name: c.name, area: c.area, dong: c.dong,
+            lat: typeof c.lat === "number" ? Math.round(c.lat * 1e5) / 1e5 : c.lat,
+            lng: typeof c.lng === "number" ? Math.round(c.lng * 1e5) / 1e5 : c.lng,
+            synth_grade: c.synth_grade, synth_count: c.synth_count, synth_identity: c.synth_identity,
+          };
+          if (c.vibe) o.vibe = c.vibe;
+          if (c.note) o.note = c.note;
+          if (c.signature) o.signature = c.signature;
+          if (live && c.featured) o.featured = true;
+          const cs = encodeCharScores(c.char_scores);
+          if (cs) o.cs = cs;
+          // 🧳🏠 방문객 성격 배지 — 판정은 서버에서 하고 **붙는 곳만** 2글자로 보낸다("T"/"L"/"TL").
+          //   13,634곳 전체에 숫자 3개를 실으면 페이로드가 커진다(위 ①~③ 축소 원칙과 같은 결).
+          let vb = visitorBadges({ n: c.visitor_n ?? 0, trip: c.visitor_trip ?? 0, local: c.visitor_local ?? 0 })
+            .map((b) => (b.key === "trip" ? "T" : "L")).join("");
+          // "D" = 관광지로 알려진 동네(언론 보도 기준·동 단위 판정 — CEO 08-25 "후기 말투가 아니라 공개된 사실로").
+          if (c.dong_tourist) vb += "D";
+          if (vb) o.vb = vb;
+          // ⚠️ "이건 알고 가세요"(2026-09-14) — 지도·목록 카드에도 붙인다.
+          //   ⚠️ 이 응답은 공개 전량(약 26,700곳·2.51MB)이라 jsonb를 통째로 실으면 안 된다.
+          //   라벨 2개만 "·"로 이어 **짧은 문자열 1개**로 보낸다(있는 카페에만 키 추가 → 없는 곳은 낭비 0).
+          if (Array.isArray(c.cautions) && c.cautions.length) {
+            const cau = c.cautions.slice(0, 2).map((x: any) => String(x?.label ?? "")).filter(Boolean).join("·");
+            if (cau) o.cau = cau;
+          }
+          // 🅿️ 시설 3개 — 카드 시각 앵커. ⚠️ 이 응답은 공개 전량(2.51MB)이라 **아이콘/라벨 문자열은 싣지 않는다.**
+          //   라벨만 "·"로 이은 짧은 문자열로 보내고, 아이콘은 클라이언트가 사전에서 붙인다(전송 최소).
+          if (Array.isArray(c.facets) && c.facets.length) {
+            const f = cardFacets(c.facets, 3).map((x: { label: string }) => x.label).join("·");
+            if (f) o.fac = f;
+          }
+          if (owned.has(Number(c.id))) o.om = 1; // 🏅 사장님이 직접 관리 중(구독·체험 유효). 해당 카페에만 키를 넣어 페이로드 낭비 0
+          return o;
+        });
+        // 🔎 재발 감시(2026-09-23): 맨 앞에 건수를 넣어 **첫 200바이트만 받아도** 지도 데이터가 굳었는지 알 수 있게 한다.
+        //   09-23 사고: 응답이 캐시 한도를 넘겨 2시간 45분간 옛 데이터가 나갔는데 아무도 몰랐다(대표님이 화면 숫자로 발견).
+        //   아침 스윕이 Range 요청 1회로 DB 공개 수와 대조한다 — 전송 0에 가깝다.
+        const enc = new TextEncoder();
+        const body = enc.encode(JSON.stringify({ ok: true, n: out.length, cafes: out }));
+        const parts = Array.from({ length: MAP_PARTS }, (_, k) =>
+          enc.encode(JSON.stringify({ ok: true, n: out.length, part: k, parts: MAP_PARTS,
+            cafes: out.filter((o) => Number(o.id) % MAP_PARTS === k) })));
+        return { version, body, parts };
+      })();
+      const b = { version, p };
+      building = b;
+      p.then((c) => { cache = c; }, () => {}).finally(() => { if (building === b) building = null; });
     }
-    if (cache && cache.version === version) return mapResponse(cache.body, "HIT");
-    await loadCriteria(); // 배지 임계(criteria) 프라임 — 없으면 폴백 DEFAULTS로 동작
-    const cafes = await sql`
-      SELECT c.id, c.name, c.area, c.dong, c.lat, c.lng, c.vibe, c.note, c.signature,
-             c.synth_grade, c.synth_count, c.synth_identity, c.char_scores,
-             c.visitor_n, c.visitor_trip, c.visitor_local, c.cautions, c.facets,
-             COALESCE(p.featured AND p.approved AND (p.featured_until IS NULL OR p.featured_until > now()), false) AS featured,
-             COALESCE(dt.is_tourist, false) AS dong_tourist
-      FROM cafes c
-      LEFT JOIN cafe_promos p ON p.cafe_id = c.id
-      -- 📰 관광지 동네(뉴스 기반, 2026-08-27) — dong_tourism은 ~1천 행이라 조인 비용 무시 수준.
-      LEFT JOIN dong_tourism dt ON dt.area = c.area AND dt.dong = c.dong
-      WHERE c.published = true
-      ORDER BY (c.note IS NOT NULL AND c.note <> '') DESC, c.synth_count DESC NULLS LAST
-    `;
-    // 📉 페이로드 축소 — 담는 정보는 그대로 두고 낭비만 걷어낸다(실측 raw 4.04MB→2.51MB).
-    //   ①빈 값은 키 자체를 뺀다(vibe·note·signature는 13,460곳 중 11곳만 값이 있다)
-    //   ②좌표는 소수 5자리(약 1m)로 반올림
-    //   ③char_scores 6축은 키 이름 대신 고정 순서 배열 `cs`로(단일 최대 항목, 전체의 26%)
-    //   구독 라이브 전에는 featured(금색 핀·추천)를 소비자에 숨긴다 — 예전과 동일하게 값 자체를 안 보냄.
-    const out = (cafes as any[]).map((c) => {
-      const o: Record<string, unknown> = {
-        id: c.id, name: c.name, area: c.area, dong: c.dong,
-        lat: typeof c.lat === "number" ? Math.round(c.lat * 1e5) / 1e5 : c.lat,
-        lng: typeof c.lng === "number" ? Math.round(c.lng * 1e5) / 1e5 : c.lng,
-        synth_grade: c.synth_grade, synth_count: c.synth_count, synth_identity: c.synth_identity,
-      };
-      if (c.vibe) o.vibe = c.vibe;
-      if (c.note) o.note = c.note;
-      if (c.signature) o.signature = c.signature;
-      if (live && c.featured) o.featured = true;
-      const cs = encodeCharScores(c.char_scores);
-      if (cs) o.cs = cs;
-      // 🧳🏠 방문객 성격 배지 — 판정은 서버에서 하고 **붙는 곳만** 2글자로 보낸다("T"/"L"/"TL").
-      //   13,634곳 전체에 숫자 3개를 실으면 페이로드가 커진다(위 ①~③ 축소 원칙과 같은 결).
-      let vb = visitorBadges({ n: c.visitor_n ?? 0, trip: c.visitor_trip ?? 0, local: c.visitor_local ?? 0 })
-        .map((b) => (b.key === "trip" ? "T" : "L")).join("");
-      // "D" = 관광지로 알려진 동네(언론 보도 기준·동 단위 판정 — CEO 08-25 "후기 말투가 아니라 공개된 사실로").
-      if (c.dong_tourist) vb += "D";
-      if (vb) o.vb = vb;
-      // ⚠️ "이건 알고 가세요"(2026-09-14) — 지도·목록 카드에도 붙인다.
-      //   ⚠️ 이 응답은 공개 전량(약 26,700곳·2.51MB)이라 jsonb를 통째로 실으면 안 된다.
-      //   라벨 2개만 "·"로 이어 **짧은 문자열 1개**로 보낸다(있는 카페에만 키 추가 → 없는 곳은 낭비 0).
-      if (Array.isArray(c.cautions) && c.cautions.length) {
-        const cau = c.cautions.slice(0, 2).map((x: any) => String(x?.label ?? "")).filter(Boolean).join("·");
-        if (cau) o.cau = cau;
-      }
-      // 🅿️ 시설 3개 — 카드 시각 앵커. ⚠️ 이 응답은 공개 전량(2.51MB)이라 **아이콘/라벨 문자열은 싣지 않는다.**
-      //   라벨만 "·"로 이은 짧은 문자열로 보내고, 아이콘은 클라이언트가 사전에서 붙인다(전송 최소).
-      if (Array.isArray(c.facets) && c.facets.length) {
-        const f = cardFacets(c.facets, 3).map((x: { label: string }) => x.label).join("·");
-        if (f) o.fac = f;
-      }
-      if (owned.has(Number(c.id))) o.om = 1; // 🏅 사장님이 직접 관리 중(구독·체험 유효). 해당 카페에만 키를 넣어 페이로드 낭비 0
-      return o;
-    });
-    // 🔎 재발 감시(2026-09-23): 맨 앞에 건수를 넣어 **첫 200바이트만 받아도** 지도 데이터가 굳었는지 알 수 있게 한다.
-    //   09-23 사고: 응답이 캐시 한도를 넘겨 2시간 45분간 옛 데이터가 나갔는데 아무도 몰랐다(대표님이 화면 숫자로 발견).
-    //   아침 스윕이 Range 요청 1회로 DB 공개 수와 대조한다 — 전송 0에 가깝다.
-    const body = new TextEncoder().encode(JSON.stringify({ ok: true, n: out.length, cafes: out }));
-    cache = { version, body };
-    return mapResponse(body, "MISS");
+    return mapResponse(pick(await building.p), "MISS");
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e), cafes: [] }, { status: 500 });
   }
