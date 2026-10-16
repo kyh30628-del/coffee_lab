@@ -104,15 +104,26 @@ export async function GET(req: NextRequest) {
     //   ④30일 안전망(지문이 못 잡는 드리프트 대비 — 고덕방 38일 방치 사고의 재발 한도)뿐이다.
     //   규칙이 바뀌면 지문이 바뀌어 자연히 전수 재검 1회가 돌고, 그 뒤 다시 잠잠해진다.
     const rulesFp = await rulesFingerprint();
+    // 🧲 2026-10-16(CEO "근거 오염·광고·협찬을 항상 제대로 감지해서 조치해") — 광고·협찬 플래그 우선 처리.
+    //   쓰기 시점 트리거가 굳혀 둔 synth_ev_flags.adflag_n(= 노출 후기에 협찬·체험단·리뷰이벤트·영수증리뷰·
+    //   기자단 신호)을 **정렬 1순위**로 올린다. 오염 카페가 48,639곳 순환(24일)을 기다리지 않고 몇 시간 안에 재판정된다.
+    //   💰 추가 비용 0 — 처리 곳수(GEN_MAX)도 쿼리 수도 그대로고 '순서'만 바뀐다. 정렬은 idx_cafes_adflag 부분인덱스.
+    //   ♻️ 재선정 낭비 방지: 플래그만으로 상시 재선정하면 '협찬 아님'처럼 재판정해도 안 사라지는 카페를 매 런 다시
+    //      돌게 된다(그게 낭비다). 그래서 플래그 단독 자격은 7일에 한 번으로 묶는다 — 규칙이 바뀌면 어차피 지문으로 잡힌다.
     const genRows = (await sql`
       SELECT id, name, area, synth_count FROM cafes
       WHERE published = true AND raw_reviews IS NOT NULL
         AND (raw_collected_at > synth_checked_at OR synth_checked_at IS NULL
              OR rules_fp IS DISTINCT FROM ${rulesFp}
-             OR synth_checked_at < now() - interval '30 days')
-      ORDER BY (raw_collected_at > synth_checked_at) DESC, synth_checked_at ASC NULLS FIRST
+             OR synth_checked_at < now() - interval '30 days'
+             OR (COALESCE((synth_ev_flags->>'adflag_n')::int, 0) > 0
+                 AND synth_checked_at < now() - interval '7 days'))
+      ORDER BY (COALESCE((synth_ev_flags->>'adflag_n')::int, 0) > 0) DESC,
+               (raw_collected_at > synth_checked_at) DESC, synth_checked_at ASC NULLS FIRST
       LIMIT ${GEN_MAX}
     `) as unknown as { id: number; name: string; area: string; synth_count: number }[];
+    const gAdFlagged = (await sql`SELECT count(*)::int n FROM cafes
+      WHERE published AND COALESCE((synth_ev_flags->>'adflag_n')::int, 0) > 0`)[0] as unknown as { n: number };
     let gi = 0, gDone = 0, gErr = 0; const gErrSamples: string[] = []; const gUnpub: number[] = []; const gChangedIds: number[] = []; let gStop = false;
     const genWorker = async () => {
       while (!gStop) {
@@ -209,7 +220,7 @@ export async function GET(req: NextRequest) {
     if (toInvalidate.length) { const { invalidateCafeCaches } = await import("@/lib/cafeCacheInvalidate"); await invalidateCafeCaches(toInvalidate).catch(() => {}); }
 
     const _u = runUsage(); if (!_u?.overBudget) void clearOverBudget("cron-resynth"); // 💰 하네스 L1 — 이번 런의 큰 컬럼 소비량을 원장에 남긴다
-    await recordRun("cron-resynth", true, `raw정리 ${purged.length} 유튜브 ${ytRefreshed.length} · 구독재수집 ${subResults.length} · 파기재수집 ${recollected}${recollectErr ? `(오류 ${recollectErr})` : ""}${recollectSkip ? `(스킵:${recollectSkip})` : ""} · 전수적용 ${gDone}(변동 ${gChangedIds.length}·비공개 ${gUnpub.length}·오류 ${gErr}) · held재평가 ${heldDone}(복귀 ${heldFreed}·오류 ${heldErr}) · rejected재평가 ${rejDone}(복귀 ${rejFreed}·오류 ${rejErr})${gErr > 0 ? ` [${gErrSamples.join(" / ")}]` : ""}${gStop ? " ⚠️차단기발동" : ""}`, gDone, { metrics: { blobReads: _u?.blobReads ?? 0, wallMs: _u?.wallMs ?? 0 } });
+    await recordRun("cron-resynth", true, `광고·협찬플래그 ${gAdFlagged?.n ?? 0}곳(우선처리) · raw정리 ${purged.length} 유튜브 ${ytRefreshed.length} · 구독재수집 ${subResults.length} · 파기재수집 ${recollected}${recollectErr ? `(오류 ${recollectErr})` : ""}${recollectSkip ? `(스킵:${recollectSkip})` : ""} · 전수적용 ${gDone}(변동 ${gChangedIds.length}·비공개 ${gUnpub.length}·오류 ${gErr}) · held재평가 ${heldDone}(복귀 ${heldFreed}·오류 ${heldErr}) · rejected재평가 ${rejDone}(복귀 ${rejFreed}·오류 ${rejErr})${gErr > 0 ? ` [${gErrSamples.join(" / ")}]` : ""}${gStop ? " ⚠️차단기발동" : ""}`, gDone, { metrics: { blobReads: _u?.blobReads ?? 0, wallMs: _u?.wallMs ?? 0 } });
     return NextResponse.json({ ok: true, ranAt: new Date().toISOString(), rawPurged: purged.length, ytRefreshed: ytRefreshed.length, subResynth: subResults.length, netApplied: gDone, changed: gChangedIds.length, unpublished: gUnpub.length, breaker: gStop, heldReeval: { done: heldDone, freed: heldFreed }, rejectedReeval: { done: rejDone, freed: rejFreed } });
   } catch (e) {
     await recordRun("cron-resynth", false, String(e).slice(0, 150));
