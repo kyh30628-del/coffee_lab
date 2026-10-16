@@ -718,6 +718,8 @@ export default function AdminPage() {
                     <span>주간(WAU) <b className="text-sky-700">{tower.traffic.wau}</b></span>
                     <span>월간(MAU) <b className="text-sky-700">{tower.traffic.mau}</b></span>
                     <span>재방문 <b className="text-stone-700">{tower.traffic.retention?.returning ?? 0}</b></span>
+                    {/* 📈 2026-10-16(CEO 지시) — 월별 누적·전국 230개 지역 전수는 전용 화면으로 */}
+                    <a href="/admin/traffic" onClick={(e) => e.stopPropagation()} className="ml-auto font-bold text-sky-700 underline">월별·전국 전체 →</a>
                   </div>
                   {/* 🕒 판정 신선도(2026-09-14) — "50이었다가 45로 줄었다"의 답을 화면에 둔다. */}
                   <div className="mt-1 pt-1 border-t border-sky-200/70 text-[10px] leading-relaxed text-stone-600">
