@@ -72,8 +72,12 @@ export async function POST(req: NextRequest) {
       // 🐛 2026-08-25 전수점검: 좌표 근접(55m)만으로 이름검증 없이 중복 처리하던 과잉차단 교정
       //   (decisions#814와 같은 버그·밀도 의존). 좌표는 후보만, 동일 판정은 이름으로.
       const nameHit = await sql`SELECT id FROM cafes WHERE name = ${it.name} LIMIT 1`;
+      // 🔴 2026-10-10 비용사고 — ABS(lat-x)<y는 btree 인덱스를 못 타 **호출마다 cafes 전수 스캔**이었다.
+      //   실측(10-10): 이 질의 하나가 5,607회 호출되며 하루 399.9GB를 읽어 cost_guard 전역 자동정지를 유발했다
+      //   (resynth·sentinel·exposure가 14시간 넘게 스킵됨). BETWEEN이면 같은 결과를 idx_cafes_latlng_all로 받는다.
       const nearRows = nameHit.length ? [] : (await sql`SELECT id, name FROM cafes
-        WHERE ABS(lat - ${it.lat}) < 0.0005 AND ABS(lng - ${it.lng}) < 0.0005 LIMIT 5`) as any[];
+        WHERE lat BETWEEN ${it.lat - 0.0005} AND ${it.lat + 0.0005}
+          AND lng BETWEEN ${it.lng - 0.0005} AND ${it.lng + 0.0005} LIMIT 5`) as any[];
       const exists = nameHit.length ? nameHit
         : (nearRows.some((r: any) => brandTokenOverlap(r.name, it.name)) ? nearRows : []);
       if (exists.length > 0) { skipped++; continue; }

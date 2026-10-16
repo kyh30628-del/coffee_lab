@@ -497,18 +497,26 @@ export async function GET(req: NextRequest) {
       //   → 적체 메움은 '늦어도 되는 백그라운드'지만 오염 노출은 **지금 소비자가 보는 손상**이다.
       //     비용도 정반대다: 이건 UPDATE 한 방(수십 ms), 앞의 루프는 카페당 수 초. 맨 앞으로 올린다.
       // (e-1c) 이름오염(coherence<0.3) 자동 홀드 — 노출 후기가 실제 그 카페를 거의 안 말하는 공개 카페(namepol HIGH, 토큰충돌 오염).
-      //   결정론이 '명확 통과'로 분류해 AI판정 대상조차 안 되는 오염은 coherence가 유일한 그물. 지금껏 이슈만 뜨고 자동조치 없어
-      //   '처리중'으로 방치됐음(#1420). raw 있어도 재합성으로 coherence 안 오르면 홀드(되돌림가능·재합성 개선 시 복귀). 대량이면 규칙회귀로 보고 중단·경보.
+      //   결정론이 '명확 통과'로 분류해 AI판정 대상조차 안 되는 오염은 coherence가 유일한 그물.
+      //   🔴 2026-10-16 수리 — 예전엔 LIMIT 16 전부-아니면-전무(all-or-nothing)였다. 한 번 적체가 16곳을 넘으면
+      //   "규칙회귀 의심"으로 **영구 중단**됐고, 다음 회차도 같은 16+곳을 또 보고 또 중단해 절대 안 풀렸다
+      //   (#1420 실측: 06-30 최초 탐지 후 10-16까지 108일간 자동조치 0건·방치 중 17곳까지 누적, 전부 실제 오염 확인됨 —
+      //   수동 표본 7곳 전수가 옆가게/등산기·행정공지 등 확실한 교차오염이었다).
+      //   → cron-resynth와 같은 설계(GEN_MAX 전량이 아니라 회차당 한도)로 바꾼다: 안전상한(진짜 규칙회귀면 걸림)은
+      //   훨씬 높게 두고(200 — 하루 안에 이 숫자가 새로 생기면 그건 정말 회귀다), 회차당 실제 홀드는 20곳으로 묶어
+      //   누적분을 **매 회차 조금씩 영구히 드레인**한다. 오래 방치된 것부터(id 오름차순=먼저 탐지된 것부터).
       try {
-        const namepol = (await sql`SELECT id, name FROM cafes
+        const HOLD_SAFETY_CEIL = 200, HOLD_PER_RUN = 20;
+        const namepolAll = (await sql`SELECT id, name FROM cafes
           WHERE published AND synth_coherence IS NOT NULL AND synth_coherence < 0.3
-            AND COALESCE(offctx_ok, false) = false ORDER BY id LIMIT 16`) as any[];
-        if (namepol.length > 15) {
-          integrity.push(`🚨이름오염(coherence<0.3) 급증(${namepol.length}곳+) — 규칙회귀 의심, 자동홀드 중단·즉시 점검`);
-        } else if (namepol.length > 0) {
+            AND COALESCE(offctx_ok, false) = false ORDER BY id LIMIT ${HOLD_SAFETY_CEIL + 1}`) as any[];
+        if (namepolAll.length > HOLD_SAFETY_CEIL) {
+          integrity.push(`🚨이름오염(coherence<0.3) 급증(${namepolAll.length}곳+) — 규칙회귀 의심, 자동홀드 중단·즉시 점검`);
+        } else if (namepolAll.length > 0) {
+          const batch = namepolAll.slice(0, HOLD_PER_RUN).map((x: any) => Number(x.id));
           const r = (await sql`UPDATE cafes SET published=false, pipeline_status='held', updated_at=now()
-            WHERE published AND synth_coherence < 0.3 AND COALESCE(offctx_ok, false) = false RETURNING id`) as any[];
-          if (r.length) { unpubThisRun += r.length; await invalidateCafeCaches(r.map((x: any) => x.id)).catch(() => {}); healed.push(`이름오염(coherence<0.3) ${r.length}곳 자동 홀드(${namepol.slice(0, 3).map((x: any) => x.name).join(", ")})`); }
+            WHERE id = ANY(${batch}::bigint[]) AND published RETURNING id`) as any[];
+          if (r.length) { unpubThisRun += r.length; await invalidateCafeCaches(r.map((x: any) => x.id)).catch(() => {}); healed.push(`이름오염(coherence<0.3) ${r.length}곳 자동 홀드(잔여 ${namepolAll.length - r.length}곳, ${namepolAll.slice(0, 3).map((x: any) => x.name).join(", ")})`); }
         }
       } catch {}
       // (a) 합성 적체(raw 있는데 미합성) 메움 → 신규 'new'가 'pending'으로 진행

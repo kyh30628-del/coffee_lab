@@ -62,7 +62,9 @@ const CONTRACTS: Record<string, Partial<JobContract>> = {
   //   실측: 런당 blobReads 300~326(처리 300건과 1:1, 폭주 아님). 300 + 여유 = 350.
   //   ⚠️ 경보를 끄려고 예산을 올리는 게 아니다 — 실제 비용 게이트는 24h 창 예산이고 그건 이미 갱신됐다.
   //   일별 디스크읽기와도 상관없음을 실측 확인(09-07 349GB/blob 314 vs 09-11 52GB/blob 608).
-  "cron-resynth": { tier: "L2", budget: { blobReads: 350, rows: 40000, wallMs: 300_000 }, writes: ["cafes.synth_*", "reviewer_cafes.*"] },
+  // 📌 2026-10-16(#10935 수리) — 같은 이유로 또 한 번: GEN_MAX 300→500(공개 48,639곳에서 순환 40.5일 → 안전망 30일 초과).
+  //   런당 처리 500건과 1:1이므로 500 + 같은 비율 여유(약 17%) = 600.
+  "cron-resynth": { tier: "L2", budget: { blobReads: 600, rows: 40000, wallMs: 300_000 }, writes: ["cafes.synth_*", "reviewer_cafes.*"] },
   "cron-synth": { tier: "L2", budget: { blobReads: 60, rows: 40000, wallMs: 300_000 }, writes: ["cafes.synth_*", "cafes.published", "reviewer_cafes.*"] },
   // 발굴·수집 — 네이버 쿼터가 진짜 제약(일 25,000). 신규 발굴 카페를 합성할 때 raw를 곳당 1회 로드한다
   //   (5일 실측: 런당 1~6회, 합성 상한 5곳+검증여유). 08-08의 blobReads:0 선언은 이 정당 경로를 몰랐던 오기 —
