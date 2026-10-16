@@ -154,6 +154,33 @@ async function runChecks(): Promise<Check[]> {
   return checks;
 }
 
+// 🧪 오염 유형 전수 집계(2026-10-16, CEO "오염 유형이 왜 7가지밖에 안 되냐") —
+//   엔진(lib/reviewQuality.ts)은 이미 **86종**의 오염을 판정해 카페마다 synth_quality.rejectReasons에
+//   유형별 건수를 적어 둔다(실측: 누적 3,483,691건 제외). 빠져 있던 건 '감지'가 아니라 **집계·가시화**였다.
+//   여기서는 그 기록만 합산한다 — 새 판정도, raw_reviews 접근도 없다.
+//   💰 비용: synth_quality(전체 38MB) 1회 스캔 ≈ 3초, **하루 1회만**(아래 20h 가드). 새 크론·새 컬럼 없음.
+//   ⚠️ 사유 문자열엔 상호·주소 같은 변수가 섞여 그대로 세면 7만 종으로 보인다 → 괄호 이하를 잘라 정규화한다.
+async function contamCensus(): Promise<{ cats: number; total: number; delta: number } | null> {
+  try {
+    const claimed = (await sql`INSERT INTO cache_purge_state (k, at) VALUES ('contam_census', now())
+      ON CONFLICT (k) DO UPDATE SET at = now()
+      WHERE cache_purge_state.at < now() - interval '20 hours' RETURNING k`) as unknown[];
+    if (!claimed.length) return null; // 하루 1회만 — 중복 스캔이 곧 낭비
+    const rows = (await sql`
+      SELECT regexp_replace(regexp_replace(k, '\\(.*', '', 'g'), $q$'[^']*'$q$, '', 'g') AS cat,
+             count(DISTINCT id)::int cafes, sum(v::int)::int reviews
+      FROM cafes, LATERAL jsonb_each_text(COALESCE(synth_quality->'rejectReasons','{}'::jsonb)) AS e(k, v)
+      WHERE published GROUP BY 1 ORDER BY reviews DESC`) as { cat: string; cafes: number; reviews: number }[];
+    const total = rows.reduce((a, r) => a + Number(r.reviews || 0), 0);
+    await sql`CREATE TABLE IF NOT EXISTS contam_census (id SERIAL PRIMARY KEY, ran_at TIMESTAMPTZ DEFAULT now(), cats INT, total BIGINT, top JSONB)`;
+    const prevRows = (await sql`SELECT total FROM contam_census ORDER BY ran_at DESC LIMIT 1`) as { total: string }[];
+    await sql`INSERT INTO contam_census (cats, total, top) VALUES (${rows.length}, ${total},
+      ${JSON.stringify(rows.slice(0, 40).map((r) => ({ cat: r.cat.trim(), cafes: r.cafes, reviews: r.reviews })))}::jsonb)`;
+    await sql`DELETE FROM contam_census WHERE id NOT IN (SELECT id FROM contam_census ORDER BY ran_at DESC LIMIT 90)`;
+    return { cats: rows.length, total, delta: prevRows.length ? total - Number(prevRows[0].total) : 0 };
+  } catch { return null; }
+}
+
 export async function GET(req: NextRequest) {
   startJobRun("cron-verify"); openScope("cron-verify"); // 💰🔐 하네스 L1·L3 — 큰 컬럼 계량 + 쓰기 스코프
   try {
@@ -223,12 +250,13 @@ export async function GET(req: NextRequest) {
     const warns = checks.filter((c) => c.severity === "warn" && c.count > 0).length;
     const status = fails > 0 ? "fail" : warns > 0 ? "warn" : "pass";
 
+    const census = await contamCensus();
     await sql`INSERT INTO verify_reports (status, fails, warns, checks) VALUES (${status}, ${fails}, ${warns}, ${JSON.stringify(checks)})`;
     await sql`DELETE FROM verify_reports WHERE id NOT IN (SELECT id FROM verify_reports ORDER BY ran_at DESC LIMIT 60)`; // 최근 60건만 보관
 
     // 📒 하네스 L5 — 지문은 **남은 일(백로그)** 기준. 할 일이 없으면(0) 지문을 안 남긴다 —
     //   "일이 없어 조용한 것"과 "일이 있는데 못 끝내는 것"을 구분해야 정체 탐지가 소음이 안 된다.
-    await recordRun("cron-verify", true, `fail ${fails} warn ${warns}`, fails + warns, { fingerprint: ((fails + warns)) > 0 ? fingerprintOf({ fails, warns }) : undefined, metrics: { fails, warns } });
+    await recordRun("cron-verify", true, `fail ${fails} warn ${warns}${census ? ` · 🧪오염유형 ${census.cats}종·제외누적 ${census.total.toLocaleString()}건${census.delta ? `(${census.delta > 0 ? "+" : ""}${census.delta.toLocaleString()})` : ""}` : ""}`, fails + warns, { fingerprint: ((fails + warns)) > 0 ? fingerprintOf({ fails, warns }) : undefined, metrics: { fails, warns } });
     return NextResponse.json({ ok: true, ranAt: new Date().toISOString(), status, fails, warns, checks, grounding });
   } catch (e) {
     await recordRun("cron-verify", false, String(e).slice(0, 150));
