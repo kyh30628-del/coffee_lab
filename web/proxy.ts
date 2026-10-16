@@ -21,8 +21,16 @@ function clientIp(req: NextRequest): string {
 //   → vercel.json엔 전부 등록해 두고, 실제 실행 여부는 DB `cron_gate`(path → enabled)로 정한다. 배포 없이 단계별로 연다.
 //   목록에 없거나 enabled=false면 실행하지 않고 200(skipped)으로 끝낸다. DB 조회가 실패하면 **열지 않는다**(비용 쪽으로 안전).
 //   비용감시·캐시 큐 비우기는 관문 없이 항상 돈다(이 둘이 멈추면 감시·신선도가 무너진다).
+//
+// 🔴 2026-10-16 **12일 무경보 사고의 진범 수리**(CEO "자율 서비스 만들었는데 작동 안 시킨다").
+//   위 원칙("멈추면 감시가 무너지는 잡은 관문 밖에 둔다")을 적어놓고 **자가감사(cron-selfaudit)를 빠뜨렸다.**
+//   그래서 10-03 비용비상으로 관문을 전부 닫을 때 **감시자가 감시대상과 같은 정지에 함께 들어갔다.**
+//   원장 실측: 조직 전체 실행량이 10-03 67건/33종 → 10-04~09 **1건/1종**으로 떨어졌는데
+//   selfaudit_runs도 10-03 이후 10-16까지 0건 → **12일간 경보가 단 한 건도 없었다.**
+//   감시자를 끌 수 있으면, 끄는 순간 "문제 없음"과 "볼 사람 없음"이 구분되지 않는다.
+//   → 자가감사는 관문 밖으로 옮긴다. 비용은 하루 3회 함수호출(UTC 20 3,11,23)·LLM 0으로 가장 싼 보험이다.
 const CRON_PREFIXES = ["/api/cron-", "/api/orchestrator"];
-const CRON_ALWAYS = new Set(["/api/cron-costwatch", "/api/cron-cache-flush"]);
+const CRON_ALWAYS = new Set(["/api/cron-costwatch", "/api/cron-cache-flush", "/api/cron-selfaudit"]);
 async function cronGateOpen(pathname: string): Promise<boolean> {
   if (CRON_ALWAYS.has(pathname)) return true;
   try {

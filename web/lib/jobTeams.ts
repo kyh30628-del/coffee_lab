@@ -81,8 +81,39 @@ export const EXPECT_MAX_H: Record<string, number> = {
   "dev-pipeline": 14,     // 개발 파이프라인 KST 08·12·16·20시
   "dev-deploy": 14,       // 배포 워처 KST 08·12·16·20시
   "cron-costwatch": 30,   // Neon 비용 이상탐지, 매일 09:20 UTC(18:20 KST) + 버퍼(2026-07-29 CEO 지시)
+
+  // 🔴 2026-10-16 **부모만 보던 감시의 근본수리**(CEO "자율 서비스 만들었는데 작동 안 시킨다").
+  //   실측 사고: `chief-manager`(부모)는 하트비트 1.4h전으로 **초록**이었는데, 그 안에서 돌아야 할
+  //   리프 에이전트 6개가 13~15일 무실행이었다. 08시 블록 전용 잡들이라 16시 사이클만 돈 날엔 아예 안 돈다.
+  //   orchestrator.log 증거: 일간 사이클이 **10-03 16:05 → 10-16 16:05, 13일 공백**(10-04~15 launchd 미등재).
+  //   부모 하트비트가 자식의 침묵을 덮어 "감시 초록 + 실제 정지"가 13일간 공존했다.
+  //   → 리프 에이전트도 **자기 계약을 갖는다**. 임계는 run-daily.sh/run-weekly.sh의 실제 분기에서 역산한 최대공백+버퍼.
+  //   ⚠️ 과거 리프를 뺀 이유(= lib/issues.ts가 '계약 없음'을 은퇴로 *추론*해 결재를 오종결, #200)는
+  //      2026-07-07 근본수리로 사라졌다(이제 RETIRED_JOBS 명시 집합만 본다, issues.ts:278) → 넣어도 안전.
+  // ── run-daily.sh (launchd 08:05·12:05·16:05)
+  "rulegap-agent": 20,          // 매 사이클 3× — 최대공백 16:05→익일 08:05=16h + 버퍼
+  "self-audit-agent": 20,       // 풀 사이클(08·16) — 최대공백 16h + 버퍼
+  "integrity-agent": 30,        // 08시 1×(09-05 비용다이어트로 3×→1×) — 24h + 버퍼
+  "quality-redteam-agent": 30,  // 08시 1× — 위와 짝
+  "closure-agent": 30,          // 08시 1× — 폐업 감지
+  "demand-grow-agent": 30,      // 08시 1× — 발굴
+  "marketing-agent": 54,        // 격일 저녁(b2b와 DOY 로테이션) — 48h + 버퍼
+  "chief-manager-agent": 30,    // 저녁(H≥15) 1× 종합 — 24h + 버퍼
+  "chief-secretary-agent": 30,  // 저녁 1× 비서실장 — 위와 짝
+  // ── run-weekly.sh (launchd 10:30, 월·목 게이트)
+  "evaluation": 192,              // 월요일만 — 168h + 버퍼 24h
+  "team-legal-agent": 192,        // 월요일만
+  "team-finance-agent": 192,      // 월요일만
+  "team-ops-support-agent": 192,  // 월요일만
+  "support-office-director": 192, // 월요일만
+  "risk-mgmt-agent": 120,         // 월·목 2× — 최대공백 목→월 96h + 버퍼
+  "strategy-agent": 120,          // 월·목 2× — 위와 짝
+
   // ⚠️ cron-selfaudit 자신은 여기 못 넣는다(자기 정지를 자기가 감지 불가) — 로컬 run-trigger-watch.sh의
   //   결정론 워치독이 감시(7h+ 미실행 시 ok=false 하트비트로 에스컬레이션).
+  // ⚠️ auth-precheck도 넣지 않는다 — **실패할 때만 기록**하는 잡이라 무기록=정상이다(위 17행 규칙).
+  //   실측 2026-10-16: 마지막 기록 33일 전 = 33일간 인증 실패 0건. 계약에 넣으면 영구 오탐이 된다.
+  // ⚠️ dev-agent는 dev-pipeline 경유로만 돌아 부모가 은퇴 중이면 같이 멈춘다 → RETIRED_JOBS에 짝으로 둔다.
 };
 
 // 🛠 **로컬 launchd 잡의 표시 메타(라벨·스케줄) 단일 출처** — /admin/org '핵심 잡 신선도' 카드용.
@@ -119,8 +150,11 @@ export const RETIRED_JOBS: ReadonlySet<string> = new Set(["dong-backfill", "qual
   "cron-newsletter",  // 주간 뉴스레터 발송 — 같은 이유
   "dev-deploy",       // 자동 배포 — CEO가 배포 시점을 직접 통제 중(10-10 사고 이후)
   "dev-pipeline",     // 자동 개발 파이프라인 — 위와 짝
-  // ⬇️ 아래 셋은 실행 수단(plist)이 아예 없어 영구 오탐이었다. 스케줄러를 만들 때 다시 계약에 올린다.
-  "search-quality-agent", "b2b-sales-agent",
+  // 🔴 2026-10-16 **정정(제 오판)** — search-quality-agent·b2b-sales-agent를 "plist가 없어 영구 오탐"이라며
+  //   여기 내렸는데, 둘은 **plist가 아니라 run-daily.sh의 저녁 블록에서 실행된다**(부모 = com.coffee.chief-manager).
+  //   실측 반증: 같은 날 16:05 사이클에서 search-quality 1.7h전·b2b-sales 1.6h전 정상 하트비트.
+  //   '호출처를 plist에서만 찾은' 탐색 실수였다 → 은퇴 해제, 계약(위 73·74행) 유지.
+  "dev-agent",        // dev-pipeline 경유로만 실행 — 부모가 승인 대기 중이라 짝으로 은퇴(단독 실행수단 없음)
   // sangga-rollout: 10-10 cost_guard 전역정지(399.9GB)의 진범 경로. 쿼리는 인덱스로 고쳤지만
   //   **공개 전환율이 1%**(discover 69%·permit 47% 대비)라 같은 쿼터를 여기 쓰는 게 손해다(10-16 실측).
   "sangga-rollout",
