@@ -649,7 +649,9 @@ export default function AdminPage() {
                       { l: "오늘 합성처리", v: tower.today.synthesized, c: "text-sky-700 bg-sky-50 border-sky-200", m: "synthesized" },
                       { l: "오늘 신규공개", v: tower.today.published, c: "text-emerald-700 bg-emerald-50 border-emerald-200", m: "published" },
                       { l: "동 채움", v: `${tower.today.dongPct}%`, c: "text-stone-700 bg-stone-50 border-stone-300", m: "dongMissing" },
-                      { l: "노이즈탈락(누적)", v: tower.today.noise, c: "text-stone-700 bg-stone-50 border-stone-300", m: "noise" },
+                      // 🔴 2026-10-16 제거 — '노이즈탈락(누적)'은 과거 히스토리 누적값이라 줄지 않는다.
+                    //   CEO 지침: 관제탑은 '현재 상태'만 보여준다(과거 로그 끌어오지 말 것). 상세는 아래 모달에 유지.
+                    // { l: "노이즈탈락(누적)", v: tower.today.noise, c: "text-stone-700 bg-stone-50 border-stone-300", m: "noise" },
                       { l: "합성대기", v: tower.today.newQueue, c: "text-amber-600 bg-amber-50 border-amber-300", m: "newQueue" },
                       { l: "유튜브 확인(누적)", v: tower.today.ytTotal ?? 0, c: "text-rose-700 bg-rose-50 border-rose-200", m: "yt" },
                     ].map((t) => (
@@ -729,10 +731,13 @@ export default function AdminPage() {
               {blData?.summary?.cafes > 0 && (
                 <button onClick={() => setShowBorderline(true)} className="w-full mb-2.5 rounded-xl border border-violet-200 bg-violet-50/60 p-2.5 text-left hover:bg-violet-100/70 transition">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-stone-700">🤖 LLM 보강 대기 <span className="font-normal text-stone-600">· 경계후기는 노출서 제외(신뢰 유지)</span></span>
+                    <span className="text-[11px] font-bold text-stone-700">🤖 경계후기 보강 <span className="font-normal text-stone-600">· 노출에선 이미 제외됨(소비자 영향 없음)</span></span>
                     <span className="text-[11px] font-bold text-violet-700">목록 →</span>
                   </div>
-                  <div className="text-[10.5px] text-stone-600 mt-0.5">카페 <b className="text-violet-700">{blData.summary.cafes.toLocaleString()}</b>곳 · 대기 경계후기 <b className="text-violet-700">{blData.summary.reviews.toLocaleString()}</b>건 <span className="text-stone-600">— 크레딧 복구 시 LLM 평가·확인분만 보강</span></div>
+                  {/* 🔴 2026-10-16 CEO 반복지적 — "안 줄어드는/소비자 무관 숫자는 띄우지 말 것".
+                       경계후기 대기(44만건)는 크레딧이 없으면 줄지 않고, 노출에선 이미 빠져 있어 소비자와 무관하다.
+                       숫자를 지우고 '목록 →'으로만 접근한다(데이터는 모달에 그대로 있다). */}
+                  <div className="text-[10.5px] text-stone-600 mt-0.5">크레딧 복구 시 자동 보강 — 목록에서 대상 확인</div>
                 </button>
               )}
               <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-stone-700">
@@ -963,22 +968,15 @@ export default function AdminPage() {
                 <span className="text-[11px] text-stone-600">{jstatus.last ? `최근 ${new Date(jstatus.last).toLocaleString("ko-KR")}` : "미실행"}</span>
               </div>
               <div className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2 py-1 mb-1.5">소비자 노출 정상 ✅ <span className="font-normal text-emerald-600">— 공개 카페는 규칙으로 검증돼 노출 중. 아래 '대기'는 그 위 선택적 정제일 뿐 품질·위험과 무관.</span></div>
-              <div className="flex items-end justify-between mb-1.5">
-                <span className="text-xl font-bold text-stone-800">{jstatus.pct}%</span>
-                <span className="text-[11px] text-stone-700">{jstatus.done?.toLocaleString()} / {jstatus.total?.toLocaleString()}곳</span>
-              </div>
-              <div className="w-full h-2 bg-stone-100 rounded-full overflow-hidden mb-1.5">
-                <div className="h-full bg-gradient-to-r from-emerald-400 to-emerald-600 rounded-full transition-all" style={{ width: `${jstatus.pct}%` }} />
-              </div>
+              {/* 🔴 큰 퍼센트+진행바는 멈춰 있을 때 '63% 고장'으로 읽혀 바로 위 초록 '정상'과 모순됐다.
+                   선택적 정제 레이어이므로 작은 중립 줄로 낮춘다(수치 자체는 유지). */}
+              <div className="text-[10.5px] text-stone-600 mb-1.5">정제 진행 {jstatus.done?.toLocaleString()} / {jstatus.total?.toLocaleString()}곳 ({jstatus.pct}%)</div>
+              {/* 🔴 2026-10-16 CEO 반복지적 — 여기 '판정 대기 9,897곳'과 "괜찮다"는 3줄 설명이 같이 떠 있었다.
+                   대표님 지침 그대로: "숫자가 떠 있으면 문제로 읽힌다 · '괜찮다'는 구두 설명은 무의미".
+                   이 큐는 공개 품질과 무관한 선택적 정제라 숫자를 빼고, 오늘 처리량만 남긴다. */}
               <div className="flex gap-3 text-[11px] text-stone-700">
-                <span>판정 대기 <b className="text-stone-600">{jstatus.queue?.toLocaleString()}</b>곳</span>
-                <span>· 오늘 <b className="text-emerald-600">{jstatus.today}</b>곳 판정</span>
+                <span>오늘 <b className="text-emerald-600">{jstatus.today}</b>곳 판정</span>
               </div>
-              <p className="text-[10px] text-stone-600 mt-1.5 leading-relaxed">
-                ℹ️ '판정 대기' = 같은 이름의 딴 가게·맥락이 <b>애매한 '경계 리뷰'가 있어 LLM 확인이 필요한 곳</b>입니다.
-                새벽 Batches가 크레딧 한도 내에서 자동 처리합니다(경계 리뷰 없는 곳은 무과금 자동완료). <b>공개 카페는 이미
-                규칙으로 검증돼 정상 노출 중</b>이고 판정은 그 위 정제 레이어라, 이 대기 숫자는 <b>소비자 품질·위험과 무관</b>합니다(적체·고장 아님).
-              </p>
             </div>
 
             {/* 수집·공개 */}
@@ -990,7 +988,7 @@ export default function AdminPage() {
               <div className="flex gap-4 text-[11px] text-stone-700">
                 <span>전체 <b className="text-stone-700">{jstatus.cafesTotal?.toLocaleString()}</b>곳</span>
                 <span>공개 <b className="text-emerald-600">{jstatus.cafesPub?.toLocaleString()}</b>곳</span>
-                <span>수집대기 <b className="text-amber-600">{jstatus.collectQueue?.toLocaleString()}</b>곳</span>
+                <span className="text-stone-600">수집대기 <b className="text-stone-600">{jstatus.collectQueue?.toLocaleString()}</b>곳</span>
               </div>
             </div>
 
@@ -1003,7 +1001,7 @@ export default function AdminPage() {
               <div className="flex gap-4 text-[11px] text-stone-700">
                 <span>확인완료 <b className="text-stone-700">{jstatus.ytTotal?.toLocaleString()}</b>곳</span>
                 <span>오늘 <b className="text-emerald-600">{jstatus.ytToday ?? 0}</b>곳</span>
-                <span>대기 <b className="text-amber-600">{jstatus.ytQueue?.toLocaleString()}</b>곳</span>
+                <span className="text-stone-600">대기 <b className="text-stone-600">{jstatus.ytQueue?.toLocaleString()}</b>곳</span>
               </div>
             </div>
             </>}
