@@ -365,6 +365,17 @@ export default function AdminPage() {
           <button onClick={() => load(pw)} className="ml-auto text-xs px-3 py-1.5 rounded-lg bg-stone-200 text-stone-700">새로고침</button>
         </div>
 
+        {/* 📈 2026-10-16(CEO "대시보드 어딨어") — 전용 화면 링크를 조건부 카드 안에 묻어놔서 못 찾으셨다.
+            로그인 여부·데이터 유무와 무관하게 **맨 위에 항상** 보이게 올린다. */}
+        <a href="/admin/traffic"
+           className="block mb-4 rounded-xl border-2 border-sky-400 bg-sky-50 px-4 py-3 hover:bg-sky-100 transition">
+          <div className="flex items-center justify-between">
+            <span className="text-[14px] font-extrabold text-sky-900">📈 접속자 전체 현황 (월별 누적 · 전국 지역별 · 패턴)</span>
+            <span className="text-[13px] font-bold text-sky-700">열기 →</span>
+          </div>
+          <p className="text-[11px] text-sky-800/80 mt-0.5">월별 순방문·재방문·검색유입 · 전국 441개 지역 전수 · 요일/시간대/체류깊이</p>
+        </a>
+
         {/* ===== 📊 핵심 지표 (상단 KPI 행) — 발행수·검증/참고·오염·미결재를 한눈에 ===== */}
         <GroupHeader icon="📊" label="핵심 지표" />
         <div className="admin-kpi-grid mb-6">

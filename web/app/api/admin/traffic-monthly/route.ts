@@ -60,6 +60,32 @@ export async function GET(req: NextRequest) {
       FROM c FULL OUTER JOIN t ON c.area = t.region
       ORDER BY people DESC NULLS LAST, cafes DESC`) as any[];
 
+    // ④ 패턴 — 요일별·시간대별(최근 90일). "언제 들어오는가"를 본다.
+    const byDow = (await sql`
+      SELECT EXTRACT(dow FROM ts AT TIME ZONE 'Asia/Seoul')::int dow,
+             count(DISTINCT anon_id)::int people, count(*)::int pv
+      FROM traffic_events
+      WHERE ts > now() - interval '90 days' AND anon_id NOT IN (SELECT anon_id FROM bot_anon_cache)
+      GROUP BY 1 ORDER BY 1`) as any[];
+    const byHour = (await sql`
+      SELECT EXTRACT(hour FROM ts AT TIME ZONE 'Asia/Seoul')::int h,
+             count(DISTINCT anon_id)::int people, count(*)::int pv
+      FROM traffic_events
+      WHERE ts > now() - interval '90 days' AND anon_id NOT IN (SELECT anon_id FROM bot_anon_cache)
+      GROUP BY 1 ORDER BY 1`) as any[];
+    // ⑤ 패턴 — 체류 깊이(한 페이지만 보고 나갔나). 재방문을 못 만드는 원인 지표.
+    const depth = (await sql`
+      WITH p AS (
+        SELECT anon_id, count(*)::int pv, count(DISTINCT path)::int paths
+        FROM traffic_events
+        WHERE ts > now() - interval '90 days' AND anon_id NOT IN (SELECT anon_id FROM bot_anon_cache)
+        GROUP BY 1)
+      SELECT count(*)::int people,
+             count(*) FILTER (WHERE paths = 1)::int one_page,
+             count(*) FILTER (WHERE paths >= 3)::int three_plus,
+             round(avg(pv)::numeric, 1)::float avg_pv
+      FROM p`) as any[];
+
     const totals = {
       cafes: byRegion.reduce((a, r) => a + Number(r.cafes || 0), 0),
       regions: byRegion.length,
@@ -70,7 +96,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       ok: true, at: new Date().toISOString(),
       monthly: monthly.map((m) => ({ ...m, repeat: repeatBy.get(m.m) ?? 0 })),
-      byRegion, totals,
+      byRegion, totals, byDow, byHour, depth: depth[0] ?? null,
     }, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e).slice(0, 200) }, { status: 500 });

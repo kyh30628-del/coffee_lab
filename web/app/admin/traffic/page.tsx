@@ -7,10 +7,13 @@ import Link from "next/link";
 //   ⚠️ 숫자는 열 때마다 실시간 재집계(캐시 없음) — 관제탑 규칙: 화면이 옛 숫자를 보이면 안 된다.
 type Monthly = { m: string; people: number; pv: number; naver: number; google: number; ai: number; repeat: number };
 type Region = { region: string; cafes: number; people: number; pv: number };
+type Dow = { dow: number; people: number; pv: number };
+type Hour = { h: number; people: number; pv: number };
+type Depth = { people: number; one_page: number; three_plus: number; avg_pv: number };
 
 export default function TrafficPage() {
   const [pw, setPw] = useState("");
-  const [data, setData] = useState<{ monthly: Monthly[]; byRegion: Region[]; totals: any } | null>(null);
+  const [data, setData] = useState<{ monthly: Monthly[]; byRegion: Region[]; totals: any; byDow: Dow[]; byHour: Hour[]; depth: Depth | null } | null>(null);
   const [err, setErr] = useState("");
   const [onlyZero, setOnlyZero] = useState(false);
 
@@ -89,6 +92,54 @@ export default function TrafficPage() {
               ))}
             </div>
             <p className="text-[10.5px] text-stone-600 mt-2">사람 증거(검색유입·2페이지·재방문·모바일) 있는 방문만 셉니다. 이번 달은 집계 중이라 더 오릅니다.</p>
+          </section>
+
+          {/* 패턴 — 요일·시간대·체류깊이 */}
+          <section className="bg-white rounded-xl border border-stone-300 p-3 mb-3">
+            <h2 className="text-[13px] font-bold text-stone-800 mb-2">접속 패턴 (최근 90일)</h2>
+
+            <p className="text-[11px] font-semibold text-stone-700 mb-1">요일별</p>
+            <div className="flex items-end gap-1.5 h-16 mb-3">
+              {(() => { const mx = Math.max(1, ...(data.byDow ?? []).map((d) => d.people));
+                return ["일","월","화","수","목","금","토"].map((lbl, i) => {
+                  const d = (data.byDow ?? []).find((x) => x.dow === i);
+                  const v = d?.people ?? 0;
+                  return (
+                    <div key={lbl} className="flex-1 flex flex-col items-center justify-end">
+                      <span className="text-[9px] text-stone-600">{v}</span>
+                      <div className={`w-full rounded-t ${i===0||i===6 ? "bg-amber-500" : "bg-sky-500"}`} style={{ height: `${(v/mx)*100}%` }} />
+                      <span className="text-[9px] text-stone-600 mt-0.5">{lbl}</span>
+                    </div>);
+                }); })()}
+            </div>
+
+            <p className="text-[11px] font-semibold text-stone-700 mb-1">시간대별 (KST)</p>
+            <div className="flex items-end gap-[2px] h-16 mb-3">
+              {(() => { const mx = Math.max(1, ...(data.byHour ?? []).map((d) => d.people));
+                return Array.from({ length: 24 }, (_, h) => {
+                  const d = (data.byHour ?? []).find((x) => x.h === h);
+                  const v = d?.people ?? 0;
+                  return (
+                    <div key={h} className="flex-1 flex flex-col items-center justify-end" title={`${h}시 ${v}명`}>
+                      <div className="w-full bg-stone-700 rounded-t" style={{ height: `${(v/mx)*100}%` }} />
+                      {h % 6 === 0 && <span className="text-[8px] text-stone-600 mt-0.5">{h}</span>}
+                    </div>);
+                }); })()}
+            </div>
+
+            {data.depth && (
+              <div className="rounded-lg bg-stone-50 border border-stone-200 p-2.5">
+                <p className="text-[11px] font-semibold text-stone-700 mb-1">체류 깊이</p>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11.5px] text-stone-700">
+                  <span>방문자 <b>{n(data.depth.people)}</b></span>
+                  <span>한 페이지만 보고 이탈 <b className="text-amber-700">{n(data.depth.one_page)}</b>
+                    ({data.depth.people ? Math.round((data.depth.one_page / data.depth.people) * 100) : 0}%)</span>
+                  <span>3페이지 이상 <b className="text-emerald-700">{n(data.depth.three_plus)}</b>
+                    ({data.depth.people ? Math.round((data.depth.three_plus / data.depth.people) * 100) : 0}%)</span>
+                  <span>평균 PV <b>{data.depth.avg_pv}</b></span>
+                </div>
+              </div>
+            )}
           </section>
 
           {/* 전국 지역 전수 */}
