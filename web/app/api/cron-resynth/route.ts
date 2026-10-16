@@ -119,6 +119,15 @@ export async function GET(req: NextRequest) {
              OR (COALESCE((synth_ev_flags->>'adflag_n')::int, 0) > 0
                  AND synth_checked_at < now() - interval '7 days'))
       ORDER BY (COALESCE((synth_ev_flags->>'adflag_n')::int, 0) > 0) DESC,
+               -- 🎯 2026-10-16 오염 우선순위(B안) — 600곳 표본을 **원문 기준**으로 재판정해 실측한 리프트로만 가중.
+               --   기준율 6.5% 대비: 일관성<0.6 3.08x · 호텔/펜션 부속 3.08x · offctx≥0.2 2.80x · 지점명 2.04x · 후기<15건 1.56x.
+               --   ⚠️ 처음엔 rejectReasons(제목만일치 등)로 정렬하려 했으나 실측 리프트 0.30x(무작위보다 나쁨)라 폐기했다.
+               --   💰 추가 비용 0 — 전부 이미 읽는 컬럼이고 처리 곳수·쿼리 수 불변, 순서만 바뀐다.
+               ( (CASE WHEN synth_coherence < 0.6 THEN 3 ELSE 0 END)
+               + (CASE WHEN COALESCE(offctx_rate,0) >= 0.2 THEN 3 ELSE 0 END)
+               + (CASE WHEN name ~ '(호텔|펜션|리조트)' THEN 3 ELSE 0 END)
+               + (CASE WHEN name ~ '(본점|지점|[가-힣A-Za-z0-9]{2,10}점)$' THEN 2 ELSE 0 END)
+               + (CASE WHEN COALESCE(synth_count,0) < 15 THEN 1 ELSE 0 END) ) DESC,
                (raw_collected_at > synth_checked_at) DESC, synth_checked_at ASC NULLS FIRST
       LIMIT ${GEN_MAX}
     `) as unknown as { id: number; name: string; area: string; synth_count: number }[];
