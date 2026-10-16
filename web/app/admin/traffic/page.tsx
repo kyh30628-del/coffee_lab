@@ -1,6 +1,13 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
+
+// 📈 차트는 ssr:false 지연 로드 — 초기 번들에 recharts가 안 들어간다(관제탑 기존 차트와 같은 청크).
+const MonthlyHumanBot = dynamic(() => import("../AdminCharts").then((m) => m.MonthlyHumanBot), { ssr: false, loading: () => <div className="h-[210px]" /> });
+const DowBar = dynamic(() => import("../AdminCharts").then((m) => m.DowBar), { ssr: false, loading: () => <div className="h-[150px]" /> });
+const HourArea = dynamic(() => import("../AdminCharts").then((m) => m.HourArea), { ssr: false, loading: () => <div className="h-[150px]" /> });
+const RegionHumanBot = dynamic(() => import("../AdminCharts").then((m) => m.RegionHumanBot), { ssr: false, loading: () => <div className="h-[260px]" /> });
 
 // 📈 접속자 전체 현황 — 월별 누적 · 패턴 · 전국 지역 전수(2026-10-16, CEO 지시).
 //   설계 기준: "보기 좋은 숫자"가 아니라 **대표님이 결정을 내릴 수 있는 숫자**만 올린다.
@@ -112,42 +119,19 @@ export default function TrafficPage() {
                 </tbody>
               </table>
             </div>
-            <div className="flex items-end gap-2 h-20 mt-3">
-              {data.monthly.map((m) => (
-                <div key={m.m} className="flex-1 flex flex-col items-center justify-end">
-                  <div className="w-full bg-sky-500 rounded-t" style={{ height: `${(m.people / maxPeople) * 100}%` }} />
-                  <span className="text-[9px] text-stone-600 mt-0.5">{m.m.slice(5)}월</span>
-                </div>
-              ))}
-            </div>
+            <MonthlyHumanBot data={data.monthly.map((m) => ({ m: m.m, people: m.people, bots: m.bots, repeat: m.repeat }))} />
           </section>
 
           {/* 패턴 */}
           <section className="bg-white rounded-xl border border-stone-300 p-3 mb-3">
             <h2 className="text-[13px] font-bold text-stone-800 mb-2">접속 패턴 (최근 90일 · 사람만)</h2>
-            <p className="text-[11px] font-semibold text-stone-700 mb-1">요일별</p>
-            <div className="flex items-end gap-1.5 h-16 mb-3">
-              {(() => { const mx = Math.max(1, ...(data.byDow ?? []).map((d) => d.people));
-                return ["일", "월", "화", "수", "목", "금", "토"].map((lbl, i) => {
-                  const v = (data.byDow ?? []).find((x) => x.dow === i)?.people ?? 0;
-                  return (
-                    <div key={lbl} className="flex-1 flex flex-col items-center justify-end">
-                      <span className="text-[9px] text-stone-600">{v}</span>
-                      <div className={`w-full rounded-t ${i === 0 || i === 6 ? "bg-amber-500" : "bg-sky-500"}`} style={{ height: `${(v / mx) * 100}%` }} />
-                      <span className="text-[9px] text-stone-600 mt-0.5">{lbl}</span>
-                    </div>); }); })()}
-            </div>
+            <p className="text-[11px] font-semibold text-stone-700 mb-1">요일별 <span className="font-normal text-stone-600">(주황=주말)</span></p>
+            <DowBar data={["일","월","화","수","목","금","토"].map((lbl, i) => ({
+              label: lbl, weekend: i === 0 || i === 6,
+              people: (data.byDow ?? []).find((x) => x.dow === i)?.people ?? 0 }))} />
             <p className="text-[11px] font-semibold text-stone-700 mb-1">시간대별 (KST)</p>
-            <div className="flex items-end gap-[2px] h-16 mb-3">
-              {(() => { const mx = Math.max(1, ...(data.byHour ?? []).map((d) => d.people));
-                return Array.from({ length: 24 }, (_, h) => {
-                  const v = (data.byHour ?? []).find((x) => x.h === h)?.people ?? 0;
-                  return (
-                    <div key={h} className="flex-1 flex flex-col items-center justify-end" title={`${h}시 ${v}명`}>
-                      <div className="w-full bg-stone-700 rounded-t" style={{ height: `${(v / mx) * 100}%` }} />
-                      {h % 6 === 0 && <span className="text-[8px] text-stone-600 mt-0.5">{h}</span>}
-                    </div>); }); })()}
-            </div>
+            <HourArea data={Array.from({ length: 24 }, (_, h) => ({
+              h, people: (data.byHour ?? []).find((x) => x.h === h)?.people ?? 0 }))} />
             {data.depth && (
               <div className="rounded-lg bg-stone-50 border border-stone-200 p-2.5">
                 <p className="text-[11px] font-semibold text-stone-700 mb-1">체류 깊이 — 재방문을 못 만드는 지점</p>
@@ -159,6 +143,14 @@ export default function TrafficPage() {
                 </div>
               </div>
             )}
+          </section>
+
+          {/* 지역 상위 — 사람 vs 봇 */}
+          <section className="bg-white rounded-xl border border-stone-300 p-3 mb-3">
+            <h2 className="text-[13px] font-bold text-stone-800 mb-1">지역 상위 12 — 사람 vs 봇</h2>
+            <p className="text-[10.5px] text-stone-600 mb-2">회색(봇)만 길고 파랑(사람)이 짧으면 크롤러만 긁어가는 지역입니다.</p>
+            <RegionHumanBot data={[...(data.byRegion ?? [])].sort((a, b) => b.people - a.people).slice(0, 12)
+              .map((r) => ({ region: r.region, people: r.people, bots: r.bots }))} />
           </section>
 
           {/* 전국 지역 — 정렬 가능 */}
