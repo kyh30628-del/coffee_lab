@@ -100,6 +100,21 @@ function topTags(cs: any): string[] {
 }
 
 // AI답변엔진(ChatGPT 등) 인용 최적화용 FAQ — 실제 페이지 데이터로만 생성, 데이터 없으면 문항 생략(coordination#226/decisions#424)
+// 🔴 2026-10-16 수리(CEO "정보가 눈에 안 들어온다") — 조립 문장이 문법을 깨뜨리고 있었다.
+//   실측: "아쉬운 점은 디저트 중심은 아니에요, 작업·공부용으로는 **덜 언급돼요이에요**."
+//   원인 둘: ①profile.weak 값이 이미 '…돼요'로 끝나는 완결 문장인데 뒤에 '이에요'를 또 붙였다
+//           ②받침을 안 봐서 '테라스·야외이에요'가 됐다(받침 없으면 '예요'다).
+//   읽다가 턱 걸리는 문장은 그 자체로 "읽고 싶지 않은" 화면을 만든다.
+const SENT_END = /(요|다|니다|죠|음|함|됨)$/;
+function josaEnd(s: string): string {
+  const t = s.trim();
+  if (!t) return "";
+  if (SENT_END.test(t)) return t;                       // 이미 끝난 문장엔 아무것도 붙이지 않는다
+  const last = t.charCodeAt(t.length - 1);
+  const hasJong = last >= 0xac00 && last <= 0xd7a3 && (last - 0xac00) % 28 !== 0;
+  return t + (hasJong ? "이에요" : "예요");
+}
+
 function buildFaq(c: any, grade: string, highlights: { emoji: string; label: string; count: number }[], profile: any, tags: string[]): { q: string; a: string }[] {
   const faqs: { q: string; a: string }[] = [];
   if (c.synth_identity) {
@@ -112,14 +127,14 @@ function buildFaq(c: any, grade: string, highlights: { emoji: string; label: str
     });
   }
   if (highlights.length > 0) {
-    faqs.push({ q: `${c.name}의 특징은 무엇인가요?`, a: `후기에서 가장 많이 언급된 특징은 ${highlights.slice(0, 3).map((h) => h.label).join(", ")}이에요.` });
+    faqs.push({ q: `${c.name}의 특징은 무엇인가요?`, a: `후기에서 가장 많이 언급된 특징은 ${josaEnd(highlights.slice(0, 3).map((h) => h.label).join(", "))}.` });
   } else if (tags.length > 0) {
-    faqs.push({ q: `${c.name}의 특징은 무엇인가요?`, a: `후기에서 자주 언급되는 결은 ${tags.join(", ")}이에요.` });
+    faqs.push({ q: `${c.name}의 특징은 무엇인가요?`, a: `후기에서 자주 언급되는 결은 ${josaEnd(tags.join(", "))}.` });
   }
   if (profile.ok && (profile.strong.length > 0 || profile.weak.length > 0)) {
     const parts: string[] = [];
-    if (profile.strong.length > 0) parts.push(`강점은 ${profile.strong.map((s: any) => s.text).join(", ")}이에요(전체 카페 평균 대비)`);
-    if (profile.weak.length > 0) parts.push(`아쉬운 점은 ${profile.weak.map((w: any) => w.text).join(", ")}이에요`);
+    if (profile.strong.length > 0) parts.push(`강점은 ${josaEnd(profile.strong.map((s: any) => s.text).join(", "))}(전체 카페 평균 대비)`);
+    if (profile.weak.length > 0) parts.push(`아쉬운 점은 ${josaEnd(profile.weak.map((w: any) => w.text).join(", "))}`);
     faqs.push({ q: `${c.name}의 강점과 아쉬운 점은 무엇인가요?`, a: `${parts.join(". ")}.` });
   }
   const locParts = [c.area, c.dong].filter(Boolean).join(" ");

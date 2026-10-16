@@ -151,18 +151,48 @@ export const igHandle = (u: string | null | undefined) => {
 export const igProfileUrl = (u: string | null | undefined) => { const h = igHandle(u); return h ? `https://www.instagram.com/${h}/` : null; };
 
 // ── 후기 문장 속 핵심어(2026-09-20 CEO: "영역별로 강조·하이라이트") — 결정하는 데 쓰이는 말만. 화면은 <mark class="nt-key">로 감싼다.
-const KEY_TERMS = ["오션뷰","바다뷰","한강뷰","뷰가 끝내","뷰가 좋","뷰 맛집","뷰맛집","전망","뷰","바다","노을","일출","소금빵","크루아상","크로플","휘낭시에","스콘","케이크","케익","디저트","빵이 맛","빵 맛","빵","커피가 맛","커피 맛","커피","라떼","아메리카노","맛있","맛집","분위기","감성","조용","넓","좌석","주차","콘센트","와이파이","친절","재방문","또 오","또 가","인생","최고","추천","가성비","웨이팅","아쉬","별로"];
+// 🔴 2026-10-16 전면 수리(CEO "정보가 눈에 안 들어온다·글만 엄청 많다"). 실측으로 원인을 셋 잡았다.
+//   노출 후기 2,339문장 기준(공개 상위 400곳):
+//   ① **구별력 0인 말을 칠했다** — 맛집 15.5% · 빵 14.7% · 커피 11.6% · 디저트 8.8% · 추천 5.9%
+//      = 상위 5개가 전체 하이라이트의 56.5%. 커피 플랫폼 후기에서 '커피'를 칠하면 아무것도 구별되지 않는다.
+//   ② **단어를 중간에서 잘랐다** — 하이라이트 4,348개 중 **1,881개(43%)**가 뒤에 한글이 바로 이어졌다.
+//      '커피 맛'이 "커피맛집이라"를 `커피 맛`+`집이라`로 자르고, '넓'은 어디든 걸렸다.
+//   ③ **문장당 상한이 없었다** — 한 문장이 평균 4.6조각(최대 11개 하이라이트)으로 분해됐다.
+//      그래서 글자 수는 2,769자인데 화면의 텍스트 조각이 277개(중위 5자)가 됐다. 읽을 수가 없다.
+//   → 범용어를 버리고 **구별되는 말만** 남긴다. 조사·어미까지 한 덩어리로 칠한다. 문장당 2개로 막는다.
+const KEY_TERMS = [
+  // 뷰 — '뷰'·'전망' 단독은 뺀다(어느 카페나 쓴다). 종류가 말해주는 것만.
+  "오션뷰", "바다뷰", "한강뷰", "노을", "일출",
+  // 메뉴 — '빵'·'디저트'·'케이크'·'커피'·'라떼' 같은 분류어는 뺀다. 특정 메뉴만.
+  "소금빵", "크루아상", "크로플", "휘낭시에", "스콘",
+  // 공간·조건 — 가서 겪는 것(결정에 쓰이는 말)
+  "조용", "좌석", "주차", "콘센트", "와이파이", "친절", "웨이팅", "가성비", "재방문",
+  // 아쉬운 점 — 숨기지 않는다
+  "아쉬", "별로",
+];
 const KEY_RE = new RegExp("(" + KEY_TERMS.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|") + ")", "g");
+const HANGUL = /[가-힣]/;
+const KEY_MAX = 2; // 문장당 상한 — 셋 이상 칠하면 강조가 아니라 얼룩이 된다
+
 export function splitKeyTerms(text: unknown): { t: string; k: boolean }[] {
   const s = String(text ?? "");
   if (!s) return [];
   const out: { t: string; k: boolean }[] = [];
   let last = 0;
+  let used = 0;
   for (const m of s.matchAll(KEY_RE)) {
+    if (used >= KEY_MAX) break;
     const i = m.index ?? 0;
+    if (i < last) continue;
+    // 🚫 앞이 한글이면 낱말 안이다('드립커피'의 커피, '애크로매틱커피'의 커피) → 칠하지 않는다.
+    if (i > 0 && HANGUL.test(s[i - 1])) continue;
+    // ✅ 뒤로 이어지는 한글(어미·조사)까지 한 덩어리로 삼는다 — '조용'만 칠하고 '한'을 떼면 글이 깨져 보인다.
+    let end = i + m[0].length;
+    while (end < s.length && HANGUL.test(s[end]) && end - (i + m[0].length) < 3) end++;
     if (i > last) out.push({ t: s.slice(last, i), k: false });
-    out.push({ t: m[0], k: true });
-    last = i + m[0].length;
+    out.push({ t: s.slice(i, end), k: true });
+    last = end;
+    used++;
   }
   if (last < s.length) out.push({ t: s.slice(last), k: false });
   return out;
