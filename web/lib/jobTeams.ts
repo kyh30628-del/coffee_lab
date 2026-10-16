@@ -110,7 +110,21 @@ export const LAUNCHD_JOBS: Record<string, { label: string; sched: string }> = {
 //   quality-redteam-agent·team-legal-agent·dev-agent 등)가 전부 걸린다 → 그들의 investigate 결재가
 //   CEO가 보기도 전에(수십초~2분) '은퇴 확인'으로 오종결돼 L3 에스컬레이션이 무력화됐다(2026-07-07 #200).
 //   → 진짜 은퇴는 여기 **명시적으로만** 표기한다. 은퇴 시 추가, 재활성 시 제거(위 JOB_TEAM 주석과 동기).
-export const RETIRED_JOBS: ReadonlySet<string> = new Set(["dong-backfill", "qualityaudit", "chat-watch", "youtube-backfill", "recollect-purged", "cron-batch-judge", "discover-sweep"]); // discover-sweep: 2026-09-21 CEO 승인 정지 — 공공원장 적재(import-permits, 1.69콜/곳)가 발굴(16.9콜/곳)을 대체. plist unload. // chat-watch: 2026-08-04 컴퓨트 절감 위해 정지(관제 챗봇, 필요시 수동 재기동)
+export const RETIRED_JOBS: ReadonlySet<string> = new Set(["dong-backfill", "qualityaudit", "chat-watch", "youtube-backfill", "recollect-purged", "cron-batch-judge", "discover-sweep",
+  // 🔴 2026-10-16 정리(CEO "관제탑 에러 좀 잡아라") — 10-03 비용비상으로 전부 내린 뒤 13일간 방치돼
+  //   감시계약 36개 중 22개가 '정지의심'으로 떠 있었다. 다시 켠 것은 계약에 그대로 두고(다음 회차에 자동 해소),
+  //   **의도적으로 안 켜는 것만** 여기로 내린다 — 안 고칠 걸 빨갛게 띄워두면 진짜 문제가 묻힌다.
+  //   ⚠️ 아래 넷은 '폐기'가 아니라 **CEO 승인 대기**다. 승인되면 이 Set에서 빼고 plist/gate를 켜면 된다.
+  "owner-weekly",     // 사장님 주간 메일 — 고객에게 직접 발송이라 CEO 승인 전엔 안 켠다
+  "cron-newsletter",  // 주간 뉴스레터 발송 — 같은 이유
+  "dev-deploy",       // 자동 배포 — CEO가 배포 시점을 직접 통제 중(10-10 사고 이후)
+  "dev-pipeline",     // 자동 개발 파이프라인 — 위와 짝
+  // ⬇️ 아래 셋은 실행 수단(plist)이 아예 없어 영구 오탐이었다. 스케줄러를 만들 때 다시 계약에 올린다.
+  "search-quality-agent", "b2b-sales-agent",
+  // sangga-rollout: 10-10 cost_guard 전역정지(399.9GB)의 진범 경로. 쿼리는 인덱스로 고쳤지만
+  //   **공개 전환율이 1%**(discover 69%·permit 47% 대비)라 같은 쿼터를 여기 쓰는 게 손해다(10-16 실측).
+  "sangga-rollout",
+]); // discover-sweep: 2026-09-21 CEO 승인 정지 — 공공원장 적재(import-permits, 1.69콜/곳)가 발굴(16.9콜/곳)을 대체. plist unload. // chat-watch: 2026-08-04 컴퓨트 절감 위해 정지(관제 챗봇, 필요시 수동 재기동)
 // youtube-backfill: 2026-08-12 CEO 지시로 정지 — 몇 달간 커버리지 24%(3,302/13,495)에 남은 분량 107일 소요 대비 매 실행 GB급 판독. 재기동 = plist에서 .disabled 제거 후 launchctl load.
 // recollect-purged: 2026-09-17 13:22 CEO 승인 폐지(24a60fbe, plist .disabled). cron-batch-judge: vercel.json crons에서 제거된 폐지 잡.
 export const isRetired = (job: string) => RETIRED_JOBS.has(job);
