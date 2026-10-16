@@ -344,15 +344,37 @@ export default async function CafePage({ params }: Props) {
   //   정보 블록 추가(주소·인스타·자주 나온 말·후기 더 읽기·결 막대·상위% 타일·후기 흐름·근처 거리),
   //   CTA는 하단 고정 2개로. 정보 구조·링크·JSON-LD는 그대로(SEO 무변). 추가 조회는 근처 좌표 박스 1회뿐.
   const stampKind = grade === "참고" ? "ref" : grade === "후보" ? "cand" : "";
-  const stampEn = grade === "검증" ? "VERIFIED" : grade === "참고" ? "REFERENCE" : "CANDIDATE";
   const series = monthlySeries(c.review_dates);
   const seriesMax = series ? Math.max(1, ...series.map((m) => m.n)) : 1;
   const seriesLast = series ? series.reduce((acc, m, i) => (m.n > 0 ? i : acc), -1) : -1;
   const charBars = charBarsOf(c.char_scores);
   const barMax = charBars.length ? Number(charBars[0][1]) : 1;
+  // 🔴 2026-10-16 통합(CEO "정보가 눈에 안 들어온다") — 같은 축을 세 군데가 제각각 보여주고 있었다.
+  //   실측(/c/2 화면): 머리말 칩 `커피가 맛있는28` · 이곳의 결 `직접 로스팅47` · 다른 카페보다 `직접 로스팅 상위3%`.
+  //   '루프탑·테라스'(머리말)와 '테라스·야외'(다른 카페보다)는 같은 축인데 이름까지 달랐다.
+  //   게다가 '이곳의 결'은 "디저트 14회"라 하고 바로 아래 줄은 "디저트는 거의 언급이 없어요"라고 해
+  //   **같은 화면에서 서로 모순**이었다(앞은 절대 횟수, 뒤는 다른 카페 대비 — 섞어 놓으면 읽는 사람이 틀린다).
+  //   → 축마다 '몇 번 나왔나'와 '전체 대비'를 한 줄에 나란히 둔다. 약점은 상대 비교임을 문구로 못박는다.
+  const pctByKey = new Map<string, number>(
+    (profile.ok ? profile.strong : []).map((s: any) => [s.key, Number(s.topPct)]),
+  );
+  const mergedBars = charBars.map(([k, v]) => ({
+    key: k, label: CHAR_LABEL[k] ?? k, count: Number(v),
+    topPct: pctByKey.get(k) ?? null,
+    w: Math.max(4, Math.round((Number(v) / barMax) * 100)),
+  }));
+  // 횟수엔 안 잡혔지만 전체 대비로는 뚜렷한 축(상위 %만 있는 것)도 같은 표에 올린다.
+  const seenKeys = new Set(mergedBars.map((b) => b.key));
+  for (const s of (profile.ok ? profile.strong : [])) {
+    if (seenKeys.has(s.key)) continue;
+    mergedBars.push({ key: s.key, label: CHAR_LABEL[s.key] ?? s.label, count: 0, topPct: Number(s.topPct), w: 4 });
+  }
+  // 약점에서 **이미 위 표에 횟수로 올라간 축은 뺀다** — 같은 말을 "많다"와 "없다"로 두 번 하지 않는다.
+  const weakRest = (profile.ok ? profile.weak : [])
+    .filter((w: any) => !seenKeys.has(w.key))
+    .map((w: any) => CHAR_LABEL[w.key] ?? w.label);
   const addrRest = addrTail(c.address, c.area, c.dong);
   const ig = igHandle(c.instagram_url);
-  const facts = highlights.slice(0, 4);
   const vBadges = visitorBadges({ n: c.visitor_n ?? 0, trip: c.visitor_trip ?? 0, local: c.visitor_local ?? 0 });
   const showRank = typeof c.area_rank === "number" && c.area_rank <= 10 && (c.area_total ?? 0) >= 20;
   const nearTitle = nearbyTitle(nearby, c.area, c.dong);
@@ -409,9 +431,9 @@ export default async function CafePage({ params }: Props) {
         {/* 머리 — 등급줄 · 이름 · 주소 · 인스타 · 배지. 도장은 오른쪽. */}
         <header className="nt-ruled nt-margin-gutter relative z-[1] nt-band nt-torn-b" style={{ paddingTop: 34, paddingBottom: 34, paddingRight: grade ? 100 : 20, ["--nt-rule" as any]: "rgba(84,104,140,0.22)" }}>
           {grade && (
-            <div className={`nt-stamp in absolute ${stampKind}`} style={{ right: 16, top: 30 }} aria-label={`등급 ${grade}`}>{grade}<small>{stampEn}</small></div>
+            <div className={`nt-stamp in absolute ${stampKind}`} style={{ right: 16, top: 30 }} aria-label={`등급 ${grade}`}>{grade}</div>
           )}
-          <div className={`nt-grade ${stampKind}`}>{grade || "카페"} · 후기 {(c.synth_count ?? 0).toLocaleString()}건</div>
+          <div className={`nt-grade ${stampKind}`}>후기 {(c.synth_count ?? 0).toLocaleString()}건 교차검증</div>
           <h1 className={`nt-name ${String(c.name).length > 12 ? "long" : ""}`}>{c.name}</h1>
           <p className="nt-addr"><IcoPin /><span><b>{c.area}{c.dong ? ` ${c.dong}` : ""}</b>{addrRest ? ` ${addrRest}` : ""}</span></p>
           {/* 인스타 줄 — 오른쪽 끝(도장 바로 아래)에 ❤ 추억 저장 */}
@@ -444,15 +466,13 @@ export default async function CafePage({ params }: Props) {
           )}
         </header>
 
-        {/* ✍ 우리가 읽고 적은 판정 — 손글씨 한 줄 + 후기에 자주 나온 말 */}
-        {(c.synth_identity || facts.length > 0) && (
+        {/* ✍ 우리가 읽고 적은 판정 — 한 줄.
+            🔴 2026-10-16: 여기 있던 '자주 나온 말' 칩(`커피가 맛있는28`·`루프탑·테라스2`)을 뺐다.
+            아래 '이 카페의 결'이 같은 축을 더 정확히(횟수 + 전체 대비) 보여주는데, 이름만 다르게 두 번
+            보여주고 있었다('루프탑·테라스' vs '테라스·야외'). 같은 정보를 두 번 쓰면 둘 다 안 읽힌다. */}
+        {c.synth_identity && (
           <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
-            {c.synth_identity && <p className="nt-verdict"><span className="nt-hl">{c.synth_identity}</span></p>}
-            {facts.length > 0 && (
-              <div className="nt-chips">
-                {facts.map((h, i) => <span key={h.label} className={`nt-chip ${i === 0 ? "ink" : ""}`}>{h.label}<b>{h.count}</b></span>)}
-              </div>
-            )}
+            <p className="nt-verdict"><span className="nt-hl">{c.synth_identity}</span></p>
           </div>
         )}
 
@@ -484,36 +504,22 @@ export default async function CafePage({ params }: Props) {
           </div>
         )}
 
-        {/* 📊 이곳의 결 — char_scores 상위 5축. 현재 페이지엔 아예 안 나오던 값. */}
-        {charBars.length > 0 && (
+        {/* 📊 이 카페의 결 — 2026-10-16 통합. 종전 '이곳의 결'(횟수)과 '다른 카페보다'(상위%)를 한 구역으로.
+            두 구역이 같은 축을 따로 보여주며 모순까지 냈다(위 mergedBars 주석에 실측 근거). */}
+        {mergedBars.length > 0 && (
           <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
-            <div className="nt-lbl">이곳의 결 <em>· 후기에서 언급된 횟수</em></div>
+            <div className="nt-lbl">이 카페의 결 <em>· 후기에 나온 횟수 · 전체 검증 카페 대비</em></div>
             <div className="nt-free">
-              {charBars.map(([k, v], i) => (
-                <div key={k} className={`nt-bar ${i === 0 ? "top" : ""}`}>
-                  <span>{CHAR_LABEL[k]}</span>
-                  <span className="tr"><span className="fl" style={{ width: `${Math.max(4, Math.round((Number(v) / barMax) * 100))}%` }} /></span>
-                  <span className="n">{Number(v).toLocaleString()}</span>
+              {mergedBars.map((b, i) => (
+                <div key={b.key} className={`nt-bar ${i === 0 ? "top" : ""}`}>
+                  <span>{b.label}</span>
+                  <span className="tr"><span className="fl" style={{ width: `${b.w}%` }} /></span>
+                  <span className="n">{[b.count > 0 ? `${b.count.toLocaleString()}회` : null, b.topPct ? `상위 ${b.topPct}%` : null].filter(Boolean).join(" · ")}</span>
                 </div>
               ))}
             </div>
-          </div>
-        )}
-
-        {/* 👍 다른 카페보다 — 전체 검증 카페 대비 상위 %(후기당 언급률 순위). 약점은 한 줄로. */}
-        {profile.ok && profile.strong.length > 0 && (
-          <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
-            <div className="nt-lbl">다른 카페보다 <em>· 전체 검증 카페 대비</em></div>
-            <div className="nt-free nt-tiles">
-              {profile.strong.slice(0, 3).map((s) => (
-                <div key={s.key} className="nt-tile">
-                  <div className="k">{CHAR_LABEL[s.key] ?? s.label}</div>
-                  <div className="v">{s.topPct}<small>% 안</small></div>
-                </div>
-              ))}
-            </div>
-            {profile.weak.length > 0 && (
-              <p className="nt-note"><IcoInfo /><span>‘{profile.weak.map((w) => CHAR_LABEL[w.key] ?? w.label).join(" · ")}’는 후기에 거의 언급이 없어요.</span></p>
+            {weakRest.length > 0 && (
+              <p className="nt-note"><IcoInfo /><span>‘{weakRest.join(" · ")}’는 다른 카페보다 덜 언급돼요.</span></p>
             )}
           </div>
         )}
