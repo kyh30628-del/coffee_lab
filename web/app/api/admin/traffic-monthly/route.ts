@@ -39,26 +39,43 @@ export async function GET(req: NextRequest) {
       SELECT m, count(*) FILTER (WHERE days >= 2)::int repeat_people FROM d GROUP BY 1`) as any[];
     const repeatBy = new Map(repeat.map((r) => [r.m, r.repeat_people]));
 
-    // ③ 전국 지역별 — 유입(착지 기준) + 보유 카페. 230개 지역 전수.
-    //    /area/{지역} 착지와 /c/{id}(카페의 area)를 합쳐 '그 지역이 받은 사람 수'로 센다.
-    const byRegion = (await sql`
-      WITH ev AS (
-        SELECT anon_id,
-               COALESCE(
-                 substring(path from '^/area/([^/?]+)'),
-                 (SELECT area FROM cafes WHERE cafes.id = NULLIF(substring(path from '^/c/([0-9]+)'),'')::bigint)
-               ) AS region
-        FROM traffic_events
-        WHERE ts > now() - interval '90 days'
-          AND anon_id NOT IN (SELECT anon_id FROM bot_anon_cache)
-          AND (path LIKE '/area/%' OR path ~ '^/c/[0-9]+')
-      ),
-      t AS (SELECT region, count(DISTINCT anon_id)::int people, count(*)::int pv FROM ev WHERE region IS NOT NULL GROUP BY 1),
-      c AS (SELECT area, count(*)::int cafes FROM cafes WHERE published GROUP BY 1)
-      SELECT COALESCE(c.area, t.region) region, COALESCE(c.cafes,0) cafes,
-             COALESCE(t.people,0) people, COALESCE(t.pv,0) pv
-      FROM c FULL OUTER JOIN t ON c.area = t.region
-      ORDER BY people DESC NULLS LAST, cafes DESC`) as any[];
+    // ③ 전국 지역별 — **공개 카페가 있는 지역 전수**. 유입은 착지 기준.
+    //   🔴 2026-10-16 버그수리(CEO "지역이 아닌 것들은 뭐냐") — 경로가 URL 인코딩(/area/%EA%B4%91%EC%A3%BC%EC%8B%9C)인데
+    //   디코딩 없이 지역명으로 썼다. 같은 지역이 '광주시'와 '%EA%B4%91...' 둘로 갈리고, FULL OUTER JOIN까지 겹쳐
+    //   지역이 230개 → 441개로 부풀었다.
+    //   ⚠️ SQL에서 decode(...,'hex')로 풀려다 깨졌다(부분 인코딩·잘못된 시퀀스에서 쿼리 전체가 죽는다).
+    //      → **디코딩은 JS에서** 한다(decodeURIComponent, 실패 시 그 행만 버림). 기준 목록은 cafes.area로 고정.
+    const rawHits = (await sql`
+      SELECT substring(path from '^/area/([^/?]+)') seg, NULL::bigint cid, anon_id
+      FROM traffic_events
+      WHERE ts > now() - interval '90 days' AND anon_id NOT IN (SELECT anon_id FROM bot_anon_cache)
+        AND path LIKE '/area/%'
+      UNION ALL
+      SELECT NULL, NULLIF(substring(path from '^/c/([0-9]+)'),'')::bigint, anon_id
+      FROM traffic_events
+      WHERE ts > now() - interval '90 days' AND anon_id NOT IN (SELECT anon_id FROM bot_anon_cache)
+        AND path ~ '^/c/[0-9]+'`) as { seg: string | null; cid: string | null; anon_id: string }[];
+
+    const cafeArea = new Map<string, string>(
+      ((await sql`SELECT id, area FROM cafes WHERE published AND area IS NOT NULL`) as any[])
+        .map((r) => [String(r.id), String(r.area)]),
+    );
+    const agg = new Map<string, { pv: number; people: Set<string> }>();
+    for (const h of rawHits) {
+      let region: string | null = null;
+      if (h.seg) { try { region = decodeURIComponent(h.seg); } catch { region = null; } }
+      else if (h.cid) region = cafeArea.get(String(h.cid)) ?? null;
+      if (!region) continue;
+      let a = agg.get(region);
+      if (!a) { a = { pv: 0, people: new Set() }; agg.set(region, a); }
+      a.pv++; a.people.add(h.anon_id);
+    }
+    const cafesByArea = (await sql`SELECT area, count(*)::int cafes FROM cafes
+      WHERE published AND area IS NOT NULL AND area <> '' GROUP BY 1`) as { area: string; cafes: number }[];
+    const byRegion = cafesByArea.map((c) => {
+      const a = agg.get(c.area);
+      return { region: c.area, cafes: c.cafes, people: a ? a.people.size : 0, pv: a ? a.pv : 0 };
+    }).sort((x, y) => y.people - x.people || y.cafes - x.cafes);
 
     // ④ 패턴 — 요일별·시간대별(최근 90일). "언제 들어오는가"를 본다.
     const byDow = (await sql`
