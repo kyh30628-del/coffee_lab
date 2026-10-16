@@ -6,6 +6,7 @@ import { cardFacets } from "@/lib/cafeProfile";
 import { visitorBadges } from "@/lib/visitorMix";
 import KakaoShare from "../KakaoShare";
 import RecentCafes from "../RecentCafes";
+import NearMeButton from "../NearMeButton";
 
 const GRADE_BG: Record<string, string> = { 검증: "#5f7355", 참고: "#9c6b3f", 후보: "#7a6750" };
 
@@ -100,6 +101,12 @@ export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, headin
         <div className="text-[#7a5122] text-[11px] tracking-[0.25em] uppercase mt-4 mb-1">동네 커피 노트 · 검증 큐레이션</div>
         <h1 className="text-[26px] font-bold leading-tight mb-2">{heading}</h1>
         <p className="text-[14px] text-[#524234] leading-relaxed mb-3">{intro}</p>
+        {/* 📍 2026-10-16(CEO 지시 "지방 사람한테도 위치 동의 뜨게 해") — 위치 진입점을 **이탈 지점**으로 옮긴다.
+            실측: 최근 14일 방문자 4,462명 중 홈·지도 도달은 10.5%뿐이고 89.4%가 이 SEO 화면만 보고 나간다.
+            그래서 위치 동의자 155명 중 145명(94%)이 수도권이었다 — 공개 카페는 수도권 49%·지방 51%,
+            사람 조회는 66%·34%인데도. 지방 사람은 동의를 거절한 게 아니라 **질문을 받은 적이 없었다.**
+            누를 때만 묻고(자동 요청 없음), 결과는 이 화면에 그대로 펼친다. */}
+        <NearMeButton className="mb-4" />
         {/* 🏁 2026-09-14(CEO "결국은 소비자가 어떻게 느끼느냐가 핵심") — 우리 우위를 **읽히게** 세운다.
             그동안 근거는 다 있었는데 전부 옅은 회색 잔글씨라 소비자 눈에 안 들어왔다(모바일 실측 확인).
             세 줄로 고정한다: ①무엇을 뺐나 ②단점도 적는다 ③언제 확인한 정보인가.

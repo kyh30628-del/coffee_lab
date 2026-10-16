@@ -24,6 +24,7 @@ import { isOtherBusinessQuote, displayQuote, splitKeyTerms, rankNearby, nearbyTi
 import { extractWorkSignals } from "@/lib/workDetail";
 import PlaceCta from "@/app/PlaceCta";
 import OutboundLink from "../../OutboundLink";
+import NearMeButton from "@/app/NearMeButton";
 import { isOwnerManaged } from "@/lib/ownerManaged"; // 🏅 사장님 관리 배지(조건·문구 단일출처)
 
 export const runtime = "nodejs";
@@ -573,6 +574,10 @@ export default async function CafePage({ params }: Props) {
               </OutboundLink>
             ))}
             <Link href={`/area/${encodeURIComponent(c.area)}`} className="nt-g text-[12.5px] text-[#7a5122] block">{c.area} 전체 보기 →</Link>
+            {/* 📍 2026-10-16(CEO 지시) — 여기도 이탈 지점이다. 이 글에 나온 '근처'는 **이 카페 기준**이라
+                다른 지역에서 검색해 들어온 사람에겐 멀다. 내 위치 기준으로 다시 볼 수 있게 한다.
+                위치 동의가 홈·지도에만 있어 지방 사람은 질문조차 못 받던 문제(동의자 94%가 수도권)의 짝 조치. */}
+            <NearMeButton className="mt-3" />
           </div>
         )}
 
