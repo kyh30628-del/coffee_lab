@@ -560,10 +560,25 @@ export async function discoverRegion(region: string, areaLabel: string, keywords
   // 셔플(Fisher–Yates) — 부분 실행 시 특정 동·키워드에 편중되지 않게.
   for (let i = tasks.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [tasks[i], tasks[j]] = [tasks[j], tasks[i]]; }
 
-  for (const t of tasks) {
-    if (Date.now() > deadline) { stopped = true; break; }
-    await collect(t.q, t.sort);
-  }
+  // 🚀 2026-10-16(CEO "쿼터 사용을 다 해야지") — 직렬 + 호출마다 220ms 대기라 **초당 2.7콜**이 천장이었다.
+  //   실측: 런당 약 700콜 → 하루 4런 = 2,900콜 = 무료 할당량 25,000의 **11.6%만** 쓰고 나머지를 버렸다.
+  //   그 사이 230개 지역 중 228곳이 14일 넘게 미발굴이었다.
+  //   → 워커 K개가 같은 큐를 나눠 집는 방식으로 바꾼다. 대기(220ms)는 워커별로 유지하므로
+  //     초당 호출은 K/0.37 ≈ 10.8콜(K=4)로, 네이버 쪽에 과하지 않은 선이다(한도는 '하루 25,000'이지 QPS가 아님).
+  //   ⚠️ found·seen은 공유하지만 JS 단일 스레드라 경합 없다. apiFails가 쌓이면(쿼터 소진·장애)
+  //     바로 멈춘다 — 전처럼 계속 두드려 429를 늘리지 않는다.
+  const CONC = Math.max(1, Number(process.env.DISCOVER_CONC || 4));
+  let ti = 0;
+  const worker = async () => {
+    while (true) {
+      if (Date.now() > deadline) { stopped = true; return; }
+      if (apiFails >= 10) { stopped = true; return; } // 쿼터 소진·API 장애 → 즉시 중단
+      const t = tasks[ti++];
+      if (!t) return;
+      await collect(t.q, t.sort);
+    }
+  };
+  await Promise.all(Array.from({ length: CONC }, () => worker()));
 
   // 💰 2026-08-22 잔여 수리: 이 DDL도 매 실행마다 돌고 있었다 — 배포 단위 1회로.
   await ensureOnce("lib_discover.ddl", async () => {
