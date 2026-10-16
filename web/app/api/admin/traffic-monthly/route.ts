@@ -18,6 +18,8 @@ export async function GET(req: NextRequest) {
   if (!authed(req)) return NextResponse.json({ ok: false }, { status: 401 });
   try {
     // ① 월별 — 순방문자·PV·검색유입(네이버/구글/AI)·재방문
+    //   🤖 사람/봇 분리 — bot_anon_cache 단일출처(여기서 정규식 재정의 금지, 2026-07-26 재발방지).
+    //   봇만 긁고 사람은 안 오는 지역/달을 구분해야 "SEO는 되는데 가치가 없다"를 판단할 수 있다.
     const monthly = (await sql`
       SELECT to_char(ts AT TIME ZONE 'Asia/Seoul','YYYY-MM') m,
              count(DISTINCT anon_id)::int people,
@@ -28,6 +30,15 @@ export async function GET(req: NextRequest) {
       FROM traffic_events
       WHERE anon_id NOT IN (SELECT anon_id FROM bot_anon_cache)
       GROUP BY 1 ORDER BY 1`) as any[];
+
+    // 같은 기간 봇 집계(분리 표시용)
+    const monthlyBot = (await sql`
+      SELECT to_char(ts AT TIME ZONE 'Asia/Seoul','YYYY-MM') m,
+             count(DISTINCT anon_id)::int bots, count(*)::int bot_pv
+      FROM traffic_events
+      WHERE anon_id IN (SELECT anon_id FROM bot_anon_cache)
+      GROUP BY 1`) as any[];
+    const botBy = new Map(monthlyBot.map((r: any) => [r.m, r]));
 
     // ② 월별 재방문(2일 이상 방문한 사람)
     const repeat = (await sql`
@@ -46,35 +57,50 @@ export async function GET(req: NextRequest) {
     //   ⚠️ SQL에서 decode(...,'hex')로 풀려다 깨졌다(부분 인코딩·잘못된 시퀀스에서 쿼리 전체가 죽는다).
     //      → **디코딩은 JS에서** 한다(decodeURIComponent, 실패 시 그 행만 버림). 기준 목록은 cafes.area로 고정.
     const rawHits = (await sql`
-      SELECT substring(path from '^/area/([^/?]+)') seg, NULL::bigint cid, anon_id
+      SELECT substring(path from '^/area/([^/?]+)') seg, NULL::bigint cid, anon_id,
+             (anon_id IN (SELECT anon_id FROM bot_anon_cache)) is_bot,
+             (ts > now() - interval '30 days') recent
       FROM traffic_events
-      WHERE ts > now() - interval '90 days' AND anon_id NOT IN (SELECT anon_id FROM bot_anon_cache)
-        AND path LIKE '/area/%'
+      WHERE ts > now() - interval '60 days' AND path LIKE '/area/%'
       UNION ALL
-      SELECT NULL, NULLIF(substring(path from '^/c/([0-9]+)'),'')::bigint, anon_id
+      SELECT NULL, NULLIF(substring(path from '^/c/([0-9]+)'),'')::bigint, anon_id,
+             (anon_id IN (SELECT anon_id FROM bot_anon_cache)),
+             (ts > now() - interval '30 days')
       FROM traffic_events
-      WHERE ts > now() - interval '90 days' AND anon_id NOT IN (SELECT anon_id FROM bot_anon_cache)
-        AND path ~ '^/c/[0-9]+'`) as { seg: string | null; cid: string | null; anon_id: string }[];
+      WHERE ts > now() - interval '60 days' AND path ~ '^/c/[0-9]+'`) as { seg: string | null; cid: string | null; anon_id: string; is_bot: boolean; recent: boolean }[];
 
     const cafeArea = new Map<string, string>(
       ((await sql`SELECT id, area FROM cafes WHERE published AND area IS NOT NULL`) as any[])
         .map((r) => [String(r.id), String(r.area)]),
     );
-    const agg = new Map<string, { pv: number; people: Set<string> }>();
+    // 지역별: 사람/봇 분리 + 최근 30일 vs 직전 30일(증감 판단용)
+    type Agg = { pv: number; people: Set<string>; botPv: number; bots: Set<string>; cur: Set<string>; prev: Set<string> };
+    const agg = new Map<string, Agg>();
     for (const h of rawHits) {
       let region: string | null = null;
       if (h.seg) { try { region = decodeURIComponent(h.seg); } catch { region = null; } }
       else if (h.cid) region = cafeArea.get(String(h.cid)) ?? null;
       if (!region) continue;
       let a = agg.get(region);
-      if (!a) { a = { pv: 0, people: new Set() }; agg.set(region, a); }
-      a.pv++; a.people.add(h.anon_id);
+      if (!a) { a = { pv: 0, people: new Set(), botPv: 0, bots: new Set(), cur: new Set(), prev: new Set() }; agg.set(region, a); }
+      if (h.is_bot) { a.botPv++; a.bots.add(h.anon_id); }
+      else {
+        a.pv++; a.people.add(h.anon_id);
+        (h.recent ? a.cur : a.prev).add(h.anon_id);
+      }
     }
     const cafesByArea = (await sql`SELECT area, count(*)::int cafes FROM cafes
       WHERE published AND area IS NOT NULL AND area <> '' GROUP BY 1`) as { area: string; cafes: number }[];
     const byRegion = cafesByArea.map((c) => {
       const a = agg.get(c.area);
-      return { region: c.area, cafes: c.cafes, people: a ? a.people.size : 0, pv: a ? a.pv : 0 };
+      const people = a ? a.people.size : 0;
+      const cur = a ? a.cur.size : 0, prev = a ? a.prev.size : 0;
+      return {
+        region: c.area, cafes: c.cafes, people, pv: a ? a.pv : 0,
+        bots: a ? a.bots.size : 0, botPv: a ? a.botPv : 0,
+        perCafe: c.cafes ? Number((people / c.cafes).toFixed(3)) : 0, // 📌 발굴 ROI — 카페 1곳이 데려오는 사람
+        cur, prev, delta: cur - prev,                                  // 📌 최근 30일 vs 직전 30일
+      };
     }).sort((x, y) => y.people - x.people || y.cafes - x.cafes);
 
     // ④ 패턴 — 요일별·시간대별(최근 90일). "언제 들어오는가"를 본다.
@@ -112,7 +138,8 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       ok: true, at: new Date().toISOString(),
-      monthly: monthly.map((m) => ({ ...m, repeat: repeatBy.get(m.m) ?? 0 })),
+      monthly: monthly.map((m) => ({ ...m, repeat: repeatBy.get(m.m) ?? 0,
+        bots: (botBy.get(m.m) as any)?.bots ?? 0, botPv: (botBy.get(m.m) as any)?.bot_pv ?? 0 })),
       byRegion, totals, byDow, byHour, depth: depth[0] ?? null,
     }, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
