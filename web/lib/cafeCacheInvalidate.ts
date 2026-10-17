@@ -116,6 +116,32 @@ function revalidateDetails(revalidatePath: (p: string) => void, ids: number[]) {
   }
 }
 
+/** 내용만 바뀐 경우용 **좁은 무효화** — 상세 1장만 지운다(2026-10-17, 깊은 수집 레인 전용).
+ *
+ *  비용 근거: invalidateCafeCaches는 카페당 ISR을 **3장** 지운다 —
+ *    `/c/{id}` · `/share/{id}` · `/c/{id}/opengraph-image`.
+ *  그중 **OG가 가장 비싸다**: 전용 라우트가 4.5MB 한글 폰트(data/fonts/NanumSeongSirCe.ttf)를 읽어
+ *  이미지를 다시 그린다. 그런데 OG에 실리는 건 이름·등급·후기 수뿐이라 **후기가 늘어도 그림은 거의 같다**.
+ *  `/share/{id}`도 공유로 들어온 사람만 본다.
+ *  → 등급·공개가 안 바뀌는 변경은 상세 1장만. **카페당 ISR write 3 → 1(-67%)**.
+ *
+ *  ⚠️ 등급·공개가 바뀌었으면 쓰지 말 것 — 목록·지도·검색·OG까지 어긋난다(그때는 invalidateCafeCaches).
+ */
+export async function invalidateCafeDetailOnly(ids: number[]): Promise<void> {
+  const list = [...new Set((ids || []).map(Number).filter((n) => Number.isInteger(n) && n > 0))];
+  if (!list.length) return;
+  try {
+    const { revalidatePath } = await import("next/cache");
+    revalidatePath(`/c/${list[0]}`); // 요청 컨텍스트 밖이면 여기서 던진다 → 원격 위임
+    for (const id of list) revalidatePath(`/c/${id}`);
+  } catch (e) {
+    await remoteInvalidate(list, "detail").catch(async (e2) => {
+      const { noteSilentFail } = await import("./silentFail");
+      await noteSilentFail("cacheInvalidate.detailRemote", e2 ?? e).catch(() => {});
+    });
+  }
+}
+
 export async function invalidateCafeCaches(ids: number[]): Promise<void> {
   const list = [...new Set((ids || []).map(Number).filter((n) => Number.isInteger(n) && n > 0))];
   if (!list.length) return;
@@ -151,14 +177,15 @@ export async function invalidateCafeCaches(ids: number[]): Promise<void> {
 }
 
 /** 요청 컨텍스트 밖에서 ISR을 지우는 유일한 방법 — 프로덕션 안에서 같은 함수를 실행시킨다. */
-async function remoteInvalidate(ids: number[]): Promise<void> {
+async function remoteInvalidate(ids: number[], mode?: "detail"): Promise<void> {
   const pw = process.env.ADMIN_PASSWORD;
   if (!pw) throw new Error("ADMIN_PASSWORD 미설정 — 원격 무효화 불가");
   for (let i = 0; i < ids.length; i += REMOTE_CHUNK) {
     const r = await fetch("https://dongnecoffeenote.com/api/admin/revalidate", {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-admin-password": pw },
-      body: JSON.stringify({ ids: ids.slice(i, i + REMOTE_CHUNK) }),
+      // mode:"detail" = 상세 1장만(내용 변경). 없으면 종전대로 전체(상세·공유·OG + 목록 diff).
+      body: JSON.stringify({ ids: ids.slice(i, i + REMOTE_CHUNK), mode }),
       signal: AbortSignal.timeout(20000),
     });
     if (!r.ok) throw new Error(`원격 무효화 실패 ${r.status}`);

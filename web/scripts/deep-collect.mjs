@@ -29,7 +29,7 @@ const { fetchDeepWebReviews } = await import("../lib/webSearchCollector.ts");
 const { nameCoherence, cleanCafeName } = await import("../lib/reviewQuality.ts");
 const { areaTermsFor } = await import("../lib/synthStore.ts");
 const { synthAndStore } = await import("../lib/synthStore.ts");
-const { invalidateCafeCaches } = await import("../lib/cafeCacheInvalidate.ts");
+const { invalidateCafeCaches, invalidateCafeDetailOnly } = await import("../lib/cafeCacheInvalidate.ts");
 const { naverBlocked, naverUsedToday, NAVER_DAILY_QUOTA } = await import("../lib/naverBudget.ts");
 const sql = neon(process.env.DATABASE_URL);
 
@@ -177,9 +177,17 @@ for (const t of targets) {
 
 // 🧹 무효화 — 마지막에 묶음. 내용만 바뀐 곳도 상세 1장은 지워야 화면에 반영된다(ISR 30일 주기).
 //   등급이 바뀐 곳만 목록·지도·OG까지 간다.
-if (detailOnly.length || fullPurge.length) {
-  await invalidateCafeCaches([...detailOnly, ...fullPurge]).catch((e) => console.log(`  무효화 실패: ${String(e).slice(0, 70)}`));
-}
+// 내용만 바뀐 곳은 **상세 1장만** — OG(4.5MB 폰트 렌더)·공유 페이지는 등급이 안 바뀌면 그대로여도 된다.
+//   등급이 바뀐 곳만 전체(목록·지도·검색·OG)로 간다. 카페당 ISR write 3 → 1.
+if (detailOnly.length) await invalidateCafeDetailOnly(detailOnly).catch((e) => console.log(`  무효화(상세) 실패: ${String(e).slice(0, 70)}`));
+if (fullPurge.length) await invalidateCafeCaches(fullPurge).catch((e) => console.log(`  무효화(전체) 실패: ${String(e).slice(0, 70)}`));
 const used1 = await naverUsedToday();
 console.log(`🔎 끝 — 늘어난 곳 ${grew} · 변화없음 ${flat} · 차단 ${blocked} · 실패 ${failed}`);
-console.log(`   원본 +${rawAdded.toLocaleString()}건 · Neon 쓰기 ${writes}건 · ISR 무효화 ${detailOnly.length + fullPurge.length}곳(등급변경 ${fullPurge.length}) · 네이버 ${(used1 - used0).toLocaleString()}콜`);
+// 💓 하트비트 — 관제탑이 이 레인의 정지를 감지하게 한다(3종 세트 ①: 러너 heartbeat).
+try {
+  const { execFileSync } = await import("node:child_process");
+  execFileSync(process.execPath, ["--import", "tsx", "scripts/heartbeat.mjs", "deep-collect", "0",
+    `늘어난 곳 ${grew} · 차단 ${blocked} · 원본 +${rawAdded} · ISR ${detailOnly.length + fullPurge.length * 3}장`],
+    { stdio: "ignore" });
+} catch { /* 하트비트 실패가 레인을 막지 않는다 */ }
+console.log(`   원본 +${rawAdded.toLocaleString()}건 · Neon 쓰기 ${writes}건 · ISR write ${detailOnly.length + fullPurge.length * 3}장(상세만 ${detailOnly.length} + 등급변경 ${fullPurge.length}×3) · 네이버 ${(used1 - used0).toLocaleString()}콜`);

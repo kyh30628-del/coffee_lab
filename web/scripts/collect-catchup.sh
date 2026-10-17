@@ -88,12 +88,15 @@ DEADLINE=$(( $(date +%s) + 120*60 ))
   # 깊은 수집(2026-10-17, CEO 승인) — 기존 수집이 질의당 상위 100건만 받아 **이미 있는 후기**를 10~18배
   #   놓치고 있던 것을 긁는다. '최신화'(ISR 30일 주기라 갱신=재생성)보다 효율이 훨씬 좋다: 한 번 긁으면 영구 자산.
   #   하루 1회만(마커 파일) · 대상은 사람이 본 카페 조회순 · 곳당 네이버 ~10콜·Neon 쓰기 2건·ISR 1장.
+#   2026-10-17 상한 60 -> 300곳: 수집 예약을 적체 기반 동적(16,000 -> 1,000)으로 바꿔 게이트가
+#   used<7,800 -> 22,800으로 열렸다(+15,000콜 여유). 남은 대상 4,301곳을 72일 -> 15일로 줄인다.
+#   창 데드라인을 넘기면 스스로 멈추고 다음날 이어간다(손실 0) — 상한은 안전밸브다.
   #   💰 실측(6곳): 네이버 59콜 · Neon 12쓰기 · ISR 4장. 60곳/일이면 ~600콜(유휴 15,700 안)·ISR ~40장/일.
   DEEPMARK=/tmp/coffee-deep-$(date +%Y%m%d)
   if [ ! -f "$DEEPMARK" ]; then
     touch "$DEEPMARK"
     echo "--- 깊은 수집(하루 1회) ---"
-    DEEP_CAP=${DEEP_CAP:-60} DEEP_BUDGET=${DEEP_BUDGET:-900} node --import tsx scripts/deep-collect.mjs 2>&1 | tail -12 || true
+    DEEP_CAP=${DEEP_CAP:-300} DEEP_BUDGET=${DEEP_BUDGET:-3500} node --import tsx scripts/deep-collect.mjs 2>&1 | tail -12 || true
   fi
 
   node --import tsx scripts/indexnow-submit.mjs 2>&1 | tail -4 || true

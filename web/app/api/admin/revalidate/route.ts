@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { invalidateCafeCaches } from "@/lib/cafeCacheInvalidate";
+import { invalidateCafeCaches, invalidateCafeDetailOnly } from "@/lib/cafeCacheInvalidate";
 
 export const runtime = "nodejs";
 
@@ -16,8 +16,11 @@ export async function POST(req: NextRequest) {
   if (req.headers.get("x-admin-password") !== process.env.ADMIN_PASSWORD)
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   try {
-    const { ids } = await req.json();
+    const { ids, mode } = await req.json();
     const list = (Array.isArray(ids) ? ids : []).map(Number).filter((n) => Number.isInteger(n) && n > 0).slice(0, 500);
+    // 🪶 2026-10-17: mode="detail"이면 **상세 1장만** 지운다(깊은 수집처럼 등급·공개가 안 바뀌는 변경).
+    //   카페당 ISR write 3장(상세·공유·OG) → 1장. OG는 4.5MB 폰트로 그림을 다시 그리는 가장 비싼 경로다.
+    if (mode === "detail") { await invalidateCafeDetailOnly(list); return NextResponse.json({ ok: true, revalidated: list.length, mode: "detail" }); }
     await invalidateCafeCaches(list);
     return NextResponse.json({ ok: true, revalidated: list.length });
   } catch (e) {

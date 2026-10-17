@@ -82,11 +82,30 @@ export const NAVER_RECOLLECT_RESERVE = Number(process.env.NAVER_RECOLLECT_RESERV
 //   수집 예약의 기존 보장은 안 건드린다.
 export const NAVER_GROW_RESERVE = Number(process.env.NAVER_GROW_RESERVE || 3000);
 /** 발굴(cron-grow)·재수집 등 '폐업 아닌' 소비자가 지금 더 써도 되는가 — 예약분 1,200을 남긴다. */
+// 🔴 2026-10-17 **유휴 예약 해제**(CEO "네이버 무료한도를 효율적으로 나눠서 일 최대로 사용").
+//   NAVER_COLLECT_RESERVE 16,000은 2026-09-23에 "하루 3,550곳이 새로 들어온다"는 전제로 잡힌 값이다.
+//   실측(10-17): 수집 적체 **5곳** → 수집이 실제 필요한 콜 약 23개. **15,978콜이 매일 유휴로 버려지면서**
+//   동시에 발굴·깊은수집 게이트를 used < 7,800에 묶고 있었다(그 결과 하루 사용률 33%).
+//   → 예약을 **적체 기반으로** 정한다: 적체 × COLLECT_PER_CAFE, 최소 COLLECT_RESERVE_MIN.
+//     적체가 다시 쌓이면(확장·대량 적재) 예약도 같이 커져 09-23의 보호가 그대로 복원된다.
+//   ⚠️ 폐업 예약(1,200)은 건드리지 않는다 — 결재 #1070으로 보장된 최소 몫이다.
+const COLLECT_PER_CAFE = Number(process.env.NAVER_COLLECT_PER_CAFE || 5);   // 실측 4.5콜/곳 + 여유
+const COLLECT_RESERVE_MIN = Number(process.env.NAVER_COLLECT_RESERVE_MIN || 1000);
+/** 지금 수집이 실제로 필요한 몫 — 적체에 비례. 상한은 종전 고정값(16,000). */
+export async function collectReserveNow(): Promise<number> {
+  try {
+    const backlog = await collectBacklog();
+    return Math.min(NAVER_COLLECT_RESERVE, Math.max(COLLECT_RESERVE_MIN, Math.ceil(backlog * COLLECT_PER_CAFE)));
+  } catch {
+    return NAVER_COLLECT_RESERVE; // 적체를 못 읽으면 보수적으로(종전 동작)
+  }
+}
+
 export async function nonClosureMayUse(): Promise<{ ok: boolean; remaining: number }> {
   const used = await naverUsedToday();
   const remaining = Math.max(0, NAVER_DAILY_QUOTA - used);
-  // 발굴(cron-grow)은 폐업 예약 + **수집 예약**을 둘 다 남긴다. 수집은 이 함수를 호출하지 않으므로 안 막힌다.
-  return { ok: remaining > NAVER_CLOSURE_RESERVE + NAVER_COLLECT_RESERVE, remaining };
+  // 발굴(cron-grow)은 폐업 예약 + **수집 예약(동적)**을 둘 다 남긴다. 수집은 이 함수를 호출하지 않으므로 안 막힌다.
+  return { ok: remaining > NAVER_CLOSURE_RESERVE + (await collectReserveNow()), remaining };
 }
 
 // 🚦 적체 가드(2026-08-25) — **발굴이 쿼터를 독식해 수집이 굶던 구조를 끊는다.**
@@ -183,7 +202,7 @@ export async function sweepMayContinue(): Promise<{ ok: boolean; used: number; r
   const blocked = await naverBlocked();
   const remaining = Math.max(0, NAVER_DAILY_QUOTA - used);
   // 스윕은 발굴(cron-grow)·폐업·파기재수집·**수집** 예약을 모두 남긴다
-  return { ok: !blocked && remaining > NAVER_SWEEP_RESERVE + NAVER_CLOSURE_RESERVE + NAVER_RECOLLECT_RESERVE + NAVER_COLLECT_RESERVE, used, remaining, blocked };
+  return { ok: !blocked && remaining > NAVER_SWEEP_RESERVE + NAVER_CLOSURE_RESERVE + NAVER_RECOLLECT_RESERVE + (await collectReserveNow()), used, remaining, blocked };
 }
 
 /** 파기 재수집 전용: 자기 예약분(1,500) 안에서만 쓴다 — 폐업 예약은 건드리지 않는다. */
