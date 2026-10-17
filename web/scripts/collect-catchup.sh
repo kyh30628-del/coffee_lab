@@ -96,7 +96,14 @@ DEADLINE=$(( $(date +%s) + 120*60 ))
   if [ ! -f "$DEEPMARK" ]; then
     touch "$DEEPMARK"
     echo "--- 깊은 수집(하루 1회) ---"
-    DEEP_CAP=${DEEP_CAP:-300} DEEP_BUDGET=${DEEP_BUDGET:-3500} node --import tsx scripts/deep-collect.mjs 2>&1 | tail -12 || true
+    # 🧵 3샤드 병렬 — 병목이 쿼터가 아니라 재합성 CPU였다(곳당 22초 중 네이버 1.5초).
+    #   단일 프로세스는 창 안에 ~140곳이 한계라 네이버 유휴가 남았다(사용률 36%).
+    #   실측 3샤드: 곳당 22초 → 3.75초(약 6배) · 429·실패 0건. 샤드는 3 이하로(버스트 429 함정).
+    for k in 0 1 2; do
+      DEEP_CAP=${DEEP_CAP:-400} DEEP_BUDGET=${DEEP_BUDGET:-4000} \
+        node --import tsx scripts/deep-collect.mjs --shard=$k --of=3 2>&1 | tail -4 &
+    done
+    wait
   fi
 
   node --import tsx scripts/indexnow-submit.mjs 2>&1 | tail -4 || true

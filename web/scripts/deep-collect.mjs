@@ -37,7 +37,13 @@ const arg = (k, d) => { const a = process.argv.find((x) => x.startsWith(`--${k}=
 const DRY = process.argv.includes("--dry");
 const CAP = Number(arg("cap", process.env.DEEP_CAP || 60));          // 하루 처리 곳 수(= 최대 ISR write 수)
 const BUDGET = Number(arg("budget", process.env.DEEP_BUDGET || 1500)); // 이 회차에 쓸 네이버 콜 상한
-const ONLY = arg("only", "");                                          // 특정 카페명(복구용)
+const ONLY = arg("only", "");
+// 🧵 샤드 — 2026-10-17: 병목이 쿼터가 아니라 **재합성 CPU**였다(곳당 22초 중 네이버는 1.5초뿐).
+//   단일 프로세스로는 창(50분) 안에 ~140곳이 한계라 네이버 유휴가 그대로 남았다(사용률 36%).
+//   collect-shard와 같은 방식으로 맥 코어를 나눠 쓴다. 샤드 수는 보수적으로(3 이하) —
+//   더 늘리면 네이버 초당 버스트 429가 나 콜은 쓰고 수확이 0이 된다(collect-shard가 겪은 함정).
+const SHARD = Number(arg("shard", 0)), OF = Number(arg("of", 1));
+const tag = OF > 1 ? `[${SHARD}/${OF}] ` : "";                                          // 특정 카페명(복구용)
 const STALE_D = Number(process.env.DEEP_STALE_D || 0);
 const DEADLINE_MS = Number(process.env.COLLECT_DEADLINE) > 0
   ? Number(process.env.COLLECT_DEADLINE) * 1000
@@ -68,11 +74,12 @@ const targets = ONLY
     LEFT JOIN deep_log d ON d.cafe_id = c.id
     WHERE c.published AND c.raw_reviews IS NOT NULL AND d.cafe_id IS NULL
       AND c.raw_collected_at < now() - make_interval(days => ${STALE_D})
+      AND (c.id % ${OF}) = ${SHARD}
     ORDER BY v.views DESC, c.synth_count DESC NULLS LAST
     LIMIT ${CAP}`;
 
 const used0 = await naverUsedToday();
-console.log(`🔎 깊은 수집 — 대상 ${targets.length}곳(상한 ${CAP}) · 콜 예산 ${BUDGET} · 네이버 ${used0.toLocaleString()}/${NAVER_DAILY_QUOTA.toLocaleString()}`);
+console.log(`${tag}🔎 깊은 수집 — 대상 ${targets.length}곳(상한 ${CAP}) · 콜 예산 ${BUDGET} · 네이버 ${used0.toLocaleString()}/${NAVER_DAILY_QUOTA.toLocaleString()}`);
 if (!targets.length) { console.log("  할 일 없음"); process.exit(0); }
 if (DRY) {
   for (const t of targets.slice(0, 12)) console.log(`  [조회 ${String(t.views).padStart(3)}] ${t.name} (${t.area}) 후기 ${t.synth_count ?? 0}건`);
@@ -167,7 +174,7 @@ for (const t of targets) {
   const gradeChanged = a?.synth_grade !== t.synth_grade;
   grew++;
   (gradeChanged ? fullPurge : detailOnly).push(Number(t.id));
-  console.log(`  ✅ ${String(t.name).slice(0, 18).padEnd(20)} 원본 ${prev.length}→${merged.length} · 검증 ${cBefore}→${cAfter}${gradeChanged ? ` · 등급 ${t.synth_grade}→${a.synth_grade}` : ""} (${deep.calls}콜 · 이름일치 ${kept.length}/${deep.snippets.length})`);
+  console.log(`  ${tag}✅ ${String(t.name).slice(0, 18).padEnd(20)} 원본 ${prev.length}→${merged.length} · 검증 ${cBefore}→${cAfter}${gradeChanged ? ` · 등급 ${t.synth_grade}→${a.synth_grade}` : ""} (${deep.calls}콜 · 이름일치 ${kept.length}/${deep.snippets.length})`);
 
   await sql`INSERT INTO deep_log (cafe_id, raw_before, raw_after, count_before, count_after, calls)
     VALUES (${t.id}, ${prev.length}, ${merged.length}, ${cBefore}, ${cAfter}, ${deep.calls})
@@ -182,7 +189,7 @@ for (const t of targets) {
 if (detailOnly.length) await invalidateCafeDetailOnly(detailOnly).catch((e) => console.log(`  무효화(상세) 실패: ${String(e).slice(0, 70)}`));
 if (fullPurge.length) await invalidateCafeCaches(fullPurge).catch((e) => console.log(`  무효화(전체) 실패: ${String(e).slice(0, 70)}`));
 const used1 = await naverUsedToday();
-console.log(`🔎 끝 — 늘어난 곳 ${grew} · 변화없음 ${flat} · 차단 ${blocked} · 실패 ${failed}`);
+console.log(`${tag}🔎 끝 — 늘어난 곳 ${grew} · 변화없음 ${flat} · 차단 ${blocked} · 실패 ${failed}`);
 // 💓 하트비트 — 관제탑이 이 레인의 정지를 감지하게 한다(3종 세트 ①: 러너 heartbeat).
 try {
   const { execFileSync } = await import("node:child_process");
