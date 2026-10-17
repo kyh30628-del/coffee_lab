@@ -25,7 +25,17 @@ export const NAVER_SWEEP_RESERVE = Number(process.env.NAVER_SWEEP_RESERVE || 0);
 // 🚪 폐업 재확인 예약(2026-09-13 결재 #1070): 하루 25,000 중 1,200(4.8%)은 발굴·스윕이 못 쓴다.
 //   폐업 크론(카페당 1~3호출, 하루 ~220곳)이 '쿼터중단'으로 굶던 것을 끝낸다. 예약은 상한이 아니라 최소 보장 —
 //   폐업 크론이 덜 쓰면 남은 몫은 자정 리셋까지 그냥 남는다(발굴이 예약선까지는 계속 쓴다).
-export const NAVER_CLOSURE_RESERVE = Number(process.env.NAVER_CLOSURE_RESERVE || 1200);
+// 🔁 2026-10-17 재배분(CEO "폐업보다는 신규 발굴·리뷰 재수집에 더 배분") — 1,200 → 400.
+//   실측 근거:
+//     · 폐업 크론 실사용 = 하루 3회(08·12·20시) × 재확인 150+35+35 = 220곳 × 1.4콜 ≈ **308콜/일**.
+//       예약 1,200 중 **892콜이 매일 유휴**였다.
+//     · 폐업 감지는 이미 **공공 인허가 원장이 주력**이다 — 원장에 폐업일이 찍힌 매칭 카페 **1,262곳** vs
+//       네이버 재확인으로 비공개된 것 49곳. 네이버 재확인은 보조이고, 원장은 네이버 콜을 거의 안 쓴다.
+//   → 400(실사용 308 + 여유 30%). 예약은 **상한이 아니라 최소 보장**이라, 쿼터가 남으면 폐업 크론은
+//     400을 넘겨서도 쓴다. 줄이는 효과는 "발굴·재수집 게이트가 800콜 더 열린다"는 것뿐이다.
+//   ⚠️ 결재 #1070(09-13)이 1,200으로 정한 값이다. 이번 변경은 CEO 직접 지시(10-17)로 갱신한다.
+//     폐업 재확인이 400에 막혀 굶는 일이 생기면(run_ledger에서 '쿼터중단' 확인) 즉시 되돌릴 것.
+export const NAVER_CLOSURE_RESERVE = Number(process.env.NAVER_CLOSURE_RESERVE || 400);
 // 🔁 파기 재수집 예약(2026-09-16 결재 승인 B안): 하루 25,000 중 1,500(5.9%)은 발굴·스윕이 못 쓴다.
 //   왜: raw는 약관 준수로 90일에 파기되는데(cron-resynth), 그 짝인 재수집 장치 `warmup`이
 //   **어느 스케줄러에도 존재하지 않았다**(코드엔 주석만 남음). 파기만 돌았다.
@@ -211,3 +221,15 @@ export async function recollectMayUse(): Promise<{ ok: boolean; remaining: numbe
   const remaining = Math.max(0, NAVER_DAILY_QUOTA - used);
   return { ok: !(await naverBlocked()) && remaining > NAVER_CLOSURE_RESERVE, remaining };
 }
+
+// 📏 2026-10-17 실측 — **발굴에 쿼터를 더 줘도 효율은 오르지 않는다**(CEO "신규 발굴에 더 배분" 검토 결과).
+//   발굴은 네이버 **지역검색(local)** API를 쓰는데, 그 API는 display·start를 어떻게 줘도 5건만 준다:
+//     display=5  start=1  → total=5 items=5
+//     display=30 start=1  → total=5 items=5   (display 무시)
+//     display=5  start=6  → total=5 items=5   (start 무시, 같은 5건)
+//   즉 질의당 5건이 하드 상한이라 곳당 110콜(기준 16.9의 6.5배)은 **API 한계**이고
+//   페이지네이션으로 고칠 수 없다. 발굴의 레버는 쿼터가 아니라 **질의 선택**(수확률 쿨다운)이다.
+//   반면 리뷰 재수집은 **블로그 검색** API라 start를 1000까지 쓸 수 있어 실측 10~18배를 더 긁는다
+//   (scripts/deep-collect.mjs). → 유휴 쿼터는 재수집이 쓰는 것이 맞다.
+//   발굴 게이트도 함께 열려 있다(used < 23,600) — 발굴이 더 쓸 수 있는 상태이고, 실제 사용량은
+//   수확률 쿨다운이 정한다. 여기서 더 밀어주는 것은 빈 우물 태우기다.
