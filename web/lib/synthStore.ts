@@ -43,6 +43,13 @@ async function synthMetaFor(id: number): Promise<{ address: string; naverCategor
 }
 
 type RawItem = { source: "google" | "blog" | "youtube"; text: string; title?: string; desc?: string; time?: number; link?: string; date?: string; srcName?: string };
+// 💰 재수집 누적 상한 — raw_reviews는 큰 컬럼이라 무한 누적이 조회비용으로 돌아온다.
+//   실측(표본 300곳): 평균 18.1KB · 글 중위 17건 · **기존 최대 578건** · 글당 298B · 총량 약 0.70GB.
+//   상한은 **기존 최대(578)를 자르지 않는 선**인 600으로 둔다 — 더 낮추면 이미 모은 근거를 또 잘라먹는다.
+//   이건 안전밸브이고 기대 크기가 아니다: 합치기는 '진짜 새 글'만 더하므로 중위 17건짜리는 상한에 안 닿는다.
+//   ⚠️ 그래도 상한까지 다 차면 최악 5.6GB(현재의 8배)다 → 총량은 주기적으로 **표본으로** 확인할 것.
+//     (2026-10-17: 이걸 재려고 pg_column_size 전수 스캔을 돌렸다가 큰 컬럼 전체를 읽었다 — 전수 금지, LIMIT 표본만.)
+const RAW_KEEP_MAX = Number(process.env.RAW_KEEP_MAX || 600);
 
 // 🛡️ jsonb 안전 직렬화: 인용문이 이모지(서로게이트쌍) 중간에서 잘리면 짝 없는 서로게이트가 남고,
 //   JSON.stringify는 이를 \udXXX 이스케이프로 내보내지만 PostgreSQL jsonb는 이를 거부한다
@@ -227,7 +234,41 @@ async function gatherRaw(cafe: { id: number; name: string; area: string }, refre
   if (raw.length === 0 && (web.apiError || ytErr)) return { raw: [], fromCache: false, apiFailed: true };
   // 내용 비교: 재수집했는데 후기가 그대로면 raw_collected_at을 건드리지 않는다(= 재판정 큐에 다시 안 올라감).
   // raw_checked_at만 갱신 → 커서는 계속 순환하되, 헛 재판정(토큰 낭비)·관제탑 숫자 들쭉날쭉이 사라진다.
-  const cleaned = cleanRaw(raw);
+  // 🔴 2026-10-17 **누적 근거 소실 수리**(CEO "재생성 방식이 비용을 기하급수로 올린다" 작업 중 발견).
+  //   여기는 재수집 결과를 **그대로 덮어쓰고** 있었다. 그런데 저장된 raw는 여러 번의 수집이 **누적된** 것이고
+  //   한 번의 조회는 네이버가 지금 돌려주는 창(검색 결과 상한)만 받는다 → 재수집할수록 근거가 줄어든다.
+  //   실측(10-17, 공개 카페 3곳에 refresh 적용한 결과):
+  //     한남작업실   검증 171 → 36건 (갱신 후 원본 84건 — 171건이려면 원본 400건+ 필요)
+  //     카페 마나랑   검증 100 → 68건 (갱신 후 원본 133건)
+  //     새벽카페호르  검증 144 → 159건 (원본 379건 — 이 건만 정상 증가)
+  //   정상 검증/원본 비율은 0.379(공개 2,000곳 표본)인데 위 둘은 원본 자체가 줄었다 = **누적 근거 소실**.
+  //   이 경로는 `refresh:true`를 쓰는 **모든 호출자**에 해당한다(collect-shard 미달 재수집 티어 하루 96곳 포함)
+  //   — 조용히 근거를 깎아왔다. 09-13 해자 감사의 "raw 파기 후 재수집 無"와 같은 계열의 결함이다.
+  //   → **합친다**(기존 ∪ 신규). 링크로, 링크가 없으면 출처+제목+본문 앞머리로 중복을 제거한다.
+  //   ⚠️ 무한 누적은 금지 — raw는 큰 컬럼이라 누적이 그대로 조회비용이 된다(비용 하드규칙).
+  //     날짜가 새것인 것부터 RAW_KEEP_MAX건까지만 남긴다(날짜 없는 항목은 뒤로).
+  const fetchedRaw = cleanRaw(raw);
+  let mergedRaw = fetchedRaw;
+  try {
+    const prevRaw = await loadRaw(cafe.id);
+    if (prevRaw.length) {
+      const keyOf = (r: RawItem) => (r.link ? `L:${r.link}` : `T:${r.source}|${(r.title || "").slice(0, 60)}|${(r.text || "").slice(0, 120)}`);
+      const byKey = new Map<string, RawItem>();
+      for (const r of prevRaw) byKey.set(keyOf(r), r);      // 기존을 먼저 깔고
+      for (const r of fetchedRaw) byKey.set(keyOf(r), r);   // 같은 글은 새 판본으로 덮는다
+      const all = [...byKey.values()];
+      all.sort((a, b) => {
+        const ta = a.date ? Date.parse(String(a.date)) : NaN;
+        const tb = b.date ? Date.parse(String(b.date)) : NaN;
+        if (Number.isFinite(ta) && Number.isFinite(tb)) return (tb as number) - (ta as number);
+        if (Number.isFinite(tb)) return 1;
+        if (Number.isFinite(ta)) return -1;
+        return 0;
+      });
+      mergedRaw = all.slice(0, RAW_KEEP_MAX);
+    }
+  } catch { /* 기존을 못 읽으면 신규만 쓴다(종전 동작) */ }
+  const cleaned = mergedRaw;
   const sig = (a: RawItem[]) => a.map((r) => `${r.source}${r.text || ""}${r.title || ""}${r.desc || ""}`).sort().join("");
   let changed = true;
   try { const prev = await loadRaw(cafe.id); if (prev.length === cleaned.length && sig(prev) === sig(cleaned)) changed = false; } catch { /* 비교 실패 시 안전하게 변경으로 간주 */ }
