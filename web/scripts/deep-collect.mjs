@@ -60,29 +60,50 @@ await sql`CREATE TABLE IF NOT EXISTS deep_log (
 
 // 📋 대상 — **사람이 본 카페**만(재생성이 아깝지 않은 곳), 조회 많은 순.
 //   60일 조회 6,627곳 = 공개 48,623곳의 13.6%. 나머지 86%는 깊게 긁어도 아무도 안 본다.
+// 🗺️ 2026-10-17 **전국 격차 보정**(CEO "전국 모든 사람들이 제약없이 차이없이 사용").
+//   실측한 격차: 지역별 '검증' 비율이 **47% vs 12% = 4배**다(성동구·대구 중구 47% ↔ 완주군 12%).
+//     원인은 후기 수 — 평균 56건 vs 18건이고, 검증 문턱이 30건이라 지방 소도시는 구조적으로 '참고'에 머문다.
+//   더 심한 건 **희소 지역**이다: 공개 60곳 미만 지역이 **57개(카페 2,175곳)**이고
+//     영양군 11곳·검증 0 · 장수군 12곳·검증 0 처럼 **신뢰 정보가 아예 없는** 곳이 있다.
+//     그런데 그 지역은 조회가 거의 없어(2,175곳 중 조회된 곳 175곳) '사람이 본 카페' 기준으로는
+//     **영원히 개선 대상이 아니었다** — 그게 구조적 차이다.
+//   → 대상을 둘로 넓히고, 정렬을 **지역 검증비율 낮은 순**으로 바꾼다:
+//     ⓐ 사람이 본 카페(종전) — 재생성이 아깝지 않은 곳
+//     ⓑ 희소 지역(공개 SPARSE_MAX곳 미만) 카페 — 조회가 없어도 처리한다.
+//        근거: 그 지역 사용자가 들어왔을 때 볼 게 없으면 그 자체가 '차이'다. 규모도 2,175곳으로 한정적이다.
+//   정렬은 '지역 검증비율 오름차순 → 조회 내림차순'. 낮은 곳을 먼저 올려 격차를 좁힌다.
+const SPARSE_MAX = Number(process.env.DEEP_SPARSE_MAX || 60);
 const targets = ONLY
   ? await sql`SELECT id, name, area, synth_count, synth_grade, published, 0 views FROM cafes WHERE name = ${ONLY}`
   : await sql`
-    WITH viewed AS (
+    WITH areastat AS (
+      SELECT area, count(*)::int pub,
+             100.0 * count(*) FILTER (WHERE synth_grade = '검증') / count(*) AS vpct
+      FROM cafes WHERE published GROUP BY 1),
+    viewed AS (
       SELECT NULLIF(substring(path from '^/c/([0-9]+)'), '')::bigint id, count(*)::int views
       FROM traffic_events
       WHERE ts > now() - interval '60 days' AND path ~ '^/c/[0-9]+'
         AND anon_id NOT IN (SELECT anon_id FROM bot_anon_cache)
       GROUP BY 1)
-    SELECT c.id, c.name, c.area, c.synth_count, c.synth_grade, c.published, v.views
-    FROM viewed v JOIN cafes c ON c.id = v.id
+    SELECT c.id, c.name, c.area, c.synth_count, c.synth_grade, c.published,
+           COALESCE(v.views, 0) views, a.vpct, a.pub area_pub
+    FROM cafes c
+    JOIN areastat a ON a.area = c.area
+    LEFT JOIN viewed v ON v.id = c.id
     LEFT JOIN deep_log d ON d.cafe_id = c.id
     WHERE c.published AND c.raw_reviews IS NOT NULL AND d.cafe_id IS NULL
       AND c.raw_collected_at < now() - make_interval(days => ${STALE_D})
       AND (c.id % ${OF}) = ${SHARD}
-    ORDER BY v.views DESC, c.synth_count DESC NULLS LAST
+      AND (v.id IS NOT NULL OR a.pub < ${SPARSE_MAX})   -- ⓐ 본 카페 또는 ⓑ 희소 지역
+    ORDER BY a.vpct ASC, COALESCE(v.views, 0) DESC, c.synth_count DESC NULLS LAST
     LIMIT ${CAP}`;
 
 const used0 = await naverUsedToday();
 console.log(`${tag}🔎 깊은 수집 — 대상 ${targets.length}곳(상한 ${CAP}) · 콜 예산 ${BUDGET} · 네이버 ${used0.toLocaleString()}/${NAVER_DAILY_QUOTA.toLocaleString()}`);
 if (!targets.length) { console.log("  할 일 없음"); process.exit(0); }
 if (DRY) {
-  for (const t of targets.slice(0, 12)) console.log(`  [조회 ${String(t.views).padStart(3)}] ${t.name} (${t.area}) 후기 ${t.synth_count ?? 0}건`);
+  for (const t of targets.slice(0, 12)) console.log(`  [지역검증 ${String(Math.round(Number(t.vpct ?? 0))).padStart(2)}% · 조회 ${String(t.views).padStart(3)} · 지역공개 ${String(t.area_pub ?? "?").padStart(4)}] ${t.name} (${t.area}) 후기 ${t.synth_count ?? 0}건`);
   console.log("  ▶ 미리보기 — 쓰기·무효화 없음"); process.exit(0);
 }
 
