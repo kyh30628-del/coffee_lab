@@ -37,7 +37,9 @@ export async function GET(req: NextRequest) {
       WHERE (published = true OR pipeline_status = 'pending')
         AND synth_updated IS NOT NULL
         AND (embedding IS NULL OR embed_updated IS NULL OR embed_updated < synth_updated)
-      ORDER BY (pipeline_status = 'pending') DESC NULLS LAST, (area = ANY(${PRIORITY_AREAS})) DESC, (embedding IS NOT NULL), embed_updated ASC NULLS FIRST
+      -- 🔓 2026-10-17: 공개 게이트에서 임베딩을 뺀 뒤로는 **이미 공개된(사람이 보는) 카페**를 먼저 채운다.
+      --   종전엔 pending이 최우선이었다 — 공개를 막고 있었으니 당연했지만, 이제 그 제약이 없다.
+      ORDER BY (published = true) DESC NULLS LAST, (pipeline_status = 'pending') DESC NULLS LAST, (area = ANY(${PRIORITY_AREAS})) DESC, (embedding IS NOT NULL), embed_updated ASC NULLS FIRST
       LIMIT 600`) as unknown as any[];
 
     let updated = 0;

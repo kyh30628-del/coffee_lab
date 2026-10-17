@@ -1089,7 +1089,8 @@ export async function finalizePipeline(): Promise<{ promoted: number; names: str
   try {
     const cand = (await sql`SELECT id, name, naver_category cat FROM cafes c
       WHERE NOT c.published AND c.pipeline_status = 'held' AND COALESCE(c.exclude_reason, '') = ''
-        AND c.synth_grade IN ('검증','참고') AND c.embedding IS NOT NULL
+        AND c.synth_grade IN ('검증','참고')
+        -- 🔓 2026-10-17: 임베딩 조건 제거(위 승격 주석과 같은 근거 — 검색 전용이고 이용자 0명).
         AND COALESCE(c.synth_coherence, 0) >= 0.5 AND COALESCE(c.offctx_rate, 0) < 0.2
         AND COALESCE(c.naver_category, '') <> ''
         AND NOT EXISTS (SELECT 1 FROM audit_flags af WHERE af.cafe_id = c.id AND NOT af.resolved)
@@ -1108,10 +1109,19 @@ export async function finalizePipeline(): Promise<{ promoted: number; names: str
   await loadCriteria(); // 수도권 좌표박스 기준 캐시 프라임 — 공개 승격 게이트가 synth와 같은 진실(폴백=criteria DEFAULTS(현재 36.8~38.7/124.5~129.4))
   const latMin = getCriterionSync("geo.box.lat_min"), latMax = getCriterionSync("geo.box.lat_max");
   const lngMin = getCriterionSync("geo.box.lng_min"), lngMax = getCriterionSync("geo.box.lng_max");
+  // 🔓 2026-10-17 **임베딩 게이트 제거**(CEO 승인) — 조사 근거:
+  //   · 임베딩의 유일한 소비처는 `/api/search` 의미 검색 하나이고, 그 검색은 **키워드 폴백**이 이미 있다
+  //     (hasEmbedKey()가 거짓이거나 벡터가 없으면 mode="keyword"로 내려간다).
+  //   · 그 검색을 쓰는 사람이 **최근 30일 0명 / 9,977명(0.0%)·조회 0회**다.
+  //   · 반면 이 조건 때문에 **74곳이 공개되지 못하고 있었다**(그중 '검증' 12곳, 검증 후기 합계 1,932건).
+  //   · 이미 공개된 48,618곳은 전부 임베딩을 갖고 있다(미보유 0) → 이 게이트는 기존 품질 유지에
+  //     기여하지 않고 **신규 공개만 막고** 있었다. 임베딩은 품질 판정에 전혀 쓰이지 않는다(검색 전용).
+  //   · 임베딩은 나중에 채워도 된다 — cron-embed의 큐가 `published OR pending`이라 공개 후에도 자동 대상이다.
+  //   ⚠️ 품질 관문은 그대로다: 등급(검증·참고) · 좌표박스 · audit_flags · LLM판정/규칙명확/프록시.
+  //     임베딩이 없어 **의미 검색이 새 카페를 늦게 찾는 것**이 유일한 대가이고, 이용자 0명이라 실질 영향 0.
   const promoted = (await sql`
     UPDATE cafes SET published = true, pipeline_status = 'live'
     WHERE pipeline_status = 'pending'
-      AND embedding IS NOT NULL
       AND synth_grade IN ('검증','참고')
       AND lat IS NOT NULL AND lat BETWEEN ${latMin} AND ${latMax} AND lng BETWEEN ${lngMin} AND ${lngMax}
       AND NOT EXISTS (SELECT 1 FROM audit_flags af WHERE af.cafe_id = cafes.id AND NOT af.resolved)

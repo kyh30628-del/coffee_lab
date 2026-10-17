@@ -32,19 +32,37 @@ export async function embedQuery(text: string): Promise<number[] | null> {
   return embedOne(text, "RETRIEVAL_QUERY");
 }
 
-// 여러 문서를 제한된 동시성으로 임베딩. 실패 항목은 null(원위치 보존).
+// 🔴 2026-10-17 **오류를 삼키던 구멍 수리**(CEO "변화가 없어" 진단 중 발견).
+//   종전 `catch { out[idx] = null }`는 **모든 실패를 똑같이 null로 뭉갰다.** 그래서 호출부(cron-embed)는
+//   "임베딩 0 남음 5,611"만 찍고 끝났고, 관제탑에는 **성공(ok=true)** 으로 올라갔다.
+//   실제로는 제공자가 치명 응답(키·결제·권한)을 주고 있었고, 그 결과 공개 게이트가 조용히 막혀
+//   '검증' 등급·후기 100건대 카페들이 화면에 안 나오고 있었다 — 며칠간 아무 경보 없이.
+//   → **치명 오류와 일시 오류를 가른다.** 치명(401·402·403·키 미설정)은 **던져서** 크론을 실패로 만든다.
+//     실패하면 recordRun이 관제탑에 올리고 담당 본부에 배정된다(기존 인프라 재사용).
+//     일시 오류(429·5xx·네트워크)는 종전처럼 null로 두고 다음 회차가 이어받는다.
+const FATAL_RE = /\b(401|402|403)\b|미설정|API key|credits are depleted|PERMISSION_DENIED/i;
+export class EmbedFatalError extends Error {}
+
 export async function embedBatch(texts: string[], task: Task = "RETRIEVAL_DOCUMENT"): Promise<(number[] | null)[]> {
-  if (!KEY) throw new Error("GOOGLE_AI_KEY 미설정");
+  if (!KEY) throw new EmbedFatalError("임베딩 키 미설정 — 공개 승격이 막힌다");
   const out: (number[] | null)[] = new Array(texts.length).fill(null);
   const CONC = 5;
   let i = 0;
+  let fatal: Error | null = null;
   async function worker() {
     while (i < texts.length) {
+      if (fatal) return;                       // 치명 오류를 만나면 나머지 호출을 낭비하지 않는다
       const idx = i++;
-      try { out[idx] = await embedOne(texts[idx], task); } catch { out[idx] = null; }
+      try { out[idx] = await embedOne(texts[idx], task); }
+      catch (e) {
+        const msg = String((e as Error)?.message ?? e);
+        if (FATAL_RE.test(msg)) { fatal = new EmbedFatalError(`임베딩 제공자 치명 오류 — ${msg.slice(0, 180)}`); return; }
+        out[idx] = null;                       // 일시 오류: 다음 회차가 이어받는다
+      }
     }
   }
   await Promise.all(Array.from({ length: Math.min(CONC, texts.length || 1) }, worker));
+  if (fatal) throw fatal;                      // 조용히 0건으로 끝내지 않는다
   return out;
 }
 
