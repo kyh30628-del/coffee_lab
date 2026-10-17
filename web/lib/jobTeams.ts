@@ -18,6 +18,7 @@ export const JOB_TEAM: Record<string, string> = {
   "auth-precheck": "기획조정실",
   "cron-costwatch": "경영지원본부", // Neon 데이터전송비 이상탐지 워치독(2026-07-29, CEO 지시 — youtube-backfill 663GB 사고 재발방지)
   // 로컬 launchd 잡(하트비트 경유)
+  "dawn-deploy": "기획조정실", // 🌅2026-10-17 매일 06:00 자동 배포(미푸시 있을 때만 빌드·푸시)
   "discover-sweep": "성장본부", // 🔄2026-08-04 KST 12·20시 전 지역 발굴 스윕 — ⏸ 2026-09-21 정지(공공원장 적재로 대체, RETIRED_JOBS)
   "import-permits": "성장본부", // 🧾2026-09-21 매일 07:00 공공 인허가 원장 적재(--limit 2700, 실측 1.69콜/곳)
   "sangga-rollout": "성장본부", // 🏪2026-10-02 매일 07:00 소상공인 상가업소정보 수도권 롤아웃(CEO 지시, 원장과 별개 소스)
@@ -65,6 +66,7 @@ export const EXPECT_MAX_H: Record<string, number> = {
   "import-permits": 30,    // 🧾2026-09-21 매일 07:00 원장 적재 + 버퍼
   "sangga-rollout": 30,    // 🏪2026-10-02 매일 07:00 상가업소정보 롤아웃 + 버퍼
   "indexnow": 30,          // 🔎2026-09-13 KST 09:40 하루 1회 + 버퍼
+  "dawn-deploy": 30,      // 🌅2026-10-17 매일 06:00 + 버퍼(할 일 없는 날도 하트비트를 찍어 오탐 없음)
   "neon-billing": 30,      // 💳2026-09-14 KST 07:50 하루 1회 + 버퍼
   "chief-manager": 20,    // 일간 사이클 KST 08·12·16시
   "self-audit": 18,       // 🔄KST 12·16·20시 (최대공백 20→익일12시=16h + 버퍼)
@@ -133,6 +135,7 @@ export const LAUNCHD_JOBS: Record<string, { label: string; sched: string }> = {
   "sangga-rollout":    { label: "상가업소 롤아웃", sched: "07:00" },
   "indexnow":          { label: "IndexNow 제출",   sched: "09:40" },
   "neon-billing":      { label: "Neon 청구 스냅샷", sched: "07:50" },
+  "dawn-deploy":       { label: "새벽 자동 배포",   sched: "06:00" },
 };
 
 // 🛑 **의도적으로 은퇴(plist .disabled)한 잡의 명시적 단일 출처.**
