@@ -32,9 +32,10 @@ function fmtDate(d?: string): string {
 //   local/blog/cafearticle이 각각 25,000인 줄 알고 수집을 병렬로 올렸다가 하루치를 태웠다
 //   (실측 응답: 세 API 모두 `{count/quota=25000/25000}`). 그래서 여기서도 예산에 계상해야
 //   naver_budget이 진실이 된다 — 예전엔 lib/discover.ts(발굴)만 계상해 절반만 보였다.
-async function naverSearch(kind: "blog" | "cafearticle", query: string): Promise<{ items: WebSnippet[]; ok: boolean }> {
+async function naverSearch(kind: "blog" | "cafearticle", query: string, start = 1, sort: "sim" | "date" = "sim"): Promise<{ items: WebSnippet[]; ok: boolean }> {
   if (!ID || !SECRET) return { items: [], ok: false };
-  const url = `https://openapi.naver.com/v1/search/${kind}.json?query=${encodeURIComponent(query)}&display=${NAVER_DISPLAY}&sort=sim`;
+  // ⚠️ start·sort 기본값은 종전과 같다(1·sim) → 기존 호출자 동작·콜 수 **무변**. 깊은 수집만 다른 값을 넘긴다.
+  const url = `https://openapi.naver.com/v1/search/${kind}.json?query=${encodeURIComponent(query)}&display=${NAVER_DISPLAY}&start=${start}&sort=${sort}`;
   // 🔑 키가 여러 개면 소진된 키를 건너뛰며 재시도한다(lib/naverKeys.ts). 키 1개면 기존과 동일 동작.
   let res: Response | null = null;
   // ⚠️ 429는 **두 종류**다(discover.ts가 2026-07-11에 이미 겪은 함정 — 수집 경로엔 빠져 있었다):
@@ -150,4 +151,44 @@ export async function fetchWebReviews(name: string, area: string, dong?: string)
   } catch (e) {
     return { snippets: [], error: String(e) };
   }
+}
+
+// 🔎 **깊은 수집**(2026-10-17, CEO 승인) — 기존 수집이 놓치던 '이미 있는 후기'를 긁는다.
+//
+// 왜 필요한가(실측): 기본 수집은 질의당 `display=100&start=1&sort=sim`으로 **상위 100건만** 받는다.
+//   네이버 블로그 검색은 `start`를 1000까지 허용한다. 손상 복구 중에 재보니:
+//     한남작업실  현재 원본 53건 ← 깊은 수집 10콜로 **고유 링크 949건**
+//     카페 마나랑  현재 원본 115건 ← 깊은 수집 10콜로 **고유 링크 674건**
+//   즉 우리는 이미 존재하는 후기를 10~18배 놓치고 있었다. 한 번 긁으면 영구 자산이라
+//   '최신화'(ISR 30일 주기 때문에 갱신=재생성)보다 효율이 훨씬 좋다.
+//
+// 💰 비용 설계: 블로그만, 가장 넓은 질의 하나로, sim·date 두 축을 각각 최대 DEEP_PAGES쪽까지.
+//   한 쪽이 100건 미만이면 그 축은 즉시 중단(소진) → 평균은 상한보다 훨씬 적다. 곳당 **최대 2×DEEP_PAGES콜**.
+//   카페글(cafearticle)은 옥석 기여 3.6%뿐이라 깊은 수집에서 제외한다(기본 수집이 1콜로 이미 덮는다).
+//   네이버는 무료지만 하루 25,000 공유 한도라 호출자가 상한을 들고 온다.
+const DEEP_PAGES = Number(process.env.DEEP_PAGES || 5);
+export async function fetchDeepWebReviews(name: string, area: string): Promise<{ snippets: WebSnippet[]; calls: number; apiError?: boolean }> {
+  if (!ID || !SECRET) return { snippets: [], calls: 0, apiError: true };
+  const q = area ? `${name} ${area}` : `${name} 카페`;
+  const seen = new Set<string>();
+  const snippets: WebSnippet[] = [];
+  let calls = 0, anyFail = false;
+  for (const sort of ["sim", "date"] as const) {
+    for (let page = 0; page < DEEP_PAGES; page++) {
+      const start = 1 + page * NAVER_DISPLAY;
+      if (start > 1000) break; // 네이버 상한
+      const { items, ok } = await naverSearch("blog", q, start, sort);
+      calls++;
+      if (!ok) { anyFail = true; break; }
+      for (const it of items) {
+        const key = it.text.slice(0, 50);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        snippets.push({ ...it, q: 0 });
+      }
+      if (items.length < NAVER_DISPLAY) break; // 이 축은 소진 — 다음 쪽은 신규 0건
+      await new Promise((r) => setTimeout(r, 150)); // 버스트 429 완화(기본 수집과 같은 규약)
+    }
+  }
+  return { snippets, calls, apiError: anyFail && snippets.length === 0 };
 }

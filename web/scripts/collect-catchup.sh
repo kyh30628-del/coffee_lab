@@ -85,6 +85,17 @@ DEADLINE=$(( $(date +%s) + 120*60 ))
   #   ⚠️ 키 파일을 막 올린 직후에는 엔진이 아직 검증을 못 해 403(SiteVerificationNotCompleted)이 난다.
   #      실패해도 그냥 넘어가고 다음 창에서 다시 시도한다 — 미제출분만 보내므로 중복도 안 생긴다.
   #   💰 아웃바운드 HTTP 몇 건 + DB 읽기 1회. 로컬 실행이라 Vercel 함수시간 0.
+  # 깊은 수집(2026-10-17, CEO 승인) — 기존 수집이 질의당 상위 100건만 받아 **이미 있는 후기**를 10~18배
+  #   놓치고 있던 것을 긁는다. '최신화'(ISR 30일 주기라 갱신=재생성)보다 효율이 훨씬 좋다: 한 번 긁으면 영구 자산.
+  #   하루 1회만(마커 파일) · 대상은 사람이 본 카페 조회순 · 곳당 네이버 ~10콜·Neon 쓰기 2건·ISR 1장.
+  #   💰 실측(6곳): 네이버 59콜 · Neon 12쓰기 · ISR 4장. 60곳/일이면 ~600콜(유휴 15,700 안)·ISR ~40장/일.
+  DEEPMARK=/tmp/coffee-deep-$(date +%Y%m%d)
+  if [ ! -f "$DEEPMARK" ]; then
+    touch "$DEEPMARK"
+    echo "--- 깊은 수집(하루 1회) ---"
+    DEEP_CAP=${DEEP_CAP:-60} DEEP_BUDGET=${DEEP_BUDGET:-900} node --import tsx scripts/deep-collect.mjs 2>&1 | tail -12 || true
+  fi
+
   node --import tsx scripts/indexnow-submit.mjs 2>&1 | tail -4 || true
 
   # 📰 수집 큐가 **완전히 비었을 때만** 관광지 캘리브레이션 표본을 뜬다(40콜).

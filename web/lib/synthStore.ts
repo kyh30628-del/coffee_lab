@@ -26,7 +26,7 @@ import { regionKeyFor, SIDO_GU } from "./regionList";
 import { igHandle } from "./cafeDetailView"; // 인스타 계정 추출 단일출처(화면·사장님 글 판정 공용)
 
 // 카페 지역어(시 + 동洞) — 동까지 넘겨야 reviewQuality가 '분당점=성남시' 같은 市단위 동명 지점 오인을 거른다.
-async function areaTermsFor(id: number, area?: string | null): Promise<string[]> {
+export async function areaTermsFor(id: number, area?: string | null): Promise<string[]> {
   const terms = area ? [area] : [];
   try { const r = (await sql`SELECT dong FROM cafes WHERE id=${id}`) as any[]; const d = r[0]?.dong; if (d && !terms.includes(d)) terms.push(d); } catch {}
   return terms;
@@ -50,6 +50,10 @@ type RawItem = { source: "google" | "blog" | "youtube"; text: string; title?: st
 //   ⚠️ 그래도 상한까지 다 차면 최악 5.6GB(현재의 8배)다 → 총량은 주기적으로 **표본으로** 확인할 것.
 //     (2026-10-17: 이걸 재려고 pg_column_size 전수 스캔을 돌렸다가 큰 컬럼 전체를 읽었다 — 전수 금지, LIMIT 표본만.)
 const RAW_KEEP_MAX = Number(process.env.RAW_KEEP_MAX || 600);
+// 🛡️ 급감 차단기 임계 — 공개 카페의 검증 후기가 기존의 이 비율 미만으로 떨어지는 쓰기는 거부한다.
+//   SHRINK_MIN 미만(근거가 애초에 적은 곳)은 자연 변동이 커서 대상에서 뺀다.
+const SHRINK_RATIO = Number(process.env.SYNTH_SHRINK_RATIO || 0.8);
+const SHRINK_MIN = Number(process.env.SYNTH_SHRINK_MIN || 10);
 
 // 🛡️ jsonb 안전 직렬화: 인용문이 이모지(서로게이트쌍) 중간에서 잘리면 짝 없는 서로게이트가 남고,
 //   JSON.stringify는 이를 \udXXX 이스케이프로 내보내지만 PostgreSQL jsonb는 이를 거부한다
@@ -561,6 +565,29 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
 
   // 🔐 하네스 L3 — 합성 결과 쓰기의 **단일 지점**에서 신고한다. 스코프를 연 잡(openScope)은
   //   여기 한 곳만으로 자동 적용되고, 계약에 이 대상이 없으면 드리프트로 잡힌다.
+  // 🛡️ 2026-10-17 **공개 카페 후기 급감 차단기**(CEO "잘못 이해하고 헛짓거리 해서 날려버리지 말라").
+  //   사고 경위: 재수집이 누적 원본을 덮어써 공개 카페 2곳의 검증 후기가 171→36·100→68로 깎였다.
+  //   합치기로 원인은 막았지만(gatherRaw), **"줄어드는 쓰기"를 거부하는 관문이 없었다** — 그게 진짜 구멍이다.
+  //   앞으로 어떤 경로(깊은 수집·재합성·규칙 변경)로 들어와도 공개 중인 카페의 근거가 한 번에 꺾이면 멈춘다.
+  //   · 대상: **지금 공개 중**이고 기존 검증 후기가 SHRINK_MIN건 이상인 카페만(신규·미공개는 자연 변동이 크다)
+  //   · 임계: 신규가 기존의 SHRINK_RATIO 미만이면 **쓰지 않는다**(기존 화면 그대로 유지)
+  //   · 정상적인 감소(폐업·오염 정리)는 CEO 결재나 전용 힐러가 집행한다 — 수집 경로가 할 일이 아니다.
+  //   💰 비용: 쓰기 전 SELECT 1회(작은 컬럼 3개)뿐. 막은 경우엔 UPDATE·ISR 무효화가 **아예 안 나간다**(절감).
+  try {
+    const prevRow = (await sql`SELECT published, COALESCE(synth_count,0) sc, synth_grade FROM cafes WHERE id=${cafeId}`)[0];
+    const wasPub = !!prevRow?.published, prevCount = Number(prevRow?.sc ?? 0);
+    if (wasPub && prevCount >= SHRINK_MIN && collected < prevCount * SHRINK_RATIO) {
+      const msg = `공개 카페 후기 급감 차단 — ${name}(id ${cafeId}) ${prevCount} → ${collected}건, 쓰기 거부`;
+      console.warn(`[shrinkGuard] ${msg}`);
+      const { noteSilentFail } = await import("./silentFail");
+      await noteSilentFail("synthStore.shrinkGuard", new Error(msg)).catch(() => {});
+      try { (await import("node:child_process")).execFileSync("/usr/bin/osascript", ["-e",
+        `display notification "${name} 후기 ${prevCount}→${collected}건 — 쓰기를 막았습니다" with title "동네 커피 노트 급감 차단" sound name "Basso"`]); } catch {}
+      return { grade: prevRow?.synth_grade ?? grade, collected: prevCount, published: true, ruleOk, pipeline: "live",
+               evidence: 0, coherence, blocked: true } as any;
+    }
+  } catch { /* 비교 실패는 쓰기를 막지 않는다(가드가 서비스를 멈추게 하지 않는다) */ }
+
   noteWrite("cafes.synth_reviews"); noteWrite("cafes.synth_reviews_all"); noteWrite("cafes.published");
   if (llmJudged) {
     await sql`UPDATE cafes SET synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_coherence=${coherence}, offctx_rate=${offctx}, visitor_n=${vmix.n}, visitor_trip=${vmix.trip}, visitor_local=${vmix.local}, needs_llm=${needsLLM}, needs_llm_priority=${needsLlmPriority}, borderline_count=${blCount}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${safeJson(tidyDisplayQuotes(evidenceReviews as any[]))}, synth_reviews_all=${allEv}, char_scores=${safeJson(charScores)}, work_facts=${safeJson(workFacts)}, synth_quality=${safeJson(quality)}, review_dates=${safeJson(reviewDates)}, pipeline_status=${newPst}, exclude_reason=${exReason}, exclude_at=${exReason ? new Date() : null}, synth_updated=${synthTs}, synth_checked_at=now(), llm_judged_at=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN ${latMin} AND ${latMax} AND lng BETWEEN ${lngMin} AND ${lngMax}) WHERE id=${cafeId}`;
