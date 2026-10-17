@@ -30,7 +30,7 @@ const { nameCoherence, cleanCafeName } = await import("../lib/reviewQuality.ts")
 const { areaTermsFor } = await import("../lib/synthStore.ts");
 const { synthAndStore } = await import("../lib/synthStore.ts");
 const { invalidateCafeCaches, invalidateCafeDetailOnly } = await import("../lib/cafeCacheInvalidate.ts");
-const { naverBlocked, naverUsedToday, NAVER_DAILY_QUOTA } = await import("../lib/naverBudget.ts");
+const { naverBlocked, naverUsedToday, NAVER_DAILY_QUOTA, nonClosureMayUse } = await import("../lib/naverBudget.ts");
 const sql = neon(process.env.DATABASE_URL);
 
 const arg = (k, d) => { const a = process.argv.find((x) => x.startsWith(`--${k}=`)); return a ? a.split("=")[1] : d; };
@@ -94,6 +94,11 @@ for (const t of targets) {
   if (Date.now() >= DEADLINE_MS) { console.log("  ⏰ 창 종료 — 중단(다음 회차가 이어감)"); break; }
   if (calls >= BUDGET) { console.log(`  콜 예산 ${BUDGET} 소진 — 중단`); break; }
   if (await naverBlocked()) { console.log("  쿼터 소진 — 중단"); break; }
+  // 🚦 예약 게이트 — 2026-10-17 보강. 종전엔 naverBlocked(429·전면소진)만 봐서 **폐업·수집 예약까지 먹을 수 있었다.**
+  //   nonClosureMayUse는 '폐업 예약(400) + 수집 예약(적체 기반 동적)'을 남기고서야 참이다.
+  //   깊은 수집은 유휴를 쓰는 레인이지 다른 몫을 빼앗는 레인이 아니다 — 문턱에 닿으면 스스로 멈춘다.
+  const gate = await nonClosureMayUse();
+  if (!gate.ok) { console.log(`  예약 문턱 도달(잔여 ${gate.remaining.toLocaleString()}) — 중단, 다음 회차가 이어감`); break; }
 
   const row = (await sql`SELECT raw_reviews FROM cafes WHERE id=${t.id}`)[0];
   const prev = Array.isArray(row?.raw_reviews) ? row.raw_reviews : [];
