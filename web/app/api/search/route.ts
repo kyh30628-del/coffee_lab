@@ -815,6 +815,53 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // 🔴 2026-10-17 **개념 질의가 1곳만 나오던 버그 수리**(CEO "차이없이 사용" 점검 중 발견).
+    //   실측(프로덕션): "조용한 카페" → concepts=['조용·혼자']를 정확히 뽑는데 결과 **1곳**,
+    //   "작업하기 좋은 카페" → **1곳**. 이 서비스의 핵심 질의가 사실상 죽어 있었다.
+    //   원인: 위 키워드 폴백의 전치 필터가 name/identity/… **ILIKE 어휘 일치만** 본다.
+    //     점수 단계(lexicalScore)는 char_scores 축으로 개념 점수를 주는데, 그 카페들은
+    //     **SQL에서 이미 탈락**해 점수를 받을 기회가 없었다(이름에 글자 그대로 '조용한'이 든 1곳만 통과).
+    //     의미검색(임베딩) 경로가 살아 있을 땐 이 폴백이 거의 안 쓰여 가려져 있었다.
+    //
+    //   💰 왜 '부족할 때만'인가 — 비용을 재고 결정했다:
+    //     개념 축 조건은 char_scores에 인덱스가 없어 전수 스캔이다. 실측:
+    //       축>=2·LIMIT 400 → 1,946ms · 축>=3·200 → 1,771ms · 축>=5·120 → **857ms**
+    //     이걸 모든 검색에 붙이면 멀쩡한 질의까지 1~2초 느려진다(현재 검색은 1초 안).
+    //     그래서 **어휘 결과가 CONCEPT_MIN곳 미만일 때만** 보강한다 — 지금 깨진 경우에만 비용을 낸다.
+    //     축 문턱 5(공개 6,914곳)·상한 120으로 강한 후보만 가져온다. 큰 컬럼은 인용만 잘라 받는다.
+    //   ⚠️ 축 이름은 CONCEPTS_BASE의 고정 id만 쓴다(코드 상수) — 외부 입력이 들어올 자리가 없다.
+    const CONCEPT_MIN = 6;
+    if (scored.length < CONCEPT_MIN && hitConcepts.length > 0) {
+      const AX_OK = new Set(CONCEPTS_BASE.map((c) => c.axis).filter(Boolean) as string[]);
+      const axes = [...new Set(hitConcepts.map((c) => c.axis).filter((a): a is string => !!a && AX_OK.has(a)))].slice(0, 3);
+      if (axes.length) {
+        const score = axes.map((a) => `COALESCE((char_scores->>'${a}')::int, 0)`).join(", ");
+        const expr = axes.length > 1 ? `GREATEST(${score})` : score;
+        try {
+          const crows = (await sql.query(
+            `SELECT id, name, area, synth_grade, synth_count, synth_identity, signature, note, vibe, uses, beans,
+                    char_scores, synth_acidity, synth_body, synth_sweet,
+                    jsonb_path_query_array(synth_reviews, '$[*].quote') AS synth_reviews
+             FROM cafes
+             WHERE published = true AND ${expr} >= 5
+             ORDER BY ${expr} DESC, COALESCE(synth_count, 0) DESC
+             LIMIT 120`,
+          )) as unknown as any[];
+          const seen = new Set(scored.map((x) => x.id));
+          for (const c of crows) {
+            if (seen.has(c.id)) continue;
+            if (!inRegion(c.area ?? "", effectiveRegion)) continue;
+            const { exact, concept, reasons, snippet, reviewOnly } = lexicalScore(c, tokens, hitConcepts);
+            if (concept <= 0) continue;                       // 개념 점수가 없으면 넣지 않는다
+            const qualifies = (exact > 0 && !reviewOnly) || concept > 0;
+            const total = exact + concept + (qualifies ? gradeBonus(c.synth_grade) : 0);
+            byId.set(c.id, c);
+            scored.push({ id: c.id, name: c.name, area: c.area, grade: c.synth_grade, count: c.synth_count, identity: c.synth_identity, cau: cauOf(c), fac: facOf(c), vb: vbOf(c), score: Math.round(total * 10) / 10, reasons: reasons.slice(0, 3), snippet });
+          }
+        } catch { /* 보강 실패는 기존 결과를 지우지 않는다 */ }
+      }
+    }
+
     scored.sort((a, b) => b.score - a.score);
 
     // 🏢 브랜드 다지점(8곳+ 동일상호 부분일치, decisions#1045) — 전 지점이 질의와 동일하게 "의미적합"이라
