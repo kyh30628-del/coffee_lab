@@ -115,6 +115,52 @@ export async function detectStuck(hours = 48, minRepeats = 3): Promise<StuckJob[
   } catch { return []; }
 }
 
+export type NoProgressJob = { job: string; runs: number; remain: number; first_at: string; last_at: string };
+
+/**
+ * 🚧 **진척 0 탐지**(2026-10-17) — "할 일이 남았는데 처리 0건"을 지문과 **무관하게** 잡는다.
+ *
+ * 왜 detectStuck으로는 안 되는가(실측):
+ *   지문(fingerprint)에 큐 크기(remain)가 섞여 있다. cron-embed의 원장을 보면
+ *     20:02 임베딩 0 남음 5034 · 08:07 임베딩 0 남음 5558 · 12:06 임베딩 0 남음 5611
+ *   처리는 계속 0인데 **큐가 늘어나 지문이 매번 달라져** 연속 반복이 성립하지 않는다.
+ *   그래서 임베딩이 며칠째 0건이어도 detectStuck이 0건을 반환했고(ok=true), 공개 파이프라인이
+ *   조용히 멈춰 '검증' 등급·후기 100건대 카페가 화면에 안 나왔다(CEO가 "변화 없어"로 발견).
+ *
+ * 판정: metrics에 처리량(updated|processed)과 잔량(remain)이 있는 런만 본다.
+ *   최신 런부터 연속으로 `처리 0 && 잔량 > 0`인 횟수가 minRuns 이상이면 정체.
+ *   ⚠️ 잔량 0(할 일 없음)이나 처리 > 0(진척 있음)을 만나면 **즉시 연속이 끊긴다** —
+ *      "일이 없어 조용한 것"을 문제로 찍지 않는다(2026-08-10 오탐 수리와 같은 규약).
+ *   ⚠️ ok=false(이미 실패로 보고된 런)는 세지 않는다 — 실패는 다른 경로가 이미 올린다.
+ */
+export async function detectNoProgress(hours = 48, minRuns = 3): Promise<NoProgressJob[]> {
+  try {
+    await ensure();
+    const rows = (await sql`
+      SELECT job, ok, metrics, started_at
+      FROM run_ledger
+      WHERE started_at > now() - (${hours} * interval '1 hour') AND metrics IS NOT NULL
+      ORDER BY job, started_at DESC`) as unknown as { job: string; ok: boolean | null; metrics: any; started_at: string }[];
+    const out: NoProgressJob[] = [];
+    const byJob = new Map<string, typeof rows>();
+    for (const r of rows) { const a = byJob.get(r.job) ?? []; a.push(r); byJob.set(r.job, a as any); }
+    for (const [job, runs] of byJob) {
+      let streak = 0, remain = 0, first = "", last = "";
+      for (const r of runs) {                    // 최신 → 과거
+        const m = r.metrics ?? {};
+        const done = Number(m.updated ?? m.processed ?? NaN);
+        const left = Number(m.remain ?? NaN);
+        if (!Number.isFinite(done) || !Number.isFinite(left)) break; // 계량 없는 런은 판정 불가
+        if (r.ok === false) break;                                   // 이미 실패로 보고됨
+        if (left <= 0 || done > 0) break;                            // 할 일 없음 또는 진척 있음 → 연속 끊김
+        streak++; remain = left; last = last || r.started_at; first = r.started_at;
+      }
+      if (streak >= minRuns) out.push({ job, runs: streak, remain, first_at: first, last_at: last });
+    }
+    return out.sort((a, b) => b.runs - a.runs);
+  } catch { return []; }
+}
+
 /** 보존기간 정리 — cron-costwatch가 하루 1회 호출(행 수천 개 수준이라 부하 무시 가능). */
 export async function pruneLedger(days = 90): Promise<number> {
   try {

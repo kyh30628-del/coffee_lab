@@ -64,8 +64,10 @@ const CONTRACTS: Record<string, Partial<JobContract>> = {
   //   일별 디스크읽기와도 상관없음을 실측 확인(09-07 349GB/blob 314 vs 09-11 52GB/blob 608).
   // 📌 2026-10-16(#10935 수리) — 같은 이유로 또 한 번: GEN_MAX 300→500(공개 48,639곳에서 순환 40.5일 → 안전망 30일 초과).
   //   런당 처리 500건과 1:1이므로 500 + 같은 비율 여유(약 17%) = 600.
-  "cron-resynth": { tier: "L2", budget: { blobReads: 600, rows: 40000, wallMs: 300_000 }, writes: ["cafes.synth_*", "reviewer_cafes.*"] },
-  "cron-synth": { tier: "L2", budget: { blobReads: 60, rows: 40000, wallMs: 300_000 }, writes: ["cafes.synth_*", "cafes.published", "reviewer_cafes.*"] },
+  "cron-resynth": { tier: "L2", budget: { blobReads: 600, rows: 40000, wallMs: 300_000 },
+    effect: { kind: "monotone-decrease", maxNoEffectRuns: 2 }, writes: ["cafes.synth_*", "reviewer_cafes.*"] },
+  "cron-synth": { tier: "L2", budget: { blobReads: 60, rows: 40000, wallMs: 300_000 },
+    effect: { kind: "monotone-decrease", maxNoEffectRuns: 2 }, writes: ["cafes.synth_*", "cafes.published", "reviewer_cafes.*"] },
   // 발굴·수집 — 네이버 쿼터가 진짜 제약(일 25,000). 신규 발굴 카페를 합성할 때 raw를 곳당 1회 로드한다
   //   (5일 실측: 런당 1~6회, 합성 상한 5곳+검증여유). 08-08의 blobReads:0 선언은 이 정당 경로를 몰랐던 오기 —
   //   실측 관찰 후 확정하기로 한 CEO 결정(08-09 "후자로")의 이행이 이 값이다.
@@ -74,13 +76,19 @@ const CONTRACTS: Record<string, Partial<JobContract>> = {
   // 유튜브 백필 — 2026-07 전송 663GB 사고의 주범이었던 경로(LIMIT 5 반복쿼리)
   "youtube-backfill": { tier: "L0", budget: { blobReads: 120, rows: 20000, wallMs: 1_800_000 } },
   // 합성·발굴·수집 — 쓰기 대상을 선언해야 L3 스코프가 드리프트를 잡는다(미선언이면 통과)
-  "cron-embed": { tier: "L2", budget: { blobReads: 0, rows: 20000, wallMs: 300_000 }, writes: ["cafes.embedding", "cafes.embed_updated"] },
+  "cron-embed": { tier: "L2", budget: { blobReads: 0, rows: 20000, wallMs: 300_000 },
+    // 🔴 2026-10-17 effect 선언 — 이 잡은 **백로그를 줄이기로 약속한** 잡이다(임베딩 대기 → 0).
+    //   선언이 없어 정체 판정에서 아예 빠져 있었고, "0건 처리 · 5,611건 남음"이 며칠 묻혔다.
+    effect: { kind: "monotone-decrease", maxNoEffectRuns: 2 },
+    writes: ["cafes.embedding", "cafes.embed_updated"] },
   "cron-enrich": { tier: "L2", budget: { blobReads: 0, rows: 20000, wallMs: 300_000 }, writes: ["cafes.reputation_note", "cafes.enriched_at", "cafes.rating", "cafes.rating_count"] },
   "cron-closure": { tier: "L2", budget: { blobReads: 0, rows: 20000, wallMs: 300_000 }, writes: ["cafes.closure_misses", "cafes.closure_checked_at"] },
   "cron-verify": { tier: "L0", budget: { blobReads: 0, rows: 20000, wallMs: 300_000 } },
   "cron-rulegap": { tier: "L2", budget: { blobReads: 12, rows: 20000, wallMs: 300_000 }, writes: ["cafes.synth_*", "cafes.published", "cafes.instagram_url", "learned_terms.*"] },
-  "cron-issues": { tier: "L2", budget: { blobReads: 0, rows: 20000, wallMs: 300_000 }, writes: ["cafes.published", "cafes.pipeline_status", "issues.*", "decisions.*"] },
-  "cron-coord-consumer": { tier: "L2", budget: { blobReads: 0, rows: 10000, wallMs: 300_000 } },
+  "cron-issues": { tier: "L2", budget: { blobReads: 0, rows: 20000, wallMs: 300_000 },
+    effect: { kind: "monotone-decrease", maxNoEffectRuns: 2 }, writes: ["cafes.published", "cafes.pipeline_status", "issues.*", "decisions.*"] },
+  "cron-coord-consumer": { tier: "L2", budget: { blobReads: 0, rows: 10000, wallMs: 300_000 },
+    effect: { kind: "monotone-decrease", maxNoEffectRuns: 2 } },
   "cron-demand": { tier: "L0", budget: { blobReads: 0, rows: 10000, wallMs: 300_000 } },
   // 읽기 전용 감시류
   "cron-costwatch": { tier: "L0", budget: { blobReads: 0, rows: 5000, wallMs: 120_000 } },

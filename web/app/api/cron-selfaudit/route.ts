@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { OUT_OF_SCOPE_SQL } from "@/lib/serviceScope";
 import { sql } from "@/lib/db";
 import { recordRun } from "@/lib/agentLog";
-import { detectStuck } from "@/lib/runLedger";
+import { detectStuck, detectNoProgress } from "@/lib/runLedger";
 import { verifyContracts } from "@/lib/jobContract";
 import { pendingGates } from "@/lib/gateQueue";
 import { openRecheckCount } from "@/lib/recheckQueue";
@@ -164,6 +164,16 @@ export async function GET(req: NextRequest) {
         findings.push({ check: `자율조치 정체 ${s.job} (같은 결과 ${s.repeats}회 연속)`, count: s.repeats, team: teamOf(s.job.split(".")[0]), critical: false });
         // 판단이 필요한 이산 이벤트 → self-audit LLM이 근본원인을 조사하도록 신호만 남긴다(디바운스 내장).
         await pushTrigger("heal_stuck", s.job, `같은 문제집합 ${s.repeats}회 연속(${String(s.first_at).slice(5, 16)}~) — 자동조치가 효과 없음`, "HIGH").catch(() => {});
+      }
+      // 🚧 2026-10-17 신설 — 지문이 큐 크기 때문에 매번 바뀌어 detectStuck이 못 잡는 "처리 0건"을 따로 잡는다.
+      //   cron-embed가 며칠째 '임베딩 0 · 남음 5,600'이었는데 지문이 달라져 정체로 안 찍혔다(ok=true로 묻힘).
+      for (const np of await detectNoProgress(48, 3)) {
+        findings.push({
+          check: `진척 0 ${np.job} — ${np.runs}회 연속 처리 0건(남은 일 ${np.remain.toLocaleString()})`,
+          count: np.runs, team: teamOf(np.job.split(".")[0]), critical: true,
+          ikey: `selfaudit:진척0:${np.job}`,
+        });
+        await pushTrigger("heal_stuck", np.job, `${np.runs}회 연속 처리 0건 · 남은 일 ${np.remain} — 막힌 원인 조사 필요`, "HIGH").catch(() => {});
       }
     } catch { /* 감시 실패가 자가감사를 깨지 않게 */ }
 
