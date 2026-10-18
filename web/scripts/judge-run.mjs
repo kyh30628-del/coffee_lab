@@ -104,6 +104,15 @@ for (let cycle = 1; cycle <= MAX_CYCLES; cycle++) {
     const perCafe = Number(a.cafes) > 0 ? Number(a.costUsd) / Number(a.cafes) : 0;
     console.log(`  [${cycle}] 수거 ${n(a.cafes)}곳 · 구제 ${n(a.rescuedReviews)}건 · $${Number(a.costUsd).toFixed(5)} (곳당 $${perCafe.toFixed(5)}) · 누적 $${spent.toFixed(4)}`);
   }
+  // 🔬 정확성 계측(2026-10-19) — **감시자는 감시대상과 같이 멈추면 안 된다.**
+  //   라우트가 응답에 실어주는 truncated/parseFailed/unanswered를 매 사이클 눈으로 본다.
+  //   0이 아니면 "AI가 못 본 후기"가 생긴 것이다 — 조용히 넘어가지 않게 로그에 🔴로 띄운다.
+  //   (잘림은 judgeMaxTokens로 막았고, 미응답은 미결로 남겨 규칙 판정이 가지만, 발생 자체를 봐야 한다.)
+  const pr = col.precision ?? {};
+  if (Number(pr.truncated ?? 0) || Number(pr.parseFailed ?? 0) || Number(pr.unanswered ?? 0))
+    console.log(`  [${cycle}] 🔴 정확성 — 출력잘림 ${n(pr.truncated)}건 · 파싱실패 ${n(pr.parseFailed)}건 · 미응답후보 ${n(pr.unanswered)}건 (미응답은 규칙 판정 유지)`);
+  else if (Number(a.cafes ?? 0) > 0)
+    console.log(`  [${cycle}] ✅ 정확성 — 잘림·파싱실패·미응답 0건 (제출 후보 전원이 AI 판정을 받았다)`);
 
   // ── ①-b 공개 승격 — **판정만 하면 공개가 안 된다.**
   //   판정 적용(applyDecisions)은 카페를 `pending`(공개 심사)으로 보낼 뿐이고, 승격은 finalizePipeline이 한다.
