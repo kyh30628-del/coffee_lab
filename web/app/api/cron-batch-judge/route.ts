@@ -91,6 +91,7 @@ export async function GET(req: NextRequest) {
     //   근본 원인은 이 엔드포인트가 '수거'와 '제출'을 한 호출에 묶어둔 것이다 —
     //   **수거하고 싶을 때마다 제출이 따라온다.** 그래서 둘을 파라미터로 분리한다.
     //   기본(=수거만)이 안전한 쪽이고, 제출은 `&submit=1`을 명시해야만 한다.
+    const scope = req.nextUrl.searchParams.get("scope") ?? "";   // "" | rescue | refine (아래 후보 선정에서 사용)
     if (req.nextUrl.searchParams.get("submit") !== "1") {
       return NextResponse.json({ ok: true, mode: "collect-only",
         note: "수거만 수행했다. 신규 제출은 &submit=1 을 명시할 때만 — 상태 확인 목적 호출이 과금을 만들지 않게(09-20 중복제출 사고).",
@@ -134,6 +135,19 @@ export async function GET(req: NextRequest) {
             AND (pipeline_status IS NULL OR pipeline_status NOT IN ('excluded', 'held', 'noise'))
           )
         )
+        -- 구간 필터(2026-10-18) — 비싼 모델이 값어치 낮은 구간에 새지 않게 한다.
+        --   scope=rescue : 미공개(후보구제) 전용. 판정 통과하면 공개가 늘어난다(파일럿 60곳 -> 공개 35곳).
+        --   scope=refine : 이미 공개된 카페의 재정제 전용. 품질은 올리지만 공개 수를 늘리지 않는다.
+        --   미지정이면 기존 동작(둘 다. ORDER BY가 후보구제를 먼저 본다).
+        --   실측 2026-10-18: 큐 32,470곳 = 후보구제 7,880 + 재정제 24,590.
+        --     Sonnet 5로 전부 165.76달러(예산 초과)이지만 후보구제만이면 40.23달러다.
+        --     공개를 늘리는 쪽에 좋은 모델, 다듬는 쪽에 싼 모델이 같은 예산에서 최대 효과다.
+        --   주의: Neon 태그드 템플릿은 SQL 조각 합성을 지원하지 않는다(lib/metrics.ts 주석과 같은 이유).
+        --      조건을 파라미터 하나로 표현한다. 조각을 끼우면 문법 오류가 난다(실제로 한 번 났다).
+        --      그리고 이 주석에 백틱을 쓰면 템플릿 문자열이 끊긴다 -- 실제로 한 번 깨졌다.
+        AND (${scope} = ''
+             OR (${scope} = 'rescue' AND NOT COALESCE(published, false))
+             OR (${scope} = 'refine' AND COALESCE(published, false)))
       ORDER BY (COALESCE(pipeline_status, '') = 'pending') DESC,
                -- ⚠️ pipeline_status IS NULL(grandfather)인 행은 위 비교가 SQL NULL이 되고, Postgres는
                --   DESC에서 NULL을 '가장 큼'으로 취급해 맨 앞으로 보낸다 — COALESCE로 NULL을 없애 방지(실측으로 발견).

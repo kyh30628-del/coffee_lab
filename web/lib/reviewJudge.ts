@@ -7,7 +7,11 @@
 
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 const GOOGLE_KEY = process.env.GOOGLE_AI_KEY || process.env.GOOGLE_API_KEY_1;
-export const CLAUDE_MODEL = "claude-haiku-4-5";
+// 🔧 2026-10-18 — 런별 모델 지정 가능(기본값은 불변: 프로덕션 동작 보존).
+//   공식 단가(platform.claude.com/docs/en/about-claude/pricing, 2026-10-18 확인) · 배치는 입·출력 50% 할인:
+//     Haiku 5.5 $0.10/$0.50 · Haiku 4.5 $0.50/$2.50 · Sonnet 5 $2/$10 · Opus 5.5 $4/$20
+//   ⚠️ 모델을 바꾸면 lib/anthropicBatch.ts의 단가도 같이 따라가야 한다(batchPriceFor가 모델로 조회한다).
+export const CLAUDE_MODEL = process.env.JUDGE_MODEL || "claude-haiku-4-5";
 const GEMINI_MODEL = "gemini-2.0-flash-lite";
 
 export const hasJudgeKey = () => !!(ANTHROPIC_KEY || GOOGLE_KEY);

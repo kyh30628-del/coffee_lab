@@ -43,13 +43,25 @@ export async function GET(req: NextRequest) {
       LIMIT 600`) as unknown as any[];
 
     let updated = 0;
+    // 🔴 2026-10-18 **반쪽 수리의 나머지 반쪽** — 10-18 오전에 승격을 `if (updated > 0)`에서 풀었는데,
+    //   **던지는 지점이 그 위였다**: `embedBatch`가 치명 오류(402 크레딧 소진 등)에 throw하므로
+    //   아래 승격 코드에 **도달 자체를 못 했다.** 실측(10-18 저녁): AI 판정으로 31곳이 pending에 올라왔는데
+    //   이 라우트가 HTTP 500으로 죽어 **공개가 0곳**이었다.
+    //   → 임베딩 단계를 자체 try로 감싸 **승격은 임베딩과 무관하게 항상 돌게** 한다.
+    //   ⚠️ 실패를 삼키지는 않는다(10-17 수리의 취지) — 아래에서 recordRun(ok=false)로 **표면화**한다.
+    //      임베딩은 검색 보조이고 공개는 소비자 화면이다. 보조의 장애가 본체를 멈추면 안 된다.
+    let embedFatal: string | null = null;
     if (rows.length > 0) {
-      const vecs = await embedBatch(rows.map(buildCafeEmbedText), "RETRIEVAL_DOCUMENT");
-      for (let i = 0; i < rows.length; i++) {
-        const v = vecs[i];
-        if (!v || v.length !== EMBED_DIM) continue;
-        await sql`UPDATE cafes SET embedding = ${toVectorLiteral(v)}::vector, embed_updated = now() WHERE id = ${rows[i].id}`;
-        updated++;
+      try {
+        const vecs = await embedBatch(rows.map(buildCafeEmbedText), "RETRIEVAL_DOCUMENT");
+        for (let i = 0; i < rows.length; i++) {
+          const v = vecs[i];
+          if (!v || v.length !== EMBED_DIM) continue;
+          await sql`UPDATE cafes SET embedding = ${toVectorLiteral(v)}::vector, embed_updated = now() WHERE id = ${rows[i].id}`;
+          updated++;
+        }
+      } catch (e) {
+        embedFatal = String((e as any)?.message ?? e).slice(0, 180);
       }
     }
     // 🔗 B(2026-08-27): 임베딩 직후 바로 공개 승격을 붙인다.
@@ -78,6 +90,13 @@ export async function GET(req: NextRequest) {
         AND (embedding IS NULL OR embed_updated IS NULL OR embed_updated < synth_updated)`)[0].n;
     // 📒 하네스 L5 — 지문은 **남은 일(백로그)** 기준. 할 일이 없으면(0) 지문을 안 남긴다 —
     //   "일이 없어 조용한 것"과 "일이 있는데 못 끝내는 것"을 구분해야 정체 탐지가 소음이 안 된다.
+    // 🔴 임베딩이 치명 실패면 ok=false로 남긴다(삼키지 않는다) — 단, 승격 결과는 함께 적는다.
+    if (embedFatal) {
+      await recordRun("cron-embed", false, `임베딩 실패(${embedFatal}) · 공개승격 ${promoted} · held해제 ${released}`, updated,
+        { metrics: { remain, updated, promoted, released } }).catch(() => {});
+      return NextResponse.json({ ok: false, embedError: embedFatal, embedded: updated, remaining: remain, promoted, released },
+        { headers: { "Cache-Control": "no-store" } });
+    }
     await recordRun("cron-embed", true, `임베딩 ${updated} 남음 ${remain}${promoted ? ` · 공개승격 ${promoted}` : ""}${released ? ` · held해제 ${released}` : ""}`, updated, { fingerprint: (remain) > 0 ? fingerprintOf({ remain, updated, promoted }) : undefined, metrics: { remain, updated, promoted } });
     return NextResponse.json({ ok: true, ranAt: new Date().toISOString(), embedded: updated, remaining: remain, promoted });
   } catch (e) {

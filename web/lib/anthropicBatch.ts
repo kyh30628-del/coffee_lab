@@ -55,9 +55,26 @@ export async function* streamResults(key: string, url: string): AsyncGenerator<a
   for (const line of text.split("\n")) { const t = line.trim(); if (t) { try { yield JSON.parse(t); } catch {} } }
 }
 
-// Haiku 4.5 Batches 단가(정가 50%): 입력 $0.50 / 출력 $2.50 per 1M
-export const BATCH_PRICE_IN = 0.5 / 1e6;
-export const BATCH_PRICE_OUT = 2.5 / 1e6;
+// 📏 Batches 단가 = 정가의 50%(입·출력 모두). 공식 표 2026-10-18 확인:
+//   platform.claude.com/docs/en/about-claude/pricing
+//     Haiku 5.5 $0.10/$0.50 · Haiku 4.5 $0.50/$2.50 · Sonnet 5 $2/$10 · Sonnet 4.5 $3/$15 · Opus 5.5 $4/$20
+//   ⚠️ **단가를 모르는 모델은 쓰지 않는다**(추정 금지 — 예산 계산이 거짓이 된다).
+const BATCH_PRICES: Record<string, { in: number; out: number }> = {
+  "claude-haiku-5-5":           { in: 0.05 / 1e6, out: 0.25 / 1e6 },
+  "claude-haiku-4-5":           { in: 0.25 / 1e6, out: 1.25 / 1e6 },
+  "claude-haiku-4-5-20251001":  { in: 0.25 / 1e6, out: 1.25 / 1e6 },
+  "claude-sonnet-5":            { in: 1.0 / 1e6,  out: 5.0 / 1e6 },
+  "claude-sonnet-5-5":          { in: 1.0 / 1e6,  out: 5.0 / 1e6 },
+  "claude-sonnet-4-5-20250929": { in: 1.5 / 1e6,  out: 7.5 / 1e6 },
+  "claude-opus-5-5":            { in: 2.0 / 1e6,  out: 10.0 / 1e6 },
+};
+export function batchPriceFor(model: string): { in: number; out: number } {
+  return BATCH_PRICES[model] ?? BATCH_PRICES["claude-haiku-4-5"]; // 모르는 모델은 보수적으로 구형 단가로 보고
+}
+// 하위호환 — 기존 호출부가 쓰는 상수(기본 모델 기준). 새 코드는 batchPriceFor(model)을 쓸 것.
+const DEFAULT_MODEL = process.env.JUDGE_MODEL || "claude-haiku-4-5";
+export const BATCH_PRICE_IN = batchPriceFor(DEFAULT_MODEL).in;
+export const BATCH_PRICE_OUT = batchPriceFor(DEFAULT_MODEL).out;
 
 /** 배치 취소 — manifest 저장 실패 등으로 **수거할 수 없게 된 배치의 과금을 끊는다**(2026-09-20 고아배치 사고). */
 export async function cancelBatch(key: string, id: string): Promise<void> {
