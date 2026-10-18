@@ -738,6 +738,11 @@ test("판정: 카페 단위 함수가 호출마다 DDL(ALTER TABLE)을 치지 �
 test("판정: 런타임 노브는 대괄호 접근으로 읽는다(Next 빌드시 치환 회피)", () => {
   const route = readFileSync(new URL("../../app/api/cron-batch-judge/route.ts", import.meta.url), "utf8")
     .split("\n").filter((l) => !l.trim().startsWith("//")).join("\n");   // 주석의 설명문은 코드가 아니다
+  const judge = readFileSync(new URL("../reviewJudge.ts", import.meta.url), "utf8")
+    .split("\n").filter((l) => !l.trim().startsWith("//")).join("\n");
+  // JUDGE_MODEL도 같은 함정이었다 — 점 접근이면 모델 전환에 **재빌드**가 필요해진다(2026-10-19).
+  assert.ok(!/process\.env\.JUDGE_MODEL\b/.test(judge), "JUDGE_MODEL을 점 접근으로 읽는다 — 빌드 시점에 굳는다");
+  assert.ok(judge.includes('process.env["JUDGE_MODEL"]'), "JUDGE_MODEL을 대괄호로 읽지 않는다");
   for (const k of ["JUDGE_CONCURRENCY", "JUDGE_MAX_PASSES", "BATCH_JUDGE_LIMIT"]) {
     assert.ok(!new RegExp(`process\\.env\\.${k}\\b`).test(route), `${k}를 점 접근으로 읽는다 — 빌드 시점에 굳는다`);
     assert.ok(route.includes(`process.env["${k}"]`), `${k}를 대괄호로 읽지 않는다`);
