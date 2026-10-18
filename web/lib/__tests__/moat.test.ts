@@ -820,3 +820,21 @@ test("보수적 유지: 공개를 유지하면 표시 등급이 '후보'로 떨�
   assert.ok(!/UPDATE cafes SET synth_grade=\$\{grade\},/.test(store),
     "UPDATE가 보정 전 grade를 쓴다 — 공개 중 '후보'라는 새 상태가 생긴다");
 });
+
+// 👁️ 감시 지표 — 2026-10-19. 「감시자는 감시대상과 같이 멈추면 안 된다」의 짝: **감시 지표가 거짓이면
+//   감시가 없는 것과 같다.** 실측 사고: `NOT published AND exclude_at > now()-10min`으로 '판정 비공개'를
+//   셌더니 277곳이라고 경보했는데 실제 신규 비공개는 0곳이었다. 두 가지가 섞였다 —
+//     ① 내가 직접 한 데이터 조작(1건 카페 320곳 되돌림)도 exclude_at을 now()로 찍는다
+//     ② **이미 비공개였던 카페**를 재합성하면 exclude_at이 갱신된다(rescue 구간은 전부 미공개다)
+//   → 감시는 공개 수의 **순변동**을 본다. 소비자가 보는 것이 늘었나 줄었나를 그대로 말해준다.
+test("감시: 판정 감시는 exclude_at이 아니라 공개 수 순변동을 본다", () => {
+  const w = readFileSync(new URL("../../scripts/judge-watch.mjs", import.meta.url), "utf8");
+  const code = w.split("\n").filter((l) => !l.trim().startsWith("//")).join("\n");
+  assert.ok(/count\(\*\) FILTER \(WHERE published\)::int pub/.test(code), "공개 수를 세지 않는다");
+  assert.ok(/r\.pub - prev\.pub/.test(code), "순변동(delta)을 계산하지 않는다");
+  assert.ok(!/exclude_at > now\(\)/.test(code),
+    "exclude_at 기반 경보가 다시 들어왔다 — 내 데이터 조작과 재합성 갱신이 섞여 거짓 경보가 난다");
+  // CEO 지시 2건이 감시에 걸려 있어야 한다: 후기 1건 공개 금지 · 공개 중 '후보' 등급 금지
+  assert.ok(/synth_count,0\) <= 1\)::int thin/.test(code), "공개 중 후기1건 감시가 없다");
+  assert.ok(/synth_grade = '후보'\)::int odd/.test(code), "공개 중 '후보' 등급 감시가 없다");
+});
