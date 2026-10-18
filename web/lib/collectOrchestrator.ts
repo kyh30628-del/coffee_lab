@@ -32,8 +32,11 @@ export type QualityStats = {
   raw: number; verified: number; reference: number; rejected: number; duplicates: number;
   rejectReasons: Record<string, number>; // 탈락 사유별 건수 (투명성)
   // 2026-09-13 해자 감사 — 등급 산정에서 빠진 옥석(표시는 되지만 '검증' 등급 근거로는 안 세는 것)
-  gradeExcluded?: { closureMention: number; accountCap: number; oldHalf: number };
-  closureMentions?: number; // 제목에 폐업·문닫음 언급 + 카페명 — cron-closure 재확인 우선 신호
+  gradeExcluded?: { accountCap: number; oldHalf: number };
+  // ⚠️ 2026-10-18: `closureMentions`를 제거했다 — **항상 0이고 읽는 곳도 없던 빈껍데기**였다.
+  //   폐업 언급 글은 아래 폐업 게이트에서 **노출 제외(rejected)**되어 등급 누계까지 오지 못하므로
+  //   그 카운터는 도달 불가였고, cron-closure는 처음부터 `rejectReasons`로 신호를 받고 있다
+  //   (app/api/cron-closure/route.ts:75 — `synth_quality->'rejectReasons' ? '폐업 언급 — 노출 제외(폐업 확인 대상)'`).
 };
 
 export type BorderlineItem = { key: string; title?: string; body: string; text?: string };
@@ -114,12 +117,14 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
   const seen = new Set<string>();
   const reviewerStats = new Map<string, ReviewerCafeStat>(); // 👤 #699 1단계 — 판정 무영향, 적재용
   const seenLinks = new Set<string>();     // 같은 글(URL) 중복 수집 제거용
-  const stats: QualityStats = { raw: 0, verified: 0, reference: 0, rejected: 0, duplicates: 0, rejectReasons: {}, gradeExcluded: { closureMention: 0, accountCap: 0, oldHalf: 0 }, closureMentions: 0 };
+  const stats: QualityStats = { raw: 0, verified: 0, reference: 0, rejected: 0, duplicates: 0, rejectReasons: {}, gradeExcluded: { accountCap: 0, oldHalf: 0 } };
   // 🔴 2026-09-13 해자 감사 — 등급 산정 전용 누계(표시 카운트 trustCount와 분리).
   //   ⓐ 사장님·공식 계정 글은 아예 제외(아래 루프, rejectReasons로 투명 공개) — "광고도 아닌 진짜 후기" 약속.
   //   ⓑ 같은 블로그 계정은 등급 근거로 최대 2건(사업자 계정 30건이 그것만으로 '검증'을 만들던 구멍).
   //   ⓒ 3년 넘은 글은 등급 근거 0.5 가중(표시·trustCount엔 그대로).
-  //   ⓓ 제목이 폐업·문닫음을 말하는 글은 등급 근거 제외 + 폐업 신호 카운트(자동 비공개 아님, cron-closure가 우선 재확인).
+  //   ⓓ 폐업·문닫음을 말하는 글(제목 또는 본문 + 우리 상호)은 **등급 근거 제외가 아니라 노출 제외(rejected)**다.
+  //      2026-10-18 정정 — 여기엔 "등급 근거 제외 + 폐업 신호 카운트"로 적혀 있었지만 실제로는 폐업 게이트가
+  //      먼저 거절한다. 자동 비공개는 아니고, cron-closure가 `rejectReasons`의 CLOSURE_REASON으로 재확인한다.
   let gradeVerified = 0, gradeReference = 0;
   const accountKept = new Map<string, number>();
   const nameCoreForSelf = coreTokens(name, area).map((t) => t.replace(/\s/g, "").toLowerCase()).filter((t) => t.length >= 3);
@@ -217,13 +222,15 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
       }
       if (verdict === "verified") stats.verified++; else stats.reference++;
       { const rid = extractRid(t.link); if (rid) { const cur = reviewerStats.get(rid)!; if (cur) cur.accepted++; } } // 👤 #699
-      // 등급 근거 누계(위 ⓑⓒⓓ) — 표시·trustCount는 건드리지 않는다.
+      // 등급 근거 누계(위 ⓑⓒ) — 표시·trustCount는 건드리지 않는다. (ⓓ 폐업은 이 앞에서 노출 제외된다)
       {
         const rid = extractRid(t.link) ?? "";
         const kept = rid ? (accountKept.get(rid) ?? 0) : 0;
-        const closureHit = !!t.title && CLOSURE_TITLE.test(t.title) && (t.title.replace(/\s/g, "").toLowerCase().includes(nameNormForSelf) || nameCoreForSelf.some((k) => t.title!.replace(/\s/g, "").toLowerCase().includes(k)));
-        if (closureHit) { stats.closureMentions!++; stats.gradeExcluded!.closureMention++; }
-        else if (rid && kept >= 2) { stats.gradeExcluded!.accountCap++; }
+        // 🔴 2026-10-18 — 여기 있던 '폐업 제목이면 등급 근거 제외' 분기를 제거했다. **도달 불가였다**:
+        //   폐업 언급 글은 위 폐업 게이트(CLOSURE_REASON)에서 이미 rejected → `continue`로 빠져
+        //   이 누계 블록에 들어올 수 없다(그 게이트가 제목·본문 양쪽을 같은 이름 조건으로 본다).
+        //   선언(아래 ⓓ)과 실제 동작이 달랐던 자리다 — 선언도 함께 바로잡았다.
+        if (rid && kept >= 2) { stats.gradeExcluded!.accountCap++; }
         else {
           const mo = ageMonths((t as any).date);
           const w = mo != null && mo > 36 ? 0.5 : 1;
@@ -266,7 +273,8 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
   //   DB로 안 빼고 코드 상수로 둔다(grade.floor.*처럼 공개상태 대량변동을 부르는 값이 아니라 그 값의 산정
   //   방식 보정이며, 조정 시 재합성이 필요해 무배포 즉시효과 대상이 아님).
   const REFERENCE_GRADE_WEIGHT = 0.5;
-  // 2026-09-13: 등급 근거는 위 누계(자기글 제외·계정당 2건·3년+ 절반·폐업 언급 제외)를 쓴다. trustCount(표시)는 불변.
+  // 2026-09-13: 등급 근거는 위 누계(자기글 제외·계정당 2건·3년+ 절반)를 쓴다. trustCount(표시)는 불변.
+  //   (폐업 언급 글은 누계 이전에 노출 제외되므로 '등급 근거 제외' 항목이 아니다 — 2026-10-18 정정)
   const gradeCount = gradeVerified + gradeReference * REFERENCE_GRADE_WEIGHT;
   // 공개 floor = 검증리뷰 3건 (2026-06-30, CEO "검증된 리뷰 3건 이상"). trustCount는 옥석(verified+reference)만 —
   //   가비지·노이즈(rejected: 동명·무관·광고·SEO·nameAsWord)는 카운트 안 됨. 진짜 검증 리뷰 3건+ 있으면 참고(공개).

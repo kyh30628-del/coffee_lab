@@ -18,6 +18,7 @@ import {
 } from "../reviewQuality";
 import { isOtherBusinessQuote, isReadableQuote, isSentenceQuote, displayQuote, splitKeyTerms } from "../cafeDetailView";
 import { sortReviews, ensureRecent } from "../exposureOrder";
+import { collectAndSynthesize } from "../collectOrchestrator";
 
 const AREA = ["서울", "강남구", "역삼동"];
 
@@ -214,4 +215,71 @@ test("식사 메뉴(샌드위치·파스타)는 카페 실질맥락으로 인정
   const r = verifyReview({ name: "아르테", areaTerms: ["서울", "강남구"], source: "blog",
     title: "아르테 미용실", body: "아르테 미용실에서 머리하고 네일샵 갔어요. 파스타랑 샌드위치도 먹었습니다. 필라테스도 했어요." });
   assert.equal(r.verdict, "rejected");
+});
+
+// ═══ 등급 산정(collectOrchestrator) — 해자의 마지막 미보호 구간. 2026-10-18 신설 ═══
+//   09-13 해자 감사로 들어간 네 규칙이 **테스트 없이** 돌고 있었다. 이 규칙이 조용히 풀리면
+//   사업자 계정 30건이 그것만으로 '검증'을 만들던 구멍이 되살아난다.
+//   표시 수(trustCount)와 등급 근거(gradeCount)는 **분리**돼 있다 — 표시는 줄지 않고 등급만 엄격해진다.
+const AREA2 = ["서울", "강남구"];
+const CAFE = "리플렉트랩";
+const review = (i: number, acct: string, date: string, title?: string) => ({
+  title: title ?? `${CAFE} 다녀왔어요 ${i}`,
+  text: `${CAFE}에서 아메리카노와 소금빵을 주문했어요. 원두가 산미 있고 좌석이 넓어 좋았습니다. ${i}`,
+  link: `https://blog.naver.com/${acct}/${1000 + i}`,
+  date, source: "blog", srcName: `블로거${acct}`,
+});
+const judge = (texts: any[]) => collectAndSynthesize(CAFE, AREA2, [{ source: "blog", texts }]);
+const NOW = "2026.09.01", OLD3Y = "2021.01.01";
+
+test("등급: 서로 다른 계정 35건이면 '검증'(문턱 30)", () => {
+  const r = judge(Array.from({ length: 35 }, (_, i) => review(i, `acct${i}`, NOW)));
+  assert.equal(r.grade, "검증");
+  assert.equal(r.collected, 35);
+});
+test("등급: 같은 계정 35건은 '검증'이 되지 않는다(계정당 2건 상한)", () => {
+  const r = judge(Array.from({ length: 35 }, (_, i) => review(i, "sameacct", NOW)));
+  assert.notEqual(r.grade, "검증", "사업자 계정 한 개로 검증을 만들 수 있으면 해자가 뚫린다");
+  assert.equal(r.collected, 35, "표시 수는 줄지 않는다(등급 근거만 엄격)");
+  assert.equal(r.quality?.gradeExcluded?.accountCap, 33, "2건만 인정하고 33건을 등급에서 뺀다");
+});
+test("등급: 3년 넘은 글은 등급 근거 0.5 가중", () => {
+  const a = judge(Array.from({ length: 35 }, (_, i) => review(i, `acct${i}`, OLD3Y)));
+  assert.notEqual(a.grade, "검증", "35×0.5=17.5 < 30");
+  assert.equal(a.quality?.gradeExcluded?.oldHalf, 35);
+  const b = judge(Array.from({ length: 70 }, (_, i) => review(i, `acct${i}`, OLD3Y)));
+  assert.equal(b.grade, "검증", "70×0.5=35 ≥ 30");
+});
+// 🚪 폐업 신호 — cron-closure(route.ts:75)가 **rejectReasons의 이 문자열**로 재확인한다.
+//   문자열이 바뀌면 크론이 조용히 신호를 못 받는다(설명과 규칙이 갈라지는 자리). 못으로 박는다.
+test("폐업 언급 글은 노출에서 빠지고 rejectReasons에 신호를 남긴다", () => {
+  const r = judge([
+    ...Array.from({ length: 5 }, (_, i) => review(i, `ok${i}`, NOW)),
+    { title: `${CAFE} 폐업했대요`, text: `${CAFE} 아메리카노 좋았는데 지금은 문을 닫았다고 합니다.`,
+      link: "https://blog.naver.com/clo1/1", date: NOW, source: "blog" },
+  ]);
+  assert.equal(r.collected, 5, "폐업 언급 글은 표시에서 제외된다");
+  assert.ok(r.quality?.rejectReasons?.["폐업 언급 — 노출 제외(폐업 확인 대상)"],
+    "cron-closure가 읽는 신호 문자열이 사라졌다 — route.ts:75와 함께 고쳐야 한다");
+});
+// 👤 사장님·공식 계정 — ⚠️ 실제 파이프라인은 **블로거명을 snippet.source에** 담는다
+//   (lib/webSearchCollector.ts:73 → collectOrchestrator가 `srcName: t.source`로 넘긴다).
+//   `srcName`을 snippet에 직접 넣으면 아무 일도 일어나지 않는다 — 내가 처음 이 테스트를 그렇게 써서
+//   "탐지 실패"로 오판했다(2026-10-18). 필드를 틀리면 조용히 통과하므로 여기 적어 둔다.
+test("사장님·공식 계정 글은 제외된다(한글 상호·영문 핸들 모두)", () => {
+  const withBlogger = (blogger: string, handles?: string[]) => {
+    const texts = [
+      ...Array.from({ length: 5 }, (_, i) => ({ ...review(i, `ok${i}`, NOW), source: `블로거${i}` })),
+      { ...review(99, "owner", NOW), source: blogger },
+    ];
+    return collectAndSynthesize(CAFE, AREA2, [{ source: "blog", texts } as any],
+      handles ? { selfHandles: handles } : undefined);
+  };
+  for (const [blogger, handles] of [[`${CAFE} 공식`, undefined], [CAFE, undefined], ["reflectlab", ["reflectlab"]]] as [string, string[] | undefined][]) {
+    const r = withBlogger(blogger, handles);
+    assert.equal(r.collected, 5, `자기 홍보 글이 통과했다(블로거명 "${blogger}") — '광고도 아닌 진짜 후기' 약속이 깨진다`);
+    assert.ok(r.quality?.rejectReasons?.["사장님·공식 계정 글 — 자기 홍보 제외"]);
+  }
+  // 대조군 — 일반 블로거는 그대로 통과해야 한다(과잉 제외 방지).
+  assert.equal(withBlogger("그냥블로거").collected, 6);
 });
