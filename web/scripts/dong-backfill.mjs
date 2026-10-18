@@ -12,6 +12,17 @@ const { recordRun, guardJob } = await import("../lib/heartbeat.ts");
 // 🚨 좌표 박스는 criteria 단일출처(2026-08-26) — 하드코딩하면 범위 확대 후 이 스크립트가
 //   정상 카페를 다시 비공개로 되돌린다(공개 상태를 직접 쓰는 경로라 특히 위험).
 const { loadCriteria: _lc, getCriterionSync: _gc } = await import("../lib/criteria.ts");
+// 🔴 2026-10-19 **규칙 사전 프라임 필수** — 안 하면 사전 필터가 공개 관문보다 약하게 돈다.
+//   `isFranchise`·`isNonCafe`·`isGenericFoodName`은 하드코딩 목록 **+ 학습 용어(DB)** 를 함께 본다
+//   (lib/discover.ts의 `getLearned("franchise")`). 학습 용어는 loadLearnedTerms()로 캐시에 올려야 보인다.
+//   실측 증거(2026-10-19): 로드 전 `isFranchise("빵집오빠 수원우만점")=false` → 로드 후 **true**.
+//   학습 프랜차이즈가 22개 있었고, 그만큼 사전 필터를 빠져나가 **네이버 콜을 헛썼다**
+//   (공개 관문 storeResult는 learnedTerms를 로드하므로 결국 거절한다 — 즉 순수 낭비다).
+//   패턴 출처: scripts/import-permits.mjs:32 "공개 관문(synthStore)과 같은 사전으로 판정하려면 먼저 프라임해야 한다"
+const { loadLearnedTerms } = await import("../lib/learnedTerms.ts");
+const { loadCriteriaLists } = await import("../lib/criteriaLists.ts");
+await loadLearnedTerms().catch(() => {});
+await loadCriteriaLists().catch(() => {});
 await _lc();
 const BOX = { aMin: _gc("geo.box.lat_min"), aMax: _gc("geo.box.lat_max"), oMin: _gc("geo.box.lng_min"), oMax: _gc("geo.box.lng_max") };
 guardJob("dong-backfill"); // 잡히지 않은 크래시(ReferenceError 등)도 관제탑이 보게 기록

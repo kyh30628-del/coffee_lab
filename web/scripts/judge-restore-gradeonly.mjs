@@ -27,6 +27,17 @@ for (const [name, mod] of [["isFranchise", "../lib/discover.ts"], ["isNonCafe", 
 }
 const missing = ["isFranchise", "isNonCafe"].filter((k) => !rules[k]);
 if (missing.length) { console.error(`🔴 규칙 함수를 못 불러왔다: ${missing.join(", ")} — 중단(규칙 0개로 '안전' 판정하는 사고 방지)`); process.exit(1); }
+// 🔴 2026-10-19 **규칙 사전 프라임 필수** — 안 하면 사전 필터가 공개 관문보다 약하게 돈다.
+//   `isFranchise`·`isNonCafe`·`isGenericFoodName`은 하드코딩 목록 **+ 학습 용어(DB)** 를 함께 본다
+//   (lib/discover.ts의 `getLearned("franchise")`). 학습 용어는 loadLearnedTerms()로 캐시에 올려야 보인다.
+//   실측 증거(2026-10-19): 로드 전 `isFranchise("빵집오빠 수원우만점")=false` → 로드 후 **true**.
+//   학습 프랜차이즈가 22개 있었고, 그만큼 사전 필터를 빠져나가 **네이버 콜을 헛썼다**
+//   (공개 관문 storeResult는 learnedTerms를 로드하므로 결국 거절한다 — 즉 순수 낭비다).
+//   패턴 출처: scripts/import-permits.mjs:32 "공개 관문(synthStore)과 같은 사전으로 판정하려면 먼저 프라임해야 한다"
+const { loadLearnedTerms } = await import("../lib/learnedTerms.ts");
+const { loadCriteriaLists } = await import("../lib/criteriaLists.ts");
+await loadLearnedTerms().catch(() => {});
+await loadCriteriaLists().catch(() => {});
 const { loadCriteria, getCriterionSync } = await import("../lib/criteria.ts");
 await loadCriteria();
 const box = { latMin: getCriterionSync("geo.box.lat_min"), latMax: getCriterionSync("geo.box.lat_max"),
@@ -76,6 +87,7 @@ const ids = keep.map((c) => c.id);
 await sql`UPDATE cafes SET published = true, pipeline_status = 'live', synth_grade = '참고',
   exclude_reason = NULL, exclude_at = NULL WHERE id = ANY(${ids})`;
 const { invalidateCafeCaches } = await import("../lib/cafeCacheInvalidate.ts");
+
 await invalidateCafeCaches(ids).catch((e) => console.warn(`캐시 무효화 실패(비치명): ${String(e).slice(0, 80)}`));
 const [after] = await sql`SELECT count(*)::int c FROM cafes WHERE published`;
 console.log(`   ✅ ${n(ids.length)}곳 복구 · 캐시 무효화 완료 · 현재 공개 ${n(after.c)}곳`);

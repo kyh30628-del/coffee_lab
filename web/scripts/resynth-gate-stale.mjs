@@ -25,6 +25,17 @@ if (typeof isFranchise !== "function" || typeof isNonCafe !== "function") {
 }
 const { synthAndStore } = await import("../lib/synthStore.ts");
 const sql = neon(process.env.DATABASE_URL);
+// 🔴 2026-10-19 **규칙 사전 프라임 필수** — 안 하면 사전 필터가 공개 관문보다 약하게 돈다.
+//   `isFranchise`·`isNonCafe`·`isGenericFoodName`은 하드코딩 목록 **+ 학습 용어(DB)** 를 함께 본다
+//   (lib/discover.ts의 `getLearned("franchise")`). 학습 용어는 loadLearnedTerms()로 캐시에 올려야 보인다.
+//   실측 증거(2026-10-19): 로드 전 `isFranchise("빵집오빠 수원우만점")=false` → 로드 후 **true**.
+//   학습 프랜차이즈가 22개 있었고, 그만큼 사전 필터를 빠져나가 **네이버 콜을 헛썼다**
+//   (공개 관문 storeResult는 learnedTerms를 로드하므로 결국 거절한다 — 즉 순수 낭비다).
+//   패턴 출처: scripts/import-permits.mjs:32 "공개 관문(synthStore)과 같은 사전으로 판정하려면 먼저 프라임해야 한다"
+const { loadLearnedTerms } = await import("../lib/learnedTerms.ts");
+const { loadCriteriaLists } = await import("../lib/criteriaLists.ts");
+await loadLearnedTerms().catch(() => {});
+await loadCriteriaLists().catch(() => {});
 const APPLY = process.argv.includes("--apply");
 const CAP = Number((process.argv.find((a) => a.startsWith("--cap=")) ?? "").split("=")[1] || 400);
 const n = (v) => Number(v ?? 0).toLocaleString();

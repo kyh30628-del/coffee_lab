@@ -922,3 +922,28 @@ test("쿼터 적체: gap은 발굴 정지 판정에 들어가지 않는다(발�
   assert.ok(/gapBacklog/.test(resBody), "collectReserveNow가 gap 몫을 예약하지 않는다 — 수집 창이 굶는다");
   assert.ok(/GAP_DAILY_CAPACITY/.test(resBody), "적체 전체를 예약하면 발굴을 과하게 굶긴다 — 하루 소화량으로 제한해야 한다");
 });
+
+// 🔴 규칙 사전 프라임 — 2026-10-19 실측 결함. `isFranchise`·`isNonCafe`·`isGenericFoodName`은
+//   하드코딩 목록 **+ 학습 용어(DB)** 를 함께 본다(discover.ts의 getLearned). 학습 용어는
+//   loadLearnedTerms()로 캐시에 올려야 보인다. 증거: 로드 전 isFranchise("빵집오빠 수원우만점")=false
+//   → 로드 후 **true**(학습 프랜차이즈 22개). 프라임 없이 사전 필터를 돌리면 **공개 관문보다 약해서**
+//   관문이 결국 거절할 카페에 네이버 콜을 헛쓴다(순수 낭비). 운영 스크립트 3개가 그 상태였다.
+//   패턴 출처: scripts/import-permits.mjs:32.
+test("규칙 사전: 규칙을 쓰는 스크립트는 loadLearnedTerms를 먼저 호출한다", () => {
+  const files = ["collect-shard.mjs", "deep-collect.mjs", "dong-backfill.mjs",
+                 "resynth-gate-stale.mjs", "judge-restore-gradeonly.mjs", "collect-deeper-probe.mjs"];
+  const USE = /\b(isFranchise|isNonCafe|verifyReview|isGenericFoodName)\s*\(/;
+  for (const f of files) {
+    const src = readFileSync(new URL(`../../scripts/${f}`, import.meta.url), "utf8");
+    let prime = -1, firstUse = -1;
+    src.split("\n").forEach((raw, i) => {
+      const t = raw.trim();
+      if (t.startsWith("//") || t.startsWith("*")) return;   // 주석의 함수 이름은 '사용'이 아니다
+      const code = raw.split("//")[0];
+      if (prime < 0 && code.includes("await loadLearnedTerms()")) prime = i;
+      if (firstUse < 0 && USE.test(code) && !code.includes("typeof") && !code.includes("import(")) firstUse = i;
+    });
+    assert.ok(prime >= 0, `${f}: loadLearnedTerms를 호출하지 않는다 — 사전 필터가 관문보다 약해진다`);
+    if (firstUse >= 0) assert.ok(prime < firstUse, `${f}: 규칙을 쓰기 전에 프라임하지 않는다(프라임 ${prime + 1}행 · 첫 호출 ${firstUse + 1}행)`);
+  }
+});
