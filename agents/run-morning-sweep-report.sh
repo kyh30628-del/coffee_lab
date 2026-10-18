@@ -31,3 +31,7 @@ node --import tsx scripts/pipeline-report.mjs || true
 #   기준선 2026-10-18: 종합 96%(지역 100 · 사실 93 · 상호 100 · 무의미질의 100 · 수도권 핵심부 71%).
 #   비용: 질의 28개의 키워드·장소 경로만 타서 LLM·임베딩 0원(실측 — 전부 keyword/place 모드로 처리됨).
 node scripts/search-eval.mjs 2>&1 | tail -8 || true
+# 📄 매각 자료 검산(2026-10-18) — docs/ACQUISITION.md의 숫자가 실측과 어긋나면 알린다.
+#   왜: 사람이 옮기면 어긋난다(실제로 후기 수가 1,732,645 vs 1,950,728로 갈렸다 — 정의가 두 갈래였다).
+#   비용: 집계 쿼리 4개 + 파일 읽기. 로컬 실행.
+node --import tsx scripts/acquisition-verify.mjs || true
