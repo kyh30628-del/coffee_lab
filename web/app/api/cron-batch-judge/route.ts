@@ -31,6 +31,16 @@ const JUDGE_MAX_PASSES = Number(process.env["JUDGE_MAX_PASSES"] || 9);
 //   직렬 기준선 12.7곳과 차이 없음 · 서버 CPU는 1.7%로 한가했다 = 병렬이 아예 안 걸린 증거).
 //   대괄호 접근은 치환 대상이 아니라 런타임 값을 읽는다.
 const CONC = Math.max(1, Math.min(12, Number(process.env["JUDGE_CONCURRENCY"] || 1)));
+// 🛑 판정 대량 비공개 차단기 (2026-10-19) — **판정 경로엔 상한이 없었다.**
+//   힐러들은 2026-07-29 보안감사 때 HEAL_UNPUB_CAP(50)을 받았는데, applyDecisions는 무제한이었다.
+//   왜 위험한가(실측): 공개 카페는 등급이 '후보'로 떨어지면 비공개된다(grade.floor.reference=2).
+//     재정제 대상 21,145곳 중 **후기 2건 이하가 1,778곳(8.4%)** — 거절 1건에도 내려간다.
+//     최근 7일 실측으로 판정 후 비공개로 내려간 카페가 **502곳** 있었다. 24,737곳을 한 번에 돌리면
+//     루브릭·파싱 회귀 한 번에 수백~수천 곳이 소비자 화면에서 사라질 수 있다.
+//   🔴 비공개 자체를 막지는 않는다 — AI가 "이 후기는 이 가게 글이 아니다"라고 보면 내려가는 게 맞고,
+//      그게 판정을 돌리는 이유다. 막는 것은 **한 회차의 속도**다: 상한을 넘으면 그 회차의 적용을
+//      멈추고 신호를 남긴다(수거는 멱등이라 다음에 이어진다). 「수렴 못하면 멈춤」 원칙.
+const JUDGE_UNPUB_CAP = Number(process.env["JUDGE_UNPUB_CAP"] || 100);
 async function mapPool<T>(items: T[], worker: (x: T) => Promise<void>) {
   if (CONC <= 1) { for (const x of items) await worker(x); return; }
   let i = 0;
@@ -67,6 +77,7 @@ export async function GET(req: NextRequest) {
     let appliedCafes = 0, rescued = 0, inTok = 0, outTok = 0, stillRunning = 0, expiredBatches = 0;
     // 🔬 2026-10-19 정확성 계측 — 이 셋이 0이 아니면 'AI가 보지 않은 채 버려진 후기'가 있다는 뜻이다.
     let truncated = 0, parseFailed = 0, unanswered = 0;
+    let unpublished = 0, cappedStop = false;   // 🛑 판정으로 공개→비공개가 된 수(차단기 근거)
     let costAcc = 0;   // 배치별 모델 단가로 적립한 실비용(아래 보고에 쓴다)
     const open = (await sql`SELECT batch_id, manifest FROM judge_batches WHERE NOT applied ORDER BY created_at LIMIT 5`) as any[];
     for (const row of open) {
@@ -114,7 +125,18 @@ export async function GET(req: NextRequest) {
         const mapped = decisionsFromVerdicts(entry.keys as string[], verdicts);
         unanswered += mapped.unanswered;
         if (Object.keys(mapped.decisions).length === 0) { try { await markJudged(entry.id); } catch {} return; }
-        try { await applyDecisions({ id: entry.id, name: entry.name, area: entry.area ?? "" }, mapped.decisions); appliedCafes++; rescued += mapped.kept; }
+        if (cappedStop) return;   // 상한 초과 — 이 회차는 더 적용하지 않는다(멱등 수거라 다음에 이어진다)
+        try {
+          const res2: any = await applyDecisions({ id: entry.id, name: entry.name, area: entry.area ?? "" }, mapped.decisions);
+          appliedCafes++; rescued += mapped.kept;
+          if (res2?.wasPublished && res2?.published === false) {
+            unpublished++;
+            if (unpublished > JUDGE_UNPUB_CAP) {
+              cappedStop = true;
+              console.warn(`[judgeGuard] 판정으로 비공개 전환 ${unpublished}곳 > 상한 ${JUDGE_UNPUB_CAP} — 이 회차 적용을 중단합니다`);
+            }
+          }
+        }
         catch { /* 실패분 스킵 — 다음 배치에서 재시도되지 않게 markJudged */ try { await markJudged(entry.id); } catch {} }
       });
       await sql`UPDATE judge_batches SET applied = true WHERE batch_id = ${row.batch_id}`;
@@ -145,6 +167,7 @@ export async function GET(req: NextRequest) {
         note: "수거만 수행했다. 신규 제출은 &submit=1 을 명시할 때만 — 상태 확인 목적 호출이 과금을 만들지 않게(09-20 중복제출 사고).",
         applied: { cafes: appliedCafes, rescuedReviews: rescued, costUsd: +costAcc.toFixed(5), inTok, outTok },
         precision: { truncated, parseFailed, unanswered },   // 0이 아니면 'AI가 못 본 후기'가 있다
+        unpublished, cappedStop,   // 🛑 공개→비공개 전환 수 · 상한 초과로 중단했는지
         pollingBatches: stillRunning, expiredClosed: expiredBatches });
     }
     // 🔴 2026-09-20 하드 가드 — **진행 중 배치가 하나라도 있으면 신규 제출을 아예 하지 않는다.**
@@ -304,6 +327,7 @@ export async function GET(req: NextRequest) {
       ok: true,
       applied: { cafes: appliedCafes, rescuedReviews: rescued, costUsd: Number(cost.toFixed(4)), inTok, outTok },
       precision: { truncated, parseFailed, unanswered },
+      unpublished, cappedStop,
       concurrency: CONC,
       pollingBatches: stillRunning,
       expiredClosed: expiredBatches, // 결과 보관기간(29일) 지나 회수 불가 → 닫은 배치 수

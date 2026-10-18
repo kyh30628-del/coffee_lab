@@ -117,6 +117,10 @@ for (let cycle = 1; cycle <= MAX_CYCLES; cycle++) {
   //   라우트가 응답에 실어주는 truncated/parseFailed/unanswered를 매 사이클 눈으로 본다.
   //   0이 아니면 "AI가 못 본 후기"가 생긴 것이다 — 조용히 넘어가지 않게 로그에 🔴로 띄운다.
   //   (잘림은 judgeMaxTokens로 막았고, 미응답은 미결로 남겨 규칙 판정이 가지만, 발생 자체를 봐야 한다.)
+  // 🛑 대량 비공개 차단기 신호 — 공개 카페가 판정으로 내려간 수. 상한 초과면 그 회차는 멈춘다.
+  //   비공개 자체는 정당할 수 있지만(AI가 '이 가게 글이 아니다'라고 본 경우) **속도**는 봐야 한다.
+  if (Number(col.unpublished ?? 0) > 0)
+    console.log(`  [${cycle}] 🔴 공개→비공개 전환 ${n(col.unpublished)}곳${col.cappedStop ? " · ⛔ 상한 초과로 이 회차 적용 중단(다음에 이어진다)" : ""}`);
   const pr = col.precision ?? {};
   if (Number(pr.truncated ?? 0) || Number(pr.parseFailed ?? 0) || Number(pr.unanswered ?? 0))
     console.log(`  [${cycle}] 🔴 정확성 — 출력잘림 ${n(pr.truncated)}건 · 파싱실패 ${n(pr.parseFailed)}건 · 미응답후보 ${n(pr.unanswered)}건 (미응답은 규칙 판정 유지)`);

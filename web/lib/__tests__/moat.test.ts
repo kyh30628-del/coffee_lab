@@ -767,3 +767,23 @@ test("판정: 'AI가 살린 경계 후기는 검증이 아니다'는 전제가 �
   assert.ok(/decisions\[key\]\) \{ verdict = rule\.verdict === "verified" \? "verified" : "reference"/.test(orch),
     "채택 경로가 바뀌었다 — flip 조건(주제 글 1건)의 근거를 다시 확인해야 한다");
 });
+
+// 🛑 판정 대량 비공개 차단기 — 2026-10-19. 힐러엔 2026-07-29부터 상한이 있었는데 **판정 경로엔 없었다.**
+//   실측 위험: 재정제 대상 21,145곳 중 후기 2건 이하가 1,778곳(8.4%) — 거절 1건에 비공개로 내려간다.
+//   최근 7일 실측 비공개 전환 502곳. 24,737곳 일괄 집행 시 회귀 한 번에 수백~수천 곳이 화면에서 사라진다.
+//   ⚠️ 비공개를 막는 게 아니다(AI가 '이 가게 글이 아니다'라고 보면 내려가는 게 맞다) — **한 회차의 속도**를 막는다.
+test("판정: 공개→비공개 전환에 상한 차단기가 있다", () => {
+  const route = readFileSync(new URL("../../app/api/cron-batch-judge/route.ts", import.meta.url), "utf8")
+    .split("\n").filter((l) => !l.trim().startsWith("//")).join("\n");
+  assert.ok(/JUDGE_UNPUB_CAP/.test(route), "판정 경로에 비공개 상한이 없다");
+  assert.ok(/unpublished > JUDGE_UNPUB_CAP/.test(route), "상한을 실제로 비교하지 않는다");
+  assert.ok(/cappedStop = true/.test(route), "상한 초과 시 집행을 멈추지 않는다");
+  assert.ok(/if \(cappedStop\) return;/.test(route), "멈춤 신호를 적용 루프가 읽지 않는다");
+  assert.ok(/unpublished, cappedStop/.test(route), "응답에 노출하지 않으면 재발을 못 본다");
+});
+test("판정: 비공개 전환 판정에 '직전 공개상태'를 쓴다(왕복 추가 없이)", () => {
+  const store = readFileSync(new URL("../synthStore.ts", import.meta.url), "utf8");
+  assert.ok(/COALESCE\(published, false\) AS was_published/.test(store),
+    "storeResult의 현재상태 SELECT에 published가 없다 — 내려간 수를 셀 수 없다");
+  assert.ok(/wasPublished: !!cur\?\.was_published/.test(store), "storeResult가 wasPublished를 반환하지 않는다");
+});

@@ -391,6 +391,7 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   const allEv = safeJson(allEvidence ?? evidenceReviews);
   // 현재 상태(파이프라인 단계·카테고리·이전 합성값) 먼저 — 카테고리 게이트 분기에 pst 필요.
   const cur = (await sql`SELECT pipeline_status, naver_category, synth_identity, synth_count, synth_updated, raw_collected_at, jsonb_array_length(COALESCE(synth_reviews,'[]'::jsonb)) prev_ev,
+    COALESCE(published, false) AS was_published,   -- 🛑 판정 전 공개 상태 — 대량 비공개 차단기가 '내려간 수'를 세는 근거(왕복 추가 0)
     embedding IS NOT NULL AS has_embed, exclude_reason AS prev_exclude_reason,
     (COALESCE(raw_reviews::text,'') ~* '커피|디저트|음료|아메리카노|에스프레소|카푸치노|콜드브루|플랫화이트|핸드드립|카페라') AS raw_coffee
     FROM cafes WHERE id=${cafeId} LIMIT 1`)[0] as any;
@@ -575,7 +576,7 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
       await noteSilentFail("synthStore.shrinkGuard", new Error(msg)).catch(() => {});
       try { (await import("node:child_process")).execFileSync("/usr/bin/osascript", ["-e",
         `display notification "${name} 후기 ${prevCount}→${collected}건 — 쓰기를 막았습니다" with title "동네 커피 노트 급감 차단" sound name "Basso"`]); } catch {}
-      return { grade: prevRow?.synth_grade ?? grade, collected: prevCount, published: true, ruleOk, pipeline: "live",
+      return { grade: prevRow?.synth_grade ?? grade, collected: prevCount, published: true, wasPublished: true, ruleOk, pipeline: "live",
                evidence: 0, coherence, blocked: true } as any;
     }
   } catch { /* 비교 실패는 쓰기를 막지 않는다(가드가 서비스를 멈추게 하지 않는다) */ }
@@ -586,7 +587,7 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   } else {
     await sql`UPDATE cafes SET synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_coherence=${coherence}, offctx_rate=${offctx}, visitor_n=${vmix.n}, visitor_trip=${vmix.trip}, visitor_local=${vmix.local}, needs_llm=${needsLLM}, needs_llm_priority=${needsLlmPriority}, borderline_count=${blCount}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${safeJson(tidyDisplayQuotes(evidenceReviews as any[]))}, synth_reviews_all=${allEv}, char_scores=${safeJson(charScores)}, work_facts=${safeJson(workFacts)}, synth_quality=${safeJson(quality)}, review_dates=${safeJson(reviewDates)}, pipeline_status=${newPst}, exclude_reason=${exReason}, exclude_at=${exReason ? new Date() : null}, synth_updated=${synthTs}, synth_checked_at=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN ${latMin} AND ${latMax} AND lng BETWEEN ${lngMin} AND ${lngMax}) WHERE id=${cafeId}`;
   }
-  return { grade, collected, published: publish, ruleOk, pipeline: newPst, evidence: evidenceReviews.length, coherence: Math.round(coherence * 100), noisy };
+  return { grade, collected, published: publish, wasPublished: !!cur?.was_published, ruleOk, pipeline: newPst, evidence: evidenceReviews.length, coherence: Math.round(coherence * 100), noisy };
 }
 
 // 🧼 PII 자동 세척 — 공개 인용문에서 전화·이메일·핸들 제거(레드팀 pii_leak 자가치유).
