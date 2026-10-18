@@ -662,15 +662,23 @@ export async function holdZeroEvidenceSuspects(): Promise<{ held: number; releas
   await sql`CREATE TABLE IF NOT EXISTS grounding_checks (cafe_id INT PRIMARY KEY, grounded BOOLEAN, issue TEXT, checked_at TIMESTAMPTZ DEFAULT now())`.catch(() => {});
   // 보류: grounded=false + 이슈가 '진짜 근거 0건'임을 명시(전부 다른 가게 / 후기 0건 / 자체 없음).
   //   ⚠️ '모두 커피특성으로 재표현'(업종오인=코끼리베이글) 같은 건 제외 — 진짜 근거 있는 곳은 유지.
-  const heldRows = (await sql`
-    UPDATE cafes SET published = false, pipeline_status = 'held'
-    WHERE pipeline_status IS DISTINCT FROM 'held'
-      AND id IN (
+  // 🛑 대량 차단(2026-10-18) — 먼저 후보를 고르고 상한을 넘으면 **내리지 않는다**.
+  const heldCand = (await sql`
+    SELECT c.id, c.name FROM cafes c
+    WHERE c.pipeline_status IS DISTINCT FROM 'held'
+      AND c.id IN (
         SELECT g.cafe_id FROM grounding_checks g
         WHERE g.grounded = false AND (
           g.issue ~ '(후기[^,.]{0,6}0건|커피 후기 0|후기[^,.]{0,4}자체 없|전부 다른 (가게|업체|점포)|전부 카페가 아|건 전부.{0,16}(다른|아님|아닌|카페가 아))'
-        ))
-    RETURNING id, name`) as any[];
+        ))`) as any[];
+  if (overUnpubCap(heldCand.length)) {
+    console.warn(`[healGuard] holdZeroEvidenceSuspects 후보 ${heldCand.length}곳 > 상한 ${HEAL_UNPUB_CAP} — 비공개를 건너뜁니다`);
+    return { held: 0, released: 0, names: heldCand.slice(0, 12).map((r: any) => r.name) };
+  }
+  const heldRows = heldCand.length
+    ? ((await sql`UPDATE cafes SET published = false, pipeline_status = 'held'
+        WHERE id = ANY(${heldCand.map((r: any) => r.id)}) RETURNING id, name`) as any[])
+    : [];
   // 🧹 2026-08-28: /c/[id]가 ISR(48h)로 바뀌면서, 비공개 처리 후 캐시를 안 지우면 최대 48시간 화면에 남는다.
   //   (동적 렌더링이던 시절엔 이 호출이 없어도 다음 요청이 곧 최신이라 티가 안 났다.)
   if (heldRows.length) await invalidateCafeCaches(heldRows.map((r: any) => r.id)).catch(() => {});
@@ -697,8 +705,8 @@ export async function holdZeroEvidenceSuspects(): Promise<{ held: number; releas
 //   ⚠️ 인천 사태 방지 가드: '커피가공(로스터리)·북카페' 등 애매한 건 카페 키워드(카테고리·이름)로 제외.
 //   '카테고리 없음'으로는 절대 안 내림(누락 ≠ 비카페) — '명백한 비카페 카테고리가 박혀 있을 때'만.
 export async function healNonCafeCategory(): Promise<{ held: number; names: string[] }> {
-  const rows = (await sql`
-    UPDATE cafes SET published = false, pipeline_status = 'excluded', exclude_reason = '비카페 카테고리(명백) — 카테고리 누락이 아니라 비카페가 박혀 있음', exclude_at = now()
+  const candA = (await sql`
+    SELECT id, name FROM cafes
     WHERE published = true AND naver_category IS NOT NULL
       AND (
         naver_category ~ '(건설|미장|타일|방수|도배|식물원|수목원|동물원|자동차|정비소|주유|부동산|공인중개|병원|의원|약국|한의원|치과|동물병원|미용실|헤어샵|네일|왁싱|에스테틱|피부관리|펜션|모텔|캠핑,야영|글램핑|변호사|법무사|세무사|회계|보험|은행|증권|독서실|고시원|장례|예식장|웨딩홀|장소대여)'
@@ -706,26 +714,32 @@ export async function healNonCafeCategory(): Promise<{ held: number; names: stri
         OR naver_category ~ '음식점>(일식|한식|중식|분식|고기|육류|치킨|족발|보쌈|곱창|막창|횟집|>회|국밥|찌개|전골|샤브|뷔페|돼지|소고기|닭|오리|장어|해물|냉면|칼국수|쌈밥|백반|기사식당|순대|감자탕|마라)'
       )
       AND naver_category !~ '(카페|커피|로스터|디저트|베이커리|제과|브런치|찻집|티룸|티하우스)'
-      AND name !~ '(카페|까페|커피|로스터|디저트|베이커리|제과|찻집|티하우스|북카페|coffee|cafe)'
-    RETURNING id, name`) as any[];
+      AND name !~ '(카페|까페|커피|로스터|디저트|베이커리|제과|찻집|티하우스|북카페|coffee|cafe)'`) as any[];
   // 🐶 오프콘셉 '○○카페' — 업종에 '카페'가 들어가도, 커피·디저트 취향 큐레이션과 안 맞는 '활동 목적' 공간은 제외.
   //   애견·고양이·키즈·스터디·만화·룸·보드게임·방탈출·노래·찜질방 + 서점(소매). 이 서비스는 커피/디저트 카페만 다룬다.
   //   📚 북카페·도서관 — 책/독서가 메인, 커피는 부차 → CEO 지시(2026-06)로 제외. 갤러리·플라워카페는 커피가 메인이라 보존.
   //   카테고리(카페,디저트>북카페·교육,학문>도서관) + 이름(○○북카페) 양쪽으로 잡는다.
-  const off = (await sql`
-    UPDATE cafes SET published = false, pipeline_status = 'excluded', exclude_reason = '북카페·서점·도서관·놀이시설(애견/키즈/스터디/방탈출 등) — CEO 2026-06 지시: 커피/디저트 카페만', exclude_at = now()
+  const candB = (await sql`
+    SELECT id, name FROM cafes
     WHERE published = true AND naver_category IS NOT NULL
-      AND naver_category ~ '(애견|애완|반려동물|펫카페|고양이카페|동물카페|키즈|실내놀이터|놀이방|스터디카페|독서실|만화방|만화카페|룸카페|멀티방|파티룸|방탈출|보드게임|보드카페|볼링|당구|스크린골프|골프연습|코인노래|노래방|찜질방|사우나|클라이밍|트램폴린|트램펄린|서점|북카페|도서관)'
-    RETURNING id, name`) as any[];
+      AND naver_category ~ '(애견|애완|반려동물|펫카페|고양이카페|동물카페|키즈|실내놀이터|놀이방|스터디카페|독서실|만화방|만화카페|룸카페|멀티방|파티룸|방탈출|보드게임|보드카페|볼링|당구|스크린골프|골프연습|코인노래|노래방|찜질방|사우나|클라이밍|트램폴린|트램펄린|서점|북카페|도서관)'`) as any[];
   // 📚 북카페 — 카테고리가 일반(카페,디저트>카페)으로 붙어도 이름에 '북카페'면 책 메인 → 제외.
-  const bookByName = (await sql`
-    UPDATE cafes SET published = false, pipeline_status = 'excluded', exclude_reason = '북카페(이름 기준) — 카테고리는 일반이나 상호가 북카페 → 책이 메인', exclude_at = now()
-    WHERE published = true AND name ~ '북카페|북 ?카페'
-    RETURNING id, name`) as any[];
-  off.push(...bookByName);
-  const killedIds = [...rows, ...off].map((r) => r.id).filter((x) => x != null);
+  const candC = (await sql`
+    SELECT id, name FROM cafes
+    WHERE published = true AND name ~ '북카페|북 ?카페'`) as any[];
+  // 🛑 대량 차단(2026-10-18) — 세 분기 **합계**로 검사한다(한 분기만 터져도 전체 영향이 같다).
+  const total = candA.length + candB.length + candC.length;
+  if (overUnpubCap(total)) {
+    console.warn(`[healGuard] healNonCafeCategory 후보 ${total}곳(카테고리 ${candA.length}·오프콘셉 ${candB.length}·상호북카페 ${candC.length}) > 상한 ${HEAL_UNPUB_CAP} — 비공개를 건너뜁니다`);
+    return { held: 0, names: [...candA, ...candB, ...candC].slice(0, 12).map((r: any) => r.name) };
+  }
+  const ids = (a: any[]) => a.map((r) => r.id).filter((x) => x != null);
+  if (candA.length) await sql`UPDATE cafes SET published = false, pipeline_status = 'excluded', exclude_reason = '비카페 카테고리(명백) — 카테고리 누락이 아니라 비카페가 박혀 있음', exclude_at = now() WHERE id = ANY(${ids(candA)})`;
+  if (candB.length) await sql`UPDATE cafes SET published = false, pipeline_status = 'excluded', exclude_reason = '북카페·서점·도서관·놀이시설(애견/키즈/스터디/방탈출 등) — CEO 2026-06 지시: 커피/디저트 카페만', exclude_at = now() WHERE id = ANY(${ids(candB)})`;
+  if (candC.length) await sql`UPDATE cafes SET published = false, pipeline_status = 'excluded', exclude_reason = '북카페(이름 기준) — 카테고리는 일반이나 상호가 북카페 → 책이 메인', exclude_at = now() WHERE id = ANY(${ids(candC)})`;
+  const killedIds = ids([...candA, ...candB, ...candC]);
   if (killedIds.length) await invalidateCafeCaches(killedIds).catch(() => {}); // 비공개 → 모든 캐시 레이어 무효화
-  return { held: rows.length + off.length, names: [...rows.map((r) => r.name), ...off.map((r) => r.name)].slice(0, 12) };
+  return { held: total, names: [...candA, ...candB, ...candC].map((r: any) => r.name).slice(0, 12) };
 }
 
 // 🎯 노출리뷰 기반 오프콘셉 자동 비공개 — 네이버가 '카페,디저트'로 뭉뚱그려 카테고리 게이트를 통과하지만
@@ -744,6 +758,20 @@ function offconceptBrand(name: string): string {
 //   정상 회차는 보통 0~수곳(이미 내린 건 published=false라 재대상 아님). 초과 시 UPDATE 스킵 → held:0, capped:N.
 //   진짜 대량정리가 필요하면 CEO가 HEAL_UNPUB_CAP env를 올리거나 결재로 집행(healPublishedAudit의 unpubCap과 동일 사상).
 const HEAL_UNPUB_CAP = Number(process.env.HEAL_UNPUB_CAP || 50);
+
+// 🛑 2026-10-18 — 차단기를 **비공개를 내리는 모든 힐러**로 확장했다.
+//   그때까지 상한은 리뷰기반 힐러 3곳(healOffConcept/healRestaurant/healNonCafeByReview)에만 있었고,
+//   `holdZeroEvidenceSuspects`·`healNonCafeCategory`(상호 정규식 포함)·`healOutOfBox`는 **무제한**이었다.
+//   특히 두 곳이 차단기를 만든 이유에 정확히 해당한다:
+//     · healNonCafeCategory의 '상호가 북카페' 분기 = **이름 정규식** (차단기 도입 사유가 "정규식 회귀")
+//     · healOutOfBox = **criteria `geo.box.*`에 의존** — 기준값이 잘못 들어가면 전량 비공개가 된다
+//       (메모리 기록: criteria 한쪽만 바꿔 제주가 이틀 공개불가였던 실사고가 있었다)
+//   평시 처리량 실측(2026-10-18): 이 힐러들의 대상 모집단이 **지금 0곳**이다(북카페 상호 0·근거0건 0·좌표없음 0,
+//   비카페 카테고리 25곳). 즉 상한은 **정상 운영을 막을 수 없고**, 회귀 때만 48,745곳 전체 노출을 멈춘다.
+//   패턴은 기존 3곳과 동일하게 맞췄다 — ①후보를 SELECT로 고르고 ②상한을 검사하고 ③id로만 UPDATE.
+function overUnpubCap(n: number): boolean { return n > HEAL_UNPUB_CAP; }
+// 테스트 전용 노출 — 판정식만 검사한다(힐러 본체는 DB를 바꾸므로 테스트에서 호출하지 않는다).
+export const overUnpubCapForTest = overUnpubCap;
 
 // 🪶 2026-09-26 비용수리(decision#1262) — 워터마크(scan_at)를 cafes 컬럼에 두면 "타임스탬프 하나만" 갱신해도
 //   넓은 행(평균 78KB, 벡터·GIN 인덱스 다수) 전체를 다시 써야 한다. pg_stat_statements 실측: noncafe UPDATE
@@ -932,24 +960,33 @@ export async function healOutOfBox(): Promise<{ excluded: number; names: string[
   await loadCriteria(); // 수도권 좌표박스 기준 캐시 프라임 — synth 게이트와 같은 진실(폴백=criteria DEFAULTS(현재 36.8~38.7/124.5~129.4))
   const latMin = getCriterionSync("geo.box.lat_min"), latMax = getCriterionSync("geo.box.lat_max");
   const lngMin = getCriterionSync("geo.box.lng_min"), lngMax = getCriterionSync("geo.box.lng_max");
-  // ① 좌표 박스 밖
-  const rows = (await sql`UPDATE cafes SET published = false, pipeline_status = 'excluded', exclude_reason = '좌표박스 밖(재확인)', exclude_at = now(), updated_at = now()
+  // ① 좌표 박스 밖 — 🛑 대량 차단(2026-10-18): 이 힐러는 criteria `geo.box.*`에 의존한다.
+  //   기준값이 잘못 들어가면 상한 없이 전량 비공개가 된다(메모리 기록: criteria 한쪽만 바꿔 제주가 이틀 공개불가).
+  //   그래서 먼저 후보를 세고, 상한을 넘으면 **아무것도 내리지 않고** 보고만 한다.
+  const candGeo = (await sql`SELECT id, name FROM cafes
     WHERE lat IS NOT NULL AND NOT (lat BETWEEN ${latMin} AND ${latMax} AND lng BETWEEN ${lngMin} AND ${lngMax})
-      AND pipeline_status IS DISTINCT FROM 'excluded'
-    RETURNING id, name`) as any[];
+      AND pipeline_status IS DISTINCT FROM 'excluded'`) as any[];
   // ② 주소 시·도가 비수도권 — 좌표가 박스에 걸쳐도(천안·당진·춘천 등 경계지역) 주소가 진짜 근거.
   //    area가 수도권 시로 잘못 붙는 경계 카페 방어. 주소 '접두'로만 판단(경기 광주시 오인 방지 위해 '광주광역시'만).
   // 🗺️ 서비스 범위 밖 시·도 = lib/serviceScope.ts **단일출처**. 여기 목록을 따로 적어 두면
   //   범위가 바뀔 때 이 파일만 뒤처져 정상 카페를 배제하거나(여기) 오경보를 낸다(issues.ts에서 실제로 났다).
-  const adr = (await sql.query(`UPDATE cafes SET published = false, pipeline_status = 'excluded', exclude_reason = '서비스 범위 밖 시·도 주소', exclude_at = now(), updated_at = now()
+  const candAdr = (await sql.query(`SELECT id, name FROM cafes
     WHERE address IS NOT NULL AND (${OUT_OF_SCOPE_SQL})
-      AND pipeline_status IS DISTINCT FROM 'excluded'
-    RETURNING id, name`)) as any[];
-  const names = [...rows, ...adr].map((r) => r.name).slice(0, 8);
+      AND pipeline_status IS DISTINCT FROM 'excluded'`)) as any[];
+  const total = candGeo.length + candAdr.length;
+  const names = [...candGeo, ...candAdr].map((r: any) => r.name).slice(0, 8);
+  if (overUnpubCap(total)) {
+    console.warn(`[healGuard] healOutOfBox 후보 ${total}곳(좌표 ${candGeo.length}·주소 ${candAdr.length}) > 상한 ${HEAL_UNPUB_CAP} — 비공개를 건너뜁니다. geo.box 기준값을 먼저 확인할 것.`);
+    return { excluded: 0, names };
+  }
+  const gid = candGeo.map((r: any) => r.id).filter(Boolean);
+  const aid = candAdr.map((r: any) => r.id).filter(Boolean);
+  if (gid.length) await sql`UPDATE cafes SET published = false, pipeline_status = 'excluded', exclude_reason = '좌표박스 밖(재확인)', exclude_at = now(), updated_at = now() WHERE id = ANY(${gid})`;
+  if (aid.length) await sql`UPDATE cafes SET published = false, pipeline_status = 'excluded', exclude_reason = '서비스 범위 밖 시·도 주소', exclude_at = now(), updated_at = now() WHERE id = ANY(${aid})`;
   // 🧹 ISR(48h) 전환 대응 — 비공개시킨 카페의 캐시를 즉시 무효화(안 하면 최대 48시간 노출 잔존).
-  const gone = [...rows, ...adr].map((r: any) => r.id).filter(Boolean);
+  const gone = [...gid, ...aid];
   if (gone.length) await invalidateCafeCaches(gone).catch(() => {});
-  return { excluded: rows.length + adr.length, names };
+  return { excluded: total, names };
 }
 
 // 🏷️ area 라벨 교정 — 발굴 당시 검색지역으로 area가 붙어 실제 주소 도시와 어긋나는 문제(경기 시/군·서울 구).

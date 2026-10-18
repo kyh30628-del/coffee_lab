@@ -20,6 +20,7 @@ import { isOtherBusinessQuote, isReadableQuote, isSentenceQuote, displayQuote, s
 import { sortReviews, ensureRecent } from "../exposureOrder";
 import { collectAndSynthesize } from "../collectOrchestrator";
 import { mergeRawEvidence, shouldBlockShrink } from "../evidenceMerge";
+import { overUnpubCapForTest } from "../synthStore";
 
 const AREA = ["서울", "강남구", "역삼동"];
 
@@ -342,4 +343,15 @@ test("급감 차단: 미공개·근거 적은 카페는 대상이 아니다(수�
 });
 test("급감 차단: 증가하는 쓰기는 당연히 통과한다", () => {
   assert.equal(shouldBlockShrink({ wasPublished: true, prevCount: 50, newCount: 90, ...G }), false);
+});
+
+// ── ⑭ 🛑 대량 비공개 차단기 — 소비자 손상(공개 카페가 한꺼번에 사라짐)을 막는 마지막 관문.
+//   2026-10-18 실측: 상한이 리뷰기반 힐러 3곳에만 있었고 `holdZeroEvidenceSuspects`·
+//   `healNonCafeCategory`(상호 정규식 포함)·`healOutOfBox`(criteria geo.box 의존)는 **무제한**이었다.
+//   평시 대상 모집단이 0곳이라 상한은 정상 운영을 막지 못하고, 회귀 때만 48,745곳 전체 노출을 멈춘다.
+test("대량 비공개 차단: 상한(50)을 기준으로 판정한다", () => {
+  assert.equal(overUnpubCapForTest(0), false, "평시 0건은 통과해야 한다");
+  assert.equal(overUnpubCapForTest(50), false, "상한까지는 집행한다");
+  assert.equal(overUnpubCapForTest(51), true, "상한을 넘으면 멈춘다");
+  assert.equal(overUnpubCapForTest(48745), true, "회귀로 전량이 걸리면 반드시 멈춘다");
 });
