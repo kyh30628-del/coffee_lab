@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
 import { getAuditCandidates, applyDecisions, markJudged } from "@/lib/synthStore";
-import { createBatch, getBatch, streamResults, cancelBatch, BATCH_PRICE_IN, BATCH_PRICE_OUT } from "@/lib/anthropicBatch";
+import { createBatch, getBatch, streamResults, cancelBatch, BATCH_PRICE_IN, BATCH_PRICE_OUT, batchPriceFor } from "@/lib/anthropicBatch";
 import { RUBRIC, buildUserText, parseVerdicts, CLAUDE_MODEL } from "@/lib/reviewJudge";
 import { OLD_REVIEW_MONTHS } from "@/lib/cafeProfile";
 
@@ -41,6 +41,7 @@ export async function GET(req: NextRequest) {
 
     // ── ① 끝난 배치 수거·적용 ──
     let appliedCafes = 0, rescued = 0, inTok = 0, outTok = 0, stillRunning = 0, expiredBatches = 0;
+    let costAcc = 0;   // 배치별 모델 단가로 적립한 실비용(아래 보고에 쓴다)
     const open = (await sql`SELECT batch_id, manifest FROM judge_batches WHERE NOT applied ORDER BY created_at LIMIT 5`) as any[];
     for (const row of open) {
       const b = await getBatch(KEY, row.batch_id);
@@ -58,10 +59,21 @@ export async function GET(req: NextRequest) {
         continue;
       }
       const cafes = row.manifest?.cafes ?? {};
+      // 💰 2026-10-18 — **배치마다 쓴 모델의 단가로 계산한다.**
+      //   그 전엔 수거 시점의 기본 모델 단가로 계산해서, 모델을 바꿔 돌리면 비용 보고가 틀렸다
+      //   (실측: Haiku 4.5로 제출한 584곳 배치를 Sonnet 5 단가로 세면 4배 과대). 예산 가드가 쓰는 숫자다.
+      //   매니페스트에 model이 없는 옛 배치는 batchPriceFor의 기본값(구형 Haiku 단가)으로 떨어진다.
+      const bp = batchPriceFor(String(row.manifest?.model ?? ""));
       for await (const res of streamResults(KEY, b.results_url)) {
         const entry = cafes[res.custom_id];
         if (!entry || res.result?.type !== "succeeded") continue;
-        const u = res.result.message?.usage; if (u) { inTok += (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0); outTok += u.output_tokens || 0; }
+        // 💰 비용은 **그 배치의 모델 단가**로 바로 적립한다(토큰만 모으면 모델이 섞여 계산이 틀어진다).
+        const u = res.result.message?.usage;
+        if (u) {
+          const i = (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0);
+          const o = u.output_tokens || 0;
+          inTok += i; outTok += o; costAcc += i * bp.in + o * bp.out;
+        }
         const text = res.result.message?.content?.find((x: any) => x.type === "text")?.text || "";
         const verdicts = parseVerdicts(text); // Map<i, {about,helpful}>
         const decisions: Record<string, boolean> = {};
@@ -95,7 +107,7 @@ export async function GET(req: NextRequest) {
     if (req.nextUrl.searchParams.get("submit") !== "1") {
       return NextResponse.json({ ok: true, mode: "collect-only",
         note: "수거만 수행했다. 신규 제출은 &submit=1 을 명시할 때만 — 상태 확인 목적 호출이 과금을 만들지 않게(09-20 중복제출 사고).",
-        applied: { cafes: appliedCafes, rescuedReviews: rescued, costUsd: +(inTok * BATCH_PRICE_IN + outTok * BATCH_PRICE_OUT).toFixed(4), inTok, outTok },
+        applied: { cafes: appliedCafes, rescuedReviews: rescued, costUsd: +costAcc.toFixed(5), inTok, outTok },
         pollingBatches: stillRunning, expiredClosed: expiredBatches });
     }
     // 🔴 2026-09-20 하드 가드 — **진행 중 배치가 하나라도 있으면 신규 제출을 아예 하지 않는다.**
@@ -108,7 +120,7 @@ export async function GET(req: NextRequest) {
     if ((openBatches[0]?.c ?? 0) > 0 && stillRunning > 0) {
       return NextResponse.json({ ok: true, blocked: "in-flight",
         note: `진행 중 배치 ${stillRunning}건 — 끝날 때까지 신규 제출을 막는다(중복 과금 방지). 수거만 수행했다.`,
-        applied: { cafes: appliedCafes, rescuedReviews: rescued, costUsd: +(inTok * BATCH_PRICE_IN + outTok * BATCH_PRICE_OUT).toFixed(4), inTok, outTok },
+        applied: { cafes: appliedCafes, rescuedReviews: rescued, costUsd: +costAcc.toFixed(5), inTok, outTok },
         pollingBatches: stillRunning });
     }
     const inFlight = (await sql`
@@ -208,7 +220,7 @@ export async function GET(req: NextRequest) {
         : Array.isArray(v) ? v.map(scrub)
         : v && typeof v === "object" ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, scrub(x)]))
         : v;
-      try { await sql`INSERT INTO judge_batches (batch_id, manifest) VALUES (${b.id}, ${JSON.stringify(scrub({ cafes: manifestCafes }))}::jsonb) ON CONFLICT (batch_id) DO NOTHING`; }
+      try { await sql`INSERT INTO judge_batches (batch_id, manifest) VALUES (${b.id}, ${JSON.stringify(scrub({ cafes: manifestCafes, model: CLAUDE_MODEL }))}::jsonb) ON CONFLICT (batch_id) DO NOTHING`; }
       catch (e) {
         await cancelBatch(KEY, b.id).catch(() => {});   // 수거 못 할 배치는 살려둘 이유가 없다 — 과금부터 끊는다
         return NextResponse.json({ ok: false, error: "manifest 저장 실패 — 배치 취소함", detail: String(e).slice(0, 120), batchId: b.id });

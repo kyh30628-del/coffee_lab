@@ -57,11 +57,26 @@ const queue = async (scope = "") => Number((await sql`SELECT count(*)::int n FRO
          OR (${scope} = 'refine' AND COALESCE(published,false)))`)[0].n);
 const published = async () => Number((await sql`SELECT count(*)::int n FROM cafes WHERE published`)[0].n);
 
-const call = async (qs) => {
-  const r = await fetch(`${BASE}/api/cron-batch-judge?${qs}`, { headers: { authorization: `Bearer ${SECRET}` } });
-  const t = await r.text();
-  try { return JSON.parse(t); } catch { return { ok: false, raw: t.slice(0, 200) }; }
-};
+// 🔴 2026-10-19 — `fetch`로 부르면 **죽는다.** Node의 undici는 응답 헤더를 **300초** 안에 못 받으면
+//   `HeadersTimeoutError`를 던진다. 그런데 이 라우트의 수거 단계는 카페마다 재합성을 하므로
+//   584곳이면 20분이 넘는다(실측). 집행기가 그 자리에서 죽어 원장 기록과 다음 제출이 멈췄다.
+//   → 타임아웃을 끌 수 있는 curl로 부른다(의존성 추가 없음). 서버 작업은 계속 진행되므로
+//     집행기만 살아 있으면 멱등 수거로 이어진다.
+const { execFile } = await import("node:child_process");
+const call = (qs) => new Promise((resolve) => {
+  execFile("curl", ["-s", "--max-time", "7200", "-H", `authorization: Bearer ${SECRET}`,
+    `${BASE}/api/cron-batch-judge?${qs}`], { maxBuffer: 1 << 24 }, (err, stdout) => {
+    if (err) return resolve({ ok: false, raw: String(err.message).slice(0, 200) });
+    try { resolve(JSON.parse(stdout)); } catch { resolve({ ok: false, raw: String(stdout).slice(0, 200) }); }
+  });
+});
+const callPlain = (path) => new Promise((resolve) => {
+  execFile("curl", ["-s", "--max-time", "1800", "-H", `authorization: Bearer ${SECRET}`,
+    `${BASE}${path}`], { maxBuffer: 1 << 24 }, (err, stdout) => {
+    if (err) return resolve({});
+    try { resolve(JSON.parse(stdout)); } catch { resolve({}); }
+  });
+});
 
 console.log(`🤖 AI 판정 — 예산 $${BUDGET} · 지금까지 지출 $${spent.toFixed(4)} (사이클 ${spentRow.c}회)`);
 console.log(`   판정 대기 ${n(await queue(SCOPE))}곳(구간 ${SCOPE || '전체'}) · 공개 ${n(await published())}곳`);
@@ -75,7 +90,12 @@ if (STATUS_ONLY) {
 for (let cycle = 1; cycle <= MAX_CYCLES; cycle++) {
   // ── ① 수거(무과금) — 끝난 배치 결과를 적용하고 실제 비용을 받아온다
   const col = await call("manual=1");
-  if (!col.ok) { console.log(`🔴 수거 실패: ${JSON.stringify(col).slice(0, 180)}`); break; }
+  if (!col.ok) {
+    // 한 번의 실패로 멈추지 않는다 — 서버는 계속 일하고 수거는 멱등이다(3분 뒤 재시도).
+    console.log(`  [${cycle}] ⚠️ 수거 실패(재시도 예정): ${JSON.stringify(col).slice(0, 140)}`);
+    await new Promise((r) => setTimeout(r, 180_000));
+    continue;
+  }
   const a = col.applied ?? {};
   if (Number(a.cafes ?? 0) > 0 || Number(a.costUsd ?? 0) > 0) {
     await sql`INSERT INTO judge_spend (cafes, rescued, in_tok, out_tok, cost_usd, note)
@@ -84,6 +104,17 @@ for (let cycle = 1; cycle <= MAX_CYCLES; cycle++) {
     const perCafe = Number(a.cafes) > 0 ? Number(a.costUsd) / Number(a.cafes) : 0;
     console.log(`  [${cycle}] 수거 ${n(a.cafes)}곳 · 구제 ${n(a.rescuedReviews)}건 · $${Number(a.costUsd).toFixed(5)} (곳당 $${perCafe.toFixed(5)}) · 누적 $${spent.toFixed(4)}`);
   }
+
+  // ── ①-b 공개 승격 — **판정만 하면 공개가 안 된다.**
+  //   판정 적용(applyDecisions)은 카페를 `pending`(공개 심사)으로 보낼 뿐이고, 승격은 finalizePipeline이 한다.
+  //   그 함수는 cron-embed 안에서만 불린다 → 판정 루프가 승격을 같이 돌려야 "판정 → 공개" 한 바퀴가 닫힌다.
+  //   (실측 2026-10-18: 판정 443곳이 적용됐는데 pending 65곳이 쌓이고 공개는 그대로였다.)
+  //   💰 비용: 이 호출은 임베딩을 시도하다 실패(크레딧)하지만 과금 0이고, 승격 UPDATE만 남는다.
+  try {
+    const pj = await callPlain("/api/cron-embed");
+    if (Number(pj.promoted ?? 0) > 0 || Number(pj.released ?? 0) > 0)
+      console.log(`  [${cycle}] 공개 승격 ${n(pj.promoted ?? 0)}곳 · 보류해제 ${n(pj.released ?? 0)}곳`);
+  } catch { /* 승격 실패가 판정 루프를 멈추지 않는다 */ }
 
   // ── ② 진행 중 배치가 있으면 기다린다(제출 겹치지 않게 — 09-20 사고)
   if (Number(col.pollingBatches ?? 0) > 0) {
