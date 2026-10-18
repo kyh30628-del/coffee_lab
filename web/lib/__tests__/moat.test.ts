@@ -654,7 +654,7 @@ test("정체성: '직접 로스팅'은 1건으로 주장하지 않는다", () =>
 //        영구 저장(judge_decisions는 재합성에도 유지된다). AI가 보지도 않은 글을 AI 이름으로 버린 것이다.
 //     ③ 경계 후보를 slice(0,35)만 보내고 llm_judged_at을 찍어 큐에서 빼, 36번째 이후는 영영 미판정.
 //        실측: 경계 35건 초과 4,280곳 · 못 본 후보 140,932건 · 영구 미판정 확정 14,019건.
-import { judgeMaxTokens, decisionsFromVerdicts, type JudgeVerdict } from "../reviewJudge";
+import { judgeMaxTokens, decisionsFromVerdicts, parseVerdicts, type JudgeVerdict } from "../reviewJudge";
 const V = (i: number, about: boolean, helpful: boolean): JudgeVerdict => ({ i, about, helpful, reason: "t" });
 const mapOf = (...vs: JudgeVerdict[]) => new Map(vs.map((v) => [v.i, v]));
 
@@ -837,4 +837,40 @@ test("감시: 판정 감시는 exclude_at이 아니라 공개 수 순변동을 �
   // CEO 지시 2건이 감시에 걸려 있어야 한다: 후기 1건 공개 금지 · 공개 중 '후보' 등급 금지
   assert.ok(/synth_count,0\) <= 1\)::int thin/.test(code), "공개 중 후기1건 감시가 없다");
   assert.ok(/synth_grade = '후보'\)::int odd/.test(code), "공개 중 '후보' 등급 감시가 없다");
+});
+
+// 🔴 2026-10-19 재측정 — 판정 응답을 버리던 두 결함(565곳 배치에서 58곳 파싱실패 = 11.4%).
+//   ⒜ 후보 1건이면 모델이 **배열 없이 단일 객체**로 답한다 → 정규식 불일치 + for...of 폭발로 null (26곳)
+//   ⒝ 출력이 잘리면 **전부** 버렸다 → 앞의 완성된 객체는 건질 수 있었다 (32곳, 평균 1,586토큰)
+//   그리고 상한 600+40n이 작았다: 15-29건 구간 잘림 30.0% · 30+건 32.1% · 1-4건은 최대 732 > 상한 720.
+test("판정 파싱 ⒜: 배열 없는 단일 객체 응답도 읽는다", () => {
+  const m = parseVerdicts('{"i":0,"about":true,"helpful":true,"reason":"재방문 경험과 메뉴평 포함"}');
+  assert.ok(m, "단일 객체를 못 읽었다 — 실측 26곳이 이것 때문에 버려졌다");
+  assert.equal(m.get(0)?.about, true);
+  assert.equal(m.get(0)?.helpful, true);
+});
+test("판정 파싱 ⒝: 잘린 배열에서 완성된 객체는 건진다", () => {
+  const cut = '[{"i":0,"about":true,"helpful":true,"reason":"맛 평가"},'
+            + '{"i":1,"about":false,"helpful":false,"reason":"다른 가게"},'
+            + '{"i":2,"about":true,"helpful":tr';   // ← 여기서 잘렸다
+  const m = parseVerdicts(cut);
+  assert.ok(m, "잘린 응답을 전부 버렸다");
+  assert.equal(m.size, 2, "완성된 2건을 건져야 한다");
+  assert.equal(m.get(0)?.about, true);
+  assert.equal(m.get(1)?.about, false);
+  assert.equal(m.get(2), undefined, "잘린 조각은 추측하지 말고 미결로 둬야 한다");
+});
+test("판정 파싱: 건질 게 하나도 없으면 null(규칙 판정 유지)", () => {
+  assert.equal(parseVerdicts("죄송합니다, 판정할 수 없습니다."), null);
+  assert.equal(parseVerdicts(""), null);
+});
+test("판정 파싱: 코드블록으로 감싼 배열도 읽는다(회귀)", () => {
+  const m = parseVerdicts('```json\n[{"i":0,"about":true,"helpful":true,"reason":"ok"}]\n```');
+  assert.equal(m?.get(0)?.helpful, true);
+});
+test("판정 상한: 실측 소요(항목당 ~50토큰)를 여유 있게 덮는다", () => {
+  assert.ok(judgeMaxTokens(1) >= 732, `후보 1건 실측 최대 732를 못 덮는다(${judgeMaxTokens(1)})`);
+  assert.ok(judgeMaxTokens(29) >= 1760, `후보 29건 실측 최대 1,760을 못 덮는다(${judgeMaxTokens(29)})`);
+  assert.ok(judgeMaxTokens(35) >= 3000, `후보 35건(평균 1,586)에 여유가 없다(${judgeMaxTokens(35)})`);
+  assert.ok(judgeMaxTokens(1000) <= 8000, "상한은 있어야 한다");
 });

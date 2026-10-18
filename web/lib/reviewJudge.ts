@@ -50,7 +50,17 @@ export const RUBRIC = `너는 카페 리뷰 품질 심사관이다. 블로그 �
 //     msgbatch_01225x… 54건 중 1건(30건 피해). 즉 잘림률 0.3~1.9%가 전부 오판정이었다.
 //   출력 토큰은 **실제로 생성한 만큼만** 과금된다 — 상한을 올려도 안 쓰면 비용이 늘지 않는다.
 //   그래서 두 경로가 이 함수 하나만 쓴다(드리프트 차단).
-export const judgeMaxTokens = (itemCount: number) => Math.min(8000, 600 + itemCount * 40);
+//   📏 2026-10-19 재측정 — 600+40n은 **여전히 작았다.** 565곳 배치(Sonnet 5) 응답 원본 실측:
+//     후보 1-4건   상한 720   · 평균출력 122  · 최대 732  → 상한을 이미 넘겼다
+//     후보 5-14건  상한 1,160 · 평균 492      · 잘림 8.9%
+//     후보 15-29건 상한~1,320 · 평균 1,028    · 잘림 **30.0%**
+//     후보 30+건   상한 2,000 · 평균 1,586    · 잘림 **32.1%**
+//   Sonnet 5는 Haiku보다 사유를 길게 쓴다(같은 루브릭·같은 '15자 이내' 지시인데도).
+//   항목당 실측 소요가 ~50토큰이라 여유를 2배로 둔다. 💰 출력은 **생성한 만큼만** 과금되므로
+//   상한을 올려도 안 쓰면 비용이 늘지 않는다 — 작게 잡는 쪽이 일방적으로 손해다(잘리면 그 돈이 다 버려진다).
+//   기본값 800: 후보 1건인데 출력이 732토큰까지 나온 응답이 실제로 있었다(모델이 설명을 덧붙인 경우).
+//   항목당 100: 실측 소요 ~50토큰의 2배 여유.
+export const judgeMaxTokens = (itemCount: number) => Math.min(8000, 800 + itemCount * 100);
 
 // 🧮 판정 → 결정 매핑 — **답을 못 받은 후보를 false로 박지 않는다.** (2026-10-19)
 //   🔴 사고: 라우트가 `decisions[k] = !!(v && v.about && v.helpful)` 로 **모든 키**에 값을 박았다.
@@ -76,14 +86,25 @@ export function buildUserText(cafeName: string, area: string, items: JudgeItem[]
   return `대상 카페: "${cafeName}" (${area})\n\n스니펫:\n${list}`;
 }
 
+// 🔴 2026-10-19 — 이 함수가 **두 가지 정상 응답을 버리고 있었다**(565곳 배치 실측: 58곳 파싱실패).
+//   ⒜ **후보가 1건이면 모델이 배열 없이 단일 객체**로 답한다: `{"i":0,"about":true,...}`
+//      그러면 `[...]` 정규식이 안 맞고, JSON.parse는 객체를 돌려주는데 `for...of`가 터져 null이 됐다.
+//      실측 26곳이 이것 때문이었다 — 응답은 완벽했는데 우리가 못 읽었다.
+//   ⒝ **출력이 잘리면 전부 버렸다.** 잘린 배열에도 **완성된 객체**는 앞에 여러 개 남아 있다.
+//      그걸 건지면 답이 온 항목은 살리고 나머지는 미결로 둘 수 있다(decisionsFromVerdicts와 짝).
+//      실측 32곳이 잘렸는데, 평균 1,586토큰이면 대부분 항목은 이미 답이 나와 있었다.
+//   → 정상 파싱 → 실패 시 **객체 단위 건지기**. 한 건도 못 건지면 그때만 null(규칙 판정 유지).
 export function parseVerdicts(text: string): Map<number, JudgeVerdict> | null {
+  const map = new Map<number, JudgeVerdict>();
+  const push = (v: any) => { if (v && typeof v.i === "number") map.set(v.i, v as JudgeVerdict); };
   try {
-    const m = text.match(/\[[\s\S]*\]/); // JSON 배열만 추출(코드블록 등 방어)
-    const arr = JSON.parse(m ? m[0] : text) as JudgeVerdict[];
-    const map = new Map<number, JudgeVerdict>();
-    for (const v of arr) if (typeof v?.i === "number") map.set(v.i, v);
-    return map;
-  } catch { return null; }
+    const m = text.match(/\[[\s\S]*\]/); // JSON 배열 우선(코드블록 등 방어)
+    const parsed = JSON.parse(m ? m[0] : text);
+    if (Array.isArray(parsed)) { for (const v of parsed) push(v); } else push(parsed);  // ⒜ 단일 객체 허용
+    if (map.size) return map;
+  } catch { /* ⒝ 아래 건지기로 */ }
+  for (const m of text.matchAll(/\{[^{}]*\}/g)) { try { push(JSON.parse(m[0])); } catch { /* 조각은 버린다 */ } }
+  return map.size ? map : null;
 }
 
 async function judgeClaude(cafeName: string, area: string, items: JudgeItem[]): Promise<Map<number, JudgeVerdict> | null> {
