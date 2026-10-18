@@ -2,6 +2,7 @@
 // PRINCIPLES §1·§3·§5·§7: raw 보존 → 재합성 시 API 재호출 없이 재현(쿼터 절약).
 // 규칙 1차 + LLM 맥락 재판정(스마트). 검증/참고면 자동 공개, 부족하면 비공개(정직).
 import { sql , ensureOnce } from "./db";
+import { mergeRawEvidence, shouldBlockShrink } from "./evidenceMerge";
 import { OUT_OF_SCOPE_SQL } from "./serviceScope";
 import { fetchPlacesReviews } from "./placesCollector";
 import { fetchWebReviews } from "./webSearchCollector";
@@ -251,26 +252,13 @@ async function gatherRaw(cafe: { id: number; name: string; area: string }, refre
   //   → **합친다**(기존 ∪ 신규). 링크로, 링크가 없으면 출처+제목+본문 앞머리로 중복을 제거한다.
   //   ⚠️ 무한 누적은 금지 — raw는 큰 컬럼이라 누적이 그대로 조회비용이 된다(비용 하드규칙).
   //     날짜가 새것인 것부터 RAW_KEEP_MAX건까지만 남긴다(날짜 없는 항목은 뒤로).
+  //   📦 2026-10-18: 합치기 로직을 `lib/evidenceMerge.ts`의 **순수 함수**로 들어냈다(동작 불변).
+  //     이 코드는 서비스 최대 자산(누적 원본)을 지키는 자리인데 긴 함수 안에 박혀 테스트가 불가능했다.
   const fetchedRaw = cleanRaw(raw);
   let mergedRaw = fetchedRaw;
   try {
     const prevRaw = await loadRaw(cafe.id);
-    if (prevRaw.length) {
-      const keyOf = (r: RawItem) => (r.link ? `L:${r.link}` : `T:${r.source}|${(r.title || "").slice(0, 60)}|${(r.text || "").slice(0, 120)}`);
-      const byKey = new Map<string, RawItem>();
-      for (const r of prevRaw) byKey.set(keyOf(r), r);      // 기존을 먼저 깔고
-      for (const r of fetchedRaw) byKey.set(keyOf(r), r);   // 같은 글은 새 판본으로 덮는다
-      const all = [...byKey.values()];
-      all.sort((a, b) => {
-        const ta = a.date ? Date.parse(String(a.date)) : NaN;
-        const tb = b.date ? Date.parse(String(b.date)) : NaN;
-        if (Number.isFinite(ta) && Number.isFinite(tb)) return (tb as number) - (ta as number);
-        if (Number.isFinite(tb)) return 1;
-        if (Number.isFinite(ta)) return -1;
-        return 0;
-      });
-      mergedRaw = all.slice(0, RAW_KEEP_MAX);
-    }
+    mergedRaw = mergeRawEvidence(prevRaw as any, fetchedRaw as any, RAW_KEEP_MAX) as any;
   } catch { /* 기존을 못 읽으면 신규만 쓴다(종전 동작) */ }
   const cleaned = mergedRaw;
   const sig = (a: RawItem[]) => a.map((r) => `${r.source}${r.text || ""}${r.title || ""}${r.desc || ""}`).sort().join("");
@@ -576,7 +564,8 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   try {
     const prevRow = (await sql`SELECT published, COALESCE(synth_count,0) sc, synth_grade FROM cafes WHERE id=${cafeId}`)[0];
     const wasPub = !!prevRow?.published, prevCount = Number(prevRow?.sc ?? 0);
-    if (wasPub && prevCount >= SHRINK_MIN && collected < prevCount * SHRINK_RATIO) {
+    // 📦 2026-10-18: 판정식을 `lib/evidenceMerge.ts`의 순수 함수로 들어냈다(동작 불변·테스트 가능).
+    if (shouldBlockShrink({ wasPublished: wasPub, prevCount, newCount: collected, minCount: SHRINK_MIN, ratio: SHRINK_RATIO })) {
       const msg = `공개 카페 후기 급감 차단 — ${name}(id ${cafeId}) ${prevCount} → ${collected}건, 쓰기 거부`;
       console.warn(`[shrinkGuard] ${msg}`);
       const { noteSilentFail } = await import("./silentFail");

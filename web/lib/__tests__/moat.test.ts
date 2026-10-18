@@ -19,6 +19,7 @@ import {
 import { isOtherBusinessQuote, isReadableQuote, isSentenceQuote, displayQuote, splitKeyTerms } from "../cafeDetailView";
 import { sortReviews, ensureRecent } from "../exposureOrder";
 import { collectAndSynthesize } from "../collectOrchestrator";
+import { mergeRawEvidence, shouldBlockShrink } from "../evidenceMerge";
 
 const AREA = ["서울", "강남구", "역삼동"];
 
@@ -282,4 +283,63 @@ test("사장님·공식 계정 글은 제외된다(한글 상호·영문 핸들 
   }
   // 대조군 — 일반 블로거는 그대로 통과해야 한다(과잉 제외 방지).
   assert.equal(withBlogger("그냥블로거").collected, 6);
+});
+
+// ═══ 근거 보존(evidenceMerge) — 10-17 내가 실제로 데이터를 날린 자리. 2026-10-18 신설 ═══
+//   그날 재수집이 누적 원본을 **덮어써서** 공개 카페 2곳의 검증 후기가 171→36 · 100→68로 깎였다(복구 불가).
+//   합치기와 급감 차단기로 막았지만 둘 다 테스트가 없었다 — 서비스 최대 자산을 지키는 코드가 무방비였다.
+const ev = (link: string, date?: string, text = "본문") =>
+  ({ source: "blog" as const, text, title: `제목 ${link}`, link, date });
+
+test("합치기: 새 수집이 기존 근거를 덮어쓰지 않는다(10-17 사고 재발 방지)", () => {
+  // 그날의 모양 — 기존 171건, 재수집은 36건만 돌려줬다.
+  const prev = Array.from({ length: 171 }, (_, i) => ev(`p${i}`, "2025.01.01"));
+  const fetched = Array.from({ length: 36 }, (_, i) => ev(`f${i}`, "2026.09.01"));
+  const merged = mergeRawEvidence(prev, fetched, 600);
+  assert.equal(merged.length, 207, "합집합이어야 한다 — 덮어쓰면 171건이 36건으로 깎인다");
+  for (const p of prev) assert.ok(merged.some((m) => m.link === p.link), `기존 근거가 사라졌다: ${p.link}`);
+});
+test("합치기: 같은 글(링크 동일)은 새 판본이 이기고 개수는 늘지 않는다", () => {
+  const merged = mergeRawEvidence([ev("a", "2025.01.01", "낡은 본문")], [ev("a", "2026.09.01", "새 본문")], 600);
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0].text, "새 본문");
+});
+test("합치기: 링크가 없으면 출처+제목+본문으로 중복을 제거한다", () => {
+  const a = { source: "blog" as const, text: "같은 본문입니다", title: "같은 제목", date: "2026.01.01" };
+  assert.equal(mergeRawEvidence([a], [{ ...a }], 600).length, 1);
+});
+test("합치기: 상한을 넘으면 **오래된 것부터** 잘린다(최신은 반드시 남는다)", () => {
+  const old = Array.from({ length: 5 }, (_, i) => ev(`old${i}`, "2020.01.01"));
+  const fresh = Array.from({ length: 5 }, (_, i) => ev(`new${i}`, "2026.09.01"));
+  const merged = mergeRawEvidence(old, fresh, 5);
+  assert.equal(merged.length, 5);
+  for (const f of fresh) assert.ok(merged.some((m) => m.link === f.link), `최신 근거가 잘렸다: ${f.link}`);
+});
+test("합치기: 날짜 없는 항목은 맨 뒤로 가 상한에서 먼저 잘린다", () => {
+  const dated = Array.from({ length: 3 }, (_, i) => ev(`d${i}`, "2026.09.01"));
+  const undated = Array.from({ length: 3 }, (_, i) => ev(`u${i}`));
+  const merged = mergeRawEvidence(undated, dated, 3);
+  for (const d of dated) assert.ok(merged.some((m) => m.link === d.link), "날짜 있는 근거가 밀려났다");
+});
+test("합치기: 기존이 없으면 새 수집을 그대로 쓴다", () => {
+  const f = [ev("x", "2026.01.01")];
+  assert.deepEqual(mergeRawEvidence([], f, 600), f);
+});
+
+// 🛡️ 급감 차단기 — 10-17 사고의 **진짜 구멍**은 "줄어드는 쓰기를 거부하는 관문이 없었다"는 것.
+//   어떤 경로(깊은 수집·재합성·규칙 변경)로 들어와도 공개 카페 근거가 한 번에 꺾이면 멈춰야 한다.
+const G = { minCount: 10, ratio: 0.8 };
+test("급감 차단: 공개 카페가 171 → 36건이면 쓰기를 막는다", () => {
+  assert.equal(shouldBlockShrink({ wasPublished: true, prevCount: 171, newCount: 36, ...G }), true);
+});
+test("급감 차단: 20% 이내 자연 감소는 통과시킨다(과잉 차단 방지)", () => {
+  assert.equal(shouldBlockShrink({ wasPublished: true, prevCount: 100, newCount: 85, ...G }), false);
+  assert.equal(shouldBlockShrink({ wasPublished: true, prevCount: 100, newCount: 79, ...G }), true, "80% 미만은 막는다");
+});
+test("급감 차단: 미공개·근거 적은 카페는 대상이 아니다(수집을 멈추지 않는다)", () => {
+  assert.equal(shouldBlockShrink({ wasPublished: false, prevCount: 171, newCount: 1, ...G }), false, "미공개는 자연 변동이 크다");
+  assert.equal(shouldBlockShrink({ wasPublished: true, prevCount: 9, newCount: 0, ...G }), false, "10건 미만은 대상 밖");
+});
+test("급감 차단: 증가하는 쓰기는 당연히 통과한다", () => {
+  assert.equal(shouldBlockShrink({ wasPublished: true, prevCount: 50, newCount: 90, ...G }), false);
 });
