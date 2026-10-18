@@ -59,9 +59,15 @@ export async function GET(req: NextRequest) {
     //   ⚠️ 캐시 무효화는 하지 않는다 — heal도 '비공개'일 때만 search_cache를 지운다(공개는 자연 만료 대기).
     //   공개를 즉시 반영하려고 캐시를 지우면 검색이 통째로 재계산돼 비용이 는다.
     let promoted = 0, released = 0;
-    if (updated > 0) {
-      try { const fp = await finalizePipeline(); promoted = fp.promoted; released = fp.released ?? 0; } catch { /* 승격 실패가 임베딩 성과를 되돌리지 않는다 */ }
-    }
+    // 🔴 2026-10-18 **반쪽 수리 완결** — 10-17에 공개 승격에서 임베딩 조건(`embedding IS NOT NULL`)을 뺐는데,
+    //   **승격 호출 자체가 아직 `updated > 0`(임베딩 성공)에 묶여 있었다.** 그래서 임베딩이 실패하면
+    //   승격이 아예 돌지 않아 공개가 멈췄다.
+    //   실측(10-18): 오늘 적재 81곳 → **공개 0곳** · pending 61곳(그중 판정대기 26곳만 정당한 보류,
+    //   나머지 35곳은 자격이 있는데 승격이 안 돌아 묶여 있었다. pending/검증 7곳은 평균 후기 112건이다).
+    //   → 승격은 임베딩과 **무관하게** 항상 돈다. 승격 조건에 임베딩이 없으므로 의존할 이유도 없다.
+    //   💰 비용: UPDATE 1회(조건에 맞는 행만). 임베딩이 0건이어도 돌지만, 승격 대상이 없으면 0행이다.
+    try { const fp = await finalizePipeline(); promoted = fp.promoted; released = fp.released ?? 0; }
+    catch { /* 승격 실패가 임베딩 성과를 되돌리지 않는다 */ }
     // 🔴 A(2026-08-27): '남음' 집계가 큐 조건과 달라 **적체를 0으로 보고**하던 사각지대를 고친다.
     //   큐는 (published OR pending) + 재임베딩 대상까지 집는데, 집계는 published만 세어
     //   실제 577곳이 밀려 있는데 로그에 "남음 0"이 찍혔다(LIMIT 600에 잘려도 티가 안 났다).
