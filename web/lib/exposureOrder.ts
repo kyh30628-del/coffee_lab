@@ -31,7 +31,7 @@ function recencyBonus(d: string | undefined, nowT: number): number {
 //   → 정렬은 그대로 두되(오염 방어 순서 불변) **읽히는 문장을 뒤로 밀지 않게** 키를 하나 더 두고,
 //     상세 페이지는 이 판별을 통과한 것만 보여준다. 통과분이 없으면 아무것도 안 보여준다(주소 덩어리보다 낫다).
 // 읽히는 문장 판정은 lib/cafeDetailView(클라이언트 안전)로 옮겼다(2026-09-20) — 정렬과 화면이 같은 기준.
-import { isReadableQuote, isOtherBusinessQuote } from "./cafeDetailView";
+import { isReadableQuote, isOtherBusinessQuote, isSentenceQuote } from "./cafeDetailView";
 export { isReadableQuote };
 
 // 정확도(score) — 후기 한 건의 판정 정확도 수치(0~100). 등급 다음가는 정렬 기준(CEO 2026-08-05).
@@ -93,6 +93,10 @@ export function sortReviews(raw: any[], name: string, areaTerms: string[], nowT:
       //   왜 지금 하나: 실측(후기 60건+ 120곳)에서 **화면에 나가는 인용문의 67%가 본문이 아니라 블로그 제목 조각**이었다
       //   ("당진 대형카페 아미루트 …"). 순위 1-3도 31.7%만 본문이라, 사용자가 읽는 첫 세 줄이 대개 제목이다.
       read: isReadableQuote(e?.quote, name) ? 1 : 0, // 0 = 제목 조각·정보카드 → 같은 등급 안에서 뒤로
+      // 더 엄격한 보조키 — isReadableQuote는 '추천·맛있' 같은 명사까지 술어로 세어 제목이 통과한다(실측:
+      //   느슨한 기준 91.6% vs 엄격한 기준 48.2%). 종결어미·1인칭 서사가 있는 **문장**을 한 칸 더 앞으로.
+      //   숨기지 않고 순서만 바꾸므로 09-22 사고(제목 조각이라 최신 검증 후기가 사라짐)와 성질이 다르다.
+      sent: isSentenceQuote(e?.quote) ? 1 : 0,
     }))
     .sort((a, b) => {
       // 🔴 2026-09-22 CEO 확정("검증이 우선이고 최신순. 이게 기본"):
@@ -107,6 +111,7 @@ export function sortReviews(raw: any[], name: string, areaTerms: string[], nowT:
       if (b.real !== a.real) return b.real - a.real;
       if (b.solo !== a.solo) return b.solo - a.solo;
       if (b.read !== a.read) return b.read - a.read; // 같은 등급·같은 관문이면 본문 인용문을 앞으로(2026-10-18 복원)
+      if (b.sent !== a.sent) return b.sent - a.sent; // 그중에서도 '문장'을 앞으로(2026-10-18)
       const ta = parseYmd(a.e?.date) ?? 0, tb = parseYmd(b.e?.date) ?? 0;
       if (tb !== ta) return tb - ta;
       // 🔴 2026-08-28 수리(CEO: "최신의 오염 없이 검증된 리뷰를 노출"):

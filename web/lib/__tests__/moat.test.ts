@@ -16,7 +16,7 @@ import {
   nameCoherence, brandTokenOverlap, coreTokens, nearDuplicateCafeName,
   detectCampaignCluster, isPopupRotatingVenue, cleanCafeName,
 } from "../reviewQuality";
-import { isOtherBusinessQuote, isReadableQuote, displayQuote, splitKeyTerms } from "../cafeDetailView";
+import { isOtherBusinessQuote, isReadableQuote, isSentenceQuote, displayQuote, splitKeyTerms } from "../cafeDetailView";
 import { sortReviews, ensureRecent } from "../exposureOrder";
 
 const AREA = ["서울", "강남구", "역삼동"];
@@ -148,4 +148,22 @@ test("ensureRecent(n=3): 상위 3칸 안에 최근 1년 검증 후기를 한 자
   assert.ok(top3.some((e) => e.date?.startsWith("2026")), "최근 1년 검증 후기가 3칸 안에 없다");
   // n=6(기본)이면 예약석이 화면 밖(6번째)에 생겨 사용자는 옛 글만 본다 — 이게 10-18에 고친 것.
   assert.equal(ensureRecent(rows, 3).length, rows.length, "후기가 사라지지 않는다(순서만 바뀐다)");
+});
+
+// ── ⑫ '문장' 보조키 — isReadableQuote가 '추천·맛있' 같은 명사를 술어로 세는 느슨함을 보완한다.
+//   10-18에 내가 "본문 91.6%"로 보고했는데 엄격히 재니 48.2%였다 — 지표가 느슨해서 과장된 숫자였다.
+//   렌더 판정(isReadableQuote)은 09-22 결정 때문에 조이지 않고, **정렬용 키**를 따로 둔다.
+test("isSentenceQuote: 제목은 '추천'이 있어도 문장이 아니다", () => {
+  assert.equal(isSentenceQuote("[당진] 신상카페 아미루트, 분위기 좋은 대형카페 추천(수유실 완비)"), false);
+  assert.equal(isSentenceQuote("당진 대형카페 아미루트 베이커리"), false);
+  assert.equal(isSentenceQuote("가족들과 방문했는데 빵이 정말 맛있었어요"), true);
+  assert.equal(isSentenceQuote("제가 주문한 라떼는 산미가 적었습니다"), true);
+});
+test("sortReviews: 같은 등급·같은 날짜면 '문장'이 제목보다 앞선다", () => {
+  const rows = [
+    { quote: "[당진] 신상카페 온다, 분위기 좋은 대형카페 추천(수유실 완비)", trust: "verified", date: "2026.03.01", score: 90 },
+    { quote: "온다 창가 자리에 앉아 라떼를 마셨는데 산미가 적어 좋았어요", trust: "verified", date: "2026.03.01", score: 90 },
+  ];
+  const [first] = sortReviews(rows, "온다", ["서울", "강남구"], Date.now());
+  assert.ok(isSentenceQuote(first.quote), `문장이 먼저여야 한다: ${first.quote}`);
 });

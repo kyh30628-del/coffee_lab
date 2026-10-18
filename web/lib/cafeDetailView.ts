@@ -16,6 +16,18 @@ export function isOtherBusinessQuote(q: unknown, cafeName = ""): boolean {
   const esc = first.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return new RegExp(`${esc}\\s*(호텔|펜션|숙소|리조트|모텔|게스트하우스)|(호텔|펜션|숙소|리조트|모텔|게스트하우스)\\s*${esc}`).test(s);
 }
+// 📝 '문장인가' 판정(2026-10-18) — isReadableQuote보다 **엄격한 보조 기준**. 정렬에만 쓰고 숨기지 않는다.
+//   왜 따로 두나: isReadableQuote의 술어 목록에 '추천·맛있·좋았' 같은 **명사·어간**이 들어 있어서
+//   블로그 제목("[당진] 신상카페 아미루트, 분위기 좋은 대형카페 **추천**(수유실 완비)")이 본문으로 통과한다.
+//   그 느슨함은 09-22 결정(제목 조각이라고 최신 검증 후기를 숨기지 말 것)을 지키려면 **그대로 둬야 한다** —
+//   렌더 판정을 조이면 그때 사고가 재발한다. 그래서 **조이지 않고, 순서용 키를 하나 더** 만든다.
+//   실측(표본 150곳·화면 3칸): 느슨한 기준으로는 91.6%가 '본문'이지만 엄격히 보면 48.2%다.
+const SENT_ENDING = /(어요|아요|에요|예요|네요|더라|았다|었다|습니다|해요|거든요|던데|았어|었어)[\s.!?)”"']*$|(어요|아요|네요|습니다|더라고요|았어요|었어요)[\s,.]/;
+const FIRST_PERSON = /(저는|제가|우리는|나는|내가|다녀왔|가봤|먹어봤|마셔봤|앉아|주문했)/;
+export function isSentenceQuote(q: unknown): boolean {
+  const s = String(q ?? "").trim();
+  return SENT_ENDING.test(s) || FIRST_PERSON.test(s);
+}
 export function isReadableQuote(q: unknown, cafeName = ""): boolean {
   const s = String(q ?? "").trim();
   // 2026-09-22: 잘린 꼬리(…)는 더 이상 탈락 사유가 아니다 — 수집 스니펫이 91자에서 잘리며 전부 …로 끝나, 사실상 최신 글 전부를
