@@ -267,7 +267,13 @@ export default async function CafePage({ params }: Props) {
   //   정렬(검증 우선·최신순) 그대로 보여주되, 제목 조각·정보카드는 displayQuote가 다듬어 제목 줄로 렌더한다.
   const readable = evAll.filter((e: any) => !isOtherBusinessQuote(e?.quote, c.name ?? "") && !displayQuote(e?.quote, c.name ?? "").empty);
   const shownQuotes = readable.slice(0, 3);
-  const moreQuotes = readable.slice(3, 12); // 접힘 — 페이지 길이는 안 늘고 정보는 있다
+  // 접힘 — 페이지 길이는 안 늘고 본문 텍스트(SEO)만 늘어난다.
+  // 📏 2026-10-18 상한 12 → 30 (실측 근거):
+  //   표본 40곳(후기 60건+)에서 **필터 통과 인용문이 평균 413개**인데 12개만 쓰고 있었다(34배 미사용).
+  //   필터가 버리는 건 418건 중 5건(1%)뿐 — 재고가 없어서가 아니라 상한 때문에 안 보여준 것.
+  //   비용(실측): 인용문 본문 바이트 12개 1.7KB → 30개 4.2KB = **+2.6KB/곳**.
+  //   ⚠️ 전부(413개)는 56.5KB/곳 = +54.8KB → 09-23 라우트 캐시 한도 초과 사고와 같은 급이라 안 한다.
+  const moreQuotes = readable.slice(3, 30);
   const showQuotes = shownQuotes.length >= 2;
   const highlights = extractHighlights(quotesAll, 6, evAll.map((e: any) => e?.date)); // 🕰️ 최근 후기 가중(09-24)
   // 💻 카공 세부 신호(2026-08-17) — "작업하기 좋음" 한 축으로 뭉뚱그리던 것을 콘센트·와이파이·자리로 쪼갠다.

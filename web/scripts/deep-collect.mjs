@@ -74,6 +74,8 @@ await sql`CREATE TABLE IF NOT EXISTS deep_log (
 //        근거: 그 지역 사용자가 들어왔을 때 볼 게 없으면 그 자체가 '차이'다. 규모도 2,175곳으로 한정적이다.
 //   정렬은 '지역 검증비율 오름차순 → 조회 내림차순'. 낮은 곳을 먼저 올려 격차를 좁힌다.
 const SPARSE_MAX = Number(process.env.DEEP_SPARSE_MAX || 60);
+// 🛑 포화 중단선 — 후기가 이 수 이상인 카페는 더 모아도 화면이 안 달라진다(아래 쿼리 주석에 실측 근거).
+const SATURATED_AT = Number(process.env.DEEP_SATURATED_AT || 60);
 const targets = ONLY
   ? await sql`SELECT id, name, area, synth_count, synth_grade, published, 0 views FROM cafes WHERE name = ${ONLY}`
   : await sql`
@@ -97,6 +99,14 @@ const targets = ONLY
       AND c.raw_collected_at < now() - make_interval(days => ${STALE_D})
       AND (c.id % ${OF}) = ${SHARD}
       AND (v.id IS NOT NULL OR a.pub < ${SPARSE_MAX})   -- ⓐ 본 카페 또는 ⓑ 희소 지역
+      -- 🛑 2026-10-18 **포화 중단선**(CEO 낭비 지적 → 실측으로 확정).
+      --   10-17~18 실측: 처리한 3,301곳 중 **이미 후기 60건 넘은 곳에 11,967콜(전체의 52%)**이 들어갔다.
+      --   그 콜이 사용자 화면에 만든 변화는 "N건 교차검증" 숫자뿐이었다 — 등급은 이미 '검증'이고,
+      --   인용문 재고도 이미 남는다(구간 실측: 60~79건 → 재고 62개 / 노출 상한 30개).
+      --   즉 60건 이상은 **더 모아도 화면이 달라지지 않는다** → 콜을 쓰지 않는다.
+      --   45~59건 구간은 24/25곳이 이미 재고 30개를 넘지만, 등급 감점(계정 상한·3년 경과)으로
+      --   '검증' 문턱에서 떨어지는 곳이 있어 남겨둔다. 상한은 환경변수로 조정 가능.
+      AND COALESCE(c.synth_count, 0) < ${SATURATED_AT}
     ORDER BY a.vpct ASC, COALESCE(v.views, 0) DESC, c.synth_count DESC NULLS LAST
     LIMIT ${CAP}`;
 
