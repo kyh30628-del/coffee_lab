@@ -642,3 +642,77 @@ test("정체성: '직접 로스팅'은 1건으로 주장하지 않는다", () =>
   const one = synthesize("리플렉트랩", [vr("직접 로스팅한 원두를 쓴다고 하네요")], ["서울", "강남구"], "카페,디저트>카페");
   assert.ok(!one.identity.includes("직접 로스팅"), `1건으로 로스팅을 단정했다: "${one.identity}"`);
 });
+
+// ═══ ㉑ AI 판정의 정확성 — "AI가 제대로 내용을 보고 판정한다"는 약속. 2026-10-19 ═══
+//   CEO 지시: "우리의 해자와 로직 기반으로 설계된 것을 AI가 제대로 내용을 보고 판정해 주는게
+//              우리 서비스의 핵심이라는 걸 명심해! 한치의 오차도 없어야 된다."
+//   🔴 배치 응답 원본을 검시해 확정한 결함 3건(전부 실측, 추측 아님):
+//     ① 배치 경로의 max_tokens가 1500 **고정**이었다(실시간 경로는 항목수 비례였다).
+//        msgbatch_01AB44… 584건 중 2건이 stop_reason=max_tokens(출력 정확히 1,500),
+//        msgbatch_01225x… 54건 중 1건. 잘리면 JSON이 깨져 parseVerdicts가 null이 된다.
+//     ② 그때 라우트가 **모든 키에 false**를 박았다 → 후보 69건·30건이 "AI 판정: 무관/저품질 제외"로
+//        영구 저장(judge_decisions는 재합성에도 유지된다). AI가 보지도 않은 글을 AI 이름으로 버린 것이다.
+//     ③ 경계 후보를 slice(0,35)만 보내고 llm_judged_at을 찍어 큐에서 빼, 36번째 이후는 영영 미판정.
+//        실측: 경계 35건 초과 4,280곳 · 못 본 후보 140,932건 · 영구 미판정 확정 14,019건.
+import { judgeMaxTokens, decisionsFromVerdicts, type JudgeVerdict } from "../reviewJudge";
+const V = (i: number, about: boolean, helpful: boolean): JudgeVerdict => ({ i, about, helpful, reason: "t" });
+const mapOf = (...vs: JudgeVerdict[]) => new Map(vs.map((v) => [v.i, v]));
+
+test("판정 ①: 35항목 요청의 출력 상한이 1,500을 넘는다(잘림 재발 차단)", () => {
+  assert.ok(judgeMaxTokens(35) > 1500, `35항목 상한이 ${judgeMaxTokens(35)} — 실측 잘림이 1,500에서 났다`);
+  assert.ok(judgeMaxTokens(100) >= 4600, "100항목도 커버해야 한다");
+  assert.ok(judgeMaxTokens(1000) <= 8000, "상한은 있어야 한다(폭주 과금 방지)");
+});
+test("판정 ①: 배치 경로와 실시간 경로가 같은 상한 함수를 쓴다(드리프트 차단)", () => {
+  const route = readFileSync(new URL("../../app/api/cron-batch-judge/route.ts", import.meta.url), "utf8");
+  assert.ok(/max_tokens:\s*judgeMaxTokens\(/.test(route), "배치 경로가 judgeMaxTokens를 안 쓴다");
+  assert.ok(!/max_tokens:\s*1500/.test(route), "max_tokens 1500 고정이 남아 있다");
+  const judge = readFileSync(new URL("../reviewJudge.ts", import.meta.url), "utf8");
+  assert.ok(/max_tokens:\s*judgeMaxTokens\(/.test(judge), "실시간 경로가 judgeMaxTokens를 안 쓴다");
+});
+
+test("판정 ②: 파싱 실패(null)면 단 한 건도 false로 박지 않는다", () => {
+  const r = decisionsFromVerdicts(["a", "b", "c"], null);
+  assert.deepEqual(r.decisions, {}, "답을 못 읽었는데 결정을 남겼다 — 규칙 판정을 덮어쓴다");
+  assert.equal(r.unanswered, 3);
+  assert.equal(r.kept, 0);
+});
+test("판정 ②: 모델이 빼먹은 번호는 미결로 남는다(규칙 판정 유지)", () => {
+  const r = decisionsFromVerdicts(["a", "b", "c"], mapOf(V(0, true, true), V(2, false, true)));
+  assert.deepEqual(Object.keys(r.decisions).sort(), ["a", "c"], "답 없는 b에 값을 박았다");
+  assert.ok(!("b" in r.decisions), "b는 미결이어야 한다 — false는 'AI가 무관하다고 판정'으로 영구 저장된다");
+  assert.equal(r.unanswered, 1);
+});
+test("판정 ②: 채택은 about·helpful 둘 다 참일 때만(라우트와 동일)", () => {
+  const r = decisionsFromVerdicts(["a", "b", "c", "d"],
+    mapOf(V(0, true, true), V(1, true, false), V(2, false, true), V(3, false, false)));
+  assert.deepEqual(r.decisions, { a: true, b: false, c: false, d: false });
+  assert.equal(r.kept, 1);
+  assert.equal(r.unanswered, 0);
+});
+test("판정 ②: 수거 경로가 파싱 실패 시 결정을 쓰지 않고 빠져나간다", () => {
+  const route = readFileSync(new URL("../../app/api/cron-batch-judge/route.ts", import.meta.url), "utf8");
+  assert.ok(/if \(!verdicts\) \{ parseFailed\+\+;[\s\S]{0,120}continue; \}/.test(route),
+    "파싱 실패 시 곧바로 continue하지 않는다 — false가 박힐 수 있다");
+  assert.ok(!/decisions\[k\] = !!\(v && v\.about/.test(route), "모든 키에 값을 박는 옛 매핑이 남아 있다");
+  assert.ok(/precision: \{ truncated, parseFailed, unanswered \}/.test(route),
+    "정확성 계측을 응답에 노출하지 않으면 재발을 못 본다");
+});
+
+test("판정 ③: 경계 35건 초과 카페는 '아직 안 본 후보'부터 올린다", () => {
+  const route = readFileSync(new URL("../../app/api/cron-batch-judge/route.ts", import.meta.url), "utf8");
+  assert.ok(/getUndecidedAuditCandidates\(/.test(route), "판정받은 후보를 걸러내지 않는다 — 36번째 이후가 영영 미판정");
+  assert.ok(/judge_passes/.test(route) && /JUDGE_MAX_PASSES/.test(route),
+    "재입장 커서에 종료 보장(패스 상한)이 없다 — 무한 재구매 위험");
+  assert.ok(/bumpJudgePass\(/.test(route), "패스 카운터를 올리지 않으면 상한이 작동하지 않는다");
+});
+test("판정 ③: 패스 카운터는 제출 시점에 올린다(수거 못 한 배치로 무한루프 금지)", () => {
+  const store = readFileSync(new URL("../synthStore.ts", import.meta.url), "utf8");
+  const i = store.indexOf("export async function bumpJudgePass");
+  assert.ok(i > 0, "bumpJudgePass가 없다");
+  assert.ok(/제출 시점/.test(store.slice(i - 400, i)), "제출 시점에 올린다는 근거 주석이 없다");
+});
+test("판정: 과거 결정이 배열로 들어와도 조용히 사라지지 않는다", () => {
+  const store = readFileSync(new URL("../synthStore.ts", import.meta.url), "utf8");
+  assert.ok(/!Array\.isArray\(d\)/.test(store), "typeof []==='object' 를 막지 않았다(실측 15행이 배열)");
+});

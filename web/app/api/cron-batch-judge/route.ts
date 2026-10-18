@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
-import { getAuditCandidates, applyDecisions, markJudged } from "@/lib/synthStore";
+import { getAuditCandidates, getUndecidedAuditCandidates, applyDecisions, markJudged, bumpJudgePass } from "@/lib/synthStore";
 import { createBatch, getBatch, streamResults, cancelBatch, BATCH_PRICE_IN, BATCH_PRICE_OUT, batchPriceFor } from "@/lib/anthropicBatch";
-import { RUBRIC, buildUserText, parseVerdicts, CLAUDE_MODEL } from "@/lib/reviewJudge";
+import { RUBRIC, buildUserText, parseVerdicts, decisionsFromVerdicts, judgeMaxTokens, CLAUDE_MODEL } from "@/lib/reviewJudge";
 import { OLD_REVIEW_MONTHS } from "@/lib/cafeProfile";
 
 export const runtime = "nodejs";
@@ -15,6 +15,10 @@ export const maxDuration = 300;
 const BUILD_LIMIT = Number(process.env.BATCH_JUDGE_LIMIT || 60);  // 2026-09-20 150→120→60. 120에서 8회차가 300s 타임아웃으로 빈 응답을 냈다(rejected 3,089곳이 남았는데 '대상 없음'처럼 보였다).
 //   원인: 후보 선정 정렬이 synth_count ASC(후기 적은 순)라 **회차가 갈수록 무거운 카페**가 온다 — 카페당 합성이 느려진다. // 빌드 시 getAuditCandidates가 카페당 합성 → 300s 내로 제한
 const PER_CAFE = 35;
+// 🔁 한 카페를 최대 몇 번까지 판정 배치에 올릴 수 있나. 경계 후기 35건 초과 카페(실측 4,280곳,
+//   최대 317건)를 끝까지 보려면 여러 번 올라가야 한다. 상한 = 35 × 9 = 315건까지 커버.
+//   ⚠️ 상한이 없으면 '모델이 답 안 한 후보는 미결로 남긴다'는 수리와 맞물려 무한 재구매가 된다.
+const JUDGE_MAX_PASSES = Number(process.env.JUDGE_MAX_PASSES || 9);
 // 🎯 위험군 게이트(2026-07-05 CEO): 공개 카페 '재판정'은 신뢰도 낮은 등급만 — 파이프라인 자체 등급으로 원리적 선.
 //   '검증'(verified, 평균 85리뷰 = 옥석 코어)은 스킵(재판정 불필요), 그 외('참고' 등, 평균 12리뷰)는 판정.
 //   근거: 오염 4곳(리코·충무·블라블라·블루다이아) 전부 '참고'였음 — 리뷰 개수(<5) 같은 자의적 선보다 등급이 정확.
@@ -38,9 +42,12 @@ export async function GET(req: NextRequest) {
     if (!KEY) return NextResponse.json({ ok: false, error: "ANTHROPIC_API_KEY 미설정 — 판정 비활성" });
     await ensureSchema();
     await sql`CREATE TABLE IF NOT EXISTS judge_batches (batch_id TEXT PRIMARY KEY, manifest JSONB, applied BOOLEAN DEFAULT false, created_at TIMESTAMPTZ DEFAULT now())`;
+    await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS judge_passes INT DEFAULT 0`;   // 아래 후보 SELECT가 이 칼럼을 읽는다 — 먼저 만든다
 
     // ── ① 끝난 배치 수거·적용 ──
     let appliedCafes = 0, rescued = 0, inTok = 0, outTok = 0, stillRunning = 0, expiredBatches = 0;
+    // 🔬 2026-10-19 정확성 계측 — 이 셋이 0이 아니면 'AI가 보지 않은 채 버려진 후기'가 있다는 뜻이다.
+    let truncated = 0, parseFailed = 0, unanswered = 0;
     let costAcc = 0;   // 배치별 모델 단가로 적립한 실비용(아래 보고에 쓴다)
     const open = (await sql`SELECT batch_id, manifest FROM judge_batches WHERE NOT applied ORDER BY created_at LIMIT 5`) as any[];
     for (const row of open) {
@@ -74,11 +81,18 @@ export async function GET(req: NextRequest) {
           const o = u.output_tokens || 0;
           inTok += i; outTok += o; costAcc += i * bp.in + o * bp.out;
         }
+        if (res.result.message?.stop_reason === "max_tokens") truncated++;
         const text = res.result.message?.content?.find((x: any) => x.type === "text")?.text || "";
         const verdicts = parseVerdicts(text); // Map<i, {about,helpful}>
-        const decisions: Record<string, boolean> = {};
-        (entry.keys as string[]).forEach((k, i) => { const v = verdicts?.get(i); decisions[k] = !!(v && v.about && v.helpful); });
-        try { await applyDecisions({ id: entry.id, name: entry.name, area: entry.area ?? "" }, decisions); appliedCafes++; rescued += Object.values(decisions).filter(Boolean).length; }
+        // 🔴 2026-10-19 — **답을 못 읽었으면 아무 결정도 남기지 않는다.**
+        //   그 전엔 파싱 실패 시 모든 키에 false를 박아 후보 전원이 "AI 판정: 무관/저품질 제외"로
+        //   영구 저장됐다(실측: 잘림 0.3~1.9%, 한 배치에서 69건·30건). 규칙 판정을 그대로 두는 게
+        //   무회귀 기본값이다 — 커서만 전진시켜 같은 비용을 두 번 쓰지 않는다.
+        if (!verdicts) { parseFailed++; try { await markJudged(entry.id); } catch {} continue; }
+        const mapped = decisionsFromVerdicts(entry.keys as string[], verdicts);
+        unanswered += mapped.unanswered;
+        if (Object.keys(mapped.decisions).length === 0) { try { await markJudged(entry.id); } catch {} continue; }
+        try { await applyDecisions({ id: entry.id, name: entry.name, area: entry.area ?? "" }, mapped.decisions); appliedCafes++; rescued += mapped.kept; }
         catch { /* 실패분 스킵 — 다음 배치에서 재시도되지 않게 markJudged */ try { await markJudged(entry.id); } catch {} }
       }
       await sql`UPDATE judge_batches SET applied = true WHERE batch_id = ${row.batch_id}`;
@@ -108,6 +122,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ ok: true, mode: "collect-only",
         note: "수거만 수행했다. 신규 제출은 &submit=1 을 명시할 때만 — 상태 확인 목적 호출이 과금을 만들지 않게(09-20 중복제출 사고).",
         applied: { cafes: appliedCafes, rescuedReviews: rescued, costUsd: +costAcc.toFixed(5), inTok, outTok },
+        precision: { truncated, parseFailed, unanswered },   // 0이 아니면 'AI가 못 본 후기'가 있다
         pollingBatches: stillRunning, expiredClosed: expiredBatches });
     }
     // 🔴 2026-09-20 하드 가드 — **진행 중 배치가 하나라도 있으면 신규 제출을 아예 하지 않는다.**
@@ -137,7 +152,11 @@ export async function GET(req: NextRequest) {
     const oldCutStr = `${oldCut.getFullYear()}.${String(oldCut.getMonth() + 1).padStart(2, "0")}.${String(oldCut.getDate()).padStart(2, "0")}`;
     const rows = (await sql`SELECT id, name, area FROM cafes
       WHERE raw_reviews IS NOT NULL
-        AND (llm_judged_at IS NULL OR llm_judged_at < raw_collected_at)
+        -- 🔴 2026-10-19 커서 완화 — 경계 후기가 PER_CAFE(35)를 넘는 카페는 한 번 판정했어도
+        --   '아직 안 본 후보'가 남는다. judge_passes(제출 시 +1) 상한 JUDGE_MAX_PASSES로 종료를 보장한다
+        --   (모델이 답을 안 한 후보는 미결로 남으므로, 상한이 없으면 같은 카페를 영원히 다시 살 수 있다).
+        AND (llm_judged_at IS NULL OR llm_judged_at < raw_collected_at
+             OR (COALESCE(borderline_count, 0) > ${PER_CAFE} AND COALESCE(judge_passes, 0) < ${JUDGE_MAX_PASSES}))
         AND NOT (id = ANY(${inFlightIds}))
         AND (
           pipeline_status = 'pending'
@@ -184,14 +203,19 @@ export async function GET(req: NextRequest) {
     const manifestCafes: Record<string, any> = {};
     for (const c of rows) {
       try { // 한 카페 오류(데이터·합성)로 전체 빌드가 멈추지 않게 격리
-        const { candidates, hasRaw } = await getAuditCandidates({ id: c.id, name: c.name, area: c.area ?? "" });
+        // 🔴 2026-10-19 — **이미 판정받은 후보는 빼고 '아직 안 본 것'부터 본다.**
+        //   그 전엔 candidates.slice(0, 35)라, 경계 후기가 35건을 넘는 카페는 36번째부터 **영영**
+        //   AI 눈에 들어가지 않았다(판정 후 llm_judged_at이 찍혀 큐에서 빠지므로). 실측 2026-10-19:
+        //     경계 35건 초과 카페 4,280곳 · 못 본 경계 후기 140,932건 · 그중 이미 큐에서 빠져
+        //     영구 미판정 확정 14,019건. "AI가 내용을 보고 가린다"는 약속이 거기서 끊겨 있었다.
+        const { candidates, hasRaw } = await getUndecidedAuditCandidates({ id: c.id, name: c.name, area: c.area ?? "" });
         if (!hasRaw) continue;
         const items = candidates.slice(0, PER_CAFE).filter((it: any) => it && it.key);
         if (items.length === 0) { await markJudged(c.id); noCand++; continue; } // 후보 없음 → 무과금 판정완료
         requests.push({
           custom_id: `cafe_${c.id}`,
           params: {
-            model: CLAUDE_MODEL, max_tokens: 1500,
+            model: CLAUDE_MODEL, max_tokens: judgeMaxTokens(items.length),   // 🔴 1500 고정이던 자리 — 35항목에서 잘려 오판정을 냈다(reviewJudge.judgeMaxTokens 주석)
             system: [{ type: "text", text: RUBRIC, cache_control: { type: "ephemeral" } }],
             messages: [{ role: "user", content: buildUserText(c.name, c.area ?? "", items.map((it: any, i: number) => ({ i, title: it.title || "", body: it.body || "" }))) }],
           },
@@ -225,6 +249,7 @@ export async function GET(req: NextRequest) {
         await cancelBatch(KEY, b.id).catch(() => {});   // 수거 못 할 배치는 살려둘 이유가 없다 — 과금부터 끊는다
         return NextResponse.json({ ok: false, error: "manifest 저장 실패 — 배치 취소함", detail: String(e).slice(0, 120), batchId: b.id });
       }
+      await bumpJudgePass(Object.values(manifestCafes).map((x: any) => x.id));   // 🔁 종료 보장 카운터
       submitted = requests.length;
     }
 
@@ -232,6 +257,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       ok: true,
       applied: { cafes: appliedCafes, rescuedReviews: rescued, costUsd: Number(cost.toFixed(4)), inTok, outTok },
+      precision: { truncated, parseFailed, unanswered },
       pollingBatches: stillRunning,
       expiredClosed: expiredBatches, // 결과 보관기간(29일) 지나 회수 불가 → 닫은 배치 수
       submitted: { newBatchId: batchId, cafes: submitted, noBorderlineMarked: noCand },

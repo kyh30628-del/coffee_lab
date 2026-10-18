@@ -42,6 +42,35 @@ export const RUBRIC = `너는 카페 리뷰 품질 심사관이다. 블로그 �
 
 반드시 JSON 배열로만 답한다(설명·코드블록 금지): [{"i":번호,"about":true/false,"helpful":true/false,"reason":"15자 이내"}]`;
 
+// 📏 출력 토큰 상한 — **단일 출처.** (2026-10-19)
+//   🔴 사고: 실시간 경로는 항목수 비례로 늘렸는데 **배치 경로는 1500 고정**이었다. 35항목이면
+//   한 항목당 40토큰 × 35 = 1,400 + 배열 오버헤드로 상한에 닿는다. 실측(배치 응답 원본 검시):
+//     msgbatch_01AB44… 584건 중 2건이 stop_reason=max_tokens(출력 정확히 1,500) → JSON이 잘려
+//     parseVerdicts가 null → **그 카페 후보 69건 전원이 "AI 판정: 무관/저품질 제외"로 영구 저장됐다.**
+//     msgbatch_01225x… 54건 중 1건(30건 피해). 즉 잘림률 0.3~1.9%가 전부 오판정이었다.
+//   출력 토큰은 **실제로 생성한 만큼만** 과금된다 — 상한을 올려도 안 쓰면 비용이 늘지 않는다.
+//   그래서 두 경로가 이 함수 하나만 쓴다(드리프트 차단).
+export const judgeMaxTokens = (itemCount: number) => Math.min(8000, 600 + itemCount * 40);
+
+// 🧮 판정 → 결정 매핑 — **답을 못 받은 후보를 false로 박지 않는다.** (2026-10-19)
+//   🔴 사고: 라우트가 `decisions[k] = !!(v && v.about && v.helpful)` 로 **모든 키**에 값을 박았다.
+//   그래서 ①JSON 파싱 실패(잘림) ②모델이 그 번호를 빼먹음 두 경우에 후보가 "AI가 무관하다고 판정함"으로
+//   영구 저장됐다(judge_decisions는 재합성에도 유지된다). 규칙이 '경계'라고 본 글을 AI가 보지도 않고
+//   버린 셈이라, 우리 서비스의 핵심 약속("AI가 내용을 보고 가린다")을 정면으로 어긴다.
+//   → **답이 온 후보만** 결정을 남긴다. 답이 없으면 미결로 두어 규칙 판정이 그대로 간다(무회귀).
+export function decisionsFromVerdicts(keys: string[], verdicts: Map<number, JudgeVerdict> | null) {
+  const decisions: Record<string, boolean> = {};
+  let answered = 0, kept = 0;
+  keys.forEach((k, i) => {
+    const v = verdicts?.get(i);
+    if (!v) return;                       // 미결 — 규칙 판정 유지
+    answered++;
+    decisions[k] = !!(v.about && v.helpful);
+    if (decisions[k]) kept++;
+  });
+  return { decisions, answered, unanswered: keys.length - answered, kept };
+}
+
 export function buildUserText(cafeName: string, area: string, items: JudgeItem[]): string {
   const list = items.map((it) => `#${it.i} 제목:"${(it.title || "").slice(0, 120)}" 내용:"${(it.body || "").slice(0, 300)}"`).join("\n");
   return `대상 카페: "${cafeName}" (${area})\n\n스니펫:\n${list}`;
@@ -64,7 +93,7 @@ async function judgeClaude(cafeName: string, area: string, items: JudgeItem[]): 
       headers: { "x-api-key": ANTHROPIC_KEY!, "anthropic-version": "2023-06-01", "content-type": "application/json" },
       body: JSON.stringify({
         model: CLAUDE_MODEL,
-        max_tokens: Math.min(8000, 600 + items.length * 40), // 항목수 비례 동적(100건≈4600) — 출력 잘림→JSON 파싱 실패 방지
+        max_tokens: judgeMaxTokens(items.length), // 항목수 비례 동적 — 출력 잘림→JSON 파싱 실패 방지(단일 출처)
         // 정적 기준은 캐시(ephemeral)로 재사용 → 비용·지연 절감
         system: [{ type: "text", text: RUBRIC, cache_control: { type: "ephemeral" } }],
         messages: [{ role: "user", content: buildUserText(cafeName, area, items) }],

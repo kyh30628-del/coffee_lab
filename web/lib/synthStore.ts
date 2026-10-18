@@ -153,7 +153,9 @@ export const OFFCTX_FLAG_RATE = 0.55;
 async function loadDecisions(cafeId: number): Promise<Record<string, boolean>> {
   const row = (await sql`SELECT judge_decisions FROM cafes WHERE id=${cafeId}`)[0];
   const d = row?.judge_decisions;
-  return d && typeof d === "object" ? d : {};
+  // ⚠️ typeof []  === "object" 다. 실측 2026-10-19: judge_decisions가 **배열**인 행이 15개 있었다
+  //   (옛 경로의 흔적). 배열이면 `key in d`가 전부 false라 과거 판정이 조용히 사라진다 — 명시적으로 막는다.
+  return d && typeof d === "object" && !Array.isArray(d) ? (d as Record<string, boolean>) : {};
 }
 
 // 🔒 승인된 unpublish 결정 재발 가드(#172): 재합성이 규칙판정만으로 published를 되돌리지 못하게,
@@ -1243,6 +1245,26 @@ export async function getAuditCandidates(cafe: { id: number; name: string; area:
   const result = collectAndSynthesize(cleanCafeName(cafe.name), await areaTermsFor(cafe.id, cafe.area), rawToSources(raw), { ...(await synthMetaFor(cafe.id)) });
   // 토큰 최적화: AI에는 '경계(규칙이 애매)'만 보냄(70~90% 절감). 명확한 검증·참고는 규칙 신뢰.
   return { candidates: result.borderline, hasRaw: true };
+}
+
+// 🔎 **아직 AI 판정을 받지 않은** 경계 후보만 돌려준다. (2026-10-19)
+//   getAuditCandidates는 경계 전체를 주므로, 호출측이 slice(0,35)하면 36번째 이후가 매번 같은 자리에
+//   밀려 영영 판정을 못 받았다(실측 140,932건). 저장된 judge_decisions의 키를 빼고 돌려주면
+//   같은 카페를 다시 올릴 때 **다음 35건**이 올라간다. 이미 전부 판정됐으면 빈 배열 → 호출측이 무과금 종료.
+export async function getUndecidedAuditCandidates(cafe: { id: number; name: string; area: string }): Promise<{ candidates: BorderlineItem[]; hasRaw: boolean; totalBorderline: number; alreadyDecided: number }> {
+  const { candidates, hasRaw } = await getAuditCandidates(cafe);
+  if (!hasRaw) return { candidates: [], hasRaw: false, totalBorderline: 0, alreadyDecided: 0 };
+  const decided = await loadDecisions(cafe.id);
+  const left = candidates.filter((c) => !(c.key in decided));
+  return { candidates: left, hasRaw: true, totalBorderline: candidates.length, alreadyDecided: candidates.length - left.length };
+}
+
+// 🔁 판정 배치에 올린 횟수 +1 — 종료 보장용(cron-batch-judge의 JUDGE_MAX_PASSES와 짝).
+//   **제출 시점**에 올린다. 수거 시점에 올리면 영영 수거 못 한 배치가 무한 재구매를 만든다.
+export async function bumpJudgePass(ids: number[]) {
+  if (!ids.length) return;
+  await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS judge_passes INT DEFAULT 0`;
+  await sql`UPDATE cafes SET judge_passes = COALESCE(judge_passes, 0) + 1 WHERE id = ANY(${ids})`;
 }
 
 // Sonnet 최종 결정(key→keep/drop)을 적용해 재합성·저장 + llm_judged_at 기록.
