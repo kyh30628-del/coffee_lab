@@ -47,14 +47,23 @@ let spent = Number(spentRow.s);
 //   정의가 갈라지면 "대기 1곳"처럼 보여 판단이 틀어진다 — 실제로 한 번 틀렸다.
 const queue = async (scope = "") => Number((await sql`SELECT count(*)::int n FROM cafes
   WHERE raw_reviews IS NOT NULL
-    AND (llm_judged_at IS NULL OR llm_judged_at < raw_collected_at)
+    AND (llm_judged_at IS NULL OR llm_judged_at < raw_collected_at
+         OR (COALESCE(borderline_count,0) > 35 AND COALESCE(judge_passes,0) < 9))
     AND (pipeline_status = 'pending'
          OR (published AND synth_grade IS DISTINCT FROM '검증')
          OR (synth_grade = '후보' AND NOT published AND COALESCE(borderline_count,0) > 0
              AND (pipeline_status IS NULL OR pipeline_status NOT IN ('excluded','held','noise'))))
     AND (${scope} = ''
          OR (${scope} = 'rescue' AND NOT COALESCE(published,false))
-         OR (${scope} = 'refine' AND COALESCE(published,false)))`)[0].n);
+         OR (${scope} = 'refine' AND COALESCE(published,false))
+         -- 🎯 flip = AI 판정이 실제로 공개를 만들 수 있는 미공개 카페만(라우트의 scope=flip과 글자까지 같게).
+         --   급소는 '주제 글(검증) >= 1'이다 — AI가 살린 경계 후기는 '참고'가 되고 '검증'이 안 되므로,
+         --   주제 글 0건 카페는 AI가 전부 살려줘도 공개 게이트를 못 넘는다(실측 85.4%가 그렇다).
+         OR (${scope} = 'flip' AND NOT COALESCE(published,false)
+             AND (raw_collected_at > now() - interval '30 day' OR embedding IS NOT NULL)
+             AND COALESCE(naver_category,'') <> ''
+             AND COALESCE(synth_count,0) + COALESCE(borderline_count,0) >= 2
+             AND COALESCE((synth_quality->>'verified')::int, 0) >= 1))`)[0].n);
 const published = async () => Number((await sql`SELECT count(*)::int n FROM cafes WHERE published`)[0].n);
 
 // 🔴 2026-10-19 — `fetch`로 부르면 **죽는다.** Node의 undici는 응답 헤더를 **300초** 안에 못 받으면

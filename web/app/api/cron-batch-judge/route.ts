@@ -198,9 +198,31 @@ export async function GET(req: NextRequest) {
         --   주의: Neon 태그드 템플릿은 SQL 조각 합성을 지원하지 않는다(lib/metrics.ts 주석과 같은 이유).
         --      조건을 파라미터 하나로 표현한다. 조각을 끼우면 문법 오류가 난다(실제로 한 번 났다).
         --      그리고 이 주석에 백틱을 쓰면 템플릿 문자열이 끊긴다 -- 실제로 한 번 깨졌다.
+        --   scope=flip  : 🎯 **AI 판정이 실제로 공개를 만들 수 있는 미공개 카페만.** (2026-10-19)
+        --     왜 필요한가 — CEO 질문("후보 구제율이 왜 이렇게 낮은데?")의 답을 파서 나온 결론이다.
+        --     신규 공개 게이트(storeResult의 ruleOk)는 네 가지를 **동시에** 요구한다:
+        --       ⓐ raw 나이 <= grade.floor.reference_new_fresh_days(30일) 또는 과거 통과이력(임베딩)
+        --       ⓑ 네이버 카테고리 존재(비카페 판별 불가면 신규는 막는다)
+        --       ⓒ 채택 후기 >= grade.floor.reference_new(2)
+        --       ⓓ **주제 글(검증) >= 1건** — 제목이 이 카페인 글
+        --     🔴 ⓓ가 급소다. AI가 살린 경계 후기는 collectOrchestrator:213에서
+        --        rule.verdict가 verified일 때만 verified, 아니면 reference로 가는데, 경계 후기의
+        --        rule.verdict는 항상 "rejected"다 → **채택해도 '참고'가 되고 '검증'이 안 된다.**
+        --        즉 주제 글 0건인 카페는 AI가 전부 살려줘도 공개 조건을 못 넘는다.
+        --     실측 2026-10-19: 미공개 큐 8,704곳 중 주제 글 0건이 **7,437곳(85.4%)**.
+        --       네 조건 전부 통과 = 1,116곳(12.8%)뿐. 관측 전환율 11.6%와 정확히 맞는다.
+        --       반증 점검: 최근 2일 판정 후 공개된 206곳 중 **201곳(97.6%)**이 주제 글 보유 — 게이트가 범인.
+        --       그래서 큐 전량에 쓰면 Sonnet 5 $29.65 중 $25.71(87%)이 **결과를 바꿀 수 없는 곳**에 간다.
+        --     ⚠️ "영원히 불가"가 아니다 — 나중에 수집으로 주제 글이 생기면 자격이 돌아온다.
+        --        AI 판정으로는 바꿀 수 없다는 뜻이다. 그 카페는 발굴·수집 레인의 일이다.
         AND (${scope} = ''
              OR (${scope} = 'rescue' AND NOT COALESCE(published, false))
-             OR (${scope} = 'refine' AND COALESCE(published, false)))
+             OR (${scope} = 'refine' AND COALESCE(published, false))
+             OR (${scope} = 'flip' AND NOT COALESCE(published, false)
+                 AND (raw_collected_at > now() - interval '30 day' OR embedding IS NOT NULL)
+                 AND COALESCE(naver_category, '') <> ''
+                 AND COALESCE(synth_count, 0) + COALESCE(borderline_count, 0) >= 2
+                 AND COALESCE((synth_quality->>'verified')::int, 0) >= 1))
       ORDER BY (COALESCE(pipeline_status, '') = 'pending') DESC,
                -- ⚠️ pipeline_status IS NULL(grandfather)인 행은 위 비교가 SQL NULL이 되고, Postgres는
                --   DESC에서 NULL을 '가장 큼'으로 취급해 맨 앞으로 보낸다 — COALESCE로 NULL을 없애 방지(실측으로 발견).

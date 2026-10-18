@@ -743,3 +743,27 @@ test("판정: 런타임 노브는 대괄호 접근으로 읽는다(Next 빌드�
     assert.ok(route.includes(`process.env["${k}"]`), `${k}를 대괄호로 읽지 않는다`);
   }
 });
+
+// 🎯 구제 가능성 게이트(scope=flip) — CEO 질문 "후보 구제율이 왜 이렇게 낮은데?"의 답을 코드로 박는다.
+//   신규 공개는 주제 글(검증) 1건을 요구하는데, AI가 살린 경계 후기는 '참고'가 되고 '검증'이 안 된다
+//   (collectOrchestrator: `rule.verdict === "verified" ? "verified" : "reference"`, 경계는 항상 rejected).
+//   → 주제 글 0건 카페(실측 85.4%)에 판정비를 쓰면 결과를 바꿀 수 없다. 범위 정의가 갈라지면 또 샌다.
+test("판정 범위: flip 구간은 라우트와 집행기가 같은 네 조건을 쓴다", () => {
+  const route = readFileSync(new URL("../../app/api/cron-batch-judge/route.ts", import.meta.url), "utf8");
+  const runner = readFileSync(new URL("../../scripts/judge-run.mjs", import.meta.url), "utf8");
+  const must = [
+    /= 'flip'/, /raw_collected_at > now\(\) - interval '30 day'/, /embedding IS NOT NULL/,
+    /naver_category/, /synth_count,\s*0\)\s*\+\s*COALESCE\(borderline_count,\s*0\)\s*>= 2/,
+    /synth_quality->>'verified'\)::int,\s*0\)\s*>= 1/,
+  ];
+  for (const re of must) {
+    assert.ok(re.test(route), `라우트에 flip 조건이 없다: ${re}`);
+    assert.ok(re.test(runner), `집행기에 flip 조건이 없다: ${re}`);
+  }
+});
+test("판정: 'AI가 살린 경계 후기는 검증이 아니다'는 전제가 코드와 일치한다", () => {
+  const orch = readFileSync(new URL("../collectOrchestrator.ts", import.meta.url), "utf8");
+  // 경계 후보가 decisions로 채택되면 verified가 아니라 reference가 된다 — 이 전제가 flip 조건의 근거다.
+  assert.ok(/decisions\[key\]\) \{ verdict = rule\.verdict === "verified" \? "verified" : "reference"/.test(orch),
+    "채택 경로가 바뀌었다 — flip 조건(주제 글 1건)의 근거를 다시 확인해야 한다");
+});
