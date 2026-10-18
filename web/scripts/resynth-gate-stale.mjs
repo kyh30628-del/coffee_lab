@@ -46,7 +46,12 @@ const rows = await sql`SELECT id, name, area, naver_category cat, synth_count,
   WHERE NOT published AND COALESCE(naver_category, '') <> ''
     AND COALESCE(synth_count, 0) >= 2
     AND COALESCE((synth_quality->>'verified')::int, 0) >= 1
-    AND COALESCE(pipeline_status, '') NOT IN ('excluded', 'noise')
+    -- 🔴 2026-10-19 수정 — **'held'를 빼먹어 보고가 틀렸다.** held는 storeResult의 otherwiseBlocked에
+    --   들어가 재합성해도 published=false로 고정된다(설계). 그래서 처음 돌린 50곳이 **공개 0곳**이었다.
+    --   held 사유 실측: "오염 — 재합성 후 카페명 일치율 33%(noisy 게이트)" 등 — 후기 50건·주제글 38건이어도
+    --   그 후기들이 다른 가게 얘기라는 뜻이다. **엔진이 맞고 내 선정이 틀렸다**(막는 게 옳다).
+    --   held 재평가는 cron-resynth의 held 레인(7일 주기)이 따로 한다 — 이 스크립트가 할 일이 아니다.
+    AND COALESCE(pipeline_status, '') NOT IN ('excluded', 'noise', 'held')
     AND lat IS NOT NULL AND raw_reviews IS NOT NULL
   ORDER BY synth_count DESC, id`;
 const cand = rows.filter((r) => !isFranchise(r.name) && !isNonCafe(r.name, r.cat) && (r.fresh || r.ever)).slice(0, CAP);
@@ -55,12 +60,16 @@ console.log(`   표본: ${cand.slice(0, 6).map((r) => `${r.name}(${r.synth_count
 if (!APPLY) { console.log("   → 실제로 돌리려면 --apply"); process.exit(0); }
 
 const [before] = await sql`SELECT count(*)::int c FROM cafes WHERE published`;
-let pub = 0, kept = 0, err = 0;
+// 🔴 2026-10-19 — **진행 로그를 중간에 찍는다.** 최종 요약만 찍었더니 프로세스가 중간에 끊겼을 때
+//   출력이 완전히 비어 아무것도 알 수 없었다(실측: 18곳 처리 후 사망, 로그 0줄).
+//   긴 배치는 "끝까지 돌았나"가 아니라 "어디까지 갔나"를 남겨야 한다.
+let pub = 0, kept = 0, err = 0, done = 0;
 for (const c of cand) {
   try {
     const r = await synthAndStore({ id: c.id, name: c.name, area: c.area ?? "" }, { refresh: false });
     if (r?.published) pub++; else kept++;
   } catch (e) { err++; if (err <= 3) console.log(`   ✗ ${c.name}: ${String(e).slice(0, 60)}`); }
+  if (++done % 25 === 0) console.log(`   … ${done}/${cand.length} · 공개 ${pub} · 그대로 ${kept} · 오류 ${err}`);
 }
 const [after] = await sql`SELECT count(*)::int c FROM cafes WHERE published`;
 console.log(`   처리 ${n(cand.length)}곳 → 공개 ${n(pub)}곳 · 그대로 ${n(kept)}곳 · 오류 ${n(err)}곳`);
