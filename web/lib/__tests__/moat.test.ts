@@ -28,6 +28,7 @@ import { effectVerdictFor } from "../runLedger";
 import { getContract, ALL_CONTRACT_IDS } from "../jobContract";
 import { STAGES } from "../pipelineStages";
 import { extractHighlights, extractCautions, reviewAge, tasteVector, tasteSimilarity, cardFacets } from "../cafeProfile";
+import { synthesize } from "../synthEngine";
 
 const AREA = ["서울", "강남구", "역삼동"];
 
@@ -609,4 +610,35 @@ test("카드 배지: 상한 개수만 보여준다", () => {
   const got = cardFacets(["조용·차분한", "작업·노트북", "디저트 맛집", "주차 편함"], 3);
   assert.equal(got.length, 3);
   for (const g of got) assert.ok(g.emoji, `${g.label}: 이모지가 없다`);
+});
+
+// ═══ ⑳ 정체성 문장(synthEngine) — 화면 첫 줄의 주장 강도. 2026-10-18 ═══
+//   🔴 발견: `빵` 문구만 "특히 **자주** 언급되는"이라고 **빈도를 단정**하는데 건수 가드가 없었다.
+//     실측: 공개 48,744곳 중 후기 6건 미만 11,059곳(23%) · 그중 빈도 주장 **4,768곳**.
+//     후기 **2건** 카페 3,212곳 중 **1,155곳(36%)**이 "자주 언급"을 주장했다 — 2건으로 '자주'는 거짓이다.
+//   같은 파일이 이미 같은 원칙을 쓴다(`직접로스팅`은 "1건은 환각 위험 → 2건+만 주장")고,
+//   결 축·주의점(cafeProfile)은 "표본 6건 미만 판단 안 함"인데 여기만 단정했다 — 규약 불일치였다.
+//   → 문장을 없애지 않고(SEO 본문·체감 유지) **'자주'라는 거짓 주장만** 사실 표현으로 바꾼다.
+const vr = (t: string) => ({ text: t, trust: "verified" as const });
+const BREAD = ["빵이 맛있고 케이크도 촉촉했어요", "크루아상이 바삭했어요 빵 종류가 많아요",
+  "케이크가 달지 않고 좋았어요", "소금빵이 유명하대요 빵이 맛있습니다"];
+
+test("정체성: 표본 3건 미만이면 '자주 언급'이라고 주장하지 않는다", () => {
+  const s = synthesize("리플렉트랩", BREAD.slice(0, 2).map(vr), ["서울", "강남구"], "카페,디저트>베이커리");
+  assert.ok(!s.identity.includes("자주"), `후기 2건으로 빈도를 단정했다: "${s.identity}"`);
+  assert.ok(s.identity.length > 5, "문장 자체를 없애면 안 된다(SEO 본문·체감)");
+});
+test("정체성: 표본 3건 이상이면 빈도 주장을 허용한다(과잉 교정 방지)", () => {
+  const s = synthesize("리플렉트랩", BREAD.slice(0, 3).map(vr), ["서울", "강남구"], "카페,디저트>베이커리");
+  assert.ok(s.identity.includes("자주"), `3건이면 빈도 주장이 맞다: "${s.identity}"`);
+});
+test("정체성: 후기 0건이면 중립 문장만", () => {
+  const s = synthesize("리플렉트랩", [], ["서울", "강남구"], "카페,디저트>카페");
+  assert.ok(!/자주|좋은 곳|맛집/.test(s.identity), `근거 0건으로 단정했다: "${s.identity}"`);
+  assert.equal(s.reviewCount, 0);
+});
+// 🫘 기존 원칙 회귀 — '직접 로스팅'은 1건이면 환각 위험이라 2건+만 주장한다.
+test("정체성: '직접 로스팅'은 1건으로 주장하지 않는다", () => {
+  const one = synthesize("리플렉트랩", [vr("직접 로스팅한 원두를 쓴다고 하네요")], ["서울", "강남구"], "카페,디저트>카페");
+  assert.ok(!one.identity.includes("직접 로스팅"), `1건으로 로스팅을 단정했다: "${one.identity}"`);
 });

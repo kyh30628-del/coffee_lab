@@ -135,6 +135,10 @@ const USE_PHRASE: Record<string, string> = {
   작업: "작업·공부하기 좋은 곳", 혼자: "혼자 조용히 머물기 좋은 곳", 수다: "함께 도란도란 이야기 나누기 좋은 곳",
   사진: "사진 찍기 좋은 분위기", 빵: "빵·디저트가 특히 자주 언급되는 곳", 애견: "애견동반이 가능한 곳",
 };
+// 표본이 적을 때 쓰는 포괄 문구 — 빈도 주장을 뺀 사실 표현(위 FREQ_CLAIM_MIN 주석 참조).
+const USE_PHRASE_LOW: Record<string, string> = {
+  빵: "빵·디저트를 함께 내는 곳",
+};
 // 동일 동네에 같은 최다용도 카테고리가 겹치면 '동+용도' 조합만으로 수십~수백 곳이 완전동일 문구로
 //   수렴한다(정합성조사 #536 '동+빵' 724곳 → #583 breadTerm 완화 → #605 잔여 135그룹/1,772곳: 사진/작업/
 //   혼자/수다는 disambiguator가 없어 그대로 판박이). 5개 용도 전부에 4차 disambiguator를 둔다: '빵'만
@@ -197,6 +201,19 @@ function iGa(term: string): "이" | "가" {
   const hasBatchim = code < 0 || code > 11171 ? true : code % 28 !== 0; // 한글 완성형 밖(영문 등)은 안전폴백
   return hasBatchim ? "이" : "가";
 }
+// 🔢 2026-10-18 — **빈도를 주장하는 문구는 최소 건수를 요구한다.**
+//   `빵` 문구만 "특히 **자주** 언급되는"이라고 **빈도를 단정**한다(나머지는 '좋은 곳'류 평가 표현).
+//   그런데 건수 가드가 없어서 **후기 2건으로도 "자주 언급"**이라고 썼다 — 실측:
+//     공개 48,744곳 중 후기 6건 미만 11,059곳(23%) · 그중 빈도 주장 **4,768곳**
+//     후기 2건 카페 3,212곳 중 **1,155곳(36%)**이 "자주 언급"을 주장했다.
+//   같은 파일이 이미 같은 원칙을 쓴다 — `직접로스팅`은 "1건은 환각 위험 → 2건+만 주장".
+//   결 축·주의점(cafeProfile)은 "표본 6건 미만이면 판단하지 않는다"인데 여기만 단정했다(규약 불일치).
+//   → 그 용도 신호가 FREQ_CLAIM_MIN건 미만이면 **빈도를 주장하지 않는 사실 표현**으로 바꾼다.
+//     문장을 없애지 않는다(SEO 본문·체감 유지) — '자주'라는 거짓 주장만 뺀다.
+const FREQ_CLAIM_MIN = 3;
+const LOW_SAMPLE_PHRASE: Record<string, (term: string) => string> = {
+  빵: (term) => `${term}·디저트를 함께 내는 곳`,
+};
 // 최다용도 카테고리별 구체 문구 템플릿 — USE_PHRASE(포괄형)를 대체할 때만 쓴다.
 const SPECIFIC_PHRASE: Record<string, (term: string) => string> = {
   빵: (term) => `${term}·디저트가 특히 자주 언급되는 곳`,
@@ -244,8 +261,15 @@ function buildIdentity(coords: Record<string, number | null>, basis: Record<stri
       if (term) { picked = { cat, term }; break; }
     }
     const topCat = useEntries[0][0];
-    if (picked && SPECIFIC_PHRASE[picked.cat]) p.push(wrapLocality(SPECIFIC_PHRASE[picked.cat](picked.term)));
-    else if (USE_PHRASE[topCat]) p.push(wrapLocality(USE_PHRASE[topCat]));
+    // 🔢 빈도 주장 가드(2026-10-18) — 그 용도 신호가 FREQ_CLAIM_MIN건 미만이면 '자주'를 말하지 않는다.
+    const enough = (cat: string) => (uses[cat] ?? 0) >= FREQ_CLAIM_MIN;
+    if (picked && SPECIFIC_PHRASE[picked.cat]) {
+      const low = !enough(picked.cat) && LOW_SAMPLE_PHRASE[picked.cat];
+      p.push(wrapLocality(low ? LOW_SAMPLE_PHRASE[picked.cat](picked.term) : SPECIFIC_PHRASE[picked.cat](picked.term)));
+    } else if (USE_PHRASE[topCat]) {
+      const low = !enough(topCat) && USE_PHRASE_LOW[topCat];
+      p.push(wrapLocality(low ? USE_PHRASE_LOW[topCat] : USE_PHRASE[topCat]));
+    }
   } else if (locality) p.push(`${locality}의 카페`);
   if (ops["원두판매"] && p.length < 4) p.push("원두도 살 수 있는 곳");
   if (ops["권위"]) p.push("매체·평단에 소개된 곳");
