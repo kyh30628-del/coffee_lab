@@ -7,10 +7,14 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "preflight": "node --import tsx scripts/preflight.mjs",
+    "preflight": "node --import tsx scripts/preflight.mjs && npm run test:moat && npm run schema:guard",
     "ship": "npm run preflight && npm run fixtures && npm run build && npm run smoke && git push origin main",
     "fixtures": "node scripts/fixtures-all.mjs",
-    "smoke": "node --import tsx scripts/smoke.mjs"
+    "smoke": "node --import tsx scripts/smoke.mjs",
+    "test:moat": "node --import tsx --test lib/__tests__/*.test.ts",
+    "schema:dump": "node --import tsx scripts/schema-dump.mjs",
+    "env:example": "./scripts/env-example.sh",
+    "schema:guard": "node scripts/schema-guard.mjs"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.168",

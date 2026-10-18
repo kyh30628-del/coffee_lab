@@ -274,7 +274,11 @@ export default async function CafePage({ params }: Props) {
   //   비용(실측): 인용문 본문 바이트 12개 1.7KB → 30개 4.2KB = **+2.6KB/곳**.
   //   ⚠️ 전부(413개)는 56.5KB/곳 = +54.8KB → 09-23 라우트 캐시 한도 초과 사고와 같은 급이라 안 한다.
   const moreQuotes = readable.slice(3, 30);
-  const showQuotes = shownQuotes.length >= 2;
+  // 📏 2026-10-18: 상한 2개 → 1개. 같은 날 displayQuote의 'empty' 판정을 고치면서(업종어·지역어만 남는
+  //   소음 조각 제외) 후기 2건짜리 카페 일부가 **인용문 블록을 통째로 잃었다**(불리한 표본 400곳 중 12곳).
+  //   소음을 지운 건 맞지만 블록까지 없애는 건 손실이라, 하나라도 있으면 보여준다.
+  //   실측: 후기 30건 미만 29,906곳 중 '표시가능 1개'가 2.4% → 약 731곳이 인용문을 되찾는다(층화표본 450곳 추정).
+  const showQuotes = shownQuotes.length >= 1;
   const highlights = extractHighlights(quotesAll, 6, evAll.map((e: any) => e?.date)); // 🕰️ 최근 후기 가중(09-24)
   // 💻 카공 세부 신호(2026-08-17) — "작업하기 좋음" 한 축으로 뭉뚱그리던 것을 콘센트·와이파이·자리로 쪼갠다.
   //   실측: 테마 수요 상위 8개 중 7개가 카공인데 정작 카공족이 묻는 건 이 시설 정보였다.

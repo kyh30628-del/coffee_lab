@@ -33,6 +33,10 @@ export function isReadableQuote(q: unknown, cafeName = ""): boolean {
 //   readable=false면 따옴표 없이 제목 줄로 렌더한다. 정리: 앞머리 [태그]·이모지 제거, 해시태그 제거, 영업시간/주소/전화
 //   정보카드 시작점에서 자르기, 잘린 꼬리(....)는 …로.
 const DQ_META_CUT = /(\s*[ㅁ□■▪️•⏰☎📍📞🕐]?\s*(영업시간|운영시간|오픈시간|주차\s*여부|주차\s*[:：]|주소\s*[:：]?|위치\s*[:：]|전화\s*[:：]?|문의\s*[:：]?|OPEN|CLOSE)|\s\d{1,2}:\d{2}\s*[~\-–])/i;
+// 'empty' 판정에서만 지우는 말 — 업종어와 지역 접미사. **표시 텍스트는 건드리지 않는다**(판정용 사본에만 적용).
+//   업종어는 그 자체로 정보가 없는 말만 넣는다("대형카페"의 '대형'처럼 수식어는 제외 — 평가일 수 있다).
+const DQ_VENUE_WORD = /(카페|커피|로스터리|로스터스|베이커리|디저트|브런치|스페셜티|coffee|cafe|roaster|bakery|dessert)/gi;
+const DQ_AREA_SUFFIX = /[가-힣]{2,4}(시|군|구|동|읍|면|로|길)(?=\s|$)/g;
 //   empty=true: 다듬고 나니 상호·지역 말고는 남는 말이 없는 조각("☕ 속초 메이트힐 로스터리 카페 (feat.") — 이건 보여줄 정보가 없어 뺀다.
 export function displayQuote(q: unknown, cafeName = ""): { text: string; readable: boolean; empty: boolean } {
   const raw = String(q ?? "").replace(/\s+/g, " ").trim();
@@ -47,6 +51,13 @@ export function displayQuote(q: unknown, cafeName = ""): { text: string; readabl
   if (t.length < 8) t = raw;                                              // 너무 깎이면 원문 그대로
   let rest = t;
   for (const tok of cafeName.split(/\s+/).filter((x) => x.length >= 2)) rest = rest.split(tok).join(" ");
+  // 🔴 2026-10-18 수리 — 위 주석("상호·지역 말고는 남는 말이 없는 조각은 뺀다")이 **지켜지지 않았다.**
+  //   이름 토큰만 지우고 업종어·지역어를 남겨서, 정보가 0인 조각이 인용문으로 화면에 나갔다.
+  //   실측 사례: "유어스베이크샵 목동본점 유어스베이크샵 목동본점 서울 양천구 목동…", "당진 대형카페 아미루트!"
+  //   → 업종어와 지역 접미사(…시/군/구/동/읍/면/로/길)도 지운 뒤에 남는 말로 판정한다.
+  //   영향 실측(표본 300곳·인용문 11,544개): 추가로 빠지는 것 169개 = 표시분의 **1.48%**, 전부 정보 0 조각.
+  //   ⚠️ 업종어 목록은 보수적으로 유지한다 — 넓히면 "로스팅이 깊어요" 같은 실제 평가가 빈 조각으로 오판된다.
+  rest = rest.replace(DQ_VENUE_WORD, " ").replace(DQ_AREA_SUFFIX, " ");
   const empty = (rest.match(/[\p{L}]/gu) ?? []).length < 6;
   return { text: truncated || t.length < raw.length - 4 ? t + "…" : t, readable: false, empty };
 }
