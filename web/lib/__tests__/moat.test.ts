@@ -12,6 +12,7 @@
 // 실행: npm run test:moat
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   nameCoherence, brandTokenOverlap, coreTokens, nearDuplicateCafeName,
   detectCampaignCluster, isPopupRotatingVenue, cleanCafeName, verifyReview,
@@ -23,6 +24,7 @@ import { mergeRawEvidence, shouldBlockShrink } from "../evidenceMerge";
 import { overUnpubCapForTest } from "../synthStore";
 import { effectVerdictFor } from "../runLedger";
 import { getContract, ALL_CONTRACT_IDS } from "../jobContract";
+import { STAGES } from "../pipelineStages";
 
 const AREA = ["서울", "강남구", "역삼동"];
 
@@ -406,4 +408,64 @@ test("계약: 구현되지 않은 effect 종류를 선언하지 않는다", () =
     const k = getContract(j).effect?.kind;
     assert.ok(!k || IMPLEMENTED.has(k), `${j}: 구현 없는 effect 종류 "${k}" — 선언만 하면 빈껍데기가 된다`);
   }
+});
+
+// ── ⑯ 🪜 파이프라인 단계 모델 — "체계적으로 구조화된 파이프라인"의 뼈대. (2026-10-18)
+//   실측: 계량을 남긴 잡 **42종 중 '남은 일'을 보고하는 건 2종**뿐이었다. 그래서
+//   "할 일이 없어서 0건"과 "막혀서 0건"을 구분할 수 없었다 — 12일 무경보 사고의 구조적 원인.
+//   단계 정의를 `lib/pipelineStages.ts` 한 곳에 모았다(34개 라우트에 흩어 놓으면 '부분 적용' 병이 재발한다).
+//   🔑 철칙: 단계의 적체 정의는 **그 단계를 전진시키는 잡의 큐 정의와 같아야 한다.**
+//      이 모델을 만들면서 내 정의가 3번 틀렸고 전부 잡과 대조해 잡았다:
+//        ④ 임베딩  `embedding IS NULL`만 셈 → 149곳 (잡은 '낡은 임베딩'까지 세어 9,056곳)
+//        ⑤ 순환    `synth_updated` 사용 → 11,858곳 (순환 기준은 `synth_checked_at`, 실제 4,258곳)
+//        날짜      JS `toISOString()`이 KST를 UTC로 되돌려 머리글이 하루 밀렸다
+test("파이프라인 단계 모델: 단계마다 소유 잡과 적체 정의가 있다", () => {
+  assert.ok(STAGES.length >= 7, "단계가 줄었다 — 파이프라인 모델이 흐려지면 어디가 막혔는지 모른다");
+  for (const s of STAGES) {
+    assert.ok(s.id && s.id.length > 1, "단계 이름이 없다");
+    assert.ok(s.owner && s.owner.length > 1, `${s.id}: 적체가 쌓일 때 **누가 전진시키는지**가 없다`);
+    assert.ok(s.note && s.note.length > 5, `${s.id}: 무엇이 '남은 일'인지 설명이 없다`);
+    assert.equal(typeof s.backlog, "function", `${s.id}: 적체 측정이 없다`);
+  }
+});
+test("파이프라인 단계 모델: 순환 단계는 명시된다(0이 목표가 아니다)", () => {
+  const cyclic = STAGES.filter((s) => s.cyclic).map((s) => s.id);
+  assert.ok(cyclic.length >= 1, "순환 단계 표시가 사라졌다 — 재합성처럼 0이 될 수 없는 단계를 '막힘'으로 오판한다");
+});
+
+// ── ⑰ 🔓 보류에서 나오는 길 — "들어가는 문만 있는 방"을 막는다. (2026-10-18)
+//   실측: 보류 7,836곳 중 해제 레인이 지금 풀 수 있는 곳이 **0곳**이었다.
+//     · `holdZeroEvidenceSuspects`의 해제 조건은 새 그라운딩 판정(grounded=true)을 요구하는데,
+//       그라운딩은 **공개 카페만** 본다 → 보류되면 재검 자체가 안 된다(영구 교착).
+//       (보류 7,836곳의 판정 신선도: 없음 7,474 · 낡음 362 · **유효 0**)
+//     · `finalizePipeline`의 해제 레인은 `exclude_reason = ''`(사유 비어 있어야 함)인데,
+//       09-16·17 소급 정정이 사유를 적어 넣었다: "수집 근거 0건 — **held 재평가 대기**".
+//       문구가 재평가를 약속하는데 재평가 레인이 그 사유를 건너뛴다.
+//   09-24 주석이 이미 같은 구멍("그 대기열이 없었다")을 적어뒀는데 **문구만 바뀌어 되살아났다.**
+//   이 테스트는 그 사유가 해제 후보에서 다시 빠지면 깨진다.
+function laneSrc(src: string): string {
+  const a = src.indexOf("🔓 held 해제 레인");
+  const b = src.indexOf("해제 실패가 승격을 막지 않는다", a);
+  assert.ok(a >= 0 && b > a, "해제 레인 구간을 찾지 못했다 — 앵커 문구가 바뀌었다면 이 테스트부터 고칠 것");
+  return src.slice(a, b);
+}
+test("보류 해제: '재평가 대기' 사유는 해제 후보에 포함된다", () => {
+  const src = readFileSync(new URL("../synthStore.ts", import.meta.url), "utf8");
+  // ⚠️ 끝 앵커는 **이 레인 안에서만 나오는 문구**여야 한다 — 처음엔 `await loadCriteria(); // 수도권 좌표박스`를
+  //   썼다가 그 문구가 파일 앞쪽(healOutOfBox)에 먼저 나와 잘라낸 구간이 빈 문자열이 됐고 테스트가 거짓 실패했다.
+  const lane = laneSrc(src);
+  assert.ok(lane.includes("재평가 대기%"),
+    "'수집 근거 0건 … 재평가 대기' 사유가 해제 후보에서 빠졌다 — 그러면 보류에서 나오는 길이 다시 막힌다");
+  // 가드가 함께 남아 있어야 한다 — 사유만 넓히고 가드를 빼면 프랜차이즈·비카페가 공개된다.
+  for (const guard of ["synth_coherence", "offctx_rate", "naver_category", "audit_flags",
+                       "isFranchise", "isNonCafe", "isSnackStall", "isStructuralPhantom", "isUnmannedCafe"]) {
+    assert.ok(lane.includes(guard), `해제 레인에서 가드 ${guard}가 사라졌다 — 비카페·프랜차이즈가 공개된다`);
+  }
+  assert.ok(/slice\(0,\s*200\)/.test(lane), "1회 200곳 상한이 사라졌다 — 대량 공개 변동 위험");
+});
+test("보류 해제: 판정 결과(규칙 위반·오염) 사유는 포함하지 않는다", () => {
+  const src = readFileSync(new URL("../synthStore.ts", import.meta.url), "utf8");
+  const lane = laneSrc(src);
+  assert.ok(!lane.includes("규칙 위반%"), "'규칙 위반(프랜차이즈·비카페)'은 재평가 대기가 아니라 판정 결과다 — 풀면 안 된다");
+  assert.ok(!lane.includes("오염%"), "'오염' 사유는 판정 결과다 — 풀면 안 된다");
 });

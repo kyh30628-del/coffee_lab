@@ -21,3 +21,7 @@ node scripts/schema-guard.mjs || true
 #   그 전까지 effect_ok가 30일 2,372건 전부 NULL이었다(선언만 있고 계산 안 됨). 고쳤으니 증거를 매일 남긴다.
 #   비용 0: 집계 쿼리 2개(작은 컬럼). 로컬 실행 → Vercel 0.
 node --import tsx scripts/effect-watch.mjs || true
+# 🪜 파이프라인 적체 보고(2026-10-18) — 단계별 '남은 일'과 추세. 적체가 줄지 않으면 그 단계가 막힌 것이다.
+#   왜: 계량을 남긴 잡 42종 중 '남은 일'을 보고하는 건 2종뿐이었다 → 어느 단계가 막혔는지 알 수 없었다.
+#   비용: 단계별 COUNT 7회(작은 컬럼) + 스냅샷 7행. 하루 1회. 로컬 실행 → Vercel 0.
+node --import tsx scripts/pipeline-report.mjs || true

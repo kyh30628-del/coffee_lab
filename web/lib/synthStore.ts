@@ -1113,8 +1113,22 @@ export async function finalizePipeline(): Promise<{ promoted: number; names: str
   //     recheckTrigger(excluded 레인)가 쓰는 것과 **같은 규칙 세트**다. 한쪽만 고치지 않는다.
   let released = 0;
   try {
+    // 🔴 2026-10-18 수리 — 이 레인이 **한 곳도 풀 수 없었다**(실측 0곳).
+    //   조건이 `exclude_reason = ''`(사유가 비어 있어야 함)인데, 09-16·17 소급 정정이 보류 6,980곳에
+    //   **사유를 적어 넣었다**: "수집 근거 0건 — held 재평가 대기".
+    //   문구가 '재평가 대기'라고 약속하는데 **재평가하는 레인이 그 사유를 건너뛴다** — 위 ③ 주석이
+    //   이미 "그 대기열이 없었다"고 적어둔 바로 그 구멍이 사유 문구만 바꿔 되살아난 것이다.
+    //   실측: 보류 7,836곳 중 그라운딩 판정이 **유효한 것 0곳**(없음 7,474·낡음 362) →
+    //   holdZeroEvidenceSuspects의 해제 조건(grounded=true 요구)도 영구 교착이다.
+    //   → '재평가 대기' 사유를 후보에 포함한다. **다른 가드는 그대로**다:
+    //     일치율 0.5+ · offctx<0.2 · 카테고리 존재 · 미해결 감사플래그 없음 · TS 규칙 5종 · 1회 200곳 상한.
+    //   실측 효과: +128곳(검증 4)이 공개 심사로 올라간다. 추가분 카테고리는 전부 카페·디저트·베이커리
+    //   계열이고 비카페 0건이었다(바베큐장 1곳은 위 가드에서 걸렸다 — 손으로 만든 조건보다 이 가드가 정확하다).
+    //   ⚠️ '규칙 위반(프랜차이즈·비카페)'·'오염' 사유는 여전히 제외한다 — 그건 재평가 대기가 아니라 판정 결과다.
     const cand = (await sql`SELECT id, name, naver_category cat FROM cafes c
-      WHERE NOT c.published AND c.pipeline_status = 'held' AND COALESCE(c.exclude_reason, '') = ''
+      WHERE NOT c.published AND c.pipeline_status = 'held'
+        AND (COALESCE(c.exclude_reason, '') = ''
+             OR COALESCE(c.exclude_reason, '') LIKE '수집 근거 0건%재평가 대기%')
         AND c.synth_grade IN ('검증','참고')
         -- 🔓 2026-10-17: 임베딩 조건 제거(위 승격 주석과 같은 근거 — 검색 전용이고 이용자 0명).
         AND COALESCE(c.synth_coherence, 0) >= 0.5 AND COALESCE(c.offctx_rate, 0) < 0.2
