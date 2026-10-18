@@ -29,4 +29,7 @@ const warn = [];
 if (r.thin > 0) warn.push(`🔴 공개중 후기1건 ${n(r.thin)}곳`);           // CEO 지시: 1건은 비공개
 if (r.odd > 0) warn.push(`🔴 공개중 '후보' 등급 ${n(r.odd)}곳`);          // 있어선 안 되는 상태
 if (d !== null && d <= -50) warn.push(`🔴 공개 순감 ${n(-d)}곳`);         // 소비자 화면이 줄었다
-console.log(`공개 ${n(r.pub)}${d === null ? "" : ` (${d >= 0 ? "+" : ""}${n(d)})`} · 재합성 분당 ${(r.m5 / 5).toFixed(0)}곳 · 구제 ${n(s.resc)}건 · $${s.spent.toFixed(4)}/100 (원장 ${s.rows}행)${warn.length ? " · " + warn.join(" · ") : ""}`);
+// ⚠️ '재합성 분당'은 **수거 단계에서만** 의미가 있다. 제출 전 **빌드 단계**는 후보만 계산하고
+//   storeResult를 부르지 않으므로 synth_checked_at이 안 찍혀 0으로 보인다(멈춘 게 아니다).
+//   그래서 0일 때는 "빌드 중일 수 있음"을 함께 적는다 — 0을 '정지'로 오해해 집행을 세운 이력이 있다.
+console.log(`공개 ${n(r.pub)}${d === null ? "" : ` (${d >= 0 ? "+" : ""}${n(d)})`} · 재합성 분당 ${(r.m5 / 5).toFixed(0)}곳${r.m5 === 0 ? "(빌드 중일 수 있음)" : ""} · 구제 ${n(s.resc)}건 · $${s.spent.toFixed(4)}/100 (원장 ${s.rows}행)${warn.length ? " · " + warn.join(" · ") : ""}`);
