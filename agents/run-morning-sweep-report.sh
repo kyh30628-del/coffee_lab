@@ -1,9 +1,10 @@
 #!/bin/zsh
+COFFEE_ROOT="${COFFEE_ROOT:-${0:A:h:h}}"   # 📦 2026-10-18 이식성 — 러너는 agents/ 안에 있으므로 두 단계 위가 저장소 뿌리.
 # 📋 아침 스윕 보고(매일 08:20) — 07:05 스윕이 끝난 뒤 종합 리포트를 남긴다.
 #   3종 세트: 이 러너 + com.coffee.morning-sweep-report.plist + web/lib/jobTeams.ts + SCHEDULE.md
 #   왜 잡인가: "내일 아침 보고하겠다"가 반복해서 안 지켜졌다(CEO 2026-09-17). 기억에 기대지 않는다.
-export PATH="/Users/wangwida/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
-cd /Users/wangwida/coffee-platform/web || exit 1
+export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+cd "$COFFEE_ROOT/web" || exit 1
 trap '(node --import tsx scripts/heartbeat.mjs morning-sweep-report $? >> /tmp/coffee-heartbeat.log 2>&1)' EXIT
 node --import tsx scripts/morning-sweep-report.mjs
 # 깊은 수집 일일 보고(2026-10-17, CEO 요구) — 처리 수·검증 후기 증감·ISR write·Neon 쓰기·네이버 사용률.

@@ -1,3 +1,4 @@
+COFFEE_ROOT="${COFFEE_ROOT:-${0:A:h:h}}"   # 📦 2026-10-18 이식성 — 러너는 agents/ 안에 있으므로 두 단계 위가 저장소 뿌리.
 # 기획조정실장·에이전트 공용 러너 — 재시도+검증+토큰 실측 로깅 + 리프별 하트비트
 # 2026-07-02 전수감사 수리:
 #   ①성공 판정 = '"result"' 문자열 존재 → "is_error":false 로 교정(401 에러 JSON도 성공 처리돼
@@ -36,7 +37,7 @@ auth_precheck() {
 #   그 오탐이 관제탑에 MED 이슈로 상주했고, 덮으려고 orchestrator에 '복구됨' 주의까지 붙어 있었다(증상 치료).
 #   → 기록·알림은 **호출부가 최종 실패를 확정한 뒤에만** 한다.
 auth_alarm() {
-  (cd /Users/wangwida/coffee-platform/web && node --import tsx scripts/heartbeat.mjs "auth-precheck" 1 \
+  (cd "$COFFEE_ROOT/web" && node --import tsx scripts/heartbeat.mjs "auth-precheck" 1 \
      "OAuth 세션 만료 — 터미널에서 claude 로그인 1회 필요(에이전트 사이클 중단)" >> /tmp/coffee-heartbeat.log 2>&1)
   # 로컬 즉시 알림(비용 0·외부 의존 0). Slack 미설정 상태라 이게 유일한 즉시 채널이다.
   osascript -e 'display notification "터미널에서 claude 로그인 1회 필요" with title "동네 커피 노트 — 에이전트 정지" sound name "Basso"' 2>/dev/null || true
@@ -63,15 +64,15 @@ claude_run() {
     else
     auth_alarm
     echo "[중단] $(date) 인증 만료 — 재시도 생략" >> "$log"
-    (cd /Users/wangwida/coffee-platform/web && node --import tsx scripts/heartbeat.mjs "$name" 1 \
+    (cd "$COFFEE_ROOT/web" && node --import tsx scripts/heartbeat.mjs "$name" 1 \
        "인증 만료로 미실행(재시도 생략) — claude 로그인 후 자동 정상화" >> /tmp/coffee-heartbeat.log 2>&1)
     return 1
     fi
   fi
   jf="${log%.log}.json"
   # 최근 받은 피드백(대표님·동료평가)을 프롬프트에 주입 — 표시가 아니라 실제 업무에 반영되게(동기부여·개선 양분)
-  fb=$(cd /Users/wangwida/coffee-platform/web && node --import tsx scripts/agent-feedback.mjs "$name" 2>/dev/null)
-  MODEL=$(cd /Users/wangwida/coffee-platform/web && node scripts/agentModel.mjs "$name" 2>/dev/null); case "$MODEL" in sonnet|haiku) ;; *) MODEL=sonnet;; esac  # 🎛️ 잡별 모델(품질 안전: 미해석=sonnet)
+  fb=$(cd "$COFFEE_ROOT/web" && node --import tsx scripts/agent-feedback.mjs "$name" 2>/dev/null)
+  MODEL=$(cd "$COFFEE_ROOT/web" && node scripts/agentModel.mjs "$name" 2>/dev/null); case "$MODEL" in sonnet|haiku) ;; *) MODEL=sonnet;; esac  # 🎛️ 잡별 모델(품질 안전: 미해석=sonnet)
   for attempt in 1 2 3; do
     claude -p "${fb}
 
@@ -83,13 +84,13 @@ claude_run() {
 동료평가: <이번 사이클에 관찰한 다른 팀/에이전트 최소 1곳을 '대상 | 한 줄 평가'로 반드시. 팩트 기반·구체적. 정말 관찰 근거가 없을 때만 이 줄 생략('없음' 쓰지 마라). 여러 팀이면 줄 나눠 최대 3.>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" --append-system-prompt-file "$prompt_file" --model "$MODEL" --dangerously-skip-permissions --allowedTools "$tools" --max-turns 80 --output-format json > "$jf" 2>"$log"
     if [ -s "$jf" ] && grep -q '"is_error":false' "$jf"; then
-      node -e 'const fs=require("fs");try{const d=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const u=d.usage||{};const fullIn=(u.input_tokens||0)+(u.cache_creation_input_tokens||0);const cacheRead=(u.cache_read_input_tokens||0);const row=[new Date().toISOString(),process.argv[2],fullIn,(u.output_tokens||0),(d.total_cost_usd||0).toFixed(4),(d.num_turns||0),cacheRead].join("\t");fs.appendFileSync("/Users/wangwida/coffee-platform/agent-reports/USAGE.tsv",row+"\n");}catch(e){}' "$jf" "$name" 2>/dev/null
-      (cd /Users/wangwida/coffee-platform/web && node --import tsx scripts/agent-outcome.mjs "$name" "$jf" >> /tmp/coffee-heartbeat.log 2>&1)
+      node -e 'const fs=require("fs");try{const d=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const u=d.usage||{};const fullIn=(u.input_tokens||0)+(u.cache_creation_input_tokens||0);const cacheRead=(u.cache_read_input_tokens||0);const row=[new Date().toISOString(),process.argv[2],fullIn,(u.output_tokens||0),(d.total_cost_usd||0).toFixed(4),(d.num_turns||0),cacheRead].join("\t");fs.appendFileSync("$COFFEE_ROOT/agent-reports/USAGE.tsv",row+"\n");}catch(e){}' "$jf" "$name" 2>/dev/null
+      (cd "$COFFEE_ROOT/web" && node --import tsx scripts/agent-outcome.mjs "$name" "$jf" >> /tmp/coffee-heartbeat.log 2>&1)
       return 0
     fi
     snippet=$(grep -o '"result":"[^"]\{0,110\}' "$jf" 2>/dev/null | head -1)
     echo "[재시도 $attempt] $(date) ${snippet}" >> "$log"; sleep 30
   done
-  (cd /Users/wangwida/coffee-platform/web && node --import tsx scripts/heartbeat.mjs "$name" 1 "3회 실패: ${snippet:-무응답/빈 JSON}" >> /tmp/coffee-heartbeat.log 2>&1)
+  (cd "$COFFEE_ROOT/web" && node --import tsx scripts/heartbeat.mjs "$name" 1 "3회 실패: ${snippet:-무응답/빈 JSON}" >> /tmp/coffee-heartbeat.log 2>&1)
   return 1
 }

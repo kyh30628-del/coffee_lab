@@ -1,9 +1,10 @@
 #!/bin/zsh
-export PATH="/Users/wangwida/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
-cd /Users/wangwida/coffee-platform/web || exit 1
+COFFEE_ROOT="${COFFEE_ROOT:-${0:A:h:h}}"   # 📦 2026-10-18 이식성 — 러너는 agents/ 안에 있으므로 두 단계 위가 저장소 뿌리.
+export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+cd "$COFFEE_ROOT/web" || exit 1
 # 💓 하트비트 — 5분 주기 종료마다 agent_runs 기록 → 워처 정지 감지(담당: 기획조정실 직할 자율진단).
-trap 'c=$?; (cd /Users/wangwida/coffee-platform/web && node --import tsx scripts/heartbeat.mjs audit-watch $c >> /tmp/coffee-heartbeat.log 2>&1)' EXIT
-LOGF=/Users/wangwida/coffee-platform/agent-reports/logs/orchestrator.log
+trap 'c=$?; (cd "$COFFEE_ROOT/web" && node --import tsx scripts/heartbeat.mjs audit-watch $c >> /tmp/coffee-heartbeat.log 2>&1)' EXIT
+LOGF=$COFFEE_ROOT/agent-reports/logs/orchestrator.log
 RD='const{neon}=require("@neondatabase/serverless");const fs=require("fs");const url=fs.readFileSync(".env.local","utf8").match(/DATABASE_URL="?([^"\n]+)/)[1].trim();const sql=neon(url);'
 
 # 🐶 감시자의 감시자(2026-07-02) — cron-selfaudit(Vercel) 자신이 죽으면 감시망 전체가 무음 소멸하던 P0.
@@ -40,7 +41,7 @@ if [ "${PENDING:-0}" -gt 0 ]; then
   #   과거 consume→실패로 사건이 영구 소실(7/1 17:29 실사고). 다음 5분 틱이 재시도.
   #   ⚠️ 재시도 상한 2회(retries<2, 2026-07-02): 무한 복원이 레이트리밋 등 지속 실패 시 5분마다 재시도 폭풍을
   #     만들던 것 차단. 상한 초과분은 consumed로 남겨 종결(근본원인은 issues 보드+정기 self-audit이 백스톱).
-  if ! bash /Users/wangwida/coffee-platform/agents/run-self-audit-agent.sh; then
+  if ! bash $COFFEE_ROOT/agents/run-self-audit-agent.sh; then
     echo "[$(date)] ⚠️ 자율진단 실패 → 트리거 복원(재시도 ≤2회)" >> "$LOGF"
     node -e "$RD(async()=>{try{await sql\`ALTER TABLE audit_triggers ADD COLUMN IF NOT EXISTS retries INT DEFAULT 0\`;await sql\`UPDATE audit_triggers SET status='pending', consumed_at=NULL, retries=COALESCE(retries,0)+1 WHERE status='consumed' AND consumed_at > now() - interval '30 minutes' AND COALESCE(retries,0) < 2\`}catch(e){}})()" 2>/dev/null
   fi

@@ -1,10 +1,11 @@
 #!/bin/zsh
+COFFEE_ROOT="${COFFEE_ROOT:-${0:A:h:h}}"   # 📦 2026-10-18 이식성 — 러너는 agents/ 안에 있으므로 두 단계 위가 저장소 뿌리.
 # 단일 개발 태스크(병렬 1워커) — 전용 워크트리에서 에이전트가 코딩·빌드만, git 조작은 러너가 전역 락으로 직렬화.
 #   git 레이스로 메인 레포가 오염된 사고(2026-07-01) 재발 방지: worktree add/remove/commit 전부 락 안에서만.
-export PATH="/Users/wangwida/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
 id=$1
 [ -z "$id" ] && exit 1
-ROOT=/Users/wangwida/coffee-platform
+ROOT=$COFFEE_ROOT
 WT=/tmp/coffee-dev-$id
 BR=dev/task-$id
 GLOCK=/tmp/coffee-gitrepo.lock   # 메인 레포 git 조작 전역 락(macOS엔 flock 없어서 mkdir 원자성 사용)

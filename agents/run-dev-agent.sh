@@ -1,8 +1,9 @@
 #!/bin/bash
+COFFEE_ROOT="${COFFEE_ROOT:-${0:A:h:h}}"   # 📦 2026-10-18 이식성 — 러너는 agents/ 안에 있으므로 두 단계 위가 저장소 뿌리.
 # 개발 실행 디스패처(병렬) — 승인·미빌드 dev_task를 최대 K건 원자적 클레임 → 각각 전용 워크트리에서 동시 구현·검증.
 #   대상 없으면 LLM 안 부름(토큰0). 워크트리 격리 + 전역 git락으로 병렬 안전(2026-07-01 레이스 사고 후).
-export PATH="/Users/wangwida/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
-ROOT=/Users/wangwida/coffee-platform
+export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+ROOT=$COFFEE_ROOT
 cd "$ROOT/web" || exit 1
 K=${DEV_PARALLEL:-3}   # 동시 빌드 상한
 IDS=$(node --import tsx scripts/dev-claim.mjs "$K" 2>/dev/null)

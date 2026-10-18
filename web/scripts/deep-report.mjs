@@ -57,4 +57,18 @@ console.log(`  네이버 ${n(used)}/${n(nb.NAVER_DAILY_QUOTA)} (${(used / nb.NAV
 console.log(`     수집 예약(동적) ${n(reserve)} · 발굴·깊은수집 게이트 used<${n(gate)} · 남은 유휴 ${n(Math.max(0, gate - used))}콜`);
 console.log(`  남은 대상 ${n(remain)}곳 · 하루 300곳이면 ${Math.ceil(remain / 300)}일`);
 console.log(`  원본 평균 크기 ${(sz / 1024).toFixed(1)}KB(표본 300곳, 상한 600건≈179KB)`);
-if (Number(d.shrank ?? 0) > 0) console.log(`  🔴 검증 후기가 줄어든 곳 ${n(d.shrank)}곳 — 급감 차단기를 통과한 감소다. 즉시 확인 필요.`);
+// 🚨 2026-10-18 경보 보정 — 그 전엔 **1건만 줄어도 🔴**를 띄웠다(실측: 17곳 중 14곳이 1~5건 감소).
+//   그 감소의 정체는 대개 **규칙을 엄격하게 고친 결과**(같은 원본·더 엄격한 판정)이고 소비자 손상이 아니다.
+//   CEO 규칙: **빨강은 지금 소비자 화면이 실제로 망가졌을 때만.** 안 고칠 걸 빨갛게 띄우면 진짜 문제가 묻힌다.
+//   → 🔴는 '공개 + 검증등급 + 20% 이상 또는 10건 이상' 감소만. 나머지는 ⚠️ 주의로 센다.
+if (Number(d.shrank ?? 0) > 0) {
+  const big = (await sql`SELECT count(*)::int n, COALESCE(sum(dl.count_before - dl.count_after),0)::int lost
+    FROM deep_log dl JOIN cafes c ON c.id = dl.cafe_id
+    WHERE dl.at > now() - ${since}::interval AND dl.count_after < dl.count_before
+      AND c.published AND c.synth_grade = '검증'
+      AND (dl.count_before - dl.count_after >= 10
+           OR dl.count_after < dl.count_before * 0.8)`)[0];
+  const minor = Number(d.shrank) - Number(big.n ?? 0);
+  if (Number(big.n ?? 0) > 0) console.log(`  🔴 공개·검증 카페가 크게 줄었다 ${n(big.n)}곳(−${n(big.lost)}건) — 즉시 확인. 급감 차단기를 통과한 감소다.`);
+  if (minor > 0) console.log(`  ⚠️ 소폭 감소 ${n(minor)}곳 — 대개 판정 규칙을 엄격하게 고친 결과다(소비자 손상 아님).`);
+}
