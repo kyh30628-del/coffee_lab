@@ -112,7 +112,10 @@ const COLLECT_RESERVE_MIN = Number(process.env.NAVER_COLLECT_RESERVE_MIN || 1000
 export async function collectReserveNow(): Promise<number> {
   try {
     const backlog = await collectBacklog();
-    return Math.min(NAVER_COLLECT_RESERVE, Math.max(COLLECT_RESERVE_MIN, Math.ceil(backlog * COLLECT_PER_CAFE)));
+    // 🔴 2026-10-19 — gap 층 몫을 **하루 소화량 한도로** 더한다(gapBacklog 주석 참조).
+    //   그 전엔 gap에 일이 3,211곳 있어도 예약이 최소치라 발굴이 쿼터를 먼저 다 쓸 수 있었다.
+    const gap = Math.min(await gapBacklog(), GAP_DAILY_CAPACITY);
+    return Math.min(NAVER_COLLECT_RESERVE, Math.max(COLLECT_RESERVE_MIN, Math.ceil((backlog + gap) * COLLECT_PER_CAFE)));
   } catch {
     return NAVER_COLLECT_RESERVE; // 적체를 못 읽으면 보수적으로(종전 동작)
   }
@@ -143,12 +146,33 @@ export async function nonClosureMayUse(): Promise<{ ok: boolean; remaining: numb
 //   발굴을 다시 켠다 — 하루 수집 소화량(실측 907~1,447곳)의 약 2~3배까지는 허용.
 const COLLECT_BACKLOG_STOP = Number(process.env.COLLECT_BACKLOG_STOP || 3000);
 
-/** 후기 수집 대기(적재만 되고 후기 없는 카페) 수. */
+/** 후기 수집 대기(적재만 되고 후기 없는 카페) 수 — **신규 유입 압력**. discoveryMayRun의 정지 임계가 이걸 본다. */
 export async function collectBacklog(): Promise<number> {
   const r = (await sql`SELECT count(*)::int n FROM cafes WHERE pipeline_status='new' AND raw_reviews IS NULL`
     .catch(() => [])) as any[];
   return Number(r[0]?.n ?? 0);
 }
+
+// 🔴 2026-10-19 — collect-shard.mjs 3층 'gap'(원본 없음·글 0건)의 대기 수.
+//   왜 따로 세는가: 위 collectBacklog는 `pipeline_status='new'`만 보는데, gap 층이 처리하는 카페는
+//   status가 rejected/held/(없음)이라 **0으로 보인다**. 그러면 collectReserveNow가 최소 예약만
+//   돌려주고, 발굴이 쿼터를 먼저 다 써 **수집 창이 또 굶는다**(2026-08-25 사고 클래스 그대로).
+//   ⚠️ **discoveryMayRun(정지 임계 3,000)에는 넣지 않는다.** gap은 옛 카페를 따라잡는 일회성 적체이지
+//      신규 유입 압력이 아니다. 여기에 넣으면 3,211 > 3,000으로 **발굴이 통째로 멈춘다**(잘못된 결과).
+//   정의는 collect-shard.mjs의 gap 큐와 **같게** 맞춘다 — 갈라지면 예약이 거짓이 된다
+//     (「단계의 적체 정의는 그 단계를 전진시키는 잡의 큐 정의와 글자까지 같아야 한다」).
+export async function gapBacklog(): Promise<number> {
+  const r = (await sql`SELECT count(*)::int n FROM cafes
+    WHERE published = false
+      AND COALESCE(pipeline_status, '') NOT IN ('excluded', 'noise')
+      AND (raw_reviews IS NULL OR COALESCE(jsonb_array_length(raw_reviews), 0) = 0)
+      AND (raw_checked_at IS NULL OR raw_checked_at < now() - interval '30 days')
+      AND lat IS NOT NULL`.catch(() => [])) as any[];
+  return Number(r[0]?.n ?? 0);
+}
+// 하루에 gap이 실제로 소화할 수 있는 카페 수 = 창당 상한(COLLECT_GAP_CAP) × 수집 창 4개(08:15·12:15·16:15·20:15).
+//   예약은 **하루 소화량만** 잡는다. 적체 전체(3,211곳)를 예약하면 발굴을 과하게 굶긴다.
+const GAP_DAILY_CAPACITY = Number(process.env.COLLECT_GAP_CAP || 400) * 4;
 
 /** 발굴을 더 해도 되나 — 적체가 임계 미만일 때만. 임계 초과면 남은 쿼터는 수집이 쓴다. */
 export async function discoveryMayRun(): Promise<{ ok: boolean; backlog: number; limit: number }> {

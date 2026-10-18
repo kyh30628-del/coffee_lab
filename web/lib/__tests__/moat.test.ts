@@ -890,3 +890,35 @@ test("네이버 쿼터: bumpNaver는 발굴·수집·마이닝 세 경로에서 
     "거꾸로였던 옛 주석이 되살아났다");
   assert.ok(/앱 전체 공유/.test(budget), "공유 한도라는 사실이 단일 출처에 적혀 있어야 한다");
 });
+
+// 🚦 적체 정의 정합 — 「단계의 적체 정의는 그 단계를 전진시키는 잡의 큐 정의와 글자까지 같아야 한다」.
+//   2026-10-19 실측 사고: 수집 레인에 3,211곳의 일이 생겼는데 `collectBacklog`은 `pipeline_status='new'`만
+//   세서 0을 돌려줬다 → 수집 예약이 최소치 → 발굴이 쿼터를 먼저 다 쓰면 수집 창이 또 굶는다(08-25 사고 클래스).
+//   🔴 동시에, gap 적체를 `discoveryMayRun`(정지 임계 3,000)에 넣으면 3,211 > 3,000으로 **발굴이 통째로 멈춘다**.
+//   그래서 둘을 분리했다: 예약 계산엔 넣고, 발굴 정지 판정엔 넣지 않는다.
+test("쿼터 적체: gap 큐 정의가 수집 레인과 같다(예약이 거짓이 되지 않게)", () => {
+  const budget = readFileSync(new URL("../naverBudget.ts", import.meta.url), "utf8");
+  const shard = readFileSync(new URL("../../scripts/collect-shard.mjs", import.meta.url), "utf8");
+  const must = [
+    /COALESCE\(pipeline_status, ''\) NOT IN \('excluded', 'noise'\)/,
+    /raw_reviews IS NULL OR COALESCE\(jsonb_array_length\(raw_reviews\), 0\) = 0/,
+    /raw_checked_at IS NULL OR raw_checked_at < now\(\) - interval '30 days'/,
+    /lat IS NOT NULL/,
+  ];
+  for (const re of must) {
+    assert.ok(re.test(budget), `naverBudget.gapBacklog에 조건이 없다: ${re}`);
+    assert.ok(re.test(shard), `collect-shard의 gap 큐에 조건이 없다: ${re}`);
+  }
+});
+test("쿼터 적체: gap은 발굴 정지 판정에 들어가지 않는다(발굴 전면정지 방지)", () => {
+  const budget = readFileSync(new URL("../naverBudget.ts", import.meta.url), "utf8");
+  const i = budget.indexOf("export async function discoveryMayRun");
+  const body = budget.slice(i, budget.indexOf("\n}", i));
+  assert.ok(!/gapBacklog/.test(body),
+    "discoveryMayRun이 gapBacklog를 본다 — 일회성 적체 3,211곳이 임계 3,000을 넘겨 발굴이 통째로 멈춘다");
+  // 예약 계산에는 반드시 들어가야 한다
+  const j = budget.indexOf("export async function collectReserveNow");
+  const resBody = budget.slice(j, budget.indexOf("\n}", j));
+  assert.ok(/gapBacklog/.test(resBody), "collectReserveNow가 gap 몫을 예약하지 않는다 — 수집 창이 굶는다");
+  assert.ok(/GAP_DAILY_CAPACITY/.test(resBody), "적체 전체를 예약하면 발굴을 과하게 굶긴다 — 하루 소화량으로 제한해야 한다");
+});
