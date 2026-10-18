@@ -6,7 +6,7 @@
 cd /Users/wangwida/coffee-platform/web
 for S in refine flip; do
   echo "══════ 구간 $S 시작 $(date '+%m-%d %H:%M') ══════"
-  node --import tsx scripts/judge-run.mjs --scope=$S --budget=100 --base=http://127.0.0.1:3211
+  node --import tsx scripts/judge-run.mjs --scope=$S --budget=100 --base=http://127.0.0.1:3213
   echo "══════ 구간 $S 종료 $(date '+%m-%d %H:%M') ══════"
 done
 echo "✅ 전 구간 종료 $(date '+%m-%d %H:%M')"

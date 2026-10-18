@@ -787,3 +787,36 @@ test("판정: 비공개 전환 판정에 '직전 공개상태'를 쓴다(왕복 
     "storeResult의 현재상태 SELECT에 published가 없다 — 내려간 수를 셀 수 없다");
   assert.ok(/wasPublished: !!cur\?\.was_published/.test(store), "storeResult가 wasPublished를 반환하지 않는다");
 });
+
+// 🛡️ 보수적 유지 — CEO 지시(2026-10-19): "비공개는 보수적으로 해. 이미 공개된 거고 판정으로 인해
+//   진짜 오염이나 근거 없는 게 아니라면 되도록 유지해."
+//   실측: 판정으로 내려간 799곳 중 398곳이 '등급미달(후보)' 단독, 그중 379곳은 근거가 1건 이상 남아
+//   있었다 — 오염이 아니라 건수가 문턱(grade.floor.reference=2) 아래로 간 것뿐이다. 379곳을 복구했다.
+test("보수적 유지: 이미 공개된 카페는 등급미달만으로 내리지 않는다", () => {
+  const store = readFileSync(new URL("../synthStore.ts", import.meta.url), "utf8")
+    .split("\n").filter((l) => !l.trim().startsWith("//")).join("\n");
+  assert.ok(/const keepLive = !!cur\?\.was_published && collected >= 2 && isCafeCat && !noisy;/.test(store),
+    "keepLive 규칙이 없거나 조건이 바뀌었다 — 문턱은 2건이다(CEO: 리뷰 1개면 비공개)");
+  assert.ok(/\(\(gradeOk && isCafeCat && !noisy\) \|\| keepLive\)/.test(store),
+    "라이브 분기 ruleOk가 keepLive를 쓰지 않는다");
+  // 🔴 신규(공개 전)에는 절대 적용하지 않는다 — 공개 게이트는 엄격해야 한다.
+  assert.ok(/inPipeline && !everPassedGate\s*\n?\s*\? \(gradeOk && isCafeCat && !isFranchise\(name\) && !noisy\)/.test(store),
+    "신규 분기에 완화가 섞였다 — 공개 전 게이트는 엄격해야 한다");
+});
+test("보수적 유지: 근거 0건·오염·비카페는 그대로 내린다", () => {
+  const store = readFileSync(new URL("../synthStore.ts", import.meta.url), "utf8")
+    .split("\n").filter((l) => !l.trim().startsWith("//")).join("\n");
+  const i = store.indexOf("const keepLive =");
+  const line = store.slice(i, store.indexOf("\n", i));
+  // 🔴 문턱 2건 — CEO 지시(2026-10-19) "근거 1개는 좀 심하네. 리뷰가 1개인 거야? 그럼 비공개로 해."
+  //   1건으로 열었다가 320곳을 복구했고, 지시받아 전부 되돌렸다. 1로 내려가면 그 사고가 재발한다.
+  assert.ok(/collected >= 2/.test(line), "문턱이 2건이 아니다 — 후기 1건 카페가 공개로 남는다");
+  assert.ok(/!noisy/.test(line), "오염(노이즈)도 유지해버린다");
+  assert.ok(/isCafeCat/.test(line), "비카페 분류도 유지해버린다");
+});
+test("보수적 유지: 공개를 유지하면 표시 등급이 '후보'로 떨어지지 않는다", () => {
+  const store = readFileSync(new URL("../synthStore.ts", import.meta.url), "utf8");
+  assert.ok(/const gradeOut = \(publish && !gradeOk && keepLive/.test(store), "gradeOut 보정이 없다");
+  assert.ok(!/UPDATE cafes SET synth_grade=\$\{grade\},/.test(store),
+    "UPDATE가 보정 전 grade를 쓴다 — 공개 중 '후보'라는 새 상태가 생긴다");
+});

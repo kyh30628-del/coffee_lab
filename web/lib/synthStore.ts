@@ -462,9 +462,25 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   const isCafeCat = inPipeline && !everPassedGate ? (hasCategory && !nonCafeReal) : ((hasCategory && !nonCafeReal) || !isNonCafe(name, ""));
   // 신규(파이프라인): 프랜차이즈 제외 포함 엄격 게이트. 라이브(grandfather)·재편입(everPassedGate): 등급+실제카테고리만 —
   //   프랜차이즈 등 소프트룰로 기존 공개 카페를 내리지 않는다(힐 b-2 복원조건과 일치 → 진동 원천 제거). 정의적 비카페는 아래 excluded가 처리.
+  // 🛡️ 2026-10-19 CEO 지시 — **이미 공개된 카페는 보수적으로 유지한다.**
+  //   "이미 공개된 거고 판정으로 인해 진짜 오염이나 근거 없는 게 아니라면 되도록 유지해."
+  //   실측(판정 집행 6시간): 판정으로 내려간 799곳 중 **398곳이 '등급미달(후보)' 단독**이었고
+  //   그중 379곳은 근거가 1건 이상 남아 있었다 — 오염이 아니라 건수가 문턱(grade.floor.reference=2)
+  //   아래로 내려간 것뿐이다. 그 379곳을 내리는 건 CEO 지시에 반한다.
+  //   🔴 '내리는 게 맞는' 사유는 유지한다: 노이즈(오염 비중 초과) · 비카페 분류 ·
+  //      excluded/held/승인된 비공개(이건 아래 otherwiseBlocked가 따로 처리한다).
+  //   ⚠️ 신규(inPipeline && !everPassedGate)에는 적용하지 않는다 — 공개 전 게이트는 엄격해야 한다.
+  //      이 완화는 **이미 공개돼 있던 카페**(was_published)에만 준다.
+  //   🔴 문턱은 **2건**이다. CEO 추가 지시(2026-10-19): "근거 1개는 좀 심하네. 리뷰가 1개인 거야?
+  //      그럼 비공개로 해." 처음에 1건으로 열어 320곳을 복구했다가 전부 되돌렸다(판단 착오).
+  //      그래서 이 완화가 실제로 구하는 것은 '표시 후기는 2건 이상인데 **등급 근거**(gradeCount)가
+  //      문턱 아래인 카페'다 — 같은 계정 2건·3년 지난 글 등으로 gradeCount가 깎인 경우
+  //      (lib/collectOrchestrator의 accountCap·oldHalf). 표시할 후기가 2건 넘게 있는데 내리는 건
+  //      소비자가 보기에 멀쩡한 페이지를 지우는 일이라 보수적으로 유지한다.
+  const keepLive = !!cur?.was_published && collected >= 2 && isCafeCat && !noisy;
   const ruleOk = inPipeline && !everPassedGate
     ? (gradeOk && isCafeCat && !isFranchise(name) && !noisy)
-    : (gradeOk && isCafeCat && !noisy);
+    : ((gradeOk && isCafeCat && !noisy) || keepLive);
 
   // 🔒 진정한 자동화 게이트: 신규 카페는 규칙 통과해도 즉시 공개 안 함 — AI 판정·임베딩·검증 통과 후 finalizer가 'live'로 승격할 때만.
   //   기존 카페(grandfather/live)는 규칙 게이트로 공개.
@@ -488,6 +504,11 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   //   → 두 필드를 **마지막에 강제로 정렬**한다. 공개면 live, 비공개인데 live로 남으려 하면 held로 내린다.
   //   ⚠️ 다른 상태(excluded·noise·pending·rejected)는 그대로 둔다 — 각자 뜻이 있고 이미 published와 일치한다.
   const newPst = publish ? "live" : (newPstRaw === "live" ? "held" : newPstRaw);
+  // 🛡️ keepLive로 공개를 유지했는데 등급만 '후보'로 떨어지면 **공개 중 후보**라는 새 상태가 생긴다
+  //   (실측: 지금 공개 49,008곳의 등급은 참고 34,099 · 검증 14,909 · 후보 0곳).
+  //   화면 배지·검색 가중치가 흔들리므로 라이브 유지분은 '참고'로 고정한다(라이브 grandfather와 같은 사상).
+  //   ⚠️ 등급을 올리는 게 아니라 **떨어지는 것만** 막는다 — 검증이 참고로 내려가는 건 그대로 둔다.
+  const gradeOut = (publish && !gradeOk && keepLive && grade !== "검증" && grade !== "참고") ? "참고" : grade;
 
   // 🩹 2026-09-28 CEO 지시(전수점검) — exclude_reason 추적성 수리. 이 함수(매일 도는 핵심 재합성 경로)는
   //   rejected/held/noise/excluded로 내릴 때 사유를 한 번도 안 남겼다(아래 다른 배치 정리 함수들 — 597·612·
@@ -511,6 +532,8 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   //   일반화된 사유로 덮어쓰면 그 구체성이 사라진다. 새로 이 상태에 들어왔거나 사유가 비어 있을 때만 새로 채운다.
   const prevReason: string | null = cur?.prev_exclude_reason ?? null;
   let exReason: string | null = null;
+  // 🛡️ keepLive로 공개를 유지한 경우 제외사유를 남기지 않는다 — 공개 중인데 exclude_reason이 박히면
+  //   관제탑이 '내려간 카페'로 세고(실측 과다계상 이력 있음) held 재평가 레인 판단도 틀어진다.
   if (newPst === "excluded") {
     exReason = (pst === "excluded" && prevReason) ? prevReason
       : unpublishLocked ? "승인된 비공개 결재 재발가드"
@@ -583,11 +606,11 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
 
   noteWrite("cafes.synth_reviews"); noteWrite("cafes.synth_reviews_all"); noteWrite("cafes.published");
   if (llmJudged) {
-    await sql`UPDATE cafes SET synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_coherence=${coherence}, offctx_rate=${offctx}, visitor_n=${vmix.n}, visitor_trip=${vmix.trip}, visitor_local=${vmix.local}, needs_llm=${needsLLM}, needs_llm_priority=${needsLlmPriority}, borderline_count=${blCount}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${safeJson(tidyDisplayQuotes(evidenceReviews as any[]))}, synth_reviews_all=${allEv}, char_scores=${safeJson(charScores)}, work_facts=${safeJson(workFacts)}, synth_quality=${safeJson(quality)}, review_dates=${safeJson(reviewDates)}, pipeline_status=${newPst}, exclude_reason=${exReason}, exclude_at=${exReason ? new Date() : null}, synth_updated=${synthTs}, synth_checked_at=now(), llm_judged_at=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN ${latMin} AND ${latMax} AND lng BETWEEN ${lngMin} AND ${lngMax}) WHERE id=${cafeId}`;
+    await sql`UPDATE cafes SET synth_grade=${gradeOut}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_coherence=${coherence}, offctx_rate=${offctx}, visitor_n=${vmix.n}, visitor_trip=${vmix.trip}, visitor_local=${vmix.local}, needs_llm=${needsLLM}, needs_llm_priority=${needsLlmPriority}, borderline_count=${blCount}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${safeJson(tidyDisplayQuotes(evidenceReviews as any[]))}, synth_reviews_all=${allEv}, char_scores=${safeJson(charScores)}, work_facts=${safeJson(workFacts)}, synth_quality=${safeJson(quality)}, review_dates=${safeJson(reviewDates)}, pipeline_status=${newPst}, exclude_reason=${exReason}, exclude_at=${exReason ? new Date() : null}, synth_updated=${synthTs}, synth_checked_at=now(), llm_judged_at=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN ${latMin} AND ${latMax} AND lng BETWEEN ${lngMin} AND ${lngMax}) WHERE id=${cafeId}`;
   } else {
-    await sql`UPDATE cafes SET synth_grade=${grade}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_coherence=${coherence}, offctx_rate=${offctx}, visitor_n=${vmix.n}, visitor_trip=${vmix.trip}, visitor_local=${vmix.local}, needs_llm=${needsLLM}, needs_llm_priority=${needsLlmPriority}, borderline_count=${blCount}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${safeJson(tidyDisplayQuotes(evidenceReviews as any[]))}, synth_reviews_all=${allEv}, char_scores=${safeJson(charScores)}, work_facts=${safeJson(workFacts)}, synth_quality=${safeJson(quality)}, review_dates=${safeJson(reviewDates)}, pipeline_status=${newPst}, exclude_reason=${exReason}, exclude_at=${exReason ? new Date() : null}, synth_updated=${synthTs}, synth_checked_at=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN ${latMin} AND ${latMax} AND lng BETWEEN ${lngMin} AND ${lngMax}) WHERE id=${cafeId}`;
+    await sql`UPDATE cafes SET synth_grade=${gradeOut}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_coherence=${coherence}, offctx_rate=${offctx}, visitor_n=${vmix.n}, visitor_trip=${vmix.trip}, visitor_local=${vmix.local}, needs_llm=${needsLLM}, needs_llm_priority=${needsLlmPriority}, borderline_count=${blCount}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${safeJson(tidyDisplayQuotes(evidenceReviews as any[]))}, synth_reviews_all=${allEv}, char_scores=${safeJson(charScores)}, work_facts=${safeJson(workFacts)}, synth_quality=${safeJson(quality)}, review_dates=${safeJson(reviewDates)}, pipeline_status=${newPst}, exclude_reason=${exReason}, exclude_at=${exReason ? new Date() : null}, synth_updated=${synthTs}, synth_checked_at=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN ${latMin} AND ${latMax} AND lng BETWEEN ${lngMin} AND ${lngMax}) WHERE id=${cafeId}`;
   }
-  return { grade, collected, published: publish, wasPublished: !!cur?.was_published, ruleOk, pipeline: newPst, evidence: evidenceReviews.length, coherence: Math.round(coherence * 100), noisy };
+  return { grade: gradeOut, collected, published: publish, wasPublished: !!cur?.was_published, ruleOk, pipeline: newPst, evidence: evidenceReviews.length, coherence: Math.round(coherence * 100), noisy };
 }
 
 // 🧼 PII 자동 세척 — 공개 인용문에서 전화·이메일·핸들 제거(레드팀 pii_leak 자가치유).
