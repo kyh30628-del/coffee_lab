@@ -190,10 +190,24 @@ const j = await sql`SELECT job, ok, to_char(ran_at AT TIME ZONE 'Asia/Seoul','HH
   FROM agent_runs WHERE job IN ('cron-grow','cron-synth','cron-resynth','cron-embed','discover-sweep') ORDER BY ran_at DESC`;
 // 08:20 기준 '오늘 08시대 실행이 있어야 하는 잡'이 어제 시각을 달고 있으면 = 아침 회차가 조용히 죽은 것.
 //   (cron-resynth 20시 타임아웃이 기록조차 안 남아 관제탑에 안 보이던 2026-09-16 함정 재발 방지)
-const expectMorning = new Set(["cron-grow", "cron-synth", "cron-resynth", "cron-embed"]); // discover-sweep은 09-21 정지(RETIRED) — 기대 목록에서 제외
+// 🔴 2026-10-18 오탐 수리 — `cron-grow`를 기대 목록에서 뺀다.
+//   grow는 vercel.json에서 `10 */3 * * *`(UTC) = **KST 00·03·06·09·12·15·18·21시**다.
+//   07·08시에 도는 스케줄이 아예 아니라 이 판정이 **매일 "🔴 아침 회차 누락: grow"를 거짓으로** 찍었다
+//   (10-17·10-18 이틀 연속 확인). 나머지 셋은 UTC 23시 = KST 08시라 판정이 맞다:
+//     synth `2 3,7,11,23` · resynth `0 3,7,13,23` · embed `1 3,7,11,23` → 전부 KST 08시대 회차가 있다.
+//   grow는 대신 **자기 주기(3시간)** 기준으로 본다 — 마지막 실행이 4시간 넘으면 그때가 진짜 누락이다.
+//   메모리 규약: "정상 상태를 문제로 표시하지 않는다" · "빨강은 소비자 손상일 때만".
+const expectMorning = new Set(["cron-synth", "cron-resynth", "cron-embed"]); // discover-sweep은 09-21 정지(RETIRED)
 //   ⚠️ 08:15~09:30 사이에 돌 때만 판정한다 — 낮에 수동으로 돌리면 아침 시각이 아니라 거짓 빨강이 난다(21시 시험에서 실제로 났다).
 const hhmm = Number(new Date(Date.now() + 9 * 3600e3).toISOString().slice(11, 16).replace(":", ""));
 const missed = (hhmm >= 815 && hhmm <= 930) ? j.filter((x) => expectMorning.has(x.job) && !/^0[78]:/.test(x.t)).map((x) => x.job.replace("cron-", "")) : [];
+// grow 전용: 3시간 주기이므로 4시간 넘게 안 돌았을 때만 누락으로 본다.
+const growRow = j.find((x) => x.job === "cron-grow");
+if (growRow) {
+  const gh = await sql`SELECT round((EXTRACT(epoch FROM (now()-max(ran_at)))/3600.0)::numeric,1)::float h FROM agent_runs WHERE job='cron-grow'`;
+  const ageH = Number(gh[0]?.h ?? 0);
+  if (ageH > 4) missed.push(`grow(${ageH}h)`);
+}
 say(`⑥ 잡: ${j.map((x) => `${x.job.replace("cron-", "")}=${x.t}${x.ok ? "" : "❌"}`).join(" · ")}${missed.length ? ` 🔴 아침 회차 누락: ${missed.join(",")}` : ""}`);
 
 // ⑦ 지역별 유입 효율 — 지방 확장이 방문자를 데려오는지(2026-09-17 CEO 지시 "제대로 똑바로 해놔")
