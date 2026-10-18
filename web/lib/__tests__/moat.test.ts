@@ -14,7 +14,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   nameCoherence, brandTokenOverlap, coreTokens, nearDuplicateCafeName,
-  detectCampaignCluster, isPopupRotatingVenue, cleanCafeName,
+  detectCampaignCluster, isPopupRotatingVenue, cleanCafeName, verifyReview,
 } from "../reviewQuality";
 import { isOtherBusinessQuote, isReadableQuote, isSentenceQuote, displayQuote, splitKeyTerms } from "../cafeDetailView";
 import { sortReviews, ensureRecent } from "../exposureOrder";
@@ -166,4 +166,52 @@ test("sortReviews: 같은 등급·같은 날짜면 '문장'이 제목보다 앞�
   ];
   const [first] = sortReviews(rows, "온다", ["서울", "강남구"], Date.now());
   assert.ok(isSentenceQuote(first.quote), `문장이 먼저여야 한다: ${first.quote}`);
+});
+
+// ── ⑬ 🔑 해자 불변식: **판정은 카페 상호에 어떤 낱말이 들어있는지와 무관해야 한다.**
+//   2026-10-18 실측으로 드러난 결함 클래스 — 게이트들이 "카페 실질맥락이 전무하면 거절" 구조인데,
+//   그 맥락 검사를 **상호가 포함된 문자열**에 해서, 상호에 '커피/카페'가 들어간 카페(공개 48,745곳 중
+//   **14,633곳 = 30.0%**)에서 게이트가 통째로 무력화됐다. decisions#1158이 하드거절 7종만 고치고
+//   라이브카페·네이버카페링크·관광지·ctxGate 네 곳이 누락돼 있었다.
+//   실측 전/후: 카페 내용 0인 글이 상호 "아르테"→rejected/20, "아르테커피"→**verified/74** 였다.
+//   이 테스트는 그 비대칭이 어디서든 되살아나면 즉시 깨진다.
+const NAME_PAIRS: [string, string][] = [["아르테", "아르테커피"], ["야누스", "야누스베이커리"], ["루미나", "루미나디저트"]];
+function verdictFor(name: string, extra: Record<string, unknown>) {
+  return verifyReview({ name, areaTerms: ["서울", "강남구"], source: "blog", body: "", ...extra } as any).verdict;
+}
+test("상호에 카페 낱말이 있어도 '카페 내용 전무' 판정은 같다", () => {
+  for (const [plain, withWord] of NAME_PAIRS) {
+    // 카페 내용이 전혀 없는 글(주차장·사람 많음·날씨)
+    const mk = (n: string) => ({ title: `${n} 다녀왔어요`, body: `${n}에 갔어요. 주차장이 넓고 사람이 많았습니다. 날씨가 좋았어요.` });
+    assert.equal(verdictFor(plain, mk(plain)), verdictFor(withWord, mk(withWord)),
+      `상호에 카페 낱말이 있다는 이유만으로 판정이 달라졌다: ${plain} vs ${withWord}`);
+  }
+});
+test("라이브카페 주류·공연 캡은 상호와 무관하게 적용된다", () => {
+  const mk = (n: string) => ({ naverCategory: "라이브카페", title: `${n} 방문`,
+    body: `${n}에서 하이볼과 위스키 마시며 재즈 공연 봤어요. 커버차지 있어요.` });
+  for (const [plain, withWord] of NAME_PAIRS) {
+    assert.equal(verdictFor(plain, mk(plain)), verdictFor(withWord, mk(withWord)), `${plain} vs ${withWord}`);
+  }
+});
+test("진짜 카페 내용이 있으면 그대로 검증된다(과잉 거절 방지)", () => {
+  const r = verifyReview({ name: "아르테커피", areaTerms: ["서울", "강남구"], source: "blog",
+    title: "아르테커피 다녀왔어요",
+    body: "아르테커피에서 아메리카노와 소금빵을 주문했어요. 원두가 산미 있고 좌석도 넓어서 오래 앉아 있었습니다." });
+  assert.equal(r.verdict, "verified");
+});
+// 🍰 어휘 보강 회귀 — 상호명을 빼고 검사하게 되면서 사전 누락이 곧 오탐이 된다. 실측 빈도순 상위를 못으로 박는다.
+test("음료·디저트 어휘가 카페 실질맥락으로 인정된다", () => {
+  for (const w of ["소금빵", "팥빙수", "쿠키", "말차", "휘낭시에", "크로플", "스페셜티"]) {
+    const r = verifyReview({ name: "아르테커피", areaTerms: ["서울", "강남구"], source: "blog",
+      title: "아르테커피 다녀왔어요", body: `아르테커피에서 ${w} 먹었어요. 자리가 넓고 좋았습니다.` });
+    assert.notEqual(r.verdict, "rejected", `'${w}'가 카페 내용으로 인정되지 않는다`);
+  }
+});
+// ⚠️ 식사 메뉴는 일부러 실질맥락에서 제외했다 — 식당·분식 게이트가 `!CAFE_CONTEXT_SUBSTANCE` 구조라,
+//   이걸 인정하면 그 방어가 약해진다. 이 선택이 뒤집히면 테스트가 알려준다.
+test("식사 메뉴(샌드위치·파스타)는 카페 실질맥락으로 인정하지 않는다", () => {
+  const r = verifyReview({ name: "아르테", areaTerms: ["서울", "강남구"], source: "blog",
+    title: "아르테 미용실", body: "아르테 미용실에서 머리하고 네일샵 갔어요. 파스타랑 샌드위치도 먹었습니다. 필라테스도 했어요." });
+  assert.equal(r.verdict, "rejected");
 });

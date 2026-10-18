@@ -535,7 +535,13 @@ function foreignSidoAddress(text: string, selfSido: string): string | null {
 // ★ 협업#278(품질본부 룰갭발굴팀 2~4차 사이클, 08-02~08-03): 목장·치즈체험·요거트·답례품·파충류카페·재즈공연·
 //   문화기획전시·티카페(밀크티·버블티·망고사고) 등 니치 업종 어휘 미등재로 진짜 카페 후기가 offctx로 과대측정되던
 //   현상(4사이클 연속 재현, 누적 14곳+) — 기조실장 정책판단으로 CAFE_CTX(synthStore.ts)와 함께 사전 확장(#599).
-const CAFE_CONTEXT = /(카페|커피|라떼|아메리카노|에스프레소|콜드브루|핸드드립|디저트|케이크|베이커리|메뉴판?|음료|원두|바리스타|좌석|매장|사장님|주문|아인슈페너|브런치|로스팅|카공|cafe|coffee|latte|목장|치즈|요거트|답례품|파충류|재즈|공연|전시|밀크티|버블티|망고사고)/i;
+// 🍰 2026-10-18 어휘 보강 — ctxGate에서 **카페 자기 상호명을 빼고** 맥락을 검사하도록 고치자(decisions#1158의
+//   마지막 사각), 전에는 상호의 '카페/커피'가 메워주던 진짜 후기가 드러났다. 실데이터에서 강등된 글 268건을
+//   훑어 '카페 내용인데 사전에 없던 말'을 빈도순으로 뽑아 넣는다(실측: 테라스 8·샌드위치 5·빙수 5·소금빵 5·
+//   쿠키 4·루프탑 4·팥빙수 3…). 누락어가 있는 건 15%뿐이고 나머지 85%는 진짜로 카페 내용이 없었다.
+//   ⚠️ 샌드위치·샐러드·파스타·피자·떡은 **일부러 넣지 않는다** — 식당·분식 게이트(NONCAFE_BIZ 등)가
+//      `!CAFE_CONTEXT_SUBSTANCE` 구조라, 식사 메뉴를 실질맥락으로 인정하면 그 방어가 약해진다.
+const CAFE_CONTEXT = /(카페|커피|라떼|아메리카노|에스프레소|콜드브루|핸드드립|디저트|케이크|베이커리|메뉴판?|음료|원두|바리스타|좌석|매장|사장님|주문|아인슈페너|브런치|로스팅|카공|cafe|coffee|latte|목장|치즈|요거트|답례품|파충류|재즈|공연|전시|밀크티|버블티|망고사고|테라스|루프탑|빙수|팥빙수|쿠키|스콘|마들렌|휘낭시에|크로플|와플|타르트|마카롱|푸딩|젤라또|아이스크림|브라우니|티라미수|크루아상|소금빵|앙버터|베이글|도넛|식빵|스무디|에이드|말차|녹차|홍차|허브티|스페셜티|디카페인|드립백|플랫화이트|비엔나)/i;
 // 룰갭 제안15: 1~2글자/일반어 카페명은 SEO·무관 글에 '문장 성분'으로 우연일치 → 카페 맥락 없으면 오염. (길이≤2 + 아래 3+글자 일반어)
 //   레드팀 2026-07-07(coord#125): '행복이가득한집'은 관용구+동명이인(용인 가구점·배송글·일반문구)이 이름만
 //   스쳐 딸려오던 신종 — 카페 맥락(CAFE_CONTEXT_STRONG) 없으면 nameAsWord 오염으로 거절(진짜 후기는 카페어 동반).
@@ -603,7 +609,7 @@ COMMON_WORD_NAMES.add("프리마베라");
 const TRENDING_BRAND_SUFFIX = new Set(["방앗간", "스튜디오"]);
 // ★ 비카페 업종이 '제목을 지배'할 때의 가드 — 매장·음료·주문·메뉴·좌석은 피부관리/필라테스 등 비카페도 흔히 써서
 //   가드를 뚫는다('피부관리 하이드뷰티…매장 전화번호'→결). 이 경로엔 진짜 커피전문 어휘(카페·커피·디저트·원두…)만 인정(2026-06-28).
-const CAFE_CONTEXT_STRONG = /(카페|커피|라떼|아메리카노|에스프레소|콜드브루|핸드드립|디저트|케이크|베이커리|빵|제과|원두|바리스타|아인슈페너|브런치|로스팅|카공|cafe|coffee|latte|목장|치즈|요거트|답례품|파충류|재즈|공연|전시|밀크티|버블티|망고사고)/i;
+const CAFE_CONTEXT_STRONG = /(카페|커피|라떼|아메리카노|에스프레소|콜드브루|핸드드립|디저트|케이크|베이커리|빵|제과|원두|바리스타|아인슈페너|브런치|로스팅|카공|cafe|coffee|latte|목장|치즈|요거트|답례품|파충류|재즈|공연|전시|밀크티|버블티|망고사고|빙수|팥빙수|쿠키|스콘|마들렌|휘낭시에|크로플|와플|타르트|마카롱|푸딩|젤라또|아이스크림|브라우니|티라미수|크루아상|소금빵|앙버터|베이글|도넛|식빵|스무디|에이드|말차|녹차|홍차|허브티|스페셜티|디카페인|드립백|플랫화이트|비엔나)/i;  // 🍰 2026-10-18 어휘 보강(위 CAFE_CONTEXT 주석 참조) — 공간 특징(테라스·루프탑)은 '실질' 축이 아니라 제외
 // ★ 룰갭 P56 전용 — CAFE_CONTEXT_STRONG에서 카테고리어("카페"/cafe/coffee/카공)를 뺀 '실질' 음료·디저트
 //   어휘만. "카페"는 겸업 업체 설명문에도 흔해(카페+에스테틱 겸업) 자기소개 신뢰 신호로 약하다.
 // ★ 협업#278(#599): 목장·파충류·재즈·공연·전시는 업종/활동어라 여기(실질 음료·디저트 소비 증거) 대상 아님 —
@@ -612,7 +618,7 @@ const CAFE_CONTEXT_STRONG = /(카페|커피|라떼|아메리카노|에스프레�
 //   (식물명) 같은 비카페 복합어에도 우연 매칭돼 실질맥락 가드 자체가 무력화됐다(id10605 꼬모까사 가구
 //   블로그 "…커피테이블로도 안성맞춤인…", id3525 커피나무 화훼샵 "…커피나무 공기정화식물…" 실측). 두
 //   복합어 뒤에 바로 이어지는 경우만 실질맥락으로 인정하지 않도록 부정형 lookahead로 제외한다.
-const CAFE_CONTEXT_SUBSTANCE = /(커피(?!\s*(테이블|나무))|라떼|아메리카노|에스프레소|콜드브루|핸드드립|디저트|케이크|베이커리|빵|제과|원두|바리스타|아인슈페너|브런치|로스팅|치즈|요거트|답례품|밀크티|버블티|망고사고)/i;
+const CAFE_CONTEXT_SUBSTANCE = /(커피(?!\s*(테이블|나무))|라떼|아메리카노|에스프레소|콜드브루|핸드드립|디저트|케이크|베이커리|빵|제과|원두|바리스타|아인슈페너|브런치|로스팅|치즈|요거트|답례품|밀크티|버블티|망고사고|빙수|팥빙수|쿠키|스콘|마들렌|휘낭시에|크로플|와플|타르트|마카롱|푸딩|젤라또|아이스크림|브라우니|티라미수|크루아상|소금빵|앙버터|베이글|도넛|식빵|스무디|에이드|말차|녹차|홍차|허브티|스페셜티|디카페인|드립백|플랫화이트|비엔나)/i;  // 🍰 2026-10-18 어휘 보강(식사 메뉴는 제외 — 위 CAFE_CONTEXT 주석)
 // ★ 룰갭 신규(2026-09-20, decisions#1158): 아래 하드거절 게이트 7종(CRAFT_WORKSHOP_ACTIVITY·AQUASCAPE_PET_RETAIL·
 //   NONCAFE_INTERIOR_CUES·BRAND_NAMESAKE_COMMERCE_LEAK·REAL_ESTATE_LISTING_CUES·VAPE_ECIG_RETAIL_CUES·
 //   DISH_SPECIFIC_NONCAFE_CATEGORY)가 공통으로 <업종큐 매칭> && !CAFE_CONTEXT_SUBSTANCE 구조인데,
@@ -622,6 +628,14 @@ const CAFE_CONTEXT_SUBSTANCE = /(커피(?!\s*(테이블|나무))|라떼|아메�
 //   rulegap-proposals-20260920-2.md 제안1). 7개 게이트 전부 카페 자신의 상호명을 제거(공백 유연 매칭)한
 //   텍스트로 CAFE_CONTEXT_SUBSTANCE를 재검사하는 공용 헬퍼로 통일한다 — 상호명과 무관하게 별도로 등장하는
 //   진짜 실질맥락(예: "아메리카노 마셨다")은 그대로 보존되므로 오탐 없음.
+// 상호명을 공백 유연하게 제거한 텍스트 — '카페 맥락'을 카페 자기 이름으로 충족하는 사각을 막는 공용 수단.
+//   (decisions#1158이 CAFE_CONTEXT_SUBSTANCE 한정으로 만든 로직을 ctxGate 등에서도 쓰려고 분리했다.)
+function stripNameFlexible(text: string, name: string): string {
+  const chars = (name || "").replace(/\s+/g, "").split("");
+  if (!chars.length) return text;
+  const pattern = chars.map((c) => c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\s*");
+  return text.replace(new RegExp(pattern, "gi"), " ");
+}
 function hasCafeSubstanceExcludingName(text: string, name: string): boolean {
   const chars = (name || "").replace(/\s+/g, "").split("");
   if (!chars.length) return CAFE_CONTEXT_SUBSTANCE.test(text);
@@ -1814,8 +1828,11 @@ export function verifyReview(input: QualityInput): QualityResult {
   //   VISIT_CUES 매칭을 무효화한다. 진짜 방문후기(id26740 멜팅포인트 실측: "커피맛이 맛있어요" 등
   //   CAFE_CONTEXT_SUBSTANCE 동반)는 그대로 보존, 무관 콘텐츠(id6084 중고가구·id760 자동차 정비·id22973
   //   중고차·id26803 통신요금제 실측: 셋 다 전무)만 걸린다.
+  // 🔴 2026-10-18 — decisions#1158 수리(상호명 재진술이 실질맥락으로 세어지는 사각)에서 **누락된 게이트**.
+  //   실측: 같은 글인데 상호만 "아르테"→"아르테커피"로 바꾸면 rejected/20 → **verified/66**으로 뒤집혔다.
+  //   모집단: 공개 카페 48,745곳 중 상호에 실질맥락 어휘가 든 곳이 **14,633곳(30.0%)**이다.
   const cafeNaverNoSubstance = CLUB_NAVER_LINK.test(input.link ?? "")
-    && !CAFE_CONTEXT_SUBSTANCE.test(fullL) && !DRINK_TASTING_CUES.test(fullL) && !INSTORE_VISIT_CUES.test(fullL);
+    && !hasCafeSubstanceExcludingName(fullL, input.name) && !DRINK_TASTING_CUES.test(fullL) && !INSTORE_VISIT_CUES.test(fullL);
   const visit = has(fullL, VISIT_CUES) && !deliveryOnly && !pickupOnly && !wholesaleOnly && !recruitmentOnly && !jobPrepBlogOnly && !equipmentServiceOnly && !clubMeetupLogisticsLeak && !cafeNaverNoSubstance;
   const substance = SUBSTANCE_CUES.filter((k) => fullL.includes(k.toLowerCase())).length;
   // [#4] 흔한 단어 이름 오매칭 방지: 전체 이름 일치는 강함. 토큰만 일치면
@@ -2089,7 +2106,10 @@ export function verifyReview(input: QualityInput): QualityResult {
   //   오염 8건 전부 이 신호 0개, 정상 리뷰는 이 신호를 동반해 안전).
   if (nameInTitle && NONCAFE_BIZ.test(title)) {
     const nonCafeBizHits = (fullL.match(new RegExp(NONCAFE_BIZ.source, "g")) ?? []).length;
-    if (nonCafeBizHits >= 2 && !CAFE_CONTEXT_SUBSTANCE.test(fullL)) {
+    // 🔴 2026-10-18 — decisions#1158 수리(상호명 재진술이 실질맥락으로 세어지는 사각)에서 **누락된 게이트**.
+    //   실측: 같은 글인데 상호만 "아르테"→"아르테커피"로 바꾸면 rejected/20 → **verified/66**으로 뒤집혔다.
+    //   모집단: 공개 카페 48,745곳 중 상호에 실질맥락 어휘가 든 곳이 **14,633곳(30.0%)**이다.
+    if (nonCafeBizHits >= 2 && !hasCafeSubstanceExcludingName(fullL, input.name)) {
       return { verdict: "rejected", score: 4, reasons: ["동명 비카페 업체(제목 자기소개 예외 무력화 — 시술어 반복·카페 실질신호 전무)"], signals: sig };
     }
   }
@@ -2231,7 +2251,16 @@ export function verifyReview(input: QualityInput): QualityResult {
   const onlyTokShort = onlyTok.length >= 1 && onlyTok.length <= 4;
   if (inTitleFull && ((nameNoSpace.length >= 1 && nameNoSpace.length <= 4) || onlyTokShort || weakWhitelist || nameLatinHeavy)) {
     const ctxGate = nameNoSpace.length <= 3 ? CAFE_CONTEXT_STRONG : input.source === "cafearticle" ? CAFE_CONTEXT_SUBSTANCE : CAFE_CONTEXT;
-    if (!ctxGate.test(fullL)) {
+    // 🔴 2026-10-18 — decisions#1158·#1273 수리의 **마지막 사각**. #1273은 "브랜드토큰+흔한접미어로 전체이름이
+    //   길어져 게이트를 빠져나가는" 길목(onlyTokShort)을 막았지만, 게이트를 통과하는 '카페 맥락' 자체가
+    //   **카페 자기 상호명으로 충족되는** 구멍은 남아 있었다.
+    //   실측(10-18): 카페 내용이 전혀 없는 글("상호에 갔어요. 주차장이 넓고 사람이 많았습니다")이
+    //     상호 "아르테"   → rejected/20 (게이트 작동)
+    //     상호 "아르테커피" → **verified/74** (상호의 '커피'가 맥락으로 세어져 게이트 무력화)
+    //   모집단: 공개 48,745곳 중 상호에 그 어휘가 든 곳 **14,633곳(30.0%)**.
+    //   → 상호명을 뺀 텍스트로 검사한다(hasCafeSubstanceExcludingName과 동일한 공백 유연 제거).
+    const fullNoName = stripNameFlexible(fullL, input.name);
+    if (!ctxGate.test(fullNoName)) {
       return { verdict: "rejected", score: 20, reasons: ["제목=카페명 일치하나 카페 맥락 전무(흔한 이름·타업종 혼입 의심) — LLM 재판정"], borderline: true, signals: sig };
     }
   }
@@ -2784,7 +2813,15 @@ export function verifyReview(input: QualityInput): QualityResult {
   //   그 리뷰에 전무하면 verified 승격을 막고 reference 상한으로 캡한다 — 카페 전체 하드탈락이 아니라
   //   리뷰 단위 페어드 네거티브 조건(P59 CRAFT_WORKSHOP_ACTIVITY와 동일 구조)이라, 카페 겸업 자기서술이
   //   섞여 등급을 못 채운 리뷰도 삭제되지 않고 reference로 보존된다.
-  if (verdict === "verified" && LIVE_VENUE_CATEGORY.test(input.naverCategory ?? "") && ALCOHOL_LIVE_VENUE_ACTIVITY.test(fullL) && !CAFE_CONTEXT_SUBSTANCE.test(fullL)) {
+  // 🔴 2026-10-18 수리 — 이 게이트가 **decisions#1158 수리에서 빠져 있었다.** 그 수리는 "하드거절 게이트 7종이
+  //   CAFE_CONTEXT_SUBSTANCE를 카페 **자기 상호명 재진술만으로** 통과해 판정이 무력화된다"를 고치며
+  //   `hasCafeSubstanceExcludingName` 공용 헬퍼로 통일했는데, 같은 구조인 이 라이브카페 게이트는 누락됐다.
+  //   실측(10-18): 완전히 같은 글(하이볼·위스키·재즈 공연·커버차지)인데 상호만 바꾸면 판정이 뒤집혔다 —
+  //     상호 "야누스"    → reference 59 (규칙 작동)
+  //     상호 "야누스커피" → **verified 74** (상호의 '커피'가 실질맥락으로 세어져 규칙 무력화)
+  //   영향 범위: naver_category가 라이브카페/라이브클럽인 88곳(공개 14곳), 그중 상호에 카페어가 섞인 곳
+  //   (카페어게인74·카페리엉·LP음악카페 쎄시봉·칠포재즈카페 등)이 이 사각에 들어간다.
+  if (verdict === "verified" && LIVE_VENUE_CATEGORY.test(input.naverCategory ?? "") && ALCOHOL_LIVE_VENUE_ACTIVITY.test(fullL) && !hasCafeSubstanceExcludingName(fullL, input.name)) {
     verdict = "reference";
     score = Math.min(score, 59);
     reasons.push("라이브카페 주류/공연 활동기(카페 실질맥락 전무) — 참고등급 캡");
@@ -2800,7 +2837,10 @@ export function verifyReview(input: QualityInput): QualityResult {
   // [룰갭 신규, decisions#1243] 상위개체(관광지·리조트·체험관·복지시설) 부속 카페 — 위 TOURIST_FACILITY_INFO_VOCAB
   //   참조. 이름 앵커가 없는 순수 콘텐츠 구조 신호라 라이브카페·콤보 포스트 캡과 동일하게 verified 승격만 막고
   //   reference 상한으로 캡한다(하드 탈락은 오탐 위험 — 대조군에서 확인).
-  if (verdict === "verified" && !CAFE_CONTEXT_SUBSTANCE.test(fullL)) {
+  // 🔴 2026-10-18 — decisions#1158 수리(상호명 재진술이 실질맥락으로 세어지는 사각)에서 **누락된 게이트**.
+  //   실측: 같은 글인데 상호만 "아르테"→"아르테커피"로 바꾸면 rejected/20 → **verified/66**으로 뒤집혔다.
+  //   모집단: 공개 카페 48,745곳 중 상호에 실질맥락 어휘가 든 곳이 **14,633곳(30.0%)**이다.
+  if (verdict === "verified" && !hasCafeSubstanceExcludingName(fullL, input.name)) {
     const touristFacilityHits = (fullL.match(new RegExp(TOURIST_FACILITY_INFO_VOCAB.source, "g")) ?? []).length;
     if (touristFacilityHits >= 2) {
       verdict = "reference";
