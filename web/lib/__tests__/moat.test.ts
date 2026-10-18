@@ -955,3 +955,27 @@ test("규칙 사전: 규칙을 쓰는 스크립트는 loadLearnedTerms를 먼저
     if (firstUse >= 0) assert.ok(prime < firstUse, `${f}: 규칙을 쓰기 전에 프라임하지 않는다(프라임 ${prime + 1}행 · 첫 호출 ${firstUse + 1}행)`);
   }
 });
+
+// 🛡️ scope=thin — 2026-10-19 실측. 비공개 전환 위험이 '공개 문턱 근접(후기 4건 이하)' 구간에 집중된다.
+//   배치별 전환율이 그 비율에 정비례했다: Sonnet 4.9%→0.04% · Haiku#1 6.8%→0.20% · Haiku#2 10.9%→0.42%.
+//   얇은 카페당 정규화: Haiku 3.0~3.8% vs Sonnet 0.75%. CEO 지시 "비공개는 보수적으로" →
+//   **위험 구간에만 좋은 모델**을 쓰는 배분이 비용·품질을 동시에 만족한다(전량 Sonnet은 예산 초과).
+test("판정 범위: thin 구간이 라우트와 집행기에서 같은 정의다", () => {
+  const route = readFileSync(new URL("../../app/api/cron-batch-judge/route.ts", import.meta.url), "utf8");
+  const runner = readFileSync(new URL("../../scripts/judge-run.mjs", import.meta.url), "utf8");
+  for (const src of [route, runner]) {
+    const code = src.split("\n").filter((l) => !l.trim().startsWith("//") && !l.trim().startsWith("--")).join("\n");
+    assert.ok(/= 'thin'/.test(code), "thin 구간이 없다");
+    assert.ok(/COALESCE\(synth_count,\s*0\)\s*<=\s*4/.test(code), "thin의 문턱 근접 조건(후기 4건 이하)이 없다");
+  }
+});
+test("판정 집행 순서: thin(좋은 모델)이 refine(싼 모델)보다 먼저다", () => {
+  const chain = readFileSync(new URL("../../scripts/judge-chain.sh", import.meta.url), "utf8");
+  const iThin = chain.indexOf("run thin");
+  const iRefine = chain.indexOf("run refine");
+  assert.ok(iThin > 0 && iRefine > 0, "체인에 thin·refine이 없다");
+  assert.ok(iThin < iRefine,
+    "thin이 refine보다 늦으면 얇은 카페가 싼 모델에 먼저 먹혀 보수적 비공개 원칙이 깨진다");
+  assert.ok(/run thin\s+claude-sonnet-5/.test(chain), "thin에 Sonnet 5를 쓰지 않는다");
+  assert.ok(/run refine\s+claude-haiku-5-5/.test(chain), "refine에 Haiku 5.5를 쓰지 않는다");
+});

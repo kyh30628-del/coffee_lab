@@ -241,6 +241,16 @@ export async function GET(req: NextRequest) {
         AND (${scope} = ''
              OR (${scope} = 'rescue' AND NOT COALESCE(published, false))
              OR (${scope} = 'refine' AND COALESCE(published, false))
+             --   scope=thin : 🛡️ **공개 중인데 공개 문턱(후기 2건)에 가까운 카페만.** (2026-10-19)
+             --     왜 따로 두는가 — 모델별 비공개 전환율 실측에서 **위험이 이 구간에 집중**됐다:
+             --       배치별 전환율이 '후기 4건 이하 비율'에 정비례했다
+             --       (Sonnet 4.9%→0.04% · Haiku#1 6.8%→0.20% · Haiku#2 10.9%→0.42%).
+             --       얇은 카페당으로 정규화하면 Haiku 3.0~3.8% vs Sonnet 0.75% — 4~5배 거칠다.
+             --     CEO 지시 "비공개는 보수적으로 해"를 지키려면 **이 구간에만 좋은 모델**을 쓰면 된다.
+             --     실측 배분: 얇은 5,217곳 Sonnet $31.72 + 나머지 11,085곳 Haiku $4.54 = $36.26
+             --       (전량 Sonnet은 $99.12로 예산 초과, 전량 Haiku는 $6.68이지만 비공개가 4~5배)
+             --     ⚠️ thin을 먼저 돌리면 llm_judged_at이 찍혀 refine 큐에서 빠진다 → 중복 과금 없음.
+             OR (${scope} = 'thin' AND COALESCE(published, false) AND COALESCE(synth_count, 0) <= 4)
              OR (${scope} = 'flip' AND NOT COALESCE(published, false)
                  AND (raw_collected_at > now() - interval '30 day' OR embedding IS NOT NULL)
                  AND COALESCE(naver_category, '') <> ''

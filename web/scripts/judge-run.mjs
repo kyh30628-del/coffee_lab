@@ -56,6 +56,9 @@ const queue = async (scope = "") => Number((await sql`SELECT count(*)::int n FRO
     AND (${scope} = ''
          OR (${scope} = 'rescue' AND NOT COALESCE(published,false))
          OR (${scope} = 'refine' AND COALESCE(published,false))
+         -- 🛡️ thin = 공개 중 + 문턱 근접(후기 4건 이하). 비공개 위험이 집중된 구간이라 좋은 모델을 쓴다
+         --    (라우트의 scope=thin과 글자까지 같게 — 갈라지면 집행 범위가 달라진다).
+         OR (${scope} = 'thin' AND COALESCE(published,false) AND COALESCE(synth_count,0) <= 4)
          -- 🎯 flip = AI 판정이 실제로 공개를 만들 수 있는 미공개 카페만(라우트의 scope=flip과 글자까지 같게).
          --   급소는 '주제 글(검증) >= 1'이다 — AI가 살린 경계 후기는 '참고'가 되고 '검증'이 안 되므로,
          --   주제 글 0건 카페는 AI가 전부 살려줘도 공개 게이트를 못 넘는다(실측 85.4%가 그렇다).
