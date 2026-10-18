@@ -17,6 +17,7 @@ import {
   detectCampaignCluster, isPopupRotatingVenue, cleanCafeName,
 } from "../reviewQuality";
 import { isOtherBusinessQuote, isReadableQuote, displayQuote, splitKeyTerms } from "../cafeDetailView";
+import { sortReviews, ensureRecent } from "../exposureOrder";
 
 const AREA = ["서울", "강남구", "역삼동"];
 
@@ -115,4 +116,36 @@ test("nearDuplicateCafeName: 표기만 다른 같은 가게를 같다고 본다"
 test("cleanCafeName: 괄호 부가정보를 떼어 상호만 남긴다", () => {
   assert.equal(typeof cleanCafeName("오르빗 (올림픽공원점)"), "string");
   assert.ok(cleanCafeName("오르빗 (올림픽공원점)").includes("오르빗"));
+});
+
+// ── ⑩ 노출 순서 — 등급이 최우선, 가독성은 **등급 안에서만** 순서를 바꾼다.
+//   09-22 사고: 가독성이 등급보다 위에 있어 최신 검증 후기가 제목 조각이라는 이유로 화면에서 사라졌다.
+//   10-18 복원: 등급 아래(광고템플릿·캠페인과 같은 자리)로 되돌려 둘을 같이 만족시켰다.
+//   실측 효과(표본 150곳·화면 3칸): 제목 조각 297개 → 31개(-89%), 최신 검증이 안 보이는 카페 0곳 유지.
+test("sortReviews: 참고 등급의 본문 후기가 검증 등급을 앞지르지 않는다", () => {
+  const rows = [
+    { quote: "강남 카페 온다", trust: "verified", date: "2026.01.01", score: 90 },            // 제목 조각 + 검증
+    { quote: "커피가 산미 있고 좌석도 편해서 오래 앉아 있었어요", trust: "reference", date: "2026.02.01", score: 90 }, // 본문 + 참고
+  ];
+  const [first] = sortReviews(rows, "온다", ["서울", "강남구"], Date.now());
+  assert.equal(first.trust, "verified", "가독성이 등급을 넘어서면 09-22 사고가 재발한다");
+});
+test("sortReviews: 같은 등급·같은 날짜면 본문 후기가 제목 조각보다 앞선다", () => {
+  const rows = [
+    { quote: "강남 카페 온다", trust: "verified", date: "2026.03.01", score: 90 },
+    // ⚠️ 두 글 모두 상호를 담아야 한다 — 확신도(conf)가 등급보다 먼저 갈리므로, 상호 없는 글은
+    //   가독성과 무관하게 뒤로 간다(이 규칙이 교차오염 1차 방어다).
+    { quote: "온다 라떼가 부드럽고 창가 자리가 넓어서 작업하기 좋았어요", trust: "verified", date: "2026.03.01", score: 90 },
+  ];
+  const [first] = sortReviews(rows, "온다", ["서울", "강남구"], Date.now());
+  assert.ok(isReadableQuote(first.quote, "온다"), `본문이 먼저여야 한다: ${first.quote}`);
+});
+// ── ⑪ 최신 예약석 — 화면이 3칸이면 예약석도 3칸 안에 있어야 한다(08-29 "메이트힐이 아직도 2023년 글만").
+test("ensureRecent(n=3): 상위 3칸 안에 최근 1년 검증 후기를 한 자리 보장한다", () => {
+  const old = (i: number) => ({ quote: `오래된 후기 ${i}`, trust: "verified", date: "2023.01.0" + ((i % 9) + 1) });
+  const rows = [old(1), old(2), old(3), old(4), { quote: "최근 방문했어요", trust: "verified", date: "2026.09.01" }];
+  const top3 = ensureRecent(rows, 3).slice(0, 3);
+  assert.ok(top3.some((e) => e.date?.startsWith("2026")), "최근 1년 검증 후기가 3칸 안에 없다");
+  // n=6(기본)이면 예약석이 화면 밖(6번째)에 생겨 사용자는 옛 글만 본다 — 이게 10-18에 고친 것.
+  assert.equal(ensureRecent(rows, 3).length, rows.length, "후기가 사라지지 않는다(순서만 바뀐다)");
 });

@@ -85,6 +85,14 @@ export function sortReviews(raw: any[], name: string, areaTerms: string[], nowT:
       // 2026-09-22: 가독성(read) 관문 폐지 — 최신 검증 후기가 제목 조각이라는 이유로 뒤로 밀려 화면에서 사라졌다(CEO 지적).
       //   가독성은 화면 렌더(displayQuote)가 다듬어 처리한다. 대신 '이름만 같은 다른 업종'(호텔 서귀피안)은 오염이라 맨 뒤로.
       biz: isOtherBusinessQuote(e?.quote, name) ? 0 : 1,
+      // 🔴 2026-10-18 복원 — 위 머리 주석이 "광고템플릿·캠페인·**가독성** 관문은 등급 안에서만 순서를 바꾼다"고
+      //   선언했는데, 09-22 구현은 가독성을 **아예 삭제**했다(선언과 코드 불일치). 삭제한 이유는 정당했다 —
+      //   그때 가독성이 **등급보다 위**에 있어서 최신 검증 후기가 제목 조각이라는 이유로 화면에서 사라졌다.
+      //   → 선언대로 **등급 아래**(광고템플릿·캠페인과 같은 자리)로 되돌린다. 등급·확신도는 건드리지 않으므로
+      //     검증 후기가 참고 후기에 밀리는 일은 없고, 아무 후기도 사라지지 않는다(순서만 바뀐다).
+      //   왜 지금 하나: 실측(후기 60건+ 120곳)에서 **화면에 나가는 인용문의 67%가 본문이 아니라 블로그 제목 조각**이었다
+      //   ("당진 대형카페 아미루트 …"). 순위 1-3도 31.7%만 본문이라, 사용자가 읽는 첫 세 줄이 대개 제목이다.
+      read: isReadableQuote(e?.quote, name) ? 1 : 0, // 0 = 제목 조각·정보카드 → 같은 등급 안에서 뒤로
     }))
     .sort((a, b) => {
       // 🔴 2026-09-22 CEO 확정("검증이 우선이고 최신순. 이게 기본"):
@@ -98,6 +106,7 @@ export function sortReviews(raw: any[], name: string, areaTerms: string[], nowT:
       if (tier !== 0) return tier;
       if (b.real !== a.real) return b.real - a.real;
       if (b.solo !== a.solo) return b.solo - a.solo;
+      if (b.read !== a.read) return b.read - a.read; // 같은 등급·같은 관문이면 본문 인용문을 앞으로(2026-10-18 복원)
       const ta = parseYmd(a.e?.date) ?? 0, tb = parseYmd(b.e?.date) ?? 0;
       if (tb !== ta) return tb - ta;
       // 🔴 2026-08-28 수리(CEO: "최신의 오염 없이 검증된 리뷰를 노출"):

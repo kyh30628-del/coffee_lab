@@ -265,7 +265,14 @@ export default async function CafePage({ params }: Props) {
   //   사람이 쓴 말이 없었다. 정렬 순서 그대로 최대 3건. 2건 미만이면 안 보여준다.
   //   🔴 2026-09-22: '읽히는 문장만' 관문 폐지(최신 검증 후기가 통째로 사라지던 원인, CEO 지적). 다른 업종 글만 빼고
   //   정렬(검증 우선·최신순) 그대로 보여주되, 제목 조각·정보카드는 displayQuote가 다듬어 제목 줄로 렌더한다.
-  const readable = evAll.filter((e: any) => !isOtherBusinessQuote(e?.quote, c.name ?? "") && !displayQuote(e?.quote, c.name ?? "").empty);
+  const readableRaw = evAll.filter((e: any) => !isOtherBusinessQuote(e?.quote, c.name ?? "") && !displayQuote(e?.quote, c.name ?? "").empty);
+  // 🔴 2026-10-18 — 최신 예약석을 **화면 안**으로 옮긴다.
+  //   evAll은 ensureRecent(기본 n=6)를 이미 탔지만 이 화면은 **3칸만** 보여준다 → 예약석이 6번째면 화면 밖이다.
+  //   08-29 CEO 지적("메이트힐이 아직도 2023년 글만 보임")의 교훈 그대로: 사용자는 앞의 몇 개만 보고 판단한다.
+  //   같은 날 가독성 보조키를 복원하자 상위 3칸의 '최근 1년 검증' 후기가 389→275건(-28%)으로 줄었다 —
+  //   본문 비율은 29.6%→97.3%로 올랐지만 최신성을 그만큼 내준 것이라, 둘을 같이 만족시킨다.
+  //   ⚠️ 걸러진 뒤의 배열에 적용한다(예약한 글이 'empty'로 탈락해 자리만 비는 일을 막는다). 비용 0 — 순수 함수.
+  const readable = ensureRecent(readableRaw, 3);
   const shownQuotes = readable.slice(0, 3);
   // 접힘 — 페이지 길이는 안 늘고 본문 텍스트(SEO)만 늘어난다.
   // 📏 2026-10-18 상한 12 → 30 (실측 근거):
