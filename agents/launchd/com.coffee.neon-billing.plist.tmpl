@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key><string>com.coffee.neon-billing</string>
+	<key>ProgramArguments</key><array><string>/bin/zsh</string><string>__COFFEE_ROOT__/agents/run-neon-billing.sh</string></array>
+	<key>RunAtLoad</key><false/>
+	<key>StandardErrorPath</key><string>__COFFEE_ROOT__/agent-reports/neon-billing.err</string>
+	<key>StandardOutPath</key><string>__COFFEE_ROOT__/agent-reports/neon-billing.out</string>
+	<key>StartCalendarInterval</key><array><dict><key>Hour</key><integer>7</integer><key>Minute</key><integer>50</integer></dict></array>
+</dict>
+</plist>

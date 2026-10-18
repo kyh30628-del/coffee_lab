@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.coffee.owner-weekly</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>__COFFEE_ROOT__/agents/run-owner-weekly.sh</string>
+  </array>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Weekday</key><integer>1</integer>
+    <key>Hour</key><integer>8</integer>
+    <key>Minute</key><integer>40</integer>
+  </dict>
+  <key>StandardOutPath</key><string>/tmp/coffee-owner-weekly.log</string>
+  <key>StandardErrorPath</key><string>/tmp/coffee-owner-weekly.log</string>
+</dict>
+</plist>

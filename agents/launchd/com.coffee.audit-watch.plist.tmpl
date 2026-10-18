@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.coffee.audit-watch</string>
+  <key>ProgramArguments</key><array><string>/bin/zsh</string><string>__COFFEE_ROOT__/agents/run-trigger-watch.sh</string></array>
+  <key>StartCalendarInterval</key>
+  <array>
+    <dict><key>Hour</key><integer>8</integer><key>Minute</key><integer>5</integer></dict>
+    <dict><key>Hour</key><integer>12</integer><key>Minute</key><integer>5</integer></dict>
+    <dict><key>Hour</key><integer>16</integer><key>Minute</key><integer>5</integer></dict>
+    <dict><key>Hour</key><integer>20</integer><key>Minute</key><integer>5</integer></dict>
+  </array>
+  <key>StandardOutPath</key><string>__COFFEE_ROOT__/agent-reports/audit-watch.out</string>
+  <key>StandardErrorPath</key><string>__COFFEE_ROOT__/agent-reports/audit-watch.err</string>
+  <key>RunAtLoad</key><false/>
+</dict></plist>

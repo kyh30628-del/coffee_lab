@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.coffee.no-sleep</string>
+  <!-- 자율 에이전트가 예약대로 돌게 맥을 재우지 않음. -d디스플레이 -i유휴 -m디스크 -s시스템(AC) -u사용자활성 -->
+  <key>ProgramArguments</key><array><string>/usr/bin/caffeinate</string><string>-dimsu</string></array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardErrorPath</key><string>__COFFEE_ROOT__/agent-reports/no-sleep.err</string>
+</dict></plist>
