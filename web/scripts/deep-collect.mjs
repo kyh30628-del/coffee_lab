@@ -27,6 +27,7 @@ for (const l of env.split("\n")) { const m = l.match(/^([A-Z_0-9]+)=(.*)$/); if 
 const { neon } = await import("@neondatabase/serverless");
 const { fetchDeepWebReviews } = await import("../lib/webSearchCollector.ts");
 const { nameCoherence, cleanCafeName } = await import("../lib/reviewQuality.ts");
+const { extractRid } = await import("../lib/reviewerProfiles.ts");
 const { areaTermsFor } = await import("../lib/synthStore.ts");
 const { synthAndStore } = await import("../lib/synthStore.ts");
 const { invalidateCafeCaches, invalidateCafeDetailOnly } = await import("../lib/cafeCacheInvalidate.ts");
@@ -137,7 +138,38 @@ for (const t of targets) {
   //   그래서 '더 긁는 것'과 '이름이 맞는 것만 넣는 것'은 반드시 같이 가야 한다.
   const areaTerms = await areaTermsFor(Number(t.id), t.area ?? "");
   const cname = cleanCafeName(t.name);
-  const kept = deep.snippets.filter((s) => nameCoherence(cname, [s.text], areaTerms) !== 0);
+  let kept = deep.snippets.filter((s) => nameCoherence(cname, [s.text], areaTerms) !== 0);
+
+  // 🔴 2026-10-18 **등급에 기여하는 글만 받는다**(CEO "품질이 좋아진 건지 안 보인다").
+  //   실측한 문제: 깊은 수집으로 표시 후기는 크게 늘었는데 **등급은 절반만 올랐다** —
+  //   후기 30건 문턱을 새로 넘은 310곳 중 '검증'이 된 곳은 164곳뿐(146곳 미달).
+  //   원인은 `start`로 깊이 들어가면 **같은 블로거 글·오래된 글**이 대량으로 들어오는 것이다:
+  //     시실리아 커피로스팅 표시 61 = verified 8 + reference 53 · **계정공제 48**
+  //     봄그림 검단 떡케이크 표시 60 = verified 45 + reference 15 · **계정공제 58**
+  //     울진대게빵 강구점   표시 55 = verified 20 + reference 35 · **3년+ 공제 35**
+  //   등급 산정(collectOrchestrator)은 **계정당 2건까지만** 세고 **3년 넘은 글은 0.5 가중**이다.
+  //   그래서 그런 글을 더 넣으면 표시 숫자만 오르고 등급은 그대로다 — "표시만 늘리는" 수집이었다.
+  //   → 수집 단계에서 같은 규칙을 **미리** 적용한다: 계정당 ACCT_CAP건까지, 3년 넘은 글은 뒤로.
+  //     기존 raw에 이미 있는 계정 수도 함께 센다(합치면 등급 산정은 전체를 보므로).
+  //   💰 콜은 그대로다(이미 받은 결과를 고르는 것) — 같은 비용으로 등급 기여도만 올린다.
+  const ACCT_CAP = Number(process.env.DEEP_ACCT_CAP || 2);
+  const YEARS3 = Date.now() - 3 * 365.25 * 86400e3;
+  {
+    const acct = new Map();
+    for (const r of prev) { const rid = extractRid(r.link); if (rid) acct.set(rid, (acct.get(rid) ?? 0) + 1); }
+    const dated = (x) => { const t = x.date ? Date.parse(String(x.date)) : NaN; return Number.isFinite(t) ? t : 0; };
+    // 최신 우선 → 같은 계정이 상한을 넘으면 버린다. 3년 넘은 글은 상한을 1건으로 더 조인다.
+    kept = kept.sort((a, b) => dated(b) - dated(a)).filter((x) => {
+      const rid = extractRid(x.link);
+      const old3 = dated(x) > 0 && dated(x) < YEARS3;
+      const cap = old3 ? 1 : ACCT_CAP;
+      if (!rid) return !old3;                    // 계정을 못 읽는 글은 최신만 받는다
+      const n = acct.get(rid) ?? 0;
+      if (n >= cap) return false;
+      acct.set(rid, n + 1);
+      return true;
+    });
+  }
 
   // ① 합치기 — 기존을 먼저 깔고 신규를 더한다. **기존이 사라질 수 없다.**
   const byKey = new Map();
@@ -200,7 +232,7 @@ for (const t of targets) {
   const gradeChanged = a?.synth_grade !== t.synth_grade;
   grew++;
   (gradeChanged ? fullPurge : detailOnly).push(Number(t.id));
-  console.log(`  ${tag}✅ ${String(t.name).slice(0, 18).padEnd(20)} 원본 ${prev.length}→${merged.length} · 검증 ${cBefore}→${cAfter}${gradeChanged ? ` · 등급 ${t.synth_grade}→${a.synth_grade}` : ""} (${deep.calls}콜 · 이름일치 ${kept.length}/${deep.snippets.length})`);
+  console.log(`  ${tag}✅ ${String(t.name).slice(0, 18).padEnd(20)} 원본 ${prev.length}→${merged.length} · 검증 ${cBefore}→${cAfter}${gradeChanged ? ` · 등급 ${t.synth_grade}→${a.synth_grade}` : ""} (${deep.calls}콜 · 등급기여 ${kept.length}/${deep.snippets.length})`);
 
   await sql`INSERT INTO deep_log (cafe_id, raw_before, raw_after, count_before, count_after, calls)
     VALUES (${t.id}, ${prev.length}, ${merged.length}, ${cBefore}, ${cAfter}, ${deep.calls})
