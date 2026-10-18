@@ -692,8 +692,9 @@ test("판정 ②: 채택은 about·helpful 둘 다 참일 때만(라우트와 �
 });
 test("판정 ②: 수거 경로가 파싱 실패 시 결정을 쓰지 않고 빠져나간다", () => {
   const route = readFileSync(new URL("../../app/api/cron-batch-judge/route.ts", import.meta.url), "utf8");
-  assert.ok(/if \(!verdicts\) \{ parseFailed\+\+;[\s\S]{0,120}continue; \}/.test(route),
-    "파싱 실패 시 곧바로 continue하지 않는다 — false가 박힐 수 있다");
+  // 수거가 직렬 for 루프(continue)든 동시 처리 풀의 콜백(return)이든, **아무 결정도 쓰지 않고 빠져나가야** 한다.
+  assert.ok(/if \(!verdicts\) \{ parseFailed\+\+;[\s\S]{0,120}(continue|return); \}/.test(route),
+    "파싱 실패 시 곧바로 빠져나가지 않는다 — false가 박힐 수 있다");
   assert.ok(!/decisions\[k\] = !!\(v && v\.about/.test(route), "모든 키에 값을 박는 옛 매핑이 남아 있다");
   assert.ok(/precision: \{ truncated, parseFailed, unanswered \}/.test(route),
     "정확성 계측을 응답에 노출하지 않으면 재발을 못 본다");
@@ -715,4 +716,30 @@ test("판정 ③: 패스 카운터는 제출 시점에 올린다(수거 못 한 
 test("판정: 과거 결정이 배열로 들어와도 조용히 사라지지 않는다", () => {
   const store = readFileSync(new URL("../synthStore.ts", import.meta.url), "utf8");
   assert.ok(/!Array\.isArray\(d\)/.test(store), "typeof []==='object' 를 막지 않았다(실측 15행이 배열)");
+});
+
+// 🔴 라이브 보호 — 수거를 동시 처리로 바꾸면서 발견. 호출마다 DDL이면 cafes에 배타락이 반복돼
+//   실사용자 조회가 밀린다. 카페 단위 함수에 ALTER가 다시 들어오지 못하게 못으로 박는다.
+test("판정: 카페 단위 함수가 호출마다 DDL(ALTER TABLE)을 치지 않는다", () => {
+  const store = readFileSync(new URL("../synthStore.ts", import.meta.url), "utf8");
+  for (const fn of ["markJudged", "bumpJudgePass"]) {
+    const i = store.indexOf(`export async function ${fn}`);
+    assert.ok(i > 0, `${fn}이 없다`);
+    // 주석에 'ALTER TABLE'이라는 글자가 나오는 건 정상(왜 없앴는지 적어둔 근거다) — **코드 줄만** 본다.
+    const body = store.slice(i, store.indexOf("\n}", i))
+      .split("\n").filter((l) => !l.trim().startsWith("//")).join("\n");
+    assert.ok(!/ALTER TABLE/.test(body), `${fn}이 호출마다 ALTER TABLE을 친다 — 동시 처리 시 라이브가 밀린다`);
+  }
+});
+
+// 🔴 Next는 정적 분석 가능한 `process.env.X`(점 접근)를 **빌드 시점에 리터럴로 치환**한다.
+//   런타임 조절이 필요한 노브(동시성·배치크기·패스상한)를 점 접근으로 쓰면 조용히 기본값으로 굳는다.
+//   실측 2026-10-19: 동시 6을 줬는데 분당 14곳(직렬 12.7과 동일)·CPU 1.7% — 병렬이 안 걸렸다.
+test("판정: 런타임 노브는 대괄호 접근으로 읽는다(Next 빌드시 치환 회피)", () => {
+  const route = readFileSync(new URL("../../app/api/cron-batch-judge/route.ts", import.meta.url), "utf8")
+    .split("\n").filter((l) => !l.trim().startsWith("//")).join("\n");   // 주석의 설명문은 코드가 아니다
+  for (const k of ["JUDGE_CONCURRENCY", "JUDGE_MAX_PASSES", "BATCH_JUDGE_LIMIT"]) {
+    assert.ok(!new RegExp(`process\\.env\\.${k}\\b`).test(route), `${k}를 점 접근으로 읽는다 — 빌드 시점에 굳는다`);
+    assert.ok(route.includes(`process.env["${k}"]`), `${k}를 대괄호로 읽지 않는다`);
+  }
 });

@@ -118,6 +118,7 @@ async function ensureCols() {
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS pipeline_status TEXT`;
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS needs_llm BOOLEAN`;
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS borderline_count INT`;
+  await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS judge_passes INT DEFAULT 0`; // 판정 배치 재입장 횟수(35건 상한 수리와 짝)
   await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS needs_llm_priority TEXT`; // needs_llm 재판정 큐 우선순위 태그(rulegap-20260808-0815)
   });
   ensured = true;
@@ -1263,7 +1264,7 @@ export async function getUndecidedAuditCandidates(cafe: { id: number; name: stri
 //   **제출 시점**에 올린다. 수거 시점에 올리면 영영 수거 못 한 배치가 무한 재구매를 만든다.
 export async function bumpJudgePass(ids: number[]) {
   if (!ids.length) return;
-  await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS judge_passes INT DEFAULT 0`;
+  await ensureCols();   // DDL을 호출마다 치지 않는다(markJudged 주석과 같은 이유 — 라이브 락 경합)
   await sql`UPDATE cafes SET judge_passes = COALESCE(judge_passes, 0) + 1 WHERE id = ANY(${ids})`;
 }
 
@@ -1302,7 +1303,12 @@ export async function backfillYouTube(cafe: { id: number; name: string; area: st
 
 // 경계 리뷰 없는 카페는 LLM 불필요 → 판정완료로 마킹(커서 전진).
 export async function markJudged(cafeId: number) {
-  await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS llm_judged_at TIMESTAMPTZ`;
+  // 🔴 2026-10-19 — 여기 있던 `ALTER TABLE cafes ADD COLUMN IF NOT EXISTS llm_judged_at`를 없앴다.
+  //   **호출마다 DDL이었다.** 컬럼이 이미 있어도 ALTER는 cafes에 ACCESS EXCLUSIVE 락을 잠깐 잡는다.
+  //   직렬일 때는 티가 안 났지만, 수거를 동시 처리로 바꾸는 순간 카페마다 락 경합이 생겨
+  //   **라이브 서비스의 cafes 조회가 밀린다**(「서비스 멈출 위험 있으면 아예 하지 말 것」).
+  //   llm_judged_at은 ensureCols가 이미 만든다(배포 단위 1회, ensureOnce로 묶여 있다).
+  await ensureCols();
   await sql`UPDATE cafes SET llm_judged_at=now() WHERE id=${cafeId}`;
 }
 

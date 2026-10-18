@@ -12,13 +12,32 @@ export const maxDuration = 300;
 // 매 실행: ① 지난번 제출 배치가 끝났으면 결과 수거·적용  ② 판정 대기 카페로 새 배치 제출.
 //   비동기라 결과가 한 사이클(크론 간격) 늦게 반영되지만, 카페 큐레이션엔 무방.
 //   매니페스트(custom_id→cafe·keys)는 DB(judge_batches)에 보관(서버리스 /tmp 비영속 대응).
-const BUILD_LIMIT = Number(process.env.BATCH_JUDGE_LIMIT || 60);  // 2026-09-20 150→120→60. 120에서 8회차가 300s 타임아웃으로 빈 응답을 냈다(rejected 3,089곳이 남았는데 '대상 없음'처럼 보였다).
+const BUILD_LIMIT = Number(process.env["BATCH_JUDGE_LIMIT"] || 60);  // 2026-09-20 150→120→60. 120에서 8회차가 300s 타임아웃으로 빈 응답을 냈다(rejected 3,089곳이 남았는데 '대상 없음'처럼 보였다).
 //   원인: 후보 선정 정렬이 synth_count ASC(후기 적은 순)라 **회차가 갈수록 무거운 카페**가 온다 — 카페당 합성이 느려진다. // 빌드 시 getAuditCandidates가 카페당 합성 → 300s 내로 제한
 const PER_CAFE = 35;
 // 🔁 한 카페를 최대 몇 번까지 판정 배치에 올릴 수 있나. 경계 후기 35건 초과 카페(실측 4,280곳,
 //   최대 317건)를 끝까지 보려면 여러 번 올라가야 한다. 상한 = 35 × 9 = 315건까지 커버.
 //   ⚠️ 상한이 없으면 '모델이 답 안 한 후보는 미결로 남긴다'는 수리와 맞물려 무한 재구매가 된다.
-const JUDGE_MAX_PASSES = Number(process.env.JUDGE_MAX_PASSES || 9);
+const JUDGE_MAX_PASSES = Number(process.env["JUDGE_MAX_PASSES"] || 9);
+// ⚡ 동시 처리 수 (2026-10-19) — **기본 1이라 프로덕션 동작은 그대로다.**
+//   병목 실측: 수거 1곳당 재합성(loadRaw→collectAndSynthesize→storeResult)이 돌아 **분당 12.7곳**이었다.
+//   후보구제 7,518곳 = 9.9시간, 재정제 24,734곳 = 32.4시간. CEO 지적("왜 며칠이나 걸리냐")의 실체가 이것이다.
+//   카페별 처리는 서로 독립이고 Neon은 HTTP 드라이버(요청마다 독립)라 커넥션 풀 고갈이 없다 →
+//   동시 처리로 바로 줄어든다. 💰 Neon은 컴퓨트 시간 과금이라 **총 시간이 줄면 비용도 준다**(증가 아님).
+//   ⚠️ 라이브 서비스와 같은 DB다. 과하게 올리면 실사용자 응답이 느려진다 — 로컬 집행만 올려 쓰고
+//      기본값은 1로 둔다(「서비스 멈출 위험 있으면 아예 하지 말 것」).
+// 🔴 2026-10-19 — `process.env.JUDGE_CONCURRENCY` (점 접근)은 **Next가 빌드 시점에 리터럴로 치환**한다.
+//   빌드 때 값이 없으면 undefined로 박혀 런타임에 아무리 넣어도 1로 돌았다(실측: 동시6을 줘도 분당 14곳,
+//   직렬 기준선 12.7곳과 차이 없음 · 서버 CPU는 1.7%로 한가했다 = 병렬이 아예 안 걸린 증거).
+//   대괄호 접근은 치환 대상이 아니라 런타임 값을 읽는다.
+const CONC = Math.max(1, Math.min(12, Number(process.env["JUDGE_CONCURRENCY"] || 1)));
+async function mapPool<T>(items: T[], worker: (x: T) => Promise<void>) {
+  if (CONC <= 1) { for (const x of items) await worker(x); return; }
+  let i = 0;
+  await Promise.all(Array.from({ length: Math.min(CONC, items.length) }, async () => {
+    while (i < items.length) { const x = items[i++]; await worker(x); }
+  }));
+}
 // 🎯 위험군 게이트(2026-07-05 CEO): 공개 카페 '재판정'은 신뢰도 낮은 등급만 — 파이프라인 자체 등급으로 원리적 선.
 //   '검증'(verified, 평균 85리뷰 = 옥석 코어)은 스킵(재판정 불필요), 그 외('참고' 등, 평균 12리뷰)는 판정.
 //   근거: 오염 4곳(리코·충무·블라블라·블루다이아) 전부 '참고'였음 — 리뷰 개수(<5) 같은 자의적 선보다 등급이 정확.
@@ -71,9 +90,12 @@ export async function GET(req: NextRequest) {
       //   (실측: Haiku 4.5로 제출한 584곳 배치를 Sonnet 5 단가로 세면 4배 과대). 예산 가드가 쓰는 숫자다.
       //   매니페스트에 model이 없는 옛 배치는 batchPriceFor의 기본값(구형 Haiku 단가)으로 떨어진다.
       const bp = batchPriceFor(String(row.manifest?.model ?? ""));
-      for await (const res of streamResults(KEY, b.results_url)) {
+      // ⚡ 스트림을 먼저 다 읽어 두고(네트워크) 적용을 풀로 돌린다(DB·재합성). 읽기는 가볍고 적용이 무겁다.
+      const toApply: any[] = [];
+      for await (const res of streamResults(KEY, b.results_url)) toApply.push(res);
+      await mapPool(toApply, async (res: any) => {
         const entry = cafes[res.custom_id];
-        if (!entry || res.result?.type !== "succeeded") continue;
+        if (!entry || res.result?.type !== "succeeded") return;
         // 💰 비용은 **그 배치의 모델 단가**로 바로 적립한다(토큰만 모으면 모델이 섞여 계산이 틀어진다).
         const u = res.result.message?.usage;
         if (u) {
@@ -88,13 +110,13 @@ export async function GET(req: NextRequest) {
         //   그 전엔 파싱 실패 시 모든 키에 false를 박아 후보 전원이 "AI 판정: 무관/저품질 제외"로
         //   영구 저장됐다(실측: 잘림 0.3~1.9%, 한 배치에서 69건·30건). 규칙 판정을 그대로 두는 게
         //   무회귀 기본값이다 — 커서만 전진시켜 같은 비용을 두 번 쓰지 않는다.
-        if (!verdicts) { parseFailed++; try { await markJudged(entry.id); } catch {} continue; }
+        if (!verdicts) { parseFailed++; try { await markJudged(entry.id); } catch {} return; }
         const mapped = decisionsFromVerdicts(entry.keys as string[], verdicts);
         unanswered += mapped.unanswered;
-        if (Object.keys(mapped.decisions).length === 0) { try { await markJudged(entry.id); } catch {} continue; }
+        if (Object.keys(mapped.decisions).length === 0) { try { await markJudged(entry.id); } catch {} return; }
         try { await applyDecisions({ id: entry.id, name: entry.name, area: entry.area ?? "" }, mapped.decisions); appliedCafes++; rescued += mapped.kept; }
         catch { /* 실패분 스킵 — 다음 배치에서 재시도되지 않게 markJudged */ try { await markJudged(entry.id); } catch {} }
-      }
+      });
       await sql`UPDATE judge_batches SET applied = true WHERE batch_id = ${row.batch_id}`;
     }
 
@@ -201,7 +223,9 @@ export async function GET(req: NextRequest) {
                id LIMIT ${BUILD_LIMIT}`) as any[];
     const requests: any[] = [];
     const manifestCafes: Record<string, any> = {};
-    for (const c of rows) {
+    // ⚡ 빌드도 카페별 재합성(getAuditCandidates)이라 같은 병목이다 — 풀로 돌린다.
+    //   requests 순서는 판정 결과에 영향이 없다(custom_id로 매칭하므로).
+    await mapPool(rows, async (c: any) => {
       try { // 한 카페 오류(데이터·합성)로 전체 빌드가 멈추지 않게 격리
         // 🔴 2026-10-19 — **이미 판정받은 후보는 빼고 '아직 안 본 것'부터 본다.**
         //   그 전엔 candidates.slice(0, 35)라, 경계 후기가 35건을 넘는 카페는 36번째부터 **영영**
@@ -209,9 +233,9 @@ export async function GET(req: NextRequest) {
         //     경계 35건 초과 카페 4,280곳 · 못 본 경계 후기 140,932건 · 그중 이미 큐에서 빠져
         //     영구 미판정 확정 14,019건. "AI가 내용을 보고 가린다"는 약속이 거기서 끊겨 있었다.
         const { candidates, hasRaw } = await getUndecidedAuditCandidates({ id: c.id, name: c.name, area: c.area ?? "" });
-        if (!hasRaw) continue;
+        if (!hasRaw) return;
         const items = candidates.slice(0, PER_CAFE).filter((it: any) => it && it.key);
-        if (items.length === 0) { await markJudged(c.id); noCand++; continue; } // 후보 없음 → 무과금 판정완료
+        if (items.length === 0) { await markJudged(c.id); noCand++; return; } // 후보 없음 → 무과금 판정완료
         requests.push({
           custom_id: `cafe_${c.id}`,
           params: {
@@ -222,7 +246,7 @@ export async function GET(req: NextRequest) {
         });
         manifestCafes[`cafe_${c.id}`] = { id: c.id, name: c.name, area: c.area ?? "", keys: items.map((it: any) => it.key) };
       } catch { try { await markJudged(c.id); } catch {} }
-    }
+    });
     if (requests.length > 0) {
       const b = await createBatch(KEY, requests, {
       // 🔴 2026-09-20 — 크기 중복가드(같은 건수 24h 내 재제출 차단)를 여기서만 푼다.
@@ -258,6 +282,7 @@ export async function GET(req: NextRequest) {
       ok: true,
       applied: { cafes: appliedCafes, rescuedReviews: rescued, costUsd: Number(cost.toFixed(4)), inTok, outTok },
       precision: { truncated, parseFailed, unanswered },
+      concurrency: CONC,
       pollingBatches: stillRunning,
       expiredClosed: expiredBatches, // 결과 보관기간(29일) 지나 회수 불가 → 닫은 배치 수
       submitted: { newBatchId: batchId, cafes: submitted, noBorderlineMarked: noCand },
