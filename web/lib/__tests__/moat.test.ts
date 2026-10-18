@@ -21,6 +21,7 @@ import { sortReviews, ensureRecent } from "../exposureOrder";
 import { collectAndSynthesize } from "../collectOrchestrator";
 import { mergeRawEvidence, shouldBlockShrink } from "../evidenceMerge";
 import { overUnpubCapForTest } from "../synthStore";
+import { effectVerdictFor } from "../runLedger";
 
 const AREA = ["서울", "강남구", "역삼동"];
 
@@ -354,4 +355,34 @@ test("대량 비공개 차단: 상한(50)을 기준으로 판정한다", () => {
   assert.equal(overUnpubCapForTest(50), false, "상한까지는 집행한다");
   assert.equal(overUnpubCapForTest(51), true, "상한을 넘으면 멈춘다");
   assert.equal(overUnpubCapForTest(48745), true, "회귀로 전량이 걸리면 반드시 멈춘다");
+});
+
+// ═══ 하네스 1원칙 — "실행이 아니라 **효과**가 성공" (2026-10-18 신설) ═══
+//   🔴 그때까지 `run_ledger.effect_ok`는 최근 30일 **2,372건 전부 NULL**이었다.
+//   `recordLedger`가 인자로 받긴 했지만 **넘기는 호출자가 하나도 없었고**, `jobContract`의
+//   `effect: {kind:"monotone-decrease"}` 선언도 **읽는 코드가 없었다** — 하네스의 1원칙이
+//   한 번도 실행된 적이 없었다는 뜻이다. 10-17에 내가 계약에 선언 5개를 추가한 것도 빈껍데기였다.
+//   과거 30일 역검증: 이 판정이 `cron-embed`의 정체 **8건**을 잡는다(내가 며칠 놓쳤던 "0건 처리·5,611건 남음").
+const P = (updated: number, remain: number, ok: boolean | null = true) => ({ ok, updated, remain });
+test("효과 판정: 처리 0건이고 남은 일이 있어도 첫 회차는 판정하지 않는다", () => {
+  assert.equal(effectVerdictFor({ updated: 0, remain: 100 }, [], 2), true, "비교할 과거가 없으면 효과 없음으로 몰지 않는다");
+});
+test("효과 판정: 2회 연속 '처리 0 + 남은 일 있음'이면 효과 없음", () => {
+  assert.equal(effectVerdictFor({ updated: 0, remain: 5611 }, [P(0, 5611)], 2), false);
+});
+test("효과 판정: 진척이 있었던 런이 끼면 연속이 아니다", () => {
+  assert.equal(effectVerdictFor({ updated: 0, remain: 100 }, [P(50, 100)], 2), true);
+});
+test("효과 판정: 할 일이 없어서 0건인 것은 성공이다(오탐 방지)", () => {
+  assert.equal(effectVerdictFor({ updated: 0, remain: 0 }, [P(0, 0)], 2), true, "큐가 비면 0건이 정상이다");
+});
+test("효과 판정: 계량이 없으면 판정하지 않는다(NULL)", () => {
+  assert.equal(effectVerdictFor({ processed: 0 }, [P(0, 10)], 2), null, "remain이 없으면 '막힘'과 '할 일 없음'을 구분할 수 없다");
+  assert.equal(effectVerdictFor(undefined, [], 2), null);
+});
+test("효과 판정: 이미 실패로 보고된 런은 효과로 또 판정하지 않는다", () => {
+  assert.equal(effectVerdictFor({ updated: 0, remain: 10 }, [P(0, 10)], 2, false), null);
+});
+test("효과 판정: 사이에 실패가 끼면 연속으로 보지 않는다", () => {
+  assert.equal(effectVerdictFor({ updated: 0, remain: 10 }, [P(0, 10, false)], 2), true);
 });

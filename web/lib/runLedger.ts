@@ -53,6 +53,73 @@ export function fingerprintOf(parts: Record<string, string | number | readonly (
   return createHash("sha1").update(norm).digest("hex").slice(0, 16);
 }
 
+/**
+ * 🔴 2026-10-18 — **효과 판정을 실제로 계산해서 쓴다.**
+ *   그때까지 `effect_ok`는 최근 30일 **2,372건 전부 NULL**이었다. `recordLedger`가 `effectOk`를
+ *   인자로 받긴 했지만 **넘기는 호출자가 하나도 없었고**, `jobContract`의 `effect: {kind:"monotone-decrease"}`
+ *   선언도 **읽는 코드가 없었다**. 하네스 3원칙 1번("실행이 아니라 **효과**가 성공")이
+ *   한 번도 실행된 적이 없었다는 뜻이다 — 선언만 있는 빈껍데기.
+ *   (10-17에 내가 계약에 effect 선언 5개를 추가한 것도 소비자가 없어 아무 일도 하지 않았다.)
+ *
+ *   판정 규칙(계약 `effect.kind === "monotone-decrease"`인 잡만):
+ *     이번 런이 "처리 0건 + 남은 일 있음"이고, 직전 런들도 같은 모양으로 `maxNoEffectRuns`회 이어지면
+ *     → `effect_ok = false`. 그 외에는 `true`. 계량(updated/processed·remain)이 없으면 NULL(판정 불가).
+ *   💰 비용: 계약에 effect가 선언된 잡(현재 6종)에만, 직전 N행의 **작은 컬럼**을 읽는 조회 1회.
+ *     나머지 잡은 추가 조회 0. `detectNoProgress`와 같은 기준을 쓴다(판정이 두 갈래로 갈리지 않게).
+ */
+export function effectVerdictFor(
+  metrics: { updated?: number; processed?: number; remain?: number } | undefined,
+  prev: { ok?: boolean | null; updated?: number; processed?: number; remain?: number }[],
+  maxNoEffectRuns: number,
+  ok?: boolean,
+): boolean | null {
+  // 🧪 테스트 전용 순수판 — judgeEffect의 판정 규칙만 떼어낸 것(DB 미접촉). 둘이 갈라지면 테스트가 깨진다.
+  if (ok === false) return null;
+  const m = metrics ?? {};
+  const done = Number(m.updated ?? m.processed ?? NaN);
+  const left = Number(m.remain ?? NaN);
+  if (!Number.isFinite(done) || !Number.isFinite(left)) return null;
+  if (left <= 0 || done > 0) return true;
+  const need = Math.max(1, maxNoEffectRuns);
+  if (prev.length < need - 1) return true;
+  for (const r of prev.slice(0, need - 1)) {
+    const pd = Number(r.updated ?? r.processed ?? NaN);
+    const pl = Number(r.remain ?? NaN);
+    if (r.ok === false) return true;
+    if (!Number.isFinite(pd) || !Number.isFinite(pl)) return true;
+    if (pl <= 0 || pd > 0) return true;
+  }
+  return false;
+}
+
+async function judgeEffect(job: string, metrics?: RunMetrics, ok?: boolean): Promise<boolean | null> {
+  try {
+    const { getContract } = await import("./jobContract");
+    const eff = getContract(job).effect;
+    if (!eff || eff.kind !== "monotone-decrease") return null;
+    if (ok === false) return null;                       // 실패는 ok로 이미 보고된다
+    const m = (metrics ?? {}) as any;
+    const done = Number(m.updated ?? m.processed ?? NaN);
+    const left = Number(m.remain ?? NaN);
+    if (!Number.isFinite(done) || !Number.isFinite(left)) return null; // 계량 없으면 판정 불가
+    if (left <= 0 || done > 0) return true;              // 할 일 없음 또는 진척 있음 = 효과 있음
+    const need = Math.max(1, eff.maxNoEffectRuns);
+    const prev = (await sql`SELECT ok, metrics FROM run_ledger
+      WHERE job = ${job} AND metrics IS NOT NULL
+      ORDER BY started_at DESC LIMIT ${need - 1}`) as unknown as { ok: boolean | null; metrics: any }[];
+    if (prev.length < need - 1) return true;             // 비교할 과거가 부족하면 아직 판정하지 않는다
+    for (const r of prev) {
+      const pm = r.metrics ?? {};
+      const pd = Number(pm.updated ?? pm.processed ?? NaN);
+      const pl = Number(pm.remain ?? NaN);
+      if (r.ok === false) return true;                   // 사이에 실패가 끼면 연속이 아니다
+      if (!Number.isFinite(pd) || !Number.isFinite(pl)) return true;
+      if (pl <= 0 || pd > 0) return true;                // 진척이 있었던 런이 끼면 연속 끊김
+    }
+    return false;                                        // need회 연속 "처리 0 + 남은 일 있음" = 효과 없음
+  } catch { return null; }
+}
+
 /** 원장에 1행 추가. 실패해도 조용히 넘어간다(본 작업 보호). */
 export async function recordLedger(job: string, r: {
   ok?: boolean; effectOk?: boolean | null; fingerprint?: string;
@@ -60,6 +127,8 @@ export async function recordLedger(job: string, r: {
 }): Promise<void> {
   try {
     await ensure();
+    // 호출자가 명시로 넘기면 그대로 쓰고, 안 넘기면 계약을 보고 계산한다.
+    if (r.effectOk === undefined) r = { ...r, effectOk: await judgeEffect(job, r.metrics, r.ok) };
     await sql`INSERT INTO run_ledger (job, started_at, ended_at, ok, effect_ok, fingerprint, metrics, detail)
       VALUES (${job}, ${r.startedAt ?? new Date()}, now(), ${r.ok ?? null}, ${r.effectOk ?? null},
               ${r.fingerprint ?? null}, ${r.metrics ? JSON.stringify(r.metrics) : null}::jsonb,
