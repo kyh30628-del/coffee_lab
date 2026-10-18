@@ -100,7 +100,7 @@ function CafeCard({ c, top, onShowEvidence }: { c: Cafe; top: boolean; onShowEvi
 
       {c.synth_identity && (
         <div className="bg-[#efe9dd] rounded-lg px-3 py-2 mb-2 border border-[#ddd0bb]">
-          <div className="text-[13px] text-[#52402e] leading-snug">{c.synth_identity}</div>
+          <div className="text-[13px] text-note-ink-warm leading-snug">{c.synth_identity}</div>
         </div>
       )}
 
@@ -113,9 +113,9 @@ function CafeCard({ c, top, onShowEvidence }: { c: Cafe; top: boolean; onShowEvi
       )}
 
       <div className="mt-auto">
-        {c.signature && <div className="text-[12px] text-[#524234] mb-2"><span className="text-[#7a4d1c]">추천 </span>{c.signature}</div>}
+        {c.signature && <div className="text-[12px] text-note-ink-body mb-2"><span className="text-[#7a4d1c]">추천 </span>{c.signature}</div>}
         <div className="flex gap-2">
-          <a href={`https://map.kakao.com/?q=${encodeURIComponent(c.name + " " + c.area)}`} target="_blank" rel="noopener noreferrer" onClick={() => trackOutbound({ target: "kakao_map", cafeId: c.id, source: "동네목록" })} className="flex-1 text-center bg-[#2b2018] text-[#f4ece0] rounded-lg py-2 text-xs font-medium hover:bg-[#3d2f22] transition-colors">지도·길찾기</a>
+          <a href={`https://map.kakao.com/?q=${encodeURIComponent(c.name + " " + c.area)}`} target="_blank" rel="noopener noreferrer" onClick={() => trackOutbound({ target: "kakao_map", cafeId: c.id, source: "동네목록" })} className="flex-1 text-center bg-note-ink text-note-paper rounded-lg py-2 text-xs font-medium hover:bg-[#3d2f22] transition-colors">지도·길찾기</a>
           {c.phone && <a href={`tel:${c.phone}`} className="px-3 text-center bg-transparent border border-[#cbb89f] text-[#524434] rounded-lg py-2 text-xs font-medium flex items-center">전화</a>}
         </div>
       </div>
@@ -138,7 +138,7 @@ function EvidencePanel({ cafe, onClose }: { cafe: Cafe | null; onClose: () => vo
             <button onClick={onClose} className="text-2xl text-[#7a4d1c] leading-none">×</button>
           </div>
           <div className="text-[#7a4d1c] text-sm mb-4">리뷰 {cafe.synth_count}건 종합 · 근거</div>
-          {cafe.synth_identity && <div className="bg-[#efe9dd] rounded-lg px-4 py-3 mb-4 text-[14px] text-[#52402e]">{cafe.synth_identity}</div>}
+          {cafe.synth_identity && <div className="bg-[#efe9dd] rounded-lg px-4 py-3 mb-4 text-[14px] text-note-ink-warm">{cafe.synth_identity}</div>}
           <div className="text-[11px] text-[#6b5847] mb-3">이 분석의 근거가 된 실제 후기 (네이버 공개 글)</div>
           <div className="space-y-3">
             {reviews.map((rv, i) => (
@@ -184,11 +184,11 @@ export default function CafePage() {
         <BackLink to="/" label="홈" className="text-[#7a4d1c] mb-4" />
         <div className="text-[#7a4d1c] text-xs tracking-[0.4em] uppercase mb-4">강동·구리 동네 커피 노트</div>
         <h1 className="text-4xl font-bold leading-snug mb-3">오늘 커피,<br />뭐 하러 가세요?</h1>
-        <p className="text-[#524234] mb-10 leading-relaxed">목적을 알려주시면, 거기 딱 맞는 동네 로스터리를 <strong className="text-[#2b2018]">근거와 함께</strong> 추천해드려요.</p>
+        <p className="text-note-ink-body mb-10 leading-relaxed">목적을 알려주시면, 거기 딱 맞는 동네 로스터리를 <strong className="text-note-ink">근거와 함께</strong> 추천해드려요.</p>
         <div className="grid grid-cols-2 gap-3">
           {PURPOSES.map((p) => (
             <button key={p.key} onClick={() => { setPurpose(p.key); setStep("result"); }}
-              className="bg-[#fdfaf4] border border-[#ece0cd] rounded-2xl p-6 text-left hover:border-[#9c6b3f] hover:-translate-y-0.5 transition-all shadow-sm">
+              className="bg-[#fdfaf4] border border-[#ece0cd] rounded-2xl p-6 text-left hover:border-note-tan hover:-translate-y-0.5 transition-all shadow-sm">
               <div className="text-3xl mb-2">{p.emoji}</div><div className="text-lg font-bold">{p.label}</div>
             </button>
           ))}
@@ -199,7 +199,7 @@ export default function CafePage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f4ece0] text-[#2b2018]" style={{ fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }}>
+    <main className="min-h-screen bg-note-paper text-note-ink" style={{ fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }}>
       <div className="max-w-4xl mx-auto px-6 py-10">
         <header className="mb-6 flex items-center justify-between">
           <div>
@@ -209,8 +209,8 @@ export default function CafePage() {
           <button onClick={() => setStep("purpose")} className="text-xs text-[#7a4d1c] underline">처음부터</button>
         </header>
 
-        {loading ? <p className="text-[#524234]">불러오는 중...</p>
-          : ranked.length === 0 ? <p className="text-[#524234] bg-white/50 rounded-2xl p-8 text-center">맞는 곳을 아직 못 찾았어요.</p>
+        {loading ? <p className="text-note-ink-body">불러오는 중...</p>
+          : ranked.length === 0 ? <p className="text-note-ink-body bg-white/50 rounded-2xl p-8 text-center">맞는 곳을 아직 못 찾았어요.</p>
           : (
             <div className="grid md:grid-cols-2 gap-5">
               {ranked.map((c, i) => <CafeCard key={c.id} c={c} top={!!purpose && i === 0} onShowEvidence={setEvidenceCafe} />)}
@@ -228,7 +228,7 @@ export default function CafePage() {
 
 function Shell({ children, wide }: { children: React.ReactNode; wide: boolean }) {
   return (
-    <main className="min-h-screen bg-[#f4ece0] text-[#2b2018] flex items-center" style={{ fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }}>
+    <main className="min-h-screen bg-note-paper text-note-ink flex items-center" style={{ fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }}>
       <div className={`${wide ? "max-w-4xl" : "max-w-xl"} mx-auto px-6 py-16 w-full`}>{children}</div>
       <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet" />
     </main>

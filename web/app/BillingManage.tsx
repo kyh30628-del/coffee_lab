@@ -117,40 +117,40 @@ export default function BillingManage({ cafeId, pin }: { cafeId: number; pin: st
 
   return (
     <div className="bg-white rounded-2xl p-4 sm:p-5 border border-[#ece0cd] mb-4">
-      <div className="text-sm font-bold text-[#52402e] mb-1 flex items-center gap-1.5">💳 결제 관리</div>
-      {msg && <p className="text-[12px] text-[#7a5122] bg-[#fff8ee] border border-[#e7d3b3] rounded-lg px-3 py-2 my-2">{msg}</p>}
+      <div className="text-sm font-bold text-note-ink-warm mb-1 flex items-center gap-1.5">💳 결제 관리</div>
+      {msg && <p className="text-[12px] text-note-brown bg-[#fff8ee] border border-[#e7d3b3] rounded-lg px-3 py-2 my-2">{msg}</p>}
       {/* 📅 요금제: 월 / 연(2개월 무료) — 다음 결제부터 적용 */}
       <div className="flex items-center gap-2 my-2 text-[12px]">
-        <span className="text-[#8a7458] shrink-0">요금제</span>
-        <button type="button" onClick={() => setPlan("month")} disabled={busy || !yearly} className={`px-2.5 py-1 rounded-full border ${!yearly ? "bg-[#2b2018] text-[#f4ece0] border-[#2b2018]" : "text-[#52402e] border-[#d9c7ad]"}`}>월 ₩9,900</button>
-        <button type="button" onClick={() => setPlan("year")} disabled={busy || yearly} className={`px-2.5 py-1 rounded-full border ${yearly ? "bg-[#2b2018] text-[#f4ece0] border-[#2b2018]" : "text-[#52402e] border-[#d9c7ad]"}`}>연 ₩99,000 <span className="text-[10px] opacity-80">2개월 무료</span></button>
+        <span className="text-note-ink-mute shrink-0">요금제</span>
+        <button type="button" onClick={() => setPlan("month")} disabled={busy || !yearly} className={`px-2.5 py-1 rounded-full border ${!yearly ? "bg-note-ink text-note-paper border-note-ink" : "text-note-ink-warm border-[#d9c7ad]"}`}>월 ₩9,900</button>
+        <button type="button" onClick={() => setPlan("year")} disabled={busy || yearly} className={`px-2.5 py-1 rounded-full border ${yearly ? "bg-note-ink text-note-paper border-note-ink" : "text-note-ink-warm border-[#d9c7ad]"}`}>연 ₩99,000 <span className="text-[10px] opacity-80">2개월 무료</span></button>
       </div>
 
       {/* 체험 만료 임박 배너 */}
       {trialEndingSoon && (
         <div className="bg-[#fff4e6] border border-[#e8c99a] rounded-xl px-3 py-2.5 my-2">
           <div className="text-[13px] font-bold text-[#9c5b1f]">체험이 {dLeft != null && dLeft <= 0 ? "오늘" : `${dLeft}일 뒤`} 끝나요</div>
-          <div className="text-[11.5px] text-[#7a5122] mt-0.5">카드를 등록해두면 체험이 끝나는 날 자동으로 홍보팩 구독(₩9,900/월)이 이어져요. 지금은 과금되지 않아요.</div>
+          <div className="text-[11.5px] text-note-brown mt-0.5">카드를 등록해두면 체험이 끝나는 날 자동으로 홍보팩 구독(₩9,900/월)이 이어져요. 지금은 과금되지 않아요.</div>
         </div>
       )}
 
       {hasCard ? (
         <div className="mt-1">
-          <div className="flex items-center gap-2 text-[13px] text-[#52402e]">
+          <div className="flex items-center gap-2 text-[13px] text-note-ink-warm">
             <span className="font-bold">{sub.card_company || "카드"} •••• {sub.card_last4}</span>
-            <span className={`text-[10px] px-2 py-0.5 rounded-full ${sub.autopay ? "bg-[#e6f0e2] text-[#4a7a4a]" : "bg-[#f0e6d4] text-[#8a7458]"}`}>{sub.autopay ? "정기결제 켜짐" : "정기결제 꺼짐"}</span>
+            <span className={`text-[10px] px-2 py-0.5 rounded-full ${sub.autopay ? "bg-[#e6f0e2] text-[#4a7a4a]" : "bg-[#f0e6d4] text-note-ink-mute"}`}>{sub.autopay ? "정기결제 켜짐" : "정기결제 꺼짐"}</span>
           </div>
-          {sub.autopay && sub.next_billing_at && <div className="text-[11.5px] text-[#8a7458] mt-1">다음 결제 예정일 <b className="text-[#52402e]">{fmt(sub.next_billing_at)}</b> · {priceLabel}</div>}
+          {sub.autopay && sub.next_billing_at && <div className="text-[11.5px] text-note-ink-mute mt-1">다음 결제 예정일 <b className="text-note-ink-warm">{fmt(sub.next_billing_at)}</b> · {priceLabel}</div>}
           {sub.autopay
-            ? <button onClick={cancel} disabled={busy} className="mt-3 text-[12px] text-[#9c6b3f] underline disabled:opacity-40">정기결제 해지</button>
-            : <button onClick={startBilling} disabled={busy || !live} className="mt-3 w-full bg-[#2b2018] text-[#f4ece0] rounded-xl py-2.5 text-[13px] font-bold disabled:opacity-40">카드 다시 등록하고 정기결제 켜기</button>}
+            ? <button onClick={cancel} disabled={busy} className="mt-3 text-[12px] text-note-tan underline disabled:opacity-40">정기결제 해지</button>
+            : <button onClick={startBilling} disabled={busy || !live} className="mt-3 w-full bg-note-ink text-note-paper rounded-xl py-2.5 text-[13px] font-bold disabled:opacity-40">카드 다시 등록하고 정기결제 켜기</button>}
         </div>
       ) : live ? (
         <div className="mt-1">
-          <button onClick={startBilling} disabled={busy} className="w-full bg-gradient-to-r from-[#9c6b3f] to-[#2b2018] text-[#f4ece0] rounded-xl py-3 text-[13.5px] font-bold disabled:opacity-50">
+          <button onClick={startBilling} disabled={busy} className="w-full bg-gradient-to-r from-note-tan to-note-ink text-note-paper rounded-xl py-3 text-[13.5px] font-bold disabled:opacity-50">
             {busy ? "여는 중…" : "카드 등록하고 정기결제 시작 (₩9,900/월)"}
           </button>
-          <p className="text-[10.5px] text-[#8a7458] mt-2 text-center leading-relaxed">카드 정보는 토스페이먼츠가 안전하게 보관하며, 본 서비스는 저장하지 않아요. 언제든 해지할 수 있어요.</p>
+          <p className="text-[10.5px] text-note-ink-mute mt-2 text-center leading-relaxed">카드 정보는 토스페이먼츠가 안전하게 보관하며, 본 서비스는 저장하지 않아요. 언제든 해지할 수 있어요.</p>
         </div>
       ) : sub.conversion_requested_at ? (
         <div className="mt-1 bg-[#eef6ec] border border-[#cfe6c9] rounded-xl px-3 py-2.5 text-[12.5px] text-[#3f6b3a] leading-relaxed">
@@ -158,11 +158,11 @@ export default function BillingManage({ cafeId, pin }: { cafeId: number; pin: st
         </div>
       ) : (
         <div className="mt-1">
-          <p className="text-[11px] text-[#8a7458] mb-2 leading-relaxed">체험 중에도 지도 <b>골드핀</b>·홈 <b>추천 카페 상단</b>·<b>쇼케이스</b> 배너가 그대로 켜져 있어요. 버튼을 눌러도 <b>바로 결제되지 않아요</b> — 담당자 확인 요청만 접수돼요.</p>
-          <button onClick={requestConversion} disabled={busy} className="w-full bg-gradient-to-r from-[#9c6b3f] to-[#2b2018] text-[#f4ece0] rounded-xl py-3 text-[13.5px] font-bold disabled:opacity-50">
+          <p className="text-[11px] text-note-ink-mute mb-2 leading-relaxed">체험 중에도 지도 <b>골드핀</b>·홈 <b>추천 카페 상단</b>·<b>쇼케이스</b> 배너가 그대로 켜져 있어요. 버튼을 눌러도 <b>바로 결제되지 않아요</b> — 담당자 확인 요청만 접수돼요.</p>
+          <button onClick={requestConversion} disabled={busy} className="w-full bg-gradient-to-r from-note-tan to-note-ink text-note-paper rounded-xl py-3 text-[13.5px] font-bold disabled:opacity-50">
             {busy ? "요청 중…" : "구독(홍보팩) 전환 요청하기"}
           </button>
-          <p className="text-[10.5px] text-[#8a7458] mt-2 text-center leading-relaxed">카드 정기결제는 <b>곧 오픈</b>돼요. 요청하시면 담당자가 계좌이체 등으로 안내드립니다. 문의: dongnecoffeenote@gmail.com</p>
+          <p className="text-[10.5px] text-note-ink-mute mt-2 text-center leading-relaxed">카드 정기결제는 <b>곧 오픈</b>돼요. 요청하시면 담당자가 계좌이체 등으로 안내드립니다. 문의: dongnecoffeenote@gmail.com</p>
         </div>
       )}
     </div>

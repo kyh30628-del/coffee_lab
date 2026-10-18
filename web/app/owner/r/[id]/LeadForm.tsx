@@ -38,8 +38,8 @@ export default function LeadForm({ cafeId }: { cafeId: number }) {
     );
   }
   return (
-    <div className="bg-white rounded-2xl border border-[#e6dcc8] px-5 py-4 mb-4">
-      <div className="text-[13.5px] font-bold text-[#2b2018] mb-0.5">📮 월 1회, 우리 가게 요약 받기 (무료)</div>
+    <div className="bg-white rounded-2xl border border-note-line px-5 py-4 mb-4">
+      <div className="text-[13.5px] font-bold text-note-ink mb-0.5">📮 월 1회, 우리 가게 요약 받기 (무료)</div>
       <p className="text-[11.5px] text-[#7a6a55] mb-3">매월 1일에 동네 순위·검증 후기 수 변화를 한 통으로 보내드려요.</p>
       <div className="flex gap-2">
         <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
@@ -47,12 +47,12 @@ export default function LeadForm({ cafeId }: { cafeId: number }) {
           placeholder="이메일 주소" autoComplete="email"
           className="flex-1 min-w-0 border border-[#cbb89f] rounded-xl px-3.5 py-2.5 text-[13.5px] bg-white" />
         <button onClick={submit} disabled={state === "busy"}
-          className="bg-[#2b2018] text-[#f4ece0] rounded-xl px-4 py-2.5 text-[13px] font-bold shrink-0 disabled:opacity-50">
+          className="bg-note-ink text-note-paper rounded-xl px-4 py-2.5 text-[13px] font-bold shrink-0 disabled:opacity-50">
           {state === "busy" ? "…" : "받기"}
         </button>
       </div>
       {state === "err" && <p className="text-[11.5px] text-rose-600 mt-1.5">{msg}</p>}
-      <p className="text-[10.5px] text-[#8a7458] mt-2">월 1회 요약 외에는 보내지 않아요 · 메일 하단에서 한 번에 해지할 수 있어요</p>
+      <p className="text-[10.5px] text-note-ink-mute mt-2">월 1회 요약 외에는 보내지 않아요 · 메일 하단에서 한 번에 해지할 수 있어요</p>
     </div>
   );
 }

@@ -137,7 +137,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return { title: "우리 가게 리포트", robots: { index: false, follow: false } };
 }
 
-const CARD = "bg-white rounded-2xl border border-[#e6dcc8] px-5 py-4";
+const CARD = "bg-white rounded-2xl border border-note-line px-5 py-4";
 
 export default async function FreeReportPage({ params }: Props) {
   const { id } = await params;
@@ -161,16 +161,16 @@ export default async function FreeReportPage({ params }: Props) {
   return (
     <Shell>
       <Track cafeId={r.id} event="free_report_view" />
-      <div className="text-[#9c6b3f] text-[11px] tracking-[0.3em] uppercase mb-1">For Owners</div>
-      <h1 className="text-[22px] font-bold text-[#2b2018] leading-snug mb-0.5">{r.name}</h1>
+      <div className="text-note-tan text-[11px] tracking-[0.3em] uppercase mb-1">For Owners</div>
+      <h1 className="text-[22px] font-bold text-note-ink leading-snug mb-0.5">{r.name}</h1>
       <p className="text-[12.5px] text-[#7a6a55] mb-5">
         {r.area}{r.dong ? ` · ${r.dong}` : ""} · 후기 데이터로 본 우리 가게
       </p>
 
       {/* 무료 ① 동네 순위 — "이미 데이터에 잡혀 있다"는 사실을 가장 먼저 보여준다 */}
       <div className={`${CARD} mb-3`}>
-        <div className="text-[11px] text-[#8a7458] mb-1">{r.area} 카페 {r.hoodN.toLocaleString()}곳 중</div>
-        <div className="text-[28px] font-bold text-[#2b2018] leading-none">
+        <div className="text-[11px] text-note-ink-mute mb-1">{r.area} 카페 {r.hoodN.toLocaleString()}곳 중</div>
+        <div className="text-[28px] font-bold text-note-ink leading-none">
           {r.rank > 0 ? <>{r.rank}<span className="text-[15px] font-medium text-[#7a6a55]">위</span></> : "—"}
         </div>
         <div className="text-[11.5px] text-[#7a6a55] mt-1.5">후기 수 기준 · 검증된 후기만 셉니다</div>
@@ -178,27 +178,27 @@ export default async function FreeReportPage({ params }: Props) {
 
       {/* 무료 ② 검증 후기 */}
       <div className={`${CARD} mb-3 flex items-center justify-between`}>
-        <span className="text-[13px] text-[#524234]">교차검증을 통과한 후기</span>
-        <span className="text-[15px] font-bold text-[#2b2018]">
-          {r.count.toLocaleString()}건{r.grade ? <span className="ml-1.5 text-[11px] font-medium text-[#9c6b3f]">{r.grade}</span> : null}
+        <span className="text-[13px] text-note-ink-body">교차검증을 통과한 후기</span>
+        <span className="text-[15px] font-bold text-note-ink">
+          {r.count.toLocaleString()}건{r.grade ? <span className="ml-1.5 text-[11px] font-medium text-note-tan">{r.grade}</span> : null}
         </span>
       </div>
 
       {/* 무료 ③ 강점 1개 — 근거가 없으면 없다고 말한다(억지로 만들지 않는다) */}
       <div className={`${CARD} mb-3`}>
-        <div className="text-[11px] text-[#8a7458] mb-1.5">{r.strong ? "우리 가게의 강점" : "가장 많이 언급된 특징"}</div>
+        <div className="text-[11px] text-note-ink-mute mb-1.5">{r.strong ? "우리 가게의 강점" : "가장 많이 언급된 특징"}</div>
         {r.strong ? (
           <>
-            <div className="text-[16px] font-bold text-[#2b2018] mb-1">{r.strong.emoji} {r.strong.label}</div>
-            <p className="text-[12.5px] text-[#524234] leading-relaxed">
+            <div className="text-[16px] font-bold text-note-ink mb-1">{r.strong.emoji} {r.strong.label}</div>
+            <p className="text-[12.5px] text-note-ink-body leading-relaxed">
               동네 평균 <b>{r.strong.avg}점</b> 대비 <b className="text-[#5f7355]">{r.strong.diff}점 높습니다</b>
               {" "}(우리 {r.strong.me}점). 손님들이 이 점을 가장 많이 이야기해요.
             </p>
           </>
         ) : r.top ? (
           <>
-            <div className="text-[16px] font-bold text-[#2b2018] mb-1">{r.top.emoji} {r.top.label}</div>
-            <p className="text-[12.5px] text-[#524234] leading-relaxed">
+            <div className="text-[16px] font-bold text-note-ink mb-1">{r.top.emoji} {r.top.label}</div>
+            <p className="text-[12.5px] text-note-ink-body leading-relaxed">
               손님들이 <b>가장 많이 이야기한 특징</b>이에요. 다만 동네 평균({r.top.avg}점)을 뚜렷하게
               앞서지는 않아요(우리 {r.top.me}점) — 여기를 키우면 차별점이 됩니다.
             </p>
@@ -215,11 +215,11 @@ export default async function FreeReportPage({ params }: Props) {
           우리 데이터에 '부정 후기'는 사실상 없지만(1,745건 중 0.6%·대부분 오탐) **'부재'는 명확히 있다.
           동네는 다 듣는 말인데 우리만 안 나오는 것 — 심리적 효과는 같고, 이건 실제로 존재한다. */}
       <div className={`${CARD} mb-3`}>
-        <div className="text-[11px] text-[#8a7458] mb-1.5">우리 가게에 없는 말</div>
+        <div className="text-[11px] text-note-ink-mute mb-1.5">우리 가게에 없는 말</div>
         {r.weak ? (
           <>
-            <div className="text-[16px] font-bold text-[#2b2018] mb-1.5">{r.weak.emoji} {r.weak.label}</div>
-            <p className="text-[12.5px] text-[#524234] leading-relaxed">
+            <div className="text-[16px] font-bold text-note-ink mb-1.5">{r.weak.emoji} {r.weak.label}</div>
+            <p className="text-[12.5px] text-note-ink-body leading-relaxed">
               {r.area} 카페 <b>{r.hoodN}곳 중 {r.weak.hoodHas}곳({r.weak.pen}%)</b>이 이 얘기를 들어요.
               {r.weak.meRaw > 0
                 ? <> 사장님 가게는 <b className="text-[#a4553f]">{r.weak.meRaw}번</b>뿐이라 동네에서 뒤처져 있어요.</>
@@ -228,8 +228,8 @@ export default async function FreeReportPage({ params }: Props) {
           </>
         ) : (
           <>
-            <div className="text-[16px] font-bold text-[#2b2018] mb-1.5">🔍 아직 뚜렷한 약점은 없어요</div>
-            <p className="text-[12.5px] text-[#524234] leading-relaxed">동네 카페들이 공통으로 듣는 말 중 크게 뒤처진 항목이 없습니다.</p>
+            <div className="text-[16px] font-bold text-note-ink mb-1.5">🔍 아직 뚜렷한 약점은 없어요</div>
+            <p className="text-[12.5px] text-note-ink-body leading-relaxed">동네 카페들이 공통으로 듣는 말 중 크게 뒤처진 항목이 없습니다.</p>
           </>
         )}
         <div className="mt-3 pt-3 border-t border-[#f0e6d4] text-[12px] text-[#7a6a55] leading-relaxed">
@@ -240,13 +240,13 @@ export default async function FreeReportPage({ params }: Props) {
       {/* 노동 절약 — '분석'보다 '우리가 대신 한 일'이 훨씬 구체적이다 */}
       {r.filtered && (
         <div className={`${CARD} mb-3`}>
-          <div className="text-[11px] text-[#8a7458] mb-2">사장님 대신 해둔 일</div>
-          <p className="text-[12.5px] text-[#524234] leading-relaxed">
+          <div className="text-[11px] text-note-ink-mute mb-2">사장님 대신 해둔 일</div>
+          <p className="text-[12.5px] text-note-ink-body leading-relaxed">
             블로그·유튜브 글 <b>{r.filtered.raw.toLocaleString()}건</b>을 모아
             {r.filtered.ads > 0 ? <> 광고·협찬 <b>{r.filtered.ads}건</b>과</> : null} 다른 가게·무관한 글을 걸러내고,
             진짜 방문 후기 <b>{r.filtered.kept}건</b>만 남겼어요.
           </p>
-          <p className="text-[11px] text-[#8a7458] mt-1.5">직접 하면 {r.filtered.raw.toLocaleString()}건을 하나씩 열어봐야 해요.</p>
+          <p className="text-[11px] text-note-ink-mute mt-1.5">직접 하면 {r.filtered.raw.toLocaleString()}건을 하나씩 열어봐야 해요.</p>
         </div>
       )}
 
@@ -257,9 +257,9 @@ export default async function FreeReportPage({ params }: Props) {
           href={`/owner/badge?q=${encodeURIComponent(r.name)}`}
           className={`${CARD} mb-3 block border-[#d8c49c] bg-[#fbf6ea]`}
         >
-          <div className="text-[11px] text-[#8a7458] mb-1.5">무료 · 신청 없이 바로</div>
-          <div className="text-[15px] font-bold text-[#2b2018] mb-1">🏅 우리 가게 검증배지 무료로 받기</div>
-          <p className="text-[12.5px] text-[#524234] leading-relaxed">
+          <div className="text-[11px] text-note-ink-mute mb-1.5">무료 · 신청 없이 바로</div>
+          <div className="text-[15px] font-bold text-note-ink mb-1">🏅 우리 가게 검증배지 무료로 받기</div>
+          <p className="text-[12.5px] text-note-ink-body leading-relaxed">
             블로그·인스타에 붙이면 손님이 봐요. 결제·신청 없이 바로 받을 수 있어요.
           </p>
         </Link>
@@ -269,9 +269,9 @@ export default async function FreeReportPage({ params }: Props) {
       <div className="nt-header rounded-lg px-5 py-5 mb-4">
         <div className="text-[15px] font-bold mb-2">우리 가게 리포트</div>
         <ul className="text-[12.5px] leading-[1.9] text-[#e2d5c0] mb-4">
-          <li>· <b className="text-[#f4ece0]">새 후기가 올라오면</b> 알려드려요</li>
-          <li>· <b className="text-[#f4ece0]">동네 순위가 바뀌면</b> 알려드려요</li>
-          <li>· 근처에 <b className="text-[#f4ece0]">새 카페가 생기면</b> 알려드려요</li>
+          <li>· <b className="text-note-paper">새 후기가 올라오면</b> 알려드려요</li>
+          <li>· <b className="text-note-paper">동네 순위가 바뀌면</b> 알려드려요</li>
+          <li>· 근처에 <b className="text-note-paper">새 카페가 생기면</b> 알려드려요</li>
           <li>· 약점·개선 포인트와 {r.lockedCount}개 축 전체 분석</li>
         </ul>
         <PricingCta cafeId={r.id} />
@@ -279,7 +279,7 @@ export default async function FreeReportPage({ params }: Props) {
             알림 메일을 받은 **구독 중인 사장님**이 이 화면에 오면 다시 결제하라는 말만 보였다. */}
         <div className="mt-4 pt-3 border-t border-[#463628] text-center text-[11.5px] leading-relaxed text-[#c3b096]">
           이미 구독 중이신가요?{" "}
-          <Link href="/owner" className="underline font-bold text-[#f4ece0]">내 카페 분석 열기 →</Link>
+          <Link href="/owner" className="underline font-bold text-note-paper">내 카페 분석 열기 →</Link>
           <br />승인 메일로 받은 <b>PIN</b>을 넣으면 순위 추이·성격 분석·액션플랜을 전부 보실 수 있어요.
         </div>
       </div>
@@ -287,11 +287,11 @@ export default async function FreeReportPage({ params }: Props) {
       {/* 📧 유료가 부담스러운 사장님을 위한 낮은 계단 — 월 1회 무료 요약(리드 수집) */}
       <LeadForm cafeId={r.id} />
 
-      <p className="text-[11px] text-[#8a7458] leading-relaxed text-center">
+      <p className="text-[11px] text-note-ink-mute leading-relaxed text-center">
         네이버·구글·유튜브 공개 후기를 교차검증한 데이터입니다.{" "}
-        <Link href="/trust" className="underline text-[#9c6b3f]">검증 방법</Link>
+        <Link href="/trust" className="underline text-note-tan">검증 방법</Link>
         {" · "}
-        <Link href={`/c/${r.id}`} className="underline text-[#9c6b3f]">손님이 보는 화면</Link>
+        <Link href={`/c/${r.id}`} className="underline text-note-tan">손님이 보는 화면</Link>
       </p>
     </Shell>
   );
@@ -312,13 +312,13 @@ function Unpublished({ name, area }: { name: string; area: string | null }) {
   const mailto = `mailto:dongnecoffeenote@gmail.com?subject=${encodeURIComponent(`[우리 가게 리포트] ${name} 노출 문의`)}`;
   return (
     <div className="py-6">
-      <div className="text-[#9c6b3f] text-[11px] tracking-[0.3em] uppercase mb-1">For Owners</div>
-      <h1 className="text-[21px] font-bold text-[#2b2018] leading-snug mb-1">{name}</h1>
+      <div className="text-note-tan text-[11px] tracking-[0.3em] uppercase mb-1">For Owners</div>
+      <h1 className="text-[21px] font-bold text-note-ink leading-snug mb-1">{name}</h1>
       <p className="text-[12.5px] text-[#7a6a55] mb-5">{area ? `${area} · ` : ""}지금은 손님 화면에 보이지 않아요</p>
 
       <div className={`${CARD} mb-3`}>
-        <div className="text-[15px] font-bold text-[#2b2018] mb-2">가게 정보는 그대로 있어요</div>
-        <p className="text-[12.5px] text-[#524234] leading-relaxed">
+        <div className="text-[15px] font-bold text-note-ink mb-2">가게 정보는 그대로 있어요</div>
+        <p className="text-[12.5px] text-note-ink-body leading-relaxed">
           저희는 <b>교차검증을 통과한 후기</b>가 기준을 채운 가게만 손님 화면에 올립니다.
           후기를 다시 확인하는 중이거나 기준을 잠시 못 채우면 그동안 내려둬요.
           <b> 삭제된 게 아니고</b>, 기준을 다시 채우면 자동으로 돌아옵니다.
@@ -326,19 +326,19 @@ function Unpublished({ name, area }: { name: string; area: string | null }) {
       </div>
 
       <div className={`${CARD} mb-4`}>
-        <div className="text-[11px] text-[#8a7458] mb-1.5">지금은 이렇게 됩니다</div>
-        <ul className="text-[12.5px] text-[#524234] leading-[1.9]">
+        <div className="text-[11px] text-note-ink-mute mb-1.5">지금은 이렇게 됩니다</div>
+        <ul className="text-[12.5px] text-note-ink-body leading-[1.9]">
           <li>· 동네 순위·강점 분석은 <b>공개로 돌아온 뒤</b> 다시 열려요.</li>
           <li>· 구독·체험 중이신데 이 화면이 계속 보이면 <b>기간은 그대로 지켜드립니다.</b></li>
         </ul>
       </div>
 
       <a href={mailto}
-        className="block text-center bg-[#2b2018] text-[#f4ece0] rounded-xl py-3 text-[14px] font-bold mb-3">
+        className="block text-center bg-note-ink text-note-paper rounded-xl py-3 text-[14px] font-bold mb-3">
         사람에게 바로 물어보기
       </a>
       <p className="text-center text-[12px]">
-        <Link href="/" className="text-[#9c6b3f] underline">홈으로</Link>
+        <Link href="/" className="text-note-tan underline">홈으로</Link>
       </p>
     </div>
   );
@@ -348,7 +348,7 @@ function Msg({ children }: { children: React.ReactNode }) {
   return (
     <div className="text-center py-16">
       <p className="text-[13.5px] text-[#6b5a48] mb-5">{children}</p>
-      <Link href="/" className="text-[12.5px] text-[#9c6b3f] underline">홈으로</Link>
+      <Link href="/" className="text-[12.5px] text-note-tan underline">홈으로</Link>
     </div>
   );
 }

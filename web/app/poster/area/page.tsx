@@ -301,7 +301,7 @@ export default function AreaPosterPage() {
       }}
     >
       <div className="max-w-4xl mx-auto px-6 py-10">
-        <BackLink to="/poster" label="포스터" className="text-[#7a5122] mb-4" />
+        <BackLink to="/poster" label="포스터" className="text-note-brown mb-4" />
         <div className="text-[#5b6b54] text-xs tracking-[0.3em] uppercase mb-2">Area Report</div>
         <h1 className="text-3xl font-bold mb-1">지역소개 포스터</h1>
         <p className="text-[13px] text-[#665036] mb-6 leading-relaxed">
@@ -311,7 +311,7 @@ export default function AreaPosterPage() {
         </p>
 
         {/* 지역 선택 */}
-        <section className="bg-white/60 border border-[#e6dcc8] rounded-xl p-4 mb-5">
+        <section className="bg-white/60 border border-note-line rounded-xl p-4 mb-5">
           <div className="text-[13px] font-bold mb-2">1. 지역 선택</div>
           <div className="flex gap-2 mb-2">
             <input
@@ -347,7 +347,7 @@ export default function AreaPosterPage() {
         {/* 미리보기 */}
         <section className="mb-5">
           <div className="text-[13px] font-bold mb-2">2. 미리보기 · 다운로드</div>
-          <div className="rounded-xl overflow-hidden shadow-lg border border-[#e0d3bd] bg-[#F7F1E6] max-w-[440px] mx-auto">
+          <div className="rounded-xl overflow-hidden shadow-lg border border-note-line-strong bg-[#F7F1E6] max-w-[440px] mx-auto">
             <canvas
               ref={canvasRef}
               width={SIZE}
@@ -359,7 +359,7 @@ export default function AreaPosterPage() {
           <button
             onClick={download}
             disabled={!stats}
-            className="mt-4 w-full max-w-[440px] mx-auto block bg-[#2b2018] text-[#f4ece0] rounded-xl py-3 font-bold active:scale-[0.99] transition disabled:opacity-40"
+            className="mt-4 w-full max-w-[440px] mx-auto block bg-note-ink text-note-paper rounded-xl py-3 font-bold active:scale-[0.99] transition disabled:opacity-40"
           >
             ⬇ PNG 저장
           </button>

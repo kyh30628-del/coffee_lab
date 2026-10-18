@@ -478,8 +478,8 @@ export default function PosterCarouselPage() {
       {/* 캐러셀 가로 스크롤바 숨김 */}
       <style>{`.poster-carousel::-webkit-scrollbar{display:none}`}</style>
       <div className="max-w-4xl mx-auto px-6 py-10">
-        <BackLink to="/poster" label="포스터" className="text-[#7a5122] mb-4" />
-        <div className="text-[#7a5122] text-xs tracking-[0.3em] uppercase mb-2">Instagram Carousel</div>
+        <BackLink to="/poster" label="포스터" className="text-note-brown mb-4" />
+        <div className="text-note-brown text-xs tracking-[0.3em] uppercase mb-2">Instagram Carousel</div>
         <h1 className="text-3xl font-bold mb-1">인스타 홍보 캐러셀 (5장)</h1>
         <p className="text-[13px] text-[#665036] mb-6 leading-relaxed">
           아래에서 좌우로 <b>스와이프</b>하며 한 장씩 확인하고, 그 화면을 그대로 스크린샷하거나 <b>PNG 저장</b>으로
@@ -502,7 +502,7 @@ export default function PosterCarouselPage() {
                 </span>
                 <span className="text-[12px] text-[#665036]">1080 × 1080</span>
               </div>
-              <div className="rounded-xl overflow-hidden shadow-lg border border-[#e0d3bd] bg-[#F7F1E6]">
+              <div className="rounded-xl overflow-hidden shadow-lg border border-note-line-strong bg-[#F7F1E6]">
                 <canvas
                   ref={(el) => {
                     refs.current[s.key] = el;
@@ -515,7 +515,7 @@ export default function PosterCarouselPage() {
               </div>
               <button
                 onClick={() => download(s, i)}
-                className="mt-4 w-full bg-[#2b2018] text-[#f4ece0] rounded-xl py-3 font-bold active:scale-[0.99] transition"
+                className="mt-4 w-full bg-note-ink text-note-paper rounded-xl py-3 font-bold active:scale-[0.99] transition"
               >
                 ⬇ 이 장 PNG 저장
               </button>

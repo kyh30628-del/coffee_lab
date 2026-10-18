@@ -429,7 +429,7 @@ export default async function CafePage({ params }: Props) {
 
         {/* 첫 줄: 뒤로 · 공유 */}
         <div className="nt-ruled nt-margin-gutter flex items-center justify-between gap-2 relative z-[1]" style={{ paddingTop: 34 }}>
-          <Link href="/" className="nt-g text-[12.5px] text-[#63523f]">← 동네 커피 노트</Link>
+          <Link href="/" className="nt-g text-[12.5px] text-note-ink-deep">← 동네 커피 노트</Link>
           <span className="nt-free">
             <KakaoShare
               title={`${c.name} (${c.area})`}
@@ -471,7 +471,7 @@ export default async function CafePage({ params }: Props) {
               {/* 🏅 동네 순위 — 상위 10위 이내만(낮은 순위는 그 카페에 해가 된다). cron-enrich가 하루 2회 계산(조회 0). */}
               {showRank && (
                 <span className="nt-mark nt-g text-[12.5px] text-[#5c4b3c]">
-                  {c.area} {c.area_total}곳 중 <b className="text-[#7a5122]">{c.area_rank}위</b>
+                  {c.area} {c.area_total}곳 중 <b className="text-note-brown">{c.area_rank}위</b>
                   <svg viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden><path d="M8 20 C 10 6, 40 3, 62 6 S 96 14, 92 24 S 60 38, 36 36 S 3 30, 9 18 S 24 8, 40 9" /></svg>
                 </span>
               )}
@@ -611,7 +611,7 @@ export default async function CafePage({ params }: Props) {
                 </span>
               </OutboundLink>
             ))}
-            <Link href={`/area/${encodeURIComponent(c.area)}`} className="nt-g text-[12.5px] text-[#7a5122] block">{c.area} 전체 보기 →</Link>
+            <Link href={`/area/${encodeURIComponent(c.area)}`} className="nt-g text-[12.5px] text-note-brown block">{c.area} 전체 보기 →</Link>
             {/* 📍 2026-10-16(CEO 지시) — 여기도 이탈 지점이다. 이 글에 나온 '근처'는 **이 카페 기준**이라
                 다른 지역에서 검색해 들어온 사람에겐 멀다. 내 위치 기준으로 다시 볼 수 있게 한다.
                 위치 동의가 홈·지도에만 있어 지방 사람은 질문조차 못 받던 문제(동의자 94%가 수도권)의 짝 조치. */}
@@ -656,14 +656,14 @@ export default async function CafePage({ params }: Props) {
               <div className="nt-scrap flat pink"><WishButton cafeId={c.id} variant="banner" /></div>
               {/* 📷 손님 사진 제보(결재 #1084) — 찍은 사람이 권리자. 본인 촬영본만, 저작권은 올린 분에게, 사람 나온 사진 금지. */}
               <div className="nt-scrap flat">
-                <p className="text-[12.5px] text-[#63523f] mb-2">직접 찍은 사진을 보태주시면 다음 사람이 고를 때 큰 도움이 돼요. 저작권은 올려주신 분에게 그대로 있고, 사람이 나온 사진은 받지 않아요(초상권). 확인 후 올라갑니다.</p>
+                <p className="text-[12.5px] text-note-ink-deep mb-2">직접 찍은 사진을 보태주시면 다음 사람이 고를 때 큰 도움이 돼요. 저작권은 올려주신 분에게 그대로 있고, 사람이 나온 사진은 받지 않아요(초상권). 확인 후 올라갑니다.</p>
                 <SaveMemoryButton cafeId={c.id} cafeName={c.name} cafeArea={c.area} variant="banner" />
               </div>
               {/* ☕ 사장님 CTA — 클릭 계측: decisions #782 */}
               <OwnerCtaLink cafeId={c.id} cafeName={c.name} className="nt-scrap r kraft flex items-center justify-between gap-2 w-full px-4 py-3">
                 <i className="nt-tape g tr sm" aria-hidden />
                 <span className="flex flex-col text-left">
-                  <span className="text-[13px] font-bold text-[#7a5122]">이 카페 사장님이신가요?</span>
+                  <span className="text-[13px] font-bold text-note-brown">이 카페 사장님이신가요?</span>
                   <span className="text-[11px] text-[#544636]">방금 보신 강·약에 <b>동네 순위</b>까지 — 가입 없이 바로 볼 수 있어요</span>
                 </span>
                 <span className="text-[#b9793b] font-bold whitespace-nowrap">→</span>
@@ -673,18 +673,18 @@ export default async function CafePage({ params }: Props) {
                 <Link href={`/collections/${col.slug}`} className="nt-scrap flex items-center justify-between gap-2 w-full px-4 py-3">
                   <span className="flex flex-col text-left">
                     <span className="text-[13px] font-bold text-[#5c4b3c]">{col.label} 카페, 협찬 없이 교차검증한 곳</span>
-                    <span className="text-[11px] text-[#63523f]">광고·협찬·타지점 후기 빼고 실방문 후기로만 모아보기</span>
+                    <span className="text-[11px] text-note-ink-deep">광고·협찬·타지점 후기 빼고 실방문 후기로만 모아보기</span>
                   </span>
-                  <span className="text-[#7a5122] font-bold whitespace-nowrap">→</span>
+                  <span className="text-note-brown font-bold whitespace-nowrap">→</span>
                 </Link>
               )}
               {themed.map((t) => (
                 <Link key={t.key} href={`/area/${encodeURIComponent(c.area)}/${t.key}`} className="nt-g flex items-center justify-between gap-2 px-1 text-[13px] text-[#5c4b3c]">
-                  <span>{c.area} {t.label} 카페 더 찾기</span><span className="text-[#7a5122]">→</span>
+                  <span>{c.area} {t.label} 카페 더 찾기</span><span className="text-note-brown">→</span>
                 </Link>
               ))}
               <Link href={`/?region=${encodeURIComponent(c.area)}`} className="nt-g flex items-center justify-between gap-2 px-1 text-[13px] text-[#5c4b3c]">
-                <span>{c.area} 카페 지도에서 둘러보기</span><span className="text-[#7a5122]">→</span>
+                <span>{c.area} 카페 지도에서 둘러보기</span><span className="text-note-brown">→</span>
               </Link>
             </div>
           </details>

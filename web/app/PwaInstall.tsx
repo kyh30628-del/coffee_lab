@@ -85,7 +85,7 @@ export default function PwaInstall() {
       <div className="fixed inset-0 z-[6000] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)" }} onClick={dismiss}>
         <div className="w-full max-w-lg bg-[#fdfaf4] rounded-t-2xl p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center justify-between mb-3">
-            <div className="font-bold text-[#2b2018] text-[15px]">📲 홈 화면에 추가하기</div>
+            <div className="font-bold text-note-ink text-[15px]">📲 홈 화면에 추가하기</div>
             <button onClick={dismiss} className="w-8 h-8 rounded-full bg-[#f0e6d4] text-[#594839] text-lg">×</button>
           </div>
           {isIOS ? (
@@ -95,7 +95,7 @@ export default function PwaInstall() {
                 <li>2. 메뉴에서 <b>‘홈 화면에 추가’</b>를 선택하세요.</li>
                 <li>3. 오른쪽 위 <b>‘추가’</b>를 누르면 바탕화면에 아이콘이 생겨요.</li>
               </ol>
-              <div className="mt-3 text-[11px] text-[#54432c]">※ 아이폰은 <b>Safari</b>에서만 홈 화면에 추가할 수 있어요.</div>
+              <div className="mt-3 text-[11px] text-note-ink-soft">※ 아이폰은 <b>Safari</b>에서만 홈 화면에 추가할 수 있어요.</div>
             </>
           ) : (
             <>
@@ -104,10 +104,10 @@ export default function PwaInstall() {
                 <li>2. <b>‘앱 설치’</b> 또는 <b>‘홈 화면에 추가’</b>를 선택하세요.</li>
                 <li>3. <b>‘설치’</b>를 누르면 홈 화면에 아이콘이 생겨요.</li>
               </ol>
-              <div className="mt-3 text-[11px] text-[#54432c]">※ Chrome·삼성 인터넷에서 가능해요. 시크릿 창에서는 안 돼요.</div>
+              <div className="mt-3 text-[11px] text-note-ink-soft">※ Chrome·삼성 인터넷에서 가능해요. 시크릿 창에서는 안 돼요.</div>
             </>
           )}
-          <button onClick={dismiss} className="w-full mt-4 bg-[#2b2018] text-[#f4ece0] rounded-xl py-3 font-medium">알겠어요</button>
+          <button onClick={dismiss} className="w-full mt-4 bg-note-ink text-note-paper rounded-xl py-3 font-medium">알겠어요</button>
         </div>
       </div>
     );
@@ -116,13 +116,13 @@ export default function PwaInstall() {
   // 배너 — 상단 고정(CEO 지시 2026-09-04 "상단에"). 닫기(✕)는 즉시 소멸(입장 배너는 영구 1회).
   return (
     <div className="fixed z-[1300] left-0 right-0 px-3" style={{ top: "calc(0.5rem + env(safe-area-inset-top))" }}>
-      <div className="max-w-lg mx-auto bg-[#2b2018] text-[#f4ece0] rounded-2xl shadow-xl p-3.5 flex items-center gap-3">
+      <div className="max-w-lg mx-auto bg-note-ink text-note-paper rounded-2xl shadow-xl p-3.5 flex items-center gap-3">
         <div className="text-2xl leading-none">☕</div>
         <div className="flex-1 min-w-0">
           <div className="font-bold text-[13px]">홈 화면에 ‘동네 커피 노트’ 추가</div>
           <div className="text-[11px] text-[#d9c9b3] leading-snug">한 번 누르면 앱처럼 바로 열려요{isIOS ? " · 아이폰은 공유→홈 화면에 추가" : ""}</div>
         </div>
-        <button onClick={install} className="bg-[#e0a32e] text-[#2b2018] font-bold text-[12px] rounded-full px-3.5 py-2 whitespace-nowrap shrink-0">{isIOS ? "방법 보기" : "설치"}</button>
+        <button onClick={install} className="bg-[#e0a32e] text-note-ink font-bold text-[12px] rounded-full px-3.5 py-2 whitespace-nowrap shrink-0">{isIOS ? "방법 보기" : "설치"}</button>
         <button onClick={dismiss} aria-label="닫기" className="text-[#b7a58e] px-1 shrink-0 text-sm">✕</button>
       </div>
     </div>

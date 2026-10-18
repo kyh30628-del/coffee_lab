@@ -26,7 +26,7 @@ export default async function StartupReportPage({ params }: { params: Promise<{ 
     <main className="nt-app nt-paper min-h-screen">
       <div className="max-w-xl mx-auto nt-page pb-12 overflow-hidden" style={{ ["--nt-mx" as any]: "36px" }}>
         <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
-          <Link href="/" className="text-[13px] text-[#63523f]">← 동네 커피 노트</Link>
+          <Link href="/" className="text-[13px] text-note-ink-deep">← 동네 커피 노트</Link>
         </div>
         <div className="nt-ruled nt-margin-gutter nt-band nt-torn-b" style={{ paddingTop: 34, paddingBottom: 34 }}>
           <div className="nt-eyebrow">카페 창업 리포트 · {r.def.area}</div>

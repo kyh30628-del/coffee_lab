@@ -65,12 +65,12 @@ export default function Pricing() {
   }, []);
 
   return (
-    <main className="min-h-screen bg-[#f4ece0] text-[#2b2018]" style={{ fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }}>
+    <main className="min-h-screen bg-note-paper text-note-ink" style={{ fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }}>
       <div className="max-w-md mx-auto px-5 py-10">
-        <BackLink to="/" label="홈" className="text-[#7a5122] mb-4" />
-        <div className="text-[#7a5122] text-xs tracking-[0.3em] uppercase mb-2">For Owners</div>
+        <BackLink to="/" label="홈" className="text-note-brown mb-4" />
+        <div className="text-note-brown text-xs tracking-[0.3em] uppercase mb-2">For Owners</div>
         <h1 className="text-3xl font-bold mb-2 leading-tight">손님이 뭐라고 하는지,<br />우리가 대신 지켜봅니다</h1>
-        <p className="text-[14px] text-[#524234] leading-relaxed mb-6">
+        <p className="text-[14px] text-note-ink-body leading-relaxed mb-6">
           네이버·구글·유튜브에 흩어진 우리 가게 후기를 매일 확인해서, <b>달라진 것만</b> 알려드려요.
           사장님이 일일이 검색할 필요 없이요.
         </p>
@@ -78,25 +78,25 @@ export default function Pricing() {
         {/* 먼저 보여준다 — 파는 것보다 확인이 먼저다 */}
         <button onClick={() => setFind(true)}
           className="w-full bg-white border border-[#d9c9ab] rounded-2xl px-5 py-4 mb-5 text-left active:scale-[0.99] transition">
-          <div className="text-[14px] font-bold text-[#2b2018]">☕ 먼저 우리 가게부터 확인해보세요</div>
+          <div className="text-[14px] font-bold text-note-ink">☕ 먼저 우리 가게부터 확인해보세요</div>
           <div className="text-[12px] text-[#7a6a55] mt-0.5">가입 없이 동네 순위·강점을 바로 볼 수 있어요 →</div>
         </button>
 
         {/* 무료 */}
-        <div className="bg-white rounded-2xl border border-[#e6dcc8] p-5 mb-4">
+        <div className="bg-white rounded-2xl border border-note-line p-5 mb-4">
           <div className="flex items-baseline justify-between mb-3">
             <div className="font-bold text-lg">무료</div>
-            <div className="text-[13px] text-[#7a5122]">₩0</div>
+            <div className="text-[13px] text-note-brown">₩0</div>
           </div>
-          <ul className="space-y-1.5 text-[13px] text-[#52402e]">{FREE.map((f) => <li key={f}>· {f}</li>)}</ul>
+          <ul className="space-y-1.5 text-[13px] text-note-ink-warm">{FREE.map((f) => <li key={f}>· {f}</li>)}</ul>
         </div>
 
         {/* 우리 가게 리포트 */}
-        <div className="bg-gradient-to-br from-[#2b2018] to-[#4a3424] text-[#f4ece0] rounded-2xl p-5 mb-5 shadow-xl relative overflow-hidden">
-          <div className="absolute top-3 right-3 text-[9px] font-bold bg-[#e8b87a] text-[#2b2018] px-2 py-0.5 rounded-full">추천</div>
+        <div className="bg-gradient-to-br from-note-ink to-[#4a3424] text-note-paper rounded-2xl p-5 mb-5 shadow-xl relative overflow-hidden">
+          <div className="absolute top-3 right-3 text-[9px] font-bold bg-note-honey text-note-ink px-2 py-0.5 rounded-full">추천</div>
           <div className="font-bold text-lg mb-1">우리 가게 리포트</div>
-          <div className="mb-1"><span className="text-2xl font-bold text-[#e8b87a]">₩9,900</span><span className="text-[12px] text-[#8f7a58]"> / 월</span></div>
-          <div className="mb-4 text-[12px] text-[#c7ab82]">연 결제 <b className="text-[#e8b87a]">₩99,000</b> (월 8,250원 꼴 · 2개월 무료)</div>
+          <div className="mb-1"><span className="text-2xl font-bold text-note-honey">₩9,900</span><span className="text-[12px] text-[#8f7a58]"> / 월</span></div>
+          <div className="mb-4 text-[12px] text-[#c7ab82]">연 결제 <b className="text-note-honey">₩99,000</b> (월 8,250원 꼴 · 2개월 무료)</div>
 
           <div className="text-[11px] text-[#c7ab82] tracking-wider mb-2">매일 지켜보고 알려드려요</div>
           <ul className="space-y-2.5 mb-4">
@@ -104,7 +104,7 @@ export default function Pricing() {
               <li key={w.t} className="flex gap-2.5">
                 <span className="text-[15px] leading-none mt-0.5">{w.emoji}</span>
                 <span className="flex flex-col">
-                  <span className="text-[13.5px] font-bold text-[#f4ece0]">{w.t}</span>
+                  <span className="text-[13.5px] font-bold text-note-paper">{w.t}</span>
                   <span className="text-[11.5px]" style={{ color: "#b0997a" }}>{w.d}</span>
                 </span>
               </li>
@@ -117,16 +117,16 @@ export default function Pricing() {
           <div className="text-[11px] text-[#c7ab82] tracking-wider mb-2">홍보 도구도 함께</div>
           <ul className="space-y-1.5 text-[12.5px] text-[#c7ab82] mb-4">{BONUS.map((f) => <li key={f}>{f}</li>)}</ul>
 
-          <button onClick={() => { setTrial(true); setOpen(true); }} className="w-full bg-white text-[#2b2018] rounded-lg py-3 font-bold">✨ {TRIAL_DAYS}일 무료 체험</button>
-          <button onClick={() => { setTrial(false); setOpen(true); }} className="w-full mt-2 bg-[#e8b87a] text-[#2b2018] rounded-lg py-3 font-bold">구독 신청하기</button>
+          <button onClick={() => { setTrial(true); setOpen(true); }} className="w-full bg-white text-note-ink rounded-lg py-3 font-bold">✨ {TRIAL_DAYS}일 무료 체험</button>
+          <button onClick={() => { setTrial(false); setOpen(true); }} className="w-full mt-2 bg-note-honey text-note-ink rounded-lg py-3 font-bold">구독 신청하기</button>
           <p className="text-[10.5px] text-[#8f7a58] mt-2 text-center">체험은 결제 없이 {TRIAL_DAYS}일 · 신청하면 결제·세팅을 안내해 드려요</p>
         </div>
 
-        <p className="text-[11px] text-[#54432c] text-center leading-relaxed">
+        <p className="text-[11px] text-note-ink-soft text-center leading-relaxed">
           소비자에게 보여지는 후기·등급은 <b>모든 카페가 동일하게 검증</b>됩니다.
           구독은 <b>내 가게 데이터를 보는 도구</b>이며, 후기 평가를 돈으로 바꾸지 않습니다.
         </p>
-        <div className="mt-4 flex justify-center gap-3 text-[11px] text-[#7a5122]">
+        <div className="mt-4 flex justify-center gap-3 text-[11px] text-note-brown">
           <a href="/business" className="underline">사업자정보·환불정책</a>
           <a href="/trust" className="underline">검증 방법</a>
         </div>

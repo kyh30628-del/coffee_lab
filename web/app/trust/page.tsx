@@ -46,56 +46,56 @@ export default async function TrustPage() {
     description: "리뷰 교차검증 방법론과 실제 숫자 공개", url: `${SITE}/trust`,
   };
   return (
-    <main className="min-h-screen bg-[#f4ece0] text-[#2b2018]" style={{ fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }}>
+    <main className="min-h-screen bg-note-paper text-note-ink" style={{ fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <div className="max-w-2xl mx-auto px-5 py-9">
-        <Link href="/" className="text-[#7a5122] text-[13px] underline">← 동네 커피 노트</Link>
-        <div className="text-[#7a5122] text-[11px] tracking-[0.25em] uppercase mt-4 mb-1">동네 커피 노트 · 검증 방법</div>
+        <Link href="/" className="text-note-brown text-[13px] underline">← 동네 커피 노트</Link>
+        <div className="text-note-brown text-[11px] tracking-[0.25em] uppercase mt-4 mb-1">동네 커피 노트 · 검증 방법</div>
         <h1 className="text-[26px] font-bold leading-tight mb-3">저희는 후기를 이렇게 거릅니다</h1>
-        <p className="text-[14px] text-[#524234] leading-relaxed mb-6">
+        <p className="text-[14px] text-note-ink-body leading-relaxed mb-6">
           영수증 리뷰 수만 건이 조작으로 적발되는 시대입니다. 동네 커피 노트는 별점을 모으지 않습니다 —
           <b> 네이버·구글·유튜브의 공개 후기를 교차검증해서, 실제 방문이 확인되는 이야기만</b> 남깁니다.
         </p>
 
         {s && (
           <div className="grid grid-cols-2 gap-2.5 mb-8">
-            <div className="bg-white rounded-xl border border-[#e0d3bd] px-4 py-3.5"><div className="text-[22px] font-bold">{s.total.toLocaleString()}</div><div className="text-[11.5px] text-[#544636]">검토한 카페</div></div>
-            <div className="bg-white rounded-xl border border-[#e0d3bd] px-4 py-3.5"><div className="text-[22px] font-bold">{s.pub.toLocaleString()}</div><div className="text-[11.5px] text-[#544636]">검증을 통과해 공개된 카페</div></div>
-            <div className="bg-white rounded-xl border border-[#e0d3bd] px-4 py-3.5"><div className="text-[22px] font-bold">{s.passed.toLocaleString()}</div><div className="text-[11.5px] text-[#544636]">교차검증을 통과한 후기</div></div>
-            <div className="bg-white rounded-xl border border-[#e0d3bd] px-4 py-3.5"><div className="text-[22px] font-bold text-[#8a4f3f]">{s.excluded.toLocaleString()}</div><div className="text-[11.5px] text-[#544636]">오염·비카페로 격리(비공개)</div></div>
+            <div className="bg-white rounded-xl border border-note-line-strong px-4 py-3.5"><div className="text-[22px] font-bold">{s.total.toLocaleString()}</div><div className="text-[11.5px] text-[#544636]">검토한 카페</div></div>
+            <div className="bg-white rounded-xl border border-note-line-strong px-4 py-3.5"><div className="text-[22px] font-bold">{s.pub.toLocaleString()}</div><div className="text-[11.5px] text-[#544636]">검증을 통과해 공개된 카페</div></div>
+            <div className="bg-white rounded-xl border border-note-line-strong px-4 py-3.5"><div className="text-[22px] font-bold">{s.passed.toLocaleString()}</div><div className="text-[11.5px] text-[#544636]">교차검증을 통과한 후기</div></div>
+            <div className="bg-white rounded-xl border border-note-line-strong px-4 py-3.5"><div className="text-[22px] font-bold text-[#8a4f3f]">{s.excluded.toLocaleString()}</div><div className="text-[11.5px] text-[#544636]">오염·비카페로 격리(비공개)</div></div>
           </div>
         )}
 
         <h2 className="text-[18px] font-bold mb-3">1. 무엇을 걸러내나요</h2>
         <div className="flex flex-col gap-2 mb-8">
           {RULES.map((r) => (
-            <div key={r.name} className="bg-white rounded-xl border border-[#e6dcc8] px-4 py-3">
+            <div key={r.name} className="bg-white rounded-xl border border-note-line px-4 py-3">
               <div className="text-[13.5px] font-bold">{r.icon} {r.name}</div>
-              <div className="text-[12px] text-[#54432c] mt-0.5 leading-relaxed">{r.how}</div>
+              <div className="text-[12px] text-note-ink-soft mt-0.5 leading-relaxed">{r.how}</div>
             </div>
           ))}
         </div>
 
         <h2 className="text-[18px] font-bold mb-3">2. 등급은 이렇게 매깁니다</h2>
-        <div className="bg-white rounded-xl border border-[#e6dcc8] px-4 py-3.5 mb-2">
+        <div className="bg-white rounded-xl border border-note-line px-4 py-3.5 mb-2">
           <span className="text-[10px] font-bold text-white px-1.5 py-0.5 rounded" style={{ background: "#5f7355" }}>검증</span>
-          <span className="text-[12.5px] text-[#524234] ml-2 leading-relaxed">서로 다른 출처의 실제 방문 후기가 충분히 쌓여 교차 확인된 카페{s ? ` (현재 ${s.verified.toLocaleString()}곳)` : ""}</span>
+          <span className="text-[12.5px] text-note-ink-body ml-2 leading-relaxed">서로 다른 출처의 실제 방문 후기가 충분히 쌓여 교차 확인된 카페{s ? ` (현재 ${s.verified.toLocaleString()}곳)` : ""}</span>
         </div>
-        <div className="bg-white rounded-xl border border-[#e6dcc8] px-4 py-3.5 mb-8">
+        <div className="bg-white rounded-xl border border-note-line px-4 py-3.5 mb-8">
           <span className="text-[10px] font-bold text-white px-1.5 py-0.5 rounded" style={{ background: "#9c6b3f" }}>참고</span>
-          <span className="text-[12.5px] text-[#524234] ml-2 leading-relaxed">진짜 후기는 확인됐지만 아직 수가 적어 교차 확인이 덜 된 카페{s ? ` (현재 ${s.ref.toLocaleString()}곳)` : ""}</span>
+          <span className="text-[12.5px] text-note-ink-body ml-2 leading-relaxed">진짜 후기는 확인됐지만 아직 수가 적어 교차 확인이 덜 된 카페{s ? ` (현재 ${s.ref.toLocaleString()}곳)` : ""}</span>
         </div>
 
         <h2 className="text-[18px] font-bold mb-3">3. 한 번 걸러서 끝나지 않습니다</h2>
-        <p className="text-[13px] text-[#524234] leading-relaxed mb-8">
+        <p className="text-[13px] text-note-ink-body leading-relaxed mb-8">
           공개된 카페도 매일 자동 감시가 다시 봅니다. 오염이 새로 발견되면 즉시 격리되고, 판단이 애매한 건은
           자동으로 처리하지 않고 사람이 직접 확인합니다. 프랜차이즈는 다루지 않습니다 — 동네의 개인 카페만 큐레이션합니다.
         </p>
 
         <h2 className="text-[18px] font-bold mb-3">4. 솔직한 한계 — 저희가 못 하는 것</h2>
-        <div className="bg-white rounded-xl border border-[#e6dcc8] px-4 py-3.5 mb-3">
+        <div className="bg-white rounded-xl border border-note-line px-4 py-3.5 mb-3">
           <div className="text-[13.5px] font-bold mb-1">🔍 협찬을 100% 걸러내지는 못합니다</div>
-          <div className="text-[12.5px] text-[#524234] leading-relaxed">
+          <div className="text-[12.5px] text-note-ink-body leading-relaxed">
             저희가 볼 수 있는 건 블로그 <b>원문 전체가 아니라 검색 결과 발췌</b>입니다(네이버가 제공하는 범위).
             글 안에서 <b>카페가 언급된 부분</b>은 잘 보이지만, 협찬 고지 문구는 대개 글 끝에 따로 적혀 있어
             그 발췌에 들어오지 않습니다. 그래서 <b>고지가 발췌에 잡힌 협찬 글은 자동 제외</b>하고,
@@ -103,19 +103,19 @@ export default async function TrustPage() {
             <b>노출 순위를 뒤로 미룹니다</b>(지우지는 않습니다 — 진짜 후기가 함께 죽으면 안 되니까요).
           </div>
         </div>
-        <div className="bg-white rounded-xl border border-[#e6dcc8] px-4 py-3.5 mb-3">
+        <div className="bg-white rounded-xl border border-note-line px-4 py-3.5 mb-3">
           <div className="text-[13.5px] font-bold mb-1">🤖 자동 검증은 완벽하지 않습니다</div>
-          <div className="text-[12.5px] text-[#524234] leading-relaxed">
+          <div className="text-[12.5px] text-note-ink-body leading-relaxed">
             드물게 잘못 걸러지거나 놓치는 후기가 있습니다. 발견되는 대로 고치고, 애매한 건은 자동으로 처리하지 않고
             사람이 직접 확인합니다.
           </div>
         </div>
-        <p className="text-[13px] text-[#524234] leading-relaxed mb-8">
+        <p className="text-[13px] text-note-ink-body leading-relaxed mb-8">
           맛과 분위기의 판단은 결국 취향의 영역이라, 저희는 &lsquo;<b>이 글이 이 카페를 실제로 다녀와서 쓴 글인가</b>&rsquo;까지를 책임집니다.
         </p>
 
-        <Link href="/area" className="block w-full text-center bg-[#2b2018] text-[#f4ece0] rounded-xl py-3.5 font-bold">검증된 동네 카페 보러 가기 →</Link>
-        <div className="text-center text-[11px] text-[#9c8a6c] mt-8">숫자는 실시간 데이터 기준 · 동네 커피 노트</div>
+        <Link href="/area" className="block w-full text-center bg-note-ink text-note-paper rounded-xl py-3.5 font-bold">검증된 동네 카페 보러 가기 →</Link>
+        <div className="text-center text-[11px] text-note-ink-faint mt-8">숫자는 실시간 데이터 기준 · 동네 커피 노트</div>
       </div>
     </main>
   );

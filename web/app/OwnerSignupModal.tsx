@@ -80,13 +80,13 @@ export default function OwnerSignupModal({ open, onClose, trial = false, prefill
   return (
     <div className="fixed inset-0 z-[7000]" onClick={close}>
       <div className="absolute inset-0 bg-black/50" />
-      <div className="absolute inset-x-0 bottom-0 sm:inset-0 sm:m-auto sm:w-[360px] sm:h-fit bg-[#fdfaf4] text-[#2b2018] rounded-t-2xl sm:rounded-2xl p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="absolute inset-x-0 bottom-0 sm:inset-0 sm:m-auto sm:w-[360px] sm:h-fit bg-[#fdfaf4] text-note-ink rounded-t-2xl sm:rounded-2xl p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
         {done ? (
           <div className="text-center py-6">
             <div className="text-3xl mb-2">🎉</div>
             <div className="font-bold mb-1">{trial ? `${TRIAL_DAYS}일 체험 신청 완료` : "구독 신청 완료"}</div>
-            <p className="text-[13px] text-[#524234] leading-relaxed">관리자 승인 후 <b>등록하신 이메일로 키(PIN)</b>가 발송돼요. 그 키로 사장님 화면에 로그인하시면 <b>내 카페 분석으로 바로</b> 들어갑니다.{trial ? ` 체험은 승인일로부터 ${TRIAL_DAYS}일간이에요.` : ""}</p>
-            <button onClick={close} className="w-full mt-5 bg-[#2b2018] text-[#f4ece0] rounded-lg py-2.5 text-sm font-bold">닫기</button>
+            <p className="text-[13px] text-note-ink-body leading-relaxed">관리자 승인 후 <b>등록하신 이메일로 키(PIN)</b>가 발송돼요. 그 키로 사장님 화면에 로그인하시면 <b>내 카페 분석으로 바로</b> 들어갑니다.{trial ? ` 체험은 승인일로부터 ${TRIAL_DAYS}일간이에요.` : ""}</p>
+            <button onClick={close} className="w-full mt-5 bg-note-ink text-note-paper rounded-lg py-2.5 text-sm font-bold">닫기</button>
           </div>
         ) : (
           <>
@@ -94,9 +94,9 @@ export default function OwnerSignupModal({ open, onClose, trial = false, prefill
               <h3 className="font-bold text-lg">{trial ? `✨ ${TRIAL_DAYS}일 무료 체험 신청` : "홍보팩 구독 신청"}</h3>
               <button onClick={close} className="text-2xl text-[#82714f] leading-none -mt-1">×</button>
             </div>
-            <p className="text-[12px] text-[#524234] mb-3">{prefillCafe ? "방금 등록한 카페로 체험을 신청합니다. 사장님 정보를 남겨주세요." : "내 카페를 선택하고 정보를 남겨주세요."} 승인되면 <b>이메일로 키(PIN)</b>를 보내드려요.{trial ? ` 결제 없이 ${TRIAL_DAYS}일간 모든 사장님 기능을 써보실 수 있어요.` : ""}</p>
+            <p className="text-[12px] text-note-ink-body mb-3">{prefillCafe ? "방금 등록한 카페로 체험을 신청합니다. 사장님 정보를 남겨주세요." : "내 카페를 선택하고 정보를 남겨주세요."} 승인되면 <b>이메일로 키(PIN)</b>를 보내드려요.{trial ? ` 결제 없이 ${TRIAL_DAYS}일간 모든 사장님 기능을 써보실 수 있어요.` : ""}</p>
             {prefillCafe ? (
-              <div className="mb-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-[14px]"><b>{prefillCafe.name}</b><span className="text-[12px] text-emerald-600 font-bold ml-2">✓ 방금 등록한 내 카페</span><div className="text-[11px] text-[#54432c] mt-0.5">검증·공개되면 승인 후 키를 보내드려요.</div></div>
+              <div className="mb-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-[14px]"><b>{prefillCafe.name}</b><span className="text-[12px] text-emerald-600 font-bold ml-2">✓ 방금 등록한 내 카페</span><div className="text-[11px] text-note-ink-soft mt-0.5">검증·공개되면 승인 후 키를 보내드려요.</div></div>
             ) : (
               <>
                 <div className="relative mb-2">
@@ -105,12 +105,12 @@ export default function OwnerSignupModal({ open, onClose, trial = false, prefill
                   {!picked && sug.length > 0 && (
                     <div className="absolute z-10 left-0 right-0 mt-1 bg-white border border-[#d9c9b0] rounded-lg shadow-lg max-h-44 overflow-y-auto">
                       {sug.map((c) => (
-                        <button key={c.id} onClick={() => { setPicked({ id: c.id, name: c.name }); setSug([]); }} className="w-full text-left px-3 py-2 text-[13px] hover:bg-[#f4ece0] border-b border-[#f0e6d4] last:border-0"><b>{c.name}</b> <span className="text-[11px] text-[#54432c]">{c.area}</span></button>
+                        <button key={c.id} onClick={() => { setPicked({ id: c.id, name: c.name }); setSug([]); }} className="w-full text-left px-3 py-2 text-[13px] hover:bg-note-paper border-b border-[#f0e6d4] last:border-0"><b>{c.name}</b> <span className="text-[11px] text-note-ink-soft">{c.area}</span></button>
                       ))}
                     </div>
                   )}
                 </div>
-                <p className="text-[11px] text-[#54432c] -mt-0.5 mb-2">내 카페가 목록에 없나요? <a href="/cafe/register" className="text-[#7a5122] font-bold underline">카페 등록 신청 →</a> <span className="text-[#82714f]">(검증 후 분석·체험 이용 가능)</span></p>
+                <p className="text-[11px] text-note-ink-soft -mt-0.5 mb-2">내 카페가 목록에 없나요? <a href="/cafe/register" className="text-note-brown font-bold underline">카페 등록 신청 →</a> <span className="text-[#82714f]">(검증 후 분석·체험 이용 가능)</span></p>
               </>
             )}
             <input value={ownerName} onChange={(e) => setOwnerName(e.target.value)} placeholder="사장님 성함" className="w-full rounded-lg border border-[#d9c9b0] px-3 py-2.5 text-[14px] mb-2 bg-white" />
@@ -119,30 +119,30 @@ export default function OwnerSignupModal({ open, onClose, trial = false, prefill
             <input value={bizNo} onChange={(e) => setBizNo(e.target.value)} inputMode="numeric" placeholder="사업자등록번호 (선택, 숫자만)" className="w-full rounded-lg border border-[#d9c9b0] px-3 py-2.5 text-[14px] mb-2 bg-white" />
             {/* 사업자등록증 이미지(필수) — 사칭 방지 증빙 */}
             <label className="block mb-2">
-              <div className="text-[11.5px] font-bold text-[#52402e] mb-1">사업자등록증 사진 <span className="text-[#c0392b]">(필수)</span></div>
+              <div className="text-[11.5px] font-bold text-note-ink-warm mb-1">사업자등록증 사진 <span className="text-[#c0392b]">(필수)</span></div>
               <p className="text-[10.5px] text-[#82714f] mb-1">🔒 가게 확인 용도로만 사용되고, 외부에 공개되지 않아요.</p>
               <div className="flex items-center gap-2">
-                <span className="shrink-0 rounded-lg bg-[#2b2018] text-[#f4ece0] text-[12px] font-bold px-3 py-2">{bizRegBase64 ? "다시 선택" : "📷 이미지 선택"}</span>
-                <span className="text-[11px] text-[#54432c] truncate">{bizRegName || "대표자명·상호가 보이게 촬영/스캔"}</span>
+                <span className="shrink-0 rounded-lg bg-note-ink text-note-paper text-[12px] font-bold px-3 py-2">{bizRegBase64 ? "다시 선택" : "📷 이미지 선택"}</span>
+                <span className="text-[11px] text-note-ink-soft truncate">{bizRegName || "대표자명·상호가 보이게 촬영/스캔"}</span>
                 <input type="file" accept="image/*" onChange={(e) => onFile(e.target.files?.[0])} className="hidden" />
               </div>
-              {bizRegBase64 && <img src={bizRegBase64} alt="사업자등록증 미리보기" className="mt-2 w-full max-h-40 object-contain rounded-lg border border-[#e6dcc8] bg-white" />}
-              <p className="text-[10.5px] text-[#54432c] mt-1">⚠️ 주민등록번호 등은 <b>가리고</b> 올려주세요(본인확인엔 상호·대표자명만 필요).</p>
+              {bizRegBase64 && <img src={bizRegBase64} alt="사업자등록증 미리보기" className="mt-2 w-full max-h-40 object-contain rounded-lg border border-note-line bg-white" />}
+              <p className="text-[10.5px] text-note-ink-soft mt-1">⚠️ 주민등록번호 등은 <b>가리고</b> 올려주세요(본인확인엔 상호·대표자명만 필요).</p>
             </label>
             <label className="flex items-start gap-2 mb-2 cursor-pointer">
               <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5 shrink-0" />
-              <span className="text-[11.5px] text-[#52402e] leading-snug"><b>(필수)</b> 승인·키(PIN) 발송을 위한 개인정보 수집·이용 동의. 연락처·이메일·서류는 <b>암호화/안전 저장</b>됩니다. <a href="/privacy" target="_blank" className="text-[#7a5122] underline">방침</a></span>
+              <span className="text-[11.5px] text-note-ink-warm leading-snug"><b>(필수)</b> 승인·키(PIN) 발송을 위한 개인정보 수집·이용 동의. 연락처·이메일·서류는 <b>암호화/안전 저장</b>됩니다. <a href="/privacy" target="_blank" className="text-note-brown underline">방침</a></span>
             </label>
             <label className="flex items-start gap-2 mb-3 cursor-pointer">
               <input type="checkbox" checked={attest} onChange={(e) => setAttest(e.target.checked)} className="mt-0.5 shrink-0" />
-              <span className="text-[11.5px] text-[#52402e] leading-snug"><b>(필수)</b> 본인은 <b>해당 매장의 사업주 또는 정당한 운영 권한자</b>이며, 제출한 사업자등록증이 진본임을 확인합니다. <b>허위·사칭 신청 시</b> 이용이 제한되고 관련 법령에 따라 민·형사상 책임을 질 수 있음에 동의합니다.</span>
+              <span className="text-[11.5px] text-note-ink-warm leading-snug"><b>(필수)</b> 본인은 <b>해당 매장의 사업주 또는 정당한 운영 권한자</b>이며, 제출한 사업자등록증이 진본임을 확인합니다. <b>허위·사칭 신청 시</b> 이용이 제한되고 관련 법령에 따라 민·형사상 책임을 질 수 있음에 동의합니다.</span>
             </label>
             <label className="flex items-start gap-2 mb-3 cursor-pointer">
               <input type="checkbox" checked={news} onChange={(e) => setNews(e.target.checked)} className="mt-0.5 shrink-0" />
-              <span className="text-[11.5px] text-[#52402e] leading-snug"><b>(선택)</b> 📰 <b>주간 커피·디저트 트렌드 뉴스레터</b> 받기. 광고성 정보 수신에 동의합니다(언제든 메일 하단 <b>수신거부</b> 가능).</span>
+              <span className="text-[11.5px] text-note-ink-warm leading-snug"><b>(선택)</b> 📰 <b>주간 커피·디저트 트렌드 뉴스레터</b> 받기. 광고성 정보 수신에 동의합니다(언제든 메일 하단 <b>수신거부</b> 가능).</span>
             </label>
             {err && <p className="text-[12px] text-[#c0392b] mb-2">{err}</p>}
-            <button disabled={busy || !canSubmit} onClick={submit} className="w-full bg-[#e8b87a] text-[#2b2018] rounded-lg py-3 font-bold disabled:opacity-50">{busy ? "신청 중…" : trial ? `${TRIAL_DAYS}일 체험 신청` : "구독 신청"}</button>
+            <button disabled={busy || !canSubmit} onClick={submit} className="w-full bg-note-honey text-note-ink rounded-lg py-3 font-bold disabled:opacity-50">{busy ? "신청 중…" : trial ? `${TRIAL_DAYS}일 체험 신청` : "구독 신청"}</button>
           </>
         )}
       </div>

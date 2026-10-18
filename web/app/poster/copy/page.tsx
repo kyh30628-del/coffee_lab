@@ -297,8 +297,8 @@ export default function PosterCopyPage() {
       }}
     >
       <div className="max-w-4xl mx-auto px-6 py-10">
-        <BackLink to="/poster" label="포스터" className="text-[#7a5122] mb-4" />
-        <div className="text-[#7a5122] text-xs tracking-[0.3em] uppercase mb-2">Caption Studio</div>
+        <BackLink to="/poster" label="포스터" className="text-note-brown mb-4" />
+        <div className="text-note-brown text-xs tracking-[0.3em] uppercase mb-2">Caption Studio</div>
         <h1 className="text-3xl font-bold mb-1">홍보카피 포스터</h1>
         <p className="text-[13px] text-[#665036] mb-6 leading-relaxed">
           확정된 인스타 홍보카피 {PRESETS.length}종 중 하나를 골라 &ldquo;{REGION_TOKEN}&rdquo; 자리에 원하는
@@ -307,7 +307,7 @@ export default function PosterCopyPage() {
           지역명이든 입력할 수 있어요.
         </p>
 
-        <section className="bg-white/60 border border-[#e6dcc8] rounded-xl p-4 mb-5">
+        <section className="bg-white/60 border border-note-line rounded-xl p-4 mb-5">
           <div className="text-[13px] font-bold mb-2">1. 카피 버전 선택</div>
           <select
             value={presetKey}
@@ -334,7 +334,7 @@ export default function PosterCopyPage() {
 
         <section className="mb-5">
           <div className="text-[13px] font-bold mb-2">3. 미리보기 · 다운로드</div>
-          <div className="rounded-xl overflow-hidden shadow-lg border border-[#2b2018] max-w-[440px] mx-auto">
+          <div className="rounded-xl overflow-hidden shadow-lg border border-note-ink max-w-[440px] mx-auto">
             <canvas
               ref={canvasRef}
               width={SIZE}
@@ -345,7 +345,7 @@ export default function PosterCopyPage() {
           </div>
           <button
             onClick={download}
-            className="mt-4 w-full max-w-[440px] mx-auto block bg-[#2b2018] text-[#f4ece0] rounded-xl py-3 font-bold active:scale-[0.99] transition"
+            className="mt-4 w-full max-w-[440px] mx-auto block bg-note-ink text-note-paper rounded-xl py-3 font-bold active:scale-[0.99] transition"
           >
             ⬇ PNG 저장
           </button>

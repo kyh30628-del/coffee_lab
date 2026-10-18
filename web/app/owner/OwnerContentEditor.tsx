@@ -38,9 +38,9 @@ export default function OwnerContentEditor({ cafeId, pin }: { cafeId: number; pi
   };
   return (
     <div className="bg-white rounded-2xl p-4 sm:p-5 border border-[#ece0cd] mb-4">
-      <div className="text-sm font-bold text-[#52402e] mb-1">📷 우리 가게 사진 · ✍ 사장님 한마디</div>
-      <p className="text-[12px] text-[#8a7458] leading-relaxed mb-3">손님이 보는 카페 페이지에 <b>사장님이 직접 올린 사진</b>과 <b>한마디</b>가 실려요. 후기·등급은 그대로예요(사장님 글은 따로 표시). 사진은 직접 촬영한 것만 올려주세요(저작권·초상권 책임은 올리는 분에게 있어요).</p>
-      <p className="text-[12px] text-[#54432c] bg-white/60 border border-[#e6dcc8] rounded-lg px-3 py-2 mb-3">📷 <b>사진은 구독과 상관없이 계속 보여요.</b> 구독이 끝나도 내려가지 않아요. <b>사장님 한마디</b>와 <b>🏅 직접 관리 배지</b>는 구독 중에만 표시돼요.</p>
+      <div className="text-sm font-bold text-note-ink-warm mb-1">📷 우리 가게 사진 · ✍ 사장님 한마디</div>
+      <p className="text-[12px] text-note-ink-mute leading-relaxed mb-3">손님이 보는 카페 페이지에 <b>사장님이 직접 올린 사진</b>과 <b>한마디</b>가 실려요. 후기·등급은 그대로예요(사장님 글은 따로 표시). 사진은 직접 촬영한 것만 올려주세요(저작권·초상권 책임은 올리는 분에게 있어요).</p>
+      <p className="text-[12px] text-note-ink-soft bg-white/60 border border-note-line rounded-lg px-3 py-2 mb-3">📷 <b>사진은 구독과 상관없이 계속 보여요.</b> 구독이 끝나도 내려가지 않아요. <b>사장님 한마디</b>와 <b>🏅 직접 관리 배지</b>는 구독 중에만 표시돼요.</p>
       <div className="flex gap-2 flex-wrap mb-2">
         {keep.map((p) => (
           <div key={p.url} className="relative w-20 h-20 rounded-lg overflow-hidden border border-[#ece0cd]">
@@ -57,16 +57,16 @@ export default function OwnerContentEditor({ cafeId, pin }: { cafeId: number; pi
           </div>
         ))}
         {total < limits.photos && (
-          <button type="button" onClick={() => fileRef.current?.click()} className="w-20 h-20 rounded-lg border border-dashed border-[#c9b391] text-[#8a7458] text-[11px]">+ 사진<br />{total}/{limits.photos}</button>
+          <button type="button" onClick={() => fileRef.current?.click()} className="w-20 h-20 rounded-lg border border-dashed border-[#c9b391] text-note-ink-mute text-[11px]">+ 사진<br />{total}/{limits.photos}</button>
         )}
         <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={(e) => { const fs = Array.from(e.target.files ?? []); setPending((a) => [...a, ...fs].slice(0, Math.max(0, limits.photos - keep.length))); e.target.value = ""; }} />
       </div>
-      <textarea value={note} onChange={(e) => setNote(e.target.value.slice(0, limits.note))} rows={3} placeholder="예) 매일 아침 직접 로스팅해요. 조용히 책 읽기 좋은 창가 자리가 있어요." className="w-full text-[13px] border border-[#ece0cd] rounded-xl p-3 outline-none focus:border-[#9c6b3f]" />
+      <textarea value={note} onChange={(e) => setNote(e.target.value.slice(0, limits.note))} rows={3} placeholder="예) 매일 아침 직접 로스팅해요. 조용히 책 읽기 좋은 창가 자리가 있어요." className="w-full text-[13px] border border-[#ece0cd] rounded-xl p-3 outline-none focus:border-note-tan" />
       <div className="flex items-center justify-between mt-2">
-        <span className="text-[11px] text-[#8a7458]">{note.length}/{limits.note}</span>
-        <button type="button" onClick={save} disabled={busy} className="bg-[#2b2018] text-[#f4ece0] rounded-xl px-4 py-2 text-[13px] font-bold disabled:opacity-50">{busy ? "저장 중…" : "저장"}</button>
+        <span className="text-[11px] text-note-ink-mute">{note.length}/{limits.note}</span>
+        <button type="button" onClick={save} disabled={busy} className="bg-note-ink text-note-paper rounded-xl px-4 py-2 text-[13px] font-bold disabled:opacity-50">{busy ? "저장 중…" : "저장"}</button>
       </div>
-      {msg && <p className="text-[12px] text-[#7a5122] mt-2">{msg}</p>}
+      {msg && <p className="text-[12px] text-note-brown mt-2">{msg}</p>}
     </div>
   );
 }

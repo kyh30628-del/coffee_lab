@@ -57,12 +57,12 @@ export default function RecentCafes({ current, title = "🕘 최근 본 카페" 
       <div className="flex flex-col gap-2">
         {items.map((c) => (
           <Link key={c.id} href={`/c/${c.id}`}
-            className="flex items-center gap-2.5 bg-white border border-[#e0d3bd] rounded-xl px-3.5 py-2.5">
+            className="flex items-center gap-2.5 bg-white border border-note-line-strong rounded-xl px-3.5 py-2.5">
             <span className="flex flex-col text-left min-w-0">
               <span className="text-[13.5px] font-bold text-[#3d2f22] truncate">{c.name}</span>
               <span className="text-[10.5px] text-[#544636] truncate">{c.area}</span>
             </span>
-            {c.grade && <span className="ml-auto text-[10px] font-bold bg-[#2b2018] text-[#e8b87a] px-2 py-0.5 rounded-full whitespace-nowrap">{c.grade}</span>}
+            {c.grade && <span className="ml-auto text-[10px] font-bold bg-note-ink text-note-honey px-2 py-0.5 rounded-full whitespace-nowrap">{c.grade}</span>}
           </Link>
         ))}
       </div>

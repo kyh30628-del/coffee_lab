@@ -39,22 +39,22 @@ function BadgeForm() {
   return (
     <div className="max-w-lg mx-auto">
       <h1 className="text-2xl font-bold mb-2">🏅 검증 배지 달기</h1>
-      <p className="text-[13.5px] text-[#524234] leading-relaxed mb-6">
+      <p className="text-[13.5px] text-note-ink-body leading-relaxed mb-6">
         동네 커피 노트가 <b>광고·협찬을 걸러낸 진짜 후기</b>로 검증한 카페임을 보여주는 배지예요.<br />
         블로그·홈페이지·인스타 프로필 링크 어디든 붙일 수 있어요.
       </p>
       <div className="flex gap-2 mb-4">
         <input value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === "Enter" && search()}
           placeholder="카페 상호 입력" className="flex-1 border border-[#cbb89f] rounded-xl px-4 py-3 bg-white text-[15px]" />
-        <button onClick={() => search()} className="bg-[#2b2018] text-[#f4ece0] rounded-xl px-5 font-bold">찾기</button>
+        <button onClick={() => search()} className="bg-note-ink text-note-paper rounded-xl px-5 font-bold">찾기</button>
       </div>
       {msg && <p className="text-[13px] text-[#b23a5f] mb-4">{msg}</p>}
       {cafe && (
         <div className="bg-white rounded-2xl border border-[#d9c9ab] p-5">
-          <div className="text-[13px] font-bold mb-3">{cafe.name} <span className="text-[#7a5122] font-normal">({cafe.area})</span></div>
+          <div className="text-[13px] font-bold mb-3">{cafe.name} <span className="text-note-brown font-normal">({cafe.area})</span></div>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={`/api/badge/${cafe.id}`} alt="배지 미리보기" width={230} height={54} className="mb-4" />
-          <div className="text-[11px] font-bold text-[#52402e] mb-1">아래 HTML을 복사해 붙여넣으세요</div>
+          <div className="text-[11px] font-bold text-note-ink-warm mb-1">아래 HTML을 복사해 붙여넣으세요</div>
           <textarea readOnly value={html} onClick={(e) => (e.target as HTMLTextAreaElement).select()}
             className="w-full h-24 text-[11px] font-mono border border-[#e3d3b8] rounded-lg p-2.5 bg-[#fdfaf4]" />
           <button onClick={() => { navigator.clipboard.writeText(html).then(() => setCopied(true)).catch(() => {}); }}

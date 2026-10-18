@@ -52,14 +52,14 @@ async function getStats() {
 
 export default async function InsightsPage() {
   const s = await getStats();
-  if (!s) return <main className="min-h-screen bg-[#f4ece0] p-10 text-center text-[#524234]">리포트를 준비 중이에요.</main>;
+  if (!s) return <main className="min-h-screen bg-note-paper p-10 text-center text-note-ink-body">리포트를 준비 중이에요.</main>;
   const upd = new Date().toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric" });
   const Row = ({ items }: { items: any[] }) => (
     <ol className="space-y-1.5">{items.map((x, i) => (
       <li key={x.area} className="flex items-center gap-2 text-[13.5px]">
         <span className="w-5 text-right font-bold text-[#82714f]">{i + 1}</span>
-        <Link href={`/area/${encodeURIComponent(x.area)}`} className="underline underline-offset-2 text-[#2b2018]">{x.area}</Link>
-        <span className="ml-auto text-[#7a5122] font-bold">{x.n}곳</span>
+        <Link href={`/area/${encodeURIComponent(x.area)}`} className="underline underline-offset-2 text-note-ink">{x.area}</Link>
+        <span className="ml-auto text-note-brown font-bold">{x.n}곳</span>
       </li>))}
     </ol>
   );
@@ -89,21 +89,21 @@ export default async function InsightsPage() {
     ],
   };
   return (
-    <main className="min-h-screen bg-[#f4ece0] text-[#2b2018]" style={{ fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }}>
+    <main className="min-h-screen bg-note-paper text-note-ink" style={{ fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(datasetLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqLd) }} />
       <div className="max-w-2xl mx-auto px-5 py-10">
-        <div className="text-[#7a5122] text-[11px] tracking-[0.25em] uppercase mb-1">동네 커피 노트 · 데이터 리포트</div>
+        <div className="text-note-brown text-[11px] tracking-[0.25em] uppercase mb-1">동네 커피 노트 · 데이터 리포트</div>
         <h1 className="text-[26px] font-bold leading-tight mb-2">검증 후기로 본 카페 지형</h1>
-        <p className="text-[13.5px] text-[#524234] leading-relaxed mb-1">
+        <p className="text-[13.5px] text-note-ink-body leading-relaxed mb-1">
           별점·광고가 아니라 <b>광고·협찬·무관 글을 걸러낸 공개 후기</b>만으로 집계했습니다.
         </p>
         <p className="text-[11.5px] text-[#7a6a55] mb-7">기준일 {upd} · 매일 갱신 · 인용 시 출처 링크를 부탁드려요.</p>
 
         <div className="grid grid-cols-3 gap-2 mb-8">
           {[["검증 완료 카페", s.tot.pub.toLocaleString() + "곳"], ["검증 등급", s.tot.v.toLocaleString() + "곳"], ["검증 통과 후기", s.tot.reviews.toLocaleString() + "건"]].map(([k, v]) => (
-            <div key={k} className="bg-white rounded-2xl border border-[#e6dcc8] p-4 text-center">
-              <div className="text-[17px] font-bold">{v}</div><div className="text-[10.5px] text-[#7a5122] mt-1">{k}</div>
+            <div key={k} className="bg-white rounded-2xl border border-note-line p-4 text-center">
+              <div className="text-[17px] font-bold">{v}</div><div className="text-[10.5px] text-note-brown mt-1">{k}</div>
             </div>))}
         </div>
 
@@ -112,7 +112,7 @@ export default async function InsightsPage() {
         {s.cautionTop?.length > 0 && (
           <section className="mb-8">
             <h2 className="text-[17px] font-bold mb-1">⚠️ 후기가 말한 &lsquo;가기 전 알아둘 점&rsquo;</h2>
-            <p className="text-[12.5px] text-[#524234] leading-relaxed mb-2">
+            <p className="text-[12.5px] text-note-ink-body leading-relaxed mb-2">
               광고는 절대 말하지 않는 정보예요. 판정한 <b>{s.cautionTot.judged.toLocaleString()}곳</b> 중
               <b> {s.cautionTot.with_c.toLocaleString()}곳({Math.round(s.cautionTot.with_c / Math.max(1, s.cautionTot.judged) * 100)}%)</b>에서
               서로 다른 후기 2건 이상으로 확인된 주의점이 나왔어요.
@@ -121,7 +121,7 @@ export default async function InsightsPage() {
               {s.cautionTop.map((c: any, i: number) => (
                 <li key={c.label} className="flex items-center gap-2 text-[13.5px]">
                   <span className="w-5 text-right font-bold text-[#82714f]">{i + 1}</span>
-                  <span className="text-[#2b2018]">{c.label}</span>
+                  <span className="text-note-ink">{c.label}</span>
                   <span className="ml-auto text-[#8a5a3a] font-bold">{c.n.toLocaleString()}곳</span>
                 </li>))}
             </ol>
@@ -130,15 +130,15 @@ export default async function InsightsPage() {
 
         <section className="mb-8">
           <h2 className="text-[17px] font-bold mb-1">🏠 동네 단골 카페 vs 🧳 여행객 카페</h2>
-          <p className="text-[12.5px] text-[#524234] leading-relaxed mb-3">
+          <p className="text-[12.5px] text-note-ink-body leading-relaxed mb-3">
             후기를 쓴 사람이 <b>단골·생활권 방문자</b>인지 <b>여행 중 방문자</b>인지 신호어로 분류했습니다.
             전국 공개 카페 중 동네 단골 카페 <b>{s.vb.local.toLocaleString()}곳</b>, 여행객 카페 <b>{s.vb.trip.toLocaleString()}곳</b>.
           </p>
           <div className="grid sm:grid-cols-2 gap-4">
-            <div className="bg-white rounded-2xl border border-[#e6dcc8] p-4">
+            <div className="bg-white rounded-2xl border border-note-line p-4">
               <div className="text-[12px] font-bold text-[#4a5a4e] mb-2">🏠 동네 단골 카페가 많은 지역</div><Row items={s.localTop} />
             </div>
-            <div className="bg-white rounded-2xl border border-[#e6dcc8] p-4">
+            <div className="bg-white rounded-2xl border border-note-line p-4">
               <div className="text-[12px] font-bold text-[#4a5a4e] mb-2">🧳 여행객 후기 카페가 많은 지역</div><Row items={s.tripTop} />
             </div>
           </div>
@@ -146,33 +146,33 @@ export default async function InsightsPage() {
 
         <section className="mb-8">
           <h2 className="text-[17px] font-bold mb-1">📈 최근 30일, 검증 카페가 늘어난 지역</h2>
-          <div className="bg-white rounded-2xl border border-[#e6dcc8] p-4 mt-3"><Row items={s.grow} /></div>
+          <div className="bg-white rounded-2xl border border-note-line p-4 mt-3"><Row items={s.grow} /></div>
         </section>
 
         <section className="mb-8">
           <h2 className="text-[17px] font-bold mb-1">🗺️ 뉴스가 &lsquo;관광지&rsquo;로 다루는 카페 동네 TOP 10</h2>
-          <p className="text-[12.5px] text-[#54432c] mb-3">
+          <p className="text-[12.5px] text-note-ink-soft mb-3">
             전국 {Number(s.tCnt?.total ?? 0).toLocaleString()}개 동의 최근 언론 보도를 표본 조사해, 관광 맥락 기사 비율이
             높은 동네를 가려냈습니다(판정 {s.tCnt?.tourist ?? 0}곳). 후기 말투가 아니라 <b>공개된 보도</b>로 판정한 수치입니다.
           </p>
-          <div className="bg-white rounded-2xl border border-[#e6dcc8] p-4">
+          <div className="bg-white rounded-2xl border border-note-line p-4">
             <ol className="space-y-1.5">{(s.touristDong ?? []).map((x: any, i: number) => (
               <li key={`${x.area}${x.dong}`} className="flex items-center gap-2 text-[13.5px]">
                 <span className="w-5 text-right font-bold text-[#82714f]">{i + 1}</span>
-                <span className="text-[#2b2018]">{x.area} <b>{x.dong}</b></span>
-                <span className="text-[11px] text-[#8a7458]">검증 카페 {x.cafes}곳</span>
-                <span className="ml-auto text-[#7a5122] font-bold">관광기사 {x.pct}%</span>
+                <span className="text-note-ink">{x.area} <b>{x.dong}</b></span>
+                <span className="text-[11px] text-note-ink-mute">검증 카페 {x.cafes}곳</span>
+                <span className="ml-auto text-note-brown font-bold">관광기사 {x.pct}%</span>
               </li>))}
             </ol>
           </div>
         </section>
 
-        <p className="text-[11.5px] text-[#54432c] bg-white/60 border border-[#e6dcc8] rounded-lg px-3 py-2.5 leading-relaxed">
+        <p className="text-[11.5px] text-note-ink-soft bg-white/60 border border-note-line rounded-lg px-3 py-2.5 leading-relaxed">
           집계 방법: 네이버·구글·유튜브 공개 후기를 교차 수집한 뒤 광고·협찬 표기, 서포터즈·기자단, 동명·옆가게 오염,
-          템플릿 도배를 규칙 기반으로 제외했습니다. <Link href="/trust" className="underline text-[#7a5122]">검증 방법 자세히</Link>
+          템플릿 도배를 규칙 기반으로 제외했습니다. <Link href="/trust" className="underline text-note-brown">검증 방법 자세히</Link>
         </p>
         {/* 📎 인용 안내 — 이 페이지의 존재 이유(백링크). 조건을 낮추고 명확하게. */}
-        <p className="mt-3 text-[11.5px] text-[#54432c] bg-[#fdf6e9] border border-[#ecd9b0] rounded-lg px-3 py-2.5 leading-relaxed">
+        <p className="mt-3 text-[11.5px] text-note-ink-soft bg-[#fdf6e9] border border-[#ecd9b0] rounded-lg px-3 py-2.5 leading-relaxed">
           📎 <b>이 리포트의 수치·순위는 출처 표기 시 자유롭게 인용하실 수 있습니다.</b>{" "}
           &ldquo;동네 커피 노트(dongnecoffeenote.com)&rdquo;와 링크를 함께 적어주세요. 기사·영상용 상세 데이터가
           필요하면 언제든 요청 주세요.

@@ -52,8 +52,8 @@ export default function OwnerFindModal({
       className="fixed inset-0 z-[5000] flex items-end sm:items-center justify-center px-4 pb-4 sm:pb-0"
       style={{ background: "rgba(20,14,8,0.6)" }}>
       <div onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-sm bg-[#f4ece0] rounded-2xl border border-[#d9c9ab] shadow-xl px-5 pt-5 pb-4">
-        <h2 id="dcn-find-title" className="text-[17px] font-bold text-[#2b2018] mb-1">우리 가게 찾기</h2>
+        className="w-full max-w-sm bg-note-paper rounded-2xl border border-[#d9c9ab] shadow-xl px-5 pt-5 pb-4">
+        <h2 id="dcn-find-title" className="text-[17px] font-bold text-note-ink mb-1">우리 가게 찾기</h2>
         <p className="text-[12.5px] text-[#6b5a48] mb-4 leading-relaxed">
           가게 이름을 넣으면 <b>동네 순위·강점</b>을 바로 보여드려요. 가입 없이 볼 수 있어요.
         </p>
@@ -63,22 +63,22 @@ export default function OwnerFindModal({
             placeholder="가게 이름" autoFocus
             className="flex-1 min-w-0 border border-[#cbb89f] rounded-xl px-4 py-3 text-[15px] bg-white" />
           <button onClick={run} disabled={q.trim().length < 2}
-            className="bg-[#2b2018] text-[#f4ece0] rounded-xl px-5 py-3 text-[14px] font-bold shrink-0 disabled:opacity-40">
+            className="bg-note-ink text-note-paper rounded-xl px-5 py-3 text-[14px] font-bold shrink-0 disabled:opacity-40">
             찾기
           </button>
         </div>
 
-        {loading && <p className="text-[12.5px] text-[#8a7458] py-3 text-center">찾는 중…</p>}
+        {loading && <p className="text-[12.5px] text-note-ink-mute py-3 text-center">찾는 중…</p>}
 
         {!loading && hits.length > 0 && (
           <div className="space-y-2 max-h-[46vh] overflow-y-auto mb-3">
             {hits.map((c) => (
               // a 태그 — 새 화면으로 확실히 이동시킨다(모달 안에서 라우팅하면 뒤로가기가 꼬인다)
               <a key={c.id} href={`/owner/r/${c.id}`}
-                className="block bg-white rounded-xl border border-[#ece0cd] px-4 py-3 hover:border-[#9c6b3f] transition">
+                className="block bg-white rounded-xl border border-[#ece0cd] px-4 py-3 hover:border-note-tan transition">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-[14px] font-bold text-[#2b2018] truncate">{c.name}</span>
-                  <span className="text-[11px] text-[#8a7458] shrink-0">{c.area}</span>
+                  <span className="text-[14px] font-bold text-note-ink truncate">{c.name}</span>
+                  <span className="text-[11px] text-note-ink-mute shrink-0">{c.area}</span>
                 </div>
                 {typeof c.count === "number" && (
                   <div className="text-[11px] text-[#7a6a55] mt-0.5">검증 후기 {c.count}건{c.grade ? ` · ${c.grade}` : ""}</div>
@@ -89,7 +89,7 @@ export default function OwnerFindModal({
         )}
 
         {!loading && searched && hits.length === 0 && (
-          <p className="text-[12.5px] text-[#8a7458] py-3 text-center leading-relaxed">
+          <p className="text-[12.5px] text-note-ink-mute py-3 text-center leading-relaxed">
             찾는 가게가 없어요.<br />아직 등록 전이거나 이름이 다를 수 있어요.
           </p>
         )}
@@ -102,10 +102,10 @@ export default function OwnerFindModal({
             } catch {}
             onNoMatch();
           }}
-          className="w-full text-center text-[12px] text-[#9c6b3f] underline py-2">
+          className="w-full text-center text-[12px] text-note-tan underline py-2">
           우리 가게가 안 보여요 · 등록·체험 신청
         </button>
-        <button onClick={onClose} className="w-full text-center text-[12px] text-[#8a7458] py-1.5">닫기</button>
+        <button onClick={onClose} className="w-full text-center text-[12px] text-note-ink-mute py-1.5">닫기</button>
       </div>
     </div>
   );

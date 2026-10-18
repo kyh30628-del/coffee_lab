@@ -77,7 +77,7 @@ export default function WishButton({ cafeId, variant = "pill" }: { cafeId: numbe
             {on ? "지도에서 찜한 곳만 모아볼 수 있어요" : "탭 한 번 · 가입도 위치확인도 없어요"}
           </span>
         </span>
-        <span className={`font-bold whitespace-nowrap text-[13px] ${on ? "text-[#d6336c]" : "text-[#7a5122]"}`}>{on ? "✓" : "＋"}</span>
+        <span className={`font-bold whitespace-nowrap text-[13px] ${on ? "text-[#d6336c]" : "text-note-brown"}`}>{on ? "✓" : "＋"}</span>
       </button>
       {/* 저장은 **다시 꺼내볼 수 있어야** 저장이다 — 찜한 직후에만 회수 동선을 연다(평소엔 화면을 어지럽히지 않게). */}
       {on && (

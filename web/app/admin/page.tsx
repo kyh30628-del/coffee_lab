@@ -2178,7 +2178,7 @@ export default function AdminPage() {
               <div className="admin-stat-grid">
                 <div><div className="text-xl font-bold text-stone-900">{ct.total ? Math.round((ct.raw_cached / ct.total) * 100) : 0}%</div><div className="text-[11px] text-stone-700">원본 수집(예열)</div><div className="text-[10px] text-stone-600">{ct.raw_cached}/{ct.total}</div></div>
                 <div><div className="text-xl font-bold text-emerald-600">{ct.total ? Math.round((ct.llm_judged / ct.total) * 100) : 0}%</div><div className="text-[11px] text-stone-700">AI 맥락 판정</div><div className="text-[10px] text-stone-600">{ct.llm_judged}/{ct.total}</div></div>
-                <div><div className="text-xl font-bold text-[#9c6b3f]">{ct.quality.avg_noise_pct ?? 0}%</div><div className="text-[11px] text-stone-700">노이즈 제거율</div><div className="text-[10px] text-stone-600">옥석만</div></div>
+                <div><div className="text-xl font-bold text-note-tan">{ct.quality.avg_noise_pct ?? 0}%</div><div className="text-[11px] text-stone-700">노이즈 제거율</div><div className="text-[10px] text-stone-600">옥석만</div></div>
               </div>
               <p className="text-[10px] text-stone-600 mt-2.5">예열(00:10)으로 원본을 한 번 모아두고, Sonnet 판정(04:00)이 매일 정확도를 끌어올립니다.</p>
             </Card>
@@ -2189,7 +2189,7 @@ export default function AdminPage() {
           <div className="mb-6">
             <Card title="데이터 품질" note="모든 화면 데이터는 검증된 옥석 리뷰만 사용">
               <div className="admin-stat-grid">
-                <div><div className="text-xl font-bold text-[#9c6b3f]">{ct.quality.avg_noise_pct ?? 0}%</div><div className="text-[11px] text-stone-700">평균 노이즈 제거</div></div>
+                <div><div className="text-xl font-bold text-note-tan">{ct.quality.avg_noise_pct ?? 0}%</div><div className="text-[11px] text-stone-700">평균 노이즈 제거</div></div>
                 <div><div className="text-xl font-bold text-emerald-600">{keptPct}%</div><div className="text-[11px] text-stone-700">옥석 채택률</div></div>
                 <div><div className="text-xl font-bold text-stone-900">{ct.published ? Math.round(((ct.pub_embedded ?? 0) / ct.published) * 100) : 0}%</div><div className="text-[11px] text-stone-700">임베딩 커버리지<br/>(공개 기준)</div></div>
                 <div><div className="text-xl font-bold text-stone-900">{ct.published ? Math.round(((ct.pub_has_dates ?? 0) / ct.published) * 100) : 0}%</div><div className="text-[11px] text-stone-700">리뷰주기 데이터<br/>(공개 기준)</div></div>

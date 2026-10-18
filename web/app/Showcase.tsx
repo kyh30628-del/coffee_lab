@@ -68,7 +68,7 @@ export default function Showcase({ cafeId, cafeName, pw, pin }: { cafeId: number
     setBusy(false);
   };
 
-  if (!promo) return <p className="text-[12px] text-[#54432c]">불러오는 중…</p>;
+  if (!promo) return <p className="text-[12px] text-note-ink-soft">불러오는 중…</p>;
   const status = promo.style === 0
     ? (promo.video_url ? (promo.approved ? "🟢 공개 중 — 카페 상세에 영상이 노출돼요" : "🟡 영상 — 관리자 승인 대기 중") : "🎬 홍보 영상을 올려주세요")
     : promo.ai_pending ? "🕐 관리자가 생성 요청함 — AI 카피 생성 중"
@@ -76,21 +76,21 @@ export default function Showcase({ cafeId, cafeName, pw, pin }: { cafeId: number
         : "🟡 저장 후 관리자가 검토·생성합니다 (문구를 적고 저장해 주세요)";
 
   return (
-    <div className="bg-gradient-to-br from-[#2b2018] to-[#4a3424] text-[#f4ece0] rounded-2xl p-4 sm:p-5">
+    <div className="bg-gradient-to-br from-note-ink to-[#4a3424] text-note-paper rounded-2xl p-4 sm:p-5">
       <style dangerouslySetInnerHTML={{ __html: SHOWCASE_CSS }} />
       <div className="flex items-center gap-2 mb-1">
         <span className="text-lg">🎀</span>
         <h3 className="text-base font-bold">우리 가게 쇼케이스</h3>
-        <span className="text-[9px] bg-[#e8b87a] text-[#2b2018] px-1.5 py-0.5 rounded-full font-bold ml-auto">💎 구독 전용</span>
+        <span className="text-[9px] bg-note-honey text-note-ink px-1.5 py-0.5 rounded-full font-bold ml-auto">💎 구독 전용</span>
       </div>
-      <p className="text-[12px] text-[#8f7a58] leading-relaxed mb-3"><b className="text-[#f4ece0]">{cafeName}</b> · 홍보 <b className="text-[#f4ece0]">문구를 적으면 AI가 요약</b>해 어필 카피로, 또는 <b className="text-[#f4ece0]">홍보 영상</b>을 올릴 수 있어요. <b className="text-[#f4ece0]">관리자 승인</b> 후 카페 상세 맨 위에 노출돼요.</p>
+      <p className="text-[12px] text-[#8f7a58] leading-relaxed mb-3"><b className="text-note-paper">{cafeName}</b> · 홍보 <b className="text-note-paper">문구를 적으면 AI가 요약</b>해 어필 카피로, 또는 <b className="text-note-paper">홍보 영상</b>을 올릴 수 있어요. <b className="text-note-paper">관리자 승인</b> 후 카페 상세 맨 위에 노출돼요.</p>
 
       {/* 📊 성과 분석 — 우리 앱 1차 데이터 */}
       {promo?.approved && (
         <div className="mb-3">
           <div className="flex items-center gap-2 mb-1.5">
             <span className="text-[11px] text-[#8f7a58]">📊 우리 가게 홍보 성과</span>
-            {promo?.featured && <span className="text-[9px] bg-[#e8b87a] text-[#2b2018] px-1.5 py-0.5 rounded-full font-bold">⭐ 우선 노출 중{promo.featured_until ? ` (D-${Math.max(0, Math.ceil((new Date(promo.featured_until).getTime() - Date.now()) / 86400000))})` : ""}</span>}
+            {promo?.featured && <span className="text-[9px] bg-note-honey text-note-ink px-1.5 py-0.5 rounded-full font-bold">⭐ 우선 노출 중{promo.featured_until ? ` (D-${Math.max(0, Math.ceil((new Date(promo.featured_until).getTime() - Date.now()) / 86400000))})` : ""}</span>}
           </div>
           {/* 이번 달 리포트 */}
           {month && (
@@ -102,18 +102,18 @@ export default function Showcase({ cafeId, cafeName, pw, pin }: { cafeId: number
                   </span>
                 )}
               </div>
-              <div className="flex gap-4 text-[12px] text-[#f4ece0]">
-                <span>노출 <b className="text-[#e8b87a]">{month.views}</b></span>
-                <span>클릭 <b className="text-[#e8b87a]">{month.clicks}</b></span>
-                <span>재생 <b className="text-[#e8b87a]">{month.plays}</b></span>
+              <div className="flex gap-4 text-[12px] text-note-paper">
+                <span>노출 <b className="text-note-honey">{month.views}</b></span>
+                <span>클릭 <b className="text-note-honey">{month.clicks}</b></span>
+                <span>재생 <b className="text-note-honey">{month.plays}</b></span>
               </div>
             </div>
           )}
           <div className="text-[9px] text-[#7a6750] mb-1">누적</div>
           <div className="grid grid-cols-3 gap-1.5">
-            <div className="bg-black/25 rounded-lg py-2 text-center"><div className="text-lg font-bold text-[#e8b87a]">{promo.views ?? 0}</div><div className="text-[9px] text-[#8f7a58]">노출(조회)</div></div>
-            <div className="bg-black/25 rounded-lg py-2 text-center"><div className="text-lg font-bold text-[#e8b87a]">{promo.clicks ?? 0}</div><div className="text-[9px] text-[#8f7a58]">클릭</div></div>
-            <div className="bg-black/25 rounded-lg py-2 text-center"><div className="text-lg font-bold text-[#e8b87a]">{promo.plays ?? 0}</div><div className="text-[9px] text-[#8f7a58]">영상 재생</div></div>
+            <div className="bg-black/25 rounded-lg py-2 text-center"><div className="text-lg font-bold text-note-honey">{promo.views ?? 0}</div><div className="text-[9px] text-[#8f7a58]">노출(조회)</div></div>
+            <div className="bg-black/25 rounded-lg py-2 text-center"><div className="text-lg font-bold text-note-honey">{promo.clicks ?? 0}</div><div className="text-[9px] text-[#8f7a58]">클릭</div></div>
+            <div className="bg-black/25 rounded-lg py-2 text-center"><div className="text-lg font-bold text-note-honey">{promo.plays ?? 0}</div><div className="text-[9px] text-[#8f7a58]">영상 재생</div></div>
           </div>
         </div>
       )}
@@ -123,8 +123,8 @@ export default function Showcase({ cafeId, cafeName, pw, pin }: { cafeId: number
         <div className="mb-3">
           <div className="text-[11px] text-[#8f7a58] mb-1.5">🎟 방문 혜택 (카페 상세에 노출 → 손님 유입)</div>
           <div className="flex gap-1.5">
-            <input value={coupon} onChange={(e) => setCoupon(e.target.value)} maxLength={60} placeholder="예) 이 글 보고 오면 사이즈업 ☕" className="flex-1 min-w-0 rounded-lg px-3 py-2 text-[12.5px] text-[#2b2018] bg-[#fdfaf4]" />
-            <button disabled={busy} onClick={saveCoupon} className="shrink-0 bg-[#9c6b3f] text-[#f4ece0] rounded-lg px-4 text-[13px] font-bold disabled:opacity-50">저장</button>
+            <input value={coupon} onChange={(e) => setCoupon(e.target.value)} maxLength={60} placeholder="예) 이 글 보고 오면 사이즈업 ☕" className="flex-1 min-w-0 rounded-lg px-3 py-2 text-[12.5px] text-note-ink bg-[#fdfaf4]" />
+            <button disabled={busy} onClick={saveCoupon} className="shrink-0 bg-note-tan text-note-paper rounded-lg px-4 text-[13px] font-bold disabled:opacity-50">저장</button>
           </div>
         </div>
       )}
@@ -133,7 +133,7 @@ export default function Showcase({ cafeId, cafeName, pw, pin }: { cafeId: number
       <div className="mb-3">
         <div className="text-[11px] text-[#8f7a58] mb-1.5">표시 방식 — 영상 또는 템플릿(글)을 고르세요 (<a href="/showcase-styles" target="_blank" className="underline">템플릿 샘플 보기</a>)</div>
         <div className="flex gap-1.5 overflow-x-auto pb-1.5 -mx-1 px-1">
-          <label className={`shrink-0 text-[10.5px] px-2.5 py-1.5 rounded-full border whitespace-nowrap cursor-pointer ${promo?.style === 0 ? "bg-[#e8b87a] text-[#2b2018] border-[#e8b87a] font-bold" : "border-[#7a5c3c] text-[#8f7a58]"}`}>
+          <label className={`shrink-0 text-[10.5px] px-2.5 py-1.5 rounded-full border whitespace-nowrap cursor-pointer ${promo?.style === 0 ? "bg-note-honey text-note-ink border-note-honey font-bold" : "border-[#7a5c3c] text-[#8f7a58]"}`}>
             🎬 영상 업로드
             <input type="file" accept="video/*" onChange={onVideo} className="hidden" />
           </label>
@@ -141,7 +141,7 @@ export default function Showcase({ cafeId, cafeName, pw, pin }: { cafeId: number
             const on = (promo?.style || 1) === t.id;
             return (
               <button key={t.id} onClick={() => pickStyle(t.id)} title={t.desc}
-                className={`shrink-0 text-[10.5px] px-2.5 py-1.5 rounded-full border whitespace-nowrap ${on ? "bg-[#e8b87a] text-[#2b2018] border-[#e8b87a] font-bold" : "border-[#7a5c3c] text-[#8f7a58]"}`}>
+                className={`shrink-0 text-[10.5px] px-2.5 py-1.5 rounded-full border whitespace-nowrap ${on ? "bg-note-honey text-note-ink border-note-honey font-bold" : "border-[#7a5c3c] text-[#8f7a58]"}`}>
                 {t.id}. {t.name}
               </button>
             );
@@ -157,10 +157,10 @@ export default function Showcase({ cafeId, cafeName, pw, pin }: { cafeId: number
               <div className="rounded-xl overflow-hidden border border-[#5a4633] mb-2 bg-black">
                 <video src={promo.video_url} controls playsInline preload="metadata" className="w-full max-h-56" />
               </div>
-              <label className="block text-center text-[11px] text-[#e8b87a] underline cursor-pointer">다른 영상으로 교체<input type="file" accept="video/*" onChange={onVideo} className="hidden" /></label>
+              <label className="block text-center text-[11px] text-note-honey underline cursor-pointer">다른 영상으로 교체<input type="file" accept="video/*" onChange={onVideo} className="hidden" /></label>
             </>
           ) : (
-            <label className="block border-2 border-dashed border-[#9c6b3f] rounded-xl py-7 text-center text-[#8f7a58] text-[13px] cursor-pointer">
+            <label className="block border-2 border-dashed border-note-tan rounded-xl py-7 text-center text-[#8f7a58] text-[13px] cursor-pointer">
               {vidBusy ? "업로드 중…" : <>🎬 홍보 영상 올리기 (탭하여 선택)<br /><span className="text-[10.5px] opacity-80">약 20초 이내 · 80MB · mp4/mov</span></>}
               <input type="file" accept="video/*" onChange={onVideo} className="hidden" disabled={vidBusy} />
             </label>
@@ -169,7 +169,7 @@ export default function Showcase({ cafeId, cafeName, pw, pin }: { cafeId: number
       ) : (
         // ===== 템플릿(글) 모드 =====
         <div>
-          <textarea value={promo?.intro ?? ""} onChange={(e) => setPromo((p: any) => ({ ...(p ?? {}), intro: e.target.value }))} placeholder="우리 가게 홍보 문구를 자유롭게 — AI가 요약해 어필 카피로 만들어요" rows={3} className="w-full rounded-lg p-3 text-[13px] text-[#2b2018] bg-[#fdfaf4] mb-2 resize-none" />
+          <textarea value={promo?.intro ?? ""} onChange={(e) => setPromo((p: any) => ({ ...(p ?? {}), intro: e.target.value }))} placeholder="우리 가게 홍보 문구를 자유롭게 — AI가 요약해 어필 카피로 만들어요" rows={3} className="w-full rounded-lg p-3 text-[13px] text-note-ink bg-[#fdfaf4] mb-2 resize-none" />
           <div className="flex gap-2 flex-wrap mb-2.5">
             {(promo?.photos ?? []).map((url: string, i: number) => (
               <div key={i} className="relative w-16 h-16 rounded-lg overflow-hidden">
@@ -178,12 +178,12 @@ export default function Showcase({ cafeId, cafeName, pw, pin }: { cafeId: number
               </div>
             ))}
             {(promo?.photos?.length ?? 0) < 3 && (
-              <label className="w-16 h-16 rounded-lg border-2 border-dashed border-[#9c6b3f] flex items-center justify-center text-[#8f7a58] text-2xl cursor-pointer">+
+              <label className="w-16 h-16 rounded-lg border-2 border-dashed border-note-tan flex items-center justify-center text-[#8f7a58] text-2xl cursor-pointer">+
                 <input type="file" accept="image/*" onChange={onPhoto} className="hidden" />
               </label>
             )}
           </div>
-          <button disabled={busy} onClick={submit} className="w-full bg-[#e8b87a] text-[#2b2018] rounded-lg py-2.5 font-bold disabled:opacity-50 mb-2 text-center leading-tight">💾 저장하고 검토 요청<br /><span className="text-[10px] font-normal opacity-80">(관리자가 AI 카피 생성)</span></button>
+          <button disabled={busy} onClick={submit} className="w-full bg-note-honey text-note-ink rounded-lg py-2.5 font-bold disabled:opacity-50 mb-2 text-center leading-tight">💾 저장하고 검토 요청<br /><span className="text-[10px] font-normal opacity-80">(관리자가 AI 카피 생성)</span></button>
           {promo?.ai_headline && (
             <div className="mt-1">
               <div className="text-[10px] text-[#8f7a58] mb-1">미리보기 — 위에서 스타일을 바꾸면 바로 반영돼요</div>
@@ -194,7 +194,7 @@ export default function Showcase({ cafeId, cafeName, pw, pin }: { cafeId: number
           )}
         </div>
       )}
-      {msg && <p className="text-[11px] text-[#e8b87a] mt-2">{msg}</p>}
+      {msg && <p className="text-[11px] text-note-honey mt-2">{msg}</p>}
       <p className="text-[10.5px] text-[#8f7a58] mt-2">{status}</p>
     </div>
   );

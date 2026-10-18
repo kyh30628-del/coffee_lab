@@ -13,7 +13,7 @@ export default function ShareBtn({ name }: { name: string }) {
     } catch { /* 취소 */ }
   };
   return (
-    <button onClick={share} className="w-full bg-[#e8b87a] text-[#2b2018] rounded-xl py-3.5 font-bold mb-2.5">
+    <button onClick={share} className="w-full bg-note-honey text-note-ink rounded-xl py-3.5 font-bold mb-2.5">
       {copied ? "✓ 복사됐어요 — 붙여넣어 공유!" : "🔗 내 취향 결과 공유하기"}
     </button>
   );

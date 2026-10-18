@@ -516,7 +516,7 @@ export default function CafePosterPage() {
       }}
     >
       <div className="max-w-4xl mx-auto px-6 py-10">
-        <BackLink to="/poster" label="포스터" className="text-[#7a5122] mb-4" />
+        <BackLink to="/poster" label="포스터" className="text-note-brown mb-4" />
         <div className="text-[#a64b2a] text-xs tracking-[0.3em] uppercase mb-2">Cafe Spotlight</div>
         <h1 className="text-3xl font-bold mb-1">카페소개 포스터</h1>
         <p className="text-[13px] text-[#665036] mb-6 leading-relaxed">
@@ -525,7 +525,7 @@ export default function CafePosterPage() {
         </p>
 
         {/* 카페 선택 */}
-        <section className="bg-white/60 border border-[#e6dcc8] rounded-xl p-4 mb-5">
+        <section className="bg-white/60 border border-note-line rounded-xl p-4 mb-5">
           <div className="text-[13px] font-bold mb-2">1. 카페 선택</div>
           <div className="flex gap-2 mb-2">
             <input
@@ -543,7 +543,7 @@ export default function CafePosterPage() {
             </button>
           </div>
           {results.length > 0 && (
-            <ul className="border border-[#e6dcc8] rounded-lg divide-y divide-[#eee2cc] overflow-hidden mb-2 bg-white">
+            <ul className="border border-note-line rounded-lg divide-y divide-[#eee2cc] overflow-hidden mb-2 bg-white">
               {results.map((r) => (
                 <li key={r.id}>
                   <button
@@ -567,13 +567,13 @@ export default function CafePosterPage() {
         </section>
 
         {/* 템플릿 선택 */}
-        <section className="bg-white/60 border border-[#e6dcc8] rounded-xl p-4 mb-5">
+        <section className="bg-white/60 border border-note-line rounded-xl p-4 mb-5">
           <div className="text-[13px] font-bold mb-2">2. 템플릿 선택</div>
           <div className="flex gap-2 mb-3">
             <button
               onClick={() => setTemplate("card")}
               className={`flex-1 rounded-lg py-2 text-[13.5px] font-bold border transition ${
-                template === "card" ? "bg-[#2b2018] text-[#f4ece0] border-[#2b2018]" : "border-[#d8c6ac] text-[#6b4a2e]"
+                template === "card" ? "bg-note-ink text-note-paper border-note-ink" : "border-[#d8c6ac] text-[#6b4a2e]"
               }`}
             >
               카드형(2안)
@@ -581,7 +581,7 @@ export default function CafePosterPage() {
             <button
               onClick={() => setTemplate("photo")}
               className={`flex-1 rounded-lg py-2 text-[13.5px] font-bold border transition ${
-                template === "photo" ? "bg-[#2b2018] text-[#f4ece0] border-[#2b2018]" : "border-[#d8c6ac] text-[#6b4a2e]"
+                template === "photo" ? "bg-note-ink text-note-paper border-note-ink" : "border-[#d8c6ac] text-[#6b4a2e]"
               }`}
             >
               포토형(3안)
@@ -609,7 +609,7 @@ export default function CafePosterPage() {
         {/* 미리보기 */}
         <section className="mb-5">
           <div className="text-[13px] font-bold mb-2">3. 미리보기 · 다운로드</div>
-          <div className="rounded-xl overflow-hidden shadow-lg border border-[#e0d3bd] bg-[#F7F1E6] max-w-[440px] mx-auto">
+          <div className="rounded-xl overflow-hidden shadow-lg border border-note-line-strong bg-[#F7F1E6] max-w-[440px] mx-auto">
             <canvas
               ref={canvasRef}
               width={SIZE}
@@ -621,7 +621,7 @@ export default function CafePosterPage() {
           <button
             onClick={download}
             disabled={!cafe}
-            className="mt-4 w-full max-w-[440px] mx-auto block bg-[#2b2018] text-[#f4ece0] rounded-xl py-3 font-bold active:scale-[0.99] transition disabled:opacity-40"
+            className="mt-4 w-full max-w-[440px] mx-auto block bg-note-ink text-note-paper rounded-xl py-3 font-bold active:scale-[0.99] transition disabled:opacity-40"
           >
             ⬇ PNG 저장
           </button>

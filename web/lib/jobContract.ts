@@ -50,6 +50,10 @@ const CONTRACTS: Record<string, Partial<JobContract>> = {
   //   나머지 5종처럼 slice(0,12)로 고정 상한을 걸 수 없는 성격(오염 재발이 몰리는 주기엔 정상적으로 급증).
   //   9일 실측(run_ledger, 08-11~08-20, n=43): 평균 18·최댓값 151. 정상 변동폭을 예산으로 오탐하지 않으면서
   //   2026-08-03류 진짜 폭주(13,000곳×8스캔)는 여전히 잡도록, cron-resynth와 같은 상한 200으로 올린다.
+  // 📌 2026-10-18: 이 선언은 유지하되 **현재는 판정 불가**다 — 이 잡이 `remain`을 계량에 안 내보내므로
+  //   effect_ok가 NULL로 남는다(그게 정직한 상태다. 억지로 숫자를 넣으면 오탐이 된다).
+  //   ⚠️ 오염 재발은 정상이라(2026-08-10 오탐 수리 교훈) 계량을 붙일 때 '치유 대상이 줄어드는가'를
+  //   신중히 정의해야 한다 — detected는 재발로 다시 늘 수 있다.
   "cron-sentinel": {
     tier: "L2", budget: { blobReads: 200, rows: 40000, wallMs: 300_000 },
     effect: { kind: "monotone-decrease", maxNoEffectRuns: 2 },
@@ -64,8 +68,13 @@ const CONTRACTS: Record<string, Partial<JobContract>> = {
   //   일별 디스크읽기와도 상관없음을 실측 확인(09-07 349GB/blob 314 vs 09-11 52GB/blob 608).
   // 📌 2026-10-16(#10935 수리) — 같은 이유로 또 한 번: GEN_MAX 300→500(공개 48,639곳에서 순환 40.5일 → 안전망 30일 초과).
   //   런당 처리 500건과 1:1이므로 500 + 같은 비율 여유(약 17%) = 600.
+  // 🔴 2026-10-18 effect 선언 **철회** — 내가 10-17에 붙였는데 잡의 성질과 맞지 않았다.
+  //   cron-resynth는 **4일 주기 전수 순환** 잡이다(대상: 새 리뷰 수집분 + 4일+ 미갱신).
+  //   "남은 일"이 순환으로 계속 재생성되므로 monotone-decrease(줄어들어야 한다)가 성립하지 않는다.
+  //   이 잡의 성공 기준은 '주기 안에 전수를 도는가'이고, 그건 이미 30일 안전망(#10935)이 본다.
+  //   틀린 선언을 두면 영구 거짓 경보가 되고 **그게 진짜 문제를 묻는다**(빨강 규칙).
   "cron-resynth": { tier: "L2", budget: { blobReads: 600, rows: 40000, wallMs: 300_000 },
-    effect: { kind: "monotone-decrease", maxNoEffectRuns: 2 }, writes: ["cafes.synth_*", "reviewer_cafes.*"] },
+    writes: ["cafes.synth_*", "reviewer_cafes.*"] },
   "cron-synth": { tier: "L2", budget: { blobReads: 60, rows: 40000, wallMs: 300_000 },
     effect: { kind: "monotone-decrease", maxNoEffectRuns: 2 }, writes: ["cafes.synth_*", "cafes.published", "reviewer_cafes.*"] },
   // 발굴·수집 — 네이버 쿼터가 진짜 제약(일 25,000). 신규 발굴 카페를 합성할 때 raw를 곳당 1회 로드한다
@@ -85,10 +94,14 @@ const CONTRACTS: Record<string, Partial<JobContract>> = {
   "cron-closure": { tier: "L2", budget: { blobReads: 0, rows: 20000, wallMs: 300_000 }, writes: ["cafes.closure_misses", "cafes.closure_checked_at"] },
   "cron-verify": { tier: "L0", budget: { blobReads: 0, rows: 20000, wallMs: 300_000 } },
   "cron-rulegap": { tier: "L2", budget: { blobReads: 12, rows: 20000, wallMs: 300_000 }, writes: ["cafes.synth_*", "cafes.published", "cafes.instagram_url", "learned_terms.*"] },
+  // 🔴 2026-10-18 effect 선언 **철회**(10-17에 내가 잘못 붙였다) — 열린 이슈가 줄어드는지는
+  //   이 잡이 아니라 **CEO 결재**에 달려 있다. 결재 대기 중에 안 줄어드는 건 정상이고 실패가 아니다.
   "cron-issues": { tier: "L2", budget: { blobReads: 0, rows: 20000, wallMs: 300_000 },
-    effect: { kind: "monotone-decrease", maxNoEffectRuns: 2 }, writes: ["cafes.published", "cafes.pipeline_status", "issues.*", "decisions.*"] },
-  "cron-coord-consumer": { tier: "L2", budget: { blobReads: 0, rows: 10000, wallMs: 300_000 },
-    effect: { kind: "monotone-decrease", maxNoEffectRuns: 2 } },
+    writes: ["cafes.published", "cafes.pipeline_status", "issues.*", "decisions.*"] },
+  // 🔴 2026-10-18 effect 선언 **철회**(10-17에 내가 잘못 붙였다) — 이 잡은 롤아웃 1단계로
+  //   **기본이 드라이런**(집행 0, `?mode=live`일 때만 집행). 의도적으로 큐를 줄이지 않는 상태라
+  //   monotone-decrease로 보면 영구 '효과 없음'이 된다. live 승격 시 이 선언을 되살릴 것.
+  "cron-coord-consumer": { tier: "L2", budget: { blobReads: 0, rows: 10000, wallMs: 300_000 } },
   "cron-demand": { tier: "L0", budget: { blobReads: 0, rows: 10000, wallMs: 300_000 } },
   // 읽기 전용 감시류
   "cron-costwatch": { tier: "L0", budget: { blobReads: 0, rows: 5000, wallMs: 120_000 } },

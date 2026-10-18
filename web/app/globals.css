@@ -12,6 +12,27 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  /* 🎨 「한 권의 노트」 팔레트 — 2026-10-18 토큰화.
+     왜: 색상이 **2,525곳에 하드코딩**돼 있었고 고유 501종이었다(디자인 토큰 0 — 위 CSS 변수 4개는 Next 기본값).
+       1회만 쓰인 색이 272종 = 노이즈. 톤을 한 곳에서 바꿀 수 없고, 실사에서 "디자인 시스템 없음"으로 깎인다.
+     이름은 **역할**로 붙였다(쓰임새 실측 기준). `note-` 접두 = Tailwind 내장 색과 충돌 방지 + 디자인 정체성.
+     ⚠️ 값은 한 자리도 바꾸지 않았다 — 기존 리터럴을 그대로 옮긴 것이다(픽셀 변화 0).
+     검증: `node scripts/color-inventory.mjs` — 빌드된 CSS의 색상 집합이 기준선과 같은지 본다(색 소실 시 배포 중단). */
+  --color-note-ink: #2b2018;         /* 본문 잉크·강조 배경 (실측 217회) */
+  --color-note-brown: #7a5122;       /* 링크·강조 텍스트 (138회) */
+  --color-note-paper: #f4ece0;       /* 종이 바탕 (109회) */
+  --color-note-tan: #9c6b3f;         /* 참고 등급·테두리 (97회) */
+  --color-note-ink-soft: #54432c;    /* 본문 보조 (95회) */
+  --color-note-ink-faint: #9c8a6c;   /* 흐린 텍스트 (85회) */
+  --color-note-ink-mute: #8a7458;    /* 더 흐린 텍스트·플레이스홀더 (63회) */
+  --color-note-honey: #e8b87a;       /* 밝은 강조 (60회) */
+  --color-note-ink-body: #524234;    /* 본문 (57회) */
+  --color-note-danger: #b03a3a;      /* 경고·위험 (47회) */
+  --color-note-ink-deep: #63523f;    /* 짙은 보조 (40회) */
+  --color-note-ink-warm: #52402e;    /* 따뜻한 보조 (39회) */
+  --color-note-line: #e6dcc8;        /* 얇은 구분선 */
+  --color-note-line-strong: #e0d3bd; /* 카드 테두리 */
 }
 
 /* 이 앱은 '라이트 전용'(배경을 크림 #f4ece0으로 강제 — 아래 html/body).

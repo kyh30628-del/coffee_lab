@@ -113,7 +113,7 @@ export default function OutreachPage() {
               {copied ? "✓ 복사됨 — 인스타 탭에서 붙여넣기(⌘V) 후 전송" : "① 문구 복사 + DM 창 열기"}
             </button>
             <button onClick={() => markSent(cur)} disabled={busy}
-              className="w-full mt-2 py-3 text-[13.5px] font-bold rounded-xl bg-[#e8b87a] text-[#2b2018] active:scale-[0.99] disabled:opacity-50">
+              className="w-full mt-2 py-3 text-[13.5px] font-bold rounded-xl bg-note-honey text-note-ink active:scale-[0.99] disabled:opacity-50">
               {busy ? "기록 중…" : "② 보냈음 → 다음 곳으로"}
             </button>
             <button onClick={() => setIdx((i) => i + 1)}

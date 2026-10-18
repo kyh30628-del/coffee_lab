@@ -17,3 +17,7 @@ node --import tsx scripts/deep-effect.mjs || true
 #   왜 상시화: 측정 오류 15건 중 4건이 '이름을 확인 없이 지어 쓴 것'이었다. 사람 눈으로는 못 찾는다.
 #   비용 0: sql 템플릿 952개를 EXPLAIN만 건다(계획만 세우고 행을 읽지 않음). 로컬 실행 → Vercel 0.
 node scripts/schema-guard.mjs || true
+# 🔭 효과 판정 확인(2026-10-18) — 하네스 1원칙이 **실제로 기록되는지** 매일 본다.
+#   그 전까지 effect_ok가 30일 2,372건 전부 NULL이었다(선언만 있고 계산 안 됨). 고쳤으니 증거를 매일 남긴다.
+#   비용 0: 집계 쿼리 2개(작은 컬럼). 로컬 실행 → Vercel 0.
+node --import tsx scripts/effect-watch.mjs || true

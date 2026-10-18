@@ -65,8 +65,8 @@ function OwnerBadge({ om, dark }: { om?: number; dark?: boolean }) {
   return (
     <span title="사장님이 직접 정보를 관리하는 카페예요"
       className={dark
-        ? "text-[10.5px] font-bold bg-[#f4ece0]/20 text-[#f4ece0] px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap"
-        : "text-[9px] font-bold text-[#7a5122] bg-[#f7e9cf] border border-[#e3c79a] px-1.5 py-0.5 rounded-full shrink-0 whitespace-nowrap"}>
+        ? "text-[10.5px] font-bold bg-note-paper/20 text-note-paper px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap"
+        : "text-[9px] font-bold text-note-brown bg-[#f7e9cf] border border-[#e3c79a] px-1.5 py-0.5 rounded-full shrink-0 whitespace-nowrap"}>
       🏅 사장님 관리
     </span>
   );
@@ -77,7 +77,7 @@ function VisitorBadges({ vb, dark }: { vb?: string; dark?: boolean }) {
     <>
       {vb.split("").map((k) => VB_LABEL[k] && (
         <span key={k} title={VB_LABEL[k].label}
-          className={dark ? "text-[10.5px] font-bold bg-[#f4ece0]/20 px-2 py-0.5 rounded-full shrink-0"
+          className={dark ? "text-[10.5px] font-bold bg-note-paper/20 px-2 py-0.5 rounded-full shrink-0"
                           : "text-[10px] font-bold leading-none text-[#4a5a4e] bg-[#e6efe8] border border-[#c9dbcf] px-2 py-1 rounded-full shrink-0"}>
           {VB_LABEL[k].short}
         </span>
@@ -207,7 +207,7 @@ const HeadlineCard = memo(function HeadlineCard({ c, kicker, tone, onOpen, onSav
       </div>
       {/* 메타 줄 — 왼쪽 지역·후기 수, 오른쪽 끝(도장 바로 아래) ❤ 추억 저장. 상세 패널과 같은 자리. */}
       <div className="flex items-center justify-between gap-2 mb-1">
-        <div className="text-[11.5px] text-[#7a5122] nt-meta">{c.area} · 검증 후기 <b>{c.count ?? 0}건</b></div>
+        <div className="text-[11.5px] text-note-brown nt-meta">{c.area} · 검증 후기 <b>{c.count ?? 0}건</b></div>
         {onSave && (
           <button type="button" onClick={(e) => { e.stopPropagation(); onSave(c.id); }} className="nt-mem sm" aria-label={`${c.name} 추억 저장`}>
             <svg viewBox="0 0 24 24" aria-hidden><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 5 6.4 5c2 0 3.3 1 4.1 2.3C11.3 6 12.6 5 14.6 5 18 5 20.1 8.4 18.6 11.8 16.5 16.4 12 21 12 21z"/></svg>
@@ -346,7 +346,7 @@ const RankSpotlight = memo(function RankSpotlight({ top3, momentum, specialty, f
       <div className="flex gap-1.5 mb-2.5 mt-1 flex-wrap">
         {RANK_TABS.map((t, i) => (dataByKey[t.key] || []).length > 0 && (
           <button key={t.key} onClick={() => setTabIdx(i)}
-            className={`nt-chip transition-colors ${i === safeIdx ? "ink" : "hover:border-[#9c6b3f]"}`} style={{ fontSize: 11.5 }}>
+            className={`nt-chip transition-colors ${i === safeIdx ? "ink" : "hover:border-note-tan"}`} style={{ fontSize: 11.5 }}>
             {t.label}
           </button>
         ))}
@@ -657,14 +657,14 @@ function FavoritesModal({ items, onClose, onOpen, onRemove, onRecord }: { items:
     <div className="fixed inset-0 z-[5000] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)", fontFamily: "var(--nt-font)" }} onClick={onClose}>
       <div className="w-full max-w-lg nt-paper rounded-t-2xl max-h-[80dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-[#f0e6d4]">
-          <div className="font-bold text-[#2b2018] text-[15px]"><span style={{ color: "#f0a832" }}>★</span> 즐겨찾기 <span className="text-[#54432c] text-[12px] font-normal">{items.length}곳</span></div>
+          <div className="font-bold text-note-ink text-[15px]"><span style={{ color: "#f0a832" }}>★</span> 즐겨찾기 <span className="text-note-ink-soft text-[12px] font-normal">{items.length}곳</span></div>
           <button onClick={onClose} className="w-8 h-8 rounded-full bg-[#f0e6d4] text-[#594839] text-lg">×</button>
         </div>
         <div className="overflow-y-auto flex-1 p-3 space-y-2 pb-[calc(1rem_+_env(safe-area-inset-bottom))]">
           {items.length === 0 ? (
-            <div className="text-center text-[#54432c] text-[13px] py-12 leading-relaxed">
+            <div className="text-center text-note-ink-soft text-[13px] py-12 leading-relaxed">
               아직 찜한 카페가 없어요.<br />카페 상세에서 <span style={{ color: "#d6336c" }}>❤</span> <b>찜하기</b>를 누르면 여기에 모여요.<br />
-              <span className="text-[11.5px] text-[#63523f]">가입도 위치확인도 필요 없어요 · 탭 한 번</span>
+              <span className="text-[11.5px] text-note-ink-deep">가입도 위치확인도 필요 없어요 · 탭 한 번</span>
             </div>
           ) : items.map((c) => (
             <div key={c.id} className="bg-white rounded-xl border border-[#ece0cd] p-3 flex gap-2 items-center">
@@ -672,12 +672,12 @@ function FavoritesModal({ items, onClose, onOpen, onRemove, onRecord }: { items:
                 <div className="w-10 h-10 rounded-lg bg-[#f3ede1] flex items-center justify-center text-[16px] shrink-0">☕</div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5">
-                    <span className="font-bold text-[#2b2018] text-[14px] truncate">{c.name}</span>
+                    <span className="font-bold text-note-ink text-[14px] truncate">{c.name}</span>
                     {c.synth_grade && GRADE_STYLE[c.synth_grade] && <span className="text-[9px] text-white px-1.5 py-0.5 rounded-full shrink-0" style={{ background: GRADE_STYLE[c.synth_grade].bg }}>{c.synth_grade}</span>}
                     <OwnerBadge om={(c as any).om} />
                     <VisitorBadges vb={(c as any).vb} />
                   </div>
-                  <div className="text-[11px] text-[#7a5122]">{c.area}{c.synth_count ? ` · 리뷰 ${c.synth_count}` : ""}</div>
+                  <div className="text-[11px] text-note-brown">{c.area}{c.synth_count ? ` · 리뷰 ${c.synth_count}` : ""}</div>
                 </div>
               </button>
               <button onClick={() => onRecord(c)} className="shrink-0 text-[11px] font-bold text-[#b23a5f] border border-[#f0b8cc] rounded-full px-2 py-1 active:scale-95">다녀왔어요</button>
@@ -2219,33 +2219,33 @@ export default function Home() {
             <div className="absolute inset-0 bg-black/50" onClick={() => setOwnerPwModal(false)} />
             <div className="relative nt-paper text-[#2a1f17] w-full max-w-sm rounded-2xl p-6 shadow-2xl">
               {/* 우측 상단: 무료 체험 */}
-              <button onClick={() => setShowSignup(true)} className="absolute top-4 right-4 text-[11px] font-bold bg-[#e8b87a] text-[#2b2018] px-3 py-1.5 rounded-full shadow active:scale-95">✨ {TRIAL_DAYS}일 무료 체험</button>
+              <button onClick={() => setShowSignup(true)} className="absolute top-4 right-4 text-[11px] font-bold bg-note-honey text-note-ink px-3 py-1.5 rounded-full shadow active:scale-95">✨ {TRIAL_DAYS}일 무료 체험</button>
               {ownerAdminMode ? (
                 <>
                   <h3 className="text-lg font-bold mb-1">🔒 관리자 로그인</h3>
-                  <p className="text-[13px] text-[#524234] mb-3">관리자 비밀번호를 입력하세요.</p>
+                  <p className="text-[13px] text-note-ink-body mb-3">관리자 비밀번호를 입력하세요.</p>
                   <input autoFocus type="password" value={ownerPw} onChange={(e) => setOwnerPw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submitOwner()}
                     placeholder="관리자 비밀번호" className="w-full border border-[#cbb89f] rounded-lg px-3 py-2.5 text-base bg-white mb-2" />
                   {ownerErr && <p className="text-[12px] text-[#c0392b] mb-2">{ownerErr}</p>}
                   <div className="flex gap-2">
-                    <button onClick={submitOwner} className="flex-1 bg-[#2b2018] text-[#f4ece0] rounded-xl py-2.5 font-medium">확인</button>
-                    <button onClick={() => setOwnerPwModal(false)} className="px-4 text-[#7a5122]">취소</button>
+                    <button onClick={submitOwner} className="flex-1 bg-note-ink text-note-paper rounded-xl py-2.5 font-medium">확인</button>
+                    <button onClick={() => setOwnerPwModal(false)} className="px-4 text-note-brown">취소</button>
                   </div>
-                  <button onClick={() => { setOwnerAdminMode(false); setOwnerErr(""); }} className="block w-full text-center text-[12px] text-[#7a5122] underline mt-3">← 사장님 키 로그인</button>
+                  <button onClick={() => { setOwnerAdminMode(false); setOwnerErr(""); }} className="block w-full text-center text-[12px] text-note-brown underline mt-3">← 사장님 키 로그인</button>
                 </>
               ) : (
                 <>
                   <h3 className="text-lg font-bold mb-1 pr-24">🏪 사장님 로그인</h3>
-                  <p className="text-[13px] text-[#524234] mb-3">이메일로 받은 <b>키(PIN)</b>를 입력하면 내 카페 분석으로 바로 들어갑니다.</p>
+                  <p className="text-[13px] text-note-ink-body mb-3">이메일로 받은 <b>키(PIN)</b>를 입력하면 내 카페 분석으로 바로 들어갑니다.</p>
                   <input autoFocus value={ownerPin} onChange={(e) => setOwnerPin(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submitOwnerPin()}
                     placeholder="발급받은 키(PIN)" className="w-full border border-[#cbb89f] rounded-lg px-3 py-2.5 text-base bg-white mb-2 tracking-widest font-mono uppercase" />
                   {ownerPinErr && <p className="text-[12px] text-[#c0392b] mb-2">{ownerPinErr}</p>}
                   <div className="flex gap-2">
-                    <button onClick={submitOwnerPin} className="flex-1 bg-[#2b2018] text-[#f4ece0] rounded-xl py-2.5 font-bold">내 카페 들어가기</button>
-                    <button onClick={() => setOwnerPwModal(false)} className="px-4 text-[#7a5122]">취소</button>
+                    <button onClick={submitOwnerPin} className="flex-1 bg-note-ink text-note-paper rounded-xl py-2.5 font-bold">내 카페 들어가기</button>
+                    <button onClick={() => setOwnerPwModal(false)} className="px-4 text-note-brown">취소</button>
                   </div>
-                  <p className="text-[12px] text-[#524234] text-center mt-3">키가 없으세요? <button onClick={() => setShowSignup(true)} className="text-[#7a5122] font-bold underline">{TRIAL_DAYS}일 무료 체험 신청</button></p>
-                  <button onClick={() => { setOwnerAdminMode(true); setOwnerPinErr(""); }} className="block w-full text-center text-[11px] text-[#54432c] underline mt-2">관리자세요? 관리자 로그인</button>
+                  <p className="text-[12px] text-note-ink-body text-center mt-3">키가 없으세요? <button onClick={() => setShowSignup(true)} className="text-note-brown font-bold underline">{TRIAL_DAYS}일 무료 체험 신청</button></p>
+                  <button onClick={() => { setOwnerAdminMode(true); setOwnerPinErr(""); }} className="block w-full text-center text-[11px] text-note-ink-soft underline mt-2">관리자세요? 관리자 로그인</button>
                 </>
               )}
             </div>
@@ -2363,7 +2363,7 @@ export default function Home() {
         <div className="flex gap-2 shrink-0 items-center">
           {role === "owner" ? (
             <>
-              <a href="/owner" className="bg-[#9c6b3f] text-[#fbf7f0] rounded-full px-3 py-1.5 text-xs whitespace-nowrap">내 카페 분석</a>
+              <a href="/owner" className="bg-note-tan text-[#fbf7f0] rounded-full px-3 py-1.5 text-xs whitespace-nowrap">내 카페 분석</a>
               <a href="/cafe/register" className="bg-[#2a1f17] text-[#fbf7f0] rounded-full px-3 py-1.5 text-xs whitespace-nowrap hidden sm:inline-block">사장님 등록</a>
             </>
           ) : (
@@ -2402,7 +2402,7 @@ export default function Home() {
                 {/* 📍 내 주변 옥석 카페 바로 찾기 — 아이콘만, 하단 내비 '내 위치' 핀과 같은 외곽선 아이콘으로 통일(발광 없음, 주변 select와 같은 톤) */}
                 <button onClick={() => (nearHome ? clearNearHome() : openLocation())}
                   aria-label={nearHome ? "내 주변 500m 해제" : "내 주변 옥석 카페 바로 찾기"}
-                  className={`shrink-0 w-9 h-9 flex items-center justify-center rounded-[5px] border transition-colors ${nearHome ? "border-[#7a5122] bg-[#f0e6d4]" : "border-[rgba(90,70,50,.28)] bg-white/85"}`}>
+                  className={`shrink-0 w-9 h-9 flex items-center justify-center rounded-[5px] border transition-colors ${nearHome ? "border-note-brown bg-[#f0e6d4]" : "border-[rgba(90,70,50,.28)] bg-white/85"}`}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={nearHome ? "#7a5122" : "#8a7458"} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M12 21c4.2-4 7-7.2 7-10.5A7 7 0 0 0 5 10.5C5 13.8 7.8 17 12 21Z" /><circle cx="12" cy="10.5" r="2.4" />
                   </svg>
@@ -2412,11 +2412,11 @@ export default function Home() {
                 {autoGu && (
                   <div className="flex items-center gap-2">
                     <span className="text-[11px] text-[#5f7355] bg-[#eef3ea] border border-[#cfe0c2] rounded-full px-2.5 py-1">📍 내 위치 기준 <b>{autoGu}</b></span>
-                    <button onClick={clearAuto} className="text-[11px] text-[#7a5122] underline">전체보기</button>
+                    <button onClick={clearAuto} className="text-[11px] text-note-brown underline">전체보기</button>
                   </div>
                 )}
-                {geoMsg && <span className="text-[10px] text-[#54432c]">{geoMsg}</span>}
-                {homeGu && !autoGu && <button onClick={clearAuto} className="text-[11px] text-[#7a5122] underline">전체 지역 보기</button>}
+                {geoMsg && <span className="text-[10px] text-note-ink-soft">{geoMsg}</span>}
+                {homeGu && !autoGu && <button onClick={clearAuto} className="text-[11px] text-note-brown underline">전체 지역 보기</button>}
               </div>
             </div>
             {nearHome ? (
@@ -2426,7 +2426,7 @@ export default function Home() {
                   <div className="text-[11px] text-[#2f6fb0] shrink-0 font-medium">{nearHomeCafes.length}곳</div>
                 </div>
                 {nearHomeCafes.length === 0 ? (
-                  <div className="text-center text-[#54432c] text-[13px] py-12 leading-relaxed">500m 내에 추천할 카페가 없습니다</div>
+                  <div className="text-center text-note-ink-soft text-[13px] py-12 leading-relaxed">500m 내에 추천할 카페가 없습니다</div>
                 ) : (
                   <div className="flex flex-col gap-2">
                     {nearHomeCafes.map(({ c, d }) => (
@@ -2437,7 +2437,7 @@ export default function Home() {
                             <OwnerBadge om={(c as any).om} />
                     <VisitorBadges vb={(c as any).vb} />
                         </div>
-                        <div className="text-[11px] text-[#54432c]">{c.area}{c.dong ? ` ${c.dong}` : ""} · {Math.round(d)}m · 리뷰 {c.synth_count ?? 0}</div>
+                        <div className="text-[11px] text-note-ink-soft">{c.area}{c.dong ? ` ${c.dong}` : ""} · {Math.round(d)}m · 리뷰 {c.synth_count ?? 0}</div>
                         {c.synth_identity && <p className="text-[12px] text-[#5a4a38] leading-relaxed mt-1.5 line-clamp-2">{c.synth_identity}</p>}
                         <FacetStrip fac={c.fac} size={11} />
                         <CautionLine cau={c.cau} size={11} />
@@ -2465,7 +2465,7 @@ export default function Home() {
                 <button onClick={() => { setSido(homeSido); setSigungu(homeGu); setDong(homeDong); setFocusId(null); setSheetOpen(false); setTab("map"); }} className="nt-btn-ink py-3.5 mt-2">{homeDong ? `${homeDong} 지도로 보기` : homeGu ? `${homeGu} 지도로 보기` : "지도에서 전체 둘러보기"} →</button>
               </>
             )}
-            <p className="text-[10.5px] text-[#63523f] mt-6 text-center leading-relaxed">모든 큐레이션은 네이버 공개 후기를 교차검증한 데이터 기반입니다.</p>
+            <p className="text-[10.5px] text-note-ink-deep mt-6 text-center leading-relaxed">모든 큐레이션은 네이버 공개 후기를 교차검증한 데이터 기반입니다.</p>
           </div>
 
         </div>
@@ -2491,8 +2491,8 @@ export default function Home() {
             <div className="absolute top-14 md:top-[8.25rem] left-3 z-[1100] flex items-center gap-1.5 max-w-[calc(100vw-1.5rem)]">
               {inViewCount != null && (
                 <div className="inline-flex items-center gap-1.5 rounded-full pl-2.5 pr-3 h-8 text-[11px] font-bold shadow-lg pointer-events-none whitespace-nowrap" style={{ background: "rgba(43,32,24,0.86)", color: "#f4ece0", backdropFilter: "blur(3px)" }}>
-                  <span className="text-[#e8b87a] text-[12px] leading-none">☕</span>
-                  <span>이 화면 <b className="text-[#e8b87a]">{inViewCount.toLocaleString()}</b>곳</span>
+                  <span className="text-note-honey text-[12px] leading-none">☕</span>
+                  <span>이 화면 <b className="text-note-honey">{inViewCount.toLocaleString()}</b>곳</span>
                 </div>
               )}
               <div className="md:hidden">{legendOpen ? null : (
@@ -2517,7 +2517,7 @@ export default function Home() {
                       <span className="inline-flex items-center gap-1.5"><span className="relative inline-block"><img className="dcn-lg-img" src="/pins/pin-ref.png" alt="" /><i className="absolute -right-1 -top-1 w-2.5 h-2.5 rounded-full text-[7px] font-black text-white flex items-center justify-center" style={{ background: "#e0a32e" }}>✓</i></span>취향 일치 ✓</span>
                       <span className="inline-flex items-center gap-1.5"><img className="dcn-lg-img" src="/pins/pin-feat.png" alt="" />우선 노출 ★</span>
                       <span className="inline-flex items-center gap-1.5"><img className="dcn-lg-img" src="/pins/pin-mine.png" alt="" />내 카페 ❤</span>
-                      <span className="inline-flex items-center gap-1.5 col-span-2 pt-1 mt-0.5 border-t border-[#eee2d2] text-[#54432c]"><img className="dcn-lg-img" src="/pins/puck.png" alt="" style={{ height: 12 }} />숫자 받침 = 근처 카페 묶음(누르면 확대)</span>
+                      <span className="inline-flex items-center gap-1.5 col-span-2 pt-1 mt-0.5 border-t border-[#eee2d2] text-note-ink-soft"><img className="dcn-lg-img" src="/pins/puck.png" alt="" style={{ height: 12 }} />숫자 받침 = 근처 카페 묶음(누르면 확대)</span>
                     </div>
                   </div>
                 ) : (
@@ -2551,15 +2551,15 @@ export default function Home() {
             {/* 🗺️ 지도 표시 토글 — 우측(상단 컨트롤과 겹치지 않게 한 줄 아래로) */}
             <div className="absolute top-14 right-3 z-[1100] flex flex-col gap-1.5 items-end">
               <button onClick={() => setShowStreets((v) => !v)} aria-pressed={showStreets} title="길이름·건물·상가 표시"
-                className={`dcn-tgl inline-flex items-center gap-1.5 h-8 pl-2 pr-3 rounded-full text-[11px] font-bold shadow-lg whitespace-nowrap transition-colors ${showStreets ? "bg-[#5b4636] text-white" : "bg-white/95 text-[#54432c] border border-[#e0d3bd]"}`}>
+                className={`dcn-tgl inline-flex items-center gap-1.5 h-8 pl-2 pr-3 rounded-full text-[11px] font-bold shadow-lg whitespace-nowrap transition-colors ${showStreets ? "bg-[#5b4636] text-white" : "bg-white/95 text-note-ink-soft border border-note-line-strong"}`}>
                 <span className={`dcn-tgl-dot ${showStreets ? "on" : ""}`} aria-hidden="true" /><span aria-hidden="true" className="md:hidden text-[13px] leading-none">🏷️</span><span className="dcn-tgl-txt">상세 지도</span>
               </button>
               <button onClick={() => setShow3d((v) => !v)} aria-pressed={show3d} title="3D 건물·기울임 (동네 줌에서 자동으로 기울어요)"
-                className={`dcn-tgl inline-flex items-center gap-1.5 h-8 pl-2 pr-3 rounded-full text-[11px] font-bold shadow-lg whitespace-nowrap transition-colors ${show3d ? "bg-[#7a5122] text-white" : "bg-white/95 text-[#54432c] border border-[#e0d3bd]"}`}>
+                className={`dcn-tgl inline-flex items-center gap-1.5 h-8 pl-2 pr-3 rounded-full text-[11px] font-bold shadow-lg whitespace-nowrap transition-colors ${show3d ? "bg-note-brown text-white" : "bg-white/95 text-note-ink-soft border border-note-line-strong"}`}>
                 <span className={`dcn-tgl-dot ${show3d ? "on" : ""}`} aria-hidden="true" /><span aria-hidden="true" className="md:hidden text-[13px] leading-none">🏢</span><span className="dcn-tgl-txt">3D 건물</span>
               </button>
               <button onClick={() => setShowBus((v) => !v)} aria-pressed={showBus} title="버스 정류장 표시"
-                className={`dcn-tgl inline-flex items-center gap-1.5 h-8 pl-2 pr-3 rounded-full text-[11px] font-bold shadow-lg whitespace-nowrap transition-colors ${showBus ? "bg-[#235a86] text-white" : "bg-white/95 text-[#54432c] border border-[#bcd0e0]"}`}>
+                className={`dcn-tgl inline-flex items-center gap-1.5 h-8 pl-2 pr-3 rounded-full text-[11px] font-bold shadow-lg whitespace-nowrap transition-colors ${showBus ? "bg-[#235a86] text-white" : "bg-white/95 text-note-ink-soft border border-[#bcd0e0]"}`}>
                 <span className={`dcn-tgl-dot ${showBus ? "on" : ""}`} aria-hidden="true" /><span aria-hidden="true" className="md:hidden text-[13px] leading-none">🚌</span><span className="dcn-tgl-txt">버스 정류장</span>
               </button>
             </div>
@@ -2567,7 +2567,7 @@ export default function Home() {
             {(nearMe || nearMsg) && (
               <div className="absolute top-[3.25rem] left-1/2 -translate-x-1/2 z-[1100] bg-white/95 backdrop-blur rounded-full shadow-lg px-3 py-1.5 text-[11px] text-[#23527c] flex items-center gap-2 whitespace-nowrap">
                 <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: "#2f6fb0" }} />
-                {nearMsg ? <span>{nearMsg}</span> : <><span>내 위치 반경 <b>500m</b> 카페</span><button onClick={clearNearMe} className="text-[#54432c] font-bold ml-0.5">✕ 해제</button></>}
+                {nearMsg ? <span>{nearMsg}</span> : <><span>내 위치 반경 <b>500m</b> 카페</span><button onClick={clearNearMe} className="text-note-ink-soft font-bold ml-0.5">✕ 해제</button></>}
               </div>
             )}
             {/* 범례 — 두 핀의 의미 안내(켜졌을 때만). 같은 카페면 핀이 하나로 병합됨 */}
@@ -2575,7 +2575,7 @@ export default function Home() {
               <div className="absolute top-3 left-3 z-[1100] bg-white/95 backdrop-blur rounded-xl shadow-lg px-3 py-2 text-[11px] text-[#4a3a2a] leading-snug max-w-[150px]">
                 {myPinMode && <div className="flex items-center gap-1.5 mb-0.5"><span className="inline-block w-3 h-3 rounded-full" style={{ background: "#d6336c" }} />❤ 내가 저장한 카페</div>}
                 {othersMode && <div className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-full" style={{ background: "#5f7355" }} />숫자 = 저장한 사람 수</div>}
-                {myPinMode && othersMode && <div className="mt-1 pt-1 border-t border-[#eee2d2] text-[10px] text-[#54432c]">같은 카페면 ❤에 인원 배지로 합쳐져요</div>}
+                {myPinMode && othersMode && <div className="mt-1 pt-1 border-t border-[#eee2d2] text-[10px] text-note-ink-soft">같은 카페면 ❤에 인원 배지로 합쳐져요</div>}
               </div>
             )}
           </div>
@@ -2591,10 +2591,10 @@ export default function Home() {
             <div className="shrink-0 w-full flex items-center justify-between px-4" style={{ height: "2.75rem" }}>
               <button onClick={() => { if (!sheetOpen) { setSheetMode("half"); setSheetOpen(true); } else if (sheetMode === "half") setSheetMode("full"); else setSheetOpen(false); }} className="flex-1 flex flex-col items-center justify-center gap-1 h-full" aria-expanded={sheetOpen}>
                 <div className="w-9 h-1 bg-[#c9bda9] rounded-full" />
-                <span className="text-[11px] font-bold text-[#7a5122] leading-none">{!sheetOpen ? `지역·필터 펼치기 ▴ (${filtered.length})` : sheetMode === "half" ? "더 펼치기 ▴" : "지도 보기 ▾"}</span>
+                <span className="text-[11px] font-bold text-note-brown leading-none">{!sheetOpen ? `지역·필터 펼치기 ▴ (${filtered.length})` : sheetMode === "half" ? "더 펼치기 ▴" : "지도 보기 ▾"}</span>
               </button>
               {sheetOpen && sheetMode === "full" && (
-                <button onClick={() => setSheetMode("half")} className="shrink-0 text-[11px] font-bold text-[#7a5122] px-2 h-7 rounded-full border border-[#e6d8c2] bg-white">반만 ▾</button>
+                <button onClick={() => setSheetMode("half")} className="shrink-0 text-[11px] font-bold text-note-brown px-2 h-7 rounded-full border border-[#e6d8c2] bg-white">반만 ▾</button>
               )}
             </div>
             <div className="flex-1 overflow-y-auto overflow-x-hidden px-5 pb-8" style={{ WebkitOverflowScrolling: "touch" }}>
@@ -2664,7 +2664,7 @@ export default function Home() {
             {explain === "mine" ? (
               <>
                 <div className="text-[16px] font-bold text-[#d6336c] mb-2">❤ 내 카페</div>
-                <p className="text-[13.5px] text-[#3d2f22] leading-relaxed">내가 머문 카페, 그날의 커피와 순간을 <b>❤로 기록한 추억</b>들이에요. 지도 위에 하나둘 모아 <b>나만의 추억 지도</b>를 그려가요. <span className="text-[#54432c]">(이 기기에만 소중히 담겨요.)</span></p>
+                <p className="text-[13.5px] text-[#3d2f22] leading-relaxed">내가 머문 카페, 그날의 커피와 순간을 <b>❤로 기록한 추억</b>들이에요. 지도 위에 하나둘 모아 <b>나만의 추억 지도</b>를 그려가요. <span className="text-note-ink-soft">(이 기기에만 소중히 담겨요.)</span></p>
               </>
             ) : (
               <>
@@ -2673,8 +2673,8 @@ export default function Home() {
               </>
             )}
             <div className="flex gap-2 mt-5">
-              <button onClick={() => { const t = explain; setExplain(null); revealMode(t); }} className="flex-1 bg-[#2b2018] text-[#f4ece0] rounded-lg py-2.5 text-sm font-bold">닫기</button>
-              <button onClick={() => { const t = explain; suppressExplain(t); setExplain(null); revealMode(t); }} className="flex-1 bg-white border border-[#cbb89f] text-[#524234] rounded-lg py-2.5 text-[13px]">일주일 동안 보지 않기</button>
+              <button onClick={() => { const t = explain; setExplain(null); revealMode(t); }} className="flex-1 bg-note-ink text-note-paper rounded-lg py-2.5 text-sm font-bold">닫기</button>
+              <button onClick={() => { const t = explain; suppressExplain(t); setExplain(null); revealMode(t); }} className="flex-1 bg-white border border-[#cbb89f] text-note-ink-body rounded-lg py-2.5 text-[13px]">일주일 동안 보지 않기</button>
             </div>
           </div>
         </div>
@@ -2688,11 +2688,11 @@ export default function Home() {
             <div className="shrink-0 px-4 pt-4 pb-3 nt-header">
               <div className="nt-eyebrow mb-2" style={{ color: "#c9b391" }}>느낌으로 찾기</div>
               <div className="flex items-center gap-2 rounded-lg px-3" style={{ background: "rgba(247,240,228,.96)", boxShadow: "0 10px 18px -12px rgba(0,0,0,.7)" }}>
-                <span className="text-[#63523f] text-[15px] shrink-0" aria-hidden>🔍</span>
+                <span className="text-note-ink-deep text-[15px] shrink-0" aria-hidden>🔍</span>
                 <input autoFocus value={searchQ} onChange={(e) => setSearchQ(e.target.value)} onKeyDown={(e) => e.key === "Enter" && runSearch(searchQ)}
                   placeholder={`느낌 또는 ☕카페 이름으로 찾기`} className="flex-1 min-w-0 bg-transparent px-1 py-3 text-[17px] outline-none" style={{ fontFamily: "var(--nt-font)" }} />
                 <button onClick={() => runSearch(searchQ)} className="nt-btn-ink !w-auto px-4 py-1.5 text-sm shrink-0">검색</button>
-                <button onClick={() => setShowSearch(false)} className="text-2xl text-[#63523f] leading-none px-1 shrink-0">×</button>
+                <button onClick={() => setShowSearch(false)} className="text-2xl text-note-ink-deep leading-none px-1 shrink-0">×</button>
               </div>
               <div className="text-[11.5px] mt-2.5" style={{ color: "#e9d6bd" }}>💡 “비 오는 날 조용히” 같은 <b>느낌</b>은 물론, <b>카페 이름</b>을 바로 적어도 찾아드려요.</div>
               <div className="text-[11px] mt-1" style={{ color: "#c9b391" }}>{homeGu ? `📍 ${homeGu} 안에서` : "전체 지역에서"} 검색</div>
@@ -2704,7 +2704,7 @@ export default function Home() {
             </div>
             <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 pb-[calc(1rem_+_env(safe-area-inset-bottom))]">
               {searchLoading ? <CoffeeLoader label="취향 맞는 카페 찾는 중…" />
-                : !searchRes ? <p className="text-center text-[#54432c] py-10 text-sm leading-relaxed">"비 오는 날 혼자 조용히", "감성 사진 데이트"처럼<br />구체적이지 않아도 떠오르는 느낌으로 찾아드려요.</p>
+                : !searchRes ? <p className="text-center text-note-ink-soft py-10 text-sm leading-relaxed">"비 오는 날 혼자 조용히", "감성 사진 데이트"처럼<br />구체적이지 않아도 떠오르는 느낌으로 찾아드려요.</p>
                 : (
                   <>
                     {searchRes.coverageNote && (
@@ -2720,11 +2720,11 @@ export default function Home() {
                     {/* 📍 가려는 곳 — 누르면 지도가 그 자리로 이동한다(주변 카페가 바로 보인다). 2026-09-12 사용자 피드백. */}
                     {!!searchRes.places?.length && (
                       <div className="mb-3">
-                        <div className="text-[11px] text-[#54432c] mb-1.5">📍 이 장소로 지도 이동 — 주변 카페를 바로 봐요</div>
+                        <div className="text-[11px] text-note-ink-soft mb-1.5">📍 이 장소로 지도 이동 — 주변 카페를 바로 봐요</div>
                         <div className="flex flex-wrap gap-1.5">
                           {searchRes.places.map((p, i) => (
                             <button key={`${p.name}-${i}`} onClick={() => goToPlace(p.lat, p.lng, p.kind === "apt" || p.kind === "station" ? 16.5 : 15.5)}
-                              className="nt-chip hover:border-[#9c6b3f] active:bg-[#faf5ea]" style={{ height: 28 }}>
+                              className="nt-chip hover:border-note-tan active:bg-[#faf5ea]" style={{ height: 28 }}>
                               <span>{p.icon}</span><b className="font-semibold">{p.name}</b>
                               <span className="text-[10px] text-[#8a7a68]">{p.label}</span>
                             </button>
@@ -2734,38 +2734,38 @@ export default function Home() {
                     )}
                     {searchRes.concepts.length > 0 && <div className="text-[11px] text-[#5f7355] mb-3">감지된 느낌: <b>{searchRes.concepts.join(" · ")}</b></div>}
                     {searchRes.results.length === 0 ? (
-                      <p className="text-center text-[#54432c] py-10 text-sm">{searchRes.places?.length
+                      <p className="text-center text-note-ink-soft py-10 text-sm">{searchRes.places?.length
                         ? "이 이름의 카페는 없어요. 위의 📍장소를 누르면 그 주변 카페를 지도에서 볼 수 있어요."
                         : "결과가 없어요. 다른 표현이나 더 넓은 동네로 시도해 보세요."}</p>
                     ) : (
                       <div className="space-y-2">
                         {/* 📍 장소 주변 결과면 기준점을 명확히 — "어디에서 몇 m"인지 각 항목 근거에도 나온다. */}
-                        <div className="text-[11px] text-[#54432c] mb-1">
+                        <div className="text-[11px] text-note-ink-soft mb-1">
                           {searchRes.nearPlace
-                            ? <><b className="text-[#2b2018]">{searchRes.nearPlace.icon} {searchRes.nearPlace.name}</b> 주변 {searchRes.count}곳 · 가까운 순</>
+                            ? <><b className="text-note-ink">{searchRes.nearPlace.icon} {searchRes.nearPlace.name}</b> 주변 {searchRes.count}곳 · 가까운 순</>
                             : <>{searchRes.region} · {searchRes.count}곳 중 가까운 순</>}
                         </div>
                         {/* 🔀 같은 동 이름이 여러 곳에 있을 때(고덕동=강동구·평택시) — 우리가 단정하지 않고 한 번에 바꾸게 한다. */}
                         {!!searchRes.regionAlts?.length && (
-                          <div className="flex items-center flex-wrap gap-1.5 mb-2 text-[11px] text-[#54432c]">
+                          <div className="flex items-center flex-wrap gap-1.5 mb-2 text-[11px] text-note-ink-soft">
                             <span>혹시 이쪽인가요?</span>
                             {searchRes.regionAlts.map((a) => (
                               <button key={a} onClick={() => runSearch(searchRes.q, a)}
-                                className="border border-[#d8c8ad] bg-white rounded-full px-2.5 py-1 font-semibold text-[#2b2018] hover:border-[#9c6b3f]">{a}</button>
+                                className="border border-[#d8c8ad] bg-white rounded-full px-2.5 py-1 font-semibold text-note-ink hover:border-note-tan">{a}</button>
                             ))}
                           </div>
                         )}
                         {searchRes.results.map((r) => (
-                          <button key={r.id} onClick={() => { openById(r.id); setShowSearch(false); }} className="w-full text-left nt-scrap flat px-3.5 py-3 hover:border-[#9c6b3f]">
+                          <button key={r.id} onClick={() => { openById(r.id); setShowSearch(false); }} className="w-full text-left nt-scrap flat px-3.5 py-3 hover:border-note-tan">
                             <div className="flex items-center gap-1.5 mb-0.5">
                               {/* 2026-09-14 CEO "검색 카페명이 너무 안 보인다" — font-bold는 손글씨체에선 굵어지지 않는다.
                                   홈 카드와 같은 .nt-title(명조 + text-stroke)로 통일하고 크기를 키운다. */}
                               <span className="nt-title text-[16.5px] leading-tight">{r.name}</span>
                               {r.grade && GRADE_STYLE[r.grade] && <span className={`nt-pill ${r.grade === "검증" ? "verify" : r.grade === "참고" ? "ref" : "cand"}`}>{r.grade}</span>}
                                 <VisitorBadges vb={(r as any).vb} />
-                              <span className="text-[10px] text-[#54432c] ml-auto">{r.area} · 리뷰 {r.count ?? 0}</span>
+                              <span className="text-[10px] text-note-ink-soft ml-auto">{r.area} · 리뷰 {r.count ?? 0}</span>
                             </div>
-                            {r.identity && <p className="text-[11px] text-[#524234] line-clamp-1 mb-1">{r.identity}</p>}
+                            {r.identity && <p className="text-[11px] text-note-ink-body line-clamp-1 mb-1">{r.identity}</p>}
                             <FacetStrip fac={r.fac} size={10.5} />
                             <CautionLine cau={r.cau} size={10.5} />
                             {r.reasons.length > 0 && <div className="text-[10px] text-[#b08440]">🔎 {r.reasons.join(" · ")}</div>}
@@ -2786,8 +2786,8 @@ export default function Home() {
           <div className="absolute inset-0 bg-black/40" onClick={onDecline} />
           <div className="relative bg-[#fdfaf4] w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl p-6 shadow-2xl">
             <div className="text-2xl mb-1">📍</div>
-            <h3 className="text-lg font-bold text-[#2b2018] mb-2">내 주변 옥석 카페 바로 찾기</h3>
-            <p className="text-[13px] text-[#52402e] leading-relaxed mb-2.5">
+            <h3 className="text-lg font-bold text-note-ink mb-2">내 주변 옥석 카페 바로 찾기</h3>
+            <p className="text-[13px] text-note-ink-warm leading-relaxed mb-2.5">
               위치를 켜면 지금 <b>걸어갈 만한 거리의 검증된 옥석 카페</b>만 골라서 바로 보여드려요. 옆동네까지 헤맬 필요 없이, <b>내 동네부터</b>.
             </p>
             <div className="flex flex-col gap-1 mb-3 bg-[#f1f5ee] border border-[#d6e3ca] rounded-xl px-3.5 py-2.5">
@@ -2795,12 +2795,12 @@ export default function Home() {
               <div className="text-[12.5px] text-[#3f5a37] font-medium">🎯 내 동네 검증 후기 카페 <b>자동 정렬·추천</b></div>
               <div className="text-[12.5px] text-[#3f5a37] font-medium">☕ 광고·옆가게 없이 <b>진짜 후기로 가린 옥석</b>만</div>
             </div>
-            <p className="text-[11.5px] text-[#524234] leading-relaxed mb-3">
+            <p className="text-[11.5px] text-note-ink-body leading-relaxed mb-3">
               🔒 정확한 좌표가 아니라 <b>대략적 지역(≈500m)만</b> 쓰고, 이름·연락처 같은 <b>개인정보는 일절 안 받아요</b>. 동의는 <b>선택</b>이고 언제든 끌 수 있어요. 동의하시면 브라우저가 위치 권한을 한 번 더 물어봅니다.
             </p>
             <details className="mb-4">
-              <summary className="text-[12px] text-[#7a5122] cursor-pointer">수집·이용 동의 내용 자세히 보기</summary>
-              <div className="text-[11px] text-[#524234] leading-relaxed mt-2 bg-[#f4ece0] rounded-lg p-3 space-y-1">
+              <summary className="text-[12px] text-note-brown cursor-pointer">수집·이용 동의 내용 자세히 보기</summary>
+              <div className="text-[11px] text-note-ink-body leading-relaxed mt-2 bg-note-paper rounded-lg p-3 space-y-1">
                 <div>· <b>수집 항목</b>: 대략적 위치(시·군·구 수준), 브라우저 익명 식별자</div>
                 <div>· <b>이용 목적</b>: 내 동네 카페 자동 추천·필터, 지역별 수요 통계</div>
                 <div>· <b>보관·파기</b>: 동의 철회 또는 브라우저 데이터 삭제 시까지, 이후 파기</div>
@@ -2811,14 +2811,14 @@ export default function Home() {
               </div>
             </details>
             <div className="flex flex-col gap-2">
-              <button onClick={onAgree} className="w-full bg-[#2b2018] text-[#f4ece0] rounded-xl py-3 font-bold">내 주변 옥석 카페 보기</button>
-              <button onClick={onDecline} className="w-full text-[#7a5122] rounded-xl py-2 text-sm">아니요, 전체 볼게요</button>
+              <button onClick={onAgree} className="w-full bg-note-ink text-note-paper rounded-xl py-3 font-bold">내 주변 옥석 카페 보기</button>
+              <button onClick={onDecline} className="w-full text-note-brown rounded-xl py-2 text-sm">아니요, 전체 볼게요</button>
             </div>
           </div>
         </div>
       )}
       {backToast && (
-        <div className="fixed left-1/2 -translate-x-1/2 bottom-8 z-[5000] bg-[#2b2018] text-[#f4ece0] text-sm px-5 py-3 rounded-full shadow-xl border border-[#9c6b3f]">
+        <div className="fixed left-1/2 -translate-x-1/2 bottom-8 z-[5000] bg-note-ink text-note-paper text-sm px-5 py-3 rounded-full shadow-xl border border-note-tan">
           한 번 더 누르면 나가요
         </div>
       )}
@@ -2873,8 +2873,8 @@ function MapControls({ sido, sigungu, dong, onSido, onSigungu, setDong, dongOpti
             <option value="">{sigungu && !(dongOptions?.length) ? "우리 동네(수집중)" : "우리 동네"}</option>{(dongOptions ?? []).map((d: string) => <option key={d} value={d}>{d}</option>)}
           </select>
         </div>
-        {geoMsg && <div className="text-[10px] text-[#54432c] mt-1.5">{geoMsg}</div>}
-        {(sido || sigungu || dong) && <button onClick={() => { if (clearAuto) clearAuto(); else { onSido(""); } }} className="text-xs text-[#7a5122] underline mt-2">전체</button>}
+        {geoMsg && <div className="text-[10px] text-note-ink-soft mt-1.5">{geoMsg}</div>}
+        {(sido || sigungu || dong) && <button onClick={() => { if (clearAuto) clearAuto(); else { onSido(""); } }} className="text-xs text-note-brown underline mt-2">전체</button>}
       </div>
       <div className="mb-5">
         <div className="nt-title text-[15px] mb-2.5 flex items-center gap-1.5">어떤 카페 찾으세요?<InfoDot title="'결'로 거르기"><b>결</b>은 후기에서 자주 언급되는 카페의 성격이에요(조용·작업·디저트·로스팅 등). 고르면 그 결이 강한 카페만 핀·목록에 뜨고, <b>그 결이 많이 언급된 순</b>으로 정렬돼요. 측정값이 아니라 '리뷰에서 자주 나온 정도'입니다.</InfoDot></div>
@@ -2883,21 +2883,21 @@ function MapControls({ sido, sigungu, dong, onSido, onSigungu, setDong, dongOpti
             <button key={t.key} onClick={() => setTasteKey(tasteKey === t.key ? null : t.key)} className={`nt-scrap p-3 text-left transition-colors ${tasteKey === t.key ? "!bg-[#2a1f17] text-[#fbf7f0]" : "text-[#2a1f17]"}`} style={tasteKey === t.key ? { backgroundImage: "none" } : undefined}>
               <i className="nt-tape sm" aria-hidden style={{ width: 62, height: 14, top: -6 }} />
               <div className="text-2xl mb-0.5">{t.emoji}</div><div className="nt-title text-[13.5px]">{t.label}</div>
-              <div className={`text-[10px] mt-0.5 ${tasteKey === t.key ? "text-[#d4a574]" : "text-[#63523f]"}`}>{t.desc}</div>
+              <div className={`text-[10px] mt-0.5 ${tasteKey === t.key ? "text-[#d4a574]" : "text-note-ink-deep"}`}>{t.desc}</div>
             </button>
           ))}
         </div>
         {tasteKey && (
           <div className="mt-2 flex items-center justify-between gap-2">
-            <p className="text-xs text-[#7a5122]">'{TASTE_CHOICES.find((t) => t.key === tasteKey)?.label}' 결이 자주 언급되는 {matchSet.size}곳만 보는 중</p>
-            <a href={`/taste/${tasteKey}`} className="text-[11px] font-bold text-[#7a5122] border border-[#d9c9b0] rounded-full px-2.5 py-1 shrink-0 whitespace-nowrap">🔗 내 취향 공유</a>
+            <p className="text-xs text-note-brown">'{TASTE_CHOICES.find((t) => t.key === tasteKey)?.label}' 결이 자주 언급되는 {matchSet.size}곳만 보는 중</p>
+            <a href={`/taste/${tasteKey}`} className="text-[11px] font-bold text-note-brown border border-[#d9c9b0] rounded-full px-2.5 py-1 shrink-0 whitespace-nowrap">🔗 내 취향 공유</a>
           </div>
         )}
       </div>
       <div>
         <div className="flex items-baseline justify-between nt-ruled">
           <div className="nt-title text-[15px]">목록 ({listCafes.length}{tasteKey ? ` · ${TASTE_CHOICES.find((t: any) => t.key === tasteKey)?.label}` : ""})</div>
-          <div className="text-[10px] text-[#63523f] shrink-0">↕ {sortLabel}</div>
+          <div className="text-[10px] text-note-ink-deep shrink-0">↕ {sortLabel}</div>
         </div>
         {/* 🧳🏠 방문객 성격 필터 — 배지가 소수라 목록을 훑어선 못 찾는다. 곳수를 함께 보여줘 헛클릭을 막는다. */}
         {(vbCounts.L > 0 || vbCounts.T > 0 || vbCounts.D > 0) && (
@@ -2908,10 +2908,10 @@ function MapControls({ sido, sigungu, dong, onSido, onSigungu, setDong, dongOpti
                 {emoji} {label} {n}
               </button>
             ))}
-            {vbFilter && <button onClick={() => setVbFilter("")} className="text-[11px] text-[#7a5122] underline px-1">전체</button>}
+            {vbFilter && <button onClick={() => setVbFilter("")} className="text-[11px] text-note-brown underline px-1">전체</button>}
           </div>
         )}
-        {listCafes.length === 0 ? <p className="text-xs text-[#63523f] nt-ruled" style={{ paddingTop: 34 }}>{tasteKey ? "이 카테고리에 해당하는 카페가 이 지역엔 없어요. 다른 결을 골라보세요." : "지역을 선택하면 목록이 나와요."}</p> : (
+        {listCafes.length === 0 ? <p className="text-xs text-note-ink-deep nt-ruled" style={{ paddingTop: 34 }}>{tasteKey ? "이 카테고리에 해당하는 카페가 이 지역엔 없어요. 다른 결을 골라보세요." : "지역을 선택하면 목록이 나와요."}</p> : (
           <div className="nt-ruled" style={{ ["--nt-rule" as any]: "rgba(84,104,140,0.42)" }}>
             {/* 📓 목차 줄 — 번호는 손글씨, 이름은 성실체, 한 줄 메모는 그 아래 줄. 항목마다 정확히 1~2줄 */}
             {listCafes.slice(0, 50).map((c: Cafe, i: number) => (
@@ -3035,7 +3035,7 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
     const body = dq.readable ? <>“{segs}”</> : <>{segs}</>;
     return (
       <blockquote key={e?.link ?? i} className={dq.readable ? "nt-q" : "nt-q t"}>
-        {e.link ? <a href={e.link} target="_blank" rel="noopener noreferrer" className="hover:text-[#7a5122]">{body}</a> : body}
+        {e.link ? <a href={e.link} target="_blank" rel="noopener noreferrer" className="hover:text-note-brown">{body}</a> : body}
         {(e?.source || e?.date) && (() => { const ag = reviewAge(e?.date); return <span className="m">{e?.source ?? ""}{ag?.old ? <span className="nt-old">{ag.ym} · {ag.ago} 후기</span> : e?.date ? ` · ${String(e.date).slice(0, 7)}` : ""}</span>; })()}
       </blockquote>
     );
@@ -3059,9 +3059,9 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
               <div className="w-full px-4 pt-4 pb-3" style={{ background: "linear-gradient(135deg,#f4ece0,#e8dcc8)" }}>
                 <div className="relative rounded-xl overflow-hidden shadow-lg ring-1 ring-[#cbb89f] bg-black">
                   <video src={promo.video_url} controls playsInline preload="metadata" onPlay={() => trackPromo(cafe.id, "play")} className="w-full block bg-black" style={{ maxHeight: "22rem" }} />
-                  <span className="absolute top-2.5 left-2.5 z-10 text-[9px] font-bold text-[#2b2018] bg-[#e8b87a] px-2.5 py-1 rounded-full shadow-md pointer-events-none nt-g">사장님 쇼케이스</span>
+                  <span className="absolute top-2.5 left-2.5 z-10 text-[9px] font-bold text-note-ink bg-note-honey px-2.5 py-1 rounded-full shadow-md pointer-events-none nt-g">사장님 쇼케이스</span>
                 </div>
-                <div className="text-center text-[10px] text-[#7a5122] mt-2 tracking-wide nt-g">사장님이 직접 올린 우리 가게 영상</div>
+                <div className="text-center text-[10px] text-note-brown mt-2 tracking-wide nt-g">사장님이 직접 올린 우리 가게 영상</div>
               </div>
             ) : (
               <div onClick={() => trackPromo(cafe.id, "click")}>
@@ -3081,7 +3081,7 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
 
           {/* 첫 줄: 지도로 · 즐겨찾기 · 공유 · 닫기 */}
           <div className="nt-ruled nt-margin-gutter flex items-center justify-between gap-2 relative z-[2]" style={{ paddingTop: 34 }}>
-            <button type="button" onClick={onClose} className="nt-g text-[12.5px] text-[#63523f]">← 지도로</button>
+            <button type="button" onClick={onClose} className="nt-g text-[12.5px] text-note-ink-deep">← 지도로</button>
             <span className="nt-free flex items-center gap-1 nt-g">
               <span className="relative inline-flex">
                 {saveFx && <span className="dcn-fly" aria-hidden="true">★</span>}
@@ -3098,7 +3098,7 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="#3c1e1e"><path d="M12 3C6.5 3 2 6.6 2 11c0 2.8 1.9 5.3 4.7 6.7-.2.7-.7 2.6-.8 3-.1.5.2.5.4.4.2-.1 2.6-1.8 3.7-2.5.6.1 1.3.1 2 .1 5.5 0 10-3.6 10-8S17.5 3 12 3z"/></svg>
                 공유
               </KakaoShare>
-              <button onClick={onClose} aria-label="닫기" className="text-2xl text-[#7a5122] leading-none px-1.5">×</button>
+              <button onClick={onClose} aria-label="닫기" className="text-2xl text-note-brown leading-none px-1.5">×</button>
             </span>
           </div>
 
@@ -3273,7 +3273,7 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
                     <span className="text-[#d6336c] font-bold whitespace-nowrap">→</span>
                   </button>
                 )}
-                <a href={`/c/${cafe.id}`} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between gap-2 px-1 text-[13px] text-[#5c4b3c]"><span>이 카페 페이지 새 창으로 열기</span><span className="text-[#7a5122]">→</span></a>
+                <a href={`/c/${cafe.id}`} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between gap-2 px-1 text-[13px] text-[#5c4b3c]"><span>이 카페 페이지 새 창으로 열기</span><span className="text-note-brown">→</span></a>
               </div>
             </details>
           </div>
@@ -3287,15 +3287,15 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
               {/* 헤더 */}
               <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-[#f0e6d4]">
                 <div>
-                  <div className="font-bold text-[#2b2018] text-[15px]">{cafe.name}</div>
-                  <div className="flex items-center gap-2 mt-0.5 text-[11px] text-[#54432c]">
+                  <div className="font-bold text-note-ink text-[15px]">{cafe.name}</div>
+                  <div className="flex items-center gap-2 mt-0.5 text-[11px] text-note-ink-soft">
                     <span>검증 <b className="text-[#5f7355]">{reviews.filter(r => r.trust === "verified").length}</b></span>
-                    <span>· 참고 <b className="text-[#7a5122]">{reviews.filter(r => r.trust === "reference").length}</b></span>
-                    <span>· 총 <b className="text-[#2b2018]">{reviews.length}</b>건</span>
+                    <span>· 참고 <b className="text-note-brown">{reviews.filter(r => r.trust === "reference").length}</b></span>
+                    <span>· 총 <b className="text-note-ink">{reviews.length}</b>건</span>
                     {quality && quality.rejected > 0 && <span className="text-[#c0a08a]">/ 제외 {quality.rejected}</span>}
                   </div>
                 </div>
-                <button type="button" onClick={(e) => { e.stopPropagation(); setShowAllReviews(false); }} aria-label="닫기" className="h-10 px-4 flex items-center justify-center gap-1 rounded-full bg-[#2b2018] text-[#f4ece0] text-[15px] leading-none shrink-0">닫기 ×</button>
+                <button type="button" onClick={(e) => { e.stopPropagation(); setShowAllReviews(false); }} aria-label="닫기" className="h-10 px-4 flex items-center justify-center gap-1 rounded-full bg-note-ink text-note-paper text-[15px] leading-none shrink-0">닫기 ×</button>
               </div>
               {/* 필터 — wrap으로 잘림 방지 */}
               <div className="px-4 py-2.5 border-b border-[#f0e6d4]">
@@ -3314,7 +3314,7 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
                       <button key={v} onClick={() => setReviewFilter(v as any)}
                         className={`px-3 py-1.5 rounded-full text-[11px] font-medium transition-all ${
                           active
-                            ? ytColor ? "text-white" : "bg-[#2b2018] text-[#f4ece0]"
+                            ? ytColor ? "text-white" : "bg-note-ink text-note-paper"
                             : "bg-white border border-[#e6d9c8] text-[#594839]"
                         }`}
                         style={active && ytColor ? { background: "#c4302b" } : {}}>
@@ -3345,17 +3345,17 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
                         : null}
                       {rv.why?.some((w) => w.includes("AI 검증"))
                         ? <span className="text-[9px] text-white px-1.5 py-0.5 rounded-full" style={{ background: "#7c5cbf" }}>✨ AI 검증</span>
-                        : rv.why?.[0] && <span className="text-[10px] text-[#54432c]">{rv.why[0]}</span>}
+                        : rv.why?.[0] && <span className="text-[10px] text-note-ink-soft">{rv.why[0]}</span>}
                     </div>
                     {rv.link
-                      ? <a href={rv.link} target="_blank" rel="noopener noreferrer" className="block text-[13.5px] text-[#3d2f22] leading-[1.75] hover:text-[#7a5122] transition-colors">"{hlQuote(rv.quote)}"</a>
+                      ? <a href={rv.link} target="_blank" rel="noopener noreferrer" className="block text-[13.5px] text-[#3d2f22] leading-[1.75] hover:text-note-brown transition-colors">"{hlQuote(rv.quote)}"</a>
                       : <div className="text-[13.5px] text-[#3d2f22] leading-[1.75]">"{hlQuote(rv.quote)}"</div>}
-                    <div className="flex items-center gap-2 mt-1.5 text-[10px] text-[#54432c]">
+                    <div className="flex items-center gap-2 mt-1.5 text-[10px] text-note-ink-soft">
                       {rv.link && /youtu\.?be/.test(rv.link) && <span className="text-white rounded-[3px] px-1 py-0.5" style={{ background: "#c4302b", fontSize: "8px" }}>▶ YouTube</span>}
                       <span>{rv.source}</span>{rv.date && (() => { const ag = reviewAge(rv.date); return ag?.old ? <span className="nt-old" style={{ marginLeft: 0 }}>{ag.ym} · {ag.ago} 후기</span> : <span>· {rv.date}</span>; })()}
                       {rv.link && (/youtu\.?be/.test(rv.link)
                         ? <a href={rv.link} target="_blank" rel="noopener noreferrer" className="text-[#c4302b] font-medium ml-auto">영상 보기 →</a>
-                        : <a href={rv.link} target="_blank" rel="noopener noreferrer" className="text-[#7a5122] underline ml-auto">원문 →</a>)}
+                        : <a href={rv.link} target="_blank" rel="noopener noreferrer" className="text-note-brown underline ml-auto">원문 →</a>)}
                     </div>
                   </div>
                 ))}
@@ -3415,11 +3415,11 @@ function MemoryTab({ device, visits, locked = false, sessionPin = "", onReload, 
         <div className="nt-scrap px-7 py-8 text-center max-w-xs w-full">
           <i className="nt-tape" aria-hidden />
           <div className="text-[34px] mb-2">🔒</div>
-          <div className="text-[16px] font-bold text-[#2b2018] mb-1">잠긴 추억 보관소</div>
+          <div className="text-[16px] font-bold text-note-ink mb-1">잠긴 추억 보관소</div>
           <div className="text-[12px] text-[#594839] leading-relaxed mb-4">공용 PC 보호를 위해 PIN으로 잠겨 있어요.<br />내 PIN을 입력하면 내 기록만 보여요.</div>
           <input value={unlockPin} onChange={(e) => setUnlockPin(e.target.value.replace(/\D/g, ""))} inputMode="numeric" maxLength={8} onKeyDown={(e) => e.key === "Enter" && doUnlock()} autoFocus placeholder="PIN (숫자)" className="w-full border border-[#cbb89f] rounded-lg px-3 py-2.5 text-[18px] text-center tracking-[0.4em] bg-white mb-2" />
           {msg && <p className="text-[12px] text-[#c0392b] mb-2">{msg}</p>}
-          <button onClick={doUnlock} disabled={busy} className="w-full bg-[#2b2018] text-[#f4ece0] rounded-xl py-2.5 font-bold text-[14px] disabled:opacity-60">{busy ? "확인 중..." : "잠금 해제"}</button>
+          <button onClick={doUnlock} disabled={busy} className="w-full bg-note-ink text-note-paper rounded-xl py-2.5 font-bold text-[14px] disabled:opacity-60">{busy ? "확인 중..." : "잠금 해제"}</button>
         </div>
       </div>
     );
@@ -3433,7 +3433,7 @@ function MemoryTab({ device, visits, locked = false, sessionPin = "", onReload, 
           <div>
             <div className="nt-eyebrow">스탬프 수첩</div>
             <div className="nt-title text-[21px]">🗃 추억 보관소</div>
-            <div className="text-[11px] text-[#63523f]">이 기기의 내 추억 {visits.length}곳 · 다른 사람 기록은 안 보여요</div>
+            <div className="text-[11px] text-note-ink-deep">이 기기의 내 추억 {visits.length}곳 · 다른 사람 기록은 안 보여요</div>
           </div>
           <button onClick={() => setShowSettings(true)} className="inline-flex items-center gap-1 h-9 px-3 rounded-full text-[12px] font-bold bg-white/80 text-[#5c4b3c] border border-[rgba(90,70,50,.25)] shrink-0">⚙ 설정</button>
         </div>
@@ -3457,7 +3457,7 @@ function MemoryTab({ device, visits, locked = false, sessionPin = "", onReload, 
           <span className="text-[16px] leading-none">➕</span> 새 카페 추억 등록하기
         </button>
         {visits.length === 0 ? (
-          <div className="nt-ruled text-center text-[#63523f] text-[13px]" style={{ paddingTop: 34, paddingBottom: 34 }}>아직 등록한 추억이 없어요.<br />카페에서 위치 인증하고 첫 추억을 남겨보세요.</div>
+          <div className="nt-ruled text-center text-note-ink-deep text-[13px]" style={{ paddingTop: 34, paddingBottom: 34 }}>아직 등록한 추억이 없어요.<br />카페에서 위치 인증하고 첫 추억을 남겨보세요.</div>
         ) : (
           <div className="space-y-2.5">
             {visits.map((v) => {
@@ -3472,17 +3472,17 @@ function MemoryTab({ device, visits, locked = false, sessionPin = "", onReload, 
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
                     {v.favorite && <span className="text-[#f0a832] text-[13px]">★</span>}
-                    <span className="font-bold text-[#2b2018] text-[14px] truncate">{v.name}</span>
-                    <span className="text-[10px] text-[#7a5122] shrink-0">{v.area}</span>
+                    <span className="font-bold text-note-ink text-[14px] truncate">{v.name}</span>
+                    <span className="text-[10px] text-note-brown shrink-0">{v.area}</span>
                     {v.verified === false ? (
                       <span className="nt-pill cand shrink-0" style={{ height: 18, fontSize: 9.5 }}>미인증</span>
                     ) : (
                       <span className="nt-pill verify shrink-0" style={{ height: 18, fontSize: 9.5 }}>인증</span>
                     )}
-                    <span className="ml-auto text-[10px] text-[#54432c] shrink-0">보기 ›</span>
+                    <span className="ml-auto text-[10px] text-note-ink-soft shrink-0">보기 ›</span>
                   </div>
-                  {v.memory ? <p className="nt-hand sm mt-0.5 line-clamp-2" style={{ fontSize: 18 }}>{v.memory}</p> : <p className="text-[12px] text-[#63523f] mt-0.5">기억 메모 없음</p>}
-                  <div className="text-[10px] text-[#54432c] mt-1">{fmtDate(v.created_at)}</div>
+                  {v.memory ? <p className="nt-hand sm mt-0.5 line-clamp-2" style={{ fontSize: 18 }}>{v.memory}</p> : <p className="text-[12px] text-note-ink-deep mt-0.5">기억 메모 없음</p>}
+                  <div className="text-[10px] text-note-ink-soft mt-1">{fmtDate(v.created_at)}</div>
                 </div>
               </button>
               );
@@ -3499,8 +3499,8 @@ function MemoryTab({ device, visits, locked = false, sessionPin = "", onReload, 
               <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-[#f0e6d4]">
                 <div className="flex items-center gap-2 min-w-0">
                   {viewVisit.favorite && <span className="text-[#f0a832] text-[18px] leading-none">★</span>}
-                  <div className="font-bold text-[#2b2018] text-[15px] truncate">{viewVisit.name}</div>
-                  <span className="text-[11px] text-[#7a5122] shrink-0">{viewVisit.area}</span>
+                  <div className="font-bold text-note-ink text-[15px] truncate">{viewVisit.name}</div>
+                  <span className="text-[11px] text-note-brown shrink-0">{viewVisit.area}</span>
                 </div>
                 <button onClick={() => setViewVisit(null)} className="w-8 h-8 rounded-full bg-[#f0e6d4] text-[#594839] text-lg shrink-0">×</button>
               </div>
@@ -3516,16 +3516,16 @@ function MemoryTab({ device, visits, locked = false, sessionPin = "", onReload, 
                 )}
                 <div>
                   <div className="text-[12px] text-[#594839] mb-1 font-medium">기억</div>
-                  {viewVisit.memory ? <p className="nt-hand whitespace-pre-wrap" style={{ lineHeight: "30px" }}>{viewVisit.memory}</p> : <p className="text-[13px] text-[#63523f]">기억 메모 없음</p>}
+                  {viewVisit.memory ? <p className="nt-hand whitespace-pre-wrap" style={{ lineHeight: "30px" }}>{viewVisit.memory}</p> : <p className="text-[13px] text-note-ink-deep">기억 메모 없음</p>}
                 </div>
-                <div className="text-[11px] text-[#54432c]">{fmtDate(viewVisit.created_at)}{viewVisit.favorite ? " · ★ 즐겨찾기" : ""}</div>
+                <div className="text-[11px] text-note-ink-soft">{fmtDate(viewVisit.created_at)}{viewVisit.favorite ? " · ★ 즐겨찾기" : ""}</div>
                 {viewVisit.verified === false && (
                   <div className="rounded-xl border border-[#e6d9c8] bg-[#faf6ee] p-3">
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[9px] font-bold text-[#54432c] bg-[#f3ede1] rounded-full px-1.5 py-0.5">미인증</span>
+                      <span className="text-[9px] font-bold text-note-ink-soft bg-[#f3ede1] rounded-full px-1.5 py-0.5">미인증</span>
                       <div className="text-[12px] font-bold text-[#594839]">미인증 추억</div>
                     </div>
-                    <div className="text-[11px] text-[#54432c] mt-1 leading-relaxed">위치 인증을 아직 안 했어요. <b>나에게만 보임(비공개)</b> — 지도에서 다른 사람에게는 안 보여요. <b>인증된 기록만</b> 타인에게 지도로 공개돼요. 이 카페에 다시 방문해 <b>GPS 30m 이내</b>에서 <b>지금 인증하기</b>를 누르면 <b>인증 상태로 전환</b>돼 지도에 공개될 수 있어요.</div>
+                    <div className="text-[11px] text-note-ink-soft mt-1 leading-relaxed">위치 인증을 아직 안 했어요. <b>나에게만 보임(비공개)</b> — 지도에서 다른 사람에게는 안 보여요. <b>인증된 기록만</b> 타인에게 지도로 공개돼요. 이 카페에 다시 방문해 <b>GPS 30m 이내</b>에서 <b>지금 인증하기</b>를 누르면 <b>인증 상태로 전환</b>돼 지도에 공개될 수 있어요.</div>
                     {verifyMsg && <p className="text-[11px] text-[#c0392b] mt-1.5">{verifyMsg}</p>}
                     <button onClick={() => verifyNow(viewVisit)} disabled={verifyBusy} className="mt-2 w-full bg-[#5f7355] text-white rounded-lg py-2.5 font-bold text-[13px] disabled:opacity-60">
                       {verifyBusy ? "위치 확인 중..." : "📍 지금 인증하기 (카페 30m)"}
@@ -3646,9 +3646,9 @@ function MemorySettingsModal({ device, visits, hasPin, onPinChange, onClose, onR
     <div className="fixed inset-0 z-[5000] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)", fontFamily: "var(--nt-font)" }} onClick={onClose}>
       <div className="w-full max-w-lg bg-[#fdfaf4] rounded-t-2xl max-h-[88dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-[#f0e6d4]">
-          <div className="font-bold text-[#2b2018] text-[15px]">⚙ 설정</div>
+          <div className="font-bold text-note-ink text-[15px]">⚙ 설정</div>
           <div className="flex items-center gap-2">
-            {hasPin && <button onClick={() => { onLock?.(); onClose(); }} className="text-[11px] font-bold text-[#7a5122] border border-[#e6d9c8] rounded-full px-2.5 py-1">🔒 지금 잠그기</button>}
+            {hasPin && <button onClick={() => { onLock?.(); onClose(); }} className="text-[11px] font-bold text-note-brown border border-[#e6d9c8] rounded-full px-2.5 py-1">🔒 지금 잠그기</button>}
             <button onClick={onClose} className="w-8 h-8 rounded-full bg-[#f0e6d4] text-[#594839] text-lg">×</button>
           </div>
         </div>
@@ -3659,54 +3659,54 @@ function MemorySettingsModal({ device, visits, hasPin, onPinChange, onClose, onR
 
           {/* 백업 코드 */}
           <div>
-            <div className="text-[13px] font-bold text-[#2b2018] mb-1.5">① 백업 코드 (다른 기기에서 불러오기)</div>
+            <div className="text-[13px] font-bold text-note-ink mb-1.5">① 백업 코드 (다른 기기에서 불러오기)</div>
             {code ? (
               <div className="bg-white border-2 border-[#d6336c] rounded-xl p-3 text-center">
                 <div className="text-[20px] font-bold tracking-widest text-[#d6336c]">{code}</div>
-                <div className="text-[11px] text-[#54432c] mt-1">이 코드를 메모해두세요. 잃어버리면 복구할 수 없어요(= 우리도 누구 건지 몰라요).</div>
+                <div className="text-[11px] text-note-ink-soft mt-1">이 코드를 메모해두세요. 잃어버리면 복구할 수 없어요(= 우리도 누구 건지 몰라요).</div>
               </div>
             ) : (
-              <button onClick={issueCode} disabled={busy} className="w-full bg-[#2b2018] text-[#f4ece0] rounded-lg py-2.5 text-[13px] font-bold disabled:opacity-60">{busy ? "발급 중..." : "백업 코드 발급"}</button>
+              <button onClick={issueCode} disabled={busy} className="w-full bg-note-ink text-note-paper rounded-lg py-2.5 text-[13px] font-bold disabled:opacity-60">{busy ? "발급 중..." : "백업 코드 발급"}</button>
             )}
           </div>
 
           {/* 복원 */}
           <div>
-            <div className="text-[13px] font-bold text-[#2b2018] mb-1.5">② 코드로 복원 (기기 바꿨을 때)</div>
+            <div className="text-[13px] font-bold text-note-ink mb-1.5">② 코드로 복원 (기기 바꿨을 때)</div>
             <div className="flex gap-2">
               <input value={inputCode} onChange={(e) => setInputCode(e.target.value)} placeholder="COFFEE-XXXXXX"
                 className="flex-1 border border-[#cbb89f] rounded-lg px-3 py-2.5 text-[14px] bg-white uppercase" />
-              <button onClick={restore} disabled={busy} className="px-4 bg-[#9c6b3f] text-white rounded-lg text-[13px] font-bold disabled:opacity-60">불러오기</button>
+              <button onClick={restore} disabled={busy} className="px-4 bg-note-tan text-white rounded-lg text-[13px] font-bold disabled:opacity-60">불러오기</button>
             </div>
           </div>
 
           {/* 내보내기 */}
           <div>
-            <div className="text-[13px] font-bold text-[#2b2018] mb-1.5">③ 내 기기에 영구 보관 (다운로드)</div>
+            <div className="text-[13px] font-bold text-note-ink mb-1.5">③ 내 기기에 영구 보관 (다운로드)</div>
             <div className="flex gap-2">
               <button onClick={exportPDF} disabled={!visits.length} className="flex-1 border-2 border-[#cbb89f] text-[#524434] rounded-lg py-2.5 text-[13px] font-bold bg-white disabled:opacity-50">PDF로 저장</button>
               <button onClick={exportJSON} disabled={!visits.length} className="flex-1 border-2 border-[#cbb89f] text-[#524434] rounded-lg py-2.5 text-[13px] font-bold bg-white disabled:opacity-50">JSON으로 저장</button>
             </div>
-            <p className="text-[10px] text-[#54432c] mt-1.5">PDF는 보기 좋게, JSON은 백업·재가져오기용. 파일은 본인 기기에만 저장돼요.</p>
+            <p className="text-[10px] text-note-ink-soft mt-1.5">PDF는 보기 좋게, JSON은 백업·재가져오기용. 파일은 본인 기기에만 저장돼요.</p>
           </div>
 
           {/* ④ 공용 PC 잠금 (PIN) */}
           <div className="border-t border-[#f0e6d4] pt-4">
-            <div className="text-[13px] font-bold text-[#2b2018] mb-1.5">④ 공용 PC 잠금 (PIN)</div>
+            <div className="text-[13px] font-bold text-note-ink mb-1.5">④ 공용 PC 잠금 (PIN)</div>
             {!hasPin ? (
               pinMode === "set" ? (
                 <div className="space-y-2">
                   <input value={pinA} onChange={(e) => setPinA(e.target.value.replace(/\D/g, ""))} inputMode="numeric" maxLength={8} placeholder="새 PIN (숫자 4~8자리)"
                     className="w-full border border-[#cbb89f] rounded-lg px-3 py-2.5 text-[15px] tracking-[0.3em] bg-white" />
                   <div className="flex gap-2">
-                    <button onClick={doSetPin} disabled={busy || pinA.length < 4} className="flex-1 bg-[#2b2018] text-[#f4ece0] rounded-lg py-2.5 text-[13px] font-bold disabled:opacity-50">설정</button>
-                    <button onClick={() => { setPinMode(""); setPinA(""); }} className="px-4 text-[#7a5122] text-[13px]">취소</button>
+                    <button onClick={doSetPin} disabled={busy || pinA.length < 4} className="flex-1 bg-note-ink text-note-paper rounded-lg py-2.5 text-[13px] font-bold disabled:opacity-50">설정</button>
+                    <button onClick={() => { setPinMode(""); setPinA(""); }} className="px-4 text-note-brown text-[13px]">취소</button>
                   </div>
                 </div>
               ) : (
                 <>
                   <button onClick={() => { setPinMode("set"); setMsg(""); }} className="w-full border-2 border-[#cbb89f] text-[#524434] rounded-lg py-2.5 text-[13px] font-bold bg-white">PIN 설정하기</button>
-                  <p className="text-[10px] text-[#54432c] mt-1.5">PIN을 걸면 이 기기에서 <b>PIN을 입력해야만</b> 내 추억이 보여요. 카페·도서관 등 공용 PC에서 추천해요.</p>
+                  <p className="text-[10px] text-note-ink-soft mt-1.5">PIN을 걸면 이 기기에서 <b>PIN을 입력해야만</b> 내 추억이 보여요. 카페·도서관 등 공용 PC에서 추천해요.</p>
                 </>
               )
             ) : pinMode === "change" ? (
@@ -3716,8 +3716,8 @@ function MemorySettingsModal({ device, visits, hasPin, onPinChange, onClose, onR
                 <input value={pinB} onChange={(e) => setPinB(e.target.value.replace(/\D/g, ""))} inputMode="numeric" maxLength={8} placeholder="새 PIN (4~8자리)"
                   className="w-full border border-[#cbb89f] rounded-lg px-3 py-2.5 text-[15px] tracking-[0.3em] bg-white" />
                 <div className="flex gap-2">
-                  <button onClick={doChangePin} disabled={busy || pinB.length < 4} className="flex-1 bg-[#2b2018] text-[#f4ece0] rounded-lg py-2.5 text-[13px] font-bold disabled:opacity-50">변경</button>
-                  <button onClick={() => { setPinMode(""); setPinA(""); setPinB(""); }} className="px-4 text-[#7a5122] text-[13px]">취소</button>
+                  <button onClick={doChangePin} disabled={busy || pinB.length < 4} className="flex-1 bg-note-ink text-note-paper rounded-lg py-2.5 text-[13px] font-bold disabled:opacity-50">변경</button>
+                  <button onClick={() => { setPinMode(""); setPinA(""); setPinB(""); }} className="px-4 text-note-brown text-[13px]">취소</button>
                 </div>
               </div>
             ) : pinMode === "remove" ? (
@@ -3726,7 +3726,7 @@ function MemorySettingsModal({ device, visits, hasPin, onPinChange, onClose, onR
                   className="w-full border border-[#cbb89f] rounded-lg px-3 py-2.5 text-[15px] tracking-[0.3em] bg-white" />
                 <div className="flex gap-2">
                   <button onClick={doRemovePin} disabled={busy} className="flex-1 bg-[#c0392b] text-white rounded-lg py-2.5 text-[13px] font-bold disabled:opacity-50">PIN 해제</button>
-                  <button onClick={() => { setPinMode(""); setPinA(""); }} className="px-4 text-[#7a5122] text-[13px]">취소</button>
+                  <button onClick={() => { setPinMode(""); setPinA(""); }} className="px-4 text-note-brown text-[13px]">취소</button>
                 </div>
               </div>
             ) : (

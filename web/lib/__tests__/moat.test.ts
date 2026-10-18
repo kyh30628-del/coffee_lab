@@ -22,6 +22,7 @@ import { collectAndSynthesize } from "../collectOrchestrator";
 import { mergeRawEvidence, shouldBlockShrink } from "../evidenceMerge";
 import { overUnpubCapForTest } from "../synthStore";
 import { effectVerdictFor } from "../runLedger";
+import { getContract, ALL_CONTRACT_IDS } from "../jobContract";
 
 const AREA = ["서울", "강남구", "역삼동"];
 
@@ -385,4 +386,24 @@ test("효과 판정: 이미 실패로 보고된 런은 효과로 또 판정하�
 });
 test("효과 판정: 사이에 실패가 끼면 연속으로 보지 않는다", () => {
   assert.equal(effectVerdictFor({ updated: 0, remain: 10 }, [P(0, 10, false)], 2), true);
+});
+
+// ── ⑮ 계약 선언이 **잡의 성질과 맞는지** 고정 (2026-10-18)
+//   10-17에 내가 effect 선언 5개를 한꺼번에 붙였는데 3개가 잡의 성질과 맞지 않았다:
+//     cron-resynth        4일 주기 **전수 순환** — 남은 일이 계속 재생성되므로 '줄어들어야 한다'가 성립 안 함
+//     cron-issues         열린 이슈는 **CEO 결재**에 달려 있음 — 결재 대기 중 안 줄어드는 건 정상
+//     cron-coord-consumer 롤아웃 1단계 **드라이런**(집행 0) — 의도적으로 큐를 줄이지 않는 상태
+//   틀린 선언을 두면 **영구 거짓 경보**가 되고 그게 진짜 문제를 묻는다(빨강 규칙). 그래서 철회했다.
+//   이 테스트는 누가 다시 붙이면 깨진다 — 붙이려면 그 잡이 정말 '자기 힘으로 백로그를 줄이는 잡'인지 먼저 따져야 한다.
+test("계약: monotone-decrease는 '자기 힘으로 백로그를 줄이는 잡'만", () => {
+  const declared = ALL_CONTRACT_IDS.filter((j) => getContract(j).effect?.kind === "monotone-decrease").sort();
+  assert.deepEqual(declared, ["cron-embed", "cron-sentinel", "cron-synth"],
+    "effect 선언이 바뀌었다 — 잡의 성질을 따져보고 주석에 근거를 남긴 뒤 이 목록을 갱신할 것");
+});
+test("계약: 구현되지 않은 effect 종류를 선언하지 않는다", () => {
+  const IMPLEMENTED = new Set(["monotone-decrease", "idempotent", "none"]);
+  for (const j of ALL_CONTRACT_IDS) {
+    const k = getContract(j).effect?.kind;
+    assert.ok(!k || IMPLEMENTED.has(k), `${j}: 구현 없는 effect 종류 "${k}" — 선언만 하면 빈껍데기가 된다`);
+  }
 });

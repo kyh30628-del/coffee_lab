@@ -40,7 +40,7 @@ export default function SavedCafes({ excludeId }: { excludeId?: number }) {
               <span className="text-[13.5px] font-bold text-[#3d2f22] truncate">{c.name}</span>
               <span className="text-[10.5px] text-[#544636] truncate">{c.area}</span>
             </span>
-            {c.synth_grade && <span className="ml-auto text-[10px] font-bold bg-[#2b2018] text-[#e8b87a] px-2 py-0.5 rounded-full whitespace-nowrap">{c.synth_grade}</span>}
+            {c.synth_grade && <span className="ml-auto text-[10px] font-bold bg-note-ink text-note-honey px-2 py-0.5 rounded-full whitespace-nowrap">{c.synth_grade}</span>}
           </Link>
         ))}
       </div>
