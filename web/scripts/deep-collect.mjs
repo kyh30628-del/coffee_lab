@@ -52,7 +52,8 @@ const DEADLINE_MS = Number(process.env.COLLECT_DEADLINE) > 0
 
 // 🌙 창 가드 — 08~21시만. 새벽에 DB를 깨우지 않는다(collect-catchup과 같은 규약).
 const H = new Date(Date.now() + 9 * 3600e3).getUTCHours();
-if (!ONLY && (H < 8 || H >= 21)) { console.log(`🔎 창 밖(${H}시) — 건너뜀`); process.exit(0); }
+// ⚠️ --dry는 네이버 호출·DB 쓰기가 0이라 창 가드를 받지 않는다(대상 선정만 확인하는 용도).
+if (!ONLY && !DRY && (H < 8 || H >= 21)) { console.log(`🔎 창 밖(${H}시) — 건너뜀`); process.exit(0); }
 if (await naverBlocked()) { console.log("🔎 네이버 막힘 — 건너뜀(쓰기 0)"); process.exit(0); }
 
 await sql`CREATE TABLE IF NOT EXISTS deep_log (
@@ -109,6 +110,46 @@ const targets = ONLY
       AND COALESCE(c.synth_count, 0) < ${SATURATED_AT}
     ORDER BY a.vpct ASC, COALESCE(v.views, 0) DESC, c.synth_count DESC NULLS LAST
     LIMIT ${CAP}`;
+
+// 🔴 2026-10-19 **미공개·주제글0 층 신설** — 이 레인의 큐가 `c.published`로 묶여 있어서
+//   "주제 글이 없어 공개가 안 된" 카페 22,282곳을 **한 번도 깊게 파본 적이 없었다.**
+//   CEO 지시: "주제 글이 없어 수집 필요 … 이런 거는 네이버 쿼터랑 연계해서 하라고.
+//              무책임하게 그냥 제외하지 말고. 완벽하게 해."
+//   왜 이 레인이 맞는 도구인가: 공개 게이트의 급소는 **주제 글(제목이 이 카페인 글) 1건**이고,
+//   기본 수집은 질의당 start=1 상위 100건만 본다 — 주제 글이 101위 아래 있으면 영영 못 찾는다.
+//   이 레인은 sim 5쪽 + date 5쪽을 파므로 바로 그 사각을 메운다.
+//   💰 수확률 실측(scripts/collect-deeper-probe.mjs, 표본 100곳·쿼터 1,070콜):
+//     주제글無 그룹 — 현행 질의 8% · 2페이지/sort=date/이름단독 추가 시 **22%**가 주제 글을 새로 찾는다.
+//     (원본없음 41%→54% · 글0건 12%→25%. 세 그룹 모두 추가 탐색이 2~3배로 올린다.)
+//     이 레인은 5쪽까지 파므로 22%보다 높을 가능성이 있다(실측 후 보고).
+//   ⚠️ 공개 레인을 굶기지 않게 **별도 상한**(DEEP_UNPUB_CAP)으로 돈다 — 같은 회차에서 둘 다 전진한다.
+//   ⚠️ areastat INNER JOIN을 쓰지 않는다: 공개 카페가 없는 지역의 미공개 카페가 통째로 빠진다.
+//      조회수·희소지역 게이트도 적용하지 않는다(미공개 페이지는 조회수가 구조적으로 0이다).
+//   💰 ISR 비용: 미공개 카페는 공개 페이지가 없어 무효화가 사실상 무상이다(공개로 올라갈 때만 1장).
+const UNPUB_CAP = Number(arg("unpub-cap", process.env.DEEP_UNPUB_CAP || 60));
+if (!ONLY && UNPUB_CAP > 0) {
+  const unpub = await sql`
+    SELECT c.id, c.name, c.area, c.synth_count, c.synth_grade, c.published,
+           0 views, NULL::numeric vpct, NULL::int area_pub
+    FROM cafes c
+    LEFT JOIN deep_log d ON d.cafe_id = c.id
+    WHERE NOT c.published AND c.raw_reviews IS NOT NULL AND d.cafe_id IS NULL
+      AND COALESCE((c.synth_quality->>'verified')::int, 0) = 0   -- 주제 글 0건 = 공개 게이트의 급소
+      AND COALESCE(c.pipeline_status, '') NOT IN ('excluded', 'noise')
+      AND c.lat IS NOT NULL
+      AND (c.id % ${OF}) = ${SHARD}
+    ORDER BY COALESCE(c.synth_count, 0) DESC, c.id   -- 근거가 이미 있는 쪽이 문턱에 가깝다
+    LIMIT ${UNPUB_CAP}`;
+  // 프랜차이즈·비카페는 수집해도 공개 게이트에서 영원히 탈락한다 — 뽑는 즉시 거른다(collect-shard와 동일 사상).
+  const { isFranchise, isNonCafe } = await import("../lib/discover.ts");
+  if (typeof isFranchise !== "function" || typeof isNonCafe !== "function") {
+    console.error("🔴 규칙 함수(isFranchise·isNonCafe)를 못 불러왔다 — 미공개 층을 건너뛴다(규칙 0개로 '안전' 판정 방지)");
+  } else {
+    const kept = unpub.filter((r) => !isFranchise(r.name) && !isNonCafe(r.name, ""));
+    console.log(`${tag}   + 미공개·주제글0 층 ${kept.length}곳(상한 ${UNPUB_CAP} · 프랜차이즈·비카페 ${unpub.length - kept.length}곳 제외)`);
+    targets.push(...kept);
+  }
+}
 
 const used0 = await naverUsedToday();
 console.log(`${tag}🔎 깊은 수집 — 대상 ${targets.length}곳(상한 ${CAP}) · 콜 예산 ${BUDGET} · 네이버 ${used0.toLocaleString()}/${NAVER_DAILY_QUOTA.toLocaleString()}`);

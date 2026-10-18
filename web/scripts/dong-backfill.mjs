@@ -37,7 +37,24 @@ try {
   while (done + miss < MAX && !stop) {
     // ★ 커서(id>cursor)와 정렬을 반드시 id로 일치시킬 것. 카테고리우선 정렬은 커서가 점프해
     //   하위 id의 동없는 카페를 통째로 스킵시키는 버그를 유발(45%에서 멈춘 원인). 순수 id 순으로 전수 처리.
-    const rows = await sql`SELECT id, name, area, lat, lng, synth_grade, needs_category, dong FROM cafes WHERE (${REVAL} OR naver_category IS NULL OR naver_category='' OR dong IS NULL) AND lat IS NOT NULL AND id > ${cursor} AND (${Number(process.env.SHARDS || 1)} = 1 OR id % ${Number(process.env.SHARDS || 1)} = ${Number(process.env.SHARD || 0)}) ORDER BY id LIMIT 25`;
+    // 🎯 2026-10-19 PUBLISHABLE_ONLY — **카테고리만 채우면 즉시 공개 자격을 얻는 미공개 카페**로 좁힌다.
+    //   왜: 이 잡은 은퇴(RETIRED_JOBS·plist.disabled) 상태라 크론으로 되살리지 않는다
+    //       (09-26 discover-sweep 부활로 쿼터 15.6%가 유출된 사고 이력). 대신 **1회 표적 집행**한다.
+    //   실측 2026-10-19: 미공개인데 카테고리가 없는 카페 3,969곳 중
+    //     · 후기 2건 이상 + 주제 글 1건 이상 = **941곳** → 카테고리만 채우면 공개 게이트 4조건을 전부 통과한다.
+    //     · 비용 네이버 local **1콜/곳 = 941콜**(하루 한도의 3.8%). 지금까지 찾은 수단 중 단가가 가장 좋다
+    //       (AI 판정은 $29.65로 약 830곳).
+    //   ⚠️ 카테고리를 채워도 그게 '비카페'로 나오면 그대로 막힌다(기존 안전장치가 처리) — 941곳 전부가
+    //      공개되는 게 아니다. 실제 증가는 집행 후 실측해 보고한다.
+    const rows = process.env.PUBLISHABLE_ONLY === "1"
+      ? await sql`SELECT id, name, area, lat, lng, synth_grade, needs_category, dong FROM cafes
+          WHERE NOT published AND COALESCE(naver_category, '') = ''
+            AND COALESCE(pipeline_status, '') NOT IN ('excluded', 'noise')
+            AND lat IS NOT NULL AND id > ${cursor}
+            AND COALESCE(synth_count, 0) >= 2
+            AND COALESCE((synth_quality->>'verified')::int, 0) >= 1
+          ORDER BY id LIMIT 25`
+      : await sql`SELECT id, name, area, lat, lng, synth_grade, needs_category, dong FROM cafes WHERE (${REVAL} OR naver_category IS NULL OR naver_category='' OR dong IS NULL) AND lat IS NOT NULL AND id > ${cursor} AND (${Number(process.env.SHARDS || 1)} = 1 OR id % ${Number(process.env.SHARDS || 1)} = ${Number(process.env.SHARD || 0)}) ORDER BY id LIMIT 25`;
     if (!rows.length) { stop = "동·카테고리 미보유 카페 소진 — 완료"; break; }
     for (const c of rows) {
       cursor = c.id;
