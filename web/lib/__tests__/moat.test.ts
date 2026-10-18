@@ -16,6 +16,8 @@ import { readFileSync } from "node:fs";
 import {
   nameCoherence, brandTokenOverlap, coreTokens, nearDuplicateCafeName,
   detectCampaignCluster, isPopupRotatingVenue, cleanCafeName, verifyReview,
+  quoteMatchConfidence, isNonCafeFnbCategory, isNonFnbCategory, isNonCafeFamilySignal,
+  coreTokensDetail, addrKeys, isNonBranchWord, nonCoffeeCafeCategoryWords,
 } from "../reviewQuality";
 import { isOtherBusinessQuote, isReadableQuote, isSentenceQuote, displayQuote, splitKeyTerms } from "../cafeDetailView";
 import { sortReviews, ensureRecent } from "../exposureOrder";
@@ -25,6 +27,7 @@ import { overUnpubCapForTest } from "../synthStore";
 import { effectVerdictFor } from "../runLedger";
 import { getContract, ALL_CONTRACT_IDS } from "../jobContract";
 import { STAGES } from "../pipelineStages";
+import { extractHighlights, extractCautions, reviewAge, tasteVector, tasteSimilarity, cardFacets } from "../cafeProfile";
 
 const AREA = ["서울", "강남구", "역삼동"];
 
@@ -468,4 +471,142 @@ test("보류 해제: 판정 결과(규칙 위반·오염) 사유는 포함하지
   const lane = laneSrc(src);
   assert.ok(!lane.includes("규칙 위반%"), "'규칙 위반(프랜차이즈·비카페)'은 재평가 대기가 아니라 판정 결과다 — 풀면 안 된다");
   assert.ok(!lane.includes("오염%"), "'오염' 사유는 판정 결과다 — 풀면 안 된다");
+});
+
+// ═══ ⑱ 무방비였던 판정 함수 8개 — 2026-10-18 전수 보강 ═══
+//   판정 함수 19개 중 11개만 테스트가 있었다. 남은 8개를 **각 함수 주석에 적힌 실제 사고 사례**로 덮는다.
+//   이 함수들이 조용히 풀리면 옆가게·식당·교육업체 글이 '검증 후기'로 화면에 올라간다.
+
+// 🎯 인용문 하나의 확신도 — nameCoherence(집계용)보다 엄격해야 한다(#307).
+//   흔한 낱말 상호('여유')가 한 번 스친 것만으로 상위에 올라가면 동명 카페 글이 섞인다.
+test("quoteMatchConfidence: 흔한 낱말 상호는 전체 이름 원문 일치를 요구한다", () => {
+  const A = ["서울", "강남구", "역삼동"];
+  assert.equal(quoteMatchConfidence("여유", "여유롭게 쉬다 왔어요", A), 0, "'여유'가 부사로 스친 것은 근거가 아니다");
+  assert.ok(quoteMatchConfidence("여유", "카페 여유 다녀왔어요 커피 좋아요", A) > 0.9, "전체 이름이 원문으로 있으면 인정");
+  assert.ok(quoteMatchConfidence("리플렉트랩", "리플렉트랩 다녀왔어요", A) > 0.9);
+  assert.equal(quoteMatchConfidence("리플렉트랩", "오늘 날씨가 좋네요", A), 0);
+});
+
+// 🍝 F&B지만 카페가 아닌 식당 — 상호에 '카페'가 들어가도 카테고리가 순수 식당이면 대상이다
+//   (실사고: 카페나하본점·파스타인카페·루비스한남점). 이름만으론 카페가 아니다.
+test("isNonCafeFnbCategory: 순수 식당 업종은 카페가 아니다", () => {
+  for (const c of ["음식점>한식", "음식점>이탈리아음식", "음식점>일식>초밥,롤"]) {
+    assert.equal(isNonCafeFnbCategory(c), true, `${c}가 카페로 통과하면 식당 후기가 섞인다`);
+  }
+  for (const c of ["음식점>카페,디저트", "카페,디저트>카페"]) {
+    assert.equal(isNonCafeFnbCategory(c), false, `${c}는 카페다 — 걸러내면 정상 카페가 죽는다`);
+  }
+  assert.equal(isNonCafeFnbCategory(""), false, "카테고리 없음 ≠ 비카페(누락을 판정으로 쓰지 않는다)");
+});
+
+// 🏭 F&B 대분류가 아닌 업종 — 상호가 '○○로스터스'인 **바리스타 교육업체**가 카페 맥락 가드를 무력화했다.
+test("isNonFnbCategory: F&B가 아닌 업종을 가린다", () => {
+  for (const c of ["직업기술교육>바리스타", "제조업>떡류제조", "서비스,산업>통신"]) {
+    assert.equal(isNonFnbCategory(c), true, `${c}는 F&B가 아니다`);
+  }
+  assert.equal(isNonFnbCategory("음식점>카페,디저트"), false);
+  assert.equal(isNonFnbCategory("제조업>커피가공"), false, "커피가공은 정상 로스터리 겸영이다 — 걸러내면 오탐");
+  assert.equal(isNonFnbCategory(""), false);
+});
+
+// 🚩 임의 업종 + 상호에 카페어 없음 = LLM 그라운딩 **우선순위 신호**(자동 비공개가 아니다 — 오탐 위험).
+test("isNonCafeFamilySignal: 상호에 카페어가 있으면 신호를 끈다", () => {
+  assert.equal(isNonCafeFamilySignal("서비스,산업>통신", "온다"), true);
+  assert.equal(isNonCafeFamilySignal("서비스,산업>통신", "온다커피"), false, "상호에 카페어가 있으면 정상 카페 가능성");
+  assert.equal(isNonCafeFamilySignal("음식점>카페,디저트", "온다"), false);
+});
+
+// 🏢 식별 토큰 — 몰·신도시명을 떼고 브랜드만 남긴다. 남은 게 전부 건물·기관명이면 venueOnly(앵커 부족).
+test("coreTokensDetail: 몰·지역명을 떼고 브랜드만 남긴다", () => {
+  const a = coreTokensDetail("앤티앤스 스타필드 위례", ["경기", "하남시"]);
+  assert.deepEqual(a.tokens, ["앤티앤스"], "몰 이름(스타필드)·신도시(위례)가 식별 토큰에 남으면 옆가게가 통과한다");
+  const b = coreTokensDetail("스타벅스 역삼동점", ["서울", "강남구", "역삼동"]);
+  assert.deepEqual(b.tokens, ["스타벅스"]);
+  const c = coreTokensDetail("미사강변 북카페", ["경기", "하남시"]);
+  assert.equal(c.venueOnly, true, "남은 토큰이 지역·건물명뿐이면 지역일치만으로 식별 인정하면 안 된다");
+});
+
+// 📍 주소 증거 — **도로명+건물번호**가 후기에 있으면 상호보다 강한 증거다. 동/읍만으로는 인정하지 않는다
+//   (같은 동 옆가게가 통과한다).
+test("addrKeys: 번지까지 있는 주소만 증거로 쓴다", () => {
+  assert.deepEqual(addrKeys("서울 강남구 역삼로 223"), ["역삼로223"]);
+  assert.deepEqual(addrKeys("서울 강남구 역삼동"), [], "동만으로는 옆가게와 구분이 안 된다");
+  assert.deepEqual(addrKeys(undefined), []);
+});
+
+// 🏷️ 지점앵커가 아닌 말 — '제과점'을 지점명으로 오인해 형제지점끼리 근거를 공유한 사고(coordination#225).
+//   GENERIC_WORD 사전과 **하나로 합쳤다** — 사전이 둘이면 드리프트로 재발한다.
+test("isNonBranchWord: 업종어는 지점앵커가 아니다", () => {
+  for (const w of ["제과점", "본점", "로스터리", "커피"]) {
+    assert.equal(isNonBranchWord(w), true, `'${w}'를 지점으로 보면 형제지점 근거가 섞인다`);
+  }
+  for (const w of ["역삼점", "신사점"]) {
+    assert.equal(isNonBranchWord(w), false, `'${w}'는 진짜 지점명이다`);
+  }
+});
+
+// 🎷 카테고리가 업종어를 쓰는 카페(라이브카페·북카페·와인바·펍카페) — 그 업종어를 '카페 어휘'로 인정해야
+//   "제목이 다른 카페를 가리킴" 방어가 발동한다(decisions#566, 재즈클럽 야누스 사고).
+//   ⚠️ 범위가 좁은 게 설계다 — 스터디·애견카페는 아예 서비스 대상이 아니라 다른 경로가 비공개한다.
+test("nonCoffeeCafeCategoryWords: 해당 카테고리일 때만 그 업종어를 인정한다", () => {
+  assert.deepEqual(nonCoffeeCafeCategoryWords("카페,디저트>북카페"), ["북카페"]);
+  assert.deepEqual(nonCoffeeCafeCategoryWords("카페,디저트>카페"), [], "일반 카페엔 업종어 확장을 적용하지 않는다");
+  assert.ok(nonCoffeeCafeCategoryWords("카페,디저트>라이브카페").includes("재즈바"));
+});
+
+// ═══ ⑲ 화면에 직접 나가는 계산(cafeProfile) — 2026-10-18 보강 ═══
+//   결 축·주의점·시설 배지·근처 카페 유사도는 **소비자가 읽는 숫자**인데 테스트가 0개였다.
+//   핵심 규약: **표본이 적으면 판단하지 않는다**(6건 미만 생략 · 9%+ 최소 3건 · 주의점은 2건+).
+//   그 문턱이 풀리면 후기 2건짜리 카페에 "조용·차분한"이 단정으로 박힌다.
+const QUIET = "조용하고 차분해서 좋았어요 커피도 맛있습니다";
+const PARK = "주차가 어려워서 한참 돌았어요";
+const rep = (t: string, k: number) => Array(k).fill(t);
+
+test("결 축: 표본 6건 미만이면 판단하지 않는다", () => {
+  assert.deepEqual(extractHighlights(rep(QUIET, 5)), [], "5건으로 단정하면 근거가 약하다");
+  assert.deepEqual(extractHighlights(rep(QUIET, 6)).map((h) => h.label), ["조용·차분한"]);
+});
+test("결 축: 9%·최소 3건 문턱", () => {
+  const a = extractHighlights([...rep(QUIET, 3), ...rep(PARK, 7)]);
+  assert.deepEqual(a.map((h) => h.label), ["조용·차분한"], "10건 중 3건 = 문턱 충족");
+  const b = extractHighlights([...rep(QUIET, 2), ...rep(PARK, 8)]);
+  assert.deepEqual(b, [], "10건 중 2건은 문턱 미달");
+});
+test("결 축: 부정 표현은 긍정으로 세지 않는다", () => {
+  assert.deepEqual(extractHighlights(rep("조용하지 않고 시끄러웠어요 커피는 괜찮았습니다", 6)), [],
+    "'조용하지 않다'를 '조용함'으로 세면 거짓 정보가 화면에 박힌다");
+});
+test("주의점: 표본 6건 미만 생략 · 2건 이상이면 표면화", () => {
+  assert.deepEqual(extractCautions(rep(PARK, 5)), []);
+  const c = extractCautions(rep(PARK, 6));
+  assert.ok(c.some((x) => x.label === "주차 어려움"));
+  assert.ok(c[0].quote && c[0].quote.includes("주차"), "근거 인용에 그 표현이 들어 있어야 한다(09-14 수리)");
+});
+// 🅿️ 2026-10-18 어휘 보강 회귀 — "주차가 어려워요"는 `주차가 어렵`·`주차 어려` 어디에도 안 걸렸다.
+//   ⚠️ 넓게(`"주차가 어려"`) 잡으면 **"주차가 어려움이 없어요"를 주의점으로 오판**한다 —
+//      CAUTION_FLIP은 `않/아니`만 보고 `없`은 안 본다. 그래서 **활용형을 정확히** 지정했다.
+test("주의점: 조사+활용형을 잡고, 부정 문맥은 잡지 않는다", () => {
+  for (const t of ["주차가 어려워요 한참 돌았어요", "주차가 어려웠어요", "주차는 어려워서 아쉬웠어요", "주차가 어렵습니다"]) {
+    assert.ok(extractCautions(rep(t, 6)).some((c) => c.label === "주차 어려움"), `놓침: ${t}`);
+  }
+  for (const t of ["주차가 어려움이 없어요 넓습니다", "주차 편해요 넓습니다"]) {
+    assert.ok(!extractCautions(rep(t, 6)).some((c) => c.label === "주차 어려움"), `오탐: ${t}`);
+  }
+});
+test("후기 나이: 18개월이 '오래된 후기' 경계", () => {
+  assert.equal(reviewAge("2026.09.01", Date.parse("2026-10-18"))?.old, false);
+  assert.equal(reviewAge("2024.01.01", Date.parse("2026-10-18"))?.old, true);
+  assert.equal(reviewAge("아무말"), null, "파싱 실패는 null — 추측하지 않는다");
+});
+test("근처 카페 유사도: 후기 0건이면 결 벡터를 신뢰하지 않는다", () => {
+  const none = tasteVector({ quiet: 9 }, 0);
+  assert.ok(none.every((v) => v === 0), "후기 0건인데 결이 세면 엉뚱한 카페를 '비슷하다'고 추천한다");
+  const a = tasteVector({ quiet: 8, work: 7 }, 50), b = tasteVector({ quiet: 8, work: 7 }, 50);
+  assert.equal(tasteSimilarity(a, b), 1);
+  assert.equal(tasteSimilarity(a, tasteVector({ dessert: 9 }, 50)), 0);
+});
+test("카드 배지: 상한 개수만 보여준다", () => {
+  const got = cardFacets(["조용·차분한", "작업·노트북", "디저트 맛집", "주차 편함"], 3);
+  assert.equal(got.length, 3);
+  for (const g of got) assert.ok(g.emoji, `${g.label}: 이모지가 없다`);
 });
