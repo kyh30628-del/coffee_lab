@@ -33,6 +33,12 @@ let done = 0, err = 0, consecErr = 0, stale = 0, batches = 0, baselineUsed = 0;
 //   ⚠️ 쿼터 소진 시 gatherRaw가 apiFailed로 빠져 raw_checked_at이 안 찍힌다 → 같은 행이
 //   무한 재선택되는 것을 in-memory nearTried로 차단(신규 큐의 12h 가드와 같은 역할).
 const NEARMISS_CAP = Number(process.env.NEARMISS_CAP || 12);
+// 🔴 2026-10-19 gap 층 상한 — 한 창에서 gap에만 쿼터를 다 쓰지 않게(신규·미달 몫 보호).
+//   창당 기본 400곳 × 3.7콜 ≈ 1,480콜. 유휴분(평균 15,700콜/일) 안에서 충분하고,
+//   큐가 2,516+6,212곳이라 며칠에 걸쳐 소진된다(쿨다운 30일로 재수집 폭주도 막힌다).
+const GAP_CAP = Number(process.env.COLLECT_GAP_CAP || 400);
+let gapDone = 0;
+const gapTried = new Set();
 let nearDone = 0;
 const nearTried = new Set();
 const CALL_PER_CAFE_STOP = Number(process.env.CALL_PER_CAFE_STOP || 15); // 정상 ~5콜의 3배
@@ -93,6 +99,43 @@ for (;;) {
     }
     if (rows.length) tier = "near";
   }
+  // 🔴 2026-10-19 3층 'gap' 신설 — **수집 큐가 비어 있는데 수집 가능한 카페가 수천 곳 있었다.**
+  //   CEO 지시: "수집조차 안 되거나 글이 0건인 것들을 네이버 쿼터랑 연계해서 하라고.
+  //              무책임하게 그냥 제외하지 말고. 완벽하게 해."
+  //   진단(실측 2026-10-19):
+  //     · 1층 'new' 큐 = `raw_reviews IS NULL AND pipeline_status='new'` → **0곳**(완전히 비었다).
+  //     · 그런데 원본이 없는 비공개 카페는 **4,796곳**이고 status가 rejected 1,459 · (없음) 539 ·
+  //       held 518 · excluded 1,783 · noise 497 이다. 즉 **구조적 제외(2,280) 빼고 2,516곳이
+  //       status 때문에 큐에 아예 안 들어왔다.**
+  //     · 2층 'near'도 못 본다: `synth_count IN (1,2,3,4)` + `exclude_at IS NULL` 조건이라
+  //       원본 없는 카페(synth_count 0)와 사유가 찍힌 카페는 전부 빠진다.
+  //     · 원본은 있는데 **글 0건**인 카페 6,212곳도 같은 이유로 어느 층에도 안 걸린다.
+  //   그래서 네이버 쿼터가 최근 13일 평균 **37%**(매일 ~15,700콜 유휴)였다 — 일이 없어서가 아니라
+  //   큐가 일을 못 보고 있었다.
+  //   💰 수확률 실측(scripts/collect-deeper-probe.mjs, 현행 질의만으로):
+  //     원본 없음 25% · 글 0건 15%가 '주제 글'(제목이 이 카페인 글)을 새로 찾는다. 곳당 3.7콜.
+  //   ⚠️ excluded·noise는 넣지 않는다(구조적 제외 — 수집해도 공개 불가). 프랜차이즈·비카페는
+  //      아래에서 2층과 **같은 방식**으로 거른다. 좌표 없는 카페도 제외(published 조건에 좌표 박스가 있다).
+  //   ⚠️ raw_checked_at 30일 쿨다운 — 같은 카페를 반복 재수집해 쿼터를 태우지 않게.
+  if (!rows.length && !FILTER && gapDone < GAP_CAP) {
+    rows = await sql`SELECT id, name, area FROM cafes
+      WHERE published = false
+        AND COALESCE(pipeline_status, '') NOT IN ('excluded', 'noise')
+        AND (raw_reviews IS NULL OR COALESCE(jsonb_array_length(raw_reviews), 0) = 0)
+        AND (raw_checked_at IS NULL OR raw_checked_at < now() - interval '30 days')
+        AND lat IS NOT NULL
+        AND NOT (id = ANY(${[...gapTried, -1]}))
+        AND (id % ${OF}) = ${SHARD}
+      ORDER BY (raw_reviews IS NULL) DESC, id
+      LIMIT ${Math.min(20, GAP_CAP - gapDone)}`;
+    if (rows.length) {
+      rows.forEach((r) => gapTried.add(r.id));
+      const picked = rows.length;
+      rows = rows.filter((r) => !isFranchise(r.name) && !isNonCafe(r.name, ""));
+      if (!rows.length && picked > 0) continue;   // 배치가 통째로 걸러졌으면 큐 소진이 아니다
+    }
+    if (rows.length) tier = "gap";
+  }
   // 미달 몫 차례였는데 미달 풀이 비었으면 신규로 복귀 — 배분 때문에 워커가 놀면 안 된다.
   if (!rows.length && nearTurn) {
     rows = await sql`SELECT id, name, area FROM cafes WHERE raw_reviews IS NULL AND pipeline_status='new'
@@ -100,13 +143,14 @@ for (;;) {
         AND (id % ${OF}) = ${SHARD}
         ORDER BY (address LIKE '강원%') DESC, id LIMIT 20`;
   }
-  if (!rows.length) { console.log(`${label} 큐 소진 — 완료 ${done}곳${nearDone ? ` (미달재수집 ${nearDone})` : ""}`); break; }
+  if (!rows.length) { console.log(`${label} 큐 소진 — 완료 ${done}곳${nearDone ? ` (미달재수집 ${nearDone})` : ""}${gapDone ? ` (미수집갭 ${gapDone})` : ""}`); break; }
   for (const c of rows) {
     // 배치(20곳)가 도는 중에도 창을 넘기면 즉시 멈춘다 — 배치 단위로만 보면 최대 2분을 초과한다.
     if (overDeadline()) { console.log(`${label} ⏰ 창 종료(${deadlineLabel()}) — 배치 중단. 확보 ${done}곳`); break; }
     // 미달 재수집은 refresh:true(캐시 무시·새 글 수집) — 신규는 기존대로 false(raw 없어서 어차피 수집).
-    try { await synthAndStore(c, { refresh: tier === "near" }); done++; consecErr = 0; if (tier === "near") nearDone++; }
-    catch (e) { err++; consecErr++; if (tier === "near") nearDone++; if (err <= 3) console.log(`${label} ✗ ${c.name}: ${String(e).slice(0, 50)}`); }
+    // ⚠️ gap 층도 상한을 '시도'로 센다(성공만 세면 수확 0인 카페를 무한히 다시 집어 쿼터를 태운다 — near와 동일 사상).
+    try { await synthAndStore(c, { refresh: tier !== "new" }); done++; consecErr = 0; if (tier === "near") nearDone++; if (tier === "gap") gapDone++; }
+    catch (e) { err++; consecErr++; if (tier === "near") nearDone++; if (tier === "gap") gapDone++; if (err <= 3) console.log(`${label} ✗ ${c.name}: ${String(e).slice(0, 50)}`); }
     if (consecErr >= 10) { console.log(`${label} 연속 오류 10회 — 중단(재실행시 재개)`); process.exit(0); }
   }
   // 🚨 효율 자동 차단(2026-08-26) — **낭비를 사람이 발견하기 전에 워커가 스스로 멈춘다.**

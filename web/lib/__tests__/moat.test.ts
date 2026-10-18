@@ -874,3 +874,19 @@ test("판정 상한: 실측 소요(항목당 ~50토큰)를 여유 있게 덮는�
   assert.ok(judgeMaxTokens(35) >= 3000, `후보 35건(평균 1,586)에 여유가 없다(${judgeMaxTokens(35)})`);
   assert.ok(judgeMaxTokens(1000) <= 8000, "상한은 있어야 한다");
 });
+
+// 🔴 네이버 쿼터는 **앱 전체 공유 25,000/일**이고 naver_budget 카운터가 발굴+수집+마이닝을 전부 계상한다.
+//   2026-10-19 발견: lib/naverBudget.ts 주석이 "발굴 전용 · API별 한도 따로 · discover.ts 한 곳에서만 호출"
+//   이라고 **거꾸로** 적혀 있었다. 단일 출처에 거짓이 있으면 모든 계획·보고가 거짓이 된다.
+//   호출처가 줄어/늘어나면 이 테스트가 먼저 깨져 주석을 다시 보게 만든다.
+test("네이버 쿼터: bumpNaver는 발굴·수집·마이닝 세 경로에서 계상한다(공유 한도)", () => {
+  const callers = ["../discover.ts", "../webSearchCollector.ts", "../reviewMiner.ts"];
+  for (const f of callers) {
+    const src = readFileSync(new URL(f, import.meta.url), "utf8");
+    assert.ok(/bumpNaver\(/.test(src), `${f}가 bumpNaver를 호출하지 않는다 — 공유 한도 계상이 깨진다`);
+  }
+  const budget = readFileSync(new URL("../naverBudget.ts", import.meta.url), "utf8");
+  assert.ok(!/bumpNaver는 lib\/discover\.ts 한 곳에서만 호출된다/.test(budget),
+    "거꾸로였던 옛 주석이 되살아났다");
+  assert.ok(/앱 전체 공유/.test(budget), "공유 한도라는 사실이 단일 출처에 적혀 있어야 한다");
+});
