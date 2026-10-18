@@ -874,9 +874,12 @@ test("판정 파싱: 코드블록으로 감싼 배열도 읽는다(회귀)", () 
   assert.equal(m?.get(0)?.helpful, true);
 });
 test("판정 상한: 실측 소요(항목당 ~50토큰)를 여유 있게 덮는다", () => {
-  assert.ok(judgeMaxTokens(1) >= 732, `후보 1건 실측 최대 732를 못 덮는다(${judgeMaxTokens(1)})`);
-  assert.ok(judgeMaxTokens(29) >= 1760, `후보 29건 실측 최대 1,760을 못 덮는다(${judgeMaxTokens(29)})`);
-  assert.ok(judgeMaxTokens(35) >= 3000, `후보 35건(평균 1,586)에 여유가 없다(${judgeMaxTokens(35)})`);
+  // 실측 최대(2026-10-19 3차, Haiku 5.5는 Sonnet보다 1.6배 길게 쓴다): n≈2에서 1,200 · n≈9에서 2,200 ·
+  //   n≈20에서 3,700 · n≈34에서 4,300. 이 값들을 덮어야 잘림이 사라진다.
+  assert.ok(judgeMaxTokens(2) >= 1200, `후보 2건 실측 최대 1,200을 못 덮는다(${judgeMaxTokens(2)})`);
+  assert.ok(judgeMaxTokens(9) >= 2200, `후보 9건 실측 최대 2,200을 못 덮는다(${judgeMaxTokens(9)})`);
+  assert.ok(judgeMaxTokens(20) >= 3700, `후보 20건 실측 최대 3,700을 못 덮는다(${judgeMaxTokens(20)})`);
+  assert.ok(judgeMaxTokens(35) >= 4300, `후보 35건 실측 최대 4,300을 못 덮는다(${judgeMaxTokens(35)})`);
   assert.ok(judgeMaxTokens(1000) <= 8000, "상한은 있어야 한다");
 });
 
