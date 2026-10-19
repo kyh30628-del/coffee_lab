@@ -1183,6 +1183,11 @@ test("배포: 자동 배포가 푸시 뒤 상세 라우트 캐시를 비운다",
   assert.ok(iPush > 0, "푸시 단계가 없다");
   assert.ok(iPurge > 0, "캐시 무효화 단계가 없다 — UI 변경이 사용자 화면에 가지 않는다");
   assert.ok(iPush < iPurge, "무효화가 푸시보다 먼저다 — 빌드 전에 비우면 옛 HTML이 다시 캐시된다");
+  // 🔴 2026-10-19: 무효화 엔드포인트는 **빌드 중에도** ok:true를 돌려준다. 그 응답만 보고 비우면
+  //   옛 HTML이 그대로 다시 캐시된다(= "배포했는데 화면에 안 보인다"의 진범). 새 SHA가 뜬 뒤에 비운다.
+  const iVer = sh.indexOf("api/version");
+  assert.ok(iVer > iPush && iVer < iPurge, "새 빌드가 올라왔는지 확인하지 않고 캐시를 비운다");
+  assert.ok(/FULL=\$\(git rev-parse HEAD\)/.test(sh), "방금 푸시한 커밋과 대조하지 않는다");
 });
 test("배포: 무효화 엔드포인트는 라우트 전체를 한 번에 비우고 인증을 요구한다", () => {
   const api = codeOf("../../app/api/purge-detail-route/route.ts");

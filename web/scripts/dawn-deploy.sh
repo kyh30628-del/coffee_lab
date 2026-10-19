@@ -68,17 +68,31 @@ if git push origin main >> "$LOG" 2>&1; then
   #      상세 페이지는 8,853곳으로 평상시 월간 재생성(49,874회)의 17.8%다.
   #      총량이 느는 게 아니라 **30일 주기를 앞당기는 것**이다.
   # .env.local 값은 따옴표가 없거나 큰따옴표만 쓴다 — 읽기 쉬운 형태로 둔다(중첩 따옴표 지옥 금지).
+  #   🔴 순서가 생명이다(2026-10-19 수리): **빌드가 끝나기 전에 비우면 옛 HTML이 그대로 다시 캐시된다.**
+  #   무효화 엔드포인트는 빌드 중에도 ok:true를 돌려주므로 그 응답만 보고 멈추면 안 된다.
+  #   그래서 `/api/version`이 **방금 푸시한 커밋 SHA**를 돌려줄 때까지 기다린 뒤에 비운다.
   SECRET=$(grep -m1 '^CRON_SECRET=' "$REPO/web/.env.local" 2>/dev/null | cut -d= -f2- | tr -d '"')
   if [ -n "$SECRET" ]; then
-    for i in $(seq 1 30); do   # 빌드 대기 최대 10분(20초 × 30)
-      if curl -s -m 20 -H "authorization: Bearer $SECRET" \
-           "https://dongnecoffeenote.com/api/purge-detail-route" 2>/dev/null | grep -q '"ok":true'; then
-        say "🧹 상세 라우트 캐시 무효화 완료 — 사용자 화면에 반영됨"
-        break
+    FULL=$(git rev-parse HEAD)
+    LIVE=0
+    for i in $(seq 1 45); do   # 빌드 대기 최대 15분(20초 × 45)
+      if curl -s -m 20 "https://dongnecoffeenote.com/api/version" 2>/dev/null | grep -q "$FULL"; then
+        LIVE=1; say "✅ 새 빌드가 프로덕션에 올라옴($SHA) — 이제 캐시를 비운다"; break
       fi
-      [ "$i" = "30" ] && say "WARN 캐시 무효화 실패 - 빌드 지연 가능. 다음 배포 또는 수동 호출 필요"
       sleep 20
     done
+    if [ "$LIVE" = "1" ]; then
+      if curl -s -m 30 -H "authorization: Bearer $SECRET" \
+           "https://dongnecoffeenote.com/api/purge-detail-route" 2>/dev/null | grep -q '"ok":true'; then
+        say "🧹 상세 라우트 캐시 무효화 완료 — 사용자 화면에 반영됨"
+      else
+        say "🔴 캐시 무효화 실패 — 새 코드는 올라갔지만 캐시된 상세는 옛 화면이다. 수동 호출 필요."
+        beat 1 "캐시 무효화 실패($SHA) — 상세 페이지가 옛 화면을 내보낸다"
+      fi
+    else
+      say "🔴 15분 안에 새 빌드가 안 올라옴 — 비우지 않았다(일찍 비우면 옛 HTML이 다시 캐시된다)"
+      beat 1 "배포 빌드 미완료($SHA) — 캐시 무효화 보류, 확인 필요"
+    fi
   else
     say "⚠️ CRON_SECRET 없음 — 캐시 무효화 생략(UI 변경이 사용자에게 안 갈 수 있다)"
   fi
