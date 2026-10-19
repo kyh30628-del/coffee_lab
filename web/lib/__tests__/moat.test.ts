@@ -1223,6 +1223,8 @@ test("ISR: 대량 캐시 라우트에 날짜·난수 같은 비결정 출력이 
 test("ISR: 상세 '확인' 날짜는 렌더 시각이 아니라 검증 시각(synth_checked_at)이다", () => {
   const code = codeOf("../../app/c/[id]/page.tsx");
   assert.ok(/c\.synth_checked_at/.test(code), "SELECT에 synth_checked_at이 없다");
-  assert.ok(/const checkedT = c\.synth_checked_at/.test(code), "검증 시각을 기준으로 쓰지 않는다");
+  // 🔴 날짜 그대로 쓰면 스캔마다 갱신돼(실측 하루 20,735곳) 비결정성이 되살아난다 — 월 단위여야 한다.
+  assert.ok(/slice\(0, 7\)/.test(code), "검증 시각을 월 단위로 낮추지 않았다 — 스캔마다 ISR 쓰기가 난다");
+  assert.ok(!/synth_checked_at[\s\S]{0,80}slice\(0, 10\)/.test(code), "검증 시각을 일 단위로 찍고 있다");
   assert.ok(/checkedOn \? `/.test(code), "값이 없을 때 빈 날짜가 화면에 찍힌다");
 });

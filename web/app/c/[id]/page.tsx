@@ -262,7 +262,12 @@ export default async function CafePage({ params }: Props) {
   //    ISR 출력에 new Date()·Math.random() 같은 비결정 코드가 있는지 보라"). 상세 1쪽 98KB = 쓰기 13단위다.
   //   그래서 기준 시각을 **그 카페를 마지막으로 검증한 때**(synth_checked_at)로 고정한다 —
   //   값이 바뀌는 시점 = 실제로 내용이 바뀐 시점이라, 그때만 쓰기가 나간다.
-  const checkedT = c.synth_checked_at ? new Date(c.synth_checked_at).getTime() : 0;
+  //   🔴 단, synth_checked_at을 **날짜 그대로** 쓰면 안 된다(실측): 내용이 그대로여도 스캔할 때마다
+  //   갱신돼 하루 20,735곳이 바뀐다 = 비결정성을 옮긴 것뿐이다. 그래서 **월 단위로 낮춘다** —
+  //   한 카페당 한 달에 한 번만 바뀌고, 그때는 어차피 내용도 바뀌어 쓰기가 정당하다.
+  const checkedMo = typeof c.synth_checked_at === "string" || c.synth_checked_at
+    ? new Date(c.synth_checked_at).toISOString().slice(0, 7) : "";          // "2026-10"
+  const checkedT = checkedMo ? Date.parse(`${checkedMo}-01T00:00:00Z`) : 0; // 월초로 고정
   const evAll = Array.isArray(evRaw)
     ? ensureRecent(sortReviews(evRaw, c.name ?? "", [c.area, c.dong].filter(Boolean) as string[], checkedT || Date.parse("2026-01-01"), c.dong))
     : [];
@@ -404,7 +409,7 @@ export default async function CafePage({ params }: Props) {
   const nearTitle = nearbyTitle(nearby, c.area, c.dong);
   // 🔴 렌더 날짜(new Date())를 찍으면 **매일 출력이 달라져 ISR 쓰기가 영구 과금된다.** 위 checkedT 주석 참조.
   //   의미상으로도 "확인"은 페이지가 그려진 날이 아니라 **우리가 검증한 날**이 맞다.
-  const checkedOn = checkedT ? new Date(checkedT).toISOString().slice(0, 10) : "";
+  const checkedOn = checkedMo ? `${checkedMo.slice(0, 4)}년 ${Number(checkedMo.slice(5, 7))}월` : "";
   const srcLine = (
     <p className="nt-src">네이버 공개 후기 {(c.synth_count ?? 0).toLocaleString()}건 교차검증 · 영수증 리뷰·광고·협찬 제외{checkedOn ? ` · ${checkedOn} 확인` : ""}</p>
   );
