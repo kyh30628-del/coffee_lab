@@ -1121,14 +1121,29 @@ test("SQL 템플릿: 태그드 템플릿 안의 주석에 백틱이 없다", () 
 // 💬 사용자 한 줄 피드백 — 2026-10-19 신설. 우리에게 **실사용자 직접 피드백 채널이 없었다**
 //   (품질을 전부 내부 지표로 추정했다). CEO와 합의한 설계 제약을 못으로 박는다.
 test("피드백: 뒤로가기를 가로채지 않는다(모바일 제스처·검색 복귀 보호)", () => {
-  const bar = readFileSync(new URL("../../app/c/[id]/FeedbackBar.tsx", import.meta.url), "utf8");
+  const bar = readFileSync(new URL("../../app/FeedbackBar.tsx", import.meta.url), "utf8");
   const code = bar.split("\n").filter((l) => !l.trim().startsWith("//")).join("\n");
   for (const bad of ["popstate", "pushState", "beforeunload", "history.back"]) {
     assert.ok(!code.includes(bad), `뒤로가기/이탈을 가로챈다(${bad}) — 유입 34%가 모바일이고 81%가 검색이다`);
   }
 });
+// 🔴 2026-10-19 CEO 격노 — 피드백 바를 **SEO 페이지에만** 넣고 사람들이 실제로 쓰는
+//   지도 상세 패널에는 안 넣었다. 상세를 건드릴 때는 `/c/[id]`와 `CafePanel`(app/page.tsx) **둘 다**가 원칙이다.
+//   같은 사고가 2026-09-20·09-22에도 있었고 메모리에 규칙으로 적혀 있었는데 또 어겼다. 관문으로 고정한다.
+test("상세 두 화면: 피드백 바가 SEO 페이지와 지도 패널 **둘 다** 있다", () => {
+  for (const f of ["../../app/c/[id]/page.tsx", "../../app/page.tsx"]) {
+    const code = codeOf(f);
+    assert.ok(/<FeedbackBar\s+cafeId=/.test(code), `${f}: 피드백 바가 없다 — 한쪽만 넣으면 반쪽이다`);
+  }
+});
+test("상세 두 화면: 후기에 원문 링크가 **둘 다** 걸린다", () => {
+  for (const f of ["../../app/c/[id]/page.tsx", "../../app/page.tsx"]) {
+    const code = codeOf(f);
+    assert.ok(/e\.link|rv\.link/.test(code) && /href=/.test(code), `${f}: 후기 원문으로 갈 길이 없다`);
+  }
+});
 test("피드백: 한 탭만으로 접수된다(텍스트 필수 아님)", () => {
-  const bar = readFileSync(new URL("../../app/c/[id]/FeedbackBar.tsx", import.meta.url), "utf8");
+  const bar = readFileSync(new URL("../../app/FeedbackBar.tsx", import.meta.url), "utf8");
   // 👍/👎 누르는 즉시 send 한다 — 텍스트 입력 전에 이미 신호가 남아야 응답률이 유지된다.
   assert.ok(/setKind\("like"\); send\("like"\)/.test(bar), "좋아요 탭이 즉시 접수하지 않는다");
   assert.ok(/setKind\("meh"\); send\("meh"\)/.test(bar), "아쉬워요 탭이 즉시 접수하지 않는다");

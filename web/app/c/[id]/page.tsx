@@ -10,7 +10,7 @@ import SaveMemoryButton from "./SaveMemoryButton";
 import WishButton from "../../WishButton";
 import OwnerCtaLink from "./OwnerCtaLink";
 import ReportButton from "./ReportButton";
-import FeedbackBar from "./FeedbackBar";
+import FeedbackBar from "../../FeedbackBar";
 import { publicOwnerContent } from "@/lib/ownerContent";
 import VisitorReviews from "../../VisitorReviews";
 import RecentCafes from "../../RecentCafes";

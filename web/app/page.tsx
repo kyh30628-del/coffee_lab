@@ -10,6 +10,7 @@ import PlaceCta from "./PlaceCta";
 import ShowcaseBanner, { SHOWCASE_CSS } from "./ShowcaseBanner";
 import OwnerSignupModal from "./OwnerSignupModal";
 import OwnerFindModal from "./OwnerFindModal";
+import FeedbackBar from "./FeedbackBar";
 import VisitorReviews from "./VisitorReviews";
 import KakaoShare from "./KakaoShare";
 import { trackShare } from "./trackShareClient";
@@ -3248,6 +3249,14 @@ function CafePanel({ cafe, dist, allCafes, onOpenCafe, onClose, onMap, bookmarke
 
           {/* 방문자 후기 */}
           {userReviews.length > 0 && <div className="px-3 pt-3 nt-free nt-g"><VisitorReviews reviews={userReviews} /></div>}
+
+          {/* 💬 한 줄 피드백 — 🔴 2026-10-19 CEO 지적: 처음에 **SEO 페이지(/c/[id])에만** 넣었다.
+              사람들이 실제로 쓰는 화면은 지도 상세 패널인데 거기가 비어 있었다.
+              상세를 건드릴 때는 `/c/[id]`와 이 패널 **둘 다**가 원칙이다(메모리에 적혀 있던 규칙을 내가 어겼다).
+              자리도 SEO 페이지와 같게 둔다 — 방문자 후기 아래, 접힘 위(접힘 안에 넣으면 아무도 안 본다). */}
+          <div className="nt-ruled nt-margin-gutter px-3" style={{ paddingTop: 34 }}>
+            <FeedbackBar cafeId={cafe.id} />
+          </div>
 
           {/* 접힘 — 판정 방법 · 더 하기 */}
           <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34, paddingBottom: 34 }}>
