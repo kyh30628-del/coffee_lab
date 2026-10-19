@@ -1168,3 +1168,25 @@ test("판정 모델: 집행기가 model을 쿼리로 넘긴다(환경변수에 �
   const runner = codeOf("../../scripts/judge-run.mjs");
   assert.ok(/&model=\$\{encodeURIComponent\(MODEL\)\}/.test(runner), "집행기가 model을 쿼리로 넘기지 않는다");
 });
+
+// 🔴 배포는 **사용자 화면까지** 가야 끝이다 — 2026-10-19 실사고.
+//   `/c/[id]`는 ISR 30일이라 배포해도 **이미 캐시된 페이지는 옛 HTML을 그대로 내보낸다.**
+//   사용자 피드백 바를 배포했는데 대부분의 카페 페이지에서 보이지 않았다. 내가 확인한 한 곳이
+//   마침 재생성된 페이지라 "프로덕션 작동 확인"이라고 잘못 보고했다(표본 1개로 단정).
+//   → 자동 배포가 푸시 뒤 **상세 라우트 캐시를 비운다.** 이 단계가 빠지면 같은 사고가 반복된다.
+//   💰 무효화는 쓰기 0이고 재생성은 방문 시에만 → 실측 30일 방문 8,853곳 = 평상시 월간의 17.8%.
+//      총량이 느는 게 아니라 30일 주기를 앞당기는 것이다.
+test("배포: 자동 배포가 푸시 뒤 상세 라우트 캐시를 비운다", () => {
+  const sh = readFileSync(new URL("../../scripts/dawn-deploy.sh", import.meta.url), "utf8");
+  const iPush = sh.indexOf("git push origin main");
+  const iPurge = sh.indexOf("api/purge-detail-route");
+  assert.ok(iPush > 0, "푸시 단계가 없다");
+  assert.ok(iPurge > 0, "캐시 무효화 단계가 없다 — UI 변경이 사용자 화면에 가지 않는다");
+  assert.ok(iPush < iPurge, "무효화가 푸시보다 먼저다 — 빌드 전에 비우면 옛 HTML이 다시 캐시된다");
+});
+test("배포: 무효화 엔드포인트는 라우트 전체를 한 번에 비우고 인증을 요구한다", () => {
+  const api = codeOf("../../app/api/purge-detail-route/route.ts");
+  assert.ok(/CRON_SECRET/.test(api) && /status: 401/.test(api), "인증이 없다");
+  assert.ok(/revalidatePath\(route, type\)/.test(api), "라우트 단위 무효화를 쓰지 않는다");
+  assert.ok(/"\/c\/\[id\]", "page"/.test(api), "상세 라우트를 비우지 않는다");
+});

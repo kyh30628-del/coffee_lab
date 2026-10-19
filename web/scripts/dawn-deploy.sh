@@ -57,6 +57,32 @@ say "✅ 빌드 통과 — 푸시"
 if git push origin main >> "$LOG" 2>&1; then
   SHA=$(git rev-parse --short HEAD)
   say "✅ 푸시 완료 $SHA (${N}건)"
+
+  # 🔴 2026-10-19 — **배포만으로는 사용자 화면에 가지 않는다.** (CEO: "배포하면 사용자 화면까지 가도록 하라")
+  #   `/c/[id]`는 ISR 30일(revalidate=2592000)이라 이미 캐시된 페이지는 **배포 전 HTML을 그대로 내보낸다.**
+  #   클라이언트 컴포넌트도 예외가 아니다 — 마운트 지점이 그 페이지의 RSC 페이로드에 있어야 한다.
+  #   실사고: 사용자 피드백 바를 배포했는데 대부분의 카페 페이지에서 보이지 않았고,
+  #   내가 확인한 한 곳은 마침 재생성된 페이지라 "배포 완료"라고 잘못 보고했다.
+  #   → 푸시 뒤 Vercel 빌드가 끝나길 기다렸다가 **상세 라우트 캐시를 비운다.**
+  #   💰 무효화 자체는 쓰기 0이고, 재생성은 **방문할 때만** 일어난다. 실측: 30일간 실제 방문되는
+  #      상세 페이지는 8,853곳으로 평상시 월간 재생성(49,874회)의 17.8%다.
+  #      총량이 느는 게 아니라 **30일 주기를 앞당기는 것**이다.
+  # .env.local 값은 따옴표가 없거나 큰따옴표만 쓴다 — 읽기 쉬운 형태로 둔다(중첩 따옴표 지옥 금지).
+  SECRET=$(grep -m1 '^CRON_SECRET=' "$REPO/web/.env.local" 2>/dev/null | cut -d= -f2- | tr -d '"')
+  if [ -n "$SECRET" ]; then
+    for i in $(seq 1 30); do   # 빌드 대기 최대 10분(20초 × 30)
+      if curl -s -m 20 -H "authorization: Bearer $SECRET" \
+           "https://dongnecoffeenote.com/api/purge-detail-route" 2>/dev/null | grep -q '"ok":true'; then
+        say "🧹 상세 라우트 캐시 무효화 완료 — 사용자 화면에 반영됨"
+        break
+      fi
+      [ "$i" = "30" ] && say "WARN 캐시 무효화 실패 - 빌드 지연 가능. 다음 배포 또는 수동 호출 필요"
+      sleep 20
+    done
+  else
+    say "⚠️ CRON_SECRET 없음 — 캐시 무효화 생략(UI 변경이 사용자에게 안 갈 수 있다)"
+  fi
+
   beat 0 "자동 배포 ${N}건 푸시 완료($SHA)"
   notify "배포했습니다 — ${N}건 ($SHA)"
 else
