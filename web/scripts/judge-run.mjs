@@ -28,6 +28,9 @@ const arg = (k, d) => { const a = process.argv.find((x) => x.startsWith(`--${k}=
 const BASE = arg("base", "http://127.0.0.1:3204");
 // 🎯 구간 — rescue(미공개 후보구제: 공개를 늘린다) / refine(공개 재정제: 품질만) / "" (둘 다)
 const SCOPE = arg("scope", "");
+// 🔴 2026-10-19 — 모델은 **쿼리로 서버에 넘긴다.** 환경변수(JUDGE_MODEL)는 이 프로세스의 것이고
+//   판정 제출은 curl로 부르는 **서버**가 한다 → 환경변수는 전달되지 않는다(실사고: Sonnet 대신 Haiku 4.5로 샀다).
+const MODEL = process.env["JUDGE_MODEL"] || "";
 const BUDGET = Number(arg("budget", 100));
 const MAX_CYCLES = Number(arg("max-cycles", 999));
 const STATUS_ONLY = process.argv.includes("--status");
@@ -161,7 +164,7 @@ for (let cycle = 1; cycle <= MAX_CYCLES; cycle++) {
   if (left === 0) { console.log(`\n✅ 판정 대기 0곳 — 더 살 것이 없다.`); break; }
 
   // ── ④ 제출 1회(라우트의 BUILD_LIMIT만큼)
-  const sub = await call(`manual=1&submit=1${SCOPE ? `&scope=${SCOPE}` : ""}`);
+  const sub = await call(`manual=1&submit=1${SCOPE ? `&scope=${SCOPE}` : ""}${MODEL ? `&model=${encodeURIComponent(MODEL)}` : ""}`);
   if (!sub.ok) { console.log(`🔴 제출 실패: ${JSON.stringify(sub).slice(0, 180)}`); break; }
   const s = sub.submitted;
   if (!s || !s.newBatchId) { console.log(`  [${cycle}] 제출 없음 — ${sub.note ?? JSON.stringify(sub).slice(0, 140)}`); break; }

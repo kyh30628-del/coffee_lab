@@ -102,6 +102,9 @@ export default function AdminPage() {
   const [showBorderline, setShowBorderline] = useState(false);
   const [blData, setBlData] = useState<any>(null);
   const loadBorderline = (password: string) => fetch("/api/admin/borderline", { headers: { "x-admin-password": password }, cache: "no-store" }).then((x) => x.json()).then((d) => { if (d.ok) setBlData(d); }).catch(() => {});
+  // 💬 사용자 한 줄 피드백(2026-10-19) — 실사용자 직접 목소리. 우리에게 이 채널이 **없었다**.
+  const [fb, setFb] = useState<any>(null);
+  const loadFeedback = (password: string) => fetch("/api/admin/feedback", { headers: { "x-admin-password": password }, cache: "no-store" }).then((x) => x.json()).then((d) => { if (d.ok) setFb(d); }).catch(() => {});
   // ⚖️ 카페 둘러보기 시·도 순환 — 순환이 실제로 공평하게 도는지 확인(CEO 지시 2026-08-25).
   //   ⚠️ 아래 loadRotation(/api/admin/rotation)은 **유료 노출 로테이션**으로 이름만 비슷한 다른 기능이다.
   const [rot, setRot] = useState<any>(null);
@@ -197,6 +200,7 @@ export default function AdminPage() {
     fetch("/api/sub-request", h).then((x) => x.json()).then((d) => { if (d.ok) { setSubs(d.requests ?? []); setPurged(d.purgedRecently ?? 0); } }).catch(() => {});
     fetch("/api/cron-verify?latest=1", h).then((x) => x.json()).then((d) => { if (d.ok) { setVerify(d.report); setGrounding(d.grounding); setVerifyHistory(d.history ?? []); } }).catch(() => {});
     loadBorderline(password);
+    loadFeedback(password);
   };
   // 🔐 세션 복원 — 저장된 관리자 비밀번호(adm_pw)가 있으면 자동 인증(/admin/org와 동일 패턴).
   //   조직관제에서 '대시보드'로 돌아올 때 비밀번호 화면이 재노출되지 않도록 한다(#213).
@@ -396,6 +400,58 @@ export default function AdminPage() {
             <div className={`text-[11px] font-medium mt-0.5 ${pendingActionsN > 0 ? "text-amber-800" : "text-stone-600"}`}>{pendingActionsN > 0 ? "🟡" : "🟢"} CEO 결재 대기</div>
           </a>
         </div>
+
+        {/* 💬 사용자 한 줄 피드백(2026-10-19 신설) — 실사용자가 상세 페이지 하단 또는 지도·플레이스
+            외부 클릭 직후에 남긴 👍/👎 + 선택 텍스트. **글이 달린 것부터** 보여준다(숫자는 집계로 본다).
+            기본 접힘(CEO 규약) · 접힌 헤더에 7일 요약과 읽을 글 수를 띄운다. */}
+        {fb && (
+          <details className="mb-6 rounded-2xl border border-stone-300 bg-white overflow-hidden">
+            <summary className="px-4 py-3 cursor-pointer select-none flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <span className="text-lg">💬</span>
+                <span className="flex flex-col">
+                  <span className="font-bold text-stone-800">사용자 피드백 {fb.sum.d7.note > 0 ? `— 읽을 글 ${fb.sum.d7.note}건` : ""}</span>
+                  <span className="text-[11px] text-stone-700">
+                    7일 — 👍 {fb.sum.d7.like} · 👎 {fb.sum.d7.meh} · 글 {fb.sum.d7.note}
+                    {" | 30일 — 👍 "}{fb.sum.d30.like} · 👎 {fb.sum.d30.meh} · 글 {fb.sum.d30.note}
+                    {" | 누적 "}{fb.sum.all}
+                    {fb.sum.all === 0 ? " — 아직 0건(배포 직후면 정상)" : ""}
+                  </span>
+                </span>
+              </span>
+              <span className="text-stone-400 text-xs">펼치기</span>
+            </summary>
+            <div className="px-4 pb-4">
+              <p className="text-[11px] text-stone-600 mb-3 leading-relaxed">
+                👍/👎는 <b>한 번 탭하면 즉시 접수</b>되고 텍스트는 선택입니다. 같은 카페는 30일간 다시 묻지 않습니다.
+                뒤로가기는 가로채지 않습니다(모바일 제스처·검색 복귀 보호).
+              </p>
+              {fb.items.length === 0 ? (
+                <p className="text-[12px] text-stone-500">아직 없습니다.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {fb.items.map((it: any) => (
+                    <li key={it.id} className="rounded-lg border border-stone-200 px-3 py-2">
+                      <div className="flex items-center gap-2 text-[11px] text-stone-600">
+                        <span className={it.kind === "like" ? "text-emerald-700" : "text-amber-800"}>
+                          {it.kind === "like" ? "👍 좋아요" : "👎 아쉬워요"}
+                        </span>
+                        {it.cafeId && (
+                          <a href={`/c/${it.cafeId}`} target="_blank" rel="noreferrer" className="underline">
+                            {it.cafeName || `#${it.cafeId}`}{it.cafeArea ? ` (${it.cafeArea})` : ""}
+                          </a>
+                        )}
+                        {it.place === "after-outlink" && <span className="text-stone-500">· 지도·플레이스 클릭 직후</span>}
+                        <span className="ml-auto text-stone-400">{it.at ? new Date(it.at).toLocaleString("ko-KR", { hour12: false }) : ""}</span>
+                      </div>
+                      {it.note && <p className="mt-1 text-[13px] text-stone-800 whitespace-pre-wrap leading-relaxed">{it.note}</p>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </details>
+        )}
 
         {/* 🏛️ 회사 포트폴리오 — 형제 서비스 이슈·결재 읽기전용(조치는 해당 서비스 관제탑에서). 기본 접힘. */}
         {ownerFunnel && (

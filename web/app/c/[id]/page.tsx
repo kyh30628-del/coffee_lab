@@ -10,6 +10,7 @@ import SaveMemoryButton from "./SaveMemoryButton";
 import WishButton from "../../WishButton";
 import OwnerCtaLink from "./OwnerCtaLink";
 import ReportButton from "./ReportButton";
+import FeedbackBar from "./FeedbackBar";
 import { publicOwnerContent } from "@/lib/ownerContent";
 import VisitorReviews from "../../VisitorReviews";
 import RecentCafes from "../../RecentCafes";
@@ -623,6 +624,13 @@ export default async function CafePage({ params }: Props) {
 
         {/* 방문자 후기 */}
         {userReviews.length > 0 && <div className="px-3 pt-3 nt-free"><VisitorReviews reviews={userReviews} /></div>}
+
+        {/* 💬 한 줄 피드백(2026-10-19) — **접힘 밖, 본문 끝 상시 노출.**
+            접힘 안에 넣으면 아무도 안 본다(ReportButton이 접힘 안에 있어 접수가 거의 없었다).
+            끝까지 읽은 사람이 자연스럽게 누르는 자리다. 뒤로가기는 가로채지 않는다. */}
+        <div className="nt-ruled nt-margin-gutter px-3" style={{ paddingTop: 28 }}>
+          <FeedbackBar cafeId={Number(c.id)} />
+        </div>
 
         {/* 접힘 — 판정 방법 · 자주 묻는 질문 · 더 하기(담아두기·추억·사진·사장님·더 찾기) */}
         <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>

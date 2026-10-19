@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema } from "@/lib/db";
 import { getAuditCandidates, getUndecidedAuditCandidates, applyDecisions, markJudged, bumpJudgePass } from "@/lib/synthStore";
-import { createBatch, getBatch, streamResults, cancelBatch, BATCH_PRICE_IN, BATCH_PRICE_OUT, batchPriceFor } from "@/lib/anthropicBatch";
+import { createBatch, getBatch, streamResults, cancelBatch, BATCH_PRICE_IN, BATCH_PRICE_OUT, batchPriceFor, BATCH_PRICES } from "@/lib/anthropicBatch";
 import { RUBRIC, buildUserText, parseVerdicts, decisionsFromVerdicts, judgeMaxTokens, CLAUDE_MODEL } from "@/lib/reviewJudge";
 import { OLD_REVIEW_MONTHS } from "@/lib/cafeProfile";
 
@@ -186,7 +186,18 @@ export async function GET(req: NextRequest) {
     //   근본 원인은 이 엔드포인트가 '수거'와 '제출'을 한 호출에 묶어둔 것이다 —
     //   **수거하고 싶을 때마다 제출이 따라온다.** 그래서 둘을 파라미터로 분리한다.
     //   기본(=수거만)이 안전한 쪽이고, 제출은 `&submit=1`을 명시해야만 한다.
-    const scope = req.nextUrl.searchParams.get("scope") ?? "";   // "" | rescue | refine (아래 후보 선정에서 사용)
+    const scope = req.nextUrl.searchParams.get("scope") ?? "";   // "" | rescue | refine | thin | verified | flip
+    // 🔴 2026-10-19 **모델을 요청마다 받는다.** 그 전엔 `JUDGE_MODEL` 환경변수만 봤는데, 그 값은
+    //   **이 라우트가 도는 서버 프로세스**의 것이다. 집행기(judge-run.mjs)는 curl로 이 라우트를 부르므로
+    //   `JUDGE_MODEL=... node judge-run.mjs` 는 **서버에 전달되지 않는다.**
+    //   실사고: judge-full-coverage.sh가 구간별로 모델을 넘겼는데 서버는 기본값(claude-haiku-4-5)으로
+    //   제출했다 — "thin은 Sonnet 5" 라는 내 보고가 거짓이 됐고, 구형 Haiku 4.5(5배 비싼 단가)로 샀다.
+    //   ⚠️ 단가표에 없는 모델은 거부한다(모르는 단가로 사면 예산 가드가 거짓이 된다).
+    const reqModel = req.nextUrl.searchParams.get("model") ?? "";
+    if (reqModel && !BATCH_PRICES[reqModel]) {
+      return NextResponse.json({ ok: false, error: `단가를 모르는 모델: ${reqModel} — 거부(예산 가드가 거짓이 된다)` }, { status: 400 });
+    }
+    const MODEL = reqModel || CLAUDE_MODEL;
     if (req.nextUrl.searchParams.get("submit") !== "1") {
       return NextResponse.json({ ok: true, mode: "collect-only",
         note: "수거만 수행했다. 신규 제출은 &submit=1 을 명시할 때만 — 상태 확인 목적 호출이 과금을 만들지 않게(09-20 중복제출 사고).",
@@ -337,7 +348,7 @@ export async function GET(req: NextRequest) {
         requests.push({
           custom_id: `cafe_${c.id}`,
           params: {
-            model: CLAUDE_MODEL, max_tokens: judgeMaxTokens(items.length),   // 🔴 1500 고정이던 자리 — 35항목에서 잘려 오판정을 냈다(reviewJudge.judgeMaxTokens 주석)
+            model: MODEL, max_tokens: judgeMaxTokens(items.length),   // 🔴 1500 고정이던 자리 — 35항목에서 잘려 오판정을 냈다(reviewJudge.judgeMaxTokens 주석)
             system: [{ type: "text", text: RUBRIC, cache_control: { type: "ephemeral" } }],
             messages: [{ role: "user", content: buildUserText(c.name, c.area ?? "", items.map((it: any, i: number) => ({ i, title: it.title || "", body: it.body || "" }))) }],
           },
@@ -366,7 +377,7 @@ export async function GET(req: NextRequest) {
         : Array.isArray(v) ? v.map(scrub)
         : v && typeof v === "object" ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, scrub(x)]))
         : v;
-      try { await sql`INSERT INTO judge_batches (batch_id, manifest) VALUES (${b.id}, ${JSON.stringify(scrub({ cafes: manifestCafes, model: CLAUDE_MODEL }))}::jsonb) ON CONFLICT (batch_id) DO NOTHING`; }
+      try { await sql`INSERT INTO judge_batches (batch_id, manifest) VALUES (${b.id}, ${JSON.stringify(scrub({ cafes: manifestCafes, model: MODEL }))}::jsonb) ON CONFLICT (batch_id) DO NOTHING`; }
       catch (e) {
         await cancelBatch(KEY, b.id).catch(() => {});   // 수거 못 할 배치는 살려둘 이유가 없다 — 과금부터 끊는다
         return NextResponse.json({ ok: false, error: "manifest 저장 실패 — 배치 취소함", detail: String(e).slice(0, 120), batchId: b.id });

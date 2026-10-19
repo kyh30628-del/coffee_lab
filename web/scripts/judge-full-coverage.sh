@@ -11,7 +11,7 @@
 # 모델 배분(실측 단가 Haiku $0.00042 · Sonnet $0.00608):
 #   얇은 카페(문턱 근접)·오염 의심 = Sonnet 5 · 나머지 = Haiku 5.5
 cd /Users/wangwida/coffee-platform/web
-PORT=${PORT:-3220}
+PORT=${PORT:-3221}
 run() {
   echo "══════ [$1 · $2] $(date '+%H:%M') ══════"
   JUDGE_MODEL=$2 node --import tsx scripts/judge-run.mjs --scope=$1 --budget=100 --base=http://127.0.0.1:$PORT

@@ -619,6 +619,17 @@ test("카드 배지: 상한 개수만 보여준다", () => {
 //   같은 파일이 이미 같은 원칙을 쓴다(`직접로스팅`은 "1건은 환각 위험 → 2건+만 주장")고,
 //   결 축·주의점(cafeProfile)은 "표본 6건 미만 판단 안 함"인데 여기만 단정했다 — 규약 불일치였다.
 //   → 문장을 없애지 않고(SEO 본문·체감 유지) **'자주'라는 거짓 주장만** 사실 표현으로 바꾼다.
+// 🔧 소스 검사 전용 — **주석을 걷어낸 코드만** 돌려준다.
+//   2026-10-19에 "주석에 적힌 함수·컬럼 이름을 코드로 세는" 실수를 **네 번** 했다
+//   (판정 파싱 2건·프라임 순서 1건·관제탑 큰컬럼 1건). 매번 따로 거르다 또 틀렸다 → 한 곳으로 모은다.
+//   소스를 regex로 검사하는 테스트는 **반드시 이 함수를 통과시킨 문자열**을 쓴다.
+function codeOf(relUrl: string): string {
+  return readFileSync(new URL(relUrl, import.meta.url), "utf8")
+    .split("\n")
+    .filter((l) => { const t = l.trim(); return !t.startsWith("//") && !t.startsWith("*") && !t.startsWith("--"); })
+    .join("\n");
+}
+
 const vr = (t: string) => ({ text: t, trust: "verified" as const });
 const BREAD = ["빵이 맛있고 케이크도 촉촉했어요", "크루아상이 바삭했어요 빵 종류가 많아요",
   "케이크가 달지 않고 좋았어요", "소금빵이 유명하대요 빵이 맛있습니다"];
@@ -1105,4 +1116,55 @@ test("SQL 템플릿: 태그드 템플릿 안의 주석에 백틱이 없다", () 
       }
     }
   }
+});
+
+// 💬 사용자 한 줄 피드백 — 2026-10-19 신설. 우리에게 **실사용자 직접 피드백 채널이 없었다**
+//   (품질을 전부 내부 지표로 추정했다). CEO와 합의한 설계 제약을 못으로 박는다.
+test("피드백: 뒤로가기를 가로채지 않는다(모바일 제스처·검색 복귀 보호)", () => {
+  const bar = readFileSync(new URL("../../app/c/[id]/FeedbackBar.tsx", import.meta.url), "utf8");
+  const code = bar.split("\n").filter((l) => !l.trim().startsWith("//")).join("\n");
+  for (const bad of ["popstate", "pushState", "beforeunload", "history.back"]) {
+    assert.ok(!code.includes(bad), `뒤로가기/이탈을 가로챈다(${bad}) — 유입 34%가 모바일이고 81%가 검색이다`);
+  }
+});
+test("피드백: 한 탭만으로 접수된다(텍스트 필수 아님)", () => {
+  const bar = readFileSync(new URL("../../app/c/[id]/FeedbackBar.tsx", import.meta.url), "utf8");
+  // 👍/👎 누르는 즉시 send 한다 — 텍스트 입력 전에 이미 신호가 남아야 응답률이 유지된다.
+  assert.ok(/setKind\("like"\); send\("like"\)/.test(bar), "좋아요 탭이 즉시 접수하지 않는다");
+  assert.ok(/setKind\("meh"\); send\("meh"\)/.test(bar), "아쉬워요 탭이 즉시 접수하지 않는다");
+  const api = readFileSync(new URL("../../app/api/feedback/route.ts", import.meta.url), "utf8");
+  assert.ok(/String\(b\?\.note \?\? ""\)\.trim\(\)\.slice\(0, 500\) \|\| null/.test(api), "본문 상한·선택 처리가 없다");
+});
+test("피드백: 도배 차단과 입력 검증이 있다", () => {
+  const api = readFileSync(new URL("../../app/api/feedback/route.ts", import.meta.url), "utf8");
+  assert.ok(/KINDS\.has\(kind\)/.test(api), "종류 검증이 없다");
+  assert.ok(/anon\.length < 8/.test(api), "기기키 검증이 없다");
+  assert.ok(/interval '24 hours'/.test(api), "같은 기기·같은 대상 24시간 1건 제약이 없다");
+});
+test("피드백: 관제탑은 글이 달린 것부터 보여주고 인증을 요구한다", () => {
+  const adm = codeOf("../../app/api/admin/feedback/route.ts");   // 주석 제외 — 코드만 본다
+  assert.ok(/x-admin-password/.test(adm) && /status: 401/.test(adm), "인증이 없다");
+  assert.ok(/ORDER BY \(COALESCE\(f\.note,''\) <> ''\) DESC/.test(adm), "글 달린 것을 먼저 보여주지 않는다");
+  assert.ok(/LIMIT 120/.test(adm), "상한이 없다");
+  // 💰 큰 컬럼 접촉 금지 — 관제탑 조회가 raw_reviews·synth_reviews_all을 읽으면 비용이 튄다.
+  for (const big of ["raw_reviews", "synth_reviews_all", "synth_reviews"]) {
+    assert.ok(!adm.includes(big), `관제탑 조회가 큰 컬럼(${big})을 읽는다`);
+  }
+});
+
+// 🔴 모델은 **요청마다** 넘겨야 한다 — 2026-10-19 실사고.
+//   `JUDGE_MODEL` 환경변수는 그 값을 읽는 **프로세스**의 것이다. 판정 제출은 라우트(서버)가 하고
+//   집행기(judge-run.mjs)는 curl로 그 라우트를 부른다 → `JUDGE_MODEL=... node judge-run.mjs`는
+//   **서버에 전달되지 않는다.** judge-full-coverage.sh가 구간별 모델을 넘겼는데 서버는 기본값
+//   (claude-haiku-4-5)으로 제출했다. "thin은 Sonnet 5"라는 보고가 거짓이 됐고 5배 비싼 구형으로 샀다.
+test("판정 모델: 라우트가 요청 파라미터로 모델을 받고, 모르는 단가는 거부한다", () => {
+  const route = codeOf("../../app/api/cron-batch-judge/route.ts");
+  assert.ok(/searchParams\.get\("model"\)/.test(route), "라우트가 model 파라미터를 받지 않는다");
+  assert.ok(/!BATCH_PRICES\[reqModel\]/.test(route), "단가표에 없는 모델을 거부하지 않는다 — 예산 가드가 거짓이 된다");
+  assert.ok(/model: MODEL,/.test(route), "제출에 요청 모델을 쓰지 않는다");
+  assert.ok(/model: MODEL \}/.test(route), "매니페스트에 요청 모델을 기록하지 않는다 — 수거 시 단가가 틀어진다");
+});
+test("판정 모델: 집행기가 model을 쿼리로 넘긴다(환경변수에 의존하지 않는다)", () => {
+  const runner = codeOf("../../scripts/judge-run.mjs");
+  assert.ok(/&model=\$\{encodeURIComponent\(MODEL\)\}/.test(runner), "집행기가 model을 쿼리로 넘기지 않는다");
 });

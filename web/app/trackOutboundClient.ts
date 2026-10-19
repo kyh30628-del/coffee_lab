@@ -17,6 +17,12 @@ export function trackOutbound(opts: {
     // 내부(대표·팀) 클릭은 성과 지표를 흔들므로 아예 보내지 않는다 — 방문 계측과 같은 기준.
     if (typeof window !== "undefined" && localStorage.getItem("dcn_internal") === "1") return;
     const path = opts.path ?? (typeof window !== "undefined" ? window.location.pathname : "");
+    // 💬 2026-10-19 — 외부로 나가는 클릭(지도·플레이스)이면 피드백 바를 '도움이 됐나요?'로 펼친다.
+    //   그 순간이 **"이 정보가 쓸모 있었나"를 묻기 가장 자연스러운 시점**이다(CEO와 합의: 뒤로가기는 가로채지 않는다).
+    //   계측 전송과 독립이라 실패해도 서로 영향이 없다.
+    if (typeof window !== "undefined" && (opts.target === "naver_place" || opts.target === "kakao_map")) {
+      try { window.dispatchEvent(new Event("dcn:outlink")); } catch { /* 구형 브라우저 무시 */ }
+    }
     fetch("/api/track-outbound", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

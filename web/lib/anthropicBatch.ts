@@ -59,7 +59,7 @@ export async function* streamResults(key: string, url: string): AsyncGenerator<a
 //   platform.claude.com/docs/en/about-claude/pricing
 //     Haiku 5.5 $0.10/$0.50 · Haiku 4.5 $0.50/$2.50 · Sonnet 5 $2/$10 · Sonnet 4.5 $3/$15 · Opus 5.5 $4/$20
 //   ⚠️ **단가를 모르는 모델은 쓰지 않는다**(추정 금지 — 예산 계산이 거짓이 된다).
-const BATCH_PRICES: Record<string, { in: number; out: number }> = {
+export const BATCH_PRICES: Record<string, { in: number; out: number }> = {
   "claude-haiku-5-5":           { in: 0.05 / 1e6, out: 0.25 / 1e6 },
   "claude-haiku-4-5":           { in: 0.25 / 1e6, out: 1.25 / 1e6 },
   "claude-haiku-4-5-20251001":  { in: 0.25 / 1e6, out: 1.25 / 1e6 },
@@ -72,7 +72,7 @@ export function batchPriceFor(model: string): { in: number; out: number } {
   return BATCH_PRICES[model] ?? BATCH_PRICES["claude-haiku-4-5"]; // 모르는 모델은 보수적으로 구형 단가로 보고
 }
 // 하위호환 — 기존 호출부가 쓰는 상수(기본 모델 기준). 새 코드는 batchPriceFor(model)을 쓸 것.
-const DEFAULT_MODEL = process.env.JUDGE_MODEL || "claude-haiku-4-5";
+const DEFAULT_MODEL = process.env["JUDGE_MODEL"] || "claude-haiku-4-5";   // 대괄호 — Next 빌드 시점 치환 회피
 export const BATCH_PRICE_IN = batchPriceFor(DEFAULT_MODEL).in;
 export const BATCH_PRICE_OUT = batchPriceFor(DEFAULT_MODEL).out;
 
