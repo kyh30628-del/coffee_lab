@@ -19,14 +19,25 @@ const { verifyReview, cleanCafeName } = await import("../lib/reviewQuality.ts");
 
 const norm = (s) => (s || "").toLowerCase().replace(/\s+/g, "");
 
-const rows = await sql`
-  SELECT c.id, c.name, c.area, c.dong, c.address AS addr, elem->>'quote' AS quote, elem->>'link' AS link, elem->>'trust' AS trust
-  FROM cafes c
-  CROSS JOIN LATERAL jsonb_array_elements(
-    CASE WHEN jsonb_typeof(c.synth_reviews) = 'array' THEN c.synth_reviews ELSE '[]'::jsonb END
-  ) elem
-  WHERE c.published = true AND length(elem->>'quote') >= 8
-`;
+// 🔴 2026-10-19 수리 — 공개 카페 전수의 인용문을 **한 방에** 당기던 쿼리라 DB가 커지자
+//   Neon 응답 한도(67MB)를 넘겨 통째로 실패했다(HTTP 507). id 구간으로 끊어 읽는다.
+//   결과는 메모리에 모으되, 행마다 필요한 필드만 담아 그대로다(판정 로직 불변).
+const rows = [];
+{
+  const [mx] = await sql`SELECT COALESCE(MAX(id),0)::int m FROM cafes WHERE published`;
+  const STEP = 2000;
+  for (let lo = 0; lo <= mx.m; lo += STEP) {
+    const part = await sql`
+      SELECT c.id, c.name, c.area, c.dong, c.address AS addr, elem->>'quote' AS quote, elem->>'link' AS link, elem->>'trust' AS trust
+      FROM cafes c
+      CROSS JOIN LATERAL jsonb_array_elements(
+        CASE WHEN jsonb_typeof(c.synth_reviews) = 'array' THEN c.synth_reviews ELSE '[]'::jsonb END
+      ) elem
+      WHERE c.published = true AND c.id >= ${lo} AND c.id < ${lo + STEP} AND length(elem->>'quote') >= 8`;
+    rows.push(...part);
+  }
+  console.log(`인용문 ${rows.length.toLocaleString()}건 적재(구간 ${Math.ceil((mx.m + 1) / STEP)}회)`);
+}
 
 const byKey = new Map();
 for (const r of rows) {

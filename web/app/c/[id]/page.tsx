@@ -15,7 +15,7 @@ import { publicOwnerContent } from "@/lib/ownerContent";
 import VisitorReviews from "../../VisitorReviews";
 import RecentCafes from "../../RecentCafes";
 import SavedCafes from "../../SavedCafes";
-import { buildAxisDist, cafeProfile, extractHighlights, amenityFeaturesOf } from "@/lib/cafeProfile";
+import { buildAxisDist, cafeProfile, extractHighlights, amenityFeaturesOf, cardFacets } from "@/lib/cafeProfile";
 import { topCharTraits } from "@/lib/charScore";
 import { collectionForCafe } from "@/lib/collections";
 import { tasteByKey } from "@/lib/seoData";
@@ -510,9 +510,20 @@ export default async function CafePage({ params }: Props) {
             🔴 2026-10-16: 여기 있던 '자주 나온 말' 칩(`커피가 맛있는28`·`루프탑·테라스2`)을 뺐다.
             아래 '이 카페의 결'이 같은 축을 더 정확히(횟수 + 전체 대비) 보여주는데, 이름만 다르게 두 번
             보여주고 있었다('루프탑·테라스' vs '테라스·야외'). 같은 정보를 두 번 쓰면 둘 다 안 읽힌다. */}
-        {c.synth_identity && (
+        {/* 🅿️ 시설 띠(2026-10-19, CEO "SEO 페이지가 너무 밋밋하다 — 본 화면과 같은 품질로") —
+            10-16에 뺀 '자주 나온 말' 칩을 되돌리는 게 아니다. 그건 아래 '이 카페의 결'과 **같은 축**이라
+            두 번 보여주던 것이고, 이건 **다른 축**이다: 취향 인상이 아니라 **가기 전에 확인하는 사실**
+            (주차·반려동물·루프탑). 사진이 없는 화면이라 여기가 첫인상이자 시각 앵커다.
+            목록 카드(app/area/Curated.tsx)와 **같은 부품·같은 모양**을 쓴다 — 화면마다 다르면 또 어긋난다.
+            💰 조회 0 — c.facets는 이미 이 페이지 SELECT에 들어 있다. ISR 본문도 한 줄만 늘어난다. */}
+        {(c.synth_identity || cardFacets(c.facets, 4).length > 0) && (
           <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
-            <p className="nt-verdict"><span className="nt-hl">{c.synth_identity}</span></p>
+            {c.synth_identity && <p className="nt-verdict"><span className="nt-hl">{c.synth_identity}</span></p>}
+            {(() => { const fs = cardFacets(c.facets, 4); return fs.length ? (
+              <div className="nt-chips">
+                {fs.map((f, i) => <span key={f.label} className={`nt-chip ${i === 0 ? "ink" : ""}`}>{f.emoji} {f.label}</span>)}
+              </div>
+            ) : null; })()}
           </div>
         )}
 
