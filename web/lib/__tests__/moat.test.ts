@@ -1228,3 +1228,33 @@ test("ISR: 상세 '확인' 날짜는 렌더 시각이 아니라 검증 시각(sy
   assert.ok(!/synth_checked_at[\s\S]{0,80}slice\(0, 10\)/.test(code), "검증 시각을 일 단위로 찍고 있다");
   assert.ok(/checkedOn \? `/.test(code), "값이 없을 때 빈 날짜가 화면에 찍힌다");
 });
+
+// 🔗 후기 원문 링크 관문(2026-10-19, CEO "리뷰를 클릭하면 링크 타고 들어가는 게 왜 안 되냐").
+//   진범은 데이터가 아니라 화면이었다 — `e.link`가 **React key로만** 쓰이고 링크로는 안 걸렸다.
+//   우리는 "검증했다"고 말하면서 정작 근거 원문으로 갈 길을 막아두고 있었다(해자가 안 보이던 셈).
+test("후기: 원문 주소가 있으면 링크로 걸고, 외부 블로그엔 가중치를 넘기지 않는다", () => {
+  const code = codeOf("../../app/c/[id]/page.tsx");
+  assert.ok(/OutboundLink[\s\S]{0,200}target="review_src"/.test(code), "후기를 OutboundLink로 감싸지 않았다");
+  assert.ok(/href=\{String\(e\.link\)\}/.test(code), "e.link를 href로 쓰지 않는다(키로만 쓰면 사용자는 원문에 못 간다)");
+  assert.ok(/nofollow/.test(code), "후기 수십 개가 dofollow로 나가면 검색 가중치가 샌다");
+  const ob = codeOf("../../app/OutboundLink.tsx");
+  assert.ok(/nofollow \? " nofollow"/.test(ob), "nofollow가 rel에 실제로 반영되지 않는다");
+});
+// 📐 노트 격자 관문 — note.css가 스스로 정한 규칙: "여백은 padding으로만, --lh(34px) 배수".
+//   배수가 아니면 그 아래 글자가 전부 밀려 **줄이 글자를 가른다**(내가 피드백 바에 28px을 써서 실제로 냈던 사고).
+test("노트 격자: 상세 페이지 padding은 전부 34의 배수다", () => {
+  const raw = readFileSync(new URL("../../app/c/[id]/page.tsx", import.meta.url), "utf8");
+  // .nt-scrap(붙인 사진 조각)은 note.css가 명시한 격자 예외 — "줄 위에 얹히는 불투명 조각".
+  const bad = raw.split("\n")
+    .filter((l) => !/nt-scrap|nt-free/.test(l))
+    .flatMap((l) => [...l.matchAll(/padding(?:Top|Bottom)?: (\d+)/g)].map((m) => Number(m[1])))
+    .filter((n) => n > 0 && n % 34 !== 0);
+  assert.deepEqual(bad, [], `34의 배수가 아닌 padding: ${bad.join(", ")}`);
+});
+// 선이 글자를 지나가지 않으려면 --base가 충분히 낮아야 한다(실측: 28px이면 17.5px 후기에 여유 1px뿐).
+test("노트 격자: 줄 위치(--base)가 글자 바닥을 피한다", () => {
+  const css = readFileSync(new URL("../../app/note.css", import.meta.url), "utf8");
+  const m = css.match(/--lh: 34px; --base: (\d+)px;/);
+  assert.ok(m, "--base를 못 찾았다");
+  assert.ok(Number(m![1]) >= 30, `--base ${m![1]}px — 30px 미만이면 17.5px 후기 글자에 선이 닿는다`);
+});

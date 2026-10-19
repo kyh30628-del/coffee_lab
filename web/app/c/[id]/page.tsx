@@ -416,10 +416,19 @@ export default async function CafePage({ params }: Props) {
   const quoteOf = (e: any, i: number) => {
     const dq = displayQuote(e?.quote, c.name ?? "");
     const body = splitKeyTerms(dq.text).map((seg, j) => seg.k ? <mark key={j} className="nt-key">{seg.t}</mark> : <span key={j}>{seg.t}</span>);
+    const meta = (e?.source || e?.date) ? (() => { const ag = reviewAge(e?.date); return (
+      <span className="m">{e?.source ?? ""}{ag?.old ? <span className="nt-old">{ag.ym} · {ag.ago} 후기</span> : e?.date ? ` · ${String(e.date).slice(0, 7)}` : ""}{e?.link ? <span className="go"> 원문 보기 ↗</span> : null}</span>
+    ); })() : null;
+    const inner = <>{dq.readable ? <>“{body}”</> : body}{meta}</>;
+    // 🔗 2026-10-19(CEO "리뷰를 클릭하면 링크 타고 들어가는 게 왜 안 되냐") — **진범: e.link를 React key로만 썼다.**
+    //   데이터엔 원문 주소가 다 있는데(실측 /c/24038 161/161건) 화면에서 버리고 있었다.
+    //   검증했다고 말하면서 원문으로 갈 길을 막아두면 근거를 확인할 수가 없다 — 해자의 핵심이 안 보이던 셈이다.
+    //   ⚠️ rel=nofollow: 한 쪽에 후기 수십 개가 붙으므로 외부 블로그로 검색 가중치를 넘기지 않는다.
     return (
       <blockquote key={e?.link ?? i} className={dq.readable ? "nt-q" : "nt-q t"}>
-        {dq.readable ? <>“{body}”</> : body}
-        {(e?.source || e?.date) && (() => { const ag = reviewAge(e?.date); return <span className="m">{e?.source ?? ""}{ag?.old ? <span className="nt-old">{ag.ym} · {ag.ago} 후기</span> : e?.date ? ` · ${String(e.date).slice(0, 7)}` : ""}</span>; })()}
+        {e?.link
+          ? <OutboundLink href={String(e.link)} target="review_src" cafeId={Number(c.id)} source="카페상세" nofollow className="qa">{inner}</OutboundLink>
+          : inner}
       </blockquote>
     );
   };
@@ -641,7 +650,7 @@ export default async function CafePage({ params }: Props) {
         {/* 💬 한 줄 피드백(2026-10-19) — **접힘 밖, 본문 끝 상시 노출.**
             접힘 안에 넣으면 아무도 안 본다(ReportButton이 접힘 안에 있어 접수가 거의 없었다).
             끝까지 읽은 사람이 자연스럽게 누르는 자리다. 뒤로가기는 가로채지 않는다. */}
-        <div className="nt-ruled nt-margin-gutter px-3" style={{ paddingTop: 28 }}>
+        <div className="nt-ruled nt-margin-gutter px-3" style={{ paddingTop: 34 }}>
           <FeedbackBar cafeId={Number(c.id)} />
         </div>
 

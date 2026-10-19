@@ -36,13 +36,17 @@
 
 /* ── 줄 ── */
 .nt-ruled {
-  --lh: 34px; --base: 28px;
+  /* 🔴 2026-10-19(CEO "줄이 텍스트를 가리지 말고 제대로 그어라") — 28px → 30px.
+     실측(프로덕션 /c/24038, Range.getClientRects): 글자 바닥과 선 사이 여유가
+     본문 17px은 3px인데 **후기 17.5px·라벨 19px은 1px뿐**이라 글꼴 잉크가 선에 닿았다.
+     선을 2px 내려 전부 3px 이상 확보한다(행 높이 34px 안이라 격자는 그대로). */
+  --lh: 34px; --base: 30px;
   line-height: var(--lh);
   background-image: repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--lh) - 1px), var(--nt-rule) calc(var(--lh) - 1px), var(--nt-rule) var(--lh));
   background-position: 0 calc(var(--base) - var(--lh));
   background-origin: padding-box;
 }
-.nt-ruled.nt-h { --base: 27px; }                /* 26px 제목: 밑선 26.3 → 줄 27 */
+.nt-ruled.nt-h { --base: 29px; }                /* 26px 제목. 본문과 2px 차이를 그대로 유지(27→29) */
 /* 줄 안의 모든 글자는 줄 간격을 따른다(Tailwind text-sm 등 행간 덮어씀). 외부 컴포넌트는 .nt-free로 빠져나간다. */
 .nt-ruled *:not(.nt-free, .nt-free *) { line-height: var(--lh); }
 .nt-ruled { font-size: 17px; }
@@ -348,7 +352,14 @@
 .nt-detail .nt-q { margin: 0; padding: 0 0 0 14px; border-left: 3px solid var(--nt-coffee); color: var(--nt-ink); font-size: 17.5px; letter-spacing: 0; }
 .nt-detail .nt-key { background: linear-gradient(transparent 52%, rgba(233, 214, 189, 0.95) 52%); color: var(--nt-ink); font-weight: 400; -webkit-text-stroke: 0.15px currentColor; padding: 0 1px; border-radius: 1px; }
 .nt-detail .nt-q .m { display: block; font: 400 14px/34px var(--nt-gothic); color: #8a7a66; }
-.nt-detail .nt-q.t { border-left-style: dashed; color: #3d2f24; }   /* 글 제목 줄(본문 문장이 아닌 스니펫) — 따옴표 없이, 점선 */
+.nt-detail .nt-q.t { border-left-style: dashed; color: #3d2f24; }
+/* 🔗 후기 원문 링크(2026-10-19) — 글 전체가 눌린다. 인용문 모양은 그대로 두고,
+   '원문 보기 ↗'만 링크처럼 보이게 한다(파란 밑줄로 노트 느낌을 깨지 않는다). */
+.nt-detail .nt-q a.qa { color: inherit; text-decoration: none; display: block; }
+.nt-detail .nt-q a.qa .go { color: var(--nt-coffee); margin-left: 6px; white-space: nowrap; }
+.nt-detail .nt-q a.qa:hover .go, .nt-detail .nt-q a.qa:focus-visible .go { text-decoration: underline; }
+.nt-detail .nt-q a.qa:hover { background: rgba(168, 118, 62, 0.06); }
+.nt-detail .nt-q a.qa:focus-visible { outline: 2px solid var(--nt-coffee); outline-offset: 2px; }   /* 글 제목 줄(본문 문장이 아닌 스니펫) — 따옴표 없이, 점선 */
 .nt-detail details.nt-more > summary { list-style: none; cursor: pointer; font: 500 13px/34px var(--nt-gothic); color: var(--nt-coffee); }
 .nt-detail details.nt-more > summary::-webkit-details-marker { display: none; }
 .nt-detail details.nt-more[open] > summary .t1, .nt-detail details.nt-more:not([open]) > summary .t2 { display: none; }
