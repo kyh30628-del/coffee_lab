@@ -42,7 +42,11 @@ await sql`CREATE TABLE IF NOT EXISTS judge_spend (
   cafes INT, rescued INT, in_tok BIGINT, out_tok BIGINT, cost_usd NUMERIC(10,5),
   batch_id TEXT, note TEXT)`;
 
-const spentRow = (await sql`SELECT COALESCE(SUM(cost_usd),0)::float s, count(*)::int c FROM judge_spend`)[0];
+// 🔴 2026-10-19 수리 — 예산 가드가 **전체기간 누계**였다. 무료 크레딧 $100은 **매달 초기화되고 이월되지 않는데**,
+//   누계로 재면 다음 달에 크레딧이 새로 들어와도 "이미 $44 썼다"며 제출을 막는다(= 남은 크레딧을 그냥 소멸시킨다).
+//   크레딧 주기와 같은 단위(이번 달)로 센다. 원장 자체는 그대로 남으니 과거 집계는 잃지 않는다.
+const spentRow = (await sql`SELECT COALESCE(SUM(cost_usd),0)::float s, count(*)::int c
+  FROM judge_spend WHERE at >= date_trunc('month', now())`)[0];
 let spent = Number(spentRow.s);
 
 // 🔑 큐 집계는 **cron-batch-judge의 실제 WHERE와 같아야** 한다.
