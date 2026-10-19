@@ -87,7 +87,7 @@ async function getCafe(id: string) {
   const n = Number(id);
   if (!Number.isFinite(n) || n <= 0) return null;
   try {
-    return (await sql`SELECT c.id, c.name, c.area, c.dong, c.address, c.lat, c.lng, c.synth_grade, c.synth_identity, c.synth_count, c.char_scores, c.synth_reviews_all, c.synth_reviews, c.reputation_note, c.synth_quality, c.visitor_n, c.visitor_trip, c.visitor_local, c.area_rank, c.area_total, c.review_dates, c.cautions, c.instagram_url, c.facets,
+    return (await sql`SELECT c.id, c.name, c.area, c.dong, c.address, c.lat, c.lng, c.synth_grade, c.synth_identity, c.synth_count, c.char_scores, c.synth_reviews_all, c.synth_reviews, c.reputation_note, c.synth_quality, c.visitor_n, c.visitor_trip, c.visitor_local, c.area_rank, c.area_total, c.review_dates, c.cautions, c.instagram_url, c.facets, c.synth_checked_at,
       COALESCE(dt.is_tourist, false) AS dong_tourist
       FROM cafes c LEFT JOIN dong_tourism dt ON dt.area = c.area AND dt.dong = c.dong
       WHERE c.id=${n} AND c.published=true LIMIT 1`)[0] as any ?? null;
@@ -257,8 +257,14 @@ export default async function CafePage({ params }: Props) {
   //   구글에 색인되는 면이 정작 방어를 안 받던 셈이라, 같은 함수를 태워 두 경로를 일치시킨다.
   //   비용 0 — 이미 읽어온 배열에 대한 순수함수 정렬이라 추가 조회가 없다.
   const evRaw = (c.synth_reviews_all ?? c.synth_reviews ?? []) as any[];
+  // 💰 ISR 결정성(2026-10-19) — `Date.now()`를 쓰면 **재생성할 때마다 출력이 달라져 ISR 쓰기가 과금된다**
+  //   (Vercel 공식: "재검증 결과가 이전과 같으면 쓰기 단위가 발생하지 않는다. 예상 못한 쓰기가 보이면
+  //    ISR 출력에 new Date()·Math.random() 같은 비결정 코드가 있는지 보라"). 상세 1쪽 98KB = 쓰기 13단위다.
+  //   그래서 기준 시각을 **그 카페를 마지막으로 검증한 때**(synth_checked_at)로 고정한다 —
+  //   값이 바뀌는 시점 = 실제로 내용이 바뀐 시점이라, 그때만 쓰기가 나간다.
+  const checkedT = c.synth_checked_at ? new Date(c.synth_checked_at).getTime() : 0;
   const evAll = Array.isArray(evRaw)
-    ? ensureRecent(sortReviews(evRaw, c.name ?? "", [c.area, c.dong].filter(Boolean) as string[], Date.now(), c.dong))
+    ? ensureRecent(sortReviews(evRaw, c.name ?? "", [c.area, c.dong].filter(Boolean) as string[], checkedT || Date.parse("2026-01-01"), c.dong))
     : [];
   const quotesAll = evAll.map((e: any) => e?.quote || "");
   // 📖 화면에 보여줄 후기(2026-09-20) — 이 페이지는 후기 100건을 읽어 통계만 뽑고 **문장은 한 줄도 안 보여주고 있었다.**
@@ -396,9 +402,11 @@ export default async function CafePage({ params }: Props) {
   const vBadges = visitorBadges({ n: c.visitor_n ?? 0, trip: c.visitor_trip ?? 0, local: c.visitor_local ?? 0 });
   const showRank = typeof c.area_rank === "number" && c.area_rank <= 10 && (c.area_total ?? 0) >= 20;
   const nearTitle = nearbyTitle(nearby, c.area, c.dong);
-  const checkedOn = new Date().toISOString().slice(0, 10);
+  // 🔴 렌더 날짜(new Date())를 찍으면 **매일 출력이 달라져 ISR 쓰기가 영구 과금된다.** 위 checkedT 주석 참조.
+  //   의미상으로도 "확인"은 페이지가 그려진 날이 아니라 **우리가 검증한 날**이 맞다.
+  const checkedOn = checkedT ? new Date(checkedT).toISOString().slice(0, 10) : "";
   const srcLine = (
-    <p className="nt-src">네이버 공개 후기 {(c.synth_count ?? 0).toLocaleString()}건 교차검증 · 영수증 리뷰·광고·협찬 제외 · {checkedOn} 확인</p>
+    <p className="nt-src">네이버 공개 후기 {(c.synth_count ?? 0).toLocaleString()}건 교차검증 · 영수증 리뷰·광고·협찬 제외{checkedOn ? ` · ${checkedOn} 확인` : ""}</p>
   );
   const quoteOf = (e: any, i: number) => {
     const dq = displayQuote(e?.quote, c.name ?? "");

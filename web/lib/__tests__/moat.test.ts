@@ -1190,3 +1190,34 @@ test("배포: 무효화 엔드포인트는 라우트 전체를 한 번에 비우
   assert.ok(/revalidatePath\(route, type\)/.test(api), "라우트 단위 무효화를 쓰지 않는다");
   assert.ok(/"\/c\/\[id\]", "page"/.test(api), "상세 라우트를 비우지 않는다");
 });
+
+// 💰 ISR 쓰기 관문(2026-10-19) — **이 세션 실사고**: 상세 페이지가 `new Date()`로 "오늘 날짜 확인"을 찍고 있었다.
+//   Vercel 공식: "재검증 결과가 이전과 같으면 쓰기 단위가 발생하지 않는다. 예상 못한 쓰기가 보이면
+//   ISR 출력에 new Date()·Math.random() 같은 비결정 코드가 있는지 보라." 날짜는 매일 바뀌니
+//   **재생성할 때마다 내용이 달라져 쓰기가 영구 과금**됐다(상세 1쪽 98KB = 쓰기 13단위 × 공개 49,874쪽).
+//   대량 ISR 라우트에 같은 함정이 다시 들어오면 여기서 막는다.
+test("ISR: 대량 캐시 라우트에 날짜·난수 같은 비결정 출력이 없다", () => {
+  const routes = [
+    "../../app/c/[id]/page.tsx",
+    "../../app/area/[gu]/page.tsx",
+    "../../app/area/[gu]/[taste]/page.tsx",
+    "../../app/area/[gu]/dong/[dong]/page.tsx",
+    "../../app/area/[gu]/dong/[dong]/[taste]/page.tsx",
+    "../../app/area/[gu]/f/[facet]/page.tsx",
+    "../../app/area/[gu]/dong/[dong]/f/[facet]/page.tsx",
+    "../../app/share/[id]/page.tsx",
+  ];
+  for (const r of routes) {
+    // 메모이즈 TTL(`axisDistMem`)은 출력이 아니라 서버 메모리 수명이라 예외다 — 그 줄만 걷어낸다.
+    const code = codeOf(r).split("\n").filter((l) => !/Mem\b/.test(l)).join("\n");
+    assert.ok(!/new Date\(\)/.test(code), `${r}: new Date()가 ISR 출력에 섞이면 매 재생성마다 쓰기가 과금된다`);
+    assert.ok(!/Date\.now\(\)/.test(code), `${r}: Date.now()가 ISR 출력에 섞이면 매 재생성마다 쓰기가 과금된다`);
+    assert.ok(!/Math\.random\(\)/.test(code), `${r}: Math.random()은 재생성마다 다른 HTML을 만든다`);
+  }
+});
+test("ISR: 상세 '확인' 날짜는 렌더 시각이 아니라 검증 시각(synth_checked_at)이다", () => {
+  const code = codeOf("../../app/c/[id]/page.tsx");
+  assert.ok(/c\.synth_checked_at/.test(code), "SELECT에 synth_checked_at이 없다");
+  assert.ok(/const checkedT = c\.synth_checked_at/.test(code), "검증 시각을 기준으로 쓰지 않는다");
+  assert.ok(/checkedOn \? `/.test(code), "값이 없을 때 빈 날짜가 화면에 찍힌다");
+});
