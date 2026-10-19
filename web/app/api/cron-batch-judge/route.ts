@@ -72,7 +72,17 @@ export async function GET(req: NextRequest) {
     await ensureSchema();
     await sql`CREATE TABLE IF NOT EXISTS judge_batches (batch_id TEXT PRIMARY KEY, manifest JSONB, applied BOOLEAN DEFAULT false, created_at TIMESTAMPTZ DEFAULT now())`;
     await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS judge_passes INT DEFAULT 0`;   // 아래 후보 SELECT가 이 칼럼을 읽는다 — 먼저 만든다
-    await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS judge_marks JSONB`;   // 🔬 세밀 축(depth·adStyle·listicle) — 판정 결정과 분리 보관
+    // 🔴 2026-10-19 비용수리 — 세밀 축을 **cafes 컬럼에 넣으면 안 된다.**
+    //   cafes 행은 평균 78KB(벡터·GIN 인덱스 다수)라, 작은 JSONB 하나만 갱신해도 **행 전체를 다시 쓴다.**
+    //   판정 40,767곳이면 추가 쓰기 약 3.2GB이고, 더 나쁜 건 storeResult의 UPDATE와 **별개 UPDATE**라
+    //   같은 행을 **두 번** 쓴다는 것이다. 2026-09-26에 정확히 이 패턴으로 cost_guard가 자동정지했다
+    //   (noncafe UPDATE 89.7GB·offconcept 33.5GB — decision#1262, 해법은 경량 테이블 분리).
+    //   → 전용 얇은 테이블. cafes를 전혀 건드리지 않는다. (cafe_scan_state와 같은 사상)
+    await sql`CREATE TABLE IF NOT EXISTS cafe_judge_marks (
+      cafe_id BIGINT PRIMARY KEY REFERENCES cafes(id) ON DELETE CASCADE,
+      marks JSONB NOT NULL,
+      at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )`.catch(() => {});
 
     // ── ① 끝난 배치 수거·적용 ──
     let appliedCafes = 0, rescued = 0, inTok = 0, outTok = 0, stillRunning = 0, expiredBatches = 0;
@@ -132,12 +142,13 @@ export async function GET(req: NextRequest) {
         // 🔬 세밀 축을 카페별로 저장 — 노출 순서(구체성 높은 인용문 우선)와 협찬 감시에 쓴다.
         //   판정 결정(judge_decisions)과 **분리**해 둔다: 결정은 채택/거부라는 계약이고, 이건 부가 신호다.
         //   섞으면 옛 판정과 호환이 깨진다(판정 결정은 재합성이 매번 읽는 핫패스다).
-        if (Object.keys(mapped.marks).length) {
-          try {
-            await sql`UPDATE cafes SET judge_marks = COALESCE(judge_marks, '{}'::jsonb) || ${JSON.stringify(mapped.marks)}::jsonb WHERE id = ${entry.id}`;
-            marksSaved++;
-          } catch { /* 부가 신호 저장 실패가 판정을 막지 않는다 */ }
-        }
+        try {
+          // 얇은 테이블에만 쓴다 — cafes(40KB/행)를 건드리지 않아 추가 쓰기가 사실상 0이다.
+          // 🔑 축이 비어도 **행은 남긴다** — '세밀 축 미보유' 큐 조건의 종료 보장이다(무한 재판정 차단).
+          await sql`INSERT INTO cafe_judge_marks (cafe_id, marks) VALUES (${entry.id}, ${JSON.stringify(mapped.marks)}::jsonb)
+            ON CONFLICT (cafe_id) DO UPDATE SET marks = cafe_judge_marks.marks || EXCLUDED.marks, at = now()`;
+          if (Object.keys(mapped.marks).length) marksSaved++;
+        } catch { /* 부가 신호 저장 실패가 판정을 막지 않는다 */ }
         if (Object.keys(mapped.decisions).length === 0) { try { await markJudged(entry.id); } catch {} return; }
         if (cappedStop) return;   // 상한 초과 — 이 회차는 더 적용하지 않는다(멱등 수거라 다음에 이어진다)
         try {
@@ -216,7 +227,14 @@ export async function GET(req: NextRequest) {
         --   '아직 안 본 후보'가 남는다. judge_passes(제출 시 +1) 상한 JUDGE_MAX_PASSES로 종료를 보장한다
         --   (모델이 답을 안 한 후보는 미결로 남으므로, 상한이 없으면 같은 카페를 영원히 다시 살 수 있다).
         AND (llm_judged_at IS NULL OR llm_judged_at < raw_collected_at
-             OR (COALESCE(borderline_count, 0) > ${PER_CAFE} AND COALESCE(judge_passes, 0) < ${JUDGE_MAX_PASSES}))
+             OR (COALESCE(borderline_count, 0) > ${PER_CAFE} AND COALESCE(judge_passes, 0) < ${JUDGE_MAX_PASSES})
+             -- 🔬 2026-10-19 **세밀 축 미보유분 재판정** — depth·adStyle·listicle은 오늘 신설해서
+             --   커버리지가 1.1%(556/49,674)뿐이다. 커서를 그대로 두면 영영 안 채워진다.
+             --   💰 llm_judged_at을 NULL로 리셋하는 방법은 쓰지 않는다 — cafes 행이 40KB라
+             --      31,124곳 리셋이 **추가 1.25GB 쓰기**가 된다. 조건에 넣으면 **읽기만** 한다.
+             --   종료 보장: 판정 경로가 카페마다 marks 행을 반드시 남기므로(후보 0건이면 빈 행) 1회로 끝난다.
+             OR (published AND NOT EXISTS (SELECT 1 FROM cafe_judge_marks m WHERE m.cafe_id = cafes.id)
+                 AND COALESCE(judge_passes, 0) < ${JUDGE_MAX_PASSES}))
         AND NOT (id = ANY(${inFlightIds}))
         AND (
           pipeline_status = 'pending'
@@ -308,7 +326,14 @@ export async function GET(req: NextRequest) {
         const { candidates, hasRaw } = await getUndecidedAuditCandidates({ id: c.id, name: c.name, area: c.area ?? "" });
         if (!hasRaw) return;
         const items = candidates.slice(0, PER_CAFE).filter((it: any) => it && it.key);
-        if (items.length === 0) { await markJudged(c.id); noCand++; return; } // 후보 없음 → 무과금 판정완료
+        if (items.length === 0) {
+          await markJudged(c.id); noCand++;
+          // 🔑 후보가 없어 AI를 안 부른 카페도 marks 행을 남긴다 — 안 남기면 '세밀 축 미보유'로
+          //   매 회차 다시 뽑혀 빌드 비용(재합성)을 영원히 쓴다.
+          await sql`INSERT INTO cafe_judge_marks (cafe_id, marks) VALUES (${c.id}, '{}'::jsonb)
+            ON CONFLICT (cafe_id) DO NOTHING`.catch(() => {});
+          return;
+        }
         requests.push({
           custom_id: `cafe_${c.id}`,
           params: {

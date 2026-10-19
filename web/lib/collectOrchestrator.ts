@@ -26,6 +26,11 @@ const SRC_KIND: Record<RawSource["source"], SourceKind> = {
 export type EvidenceReview = {
   quote: string; link?: string; source?: string; date?: string;
   trust?: QualityVerdict; score?: number; why?: string[];
+  // 🔬 2026-10-19 — AI 세밀 축을 이 후기에 붙이기 위한 키·값(전부 선택 필드라 하위호환).
+  //   k = dedupeKey(원문 앞 60자) · cafe_judge_marks의 키와 같다.
+  //   depth 0~3(구체성) · adStyle(협찬 문체 의심) · listicle(여러 업체 나열글).
+  //   이게 없으면 AI가 찾은 협찬·나열글이 **노출에 아무 영향을 못 준다**(실측 348곳·260곳이 그 상태였다).
+  k?: string; depth?: number; adStyle?: boolean; listicle?: boolean;
 };
 
 export type QualityStats = {
@@ -254,6 +259,11 @@ export function collectAndSynthesize(name: string, area: string[], sources: RawS
         evidence.push({
           quote: toQuote(t.text, name), link: t.link, source: t.source, date: dateOk ? t.date : undefined,
           trust: verdict, score, why: reasons.slice(0, 3),
+          // 🔬 2026-10-19 — AI 세밀 축(depth·adStyle·listicle)을 이 후기에 붙일 수 있게 key를 싣는다.
+          //   세밀 축은 key(dedupeKey)로 저장돼 있다(cafe_judge_marks). key가 없으면 붙일 방법이 없어
+          //   "AI가 찾은 협찬 문체·나열글"이 노출에 **아무 영향을 못 준다**(실측: 348곳·260곳이 그 상태였다).
+          //   추가 필드라 기존 소비자는 무시한다(하위호환).
+          k: key,
         });
       }
     }

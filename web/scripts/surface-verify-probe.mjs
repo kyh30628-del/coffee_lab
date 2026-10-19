@@ -44,6 +44,14 @@ const RUBRIC = `너는 카페 정보 검수관이다. 아래에 ①그 카페의
 반드시 JSON으로만 답한다(설명·코드블록 금지):
 {"facets":{"태그명":"true|false|contra", ...},"identity":"true|false","identityWhy":"15자 이내","taste":"ok|mismatch|unknown"}`;
 
+// 🔴 2026-10-19 **측정 설계 수리** — 1차 측정이 거짓이었다.
+//   1차: AI에게 **노출 인용문 10건(각 220자)** 만 주고 패싯·정체성이 뒷받침되는지 물었다.
+//        결과 "주차 편함 오분류 82% · 단체·모임룸 94% · 정체성 97.5%"가 나왔다.
+//   🔴 그런데 패싯은 `extractFacets(verifiedTexts)` — **검증된 후기 원문 전체**에서 뽑힌다
+//      (lib/collectOrchestrator.ts:421). 정체성도 전체 후기로 합성한다.
+//      즉 "내가 준 10개 발췌에 근거가 없다"를 "표시가 틀렸다"로 읽은 것이다. **측정이 거짓이었다.**
+//   → 2차: 패싯 산출과 **같은 입력**(검증 후기 원문)을 준다. 그래야 비교가 성립한다.
+//     비용은 토큰이 늘지만 Haiku 5.5라 곳당 몇 십 분의 1센트다.
 const rows = (await sql.query(`WITH vw AS (
     SELECT substring(path from '^/c/([0-9]+)')::bigint id, count(*)::int pv
     FROM traffic_events WHERE ts > now() - interval '90 day' AND path LIKE '/c/%'
@@ -56,17 +64,35 @@ const rows = (await sql.query(`WITH vw AS (
   ORDER BY COALESCE(v.pv,0) DESC, c.synth_count DESC LIMIT ${N}`));
 console.log(`🔬 화면 요소 검증 — 표본 ${n(rows.length)}곳 · ${MODEL} · 누적 $${sp.s.toFixed(2)}/100`);
 
+const { collectAndSynthesize } = await import("../lib/collectOrchestrator.ts");
+const { cleanCafeName } = await import("../lib/reviewQuality.ts");
+const { areaTermsFor } = await import("../lib/synthStore.ts");
 const reqs = [], meta = {};
 for (const c of rows) {
-  const quotes = (c.synth_reviews ?? []).slice(0, 10).map((r, i) => `#${i + 1} ${String(r.quote ?? r.text ?? "").slice(0, 220)}`).join("\n");
+  // 패싯 산출과 **같은 입력**을 만든다: collectAndSynthesize가 쓰는 검증 후기 원문.
+  let quotes = "";
+  try {
+    const [rr] = await sql`SELECT raw_reviews, naver_category, address FROM cafes WHERE id=${c.id}`;
+    const raw = rr?.raw_reviews ?? [];
+    if (raw.length) {
+      const area = await areaTermsFor(c.id, c.area);
+      const srcs = [{ source: "blog", texts: raw.map((r) => ({ title: r.title ?? "", text: r.text ?? "", desc: r.desc ?? "", link: r.link, date: r.date, source: r.srcName })) }];
+      const res = collectAndSynthesize(cleanCafeName(c.name), area, srcs, { naverCategory: rr?.naver_category ?? "", address: rr?.address ?? "" });
+      const texts = (res.evidenceReviews ?? []).map((e) => e?.quote).filter(Boolean);
+      const all = (res.allEvidence ?? []).map((e) => e?.quote).filter(Boolean);
+      const pool = (all.length ? all : texts);
+      quotes = pool.slice(0, 25).map((t, i) => `#${i + 1} ${String(t).slice(0, 300)}`).join("\n");
+    }
+  } catch { /* 한 곳 실패가 측정을 막지 않는다 */ }
+  if (!quotes.trim()) quotes = (c.synth_reviews ?? []).slice(0, 10).map((r, i) => `#${i + 1} ${String(r.quote ?? r.text ?? "").slice(0, 220)}`).join("\n");
   if (!quotes.trim()) continue;
   const cs = c.char_scores ?? {};
-  const body = `카페: "${c.name}"\n\n[노출 중인 후기]\n${quotes}\n\n[화면 표시]\n`
+  const body = `카페: "${c.name}"\n\n[검증된 후기(패싯 산출과 같은 입력)]\n${quotes}\n\n[화면 표시]\n`
     + `facets: ${JSON.stringify(c.facets)}\n`
     + `identity: "${String(c.synth_identity ?? "").slice(0, 160)}"\n`
     + `taste: 산미 ${cs.acidity ?? "?"} · 바디 ${cs.body ?? "?"} · 단맛 ${cs.sweet ?? "?"} (0~5)`;
   meta[`s_${c.id}`] = { id: c.id, name: c.name, pv: c.pv, facets: c.facets, identity: String(c.synth_identity ?? "") };
-  reqs.push({ custom_id: `s_${c.id}`, params: { model: MODEL, max_tokens: 1200,
+  reqs.push({ custom_id: `s_${c.id}`, params: { model: MODEL, max_tokens: 1600,
     system: [{ type: "text", text: RUBRIC, cache_control: { type: "ephemeral" } }],
     messages: [{ role: "user", content: body }] } });
 }

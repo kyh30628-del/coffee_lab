@@ -1012,3 +1012,97 @@ test("판정 세밀화: RUBRIC이 세 축을 요구하고 협찬 추측을 금�
   assert.ok(/협찬 '공시'는 발췌에 들어오지 않으니 추측하지 마라/.test(judge),
     "협찬 공시 추측 금지 문구가 사라졌다 — 없는 근거로 판정하면 오판이 된다");
 });
+
+// 📋 정보 나열 글 강등 — 2026-10-19. 규칙갭 AI 발굴로 찾은 가장 큰 구멍.
+//   실측: 노출 중인 후기의 **43.95%를 AI가 거부**(표본 50곳·976건), 품질 미달 429건 중 **82%가 경험 서술어 0건**.
+//   케이스는 전부 실제 노출된 글이다(비디788 PV18 등). 🔴 거절이 아니라 **순위 강등**이다 —
+//   스니펫이 153자 발췌라 경험 서술이 발췌 밖일 수 있고, 거절하면 진짜 후기를 버린다.
+import { isInfoDumpQuote } from "../exposureOrder";
+test("정보나열: 주소·영업시간·전화번호만 있는 글은 나열글로 본다", () => {
+  assert.equal(isInfoDumpQuote("비디788 주소 : 경기 성남시 분당구 판교로 788 영업시간 : 9:00 ~ 20:30 전화번호 : 0507-1370-1502 메뉴판"), true);
+  assert.equal(isInfoDumpQuote("비디788 경기 성남시 분당구 판교로 788 영업시간 매일 09:00 ~ 20:30 (라스트오더 20:00) 주차공간 전용 주차장"), true);
+});
+test("정보나열: 해시태그 뭉치도 나열글로 본다", () => {
+  assert.equal(isInfoDumpQuote("비디788 (BD788) 유럽형 대형카페 #야탑역대형카페 #BD788 #야탑브런치카페 #분당카페"), true);
+  assert.equal(isInfoDumpQuote("좋은 카페 #카페"), false, "해시태그 1~2개는 정상 글에도 흔하다");
+});
+test("정보나열: 경험 서술이 하나라도 있으면 강등하지 않는다(진짜 후기 보호)", () => {
+  assert.equal(isInfoDumpQuote("주소 : 경기 성남시 판교로 788 영업시간 9:00~20:30 인데 소금빵을 먹었는데 바삭했어요"), false);
+  assert.equal(isInfoDumpQuote("라떼가 부드럽고 직원분이 친절했어요"), false);
+  assert.equal(isInfoDumpQuote(""), false);
+});
+test("정보나열: 등급 아래에서만 작동한다(공개·등급 불변)", () => {
+  const src = readFileSync(new URL("../exposureOrder.ts", import.meta.url), "utf8");
+  const cmp = src.slice(src.indexOf(".sort((a, b) =>"));
+  const iTier = cmp.indexOf("trustTier(b.e) - trustTier(a.e)");
+  const iInfo = cmp.indexOf("b.info - a.info");
+  assert.ok(iTier > 0 && iInfo > 0, "정렬 키를 못 찾았다");
+  assert.ok(iTier < iInfo, "정보나열 강등이 신뢰등급보다 위에 있다 — 참고글이 검증글을 밀어낼 수 있다");
+});
+
+// 💰 비용 하드규칙 — 2026-10-19. CEO 지시("버셀·네온·ISR write 비용 증가에 큰 영향 없도록 확실하게").
+//   `cafes` 행은 평균 78KB(벡터·GIN 인덱스 다수)라 작은 값 하나만 갱신해도 **행 전체를 다시 쓴다.**
+//   2026-09-26에 정확히 이 패턴으로 cost_guard가 자동정지했다(noncafe UPDATE 89.7GB · decision#1262).
+//   해법은 경량 테이블 분리(cafe_scan_state와 같은 사상). 판정 세밀 축도 같은 함정에 빠졌다가 수리했다 —
+//   판정 40,767곳이면 추가 쓰기 약 3.2GB였고, storeResult UPDATE와 별개라 같은 행을 **두 번** 썼다.
+test("비용: 판정 세밀 축은 cafes가 아니라 경량 테이블에 쓴다", () => {
+  const route = readFileSync(new URL("../../app/api/cron-batch-judge/route.ts", import.meta.url), "utf8")
+    .split("\n").filter((l) => !l.trim().startsWith("//")).join("\n");
+  assert.ok(!/UPDATE cafes SET judge_marks/.test(route),
+    "cafes에 judge_marks를 쓴다 — 78KB 행을 매번 다시 쓴다(09-26 cost_guard 정지 패턴)");
+  assert.ok(!/ALTER TABLE cafes ADD COLUMN IF NOT EXISTS judge_marks/.test(route),
+    "cafes에 judge_marks 컬럼을 만든다 — 넓은 행에 붙이면 안 된다");
+  assert.ok(/INSERT INTO cafe_judge_marks/.test(route), "경량 테이블(cafe_judge_marks)에 쓰지 않는다");
+});
+
+// 🔬 AI 세밀 축이 **실제로 노출에 영향을 주는가** — 2026-10-19.
+//   실측 사고: 협찬 문체 348곳·나열글 260곳을 AI가 찾아놨는데 **쓰는 곳이 없었다**(돈만 쓴 상태).
+//   판정을 돌려도 결과를 안 쓰면 비용만 나간다. 그래서 ①evidence에 key를 싣고 ②경량 테이블에서 붙이고
+//   ③노출 순서가 읽게 만들었다. 이 사슬이 끊기면 다시 "수집만 하는" 상태로 돌아간다.
+test("세밀 축: AI 나열글·협찬문체는 노출 순서에서 뒤로 간다", () => {
+  const mk = (q: string, o: any = {}) => ({ quote: q, trust: "verified", score: 80, date: "2026.10.01", ...o });
+  const out = sortReviews([
+    mk("라떼가 부드럽고 좋았어요 또 가고 싶어요", { adStyle: true }),
+    mk("소금빵을 먹었는데 바삭하고 짭짤해서 맛있었어요", { depth: 3 }),
+    mk("직원분이 친절했고 자리가 넓어서 편했어요", { listicle: true }),
+  ], "테스트카페", ["서울", "강남구"], Date.now());
+  assert.equal(out[0].depth, 3, "구체성 높은 후기가 맨 앞이어야 한다");
+  assert.ok(out[1].adStyle || out[1].listicle, "의심 신호가 있는 후기는 뒤로 가야 한다");
+});
+test("세밀 축: 구체성(depth) 높은 후기가 앞으로 — 같은 등급 안에서", () => {
+  const mk = (q: string, d: number) => ({ quote: q, trust: "verified", score: 80, date: "2026.10.01", depth: d });
+  const out = sortReviews([mk("괜찮았어요 또 갈게요", 1), mk("아인슈페너를 마셨는데 크림이 진했어요", 3), mk("맛있게 먹었어요", 2)],
+    "테스트카페", ["서울"], Date.now());
+  assert.deepEqual(out.map((x: any) => x.depth), [3, 2, 1]);
+});
+test("세밀 축: 부착 사슬이 끊기지 않는다(key·경량테이블·노출)", () => {
+  const orch = readFileSync(new URL("../collectOrchestrator.ts", import.meta.url), "utf8");
+  assert.ok(/k\?: string; depth\?: number; adStyle\?: boolean; listicle\?: boolean;/.test(orch), "EvidenceReview에 축 필드가 없다");
+  assert.ok(/k: key,/.test(orch), "evidence에 key를 싣지 않는다 — 축을 붙일 방법이 없다");
+  const store = readFileSync(new URL("../synthStore.ts", import.meta.url), "utf8");
+  assert.ok(/SELECT marks FROM cafe_judge_marks/.test(store), "경량 테이블에서 축을 읽지 않는다");
+  assert.ok(/depth: m\.depth, adStyle: m\.adStyle, listicle: m\.listicle/.test(store), "evidence에 축을 붙이지 않는다");
+  const exp = readFileSync(new URL("../exposureOrder.ts", import.meta.url), "utf8");
+  assert.ok(/e\?\.listicle === true \|\| e\?\.adStyle === true/.test(exp), "노출 순서가 AI 의심 신호를 읽지 않는다");
+  assert.ok(/b\.depth - a\.depth/.test(exp), "노출 순서가 구체성을 쓰지 않는다");
+});
+
+// 🔴 SQL 템플릿 주석에 **백틱 금지** — 2026-10-19에 같은 실수를 **세 번** 했다.
+//   Neon 태그드 템플릿(sql`…`) 안의 `--` 주석에 백틱을 쓰면 템플릿 문자열이 그 자리에서 끊겨
+//   TS1005로 빌드가 깨진다. 파일 자체 주석(route.ts)에 이미 "이 주석에 백틱을 쓰면 템플릿 문자열이
+//   끊긴다 -- 실제로 한 번 깨졌다"고 적혀 있었는데도 반복했다 → 사람이 조심하는 대신 관문이 막는다.
+test("SQL 템플릿: 태그드 템플릿 안의 주석에 백틱이 없다", () => {
+  for (const f of ["../../app/api/cron-batch-judge/route.ts", "../../scripts/judge-run.mjs"]) {
+    const src = readFileSync(new URL(f, import.meta.url), "utf8");
+    // sql` … ` 구간을 훑어 '--' 주석 줄에 백틱이 있는지 본다(있으면 애초에 템플릿이 끊겨 파싱 불가).
+    const re = /sql(?:\.query)?`([\s\S]*?)`/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(src))) {
+      for (const line of m[1].split("\n")) {
+        const t = line.trim();
+        if (!t.startsWith("--")) continue;
+        assert.ok(!t.includes("`"), `${f}: SQL 주석에 백틱이 있다 → ${t.slice(0, 60)}`);
+      }
+    }
+  }
+});

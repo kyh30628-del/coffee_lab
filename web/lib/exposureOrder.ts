@@ -56,6 +56,28 @@ function trustTier(e: any): number {
 //   '쉐프부랑제 사우점' 상세에 '운양동 …쉐프부랑제 방문기'가 대표 6건에 뜨던 문제(센티넬 지점오염 22곳).
 //   삭제하지 않는 이유: 한 글이 두 지점을 함께 다루는 경우가 흔해 지우면 정상 후기가 죽는다. 순서만 바꾼다.
 //   ⚠️ 형제 지점 목록 조회 없음 — 카페 이름 하나로만 판정해 **추가 DB 비용 0**.
+// 📋 **정보 나열 글 판별**(2026-10-19) — 규칙갭 AI 발굴로 찾은 가장 큰 구멍.
+//   실측(표본 50곳·노출 후기 976건, Sonnet 5): 노출 중인 후기의 **43.95%를 AI가 거부**했고
+//   그중 410건이 품질 미달이었다. 사유가 `정보나열 위주` 약 100건 · `해시태그 나열` 약 35건에 몰렸다.
+//   품질 미달 429건을 분해하니 **82%가 "경험 서술어 0건"** 이었다 — 주소·영업시간·전화번호·메뉴가격만 있다.
+//   실제 표본(비디788, PV18): "비디788 주소 : 경기 성남시 분당구 판교로 788 영업시간 : 9:00 ~ 20:30
+//   전화번호 : 0507-… 메뉴판 …" — 소비자가 네이버 플레이스에서 이미 아는 정보뿐이다.
+//
+// 🔴 **거절이 아니라 순위 강등으로 고친다.** 스니펫은 평균 153자이고 검색어 주변을 자른 발췌라,
+//   경험 서술이 발췌 **밖**에 있을 수 있다. 거절하면 진짜 후기를 버린다(「비공개는 보수적으로」).
+//   순위만 내리면 등급·공개는 불변이고 **소비자 화면만** 좋아진다. 위험 0·비용 0.
+const EXP_CUES = /(먹었|마셨|갔|방문|주문|시켰|앉|느껴|좋았|맛있었|친절|추천해|다녀왔|들렀|머물|쉬었|구경|담았)/;
+const INFO_CUES = /(영업\s*시간|주소\s*[:：]|전화번호|☎|브레이크\s*타임|라스트\s*오더|정기\s*휴무|주차\s*공간|메뉴판|매일\s*\d{1,2}\s*[:：]\s*\d{2})/;
+/** 경험 서술이 없고 정보·해시태그만 있는 글인가 — 노출 순위를 내릴 대상. */
+export function isInfoDumpQuote(q?: string): boolean {
+  const t = String(q ?? "");
+  if (!t.trim()) return false;
+  if (EXP_CUES.test(t)) return false;                 // 경험 서술이 하나라도 있으면 대상 아님
+  const hashes = (t.match(/#\S+/g) ?? []).length;
+  const infos = (t.match(INFO_CUES) ?? []).length;
+  return infos >= 1 || hashes >= 3;                   // 실측 분포: 정보패턴 2개+ 40% · 해시태그 3개+ 21%
+}
+
 export function sortReviews(raw: any[], name: string, areaTerms: string[], nowT: number, dong?: string | null): any[] {
   const own = ownBranch(name, dong);
   // 🚩 네 번째 선행 관문(2026-08-17) — **미표기 체험단 캠페인**을 뒤로 민다.
@@ -97,6 +119,13 @@ export function sortReviews(raw: any[], name: string, areaTerms: string[], nowT:
       //   느슨한 기준 91.6% vs 엄격한 기준 48.2%). 종결어미·1인칭 서사가 있는 **문장**을 한 칸 더 앞으로.
       //   숨기지 않고 순서만 바꾸므로 09-22 사고(제목 조각이라 최신 검증 후기가 사라짐)와 성질이 다르다.
       sent: isSentenceQuote(e?.quote) ? 1 : 0,
+      // 📋 정보 나열 글은 **뒤로**(0=나열글, 1=정상). 등급 아래에서만 작동해 공개·등급은 불변이다.
+      //   AI가 나열글(listicle)·협찬 문체(adStyle)로 본 것도 같은 칸에서 뒤로 보낸다 —
+      //   둘은 '의심'이라 숨기지 않고 **순서만** 내린다(협찬 공시는 발췌에 없어 단정할 수 없다).
+      info: (isInfoDumpQuote(e?.quote) || e?.listicle === true || e?.adStyle === true) ? 0 : 1,
+      // 🔬 AI 구체성(0~3) — 같은 등급·같은 관문이면 **더 구체적인 후기를 앞으로**.
+      //   없으면 중립 1.5(옛 판정분과 섞여도 순서가 흔들리지 않게).
+      depth: typeof e?.depth === "number" ? e.depth : 1.5,
     }))
     .sort((a, b) => {
       // 🔴 2026-09-22 CEO 확정("검증이 우선이고 최신순. 이게 기본"):
@@ -111,7 +140,9 @@ export function sortReviews(raw: any[], name: string, areaTerms: string[], nowT:
       if (b.real !== a.real) return b.real - a.real;
       if (b.solo !== a.solo) return b.solo - a.solo;
       if (b.read !== a.read) return b.read - a.read; // 같은 등급·같은 관문이면 본문 인용문을 앞으로(2026-10-18 복원)
+      if (b.info !== a.info) return b.info - a.info; // 📋 정보 나열·AI 나열글·협찬문체를 뒤로(2026-10-19)
       if (b.sent !== a.sent) return b.sent - a.sent; // 그중에서도 '문장'을 앞으로(2026-10-18)
+      if (b.depth !== a.depth) return b.depth - a.depth; // 🔬 AI 구체성 높은 후기를 앞으로(2026-10-19)
       const ta = parseYmd(a.e?.date) ?? 0, tb = parseYmd(b.e?.date) ?? 0;
       if (tb !== ta) return tb - ta;
       // 🔴 2026-08-28 수리(CEO: "최신의 오염 없이 검증된 리뷰를 노출"):

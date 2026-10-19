@@ -48,7 +48,10 @@ let spent = Number(spentRow.s);
 const queue = async (scope = "") => Number((await sql`SELECT count(*)::int n FROM cafes
   WHERE raw_reviews IS NOT NULL
     AND (llm_judged_at IS NULL OR llm_judged_at < raw_collected_at
-         OR (COALESCE(borderline_count,0) > 35 AND COALESCE(judge_passes,0) < 9))
+         OR (COALESCE(borderline_count,0) > 35 AND COALESCE(judge_passes,0) < 9)
+         -- 🔬 세밀 축 미보유분(라우트와 같은 조건). 리셋 UPDATE 없이 재판정 대상이 된다(쓰기 0).
+         OR (published AND NOT EXISTS (SELECT 1 FROM cafe_judge_marks m WHERE m.cafe_id = cafes.id)
+             AND COALESCE(judge_passes,0) < 9))
     AND (pipeline_status = 'pending'
          OR (published AND synth_grade IS DISTINCT FROM '검증')
          OR (synth_grade = '후보' AND NOT published AND COALESCE(borderline_count,0) > 0

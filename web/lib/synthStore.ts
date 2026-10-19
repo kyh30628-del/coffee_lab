@@ -151,6 +151,15 @@ export function offctxFalsePositive(quotes: string[]): boolean {
 export const OFFCTX_FLAG_RATE = 0.55;
 
 // 저장된 판정 결정(영구). 재합성 시에도 동명/무관 제거가 유지되도록 모든 합성에 주입.
+// 🔬 AI 세밀 축 적재(2026-10-19) — depth(구체성 0~3)·adStyle(협찬 문체)·listicle(나열글).
+//   💰 `cafes`가 아니라 경량 테이블에서 읽는다. cafes 행은 평균 40KB라 거기 붙이면 작은 값 갱신에도
+//   행 전체를 다시 쓴다(2026-09-26 cost_guard 자동정지 패턴, decision#1262).
+async function loadJudgeMarks(cafeId: number): Promise<Record<string, { depth?: number; adStyle?: boolean; listicle?: boolean }>> {
+  const row = (await sql`SELECT marks FROM cafe_judge_marks WHERE cafe_id=${cafeId}`.catch(() => []))[0] as any;
+  const m = row?.marks;
+  return m && typeof m === "object" && !Array.isArray(m) ? m : {};
+}
+
 async function loadDecisions(cafeId: number): Promise<Record<string, boolean>> {
   const row = (await sql`SELECT judge_decisions FROM cafes WHERE id=${cafeId}`)[0];
   const d = row?.judge_decisions;
@@ -308,8 +317,18 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   //   재합성이 되돌림" 매커니즘 차단). 여기 storeResult에서도 한 번 더 걸러 표시 근거 배열을 정리(이중 방어).
   const excludedLinks = await loadLinkExclusions(cafeId);
   const dropExcluded = (arr: any[]) => excludedLinks.size ? arr.filter((r) => !excludedLinks.has(r?.link)) : arr;
-  const evidenceReviews = dropExcluded(evidenceReviewsRaw as any[]);
-  const allEvidence = allEvidenceRaw ? dropExcluded(allEvidenceRaw as any[]) : allEvidenceRaw;
+  const evidenceReviews0 = dropExcluded(evidenceReviewsRaw as any[]);
+  const allEvidence0 = allEvidenceRaw ? dropExcluded(allEvidenceRaw as any[]) : allEvidenceRaw;
+  // 🔬 2026-10-19 — AI 세밀 축을 노출 데이터에 **붙인다.** 안 붙이면 판정 결과가 화면에 아무 영향을 못 준다
+  //   (실측: 협찬 문체 348곳·나열글 260곳을 AI가 찾아놨는데 쓰는 곳이 없었다 = 돈만 쓴 상태).
+  //   💰 경량 테이블 1회 조회(cafe_judge_marks, PK 조회) — cafes는 건드리지 않는다.
+  const marks = await loadJudgeMarks(cafeId);
+  const attach = (arr: any[] | null | undefined) => !arr ? arr : arr.map((e) => {
+    const m = e?.k ? marks[e.k] : undefined;
+    return m ? { ...e, depth: m.depth, adStyle: m.adStyle, listicle: m.listicle } : e;
+  });
+  const evidenceReviews = attach(evidenceReviews0) as any[];
+  const allEvidence = attach(allEvidence0);
   // 🔒 승인된 downgrade 상한(위 lastDowngradeCap) — 재계산 등급이 이를 넘어서면 상한으로 눌러앉힌다.
   //   내려가는 방향(실제 재계산이 더 낮음)은 막지 않는다 — 이 가드는 바닥이 아니라 천장이다.
   const downgradeCap = await lastDowngradeCap(cafeId);
