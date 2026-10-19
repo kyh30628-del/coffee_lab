@@ -72,12 +72,15 @@ export async function GET(req: NextRequest) {
     await ensureSchema();
     await sql`CREATE TABLE IF NOT EXISTS judge_batches (batch_id TEXT PRIMARY KEY, manifest JSONB, applied BOOLEAN DEFAULT false, created_at TIMESTAMPTZ DEFAULT now())`;
     await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS judge_passes INT DEFAULT 0`;   // 아래 후보 SELECT가 이 칼럼을 읽는다 — 먼저 만든다
+    await sql`ALTER TABLE cafes ADD COLUMN IF NOT EXISTS judge_marks JSONB`;   // 🔬 세밀 축(depth·adStyle·listicle) — 판정 결정과 분리 보관
 
     // ── ① 끝난 배치 수거·적용 ──
     let appliedCafes = 0, rescued = 0, inTok = 0, outTok = 0, stillRunning = 0, expiredBatches = 0;
     // 🔬 2026-10-19 정확성 계측 — 이 셋이 0이 아니면 'AI가 보지 않은 채 버려진 후기'가 있다는 뜻이다.
     let truncated = 0, parseFailed = 0, unanswered = 0;
     let unpublished = 0, cappedStop = false;   // 🛑 판정으로 공개→비공개가 된 수(차단기 근거)
+    // 🔬 2026-10-19 세밀 축 집계 — 협찬 문체·나열글·구체성. 응답에 실어 보고에 쓴다.
+    let adStyleN = 0, listicleN = 0, depthSum = 0, depthCafes = 0, marksSaved = 0;
     let costAcc = 0;   // 배치별 모델 단가로 적립한 실비용(아래 보고에 쓴다)
     const open = (await sql`SELECT batch_id, manifest FROM judge_batches WHERE NOT applied ORDER BY created_at LIMIT 5`) as any[];
     for (const row of open) {
@@ -124,6 +127,17 @@ export async function GET(req: NextRequest) {
         if (!verdicts) { parseFailed++; try { await markJudged(entry.id); } catch {} return; }
         const mapped = decisionsFromVerdicts(entry.keys as string[], verdicts);
         unanswered += mapped.unanswered;
+        adStyleN += mapped.ads; listicleN += mapped.lists;
+        if (mapped.depthAvg !== null) { depthSum += mapped.depthAvg; depthCafes++; }
+        // 🔬 세밀 축을 카페별로 저장 — 노출 순서(구체성 높은 인용문 우선)와 협찬 감시에 쓴다.
+        //   판정 결정(judge_decisions)과 **분리**해 둔다: 결정은 채택/거부라는 계약이고, 이건 부가 신호다.
+        //   섞으면 옛 판정과 호환이 깨진다(판정 결정은 재합성이 매번 읽는 핫패스다).
+        if (Object.keys(mapped.marks).length) {
+          try {
+            await sql`UPDATE cafes SET judge_marks = COALESCE(judge_marks, '{}'::jsonb) || ${JSON.stringify(mapped.marks)}::jsonb WHERE id = ${entry.id}`;
+            marksSaved++;
+          } catch { /* 부가 신호 저장 실패가 판정을 막지 않는다 */ }
+        }
         if (Object.keys(mapped.decisions).length === 0) { try { await markJudged(entry.id); } catch {} return; }
         if (cappedStop) return;   // 상한 초과 — 이 회차는 더 적용하지 않는다(멱등 수거라 다음에 이어진다)
         try {
@@ -167,6 +181,7 @@ export async function GET(req: NextRequest) {
         note: "수거만 수행했다. 신규 제출은 &submit=1 을 명시할 때만 — 상태 확인 목적 호출이 과금을 만들지 않게(09-20 중복제출 사고).",
         applied: { cafes: appliedCafes, rescuedReviews: rescued, costUsd: +costAcc.toFixed(5), inTok, outTok },
         precision: { truncated, parseFailed, unanswered },   // 0이 아니면 'AI가 못 본 후기'가 있다
+        marks: { adStyle: adStyleN, listicle: listicleN, depthAvg: depthCafes ? +(depthSum / depthCafes).toFixed(2) : null, saved: marksSaved },
         unpublished, cappedStop,   // 🛑 공개→비공개 전환 수 · 상한 초과로 중단했는지
         pollingBatches: stillRunning, expiredClosed: expiredBatches });
     }
@@ -251,6 +266,9 @@ export async function GET(req: NextRequest) {
              --       (전량 Sonnet은 $99.12로 예산 초과, 전량 Haiku는 $6.68이지만 비공개가 4~5배)
              --     ⚠️ thin을 먼저 돌리면 llm_judged_at이 찍혀 refine 큐에서 빠진다 → 중복 과금 없음.
              OR (${scope} = 'thin' AND COALESCE(published, false) AND COALESCE(synth_count, 0) <= 4)
+             --   scope=verified : 공개 '검증' 카페(옥석 코어) 재판정. 위 외부 게이트 주석 참조 —
+             --     9,090곳이 AI 판정 무경험이고 심사 후보가 261,124건 쌓여 있다.
+             OR (${scope} = 'verified' AND COALESCE(published, false) AND synth_grade = ${TRUSTED_GRADE})
              OR (${scope} = 'flip' AND NOT COALESCE(published, false)
                  AND (raw_collected_at > now() - interval '30 day' OR embedding IS NOT NULL)
                  AND COALESCE(naver_category, '') <> ''
@@ -337,6 +355,7 @@ export async function GET(req: NextRequest) {
       ok: true,
       applied: { cafes: appliedCafes, rescuedReviews: rescued, costUsd: Number(cost.toFixed(4)), inTok, outTok },
       precision: { truncated, parseFailed, unanswered },
+      marks: { adStyle: adStyleN, listicle: listicleN, depthAvg: depthCafes ? +(depthSum / depthCafes).toFixed(2) : null, saved: marksSaved },
       unpublished, cappedStop,
       concurrency: CONC,
       pollingBatches: stillRunning,

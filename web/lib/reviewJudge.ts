@@ -23,7 +23,23 @@ export const hasJudgeKey = () => !!(ANTHROPIC_KEY || GOOGLE_KEY);
 export const judgeProvider = () => (ANTHROPIC_KEY ? "claude" : GOOGLE_KEY ? "gemini" : "none");
 
 export type JudgeItem = { i: number; title: string; body: string };
-export type JudgeVerdict = { i: number; about: boolean; helpful: boolean; reason: string };
+// 🔬 2026-10-19 **판정 세밀화**(CEO 지시 "판정을 더 세밀하게 … 제대로 사용해야 할 거 아니야").
+//   그 전엔 about/helpful **boolean 2개**뿐이라 "얼마나 구체적인가"를 **노출 순서에 쓸 수 없었다**.
+//   공개 49,294곳이 평균 5.1건의 인용문을 보여주는데 그 순서는 규칙(문장성·등급·최신)으로만 정해졌다.
+//   실측 근거(규칙갭 AI 발굴, 표본 50곳·후기 976건): 노출 중인 후기의 **43.95%를 AI가 거부**했고
+//   사유가 `정보나열 위주` 약 100건 · `해시태그 나열` 약 35건으로 **한 덩어리에 몰렸다**.
+//   즉 "경험 서술 없이 정보만 나열한 글"이 상단에 올라가고 있었다.
+//   → 축을 셋 더 받는다. 💰 **추가 비용 거의 0**(같은 1회 호출의 출력 토큰만 약간 늘어난다).
+//     · depth 0~3 : 구체성. 3=맛·분위기·메뉴를 직접 경험으로 서술 / 0=정보 나열·해시태그뿐
+//     · adStyle    : 협찬·홍보 **문체** 의심(공시가 아니라 문체로만 — 스니펫엔 공시가 안 들어온다)
+//     · listicle   : 여러 업체를 나열한 글(귀속 실패의 주원인 — 실측 '맛집 3곳 선별' 류)
+//   ⚠️ 하위호환: 옛 응답(about/helpful만)도 그대로 읽힌다. 없는 축은 undefined로 남고 호출측이 보정한다.
+export type JudgeVerdict = {
+  i: number; about: boolean; helpful: boolean; reason: string;
+  depth?: number;        // 0~3 구체성
+  adStyle?: boolean;     // 협찬·홍보 문체 의심
+  listicle?: boolean;    // 여러 업체 나열글
+};
 
 // 정적 판정 기준(프롬프트 캐싱 대상 — 모든 카페 판정에서 재사용)
 // ⚠️ 입력의 구조적 한계(2026-08-16 확인·CEO 지적) — 이 파일을 고칠 사람이 반드시 알아야 한다.
@@ -45,7 +61,16 @@ export const RUBRIC = `너는 카페 리뷰 품질 심사관이다. 블로그 �
    오판이 된다. 눈에 보이는 **문체·내용**만으로 helpful을 판단하고, 협찬 탐지는 별도 장치(템플릿 지문·
    캠페인 클러스터·리뷰어 이력)가 담당한다.
 
-반드시 JSON 배열로만 답한다(설명·코드블록 금지): [{"i":번호,"about":true/false,"helpful":true/false,"reason":"15자 이내"}]`;
+추가 판정(2026-10-19 신설 — 노출 순서와 협찬 탐지에 쓴다):
+- depth: 0~3 정수. 3=맛·분위기·메뉴를 **직접 경험으로 구체적으로** 서술 / 2=경험 서술이 있으나 단편적 /
+  1=언급 수준 / 0=주소·영업시간·메뉴가격·해시태그만 나열하고 경험 서술이 없음.
+- adStyle: true/false. **문체만으로** 판단하는 협찬·홍보 의심(정보 나열·과장 수식·업체 소개문 어조).
+  ⚠️ 협찬 '공시'는 발췌에 들어오지 않으니 추측하지 마라. 눈에 보이는 문체만 본다.
+- listicle: true/false. 여러 업체를 함께 소개하는 나열글(「○○ 맛집 3곳」·「선별」·여러 가게 주소 병기).
+  이 글은 우리 카페가 한 줄 스쳤을 뿐이라 대표 후기로 쓰면 안 된다.
+
+반드시 JSON 배열로만 답한다(설명·코드블록 금지):
+[{"i":번호,"about":true/false,"helpful":true/false,"depth":0-3,"adStyle":true/false,"listicle":true/false,"reason":"15자 이내"}]`;
 
 // 📏 출력 토큰 상한 — **단일 출처.** (2026-10-19)
 //   🔴 사고: 실시간 경로는 항목수 비례로 늘렸는데 **배치 경로는 1500 고정**이었다. 35항목이면
@@ -86,15 +111,26 @@ export const judgeMaxTokens = (itemCount: number) => Math.min(8000, 1000 + itemC
 //   → **답이 온 후보만** 결정을 남긴다. 답이 없으면 미결로 두어 규칙 판정이 그대로 간다(무회귀).
 export function decisionsFromVerdicts(keys: string[], verdicts: Map<number, JudgeVerdict> | null) {
   const decisions: Record<string, boolean> = {};
-  let answered = 0, kept = 0;
+  // 🔬 2026-10-19 세밀 축 — key별로 보존해 노출 순서·협찬 감시에 쓴다(judge_marks).
+  const marks: Record<string, { depth?: number; adStyle?: boolean; listicle?: boolean }> = {};
+  let answered = 0, kept = 0, ads = 0, lists = 0, depthSum = 0, depthN = 0;
   keys.forEach((k, i) => {
     const v = verdicts?.get(i);
     if (!v) return;                       // 미결 — 규칙 판정 유지
     answered++;
-    decisions[k] = !!(v.about && v.helpful);
-    if (decisions[k]) kept++;
+    // 🔴 나열글은 채택하지 않는다 — 우리 카페가 한 줄 스쳤을 뿐이라 대표 후기로 쓰면 안 된다
+    //   (실측: 귀속 실패 표본이 전부 「맛집 N곳 선별」 류였다).
+    const ok = !!(v.about && v.helpful) && v.listicle !== true;
+    decisions[k] = ok;
+    if (ok) kept++;
+    if (v.adStyle === true) ads++;
+    if (v.listicle === true) lists++;
+    if (typeof v.depth === "number") { depthSum += v.depth; depthN++; }
+    if (typeof v.depth === "number" || v.adStyle !== undefined || v.listicle !== undefined)
+      marks[k] = { depth: v.depth, adStyle: v.adStyle, listicle: v.listicle };
   });
-  return { decisions, answered, unanswered: keys.length - answered, kept };
+  return { decisions, marks, answered, unanswered: keys.length - answered, kept,
+           ads, lists, depthAvg: depthN ? depthSum / depthN : null };
 }
 
 export function buildUserText(cafeName: string, area: string, items: JudgeItem[]): string {

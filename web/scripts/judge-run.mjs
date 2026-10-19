@@ -124,6 +124,10 @@ for (let cycle = 1; cycle <= MAX_CYCLES; cycle++) {
   //   비공개 자체는 정당할 수 있지만(AI가 '이 가게 글이 아니다'라고 본 경우) **속도**는 봐야 한다.
   if (Number(col.unpublished ?? 0) > 0)
     console.log(`  [${cycle}] 🔴 공개→비공개 전환 ${n(col.unpublished)}곳${col.cappedStop ? " · ⛔ 상한 초과로 이 회차 적용 중단(다음에 이어진다)" : ""}`);
+  // 🔬 세밀 축(2026-10-19) — 협찬 문체·나열글·구체성 평균. 규칙 보강과 노출 순서의 근거가 된다.
+  const mk = col.marks ?? {};
+  if (Number(mk.saved ?? 0) > 0)
+    console.log(`  [${cycle}] 🔬 세밀 — 협찬문체 ${n(mk.adStyle)}건 · 나열글 ${n(mk.listicle)}건 · 구체성 평균 ${mk.depthAvg ?? "?"} (저장 ${n(mk.saved)}곳)`);
   const pr = col.precision ?? {};
   if (Number(pr.truncated ?? 0) || Number(pr.parseFailed ?? 0) || Number(pr.unanswered ?? 0))
     console.log(`  [${cycle}] 🔴 정확성 — 출력잘림 ${n(pr.truncated)}건 · 파싱실패 ${n(pr.parseFailed)}건 · 미응답후보 ${n(pr.unanswered)}건 (미응답은 규칙 판정 유지)`);

@@ -979,3 +979,36 @@ test("판정 집행 순서: thin(좋은 모델)이 refine(싼 모델)보다 먼�
   assert.ok(/run thin\s+claude-sonnet-5/.test(chain), "thin에 Sonnet 5를 쓰지 않는다");
   assert.ok(/run refine\s+claude-haiku-5-5/.test(chain), "refine에 Haiku 5.5를 쓰지 않는다");
 });
+
+// 🔬 판정 세밀화 — 2026-10-19. CEO 지시("판정을 더 세밀하게"). 실측 근거: 노출 중인 후기의 **43.95%**를
+//   AI가 거부했고(표본 50곳·976건) 사유가 `정보나열 위주`·`해시태그 나열`에 몰렸다. about/helpful
+//   boolean 2개로는 "얼마나 구체적인가"를 노출 순서에 쓸 수 없었다.
+//   → depth(0~3)·adStyle(협찬 문체)·listicle(나열글) 세 축을 더하고, **나열글은 채택하지 않는다**.
+test("판정 세밀화: 나열글(listicle)은 채택하지 않는다", () => {
+  const V = (i: number, o: Partial<JudgeVerdict>) => ({ i, about: true, helpful: true, reason: "t", ...o } as JudgeVerdict);
+  const m = new Map([[0, V(0, { listicle: true })], [1, V(1, { listicle: false })]]);
+  const r = decisionsFromVerdicts(["a", "b"], m);
+  assert.equal(r.decisions.a, false, "나열글을 채택했다 — 우리 카페가 한 줄 스친 글이 대표 후기가 된다");
+  assert.equal(r.decisions.b, true);
+  assert.equal(r.lists, 1);
+});
+test("판정 세밀화: depth·adStyle이 key별로 보존된다(노출 순서·협찬 감시용)", () => {
+  const V = (i: number, o: Partial<JudgeVerdict>) => ({ i, about: true, helpful: true, reason: "t", ...o } as JudgeVerdict);
+  const r = decisionsFromVerdicts(["a", "b"], new Map([[0, V(0, { depth: 3 })], [1, V(1, { depth: 1, adStyle: true })]]));
+  assert.equal(r.marks.a?.depth, 3);
+  assert.equal(r.marks.b?.adStyle, true);
+  assert.equal(r.ads, 1);
+  assert.equal(r.depthAvg, 2);
+});
+test("판정 세밀화: 옛 응답(축 없음)도 그대로 읽힌다(하위호환)", () => {
+  const r = decisionsFromVerdicts(["a"], new Map([[0, { i: 0, about: true, helpful: true, reason: "t" }]]));
+  assert.equal(r.decisions.a, true, "축이 없으면 채택이 막혀선 안 된다");
+  assert.equal(r.depthAvg, null);
+  assert.deepEqual(r.marks, {});
+});
+test("판정 세밀화: RUBRIC이 세 축을 요구하고 협찬 추측을 금지한다", () => {
+  const judge = readFileSync(new URL("../reviewJudge.ts", import.meta.url), "utf8");
+  for (const k of ["depth", "adStyle", "listicle"]) assert.ok(judge.includes(`"${k}"`), `RUBRIC 응답 형식에 ${k}가 없다`);
+  assert.ok(/협찬 '공시'는 발췌에 들어오지 않으니 추측하지 마라/.test(judge),
+    "협찬 공시 추측 금지 문구가 사라졌다 — 없는 근거로 판정하면 오판이 된다");
+});
