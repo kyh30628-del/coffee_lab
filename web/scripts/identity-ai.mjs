@@ -53,7 +53,11 @@ if (!rows.length) process.exit(0);
 const reqs = [];
 for (const r of rows) {
   const qs = (Array.isArray(r.rv) ? r.rv : []).map((x) => String(x?.quote ?? "").trim()).filter((q) => q.length > 15).slice(0, 10);
-  if (qs.length < 3) continue;   // 근거가 너무 적으면 쓰지 않는다 — 지어내느니 비워 둔다
+  // 근거가 너무 적으면 쓰지 않는다 — 지어내느니 비워 둔다.
+  // 🔴 단, **건너뛴 것도 기록**해야 한다. 안 그러면 같은 카페가 매 회차 다시 뽑혀 루프가 영원히 돈다
+  //   (실사고: 잔량 1,411곳이 5회차를 그대로 돌았다). "처리했다"의 정의에 '보류'도 들어가야 한다.
+  if (qs.length < 3) { await sql`INSERT INTO identity_drafts (cafe_id, draft, prev, model)
+    VALUES (${r.id}, NULL, ${r.ident ?? null}, 'skip:근거부족') ON CONFLICT (cafe_id) DO NOTHING`; continue; }
   reqs.push({ custom_id: `i${r.id}`, params: { model: MODEL, max_tokens: 200, messages: [{ role: "user", content:
 `카페 "${r.name}"(${r.dong ?? ""})의 공개 후기 발췌다. 이 카페가 **어떤 곳인지** 한 줄로 정리하라.
 

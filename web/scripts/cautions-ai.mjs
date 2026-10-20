@@ -105,7 +105,8 @@ const srcQuotes = new Map();
 const nameOf = new Map();   // 지어낸 근거를 걸러내려면 '무엇을 보여줬는지'를 들고 있어야 한다
 for (const r of rows) {
   const qs = (Array.isArray(r.rv) ? r.rv : []).map((x) => String(x?.quote ?? "").trim()).filter((q) => q.length > 15).slice(0, 12);
-  if (qs.length < 4) continue;
+  if (qs.length < 4) { await sql`INSERT INTO caution_drafts (cafe_id, items, model)
+    VALUES (${r.id}, '[]'::jsonb, 'skip:근거부족') ON CONFLICT (cafe_id) DO NOTHING`; continue; }   // 건너뛴 것도 기록(무한루프 방지)
   // 🔴 생성이 아니라 **검증**이다 — 규칙이 후보를 내고 AI는 맞는지만 본다.
   //   생성으로 돌렸더니 9건 중 6건이 틀렸다(「애견 동반 가능」을 '반려동물 불가'로, 「브레이크타임 없어요」를
   //   '브레이크타임'으로 뒤집었다). 시설 태그 검증은 같은 데이터로 잘 맞았다 — 차이는 생성이냐 검증이냐였다.
