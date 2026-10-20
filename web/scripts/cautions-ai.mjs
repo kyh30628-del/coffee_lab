@@ -53,6 +53,24 @@ const NEGATE = {
   "콘센트 부족": /콘센트.{0,4}(많|충분)/,
 };
 
+/** 🔒 라벨별 **근거 요건** — 단어가 나왔다고 사실이 아니다. 그 일을 **겪었다는 진술**이어야 한다.
+ *  실측: '웨이팅'은 블로그 제목이 주제어로 늘 달아서(“○○ 주말 웨이팅 방문 후기입니다!”) 오탐이 몰렸다.
+ *  라벨을 지우는 대신 **근거의 질**을 요구한다 — 적게 나오더라도 틀리지 않는 쪽이 맞다. */
+const EVIDENCE = {
+  "웨이팅 있음": /기다|대기.{0,6}(시간|분|길)|줄.{0,3}(서|섰)|웨이팅.{0,8}(했|하고|있었|길|심|많|걸)/,
+  "좌석 부족": /자리.{0,6}(없|부족|꽉|모자)|좌석.{0,6}(없|부족|꽉)/,
+  "주말 혼잡": /주말.{0,10}(붐비|혼잡|많았|밀려)/,
+  "소음 있음": /시끄|소음|웅성|떠들/,
+  "가격대 높음": /비싸|가격.{0,6}(높|센|부담)/,
+};
+
+/** 근거 문장에 **우리가 아닌 다른 업소명**이 섞였나. 교차 귀속(다른 가게 사실을 이 가게에 붙이기) 차단용. */
+function otherBiz(quote, myName) {
+  const mine = myName.replace(/\s/g, "");
+  const toks = String(quote).match(/[가-힣A-Za-z0-9]{2,12}(커피|카페|식당|베이커리|제과|로스터리|다방|분식|국수|집)/g) ?? [];
+  return toks.some((t) => { const n = t.replace(/\s/g, ""); return !mine.includes(n) && !n.includes(mine) && mine.length > 1; });
+}
+
 await sql`CREATE TABLE IF NOT EXISTS caution_drafts (
   cafe_id INT PRIMARY KEY, items JSONB, model TEXT,
   at TIMESTAMPTZ NOT NULL DEFAULT now(), applied BOOLEAN NOT NULL DEFAULT false)`;
@@ -83,7 +101,8 @@ console.log(`대상 ${rows.length}곳`);
 if (!rows.length) process.exit(0);
 
 const reqs = [];
-const srcQuotes = new Map();   // 지어낸 근거를 걸러내려면 '무엇을 보여줬는지'를 들고 있어야 한다
+const srcQuotes = new Map();
+const nameOf = new Map();   // 지어낸 근거를 걸러내려면 '무엇을 보여줬는지'를 들고 있어야 한다
 for (const r of rows) {
   const qs = (Array.isArray(r.rv) ? r.rv : []).map((x) => String(x?.quote ?? "").trim()).filter((q) => q.length > 15).slice(0, 12);
   if (qs.length < 4) continue;
@@ -94,7 +113,7 @@ for (const r of rows) {
   const cand = Object.keys(VOCAB).filter((lb) => CUE[lb]?.test(blob));
   if (!cand.length) { await sql`INSERT INTO caution_drafts (cafe_id, items, model) VALUES (${r.id}, '[]'::jsonb, 'rule')
     ON CONFLICT (cafe_id) DO NOTHING`; continue; }
-  srcQuotes.set(Number(r.id), qs);
+  srcQuotes.set(Number(r.id), qs); nameOf.set(Number(r.id), String(r.name ?? ""));
   reqs.push({ custom_id: `u${r.id}`, params: { model: MODEL, max_tokens: 400, messages: [{ role: "user", content:
 `카페 "${r.name}"의 공개 후기 발췌다. 아래 **후보 주의점이 사실인지** 하나씩 판정하라.
 
@@ -104,12 +123,18 @@ for (const r of rows) {
 ${qs.map((q, i) => `${i + 1}. ${q}`).join("\n")}
 
 규칙(어기면 틀린 경고가 소비자에게 나간다):
+- 🔴 **가장 중요**: 그 문장이 **"${r.name}"에 대한 말인지** 먼저 확인하라.
+  블로그 글에는 **다른 가게 이야기가 섞여 있다**. 실제로 틀렸던 예:
+    "해밀화에 가려고 했는데 주차 자리가 없어서 → 블루트렁크 방문" = 주차 없던 곳은 **해밀화**다.
+    "아이맥스 좌석이 없더라구요" = 영화관 좌석이지 이 카페가 아니다.
+    "한 곳에서 웨이팅하다 못 사고 → 베비에르에서 사왔다" = 웨이팅은 **다른 곳**이다.
+  조금이라도 다른 장소 이야기면 **모름**이다.
 - 후보 라벨 외에 **새로 만들지 마라**.
 - "애견 동반 **가능**", "브레이크타임 **없어요**", "**내부** 화장실" 처럼 **반대 뜻이면 거짓**이다.
 - 발췌가 그 주의점을 말하지 않으면 **모름**이다. 추측·유추 금지.
 - quote는 발췌에 **있는 그대로** 베껴라(지어내면 버려진다). 그 주의점을 직접 말하는 구절만.
 - 전화번호·해시태그·영업시간 안내문은 근거로 쓰지 마라.
-JSON만: {"판정":[{"label":"...","값":"참"|"거짓"|"모름","quote":"..."}]}` }] } });
+JSON만: {"판정":[{"label":"...","값":"참"|"거짓"|"모름","이가게의말인가":true|false,"quote":"..."}]}` }] } });
 }
 console.log(`LLM 생성 ${reqs.length}건 제출`);
 if (!reqs.length) process.exit(0);
@@ -128,7 +153,7 @@ for await (const res of streamResults(KEY, b.results_url)) {
   const seen = new Set();
   const src = (srcQuotes.get(id) ?? []).join(" ").replace(/\s+/g, "");
   const items = (j?.판정 ?? [])
-    .filter((x) => x?.값 === "참" && VOCAB[x?.label] && !seen.has(x.label) && seen.add(x.label))
+    .filter((x) => x?.값 === "참" && x?.이가게의말인가 === true && VOCAB[x?.label] && !seen.has(x.label) && seen.add(x.label))
     .map((x) => ({ label: x.label, emoji: VOCAB[x.label], count: 1, quote: String(x.quote ?? "").slice(0, 60) }))
     // 🔒 지어낸 근거 차단 — quote가 **발췌에 실제로 있는 문자열**이 아니면 버린다(공백 무시 대조).
     .filter((x) => x.quote.length >= 6 && src.includes(x.quote.replace(/\s+/g, "").slice(0, 20)))
@@ -140,6 +165,16 @@ for await (const res of streamResults(KEY, b.results_url)) {
                 && !/\|/.test(x.quote))
     // 🔒 라벨-근거 축 불일치 차단 — "주차 … 협소한 편"을 '공간 협소'로 붙이던 실제 오분류.
     .filter((x) => !(x.label === "공간 협소" && /주차/.test(x.quote)))
+    // 🔴 교차 귀속 차단 — **우리 해자의 급소**. 실사고:
+    //   "월송커피 갔더니 자리가 없어서 … 모우 커피랩으로" → 모우에 '좌석 부족'
+    //   "웨이팅 227팀 감나무식당부터 … 메타비치" → 메타비치에 '웨이팅'
+    //   근거 문장에 **우리 상호가 아닌 다른 업소명**이 보이면 그 문장은 이 가게의 사실이 아니다.
+    .filter((x) => !otherBiz(x.quote, nameOf.get(id) ?? ""))
+    // 🔒 진술이 아닌 **제목 조각** 차단 — "평일 웨이팅"·"(주차/웨이팅)"은 사실 진술이 아니다.
+    //   서술어로 끝나는 문장만 근거로 인정한다.
+    .filter((x) => x.quote.length >= 12 && /(요|다|음|네|죠|습니다|했|함|됨|많|길|없|있)[.!~…]*$/.test(x.quote.trim()))
+    // 🔒 라벨별 근거 요건 — 단어가 아니라 **겪었다는 진술**이어야 한다(위 EVIDENCE 주석 참조).
+    .filter((x) => !EVIDENCE[x.label] || EVIDENCE[x.label].test(x.quote))
     .slice(0, 3);
   if (items.length) made++; else empty++;
   await sql`INSERT INTO caution_drafts (cafe_id, items, model) VALUES (${id}, ${JSON.stringify(items)}::jsonb, ${MODEL})
