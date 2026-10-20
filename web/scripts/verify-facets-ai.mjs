@@ -74,6 +74,7 @@ const { HIGHLIGHTS } = await import("../lib/cafeProfile.ts");
 const esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const CUE = Object.fromEntries(HIGHLIGHTS.map((h) => [h.label, new RegExp(h.kws.map(esc).join("|"))]));
 const reqs = [];
+const tagsOf = new Map();   // 파싱 실패 시에도 기록을 남기려면 '무엇을 물었는지'를 들고 있어야 한다
 for (const r of rows) {
   const mine = (r.facets ?? []).filter((f) => TAGS.includes(f));
   if (!mine.length) continue;
@@ -84,7 +85,8 @@ for (const r of rows) {
       VALUES (${r.id}, ${t}, false, '근거 문장 0건', 'rule') ON CONFLICT DO NOTHING`;
     continue;
   }
-  reqs.push({ custom_id: `c${r.id}`, params: { model: MODEL, max_tokens: 300, messages: [{ role: "user", content:
+  tagsOf.set(Number(r.id), mine);
+  reqs.push({ custom_id: `c${r.id}`, params: { model: MODEL, max_tokens: Math.min(1200, 220 + mine.length * 180), messages: [{ role: "user", content:
 `카페 "${r.name}"의 공개 후기 발췌다. 아래 태그가 **이 카페의 시설로서 사실인지** 판정하라.
 
 태그: ${mine.join(" / ")}
@@ -114,8 +116,14 @@ for await (const res of streamResults(KEY, b.results_url)) {
   const msg = res?.result?.message; if (!msg) continue;
   tin += msg.usage?.input_tokens ?? 0; tout += msg.usage?.output_tokens ?? 0;
   const txt = (msg.content ?? []).map((c) => c.text ?? "").join("");
-  const m = txt.match(/\{[\s\S]*\}/); if (!m) continue;
-  let j; try { j = JSON.parse(m[0]); } catch { continue; }
+  // 🔴 2026-10-19 실사고 — 출력이 잘려 파싱에 실패하면 **아무 기록도 안 남겨** 같은 카페가
+  //   매 회차 다시 뽑혔다(668곳이 20회차를 그대로 돌았다). 판정 레인에서 이미 겪은 함정인데 또 냈다.
+  //   "못 읽었다"도 처리 결과다 — ok=null(모름)로 남겨 다시 집지 않게 한다. 태그는 건드리지 않는다.
+  const mark = async (why) => { for (const t of (tagsOf.get(id) ?? []))
+    await sql`INSERT INTO facet_verdicts (cafe_id, tag, ok, why, model) VALUES (${id}, ${t}, NULL, ${why}, ${MODEL})
+      ON CONFLICT (cafe_id, tag) DO NOTHING`; };
+  const m = txt.match(/\{[\s\S]*\}/); if (!m) { await mark("출력 파싱 실패"); continue; }
+  let j; try { j = JSON.parse(m[0]); } catch { await mark("출력 잘림"); continue; }
   for (const v of j?.판정 ?? []) {
     const val = v?.값 === "참" ? true : v?.값 === "거짓" ? false : null;
     if (val === true) ok++; else if (val === false) ng++; else unk++;
