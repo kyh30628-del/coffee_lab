@@ -115,9 +115,13 @@ export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, headin
         <div className="bg-white/70 border border-[#e0d3b8] rounded-xl px-3.5 py-3 mb-6">
           {/* 2026-09-14: div였다. 이 페이지에 h2가 **하나도 없었다**(경쟁사 12개) — 검색엔진이 구조를 못 읽는다.
               보이는 모양은 그대로 두고 태그만 h2로 올린다. */}
+          {/* 🔗 /insights 내부링크(2026-10-23) — 백링크 전략용으로 8/26에 만든 "데이터 리포트" 페이지가
+              사이트맵엔 있었지만 **내부 링크가 0개**라 2개월간 방문자가 0명이었다(실측). 이 컴포넌트는
+              구+취향·구+시설·동 — 가장 효율 좋은 페이지 유형 전부(860쪽+)의 공용 부품이라, 여기 한 줄로
+              전부에 동시 적용된다. 링크를 타고 들어온 기자·블로거가 인용할 수 있게 만드는 게 목적. */}
           <h2 className="text-[11px] font-bold tracking-[0.18em] text-note-brown uppercase mb-1.5">왜 여기 목록이 다른가</h2>
           <ul className="text-[12.5px] text-[#3d2f22] leading-[1.65] space-y-0.5">
-            <li>☕ <b>광고·협찬·영수증 리뷰를 뺐어요.</b> 네이버·구글·유튜브 공개 후기를 교차검증했어요. <Link href="/trust" className="underline text-note-brown">검증 방법</Link></li>
+            <li>☕ <b>광고·협찬·영수증 리뷰를 뺐어요.</b> 네이버·구글·유튜브 공개 후기를 교차검증했어요. <Link href="/trust" className="underline text-note-brown">검증 방법</Link> · <Link href="/insights" className="underline text-note-brown">전국 데이터로 보기</Link></li>
             {cautionCount > 0 && <li>⚠️ <b>좋은 점만 쓰지 않아요.</b> 이 목록 {cautionCount}곳은 주차·웨이팅 같은 <b>주의점</b>까지 후기에서 찾아 적었어요.</li>}
             <li>🕒 <b>{factLine}</b></li>
           </ul>

@@ -1369,3 +1369,20 @@ test("푸시: 구독은 고의도 순간(북마크 추가)에만 묻는다 — �
   assert.ok(/Notification\.permission === "denied"/.test(code), "거절 상태 확인이 없다");
   assert.ok(/pushDismissedRecently/.test(code), "재요청 쿨다운이 없다");
 });
+
+// 📊 /insights "걸러낸 것" 섹션 — 2026-10-23, 백링크용 신규 콘텐츠. 과장 방지 관문.
+//   실측(표본 3,000곳 분해): 거절 사유 중 "광고·협찬"은 5.3%뿐, 대부분(40%+)은 동명이인·옆가게 혼입·
+//   실제 방문 흔적 없음이다. "광고라서 걸렀다"고 쓰면 과장이다(CEO가 반복 지적한 실수 유형).
+test("/insights: 걸러낸 비율을 '광고 때문'으로 과장하지 않는다", () => {
+  const code = codeOf("../../app/insights/page.tsx");
+  assert.ok(/그 카페 얘기가 아니었습니다/.test(code), "정확한 표현(혼입)이 빠졌다");
+  // '광고'라는 단어가 이 섹션의 핵심 설명으로 쓰이면 안 된다 — "광고·협찬은 이 중 일부일 뿐"처럼
+  // 비중을 낮춰 쓰는 문장이어야 한다(완전히 못 쓰게 막지는 않는다 — 다른 섹션에서도 쓰는 정상 단어다).
+  assert.ok(/광고·협찬은 이 중 일부일 뿐/.test(code), "광고를 주된 이유로 과장했을 위험 — '일부일 뿐' 명시가 빠졌다");
+});
+test("/insights: 카페 상세·구+취향·구+시설 페이지에서 링크로 닿을 수 있다(2개월간 방문 0명이던 원인 재발 방지)", () => {
+  const detail = codeOf("../../app/c/[id]/page.tsx");
+  assert.ok(/<Link href="\/insights">/.test(detail), "카페 상세에 /insights 링크가 없다");
+  const curated = codeOf("../../app/area/Curated.tsx");
+  assert.ok(/<Link href="\/insights"/.test(curated), "구+취향·구+시설 공용 컴포넌트에 /insights 링크가 없다");
+});

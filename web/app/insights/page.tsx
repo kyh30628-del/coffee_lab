@@ -21,6 +21,20 @@ async function getStats() {
     const [tot] = (await sql`SELECT count(*) FILTER (WHERE published)::int pub,
       count(*) FILTER (WHERE published AND synth_grade='검증')::int v,
       COALESCE(sum(synth_count) FILTER (WHERE published),0)::int reviews FROM cafes`) as any[];
+    // 🎯 2026-10-23 추가 — CEO 지시(백링크용 신규 콘텐츠). 기존 섹션은 전부 "검증된 것"(긍정 프레이밍)만
+    //   보여줬는데, 여기는 "걸러낸 것"(10건 중 6건)을 처음 공개한다 — 기자·블로거가 더 집지 쉬운 "폭로성" 숫자.
+    //   ⚠️ 표본 분해 실측(3,000곳): 거절 사유 중 "광고·협찬"은 5.3%뿐이고, 대부분(40%+)은
+    //   "동명이인·옆가게 혼입·실제 방문 흔적 없음"이다. "광고라서 걸렀다"고 쓰면 과장이다 —
+    //   "그 카페 얘기가 아니었다"가 정확한 표현이다(내 보정을 먼저 읽지 않고 과장했던 반복 사고 재발 방지).
+    const [noise] = (await sql`SELECT
+      SUM((synth_quality->>'raw')::int)::bigint raw,
+      SUM((synth_quality->>'rejected')::int)::bigint rejected
+      FROM cafes WHERE published AND synth_quality IS NOT NULL`) as any[];
+    const noiseTop = (await sql`SELECT area,
+        SUM((synth_quality->>'raw')::int)::bigint raw, SUM((synth_quality->>'rejected')::int)::bigint rejected
+      FROM cafes WHERE published AND synth_quality IS NOT NULL
+      GROUP BY area HAVING SUM((synth_quality->>'raw')::int) >= 200
+      ORDER BY (SUM((synth_quality->>'rejected')::int)::float / NULLIF(SUM((synth_quality->>'raw')::int),0)) DESC LIMIT 10`) as any[];
     const [vb] = (await sql`SELECT
       count(*) FILTER (WHERE published AND visitor_n>=10 AND visitor_local>=0.08)::int local,
       count(*) FILTER (WHERE published AND visitor_n>=15 AND visitor_trip>=0.20)::int trip FROM cafes`) as any[];
@@ -46,7 +60,7 @@ async function getStats() {
         (SELECT count(*)::int FROM cafes c WHERE c.published AND c.area=t.area AND c.dong=t.dong) cafes
       FROM dong_tourism t WHERE t.is_tourist ORDER BY t.rate DESC LIMIT 10`) as any[];
     const [tCnt] = (await sql`SELECT count(*)::int total, count(*) FILTER (WHERE is_tourist)::int tourist FROM dong_tourism`) as any[];
-    return { tot, vb, cautionTop, cautionTot, localTop, tripTop, grow, touristDong, tCnt };
+    return { tot, vb, cautionTop, cautionTot, localTop, tripTop, grow, touristDong, tCnt, noise, noiseTop };
   } catch { return null; }
 }
 
@@ -77,6 +91,7 @@ export default async function InsightsPage() {
       { "@type": "PropertyValue", name: "검증 등급 카페 수", value: s.tot.v },
       { "@type": "PropertyValue", name: "검증 통과 후기 수", value: s.tot.reviews },
       ...(s.cautionTot ? [{ "@type": "PropertyValue", name: "주의점이 확인된 카페 수", value: s.cautionTot.with_c }] : []),
+      ...(s.noise?.raw > 0 ? [{ "@type": "PropertyValue", name: "무관 글 비율(%)", value: Math.round((s.noise.rejected / s.noise.raw) * 100) }] : []),
     ],
   };
   const faqLd = {
@@ -86,6 +101,8 @@ export default async function InsightsPage() {
         acceptedAnswer: { "@type": "Answer", text: `네이버·구글·유튜브 공개 후기를 교차검증해 광고·협찬·영수증 리뷰와 다른 가게 이야기를 제거한 뒤 집계했습니다. 별점은 쓰지 않습니다. 기준일 ${upd}, 매일 갱신됩니다.` } },
       ...(s.cautionTot?.with_c ? [{ "@type": "Question", name: "카페의 단점 정보도 있나요?",
         acceptedAnswer: { "@type": "Answer", text: `있습니다. 판정한 ${s.cautionTot.judged.toLocaleString()}곳 중 ${s.cautionTot.with_c.toLocaleString()}곳에서 서로 다른 후기 2건 이상으로 확인된 주의점(주차 어려움·웨이팅·좌석 부족 등)을 찾아 표기합니다. 좋은 점만 적지 않습니다.` } }] : []),
+      ...(s.noise?.raw > 0 ? [{ "@type": "Question", name: "걸러낸 후기는 얼마나 되나요?",
+        acceptedAnswer: { "@type": "Answer", text: `"이 카페 이름이 나온 글" ${s.noise.raw.toLocaleString()}건을 확인한 결과 ${Math.round((s.noise.rejected / s.noise.raw) * 100)}%(${s.noise.rejected.toLocaleString()}건)는 그 카페 얘기가 아니었습니다. 동명이인·옆가게 혼입, 상호만 스친 글, 실제 방문 흔적이 없는 글이 대부분이었고 광고·협찬은 일부였습니다.` } }] : []),
     ],
   };
   return (
@@ -106,6 +123,35 @@ export default async function InsightsPage() {
               <div className="text-[17px] font-bold">{v}</div><div className="text-[10.5px] text-note-brown mt-1">{k}</div>
             </div>))}
         </div>
+
+        {/* 🎯 '걸러낸 것' 리포트(2026-10-23 신설) — CEO 지시로 추가. 위는 전부 "검증된 것"(긍정 프레이밍)만
+            보였는데, 여기는 우리가 **치워버린 것**을 처음 공개한다. "10건 중 6건은 그 카페 얘기가 아니었다"는
+            경쟁 서비스는 절대 공개 안 하는 숫자라 기자·블로거가 제일 집기 쉬운 자리다.
+            ⚠️ "광고를 걸렀다"고 쓰지 않는다 — 표본 분해 실측상 광고는 거절 사유의 5.3%뿐이고 대부분은
+            동명이인·옆가게 혼입·실제 방문 흔적 없음이다. 정확한 말만 쓴다(과장 금지). */}
+        {s.noise?.raw > 0 && (
+          <section className="mb-8">
+            <h2 className="text-[17px] font-bold mb-1">🔍 저희가 치워버린 것</h2>
+            <p className="text-[12.5px] text-note-ink-body leading-relaxed mb-3">
+              "이 카페 이름이 나온 글"을 전부 모아 하나씩 읽어보면, <b>{Math.round((s.noise.rejected / s.noise.raw) * 100)}%는
+              사실 그 카페 얘기가 아니었습니다.</b> 동명이인·옆가게가 섞여 들어오거나, 상호만 스치고 지나가거나,
+              실제로 가본 흔적이 없는 글이었어요(전국 {s.noise.raw.toLocaleString()}건 확인, 그중 {s.noise.rejected.toLocaleString()}건 제외).
+              광고·협찬은 이 중 일부일 뿐이고, 더 큰 비중은 <b>혼입</b>이었습니다 — 별점 사이트들이 거의 안 거르는 부분이에요.
+            </p>
+            <div className="bg-white rounded-2xl border border-note-line p-4">
+              <div className="text-[12px] font-bold text-[#4a5a4e] mb-2">혼입 비율이 가장 높았던 지역</div>
+              <ol className="space-y-1.5">
+                {(s.noiseTop ?? []).map((r: any, i: number) => (
+                  <li key={r.area} className="flex items-center gap-2 text-[13.5px]">
+                    <span className="w-5 text-right font-bold text-[#82714f]">{i + 1}</span>
+                    <span className="text-note-ink">{r.area}</span>
+                    <span className="ml-auto text-[#8a5a3a] font-bold">{Math.round((Number(r.rejected) / Number(r.raw)) * 100)}%</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          </section>
+        )}
 
         {/* ⚠️ 주의점 리포트(2026-09-14) — 우리만 만들 수 있는 숫자. 인용·백링크가 붙는 자리다.
             메모리에 "유일한 실질 가속 = 백링크"라고 적혀 있다. 그 백링크를 만드는 게 이 섹션의 목적이다. */}

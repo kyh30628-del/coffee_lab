@@ -673,7 +673,10 @@ export default async function CafePage({ params }: Props) {
               <div className="nt-body">
                 <p>이 카페가 나온 글 <b>{sqRaw.toLocaleString()}건</b>을 확인해 <b>{(sqRaw - Number(sq?.verified ?? 0) - Number(sq?.reference ?? 0)).toLocaleString()}건</b>을 걸러내고 <b>{Number(sq?.verified ?? 0).toLocaleString()}건</b>의 실제 방문 후기로 판단했어요.</p>
                 <p>'이곳의 결'은 후기에서 그 말이 나온 횟수, '다른 카페보다'는 후기 1건당 언급 비율을 전체 검증 카페와 비교한 순위예요. 절대 평가가 아닙니다.</p>
-                <p className="flex items-center gap-3 flex-wrap"><Link href="/trust">검증 방법 자세히 →</Link><span className="nt-free"><ReportButton cafeId={Number(c.id)} /></span></p>
+                {/* 🔗 /insights 내부링크(2026-10-23) — 8/26에 만든 백링크용 데이터 리포트가 2개월간
+                    방문자 0명이었다(내부 링크 0개가 원인, 실측). 카페 상세는 공개 50,151쪽 중 가장
+                    총 유입이 큰 유형이라 여기 한 줄이 가장 넓게 닿는다. */}
+                <p className="flex items-center gap-3 flex-wrap"><Link href="/trust">검증 방법 자세히 →</Link><Link href="/insights">전국 데이터 리포트 →</Link><span className="nt-free"><ReportButton cafeId={Number(c.id)} /></span></p>
               </div>
             </details>
           )}
