@@ -286,7 +286,13 @@ async function gatherRaw(cafe: { id: number; name: string; area: string }, refre
   } else {
     await sql`UPDATE cafes SET raw_checked_at=now() WHERE id=${cafe.id}`;
   }
-  return { raw, fromCache: false, apiFailed: false };
+  // 🔴 2026-10-23 수리 — 10-17 수리가 **절반만** 됐었다. DB(raw_reviews)엔 합친 값(cleaned)을 저장하면서
+  //   정작 이 함수가 **돌려주는** 값은 이번 조회분(raw)뿐이었다. 그 반환값이 바로 검증(trustCount) 입력이라,
+  //   재수집할 때마다 "DB엔 누적되지만 판정은 이번 한 번만 본 걸로" 계산됐다 — 원본은 늘어도 검증 건수가
+  //   줄어 보여 shrinkGuard가 매번 쓰기를 막는 구조였다(실측: 밀곳간 원본 252→331건인데 재판정은 200건으로
+  //   계산돼 차단). 차단기는 소비자 화면을 지켰지만, 그 바람에 "새 글을 반영한다"는 재수집의 목적 자체가
+  //   거의 항상 무력화되고 있었다. 합친 값(cleaned)을 돌려준다 — 이게 원래 의도였다.
+  return { raw: cleaned, fromCache: false, apiFailed: false };
 }
 
 // 다른 카페로 이미 확정 귀속된 근거 링크(healCrossCafeLinkContamination이 형제지점/리스티클 교차오염으로

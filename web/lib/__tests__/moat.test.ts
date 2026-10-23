@@ -1281,3 +1281,15 @@ test("판정 예산: 크레딧 주기(이번 달)로 센다 — 전체기간 누
   assert.ok(/FROM judge_spend WHERE at >= date_trunc\('month', now\(\)\)/.test(code),
     "예산 가드가 이번 달이 아니라 전체기간을 센다 — 다음 달 크레딧이 소멸한다");
 });
+
+// 🔄 재수집 반환값 관문(2026-10-23) — **10-17 수리가 절반만 됐던 실사고**.
+//   gatherRaw가 DB(raw_reviews)엔 합친 값을 저장하면서, 돌려주는 값은 이번 조회분만이었다.
+//   그 반환값이 검증 입력이라 재수집할수록 "원본은 늘어도 판정은 이번 한 번만" 계산돼
+//   shrinkGuard가 거의 항상 쓰기를 막았다(재수집의 목적 자체가 무력화).
+test("재수집: gatherRaw는 합친 값을 돌려준다(이번 조회분만 아니다)", () => {
+  const code = codeOf("../../lib/synthStore.ts");
+  assert.ok(/return \{ raw: cleaned, fromCache: false, apiFailed: false \};/.test(code),
+    "gatherRaw가 merge 전 raw를 그대로 반환한다 — DB 캐시와 검증 입력이 어긋난다");
+  assert.ok(!/return \{ raw, fromCache: false, apiFailed: false \};/.test(code),
+    "이번 조회분만 반환하는 옛 코드가 되살아났다");
+});
