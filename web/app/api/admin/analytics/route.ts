@@ -177,6 +177,17 @@ export async function GET(req: NextRequest) {
        WHERE region IS NOT NULL AND ${BOT} GROUP BY region ORDER BY n DESC LIMIT 12`
     ).catch(() => [])) as any[];
 
+    // 🔴 2026-10-23 — 위 visitorRegions는 **위치 버튼을 눌러 동의한 1.1%뿐**(94.6% 수도권 쏠림, 실측).
+    //   Vercel이 모든 요청에 무동의로 붙이는 IP 지역(ip_city/ip_region, web/app/api/visit/route.ts에서 적재
+    //   시작)은 100% 커버리지라 표본 편향이 없다. 적재는 오늘부터이므로 최근 N일만 의미 있다.
+    const ipRegions = (await sql.query(
+      `SELECT ip_region AS region, COUNT(*)::int n FROM user_consents
+       WHERE ip_region IS NOT NULL AND ${BOT} GROUP BY ip_region ORDER BY n DESC LIMIT 20`
+    ).catch(() => [])) as any[];
+    const ipCoverage = (await sql.query(
+      `SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE ip_region IS NOT NULL)::int tagged FROM user_consents WHERE ${BOT}`
+    ).catch(() => [{ total: 0, tagged: 0 }]))[0] as any;
+
     // 유입경로 — 고유 방문자·평균 재방문·비중
     const sources = (await sql.query(
       `SELECT COALESCE(NULLIF(src,''),'미상') AS src, COUNT(*)::int visitors,
@@ -450,7 +461,7 @@ export async function GET(req: NextRequest) {
       realtime: { active5: live?.active5 ?? 0, active30: live?.active30 ?? 0 },
       today: { visitors: todayTraffic.visitors, pageviews: todayTraffic.pageviews },
       consent: { pinged: consent?.pinged ?? 0, asked: consent?.asked ?? 0, agreed: consent?.agreed ?? 0, located: consent?.located ?? 0 },
-      visitorRegions,
+      visitorRegions, ipRegions, ipCoverage: { total: ipCoverage?.total ?? 0, tagged: ipCoverage?.tagged ?? 0 },
       sources, retention: { newcomers: retention?.newcomers ?? 0, returning: retention?.ret ?? 0 },
       devices, daily, dailyInsights, todayInsight, pageBuckets, topCafes, topRegions, hours,
       funnel: { visitors: funnel?.visitors ?? 0, viewedCafe: funnel?.viewed_cafe ?? 0, browsed: funnel?.browsed ?? 0, engaged },

@@ -1620,6 +1620,7 @@ export default function AdminPage() {
                   const devTotal = dev.mobile + dev.desktop + dev.tablet || 1;
                   const noEvents = (a.kpi?.pageviews30d ?? 0) === 0;
                   const maxVReg = Math.max(1, ...(a.visitorRegions || []).map((r: any) => r.n));
+                  const maxIpReg = Math.max(1, ...(a.ipRegions || []).map((r: any) => r.n));
                   const maxFav = Math.max(1, ...(a.favorites?.daily || []).map((d: any) => d.n));
                   const cs = a.consent || {};
                   const consentRate = cs.asked ? Math.round((cs.agreed ?? 0) / cs.asked * 100) : 0;
@@ -1918,6 +1919,23 @@ export default function AdminPage() {
                             <div key={i} className="mb-1">
                               <div className="flex justify-between text-[10.5px]"><span className="text-stone-600">{r.region}</span><span className="text-stone-700">{r.n}</span></div>
                               <div className="h-1.5 bg-stone-100 rounded-full overflow-hidden mt-0.5"><div className="h-full bg-rose-300 rounded-full" style={{ width: `${r.n / maxVReg * 100}%` }}></div></div>
+                            </div>
+                          ))}
+                        </div>
+                        {/* 📍 2026-10-23 신설 — 위 "방문자 지역"의 1.1% 편향 표본 대신, Vercel이 모든 요청에
+                            무동의로 붙이는 IP 지역(x-vercel-ip-city/-region)으로 **진짜 전국 분포**를 보여준다.
+                            오늘부터 적재를 시작했으므로 데이터가 쌓이는 데 며칠 걸린다(0건이면 그 뜻). */}
+                        <div className="bg-white rounded-xl border border-stone-300 p-3">
+                          <div className="text-[12px] font-bold text-stone-700">방문자 지역 <span className="font-normal text-emerald-700 text-[10px]">IP 기반·무동의·100%</span></div>
+                          <p className="text-[9.5px] text-stone-600 mb-2">
+                            동의 없이 모든 방문자에게 붙는 IP 지역(시/도 단위) — 편향 없는 진짜 분포.
+                            태깅 {a.ipCoverage?.tagged ?? 0}/{a.ipCoverage?.total ?? 0}명
+                            ({a.ipCoverage?.total ? ((a.ipCoverage.tagged / a.ipCoverage.total) * 100).toFixed(0) : 0}%, 2026-10-23부터 적재 시작).
+                          </p>
+                          {(a.ipRegions || []).length === 0 ? <p className="text-[11px] text-stone-600">아직 데이터가 쌓이는 중(적재 시작 직후)</p> : a.ipRegions.map((r: any, i: number) => (
+                            <div key={i} className="mb-1">
+                              <div className="flex justify-between text-[10.5px]"><span className="text-stone-600">{r.region}</span><span className="text-stone-700">{r.n}</span></div>
+                              <div className="h-1.5 bg-stone-100 rounded-full overflow-hidden mt-0.5"><div className="h-full bg-emerald-300 rounded-full" style={{ width: `${r.n / maxIpReg * 100}%` }}></div></div>
                             </div>
                           ))}
                         </div>

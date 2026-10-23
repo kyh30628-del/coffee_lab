@@ -37,6 +37,13 @@ async function ensure() {
   await sql`ALTER TABLE user_consents ADD COLUMN IF NOT EXISTS sessions INT DEFAULT 1`;
   // PWA 홈화면설치 후 standalone 실행 여부 — direct 채널 고재방문율이 PWA 사용자인지 판별용(coord#441). 한번 감지되면 유지.
   await sql`ALTER TABLE user_consents ADD COLUMN IF NOT EXISTS pwa_standalone BOOLEAN DEFAULT false`;
+  // 🔴 2026-10-23 CEO 지적("위치공유 지역 데이터가 전국 유입 맞아?") — 실측: 동의 기반 지역은 전체 방문자의
+  //   1.1%뿐이고 그마저 94.6%가 수도권(클릭해야만 묻는 구조라 당연히 희박 — 버그 아님, 설계대로다).
+  //   "진짜 전국 분포"를 보려면 동의가 필요 없는 수단이 따로 있어야 한다 — Vercel이 **모든 요청마다 무동의로**
+  //   붙여주는 IP 기반 지역 헤더(x-vercel-ip-city·x-vercel-ip-country-region, 공식 문서 확인)를 쓴다.
+  //   정밀좌표가 아니라 시/도·도시 단위뿐이라 개인정보 수집이 아니고, 100% 커버리지라 표본 편향이 없다.
+  await sql`ALTER TABLE user_consents ADD COLUMN IF NOT EXISTS ip_city TEXT`;
+  await sql`ALTER TABLE user_consents ADD COLUMN IF NOT EXISTS ip_region TEXT`;
   // 방문핑 행은 동의 '미정'(NULL)이어야 거절(false)과 구분됨
   await sql`ALTER TABLE user_consents ALTER COLUMN agreed DROP NOT NULL`;
   await sql`ALTER TABLE user_consents ALTER COLUMN agreed DROP DEFAULT`;
@@ -69,11 +76,14 @@ export async function POST(req: NextRequest) {
     const isInternal = b.internal === true || /^\/(admin|owner)/.test(landing);
     const newSession = b.newSession === true; // 세션 첫 핑(브라우저 새로 켬) → 세션 +1(같은 날 재방문도 잡힘)
     const pwaStandalone = b.standalone === true; // PWA 홈화면설치 후 standalone 실행(세션 첫 핑에서만 옴)
+    // 무동의 IP 지역(100% 커버리지) — Vercel이 모든 요청에 자동으로 붙인다. 못 주는 환경(로컬·일부 엣지)은 null.
+    const ipCity = (req.headers.get("x-vercel-ip-city") ?? "").slice(0, 80) || null;
+    const ipRegion = (req.headers.get("x-vercel-ip-country-region") ?? "").slice(0, 20) || null;
     // 방문 기록: 첫 방문이면 행 생성(동의 미정=NULL), 재방문이면 카운트·최근시각 갱신.
     // 출처(src/referrer/utm/landing)는 첫터치만 보존 — 이미 있으면 덮어쓰지 않음(COALESCE).
     await sql`
-      INSERT INTO user_consents (anon_id, visit_count, last_seen, user_agent, src, referrer, utm_source, utm_medium, utm_campaign, landing, internal, pwa_standalone)
-      VALUES (${anonId}, 1, now(), ${ua}, ${src}, ${ref}, ${utmSource}, ${utmMedium}, ${utmCampaign}, ${landing}, ${isInternal}, ${pwaStandalone})
+      INSERT INTO user_consents (anon_id, visit_count, last_seen, user_agent, src, referrer, utm_source, utm_medium, utm_campaign, landing, internal, pwa_standalone, ip_city, ip_region)
+      VALUES (${anonId}, 1, now(), ${ua}, ${src}, ${ref}, ${utmSource}, ${utmMedium}, ${utmCampaign}, ${landing}, ${isInternal}, ${pwaStandalone}, ${ipCity}, ${ipRegion})
       ON CONFLICT (anon_id) DO UPDATE SET
         visit_count = COALESCE(user_consents.visit_count, 1) + 1,
         sessions = COALESCE(user_consents.sessions, 1) + ${newSession ? 1 : 0},
@@ -85,7 +95,9 @@ export async function POST(req: NextRequest) {
         utm_medium = COALESCE(NULLIF(user_consents.utm_medium, ''), NULLIF(EXCLUDED.utm_medium, '')),
         utm_campaign = COALESCE(NULLIF(user_consents.utm_campaign, ''), NULLIF(EXCLUDED.utm_campaign, '')),
         landing = COALESCE(NULLIF(user_consents.landing, ''), NULLIF(EXCLUDED.landing, '')),
-        pwa_standalone = COALESCE(user_consents.pwa_standalone, false) OR ${pwaStandalone}`;
+        pwa_standalone = COALESCE(user_consents.pwa_standalone, false) OR ${pwaStandalone},
+        ip_city = COALESCE(user_consents.ip_city, EXCLUDED.ip_city),
+        ip_region = COALESCE(user_consents.ip_region, EXCLUDED.ip_region)`;
     // 빈 경로·내부(대표/팀·/admin·/owner)는 페이지뷰 이벤트서 제외(분석 정확도). 봇은 위에서 이미 원천 차단됨.
     if (landing && !isInternal && !/^\/(admin|owner)/.test(landing)) {
       // 🔇 실패해도 사용자 요청은 계속(원래 설계) — 다만 **몇 건 잃었는지는 남긴다.**
