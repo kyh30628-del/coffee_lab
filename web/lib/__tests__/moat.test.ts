@@ -1396,3 +1396,13 @@ test("검색: 프랜차이즈 안내가 뜨면 '근처 검증 카페'를 실제�
   assert.ok(/ORDER BY km ASC LIMIT 6/.test(code), "지도 중심(lat\/lng) 기반 거리순 대체 쿼리가 없다");
   assert.ok(/effectiveRegion \? \[effectiveRegion\] : \[\]/.test(code), "지역 판정 기반 대체 쿼리가 없다");
 });
+
+// 📍 랜드마크 별칭 관문(2026-10-24) — search_log 45일 0결과 실측: "상상나라"·"국제시장"·"반포자이"는
+//   인덱스에 후보가 있는데도(각 후보 주변 수백~1,500곳 카페 존재) route.ts 판정에서 떨어져 0건이었다.
+//   "실측으로 확인된 것만 등재한다"(ALIAS 사전 규약) 준수 — 추측 추가 금지, 회귀도 실측 결과로 고정한다.
+test("랜드마크 별칭: 공식명과 다르게 부르는 장소 3건이 ALIAS 사전에 있다", () => {
+  const code = codeOf("../../lib/placeIndex.ts");
+  assert.ok(/"상상나라": "서울상상나라"/.test(code), "'상상나라' 별칭이 없다");
+  assert.ok(/"국제시장": "국제시장 먹자골목"/.test(code), "'국제시장' 별칭이 없다");
+  assert.ok(/"반포자이": "반포자이아파트"/.test(code), "'반포자이' 별칭이 없다");
+});
