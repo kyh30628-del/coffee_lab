@@ -1896,7 +1896,24 @@ export default function AdminPage() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         <div className="bg-white rounded-xl border border-stone-300 p-3">
                           <div className="text-[12px] font-bold text-stone-700">방문자 지역 <span className="font-normal text-stone-600 text-[10px]">위치 공유</span></div>
-                          <p className="text-[9.5px] text-stone-600 mb-2">위치 안내에 동의한 방문자가 어디서 접속하는지.</p>
+                          {/* 🔴 2026-10-23 CEO 지적("이게 전국 유입 맞아?") — 실측: 전체 방문자 20,040명 중 위치 실제
+                              공유 220명(1.10%), 그중 94.6%가 수도권. "지역별 분포"처럼 보이지만 **전국 유입 지도가 아니라
+                              위치 공유에 동의한 1%의 거주지**다(동의 자체가 수도권 편향이라 지방 유입이 없어서가 아니라
+                              안 보이는 것). 숫자만 보면 오해하기 쉬워 비율·수도권 쏠림을 화면에 직접 못박는다. */}
+                          {(() => {
+                            const pinged = a.consent?.pinged ?? 0, located = a.consent?.located ?? 0;
+                            const pct = pinged > 0 ? (located / pinged * 100) : 0;
+                            const metroSum = (a.visitorRegions || []).filter((r: any) => /^(서울|경기|인천)/.test(r.region)).reduce((s: number, r: any) => s + r.n, 0);
+                            const totalSum = (a.visitorRegions || []).reduce((s: number, r: any) => s + r.n, 0);
+                            const metroPct = totalSum > 0 ? (metroSum / totalSum * 100) : 0;
+                            return (
+                              <p className="text-[9.5px] text-amber-700 mb-2 font-semibold">
+                                ⚠️ 전국 유입 아님 — 전체 방문자의 <b>{pct.toFixed(1)}%</b>({located}/{pinged}명)만 위치를 공유했고,
+                                그중 <b>{metroPct.toFixed(0)}%가 수도권</b>이다. 지방이 "안 와서"가 아니라 이 1% 표본에
+                                "안 잡혀서" 비어 보일 수 있다 — 지역 분포가 아니라 동의자 거주지로 읽을 것.
+                              </p>
+                            );
+                          })()}
                           {(a.visitorRegions || []).length === 0 ? <p className="text-[11px] text-stone-600">위치 공유 데이터 없음</p> : a.visitorRegions.map((r: any, i: number) => (
                             <div key={i} className="mb-1">
                               <div className="flex justify-between text-[10.5px]"><span className="text-stone-600">{r.region}</span><span className="text-stone-700">{r.n}</span></div>
