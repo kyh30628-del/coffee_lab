@@ -19,6 +19,7 @@ import { buildAxisDist, cafeProfile, tasteVector, tasteSimilarity, GRADE_RANK, t
 import { FACET_EMOJI } from "@/lib/cafeProfile";
 import { useLockBodyScroll } from "@/lib/useLockBodyScroll";
 import { shareHookText } from "@/lib/shareCopy";
+import { maybeSubscribePush } from "./pushSubscribe";
 import { decodeCafeScores, fetchMapCafes } from "@/lib/mapCafes";
 import { isOtherBusinessQuote, displayQuote, splitKeyTerms, rankNearby, nearbyTitle, fmtKm, monthlySeries, freshnessOf, CHAR_LABEL, charBarsOf, addrTail, igHandle, igProfileUrl, reviewAge } from "@/lib/cafeDetailView"; // 📓 상세 패널 2차 공용 계산
 
@@ -1183,7 +1184,12 @@ export default function Home() {
   const toggleBookmark = async (cafeId: number) => {
     const cur = bookmarkIds.has(cafeId);
     setBookmarkIds((prev) => { const n = new Set(prev); if (cur) n.delete(cafeId); else n.add(cafeId); return n; }); // 낙관적 업데이트
-    if (!cur) { try { window.dispatchEvent(new Event("dcn:install-hint")); } catch {} } // 즐겨찾기 추가 = 재방문 의도 → PWA 설치 배너 트리거
+    if (!cur) {
+      try { window.dispatchEvent(new Event("dcn:install-hint")); } catch {} // 즐겨찾기 추가 = 재방문 의도 → PWA 설치 배너 트리거
+      // 🔔 재방문 장치(2026-10-23) — 같은 고의도 순간에 푸시 구독도 같이 묻는다(순서: 먼저 포그라운드
+      //   install-hint 배너, 알림 권한은 그 뒤 setTimeout으로 살짝 늦춰 두 팝업이 겹치지 않게 한다).
+      if (deviceId) setTimeout(() => { maybeSubscribePush(deviceId); }, 1500);
+    }
     try { await fetch("/api/bookmark", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ device: deviceId, cafeId, action: "toggle", anonId: (() => { try { return localStorage.getItem("dcn_anon") || null; } catch { return null; } })() }) }); }
     catch { reloadBookmarks(deviceId); }
   };

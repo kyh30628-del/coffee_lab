@@ -19,3 +19,28 @@ self.addEventListener("activate", (e) => {
 });
 // no-op fetch 핸들러 — respondWith를 호출하지 않으므로 브라우저 기본(네트워크)로 처리, 캐시 안 함.
 self.addEventListener("fetch", () => {});
+
+// 🔔 재방문 장치(2026-10-23) — 찜한 카페에 새 소식이 생기면 푸시로 알린다.
+//   payload는 JSON { title, body, url }. 캐시와 무관(이 파일 상단 규칙 위반 아님) — 알림 표시만 한다.
+self.addEventListener("push", (e) => {
+  let data = { title: "동네 커피 노트", body: "새 소식이 있어요", url: "/" };
+  try { if (e.data) data = { ...data, ...e.data.json() }; } catch {}
+  e.waitUntil(self.registration.showNotification(data.title, {
+    body: data.body,
+    icon: "/icon-192.png",
+    badge: "/icon-192.png",
+    data: { url: data.url },
+    tag: "dcn-push", // 같은 태그면 중복 알림이 쌓이지 않고 최신 것으로 교체된다.
+  }));
+});
+
+// 알림 클릭 — 이미 열려 있으면 그 탭을 포커스, 없으면 새로 연다.
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  const url = e.notification.data?.url || "/";
+  e.waitUntil((async () => {
+    const all = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    const hit = all.find((c) => c.url.includes(self.location.origin));
+    if (hit) { hit.focus(); hit.navigate(url); } else { await self.clients.openWindow(url); }
+  })());
+});

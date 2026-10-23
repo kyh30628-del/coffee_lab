@@ -1343,3 +1343,29 @@ test("재수집: gatherRaw는 합친 값을 돌려준다(이번 조회분만 아
   assert.ok(!/return \{ raw, fromCache: false, apiFailed: false \};/.test(code),
     "이번 조회분만 반환하는 옛 코드가 되살아났다");
 });
+
+// 🔔 재방문 장치(push) 관문 — 2026-10-23, 재방문율 2.1% 대응.
+test("푸시: 첫 구독은 발송 없이 기준선만 잡는다(과거 누적을 한꺼번에 들이밀지 않는다)", () => {
+  const code = codeOf("../../app/api/cron-push-digest/route.ts");
+  assert.ok(/UPDATE push_subscriptions SET last_sent_at = now\(\) WHERE last_sent_at IS NULL/.test(code),
+    "첫 구독(last_sent_at NULL) 기준선 처리가 없다 — 과거 변동을 전부 보낼 위험");
+});
+test("푸시: 보낼 대상은 북마크와 구독이 **둘 다** 있고 그 카페가 지난 발송 이후 갱신된 기기만이다", () => {
+  const code = codeOf("../../app/api/cron-push-digest/route.ts");
+  assert.ok(/JOIN bookmarks b ON b\.device_id = ps\.device_id/.test(code), "북마크 교집합이 없다");
+  assert.ok(/c\.synth_updated > ps\.last_sent_at/.test(code), "지난 발송 이후 갱신 여부를 안 본다");
+});
+test("푸시: 구독이 죽은 기기(410/404)는 다음부터 정리한다(영구 실패 재시도 금지)", () => {
+  const code = codeOf("../../app/api/cron-push-digest/route.ts");
+  assert.ok(/statusCode === 410 \|\| e\?\.statusCode === 404/.test(code), "만료 구독 정리 로직이 없다");
+  assert.ok(/DELETE FROM push_subscriptions WHERE device_id = \$\{t\.device_id\}/.test(code), "죽은 구독을 지우지 않는다");
+});
+test("푸시: VAPID 키가 없으면 조용히 건너뛴다(배포 전 상태에서 에러로 깨지지 않는다)", () => {
+  const code = codeOf("../../app/api/cron-push-digest/route.ts");
+  assert.ok(/if \(!PUB \|\| !PRIV\) return NextResponse\.json\(\{ ok: true, skipped:/.test(code), "VAPID 미설정 가드가 없다");
+});
+test("푸시: 구독은 고의도 순간(북마크 추가)에만 묻는다 — 거절 시 30일 재요청 안 함", () => {
+  const code = codeOf("../../app/pushSubscribe.ts");
+  assert.ok(/Notification\.permission === "denied"/.test(code), "거절 상태 확인이 없다");
+  assert.ok(/pushDismissedRecently/.test(code), "재요청 쿨다운이 없다");
+});
