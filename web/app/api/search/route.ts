@@ -978,6 +978,33 @@ export async function GET(req: NextRequest) {
     const franchiseNote = isFranchise(q.replace(/\s+/g, ""))
       ? "동네 커피 노트는 프랜차이즈 대신 동네의 검증된 개인 카페만 큐레이션해요. 아래에서 근처의 검증 카페를 만나보세요."
       : null;
+    // 🏪 프랜차이즈 대체 채움(2026-10-24) — 실측: franchiseNote는 있었지만 results가 항상 0이라
+    //   "아래에서 근처의 검증 카페를 만나보세요"가 빈 약속이었다(search_log 152건 0결과 검색 중 franchiseNote 최다).
+    //   지도 중심(lat/lng, runSearch가 매 검색마다 보냄)이 있으면 거리순, 없으면 지역 판정(effectiveRegion)으로 좁힌다.
+    if (franchiseNote && results.length === 0) {
+      try {
+        const near = nearOf(req);
+        const rows = (near
+          ? await sql.query(
+              `SELECT ${FIELDS},
+                 (6371 * acos(LEAST(1, cos(radians($1)) * cos(radians(lat)) * cos(radians(lng) - radians($2))
+                   + sin(radians($1)) * sin(radians(lat))))) AS km
+               FROM cafes WHERE published = true AND lat IS NOT NULL
+                 AND lat BETWEEN $1 - 0.135 AND $1 + 0.135 AND lng BETWEEN $2 - 0.135 AND $2 + 0.135
+               ORDER BY km ASC LIMIT 6`,
+              [near[0], near[1]],
+            )
+          : await sql.query(
+              `SELECT ${FIELDS} FROM cafes WHERE published = true ${effectiveRegion ? "AND area = $1" : ""}
+               ORDER BY (synth_grade = '검증') DESC, synth_count DESC NULLS LAST LIMIT 6`,
+              effectiveRegion ? [effectiveRegion] : [],
+            )) as unknown as any[];
+        results = rows.map((c: any) => ({
+          id: c.id, name: c.name, area: c.area, grade: c.synth_grade, count: c.synth_count, vb: vbOf(c),
+          identity: c.synth_identity, cau: cauOf(c), fac: facOf(c), score: 0, reasons: ["근처 검증 카페"],
+        }));
+      } catch { /* 대체 실패해도 note는 그대로 보여준다 — results만 비어 있던 원래 동작으로 복귀 */ }
+    }
     const payload: Record<string, unknown> = {
       ok: true, mode, region: effectiveRegion || "전체 지역", q,
       concepts: hitConcepts.map((c) => c.label),

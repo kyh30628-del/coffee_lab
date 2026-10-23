@@ -1386,3 +1386,13 @@ test("/insights: 카페 상세·구+취향·구+시설 페이지에서 링크로
   const curated = codeOf("../../app/area/Curated.tsx");
   assert.ok(/<Link href="\/insights"/.test(curated), "구+취향·구+시설 공용 컴포넌트에 /insights 링크가 없다");
 });
+
+// 🏪 프랜차이즈 대체 채움 관문(2026-10-24) — 실측: franchiseNote("아래에서 근처의 검증 카페를 만나보세요")는
+//   있었지만 results가 항상 0이라 빈 약속이었다. 지도 중심(lat/lng)·지역 판정 중 하나로라도 반드시 채워야 한다.
+test("검색: 프랜차이즈 안내가 뜨면 '근처 검증 카페'를 실제로 채운다(빈 약속 금지)", () => {
+  const code = codeOf("../../app/api/search/route.ts");
+  assert.ok(/if \(franchiseNote && results\.length === 0\)/.test(code),
+    "franchiseNote가 있어도 results를 채우는 대체 로직이 없다");
+  assert.ok(/ORDER BY km ASC LIMIT 6/.test(code), "지도 중심(lat\/lng) 기반 거리순 대체 쿼리가 없다");
+  assert.ok(/effectiveRegion \? \[effectiveRegion\] : \[\]/.test(code), "지역 판정 기반 대체 쿼리가 없다");
+});
