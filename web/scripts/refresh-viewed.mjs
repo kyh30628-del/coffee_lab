@@ -32,10 +32,16 @@ const DRY = process.argv.includes("--dry");
 
 if (await naverBlocked()) { console.log("쿼터 소진 — 오늘은 건너뜀"); process.exit(0); }
 
+// 🔴 2026-10-23 추가 가드 — 내용이 그대로면 gatherRaw가 raw_checked_at만 갱신하고
+//   raw_collected_at은 그대로 둔다(의도된 설계: "재판정 큐에 다시 안 올라감" 최적화).
+//   그런데 이 레인은 raw_collected_at만 보고 대상을 고르므로, **변동 없는 카페가 매일 다시 뽑혀**
+//   네이버 호출만 반복하고 똑같은 결론을 내는 낭비가 생긴다(300곳 상한을 "그대로"인 카페가 매일 잠식).
+//   raw_checked_at에 7일 쿨다운을 추가 — 어제 확인해 변동 없던 카페는 일주일은 건드리지 않는다.
 const rows = await sql`SELECT c.id, c.name, c.area, c.synth_count prev FROM cafes c
   JOIN (SELECT DISTINCT CAST(regexp_replace(path,'^/c/','') AS int) id FROM traffic_events
         WHERE path ~ '^/c/[0-9]+$' AND ts > now() - interval '60 days') v ON v.id = c.id
   WHERE c.published AND (c.raw_collected_at IS NULL OR c.raw_collected_at < now() - interval '30 days')
+    AND (c.raw_checked_at IS NULL OR c.raw_checked_at < now() - interval '7 days')
   ORDER BY c.raw_collected_at ASC NULLS FIRST LIMIT ${LIMIT}`;
 console.log(`대상 ${rows.length}곳 (사람이 60일 내 본 카페 중 원본 30일+)`);
 if (DRY) process.exit(0);

@@ -20,6 +20,7 @@ export const JOB_TEAM: Record<string, string> = {
   // 로컬 launchd 잡(하트비트 경유)
   "dawn-deploy": "기획조정실", // 🌅2026-10-17 매일 06:00 자동 배포(미푸시 있을 때만 빌드·푸시)
   "deep-collect": "성장본부", // 🔎2026-10-17 깊은 수집(collect-catchup 창 안 하루 1회) — 이미 있는데 안 긁던 후기
+  "refresh-viewed": "성장본부", // 🔄2026-10-23 매일 08:30 사람이 본 카페 원본 재수집(네이버 신규 리뷰 반영, CEO 지시)
   "discover-sweep": "성장본부", // 🔄2026-08-04 KST 12·20시 전 지역 발굴 스윕 — ⏸ 2026-09-21 정지(공공원장 적재로 대체, RETIRED_JOBS)
   "import-permits": "성장본부", // 🧾2026-09-21 매일 07:00 공공 인허가 원장 적재(--limit 2700, 실측 1.69콜/곳)
   "sangga-rollout": "성장본부", // 🏪2026-10-02 매일 07:00 소상공인 상가업소정보 수도권 롤아웃(CEO 지시, 원장과 별개 소스)
@@ -69,6 +70,7 @@ export const EXPECT_MAX_H: Record<string, number> = {
   "indexnow": 30,          // 🔎2026-09-13 KST 09:40 하루 1회 + 버퍼
   "dawn-deploy": 30,      // 🌅2026-10-17 매일 06:00 + 버퍼(할 일 없는 날도 하트비트를 찍어 오탐 없음)
   "deep-collect": 30,     // 🔎2026-10-17 하루 1회(collect-catchup 창) + 버퍼
+  "refresh-viewed": 30,    // 🔄2026-10-23 매일 08:30 하루 1회 + 버퍼
   "neon-billing": 30,      // 💳2026-09-14 KST 07:50 하루 1회 + 버퍼
   "chief-manager": 20,    // 일간 사이클 KST 08·12·16시
   "self-audit": 18,       // 🔄KST 12·16·20시 (최대공백 20→익일12시=16h + 버퍼)
@@ -138,6 +140,7 @@ export const LAUNCHD_JOBS: Record<string, { label: string; sched: string }> = {
   "indexnow":          { label: "IndexNow 제출",   sched: "09:40" },
   "neon-billing":      { label: "Neon 청구 스냅샷", sched: "07:50" },
   "dawn-deploy":       { label: "새벽 자동 배포",   sched: "06:00" },
+  "refresh-viewed":    { label: "본 카페 재수집",   sched: "08:30" },
 };
 
 // 🛑 **의도적으로 은퇴(plist .disabled)한 잡의 명시적 단일 출처.**
