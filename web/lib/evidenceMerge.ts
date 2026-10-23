@@ -45,6 +45,54 @@ export function mergeRawEvidence(prev: EvidenceItem[], fetched: EvidenceItem[], 
   return all.slice(0, keepMax);
 }
 
+// 🔴 2026-10-23 — 옥석(채택된 근거 전체)에 쓰는 **별도의** 아이템 타입과 키.
+//   raw(EvidenceItem)는 title/desc/text를 쓰지만, 옥석(EvidenceReview)은 이미 추출된 quote 하나뿐이다
+//   — evidenceKey를 그대로 재사용하면 필드가 안 맞는다.
+export type GradedEvidence = {
+  quote: string; link?: string; source?: string; date?: string; trust?: string; score?: number;
+  why?: string[]; k?: string; depth?: number; adStyle?: boolean; listicle?: boolean;
+};
+function gradedKey(r: GradedEvidence): string {
+  return r.link ? `L:${r.link}` : `Q:${(r.quote || "").replace(/\s+/g, "").slice(0, 80)}`;
+}
+
+/**
+ * 🔴 **급감 차단의 다음 단계**(2026-10-23, CEO "네이버 리뷰는 계속 늘잖아. 효과적으로 가져와야지").
+ *
+ *   shrinkGuard가 막는 상황의 실제 원인은 두 가지가 섞여 있다 — ① 데이터 손실(10-17 사고 계열, 합치기로 이미 막음)
+ *   ② **판정 규칙이 그동안 엄격해져서**, 옛 느슨한 규칙으로 쌓인 평가를 지금 규칙으로 통째 재평가하면 자연히
+ *   준다(실측: 트리오드 261→195건 — 네이버 호출 없이 저장된 걸 다시 판정만 해도 준다. 데이터 손실이 아니다).
+ *   shrinkGuard는 ①②를 구분 못 하고 둘 다 "쓰지 않는다"로 막아, ②가 섞인 카페는 **새 글이 생겨도 영영 반영이
+ *   안 된다** — 재수집의 목적 자체가 무력화된다.
+ *
+ *   해법: 옛 평가(old)를 **재평가하지 않고 그대로 보존**하고, 새로 돈 평가(fresh)에서 old에 없던(링크 기준)
+ *   근거만 **보탠다**. old의 개별 항목은 지금 규칙으로 다시 심사받지 않으므로(= 조부보호), 결과 집합은
+ *   정의상 old보다 작아질 수 없다 — shrinkGuard가 막을 이유 자체가 사라진다.
+ *   같은 글이 둘 다에 있으면 fresh 판본이 이긴다(본문이 갱신됐을 수 있다 — mergeRawEvidence와 같은 정책).
+ *
+ *   ⚠️ 전체 재평가(cron-resynth 등 기존 경로)는 건드리지 않는다 — 이 함수는 **급감이 날 때만** 호출되는
+ *   별도 경로다. 평상시(급감 없음)는 기존처럼 fresh 결과를 그대로 쓴다.
+ */
+export function grandfatherEvidence(old: GradedEvidence[], fresh: GradedEvidence[]): GradedEvidence[] {
+  const byKey = new Map<string, GradedEvidence>();
+  for (const r of old) byKey.set(gradedKey(r), r);     // 옛 평가를 먼저 깔고(보존)
+  for (const r of fresh) byKey.set(gradedKey(r), r);   // 같은 글만 새 판본으로 덮는다 — old에 없던 글은 추가됨
+  return [...byKey.values()];
+}
+
+/** 조부보호 결과(union, 순서 무관)에서 "표시용 상위 N건"만 추린다 — 최신순(mergeRawEvidence와 같은 정렬 정책). */
+export function pickRecentTop(items: GradedEvidence[], n: number): GradedEvidence[] {
+  const sorted = [...items].sort((a, b) => {
+    const ta = a.date ? Date.parse(String(a.date)) : NaN;
+    const tb = b.date ? Date.parse(String(b.date)) : NaN;
+    if (Number.isFinite(ta) && Number.isFinite(tb)) return (tb as number) - (ta as number);
+    if (Number.isFinite(tb)) return 1;
+    if (Number.isFinite(ta)) return -1;
+    return 0;
+  });
+  return sorted.slice(0, n);
+}
+
 /**
  * 공개 카페의 근거가 한 번에 꺾이는 쓰기를 막는다(10-17 사고의 진짜 구멍 = "줄어드는 쓰기를 거부하는 관문 없음").
  *

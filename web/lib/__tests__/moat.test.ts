@@ -22,7 +22,7 @@ import {
 import { isOtherBusinessQuote, isReadableQuote, isSentenceQuote, displayQuote, splitKeyTerms } from "../cafeDetailView";
 import { sortReviews, ensureRecent } from "../exposureOrder";
 import { collectAndSynthesize } from "../collectOrchestrator";
-import { mergeRawEvidence, shouldBlockShrink } from "../evidenceMerge";
+import { mergeRawEvidence, shouldBlockShrink, grandfatherEvidence, pickRecentTop } from "../evidenceMerge";
 import { overUnpubCapForTest } from "../synthStore";
 import { effectVerdictFor } from "../runLedger";
 import { getContract, ALL_CONTRACT_IDS } from "../jobContract";
@@ -351,6 +351,56 @@ test("급감 차단: 미공개·근거 적은 카페는 대상이 아니다(수�
 });
 test("급감 차단: 증가하는 쓰기는 당연히 통과한다", () => {
   assert.equal(shouldBlockShrink({ wasPublished: true, prevCount: 50, newCount: 90, ...G }), false);
+});
+
+// 🔴 조부보호(grandfatherEvidence) — 2026-10-23, CEO "네이버 리뷰는 계속 늘잖아. 효과적으로 가져와야지".
+//   실사고: 저장된 원본을 **네이버 호출 없이 다시 판정만 해도** 급감한다(트리오드 261→195건) —
+//   데이터 손실이 아니라 판정 규칙이 그동안 엄격해진 탓이다. 급감 차단은 이걸 막긴 하지만 그 바람에
+//   "새 글이 생겨도 영영 반영 안 됨"이 됐다. 조부보호는 옛 평가를 재심사하지 않고 보존 + 새 글만 보탠다.
+const gq = (link: string, date?: string, quote = "본문") => ({ link, date, quote, trust: "verified" });
+test("조부보호: old를 재평가 없이 보존하고, fresh에 없는 old 항목도 살아남는다", () => {
+  // 실측 재현 — old 261건(과거 느슨한 규칙), fresh 195건(지금 엄격한 규칙으로 재평가, old의 부분집합 아님)
+  const old = Array.from({ length: 261 }, (_, i) => gq(`o${i}`, "2025.01.01"));
+  const fresh = Array.from({ length: 195 }, (_, i) => gq(`f${i}`, "2026.10.01")); // old와 겹치는 링크 없음
+  const grand = grandfatherEvidence(old, fresh);
+  assert.equal(grand.length, 261 + 195, "old 전부 + fresh 전부(겹침 없음)가 합쳐져야 한다");
+  for (const o of old) assert.ok(grand.some((g) => g.link === o.link), `old 근거가 사라졌다: ${o.link}`);
+});
+test("조부보호: 같은 글(링크 동일)은 새 판본이 이긴다", () => {
+  const grand = grandfatherEvidence([gq("a", "2025.01.01", "옛 문장")], [gq("a", "2026.10.01", "새 문장")]);
+  assert.equal(grand.length, 1);
+  assert.equal(grand[0].quote, "새 문장");
+});
+test("조부보호: fresh가 old의 순수 부분집합이어도(=재평가로 줄어든 전형) 결과는 old 그대로다", () => {
+  const old = Array.from({ length: 10 }, (_, i) => gq(`x${i}`, "2025.01.01"));
+  const fresh = old.slice(0, 6); // 재평가가 10건 중 6건만 통과시킨 경우
+  const grand = grandfatherEvidence(old, fresh);
+  assert.equal(grand.length, 10, "재평가로 줄어든 4건도 old에서 보존돼야 한다");
+});
+test("조부보호: 결과는 old보다 작아질 수 없다(핵심 불변식 — shrinkGuard가 막을 이유가 사라진다)", () => {
+  for (const [oldN, freshN, overlap] of [[261, 195, 0], [50, 50, 50], [3, 0, 0], [0, 10, 0]] as const) {
+    const old = Array.from({ length: oldN }, (_, i) => gq(`o${i}`));
+    const fresh = [...Array.from({ length: overlap }, (_, i) => gq(`o${i}`)), ...Array.from({ length: freshN - overlap }, (_, i) => gq(`f${i}`))];
+    const grand = grandfatherEvidence(old, fresh);
+    assert.ok(grand.length >= oldN, `old=${oldN} fresh=${freshN} overlap=${overlap} → 결과 ${grand.length}이 old보다 작다`);
+  }
+});
+test("조부보호 + 표시 상위 N — 최신순으로 추리고 개수를 지킨다", () => {
+  const items = [gq("a", "2020.01.01"), gq("b", "2026.09.01"), gq("c", "2023.05.01")];
+  const top2 = pickRecentTop(items, 2);
+  assert.equal(top2.length, 2);
+  assert.equal(top2[0].link, "b", "가장 최근 글이 먼저 와야 한다");
+});
+// 🔴 소비자 화면 불일치 관문 — 조부보호로 synth_count는 늘었는데 synth_quality.verified/reference를
+//   안 맞추면, 상단 "후기 396건" 배지와 "이 판정을 어떻게 냈나"의 "200건으로 판단했어요" 설명이
+//   서로 어긋나 보인다(실제로 한 번 이 상태로 썼다가 이 세션에서 바로 잡았다).
+test("조부보호: synth_quality를 쓸 때는 반드시 finalCollected와 재조정한다(quality 변수 직접 사용 금지)", () => {
+  const code = codeOf("../../lib/synthStore.ts");
+  const n = (code.match(/synth_quality=\$\{safeJson\(quality\)\}/g) || []).length;
+  assert.equal(n, 0, "synth_quality에 조정 전 quality를 그대로 쓰는 자리가 남아 있다 — finalQuality를 써야 한다");
+  assert.ok(/synth_quality=\$\{safeJson\(finalQuality\)\}/.test(code), "finalQuality로 쓰는 자리가 없다");
+  assert.ok(/finalQuality = \{ \.\.\.quality, verified: gVerified, reference: grand\.length - gVerified \}/.test(code),
+    "조부보호 분기에서 verified/reference를 union 기준으로 재계산하지 않는다");
 });
 
 // ── ⑭ 🛑 대량 비공개 차단기 — 소비자 손상(공개 카페가 한꺼번에 사라짐)을 막는 마지막 관문.

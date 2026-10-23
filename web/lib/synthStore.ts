@@ -2,7 +2,7 @@
 // PRINCIPLES §1·§3·§5·§7: raw 보존 → 재합성 시 API 재호출 없이 재현(쿼터 절약).
 // 규칙 1차 + LLM 맥락 재판정(스마트). 검증/참고면 자동 공개, 부족하면 비공개(정직).
 import { sql , ensureOnce } from "./db";
-import { mergeRawEvidence, shouldBlockShrink } from "./evidenceMerge";
+import { mergeRawEvidence, shouldBlockShrink, grandfatherEvidence, pickRecentTop } from "./evidenceMerge";
 import { OUT_OF_SCOPE_SQL } from "./serviceScope";
 import { fetchPlacesReviews } from "./placesCollector";
 import { fetchWebReviews } from "./webSearchCollector";
@@ -413,7 +413,8 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   const needsLLM = ambiguousEvidence || recoverableEdge || campaignSignal.suspect;
   const needsLlmPriority = campaignSignal.suspect ? "동일날짜 SEO반복 캠페인 의심" : null;
   // (컬럼 보장 DDL 5개는 ensureCols로 이관 — 2026-09-17, 핫패스에서 20만 회 돌던 낭비)
-  const allEv = safeJson(allEvidence ?? evidenceReviews);
+  // allEv 변수 제거(2026-10-23) — 조부보호 패치로 저장 직전 finalAllEvidence를 쓰므로
+  //   여기서 미리 safeJson한 값은 더 이상 안 쓴다(혼동 방지 — 둘 다 들고 있으면 또 반환값 불일치 버그가 난다).
   // 현재 상태(파이프라인 단계·카테고리·이전 합성값) 먼저 — 카테고리 게이트 분기에 pst 필요.
   const cur = (await sql`SELECT pipeline_status, naver_category, synth_identity, synth_count, synth_updated, raw_collected_at, jsonb_array_length(COALESCE(synth_reviews,'[]'::jsonb)) prev_ev,
     COALESCE(published, false) AS was_published,   -- 🛑 판정 전 공개 상태 — 대량 비공개 차단기가 '내려간 수'를 세는 근거(왕복 추가 0)
@@ -613,29 +614,54 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
   //   · 임계: 신규가 기존의 SHRINK_RATIO 미만이면 **쓰지 않는다**(기존 화면 그대로 유지)
   //   · 정상적인 감소(폐업·오염 정리)는 CEO 결재나 전용 힐러가 집행한다 — 수집 경로가 할 일이 아니다.
   //   💰 비용: 쓰기 전 SELECT 1회(작은 컬럼 3개)뿐. 막은 경우엔 UPDATE·ISR 무효화가 **아예 안 나간다**(절감).
+  // 🔴 2026-10-23 — 급감 차단 **전에** 조부보호를 시도한다(lib/evidenceMerge.ts grandfatherEvidence
+  //   주석 참조). 차단은 여전히 최종 안전망으로 남는다 — 조부보호로도 못 채우면 그대로 막는다.
+  let finalCollected = collected;
+  let finalEvidenceReviews: any[] = evidenceReviews;
+  let finalAllEvidence: any[] = (allEvidence ?? evidenceReviews) as any[];
+  let finalQuality = quality;
   try {
     const prevRow = (await sql`SELECT published, COALESCE(synth_count,0) sc, synth_grade FROM cafes WHERE id=${cafeId}`)[0];
     const wasPub = !!prevRow?.published, prevCount = Number(prevRow?.sc ?? 0);
     // 📦 2026-10-18: 판정식을 `lib/evidenceMerge.ts`의 순수 함수로 들어냈다(동작 불변·테스트 가능).
     if (shouldBlockShrink({ wasPublished: wasPub, prevCount, newCount: collected, minCount: SHRINK_MIN, ratio: SHRINK_RATIO })) {
-      const msg = `공개 카페 후기 급감 차단 — ${name}(id ${cafeId}) ${prevCount} → ${collected}건, 쓰기 거부`;
-      console.warn(`[shrinkGuard] ${msg}`);
-      const { noteSilentFail } = await import("./silentFail");
-      await noteSilentFail("synthStore.shrinkGuard", new Error(msg)).catch(() => {});
-      try { (await import("node:child_process")).execFileSync("/usr/bin/osascript", ["-e",
-        `display notification "${name} 후기 ${prevCount}→${collected}건 — 쓰기를 막았습니다" with title "동네 커피 노트 급감 차단" sound name "Basso"`]); } catch {}
-      return { grade: prevRow?.synth_grade ?? grade, collected: prevCount, published: true, wasPublished: true, ruleOk, pipeline: "live",
-               evidence: 0, coherence, blocked: true } as any;
+      // 💰 조부보호는 급감이 날 때만 추가 조회 1회(synth_reviews_all, 이 카페 1건) — 평상시엔 비용 0.
+      const prevAllRow = (await sql`SELECT synth_reviews_all FROM cafes WHERE id=${cafeId}`)[0];
+      const oldAll = Array.isArray(prevAllRow?.synth_reviews_all) ? (prevAllRow.synth_reviews_all as any[]) : [];
+      const grand = grandfatherEvidence(oldAll, finalAllEvidence);
+      if (grand.length >= prevCount) {
+        // old를 다시 심사하지 않고 그대로 보존 + 새 글만 보탰다 → 정의상 prevCount보다 작아질 수 없다.
+        finalCollected = grand.length;
+        finalAllEvidence = grand;
+        finalEvidenceReviews = pickRecentTop(grand, 6);
+        // 🔴 synth_quality.verified/reference도 맞춰야 한다 — 이게 소비자 화면 "이 판정을 어떻게 냈나"
+        //   설명문("N건의 실제 방문 후기로 판단했어요", app/page.tsx:3267)의 분모다. 안 맞추면 상단 배지
+        //   "후기 396건"과 설명문 "200건으로 판단"이 **서로 어긋나** 보인다(CEO가 가장 싫어하는 유형의 불일치
+        //   — reference_traffic_analysis 등 메모리에 "관리자 화면은 항상 실시간 정확" 반복 지적됨).
+        const gVerified = grand.filter((r: any) => r?.trust === "verified").length;
+        finalQuality = { ...quality, verified: gVerified, reference: grand.length - gVerified };
+        console.warn(`[grandfather] 급감 대신 조부보호 적용 — ${name}(id ${cafeId}) ${prevCount} → ${finalCollected}건(재평가 ${collected}건은 버리지 않고 보존)`);
+      } else {
+        // 조부보호로도 old를 못 채우면(옛 데이터 자체가 비정상) 원래대로 차단 — 안전망 유지.
+        const msg = `공개 카페 후기 급감 차단 — ${name}(id ${cafeId}) ${prevCount} → ${collected}건, 쓰기 거부`;
+        console.warn(`[shrinkGuard] ${msg}`);
+        const { noteSilentFail } = await import("./silentFail");
+        await noteSilentFail("synthStore.shrinkGuard", new Error(msg)).catch(() => {});
+        try { (await import("node:child_process")).execFileSync("/usr/bin/osascript", ["-e",
+          `display notification "${name} 후기 ${prevCount}→${collected}건 — 쓰기를 막았습니다" with title "동네 커피 노트 급감 차단" sound name "Basso"`]); } catch {}
+        return { grade: prevRow?.synth_grade ?? grade, collected: prevCount, published: true, wasPublished: true, ruleOk, pipeline: "live",
+                 evidence: 0, coherence, blocked: true } as any;
+      }
     }
   } catch { /* 비교 실패는 쓰기를 막지 않는다(가드가 서비스를 멈추게 하지 않는다) */ }
 
   noteWrite("cafes.synth_reviews"); noteWrite("cafes.synth_reviews_all"); noteWrite("cafes.published");
   if (llmJudged) {
-    await sql`UPDATE cafes SET synth_grade=${gradeOut}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_coherence=${coherence}, offctx_rate=${offctx}, visitor_n=${vmix.n}, visitor_trip=${vmix.trip}, visitor_local=${vmix.local}, needs_llm=${needsLLM}, needs_llm_priority=${needsLlmPriority}, borderline_count=${blCount}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${safeJson(tidyDisplayQuotes(evidenceReviews as any[]))}, synth_reviews_all=${allEv}, char_scores=${safeJson(charScores)}, work_facts=${safeJson(workFacts)}, synth_quality=${safeJson(quality)}, review_dates=${safeJson(reviewDates)}, pipeline_status=${newPst}, exclude_reason=${exReason}, exclude_at=${exReason ? new Date() : null}, synth_updated=${synthTs}, synth_checked_at=now(), llm_judged_at=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN ${latMin} AND ${latMax} AND lng BETWEEN ${lngMin} AND ${lngMax}) WHERE id=${cafeId}`;
+    await sql`UPDATE cafes SET synth_grade=${gradeOut}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${finalCollected}, synth_coherence=${coherence}, offctx_rate=${offctx}, visitor_n=${vmix.n}, visitor_trip=${vmix.trip}, visitor_local=${vmix.local}, needs_llm=${needsLLM}, needs_llm_priority=${needsLlmPriority}, borderline_count=${blCount}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${safeJson(tidyDisplayQuotes(finalEvidenceReviews as any[]))}, synth_reviews_all=${safeJson(finalAllEvidence)}, char_scores=${safeJson(charScores)}, work_facts=${safeJson(workFacts)}, synth_quality=${safeJson(finalQuality)}, review_dates=${safeJson(reviewDates)}, pipeline_status=${newPst}, exclude_reason=${exReason}, exclude_at=${exReason ? new Date() : null}, synth_updated=${synthTs}, synth_checked_at=now(), llm_judged_at=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN ${latMin} AND ${latMax} AND lng BETWEEN ${lngMin} AND ${lngMax}) WHERE id=${cafeId}`;
   } else {
-    await sql`UPDATE cafes SET synth_grade=${gradeOut}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${collected}, synth_coherence=${coherence}, offctx_rate=${offctx}, visitor_n=${vmix.n}, visitor_trip=${vmix.trip}, visitor_local=${vmix.local}, needs_llm=${needsLLM}, needs_llm_priority=${needsLlmPriority}, borderline_count=${blCount}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${safeJson(tidyDisplayQuotes(evidenceReviews as any[]))}, synth_reviews_all=${allEv}, char_scores=${safeJson(charScores)}, work_facts=${safeJson(workFacts)}, synth_quality=${safeJson(quality)}, review_dates=${safeJson(reviewDates)}, pipeline_status=${newPst}, exclude_reason=${exReason}, exclude_at=${exReason ? new Date() : null}, synth_updated=${synthTs}, synth_checked_at=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN ${latMin} AND ${latMax} AND lng BETWEEN ${lngMin} AND ${lngMax}) WHERE id=${cafeId}`;
+    await sql`UPDATE cafes SET synth_grade=${gradeOut}, synth_identity=${synth.identity}, synth_basis=${basisLine}, synth_count=${finalCollected}, synth_coherence=${coherence}, offctx_rate=${offctx}, visitor_n=${vmix.n}, visitor_trip=${vmix.trip}, visitor_local=${vmix.local}, needs_llm=${needsLLM}, needs_llm_priority=${needsLlmPriority}, borderline_count=${blCount}, synth_acidity=${c.acidity}, synth_body=${c.body}, synth_sweet=${c.sweet}, synth_reviews=${safeJson(tidyDisplayQuotes(finalEvidenceReviews as any[]))}, synth_reviews_all=${safeJson(finalAllEvidence)}, char_scores=${safeJson(charScores)}, work_facts=${safeJson(workFacts)}, synth_quality=${safeJson(finalQuality)}, review_dates=${safeJson(reviewDates)}, pipeline_status=${newPst}, exclude_reason=${exReason}, exclude_at=${exReason ? new Date() : null}, synth_updated=${synthTs}, synth_checked_at=now(), published=(${publish} AND lat IS NOT NULL AND lat BETWEEN ${latMin} AND ${latMax} AND lng BETWEEN ${lngMin} AND ${lngMax}) WHERE id=${cafeId}`;
   }
-  return { grade: gradeOut, collected, published: publish, wasPublished: !!cur?.was_published, ruleOk, pipeline: newPst, evidence: evidenceReviews.length, coherence: Math.round(coherence * 100), noisy };
+  return { grade: gradeOut, collected: finalCollected, published: publish, wasPublished: !!cur?.was_published, ruleOk, pipeline: newPst, evidence: finalEvidenceReviews.length, coherence: Math.round(coherence * 100), noisy };
 }
 
 // 🧼 PII 자동 세척 — 공개 인용문에서 전화·이메일·핸들 제거(레드팀 pii_leak 자가치유).
