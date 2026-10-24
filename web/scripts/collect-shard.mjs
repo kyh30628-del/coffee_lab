@@ -129,16 +129,29 @@ for (;;) {
   //      아래에서 2층과 **같은 방식**으로 거른다. 좌표 없는 카페도 제외(published 조건에 좌표 박스가 있다).
   //   ⚠️ raw_checked_at 30일 쿨다운 — 같은 카페를 반복 재수집해 쿼터를 태우지 않게.
   if (!rows.length && !FILTER && gapDone < GAP_CAP) {
-    rows = await sql`SELECT id, name, area FROM cafes
-      WHERE published = false
-        AND COALESCE(pipeline_status, '') NOT IN ('excluded', 'noise')
-        AND (raw_reviews IS NULL OR COALESCE(jsonb_array_length(raw_reviews), 0) = 0)
-        AND (raw_checked_at IS NULL OR raw_checked_at < now() - interval '30 days')
-        AND lat IS NOT NULL
-        AND NOT (id = ANY(${[...gapTried, -1]}))
-        AND (id % ${OF}) = ${SHARD}
-      ORDER BY (raw_reviews IS NULL) DESC, id
-      LIMIT ${Math.min(20, GAP_CAP - gapDone)}`;
+    // 🔴 2026-10-24 비용 사고 수리 — 원래는 (raw_reviews IS NULL OR jsonb_array_length=0) 한 쿼리였는데,
+    //   이 OR+COALESCE 모양은 어떤 부분 인덱스로도 플래너가 매칭을 못 해 **매번 테이블 전체를 훑었다**
+    //   (EXPLAIN 실측: Parallel Seq Scan, 1회 964MB·10.4초 — pg_stat_statements 전체 1위, 누적 1,894.8GB).
+    //   OR의 두 분기를 쪼개 **각각 전용 부분 인덱스**(idx_cafes_gap_nullraw·idx_cafes_gap_emptyraw)에
+    //   정확히 매칭되는 단순 쿼리 2개로 나누고 앱에서 합친다. 수리 후: 각 7.7ms·3.7ms, 합쳐도 ~2MB.
+    const GAP_LIMIT = Math.min(20, GAP_CAP - gapDone);
+    const excl = [...gapTried, -1];
+    const [nullRaw, emptyRaw] = await Promise.all([
+      sql`SELECT id, name, area FROM cafes
+        WHERE published = false AND lat IS NOT NULL AND raw_reviews IS NULL
+          AND COALESCE(pipeline_status, '') NOT IN ('excluded', 'noise')
+          AND (raw_checked_at IS NULL OR raw_checked_at < now() - interval '30 days')
+          AND NOT (id = ANY(${excl})) AND (id % ${OF}) = ${SHARD}
+        ORDER BY id LIMIT ${GAP_LIMIT}`,
+      sql`SELECT id, name, area FROM cafes
+        WHERE published = false AND lat IS NOT NULL AND raw_reviews IS NOT NULL AND jsonb_array_length(raw_reviews) = 0
+          AND COALESCE(pipeline_status, '') NOT IN ('excluded', 'noise')
+          AND (raw_checked_at IS NULL OR raw_checked_at < now() - interval '30 days')
+          AND NOT (id = ANY(${excl})) AND (id % ${OF}) = ${SHARD}
+        ORDER BY id LIMIT ${GAP_LIMIT}`,
+    ]);
+    // 원래 순서(raw_reviews IS NULL 먼저)를 유지한다.
+    rows = [...nullRaw, ...emptyRaw].slice(0, GAP_LIMIT);
     if (rows.length) {
       rows.forEach((r) => gapTried.add(r.id));
       const picked = rows.length;

@@ -161,14 +161,24 @@ export async function collectBacklog(): Promise<number> {
 //      신규 유입 압력이 아니다. 여기에 넣으면 3,211 > 3,000으로 **발굴이 통째로 멈춘다**(잘못된 결과).
 //   정의는 collect-shard.mjs의 gap 큐와 **같게** 맞춘다 — 갈라지면 예약이 거짓이 된다
 //     (「단계의 적체 정의는 그 단계를 전진시키는 잡의 큐 정의와 글자까지 같아야 한다」).
+// 🔴 2026-10-24 비용 사고 수리 — 이 함수가 discoveryMayRun을 통해 수집 주기마다 불려,
+//   (raw_reviews IS NULL OR jsonb_array_length=0) OR+COALESCE 모양이 인덱스 매칭에 실패해
+//   **시스템 전체 쿼리 중 디스크 읽기 1위**(pg_stat_statements 실측: 누적 1,894.8GB·3,909회 호출,
+//   collect-shard.mjs의 같은 모양 쿼리보다 이쪽이 진짜 주범이었다)로 매번 전체 스캔했다.
+//   OR의 두 분기를 전용 부분 인덱스(idx_cafes_gap_nullraw·idx_cafes_gap_emptyraw)에 맞는
+//   단순 COUNT 2개로 쪼개 합산 — collect-shard.mjs의 큐 정의와 글자까지 같은 조건을 유지한다.
 export async function gapBacklog(): Promise<number> {
-  const r = (await sql`SELECT count(*)::int n FROM cafes
-    WHERE published = false
-      AND COALESCE(pipeline_status, '') NOT IN ('excluded', 'noise')
-      AND (raw_reviews IS NULL OR COALESCE(jsonb_array_length(raw_reviews), 0) = 0)
-      AND (raw_checked_at IS NULL OR raw_checked_at < now() - interval '30 days')
-      AND lat IS NOT NULL`.catch(() => [])) as any[];
-  return Number(r[0]?.n ?? 0);
+  const [a, b] = await Promise.all([
+    sql`SELECT count(*)::int n FROM cafes
+      WHERE published = false AND lat IS NOT NULL AND raw_reviews IS NULL
+        AND COALESCE(pipeline_status, '') NOT IN ('excluded', 'noise')
+        AND (raw_checked_at IS NULL OR raw_checked_at < now() - interval '30 days')`.catch(() => [{ n: 0 }]),
+    sql`SELECT count(*)::int n FROM cafes
+      WHERE published = false AND lat IS NOT NULL AND raw_reviews IS NOT NULL AND jsonb_array_length(raw_reviews) = 0
+        AND COALESCE(pipeline_status, '') NOT IN ('excluded', 'noise')
+        AND (raw_checked_at IS NULL OR raw_checked_at < now() - interval '30 days')`.catch(() => [{ n: 0 }]),
+  ]) as any[][];
+  return Number(a[0]?.n ?? 0) + Number(b[0]?.n ?? 0);
 }
 // 하루에 gap이 실제로 소화할 수 있는 카페 수 = 창당 상한(COLLECT_GAP_CAP) × 수집 창 4개(08:15·12:15·16:15·20:15).
 //   예약은 **하루 소화량만** 잡는다. 적체 전체(3,211곳)를 예약하면 발굴을 과하게 굶긴다.

@@ -968,11 +968,14 @@ test("네이버 쿼터: bumpNaver는 발굴·수집·마이닝 세 경로에서 
 test("쿼터 적체: gap 큐 정의가 수집 레인과 같다(예약이 거짓이 되지 않게)", () => {
   const budget = readFileSync(new URL("../naverBudget.ts", import.meta.url), "utf8");
   const shard = readFileSync(new URL("../../scripts/collect-shard.mjs", import.meta.url), "utf8");
+  // 🔴 2026-10-24 — 원래 한 쿼리(OR+COALESCE)는 인덱스 매칭 실패로 매번 전체 스캔했다(pg_stat_statements
+  //   실측: 시스템 전체 1위, 누적 1,894.8GB). OR의 두 분기를 전용 부분 인덱스에 맞춰 쪼갰다 — 조건 자체는
+  //   그대로이므로(참·거짓 분기로 쪼갠 것뿐) 두 조각이 **양쪽 파일에 글자까지 같이** 있는지로 동기화를 본다.
   const must = [
     /COALESCE\(pipeline_status, ''\) NOT IN \('excluded', 'noise'\)/,
-    /raw_reviews IS NULL OR COALESCE\(jsonb_array_length\(raw_reviews\), 0\) = 0/,
+    /published = false AND lat IS NOT NULL AND raw_reviews IS NULL/,
+    /published = false AND lat IS NOT NULL AND raw_reviews IS NOT NULL AND jsonb_array_length\(raw_reviews\) = 0/,
     /raw_checked_at IS NULL OR raw_checked_at < now\(\) - interval '30 days'/,
-    /lat IS NOT NULL/,
   ];
   for (const re of must) {
     assert.ok(re.test(budget), `naverBudget.gapBacklog에 조건이 없다: ${re}`);
@@ -1405,4 +1408,16 @@ test("랜드마크 별칭: 공식명과 다르게 부르는 장소 3건이 ALIAS
   assert.ok(/"상상나라": "서울상상나라"/.test(code), "'상상나라' 별칭이 없다");
   assert.ok(/"국제시장": "국제시장 먹자골목"/.test(code), "'국제시장' 별칭이 없다");
   assert.ok(/"반포자이": "반포자이아파트"/.test(code), "'반포자이' 별칭이 없다");
+});
+
+// 🛑 Neon 무료한도 자동정지 관문(2026-10-24) — CEO 절대지시 "무료 한도 넘어가면 무조건 중지해 무조건".
+//   실측 결함: 실청구 전송량(egress_gb)은 지금까지 표시만 되고 자동정지 조건에 한 번도 안 들어갔었다
+//   (디스크 읽기 프록시만 globalHalt를 결정). 이 관문은 egress_gb가 halt 결정에 실제로 반영되는지 본다.
+test("비용: Neon 실청구 전송량이 자동정지(cost_guard) 조건에 들어간다", () => {
+  const code = codeOf("../../app/api/cron-costwatch/route.ts");
+  assert.ok(/egressHalt = Number\(b\.egress_gb\) \+ safetyGb >= 475/.test(code),
+    "실청구 전송량 기반 egressHalt 계산이 없다 — 표시만 하고 멈추지 않는다");
+  assert.ok(/if \(egressHalt\) globalHalt = true;/.test(code),
+    "egressHalt가 globalHalt(cost_guard 정지)에 반영되지 않는다");
+  assert.ok(/let globalHalt/.test(code), "globalHalt가 재할당 불가능(const)하면 egressHalt를 반영할 수 없다");
 });

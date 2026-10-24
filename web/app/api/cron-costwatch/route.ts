@@ -248,9 +248,8 @@ export async function GET(req: NextRequest) {
     //   🔧 #1326: 정지 범위를 좁힌다 — 최다쿼리로 원천 job이 특정되면 그 job만, 미특정이면 총량이 임계의 2배 이상일 때만
     //   전역(4개 크론 동시정지). 미특정+경미(<2배)는 경보만 — 오탐 1건이 전 파이프라인을 얼리던 SPOF 제거.
     const culprit = totalBad ? attributeCostJob(top?.q) : null;
-    const globalHalt = totalBad && !culprit && totalGb >= totalLimit * 2;
+    let globalHalt = totalBad && !culprit && totalGb >= totalLimit * 2;
     const anomaly = totalBad;
-    const scopeTxt = culprit ? `개별정지(${culprit})` : globalHalt ? "자동정지(전역)" : "경보만(정지 없음·원인 미특정 경미)";
     const alertOnly = perQueryBad && !totalBad;
     const awakeTxt = `가동 ${(aw.awakeMin / 60).toFixed(1)}h/일(깨어남 ${aw.wakes}회, 새벽 ${aw.nightMin}분, 7일중앙값 ${(aw.medianMin / 60).toFixed(1)}h)`;
     const awakeNote = awakeBad ? `⚠️ 가동시간 주의: ${awakeTxt} — 중앙값의 ${AWAKE_MEDIAN_MULT}배(${(awakeLimit / 60).toFixed(1)}h) 초과. ` : "";
@@ -262,16 +261,29 @@ export async function GET(req: NextRequest) {
     //   여기서 직접 호출하면 늘 실패한다. 키를 가진 로컬이 하루 1회 scripts/neon-billing-snapshot.mjs로 neon_billing에 적재하고
     //   여기선 최신 1행만 읽는다 — 시크릿이 배포 환경으로 안 나가고, 이력이 남아 추세 비교도 된다.
     let billed = "";
+    let egressHalt = false;
     try {
       // 🔴 2026-10-03: neon_billing이 카페+부동산 2개 DB를 같이 기록하므로 project로 좁힌다(안 그러면 날에 따라 부동산 행을 읽는다).
       const b = (await sql`SELECT egress_gb, egress_per_day, compute_per_day, taken_at FROM neon_billing WHERE project='coffee-db' ORDER BY taken_at DESC LIMIT 1`.catch(() => []))[0] as any;
       if (b) {
         const ageH = Math.round((Date.now() - new Date(b.taken_at).getTime()) / 3600000);
         billed = ` · 💳실청구 전송 ${Number(b.egress_per_day).toFixed(1)}GB/일(월누계 ${Number(b.egress_gb).toFixed(0)}GB·무료 500GB의 ${Math.round(Number(b.egress_gb) / 5)}%) · 컴퓨트 ${Number(b.compute_per_day).toFixed(1)}CU-h/일${ageH > 30 ? `(${ageH}h 전 기준)` : ""}`;
+        // 🔴 2026-10-24 CEO 지시(절대): "네온 사용량 무료 한도 넘어가면 무조건 중지해 무조건".
+        //   위 totalBad/globalHalt는 디스크 읽기(내부 프록시)만 본다 — **실제 Neon 청구 전송량(egress_gb)은
+        //   지금까지 한 번도 자동정지 조건에 들어가지 않았다**(표시만 하고 멈추지는 않았다, 10-24 실측으로 발견).
+        //   무료 500GB의 95%(475GB)에서 선제 정지 — neon-billing-snapshot이 하루 1회만 갱신돼 최대 ~1일
+        //   지연이 있으므로(하루 평균 전송량만큼) 100%가 아니라 여유를 둔다. 이 스냅샷이 오래됐으면(12h+)
+        //   그만큼 더 일찍 멈춘다(지연 중에도 계속 전송되고 있었다고 가정).
+        const safetyGb = Number(b.egress_per_day) * (ageH / 24);
+        egressHalt = Number(b.egress_gb) + safetyGb >= 475;
       } else billed = " · 💳실청구 미수집(로컬 neon-billing 스냅샷 확인 필요)";
     } catch { /* 실패해도 디스크 읽기만으로 보고 */ }
+    if (egressHalt) globalHalt = true;
+    const scopeTxt = culprit ? `개별정지(${culprit})` : globalHalt ? "자동정지(전역)" : "경보만(정지 없음·원인 미특정 경미)";
     const topTxt = perQueryBad ? ` · 최다쿼리 ${top!.deltaGb.toFixed(1)}GB: ${top!.q.replace(/\s+/g, " ").slice(0, 100)}` : "";
-    const detail = anomaly
+    const detail = egressHalt
+      ? awakeNote + `🚨🛑 실청구 전송량 무료한도(500GB) 근접/초과 — 전역 자동정지: ${billed.replace(/^ · /, "")}${totalBad ? ` · 디스크 읽기도 이상(${totalGb.toFixed(1)}GB)` : ""}${topTxt}`
+      : anomaly
       ? awakeNote + `🚨 디스크 읽기 총량 이상 — ${scopeTxt}: 오늘 총 ${totalGb.toFixed(1)}GB(임계 ${totalLimit.toFixed(1)}GB, 7일중앙값 ${medGb.toFixed(1)}GB×${TOTAL_MEDIAN_MULT})${billed}${topTxt}`
       : alertOnly
       ? awakeNote + `⚠️ 단일쿼리 주의(정지 아님): 최다 ${top!.deltaGb.toFixed(1)}GB ≥ ${PER_QUERY_GB_ALERT}GB — 총량은 정상 ${totalGb.toFixed(1)}GB/임계 ${totalLimit.toFixed(1)}GB${billed}${topTxt}`
