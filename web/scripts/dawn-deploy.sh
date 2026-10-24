@@ -89,6 +89,13 @@ if git push origin main >> "$LOG" 2>&1; then
         say "🔴 캐시 무효화 실패 — 새 코드는 올라갔지만 캐시된 상세는 옛 화면이다. 수동 호출 필요."
         beat 1 "캐시 무효화 실패($SHA) — 상세 페이지가 옛 화면을 내보낸다"
       fi
+      # ☕ 홈 화면 선제 예열(2026-10-24, CEO "로딩 때 커피 내리는 중이 너무 오래 나온다").
+      #   원인: 새 배포 직후 /api/discover의 CDN 캐시(s-maxage=300)가 비어 있어, 그 시점의 첫 방문자가
+      #   DB 콜드스타트+전체 조회를 그대로 맞는다(실측: 예열 전 6.2초 → 예열 후 0.25초).
+      #   여기서 한 번 불러 CDN에 데이터를 채워두면 실제 방문자는 늘 캐시만 본다. 비용: GET 2회뿐.
+      curl -s -m 15 "https://dongnecoffeenote.com/" > /dev/null 2>&1
+      curl -s -m 15 "https://dongnecoffeenote.com/api/discover" > /dev/null 2>&1
+      say "☕ 홈 화면 예열 완료"
     else
       say "🔴 15분 안에 새 빌드가 안 올라옴 — 비우지 않았다(일찍 비우면 옛 HTML이 다시 캐시된다)"
       beat 1 "배포 빌드 미완료($SHA) — 캐시 무효화 보류, 확인 필요"

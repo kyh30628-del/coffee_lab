@@ -1264,6 +1264,16 @@ test("배포: 무효화 엔드포인트는 라우트 전체를 한 번에 비우
   assert.ok(/"\/c\/\[id\]", "page"/.test(api), "상세 라우트를 비우지 않는다");
 });
 
+// ☕ 홈 화면 예열 관문(2026-10-24) — CEO 지적("로딩 때 커피 내리는 중이 너무 오래 나온다").
+//   실측: 배포 직후 /api/discover 캐시가 비어 첫 방문자가 콜드스타트 6.2초를 그대로 맞았다(예열 후 0.25초).
+//   무효화 뒤 홈·discover를 한 번 불러 CDN을 채워둬야 실제 방문자가 빈 캐시를 안 맞는다.
+test("배포: 캐시 무효화 뒤 홈 화면을 예열해 첫 방문자가 콜드스타트를 안 맞는다", () => {
+  const sh = readFileSync(new URL("../../scripts/dawn-deploy.sh", import.meta.url), "utf8");
+  const iPurge = sh.indexOf("api/purge-detail-route");
+  const iWarm = sh.indexOf("api/discover");
+  assert.ok(iWarm > iPurge, "예열 단계가 없거나 무효화보다 먼저다");
+});
+
 // 💰 ISR 쓰기 관문(2026-10-19) — **이 세션 실사고**: 상세 페이지가 `new Date()`로 "오늘 날짜 확인"을 찍고 있었다.
 //   Vercel 공식: "재검증 결과가 이전과 같으면 쓰기 단위가 발생하지 않는다. 예상 못한 쓰기가 보이면
 //   ISR 출력에 new Date()·Math.random() 같은 비결정 코드가 있는지 보라." 날짜는 매일 바뀌니
