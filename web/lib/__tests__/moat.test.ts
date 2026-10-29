@@ -1274,6 +1274,18 @@ test("배포: 캐시 무효화 뒤 홈 화면을 예열해 첫 방문자가 콜�
   assert.ok(iWarm > iPurge, "예열 단계가 없거나 무효화보다 먼저다");
 });
 
+// 🗺️ 지도 조각 폴백 관문(2026-10-30) — 실측: /api/cafes 전체(비청크) 응답이 pg_stat_statements 11.6일간
+//   2,613회로 시스템 전체 전송 1위였다. 조각 4개 중 하나만 일시 실패해도 Promise.all이 전부 reject돼
+//   곧바로 이 비싼 전체응답으로 떨어졌다 — 전체 폴백 전에 조각별 개별 재시도를 끼워야 한다.
+test("지도: 조각(part) 요청이 하나 실패해도 전체응답 전에 조각별로 한 번 더 재시도한다", () => {
+  const code = codeOf("../mapCafes.ts");
+  const iFirst = code.indexOf("Promise.all(Array.from({ length: MAP_PARTS }, (_, k) => fetchPart(k)))");
+  const iRetry = code.indexOf("fetchPart(k).catch(() => fetchPart(k))");
+  const iFull = code.indexOf('fetch("/api/cafes")).json()');
+  assert.ok(iFirst >= 0 && iRetry > iFirst, "조각별 개별 재시도 단계가 없다");
+  assert.ok(iFull > iRetry, "전체응답 폴백이 재시도보다 먼저다 — 재시도 없이 바로 비싼 길로 간다");
+});
+
 // 💰 ISR 쓰기 관문(2026-10-19) — **이 세션 실사고**: 상세 페이지가 `new Date()`로 "오늘 날짜 확인"을 찍고 있었다.
 //   Vercel 공식: "재검증 결과가 이전과 같으면 쓰기 단위가 발생하지 않는다. 예상 못한 쓰기가 보이면
 //   ISR 출력에 new Date()·Math.random() 같은 비결정 코드가 있는지 보라." 날짜는 매일 바뀌니

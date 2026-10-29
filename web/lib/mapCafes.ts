@@ -34,20 +34,37 @@ function byServerOrder(a: MapCafeRaw, b: MapCafeRaw): number {
   return Number(a.id) - Number(b.id);
 }
 
-/** 지도용 공개 카페 전량. 조각 4개를 병렬로 받아 합치고, 하나라도 실패하면 전체 응답 1개로 되돌아간다(화면은 절대 비지 않게). */
+const fetchPart = (k: number) =>
+  fetch(`/api/cafes?part=${k}`).then((r) => { if (!r.ok) throw new Error(String(r.status)); return r.json(); });
+
+function mergeParts(ds: any[]): MapCafeRaw[] | null {
+  if (!ds.every((d, k) => d?.ok && d.part === k && d.parts === MAP_PARTS && Array.isArray(d.cafes))) return null;
+  const seen = new Set<string>();
+  const all: MapCafeRaw[] = [];
+  for (const d of ds) for (const c of d.cafes as MapCafeRaw[]) {
+    const key = String(c.id);
+    if (!seen.has(key)) { seen.add(key); all.push(c); }
+  }
+  return all.length > 0 ? all : null;
+}
+
+/** 지도용 공개 카페 전량. 조각 4개를 병렬로 받아 합치고, 하나라도 실패하면 전체 응답 1개로 되돌아간다(화면은 절대 비지 않게).
+ *  🔴 2026-10-30 비용 사고 수리 — pg_stat_statements 실측: 이 함수의 **전체 응답 폴백**(캐시 전혀 안 걸리는 경로, 매번
+ *  공개 카페 전량 5만여 행 Neon 직결)이 11.6일간 2,613회 불려 시스템 전체 전송 1위였다. 조각 4개 중 **하나만 일시
+ *  실패해도**(Promise.all이 전부를 reject) 곧바로 이 비싼 길로 떨어졌다 — 저트래픽 사이트라 각 조각이 식어
+ *  있을 때가 많아 실제로 자주 걸렸다. 전체 폴백 전에 **조각별로 한 번씩만 개별 재시도**를 끼워 넣어,
+ *  흔한 '조각 하나만 식음/일시 오류' 케이스는 전체 응답 없이 넘어가게 한다. 화면이 비지 않는 보장은 그대로 유지. */
 export async function fetchMapCafes<T = any>(): Promise<T[]> {
   try {
-    const ds = await Promise.all(Array.from({ length: MAP_PARTS }, (_, k) =>
-      fetch(`/api/cafes?part=${k}`).then((r) => { if (!r.ok) throw new Error(String(r.status)); return r.json(); })));
-    if (ds.every((d, k) => d?.ok && d.part === k && d.parts === MAP_PARTS && Array.isArray(d.cafes))) {
-      const seen = new Set<string>();
-      const all: MapCafeRaw[] = [];
-      for (const d of ds) for (const c of d.cafes as MapCafeRaw[]) {
-        const key = String(c.id);
-        if (!seen.has(key)) { seen.add(key); all.push(c); }
-      }
-      if (all.length > 0) return all.sort(byServerOrder) as unknown as T[];
-    }
+    const ds = await Promise.all(Array.from({ length: MAP_PARTS }, (_, k) => fetchPart(k)));
+    const merged = mergeParts(ds);
+    if (merged) return merged.sort(byServerOrder) as unknown as T[];
+  } catch {}
+  try {
+    // 조각별 개별 재시도 — 전체(Promise.all) 재시도가 아니라 **실패한 조각만** 다시 받는다.
+    const ds = await Promise.all(Array.from({ length: MAP_PARTS }, (_, k) => fetchPart(k).catch(() => fetchPart(k))));
+    const merged = mergeParts(ds);
+    if (merged) return merged.sort(byServerOrder) as unknown as T[];
   } catch {}
   const d = await (await fetch("/api/cafes")).json();
   return (d?.cafes ?? []) as T[];
