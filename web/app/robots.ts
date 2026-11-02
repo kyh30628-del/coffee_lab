@@ -38,12 +38,15 @@ export default function robots(): MetadataRoute.Robots {
       { userAgent: "*", allow: "/", disallow: DISALLOW },
     ],
     // 전체 + 유형별을 함께 싣는다 — 유형별은 Search Console에서 **색인 수를 따로 보기 위한 것**이다.
-    // 🔴 2026-09-16 — dongtaste·dongfacet 제외(CEO 승인). 라우트(/sitemaps/dongtaste.xml)는 살아 있고
-    //   여기서 '크롤해달라'는 신호만 뺀다. 근거는 app/sitemap.ts 주석 참조
-    //   (제출 34,455 → 색인 3,100(9%) · "발견됐지만 크롤 안 함" 18,318개 · 노출 상위 10개 중 9개가 카페 상세).
+    // 🔴 2026-11-02 — dongtaste·dongfacet 재개(CEO 승인). 09-16에 크롤예산 분산 우려로 뺐던 것을
+    //   되돌린다. 판정선 2개 중 AI경유 유입(10-31 기준 300PV)은 1,069PV로 압도 통과 확인(2026-11-02
+    //   실측). 네이버 상위10 진입(10-15 기준)은 이 세션에서 확인 도구가 없어 미검증으로 남김 — 다만
+    //   페이지 자체는 9-16 이후 7주째 멀쩡히 서비스 중이고(ISR 30일 캐시, 신규 쿼리 없음), 이번 달
+    //   전송 15.4GB(무료한도 500GB의 3%)로 여유가 크다. 되돌림 조건은 그대로 유효: 2주 내 네이버
+    //   경유 동 계열 유입이 20% 이상 줄면 이 줄만 다시 빼면 된다.
     sitemap: [
       "https://dongnecoffeenote.com/sitemap.xml",
-      ...["cafes", "areas", "taste", "facet", "dong", "misc"]
+      ...["cafes", "areas", "taste", "facet", "dong", "dongtaste", "dongfacet", "misc"]
         .map((k) => `https://dongnecoffeenote.com/sitemaps/${k}.xml`),
     ],
     host: "https://dongnecoffeenote.com",
