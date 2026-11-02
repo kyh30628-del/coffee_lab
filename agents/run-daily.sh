@@ -40,18 +40,18 @@ else
     if [ $((DOY % 2)) -eq 0 ]; then RUN="$RUN run-marketing-agent"; else RUN="$RUN run-b2b-sales-agent"; fi
   fi
 fi
-for w in ${(z)RUN}; do bash "$A/$w.sh"; sleep 5; done
+for w in ${(z)RUN}; do "$A/$w.sh"; sleep 5; done
 # 심층판정·종합은 풀 사이클(08·17시)만 — 점심엔 audit-watch(5분 워처)가 긴급건 커버, 종합은 17시에.
 if [ "$HOUR" != "12" ]; then
   # 심층판정은 격일(짝수일)만 — 무거워서 토큰 절약
-  if [ $(( $(date +%j) % 2 )) -eq 0 ]; then bash "$A/run-deep-judge-agent.sh"; sleep 5;
+  if [ $(( $(date +%j) % 2 )) -eq 0 ]; then "$A/run-deep-judge-agent.sh"; sleep 5;
   else echo "[$(date)] 심층판정 격일 스킵(홀수일)" >> $COFFEE_ROOT/agent-reports/logs/orchestrator.log; fi
   # 종합 + 비서실장 = 저녁(17시) 1회만(2026-07-12 CEO 승인 — 토큰/Max헤드룸 확보).
   #   관리·보고 오버헤드는 소비자 데이터에 안 닿음. 08시엔 모트가드·자율진단·발굴·심층판정은 그대로 돌고
   #   종합 보고만 저녁으로 통합 → CEO는 하루 1회 통합 EXECUTIVE 수신. 소비자 품질 영향 0.
   if [ "$EVENING" = "1" ]; then
-    bash "$A/run-chief-manager-agent.sh"; sleep 5
-    bash "$A/run-chief-secretary-agent.sh"
+    "$A/run-chief-manager-agent.sh"; sleep 5
+    "$A/run-chief-secretary-agent.sh"
   else
     echo "[$(date)] 종합·비서실장 저녁 1회 통합 — 오전/점심 스킵(모트·자율진단은 정상 실행됨)" >> $COFFEE_ROOT/agent-reports/logs/orchestrator.log
   fi

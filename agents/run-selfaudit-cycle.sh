@@ -12,5 +12,5 @@ fi
 echo $$ > "$LOCK"
 echo "[$(date)] === 자율진단 사이클(정기 매일 11:30·15:30·21:30) ===" >> $COFFEE_ROOT/agent-reports/logs/orchestrator.log
 (cd "$COFFEE_ROOT/web" && node --import tsx scripts/make-digest.mjs >> $COFFEE_ROOT/agent-reports/logs/orchestrator.log 2>&1)
-bash "$A/run-self-audit-agent.sh"
+"$A/run-self-audit-agent.sh"
 rm -f "$LOCK"

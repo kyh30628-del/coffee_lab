@@ -15,9 +15,9 @@ else
   echo "[$(date)] 목요일 리프레시 — 리스크·전략만(안정 도메인은 월 1×)" >> $COFFEE_ROOT/agent-reports/logs/orchestrator.log
   WEEKLY="run-risk-mgmt-agent run-strategy-agent"
 fi
-for w in ${(z)WEEKLY}; do bash "$A/$w.sh"; sleep 5; done
+for w in ${(z)WEEKLY}; do "$A/$w.sh"; sleep 5; done
 # 2) 경영지원본부장 종합(SUPPORT-WEEKLY) — 풀 거버넌스가 도는 월요일만.
-[ "$DOW" = "1" ] && bash "$A/run-support-office-director.sh"
+[ "$DOW" = "1" ] && "$A/run-support-office-director.sh"
 # 3) 📤 주간 리포트를 DB(org_reports)로 푸시 — 그날 갱신된 것만(스테일 방지).
 #    월요일: 조직평가·경영지원 종합(풀 거버넌스 산출) / 월·목: 전략 밸류업(주2회 발행).
 if [ "$DOW" = "1" ]; then

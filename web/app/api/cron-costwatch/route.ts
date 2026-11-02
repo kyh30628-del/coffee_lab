@@ -97,10 +97,22 @@ async function transferMedianGb(): Promise<number> {
       FROM run_ledger WHERE job='cron-costwatch' AND started_at > now() - interval '8 days'
         AND started_at < date_trunc('day', now() AT TIME ZONE 'Asia/Seoul') AT TIME ZONE 'Asia/Seoul'
       ORDER BY started_at ASC`) as { d: string; detail: string }[];
+    // 🔴 2026-11-02 수리 — 이 정규식이 "오늘 총 X GB(임계" 형태(비egress 이상 분기)에만 걸렸다.
+    //   "정상"(디스크 읽기 X GB)·"단일쿼리 주의"(총량은 정상 X GB)·egressHalt(디스크 읽기도 이상(X GB))
+    //   분기 문구는 전부 못 집어 **대부분의 날이 median 계산에서 통째로 빠졌다.** 10-26~10-31이 egressHalt로
+    //   도배되자 중앙값이 0으로 꺼져 totalLimit이 바닥(25GB)까지 떨어졌고, 11-01 실측 진짜 기준선(최근
+    //   정상일 200~800GB대)보다 한참 낮은 임계에 275GB가 걸려 전역 자동정지가 났다(오탐 — 그날은 평소보다
+    //   오히려 낮았다). 향후 재발 방지로 recordRun에 안정적인 [tgb=] 태그를 덧붙이고(아래), 과거분은 이
+    //   4갈래 패턴으로 모두 읽어 즉시 올바른 기준선을 복원한다(백필 스크립트·새 쿼리 없음 — 이미 저장된
+    //   텍스트를 더 정확히 해석할 뿐).
     const byDay = new Map<string, number>();
     for (const r of rows) {
       if (byDay.has(r.d)) continue; // 하루 여러 실행 시 **정기 실행(첫 실행)** 값만 — 수동 재실행이 중앙값을 오염시키던 원인
-      const m = String(r.detail).match(/총\s*([\d.]+)\s*GB/);
+      const d = String(r.detail);
+      const m = d.match(/\[tgb=([\d.]+)\]/) // 신규(이 수리 이후) 안정 태그 — 최우선
+        || d.match(/총\s*([\d.]+)\s*GB\(임계/) // 비egress 이상 분기: "오늘 총 X GB(임계"
+        || d.match(/총량은\s*정상\s*([\d.]+)\s*GB/) // 단일쿼리 주의 분기: "총량은 정상 X GB"
+        || d.match(/디스크\s*읽기(?:도\s*이상)?\(?\s*([\d.]+)\s*GB\)?/); // 정상·egressHalt 분기
       if (m) byDay.set(r.d, Number(m[1]));
     }
     const vals = [...byDay.values()].filter((n) => Number.isFinite(n)).sort((a, b) => a - b);
@@ -300,7 +312,8 @@ export async function GET(req: NextRequest) {
     await sql`DELETE FROM owner_funnel_events WHERE ts < now() - interval '365 days'`.catch(() => {});
     // ✅ 실행에 성공했으면 ok=true다. 이상 여부는 detail이 말하고, 관제탑엔 '비용 이상'이라는
     //   제 이름의 이슈로 뜬다(lib/issues.ts). 여기서 false를 찍으면 '크론 실패'로 둔갑한다.
-    await recordRun("cron-costwatch", true, detail + (pruned ? ` · 원장정리 ${pruned}행` : ""), cur.length);
+    // [tgb=] — median 계산용 안정 태그(사람이 읽는 문구와 무관하게 분기와 상관없이 항상 파싱 가능).
+    await recordRun("cron-costwatch", true, detail + (pruned ? ` · 원장정리 ${pruned}행` : "") + ` [tgb=${totalGb.toFixed(2)}]`, cur.length);
     // 🛑 과다 시 자동 정지(무거운 자율 크론이 스킵) / 정상 복귀 시 자동 해제 — CEO "과다면 멈춰"
     await setCostHalt(globalHalt, globalHalt ? `자동정지: ${detail.slice(0, 150)}` : "정상").catch(() => {});
     await setJobHalts(culprit ? [{ job: culprit, reason: `개별정지: ${detail.slice(0, 150)}` }] : []).catch(() => {});
