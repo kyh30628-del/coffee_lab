@@ -14,6 +14,7 @@ import FeedbackBar from "../../FeedbackBar";
 import { publicOwnerContent } from "@/lib/ownerContent";
 import VisitorReviews from "../../VisitorReviews";
 import RecentCafes from "../../RecentCafes";
+import RevisitHookBanner from "./RevisitHookBanner";
 import SavedCafes from "../../SavedCafes";
 import { buildAxisDist, cafeProfile, extractHighlights, amenityFeaturesOf, cardFacets } from "@/lib/cafeProfile";
 import { topCharTraits } from "@/lib/charScore";
@@ -554,6 +555,8 @@ export default async function CafePage({ params }: Props) {
             {srcLine}
           </div>
         )}
+
+        <RevisitHookBanner cafeId={Number(c.id)} />
 
         {/* 📊 이 카페의 결 — 2026-10-16 통합. 종전 '이곳의 결'(횟수)과 '다른 카페보다'(상위%)를 한 구역으로.
             두 구역이 같은 축을 따로 보여주며 모순까지 냈다(위 mergedBars 주석에 실측 근거). */}
