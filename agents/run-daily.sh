@@ -32,7 +32,11 @@ if [ "$HOUR" = "12" ]; then
   echo "[$(date)] 점심 경량 — 경량 가드만(무결성·레드팀은 08시 1×, 09-05 비용 다이어트)" >> $COFFEE_ROOT/agent-reports/logs/orchestrator.log
   RUN="$GUARDS_LIGHT"
 else
-  RUN="run-self-audit-agent $GUARDS_LIGHT"                                    # 풀: 자율진단 + 경량 가드
+  # 🔴 2026-11-06 중복실행 수리 — run-self-audit-agent를 여기서 빼낸다. 전용 launchd
+  #   잡(com.coffee.self-audit.plist → run-selfaudit-cycle.sh)이 12:05·16:05·20:05에
+  #   이미 돌린다. 여기도 08:05·16:05에 불러 **16:05가 매일 이중 실행**되고 있었다
+  #   (주간 사용량 한도 조기소진 원인 중 하나, 11-02~11-05 실측으로 발견). 전용 잡 하나로 일원화.
+  RUN="$GUARDS_LIGHT"                                                          # 풀: 경량 가드(자율진단은 전용 잡이 담당)
   [ "$HOUR" = "08" ] && RUN="$RUN $GUARDS_HEAVY"                              # 무거운 가드 = 아침 1×
   [ "$HOUR" = "08" ] && RUN="$RUN run-closure-agent run-demand-grow-agent"    # 폐업·발굴 = 아침 1×
   [ "$EVENING" = "1" ] && RUN="$RUN run-search-quality-agent"                 # 검색품질 = 저녁 1×
@@ -43,17 +47,19 @@ fi
 for w in ${(z)RUN}; do "$A/$w.sh"; sleep 5; done
 # 심층판정·종합은 풀 사이클(08·17시)만 — 점심엔 audit-watch(5분 워처)가 긴급건 커버, 종합은 17시에.
 if [ "$HOUR" != "12" ]; then
-  # 심층판정은 격일(짝수일)만 — 무거워서 토큰 절약
-  if [ $(( $(date +%j) % 2 )) -eq 0 ]; then "$A/run-deep-judge-agent.sh"; sleep 5;
-  else echo "[$(date)] 심층판정 격일 스킵(홀수일)" >> $COFFEE_ROOT/agent-reports/logs/orchestrator.log; fi
   # 종합 + 비서실장 = 저녁(17시) 1회만(2026-07-12 CEO 승인 — 토큰/Max헤드룸 확보).
   #   관리·보고 오버헤드는 소비자 데이터에 안 닿음. 08시엔 모트가드·자율진단·발굴·심층판정은 그대로 돌고
   #   종합 보고만 저녁으로 통합 → CEO는 하루 1회 통합 EXECUTIVE 수신. 소비자 품질 영향 0.
   if [ "$EVENING" = "1" ]; then
+    # 🔴 2026-11-06 중복실행 수리 — 심층판정(격일 짝수일)을 **여기(저녁 1회)로만** 옮긴다.
+    #   예전엔 "HOUR != 12"에 걸려 짝수일마다 08:05·16:05 **두 번** 돌았다(무거운 잡이라 영향 큼,
+    #   주간 사용량 한도 조기소진 원인 중 하나). 저녁 종합 직전에 한 번이면 그날 발견분이 바로 브리핑에 반영된다.
+    if [ $((DOY % 2)) -eq 0 ]; then "$A/run-deep-judge-agent.sh"; sleep 5;
+    else echo "[$(date)] 심층판정 격일 스킵(홀수일)" >> $COFFEE_ROOT/agent-reports/logs/orchestrator.log; fi
     "$A/run-chief-manager-agent.sh"; sleep 5
     "$A/run-chief-secretary-agent.sh"
   else
-    echo "[$(date)] 종합·비서실장 저녁 1회 통합 — 오전/점심 스킵(모트·자율진단은 정상 실행됨)" >> $COFFEE_ROOT/agent-reports/logs/orchestrator.log
+    echo "[$(date)] 종합·비서실장·심층판정 저녁 1회 통합 — 오전/점심 스킵(모트·자율진단은 정상 실행됨)" >> $COFFEE_ROOT/agent-reports/logs/orchestrator.log
   fi
 fi
 (cd "$COFFEE_ROOT/web" && node scripts/make-dashboard.mjs >> $COFFEE_ROOT/agent-reports/logs/orchestrator.log 2>&1)
