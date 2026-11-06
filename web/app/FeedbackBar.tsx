@@ -32,7 +32,7 @@ export default function FeedbackBar({ cafeId }: { cafeId: number }) {
   const [note, setNote] = useState("");
   const [done, setDone] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [place, setPlace] = useState<"bottom" | "after-outlink">("bottom");
+  const [place, setPlace] = useState<"bottom" | "after-outlink" | "after-wish">("bottom");
 
   useEffect(() => {
     try {
@@ -40,8 +40,11 @@ export default function FeedbackBar({ cafeId }: { cafeId: number }) {
       setHidden(!!t && Date.now() - t < DAYS_30);
     } catch { setHidden(false); }
     const onOut = () => setPlace("after-outlink");
+    // 🔔 2026-11-06 — 찜(WishButton) 직후도 "방금 뭔가 했다"는 고의도 순간이라 질문 자리로 추가.
+    const onWish = () => setPlace("after-wish");
     window.addEventListener("dcn:outlink", onOut);
-    return () => window.removeEventListener("dcn:outlink", onOut);
+    window.addEventListener("dcn:wish", onWish);
+    return () => { window.removeEventListener("dcn:outlink", onOut); window.removeEventListener("dcn:wish", onWish); };
   }, [cafeId]);
 
   const send = async (k: "like" | "meh", text?: string) => {
@@ -65,7 +68,7 @@ export default function FeedbackBar({ cafeId }: { cafeId: number }) {
   if (!kind) return (
     <div className="mt-3 flex items-center gap-2 flex-wrap">
       <span className="text-[10.4px] text-[#5b4a36]">
-        {place === "after-outlink" ? "이 정보가 도움이 됐나요?" : "이 카페 정보, 어땠나요?"}
+        {place === "after-outlink" ? "이 정보가 도움이 됐나요?" : place === "after-wish" ? "찜하셨네요! 이 카페 정보, 어땠나요?" : "이 카페 정보, 어땠나요?"}
       </span>
       <button type="button" disabled={busy} onClick={() => { setKind("like"); send("like"); }}
         className="nt-chip" aria-label="좋아요">👍 좋아요</button>

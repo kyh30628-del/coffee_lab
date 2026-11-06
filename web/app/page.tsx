@@ -1186,6 +1186,7 @@ export default function Home() {
     setBookmarkIds((prev) => { const n = new Set(prev); if (cur) n.delete(cafeId); else n.add(cafeId); return n; }); // 낙관적 업데이트
     if (!cur) {
       try { window.dispatchEvent(new Event("dcn:install-hint")); } catch {} // 즐겨찾기 추가 = 재방문 의도 → PWA 설치 배너 트리거
+      try { window.dispatchEvent(new Event("dcn:wish")); } catch {} // 2026-11-06: WishButton과 같은 "찜 직후" 피드백 질문 자리 트리거
       // 🔔 재방문 장치(2026-10-23) — 같은 고의도 순간에 푸시 구독도 같이 묻는다(순서: 먼저 포그라운드
       //   install-hint 배너, 알림 권한은 그 뒤 setTimeout으로 살짝 늦춰 두 팝업이 겹치지 않게 한다).
       if (deviceId) setTimeout(() => { maybeSubscribePush(deviceId); }, 1500);

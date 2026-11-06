@@ -1,5 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
+import { maybeSubscribePush } from "./pushSubscribe";
+import { trackShare } from "./trackShareClient";
 
 // ❤ 찜(가보고 싶은 곳) — 카페 상세용 무마찰 저장.
 //
@@ -58,9 +60,33 @@ export default function WishButton({ cafeId, variant = "pill" }: { cafeId: numbe
             }).catch(() => {});
           }
         } catch {}
+        // 🔔 2026-11-06 재방문 장치 — 홈 지도앱 즐겨찾기(page.tsx)만 이 호출들을 하고 있었고, 실제로
+        //   더 많이 쓰이는 이 찜하기 버튼(카페상세·/c/[id] 공용)엔 빠져 있어 푸시 구독이 0건이었다.
+        //   같은 패턴으로 통일: install-hint 배너 먼저, 알림 권한은 겹치지 않게 살짝 늦춰서.
+        try { window.dispatchEvent(new Event("dcn:install-hint")); } catch {}
+        try { window.dispatchEvent(new Event("dcn:wish")); } catch {}
+        setTimeout(() => { maybeSubscribePush(device); }, 1500);
       }
     } catch { setOn(!next); }
     finally { setBusy(false); }
+  };
+
+  // 📲 2026-11-06 — 아이폰 사파리(최근 30일 사람의 35.6%)는 홈화면에 PWA를 설치하지 않으면
+  //   웹 푸시 자체가 불가능하다(실측 설치율 0.28%). 계정·이메일이 없는 서비스라 그 다수에게는
+  //   푸시 대신 "카톡으로 나에게 보내 저장"이 유일하게 바로 되는 재방문 고리다.
+  //   기존 shareCafe()와 같은 navigator.share/clipboard 패턴 재사용 — 새 SDK·새 테이블 0.
+  const shareSave = async () => {
+    const url = `${window.location.origin}/c/${cafeId}`;
+    const title = "찜한 카페 — 동네 커피 노트";
+    try {
+      if (typeof navigator !== "undefined" && (navigator as any).share) {
+        await (navigator as any).share({ title, text: title, url });
+        trackShare({ channel: "web", source: "찜하기저장", cafeId });
+      } else {
+        await navigator.clipboard.writeText(url);
+        trackShare({ channel: "clipboard", source: "찜하기저장", cafeId });
+      }
+    } catch { /* 사용자 취소 */ }
   };
 
   if (variant === "banner") {
@@ -85,6 +111,12 @@ export default function WishButton({ cafeId, variant = "pill" }: { cafeId: numbe
           className="mt-1.5 block text-center text-[9.2px] font-semibold text-[#b23a5f] underline underline-offset-2">
           찜한 곳 모아보기 →
         </a>
+      )}
+      {on && (
+        <button type="button" onClick={shareSave}
+          className="mt-1 block w-full text-center text-[8.4px] text-[#7a6750] underline underline-offset-2">
+          📱 잊지 않게 카톡(나에게 보내기)으로 저장해두기
+        </button>
       )}
       </>
     );
