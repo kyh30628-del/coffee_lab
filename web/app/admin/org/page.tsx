@@ -168,13 +168,13 @@ export default function OrgDashboard() {
   // 팀 렌더 공용(직할·라인 본부가 동일한 팀 표현을 씀)
   const renderTeams = (d: Division) => d.teams.map((t: Team) => (
     <div key={t.n} style={{ margin: "6px 0" }}>
-      <div style={{ fontSize: 12.5, color: "#3d2f22", display: "flex", alignItems: "center", gap: 5, fontWeight: 600 }}>
+      <div style={{ fontSize: 10, color: "#3d2f22", display: "flex", alignItems: "center", gap: 5, fontWeight: 600 }}>
         <span style={{ color: d.c, fontFamily: "monospace" }}>└</span>{t.n}
       </div>
-      <div style={{ fontSize: 10.5, color: "#9c8a6c", marginLeft: 16, lineHeight: 1.35 }}>{t.s}</div>
+      <div style={{ fontSize: 8.4, color: "#9c8a6c", marginLeft: 16, lineHeight: 1.35 }}>{t.s}</div>
       {t.w && <div style={{ marginLeft: 16, marginTop: 3, display: "flex", flexWrap: "wrap", gap: 4 }}>
         {t.w.map((mm: Worker, mi: number) => (
-          <button key={mi} onClick={() => setMember(mm)} style={{ fontSize: 10, background: mm.k === "⚙️" ? "#eef3ee" : mm.k === "🌐" ? "#eef0f6" : "#f6efe2", border: `1px solid ${mm.k === "⚙️" ? "#bcd4bc" : mm.k === "🌐" ? "#c2c8e0" : "#e2cfa8"}`, borderRadius: 6, padding: "2px 6px", color: "#5a4631", cursor: "pointer", fontFamily: "inherit" }}>
+          <button key={mi} onClick={() => setMember(mm)} style={{ fontSize: 8, background: mm.k === "⚙️" ? "#eef3ee" : mm.k === "🌐" ? "#eef0f6" : "#f6efe2", border: `1px solid ${mm.k === "⚙️" ? "#bcd4bc" : mm.k === "🌐" ? "#c2c8e0" : "#e2cfa8"}`, borderRadius: 6, padding: "2px 6px", color: "#5a4631", cursor: "pointer", fontFamily: "inherit" }}>
             {mm.k} {mm.n} <span style={{ color: "#9c8a6c" }}>· {mm.t}</span>
           </button>
         ))}
@@ -191,21 +191,21 @@ export default function OrgDashboard() {
       <BackLink to="/admin" label="대시보드" className="text-stone-500 mb-2" />
 
       <div style={{ background: "#2b2018", color: "#e8b87a", borderRadius: 14, padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div><div style={{ fontSize: 17, fontWeight: 700 }}>🎩 조직 관제</div><div style={{ fontSize: 11, color: "#cbb38c" }}>기획조정실 · 자율 조직 브리핑</div></div>
+        <div><div style={{ fontSize: 13.6, fontWeight: 700 }}>🎩 조직 관제</div><div style={{ fontSize: 8.8, color: "#cbb38c" }}>기획조정실 · 자율 조직 브리핑</div></div>
         <div style={{ display: "flex", gap: 5, flexWrap: "nowrap", justifyContent: "flex-end" }}>
-          <a href="/admin/criteria" style={{ background: "#c98a3c", color: "#fff", borderRadius: 9, padding: "7px 11px", fontSize: 12, fontWeight: 700, textDecoration: "none", textAlign: "center", whiteSpace: "nowrap" }}>🎛️ 기준</a>
-          <a href="/admin/lounge" style={{ background: "#6a468c", color: "#fff", borderRadius: 9, padding: "7px 11px", fontSize: 12, fontWeight: 700, textDecoration: "none", textAlign: "center", whiteSpace: "nowrap" }}>🏛️ 라운지</a>
-          <button onClick={openHarness} style={{ background: "#3f6a7a", color: "#fff", border: "none", borderRadius: 9, padding: "7px 11px", fontSize: 12, fontWeight: 700, textAlign: "center", whiteSpace: "nowrap", cursor: "pointer" }}>🩺 하네스</button>
-          <button onClick={() => setShowOrg(true)} style={{ background: "#c98a3c", color: "#fff", border: "none", borderRadius: 9, padding: "7px 11px", fontSize: 12, fontWeight: 700, textAlign: "center", whiteSpace: "nowrap", cursor: "pointer" }}>🏢 조직도</button>
+          <a href="/admin/criteria" style={{ background: "#c98a3c", color: "#fff", borderRadius: 9, padding: "7px 11px", fontSize: 9.6, fontWeight: 700, textDecoration: "none", textAlign: "center", whiteSpace: "nowrap" }}>🎛️ 기준</a>
+          <a href="/admin/lounge" style={{ background: "#6a468c", color: "#fff", borderRadius: 9, padding: "7px 11px", fontSize: 9.6, fontWeight: 700, textDecoration: "none", textAlign: "center", whiteSpace: "nowrap" }}>🏛️ 라운지</a>
+          <button onClick={openHarness} style={{ background: "#3f6a7a", color: "#fff", border: "none", borderRadius: 9, padding: "7px 11px", fontSize: 9.6, fontWeight: 700, textAlign: "center", whiteSpace: "nowrap", cursor: "pointer" }}>🩺 하네스</button>
+          <button onClick={() => setShowOrg(true)} style={{ background: "#c98a3c", color: "#fff", border: "none", borderRadius: 9, padding: "7px 11px", fontSize: 9.6, fontWeight: 700, textAlign: "center", whiteSpace: "nowrap", cursor: "pointer" }}>🏢 조직도</button>
         </div>
       </div>
 
       {!authed && (
         <div style={{ ...card, marginTop: 12 }}>
-          <div style={{ fontSize: 13, marginBottom: 8 }}>관리자 비밀번호</div>
-          <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && load(pw)} style={{ width: "100%", padding: 10, border: "1px solid #d8c4a4", borderRadius: 9, fontSize: 16 }} placeholder="비밀번호" />
-          <button onClick={() => load(pw)} style={{ marginTop: 10, width: "100%", padding: 12, background: "#2b2018", color: "#f4ece0", border: "none", borderRadius: 10, fontWeight: 700, fontSize: 15 }}>{loading ? "불러오는 중…" : "열기"}</button>
-          {err && <div style={{ color: "#b03a3a", fontSize: 12, marginTop: 8 }}>{err}</div>}
+          <div style={{ fontSize: 10.4, marginBottom: 8 }}>관리자 비밀번호</div>
+          <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && load(pw)} style={{ width: "100%", padding: 10, border: "1px solid #d8c4a4", borderRadius: 9, fontSize: 12.8 }} placeholder="비밀번호" />
+          <button onClick={() => load(pw)} style={{ marginTop: 10, width: "100%", padding: 12, background: "#2b2018", color: "#f4ece0", border: "none", borderRadius: 10, fontWeight: 700, fontSize: 12 }}>{loading ? "불러오는 중…" : "열기"}</button>
+          {err && <div style={{ color: "#b03a3a", fontSize: 9.6, marginTop: 8 }}>{err}</div>}
         </div>
       )}
 
@@ -213,8 +213,8 @@ export default function OrgDashboard() {
       {/* 브리핑이 없을 때 화면이 조용히 비어 보이지 않게 사실대로 알린다(이번 사고의 재발 방지) */}
       {!brief && (
         <div style={{ ...card, marginTop: 12, borderLeft: "4px solid #c0762a" }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#c0762a", marginBottom: 4 }}>⚠️ 조직 브리핑 없음</div>
-          <div style={{ fontSize: 11.5, color: "#6b5640", lineHeight: 1.6 }}>
+          <div style={{ fontSize: 10.4, fontWeight: 700, color: "#c0762a", marginBottom: 4 }}>⚠️ 조직 브리핑 없음</div>
+          <div style={{ fontSize: 9.2, color: "#6b5640", lineHeight: 1.6 }}>
             최근 10일간 생성된 브리핑이 없습니다. 아래 결재·협업·이슈·잡 현황은 정상 표시됩니다.
           </div>
         </div>
@@ -226,43 +226,43 @@ export default function OrgDashboard() {
             <div style={{ ...big, color: dec.pending.length ? "#b03a1e" : "#7a6a4c" }}>{dec.pending.length}건</div>
           </div>
           <div style={card}><div style={lbl}>📊 오늘 토큰(in)</div><div style={big}>{fmt(tok.input || 0)}</div><div style={sub}>비용프록시 ${Number(tok.cost || 0).toFixed(2)}</div></div>
-          <div style={card}><div style={lbl}>📈 공개 카페 <span style={{ fontSize: 9.5, color: "#9c8a6c", fontWeight: 700 }}>실시간</span></div><div style={big}>{live ? live.pub.toLocaleString() : "—"}</div><div style={sub}>검증 {live ? live.v.toLocaleString() : "—"}{live?.backlog ? ` · 대기 ${live.backlog}` : ""}</div></div>
-          <div style={card}><div style={lbl}>🤖 자율 잡 가동 <span style={{ fontSize: 9.5, color: "#9c8a6c", fontWeight: 700 }}>최신 실행</span></div><div style={{ ...big, color: (live ? live.cronFail?.length === 0 : crons.every((c: any) => c.ok)) ? "#2f7a4a" : "#b06a1e" }}>{live ? `${live.cronOk}/${live.cronTotal}` : `${crons.filter((c: any) => c.ok).length}/${crons.length}`} {(live ? live.cronFail?.length === 0 : crons.every((c: any) => c.ok)) ? "✅" : "⚠️"}</div><div style={sub}>잡별 최신 실행 성공/전체(크론·에이전트·워커)</div></div>
+          <div style={card}><div style={lbl}>📈 공개 카페 <span style={{ fontSize: 7.6, color: "#9c8a6c", fontWeight: 700 }}>실시간</span></div><div style={big}>{live ? live.pub.toLocaleString() : "—"}</div><div style={sub}>검증 {live ? live.v.toLocaleString() : "—"}{live?.backlog ? ` · 대기 ${live.backlog}` : ""}</div></div>
+          <div style={card}><div style={lbl}>🤖 자율 잡 가동 <span style={{ fontSize: 7.6, color: "#9c8a6c", fontWeight: 700 }}>최신 실행</span></div><div style={{ ...big, color: (live ? live.cronFail?.length === 0 : crons.every((c: any) => c.ok)) ? "#2f7a4a" : "#b06a1e" }}>{live ? `${live.cronOk}/${live.cronTotal}` : `${crons.filter((c: any) => c.ok).length}/${crons.length}`} {(live ? live.cronFail?.length === 0 : crons.every((c: any) => c.ok)) ? "✅" : "⚠️"}</div><div style={sub}>잡별 최신 실행 성공/전체(크론·에이전트·워커)</div></div>
         </div>
 
         {/* 🎛️ 기준 관제 — 비즈니스 기준(criteria) 스냅샷·최근변경·검증에이전트 결과. 품질본부 소유·기조실장(L2) 관장 */}
         {crit && (
           <div style={{ ...card, marginTop: 10, border: crit.verify?.status === "fail" ? "2px solid #b03a3a" : crit.verify?.status === "warn" ? "1px solid #e0b357" : "1px solid #ddc9a8" }}>
             <button onClick={() => setShowCrit(!showCrit)} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
-              <span style={{ fontSize: 13.5, fontWeight: 700, color: crit.verify?.status === "fail" ? "#b03a3a" : crit.verify?.status === "warn" ? "#a5701e" : "#3f7a4f" }}>
-                {showCrit ? "▾" : "▸"} 🎛️ 기준 관제 <span style={{ fontSize: 10, fontWeight: 700, color: "#9c8a6c" }}>· {crit.adjusted}/{crit.total} 조정</span>
-                {crit.verify?.status === "fail" ? <span style={{ fontSize: 10, fontWeight: 700, color: "#b03a3a" }}> · 🔴 검증실패 {crit.verify.fails}{crit.verify.deadKnobs?.length ? ` (dead-knob ${crit.verify.deadKnobs.length})` : ""}</span>
-                  : crit.verify?.status === "warn" ? <span style={{ fontSize: 10, fontWeight: 700, color: "#a5701e" }}> · 🟡 주의 {crit.verify.warns}</span>
-                  : <span style={{ fontSize: 10, color: "#3f7a4f" }}> · 검증 정상 ✅</span>}
+              <span style={{ fontSize: 10.8, fontWeight: 700, color: crit.verify?.status === "fail" ? "#b03a3a" : crit.verify?.status === "warn" ? "#a5701e" : "#3f7a4f" }}>
+                {showCrit ? "▾" : "▸"} 🎛️ 기준 관제 <span style={{ fontSize: 8, fontWeight: 700, color: "#9c8a6c" }}>· {crit.adjusted}/{crit.total} 조정</span>
+                {crit.verify?.status === "fail" ? <span style={{ fontSize: 8, fontWeight: 700, color: "#b03a3a" }}> · 🔴 검증실패 {crit.verify.fails}{crit.verify.deadKnobs?.length ? ` (dead-knob ${crit.verify.deadKnobs.length})` : ""}</span>
+                  : crit.verify?.status === "warn" ? <span style={{ fontSize: 8, fontWeight: 700, color: "#a5701e" }}> · 🟡 주의 {crit.verify.warns}</span>
+                  : <span style={{ fontSize: 8, color: "#3f7a4f" }}> · 검증 정상 ✅</span>}
               </span>
-              <a href="/admin/criteria" onClick={(e) => e.stopPropagation()} style={{ fontSize: 11, fontWeight: 700, color: "#6a468c", textDecoration: "none", whiteSpace: "nowrap" }}>관제 열기 →</a>
+              <a href="/admin/criteria" onClick={(e) => e.stopPropagation()} style={{ fontSize: 8.8, fontWeight: 700, color: "#6a468c", textDecoration: "none", whiteSpace: "nowrap" }}>관제 열기 →</a>
             </button>
             {showCrit && (
-              <div style={{ marginTop: 9, fontSize: 12, color: "#5a4631" }}>
-                <div style={{ fontSize: 10.5, color: "#9c8a6c" }}>검증 에이전트(criteria-verify · 결정론) — 소스 {crit.verify?.scanned ?? "?"}파일 스캔 · {crit.verify?.ranAt ? new Date(crit.verify.ranAt).toLocaleTimeString("ko-KR") : ""}</div>
+              <div style={{ marginTop: 9, fontSize: 9.6, color: "#5a4631" }}>
+                <div style={{ fontSize: 8.4, color: "#9c8a6c" }}>검증 에이전트(criteria-verify · 결정론) — 소스 {crit.verify?.scanned ?? "?"}파일 스캔 · {crit.verify?.ranAt ? new Date(crit.verify.ranAt).toLocaleTimeString("ko-KR") : ""}</div>
                 {crit.verify?.failing?.length > 0 && (
                   <div style={{ marginTop: 6, padding: "7px 9px", borderRadius: 8, background: "#fbeeee", border: "1px solid #e6b3b3" }}>
                     {crit.verify.failing.map((f: any, i: number) => (
-                      <div key={i} style={{ fontSize: 11.5, color: "#b03a3a", fontWeight: 600 }}>🔴 {f.label} — {f.count}건{f.samples?.length ? <span style={{ fontWeight: 400, color: "#8a5a5a" }}> ({f.samples.join(", ")})</span> : null}</div>
+                      <div key={i} style={{ fontSize: 9.2, color: "#b03a3a", fontWeight: 600 }}>🔴 {f.label} — {f.count}건{f.samples?.length ? <span style={{ fontWeight: 400, color: "#8a5a5a" }}> ({f.samples.join(", ")})</span> : null}</div>
                     ))}
                   </div>
                 )}
                 {crit.verify?.warning?.length > 0 && (
-                  <div style={{ marginTop: 6, fontSize: 11, color: "#a5701e" }}>
+                  <div style={{ marginTop: 6, fontSize: 8.8, color: "#a5701e" }}>
                     {crit.verify.warning.map((w: any, i: number) => <div key={i}>🟡 {w.label} — {w.count}건</div>)}
                   </div>
                 )}
                 {crit.lastChange ? (
-                  <div style={{ marginTop: 7, fontSize: 11, color: "#7a6a4c" }}>
+                  <div style={{ marginTop: 7, fontSize: 8.8, color: "#7a6a4c" }}>
                     최근 변경: <span style={{ fontFamily: "monospace", color: "#8a5e30" }}>{crit.lastChange.key}</span> {crit.lastChange.old_value} → <b style={{ color: "#b5731f" }}>{crit.lastChange.new_value}</b> · {crit.lastChange.changed_by} · {new Date(crit.lastChange.changed_at).toLocaleString("ko-KR")}
                   </div>
-                ) : <div style={{ marginTop: 7, fontSize: 11, color: "#9c8a6c" }}>변경 이력 없음(전부 기본값)</div>}
-                <div style={{ marginTop: 7, fontSize: 10.5, color: "#9c8a6c", lineHeight: 1.5 }}>
+                ) : <div style={{ marginTop: 7, fontSize: 8.8, color: "#9c8a6c" }}>변경 이력 없음(전부 기본값)</div>}
+                <div style={{ marginTop: 7, fontSize: 8.4, color: "#9c8a6c", lineHeight: 1.5 }}>
                   DoA: <b>대량영향</b>(등급바닥·좌표박스 → 공개상태 흔들림)=<b style={{ color: "#b03a3a" }}>L3 CEO 확인 게이트</b> · <b>소영향</b>(검색가산점·노출상한)=L2 기조실장 전결(바로 적용). 소유=품질본부.
                 </div>
               </div>
@@ -273,8 +273,8 @@ export default function OrgDashboard() {
         {/* 🛠 로컬 잡 상태 — 접이식·기본 접힘(헤더에 정상/정지 요약). 8개 launchd 잡 하트비트 기준 실시간 */}
         <div style={{ ...card, marginTop: 10, border: jobs?.bad ? "2px solid #b03a3a" : "1px solid #ddc9a8" }}>
           <button onClick={() => setShowJobs(!showJobs)} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
-            <span style={{ fontSize: 13.5, fontWeight: 700, color: jobs?.bad ? "#b03a3a" : "#3f7a4f" }}>
-              {showJobs ? "▾" : "▸"} 🛠 핵심 잡 신선도 (launchd {jobs?.total ?? 8}종){jobs?.bad ? <span style={{ fontSize: 10, fontWeight: 700, color: "#b03a3a" }}> · ⚠️ 정지 {jobs.bad}</span> : <span style={{ fontSize: 10, color: "#3f7a4f" }}> · 전체 정상 ✅</span>}
+            <span style={{ fontSize: 10.8, fontWeight: 700, color: jobs?.bad ? "#b03a3a" : "#3f7a4f" }}>
+              {showJobs ? "▾" : "▸"} 🛠 핵심 잡 신선도 (launchd {jobs?.total ?? 8}종){jobs?.bad ? <span style={{ fontSize: 8, fontWeight: 700, color: "#b03a3a" }}> · ⚠️ 정지 {jobs.bad}</span> : <span style={{ fontSize: 8, color: "#3f7a4f" }}> · 전체 정상 ✅</span>}
             </span>
           </button>
           {/* 🕐 오늘의 핵심 사이클(08·12·17시) 실행여부 — 항상 표시. "12시 배치 돌았나?"를 물어보지 않고 한눈에. */}
@@ -290,8 +290,8 @@ export default function OrgDashboard() {
                 const txt = st === "ran" ? `${c.at} 실행` : st === "ran_inferred" ? "실행됨" : st === "missing" ? "누락!" : st === "running" ? "진행중" : "예정";
                 return (
                   <div key={c.name} style={{ flex: 1, minWidth: 92, background: bg, border: `1px solid ${bd}`, borderRadius: 8, padding: "6px 8px", textAlign: "center" }}>
-                    <div style={{ fontSize: 11.5, fontWeight: 700, color: "#2b2018" }}>{c.name} {c.label}</div>
-                    <div style={{ fontSize: 10.5, fontWeight: 700, color: fg, marginTop: 2 }}>{icon} {txt}</div>
+                    <div style={{ fontSize: 9.2, fontWeight: 700, color: "#2b2018" }}>{c.name} {c.label}</div>
+                    <div style={{ fontSize: 8.4, fontWeight: 700, color: fg, marginTop: 2 }}>{icon} {txt}</div>
                   </div>
                 );
               })}
@@ -305,9 +305,9 @@ export default function OrgDashboard() {
                 const age = j.ageMin == null ? "기록없음" : j.ageMin < 60 ? `${j.ageMin}분 전` : j.ageMin < 1440 ? `${Math.round(j.ageMin / 60)}시간 전` : `${Math.round(j.ageMin / 1440)}일 전`;
                 return (
                   <div key={j.job} style={{ background: "#fbf6ec", border: `1px solid ${j.state === "정상" ? "#e6d8bf" : "#e6b3b3"}`, borderRadius: 9, padding: "8px 9px" }}>
-                    <div style={{ fontSize: 12.5, fontWeight: 700, color: "#2b2018" }}>{dot} {j.label}</div>
-                    <div style={{ fontSize: 10, color: c, fontWeight: 700, marginTop: 2 }}>{j.state} · {age}</div>
-                    <div style={{ fontSize: 9.5, color: "#9c8a6c", marginTop: 2 }}>{j.team} · {j.sched}</div>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: "#2b2018" }}>{dot} {j.label}</div>
+                    <div style={{ fontSize: 8, color: c, fontWeight: 700, marginTop: 2 }}>{j.state} · {age}</div>
+                    <div style={{ fontSize: 7.6, color: "#9c8a6c", marginTop: 2 }}>{j.team} · {j.sched}</div>
                   </div>
                 );
               })}
@@ -319,39 +319,39 @@ export default function OrgDashboard() {
         {sentinel && !sentinel.empty && (
           <div style={{ ...card, marginTop: 10, border: sentinel.detectors?.some((d: any) => d.residual > 0) ? "1px solid #e0b357" : "1px solid #ddc9a8" }}>
             <button onClick={() => setShowSentinel(!showSentinel)} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
-              <span style={{ fontSize: 13.5, fontWeight: 700, color: "#3a6ea5" }}>
-                {showSentinel ? "▾" : "▸"} 🛡️ 센티넬 오염 방어 <span style={{ fontSize: 10, fontWeight: 600, color: "#9c8a6c" }}>(품질본부)</span>
+              <span style={{ fontSize: 10.8, fontWeight: 700, color: "#3a6ea5" }}>
+                {showSentinel ? "▾" : "▸"} 🛡️ 센티넬 오염 방어 <span style={{ fontSize: 8, fontWeight: 600, color: "#9c8a6c" }}>(품질본부)</span>
               </span>
-              <span style={{ fontSize: 10.5, fontWeight: 700, color: sentinel.ageH > 16 ? "#b03a3a" : "#3f7a4f" }}>
+              <span style={{ fontSize: 8.4, fontWeight: 700, color: sentinel.ageH > 16 ? "#b03a3a" : "#3f7a4f" }}>
                 {sentinel.ageH > 16 ? `🔴 ${sentinel.ageH}h 전(정지의심)` : `🟢 ${sentinel.ageH < 1 ? "방금" : sentinel.ageH + "h 전"}`} · 7일 -{sentinel.totalDropped14}건
               </span>
             </button>
             {showSentinel && (
               <div style={{ marginTop: 10 }}>
-                <div style={{ fontSize: 10.5, color: "#9c8a6c", marginBottom: 8 }}>
+                <div style={{ fontSize: 8.4, color: "#9c8a6c", marginBottom: 8 }}>
                   하루 2회(12·00시 KST) 전 축 스캔 → 안전한 오염은 결정론 자동 제거·재합성(멱등). 최근 7일 누적 실적:
                 </div>
                 {/* 🔴 스냅샷과 현재값이 다르면 그 사실을 명시한다 — 조치했는데 화면이 계속 빨강이면 관제탑을 못 믿게 된다(2026-08-29 CEO 지적). */}
                 {sentinel.namePollution && (
-                  <div style={{ fontSize: 10.5, marginBottom: 8, color: sentinel.namePollution.live > 0 ? "#a5701e" : "#3f7a4f", fontWeight: 700 }}>
+                  <div style={{ fontSize: 8.4, marginBottom: 8, color: sentinel.namePollution.live > 0 ? "#a5701e" : "#3f7a4f", fontWeight: 700 }}>
                     이름오염(coherence&lt;0.3) 지금 <b>{sentinel.namePollution.live}곳</b>
                     {sentinel.namePollution.resolvedSince
                       ? ` — 스캔 당시 ${sentinel.namePollution.snapshot}곳이었으나 이후 자가치유로 해소됨(실시간 재계산)`
                       : sentinel.namePollution.live > 0 ? " — 다음 자가치유 런에서 자동 홀드" : ""}
                   </div>
                 )}
-                <div style={{ fontSize: 10.5, color: "#9c8a6c", marginBottom: 8 }}>
+                <div style={{ fontSize: 8.4, color: "#9c8a6c", marginBottom: 8 }}>
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 7 }}>
                   {sentinel.detectors?.map((d: any) => (
                     <div key={d.key} style={{ background: d.residual > 0 ? "#fdf6e8" : "#fbf6ec", border: `1px solid ${d.residual > 0 ? "#e0cfa0" : "#e6d8bf"}`, borderRadius: 9, padding: "8px 9px" }}>
-                      <div style={{ fontSize: 11.5, fontWeight: 700, color: "#2b2018" }}>{d.label}</div>
-                      <div style={{ fontSize: 10.5, color: "#3f7a4f", fontWeight: 700, marginTop: 3 }}>정리 {d.fixed}곳 · 후기 -{d.dropped}</div>
-                      <div style={{ fontSize: 9.5, color: "#9c8a6c", marginTop: 1 }}>비공개 {d.unpub} · 잔여 {d.residual > 0 ? <b style={{ color: "#a5701e" }}>{d.residual}(다음런)</b> : "0"}</div>
+                      <div style={{ fontSize: 9.2, fontWeight: 700, color: "#2b2018" }}>{d.label}</div>
+                      <div style={{ fontSize: 8.4, color: "#3f7a4f", fontWeight: 700, marginTop: 3 }}>정리 {d.fixed}곳 · 후기 -{d.dropped}</div>
+                      <div style={{ fontSize: 7.6, color: "#9c8a6c", marginTop: 1 }}>비공개 {d.unpub} · 잔여 {d.residual > 0 ? <b style={{ color: "#a5701e" }}>{d.residual}(다음런)</b> : "0"}</div>
                     </div>
                   ))}
                 </div>
-                <div style={{ fontSize: 10, color: "#9c8a6c", marginTop: 8 }}>
+                <div style={{ fontSize: 8, color: "#9c8a6c", marginTop: 8 }}>
                   안전 치유(최신 런): area {sentinel.safeHeal?.area ?? 0} · 박스밖 {sentinel.safeHeal?.box ?? 0} · 중복 {sentinel.safeHeal?.dup ?? 0}
                   {sentinel.nameMismatchWatch > 0 && <span> · 🔎 이름불일치 워치 {sentinel.nameMismatchWatch}(경보만)</span>}
                   {" "}· 마지막 {sentinel.lastRanKst}
@@ -364,13 +364,13 @@ export default function OrgDashboard() {
         {/* 🕐 조직 운영 리듬 — 본부별 활동(live) + 실행 케이던스(설계). 기본 펼침 */}
         <div style={{ ...card, marginTop: 10 }}>
           <button onClick={() => setShowRhythm(!showRhythm)} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
-            <span style={{ fontSize: 13.5, fontWeight: 700, color: "#2a7a72" }}>{showRhythm ? "▾" : "▸"} 🕐 조직 운영 리듬</span>
-            {orgAct && <span style={{ fontSize: 10.5, color: "#9c8a6c", fontWeight: 700 }}>24h {orgAct.totalRan24h}회 · 다음 {orgAct.nextCycleHour}시({orgAct.nextCycleToday ? "오늘" : "내일"})</span>}
+            <span style={{ fontSize: 10.8, fontWeight: 700, color: "#2a7a72" }}>{showRhythm ? "▾" : "▸"} 🕐 조직 운영 리듬</span>
+            {orgAct && <span style={{ fontSize: 8.4, color: "#9c8a6c", fontWeight: 700 }}>24h {orgAct.totalRan24h}회 · 다음 {orgAct.nextCycleHour}시({orgAct.nextCycleToday ? "오늘" : "내일"})</span>}
           </button>
           {showRhythm && (
             <div style={{ marginTop: 10 }}>
               {/* 본부별 활동(현재) */}
-              <div style={{ fontSize: 11, fontWeight: 700, color: "#9c6b3f", marginBottom: 6 }}>본부별 활동 (현재)</div>
+              <div style={{ fontSize: 8.8, fontWeight: 700, color: "#9c6b3f", marginBottom: 6 }}>본부별 활동 (현재)</div>
               {orgAct?.teams ? (
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
                   {orgAct.teams.map((t: any) => {
@@ -378,28 +378,28 @@ export default function OrgDashboard() {
                     const ago = t.lastH < 1 ? "방금" : `${t.lastH}h 전`;
                     return (
                       <div key={t.team} style={{ background: "#fbf6ec", border: "1px solid #e6d8bf", borderRadius: 9, padding: "7px 9px" }}>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: "#2b2018" }}>{dot} {t.team}</div>
-                        <div style={{ fontSize: 9.5, color: "#9c8a6c", marginTop: 2 }}>{ago} · {t.lastJob} ({t.ran24h}/{t.jobs})</div>
+                        <div style={{ fontSize: 9.6, fontWeight: 700, color: "#2b2018" }}>{dot} {t.team}</div>
+                        <div style={{ fontSize: 7.6, color: "#9c8a6c", marginTop: 2 }}>{ago} · {t.lastJob} ({t.ran24h}/{t.jobs})</div>
                       </div>
                     );
                   })}
                 </div>
-              ) : <div style={{ fontSize: 11, color: "#9c8a6c" }}>불러오는 중…</div>}
+              ) : <div style={{ fontSize: 8.8, color: "#9c8a6c" }}>불러오는 중…</div>}
 
               {/* 🔎 조직도↔본부맵 드리프트 경보 — 자동감지(정상=숨김). org.ts와 jobTeams.ts가 어긋난 잡. */}
               {orgAct?.drift?.length > 0 && (
                 <div style={{ marginTop: 10, background: "#fbeaea", border: "1px solid #e0b4b4", borderRadius: 9, padding: "8px 10px" }}>
-                  <div style={{ fontSize: 11.5, fontWeight: 700, color: "#b03a3a" }}>⚠️ 조직도 드리프트 {orgAct.drift.length}건 — org.ts↔jobTeams.ts 본부 불일치</div>
+                  <div style={{ fontSize: 9.2, fontWeight: 700, color: "#b03a3a" }}>⚠️ 조직도 드리프트 {orgAct.drift.length}건 — org.ts↔jobTeams.ts 본부 불일치</div>
                   {orgAct.drift.map((d: any) => (
-                    <div key={d.job} style={{ fontSize: 10, color: "#8a4a4a", marginTop: 3 }}>{d.name}({d.job}): 조직도 <b>{d.orgDivision}</b> ↔ 본부맵 <b>{d.jobTeamDivision}</b></div>
+                    <div key={d.job} style={{ fontSize: 8, color: "#8a4a4a", marginTop: 3 }}>{d.name}({d.job}): 조직도 <b>{d.orgDivision}</b> ↔ 본부맵 <b>{d.jobTeamDivision}</b></div>
                   ))}
                 </div>
               )}
 
               {/* 실행 케이던스(설계) */}
-              <div style={{ fontSize: 11, fontWeight: 700, color: "#9c6b3f", margin: "12px 0 6px" }}>실행 케이던스 (설계 · 도메인 변화속도에 맞춤)</div>
+              <div style={{ fontSize: 8.8, fontWeight: 700, color: "#9c6b3f", margin: "12px 0 6px" }}>실행 케이던스 (설계 · 도메인 변화속도에 맞춤)</div>
               <div style={{ overflowX: "auto", border: "1px solid #ddc9a8", borderRadius: 9 }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11, minWidth: 480 }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 8.8, minWidth: 480 }}>
                   <thead>
                     <tr style={{ background: "#f3e9d8", color: "#8a7a5c", textAlign: "left" }}>
                       <th style={{ padding: "6px 8px", fontWeight: 700 }}>계층</th>
@@ -416,7 +416,7 @@ export default function OrgDashboard() {
                       return (
                         <tr key={c.tier} style={{ borderTop: "1px solid #e6d8bf", verticalAlign: "top" }}>
                           <td style={{ padding: "7px 8px", fontWeight: 700, color: "#2b2018", whiteSpace: "nowrap" }}>{c.tier}</td>
-                          <td style={{ padding: "7px 8px", whiteSpace: "nowrap" }}><span style={{ background: bg, color: fg, fontWeight: 700, padding: "1px 7px", borderRadius: 20, fontSize: 10 }}>{c.freq}</span></td>
+                          <td style={{ padding: "7px 8px", whiteSpace: "nowrap" }}><span style={{ background: bg, color: fg, fontWeight: 700, padding: "1px 7px", borderRadius: 20, fontSize: 8 }}>{c.freq}</span></td>
                           <td style={{ padding: "7px 8px", color: "#6a5a44" }}>{c.when}</td>
                           <td style={{ padding: "7px 8px", color: "#9c8a6c" }}>{c.items} · {c.why}</td>
                         </tr>
@@ -425,7 +425,7 @@ export default function OrgDashboard() {
                   </tbody>
                 </table>
               </div>
-              <div style={{ fontSize: 9.5, color: "#a89574", marginTop: 6 }}>조간회의 폐지 · 12시 점심=오염 가드만 · 결정론 품질크론은 토큰0이라 2×로 촘촘. 변경 출처: run-daily/weekly·vercel.json (lib/cadence.ts)</div>
+              <div style={{ fontSize: 7.6, color: "#a89574", marginTop: 6 }}>조간회의 폐지 · 12시 점심=오염 가드만 · 결정론 품질크론은 토큰0이라 2×로 촘촘. 변경 출처: run-daily/weekly·vercel.json (lib/cadence.ts)</div>
             </div>
           )}
         </div>
@@ -434,18 +434,18 @@ export default function OrgDashboard() {
         {devpipe?.jobs?.length > 0 && (
           <div style={{ ...card, marginTop: 10, border: devpipe.stuckNonChatCount ? "2px solid #b03a3a" : devpipe.waiting ? "2px solid #6a468c" : "1px solid #ddc9a8" }}>
             <button onClick={() => setShowDev(!showDev)} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
-              <span style={{ fontSize: 13.5, fontWeight: 700, color: devpipe.stuckNonChatCount ? "#b03a3a" : devpipe.waiting ? "#6a468c" : "#9c6b3f" }}>
-                {showDev ? "▾" : "▸"} 🛠 개발 파이프라인 ({devpipe.jobs.length}){devpipe.waiting ? <span style={{ fontSize: 10, fontWeight: 700, color: "#6a468c" }}> · 🚀 배포대기 {devpipe.waiting}</span> : null}{devpipe.stuckCount ? <span style={{ fontSize: 10, fontWeight: 700, color: "#b03a3a" }}> · ⏱ 정체 {devpipe.stuckCount}{devpipe.stuckNonChatCount ? `(자동승격 없음 ${devpipe.stuckNonChatCount})` : ""}</span> : null}
+              <span style={{ fontSize: 10.8, fontWeight: 700, color: devpipe.stuckNonChatCount ? "#b03a3a" : devpipe.waiting ? "#6a468c" : "#9c6b3f" }}>
+                {showDev ? "▾" : "▸"} 🛠 개발 파이프라인 ({devpipe.jobs.length}){devpipe.waiting ? <span style={{ fontSize: 8, fontWeight: 700, color: "#6a468c" }}> · 🚀 배포대기 {devpipe.waiting}</span> : null}{devpipe.stuckCount ? <span style={{ fontSize: 8, fontWeight: 700, color: "#b03a3a" }}> · ⏱ 정체 {devpipe.stuckCount}{devpipe.stuckNonChatCount ? `(자동승격 없음 ${devpipe.stuckNonChatCount})` : ""}</span> : null}
               </span>
-              <span style={{ fontSize: 10.5, color: "#9c8a6c" }}>승인→브랜치구현→검증→배포</span>
+              <span style={{ fontSize: 8.4, color: "#9c8a6c" }}>승인→브랜치구현→검증→배포</span>
             </button>
             {/* 🔔 즉시발화 미설정 경고(2026-08-31) — API가 triggerConfigured를 내보내는데 화면이 안 쓰고 있었다.
                 미설정이면 🚀배포를 눌러도 로컬 워커에 신호가 안 가 최대 4시간 방치된다. 실측 9시간 사례 있음.
                 조용한 실패를 막으려면 **설정 상태를 시스템이 스스로 말해야** 한다. */}
             {devpipe.triggerConfigured === false && (
               <div style={{ marginTop: 8, background: "#fbeaea", border: "1px solid #e0b4b4", borderRadius: 9, padding: "8px 10px" }}>
-                <div style={{ fontSize: 11.5, fontWeight: 700, color: "#b03a3a" }}>🔔 즉시발화 꺼져 있음 — 배포를 눌러도 바로 안 나갑니다</div>
-                <div style={{ fontSize: 10.5, color: "#8a4a4a", marginTop: 3, lineHeight: 1.5 }}>
+                <div style={{ fontSize: 9.2, fontWeight: 700, color: "#b03a3a" }}>🔔 즉시발화 꺼져 있음 — 배포를 눌러도 바로 안 나갑니다</div>
+                <div style={{ fontSize: 8.4, color: "#8a4a4a", marginTop: 3, lineHeight: 1.5 }}>
                   Vercel 환경변수 <b>TRIGGER_NTFY_TOPIC</b> 미설정. 지금은 배포가 정시(08·12·16·20시)까지 대기합니다.
                   Settings → Environment Variables에 추가 후 재배포하면 즉시 실행됩니다.
                 </div>
@@ -454,19 +454,19 @@ export default function OrgDashboard() {
             {/* 🚀 배포 확정 후 멈춤(2026-08-31) — 배포를 누르면 감시망에서 사라지던 사각을 메움 */}
             {devpipe.deployStalledCount > 0 && (
               <div style={{ marginTop: 8, background: "#fbeaea", border: "1px solid #e0b4b4", borderRadius: 9, padding: "8px 10px" }}>
-                <div style={{ fontSize: 11.5, fontWeight: 700, color: "#b03a3a" }}>🚀 배포 확정했는데 안 나감 {devpipe.deployStalledCount}건 — 30분+ 멈춤</div>
+                <div style={{ fontSize: 9.2, fontWeight: 700, color: "#b03a3a" }}>🚀 배포 확정했는데 안 나감 {devpipe.deployStalledCount}건 — 30분+ 멈춤</div>
                 {devpipe.deployStalled.map((s: any) => (
-                  <div key={s.id} style={{ fontSize: 10, color: "#8a4a4a", marginTop: 3 }}>
+                  <div key={s.id} style={{ fontSize: 8, color: "#8a4a4a", marginTop: 3 }}>
                     #{s.id} {s.title.replace(/^\[개발\]\s*/, "")} — {s.age_min}분 경과{s.fired && s.fired !== "sent" ? ` · 즉시발화 ${s.fired}` : ""}
                   </div>
                 ))}
-                <div style={{ fontSize: 10.5, color: "#8a4a4a", marginTop: 4 }}>맥이 신호를 못 받았을 수 있습니다. 위 즉시발화 설정을 확인하세요.</div>
+                <div style={{ fontSize: 8.4, color: "#8a4a4a", marginTop: 4 }}>맥이 신호를 못 받았을 수 있습니다. 위 즉시발화 설정을 확인하세요.</div>
               </div>
             )}
             {/* ⏱ 배포정체 경보(#280) — 접힘 여부와 무관하게 항상 노출. source≠'chat'은 자동승격 경로 없음(우선 표시) */}
             {devpipe.stuckCount > 0 && (
               <div style={{ marginTop: 8, background: devpipe.stuckNonChatCount ? "#fbeaea" : "#fdf3e3", border: `1px solid ${devpipe.stuckNonChatCount ? "#e0b4b4" : "#e6cfa0"}`, borderRadius: 9, padding: "8px 10px" }}>
-                <div style={{ fontSize: 11.5, fontWeight: 700, color: devpipe.stuckNonChatCount ? "#b03a3a" : "#9c6b3f" }}>
+                <div style={{ fontSize: 9.2, fontWeight: 700, color: devpipe.stuckNonChatCount ? "#b03a3a" : "#9c6b3f" }}>
                   ⏱ 배포 정체 {devpipe.stuckCount}건 — 30분+ 배포대기{devpipe.stuckNonChatCount ? ` (그중 자동승격 경로 없음 ${devpipe.stuckNonChatCount}건 — 수동 배포/폐기 필요)` : ""}
                 </div>
                 {/* ⚠️ 2026-08-06 CEO "배포 버튼이 없잖아" — 정체 경고는 **접힌 상태에서도** 보이는데
@@ -475,12 +475,12 @@ export default function OrgDashboard() {
                 {devpipe.stuck.map((s: any) => {
                   const job = devpipe.jobs.find((j: any) => j.id === s.id);
                   return (
-                    <div key={s.id} style={{ fontSize: 10, color: s.source !== "chat" ? "#8a4a4a" : "#8a7458", marginTop: 3 }}>
+                    <div key={s.id} style={{ fontSize: 8, color: s.source !== "chat" ? "#8a4a4a" : "#8a7458", marginTop: 3 }}>
                       <div>#{s.id} {s.title.replace(/^\[개발\]\s*/, "")} — {s.age_min}분 경과{s.source !== "chat" ? " · 출처: 비챗(자동승격 없음)" : " · 출처: 챗"}</div>
                       {job?.dev_status === "배포대기" && (
                         <div style={{ display: "flex", gap: 6, margin: "5px 0 7px" }}>
-                          <button disabled={busy === s.id} onClick={() => devAction(s.id, "deploy")} style={{ flex: 1, padding: "7px 0", background: "#6a468c", color: "#fff", border: "none", borderRadius: 8, fontWeight: 700, fontSize: 12.5 }}>🚀 배포</button>
-                          <button disabled={busy === s.id} onClick={() => devAction(s.id, "discard")} style={{ flex: 1, padding: "7px 0", background: "#efe7d8", color: "#8a5a5a", border: "1px solid #d8c4a4", borderRadius: 8, fontWeight: 700, fontSize: 12.5 }}>폐기</button>
+                          <button disabled={busy === s.id} onClick={() => devAction(s.id, "deploy")} style={{ flex: 1, padding: "7px 0", background: "#6a468c", color: "#fff", border: "none", borderRadius: 8, fontWeight: 700, fontSize: 10 }}>🚀 배포</button>
+                          <button disabled={busy === s.id} onClick={() => devAction(s.id, "discard")} style={{ flex: 1, padding: "7px 0", background: "#efe7d8", color: "#8a5a5a", border: "1px solid #d8c4a4", borderRadius: 8, fontWeight: 700, fontSize: 10 }}>폐기</button>
                         </div>
                       )}
                     </div>
@@ -501,19 +501,19 @@ export default function OrgDashboard() {
                 return (
                   <div key={j.id} style={{ border: `1px solid ${j.dev_status === "배포대기" ? "#d3c0e6" : "#e6d8bf"}`, borderRadius: 10, padding: "9px 11px", marginBottom: 8, background: j.dev_status === "배포대기" ? "#faf7fd" : "#fbfaf5" }}>
                     <div style={{ display: "flex", gap: 5, alignItems: "center", flexWrap: "wrap" }}>
-                      <span style={{ background: color, color: "#fff", fontSize: 9.5, fontWeight: 700, padding: "2px 7px", borderRadius: 20 }}>{label}</span>
-                      <span style={{ fontWeight: 700, fontSize: 12.5 }}>#{j.id} {j.title.replace(/^\[개발\]\s*/, "")}</span>
+                      <span style={{ background: color, color: "#fff", fontSize: 7.6, fontWeight: 700, padding: "2px 7px", borderRadius: 20 }}>{label}</span>
+                      <span style={{ fontWeight: 700, fontSize: 10 }}>#{j.id} {j.title.replace(/^\[개발\]\s*/, "")}</span>
                     </div>
-                    {j.summary && <div style={{ fontSize: 11.5, color: "#5a4631", lineHeight: 1.45, margin: "4px 0 2px" }}>{j.summary}</div>}
-                    {j.branch && <div style={{ fontSize: 10, color: "#9c8a6c" }}>🌿 {j.branch}{j.result ? ` · ${j.result}` : ""}</div>}
+                    {j.summary && <div style={{ fontSize: 9.2, color: "#5a4631", lineHeight: 1.45, margin: "4px 0 2px" }}>{j.summary}</div>}
+                    {j.branch && <div style={{ fontSize: 8, color: "#9c8a6c" }}>🌿 {j.branch}{j.result ? ` · ${j.result}` : ""}</div>}
                     {j.dev_status === "배포대기" && (
                       <div style={{ display: "flex", gap: 6, marginTop: 7 }}>
-                        <button disabled={busy === j.id} onClick={() => devAction(j.id, "deploy")} style={{ flex: 1, padding: "7px 0", background: "#6a468c", color: "#fff", border: "none", borderRadius: 8, fontWeight: 700, fontSize: 12.5 }}>🚀 배포</button>
-                        <button disabled={busy === j.id} onClick={() => devAction(j.id, "discard")} style={{ flex: 1, padding: "7px 0", background: "#efe7d8", color: "#8a5a5a", border: "1px solid #d8c4a4", borderRadius: 8, fontWeight: 700, fontSize: 12.5 }}>폐기</button>
+                        <button disabled={busy === j.id} onClick={() => devAction(j.id, "deploy")} style={{ flex: 1, padding: "7px 0", background: "#6a468c", color: "#fff", border: "none", borderRadius: 8, fontWeight: 700, fontSize: 10 }}>🚀 배포</button>
+                        <button disabled={busy === j.id} onClick={() => devAction(j.id, "discard")} style={{ flex: 1, padding: "7px 0", background: "#efe7d8", color: "#8a5a5a", border: "1px solid #d8c4a4", borderRadius: 8, fontWeight: 700, fontSize: 10 }}>폐기</button>
                       </div>
                     )}
                     {["빌드오류", "구현불가", "스코프반려", "회귀반려"].includes(j.dev_status) && (
-                      <button disabled={busy === j.id} onClick={() => devAction(j.id, "discard")} style={{ marginTop: 7, width: "100%", padding: "6px 0", background: "#efe7d8", color: "#8a5a5a", border: "1px solid #d8c4a4", borderRadius: 8, fontWeight: 700, fontSize: 12 }}>폐기</button>
+                      <button disabled={busy === j.id} onClick={() => devAction(j.id, "discard")} style={{ marginTop: 7, width: "100%", padding: "6px 0", background: "#efe7d8", color: "#8a5a5a", border: "1px solid #d8c4a4", borderRadius: 8, fontWeight: 700, fontSize: 9.6 }}>폐기</button>
                     )}
                   </div>
                 );
@@ -529,22 +529,22 @@ export default function OrgDashboard() {
             → 빨강은 HIGH가 있을 때만. 그 외엔 '주의'(호박)·'정상'(초록)으로 구분한다. */}
         <div style={{ ...card, marginTop: 10, border: highN ? "2px solid #b03a3a" : issues.length ? "1px solid #d8c8ad" : "1px solid #bcd4bc" }}>
           <button onClick={() => setShowIssues(!showIssues)} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
-            <span style={{ fontSize: 13.5, fontWeight: 700, color: highN ? "#b03a3a" : issues.length ? "#8a6a3a" : "#3f7a4f" }}>
-              {showIssues ? "▾" : "▸"} {highN ? "🚨" : issues.length ? "⚠️" : "✅"} RM 실시간 이슈 ({issues.length}) {issues.length > 0 && <span style={{ fontSize: 10, fontWeight: 700, color: highN ? "#b03a3a" : "#8a6a3a" }}>· HIGH {highN}</span>}
+            <span style={{ fontSize: 10.8, fontWeight: 700, color: highN ? "#b03a3a" : issues.length ? "#8a6a3a" : "#3f7a4f" }}>
+              {showIssues ? "▾" : "▸"} {highN ? "🚨" : issues.length ? "⚠️" : "✅"} RM 실시간 이슈 ({issues.length}) {issues.length > 0 && <span style={{ fontSize: 8, fontWeight: 700, color: highN ? "#b03a3a" : "#8a6a3a" }}>· HIGH {highN}</span>}
             </span>
-            <span style={{ fontSize: 10.5, color: "#9c8a6c" }}>{showIssues ? "접기" : issues.length ? "조치 보기" : "보기"}</span>
+            <span style={{ fontSize: 8.4, color: "#9c8a6c" }}>{showIssues ? "접기" : issues.length ? "조치 보기" : "보기"}</span>
           </button>
           {showIssues && <div style={{ marginTop: 8 }}>
-          <div style={{ fontSize: 10.5, color: "#9c8a6c", marginBottom: 8 }}>발견 즉시 RM 분류·담당 배정. 상태: <b style={{ color: "#3f7a4f" }}>🔵처리중</b>(팀이 처리 중) · <b style={{ color: "#b06a2e" }}>🔔결재대기</b>(CEO 승인 요청) · <b style={{ color: "#b03a3a" }}>🔴OUTSTANDING</b>(즉시해결 불가·중대). 해결되면 자동 사라짐.</div>
-          {issues.length === 0 ? <div style={{ color: "#3f7a4f", fontSize: 13 }}>현재 열린 이슈 없음 ✅</div> :
+          <div style={{ fontSize: 8.4, color: "#9c8a6c", marginBottom: 8 }}>발견 즉시 RM 분류·담당 배정. 상태: <b style={{ color: "#3f7a4f" }}>🔵처리중</b>(팀이 처리 중) · <b style={{ color: "#b06a2e" }}>🔔결재대기</b>(CEO 승인 요청) · <b style={{ color: "#b03a3a" }}>🔴OUTSTANDING</b>(즉시해결 불가·중대). 해결되면 자동 사라짐.</div>
+          {issues.length === 0 ? <div style={{ color: "#3f7a4f", fontSize: 10.4 }}>현재 열린 이슈 없음 ✅</div> :
             issues.map((i) => (
               <div key={i.ikey} style={{ border: "1px solid #e6d8bf", borderRadius: 10, padding: "9px 11px", marginBottom: 8, background: i.severity === "HIGH" ? "#fff6f4" : "#fbfaf5" }}>
                 <div style={{ display: "flex", gap: 5, alignItems: "center", flexWrap: "wrap" }}>
-                  {(() => { const st = i.state || "처리중"; const c = st === "결재대기" ? "#b06a2e" : st === "OUTSTANDING" ? "#b03a3a" : "#3f7a4f"; const ic = st === "결재대기" ? "🔔" : st === "OUTSTANDING" ? "🔴" : "🔵"; return <span style={{ background: c, color: "#fff", fontSize: 9.5, fontWeight: 700, padding: "2px 7px", borderRadius: 20 }}>{ic} {st}</span>; })()}
-                  <span style={{ background: sevC[i.severity] || "#888", color: "#fff", fontSize: 9.5, fontWeight: 700, padding: "2px 7px", borderRadius: 20 }}>{i.severity}</span>
-                  <span style={{ fontWeight: 700, fontSize: 12.5 }}>{i.title}</span>
+                  {(() => { const st = i.state || "처리중"; const c = st === "결재대기" ? "#b06a2e" : st === "OUTSTANDING" ? "#b03a3a" : "#3f7a4f"; const ic = st === "결재대기" ? "🔔" : st === "OUTSTANDING" ? "🔴" : "🔵"; return <span style={{ background: c, color: "#fff", fontSize: 7.6, fontWeight: 700, padding: "2px 7px", borderRadius: 20 }}>{ic} {st}</span>; })()}
+                  <span style={{ background: sevC[i.severity] || "#888", color: "#fff", fontSize: 7.6, fontWeight: 700, padding: "2px 7px", borderRadius: 20 }}>{i.severity}</span>
+                  <span style={{ fontWeight: 700, fontSize: 10 }}>{i.title}</span>
                 </div>
-                {i.detail && <div style={{ fontSize: 11, color: "#5a4631", margin: "4px 0 3px", lineHeight: 1.4 }}>{i.detail}</div>}
+                {i.detail && <div style={{ fontSize: 8.8, color: "#5a4631", margin: "4px 0 3px", lineHeight: 1.4 }}>{i.detail}</div>}
                 {(() => {
                   const st = i.state || "처리중";
                   const hrs = Number(i.hrs) || 0;
@@ -561,7 +561,7 @@ export default function OrgDashboard() {
                     : "다음 자동 교정 사이클 (~10분 주기)";
                   const elapsed = hrs >= 24 ? `${Math.floor(hrs / 24)}일 경과` : hrs >= 1 ? `${Math.floor(hrs)}시간 경과` : "방금";
                   return (
-                    <div style={{ fontSize: 10.5, color: stalled ? "#b06a2e" : "#9c8a6c", lineHeight: 1.55 }}>
+                    <div style={{ fontSize: 8.4, color: stalled ? "#b06a2e" : "#9c8a6c", lineHeight: 1.55 }}>
                       🕐 <b>발생</b> {i.seen} (<b style={{ color: stalled ? "#b03a3a" : "inherit" }}>{elapsed}</b>) · ⏱ <b>조치예상</b> {stalled ? <b style={{ color: "#b03a3a" }}>⚠️ {eta}</b> : eta} · 담당 <b style={{ color: "#7a5a2a" }}>{i.team}</b>
                     </div>
                   );
@@ -574,51 +574,51 @@ export default function OrgDashboard() {
         {/* 💰 오늘 토큰 사용 — 접이식·기본 접힘 */}
         <div style={{ ...card, marginTop: 10 }}>
           <button onClick={() => setShowTok(!showTok)} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: "#9c6b3f" }}>{showTok ? "▾" : "▸"} 💰 오늘 토큰 사용 ({fmt(tok.input || 0)} in · ${Number(tok.cost || 0).toFixed(2)})</span>
-            <span style={{ fontSize: 10.5, color: "#9c8a6c" }}>{showTok ? "접기" : "보기"}</span>
+            <span style={{ fontSize: 10.4, fontWeight: 700, color: "#9c6b3f" }}>{showTok ? "▾" : "▸"} 💰 오늘 토큰 사용 ({fmt(tok.input || 0)} in · ${Number(tok.cost || 0).toFixed(2)})</span>
+            <span style={{ fontSize: 8.4, color: "#9c8a6c" }}>{showTok ? "접기" : "보기"}</span>
           </button>
           {showTok && <div style={{ marginTop: 8 }}>
-          <div style={{ fontSize: 10.5, color: "#9c8a6c", marginBottom: 8 }}>구독 기반이라 실청구 0 · 비용프록시는 콘솔키 환산 참고치</div>
+          <div style={{ fontSize: 8.4, color: "#9c8a6c", marginBottom: 8 }}>구독 기반이라 실청구 0 · 비용프록시는 콘솔키 환산 참고치</div>
           <div style={{ display: "flex", gap: 14, alignItems: "baseline", marginBottom: 8 }}>
-            <div><span style={{ fontSize: 22, fontWeight: 700, color: "#c98a3c" }}>{fmt(tok.input || 0)}</span><span style={{ fontSize: 11, color: "#9c6b3f" }}> in</span></div>
-            <div><span style={{ fontSize: 18, fontWeight: 700, color: "#c98a3c" }}>{fmt(tok.output || 0)}</span><span style={{ fontSize: 11, color: "#9c6b3f" }}> out</span></div>
-            <div><span style={{ fontSize: 15, fontWeight: 700, color: "#5a4631" }}>${Number(tok.cost || 0).toFixed(2)}</span><span style={{ fontSize: 11, color: "#9c8a6c" }}> 프록시</span></div>
+            <div><span style={{ fontSize: 17.6, fontWeight: 700, color: "#c98a3c" }}>{fmt(tok.input || 0)}</span><span style={{ fontSize: 8.8, color: "#9c6b3f" }}> in</span></div>
+            <div><span style={{ fontSize: 14.4, fontWeight: 700, color: "#c98a3c" }}>{fmt(tok.output || 0)}</span><span style={{ fontSize: 8.8, color: "#9c6b3f" }}> out</span></div>
+            <div><span style={{ fontSize: 12, fontWeight: 700, color: "#5a4631" }}>${Number(tok.cost || 0).toFixed(2)}</span><span style={{ fontSize: 8.8, color: "#9c8a6c" }}> 프록시</span></div>
           </div>
           {(tok.byAgent || []).length > 0 ? (
             <div>{(tok.byAgent || []).slice(0, 5).map((a: any, i: number) => (
-              <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5, padding: "3px 0", borderBottom: "1px solid #f0e8d8", color: "#5a4631" }}>
+              <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 9.2, padding: "3px 0", borderBottom: "1px solid #f0e8d8", color: "#5a4631" }}>
                 <span>{i + 1}. {a.a}</span><span style={{ color: "#9c8a6c" }}>{fmt(a.i || 0)} tok · {a.n}회</span>
               </div>))}</div>
-          ) : <div style={{ fontSize: 11.5, color: "#9c8a6c" }}>오늘 실행 데이터 없음 — 사이클(08:00) 후 집계</div>}
+          ) : <div style={{ fontSize: 9.2, color: "#9c8a6c" }}>오늘 실행 데이터 없음 — 사이클(08:00) 후 집계</div>}
           </div>}
         </div>
 
         {/* 🔔 결재 — 승인 클릭 시 실행 (접이식·기본 접힘) */}
         <div style={{ ...card, marginTop: 10 }}>
           <button onClick={() => setShowPending(!showPending)} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
-            <span style={{ fontSize: 14, fontWeight: 700, color: dec.pending.length ? "#b03a3a" : "#9c6b3f" }}>{showPending ? "▾" : "▸"} 🔔 CEO 결재 대기 ({dec.pending.length})</span>
-            <span style={{ fontSize: 10.5, color: "#9c8a6c" }}>{showPending ? "접기" : dec.pending.length ? "결재하기" : "보기"}</span>
+            <span style={{ fontSize: 11.2, fontWeight: 700, color: dec.pending.length ? "#b03a3a" : "#9c6b3f" }}>{showPending ? "▾" : "▸"} 🔔 CEO 결재 대기 ({dec.pending.length})</span>
+            <span style={{ fontSize: 8.4, color: "#9c8a6c" }}>{showPending ? "접기" : dec.pending.length ? "결재하기" : "보기"}</span>
           </button>
           {showPending && <>
-          <div style={{ fontSize: 10.5, color: "#9c8a6c", margin: "6px 0 8px" }}>치명적·비가역(L3)만 — 카페 비공개·등급변경·새 규칙로직·외부발송. 운영결정(L1·L2)은 본부·기조실장 전결.</div>
-          {dec.pending.length === 0 ? <div style={{ color: "#3f7a4f", fontSize: 13 }}>대기 중인 결재 없음 ✅</div> :
+          <div style={{ fontSize: 8.4, color: "#9c8a6c", margin: "6px 0 8px" }}>치명적·비가역(L3)만 — 카페 비공개·등급변경·새 규칙로직·외부발송. 운영결정(L1·L2)은 본부·기조실장 전결.</div>
+          {dec.pending.length === 0 ? <div style={{ color: "#3f7a4f", fontSize: 10.4 }}>대기 중인 결재 없음 ✅</div> :
             dec.pending.map((d) => (
               <div key={d.id} style={{ border: "1px solid #e6d8bf", borderRadius: 11, padding: 12, marginBottom: 10, background: "#fffdf8" }}>
                 <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-                  <span style={{ background: sevC[d.severity] || "#888", color: "#fff", fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 20 }}>{d.severity || "—"}</span>
-                  <span style={{ fontWeight: 700, fontSize: 13.5 }}>{d.title}</span>
-                  {d.team && <span style={{ fontSize: 10, color: "#9c8a6c" }}>· {d.team}</span>}
+                  <span style={{ background: sevC[d.severity] || "#888", color: "#fff", fontSize: 8, fontWeight: 700, padding: "2px 7px", borderRadius: 20 }}>{d.severity || "—"}</span>
+                  <span style={{ fontWeight: 700, fontSize: 10.8 }}>{d.title}</span>
+                  {d.team && <span style={{ fontSize: 8, color: "#9c8a6c" }}>· {d.team}</span>}
                 </div>
-                {d.detail && <div style={{ fontSize: 12, color: "#5a4631", margin: "6px 0", lineHeight: 1.5 }}>{d.detail}</div>}
-                {d.recommendation && <div style={{ fontSize: 12, color: "#2f5d3a", background: "#eef6ee", border: "1px solid #cfe6cf", borderRadius: 8, padding: "7px 9px", margin: "6px 0", lineHeight: 1.5 }}><b>💬 기조실장 의견</b> · {d.recommendation}</div>}
-                <div style={{ fontSize: 10.5, color: "#9c8a6c", marginBottom: 8 }}>실행: {d.action_type === "agent_task" ? "기조실장이 담당 본부 배분" : `${d.action_type}${d.action_params?.ids ? ` (${d.action_params.ids.length}곳)` : ""}`}</div>
+                {d.detail && <div style={{ fontSize: 9.6, color: "#5a4631", margin: "6px 0", lineHeight: 1.5 }}>{d.detail}</div>}
+                {d.recommendation && <div style={{ fontSize: 9.6, color: "#2f5d3a", background: "#eef6ee", border: "1px solid #cfe6cf", borderRadius: 8, padding: "7px 9px", margin: "6px 0", lineHeight: 1.5 }}><b>💬 기조실장 의견</b> · {d.recommendation}</div>}
+                <div style={{ fontSize: 8.4, color: "#9c8a6c", marginBottom: 8 }}>실행: {d.action_type === "agent_task" ? "기조실장이 담당 본부 배분" : `${d.action_type}${d.action_params?.ids ? ` (${d.action_params.ids.length}곳)` : ""}`}</div>
                 <div style={{ display: "flex", gap: 8 }}>
-                  <button disabled={busy === d.id} onClick={() => decide(d.id, "approve")} style={{ flex: 2, padding: 10, background: "#3f7a4f", color: "#fff", border: "none", borderRadius: 9, fontWeight: 700, fontSize: 13, opacity: busy === d.id ? 0.5 : 1 }}>{busy === d.id ? "실행 중…" : "✅ 승인 · 실행"}</button>
-                  <button disabled={busy === d.id} onClick={() => decide(d.id, "reject")} style={{ flex: 1, padding: 10, background: "#efe7d8", color: "#8a6534", border: "1px solid #ddc9a8", borderRadius: 9, fontWeight: 700, fontSize: 13 }}>반려</button>
+                  <button disabled={busy === d.id} onClick={() => decide(d.id, "approve")} style={{ flex: 2, padding: 10, background: "#3f7a4f", color: "#fff", border: "none", borderRadius: 9, fontWeight: 700, fontSize: 10.4, opacity: busy === d.id ? 0.5 : 1 }}>{busy === d.id ? "실행 중…" : "✅ 승인 · 실행"}</button>
+                  <button disabled={busy === d.id} onClick={() => decide(d.id, "reject")} style={{ flex: 1, padding: 10, background: "#efe7d8", color: "#8a6534", border: "1px solid #ddc9a8", borderRadius: 9, fontWeight: 700, fontSize: 10.4 }}>반려</button>
                 </div>
               </div>
             ))}
-          {dec.recent.length > 0 && <div style={{ fontSize: 10.5, color: "#9c8a6c", marginTop: 6 }}>최근 처리: {dec.recent.slice(0, 4).map((r) => `${r.title}(${r.status})`).join(" · ")}</div>}
+          {dec.recent.length > 0 && <div style={{ fontSize: 8.4, color: "#9c8a6c", marginTop: 6 }}>최근 처리: {dec.recent.slice(0, 4).map((r) => `${r.title}(${r.status})`).join(" · ")}</div>}
           </>}
         </div>
 
@@ -627,24 +627,24 @@ export default function OrgDashboard() {
         {dec.deferred.length > 0 && (
           <div style={{ ...card, marginTop: 10 }}>
             <button onClick={() => setShowDeferred(!showDeferred)} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: "#8a6534" }}>{showDeferred ? "▾" : "▸"} ⏸️ 보류 (deferred) ({dec.deferred.length})</span>
-              <span style={{ fontSize: 10.5, color: "#9c8a6c" }}>{showDeferred ? "접기" : "보기"}</span>
+              <span style={{ fontSize: 10.4, fontWeight: 700, color: "#8a6534" }}>{showDeferred ? "▾" : "▸"} ⏸️ 보류 (deferred) ({dec.deferred.length})</span>
+              <span style={{ fontSize: 8.4, color: "#9c8a6c" }}>{showDeferred ? "접기" : "보기"}</span>
             </button>
             {showDeferred && <>
-            <div style={{ fontSize: 10.5, color: "#9c8a6c", margin: "6px 0 8px" }}>보류 상태의 결재 — 여기서 바로 결정하세요. <b style={{ color: "#3f7a4f" }}>▶ 재개</b>(활성 큐로 되돌림 → 기조실장이 배분·실행) · <b style={{ color: "#8a5a5a" }}>종결</b>(폐기). 자동 만료 없음 — 결정 전까지 계속 떠 있습니다.</div>
+            <div style={{ fontSize: 8.4, color: "#9c8a6c", margin: "6px 0 8px" }}>보류 상태의 결재 — 여기서 바로 결정하세요. <b style={{ color: "#3f7a4f" }}>▶ 재개</b>(활성 큐로 되돌림 → 기조실장이 배분·실행) · <b style={{ color: "#8a5a5a" }}>종결</b>(폐기). 자동 만료 없음 — 결정 전까지 계속 떠 있습니다.</div>
             {dec.deferred.map((d) => (
               <div key={d.id} style={{ border: "1px solid #e6d8bf", borderRadius: 10, padding: "9px 11px", marginBottom: 8, background: "#fbfaf5" }}>
                 <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-                  <span style={{ background: d.status === "deferred" ? "#8a6534" : "#9c8a6c", color: "#fff", fontSize: 9.5, fontWeight: 700, padding: "2px 7px", borderRadius: 20 }}>{d.status === "deferred" ? "⏸️ 보류" : "종결"}</span>
-                  {d.tier && <span style={{ background: "#6b8fae", color: "#fff", fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 20 }}>{d.tier}</span>}
-                  <span style={{ fontWeight: 700, fontSize: 12.5 }}>#{d.id} {d.title}</span>
+                  <span style={{ background: d.status === "deferred" ? "#8a6534" : "#9c8a6c", color: "#fff", fontSize: 7.6, fontWeight: 700, padding: "2px 7px", borderRadius: 20 }}>{d.status === "deferred" ? "⏸️ 보류" : "종결"}</span>
+                  {d.tier && <span style={{ background: "#6b8fae", color: "#fff", fontSize: 7.2, fontWeight: 700, padding: "1px 6px", borderRadius: 20 }}>{d.tier}</span>}
+                  <span style={{ fontWeight: 700, fontSize: 10 }}>#{d.id} {d.title}</span>
                 </div>
-                <div style={{ fontSize: 10.5, color: "#9c8a6c", marginTop: 3 }}>{d.team || "-"} · {d.created_at}</div>
-                {d.recommendation && <div style={{ fontSize: 11.5, color: "#2f5d3a", background: "#eef6ee", border: "1px solid #cfe6cf", borderRadius: 8, padding: "6px 8px", marginTop: 5, lineHeight: 1.5 }}><b>💬 기조실장 의견</b> · {d.recommendation}</div>}
+                <div style={{ fontSize: 8.4, color: "#9c8a6c", marginTop: 3 }}>{d.team || "-"} · {d.created_at}</div>
+                {d.recommendation && <div style={{ fontSize: 9.2, color: "#2f5d3a", background: "#eef6ee", border: "1px solid #cfe6cf", borderRadius: 8, padding: "6px 8px", marginTop: 5, lineHeight: 1.5 }}><b>💬 기조실장 의견</b> · {d.recommendation}</div>}
                 {d.status === "deferred" && (
                   <div style={{ display: "flex", gap: 6, marginTop: 7 }}>
-                    <button disabled={busy === d.id} onClick={() => decide(d.id, "approve")} style={{ flex: 1, padding: "7px 0", background: "#3f7a4f", color: "#fff", border: "none", borderRadius: 8, fontWeight: 700, fontSize: 12.5, opacity: busy === d.id ? 0.5 : 1 }}>▶ 재개</button>
-                    <button disabled={busy === d.id} onClick={() => { if (confirm(`#${d.id} 종결(폐기)합니다. 되돌리려면 다시 상신해야 합니다.`)) decide(d.id, "reject"); }} style={{ flex: 1, padding: "7px 0", background: "#efe7d8", color: "#8a5a5a", border: "1px solid #d8c4a4", borderRadius: 8, fontWeight: 700, fontSize: 12.5, opacity: busy === d.id ? 0.5 : 1 }}>종결</button>
+                    <button disabled={busy === d.id} onClick={() => decide(d.id, "approve")} style={{ flex: 1, padding: "7px 0", background: "#3f7a4f", color: "#fff", border: "none", borderRadius: 8, fontWeight: 700, fontSize: 10, opacity: busy === d.id ? 0.5 : 1 }}>▶ 재개</button>
+                    <button disabled={busy === d.id} onClick={() => { if (confirm(`#${d.id} 종결(폐기)합니다. 되돌리려면 다시 상신해야 합니다.`)) decide(d.id, "reject"); }} style={{ flex: 1, padding: "7px 0", background: "#efe7d8", color: "#8a5a5a", border: "1px solid #d8c4a4", borderRadius: 8, fontWeight: 700, fontSize: 10, opacity: busy === d.id ? 0.5 : 1 }}>종결</button>
                   </div>
                 )}
               </div>
@@ -656,23 +656,23 @@ export default function OrgDashboard() {
         {/* 🔧 실행 중 — 승인됐지만 아직 완료 안 된 실무형(실세계·판단 필요). 끝난 것/진행중 구분. 접이식·기본 접힘. */}
         <div style={{ ...card, marginTop: 10 }}>
           <button onClick={() => setShowInProg(!showInProg)} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: "#8a6534" }}>{showInProg ? "▾" : "▸"} 🔧 실행 중 ({dec.inProgress.length + 1})</span>
-            <span style={{ fontSize: 10.5, color: "#9c8a6c" }}>{showInProg ? "접기" : "보기"}</span>
+            <span style={{ fontSize: 10.4, fontWeight: 700, color: "#8a6534" }}>{showInProg ? "▾" : "▸"} 🔧 실행 중 ({dec.inProgress.length + 1})</span>
+            <span style={{ fontSize: 8.4, color: "#9c8a6c" }}>{showInProg ? "접기" : "보기"}</span>
           </button>
           {showInProg && <>
-          <div style={{ fontSize: 10.5, color: "#9c8a6c", margin: "6px 0 8px" }}>CEO 승인 후 담당 본부가 실제 실행 중인 실무(방문·정책·룰적용 등). 완료되면 자동으로 여기서 빠짐.</div>
+          <div style={{ fontSize: 8.4, color: "#9c8a6c", margin: "6px 0 8px" }}>CEO 승인 후 담당 본부가 실제 실행 중인 실무(방문·정책·룰적용 등). 완료되면 자동으로 여기서 빠짐.</div>
           {/* 📌 상시 추적 항목 — 검색 AI 저하(콘솔키 크레딧 소진). 관제탑 실시간 이슈에서 제외하고 여기서만 추적(#207). 코드 상수(DB 아님) — 완료 버튼 없음. */}
-          <div style={{ display: "flex", gap: 7, alignItems: "center", padding: "5px 0", borderBottom: "1px solid #f0e8d8", fontSize: 12 }}>
-            <span style={{ background: "#8a6534", color: "#fff", fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 20 }}>추적</span>
-            <span style={{ flex: 1, color: "#5a4631" }}>{SEARCH_DEGRADE_TRACK.title} <span style={{ fontSize: 10, color: "#9c8a6c" }}>· {SEARCH_DEGRADE_TRACK.note}</span></span>
-            <span style={{ fontSize: 10, color: "#9c8a6c" }}>{SEARCH_DEGRADE_TRACK.team}</span>
+          <div style={{ display: "flex", gap: 7, alignItems: "center", padding: "5px 0", borderBottom: "1px solid #f0e8d8", fontSize: 9.6 }}>
+            <span style={{ background: "#8a6534", color: "#fff", fontSize: 7.2, fontWeight: 700, padding: "1px 6px", borderRadius: 20 }}>추적</span>
+            <span style={{ flex: 1, color: "#5a4631" }}>{SEARCH_DEGRADE_TRACK.title} <span style={{ fontSize: 8, color: "#9c8a6c" }}>· {SEARCH_DEGRADE_TRACK.note}</span></span>
+            <span style={{ fontSize: 8, color: "#9c8a6c" }}>{SEARCH_DEGRADE_TRACK.team}</span>
           </div>
           {dec.inProgress.map((d) => (
-            <div key={d.id} style={{ display: "flex", gap: 7, alignItems: "center", padding: "5px 0", borderBottom: "1px solid #f0e8d8", fontSize: 12 }}>
-              <span style={{ background: "#c08a3e", color: "#fff", fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 20 }}>실행중</span>
+            <div key={d.id} style={{ display: "flex", gap: 7, alignItems: "center", padding: "5px 0", borderBottom: "1px solid #f0e8d8", fontSize: 9.6 }}>
+              <span style={{ background: "#c08a3e", color: "#fff", fontSize: 7.2, fontWeight: 700, padding: "1px 6px", borderRadius: 20 }}>실행중</span>
               <span style={{ flex: 1, color: "#5a4631" }}>{d.title}</span>
-              <span style={{ fontSize: 10, color: d.age_h >= 72 ? "#b03a3a" : "#9c8a6c" }}>{d.team || "-"} · {d.age_h}h</span>
-              <button disabled={busy === d.id} onClick={() => completeTask(d.id)} style={{ fontSize: 10, fontWeight: 700, color: "#3f7a4f", background: "#eef5ef", border: "1px solid #cfe3d2", borderRadius: 7, padding: "2px 8px", cursor: "pointer", opacity: busy === d.id ? 0.5 : 1 }}>완료</button>
+              <span style={{ fontSize: 8, color: d.age_h >= 72 ? "#b03a3a" : "#9c8a6c" }}>{d.team || "-"} · {d.age_h}h</span>
+              <button disabled={busy === d.id} onClick={() => completeTask(d.id)} style={{ fontSize: 8, fontWeight: 700, color: "#3f7a4f", background: "#eef5ef", border: "1px solid #cfe3d2", borderRadius: 7, padding: "2px 8px", cursor: "pointer", opacity: busy === d.id ? 0.5 : 1 }}>완료</button>
             </div>
           ))}
           </>}
@@ -681,46 +681,46 @@ export default function OrgDashboard() {
         {/* 🟢 하위 전결 FYI — 본부(L1)·기조실장(L2)이 자체 처리한 결정. 접이식·기본 접힘. */}
         <div style={{ ...card, marginTop: 10 }}>
           <button onClick={() => setShowDeleg(!showDeleg)} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: "#3f7a4f" }}>{showDeleg ? "▾" : "▸"} 🟢 전결 처리내역 ({dec.delegated.length})</span>
-            <span style={{ fontSize: 10.5, color: "#9c8a6c" }}>{showDeleg ? "접기" : "보기"}</span>
+            <span style={{ fontSize: 10.4, fontWeight: 700, color: "#3f7a4f" }}>{showDeleg ? "▾" : "▸"} 🟢 전결 처리내역 ({dec.delegated.length})</span>
+            <span style={{ fontSize: 8.4, color: "#9c8a6c" }}>{showDeleg ? "접기" : "보기"}</span>
           </button>
           {showDeleg && <>
-          <div style={{ fontSize: 10.5, color: "#9c8a6c", margin: "6px 0 8px" }}>본부·기조실장이 권한 내 결정·집행 — CEO 결재 불필요, 사후 가시성.</div>
+          <div style={{ fontSize: 8.4, color: "#9c8a6c", margin: "6px 0 8px" }}>본부·기조실장이 권한 내 결정·집행 — CEO 결재 불필요, 사후 가시성.</div>
           {dec.delegated.length > 0 ? dec.delegated.map((d) => (
-            <div key={d.id} style={{ display: "flex", gap: 7, alignItems: "center", padding: "5px 0", borderBottom: "1px solid #f0e8d8", fontSize: 12 }}>
-              <span style={{ background: d.tier === "L1" ? "#6b8fae" : "#9c7bbf", color: "#fff", fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 20 }}>{d.tier}</span>
+            <div key={d.id} style={{ display: "flex", gap: 7, alignItems: "center", padding: "5px 0", borderBottom: "1px solid #f0e8d8", fontSize: 9.6 }}>
+              <span style={{ background: d.tier === "L1" ? "#6b8fae" : "#9c7bbf", color: "#fff", fontSize: 7.2, fontWeight: 700, padding: "1px 6px", borderRadius: 20 }}>{d.tier}</span>
               <span style={{ flex: 1, color: "#5a4631" }}>{d.title}</span>
-              <span style={{ fontSize: 10, color: "#9c8a6c" }}>{d.decided_by} · {d.at}</span>
+              <span style={{ fontSize: 8, color: "#9c8a6c" }}>{d.decided_by} · {d.at}</span>
             </div>
-          )) : <div style={{ fontSize: 12, color: "#9c8a6c" }}>최근 전결 처리 없음</div>}
+          )) : <div style={{ fontSize: 9.6, color: "#9c8a6c" }}>최근 전결 처리 없음</div>}
           </>}
         </div>
 
         {/* 🤝 협업 현황 — 경영지원팀 주관 코디네이션 (접이식·기본 접힘) */}
         <div style={{ ...card, marginTop: 10 }}>
           <button onClick={() => setShowCoord(!showCoord)} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
-            <span style={{ fontSize: 14, fontWeight: 700, color: (coord as any).overdue ? "#b03a3a" : "#9c6b3f" }}>{showCoord ? "▾" : "▸"} 🤝 협업 현황 (진행 {coord.open.length}){(coord as any).overdue ? <span style={{ fontSize: 10, fontWeight: 700, color: "#b03a3a" }}> · ⚠️ 지연 {(coord as any).overdue}</span> : null} <span style={{ fontSize: 10, fontWeight: 400, color: "#9c8a6c" }}>· 경영지원팀 주관</span></span>
-            <span style={{ fontSize: 10.5, color: "#9c8a6c" }}>{showCoord ? "접기" : "보기"}</span>
+            <span style={{ fontSize: 11.2, fontWeight: 700, color: (coord as any).overdue ? "#b03a3a" : "#9c6b3f" }}>{showCoord ? "▾" : "▸"} 🤝 협업 현황 (진행 {coord.open.length}){(coord as any).overdue ? <span style={{ fontSize: 8, fontWeight: 700, color: "#b03a3a" }}> · ⚠️ 지연 {(coord as any).overdue}</span> : null} <span style={{ fontSize: 8, fontWeight: 400, color: "#9c8a6c" }}>· 경영지원팀 주관</span></span>
+            <span style={{ fontSize: 8.4, color: "#9c8a6c" }}>{showCoord ? "접기" : "보기"}</span>
           </button>
           {showCoord && <div style={{ marginTop: 8 }}>
-          <div style={{ fontSize: 10, color: "#9c8a6c", marginBottom: 6 }}>흐름: 요청 → 조율 → 수신확인 → 완료 (기한초과 시 지연·재촉)</div>
-          {coord.open.length === 0 ? <div style={{ color: "#3f7a4f", fontSize: 13 }}>진행 중인 부서 간 협업 없음</div> :
+          <div style={{ fontSize: 8, color: "#9c8a6c", marginBottom: 6 }}>흐름: 요청 → 조율 → 수신확인 → 완료 (기한초과 시 지연·재촉)</div>
+          {coord.open.length === 0 ? <div style={{ color: "#3f7a4f", fontSize: 10.4 }}>진행 중인 부서 간 협업 없음</div> :
             coord.open.map((c: any) => {
               const stg = c.stage || "요청";
               const stageC: Record<string, string> = { "요청": "#8a7458", "조율": "#c98a3c", "수신확인": "#2a7a72", "지연": "#b03a3a", "CEO결재": "#6a468c", "개발승인": "#3a6ea5", "CEO정체판단": "#a53a6e", "기조실장 재배정": "#3f7a4f" };
               return (
               <div key={c.id} style={{ border: `1px solid ${stg === "지연" ? "#e6b3b3" : "#e6d8bf"}`, borderRadius: 10, padding: "9px 11px", marginBottom: 8, background: stg === "지연" ? "#fdf3f3" : "#fbfaf5" }}>
                 <div style={{ display: "flex", gap: 5, alignItems: "center", flexWrap: "wrap" }}>
-                  <span style={{ background: typeC[c.type] || "#888", color: "#fff", fontSize: 9.5, fontWeight: 700, padding: "2px 7px", borderRadius: 20 }}>{typeLabel[c.type] || c.type}</span>
-                  <span style={{ background: stageC[stg] || "#888", color: "#fff", fontSize: 9.5, fontWeight: 700, padding: "2px 7px", borderRadius: 20 }}>{stg}</span>
-                  {c.due_h != null && stg !== "지연" && <span style={{ fontSize: 9.5, color: Number(c.due_h) < 0 ? "#b03a3a" : "#9c8a6c" }}>{Number(c.due_h) >= 0 ? `${c.due_h}h 내` : "기한초과"}</span>}
-                  <span style={{ fontWeight: 700, fontSize: 12.5 }}>{c.topic}</span>
+                  <span style={{ background: typeC[c.type] || "#888", color: "#fff", fontSize: 7.6, fontWeight: 700, padding: "2px 7px", borderRadius: 20 }}>{typeLabel[c.type] || c.type}</span>
+                  <span style={{ background: stageC[stg] || "#888", color: "#fff", fontSize: 7.6, fontWeight: 700, padding: "2px 7px", borderRadius: 20 }}>{stg}</span>
+                  {c.due_h != null && stg !== "지연" && <span style={{ fontSize: 7.6, color: Number(c.due_h) < 0 ? "#b03a3a" : "#9c8a6c" }}>{Number(c.due_h) >= 0 ? `${c.due_h}h 내` : "기한초과"}</span>}
+                  <span style={{ fontWeight: 700, fontSize: 10 }}>{c.topic}</span>
                 </div>
-                <div style={{ fontSize: 11, color: "#8a7458", margin: "4px 0 2px" }}>{c.from_team} <span style={{ color: "#c98a3c" }}>→</span> {c.to_team}</div>
-                {c.detail && <div style={{ fontSize: 11.5, color: "#5a4631", lineHeight: 1.45 }}>{c.detail}</div>}
+                <div style={{ fontSize: 8.8, color: "#8a7458", margin: "4px 0 2px" }}>{c.from_team} <span style={{ color: "#c98a3c" }}>→</span> {c.to_team}</div>
+                {c.detail && <div style={{ fontSize: 9.2, color: "#5a4631", lineHeight: 1.45 }}>{c.detail}</div>}
               </div>
             );})}
-          {coord.resolved.length > 0 && <div style={{ fontSize: 10.5, color: "#9c8a6c", marginTop: 4 }}>최근 해결: {coord.resolved.slice(0, 3).map((r: any) => r.topic).join(" · ")}</div>}
+          {coord.resolved.length > 0 && <div style={{ fontSize: 8.4, color: "#9c8a6c", marginTop: 4 }}>최근 해결: {coord.resolved.slice(0, 3).map((r: any) => r.topic).join(" · ")}</div>}
           </div>}
         </div>
 
@@ -728,8 +728,8 @@ export default function OrgDashboard() {
         {brief?.work_order && (
           <div style={{ ...card, marginTop: 10 }} className="ex">
             <button onClick={() => setShowWO(!showWO)} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: "#6a468c" }}>{showWO ? "▾" : "▸"} 🗂️ 기획조정실장 업무지시 (다음 사이클)</span>
-              <span style={{ fontSize: 10.5, color: "#9c8a6c" }}>{showWO ? "접기" : "본부별 지시 보기"}</span>
+              <span style={{ fontSize: 10.4, fontWeight: 700, color: "#6a468c" }}>{showWO ? "▾" : "▸"} 🗂️ 기획조정실장 업무지시 (다음 사이클)</span>
+              <span style={{ fontSize: 8.4, color: "#9c8a6c" }}>{showWO ? "접기" : "본부별 지시 보기"}</span>
             </button>
             {showWO && <div style={{ marginTop: 8 }} dangerouslySetInnerHTML={{ __html: md2html(brief?.work_order || "") }} />}
           </div>
@@ -737,11 +737,11 @@ export default function OrgDashboard() {
 
         <div style={{ ...card, marginTop: 10 }} className="ex">
           <button onClick={() => setShowBriefs(!showBriefs)} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: "#9c6b3f" }}>{showBriefs ? "▾" : "▸"} 📋 EXECUTIVE 일일보고서 (최근 10일 · 시간별)</span>
-            <span style={{ fontSize: 10.5, color: "#9c8a6c" }}>{showBriefs ? "접기" : "보기"}</span>
+            <span style={{ fontSize: 10.4, fontWeight: 700, color: "#9c6b3f" }}>{showBriefs ? "▾" : "▸"} 📋 EXECUTIVE 일일보고서 (최근 10일 · 시간별)</span>
+            <span style={{ fontSize: 8.4, color: "#9c8a6c" }}>{showBriefs ? "접기" : "보기"}</span>
           </button>
           {showBriefs && <div style={{ marginTop: 6 }}>
-          {briefs.length === 0 ? <div style={{ fontSize: 12, color: "#9c8a6c" }}>보고서 없음</div> :
+          {briefs.length === 0 ? <div style={{ fontSize: 9.6, color: "#9c8a6c" }}>보고서 없음</div> :
             briefs.map((bf: any, i: number) => {
               const day = bf.day || String(bf.created_at || "").slice(0, 10);
               const time = bf.time || String(bf.created_at || "").slice(11, 16);
@@ -750,11 +750,11 @@ export default function OrgDashboard() {
               const newDay = i === 0 || (briefs[i - 1]?.day !== day); // 날짜 바뀌는 지점에 구분선
               return (
                 <div key={bf.id ?? i}>
-                  {newDay && <div style={{ fontSize: 11, fontWeight: 700, color: "#9c6b3f", marginTop: i === 0 ? 0 : 8, padding: "4px 2px 2px", borderTop: i === 0 ? "none" : "1px solid #e6d8bf" }}>{day} ({wd})</div>}
+                  {newDay && <div style={{ fontSize: 8.8, fontWeight: 700, color: "#9c6b3f", marginTop: i === 0 ? 0 : 8, padding: "4px 2px 2px", borderTop: i === 0 ? "none" : "1px solid #e6d8bf" }}>{day} ({wd})</div>}
                   <div style={{ borderBottom: "1px solid #f0e8d8" }}>
                     <button onClick={() => setOpenId(open ? null : bf.id)} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", padding: "9px 2px", cursor: "pointer", fontFamily: "inherit" }}>
-                      <span style={{ fontWeight: 600, fontSize: 12.5, color: "#5a4631" }}>{open ? "▾" : "▸"} {time}{i === 0 && <span style={{ fontSize: 10, color: "#c98a3c", fontWeight: 400 }}> · 최신</span>}</span>
-                      <span style={{ fontSize: 10.5, color: "#9c8a6c" }}>{open ? "접기" : "보기"}</span>
+                      <span style={{ fontWeight: 600, fontSize: 10, color: "#5a4631" }}>{open ? "▾" : "▸"} {time}{i === 0 && <span style={{ fontSize: 8, color: "#c98a3c", fontWeight: 400 }}> · 최신</span>}</span>
+                      <span style={{ fontSize: 8.4, color: "#9c8a6c" }}>{open ? "접기" : "보기"}</span>
                     </button>
                     {open && <div style={{ padding: "2px 2px 12px" }} dangerouslySetInnerHTML={{ __html: md2html(bf.executive_md || "_이 보고서 내용 없음_") }} />}
                   </div>
@@ -763,8 +763,8 @@ export default function OrgDashboard() {
             })}
           </div>}
         </div>
-        <div style={{ marginTop: 12, textAlign: "center", fontSize: 11.5, color: "#3f7a4f", fontWeight: 600 }}>🟢 실시간 자동 갱신 중{synced && <span style={{ color: "#9c8a6c", fontWeight: 400 }}> · 마지막 동기 {synced}</span>}</div>
-        <div style={{ textAlign: "center", color: "#9c8a6c", fontSize: 11, margin: "10px 0 16px" }}>소비자 경험을 최우선한다 · 기획조정실</div>
+        <div style={{ marginTop: 12, textAlign: "center", fontSize: 9.2, color: "#3f7a4f", fontWeight: 600 }}>🟢 실시간 자동 갱신 중{synced && <span style={{ color: "#9c8a6c", fontWeight: 400 }}> · 마지막 동기 {synced}</span>}</div>
+        <div style={{ textAlign: "center", color: "#9c8a6c", fontSize: 8.8, margin: "10px 0 16px" }}>소비자 경험을 최우선한다 · 기획조정실</div>
       </>)}
 
       {/* 🩺 하네스 엔지니어링 관제 모달 — 자율 실행을 감싸는 6계층이 "지금" 물려 있는지 */}
@@ -772,13 +772,13 @@ export default function OrgDashboard() {
         <div onClick={() => setShowHarness(false)} style={{ position: "fixed", inset: 0, background: "rgba(20,14,10,.6)", zIndex: 55, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
           <div onClick={(e) => e.stopPropagation()} style={{ background: "#f4ece0", borderRadius: "18px 18px 0 0", padding: 18, width: "100%", maxWidth: 680, maxHeight: "88vh", overflowY: "auto" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-              <div style={{ fontSize: 16, fontWeight: 700, color: "#2b2018" }}>🩺 하네스 엔지니어링</div>
-              <button onClick={() => setShowHarness(false)} style={{ background: "none", border: "none", fontSize: 20, color: "#9c8a6c", cursor: "pointer" }}>✕</button>
+              <div style={{ fontSize: 12.8, fontWeight: 700, color: "#2b2018" }}>🩺 하네스 엔지니어링</div>
+              <button onClick={() => setShowHarness(false)} style={{ background: "none", border: "none", fontSize: 16, color: "#9c8a6c", cursor: "pointer" }}>✕</button>
             </div>
-            {!harness && <div style={{ padding: 24, textAlign: "center", color: "#9c8a6c", fontSize: 12 }}>불러오는 중…</div>}
-            {harness && !harness.ok && <div style={{ padding: 20, color: "#b03a3a", fontSize: 12 }}>⚠️ {harness.error}</div>}
+            {!harness && <div style={{ padding: 24, textAlign: "center", color: "#9c8a6c", fontSize: 9.6 }}>불러오는 중…</div>}
+            {harness && !harness.ok && <div style={{ padding: 20, color: "#b03a3a", fontSize: 9.6 }}>⚠️ {harness.error}</div>}
             {harness?.ok && (<>
-              <div style={{ fontSize: 10.5, color: "#6b5640", marginBottom: 12, lineHeight: 1.6, background: "#efe2cf", borderRadius: 8, padding: "8px 10px" }}>
+              <div style={{ fontSize: 8.4, color: "#6b5640", marginBottom: 12, lineHeight: 1.6, background: "#efe2cf", borderRadius: 8, padding: "8px 10px" }}>
                 자율 실행(크론·에이전트·치유기)을 감싸는 <b>안전·검증 계층</b>입니다. 도입 계기: 치유기가 6일간 헛돌며 큰 데이터를 하루 40회 헛 로드했는데 기존 감시망이 전부 &quot;정상&quot;으로 통과시켰습니다 — <b>실행 여부만 보고 효과를 안 봤기 때문</b>입니다.
                 {(harness.principles || []).map((p: string, i: number) => <div key={i} style={{ marginTop: 4 }}>· {p}</div>)}
               </div>
@@ -788,25 +788,25 @@ export default function OrgDashboard() {
                 {(harness.layers || []).map((L: any) => (
                   <div key={L.id} style={{ background: "#fff", borderRadius: 10, padding: "9px 11px", border: `1.5px solid ${L.ok ? "#cfe0cf" : "#e8c4a0"}` }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                      <span style={{ background: L.ok ? "#3f7a4f" : "#c0762a", color: "#fff", fontSize: 10, fontWeight: 700, borderRadius: 5, padding: "2px 6px" }}>{L.id}</span>
-                      <span style={{ fontSize: 12.5, fontWeight: 700, color: "#2b2018" }}>{L.name}</span>
-                      <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 700, color: L.ok ? "#3f7a4f" : "#c0762a" }}>{L.ok ? "정상" : "확인 필요"}</span>
+                      <span style={{ background: L.ok ? "#3f7a4f" : "#c0762a", color: "#fff", fontSize: 8, fontWeight: 700, borderRadius: 5, padding: "2px 6px" }}>{L.id}</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: "#2b2018" }}>{L.name}</span>
+                      <span style={{ marginLeft: "auto", fontSize: 8.8, fontWeight: 700, color: L.ok ? "#3f7a4f" : "#c0762a" }}>{L.ok ? "정상" : "확인 필요"}</span>
                     </div>
-                    <div style={{ fontSize: 11, color: "#4a3a2a", marginTop: 4, fontWeight: 600 }}>{L.stat}</div>
-                    <div style={{ fontSize: 10, color: "#63523f", marginTop: 3, lineHeight: 1.5 }}>{L.note}</div>
-                    <div style={{ fontSize: 9.5, color: "#b09b78", marginTop: 2, fontFamily: "monospace" }}>{L.file}</div>
-                    {L.link && <a href={L.link} style={{ display: "inline-block", marginTop: 5, fontSize: 11, fontWeight: 700, color: "#6a468c", textDecoration: "none" }}>리뷰 화면 열기 →</a>}
+                    <div style={{ fontSize: 8.8, color: "#4a3a2a", marginTop: 4, fontWeight: 600 }}>{L.stat}</div>
+                    <div style={{ fontSize: 8, color: "#63523f", marginTop: 3, lineHeight: 1.5 }}>{L.note}</div>
+                    <div style={{ fontSize: 7.6, color: "#b09b78", marginTop: 2, fontFamily: "monospace" }}>{L.file}</div>
+                    {L.link && <a href={L.link} style={{ display: "inline-block", marginTop: 5, fontSize: 8.8, fontWeight: 700, color: "#6a468c", textDecoration: "none" }}>리뷰 화면 열기 →</a>}
                   </div>
                 ))}
               </div>
 
               {/* 예산 실측 — 계약 대비 큰컬럼 로드 */}
-              <div style={{ marginTop: 14, fontSize: 12.5, fontWeight: 700, color: "#2b2018" }}>💰 24시간 큰 데이터 로드 (계약 대비)</div>
-              <div style={{ fontSize: 10, color: "#63523f", margin: "3px 0 6px" }}>리뷰 원문 같은 큰 컬럼을 몇 번 읽었는지. 계약 상한을 넘으면 원장에 기록됩니다(현재 관측 모드 — 막지는 않음).</div>
+              <div style={{ marginTop: 14, fontSize: 10, fontWeight: 700, color: "#2b2018" }}>💰 24시간 큰 데이터 로드 (계약 대비)</div>
+              <div style={{ fontSize: 8, color: "#63523f", margin: "3px 0 6px" }}>리뷰 원문 같은 큰 컬럼을 몇 번 읽었는지. 계약 상한을 넘으면 원장에 기록됩니다(현재 관측 모드 — 막지는 않음).</div>
               <div style={{ display: "grid", gap: 4 }}>
-                {(harness.budgets || []).length === 0 && <div style={{ fontSize: 11, color: "#9c8a6c" }}>기록 없음</div>}
+                {(harness.budgets || []).length === 0 && <div style={{ fontSize: 8.8, color: "#9c8a6c" }}>기록 없음</div>}
                 {(harness.budgets || []).map((b: any) => (
-                  <div key={b.job} style={{ display: "flex", alignItems: "center", gap: 8, background: "#fff", borderRadius: 8, padding: "6px 9px", fontSize: 11 }}>
+                  <div key={b.job} style={{ display: "flex", alignItems: "center", gap: 8, background: "#fff", borderRadius: 8, padding: "6px 9px", fontSize: 8.8 }}>
                     <span style={{ fontFamily: "monospace", color: "#4a3a2a", flex: 1 }}>{b.job}</span>
                     <span style={{ color: "#63523f" }}>{b.runs}회</span>
                     <span style={{ fontWeight: 700, color: b.over ? "#b03a3a" : "#3f7a4f" }}>{b.used ?? 0} / {b.limit}</span>
@@ -816,16 +816,16 @@ export default function OrgDashboard() {
 
               {/* 정체·동결 */}
               {(harness.stuck || []).length > 0 && (<>
-                <div style={{ marginTop: 14, fontSize: 12.5, fontWeight: 700, color: "#b03a3a" }}>🔁 정체(같은 문제집합 3회+ 연속)</div>
+                <div style={{ marginTop: 14, fontSize: 10, fontWeight: 700, color: "#b03a3a" }}>🔁 정체(같은 문제집합 3회+ 연속)</div>
                 {(harness.stuck || []).map((sk: any, i: number) => (
-                  <div key={i} style={{ fontSize: 11, color: "#4a3a2a", background: "#fff", borderRadius: 8, padding: "6px 9px", marginTop: 4 }}>{sk.job} — {sk.repeats}회</div>
+                  <div key={i} style={{ fontSize: 8.8, color: "#4a3a2a", background: "#fff", borderRadius: 8, padding: "6px 9px", marginTop: 4 }}>{sk.job} — {sk.repeats}회</div>
                 ))}
               </>)}
               {(harness.frozen || []).length > 0 && (<>
-                <div style={{ marginTop: 14, fontSize: 12.5, fontWeight: 700, color: "#2b2018" }}>🧊 동결 — 자동으로 못 고쳐 사람에게 넘긴 것</div>
-                <div style={{ fontSize: 10, color: "#63523f", margin: "3px 0 6px" }}>2회 시도해도 효과가 없으면 계속 재시도하지 않고 멈춥니다(무한루프 차단).</div>
+                <div style={{ marginTop: 14, fontSize: 10, fontWeight: 700, color: "#2b2018" }}>🧊 동결 — 자동으로 못 고쳐 사람에게 넘긴 것</div>
+                <div style={{ fontSize: 8, color: "#63523f", margin: "3px 0 6px" }}>2회 시도해도 효과가 없으면 계속 재시도하지 않고 멈춥니다(무한루프 차단).</div>
                 {(harness.frozen || []).map((f: any) => (
-                  <div key={f.job} style={{ display: "flex", gap: 8, fontSize: 11, background: "#fff", borderRadius: 8, padding: "6px 9px", marginTop: 4 }}>
+                  <div key={f.job} style={{ display: "flex", gap: 8, fontSize: 8.8, background: "#fff", borderRadius: 8, padding: "6px 9px", marginTop: 4 }}>
                     <span style={{ fontFamily: "monospace", color: "#4a3a2a", flex: 1 }}>{f.job}</span>
                     <span style={{ color: "#63523f" }}>{f.n}건 · 판독 {f.read} · 오탐 {f.fp}</span>
                   </div>
@@ -833,11 +833,11 @@ export default function OrgDashboard() {
               </>)}
 
               {/* 원장 최근 실행 */}
-              <div style={{ marginTop: 14, fontSize: 12.5, fontWeight: 700, color: "#2b2018" }}>📒 원장 — 최근 24시간 실행</div>
-              <div style={{ fontSize: 10, color: "#63523f", margin: "3px 0 6px" }}>지문=같은 문제집합 반복(헛돎) 검출용 · blob=큰 데이터 로드 횟수 · 동결스킵=시도조차 안 한 건</div>
+              <div style={{ marginTop: 14, fontSize: 10, fontWeight: 700, color: "#2b2018" }}>📒 원장 — 최근 24시간 실행</div>
+              <div style={{ fontSize: 8, color: "#63523f", margin: "3px 0 6px" }}>지문=같은 문제집합 반복(헛돎) 검출용 · blob=큰 데이터 로드 횟수 · 동결스킵=시도조차 안 한 건</div>
               <div style={{ display: "grid", gap: 3 }}>
                 {(harness.runs || []).map((r: any, i: number) => (
-                  <div key={i} style={{ display: "flex", gap: 7, alignItems: "center", background: "#fff", borderRadius: 7, padding: "5px 8px", fontSize: 10.5 }}>
+                  <div key={i} style={{ display: "flex", gap: 7, alignItems: "center", background: "#fff", borderRadius: 7, padding: "5px 8px", fontSize: 8.4 }}>
                     <span style={{ color: "#9c8a6c", fontFamily: "monospace" }}>{String(r.kst).slice(5, 16)}</span>
                     <span>{r.ok ? "✅" : "❌"}</span>
                     <span style={{ fontFamily: "monospace", color: "#4a3a2a", minWidth: 120 }}>{r.job}</span>
@@ -848,7 +848,7 @@ export default function OrgDashboard() {
                 ))}
               </div>
 
-              <div style={{ marginTop: 14, fontSize: 10, color: "#63523f", lineHeight: 1.6, background: "#efe2cf", borderRadius: 8, padding: "8px 10px" }}>
+              <div style={{ marginTop: 14, fontSize: 8, color: "#63523f", lineHeight: 1.6, background: "#efe2cf", borderRadius: 8, padding: "8px 10px" }}>
                 <b>하네스도 못 넘는 제약</b> — L3(코드·배포) 자동승인 없음 · 자동 재공개 없음 · 이슈↔결재 자동변환 금지 · 감시자에게 집행 권한 없음.
               </div>
             </>)}
@@ -861,20 +861,20 @@ export default function OrgDashboard() {
         <div onClick={() => setShowOrg(false)} style={{ position: "fixed", inset: 0, background: "rgba(20,14,10,.6)", zIndex: 50, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
           <div onClick={(e) => e.stopPropagation()} style={{ background: "#f4ece0", borderRadius: "18px 18px 0 0", padding: 18, width: "100%", maxWidth: 640, maxHeight: "85vh", overflowY: "auto" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-              <div style={{ fontSize: 16, fontWeight: 700, color: "#2b2018" }}>🏢 자율 조직도</div>
-              <button onClick={() => setShowOrg(false)} style={{ background: "none", border: "none", fontSize: 20, color: "#9c8a6c" }}>✕</button>
+              <div style={{ fontSize: 12.8, fontWeight: 700, color: "#2b2018" }}>🏢 자율 조직도</div>
+              <button onClick={() => setShowOrg(false)} style={{ background: "none", border: "none", fontSize: 16, color: "#9c8a6c" }}>✕</button>
             </div>
-            <div style={{ fontSize: 10.5, color: "#6b5640", marginBottom: 12, lineHeight: 1.5, background: "#efe2cf", borderRadius: 8, padding: "7px 10px" }}>
+            <div style={{ fontSize: 8.4, color: "#6b5640", marginBottom: 12, lineHeight: 1.5, background: "#efe2cf", borderRadius: 8, padding: "7px 10px" }}>
               서비스 전 영역에 주인 팀이 있습니다. 각 팀의 가동 멤버: <b>🧠 배치</b>(LLM 에이전트·하루1회/격일) · <b>⚙️ 상시</b>(결정론 크론·매시간~매일 자동) · <b>🌐 실시간</b>(API·매 요청). 결정론 크론도 팀 소속입니다.
             </div>
             {/* CEO */}
             <div style={{ display: "flex", justifyContent: "center" }}>
-              <span style={{ background: "#2b2018", color: "#e8b87a", fontWeight: 700, fontSize: 14, padding: "7px 16px", borderRadius: 10 }}>👤 {ORG.ceo}</span>
+              <span style={{ background: "#2b2018", color: "#e8b87a", fontWeight: 700, fontSize: 11.2, padding: "7px 16px", borderRadius: 10 }}>👤 {ORG.ceo}</span>
             </div>
             <div style={{ width: 2, height: 14, background: "#c98a3c", margin: "0 auto" }} />
             {/* 기획조정실장 */}
             <div style={{ display: "flex", justifyContent: "center" }}>
-              <span style={{ background: "#c98a3c", color: "#fff", fontWeight: 700, fontSize: 13.5, padding: "7px 16px", borderRadius: 10, textAlign: "center" }}>{ORG.chief}</span>
+              <span style={{ background: "#c98a3c", color: "#fff", fontWeight: 700, fontSize: 10.8, padding: "7px 16px", borderRadius: 10, textAlign: "center" }}>{ORG.chief}</span>
             </div>
             <div style={{ width: 2, height: 14, background: "#c98a3c", margin: "0 auto" }} />
             {/* 직할(스태프) + 라인 본부 트리 — 기조실장 아래 계층 연결선 */}
@@ -882,17 +882,17 @@ export default function OrgDashboard() {
               {/* 🎯 기조실장 직할 — 라인 본부와 위치(맨 위)·스타일(톤다운 배경·점선 액센트 보더)로 구분되는 스태프 그룹 */}
               <div style={{ background: "#f0e7d5", border: "1.5px dashed #c9a56a", borderRadius: 10, padding: "9px 11px 5px", marginBottom: 16 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 9 }}>
-                  <span style={{ background: "#8a6d3b", color: "#fff", fontWeight: 700, fontSize: 9.5, letterSpacing: 0.5, padding: "2px 8px", borderRadius: 5 }}>직할</span>
-                  <span style={{ fontSize: 10.5, color: "#8a6d3b", fontWeight: 700 }}>기조실장 직속 · 스태프 유닛</span>
+                  <span style={{ background: "#8a6d3b", color: "#fff", fontWeight: 700, fontSize: 7.6, letterSpacing: 0.5, padding: "2px 8px", borderRadius: 5 }}>직할</span>
+                  <span style={{ fontSize: 8.4, color: "#8a6d3b", fontWeight: 700 }}>기조실장 직속 · 스태프 유닛</span>
                 </div>
                 {/* 비서실장 — 스태프이므로 점선 보더로 톤다운 */}
-                <div style={{ background: "#fbf6ec", color: "#6b5640", fontWeight: 600, fontSize: 12.5, padding: "5px 10px", borderRadius: 8, border: "1px dashed #d3bd94", marginBottom: 10, display: "inline-block" }}>{ORG.secretary}</div>
+                <div style={{ background: "#fbf6ec", color: "#6b5640", fontWeight: 600, fontSize: 10, padding: "5px 10px", borderRadius: 8, border: "1px dashed #d3bd94", marginBottom: 10, display: "inline-block" }}>{ORG.secretary}</div>
                 {staffDivs.map((d) => (
                   <div key={d.n} style={{ marginBottom: 4 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                       {/* 라인 본부는 solid 채움, 직할은 투명배경·점선 아웃라인으로 스태프 성격 표시 */}
-                      <span style={{ background: "transparent", color: d.c, border: `1.5px dashed ${d.c}`, fontWeight: 700, fontSize: 13, padding: "3px 10px", borderRadius: 8 }}>{d.n}</span>
-                      {d.note && <span style={{ fontSize: 10, color: "#9c8a6c", fontWeight: 700 }}>· {d.note}</span>}
+                      <span style={{ background: "transparent", color: d.c, border: `1.5px dashed ${d.c}`, fontWeight: 700, fontSize: 10.4, padding: "3px 10px", borderRadius: 8 }}>{d.n}</span>
+                      {d.note && <span style={{ fontSize: 8, color: "#9c8a6c", fontWeight: 700 }}>· {d.note}</span>}
                     </div>
                     <div style={{ borderLeft: `2px dashed ${d.c}`, marginLeft: 12, paddingLeft: 12, marginTop: 5, opacity: 0.95 }}>
                       {renderTeams(d)}
@@ -904,8 +904,8 @@ export default function OrgDashboard() {
               {lineDivs.map((d) => (
                 <div key={d.n} style={{ marginBottom: 12 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                    <span style={{ background: d.c, color: "#fff", fontWeight: 700, fontSize: 13, padding: "4px 11px", borderRadius: 8 }}>{d.n}</span>
-                    {d.note && <span style={{ fontSize: 10, color: "#9c8a6c", fontWeight: 700 }}>· {d.note}</span>}
+                    <span style={{ background: d.c, color: "#fff", fontWeight: 700, fontSize: 10.4, padding: "4px 11px", borderRadius: 8 }}>{d.n}</span>
+                    {d.note && <span style={{ fontSize: 8, color: "#9c8a6c", fontWeight: 700 }}>· {d.note}</span>}
                   </div>
                   <div style={{ borderLeft: `2px solid ${d.c}`, marginLeft: 12, paddingLeft: 12, marginTop: 5, opacity: 0.95 }}>
                     {renderTeams(d)}
@@ -913,7 +913,7 @@ export default function OrgDashboard() {
                 </div>
               ))}
             </div>
-            <div style={{ marginTop: 10, fontSize: 11, color: "#9c6b3f", borderTop: "1px dashed #d8c4a0", paddingTop: 10 }}>
+            <div style={{ marginTop: 10, fontSize: 8.8, color: "#9c6b3f", borderTop: "1px dashed #d8c4a0", paddingTop: 10 }}>
               실행: 현업 본부 매일 자율 가동 → 기조실장 종합 → CEO 보고. 결재는 기조실장이 담당 본부·팀에 배분. (전략기획·경영지원은 격일)
             </div>
           </div>
@@ -925,27 +925,27 @@ export default function OrgDashboard() {
         <div onClick={() => setMember(null)} style={{ position: "fixed", inset: 0, background: "rgba(20,14,10,.55)", zIndex: 70, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
           <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 14, padding: 18, maxWidth: 340, width: "100%", boxShadow: "0 10px 40px rgba(0,0,0,.3)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 4 }}>
-              <span style={{ fontSize: 18 }}>{member.k}</span>
-              <span style={{ fontSize: 14.5, fontWeight: 700, color: "#2b2018" }}>{member.n}</span>
+              <span style={{ fontSize: 14.4 }}>{member.k}</span>
+              <span style={{ fontSize: 11.6, fontWeight: 700, color: "#2b2018" }}>{member.n}</span>
             </div>
-            <div style={{ fontSize: 11, color: "#9c8a6c", marginBottom: 9 }}>
+            <div style={{ fontSize: 8.8, color: "#9c8a6c", marginBottom: 9 }}>
               {member.k === "⚙️" ? "결정론 크론 · 상시 자동" : member.k === "🌐" ? "API · 실시간 서빙" : "LLM 에이전트 · 배치"} · 가동 {member.t}
             </div>
-            <div style={{ fontSize: 12.5, color: "#3d2f22", lineHeight: 1.6 }}>{MEMBER_INFO[member.n] || "설명 준비 중."}</div>
-            <button onClick={() => setMember(null)} style={{ marginTop: 12, width: "100%", padding: 9, background: "#efe7d8", color: "#5a4631", border: "1px solid #ddc9a8", borderRadius: 9, fontWeight: 700, fontSize: 12.5, fontFamily: "inherit" }}>닫기</button>
+            <div style={{ fontSize: 10, color: "#3d2f22", lineHeight: 1.6 }}>{MEMBER_INFO[member.n] || "설명 준비 중."}</div>
+            <button onClick={() => setMember(null)} style={{ marginTop: 12, width: "100%", padding: 9, background: "#efe7d8", color: "#5a4631", border: "1px solid #ddc9a8", borderRadius: 9, fontWeight: 700, fontSize: 10, fontFamily: "inherit" }}>닫기</button>
           </div>
         </div>
       )}
 
-      {toast && <div style={{ position: "fixed", bottom: 20, left: "50%", transform: "translateX(-50%)", background: "#2b2018", color: "#fff", padding: "10px 18px", borderRadius: 22, fontSize: 13, zIndex: 60, maxWidth: "90%", textAlign: "center" }}>{toast}</div>}
+      {toast && <div style={{ position: "fixed", bottom: 20, left: "50%", transform: "translateX(-50%)", background: "#2b2018", color: "#fff", padding: "10px 18px", borderRadius: 22, fontSize: 10.4, zIndex: 60, maxWidth: "90%", textAlign: "center" }}>{toast}</div>}
       <ChatWidget pw={pw} />
     </main>
   );
 }
 const card: React.CSSProperties = { background: "#fff", border: "1px solid #ddc9a8", borderRadius: 12, padding: "12px 14px", minWidth: 0 };
-const lbl: React.CSSProperties = { fontSize: 11.5, fontWeight: 700, color: "#8a5e30" };
+const lbl: React.CSSProperties = { fontSize: 9.2, fontWeight: 700, color: "#8a5e30" };
 // 핵심 수치 — 폭에 맞춰 잘림 없이(자릿수 정렬 tabular-nums·한 줄 유지·넘치면 축약). 대비 강한 진한 색.
-const big: React.CSSProperties = { fontSize: 23, fontWeight: 800, color: "#b5731f", lineHeight: 1.15, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
-const sub: React.CSSProperties = { fontSize: 10.5, color: "#8a7a5c", fontWeight: 600 };
+const big: React.CSSProperties = { fontSize: 18.4, fontWeight: 800, color: "#b5731f", lineHeight: 1.15, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
+const sub: React.CSSProperties = { fontSize: 8.4, color: "#8a7a5c", fontWeight: 600 };
 const typeC: Record<string, string> = { help: "#3a6ea5", handoff: "#3f7a4f", cowork: "#7a5a2a", dependency: "#b06a2e" };
 const typeLabel: Record<string, string> = { help: "도움요청", handoff: "인계", cowork: "코웍", dependency: "의존" };

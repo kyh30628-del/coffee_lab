@@ -10,9 +10,9 @@ export default function PrivacyPage() {
         <BackLink to="/" label="홈" className="text-note-brown mb-4" />
         <div className="text-note-brown text-xs tracking-[0.3em] uppercase mb-2">Privacy Policy</div>
         <h1 className="text-3xl font-bold mb-1">개인정보처리방침</h1>
-        <p className="text-[13px] text-note-ink-soft mb-8">동네 커피 노트 (Dongne Coffee Note) · 최종 업데이트 {updated}</p>
+        <p className="text-[10.4px] text-note-ink-soft mb-8">동네 커피 노트 (Dongne Coffee Note) · 최종 업데이트 {updated}</p>
 
-        <div className="space-y-7 text-[14px] leading-relaxed text-[#3d2f22]">
+        <div className="space-y-7 text-[11.2px] leading-relaxed text-[#3d2f22]">
           <section>
             <h2 className="text-lg font-bold mb-2">1. 우리가 수집하는 것 (개인정보 최소화)</h2>
             <p>동네 커피 노트는 <b>이름·연락처·정밀 위치 등 개인을 식별하는 정보를 수집하지 않습니다.</b> 서비스 제공에 필요한 최소한만 익명으로 처리합니다.</p>

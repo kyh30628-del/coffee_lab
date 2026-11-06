@@ -36,10 +36,10 @@ export default async function RegionPage({ params }: Props) {
   const intro = `${area}에서 가볼 만한 동네 카페 ${total || cafes.length}곳을 실제 방문 후기로 검증해 모았어요. 취향별로도 골라보세요.`;
   const extra = dongs.length > 0 ? (
     <div className="mt-8 pt-5 border-t border-note-line">
-      <div className="text-[12px] font-bold text-note-brown mb-2">동별로 보기</div>
+      <div className="text-[9.6px] font-bold text-note-brown mb-2">동별로 보기</div>
       <div className="flex flex-wrap gap-1.5">
         {dongs.map((d) => (
-          <Link key={d.dong} href={`/area/${encodeURIComponent(area)}/dong/${encodeURIComponent(d.dong)}`} className="text-[12px] px-2.5 py-1 rounded-full bg-white text-note-ink-body border border-[#d9c9b0]">{d.dong}</Link>
+          <Link key={d.dong} href={`/area/${encodeURIComponent(area)}/dong/${encodeURIComponent(d.dong)}`} className="text-[9.6px] px-2.5 py-1 rounded-full bg-white text-note-ink-body border border-[#d9c9b0]">{d.dong}</Link>
         ))}
       </div>
     </div>

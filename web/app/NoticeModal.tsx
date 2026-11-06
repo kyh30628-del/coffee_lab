@@ -65,22 +65,22 @@ export default function NoticeModal({ source }: { source?: Notice | null }) {
       style={{ background: "rgba(20,14,8,0.55)" }}>
       <div onClick={(e) => e.stopPropagation()}
         className="w-full max-w-[340px] nt-paper rounded-lg border border-[#d9cdb9] shadow-xl px-6 pt-6 pb-4 text-center">
-        <div className="text-[34px] leading-none mb-3">{notice.emoji}</div>
-        <h2 id="dcn-notice-title" className="text-[17px] font-bold text-note-ink leading-snug mb-2">
+        <div className="text-[27.2px] leading-none mb-3">{notice.emoji}</div>
+        <h2 id="dcn-notice-title" className="text-[13.6px] font-bold text-note-ink leading-snug mb-2">
           {past ? notice.titlePast : notice.title}
         </h2>
-        <p className="text-[13.5px] text-note-ink-body leading-relaxed mb-1">
+        <p className="text-[10.8px] text-note-ink-body leading-relaxed mb-1">
           {notice.highlight && <b className="text-note-brown">{notice.highlight}</b>}{notice.highlight ? " " : ""}
           {past ? notice.bodyPast : notice.body}
         </p>
-        <p className="text-[12px] text-[#7a6a55] leading-relaxed mb-5">{past ? notice.subPast : notice.sub}</p>
+        <p className="text-[9.6px] text-[#7a6a55] leading-relaxed mb-5">{past ? notice.subPast : notice.sub}</p>
         <button onClick={go}
-          className="w-full bg-note-ink text-note-paper rounded-xl py-3 text-[14px] font-bold active:scale-[0.98] transition-transform">
+          className="w-full bg-note-ink text-note-paper rounded-xl py-3 text-[11.2px] font-bold active:scale-[0.98] transition-transform">
           {past ? notice.ctaPast : notice.cta}
         </button>
         {/* 영구 해제 — 주 동작(둘러보기)보다 약하게 두되, 찾기 어렵지 않게 바로 아래에. */}
         <button onClick={never}
-          className="mt-2.5 w-full text-[12px] text-[#8a7a64] underline underline-offset-2 py-1.5 active:opacity-70">
+          className="mt-2.5 w-full text-[9.6px] text-[#8a7a64] underline underline-offset-2 py-1.5 active:opacity-70">
           다시 보지 않기
         </button>
       </div>

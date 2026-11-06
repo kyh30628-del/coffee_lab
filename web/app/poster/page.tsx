@@ -50,7 +50,7 @@ export default function PosterHubPage() {
         <BackLink to="/" label="홈" className="text-note-brown mb-4" />
         <div className="text-note-brown text-xs tracking-[0.3em] uppercase mb-2">Poster Studio</div>
         <h1 className="text-3xl font-bold mb-1">홍보 포스터</h1>
-        <p className="text-[13px] text-[#665036] mb-8 leading-relaxed">
+        <p className="text-[10.4px] text-[#665036] mb-8 leading-relaxed">
           유형을 골라 인스타 홍보용 포스터를 만들고 PNG로 저장하세요. 카페·지역 포스터는 전부 실제 검증 데이터
           기준이에요.
         </p>
@@ -63,9 +63,9 @@ export default function PosterHubPage() {
               className="block bg-white/60 border border-note-line rounded-xl p-5 hover:border-[#c0a883] hover:bg-white/80 transition"
             >
               <div className="text-3xl mb-3">{c.icon}</div>
-              <div className="text-[16px] font-bold mb-1">{c.title}</div>
-              <p className="text-[12.5px] text-note-ink-body leading-relaxed mb-3">{c.desc}</p>
-              <div className="text-[11px] text-[#665036]">{c.meta}</div>
+              <div className="text-[12.8px] font-bold mb-1">{c.title}</div>
+              <p className="text-[10px] text-note-ink-body leading-relaxed mb-3">{c.desc}</p>
+              <div className="text-[8.8px] text-[#665036]">{c.meta}</div>
             </Link>
           ))}
         </div>

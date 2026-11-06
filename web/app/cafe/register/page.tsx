@@ -47,7 +47,7 @@ export default function RegisterPage() {
     } catch { setStatus("error"); setErr("네트워크 오류. 다시 시도해주세요."); }
   };
 
-  const field = "w-full bg-white border border-[#d9c9b0] rounded-lg px-3.5 py-2.5 text-[15px] focus:border-note-tan focus:outline-none";
+  const field = "w-full bg-white border border-[#d9c9b0] rounded-lg px-3.5 py-2.5 text-[12px] focus:border-note-tan focus:outline-none";
 
   if (status === "done") {
     return (
@@ -60,7 +60,7 @@ export default function RegisterPage() {
             보내주신 정보를 확인한 뒤 가이드에 실어드릴게요.
             커피를 아는 사람들에게 사장님 가게가 제대로 소개되도록 정성껏 다듬겠습니다.
           </p>
-          <p className="text-[13px] text-note-ink-soft leading-relaxed mt-3 bg-note-paper rounded-xl px-4 py-3">
+          <p className="text-[10.4px] text-note-ink-soft leading-relaxed mt-3 bg-note-paper rounded-xl px-4 py-3">
             가게가 <b>검증·공개</b>되면, 사장님 화면에서 <b>내 카페 분석</b>과 <b>{TRIAL_DAYS}일 무료 체험</b>을 이용하실 수 있어요. 준비되면 안내드릴게요.
           </p>
           {newCafe && (
@@ -81,7 +81,7 @@ export default function RegisterPage() {
           <BackLink to="/" label="홈" className="text-note-brown mb-4" />
           <div className="text-note-brown text-xs tracking-[0.4em] uppercase mb-3">For Owners</div>
           <h1 className="text-3xl font-bold leading-tight">사장님, 가게를 소개해주세요</h1>
-          <p className="text-note-ink-body mt-3 leading-relaxed text-[15px]">
+          <p className="text-note-ink-body mt-3 leading-relaxed text-[12px]">
             별점·광고가 아니라, 커피를 아는 손님에게 우리 가게의 결을 전하는 안내입니다.
             아래를 채워주시면 확인 후 동네 가이드에 실어드려요. (무료)
           </p>
@@ -89,7 +89,7 @@ export default function RegisterPage() {
 
         <div className="space-y-5">
           <div className="relative">
-            <label className="block text-sm text-note-brown mb-1.5">카페 이름 * {supplementId && <span className="text-[11px] text-[#5f7355]">· 기존 카페 보완 모드</span>}</label>
+            <label className="block text-sm text-note-brown mb-1.5">카페 이름 * {supplementId && <span className="text-[8.8px] text-[#5f7355]">· 기존 카페 보완 모드</span>}</label>
             <input className={field} value={form.name} onChange={(e) => { set("name", e.target.value); setSupplementId(null); nameLookup(e.target.value); }} placeholder="기존 카페를 찾거나 새 이름을 입력" />
             {nameSug.length > 0 && form.name.trim() && (
               <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-[#d9c9b0] rounded-lg shadow-lg overflow-hidden max-h-56 overflow-y-auto">
@@ -99,7 +99,7 @@ export default function RegisterPage() {
                     <span className="font-bold text-sm">{c.name}</span><span className="text-xs text-note-ink-soft ml-2">{c.area} · 내용 보완</span>
                   </button>
                 ))}
-                <div className="px-3.5 py-2 text-[11px] text-note-ink-soft">목록에 없으면 그대로 두고 새로 등록하세요</div>
+                <div className="px-3.5 py-2 text-[8.8px] text-note-ink-soft">목록에 없으면 그대로 두고 새로 등록하세요</div>
               </div>
             )}
           </div>
@@ -124,7 +124,7 @@ export default function RegisterPage() {
 
           <div className="flex items-center gap-2 py-1">
             <input type="checkbox" id="roast" checked={form.roasts_own} onChange={(e) => set("roasts_own", e.target.checked)} className="w-4 h-4 accent-note-tan" />
-            <label htmlFor="roast" className="text-[15px]">직접 로스팅합니다</label>
+            <label htmlFor="roast" className="text-[12px]">직접 로스팅합니다</label>
           </div>
 
           <div>
@@ -164,7 +164,7 @@ export default function RegisterPage() {
           {/* 🎁 등록과 함께 무료 체험 신청 */}
           <label className="flex items-start gap-2.5 rounded-xl border border-note-honey bg-[#fbf3e6] px-3.5 py-3 cursor-pointer">
             <input type="checkbox" checked={wantTrial} onChange={(e) => setWantTrial(e.target.checked)} className="mt-0.5 w-4 h-4 accent-note-tan shrink-0" />
-            <span className="text-[13px] text-note-ink-warm leading-snug"><b>🎁 등록과 함께 {TRIAL_DAYS}일 무료 체험도 신청할게요</b><br /><span className="text-[11.5px] text-note-ink-soft">등록 직후 사장님 정보·사업자등록증을 받고, 가게가 검증·공개되면 승인해 이메일로 키를 보내드려요.</span></span>
+            <span className="text-[10.4px] text-note-ink-warm leading-snug"><b>🎁 등록과 함께 {TRIAL_DAYS}일 무료 체험도 신청할게요</b><br /><span className="text-[9.2px] text-note-ink-soft">등록 직후 사장님 정보·사업자등록증을 받고, 가게가 검증·공개되면 승인해 이메일로 키를 보내드려요.</span></span>
           </label>
 
           {err && <p className="text-red-700 text-sm">{err}</p>}
@@ -173,7 +173,7 @@ export default function RegisterPage() {
             className="w-full bg-note-ink text-note-paper rounded-lg py-3.5 font-medium hover:bg-[#3d2f22] transition-colors disabled:opacity-50">
             {status === "sending" ? "보내는 중..." : wantTrial ? "등록하고 체험 신청하기" : "등록 신청하기"}
           </button>
-          <p className="text-[11px] text-note-ink-soft text-center">신청 후 확인을 거쳐 가이드에 노출됩니다.</p>
+          <p className="text-[8.8px] text-note-ink-soft text-center">신청 후 확인을 거쳐 가이드에 노출됩니다.</p>
         </div>
 
       </div>

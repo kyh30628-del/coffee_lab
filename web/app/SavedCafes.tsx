@@ -31,16 +31,16 @@ export default function SavedCafes({ excludeId }: { excludeId?: number }) {
 
   return (
     <div className="mt-7">
-      <div className="text-[13px] font-bold text-[#5a4632] mb-2">❤ 찜한 카페 다시 보기</div>
+      <div className="text-[10.4px] font-bold text-[#5a4632] mb-2">❤ 찜한 카페 다시 보기</div>
       <div className="flex flex-col gap-2">
         {items.slice(0, 8).map((c) => (
           <Link key={c.id} href={`/c/${c.id}`}
             className="flex items-center gap-2.5 bg-white border border-[#f0b8cc] rounded-xl px-3.5 py-2.5">
             <span className="flex flex-col text-left min-w-0">
-              <span className="text-[13.5px] font-bold text-[#3d2f22] truncate">{c.name}</span>
-              <span className="text-[10.5px] text-[#544636] truncate">{c.area}</span>
+              <span className="text-[10.8px] font-bold text-[#3d2f22] truncate">{c.name}</span>
+              <span className="text-[8.4px] text-[#544636] truncate">{c.area}</span>
             </span>
-            {c.synth_grade && <span className="ml-auto text-[10px] font-bold bg-note-ink text-note-honey px-2 py-0.5 rounded-full whitespace-nowrap">{c.synth_grade}</span>}
+            {c.synth_grade && <span className="ml-auto text-[8px] font-bold bg-note-ink text-note-honey px-2 py-0.5 rounded-full whitespace-nowrap">{c.synth_grade}</span>}
           </Link>
         ))}
       </div>

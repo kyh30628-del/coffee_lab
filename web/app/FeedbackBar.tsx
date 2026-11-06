@@ -58,13 +58,13 @@ export default function FeedbackBar({ cafeId }: { cafeId: number }) {
 
   if (hidden) return null;
   if (done) return (
-    <p className="mt-3 text-[13px] text-[#33684b]">✓ 고맙습니다. 더 정확하게 만드는 데 쓰겠습니다.</p>
+    <p className="mt-3 text-[10.4px] text-[#33684b]">✓ 고맙습니다. 더 정확하게 만드는 데 쓰겠습니다.</p>
   );
 
   // 1단계 — 한 탭. 누르면 즉시 접수된다.
   if (!kind) return (
     <div className="mt-3 flex items-center gap-2 flex-wrap">
-      <span className="text-[13px] text-[#5b4a36]">
+      <span className="text-[10.4px] text-[#5b4a36]">
         {place === "after-outlink" ? "이 정보가 도움이 됐나요?" : "이 카페 정보, 어땠나요?"}
       </span>
       <button type="button" disabled={busy} onClick={() => { setKind("like"); send("like"); }}
@@ -77,7 +77,7 @@ export default function FeedbackBar({ cafeId }: { cafeId: number }) {
   // 2단계 — 선택 입력. 안 써도 이미 접수됐다고 분명히 알린다.
   return (
     <div className="mt-3">
-      <p className="text-[13px] text-[#5b4a36]">
+      <p className="text-[10.4px] text-[#5b4a36]">
         {kind === "like" ? "👍 고맙습니다." : "👎 알려주셔서 고맙습니다."}
         <span className="text-[#7a6750]"> 한 줄 더 남겨주시면 바로 고칩니다. (선택)</span>
       </p>
@@ -86,14 +86,14 @@ export default function FeedbackBar({ cafeId }: { cafeId: number }) {
           value={note} onChange={(e) => setNote(e.target.value.slice(0, 500))}
           rows={2} maxLength={500}
           placeholder={kind === "like" ? "어떤 점이 좋았나요?" : "무엇이 아쉬웠나요?"}
-          className="flex-1 min-w-0 rounded-lg border border-note-line bg-white px-3 py-2 text-[14px] leading-relaxed outline-none focus:border-note-brown"
+          className="flex-1 min-w-0 rounded-lg border border-note-line bg-white px-3 py-2 text-[11.2px] leading-relaxed outline-none focus:border-note-brown"
         />
         <div className="flex flex-col gap-1">
           <button type="button" disabled={busy || !note.trim()}
             onClick={async () => { await send(kind, note.trim()); setDone(true); }}
             className="nt-btn whitespace-nowrap disabled:opacity-40">보내기</button>
           <button type="button" onClick={() => setDone(true)}
-            className="text-[12px] text-[#7a6750] whitespace-nowrap">그냥 닫기</button>
+            className="text-[9.6px] text-[#7a6750] whitespace-nowrap">그냥 닫기</button>
         </div>
       </div>
     </div>

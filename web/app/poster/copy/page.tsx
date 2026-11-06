@@ -300,7 +300,7 @@ export default function PosterCopyPage() {
         <BackLink to="/poster" label="포스터" className="text-note-brown mb-4" />
         <div className="text-note-brown text-xs tracking-[0.3em] uppercase mb-2">Caption Studio</div>
         <h1 className="text-3xl font-bold mb-1">홍보카피 포스터</h1>
-        <p className="text-[13px] text-[#665036] mb-6 leading-relaxed">
+        <p className="text-[10.4px] text-[#665036] mb-6 leading-relaxed">
           확정된 인스타 홍보카피 {PRESETS.length}종 중 하나를 골라 &ldquo;{REGION_TOKEN}&rdquo; 자리에 원하는
           지역명을 자유롭게 입력하면 실시간 미리보기에 바로 반영돼요. 통합 추천안·공감형·취향/결·짧고임팩트에
           스토리텔링·후킹 질문·통계 인용형을 더해 문장 뼈대 자체가 서로 달라요. DB 지역 목록에 제한되지 않아 어떤
@@ -308,11 +308,11 @@ export default function PosterCopyPage() {
         </p>
 
         <section className="bg-white/60 border border-note-line rounded-xl p-4 mb-5">
-          <div className="text-[13px] font-bold mb-2">1. 카피 버전 선택</div>
+          <div className="text-[10.4px] font-bold mb-2">1. 카피 버전 선택</div>
           <select
             value={presetKey}
             onChange={(e) => setPresetKey(e.target.value)}
-            className="w-full border border-[#d8c6ac] rounded-lg px-3 py-2 text-[14px] bg-white mb-4"
+            className="w-full border border-[#d8c6ac] rounded-lg px-3 py-2 text-[11.2px] bg-white mb-4"
           >
             {PRESETS.map((p) => (
               <option key={p.key} value={p.key}>
@@ -321,19 +321,19 @@ export default function PosterCopyPage() {
             ))}
           </select>
 
-          <div className="text-[13px] font-bold mb-2">2. 지역명 입력</div>
+          <div className="text-[10.4px] font-bold mb-2">2. 지역명 입력</div>
           <input
             type="text"
             value={region}
             onChange={(e) => setRegion(e.target.value)}
             placeholder={`예: 성수동, 망원동, 판교 (비워두면 "${DEFAULT_REGION}")`}
             maxLength={20}
-            className="w-full border border-[#d8c6ac] rounded-lg px-3 py-2 text-[14px] bg-white"
+            className="w-full border border-[#d8c6ac] rounded-lg px-3 py-2 text-[11.2px] bg-white"
           />
         </section>
 
         <section className="mb-5">
-          <div className="text-[13px] font-bold mb-2">3. 미리보기 · 다운로드</div>
+          <div className="text-[10.4px] font-bold mb-2">3. 미리보기 · 다운로드</div>
           <div className="rounded-xl overflow-hidden shadow-lg border border-note-ink max-w-[440px] mx-auto">
             <canvas
               ref={canvasRef}
@@ -351,7 +351,7 @@ export default function PosterCopyPage() {
           </button>
         </section>
 
-        <p className="text-[11px] text-[#665036] leading-relaxed">
+        <p className="text-[8.8px] text-[#665036] leading-relaxed">
           ※ 다른 포스터 타입과 달리 다크 배경·골드 코너브래킷의 에디토리얼 톤으로 차별화했어요. DB 조회 없이
           브라우저에서만 렌더링되고, 어떤 프리셋에도 특정 카페명은 등장하지 않아요(지역명만 자유 입력). 지역명은 자유
           입력이라 어떤 텍스트를 넣어도 실제 존재 여부와 무관하게 렌더링됩니다 — 게시 전 직접 확인해 주세요.

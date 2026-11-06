@@ -42,6 +42,22 @@
   --color-note-ink-warm: #52402e;    /* 따뜻한 보조 (39회) */
   --color-note-line: #e6dcc8;        /* 얇은 구분선 */
   --color-note-line-strong: #e0d3bd; /* 카드 테두리 */
+
+  /* 🔡 2026-11-06 CEO 지시: 전체 텍스트 20% 축소. Tailwind 기본 text-* 유틸(admin/owner/pricing 등
+     text-sm·text-lg류 ~250곳)은 기본 스케일(rem)을 그대로 쓰므로, 토큰값만 ×0.8로 재정의하면
+     파일을 건드리지 않고 전부 반영된다 — line-height는 비율(calc)이라 그대로 비례 축소돼 줄간격도 유지됨.
+     note.css 변수·Tailwind 임의값(text-[Npx])·인라인 fontSize는 각 선언을 직접 ×0.8 했다(별도). */
+  --text-xs: 0.6rem;
+  --text-sm: 0.7rem;
+  --text-base: 0.8rem;
+  --text-lg: 0.9rem;
+  --text-xl: 1rem;
+  --text-2xl: 1.2rem;
+  --text-3xl: 1.5rem;
+  --text-4xl: 1.8rem;
+  --text-5xl: 2.4rem;
+  --text-6xl: 3rem;
+  --text-7xl: 3.6rem;
 }
 
 
@@ -106,10 +122,10 @@ body {
 .admin-today-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(82px, 1fr)); gap: 0.375rem; }
 .admin-stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 0.75rem; text-align: center; }
 .admin-stat-grid > div > div:first-child { font-variant-numeric: tabular-nums; }
-.admin-h1 { font-size: clamp(1.25rem, 1.1rem + 0.8vw, 1.625rem); }
-.admin-section-title { font-size: clamp(0.78rem, 0.72rem + 0.28vw, 0.9rem); }
-.admin-group-title { font-size: clamp(0.68rem, 0.64rem + 0.16vw, 0.75rem); }
-.admin-card-title { font-size: clamp(0.8rem, 0.76rem + 0.18vw, 0.9rem); }
+.admin-h1 { font-size: clamp(1rem, 0.88rem + 0.64vw, 1.3rem); }
+.admin-section-title { font-size: clamp(0.62rem, 0.58rem + 0.22vw, 0.72rem); }
+.admin-group-title { font-size: clamp(0.54rem, 0.51rem + 0.13vw, 0.6rem); }
+.admin-card-title { font-size: clamp(0.64rem, 0.61rem + 0.14vw, 0.72rem); }
 
 /* 관제탑 신호등 — 작동 중 램프가 또렷이 켜졌다 꺼졌다(깜빡) */
 @keyframes accBlink { 0%, 48% { opacity: 1; } 49%, 100% { opacity: 0.16; } }

@@ -80,13 +80,13 @@ export default function OutreachPage() {
   return (
     <main className="min-h-screen nt-paper nt-app pb-16">
       <div className="sticky top-0 bg-[#f7f3ec] border-b border-stone-200 px-4 py-3 z-10">
-        <h1 className="font-bold text-stone-800 text-[15px]">📇 아웃리치 콘솔</h1>
-        <p className="text-[12px] text-stone-700 mt-1">
+        <h1 className="font-bold text-stone-800 text-[12px]">📇 아웃리치 콘솔</h1>
+        <p className="text-[9.6px] text-stone-700 mt-1">
           오늘 <b>{data.todaySent}</b>건 · 오늘 <b className={left === 0 ? "text-rose-600" : "text-emerald-700"}>{left}건</b> 남음
           {" · "}누적 {data.sentTotal}/{data.total}
           {sent.length > 0 && <> · <b className="text-emerald-700">열어본 사장님 {arrived}명</b></>}
         </p>
-        {left === 0 && <p className="text-[11px] text-rose-600 mt-1">오늘 권장량을 채웠습니다. 내일 이어서 하시는 게 안전합니다(스팸 처리 위험).</p>}
+        {left === 0 && <p className="text-[8.8px] text-rose-600 mt-1">오늘 권장량을 채웠습니다. 내일 이어서 하시는 게 안전합니다(스팸 처리 위험).</p>}
       </div>
 
       <div className="px-4 pt-4">
@@ -95,29 +95,29 @@ export default function OutreachPage() {
         ) : (
           <div className="bg-white rounded-2xl border border-stone-300 p-5 shadow-sm">
             <div className="flex items-baseline justify-between gap-2">
-              <span className="font-bold text-stone-900 text-[16px]">{cur.name}</span>
-              <span className="text-[11px] text-stone-500">{pending.length}곳 남음</span>
+              <span className="font-bold text-stone-900 text-[12.8px]">{cur.name}</span>
+              <span className="text-[8.8px] text-stone-500">{pending.length}곳 남음</span>
             </div>
-            <p className="text-[12px] text-stone-600 mt-1">
+            <p className="text-[9.6px] text-stone-600 mt-1">
               {cur.area}{cur.dong ? ` ${cur.dong}` : ""} · {cur.areaN}곳 중 <b className="text-stone-800">{cur.rank}위</b>
               {" · "}검증 후기 {cur.count}건{cur.strength ? ` · 강점 ${cur.strength}` : ""}
             </p>
-            <p className="text-[11.5px] text-stone-500 mt-0.5">
+            <p className="text-[9.2px] text-stone-500 mt-0.5">
               보낼 곳 <a href={cur.profile ?? cur.instagram} target="_blank" rel="noreferrer" className="underline">@{cur.handle}</a>
             </p>
 
-            <pre className="whitespace-pre-wrap text-[12px] text-stone-700 bg-stone-50 rounded-xl p-3.5 mt-3 leading-relaxed border border-stone-200">{cur.message}</pre>
+            <pre className="whitespace-pre-wrap text-[9.6px] text-stone-700 bg-stone-50 rounded-xl p-3.5 mt-3 leading-relaxed border border-stone-200">{cur.message}</pre>
 
             <button onClick={() => copyAndOpen(cur)}
-              className="w-full mt-4 py-3.5 text-[14px] font-bold rounded-xl bg-stone-900 text-white active:scale-[0.99]">
+              className="w-full mt-4 py-3.5 text-[11.2px] font-bold rounded-xl bg-stone-900 text-white active:scale-[0.99]">
               {copied ? "✓ 복사됨 — 인스타 탭에서 붙여넣기(⌘V) 후 전송" : "① 문구 복사 + DM 창 열기"}
             </button>
             <button onClick={() => markSent(cur)} disabled={busy}
-              className="w-full mt-2 py-3 text-[13.5px] font-bold rounded-xl bg-note-honey text-note-ink active:scale-[0.99] disabled:opacity-50">
+              className="w-full mt-2 py-3 text-[10.8px] font-bold rounded-xl bg-note-honey text-note-ink active:scale-[0.99] disabled:opacity-50">
               {busy ? "기록 중…" : "② 보냈음 → 다음 곳으로"}
             </button>
             <button onClick={() => setIdx((i) => i + 1)}
-              className="w-full mt-2 py-2 text-[12px] text-stone-500 underline">
+              className="w-full mt-2 py-2 text-[9.6px] text-stone-500 underline">
               이 곳은 건너뛰기
             </button>
           </div>
@@ -126,15 +126,15 @@ export default function OutreachPage() {
 
       {sent.length > 0 && (
         <div className="px-4 mt-5">
-          <p className="text-[12px] font-bold text-stone-700 mb-2">보낸 곳 {sent.length}건 · 열어본 곳 {arrived}</p>
+          <p className="text-[9.6px] font-bold text-stone-700 mb-2">보낸 곳 {sent.length}건 · 열어본 곳 {arrived}</p>
           {sent.slice(0, 20).map((t) => (
-            <div key={t.id} className="flex items-center justify-between bg-white/60 rounded-lg px-3 py-2 mb-1.5 text-[12px]">
+            <div key={t.id} className="flex items-center justify-between bg-white/60 rounded-lg px-3 py-2 mb-1.5 text-[9.6px]">
               <span className="text-stone-700">
                 {t.visits > 0 ? "🟢" : "⚪"} {t.name}
                 {t.visits > 0 && <b className="text-emerald-700"> · 열어봄 {t.visits}회</b>}
               </span>
               <button onClick={() => { setBusy(true); fetch("/api/admin/outreach", { method: "POST", headers: { "Content-Type": "application/json", "x-admin-password": pw }, body: JSON.stringify({ cafeId: t.id, undo: true }) }).then(() => load(pw)).finally(() => setBusy(false)); }}
-                className="text-[11px] text-stone-500 underline">되돌리기</button>
+                className="text-[8.8px] text-stone-500 underline">되돌리기</button>
             </div>
           ))}
         </div>

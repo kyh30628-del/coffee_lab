@@ -481,7 +481,7 @@ export default function PosterCarouselPage() {
         <BackLink to="/poster" label="포스터" className="text-note-brown mb-4" />
         <div className="text-note-brown text-xs tracking-[0.3em] uppercase mb-2">Instagram Carousel</div>
         <h1 className="text-3xl font-bold mb-1">인스타 홍보 캐러셀 (5장)</h1>
-        <p className="text-[13px] text-[#665036] mb-6 leading-relaxed">
+        <p className="text-[10.4px] text-[#665036] mb-6 leading-relaxed">
           아래에서 좌우로 <b>스와이프</b>하며 한 장씩 확인하고, 그 화면을 그대로 스크린샷하거나 <b>PNG 저장</b>으로
           원본 해상도(1080×1080) 그대로 내려받아 인스타 캐러셀로 올리세요.
           <br className="hidden sm:block" />
@@ -497,10 +497,10 @@ export default function PosterCarouselPage() {
           {SLIDES.map((s, i) => (
             <section key={s.key} className="snap-center shrink-0 w-full sm:w-[440px] flex flex-col">
               <div className="w-full flex items-baseline justify-between mb-3">
-                <span className="text-[15px] font-bold">
+                <span className="text-[12px] font-bold">
                   {i + 1}. {s.label}
                 </span>
-                <span className="text-[12px] text-[#665036]">1080 × 1080</span>
+                <span className="text-[9.6px] text-[#665036]">1080 × 1080</span>
               </div>
               <div className="rounded-xl overflow-hidden shadow-lg border border-note-line-strong bg-[#F7F1E6]">
                 <canvas
@@ -544,7 +544,7 @@ export default function PosterCarouselPage() {
           ⬇ 5장 모두 저장
         </button>
 
-        <p className="text-[11px] text-[#665036] mt-10 leading-relaxed">
+        <p className="text-[8.8px] text-[#665036] mt-10 leading-relaxed">
           ※ 캔버스로 서비스 브랜드 톤(크림·에스프레소·골드·지도 핀·Gowun Batang)에 맞춰 그렸습니다. 글꼴이 로딩된 뒤
           자동으로 다시 렌더됩니다. 모바일에서는 한 화면에 한 장씩 꽉 차게 표시되어 그대로 캡처하기 좋습니다.
         </p>

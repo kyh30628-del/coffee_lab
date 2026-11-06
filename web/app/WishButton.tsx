@@ -69,20 +69,20 @@ export default function WishButton({ cafeId, variant = "pill" }: { cafeId: numbe
       <button type="button" onClick={toggle} aria-pressed={on}
         className={`w-full flex items-center justify-between gap-2 rounded-xl px-4 py-3 border text-left transition ${on ? "border-[#d6336c] bg-[#fdeaf1]" : "border-[#d8c8ad] bg-white"}`}>
         <span className="flex flex-col">
-          <span className={`text-[13px] font-bold flex items-center gap-1.5 ${on ? "text-[#b23a5f]" : "text-[#3d2f22]"}`}>
-            <span className="text-[15px] leading-none">{on ? "❤" : "🤍"}</span>
+          <span className={`text-[10.4px] font-bold flex items-center gap-1.5 ${on ? "text-[#b23a5f]" : "text-[#3d2f22]"}`}>
+            <span className="text-[12px] leading-none">{on ? "❤" : "🤍"}</span>
             {on ? "찜한 곳에 담았어요" : "가보고 싶은 곳에 담아두기"}
           </span>
-          <span className="text-[10.5px] text-[#544636] mt-0.5">
+          <span className="text-[8.4px] text-[#544636] mt-0.5">
             {on ? "지도에서 찜한 곳만 모아볼 수 있어요" : "탭 한 번 · 가입도 위치확인도 없어요"}
           </span>
         </span>
-        <span className={`font-bold whitespace-nowrap text-[13px] ${on ? "text-[#d6336c]" : "text-note-brown"}`}>{on ? "✓" : "＋"}</span>
+        <span className={`font-bold whitespace-nowrap text-[10.4px] ${on ? "text-[#d6336c]" : "text-note-brown"}`}>{on ? "✓" : "＋"}</span>
       </button>
       {/* 저장은 **다시 꺼내볼 수 있어야** 저장이다 — 찜한 직후에만 회수 동선을 연다(평소엔 화면을 어지럽히지 않게). */}
       {on && (
         <a href="/?favs=1" onClick={() => { try { const a = localStorage.getItem("dcn_anon")||""; if (localStorage.getItem("dcn_internal")!=="1") fetch("/api/track-outbound",{method:"POST",headers:{"Content-Type":"application/json"},keepalive:true,body:JSON.stringify({anonId:a,cafeId,target:"favs_link",source:"카페상세",path:window.location.pathname})}).catch(()=>{}); } catch {} }}
-          className="mt-1.5 block text-center text-[11.5px] font-semibold text-[#b23a5f] underline underline-offset-2">
+          className="mt-1.5 block text-center text-[9.2px] font-semibold text-[#b23a5f] underline underline-offset-2">
           찜한 곳 모아보기 →
         </a>
       )}
@@ -91,8 +91,8 @@ export default function WishButton({ cafeId, variant = "pill" }: { cafeId: numbe
   }
   return (
     <button type="button" onClick={toggle} aria-pressed={on} aria-label={on ? "찜 해제" : "찜하기"}
-      className={`flex items-center gap-1.5 rounded-full pl-2.5 pr-3 py-1.5 text-[12px] font-bold border transition whitespace-nowrap ${on ? "bg-[#d6336c] text-white border-[#d6336c]" : "bg-white text-[#b23a5f] border-[#f0b8cc]"}`}>
-      <span className="text-[14px] leading-none">{on ? "❤" : "🤍"}</span>{on ? "찜함" : "찜하기"}
+      className={`flex items-center gap-1.5 rounded-full pl-2.5 pr-3 py-1.5 text-[9.6px] font-bold border transition whitespace-nowrap ${on ? "bg-[#d6336c] text-white border-[#d6336c]" : "bg-white text-[#b23a5f] border-[#f0b8cc]"}`}>
+      <span className="text-[11.2px] leading-none">{on ? "❤" : "🤍"}</span>{on ? "찜함" : "찜하기"}
     </button>
   );
 }

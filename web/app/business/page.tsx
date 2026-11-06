@@ -14,15 +14,15 @@ export default function BusinessInfo() {
       <div className="max-w-2xl mx-auto px-5 py-10">
         <BackLink to="/" label="홈" className="text-note-tan mb-4" />
         <h1 className="text-3xl font-bold mb-1">사업자 정보 · 환불 정책</h1>
-        <p className="text-[13px] text-note-ink-mute mb-8">전자상거래 등에서의 소비자보호에 관한 법률에 따른 표시 사항입니다.</p>
+        <p className="text-[10.4px] text-note-ink-mute mb-8">전자상거래 등에서의 소비자보호에 관한 법률에 따른 표시 사항입니다.</p>
 
-        <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 mb-8 text-[12px] text-amber-800">
+        <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 mb-8 text-[9.6px] text-amber-800">
           ⚠️ <b>운영자 안내</b>: 유료 결제를 시작하기 전 아래 <b>[입력 필요]</b> 항목을 실제 사업자등록·통신판매업 신고 정보로 채우고, <b>통신판매업 신고</b>를 완료하세요. (무료 체험만 운영 중이면 결제 의무 표시는 약하지만, 유료 과금 시 필수입니다.)
         </div>
 
         <section className="mb-8">
           <h2 className="text-lg font-bold mb-3">1. 사업자 정보</h2>
-          <table className="w-full text-[13px] border border-note-line rounded-lg overflow-hidden">
+          <table className="w-full text-[10.4px] border border-note-line rounded-lg overflow-hidden">
             <tbody>
               {[
                 ["상호(서비스명)", `${FILL} (동네 커피 노트)`],
@@ -46,7 +46,7 @@ export default function BusinessInfo() {
 
         <section className="mb-8">
           <h2 className="text-lg font-bold mb-3">2. 요금·결제</h2>
-          <ul className="list-disc ml-5 space-y-1.5 text-[13px] text-note-ink-warm">
+          <ul className="list-disc ml-5 space-y-1.5 text-[10.4px] text-note-ink-warm">
             <li><b>{TRIAL_DAYS}일 무료 체험</b>: 결제 없이 {TRIAL_DAYS}일간 사장님 기능 이용. 체험은 <b>무료이므로 환불 대상이 아닙니다</b>. 체험 종료 시 자동으로 접근이 만료됩니다.</li>
             <li><b>우리가게 홍보팩(구독)</b>: 월 ₩9,900(부가세 포함 여부: {FILL}). 결제는 PG사를 통해 처리되며, 카드 등 민감 결제정보는 본 서비스가 보관하지 않습니다.</li>
             <li>구독은 별도 해지 전까지 <b>{FILL}(예: 매월 자동결제)</b> 됩니다. 해지는 사장님 화면 또는 고객센터로 요청할 수 있습니다.</li>
@@ -55,7 +55,7 @@ export default function BusinessInfo() {
 
         <section className="mb-8">
           <h2 className="text-lg font-bold mb-3">3. 청약철회·환불 정책</h2>
-          <ul className="list-disc ml-5 space-y-1.5 text-[13px] text-note-ink-warm">
+          <ul className="list-disc ml-5 space-y-1.5 text-[10.4px] text-note-ink-warm">
             <li><b>원칙(청약철회)</b>: 결제일로부터 <b>7일 이내</b>에는 청약을 철회하고 전액 환불받을 수 있습니다. 단, 아래 ‘제한’에 해당하면 제한될 수 있습니다.</li>
             <li><b>제한 및 표시 의무 이행</b>: 디지털 서비스 특성상 <b>홍보팩 기능(우선노출·쇼케이스 게시 등)을 이미 사용·개시</b>한 부분은 청약철회가 제한될 수 있습니다(「전자상거래법」 제17조 제2항). 본 서비스는 이 제한 사실을 명확히 표시하고, 철회권 행사가 방해되지 않도록 <b>{TRIAL_DAYS}일 무료 체험(시험 사용)</b>을 제공합니다(같은 조 제6항). 개시되지 않은 부분에 대해서는 <b>잔여기간 일할 계산 환불</b>을 적용합니다.</li>
             <li><b>일할 환불 예</b>: 월 구독 중도 해지 시 = 결제금액 × (잔여일수 ÷ 결제주기 일수). <b>위약금은 부과하지 않습니다.</b></li>
@@ -67,10 +67,10 @@ export default function BusinessInfo() {
 
         <section className="mb-10">
           <h2 className="text-lg font-bold mb-3">4. 분쟁 해결</h2>
-          <p className="text-[13px] text-note-ink-warm leading-relaxed">소비자 분쟁은 <b>공정거래위원회 고시 ‘소비자분쟁해결기준’</b>에 따라 처리하며, 협의가 어려운 경우 <b>한국소비자원·전자거래분쟁조정위원회</b> 등에 조정을 신청할 수 있습니다. 1차 문의: <b>dongnecoffeenote@gmail.com</b>.</p>
+          <p className="text-[10.4px] text-note-ink-warm leading-relaxed">소비자 분쟁은 <b>공정거래위원회 고시 ‘소비자분쟁해결기준’</b>에 따라 처리하며, 협의가 어려운 경우 <b>한국소비자원·전자거래분쟁조정위원회</b> 등에 조정을 신청할 수 있습니다. 1차 문의: <b>dongnecoffeenote@gmail.com</b>.</p>
         </section>
 
-        <p className="text-[11px] text-note-ink-mute leading-relaxed">본 페이지는 전자상거래법상 표시 의무 이행을 돕기 위한 골격이며, 실제 공개 전 <b>사업자등록·통신판매업 신고 정보 기입</b>과 <b>법률 검토</b>를 권장합니다.</p>
+        <p className="text-[8.8px] text-note-ink-mute leading-relaxed">본 페이지는 전자상거래법상 표시 의무 이행을 돕기 위한 골격이며, 실제 공개 전 <b>사업자등록·통신판매업 신고 정보 기입</b>과 <b>법률 검토</b>를 권장합니다.</p>
       </div>
       <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet" />
     </main>

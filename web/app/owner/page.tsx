@@ -127,19 +127,19 @@ export default function OwnerPage() {
         <div className="w-full max-w-sm">
           <div className="text-note-tan text-xs tracking-[0.3em] uppercase mb-2 text-center">For Owners</div>
           <h1 className="text-2xl font-bold mb-1 text-center">사장님 로그인</h1>
-          <p className="text-[13px] text-[#6b5a48] mb-3 text-center">구독 승인 후 <b>이메일로 받은 PIN</b>으로 들어오세요.</p>
+          <p className="text-[10.4px] text-[#6b5a48] mb-3 text-center">구독 승인 후 <b>이메일로 받은 PIN</b>으로 들어오세요.</p>
           {/* 🔴 2026-09-08 CEO 지적: 문 앞에서 **안에 뭐가 있는지** 한 줄도 말해주지 않았다.
               무료 리포트에서 넘어온 사장님이 PIN 칸만 보고 되돌아간다. */}
-          <ul className="bg-white/70 border border-note-line rounded-xl px-4 py-3 mb-4 text-[12px] text-note-ink-body leading-[1.9]">
+          <ul className="bg-white/70 border border-note-line rounded-xl px-4 py-3 mb-4 text-[9.6px] text-note-ink-body leading-[1.9]">
             <li>📊 동네 순위와 <b>월별 후기 추이</b></li>
             <li>🕸️ 우리 가게 <b>성격 분석</b>(동네 평균 대비)</li>
             <li>🍩 후기 <b>구성</b>과 비슷한 카페 비교</li>
             <li>✅ 지금 무엇을 바꿀지 <b>액션플랜</b></li>
           </ul>
           <input value={pinInput} onChange={(e) => setPinInput(e.target.value.toUpperCase())} onKeyDown={(e) => e.key === "Enter" && pinLogin()} placeholder="PIN 8자리" maxLength={8} className="w-full rounded-xl border border-[#cbb89f] px-4 py-3 text-center text-xl tracking-[6px] font-bold bg-white mb-2" />
-          {pinErr && <p className="text-[12px] text-rose-500 text-center mb-2">{pinErr}</p>}
+          {pinErr && <p className="text-[9.6px] text-rose-500 text-center mb-2">{pinErr}</p>}
           <button onClick={pinLogin} disabled={pinInput.trim().length < 6} className="w-full bg-note-ink text-note-paper rounded-xl py-3 font-bold disabled:opacity-40">내 카페 들어가기</button>
-          <div className="flex justify-between mt-4 text-[12px]"><a href="/pricing" className="text-note-tan underline">구독 신청</a><a href="/" className="text-note-tan underline">홈으로</a></div>
+          <div className="flex justify-between mt-4 text-[9.6px]"><a href="/pricing" className="text-note-tan underline">구독 신청</a><a href="/" className="text-note-tan underline">홈으로</a></div>
         </div>
         <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet" />
       </div>
@@ -155,12 +155,12 @@ export default function OwnerPage() {
       <header className="nt-header px-4 pb-3 flex items-center justify-between gap-2" style={{ paddingTop: "calc(0.75rem + env(safe-area-inset-top))" }}>
         <div className="flex items-center gap-2 min-w-0">
           <BackLink to="/" label="홈" className="text-[#cbb89f] shrink-0" />
-          <h1 className="text-[15px] font-bold truncate">사장님 분석</h1>
+          <h1 className="text-[12px] font-bold truncate">사장님 분석</h1>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
-          <a href="/pricing" className="text-[11px] bg-note-honey text-note-ink rounded-full px-2.5 py-1.5 whitespace-nowrap font-bold">💎 요금제</a>
+          <a href="/pricing" className="text-[8.8px] bg-note-honey text-note-ink rounded-full px-2.5 py-1.5 whitespace-nowrap font-bold">💎 요금제</a>
           {/* '내 카페 등록'은 카페가 아직 없는 사장님용 → PIN으로 본인 카페에 들어온 사장님에겐 숨김 */}
-          {!locked && <a href="/cafe/register" className="text-[11px] bg-note-tan text-note-paper rounded-full px-2.5 py-1.5 whitespace-nowrap">📋 등록</a>}
+          {!locked && <a href="/cafe/register" className="text-[8.8px] bg-note-tan text-note-paper rounded-full px-2.5 py-1.5 whitespace-nowrap">📋 등록</a>}
         </div>
       </header>
 
@@ -187,12 +187,12 @@ export default function OwnerPage() {
         {insight && (
           <div>
             {!locked && !pin && <button onClick={() => setInsight(null)} className="text-xs text-note-tan underline mb-4">← 다른 카페 검색</button>}
-            {locked && <div className="flex items-center gap-2 mb-4"><span className="text-[10px] font-bold bg-note-honey text-note-ink px-2 py-0.5 rounded-full">✅ 구독 사장님</span><span className="text-[11px] text-note-ink-mute">내 카페 전용 화면</span><button onClick={() => { sessionStorage.removeItem("dcn_owner_pin"); sessionStorage.removeItem("dcn_owner_cafe"); location.reload(); }} className="ml-auto text-[11px] text-note-tan underline">로그아웃</button></div>}
+            {locked && <div className="flex items-center gap-2 mb-4"><span className="text-[8px] font-bold bg-note-honey text-note-ink px-2 py-0.5 rounded-full">✅ 구독 사장님</span><span className="text-[8.8px] text-note-ink-mute">내 카페 전용 화면</span><button onClick={() => { sessionStorage.removeItem("dcn_owner_pin"); sessionStorage.removeItem("dcn_owner_cafe"); location.reload(); }} className="ml-auto text-[8.8px] text-note-tan underline">로그아웃</button></div>}
 
             <div className="bg-white rounded-2xl p-4 sm:p-5 border border-[#ece0cd] mb-4">
               <div className="flex items-center gap-2 mb-1">
                 <h2 className="text-2xl font-bold">{insight.me.name}</h2>
-                {insight.me.grade && <span className="text-[10px] text-white px-2 py-0.5 rounded-full" style={{ background: GRADE_BG[insight.me.grade] }}>{insight.me.grade}</span>}
+                {insight.me.grade && <span className="text-[8px] text-white px-2 py-0.5 rounded-full" style={{ background: GRADE_BG[insight.me.grade] }}>{insight.me.grade}</span>}
               </div>
               <div className="text-sm text-note-tan mb-2">{insight.me.identity}</div>
               <div className="text-sm font-bold">{insight.gu} {insight.hoodCount}곳 중 <span className="text-note-tan">{insight.rank}위</span></div>
@@ -205,19 +205,19 @@ export default function OwnerPage() {
               <div className="text-sm font-bold text-note-ink-warm mb-1 flex items-center gap-1.5">🔎 손님이 이 검색으로 우리 가게를 봤어요<InfoDot title="검색어 리포트가 뭐예요?">동네 커피 노트 안에서 손님이 검색했을 때 <b>우리 가게가 상위 10에 나온 검색어</b>예요. 손님이 어떤 말로 우리를 찾는지 알면 메뉴판·SNS 소개 문구를 그 말로 맞출 수 있어요. 최근 30일 기준.</InfoDot></div>
               {(insight.searchQueries?.length ?? 0) > 0 ? (
                 <>
-                  <div className="text-[11.5px] text-note-ink-mute mb-2">최근 30일 <b className="text-note-ink-warm">{insight.searchTotal}회</b> 노출 · 검색어별 횟수와 최고 순위</div>
+                  <div className="text-[9.2px] text-note-ink-mute mb-2">최근 30일 <b className="text-note-ink-warm">{insight.searchTotal}회</b> 노출 · 검색어별 횟수와 최고 순위</div>
                   <ul className="space-y-1.5">
                     {insight.searchQueries!.map((r) => (
-                      <li key={`${r.q}|${r.region}`} className="flex items-center gap-2 text-[13px]">
+                      <li key={`${r.q}|${r.region}`} className="flex items-center gap-2 text-[10.4px]">
                         <span className="font-bold text-note-ink truncate">“{r.q}”</span>
-                        {r.region && <span className="text-[11px] text-note-ink-mute shrink-0">{r.region}</span>}
-                        <span className="ml-auto shrink-0 text-[11.5px] text-note-brown">{r.n}회 · 최고 {r.best}위</span>
+                        {r.region && <span className="text-[8.8px] text-note-ink-mute shrink-0">{r.region}</span>}
+                        <span className="ml-auto shrink-0 text-[9.2px] text-note-brown">{r.n}회 · 최고 {r.best}위</span>
                       </li>
                     ))}
                   </ul>
                 </>
               ) : (
-                <p className="text-[12.5px] text-note-ink-mute leading-relaxed">아직 30일 안에 우리 가게가 노출된 검색이 없어요. 손님 검색은 매일 쌓이니 다음 주에 다시 확인해 보세요.</p>
+                <p className="text-[10px] text-note-ink-mute leading-relaxed">아직 30일 안에 우리 가게가 노출된 검색이 없어요. 손님 검색은 매일 쌓이니 다음 주에 다시 확인해 보세요.</p>
               )}
             </div>
 
@@ -229,11 +229,11 @@ export default function OwnerPage() {
                   {insight.competitors!.map((c) => (
                     <li key={c.id} className="rounded-xl border border-[#ece0cd] p-3">
                       <div className="flex items-center gap-2">
-                        <span className="text-[13.5px] font-bold text-note-ink truncate">{c.name}</span>
-                        {c.grade && <span className="text-[10px] text-white px-1.5 py-0.5 rounded-full shrink-0" style={{ background: GRADE_BG[c.grade] ?? "#7a6750" }}>{c.grade}</span>}
-                        <span className="ml-auto text-[11.5px] text-note-ink-mute shrink-0">후기 {c.count}건{c.topAxis ? ` · 강점 ${c.topAxis}` : ""}</span>
+                        <span className="text-[10.8px] font-bold text-note-ink truncate">{c.name}</span>
+                        {c.grade && <span className="text-[8px] text-white px-1.5 py-0.5 rounded-full shrink-0" style={{ background: GRADE_BG[c.grade] ?? "#7a6750" }}>{c.grade}</span>}
+                        <span className="ml-auto text-[9.2px] text-note-ink-mute shrink-0">후기 {c.count}건{c.topAxis ? ` · 강점 ${c.topAxis}` : ""}</span>
                       </div>
-                      <div className="mt-1.5 flex flex-wrap gap-1.5 text-[11.5px]">
+                      <div className="mt-1.5 flex flex-wrap gap-1.5 text-[9.2px]">
                         {c.win.length > 0 && <span className="px-2 py-0.5 rounded-full bg-[#eef3ea] text-[#4a6a42]">우리가 앞서요: {c.win.join(" · ")}</span>}
                         {c.lose.length > 0 && <span className="px-2 py-0.5 rounded-full bg-[#f7ede4] text-[#9a5f2e]">저쪽이 앞서요: {c.lose.join(" · ")}</span>}
                         {c.win.length === 0 && c.lose.length === 0 && <span className="text-note-ink-mute">성격이 비슷해요 — 차이는 후기 수예요</span>}
@@ -241,7 +241,7 @@ export default function OwnerPage() {
                     </li>
                   ))}
                 </ul>
-                {(insight.openAxes?.length ?? 0) > 0 && <p className="mt-2.5 text-[12.5px] text-note-ink-warm">🪧 <b>비어 있는 자리</b>: {insight.openAxes!.join(" · ")} — 경쟁 3곳도 우리도 약한 축이에요. 먼저 잡으면 동네에서 그 말의 주인이 됩니다.</p>}
+                {(insight.openAxes?.length ?? 0) > 0 && <p className="mt-2.5 text-[10px] text-note-ink-warm">🪧 <b>비어 있는 자리</b>: {insight.openAxes!.join(" · ")} — 경쟁 3곳도 우리도 약한 축이에요. 먼저 잡으면 동네에서 그 말의 주인이 됩니다.</p>}
               </div>
             )}
 
@@ -252,13 +252,13 @@ export default function OwnerPage() {
               return (
                 <div className="bg-[#fff8ee] rounded-2xl p-4 border border-[#e7d3b3] mb-4">
                   <div className="text-sm font-bold text-[#7a5a2e] mb-1">📣 우리 카페 검증 리포트 공유하기</div>
-                  <p className="text-[12px] text-note-ink-mute mb-3 leading-relaxed">"{insight.gu} {insight.rank}위" 리포트를 손님·SNS·매장 QR로 공유하면 단골·신규 유입에 도움이 돼요. 광고 아닌 <b>검증 데이터</b>라 신뢰가 높습니다.</p>
+                  <p className="text-[9.6px] text-note-ink-mute mb-3 leading-relaxed">"{insight.gu} {insight.rank}위" 리포트를 손님·SNS·매장 QR로 공유하면 단골·신규 유입에 도움이 돼요. 광고 아닌 <b>검증 데이터</b>라 신뢰가 높습니다.</p>
                   <div className="flex items-center gap-3">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={qr} alt="공유 QR" width={84} height={84} className="rounded-lg border border-[#ece0cd] bg-white shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <a href={shareUrl} target="_blank" rel="noreferrer" className="block text-[12px] text-note-tan underline break-all mb-2">{shareUrl}</a>
-                      <button onClick={() => { navigator.clipboard?.writeText(shareUrl); }} className="text-[12px] font-bold bg-note-tan text-white rounded-lg px-3 py-1.5">링크 복사</button>
+                      <a href={shareUrl} target="_blank" rel="noreferrer" className="block text-[9.6px] text-note-tan underline break-all mb-2">{shareUrl}</a>
+                      <button onClick={() => { navigator.clipboard?.writeText(shareUrl); }} className="text-[9.6px] font-bold bg-note-tan text-white rounded-lg px-3 py-1.5">링크 복사</button>
                     </div>
                   </div>
                 </div>
@@ -268,7 +268,7 @@ export default function OwnerPage() {
             {/* 📰 주간 레터 안내 — 분석 화면에 항상 표시(로그인 사장님=수신 안내 / 미리보기=구독 혜택) */}
             <div className="bg-[#f0f5ee] rounded-2xl p-4 border border-[#d6e3ca] mb-4">
               <div className="text-sm font-bold text-[#3f5a37] mb-1">📰 {locked ? "매주 트렌드 레터를 보내드려요" : "구독 사장님께 드리는 주간 레터"}</div>
-              <p className="text-[12px] text-[#5a6f52] leading-relaxed">
+              <p className="text-[9.6px] text-[#5a6f52] leading-relaxed">
                 {locked
                   ? <>가입하신 이메일로 <b>매주 커피·디저트 트렌드와 사장님 액션 팁</b>을 담은 주간 레터를 보내드려요. 우리 동네·업계 흐름을 놓치지 않게요.</>
                   : <>구독하시면 가입하신 이메일로 <b>매주 커피·디저트 트렌드와 사장님 액션 팁</b>을 담은 주간 레터를 보내드려요. 우리 동네·업계 흐름을 놓치지 않게요.</>}
@@ -276,7 +276,7 @@ export default function OwnerPage() {
               {/* 📰 본인 수신 on/off 토글(로그인 사장님만) — 신청 때 껐어도 여기서 직접 켤 수 있어요 */}
               {locked && nlOptIn !== null && (
                 <div className="mt-3 pt-3 border-t border-[#d6e3ca] flex items-center justify-between gap-3">
-                  <span className="text-[12px] font-bold text-[#3f5a37]">{nlOptIn ? "주간 레터 받는 중이에요 ✓" : "지금은 안 받고 있어요"}</span>
+                  <span className="text-[9.6px] font-bold text-[#3f5a37]">{nlOptIn ? "주간 레터 받는 중이에요 ✓" : "지금은 안 받고 있어요"}</span>
                   <button onClick={() => toggleNewsletter(!nlOptIn)} disabled={nlSaving} aria-label="주간 레터 수신 토글"
                     className="relative inline-flex items-center h-6 w-11 rounded-full transition-colors disabled:opacity-50 shrink-0"
                     style={{ background: nlOptIn ? "#5f7355" : "#cabfa8" }}>
@@ -289,7 +289,7 @@ export default function OwnerPage() {
             {/* 액션 플랜 — 가장 위에, 핵심 */}
             <div className="mb-4">
               <div className="text-sm font-bold text-note-ink-warm mb-1 flex items-center gap-1.5">💡 데이터 기반 액션 플랜<InfoDot title="액션 플랜이 뭐예요?">일반론이 아니라 <b>우리 카페의 검증된 후기 데이터에서만</b> 나오는 구체 제안이에요. 같은 동네 카페와 비교해 <b>차별점·빈 포지션(아무도 안 하는 강점)·매몰점·보완점·순위 전략</b>을 알려드려요.</InfoDot></div>
-              <div className="text-[11px] text-note-ink-mute mb-2.5">제목을 눌러 상세 내용을 펼쳐보세요</div>
+              <div className="text-[8.8px] text-note-ink-mute mb-2.5">제목을 눌러 상세 내용을 펼쳐보세요</div>
               <div className="space-y-2">
                 {insight.actions.map((a, i) => {
                   const t = TONE[a.tone];
@@ -302,12 +302,12 @@ export default function OwnerPage() {
                         aria-expanded={open}
                         className="w-full flex items-center gap-2 px-4 py-3 text-left"
                       >
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white shrink-0" style={{ background: t.tag }}>{a.type}</span>
+                        <span className="text-[8px] font-bold px-2 py-0.5 rounded-full text-white shrink-0" style={{ background: t.tag }}>{a.type}</span>
                         <span className="text-sm font-bold text-note-ink flex-1">{a.title}</span>
                         <svg viewBox="0 0 20 20" className={`w-4 h-4 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`} fill="none" stroke={t.tag} strokeWidth="2.2"><path d="M5 8l5 5 5-5" strokeLinecap="round" strokeLinejoin="round" /></svg>
                       </button>
                       {open && (
-                        <p className="text-[13px] text-note-ink-warm leading-relaxed px-4 pb-3.5 -mt-0.5">{renderEmphasis(a.body, t.tag)}</p>
+                        <p className="text-[10.4px] text-note-ink-warm leading-relaxed px-4 pb-3.5 -mt-0.5">{renderEmphasis(a.body, t.tag)}</p>
                       )}
                     </div>
                   );
@@ -323,47 +323,47 @@ export default function OwnerPage() {
             </div>
             <div className="bg-white rounded-2xl p-4 sm:p-5 border border-[#ece0cd] mb-4">
               {tab === "rank" && (<>
-                <div className="text-[11px] text-note-ink-mute uppercase tracking-wider mb-3">동네 카페 리뷰 수 순위</div>
+                <div className="text-[8.8px] text-note-ink-mute uppercase tracking-wider mb-3">동네 카페 리뷰 수 순위</div>
                 <RankChart data={rankData} />
-                <div className="text-[10px] text-note-ink-mute mt-1">진한 막대 = 내 카페</div>
+                <div className="text-[8px] text-note-ink-mute mt-1">진한 막대 = 내 카페</div>
               </>)}
               {tab === "radar" && (<>
-                <div className="text-[11px] text-note-ink-mute uppercase tracking-wider mb-3">우리 카페의 결 vs 동네 평균</div>
+                <div className="text-[8.8px] text-note-ink-mute uppercase tracking-wider mb-3">우리 카페의 결 vs 동네 평균</div>
                 <RadarChartBox data={radarData} />
-                <div className="text-[10px] text-note-ink-mute mt-1 leading-relaxed">0~100점 = 같은 동네 카페들 분포 안에서의 상대 위치(50 = 동네 중간, 높을수록 그 특징이 두드러짐). 리뷰 언급 빈도 기반이며 측정값이 아닙니다.</div>
+                <div className="text-[8px] text-note-ink-mute mt-1 leading-relaxed">0~100점 = 같은 동네 카페들 분포 안에서의 상대 위치(50 = 동네 중간, 높을수록 그 특징이 두드러짐). 리뷰 언급 빈도 기반이며 측정값이 아닙니다.</div>
               </>)}
               {tab === "pie" && (<>
-                <div className="text-[11px] text-note-ink-mute uppercase tracking-wider mb-3">우리 카페는 어떤 특징으로 이야기되나</div>
+                <div className="text-[8.8px] text-note-ink-mute uppercase tracking-wider mb-3">우리 카페는 어떤 특징으로 이야기되나</div>
                 {pieData.length === 0 ? <p className="text-sm text-note-ink-mute py-8 text-center">아직 두드러진 특징 언급이 적어요.</p> : (
                   <CompPie data={pieData} />
                 )}
-                <div className="text-[10px] text-note-ink-mute mt-1">언급 비중이 클수록 그 특징으로 많이 이야기돼요</div>
+                <div className="text-[8px] text-note-ink-mute mt-1">언급 비중이 클수록 그 특징으로 많이 이야기돼요</div>
               </>)}
             </div>
 
             {/* 리뷰 주기 */}
             {insight.reviewCadence && (
               <div className="bg-white rounded-2xl p-4 sm:p-5 border border-[#ece0cd] mb-4">
-                <div className="text-[11px] text-note-ink-mute uppercase tracking-wider mb-1">🗓 리뷰 주기 (최근 12개월)</div>
-                <div className="text-[13px] text-note-ink-warm leading-relaxed mb-3">{renderEmphasis(insight.reviewCadence.insight, "#b5703c")}</div>
+                <div className="text-[8.8px] text-note-ink-mute uppercase tracking-wider mb-1">🗓 리뷰 주기 (최근 12개월)</div>
+                <div className="text-[10.4px] text-note-ink-warm leading-relaxed mb-3">{renderEmphasis(insight.reviewCadence.insight, "#b5703c")}</div>
                 {insight.reviewCadence.last12 > 0 ? (
                   <CadenceChart months={insight.reviewCadence.months} />
                 ) : <p className="text-sm text-note-ink-mute py-6 text-center">날짜가 있는 검증 리뷰가 아직 적어요.</p>}
-                <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-note-ink-mute mt-2">
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-[8px] text-note-ink-mute mt-2">
                   <span>최근 12개월 <b className="text-note-ink-warm">{insight.reviewCadence.last12}건</b></span>
                   {insight.reviewCadence.lastDate && <span>마지막 리뷰 <b className="text-note-ink-warm">{insight.reviewCadence.lastDate}</b></span>}
                   {insight.reviewCadence.recentShare > 0 && <span>최근 3개월 비중 <b className="text-note-ink-warm">{insight.reviewCadence.recentShare}%</b></span>}
                 </div>
-                <div className="text-[10px] text-note-ink-mute mt-1">검증된 리뷰의 게시일 기준 · 측정값이 아니라 공개 후기 작성 시점</div>
+                <div className="text-[8px] text-note-ink-mute mt-1">검증된 리뷰의 게시일 기준 · 측정값이 아니라 공개 후기 작성 시점</div>
               </div>
             )}
 
             <div className="bg-white rounded-2xl p-4 sm:p-5 border border-[#ece0cd] mb-4">
-              <div className="text-[11px] text-note-ink-mute uppercase tracking-wider mb-3">성격이 비슷한 경쟁 카페</div>
+              <div className="text-[8.8px] text-note-ink-mute uppercase tracking-wider mb-3">성격이 비슷한 경쟁 카페</div>
               {insight.similar.map((c) => (
                 <div key={c.name} className="flex items-center gap-2 py-2 border-b border-[#f0e6d4] last:border-0">
                   <span className="font-bold text-sm">{c.name}</span>
-                  {c.grade && <span className="text-[9px] text-white px-1.5 py-0.5 rounded-full" style={{ background: GRADE_BG[c.grade] }}>{c.grade}</span>}
+                  {c.grade && <span className="text-[7.2px] text-white px-1.5 py-0.5 rounded-full" style={{ background: GRADE_BG[c.grade] }}>{c.grade}</span>}
                   <span className="text-xs text-note-ink-mute ml-auto">리뷰 {c.count}건</span>
                 </div>
               ))}
@@ -375,13 +375,13 @@ export default function OwnerPage() {
             {/* 무료/유료 경계 명확화 */}
             <div className="mt-5 mb-2">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] bg-note-honey text-note-ink px-2 py-0.5 rounded-full font-bold">💎 구독 전용</span>
-                <a href="/pricing" className="text-[11px] text-note-tan underline">요금제 보기</a>
+                <span className="text-[8px] bg-note-honey text-note-ink px-2 py-0.5 rounded-full font-bold">💎 구독 전용</span>
+                <a href="/pricing" className="text-[8.8px] text-note-tan underline">요금제 보기</a>
               </div>
-              <p className="text-[11px] text-note-ink-mute mt-1.5">위 후기 분석은 <b>무료</b> · 아래는 <b>홍보팩(구독)</b>이에요</p>
+              <p className="text-[8.8px] text-note-ink-mute mt-1.5">위 후기 분석은 <b>무료</b> · 아래는 <b>홍보팩(구독)</b>이에요</p>
             </div>
             <button onClick={() => setShowShowcase(true)} className="w-full bg-gradient-to-r from-note-tan to-note-ink text-note-paper rounded-xl py-3.5 font-medium">🎀 쇼케이스·우선노출·성과 (홍보팩)</button>
-            <p className="text-[10px] text-note-ink-mute mt-3 text-center leading-relaxed">분석은 네이버 공개 후기를 교차검증한 데이터 기반입니다(무료). '결'은 측정값이 아니라 리뷰에서 자주 언급되는 정도입니다.</p>
+            <p className="text-[8px] text-note-ink-mute mt-3 text-center leading-relaxed">분석은 네이버 공개 후기를 교차검증한 데이터 기반입니다(무료). '결'은 측정값이 아니라 리뷰에서 자주 언급되는 정도입니다.</p>
           </div>
         )}
       </div>

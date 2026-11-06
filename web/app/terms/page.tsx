@@ -11,9 +11,9 @@ export default function TermsPage() {
         <BackLink to="/" label="홈" className="text-note-brown mb-4" />
         <div className="text-note-brown text-xs tracking-[0.3em] uppercase mb-2">Terms of Service</div>
         <h1 className="text-3xl font-bold mb-1">이용약관</h1>
-        <p className="text-[13px] text-note-ink-soft mb-8">동네 커피 노트 (Dongne Coffee Note) · 최종 업데이트 {updated}</p>
+        <p className="text-[10.4px] text-note-ink-soft mb-8">동네 커피 노트 (Dongne Coffee Note) · 최종 업데이트 {updated}</p>
 
-        <div className="space-y-7 text-[14px] leading-relaxed text-[#3d2f22]">
+        <div className="space-y-7 text-[11.2px] leading-relaxed text-[#3d2f22]">
           <section>
             <h2 className="text-lg font-bold mb-2">1. 서비스 개요</h2>
             <p>동네 커피 노트는 네이버·구글·YouTube 등 공개 후기를 교차검증해 수도권 동네 카페를 안내하는 무료 정보 서비스입니다. 카페를 직접 운영·판매하지 않습니다.</p>

@@ -39,27 +39,27 @@ function BadgeForm() {
   return (
     <div className="max-w-lg mx-auto">
       <h1 className="text-2xl font-bold mb-2">🏅 검증 배지 달기</h1>
-      <p className="text-[13.5px] text-note-ink-body leading-relaxed mb-6">
+      <p className="text-[10.8px] text-note-ink-body leading-relaxed mb-6">
         동네 커피 노트가 <b>광고·협찬을 걸러낸 진짜 후기</b>로 검증한 카페임을 보여주는 배지예요.<br />
         블로그·홈페이지·인스타 프로필 링크 어디든 붙일 수 있어요.
       </p>
       <div className="flex gap-2 mb-4">
         <input value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === "Enter" && search()}
-          placeholder="카페 상호 입력" className="flex-1 border border-[#cbb89f] rounded-xl px-4 py-3 bg-white text-[15px]" />
+          placeholder="카페 상호 입력" className="flex-1 border border-[#cbb89f] rounded-xl px-4 py-3 bg-white text-[12px]" />
         <button onClick={() => search()} className="bg-note-ink text-note-paper rounded-xl px-5 font-bold">찾기</button>
       </div>
-      {msg && <p className="text-[13px] text-[#b23a5f] mb-4">{msg}</p>}
+      {msg && <p className="text-[10.4px] text-[#b23a5f] mb-4">{msg}</p>}
       {cafe && (
         <div className="bg-white rounded-2xl border border-[#d9c9ab] p-5">
-          <div className="text-[13px] font-bold mb-3">{cafe.name} <span className="text-note-brown font-normal">({cafe.area})</span></div>
+          <div className="text-[10.4px] font-bold mb-3">{cafe.name} <span className="text-note-brown font-normal">({cafe.area})</span></div>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={`/api/badge/${cafe.id}`} alt="배지 미리보기" width={230} height={54} className="mb-4" />
-          <div className="text-[11px] font-bold text-note-ink-warm mb-1">아래 HTML을 복사해 붙여넣으세요</div>
+          <div className="text-[8.8px] font-bold text-note-ink-warm mb-1">아래 HTML을 복사해 붙여넣으세요</div>
           <textarea readOnly value={html} onClick={(e) => (e.target as HTMLTextAreaElement).select()}
-            className="w-full h-24 text-[11px] font-mono border border-[#e3d3b8] rounded-lg p-2.5 bg-[#fdfaf4]" />
+            className="w-full h-24 text-[8.8px] font-mono border border-[#e3d3b8] rounded-lg p-2.5 bg-[#fdfaf4]" />
           <button onClick={() => { navigator.clipboard.writeText(html).then(() => setCopied(true)).catch(() => {}); }}
-            className="mt-2 w-full bg-[#5f7355] text-white rounded-xl py-2.5 text-[13px] font-bold">{copied ? "복사됨 ✓" : "HTML 복사"}</button>
-          <p className="text-[11px] text-[#7a6a55] mt-3 leading-relaxed">
+            className="mt-2 w-full bg-[#5f7355] text-white rounded-xl py-2.5 text-[10.4px] font-bold">{copied ? "복사됨 ✓" : "HTML 복사"}</button>
+          <p className="text-[8.8px] text-[#7a6a55] mt-3 leading-relaxed">
             배지는 등급이 유지되는 동안 자동 갱신돼요. 검증 기준을 벗어나면 표시되지 않습니다.
           </p>
         </div>
@@ -71,7 +71,7 @@ function BadgeForm() {
 export default function BadgePage() {
   return (
     <main className="min-h-screen nt-paper nt-app text-[#17100b] px-5 py-10" style={{ fontFamily: "'Paperlogy', 'Apple SD Gothic Neo', sans-serif" }}>
-      <Suspense fallback={<div className="max-w-lg mx-auto text-[13.5px] text-[#7a6a55]">불러오는 중…</div>}>
+      <Suspense fallback={<div className="max-w-lg mx-auto text-[10.8px] text-[#7a6a55]">불러오는 중…</div>}>
         <BadgeForm />
       </Suspense>
     </main>

@@ -58,21 +58,21 @@ export default function NearMeButton({ className = "" }: { className?: string })
         <button
           onClick={run}
           disabled={state === "loading"}
-          className="w-full rounded-xl border border-stone-300 bg-white px-4 py-3 text-[14px] font-bold text-stone-800 hover:bg-stone-50 disabled:opacity-60"
+          className="w-full rounded-xl border border-stone-300 bg-white px-4 py-3 text-[11.2px] font-bold text-stone-800 hover:bg-stone-50 disabled:opacity-60"
         >
           📍 {state === "loading" ? "위치 확인 중…" : "내 위치에서 가까운 카페 보기"}
         </button>
       )}
-      {msg && <p className="mt-2 text-center text-[12px] text-stone-600">{msg}</p>}
+      {msg && <p className="mt-2 text-center text-[9.6px] text-stone-600">{msg}</p>}
       {state === "done" && cafes.length > 0 && (
         <div className="rounded-xl border border-stone-300 bg-white p-3">
-          <p className="mb-2 text-[13px] font-bold text-stone-800">📍 {region ?? "내 위치"} 근처</p>
+          <p className="mb-2 text-[10.4px] font-bold text-stone-800">📍 {region ?? "내 위치"} 근처</p>
           <ul className="space-y-1.5">
             {cafes.map((c) => (
               <li key={c.id}>
                 <Link href={`/c/${c.id}`} className="flex items-baseline justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-stone-50">
-                  <span className="truncate text-[13.5px] font-semibold text-stone-800">{c.name}</span>
-                  <span className="shrink-0 text-[11.5px] text-stone-600">
+                  <span className="truncate text-[10.8px] font-semibold text-stone-800">{c.name}</span>
+                  <span className="shrink-0 text-[9.2px] text-stone-600">
                     {c.km < 1 ? `${Math.round(c.km * 1000)}m` : `${c.km}km`}
                     {c.synth_grade === "검증" ? " · 검증" : ""}
                   </span>

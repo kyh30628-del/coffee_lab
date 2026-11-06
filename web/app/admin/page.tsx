@@ -314,8 +314,8 @@ export default function AdminPage() {
   const Kpi = ({ label, value, sub, color = "text-stone-900" }: { label: string; value: any; sub?: string; color?: string }) => (
     <div className="bg-white rounded-xl border p-3.5">
       <div className={`text-2xl font-bold tabular-nums truncate ${color}`}>{value}</div>
-      <div className="text-[11px] text-stone-600 mt-0.5">{label}</div>
-      {sub && <div className="text-[10px] text-stone-600 mt-0.5">{sub}</div>}
+      <div className="text-[8.8px] text-stone-600 mt-0.5">{label}</div>
+      {sub && <div className="text-[8px] text-stone-600 mt-0.5">{sub}</div>}
     </div>
   );
   const Card = ({ title, children, note }: { title: string; children: React.ReactNode; note?: string }) => (
@@ -323,7 +323,7 @@ export default function AdminPage() {
       {/* 제목: 영역 가로·세로 정중앙 + 글자 높이에 맞춰 콤팩트(고정높이 없음) + 긴 제목은 어절 경계에서 여러 줄로(잘림 방지) */}
       <div className="admin-card-title font-bold text-stone-700 mb-3 flex items-center justify-center text-center break-keep leading-snug">{title}</div>
       {children}
-      {note && <p className="text-[10px] text-stone-600 mt-2">{note}</p>}
+      {note && <p className="text-[8px] text-stone-600 mt-2">{note}</p>}
     </div>
   );
   // 📐 섹션 그룹 헤더 — 논리 그룹 사이에 라벨+구분선으로 시각 분리(기존 카드 위치·데이터는 그대로, 표기만 추가)
@@ -339,8 +339,8 @@ export default function AdminPage() {
         <div className="flex items-center gap-2 flex-wrap">
           <span className="font-bold">{c.name}</span>
           <span className="text-xs text-stone-600">{c.area}</span>
-          <span className={`text-[10px] px-1.5 py-0.5 rounded ${c.source === "owner" ? "bg-blue-100 text-blue-700" : c.source === "seed" ? "bg-amber-100 text-amber-700" : "bg-stone-100 text-stone-700"}`}>{c.source}</span>
-          {!c.published && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-50 text-red-500">비공개</span>}
+          <span className={`text-[8px] px-1.5 py-0.5 rounded ${c.source === "owner" ? "bg-blue-100 text-blue-700" : c.source === "seed" ? "bg-amber-100 text-amber-700" : "bg-stone-100 text-stone-700"}`}>{c.source}</span>
+          {!c.published && <span className="text-[8px] px-1.5 py-0.5 rounded bg-red-50 text-red-500">비공개</span>}
         </div>
         {c.note && <p className="text-sm text-stone-600 mt-1 line-clamp-1">{c.note}</p>}
       </div>
@@ -374,10 +374,10 @@ export default function AdminPage() {
         <a href="/admin/traffic"
            className="block mb-4 rounded-xl border-2 border-sky-400 bg-sky-50 px-4 py-3 hover:bg-sky-100 transition">
           <div className="flex items-center justify-between">
-            <span className="text-[14px] font-extrabold text-sky-900">📈 접속자 전체 현황 (월별 누적 · 전국 지역별 · 패턴)</span>
-            <span className="text-[13px] font-bold text-sky-700">열기 →</span>
+            <span className="text-[11.2px] font-extrabold text-sky-900">📈 접속자 전체 현황 (월별 누적 · 전국 지역별 · 패턴)</span>
+            <span className="text-[10.4px] font-bold text-sky-700">열기 →</span>
           </div>
-          <p className="text-[11px] text-sky-800/80 mt-0.5">월별 순방문·재방문·검색유입 · 전국 441개 지역 전수 · 요일/시간대/체류깊이</p>
+          <p className="text-[8.8px] text-sky-800/80 mt-0.5">월별 순방문·재방문·검색유입 · 전국 441개 지역 전수 · 요일/시간대/체류깊이</p>
         </a>
 
         {/* ===== 📊 핵심 지표 (상단 KPI 행) — 발행수·검증/참고·오염·미결재를 한눈에 ===== */}
@@ -385,19 +385,19 @@ export default function AdminPage() {
         <div className="admin-kpi-grid mb-6">
           <div className="bg-white rounded-xl border border-stone-300 p-3.5">
             <div className="text-2xl font-extrabold text-stone-900 leading-tight tabular-nums truncate">{ct?.published?.toLocaleString() ?? "·"}</div>
-            <div className="text-[11px] font-medium text-stone-600 mt-0.5">📦 발행 (공개 카페)</div>
+            <div className="text-[8.8px] font-medium text-stone-600 mt-0.5">📦 발행 (공개 카페)</div>
           </div>
           <div className="bg-white rounded-xl border border-stone-300 p-3.5">
             <div className="text-2xl font-extrabold text-emerald-600 leading-tight tabular-nums truncate">{verifiedRefN.toLocaleString()}</div>
-            <div className="text-[11px] font-medium text-stone-600 mt-0.5">✅ 검증 · 참고 등급</div>
+            <div className="text-[8.8px] font-medium text-stone-600 mt-0.5">✅ 검증 · 참고 등급</div>
           </div>
           <div className={`rounded-xl border p-3.5 ${auditUnresolvedN > 0 ? "bg-red-50 border-red-400" : "bg-white border-stone-300"}`}>
             <div className={`text-2xl font-extrabold leading-tight tabular-nums truncate ${auditUnresolvedN > 0 ? "text-red-700" : "text-stone-900"}`}>{auditUnresolvedN}</div>
-            <div className={`text-[11px] font-medium mt-0.5 ${auditUnresolvedN > 0 ? "text-red-700" : "text-stone-600"}`}>{auditUnresolvedN > 0 ? "🔴" : "🟢"} 오염 · 품질 이슈</div>
+            <div className={`text-[8.8px] font-medium mt-0.5 ${auditUnresolvedN > 0 ? "text-red-700" : "text-stone-600"}`}>{auditUnresolvedN > 0 ? "🔴" : "🟢"} 오염 · 품질 이슈</div>
           </div>
           <a href="/admin/org?open=pending" className={`rounded-xl border p-3.5 block ${pendingActionsN > 0 ? "bg-amber-50 border-amber-400" : "bg-white border-stone-300"}`}>
             <div className={`text-2xl font-extrabold leading-tight tabular-nums truncate ${pendingActionsN > 0 ? "text-amber-700" : "text-stone-900"}`}>{pendingActionsN}</div>
-            <div className={`text-[11px] font-medium mt-0.5 ${pendingActionsN > 0 ? "text-amber-800" : "text-stone-600"}`}>{pendingActionsN > 0 ? "🟡" : "🟢"} CEO 결재 대기</div>
+            <div className={`text-[8.8px] font-medium mt-0.5 ${pendingActionsN > 0 ? "text-amber-800" : "text-stone-600"}`}>{pendingActionsN > 0 ? "🟡" : "🟢"} CEO 결재 대기</div>
           </a>
         </div>
 
@@ -411,7 +411,7 @@ export default function AdminPage() {
                 <span className="text-lg">💬</span>
                 <span className="flex flex-col">
                   <span className="font-bold text-stone-800">사용자 피드백 {fb.sum.d7.note > 0 ? `— 읽을 글 ${fb.sum.d7.note}건` : ""}</span>
-                  <span className="text-[11px] text-stone-700">
+                  <span className="text-[8.8px] text-stone-700">
                     7일 — 👍 {fb.sum.d7.like} · 👎 {fb.sum.d7.meh} · 글 {fb.sum.d7.note}
                     {" | 30일 — 👍 "}{fb.sum.d30.like} · 👎 {fb.sum.d30.meh} · 글 {fb.sum.d30.note}
                     {" | 누적 "}{fb.sum.all}
@@ -422,17 +422,17 @@ export default function AdminPage() {
               <span className="text-stone-400 text-xs">펼치기</span>
             </summary>
             <div className="px-4 pb-4">
-              <p className="text-[11px] text-stone-600 mb-3 leading-relaxed">
+              <p className="text-[8.8px] text-stone-600 mb-3 leading-relaxed">
                 👍/👎는 <b>한 번 탭하면 즉시 접수</b>되고 텍스트는 선택입니다. 같은 카페는 30일간 다시 묻지 않습니다.
                 뒤로가기는 가로채지 않습니다(모바일 제스처·검색 복귀 보호).
               </p>
               {fb.items.length === 0 ? (
-                <p className="text-[12px] text-stone-500">아직 없습니다.</p>
+                <p className="text-[9.6px] text-stone-500">아직 없습니다.</p>
               ) : (
                 <ul className="space-y-2">
                   {fb.items.map((it: any) => (
                     <li key={it.id} className="rounded-lg border border-stone-200 px-3 py-2">
-                      <div className="flex items-center gap-2 text-[11px] text-stone-600">
+                      <div className="flex items-center gap-2 text-[8.8px] text-stone-600">
                         <span className={it.kind === "like" ? "text-emerald-700" : "text-amber-800"}>
                           {it.kind === "like" ? "👍 좋아요" : "👎 아쉬워요"}
                         </span>
@@ -444,7 +444,7 @@ export default function AdminPage() {
                         {it.place === "after-outlink" && <span className="text-stone-500">· 지도·플레이스 클릭 직후</span>}
                         <span className="ml-auto text-stone-400">{it.at ? new Date(it.at).toLocaleString("ko-KR", { hour12: false }) : ""}</span>
                       </div>
-                      {it.note && <p className="mt-1 text-[13px] text-stone-800 whitespace-pre-wrap leading-relaxed">{it.note}</p>}
+                      {it.note && <p className="mt-1 text-[10.4px] text-stone-800 whitespace-pre-wrap leading-relaxed">{it.note}</p>}
                     </li>
                   ))}
                 </ul>
@@ -461,7 +461,7 @@ export default function AdminPage() {
                 <span className="text-lg">🏪</span>
                 <span className="flex flex-col">
                   <span className="font-bold text-stone-800">사장님 퍼널 (우리 가게 리포트)</span>
-                  <span className="text-[11px] text-stone-700">
+                  <span className="text-[8.8px] text-stone-700">
                     7일 — 진입 {ownerFunnel.d7.cta.total} · 리포트 {ownerFunnel.d7.reportView}
                     {ownerFunnel.d7.reachRate !== null ? ` (도달 ${ownerFunnel.d7.reachRate}%${ownerFunnel.d7.reachRateCapped ? "+" : ""})` : ""}
                     {(ownerFunnel.d7.reachRateCapped || ownerFunnel.d7.lowSample) ? " ⚠️표본이상치" : ""}
@@ -470,7 +470,7 @@ export default function AdminPage() {
                   {/* 🎯 아웃리치(B안) — 사장님께 직접 보낸 링크(?src=)로 들어온 것만.
                       0이면 '실패'가 아니라 '아직 안 보냄'일 수 있다(발송 건수는 사람만 안다). */}
                   {ownerFunnel.d7.outreach && (
-                    <span className="text-[11px] text-stone-700">
+                    <span className="text-[8.8px] text-stone-700">
                       아웃리치 7일 — DM {ownerFunnel.d7.outreach.dm} · 메일 {ownerFunnel.d7.outreach.email}
                       {" · 카톡 "}{ownerFunnel.d7.outreach.kakao} · 포스터 {ownerFunnel.d7.outreach.poster}
                       {" · 명함 "}{ownerFunnel.d7.outreach.card}
@@ -484,11 +484,11 @@ export default function AdminPage() {
               <span className="text-stone-400 text-xs">펼치기</span>
             </summary>
             <div className="px-4 pb-4">
-              <p className="text-[11px] text-stone-600 mb-3 leading-relaxed">
+              <p className="text-[8.8px] text-stone-600 mb-3 leading-relaxed">
                 진입(CTA 클릭) → 무료 리포트 도달 → 체험 신청 → 유료. <b>도달률</b>이 2026-08-27 수리의 성적표입니다
                 (그전엔 리포트 대신 PIN 로그인 벽이 떠서 사실상 0%였습니다).
               </p>
-              <table className="w-full text-[12px]">
+              <table className="w-full text-[9.6px]">
                 <thead>
                   <tr className="text-stone-500 border-b border-stone-200">
                     <th className="text-left py-1.5 font-medium">단계</th>
@@ -525,13 +525,13 @@ export default function AdminPage() {
                 </tbody>
               </table>
               {(ownerFunnel.d7.reachRateCapped || ownerFunnel.d7.lowSample) && (
-                <p className="mt-2 text-[11px] text-amber-700">
+                <p className="mt-2 text-[8.8px] text-amber-700">
                   ⚠️ 7일창 표본 이상치 — 진입(cta_click) {ownerFunnel.d7.cta.total}건으로 분모가 작아
                   {ownerFunnel.d7.reachRateCapped ? " 원시 도달률이 100%를 넘어 100%로 표시를 캡했습니다." : " 비율이 튈 수 있습니다."}
                   리포트 조회는 재방문·크로스링크 등 CTA를 거치지 않은 유입도 포함합니다.
                 </p>
               )}
-              <div className="mt-3 text-[11px] text-stone-600">
+              <div className="mt-3 text-[8.8px] text-stone-600">
                 구독 {ownerFunnel.subs.total}건 · 활성 {ownerFunnel.subs.active} · <b className={ownerFunnel.subs.paid > 0 ? "text-emerald-700" : "text-stone-800"}>유료 {ownerFunnel.subs.paid}건</b>
               </div>
             </div>
@@ -545,7 +545,7 @@ export default function AdminPage() {
                 <span className="text-lg">🏛️</span>
                 <span className="flex flex-col">
                   <span className="font-bold text-stone-800">회사 포트폴리오 (다른 서비스)</span>
-                  <span className="text-[11px] text-stone-700">
+                  <span className="text-[8.8px] text-stone-700">
                     {portfolioData.services.map((x: any) => `${x.name} ${x.ok ? `이슈 ${(x.issues?.high ?? 0) + (x.issues?.med ?? 0)}·결재 ${x.decisions?.pending ?? 0}` : "연결 실패"}`).join(" · ")}
                   </span>
                 </span>
@@ -557,25 +557,25 @@ export default function AdminPage() {
                 <div key={x.key} className="pt-3">
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-stone-800 text-sm">{x.emoji} {x.name}</span>
-                    <a href={x.admin} target="_blank" rel="noopener" className="text-[11px] font-bold text-emerald-700 underline">관제탑 열기 ↗</a>
+                    <a href={x.admin} target="_blank" rel="noopener" className="text-[8.8px] font-bold text-emerald-700 underline">관제탑 열기 ↗</a>
                   </div>
                   {!x.ok ? (
-                    <div className="text-[11px] text-red-700 mt-1">연결 실패 — {x.error || "상태를 가져오지 못했습니다"}</div>
+                    <div className="text-[8.8px] text-red-700 mt-1">연결 실패 — {x.error || "상태를 가져오지 못했습니다"}</div>
                   ) : (
                     <>
-                      <div className="text-[11px] text-stone-700 mt-1">
+                      <div className="text-[8.8px] text-stone-700 mt-1">
                         물건 {Number(x.items ?? 0).toLocaleString()}건 · 수집 {x.freshHours ?? "-"}시간 전 · 오늘 방문자 {x.visitorsToday ?? 0}명
                       </div>
                       <div className="flex gap-2 mt-2 flex-wrap">
-                        <span className={`text-[11px] font-bold rounded-full px-2.5 py-1 border ${(x.issues?.high ?? 0) > 0 ? "bg-red-50 border-red-400 text-red-700" : "bg-white border-stone-300 text-stone-700"}`}>긴급 {x.issues?.high ?? 0}</span>
-                        <span className="text-[11px] font-bold rounded-full px-2.5 py-1 border bg-white border-stone-300 text-stone-700">주의 {x.issues?.med ?? 0}</span>
-                        <span className={`text-[11px] font-bold rounded-full px-2.5 py-1 border ${(x.decisions?.pending ?? 0) > 0 ? "bg-amber-50 border-amber-400 text-amber-800" : "bg-white border-stone-300 text-stone-700"}`}>결재 대기 {x.decisions?.pending ?? 0}</span>
-                        {(x.decisions?.approved ?? 0) > 0 && <span className="text-[11px] font-bold rounded-full px-2.5 py-1 border bg-white border-stone-300 text-stone-700">집행 대기 {x.decisions.approved}</span>}
+                        <span className={`text-[8.8px] font-bold rounded-full px-2.5 py-1 border ${(x.issues?.high ?? 0) > 0 ? "bg-red-50 border-red-400 text-red-700" : "bg-white border-stone-300 text-stone-700"}`}>긴급 {x.issues?.high ?? 0}</span>
+                        <span className="text-[8.8px] font-bold rounded-full px-2.5 py-1 border bg-white border-stone-300 text-stone-700">주의 {x.issues?.med ?? 0}</span>
+                        <span className={`text-[8.8px] font-bold rounded-full px-2.5 py-1 border ${(x.decisions?.pending ?? 0) > 0 ? "bg-amber-50 border-amber-400 text-amber-800" : "bg-white border-stone-300 text-stone-700"}`}>결재 대기 {x.decisions?.pending ?? 0}</span>
+                        {(x.decisions?.approved ?? 0) > 0 && <span className="text-[8.8px] font-bold rounded-full px-2.5 py-1 border bg-white border-stone-300 text-stone-700">집행 대기 {x.decisions.approved}</span>}
                       </div>
                       {(x.issues?.top ?? []).length > 0 && (
                         <ul className="mt-2 space-y-1">
                           {x.issues.top.map((i: any, n: number) => (
-                            <li key={n} className="text-[11px] text-stone-700 flex gap-1.5">
+                            <li key={n} className="text-[8.8px] text-stone-700 flex gap-1.5">
                               <span className={i.severity === "HIGH" ? "text-red-600 font-bold" : "text-amber-700"}>{i.severity === "HIGH" ? "●" : "○"}</span>
                               <span className="flex-1">{i.title}{i.consumer ? "" : " (내부)"}</span>
                             </li>
@@ -585,7 +585,7 @@ export default function AdminPage() {
                       {(x.decisions?.top ?? []).length > 0 && (
                         <ul className="mt-2 space-y-1 border-t border-stone-200 pt-2">
                           {x.decisions.top.map((d: any) => (
-                            <li key={d.id} className="text-[11px] text-stone-700">📋 {d.title} <span className="text-stone-500">[{d.tier} · {d.status === "pending" ? "결재 대기" : "집행 대기"}]</span></li>
+                            <li key={d.id} className="text-[8.8px] text-stone-700">📋 {d.title} <span className="text-stone-500">[{d.tier} · {d.status === "pending" ? "결재 대기" : "집행 대기"}]</span></li>
                           ))}
                         </ul>
                       )}
@@ -593,14 +593,14 @@ export default function AdminPage() {
                   )}
                 </div>
               ))}
-              <p className="text-[10px] text-stone-500 mt-3">읽기 전용입니다 — 승인·조치는 해당 서비스 관제탑에서 하세요. 서비스 간 DB는 분리돼 있습니다(60초 캐시).</p>
+              <p className="text-[8px] text-stone-500 mt-3">읽기 전용입니다 — 승인·조치는 해당 서비스 관제탑에서 하세요. 서비스 간 DB는 분리돼 있습니다(60초 캐시).</p>
             </div>
           </details>
         )}
 
         {/* 🎩 조직 관제(기획조정실 자율조직 브리핑) — 카페-데이터 관제탑과 별개. 모바일 전용 화면으로. */}
         <a href="/admin/org" className="flex items-center justify-between mb-6 rounded-2xl border border-stone-300 bg-white px-4 py-3 hover:bg-stone-50 transition">
-          <span className="flex items-center gap-2"><span className="text-lg">🎩</span><span className="flex flex-col"><span className="font-bold text-stone-800">조직 관제 (기획조정실)</span><span className="text-[11px] text-stone-700">자율 에이전트 일일 브리핑·결재·토큰</span></span></span>
+          <span className="flex items-center gap-2"><span className="text-lg">🎩</span><span className="flex flex-col"><span className="font-bold text-stone-800">조직 관제 (기획조정실)</span><span className="text-[8.8px] text-stone-700">자율 에이전트 일일 브리핑·결재·토큰</span></span></span>
           <span className="text-stone-600 font-bold">→</span>
         </a>
 
@@ -643,9 +643,9 @@ export default function AdminPage() {
             return (
               <button onClick={() => setSelAgent(a)} className={`relative shrink-0 w-[84px] rounded-2xl border-2 ${nodeBorder[a.status] || nodeBorder.idle} bg-white px-1.5 pt-2.5 pb-2 text-center transition hover:shadow-md hover:-translate-y-0.5 active:scale-95`}>
                 <div className="flex justify-center -mt-[18px] mb-1"><Light status={a.status} /></div>
-                <div className="text-[17px] leading-none">{d?.icon || "•"}</div>
-                <div className="text-[10.5px] font-extrabold text-stone-800 mt-1 leading-tight">{a.label.split(" (")[0]}</div>
-                <div className="text-[9px] mt-0.5 font-bold">{a.queue > 0 ? <span className="text-amber-600">대기 {a.queue.toLocaleString()}</span> : <span className="text-stone-600">{ago(a.ageH)}</span>}</div>
+                <div className="text-[13.6px] leading-none">{d?.icon || "•"}</div>
+                <div className="text-[8.4px] font-extrabold text-stone-800 mt-1 leading-tight">{a.label.split(" (")[0]}</div>
+                <div className="text-[7.2px] mt-0.5 font-bold">{a.queue > 0 ? <span className="text-amber-600">대기 {a.queue.toLocaleString()}</span> : <span className="text-stone-600">{ago(a.ageH)}</span>}</div>
               </button>
             );
           };
@@ -660,11 +660,11 @@ export default function AdminPage() {
                   <Light status={a.status} />
                   <span className="text-2xl leading-none shrink-0">{d?.icon || "•"}</span>
                   <div className="flex-1 min-w-0">
-                    <div className="font-extrabold text-stone-800 text-[14px] leading-tight">{a.label}</div>
-                    <div className="text-[11px] text-stone-700 leading-snug mt-0.5 line-clamp-2">{d?.what || a.note}</div>
+                    <div className="font-extrabold text-stone-800 text-[11.2px] leading-tight">{a.label}</div>
+                    <div className="text-[8.8px] text-stone-700 leading-snug mt-0.5 line-clamp-2">{d?.what || a.note}</div>
                   </div>
                   <div className="text-right shrink-0">
-                    {a.queue > 0 ? <div className="text-amber-600 font-extrabold text-[13px]">대기<br />{a.queue.toLocaleString()}</div> : <div className="text-stone-600 text-[11px]">{ago(a.ageH)}</div>}
+                    {a.queue > 0 ? <div className="text-amber-600 font-extrabold text-[10.4px]">대기<br />{a.queue.toLocaleString()}</div> : <div className="text-stone-600 text-[8.8px]">{ago(a.ageH)}</div>}
                   </div>
                 </button>
                 {arrow && <div className="flex justify-center py-0.5 text-stone-600 text-xl leading-none select-none">↓</div>}
@@ -687,29 +687,29 @@ export default function AdminPage() {
                   {!((tower.alerts?.length || 0) + towerRisks.length) && !(tower.notices?.length || 0) && <span className="text-emerald-600 normal-case">✅</span>}
                 </button>
                 <div className="flex items-center gap-1.5">
-                  <button onClick={() => setTowerFull(true)} className="text-[11px] font-bold px-2.5 py-1 rounded-full border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100">⛶ 전체화면</button>
-                  <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full border ${oc[tower.overall] || oc.degraded}`}>{ocl[tower.overall] || tower.overall}</span>
+                  <button onClick={() => setTowerFull(true)} className="text-[8.8px] font-bold px-2.5 py-1 rounded-full border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100">⛶ 전체화면</button>
+                  <span className={`text-[8.8px] font-bold px-2.5 py-1 rounded-full border ${oc[tower.overall] || oc.degraded}`}>{ocl[tower.overall] || tower.overall}</span>
                 </div>
               </div>
               {openSecs.tower && <div className="mt-3">
               {tower.alerts?.length > 0 && (
-                <div className="mb-2.5 text-[11px] text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">🚨 경보(즉시조치): {tower.alerts.join(" · ")}</div>
+                <div className="mb-2.5 text-[8.8px] text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">🚨 경보(즉시조치): {tower.alerts.join(" · ")}</div>
               )}
               {towerRisks.length > 0 && (
-                <div className="mb-2.5 text-[11px] text-red-700 bg-red-50 border border-red-300 rounded-lg px-3 py-2">🔴 위험(해자·소비자 타격): {towerRisks.join(" · ")}</div>
+                <div className="mb-2.5 text-[8.8px] text-red-700 bg-red-50 border border-red-300 rounded-lg px-3 py-2">🔴 위험(해자·소비자 타격): {towerRisks.join(" · ")}</div>
               )}
               {(!tower.alerts?.length && !towerRisks.length) && (
-                <div className="mb-2.5 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">✅ 위험·해자 검사 통과 — 소비자 노출 손상 없음(숫자 신뢰 가능)</div>
+                <div className="mb-2.5 text-[8.8px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">✅ 위험·해자 검사 통과 — 소비자 노출 손상 없음(숫자 신뢰 가능)</div>
               )}
               {tower.notices?.length > 0 && (
-                <div className="mb-2.5 text-[11px] text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">🛠 주의(백그라운드 — 자동 처리, 소비자 무관): {tower.notices.join(" · ")}</div>
+                <div className="mb-2.5 text-[8.8px] text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">🛠 주의(백그라운드 — 자동 처리, 소비자 무관): {tower.notices.join(" · ")}</div>
               )}
               {tower.healed?.length > 0 && (
-                <div className="mb-2.5 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">🔧 자가치유: {tower.healed.join(" · ")}</div>
+                <div className="mb-2.5 text-[8.8px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">🔧 자가치유: {tower.healed.join(" · ")}</div>
               )}
               {tower.today && (
                 <div className="mb-2.5">
-                  <div className="text-[10px] font-bold text-stone-700 mb-1.5">📅 오늘의 수집 (KST · 자동 갱신)</div>
+                  <div className="text-[8px] font-bold text-stone-700 mb-1.5">📅 오늘의 수집 (KST · 자동 갱신)</div>
                   <div className="admin-today-grid">
                     {[
                       { l: "오늘 신규발굴", v: tower.today.newCafes, c: "text-amber-700 bg-amber-50 border-amber-300", m: "newCafes" },
@@ -724,8 +724,8 @@ export default function AdminPage() {
                     ].map((t) => (
                       <button key={t.l} onClick={() => openToday(t.m, t.l)} title="클릭하면 상세 목록"
                         className={`rounded-xl border px-2 py-2 text-center transition hover:brightness-95 hover:shadow-sm cursor-pointer ${t.c}`}>
-                        <div className="text-[15px] font-extrabold leading-none">{typeof t.v === "number" ? t.v.toLocaleString() : t.v}</div>
-                        <div className="text-[9px] mt-1 font-bold whitespace-nowrap">{t.l}</div>
+                        <div className="text-[12px] font-extrabold leading-none">{typeof t.v === "number" ? t.v.toLocaleString() : t.v}</div>
+                        <div className="text-[7.2px] mt-1 font-bold whitespace-nowrap">{t.l}</div>
                       </button>
                     ))}
                   </div>
@@ -738,23 +738,23 @@ export default function AdminPage() {
                   return (
                     <button key={a.key} onClick={() => setSelAgent(a)} className="flex items-center gap-1.5 rounded-xl border border-stone-300 bg-stone-50 px-2.5 py-2 text-left hover:bg-stone-100 transition">
                       <span className={`w-2 h-2 rounded-full shrink-0 ${dot[a.status] || "bg-stone-300"} ${working ? "acc-blink" : ""}`} />
-                      <span className="text-[11px] font-bold text-stone-700 truncate flex-1">{a.label.split(" (")[0]}</span>
-                      {a.queue > 0 && <span className="text-[9px] font-bold text-amber-600 shrink-0">{a.queue.toLocaleString()}</span>}
+                      <span className="text-[8.8px] font-bold text-stone-700 truncate flex-1">{a.label.split(" (")[0]}</span>
+                      {a.queue > 0 && <span className="text-[7.2px] font-bold text-amber-600 shrink-0">{a.queue.toLocaleString()}</span>}
                     </button>
                   );
                 })}
               </div>
-              <button onClick={() => setTowerFull(true)} className="w-full mb-2.5 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-700 text-[12px] font-bold py-2 hover:bg-indigo-100 transition">⛶ 관제탑 전체 흐름 보기 (수집 → 공개)</button>
+              <button onClick={() => setTowerFull(true)} className="w-full mb-2.5 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-700 text-[9.6px] font-bold py-2 hover:bg-indigo-100 transition">⛶ 관제탑 전체 흐름 보기 (수집 → 공개)</button>
               {/* 🔬 그라운딩 — '소비자 노출 의심'이 있을 때만 빨강 경보. 0이면 표시 안 함(아래 검증 패널이 0 확인).
                    (그라운딩은 결정론적 규칙으로 대체됨 — 안 줄어드는 '감사 대기' 백로그는 오해라 미표시) */}
               {tower.grounding && tower.grounding.suspectCount > 0 && (
                 <div className="mb-2.5 rounded-xl border p-2.5 border-rose-200 bg-rose-50/60">
-                  <div className="text-[11px] font-bold mb-1.5 text-stone-700">
+                  <div className="text-[8.8px] font-bold mb-1.5 text-stone-700">
                     🔬 LLM 그라운딩 · 소비자 노출 의심 <b className="text-rose-700">{tower.grounding.suspectCount}건</b>
                   </div>
                   <div className="space-y-1 max-h-44 overflow-y-auto">
                     {tower.grounding.suspects?.map((s: any, i: number) => (
-                      <div key={i} className="text-[10.5px] leading-snug"><b className="text-rose-700">{s.name}</b> <span className="text-stone-600">{s.area}</span><br /><span className="text-stone-600">{s.issue}</span></div>
+                      <div key={i} className="text-[8.4px] leading-snug"><b className="text-rose-700">{s.name}</b> <span className="text-stone-600">{s.area}</span><br /><span className="text-stone-600">{s.issue}</span></div>
                     ))}
                   </div>
                 </div>
@@ -762,25 +762,25 @@ export default function AdminPage() {
               {/* 🛡️ 리뷰-카페 불일치 감시 — 표시 리뷰에 카페 맥락 없는 비율↑ = 규칙-사각 오염(딴업종·문구이름). 있을 때만 빨강 */}
               {tower.offctx && tower.offctx.count > 0 && (
                 <div className="mb-2.5 rounded-xl border p-2.5 border-amber-300 bg-amber-50/60">
-                  <div className="text-[11px] font-bold mb-1.5 text-stone-700">
+                  <div className="text-[8.8px] font-bold mb-1.5 text-stone-700">
                     🔎 리뷰 맥락 점검 목록 <b className="text-amber-700">{tower.offctx.count}곳</b> <span className="font-normal text-stone-700">· 위험 아님 · 표시 리뷰에 카페 맥락 적음(점검 권장)</span>
                   </div>
                   <div className="space-y-0.5 max-h-44 overflow-y-auto">
                     {tower.offctx.suspects?.map((s: any, i: number) => (
-                      <div key={i} className="text-[10.5px] leading-snug"><b className="text-amber-800">{s.name}</b> <span className="text-stone-600">{s.area}</span> <span className="text-stone-700">맥락없음 {Math.round((s.rate ?? 0) * 100)}%</span></div>
+                      <div key={i} className="text-[8.4px] leading-snug"><b className="text-amber-800">{s.name}</b> <span className="text-stone-600">{s.area}</span> <span className="text-stone-700">맥락없음 {Math.round((s.rate ?? 0) * 100)}%</span></div>
                     ))}
                   </div>
-                  <p className="text-[10px] text-stone-600 mt-1">사각 오염 감시용 watchlist — <b>일부는 진짜 카페(찻집·북카페·시적이름) 오탐</b>. 사람이 확인 후 진짜 오염만 비공개. (헛경보 방지로 위험 아닌 주의)</p>
+                  <p className="text-[8px] text-stone-600 mt-1">사각 오염 감시용 watchlist — <b>일부는 진짜 카페(찻집·북카페·시적이름) 오탐</b>. 사람이 확인 후 진짜 오염만 비공개. (헛경보 방지로 위험 아닌 주의)</p>
                 </div>
               )}
               {/* 📊 접속·유입 — 요약 진입 카드(상세는 전용 대시보드 1곳으로 일원화) */}
               {tower.traffic && (
                 <button onClick={openAnalytics} className="w-full mb-2.5 rounded-xl border border-sky-200 bg-sky-50/60 p-2.5 text-left hover:bg-sky-100/70 transition">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-[11px] font-bold text-stone-700">📊 접속·유입 현황</span>
-                    <span className="text-[11px] font-bold text-sky-700">전체 대시보드 →</span>
+                    <span className="text-[8.8px] font-bold text-stone-700">📊 접속·유입 현황</span>
+                    <span className="text-[8.8px] font-bold text-sky-700">전체 대시보드 →</span>
                   </div>
-                  <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10.5px] text-stone-600">
+                  <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[8.4px] text-stone-600">
                     <span>일간(DAU) <b className="text-sky-700">{tower.traffic.dau}</b></span>
                     <span>주간(WAU) <b className="text-sky-700">{tower.traffic.wau}</b></span>
                     <span>월간(MAU) <b className="text-sky-700">{tower.traffic.mau}</b></span>
@@ -789,7 +789,7 @@ export default function AdminPage() {
                     <a href="/admin/traffic" onClick={(e) => e.stopPropagation()} className="ml-auto font-bold text-sky-700 underline">월별·전국 전체 →</a>
                   </div>
                   {/* 🕒 판정 신선도(2026-09-14) — "50이었다가 45로 줄었다"의 답을 화면에 둔다. */}
-                  <div className="mt-1 pt-1 border-t border-sky-200/70 text-[10px] leading-relaxed text-stone-600">
+                  <div className="mt-1 pt-1 border-t border-sky-200/70 text-[8px] leading-relaxed text-stone-600">
                     <b className="text-amber-700">오늘 숫자는 집계 중</b>이라 오르내립니다 · 확정 <b className="text-stone-800">{tower.traffic.verdict?.settlesAt ?? "다음 날 00:30"}</b>
                     {tower.traffic.verdict?.cacheAgeMin != null && <> · 마지막 판정 <b className="text-stone-800">{tower.traffic.verdict.cacheAgeMin}분 전</b></>}
                     <div className="text-stone-500">봇을 빼는 게 아니라 <b>사람 증거(검색 유입·2페이지·재방문·모바일) 있는 사람만</b> 셉니다. 방금 온 사람은 아직 증거가 없어 다음 판정에서 빠지고, 나중에 더 보거나 다시 오면 다시 들어옵니다.</div>
@@ -800,16 +800,16 @@ export default function AdminPage() {
               {blData?.summary?.cafes > 0 && (
                 <button onClick={() => setShowBorderline(true)} className="w-full mb-2.5 rounded-xl border border-violet-200 bg-violet-50/60 p-2.5 text-left hover:bg-violet-100/70 transition">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-stone-700">🤖 경계후기 보강 <span className="font-normal text-stone-600">· 노출에선 이미 제외됨(소비자 영향 없음)</span></span>
-                    <span className="text-[11px] font-bold text-violet-700">목록 →</span>
+                    <span className="text-[8.8px] font-bold text-stone-700">🤖 경계후기 보강 <span className="font-normal text-stone-600">· 노출에선 이미 제외됨(소비자 영향 없음)</span></span>
+                    <span className="text-[8.8px] font-bold text-violet-700">목록 →</span>
                   </div>
                   {/* 🔴 2026-10-16 CEO 반복지적 — "안 줄어드는/소비자 무관 숫자는 띄우지 말 것".
                        경계후기 대기(44만건)는 크레딧이 없으면 줄지 않고, 노출에선 이미 빠져 있어 소비자와 무관하다.
                        숫자를 지우고 '목록 →'으로만 접근한다(데이터는 모달에 그대로 있다). */}
-                  <div className="text-[10.5px] text-stone-600 mt-0.5">크레딧 복구 시 자동 보강 — 목록에서 대상 확인</div>
+                  <div className="text-[8.4px] text-stone-600 mt-0.5">크레딧 복구 시 자동 보강 — 목록에서 대상 확인</div>
                 </button>
               )}
-              <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-stone-700">
+              <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[8px] text-stone-700">
                 <span>공개 <b className="text-stone-700">{tower.coverage?.published?.toLocaleString()}</b>/{tower.coverage?.total?.toLocaleString()}</span>
                 <span>raw {tower.coverage?.rawCachedPct}%</span>
                 <span>판정 {tower.coverage?.judgedPct}%</span>
@@ -829,19 +829,19 @@ export default function AdminPage() {
                       <span className="text-2xl leading-none">{d.icon || "•"}</span>
                       <div className="min-w-0">
                         <div className="text-base font-extrabold text-stone-800 leading-tight">{selAgent.label}</div>
-                        <span className={`inline-block mt-1 text-[11px] font-bold px-2 py-0.5 rounded-full ${pill}`}>{stLabel}</span>
+                        <span className={`inline-block mt-1 text-[8.8px] font-bold px-2 py-0.5 rounded-full ${pill}`}>{stLabel}</span>
                       </div>
                       <button onClick={() => setSelAgent(null)} className="ml-auto text-stone-600 text-2xl leading-none px-1">×</button>
                     </div>
-                    <p className="text-[13px] text-stone-700 mt-1.5 leading-relaxed">{d.what || selAgent.note}</p>
-                    <div className="mt-3 space-y-1.5 text-[12px] border-t border-stone-300 pt-3">
+                    <p className="text-[10.4px] text-stone-700 mt-1.5 leading-relaxed">{d.what || selAgent.note}</p>
+                    <div className="mt-3 space-y-1.5 text-[9.6px] border-t border-stone-300 pt-3">
                       <div className="flex gap-2"><span className="text-stone-600 w-16 shrink-0">⏰ 주기</span><span className="text-stone-700">{d.sched || "—"}</span></div>
                       <div className="flex gap-2"><span className="text-stone-600 w-16 shrink-0">➡️ 다음</span><span className="text-stone-700">{d.feeds || "—"}</span></div>
                       <div className="flex gap-2"><span className="text-stone-600 w-16 shrink-0">🕐 마지막</span><span className="text-stone-700">{ago(selAgent.ageH)}</span></div>
                       {selAgent.queue > 0 && <div className="flex gap-2"><span className="text-stone-600 w-16 shrink-0">📋 대기</span><span className="text-amber-600 font-bold">{selAgent.queue.toLocaleString()}건</span></div>}
                       <div className="flex gap-2"><span className="text-stone-600 w-16 shrink-0">📝 현황</span><span className="text-stone-700">{selAgent.note}</span></div>
                     </div>
-                    <button onClick={() => setSelAgent(null)} className="mt-4 w-full rounded-xl bg-stone-800 text-white text-[13px] font-bold py-2.5">닫기</button>
+                    <button onClick={() => setSelAgent(null)} className="mt-4 w-full rounded-xl bg-stone-800 text-white text-[10.4px] font-bold py-2.5">닫기</button>
                   </div>
                 </div>
               );
@@ -852,27 +852,27 @@ export default function AdminPage() {
                 <div onClick={(e) => e.stopPropagation()} className="w-full max-w-lg max-h-[80vh] flex flex-col rounded-2xl bg-white p-5 shadow-xl">
                   <div className="flex items-center gap-2 mb-3">
                     <span className="text-base font-extrabold text-stone-800">📅 {todayDetail.label}</span>
-                    {!todayDetail.loading && <span className="text-[12px] font-bold text-stone-700">{todayDetail.cafes.length.toLocaleString()}곳{todayDetail.capped ? "+" : ""}</span>}
+                    {!todayDetail.loading && <span className="text-[9.6px] font-bold text-stone-700">{todayDetail.cafes.length.toLocaleString()}곳{todayDetail.capped ? "+" : ""}</span>}
                     <button onClick={() => setTodayDetail(null)} className="ml-auto text-stone-600 text-2xl leading-none px-1">×</button>
                   </div>
                   <div className="overflow-y-auto flex-1 -mx-1 px-1">
                     {todayDetail.loading ? (
-                      <div className="text-[13px] text-stone-600 text-center py-8">불러오는 중…</div>
+                      <div className="text-[10.4px] text-stone-600 text-center py-8">불러오는 중…</div>
                     ) : todayDetail.error ? (
-                      <div className="text-[13px] text-red-600 text-center py-8">에러: {todayDetail.error}</div>
+                      <div className="text-[10.4px] text-red-600 text-center py-8">에러: {todayDetail.error}</div>
                     ) : todayDetail.cafes.length === 0 ? (
-                      <div className="text-[13px] text-stone-600 text-center py-8">해당 카페가 없습니다.</div>
+                      <div className="text-[10.4px] text-stone-600 text-center py-8">해당 카페가 없습니다.</div>
                     ) : (
                       <div className="divide-y divide-stone-100">
                         {todayDetail.cafes.map((c: any) => {
                           const inner = (
                             <>
                               <div className="min-w-0 flex-1">
-                                <div className="text-[13px] font-bold text-stone-800 truncate">{c.name}{c.published && <span className="text-[10px] text-indigo-400 font-normal"> ↗</span>}</div>
-                                <div className="text-[11px] text-stone-700 truncate">{c.area}{c.dong ? ` · ${c.dong}` : ""}{c.source ? ` · ${c.source}` : ""}{c.at ? ` · ${c.at}` : ""}</div>
+                                <div className="text-[10.4px] font-bold text-stone-800 truncate">{c.name}{c.published && <span className="text-[8px] text-indigo-400 font-normal"> ↗</span>}</div>
+                                <div className="text-[8.8px] text-stone-700 truncate">{c.area}{c.dong ? ` · ${c.dong}` : ""}{c.source ? ` · ${c.source}` : ""}{c.at ? ` · ${c.at}` : ""}</div>
                               </div>
-                              {c.grade && <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${c.grade === "검증" ? "bg-emerald-100 text-emerald-700" : c.grade === "참고" ? "bg-sky-100 text-sky-700" : "bg-stone-100 text-stone-700"}`}>{c.grade}{c.cnt != null ? ` ${c.cnt}` : ""}</span>}
-                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${c.published ? "bg-emerald-50 text-emerald-600 border border-emerald-200" : "bg-stone-50 text-stone-600 border border-stone-300"}`}>{c.published ? "공개" : "비공개"}</span>
+                              {c.grade && <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${c.grade === "검증" ? "bg-emerald-100 text-emerald-700" : c.grade === "참고" ? "bg-sky-100 text-sky-700" : "bg-stone-100 text-stone-700"}`}>{c.grade}{c.cnt != null ? ` ${c.cnt}` : ""}</span>}
+                              <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${c.published ? "bg-emerald-50 text-emerald-600 border border-emerald-200" : "bg-stone-50 text-stone-600 border border-stone-300"}`}>{c.published ? "공개" : "비공개"}</span>
                             </>
                           );
                           return c.published ? (
@@ -884,8 +884,8 @@ export default function AdminPage() {
                       </div>
                     )}
                   </div>
-                  {todayDetail.capped && <div className="text-[10px] text-stone-600 text-center pt-2">최대 500곳까지 표시</div>}
-                  <button onClick={() => setTodayDetail(null)} className="mt-3 w-full rounded-xl bg-stone-800 text-white text-[13px] font-bold py-2.5 shrink-0">닫기</button>
+                  {todayDetail.capped && <div className="text-[8px] text-stone-600 text-center pt-2">최대 500곳까지 표시</div>}
+                  <button onClick={() => setTodayDetail(null)} className="mt-3 w-full rounded-xl bg-stone-800 text-white text-[10.4px] font-bold py-2.5 shrink-0">닫기</button>
                 </div>
               </div>
             )}
@@ -898,35 +898,35 @@ export default function AdminPage() {
                       <span className="text-white font-extrabold text-sm">자율 운영 관제탑</span>
                       <Light status={tower.overall === "healthy" ? "ok" : tower.overall === "critical" ? "stalled" : "warn"} />
                     </div>
-                    <button onClick={() => setTowerFull(false)} className="text-stone-300 text-[13px] font-bold rounded-full border border-stone-600 px-3 py-1 hover:bg-stone-800">✕ 닫기</button>
+                    <button onClick={() => setTowerFull(false)} className="text-stone-300 text-[10.4px] font-bold rounded-full border border-stone-600 px-3 py-1 hover:bg-stone-800">✕ 닫기</button>
                   </div>
-                  {tower.alerts?.length > 0 && <div className="mb-2 text-[11px] text-red-300 bg-red-950/60 border border-red-900 rounded-lg px-3 py-2">⚠ {tower.alerts.join(" · ")}</div>}
-                  {tower.healed?.length > 0 && <div className="mb-2 text-[11px] text-emerald-300 bg-emerald-950/50 border border-emerald-900 rounded-lg px-3 py-2">🔧 자가치유: {tower.healed.join(" · ")}</div>}
-                  <div className="text-[11px] font-extrabold text-stone-300 mb-2 mt-1">📥 데이터 생성 라인 · 수집 → 공개</div>
+                  {tower.alerts?.length > 0 && <div className="mb-2 text-[8.8px] text-red-300 bg-red-950/60 border border-red-900 rounded-lg px-3 py-2">⚠ {tower.alerts.join(" · ")}</div>}
+                  {tower.healed?.length > 0 && <div className="mb-2 text-[8.8px] text-emerald-300 bg-emerald-950/50 border border-emerald-900 rounded-lg px-3 py-2">🔧 자가치유: {tower.healed.join(" · ")}</div>}
+                  <div className="text-[8.8px] font-extrabold text-stone-300 mb-2 mt-1">📥 데이터 생성 라인 · 수집 → 공개</div>
                   <div>
                     {flow.map((a: any) => <BigStep key={a.key} a={a} arrow />)}
                     <button onClick={() => setTowerFull(false)} className="w-full flex items-center gap-3 rounded-2xl border-2 border-emerald-400 bg-emerald-50 px-3.5 py-3 text-left">
                       <Light status="ok" />
                       <span className="text-2xl leading-none shrink-0">✅</span>
                       <div className="flex-1 min-w-0">
-                        <div className="font-extrabold text-emerald-800 text-[14px] leading-tight">공개 — 소비자 화면 노출</div>
-                        <div className="text-[11px] text-emerald-600 mt-0.5">전 게이트를 통과한 카페만 지도·목록에 나타납니다.</div>
+                        <div className="font-extrabold text-emerald-800 text-[11.2px] leading-tight">공개 — 소비자 화면 노출</div>
+                        <div className="text-[8.8px] text-emerald-600 mt-0.5">전 게이트를 통과한 카페만 지도·목록에 나타납니다.</div>
                       </div>
-                      <div className="text-emerald-700 font-extrabold text-[13px] text-right shrink-0">{tower.coverage?.published?.toLocaleString()}<br />곳</div>
+                      <div className="text-emerald-700 font-extrabold text-[10.4px] text-right shrink-0">{tower.coverage?.published?.toLocaleString()}<br />곳</div>
                     </button>
                   </div>
-                  <div className="text-[11px] font-extrabold text-stone-300 mt-5 mb-2">🛡️ 검증 레드팀 · 위 전체를 상시 감시</div>
+                  <div className="text-[8.8px] font-extrabold text-stone-300 mt-5 mb-2">🛡️ 검증 레드팀 · 위 전체를 상시 감시</div>
                   <div className="space-y-2">
                     {redteam.map((a: any) => <BigStep key={a.key} a={a} />)}
                   </div>
                   <div className="mt-5 rounded-2xl bg-stone-800/60 border border-stone-700 p-3">
-                    <div className="text-[10px] font-bold text-stone-400 mb-2">📊 조립라인 현황 (각 단계 카페 수)</div>
-                    <div className="flex flex-wrap gap-x-3 gap-y-1.5 text-[11px] text-stone-300">
+                    <div className="text-[8px] font-bold text-stone-400 mb-2">📊 조립라인 현황 (각 단계 카페 수)</div>
+                    <div className="flex flex-wrap gap-x-3 gap-y-1.5 text-[8.8px] text-stone-300">
                       {tower.pipeline?.stages?.filter((s: any) => s.key !== "rejected").map((s: any) => (
                         <span key={s.key}><b className="text-white">{s.count?.toLocaleString() ?? 0}</b> {s.label}</span>
                       ))}
                     </div>
-                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-stone-400 mt-2 pt-2 border-t border-stone-700">
+                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-[8px] text-stone-400 mt-2 pt-2 border-t border-stone-700">
                       <span>공개 {tower.coverage?.published?.toLocaleString()}/{tower.coverage?.total?.toLocaleString()}</span>
                       <span>raw {tower.coverage?.rawCachedPct}%</span>
                       <span>판정 {tower.coverage?.judgedPct}%</span>
@@ -934,7 +934,7 @@ export default function AdminPage() {
                       <span>동 {tower.coverage?.dongPct}%</span>
                     </div>
                   </div>
-                  <div className="text-[10px] text-stone-500 text-center mt-4">노드를 누르면 상세 설명 · 신호등 깜빡임 = 작동 중 · 20초마다 자동 갱신</div>
+                  <div className="text-[8px] text-stone-500 text-center mt-4">노드를 누르면 상세 설명 · 신호등 깜빡임 = 작동 중 · 20초마다 자동 갱신</div>
                 </div>
               </div>
             )}
@@ -946,12 +946,12 @@ export default function AdminPage() {
         <div className="mb-6 rounded-2xl border border-stone-300 bg-white p-4 sm:p-5">
           <button onClick={() => { toggleSec("rq"); if (!rq) loadRq(); }} className="w-full flex items-center justify-between text-left">
             <span className="admin-section-title font-extrabold text-stone-800">{openSecs.rq ? "▾" : "▸"} 📊 지역별 품질 현황 <span className="normal-case font-normal text-stone-600">· 통과율·검증비율·오염 (열 때 갱신)</span></span>
-            <span className="text-[10px] text-stone-600 shrink-0">{openSecs.rq ? "접기" : "보기"}</span>
+            <span className="text-[8px] text-stone-600 shrink-0">{openSecs.rq ? "접기" : "보기"}</span>
           </button>
           {openSecs.rq && (
             <div className="mt-3 overflow-x-auto">
-              {!rq ? <p className="text-[12px] text-stone-500">불러오는 중…</p> : (
-                <table className="w-full text-[12px] whitespace-nowrap">
+              {!rq ? <p className="text-[9.6px] text-stone-500">불러오는 중…</p> : (
+                <table className="w-full text-[9.6px] whitespace-nowrap">
                   <thead><tr className="text-left text-stone-500 border-b border-stone-200">
                     <th className="py-1.5 pr-3">지역</th><th className="pr-3 text-right">등록</th><th className="pr-3 text-right">공개</th>
                     <th className="pr-3 text-right">통과율</th><th className="pr-3 text-right">검증등급</th><th className="pr-3 text-right">평균후기</th>
@@ -979,7 +979,7 @@ export default function AdminPage() {
                   })}</tbody>
                 </table>
               )}
-              <p className="text-[10px] text-stone-500 mt-2">통과율=공개/등록 <span className="text-stone-400">(클릭하면 미달 원인)</span> · 오염신호=이름불일치(coh&lt;0.5)+맥락의심 건수 · 최신성=최근 {rq?.criteria?.oldMonths ?? 18}개월({rq?.criteria?.cut ?? ""} 이후) 검증 후기 보유율 · 전부 오래됨=재수집·폐업확인 대상 · 공개선 검증 {rq?.criteria?.floor ?? "?"}건·수집 {rq?.criteria?.freshDays ?? "?"}일 이내(현행 기준 자동 반영) · 새 시도는 발굴 시작 시 자동 표시</p>
+              <p className="text-[8px] text-stone-500 mt-2">통과율=공개/등록 <span className="text-stone-400">(클릭하면 미달 원인)</span> · 오염신호=이름불일치(coh&lt;0.5)+맥락의심 건수 · 최신성=최근 {rq?.criteria?.oldMonths ?? 18}개월({rq?.criteria?.cut ?? ""} 이후) 검증 후기 보유율 · 전부 오래됨=재수집·폐업확인 대상 · 공개선 검증 {rq?.criteria?.floor ?? "?"}건·수집 {rq?.criteria?.freshDays ?? "?"}일 이내(현행 기준 자동 반영) · 새 시도는 발굴 시작 시 자동 표시</p>
             </div>
           )}
         </div>
@@ -1001,20 +1001,20 @@ export default function AdminPage() {
             <div className="fixed inset-0 z-[6100] flex items-center justify-center bg-black/60 p-3" onClick={() => setRqDetail(null)}>
               <div className="w-full max-w-md bg-white rounded-2xl max-h-[85dvh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
                 <div className="flex items-center justify-between px-4 py-3 border-b sticky top-0 bg-white">
-                  <span className="text-sm font-bold text-stone-800">🔍 {d.sido} 통과율 미달 원인 <span className="font-normal text-[11px] text-stone-600">미공개 {unpub.toLocaleString()}곳</span></span>
+                  <span className="text-sm font-bold text-stone-800">🔍 {d.sido} 통과율 미달 원인 <span className="font-normal text-[8.8px] text-stone-600">미공개 {unpub.toLocaleString()}곳</span></span>
                   <button onClick={() => setRqDetail(null)} className="text-2xl text-stone-600 leading-none">×</button>
                 </div>
                 <div className="p-4 space-y-2">
                   {rows.filter(([, n]) => Number(n ?? 0) > 0).map(([label, n, desc, color]) => (
                     <div key={label} className="border border-stone-200 rounded-xl p-2.5">
                       <div className="flex items-center justify-between">
-                        <span className={`text-[12px] font-bold ${color}`}>{label}</span>
-                        <span className="text-[13px] font-bold text-stone-800 tabular-nums">{Number(n).toLocaleString()}곳 <span className="font-normal text-[10px] text-stone-500">({Math.round((Number(n) / Math.max(unpub, 1)) * 100)}%)</span></span>
+                        <span className={`text-[9.6px] font-bold ${color}`}>{label}</span>
+                        <span className="text-[10.4px] font-bold text-stone-800 tabular-nums">{Number(n).toLocaleString()}곳 <span className="font-normal text-[8px] text-stone-500">({Math.round((Number(n) / Math.max(unpub, 1)) * 100)}%)</span></span>
                       </div>
-                      <p className="text-[10.5px] text-stone-600 mt-0.5">{desc}</p>
+                      <p className="text-[8.4px] text-stone-600 mt-0.5">{desc}</p>
                     </div>
                   ))}
-                  <p className="text-[10px] text-stone-500 pt-1">후기 부족(0~2건)은 품질 문제가 아니라 시간 문제 — 재수집 순환이 돌 때마다 자동 승급됩니다. 미달 원인 중 지금 사람이 조치해서 열 수 있는 곳은 없습니다(품질 차단은 정체성).</p>
+                  <p className="text-[8px] text-stone-500 pt-1">후기 부족(0~2건)은 품질 문제가 아니라 시간 문제 — 재수집 순환이 돌 때마다 자동 승급됩니다. 미달 원인 중 지금 사람이 조치해서 열 수 있는 곳은 없습니다(품질 차단은 정체성).</p>
                 </div>
               </div>
             </div>
@@ -1026,24 +1026,24 @@ export default function AdminPage() {
           <div className="mb-6 rounded-2xl border border-stone-300 bg-white p-4 sm:p-5 space-y-3">
             <button onClick={() => toggleSec("auto")} className="w-full flex items-center justify-between text-left">
               <span className="admin-section-title font-extrabold text-stone-800">{openSecs.auto ? "▾" : "▸"} 🔄 크론 자동화 현황 <span className="normal-case font-normal text-stone-700">(합성·판정 배치)</span> <span className="normal-case font-normal text-stone-600">· 판정대기 {jstatus.queue?.toLocaleString() ?? 0} · 오늘신규 {jstatus.newToday ?? 0}</span></span>
-              <span className="text-[10px] text-stone-600 shrink-0">{openSecs.auto ? "접기" : "보기"}</span>
+              <span className="text-[8px] text-stone-600 shrink-0">{openSecs.auto ? "접기" : "보기"}</span>
             </button>
             {openSecs.auto && <>
 
             {/* AI 판정 */}
             <div className="bg-white rounded-xl border border-stone-300 p-3">
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[12px] font-bold text-stone-700">🧮 AI 맥락 판정 <span className="font-normal text-stone-600">(보조 정제)</span></span>
-                <span className="text-[11px] text-stone-600">{jstatus.last ? `최근 ${new Date(jstatus.last).toLocaleString("ko-KR")}` : "미실행"}</span>
+                <span className="text-[9.6px] font-bold text-stone-700">🧮 AI 맥락 판정 <span className="font-normal text-stone-600">(보조 정제)</span></span>
+                <span className="text-[8.8px] text-stone-600">{jstatus.last ? `최근 ${new Date(jstatus.last).toLocaleString("ko-KR")}` : "미실행"}</span>
               </div>
-              <div className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2 py-1 mb-1.5">소비자 노출 정상 ✅ <span className="font-normal text-emerald-600">— 공개 카페는 규칙으로 검증돼 노출 중. 아래 '대기'는 그 위 선택적 정제일 뿐 품질·위험과 무관.</span></div>
+              <div className="text-[8.8px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2 py-1 mb-1.5">소비자 노출 정상 ✅ <span className="font-normal text-emerald-600">— 공개 카페는 규칙으로 검증돼 노출 중. 아래 '대기'는 그 위 선택적 정제일 뿐 품질·위험과 무관.</span></div>
               {/* 🔴 큰 퍼센트+진행바는 멈춰 있을 때 '63% 고장'으로 읽혀 바로 위 초록 '정상'과 모순됐다.
                    선택적 정제 레이어이므로 작은 중립 줄로 낮춘다(수치 자체는 유지). */}
-              <div className="text-[10.5px] text-stone-600 mb-1.5">정제 진행 {jstatus.done?.toLocaleString()} / {jstatus.total?.toLocaleString()}곳 ({jstatus.pct}%)</div>
+              <div className="text-[8.4px] text-stone-600 mb-1.5">정제 진행 {jstatus.done?.toLocaleString()} / {jstatus.total?.toLocaleString()}곳 ({jstatus.pct}%)</div>
               {/* 🔴 2026-10-16 CEO 반복지적 — 여기 '판정 대기 9,897곳'과 "괜찮다"는 3줄 설명이 같이 떠 있었다.
                    대표님 지침 그대로: "숫자가 떠 있으면 문제로 읽힌다 · '괜찮다'는 구두 설명은 무의미".
                    이 큐는 공개 품질과 무관한 선택적 정제라 숫자를 빼고, 오늘 처리량만 남긴다. */}
-              <div className="flex gap-3 text-[11px] text-stone-700">
+              <div className="flex gap-3 text-[8.8px] text-stone-700">
                 <span>오늘 <b className="text-emerald-600">{jstatus.today}</b>곳 판정</span>
               </div>
             </div>
@@ -1051,10 +1051,10 @@ export default function AdminPage() {
             {/* 수집·공개 */}
             <div className="bg-white rounded-xl border border-stone-300 p-3">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-[12px] font-bold text-stone-700">📡 카페 수집·공개</span>
-                <span className="text-[11px] text-stone-600">오늘 신규 <b className="text-blue-600">{jstatus.newToday ?? 0}</b>곳</span>
+                <span className="text-[9.6px] font-bold text-stone-700">📡 카페 수집·공개</span>
+                <span className="text-[8.8px] text-stone-600">오늘 신규 <b className="text-blue-600">{jstatus.newToday ?? 0}</b>곳</span>
               </div>
-              <div className="flex gap-4 text-[11px] text-stone-700">
+              <div className="flex gap-4 text-[8.8px] text-stone-700">
                 <span>전체 <b className="text-stone-700">{jstatus.cafesTotal?.toLocaleString()}</b>곳</span>
                 <span>공개 <b className="text-emerald-600">{jstatus.cafesPub?.toLocaleString()}</b>곳</span>
                 <span className="text-stone-600">수집대기 <b className="text-stone-600">{jstatus.collectQueue?.toLocaleString()}</b>곳</span>
@@ -1064,10 +1064,10 @@ export default function AdminPage() {
             {/* 유튜브 */}
             <div className="bg-white rounded-xl border border-stone-300 p-3">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-[12px] font-bold text-stone-700">📺 유튜브 수집</span>
-                <span className="text-[11px] text-stone-600">{jstatus.ytLast ? `최근 ${new Date(jstatus.ytLast).toLocaleString("ko-KR")}` : "미실행"}</span>
+                <span className="text-[9.6px] font-bold text-stone-700">📺 유튜브 수집</span>
+                <span className="text-[8.8px] text-stone-600">{jstatus.ytLast ? `최근 ${new Date(jstatus.ytLast).toLocaleString("ko-KR")}` : "미실행"}</span>
               </div>
-              <div className="flex gap-4 text-[11px] text-stone-700">
+              <div className="flex gap-4 text-[8.8px] text-stone-700">
                 <span>확인완료 <b className="text-stone-700">{jstatus.ytTotal?.toLocaleString()}</b>곳</span>
                 <span>오늘 <b className="text-emerald-600">{jstatus.ytToday ?? 0}</b>곳</span>
                 <span className="text-stone-600">대기 <b className="text-stone-600">{jstatus.ytQueue?.toLocaleString()}</b>곳</span>
@@ -1085,18 +1085,18 @@ export default function AdminPage() {
             <div className="mb-6 rounded-2xl border border-stone-300 bg-white p-4 sm:p-5">
               <button onClick={() => toggleSec("audit")} className="w-full flex items-center justify-between text-left mb-2">
                 <span className={`admin-section-title font-extrabold ${unresolved.length ? "text-red-600" : "text-stone-800"}`}>{openSecs.audit ? "▾" : "▸"} {unresolved.length ? `🚨 실시간 이슈 · 품질 오염 감지 (${unresolved.length}건)` : "✅ 실시간 이슈 · 품질 오염 감지 (0건)"}</span>
-                <span className="text-[11px] text-stone-600 shrink-0">{auditFlags.lastAudit}</span>
+                <span className="text-[8.8px] text-stone-600 shrink-0">{auditFlags.lastAudit}</span>
               </button>
               {openSecs.audit && (unresolved.length > 0 ? (
                 <div className="bg-red-50 border border-red-200 rounded-xl p-3 space-y-1.5">
                   {unresolved.slice(0, 8).map((f: any, i: number) => (
-                    <div key={i} className="text-[11px] text-red-700">
+                    <div key={i} className="text-[8.8px] text-red-700">
                       <b>{f.cafe_name}</b> — {f.detail?.slice(0, 60)}
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-[11px] text-emerald-700">
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-[8.8px] text-emerald-700">
                   ✅ 품질 감사 이상 없음 — {auditFlags.lastAudit}
                 </div>
               ))}
@@ -1114,47 +1114,47 @@ export default function AdminPage() {
               </span>
             </button>
             <button onClick={() => setNtEdit({ id: "", emoji: "📣", title: "", titlePast: "", highlight: "", body: "", bodyPast: "", sub: "", subPast: "", cta: "확인", ctaPast: "확인", ctaHref: "", from: "", pastFrom: "", until: "" })}
-              className="text-[11px] bg-stone-800 text-white rounded-full px-3 py-1">+ 새 공지</button>
+              className="text-[8.8px] bg-stone-800 text-white rounded-full px-3 py-1">+ 새 공지</button>
           </div>
           {openSecs.notice && <>
-            <p className="text-[11.5px] text-stone-600 leading-relaxed mb-3">
+            <p className="text-[9.2px] text-stone-600 leading-relaxed mb-3">
               사용자에게 접속 시 뜨는 안내 모달입니다. <b>세션당 1회</b> 뜨고, 사용자가 <b>&apos;다시 보지 않기&apos;</b>를 누르면 영구 해제됩니다.
               날짜가 <b>완료형 전환</b>을 지나면 문구가 자동으로 과거형이 되고, <b>종료</b>가 지나면 아무것도 안 뜹니다.
               <span className="text-stone-500"> 저장 후 사용자 화면 반영은 CDN 캐시로 최대 10분.</span>
             </p>
-            {ntMsg && <div className="mb-2 text-[11.5px] rounded-lg px-3 py-2 bg-stone-100 text-stone-700">{ntMsg}</div>}
+            {ntMsg && <div className="mb-2 text-[9.2px] rounded-lg px-3 py-2 bg-stone-100 text-stone-700">{ntMsg}</div>}
             <div className="space-y-2">
               {(notices ?? []).map((n: any) => (
                 <div key={n.id} className="rounded-xl border border-stone-200 bg-stone-50 p-3">
                   <div className="flex items-center gap-2 flex-wrap mb-1">
-                    <span className="text-[15px]">{n.emoji}</span>
-                    <span className="font-bold text-[13px] text-stone-800">{n.title}</span>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${n.status.startsWith("진행") ? "bg-emerald-100 text-emerald-700" : n.status === "예정" ? "bg-amber-100 text-amber-700" : "bg-stone-200 text-stone-600"}`}>{n.status}</span>
-                    <span className="text-[10.5px] text-stone-500 ml-auto font-mono">{n.id}</span>
+                    <span className="text-[12px]">{n.emoji}</span>
+                    <span className="font-bold text-[10.4px] text-stone-800">{n.title}</span>
+                    <span className={`text-[8px] font-bold px-2 py-0.5 rounded-full ${n.status.startsWith("진행") ? "bg-emerald-100 text-emerald-700" : n.status === "예정" ? "bg-amber-100 text-amber-700" : "bg-stone-200 text-stone-600"}`}>{n.status}</span>
+                    <span className="text-[8.4px] text-stone-500 ml-auto font-mono">{n.id}</span>
                   </div>
-                  <div className="text-[11px] text-stone-600 mb-1.5">
+                  <div className="text-[8.8px] text-stone-600 mb-1.5">
                     {new Date(n.from).toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit" })} 시작
                     {" · "}{new Date(n.pastFrom).toLocaleString("ko-KR", { month: "2-digit", day: "2-digit" })} 완료형
                     {" · "}{new Date(n.until).toLocaleString("ko-KR", { month: "2-digit", day: "2-digit" })} 종료
                   </div>
-                  <div className="flex items-center gap-3 text-[11px] text-stone-600">
+                  <div className="flex items-center gap-3 text-[8.8px] text-stone-600">
                     <span>기간 방문자 <b className="text-stone-800">{n.reach == null ? "—" : n.reach.toLocaleString()}</b></span>
                     <span>다시보지않기 <b className="text-stone-800">{(n.dismissals ?? 0).toLocaleString()}</b></span>
                     <div className="ml-auto flex gap-1.5">
                       <button onClick={() => setNtEdit({ ...n, from: new Date(n.from).toISOString().slice(0, 16), pastFrom: new Date(n.pastFrom).toISOString().slice(0, 16), until: new Date(n.until).toISOString().slice(0, 16), titlePast: n.title_past, bodyPast: n.body_past, subPast: n.sub_past, ctaPast: n.cta_past, ctaHref: n.cta_href ?? "" })}
-                        className="text-[11px] px-2 py-1 rounded-lg bg-white border border-stone-300 text-stone-700">수정</button>
+                        className="text-[8.8px] px-2 py-1 rounded-lg bg-white border border-stone-300 text-stone-700">수정</button>
                       <button onClick={() => ntAct({ action: "toggle", id: n.id })}
-                        className={`text-[11px] px-2 py-1 rounded-lg border ${n.enabled ? "bg-white border-stone-300 text-stone-700" : "bg-emerald-600 border-emerald-600 text-white"}`}>{n.enabled ? "중지" : "재개"}</button>
+                        className={`text-[8.8px] px-2 py-1 rounded-lg border ${n.enabled ? "bg-white border-stone-300 text-stone-700" : "bg-emerald-600 border-emerald-600 text-white"}`}>{n.enabled ? "중지" : "재개"}</button>
                     </div>
                   </div>
                 </div>
               ))}
-              {notices && notices.length === 0 && <p className="text-[12px] text-stone-500 py-3 text-center">공지가 없습니다.</p>}
+              {notices && notices.length === 0 && <p className="text-[9.6px] text-stone-500 py-3 text-center">공지가 없습니다.</p>}
             </div>
 
             {ntEdit && (
               <div className="mt-3 rounded-xl border-2 border-stone-800 bg-white p-3">
-                <div className="text-[12px] font-bold text-stone-800 mb-2">{ntEdit.created_at ? "공지 수정" : "새 공지"}</div>
+                <div className="text-[9.6px] font-bold text-stone-800 mb-2">{ntEdit.created_at ? "공지 수정" : "새 공지"}</div>
                 <div className="grid grid-cols-2 gap-2">
                   {([
                     ["id", "ID(영문·재사용 금지)", "text"], ["emoji", "이모지", "text"],
@@ -1166,17 +1166,17 @@ export default function AdminPage() {
                     ["ctaHref", "버튼 목적지(예: /?sido=강원&tab=map)", "text"],
                     ["from", "시작", "datetime-local"], ["pastFrom", "완료형 전환", "datetime-local"], ["until", "종료", "datetime-local"],
                   ] as [string, string, string][]).map(([k, label, type]) => (
-                    <label key={k} className="text-[10.5px] text-stone-600">
+                    <label key={k} className="text-[8.4px] text-stone-600">
                       {label}
                       <input type={type} value={ntEdit[k] ?? ""} disabled={k === "id" && !!ntEdit.created_at}
                         onChange={(e) => setNtEdit({ ...ntEdit, [k]: e.target.value })}
-                        className="w-full mt-0.5 border border-stone-300 rounded-lg px-2 py-1.5 text-[12px] bg-white disabled:bg-stone-100" />
+                        className="w-full mt-0.5 border border-stone-300 rounded-lg px-2 py-1.5 text-[9.6px] bg-white disabled:bg-stone-100" />
                     </label>
                   ))}
                 </div>
                 <div className="flex gap-2 mt-3">
-                  <button onClick={() => ntAct({ action: "save", fields: ntEdit })} className="flex-1 bg-stone-800 text-white rounded-lg py-2 text-[12px] font-bold">저장</button>
-                  <button onClick={() => { setNtEdit(null); setNtMsg(""); }} className="px-4 text-[12px] text-stone-600">취소</button>
+                  <button onClick={() => ntAct({ action: "save", fields: ntEdit })} className="flex-1 bg-stone-800 text-white rounded-lg py-2 text-[9.6px] font-bold">저장</button>
+                  <button onClick={() => { setNtEdit(null); setNtMsg(""); }} className="px-4 text-[9.6px] text-stone-600">취소</button>
                 </div>
               </div>
             )}
@@ -1191,10 +1191,10 @@ export default function AdminPage() {
               {rot ? <span className="normal-case font-normal text-stone-600">· 현재 선두 <b className="text-stone-800">{rot.leadNow}</b> · {rot.minutesLeft}분 뒤 교대 · {rot.slotHours}시간마다(하루 2회)</span>
                    : <span className="normal-case font-normal text-stone-600">불러오는 중…</span>}
             </button>
-            <button onClick={() => loadSidoRotation(pw)} className="text-[11px] bg-stone-800 text-white rounded-full px-3 py-1">새로고침</button>
+            <button onClick={() => loadSidoRotation(pw)} className="text-[8.8px] bg-stone-800 text-white rounded-full px-3 py-1">새로고침</button>
           </div>
           {openSecs.rot && rot && <>
-            <p className="text-[11.5px] text-stone-600 leading-relaxed mb-3">
+            <p className="text-[9.2px] text-stone-600 leading-relaxed mb-3">
               후기 수로만 줄 세우면 서울·경기가 독식해 늦게 합류한 지역이 영영 안 보입니다. 시·도별로 한 곳씩 번갈아 뽑고,
               선두 시·도를 <b>{rot.slotHours}시간마다</b> 돌려 <b>{rot.cycleHours}시간({rot.cycleSlots}슬롯)</b>이면 한 바퀴가 됩니다.
               각 시·도 <b>안에서는</b> 원래 정렬(리뷰순 등)이 그대로라 라벨이 거짓이 되지 않습니다.
@@ -1202,23 +1202,23 @@ export default function AdminPage() {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
               {(rot.pool ?? []).map((p: any) => (
                 <div key={p.sido} className={`rounded-xl border p-2.5 text-center ${p.sido === rot.leadNow ? "bg-amber-50 border-amber-300" : "bg-stone-50 border-stone-200"}`}>
-                  <div className="text-[12px] font-bold text-stone-800">{p.sido}{p.sido === rot.leadNow ? " 👑" : ""}</div>
-                  <div className="text-[11px] text-stone-600">공개 {p.cafes.toLocaleString()}곳</div>
+                  <div className="text-[9.6px] font-bold text-stone-800">{p.sido}{p.sido === rot.leadNow ? " 👑" : ""}</div>
+                  <div className="text-[8.8px] text-stone-600">공개 {p.cafes.toLocaleString()}곳</div>
                 </div>
               ))}
             </div>
             {rot.unclassified > 0 && (
-              <div className="rounded-lg bg-rose-50 border border-rose-200 px-3 py-2 text-[11.5px] text-rose-700 mb-3">
+              <div className="rounded-lg bg-rose-50 border border-rose-200 px-3 py-2 text-[9.2px] text-rose-700 mb-3">
                 🔴 시·도 판정 실패 {rot.unclassified.toLocaleString()}곳 — area 라벨이 목록(lib/regionList.ts)에 없습니다. 순환에서 항상 뒤로 밀립니다.
               </div>
             )}
-            <div className="text-[11px] font-bold text-stone-700 mb-1">교대 예정</div>
+            <div className="text-[8.8px] font-bold text-stone-700 mb-1">교대 예정</div>
             <div className="space-y-1">
               {(rot.upcoming ?? []).map((u: any, i: number) => (
-                <div key={u.slot} className={`flex items-center gap-2 text-[11.5px] rounded-lg px-2.5 py-1.5 ${i === 0 ? "bg-amber-50" : "bg-stone-50"}`}>
+                <div key={u.slot} className={`flex items-center gap-2 text-[9.2px] rounded-lg px-2.5 py-1.5 ${i === 0 ? "bg-amber-50" : "bg-stone-50"}`}>
                   <span className="text-stone-500 w-[110px] shrink-0">{new Date(u.at).toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
                   <span className="text-stone-800">{u.order.join(" → ")}</span>
-                  {i === 0 && <span className="ml-auto text-[10px] font-bold text-amber-700">지금</span>}
+                  {i === 0 && <span className="ml-auto text-[8px] font-bold text-amber-700">지금</span>}
                 </div>
               ))}
             </div>
@@ -1232,7 +1232,7 @@ export default function AdminPage() {
               {openSecs.verify ? "▾" : "▸"} 🛡️ 데이터 정합성 검증 <span className="normal-case font-normal text-stone-600">·</span>{" "}
               {verify ? (verify.status === "pass" ? <span className="text-emerald-600 normal-case">정상 ✅</span> : verify.status === "warn" ? <span className="text-amber-600 normal-case">🟡 주의 {verify.warns}</span> : <span className="text-red-600 normal-case">🔴 오류 {verify.fails}</span>) : <span className="normal-case font-normal text-stone-600">리포트 없음</span>}
             </button>
-            <button onClick={runVerify} disabled={verifying} className="text-[11px] bg-stone-800 text-white rounded-full px-3 py-1 disabled:opacity-50">{verifying ? "검사 중…" : "지금 검사"}</button>
+            <button onClick={runVerify} disabled={verifying} className="text-[8.8px] bg-stone-800 text-white rounded-full px-3 py-1 disabled:opacity-50">{verifying ? "검사 중…" : "지금 검사"}</button>
           </div>
           {openSecs.verify && <>
           {verify ? (
@@ -1240,20 +1240,20 @@ export default function AdminPage() {
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-lg">{verify.status === "pass" ? "✅" : verify.status === "warn" ? "🟡" : "🔴"}</span>
                 <span className="font-bold text-sm">{verify.status === "pass" ? "전체 정상 — 한치의 오차 없음" : verify.status === "warn" ? `주의 ${verify.warns}건` : `오류 ${verify.fails}건 — 즉시 확인 필요`}</span>
-                <span className="text-[10px] text-stone-600 ml-auto">{verify.ran_at ? new Date(verify.ran_at).toLocaleString("ko-KR") : ""}</span>
+                <span className="text-[8px] text-stone-600 ml-auto">{verify.ran_at ? new Date(verify.ran_at).toLocaleString("ko-KR") : ""}</span>
               </div>
               <div className="space-y-1">
                 {(verify.checks ?? []).map((c: any) => (
-                  <div key={c.key} className="flex items-center gap-2 text-[12px]">
+                  <div key={c.key} className="flex items-center gap-2 text-[9.6px]">
                     <span>{c.count === 0 ? "🟢" : c.severity === "fail" ? "🔴" : "🟡"}</span>
                     <span className="flex-1 text-stone-700">{c.label}</span>
-                    {c.count > 0 && c.samples?.length > 0 && <span className="text-[10px] text-stone-600 truncate max-w-[40%]" title={c.samples.join(", ")}>{c.samples.join(", ")}</span>}
+                    {c.count > 0 && c.samples?.length > 0 && <span className="text-[8px] text-stone-600 truncate max-w-[40%]" title={c.samples.join(", ")}>{c.samples.join(", ")}</span>}
                     <span className={c.count > 0 ? (c.severity === "fail" ? "text-rose-600 font-bold" : "text-amber-600 font-bold") : "text-stone-300"}>{c.count}</span>
                   </div>
                 ))}
               </div>
             </div>
-          ) : <p className="text-[12px] text-stone-600">검증 리포트 없음 — '지금 검사'를 눌러 실행하세요.</p>}
+          ) : <p className="text-[9.6px] text-stone-600">검증 리포트 없음 — '지금 검사'를 눌러 실행하세요.</p>}
 
           {/* 📈 검증 이력 추이 — 크론이 하루 여러 번 자동 실행한 이력(verify_reports)을 그대로 사용, 신규 집계 없음 */}
           {verifyHistory.length > 1 && (() => {
@@ -1262,8 +1262,8 @@ export default function AdminPage() {
             return (
               <div className="mt-2.5 rounded-xl border border-stone-200 bg-stone-50/60 p-2.5">
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-[11px] font-bold text-stone-600">📈 검증 이력 추이 <span className="font-normal text-stone-600">· 최근 {verifyHistory.length}회 자동검사</span></span>
-                  <span className="text-[10.5px] font-bold text-emerald-600">{okStreak > 0 ? `연속 정상 ${okStreak}회` : "직전 검사 이상 있음"}</span>
+                  <span className="text-[8.8px] font-bold text-stone-600">📈 검증 이력 추이 <span className="font-normal text-stone-600">· 최근 {verifyHistory.length}회 자동검사</span></span>
+                  <span className="text-[8.4px] font-bold text-emerald-600">{okStreak > 0 ? `연속 정상 ${okStreak}회` : "직전 검사 이상 있음"}</span>
                 </div>
                 <div className="flex items-end gap-0.5 h-8">
                   {verifyHistory.map((h: any, i: number) => {
@@ -1282,17 +1282,17 @@ export default function AdminPage() {
             return (
             <div className={`mt-2 rounded-xl border p-3 ${pub > 0 ? "bg-amber-50 border-amber-300" : "bg-emerald-50 border-emerald-200"}`}>
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-[13px] font-bold">🧠 그라운딩 (소비자 노출 오염 검사)</span>
-                <span className={`text-[12px] font-bold ml-auto ${pub > 0 ? "text-amber-700" : "text-emerald-700"}`}>{pub > 0 ? `⚠ 노출 오염 ${pub}건` : "현재 0건 ✅"}</span>
+                <span className="text-[10.4px] font-bold">🧠 그라운딩 (소비자 노출 오염 검사)</span>
+                <span className={`text-[9.6px] font-bold ml-auto ${pub > 0 ? "text-amber-700" : "text-emerald-700"}`}>{pub > 0 ? `⚠ 노출 오염 ${pub}건` : "현재 0건 ✅"}</span>
               </div>
               {pub > 0 ? (
                 <div className="space-y-0.5">
                   {grounding.samples.map((s: any, i: number) => (
-                    <div key={i} className="text-[11px] text-stone-600"><b>{s.s}</b>: {s.issue || "근거 불충분"}</div>
+                    <div key={i} className="text-[8.8px] text-stone-600"><b>{s.s}</b>: {s.issue || "근거 불충분"}</div>
                   ))}
-                  <p className="text-[10px] text-stone-600 mt-1">⚠ 공개 노출 중 — 사람이 확인 후 재합성/비공개 처리하세요.</p>
+                  <p className="text-[8px] text-stone-600 mt-1">⚠ 공개 노출 중 — 사람이 확인 후 재합성/비공개 처리하세요.</p>
                 </div>
-              ) : <p className="text-[11px] text-emerald-700">지금 공개 중인 카페 전부 근거 일치 — 소비자에게 보이는 오염 <b>없음</b>.</p>}
+              ) : <p className="text-[8.8px] text-emerald-700">지금 공개 중인 카페 전부 근거 일치 — 소비자에게 보이는 오염 <b>없음</b>.</p>}
             </div>
             );
           })()}
@@ -1303,25 +1303,25 @@ export default function AdminPage() {
         {(subscribers.some((s: any) => s.status === "pending") || subscribers.some((s: any) => s.conversion_requested_at && s.status !== "active") || (nlList[0] && nlList[0].status !== "sent")) && (
           <div className="mb-4 space-y-2">
             {subscribers.some((s: any) => s.conversion_requested_at && s.status !== "active") && (
-              <button onClick={() => setShowSubsModal(true)} className="w-full text-left bg-orange-50 border border-orange-400 rounded-xl px-3.5 py-2.5 text-[12.5px] text-orange-800 font-bold">🔔 구독 전환 요청 {subscribers.filter((s: any) => s.conversion_requested_at && s.status !== "active").length}명 — 사장님이 유료 전환을 원해요. 승인 또는 계좌이체 안내로 진행하세요 →</button>
+              <button onClick={() => setShowSubsModal(true)} className="w-full text-left bg-orange-50 border border-orange-400 rounded-xl px-3.5 py-2.5 text-[10px] text-orange-800 font-bold">🔔 구독 전환 요청 {subscribers.filter((s: any) => s.conversion_requested_at && s.status !== "active").length}명 — 사장님이 유료 전환을 원해요. 승인 또는 계좌이체 안내로 진행하세요 →</button>
             )}
             {subscribers.some((s: any) => s.status === "pending") && (
-              <button onClick={() => setShowSubsModal(true)} className="w-full text-left bg-amber-50 border border-amber-300 rounded-xl px-3.5 py-2.5 text-[12.5px] text-amber-800 font-bold">🔔 승인 대기 사장님 {subscribers.filter((s: any) => s.status === "pending").length}명 — 서류 확인 후 승인하세요 →</button>
+              <button onClick={() => setShowSubsModal(true)} className="w-full text-left bg-amber-50 border border-amber-300 rounded-xl px-3.5 py-2.5 text-[10px] text-amber-800 font-bold">🔔 승인 대기 사장님 {subscribers.filter((s: any) => s.status === "pending").length}명 — 서류 확인 후 승인하세요 →</button>
             )}
             {nlList[0] && nlList[0].status !== "sent" && (
-              <button onClick={() => { setShowNL(true); loadNL(); }} className="w-full text-left bg-indigo-50 border border-indigo-300 rounded-xl px-3.5 py-2.5 text-[12.5px] text-indigo-800 font-bold">📰 이번 주 사장님 레터 초안이 발송 대기 중 — 검토·발송하세요 →</button>
+              <button onClick={() => { setShowNL(true); loadNL(); }} className="w-full text-left bg-indigo-50 border border-indigo-300 rounded-xl px-3.5 py-2.5 text-[10px] text-indigo-800 font-bold">📰 이번 주 사장님 레터 초안이 발송 대기 중 — 검토·발송하세요 →</button>
             )}
           </div>
         )}
 
         {/* ===== 모달 트리거 (접속·유입 현황 · 구독 카페 현황 · 유튜브 수집 · 내 카페 기록) ===== */}
         <div className="admin-chip-grid mb-6">
-          <button onClick={openAnalytics} className="py-2.5 text-[13px] font-bold text-stone-700 bg-white border border-stone-300 rounded-xl hover:bg-stone-50">📊 접속·유입 현황{tower?.traffic?.dau != null ? ` (DAU ${tower.traffic.dau})` : ""}</button>
-          <button onClick={() => setShowSubsModal(true)} className="py-2.5 text-[13px] font-bold text-stone-700 bg-white border border-stone-300 rounded-xl hover:bg-stone-50">💳 구독 카페 현황{subscribers.length ? ` (${subscribers.length})` : ""}</button>
-          <button onClick={() => { setShowNL(true); loadNL(); }} className="py-2.5 text-[13px] font-bold text-stone-700 bg-white border border-stone-300 rounded-xl hover:bg-stone-50">📰 주간 뉴스레터{nlList.length ? ` (${nlList.length})` : ""}</button>
-          <button onClick={() => { setShowYtModal(true); if (!yt) fetch("/api/yt-report", { headers: { "x-admin-password": pw }, cache: "no-store" }).then((x) => x.json()).then((d) => { if (d.ok) setYt(d); }).catch(() => {}); }} className="py-2.5 text-[13px] font-bold text-stone-700 bg-white border border-stone-300 rounded-xl hover:bg-stone-50">📺 유튜브 확보{yt?.withYt != null ? ` (${yt.withYt})` : ""}</button>
-          <button onClick={() => { setShowVisits(true); fetch("/api/admin/visits", { headers: { "x-admin-password": pw } }).then((x) => x.json()).then((d) => { if (d.ok) setVisits(d); }); }} className="py-2.5 text-[13px] font-bold text-stone-700 bg-white border border-stone-300 rounded-xl hover:bg-stone-50">❤ 추억·찜{visits?.stat?.total != null ? ` (${visits.stat.total}·${visits?.mstat?.total ?? 0})` : ""}</button>
-          <button onClick={openRotation} className="py-2.5 text-[13px] font-bold text-stone-700 bg-white border border-stone-300 rounded-xl hover:bg-stone-50">🔁 노출 로테이션 현황</button>
+          <button onClick={openAnalytics} className="py-2.5 text-[10.4px] font-bold text-stone-700 bg-white border border-stone-300 rounded-xl hover:bg-stone-50">📊 접속·유입 현황{tower?.traffic?.dau != null ? ` (DAU ${tower.traffic.dau})` : ""}</button>
+          <button onClick={() => setShowSubsModal(true)} className="py-2.5 text-[10.4px] font-bold text-stone-700 bg-white border border-stone-300 rounded-xl hover:bg-stone-50">💳 구독 카페 현황{subscribers.length ? ` (${subscribers.length})` : ""}</button>
+          <button onClick={() => { setShowNL(true); loadNL(); }} className="py-2.5 text-[10.4px] font-bold text-stone-700 bg-white border border-stone-300 rounded-xl hover:bg-stone-50">📰 주간 뉴스레터{nlList.length ? ` (${nlList.length})` : ""}</button>
+          <button onClick={() => { setShowYtModal(true); if (!yt) fetch("/api/yt-report", { headers: { "x-admin-password": pw }, cache: "no-store" }).then((x) => x.json()).then((d) => { if (d.ok) setYt(d); }).catch(() => {}); }} className="py-2.5 text-[10.4px] font-bold text-stone-700 bg-white border border-stone-300 rounded-xl hover:bg-stone-50">📺 유튜브 확보{yt?.withYt != null ? ` (${yt.withYt})` : ""}</button>
+          <button onClick={() => { setShowVisits(true); fetch("/api/admin/visits", { headers: { "x-admin-password": pw } }).then((x) => x.json()).then((d) => { if (d.ok) setVisits(d); }); }} className="py-2.5 text-[10.4px] font-bold text-stone-700 bg-white border border-stone-300 rounded-xl hover:bg-stone-50">❤ 추억·찜{visits?.stat?.total != null ? ` (${visits.stat.total}·${visits?.mstat?.total ?? 0})` : ""}</button>
+          <button onClick={openRotation} className="py-2.5 text-[10.4px] font-bold text-stone-700 bg-white border border-stone-300 rounded-xl hover:bg-stone-50">🔁 노출 로테이션 현황</button>
         </div>
 
         {/* ℹ️ 조직 활동·실행 케이던스는 '조직 관제(/admin/org)'로 이동 — 대시보드는 운영(카페·구독·품질)에 집중 */}
@@ -1332,15 +1332,15 @@ export default function AdminPage() {
             <div className="w-full max-w-2xl bg-white rounded-t-2xl max-h-[88dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between px-4 py-3 border-b">
                 <span className="text-sm font-bold text-stone-800">❤ 내 카페 추억 · ⭐ 찜
-                  {visits?.stat && <span className="text-[11px] text-stone-600 font-normal"> 추억 {visits.stat.total}(인증 {visits.stat.verified}·미인증 {visits.stat.unverified})</span>}
-                  {visits?.mstat && <span className="text-[11px] text-amber-700 font-normal"> · 찜 {visits.mstat.total}건 / 기기 {visits.mstat.users}대 (7일 +{visits.mstat.last7})</span>}</span>
+                  {visits?.stat && <span className="text-[8.8px] text-stone-600 font-normal"> 추억 {visits.stat.total}(인증 {visits.stat.verified}·미인증 {visits.stat.unverified})</span>}
+                  {visits?.mstat && <span className="text-[8.8px] text-amber-700 font-normal"> · 찜 {visits.mstat.total}건 / 기기 {visits.mstat.users}대 (7일 +{visits.mstat.last7})</span>}</span>
                 <button onClick={() => setShowVisits(false)} className="text-2xl text-stone-600 leading-none">×</button>
               </div>
               {/* 📑 탭 — 추억/찜을 분리한다(2026-08-25 CEO 지시). 한 목록에 섞여 있으면 구분이 안 된다. */}
               <div className="flex gap-1 px-3 pt-2 border-b border-stone-200">
                 {([["memory", `❤ 추억 ${visits?.stat?.total ?? 0}`], ["mark", `⭐ 찜 ${visits?.mstat?.total ?? 0}`]] as const).map(([k, label]) => (
                   <button key={k} onClick={() => { setVisitTab(k as any); setVisitDetail(null); }}
-                    className={`px-3 py-2 text-[12.5px] font-bold rounded-t-lg ${visitTab === k ? "bg-stone-800 text-white" : "text-stone-600 hover:bg-stone-100"}`}>
+                    className={`px-3 py-2 text-[10px] font-bold rounded-t-lg ${visitTab === k ? "bg-stone-800 text-white" : "text-stone-600 hover:bg-stone-100"}`}>
                     {label}
                   </button>
                 ))}
@@ -1355,13 +1355,13 @@ export default function AdminPage() {
                       {ph.length > 0 && <img src={ph[0]} alt="" className="w-16 h-16 rounded-lg object-cover shrink-0" />}
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <b className="text-[13px] text-stone-800">{v.cafe_name}</b>
-                          <span className="text-[10px] text-stone-600">{v.area}</span>
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${v.verified ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-700"}`}>{v.verified ? "✓ 인증" : "📍 미인증(나만)"}</span>
-                          {ph.length > 1 && <span className="text-[10px] text-stone-600">사진 {ph.length}장</span>}
+                          <b className="text-[10.4px] text-stone-800">{v.cafe_name}</b>
+                          <span className="text-[8px] text-stone-600">{v.area}</span>
+                          <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-bold ${v.verified ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-700"}`}>{v.verified ? "✓ 인증" : "📍 미인증(나만)"}</span>
+                          {ph.length > 1 && <span className="text-[8px] text-stone-600">사진 {ph.length}장</span>}
                         </div>
-                        {v.memory && <div className="text-[12px] text-stone-600 mt-1 line-clamp-2">{v.memory}</div>}
-                        <div className="text-[10px] text-stone-500 mt-1">{new Date(v.created_at).toLocaleString("ko-KR")} · 익명 {String(v.device_id).slice(0, 6)} · 눌러서 상세</div>
+                        {v.memory && <div className="text-[9.6px] text-stone-600 mt-1 line-clamp-2">{v.memory}</div>}
+                        <div className="text-[8px] text-stone-500 mt-1">{new Date(v.created_at).toLocaleString("ko-KR")} · 익명 {String(v.device_id).slice(0, 6)} · 눌러서 상세</div>
                       </div>
                     </button>
                   );
@@ -1371,15 +1371,15 @@ export default function AdminPage() {
                   <button key={m.id} onClick={() => setVisitDetail({ kind: "mark", ...m })}
                     className="w-full text-left flex items-center gap-2 border border-amber-200 bg-amber-50/40 rounded-xl px-3 py-2.5 hover:bg-amber-50">
                     <span className="text-amber-500">★</span>
-                    <b className="text-[13px] text-stone-800">{m.cafe_name ?? "(카페삭제)"}</b>
-                    <span className="text-[10px] text-stone-600">{m.area}</span>
-                    {m.synth_grade && <span className="text-[9.5px] px-1.5 py-0.5 rounded-full bg-white border border-stone-300 text-stone-700">{m.synth_grade}</span>}
-                    {m.published === false && <span className="text-[9.5px] text-rose-700">비공개</span>}
-                    <span className="ml-auto text-[10px] text-stone-600 whitespace-nowrap">{new Date(m.created_at).toLocaleDateString("ko-KR")}</span>
+                    <b className="text-[10.4px] text-stone-800">{m.cafe_name ?? "(카페삭제)"}</b>
+                    <span className="text-[8px] text-stone-600">{m.area}</span>
+                    {m.synth_grade && <span className="text-[7.6px] px-1.5 py-0.5 rounded-full bg-white border border-stone-300 text-stone-700">{m.synth_grade}</span>}
+                    {m.published === false && <span className="text-[7.6px] text-rose-700">비공개</span>}
+                    <span className="ml-auto text-[8px] text-stone-600 whitespace-nowrap">{new Date(m.created_at).toLocaleDateString("ko-KR")}</span>
                   </button>
                 ))}
-                {visitTab === "memory" && (!visits?.visits || visits.visits.length === 0) && <p className="text-[12px] text-stone-600 text-center py-6">아직 등록된 추억이 없어요.</p>}
-                {visitTab === "mark" && (!visits?.marks || visits.marks.length === 0) && <p className="text-[12px] text-stone-600 text-center py-6">아직 찜 기록이 없어요.</p>}
+                {visitTab === "memory" && (!visits?.visits || visits.visits.length === 0) && <p className="text-[9.6px] text-stone-600 text-center py-6">아직 등록된 추억이 없어요.</p>}
+                {visitTab === "mark" && (!visits?.marks || visits.marks.length === 0) && <p className="text-[9.6px] text-stone-600 text-center py-6">아직 찜 기록이 없어요.</p>}
               </div>
             </div>
           </div>
@@ -1397,15 +1397,15 @@ export default function AdminPage() {
               </div>
               <div className="p-4 space-y-3">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <b className="text-[15px] text-stone-900">{visitDetail.cafe_name ?? "(카페삭제)"}</b>
-                  <span className="text-[11px] text-stone-600">{visitDetail.area}</span>
-                  {visitDetail.synth_grade && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-stone-100 text-stone-700">{visitDetail.synth_grade}</span>}
+                  <b className="text-[12px] text-stone-900">{visitDetail.cafe_name ?? "(카페삭제)"}</b>
+                  <span className="text-[8.8px] text-stone-600">{visitDetail.area}</span>
+                  {visitDetail.synth_grade && <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-stone-100 text-stone-700">{visitDetail.synth_grade}</span>}
                   {visitDetail.kind === "memory" && (
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${visitDetail.verified ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-700"}`}>
+                    <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-bold ${visitDetail.verified ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-700"}`}>
                       {visitDetail.verified ? "✓ 위치인증됨(공개)" : "📍 미인증 — 본인·관리자만"}
                     </span>
                   )}
-                  {visitDetail.published === false && <span className="text-[10px] text-rose-700">카페 비공개</span>}
+                  {visitDetail.published === false && <span className="text-[8px] text-rose-700">카페 비공개</span>}
                 </div>
 
                 {visitDetail.kind === "memory" && (visitDetail.ph ?? []).length > 0 && (
@@ -1419,10 +1419,10 @@ export default function AdminPage() {
                 )}
 
                 {visitDetail.kind === "memory" && visitDetail.memory && (
-                  <div className="text-[13px] text-stone-700 leading-relaxed whitespace-pre-wrap bg-stone-50 rounded-lg p-3">{visitDetail.memory}</div>
+                  <div className="text-[10.4px] text-stone-700 leading-relaxed whitespace-pre-wrap bg-stone-50 rounded-lg p-3">{visitDetail.memory}</div>
                 )}
 
-                <div className="text-[11px] text-stone-600 space-y-0.5 border-t pt-2">
+                <div className="text-[8.8px] text-stone-600 space-y-0.5 border-t pt-2">
                   <div>등록: {new Date(visitDetail.created_at).toLocaleString("ko-KR")}</div>
                   <div>익명 기기: {String(visitDetail.device_id).slice(0, 10)}…</div>
                   <div>유입 연결: {visitDetail.anon_id ? `연결됨 (${String(visitDetail.anon_id).slice(0, 8)}…)` : "미연결 — 08-24 이전 저장분"}</div>
@@ -1431,7 +1431,7 @@ export default function AdminPage() {
 
                 {visitDetail.cafe_id && (
                   <a href={`/c/${visitDetail.cafe_id}`} target="_blank" rel="noopener noreferrer"
-                    className="block text-center text-[12.5px] font-bold text-stone-700 border border-stone-300 rounded-xl py-2.5 hover:bg-stone-50">
+                    className="block text-center text-[10px] font-bold text-stone-700 border border-stone-300 rounded-xl py-2.5 hover:bg-stone-50">
                     카페 페이지 열기 →
                   </a>
                 )}
@@ -1446,20 +1446,20 @@ export default function AdminPage() {
             <div className="absolute inset-0 bg-black/50" />
             <div className="absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto bg-stone-50 rounded-t-2xl p-4 sm:inset-0 sm:m-auto sm:max-w-md sm:h-fit sm:max-h-[85vh] sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-bold text-stone-800">📺 유튜브 확보 현황 <span className="text-[11px] text-stone-600 font-normal">보유 {yt.withYt}·오늘 확인 {yt.checkedToday}·미확인 {yt.remaining}</span></span>
+              <span className="text-sm font-bold text-stone-800">📺 유튜브 확보 현황 <span className="text-[8.8px] text-stone-600 font-normal">보유 {yt.withYt}·오늘 확인 {yt.checkedToday}·미확인 {yt.remaining}</span></span>
               <button onClick={() => setShowYtModal(false)} className="text-2xl text-stone-600 leading-none">×</button>
             </div>
             {yt.rows?.length > 0 ? (
               <div className="space-y-3">
                 {Object.entries(groupByDate(yt.rows)).map(([date, cafes]: any) => (
                   <div key={date}>
-                    <div className="text-[11px] font-bold text-stone-600 mb-1">📅 {date} <span className="text-stone-600 font-normal">({cafes.length}곳 수집)</span></div>
+                    <div className="text-[8.8px] font-bold text-stone-600 mb-1">📅 {date} <span className="text-stone-600 font-normal">({cafes.length}곳 수집)</span></div>
                     <div className="space-y-1.5">
                       {cafes.map((c: any) => (
                         <div key={c.id} className="bg-white rounded-lg border border-stone-300 p-2">
-                          <div className="text-[12px] font-bold text-stone-800">{c.name} <span className="text-[10px] text-stone-600 font-normal">{c.area}</span> <span className="text-[10px] text-rose-500">▶{c.videos?.length || 0}</span></div>
+                          <div className="text-[9.6px] font-bold text-stone-800">{c.name} <span className="text-[8px] text-stone-600 font-normal">{c.area}</span> <span className="text-[8px] text-rose-500">▶{c.videos?.length || 0}</span></div>
                           {(c.videos || []).map((v: any, i: number) => (
-                            <a key={i} href={v.l} target="_blank" rel="noopener noreferrer" className="block text-[11px] text-blue-600 truncate hover:underline">▶ {v.q}{v.s ? ` · ${v.s}` : ""}</a>
+                            <a key={i} href={v.l} target="_blank" rel="noopener noreferrer" className="block text-[8.8px] text-blue-600 truncate hover:underline">▶ {v.q}{v.s ? ` · ${v.s}` : ""}</a>
                           ))}
                         </div>
                       ))}
@@ -1467,8 +1467,8 @@ export default function AdminPage() {
                   </div>
                 ))}
               </div>
-            ) : <p className="text-[12px] text-stone-600">최근 30일 유튜브 확보 없음.</p>}
-            <p className="text-[10px] text-stone-600 mt-2">유튜브 API 쿼터 한도로 매일 조금씩 확인(04:00 백필). 남은 {yt.remaining}곳 순차 진행. ※ 이 "보유" 수치는 실제 영상을 찾은 카페 수 — 위 "유튜브 확인(누적)" 타일(체크만 하고 영상 못 찾은 곳 포함)과는 다른 값입니다.</p>
+            ) : <p className="text-[9.6px] text-stone-600">최근 30일 유튜브 확보 없음.</p>}
+            <p className="text-[8px] text-stone-600 mt-2">유튜브 API 쿼터 한도로 매일 조금씩 확인(04:00 백필). 남은 {yt.remaining}곳 순차 진행. ※ 이 "보유" 수치는 실제 영상을 찾은 카페 수 — 위 "유튜브 확인(누적)" 타일(체크만 하고 영상 못 찾은 곳 포함)과는 다른 값입니다.</p>
             </div>
           </div>
         )}
@@ -1480,15 +1480,15 @@ export default function AdminPage() {
             <div className="flex items-center justify-between px-4 py-3 border-b border-stone-200 bg-white shrink-0"><span className="text-sm font-bold text-stone-800">💳 구독 카페 현황 ({subscribers.length})</span><button onClick={() => { setShowSubsModal(false); setSubMsg(""); }} className="text-2xl text-stone-600 leading-none">×</button></div>
             <div className="overflow-y-auto flex-1 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
             {/* 📧 승인 시 사장님께 자동 발송되는 온보딩 메일(서비스 사용법 + 전용 서비스 안내) 내용 확인 */}
-            <button onClick={openOnboard} className="w-full mb-3 text-left bg-amber-50 border border-amber-300 rounded-lg px-3 py-2 text-[12px] font-bold text-amber-800">📧 승인 시 발송되는 온보딩 메일 내용 보기 →</button>
+            <button onClick={openOnboard} className="w-full mb-3 text-left bg-amber-50 border border-amber-300 rounded-lg px-3 py-2 text-[9.6px] font-bold text-amber-800">📧 승인 시 발송되는 온보딩 메일 내용 보기 →</button>
             {/* 📧 이메일 발송 준비 상태 — 승인 시 키 자동발송 가능 여부(프로덕션 env) */}
-            {emailReady === false && <div className="mb-3 text-[11px] text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-2.5 py-2">🚨 이 환경에 <b>이메일 발송키(RESEND)가 없어요</b>. 승인해도 키가 자동 발송되지 않으니, 승인 후 <b>PIN을 사장님께 직접 전달</b>해야 해요. (Vercel 환경변수 RESEND_API_KEY 설정 필요)</div>}
-            {emailReady === true && senderReady === false && <div className="mb-3 text-[11px] text-amber-800 bg-amber-50 border border-amber-300 rounded-lg px-2.5 py-2">⚠️ 발송키는 있는데 <b>발신주소(RESEND_FROM)가 없어요</b>. 이대로 승인하면 메일이 공용 테스트 도메인(onboarding@resend.dev)으로 나가 <b>스팸함에 갈 위험</b>이 있어요. Vercel 환경변수 <b>RESEND_FROM</b>을 브랜드 도메인(예: 동네 커피 노트 &lt;noreply@dongnecoffeenote.com&gt;)으로 설정 후 발송을 권장해요.</div>}
-            {emailReady === true && senderReady === true && <div className="mb-3 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-2">📧 이메일 발송 준비됨 — 승인하면 키(PIN)가 브랜드 발신주소로 사장님 이메일에 <b>자동 발송</b>돼요.</div>}
+            {emailReady === false && <div className="mb-3 text-[8.8px] text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-2.5 py-2">🚨 이 환경에 <b>이메일 발송키(RESEND)가 없어요</b>. 승인해도 키가 자동 발송되지 않으니, 승인 후 <b>PIN을 사장님께 직접 전달</b>해야 해요. (Vercel 환경변수 RESEND_API_KEY 설정 필요)</div>}
+            {emailReady === true && senderReady === false && <div className="mb-3 text-[8.8px] text-amber-800 bg-amber-50 border border-amber-300 rounded-lg px-2.5 py-2">⚠️ 발송키는 있는데 <b>발신주소(RESEND_FROM)가 없어요</b>. 이대로 승인하면 메일이 공용 테스트 도메인(onboarding@resend.dev)으로 나가 <b>스팸함에 갈 위험</b>이 있어요. Vercel 환경변수 <b>RESEND_FROM</b>을 브랜드 도메인(예: 동네 커피 노트 &lt;noreply@dongnecoffeenote.com&gt;)으로 설정 후 발송을 권장해요.</div>}
+            {emailReady === true && senderReady === true && <div className="mb-3 text-[8.8px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-2">📧 이메일 발송 준비됨 — 승인하면 키(PIN)가 브랜드 발신주소로 사장님 이메일에 <b>자동 발송</b>돼요.</div>}
             {/* ✨ 소비자 노출 — 기본 자동 ON. false 명시(킬스위치)일 때만 경고 */}
-            {liveExposure === false && <div className="mb-3 text-[11px] text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-2.5 py-2">🚨 <b>소비자 노출이 비상 차단(OFF)돼 있어요</b> — 누군가 Vercel 환경변수 <b>SUBSCRIPTION_LIVE=false</b>로 꺼둔 상태입니다. 이 값을 <b>지우면 자동으로 다시 켜집니다</b>(기본 ON).</div>}
-            {liveExposure === true && <div className="mb-3 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-2">✨ 소비자 노출 <b>자동 ON</b> — 구독 사장님이 <b>첫 로그인하면</b> 우선노출(금색핀·추천카페·쇼케이스)이 손님에게 자동으로 노출됩니다. 별도로 켤 필요 없어요.</div>}
-            {subMsg && <div className="mb-3 text-[12px] text-stone-800 bg-amber-50 border border-amber-300 rounded-lg px-2.5 py-2 flex items-start gap-2"><span className="flex-1">{subMsg}</span><button onClick={() => setSubMsg("")} className="text-stone-600 shrink-0">×</button></div>}
+            {liveExposure === false && <div className="mb-3 text-[8.8px] text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-2.5 py-2">🚨 <b>소비자 노출이 비상 차단(OFF)돼 있어요</b> — 누군가 Vercel 환경변수 <b>SUBSCRIPTION_LIVE=false</b>로 꺼둔 상태입니다. 이 값을 <b>지우면 자동으로 다시 켜집니다</b>(기본 ON).</div>}
+            {liveExposure === true && <div className="mb-3 text-[8.8px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-2">✨ 소비자 노출 <b>자동 ON</b> — 구독 사장님이 <b>첫 로그인하면</b> 우선노출(금색핀·추천카페·쇼케이스)이 손님에게 자동으로 노출됩니다. 별도로 켤 필요 없어요.</div>}
+            {subMsg && <div className="mb-3 text-[9.6px] text-stone-800 bg-amber-50 border border-amber-300 rounded-lg px-2.5 py-2 flex items-start gap-2"><span className="flex-1">{subMsg}</span><button onClick={() => setSubMsg("")} className="text-stone-600 shrink-0">×</button></div>}
             {subscribers.length > 0 ? (
             <div className="space-y-2">
               {subscribers.map((s) => {
@@ -1506,20 +1506,20 @@ export default function AdminPage() {
                   <div key={s.id} className="bg-white rounded-xl border border-amber-300 p-3">
                     <div className="min-w-0">
                       <span className="font-bold text-sm">{s.cafe_name}</span>
-                      <span className={`text-[10px] ml-2 px-2 py-0.5 rounded-full font-bold border ${badge.cls}`}>{badge.label}{s.status === "active" ? (s.expires_at ? ` · D-${dleft}` : ` · ⏳ 로그인 대기(첫 접속 시 ${s.duration_days || 30}일 시작)`) : ""}</span>
-                      <span className={`text-[10px] ml-1.5 px-2 py-0.5 rounded-full font-bold border ${s.billing_key ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-stone-100 text-stone-500 border-stone-200"}`}>{s.billing_key ? `💳 카드 등록${s.card_last4 ? ` ${s.card_company ?? ""} ····${s.card_last4}` : ""}${s.autopay ? " · 자동결제 ON" : ""}` : "💳 카드 미등록"}</span>
-                      {s.conversion_requested_at && s.status !== "active" && <span className="text-[10px] ml-1.5 px-2 py-0.5 rounded-full font-bold border bg-orange-100 text-orange-800 border-orange-300" title={`요청일 ${new Date(s.conversion_requested_at).toLocaleDateString("ko-KR")}`}>🔔 구독 전환 요청</span>}
-                      <div className="text-[12px] text-stone-600 truncate">{s.owner_name} · 📞 {s.contact}{s.email ? ` · ✉️ ${s.email}` : ""} · {s.plan}{s.price ? ` ₩${s.price.toLocaleString()}` : " 무료"}</div>
+                      <span className={`text-[8px] ml-2 px-2 py-0.5 rounded-full font-bold border ${badge.cls}`}>{badge.label}{s.status === "active" ? (s.expires_at ? ` · D-${dleft}` : ` · ⏳ 로그인 대기(첫 접속 시 ${s.duration_days || 30}일 시작)`) : ""}</span>
+                      <span className={`text-[8px] ml-1.5 px-2 py-0.5 rounded-full font-bold border ${s.billing_key ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-stone-100 text-stone-500 border-stone-200"}`}>{s.billing_key ? `💳 카드 등록${s.card_last4 ? ` ${s.card_company ?? ""} ····${s.card_last4}` : ""}${s.autopay ? " · 자동결제 ON" : ""}` : "💳 카드 미등록"}</span>
+                      {s.conversion_requested_at && s.status !== "active" && <span className="text-[8px] ml-1.5 px-2 py-0.5 rounded-full font-bold border bg-orange-100 text-orange-800 border-orange-300" title={`요청일 ${new Date(s.conversion_requested_at).toLocaleDateString("ko-KR")}`}>🔔 구독 전환 요청</span>}
+                      <div className="text-[9.6px] text-stone-600 truncate">{s.owner_name} · 📞 {s.contact}{s.email ? ` · ✉️ ${s.email}` : ""} · {s.plan}{s.price ? ` ₩${s.price.toLocaleString()}` : " 무료"}</div>
                       {/* 🔒 사칭 방지 증빙 — 승인 전 대조: 사업자등록증·대표자명·번호·동의·접속기록 */}
-                      <div className="mt-1.5 rounded-lg bg-amber-50/70 border border-amber-100 p-2 text-[11px] text-stone-600 space-y-0.5">
+                      <div className="mt-1.5 rounded-lg bg-amber-50/70 border border-amber-100 p-2 text-[8.8px] text-stone-600 space-y-0.5">
                         <div className="font-bold text-amber-800">🔒 인증 서류 (승인 전 대조)</div>
                         {s.biz_reg_url ? <a href={s.biz_reg_url} target="_blank" rel="noopener" className="inline-flex items-center gap-1 text-blue-700 underline font-bold">🧾 사업자등록증 보기</a> : <span className="text-rose-600">⚠️ 사업자등록증 없음</span>}
                         <div>대표자명 대조: <b>{s.owner_name}</b>{s.biz_no ? ` · 사업자번호 ${s.biz_no}` : ""}</div>
                         <div>{s.attested ? "✅ 본인확인(사업주) 법적 동의" : "❌ 본인확인 미동의"}{s.signup_ip ? ` · IP ${s.signup_ip}` : ""}</div>
-                        <div className="text-[10px] text-stone-600">대표자명·상호가 이 카페와 일치하는지 확인 후 승인하세요.</div>
+                        <div className="text-[8px] text-stone-600">대표자명·상호가 이 카페와 일치하는지 확인 후 승인하세요.</div>
                       </div>
-                      {s.status === "active" && s.pin && <div className="text-[12px] mt-1">🔑 PIN <b className="font-mono tracking-wider text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">{s.pin}</b> {s.pin_emailed_at ? <span className="text-[10px] text-emerald-600">✅ 이메일 발송됨 · 사장님 로그인용</span> : <span className="text-[10px] text-rose-500">⚠️ 이메일 미발송 — 이 PIN을 직접 전달하세요</span>}</div>}
-                      {s.newsletter_opt_in && <div className="text-[10px] text-stone-600 mt-0.5">📰 주간 레터 수신동의 — 매주 트렌드 레터 발송 대상</div>}
+                      {s.status === "active" && s.pin && <div className="text-[9.6px] mt-1">🔑 PIN <b className="font-mono tracking-wider text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">{s.pin}</b> {s.pin_emailed_at ? <span className="text-[8px] text-emerald-600">✅ 이메일 발송됨 · 사장님 로그인용</span> : <span className="text-[8px] text-rose-500">⚠️ 이메일 미발송 — 이 PIN을 직접 전달하세요</span>}</div>}
+                      {s.newsletter_opt_in && <div className="text-[8px] text-stone-600 mt-0.5">📰 주간 레터 수신동의 — 매주 트렌드 레터 발송 대상</div>}
                       {/* 📈 접속 모니터링 — PIN 발급 사장님이 실제 로그인·사용하는지 */}
                       {s.status === "active" && s.pin && (() => {
                         const ago = (v: any) => { if (!v) return ""; const ms = Date.now() - new Date(v).getTime(); const d = Math.floor(ms / 86400000), h = Math.floor(ms / 3600000), m = Math.floor(ms / 60000); return d > 0 ? `${d}일 전` : h > 0 ? `${h}시간 전` : m > 0 ? `${m}분 전` : "방금"; };
@@ -1530,35 +1530,35 @@ export default function AdminPage() {
                         const issuedAgo = issuedAt ? Math.floor((Date.now() - new Date(issuedAt).getTime()) / 86400000) : null;
                         const evs = Array.isArray(s.recent_events) ? s.recent_events : [];
                         return (
-                          <div className={`mt-1.5 rounded-lg border p-2 text-[11px] ${never ? "bg-rose-50 border-rose-200" : "bg-sky-50 border-sky-100"}`}>
+                          <div className={`mt-1.5 rounded-lg border p-2 text-[8.8px] ${never ? "bg-rose-50 border-rose-200" : "bg-sky-50 border-sky-100"}`}>
                             <div className={`font-bold ${never ? "text-rose-700" : "text-sky-800"}`}>📈 접속 모니터링</div>
                             {never
                               ? <div className="text-rose-600">🔴 <b>아직 한 번도 로그인 안 함</b>{issuedAgo != null ? ` — PIN 발급 ${issuedAgo}일째 미접속` : ""}. 사용 안내(온보딩)가 필요해요.</div>
                               : <div className="text-stone-600">✅ 로그인 <b className="text-sky-700">{s.login_count}회</b> · 최근 접속 <b>{ago(s.last_seen_at)}</b>{s.first_login_at ? ` · 첫 접속 ${new Date(s.first_login_at).toLocaleDateString("ko-KR")}` : ""}</div>}
-                            {evs.length > 0 && <div className="mt-1 flex flex-wrap gap-1">{evs.slice(0, 6).map((e: any, i: number) => <span key={i} className="text-[10px] bg-white/70 border border-stone-300 rounded px-1.5 py-0.5 text-stone-700">{EV[e.event] || e.event} · {ago(e.at)}</span>)}</div>}
+                            {evs.length > 0 && <div className="mt-1 flex flex-wrap gap-1">{evs.slice(0, 6).map((e: any, i: number) => <span key={i} className="text-[8px] bg-white/70 border border-stone-300 rounded px-1.5 py-0.5 text-stone-700">{EV[e.event] || e.event} · {ago(e.at)}</span>)}</div>}
                           </div>
                         );
                       })()}
                     </div>
-                    {s.status !== "active" && !s.cafe_published && <div className="mt-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-300 rounded-lg px-2 py-1.5">⚠️ 카페 <b>미공개</b> — 검수·공개(필요 시 분석 생성) 후에 승인할 수 있어요.</div>}
+                    {s.status !== "active" && !s.cafe_published && <div className="mt-2 text-[8.8px] text-amber-700 bg-amber-50 border border-amber-300 rounded-lg px-2 py-1.5">⚠️ 카페 <b>미공개</b> — 검수·공개(필요 시 분석 생성) 후에 승인할 수 있어요.</div>}
                     <div className="flex gap-2 mt-2">
-                      {s.status !== "active" && <button onClick={() => subAct(s.id, "activate", TRIAL_DAYS)} disabled={!s.cafe_published} title={s.cafe_published ? "" : "카페가 공개된 뒤 승인할 수 있어요"} className="flex-1 py-1.5 text-[12px] font-bold text-blue-700 bg-blue-50 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed">✓ 체험 승인({TRIAL_DAYS}일)</button>}
-                      {s.status !== "active" && <button onClick={() => subAct(s.id, "activate", 30)} disabled={!s.cafe_published} title={s.cafe_published ? "" : "카페가 공개된 뒤 승인할 수 있어요"} className="flex-1 py-1.5 text-[12px] font-bold text-emerald-700 bg-emerald-50 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed">✓ 구독 승인(30일)</button>}
-                      {s.status === "active" && s.pin && <button onClick={() => subAct(s.id, "remind")} disabled={!s.email} title={s.email ? "온보딩 패키지(PIN+서비스 사용법)를 사장님 이메일로 다시 보냅니다" : "등록 이메일이 없어요 — 화면의 PIN을 직접 전달하세요"} className="flex-1 py-1.5 text-[12px] font-bold text-amber-700 bg-amber-50 border border-amber-300 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed">📧 온보딩 리마인드</button>}
+                      {s.status !== "active" && <button onClick={() => subAct(s.id, "activate", TRIAL_DAYS)} disabled={!s.cafe_published} title={s.cafe_published ? "" : "카페가 공개된 뒤 승인할 수 있어요"} className="flex-1 py-1.5 text-[9.6px] font-bold text-blue-700 bg-blue-50 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed">✓ 체험 승인({TRIAL_DAYS}일)</button>}
+                      {s.status !== "active" && <button onClick={() => subAct(s.id, "activate", 30)} disabled={!s.cafe_published} title={s.cafe_published ? "" : "카페가 공개된 뒤 승인할 수 있어요"} className="flex-1 py-1.5 text-[9.6px] font-bold text-emerald-700 bg-emerald-50 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed">✓ 구독 승인(30일)</button>}
+                      {s.status === "active" && s.pin && <button onClick={() => subAct(s.id, "remind")} disabled={!s.email} title={s.email ? "온보딩 패키지(PIN+서비스 사용법)를 사장님 이메일로 다시 보냅니다" : "등록 이메일이 없어요 — 화면의 PIN을 직접 전달하세요"} className="flex-1 py-1.5 text-[9.6px] font-bold text-amber-700 bg-amber-50 border border-amber-300 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed">📧 온보딩 리마인드</button>}
                       {/* 🏦 카드 정기결제(PAYMENTS_LIVE) 오픈 전 — 계좌이체로 먼저 전환 유도. 실제 계좌번호는 이 메일 회신으로만 개별 안내.
                           현재 발송 중단(BANK_TRANSFER_EMAIL_ENABLED 기본 off) — 버튼은 남기되 비활성. on 하면 그대로 되살아남. */}
-                      {s.status === "active" && !s.card_last4 && <button onClick={() => subAct(s.id, "bank_transfer")} disabled={!s.email || bankTransferEmail === false} title={bankTransferEmail === false ? "계좌이체 안내 메일은 현재 발송 중단 상태예요 — 재개하려면 BANK_TRANSFER_EMAIL_ENABLED=on" : s.email ? "카드 정기결제가 열리기 전, 계좌이체로 먼저 전환하실 수 있다는 안내 메일을 보냅니다" : "등록 이메일이 없어요"} className="flex-1 py-1.5 text-[12px] font-bold text-sky-700 bg-sky-50 border border-sky-300 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed">🏦 계좌이체 안내{bankTransferEmail === false && " (중단)"}</button>}
-                      {s.status === "active" && <button onClick={() => subAct(s.id, "extend", 30)} className="flex-1 py-1.5 text-[12px] font-bold text-stone-700 bg-stone-100 rounded-lg">+30일 연장</button>}
-                      {s.status === "active" && <button onClick={() => subAct(s.id, "cancel")} className="flex-1 py-1.5 text-[12px] text-rose-600 bg-rose-50 rounded-lg">해지</button>}
-                      {s.status !== "suspended" && s.status !== "cancelled" && <button onClick={() => suspendSub(s.id, s.cafe_name)} className="flex-1 py-1.5 text-[12px] font-bold text-white bg-rose-600 rounded-lg">🚫 사칭/위반 즉시정지</button>}
+                      {s.status === "active" && !s.card_last4 && <button onClick={() => subAct(s.id, "bank_transfer")} disabled={!s.email || bankTransferEmail === false} title={bankTransferEmail === false ? "계좌이체 안내 메일은 현재 발송 중단 상태예요 — 재개하려면 BANK_TRANSFER_EMAIL_ENABLED=on" : s.email ? "카드 정기결제가 열리기 전, 계좌이체로 먼저 전환하실 수 있다는 안내 메일을 보냅니다" : "등록 이메일이 없어요"} className="flex-1 py-1.5 text-[9.6px] font-bold text-sky-700 bg-sky-50 border border-sky-300 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed">🏦 계좌이체 안내{bankTransferEmail === false && " (중단)"}</button>}
+                      {s.status === "active" && <button onClick={() => subAct(s.id, "extend", 30)} className="flex-1 py-1.5 text-[9.6px] font-bold text-stone-700 bg-stone-100 rounded-lg">+30일 연장</button>}
+                      {s.status === "active" && <button onClick={() => subAct(s.id, "cancel")} className="flex-1 py-1.5 text-[9.6px] text-rose-600 bg-rose-50 rounded-lg">해지</button>}
+                      {s.status !== "suspended" && s.status !== "cancelled" && <button onClick={() => suspendSub(s.id, s.cafe_name)} className="flex-1 py-1.5 text-[9.6px] font-bold text-white bg-rose-600 rounded-lg">🚫 사칭/위반 즉시정지</button>}
                     </div>
-                    {s.status === "suspended" && s.suspend_reason && <div className="mt-2 text-[11px] text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-2 py-1.5">🚫 정지 사유: {s.suspend_reason}{s.suspended_at ? ` · ${new Date(s.suspended_at).toLocaleString("ko-KR")}` : ""}</div>}
+                    {s.status === "suspended" && s.suspend_reason && <div className="mt-2 text-[8.8px] text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-2 py-1.5">🚫 정지 사유: {s.suspend_reason}{s.suspended_at ? ` · ${new Date(s.suspended_at).toLocaleString("ko-KR")}` : ""}</div>}
                   </div>
                 );
               })}
             </div>
-            ) : <p className="text-[13px] text-stone-600 py-3 text-center">구독 회원이 아직 없어요.</p>}
-            <p className="text-[10px] text-stone-600 mt-2">승인 시 PIN 발급 → <b>사장님 첫 로그인 시점부터</b> 기간 카운트 시작 + 골드핀·우선노출·쇼케이스 자동 ON. 만료/해지 시 전부 OFF. 연락처는 암호화 저장.</p>
+            ) : <p className="text-[10.4px] text-stone-600 py-3 text-center">구독 회원이 아직 없어요.</p>}
+            <p className="text-[8px] text-stone-600 mt-2">승인 시 PIN 발급 → <b>사장님 첫 로그인 시점부터</b> 기간 카운트 시작 + 골드핀·우선노출·쇼케이스 자동 ON. 만료/해지 시 전부 OFF. 연락처는 암호화 저장.</p>
             </div>
             </div>
           </div>
@@ -1570,20 +1570,20 @@ export default function AdminPage() {
             <div className="min-h-full flex items-start justify-center p-2 sm:p-4">
               <div className="bg-stone-50 rounded-2xl w-full max-w-2xl shadow-2xl my-2" onClick={(e) => e.stopPropagation()}>
                 <div className="sticky top-0 z-10 bg-white border-b border-stone-300 px-4 py-3 flex items-center justify-between rounded-t-2xl">
-                  <span className="text-[14px] font-extrabold text-stone-800">🤖 LLM 보강 대기 <span className="text-[11px] font-normal text-stone-600">· 노출엔 경계후기 제외됨</span></span>
+                  <span className="text-[11.2px] font-extrabold text-stone-800">🤖 LLM 보강 대기 <span className="text-[8.8px] font-normal text-stone-600">· 노출엔 경계후기 제외됨</span></span>
                   <button onClick={() => setShowBorderline(false)} className="text-stone-600 hover:text-stone-700 text-lg leading-none px-1">✕</button>
                 </div>
                 <div className="p-4">
-                  <p className="text-[11px] text-stone-700 bg-stone-100 rounded-lg px-3 py-2 mb-3 leading-relaxed">아래 카페는 <b className="text-stone-600">깨끗한 후기만 노출 중</b>이고(소비자 신뢰 유지), 추가로 발견된 '경계후기'(같은 이름 딴 지점·업종 모호 등)는 <b className="text-stone-600">화면에서 빠진 채</b> LLM 판정을 기다립니다. 크레딧 복구 시 LLM이 평가해 <b className="text-stone-600">진짜로 확인된 것만</b> 노출에 보강됩니다. (숫자: 노출 / 경계대기)</p>
-                  {!blData?.list?.length ? <p className="text-center text-stone-600 py-8 text-[13px]">보강 대기 카페가 없습니다.</p> : (
+                  <p className="text-[8.8px] text-stone-700 bg-stone-100 rounded-lg px-3 py-2 mb-3 leading-relaxed">아래 카페는 <b className="text-stone-600">깨끗한 후기만 노출 중</b>이고(소비자 신뢰 유지), 추가로 발견된 '경계후기'(같은 이름 딴 지점·업종 모호 등)는 <b className="text-stone-600">화면에서 빠진 채</b> LLM 판정을 기다립니다. 크레딧 복구 시 LLM이 평가해 <b className="text-stone-600">진짜로 확인된 것만</b> 노출에 보강됩니다. (숫자: 노출 / 경계대기)</p>
+                  {!blData?.list?.length ? <p className="text-center text-stone-600 py-8 text-[10.4px]">보강 대기 카페가 없습니다.</p> : (
                     <div className="space-y-1">
                       {blData.list.map((c: any) => (
                         <div key={c.id} className="flex items-center justify-between bg-white rounded-lg border border-stone-300 px-2.5 py-1.5">
-                          <span className="text-[11px] text-stone-700 truncate mr-2"><b>{c.name}</b> <span className="text-stone-600 font-normal">{c.area}</span> <span className="text-[9px] text-stone-600">{c.synth_grade}</span></span>
-                          <span className="text-[10.5px] shrink-0 whitespace-nowrap"><b className="text-emerald-600">{c.shown}</b> <span className="text-stone-300">/</span> <b className="text-violet-600">{c.borderline}</b></span>
+                          <span className="text-[8.8px] text-stone-700 truncate mr-2"><b>{c.name}</b> <span className="text-stone-600 font-normal">{c.area}</span> <span className="text-[7.2px] text-stone-600">{c.synth_grade}</span></span>
+                          <span className="text-[8.4px] shrink-0 whitespace-nowrap"><b className="text-emerald-600">{c.shown}</b> <span className="text-stone-300">/</span> <b className="text-violet-600">{c.borderline}</b></span>
                         </div>
                       ))}
-                      {blData.list.length >= 200 && <p className="text-[10px] text-stone-600 text-center pt-1">상위 200곳 표시 (경계후기 많은 순)</p>}
+                      {blData.list.length >= 200 && <p className="text-[8px] text-stone-600 text-center pt-1">상위 200곳 표시 (경계후기 많은 순)</p>}
                     </div>
                   )}
                 </div>
@@ -1598,14 +1598,14 @@ export default function AdminPage() {
             <div className="min-h-full flex items-start justify-center p-2 sm:p-4">
               <div className="bg-stone-50 rounded-2xl w-full max-w-3xl shadow-2xl my-2" onClick={(e) => e.stopPropagation()}>
                 <div className="sticky top-0 z-10 bg-white border-b border-stone-300 px-4 py-3 flex items-center justify-between rounded-t-2xl">
-                  <span className="text-[14px] font-extrabold text-stone-800">📊 접속·유입 현황 <span className="text-[11px] font-normal text-stone-600">· 진짜 외부 사용자만 (대표·팀·봇 제외)</span></span>
+                  <span className="text-[11.2px] font-extrabold text-stone-800">📊 접속·유입 현황 <span className="text-[8.8px] font-normal text-stone-600">· 진짜 외부 사용자만 (대표·팀·봇 제외)</span></span>
                   <div className="flex items-center gap-2">
-                    <button onClick={() => loadAnalytics(pw)} className="text-[11px] font-bold text-stone-700 border border-stone-300 rounded-full px-2.5 py-1 hover:bg-stone-100">↻ 새로고침</button>
+                    <button onClick={() => loadAnalytics(pw)} className="text-[8.8px] font-bold text-stone-700 border border-stone-300 rounded-full px-2.5 py-1 hover:bg-stone-100">↻ 새로고침</button>
                     <button onClick={() => setShowAnalytics(false)} className="text-stone-600 hover:text-stone-700 text-lg leading-none px-1">✕</button>
                   </div>
                 </div>
                 {!analytics ? (
-                  <div className="p-10 text-center text-stone-600 text-[13px]">불러오는 중…</div>
+                  <div className="p-10 text-center text-stone-600 text-[10.4px]">불러오는 중…</div>
                 ) : (() => {
                   const a = analytics; const f = a.funnel || {};
                   const retRate = a.kpi?.mau ? Math.round((a.retention?.returning / a.kpi.mau) * 100) : 0;
@@ -1640,25 +1640,25 @@ export default function AdminPage() {
                   ];
                   return (
                     <div className="p-4 space-y-4">
-                      <p className="text-[10.5px] text-stone-700 bg-stone-100/70 rounded-lg px-3 py-2 leading-relaxed">우리 사이트 방문을 <b className="text-stone-600">외부 도구 없이 직접</b> 모은 현황입니다. <b className="text-emerald-700">대표·팀(내부)과 봇은 자동 제외</b>돼 아래 숫자는 모두 <b className="text-stone-600">진짜 외부 방문자</b>입니다. 실시간·방문자·유입경로·재방문은 정확하고, 페이지 단위(추이·인기카페)는 방문이 쌓이며 채워집니다. <span className="text-stone-600">※ 유입경로 '미상'은 추적 도입 전 옛 방문 또는 앱·북마크 유입(카톡·인스타 인앱은 경로가 안 남습니다).</span></p>
+                      <p className="text-[8.4px] text-stone-700 bg-stone-100/70 rounded-lg px-3 py-2 leading-relaxed">우리 사이트 방문을 <b className="text-stone-600">외부 도구 없이 직접</b> 모은 현황입니다. <b className="text-emerald-700">대표·팀(내부)과 봇은 자동 제외</b>돼 아래 숫자는 모두 <b className="text-stone-600">진짜 외부 방문자</b>입니다. 실시간·방문자·유입경로·재방문은 정확하고, 페이지 단위(추이·인기카페)는 방문이 쌓이며 채워집니다. <span className="text-stone-600">※ 유입경로 '미상'은 추적 도입 전 옛 방문 또는 앱·북마크 유입(카톡·인스타 인앱은 경로가 안 남습니다).</span></p>
                       {/* 🟢 실시간 · 오늘 */}
                       <div className="bg-white rounded-xl border-2 border-emerald-300 p-3">
                         <div className="text-center py-1">
-                          <div className="text-[11px] text-stone-600 font-bold mb-0.5">✅ 실제 사람 접속 · 재방문 (봇·내부 전부 제외, 명쾌 요약)</div>
-                          <div className="text-[26px] font-extrabold text-stone-800 leading-none">
+                          <div className="text-[8.8px] text-stone-600 font-bold mb-0.5">✅ 실제 사람 접속 · 재방문 (봇·내부 전부 제외, 명쾌 요약)</div>
+                          <div className="text-[20.8px] font-extrabold text-stone-800 leading-none">
                             오늘 <span className="text-emerald-700">{a.today?.visitors ?? 0}</span>명
                             <span className="mx-2 text-stone-300">|</span>
-                            재방문 <span className="text-amber-700">{a.retention?.returning ?? 0}</span>명<span className="text-[13px] text-stone-500 font-normal">(최근 30일)</span>
+                            재방문 <span className="text-amber-700">{a.retention?.returning ?? 0}</span>명<span className="text-[10.4px] text-stone-500 font-normal">(최근 30일)</span>
                           </div>
                         </div>
                         <div className="flex items-center justify-between flex-wrap gap-2 mt-2 pt-2 border-t border-stone-200">
                           <div className="flex items-center gap-1.5">
                             <span className="relative flex h-2.5 w-2.5"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span></span>
-                            <span className="text-[12px] font-bold text-stone-700">실시간 <span className="text-emerald-600 text-[16px]">{a.realtime?.active5 ?? 0}</span>명 접속 중</span>
+                            <span className="text-[9.6px] font-bold text-stone-700">실시간 <span className="text-emerald-600 text-[12.8px]">{a.realtime?.active5 ?? 0}</span>명 접속 중</span>
                           </div>
-                          <div className="text-[11px] text-stone-700">30분 내 {a.realtime?.active30 ?? 0}명 · 페이지뷰 <b className="text-sky-700">{(a.today?.pageviews ?? 0).toLocaleString()}</b></div>
+                          <div className="text-[8.8px] text-stone-700">30분 내 {a.realtime?.active30 ?? 0}명 · 페이지뷰 <b className="text-sky-700">{(a.today?.pageviews ?? 0).toLocaleString()}</b></div>
                         </div>
-                        <p className="text-[9.5px] text-stone-600 mt-1.5">위 굵은 숫자 2개가 이 화면의 유일한 기준입니다 — 아래 다른 카드들의 같은 이름 숫자도 전부 이것과 일치합니다. <b>※ 아래 '일간(DAU)'은 집계 기준(자정~ 대신 최근 24시간)이 달라 '오늘' 숫자와 미묘하게 다를 수 있어요.</b></p>
+                        <p className="text-[7.6px] text-stone-600 mt-1.5">위 굵은 숫자 2개가 이 화면의 유일한 기준입니다 — 아래 다른 카드들의 같은 이름 숫자도 전부 이것과 일치합니다. <b>※ 아래 '일간(DAU)'은 집계 기준(자정~ 대신 최근 24시간)이 달라 '오늘' 숫자와 미묘하게 다를 수 있어요.</b></p>
                       </div>
                       <div className="grid grid-cols-3 gap-2">
                         {[
@@ -1667,20 +1667,20 @@ export default function AdminPage() {
                           { ic: "🔁", l: "재방문율", v: `${retRate}%`, sub: `재방문 ${a.retention?.returning}·신규 ${a.retention?.newcomers}`, desc: "다시 찾은 사람 비율" },
                         ].map((k, i) => (
                           <div key={i} className="bg-white rounded-xl border border-stone-300 p-2.5">
-                            <div className="text-[10px] text-stone-600 font-bold">{k.ic} {k.l}</div>
-                            <div className="text-[22px] font-extrabold text-stone-800 leading-tight">{typeof k.v === "number" ? k.v?.toLocaleString() : k.v}</div>
-                            <div className="text-[9.5px] text-stone-700">{k.sub}</div>
-                            <div className="text-[9px] text-stone-600 mt-0.5 leading-tight">{k.desc}</div>
+                            <div className="text-[8px] text-stone-600 font-bold">{k.ic} {k.l}</div>
+                            <div className="text-[17.6px] font-extrabold text-stone-800 leading-tight">{typeof k.v === "number" ? k.v?.toLocaleString() : k.v}</div>
+                            <div className="text-[7.6px] text-stone-700">{k.sub}</div>
+                            <div className="text-[7.2px] text-stone-600 mt-0.5 leading-tight">{k.desc}</div>
                           </div>
                         ))}
                       </div>
                       {/* 🧾 일일 분석 요약 — 서버(route.ts)가 다차원 근거로 생성한 2~4개 인사이트 문장 */}
                       {(a.dailyInsights || []).length > 0 && (
                         <div className="bg-sky-50/70 border border-sky-200 rounded-xl p-3">
-                          <div className="text-[11px] font-bold text-sky-800 mb-1.5">🧾 일일 분석 요약</div>
+                          <div className="text-[8.8px] font-bold text-sky-800 mb-1.5">🧾 일일 분석 요약</div>
                           <ul className="space-y-1">
                             {a.dailyInsights.map((line: string, i: number) => (
-                              <li key={i} className="text-[11.5px] text-stone-700 leading-relaxed flex gap-1.5">
+                              <li key={i} className="text-[9.2px] text-stone-700 leading-relaxed flex gap-1.5">
                                 <span className="text-sky-400">·</span><span>{line}</span>
                               </li>
                             ))}
@@ -1690,15 +1690,15 @@ export default function AdminPage() {
                             const tp = a.todayInsight?.pages || [];
                             const totalToday = tp.reduce((s: number, p: any) => s + (p.views ?? 0), 0);
                             if (!tp.length || totalToday < 1) {
-                              return <div className="mt-2 pt-2 border-t border-sky-200/70 text-[10.5px] text-stone-600">오늘 페이지 조회 데이터가 쌓이는 중이에요.</div>;
+                              return <div className="mt-2 pt-2 border-t border-sky-200/70 text-[8.4px] text-stone-600">오늘 페이지 조회 데이터가 쌓이는 중이에요.</div>;
                             }
                             const maxV = Math.max(1, ...tp.map((p: any) => p.views));
                             return (
                               <div className="mt-2 pt-2 border-t border-sky-200/70">
-                                <div className="text-[10px] font-bold text-sky-700/80 mb-1">📄 오늘 많이 본 화면 top{tp.length}</div>
+                                <div className="text-[8px] font-bold text-sky-700/80 mb-1">📄 오늘 많이 본 화면 top{tp.length}</div>
                                 <div className="space-y-1">
                                   {tp.map((p: any, i: number) => (
-                                    <div key={i} className="flex items-center gap-2 text-[11px]">
+                                    <div key={i} className="flex items-center gap-2 text-[8.8px]">
                                       <span className="w-16 shrink-0 text-stone-600 font-medium">{p.bucket}</span>
                                       <div className="flex-1 bg-sky-100 rounded-full h-2 overflow-hidden">
                                         <div className="bg-sky-400 h-full rounded-full" style={{ width: `${Math.round((p.views / maxV) * 100)}%` }} />
@@ -1715,15 +1715,15 @@ export default function AdminPage() {
                       {/* 🧑 진짜 사용자 신호 — 봇으로 설명 안 되는 것들 */}
                       {a.realUsers && (
                         <div className="bg-emerald-50/60 border border-emerald-200 rounded-xl p-3">
-                          <div className="text-[12px] font-bold text-emerald-800 mb-1.5">🧑 진짜 사용자 신호 <span className="font-normal text-[10px] text-emerald-600">· 기준=브라우저(localStorage), IP 아님</span></div>
+                          <div className="text-[9.6px] font-bold text-emerald-800 mb-1.5">🧑 진짜 사용자 신호 <span className="font-normal text-[8px] text-emerald-600">· 기준=브라우저(localStorage), IP 아님</span></div>
                           <div className="grid grid-cols-2 gap-2 text-center">
                             <div>
-                              <div className="text-[19px] font-extrabold text-emerald-700">{a.realUsers.consent}</div>
-                              <div className="text-[9.5px] text-stone-700">위치동의<br/>(봇은 안 하는 행동)</div>
+                              <div className="text-[15.2px] font-extrabold text-emerald-700">{a.realUsers.consent}</div>
+                              <div className="text-[7.6px] text-stone-700">위치동의<br/>(봇은 안 하는 행동)</div>
                               {a.realUsers.consentDetail && (
                                 <details className="mt-0.5 text-left">
-                                  <summary className="text-[9px] text-emerald-600 cursor-pointer text-center list-none underline decoration-dotted">상세보기</summary>
-                                  <div className="mt-1 text-[9px] text-stone-700 leading-relaxed bg-white/70 rounded-lg p-1.5 border border-emerald-100">
+                                  <summary className="text-[7.2px] text-emerald-600 cursor-pointer text-center list-none underline decoration-dotted">상세보기</summary>
+                                  <div className="mt-1 text-[7.2px] text-stone-700 leading-relaxed bg-white/70 rounded-lg p-1.5 border border-emerald-100">
                                     <div>전체 동의 {a.realUsers.consentDetail.total}건</div>
                                     <div>− 테스트기기 {a.realUsers.consentDetail.internal}건 제외</div>
                                     <div>= 최종 {a.realUsers.consentDetail.real}건</div>
@@ -1737,38 +1737,38 @@ export default function AdminPage() {
                                 </details>
                               )}
                             </div>
-                            <div><div className="text-[19px] font-extrabold text-emerald-700">{(a.realSources || []).reduce((s: number, r: any) => s + r.visitors, 0)}</div><div className="text-[9.5px] text-stone-700">검색·소셜 유입<br/>(브라우저 수)</div></div>
+                            <div><div className="text-[15.2px] font-extrabold text-emerald-700">{(a.realSources || []).reduce((s: number, r: any) => s + r.visitors, 0)}</div><div className="text-[7.6px] text-stone-700">검색·소셜 유입<br/>(브라우저 수)</div></div>
                           </div>
                           {(a.realSources || []).length > 0 && (
-                            <div className="mt-2 pt-2 border-t border-emerald-200/70 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-stone-600">
+                            <div className="mt-2 pt-2 border-t border-emerald-200/70 flex flex-wrap gap-x-3 gap-y-1 text-[8px] text-stone-600">
                               {a.realSources.map((r: any) => (
                                 <span key={r.src}><b className="text-emerald-700">{r.src}</b> {r.visitors}명 · 재방문 {r.returned} · 평균 {r.avg_pv}장</span>
                               ))}
                             </div>
                           )}
-                          <p className="text-[9.5px] text-stone-700 mt-1.5 leading-relaxed"><b>참고:</b> 페이지 여러 장 본 사람 {a.realUsers.r2}명(3+장 {a.realUsers.r3}·5+장 {a.realUsers.r5}) — 한 방문에 여러 페이지 본 것일 뿐 재방문이 아닙니다. <b>"재방문"이라 표시된 숫자는 화면 전체에서 전부 하나(위 '재방문율' 카드)와 같은 정의</b> — 다른 날짜에 다시 온 사람만 셉니다.</p>
+                          <p className="text-[7.6px] text-stone-700 mt-1.5 leading-relaxed"><b>참고:</b> 페이지 여러 장 본 사람 {a.realUsers.r2}명(3+장 {a.realUsers.r3}·5+장 {a.realUsers.r5}) — 한 방문에 여러 페이지 본 것일 뿐 재방문이 아닙니다. <b>"재방문"이라 표시된 숫자는 화면 전체에서 전부 하나(위 '재방문율' 카드)와 같은 정의</b> — 다른 날짜에 다시 온 사람만 셉니다.</p>
                         </div>
                       )}
                       {/* 📣 공유(바이럴) 기록 */}
                       {a.shares && (
                         <div className="bg-white rounded-xl border border-stone-300 p-3">
-                          <div className="text-[12px] font-bold text-stone-700 mb-1.5">📣 공유(바이럴) 기록 <span className="font-normal text-[10px] text-stone-600">· 사용자가 카페를 타인에게 공유한 횟수</span></div>
-                          <div className="flex items-center gap-x-3 gap-y-1 flex-wrap text-[11px]">
-                            <span>30일 <b className="text-[16px] text-rose-600">{a.shares.total}</b>회 <span className="text-stone-600">(오늘 {a.shares.today})</span></span>
+                          <div className="text-[9.6px] font-bold text-stone-700 mb-1.5">📣 공유(바이럴) 기록 <span className="font-normal text-[8px] text-stone-600">· 사용자가 카페를 타인에게 공유한 횟수</span></div>
+                          <div className="flex items-center gap-x-3 gap-y-1 flex-wrap text-[8.8px]">
+                            <span>30일 <b className="text-[12.8px] text-rose-600">{a.shares.total}</b>회 <span className="text-stone-600">(오늘 {a.shares.today})</span></span>
                             <span className="text-stone-700">공유한 사람 <b>{a.shares.sharers}</b>명</span>
                             <span className="text-stone-600">카톡 {a.shares.kakao} · 웹공유 {a.shares.web} · 링크복사 {a.shares.clip}</span>
                           </div>
                           {(a.topShared || []).length > 0 ? (
-                            <div className="mt-2 pt-2 border-t border-stone-300 text-[10.5px] text-stone-600"><span className="text-stone-600">많이 공유된 카페: </span>{a.topShared.map((c: any, i: number) => <span key={i} className="mr-1.5"><b>{c.name}</b>({c.n})</span>)}</div>
-                          ) : <p className="text-[9.5px] text-stone-600 mt-1.5">아직 공유 기록 없음 — 방금 추적 시작(공유 버튼 클릭 시 채워집니다). 내부(대표·팀) 공유는 제외됩니다.</p>}
+                            <div className="mt-2 pt-2 border-t border-stone-300 text-[8.4px] text-stone-600"><span className="text-stone-600">많이 공유된 카페: </span>{a.topShared.map((c: any, i: number) => <span key={i} className="mr-1.5"><b>{c.name}</b>({c.n})</span>)}</div>
+                          ) : <p className="text-[7.6px] text-stone-600 mt-1.5">아직 공유 기록 없음 — 방금 추적 시작(공유 버튼 클릭 시 채워집니다). 내부(대표·팀) 공유는 제외됩니다.</p>}
                         </div>
                       )}
                       {/* ❤ 내 카페 추억 즐겨찾기(하트) */}
                       {a.favorites && (
                         <div className="bg-white rounded-xl border border-stone-300 p-3">
-                          <div className="text-[12px] font-bold text-stone-700 mb-1.5">⭐ 찜(즐겨찾기) <span className="font-normal text-[10px] text-stone-600">· 카페상세·지도에서 누른 찜(bookmarks)</span></div>
-                          <div className="flex items-center gap-x-3 gap-y-1 flex-wrap text-[11px] mb-2">
-                            <span>누적 <b className="text-[16px] text-rose-600">{a.favorites.total}</b>건</span>
+                          <div className="text-[9.6px] font-bold text-stone-700 mb-1.5">⭐ 찜(즐겨찾기) <span className="font-normal text-[8px] text-stone-600">· 카페상세·지도에서 누른 찜(bookmarks)</span></div>
+                          <div className="flex items-center gap-x-3 gap-y-1 flex-wrap text-[8.8px] mb-2">
+                            <span>누적 <b className="text-[12.8px] text-rose-600">{a.favorites.total}</b>건</span>
                             <span className="text-stone-700">최근 7일 <b>{a.favorites.last7}</b>건</span>
                           </div>
                           {(a.favorites.daily || []).length > 0 && (
@@ -1776,30 +1776,30 @@ export default function AdminPage() {
                               {/* 🔢 막대 위 건수 표기(2026-09-04 CEO 지시) — 막대는 70%로 스케일해 숫자 공간 확보(64px 중 라벨 18px) */}
                               {a.favorites.daily.map((d: any, i: number) => (
                                 <div key={i} className="flex-1 h-full flex flex-col items-center justify-end gap-0.5">
-                                  {d.n > 0 && <span className="text-[7px] font-bold text-rose-600 leading-none tabular-nums">{d.n}</span>}
+                                  {d.n > 0 && <span className="text-[5.6px] font-bold text-rose-600 leading-none tabular-nums">{d.n}</span>}
                                   <div className="w-full bg-rose-400 rounded-t" style={{ height: `${(d.n / maxFav) * 70}%`, minHeight: "2px" }} title={`${d.day}: ${d.n}건`}></div>
-                                  <span className="text-[7px] text-stone-600">{d.day.slice(3)}</span>
+                                  <span className="text-[5.6px] text-stone-600">{d.day.slice(3)}</span>
                                 </div>
                               ))}
                             </div>
                           )}
                           {(a.favorites.topCafes || []).length > 0 ? (
-                            <div className="pt-2 border-t border-stone-300 text-[10.5px] text-stone-600"><span className="text-stone-600">즐겨찾기 많은 카페: </span>{a.favorites.topCafes.map((c: any, i: number) => <span key={i} className="mr-1.5"><b>{c.name}</b>({c.n})</span>)}</div>
-                          ) : <p className="text-[9.5px] text-stone-600">아직 찜 기록 없음.</p>}
+                            <div className="pt-2 border-t border-stone-300 text-[8.4px] text-stone-600"><span className="text-stone-600">즐겨찾기 많은 카페: </span>{a.favorites.topCafes.map((c: any, i: number) => <span key={i} className="mr-1.5"><b>{c.name}</b>({c.n})</span>)}</div>
+                          ) : <p className="text-[7.6px] text-stone-600">아직 찜 기록 없음.</p>}
                         </div>
                       )}
-                      {noEvents && <div className="bg-amber-50 border border-amber-300 rounded-xl p-2.5 text-[11px] text-amber-800">📊 페이지뷰 단위 지표(추이·인기카페·퍼널·시간대)는 방금 추적 시작 — 방문이 쌓이며 채워집니다. 방문자·유입경로·재방문은 지금부터 정확합니다.</div>}
+                      {noEvents && <div className="bg-amber-50 border border-amber-300 rounded-xl p-2.5 text-[8.8px] text-amber-800">📊 페이지뷰 단위 지표(추이·인기카페·퍼널·시간대)는 방금 추적 시작 — 방문이 쌓이며 채워집니다. 방문자·유입경로·재방문은 지금부터 정확합니다.</div>}
                       {(a.daily || []).length > 0 && (
                         <div className="bg-white rounded-xl border border-stone-300 p-3">
-                          <div className="text-[12px] font-bold text-stone-700">일별 방문 추이 <span className="font-normal text-stone-600 text-[10px]">최근 14일</span></div>
-                          <p className="text-[9.5px] text-stone-600 mb-2">날짜별 방문자 수 — 늘고 주는 흐름을 봅니다. (막대에 마우스 올리면 상세)</p>
+                          <div className="text-[9.6px] font-bold text-stone-700">일별 방문 추이 <span className="font-normal text-stone-600 text-[8px]">최근 14일</span></div>
+                          <p className="text-[7.6px] text-stone-600 mb-2">날짜별 방문자 수 — 늘고 주는 흐름을 봅니다. (막대에 마우스 올리면 상세)</p>
                           <div className="flex items-end gap-1 h-28">
                             {/* 🔢 막대 위 방문자 수 표기(2026-09-04 CEO 지시) — 막대는 82%로 스케일해 숫자 공간 확보 */}
                             {a.daily.map((d: any, i: number) => (
                               <div key={i} className="flex-1 h-full flex flex-col items-center justify-end gap-0.5">
-                                {d.visitors > 0 && <span className="text-[7px] font-bold text-sky-700 leading-none tabular-nums">{d.visitors}</span>}
+                                {d.visitors > 0 && <span className="text-[5.6px] font-bold text-sky-700 leading-none tabular-nums">{d.visitors}</span>}
                                 <div className="w-full bg-sky-400 rounded-t" style={{ height: `${(d.visitors / maxDaily) * 82}%`, minHeight: "2px" }} title={`${d.day}: 방문 ${d.visitors}·뷰 ${d.pageviews}`}></div>
-                                <span className="text-[7px] text-stone-600">{d.day.slice(3)}</span>
+                                <span className="text-[5.6px] text-stone-600">{d.day.slice(3)}</span>
                               </div>
                             ))}
                           </div>
@@ -1807,23 +1807,23 @@ export default function AdminPage() {
                       )}
                       {f.visitors > 0 && (
                         <div className="bg-white rounded-xl border border-stone-300 p-3">
-                          <div className="text-[12px] font-bold text-stone-700">전환 퍼널</div>
-                          <p className="text-[9.5px] text-stone-600 mb-2">방문 → 카페를 실제로 열어봄 → 여러 곳 비교(몰입). 단계마다 몇 %가 남는지 봅니다.</p>
+                          <div className="text-[9.6px] font-bold text-stone-700">전환 퍼널</div>
+                          <p className="text-[7.6px] text-stone-600 mb-2">방문 → 카페를 실제로 열어봄 → 여러 곳 비교(몰입). 단계마다 몇 %가 남는지 봅니다.</p>
                           {fSteps.map((s, i) => (
                             <div key={i}>
-                              <div className="flex justify-between text-[10.5px] mb-0.5"><span className="text-stone-600">{s.l}</span><span className="font-bold text-stone-700">{s.v?.toLocaleString()}명 <span className="text-emerald-600">{s.pct}%</span></span></div>
+                              <div className="flex justify-between text-[8.4px] mb-0.5"><span className="text-stone-600">{s.l}</span><span className="font-bold text-stone-700">{s.v?.toLocaleString()}명 <span className="text-emerald-600">{s.pct}%</span></span></div>
                               <div className="h-3.5 bg-stone-100 rounded-full overflow-hidden"><div className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-full" style={{ width: `${Math.max(s.pct, 3)}%` }}></div></div>
-                              {i < fSteps.length - 1 && <div className="text-[8.5px] text-rose-400 text-center my-0.5">▼ {fSteps[i].pct - fSteps[i + 1].pct}%p 이탈</div>}
+                              {i < fSteps.length - 1 && <div className="text-[6.8px] text-rose-400 text-center my-0.5">▼ {fSteps[i].pct - fSteps[i + 1].pct}%p 이탈</div>}
                             </div>
                           ))}
                         </div>
                       )}
                       <div className="bg-white rounded-xl border border-stone-300 p-3">
-                        <div className="text-[12px] font-bold text-stone-700">유입경로 <span className="font-normal text-stone-600 text-[10px]">채널로 묶음</span></div>
-                        <p className="text-[9.5px] text-stone-600 mb-2">어디서 들어왔는지 의미 있는 채널로 묶었습니다. '평균'은 그 채널 방문자가 한 번 올 때 둘러본 페이지 수(참고용 관여도) — 재방문 횟수 아님.</p>
-                        {srcGroups.length === 0 ? <p className="text-[11px] text-stone-600">데이터 없음</p> : srcGroups.map((g) => (
+                        <div className="text-[9.6px] font-bold text-stone-700">유입경로 <span className="font-normal text-stone-600 text-[8px]">채널로 묶음</span></div>
+                        <p className="text-[7.6px] text-stone-600 mb-2">어디서 들어왔는지 의미 있는 채널로 묶었습니다. '평균'은 그 채널 방문자가 한 번 올 때 둘러본 페이지 수(참고용 관여도) — 재방문 횟수 아님.</p>
+                        {srcGroups.length === 0 ? <p className="text-[8.8px] text-stone-600">데이터 없음</p> : srcGroups.map((g) => (
                           <div key={g.key} className={`mb-1.5 ${g.isInternal ? "opacity-60" : ""}`}>
-                            <div className="flex justify-between text-[10.5px] mb-0.5">
+                            <div className="flex justify-between text-[8.4px] mb-0.5">
                               <span className={`font-medium ${g.isInternal ? "text-stone-500" : "text-stone-700"}`}>{g.label}{g.isInternal && <span className="ml-1 text-stone-500 font-normal">(제외하고 판단)</span>}</span>
                               <span className="text-stone-700">{g.visitors}명 <span className="text-stone-600">({g.pct}%) · 평균 {g.avgVisits}장</span></span>
                             </div>
@@ -1832,10 +1832,10 @@ export default function AdminPage() {
                         ))}
                         {(a.sources || []).length > 0 && (
                           <details className="mt-2 pt-2 border-t border-stone-200">
-                            <summary className="text-[10px] text-stone-600 cursor-pointer select-none hover:text-stone-700">개별 출처 상세 보기 ({a.sources.length}개)</summary>
+                            <summary className="text-[8px] text-stone-600 cursor-pointer select-none hover:text-stone-700">개별 출처 상세 보기 ({a.sources.length}개)</summary>
                             <div className="mt-1.5 space-y-1">
                               {a.sources.map((s: any, i: number) => (
-                                <div key={i} className="flex justify-between text-[9.5px] text-stone-600">
+                                <div key={i} className="flex justify-between text-[7.6px] text-stone-600">
                                   <span className="truncate mr-2">{s.src === "미상" ? "미상 (추적 도입 전 방문)" : s.src}</span>
                                   <span className="shrink-0">{s.visitors}명 ({Math.round((s.visitors / srcTotal) * 100)}%) · 평균 {s.avg_visits}장</span>
                                 </div>
@@ -1846,26 +1846,26 @@ export default function AdminPage() {
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <div className="bg-white rounded-xl border border-stone-300 p-3">
-                          <div className="text-[12px] font-bold text-stone-700">신규 vs 재방문</div>
-                          <p className="text-[9.5px] text-stone-600 mb-2">처음 온 사람 vs 다시 온 사람.</p>
-                          <div className="flex h-5 rounded-full overflow-hidden bg-stone-100 text-[9px] font-bold text-white">
+                          <div className="text-[9.6px] font-bold text-stone-700">신규 vs 재방문</div>
+                          <p className="text-[7.6px] text-stone-600 mb-2">처음 온 사람 vs 다시 온 사람.</p>
+                          <div className="flex h-5 rounded-full overflow-hidden bg-stone-100 text-[7.2px] font-bold text-white">
                             <div className="bg-indigo-400 flex items-center justify-center" style={{ width: `${newPct}%` }}>{newPct >= 14 && `${newPct}%`}</div>
                             <div className="bg-amber-400 flex items-center justify-center" style={{ width: `${retPct}%` }}>{retPct >= 14 && `${retPct}%`}</div>
                           </div>
-                          <div className="flex gap-3 text-[10px] mt-1.5">
+                          <div className="flex gap-3 text-[8px] mt-1.5">
                             <span className="flex items-center gap-1 text-stone-700"><span className="w-2 h-2 rounded-full bg-indigo-400 inline-block"></span>신규 <b className="text-stone-700">{a.retention?.newcomers}</b></span>
                             <span className="flex items-center gap-1 text-stone-700"><span className="w-2 h-2 rounded-full bg-amber-400 inline-block"></span>재방문 <b className="text-stone-700">{a.retention?.returning}</b></span>
                           </div>
                         </div>
                         <div className="bg-white rounded-xl border border-stone-300 p-3">
-                          <div className="text-[12px] font-bold text-stone-700">접속 기기</div>
-                          <p className="text-[9.5px] text-stone-600 mb-2">모바일 · 태블릿 · PC 비율.</p>
-                          <div className="flex h-5 rounded-full overflow-hidden bg-stone-100 text-[9px] font-bold text-white">
+                          <div className="text-[9.6px] font-bold text-stone-700">접속 기기</div>
+                          <p className="text-[7.6px] text-stone-600 mb-2">모바일 · 태블릿 · PC 비율.</p>
+                          <div className="flex h-5 rounded-full overflow-hidden bg-stone-100 text-[7.2px] font-bold text-white">
                             <div className="bg-teal-400 flex items-center justify-center" style={{ width: `${mobPct}%` }}>{mobPct >= 14 && `${mobPct}%`}</div>
                             <div className="bg-violet-400 flex items-center justify-center" style={{ width: `${tabPct}%` }}>{tabPct >= 14 && `${tabPct}%`}</div>
                             <div className="bg-stone-400 flex items-center justify-center" style={{ width: `${pcPct}%` }}>{pcPct >= 14 && `${pcPct}%`}</div>
                           </div>
-                          <div className="flex gap-3 text-[10px] mt-1.5 flex-wrap">
+                          <div className="flex gap-3 text-[8px] mt-1.5 flex-wrap">
                             <span className="flex items-center gap-1 text-stone-700"><span className="w-2 h-2 rounded-full bg-teal-400 inline-block"></span>📱 모바일 <b className="text-stone-700">{dev.mobile}</b></span>
                             <span className="flex items-center gap-1 text-stone-700"><span className="w-2 h-2 rounded-full bg-violet-400 inline-block"></span>📟 태블릿 <b className="text-stone-700">{dev.tablet}</b></span>
                             <span className="flex items-center gap-1 text-stone-700"><span className="w-2 h-2 rounded-full bg-stone-400 inline-block"></span>💻 PC <b className="text-stone-700">{dev.desktop}</b></span>
@@ -1874,20 +1874,20 @@ export default function AdminPage() {
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         <div className="bg-white rounded-xl border border-stone-300 p-3">
-                          <div className="text-[12px] font-bold text-stone-700">인기 카페 <span className="font-normal text-stone-600 text-[10px]">조회순</span></div>
-                          <p className="text-[9.5px] text-stone-600 mb-2">가장 많이 열어본 카페 — 어떤 곳에 관심이 몰리는지.</p>
-                          {(a.topCafes || []).length === 0 ? <p className="text-[11px] text-stone-600">데이터 쌓이는 중</p> : <div className="space-y-1 max-h-56 overflow-y-auto">{a.topCafes.map((c: any, i: number) => (
-                            <div key={i} className="text-[10.5px]">
+                          <div className="text-[9.6px] font-bold text-stone-700">인기 카페 <span className="font-normal text-stone-600 text-[8px]">조회순</span></div>
+                          <p className="text-[7.6px] text-stone-600 mb-2">가장 많이 열어본 카페 — 어떤 곳에 관심이 몰리는지.</p>
+                          {(a.topCafes || []).length === 0 ? <p className="text-[8.8px] text-stone-600">데이터 쌓이는 중</p> : <div className="space-y-1 max-h-56 overflow-y-auto">{a.topCafes.map((c: any, i: number) => (
+                            <div key={i} className="text-[8.4px]">
                               <div className="flex justify-between"><span className="text-stone-700 font-medium truncate">{i + 1}. {c.name} <span className="text-stone-600 font-normal">{c.area}</span></span><span className="text-sky-700 font-bold shrink-0 ml-1">{c.views}</span></div>
                               <div className="h-1.5 bg-stone-100 rounded-full overflow-hidden mt-0.5"><div className="h-full bg-sky-300 rounded-full" style={{ width: `${c.views / maxCafe * 100}%` }}></div></div>
                             </div>
                           ))}</div>}
                         </div>
                         <div className="bg-white rounded-xl border border-stone-300 p-3">
-                          <div className="text-[12px] font-bold text-stone-700">인기 지역 <span className="font-normal text-stone-600 text-[10px]">카페 조회 기준</span></div>
-                          <p className="text-[9.5px] text-stone-600 mb-2">조회된 카페가 어느 동네에 몰리는지 — 수요 지도.</p>
-                          {(a.topRegions || []).length === 0 ? <p className="text-[11px] text-stone-600">데이터 쌓이는 중</p> : <div className="space-y-1 max-h-56 overflow-y-auto">{a.topRegions.map((r: any, i: number) => (
-                            <div key={i} className="text-[10.5px]">
+                          <div className="text-[9.6px] font-bold text-stone-700">인기 지역 <span className="font-normal text-stone-600 text-[8px]">카페 조회 기준</span></div>
+                          <p className="text-[7.6px] text-stone-600 mb-2">조회된 카페가 어느 동네에 몰리는지 — 수요 지도.</p>
+                          {(a.topRegions || []).length === 0 ? <p className="text-[8.8px] text-stone-600">데이터 쌓이는 중</p> : <div className="space-y-1 max-h-56 overflow-y-auto">{a.topRegions.map((r: any, i: number) => (
+                            <div key={i} className="text-[8.4px]">
                               <div className="flex justify-between"><span className="text-stone-700 font-medium">{r.area}</span><span className="text-stone-700 shrink-0 ml-1">{r.views}</span></div>
                               <div className="h-1.5 bg-stone-100 rounded-full overflow-hidden mt-0.5"><div className="h-full bg-violet-300 rounded-full" style={{ width: `${r.views / maxRegion * 100}%` }}></div></div>
                             </div>
@@ -1896,7 +1896,7 @@ export default function AdminPage() {
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         <div className="bg-white rounded-xl border border-stone-300 p-3">
-                          <div className="text-[12px] font-bold text-stone-700">방문자 지역 <span className="font-normal text-stone-600 text-[10px]">위치 공유</span></div>
+                          <div className="text-[9.6px] font-bold text-stone-700">방문자 지역 <span className="font-normal text-stone-600 text-[8px]">위치 공유</span></div>
                           {/* 🔴 2026-10-23 CEO 지적("이게 전국 유입 맞아?") — 실측: 전체 방문자 20,040명 중 위치 실제
                               공유 220명(1.10%), 그중 94.6%가 수도권. "지역별 분포"처럼 보이지만 **전국 유입 지도가 아니라
                               위치 공유에 동의한 1%의 거주지**다(동의 자체가 수도권 편향이라 지방 유입이 없어서가 아니라
@@ -1908,16 +1908,16 @@ export default function AdminPage() {
                             const totalSum = (a.visitorRegions || []).reduce((s: number, r: any) => s + r.n, 0);
                             const metroPct = totalSum > 0 ? (metroSum / totalSum * 100) : 0;
                             return (
-                              <p className="text-[9.5px] text-amber-700 mb-2 font-semibold">
+                              <p className="text-[7.6px] text-amber-700 mb-2 font-semibold">
                                 ⚠️ 전국 유입 아님 — 전체 방문자의 <b>{pct.toFixed(1)}%</b>({located}/{pinged}명)만 위치를 공유했고,
                                 그중 <b>{metroPct.toFixed(0)}%가 수도권</b>이다. 지방이 "안 와서"가 아니라 이 1% 표본에
                                 "안 잡혀서" 비어 보일 수 있다 — 지역 분포가 아니라 동의자 거주지로 읽을 것.
                               </p>
                             );
                           })()}
-                          {(a.visitorRegions || []).length === 0 ? <p className="text-[11px] text-stone-600">위치 공유 데이터 없음</p> : a.visitorRegions.map((r: any, i: number) => (
+                          {(a.visitorRegions || []).length === 0 ? <p className="text-[8.8px] text-stone-600">위치 공유 데이터 없음</p> : a.visitorRegions.map((r: any, i: number) => (
                             <div key={i} className="mb-1">
-                              <div className="flex justify-between text-[10.5px]"><span className="text-stone-600">{r.region}</span><span className="text-stone-700">{r.n}</span></div>
+                              <div className="flex justify-between text-[8.4px]"><span className="text-stone-600">{r.region}</span><span className="text-stone-700">{r.n}</span></div>
                               <div className="h-1.5 bg-stone-100 rounded-full overflow-hidden mt-0.5"><div className="h-full bg-rose-300 rounded-full" style={{ width: `${r.n / maxVReg * 100}%` }}></div></div>
                             </div>
                           ))}
@@ -1926,25 +1926,25 @@ export default function AdminPage() {
                             무동의로 붙이는 IP 지역(x-vercel-ip-city/-region)으로 **진짜 전국 분포**를 보여준다.
                             오늘부터 적재를 시작했으므로 데이터가 쌓이는 데 며칠 걸린다(0건이면 그 뜻). */}
                         <div className="bg-white rounded-xl border border-stone-300 p-3">
-                          <div className="text-[12px] font-bold text-stone-700">방문자 지역 <span className="font-normal text-emerald-700 text-[10px]">IP 기반·무동의·100%</span></div>
-                          <p className="text-[9.5px] text-stone-600 mb-2">
+                          <div className="text-[9.6px] font-bold text-stone-700">방문자 지역 <span className="font-normal text-emerald-700 text-[8px]">IP 기반·무동의·100%</span></div>
+                          <p className="text-[7.6px] text-stone-600 mb-2">
                             동의 없이 모든 방문자에게 붙는 IP 지역(시/도 단위) — 편향 없는 진짜 분포.
                             태깅 {a.ipCoverage?.tagged ?? 0}/{a.ipCoverage?.total ?? 0}명
                             ({a.ipCoverage?.total ? ((a.ipCoverage.tagged / a.ipCoverage.total) * 100).toFixed(0) : 0}%, 2026-10-23부터 적재 시작).
                           </p>
-                          {(a.ipRegions || []).length === 0 ? <p className="text-[11px] text-stone-600">아직 데이터가 쌓이는 중(적재 시작 직후)</p> : a.ipRegions.map((r: any, i: number) => (
+                          {(a.ipRegions || []).length === 0 ? <p className="text-[8.8px] text-stone-600">아직 데이터가 쌓이는 중(적재 시작 직후)</p> : a.ipRegions.map((r: any, i: number) => (
                             <div key={i} className="mb-1">
-                              <div className="flex justify-between text-[10.5px]"><span className="text-stone-600">{r.region}</span><span className="text-stone-700">{r.n}</span></div>
+                              <div className="flex justify-between text-[8.4px]"><span className="text-stone-600">{r.region}</span><span className="text-stone-700">{r.n}</span></div>
                               <div className="h-1.5 bg-stone-100 rounded-full overflow-hidden mt-0.5"><div className="h-full bg-emerald-300 rounded-full" style={{ width: `${r.n / maxIpReg * 100}%` }}></div></div>
                             </div>
                           ))}
                         </div>
                         <div className="bg-white rounded-xl border border-stone-300 p-3">
-                          <div className="text-[12px] font-bold text-stone-700">위치 동의 퍼널</div>
-                          <p className="text-[9.5px] text-stone-600 mb-2">방문 → 위치 요청에 실제 응답 → 동의(수락) → 실제 위치 공유까지 단계별 비율.</p>
+                          <div className="text-[9.6px] font-bold text-stone-700">위치 동의 퍼널</div>
+                          <p className="text-[7.6px] text-stone-600 mb-2">방문 → 위치 요청에 실제 응답 → 동의(수락) → 실제 위치 공유까지 단계별 비율.</p>
                           <div className="flex items-center justify-between bg-rose-50 border border-rose-200 rounded-lg px-2.5 py-1.5 mb-2">
-                            <span className="text-[10.5px] text-stone-600">동의 수락률 <span className="text-stone-600">(요청에 응답한 사람 기준)</span></span>
-                            <span className="text-[15px] font-extrabold text-rose-600">{consentRate}%</span>
+                            <span className="text-[8.4px] text-stone-600">동의 수락률 <span className="text-stone-600">(요청에 응답한 사람 기준)</span></span>
+                            <span className="text-[12px] font-extrabold text-rose-600">{consentRate}%</span>
                           </div>
                           {[
                             { l: "전체 방문", v: cs.pinged, pct: 100 },
@@ -1953,34 +1953,34 @@ export default function AdminPage() {
                             { l: "위치 공유 성공", v: cs.located, pct: cs.agreed ? Math.round((cs.located ?? 0) / cs.agreed * 100) : 0 },
                           ].map((s, i) => (
                             <div key={i} className="mb-1.5">
-                              <div className="flex justify-between text-[10.5px] mb-0.5"><span className="text-stone-600">{s.l}</span><span className="font-bold text-stone-700">{(s.v ?? 0).toLocaleString()} <span className="text-stone-600 font-normal">{s.pct}%</span></span></div>
+                              <div className="flex justify-between text-[8.4px] mb-0.5"><span className="text-stone-600">{s.l}</span><span className="font-bold text-stone-700">{(s.v ?? 0).toLocaleString()} <span className="text-stone-600 font-normal">{s.pct}%</span></span></div>
                               <div className="h-2 bg-stone-100 rounded-full overflow-hidden"><div className="h-full bg-rose-400 rounded-full" style={{ width: `${s.pct}%` }}></div></div>
                             </div>
                           ))}
-                          <p className="text-[9.5px] text-stone-600 mt-1">※ '위치 요청 응답'은 실제로 위치 모달에 답한 사람만 기준(대부분의 방문자는 위치를 요청받지 않음) — 이전엔 전체 방문 대비로 계산돼 동의율이 실제보다 낮게 보였습니다.</p>
+                          <p className="text-[7.6px] text-stone-600 mt-1">※ '위치 요청 응답'은 실제로 위치 모달에 답한 사람만 기준(대부분의 방문자는 위치를 요청받지 않음) — 이전엔 전체 방문 대비로 계산돼 동의율이 실제보다 낮게 보였습니다.</p>
                         </div>
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         <div className="bg-white rounded-xl border border-stone-300 p-3">
-                          <div className="text-[12px] font-bold text-stone-700">페이지 유형</div>
-                          <p className="text-[9.5px] text-stone-600 mb-2">어떤 화면(홈·카페상세·지역·취향)을 많이 보는지.</p>
-                          {(a.pageBuckets || []).length === 0 ? <p className="text-[11px] text-stone-600">데이터 쌓이는 중</p> : a.pageBuckets.map((b: any, i: number) => (
+                          <div className="text-[9.6px] font-bold text-stone-700">페이지 유형</div>
+                          <p className="text-[7.6px] text-stone-600 mb-2">어떤 화면(홈·카페상세·지역·취향)을 많이 보는지.</p>
+                          {(a.pageBuckets || []).length === 0 ? <p className="text-[8.8px] text-stone-600">데이터 쌓이는 중</p> : a.pageBuckets.map((b: any, i: number) => (
                             <div key={i} className="mb-1">
-                              <div className="flex justify-between text-[10.5px]"><span className="text-stone-600">{b.bucket}</span><span className="text-stone-700">{b.views.toLocaleString()}</span></div>
+                              <div className="flex justify-between text-[8.4px]"><span className="text-stone-600">{b.bucket}</span><span className="text-stone-700">{b.views.toLocaleString()}</span></div>
                               <div className="h-1.5 bg-stone-100 rounded-full overflow-hidden mt-0.5"><div className="h-full bg-stone-400 rounded-full" style={{ width: `${b.views / maxBucket * 100}%` }}></div></div>
                             </div>
                           ))}
                         </div>
                         <div className="bg-white rounded-xl border border-stone-300 p-3">
-                          <div className="text-[12px] font-bold text-stone-700">시간대 분포 <span className="font-normal text-stone-600 text-[10px]">KST</span></div>
-                          <p className="text-[9.5px] text-stone-600 mb-2">하루 중 사람이 몰리는 시간{peakH >= 0 ? <> — <b className="text-orange-500">피크 {peakH}시</b></> : ""}. 콘텐츠 발행 타이밍 참고.</p>
-                          {(a.hours || []).length === 0 ? <p className="text-[11px] text-stone-600">데이터 쌓이는 중</p> : <div className="flex items-end gap-px h-16">{Array.from({ length: 24 }).map((_, h) => (
+                          <div className="text-[9.6px] font-bold text-stone-700">시간대 분포 <span className="font-normal text-stone-600 text-[8px]">KST</span></div>
+                          <p className="text-[7.6px] text-stone-600 mb-2">하루 중 사람이 몰리는 시간{peakH >= 0 ? <> — <b className="text-orange-500">피크 {peakH}시</b></> : ""}. 콘텐츠 발행 타이밍 참고.</p>
+                          {(a.hours || []).length === 0 ? <p className="text-[8.8px] text-stone-600">데이터 쌓이는 중</p> : <div className="flex items-end gap-px h-16">{Array.from({ length: 24 }).map((_, h) => (
                             <div key={h} className={`flex-1 rounded-t ${h === peakH ? "bg-orange-500" : "bg-orange-300"}`} style={{ height: `${((hourMap[h] || 0) / maxHour) * 100}%`, minHeight: "1px" }} title={`${h}시: ${hourMap[h] || 0}회`}></div>
                           ))}</div>}
-                          <div className="flex justify-between text-[8px] text-stone-300 mt-0.5"><span>0시</span><span>6시</span><span>12시</span><span>18시</span><span>23시</span></div>
+                          <div className="flex justify-between text-[6.4px] text-stone-300 mt-0.5"><span>0시</span><span>6시</span><span>12시</span><span>18시</span><span>23시</span></div>
                         </div>
                       </div>
-                      <p className="text-[9.5px] text-stone-600 text-center pt-1">전부 우리 DB 자체 집계 · 외부(네이버·구글) 의존 0 · 갱신 {new Date(a.generatedAt).toLocaleTimeString("ko-KR")}</p>
+                      <p className="text-[7.6px] text-stone-600 text-center pt-1">전부 우리 DB 자체 집계 · 외부(네이버·구글) 의존 0 · 갱신 {new Date(a.generatedAt).toLocaleTimeString("ko-KR")}</p>
                     </div>
                   );
                 })()}
@@ -1995,16 +1995,16 @@ export default function AdminPage() {
             <div className="absolute inset-0 bg-black/50" />
             <div className="absolute inset-x-0 bottom-0 max-h-[90vh] overflow-y-auto bg-stone-50 rounded-t-2xl p-4 sm:inset-0 sm:m-auto sm:max-w-lg sm:h-fit sm:max-h-[90vh] sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-1"><span className="text-sm font-bold text-stone-800">📧 온보딩 메일 미리보기</span><button onClick={() => setShowOnboard(false)} className="text-2xl text-stone-600 leading-none">×</button></div>
-              <p className="text-[11px] text-stone-700 mb-3">승인 버튼을 누르면 사장님 이메일로 <b>자동 발송</b>되는 내용이에요. 서비스 사용법 + 구독 전용 서비스(리뷰 분석·쇼케이스·우선 노출·뉴스레터) 안내가 담겨 있어요. <b>열쇠(PIN)는 예시</b>이고, 실제로는 그 사장님의 진짜 열쇠가 들어갑니다.</p>
+              <p className="text-[8.8px] text-stone-700 mb-3">승인 버튼을 누르면 사장님 이메일로 <b>자동 발송</b>되는 내용이에요. 서비스 사용법 + 구독 전용 서비스(리뷰 분석·쇼케이스·우선 노출·뉴스레터) 안내가 담겨 있어요. <b>열쇠(PIN)는 예시</b>이고, 실제로는 그 사장님의 진짜 열쇠가 들어갑니다.</p>
               {!onboard ? (
-                <div className="py-10 text-center text-stone-600 text-[13px]">불러오는 중…</div>
+                <div className="py-10 text-center text-stone-600 text-[10.4px]">불러오는 중…</div>
               ) : (
                 <>
                   <div className="flex gap-1.5 mb-2">
-                    <button onClick={() => setOnboardTab("trial")} className={`flex-1 py-2 text-[12px] font-bold rounded-lg border ${onboardTab === "trial" ? "bg-amber-100 border-amber-300 text-amber-800" : "bg-white border-stone-300 text-stone-700"}`}>🎁 {TRIAL_DAYS}일 체험 승인 시</button>
-                    <button onClick={() => setOnboardTab("paid")} className={`flex-1 py-2 text-[12px] font-bold rounded-lg border ${onboardTab === "paid" ? "bg-amber-100 border-amber-300 text-amber-800" : "bg-white border-stone-300 text-stone-700"}`}>☕ 구독 승인 시</button>
+                    <button onClick={() => setOnboardTab("trial")} className={`flex-1 py-2 text-[9.6px] font-bold rounded-lg border ${onboardTab === "trial" ? "bg-amber-100 border-amber-300 text-amber-800" : "bg-white border-stone-300 text-stone-700"}`}>🎁 {TRIAL_DAYS}일 체험 승인 시</button>
+                    <button onClick={() => setOnboardTab("paid")} className={`flex-1 py-2 text-[9.6px] font-bold rounded-lg border ${onboardTab === "paid" ? "bg-amber-100 border-amber-300 text-amber-800" : "bg-white border-stone-300 text-stone-700"}`}>☕ 구독 승인 시</button>
                   </div>
-                  <div className="text-[11px] text-stone-600 bg-white border border-stone-300 rounded-lg px-2.5 py-2 mb-2"><b>제목:</b> {onboard[onboardTab].subject}</div>
+                  <div className="text-[8.8px] text-stone-600 bg-white border border-stone-300 rounded-lg px-2.5 py-2 mb-2"><b>제목:</b> {onboard[onboardTab].subject}</div>
                   <iframe title="온보딩 메일 미리보기" srcDoc={onboard[onboardTab].html} className="w-full h-[60vh] bg-white rounded-lg border border-stone-300" />
                 </>
               )}
@@ -2019,46 +2019,46 @@ export default function AdminPage() {
             <div className="absolute inset-x-0 bottom-0 max-h-[90vh] overflow-y-auto bg-stone-50 rounded-t-2xl p-4 sm:inset-0 sm:m-auto sm:max-w-lg sm:h-fit sm:max-h-[90vh] sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-1"><span className="text-sm font-bold text-stone-900">🔁 노출 로테이션 현황</span><button onClick={() => setShowRotation(false)} className="text-2xl text-stone-700 leading-none">×</button></div>
               {!rotation ? (
-                <div className="py-10 text-center text-stone-700 text-[13px]">불러오는 중…</div>
+                <div className="py-10 text-center text-stone-700 text-[10.4px]">불러오는 중…</div>
               ) : (
                 <>
-                  <div className="flex flex-wrap gap-1.5 mb-2 text-[11px] font-bold">
+                  <div className="flex flex-wrap gap-1.5 mb-2 text-[8.8px] font-bold">
                     <span className={`px-2 py-1 rounded-full border ${rotation.isPeak ? "bg-teal-100 border-teal-400 text-teal-900" : "bg-stone-100 border-stone-300 text-stone-600"}`}>{rotation.isPeak ? "🔥 피크타임" : "🌙 비피크"} · {rotation.peakWindow}</span>
                     <span className="px-2 py-1 rounded-full border bg-white border-stone-300 text-stone-700">{rotation.sliceMin}분 회전 · 다음 회전 {rotation.nextRotateInMin}분 후</span>
                     <span className="px-2 py-1 rounded-full border bg-white border-stone-300 text-stone-700">구독 {rotation.total}곳 · 노출 자리 {rotation.cap}</span>
                     {!rotation.liveExposure && <span className="px-2 py-1 rounded-full border bg-amber-50 border-amber-400 text-amber-800">소비자 노출 OFF — 아래는 ‘예정’ 순서</span>}
                   </div>
-                  <p className="text-[11px] text-stone-600 mb-3">🟢=지금 노출 중(상위 {rotation.cap}), ⚪=대기(다음 차례). 20분마다 순번이 한 칸씩 돌고, 피크(09~17시)를 모든 카페가 똑같이 나눠 가져요.</p>
+                  <p className="text-[8.8px] text-stone-600 mb-3">🟢=지금 노출 중(상위 {rotation.cap}), ⚪=대기(다음 차례). 20분마다 순번이 한 칸씩 돌고, 피크(09~17시)를 모든 카페가 똑같이 나눠 가져요.</p>
                   {rotation.total === 0 ? (
-                    <div className="py-6 text-center text-stone-700 text-[13px]">아직 우선노출(featured) 구독 카페가 없어요.</div>
+                    <div className="py-6 text-center text-stone-700 text-[10.4px]">아직 우선노출(featured) 구독 카페가 없어요.</div>
                   ) : (
                     <>
                       {/* 전체 */}
                       <div className="mb-3">
-                        <div className="text-[12px] font-bold text-stone-800 mb-1.5 border-b-2 border-stone-300 pb-1">🌐 전체 노출 순서</div>
+                        <div className="text-[9.6px] font-bold text-stone-800 mb-1.5 border-b-2 border-stone-300 pb-1">🌐 전체 노출 순서</div>
                         <div className="space-y-1">
                           {rotation.global.map((c: any) => (
                             <div key={c.id} className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 border ${c.onair ? "bg-teal-50 border-teal-300" : "bg-white border-stone-300"}`}>
-                              <span className="text-[12px] w-5 text-center font-bold text-stone-700">{c.rank}</span>
-                              <span className="text-[13px]">{c.onair ? "🟢" : "⚪"}</span>
-                              <span className="text-[13px] font-bold text-stone-800 flex-1 truncate">{c.name}</span>
-                              <span className="text-[10px] text-stone-700 truncate max-w-[90px]">{c.area}</span>
+                              <span className="text-[9.6px] w-5 text-center font-bold text-stone-700">{c.rank}</span>
+                              <span className="text-[10.4px]">{c.onair ? "🟢" : "⚪"}</span>
+                              <span className="text-[10.4px] font-bold text-stone-800 flex-1 truncate">{c.name}</span>
+                              <span className="text-[8px] text-stone-700 truncate max-w-[90px]">{c.area}</span>
                             </div>
                           ))}
                         </div>
                       </div>
                       {/* 구/군별 */}
-                      <div className="text-[12px] font-bold text-stone-800 mb-1.5 border-b-2 border-stone-300 pb-1">🏙️ 구·군별 노출 순서</div>
+                      <div className="text-[9.6px] font-bold text-stone-800 mb-1.5 border-b-2 border-stone-300 pb-1">🏙️ 구·군별 노출 순서</div>
                       <div className="space-y-2.5">
                         {rotation.byGu.map((g: any) => (
                           <div key={g.gu} className="rounded-lg border border-stone-300 bg-white p-2">
-                            <div className="text-[12px] font-bold text-stone-800 mb-1">{g.gu} <span className="font-normal text-stone-700">· {g.count}곳</span></div>
+                            <div className="text-[9.6px] font-bold text-stone-800 mb-1">{g.gu} <span className="font-normal text-stone-700">· {g.count}곳</span></div>
                             <div className="space-y-1">
                               {g.order.map((c: any) => (
                                 <div key={c.id} className={`flex items-center gap-2 rounded px-2 py-1 ${c.onair ? "bg-teal-50" : ""}`}>
-                                  <span className="text-[11px] w-4 text-center font-bold text-stone-700">{c.rank}</span>
-                                  <span className="text-[12px]">{c.onair ? "🟢" : "⚪"}</span>
-                                  <span className="text-[12.5px] font-bold text-stone-800 flex-1 truncate">{c.name}</span>
+                                  <span className="text-[8.8px] w-4 text-center font-bold text-stone-700">{c.rank}</span>
+                                  <span className="text-[9.6px]">{c.onair ? "🟢" : "⚪"}</span>
+                                  <span className="text-[10px] font-bold text-stone-800 flex-1 truncate">{c.name}</span>
                                 </div>
                               ))}
                             </div>
@@ -2067,7 +2067,7 @@ export default function AdminPage() {
                       </div>
                     </>
                   )}
-                  <button onClick={loadRotation} className="mt-3 w-full py-2 text-[12px] font-bold text-stone-700 bg-stone-200 border border-stone-300 rounded-lg">↻ 새로고침</button>
+                  <button onClick={loadRotation} className="mt-3 w-full py-2 text-[9.6px] font-bold text-stone-700 bg-stone-200 border border-stone-300 rounded-lg">↻ 새로고침</button>
                 </>
               )}
             </div>
@@ -2080,49 +2080,49 @@ export default function AdminPage() {
             <div className="absolute inset-0 bg-black/50" />
             <div className="absolute inset-x-0 bottom-0 max-h-[90vh] overflow-y-auto bg-stone-50 rounded-t-2xl p-4 sm:inset-0 sm:m-auto sm:max-w-2xl sm:h-fit sm:max-h-[90vh] sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-bold text-stone-800">📰 주간 뉴스레터 <span className="text-[11px] text-stone-700 font-normal">· 수신대상 {nlRecipients}명(구독+체험)</span></span>
+                <span className="text-sm font-bold text-stone-800">📰 주간 뉴스레터 <span className="text-[8.8px] text-stone-700 font-normal">· 수신대상 {nlRecipients}명(구독+체험)</span></span>
                 <button onClick={() => { setShowNL(false); setNlSel(null); }} className="text-2xl text-stone-600 leading-none">×</button>
               </div>
               <div className="flex gap-2 mb-2">
-                <button onClick={nlGenerate} disabled={!!nlBusy} className="flex-1 py-2 text-[13px] font-bold text-white bg-indigo-600 rounded-lg disabled:opacity-50">{nlBusy === "generate" ? "생성 중…(네이버 수집)" : "✨ 이번 주 뉴스레터 생성 (무료)"}</button>
+                <button onClick={nlGenerate} disabled={!!nlBusy} className="flex-1 py-2 text-[10.4px] font-bold text-white bg-indigo-600 rounded-lg disabled:opacity-50">{nlBusy === "generate" ? "생성 중…(네이버 수집)" : "✨ 이번 주 뉴스레터 생성 (무료)"}</button>
               </div>
-              {nlMsg && <div className="text-[11.5px] text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg px-2.5 py-1.5 mb-2">{nlMsg}</div>}
-              <p className="text-[10.5px] text-stone-600 mb-2">기본 생성은 <b>네이버 검색(무료)</b>으로 최신 기사를 모읍니다(크레딧 0). 출처 없는 사실·과장 표현은 자동 ⚠️ 플래그. 더 풍성한 에디토리얼은 제작자가 별도 생성해 드립니다.</p>
+              {nlMsg && <div className="text-[9.2px] text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg px-2.5 py-1.5 mb-2">{nlMsg}</div>}
+              <p className="text-[8.4px] text-stone-600 mb-2">기본 생성은 <b>네이버 검색(무료)</b>으로 최신 기사를 모읍니다(크레딧 0). 출처 없는 사실·과장 표현은 자동 ⚠️ 플래그. 더 풍성한 에디토리얼은 제작자가 별도 생성해 드립니다.</p>
 
               {/* 목록 */}
               <div className="space-y-1.5 mb-3">
                 {nlList.map((n) => (
                   <button key={n.id} onClick={() => nlOpen(n.id)} className={`w-full text-left rounded-lg border px-3 py-2 ${nlSel?.id === n.id ? "border-indigo-300 bg-indigo-50" : "border-stone-300 bg-white"}`}>
-                    <div className="flex items-center gap-2 text-[12px]">
+                    <div className="flex items-center gap-2 text-[9.6px]">
                       <span className="font-bold">#{n.issue_no} {n.title}</span>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded ${n.status === "sent" ? "bg-emerald-100 text-emerald-700" : n.status === "approved" ? "bg-blue-100 text-blue-700" : "bg-stone-100 text-stone-700"}`}>{n.status}</span>
-                      {n.flags?.length > 0 && <span className="text-[10px] text-amber-700">⚠️ {n.flags.length}</span>}
-                      {n.sent_count > 0 && <span className="text-[10px] text-stone-600 ml-auto">발송 {n.sent_count}</span>}
+                      <span className={`text-[8px] px-1.5 py-0.5 rounded ${n.status === "sent" ? "bg-emerald-100 text-emerald-700" : n.status === "approved" ? "bg-blue-100 text-blue-700" : "bg-stone-100 text-stone-700"}`}>{n.status}</span>
+                      {n.flags?.length > 0 && <span className="text-[8px] text-amber-700">⚠️ {n.flags.length}</span>}
+                      {n.sent_count > 0 && <span className="text-[8px] text-stone-600 ml-auto">발송 {n.sent_count}</span>}
                     </div>
                   </button>
                 ))}
-                {nlList.length === 0 && <p className="text-[12px] text-stone-600 text-center py-3">아직 생성된 뉴스레터가 없어요.</p>}
+                {nlList.length === 0 && <p className="text-[9.6px] text-stone-600 text-center py-3">아직 생성된 뉴스레터가 없어요.</p>}
               </div>
 
               {/* 선택 전문 */}
               {nlSel && (
                 <div className="border-t border-stone-300 pt-3">
                   {nlSel.flags?.length > 0 && (
-                    <div className="text-[11.5px] text-amber-800 bg-amber-50 border border-amber-300 rounded-lg px-3 py-2 mb-2">
+                    <div className="text-[9.2px] text-amber-800 bg-amber-50 border border-amber-300 rounded-lg px-3 py-2 mb-2">
                       ⚠️ 확인 필요 {nlSel.flags.length}건: {nlSel.flags.slice(0, 4).join(" · ")}
                     </div>
                   )}
                   <div className="bg-white rounded-xl border border-stone-300 p-3 mb-2 max-h-72 overflow-y-auto">
-                    <div className="font-bold text-[15px] mb-2">{nlSel.title}</div>
+                    <div className="font-bold text-[12px] mb-2">{nlSel.title}</div>
                     {(nlSel.sections || []).map((sec: any, si: number) => (
                       <div key={si} className="mb-2.5">
-                        <div className="text-[12.5px] font-bold text-stone-700 border-b border-stone-300 pb-0.5 mb-1">{sec.title}</div>
+                        <div className="text-[10px] font-bold text-stone-700 border-b border-stone-300 pb-0.5 mb-1">{sec.title}</div>
                         <ul className="space-y-1">
                           {(sec.items || []).map((it: any, ii: number) => (
-                            <li key={ii} className="text-[12px] text-stone-700 leading-snug">
+                            <li key={ii} className="text-[9.6px] text-stone-700 leading-snug">
                               {it.flag && <span className="text-amber-700 font-bold">⚠️ </span>}{it.text}
                               {it.why && <span className="text-stone-600"> ↳ {it.why}</span>}
-                              {it.source_url && <a href={it.source_url} target="_blank" className="text-indigo-600 text-[10px] ml-1">[출처]</a>}
+                              {it.source_url && <a href={it.source_url} target="_blank" className="text-indigo-600 text-[8px] ml-1">[출처]</a>}
                             </li>
                           ))}
                         </ul>
@@ -2131,16 +2131,16 @@ export default function AdminPage() {
                   </div>
                   {/* 편집(JSON) */}
                   <details className="mb-2">
-                    <summary className="text-[11px] text-stone-700 cursor-pointer">✏️ 직접 편집(JSON) — 문구·항목 수정</summary>
-                    <textarea id="nlEdit" defaultValue={JSON.stringify(nlSel.sections, null, 2)} className="w-full h-40 mt-1 text-[11px] font-mono border border-stone-300 rounded-lg p-2 bg-white" />
-                    <button onClick={() => { try { const secs = JSON.parse((document.getElementById("nlEdit") as HTMLTextAreaElement).value); nlAct("update", nlSel.id, { title: nlSel.title, sections: secs }); } catch { setNlMsg("JSON 형식 오류"); } }} className="mt-1 px-3 py-1.5 text-[12px] font-bold text-stone-700 bg-stone-100 rounded-lg">저장</button>
+                    <summary className="text-[8.8px] text-stone-700 cursor-pointer">✏️ 직접 편집(JSON) — 문구·항목 수정</summary>
+                    <textarea id="nlEdit" defaultValue={JSON.stringify(nlSel.sections, null, 2)} className="w-full h-40 mt-1 text-[8.8px] font-mono border border-stone-300 rounded-lg p-2 bg-white" />
+                    <button onClick={() => { try { const secs = JSON.parse((document.getElementById("nlEdit") as HTMLTextAreaElement).value); nlAct("update", nlSel.id, { title: nlSel.title, sections: secs }); } catch { setNlMsg("JSON 형식 오류"); } }} className="mt-1 px-3 py-1.5 text-[9.6px] font-bold text-stone-700 bg-stone-100 rounded-lg">저장</button>
                   </details>
                   <div className="flex flex-wrap gap-2">
-                    {nlSel.status === "draft" && <button onClick={() => nlAct("approve", nlSel.id)} className="flex-1 py-2 text-[12px] font-bold text-blue-700 bg-blue-50 rounded-lg">✓ 승인</button>}
-                    <button onClick={() => nlAct("test", nlSel.id, { email: "dongnecoffeenote@gmail.com" })} disabled={!!nlBusy} className="flex-1 py-2 text-[12px] font-bold text-stone-700 bg-stone-100 rounded-lg">📨 미리보기 메일</button>
-                    {nlSel.status === "approved" && <button onClick={() => { if (confirm(`구독+체험 ${nlRecipients}명에게 일괄 전송할까요?`)) nlAct("send", nlSel.id); }} disabled={!!nlBusy} className="flex-1 py-2 text-[12px] font-bold text-white bg-emerald-600 rounded-lg">🚀 구독자 일괄 전송 ({nlRecipients}명)</button>}
-                    {nlSel.status === "sent" && <span className="flex-1 py-2 text-[12px] font-bold text-emerald-700 text-center">✅ 발송 완료 ({nlSel.sent_count})</span>}
-                    <button onClick={() => { if (confirm("삭제할까요?")) { nlAct("delete", nlSel.id); setNlSel(null); } }} className="px-3 py-2 text-[12px] text-rose-600 bg-rose-50 rounded-lg">삭제</button>
+                    {nlSel.status === "draft" && <button onClick={() => nlAct("approve", nlSel.id)} className="flex-1 py-2 text-[9.6px] font-bold text-blue-700 bg-blue-50 rounded-lg">✓ 승인</button>}
+                    <button onClick={() => nlAct("test", nlSel.id, { email: "dongnecoffeenote@gmail.com" })} disabled={!!nlBusy} className="flex-1 py-2 text-[9.6px] font-bold text-stone-700 bg-stone-100 rounded-lg">📨 미리보기 메일</button>
+                    {nlSel.status === "approved" && <button onClick={() => { if (confirm(`구독+체험 ${nlRecipients}명에게 일괄 전송할까요?`)) nlAct("send", nlSel.id); }} disabled={!!nlBusy} className="flex-1 py-2 text-[9.6px] font-bold text-white bg-emerald-600 rounded-lg">🚀 구독자 일괄 전송 ({nlRecipients}명)</button>}
+                    {nlSel.status === "sent" && <span className="flex-1 py-2 text-[9.6px] font-bold text-emerald-700 text-center">✅ 발송 완료 ({nlSel.sent_count})</span>}
+                    <button onClick={() => { if (confirm("삭제할까요?")) { nlAct("delete", nlSel.id); setNlSel(null); } }} className="px-3 py-2 text-[9.6px] text-rose-600 bg-rose-50 rounded-lg">삭제</button>
                   </div>
                 </div>
               )}
@@ -2152,23 +2152,23 @@ export default function AdminPage() {
         {(subs.length > 0 || purged > 0) && (
           <div className="mb-6 rounded-2xl border border-stone-300 bg-white p-4 sm:p-5">
             <div className="admin-section-title font-extrabold text-stone-800 mb-2">💎 홍보팩 구독 신청 ({subs.length})</div>
-            {purged > 0 && <div className="bg-rose-50 border border-rose-200 rounded-lg px-3 py-2 mb-2 text-[11.5px] text-rose-700">🔔 보유기간 만료로 <b>{purged}건의 개인정보가 자동 삭제</b>됐어요. 해당 사장님께 다시 연락하려면 <b>재수집·재동의</b>가 필요합니다.</div>}
+            {purged > 0 && <div className="bg-rose-50 border border-rose-200 rounded-lg px-3 py-2 mb-2 text-[9.2px] text-rose-700">🔔 보유기간 만료로 <b>{purged}건의 개인정보가 자동 삭제</b>됐어요. 해당 사장님께 다시 연락하려면 <b>재수집·재동의</b>가 필요합니다.</div>}
             <div className="space-y-2">
               {subs.map((s) => (
                 <div key={s.id} className="bg-white rounded-xl border border-amber-300 p-3 flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <span className="font-bold text-sm">{s.cafe_name}</span>
-                    <span className="text-[11px] text-stone-600 ml-2">{s.plan}</span>
-                    <div className="text-[12px] text-stone-600 truncate">📞 {s.contact}</div>
+                    <span className="text-[8.8px] text-stone-600 ml-2">{s.plan}</span>
+                    <div className="text-[9.6px] text-stone-600 truncate">📞 {s.contact}</div>
                   </div>
                   <div className="text-right shrink-0">
-                    <div className="text-[10px] text-stone-600">{new Date(s.created_at).toLocaleDateString("ko-KR")}</div>
-                    {s.delete_in != null && <div className="text-[9px] text-rose-400">자동삭제 D-{s.delete_in}</div>}
+                    <div className="text-[8px] text-stone-600">{new Date(s.created_at).toLocaleDateString("ko-KR")}</div>
+                    {s.delete_in != null && <div className="text-[7.2px] text-rose-400">자동삭제 D-{s.delete_in}</div>}
                   </div>
                 </div>
               ))}
             </div>
-            <p className="text-[10px] text-stone-600 mt-1.5">연락처는 암호화 저장되며 보유기간 만료 시 자동 삭제됩니다. 결제 안내 후 아래 쇼케이스에서 ⭐우선노출을 켜주세요.</p>
+            <p className="text-[8px] text-stone-600 mt-1.5">연락처는 암호화 저장되며 보유기간 만료 시 자동 삭제됩니다. 결제 안내 후 아래 쇼케이스에서 ⭐우선노출을 켜주세요.</p>
           </div>
         )}
 
@@ -2178,45 +2178,45 @@ export default function AdminPage() {
           <div className="mb-6 rounded-2xl border border-stone-300 bg-white p-4 sm:p-5">
             <button onClick={() => toggleSec("promo")} className="w-full flex items-center justify-between text-left mb-2">
               <span className="admin-section-title font-extrabold text-stone-800">{openSecs.promo ? "▾" : "▸"} 🎀 쇼케이스 승인 · AI 카피 생성 ({review.length})</span>
-              <span className="text-[10px] text-stone-600 shrink-0">{openSecs.promo ? "접기" : "보기"}</span>
+              <span className="text-[8px] text-stone-600 shrink-0">{openSecs.promo ? "접기" : "보기"}</span>
             </button>
             {openSecs.promo && <>
-            {review.length === 0 && <p className="text-[12px] text-stone-600 bg-white rounded-xl border p-4">대기 중인 사장님 쇼케이스 요청이 없어요. 사장님이 글(또는 영상)을 저장하면 여기에서 <b className="text-stone-600">🤖 AI 어필 카피 생성</b> → <b className="text-stone-600">✓ 승인</b> 할 수 있어요.</p>}
+            {review.length === 0 && <p className="text-[9.6px] text-stone-600 bg-white rounded-xl border p-4">대기 중인 사장님 쇼케이스 요청이 없어요. 사장님이 글(또는 영상)을 저장하면 여기에서 <b className="text-stone-600">🤖 AI 어필 카피 생성</b> → <b className="text-stone-600">✓ 승인</b> 할 수 있어요.</p>}
             <div className="space-y-3">
               {review.map((p) => (
                 <div key={p.cafe_id} className="bg-white rounded-xl border border-amber-300 overflow-hidden">
                   <div className="p-3">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="font-bold text-sm">{p.name}</span>
-                      <span className="text-[11px] text-stone-600">{p.area}</span>
-                      {p.ai_pending && <span className="text-[10px] bg-stone-200 text-stone-600 px-1.5 py-0.5 rounded-full ml-auto">AI 생성 대기</span>}
+                      <span className="text-[8.8px] text-stone-600">{p.area}</span>
+                      {p.ai_pending && <span className="text-[8px] bg-stone-200 text-stone-600 px-1.5 py-0.5 rounded-full ml-auto">AI 생성 대기</span>}
                     </div>
-                    {p.intro && <p className="text-[12px] text-stone-700 mb-2 line-clamp-2">사장님 글: {p.intro}</p>}
+                    {p.intro && <p className="text-[9.6px] text-stone-700 mb-2 line-clamp-2">사장님 글: {p.intro}</p>}
                     {p.style === 0 ? (
                       p.video_url ? (
                         <div className="rounded-lg overflow-hidden bg-black">
-                          <span className="text-[10px] text-amber-600 px-1">🎬 영상 (소비자 노출 예정)</span>
+                          <span className="text-[8px] text-amber-600 px-1">🎬 영상 (소비자 노출 예정)</span>
                           <video src={p.video_url} controls playsInline preload="metadata" className="w-full max-h-48" />
                         </div>
-                      ) : <p className="text-[12px] text-stone-600">영상 업로드 대기 중</p>
+                      ) : <p className="text-[9.6px] text-stone-600">영상 업로드 대기 중</p>
                     ) : p.ai_headline ? (
                       <div className="rounded-lg overflow-hidden bg-stone-900 text-stone-50">
                         {p.photos?.[0] && <img src={p.photos[0]} alt="" className="w-full h-28 object-cover" />}
                         <div className="p-3">
-                          <div className="text-[9px] text-amber-300 mb-0.5">미리보기 (소비자 노출 예정)</div>
+                          <div className="text-[7.2px] text-amber-300 mb-0.5">미리보기 (소비자 노출 예정)</div>
                           <div className="text-base font-bold">{p.ai_headline}</div>
-                          {p.ai_tagline && <div className="text-[12px] text-stone-300 mt-0.5">{p.ai_tagline}</div>}
-                          {Array.isArray(p.ai_points) && p.ai_points.length > 0 && <div className="flex flex-wrap gap-1 mt-1.5">{p.ai_points.map((pt: string, i: number) => <span key={i} className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full">{pt}</span>)}</div>}
+                          {p.ai_tagline && <div className="text-[9.6px] text-stone-300 mt-0.5">{p.ai_tagline}</div>}
+                          {Array.isArray(p.ai_points) && p.ai_points.length > 0 && <div className="flex flex-wrap gap-1 mt-1.5">{p.ai_points.map((pt: string, i: number) => <span key={i} className="text-[8px] bg-white/20 px-2 py-0.5 rounded-full">{pt}</span>)}</div>}
                         </div>
                       </div>
                     ) : p.ai_pending ? (
-                      <p className="text-[12px] text-amber-600">🕐 AI 생성 요청됨 — 로컬 배치가 처리 후 여기에 미리보기가 떠요</p>
+                      <p className="text-[9.6px] text-amber-600">🕐 AI 생성 요청됨 — 로컬 배치가 처리 후 여기에 미리보기가 떠요</p>
                     ) : (
                       <button onClick={() => promoAct(p.cafe_id, "generate")} className="w-full py-2.5 text-sm font-bold text-white bg-stone-800 rounded-lg">🤖 AI 어필 카피 생성</button>
                     )}
                     {/* 📊 성과(1차 데이터) — 공개 중일 때 */}
                     {p.approved && (
-                      <div className="flex gap-2 mt-2 text-[11px] text-stone-700">
+                      <div className="flex gap-2 mt-2 text-[8.8px] text-stone-700">
                         <span>👁 노출 <b className="text-stone-700">{p.views ?? 0}</b></span>
                         <span>· 클릭 <b className="text-stone-700">{p.clicks ?? 0}</b></span>
                         <span>· 재생 <b className="text-stone-700">{p.plays ?? 0}</b></span>
@@ -2242,7 +2242,7 @@ export default function AdminPage() {
         <div className="mb-6 rounded-2xl border border-stone-300 bg-white p-4 sm:p-5">
         <button onClick={() => toggleSec("content")} className="w-full flex items-center justify-between text-left mb-2">
           <span className="admin-section-title font-extrabold text-stone-800">{openSecs.content ? "▾" : "▸"} 📦 발행 현황 <span className="normal-case font-normal text-stone-600">(콘텐츠)</span> <span className="normal-case font-normal">· 공개 {ct?.published?.toLocaleString() ?? "·"} · 전체 {ct?.total?.toLocaleString() ?? "·"}</span></span>
-          <span className="text-[10px] text-stone-600 shrink-0">{openSecs.content ? "접기" : "보기"}</span>
+          <span className="text-[8px] text-stone-600 shrink-0">{openSecs.content ? "접기" : "보기"}</span>
         </button>
         {openSecs.content && <>
         <div className="admin-kpi-grid mb-4">
@@ -2267,11 +2267,11 @@ export default function AdminPage() {
           <div className="mb-4">
             <Card title="🛡 리뷰 검증 엔진 현황 (해자)" note="규칙으로 노이즈 제거 → Sonnet이 맥락 판정 → 양질 후기만 공개. 매일 자동 갱신.">
               <div className="admin-stat-grid">
-                <div><div className="text-xl font-bold text-stone-900">{ct.total ? Math.round((ct.raw_cached / ct.total) * 100) : 0}%</div><div className="text-[11px] text-stone-700">원본 수집(예열)</div><div className="text-[10px] text-stone-600">{ct.raw_cached}/{ct.total}</div></div>
-                <div><div className="text-xl font-bold text-emerald-600">{ct.total ? Math.round((ct.llm_judged / ct.total) * 100) : 0}%</div><div className="text-[11px] text-stone-700">AI 맥락 판정</div><div className="text-[10px] text-stone-600">{ct.llm_judged}/{ct.total}</div></div>
-                <div><div className="text-xl font-bold text-note-tan">{ct.quality.avg_noise_pct ?? 0}%</div><div className="text-[11px] text-stone-700">노이즈 제거율</div><div className="text-[10px] text-stone-600">옥석만</div></div>
+                <div><div className="text-xl font-bold text-stone-900">{ct.total ? Math.round((ct.raw_cached / ct.total) * 100) : 0}%</div><div className="text-[8.8px] text-stone-700">원본 수집(예열)</div><div className="text-[8px] text-stone-600">{ct.raw_cached}/{ct.total}</div></div>
+                <div><div className="text-xl font-bold text-emerald-600">{ct.total ? Math.round((ct.llm_judged / ct.total) * 100) : 0}%</div><div className="text-[8.8px] text-stone-700">AI 맥락 판정</div><div className="text-[8px] text-stone-600">{ct.llm_judged}/{ct.total}</div></div>
+                <div><div className="text-xl font-bold text-note-tan">{ct.quality.avg_noise_pct ?? 0}%</div><div className="text-[8.8px] text-stone-700">노이즈 제거율</div><div className="text-[8px] text-stone-600">옥석만</div></div>
               </div>
-              <p className="text-[10px] text-stone-600 mt-2.5">예열(00:10)으로 원본을 한 번 모아두고, Sonnet 판정(04:00)이 매일 정확도를 끌어올립니다.</p>
+              <p className="text-[8px] text-stone-600 mt-2.5">예열(00:10)으로 원본을 한 번 모아두고, Sonnet 판정(04:00)이 매일 정확도를 끌어올립니다.</p>
             </Card>
           </div>
         )}
@@ -2280,12 +2280,12 @@ export default function AdminPage() {
           <div className="mb-6">
             <Card title="데이터 품질" note="모든 화면 데이터는 검증된 옥석 리뷰만 사용">
               <div className="admin-stat-grid">
-                <div><div className="text-xl font-bold text-note-tan">{ct.quality.avg_noise_pct ?? 0}%</div><div className="text-[11px] text-stone-700">평균 노이즈 제거</div></div>
-                <div><div className="text-xl font-bold text-emerald-600">{keptPct}%</div><div className="text-[11px] text-stone-700">옥석 채택률</div></div>
-                <div><div className="text-xl font-bold text-stone-900">{ct.published ? Math.round(((ct.pub_embedded ?? 0) / ct.published) * 100) : 0}%</div><div className="text-[11px] text-stone-700">임베딩 커버리지<br/>(공개 기준)</div></div>
-                <div><div className="text-xl font-bold text-stone-900">{ct.published ? Math.round(((ct.pub_has_dates ?? 0) / ct.published) * 100) : 0}%</div><div className="text-[11px] text-stone-700">리뷰주기 데이터<br/>(공개 기준)</div></div>
+                <div><div className="text-xl font-bold text-note-tan">{ct.quality.avg_noise_pct ?? 0}%</div><div className="text-[8.8px] text-stone-700">평균 노이즈 제거</div></div>
+                <div><div className="text-xl font-bold text-emerald-600">{keptPct}%</div><div className="text-[8.8px] text-stone-700">옥석 채택률</div></div>
+                <div><div className="text-xl font-bold text-stone-900">{ct.published ? Math.round(((ct.pub_embedded ?? 0) / ct.published) * 100) : 0}%</div><div className="text-[8.8px] text-stone-700">임베딩 커버리지<br/>(공개 기준)</div></div>
+                <div><div className="text-xl font-bold text-stone-900">{ct.published ? Math.round(((ct.pub_has_dates ?? 0) / ct.published) * 100) : 0}%</div><div className="text-[8.8px] text-stone-700">리뷰주기 데이터<br/>(공개 기준)</div></div>
               </div>
-              <p className="text-[11px] text-stone-600 mt-2.5 text-center">총 수집 {ct.quality.raw?.toLocaleString()}건 중 노이즈 {ct.quality.rejected?.toLocaleString()}건 제거 → 옥석 {(ct.quality.raw - ct.quality.rejected).toLocaleString()}건</p>
+              <p className="text-[8.8px] text-stone-600 mt-2.5 text-center">총 수집 {ct.quality.raw?.toLocaleString()}건 중 노이즈 {ct.quality.rejected?.toLocaleString()}건 제거 → 옥석 {(ct.quality.raw - ct.quality.rejected).toLocaleString()}건</p>
             </Card>
           </div>
         )}
@@ -2296,18 +2296,18 @@ export default function AdminPage() {
         <div className="mb-6 rounded-2xl border border-stone-300 bg-white p-4 sm:p-5">
         <button onClick={() => toggleSec("inspect")} className="w-full flex items-center justify-between text-left mb-2">
           <span className="admin-section-title font-extrabold text-stone-800">{openSecs.inspect ? "▾" : "▸"} 🙋 후보 보류 <span className="normal-case font-normal text-stone-600">(검수 관리)</span> <span className={`normal-case ${ownerPending.length ? "font-bold text-blue-600" : "font-normal"}`}>· 사장님 대기 {ownerPending.length}</span> <span className="normal-case font-normal">· 자동 비공개 {autoHidden.length}</span></span>
-          <span className="text-[10px] text-stone-600 shrink-0">{openSecs.inspect ? "접기" : "보기"}</span>
+          <span className="text-[8px] text-stone-600 shrink-0">{openSecs.inspect ? "접기" : "보기"}</span>
         </button>
         {openSecs.inspect && <>
         <section className="mb-4">
           <h2 className="text-sm font-bold text-stone-700 mb-1">🙋 사장님 등록 검수 대기 ({ownerPending.length})</h2>
-          <p className="text-[11px] text-stone-600 mb-2">사장님이 <b>/cafe/register</b>로 직접 등록한 가게. 확인 후 공개/삭제.</p>
+          <p className="text-[8.8px] text-stone-600 mb-2">사장님이 <b>/cafe/register</b>로 직접 등록한 가게. 확인 후 공개/삭제.</p>
           {ownerPending.length === 0 ? <p className="text-sm text-stone-600 bg-white rounded-xl p-4 border">아직 사장님 직접 등록 신청이 없습니다.</p> :
             <div className="space-y-2">{ownerPending.map((c) => <Row key={c.id} c={c} />)}</div>}
         </section>
         <section className="mb-6">
           <h2 className="text-sm font-bold text-stone-700 mb-1">🔍 자동수집 미공개 · 데이터 부족 ({autoHidden.length})</h2>
-          <p className="text-[11px] text-stone-600 mb-2">검증 리뷰 5건 미만(후보)으로 자동 비공개. 사람 요청 아님 · 리뷰 쌓이면 자동 공개.</p>
+          <p className="text-[8.8px] text-stone-600 mb-2">검증 리뷰 5건 미만(후보)으로 자동 비공개. 사람 요청 아님 · 리뷰 쌓이면 자동 공개.</p>
           {autoHidden.length === 0 ? <p className="text-sm text-stone-600">없음</p> : (
             <>
               <button onClick={() => setShowAuto((v) => !v)} className="text-xs px-3 py-1.5 rounded-lg bg-stone-200 text-stone-700 mb-2">{showAuto ? "접기 ▲" : `목록 펼치기 ▼ (${autoHidden.length})`}</button>

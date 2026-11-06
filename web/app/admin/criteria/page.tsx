@@ -18,7 +18,7 @@ type ListView = { key: string; category: string; label: string; consumer: string
 type ListHist = { id: number; key: string; item: string | null; action: string; actor: string; note: string | null; at: string };
 
 const card: React.CSSProperties = { background: "#fff", border: "1px solid #ddc9a8", borderRadius: 12, padding: "12px 14px", minWidth: 0 };
-const sub: React.CSSProperties = { fontSize: 10.5, color: "#8a7a5c", fontWeight: 600 };
+const sub: React.CSSProperties = { fontSize: 8.4, color: "#8a7a5c", fontWeight: 600 };
 const CAT_ICON: Record<string, string> = { 등급: "🏅", 지리: "🗺️", 검색: "🔎", 노출: "✨", 오염: "🛡️", 성향축: "🎭", 맛축: "☕", 용도: "🪑", 운영신호: "🏷️", 검색개념: "💡", 오염리스트: "🛡️", 정체성: "🔖" };
 
 export default function CriteriaPage() {
@@ -123,22 +123,22 @@ export default function CriteriaPage() {
       <BackLink to="/admin" label="대시보드" className="text-stone-500 mb-2" />
 
       <div style={{ background: "#2b2018", color: "#e8b87a", borderRadius: 14, padding: "14px 16px" }}>
-        <div style={{ fontSize: 17, fontWeight: 700 }}>🎛️ 기준 관제</div>
-        <div style={{ fontSize: 11, color: "#cbb38c" }}>비즈니스 임계값 단일출처 · 무배포 조정 · 안전폴백</div>
+        <div style={{ fontSize: 13.6, fontWeight: 700 }}>🎛️ 기준 관제</div>
+        <div style={{ fontSize: 8.8, color: "#cbb38c" }}>비즈니스 임계값 단일출처 · 무배포 조정 · 안전폴백</div>
       </div>
 
       {!authed && (
         <div style={{ ...card, marginTop: 12 }}>
-          <div style={{ fontSize: 13, marginBottom: 8 }}>관리자 비밀번호</div>
+          <div style={{ fontSize: 10.4, marginBottom: 8 }}>관리자 비밀번호</div>
           <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && load(pw)}
-            style={{ width: "100%", padding: 10, border: "1px solid #d8c4a4", borderRadius: 9, fontSize: 16 }} placeholder="비밀번호" />
-          <button onClick={() => load(pw)} style={{ marginTop: 10, width: "100%", padding: 12, background: "#2b2018", color: "#f4ece0", border: "none", borderRadius: 10, fontWeight: 700, fontSize: 15 }}>{loading ? "불러오는 중…" : "열기"}</button>
-          {err && <div style={{ color: "#b03a3a", fontSize: 12, marginTop: 8 }}>{err}</div>}
+            style={{ width: "100%", padding: 10, border: "1px solid #d8c4a4", borderRadius: 9, fontSize: 12.8 }} placeholder="비밀번호" />
+          <button onClick={() => load(pw)} style={{ marginTop: 10, width: "100%", padding: 12, background: "#2b2018", color: "#f4ece0", border: "none", borderRadius: 10, fontWeight: 700, fontSize: 12 }}>{loading ? "불러오는 중…" : "열기"}</button>
+          {err && <div style={{ color: "#b03a3a", fontSize: 9.6, marginTop: 8 }}>{err}</div>}
         </div>
       )}
 
       {authed && (<>
-        {err && <div style={{ ...card, marginTop: 10, borderColor: "#e0b3b3", background: "#fbeeee", color: "#b03a3a", fontSize: 12.5 }}>{err}</div>}
+        {err && <div style={{ ...card, marginTop: 10, borderColor: "#e0b3b3", background: "#fbeeee", color: "#b03a3a", fontSize: 10 }}>{err}</div>}
         <div style={{ ...sub, marginTop: 10, lineHeight: 1.5 }}>
           ⚠️ 이 화면은 <b>기준값만</b> 저장합니다. 실제 카페 공개상태는 바꾸지 않으며, 반영은 합성·재판정 파이프라인이 담당합니다.
           등급·좌표 기준은 저장 전 영향 미리보기가 뜨고, 공개카페 {threshold}곳 초과가 흔들리면 재확인이 필요합니다.
@@ -147,7 +147,7 @@ export default function CriteriaPage() {
 
         {categories.map((cat) => (
           <div key={cat} style={{ marginTop: 14 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "#9c6b3f", borderBottom: "1px solid #e8b87a", paddingBottom: 4, marginBottom: 8 }}>{CAT_ICON[cat] ?? "•"} {cat}</div>
+            <div style={{ fontSize: 11.2, fontWeight: 700, color: "#9c6b3f", borderBottom: "1px solid #e8b87a", paddingBottom: 4, marginBottom: 8 }}>{CAT_ICON[cat] ?? "•"} {cat}</div>
             {items.filter((i) => i.category === cat).map((it) => {
               const pv = preview[it.key];
               const changed = draft[it.key] !== undefined && Number(draft[it.key]) !== it.value;
@@ -155,11 +155,11 @@ export default function CriteriaPage() {
               return (
                 <div key={it.key} style={{ ...card, marginBottom: 8 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
-                    <div style={{ fontSize: 13.5, fontWeight: 700 }}>{it.label}</div>
+                    <div style={{ fontSize: 10.8, fontWeight: 700 }}>{it.label}</div>
                     <div style={{ display: "flex", gap: 5, alignItems: "baseline", whiteSpace: "nowrap" }}>
-                      {!it.isDefault && <span style={{ fontSize: 10, color: "#b5731f", fontWeight: 700 }}>조정됨</span>}
+                      {!it.isDefault && <span style={{ fontSize: 8, color: "#b5731f", fontWeight: 700 }}>조정됨</span>}
                       <span title={it.tier === "L3" ? "대량영향 — CEO 확인 게이트(공개상태 흔들림)" : "소영향 — 기조실장 전결(바로 적용)"}
-                        style={{ fontSize: 9.5, fontWeight: 700, padding: "1px 6px", borderRadius: 20, color: "#fff", background: it.tier === "L3" ? "#b03a3a" : "#3f7a4f" }}>
+                        style={{ fontSize: 7.6, fontWeight: 700, padding: "1px 6px", borderRadius: 20, color: "#fff", background: it.tier === "L3" ? "#b03a3a" : "#3f7a4f" }}>
                         {it.tier === "L3" ? "L3 CEO 확인" : "L2 전결"}
                       </span>
                     </div>
@@ -168,7 +168,7 @@ export default function CriteriaPage() {
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
                     <input type="number" value={draft[it.key] ?? ""} step="any" min={it.min_value} max={it.max_value}
                       onChange={(e) => setDraft((d) => ({ ...d, [it.key]: e.target.value }))}
-                      style={{ width: 100, padding: "7px 9px", border: `1px solid ${changed ? "#c98a3c" : "#d8c4a4"}`, borderRadius: 8, fontSize: 15, fontVariantNumeric: "tabular-nums" }} />
+                      style={{ width: 100, padding: "7px 9px", border: `1px solid ${changed ? "#c98a3c" : "#d8c4a4"}`, borderRadius: 8, fontSize: 12, fontVariantNumeric: "tabular-nums" }} />
                     <span style={sub}>{it.unit}</span>
                     <span style={sub}>기본값 {it.default_value} · 범위 {it.min_value}~{it.max_value}</span>
                   </div>
@@ -177,7 +177,7 @@ export default function CriteriaPage() {
                   )}
 
                   {pv && (
-                    <div style={{ marginTop: 8, padding: "8px 10px", borderRadius: 9, fontSize: 12, background: needConfirm ? "#fff5e6" : "#f3ead8", border: needConfirm ? "2px solid #e8b046" : "1px solid #e6d8bf" }}>
+                    <div style={{ marginTop: 8, padding: "8px 10px", borderRadius: 9, fontSize: 9.6, background: needConfirm ? "#fff5e6" : "#f3ead8", border: needConfirm ? "2px solid #e8b046" : "1px solid #e6d8bf" }}>
                       <div style={{ fontWeight: 700, color: needConfirm ? "#b03a1e" : "#7a5a2c" }}>{needConfirm ? "🚨 대량변동 주의" : "미리보기"} — {pv.note}</div>
                       {pv.samples.length > 0 && <div style={{ ...sub, marginTop: 3 }}>예: {pv.samples.join(", ")}{pv.wouldUnpublish > pv.samples.length ? " …" : ""}</div>}
                     </div>
@@ -186,17 +186,17 @@ export default function CriteriaPage() {
                   <div style={{ display: "flex", gap: 7, marginTop: 9, flexWrap: "wrap" }}>
                     {!isRankOnly(it.key) && changed && (
                       <button disabled={busy === it.key} onClick={() => doPreview(it)}
-                        style={{ padding: "8px 12px", background: "#6a468c", color: "#fff", border: "none", borderRadius: 8, fontSize: 12.5, fontWeight: 700 }}>영향 미리보기</button>
+                        style={{ padding: "8px 12px", background: "#6a468c", color: "#fff", border: "none", borderRadius: 8, fontSize: 10, fontWeight: 700 }}>영향 미리보기</button>
                     )}
                     {changed && (
                       <button disabled={busy === it.key} onClick={() => save(it, needConfirm)}
-                        style={{ padding: "8px 12px", background: needConfirm ? "#b03a1e" : "#2b2018", color: "#f4ece0", border: "none", borderRadius: 8, fontSize: 12.5, fontWeight: 700 }}>
+                        style={{ padding: "8px 12px", background: needConfirm ? "#b03a1e" : "#2b2018", color: "#f4ece0", border: "none", borderRadius: 8, fontSize: 10, fontWeight: 700 }}>
                         {busy === it.key ? "…" : needConfirm ? "재확인하고 저장" : "저장"}
                       </button>
                     )}
                     {!it.isDefault && (
                       <button disabled={busy === it.key} onClick={() => revert(it)}
-                        style={{ padding: "8px 12px", background: "#fff", color: "#9c6b3f", border: "1px solid #d8c4a4", borderRadius: 8, fontSize: 12.5, fontWeight: 700 }}>기본값으로 되돌리기</button>
+                        style={{ padding: "8px 12px", background: "#fff", color: "#9c6b3f", border: "1px solid #d8c4a4", borderRadius: 8, fontSize: 10, fontWeight: 700 }}>기본값으로 되돌리기</button>
                     )}
                   </div>
                 </div>
@@ -207,8 +207,8 @@ export default function CriteriaPage() {
 
         {/* 📚 리스트 사전 — 성향축·맛·용도·검색개념·오염리스트 등 하드코딩 키워드 사전을 무배포 편집 */}
         <div style={{ marginTop: 22, background: "#2b2018", color: "#e8b87a", borderRadius: 14, padding: "12px 15px" }}>
-          <div style={{ fontSize: 15, fontWeight: 700 }}>📚 리스트 사전</div>
-          <div style={{ fontSize: 11, color: "#cbb38c", lineHeight: 1.5 }}>
+          <div style={{ fontSize: 12, fontWeight: 700 }}>📚 리스트 사전</div>
+          <div style={{ fontSize: 8.8, color: "#cbb38c", lineHeight: 1.5 }}>
             소비자 출력을 형성하는 키워드 사전(성향점수·맛좌표·검색개념·오염게이트)을 무배포로 편집. 하드코딩=폴백 진실원본, DB=오버라이드.
             <br />⚖️ <b>DoA</b>: <span style={{ color: "#8fd0a0", fontWeight: 700 }}>L2 전결</span>(기조실장) — 항목 편집이며 카페 공개상태는 직접 바꾸지 않음(반영은 합성/검색 파이프라인). 소유=품질본부.
           </div>
@@ -216,16 +216,16 @@ export default function CriteriaPage() {
 
         {listCats.map((cat) => (
           <div key={cat} style={{ marginTop: 14 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "#9c6b3f", borderBottom: "1px solid #e8b87a", paddingBottom: 4, marginBottom: 8 }}>{CAT_ICON[cat] ?? "•"} {cat}</div>
+            <div style={{ fontSize: 11.2, fontWeight: 700, color: "#9c6b3f", borderBottom: "1px solid #e8b87a", paddingBottom: 4, marginBottom: 8 }}>{CAT_ICON[cat] ?? "•"} {cat}</div>
             {lists.filter((l) => l.category === cat).map((l) => {
               const addedSet = new Set(l.added);
               return (
                 <div key={l.key} style={{ ...card, marginBottom: 8 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
-                    <div style={{ fontSize: 13.5, fontWeight: 700 }}>{l.label}</div>
+                    <div style={{ fontSize: 10.8, fontWeight: 700 }}>{l.label}</div>
                     <div style={{ display: "flex", gap: 5, alignItems: "baseline", whiteSpace: "nowrap" }}>
-                      {!l.isDefault && <span style={{ fontSize: 10, color: "#b5731f", fontWeight: 700 }}>편집됨</span>}
-                      <span title="소영향 — 기조실장 전결(바로 적용)" style={{ fontSize: 9.5, fontWeight: 700, padding: "1px 6px", borderRadius: 20, color: "#fff", background: "#3f7a4f" }}>L2 전결</span>
+                      {!l.isDefault && <span style={{ fontSize: 8, color: "#b5731f", fontWeight: 700 }}>편집됨</span>}
+                      <span title="소영향 — 기조실장 전결(바로 적용)" style={{ fontSize: 7.6, fontWeight: 700, padding: "1px 6px", borderRadius: 20, color: "#fff", background: "#3f7a4f" }}>L2 전결</span>
                     </div>
                   </div>
                   <div style={{ ...sub, marginTop: 2, fontFamily: "monospace" }}>{l.key} · {l.consumer} · {l.effective.length}개</div>
@@ -233,11 +233,11 @@ export default function CriteriaPage() {
                     {l.effective.map((it) => {
                       const isAdded = addedSet.has(it);
                       return (
-                        <span key={it} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, padding: "3px 4px 3px 9px", borderRadius: 20,
+                        <span key={it} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 9.6, padding: "3px 4px 3px 9px", borderRadius: 20,
                           background: isAdded ? "#eaf6ee" : "#f3ead8", border: `1px solid ${isAdded ? "#b6dcc2" : "#e6d8bf"}` }}>
-                          {it}{isAdded && <span style={{ fontSize: 9, color: "#3f7a4f", fontWeight: 700 }}>추가</span>}
+                          {it}{isAdded && <span style={{ fontSize: 7.2, color: "#3f7a4f", fontWeight: 700 }}>추가</span>}
                           <button disabled={busy === l.key + it} onClick={() => listAction(l.key, "remove", it)} title="제거"
-                            style={{ border: "none", background: "transparent", color: "#b03a3a", fontWeight: 700, cursor: "pointer", fontSize: 13, lineHeight: 1, padding: "0 2px" }}>×</button>
+                            style={{ border: "none", background: "transparent", color: "#b03a3a", fontWeight: 700, cursor: "pointer", fontSize: 10.4, lineHeight: 1, padding: "0 2px" }}>×</button>
                         </span>
                       );
                     })}
@@ -245,19 +245,19 @@ export default function CriteriaPage() {
                   {l.removed.length > 0 && (
                     <div style={{ ...sub, marginTop: 6 }}>숨김(기본에서 제거): {l.removed.map((it) => (
                       <button key={it} disabled={busy === l.key + it} onClick={() => listAction(l.key, "revert", it)} title="되돌리기(다시 포함)"
-                        style={{ border: "1px dashed #d8c4a4", background: "#faf4e8", color: "#9c6b3f", borderRadius: 12, fontSize: 11, padding: "1px 7px", margin: "0 3px 3px 0", cursor: "pointer", textDecoration: "line-through" }}>{it} ↩</button>
+                        style={{ border: "1px dashed #d8c4a4", background: "#faf4e8", color: "#9c6b3f", borderRadius: 12, fontSize: 8.8, padding: "1px 7px", margin: "0 3px 3px 0", cursor: "pointer", textDecoration: "line-through" }}>{it} ↩</button>
                     ))}</div>
                   )}
                   <div style={{ display: "flex", gap: 6, marginTop: 9, flexWrap: "wrap", alignItems: "center" }}>
                     <input value={newItem[l.key] ?? ""} placeholder="새 키워드 추가" maxLength={40}
                       onChange={(e) => setNewItem((s) => ({ ...s, [l.key]: e.target.value }))}
                       onKeyDown={(e) => { if (e.key === "Enter" && (newItem[l.key] ?? "").trim()) listAction(l.key, "add", newItem[l.key].trim()); }}
-                      style={{ flex: "1 1 140px", minWidth: 120, padding: "7px 9px", border: "1px solid #d8c4a4", borderRadius: 8, fontSize: 14 }} />
+                      style={{ flex: "1 1 140px", minWidth: 120, padding: "7px 9px", border: "1px solid #d8c4a4", borderRadius: 8, fontSize: 11.2 }} />
                     <button disabled={!(newItem[l.key] ?? "").trim() || busy === l.key + (newItem[l.key] ?? "").trim()} onClick={() => listAction(l.key, "add", (newItem[l.key] ?? "").trim())}
-                      style={{ padding: "8px 12px", background: "#2b2018", color: "#f4ece0", border: "none", borderRadius: 8, fontSize: 12.5, fontWeight: 700 }}>추가</button>
+                      style={{ padding: "8px 12px", background: "#2b2018", color: "#f4ece0", border: "none", borderRadius: 8, fontSize: 10, fontWeight: 700 }}>추가</button>
                     {!l.isDefault && (
                       <button disabled={busy === l.key} onClick={() => { if (window.confirm(`[${l.label}] 사전을 기본값으로 되돌립니다(모든 편집 취소).`)) listAction(l.key, "revert_all"); }}
-                        style={{ padding: "8px 12px", background: "#fff", color: "#9c6b3f", border: "1px solid #d8c4a4", borderRadius: 8, fontSize: 12.5, fontWeight: 700 }}>기본값 복원</button>
+                        style={{ padding: "8px 12px", background: "#fff", color: "#9c6b3f", border: "1px solid #d8c4a4", borderRadius: 8, fontSize: 10, fontWeight: 700 }}>기본값 복원</button>
                     )}
                   </div>
                 </div>
@@ -268,10 +268,10 @@ export default function CriteriaPage() {
 
         {listHistory.length > 0 && (
           <div style={{ marginTop: 16 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "#9c6b3f", borderBottom: "1px solid #e8b87a", paddingBottom: 4, marginBottom: 8 }}>🕘 리스트 편집 이력</div>
+            <div style={{ fontSize: 11.2, fontWeight: 700, color: "#9c6b3f", borderBottom: "1px solid #e8b87a", paddingBottom: 4, marginBottom: 8 }}>🕘 리스트 편집 이력</div>
             <div style={card}>
               {listHistory.map((h) => (
-                <div key={h.id} style={{ display: "flex", justifyContent: "space-between", gap: 8, padding: "5px 0", borderBottom: "1px solid #f0e6d2", fontSize: 12 }}>
+                <div key={h.id} style={{ display: "flex", justifyContent: "space-between", gap: 8, padding: "5px 0", borderBottom: "1px solid #f0e6d2", fontSize: 9.6 }}>
                   <div><span style={{ fontFamily: "monospace", color: "#8a5e30" }}>{h.key}</span> <b style={{ color: h.action.startsWith("revert") ? "#3f7a4f" : h.action === "remove" ? "#b03a3a" : "#b5731f" }}>{h.action}</b>{h.item ? <> · {h.item}</> : null}</div>
                   <div style={{ ...sub, whiteSpace: "nowrap" }}>{h.actor} · {new Date(h.at).toLocaleString("ko-KR")}</div>
                 </div>
@@ -281,11 +281,11 @@ export default function CriteriaPage() {
         )}
 
         <div style={{ marginTop: 18 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "#9c6b3f", borderBottom: "1px solid #e8b87a", paddingBottom: 4, marginBottom: 8 }}>🕘 최근 변경(숫자 기준)</div>
+          <div style={{ fontSize: 11.2, fontWeight: 700, color: "#9c6b3f", borderBottom: "1px solid #e8b87a", paddingBottom: 4, marginBottom: 8 }}>🕘 최근 변경(숫자 기준)</div>
           {history.length === 0 ? <div style={sub}>아직 변경 이력이 없습니다.</div> : (
             <div style={card}>
               {history.map((h) => (
-                <div key={h.id} style={{ display: "flex", justifyContent: "space-between", gap: 8, padding: "5px 0", borderBottom: "1px solid #f0e6d2", fontSize: 12 }}>
+                <div key={h.id} style={{ display: "flex", justifyContent: "space-between", gap: 8, padding: "5px 0", borderBottom: "1px solid #f0e6d2", fontSize: 9.6 }}>
                   <div><span style={{ fontFamily: "monospace", color: "#8a5e30" }}>{h.key}</span> <b>{h.old_value}</b> → <b style={{ color: "#b5731f" }}>{h.new_value}</b>{h.impact_note ? <span style={sub}> · {h.impact_note}</span> : null}</div>
                   <div style={{ ...sub, whiteSpace: "nowrap" }}>{h.changed_by} · {new Date(h.changed_at).toLocaleString("ko-KR")}</div>
                 </div>

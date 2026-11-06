@@ -27,7 +27,7 @@ export default function RevisitHookBanner({ cafeId }: { cafeId: number }) {
 
   return (
     <div className="nt-margin-gutter" style={{ paddingTop: 10, paddingBottom: 4 }}>
-      <p className="text-[11.5px] text-[#8a7256] mb-1.5">벌써 {seenCount + 1}곳째 둘러보고 계시네요 — 맘에 드는 곳은 바로 담아두세요</p>
+      <p className="text-[9.2px] text-[#8a7256] mb-1.5">벌써 {seenCount + 1}곳째 둘러보고 계시네요 — 맘에 드는 곳은 바로 담아두세요</p>
       <div className="nt-scrap flat pink"><WishButton cafeId={cafeId} variant="banner" /></div>
     </div>
   );

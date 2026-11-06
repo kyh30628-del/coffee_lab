@@ -67,17 +67,17 @@ export default function TrafficPage() {
   return (
     <main className="min-h-screen bg-stone-50 px-3 py-4 max-w-[860px] mx-auto">
       <div className="flex items-center gap-2 mb-4">
-        <Link href="/admin" className="text-[13px] text-stone-600">← 관제탑</Link>
-        <h1 className="text-[17px] font-extrabold text-stone-800">📈 접속자 전체 현황</h1>
+        <Link href="/admin" className="text-[10.4px] text-stone-600">← 관제탑</Link>
+        <h1 className="text-[13.6px] font-extrabold text-stone-800">📈 접속자 전체 현황</h1>
       </div>
 
       {!data && (
         <div className="bg-white rounded-xl border border-stone-300 p-4">
           <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder="관리자 비밀번호"
             onKeyDown={(e) => e.key === "Enter" && load(pw)}
-            className="w-full border border-stone-300 rounded-lg px-3 py-2 text-[14px] mb-2" />
-          <button onClick={() => load(pw)} className="w-full bg-stone-800 text-white rounded-lg py-2 text-[14px] font-bold">열기</button>
-          {err && <p className="text-[12px] text-red-600 mt-2">{err}</p>}
+            className="w-full border border-stone-300 rounded-lg px-3 py-2 text-[11.2px] mb-2" />
+          <button onClick={() => load(pw)} className="w-full bg-stone-800 text-white rounded-lg py-2 text-[11.2px] font-bold">열기</button>
+          {err && <p className="text-[9.6px] text-red-600 mt-2">{err}</p>}
         </div>
       )}
 
@@ -85,10 +85,10 @@ export default function TrafficPage() {
         <>
           {/* 월별 — 사람/봇 분리 */}
           <section className="bg-white rounded-xl border border-stone-300 p-3 mb-3">
-            <h2 className="text-[13px] font-bold text-stone-800 mb-1">월별 — 사람 vs 봇</h2>
-            <p className="text-[10.5px] text-stone-600 mb-2">봇만 늘고 사람이 안 늘면 페이지만 늘린 것입니다. 두 줄을 같이 보십시오.</p>
+            <h2 className="text-[10.4px] font-bold text-stone-800 mb-1">월별 — 사람 vs 봇</h2>
+            <p className="text-[8.4px] text-stone-600 mb-2">봇만 늘고 사람이 안 늘면 페이지만 늘린 것입니다. 두 줄을 같이 보십시오.</p>
             <div className="overflow-x-auto">
-              <table className="w-full text-[12px]">
+              <table className="w-full text-[9.6px]">
                 <thead>
                   <tr className="text-stone-600 border-b border-stone-200">
                     <th className="text-left py-1.5">월</th>
@@ -124,18 +124,18 @@ export default function TrafficPage() {
 
           {/* 패턴 */}
           <section className="bg-white rounded-xl border border-stone-300 p-3 mb-3">
-            <h2 className="text-[13px] font-bold text-stone-800 mb-2">접속 패턴 (최근 90일 · 사람만)</h2>
-            <p className="text-[11px] font-semibold text-stone-700 mb-1">요일별 <span className="font-normal text-stone-600">(주황=주말)</span></p>
+            <h2 className="text-[10.4px] font-bold text-stone-800 mb-2">접속 패턴 (최근 90일 · 사람만)</h2>
+            <p className="text-[8.8px] font-semibold text-stone-700 mb-1">요일별 <span className="font-normal text-stone-600">(주황=주말)</span></p>
             <DowBar data={["일","월","화","수","목","금","토"].map((lbl, i) => ({
               label: lbl, weekend: i === 0 || i === 6,
               people: (data.byDow ?? []).find((x) => x.dow === i)?.people ?? 0 }))} />
-            <p className="text-[11px] font-semibold text-stone-700 mb-1">시간대별 (KST)</p>
+            <p className="text-[8.8px] font-semibold text-stone-700 mb-1">시간대별 (KST)</p>
             <HourArea data={Array.from({ length: 24 }, (_, h) => ({
               h, people: (data.byHour ?? []).find((x) => x.h === h)?.people ?? 0 }))} />
             {data.depth && (
               <div className="rounded-lg bg-stone-50 border border-stone-200 p-2.5">
-                <p className="text-[11px] font-semibold text-stone-700 mb-1">체류 깊이 — 재방문을 못 만드는 지점</p>
-                <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11.5px] text-stone-700">
+                <p className="text-[8.8px] font-semibold text-stone-700 mb-1">체류 깊이 — 재방문을 못 만드는 지점</p>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-[9.2px] text-stone-700">
                   <span>방문자 <b>{n(data.depth.people)}</b></span>
                   <span>한 페이지만 보고 이탈 <b className="text-amber-700">{n(data.depth.one_page)}</b> ({data.depth.people ? Math.round((data.depth.one_page / data.depth.people) * 100) : 0}%)</span>
                   <span>3페이지 이상 <b className="text-emerald-700">{n(data.depth.three_plus)}</b> ({data.depth.people ? Math.round((data.depth.three_plus / data.depth.people) * 100) : 0}%)</span>
@@ -147,33 +147,33 @@ export default function TrafficPage() {
 
           {/* 지역 상위 — 사람 vs 봇 */}
           <section className="bg-white rounded-xl border border-stone-300 p-3 mb-3">
-            <h2 className="text-[13px] font-bold text-stone-800 mb-1">지역 상위 12 — 사람 vs 봇</h2>
-            <p className="text-[10.5px] text-stone-600 mb-2">회색(봇)만 길고 파랑(사람)이 짧으면 크롤러만 긁어가는 지역입니다.</p>
+            <h2 className="text-[10.4px] font-bold text-stone-800 mb-1">지역 상위 12 — 사람 vs 봇</h2>
+            <p className="text-[8.4px] text-stone-600 mb-2">회색(봇)만 길고 파랑(사람)이 짧으면 크롤러만 긁어가는 지역입니다.</p>
             <RegionHumanBot data={[...(data.byRegion ?? [])].sort((a, b) => b.people - a.people).slice(0, 12)
               .map((r) => ({ region: r.region, people: r.people, bots: r.bots }))} />
           </section>
 
           {/* 전국 지역 — 정렬 가능 */}
           <section className="bg-white rounded-xl border border-stone-300 p-3">
-            <h2 className="text-[13px] font-bold text-stone-800 mb-1">전국 지역별 (최근 30일 · 열 제목을 눌러 정렬)</h2>
-            <p className="text-[10.5px] text-stone-600 mb-2">
+            <h2 className="text-[10.4px] font-bold text-stone-800 mb-1">전국 지역별 (최근 30일 · 열 제목을 눌러 정렬)</h2>
+            <p className="text-[8.4px] text-stone-600 mb-2">
               <b>카페당</b> = 카페 1곳이 데려온 사람 수(발굴 ROI). 낮으면 더 캐도 사람이 안 옵니다.
               <b className="ml-2">증감</b> = 최근 30일 − 직전 30일.
             </p>
             <div className="flex flex-wrap items-center gap-2 mb-2">
               <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="지역 검색"
-                className="border border-stone-300 rounded-lg px-2.5 py-1.5 text-[12px] flex-1 min-w-[120px]" />
+                className="border border-stone-300 rounded-lg px-2.5 py-1.5 text-[9.6px] flex-1 min-w-[120px]" />
               <button onClick={() => setOnlyZero(!onlyZero)}
-                className={`text-[11px] rounded-full px-2.5 py-1 border ${onlyZero ? "bg-amber-50 border-amber-400 text-amber-800" : "bg-white border-stone-300 text-stone-700"}`}>
+                className={`text-[8.8px] rounded-full px-2.5 py-1 border ${onlyZero ? "bg-amber-50 border-amber-400 text-amber-800" : "bg-white border-stone-300 text-stone-700"}`}>
                 사람 0 지역만 {data.totals.regionsZero}곳
               </button>
-              <span className="text-[11px] text-stone-600">{rows.length}개 표시</span>
+              <span className="text-[8.8px] text-stone-600">{rows.length}개 표시</span>
             </div>
-            <p className="text-[11px] text-stone-600 mb-2">
+            <p className="text-[8.8px] text-stone-600 mb-2">
               지역 {n(data.totals.regions)} · 공개 카페 {n(data.totals.cafes)} · <b className="text-emerald-700">사람 유입 있는 지역 {n(data.totals.regionsWithTraffic)}</b> · <b className="text-amber-700">0인 지역 {n(data.totals.regionsZero)}</b>
             </p>
             <div className="overflow-x-auto max-h-[70vh] overflow-y-auto">
-              <table className="w-full text-[12px]">
+              <table className="w-full text-[9.6px]">
                 <thead className="sticky top-0 bg-white shadow-[0_1px_0_#e7e5e4]">
                   <tr className="text-stone-600">
                     <Th k="region" label="지역" />

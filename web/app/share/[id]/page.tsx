@@ -59,33 +59,33 @@ export default async function SharePage({ params }: Props) {
   return (
     <main className="min-h-screen bg-note-paper px-4 py-8 flex flex-col items-center">
       <div className="w-full max-w-md">
-        <div className="text-center mb-2 text-[11px] text-note-ink-soft tracking-wider uppercase">☕ 동네 커피 노트 · 검증 리포트</div>
+        <div className="text-center mb-2 text-[8.8px] text-note-ink-soft tracking-wider uppercase">☕ 동네 커피 노트 · 검증 리포트</div>
 
         {/* 리포트 카드 */}
         <section className="bg-white rounded-3xl border border-[#ece0cd] shadow-sm p-6">
           <div className="flex items-center justify-center gap-2 mb-1">
             <h1 className="text-2xl font-bold text-note-ink">{rep.name}</h1>
-            {rep.grade && <span className="text-[10px] text-white px-2 py-0.5 rounded-full" style={{ background: GRADE_BG[rep.grade] ?? "#8a7458" }}>{rep.grade}</span>}
+            {rep.grade && <span className="text-[8px] text-white px-2 py-0.5 rounded-full" style={{ background: GRADE_BG[rep.grade] ?? "#8a7458" }}>{rep.grade}</span>}
           </div>
           <p className="text-center text-sm text-note-brown mb-4">{rep.identity}</p>
 
           {/* 순위 하이라이트 */}
           <div className="rounded-2xl bg-[#faf4ea] border border-[#ece0cd] py-4 text-center mb-4">
-            <div className="text-[12px] text-note-ink-soft mb-1">우리 동네 순위</div>
+            <div className="text-[9.6px] text-note-ink-soft mb-1">우리 동네 순위</div>
             <div className="text-xl font-bold text-note-ink">{rankTxt}</div>
-            <div className="text-[12px] text-note-ink-soft mt-1">검증 후기 {rep.count}건 기준</div>
+            <div className="text-[9.6px] text-note-ink-soft mt-1">검증 후기 {rep.count}건 기준</div>
           </div>
 
           {/* 강점 */}
           {rep.strengths.length > 0 && (
             <div className="flex flex-wrap justify-center gap-2 mb-4">
               {rep.strengths.map((s, i) => (
-                <span key={i} className="text-[13px] bg-note-paper text-note-ink-warm px-3 py-1 rounded-full">{s.emoji} {s.label}</span>
+                <span key={i} className="text-[10.4px] bg-note-paper text-note-ink-warm px-3 py-1 rounded-full">{s.emoji} {s.label}</span>
               ))}
             </div>
           )}
           {rep.topStrength?.rare && (
-            <p className="text-center text-[12px] text-[#1f7a4d] mb-2">✨ {rep.gu}에서 흔치 않은 <b>{rep.topStrength.label}</b> 강점</p>
+            <p className="text-center text-[9.6px] text-[#1f7a4d] mb-2">✨ {rep.gu}에서 흔치 않은 <b>{rep.topStrength.label}</b> 강점</p>
           )}
 
           <a href={`${SITE}/c/${rep.id}`} className="block text-center mt-3 rounded-xl bg-note-ink text-note-paper font-bold py-3">상세 보기 · 길찾기 →</a>
@@ -94,20 +94,20 @@ export default async function SharePage({ params }: Props) {
         {/* QR — 가게 비치/공유용 */}
         <section className="bg-white rounded-3xl border border-[#ece0cd] mt-4 p-6 text-center">
           <div className="text-sm font-bold text-note-ink-warm mb-1">📱 이 리포트 공유 QR</div>
-          <p className="text-[12px] text-note-ink-soft mb-3">가게에 비치하거나 손님·SNS에 공유하세요</p>
+          <p className="text-[9.6px] text-note-ink-soft mb-3">가게에 비치하거나 손님·SNS에 공유하세요</p>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={qr} alt="공유 QR 코드" width={200} height={200} className="mx-auto rounded-xl border border-[#ece0cd]" />
-          <div className="text-[11px] text-[#bcab92] mt-2 break-all">{shareUrl}</div>
+          <div className="text-[8.8px] text-[#bcab92] mt-2 break-all">{shareUrl}</div>
         </section>
 
         {/* 사장님 CTA */}
         <section className="bg-[#fff8ee] rounded-3xl border border-[#e7d3b3] mt-4 p-5 text-center">
           <div className="text-sm font-bold text-[#7a5a2e] mb-1">이 카페 사장님이세요?</div>
-          <p className="text-[13px] text-note-ink-soft mb-3 leading-relaxed">동네 순위·6축 분석·데이터 기반 액션 플랜을 <b>무료</b>로 받아보세요.</p>
+          <p className="text-[10.4px] text-note-ink-soft mb-3 leading-relaxed">동네 순위·6축 분석·데이터 기반 액션 플랜을 <b>무료</b>로 받아보세요.</p>
           <a href={`${SITE}/owner`} className="inline-block rounded-xl bg-note-tan text-white font-bold px-5 py-2.5 text-sm">무료 분석 받기 →</a>
         </section>
 
-        <p className="text-center text-[11px] text-note-ink-soft mt-5">
+        <p className="text-center text-[8.8px] text-note-ink-soft mt-5">
           광고·협찬·영수증 없이 공개 후기로만 검증한 큐레이션 · <a href={SITE} className="underline">dongnecoffeenote.com</a>
         </p>
       </div>

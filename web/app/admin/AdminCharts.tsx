@@ -10,7 +10,7 @@ export function GradePie({ data }: { data: { grade: string; n: number }[] }) {
     <ResponsiveContainer width="100%" height={180}>
       <PieChart>
         <Pie data={data} dataKey="n" nameKey="grade" cx="50%" cy="50%" innerRadius={42} outerRadius={70} paddingAngle={2}
-          label={(e: any) => `${e.grade} ${e.n}`} labelLine={false} fontSize={11}>
+          label={(e: any) => `${e.grade} ${e.n}`} labelLine={false} fontSize={8.8}>
           {data.map((g) => <Cell key={g.grade} fill={GRADE_COLOR[g.grade] ?? "#cbd5e1"} />)}
         </Pie><Tooltip />
       </PieChart>
@@ -22,7 +22,7 @@ export function RegionBar({ data }: { data: { region: string; n: number }[] }) {
   return (
     <ResponsiveContainer width="100%" height={180}>
       <BarChart data={data} layout="vertical" margin={{ left: 8, right: 12 }}>
-        <XAxis type="number" hide /><YAxis type="category" dataKey="region" width={70} tick={{ fontSize: 10, fill: "#57534e" }} />
+        <XAxis type="number" hide /><YAxis type="category" dataKey="region" width={70} tick={{ fontSize: 8, fill: "#57534e" }} />
         <Tooltip /><Bar dataKey="n" fill={BAR} radius={[0, 4, 4, 0]} />
       </BarChart>
     </ResponsiveContainer>
@@ -33,7 +33,7 @@ export function RegionBar({ data }: { data: { region: string; n: number }[] }) {
 //   ssr:false 지연 로드라 초기 번들에 안 들어간다(기존 GradePie·RegionBar과 같은 청크 재사용).
 import { LineChart, Line, Legend, CartesianGrid, AreaChart, Area } from "recharts";
 
-const AXIS = { fontSize: 10, fill: "#57534e" };
+const AXIS = { fontSize: 8, fill: "#57534e" };
 
 /** 월별 사람 vs 봇 — 두 선을 겹쳐 "봇만 느는지"가 한눈에 보이게. */
 export function MonthlyHumanBot({ data }: { data: { m: string; people: number; bots: number; repeat: number }[] }) {
@@ -44,7 +44,7 @@ export function MonthlyHumanBot({ data }: { data: { m: string; people: number; b
         <XAxis dataKey="m" tick={AXIS} tickFormatter={(v: string) => v.slice(5) + "월"} />
         <YAxis tick={AXIS} />
         <Tooltip formatter={(v: any, k: any) => [Number(v).toLocaleString(), k]} />
-        <Legend wrapperStyle={{ fontSize: 11 }} />
+        <Legend wrapperStyle={{ fontSize: 8.8 }} />
         <Line type="monotone" dataKey="people" name="사람" stroke="#0284c7" strokeWidth={2.5} dot={{ r: 3 }} />
         <Line type="monotone" dataKey="bots" name="봇" stroke="#a8a29e" strokeWidth={2} strokeDasharray="4 3" dot={{ r: 3 }} />
         <Line type="monotone" dataKey="repeat" name="재방문" stroke="#15803d" strokeWidth={2} dot={{ r: 3 }} />
@@ -90,9 +90,9 @@ export function RegionHumanBot({ data }: { data: { region: string; people: numbe
     <ResponsiveContainer width="100%" height={Math.max(180, data.length * 26)}>
       <BarChart data={data} layout="vertical" margin={{ left: 10, right: 14 }}>
         <XAxis type="number" tick={AXIS} />
-        <YAxis type="category" dataKey="region" width={82} tick={{ fontSize: 10, fill: "#57534e" }} />
+        <YAxis type="category" dataKey="region" width={82} tick={{ fontSize: 8, fill: "#57534e" }} />
         <Tooltip formatter={(v: any, k: any) => [Number(v).toLocaleString(), k]} />
-        <Legend wrapperStyle={{ fontSize: 11 }} />
+        <Legend wrapperStyle={{ fontSize: 8.8 }} />
         <Bar dataKey="people" name="사람" fill="#0284c7" radius={[0, 4, 4, 0]} />
         <Bar dataKey="bots" name="봇" fill="#d6d3d1" radius={[0, 4, 4, 0]} />
       </BarChart>

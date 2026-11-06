@@ -43,13 +43,13 @@ export default async function TastePage({ params }: Props) {
     <main className="min-h-screen flex items-center justify-center px-6 text-note-paper" style={{ fontFamily: "'Paperlogy', 'Apple SD Gothic Neo', sans-serif", background: "linear-gradient(135deg,#4a3526,#2b2018 60%,#1f1610)" }}>
       <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet" />
       <div className="w-full max-w-sm text-center">
-        <div className="text-[15px] text-[#8f7a58] mb-1">나의 커피 취향은</div>
-        <div className="text-[80px] leading-none my-2">{t.emoji}</div>
+        <div className="text-[12px] text-[#8f7a58] mb-1">나의 커피 취향은</div>
+        <div className="text-[64px] leading-none my-2">{t.emoji}</div>
         <h1 className="text-4xl font-bold mb-3" style={{ color: t.accent === "#8a7458" ? "#cbb89f" : t.accent }}>{t.name}</h1>
-        <p className="text-[15px] text-note-line leading-relaxed mb-7">{t.line}</p>
+        <p className="text-[12px] text-note-line leading-relaxed mb-7">{t.line}</p>
         <Link href={`/?taste=${type}`} className="block w-full bg-note-paper text-note-ink rounded-xl py-3.5 font-bold mb-2.5">내 취향 카페 보러가기 →</Link>
         <ShareBtn name={t.name} />
-        <Link href="/" className="text-[12px] text-[#7a6750] underline">동네 커피 노트 홈</Link>
+        <Link href="/" className="text-[9.6px] text-[#7a6750] underline">동네 커피 노트 홈</Link>
       </div>
     </main>
   );

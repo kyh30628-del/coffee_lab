@@ -22,16 +22,16 @@ export default function ShowcaseStyles() {
       <div className="max-w-md mx-auto px-5 py-8">
         <BackLink to="/" label="홈" className="text-note-brown mb-3" />
         <h1 className="text-2xl font-bold text-note-ink mb-1">쇼케이스 스타일 10종</h1>
-        <p className="text-[13px] text-note-ink-body mb-6">강동구 카페로 만든 샘플. 새로고침하면 애니메이션이 처음부터 재생됩니다. 사장님은 등록 시 이 중 하나를 고릅니다.</p>
+        <p className="text-[10.4px] text-note-ink-body mb-6">강동구 카페로 만든 샘플. 새로고침하면 애니메이션이 처음부터 재생됩니다. 사장님은 등록 시 이 중 하나를 고릅니다.</p>
         <div className="space-y-8">
           {SHOWCASE_TEMPLATES.map((t, i) => {
             const s = SAMPLES[i];
             return (
               <div key={t.id}>
                 <div className="mb-2">
-                  <span className="inline-block text-[11px] font-bold text-white bg-note-tan rounded-full px-2 py-0.5 mr-1.5">{t.id}</span>
+                  <span className="inline-block text-[8.8px] font-bold text-white bg-note-tan rounded-full px-2 py-0.5 mr-1.5">{t.id}</span>
                   <span className="text-note-ink font-bold">{t.name}</span>
-                  <span className="text-[12px] text-note-ink-soft"> · {t.desc}</span>
+                  <span className="text-[9.6px] text-note-ink-soft"> · {t.desc}</span>
                 </div>
                 <div className="rounded-2xl overflow-hidden shadow-lg bg-[#fdfaf4]">
                   <ShowcaseBanner style={t.id} scene={s.scene} headline={s.headline} tagline={s.tagline} points={s.points} cta={s.cta} height="220px" />
@@ -40,7 +40,7 @@ export default function ShowcaseStyles() {
             );
           })}
         </div>
-        <p className="text-[12px] text-note-ink-soft mt-8 text-center">마음에 드는 번호들을 알려주시면 사장님 등록 화면에 ‘템플릿 선택’으로 적용돼 있어요.</p>
+        <p className="text-[9.6px] text-note-ink-soft mt-8 text-center">마음에 드는 번호들을 알려주시면 사장님 등록 화면에 ‘템플릿 선택’으로 적용돼 있어요.</p>
       </div>
       <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet" />
     </main>

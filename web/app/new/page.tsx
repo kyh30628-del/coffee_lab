@@ -48,35 +48,35 @@ export default async function NewCafesPage() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonld) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }} />
       <div className="max-w-2xl mx-auto px-5 py-9">
-        <Link href="/area" className="text-note-brown text-[13px] underline">← 지역별 카페</Link>
-        <div className="text-note-brown text-[11px] tracking-[0.25em] uppercase mt-4 mb-1">동네 커피 노트 · 새 발굴</div>
-        <h1 className="text-[26px] font-bold leading-tight mb-2">🆕 이번 달 새로 발굴한 카페 {rows.length}곳</h1>
-        <p className="text-[14px] text-note-ink-body leading-relaxed mb-3">최근 30일 사이 새로 찾아내고 <b>리뷰 교차검증</b>까지 마친 카페들이에요. 매일 자동 발굴이 돌고 있어 이 목록은 계속 새로워져요.</p>
-        <p className="text-[12px] text-note-ink-soft bg-white/60 border border-note-line rounded-lg px-3 py-2 mb-6">☕ <b>영수증 리뷰·광고·협찬은 빼고</b>, 네이버·구글·유튜브 공개 후기를 교차검증해 진짜 후기로만 골랐어요. <Link href="/trust" className="underline text-note-brown">검증 방법</Link></p>
+        <Link href="/area" className="text-note-brown text-[10.4px] underline">← 지역별 카페</Link>
+        <div className="text-note-brown text-[8.8px] tracking-[0.25em] uppercase mt-4 mb-1">동네 커피 노트 · 새 발굴</div>
+        <h1 className="text-[20.8px] font-bold leading-tight mb-2">🆕 이번 달 새로 발굴한 카페 {rows.length}곳</h1>
+        <p className="text-[11.2px] text-note-ink-body leading-relaxed mb-3">최근 30일 사이 새로 찾아내고 <b>리뷰 교차검증</b>까지 마친 카페들이에요. 매일 자동 발굴이 돌고 있어 이 목록은 계속 새로워져요.</p>
+        <p className="text-[9.6px] text-note-ink-soft bg-white/60 border border-note-line rounded-lg px-3 py-2 mb-6">☕ <b>영수증 리뷰·광고·협찬은 빼고</b>, 네이버·구글·유튜브 공개 후기를 교차검증해 진짜 후기로만 골랐어요. <Link href="/trust" className="underline text-note-brown">검증 방법</Link></p>
         {areas.map(([area, cafes]) => (
           <section key={area} className="mb-7">
             <div className="flex items-baseline justify-between mb-2">
-              <h2 className="text-[17px] font-bold">{area} <span className="text-[12px] text-note-ink-deep font-normal">{cafes.length}곳</span></h2>
-              <Link href={`/area/${encodeURIComponent(area)}`} className="text-[11px] text-note-brown underline">{area} 전체 보기</Link>
+              <h2 className="text-[13.6px] font-bold">{area} <span className="text-[9.6px] text-note-ink-deep font-normal">{cafes.length}곳</span></h2>
+              <Link href={`/area/${encodeURIComponent(area)}`} className="text-[8.8px] text-note-brown underline">{area} 전체 보기</Link>
             </div>
             <div className="flex flex-col gap-2">
               {cafes.map((c) => (
                 <Link key={c.id} href={`/c/${c.id}`} className="flex items-center gap-2.5 bg-white border border-note-line-strong rounded-xl px-3.5 py-2.5">
                   <span className="flex flex-col text-left min-w-0">
-                    <span className="text-[13.5px] font-bold text-[#3d2f22] truncate">{c.name}</span>
-                    <span className="text-[10.5px] text-[#544636] truncate">{[c.dong, c.synth_identity].filter(Boolean).join(" · ").slice(0, 46)}</span>
+                    <span className="text-[10.8px] font-bold text-[#3d2f22] truncate">{c.name}</span>
+                    <span className="text-[8.4px] text-[#544636] truncate">{[c.dong, c.synth_identity].filter(Boolean).join(" · ").slice(0, 46)}</span>
                     {/* ⚠️ 이건 알고 가세요 — 목록에서도 단점을 먼저 말한다(2026-09-14). */}
                     {Array.isArray((c as any).cautions) && (c as any).cautions.length > 0 && (
-                      <span className="text-[10.5px] font-bold text-[#8a5a3a] truncate">⚠️ {(c as any).cautions.slice(0, 2).map((x: any) => x.label).join(" · ")}</span>
+                      <span className="text-[8.4px] font-bold text-[#8a5a3a] truncate">⚠️ {(c as any).cautions.slice(0, 2).map((x: any) => x.label).join(" · ")}</span>
                     )}
                   </span>
-                  {c.synth_grade && <span className="ml-auto text-[10px] font-bold bg-note-ink text-note-honey px-2 py-0.5 rounded-full whitespace-nowrap">{c.synth_grade}</span>}
+                  {c.synth_grade && <span className="ml-auto text-[8px] font-bold bg-note-ink text-note-honey px-2 py-0.5 rounded-full whitespace-nowrap">{c.synth_grade}</span>}
                 </Link>
               ))}
             </div>
           </section>
         ))}
-        <div className="text-center text-[11px] text-note-ink-faint mt-8">매일 자동 발굴·검증 · 동네 커피 노트</div>
+        <div className="text-center text-[8.8px] text-note-ink-faint mt-8">매일 자동 발굴·검증 · 동네 커피 노트</div>
       </div>
     </main>
   );

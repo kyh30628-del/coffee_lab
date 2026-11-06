@@ -519,25 +519,25 @@ export default function CafePosterPage() {
         <BackLink to="/poster" label="포스터" className="text-note-brown mb-4" />
         <div className="text-[#a64b2a] text-xs tracking-[0.3em] uppercase mb-2">Cafe Spotlight</div>
         <h1 className="text-3xl font-bold mb-1">카페소개 포스터</h1>
-        <p className="text-[13px] text-[#665036] mb-6 leading-relaxed">
+        <p className="text-[10.4px] text-[#665036] mb-6 leading-relaxed">
           검증등급 카페 1곳을 소개하는 인스타 포스터예요. 이틀에 1회 주기로 카페를 자동 추천하지만, 아래 검색으로
           직접 골라 바꿀 수 있어요. 카페명·태그라인·후기 발췌는 모두 실제 검증 데이터 기준이에요.
         </p>
 
         {/* 카페 선택 */}
         <section className="bg-white/60 border border-note-line rounded-xl p-4 mb-5">
-          <div className="text-[13px] font-bold mb-2">1. 카페 선택</div>
+          <div className="text-[10.4px] font-bold mb-2">1. 카페 선택</div>
           <div className="flex gap-2 mb-2">
             <input
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="카페명으로 검색 (검증등급만)"
-              className="flex-1 min-w-0 border border-[#d8c6ac] rounded-lg px-3 py-2 text-[14px] bg-white"
+              className="flex-1 min-w-0 border border-[#d8c6ac] rounded-lg px-3 py-2 text-[11.2px] bg-white"
             />
             <button
               onClick={loadRecommended}
-              className="shrink-0 border border-[#c0a883] text-[#6b4a2e] rounded-lg px-3 py-2 text-[13px] font-bold active:scale-[0.98] transition"
+              className="shrink-0 border border-[#c0a883] text-[#6b4a2e] rounded-lg px-3 py-2 text-[10.4px] font-bold active:scale-[0.98] transition"
             >
               🔁 오늘의 추천
             </button>
@@ -548,19 +548,19 @@ export default function CafePosterPage() {
                 <li key={r.id}>
                   <button
                     onClick={() => fetchDetail(r.id)}
-                    className="w-full text-left px-3 py-2 text-[13.5px] hover:bg-[#f7f1e6] flex items-baseline gap-2"
+                    className="w-full text-left px-3 py-2 text-[10.8px] hover:bg-[#f7f1e6] flex items-baseline gap-2"
                   >
                     <span className="font-bold">{r.name}</span>
-                    <span className="text-[11px] text-[#6f6047]">{r.area}</span>
+                    <span className="text-[8.8px] text-[#6f6047]">{r.area}</span>
                   </button>
                 </li>
               ))}
             </ul>
           )}
-          {loading && <div className="text-[12.5px] text-[#665036]">불러오는 중…</div>}
-          {err && <div className="text-[12.5px] text-[#b5482f]">{err}</div>}
+          {loading && <div className="text-[10px] text-[#665036]">불러오는 중…</div>}
+          {err && <div className="text-[10px] text-[#b5482f]">{err}</div>}
           {cafe && !loading && (
-            <div className="text-[13px] text-[#5a4632]">
+            <div className="text-[10.4px] text-[#5a4632]">
               선택됨: <b>{cafe.name}</b> · {cafe.area} · 검증 후기 {cafe.reviewCount}건
             </div>
           )}
@@ -568,11 +568,11 @@ export default function CafePosterPage() {
 
         {/* 템플릿 선택 */}
         <section className="bg-white/60 border border-note-line rounded-xl p-4 mb-5">
-          <div className="text-[13px] font-bold mb-2">2. 템플릿 선택</div>
+          <div className="text-[10.4px] font-bold mb-2">2. 템플릿 선택</div>
           <div className="flex gap-2 mb-3">
             <button
               onClick={() => setTemplate("card")}
-              className={`flex-1 rounded-lg py-2 text-[13.5px] font-bold border transition ${
+              className={`flex-1 rounded-lg py-2 text-[10.8px] font-bold border transition ${
                 template === "card" ? "bg-note-ink text-note-paper border-note-ink" : "border-[#d8c6ac] text-[#6b4a2e]"
               }`}
             >
@@ -580,7 +580,7 @@ export default function CafePosterPage() {
             </button>
             <button
               onClick={() => setTemplate("photo")}
-              className={`flex-1 rounded-lg py-2 text-[13.5px] font-bold border transition ${
+              className={`flex-1 rounded-lg py-2 text-[10.8px] font-bold border transition ${
                 template === "photo" ? "bg-note-ink text-note-paper border-note-ink" : "border-[#d8c6ac] text-[#6b4a2e]"
               }`}
             >
@@ -589,16 +589,16 @@ export default function CafePosterPage() {
           </div>
           {template === "photo" && (
             <div className="flex items-center gap-2 flex-wrap">
-              <label className="border border-[#c0a883] text-[#6b4a2e] rounded-lg px-3 py-2 text-[12.5px] font-bold cursor-pointer active:scale-[0.98] transition">
+              <label className="border border-[#c0a883] text-[#6b4a2e] rounded-lg px-3 py-2 text-[10px] font-bold cursor-pointer active:scale-[0.98] transition">
                 📷 사진 업로드
                 <input type="file" accept="image/*" onChange={onPhotoChange} className="hidden" />
               </label>
               {photoImg && (
-                <button onClick={clearPhoto} className="text-[12.5px] text-[#b5482f] underline">
+                <button onClick={clearPhoto} className="text-[10px] text-[#b5482f] underline">
                   사진 제거
                 </button>
               )}
-              <span className="text-[11px] text-[#665036] basis-full">
+              <span className="text-[8.8px] text-[#665036] basis-full">
                 ※ 직접 촬영한 사진 또는 무료 라이선스 사진만 올려주세요. 네이버·타인 인스타 사진은 도용이라 사용
                 금지예요. 사진을 올리지 않으면 지도 핀 모티프로 대체돼요.
               </span>
@@ -608,7 +608,7 @@ export default function CafePosterPage() {
 
         {/* 미리보기 */}
         <section className="mb-5">
-          <div className="text-[13px] font-bold mb-2">3. 미리보기 · 다운로드</div>
+          <div className="text-[10.4px] font-bold mb-2">3. 미리보기 · 다운로드</div>
           <div className="rounded-xl overflow-hidden shadow-lg border border-note-line-strong bg-[#F7F1E6] max-w-[440px] mx-auto">
             <canvas
               ref={canvasRef}
@@ -627,7 +627,7 @@ export default function CafePosterPage() {
           </button>
         </section>
 
-        <p className="text-[11px] text-[#665036] leading-relaxed">
+        <p className="text-[8.8px] text-[#665036] leading-relaxed">
           ※ 카페명·태그라인·후기 발췌는 검증(옥석) 데이터베이스 실측값이에요. 같은 카페를 반복 소개할 수 있어
           두 템플릿 모두 &ldquo;제휴·협찬 아님&rdquo; 문구를 항상 표기합니다.
         </p>

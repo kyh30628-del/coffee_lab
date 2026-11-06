@@ -22,16 +22,16 @@ export default function ReportButton({ cafeId }: { cafeId: number }) {
     } catch { setDone("지금은 접수가 안 돼요."); }
     setOpen(false);
   };
-  if (done) return <span className="text-[12px] text-[#33684b]">✓ {done}</span>;
+  if (done) return <span className="text-[9.6px] text-[#33684b]">✓ {done}</span>;
   return (
     <span className="inline-flex items-center gap-2 flex-wrap">
       {!open ? (
-        <button type="button" onClick={() => setOpen(true)} className="text-[12px] text-[#7a6750] underline underline-offset-2">뭔가 달라요? 알려주세요</button>
+        <button type="button" onClick={() => setOpen(true)} className="text-[9.6px] text-[#7a6750] underline underline-offset-2">뭔가 달라요? 알려주세요</button>
       ) : (
         <>
           <button type="button" onClick={() => send("closed")} className="nt-chip">🚪 문 닫았어요</button>
           <button type="button" onClick={() => send("wrong")} className="nt-chip">↔ 다른 가게 얘기예요</button>
-          <button type="button" onClick={() => setOpen(false)} className="text-[12px] text-[#7a6750]">취소</button>
+          <button type="button" onClick={() => setOpen(false)} className="text-[9.6px] text-[#7a6750]">취소</button>
         </>
       )}
     </span>

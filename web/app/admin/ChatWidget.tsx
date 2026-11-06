@@ -259,44 +259,44 @@ export function ChatWidget({ pw }: { pw: string }) {
   return (
     <>
       <div style={{ position: "fixed", bottom: "calc(18px + env(safe-area-inset-bottom))", right: "calc(18px + env(safe-area-inset-right))", zIndex: 50 }}>
-        <button onClick={openChat} aria-label="관제 챗봇 열기" style={{ width: 54, height: 54, borderRadius: 27, background: "#2b2018", color: "#e8b87a", border: "2px solid #c98a3c", fontSize: 24, boxShadow: "0 3px 12px rgba(0,0,0,0.3)", cursor: "pointer" }}>💬</button>
-        {unread > 0 && <span style={{ position: "absolute", top: -4, right: -4, background: "#c0392b", color: "#fff", borderRadius: 10, fontSize: 11, fontWeight: 700, minWidth: 18, height: 18, padding: "0 3px", border: "1px solid #f7f1e4", display: "flex", alignItems: "center", justifyContent: "center" }}>{unread > 9 ? "9+" : unread}</span>}
+        <button onClick={openChat} aria-label="관제 챗봇 열기" style={{ width: 54, height: 54, borderRadius: 27, background: "#2b2018", color: "#e8b87a", border: "2px solid #c98a3c", fontSize: 19.2, boxShadow: "0 3px 12px rgba(0,0,0,0.3)", cursor: "pointer" }}>💬</button>
+        {unread > 0 && <span style={{ position: "absolute", top: -4, right: -4, background: "#c0392b", color: "#fff", borderRadius: 10, fontSize: 8.8, fontWeight: 700, minWidth: 18, height: 18, padding: "0 3px", border: "1px solid #f7f1e4", display: "flex", alignItems: "center", justifyContent: "center" }}>{unread > 9 ? "9+" : unread}</span>}
       </div>
       {open && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 100, display: "flex", flexDirection: "column", justifyContent: "flex-end", overscrollBehavior: "contain" }} onClick={() => setOpen(false)}>
           <div onClick={(e) => e.stopPropagation()} style={{ background: "#f7f1e4", borderRadius: "16px 16px 0 0", maxWidth: 640, width: "100%", margin: "0 auto", height: "86vh", display: "flex", flexDirection: "column" }}>
             <div style={{ background: "#2b2018", color: "#e8b87a", padding: "12px 16px", borderRadius: "16px 16px 0 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <b style={{ fontSize: 15 }}>💬 관제 챗봇</b>
+              <b style={{ fontSize: 12 }}>💬 관제 챗봇</b>
               <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
-                <span onClick={openArchive} title="대화기록(과거 세션 열람·검색)" style={{ cursor: "pointer", fontSize: 16 }}>🗂</span>
-                <span onClick={clearHistory} title="24h 대화기록 삭제" style={{ cursor: "pointer", fontSize: 17 }}>🗑</span>
-                <span onClick={() => setOpen(false)} style={{ cursor: "pointer", fontSize: 18 }}>✕</span>
+                <span onClick={openArchive} title="대화기록(과거 세션 열람·검색)" style={{ cursor: "pointer", fontSize: 12.8 }}>🗂</span>
+                <span onClick={clearHistory} title="24h 대화기록 삭제" style={{ cursor: "pointer", fontSize: 13.6 }}>🗑</span>
+                <span onClick={() => setOpen(false)} style={{ cursor: "pointer", fontSize: 14.4 }}>✕</span>
               </div>
             </div>
             <div style={{ display: "flex", gap: 6, padding: "8px 12px 0" }}>
               {(["chat", "region"] as const).map((mo) => (
-                <button key={mo} onClick={() => setMode(mo)} style={{ flex: 1, padding: "7px 0", borderRadius: 8, fontSize: 12.5, fontWeight: 700, cursor: "pointer", border: "1px solid " + (mode === mo ? "#c98a3c" : "#e0d2b8"), background: mode === mo ? "#2b2018" : "#fff", color: mode === mo ? "#e8b87a" : "#8a7a5c" }}>{mo === "chat" ? "🛠️ 작업지시" : "💬 일반"}</button>
+                <button key={mo} onClick={() => setMode(mo)} style={{ flex: 1, padding: "7px 0", borderRadius: 8, fontSize: 10, fontWeight: 700, cursor: "pointer", border: "1px solid " + (mode === mo ? "#c98a3c" : "#e0d2b8"), background: mode === mo ? "#2b2018" : "#fff", color: mode === mo ? "#e8b87a" : "#8a7a5c" }}>{mo === "chat" ? "🛠️ 작업지시" : "💬 일반"}</button>
               ))}
             </div>
             <div style={{ padding: "8px 12px 0" }}>
-              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 대화 검색…" style={{ width: "100%", padding: "6px 10px", borderRadius: 8, border: "1px solid #e0d2b8", fontSize: 12.5, background: "#fff", boxSizing: "border-box" }} />
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 대화 검색…" style={{ width: "100%", padding: "6px 10px", borderRadius: 8, border: "1px solid #e0d2b8", fontSize: 10, background: "#fff", boxSizing: "border-box" }} />
             </div>
             <div ref={scrollRef} onScroll={handleScroll} style={{ flex: 1, overflowY: "auto", overscrollBehavior: "contain", padding: 12 }}>
               {msgs.length === 0 && (mode === "chat"
-                ? <div style={{ color: "#9c8a6c", fontSize: 13, lineHeight: 1.7 }}>상태를 묻거나 <b>작업을 지시</b>하세요.<br />질문: "발행 몇 개야?" · "결재 대기 뭐 있어?"<br />지시: "관제탑 상단에 발행 수 배지 추가해줘" · "지도 팝업 여백 줄여줘"<br /><span style={{ fontSize: 11.5, color: "#b0a081" }}>안전한 코드 변경은 자율로 구현·검증·배포하고, 데이터 변경·모호한 건은 되물어봅니다.</span></div>
-                : <div style={{ color: "#9c8a6c", fontSize: 13, lineHeight: 1.7 }}>동/구 이름·<b>카페 이름</b>이나 <b>서비스·조직·관제</b> 질문에 <b>즉시</b> 답해요(LLM 안 씀·빠름).<br />예: "성수동" · "강남구" · "블루보틀" · "서비스가 뭐야?" · "관제탑이 뭐야?"</div>)}
-              {msgs.length > 0 && search.trim() && filteredMsgs.length === 0 && <div style={{ color: "#9c8a6c", fontSize: 13 }}>검색 결과 없음</div>}
+                ? <div style={{ color: "#9c8a6c", fontSize: 10.4, lineHeight: 1.7 }}>상태를 묻거나 <b>작업을 지시</b>하세요.<br />질문: "발행 몇 개야?" · "결재 대기 뭐 있어?"<br />지시: "관제탑 상단에 발행 수 배지 추가해줘" · "지도 팝업 여백 줄여줘"<br /><span style={{ fontSize: 9.2, color: "#b0a081" }}>안전한 코드 변경은 자율로 구현·검증·배포하고, 데이터 변경·모호한 건은 되물어봅니다.</span></div>
+                : <div style={{ color: "#9c8a6c", fontSize: 10.4, lineHeight: 1.7 }}>동/구 이름·<b>카페 이름</b>이나 <b>서비스·조직·관제</b> 질문에 <b>즉시</b> 답해요(LLM 안 씀·빠름).<br />예: "성수동" · "강남구" · "블루보틀" · "서비스가 뭐야?" · "관제탑이 뭐야?"</div>)}
+              {msgs.length > 0 && search.trim() && filteredMsgs.length === 0 && <div style={{ color: "#9c8a6c", fontSize: 10.4 }}>검색 결과 없음</div>}
               {filteredMsgs.map((m, i) => (
                 <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: m.role === "user" ? "flex-end" : "flex-start", margin: "6px 0" }}>
-                  <div className={m.role === "assistant" ? "ex" : ""} style={{ maxWidth: "88%", padding: "9px 12px", borderRadius: 13, fontSize: 14.5, lineHeight: 1.6, whiteSpace: m.role === "user" ? "pre-wrap" : "normal", wordBreak: "break-word", background: m.role === "user" ? "#c98a3c" : "#fff", color: m.role === "user" ? "#fff" : "#2b2018", border: m.role === "user" ? "none" : "1px solid #e6d8bf" }}>{m.role === "assistant" ? <div dangerouslySetInnerHTML={{ __html: md2html(m.content) }} /> : m.content}</div>
+                  <div className={m.role === "assistant" ? "ex" : ""} style={{ maxWidth: "88%", padding: "9px 12px", borderRadius: 13, fontSize: 11.6, lineHeight: 1.6, whiteSpace: m.role === "user" ? "pre-wrap" : "normal", wordBreak: "break-word", background: m.role === "user" ? "#c98a3c" : "#fff", color: m.role === "user" ? "#fff" : "#2b2018", border: m.role === "user" ? "none" : "1px solid #e6d8bf" }}>{m.role === "assistant" ? <div dangerouslySetInnerHTML={{ __html: md2html(m.content) }} /> : m.content}</div>
                   <span style={{ display: "flex", alignItems: "center", gap: 5, margin: "2px 4px 0" }}>
-                    {m.role === "assistant" && m.model && <span title="이 답변을 생성한 실제 모델" style={{ fontSize: 9.5, fontWeight: 700, color: "#8a6b3f", background: "#efe1c4", border: "1px solid #ddc9a8", borderRadius: 6, padding: "1px 5px", letterSpacing: 0.2 }}>{m.model.charAt(0).toUpperCase() + m.model.slice(1)}</span>}
-                    {m.time && <span style={{ fontSize: 10.5, color: "#a89878" }}>{m.time}</span>}
+                    {m.role === "assistant" && m.model && <span title="이 답변을 생성한 실제 모델" style={{ fontSize: 7.6, fontWeight: 700, color: "#8a6b3f", background: "#efe1c4", border: "1px solid #ddc9a8", borderRadius: 6, padding: "1px 5px", letterSpacing: 0.2 }}>{m.model.charAt(0).toUpperCase() + m.model.slice(1)}</span>}
+                    {m.time && <span style={{ fontSize: 8.4, color: "#a89878" }}>{m.time}</span>}
                   </span>
                 </div>
               ))}
               {loading && (
-                <div style={{ color: "#9c8a6c", fontSize: 13, margin: "6px 0", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                <div style={{ color: "#9c8a6c", fontSize: 10.4, margin: "6px 0", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                   <span>{mode === "region" ? "🗺️ 집계 중…" : "💭 접수됨 · 처리 중… (상태질문은 즉답, 지시는 착수까지 잠깐)"}</span>
                   <span style={{ color: "#b0a081", fontVariantNumeric: "tabular-nums" }}>· {elapsed}초 응답 중</span>
                 </div>
@@ -305,13 +305,13 @@ export function ChatWidget({ pw }: { pw: string }) {
             {mode === "region" && (
               <div style={{ display: "flex", gap: 6, padding: "8px 10px 0", flexWrap: "wrap", borderTop: "1px solid #e6d8bf" }}>
                 {SUGGEST.region.map((s) => (
-                  <button key={s} onClick={() => setInput(s)} disabled={loading} title="클릭하면 입력창에 채워져요" style={{ padding: "5px 11px", borderRadius: 14, fontSize: 12.5, fontWeight: 600, cursor: loading ? "default" : "pointer", border: "1px solid #ddc9a8", background: "#fff", color: "#8a6b3f", opacity: loading ? 0.5 : 1 }}>{s}</button>
+                  <button key={s} onClick={() => setInput(s)} disabled={loading} title="클릭하면 입력창에 채워져요" style={{ padding: "5px 11px", borderRadius: 14, fontSize: 10, fontWeight: 600, cursor: loading ? "default" : "pointer", border: "1px solid #ddc9a8", background: "#fff", color: "#8a6b3f", opacity: loading ? 0.5 : 1 }}>{s}</button>
                 ))}
               </div>
             )}
             <div style={{ display: "flex", gap: 7, padding: "8px 10px calc(10px + env(safe-area-inset-bottom))" }}>
-              <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !loading) (mode === "region" ? sendRegion() : send()); }} placeholder={mode === "region" ? "동/구 또는 카페 이름 (예: 성수동, 블루보틀)" : "질문…"} disabled={loading} style={{ flex: 1, minWidth: 0, padding: "11px 13px", borderRadius: 10, border: "1px solid #ddc9a8", fontSize: 16 }} />
-              <button onClick={() => (loading ? stop() : (mode === "region" ? sendRegion() : send()))} style={{ padding: "0 18px", background: loading ? "#7a2e22" : "#2b2018", color: loading ? "#f2d9c9" : "#e8b87a", border: "none", borderRadius: 10, fontWeight: 700, fontSize: 15, flexShrink: 0, cursor: "pointer" }}>{loading ? "⏹ 중지" : "전송"}</button>
+              <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !loading) (mode === "region" ? sendRegion() : send()); }} placeholder={mode === "region" ? "동/구 또는 카페 이름 (예: 성수동, 블루보틀)" : "질문…"} disabled={loading} style={{ flex: 1, minWidth: 0, padding: "11px 13px", borderRadius: 10, border: "1px solid #ddc9a8", fontSize: 12.8 }} />
+              <button onClick={() => (loading ? stop() : (mode === "region" ? sendRegion() : send()))} style={{ padding: "0 18px", background: loading ? "#7a2e22" : "#2b2018", color: loading ? "#f2d9c9" : "#e8b87a", border: "none", borderRadius: 10, fontWeight: 700, fontSize: 12, flexShrink: 0, cursor: "pointer" }}>{loading ? "⏹ 중지" : "전송"}</button>
             </div>
           </div>
         </div>
@@ -321,40 +321,40 @@ export function ChatWidget({ pw }: { pw: string }) {
           <div onClick={(e) => e.stopPropagation()} style={{ background: "#f7f1e4", borderRadius: "16px 16px 0 0", maxWidth: 640, width: "100%", margin: "0 auto", height: "86vh", display: "flex", flexDirection: "column" }}>
             <div style={{ background: "#2b2018", color: "#e8b87a", padding: "12px 16px", borderRadius: "16px 16px 0 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                {archiveDate && <span onClick={() => setArchiveDate(null)} title="세션 목록으로" style={{ cursor: "pointer", fontSize: 16 }}>←</span>}
-                <b style={{ fontSize: 15 }}>🗂 대화기록{archiveDate ? ` · ${archiveDate}` : ""}</b>
+                {archiveDate && <span onClick={() => setArchiveDate(null)} title="세션 목록으로" style={{ cursor: "pointer", fontSize: 12.8 }}>←</span>}
+                <b style={{ fontSize: 12 }}>🗂 대화기록{archiveDate ? ` · ${archiveDate}` : ""}</b>
               </div>
-              <span onClick={() => setArchiveOpen(false)} style={{ cursor: "pointer", fontSize: 18 }}>✕</span>
+              <span onClick={() => setArchiveOpen(false)} style={{ cursor: "pointer", fontSize: 14.4 }}>✕</span>
             </div>
             <div style={{ padding: "8px 12px 0" }}>
-              <input value={archiveQ} onChange={(e) => setArchiveQ(e.target.value)} placeholder="🔍 과거 대화 검색…" style={{ width: "100%", padding: "6px 10px", borderRadius: 8, border: "1px solid #e0d2b8", fontSize: 12.5, background: "#fff", boxSizing: "border-box" }} />
+              <input value={archiveQ} onChange={(e) => setArchiveQ(e.target.value)} placeholder="🔍 과거 대화 검색…" style={{ width: "100%", padding: "6px 10px", borderRadius: 8, border: "1px solid #e0d2b8", fontSize: 10, background: "#fff", boxSizing: "border-box" }} />
             </div>
             <div style={{ flex: 1, overflowY: "auto", overscrollBehavior: "contain", padding: 12 }}>
-              {archiveLoading && <div style={{ color: "#9c8a6c", fontSize: 13 }}>불러오는 중…</div>}
+              {archiveLoading && <div style={{ color: "#9c8a6c", fontSize: 10.4 }}>불러오는 중…</div>}
               {!archiveLoading && !archiveDate && archiveSessions.length === 0 && (
-                <div style={{ color: "#9c8a6c", fontSize: 13, lineHeight: 1.7 }}>{archiveQ.trim() ? "검색 결과 없음" : "24시간이 지난 과거 대화가 여기 자동 보관됩니다(읽기전용)."}</div>
+                <div style={{ color: "#9c8a6c", fontSize: 10.4, lineHeight: 1.7 }}>{archiveQ.trim() ? "검색 결과 없음" : "24시간이 지난 과거 대화가 여기 자동 보관됩니다(읽기전용)."}</div>
               )}
               {!archiveDate && archiveSessions.map((s) => (
                 <div key={s.date} onClick={() => setArchiveDate(s.date)} style={{ padding: "10px 12px", marginBottom: 6, borderRadius: 10, background: "#fff", border: "1px solid #e6d8bf", cursor: "pointer" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <b style={{ fontSize: 13.5, color: "#2b2018" }}>{s.date}</b>
-                    <span style={{ fontSize: 11.5, color: "#a89878" }}>{s.count}건</span>
+                    <b style={{ fontSize: 10.8, color: "#2b2018" }}>{s.date}</b>
+                    <span style={{ fontSize: 9.2, color: "#a89878" }}>{s.count}건</span>
                   </div>
-                  {s.title && <div style={{ fontSize: 12.5, color: "#8a7a5c", marginTop: 3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.title}</div>}
+                  {s.title && <div style={{ fontSize: 10, color: "#8a7a5c", marginTop: 3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.title}</div>}
                 </div>
               ))}
-              {archiveDate && !archiveLoading && archiveMsgs.length === 0 && <div style={{ color: "#9c8a6c", fontSize: 13 }}>{archiveQ.trim() ? "검색 결과 없음" : "기록 없음"}</div>}
+              {archiveDate && !archiveLoading && archiveMsgs.length === 0 && <div style={{ color: "#9c8a6c", fontSize: 10.4 }}>{archiveQ.trim() ? "검색 결과 없음" : "기록 없음"}</div>}
               {archiveDate && archiveMsgs.map((m, i) => (
                 <div key={i} style={{ margin: "10px 0" }}>
                   <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                    <div style={{ maxWidth: "88%", padding: "9px 12px", borderRadius: 13, fontSize: 14, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word", background: "#c98a3c", color: "#fff" }}>{m.question}</div>
+                    <div style={{ maxWidth: "88%", padding: "9px 12px", borderRadius: 13, fontSize: 11.2, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word", background: "#c98a3c", color: "#fff" }}>{m.question}</div>
                   </div>
                   {m.answer && (
                     <div style={{ display: "flex", justifyContent: "flex-start", marginTop: 4 }}>
-                      <div className="ex" style={{ maxWidth: "88%", padding: "9px 12px", borderRadius: 13, fontSize: 14, lineHeight: 1.6, background: "#fff", color: "#2b2018", border: "1px solid #e6d8bf" }}><div dangerouslySetInnerHTML={{ __html: md2html(m.answer) }} /></div>
+                      <div className="ex" style={{ maxWidth: "88%", padding: "9px 12px", borderRadius: 13, fontSize: 11.2, lineHeight: 1.6, background: "#fff", color: "#2b2018", border: "1px solid #e6d8bf" }}><div dangerouslySetInnerHTML={{ __html: md2html(m.answer) }} /></div>
                     </div>
                   )}
-                  {m.t && <div style={{ fontSize: 10.5, color: "#a89878", textAlign: "right", margin: "2px 4px 0" }}>{m.t}</div>}
+                  {m.t && <div style={{ fontSize: 8.4, color: "#a89878", textAlign: "right", margin: "2px 4px 0" }}>{m.t}</div>}
                 </div>
               ))}
             </div>

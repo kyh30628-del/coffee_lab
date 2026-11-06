@@ -304,7 +304,7 @@ export default function AreaPosterPage() {
         <BackLink to="/poster" label="포스터" className="text-note-brown mb-4" />
         <div className="text-[#5b6b54] text-xs tracking-[0.3em] uppercase mb-2">Area Report</div>
         <h1 className="text-3xl font-bold mb-1">지역소개 포스터</h1>
-        <p className="text-[13px] text-[#665036] mb-6 leading-relaxed">
+        <p className="text-[10.4px] text-[#665036] mb-6 leading-relaxed">
           구/동 단위로 검증등급 상위 카페 3~5곳을 이름·한줄 하이라이트로 소개하는 지역 큐레이션 포스터예요. 특정
           카페 단독홍보가 아닌 &ldquo;이 동네엔 이런 검증된 곳들이 있다&rdquo; 톤을 유지해요. 하이라이트는 실제
           검증 후기에서 뽑은 특징이고, 숫자 통계는 하단 리포트 스트립으로만 표기해요.
@@ -312,21 +312,21 @@ export default function AreaPosterPage() {
 
         {/* 지역 선택 */}
         <section className="bg-white/60 border border-note-line rounded-xl p-4 mb-5">
-          <div className="text-[13px] font-bold mb-2">1. 지역 선택</div>
+          <div className="text-[10.4px] font-bold mb-2">1. 지역 선택</div>
           <div className="flex gap-2 mb-2">
             <input
               type="text"
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
               placeholder="지역명으로 좁혀보기 (예: 마포)"
-              className="flex-1 min-w-0 border border-[#d8c6ac] rounded-lg px-3 py-2 text-[14px] bg-white"
+              className="flex-1 min-w-0 border border-[#d8c6ac] rounded-lg px-3 py-2 text-[11.2px] bg-white"
             />
           </div>
           <select
             value={selectedArea ?? ""}
             onChange={(e) => onSelect(e.target.value)}
             disabled={!filteredAreas.length}
-            className="w-full border border-[#d8c6ac] rounded-lg px-3 py-2 text-[14px] bg-white mb-2 disabled:opacity-50"
+            className="w-full border border-[#d8c6ac] rounded-lg px-3 py-2 text-[11.2px] bg-white mb-2 disabled:opacity-50"
           >
             {filteredAreas.length === 0 && <option value="">일치하는 지역 없음</option>}
             {filteredAreas.map((a) => (
@@ -335,10 +335,10 @@ export default function AreaPosterPage() {
               </option>
             ))}
           </select>
-          {loading && <div className="text-[12.5px] text-[#665036]">불러오는 중…</div>}
-          {err && <div className="text-[12.5px] text-[#b5482f]">{err}</div>}
+          {loading && <div className="text-[10px] text-[#665036]">불러오는 중…</div>}
+          {err && <div className="text-[10px] text-[#b5482f]">{err}</div>}
           {stats && !loading && (
-            <div className="text-[13px] text-[#5a4632]">
+            <div className="text-[10.4px] text-[#5a4632]">
               선택됨: <b>{stats.area}</b> · 카페 {stats.cafeCount}곳 · 검증 후기 {stats.verifiedReviews}건
             </div>
           )}
@@ -346,7 +346,7 @@ export default function AreaPosterPage() {
 
         {/* 미리보기 */}
         <section className="mb-5">
-          <div className="text-[13px] font-bold mb-2">2. 미리보기 · 다운로드</div>
+          <div className="text-[10.4px] font-bold mb-2">2. 미리보기 · 다운로드</div>
           <div className="rounded-xl overflow-hidden shadow-lg border border-note-line-strong bg-[#F7F1E6] max-w-[440px] mx-auto">
             <canvas
               ref={canvasRef}
@@ -365,7 +365,7 @@ export default function AreaPosterPage() {
           </button>
         </section>
 
-        <p className="text-[11px] text-[#665036] leading-relaxed">
+        <p className="text-[8.8px] text-[#665036] leading-relaxed">
           ※ 카페명·하이라이트·카페 수·검증 후기 수는 전부 검증(옥석) 데이터베이스 실측값이에요. 지어낸 카페명·후기는
           쓰지 않아요. 공개 카페가 5곳 이상인 지역만 목록에 나타나요.
         </p>

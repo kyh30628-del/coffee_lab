@@ -59,7 +59,7 @@ function Visual({ c }: { c: Cafe }) {
     return (
       <div className="relative h-32 rounded-xl overflow-hidden mb-3">
         <img src={c.photo_url} alt={c.name} className="w-full h-full object-cover" />
-        <div className="absolute top-2 right-3 text-[10px] text-white bg-black/40 rounded-full px-2 py-0.5">{c.area}</div>
+        <div className="absolute top-2 right-3 text-[8px] text-white bg-black/40 rounded-full px-2 py-0.5">{c.area}</div>
       </div>
     );
   }
@@ -69,7 +69,7 @@ function Visual({ c }: { c: Cafe }) {
       <div className="absolute bottom-2 left-3 flex items-end gap-2" style={{ color: t.ink }}>
         <span className="text-2xl font-bold leading-none opacity-90">{c.name.replace(/\s/g, "").slice(0, 1)}</span>
       </div>
-      <div className="absolute top-2 right-3 text-[10px] opacity-80" style={{ color: t.ink }}>{c.area}</div>
+      <div className="absolute top-2 right-3 text-[8px] opacity-80" style={{ color: t.ink }}>{c.area}</div>
     </div>
   );
 }
@@ -81,39 +81,39 @@ function CafeCard({ c, top, onShowEvidence }: { c: Cafe; top: boolean; onShowEvi
 
   return (
     <article className="bg-[#fdfaf4] rounded-2xl p-4 shadow-[0_4px_24px_rgba(80,50,20,0.08)] border border-[#ece0cd] flex flex-col">
-      {top && <div className="text-[10px] font-bold text-[#7a4d1c] uppercase tracking-wider mb-2">★ 이 목적에 가장 잘 맞는 곳</div>}
+      {top && <div className="text-[8px] font-bold text-[#7a4d1c] uppercase tracking-wider mb-2">★ 이 목적에 가장 잘 맞는 곳</div>}
       <Visual c={c} />
       <div className="flex items-center gap-1.5 flex-wrap mb-1">
         <h2 className="text-xl font-bold leading-tight">{c.name}</h2>
-        {g && <span className="text-[10px] text-white px-2 py-0.5 rounded-full" style={{ background: g.bg }}>{g.label}</span>}
+        {g && <span className="text-[8px] text-white px-2 py-0.5 rounded-full" style={{ background: g.bg }}>{g.label}</span>}
       </div>
       <div className="text-[#7a4d1c] text-xs mb-2">{c.vibe}</div>
 
       {/* 특징 태그 — 대부분 카페가 가진 특징을 정보로 표시 */}
       {tags.length > 0 && (
         <div className="flex flex-wrap gap-1 mb-2">
-          {tags.map((t) => <span key={t} className="text-[10px] bg-[#f0e6d4] text-[#8a6d3f] px-2 py-0.5 rounded-full">{t}</span>)}
+          {tags.map((t) => <span key={t} className="text-[8px] bg-[#f0e6d4] text-[#8a6d3f] px-2 py-0.5 rounded-full">{t}</span>)}
         </div>
       )}
 
-      {c.note && <p className="text-[15px] leading-relaxed text-[#3d2f22] font-medium mb-3">“{c.note}”</p>}
+      {c.note && <p className="text-[12px] leading-relaxed text-[#3d2f22] font-medium mb-3">“{c.note}”</p>}
 
       {c.synth_identity && (
         <div className="bg-[#efe9dd] rounded-lg px-3 py-2 mb-2 border border-[#ddd0bb]">
-          <div className="text-[13px] text-note-ink-warm leading-snug">{c.synth_identity}</div>
+          <div className="text-[10.4px] text-note-ink-warm leading-snug">{c.synth_identity}</div>
         </div>
       )}
 
       {c.synth_count != null && c.synth_count > 0 && (
         <button onClick={() => hasReviews && onShowEvidence(c)} disabled={!hasReviews}
           className={`mb-3 text-left rounded-lg px-3 py-2 flex items-center justify-between transition-colors ${hasReviews ? "bg-[#f0e6d4] hover:bg-[#e9dcc4] cursor-pointer" : "bg-[#f0e6d4]"}`}>
-          <span className="text-[12px] text-[#8a6d3f]">📋 리뷰 {c.synth_count}건 종합 {hasReviews && "· 근거 보기"}</span>
+          <span className="text-[9.6px] text-[#8a6d3f]">📋 리뷰 {c.synth_count}건 종합 {hasReviews && "· 근거 보기"}</span>
           {hasReviews && <span className="text-[#7a4d1c] text-xs">→</span>}
         </button>
       )}
 
       <div className="mt-auto">
-        {c.signature && <div className="text-[12px] text-note-ink-body mb-2"><span className="text-[#7a4d1c]">추천 </span>{c.signature}</div>}
+        {c.signature && <div className="text-[9.6px] text-note-ink-body mb-2"><span className="text-[#7a4d1c]">추천 </span>{c.signature}</div>}
         <div className="flex gap-2">
           <a href={`https://map.kakao.com/?q=${encodeURIComponent(c.name + " " + c.area)}`} target="_blank" rel="noopener noreferrer" onClick={() => trackOutbound({ target: "kakao_map", cafeId: c.id, source: "동네목록" })} className="flex-1 text-center bg-note-ink text-note-paper rounded-lg py-2 text-xs font-medium hover:bg-[#3d2f22] transition-colors">지도·길찾기</a>
           {c.phone && <a href={`tel:${c.phone}`} className="px-3 text-center bg-transparent border border-[#cbb89f] text-[#524434] rounded-lg py-2 text-xs font-medium flex items-center">전화</a>}
@@ -138,20 +138,20 @@ function EvidencePanel({ cafe, onClose }: { cafe: Cafe | null; onClose: () => vo
             <button onClick={onClose} className="text-2xl text-[#7a4d1c] leading-none">×</button>
           </div>
           <div className="text-[#7a4d1c] text-sm mb-4">리뷰 {cafe.synth_count}건 종합 · 근거</div>
-          {cafe.synth_identity && <div className="bg-[#efe9dd] rounded-lg px-4 py-3 mb-4 text-[14px] text-note-ink-warm">{cafe.synth_identity}</div>}
-          <div className="text-[11px] text-[#6b5847] mb-3">이 분석의 근거가 된 실제 후기 (네이버 공개 글)</div>
+          {cafe.synth_identity && <div className="bg-[#efe9dd] rounded-lg px-4 py-3 mb-4 text-[11.2px] text-note-ink-warm">{cafe.synth_identity}</div>}
+          <div className="text-[8.8px] text-[#6b5847] mb-3">이 분석의 근거가 된 실제 후기 (네이버 공개 글)</div>
           <div className="space-y-3">
             {reviews.map((rv, i) => (
               <div key={i} className="border-b border-[#f0e6d4] pb-3 last:border-0">
-                <div className="text-[14px] text-[#3d2f22] leading-relaxed">“{rv.quote}”</div>
-                <div className="flex items-center gap-2 mt-1.5 text-[11px] text-[#6b5847]">
+                <div className="text-[11.2px] text-[#3d2f22] leading-relaxed">“{rv.quote}”</div>
+                <div className="flex items-center gap-2 mt-1.5 text-[8.8px] text-[#6b5847]">
                   <span>{rv.source}</span>{rv.date && (() => { const ag = reviewAge(rv.date); return ag?.old ? <span className="nt-old" style={{ marginLeft: 0 }}>{ag.ym} · {ag.ago} 후기</span> : <span>· {rv.date}</span>; })()}
                   {rv.link && <a href={rv.link} target="_blank" rel="noopener noreferrer" className="text-[#7a4d1c] underline ml-auto">원문 보기 →</a>}
                 </div>
               </div>
             ))}
           </div>
-          <div className="text-[10px] text-[#6b5847] mt-6 leading-relaxed">네이버 공개 검색 결과의 요약·출처 링크입니다. 원문 저작권은 각 작성자에게 있습니다.</div>
+          <div className="text-[8px] text-[#6b5847] mt-6 leading-relaxed">네이버 공개 검색 결과의 요약·출처 링크입니다. 원문 저작권은 각 작성자에게 있습니다.</div>
         </div>
       </aside>
     </>
@@ -203,7 +203,7 @@ export default function CafePage() {
       <div className="max-w-4xl mx-auto px-6 py-10">
         <header className="mb-6 flex items-center justify-between">
           <div>
-            <div className="text-[#7a4d1c] text-[11px] tracking-[0.3em] uppercase">강동·구리 동네 커피 노트</div>
+            <div className="text-[#7a4d1c] text-[8.8px] tracking-[0.3em] uppercase">강동·구리 동네 커피 노트</div>
             <h1 className="text-2xl font-bold mt-1">{purpose ? `${PURPOSES.find((p) => p.key === purpose)?.label}` : "전체"}</h1>
           </div>
           <button onClick={() => setStep("purpose")} className="text-xs text-[#7a4d1c] underline">처음부터</button>
@@ -218,7 +218,7 @@ export default function CafePage() {
           )}
 
         <a href="/cafe/register" className="block mt-10 text-center text-sm text-[#7a4d1c] underline">사장님이세요? 우리 가게 등록하기 →</a>
-        <footer className="mt-8 pt-6 border-t border-[#d9c9b0] text-[11px] text-[#6b5847] leading-relaxed">위치·시간·평점은 공개 정보 · 리뷰 종합 분석은 네이버 공개 후기를 교차검증한 결과이며 근거 원문을 함께 제공합니다. 강동·구리 지역.</footer>
+        <footer className="mt-8 pt-6 border-t border-[#d9c9b0] text-[8.8px] text-[#6b5847] leading-relaxed">위치·시간·평점은 공개 정보 · 리뷰 종합 분석은 네이버 공개 후기를 교차검증한 결과이며 근거 원문을 함께 제공합니다. 강동·구리 지역.</footer>
       </div>
       <EvidencePanel cafe={evidenceCafe} onClose={() => setEvidenceCafe(null)} />
       <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet" />
