@@ -13,7 +13,13 @@ import { useEffect, useState } from "react";
 // 자리 두 곳(같은 컴포넌트):
 //   bottom         — 상세 페이지 하단 상시. 끝까지 읽은 사람이 자연스럽게 누른다.
 //   after-outlink  — 지도·전화 같은 외부 클릭 직후. "이 정보가 쓸모 있었나"를 묻기 가장 자연스러운 시점.
-//                    `window.dispatchEvent(new Event("dcn:outlink"))` 로 펼친다.
+//                    `window.dispatchEvent(new Event("dcn:outlink"))` 로 펼친다(trackOutboundClient.ts가 쏨).
+//
+// 🎯 2026-11-06 — 무엇을 묻는 건지 명확화(CEO 지시). 이건 "서비스 전체에 대한 의견"도
+//   "다녀온 뒤 방문 후기"도 아니라 **이 카페 한 곳에 대해 우리가 보여주는 정보가 정확한가**를 묻는다
+//   (원래 만든 이유: AI 판정 거부율·시설태그 오분류를 내부 추정 대신 실사용자로 검증).
+//   접속 피크가 "고르는 시간"이라 대부분 아직 안 가본 상태 — "어땠나요"(방문 경험으로 읽힘)는
+//   안 가본 사람을 배제시킬 위험이 있어 "정확한가요"로 바꿔 누구나 답할 수 있게 한다.
 //
 // 기기키는 다른 익명 기능과 **같은 키**(dcn_device)를 재사용 — 새 식별자 생성 0.
 function anonKey(): string {
@@ -68,12 +74,12 @@ export default function FeedbackBar({ cafeId }: { cafeId: number }) {
   if (!kind) return (
     <div className="mt-3 flex items-center gap-2 flex-wrap">
       <span className="text-[10.4px] text-[#5b4a36]">
-        {place === "after-outlink" ? "이 정보가 도움이 됐나요?" : place === "after-wish" ? "찜하셨네요! 이 카페 정보, 어땠나요?" : "이 카페 정보, 어땠나요?"}
+        {place === "after-outlink" ? "이 정보가 도움이 됐나요?" : place === "after-wish" ? "찜하셨네요! 이 카페 정보가 정확한가요?" : "이 카페 정보가 정확한가요?"}
       </span>
       <button type="button" disabled={busy} onClick={() => { setKind("like"); send("like"); }}
-        className="nt-chip" aria-label="좋아요">👍 좋아요</button>
+        className="nt-chip" aria-label="정확해요">👍 정확해요</button>
       <button type="button" disabled={busy} onClick={() => { setKind("meh"); send("meh"); }}
-        className="nt-chip" aria-label="아쉬워요">👎 아쉬워요</button>
+        className="nt-chip" aria-label="틀린 게 있어요">👎 틀린 게 있어요</button>
     </div>
   );
 
@@ -81,14 +87,14 @@ export default function FeedbackBar({ cafeId }: { cafeId: number }) {
   return (
     <div className="mt-3">
       <p className="text-[10.4px] text-[#5b4a36]">
-        {kind === "like" ? "👍 고맙습니다." : "👎 알려주셔서 고맙습니다."}
+        {kind === "like" ? "👍 확인해주셔서 고맙습니다." : "👎 알려주셔서 고맙습니다."}
         <span className="text-[#7a6750]"> 한 줄 더 남겨주시면 바로 고칩니다. (선택)</span>
       </p>
       <div className="mt-2 flex items-start gap-2">
         <textarea
           value={note} onChange={(e) => setNote(e.target.value.slice(0, 500))}
           rows={2} maxLength={500}
-          placeholder={kind === "like" ? "어떤 점이 좋았나요?" : "무엇이 아쉬웠나요?"}
+          placeholder={kind === "like" ? "더 알려주실 내용이 있다면 적어주세요" : "어떤 정보가 틀렸나요? (가격·영업시간·위치 등)"}
           className="flex-1 min-w-0 rounded-lg border border-note-line bg-white px-3 py-2 text-[11.2px] leading-relaxed outline-none focus:border-note-brown"
         />
         <div className="flex flex-col gap-1">

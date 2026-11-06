@@ -434,7 +434,7 @@ export default function AdminPage() {
                     <li key={it.id} className="rounded-lg border border-stone-200 px-3 py-2">
                       <div className="flex items-center gap-2 text-[8.8px] text-stone-600">
                         <span className={it.kind === "like" ? "text-emerald-700" : "text-amber-800"}>
-                          {it.kind === "like" ? "👍 좋아요" : "👎 아쉬워요"}
+                          {it.kind === "like" ? "👍 정확해요" : "👎 틀린 게 있어요"}
                         </span>
                         {it.cafeId && (
                           <a href={`/c/${it.cafeId}`} target="_blank" rel="noreferrer" className="underline">

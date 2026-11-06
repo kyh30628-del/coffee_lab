@@ -25,15 +25,16 @@ export default function PlaceCta({ cafeId, mapHref, mapLabel, mapExternal, scree
   const place = `/api/naver-place-redirect?id=${cafeId}`;
   const mapProps = mapExternal ? { target: "_blank", rel: "noopener noreferrer" } : {};
   const MapEl = mapExternal ? "a" : Link;
-  // 🔔 2026-11-06 — FeedbackBar의 "after-outlink" 자리(길찾기·네이버플레이스 누른 직후, 설계상 가장
-  //   자연스러운 질문 시점)가 이 이벤트를 쏘는 곳이 없어서 한 번도 안 뜨고 있었다. 복구.
-  const onOutlink = () => { try { window.dispatchEvent(new Event("dcn:outlink")); } catch {} };
+  // 🔔 2026-11-06 정정 — trackOutboundClient.ts가 target='naver_place'|'kakao_map'일 때 이미
+  //   dcn:outlink를 쏘고 있었다(처음에 .tsx만 grep해서 놓쳤던 기존 로직). 단, 카페상세(mapExternal
+  //   없음)의 길찾기는 target='map_cta'라 그 조건에 안 걸려 실제로 안 쏘고 있었다 — 그 한 곳만 보강.
+  const onMapOutlink = mapExternal ? undefined : () => { try { window.dispatchEvent(new Event("dcn:outlink")); } catch {} };
   return (
     <div className="nt-cta-mini">
-      <MapEl href={mapHref} className="nt-cta-map" {...(mapProps as any)} onClick={() => { trackOutbound({ target: mapExternal ? "kakao_map" : "map_cta", cafeId, source: screen }); onOutlink(); }}>
+      <MapEl href={mapHref} className="nt-cta-map" {...(mapProps as any)} onClick={() => { trackOutbound({ target: mapExternal ? "kakao_map" : "map_cta", cafeId, source: screen }); onMapOutlink?.(); }}>
         <span className="nt-cta-badge"><PinIcon /></span>{mapLabel}
       </MapEl>
-      <a href={place} target="_blank" rel="noopener noreferrer" className="nt-cta-naver" onClick={() => { trackOutbound({ target: "naver_place", cafeId, source: screen }); onOutlink(); }}>
+      <a href={place} target="_blank" rel="noopener noreferrer" className="nt-cta-naver" onClick={() => trackOutbound({ target: "naver_place", cafeId, source: screen })}>
         <span className="nt-cta-badge"><NIcon /></span>네이버 플레이스
       </a>
     </div>
