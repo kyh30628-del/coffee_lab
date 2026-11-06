@@ -23,11 +23,11 @@
   --nt-stamp: #a93a32;
   --nt-line: rgba(90, 70, 50, 0.18);
   --nt-shadow: rgba(60, 40, 20, 0.22);
-  --nt-font: "DCN Hand", "Nanum Pen Script", "Apple SD Gothic Neo", sans-serif; /* 2026-09-20 밤 최종(CEO): 우아한 손글씨 하나 — 나눔손편지체(DCN Letter). 굵기는 획(text-stroke)·크기·색으로 */            /* 본문 = 명조(2026-09-20: 손글씨 일변도 → 읽히는 판) */
-  --nt-hand-font: "DCN Hand Bold", "DCN Hand", "Nanum Pen Script", cursive; /* 판정 줄 = 성실체(굵은 펜) — 손편지체는 가늘고 흘려서 반려(09-21) */
-  --nt-display: "DCN Hand Bold", "DCN Hand", "Nanum Pen Script", "Apple SD Gothic Neo", sans-serif;                      /* 제목·굵게 */
-  --nt-sans: "DCN Hand", "Nanum Pen Script", "Apple SD Gothic Neo", sans-serif; /* 라벨·숫자·칩 */
-  --nt-brush: "DCN Hand Bold", "Nanum Pen Script", cursive;
+  --nt-font: "Paperlogy", "Apple SD Gothic Neo", sans-serif; /* 2026-11-06 CEO 지시: 가독성 낮은 손글씨(DCN Hand) 전면 폐기 → Paperlogy로 교체(비용 0, 서브셋 용량도 기존보다 작음) */
+  --nt-hand-font: "Paperlogy Bold", "Paperlogy", "Apple SD Gothic Neo", sans-serif; /* 판정 줄 */
+  --nt-display: "Paperlogy Bold", "Paperlogy", "Apple SD Gothic Neo", sans-serif;                      /* 제목·굵게 */
+  --nt-sans: "Paperlogy", "Apple SD Gothic Neo", sans-serif; /* 라벨·숫자·칩 */
+  --nt-brush: "Paperlogy Bold", "Apple SD Gothic Neo", sans-serif;
 }
 
 /* ── 종이 ── */
@@ -310,7 +310,7 @@
 /* ══ 📓 카페 상세 2차(2026-09-20, CEO 승인 시안) — 줄노트 위에 "읽히는 한 장" ══
    원칙: 줄(.nt-ruled 34px)·여백선·도장·찢은 띠·손글씨 판정은 노트 그대로. 본문은 명조(Gowun Batang), 이름은 Hahmlet,
    라벨·숫자는 고딕. 이모지 0 · 강조색은 커피 하나. .nt-app 5단 스냅·손글씨 굵기 규칙은 이 화면엔 적용하지 않는다(별도 스코프). */
-.nt-detail { --nt-serif: "DCN Hand", "Nanum Pen Script", "Apple SD Gothic Neo", sans-serif; --nt-gothic: "DCN Hand", "Nanum Pen Script", "Apple SD Gothic Neo", sans-serif; --nt-name: "DCN Hand Bold", "DCN Hand", "Nanum Pen Script", "Apple SD Gothic Neo", sans-serif;
+.nt-detail { --nt-serif: "Paperlogy", "Apple SD Gothic Neo", sans-serif; --nt-gothic: "Paperlogy", "Apple SD Gothic Neo", sans-serif; --nt-name: "Paperlogy Bold", "Paperlogy", "Apple SD Gothic Neo", sans-serif;
   font-family: var(--nt-serif); font-size: 17px; color: var(--nt-ink); overflow-x: clip; max-width: 100vw; -webkit-font-smoothing: antialiased; }
 .nt-detail select, .nt-detail input, .nt-detail textarea, .nt-detail button { font-family: inherit; }
 .nt-detail .nt-ruled { font-size: 17px; }

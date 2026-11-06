@@ -65,7 +65,7 @@ export default function Pricing() {
   }, []);
 
   return (
-    <main className="min-h-screen bg-note-paper text-note-ink" style={{ fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif" }}>
+    <main className="min-h-screen bg-note-paper text-note-ink" style={{ fontFamily: "'Paperlogy', 'Apple SD Gothic Neo', sans-serif" }}>
       <div className="max-w-md mx-auto px-5 py-10">
         <BackLink to="/" label="홈" className="text-note-brown mb-4" />
         <div className="text-note-brown text-xs tracking-[0.3em] uppercase mb-2">For Owners</div>

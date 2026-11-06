@@ -290,7 +290,7 @@ export default function PosterCopyPage() {
     <main
       className="min-h-screen nt-paper nt-app text-[#17100b]"
       style={{
-        fontFamily: "'DCN Hand', 'Nanum Pen Script', 'Apple SD Gothic Neo', sans-serif",
+        fontFamily: "'Paperlogy', 'Apple SD Gothic Neo', sans-serif",
         paddingBottom: "env(safe-area-inset-bottom)",
         paddingLeft: "env(safe-area-inset-left)",
         paddingRight: "env(safe-area-inset-right)",
