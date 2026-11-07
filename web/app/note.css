@@ -307,6 +307,22 @@
 .nt-sec { -webkit-text-stroke: 0.2px currentColor; }
 .nt-hand, .nt-hand b, .nt-hand strong { -webkit-text-stroke: 0; }
 
+/* ══ 📓 랜딩 전용 서체(2026-11-07, CEO 지시) ══
+   "헤드라인만 고운바탕(명조)으로 바꾸니 나머지(노트·버튼·푸터)는 나눔스퀘어라운드라 섞여서 통일성이
+   깨진다" → 랜딩(.nt-landing, LandingNote 컴포넌트) 전체를 고운바탕으로 통일. 나머지 화면(.nt-app의
+   다른 모든 뷰 — 카페상세·지도·검색 등)은 나눔스퀘어라운드 그대로(이 블록 밖이라 무영향).
+   --nt-* 토큰 전부 재정의(eyebrow·손글씨 메모·"동네 커피 노트" 라벨처럼 var()로 참조하는 요소용) +
+   font-family 직접 지정(소개 문구·버튼·푸터처럼 클래스 없이 상속만 받는 일반 텍스트까지 커버).
+   Gowun Batang은 /owner·/area·/business·/poster에서 이미 쓰는 Google Fonts 서체라 새 소싱 불필요. */
+.nt-landing {
+  --nt-font: "Gowun Batang", "Noto Serif KR", "Apple SD Gothic Neo", serif;
+  --nt-sans: "Gowun Batang", "Noto Serif KR", "Apple SD Gothic Neo", serif;
+  --nt-display: "Gowun Batang", "Noto Serif KR", "Apple SD Gothic Neo", serif;
+  --nt-hand-font: "Gowun Batang", "Noto Serif KR", "Apple SD Gothic Neo", serif;
+  --nt-brush: "Gowun Batang", "Noto Serif KR", "Apple SD Gothic Neo", serif;
+  font-family: "Gowun Batang", "Noto Serif KR", "Apple SD Gothic Neo", serif;
+}
+
 /* ══ 📓 카페 상세 2차(2026-09-20, CEO 승인 시안) — 줄노트 위에 "읽히는 한 장" ══
    원칙: 줄(.nt-ruled 34px)·여백선·도장·찢은 띠·손글씨 판정은 노트 그대로. 본문은 명조(Gowun Batang), 이름은 Hahmlet,
    라벨·숫자는 고딕. 이모지 0 · 강조색은 커피 하나. .nt-app 5단 스냅·손글씨 굵기 규칙은 이 화면엔 적용하지 않는다(별도 스코프). */
