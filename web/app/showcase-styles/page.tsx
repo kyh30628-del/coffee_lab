@@ -17,7 +17,7 @@ const SAMPLES = [
 
 export default function ShowcaseStyles() {
   return (
-    <main className="min-h-screen bg-[#e7ded0]" style={{ fontFamily: "'Paperlogy', 'Apple SD Gothic Neo', sans-serif" }}>
+    <main className="min-h-screen bg-[#e7ded0]" style={{ fontFamily: "'NanumSquareRound', 'Apple SD Gothic Neo', sans-serif" }}>
       <style dangerouslySetInnerHTML={{ __html: SHOWCASE_CSS }} />
       <div className="max-w-md mx-auto px-5 py-8">
         <BackLink to="/" label="홈" className="text-note-brown mb-3" />

@@ -61,7 +61,7 @@ export default function RootLayout({
     <html lang="ko" className="h-full subpixel-antialiased">
       <head>
         {/* 폰트를 문서 head에서 조기 연결·로딩 → 아이폰에서 글자가 점점 뜨던 문제 완화 */}
-        {/* 2026-11-06: Nanum Pen Script(Google Fonts) 제거 — Paperlogy 전면교체로 쓰이던 곳이 없어짐(자체 호스팅 서브셋만 사용) */}
+        {/* 2026-11-06: Nanum Pen Script(Google Fonts) 제거 — NanumSquareRound 전면교체로 쓰이던 곳이 없어짐(자체 호스팅 서브셋만 사용) */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         {/* Pretendard — 라벨·숫자·칩·버튼용 고딕(2026-09-20 서체 통일). 가변 1종·동적 서브셋이라 실제 쓰는 글자만 받는다 */}

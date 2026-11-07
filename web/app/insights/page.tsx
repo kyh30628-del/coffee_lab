@@ -106,7 +106,7 @@ export default async function InsightsPage() {
     ],
   };
   return (
-    <main className="min-h-screen bg-note-paper text-note-ink" style={{ fontFamily: "'Paperlogy', 'Apple SD Gothic Neo', sans-serif" }}>
+    <main className="min-h-screen bg-note-paper text-note-ink" style={{ fontFamily: "'NanumSquareRound', 'Apple SD Gothic Neo', sans-serif" }}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(datasetLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqLd) }} />
       <div className="max-w-2xl mx-auto px-5 py-10">

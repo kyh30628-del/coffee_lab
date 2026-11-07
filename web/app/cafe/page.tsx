@@ -131,7 +131,7 @@ function EvidencePanel({ cafe, onClose }: { cafe: Cafe | null; onClose: () => vo
   return (
     <>
       <div onClick={onClose} className="fixed inset-0 bg-black/30 z-40" />
-      <aside className="fixed top-0 right-0 h-full w-full max-w-md bg-[#fdfaf4] z-50 shadow-2xl overflow-y-auto" style={{ fontFamily: "'Paperlogy', 'Apple SD Gothic Neo', sans-serif" }}>
+      <aside className="fixed top-0 right-0 h-full w-full max-w-md bg-[#fdfaf4] z-50 shadow-2xl overflow-y-auto" style={{ fontFamily: "'NanumSquareRound', 'Apple SD Gothic Neo', sans-serif" }}>
         <div className="p-6">
           <div className="flex items-center justify-between mb-1">
             <h3 className="text-2xl font-bold">{cafe.name}</h3>
@@ -199,7 +199,7 @@ export default function CafePage() {
   }
 
   return (
-    <main className="min-h-screen bg-note-paper text-note-ink" style={{ fontFamily: "'Paperlogy', 'Apple SD Gothic Neo', sans-serif" }}>
+    <main className="min-h-screen bg-note-paper text-note-ink" style={{ fontFamily: "'NanumSquareRound', 'Apple SD Gothic Neo', sans-serif" }}>
       <div className="max-w-4xl mx-auto px-6 py-10">
         <header className="mb-6 flex items-center justify-between">
           <div>
@@ -228,7 +228,7 @@ export default function CafePage() {
 
 function Shell({ children, wide }: { children: React.ReactNode; wide: boolean }) {
   return (
-    <main className="min-h-screen bg-note-paper text-note-ink flex items-center" style={{ fontFamily: "'Paperlogy', 'Apple SD Gothic Neo', sans-serif" }}>
+    <main className="min-h-screen bg-note-paper text-note-ink flex items-center" style={{ fontFamily: "'NanumSquareRound', 'Apple SD Gothic Neo', sans-serif" }}>
       <div className={`${wide ? "max-w-4xl" : "max-w-xl"} mx-auto px-6 py-16 w-full`}>{children}</div>
       <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet" />
     </main>

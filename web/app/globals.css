@@ -1,6 +1,6 @@
 @import "tailwindcss";
 @import "./note.css";
-@import "./fonts-paperlogy.css";
+@import "./fonts-nanumsquareround.css";
 
 :root {
   --background: #ffffff;

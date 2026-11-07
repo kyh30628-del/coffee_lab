@@ -70,7 +70,7 @@ function BadgeForm() {
 
 export default function BadgePage() {
   return (
-    <main className="min-h-screen nt-paper nt-app text-[#17100b] px-5 py-10" style={{ fontFamily: "'Paperlogy', 'Apple SD Gothic Neo', sans-serif" }}>
+    <main className="min-h-screen nt-paper nt-app text-[#17100b] px-5 py-10" style={{ fontFamily: "'NanumSquareRound', 'Apple SD Gothic Neo', sans-serif" }}>
       <Suspense fallback={<div className="max-w-lg mx-auto text-[10.8px] text-[#7a6a55]">불러오는 중…</div>}>
         <BadgeForm />
       </Suspense>
