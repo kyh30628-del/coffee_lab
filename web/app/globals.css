@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "./note.css";
-@import "./fonts-nanumsquareround.css";
+/* 2026-11-07: 서체를 고운바탕(Gowun Batang, Google Fonts)으로 통일하며 자체 호스팅 서브셋 폐기 —
+   각 화면이 필요할 때 <link> 로 직접 불러온다(이미 /owner·/area 등 여러 화면이 쓰던 방식 그대로). */
 
 :root {
   --background: #ffffff;

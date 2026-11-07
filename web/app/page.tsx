@@ -842,7 +842,7 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
   // 🔬 화면 타임라인 — 눈에 보이는 글자 수(불투명 .ch)를 0.25초마다 25초간 기록. 0으로 떨어졌다 다시 오르면 '두 번 써짐'이 화면에서 실재.
   useEffect(() => {
     const samples: number[] = []; const t0 = performance.now(); let fontReady = false;
-    try { (document as any).fonts?.load('19px "NanumSquareRound Bold"').then(() => { fontReady = true; }); } catch {}
+    try { (document as any).fonts?.load('700 19px "Gowun Batang"').then(() => { fontReady = true; }); } catch {}
     const id = setInterval(() => {
       const page = pageRef.current; if (!page) { samples.push(-1); return; }
       let n = 0; page.querySelectorAll<HTMLElement>(".ch").forEach((el) => { if (getComputedStyle(el).opacity !== "0") n++; });
@@ -925,7 +925,7 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
       let fired = false;
       const once = (why: string) => { if (fired || cancelled) return; fired = true; landingBeacon("font", { mountId, navType: why }); go(); };
       const timer = setTimeout(() => once("timeout"), 2500);
-      Promise.all([f.load(`19px "NanumSquareRound Bold"`, txt), f.load(`17px "NanumSquareRound"`, txt)])
+      Promise.all([f.load(`700 19px "Gowun Batang"`, txt), f.load(`17px "Gowun Batang"`, txt)])
         .then(() => { clearTimeout(timer); once("loaded"); })
         .catch(() => { clearTimeout(timer); once("error"); });
     };
@@ -2353,11 +2353,11 @@ export default function Home() {
         .maplibregl-ctrl-top-left { top:6px !important; left:10px !important; }
         @media (max-width: 767px) { .maplibregl-ctrl-zoom-in, .maplibregl-ctrl-zoom-out { display:none !important; } } /* 모바일은 핀치 줌 — 나침반(회전 복귀)만 남김 */
         @media (max-width: 767px) { .dcn-tgl .dcn-tgl-txt { display:none; } .dcn-tgl { padding-left:.5rem !important; padding-right:.5rem !important; } }
-        .maplibregl-ctrl-bottom-left .maplibregl-ctrl-scale { margin:0 0 12px 12px !important; background:rgba(255,253,249,.86) !important; border:1.5px solid #b79a6f !important; border-top:none !important; color:#6b4f35 !important; font:600 10px/1.4 'NanumSquareRound', 'Apple SD Gothic Neo', sans-serif !important; padding:1px 6px !important; }
+        .maplibregl-ctrl-bottom-left .maplibregl-ctrl-scale { margin:0 0 12px 12px !important; background:rgba(255,253,249,.86) !important; border:1.5px solid #b79a6f !important; border-top:none !important; color:#6b4f35 !important; font:600 10px/1.4 'Gowun Batang', 'Apple SD Gothic Neo', sans-serif !important; padding:1px 6px !important; }
         .maplibregl-ctrl-attrib { background:rgba(255,253,249,.72) !important; color:#9c8569 !important; font-size:9px !important; padding:1px 6px !important; border-radius:6px 0 0 0 !important; }
         .maplibregl-ctrl-attrib a { color:#8a6d3b !important; }
         .maplibregl-ctrl-bottom-right .maplibregl-ctrl { margin:0 !important; }
-        .dcn-popup .maplibregl-popup-content { background:#fdfaf4; color:#2b2018; font:600 12px/1.4 'NanumSquareRound', 'Apple SD Gothic Neo', sans-serif; padding:6px 10px; border-radius:10px; box-shadow:0 4px 14px rgba(50,33,20,.28); }
+        .dcn-popup .maplibregl-popup-content { background:#fdfaf4; color:#2b2018; font:600 12px/1.4 'Gowun Batang', 'Apple SD Gothic Neo', sans-serif; padding:6px 10px; border-radius:10px; box-shadow:0 4px 14px rgba(50,33,20,.28); }
         .dcn-popup .maplibregl-popup-tip { border-top-color:#fdfaf4; }
         .maplibregl-canvas:focus { outline:none; }
       `}</style>
@@ -3656,7 +3656,7 @@ function MemorySettingsModal({ device, visits, hasPin, onPinChange, onClose, onR
         <div style="font-size:10px;color:#8a7458;margin-top:8px;">${new Date(v.created_at).toLocaleString("ko-KR")}</div>
       </div>`).join("");
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>내 커피 기억</title>
-      <style>body{font-family:'NanumSquareRound', 'Apple SD Gothic Neo', sans-serif;background:#fdfaf4;color:#2b2018;padding:24px;max-width:600px;margin:0 auto;}h1{font-size:22px;}</style></head>
+      <style>body{font-family:'Gowun Batang', 'Apple SD Gothic Neo', sans-serif;background:#fdfaf4;color:#2b2018;padding:24px;max-width:600px;margin:0 auto;}h1{font-size:22px;}</style></head>
       <body><h1>☕ 동네 커피 노트 — 내 기억</h1><p style="color:#7a6452;font-size:12px;">총 ${visits.length}곳 · 내보낸 날짜 ${new Date().toLocaleDateString("ko-KR")}</p>${rows}
       <script>window.onload=function(){setTimeout(function(){window.print();},400);}</script></body></html>`;
     const w = window.open("", "_blank");

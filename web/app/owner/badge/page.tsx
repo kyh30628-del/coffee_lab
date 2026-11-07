@@ -70,7 +70,8 @@ function BadgeForm() {
 
 export default function BadgePage() {
   return (
-    <main className="min-h-screen nt-paper nt-app text-[#17100b] px-5 py-10" style={{ fontFamily: "'NanumSquareRound', 'Apple SD Gothic Neo', sans-serif" }}>
+    <main className="min-h-screen nt-paper nt-app text-[#17100b] px-5 py-10" style={{ fontFamily: "'Gowun Batang', 'Apple SD Gothic Neo', sans-serif" }}>
+      <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet" />
       <Suspense fallback={<div className="max-w-lg mx-auto text-[10.8px] text-[#7a6a55]">불러오는 중…</div>}>
         <BadgeForm />
       </Suspense>

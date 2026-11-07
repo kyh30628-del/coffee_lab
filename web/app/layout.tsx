@@ -60,12 +60,13 @@ export default function RootLayout({
   return (
     <html lang="ko" className="h-full subpixel-antialiased">
       <head>
-        {/* 폰트를 문서 head에서 조기 연결·로딩 → 아이폰에서 글자가 점점 뜨던 문제 완화 */}
-        {/* 2026-11-06: Nanum Pen Script(Google Fonts) 제거 — NanumSquareRound 전면교체로 쓰이던 곳이 없어짐(자체 호스팅 서브셋만 사용) */}
+        {/* 폰트를 문서 head에서 조기 연결 — 아이폰에서 글자가 점점 뜨던 문제 완화.
+            2026-11-07: 서체를 고운바탕(Gowun Batang) 하나로 통일하며 여기 전역 로드하던 Pretendard
+            제거(코드 전수 확인 결과 실제로 쓰는 곳이 note.css 주석 2곳뿐 — 전부 09-20 밤에 정했다가
+            그날 밤 반려된 결정의 흔적이었음, 실사용 0인데 매 페이지 로드만 하고 있었음).
+            Gowun Batang은 각 화면이 필요할 때 자기 <link>로 직접 불러온다(이미 쓰던 방식). */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        {/* Pretendard — 라벨·숫자·칩·버튼용 고딕(2026-09-20 서체 통일). 가변 1종·동적 서브셋이라 실제 쓰는 글자만 받는다 */}
-        <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
         {/* 📓 PWA 첫 화면(iOS 스플래시) — 랜딩과 같은 에스프레소·정물·로고. 기기별 해상도 11종 */}
         <link rel="apple-touch-startup-image" href="/splash/apple-splash-1320x2868.png" media="(device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
         <link rel="apple-touch-startup-image" href="/splash/apple-splash-1206x2622.png" media="(device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />

@@ -443,10 +443,13 @@ export default async function CafePage({ params }: Props) {
   const IcoInfo = () => <svg viewBox="0 0 24 24" aria-hidden><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>;
   return (
     <main className="min-h-screen nt-paper nt-detail">
+      {/* 🔴 2026-11-07 발견: 이 화면(.nt-detail)이 Gowun Batang를 쓰도록 CSS는 돼 있었는데
+          이 페이지 어디에도 실제로 그 폰트를 불러오는 <link>가 없었다 — 가장 트래픽이 많은
+          화면인데 폰트 자체가 로드된 적이 없었다는 뜻이라 바로 추가. */}
+      <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet" />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }} />
       {faqJsonLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />}
-      {/* 서체는 layout에서 로드(Noto Serif KR·Pretendard) — 여기서 따로 싣지 않는다 */}
       <div className="max-w-xl mx-auto nt-page pb-6" style={{ ["--nt-mx" as any]: "36px" }}>
         {/* 장식 — 잔 자국 하나, 오른쪽 위에 반쯤 걸쳐서 */}
         <div className="nt-ring" aria-hidden style={{ right: -78, top: 96, width: 220 }} />

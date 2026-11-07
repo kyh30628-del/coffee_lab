@@ -10,7 +10,7 @@ const FILL = "[입력 필요]";
 
 export default function BusinessInfo() {
   return (
-    <main className="min-h-screen bg-note-paper text-note-ink" style={{ fontFamily: "'NanumSquareRound', 'Apple SD Gothic Neo', sans-serif" }}>
+    <main className="min-h-screen bg-note-paper text-note-ink" style={{ fontFamily: "'Gowun Batang', 'Apple SD Gothic Neo', sans-serif" }}>
       <div className="max-w-2xl mx-auto px-5 py-10">
         <BackLink to="/" label="홈" className="text-note-tan mb-4" />
         <h1 className="text-3xl font-bold mb-1">사업자 정보 · 환불 정책</h1>

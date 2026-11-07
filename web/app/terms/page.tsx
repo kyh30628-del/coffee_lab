@@ -6,7 +6,7 @@ export const metadata = {
 export default function TermsPage() {
   const updated = "2026-06-21";
   return (
-    <main className="min-h-screen bg-note-paper text-note-ink" style={{ fontFamily: "'NanumSquareRound', 'Apple SD Gothic Neo', sans-serif" }}>
+    <main className="min-h-screen bg-note-paper text-note-ink" style={{ fontFamily: "'Gowun Batang', 'Apple SD Gothic Neo', sans-serif" }}>
       <div className="max-w-2xl mx-auto px-6 py-12">
         <BackLink to="/" label="홈" className="text-note-brown mb-4" />
         <div className="text-note-brown text-xs tracking-[0.3em] uppercase mb-2">Terms of Service</div>

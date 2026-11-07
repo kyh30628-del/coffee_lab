@@ -469,12 +469,13 @@ export default function PosterCarouselPage() {
     <main
       className="min-h-screen nt-paper nt-app text-[#17100b]"
       style={{
-        fontFamily: "'NanumSquareRound', 'Apple SD Gothic Neo', sans-serif",
+        fontFamily: "'Gowun Batang', 'Apple SD Gothic Neo', sans-serif",
         paddingBottom: "env(safe-area-inset-bottom)",
         paddingLeft: "env(safe-area-inset-left)",
         paddingRight: "env(safe-area-inset-right)",
       }}
     >
+      <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet" />
       {/* 캐러셀 가로 스크롤바 숨김 */}
       <style>{`.poster-carousel::-webkit-scrollbar{display:none}`}</style>
       <div className="max-w-4xl mx-auto px-6 py-10">

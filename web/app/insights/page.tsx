@@ -106,7 +106,8 @@ export default async function InsightsPage() {
     ],
   };
   return (
-    <main className="min-h-screen bg-note-paper text-note-ink" style={{ fontFamily: "'NanumSquareRound', 'Apple SD Gothic Neo', sans-serif" }}>
+    <main className="min-h-screen bg-note-paper text-note-ink" style={{ fontFamily: "'Gowun Batang', 'Apple SD Gothic Neo', sans-serif" }}>
+      <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet" />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(datasetLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqLd) }} />
       <div className="max-w-2xl mx-auto px-5 py-10">

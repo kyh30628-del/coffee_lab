@@ -73,7 +73,8 @@ export default async function CollectionPage({ params }: { params: Promise<{ slu
     itemListElement: cafes.slice(0, 20).map((cf, i) => ({ "@type": "ListItem", position: i + 1, url: `${SITE}/c/${cf.id}`, name: cf.name })),
   };
   return (
-    <main className="min-h-screen bg-note-paper text-note-ink" style={{ fontFamily: "'NanumSquareRound', 'Apple SD Gothic Neo', sans-serif" }}>
+    <main className="min-h-screen bg-note-paper text-note-ink" style={{ fontFamily: "'Gowun Batang', 'Apple SD Gothic Neo', sans-serif" }}>
+      <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet" />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonld) }} />
       <div className="max-w-2xl mx-auto px-5 py-9">
         <Link href={areaHref} className="text-note-brown text-[10.4px] underline">← {area} 카페 전체</Link>

@@ -294,12 +294,13 @@ export default function AreaPosterPage() {
     <main
       className="min-h-screen nt-paper nt-app text-[#17100b]"
       style={{
-        fontFamily: "'NanumSquareRound', 'Apple SD Gothic Neo', sans-serif",
+        fontFamily: "'Gowun Batang', 'Apple SD Gothic Neo', sans-serif",
         paddingBottom: "env(safe-area-inset-bottom)",
         paddingLeft: "env(safe-area-inset-left)",
         paddingRight: "env(safe-area-inset-right)",
       }}
     >
+      <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet" />
       <div className="max-w-4xl mx-auto px-6 py-10">
         <BackLink to="/poster" label="포스터" className="text-note-brown mb-4" />
         <div className="text-[#5b6b54] text-xs tracking-[0.3em] uppercase mb-2">Area Report</div>

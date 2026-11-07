@@ -51,7 +51,7 @@ export default function RegisterPage() {
 
   if (status === "done") {
     return (
-      <main className="min-h-screen bg-note-paper text-note-ink flex items-center justify-center p-6" style={{ fontFamily: "'NanumSquareRound', 'Apple SD Gothic Neo', sans-serif" }}>
+      <main className="min-h-screen bg-note-paper text-note-ink flex items-center justify-center p-6" style={{ fontFamily: "'Gowun Batang', 'Apple SD Gothic Neo', sans-serif" }}>
         <div className="bg-[#fdfaf4] rounded-2xl p-10 text-center max-w-md border border-[#ece0cd]">
           <div className="text-4xl mb-4">☕</div>
           {/* 감사수리: 기존 카페 보완 제보는 신규 등록과 구분해 안내 */}
@@ -75,7 +75,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <main className="min-h-screen bg-note-paper text-note-ink" style={{ fontFamily: "'NanumSquareRound', 'Apple SD Gothic Neo', sans-serif" }}>
+    <main className="min-h-screen bg-note-paper text-note-ink" style={{ fontFamily: "'Gowun Batang', 'Apple SD Gothic Neo', sans-serif" }}>
       <div className="max-w-xl mx-auto px-6 py-12">
         <header className="mb-8">
           <BackLink to="/" label="홈" className="text-note-brown mb-4" />
