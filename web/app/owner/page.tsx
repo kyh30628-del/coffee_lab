@@ -7,6 +7,9 @@ import Showcase from "../Showcase";
 import BillingManage from "../BillingManage";
 import OwnerContentEditor from "./OwnerContentEditor";
 import { useLockBodyScroll } from "@/lib/useLockBodyScroll";
+import KakaoShare from "../KakaoShare";
+import { shareHookText } from "@/lib/shareCopy";
+import { SITE } from "@/lib/seoData";
 
 // ⚡ recharts 지연 로드 — 차트는 데이터 도착 후에만 렌더되므로 초기 JS에서 제외(출력 동일). 높이맞춤 폴백으로 레이아웃 시프트 없음.
 const ph = (h: number) => function ChartFallback() { return <div style={{ height: h }} />; };
@@ -245,10 +248,15 @@ export default function OwnerPage() {
               </div>
             )}
 
-            {/* 📣 공유 리포트 — 손님·SNS에 공유해 단골·신규 유입 (B2B 바이럴) */}
+            {/* 📣 공유 리포트 — 손님·SNS에 공유해 단골·신규 유입 (B2B 바이럴)
+                🔴 2026-11-08 발견: 이 카드가 "링크 복사"뿐이라 클릭해도 trackShare조차 안 찍혔다
+                (share_events 30일 중 /owner발 공유 0건 — 전략상 "최우선 레버리지"로 지정됐는데
+                사실상 꺼져있었음). 소비자 화면(카페상세 등)에서 이미 검증된 KakaoShare를 그대로
+                재사용 — 새 컴포넌트·새 API·새 테이블 0, source="사장님리포트"로 구분 계측. */}
             {insight.me.id && (() => {
               const shareUrl = `https://dongnecoffeenote.com/share/${insight.me.id}`;
               const qr = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=8&data=${encodeURIComponent(shareUrl)}`;
+              const rankTxt = insight.rank > 0 ? `${insight.gu} ${insight.hoodCount}곳 중 ${insight.rank}위` : `${insight.gu} 검증 카페`;
               return (
                 <div className="bg-[#fff8ee] rounded-2xl p-4 border border-[#e7d3b3] mb-4">
                   <div className="text-sm font-bold text-[#7a5a2e] mb-1">📣 우리 카페 검증 리포트 공유하기</div>
@@ -258,7 +266,20 @@ export default function OwnerPage() {
                     <img src={qr} alt="공유 QR" width={84} height={84} className="rounded-lg border border-[#ece0cd] bg-white shrink-0" />
                     <div className="flex-1 min-w-0">
                       <a href={shareUrl} target="_blank" rel="noreferrer" className="block text-[9.6px] text-note-tan underline break-all mb-2">{shareUrl}</a>
-                      <button onClick={() => { navigator.clipboard?.writeText(shareUrl); }} className="text-[9.6px] font-bold bg-note-tan text-white rounded-lg px-3 py-1.5">링크 복사</button>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <KakaoShare
+                          title={`${insight.me.name} — ${rankTxt}`}
+                          description={shareHookText(insight.me.grade, insight.me.identity)}
+                          imageUrl={`${SITE}/c/${insight.me.id}/opengraph-image`}
+                          link={shareUrl}
+                          source="사장님리포트"
+                          className="inline-flex items-center gap-1.5 bg-[#FEE500] text-[#3c1e1e] rounded-lg px-3 py-1.5 text-[9.6px] font-bold"
+                        >
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="#3c1e1e" aria-hidden><path d="M12 3C6.5 3 2 6.6 2 11c0 2.8 1.9 5.3 4.7 6.7-.2.7-.7 2.6-.8 3-.1.5.2.5.4.4.2-.1 2.6-1.8 3.7-2.5.6.1 1.3.1 2 .1 5.5 0 10-3.6 10-8S17.5 3 12 3z"/></svg>
+                          카톡 공유
+                        </KakaoShare>
+                        <button onClick={() => { navigator.clipboard?.writeText(shareUrl); }} className="text-[9.6px] font-bold bg-note-tan text-white rounded-lg px-3 py-1.5">링크 복사</button>
+                      </div>
                     </div>
                   </div>
                 </div>

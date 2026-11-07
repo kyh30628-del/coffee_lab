@@ -27,11 +27,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const title = `${rep.name} — ${rankTxt} | 동네 커피 노트`;
   const desc = `${rep.name}은(는) ${rankTxt}. 광고·영수증 없이 네이버·구글·유튜브 공개 후기로 검증한 ${rep.grade} 카페예요.${rep.identity ? ` ${rep.identity}` : ""}`;
   const url = `${SITE}/share/${rep.id}`;
+  const image = `${SITE}/c/${rep.id}/opengraph-image`;
   return {
     title, description: desc,
     alternates: { canonical: url },
-    openGraph: { title, description: desc, url, siteName: "동네 커피 노트", type: "website", locale: "ko_KR" },
-    twitter: { card: "summary", title, description: desc },
+    openGraph: { title, description: desc, url, siteName: "동네 커피 노트", type: "website", locale: "ko_KR", images: [image] },
+    twitter: { card: "summary_large_image", title, description: desc, images: [image] },
   };
 }
 
