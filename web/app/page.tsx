@@ -1023,7 +1023,11 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
         <div className="absolute inset-x-0 bottom-0 h-28" style={{ background: "linear-gradient(0deg, var(--nt-espresso), rgba(36,24,18,0))" }} />
         <div className="absolute left-6 top-6 right-6">
           <div className="nt-eyebrow" style={{ color: "#d9c7ad" }}>Dongne Coffee Note</div>
-          <h1 className="nt-title text-[27.2px] leading-[1.15] mt-1" style={{ color: "#f6ecdf", textShadow: "0 2px 12px rgba(0,0,0,.5)" }}>별점도 광고도 아닌,<br /><span className="nt-hl">진짜 후기.</span></h1>
+          {/* 🎯 2026-11-07 CEO 지시: 랜딩 제목만 명조(고운바탕)로 — 나눔스퀘어라운드가 "너무 네모 반듯해서
+              눈에 안 들어온다"는 피드백. 본문·나머지 화면은 나눔스퀘어라운드 그대로, 이 한 줄만 다른 결로
+              대비를 준다(Artifact 시안 비교 C안 확정). 고운바탕은 /owner·/area·/business·/poster에서
+              이미 쓰는 서체라 새 폰트 소싱·라이선스 확인 불필요. */}
+          <h1 className="nt-title text-[27.2px] leading-[1.15] mt-1" style={{ color: "#f6ecdf", textShadow: "0 2px 12px rgba(0,0,0,.5)", fontFamily: "'Gowun Batang', 'Noto Serif KR', serif", fontWeight: 700, letterSpacing: "-0.01em" }}>별점도 광고도 아닌,<br /><span className="nt-hl">진짜 후기.</span></h1>
         </div>
         {/* ☕ 김 — 잔에서 세 가닥이 흔들리며 오른다(움직임 줄이기면 없음) */}
         {cupPos && (
@@ -1111,6 +1115,7 @@ function LandingNote({ onConsumer, onOwner, onLogin, discover }: { onConsumer: (
         </div>
       </div>
       </div>
+      <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@700&display=swap" rel="stylesheet" />
     </div>
   );
 }
