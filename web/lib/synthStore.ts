@@ -629,7 +629,13 @@ async function storeResult(cafeId: number, name: string, result: CollectResult, 
       const prevAllRow = (await sql`SELECT synth_reviews_all FROM cafes WHERE id=${cafeId}`)[0];
       const oldAll = Array.isArray(prevAllRow?.synth_reviews_all) ? (prevAllRow.synth_reviews_all as any[]) : [];
       const grand = grandfatherEvidence(oldAll, finalAllEvidence);
-      if (grand.length >= prevCount) {
+      // 🔴 2026-11-10 — 비교 기준을 `prevCount`(synth_count 컬럼) 그대로 쓰면, 컬럼이 실제 저장된 근거 수(synth_reviews_all)보다
+      //   1~6건 크게 남은 카페(전주한옥화과자 14 vs 13·다과 14 vs 9 — 과거 재판정이 컬럼만 갱신한 잔재)는 조부보호가
+      //   옛 근거를 **전부 보존했는데도** `grand.length < prevCount`라 영영 차단됐다(대시보드 shrinkGuard 654건/2일, 같은 카페가
+      //   매 사이클 헛돎). 옛 근거를 하나도 안 잃었고(grand ⊇ old) 저장된 근거가 컬럼의 절반 이상이면 통과시킨다(컬럼이 stale일 뿐 손실 아님,
+      //   쓰고 나면 synth_count가 실제 근거 수로 정렬된다). 근거가 컬럼의 절반 미만이면(컬럼 100 vs 근거 20 = 진짜 손실 의심) 계속 차단.
+      if (grand.length >= prevCount
+          || (oldAll.length >= prevCount * 0.5 && grand.length >= oldAll.length)) {
         // old를 다시 심사하지 않고 그대로 보존 + 새 글만 보탰다 → 정의상 prevCount보다 작아질 수 없다.
         finalCollected = grand.length;
         finalAllEvidence = grand;

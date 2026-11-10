@@ -18,7 +18,12 @@ export async function GET(req: NextRequest) {
         headers: { "Content-Type": "application/json", ...(secret ? { authorization: `Bearer ${secret}` } : {}) },
         body: JSON.stringify({ limit: 50 }),
       });
-      const d = await r.json();
+      // 🔧 비JSON 응답(플랫폼 타임아웃/오류 텍스트)에 SyntaxError로 죽지 않고, 원인(상태코드·앞부분)을 남기며 지금까지 기록분은 보존한다.
+      const raw = await r.text();
+      let d: any;
+      try { d = JSON.parse(raw); } catch {
+        throw new Error(`snapshot-record 비JSON 응답 HTTP ${r.status} (${rounds + 1}라운드, 누적 ${totalRecorded}): ${raw.slice(0, 80)}`);
+      }
       totalRecorded += d.recorded ?? 0;
       rounds++;
       if ((d.remaining ?? 0) === 0 || (d.recorded ?? 0) === 0) break;

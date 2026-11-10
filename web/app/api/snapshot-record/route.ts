@@ -53,12 +53,16 @@ export async function POST(req: NextRequest) {
         AND NOT EXISTS (SELECT 1 FROM cafe_snapshots s WHERE s.cafe_id = c.id AND s.snap_date = CURRENT_DATE)
       LIMIT ${limit}` as unknown as { id: number; synth_count: number | null; review_dates: unknown }[];
 
+    // 🔧 2026-11-10 — 행마다 INSERT 1회(라운드당 최대 500회 왕복)라 함수 시간(60s)을 넘겨 플랫폼이 HTML/텍스트 오류를 돌려줬고
+    //   cron-snapshot이 그걸 JSON으로 파싱하다 죽었다(대시보드 「cron-snapshot 실패」 3주 연속). 한 문장 unnest 삽입으로 왕복 1회.
     let recorded = 0;
-    for (const c of targets) {
-      const vc = c.synth_count ?? 0;
-      const recent = recentN(c.review_dates, 90);
-      await sql`INSERT INTO cafe_snapshots (cafe_id, rating, rating_count, recent_count) VALUES (${c.id}, NULL, ${vc}, ${recent})`;
-      recorded++;
+    if (targets.length) {
+      const ids = targets.map((c) => Number(c.id));
+      const counts = targets.map((c) => c.synth_count ?? 0);
+      const recents = targets.map((c) => recentN(c.review_dates, 90));
+      await sql`INSERT INTO cafe_snapshots (cafe_id, rating, rating_count, recent_count)
+        SELECT t.id, NULL, t.vc, t.rc FROM unnest(${ids}::int[], ${counts}::int[], ${recents}::int[]) AS t(id, vc, rc)`;
+      recorded = targets.length;
     }
     const remain = (await sql`
       SELECT COUNT(*)::int AS n FROM cafes c

@@ -1186,6 +1186,21 @@ export function cleanCafeName(name: string): string {
 //   - "미사강변 북카페" → ["미사강변"] (브랜드 없음 → '미사강변'이 유일 정체성이므로 유지)
 // venueOnly: 남은 토큰이 전부 다중테넌트 기관/건물명(VENUE_WORDS·대학 축약명 등)일 때 true — 그 건물엔
 //   무관한 여러 시설이 함께 있으므로(제안3 "건물단위 앵커 필수화"), 지역일치만으로 식별 인정하면 안 된다.
+// 🔴 2026-11-10 실측수리 — GENERIC_SUFFIX는 `$` 앵커 1회 치환이라 업종어가 **겹쳐 붙은** 상호
+//   ('멜로우파우치커피로스터스' = 커피+로스터스)는 뒤의 '로스터스'만 떨어지고 '멜로우파우치커피'가 식별토큰으로 남았다.
+//   리뷰는 '멜로우파우치 카페'·'멜로우파우치 커피로스터스'로 부르므로 토큰이 어디에도 안 맞아
+//   진짜 후기 3/3이 coherence=0(「이름 오염 의심」HIGH)으로 찍혔다. → 남는 길이가 2자 이상인 동안 반복해서 뗀다.
+function stripGenericSuffixes(raw: string): string {
+  let cur = raw.replace(GENERIC_SUFFIX, "").trim();
+  // 보수: ①추가로 뗄 때 남는 길이 3자 이상(2자 토큰은 우연일치로 오염을 통과시킨다 — '에이점커피'→'에이' 금지)
+  //   ②'점/본점' 지점 표식은 추가 단계에서 떼지 않는다 ③업종어가 2개 겹친 경우만(최대 1회 추가).
+  const EXTRA = /(카페|까페|커피숍|커피샵|커피|로스터리|로스터스|로스터즈|로스터|로스팅|베이커리|디저트|케이크|제과점|제과|coffee|cafe|roasters?|roastery)$/i;
+  const next = cur.replace(EXTRA, "").trim();
+  // ③떼고 남은 말이 이후 필터(일반어·불용어·지역어·지명)에 걸려 토큰이 통째로 사라질 거면 떼지 않는다('행복한베이커리카페').
+  if (next !== cur && next.length >= 3 && !GENERIC_WORD.has(next.toLowerCase()) && !NAME_STOPWORD.has(next.toLowerCase())
+      && !isAreaTok(next) && !LOC_LIKE.test(next) && !LOC_SUFFIX.test(next)) cur = next;
+  return cur;
+}
 export function coreTokensDetail(name: string, areaTerms: string[]): { tokens: string[]; venueOnly: boolean; landmarkStripped: boolean } {
   // 행정 접미사(시·군·구·읍·면·동·리)를 뗀 변형도 비교군에 포함 → 지점명에서 나온 병합 지역어
   //   ('남양주오남점'→'남양주오남')를 areaTerms('남양주시'·'오남읍')와 매칭시켜 식별어에서 제외.
@@ -1212,7 +1227,7 @@ export function coreTokensDetail(name: string, areaTerms: string[]): { tokens: s
     //   '카페, 여유'처럼 콤마로 쪼개진 이름의 진짜 유일토큰('여유')이 weakSingle 보호를 못 받고
     //   다른 업체명이 섞인 리뷰(예: '노아브런치카페, ... 여유...')에 오매칭됐다. 접미·일반어 판정 전
     //   후행 구두점만 떼어(원본 raw는 보존) 정상적으로 업종어가 제거되게 한다.
-    .map(({ raw, branch }) => { const rawTrimPunct = raw.replace(/[,.;:·]+$/, ""); return { raw, core: rawTrimPunct.replace(GENERIC_SUFFIX, "").trim(), branch }; })
+    .map(({ raw, branch }) => { const rawTrimPunct = raw.replace(/[,.;:·]+$/, ""); return { raw, core: stripGenericSuffixes(rawTrimPunct), branch }; })
     .filter(({ core }) => core.length >= 2)
     .filter(({ core }) => !GENERIC_WORD.has(core.toLowerCase()))
     .filter(({ core }) => !NAME_STOPWORD.has(core.toLowerCase()))

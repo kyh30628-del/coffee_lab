@@ -1443,3 +1443,16 @@ test("비용: Neon 실청구 전송량이 자동정지(cost_guard) 조건에 들
     "egressHalt가 globalHalt(cost_guard 정지)에 반영되지 않는다");
   assert.ok(/let globalHalt/.test(code), "globalHalt가 재할당 불가능(const)하면 egressHalt를 반영할 수 없다");
 });
+
+// 2026-11-10 대시보드 「이름 오염 의심 공개 2곳」 실측 — 멜로우파우치커피로스터스 아차산(id 5617).
+//   업종어 겹침(커피+로스터스)이라 `$` 1회 치환이 '멜로우파우치커피'를 식별토큰으로 남겼고, 리뷰는 '멜로우파우치 카페'로
+//   부르니 진짜 후기 3/3이 coherence=0이었다.
+test("겹친 업종어(커피로스터스)를 뗀 브랜드 토큰으로 진짜 후기를 알아본다", () => {
+  assert.deepEqual(coreTokens("멜로우파우치커피로스터스 아차산", ["광진구"]), ["멜로우파우치", "아차산"]);
+  const qs = ["멜로우파우치 카페는 아차산역 근처에 위치하고 있으며 주차는 불가 합니다 !!"];
+  assert.equal(nameCoherence("멜로우파우치커피로스터스 아차산", qs, ["광진구"]), 1);
+});
+test("겹침 제거는 2자 토큰·불용어·일반어를 만들지 않는다(느슨해짐 방지)", () => {
+  assert.deepEqual(coreTokens("에이점커피", []), ["에이점"]);
+  assert.ok(coreTokens("행복한베이커리카페", []).length > 0);
+});
