@@ -15,7 +15,7 @@ export const metadata: Metadata = {
   //     (SEO 대상 페이지 10종 전수 확인 완료 — 선언 없는 곳은 아래 ②에서 개별 부여).
   alternates: { canonical: "/" },
   title: "동네 커피 노트 — 취향으로 찾는 동네 카페",
-  description: "전국 동네 로스터리·카페를 취향과 근거로 안내합니다. 네이버·구글·유튜브 공개 후기를 교차검증해 광고·협찬을 걸러낸 진짜 방문 후기만.",
+  description: "전국 동네 로스터리·카페를 취향과 근거로 안내합니다. 네이버·구글·유튜브 공개 후기를 교차검증해 광고·협찬을 걸러낸 진짜 방문 후기만 모았고, 지역·취향·주차 같은 조건으로 우리 동네 카페를 찾을 수 있어요.",
   manifest: "/manifest.json",
   openGraph: {
     type: "website", siteName: "동네 커피 노트", locale: "ko_KR",

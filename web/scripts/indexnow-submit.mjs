@@ -57,9 +57,20 @@ const keyOk = await fetch(`${SITE}/${KEY}.txt`).then((r) => r.ok).catch(() => fa
 if (!keyOk) { console.log(`🔴 키 파일 접근 불가: ${SITE}/${KEY}.txt — 배포 후 다시 실행하세요.`); process.exit(1); }
 console.log(`키 파일 확인 ✅ ${SITE}/${KEY}.txt`);
 
+// 🔴 2026-11-10 — 대량 일괄 제출 금지. 실측: 2026-10-23 하루에 **56,714 URL을 한 번에** 보냈고(미제출분이 쌓였다가 한꺼번에 나감),
+//   Bing 노출·클릭이 바로 다음 날(10-24)부터 0으로 끊겼다(일 300~430회 → 0, 3주째). Bing Webmaster가 같은 날짜대로
+//   "IndexNow is in batch mode — 서버 과부하·색인 지연 유발"을 경고하고 있다. 인과는 확정이 아니나 시점이 일치한다.
+//   → ①하루 상한(기본 300, INDEXNOW_MAX로 조정) ②요청당 100개 ③요청 사이 1.5초 간격 ④새로 생긴 유형(caution·new)을 먼저.
+//   남은 미제출분은 다음 날 이어서 나간다(매일 09:40 launchd) — 쌓이지도, 한꺼번에 쏟지도 않는다.
+const MAX_PER_RUN = Number(process.env.INDEXNOW_MAX || 300);
+const CHUNK = 100;
+const prio = (u) => (u.includes("/caution/") ? 0 : u.includes("/area/") && !u.includes("/dong/") ? 1 : u.includes("/c/") ? 2 : 3);
+targets = [...targets].sort((a, b) => prio(a) - prio(b)).slice(0, MAX_PER_RUN);
+console.log(`상한 ${MAX_PER_RUN}/회 적용 → 이번 실제 제출 ${targets.length}개(나머지는 다음 실행)`);
 let sent = 0;
-for (let i = 0; i < targets.length; i += 10000) {
-  const chunk = targets.slice(i, i + 10000);
+for (let i = 0; i < targets.length; i += CHUNK) {
+  if (i > 0) await new Promise((r) => setTimeout(r, 1500));
+  const chunk = targets.slice(i, i + CHUNK);
   const res = await fetch("https://api.indexnow.org/indexnow", {
     method: "POST", headers: { "Content-Type": "application/json; charset=utf-8" },
     body: JSON.stringify({ host: HOST, key: KEY, keyLocation: `${SITE}/${KEY}.txt`, urlList: chunk }),

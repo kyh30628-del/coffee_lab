@@ -169,7 +169,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const c = await getCafe(id);
   if (!c) return { title: "카페를 찾을 수 없어요 — 동네 커피 노트" };
   const title = `${c.name} (${c.area}) — 동네 커피 노트`;
-  const desc = ((c.synth_identity || `${c.area}의 카페 ${c.name}.`) + ` 네이버 공개 후기 ${c.synth_count ?? 0}건을 데이터로 교차검증했어요.`).slice(0, 155);
+  // 🔎 2026-11-10 Bing Webmaster 권장: "메타 설명이 너무 짧음 — 1.3K 페이지"(홈·/c/{id}). 한 줄짜리 identity만 있는 카페는 54자였다.
+  //   120자 미만이면 어떤 곳인지·무엇을 보여주는지 한 문장을 덧붙인다(권장 150~160자). 값은 이미 읽은 c뿐이라 비용 0.
+  let desc = (c.synth_identity || `${c.area}의 카페 ${c.name}.`) + ` 네이버 공개 후기 ${c.synth_count ?? 0}건을 데이터로 교차검증했어요.`;
+  if (desc.length < 120) desc += ` 광고·협찬 글을 걸러낸 실제 방문 후기로 강점과 가기 전에 알아둘 점을 보여드려요.`;
+  desc = desc.slice(0, 158);
   const url = `${SITE}/c/${c.id}`;
   return {
     title, description: desc,
