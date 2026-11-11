@@ -49,6 +49,8 @@ export async function GET() {
 - 지역별 카페: https://dongnecoffeenote.com/area/{지역명}
 - 지역×취향 (best for "OO에서 카공/조용한/디저트 카페" questions):
   https://dongnecoffeenote.com/area/{지역명}/{taste}  where taste ∈ ${TASTES}
+- 지역×주의점 (best for "OO에서 주차 어려운/웨이팅 있는/자리 부족한/브레이크타임 카페" questions — 후기 2건 이상에서 확인):
+  https://dongnecoffeenote.com/area/{지역명}/caution/{parking|waiting|seats|breaktime}
 - 동 단위(${dongs.toLocaleString()}개 동): https://dongnecoffeenote.com/area/{지역명}/dong/{동이름}
 - 개별 카페(검증 후기 인용 + 주의점 포함): https://dongnecoffeenote.com/c/{id}
 - 새로 생긴 카페: https://dongnecoffeenote.com/new

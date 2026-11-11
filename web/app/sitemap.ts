@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 import { sql } from "@/lib/db";
-import { getRegions, getDongs, getRegionTasteCounts, getRegionFacetCounts, getDongTasteCounts, getDongFacetCounts, TASTES } from "@/lib/seoData";
+import { getRegions, getDongs, getRegionTasteCounts, getRegionFacetCounts, getRegionCautionCounts, getDongTasteCounts, getDongFacetCounts, TASTES } from "@/lib/seoData";
+import { CAUTION_PAGES, CAUTION_MIN_CAFES } from "@/lib/cautionPages";
 import { FACET_PAGES, FACET_MIN_CAFES } from "@/lib/facetPages";
 import { COLLECTIONS } from "@/lib/collections";
 
@@ -15,7 +16,7 @@ const SITE = "https://dongnecoffeenote.com";
 //   ⚠️ **/sitemap.xml은 그대로 둔다** — IndexNow(scripts/indexnow-submit.mjs)와 robots.txt가 이 주소를 읽는다.
 //      분할(generateSitemaps)로 바꾸면 /sitemap.xml이 사라져 제출이 통째로 끊긴다(빌드로 확인하고 되돌림).
 //      대신 /sitemaps/{유형}.xml을 **덧붙이고** robots.txt에 함께 싣는다. 같은 URL이 두 사이트맵에 있어도 무방하다.
-export type SitemapKind = "cafes" | "areas" | "taste" | "facet" | "dong" | "dongtaste" | "dongfacet" | "misc";
+export type SitemapKind = "cafes" | "areas" | "taste" | "facet" | "caution" | "dong" | "dongtaste" | "dongfacet" | "misc";
 export async function sitemapByKind(kind: SitemapKind): Promise<MetadataRoute.Sitemap> {
   const all = await buildAll();
   return all[kind] ?? [];
@@ -42,7 +43,7 @@ async function buildAll(): Promise<Record<SitemapKind, MetadataRoute.Sitemap>> {
 //   🔙 되돌림 조건: 2주 내 네이버 경유 동 계열 유입이 20% 이상 줄면 즉시 원복(이 줄만 되돌리면 된다).
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const p = await sitemapParts();
-  return [...p.misc, ...p.areas, ...p.taste, ...p.facet, ...p.dong, ...p.cafes];
+  return [...p.misc, ...p.areas, ...p.taste, ...p.facet, ...p.caution, ...p.dong, ...p.cafes];
 }
 
 async function sitemapParts(): Promise<Record<SitemapKind, MetadataRoute.Sitemap>> {
@@ -123,6 +124,14 @@ async function sitemapParts(): Promise<Record<SitemapKind, MetadataRoute.Sitemap
     .filter(([k, n]) => n >= FACET_MIN_CAFES && facetLabels.has(k.split("|")[2]))
     .map(([k]) => { const [a, d, label] = k.split("|");
       return { url: `${SITE}/area/${encodeURIComponent(a)}/dong/${encodeURIComponent(d)}/f/${slugByLabel.get(label)}`, changeFrequency: "weekly" as const, priority: 0.63 }; });
+  // ⚠️ 주의점 집계(2026-11-10, AI·검색 노출 대책 #2) — "○○구 주차 어려운 카페". 4유형·5곳 이상만(약 200쪽).
+  //   크롤 예산(색인 9%)을 의식해 수요가 확실한 유형만 연다. 되돌림: 이 블록과 아래 반환의 caution만 빼면 된다.
+  const cautionCounts = await getRegionCautionCounts();
+  const cautionSlugByLabel = new Map(CAUTION_PAGES.map((c) => [c.label, c.slug]));
+  const cautionUrls: MetadataRoute.Sitemap = Object.entries(cautionCounts)
+    .filter(([k, n]) => n >= CAUTION_MIN_CAFES && cautionSlugByLabel.has(k.split("|")[1]))
+    .map(([k]) => { const [a, label] = k.split("|");
+      return { url: `${SITE}/area/${encodeURIComponent(a)}/caution/${cautionSlugByLabel.get(label)}`, changeFrequency: "weekly" as const, priority: 0.62 }; });
   // 동네 교차검증 컬렉션(에디토리얼 SEO 랜딩) — lib/collections.ts 레지스트리 단일출처.
   const collectionUrls: MetadataRoute.Sitemap = COLLECTIONS.map((c) => ({
     url: `${SITE}/collections/${c.slug}`, changeFrequency: "weekly", priority: 0.85,
@@ -137,6 +146,6 @@ async function sitemapParts(): Promise<Record<SitemapKind, MetadataRoute.Sitemap
     ...collectionUrls,
     ...tasteUrls,
   ];
-  return { misc, areas: regionUrls, taste: regionTasteUrls, facet: facetUrls,
+  return { misc, areas: regionUrls, taste: regionTasteUrls, facet: facetUrls, caution: cautionUrls,
     dong: [...dongUrls, ...dongAliasUrls], dongtaste: dongTasteUrls, dongfacet: dongFacetUrls, cafes: cafeUrls };
 }

@@ -86,7 +86,10 @@ export default function RootLayout({
             "이 사이트 안에서 이렇게 찾을 수 있다"를 알려 준다. 정적 마크업이라 비용 0. */}
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
           "@context": "https://schema.org", "@type": "Organization",
-          name: "동네 커피 노트", alternateName: "Dongne Coffee Note",
+          name: "동네 커피 노트", alternateName: ["Dongne Coffee Note", "동네커피노트", "dongnecoffeenote.com"],
+          // 🔎 2026-11-10 (AI 노출 대책 #4) — "동네 커피"는 흔한 말이라 브랜드를 검색하면 같은 이름의 커피 프랜차이즈 지점들이
+          //   나온다(실측). 이 사이트가 매장이 아니라 카페 정보 서비스임을 기계가 읽는 문장으로 못박는다.
+          disambiguatingDescription: "카페를 파는 매장이나 커피 프랜차이즈가 아니라, 한국 카페를 검증된 방문 후기로 소개하는 정보 웹사이트(dongnecoffeenote.com)입니다.",
           url: "https://dongnecoffeenote.com", logo: "https://dongnecoffeenote.com/icon-512.png",
           description: "네이버·구글·유튜브 공개 후기를 교차검증해 광고·협찬을 걸러낸 동네 카페 큐레이션. 별점이 아니라 검증된 후기 수와 실제 언급된 사실이 기준입니다.",
           knowsAbout: ["카페 추천", "카공 카페", "동네 카페", "스페셜티 커피", "카페 주차", "베이커리 카페"],

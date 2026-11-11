@@ -72,6 +72,7 @@ ${Object.entries(SIDO_GU).map(([sido, gus]) => `- ${sido}: ${(gus as string[]).j
 - 지역 추천: https://dongnecoffeenote.com/area/{지역명}
 - 지역×취향: https://dongnecoffeenote.com/area/{지역명}/{취향키}
 - 지역×시설: https://dongnecoffeenote.com/area/{지역명}/f/{시설키}
+- 지역×주의점(광고가 말하지 않는 단점, 후기 2건 이상에서 확인): https://dongnecoffeenote.com/area/{지역명}/caution/{parking|waiting|seats|breaktime}
 - 동×취향: https://dongnecoffeenote.com/area/{지역명}/dong/{동}/{취향키}
 - 동×시설: https://dongnecoffeenote.com/area/{지역명}/dong/{동}/f/{시설키}
 - 카페 상세(검증 후기 인용 + 주의점): https://dongnecoffeenote.com/c/{id}

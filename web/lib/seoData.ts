@@ -366,6 +366,35 @@ export async function computeRegionFacetCounts(): Promise<Record<string, number>
     return out;
   } catch { return {}; }
 }
+// ⚠️ 주의점 집계 페이지용 조회 — 2026-11-10. cafes.cautions = [{label, emoji, count, quote}] (후기 2건+에서 확인된 것만).
+//   quote는 방문자 본인 문장이라, 목록 카드에 "왜 주의점인지"의 근거로 그대로 실린다.
+export async function getRegionCautionCafes(area: string, label: string, limit = 30): Promise<SeoCafe[]> {
+  try {
+    return withOwnerBadge((await sql`SELECT id, name, dong, synth_grade AS grade, synth_count AS count, synth_identity AS identity, char_scores, visitor_n, visitor_trip, visitor_local, work_facts, cautions, facets,
+      (SELECT left(c->>'quote', 90) FROM jsonb_array_elements(cautions) c WHERE c->>'label' = ${label} AND COALESCE(c->>'quote','') <> '' LIMIT 1) AS quote
+      FROM cafes WHERE published AND area=${area} AND jsonb_typeof(cautions)='array' AND cautions @> ${JSON.stringify([{ label }])}::jsonb
+      ORDER BY (synth_grade='검증') DESC, synth_count DESC NULLS LAST LIMIT ${limit}`) as unknown as SeoCafe[]);
+  } catch { return []; }
+}
+export async function getRegionCautionGradeBreakdown(area: string, label: string): Promise<GradeBreakdown> {
+  try {
+    const rows = (await sql`SELECT synth_grade AS grade, count(*)::int n FROM cafes
+      WHERE published AND area=${area} AND jsonb_typeof(cautions)='array' AND cautions @> ${JSON.stringify([{ label }])}::jsonb GROUP BY 1`) as unknown as { grade: string; n: number }[];
+    const g = { verified: 0, ref: 0, candidate: 0 };
+    for (const r of rows) { if (r.grade === "검증") g.verified = r.n; else if (r.grade === "참고") g.ref = r.n; else g.candidate += r.n; }
+    return g;
+  } catch { return { verified: 0, ref: 0, candidate: 0 }; }
+}
+/** 전 지역×주의점 카운트 1회 — 하루 1회 크론(refreshSeoCounts)에서만 부른다. 페이지·사이트맵은 저장된 값을 읽는다. */
+export async function computeRegionCautionCounts(): Promise<Record<string, number>> {
+  try {
+    const rows = (await sql`SELECT area, c->>'label' AS label, count(*)::int n FROM cafes, jsonb_array_elements(cautions) c
+      WHERE published AND area IS NOT NULL AND jsonb_typeof(cautions)='array' GROUP BY 1,2 HAVING count(*) >= 5`) as unknown as { area: string; label: string; n: number }[];
+    const out: Record<string, number> = {};
+    for (const r of rows) out[`${r.area}|${r.label}`] = Number(r.n);
+    return out;
+  } catch { return {}; }
+}
 export async function getRegionFacetGradeBreakdown(area: string, label: string): Promise<GradeBreakdown> {
   try {
     const rows = (await sql`SELECT synth_grade AS grade, count(*)::int n FROM cafes
@@ -478,7 +507,7 @@ export async function computeDongFacetCounts(): Promise<Record<string, number>> 
 //   메모리 캐시로는 못 막는다 — 집계 결과를 테이블에 넣고 페이지는 **작은 테이블 1회 조회**로 끝낸다.
 //   집계는 하루 1회 크론(refreshSeoCounts)만 돈다. 4,406회 → 1회.
 // ⚠️ 표시와 사이트맵이 같은 값을 써야 한다 — 그래서 단일 테이블 하나로 모은다.
-export type SeoCountKind = "region_taste" | "region_facet" | "dong_taste" | "dong_facet";
+export type SeoCountKind = "region_taste" | "region_facet" | "dong_taste" | "dong_facet" | "region_caution";
 const countsMem: Partial<Record<SeoCountKind, { at: number; v: Record<string, number> }>> = {};
 const COUNTS_TTL_MS = 30 * 60 * 1000;   // 인스턴스 내 30분 — 테이블 조회도 공짜는 아니므로 가볍게만
 
@@ -514,6 +543,7 @@ export async function refreshSeoCounts(): Promise<Record<SeoCountKind, number>> 
   out.region_facet = await put("region_facet", await computeRegionFacetCounts());
   out.dong_taste = await put("dong_taste", await computeDongTasteCounts());
   out.dong_facet = await put("dong_facet", await computeDongFacetCounts());
+  out.region_caution = await put("region_caution", await computeRegionCautionCounts());
   return out;
 }
 
@@ -522,3 +552,4 @@ export const getRegionTasteCounts = () => getSeoCounts("region_taste");
 export const getRegionFacetCounts = () => getSeoCounts("region_facet");
 export const getDongTasteCounts = () => getSeoCounts("dong_taste");
 export const getDongFacetCounts = () => getSeoCounts("dong_facet");
+export const getRegionCautionCounts = () => getSeoCounts("region_caution");

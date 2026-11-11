@@ -34,7 +34,7 @@ function BadgeForm() {
   }, [qParam]);
 
   const site = "https://dongnecoffeenote.com";
-  const html = cafe ? `<a href="${site}/c/${cafe.id}" target="_blank" rel="noopener"><img src="${site}/api/badge/${cafe.id}" alt="동네 커피 노트 검증 카페 — ${cafe.name}" width="230" height="54" /></a>` : "";
+  const html = cafe ? `<a href="${site}/c/${cafe.id}" target="_blank" rel="noopener"><img src="${site}/api/badge/${cafe.id}" alt="동네 커피 노트 검증 카페 — ${cafe.name}" width="230" height="54" /></a><br /><a href="${site}/c/${cafe.id}" target="_blank" rel="noopener">동네 커피 노트에서 ${cafe.name} 검증 후기 보기</a>` : "";
 
   return (
     <div className="max-w-lg mx-auto">

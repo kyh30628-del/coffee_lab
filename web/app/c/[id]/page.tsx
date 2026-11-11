@@ -718,6 +718,13 @@ export default async function CafePage({ params }: Props) {
                 </span>
                 <span className="text-[#b9793b] font-bold whitespace-nowrap">→</span>
               </OwnerCtaLink>
+              {/* 🏅 검증 배지 = 백링크 엔진(2026-08-26 구축) — 만들어 놓고 사장님이 찾아올 길이 없었다(AI·검색 노출 대책 #3, 2026-11-10).
+                  배지는 검증·참고 등급에만 발급되므로 그 카페에서만 보인다. */}
+              {(c.synth_grade === "검증" || c.synth_grade === "참고") && (
+                <Link href={`/owner/badge?q=${encodeURIComponent(c.name)}`} className="nt-g flex items-center justify-between gap-2 px-1 text-[10.4px] text-[#5c4b3c]">
+                  <span>🏅 사장님 — 우리 가게 검증 배지를 블로그·홈페이지에 붙이기</span><span className="text-note-brown">→</span>
+                </Link>
+              )}
               {/* 동네 교차검증 컬렉션 · 테마 역링크 · 동네 지도(크롤 동선·SEO) */}
               {col && (
                 <Link href={`/collections/${col.slug}`} className="nt-scrap flex items-center justify-between gap-2 w-full px-4 py-3">
