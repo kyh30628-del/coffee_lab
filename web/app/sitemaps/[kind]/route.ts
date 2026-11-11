@@ -4,7 +4,7 @@ import { sitemapByKind, type SitemapKind } from "@/app/sitemap";
 //   Search Console에 이것들을 따로 제출하면 **유형별 색인 수**를 볼 수 있다.
 //   ⚠️ /sitemap.xml(전체)은 그대로 살아 있다 — IndexNow가 그 주소를 읽는다. 여기는 관측용 추가분이다.
 export const revalidate = 21600;
-const KINDS = ["cafes1", "cafes2", "cafes3", "areas", "taste", "facet", "caution", "dong", "dongtaste", "dongfacet", "misc"];
+const KINDS = ["cafes1", "cafes2", "cafes3", "areas", "taste", "facet", "caution", "station", "dong", "dongtaste", "dongfacet", "misc"];
 
 export async function generateStaticParams() { return KINDS.map((kind) => ({ kind: `${kind}.xml` })); }
 

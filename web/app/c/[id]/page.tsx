@@ -19,7 +19,8 @@ import SavedCafes from "../../SavedCafes";
 import { buildAxisDist, cafeProfile, extractHighlights, amenityFeaturesOf, cardFacets } from "@/lib/cafeProfile";
 import { topCharTraits } from "@/lib/charScore";
 import { collectionForCafe } from "@/lib/collections";
-import { tasteByKey, getAreaCautionCounts, getRegionFacetCounts } from "@/lib/seoData";
+import { tasteByKey, getAreaCautionCounts, getRegionFacetCounts, getStationCounts } from "@/lib/seoData";
+import { nearestStation, STATION_MIN_CAFES } from "@/lib/stations";
 import { CAUTION_PAGES, CAUTION_MIN_CAFES } from "@/lib/cautionPages";
 import { shareHookText } from "@/lib/shareCopy";
 import { sortReviews, ensureRecent } from "@/lib/exposureOrder";
@@ -169,7 +170,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   const c = await getCafe(id);
   if (!c) return { title: "카페를 찾을 수 없어요 — 동네 커피 노트" };
-  const title = `${c.name} (${c.area}) — 동네 커피 노트`;
+  // 🔎 2026-11-10 유입 확대 — 카페 이름을 검색하는 사람은 거의 항상 "{카페명} 후기"를 친다. 제목에 '후기'가 없어 검색어와 글자가
+  //   어긋나 있었다(상세 첫 방문 4,914명/월 = 유입의 38%가 이 페이지 유형). 후기 건수(검증 근거)를 함께 넣어 클릭 이유를 준다.
+  //   ⚠️ 건수는 c.synth_count(근거 수, 사실). 0건이면 건수를 빼고 '후기'만. 지역은 뒤로(구분용).
+  const title = `${c.name} 후기${(c.synth_count ?? 0) > 0 ? ` ${c.synth_count}건 검증` : ""} — ${c.area} | 동네 커피 노트`;
   // 🔎 2026-11-10 Bing Webmaster 권장: "메타 설명이 너무 짧음 — 1.3K 페이지"(홈·/c/{id}). 한 줄짜리 identity만 있는 카페는 54자였다.
   //   120자 미만이면 어떤 곳인지·무엇을 보여주는지 한 문장을 덧붙인다(권장 150~160자). 값은 이미 읽은 c뿐이라 비용 0.
   let desc = (c.synth_identity || `${c.area}의 카페 ${c.name}.`) + ` 네이버 공개 후기 ${c.synth_count ?? 0}건을 데이터로 교차검증했어요.`;
@@ -260,6 +264,9 @@ export default async function CafePage({ params }: Props) {
   const cautionCounts = Array.isArray(c.cautions) && c.cautions.length ? await getAreaCautionCounts(c.area).catch(() => ({} as Record<string, number>)) : ({} as Record<string, number>);
   const parkAlt = (Array.isArray(c.cautions) && (c.cautions as any[]).some((x: any) => x.label === "주차 어려움"))
     ? ((await getRegionFacetCounts().catch(() => ({} as Record<string, number>)))[`${c.area}|주차 편함`] ?? 0) : 0;
+  // 🚇 가까운 역 → 그 역 카페 목록(2026-11-10). 상세 방문자가 다음에 볼 길이자, 역 페이지로 가는 내부 링크망(52k쪽 → 역 페이지).
+  const stNear = (typeof c.lat === "number" && typeof c.lng === "number") ? nearestStation(c.lat, c.lng, 700) : null;
+  const stCount = stNear ? ((await getStationCounts().catch(() => ({} as Record<string, number>)))[stNear.name] ?? 0) : 0;
   const grade = c.synth_grade || "";
   const ownerManaged = await isOwnerManaged(Number(c.id)); // 🏅 구독·체험 유효한 사장님 카페인가(단일출처)
   // 인앱 상세와 동일: 강·약(전체 대비) + 옥석 리뷰 데이터 핵심
@@ -672,6 +679,9 @@ export default async function CafePage({ params }: Props) {
                 </span>
               </OutboundLink>
             ))}
+            {stNear && stCount >= STATION_MIN_CAFES && (
+              <Link href={`/station/${encodeURIComponent(stNear.name + "역")}`} className="nt-g text-[10px] text-note-brown block">🚇 {stNear.name}역 근처 카페 {stCount}곳 보기 (도보 약 {Math.max(1, Math.round(stNear.m / 75))}분 거리) →</Link>
+            )}
             <Link href={`/area/${encodeURIComponent(c.area)}`} className="nt-g text-[10px] text-note-brown block">{c.area} 전체 보기 →</Link>
             {/* 📍 2026-10-16(CEO 지시) — 여기도 이탈 지점이다. 이 글에 나온 '근처'는 **이 카페 기준**이라
                 다른 지역에서 검색해 들어온 사람에겐 멀다. 내 위치 기준으로 다시 볼 수 있게 한다.

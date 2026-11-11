@@ -395,6 +395,38 @@ export async function computeRegionCautionCounts(): Promise<Record<string, numbe
     return out;
   } catch { return {}; }
 }
+// 🚇 역 페이지용 — 2026-11-10. 반경(STATION_RADIUS_M) 안 공개 카페. idx_cafes_geo(lat,lng) 박스 탐색 + 정확 거리 필터.
+export async function getStationCafes(name: string, limit = 30): Promise<(SeoCafe & { m: number })[]> {
+  const { STATIONS, STATION_RADIUS_M, mPerDegLng } = await import("./stations");
+  const st = STATIONS[name]; if (!st) return [];
+  const [lat, lng] = st, dLat = STATION_RADIUS_M / 110570, dLng = STATION_RADIUS_M / mPerDegLng(lat), r2 = STATION_RADIUS_M * STATION_RADIUS_M;
+  try {
+    const rows = (await sql`SELECT id, name, dong, area, synth_grade AS grade, synth_count AS count, synth_identity AS identity, char_scores, visitor_n, visitor_trip, visitor_local, work_facts, cautions, facets,
+      sqrt(power((lat - ${lat}) * 110570, 2) + power((lng - ${lng}) * ${mPerDegLng(lat)}, 2)) AS m,
+      (SELECT left(r->>'quote', 70) FROM jsonb_array_elements(COALESCE(synth_reviews,'[]'::jsonb)) r
+        WHERE COALESCE(r->>'quote','') <> '' ORDER BY COALESCE((r->>'score')::int,0) DESC LIMIT 1) AS quote
+      FROM cafes WHERE published AND lat BETWEEN ${lat - dLat} AND ${lat + dLat} AND lng BETWEEN ${lng - dLng} AND ${lng + dLng}
+        AND power((lat - ${lat}) * 110570, 2) + power((lng - ${lng}) * ${mPerDegLng(lat)}, 2) <= ${r2}
+      ORDER BY (synth_grade='검증') DESC, synth_count DESC NULLS LAST LIMIT ${limit}`) as unknown as (SeoCafe & { m: number })[];
+    return withOwnerBadge(rows as any) as any;
+  } catch { return []; }
+}
+/** 전 역의 반경 내 공개 카페 수 — 하루 1회 크론(refreshSeoCounts)에서만. 단일 쿼리(역 목록 unnest × 지오 인덱스). */
+export async function computeStationCounts(): Promise<Record<string, number>> {
+  const { STATIONS, STATION_RADIUS_M } = await import("./stations");
+  const names = Object.keys(STATIONS);
+  try {
+    const rows = (await sql`SELECT s.name, count(*)::int n
+      FROM unnest(${names}::text[], ${names.map((n) => STATIONS[n][0])}::float8[], ${names.map((n) => STATIONS[n][1])}::float8[]) AS s(name, lat, lng)
+      JOIN cafes c ON c.published AND c.lat BETWEEN s.lat - ${STATION_RADIUS_M / 110570} AND s.lat + ${STATION_RADIUS_M / 110570}
+        AND c.lng BETWEEN s.lng - ${STATION_RADIUS_M / 85000} AND s.lng + ${STATION_RADIUS_M / 85000}
+        AND power((c.lat - s.lat) * 110570, 2) + power((c.lng - s.lng) * 111320 * cos(radians(s.lat)), 2) <= ${STATION_RADIUS_M * STATION_RADIUS_M}
+      GROUP BY s.name HAVING count(*) >= 5`) as unknown as { name: string; n: number }[];
+    const out: Record<string, number> = {};
+    for (const r of rows) out[r.name] = Number(r.n);
+    return out;
+  } catch { return {}; }
+}
 export async function getRegionFacetGradeBreakdown(area: string, label: string): Promise<GradeBreakdown> {
   try {
     const rows = (await sql`SELECT synth_grade AS grade, count(*)::int n FROM cafes
@@ -507,7 +539,7 @@ export async function computeDongFacetCounts(): Promise<Record<string, number>> 
 //   메모리 캐시로는 못 막는다 — 집계 결과를 테이블에 넣고 페이지는 **작은 테이블 1회 조회**로 끝낸다.
 //   집계는 하루 1회 크론(refreshSeoCounts)만 돈다. 4,406회 → 1회.
 // ⚠️ 표시와 사이트맵이 같은 값을 써야 한다 — 그래서 단일 테이블 하나로 모은다.
-export type SeoCountKind = "region_taste" | "region_facet" | "dong_taste" | "dong_facet" | "region_caution";
+export type SeoCountKind = "region_taste" | "region_facet" | "dong_taste" | "dong_facet" | "region_caution" | "station";
 const countsMem: Partial<Record<SeoCountKind, { at: number; v: Record<string, number> }>> = {};
 const COUNTS_TTL_MS = 30 * 60 * 1000;   // 인스턴스 내 30분 — 테이블 조회도 공짜는 아니므로 가볍게만
 
@@ -544,6 +576,7 @@ export async function refreshSeoCounts(): Promise<Record<SeoCountKind, number>> 
   out.dong_taste = await put("dong_taste", await computeDongTasteCounts());
   out.dong_facet = await put("dong_facet", await computeDongFacetCounts());
   out.region_caution = await put("region_caution", await computeRegionCautionCounts());
+  out.station = await put("station", await computeStationCounts());
   return out;
 }
 
@@ -553,6 +586,7 @@ export const getRegionFacetCounts = () => getSeoCounts("region_facet");
 export const getDongTasteCounts = () => getSeoCounts("dong_taste");
 export const getDongFacetCounts = () => getSeoCounts("dong_facet");
 export const getRegionCautionCounts = () => getSeoCounts("region_caution");
+export const getStationCounts = () => getSeoCounts("station");
 /** 한 지역의 주의점 유형별 카페 수(slug 키) — 페이지에서 Curated·카페 상세 칩에 넘긴다. 저장된 카운트 조회라 추가 집계 없음. */
 export async function getAreaCautionCounts(area: string): Promise<Record<string, number>> {
   const { CAUTION_PAGES } = await import("./cautionPages");

@@ -64,7 +64,7 @@ console.log(`키 파일 확인 ✅ ${SITE}/${KEY}.txt`);
 //   남은 미제출분은 다음 날 이어서 나간다(매일 09:40 launchd) — 쌓이지도, 한꺼번에 쏟지도 않는다.
 const MAX_PER_RUN = Number(process.env.INDEXNOW_MAX || 300);
 const CHUNK = 100;
-const prio = (u) => (u.includes("/caution/") ? 0 : u.includes("/area/") && !u.includes("/dong/") ? 1 : u.includes("/c/") ? 2 : 3);
+const prio = (u) => (u.includes("/caution/") || u.includes("/station/") ? 0 : u.includes("/area/") && !u.includes("/dong/") ? 1 : u.includes("/c/") ? 2 : 3);
 targets = [...targets].sort((a, b) => prio(a) - prio(b)).slice(0, MAX_PER_RUN);
 console.log(`상한 ${MAX_PER_RUN}/회 적용 → 이번 실제 제출 ${targets.length}개(나머지는 다음 실행)`);
 let sent = 0;

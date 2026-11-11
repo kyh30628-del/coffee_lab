@@ -62,6 +62,13 @@ function BadgeForm() {
           <p className="text-[8.8px] text-[#7a6a55] mt-3 leading-relaxed">
             배지는 등급이 유지되는 동안 자동 갱신돼요. 검증 기준을 벗어나면 표시되지 않습니다.
           </p>
+          {/* 🔗 2026-11-10 유입 확대 — 가장 큰 사장님 접점은 네이버 플레이스다. 거기 '홈페이지' 칸에 이 주소를 넣으면
+              네이버에서 가게를 찾은 손님이 그대로 우리 검증 페이지로 넘어온다(직접 유입). */}
+          <div className="mt-3 rounded-lg bg-[#f4ece0] p-3 text-[9.2px] text-note-ink-body leading-relaxed">
+            <b>네이버에서 찾아온 손님도 연결해 보세요</b><br />
+            네이버 스마트플레이스 → 업체정보 → <b>홈페이지/SNS</b> 칸에 아래 주소를 넣으면, 가게를 검색한 손님이 이 검증 페이지로 바로 올 수 있어요.
+            <div className="mt-1.5 select-all rounded bg-white border border-[#e3d3b8] px-2 py-1.5 font-mono text-[8.8px]">{`${site}/c/${cafe.id}`}</div>
+          </div>
         </div>
       )}
     </div>
