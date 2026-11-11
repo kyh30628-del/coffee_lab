@@ -2,6 +2,7 @@ import Link from "next/link";
 import { TASTES, SITE, type SeoCafe, type GradeBreakdown } from "@/lib/seoData";
 import { standoutBadges } from "@/lib/standoutBadge";
 import { FACET_PAGES } from "@/lib/facetPages";
+import { CAUTION_PAGES, CAUTION_MIN_CAFES } from "@/lib/cautionPages";
 import { cardFacets } from "@/lib/cafeProfile";
 import { visitorBadges } from "@/lib/visitorMix";
 import KakaoShare from "../KakaoShare";
@@ -15,7 +16,7 @@ const GRADE_BG: Record<string, string> = { 검증: "#5f7355", 참고: "#9c6b3f",
 // 🔌 work_facts 키 → 화면 라벨(lib/workDetail.ts RULES와 1:1).
 const WORK_FACT: Record<string, string> = { outlet: "🔌 콘센트 언급", wifi: "📶 와이파이 언급", desk: "🪑 작업 자리 언급" };
 
-export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, heading, intro, cafes, regions = [], grades, canonical, backHref = "/area", backLabel = "지역별 카페", showTasteNav = true, crossLinks, crossLinksLabel = "다른 동네도 둘러보기", extra, tasteCounts, sameTasteNearby = [], facetSlug, facetCounts }: {
+export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, heading, intro, cafes, regions = [], grades, canonical, backHref = "/area", backLabel = "지역별 카페", showTasteNav = true, crossLinks, crossLinksLabel = "다른 동네도 둘러보기", extra, tasteCounts, sameTasteNearby = [], facetSlug, facetCounts, cautionCounts }: {
   area: string; tasteKey?: string; tasteLabel?: string; tasteEmoji?: string; heading: string; intro: string; cafes: SeoCafe[]; regions?: { area: string; n: number }[]; grades?: GradeBreakdown; canonical: string;
   backHref?: string; backLabel?: string; showTasteNav?: boolean; crossLinks?: { label: string; href: string }[]; crossLinksLabel?: string; extra?: React.ReactNode;
   /** 이 지역의 테마별 카페 수 — 빈 테마 칩을 숨겨 '눌렀더니 빈 페이지' 이탈을 막는다(2026-08-15). */
@@ -25,6 +26,8 @@ export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, headin
   /** 🅿️ 시설축 페이지(결재 #1083) — 지금 보고 있는 시설 slug와 이 지역의 시설별 카페 수. */
   facetSlug?: string;
   facetCounts?: Record<string, number>;
+  /** ⚠️ 주의점 집계 페이지 링크(2026-11-10) — slug→이 지역 카페 수. 5곳 이상인 유형만 칩으로 보인다. */
+  cautionCounts?: Record<string, number>;
 }) {
   // 🧭 BreadcrumbList(2026-08-13, 구글 채널 강화) — 구글이 검색결과에 계층 경로를 표시하고
   //   사이트 구조를 이해하는 근거. 테마 페이지는 홈>지역>테마, 동/지역 페이지는 홈>지역 2단.
@@ -137,6 +140,22 @@ export default function Curated({ area, tasteKey, tasteLabel, tasteEmoji, headin
                 {f.emoji} {f.title} <span className="opacity-60">{facetCounts[f.slug]}</span>
               </Link>
             ))}
+          </div>
+        )}
+
+        {/* ⚠️ 가기 전에 알아둘 점(2026-11-10) — 주의점 집계 페이지로 가는 길. 이 페이지들은 링크가 하나도 없어 크롤러도 사람도 못 찾았다.
+            "주차 어려운 카페"는 이 지역을 찾는 사람이 실제로 다음에 궁금해하는 질문이다. 5곳 이상인 유형만. */}
+        {cautionCounts && CAUTION_PAGES.some((x) => (cautionCounts[x.slug] ?? 0) >= CAUTION_MIN_CAFES) && (
+          <div className="mb-5">
+            <div className="text-[9.2px] text-note-ink-soft mb-1.5">가기 전에 알아둘 점 · 후기 2건 이상에서 확인</div>
+            <div className="flex flex-wrap gap-1.5">
+              {CAUTION_PAGES.filter((x) => (cautionCounts[x.slug] ?? 0) >= CAUTION_MIN_CAFES).map((x) => (
+                <Link key={x.slug} href={`/area/${encodeURIComponent(area)}/caution/${x.slug}`}
+                  className={`text-[9.6px] px-2.5 py-1 rounded-full border ${facetSlug === `caution-${x.slug}` ? "bg-note-ink text-note-paper border-note-ink" : "bg-white text-note-ink-body border-[#d9c9b0]"}`}>
+                  {x.emoji} {x.title} <span className="opacity-60">{cautionCounts[x.slug]}</span>
+                </Link>
+              ))}
+            </div>
           </div>
         )}
 

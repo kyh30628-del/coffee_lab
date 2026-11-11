@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Curated from "../../../Curated";
 import { getRegions, getRegionCautionCafes, getRegionCautionGradeBreakdown, getRegionCautionCounts, getRegionTasteCounts, areaAliases, TASTES, SITE, josa } from "@/lib/seoData";
-import { cautionBySlug, CAUTION_MIN_CAFES } from "@/lib/cautionPages";
+import { cautionBySlug, CAUTION_PAGES, CAUTION_MIN_CAFES } from "@/lib/cautionPages";
 import { isReadableQuote } from "@/lib/cafeDetailView";
 
 // ⚠️ 주의점 집계 페이지(2026-11-10, AI·검색 노출 대책 #2) — "○○구 주차 어려운 카페".
@@ -56,5 +56,6 @@ export default async function RegionCautionPage({ params }: Props) {
   const intro = `${areaBare} ${c.aliases[0]}가 궁금하다면: ${area}에는 ${c.desc} 카페가 ${total}곳 있습니다. 서로 다른 방문 후기 2건 이상에서 같은 점이 확인된 곳만 모았어요(위 ${shownN}곳 표시, 읽을 수 있는 후기 문장은 근거로 함께). 다른 카페 광고는 단점을 말하지 않지만, 여기는 가기 전에 알아야 할 점을 먼저 보여드립니다.`;
   return <Curated area={area} tasteLabel={c.title} tasteEmoji={c.emoji} heading={heading} intro={intro}
     cafes={cafes} regions={regions} grades={grades} tasteCounts={tasteCounts} sameTasteNearby={sameNearby}
-    canonical={`${SITE}/area/${encodeURIComponent(area)}/caution/${type}`} facetSlug={`caution-${type}`} />;
+    canonical={`${SITE}/area/${encodeURIComponent(area)}/caution/${type}`} facetSlug={`caution-${type}`}
+    cautionCounts={Object.fromEntries(CAUTION_PAGES.map((x) => [x.slug, counts[`${area}|${x.label}`] ?? 0]))} />;
 }

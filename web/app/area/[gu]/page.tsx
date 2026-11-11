@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Curated from "../Curated";
-import { getRegions, getRegionCafes, getDongsInArea, getRegionTasteCounts, getRegionFacetCounts, TASTES, SITE } from "@/lib/seoData";
+import { getRegions, getRegionCafes, getDongsInArea, getRegionTasteCounts, getRegionFacetCounts, getAreaCautionCounts, TASTES, SITE } from "@/lib/seoData";
 import { regionPublishedCount } from "@/lib/region";
 import { FACET_PAGES, FACET_MIN_CAFES } from "@/lib/facetPages";
 
@@ -32,8 +32,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function RegionPage({ params }: Props) {
   const { gu } = await params;
   const area = decodeURIComponent(gu);
-  const [cafes, regions, total, dongs, regionTasteCounts, regionFacetCounts] = await Promise.all([
-    getRegionCafes(area, 30), getRegions(), regionPublishedCount(area), getDongsInArea(area), getRegionTasteCounts(), getRegionFacetCounts(),
+  const [cafes, regions, total, dongs, regionTasteCounts, regionFacetCounts, cautionCounts] = await Promise.all([
+    getRegionCafes(area, 30), getRegions(), regionPublishedCount(area), getDongsInArea(area), getRegionTasteCounts(), getRegionFacetCounts(), getAreaCautionCounts(area),
   ]);
   // 🔴 2026-11-08 발견: 구 허브 페이지가 동(洞) 목록만 링크하고 취향·시설 페이지로는 한 번도 링크한 적이
   //   없었다 — "강남구 애견동반 카페" 같은 페이지가 사이트맵엔 있어 색인은 되지만, 구 허브에서 그 페이지로
@@ -59,7 +59,7 @@ export default async function RegionPage({ params }: Props) {
   ) : undefined;
   return (
     <Curated
-      area={area} heading={heading} intro={intro} cafes={cafes} regions={regions}
+      area={area} heading={heading} intro={intro} cafes={cafes} regions={regions} cautionCounts={cautionCounts}
       canonical={`${SITE}/area/${encodeURIComponent(area)}`} extra={extra}
       crossLinks={[...tasteLinks, ...facetLinks, ...siblingRegionLinks]}
       crossLinksLabel={tasteLinks.length || facetLinks.length ? `${area} 취향·시설별로 보기 · 다른 지역도 둘러보기` : "다른 지역도 둘러보기"}

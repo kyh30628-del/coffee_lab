@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Curated from "../../Curated";
-import { getRegions, getRegionTasteCafes, getRegionTasteCafesGraceful, getRegionTasteCount, getRegionTasteStats, getRegionTasteCounts, getRegionTasteGradeBreakdown, getRegionFacetCounts, areaAliases, TASTES, tasteByKey, SITE, TASTE_MIN_HITS, minRatePct, josa } from "@/lib/seoData";
+import { getRegions, getRegionTasteCafes, getRegionTasteCafesGraceful, getRegionTasteCount, getRegionTasteStats, getRegionTasteCounts, getRegionTasteGradeBreakdown, getRegionFacetCounts, areaAliases, TASTES, tasteByKey, SITE, TASTE_MIN_HITS, minRatePct, josa, getAreaCautionCounts } from "@/lib/seoData";
 import { FACET_PAGES } from "@/lib/facetPages";
 
 // 📝 골라낸 기준을 화면에 **사실대로** 적는다(2026-09-26).
@@ -74,9 +74,9 @@ export default async function RegionTastePage({ params }: Props) {
   // 🧭 동선 데이터(2026-08-15): 전 지역×테마 카운트 1회 조회로 ①이 지역의 테마별 개수(빈 칩 숨김)
   //   ②같은 테마 다른 동네 링크를 동시에 만든다. 집계 1회·작은 컬럼뿐, ISR 30분 캐시라 부하 무시 수준.
   // 🛟 조인 밀도 기준으로 5곳이 안 되면 기존 기준으로 자동 완화한다(어떤 페이지도 오늘보다 얇아지지 않는다).
-  const [picked, regions, tightTotal, grades, allCounts, allFacetCounts] = await Promise.all([
+  const [picked, regions, tightTotal, grades, allCounts, allFacetCounts, cautionCounts] = await Promise.all([
     getRegionTasteCafesGraceful(area, taste, 30), getRegions(), getRegionTasteCount(area, taste),
-    getRegionTasteGradeBreakdown(area, taste), getRegionTasteCounts(), getRegionFacetCounts(),
+    getRegionTasteGradeBreakdown(area, taste), getRegionTasteCounts(), getRegionFacetCounts(), getAreaCautionCounts(area),
   ]);
   const cafes = picked.cafes;
   // 완화된 페이지의 "N곳"은 완화 기준으로 다시 센다 — 화면에 적는 숫자와 보여주는 목록이 어긋나면 안 된다.
@@ -100,5 +100,5 @@ export default async function RegionTastePage({ params }: Props) {
   const aliasIntro = t.aliases.slice(0, 2).join("·");
   const areaBare = areaAliases(area)[0] || area;
   const intro = `${areaBare} ${aliasIntro} 찾으시나요? ${area}에서 ${t.desc} 카페 ${total || cafes.length}곳. ${picked.relaxed ? `후기에 ${t.short} 이야기가 ${TASTE_MIN_HITS}번 이상 나온 곳만 골랐어요.` : gateCopy(t.key, t.short)}`;
-  return <Curated area={area} tasteKey={taste} tasteLabel={t.short} tasteEmoji={t.emoji} heading={heading} intro={intro} cafes={cafes} regions={regions} grades={grades} tasteCounts={tasteCounts} sameTasteNearby={sameTasteNearby} facetCounts={facetCounts} canonical={`${SITE}/area/${encodeURIComponent(area)}/${taste}`} />;
+  return <Curated area={area} tasteKey={taste} tasteLabel={t.short} tasteEmoji={t.emoji} heading={heading} intro={intro} cafes={cafes} regions={regions} grades={grades} tasteCounts={tasteCounts} sameTasteNearby={sameTasteNearby} facetCounts={facetCounts} cautionCounts={cautionCounts} canonical={`${SITE}/area/${encodeURIComponent(area)}/${taste}`} />;
 }

@@ -19,7 +19,8 @@ import SavedCafes from "../../SavedCafes";
 import { buildAxisDist, cafeProfile, extractHighlights, amenityFeaturesOf, cardFacets } from "@/lib/cafeProfile";
 import { topCharTraits } from "@/lib/charScore";
 import { collectionForCafe } from "@/lib/collections";
-import { tasteByKey } from "@/lib/seoData";
+import { tasteByKey, getAreaCautionCounts, getRegionFacetCounts } from "@/lib/seoData";
+import { CAUTION_PAGES, CAUTION_MIN_CAFES } from "@/lib/cautionPages";
 import { shareHookText } from "@/lib/shareCopy";
 import { sortReviews, ensureRecent } from "@/lib/exposureOrder";
 import { isOtherBusinessQuote, displayQuote, splitKeyTerms, rankNearby, nearbyTitle, fmtKm, monthlySeries, freshnessOf, CHAR_LABEL, charBarsOf, addrTail, igHandle, igProfileUrl, reviewAge, type NearbyCafe } from "@/lib/cafeDetailView";
@@ -253,6 +254,12 @@ export default async function CafePage({ params }: Props) {
   const tags = topTags(c.char_scores);
   const userReviews = await getPublicReviews(c.id);
   const nearby = await getNearby(c);
+  // 🔗 2026-11-10 유입 확대 — 상세로 처음 들어온 방문자가 4,914명/월인데 88%가 1페이지만 보고 나간다(30일 실측).
+  //   "주차 어려움" 칩을 보는 사람이 다음에 궁금한 건 "그럼 주차 되는 곳은?"이다. 칩을 집계 페이지로 잇고, 대안 시설 페이지를 붙인다.
+  //   값은 저장된 카운트 조회(seo_counts, 인스턴스 30분 메모)라 추가 집계 없음. 실패하면 칩은 링크 없이 종전대로.
+  const cautionCounts = Array.isArray(c.cautions) && c.cautions.length ? await getAreaCautionCounts(c.area).catch(() => ({} as Record<string, number>)) : ({} as Record<string, number>);
+  const parkAlt = (Array.isArray(c.cautions) && (c.cautions as any[]).some((x: any) => x.label === "주차 어려움"))
+    ? ((await getRegionFacetCounts().catch(() => ({} as Record<string, number>)))[`${c.area}|주차 편함`] ?? 0) : 0;
   const grade = c.synth_grade || "";
   const ownerManaged = await isOwnerManaged(Number(c.id)); // 🏅 구독·체험 유효한 사장님 카페인가(단일출처)
   // 인앱 상세와 동일: 강·약(전체 대비) + 옥석 리뷰 데이터 핵심
@@ -540,8 +547,18 @@ export default async function CafePage({ params }: Props) {
           <div className="nt-ruled nt-margin-gutter" style={{ paddingTop: 34 }}>
             <div className="nt-lbl">이건 알고 가세요 <em>· 후기 2건 이상에서 확인된 것만</em></div>
             <div className="nt-chips">
-              {(c.cautions as any[]).map((x: any) => <span key={x.label} className="nt-chip warn">{x.label}<b>{x.count}</b></span>)}
+              {(c.cautions as any[]).map((x: any) => {
+                const cp = CAUTION_PAGES.find((y) => y.label === x.label);
+                return cp && (cautionCounts[cp.slug] ?? 0) >= CAUTION_MIN_CAFES
+                  ? <Link key={x.label} href={`/area/${encodeURIComponent(c.area)}/caution/${cp.slug}`} title={`${c.area} ${cp.title} 카페 ${cautionCounts[cp.slug]}곳 보기`} className="nt-chip warn">{x.label}<b>{x.count}</b></Link>
+                  : <span key={x.label} className="nt-chip warn">{x.label}<b>{x.count}</b></span>;
+              })}
             </div>
+            {parkAlt >= 5 && (
+              <Link href={`/area/${encodeURIComponent(c.area)}/f/parking`} className="nt-g text-[10px] text-note-brown block" style={{ marginTop: 8 }}>
+                🅿️ 주차가 걱정이라면 — {c.area} 주차 편한 카페 {parkAlt}곳 보기 →
+              </Link>
+            )}
             {(c.cautions as any[])[0]?.quote && (
               <blockquote className="nt-q" style={{ borderColor: "#a93a32" }}>“…{(c.cautions as any[])[0].quote}…”</blockquote>
             )}

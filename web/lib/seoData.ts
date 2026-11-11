@@ -553,3 +553,11 @@ export const getRegionFacetCounts = () => getSeoCounts("region_facet");
 export const getDongTasteCounts = () => getSeoCounts("dong_taste");
 export const getDongFacetCounts = () => getSeoCounts("dong_facet");
 export const getRegionCautionCounts = () => getSeoCounts("region_caution");
+/** 한 지역의 주의점 유형별 카페 수(slug 키) — 페이지에서 Curated·카페 상세 칩에 넘긴다. 저장된 카운트 조회라 추가 집계 없음. */
+export async function getAreaCautionCounts(area: string): Promise<Record<string, number>> {
+  const { CAUTION_PAGES } = await import("./cautionPages");
+  const all = await getRegionCautionCounts();
+  const out: Record<string, number> = {};
+  for (const c of CAUTION_PAGES) out[c.slug] = all[`${area}|${c.label}`] ?? 0;
+  return out;
+}

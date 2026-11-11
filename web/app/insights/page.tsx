@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { sql } from "@/lib/db";
-import { SITE } from "@/lib/seoData";
+import { SITE, getRegionCautionCounts } from "@/lib/seoData";
+import { CAUTION_PAGES } from "@/lib/cautionPages";
 
 // 📊 데이터 리포트 — **인용되기 위한 페이지**다(2026-08-26 CEO 승인, 백링크 전략 ③).
 //   우리만 가진 숫자(검증 후기 규모·동네/여행 구분)를 공개해 기자·블로거가 출처 링크와 함께
@@ -65,6 +66,13 @@ async function getStats() {
 }
 
 export default async function InsightsPage() {
+  // 📊 2026-11-10 — 주의점 지역 랭킹: 기자·블로거가 그대로 인용할 수 있는 "어느 동네가 가장 ○○한가" 숫자 + 각 목록 페이지 링크.
+  //   저장된 카운트(seo_counts) 조회라 집계 없음. 5곳 이상인 지역만 들어 있다.
+  const cautionAreaAll = await getRegionCautionCounts().catch(() => ({} as Record<string, number>));
+  const cautionAreaTop = CAUTION_PAGES.map((c) => ({
+    ...c, top: Object.entries(cautionAreaAll).filter(([k]) => k.endsWith(`|${c.label}`))
+      .map(([k, n]) => ({ area: k.split("|")[0], n: Number(n) })).sort((a, b) => b.n - a.n).slice(0, 5),
+  })).filter((c) => c.top.length >= 3);
   const s = await getStats();
   if (!s) return <main className="min-h-screen bg-note-paper p-10 text-center text-note-ink-body">리포트를 준비 중이에요.</main>;
   const upd = new Date().toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric" });
@@ -172,6 +180,23 @@ export default async function InsightsPage() {
                   <span className="ml-auto text-[#8a5a3a] font-bold">{c.n.toLocaleString()}곳</span>
                 </li>))}
             </ol>
+            {cautionAreaTop.length > 0 && (
+              <div className="mt-4 grid gap-3">
+                {cautionAreaTop.map((c) => (
+                  <div key={c.slug}>
+                    <div className="text-[10.4px] font-bold text-note-ink mb-1">{c.emoji} {c.title} 카페가 가장 많은 지역 TOP {c.top.length}</div>
+                    <ol className="space-y-1">
+                      {c.top.map((t, i) => (
+                        <li key={t.area} className="flex items-center gap-2 text-[10.4px]">
+                          <span className="w-5 text-right font-bold text-[#82714f]">{i + 1}</span>
+                          <a href={`/area/${encodeURIComponent(t.area)}/caution/${c.slug}`} className="text-note-ink underline decoration-[#d9c9b0]">{t.area}</a>
+                          <span className="ml-auto text-[#8a5a3a] font-bold">{t.n.toLocaleString()}곳</span>
+                        </li>))}
+                    </ol>
+                  </div>))}
+              </div>
+            )}
+            <p className="text-[9px] text-note-ink-soft mt-2">기준일 {new Date().toISOString().slice(0, 10)} · 서로 다른 후기 2건 이상에서 확인된 주의점만 집계 · 인용 시 출처(동네 커피 노트)를 밝혀 주세요.</p>
           </section>
         )}
 

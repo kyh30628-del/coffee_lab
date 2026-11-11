@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Curated from "../../../Curated";
-import { getRegions, getRegionFacetCafes, getRegionFacetCount, getRegionFacetCounts, getRegionFacetGradeBreakdown, getRegionTasteCounts, areaAliases, TASTES, SITE, josa } from "@/lib/seoData";
+import { getRegions, getRegionFacetCafes, getRegionFacetCount, getRegionFacetCounts, getRegionFacetGradeBreakdown, getRegionTasteCounts, getAreaCautionCounts, areaAliases, TASTES, SITE, josa } from "@/lib/seoData";
 import { facetBySlug, FACET_PAGES, FACET_MIN_CAFES } from "@/lib/facetPages";
 
 export const revalidate = 2592000; // ISR 30일 — 기존 지역×취향과 같은 규약.
@@ -35,9 +35,9 @@ export default async function RegionFacetPage({ params }: Props) {
   const area = decodeURIComponent(gu);
   const f = facetBySlug(facet);
   if (!f) notFound();
-  const [cafes, regions, total, grades, allCounts, allTasteCounts] = await Promise.all([
+  const [cafes, regions, total, grades, allCounts, allTasteCounts, cautionCounts] = await Promise.all([
     getRegionFacetCafes(area, f.label, 30), getRegions(), getRegionFacetCount(area, f.label),
-    getRegionFacetGradeBreakdown(area, f.label), getRegionFacetCounts(), getRegionTasteCounts(),
+    getRegionFacetGradeBreakdown(area, f.label), getRegionFacetCounts(), getRegionTasteCounts(), getAreaCautionCounts(area),
   ]);
   //   🔗 2026-09-14: 시설축 페이지에서 취향 페이지로 가는 링크가 막혀 있었다(tasteCounts를 빈 객체로 넘겼다).
   //     막다른 페이지는 사람도 크롤러도 되돌아 나간다. 6시간 캐시된 값이라 추가 조회 비용 0.
@@ -57,5 +57,5 @@ export default async function RegionFacetPage({ params }: Props) {
   const intro = `${areaBare} ${f.aliases.slice(0, 2).join("·")} 찾으시나요? ${area}에서 ${f.desc} 카페 ${total}곳. 서로 다른 후기 2건 이상에서 확인된 곳만 골랐어요.`;
   return <Curated area={area} tasteLabel={f.title} tasteEmoji={f.emoji} heading={heading} intro={intro}
     cafes={cafes} regions={regions} grades={grades} tasteCounts={tasteCounts} sameTasteNearby={sameNearby}
-    canonical={`${SITE}/area/${encodeURIComponent(area)}/f/${facet}`} facetSlug={facet} facetCounts={facetCounts} />;
+    canonical={`${SITE}/area/${encodeURIComponent(area)}/f/${facet}`} facetSlug={facet} facetCounts={facetCounts} cautionCounts={cautionCounts} />;
 }
