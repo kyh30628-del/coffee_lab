@@ -46,7 +46,7 @@ export default function robots(): MetadataRoute.Robots {
     //   경유 동 계열 유입이 20% 이상 줄면 이 줄만 다시 빼면 된다.
     sitemap: [
       "https://dongnecoffeenote.com/sitemap.xml",
-      ...["cafes", "areas", "taste", "facet", "caution", "dong", "dongtaste", "dongfacet", "misc"]
+      ...["cafes1", "cafes2", "cafes3", "areas", "taste", "facet", "caution", "dong", "dongtaste", "dongfacet", "misc"]
         .map((k) => `https://dongnecoffeenote.com/sitemaps/${k}.xml`),
     ],
     host: "https://dongnecoffeenote.com",

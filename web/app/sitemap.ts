@@ -16,7 +16,7 @@ const SITE = "https://dongnecoffeenote.com";
 //   ⚠️ **/sitemap.xml은 그대로 둔다** — IndexNow(scripts/indexnow-submit.mjs)와 robots.txt가 이 주소를 읽는다.
 //      분할(generateSitemaps)로 바꾸면 /sitemap.xml이 사라져 제출이 통째로 끊긴다(빌드로 확인하고 되돌림).
 //      대신 /sitemaps/{유형}.xml을 **덧붙이고** robots.txt에 함께 싣는다. 같은 URL이 두 사이트맵에 있어도 무방하다.
-export type SitemapKind = "cafes" | "areas" | "taste" | "facet" | "caution" | "dong" | "dongtaste" | "dongfacet" | "misc";
+export type SitemapKind = "cafes" | "cafes1" | "cafes2" | "cafes3" | "areas" | "taste" | "facet" | "caution" | "dong" | "dongtaste" | "dongfacet" | "misc";
 export async function sitemapByKind(kind: SitemapKind): Promise<MetadataRoute.Sitemap> {
   const all = await buildAll();
   return all[kind] ?? [];
@@ -43,7 +43,12 @@ async function buildAll(): Promise<Record<SitemapKind, MetadataRoute.Sitemap>> {
 //   🔙 되돌림 조건: 2주 내 네이버 경유 동 계열 유입이 20% 이상 줄면 즉시 원복(이 줄만 되돌리면 된다).
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const p = await sitemapParts();
-  return [...p.misc, ...p.areas, ...p.taste, ...p.facet, ...p.caution, ...p.dong, ...p.cafes];
+  // 🔴 2026-11-10 — Search Console "URL이 너무 많습니다": 사이트맵 1개의 한도는 50,000 URL인데 이 파일이 그걸 넘어
+  //   구글이 **앞 50,000개만** 읽었다(오류 1개·발견 50,000). 카페 상세가 맨 뒤라 그만큼 잘려 나갔다.
+  //   → 이 파일은 49,000개로 자르고(비카페 유형 전부 + 카페는 후기 많은 순으로 남는 자리만),
+  //     카페 전량은 /sitemaps/cafes1~3.xml(각 25,000 이하)로 나눠 robots.txt에 싣는다. /sitemap.xml은 그대로 살아 있다(IndexNow가 읽는다).
+  const nonCafe = [...p.misc, ...p.areas, ...p.taste, ...p.facet, ...p.caution, ...p.dong];
+  return [...nonCafe, ...p.cafes.slice(0, Math.max(0, 49000 - nonCafe.length))];
 }
 
 async function sitemapParts(): Promise<Record<SitemapKind, MetadataRoute.Sitemap>> {
@@ -146,6 +151,8 @@ async function sitemapParts(): Promise<Record<SitemapKind, MetadataRoute.Sitemap
     ...collectionUrls,
     ...tasteUrls,
   ];
+  const CHUNK = 25000; // 사이트맵 1개 한도(50,000)의 절반 — 카페가 늘어도 여유
   return { misc, areas: regionUrls, taste: regionTasteUrls, facet: facetUrls, caution: cautionUrls,
-    dong: [...dongUrls, ...dongAliasUrls], dongtaste: dongTasteUrls, dongfacet: dongFacetUrls, cafes: cafeUrls };
+    dong: [...dongUrls, ...dongAliasUrls], dongtaste: dongTasteUrls, dongfacet: dongFacetUrls, cafes: cafeUrls,
+    cafes1: cafeUrls.slice(0, CHUNK), cafes2: cafeUrls.slice(CHUNK, CHUNK * 2), cafes3: cafeUrls.slice(CHUNK * 2, CHUNK * 3) };
 }
