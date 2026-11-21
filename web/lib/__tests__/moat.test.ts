@@ -101,6 +101,18 @@ test("splitKeyTerms: 단어 중간을 자르지 않고, 한 문장에 2개까지
   for (const p of parts.filter((x) => x.k)) assert.ok(p.t.length >= 2, `강조 조각이 한 글자: ${p.t}`);
 });
 
+// ── ⑥-2 부정어 형광펜 왜곡 방지(11-20 디핀로스터스 제보): 수식어 '아쉬웠던'은 칠하지 않고, 서술 평가는 칠한다.
+test("splitKeyTerms: '줄어드는 커피가 아쉬웠던 라떼 맛집'(칭찬)엔 아쉬움을 칠하지 않는다", () => {
+  const t = "김해 삼정동 줄어드는 커피가 아쉬웠던 라떼 맛집";
+  const parts = splitKeyTerms(t);
+  assert.equal(parts.map((p) => p.t).join(""), t);
+  assert.equal(parts.filter((p) => p.k && /아쉬/.test(p.t)).length, 0);
+});
+test("splitKeyTerms: 서술 평가 '주차가 아쉬웠어요'는 그대로 칠한다(숨기지 않는다)", () => {
+  const parts = splitKeyTerms("커피는 좋은데 자리가 아쉬웠어요");
+  assert.ok(parts.some((p) => p.k && /아쉬/.test(p.t)));
+});
+
 // ── ⑦ 팝업·순환 매장 — 상시 영업이 아닌 곳을 카페로 공개하면 소비자가 헛걸음한다.
 test("isPopupRotatingVenue: 팝업은 배제, 일반 카페는 통과", () => {
   assert.equal(isPopupRotatingVenue("카페", "팝업스토어 성수"), true);

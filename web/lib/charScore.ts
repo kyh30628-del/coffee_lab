@@ -52,7 +52,8 @@ function stripNameMentions(text: string, cafeName?: string): string {
 export function computeCharScores(texts: string[], cafeName?: string): Record<string, number> {
   const blob = stripNameMentions(texts.filter(Boolean).join(" "), cafeName);
   const scores: Record<string, number> = {};
-  for (const ax of CHAR_AXES) scores[ax.key] = countHits(blob, ax.kws);
+  const noTags = blob.replace(/#\S+/g, " "); // 애견동반 배지는 사실 주장 — 해시태그 홍보어는 근거로 세지 않는다(2026-11-20)
+  for (const ax of CHAR_AXES) scores[ax.key] = countHits(ax.key === "pet" ? noTags : blob, ax.kws);
   return scores;
 }
 

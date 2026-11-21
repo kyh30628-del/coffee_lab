@@ -195,6 +195,9 @@ const KEY_TERMS = [
 ];
 const KEY_RE = new RegExp("(" + KEY_TERMS.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|") + ")", "g");
 const HANGUL = /[가-힣]/;
+const NEG_TERMS = new Set(["아쉬", "별로"]);
+// 부정어 뒤가 '서술 종결'(…웠어요·…워요·…움이·…운 점·…예요)일 때만 평가로 본다. '…웠던'·'…운 + 명사'는 수식어라 제외.
+const NEG_PREDICATE = /^(웠(어|습|다|네|고|지)|워(요|서|도)|움(이|을|은|도|$)|운 ?점|다|네요|ㅠ|(예요|이에요|였|에요|임))/;
 const KEY_MAX = 2; // 문장당 상한 — 셋 이상 칠하면 강조가 아니라 얼룩이 된다
 
 export function splitKeyTerms(text: unknown): { t: string; k: boolean }[] {
@@ -209,6 +212,10 @@ export function splitKeyTerms(text: unknown): { t: string; k: boolean }[] {
     if (i < last) continue;
     // 🚫 앞이 한글이면 낱말 안이다('드립커피'의 커피, '애크로매틱커피'의 커피) → 칠하지 않는다.
     if (i > 0 && HANGUL.test(s[i - 1])) continue;
+    // 🧭 2026-11-20 왜곡 방지: '아쉬'·'별로'는 글쓴이가 **이 가게를 평가**하는 서술일 때만 칠한다.
+    //   "줄어드는 커피가 아쉬웠던 라떼 맛집"의 '아쉬웠던'은 "커피가 금방 줄어 아쉽다(=맛있다)"는 칭찬인데,
+    //   형광펜이 칠해지면 카페가 아쉽다는 뜻으로 읽힌다(디핀로스터스 사용자 제보). 수식어(…던/…ㄴ+명사)로 붙은 경우는 칠하지 않는다.
+    if (NEG_TERMS.has(m[0]) && !NEG_PREDICATE.test(s.slice(i + m[0].length, i + m[0].length + 6))) continue;
     // ✅ 뒤로 이어지는 한글(어미·조사)까지 한 덩어리로 삼는다 — '조용'만 칠하고 '한'을 떼면 글이 깨져 보인다.
     let end = i + m[0].length;
     while (end < s.length && HANGUL.test(s[end]) && end - (i + m[0].length) < 3) end++;

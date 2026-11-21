@@ -234,7 +234,9 @@ export async function GET(req: NextRequest) {
     // ⚠️ 자율교정은 '안전·결정론적인 것만' — 단, 비공개로 만드는 조치는 1회 상한(대량삭제 차단). pub_nocat는
     //   기존 검증카페까지 숨겨 인천 사태를 유발 → 자동 비공개에서 제외(카테고리 없음=비카페 아님). 동 교정만 무제한.
     const integrity: string[] = [];
-    if (ig.dong_isgu || ig.dong_badfmt || ig.pub_badcoord || ig.pub_noidentity || ig.area_xprov) {
+    // 💰 2026-11-13 비용절감: 자율교정(전수 UPDATE, 호출당 ~14s)은 정기 heal 크론(?heal=1, 하루 2회)에서만 돈다.
+    //   예전엔 읽기 호출(cron-issues 하루4회·관리자 화면)마다 돌아 26일간 1,077회·15,237s였다.
+    if (heal && (ig.dong_isgu || ig.dong_badfmt || ig.pub_badcoord || ig.pub_noidentity || ig.area_xprov)) {
       const fixes: string[] = [];
       try {
         // 도 교차오염: area를 주소 기준으로 교정(공개/비공개 불문, 비공개 조치 아님 → 안전). 추출 실패 시 건드리지 않음.

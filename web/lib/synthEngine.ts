@@ -104,7 +104,10 @@ export function synthesize(name: string, reviews: Review[], area: string[] = [],
   const uses: Record<string, number> = {};
   for (const { u, key } of USE_KEYS) {
     const kws = getListSync(key);
-    const c = clean.filter((r) => kws.some((k) => r.text.toLowerCase().includes(k.toLowerCase()))).length;
+    // 🧭 2026-11-20: 해시태그(#김해애견동반카페)는 검색 노출용 단어지 방문 경험이 아니다. 특히 '애견'은
+    //   "애견동반이 가능한 곳"이라는 사실 주장으로 노출되므로, 해시태그 제거 후 본문 근거만 센다(디핀로스터스: 2022년 태그 1개가 유일 근거였고 현재는 불가).
+    const bodyOf = (t: string) => (u === "애견" ? t.replace(/#\S+/g, " ") : t).toLowerCase();
+    const c = clean.filter((r) => { const b = bodyOf(r.text); return kws.some((k) => b.includes(k.toLowerCase())); }).length;
     if (c) uses[u] = c;
   }
   // 운영 정체성 신호(직접로스팅·원두판매·권위)는 identity에 사실 주장으로 노출되는 고위험 클레임이라
@@ -167,7 +170,7 @@ function reviewSpecificTerm(category: string, clean: Review[]): string | null {
   if (!dict) return null;
   const counts = new Map<string, number>();
   for (const [kw, label] of Object.entries(dict)) {
-    const c = clean.filter((r) => r.text.toLowerCase().includes(kw.toLowerCase())).length;
+    const c = clean.filter((r) => r.text.replace(/#\S+/g, " ").toLowerCase().includes(kw.toLowerCase())).length; // 해시태그는 근거 아님(2026-11-20)
     if (c) counts.set(label, (counts.get(label) ?? 0) + c);
   }
   if (!counts.size) return null;
@@ -187,7 +190,7 @@ function reviewSpecificTermExt(category: string, clean: Review[]): string | null
   if (!items.length) return null;
   const counts = new Map<string, number>();
   for (const term of items) {
-    const c = clean.filter((r) => r.text.toLowerCase().includes(term.toLowerCase())).length;
+    const c = clean.filter((r) => r.text.replace(/#\S+/g, " ").toLowerCase().includes(term.toLowerCase())).length; // 해시태그는 근거 아님(2026-11-20)
     if (c) counts.set(term, c);
   }
   if (!counts.size) return null;

@@ -63,7 +63,7 @@
     },
     {
       "path": "/api/cron-issues",
-      "schedule": "0 3,7,11,23 * * *"
+      "schedule": "0 11,23 * * *"
     },
     {
       "path": "/api/cron-billing",
@@ -71,7 +71,7 @@
     },
     {
       "path": "/api/cron-coord-consumer?mode=live",
-      "schedule": "3 3,7,11,23 * * *"
+      "schedule": "3 11,23 * * *"
     },
     {
       "path": "/api/cron-selfaudit",
